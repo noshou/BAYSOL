@@ -1,5 +1,5 @@
 (* SPDX-License-Identifier: LGPL-2.1-or-later *)
-module AtomicRadiiSource : sig
+module AtomicRadiiSqlite3Source : sig
     (** @param ions atom/ion symbols to look up, e.g. ["fe3+"], ["fe+3"], ["fe"]
         @return each input paired with its radius (Angstrom), or [None]
         if nothing matched at any tier of the fallback chain *)
