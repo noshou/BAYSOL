@@ -1,7 +1,7 @@
 (* SPDX-License-Identifier: LGPL-3.0-or-later *)
 open Helpers
 
-module Nd = Owl_base_dense_ndarray_d
+module Nd = Owl_dense_ndarray_d
 
 (** Defines a source for atomic radii with simple batch lookup. *)
 module type RadiiSource = sig
@@ -25,27 +25,24 @@ module AtomicVolume (RadSrc : RadiiSource) = struct
         let rads = RadSrc.lookup ions in
         Seq.map (fun rad ->
             match rad with
-                | (elem, Some r) ->
-                    (elem, Some (r, (4. /. 3.) *. Float.pi *. r ** 3.))
-                | (elem, None) ->
-                    (elem, None)
+                | (elem, Some r) -> (elem, Some (r, (4. /. 3.) *. Float.pi *. r ** 3.))
+                | (elem, None)   -> (elem, None)
         ) rads
 end
-
-(** Volume lookup backed by the real {!Atomic_radii.AtomicRadiiSource}. *)
-module AV = AtomicVolume (Atomic_radii.AtomicRadiiSource)
-
 
 (** Raised when coordinates, radii, or their shapes are invalid. *)
 exception Molecule_error of string
 
+(** Volume lookup backed by the real {!Atomic_radii_sqlite3.AtomicRadiiSqlite3Source}. *)
+module AV = AtomicVolume (Atomic_radii_sqlite3.AtomicRadiiSqlite3Source)
+
 type t = {
-    coords : Nd.arr;            (** (3, n): x, y, z, centered at the centroid. *)
-    angles : Nd.arr Cache.t;    (** (2, n): theta, phi in radians. *)
-    r      : Nd.arr Cache.t;    (** (1, n): radial distance from the centroid. *)
-    vols   : Nd.arr Cache.t;    (** (1, n): per-atom excluded volume. *)
-    elms   : string array;      (** element symbol per atom. *)
-    name   : string;            (** molecule name. *)
+    coords : Nd.arr;         (** (3, n): x, y, z, centered at the centroid. *)
+    angles : Nd.arr Cache.t; (** (2, n): theta, phi in radians. *)
+    r      : Nd.arr Cache.t; (** (1, n): radial distance from the centroid. *)
+    vols   : Nd.arr Cache.t; (** (1, n): per-atom excluded volume. *)
+    elms   : string array;   (** element symbol per atom. *)
+    name   : string;         (** molecule name. *)
 }
 
 (** Centers coordinates at their centroid.
@@ -99,6 +96,27 @@ let center_coords (coords : (float * float * float) array) : Nd.arr =
             centered
         end
 
+(** Row [i] of a (3, n) or (2, n) array, e.g. [row 0 coords] is x. *)
+let row (i : int) (a : Nd.arr) : Nd.arr = Nd.get_slice [ [ i ]; [] ] a
+
+(** Radial distance of each atom from the centroid, given its already-
+    sliced x/y/z rows. Shared by {!radii} and (via {!create}) {!angles},
+    so [coords] only ever gets sliced into x/y/z once per molecule
+    instead of once per field. *)
+let radii_of_xyz (x : Nd.arr) (y : Nd.arr) (z : Nd.arr) : Nd.arr =
+    Nd.sqrt (Nd.add (Nd.add (Nd.mul x x) (Nd.mul y y)) (Nd.mul z z))
+
+(** Polar (theta) and azimuthal (phi) angle of each atom, given already-
+    sliced x/y/z rows and [r] from {!radii_of_xyz}. Physics convention:
+    theta = arccos(z/r) in \[0, pi\], phi = atan2(y, x).
+    r=0 only occurs for single-atom molecules (atom is its own centroid).
+    j_l(0)=0 for l>0 so the angle is irrelevant; use r_safe to avoid NaN. *)
+let angles_of_xyz (x : Nd.arr) (y : Nd.arr) (z : Nd.arr) (r : Nd.arr) : Nd.arr =
+    let r_safe = Nd.map (fun _r -> if _r > 0.0 then _r else 1.0) r in
+    let theta = Nd.acos (Nd.clip_by_value ~amin:(-1.) ~amax:1. (Nd.div z r_safe)) in
+    let phi = Nd.atan2 y x in
+    Nd.concatenate ~axis:0 [| theta; phi |]
+
 (** Radial distance of each atom from the centroid.
     @param coords (3, n), centered
     @return (1, n)
@@ -110,22 +128,14 @@ let radii (coords : Nd.arr) : Nd.arr =
     else if shape.(1) = 0 then
         raise (Molecule_error "Empty coordinates")
     else
-        begin
-            let x = Nd.get_slice [ [0]; [] ] coords in
-            let y = Nd.get_slice [ [1]; [] ] coords in
-            let z = Nd.get_slice [ [2]; [] ] coords in
-            Nd.sqrt (Nd.add (Nd.add (Nd.mul x x) (Nd.mul y y)) (Nd.mul z z))
-        end
+        radii_of_xyz (row 0 coords) (row 1 coords) (row 2 coords)
 
-(** Polar (theta) and azimuthal (phi) angle of each atom, physics
-    convention: theta = arccos(z/r) in \[0, pi\], phi = atan2(y, x).
+(** Polar (theta) and azimuthal (phi) angle of each atom.
     @param coords (3, n), centered
     @param r (1, n), radial distance, from {!radii}
-    @return (theta, phi), (2, n), radians
+    @return (2, n), (theta, phi); in radians
     @raise Molecule_error if shapes are empty, wrong, or mismatched *)
 let angles (coords : Nd.arr) (r : Nd.arr) : Nd.arr =
-    
-    (* assertion checks *)
     let (shape, shaper) = (Nd.shape coords, Nd.shape r) in
     if shape.(0) <> 3 then
         raise (Molecule_error "coords must have exactly 3 rows")
@@ -135,27 +145,8 @@ let angles (coords : Nd.arr) (r : Nd.arr) : Nd.arr =
         raise (Molecule_error "Empty coordinates or radii")
     else if shape.(1) <> shaper.(1) then
         raise (Molecule_error "Dimensions of coordinates and radii must match")
-
     else
-        begin
-            (*  Physics convention:
-                    theta = polar colatitude (arccos(z/r), 0→π),
-                    phi   = azimuthal angle  (arctan2(y,x), 0→2π)
-                r=0 only occurs for single-atom molecules (atom is its own centroid).
-                j_l(0)=0 for l>0 so the angle is irrelevant; use r_safe to avoid NaN. *)
-            let r_safe = Nd.map (fun _r -> if _r > 0.0 then _r else 1.0) r in
-            let theta =
-                Nd.acos(
-                    Nd.clip_by_value ~amin:(-1.) ~amax:1.
-                    (Nd.div (Nd.get_slice [[2]; []] coords) r_safe)
-                )
-            in
-            let phi = Nd.atan2 (
-                Nd.get_slice[[1]; []] coords) (Nd.get_slice[[0]; []] coords
-                )
-            in
-            Nd.concatenate ~axis:0 [| theta; phi |]
-        end
+        angles_of_xyz (row 0 coords) (row 1 coords) (row 2 coords) r
 
 (** Per-atom excluded volume, from atomic/ionic radii looked up by
     element symbol.
@@ -198,7 +189,26 @@ let create
         raise (Molecule_error "coords and elms must be the same length")
     else
         let coords = center_coords coords_in in
-        let r_cache = Cache.make (fun () -> radii coords) in
-        let angles_cache = Cache.make (fun () -> angles coords (Cache.force r_cache)) in
+        let x = row 0 coords and y = row 1 coords and z = row 2 coords in
+        let r_cache = Cache.make (fun () -> radii_of_xyz x y z) in
+        let a_cache = Cache.make (fun () -> angles_of_xyz x y z (Cache.force r_cache)) in
         let vols_cache = Cache.make (fun () -> vols elms) in
-        { coords; angles = angles_cache; r = r_cache; vols = vols_cache; elms; name }
+        { coords; angles = a_cache; r = r_cache; vols = vols_cache; elms; name }
+
+(** Flatten a (1, n) row into a genuine 1-D (n,) array. *)
+let flatten_row (a : Nd.arr) : Nd.arr = Nd.reshape a [| (Nd.shape a).(1) |]
+
+(** Polar angle per atom, flat.
+    @param m molecule
+    @return (n,), radians *)
+let theta (m : t) : Nd.arr = flatten_row (Nd.get_slice [[0]; []] (Cache.force m.angles))
+
+(** Azimuthal angle per atom, flat.
+    @param m molecule
+    @return (n,), radians *)
+let phi (m : t) : Nd.arr = flatten_row (Nd.get_slice [[1]; []] (Cache.force m.angles))
+
+(** Radial distance from centroid per atom, flat.
+    @param m molecule
+    @return (n,), Angstrom *)
+let r (m : t) : Nd.arr = flatten_row (Cache.force m.r)
