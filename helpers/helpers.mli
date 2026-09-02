@@ -21,3 +21,6 @@ module Cache : sig
 
 end
 
+(** Absolute path to the repo root, derived from {!Stdlib.Sys.executable_name}. *)
+val repo_root : string
+
