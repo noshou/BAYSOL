@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-# Not an OCaml port: package hygiene + type-stability guards.
+# package hygiene + type-stability guards.
 using Aqua, JET
 using .SphFuncs: sphHarm, sphBess, legendre_sphPlm
 using .Molecules: create, r, radii, vols
@@ -17,8 +17,10 @@ end
     @inferred legendre_sphPlm(3, 2, 0.5)
     @inferred Union{Float64,Nothing} resolve_one("fe3+")
     @inferred lookup(["fe3+", "o2-"])
-    m = @inferred create("t", ["o", "h", "h"],
-                         [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)])
+    m = @inferred create(
+        "t", ["o", "h", "h"],
+        [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]
+    )
     @inferred r(m); @inferred radii(m); @inferred vols(m)
 end
 

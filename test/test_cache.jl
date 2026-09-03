@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-# 1:1 port of helpers/test/test_cache.ml
 using .Cache: make, force
 
 @testset "Cache" begin
