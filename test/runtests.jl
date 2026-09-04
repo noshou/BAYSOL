@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 using Test
 using ScatterNet
-using ScatterNet: Cache, Interfaces, AtomicRadii, SphFuncs, Molecules, FormFactorXrayDB
+using ScatterNet: Interfaces
+using ScatterNet.Structure: Cache, AtomicRadii, Molecules
+using ScatterNet.Scattering: SphFuncs, FormFactorXrayDB
 
 check_float(a, b) = abs(a - b) < 1e-9
 check_complex(a, b) = abs(a - b) < 1e-9

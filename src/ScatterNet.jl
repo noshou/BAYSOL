@@ -1,27 +1,19 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """
-Submodules: `Cache`, `Interfaces`, `AtomicRadii`, `SphFuncs`, `Molecules`, `FormFactorXrayDB`.
+Thin aggregator. Two grouped submodules — `Structure` (`AtomicRadii`,
+`Molecules`) and `Scattering` (`SphFuncs`, `FormFactorXrayDB`) — over the shared
+`Interfaces` markers.
 """
 module ScatterNet
 
 import CondaPkg  # keep as a direct dep for the root CondaPkg.toml
 
-include("Cache.jl")
 include("Interfaces.jl")
-include("AtomicRadii.jl")
-include("SphFuncs.jl")
-include("Molecules.jl")
-include("FormFactorXrayDB.jl")
+include("Structure/Structure.jl")
+include("Scattering/Scattering.jl")
 
-using .Cache: Cache
-using .Interfaces: Interfaces, RadiiSource, FormFactorSource
-using .AtomicRadii: AtomicRadii, Ion, tryparse_ion, resolve_one, AtomicRadiiSource
-using .SphFuncs: SphFuncs, sphHarm, sphBess, legendre_sphPlm, SphHarmError, SphBessError
-using .Molecules: Molecules, Molecule, MoleculeError
-using .FormFactorXrayDB: FormFactorXrayDB, FF, FormFactorError, compute_form_factors, FormFactorSourceXrayDB
-
-export Molecule, MoleculeError, Ion, tryparse_ion, resolve_one, AtomicRadiiSource,
-    sphHarm, sphBess, legendre_sphPlm, SphHarmError, SphBessError,
-    compute_form_factors, FormFactorSourceXrayDB, FF, FormFactorError
+using .Interfaces: Interfaces
+using .Structure: Structure
+using .Scattering: Scattering
 
 end # module
