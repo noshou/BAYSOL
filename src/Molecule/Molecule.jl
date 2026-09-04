@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """
-Real-space structure: atomic/ionic radii and the `Molecule` geometry built on
+Real-space structure: atomic/ionic radii and the molecule geometry built on
 them. Depends on the top-level `Interfaces` markers; `Cache` is local here.
 """
-module Structure
+module Molecule
 
 include("Cache.jl")
 include("AtomicRadii.jl")
