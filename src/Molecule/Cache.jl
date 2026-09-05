@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-"A memoized value guarded by a lock; safe to force concurrently."
-module Cache
-
-export Lazy, make, force
+# Kept from the OCaml migration, since OCaml didn't have concurrency w/ lazy
+# types: a memoized value guarded by a lock, safe to force concurrently.
 
 "A cache of a value of type `T`. The thunk runs on the first [`force`](@ref)."
 mutable struct Lazy{T}
@@ -41,5 +39,3 @@ function force(c::Lazy{T})::T where {T}
     end
     return c.value
 end
-
-end # module
