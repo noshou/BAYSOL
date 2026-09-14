@@ -4,9 +4,5 @@
  "H": [[6.3,  "H-basic" ], "H-neutral"],
  "K": [[10.6, "K-basic" ], "K-neutral"],
  "R": [[12.6, "R-basic" ], "R-neutral"],
- "U": [[5.24, "U-acidic"], "U-neutral"],
- "A_RNA": [[4.2, "A_RNA-basic"], "A_RNA-neutral"],
- "C_RNA": [[4.1, "C_RNA-basic"], "C_RNA-neutral"],
- "G_RNA": [[9.5, "G_RNA-acidic"], "G_RNA-neutral"],
- "U_RNA": [[9.5, "U_RNA-acidic"], "U_RNA-neutral"]
+ "U": [[5.24, "U-acidic"], "U-neutral"]
 }

@@ -136,7 +136,7 @@ function compute_B_lm(
     # _CHUNK == 0 would make the `1:_CHUNK:N` range below step by zero,
     # looping forever instead of raising.
     if _CHUNK == 0
-        throw(DomainError("_CHUNK must be > 0"))
+        throw(DomainError(_CHUNK, "_CHUNK must be > 0"))
     end
 
     lMax < 0 && throw(ArgumentError("compute_B_lm: lMax must be non-negative"))

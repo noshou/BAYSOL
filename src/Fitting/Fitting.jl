@@ -12,7 +12,6 @@ curve, recover the parameters that produced it and their uncertainty.
 """
 module Fitting
 
-# `WLS.jl` is a plain include (no submodule); its names land directly here.
 include("WLS.jl")
 
 export WLSError, WLSFit, wls_fit, predict, profiled_nll, marginal_nll
