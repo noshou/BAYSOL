@@ -1,0 +1,110 @@
+Group	Name	Temperature_C	Uncertainty	V0	basis	doi
+-CH2-	methylene	18	0.1	15.5	measured	10.1039/9781782627043-00542
+-CH2-	methylene	25	0.1	15.7	measured	10.1039/9781782627043-00542
+-CH2-	methylene	40	0.1	15.9	measured	10.1039/9781782627043-00542
+-CH2-	methylene	55	0.1	16.4	measured	10.1039/9781782627043-00542
+–CH2CONH–	glycyl	18	0.1	36.8	measured	10.1039/9781782627043-00542
+–CH2CONH–	glycyl	25	0.1	37.4	measured	10.1039/9781782627043-00542
+–CH2CONH–	glycyl	40	0.2	39.0	measured	10.1039/9781782627043-00542
+–CH2CONH–	glycyl	55	0.1	39.3	measured	10.1039/9781782627043-00542
+–CONH–	peptide	18	0.1	21.3	measured	10.1039/9781782627043-00542
+–CONH–	peptide	25	0.1	21.7	measured	10.1039/9781782627043-00542
+–CONH–	peptide	40	0.1	23.1	measured	10.1039/9781782627043-00542
+–CONH–	peptide	55	0.1	22.9	measured	10.1039/9781782627043-00542
+CH2	methylene	18	0.1	15.5	measured	10.1039/9781782627043-00542
+CH2	methylene	25	0.1	15.7	measured	10.1039/9781782627043-00542
+CH2	methylene	40	0.1	15.9	measured	10.1039/9781782627043-00542
+CH2	methylene	55	0.1	16.4	measured	10.1039/9781782627043-00542
+CH2CONH	glycyl	18	0.1	36.8	measured	10.1039/9781782627043-00542
+CH2CONH	glycyl	25	0.1	37.4	measured	10.1039/9781782627043-00542
+CH2CONH	glycyl	40	0.2	39.0	measured	10.1039/9781782627043-00542
+CH2CONH	glycyl	55	0.1	39.3	measured	10.1039/9781782627043-00542
+CONH	peptide	18	0.1	21.3	measured	10.1039/9781782627043-00542
+CONH	peptide	25	0.1	21.7	measured	10.1039/9781782627043-00542
+CONH	peptide	40	0.1	23.1	measured	10.1039/9781782627043-00542
+CONH	peptide	55	0.1	22.9	measured	10.1039/9781782627043-00542
+
+Ala	alanine	18	0.1	17.0	measured	10.1016/j.bpc.2008.02.009
+Ala	alanine	25	0.3	16.8	measured	10.1016/j.bpc.2008.02.009
+Ala	alanine	40	0.3	17.2	measured	10.1016/j.bpc.2008.02.009
+Ala	alanine	55	0.3	17.9	measured	10.1016/j.bpc.2008.02.009
+Val	valine	18	0.1	47.5	measured	10.1016/j.bpc.2008.02.009
+Val	valine	25	0.1	47.7	measured	10.1016/j.bpc.2008.02.009
+Val	valine	40	0.6	47.7	measured	10.1016/j.bpc.2008.02.009
+Val	valine	55	0.2	49.0	measured	10.1016/j.bpc.2008.02.009
+Leu	leucine	18	0.2	64.8	measured	10.1016/j.bpc.2008.02.009
+Leu	leucine	25	0.2	65.4	measured	10.1016/j.bpc.2008.02.009
+Leu	leucine	40	0.3	66.0	measured	10.1016/j.bpc.2008.02.009
+Leu	leucine	55	0.6	67.4	measured	10.1016/j.bpc.2008.02.009
+Ile	isoleucine	18	0.6	63.5	measured	10.1016/j.bpc.2008.02.009
+Ile	isoleucine	25	0.1	63.8	measured	10.1016/j.bpc.2008.02.009
+Ile	isoleucine	40	0.5	63.8	measured	10.1016/j.bpc.2008.02.009
+Ile	isoleucine	55	0.4	65.1	measured	10.1016/j.bpc.2008.02.009
+Pro	proline	18	0.2	35.1	measured	10.1016/j.bpc.2008.02.009
+Pro	proline	25	0.1	35.6	measured	10.1016/j.bpc.2008.02.009
+Pro	proline	40	0.4	36.3	measured	10.1016/j.bpc.2008.02.009
+Pro	proline	55	0.3	36.7	measured	10.1016/j.bpc.2008.02.009
+Phe	phenylalanine	18	0.1	78.7	measured	10.1016/j.bpc.2008.02.009
+Phe	phenylalanine	25	0.3	79.9	measured	10.1016/j.bpc.2008.02.009
+Phe	phenylalanine	40	0.2	80.9	measured	10.1016/j.bpc.2008.02.009
+Phe	phenylalanine	55	0.2	82.4	measured	10.1016/j.bpc.2008.02.009
+Trp	tryptophan	18	0.1	101.1	measured	10.1016/j.bpc.2008.02.009
+Trp	tryptophan	25	0.1	102.1	measured	10.1016/j.bpc.2008.02.009
+Trp	tryptophan	40	0.2	103.6	measured	10.1016/j.bpc.2008.02.009
+Trp	tryptophan	55	0.2	104.7	measured	10.1016/j.bpc.2008.02.009
+Met	methionine	18	0.2	62.1	measured	10.1016/j.bpc.2008.02.009
+Met	methionine	25	0.1	62.8	measured	10.1016/j.bpc.2008.02.009
+Met	methionine	40	0.4	63.0	measured	10.1016/j.bpc.2008.02.009
+Met	methionine	55	0.3	64.3	measured	10.1016/j.bpc.2008.02.009
+Cys	cysteine	18	0.1	29.2	measured	10.1016/j.bpc.2008.02.009
+Cys	cysteine	25	0.1	29.7	measured	10.1016/j.bpc.2008.02.009
+Cys	cysteine	40	0.2	30.3	measured	10.1016/j.bpc.2008.02.009
+Cys	cysteine	55	0.4	31.6	measured	10.1016/j.bpc.2008.02.009
+Tyr	tyrosine	18	0.3	81.6	measured	10.1016/j.bpc.2008.02.009
+Tyr	tyrosine	25	0.2	82.2	measured	10.1016/j.bpc.2008.02.009
+Tyr	tyrosine	40	1.0	83.5	measured	10.1016/j.bpc.2008.02.009
+Tyr	tyrosine	55	0.5	85.1	measured	10.1016/j.bpc.2008.02.009
+Ser	serine	18	0.1	17.3	measured	10.1016/j.bpc.2008.02.009
+Ser	serine	25	0.1	17.1	measured	10.1016/j.bpc.2008.02.009
+Ser	serine	40	0.1	17.4	measured	10.1016/j.bpc.2008.02.009
+Ser	serine	55	0.3	17.8	measured	10.1016/j.bpc.2008.02.009
+Thr	threonine	18	0.3	33.3	measured	10.1016/j.bpc.2008.02.009
+Thr	threonine	25	0.1	33.1	measured	10.1016/j.bpc.2008.02.009
+Thr	threonine	40	0.2	33.5	measured	10.1016/j.bpc.2008.02.009
+Thr	threonine	55	0.3	34.7	measured	10.1016/j.bpc.2008.02.009
+Asn	asparagine	18	0.3	34.0	measured	10.1016/j.bpc.2008.02.009
+Asn	asparagine	25	0.2	34.0	measured	10.1016/j.bpc.2008.02.009
+Asn	asparagine	40	0.6	34.5	measured	10.1016/j.bpc.2008.02.009
+Asn	asparagine	55	0.3	35.4	measured	10.1016/j.bpc.2008.02.009
+Gln	glutamine	18	0.1	49.9	measured	10.1016/j.bpc.2008.02.009
+Gln	glutamine	25	0.1	50.8	measured	10.1016/j.bpc.2008.02.009
+Gln	glutamine	40	0.2	51.2	measured	10.1016/j.bpc.2008.02.009
+Gln	glutamine	55	0.2	51.5	measured	10.1016/j.bpc.2008.02.009
+Asp	aspartic acid (neutral)	18	0.4	30.7	measured	10.1016/j.bpc.2008.02.009
+Asp	aspartic acid (neutral)	25	0.1	31.7	measured	10.1016/j.bpc.2008.02.009
+Asp	aspartic acid (neutral)	40	0.4	32.4	measured	10.1016/j.bpc.2008.02.009
+Asp	aspartic acid (neutral)	55	0.5	32.3	measured	10.1016/j.bpc.2008.02.009
+Glu	glutamic acid (neutral)	18	0.5	46.7	measured	10.1016/j.bpc.2008.02.009
+Glu	glutamic acid (neutral)	25	0.7	47.7	measured	10.1016/j.bpc.2008.02.009
+Glu	glutamic acid (neutral)	40	0.2	48.0	measured	10.1016/j.bpc.2008.02.009
+Glu	glutamic acid (neutral)	55	0.4	48.6	measured	10.1016/j.bpc.2008.02.009
+His	histidine (neutral)	18	0.4	56.9	measured	10.1016/j.bpc.2008.02.009
+His	histidine (neutral)	25	0.6	57.0	measured	10.1016/j.bpc.2008.02.009
+His	histidine (neutral)	40	0.2	57.9	measured	10.1016/j.bpc.2008.02.009
+His	histidine (neutral)	55	0.4	58.5	measured	10.1016/j.bpc.2008.02.009
+Lys	lysine (neutral)	18	0.2	69.6	measured	10.1016/j.bpc.2008.02.009
+Lys	lysine (neutral)	25	0.4	70.1	measured	10.1016/j.bpc.2008.02.009
+Lys	lysine (neutral)	40	0.3	70.7	measured	10.1016/j.bpc.2008.02.009
+Lys	lysine (neutral)	55	0.3	70.6	measured	10.1016/j.bpc.2008.02.009
+Arg	arginine (neutral)	18	0.5	66.0	measured	10.1016/j.bpc.2008.02.009
+Arg	arginine (neutral)	25	0.3	67.4	measured	10.1016/j.bpc.2008.02.009
+Arg	arginine (neutral)	40	0.3	67.6	measured	10.1016/j.bpc.2008.02.009
+Arg	arginine (neutral)	55	0.7	66.3	measured	10.1016/j.bpc.2008.02.009
+Sec	selenocysteine	25	2.0	34.2	derived	10.1016/j.bpc.2008.02.009
+Pyl	pyrrolysine	25	19.0	128.2	derived	10.1016/j.bpc.2008.02.009
+A_RNA	adenine	25	0.18	87.22	measured	10.1007/BF00973047
+A_RNA	adenine	25	0.22	88.59	measured	10.1007/s10953-008-9302-2
+C_RNA	cytosine	25	0.12	73.15	measured	10.1007/BF00973047
+G_RNA	guanine	25	7.0	91.2	derived	10.1007/BF00973047
+U_RNA	uracil	25	0.17	71.94	measured	10.1007/BF00973047
+U_RNA	uracil	25	0.10	72.02	measured	10.1007/s10953-008-9302-2

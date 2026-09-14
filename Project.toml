@@ -6,6 +6,7 @@ authors = ["noshou"]
 [deps]
 Bessels = "0e736298-9ec6-45e8-9647-e4fc86a2fe38"
 DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
@@ -16,6 +17,7 @@ SphericalHarmonics = "c489a379-e885-57ff-9236-bd896d33c250"
 [compat]
 Bessels = "0.2"
 DBInterface = "2"
+JSON3 = "1.14.3"
 LegendrePolynomials = "0.4"
 LinearAlgebra = "1"
 NearestNeighbors = "0.4.29"

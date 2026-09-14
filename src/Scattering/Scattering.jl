@@ -172,6 +172,7 @@ module Scattering
 
 using ..Interfaces: Interfaces, FormFactorSource, FormFactorSourceTables
 using ..Molecule.SASA: SASA
+using ..Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
 
 # The public surface. `forward` is the forward model; `gram_matrix` is the
 # geometry-only pass to cache when sweeping fit parameters. Everything the
@@ -180,29 +181,12 @@ using ..Molecule.SASA: SASA
 # qualified name for tests and advanced callers, but not part of the API.
 export forward, gram_matrix, forward_cache
 
-# ---------------------------------------------------------------------------
-# Module-level configuration -- the single source of truth for every knob the
-# forward model takes. `vacuo` / `hydration` / `Intensity.jl` / `Forward.jl`
-# read these as their defaults; override per call where needed.
-# ---------------------------------------------------------------------------
-
-"""
-Hydration-shell thickness in Å: how far the perturbed-density water layer
-extends beyond the solvent-accessible surface. `3.0` is CRYSOL's border-layer
-default.
-"""
-const SHELL_THICKNESS = 3.0
-
-"Solvent probe radius in Å (water), forwarded to `SASA.shell_points`."
-const PROBE_RADIUS = 1.4
-
-"""
-Default shell-dummy budget (`hydration`'s `n_target`). `nothing` lets
-`SASA.shell_points` size the cloud from the accessible area
-(`≈ area / SASA.SHELL_AREA_PER_POINT`, floored at `SASA.SHELL_MIN_POINTS`);
-an `Int` pins it.
-"""
-const SHELL_N_TARGET::Union{Nothing,Int} = nothing
+# Module-level configuration. The primitive knobs -- `SHELL_THICKNESS`,
+# `PROBE_RADIUS`, `SHELL_N_TARGET`, `DRO_UNIT`, `B_LM_CHUNK` -- live in the
+# dependency-free `ScatterNet.Constants` module (imported above). The two
+# defaults below are *constructed* from other subsystems' types, so they stay
+# here where those types are in scope. `vacuo` / `hydration` / `Intensity.jl` /
+# `Forward.jl` read all of these as their defaults; override per call as needed.
 
 """
 CRYSOL 3's three border-layer populations, in the field order of the
@@ -211,14 +195,8 @@ CRYSOL 3's three border-layer populations, in the field order of the
 """
 const SHELL_CLASSES = (SASA.CONVEX, SASA.CONCAVE, SASA.CAVITY)
 
-"Shell-contrast unit in e·Å⁻³ (CRYSOL's `--dro`); `dro_k = DRO_UNIT * ρ_k`."
-const DRO_UNIT = 0.03
-
 "Default X-ray form-factor backend (bundled Waasmaier-Kirfel + Chantler tables)."
 const FORM_FACTOR_SOURCE = FormFactorSourceTables()
-
-"Atoms/dummies per pass in `compute_B_lm`."
-const B_LM_CHUNK = UInt64(2048)
 
 include("SphFuncs.jl")
 include("PartialWave.jl")
