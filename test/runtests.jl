@@ -27,6 +27,7 @@ check_complex(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
     include("test_intensity.jl")
     include("test_forward.jl")
     include("test_formfactor.jl")
+    include("test_pmv.jl")
     include("test_plasticmap.jl")
     include("test_sasa.jl")
     include("test_quality.jl")

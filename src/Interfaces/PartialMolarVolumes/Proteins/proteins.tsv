@@ -24,6 +24,7 @@ CONH	peptide	25	0.1	21.7	measured	10.1039/9781782627043-00542
 CONH	peptide	40	0.1	23.1	measured	10.1039/9781782627043-00542
 CONH	peptide	55	0.1	22.9	measured	10.1039/9781782627043-00542
 
+Gly	glycine	25	0.0	0.0	derived	10.1016/j.bpc.2008.02.009
 Ala	alanine	18	0.1	17.0	measured	10.1016/j.bpc.2008.02.009
 Ala	alanine	25	0.3	16.8	measured	10.1016/j.bpc.2008.02.009
 Ala	alanine	40	0.3	17.2	measured	10.1016/j.bpc.2008.02.009
@@ -102,9 +103,3 @@ Arg	arginine (neutral)	40	0.3	67.6	measured	10.1016/j.bpc.2008.02.009
 Arg	arginine (neutral)	55	0.7	66.3	measured	10.1016/j.bpc.2008.02.009
 Sec	selenocysteine	25	2.0	34.2	derived	10.1016/j.bpc.2008.02.009
 Pyl	pyrrolysine	25	19.0	128.2	derived	10.1016/j.bpc.2008.02.009
-A_RNA	adenine	25	0.18	87.22	measured	10.1007/BF00973047
-A_RNA	adenine	25	0.22	88.59	measured	10.1007/s10953-008-9302-2
-C_RNA	cytosine	25	0.12	73.15	measured	10.1007/BF00973047
-G_RNA	guanine	25	7.0	91.2	derived	10.1007/BF00973047
-U_RNA	uracil	25	0.17	71.94	measured	10.1007/BF00973047
-U_RNA	uracil	25	0.10	72.02	measured	10.1007/s10953-008-9302-2

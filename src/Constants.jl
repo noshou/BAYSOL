@@ -4,8 +4,8 @@ Leaf module of constant primitives.
 """
 module Constants
 
-export  DEFAULT_ATOL, SHELL_THICKNESS, PROBE_RADIUS, 
-SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
+export  DEFAULT_ATOL, SHELL_THICKNESS, PROBE_RADIUS,
+SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK, AVOGADRO
 
 #-------------------------
 # Floating-point accuracy 
