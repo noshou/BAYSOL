@@ -28,7 +28,3 @@ Arg	arginine	basic	55	12.5		14.4		-5.2		measured	10.1016/j.bpc.2008.02.009
 -NH2	amino terminus	basic	40	7.7	0.1	-5.1	0.5	-17.9	0.9	measured	10.1016/j.bpc.2008.02.009
 -NH2	amino terminus	basic	55	7.2	0.1	-5.1	0.6	-14.7	1.1	measured	10.1016/j.bpc.2008.02.009
 Sec	selenocysteine	acidic	25	5.24		4	4			derived	10.1016/0003-9861(67)90136-1
-A_RNA	adenine	basic	25	4.2		-1.4	1.4			derived	10.1021/ar200262x
-C_RNA	cytosine	basic	25	4.1		-1.4	1.4			derived	10.1021/ar200262x
-G_RNA	guanine	acidic	25	9.5		3	3			derived	10.1021/ar200262x
-U_RNA	uracil	acidic	25	9.5		3	3			derived	10.1021/ar200262x

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """
 Swappable-backend interfaces. Declares the backend markers (`RadiiSource`,
-`FormFactorSource`, `PartialMolarVolumes`) and their generic functions 
+`FormFactorSource`, `PartialMolarVolumeSource`) and their generic functions
 then encapsulates them as child submodules:
 
     -   `AtomicRadii` — atomic/ionic radii from a bundled SQLite file
@@ -12,14 +12,21 @@ then encapsulates them as child submodules:
         [`form_factor_table`](@ref) / [`form_factors`](@ref) /
         [`form_factor_log`](@ref)).
 
-Non-test code elsewhere in the package reaches both backends ONLY through
-this module (`Interfaces.<name>`); the submodule internals are not
-re-exported.
+    -   `PartialMolarVolumes` — protein/solute partial molar volumes and bulk
+        solvent electron density from bundled JSON tables
+        (`PartialMolarVolumeSourceTables <: PartialMolarVolumeSource`, extends
+        [`ϕ°`](@ref) / [`ρₑ_w`](@ref)).
 """
 module Interfaces
 
-export  RadiiSource, FormFactorSource, AtomicRadiiSource, FormFactorSourceTables,
-        FormFactorError, lookup, form_factor_table, form_factors, form_factor_log
+export  RadiiSource, FormFactorSource, PartialMolarVolumeSource,
+        AtomicRadiiSource, FormFactorSourceTables, PartialMolarVolumeSourceTables,
+        FormFactorError, lookup, form_factor_table, form_factors, form_factor_log,
+        ϕ°, ρₑ_w
+
+#----------------------------------------------------------
+#                        RadiiSource
+#----------------------------------------------------------
 
 "A source of atomic/ionic radii. Implement [`lookup`](@ref) for a concrete subtype."
 abstract type RadiiSource end
@@ -35,6 +42,10 @@ entry per input, in input order.
 - `ions`: ion/element strings, e.g. `["fe3+", "o2-", "fe"]`.
 """
 function lookup end
+
+#----------------------------------------------------------
+#                       FormFactorSource
+#----------------------------------------------------------
 
 "A form-factor backend. See `FormFactor` for the reference implementation."
 abstract type FormFactorSource end
@@ -83,10 +94,51 @@ in full, in the order they were encountered.
 """
 function form_factor_log end
 
+#----------------------------------------------------------
+#                   PartialMolarVolumeSource
+#----------------------------------------------------------
+
+"A partial-molar-volume backend. See `PartialMolarVolumes` for the reference implementation."
+abstract type PartialMolarVolumeSource end
+
+"""
+    ρₑ_w([src::PartialMolarVolumeSource,] t::Real) -> Tuple{Float64,Float64}
+
+Bulk electron density of pure water at temperature `t` (°C), in e·Å⁻³, as
+`(ρₑ, uncertainty)`.
+
+# Arguments
+- `src`: the partial-molar-volume backend to query (optional).
+- `t`: temperature in °C.
+"""
+function ρₑ_w end
+
+"""
+    ϕ°([src::PartialMolarVolumeSource,] pH::Real, seq::AbstractString; σ_pH::Real = 0.0) -> Tuple{Int64,Float64,Float64}
+    ϕ°([src::PartialMolarVolumeSource,] name::AbstractString)                            -> Tuple{Int64,Float64,Float64}
+
+Partial molar volume at infinite dilution, as `(electron_count, v0_cm3_per_mol, uncertainty_cm3_per_mol)`,
+for a protein/peptide sequence (one-letter codes) at solution `pH`, or for a solute by IUPAC `name`.
+
+# Arguments
+- `src`: the partial-molar-volume backend to query (optional).
+- `pH`/`seq`: solution pH and one-letter-code sequence, for a protein.
+- `σ_pH`: standard uncertainty on `pH`, propagated into the returned uncertainty
+    via the delta method (protein form only; ignored for the solute-by-name form).
+- `name`: common or IUPAC solute name, for a non-protein solute.
+"""
+function ϕ° end
+
+#----------------------------------------------------------
+#                     Backend submodules
+#----------------------------------------------------------
+
 include("AtomicRadii/AtomicRadii.jl")
 include("FormFactor/FormFactor.jl")
+include("PartialMolarVolumes/PMV.jl")
 
 using .AtomicRadii: AtomicRadii, AtomicRadiiSource
 using .FormFactor: FormFactor, FormFactorSourceTables, FormFactorError
+using .PartialMolarVolumes: PartialMolarVolumes, PartialMolarVolumeSourceTables
 
 end # module
