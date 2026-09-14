@@ -6,7 +6,7 @@ using Test
 using ForwardDiff
 using ScatterNet
 using ScatterNet: Interfaces
-using ScatterNet.ABSOLUTE_TOLERANCE: DEFAULT_ATOL
+using ScatterNet.Constants: DEFAULT_ATOL
 using ScatterNet.Interfaces: AtomicRadii
 using ScatterNet.Molecule: Molecules
 using ScatterNet.Molecule.SASA: PlasticMap

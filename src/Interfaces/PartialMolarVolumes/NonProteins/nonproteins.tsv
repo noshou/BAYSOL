@@ -1,0 +1,717 @@
+common_name	iupac_name	formula	charge	v0_cm3_per_mol	uncertainty_cm3_per_mol	basis	doi
+chloride	chloride	Cl	-1	17.8		measured	10.1006/jcht.1996.0137
+dmeah+	(2-hydroxyethyl)dimethylazanium	C4H12NO	1	90.7	2.1	measured	10.1021/acs.jced.1c00352
+dmeahcl	(2-hydroxyethyl)dimethylazanium chloride	C4H12ClNO	0	108.5	0.5	measured	10.1021/acs.jced.1c00352
+guanidinium chloride	guanidinium chloride	CH6ClN3	0	69.92	0.40	measured	10.1023/A:1005231617292
+guanidinium	guanidinium	CH6N3	1	52.12	0.40	derived	10.1023/A:1005231617292
+sodium	sodium(1+)	Na	1	-1.21		measured	10.1007/BF01004477
+hydroxide	hydroxide	OH	-1	-4.13		measured	10.1007/BF01004477
+tetramethylammonium	tetramethylazanium	C4H12N	1	88.2	2	measured	10.1007/BF01004477
+dihydrogen phosphate	dihydrogen phosphate	H2PO4	-1	31.7	0.7	measured	10.1007/BF01004477
+hydrogen phosphate	hydrogen phosphate	HPO4	-2	5.3	0.5	measured	10.1007/BF01004477
+phosphate	phosphate	PO4	-3	-25.6	1	measured	10.1007/BF01004477
+sodium chloride	sodium chloride	NaCl	0	16.61	0.01	measured	10.1039/TF9686401898
+potassium chloride	potassium chloride	KCl	0	26.81	0.01	measured	10.1039/TF9686401898
+potassium bromide	potassium bromide	KBr	0	33.75	0.01	measured	10.1039/TF9686401898
+potassium iodide	potassium iodide	KI	0	45.21	0.01	measured	10.1039/TF9686401898
+tetrabutylammonium bromide	tetrabutylazanium bromide	C16H36BrN	0	300.40		measured	10.1039/TF9686401898
+calcium chloride	calcium dichloride	CaCl2	0	17.839	0.03	measured	10.1039/TF9686402951
+barium chloride	barium dichloride	BaCl2	0	23.828	0.08	measured	10.1039/TF9686402951
+magnesium chloride	magnesium dichloride	MgCl2	0	14.49		measured	10.1039/TF9666202348
+lanthanum chloride	lanthanum trichloride	LaCl3	0	14.28		measured	10.1039/TF9666202348
+hydrochloric acid	chlorane	HCl	0	17.82		measured	10.1039/TF9666202348
+potassium nitrate	potassium nitrate	KNO3	0	38.05		measured	10.1039/TF9666202348
+sodium sulfate	disodium sulfate	Na2SO4	0	11.62		measured	10.1039/TF9666202348
+potassium sulfate	dipotassium sulfate	K2SO4	0	31.99		measured	10.1039/TF9666202348
+cesium bromide	caesium bromide	CsBr	0	45.32		measured	10.1139/v76-119
+rubidium fluoride	rubidium fluoride	RbF	0	11.52		measured	10.1139/v76-119
+potassium fluoride	potassium fluoride	KF	0	7.67		measured	10.1139/v76-119
+rubidium bromide	rubidium bromide	RbBr	0	37.54		measured	10.1139/v76-119
+rubidium chloride	rubidium chloride	RbCl	0	31.82		measured	10.1139/v76-119
+cesium chloride	caesium chloride	CsCl	0	39.06		measured	10.1139/v76-119
+sodium bromide	sodium bromide	NaBr	0	23.35		measured	10.1139/v76-119
+sodium iodide	sodium iodide	NaI	0	34.70		measured	10.1139/v76-119
+lithium chloride	lithium chloride	LiCl	0	16.77		measured	10.1139/v76-119
+lithium bromide	lithium bromide	LiBr	0	23.53		measured	10.1139/v76-119
+lithium iodide	lithium iodide	LiI	0	35.09		measured	10.1139/v76-119
+sodium carbonate	disodium carbonate	Na2CO3	0	-6.48		measured	10.1063/1.555981
+sodium bicarbonate	sodium hydrogen carbonate	NaHCO3	0	23.181		measured	10.1063/1.555981
+potassium carbonate	dipotassium carbonate	K2CO3	0	13.98		derived	10.1063/1.555981
+potassium bicarbonate	potassium hydrogen carbonate	KHCO3	0	33.41		derived	10.1063/1.555981
+ammonium chloride	ammonium chloride	NH4Cl	0	36.069		measured	10.1063/1.555981
+sodium nitrate	sodium nitrate	NaNO3	0	28.007		measured	10.1063/1.555981
+ammonium sulfate	diammonium sulfate	(NH4)2SO4	0	50.674		derived	10.1063/1.555981
+magnesium sulfate	magnesium sulfate	MgSO4	0	-7.38	2.0	derived	10.1063/1.555981
+hydrochloric acid	chlorane	HCl	0	17.84		measured	10.1021/jp108992a
+ammonium chloride	ammonium chloride	NH4Cl	0	35.85	0.02	measured	10.1021/jp108992a
+nitric acid	nitric acid	HNO3	0	29.35		measured	10.1021/jp108992a
+sodium nitrate	sodium nitrate	NaNO3	0	28.137		derived	10.1021/jp108992a
+ammonium nitrate	ammonium nitrate	NH4NO3	0	47.24		derived	10.1021/jp108992a
+sodium hydroxide	sodium hydroxide	NaOH	0	-5.18		measured	10.1021/jp108992a
+sodium bisulfate	sodium hydrogen sulfate	NaHSO4	0	13.0		derived	10.1021/jp108992a
+sodium sulfate	disodium sulfate	Na2SO4	0	11.78		derived	10.1021/jp108992a
+sulfate	sulfate	SO4	-2	14.213		derived	10.1021/jp1089933
+bisulfate	hydrogen sulfate	HSO4	-1	36.495		measured	10.1021/jp1089933
+ammonium	azanium	NH4	1	18.02		derived	10.1021/jp1089933
+ammonium bisulfate	ammonium hydrogen sulfate	H5NO4S	0	32.23		derived	10.1021/jp1089933
+ammonium sulfate	diammonium sulfate	H8N2O4S	0	50.25		derived	10.1021/jp1089933
+letovicite	triammonium hydrogen disulfate	H13N3O8S2	0	82.48		derived	10.1021/jp1089933
+calcium acetate	calcium diacetate	C4H6CaO4	0	56.737		measured	10.2298/JSC080517049U
+guanidinium bromide	guanidinium bromide	CH6BrN3	0	79.84	0.38	measured	10.1023/A:1005231617292
+guanidinium acetate	guanidinium acetate	C3H9N3O2	0	54.94	0.31	measured	10.1023/A:1005231617292
+guanidinium perchlorate	guanidinium perchlorate	CH6ClN3O4	0	92.33	0.62	measured	10.1023/A:1005231617292
+guanidinium sulfate	diguanidinium sulfate	C2H12N6O4S	0	18.66	0.34	measured	10.1023/A:1005231617292
+lithium acetate	lithium acetate	C2H3LiO2	0	28.07	0.03	measured	10.1021/je800326n
+sodium acetate	sodium acetate	C2H3NaO2	0	38.44	0.05	measured	10.1021/je800326n
+potassium acetate	potassium acetate	C2H3KO2	0	51.07	0.04	measured	10.1021/je800326n
+magnesium acetate	magnesium diacetate	C4H6MgO4	0	60.23	0.08	measured	10.1021/je800326n
+calcium acetate	calcium diacetate	C4H6CaO4	0	72.32	0.13	measured	10.1021/je800326n
+lanthanum sulfate	dilanthanum trisulfate	La2(SO4)3	0	-36.30		measured	10.1007/BF00655373
+choline chloride	(2-hydroxyethyl)trimethylazanium chloride	C5H14ClNO	0	123.6093		measured	10.1016/j.fluid.2023.113903
+sodium perchlorate	sodium perchlorate	NaClO4	0	42.94	0.04	measured	10.1021/acs.jced.1c00495
+potassium perchlorate	potassium perchlorate	KClO4	0	53.29	0.04	measured	10.1021/acs.jced.1c00495
+potassium chloride	potassium chloride	KCl	0	26.97	0.04	measured	10.1021/acs.jced.1c00495
+tetramethylammonium chloride	tetramethylazanium chloride	C4H12ClN	0	107.4	0.2	measured	10.1039/TF9666202738
+tetraethylammonium chloride	tetraethylazanium chloride	C8H20ClN	0	167.0	0.2	measured	10.1039/TF9666202738
+tetra-n-propylammonium chloride	tetrapropylazanium chloride	C12H28ClN	0	232.9	0.2	measured	10.1039/TF9666202738
+tetra-n-butylammonium chloride	tetrabutylazanium chloride	C16H36ClN	0	294.3	0.2	measured	10.1039/TF9666202738
+tetramethylammonium bromide	tetramethylazanium bromide	C4H12BrN	0	114.2	0.2	measured	10.1039/TF9666202738
+tetraethylammonium bromide	tetraethylazanium bromide	C8H20BrN	0	174.3	0.2	measured	10.1039/TF9666202738
+tetra-n-propylammonium bromide	tetrapropylazanium bromide	C12H28BrN	0	239.6	0.2	measured	10.1039/TF9666202738
+tetra-n-butylammonium bromide	tetrabutylazanium bromide	C16H36BrN	0	301.0	0.2	measured	10.1039/TF9666202738
+tetra-n-amylammonium bromide	tetrapentylazanium bromide	C20H44BrN	0	363.9	0.2	measured	10.1039/TF9666202738
+tetramethylammonium iodide	tetramethylazanium iodide	C4H12IN	0	125.8	0.2	measured	10.1039/TF9666202738
+tetraethylammonium iodide	tetraethylazanium iodide	C8H20IN	0	185.5	0.2	measured	10.1039/TF9666202738
+tetra-n-propylammonium iodide	tetrapropylazanium iodide	C12H28IN	0	250.9	0.2	measured	10.1039/TF9666202738
+tetra-n-butylammonium iodide	tetrabutylazanium iodide	C16H36IN	0	312.4	0.2	measured	10.1039/TF9666202738
+carbonate	carbonate	CO3	-2	-5.8	1.6	derived	10.1016/j.jct.2003.12.008
+bicarbonate	hydrogen carbonate	HCO3	-1	24.5	1.0	derived	10.1016/j.jct.2003.12.008
+magnesium	magnesium(2+)	Mg	2	-20.1	2.0	derived	10.1016/j.jct.2006.09.008
+strontium	strontium(2+)	Sr	2	-17.3	1.4	derived	10.1016/j.jct.2006.09.008
+manganese(II)	manganese(2+)	Mn	2	-18.9	1.9	derived	10.1016/j.jct.2006.09.008
+trisodium citrate	trisodium 2-hydroxypropane-1,2,3-tricarboxylate	C6H5Na3O7	0	57.1		measured	10.1016/j.molliq.2004.07.014
+citrate	2-hydroxypropane-1,2,3-tricarboxylate	C6H5O7	-3	60.73		derived	10.1016/j.molliq.2004.07.014
+potassium nitrate	potassium nitrate	KNO3	0	35.94	0.07	measured	10.1016/j.molliq.2007.01.004
+ammonium sulfate	diammonium sulfate	H8N2O4S	0	55.04	0.11	measured	10.1016/j.molliq.2007.01.004
+tetrabutylammonium bromide	tetrabutylazanium bromide	C16H36BrN	0	295.80	0.44	measured	10.1016/j.molliq.2007.01.004
+tetrabutylammonium iodide	tetrabutylazanium iodide	C16H36IN	0	298.65	0.57	measured	10.1016/j.molliq.2007.01.004
+ammonium nickel sulfate	diammonium nickel disulfate	H32N2NiO20S2	0	67.90	0.60	measured	10.1016/j.molliq.2007.01.004
+ammonium aluminium sulfate	ammonium aluminium disulfate	H28AlNO20S2	0	291.34	0.06	measured	10.1016/j.molliq.2007.01.004
+potassium aluminium sulfate	potassium aluminium disulfate	AlH24KO20S2	0	281.73	0.88	measured	10.1016/j.molliq.2007.01.004
+ammonium ceric nitrate	diammonium hexanitratocerate(2-)	CeH8N8O18	0	222.19	0.15	measured	10.1016/j.molliq.2007.01.004
+sodium	sodium(1+)	Na	1	-1.21		derived	10.1139/v88-151
+potassium	potassium(1+)	K	1	9.00		derived	10.1139/v88-151
+tetramethylammonium	tetramethylazanium	C4H12N	1	89.38		derived	10.1139/v88-151
+chloride	chloride	Cl	-1	17.89		derived	10.1139/v88-151
+perchlorate	perchlorate	ClO4	-1	43.99		derived	10.1139/v88-151
+hydroxide	hydroxide	OH	-1	-4.05		derived	10.1139/v88-151
+EDTA	2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate	C10H12N2O8	-4	131		derived	10.1139/v88-151
+HEDTA	hydrogen 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate	C10H13N2O8	-3	151.2		derived	10.1139/v88-151
+H2EDTA	dihydrogen 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate	C10H14N2O8	-2	156.3		derived	10.1139/v88-151
+NaEDTA	sodium 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate	C10H12N2NaO8	-3	148		derived	10.1139/v88-151
+KEDTA	potassium 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate	C10H12KN2O8	-3	151		derived	10.1139/v88-151
+cobalt(II) chloride	cobalt(2+) dichloride	CoCl2	0	8.31		measured	10.1021/je9502410
+cobalt(II) bromide	cobalt(2+) dibromide	CoBr2	0	20.1		measured	10.1021/je9502410
+cobalt	cobalt(2+)	Co	2	-27.4		derived	10.1021/je9502410
+bromide	bromide	Br	-1	23.8		derived	10.1021/je9502410
+nickel(II) chloride	nickel(2+) dichloride	NiCl2	0	5.26		measured	10.1021/je960349v
+nickel(II) bromide	nickel(2+) dibromide	NiBr2	0	19.28		measured	10.1021/je960349v
+sodium formate	sodium formate	CHNaO2	0	25.22		measured	10.1080/00319101003646579
+sodium acetate	sodium acetate	C2H3NaO2	0	39.25		measured	10.1080/00319101003646579
+sodium propanoate	sodium propanoate	C3H5NaO2	0	53.73		measured	10.1080/00319101003646579
+sodium butanoate	sodium butanoate	C4H7NaO2	0	69.31		measured	10.1080/00319101003646579
+sodium pentanoate	sodium pentanoate	C5H9NaO2	0	85.16		measured	10.1080/00319101003646579
+sodium hexanoate	sodium hexanoate	C6H11NaO2	0	100.71		measured	10.1080/00319101003646579
+sodium heptanoate	sodium heptanoate	C7H13NaO2	0	116.04		measured	10.1080/00319101003646579
+sodium octanoate	sodium octanoate	C8H15NaO2	0	131.56		measured	10.1080/00319101003646579
+sodium nonanoate	sodium nonanoate	C9H17NaO2	0	147.15		measured	10.1080/00319101003646579
+sodium oxalate	disodium ethanedioate	C2Na2O4	0	23.73		measured	10.1080/00319101003646579
+sodium malonate	disodium propanedioate	C3H2Na2O4	0	38.52		measured	10.1080/00319101003646579
+sodium succinate	disodium butanedioate	C4H4Na2O4	0	53.95		measured	10.1080/00319101003646579
+sodium glutarate	disodium pentanedioate	C5H6Na2O4	0	69.90		measured	10.1080/00319101003646579
+sodium adipate	disodium hexanedioate	C6H8Na2O4	0	85.78		measured	10.1080/00319101003646579
+sodium pimelate	disodium heptanedioate	C7H10Na2O4	0	101.33		measured	10.1080/00319101003646579
+sodium suberate	disodium octanedioate	C8H12Na2O4	0	116.79		measured	10.1080/00319101003646579
+sodium chloroacetate	sodium 2-chloroacetate	C2H2ClNaO2	0	67.44		measured	10.1080/00319101003646579
+sodium 1-chloropropanoate	sodium 1-chloropropanoate	C3H4ClNaO2	0	81.58		measured	10.1080/00319101003646579
+sodium 1-chlorobutanoate	sodium 1-chlorobutanoate	C4H6ClNaO2	0	97.31		measured	10.1080/00319101003646579
+sodium 1-chloropentanoate	sodium 1-chloropentanoate	C5H8ClNaO2	0	113.17		measured	10.1080/00319101003646579
+cobalt(II) sulfate	cobalt(2+) sulfate	CoSO4	0	-11.3		derived	10.1021/acs.jced.0c00407
+nickel(II) sulfate	nickel(2+) sulfate	NiSO4	0	-15.3		derived	10.1021/acs.jced.0c00407
+copper(II) sulfate	copper(2+) sulfate	CuSO4	0	-11.1		derived	10.1021/acs.jced.0c00407
+lithium sulfate	dilithium sulfate	Li2SO4	0	12.61		measured	10.1021/acs.jced.6b00519
+lithium trifluoromethanesulfonate	lithium trifluoromethanesulfonate	LiCF3SO3	0	74.39		measured	10.1021/acs.jced.6b00519
+sodium fluoride	sodium fluoride	NaF	0	-2.426		measured	10.1063/1.555981
+hydrochloric acid	chlorane	HCl	0	17.824		measured	10.1063/1.555981
+lithium chloride	lithium chloride	LiCl	0	16.866		measured	10.1063/1.555981
+sodium chloride	sodium chloride	NaCl	0	16.620		measured	10.1063/1.555981
+potassium chloride	potassium chloride	KCl	0	26.848		measured	10.1063/1.555981
+rubidium chloride	rubidium chloride	RbCl	0	31.943		measured	10.1063/1.555981
+cesium chloride	caesium chloride	CsCl	0	39.155		measured	10.1063/1.555981
+magnesium chloride	magnesium dichloride	MgCl2	0	14.083		measured	10.1063/1.555981
+calcium chloride	calcium dichloride	CaCl2	0	17.612		measured	10.1063/1.555981
+strontium chloride	strontium dichloride	SrCl2	0	18.400		measured	10.1063/1.555981
+barium chloride	barium dichloride	BaCl2	0	22.975		measured	10.1063/1.555981
+sodium bromide	sodium bromide	NaBr	0	23.479		measured	10.1063/1.555981
+sodium iodide	sodium iodide	NaI	0	34.998		measured	10.1063/1.555981
+thallium nitrate	thallium nitrate	TlNO3	0	39.701		measured	10.1063/1.555981
+silver nitrate	silver nitrate	AgNO3	0	27.558		measured	10.1063/1.555981
+sodium perchlorate	sodium perchlorate	NaClO4	0	43.140		measured	10.1063/1.555981
+sodium dihydrogen phosphate	sodium dihydrogen phosphate	NaH2PO4	0	24.124		measured	10.1063/1.555981
+sodium acetate	sodium acetate	C2H3NaO2	0	39.152		measured	10.1063/1.555981
+beryllium sulfate	beryllium sulfate	BeSO4	0	3.680		measured	10.1063/1.555981
+potassium thiocyanate	potassium thiocyanate	KSCN	0	49.434		measured	10.1063/1.555981
+potassium bromate	potassium bromate	KBrO3	0	43.034		measured	10.1063/1.555981
+cadmium nitrate	cadmium dinitrate	CdN2O6	0	43.883		measured	10.1063/1.555981
+cobalt nitrate	cobalt dinitrate	CoN2O6	0	29.569		measured	10.1063/1.555981
+lead nitrate	lead dinitrate	PbN2O6	0	39.769		measured	10.1063/1.555981
+zinc chloride	zinc dichloride	ZnCl2	0	6.098		measured	10.1063/1.555981
+potassium fluoride	potassium fluoride	KF	0	7.80		derived	10.1063/1.555981
+rubidium fluoride	rubidium fluoride	RbF	0	12.91		derived	10.1063/1.555981
+cesium fluoride	caesium fluoride	CsF	0	20.10		derived	10.1063/1.555981
+cadmium chloride	cadmium dichloride	CdCl2	0	21.12		derived	10.1063/1.555981
+cobalt chloride	cobalt dichloride	CoCl2	0	6.80		derived	10.1063/1.555981
+lithium bromide	lithium bromide	LiBr	0	23.73		derived	10.1063/1.555981
+potassium bromide	potassium bromide	KBr	0	33.71		derived	10.1063/1.555981
+rubidium bromide	rubidium bromide	RbBr	0	38.82		derived	10.1063/1.555981
+cesium bromide	caesium bromide	CsBr	0	46.01		derived	10.1063/1.555981
+ammonium bromide	ammonium bromide	NH4Br	0	42.92		derived	10.1063/1.555981
+magnesium bromide	magnesium dibromide	MgBr2	0	27.80		derived	10.1063/1.555981
+calcium bromide	calcium dibromide	CaBr2	0	31.33		derived	10.1063/1.555981
+strontium bromide	strontium dibromide	SrBr2	0	32.12		derived	10.1063/1.555981
+copper bromide	copper dibromide	CuBr2	0	22.29		derived	10.1063/1.555981
+zinc bromide	zinc dibromide	ZnBr2	0	24.58		derived	10.1063/1.555981
+cadmium bromide	cadmium dibromide	CdBr2	0	34.83		derived	10.1063/1.555981
+lithium iodide	lithium iodide	LiI	0	35.24		derived	10.1063/1.555981
+potassium iodide	potassium iodide	KI	0	45.22		derived	10.1063/1.555981
+rubidium iodide	rubidium iodide	RbI	0	50.33		derived	10.1063/1.555981
+cesium iodide	caesium iodide	CsI	0	57.53		derived	10.1063/1.555981
+magnesium iodide	magnesium diiodide	MgI2	0	50.84		derived	10.1063/1.555981
+calcium iodide	calcium diiodide	CaI2	0	54.37		derived	10.1063/1.555981
+strontium iodide	strontium diiodide	SrI2	0	55.15		derived	10.1063/1.555981
+barium iodide	barium diiodide	BaI2	0	59.73		derived	10.1063/1.555981
+cadmium iodide	cadmium diiodide	CdI2	0	57.86		derived	10.1063/1.555981
+nickel iodide	nickel diiodide	NiI2	0	43.00		derived	10.1063/1.555981
+lithium nitrate	lithium nitrate	LiNO3	0	28.24		derived	10.1063/1.555981
+potassium nitrate	potassium nitrate	KNO3	0	38.24		derived	10.1063/1.555981
+rubidium nitrate	rubidium nitrate	RbNO3	0	43.54		derived	10.1063/1.555981
+cesium nitrate	caesium nitrate	CsNO3	0	50.54		derived	10.1063/1.555981
+ammonium nitrate	ammonium nitrate	NH4NO3	0	47.46		derived	10.1063/1.555981
+magnesium nitrate	magnesium dinitrate	MgN2O6	0	36.86		derived	10.1063/1.555981
+calcium nitrate	calcium dinitrate	CaN2O6	0	40.39		derived	10.1063/1.555981
+strontium nitrate	strontium dinitrate	SrN2O6	0	41.17		derived	10.1063/1.555981
+barium nitrate	barium dinitrate	BaN2O6	0	45.75		derived	10.1063/1.555981
+zinc nitrate	zinc dinitrate	ZnN2O6	0	33.64		derived	10.1063/1.555981
+nickel nitrate	nickel dinitrate	NiN2O6	0	29.01		derived	10.1063/1.555981
+lithium chlorate	lithium chlorate	LiClO3	0	35.70		derived	10.1063/1.555981
+lithium perchlorate	lithium perchlorate	LiClO4	0	43.38		derived	10.1063/1.555981
+silver perchlorate	silver perchlorate	AgClO4	0	42.69		derived	10.1063/1.555981
+thallium perchlorate	thallium perchlorate	TlClO4	0	54.83		derived	10.1063/1.555981
+ammonium perchlorate	ammonium perchlorate	NH4ClO4	0	62.59		derived	10.1063/1.555981
+magnesium perchlorate	magnesium diperchlorate	MgCl2O8	0	67.12		derived	10.1063/1.555981
+calcium perchlorate	calcium diperchlorate	CaCl2O8	0	70.55		derived	10.1063/1.555981
+potassium dihydrogen phosphate	potassium dihydrogen phosphate	KH2PO4	0	34.36		derived	10.1063/1.555981
+potassium acetate	potassium acetate	C2H3KO2	0	49.44		derived	10.1063/1.555981
+thallium acetate	thallium acetate	C2H3TlO2	0	50.85		derived	10.1063/1.555981
+ammonium acetate	azanium acetate	C2H7NO2	0	58.66		derived	10.1063/1.555981
+magnesium acetate	magnesium diacetate	C4H6MgO4	0	59.26		derived	10.1063/1.555981
+calcium acetate	calcium diacetate	C4H6CaO4	0	62.79		derived	10.1063/1.555981
+lithium sulfate	dilithium sulfate	Li2SO4	0	12.27		derived	10.1063/1.555981
+potassium sulfate	dipotassium sulfate	K2SO4	0	32.23		derived	10.1063/1.555981
+rubidium sulfate	dirubidium sulfate	Rb2SO4	0	42.45		derived	10.1063/1.555981
+cesium sulfate	dicaesium sulfate	Cs2SO4	0	56.85		derived	10.1063/1.555981
+copper sulfate	copper sulfate	CuSO4	0	-12.89		derived	10.1063/1.555981
+cadmium sulfate	cadmium sulfate	CdSO4	0	-0.355		derived	10.1063/1.555981
+zinc sulfate	zinc sulfate	ZnSO4	0	-10.600		derived	10.1063/1.555981
+cobalt sulfate	cobalt sulfate	CoSO4	0	-14.67		derived	10.1063/1.555981
+nickel sulfate	nickel sulfate	NiSO4	0	-15.22		derived	10.1063/1.555981
+chloride	chloride	Cl	-1	17.824		derived	10.1063/1.555981
+lithium	lithium(1+)	Li	1	-0.98		derived	10.1063/1.555981
+sodium	sodium(1+)	Na	1	-1.204		derived	10.1063/1.555981
+potassium	potassium(1+)	K	1	9.020		derived	10.1063/1.555981
+rubidium	rubidium(1+)	Rb	1	14.133		derived	10.1063/1.555981
+cesium	caesium(1+)	Cs	1	21.331		derived	10.1063/1.555981
+ammonium	azanium	NH4	1	18.245		derived	10.1063/1.555981
+magnesium	magnesium(2+)	Mg	2	-21.565		derived	10.1063/1.555981
+calcium	calcium(2+)	Ca	2	-18.038		derived	10.1063/1.555981
+strontium	strontium(2+)	Sr	2	-17.248		derived	10.1063/1.555981
+barium	barium(2+)	Ba	2	-12.675		derived	10.1063/1.555981
+copper	copper(2+)	Cu	2	-27.077		derived	10.1063/1.555981
+zinc	zinc(2+)	Zn	2	-24.784		derived	10.1063/1.555981
+nickel	nickel(2+)	Ni	2	-29.404		derived	10.1063/1.555981
+fluoride	fluoride	F	-1	-1.222		derived	10.1063/1.555981
+bromide	bromide	Br	-1	24.683		derived	10.1063/1.555981
+iodide	iodide	I	-1	36.202		derived	10.1063/1.555981
+nitrate	nitrate	NO3	-1	29.211		derived	10.1063/1.555981
+bicarbonate	hydrogen carbonate	HCO3	-1	24.385		derived	10.1063/1.555981
+perchlorate	perchlorate	ClO4	-1	44.342		derived	10.1063/1.555981
+acetate	acetate	C2H3O2	-1	40.355		derived	10.1063/1.555981
+carbonate	carbonate	CO3	-2	-4.072		derived	10.1063/1.555981
+sulfate	sulfate	SO4	-2	14.184		derived	10.1063/1.555981
+silver	silver(1+)	Ag	1	-1.655		derived	10.1063/1.555981
+thallium	thallium(1+)	Tl	1	10.490		derived	10.1063/1.555981
+cadmium	cadmium(2+)	Cd	2	-14.539		derived	10.1063/1.555981
+cobalt	cobalt(2+)	Co	2	-28.659		derived	10.1063/1.555981
+lead	lead(2+)	Pb	2	-18.653		derived	10.1063/1.555981
+beryllium	beryllium(2+)	Be	2	-10.504		derived	10.1063/1.555981
+chlorate	chlorate	ClO3	-1	36.657		derived	10.1063/1.555981
+thiocyanate	thiocyanate	SCN	-1	40.47		derived	10.1063/1.555981
+bromate	bromate	BrO3	-1	34.01		derived	10.1063/1.555981
+sodium fluoride	sodium fluoride	NaF	0	-2.29	0.07	measured	10.1021/j100872a074
+lithium	lithium(1+)	Li	1	-0.88		derived	10.1021/cr60270a001
+sodium	sodium(1+)	Na	1	-1.21		derived	10.1021/cr60270a001
+potassium	potassium(1+)	K	1	9.02		derived	10.1021/cr60270a001
+rubidium	rubidium(1+)	Rb	1	14.07		derived	10.1021/cr60270a001
+cesium	caesium(1+)	Cs	1	21.34		derived	10.1021/cr60270a001
+silver	silver(1+)	Ag	1	-0.7		derived	10.1021/cr60270a001
+thallium	thallium(1+)	Tl	1	10.6		derived	10.1021/cr60270a001
+ammonium	azanium	NH4	1	17.86		derived	10.1021/cr60270a001
+tetramethylammonium	tetramethylazanium	C4H12N	1	89.57		derived	10.1021/cr60270a001
+tetraethylammonium	tetraethylazanium	C8H20N	1	149.12		derived	10.1021/cr60270a001
+tetra-n-propylammonium	tetrapropylazanium	C12H28N	1	214.44		derived	10.1021/cr60270a001
+tetra-n-butylammonium	tetrabutylazanium	C16H36N	1	275.66		derived	10.1021/cr60270a001
+tetraphenylarsonium	tetraphenylarsanium	C24H20As	1	300.65		derived	10.1021/cr60270a001
+beryllium	beryllium(2+)	Be	2	-12.0		derived	10.1021/cr60270a001
+magnesium	magnesium(2+)	Mg	2	-21.17		derived	10.1021/cr60270a001
+calcium	calcium(2+)	Ca	2	-17.85		derived	10.1021/cr60270a001
+strontium	strontium(2+)	Sr	2	-18.16		derived	10.1021/cr60270a001
+barium	barium(2+)	Ba	2	-12.47		derived	10.1021/cr60270a001
+manganese(II)	manganese(2+)	Mn	2	-17.7		derived	10.1021/cr60270a001
+iron(II)	iron(2+)	Fe	2	-24.7		derived	10.1021/cr60270a001
+cobalt	cobalt(2+)	Co	2	-24.0		derived	10.1021/cr60270a001
+nickel	nickel(2+)	Ni	2	-24.0		derived	10.1021/cr60270a001
+copper	copper(2+)	Cu	2	-27.76		derived	10.1021/cr60270a001
+zinc	zinc(2+)	Zn	2	-21.6		derived	10.1021/cr60270a001
+cadmium	cadmium(2+)	Cd	2	-20.0		derived	10.1021/cr60270a001
+mercury(II)	mercury(2+)	Hg	2	-19.3		derived	10.1021/cr60270a001
+lead	lead(2+)	Pb	2	-15.5		derived	10.1021/cr60270a001
+aluminum	aluminium(3+)	Al	3	-42.2		derived	10.1021/cr60270a001
+iron(III)	iron(3+)	Fe	3	-43.7		derived	10.1021/cr60270a001
+chromium(III)	chromium(3+)	Cr	3	-39.5		derived	10.1021/cr60270a001
+lanthanum	lanthanum(3+)	La	3	-39.10		derived	10.1021/cr60270a001
+thorium	thorium(4+)	Th	4	-53.5		derived	10.1021/cr60270a001
+fluoride	fluoride	F	-1	-1.16		derived	10.1021/cr60270a001
+chloride	chloride	Cl	-1	17.83		derived	10.1021/cr60270a001
+bromide	bromide	Br	-1	24.71		derived	10.1021/cr60270a001
+iodide	iodide	I	-1	36.22		derived	10.1021/cr60270a001
+hydroxide	hydroxide	OH	-1	-4.04		derived	10.1021/cr60270a001
+perchlorate	perchlorate	ClO4	-1	40.7		derived	10.1021/cr60270a001
+nitrate	nitrate	NO3	-1	26.2		derived	10.1021/cr60270a001
+nitrite	nitrite	NO2	-1	29.00		derived	10.1021/cr60270a001
+thiocyanate	thiocyanate	SCN	-1	35.7		derived	10.1021/cr60270a001
+formate	formate	CHO2	-1	26.27		derived	10.1021/cr60270a001
+acetate	acetate	C2H3O2	-1	40.46		derived	10.1021/cr60270a001
+chlorate	chlorate	ClO3	-1	44.12		derived	10.1021/cr60270a001
+bromate	bromate	BrO3	-1	35.3		derived	10.1021/cr60270a001
+iodate	iodate	IO3	-1	25.3		derived	10.1021/cr60270a001
+bicarbonate	hydrogen carbonate	HCO3	-1	23.4		derived	10.1021/cr60270a001
+permanganate	permanganate	MnO4	-1	38.5		derived	10.1021/cr60270a001
+carbonate	carbonate	CO3	-2	-9.8		derived	10.1021/cr60270a001
+sulfate	sulfate	SO4	-2	11.1		derived	10.1021/cr60270a001
+chromate	chromate	CrO4	-2	13.6		derived	10.1021/cr60270a001
+hydrogen phosphate	hydrogen phosphate	HPO4	-2	7.7		derived	10.1021/cr60270a001
+guanidinium acetate	guanidinium acetate	C3H9N3O2	0	90.0		measured	10.1246/bcsj.51.2508
+guanidinium propionate	guanidinium propanoate	C4H11N3O2	0	103.6		measured	10.1246/bcsj.51.2508
+guanidinium benzoate	guanidinium benzoate	C8H11N3O2	0	136.4		measured	10.1246/bcsj.51.2508
+tripotassium citrate	tripotassium 2-hydroxypropane-1,2,3-tricarboxylate	K3C6H5O7	0	95.245		measured	10.1021/je7001368
+sodium oxalate	disodium ethanedioate	Na2C2O4	0	20.77	0.07	measured	10.1021/je0502400
+potassium oxalate	dipotassium ethanedioate	K2C2O4	0	41.90	0.17	measured	10.1021/je0502400
+sodium malonate	disodium propanedioate	Na2C3H2O4	0	35.81	0.26	measured	10.1021/je0502400
+sodium succinate	disodium butanedioate	Na2C4H4O4	0	52.03	0.15	measured	10.1021/je0502400
+sodium tartrate	disodium 2,3-dihydroxybutanedioate	Na2C4H4O6	0	57.35		measured	10.1021/je050498q
+tartrate	2,3-dihydroxybutanedioate	C4H4O6	-2	59.77		derived	10.1021/je050498q
+sodium acetate	sodium acetate	C2H3NaO2	0	40.99		measured	10.1016/j.jct.2016.12.001
+sodium benzoate	sodium benzoate	C7H5NaO2	0	89.51		measured	10.1016/j.jct.2016.12.001
+zinc chloride	zinc dichloride	ZnCl2	0	10.08	0.28	measured	10.1007/BF00652987
+zinc perchlorate	zinc diperchlorate	ZnCl2O8	0	63.14	0.04	measured	10.1007/BF00652987
+lithium perchlorate	lithium perchlorate	ClLiO4	0	43.21	0.03	measured	10.1021/acs.jced.5b00535
+disodium hydrogen citrate	disodium hydrogen 2-hydroxypropane-1,2,3-tricarboxylate	C6H6Na2O7	0	86.157		measured	10.1021/je100864e
+sodium dihydrogen citrate	sodium dihydrogen 2-hydroxypropane-1,2,3-tricarboxylate	C6H7NaO7	0	102.6137		measured	10.1021/je100864e
+tetramethylammonium bromide	tetramethylazanium bromide	C4H12BrN	0	114.05	0.04	measured	10.1007/s10953-006-8936-1
+tetraethylammonium bromide	tetraethylazanium bromide	C8H20BrN	0	172.73	0.04	measured	10.1007/s10953-006-8936-1
+butyltriethylammonium bromide	butyl(triethyl)azanium bromide	C10H24BrN	0	203.45	0.08	measured	10.1007/s10953-006-8936-1
+dibutyldiethylammonium bromide	dibutyl(diethyl)azanium bromide	C12H28BrN	0	224.47	0.05	measured	10.1007/s10953-006-8936-1
+tributylethylammonium bromide	tributyl(ethyl)azanium bromide	C14H32BrN	0	279.87	0.04	measured	10.1007/s10953-006-8936-1
+tetrabutylammonium bromide	tetrabutylazanium bromide	C16H36BrN	0	300.38	0.04	measured	10.1007/s10953-006-8936-1
+lanthanum chloride	lanthanum trichloride	LaCl3	0	14.51		measured	10.1021/j100880a003
+praseodymium chloride	praseodymium(3+) trichloride	PrCl3	0	10.96		measured	10.1021/j100880a003
+neodymium chloride	neodymium(3+) trichloride	NdCl3	0	10.18		measured	10.1021/j100880a003
+samarium chloride	samarium(3+) trichloride	SmCl3	0	11.16		measured	10.1021/j100880a003
+gadolinium chloride	gadolinium(3+) trichloride	GdCl3	0	13.08		measured	10.1021/j100880a003
+terbium chloride	terbium(3+) trichloride	TbCl3	0	13.25		measured	10.1021/j100880a003
+dysprosium chloride	dysprosium(3+) trichloride	DyCl3	0	12.66		measured	10.1021/j100880a003
+holmium chloride	holmium(3+) trichloride	HoCl3	0	11.73		measured	10.1021/j100880a003
+erbium chloride	erbium(3+) trichloride	ErCl3	0	10.63		measured	10.1021/j100880a003
+ytterbium chloride	ytterbium(3+) trichloride	YbCl3	0	9.27		measured	10.1021/j100880a003
+lanthanum nitrate	lanthanum trinitrate	LaN3O9	0	49.37		measured	10.1021/j100880a003
+neodymium nitrate	neodymium(3+) trinitrate	NdN3O9	0	44.74		measured	10.1021/j100880a003
+erbium nitrate	erbium(3+) trinitrate	ErN3O9	0	45.28		measured	10.1021/j100880a003
+ytterbium nitrate	ytterbium(3+) trinitrate	YbN3O9	0	43.37		measured	10.1021/j100880a003
+calcium sulfate	calcium sulfate	CaSO4	0	-3.87		derived	10.1007/BF00645458
+imidazolium chloride	1H-imidazol-3-ium chloride	C3H5ClN2	0	76.0		derived	10.1006/jcht.2002.0944
+imidazole	1H-imidazole	C3H4N2	0	60.0		derived	10.1006/jcht.2002.0944
+choline acetate	(2-hydroxyethyl)trimethylazanium acetate	C7H17NO3	0	163.93	0.022	measured	10.1016/j.molliq.2019.110878
+methyl potassium malonate	potassium 3-methoxy-3-oxopropanoate	C4H5KO4	0	82.939		measured	10.1016/j.jct.2011.11.014
+ethyl potassium malonate	potassium 3-ethoxy-3-oxopropanoate	C5H7KO4	0	99.149		measured	10.1016/j.jct.2011.11.014
+1-hexyl-3-methylimidazolium chloride	1-hexyl-3-methyl-1H-imidazol-3-ium chloride	C10H19ClN2	0	192.499		measured	10.1016/j.jct.2011.11.014
+lithium chloride	lithium chloride	LiCl	0	16.09		measured	10.1021/j100845a031
+lithium chloride	lithium chloride	LiCl	0	16.95		measured	10.1021/j100845a031
+sodium chloride	sodium chloride	NaCl	0	14.02		measured	10.1021/j100845a031
+lithium bromide	lithium bromide	LiBr	0	23.80		measured	10.1021/j100845a031
+lithium iodide	lithium iodide	LiI	0	35.37		measured	10.1021/j100845a031
+lithium iodide	lithium iodide	LiI	0	33.39		measured	10.1021/j100845a031
+sodium bromide	sodium bromide	NaBr	0	23.57		measured	10.1021/j100845a031
+sodium iodide	sodium iodide	NaI	0	34.98		measured	10.1021/j100845a031
+tetramethylammonium bromide	tetramethylazanium bromide	C4H12BrN	0	114.8		measured	10.1021/j100791a042
+tetraethylammonium bromide	tetraethylazanium bromide	C8H20BrN	0	175.3		measured	10.1021/j100791a042
+tetrapropylammonium bromide	tetrapropylazanium bromide	C12H28BrN	0	240.8		measured	10.1021/j100791a042
+tetrabutylammonium bromide	tetrabutylazanium bromide	C16H36BrN	0	302.9		measured	10.1021/j100791a042
+tetrapentylammonium bromide	tetrapentylazanium bromide	C20H44BrN	0	365.6		measured	10.1021/j100791a042
+potassium dihydrogen phosphate	potassium dihydrogen phosphate	KH2PO4	0	43.5	1.8	derived	10.1016/j.jct.2013.01.012
+dipotassium hydrogen phosphate	dipotassium hydrogen phosphate	K2HPO4	0	34.4	0.7	derived	10.1016/j.jct.2013.01.012
+tripotassium phosphate	tripotassium phosphate	K3PO4	0	25.2	2.5	derived	10.1016/j.jct.2013.01.012
+trisodium phosphate	trisodium phosphate	Na3PO4	0	-12.2	1.7	derived	10.1016/j.jct.2013.01.012
+sodium dihydrogen phosphate	sodium dihydrogen phosphate	NaH2PO4	0	34.0	0.1	derived	10.1016/j.jct.2013.01.012
+lithium dihydrogen phosphate	lithium dihydrogen phosphate	LiH2PO4	0	34.9	1.1	derived	10.1016/j.jct.2013.01.012
+disodium hydrogen phosphate	disodium hydrogen phosphate	Na2HPO4	0	14.2	8.4	derived	10.1016/j.jct.2013.01.012
+sodium formate	sodium formate	CHNaO2	0	25.127	0.5	measured	10.1021/je200964m
+sodium acetate	sodium acetate	C2H3NaO2	0	39.344	0.5	measured	10.1021/je200964m
+sodium propanoate	sodium propanoate	C3H5NaO2	0	53.912	1.0	measured	10.1021/je200964m
+sodium butanoate	sodium butanoate	C4H7NaO2	0	68.703	0.5	measured	10.1021/je200964m
+sodium tartrate	disodium 2,3-dihydroxybutanedioate	Na2C4H4O6	0	57.87		measured	10.1016/0378-3812(90)85049-G
+sodium hydrogen tartrate	sodium hydrogen 2,3-dihydroxybutanedioate	C4H5NaO6	0	71.01		measured	10.1016/0378-3812(90)85049-G
+sodium potassium tartrate	potassium sodium 2,3-dihydroxybutanedioate	C4H4KNaO6	0	67.44		measured	10.1016/0378-3812(90)85049-G
+ammonium tartrate	diammonium 2,3-dihydroxybutanedioate	C4H12N2O6	0	96.06		measured	10.1016/0378-3812(90)85049-G
+tartrate	2,3-dihydroxybutanedioate	C4H4O6	-2	60.1	0.4	derived	10.1016/0378-3812(90)85049-G
+hydrogen tartrate	hydrogen 2,3-dihydroxybutanedioate	C4H5O6	-1	72.22		derived	10.1016/0378-3812(90)85049-G
+trisodium citrate	trisodium 2-hydroxypropane-1,2,3-tricarboxylate	C6H5Na3O7	0	69.32		measured	10.1016/0378-3812(90)85049-G
+tripotassium citrate	tripotassium 2-hydroxypropane-1,2,3-tricarboxylate	K3C6H5O7	0	98.43		measured	10.1016/0378-3812(90)85049-G
+disodium hydrogen citrate	disodium hydrogen 2-hydroxypropane-1,2,3-tricarboxylate	C6H6Na2O7	0	86.12		measured	10.1016/0378-3812(90)85049-G
+citrate	2-hydroxypropane-1,2,3-tricarboxylate	C6H5O7	-3	72	1	derived	10.1016/0378-3812(90)85049-G
+hydrogen citrate	hydrogen 2-hydroxypropane-1,2,3-tricarboxylate	C6H6O7	-2	88.5		derived	10.1016/0378-3812(90)85049-G
+disodium malate	disodium 2-hydroxybutanedioate	C4H4Na2O5	0	66.77		measured	10.1016/0378-3812(90)85049-G
+malate	2-hydroxybutanedioate	C4H4O5	-2	69.19		derived	10.1016/0378-3812(90)85049-G
+hydrogen malate	hydrogen 2-hydroxybutanedioate	C4H5O5	-1	75.4		derived	10.1016/0378-3812(90)85049-G
+disodium maleate	disodium (2Z)-but-2-enedioate	C4H2Na2O4	0	47.69		measured	10.1016/0378-3812(90)85049-G
+maleate	(2Z)-but-2-enedioate	C4H2O4	-2	50.11		derived	10.1016/0378-3812(90)85049-G
+hydrogen maleate	hydrogen (2Z)-but-2-enedioate	C4H3O4	-1	61.6		derived	10.1016/0378-3812(90)85049-G
+disodium oxalate	disodium ethanedioate	Na2C2O4	0	22.60		measured	10.1016/0378-3812(90)85049-G
+oxalate	ethanedioate	C2O4	-2	25.02		derived	10.1016/0378-3812(90)85049-G
+hydrogen oxalate	hydrogen ethanedioate	C2HO4	-1	34.0		derived	10.1016/0378-3812(90)85049-G
+sodium lactate	sodium 2-hydroxypropanoate	C3H5NaO3	0	54.70		measured	10.1016/0378-3812(90)85049-G
+lactate	2-hydroxypropanoate	C3H5O3	-1	55.9		derived	10.1016/0378-3812(90)85049-G
+ascorbic acid	(5R)-5-[(1S)-1,2-dihydroxyethyl]-3,4-dihydroxyfuran-2(5H)-one	C6H8O6	0	106.49	0.08	measured	10.1139/v93-123
+tabs	4-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}butane-1-sulfonic acid	C8H19NO6S	0	169.24		measured	10.1021/je900260g
+tapso	3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}-2-hydroxypropane-1-sulfonic acid	C7H17NO7S	0	153.12	0.50	derived	10.1016/j.jct.2008.12.011
+pipes	2,2'-(piperazine-1,4-diyl)bis(ethane-1-sulfonic acid)	C8H18N2O6S2	0	188.6	6.4	predicted	10.1007/BF02311772
+ches	2-(cyclohexylamino)ethane-1-sulfonic acid	C8H17NO3S	0	146.6	6.4	predicted	10.1007/BF02311772
+caps	3-(cyclohexylamino)propane-1-sulfonic acid	C9H19NO3S	0	160.0	6.4	predicted	10.1007/BF02311772
+bis-tris	2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol	C8H19NO5	0	152.5	6.4	predicted	10.1007/BF02311772
+bicine	2-[bis(2-hydroxyethyl)amino]acetic acid	C6H13NO4	0	115.9	6.4	predicted	10.1007/BF02311772
+ada	2-[bis(carboxymethyl)amino]acetamide	C6H10N2O5	0	122.8	6.4	predicted	10.1007/BF02311772
+dtt	1,4-disulfanylbutane-2,3-diol	C4H10O2S2	0	103.6	6.4	predicted	10.1007/BF02311772
+tcep	3,3',3''-phosphanetriyltripropanoic acid	C9H15O6P	0	169.3	6.4	predicted	10.1007/BF02311772
+tricine	2-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}acetic acid	C6H13NO5	0	121.5	6.4	predicted	10.1007/BF02311772
+taps	3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}propane-1-sulfonic acid	C7H17NO6S	0	160.3	6.4	predicted	10.1007/BF02311772
+citric acid	2-hydroxypropane-1,2,3-tricarboxylic acid	C6H8O7	0	112.44		measured	10.1016/0021-9614(85)90057-6
+malic acid	2-hydroxybutanedioic acid	C4H6O5	0	88.22		measured	10.1016/0021-9614(85)90057-6
+maleic acid	(2Z)-but-2-enedioic acid	C4H4O4	0	75.65		measured	10.1016/0021-9614(85)90057-6
+mes	2-(morpholin-4-yl)ethane-1-sulfonic acid	C6H13NO4S	0	129.51	0.04	measured	10.1016/j.tca.2010.04.004
+mops	3-(morpholin-4-yl)propane-1-sulfonic acid	C7H15NO4S	0	145.71	0.40	measured	10.1016/j.tca.2010.04.004
+mopso	2-hydroxy-3-(morpholin-4-yl)propane-1-sulfonic acid	C7H15NO5S	0	145.92	0.06	measured	10.1016/j.tca.2010.04.004
+mobs	4-(morpholin-4-yl)butane-1-sulfonic acid	C8H17NO4S	0	160.25	0.09	measured	10.1016/j.tca.2010.04.004
+dmea	2-(dimethylamino)ethan-1-ol	C4H11NO	0	93.5	0.1	measured	10.1021/acs.jced.1c00352
+tris	2-amino-2-(hydroxymethyl)propane-1,3-diol	C4H11NO3	0	90.63	0.05	measured	10.1016/j.dsr.2015.06.008
+hepes	2-[4-(2-hydroxyethyl)piperazin-1-yl]ethane-1-sulfonic acid	C8H18N2O4S	0	152.8	3.1	predicted	10.1007/BFb0115599
+methane	methane	CH4	0	37.3		measured	10.1007/BF00646936
+ethane	ethane	C2H6	0	51.2		measured	10.1007/BF00646936
+propane	propane	C3H8	0	67.0		measured	10.1007/BF00646936
+fluoromethane	fluoromethane	CH3F	0	35.9		measured	10.1007/BF00646936
+chloromethane	chloromethane	CH3Cl	0	46.2		measured	10.1007/BF00646936
+dichloromethane	dichloromethane	CH2Cl2	0	58.1		measured	10.1007/BF00646936
+trichloromethane	trichloromethane	CHCl3	0	72.3		measured	10.1007/BF00646936
+bromomethane	bromomethane	CH3Br	0	53.0		measured	10.1007/BF00646936
+iodomethane	iodomethane	CH3I	0	63.7		measured	10.1007/BF00646936
+bromoethane	bromoethane	C2H5Br	0	66.7		measured	10.1007/BF00646936
+1-bromopropane	1-bromopropane	C3H7Br	0	82.2		measured	10.1007/BF00646936
+allyl bromide	3-bromoprop-1-ene	C3H5Br	0	77.6		measured	10.1007/BF00646936
+benzene	benzene	C6H6	0	83.1		measured	10.1007/BF00646936
+toluene	methylbenzene	C7H8	0	97.7		measured	10.1007/BF00646936
+nitrobenzene	nitrobenzene	C6H5NO2	0	97.7		measured	10.1007/BF00646936
+methanol	methanol	CH4O	0	38.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+ethanol	ethanol	C2H6O	0	55.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+allyl alcohol	prop-2-en-1-ol	C3H6O	0	64.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1-butanol	butan-1-ol	C4H10O	0	86.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1-hexanol	hexan-1-ol	C6H14O	0	118.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-methoxyethanol	2-methoxyethan-1-ol	C3H8O2	0	75.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-ethoxyethanol	2-ethoxyethan-1-ol	C4H10O2	0	91.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-propoxyethanol	2-propoxyethan-1-ol	C5H12O2	0	107.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-butoxyethanol	2-butoxyethan-1-ol	C6H14O2	0	123.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclobutanol	cyclobutan-1-ol	C4H8O	0	75.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclopentanol	cyclopentan-1-ol	C5H10O	0	89.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclohexanol	cyclohexan-1-ol	C6H12O	0	103.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclooctanol	cyclooctan-1-ol	C8H16O	0	129.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclopropylmethanol	cyclopropylmethanol	C4H8O	0	76.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1-cyclopropylethanol	1-cyclopropylethan-1-ol	C5H10O	0	92.4		measured	Edward, J. T.; Farrell, P. G.; Shahidi, F. J. Chem. Soc., Faraday Trans. 1 1977, 73, 705-714
+ethylene glycol	ethane-1,2-diol	C2H6O2	0	54.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,2-propanediol	propane-1,2-diol	C3H8O2	0	71.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,3-propanediol	propane-1,3-diol	C3H8O2	0	71.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,4-butanediol	butane-1,4-diol	C4H10O2	0	88.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2,3-butanediol	butane-2,3-diol	C4H10O2	0	86.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,6-hexanediol	hexane-1,6-diol	C6H14O2	0	120.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,8-octanediol	octane-1,8-diol	C8H18O2	0	152.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+diethylene glycol	2-(2-hydroxyethoxy)ethan-1-ol	C4H10O3	0	92.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+triethylene glycol	2-[2-(2-hydroxyethoxy)ethoxy]ethan-1-ol	C6H14O4	0	129.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetraethylene glycol	2-{2-[2-(2-hydroxyethoxy)ethoxy]ethoxy}ethan-1-ol	C8H18O5	0	166.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glycerol	propane-1,2,3-triol	C3H8O3	0	70.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+erythritol	meso-butane-1,2,3,4-tetrol	C4H10O4	0	87.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+pentaerythritol	2,2-bis(hydroxymethyl)propane-1,3-diol	C5H12O4	0	101.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cis-1,2-cyclohexanediol	cis-cyclohexane-1,2-diol	C6H12O2	0	101.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+trans-1,2-cyclohexanediol	trans-cyclohexane-1,2-diol	C6H12O2	0	103.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,4-cyclohexanediol	cyclohexane-1,4-diol	C6H12O2	0	105.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cis-1,5-cyclooctanediol	cis-cyclooctane-1,5-diol	C8H16O2	0	132.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,3-adamantanediol	adamantane-1,3-diol	C10H16O2	0	138.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,4-adamantanediol	adamantane-1,4-diol	C10H16O2	0	139.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+phenol	phenol	C6H6O	0	86.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+4-nitrophenol	4-nitrophenol	C6H5NO3	0	98.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+catechol	benzene-1,2-diol	C6H6O2	0	87.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+resorcinol	benzene-1,3-diol	C6H6O2	0	88.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+hydroquinone	benzene-1,4-diol	C6H6O2	0	88.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+ethanolamine	2-aminoethan-1-ol	C2H7NO	0	59.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+3-amino-1-propanol	3-aminopropan-1-ol	C3H9NO	0	75.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+4-amino-1-butanol	4-aminobutan-1-ol	C4H11NO	0	91.2		measured	10.1007/BF00646936
+6-amino-1-hexanol	6-aminohexan-1-ol	C6H15NO	0	123.4		measured	10.1007/BF00646936
+2-(methylamino)ethanol	2-(methylamino)ethan-1-ol	C3H9NO	0	77.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-(ethylamino)ethanol	2-(ethylamino)ethan-1-ol	C4H11NO	0	92.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-(diethylamino)ethanol	2-(diethylamino)ethan-1-ol	C6H15NO	0	123.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+diethanolamine	2,2'-(azanediyl)bis(ethan-1-ol)	C4H11NO2	0	94.4		measured	10.1007/BF00646936
+n-ethyldiethanolamine	2,2'-(ethylazanediyl)bis(ethan-1-ol)	C6H15NO2	0	125.0		measured	10.1007/BF00646936
+triethanolamine	2,2',2''-nitrilotris(ethan-1-ol)	C6H15NO3	0	127.8		measured	10.1007/BF00646936
+diethyl ether	ethoxyethane	C4H10O	0	90.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+dimethoxymethane	dimethoxymethane	C3H8O2	0	80.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+diethoxymethane	diethoxymethane	C5H12O2	0	113.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetramethoxymethane	tetramethoxymethane	C5H12O4	0	126.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,2-dimethoxyethane	1,2-dimethoxyethane	C4H10O2	0	95.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,2-diethoxyethane	1,2-diethoxyethane	C6H14O2	0	127.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+diglyme	1-methoxy-2-(2-methoxyethoxy)ethane	C6H14O3	0	132.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+bis(2-ethoxyethyl) ether	1-ethoxy-2-(2-ethoxyethoxy)ethane	C8H18O3	0	165.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetraglyme precursor	2,5,8,11-tetraoxadodecane	C8H18O4	0	169.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+pentaglyme precursor	2,5,8,11,14-pentaoxapentadecane	C10H22O5	0	206.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+acetaldehyde	ethanal	C2H4O	0	43.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+benzaldehyde	benzaldehyde	C7H6O	0	96.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+3-hydroxybenzaldehyde	3-hydroxybenzaldehyde	C7H6O2	0	97.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+4-hydroxybenzaldehyde	4-hydroxybenzaldehyde	C7H6O2	0	96.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+acetone	propan-2-one	C3H6O	0	66.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-butanone	butan-2-one	C4H8O	0	82.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-pentanone	pentan-2-one	C5H10O	0	98.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2,5-hexanedione	hexane-2,5-dione	C6H10O2	0	111.6		measured	10.1007/BF00646936
+cyclobutanone	cyclobutan-1-one	C4H6O	0	70.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclohexanone	cyclohexan-1-one	C6H10O	0	99.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclooctanone	cyclooctan-1-one	C8H14O	0	128.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclononanone	cyclononan-1-one	C9H16O	0	142.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,4-cyclohexanedione	cyclohexane-1,4-dione	C6H8O2	0	92.8		measured	10.1007/BF00646936
+2-adamantanone	adamantan-2-one	C10H14O	0	137.2		measured	10.1007/BF00646936
+formic acid	formic acid	CH2O2	0	34.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+acetic acid	acetic acid	C2H4O2	0	51.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+propanoic acid	propanoic acid	C3H6O2	0	67.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+butanoic acid	butanoic acid	C4H8O2	0	84.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+hexanoic acid	hexanoic acid	C6H12O2	0	116.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glycolic acid	2-hydroxyacetic acid	C2H4O3	0	51.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+lactic acid	2-hydroxypropanoic acid	C3H6O3	0	69.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-hydroxybutanoic acid	2-hydroxybutanoic acid	C4H8O3	0	85.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-hydroxyhexanoic acid	2-hydroxyhexanoic acid	C6H12O3	0	117.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+oxalic acid	ethanedioic acid	C2H2O4	0	49.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+malonic acid	propanedioic acid	C3H4O4	0	67.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+succinic acid	butanedioic acid	C4H6O4	0	82.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+adipic acid	hexanedioic acid	C6H10O4	0	115.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tartaric acid	2,3-dihydroxybutanedioic acid	C4H6O6	0	84.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+ethyl formate	ethyl formate	C3H6O2	0	72.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+ethyl acetate	ethyl acetate	C4H8O2	0	88.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+dimethyl oxalate	dimethyl ethanedioate	C4H6O4	0	91.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+oxetane	oxetane	C3H6O	0	61.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetrahydrofuran	oxolane	C4H8O	0	76.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetrahydropyran	oxane	C5H10O	0	91.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+oxepane	oxepane	C6H12O	0	105.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetrahydrofurfuryl alcohol	oxolan-2-ylmethanol	C5H10O2	0	93.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2,5-dimethoxytetrahydrofuran	2,5-dimethoxyoxolane	C6H12O3	0	122.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetrahydropyran-2-methanol	oxan-2-ylmethanol	C6H12O2	0	108.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,3-dioxolane	1,3-dioxolane	C3H6O2	0	65.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,3-dioxane	1,3-dioxane	C4H8O2	0	80.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,4-dioxane	1,4-dioxane	C4H8O2	0	80.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,3-dioxepane	1,3-dioxepane	C5H10O2	0	96.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,3,5-trioxane	1,3,5-trioxane	C3H6O3	0	69.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+paraldehyde	2,4,6-trimethyl-1,3,5-trioxane	C6H12O3	0	123.7		measured	10.1007/BF00646936
+12-crown-4	1,4,7,10-tetraoxacyclododecane	C8H16O4	0	149.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+15-crown-5	1,4,7,10,13-pentaoxacyclopentadecane	C10H20O5	0	186.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+18-crown-6	1,4,7,10,13,16-hexaoxacyclooctadecane	C12H24O6	0	223.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+methanamine	methanamine	CH5N	0	41.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+ethanamine	ethanamine	C2H7N	0	58.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1-butanamine	butan-1-amine	C4H11N	0	89.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1-hexanamine	hexan-1-amine	C6H15N	0	121.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+dimethylamine	N-methylmethanamine	C2H7N	0	59.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+diethylamine	N-ethylethanamine	C4H11N	0	91.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+dibutylamine	N-butylbutan-1-amine	C8H19N	0	155.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+trimethylamine	N,N-dimethylmethanamine	C3H9N	0	79.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+triethylamine	N,N-diethylethanamine	C6H15N	0	120.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclopentanamine	cyclopentanamine	C5H11N	0	91.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclohexanamine	cyclohexanamine	C6H13N	0	105.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cyclooctanamine	cyclooctanamine	C8H17N	0	133.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+amantadine	adamantan-1-amine	C10H17N	0	138.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+aniline	aniline	C6H7N	0	89.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+ethylenediamine	ethane-1,2-diamine	C2H8N2	0	62.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,3-propanediamine	propane-1,3-diamine	C3H10N2	0	78.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+putrescine	butane-1,4-diamine	C4H12N2	0	93.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+hexamethylenediamine	hexane-1,6-diamine	C6H16N2	0	124.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,8-octanediamine	octane-1,8-diamine	C8H20N2	0	157.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,10-decanediamine	decane-1,10-diamine	C10H24N2	0	188.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+trans-1,4-cyclohexanediamine	trans-cyclohexane-1,4-diamine	C6H14N2	0	108.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+diethylenetriamine	N-(2-aminoethyl)ethane-1,2-diamine	C4H13N3	0	101.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+triethylenetetramine	N,N'-bis(2-aminoethyl)ethane-1,2-diamine	C6H18N4	0	137.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetraethylenepentamine	3,6,9-triazaundecane-1,11-diamine	C8H23N5	0	175.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+formamide	formamide	CH3NO	0	38.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+acetamide	acetamide	C2H5NO	0	55.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+propanamide	propanamide	C3H7NO	0	71.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+butanamide	butanamide	C4H9NO	0	87.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+hexanamide	hexanamide	C6H13NO	0	119.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n-methylformamide	N-methylformamide	C2H5NO	0	56.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n-ethylformamide	N-ethylformamide	C3H7NO	0	74.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n-propylformamide	N-propylformamide	C4H9NO	0	87.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n-methylacetamide	N-methylacetamide	C3H7NO	0	74.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n-ethylacetamide	N-ethylacetamide	C4H9NO	0	90.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n-propylacetamide	N-propylacetamide	C5H11NO	0	105.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n-methylpropanamide	N-methylpropanamide	C4H9NO	0	89.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n-ethylpropanamide	N-ethylpropanamide	C5H11NO	0	105.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n-propylpropanamide	N-propylpropanamide	C6H13NO	0	121.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+dmf	N,N-dimethylformamide	C3H7NO	0	74.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n,n-diethylformamide	N,N-diethylformamide	C5H11NO	0	106.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+dmac	N,N-dimethylacetamide	C4H9NO	0	89.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n,n-diethylacetamide	N,N-diethylacetamide	C6H13NO	0	121.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n,n-dipropylacetamide	N,N-dipropylacetamide	C8H17NO	0	154.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n,n-diisopropylacetamide	N,N-di(propan-2-yl)acetamide	C8H17NO	0	152.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n,n-dimethylpropanamide	N,N-dimethylpropanamide	C5H11NO	0	105.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n,n-diethylpropanamide	N,N-diethylpropanamide	C7H15NO	0	137.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glycolamide	2-hydroxyacetamide	C2H5NO2	0	56.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+lactamide	2-hydroxypropanamide	C3H7NO2	0	73.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+4-hydroxybutanamide	4-hydroxybutanamide	C4H9NO2	0	88.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+6-hydroxyhexanamide	6-hydroxyhexanamide	C6H13NO2	0	121.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+oxamide	ethanediamide	C2H4N2O2	0	55.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+malonamide	propanediamide	C3H6N2O2	0	72.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+succinamide	butanediamide	C4H8N2O2	0	88.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+n,n,n',n'-tetramethyloctanediamide	N,N,N',N'-tetramethyloctanediamide	C12H24N2O2	0	224.0		measured	10.1007/BF00646936
+urea	urea	CH4N2O	0	44.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+methylurea	1-methylurea	C2H6N2O	0	62.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+ethylurea	1-ethylurea	C3H8N2O	0	80.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+propylurea	1-propylurea	C4H10N2O	0	94.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+butylurea	1-butylurea	C5H12N2O	0	116.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+isopropylurea	1-(propan-2-yl)urea	C4H10N2O	0	99.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,1-dimethylurea	1,1-dimethylurea	C3H8N2O	0	78.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,3-dimethylurea	1,3-dimethylurea	C3H8N2O	0	80.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,1-diethylurea	1,1-diethylurea	C5H12N2O	0	114.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,3-diethylurea	1,3-diethylurea	C5H12N2O	0	116.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetramethylurea	1,1,3,3-tetramethylurea	C5H12N2O	0	115.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+hydantoic acid	2-(carbamoylamino)acetic acid	C3H6N2O3	0	77.6		measured	Cohn, E. J.; Edsall, J. T., Eds. Proteins, Amino Acids and Peptides as Ions and Dipolar Ions; Reinhold: New York, 1943
+acetonitrile	acetonitrile	C2H3N	0	47.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+propanenitrile	propanenitrile	C3H5N	0	64.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+butanenitrile	butanenitrile	C4H7N	0	80.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+hexanenitrile	hexanenitrile	C6H11N	0	111.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+octanenitrile	octanenitrile	C8H15N	0	146.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+4-hydroxybenzonitrile	4-hydroxybenzonitrile	C7H5NO	0	98.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+aziridine	aziridine	C2H5N	0	48.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+azetidine	azetidine	C3H7N	0	63.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+pyrrolidine	pyrrolidine	C4H9N	0	77.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+piperidine	piperidine	C5H11N	0	92.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+azepane	azepane	C6H13N	0	105.6		measured	10.1007/BF00646936
+azocane	azocane	C7H15N	0	120.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+pyridine	pyridine	C5H5N	0	77.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+nmp	1-methylpyrrolidin-2-one	C5H9NO	0	90.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+succinimide	pyrrolidine-2,5-dione	C4H5NO2	0	72.3		measured	10.1007/BF00646936
+1-methylpiperidine	1-methylpiperidine	C6H13N	0	110.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+delta-valerolactam	piperidin-2-one	C5H9NO	0	90.3		measured	10.1007/BF00646936
+epsilon-caprolactam	azepan-2-one	C6H11NO	0	105.0		measured	10.1007/BF00646936
+4-aminopyridine	pyridin-4-amine	C5H6N2	0	82.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+3-hydroxypyridine	pyridin-3-ol	C5H5NO	0	75.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+4,4'-bipyridine	4,4'-bipyridine	C10H8N2	0	133.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+pyrazole	1H-pyrazole	C3H4N2	0	62.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+imidazole	1H-imidazole	C3H4N2	0	60.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+piperazine	piperazine	C4H10N2	0	83.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+pyrazine	pyrazine	C4H4N2	0	70.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+pyrimidine	pyrimidine	C4H4N2	0	70.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+pyridazine	pyridazine	C4H4N2	0	70.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,3,5-triazine	1,3,5-triazine	C3H3N3	0	54.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+hydantoin	imidazolidine-2,4-dione	C3H4N2O2	0	65.0		measured	10.1007/BF00646936
+1-methylpiperazine	1-methylpiperazine	C5H12N2	0	102.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glycine anhydride	piperazine-2,5-dione	C4H6N2O2	0	76.7		measured	10.1007/BF00646936
+1,4-dimethyl-2,5-piperazinedione	1,4-dimethylpiperazine-2,5-dione	C6H10N2O2	0	113.4		measured	10.1007/BF00646936
+3,6-dimethyl-2,5-piperazinedione	3,6-dimethylpiperazine-2,5-dione	C6H10N2O2	0	112.4		measured	10.1007/BF00646936
+dabco	1,4-diazabicyclo[2.2.2]octane	C6H12N2	0	105.9		measured	10.1007/BF00646936
+hexamethylenetetramine	1,3,5,7-tetraazatricyclo[3.3.1.1(3,7)]decane	C6H12N4	0	111.4		measured	10.1007/BF00646936
+benzimidazole	1H-benzimidazole	C7H6N2	0	98.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+benzotriazole	1H-benzotriazole	C6H5N3	0	94.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+quinoline	quinoline	C9H7N	0	115.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+quinazoline	quinazoline	C8H6N2	0	108.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+quinoxaline	quinoxaline	C8H6N2	0	109.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+1,10-phenanthroline	1,10-phenanthroline	C12H8N2	0	142.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+purine	7H-purine	C5H4N4	0	85.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+caffeine	1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione	C8H10N4O2	0	145.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+morpholine	morpholine	C4H9NO	0	82.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+4-methylmorpholine	4-methylmorpholine	C5H11NO	0	101.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+thiophenol	benzenethiol	C6H6S	0	94.1		measured	10.1007/BF00646936
+dmso	methanesulfinylmethane	C2H6OS	0	68.9		measured	10.1007/BF00646936
+thioacetamide	ethanethioamide	C2H5NS	0	66.4		measured	10.1007/BF00646936
+thiourea	thiourea	CH4N2S	0	54.0		measured	10.1007/BF00646936
+thiosemicarbazide	hydrazinecarbothioamide	CH5N3S	0	64.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+thiohydantoin	2-sulfanylideneimidazolidin-4-one	C3H4N2OS	0	76.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glycine	glycine	C2H5NO2	0	43.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+alanine	(2S)-2-aminopropanoic acid	C3H7NO2	0	60.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+valine	(2S)-2-amino-3-methylbutanoic acid	C5H11NO2	0	90.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+leucine	(2S)-2-amino-4-methylpentanoic acid	C6H13NO2	0	107.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+isoleucine	(2S,3S)-2-amino-3-methylpentanoic acid	C6H13NO2	0	105.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+serine	(2S)-2-amino-3-hydroxypropanoic acid	C3H7NO3	0	60.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+threonine	(2S,3R)-2-amino-3-hydroxybutanoic acid	C4H9NO3	0	76.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+cysteine	(2R)-2-amino-3-sulfanylpropanoic acid	C3H7NO2S	0	73.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+methionine	(2S)-2-amino-4-(methylsulfanyl)butanoic acid	C5H11NO2S	0	105.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+proline	(2S)-pyrrolidine-2-carboxylic acid	C5H9NO2	0	82.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+phenylalanine	(2S)-2-amino-3-phenylpropanoic acid	C9H11NO2	0	121.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tyrosine	(2S)-2-amino-3-(4-hydroxyphenyl)propanoic acid	C9H11NO3	0	123.6		measured	Rao, M. V. R.; Atreyi, M.; Rajeswari, M. R. J. Chem. Soc., Faraday Trans. 1 1984, 80, 2027-2032
+tryptophan	2-amino-3-(1H-indol-3-yl)propanoic acid	C11H12N2O2	0	143.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+aspartic acid	(2S)-2-aminobutanedioic acid	C4H7NO4	0	74.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+asparagine	(2S)-2,4-diamino-4-oxobutanoic acid	C4H8N2O3	0	78.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glutamic acid	(2S)-2-aminopentanedioic acid	C5H9NO4	0	89.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glutamine	(2S)-2,5-diamino-5-oxopentanoic acid	C5H10N2O3	0	93.9		measured	Rao, M. V. R.; Atreyi, M.; Rajeswari, M. R. J. Chem. Soc., Faraday Trans. 1 1984, 80, 2027-2032
+arginine	(2S)-2-amino-5-carbamimidamidopentanoic acid	C6H14N4O2	0	127.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+histidine	(2S)-2-amino-3-(1H-imidazol-4-yl)propanoic acid	C6H9N3O2	0	98.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-aminobutanoic acid	2-aminobutanoic acid	C4H9NO2	0	75.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+3-aminobutanoic acid	3-aminobutanoic acid	C4H9NO2	0	76.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+gaba	4-aminobutanoic acid	C4H9NO2	0	73.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+6-aminohexanoic acid	6-aminohexanoic acid	C6H13NO2	0	104.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+8-aminooctanoic acid	8-aminooctanoic acid	C8H17NO2	0	136.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+betaine	2-(trimethylazaniumyl)acetate	C5H11NO2	0	97.7		measured	Cohn, E. J.; Edsall, J. T., Eds. Proteins, Amino Acids and Peptides as Ions and Dipolar Ions; Reinhold: New York, 1943
+glycylglycine	glycylglycine	C4H8N2O3	0	76.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+triglycine	triglycine	C6H11N3O4	0	112.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetraglycine	tetraglycine	C8H14N4O5	0	149.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+pentaglycine	pentaglycine	C10H17N5O6	0	187.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+dialanine	L-alanyl-L-alanine	C6H12N2O3	0	110.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+trialanine	L-alanyl-L-alanyl-L-alanine	C9H17N3O4	0	163.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+tetraalanine	L-alanyl-L-alanyl-L-alanyl-L-alanine	C12H22N4O5	0	220.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+diserine	L-seryl-L-serine	C6H12N2O5	0	111.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+triserine	L-seryl-L-seryl-L-serine	C9H17N3O7	0	166.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glycylalanine	glycyl-L-alanine	C5H10N2O3	0	92.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+alanylglycine	L-alanylglycine	C5H10N2O3	0	95.0		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glycylalanylglycine	glycyl-L-alanylglycine	C7H13N3O4	0	132.4		measured	10.1002/bip.360301102
+glycylserylglycine	glycyl-L-serylglycine	C7H13N3O5	0	133.1		measured	10.1002/bip.360301102
+dihydrouracil	dihydrouracil	C4H6N2O2	0	76.3		measured	10.1007/BF00646936
+cytidine	cytidine	C9H13N3O5	0	153.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+uridine	uridine	C9H12N2O6	0	151.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+thymidine	thymidine	C10H14N2O5	0	167.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+ribose	D-ribose	C5H10O5	0	95.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-deoxy-d-ribose	2-deoxy-D-ribose	C5H10O4	0	93.8		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glucose	D-glucose	C6H12O6	0	111.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+2-deoxy-d-glucose	2-deoxy-D-glucose	C6H12O5	0	110.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+fructose	D-fructose	C6H12O6	0	110.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+sucrose	sucrose	C12H22O11	0	211.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+mannitol	D-mannitol	C6H14O6	0	119.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+sorbitol	D-glucitol	C6H14O6	0	119.5		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+glucuronic acid	D-glucuronic acid	C6H10O7	0	110.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
+citric acid	2-hydroxypropane-1,2,3-tricarboxylic acid	C6H8O7	0	113.93		measured	10.1016/0378-3812(90)85049-G
+oxalic acid	ethanedioic acid	C2H2O4	0	46.33		measured	10.1016/0378-3812(90)85049-G
+lactic acid	2-hydroxypropanoic acid	C3H6O3	0	66.40		measured	10.1016/0378-3812(90)85049-G

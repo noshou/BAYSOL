@@ -19,3 +19,6 @@ CLAUDE.md
 __pycache__/
 *.py[codz]
 .venv/
+
+# copyrigthed papers
+sources/

@@ -6,14 +6,16 @@ encapsulates the bundled backends as its own submodules.
 """
 module ScatterNet
 
-include("ABSOLUTE_TOLERANCE.jl")
+include("Constants.jl")
 include("Interfaces/Interfaces.jl")
 include("Molecule/Molecule.jl")
 include("Scattering/Scattering.jl")
+include("Fitting/Fitting.jl")
 
-using .ABSOLUTE_TOLERANCE: ABSOLUTE_TOLERANCE
-using .Interfaces: Interfaces
-using .Molecule: Molecule
-using .Scattering: Scattering
+using .Constants:   Constants
+using .Interfaces:  Interfaces
+using .Molecule:    Molecule
+using .Scattering:  Scattering
+using .Fitting:     Fitting 
 
 end # module
