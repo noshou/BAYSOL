@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """
 Swappable-backend interfaces. Declares the backend markers (`RadiiSource`,
-`FormFactorSource`) and their generic functions then encapsulates the two 
-bundled backends as child submodules:
+`FormFactorSource`, `PartialMolarVolumes`) and their generic functions 
+then encapsulates them as child submodules:
 
     -   `AtomicRadii` — atomic/ionic radii from a bundled SQLite file
         (`AtomicRadiiSource <: RadiiSource`, extends [`lookup`](@ref)).

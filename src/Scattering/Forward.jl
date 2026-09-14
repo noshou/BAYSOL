@@ -175,8 +175,14 @@ species and `r₀` scales it by `c₁³` at `q = 0` -- so fitting both leaves a
 near-flat direction. Fix one (CRYSOL's choice: `dns`) unless the sampler is
 explicitly meant to explore that ridge.
 """
-function forward(cache::ForwardCache, m::Real, c::Real, dns::Real, ρ;
-                 r0::Union{Nothing,Real} = nothing)
+function forward(
+    cache::ForwardCache, 
+    m::Real,
+    c::Real, 
+    dns::Real, 
+    ρ;
+    r0::Union{Nothing,Real} = nothing
+)
     (r0 === nothing || r0 == cache.r_m) &&
         return forward(cache.G, m, c, dns, ρ)
     g_ex = excluded_volume_factor(cache.qvals, cache.r_m, r0)
@@ -194,9 +200,16 @@ call [`forward_cache`](@ref) once and the [`ForwardCache`](@ref) method of
 `kwargs` beyond `m, c, dns, ρ, r0` are those of [`species_multipoles`](@ref).
 """
 function forward(
-    mol::Molecule, qvals::AbstractVector{<:Real}, lMax::Integer, energy::Real;
-    m::Real, c::Real, dns::Real, ρ, r0::Union{Nothing,Real} = nothing, kwargs...
+    mol::Molecule, 
+    qvals::AbstractVector{<:Real}, 
+    lMax::Integer, 
+    energy::Real;
+    m::Real, 
+    c::Real, 
+    dns::Real, 
+    ρ, 
+    r0::Union{Nothing,Real} = nothing, 
+    kwargs...
 )
-    return forward(forward_cache(mol, qvals, lMax, energy; kwargs...),
-                   m, c, dns, ρ; r0 = r0)
+    return forward(forward_cache(mol, qvals, lMax, energy; kwargs...), m, c, dns, ρ; r0 = r0)
 end

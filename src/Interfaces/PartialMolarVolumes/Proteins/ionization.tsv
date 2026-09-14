@@ -1,0 +1,34 @@
+Group	Name	Reaction	Temperature_C	pKa	pKa_Uncertainty	dV	dV_Uncertainty	dKS	dKS_Uncertainty	basis	doi
+Asp	aspartic acid	acidic	18	3.9	0.1	11.2	0.7	22.8	0.8	measured	10.1016/j.bpc.2008.02.009
+Asp	aspartic acid	acidic	25	3.9	0.1	12.1	0.4	21.6	0.5	measured	10.1016/j.bpc.2008.02.009
+Asp	aspartic acid	acidic	40	3.9	0.1	12.1	0.3	20.7	0.4	measured	10.1016/j.bpc.2008.02.009
+Asp	aspartic acid	acidic	55	4.0	0.1	12.8	0.5	21.5	0.5	measured	10.1016/j.bpc.2008.02.009
+Glu	glutamic acid	acidic	18	4.4	0.1	10.9	0.2	22.9	0.2	measured	10.1016/j.bpc.2008.02.009
+Glu	glutamic acid	acidic	25	4.3	0.1	11.8	0.4	22.4	0.4	measured	10.1016/j.bpc.2008.02.009
+Glu	glutamic acid	acidic	40	4.4	0.1	12.1	0.3	21.6	0.7	measured	10.1016/j.bpc.2008.02.009
+Glu	glutamic acid	acidic	55	4.4	0.1	13.5	0.3	23.2	0.3	measured	10.1016/j.bpc.2008.02.009
+His	histidine	basic	18	6.3	0.1	-1.5	0.1	-11.4	0.7	measured	10.1016/j.bpc.2008.02.009
+His	histidine	basic	25	6.2	0.1	-1.4	0.1	-11.1	0.3	measured	10.1016/j.bpc.2008.02.009
+His	histidine	basic	40	6.1	0.4	-1.3	0.4	-12.4	0.7	measured	10.1016/j.bpc.2008.02.009
+His	histidine	basic	55	5.9	0.1	-1.0	0.3	-13.8	0.4	measured	10.1016/j.bpc.2008.02.009
+Lys	lysine	basic	18	10.5	0.1	-5.6	0.2	-12.1	1.1	measured	10.1016/j.bpc.2008.02.009
+Lys	lysine	basic	25	10.5	0.1	-5.9	0.5	-14.2	1.1	measured	10.1016/j.bpc.2008.02.009
+Lys	lysine	basic	40	10.0	0.1	-5.8	0.3	-15.3	1.0	measured	10.1016/j.bpc.2008.02.009
+Lys	lysine	basic	55	9.7	0.1	-5.2	0.1	-13.2	1.2	measured	10.1016/j.bpc.2008.02.009
+Arg	arginine	basic	18	12.5		13.2		1.1		measured	10.1016/j.bpc.2008.02.009
+Arg	arginine	basic	25	12.5		13.0		-2.6		measured	10.1016/j.bpc.2008.02.009
+Arg	arginine	basic	40	12.5		13.5		-7.2		measured	10.1016/j.bpc.2008.02.009
+Arg	arginine	basic	55	12.5		14.4		-5.2		measured	10.1016/j.bpc.2008.02.009
+-COOH	carboxyl terminus	acidic	18	3.3	0.1	10.2	0.5	18.3	0.9	measured	10.1016/j.bpc.2008.02.009
+-COOH	carboxyl terminus	acidic	25	3.3	0.1	10.5	0.4	18.4	0.9	measured	10.1016/j.bpc.2008.02.009
+-COOH	carboxyl terminus	acidic	40	3.2	0.1	11.0	0.4	17.7	0.9	measured	10.1016/j.bpc.2008.02.009
+-COOH	carboxyl terminus	acidic	55	3.2	0.1	10.7	0.5	17.1	1.0	measured	10.1016/j.bpc.2008.02.009
+-NH2	amino terminus	basic	18	8.2	0.1	-6.8	0.4	-17.3	0.7	measured	10.1016/j.bpc.2008.02.009
+-NH2	amino terminus	basic	25	8.0	0.1	-4.8	0.5	-16.9	0.9	measured	10.1016/j.bpc.2008.02.009
+-NH2	amino terminus	basic	40	7.7	0.1	-5.1	0.5	-17.9	0.9	measured	10.1016/j.bpc.2008.02.009
+-NH2	amino terminus	basic	55	7.2	0.1	-5.1	0.6	-14.7	1.1	measured	10.1016/j.bpc.2008.02.009
+Sec	selenocysteine	acidic	25	5.24		4	4			derived	10.1016/0003-9861(67)90136-1
+A_RNA	adenine	basic	25	4.2		-1.4	1.4			derived	10.1021/ar200262x
+C_RNA	cytosine	basic	25	4.1		-1.4	1.4			derived	10.1021/ar200262x
+G_RNA	guanine	acidic	25	9.5		3	3			derived	10.1021/ar200262x
+U_RNA	uracil	acidic	25	9.5		3	3			derived	10.1021/ar200262x
