@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 using ..Constants: DEFAULT_ATOL, AVOGADRO
 using ..Interfaces: ρₑ_w, ϕ°
+using Distributions
 
 abstract type Solute end
 
@@ -48,14 +49,13 @@ end
     _ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real=25.0)
         -> Tuple{Float64, Float64}
 
-Bulk electron density of a solution at temperature `t` (°C), in e·Å⁻³,
-returned as `(ρₑ, σ_ρₑ)`.
+Bulk electron density of a solution at temperature `t` (°C), in e·Å⁻³.
 
 The model is linear in solute concentration:
 
     ρₑ = ρ_w(T) + Σ_j C_j · (N_A·Z_j/1e27 − ρ_w(T)·ϕ°_j/1e3)
 
-with `ϕ°_j` beign partial molar volume of solute `j` at infinite dilution
+with `ϕ°_j` being the partial molar volume of solute `j` at infinite dilution
 in cm³·mol⁻¹. Uncertainty is propagated to first order assuming independence:
 
     σ² = (1 − Σ_j C_j·ϕ°_j/1e3)² · σ_w²
@@ -63,11 +63,30 @@ in cm³·mol⁻¹. Uncertainty is propagated to first order assuming independenc
         + Σ_j (C_j·ρ_w/1e3)² · σ_ϕ°_j²
 
 where `k_j = N_A·Z_j/1e27 − ρ_w·ϕ°_j/1e3`.
+
+# Arguments
+- `pH::Real`: pH of the solution; forwarded to `Interfaces.ϕ°` for `Protein` solutes.
+- `σ_pH::Real`: standard uncertainty on `pH`, propagated through each `Protein`
+    solute's titration term.
+- `solutes::Vector{Solute}`: the `Protein`/`NonProtein` species in solution, each
+    carrying its own molarity and molarity uncertainty.
+
+# Keywords
+- `t::Real=25.0`: solution temperature in °C, forwarded to `Interfaces.ρₑ_w`.
+
+# Returns
+- `Tuple{Float64, Float64}`: `(ρₑ, σ_ρₑ)`, the bulk electron density and its
+    propagated standard uncertainty, both in e·Å⁻³.
+
+# Exceptions
+- `DomainError`: thrown if any solute's `molarity_uncertainty < 0` or
+    `molarity <= 0`.
+- `ArgumentError`: thrown if a `Protein`'s `seq` or a `NonProtein`'s `name` is empty.
 """
 function _ρₑ(
     pH::Real, 
     σ_pH::Real, 
-    solutes::Vector{Solute};
+    solutes::Vector{Solute}; 
     t::Real=25.0
 )::Tuple{Float64, Float64}
 
@@ -100,4 +119,56 @@ function _ρₑ(
     σ_total   = sqrt(var_water + var_conc + var_vol)
 
     return (μ_total, σ_total)
+end
+
+"""
+    prior(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real=25.0)
+        -> LogNormal{Float64}
+
+Prior distribution for the bulk electron density ρₑ, as a `LogNormal` moment-matched
+to the mean and standard deviation returned by `_ρₑ`. `LogNormal` is used rather than
+`Normal` (or `Truncated{Normal}`) because ρₑ has support only on (0, ∞); at the CV this
+model produces, the two agree in the bulk.
+
+Given `μ, σ = _ρₑ(...)`, the `LogNormal(μ_ln, σ_ln)` parameters are:
+
+    σ_ln = √(ln(1 + σ²/μ²))
+    μ_ln = ln(μ) − σ_ln²/2
+
+# Arguments
+- `pH::Real`: pH of the solution; forwarded to `_ρₑ`.
+- `σ_pH::Real`: standard uncertainty on `pH`; must be `>= 0`.
+- `solutes::Vector{Solute}`: the `Protein`/`NonProtein` species in solution; must be
+    non-empty.
+
+# Keywords
+- `t::Real=25.0`: solution temperature in °C, forwarded to `_ρₑ`.
+
+# Returns
+- `LogNormal{Float64}`: prior distribution over ρₑ, with `logpdf`/gradients usable
+    directly as a NUTS prior term.
+
+# Exceptions
+- `ArgumentError`: thrown if `solutes` is empty.
+- `DomainError`: thrown if `σ_pH < 0`.
+"""
+function prior(
+    pH::Real, 
+    σ_pH::Real, 
+    solutes::Vector{Solute}; 
+    t::Real=25.0
+)::LogNormal{Float64}
+
+    if (length(solutes) == 0)
+        throw(ArgumentError("solutes cannot be empty"))
+    elseif (σ_pH < 0)
+        throw(DomainError(σ_pH, "σ_pH must be >= 0"))
+    end
+
+    μ, σ = _ρₑ(pH, σ_pH, solutes; t=t)
+
+    σ_ln = sqrt(log(1 + (σ / μ)^2))
+    μ_ln = log(μ) - σ_ln^2 / 2
+
+    return LogNormal(μ_ln, σ_ln)
 end
