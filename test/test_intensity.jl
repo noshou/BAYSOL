@@ -11,7 +11,7 @@
 # is linear in them and does not depend on where they came from, so there is no
 # pipeline input on the reference side.
 using .Scattering: gram, intensity, intensity_calc, contrast_vector, DRO_UNIT,
-                   partial_wave_weights, self_scatter, cross_scatter
+partial_wave_weights, self_scatter, cross_scatter
 using LinearAlgebra: Symmetric, eigvals, issymmetric
 
 # A packed-(l,m) B_lm array (C, K, Q) filled from a deterministic LCG so every
@@ -39,8 +39,8 @@ iy_w    = partial_wave_weights(iy_lMax)
 
     @testset "gram: shape, symmetry, and the self / cross diagonal identity" begin
         Bs = [iy_B(2, iy_lMax, iy_Q; seed = 1),
-              iy_B(1, iy_lMax, iy_Q; seed = 2),
-              iy_B(1, iy_lMax, iy_Q; seed = 3)]
+            iy_B(1, iy_lMax, iy_Q; seed = 2),
+            iy_B(1, iy_lMax, iy_Q; seed = 3)]
         G = gram(Bs, iy_w)
         @test G isa Array{Float64,3}
         @test size(G) == (3, 3, iy_Q)
@@ -61,10 +61,10 @@ iy_w    = partial_wave_weights(iy_lMax)
 
     @testset "gram: every G(:,:,q) is positive semidefinite" begin
         Bs = [iy_B(2, iy_lMax, iy_Q; seed = 7),
-              iy_B(2, iy_lMax, iy_Q; seed = 8),
-              iy_B(1, iy_lMax, iy_Q; seed = 9),
-              iy_B(1, iy_lMax, iy_Q; seed = 10),
-              iy_B(1, iy_lMax, iy_Q; seed = 11)]
+            iy_B(2, iy_lMax, iy_Q; seed = 8),
+            iy_B(1, iy_lMax, iy_Q; seed = 9),
+            iy_B(1, iy_lMax, iy_Q; seed = 10),
+            iy_B(1, iy_lMax, iy_Q; seed = 11)]
         G = gram(Bs, iy_w)
         for k in 1:iy_Q
             λ = eigvals(Symmetric(G[:, :, k]))
@@ -93,9 +93,9 @@ iy_w    = partial_wave_weights(iy_lMax)
 
     @testset "gram: shape guards" begin
         good = iy_B(1, iy_lMax, iy_Q; seed = 25)
-        @test_throws ArgumentError gram(typeof(good)[], iy_w)             # no species
-        @test_throws ArgumentError gram([good], partial_wave_weights(iy_lMax + 1))  # K mismatch
-        @test_throws ArgumentError gram([good, iy_B(1, iy_lMax, iy_Q + 1; seed = 26)], iy_w)  # Q mismatch
+        @test_throws ArgumentError gram(typeof(good)[], iy_w)                                # no species
+        @test_throws ArgumentError gram([good], partial_wave_weights(iy_lMax + 1))           # K mismatch
+        @test_throws ArgumentError gram([good, iy_B(1, iy_lMax, iy_Q + 1; seed = 26)], iy_w) # Q mismatch
     end
 
     @testset "intensity: 3-species collapse equals the 6-term expansion" begin
@@ -126,12 +126,12 @@ iy_w    = partial_wave_weights(iy_lMax)
 
         S(a, b) = a == b ? self_scatter(B[a], iy_w) : cross_scatter(B[a], B[b], iy_w)
 
-        ref =  S(1, 1) .+ dns^2 .* S(2, 2) .+                                   # vac,vac  ex,ex
-               d[1]^2 .* S(3, 3) .+ d[2]^2 .* S(4, 4) .+ d[3]^2 .* S(5, 5) .+    # shk,shk
-               (-2dns) .* S(1, 2) .+                                            # vac,ex
-               2d[1] .* S(1, 3) .+ 2d[2] .* S(1, 4) .+ 2d[3] .* S(1, 5) .+       # vac,shk
-               (-2dns) .* (d[1] .* S(2, 3) .+ d[2] .* S(2, 4) .+ d[3] .* S(2, 5)) .+  # ex,shk
-               2 .* (d[1] * d[2] .* S(3, 4) .+ d[1] * d[3] .* S(3, 5) .+ d[2] * d[3] .* S(4, 5))  # shj,shk
+        ref =   S(1, 1) .+ dns^2 .* S(2, 2) .+                                                    # vac,vac  ex,ex
+                d[1]^2 .* S(3, 3) .+ d[2]^2 .* S(4, 4) .+ d[3]^2 .* S(5, 5) .+                    # shk,shk
+                (-2dns) .* S(1, 2) .+                                                             # vac,ex
+                2d[1] .* S(1, 3) .+ 2d[2] .* S(1, 4) .+ 2d[3] .* S(1, 5) .+                       # vac,shk
+                (-2dns) .* (d[1] .* S(2, 3) .+ d[2] .* S(2, 4) .+ d[3] .* S(2, 5)) .+             # ex,shk
+                2 .* (d[1] * d[2] .* S(3, 4) .+ d[1] * d[3] .* S(3, 5) .+ d[2] * d[3] .* S(4, 5)) # shj,shk
 
         v = [1.0, -dns, d[1], d[2], d[3]]
         @test v == contrast_vector(dns, ρ)
@@ -142,10 +142,7 @@ iy_w    = partial_wave_weights(iy_lMax)
     @testset "intensity: quadratic form is ≥ 0 for real v (PSD)" begin
         B = [iy_B(2, iy_lMax, iy_Q; seed = 60 + i) for i in 1:4]
         G = gram(B, iy_w)
-        for v in ([1.0, -1.0, 0.03, 0.03],
-                  [1.0, 0.5, -2.0, 3.0],
-                  [0.3, -1.1, 2.2, -0.7],
-                  zeros(4))
+        for v in ([1.0, -1.0, 0.03, 0.03], [1.0, 0.5, -2.0, 3.0], [0.3, -1.1, 2.2, -0.7], zeros(4))
             @test all(≥(-1e-9), intensity(G, v))
         end
         @test all(iszero, intensity(G, zeros(4)))
@@ -171,11 +168,11 @@ iy_w    = partial_wave_weights(iy_lMax)
     end
 
     @testset "contrast_vector: values, length, species order" begin
-        @test contrast_vector(0.334, (1.0, 1.0, 0.0)) == [1.0, -0.334, 0.03, 0.03, 0.0]
-        @test contrast_vector(0.334, 1.0)             == [1.0, -0.334, 0.03]
+        @test contrast_vector(0.334, (1.0, 1.0, 0.0))       == [1.0, -0.334, 0.03, 0.03, 0.0]
+        @test contrast_vector(0.334, 1.0)                   == [1.0, -0.334, 0.03]
         @test length(contrast_vector(0.3, (1.0, 1.0, 1.0))) == 5
         @test length(contrast_vector(0.3, 1.0))             == 3
-        @test contrast_vector(0.3, (1.0, 0.0, 0.0))[4:5] == [0.0, 0.0]   # ρ = 0 zeroes a shell
+        @test contrast_vector(0.3, (1.0, 0.0, 0.0))[4:5]    == [0.0, 0.0] # ρ = 0 zeroes a shell
         @test contrast_vector(0.334, (1, 1, 0)) isa Vector{Float64}       # integer ρ accepted
     end
 end
