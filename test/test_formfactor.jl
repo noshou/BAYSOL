@@ -20,16 +20,9 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
     end
 
     # -----------------------------------------------------------------------
-    # Anti-vacuity guard. This is what stops the rest of the file being a set of
-    # assertions about nothing: every value below is checked against a reference
+    # Every value below is checked against a reference
     # dumped from the predecessor xraydb/PythonCall implementation, at full
     # precision, over species and energies this file otherwise never touches.
-    # Provenance and tolerances: test/fixtures/README.md.
-    #
-    # It replaces a check that the xraydb package extension was loaded and owned
-    # the answering method. That guarded provenance -- *who* answered. With the
-    # backend now in-package there is no stub to fall through to, so the useful
-    # guard is *what* it answers, pinned to the implementation being replaced.
     # -----------------------------------------------------------------------
 
     "Rows of a fixture CSV, minus its header."

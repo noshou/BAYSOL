@@ -435,10 +435,7 @@ const LYSOZYME = "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRW
     #------------------------------------------------------------------
 
     @testset "_common2iupac: hits, case-insensitivity, and misses" begin
-        # Not part of the public Interfaces surface (see PMVMOD._common2iupac's
-        # own docstring) -- exercised directly here since ϕ°(name) only
-        # reaches it on a cache miss for a name that isn't already an
-        # nonproteins.json key.
+        # Not part of the public Interfaces surface.
         @test PMVMOD._common2iupac("urea") == ("urea", true)
         @test PMVMOD._common2iupac("Urea") == ("urea", true)
         @test PMVMOD._common2iupac("UREA") == ("urea", true)

@@ -591,15 +591,15 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         for mk in (scat_water, scat_blob, scat_cube, scat_canyon)
             mol = mk()
             cls = SASA.shell_points(mol; n_target = 100)[3]
-            @test count(==(SASA.CONVEX), cls) + count(==(SASA.CONCAVE), cls) +
-                  count(==(SASA.CAVITY), cls) == length(cls)
+            @test   count(==(SASA.CONVEX), cls) + count(==(SASA.CONCAVE), cls) +
+                    count(==(SASA.CAVITY), cls) == length(cls)
             # B_lm is linear in the disjoint bead sets: the three B_00(0) add up
             # to the whole surface's total area * thickness / √(4π).
             h = hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 100)
             total = sum(SASA.shell_points(mol; n_target = 100)[2])
-            @test isapprox(real(h.convex[1, 1, 1]) + real(h.concave[1, 1, 1]) +
-                           real(h.cavity[1, 1, 1]),
-                           total * SHELL_THICKNESS / sqrt(4π); rtol = 1e-12)
+            @test isapprox( real(h.convex[1, 1, 1]) + real(h.concave[1, 1, 1]) +
+                            real(h.cavity[1, 1, 1]),
+                            total * SHELL_THICKNESS / sqrt(4π); rtol = 1e-12)
         end
         for mk in (scat_water, scat_blob)          # no enclosed interior voids
             @test all(iszero, hydration(mk(), SCAT_Q, scat_lmax, scat_hchunk;
