@@ -1,21 +1,18 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-# Exercises src/Scattering/Forward.jl -- the module-level forward model that
-# composes `vacuo`/`excluded`/`hydration` -> `gram` -> `intensity` ->
-# `intensity_calc` into `I_calc(q)`, and the `Scattering`-level configuration
-# constants those defaults come from.
+# Exercises src/Scattering/Forward.jl.
 #
 # The reference side re-does the composition by hand from the per-species
 # primitives, so a mismatch is a wiring bug in Forward.jl, not a physics bug
 # (the physics is checked in test_partialwave.jl / test_scatterers.jl /
 # test_intensity.jl).
 
-using .Scattering: forward, gram_matrix, species_multipoles,
-                   forward_cache, ForwardCache, mean_atomic_radius,
-                   excluded_volume_factor, contrast_matrix,
-                   gram, intensity, intensity_calc, contrast_vector,
-                   partial_wave_weights, vacuo, excluded, hydration,
-                   SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, SHELL_CLASSES,
-                   DRO_UNIT, FORM_FACTOR_SOURCE, B_LM_CHUNK
+using .Scattering:  forward, gram_matrix, species_multipoles,
+                    forward_cache, ForwardCache, mean_atomic_radius,
+                    excluded_volume_factor, contrast_matrix,
+                    gram, intensity, intensity_calc, contrast_vector,
+                    partial_wave_weights, vacuo, excluded, hydration,
+                    SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, SHELL_CLASSES,
+                    DRO_UNIT, FORM_FACTOR_SOURCE, B_LM_CHUNK
 using .Molecules: create, elms
 using ScatterNet.Molecule: SASA
 using .Molecules: radii
@@ -23,8 +20,8 @@ using LinearAlgebra: issymmetric, eigvals
 
 fwd_mol() = create("gly", ["n", "c", "c", "o", "o", "h", "h", "h"],
     [(-1.9, 0.2, 0.1), (-0.5, -0.3, 0.0), (0.6, 0.7, -0.1),
-     ( 1.8, 0.2, 0.0), (0.4, 1.9, -0.2), (-2.6, -0.5, 0.0),
-     (-0.4, -1.0, 0.8), (0.7, 1.3, 0.8)])
+    ( 1.8, 0.2, 0.0), (0.4, 1.9, -0.2), (-2.6, -0.5, 0.0),
+    (-0.4, -1.0, 0.8), (0.7, 1.3, 0.8)])
 fwd_q      = [0.0, 0.03, 0.07, 0.15, 0.31]
 fwd_E      = 9000.0
 fwd_lmax   = 4
@@ -42,8 +39,8 @@ fwd_chunk  = UInt64(3)
         @test FORM_FACTOR_SOURCE isa ScatterNet.Interfaces.FormFactorSource
         # the primitives really do read these as their defaults
         m = fwd_mol()
-        @test hydration(m, fwd_q, 2, fwd_chunk) ==
-              hydration(m, fwd_q, 2, fwd_chunk; thickness = SHELL_THICKNESS,
+        @test   hydration(m, fwd_q, 2, fwd_chunk) ==
+                hydration(m, fwd_q, 2, fwd_chunk; thickness = SHELL_THICKNESS,
                         probe = PROBE_RADIUS, n_target = SHELL_N_TARGET,
                         classes = SHELL_CLASSES)
     end
@@ -77,7 +74,7 @@ fwd_chunk  = UInt64(3)
             @test minimum(eigvals(G[:, :, k])) > -1e-9
         end
         G_ref = gram(collect(species_multipoles(m, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)),
-                     partial_wave_weights(fwd_lmax))
+                    partial_wave_weights(fwd_lmax))
         @test G == G_ref
     end
 
@@ -93,9 +90,9 @@ fwd_chunk  = UInt64(3)
     @testset "forward(mol, …) convenience == gram_matrix + forward(G, …)" begin
         m = fwd_mol()
         G = gram_matrix(m, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        got = forward(m, fwd_q, fwd_lmax, fwd_E;
-                      m = 1.7, c = 2.5, dns = 0.334, ρ = (1.0, 1.0, 0.0),
-                      chunk = fwd_chunk)
+        got = forward(  m, fwd_q, fwd_lmax, fwd_E;
+                        m = 1.7, c = 2.5, dns = 0.334, ρ = (1.0, 1.0, 0.0),
+                        chunk = fwd_chunk)
         @test got ≈ forward(G, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0))
     end
 
@@ -111,7 +108,7 @@ fwd_chunk  = UInt64(3)
     @testset "a class outside `classes` is inert (its ρ_k does nothing)" begin
         m  = fwd_mol()
         G  = gram_matrix(m, fwd_q, fwd_lmax, fwd_E;
-                         chunk = fwd_chunk, classes = (SASA.CONVEX, SASA.CONCAVE))
+                        chunk = fwd_chunk, classes = (SASA.CONVEX, SASA.CONCAVE))
         a  = forward(G, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0))
         b  = forward(G, 1.0, 0.0, 0.334, (1.0, 1.0, 42.0))   # cavity unbuilt ⇒ B=0
         @test a ≈ b
@@ -228,10 +225,10 @@ fwd_chunk  = UInt64(3)
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         r0 = fc.r_m * 0.93
-        @test forward(mo, fwd_q, fwd_lmax, fwd_E;
-                      m = 1.7, c = 2.5, dns = 0.334, ρ = (1.0, 1.0, 0.0),
-                      r0 = r0, chunk = fwd_chunk) ≈
-              forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); r0 = r0)
+        @test   forward(mo, fwd_q, fwd_lmax, fwd_E;
+                        m = 1.7, c = 2.5, dns = 0.334, ρ = (1.0, 1.0, 0.0),
+                        r0 = r0, chunk = fwd_chunk) ≈
+                forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); r0 = r0)
     end
 
     @testset "the whole fit-parameter path is AD-differentiable" begin

@@ -33,7 +33,7 @@ everything needed for uncertainty propagation and for using the fit as a
     are both right.
     - `dof` — `n − 2`.
     - `det_XtWX` — `det(XᵀWX) = SwII·Sw − SwI²`, the normalising determinant. Enters
-    [`marginal_nll`](@ref); depends on the forward-model parameters through
+    [`wls_marg_nll`](@ref); depends on the forward-model parameters through
     `y_model`.
     - `sum_log_var` — `Σ log σᵢ²`, the data-only constant of the Gaussian.
 """
@@ -133,10 +133,10 @@ end
 
 The fitted `I_calc = f.m .* y_model .+ f.c`, on the same curve or a fresh one.
 """
-predict(f::WLSFit, y_model::AbstractVector) = f.m .* y_model .+ f.c
+wls_predict(f::WLSFit, y_model::AbstractVector) = f.m .* y_model .+ f.c
 
 """
-    profiled_nll(f::WLSFit) -> Real
+    wls_prof_nll(f::WLSFit) -> Real
 
 Negative log-likelihood of the data with `(m, c)` fixed at their WLS optimum (the
 profile likelihood):
@@ -145,15 +145,15 @@ profile likelihood):
 
 Use when `(m, c)` are treated as plugged-in point estimates.
 """
-profiled_nll(f::WLSFit) =
+wls_prof_nll(f::WLSFit) =
     (f.chi2 + f.sum_log_var) / 2 + (f.dof + 2) * log(2π) / 2
 
 """
-    marginal_nll(f::WLSFit) -> Real
+    wls_marg_nll(f::WLSFit) -> Real
 
 Negative log marginal-likelihood with `(m, c)` integrated out under a flat prior:
 
-    profiled_nll(f) + ½ log det(XᵀWX) − ½ p log 2π ,   p = 2
+    wls_prof_nll(f) + ½ log det(XᵀWX) − ½ p log 2π ,   p = 2
 
 Add this to the rest of the stage-1 log-posterior so that scale / background
 uncertainty propagates into the posterior on the geometry and contrast
@@ -161,5 +161,5 @@ parameters instead of being frozen at a point. Only `χ²` and `log det(XᵀWX)`
 depend on the forward-model parameters; everything else is a constant the sampler
 may drop.
 """
-marginal_nll(f::WLSFit) =
-    profiled_nll(f) + log(f.det_XtWX) / 2 - log(2π)
+wls_marg_nll(f::WLSFit) =
+    wls_prof_nll(f) + log(f.det_XtWX) / 2 - log(2π)

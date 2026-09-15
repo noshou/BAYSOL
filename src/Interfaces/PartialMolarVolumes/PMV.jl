@@ -363,8 +363,14 @@ Interfaces.ρₑ_w(::PartialMolarVolumeSourceTables, t::Real)::Tuple{Float64,Flo
 Interfaces.ρₑ_w(t::Real)::Tuple{Float64,Float64} = Interfaces.ρₑ_w(PartialMolarVolumeSourceTables(), t)
 
 """
-    Interfaces.ϕ°([src::PartialMolarVolumeSourceTables,] pH::Real, seq::AbstractString; σ_pH::Real = 0.0) -> (electron_count, v0, uncertainty)
-    Interfaces.ϕ°([src::PartialMolarVolumeSourceTables,] name::AbstractString)                            -> (electron_count, v0, uncertainty)
+    Interfaces.ϕ°(
+        [src::PartialMolarVolumeSourceTables,] pH::Real, 
+        seq::AbstractString; 
+        σ_pH::Real = 0.0
+    ) -> (electron_count, v0, uncertainty)
+    
+    Interfaces.ϕ°([src::PartialMolarVolumeSourceTables,] name::AbstractString) 
+        -> (electron_count, v0, uncertainty)
 
 Partial molar volume at infinite dilution (`v0` in cm³/mol) for a protein
 sequence at a given pH, or a non-protein solute by common or IUPAC name.

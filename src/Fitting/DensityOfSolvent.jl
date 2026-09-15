@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-using ..Constants: DEFAULT_ATOL, AVOGADRO
-using ..Interfaces: ρₑ_w, ϕ°
+using ..Constants: AVOGADRO
+using ..Interfaces: Interfaces
 using Distributions
 
 abstract type Solute end
@@ -22,7 +22,7 @@ function _ρₑ_i(p::Protein, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Fl
         throw(DomainError(p.molarity_uncertainty, "Uncertainty must be >= 0"))
     elseif p.molarity <= 0
         throw(DomainError(p.molarity, "Molarity must be > 0"))
-    elseif p.seq == ""
+    elseif isempty(p.seq)
         throw(ArgumentError("Sequence cannot be empty"))
     end
 
@@ -130,7 +130,20 @@ to the mean and standard deviation returned by `_ρₑ`. `LogNormal` is used rat
 `Normal` (or `Truncated{Normal}`) because ρₑ has support only on (0, ∞); at the CV this
 model produces, the two agree in the bulk.
 
-Given `μ, σ = _ρₑ(...)`, the `LogNormal(μ_ln, σ_ln)` parameters are:
+Bulk electron density at temperature `t` (°C), in e·Å⁻³, is linear in solute concentration: 
+
+    ρₑ = ρ_w(T) + Σ_j C_j · (N_A·Z_j/1e27 − ρ_w(T)·ϕ°_j/1e3)
+
+with `ϕ°_j` being the partial molar volume of solute `j` at infinite dilution
+in cm³·mol⁻¹. Uncertainty is propagated to first order assuming independence:
+
+    σ² = (1 − Σ_j C_j·ϕ°_j/1e3)² · σ_w²
+        + Σ_j k_j² · σ_C_j²
+        + Σ_j (C_j·ρ_w/1e3)² · σ_ϕ°_j²
+
+where `k_j = N_A·Z_j/1e27 − ρ_w·ϕ°_j/1e3`.
+
+Given `μ = ρₑ, σ = √σ²`, the `LogNormal(μ_ln, σ_ln)` parameters are:
 
     σ_ln = √(ln(1 + σ²/μ²))
     μ_ln = ln(μ) − σ_ln²/2
@@ -145,14 +158,13 @@ Given `μ, σ = _ρₑ(...)`, the `LogNormal(μ_ln, σ_ln)` parameters are:
 - `t::Real=25.0`: solution temperature in °C, forwarded to `_ρₑ`.
 
 # Returns
-- `LogNormal{Float64}`: prior distribution over ρₑ, with `logpdf`/gradients usable
-    directly as a NUTS prior term.
+- `LogNormal{Float64}`: prior distribution over ρₑ .
 
 # Exceptions
 - `ArgumentError`: thrown if `solutes` is empty.
 - `DomainError`: thrown if `σ_pH < 0`.
 """
-function prior(
+function dns_prior(
     pH::Real, 
     σ_pH::Real, 
     solutes::Vector{Solute}; 
