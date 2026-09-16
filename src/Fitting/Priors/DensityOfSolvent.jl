@@ -31,25 +31,25 @@ end
 
 """ Estimated bulk electron density for a non-biological solute. """
 function _ρₑ_i(s::NonBiological, ::Real, ::Real)::Tuple{Float64, Float64, Float64}
-    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(s.name)
+    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(s.arg)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
 """ Estimated bulk electron density for a protein sequence. """
 function _ρₑ_i(p::Protein, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Float64}
-    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(pH, p.seq; σ_pH)
+    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(pH, p.arg; σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
 """ Estimated bulk electron density for a DNA sequence. """
 function _ρₑ_i(d::DNA, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Float64}
-    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(true, pH, d.seq; σ_pH)
+    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(true, pH, d.arg; σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
 """ Estimated bulk electron density for an RNA sequence. """
 function _ρₑ_i(r::RNA, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Float64}
-    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(false, pH, r.seq; σ_pH)
+    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(false, pH, r.arg; σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 

@@ -7,6 +7,7 @@ module PartialMolarVolumes
 import ..Interfaces
 using  ..Interfaces: PartialMolarVolumeSource
 using  ...Constants: AVOGADRO
+using  ...Cache: KeyedCache
 using  JSON3: JSON3
 
 export PMVSrcTables, COMMON_TO_IUPAC
@@ -93,7 +94,7 @@ end
 #----------------------------------------------------------
 
 "Memoized water electron bulk density"
-const _ρₑ_w_cache = Dict{Int64, Tuple{Float64, Float64}}()
+const _ρₑ_w_cache = KeyedCache{Int64, Tuple{Float64, Float64}}()
 
 "Molar mass of H₂O, g·mol⁻¹ (IAPWS-95 value)."
 const _M_H2O = 18.015268
@@ -118,9 +119,7 @@ function ρₑ_w(t::Real)::Tuple{Float64, Float64}
 
     # look up in cache if memoized
     key = round(Int64, t * 1000)
-    if haskey(_ρₑ_w_cache, key)
-        return _ρₑ_w_cache[key]
-    else
+    return get!(_ρₑ_w_cache, key) do
         # calculate density of water at 1atm using the Kell equation
         ρ = (   999.83952 + 16.945176*t - 7.9870401e-3*t^2
                 - 46.170461e-6*t^3 + 105.56302e-9*t^4
@@ -136,9 +135,7 @@ function ρₑ_w(t::Real)::Tuple{Float64, Float64}
 
         # relative uncertainty = 0.02 / ρ(t)   ≈ 2×10⁻⁵ (≈20 ppm), nearly constant 0-150°C
         # absolute uncertainty on ρₑ_w(t) = ρₑ_w(t) × (0.02 / ρ(t))
-        _ρₑ_w_cache[key] = (ρₑ_w, ρₑ_w * 0.02 / ρ)
-
-        return _ρₑ_w_cache[key]
+        (ρₑ_w, ρₑ_w * 0.02 / ρ)
     end
 end
 
@@ -191,7 +188,7 @@ atoms at the two open chain termini.
 const _formation_water_electrons = _Z_H2O
 
 "Memoized protein partial molar volume, keyed by sequence"
-const _ϕ°_p_cache = Dict{String, Tuple{Int64, Float64, Float64}}()
+const _ϕ°_p_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 
 """
     _residue_var(res::AbstractString, pH::Real; σ_pH::Real = 0.0) -> (electron_count, pmv, variance)
@@ -227,9 +224,7 @@ function ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64, Fl
 
     key = String(seq)
 
-    if haskey(_ϕ°_p_cache, key)
-        return _ϕ°_p_cache[key]
-    else
+    return get!(_ϕ°_p_cache, key) do
 
         # initialize accumulators
         sqr_unc = 0.0
@@ -293,8 +288,7 @@ function ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64, Fl
         any_real && (z_i += _formation_water_electrons)
 
         # cache and return result
-        _ϕ°_p_cache[key] = (z_i, ϕ°, sqrt(sqr_unc))
-        return _ϕ°_p_cache[key]
+        (z_i, ϕ°, sqrt(sqr_unc))
 
     end
 end
@@ -304,7 +298,7 @@ end
 #----------------------------------------------------------
 
 "Memoized solute partial molar volume, keyed by iupac name"
-const _ϕ°_s_cache = Dict{String, Tuple{Int64, Float64, Float64}}()
+const _ϕ°_s_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 
 """ iupac name => (electron count, pmv, uncertainty) """
 const _solutes::Dict{String, Tuple{Int64, Float64, Union{Float64, Nothing}}} =
@@ -358,9 +352,9 @@ Takes the IUPAC name of a solute and returns (electron count, pmv, uncertainty).
 """
 function ϕ°(name::AbstractString)::Tuple{Int64, Float64, Float64}
 
-    # check if cache hit or miss
-    res = get(_ϕ°_s_cache, name, nothing)
-    if res === nothing
+    key = String(name)
+
+    return get!(_ϕ°_s_cache, key) do
         res = get(_solutes, name, nothing)
 
         # name is not mapped, throw error
@@ -371,23 +365,20 @@ function ϕ°(name::AbstractString)::Tuple{Int64, Float64, Float64}
             if res[3] === nothing
                 i = 0
                 s = 0.0
-                for key in keys(_solutes)
-                    u = _solutes[key][3]
+                for k in keys(_solutes)
+                    u = _solutes[k][3]
                     if u !== nothing
                         i += 1
                         s += u
                     end
                 end
                 s /= i
-                _ϕ°_s_cache[name] = (res[1], res[2], s)
+                (res[1], res[2], s)
 
             else
-                _ϕ°_s_cache[name] = (res[1], res[2], res[3])
+                (res[1], res[2], res[3])
             end
-            return _ϕ°_s_cache[name]
         end
-    else
-        return _ϕ°_s_cache[name]
     end
 end
 
@@ -396,10 +387,10 @@ end
 #----------------------------------------------------------
 
 "Memoized DNA partial molar volume, keyed by sequence"
-const _ϕ°_d_cache = Dict{String, Tuple{Int64, Float64, Float64}}()
+const _ϕ°_d_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 
 "Memoized RNA partial molar volume, keyed by sequence"
-const _ϕ°_r_cache = Dict{String, Tuple{Int64, Float64, Float64}}()
+const _ϕ°_r_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 
 """ key => (electron_count, V0, uncertainty). Strict `Float64` uncertainty
 (not `Union{Float64,Nothing}` like `_solutes`, since no `RNA/DNA` entry has
@@ -558,9 +549,7 @@ function ϕ°(
     cache = isDNA ? _ϕ°_d_cache : _ϕ°_r_cache
     key = String(seq)
 
-    if haskey(cache, key)
-        return cache[key]
-    else
+    return get!(cache, key) do
 
         sqr_unc = 0.0
         ϕ_total = 0.0
@@ -585,8 +574,7 @@ function ϕ°(
         z_i -= n_bonds * _Z_H2O
         ϕ_total -= n_bonds * _H2O_V0_25C
 
-        cache[key] = (z_i, ϕ_total, sqrt(sqr_unc))
-        return cache[key]
+        (z_i, ϕ_total, sqrt(sqr_unc))
     end
 end
 
