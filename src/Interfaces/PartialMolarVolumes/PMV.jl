@@ -9,10 +9,84 @@ using  ..Interfaces: PartialMolarVolumeSource
 using  ...Constants: AVOGADRO
 using  JSON3: JSON3
 
-export PartialMolarVolumeSourceTables, COMMON_TO_IUPAC
+export PMVSrcTables, COMMON_TO_IUPAC
 
 "Marker for the bundled-table backend."
-struct PartialMolarVolumeSourceTables <: PartialMolarVolumeSource end
+struct PMVSrcTables <: PartialMolarVolumeSource end
+
+"""
+    _titrated(
+        res::AbstractString,
+        _ionization::Dict{String, Tuple{Tuple{Float64, String}, String}},
+        _dict::Dict{String, Tuple{Int64, Float64, Float64}},
+        pH::Real;
+        σ_pH::Real = 0.0
+    ) -> Tuple{Int64, Float64, Float64}
+
+Resolves the pH-dependent partial molar volume of an ionizable residue via
+the sigmoidal titration formula `V(pH) = V0 ∓ dV/(1+10^(±(pKa-pH)))`.
+
+Generic over which value table is titrated: `_ionization` and `_dict` are
+passed in rather than closed over, so the same function serves Protein's
+`_ionization`/`_Protein` pair and any nucleotide ionization/residue-table
+pair with the same shapes, without duplicating the titration math per
+molecule kind.
+
+`σ_pH`, the standard uncertainty on the measured `pH`, is propagated into
+`variance` by the delta method: on either branch `∂pmv/∂pH = ∓dV·ln(10)·frac·(1-frac)`,
+which has the same magnitude both ways, so its contribution is
+`(dV·ln(10)·frac·(1-frac)·σ_pH)²`, added in quadrature to the existing
+parameter-uncertainty term. This is a local linear approximation: it
+degrades away from the steepest part of the sigmoid only in the sense of
+the higher-order terms it drops, but blows up fastest right at
+`pH == pKa`, where the sigmoid is steepest and `σ_pH` is least negligible
+relative to the curvature.
+
+# Arguments
+- `res`: residue code to look up in `_ionization` (e.g. a protein one-letter
+    code, or a nucleotide letter/`-nucleoside` key); must be a key of `_ionization`.
+- `_ionization`: `res -> ((pKa, ionized_key), neutral_key)` table, e.g.
+    `Protein`'s own ionization table or a nucleotide's.
+- `_dict`: `key -> (electron_count, V0, uncertainty)` value table that
+    `neutral_key`/`ionized_key` are resolved against. The ionized entry's
+    `electron_count` is the *delta* relative to the neutral entry — always
+    `0`, since deprotonation removes a bare proton, not an electron (see
+    `_Protein`'s own docstring) — not an absolute count.
+- `pH`: solution pH the titration is evaluated at.
+
+# Keywords
+- `σ_pH`: standard uncertainty on `pH`, propagated by the delta method
+    above; default `0.0` (no propagation).
+"""
+function _titrated(
+    res::AbstractString, 
+    _ionization::Dict{String, Tuple{Tuple{Float64, String}, String}},
+    _dict::Dict{String, Tuple{Int64, Float64, Float64}},
+    pH::Real; 
+    σ_pH::Real = 0.0
+)::Tuple{Int64, Float64, Float64}
+    
+    # get pKa and key of ionized residue; plain indexing throws Julia's own
+    # KeyError(res) automatically if res is missing - no manual check needed
+    (pKa, ionized_key), neutral_key = _ionization[res]
+
+    # get values for neutral and ionized key
+    e0, v0, u0 = _dict[neutral_key]
+    de, dv, du = _dict[ionized_key]
+
+    # determine if its basic or acidic (true if acidic)
+    acidic = endswith(ionized_key, "acidic")
+    
+    # do titration formula
+    frac = acidic ? 1 / (1 + 10.0^(pKa - pH)) : 1 / (1 + 10.0^(pH - pKa))
+    pmv = acidic ? v0 - dv * frac : v0 + dv * frac
+    dpmv_dpH = dv * log(10) * frac * (1 - frac)
+    
+    # propogate uncertainty
+    var = u0^2 + (frac * du)^2 + (dpmv_dpH * σ_pH)^2
+    return e0 + de, pmv, var
+end
+
 
 #----------------------------------------------------------
 #               Water Bulk Electron Density
@@ -69,12 +143,12 @@ function ρₑ_w(t::Real)::Tuple{Float64, Float64}
 end
 
 #----------------------------------------------------------
-#              Proteins Partial Molar Volume
+#              Protein Partial Molar Volume
 #----------------------------------------------------------
 
 """key => ((pH condition, ionized_key), neutral_key)"""
-const _ionization::Dict{String, Tuple{Tuple{Float64, String}, String}} = JSON3.read(
-    read(joinpath(@__DIR__, "Proteins", "ionization.json"), String),
+const _protein_ionization::Dict{String, Tuple{Tuple{Float64, String}, String}} = JSON3.read(
+    read(joinpath(@__DIR__, "Protein", "ionization.json"), String),
     Dict{String, Tuple{Tuple{Float64, String}, String}}
 )
 
@@ -83,8 +157,8 @@ side-chain-only increment relative to glycine (see `_backbone_electrons`), and i
 identical between a group's "-neutral" and "-acidic"/"-basic" forms since deprotonation
 only removes a bare proton (no electron) — so every ionization delta row's own
 electron_count is legitimately 0, not a placeholder. """
-const _proteins::Dict{String, Tuple{Int64, Float64, Float64}} = JSON3.read(
-    read(joinpath(@__DIR__, "Proteins", "proteins.json"), String),
+const _Protein::Dict{String, Tuple{Int64, Float64, Float64}} = JSON3.read(
+    read(joinpath(@__DIR__, "Protein", "protein.json"), String),
     Dict{String, Tuple{Int64, Float64, Float64}}
 )
 
@@ -93,17 +167,17 @@ const _wildcards = Dict("B" => ("D", "N"), "J" => ("L", "I"), "Z" => ("E", "Q"))
 
 """
 Peptide-bond backbone unit (`-CH2CONH-`, "glycyl") volume at 25°C, added once per
-residue in `ρₑ`. `proteins.json`'s per-residue entries (`A`, `V`, `L`, ... and `G`'s
+residue in `ρₑ`. `Protein.json`'s per-residue entries (`A`, `V`, `L`, ... and `G`'s
 zero) are side-chain-only increments relative to glycine (Lee et al. 2008's own
 convention), not absolute residue volumes — this shared backbone term is what
-they sit on top of. Source: `proteins.tsv` CH2CONH row, `10.1039/9781782627043-00542`.
+they sit on top of. Source: `Protein.tsv` CH2CONH row, `10.1039/9781782627043-00542`.
 """
 const _backbone_pmv = (37.4, 0.1)
 
 """
 Peptide backbone unit (`-CH2CONH-`, neutral, C2H3NO) electron count: 2×C(6) + 3×H(1)
 + N(7) + O(8) = 30 e. Added once per residue in `ρₑ`, on the same basis as
-`_backbone_pmv` — `proteins.json`'s electron_count field is a side-chain-only
+`_backbone_pmv` — `Protein.json`'s electron_count field is a side-chain-only
 increment relative to glycine, and this is the shared unit it sits on top of.
 """
 const _backbone_electrons = 30
@@ -120,35 +194,6 @@ const _formation_water_electrons = _Z_H2O
 const _ϕ°_p_cache = Dict{String, Tuple{Int64, Float64, Float64}}()
 
 """
-    _ionized_pmv(res::AbstractString, pH::Real; σ_pH::Real = 0.0) -> (electron_count, pmv, variance)
-
-Resolves the pH-dependent partial molar volume of an ionizable residue via
-the sigmoidal titration formula `V(pH) = V0 ∓ dV/(1+10^(±(pKa-pH)))`. electron_count
-is pH-independent (deprotonation removes a bare proton, not an electron), so it's
-just the neutral form's own count plus the (always 0) ionization delta.
-
-`σ_pH`, the standard uncertainty on the measured `pH` itself, is propagated into
-`variance` by the delta method: on either branch `∂pmv/∂pH = ∓dV·ln(10)·frac·(1-frac)`,
-which has the same magnitude both ways, so its contribution is
-`(dV·ln(10)·frac·(1-frac)·σ_pH)²`, added in quadrature to the existing
-parameter-uncertainty term. This is a local linear approximation: it degrades
-away from the steepest part of the sigmoid only in the sense of the higher-order
-terms it drops, but blows up fastest right at `pH == pKa`, where the sigmoid is
-steepest and `σ_pH` is least negligible relative to the curvature.
-"""
-function _ionized_pmv(res::AbstractString, pH::Real; σ_pH::Real = 0.0)::Tuple{Int64, Float64, Float64}
-    (pKa, ionized_key), neutral_key = _ionization[res]
-    e0, v0, u0 = _proteins[neutral_key]
-    de, dv, du = _proteins[ionized_key]
-    acidic = endswith(ionized_key, "acidic")
-    frac = acidic ? 1 / (1 + 10.0^(pKa - pH)) : 1 / (1 + 10.0^(pH - pKa))
-    pmv = acidic ? v0 - dv * frac : v0 + dv * frac
-    dpmv_dpH = dv * log(10) * frac * (1 - frac)
-    var = u0^2 + (frac * du)^2 + (dpmv_dpH * σ_pH)^2
-    return e0 + de, pmv, var
-end
-
-"""
     _residue_var(res::AbstractString, pH::Real; σ_pH::Real = 0.0) -> (electron_count, pmv, variance)
 
 Normalizes any residue lookup (ionizable or not) to (electron_count, pmv, variance),
@@ -156,10 +201,10 @@ so every call site in `ρₑ` accumulates uniformly. Non-ionizable residues have
 `pH` dependence, so `σ_pH` contributes nothing for them.
 """
 function _residue_var(res::AbstractString, pH::Real; σ_pH::Real = 0.0)::Tuple{Int64, Float64, Float64}
-    if haskey(_ionization, res)
-        return _ionized_pmv(res, pH; σ_pH)
+    if haskey(_protein_ionization, res)
+        return _titrated(res, _protein_ionization, _Protein, pH; σ_pH)
     else
-        e, pmv, u = _proteins[res]
+        e, pmv, u = _Protein[res]
         return e, pmv, u^2
     end
 end
@@ -169,7 +214,7 @@ end
 takes a sequence of one-letter amino acid codes at a pH and returns the estimated
 partial molar volume at inifinit dilution (total electron count, partial molar volume,
 uncertainty). `σ_pH` is the standard uncertainty on `pH`, propagated by the delta
-method through each ionizable residue's titration term (see `_ionized_pmv`). The
+method through each ionizable residue's titration term (see `_titrated`). The
 result is cached off of sequence only, so only the first call of `σ_pH` and `pH`
 are taken into account.
 """
@@ -222,15 +267,15 @@ function ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64, Fl
 
 
             # ionizable residue, need to get correct key
-            elseif (haskey(_ionization, aa))
-                e, pmv, var = _ionized_pmv(aa, pH; σ_pH)
+            elseif (haskey(_protein_ionization, aa))
+                e, pmv, var = _titrated(aa, _protein_ionization, _Protein, pH; σ_pH)
                 ϕ° += pmv
                 sqr_unc += var
                 z_i += e
 
             # regular amino acid
-            elseif (haskey(_proteins, aa))
-                e, pmv, u = _proteins[aa]
+            elseif (haskey(_Protein, aa))
+                e, pmv, u = _Protein[aa]
                 ϕ° += pmv
                 sqr_unc += u^2
                 z_i += e
@@ -255,7 +300,7 @@ function ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64, Fl
 end
 
 #----------------------------------------------------------
-#             Non-Protein Partial Molar Volume
+#        Non Biological Solute Partial Molar Volume        
 #----------------------------------------------------------
 
 "Memoized solute partial molar volume, keyed by iupac name"
@@ -264,13 +309,13 @@ const _ϕ°_s_cache = Dict{String, Tuple{Int64, Float64, Float64}}()
 """ iupac name => (electron count, pmv, uncertainty) """
 const _solutes::Dict{String, Tuple{Int64, Float64, Union{Float64, Nothing}}} =
     JSON3.read(
-    read(joinpath(@__DIR__, "NonProteins", "nonproteins.json"), String),
+    read(joinpath(@__DIR__, "NonBiological", "nonbiological.json"), String),
     Dict{String, Tuple{Int64, Float64, Union{Float64, Nothing}}}
 )
 
 """ common name => iupac name """
 const COMMON_TO_IUPAC::Dict{String, String} = JSON3.read(
-    read(joinpath(@__DIR__, "NonProteins", "common_to_iupac.json"), String),
+    read(joinpath(@__DIR__, "NonBiological", "common_to_iupac.json"), String),
     Dict{String, String}
 )
 
@@ -291,7 +336,7 @@ end
 """
     _resolve_solute_name(name::AbstractString) -> String
 
-`name` itself if it is already an `nonproteins.json` key, else its
+`name` itself if it is already an `nonbiological.json` key, else its
 `COMMON_TO_IUPAC` mapping via [`_common2iupac`](@ref), else `name` unchanged
 (so `ϕ°` below still throws its own `ArgumentError` rather than a
 `KeyError` from here). Mirrors `AtomicRadii`'s fallback-chain style.
@@ -347,29 +392,228 @@ function ϕ°(name::AbstractString)::Tuple{Int64, Float64, Float64}
 end
 
 #----------------------------------------------------------
+#             Nucleotides Partial Molar Volume              
+#----------------------------------------------------------
+
+"Memoized DNA partial molar volume, keyed by sequence"
+const _ϕ°_d_cache = Dict{String, Tuple{Int64, Float64, Float64}}()
+
+"Memoized RNA partial molar volume, keyed by sequence"
+const _ϕ°_r_cache = Dict{String, Tuple{Int64, Float64, Float64}}()
+
+""" key => (electron_count, V0, uncertainty). Strict `Float64` uncertainty
+(not `Union{Float64,Nothing}` like `_solutes`, since no `RNA/DNA` entry has
+a missing uncertainty) — matches `_Protein`'s type, required by `_titrated`. """
+const _DNA::Dict{String, Tuple{Int64, Float64, Float64}} =
+    JSON3.read(
+    read(joinpath(@__DIR__, "DNA", "dna.json"), String),
+    Dict{String, Tuple{Int64, Float64, Float64}}
+)
+
+""" key => (electron_count, V0, uncertainty). Strict `Float64` uncertainty
+(not `Union{Float64,Nothing}` like `_solutes`, since no `RNA/DNA` entry has
+a missing uncertainty) — matches `_Protein`'s type, required by `_titrated`. """
+const _RNA::Dict{String, Tuple{Int64, Float64, Float64}} =
+    JSON3.read(
+    read(joinpath(@__DIR__, "RNA", "rna.json"), String),
+    Dict{String, Tuple{Int64, Float64, Float64}}
+)
+
+""" key => ((pKa, ionized_key), neutral_key), same shape as `_protein_ionization`. """
+const _DNA_ionization::Dict{String, Tuple{Tuple{Float64, String}, String}} = JSON3.read(
+    read(joinpath(@__DIR__, "DNA", "ionization.json"), String),
+    Dict{String, Tuple{Tuple{Float64, String}, String}}
+)
+
+""" key => ((pKa, ionized_key), neutral_key), same shape as `_protein_ionization`. """
+const _RNA_ionization::Dict{String, Tuple{Tuple{Float64, String}, String}} = JSON3.read(
+    read(joinpath(@__DIR__, "RNA", "ionization.json"), String),
+    Dict{String, Tuple{Tuple{Float64, String}, String}}
+)
+
+"Maps IUPAC nucleotide ambiguity codes to the bases they average over."
+const _wildcards_nuc = Dict(
+    "R" => Dict("DNA" => ["A", "G"],           "RNA" => ["A", "G"]),          # puRine
+    "Y" => Dict("DNA" => ["C", "T"],           "RNA" => ["C", "U"]),          # pYrimidine
+    "S" => Dict("DNA" => ["G", "C"],           "RNA" => ["G", "C"]),          # Strong (3 H-bonds)
+    "W" => Dict("DNA" => ["A", "T"],           "RNA" => ["A", "U"]),          # Weak (2 H-bonds)
+    "K" => Dict("DNA" => ["G", "T"],           "RNA" => ["G", "U"]),          # Keto
+    "M" => Dict("DNA" => ["A", "C"],           "RNA" => ["A", "C"]),          # aMino
+    "B" => Dict("DNA" => ["C", "G", "T"],      "RNA" => ["C", "G", "U"]),     # not A
+    "D" => Dict("DNA" => ["A", "G", "T"],      "RNA" => ["A", "G", "U"]),     # not C
+    "H" => Dict("DNA" => ["A", "C", "T"],      "RNA" => ["A", "C", "U"]),     # not G
+    "V" => Dict("DNA" => ["A", "C", "G"],      "RNA" => ["A", "C", "G"]),     # not T/U
+    "N" => Dict("DNA" => ["A", "C", "G", "T"], "RNA" => ["A", "C", "G", "U"]) # aNy
+)
+
+"""
+    _wildcard_var(bases::Vector{String}, lookup::Function) -> Tuple{Int64, Float64, Float64}
+
+N-way average of a wildcard's component residues/bases: mean `pmv` and
+electron count, `variance = sum of variances / N²` (generalizes protein's
+inline 2-way wildcard averaging, which is just this formula's `N=2` case).
+
+# Arguments
+- `bases`: the residue/base codes to average over (e.g. `["A", "G"]` for `R`).
+- `lookup`: `base::AbstractString -> (electron_count, pmv, variance)` resolver
+    called once per element of `bases` — the caller's own per-residue
+    resolver (e.g. `_nuc_residue_var` itself, for recursive reuse so a
+    wildcard's component bases are still checked for ionizability).
+"""
+function _wildcard_var(bases::Vector{String}, lookup::Function)::Tuple{Int64,Float64,Float64}
+    n = length(bases)
+    es, pmvs, vars = 0, 0.0, 0.0
+    for b in bases
+        e, pmv, var = lookup(b)
+        es += e; pmvs += pmv; vars += var
+    end
+    return round(Int64, es / n), pmvs / n, vars / n^2
+end
+
+"""
+    _nuc_residue_var(res::AbstractString, isDNA::Bool, pH::Real; σ_pH::Real = 0.0)
+        -> Tuple{Int64, Float64, Float64}
+
+Resolves a single nucleotide letter (or IUPAC ambiguity code) to
+`(electron_count, pmv, variance)`, normalizing plain/ionizable/wildcard
+lookups the same way `_residue_var` does for protein. `isDNA` selects which
+value/ionization table pair to resolve against.
+
+# Arguments
+- `res`: one-letter nucleotide or ambiguity code (`A/U/G/C` or `A/T/G/C`,
+    or any key of `_wildcards_nuc`).
+- `isDNA`: `true` to resolve against `_DNA`/`_DNA_ionization`, `false` for
+    `_RNA`/`_RNA_ionization`.
+- `pH`: solution pH, forwarded to `_titrated` for ionizable residues.
+
+# Keywords
+- `σ_pH`: standard uncertainty on `pH`; default `0.0`.
+
+# Throws
+- `ArgumentError` if `res` is not a recognized key.
+"""
+function _nuc_residue_var(
+    res::AbstractString,
+    isDNA::Bool,
+    pH::Real;
+    σ_pH::Real = 0.0
+)::Tuple{Int64, Float64, Float64}
+
+    value_dict = isDNA ? _DNA : _RNA
+    ion_dict   = isDNA ? _DNA_ionization : _RNA_ionization
+
+    if haskey(_wildcards_nuc, res)
+        bases = _wildcards_nuc[res][isDNA ? "DNA" : "RNA"]
+        return _wildcard_var(bases, b -> _nuc_residue_var(b, isDNA, pH; σ_pH))
+    elseif haskey(ion_dict, res)
+        return _titrated(res, ion_dict, value_dict, pH; σ_pH)
+    elseif haskey(value_dict, res)
+        e, pmv, u = value_dict[res]
+        return e, pmv, u^2
+    else
+        throw(ArgumentError("unknown $(isDNA ? "DNA" : "RNA") residue: $res"))
+    end
+end
+
+"Bulk water molar volume at 25°C (cm³/mol), same Kell-equation source as `ρₑ_w`."
+const _H2O_V0_25C = 18.07
+
+"""
+    ϕ°(isDNA::Bool, pH::Real, seq::AbstractString; σ_pH::Real = 0.0)
+        -> Tuple{Int64, Float64, Float64}
+
+Partial molar volume at infinite dilution of a DNA/RNA sequence at a given
+pH: takes a string of one-letter nucleotide codes (or IUPAC ambiguity
+codes) and returns `(total electron count, partial molar volume, uncertainty)`.
+# Arguments
+- `isDNA`: `true` for a DNA sequence, `false` for RNA.
+- `pH`: solution pH the titration is evaluated at.
+- `seq`: sequence of one-letter nucleotide/ambiguity codes. `*` is a
+    no-op placeholder.
+
+# Keywords
+- `σ_pH`: standard uncertainty on `pH`, propagated through each ionizable
+    residue's titration term via `_titrated`; default `0.0`.
+
+# Returns
+`(electron_count, pmv, uncertainty)`.
+
+# Throws
+- `ArgumentError` if `seq` is empty.
+- `ArgumentError` (from `_nuc_residue_var`) if `seq` contains a character
+    that isn't a valid residue, ambiguity code, or `*` for the selected
+    `isDNA` alphabet.
+"""
+function ϕ°(
+    isDNA::Bool, 
+    pH::Real, 
+    seq::AbstractString; 
+    σ_pH::Real = 0.0
+)::Tuple{Int64, Float64, Float64}
+
+    if isempty(seq)
+        throw(ArgumentError("Sequence is empty!"))
+    end
+
+    cache = isDNA ? _ϕ°_d_cache : _ϕ°_r_cache
+    key = String(seq)
+
+    if haskey(cache, key)
+        return cache[key]
+    else
+
+        sqr_unc = 0.0
+        ϕ_total = 0.0
+        z_i = 0
+        n_real = 0
+
+        for nt in string.(collect(seq))
+
+            # no-op placeholder, skip (no residue contribution at all)
+            nt == "*" && continue
+
+            n_real += 1
+            e, pmv, var = _nuc_residue_var(nt, isDNA, pH; σ_pH)
+            ϕ_total += pmv
+            sqr_unc += var
+            z_i += e
+        end
+
+        # Each per-letter value is a FREE (fully-hydrated) 5'-monophosphate,
+        # unlike Protein's already-anhydrous backbone unit. Subtract per bond.
+        n_bonds = max(n_real - 1, 0)
+        z_i -= n_bonds * _Z_H2O
+        ϕ_total -= n_bonds * _H2O_V0_25C
+
+        cache[key] = (z_i, ϕ_total, sqrt(sqr_unc))
+        return cache[key]
+    end
+end
+
+#----------------------------------------------------------
 #                  Interfaces generics
 #----------------------------------------------------------
 # ϕ°/ρₑ_w are the stable API (declared in Interfaces.jl); only the backend
 # (`src`, first argument) varies. The `src`-less forms below default it to
-# `PartialMolarVolumeSourceTables()`, same convention as `form_factor_table`.
+# `PMVSrcTables()`, same convention as `form_factor_table`.
 
 """
-    Interfaces.ρₑ_w([src::PartialMolarVolumeSourceTables,] t::Real) -> (ρₑ, uncertainty)
+    Interfaces.ρₑ_w([src::PMVSrcTables,] t::Real) -> (ρₑ, uncertainty)
 
 Bulk electron density of pure water at `t` (°C), in e·Å⁻³. Thin wrapper over
 the local [`ρₑ_w`](@ref).
 """
-Interfaces.ρₑ_w(::PartialMolarVolumeSourceTables, t::Real)::Tuple{Float64,Float64} = ρₑ_w(t)
-Interfaces.ρₑ_w(t::Real)::Tuple{Float64,Float64} = Interfaces.ρₑ_w(PartialMolarVolumeSourceTables(), t)
+Interfaces.ρₑ_w(::PMVSrcTables, t::Real)::Tuple{Float64,Float64} = ρₑ_w(t)
+Interfaces.ρₑ_w(t::Real)::Tuple{Float64,Float64} = Interfaces.ρₑ_w(PMVSrcTables(), t)
 
 """
     Interfaces.ϕ°(
-        [src::PartialMolarVolumeSourceTables,] pH::Real, 
+        [src::PMVSrcTables,] pH::Real, 
         seq::AbstractString; 
         σ_pH::Real = 0.0
     ) -> (electron_count, v0, uncertainty)
     
-    Interfaces.ϕ°([src::PartialMolarVolumeSourceTables,] name::AbstractString) 
+    Interfaces.ϕ°([src::PMVSrcTables,] name::AbstractString) 
         -> (electron_count, v0, uncertainty)
 
 Partial molar volume at infinite dilution (`v0` in cm³/mol) for a protein
@@ -377,14 +621,49 @@ sequence at a given pH, or a non-protein solute by common or IUPAC name.
 `σ_pH` is the standard uncertainty on `pH`, propagated by the delta method
 (see the local [`ϕ°`](@ref)). Thin wrappers over the local [`ϕ°`](@ref).
 """
-Interfaces.ϕ°(::PartialMolarVolumeSourceTables, pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64,Float64,Float64} =
-    ϕ°(pH, seq; σ_pH)
-Interfaces.ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64,Float64,Float64} =
-    Interfaces.ϕ°(PartialMolarVolumeSourceTables(), pH, seq; σ_pH)
+Interfaces.ϕ°(
+    ::PMVSrcTables, 
+    pH::Real, 
+    seq::AbstractString; 
+    σ_pH::Real = 0.0
+)::Tuple{Int64,Float64,Float64} = ϕ°(pH, seq; σ_pH)
+Interfaces.ϕ°(
+    pH::Real, 
+    seq::AbstractString; 
+    σ_pH::Real = 0.0
+)::Tuple{Int64,Float64,Float64} = Interfaces.ϕ°(PMVSrcTables(), pH, seq; σ_pH)
 
-Interfaces.ϕ°(::PartialMolarVolumeSourceTables, name::AbstractString)::Tuple{Int64,Float64,Float64} =
-    ϕ°(_resolve_solute_name(name))
-Interfaces.ϕ°(name::AbstractString)::Tuple{Int64,Float64,Float64} =
-    Interfaces.ϕ°(PartialMolarVolumeSourceTables(), name)
+Interfaces.ϕ°(::PMVSrcTables, name::AbstractString)::Tuple{Int64,Float64,Float64} = ϕ°(_resolve_solute_name(name))
+
+Interfaces.ϕ°(name::AbstractString)::Tuple{Int64,Float64,Float64} = Interfaces.ϕ°(PMVSrcTables(), name)
+
+"""
+    Interfaces.ϕ°(
+        [src::PMVSrcTables,] isDNA::Bool,
+        pH::Real,
+        seq::AbstractString;
+        σ_pH::Real = 0.0
+    ) -> (electron_count, v0, uncertainty)
+
+Partial molar volume at infinite dilution (`v0` in cm³/mol) for a DNA/RNA
+sequence at a given pH. `isDNA` selects the `A/T/G/C` alphabet/backend
+table when `true`, `A/U/G/C` when `false`. `σ_pH` is the standard
+uncertainty on `pH`, propagated by the delta method (see the local
+[`ϕ°`](@ref)). Thin wrappers over the local [`ϕ°`](@ref).
+"""
+Interfaces.ϕ°(
+    ::PMVSrcTables,
+    isDNA::Bool,
+    pH::Real,
+    seq::AbstractString;
+    σ_pH::Real = 0.0
+)::Tuple{Int64,Float64,Float64} = ϕ°(isDNA, pH, seq; σ_pH)
+Interfaces.ϕ°(
+    isDNA::Bool,
+    pH::Real,
+    seq::AbstractString;
+    σ_pH::Real = 0.0
+)::Tuple{Int64,Float64,Float64} = Interfaces.ϕ°(PMVSrcTables(), isDNA, pH, seq; σ_pH)
+
 
 end # module PartialMolarVolumes

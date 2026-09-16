@@ -8,42 +8,51 @@ abstract type Solute end
 struct Protein <: Solute
     molarity::Float64
     molarity_uncertainty::Float64
-    seq::String
+    arg::String
 end
 
-struct NonProtein <: Solute
+struct NonBiological <: Solute
     molarity::Float64
     molarity_uncertainty::Float64
-    name::String
+    arg::String
 end
 
-function _ρₑ_i(p::Protein, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Float64}
-    if p.molarity_uncertainty < 0
-        throw(DomainError(p.molarity_uncertainty, "Uncertainty must be >= 0"))
-    elseif p.molarity <= 0
-        throw(DomainError(p.molarity, "Molarity must be > 0"))
-    elseif isempty(p.seq)
-        throw(ArgumentError("Sequence cannot be empty"))
-    end
-
-    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(pH, p.seq; σ_pH)
-    
-    return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
+struct DNA <: Solute
+    molarity::Float64
+    molarity_uncertainty::Float64
+    arg::String
 end
 
-function _ρₑ_i(s::NonProtein, ::Real, ::Real)::Tuple{Float64, Float64, Float64}
-    if s.molarity_uncertainty < 0
-        throw(DomainError(s.molarity_uncertainty, "Uncertainty must be >= 0"))
-    elseif s.molarity <= 0
-        throw(DomainError(s.molarity, "Molarity must be > 0"))
-    elseif s.name == ""
-        throw(ArgumentError("Name cannot be empty"))
-    end
+struct RNA <: Solute
+    molarity::Float64
+    molarity_uncertainty::Float64
+    arg::String
+end
 
+""" Estimated bulk electron density for a non-biological solute. """
+function _ρₑ_i(s::NonBiological, ::Real, ::Real)::Tuple{Float64, Float64, Float64}
     Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(s.name)
-    
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
+
+""" Estimated bulk electron density for a protein sequence. """
+function _ρₑ_i(p::Protein, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Float64}
+    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(pH, p.seq; σ_pH)
+    return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
+end
+
+""" Estimated bulk electron density for a DNA sequence. """
+function _ρₑ_i(d::DNA, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Float64}
+    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(true, pH, d.seq; σ_pH)
+    return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
+end
+
+""" Estimated bulk electron density for an RNA sequence. """
+function _ρₑ_i(r::RNA, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Float64}
+    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(false, pH, r.seq; σ_pH)
+    return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
+end
+
 
 """
     _ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real=25.0)
@@ -68,11 +77,11 @@ where `k_j = N_A·Z_j/1e27 − ρ_w·ϕ°_j/1e3`.
 - `pH::Real`: pH of the solution; forwarded to `Interfaces.ϕ°` for `Protein` solutes.
 - `σ_pH::Real`: standard uncertainty on `pH`, propagated through each `Protein`
     solute's titration term.
-- `solutes::Vector{Solute}`: the `Protein`/`NonProtein` species in solution, each
-    carrying its own molarity and molarity uncertainty.
+- `solutes::Vector{Solute}`: the  species in solution.
 
 # Keywords
 - `t::Real=25.0`: solution temperature in °C, forwarded to `Interfaces.ρₑ_w`.
+- !!NOTE: as of this version, this should NOT be changed, since only water is temp dependent.
 
 # Returns
 - `Tuple{Float64, Float64}`: `(ρₑ, σ_ρₑ)`, the bulk electron density and its
@@ -81,7 +90,7 @@ where `k_j = N_A·Z_j/1e27 − ρ_w·ϕ°_j/1e3`.
 # Exceptions
 - `DomainError`: thrown if any solute's `molarity_uncertainty < 0` or
     `molarity <= 0`.
-- `ArgumentError`: thrown if a `Protein`'s `seq` or a `NonProtein`'s `name` is empty.
+- `ArgumentError`: thrown if a `Protein`'s `seq` or a `NonBiological`'s `name` is empty.
 """
 function _ρₑ(
     pH::Real, 
@@ -102,6 +111,15 @@ function _ρₑ(
     var_vol  = 0.0   # Σ (C_j·ρ_w/1e3)²·σ_ϕ°_j²
 
     for s in solutes
+        if s.molarity_uncertainty < 0
+            throw(DomainError(s.molarity_uncertainty, "Uncertainty must be >= 0"))
+        elseif s.molarity <= 0
+            throw(DomainError(s.molarity, "Molarity must be > 0"))
+        elseif s.arg == ""
+            throw(ArgumentError("Name or sequence cannot be empty"))
+        end
+
+        
         Z_j, ϕ°_j, σ_ϕ°_j = _ρₑ_i(s, pH, σ_pH)
         C_j   = s.molarity
         σ_C_j = s.molarity_uncertainty
@@ -151,7 +169,7 @@ Given `μ = ρₑ, σ = √σ²`, the `LogNormal(μ_ln, σ_ln)` parameters are:
 # Arguments
 - `pH::Real`: pH of the solution; forwarded to `_ρₑ`.
 - `σ_pH::Real`: standard uncertainty on `pH`; must be `>= 0`.
-- `solutes::Vector{Solute}`: the `Protein`/`NonProtein` species in solution; must be
+- `solutes::Vector{Solute}`: the `Protein`/`NonBiological` species in solution; must be
     non-empty.
 
 # Keywords

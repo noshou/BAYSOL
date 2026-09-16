@@ -9,13 +9,13 @@
 # Data provenance for every hardcoded number below: `ρₑ_w` reference values
 # are a re-derivation of the published Kell (1975) density equation plus the same
 # ideal mass-density -> electron-density conversion PMV.jl uses. Protein
-# values are hand-derived closed forms from `proteins.json`/
+# values are hand-derived closed forms from `Protein.json`/
 # `ionization.json` (Lee et al. 2008, DOI 10.1016/j.bpc.2008.02.009) as they
 # stood when this file was written.
 
 const IFACE = ScatterNet.Interfaces
 using ScatterNet.Interfaces.PartialMolarVolumes:
-    PartialMolarVolumes, PartialMolarVolumeSourceTables, COMMON_TO_IUPAC
+    PartialMolarVolumes, PMVSrcTables, COMMON_TO_IUPAC
 using ScatterNet.Constants: AVOGADRO
 
 "Fully-qualified handle onto the submodule, for the private caches/tables below."
@@ -41,12 +41,12 @@ const LYSOZYME = "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRW
 @testset "PartialMolarVolumes" begin
 
     @testset "backend marker & Interfaces dispatch agreement" begin
-        @test PartialMolarVolumeSourceTables() isa IFACE.PartialMolarVolumeSource
-        @test IFACE.ρₑ_w(25.0) == IFACE.ρₑ_w(PartialMolarVolumeSourceTables(), 25.0)
-        @test IFACE.ϕ°(7.0, "GGGG") == IFACE.ϕ°(PartialMolarVolumeSourceTables(), 7.0, "GGGG")
-        @test IFACE.ϕ°("urea") == IFACE.ϕ°(PartialMolarVolumeSourceTables(), "urea")
+        @test PMVSrcTables() isa IFACE.PartialMolarVolumeSource
+        @test IFACE.ρₑ_w(25.0) == IFACE.ρₑ_w(PMVSrcTables(), 25.0)
+        @test IFACE.ϕ°(7.0, "GGGG") == IFACE.ϕ°(PMVSrcTables(), 7.0, "GGGG")
+        @test IFACE.ϕ°("urea") == IFACE.ϕ°(PMVSrcTables(), "urea")
         dispatch_seq = fresh_seq("D")
-        @test IFACE.ϕ°(4.0, dispatch_seq; σ_pH = 0.3) == IFACE.ϕ°(PartialMolarVolumeSourceTables(), 4.0, dispatch_seq; σ_pH = 0.3)
+        @test IFACE.ϕ°(4.0, dispatch_seq; σ_pH = 0.3) == IFACE.ϕ°(PMVSrcTables(), 4.0, dispatch_seq; σ_pH = 0.3)
     end
 
     #------------------------------------------------------------------
@@ -178,7 +178,7 @@ const LYSOZYME = "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRW
     end
 
     @testset "ϕ°(pH, seq; σ_pH): non-ionizable residues are agnostic to σ_pH" begin
-        # sigma_pH only ever reaches `_ionized_pmv`'s delta-method term; the
+        # sigma_pH only ever reaches `_titrated`'s delta-method term; the
         # non-ionizable branch of `_residue_var` never sees it at all.
         baseline = IFACE.ϕ°(7.0, "GAVLIPFWMCYSTNQ")
         loud     = IFACE.ϕ°(7.0, "GAVLIPFWMCYSTNQX"; σ_pH = 1.0e6)   # padded: fresh cache slot
@@ -217,7 +217,7 @@ const LYSOZYME = "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRW
         for code in ('D', 'E', 'H', 'K', 'R', 'U')
             res = string(code)
             (pKa, ionized_key), _ = PMVMOD._ionization[res]
-            dv = PMVMOD._proteins[ionized_key][2]
+            dv = PMVMOD._Protein[ionized_key][2]
             e_lo, v_lo, _ = IFACE.ϕ°(pKa - 30.0, fresh_seq(res))
             e_hi, v_hi, _ = IFACE.ϕ°(pKa + 30.0, fresh_seq(res))
             @test e_lo == e_hi          # electron count is pH-independent everywhere
@@ -369,7 +369,7 @@ const LYSOZYME = "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRW
     end
 
     @testset "ϕ°(name): uncertainty is backfilled with the live average when unreported" begin
-        # nonproteins.json stores `nothing` uncertainty for a solute when no
+        # nonbiological.json stores `nothing` uncertainty for a solute when no
         # source reports one; ϕ° backfills with the mean of every other solute's uncertainty.
         reported = [u for (_, _, u) in values(PMVMOD._solutes) if u !== nothing]
         avg_u = sum(reported) / length(reported)
@@ -389,7 +389,7 @@ const LYSOZYME = "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRW
     end
 
     @testset "ϕ°(name): trisodium citrate is sussy" begin
-        # NonProteins/README.md flags this row as having two disagreeing
+        # NonBiological/README.md flags this row as having two disagreeing
         # published sources (57.1 vs 69.32 cm3/mol); the currently-selected
         # value is pinned here so a future data revision is caught..
         e, v, u = IFACE.ϕ°("trisodium citrate")

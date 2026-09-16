@@ -1,0 +1,53 @@
+Group	Name	Reaction	Temperature_C	pKa	pKa_Uncertainty	dV	dV_Uncertainty	dKS	dKS_Uncertainty	basis	doi
+A	adenine N1	basic	25	4.20	0.00					measured	10.1021/bi00827a012
+A	adenine N9H	acidic	25	9.87	0.00					measured	10.1021/bi00827a012
+A-nucleoside	adenosine N1	basic	25	3.50	0.02					measured	10.1021/bi00827a012
+A-nucleoside	adenosine ribose-OH (literature value, not measured in this paper)	acidic	25	12.35						measured	10.1021/bi00827a012
+G-nucleoside	guanosine N7	basic	25	1.9	0.1					measured	10.1021/bi00827a012
+G-nucleoside	guanosine N1-C6O	acidic	25	9.25	0.01					measured	10.1021/bi00827a012
+G-nucleoside	guanosine ribose-OH	acidic	10	12.83	0.07					measured	10.1021/bi00827a012
+G-nucleoside	guanosine ribose-OH	acidic	25	12.33	0.02					measured	10.1021/bi00827a012
+G-nucleoside	guanosine ribose-OH	acidic	40	11.60	0.04					measured	10.1021/bi00827a012
+A-nucleoside	adenosine N1 (ring) deprotonation	acidic	30	3.5		26.4				measured	10.1021/ja00781a034
+A	AMP adenine-ring deprotonation	acidic	30	3.8		23.5				measured	10.1021/ja00781a034
+A	AMP terminal phosphate deprotonation	acidic	30	6.0		-2.85				measured	10.1021/ja00781a034
+A	AMP-5' phosphate deprotonation	acidic	25	6.05						measured	10.1016/S0021-9258(19)52468-1
+A	AMP-5' phosphate deprotonation	acidic	38	6.08						measured	10.1016/S0021-9258(19)52468-1
+A	ADP phosphate deprotonation	acidic	25	6.26						measured	10.1016/S0021-9258(19)52468-1
+A	ADP phosphate deprotonation	acidic	38	6.27						measured	10.1016/S0021-9258(19)52468-1
+A	ATP phosphate deprotonation	acidic	25	6.48						measured	10.1016/S0021-9258(19)52468-1
+A	ATP phosphate deprotonation	acidic	38	6.50						measured	10.1016/S0021-9258(19)52468-1
+A-nucleoside	AMP-5' adenine-ring N1 protonation	basic	25	3.74						measured	10.1016/S0021-9258(19)52468-1
+A-nucleoside	ADP adenine-ring N1 protonation	basic	25	3.95						measured	10.1016/S0021-9258(19)52468-1
+A-nucleoside	ATP adenine-ring N1 protonation	basic	25	4.00						measured	10.1016/S0021-9258(19)52468-1
+A-nucleoside	adenosine ring N1 protonation	basic	25	3.63						measured	10.1016/S0021-9258(19)52468-1
+A	adenine ring N1 protonation	basic	25	4.12						measured	10.1016/S0021-9258(19)52468-1
+A	adenine N9H (imidazole) deprotonation	acidic	25	9.75						measured	10.1016/S0021-9258(19)52468-1
+A	adenine N9H (imidazole) deprotonation	acidic	38	9.52						measured	10.1016/S0021-9258(19)52468-1
+A	AMP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.21	0.01					measured	10.3390/molecules29184479
+A	dAMP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.27	0.04					measured	10.3390/molecules29184479
+G	GMP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.25	0.02					measured	10.3390/molecules29184479
+G	dGMP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.29	0.01					measured	10.3390/molecules29184479
+C	CMP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.19	0.01					measured	10.3390/molecules29184479
+C	dCMP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.24	0.01					measured	10.3390/molecules29184479
+U	UMP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.15	0.01					measured	10.3390/molecules29184479
+T	dTMP (thymidylate) phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.36	0.03					measured	10.3390/molecules29184479
+G	GDP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.38	0.01					measured	10.3390/molecules29184479
+G	dGDP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.46	0.03					measured	10.3390/molecules29184479
+A	ADP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.40	0.01					measured	10.3390/molecules29184479
+A	dADP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.45	0.01					measured	10.3390/molecules29184479
+C	CDP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.39	0.02					measured	10.3390/molecules29184479
+U	UDP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.38	0.01					measured	10.3390/molecules29184479
+T	dTDP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.44	0.01					measured	10.3390/molecules29184479
+G	GTP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.50	0.02					measured	10.3390/molecules29184479
+G	dGTP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.64	0.02					measured	10.3390/molecules29184479
+A	ATP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.47	0.01					measured	10.3390/molecules29184479
+A	dATP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.62	0.03					measured	10.3390/molecules29184479
+C	CTP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.45	0.02					measured	10.3390/molecules29184479
+U	UTP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.45	0.01					measured	10.3390/molecules29184479
+T	dTTP phosphate deprotonation (I=0.1M NaNO3, compiled/secondary source)	acidic	25	6.52	0.02					measured	10.3390/molecules29184479
+A	AdH2+ -> AdH+ + H+ (adenine ring protonation, as reported by source; NOT yet reconciled with Christensen/Alberty/Krausz's ring-ionization convention or reaction direction)	basic	25			4.6	4.2			measured	10.1016/j.jct.2017.04.005
+A	AdH+ + OH- -> Ad- + H2O (adenine ring deprotonation via hydroxide, as reported by source; includes water-formation contribution, NOT a pure acid-dissociation dV -- needs conversion before comparing to other rows)	acidic	25			21.7	2.6			measured	10.1016/j.jct.2017.04.005
+A	AMP-5' phosphate protonation, I=0 (tetramethylammonium medium, calorimetric)	acidic	25	6.40						measured	10.1007/BF00972840
+A	ADP phosphate protonation, I=0 (tetramethylammonium medium, calorimetric)	acidic	25	7.20						measured	10.1007/BF00972840
+A	ATP phosphate protonation, I=0 (tetramethylammonium medium, calorimetric)	acidic	25	7.68						measured	10.1007/BF00972840

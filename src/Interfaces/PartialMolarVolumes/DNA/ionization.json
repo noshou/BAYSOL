@@ -1,0 +1,6 @@
+{
+ "A": [[6.27, "A-acidic"], "A-neutral"],
+ "T": [[6.36, "T-acidic"], "T-neutral"],
+ "G": [[6.29, "G-acidic"], "G-neutral"],
+ "C": [[6.24, "C-acidic"], "C-neutral"]
+}
