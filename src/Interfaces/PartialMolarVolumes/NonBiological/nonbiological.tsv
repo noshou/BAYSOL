@@ -609,7 +609,7 @@ isopropylurea	1-(propan-2-yl)urea	C4H10N2O	0	99.0		measured	Hoiland, H. In Therm
 1,1-diethylurea	1,1-diethylurea	C5H12N2O	0	114.9		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
 1,3-diethylurea	1,3-diethylurea	C5H12N2O	0	116.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
 tetramethylurea	1,1,3,3-tetramethylurea	C5H12N2O	0	115.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
-hydantoic acid	2-(carbamoylamino)acetic acid	C3H6N2O3	0	77.6		measured	Cohn, E. J.; Edsall, J. T., Eds. Proteins, Amino Acids and Peptides as Ions and Dipolar Ions; Reinhold: New York, 1943
+hydantoic acid	2-(carbamoylamino)acetic acid	C3H6N2O3	0	77.6		measured	Cohn, E. J.; Edsall, J. T., Eds. Protein, Amino Acids and Peptides as Ions and Dipolar Ions; Reinhold: New York, 1943
 acetonitrile	acetonitrile	C2H3N	0	47.4		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
 propanenitrile	propanenitrile	C3H5N	0	64.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
 butanenitrile	butanenitrile	C4H7N	0	80.6		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
@@ -685,7 +685,7 @@ histidine	(2S)-2-amino-3-(1H-imidazol-4-yl)propanoic acid	C6H9N3O2	0	98.3		measu
 gaba	4-aminobutanoic acid	C4H9NO2	0	73.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
 6-aminohexanoic acid	6-aminohexanoic acid	C6H13NO2	0	104.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
 8-aminooctanoic acid	8-aminooctanoic acid	C8H17NO2	0	136.1		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
-betaine	2-(trimethylazaniumyl)acetate	C5H11NO2	0	97.7		measured	Cohn, E. J.; Edsall, J. T., Eds. Proteins, Amino Acids and Peptides as Ions and Dipolar Ions; Reinhold: New York, 1943
+betaine	2-(trimethylazaniumyl)acetate	C5H11NO2	0	97.7		measured	Cohn, E. J.; Edsall, J. T., Eds. Protein, Amino Acids and Peptides as Ions and Dipolar Ions; Reinhold: New York, 1943
 glycylglycine	glycylglycine	C4H8N2O3	0	76.3		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
 triglycine	triglycine	C6H11N3O4	0	112.2		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
 tetraglycine	tetraglycine	C8H14N4O5	0	149.7		measured	Hoiland, H. In Thermodynamic Data for Biochemistry and Biotechnology; Hinz, H.-J., Ed.; Springer-Verlag, 1986; pp 17-44
@@ -715,3 +715,167 @@ glucuronic acid	D-glucuronic acid	C6H10O7	0	110.2		measured	Hoiland, H. In Therm
 citric acid	2-hydroxypropane-1,2,3-tricarboxylic acid	C6H8O7	0	113.93		measured	10.1016/0378-3812(90)85049-G
 oxalic acid	ethanedioic acid	C2H2O4	0	46.33		measured	10.1016/0378-3812(90)85049-G
 lactic acid	2-hydroxypropanoic acid	C3H6O3	0	66.40		measured	10.1016/0378-3812(90)85049-G
+uracil	uracil	C4H4N2O2	0	70.66	0.10	measured	10.1007/s10953-008-9302-2
+uracil	uracil	C4H4N2O2	0	71.57	0.11	measured	10.1007/s10953-008-9302-2
+uracil	uracil	C4H4N2O2	0	72.02	0.10	measured	10.1007/s10953-008-9302-2
+thymine	thymine	C5H6N2O2	0	87.78	0.18	measured	10.1007/s10953-008-9302-2
+thymine	thymine	C5H6N2O2	0	88.40	0.15	measured	10.1007/s10953-008-9302-2
+thymine	thymine	C5H6N2O2	0	89.14	0.16	measured	10.1007/s10953-008-9302-2
+adenine	adenine	C5H5N5	0	88.59	0.22	measured	10.1007/s10953-008-9302-2
+adenine	adenine	C5H5N5	0	88.86	0.18	measured	10.1007/s10953-008-9302-2
+adenine	adenine	C5H5N5	0	89.34	0.24	measured	10.1007/s10953-008-9302-2
+adenine	adenine	C5H5N5	0	89.69	0.17	measured	10.1007/s10953-008-9302-2
+adenine	adenine	C5H5N5	0	90.02	0.19	measured	10.1007/s10953-008-9302-2
+uracil	uracil	C4H4N2O2	0	70.95	0.06	measured	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	71.88	0.03	measured	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	73.28	0.05	measured	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	74.47	0.02	measured	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	75.61	0.06	measured	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	76.95	0.07	measured	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	88.03	0.05	measured	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	89.20	0.05	measured	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	90.24	0.05	measured	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	91.43	0.02	measured	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	92.59	0.04	measured	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	93.63	0.05	measured	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	79.96	0.03	measured	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	81.12	0.02	measured	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	82.21	0.06	measured	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	83.69	0.02	measured	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	84.89	0.06	measured	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	86.42	0.02	measured	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	71.23	0.028	measured	10.1016/j.jct.2014.10.015
+uracil	uracil	C4H4N2O2	0	72.30	0.022	measured	10.1016/j.jct.2014.10.015
+uracil	uracil	C4H4N2O2	0	73.72	0.028	measured	10.1016/j.jct.2014.10.015
+uracil	uracil	C4H4N2O2	0	74.74	0.016	measured	10.1016/j.jct.2014.10.015
+cytosine	cytosine	C4H5N3O	0	72.22	0.057	measured	10.1016/j.jct.2014.10.015
+cytosine	cytosine	C4H5N3O	0	73.85	0.062	measured	10.1016/j.jct.2014.10.015
+cytosine	cytosine	C4H5N3O	0	74.44	0.055	measured	10.1016/j.jct.2014.10.015
+cytosine	cytosine	C4H5N3O	0	75.42	0.020	measured	10.1016/j.jct.2014.10.015
+thymine	thymine	C5H6N2O2	0	87.88	0.021	measured	10.1016/j.jct.2014.10.015
+thymine	thymine	C5H6N2O2	0	88.90	0.006	measured	10.1016/j.jct.2014.10.015
+thymine	thymine	C5H6N2O2	0	89.77	0.011	measured	10.1016/j.jct.2014.10.015
+thymine	thymine	C5H6N2O2	0	90.90	0.017	measured	10.1016/j.jct.2014.10.015
+uridine	uridine	C9H12N2O6	0	151.40	0.015	measured	10.1016/j.jct.2014.10.015
+uridine	uridine	C9H12N2O6	0	153.18	0.015	measured	10.1016/j.jct.2014.10.015
+uridine	uridine	C9H12N2O6	0	154.81	0.015	measured	10.1016/j.jct.2014.10.015
+uridine	uridine	C9H12N2O6	0	155.83	0.016	measured	10.1016/j.jct.2014.10.015
+cytidine	cytidine	C9H13N3O5	0	152.11	0.016	measured	10.1016/j.jct.2014.10.015
+cytidine	cytidine	C9H13N3O5	0	153.86	0.022	measured	10.1016/j.jct.2014.10.015
+cytidine	cytidine	C9H13N3O5	0	156.31	0.042	measured	10.1016/j.jct.2014.10.015
+cytidine	cytidine	C9H13N3O5	0	157.13	0.048	measured	10.1016/j.jct.2014.10.015
+thymidine	thymidine	C10H14N2O5	0	167.00	0.012	measured	10.1016/j.jct.2014.10.015
+thymidine	thymidine	C10H14N2O5	0	168.20	0.003	measured	10.1016/j.jct.2014.10.015
+thymidine	thymidine	C10H14N2O5	0	169.25	0.009	measured	10.1016/j.jct.2014.10.015
+thymidine	thymidine	C10H14N2O5	0	170.76	0.018	measured	10.1016/j.jct.2014.10.015
+cytosine	cytosine	C4H5N3O	0	73.6	0.2	measured	10.1007/BF00650644
+uracil	uracil	C4H4N2O2	0	72.3	0.2	measured	10.1007/BF00650644
+thymine	thymine	C5H6N2O2	0	88.7	0.2	measured	10.1007/BF00650644
+cytidine	cytidine	C9H13N3O5	0	154.2	0.2	measured	10.1007/BF00650644
+uridine	uridine	C9H12N2O6	0	152.3	0.2	measured	10.1007/BF00650644
+thymidine	thymidine	C10H14N2O5	0	168.0	0.2	measured	10.1007/BF00650644
+adenosine	adenosine	C10H13N5O4	0	171.4	0.2	measured	10.1007/BF00650644
+adenosine 5'-monophosphate sodium salt	adenosine 5'-monophosphate sodium salt	C10H13N5NaO7P	0	189.1	0.2	measured	10.1007/BF00650644
+adenosine 5'-triphosphate disodium salt	adenosine 5'-triphosphate disodium salt	C10H14N5Na2O13P3	0	238.9	0.4	measured	10.1007/BF00650644
+adenosine	adenosine	C10H13N5O4	0	170.8	0.7	measured	10.1016/0301-4622(89)80060-2
+2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	169.8	0.6	measured	10.1016/0301-4622(89)80060-2
+inosine	inosine	C10H12N4O5	0	164.6	0.6	measured	10.1016/0301-4622(89)80060-2
+guanosine	guanosine	C10H13N5O5	0	178.2	0.6	measured	10.1016/0301-4622(89)80060-2
+cytidine	cytidine	C9H13N3O5	0	153.7	0.5	measured	10.1016/0301-4622(89)80060-2
+uridine	uridine	C9H12N2O6	0	151.7	0.5	measured	10.1016/0301-4622(89)80060-2
+2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	152.2	0.4	measured	10.1016/0301-4622(89)80060-2
+thymidine	thymidine	C10H14N2O5	0	167.6	0.6	measured	10.1016/0301-4622(89)80060-2
+D-ribose	D-ribose	C5H10O5	0	95.1	0.3	measured	10.1016/0301-4622(89)80060-2
+2-deoxy-D-ribose	2-deoxy-D-ribose	C5H10O4	0	94.7	0.4	measured	10.1016/0301-4622(89)80060-2
+inosine	inosine	C10H12N4O5	0	166.10	0.054	measured	10.1021/je500458e
+2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	163.677	0.075	measured	10.1021/je500458e
+2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	169.26	0.11	measured	10.1021/je500458e
+guanosine	guanosine	C10H13N5O5	0	171.68	0.15	derived	10.1021/je500458e
+thymidine	thymidine	C10H14N2O5	0	167.810	0.028	measured	10.1007/s10953-014-0162-7
+uracil	uracil	C4H4N2O2	0	70.2	0.4	measured	10.1016/S0301-4622(01)00200-9
+uracil	uracil	C4H4N2O2	0	71.8	0.4	measured	10.1016/S0301-4622(01)00200-9
+uracil	uracil	C4H4N2O2	0	73.6	0.4	measured	10.1016/S0301-4622(01)00200-9
+uracil	uracil	C4H4N2O2	0	74.6	0.5	measured	10.1016/S0301-4622(01)00200-9
+thymine	thymine	C5H6N2O2	0	86.3	0.4	measured	10.1016/S0301-4622(01)00200-9
+thymine	thymine	C5H6N2O2	0	88.7	0.4	measured	10.1016/S0301-4622(01)00200-9
+thymine	thymine	C5H6N2O2	0	90.1	0.4	measured	10.1016/S0301-4622(01)00200-9
+thymine	thymine	C5H6N2O2	0	91.6	0.4	measured	10.1016/S0301-4622(01)00200-9
+cytosine	cytosine	C4H5N3O	0	72.5	0.4	measured	10.1016/S0301-4622(01)00200-9
+cytosine	cytosine	C4H5N3O	0	73.5	0.4	measured	10.1016/S0301-4622(01)00200-9
+cytosine	cytosine	C4H5N3O	0	74.6	0.4	measured	10.1016/S0301-4622(01)00200-9
+cytosine	cytosine	C4H5N3O	0	75.8	0.5	measured	10.1016/S0301-4622(01)00200-9
+adenine	adenine	C5H5N5	0	88.0	0.4	measured	10.1016/S0301-4622(01)00200-9
+adenine	adenine	C5H5N5	0	89.6	0.4	measured	10.1016/S0301-4622(01)00200-9
+adenine	adenine	C5H5N5	0	92.4	0.4	measured	10.1016/S0301-4622(01)00200-9
+adenine	adenine	C5H5N5	0	93.5	0.5	measured	10.1016/S0301-4622(01)00200-9
+7H-purine	purine	C5H4N4	0	83.3	0.4	measured	10.1016/S0301-4622(01)00200-9
+7H-purine	purine	C5H4N4	0	84.1	0.4	measured	10.1016/S0301-4622(01)00200-9
+7H-purine	purine	C5H4N4	0	85.8	0.4	measured	10.1016/S0301-4622(01)00200-9
+7H-purine	purine	C5H4N4	0	87.8	0.4	measured	10.1016/S0301-4622(01)00200-9
+hypoxanthine	hypoxanthine	C5H4N4O	0	80.9	0.4	measured	10.1016/S0301-4622(01)00200-9
+hypoxanthine	hypoxanthine	C5H4N4O	0	82.9	0.4	measured	10.1016/S0301-4622(01)00200-9
+hypoxanthine	hypoxanthine	C5H4N4O	0	86.3	0.4	measured	10.1016/S0301-4622(01)00200-9
+hypoxanthine	hypoxanthine	C5H4N4O	0	88.8	0.5	measured	10.1016/S0301-4622(01)00200-9
+uridine	uridine	C9H12N2O6	0	150.7	0.6	measured	10.1016/S0301-4622(01)00200-9
+uridine	uridine	C9H12N2O6	0	152.2	0.6	measured	10.1016/S0301-4622(01)00200-9
+uridine	uridine	C9H12N2O6	0	153.4	0.7	measured	10.1016/S0301-4622(01)00200-9
+uridine	uridine	C9H12N2O6	0	154.8	0.7	measured	10.1016/S0301-4622(01)00200-9
+cytidine	cytidine	C9H13N3O5	0	152.2	0.6	measured	10.1016/S0301-4622(01)00200-9
+cytidine	cytidine	C9H13N3O5	0	153.4	0.6	measured	10.1016/S0301-4622(01)00200-9
+cytidine	cytidine	C9H13N3O5	0	155.0	0.7	measured	10.1016/S0301-4622(01)00200-9
+cytidine	cytidine	C9H13N3O5	0	156.4	0.7	measured	10.1016/S0301-4622(01)00200-9
+adenosine	adenosine	C10H13N5O4	0	169.2	0.6	measured	10.1016/S0301-4622(01)00200-9
+adenosine	adenosine	C10H13N5O4	0	170.8	0.6	measured	10.1016/S0301-4622(01)00200-9
+adenosine	adenosine	C10H13N5O4	0	173.0	0.7	measured	10.1016/S0301-4622(01)00200-9
+adenosine	adenosine	C10H13N5O4	0	175.3	0.7	measured	10.1016/S0301-4622(01)00200-9
+guanosine	guanosine	C10H13N5O5	0	172.0	0.6	measured	10.1016/S0301-4622(01)00200-9
+guanosine	guanosine	C10H13N5O5	0	175.4	0.6	measured	10.1016/S0301-4622(01)00200-9
+guanosine	guanosine	C10H13N5O5	0	177.0	0.7	measured	10.1016/S0301-4622(01)00200-9
+guanosine	guanosine	C10H13N5O5	0	177.8	0.7	measured	10.1016/S0301-4622(01)00200-9
+inosine	inosine	C10H12N4O5	0	162.2	0.6	measured	10.1016/S0301-4622(01)00200-9
+inosine	inosine	C10H12N4O5	0	165.5	0.6	measured	10.1016/S0301-4622(01)00200-9
+inosine	inosine	C10H12N4O5	0	167.3	0.7	measured	10.1016/S0301-4622(01)00200-9
+inosine	inosine	C10H12N4O5	0	168.9	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	149.4	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	151.9	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	152.7	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	154.6	0.7	measured	10.1016/S0301-4622(01)00200-9
+thymidine	thymidine	C10H14N2O5	0	166.4	0.6	measured	10.1016/S0301-4622(01)00200-9
+thymidine	thymidine	C10H14N2O5	0	167.6	0.6	measured	10.1016/S0301-4622(01)00200-9
+thymidine	thymidine	C10H14N2O5	0	169.0	0.7	measured	10.1016/S0301-4622(01)00200-9
+thymidine	thymidine	C10H14N2O5	0	170.4	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	153.0	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	154.0	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	155.8	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	157.1	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	168.9	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	170.3	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	172.0	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	175.3	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	172.0	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	173.4	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	175.1	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	178.3	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	161.7	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	162.8	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	163.9	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	166.2	0.7	measured	10.1016/S0301-4622(01)00200-9
+guanine	guanine	C5H5N5O	0	91.6	1.0	derived	10.1002/jcc.23608
+guanine	guanine	C5H5N5O	0	97.5	1.2	derived	10.1002/jcc.23608
+spermidine	N-(3-aminopropyl)butane-1,4-diamine	C7H19N3	0	153.7	15	predicted	10.1002/jcc.23608
+spermidine(3+)	N-(3-aminopropyl)butane-1,4-diaminium	C7H22N3	3	137.5	15	predicted	10.1002/jcc.23608
+spermine	N,N'-bis(3-aminopropyl)butane-1,4-diamine	C10H26N4	0	213.0	20	predicted	10.1002/jcc.23608
+spermine(4+)	N,N'-bis(3-aminopropyl)butane-1,4-diaminium	C10H30N4	4	191.4	20	predicted	10.1002/jcc.23608
+cytosine	cytosine	C4H5N3O	0	73.60	0.14	measured	
+uracil	uracil	C4H4N2O2	0	72.29	0.20	measured	
+thymine	thymine	C5H6N2O2	0	88.75	0.10	measured	
+cytidine	cytidine	C9H13N3O5	0	154.19	0.04	measured	
+uridine	uridine	C9H12N2O6	0	152.32	0.12	measured	
+thymidine	thymidine	C10H14N2O5	0	168.03	0.15	measured	
+adenosine	adenosine	C10H13N5O4	0	171.43	0.18	measured	
+adenine	adenine	C5H5N5	0	90.39	0.26	measured	
+adenine	adenine	C5H5N5	0	89.1	1.1	measured	10.1016/j.jct.2017.04.005
+adenine	adenine	C5H5N5	0	90.6	1.1	measured	10.1016/j.jct.2017.04.005
+adenine	adenine	C5H5N5	0	92.7	1.0	measured	10.1016/j.jct.2017.04.005
+adenine	adenine	C5H5N5	0	94.9	0.6	measured	10.1016/j.jct.2017.04.005
+adenine	adenine	C5H5N5	0	97.8	0.7	measured	10.1016/j.jct.2017.04.005

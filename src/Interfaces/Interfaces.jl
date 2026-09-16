@@ -14,13 +14,13 @@ then encapsulates them as child submodules:
 
     -   `PartialMolarVolumes` — protein/solute partial molar volumes and bulk
         solvent electron density from bundled JSON tables
-        (`PartialMolarVolumeSourceTables <: PartialMolarVolumeSource`, extends
+        (`PMVSrcTables <: PartialMolarVolumeSource`, extends
         [`ϕ°`](@ref) / [`ρₑ_w`](@ref)).
 """
 module Interfaces
 
 export  RadiiSource, FormFactorSource, PartialMolarVolumeSource,
-        AtomicRadiiSource, FormFactorSourceTables, PartialMolarVolumeSourceTables,
+        AtomicRadiiSource, FormFactorSourceTables, PMVSrcTables,
         FormFactorError, lookup, form_factor_table, form_factors, form_factor_log,
         ϕ°, ρₑ_w
 
@@ -114,18 +114,25 @@ Bulk electron density of pure water at temperature `t` (°C), in e·Å⁻³, as
 function ρₑ_w end
 
 """
-    ϕ°([src::PartialMolarVolumeSource,] pH::Real, seq::AbstractString; σ_pH::Real = 0.0) -> Tuple{Int64,Float64,Float64}
-    ϕ°([src::PartialMolarVolumeSource,] name::AbstractString)                            -> Tuple{Int64,Float64,Float64}
+    ϕ°([src::PartialMolarVolumeSource,] pH::Real, seq::AbstractString; σ_pH::Real = 0.0)                  -> Tuple{Int64,Float64,Float64}
+    ϕ°([src::PartialMolarVolumeSource,] isDNA::Bool, pH::Real, seq::AbstractString; σ_pH::Real = 0.0)     -> Tuple{Int64,Float64,Float64}
+    ϕ°([src::PartialMolarVolumeSource,] name::AbstractString)                                             -> Tuple{Int64,Float64,Float64}
 
 Partial molar volume at infinite dilution, as `(electron_count, v0_cm3_per_mol, uncertainty_cm3_per_mol)`,
-for a protein/peptide sequence (one-letter codes) at solution `pH`, or for a solute by IUPAC `name`.
+for a protein/peptide sequence (one-letter codes) at solution `pH`, for a DNA/RNA sequence
+(one-letter or IUPAC ambiguity codes) at solution `pH`, or for a solute by IUPAC `name`.
+The extra leading `isDNA::Bool` on the nucleotide form is what disambiguates it from the
+protein form by arity — amino-acid and nucleotide one-letter codes collide (e.g. `"A"` is
+both alanine and adenine), so the two forms cannot be told apart by `seq` alone.
 
 # Arguments
 - `src`: the partial-molar-volume backend to query (optional).
-- `pH`/`seq`: solution pH and one-letter-code sequence, for a protein.
+- `pH`/`seq`: solution pH and one-letter-code sequence, for a protein or nucleotide.
+- `isDNA`: `true` for a DNA sequence, `false` for RNA — nucleotide form only; selects
+    both the `A/T/G/C` vs `A/U/G/C` alphabet and which backend table gets queried.
 - `σ_pH`: standard uncertainty on `pH`, propagated into the returned uncertainty
-    via the delta method (protein form only; ignored for the solute-by-name form).
-- `name`: common or IUPAC solute name, for a non-protein solute.
+    via the delta method (protein/nucleotide forms only; ignored for the solute-by-name form).
+- `name`: common or IUPAC solute name, for a non-protein, non-nucleotide solute.
 """
 function ϕ° end
 
@@ -139,6 +146,6 @@ include("PartialMolarVolumes/PMV.jl")
 
 using .AtomicRadii: AtomicRadii, AtomicRadiiSource
 using .FormFactor: FormFactor, FormFactorSourceTables, FormFactorError
-using .PartialMolarVolumes: PartialMolarVolumes, PartialMolarVolumeSourceTables
+using .PartialMolarVolumes: PartialMolarVolumes, PMVSrcTables
 
 end # module

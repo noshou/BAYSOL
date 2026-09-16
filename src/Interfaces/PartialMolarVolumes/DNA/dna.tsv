@@ -1,0 +1,13 @@
+Group	Name	Temperature_C	Uncertainty	V0	basis	doi
+poly(dAdT)2	poly(dA-dT)·poly(dA-dT), Na+ form, Donnan-corrected	25.0		163.4	derived	10.1016/j.plrev.2006.11.001
+poly(dGdC)2	poly(dG-dC)·poly(dG-dC), Na+ form, Donnan-corrected	25.0		139.5	derived	10.1016/j.plrev.2006.11.001
+poly(dIdC)2	poly(dI-dC)·poly(dI-dC), Na+ form, Donnan-corrected	25.0		132.8	derived	10.1016/j.plrev.2006.11.001
+calf thymus DNA	calf thymus DNA, Na+ salt	20.0		182.5	measured	10.1016/S0301-4622(00)00125-3
+A	deoxyadenylate residue (2'-deoxyadenosine + phosphate increment)	25.0	0.6	187.5	derived	10.1016/0301-4622(89)80060-2
+T	thymidylate residue (thymidine + phosphate increment)	25.0	0.003	185.9	derived	10.1016/j.jct.2014.10.015
+G	deoxyguanylate residue (2'-deoxyguanosine + phosphate increment)	25.0	0.11	186.96	derived	10.1021/je500458e
+C	deoxycytidylate residue (2'-deoxycytidine, ESTIMATED via ribose/deoxyribose substitution + phosphate increment)	25.0		171.0	derived	10.1016/0301-4622(89)80060-2
+A	deoxyadenylate residue (Lee & Chalikian 2'-deoxyadenosine + phosphate increment, superseding earlier mixed-source row)	25.0	0.6	188.0	derived	10.1016/S0301-4622(01)00200-9
+T	thymidylate residue (Lee & Chalikian thymidine + phosphate increment, superseding earlier mixed-source row)	25.0	0.6	185.3	derived	10.1016/S0301-4622(01)00200-9
+G	deoxyguanylate residue (Lee & Chalikian 2'-deoxyguanosine + phosphate increment, superseding earlier mixed-source row)	25.0	0.6	191.1	derived	10.1016/S0301-4622(01)00200-9
+C	deoxycytidylate residue (Lee & Chalikian 2'-deoxycytidine, now a real measurement, + phosphate increment; supersedes earlier chained estimate)	25.0	0.6	171.7	derived	10.1016/S0301-4622(01)00200-9

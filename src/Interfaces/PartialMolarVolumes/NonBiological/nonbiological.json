@@ -1,4 +1,4 @@
-{  
+{
  "(2-hydroxyethyl)dimethylazanium": [
   50,
   90.7,
@@ -696,8 +696,8 @@
  ],
  "7H-purine": [
   62,
-  85.4,
-  null
+  84.1,
+  0.4
  ],
  "8-aminooctanoic acid": [
   88,
@@ -923,6 +923,86 @@
   92,
   138.2,
   null
+ ],
+ "adenine": [
+  70,
+  90.02,
+  0.19
+ ],
+ "adenosine": [
+  140,
+  171.43,
+  0.18
+ ],
+ "adenosine 5'-monophosphate sodium salt": [
+  190,
+  189.1,
+  0.2
+ ],
+ "adenosine 5'-triphosphate disodium salt": [
+  280,
+  238.9,
+  0.4
+ ],
+ "guanosine": [
+  148,
+  175.4,
+  0.6
+ ],
+ "guanine": [
+  70,
+  91.6,
+  1.0
+ ],
+ "hypoxanthine": [
+  62,
+  82.9,
+  0.4
+ ],
+ "inosine": [
+  140,
+  166.1,
+  0.054
+ ],
+ "2'-deoxyadenosine": [
+  132,
+  170.3,
+  0.6
+ ],
+ "2'-deoxycytidine": [
+  120,
+  154.0,
+  0.6
+ ],
+ "2'-deoxyuridine": [
+  120,
+  152.2,
+  0.4
+ ],
+ "2'-deoxyinosine": [
+  132,
+  163.677,
+  0.075
+ ],
+ "2'-deoxyguanosine": [
+  140,
+  173.4,
+  0.6
+ ],
+ "uracil": [
+  58,
+  72.3,
+  0.022
+ ],
+ "cytosine": [
+  58,
+  73.85,
+  0.062
+ ],
+ "thymine": [
+  66,
+  88.9,
+  0.006
  ],
  "adamantane-1,4-diol": [
   92,
@@ -1416,8 +1496,8 @@
  ],
  "cytidine": [
   128,
-  153.5,
-  null
+  153.86,
+  0.022
  ],
  "decane-1,10-diamine": [
   98,
@@ -2801,8 +2881,8 @@
  ],
  "thymidine": [
   128,
-  167.6,
-  null
+  168.2,
+  0.003
  ],
  "trans-cyclohexane-1,2-diol": [
   64,
@@ -2861,8 +2941,8 @@
  ],
  "uridine": [
   128,
-  151.5,
-  null
+  153.18,
+  0.015
  ],
  "ytterbium(3+) trichloride": [
   121,
@@ -2903,5 +2983,25 @@
   28,
   -24.784,
   null
+ ],
+ "spermidine": [
+  82,
+  153.7,
+  15
+ ],
+ "spermidine(3+)": [
+  82,
+  137.5,
+  15
+ ],
+ "spermine": [
+  114,
+  213.0,
+  20
+ ],
+ "spermine(4+)": [
+  114,
+  191.4,
+  20
  ]
 }

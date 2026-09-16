@@ -4,7 +4,7 @@
 # through `Interfaces.ρₑ_w`/`Interfaces.ϕ°` pipeline.
 
 const FIT = ScatterNet.Fitting
-using ScatterNet.Fitting: Solute, Protein, NonProtein, dns_prior
+using ScatterNet.Fitting: Solute, Protein, NonBiological, dns_prior
 using ScatterNet.Constants: AVOGADRO
 using Distributions: mean, var, LogNormal
 
@@ -70,8 +70,8 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
     #                 _ρₑ -- single-solute agreement
     #------------------------------------------------------------------
 
-    @testset "_ρₑ: single NonProtein solute matches the reference formula" begin
-        solutes = Solute[NonProtein(0.5, 0.01, "urea")]
+    @testset "_ρₑ: single NonBiological solute matches the reference formula" begin
+        solutes = Solute[NonBiological(0.5, 0.01, "urea")]
         μ, σ = FIT._ρₑ(7.0, 0.0, solutes)
         μ_ref, σ_ref = ref_ρₑ(7.0, 0.0, solutes)
         @test close_(μ, μ_ref)
@@ -89,9 +89,9 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test close_(σ, σ_ref)
     end
 
-    @testset "_ρₑ: mixed Protein + NonProtein solutes sum correctly" begin
+    @testset "_ρₑ: mixed Protein + NonBiological solutes sum correctly" begin
         solutes = Solute[
-            NonProtein(0.5, 0.01, "urea"),
+            NonBiological(0.5, 0.01, "urea"),
             Protein(1.0e-3, 1.0e-5, "GGGGXX"),
         ]
         μ, σ = FIT._ρₑ(7.0, 0.0, solutes)
@@ -102,17 +102,17 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         # additivity: the two-solute mean shift equals the sum of the
         # single-solute mean shifts (linear in concentration).
         ρw, _ = ScatterNet.Interfaces.ρₑ_w(25.0)
-        μ_urea, _ = FIT._ρₑ(7.0, 0.0, Solute[NonProtein(0.5, 0.01, "urea")])
+        μ_urea, _ = FIT._ρₑ(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")])
         μ_prot, _ = FIT._ρₑ(7.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, "GGGGXX")])
         @test close_(μ, ρw + (μ_urea - ρw) + (μ_prot - ρw); atol = 1e-9)
     end
 
-    @testset "_ρₑ: multiple real proteins + a real small molecule" begin
+    @testset "_ρₑ: multiple real Protein + a real small molecule" begin
         solutes = Solute[
             Protein(2.0e-4, 5.0e-6, LYSOZYME_DNS),
             Protein(1.0e-4, 2.0e-6, "GGGGZZ"),
-            NonProtein(1.0, 0.05, "urea"),
-            NonProtein(0.1, 0.001, "glycerol"),
+            NonBiological(1.0, 0.05, "urea"),
+            NonBiological(0.1, 0.001, "glycerol"),
         ]
         μ, σ = FIT._ρₑ(7.4, 0.05, solutes)
         μ_ref, σ_ref = ref_ρₑ(7.4, 0.05, solutes)
@@ -143,15 +143,15 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test !close_(μ_lo, μ_hi; atol = 1e-9)   # titration genuinely moves ρₑ
     end
 
-    @testset "_ρₑ: pH/σ_pH do not affect NonProtein-only solutions" begin
-        solutes = Solute[NonProtein(0.3, 0.01, "urea")]
+    @testset "_ρₑ: pH/σ_pH do not affect NonBiological-only solutions" begin
+        solutes = Solute[NonBiological(0.3, 0.01, "urea")]
         a = FIT._ρₑ(2.0, 0.0, solutes)
         b = FIT._ρₑ(11.0, 5.0, solutes)
         @test a == b
     end
 
     @testset "_ρₑ: temperature is forwarded to Interfaces.ρₑ_w" begin
-        solutes = Solute[NonProtein(0.5, 0.01, "urea")]
+        solutes = Solute[NonBiological(0.5, 0.01, "urea")]
         for t in (0.0, 25.0, 37.0, 100.0)
             μ, σ = FIT._ρₑ(7.0, 0.0, solutes; t = t)
             μ_ref, σ_ref = ref_ρₑ(7.0, 0.0, solutes; t = t)
@@ -165,19 +165,19 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
     #------------------------------------------------------------------
 
     @testset "_ρₑ: solute validation errors propagate through the aggregation loop" begin
-        good = NonProtein(0.5, 0.01, "urea")
+        good = NonBiological(0.5, 0.01, "urea")
 
-        @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, NonProtein(0.1, -1.0, "urea")])
-        @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, NonProtein(0.0, 0.01, "urea")])
-        @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, NonProtein(-0.1, 0.01, "urea")])
-        @test_throws ArgumentError FIT._ρₑ(7.0, 0.0, Solute[good, NonProtein(0.1, 0.01, "")])
+        @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, NonBiological(0.1, -1.0, "urea")])
+        @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, NonBiological(0.0, 0.01, "urea")])
+        @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, NonBiological(-0.1, 0.01, "urea")])
+        @test_throws ArgumentError FIT._ρₑ(7.0, 0.0, Solute[good, NonBiological(0.1, 0.01, "")])
 
         @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, Protein(0.1, -1.0, "A")])
         @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, Protein(0.0, 0.01, "A")])
         @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, Protein(-0.1, 0.01, "A")])
         @test_throws ArgumentError FIT._ρₑ(7.0, 0.0, Solute[good, Protein(0.1, 0.01, "")])
 
-        @test_throws ArgumentError FIT._ρₑ(7.0, 0.0, Solute[NonProtein(0.5, 0.01, "not-a-real-solute-name")])
+        @test_throws ArgumentError FIT._ρₑ(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "not-a-real-solute-name")])
     end
 
     #------------------------------------------------------------------
@@ -186,10 +186,10 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
     @testset "dns_prior: LogNormal is moment-matched to _ρₑ's (μ, σ) exactly" begin
         cases = [
-            Solute[NonProtein(0.5, 0.01, "urea")],
+            Solute[NonBiological(0.5, 0.01, "urea")],
             Solute[Protein(1.0e-3, 1.0e-5, "GGGGAA")],
-            Solute[NonProtein(0.5, 0.01, "urea"), Protein(1.0e-3, 1.0e-5, "GGGGBB")],
-            Solute[Protein(2.0e-4, 5.0e-6, LYSOZYME_DNS), NonProtein(1.0, 0.05, "glycerol")],
+            Solute[NonBiological(0.5, 0.01, "urea"), Protein(1.0e-3, 1.0e-5, "GGGGBB")],
+            Solute[Protein(2.0e-4, 5.0e-6, LYSOZYME_DNS), NonBiological(1.0, 0.05, "glycerol")],
         ]
         for solutes in cases
             μ, σ = FIT._ρₑ(7.0, 0.0, solutes)
@@ -214,7 +214,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         prior_hi = dns_prior(9.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, fresh_seq_dns("D"))])
         @test !close_(mean(prior_lo), mean(prior_hi); atol = 1e-9)
 
-        solutes = Solute[NonProtein(0.5, 0.01, "urea")]
+        solutes = Solute[NonBiological(0.5, 0.01, "urea")]
         prior_37 = dns_prior(7.0, 0.0, solutes; t = 37.0)
         μ37, _ = FIT._ρₑ(7.0, 0.0, solutes; t = 37.0)
         @test close_(mean(prior_37), μ37; atol = 1e-9)
@@ -222,13 +222,13 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
     @testset "dns_prior: argument errors" begin
         @test_throws ArgumentError dns_prior(7.0, 0.0, Solute[])
-        @test_throws DomainError dns_prior(7.0, -0.1, Solute[NonProtein(0.5, 0.01, "urea")])
+        @test_throws DomainError dns_prior(7.0, -0.1, Solute[NonBiological(0.5, 0.01, "urea")])
         # σ_pH == 0 is allowed (boundary)
-        @test dns_prior(7.0, 0.0, Solute[NonProtein(0.5, 0.01, "urea")]) isa LogNormal{Float64}
+        @test dns_prior(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")]) isa LogNormal{Float64}
     end
 
     @testset "dns_prior: solute validation errors still propagate" begin
-        @test_throws DomainError dns_prior(7.0, 0.0, Solute[NonProtein(0.0, 0.01, "urea")])
+        @test_throws DomainError dns_prior(7.0, 0.0, Solute[NonBiological(0.0, 0.01, "urea")])
         @test_throws ArgumentError dns_prior(7.0, 0.0, Solute[Protein(0.1, 0.01, "")])
     end
 
