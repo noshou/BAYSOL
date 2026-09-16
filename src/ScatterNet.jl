@@ -7,15 +7,17 @@ encapsulates the bundled backends as its own submodules.
 module ScatterNet
 
 include("Constants.jl")
+include("Cache.jl")
 include("Interfaces/Interfaces.jl")
 include("Molecule/Molecule.jl")
 include("Scattering/Scattering.jl")
 include("Fitting/Fitting.jl")
 
 using .Constants:   Constants
+using .Cache:       Cache
 using .Interfaces:  Interfaces
 using .Molecule:    Molecule
 using .Scattering:  Scattering
-using .Fitting:     Fitting 
+using .Fitting:     Fitting
 
 end # module

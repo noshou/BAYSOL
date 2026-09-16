@@ -21,22 +21,15 @@ using ScatterNet.Constants: AVOGADRO
 "Fully-qualified handle onto the submodule, for the private caches/tables below."
 const PMVMOD = ScatterNet.Interfaces.PartialMolarVolumes
 
-"Absolute-tolerance float compare with an explicit `atol`; `check_float` from
-runtests.jl pins a fixed `DEFAULT_ATOL` that is too tight once we start summing
-across thousands of accumulated residues below."
-close_(a, b; atol = 1.0e-9) = abs(a - b) < atol
+include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "fixtures", "sequences.jl"))      # LYSOZYME, ...
 
 # fresh_seq(base): a sequence that computes identically to `base` (padded
-# with inert 'X' no-ops) but is guaranteed never to have 
+# with inert 'X' no-ops) but is guaranteed never to have
 # been queried before anywhere in this file.
 let _fresh_n = Ref(0)
     global fresh_seq(base::AbstractString) = (_fresh_n[] += 1; base * "X"^_fresh_n[])
 end
-
-"""
-Hen egg-white lysozyme (UniProt P00698, mature chain, 129 aa).
-"""
-const LYSOZYME = "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRWWCNDGRTPGSRNLCNIPCSALLSSDITASVNCAKKIVSDGNGMNAWVAWRNRCKGTDVQAWIRGCRL"
 
 @testset "PartialMolarVolumes" begin
 
@@ -216,7 +209,7 @@ const LYSOZYME = "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRW
         # assumed per acidic/basic group.
         for code in ('D', 'E', 'H', 'K', 'R', 'U')
             res = string(code)
-            (pKa, ionized_key), _ = PMVMOD._ionization[res]
+            (pKa, ionized_key), _ = PMVMOD._protein_ionization[res]
             dv = PMVMOD._Protein[ionized_key][2]
             e_lo, v_lo, _ = IFACE.ϕ°(pKa - 30.0, fresh_seq(res))
             e_hi, v_hi, _ = IFACE.ϕ°(pKa + 30.0, fresh_seq(res))

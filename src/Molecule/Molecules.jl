@@ -7,8 +7,7 @@ module  Molecules
 import  ...Interfaces
 using   ...Interfaces: RadiiSource, lookup
 using   ...Interfaces: AtomicRadiiSource
-
-include("Cache.jl")
+using   ...Cache: Lazy, make, force
 
 export  Molecule, MoleculeError, create, coords_cartesian, coords_spherical,
         to_spherical, radii, vols, r_max, elms, name, n_atoms

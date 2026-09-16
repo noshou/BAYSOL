@@ -6,6 +6,7 @@ using Test
 using ForwardDiff
 using ScatterNet
 using ScatterNet: Interfaces
+using ScatterNet: Cache
 using ScatterNet.Constants: DEFAULT_ATOL
 using ScatterNet.Interfaces: AtomicRadii
 using ScatterNet.Molecule: Molecules
@@ -32,5 +33,7 @@ check_complex(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
     include("test_wls.jl")
     include("test_plasticmap.jl")
     include("test_sasa.jl")
+    include("test_hydrophobicity.jl")
+    include("test_deltarho.jl")
     include("test_quality.jl")
 end

@@ -62,6 +62,8 @@ function sasa_cube(n::Int, a::Float64)
     return out
 end
 
+include(joinpath(@__DIR__, "fixtures", "geometry.jl"))   # sph
+
 @testset "SASA" begin
 
     @testset "argument contract" begin
@@ -551,8 +553,7 @@ end
         # a sealed void inside a dense shell is CAVITY throughout, while the
         # same construction with no void has none; detection holds while the
         # void fits inside the ray range and degrades to open surface past it.
-        sph(R, n) = [(R*sqrt(1-z^2)*cos(t), R*sqrt(1-z^2)*sin(t), R*z)
-                     for (z, t) in ((-1 + 2(k - 0.5)/n, π*(1 + sqrt(5))*k) for k in 1:n)]
+        # (`sph` comes from fixtures/geometry.jl, included above.)
         for R in (4.0, 5.0, 6.0)
             hp, _, hc = SASA.shell_points(
                 sasa_mol(fill("q", 300), sph(R, 300)); probe = probe)
