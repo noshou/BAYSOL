@@ -1,0 +1,13 @@
+Group	Name	Temperature_C	Uncertainty	V0	basis	doi
+poly(rA)poly(rU)	poly(rA)·poly(rU), Na+ form, Donnan-corrected	25.0		164.2	derived	10.1016/j.plrev.2006.11.001
+poly(rG)poly(rC)	poly(rG)·poly(rC), Na+ form, Donnan-corrected	25.0		172.3	derived	10.1016/j.plrev.2006.11.001
+poly(rI)poly(rC)	poly(rI)·poly(rC), Na+ form, Donnan-corrected	25.0		177.5	derived	10.1016/j.plrev.2006.11.001
+poly(rU)	poly(rU), single-stranded, Na+ form, Donnan-corrected	25.0		155.5	derived	10.1016/j.plrev.2006.11.001
+A	adenylate residue (adenosine + phosphate increment)	25.0	0.2	189.1	derived	10.1007/BF00650644
+U	uridylate residue (uridine + phosphate increment)	25.0	0.015	170.88	derived	10.1016/j.jct.2014.10.015
+G	guanylate residue (guanosine + phosphate increment)	25.0	0.6	195.9	derived	10.1016/0301-4622(89)80060-2
+C	cytidylate residue (cytidine + phosphate increment)	25.0	0.022	171.56	derived	10.1016/j.jct.2014.10.015
+A	adenylate residue (Lee & Chalikian adenosine + phosphate increment, superseding earlier mixed-source row)	25.0	0.6	188.5	derived	10.1016/S0301-4622(01)00200-9
+U	uridylate residue (Lee & Chalikian uridine + phosphate increment, superseding earlier mixed-source row)	25.0	0.6	169.9	derived	10.1016/S0301-4622(01)00200-9
+G	guanylate residue (Lee & Chalikian guanosine + phosphate increment, superseding earlier mixed-source row)	25.0	0.6	193.1	derived	10.1016/S0301-4622(01)00200-9
+C	cytidylate residue (Lee & Chalikian cytidine + phosphate increment, superseding earlier mixed-source row)	25.0	0.6	171.1	derived	10.1016/S0301-4622(01)00200-9
