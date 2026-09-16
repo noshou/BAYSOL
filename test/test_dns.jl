@@ -1,14 +1,15 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-# End-to-end tests for src/Fitting/DensityOfSolvent.jl: bulk solution
+# End-to-end tests for src/Fitting/Priors/DensityOfSolvent.jl: bulk solution
 # electron density (`_ρₑ`) and its `LogNormal` prior (`dns_prior`), exercised
 # through `Interfaces.ρₑ_w`/`Interfaces.ϕ°` pipeline.
 
 const FIT = ScatterNet.Fitting
-using ScatterNet.Fitting: Solute, Protein, NonBiological, dns_prior
+using ScatterNet.Fitting: Solute, Protein, NonBiological, DNA, RNA, dns_prior
 using ScatterNet.Constants: AVOGADRO
 using Distributions: mean, var, LogNormal
 
-close_(a, b; atol = 1.0e-9) = abs(a - b) < atol
+include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "fixtures", "sequences.jl"))      # LYSOZYME, ...
 
 """
 Independent re-derivation of the `_ρₑ`/`dns_prior` formula from the live
@@ -25,9 +26,11 @@ function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = 25.
 
     disp = 0.0; Δμ = 0.0; var_conc = 0.0; var_vol = 0.0
     for s in solutes
-        Z, ϕ, σϕ = s isa Protein ?
-            ScatterNet.Interfaces.ϕ°(pH, s.seq; σ_pH) :
-            ScatterNet.Interfaces.ϕ°(s.name)
+        Z, ϕ, σϕ =
+            s isa Protein       ? ScatterNet.Interfaces.ϕ°(pH, s.arg; σ_pH) :
+            s isa DNA            ? ScatterNet.Interfaces.ϕ°(true, pH, s.arg; σ_pH) :
+            s isa RNA            ? ScatterNet.Interfaces.ϕ°(false, pH, s.arg; σ_pH) :
+            ScatterNet.Interfaces.ϕ°(s.arg)
         C, σC = s.molarity, s.molarity_uncertainty
         k = AVOGADRO * Z / 1e27 - ρw_k * ϕ
 
@@ -51,8 +54,6 @@ function ref_lognormal(μ::Real, σ::Real)
     μ_ln = log(μ) - σ_ln^2 / 2
     return μ_ln, σ_ln
 end
-
-const LYSOZYME_DNS = "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRWWCNDGRTPGSRNLCNIPCSALLSSDITASVNCAKKIVSDGNGMNAWVAWRNRCKGTDVQAWIRGCRL"
 
 # `Interfaces.ϕ°` caches a Protein solute's result off of its sequence alone
 # (documented on `ϕ°`), so re-querying the same literal sequence at a
@@ -109,7 +110,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
     @testset "_ρₑ: multiple real Protein + a real small molecule" begin
         solutes = Solute[
-            Protein(2.0e-4, 5.0e-6, LYSOZYME_DNS),
+            Protein(2.0e-4, 5.0e-6, LYSOZYME),
             Protein(1.0e-4, 2.0e-6, "GGGGZZ"),
             NonBiological(1.0, 0.05, "urea"),
             NonBiological(0.1, 0.001, "glycerol"),
@@ -119,6 +120,111 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test close_(μ, μ_ref)
         @test close_(σ, σ_ref)
         @test σ > 0.0
+    end
+
+    #------------------------------------------------------------------
+    #                 _ρₑ -- DNA / RNA solutes
+    #------------------------------------------------------------------
+
+    @testset "_ρₑ: single DNA solute matches the reference formula" begin
+        solutes = Solute[DNA(1.0e-4, 1.0e-6, "ATGC")]
+        μ, σ = FIT._ρₑ(7.0, 0.0, solutes)
+        μ_ref, σ_ref = ref_ρₑ(7.0, 0.0, solutes)
+        @test close_(μ, μ_ref)
+        @test close_(σ, σ_ref)
+        ρw, _ = ScatterNet.Interfaces.ρₑ_w(25.0)
+        @test !close_(μ, ρw; atol = 1e-9)
+    end
+
+    @testset "_ρₑ: single RNA solute matches the reference formula" begin
+        solutes = Solute[RNA(1.0e-4, 1.0e-6, "AUGC")]
+        μ, σ = FIT._ρₑ(7.0, 0.0, solutes)
+        μ_ref, σ_ref = ref_ρₑ(7.0, 0.0, solutes)
+        @test close_(μ, μ_ref)
+        @test close_(σ, σ_ref)
+    end
+
+    @testset "_ρₑ: DNA and RNA are distinct despite one-letter-code overlap (A/G/C shared, T vs U)" begin
+        # same molarity/uncertainty, same-length sequence; any difference in
+        # μ/σ comes only from the DNA vs RNA backend tables and alphabet.
+        μ_dna, σ_dna = FIT._ρₑ(7.0, 0.0, Solute[DNA(1.0e-4, 1.0e-6, "ATGC")])
+        μ_rna, σ_rna = FIT._ρₑ(7.0, 0.0, Solute[RNA(1.0e-4, 1.0e-6, "AUGC")])
+        @test !close_(μ_dna, μ_rna; atol = 1e-9)
+    end
+
+    @testset "_ρₑ: Protein + DNA + RNA + NonBiological mix sums correctly" begin
+        solutes = Solute[
+            Protein(1.0e-3, 1.0e-5, "GGGGCC"),
+            DNA(1.0e-4, 1.0e-6, "ATGC"),
+            RNA(1.0e-4, 1.0e-6, "AUGC"),
+            NonBiological(0.5, 0.01, "urea"),
+        ]
+        μ, σ = FIT._ρₑ(7.0, 0.0, solutes)
+        μ_ref, σ_ref = ref_ρₑ(7.0, 0.0, solutes)
+        @test close_(μ, μ_ref)
+        @test close_(σ, σ_ref)
+    end
+
+    @testset "_ρₑ: pH and σ_pH are forwarded to DNA/RNA solutes" begin
+        for (pH, σ_pH) in ((3.0, 0.0), (7.0, 0.2), (9.0, 0.0))
+            solutes = Solute[DNA(1.0e-4, 1.0e-6, "ATGC"), RNA(1.0e-4, 1.0e-6, "AUGC")]
+            μ, σ = FIT._ρₑ(pH, σ_pH, solutes)
+            μ_ref, σ_ref = ref_ρₑ(pH, σ_pH, solutes)
+            @test close_(μ, μ_ref)
+            @test close_(σ, σ_ref)
+        end
+    end
+
+    @testset "_ρₑ: DNA/RNA solute validation errors propagate" begin
+        good = NonBiological(0.5, 0.01, "urea")
+        @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, DNA(0.1, -1.0, "ATGC")])
+        @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, DNA(0.0, 0.01, "ATGC")])
+        @test_throws ArgumentError FIT._ρₑ(7.0, 0.0, Solute[good, DNA(0.1, 0.01, "")])
+        @test_throws DomainError FIT._ρₑ(7.0, 0.0, Solute[good, RNA(-0.1, 0.01, "AUGC")])
+        @test_throws ArgumentError FIT._ρₑ(7.0, 0.0, Solute[good, RNA(0.1, 0.01, "")])
+    end
+
+    @testset "dns_prior: DNA/RNA solutes moment-match the same as Protein/NonBiological" begin
+        solutes = Solute[DNA(1.0e-4, 1.0e-6, "ATGC"), RNA(1.0e-4, 1.0e-6, "AUGC")]
+        μ, σ = FIT._ρₑ(7.0, 0.0, solutes)
+        prior = dns_prior(7.0, 0.0, solutes)
+        @test prior isa LogNormal{Float64}
+        μ_ln_ref, σ_ln_ref = ref_lognormal(μ, σ)
+        @test close_(prior.μ, μ_ln_ref)
+        @test close_(prior.σ, σ_ln_ref)
+    end
+
+    @testset "dns_prior: a realistic buffer of real protein + real DNA + real RNA is internally consistent" begin
+        # Cross-checks Priors.dns_prior, DensityOfSolvent._ρₑ and
+        # Interfaces.ϕ° together on genuine biological sequences (see
+        # test/fixtures/sequences.jl for provenance), rather than the
+        # short synthetic stand-ins ("ATGC"/"AUGC"/"GGGGCC") used above to
+        # isolate the DNA/RNA-vs-Protein code paths.
+        solutes = Solute[
+            Protein(1.0e-4, 1.0e-6, LYSOZYME),
+            DNA(5.0e-5, 5.0e-7, PUC19_FRAGMENT),
+            RNA(2.0e-5, 2.0e-7, TRNA_PHE),
+            NonBiological(0.15, 0.001, "sodium chloride"),
+        ]
+        μ, σ = FIT._ρₑ(7.4, 0.05, solutes)
+        μ_ref, σ_ref = ref_ρₑ(7.4, 0.05, solutes)
+        @test close_(μ, μ_ref)
+        @test close_(σ, σ_ref)
+        @test σ > 0.0
+
+        prior = dns_prior(7.4, 0.05, solutes)
+        @test prior isa LogNormal{Float64}
+        μ_ln_ref, σ_ln_ref = ref_lognormal(μ, σ)
+        @test close_(prior.μ, μ_ln_ref)
+        @test close_(prior.σ, σ_ln_ref)
+        @test close_(mean(prior), μ; atol = 1e-9)
+        @test close_(sqrt(var(prior)), σ; atol = 1e-9)
+
+        # sanity: a real macromolecule-laden buffer genuinely shifts ρₑ
+        # away from pure water, same qualitative check as the
+        # single-solute testsets above.
+        ρw, _ = ScatterNet.Interfaces.ρₑ_w(25.0)
+        @test !close_(μ, ρw; atol = 1e-9)
     end
 
     #------------------------------------------------------------------
@@ -189,7 +295,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
             Solute[NonBiological(0.5, 0.01, "urea")],
             Solute[Protein(1.0e-3, 1.0e-5, "GGGGAA")],
             Solute[NonBiological(0.5, 0.01, "urea"), Protein(1.0e-3, 1.0e-5, "GGGGBB")],
-            Solute[Protein(2.0e-4, 5.0e-6, LYSOZYME_DNS), NonBiological(1.0, 0.05, "glycerol")],
+            Solute[Protein(2.0e-4, 5.0e-6, LYSOZYME), NonBiological(1.0, 0.05, "glycerol")],
         ]
         for solutes in cases
             μ, σ = FIT._ρₑ(7.0, 0.0, solutes)

@@ -38,7 +38,7 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
         # ulp would pin us to a NumPy implementation detail for no physical gain:
         # independent form-factor tabulations disagree at the 0.4% level.
         n = 0; exact = 0; worst = 0.0
-        for ln in _fx("fx_f0.csv")
+        for ln in _fx("f0.csv")
             ion, s_, ref = split(ln, ',')
             got = f0(String(ion), parse(Float64, s_)); r = parse(Float64, ref)
             n += 1; got === r && (exact += 1)
@@ -57,7 +57,7 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
         # f1 additionally carries a 7x7 dense solve for the spline coefficients,
         # hence the looser (but still ~5 orders inside the suite's 1e-6) bound.
         n = 0; exact2 = 0; w1 = 0.0; w2 = 0.0
-        for ln in _fx("fx_f1f2.csv")
+        for ln in _fx("f1f2.csv")
             el, E, r1, r2 = split(ln, ',')
             g1, g2 = f1f2(String(el), parse(Float64, E))
             a = parse(Float64, r1); b = parse(Float64, r2)

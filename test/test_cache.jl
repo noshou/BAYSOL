@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-# Exercises src/Molecule/Cache.jl (`Lazy` / `make` / `force`), which is
-# `include`d straight into `Molecules` rather than living in its own module.
-using .Molecules: Lazy, make, force
+# Exercises src/Cache.jl (`Lazy` / `make` / `force` and `KeyedCache`).
+using .Cache: Lazy, make, force, KeyedCache
 
 # `done` is the private "has the thunk run?" flag; reading it is the only way to
 # assert laziness without also forcing the value we are trying to prove unforced.
@@ -109,5 +108,54 @@ _forced(c) = getfield(c, :done)
         @test @inferred(force(make(Int, () -> 1))) === 1
         @test @inferred(force(make(Float64, () -> 1.5))) === 1.5
         @test @inferred(force(make(Vector{Float64}, () -> [1.0]))) == [1.0]
+    end
+
+    @testset "KeyedCache" begin
+        @testset "get! computes once then reuses" begin
+            calls = Ref(0)
+            c = KeyedCache{String, Int}()
+            v1 = get!(c, "a") do
+                calls[] += 1
+                1
+            end
+            v2 = get!(c, "a") do
+                calls[] += 1
+                2
+            end
+            @test v1 == 1 && v2 == 1
+            @test calls[] == 1
+        end
+
+        @testset "distinct keys don't collide" begin
+            c = KeyedCache{String, Int}()
+            a = get!(() -> 1, c, "a")
+            b = get!(() -> 2, c, "b")
+            @test a == 1 && b == 2
+            # re-fetching "a" still returns "a"'s memoized value, not "b"'s
+            @test get!(() -> 99, c, "a") == 1
+        end
+
+        @testset "distinct caches are independent" begin
+            c1 = KeyedCache{String, Int}()
+            c2 = KeyedCache{String, Int}()
+            get!(() -> 1, c1, "k")
+            @test get!(() -> 2, c2, "k") == 2
+            @test get!(() -> 99, c1, "k") == 1
+        end
+
+        @testset "concurrent get! on the same missing key computes once" begin
+            calls = Threads.Atomic{Int}(0)
+            c = KeyedCache{Int, Vector{Int}}()
+            results = Vector{Vector{Int}}(undef, 16)
+            @sync for i in 1:16
+                Threads.@spawn results[i] = get!(c, 1) do
+                    Threads.atomic_add!(calls, 1)
+                    sleep(0.05)
+                    [1, 2, 3]
+                end
+            end
+            @test calls[] == 1
+            @test all(r -> r == [1, 2, 3], results)
+        end
     end
 end

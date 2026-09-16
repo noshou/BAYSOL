@@ -280,7 +280,7 @@ added:   src/Interfaces/FormFactor/FormFactor.jl        the module
          src/Interfaces/FormFactor/form_factors.sqlite3 3.36 MB, two tables + provenance
          src/Interfaces/FormFactor/extract.py           reproducible derivation
          src/Interfaces/FormFactor/README.md            provenance, conventions, licensing
-         test/fixtures/fx_f0.csv, fx_f1f2.csv           1200 oracle points from the old backend
+         test/fixtures/f0.csv, fx_f1f2.csv           1200 oracle points from the old backend
          test/fixtures/README.md                        provenance + why each tolerance differs
 removed: src/Interfaces/FormFactorXrayDB/  ext/  CondaPkg.toml
 changed: Project.toml        weakdeps/extensions gone; +LinearAlgebra
