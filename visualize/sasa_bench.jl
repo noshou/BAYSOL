@@ -435,7 +435,7 @@ function bench_report(; csv_path = nothing)
     classes = unique(_col(rows, 2))
 
     println("="^100)
-    println("SASA sweep -- ", length(unique(_col(rows,1))), " systems x ",
+    println("SASA sweep: ", length(unique(_col(rows,1))), " systems x ",
             length(BENCH_TOLS), " area_tol = ", length(rows), " runs")
     println("  probe ", BENCH_PROBE, " A | n_exp ", BENCH_NEXP,
             " | n_occ 512 | reference n_exp ", BENCH_NREF)

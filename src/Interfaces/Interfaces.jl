@@ -16,13 +16,18 @@ then encapsulates them as child submodules:
         solvent electron density from bundled JSON tables
         (`PMVSrcTables <: PartialMolarVolumeSource`, extends
         [`ϕ°`](@ref) / [`ρₑ_w`](@ref)).
+
+    -   `ResidueNetCharge` — per-ionizable-atom net fractional charge at
+        physiological pH, keyed by protein residue/atom name, from a bundled
+        JSON table (`ResidueNetChargeSourceTables <: ResidueChargeSource`,
+        extends [`residue_charge`](@ref)).
 """
 module Interfaces
 
-export  RadiiSource, FormFactorSource, PartialMolarVolumeSource,
-        AtomicRadiiSource, FormFactorSourceTables, PMVSrcTables,
+export  RadiiSource, FormFactorSource, PartialMolarVolumeSource, ResidueChargeSource,
+        AtomicRadiiSource, FormFactorSourceTables, PMVSrcTables, ResidueNetChargeSourceTables,
         FormFactorError, lookup, form_factor_table, form_factors, form_factor_log,
-        ϕ°, ρₑ_w
+        ϕ°, ρₑ_w, residue_charge
 
 #----------------------------------------------------------
 #                        RadiiSource
@@ -114,9 +119,20 @@ Bulk electron density of pure water at temperature `t` (°C), in e·Å⁻³, as
 function ρₑ_w end
 
 """
-    ϕ°([src::PartialMolarVolumeSource,] pH::Real, seq::AbstractString; σ_pH::Real = 0.0)                  -> Tuple{Int64,Float64,Float64}
-    ϕ°([src::PartialMolarVolumeSource,] isDNA::Bool, pH::Real, seq::AbstractString; σ_pH::Real = 0.0)     -> Tuple{Int64,Float64,Float64}
-    ϕ°([src::PartialMolarVolumeSource,] name::AbstractString)                                             -> Tuple{Int64,Float64,Float64}
+    ϕ°(
+        [src::PartialMolarVolumeSource,] pH::Real, 
+        seq::AbstractString; 
+        σ_pH::Real = 0.0
+    ) -> Tuple{Int64,Float64,Float64}
+    
+    ϕ°(
+        [src::PartialMolarVolumeSource,] isDNA::Bool,
+        pH::Real, 
+        seq::AbstractString; 
+        σ_pH::Real = 0.0
+    ) -> Tuple{Int64,Float64,Float64}
+    
+    ϕ°([src::PartialMolarVolumeSource,] name::AbstractString) -> Tuple{Int64,Float64,Float64}
 
 Partial molar volume at infinite dilution, as `(electron_count, v0_cm3_per_mol, uncertainty_cm3_per_mol)`,
 for a protein/peptide sequence (one-letter codes) at solution `pH`, for a DNA/RNA sequence
@@ -137,15 +153,42 @@ both alanine and adenine), so the two forms cannot be told apart by `seq` alone.
 function ϕ° end
 
 #----------------------------------------------------------
+#                   ResidueChargeSource
+#----------------------------------------------------------
+
+"A source of per-ionizable-atom net charges. Implement [`residue_charge`](@ref) for a concrete subtype."
+abstract type ResidueChargeSource end
+
+"""
+    residue_charge(
+        src::ResidueChargeSource, 
+        resname::AbstractString, 
+        atomname::AbstractString
+    ) -> Union{Float64,Nothing}
+
+Net fractional charge (at physiological pH) of a single ionizable atom, or
+`nothing` if the atom carries no charge (e.g. a backbone atom, or an
+uncharged residue).
+
+# Arguments
+- `src`: the residue-charge backend to query.
+- `resname`: protein residue name, e.g. `"ASP"`, `"HIS"`.
+- `atomname`: PDB-style atom name within that residue, e.g. `"OD1"`.
+"""
+function residue_charge end
+
+#----------------------------------------------------------
 #                     Backend submodules
 #----------------------------------------------------------
 
 include("AtomicRadii/AtomicRadii.jl")
 include("FormFactor/FormFactor.jl")
 include("PartialMolarVolumes/PMV.jl")
+include("ResidueNetCharge/ResidueNetCharge.jl")
 
 using .AtomicRadii: AtomicRadii, AtomicRadiiSource
 using .FormFactor: FormFactor, FormFactorSourceTables, FormFactorError
 using .PartialMolarVolumes: PartialMolarVolumes, PMVSrcTables
+using .ResidueNetCharge: ResidueNetCharge, ResidueNetChargeSourceTables
 
 end # module

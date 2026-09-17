@@ -23,9 +23,7 @@ The five CRYSOL-3 species' multipoles `B_lm`, in the fixed order
 
 that [`gram`](@ref) and [`contrast_vector`](@ref) assume. Each is `(C, K, Q)` in
 [`compute_B_lm`](@ref)'s packed layout (`C = 2` for `vac` near an absorption
-edge, `1` otherwise; `C = 1` for the four dummy species). Geometry and beam
-only -- no contrast parameters enter here.
-
+edge, `1` otherwise; `C = 1` for the four dummy species). 
 # Arguments
 - `mol::Molecule`.
 - `qvals::AbstractVector{<:Real}`, length `Q`: momentum transfer in Å⁻¹.
@@ -152,28 +150,13 @@ forward(G::AbstractArray{<:Real,3}, m::Real, c::Real, dns::Real, ρ) =
 """
     forward(cache, m, c, dns, ρ; r0 = nothing) -> Vector
 
-The full CRYSOL-parameter forward model:
-
     I_calc(q) = m · (v(q)ᵀ G(q) v(q)) + c
     v(q)      = [1, -dns · G_ex(q; r₀), dro₁, dro₂, dro₃]
 
 `r0` is CRYSOL's fitted excluded-volume radius in Å, and `dro_k = DRO_UNIT · ρ_k`
 its fitted shell contrasts. `r0 = nothing` (the default) or `r0 == cache.r_m`
 holds the excluded volume at its tabulated value and reduces exactly to the
-5-argument [`forward`](@ref) above.
-
-O(Q) in the fit parameters -- `cache.G` is never rebuilt, because `r₀` enters as
-a `q`-dependent reweighting of the contrast rather than of the geometry (see
-[`excluded_volume_factor`](@ref)). The whole path promotes its element type, so
-`ForwardDiff`/`Zygote` can differentiate `(m, c, dns, ρ, r0)` through it.
-
-# A note on `dns` and `r₀`
-
-CRYSOL fixes the bulk solvent density at `dns = 0.334 e·Å⁻³` and fits `r₀`.
-Both are exposed here, but they are strongly degenerate -- `dns` scales the `ex`
-species and `r₀` scales it by `c₁³` at `q = 0` -- so fitting both leaves a
-near-flat direction. Fix one (CRYSOL's choice: `dns`) unless the sampler is
-explicitly meant to explore that ridge.
+5-argument [`forward`](@ref) above. O(Q) in the fit parameters.
 """
 function forward(
     cache::ForwardCache, 

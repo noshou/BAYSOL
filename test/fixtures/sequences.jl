@@ -7,10 +7,7 @@
 
 """
 Human oxytocin, mature nonapeptide (UniProt P01178, oxytocin-neurophysin 1
-proprotein, residues 3-11 of the precursor -- the mature hormone is
-C-terminally amidated in vivo, which does not change the one-letter
-sequence used here). Short (9 aa), "regular": no D/E/H/K/R ionizable
-residues.
+proprotein, residues 3-11 of the precursor.
 """
 const OXYTOCIN = "CYIQNCPLG"
 
