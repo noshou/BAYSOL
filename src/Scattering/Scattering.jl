@@ -132,18 +132,15 @@ averaged detector intensity `I_calc(q)` out.
     `G` depends only on geometry and beam; `v` only on the fit parameters, so
     `G` is built once per structure and reused across every parameter set.
 \\
-6.  A table of atomic radii gets the *displaced* volume wrong -- how much bulk
-    water an atom excludes depends on its chemical environment, not just its
-    element. CRYSOL's fix is one global expansion factor `c_1 = r_0/r_m` over
-    all dummies, `r_0` fitted and `r_m` the structure's mean atomic radius.
-    Expanding a dummy's radius sends `V_j -> c_1^3 V_j` in the Gaussian of (4),
-    i.e.
+6.  A table of atomic radii gets the *displaced* volume wrong. CRYSOL's fix is one 
+    global expansion factor `c_1 = r_0/r_m` over all dummies, `r_0` fitted and `r_m` 
+    the structure's mean atomic radius. Expanding a dummy's radius sends `V_j -> c_1^3 V_j` 
+    in the Gaussian of (4), i.e.
 
         `f_j(q) -> c_1^3 * f_j(q) * exp(-q^2 (c_1^2 - 1) V_j^(2/3) / 4π)`
 
-    The residual envelope still carries `V_j`, so exactly it does not leave the
-    atom sum and `B_ex` (hence `G`) would have to be rebuilt per `r_0`. CRYSOL's
-    standard approximation -- kept here -- replaces the per-atom `V_j^(2/3)` by
+    CRYSOL's
+    standard approximation replaces the per-atom `V_j^(2/3)` by
     the mean-radius value `V_m^(2/3) = (4π/3)^(2/3) r_m^2`, making it one scalar
     function of `q` that leaves the sum entirely:
 
@@ -157,7 +154,7 @@ averaged detector intensity `I_calc(q)` out.
     Exact at `q = 0` (total excluded volume scales by `c_1^3`) and for an atom
     of radius `r_m`; it degrades with the spread of radii about `r_m`, which for
     protein heavy atoms is small. `r_0 = r_m` gives `G_ex ≡ 1`, the uncorrected
-    model. Note `dns` and `r_0` are strongly degenerate -- CRYSOL fixes `dns` at
+    model. Note `dns` and `r_0` are strongly degenerate and CRYSOL fixes `dns` at
     `0.334` and fits `r_0`.
 \\
 7.  A real detector reads an arbitrary scale over an imperfect buffer
@@ -177,16 +174,10 @@ using ..Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM
 # The public surface. `forward` is the forward model; `gram_matrix` is the
 # geometry-only pass to cache when sweeping fit parameters. Everything the
 # `include`s below bring in (`compute_B_lm`, `vacuo`/`excluded`/`hydration`,
-# `gram`/`intensity`/…) is the machinery those two compose -- reachable by
-# qualified name for tests and advanced callers, but not part of the API.
+# `gram`/`intensity`/…) is the machinery those two compose.
 export forward, gram_matrix, forward_cache
 
-# Module-level configuration. The primitive knobs -- `SHELL_THICKNESS`,
-# `PROBE_RADIUS`, `SHELL_N_TARGET`, `DRO_UNIT`, `B_LM_CHUNK` -- live in the
-# dependency-free `ScatterNet.Constants` module (imported above). The two
-# defaults below are *constructed* from other subsystems' types, so they stay
-# here where those types are in scope. `vacuo` / `hydration` / `Intensity.jl` /
-# `Forward.jl` read all of these as their defaults; override per call as needed.
+# Module-level configuration.
 
 """
 CRYSOL 3's three border-layer populations, in the field order of the

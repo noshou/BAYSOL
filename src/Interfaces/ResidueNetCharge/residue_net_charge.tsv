@@ -1,0 +1,12 @@
+resname	atomname	charge	pKa	basis	doi
+ASP	OD1	-0.5	3.5	derived	10.1002/pro.19
+ASP	OD2	-0.5	3.5	derived	10.1002/pro.19
+GLU	OE1	-0.5	4.2	derived	10.1002/pro.19
+GLU	OE2	-0.5	4.2	derived	10.1002/pro.19
+CYS	SG	-0.80	6.8	derived	10.1002/pro.19
+HIS	ND1	0.07	6.6	derived	10.1002/pro.19
+HIS	NE2	0.07	6.6	derived	10.1002/pro.19
+LYS	NZ	1.00	10.5	derived	10.1002/pro.19
+ARG	NH1	0.33	13.8	derived	10.1002/pro.2647
+ARG	NH2	0.33	13.8	derived	10.1002/pro.2647
+ARG	NE	0.33	13.8	derived	10.1002/pro.2647

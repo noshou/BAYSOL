@@ -199,9 +199,6 @@ function f1f2(element::AbstractString, energy::Real)::Tuple{Float64,Float64}
     hi = abs(y2[j + 1]) < 1e-99 ? 1e-99 : y2[j + 1]
     lx1, lx2 = log(x[j]), log(x[j + 1])
     ly1, ly2 = log(lo), log(hi)
-    # Slope first, then `slope*(x - x1) + y1` -- the association NumPy's `interp`
-    # uses. Folding it as `(x - x1)*(y2 - y1)/(x2 - x1)` is mathematically the
-    # same and lands 1 ulp away on ~2% of grid points.
     slope = (ly2 - ly1) / (lx2 - lx1)
     b = exp(slope * (log(E) - lx1) + ly1)
     return (a, b)
