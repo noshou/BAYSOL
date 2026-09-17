@@ -3,10 +3,11 @@ module Molecule
 
 include("Molecules.jl")
 include("SASA.jl")
-include("Hydrophobicity.jl")
+include("ProteinResidues.jl")
+include("Electrostatics.jl")
 
 using .Molecules: Molecules
 using .SASA: SASA
-using .Hydrophobicity: Hydrophobicity
+using .Electrostatics: Electrostatics
 
 end # module

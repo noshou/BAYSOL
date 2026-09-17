@@ -7,9 +7,7 @@
 
 `n` points on a sphere of radius `R`, via the Fibonacci/golden-angle spiral
 (near-uniform coverage, no clustering at the poles). Used to build a sealed
-shell of atoms around an enclosed void -- e.g. for `SASA.shell_points`
-`CAVITY`-bead detection (`test_sasa.jl`) and cavity-hydrophilicity
-aggregation (`test_hydrophobicity.jl`).
+shell of atoms around an enclosed void.
 
 # Arguments
 - `R`: sphere radius.
