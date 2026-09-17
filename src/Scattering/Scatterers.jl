@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Per-species partial-wave terms: one function per scatterer species in
 # `A_total(q) = A_vac(q) - dns*A_ex(q) + Σ_k dro_k*A_sh_k(q)` (see the
 # `Scattering` docstring). Each builds that species' `(N, Q)` amplitude, hands it

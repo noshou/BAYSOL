@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 """
 X-ray form factors `f(q,E) = f0(s) + f1(E) + i*f2(E)`, `s = q/(4π)` in Å⁻¹,
 computed in pure Julia from the bundled `form_factors.sqlite3`.

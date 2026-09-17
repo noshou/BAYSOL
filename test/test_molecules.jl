@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Exercises src/Molecule/Molecules.jl: construction/centering, the two
 # coordinate frames, the lazy radii/vols/r_max accessors, and the error contract.
 using .Molecules:   Molecule, create, coords_cartesian, coords_spherical,

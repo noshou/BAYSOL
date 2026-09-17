@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 using .PlasticMap: Vec3, plastic_points, PLASTIC_RATIO
 
 nrm(p) = sqrt(p[1]^2 + p[2]^2 + p[3]^2)

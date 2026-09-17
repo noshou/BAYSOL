@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 """
 Thin aggregator. `Interfaces` is the swappable-backend facade: it declares the
 `RadiiSource`/`FormFactorSource` markers plus their generic functions and

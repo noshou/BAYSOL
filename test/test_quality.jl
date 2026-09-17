@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # package hygiene + type-stability guards.
 using Aqua, JET
 using .SphFuncs: sphHarm, sphBess, legendre_sphPlm

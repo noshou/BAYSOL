@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 """
 Partial molar volumes (V0, cm³/mol) and water bulk electron density.
 """

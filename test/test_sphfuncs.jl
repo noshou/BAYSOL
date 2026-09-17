@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Exercises src/Scattering/SphFuncs.jl against closed forms and exact identities
 # (Unsold's theorem, the Y = P̄ e^{imφ} definition, the Bessel recurrence).
 using .SphFuncs: sphHarm, sphBess, legendre_sphPlm, SphHarmError, SphBessError

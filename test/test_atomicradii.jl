@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Exercises src/Interfaces/AtomicRadii/AtomicRadii.jl: ion-string parsing, the
 # ion_key round-trip, the raw table lookups, and the resolve_one fallback chain.
 using ScatterNet.Interfaces.AtomicRadii: Ion, tryparse_ion, ion_key, ion_radius,
