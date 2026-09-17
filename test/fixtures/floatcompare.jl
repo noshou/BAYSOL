@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
+
 # Shared float-comparison helper for tests that need an explicit, looser
 # absolute tolerance than runtests.jl's own `check_float`.
 

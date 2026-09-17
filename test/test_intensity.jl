@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
+
 # Exercises src/Scattering/Intensity.jl: the species Gram matrix `gram`, the
 # contrast contraction `intensity` = v' G v, the detector map `intensity_calc`,
 # and `contrast_vector`.

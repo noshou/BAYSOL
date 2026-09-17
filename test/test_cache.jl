@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
+
 # Exercises src/Cache.jl (`Lazy` / `make` / `force` and `KeyedCache`).
 using .Cache: Lazy, make, force, KeyedCache
 

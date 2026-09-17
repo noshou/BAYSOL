@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
+
 """
 Atomic/ionic radii: parse an ion string, then resolve its radius through a
 fallback chain over the bundled `atomic_radii.sqlite3` (loaded once into

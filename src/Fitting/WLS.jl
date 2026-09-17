@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
+
 # Weighted least squares for the two instrumental parameters `m`, `c` in
 #
 #     I_calc(q) = m · I(q) + c

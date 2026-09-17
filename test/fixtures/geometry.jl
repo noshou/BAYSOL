@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
+
 # Shared point-cloud geometry for tests that need a real 3D atom arrangement
 # rather than a hand-picked handful of coordinates.
 
