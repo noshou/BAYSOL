@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Exercises the pure-Julia form-factor backend: src/Interfaces/FormFactor/.
 # f(q,E) = f0(s) + f1(E) + i*f2(E), s = q/(4pi), from the bundled
 # form_factors.sqlite3 (Waasmaier-Kirfel f0, Chantler FFAST anomalous terms).

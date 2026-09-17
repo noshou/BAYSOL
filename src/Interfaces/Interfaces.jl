@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 """
 Swappable-backend interfaces. Declares the backend markers (`RadiiSource`,
 `FormFactorSource`, `PartialMolarVolumeSource`) and their generic functions

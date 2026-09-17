@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Accuracy + performance harness for `src/Molecule/SASA.jl`. Lives here rather
 # than under test/ because the summary figures need GLMakie; nothing in this
 # file runs under `Pkg.test()`.

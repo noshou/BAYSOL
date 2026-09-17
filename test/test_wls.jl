@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Tests for src/Fitting/WLS.jl: the 2-parameter weighted least squares fit
 # of I_calc(q) = m*y_model(q) + c, plus the profile/marginal negative
 # log-likelihoods built on top of it.

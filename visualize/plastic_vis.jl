@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Optional visual check for PlasticMap. Kept out of the module so the geometry
 # core depends only on Roots; GLMakie lives in visualize/Project.toml.
 #

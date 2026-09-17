@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Exercises src/Scattering/Forward.jl.
 #
 # The reference side re-does the composition by hand from the per-species
@@ -115,7 +116,7 @@ fwd_chunk  = UInt64(3)
     end
 
     # ---------------------------------------------------------------------
-    # CRYSOL's fitted excluded-volume radius r0
+    # CRYSOL's excluded-volume correction factor c1
     # ---------------------------------------------------------------------
 
     @testset "mean_atomic_radius is the plain mean of the per-atom radii" begin
@@ -124,34 +125,33 @@ fwd_chunk  = UInt64(3)
         @test mean_atomic_radius(mo) ≈ sum(r) / length(r)
     end
 
-    @testset "excluded_volume_factor: r0 == r_m is exactly the identity" begin
+    @testset "excluded_volume_factor: c1 == 1 is exactly the identity" begin
         rm = 1.62
-        @test excluded_volume_factor(fwd_q, rm, rm) == ones(length(fwd_q))
+        @test excluded_volume_factor(fwd_q, rm, 1.0) == ones(length(fwd_q))
     end
 
     @testset "excluded_volume_factor: q=0 scales the excluded volume by c1^3" begin
-        rm, r0 = 1.62, 1.78
-        g = excluded_volume_factor([0.0], rm, r0)
-        @test g[1] ≈ (r0 / rm)^3
+        rm, c1 = 1.62, 1.0987654320987654
+        g = excluded_volume_factor([0.0], rm, c1)
+        @test g[1] ≈ c1^3
     end
 
     @testset "excluded_volume_factor: exact for a dummy at the mean radius" begin
         # The single-envelope approximation is exact for an atom of radius r_m:
         # G(q)*f(V_m, q) must equal the directly-expanded dummy f(c1^3*V_m, q).
-        rm, r0 = 1.62, 1.71
-        c1 = r0 / rm
+        rm, c1 = 1.62, 1.0555555555555556
         vm = (4π / 3) * rm^3
         gauss(v, q) = v * exp(-q^2 * v^(2 / 3) / (4π))
-        g = excluded_volume_factor(fwd_q, rm, r0)
+        g = excluded_volume_factor(fwd_q, rm, c1)
         for (k, q) in enumerate(fwd_q)
             @test g[k] * gauss(vm, q) ≈ gauss(c1^3 * vm, q)
         end
     end
 
-    @testset "excluded_volume_factor: r0 > r_m damps with q, r0 < r_m lifts" begin
+    @testset "excluded_volume_factor: c1 > 1 damps with q, c1 < 1 lifts" begin
         rm = 1.62
-        up   = excluded_volume_factor(fwd_q, rm, 1.8)
-        down = excluded_volume_factor(fwd_q, rm, 1.4)
+        up   = excluded_volume_factor(fwd_q, rm, 1.8 / 1.62)
+        down = excluded_volume_factor(fwd_q, rm, 1.4 / 1.62)
         # both start at c1^3 and move monotonically in q away from it
         @test issorted(up ./ up[1];   rev = true)
         @test issorted(down ./ down[1])
@@ -163,7 +163,7 @@ fwd_chunk  = UInt64(3)
     end
 
     @testset "contrast_matrix scales only the ex species" begin
-        g = excluded_volume_factor(fwd_q, 1.62, 1.75)
+        g = excluded_volume_factor(fwd_q, 1.62, 1.75 / 1.62)
         v = contrast_vector(0.334, (1.2, 0.8, -0.3))
         V = contrast_matrix(0.334, (1.2, 0.8, -0.3), g)
         @test size(V) == (5, length(fwd_q))
@@ -192,55 +192,55 @@ fwd_chunk  = UInt64(3)
         @test fc.r_m == mean_atomic_radius(mo)
     end
 
-    @testset "forward(cache, …): r0 = nothing / r_m is the uncorrected model" begin
+    @testset "forward(cache, …): c1 = nothing / 1 is the uncorrected model" begin
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         ref = forward(fc.G, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0))
         @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0)) == ref
-        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); r0 = nothing) == ref
-        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); r0 = fc.r_m) == ref
+        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); c1 = nothing) == ref
+        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); c1 = 1.0) == ref
     end
 
-    @testset "forward(cache, …; r0) == hand-assembled q-dependent contraction" begin
+    @testset "forward(cache, …; c1) == hand-assembled q-dependent contraction" begin
         mo   = fwd_mol()
         fc   = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        r0   = fc.r_m * 1.08
+        c1   = 1.08
         pars = (0.9, -0.4, 0.331, (1.2, 0.8, -0.3))
-        g    = excluded_volume_factor(fc.qvals, fc.r_m, r0)
+        g    = excluded_volume_factor(fc.qvals, fc.r_m, c1)
         V    = contrast_matrix(pars[3], pars[4], g)
         ref  = intensity_calc(intensity(fc.G, V), pars[1], pars[2])
-        @test forward(fc, pars...; r0 = r0) == ref
+        @test forward(fc, pars...; c1 = c1) == ref
     end
 
-    @testset "r0 actually changes the curve, and stays non-negative" begin
+    @testset "c1 actually changes the curve, and stays non-negative" begin
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         base = forward(fc, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0))
-        big  = forward(fc, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0); r0 = fc.r_m * 1.15)
+        big  = forward(fc, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0); c1 = 1.15)
         @test !(big ≈ base)
-        @test all(>=(0.0), big)          # PSD ⇒ v(q)ᵀ G v(q) ≥ 0 at every r0
+        @test all(>=(0.0), big)          # PSD ⇒ v(q)ᵀ G v(q) ≥ 0 at every c1
     end
 
-    @testset "forward(mol, …; r0) convenience == cache + forward(cache, …; r0)" begin
+    @testset "forward(mol, …; c1) convenience == cache + forward(cache, …; c1)" begin
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        r0 = fc.r_m * 0.93
+        c1 = 0.93
         @test   forward(mo, fwd_q, fwd_lmax, fwd_E;
                         m = 1.7, c = 2.5, dns = 0.334, ρ = (1.0, 1.0, 0.0),
-                        r0 = r0, chunk = fwd_chunk) ≈
-                forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); r0 = r0)
+                        c1 = c1, chunk = fwd_chunk) ≈
+                forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); c1 = c1)
     end
 
     @testset "the whole fit-parameter path is AD-differentiable" begin
-        # r0/dns/ρ are HMC parameters in stage 1, so a Dual must survive the
+        # c1/dns/ρ are HMC parameters in stage 1, so a Dual must survive the
         # contrast -> contraction -> detector-map chain without a Float64 cast.
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        f(p) = sum(forward(fc, p[1], p[2], p[3], (p[4], p[5], p[6]); r0 = p[7]))
-        p0 = [1.7, 2.5, 0.334, 1.0, 1.0, 0.0, fc.r_m * 1.05]
+        f(p) = sum(forward(fc, p[1], p[2], p[3], (p[4], p[5], p[6]); c1 = p[7]))
+        p0 = [1.7, 2.5, 0.334, 1.0, 1.0, 0.0, 1.05]
         g  = ForwardDiff.gradient(f, p0)
         @test all(isfinite, g)
-        # finite-difference check on r0, the new parameter
+        # finite-difference check on c1, the new parameter
         h  = 1e-6
         pp = copy(p0); pp[7] += h
         pm = copy(p0); pm[7] -= h

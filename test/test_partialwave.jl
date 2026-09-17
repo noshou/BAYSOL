@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Exercises src/Scattering/PartialWave.jl at the unit level: the packed (l, m)
 # ordering shared by `partial_wave_weights` and `compute_B_lm`, the `_deg_contrib`
 # contraction, the real/imaginary two-channel split, chunking invariance,

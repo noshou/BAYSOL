@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Visual check for the hydration-shell dummy cloud `SASA.shell_points`
 # builds; every solvent-accessible sample point becomes one dummy, so the
 # shell is a resolved layer over the molecular surface rather than one marker

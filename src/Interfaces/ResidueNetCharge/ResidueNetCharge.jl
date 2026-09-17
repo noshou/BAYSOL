@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 """
 Per-ionizable-atom net fractional charge at physiological pH, keyed by
 protein residue name + atom name, from a bundled JSON table.

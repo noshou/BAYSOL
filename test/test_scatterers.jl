@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Exercises src/Scattering/Scatterers.jl, the per-species partial-wave terms:
 # `_gaussian_dummy` (the Fraser/MacRae/Suzuki dummy amplitude), `excluded`,
 # `hydration`, `vacuo` and the `SHELL_THICKNESS` constant. 

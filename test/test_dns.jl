@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # End-to-end tests for src/Fitting/Priors/DensityOfSolvent.jl: bulk solution
 # electron density (`_ρₑ`) and its `LogNormal` prior (`dns_prior`), exercised
 # through `Interfaces.ρₑ_w`/`Interfaces.ϕ°` pipeline.

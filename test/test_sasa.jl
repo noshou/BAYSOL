@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 using ScatterNet: Interfaces
 using ScatterNet.Molecule.SASA: SASA, sasa, _occluded
 using .Molecules: create

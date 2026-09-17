@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 """
 Screened electrostatic field at cavity beads, aggregated over
 `SASA.CAVITY`-class hydration beads. Physics follows Laage, Elsaesser &

@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Optional visual check for the Shrake-Rupley occlusion machinery in
 # `src/Molecule/SASA.jl`. Kept out of the module so the geometry core stays
 # free of plotting deps; GLMakie lives in visualize/Project.toml.

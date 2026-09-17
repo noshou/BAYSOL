@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 """
 The SAXS/SANS forward model: a molecule and a `q` grid in, the orientationally
 averaged detector intensity `I_calc(q)` out. 
@@ -12,13 +13,13 @@ averaged detector intensity `I_calc(q)` out.
                     (the last returns one `B_lm` per `SHELL_CLASSES` entry).
 - `Intensity`   -  `gram` (the `S_ab` matrix `G`), `intensity` (`vᵀ G v`),
                     `intensity_calc` (`m·I + c`), `contrast_vector` /
-                    `contrast_matrix`, and `excluded_volume_factor` (CRYSOL's
-                    fitted excluded-volume radius `r₀`).
+                    `contrast_matrix`, and `excluded_volume_factor`
+                    (excluded-volume correction factor `c₁`).
 - `Forward`     -   the assembled model: `species_multipoles`, `gram_matrix`,
                     `forward_cache` and `forward`. Build the geometry-only
                     `ForwardCache` once with `forward_cache`, then call
-                    `forward(cache, m, c, dns, ρ; r0)` per parameter set; or
-                    `forward(mol, qvals, lMax, energy; m, c, dns, ρ, r0)` for a
+                    `forward(cache, m, c, dns, ρ; c1)` per parameter set; or
+                    `forward(mol, qvals, lMax, energy; m, c, dns, ρ, c1)` for a
                     one-off.
 
 # Background

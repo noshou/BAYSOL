@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # dro in crysol is contrast density of the water hydration layer
 # crysol sets the parameters as dr1=dr2=1.0 and dr3=0 by default,
 # where: dr1/dr2 are convex/concave water beads and dr3 are cavity water beads.
@@ -49,7 +50,10 @@ Protein variant.
                         The default `μ_χ = 0, σ_χ = 0` is a point mass at 0,
                         matching standard CRYSOL's own `dr3 = 0` default.
 """
-function dro_prior(μ_χ::Real=0; σ_χ::Real=0.0)::Tuple{LogNormal, Normal, Normal}
+function dro_prior(
+    μ_χ::Real=0; 
+    σ_χ::Real=0.0
+)::Tuple{LogNormal{Float64}, Normal{Float64}, Normal{Float64}}
     return (_dro1_prior, _dro2_prior, Normal(μ_χ, σ_χ))
 end
 

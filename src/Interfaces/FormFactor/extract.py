@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 """Extract data from xraydb.sqlite into one compact db.
 
 Source: xraydb 4.5.8's xraydb.sqlite. Its LICENSE places xraydb.sqlite and

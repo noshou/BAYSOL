@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Visual check for `Electrostatics.nucleic_acid_cavity_electrostatics` and
 # `Electrostatics.protein_cavity_electrostatics`: a sealed cavity around one
 # or more charge sites, coloured by bead class (convex/concave/cavity) and

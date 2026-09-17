@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Exercises src/Molecule/Electrostatics.jl: the Debye length, the
 # distance-based phosphate bond-graph classifier, the screened-field
 # formula, the cavity-bead aggregation, and its `SASA.shell_points`-driven

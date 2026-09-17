@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+
 # Exercises src/Fitting/Priors/DeltaRho.jl: the fixed dro1/dro2 priors and the
 # dro3 = Normal(μ_χ, σ_χ) cavity-water contrast dro_prior builds per call.
 
