@@ -1,13 +1,15 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
+using StaticArrays
+
 """
-    
+
     ξ ∈ (0,∞) × (0,∞) × ℝ × ℝ × (0,∞)
     │
-    │ [bijection]
+    │ Θ: ξ ⤇ θ
     │
     ▼
-    θ ∈ ℝ⁵ 
+    θ ∈ ℝ⁵
 
 Let the following parameters be:
     
@@ -43,32 +45,46 @@ this is done in ln form:
                 = ln(p(ξ(θ))) + a + b + c
 
 # Arguments
--   `ξ::NTuple{5,<:Real}` = `(dns, δρ1, δρ2, δρ3, c1)`: the physical fit
+-   `ξ::MVector{5,<:Real}` = `(dns, δρ1, δρ2, δρ3, c1)`: the physical fit
     parameters, in ξ-space. `dns`, `δρ1`, `c1` must be `> 0`; `δρ2`, `δρ3` are unrestricted.
+    Overwritten in place with `θ` = `(a, b, δρ2, δρ3, c)`.
 
 # Returns
-A 2-tuple `(θ, corr)`:
-- `θ::NTuple{5,<:Real}` = `(a, b, δρ2, δρ3, c)`
 - `corr::Real` = `a + b + c` = `ln|det(∂ξ/∂θ)|`: the log-Jacobian correction
 
 """
-function θ(ξ::NTuple{5,<:Real}) 
-    res = (log(ξ[1]), log(ξ[2]), ξ[3], ξ[4], log(ξ[5]))
-    corr = res[1] + res[2] + res[5]
-    return (res, corr)
+function Θ!(ξ::MVector{5,<:Real})
+    a = log(ξ[1])
+    b = log(ξ[2])
+    c = log(ξ[5])
+    ξ[1] = a
+    ξ[2] = b
+    ξ[5] = c
+    return a + b + c
 end
 
 """
-    ξ(θ) -> NTuple{5,<:Real}
+    θ ∈ ℝ⁵
+    │
+    │ Ξ: θ ⤇ ξ 
+    │
+    ▼
+    ξ ∈ (0,∞) × (0,∞) × ℝ × ℝ × (0,∞)
 
-Inverse of [`θ`](@ref): θ-space (unconstrained ℝ⁵) back to ξ-space, the
+Inverse of [`Θ!`](@ref): θ-space (unconstrained ℝ⁵) back to ξ-space, the
 physical fit parameters `forward`/the priors are defined over.
 
 # Arguments
-- `θ::NTuple{5,<:Real}` = `(a, b, δρ2, δρ3, c)`: unconstrained ℝ⁵.
+- `θ::MVector{5,<:Real}` = `(a, b, δρ2, δρ3, c)`: unconstrained ℝ⁵.
+    Overwritten in place with `ξ` = `(dns, δρ1, δρ2, δρ3, c1)`.
 
 # Returns
-- `NTuple{5,<:Real}` = `(dns, δρ1, δρ2, δρ3, c1)`
+- `nothing`
 
 """
-ξ(θ::NTuple{5,<:Real}) = (exp(θ[1]), exp(θ[2]), θ[3], θ[4], exp(θ[5]))
+function Ξ!(θ::MVector{5,<:Real})
+    θ[1] = exp(θ[1])
+    θ[2] = exp(θ[2])
+    θ[5] = exp(θ[5])
+    return nothing
+end

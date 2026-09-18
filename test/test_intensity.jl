@@ -174,6 +174,6 @@ iy_w    = partial_wave_weights(iy_lMax)
         @test length(contrast_vector(0.3, (1.0, 1.0, 1.0))) == 5
         @test length(contrast_vector(0.3, 1.0))             == 3
         @test contrast_vector(0.3, (1.0, 0.0, 0.0))[4:5]    == [0.0, 0.0] # δρ = 0 zeroes a shell
-        @test contrast_vector(0.334, (1, 1, 0)) isa Vector{Float64}       # integer δρ accepted
+        @test contrast_vector(0.334, (1, 1, 0)) isa AbstractVector{Float64}  # integer δρ accepted, SVector-backed
     end
 end

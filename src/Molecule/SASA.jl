@@ -397,6 +397,10 @@ function _shell_loop(
 
     xs = Float64[]; ys = Float64[]; zs = Float64[]; areas = Float64[]
     nx = Float64[]; ny = Float64[]; nz = Float64[]
+    upper_bound = size(crds, 2) * n_pts
+    sizehint!(xs, upper_bound); sizehint!(ys, upper_bound); sizehint!(zs, upper_bound)
+    sizehint!(areas, upper_bound)
+    sizehint!(nx, upper_bound); sizehint!(ny, upper_bound); sizehint!(nz, upper_bound)
     counts = zeros(Int, size(crds, 2))
 
     for i in axes(crds, 2)

@@ -130,6 +130,63 @@ function intensity(G::AbstractArray{<:Real,3}, V::AbstractMatrix{<:Real})
 end
 
 """
+    _fused_intensity_calc(G, v, m, c) -> Vector
+    _fused_intensity_calc(G, V, m, c) -> Vector
+
+Internal, non-exported. Same result as `intensity_calc(intensity(G, v), m, c)`
+(or the `V` variant), but computes `m * acc + c` directly inside `intensity`'s
+own accumulation loop instead of chaining two separate `Q`-length
+allocations. Exists purely for [`forward`](@ref), which sits on the
+NUTS/HMC hot path (every likelihood/gradient evaluation) — `intensity` and
+`intensity_calc` themselves are left untouched for their other callers.
+"""
+function _fused_intensity_calc(
+    G::AbstractArray{<:Real,3}, v::AbstractVector{<:Real}, m::Real, c::Real
+)
+    n = length(v)
+    (size(G, 1) == n && size(G, 2) == n) || throw(DimensionMismatch(
+        "_fused_intensity_calc: G is $(size(G, 1))×$(size(G, 2)) in its species axes but v has length $n"))
+    Q = size(G, 3)
+    T = promote_type(eltype(G), eltype(v), typeof(m), typeof(c))
+    out = Vector{T}(undef, Q)
+    @inbounds for k in 1:Q
+        acc = zero(T)
+        for b in 1:n
+            vb = v[b]
+            for a in 1:n
+                acc += v[a] * G[a, b, k] * vb
+            end
+        end
+        out[k] = m * acc + c
+    end
+    return out
+end
+
+function _fused_intensity_calc(
+    G::AbstractArray{<:Real,3}, V::AbstractMatrix{<:Real}, m::Real, c::Real
+)
+    n = size(V, 1)
+    (size(G, 1) == n && size(G, 2) == n) || throw(DimensionMismatch(
+        "_fused_intensity_calc: G is $(size(G, 1))×$(size(G, 2)) in its species axes but V has $n rows"))
+    Q = size(G, 3)
+    size(V, 2) == Q || throw(DimensionMismatch(
+        "_fused_intensity_calc: V has $(size(V, 2)) columns but G has Q=$Q"))
+    T = promote_type(eltype(G), eltype(V), typeof(m), typeof(c))
+    out = Vector{T}(undef, Q)
+    @inbounds for k in 1:Q
+        acc = zero(T)
+        for b in 1:n
+            vb = V[b, k]
+            for a in 1:n
+                acc += V[a, k] * G[a, b, k] * vb
+            end
+        end
+        out[k] = m * acc + c
+    end
+    return out
+end
+
+"""
     intensity_calc(I, m, c) -> Vector{Float64}
 
 Put the absolute model intensity `I` (from [`intensity`](@ref)) onto the
@@ -148,8 +205,8 @@ a flat background left by imperfect buffer subtraction.
 intensity_calc(I::AbstractVector{<:Real}, m::Real, c::Real) = m .* I .+ c
 
 """
-    contrast_vector(dns, δρ::NTuple{3,<:Real}) -> Vector{Float64}
-    contrast_vector(dns, δρ::Real)             -> Vector{Float64}
+    contrast_vector(dns, δρ::NTuple{3,<:Real}) -> SVector{5}
+    contrast_vector(dns, δρ::Real)             -> SVector{3}
 
 The species contrast vector `v` that [`intensity`](@ref) contracts a [`gram`](@ref)
 against. Species order matches the file header:
@@ -161,21 +218,26 @@ against. Species order matches the file header:
 the displaced bulk solvent. To supply a shell contrast in raw e·Å⁻³ instead,
 build `[1.0, -dns, dro]` directly rather than routing through `δρ`.
 
+Returns a stack-allocated `SVector` (fixed length, known at compile time):
+this sits on `forward`'s hot path (every HMC likelihood/gradient
+evaluation), so avoiding a heap allocation here matters. `SVector` is an
+`AbstractVector`, so it's a drop-in for `intensity`/`contrast_matrix`.
+
 # Arguments
     - `dns::Real`:  excluded-volume density scale.
     - `δρ`:          dimensionless shell contrast(s).
 
 # Returns
-- `Vector{Float64}` of length 3 or 5.
+- `SVector{5}` or `SVector{3}`, `eltype` promoted from `dns`, `δρ`, `DRO_UNIT`.
 """
 function contrast_vector(dns::Real, δρ::NTuple{3,<:Real})
     T = promote_type(typeof(dns), eltype(δρ), typeof(DRO_UNIT))
-    return T[one(T), -dns, DRO_UNIT * δρ[1], DRO_UNIT * δρ[2], DRO_UNIT * δρ[3]]
+    return SVector{5,T}(one(T), -dns, DRO_UNIT * δρ[1], DRO_UNIT * δρ[2], DRO_UNIT * δρ[3])
 end
 
 function contrast_vector(dns::Real, δρ::Real)
     T = promote_type(typeof(dns), typeof(δρ), typeof(DRO_UNIT))
-    return T[one(T), -dns, DRO_UNIT * δρ]
+    return SVector{3,T}(one(T), -dns, DRO_UNIT * δρ)
 end
 
 # ---------------------------------------------------------------------------

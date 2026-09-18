@@ -164,7 +164,7 @@ contrast vector `v = contrast_vector(dns, δρ)`.
 """
 forward(
     G::AbstractArray{<:Real,3}, m::Real, c::Real, dns::Real, δρ::Union{Real,NTuple{3,<:Real}}
-) = intensity_calc(intensity(G, contrast_vector(dns, δρ)), m, c)
+) = _fused_intensity_calc(G, contrast_vector(dns, δρ), m, c)
 
 """
     forward(cache, m, c, dns, δρ; c1 = nothing) -> Vector
@@ -206,7 +206,7 @@ function forward(
     (c1 === nothing || c1 == 1) &&
         return forward(cache.G, m, c, dns, δρ)
     g_ex = excluded_volume_factor(cache.qvals, cache.r_m, c1)
-    return intensity_calc(intensity(cache.G, contrast_matrix(dns, δρ, g_ex)), m, c)
+    return _fused_intensity_calc(cache.G, contrast_matrix(dns, δρ, g_ex), m, c)
 end
 
 """
