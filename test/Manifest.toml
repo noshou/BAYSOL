@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "899c43fddc156fe5f598e77c783b9f5c3864c0ee"
+project_hash = "e77da04366d8e284b8f33917c18cd3850e3bcfcb"
 
 [[deps.AbstractTrees]]
 git-tree-sha1 = "2d9c9a55f9c93e8887ad391fbae72f8ef55e1177"
@@ -610,7 +610,7 @@ uuid = "76ed43ae-9a5d-5a62-8c75-30186b810ce8"
 version = "3.53.2+0"
 
 [[deps.ScatterNet]]
-deps = ["Bessels", "DBInterface", "Distributions", "JSON3", "LegendrePolynomials", "LinearAlgebra", "NearestNeighbors", "Roots", "SQLite", "SpecialFunctions", "SphericalHarmonics"]
+deps = ["Bessels", "DBInterface", "Distributions", "JSON3", "LegendrePolynomials", "LinearAlgebra", "NearestNeighbors", "Roots", "SQLite", "SpecialFunctions", "SphericalHarmonics", "StaticArrays"]
 path = ".."
 uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 version = "0.1.0"
