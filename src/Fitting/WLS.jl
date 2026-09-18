@@ -27,14 +27,15 @@ everything needed for uncertainty propagation and for using the fit as a
 # Fields
     - `m`, `c` — the WLS point estimate.
     - `var_m`, `var_c`, `cov_mc` — entries of the 2×2 conditional covariance
-    `(XᵀWX)⁻¹`. Multiply by `chi2 / dof` for the σ-rescaled ("aposteriori") version.
-    `var_m → ∞` is the signal that the `m`/`c` fit is near-degenerate.
+    `(XᵀWX)⁻¹`. Multiply by [`reduced_chi2`](@ref)`(f)` for the σ-rescaled
+    ("aposteriori") version. `var_m → ∞` is the signal that the `m`/`c` fit is
+    near-degenerate.
     - `chi2` — weighted residual sum of squares `Σ wᵢ (I_obs − m·y_model − c)²` at
-    the optimum, i.e. `χ²`. `chi2 / dof` should be ≈ 1 when the `σᵢ` and the model
-    are both right.
+    the optimum, i.e. `χ²`. See [`reduced_chi2`](@ref) for the `χ²/dof`
+    goodness-of-fit diagnostic built from this and `dof`.
     - `dof` — `n − 2`.
     - `det_XtWX` — `det(XᵀWX) = SwII·Sw − SwI²`, the normalising determinant. Enters
-    [`wls_marg_nll`](@ref); depends on the forward-model parameters through
+    [`wls_marg_ll`](@ref); depends on the forward-model parameters through
     `y_model`.
     - `sum_log_var` — `Σ log σᵢ²`, the data-only constant of the Gaussian.
 """
@@ -77,7 +78,7 @@ then gives `m`, `c`, the conditional covariance `(XᵀWX)⁻¹`, and `χ² = Swy
 # Throws
     - [`WLSError`](@ref) on a length mismatch, `n < 3`, a non-positive `σ`, or `det(XᵀWX) ≤ 0`.
 """
-function wls_fit(y_model::AbstractVector, I_obs::AbstractVector, σ::AbstractVector)
+function wls_fit(y_model::AbstractVector, I_obs::AbstractVector, σ::AbstractVector)::WLSFit
     n = length(y_model)
     (length(I_obs) == n && length(σ) == n) || throw(WLSError(
         "y_model, I_obs, σ must have equal length; got $n, $(length(I_obs)), $(length(σ))"))
@@ -137,24 +138,36 @@ The fitted `I_calc = f.m .* y_model .+ f.c`, on the same curve or a fresh one.
 wls_predict(f::WLSFit, y_model::AbstractVector) = f.m .* y_model .+ f.c
 
 """
-    wls_prof_nll(f::WLSFit) -> Real
+    reduced_chi2(f::WLSFit) -> Real
 
-Negative log-likelihood of the data with `(m, c)` fixed at their WLS optimum (the
+`χ²/dof`. A diagnostic, not a likelihood: should land ≈ 1 when both the
+per-point `σᵢ` and the model are right; well above 1 signals an underestimated
+`σ` or a poor model, well below 1 an overestimated `σ`.
+"""
+reduced_chi2(f::WLSFit) = f.chi2 / f.dof
+
+"""
+    wls_prof_ll(f::WLSFit) -> Real
+
+Log-likelihood of the data with `(m, c)` fixed at their WLS optimum (the
 profile likelihood):
 
-    ½ χ² + ½ Σ log σᵢ² + ½ n log 2π
+    -½ χ² - ½ Σ log σᵢ² - ½ n log 2π
 
-Use when `(m, c)` are treated as plugged-in point estimates.
+Use when `(m, c)` are treated as plugged-in point estimates. Positive
+log-likelihood (not negative) so it composes by addition with the
+`Distributions.logpdf` prior terms in the rest of the log-posterior, with no
+sign to keep track of at the call site.
 """
-wls_prof_nll(f::WLSFit) =
-    (f.chi2 + f.sum_log_var) / 2 + (f.dof + 2) * log(2π) / 2
+wls_prof_ll(f::WLSFit) =
+    -(f.chi2 + f.sum_log_var) / 2 - (f.dof + 2) * log(2π) / 2
 
 """
-    wls_marg_nll(f::WLSFit) -> Real
+    wls_marg_ll(f::WLSFit) -> Real
 
-Negative log marginal-likelihood with `(m, c)` integrated out under a flat prior:
+Log marginal-likelihood with `(m, c)` integrated out under a flat prior:
 
-    wls_prof_nll(f) + ½ log det(XᵀWX) − ½ p log 2π ,   p = 2
+    wls_prof_ll(f) - ½ log det(XᵀWX) + ½ p log 2π ,   p = 2
 
 Add this to the rest of the stage-1 log-posterior so that scale / background
 uncertainty propagates into the posterior on the geometry and contrast
@@ -162,5 +175,5 @@ parameters instead of being frozen at a point. Only `χ²` and `log det(XᵀWX)`
 depend on the forward-model parameters; everything else is a constant the sampler
 may drop.
 """
-wls_marg_nll(f::WLSFit) =
-    wls_prof_nll(f) + log(f.det_XtWX) / 2 - log(2π)
+wls_marg_ll(f::WLSFit) =
+    wls_prof_ll(f) - log(f.det_XtWX) / 2 + log(2π)

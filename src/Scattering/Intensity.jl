@@ -148,34 +148,34 @@ a flat background left by imperfect buffer subtraction.
 intensity_calc(I::AbstractVector{<:Real}, m::Real, c::Real) = m .* I .+ c
 
 """
-    contrast_vector(dns, ρ::NTuple{3,<:Real}) -> Vector{Float64}
-    contrast_vector(dns, ρ::Real)             -> Vector{Float64}
+    contrast_vector(dns, δρ::NTuple{3,<:Real}) -> Vector{Float64}
+    contrast_vector(dns, δρ::Real)             -> Vector{Float64}
 
 The species contrast vector `v` that [`intensity`](@ref) contracts a [`gram`](@ref)
 against. Species order matches the file header:
 
-    3-species:  v = [1, -dns, dro]                    dro   = DRO_UNIT * ρ
-    5-species:  v = [1, -dns, dro_1, dro_2, dro_3]    dro_k = DRO_UNIT * ρ_k
+    3-species:  v = [1, -dns, dro]                    dro   = DRO_UNIT * δρ
+    5-species:  v = [1, -dns, dro_1, dro_2, dro_3]    dro_k = DRO_UNIT * δρ_k
 
 `dns` rescales the excluded-volume term to the true mean electron density of
 the displaced bulk solvent. To supply a shell contrast in raw e·Å⁻³ instead,
-build `[1.0, -dns, dro]` directly rather than routing through `ρ`.
+build `[1.0, -dns, dro]` directly rather than routing through `δρ`.
 
 # Arguments
     - `dns::Real`:  excluded-volume density scale.
-    - `ρ`:          dimensionless shell contrast(s).
+    - `δρ`:          dimensionless shell contrast(s).
 
 # Returns
 - `Vector{Float64}` of length 3 or 5.
 """
-function contrast_vector(dns::Real, ρ::NTuple{3,<:Real})
-    T = promote_type(typeof(dns), eltype(ρ), typeof(DRO_UNIT))
-    return T[one(T), -dns, DRO_UNIT * ρ[1], DRO_UNIT * ρ[2], DRO_UNIT * ρ[3]]
+function contrast_vector(dns::Real, δρ::NTuple{3,<:Real})
+    T = promote_type(typeof(dns), eltype(δρ), typeof(DRO_UNIT))
+    return T[one(T), -dns, DRO_UNIT * δρ[1], DRO_UNIT * δρ[2], DRO_UNIT * δρ[3]]
 end
 
-function contrast_vector(dns::Real, ρ::Real)
-    T = promote_type(typeof(dns), typeof(ρ), typeof(DRO_UNIT))
-    return T[one(T), -dns, DRO_UNIT * ρ]
+function contrast_vector(dns::Real, δρ::Real)
+    T = promote_type(typeof(dns), typeof(δρ), typeof(DRO_UNIT))
+    return T[one(T), -dns, DRO_UNIT * δρ]
 end
 
 # ---------------------------------------------------------------------------
@@ -221,10 +221,10 @@ function excluded_volume_factor(qvals::AbstractVector{<:Real}, r_m::Real, c1::Re
 end
 
 """
-    contrast_matrix(dns, ρ, g_ex) -> Matrix
+    contrast_matrix(dns, δρ, g_ex) -> Matrix
 
 The `q`-dependent contrast that [`intensity`](@ref) contracts a [`gram`](@ref)
-against once `c1` is fitted: [`contrast_vector`](@ref)`(dns, ρ)` with the `ex`
+against once `c1` is fitted: [`contrast_vector`](@ref)`(dns, δρ)` with the `ex`
 entry scaled by the [`excluded_volume_factor`](@ref) envelope `g_ex`.
 
 Column `k` is the contrast vector at `qvals[k]`:
@@ -235,14 +235,14 @@ Only species 2 (`ex`) carries the envelope .
 
 # Arguments
 - `dns::Real`: bulk solvent electron density in e·Å⁻³ (CRYSOL fixes `0.334`).
-- `ρ`: dimensionless shell contrast(s), as [`contrast_vector`](@ref).
+- `δρ`: dimensionless shell contrast(s), as [`contrast_vector`](@ref).
 - `g_ex::AbstractVector{<:Real}`, length `Q`: from [`excluded_volume_factor`](@ref).
 
 # Returns
 - `Matrix` of size `(n, Q)`, `n` = 3 or 5.
 """
-function contrast_matrix(dns::Real, ρ, g_ex::AbstractVector{<:Real})
-    v = contrast_vector(dns, ρ)
+function contrast_matrix(dns::Real, δρ, g_ex::AbstractVector{<:Real})
+    v = contrast_vector(dns, δρ)
     T = promote_type(eltype(v), eltype(g_ex))
     V = Matrix{T}(undef, length(v), length(g_ex))
     @inbounds for k in eachindex(g_ex), a in eachindex(v)

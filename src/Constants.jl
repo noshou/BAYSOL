@@ -41,7 +41,7 @@ an `Int` pins it.
 """
 const SHELL_N_TARGET::Union{Nothing,Int} = nothing
 
-"Shell-contrast unit in e·Å⁻³ (CRYSOL's `--dro`); `dro_k = DRO_UNIT * ρ_k`."
+"Shell-contrast unit in e·Å⁻³ (CRYSOL's `--dro`); `dro_k = DRO_UNIT * δρ_k`."
 const DRO_UNIT = 0.03
 
 "Atoms/dummies per pass in `compute_B_lm`."

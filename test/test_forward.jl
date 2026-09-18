@@ -79,7 +79,7 @@ fwd_chunk  = UInt64(3)
         @test G == G_ref
     end
 
-    @testset "forward(G, m, c, dns, ρ) == hand-assembled I_calc" begin
+    @testset "forward(G, m, c, dns, δρ) == hand-assembled I_calc" begin
         m   = fwd_mol()
         G   = gram_matrix(m, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         pars = (0.9, -0.4, 0.331, (1.2, 0.8, -0.3))
@@ -92,7 +92,7 @@ fwd_chunk  = UInt64(3)
         m = fwd_mol()
         G = gram_matrix(m, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         got = forward(  m, fwd_q, fwd_lmax, fwd_E;
-                        m = 1.7, c = 2.5, dns = 0.334, ρ = (1.0, 1.0, 0.0),
+                        m = 1.7, c = 2.5, dns = 0.334, δρ = (1.0, 1.0, 0.0),
                         chunk = fwd_chunk)
         @test got ≈ forward(G, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0))
     end
@@ -106,7 +106,7 @@ fwd_chunk  = UInt64(3)
         @test all(>=(0.0), base)                      # PSD ⇒ vᵀGv ≥ 0
     end
 
-    @testset "a class outside `classes` is inert (its ρ_k does nothing)" begin
+    @testset "a class outside `classes` is inert (its δρ_k does nothing)" begin
         m  = fwd_mol()
         G  = gram_matrix(m, fwd_q, fwd_lmax, fwd_E;
                         chunk = fwd_chunk, classes = (SASA.CONVEX, SASA.CONCAVE))
@@ -226,13 +226,13 @@ fwd_chunk  = UInt64(3)
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         c1 = 0.93
         @test   forward(mo, fwd_q, fwd_lmax, fwd_E;
-                        m = 1.7, c = 2.5, dns = 0.334, ρ = (1.0, 1.0, 0.0),
+                        m = 1.7, c = 2.5, dns = 0.334, δρ = (1.0, 1.0, 0.0),
                         c1 = c1, chunk = fwd_chunk) ≈
                 forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); c1 = c1)
     end
 
     @testset "the whole fit-parameter path is AD-differentiable" begin
-        # c1/dns/ρ are HMC parameters in stage 1, so a Dual must survive the
+        # c1/dns/δρ are HMC parameters in stage 1, so a Dual must survive the
         # contrast -> contraction -> detector-map chain without a Float64 cast.
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)

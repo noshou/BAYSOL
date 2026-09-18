@@ -6,7 +6,7 @@ Files define prior distributions over fit parameters, allowing HMC to sample ove
 
 CRYSOL's `dro` parameters are contrast densities of the hydration shell's border layer, split by bead geometry: `dro1` convex beads, `dro2` concave beads, `dro3` cavity beads. CRYSOL's own default is `dr1 = dr2 = 1.0`, `dr3 = 0`.
 
-`dro_prior(μ_χ=0; σ_χ=0.0)` returns `(dro1, dro2, dro3)`:
+`δρ_prior(μ_χ=0; σ_χ=0.0)` returns `(dro1, dro2, dro3)`:
 
 - `dro1`: `LogNormal(0, σ_ln)` with median 1 (matching CRYSOL's default exactly) and mean 1.15,  since convex beads run ~15% denser on the surface. Source: Merzel & Smith, PNAS 99(8):5378-5383 (2002), doi:10.1073/pnas.082335099, an MD explanation of the SAS/SANS measurement of Svergun et al.,  PNAS 95:2267-2272 (1998). `σ_ln` solves
 

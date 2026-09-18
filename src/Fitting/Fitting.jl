@@ -6,8 +6,9 @@ include("WLS.jl")
 include("Priors/DensityOfSolvent.jl")
 include("Priors/DeltaRho.jl")
 include("Priors/ExcludedVolume.jl")
+include("ParamTransform.jl")
 
-export WLSError, WLSFit, wls_fit, wls_predict, wls_prof_nll, wls_marg_nll,
-Solute, Protein, NonBiological, dns_prior, dro_prior, c1_prior
+export WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll, reduced_chi2,
+Solute, Protein, NonBiological, dns_prior, δρ_prior, c1_prior, θ, ξ
 
 end # module
