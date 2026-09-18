@@ -18,8 +18,8 @@ averaged detector intensity `I_calc(q)` out.
 - `Forward`     -   the assembled model: `species_multipoles`, `gram_matrix`,
                     `forward_cache` and `forward`. Build the geometry-only
                     `ForwardCache` once with `forward_cache`, then call
-                    `forward(cache, m, c, dns, ρ; c1)` per parameter set; or
-                    `forward(mol, qvals, lMax, energy; m, c, dns, ρ, c1)` for a
+                    `forward(cache, m, c, dns, δρ; c1)` per parameter set; or
+                    `forward(mol, qvals, lMax, energy; m, c, dns, δρ, c1)` for a
                     one-off.
 
 # Background
@@ -116,11 +116,11 @@ averaged detector intensity `I_calc(q)` out.
 \\
 5.  The dummy species do not carry the true local electron density
 
-        `v = (1, -dns, dro_1, dro_2, dro_3)`,     dro_k = DRO_UNIT * ρ_k
+        `v = (1, -dns, dro_1, dro_2, dro_3)`,     dro_k = DRO_UNIT * δρ_k
 
     - `dns` rescales `A_ex` to the mean electron density of the displaced
             bulk solvent (`≈ 0.334 e·Å⁻³`).
-    - `ρ_k` dimensionless shell contrast per class (CRYSOL's `--dro`
+    - `δρ_k` dimensionless shell contrast per class (CRYSOL's `--dro`
             multiple, default `(1, 1, 0)`); `dro_k` is the class's excess
             electron density over bulk.
 
@@ -183,7 +183,7 @@ export forward, gram_matrix, forward_cache
 """
 CRYSOL 3's three border-layer populations, in the field order of the
 `NamedTuple` [`hydration`](@ref) returns. Each carries its own fitted contrast
-`dro_k = DRO_UNIT * ρ_k` downstream; CRYSOL's defaults are `ρ = (1, 1, 0)`.
+`dro_k = DRO_UNIT * δρ_k` downstream; CRYSOL's defaults are `δρ = (1, 1, 0)`.
 """
 const SHELL_CLASSES = (SASA.CONVEX, SASA.CONCAVE, SASA.CAVITY)
 

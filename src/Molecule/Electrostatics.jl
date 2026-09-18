@@ -241,7 +241,7 @@ end
         cutoff_debye_lengths
     ) -> (μ_χ, σ_χ)
 
-Screened-electrostatic cavity-water contrast signal for `DeltaRho.dro_prior`'s
+Screened-electrostatic cavity-water contrast signal for `DeltaRho.δρ_prior`'s
 `(μ_χ, σ_χ)` keywords, from `mol`'s nucleic-acid phosphate groups (see
 [`_phosphate_charge_sites`](@ref)). Runs `SASA.shell_points`, then delegates
 every `CAVITY`-class bead to [`_aggregate`](@ref).
@@ -293,7 +293,7 @@ end
     cutoff_debye_lengths
 ) -> (μ_χ, σ_χ)
 
-Screened-electrostatic cavity-water contrast signal for `DeltaRho.dro_prior`'s
+Screened-electrostatic cavity-water contrast signal for `DeltaRho.δρ_prior`'s
 `(μ_χ, σ_χ)` keywords, from `mol`'s ionizable protein side chains (see
 [`_protein_charge_sites`](@ref) and `Interfaces.ResidueNetCharge`). Runs
 `SASA.shell_points`, then delegates every `CAVITY`-class bead to

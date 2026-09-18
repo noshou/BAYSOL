@@ -2,8 +2,7 @@
 
 # Tests for src/Fitting/Priors/ExcludedVolume.jl: the LogNormal prior over the
 # excluded-volume correction factor c1 = r0/r_m, calibrated so that z(n)
-# standard deviations around c1 = 1 exactly span CRYSOL's stated fitting bound
-# [0.96, 1.04].
+# standard deviations around c1 = 1 exactly span CRYSOL's stated fitting bound [0.96, 1.04].
 
 using Random
 using SpecialFunctions: erfinv

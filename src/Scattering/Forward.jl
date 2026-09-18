@@ -10,9 +10,9 @@
 #         ─► ForwardCache(G, qvals, r_m)                             forward_cache
 #         ─► I_calc(q) = m·(v(q)ᵀ G v(q)) + c                        forward
 #
-# `G(q)` depends only on geometry and beam, never on `(m, c, dns, ρ, c1)`. Build the
+# `G(q)` depends only on geometry and beam, never on `(m, c, dns, δρ, c1)`. Build the
 # cache once per structure with `forward_cache`; every likelihood evaluation is then
-# the O(Q) `forward(cache, m, c, dns, ρ; c1)`.
+# the O(Q) `forward(cache, m, c, dns, δρ; c1)`.
 
 """
     species_multipoles(mol, qvals, lMax, energy; kwargs...)
@@ -135,54 +135,99 @@ forward_cache(
     )
 
 """
-    forward(G, m, c, dns, ρ) -> Vector
+    forward(G, m, c, dns, δρ) -> Vector
 
 The detector-scale model intensity `I_calc(q) = m · (vᵀ G(q) v) + c`, with the
-contrast vector `v = contrast_vector(dns, ρ)`. `G` is from [`gram_matrix`](@ref)
-(or [`gram`](@ref)); `ρ` is `(ρ_convex, ρ_concave, ρ_cavity)` for a five-species
-`G` or a scalar for a three-species one.
+contrast vector `v = contrast_vector(dns, δρ)`.
 
-This method holds the excluded-volume radius at its tabulated value. To fit
-CRYSOL's `c₁` as well, use the [`ForwardCache`](@ref) method below.
+# Arguments
+-   `G::AbstractArray{<:Real,3}`, `(n, n, Q)`: the species Gram matrix, from
+    [`gram_matrix`](@ref) (or [`gram`](@ref)).
+-   `m::Real`: overall scale between the absolute model intensity (units of
+    electrons²) and the detector's arbitrary-unit reading. A nuisance
+    parameter with no physical prior of its own — see
+    [`Fitting.wls_fit`](@ref)/[`Fitting.wls_marg_ll`](@ref) to fit it (jointly
+    with `c`) by weighted least squares and profile or marginalise it out of
+    the likelihood, rather than giving it a prior and sampling it directly.
+-   `c::Real`: flat background left by imperfect buffer subtraction, same
+    arbitrary units as the detector reading.
+-   `dns::Real`: the mean electron density (e·Å⁻³) of the bulk solvent dummy atom displaces..
+-   `δρ`: dimensionless hydration-shell contrast(s); the *actual* per-species
+    contrast fed into `v` is `dro_k = DRO_UNIT · δρ_k`. Either
+    `δρ::NTuple{3,<:Real}` = `(δρ_convex, δρ_concave, δρ_cavity)` for the
+    five-species `G` this file builds (`sh_convex`/`sh_concave`/`sh_cavity`,
+    see the file-header species ordering in `Intensity.jl`), or a single
+    `δρ::Real` for a merged three-species `G` (`vac`/`ex`/`sh`).
+
+# Returns
+- `Vector` of length `Q`: `I_calc(q)`, `eltype` promoted from the arguments.
 """
-forward(G::AbstractArray{<:Real,3}, m::Real, c::Real, dns::Real, ρ) =
-    intensity_calc(intensity(G, contrast_vector(dns, ρ)), m, c)
+forward(
+    G::AbstractArray{<:Real,3}, m::Real, c::Real, dns::Real, δρ::Union{Real,NTuple{3,<:Real}}
+) = intensity_calc(intensity(G, contrast_vector(dns, δρ)), m, c)
 
 """
-    forward(cache, m, c, dns, ρ; c1 = nothing) -> Vector
+    forward(cache, m, c, dns, δρ; c1 = nothing) -> Vector
 
     I_calc(q) = m · (v(q)ᵀ G(q) v(q)) + c
     v(q)      = [1, -dns · G_ex(q; c₁), dro₁, dro₂, dro₃]
 
-`c1` is CRYSOL's excluded-volume correction factor (dimensionless, `r₀/r_m`),
-and `dro_k = DRO_UNIT · ρ_k` its fitted shell contrasts. `c1 = nothing` (the
-default) or `c1 == 1` holds the excluded volume at its tabulated value and
-reduces exactly to the 5-argument [`forward`](@ref) above. O(Q) in the fit
-parameters.
+Same model as the `forward(G, m, c, dns, δρ)` method above (see its
+`# Arguments` for what `m`, `c`, `dns`, `δρ` are and where their values come
+from), plus the optional excluded-volume correction `c1`. O(Q) in the fit
+parameters, same cost as the 5-argument method when `c1` is left at its
+default.
+
+# Arguments
+- `cache::ForwardCache`: from [`forward_cache`](@ref). Bundles `G` with the
+    `q` grid and `r_m` that evaluating `c1` needs
+- `m`, `c`, `dns`, `δρ`: as in the `forward(G, m, c, dns, δρ)` method above.
+
+# Keywords
+-   `c1::Union{Nothing,Real} = nothing`: CRYSOL's excluded-volume correction
+    factor, dimensionless (`r₀/r_m` in CRYSOL's own radius parameterisation;
+    see [`excluded_volume_factor`](@ref)). CRYSOL's own fitting range is
+    `c1 ∈ [0.96, 1.04]`. Has a prior, [`Fitting.c1_prior`](@ref)`(n)` (`n` =
+    the percentage of prior mass required within that range). `c1 = nothing`
+    (the default) or `c1 == 1` skips the correction entirely and reduces
+    exactly to the 5-argument [`forward`](@ref) above.
+
+# Returns
+- `Vector` of length `Q`: `I_calc(q)`.
 """
 function forward(
     cache::ForwardCache,
     m::Real,
     c::Real,
     dns::Real,
-    ρ;
+    δρ::Union{Real,NTuple{3,<:Real}};
     c1::Union{Nothing,Real} = nothing
 )
     (c1 === nothing || c1 == 1) &&
-        return forward(cache.G, m, c, dns, ρ)
+        return forward(cache.G, m, c, dns, δρ)
     g_ex = excluded_volume_factor(cache.qvals, cache.r_m, c1)
-    return intensity_calc(intensity(cache.G, contrast_matrix(dns, ρ, g_ex)), m, c)
+    return intensity_calc(intensity(cache.G, contrast_matrix(dns, δρ, g_ex)), m, c)
 end
 
 """
-    forward(mol, qvals, lMax, energy; m, c, dns, ρ, c1, kwargs...) -> Vector
+    forward(mol, qvals, lMax, energy; m, c, dns, δρ, c1, kwargs...) -> Vector
 
 The whole forward model from a molecule in one call: build the cache, then
 evaluate. A convenience for one-offs; for repeated evaluation at fixed geometry
 call [`forward_cache`](@ref) once and the [`ForwardCache`](@ref) method of
-[`forward`](@ref) per parameter set.
+[`forward`](@ref) per parameter set — this method rebuilds `G` from scratch
+(the expensive part) on every call, so avoid it in a sampler's inner loop.
 
-`kwargs` beyond `m, c, dns, ρ, c1` are those of [`species_multipoles`](@ref).
+# Arguments
+- `mol::Molecule`, `qvals`, `lMax`, `energy`: as in [`forward_cache`](@ref)/
+  [`species_multipoles`](@ref) — the geometry/beam setup, not fit parameters.
+
+# Keywords
+- `m`, `c`, `dns`, `δρ`, `c1`: the fit parameters, exactly as documented on the
+  `forward(cache, m, c, dns, δρ; c1)` method above (required except `c1`, which
+  defaults to `nothing`).
+
+`kwargs` beyond `m, c, dns, δρ, c1` are those of [`species_multipoles`](@ref).
 """
 function forward(
     mol::Molecule,
@@ -192,9 +237,9 @@ function forward(
     m::Real,
     c::Real,
     dns::Real,
-    ρ,
+    δρ::Union{Real,NTuple{3,<:Real}},
     c1::Union{Nothing,Real} = nothing,
     kwargs...
 )
-    return forward(forward_cache(mol, qvals, lMax, energy; kwargs...), m, c, dns, ρ; c1 = c1)
+    return forward(forward_cache(mol, qvals, lMax, energy; kwargs...), m, c, dns, δρ; c1 = c1)
 end

@@ -37,5 +37,6 @@ check_complex(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
     include("test_electrostatics.jl")
     include("test_deltarho.jl")
     include("test_excludedvolume.jl")
+    include("test_paramtransform.jl")
     include("test_quality.jl")
 end

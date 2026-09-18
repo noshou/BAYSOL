@@ -126,7 +126,7 @@ it stands for, so the cloud tiles the layer rather than approximating it with an
 envelope. The three arrays are the `sh_convex` / `sh_concave` / `sh_cavity`
 species of the five-species expansion
     `A_total = A_vac - dns·A_ex + Σ_k dro_k·A_sh_k`; each takes its own fitted
-contrast `dro_k` downstream (CRYSOL's `ρ = (1, 1, 0)` defaults).
+contrast `dro_k` downstream (CRYSOL's `δρ = (1, 1, 0)` defaults).
 
 # Arguments
 - `mol`: the molecule; its accessible surface is used, not its atom positions.

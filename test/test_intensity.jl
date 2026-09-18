@@ -122,8 +122,8 @@ iy_w    = partial_wave_weights(iy_lMax)
     @testset "intensity: 5-species equals the 15-term expansion" begin
         B = [iy_B(2, iy_lMax, iy_Q; seed = 40 + i) for i in 1:5]
         dns = 0.98
-        ρ   = (1.0, 0.7, -0.3)
-        d   = (DRO_UNIT * ρ[1], DRO_UNIT * ρ[2], DRO_UNIT * ρ[3])
+        δρ   = (1.0, 0.7, -0.3)
+        d   = (DRO_UNIT * δρ[1], DRO_UNIT * δρ[2], DRO_UNIT * δρ[3])
 
         S(a, b) = a == b ? self_scatter(B[a], iy_w) : cross_scatter(B[a], B[b], iy_w)
 
@@ -135,7 +135,7 @@ iy_w    = partial_wave_weights(iy_lMax)
                 2 .* (d[1] * d[2] .* S(3, 4) .+ d[1] * d[3] .* S(3, 5) .+ d[2] * d[3] .* S(4, 5)) # shj,shk
 
         v = [1.0, -dns, d[1], d[2], d[3]]
-        @test v == contrast_vector(dns, ρ)
+        @test v == contrast_vector(dns, δρ)
         got = intensity(gram(B, iy_w), v)
         @test all(check_float.(got, ref))
     end
@@ -173,7 +173,7 @@ iy_w    = partial_wave_weights(iy_lMax)
         @test contrast_vector(0.334, 1.0)                   == [1.0, -0.334, 0.03]
         @test length(contrast_vector(0.3, (1.0, 1.0, 1.0))) == 5
         @test length(contrast_vector(0.3, 1.0))             == 3
-        @test contrast_vector(0.3, (1.0, 0.0, 0.0))[4:5]    == [0.0, 0.0] # ρ = 0 zeroes a shell
-        @test contrast_vector(0.334, (1, 1, 0)) isa Vector{Float64}       # integer ρ accepted
+        @test contrast_vector(0.3, (1.0, 0.0, 0.0))[4:5]    == [0.0, 0.0] # δρ = 0 zeroes a shell
+        @test contrast_vector(0.334, (1, 1, 0)) isa Vector{Float64}       # integer δρ accepted
     end
 end
