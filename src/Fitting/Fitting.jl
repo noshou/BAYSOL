@@ -9,6 +9,6 @@ include("Priors/ExcludedVolume.jl")
 include("ParamTransform.jl")
 
 export WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll, reduced_chi2,
-Solute, Protein, NonBiological, dns_prior, δρ_prior, c1_prior, θ, ξ
+Solute, Protein, NonBiological, dns_prior, δρ_prior, c1_prior, Θ!, Ξ!
 
 end # module

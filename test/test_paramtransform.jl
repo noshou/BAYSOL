@@ -2,32 +2,55 @@
 
 # Tests for src/Fitting/ParamTransform.jl: the ξ-space (physical fit
 # parameters, mixed domains) <-> θ-space (unconstrained ℝ⁵) bijection that
-# stage-1 HMC samples in, plus the log-Jacobian correction `θ` returns
-# alongside the transform.
+# stage-1 HMC samples in, plus the log-Jacobian correction `Θ!` returns
+# alongside the (in-place) transform.
 
 using ForwardDiff
 using LinearAlgebra
 using Random
-using ScatterNet.Fitting: θ, ξ, dns_prior, δρ_prior, c1_prior, Solute, NonBiological
+using StaticArrays
+using ScatterNet.Fitting: Θ!, Ξ!, dns_prior, δρ_prior, c1_prior, Solute, NonBiological
 
 include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
 
 """
-Independent re-derivation of `θ`'s formula from its docstring, so tests
-aren't just re-running the implementation against itself.
+Independent re-derivation of `Θ!`'s formula from its docstring, so tests
+aren't just re-running the implementation against itself. Does not mutate
+`x`; returns `(θ, corr)` as plain tuples.
 """
-function ref_θ(x::NTuple{5,<:Real})
+function ref_Θ(x::NTuple{5,<:Real})
     a, b, c = log(x[1]), log(x[2]), log(x[5])
     return ((a, b, x[3], x[4], c), a + b + c)
 end
 
 """
-Independent re-derivation of `ξ`'s formula from its docstring.
+Independent re-derivation of `Ξ!`'s formula from its docstring. Does not
+mutate `t`; returns `ξ` as a plain tuple.
 """
-ref_ξ(t::NTuple{5,<:Real}) = (exp(t[1]), exp(t[2]), t[3], t[4], exp(t[5]))
+ref_Ξ(t::NTuple{5,<:Real}) = (exp(t[1]), exp(t[2]), t[3], t[4], exp(t[5]))
 
 """
-Finite-difference Jacobian of `ξ` at `t`, `(5,5)`, for cross-checking `θ`'s
+Run `Θ!` on a fresh `MVector` copy of `x` so the caller's tuple survives;
+returns `(θ, corr)` as `(NTuple{5}, Real)`.
+"""
+function apply_Θ(x::NTuple{5,<:Real})
+    buf = MVector{5,Float64}(x)
+    corr = Θ!(buf)
+    return (Tuple(buf), corr)
+end
+
+"""
+Run `Ξ!` on a fresh `MVector` copy of `t` so the caller's tuple survives;
+returns `ξ` as `NTuple{5}`.
+"""
+function apply_Ξ(t::NTuple{5,<:Real})
+    buf = MVector{5,Float64}(t)
+    Ξ!(buf)
+    return Tuple(buf)
+end
+
+"""
+Finite-difference Jacobian of `ξ` at `t`, `(5,5)`, for cross-checking `Θ!`'s
 analytic log-Jacobian correction against something that doesn't share its
 derivation.
 """
@@ -36,7 +59,7 @@ function numeric_ξ_jacobian(t::NTuple{5,<:Real}; h::Real = 1.0e-6)
     for j in 1:5
         tp = collect(Float64, t); tp[j] += h
         tm = collect(Float64, t); tm[j] -= h
-        J[:, j] = (collect(ξ(Tuple(tp))) .- collect(ξ(Tuple(tm)))) ./ (2h)
+        J[:, j] = (collect(apply_Ξ(Tuple(tp))) .- collect(apply_Ξ(Tuple(tm)))) ./ (2h)
     end
     return J
 end
@@ -44,10 +67,10 @@ end
 @testset "ParamTransform" begin
 
     #------------------------------------------------------------------
-    #                 θ / ξ -- match their own docstring formulas
+    #                 Θ! / Ξ! -- match their own docstring formulas
     #------------------------------------------------------------------
 
-    @testset "θ: matches the independent reference derivation" begin
+    @testset "Θ!: matches the independent reference derivation" begin
         cases = (
             (0.334, 1.05, -0.2, 0.1, 1.02),
             (1.0, 1.0, 0.0, 0.0, 1.0),
@@ -55,14 +78,14 @@ end
             (10.0, 20.0, 3.3, -3.3, 1.04),
         )
         for ξ0 in cases
-            res, corr = θ(ξ0)
-            res_ref, corr_ref = ref_θ(ξ0)
+            res, corr = apply_Θ(ξ0)
+            res_ref, corr_ref = ref_Θ(ξ0)
             @test all(close_.(res, res_ref))
             @test close_(corr, corr_ref)
         end
     end
 
-    @testset "ξ: matches the independent reference derivation" begin
+    @testset "Ξ!: matches the independent reference derivation" begin
         cases = (
             (0.0, 0.0, -0.2, 0.1, 0.0),
             (-3.5, 2.1, 5.0, -5.0, 0.02),
@@ -70,35 +93,35 @@ end
             (-1.0e-3, 1.0e-3, 3.3, -3.3, 1.0e-3),
         )
         for θ0 in cases
-            @test all(close_.(ξ(θ0), ref_ξ(θ0)))
+            @test all(close_.(apply_Ξ(θ0), ref_Ξ(θ0)))
         end
     end
 
     #------------------------------------------------------------------
-    #                 θ / ξ -- round trip
+    #                 Θ! / Ξ! -- round trip
     #------------------------------------------------------------------
 
-    @testset "ξ(θ(x)[1]) == x for x in the valid ξ domain" begin
+    @testset "Ξ!(Θ!(x)) == x for x in the valid ξ domain" begin
         cases = (
             (0.334, 1.05, -0.2, 0.1, 1.02),
             (1.0, 1.0, 0.0, 0.0, 1.0),
             (0.001, 100.0, -50.0, 50.0, 0.96),
         )
         for ξ0 in cases
-            res, _ = θ(ξ0)
-            @test all(close_.(ξ(res), ξ0))
+            res, _ = apply_Θ(ξ0)
+            @test all(close_.(apply_Ξ(res), ξ0))
         end
     end
 
-    @testset "θ(ξ(x))[1] == x for x in θ-space (any reals)" begin
+    @testset "Θ!(Ξ!(x)) == x for x in θ-space (any reals)" begin
         cases = (
             (0.0, 0.0, -0.2, 0.1, 0.0),
             (-3.5, 2.1, 5.0, -5.0, 0.02),
             (10.0, -10.0, 0.0, 0.0, 10.0),
         )
         for θ0 in cases
-            ξ0 = ξ(θ0)
-            res, _ = θ(ξ0)
+            ξ0 = apply_Ξ(θ0)
+            res, _ = apply_Θ(ξ0)
             @test all(close_.(res, θ0))
         end
     end
@@ -107,59 +130,59 @@ end
     #                 θ / ξ -- identity on positions 3, 4 (δρ2, δρ3)
     #------------------------------------------------------------------
 
-    @testset "θ: positions 3, 4 (δρ2, δρ3) pass through unchanged, exactly" begin
+    @testset "Θ!: positions 3, 4 (δρ2, δρ3) pass through unchanged, exactly" begin
         ξ0 = (0.5, 2.0, -7.25, 3.125, 1.01)
-        res, _ = θ(ξ0)
+        res, _ = apply_Θ(ξ0)
         @test res[3] == ξ0[3]
         @test res[4] == ξ0[4]
     end
 
-    @testset "ξ: positions 3, 4 (δρ2, δρ3) pass through unchanged, exactly" begin
+    @testset "Ξ!: positions 3, 4 (δρ2, δρ3) pass through unchanged, exactly" begin
         θ0 = (1.2, -0.5, -7.25, 3.125, 0.02)
-        res = ξ(θ0)
+        res = apply_Ξ(θ0)
         @test res[3] == θ0[3]
         @test res[4] == θ0[4]
     end
 
     #------------------------------------------------------------------
-    #                 θ -- log-Jacobian correction
+    #                 Θ! -- log-Jacobian correction
     #------------------------------------------------------------------
 
-    @testset "θ: corr == a + b + c exactly" begin
+    @testset "Θ!: corr == a + b + c exactly" begin
         for ξ0 in ((0.334, 1.05, -0.2, 0.1, 1.02), (0.02, 0.02, 0.0, 0.0, 0.02))
-            res, corr = θ(ξ0)
+            res, corr = apply_Θ(ξ0)
             @test corr == res[1] + res[2] + res[5]
         end
     end
 
-    @testset "θ: log-Jacobian correction matches a finite-difference Jacobian of ξ" begin
+    @testset "Θ!: log-Jacobian correction matches a finite-difference Jacobian of ξ" begin
         # Independent numerical cross-check of `corr`, via a totally
         # different route (finite differences on ξ, not θ's own formula).
         for θ0 in ( (0.1, -0.2, 0.3, -0.4, 0.5), (2.0, -2.0, 0.0, 0.0, 2.0),
                     (-5.0, 5.0, 1.0, -1.0, -5.0))
-            ξ0 = ξ(θ0)
-            _, corr = θ(ξ0)
+            ξ0 = apply_Ξ(θ0)
+            _, corr = apply_Θ(ξ0)
             numeric_log_det = log(abs(det(numeric_ξ_jacobian(θ0))))
             @test isapprox(corr, numeric_log_det; atol = 1.0e-6)
         end
     end
 
     #------------------------------------------------------------------
-    #                 ξ -- positivity guarantee
+    #                 Ξ! -- positivity guarantee
     #------------------------------------------------------------------
 
-    @testset "ξ: positions 1, 2, 5 (dns, δρ1, c1) are always > 0, any finite θ" begin
+    @testset "Ξ!: positions 1, 2, 5 (dns, δρ1, c1) are always > 0, any finite θ" begin
         # 700 stays clear of exp's Float64 overflow point (~709.78).
         for θ0 in ( (0.0, 0.0, 0.0, 0.0, 0.0), (700.0, -700.0, 0.0, 0.0, 700.0),
                     (-700.0, 700.0, 0.0, 0.0, -700.0), (37.0, -21.5, 0.0, 0.0, 8.2))
-            res = ξ(θ0)
+            res = apply_Ξ(θ0)
             @test res[1] > 0 && res[2] > 0 && res[5] > 0
             @test all(isfinite, res)
         end
     end
 
-    @testset "ξ: dns/δρ1/c1 overflow to Inf far beyond any plausible θ (documented, not a bug)" begin
-        res = ξ((1000.0, 0.0, 0.0, 0.0, 0.0))
+    @testset "Ξ!: dns/δρ1/c1 overflow to Inf far beyond any plausible θ (documented, not a bug)" begin
+        res = apply_Ξ((1000.0, 0.0, 0.0, 0.0, 0.0))
         @test res[1] == Inf
     end
 
@@ -168,26 +191,46 @@ end
     #------------------------------------------------------------------
 
     @testset "θ: non-positive dns/δρ1/c1 throws DomainError, matching Base log" begin
-        @test_throws DomainError θ((-1.0, 1.0, 0.0, 0.0, 1.0))
-        @test_throws DomainError θ((1.0, -1.0, 0.0, 0.0, 1.0))
-        @test_throws DomainError θ((1.0, 1.0, 0.0, 0.0, -1.0))
+        @test_throws DomainError apply_Θ((-1.0, 1.0, 0.0, 0.0, 1.0))
+        @test_throws DomainError apply_Θ((1.0, -1.0, 0.0, 0.0, 1.0))
+        @test_throws DomainError apply_Θ((1.0, 1.0, 0.0, 0.0, -1.0))
     end
 
     @testset "θ: dns/δρ1/c1 == 0 gives -Inf (Base log's own boundary behaviour, no throw)" begin
-        res, corr = θ((0.0, 1.0, 0.0, 0.0, 1.0))
+        res, corr = apply_Θ((0.0, 1.0, 0.0, 0.0, 1.0))
         @test res[1] == -Inf
         @test corr == -Inf
+    end
+
+    #------------------------------------------------------------------
+    #                 in-place semantics
+    #------------------------------------------------------------------
+
+    @testset "Θ!/Ξ! mutate their argument buffer, not a copy" begin
+        buf = MVector{5,Float64}(0.334, 1.05, -0.2, 0.1, 1.02)
+        corr = Θ!(buf)
+        @test buf[1] == log(0.334) && buf[2] == log(1.05) && buf[5] == log(1.02)
+        @test buf[3] == -0.2 && buf[4] == 0.1
+        @test corr == buf[1] + buf[2] + buf[5]
+
+        Ξ!(buf)
+        @test close_(buf[1], 0.334) && close_(buf[2], 1.05) && close_(buf[5], 1.02)
+        @test buf[3] == -0.2 && buf[4] == 0.1
     end
 
     #------------------------------------------------------------------
     #                 AD-differentiability (stage-1 HMC needs this)
     #------------------------------------------------------------------
 
-    @testset "ξ is AD-differentiable" begin
-        # ξ(θ) sits directly on the sampler's hot path: every leapfrog step
+    @testset "Ξ! is AD-differentiable" begin
+        # Ξ!(θ) sits directly on the sampler's hot path: every leapfrog step
         # unpacks the current θ into physical parameters this way, so the
         # gradient must survive with no Float64 cast anywhere in ξ.
-        f(t) = sum(ξ(Tuple(t)))
+        function f(t)
+            buf = MVector{5,eltype(t)}(t...)
+            Ξ!(buf)
+            return sum(buf)
+        end
         t0 = [0.1, -0.2, 0.3, -0.4, 0.5]
         g = ForwardDiff.gradient(f, t0)
         @test all(isfinite, g)
@@ -200,8 +243,12 @@ end
         end
     end
 
-    @testset "θ is AD-differentiable through its ξ argument" begin
-        f(x) = sum(θ(Tuple(x))[1]) + θ(Tuple(x))[2]
+    @testset "Θ! is AD-differentiable through its ξ argument" begin
+        function f(x)
+            buf = MVector{5,eltype(x)}(x...)
+            corr = Θ!(buf)
+            return sum(buf) + corr
+        end
         x0 = [0.334, 1.05, -0.2, 0.1, 1.02]
         g = ForwardDiff.gradient(f, x0)
         @test all(isfinite, g)
@@ -232,9 +279,9 @@ end
         roundtrip_ok = true
         for _ in 1:n
             ξ0 = (rand(d_dns), fixed...)
-            res, corr = θ(ξ0)
+            res, corr = apply_Θ(ξ0)
             finite_ok &= isfinite(corr) && all(isfinite, res)
-            roundtrip_ok &= all(close_.(ξ(res), ξ0))
+            roundtrip_ok &= all(close_.(apply_Ξ(res), ξ0))
         end
         @test finite_ok
         @test roundtrip_ok
@@ -249,9 +296,9 @@ end
         roundtrip_ok = true
         for _ in 1:n
             ξ0 = (fixed_dns, rand(δρ1_d), rand(δρ2_d), rand(δρ3_d), fixed_c1)
-            res, corr = θ(ξ0)
+            res, corr = apply_Θ(ξ0)
             finite_ok &= isfinite(corr) && all(isfinite, res)
-            roundtrip_ok &= all(close_.(ξ(res), ξ0))
+            roundtrip_ok &= all(close_.(apply_Ξ(res), ξ0))
         end
         @test finite_ok
         @test roundtrip_ok
@@ -268,9 +315,9 @@ end
             d_c1 = c1_prior(n)
             for _ in 1:per_n
                 ξ0 = (fixed..., rand(d_c1))
-                res, corr = θ(ξ0)
+                res, corr = apply_Θ(ξ0)
                 finite_ok &= isfinite(corr) && all(isfinite, res)
-                roundtrip_ok &= all(close_.(ξ(res), ξ0))
+                roundtrip_ok &= all(close_.(apply_Ξ(res), ξ0))
             end
         end
         @test finite_ok
@@ -288,9 +335,9 @@ end
         jacobian_ok = true
         for _ in 1:n
             ξ0 = (rand(d_dns), rand(δρ1_d), rand(δρ2_d), rand(δρ3_d), rand(d_c1))
-            res, corr = θ(ξ0)
+            res, corr = apply_Θ(ξ0)
             finite_ok &= isfinite(corr) && all(isfinite, res)
-            roundtrip_ok &= all(close_.(ξ(res), ξ0))
+            roundtrip_ok &= all(close_.(apply_Ξ(res), ξ0))
             jacobian_ok &= corr == res[1] + res[2] + res[5]
         end
         @test finite_ok
