@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Tests for src/Fitting/WLS.jl: the 2-parameter weighted least squares fit
-# of I_calc(q) = m*y_model(q) + c, plus the profile/marginal negative
-# log-likelihoods built on top of it.
+# of I_calc(q) = m*y_model(q) + c, plus the profile/marginal log-likelihoods
+# and the χ²/dof diagnostic built on top of it.
 #
 # `ref_wls` below is an independent re-derivation via explicit normal-equation
 # matrix algebra (LinearAlgebra), not a copy of `wls_fit`'s O(n) accumulator
@@ -11,7 +11,8 @@
 
 using LinearAlgebra
 using Random
-using ScatterNet.Fitting: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_nll, wls_marg_nll
+using ScatterNet.Fitting: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll,
+    reduced_chi2
 
 """
 Reference (m, c, var_m, var_c, cov_mc, chi2, det_XtWX) via explicit normal
@@ -147,53 +148,107 @@ end
     end
 
     #------------------------------------------------------------------
-    #                 wls_prof_nll / wls_marg_nll
+    #                 wls_prof_ll / wls_marg_ll
     #------------------------------------------------------------------
 
-    @testset "wls_prof_nll: matches its closed form directly from WLSFit fields" begin
+    @testset "wls_prof_ll: matches its closed form directly from WLSFit fields" begin
         y_model = collect(range(0.1, 5.0; length = 12))
         I_obs = 1.3 .* y_model .+ 0.4 .+ [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
         σ = fill(0.3, length(y_model))
         f = wls_fit(y_model, I_obs, σ)
 
-        expected = (f.chi2 + f.sum_log_var) / 2 + (f.dof + 2) * log(2π) / 2
-        @test check_float(wls_prof_nll(f), expected; atol = 1e-9)
+        expected = -(f.chi2 + f.sum_log_var) / 2 - (f.dof + 2) * log(2π) / 2
+        @test check_float(wls_prof_ll(f), expected; atol = 1e-9)
     end
 
-    @testset "wls_marg_nll: matches its closed form directly from WLSFit fields" begin
+    @testset "wls_marg_ll: matches its closed form directly from WLSFit fields" begin
         y_model = collect(range(0.1, 5.0; length = 12))
         I_obs = 1.3 .* y_model .+ 0.4 .+ [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
         σ = fill(0.3, length(y_model))
         f = wls_fit(y_model, I_obs, σ)
 
-        expected = wls_prof_nll(f) + log(f.det_XtWX) / 2 - log(2π)
-        @test check_float(wls_marg_nll(f), expected; atol = 1e-9)
+        expected = wls_prof_ll(f) - log(f.det_XtWX) / 2 + log(2π)
+        @test check_float(wls_marg_ll(f), expected; atol = 1e-9)
     end
 
-    @testset "wls_prof_nll: a perfect (chi2 == 0) fit is just the data-normalisation constant" begin
+    @testset "wls_prof_ll: a perfect (chi2 == 0) fit is just the data-normalisation constant" begin
         y_model = collect(range(0.0, 4.0; length = 6))
         I_obs = 2.0 .* y_model .- 1.0
         σ = fill(1.0, length(y_model))
         f = wls_fit(y_model, I_obs, σ)
         @test check_float(f.chi2, 0.0; atol = 1e-9)
-        expected = f.sum_log_var / 2 + (f.dof + 2) * log(2π) / 2
-        @test check_float(wls_prof_nll(f), expected; atol = 1e-9)
+        expected = -f.sum_log_var / 2 - (f.dof + 2) * log(2π) / 2
+        @test check_float(wls_prof_ll(f), expected; atol = 1e-9)
+    end
+
+    @testset "wls_prof_ll / wls_marg_ll: exact sign flip of the old NLL formulas" begin
+        # Direct cross-check against the pre-refactor NLL closed forms, kept
+        # here independent of the source so a sign error in the rename would
+        # be caught even if both sides of the wls_prof_ll test above shared
+        # the same (wrong) sign by copy-paste.
+        y_model = collect(range(0.2, 6.0; length = 9))
+        I_obs = -0.7 .* y_model .+ 2.2 .+ [0.05, -0.02, 0.1, -0.05, 0.0, 0.03, -0.08, 0.02, -0.01]
+        σ = fill(0.4, length(y_model))
+        f = wls_fit(y_model, I_obs, σ)
+
+        nll_prof = (f.chi2 + f.sum_log_var) / 2 + (f.dof + 2) * log(2π) / 2
+        nll_marg = nll_prof + log(f.det_XtWX) / 2 - log(2π)
+        @test check_float(wls_prof_ll(f), -nll_prof; atol = 1e-9)
+        @test check_float(wls_marg_ll(f), -nll_marg; atol = 1e-9)
+    end
+
+    #------------------------------------------------------------------
+    #                 reduced_chi2
+    #------------------------------------------------------------------
+
+    @testset "reduced_chi2: equals chi2 / dof exactly" begin
+        y_model = collect(range(0.1, 5.0; length = 12))
+        I_obs = 1.3 .* y_model .+ 0.4 .+ [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
+        σ = fill(0.3, length(y_model))
+        f = wls_fit(y_model, I_obs, σ)
+        @test check_float(reduced_chi2(f), f.chi2 / f.dof; atol = 1e-12)
+    end
+
+    @testset "reduced_chi2: a perfect (chi2 == 0) fit gives (numerically) 0" begin
+        y_model = collect(range(0.0, 4.0; length = 6))
+        I_obs = 2.0 .* y_model .- 1.0
+        σ = fill(1.0, length(y_model))
+        f = wls_fit(y_model, I_obs, σ)
+        @test check_float(reduced_chi2(f), 0.0; atol = 1e-9)
+    end
+
+    @testset "reduced_chi2: matches the true noise level on average over many trials" begin
+        # chi2/dof should fluctuate around 1 when sigma and the model are both
+        # right -- the classic goodness-of-fit sanity check this function
+        # exists to provide, checked here empirically rather than asserted
+        # on a single (noisy, so unreliable) trial.
+        rng = MersenneTwister(2026)
+        y_model = collect(range(0.1, 5.0; length = 30))
+        m_true, c_true = 1.4, -0.3
+        σ = fill(0.25, length(y_model))
+        vals = Float64[]
+        for _ in 1:500
+            I_obs = m_true .* y_model .+ c_true .+ σ .* randn(rng, length(y_model))
+            f = wls_fit(y_model, I_obs, σ)
+            push!(vals, reduced_chi2(f))
+        end
+        @test isapprox(sum(vals) / length(vals), 1.0; atol = 0.15)
     end
 
     #------------------------------------------------------------------
     #                 AD-differentiability (stage-1 HMC needs this)
     #------------------------------------------------------------------
 
-    @testset "wls_fit -> wls_marg_nll is AD-differentiable through y_model" begin
+    @testset "wls_fit -> wls_marg_ll is AD-differentiable through y_model" begin
         # y_model stands in for a forward-model curve parameterised by θ, as
         # it will be when this feeds stage-1 HMC; the gradient must survive
-        # with no Float64 cast anywhere in wls_fit/wls_prof_nll/wls_marg_nll.
+        # with no Float64 cast anywhere in wls_fit/wls_prof_ll/wls_marg_ll.
         q = collect(range(0.1, 2.0; length = 10))
         I_obs = 3.0 .* exp.(-q) .+ 0.5 .+ [0.02, -0.01, 0.03, 0.0, -0.02, 0.01, -0.03, 0.02, 0.0, -0.01]
         σ = fill(0.2, length(q))
 
         model(θ) = θ[1] .* exp.(-θ[2] .* q)   # θ = (amplitude, decay rate)
-        loss(θ) = wls_marg_nll(wls_fit(model(θ), I_obs, σ))
+        loss(θ) = wls_marg_ll(wls_fit(model(θ), I_obs, σ))
 
         θ0 = [2.5, 1.1]
         g = ForwardDiff.gradient(loss, θ0)

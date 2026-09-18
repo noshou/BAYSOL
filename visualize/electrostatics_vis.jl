@@ -152,7 +152,7 @@ function electrostatics_report(; probe::Float64 = 1.4)
         vals = bead_field_values(sc.mol, pts, sel, sc.sites)
         μ, σ = μ_σ
         @printf("  %d charge site(s), %d CAVITY beads\n", length(sc.sites), length(sel))
-        @printf("  μ_χ = %.4f MV/cm, σ_χ = %.4f MV/cm  (from the real dro_prior entry point)\n", μ, σ)
+        @printf("  μ_χ = %.4f MV/cm, σ_χ = %.4f MV/cm  (from the real δρ_prior entry point)\n", μ, σ)
         isempty(vals) || @printf("  per-bead range: [%.4f, %.4f] MV/cm\n", minimum(vals), maximum(vals))
         println()
     end

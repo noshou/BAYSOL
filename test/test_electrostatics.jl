@@ -13,7 +13,7 @@ using ScatterNet.Molecule.Electrostatics:
     _phosphate_charge_sites, _screened_field, _aggregate, _sample_std,
     protein_cavity_electrostatics, _protein_charge_sites
 using ScatterNet.Molecule.ProteinResidues: Residues
-using ScatterNet.Fitting: dro_prior
+using ScatterNet.Fitting: δρ_prior
 using Distributions: mean, std
 
 # ---------------------------------------------------------------------------
@@ -193,10 +193,10 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
     end
 
     #------------------------------------------------------------------
-    #                 end to end: feeds DeltaRho.dro_prior directly
+    #                 end to end: feeds DeltaRho.δρ_prior directly
     #------------------------------------------------------------------
 
-    @testset "nucleic_acid_cavity_electrostatics -> dro_prior: no manual (μ_χ, σ_χ) guess" begin
+    @testset "nucleic_acid_cavity_electrostatics -> δρ_prior: no manual (μ_χ, σ_χ) guess" begin
         shell_elms = fill("c", 800)
         shell_crds = sph(8.0, 800)
         phos_elms = ["p", "o", "o"]
@@ -204,7 +204,7 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
         m = elec_mol(vcat(shell_elms, phos_elms), vcat(shell_crds, phos_crds))
 
         μχ, σχ = nucleic_acid_cavity_electrostatics(m)
-        _, _, dro3 = dro_prior(μχ; σ_χ = σχ)
+        _, _, dro3 = δρ_prior(μχ; σ_χ = σχ)
 
         @test close_(mean(dro3), μχ)
         @test close_(std(dro3), σχ)
@@ -293,10 +293,10 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
     end
 
     #------------------------------------------------------------------
-    #                 end to end: feeds DeltaRho.dro_prior directly
+    #                 end to end: feeds DeltaRho.δρ_prior directly
     #------------------------------------------------------------------
 
-    @testset "protein_cavity_electrostatics -> dro_prior: no manual (μ_χ, σ_χ) guess" begin
+    @testset "protein_cavity_electrostatics -> δρ_prior: no manual (μ_χ, σ_χ) guess" begin
         shell_elms = fill("c", 800)
         shell_crds = sph(8.0, 800)
         ion_elms = ["o", "o", "n"]
@@ -308,7 +308,7 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
         )
 
         μχ, σχ = protein_cavity_electrostatics(m, residues)
-        _, _, dro3 = dro_prior(μχ; σ_χ = σχ)
+        _, _, dro3 = δρ_prior(μχ; σ_χ = σχ)
 
         @test close_(mean(dro3), μχ)
         @test close_(std(dro3), σχ)
