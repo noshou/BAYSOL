@@ -31,13 +31,13 @@ end
 Generates physical prior distributions of `ξ`.
 
 # Arguments
-- `pH::Real`: pH of the solution; forwarded to `Interfaces.ϕ°` for `Protein` solutes.
+- `pH::Real`: pH of the solution; forwarded to `PartialMolarVolumes.ϕ°` for `Protein` solutes.
 - `σ_pH::Real`: standard uncertainty on `pH`, propagated through each `Protein`
     solute's titration term.
 - `solutes::Vector{Solute}`: the  species in solution.
 
 # Keywords
-- `t::Real=25.0`:   solution temperature in °C, forwarded to `Interfaces.ρₑ_w`.
+- `t::Real=25.0`:   solution temperature in °C, forwarded to `PartialMolarVolumes.ρₑ_w`.
                     **!!NOTE!!: as of this version, this should NOT be changed, 
                     since only water is temp dependent.**
 - `μ_χ`=0.0:        mean, over cavity beads, of the screened-electrostatic potential χ
@@ -277,13 +277,13 @@ runs initial seeding for sampler
 - `fw::ForwardCache`: Cache of the forward model
 - `I_exp::AbstractVector`: Experimental intensity curve
 - `σ_exp::AbstractVector`: Per-q standard deviation
-- `pH::Real`: pH of the solution; forwarded to `Interfaces.ϕ°` for `Protein` solutes.
+- `pH::Real`: pH of the solution; forwarded to `PartialMolarVolumes.ϕ°` for `Protein` solutes.
 - `σ_pH::Real`: standard uncertainty on `pH`, propagated through each `Protein`
     solute's titration term.
 - `solutes::Vector{Solute}`: the  species in solution.
 
 # Keywords
-- `t::Real=25.0`:   solution temperature in °C, forwarded to `Interfaces.ρₑ_w`.
+- `t::Real=25.0`:   solution temperature in °C, forwarded to `PartialMolarVolumes.ρₑ_w`.
                     **!!NOTE!!: as of this version, this should NOT be changed, 
                     since only water is temp dependent.**
 - `μ_χ`=0.0:        mean, over cavity beads, of the screened-electrostatic potential χ

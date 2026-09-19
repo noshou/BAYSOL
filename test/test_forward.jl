@@ -36,7 +36,7 @@ fwd_chunk  = UInt64(3)
         @test SHELL_CLASSES   === (SASA.CONVEX, SASA.CONCAVE, SASA.CAVITY)
         @test DRO_UNIT        === 0.03
         @test B_LM_CHUNK isa Unsigned
-        @test FORM_FACTOR_SOURCE isa BayeSol.Interfaces.FormFactorSource
+        @test FORM_FACTOR_SOURCE isa BayeSol.FormFactor.FormFactorSource
         # the primitives really do read these as their defaults
         m = fwd_mol()
         @test   hydration(m, fwd_q, 2, fwd_chunk) ==

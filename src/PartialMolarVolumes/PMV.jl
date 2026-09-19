@@ -5,13 +5,60 @@ Partial molar volumes (V0, cm³/mol) and water bulk electron density.
 """
 module PartialMolarVolumes
 
-import ..Interfaces
-using  ..Interfaces: PartialMolarVolumeSource
-using  ...Helpers.Constants: AVOGADRO
-using  ...Helpers.Cache: KeyedCache
+using  ..Helpers.Constants: AVOGADRO
+using  ..Helpers.Cache: KeyedCache
 using  JSON3: JSON3
 
-export PMVSrcTables, COMMON_TO_IUPAC
+export PartialMolarVolumeSource, ϕ°, ρₑ_w, PMVSrcTables, COMMON_TO_IUPAC
+
+"A partial-molar-volume backend. See `PartialMolarVolumes` for the reference implementation."
+abstract type PartialMolarVolumeSource end
+
+"""
+    ρₑ_w([src::PartialMolarVolumeSource,] t::Real) -> Tuple{Float64,Float64}
+
+Bulk electron density of pure water at temperature `t` (°C), in e·Å⁻³, as
+`(ρₑ, uncertainty)`.
+
+# Arguments
+- `src`: the partial-molar-volume backend to query (optional).
+- `t`: temperature in °C.
+"""
+function ρₑ_w end
+
+"""
+    ϕ°(
+        [src::PartialMolarVolumeSource,] pH::Real,
+        seq::AbstractString;
+        σ_pH::Real = 0.0
+    ) -> Tuple{Int64,Float64,Float64}
+
+    ϕ°(
+        [src::PartialMolarVolumeSource,] isDNA::Bool,
+        pH::Real,
+        seq::AbstractString;
+        σ_pH::Real = 0.0
+    ) -> Tuple{Int64,Float64,Float64}
+
+    ϕ°([src::PartialMolarVolumeSource,] name::AbstractString) -> Tuple{Int64,Float64,Float64}
+
+Partial molar volume at infinite dilution, as `(electron_count, v0_cm3_per_mol, uncertainty_cm3_per_mol)`,
+for a protein/peptide sequence (one-letter codes) at solution `pH`, for a DNA/RNA sequence
+(one-letter or IUPAC ambiguity codes) at solution `pH`, or for a solute by IUPAC `name`.
+The extra leading `isDNA::Bool` on the nucleotide form is what disambiguates it from the
+protein form by arity — amino-acid and nucleotide one-letter codes collide (e.g. `"A"` is
+both alanine and adenine), so the two forms cannot be told apart by `seq` alone.
+
+# Arguments
+- `src`: the partial-molar-volume backend to query (optional).
+- `pH`/`seq`: solution pH and one-letter-code sequence, for a protein or nucleotide.
+- `isDNA`: `true` for a DNA sequence, `false` for RNA — nucleotide form only; selects
+    both the `A/T/G/C` vs `A/U/G/C` alphabet and which backend table gets queried.
+- `σ_pH`: standard uncertainty on `pH`, propagated into the returned uncertainty
+    via the delta method (protein/nucleotide forms only; ignored for the solute-by-name form).
+- `name`: common or IUPAC solute name, for a non-protein, non-nucleotide solute.
+"""
+function ϕ° end
 
 "Marker for the bundled-table backend."
 struct PMVSrcTables <: PartialMolarVolumeSource end
@@ -321,7 +368,7 @@ Look up a non-protein solute's IUPAC name from its common name via
 `COMMON_TO_IUPAC` (case-insensitive). Returns `(iupac_name, true)` on a hit,
 or `("", false)` if `name` has no mapping. Private: the only caller is
 `_resolve_solute_name` below, so this has no reason to be part of the
-swappable-backend `Interfaces` surface.
+swappable-backend `ϕ°` surface.
 """
 function _common2iupac(name::AbstractString)::Tuple{String,Bool}
     iupac = get(COMMON_TO_IUPAC, lowercase(String(name)), nothing)
@@ -347,11 +394,14 @@ function _resolve_solute_name(name::AbstractString)::String
 end
 
 """
-    ϕ°(name::AbstractString) -> Tuple{Int64, Float64, Float64}
+    _ϕ°_by_iupac_name(name::AbstractString) -> Tuple{Int64, Float64, Float64}
 
 Takes the IUPAC name of a solute and returns (electron count, pmv, uncertainty).
+Private: `name` must already be an exact `nonbiological.json` key (see
+[`ϕ°(::AbstractString)`](@ref), the public entry point, which resolves a
+common name to its IUPAC form via [`_resolve_solute_name`](@ref) first).
 """
-function ϕ°(name::AbstractString)::Tuple{Int64, Float64, Float64}
+function _ϕ°_by_iupac_name(name::AbstractString)::Tuple{Int64, Float64, Float64}
 
     key = String(name)
 
@@ -383,8 +433,16 @@ function ϕ°(name::AbstractString)::Tuple{Int64, Float64, Float64}
     end
 end
 
+"""
+    ϕ°(name::AbstractString) -> Tuple{Int64, Float64, Float64}
+
+Takes the common or IUPAC name of a solute (resolved via
+[`_resolve_solute_name`](@ref)) and returns (electron count, pmv, uncertainty).
+"""
+ϕ°(name::AbstractString)::Tuple{Int64, Float64, Float64} = _ϕ°_by_iupac_name(_resolve_solute_name(name))
+
 #----------------------------------------------------------
-#             Nucleotides Partial Molar Volume              
+#             Nucleotides Partial Molar Volume
 #----------------------------------------------------------
 
 "Memoized DNA partial molar volume, keyed by sequence"
@@ -580,55 +638,50 @@ function ϕ°(
 end
 
 #----------------------------------------------------------
-#                  Interfaces generics
+#                    Backend dispatch methods
 #----------------------------------------------------------
-# ϕ°/ρₑ_w are the stable API (declared in Interfaces.jl); only the backend
-# (`src`, first argument) varies. The `src`-less forms below default it to
-# `PMVSrcTables()`, same convention as `form_factor_table`.
+# ϕ°/ρₑ_w are the stable API (abstract type + generic declared above); only
+# the backend (`src`, first argument) varies. The bare (`src`-less) forms are
+# the implementations above; these `PMVSrcTables`-taking methods are thin
+# wrappers over them, same convention as `form_factor_table`.
 
 """
-    Interfaces.ρₑ_w([src::PMVSrcTables,] t::Real) -> (ρₑ, uncertainty)
+    ρₑ_w(src::PMVSrcTables, t::Real) -> (ρₑ, uncertainty)
 
 Bulk electron density of pure water at `t` (°C), in e·Å⁻³. Thin wrapper over
-the local [`ρₑ_w`](@ref).
+the src-less [`ρₑ_w`](@ref).
 """
-Interfaces.ρₑ_w(::PMVSrcTables, t::Real)::Tuple{Float64,Float64} = ρₑ_w(t)
-Interfaces.ρₑ_w(t::Real)::Tuple{Float64,Float64} = Interfaces.ρₑ_w(PMVSrcTables(), t)
+ρₑ_w(::PMVSrcTables, t::Real)::Tuple{Float64,Float64} = ρₑ_w(t)
 
 """
-    Interfaces.ϕ°(
-        [src::PMVSrcTables,] pH::Real, 
-        seq::AbstractString; 
+    ϕ°(
+        src::PMVSrcTables,
+        pH::Real,
+        seq::AbstractString;
         σ_pH::Real = 0.0
     ) -> (electron_count, v0, uncertainty)
-    
-    Interfaces.ϕ°([src::PMVSrcTables,] name::AbstractString) 
+
+    ϕ°(src::PMVSrcTables, name::AbstractString)
         -> (electron_count, v0, uncertainty)
 
 Partial molar volume at infinite dilution (`v0` in cm³/mol) for a protein
 sequence at a given pH, or a non-protein solute by common or IUPAC name.
 `σ_pH` is the standard uncertainty on `pH`, propagated by the delta method
-(see the local [`ϕ°`](@ref)). Thin wrappers over the local [`ϕ°`](@ref).
+(see the src-less [`ϕ°`](@ref)). Thin wrappers over the src-less [`ϕ°`](@ref).
 """
-Interfaces.ϕ°(
-    ::PMVSrcTables, 
-    pH::Real, 
-    seq::AbstractString; 
+ϕ°(
+    ::PMVSrcTables,
+    pH::Real,
+    seq::AbstractString;
     σ_pH::Real = 0.0
 )::Tuple{Int64,Float64,Float64} = ϕ°(pH, seq; σ_pH)
-Interfaces.ϕ°(
-    pH::Real, 
-    seq::AbstractString; 
-    σ_pH::Real = 0.0
-)::Tuple{Int64,Float64,Float64} = Interfaces.ϕ°(PMVSrcTables(), pH, seq; σ_pH)
 
-Interfaces.ϕ°(::PMVSrcTables, name::AbstractString)::Tuple{Int64,Float64,Float64} = ϕ°(_resolve_solute_name(name))
-
-Interfaces.ϕ°(name::AbstractString)::Tuple{Int64,Float64,Float64} = Interfaces.ϕ°(PMVSrcTables(), name)
+ϕ°(::PMVSrcTables, name::AbstractString)::Tuple{Int64,Float64,Float64} = ϕ°(name)
 
 """
-    Interfaces.ϕ°(
-        [src::PMVSrcTables,] isDNA::Bool,
+    ϕ°(
+        src::PMVSrcTables,
+        isDNA::Bool,
         pH::Real,
         seq::AbstractString;
         σ_pH::Real = 0.0
@@ -637,22 +690,16 @@ Interfaces.ϕ°(name::AbstractString)::Tuple{Int64,Float64,Float64} = Interfaces
 Partial molar volume at infinite dilution (`v0` in cm³/mol) for a DNA/RNA
 sequence at a given pH. `isDNA` selects the `A/T/G/C` alphabet/backend
 table when `true`, `A/U/G/C` when `false`. `σ_pH` is the standard
-uncertainty on `pH`, propagated by the delta method (see the local
-[`ϕ°`](@ref)). Thin wrappers over the local [`ϕ°`](@ref).
+uncertainty on `pH`, propagated by the delta method (see the src-less
+[`ϕ°`](@ref)). Thin wrapper over the src-less [`ϕ°`](@ref).
 """
-Interfaces.ϕ°(
+ϕ°(
     ::PMVSrcTables,
     isDNA::Bool,
     pH::Real,
     seq::AbstractString;
     σ_pH::Real = 0.0
 )::Tuple{Int64,Float64,Float64} = ϕ°(isDNA, pH, seq; σ_pH)
-Interfaces.ϕ°(
-    isDNA::Bool,
-    pH::Real,
-    seq::AbstractString;
-    σ_pH::Real = 0.0
-)::Tuple{Int64,Float64,Float64} = Interfaces.ϕ°(PMVSrcTables(), isDNA, pH, seq; σ_pH)
 
 
 end # module PartialMolarVolumes

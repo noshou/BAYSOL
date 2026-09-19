@@ -168,7 +168,7 @@ averaged detector intensity `I_calc(q)` out.
 """
 module Scattering
 
-using ..Interfaces: Interfaces, FormFactorSource, FormFactorSourceTables
+using ..FormFactor: FormFactor, FormFactorSource, FormFactorSourceTables
 using ..Solvation.SASA: SASA
 using ..Helpers.Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
 using StaticArrays: SVector

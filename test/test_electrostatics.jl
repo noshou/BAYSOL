@@ -5,13 +5,13 @@
 # formula, the cavity-bead aggregation, and its `SASA.shell_points`-driven
 # public entry point `nucleic_acid_cavity_electrostatics`.
 
-using BayeSol: Interfaces
+using BayeSol: AtomicRadii
 using BayeSol.Solvation.SASA: SASA
 using BayeSol.MolecularStructure: create, coords_cartesian
 using BayeSol.Solvation.Electrostatics:
     Electrostatics, PHOSPHATE_NET_CHARGE, debye_length, nucleic_acid_cavity_electrostatics,
     _phosphate_charge_sites, _screened_field, _aggregate, _sample_std,
-    protein_cavity_electrostatics, _protein_charge_sites
+    protein_cavity_electrostatics, _protein_charge_sites, _residue_charge
 using BayeSol.MolecularStructure: Residues
 using BayeSol.Fitting: δρ_prior
 using Distributions: mean, std
@@ -20,11 +20,11 @@ using Distributions: mean, std
 # Injected radii source, real element letters (p/o/c), mirroring
 # test_sasa.jl's SasaTestRadii.
 # ---------------------------------------------------------------------------
-struct ElecTestRadii <: Interfaces.RadiiSource
+struct ElecTestRadii <: AtomicRadii.RadiiSource
     table::Dict{String,Float64}
 end
 
-function Interfaces.lookup(s::ElecTestRadii, ions::AbstractVector{<:AbstractString})
+function AtomicRadii.lookup(s::ElecTestRadii, ions::AbstractVector{<:AbstractString})
     out = Vector{Tuple{String,Union{Float64,Nothing}}}(undef, length(ions))
     for i in eachindex(ions)
         k = String(ions[i])
@@ -226,7 +226,7 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
         @test isempty(_protein_charge_sites(m, residues))
     end
 
-    @testset "_protein_charge_sites: Asp side-chain oxygens resolve via Interfaces.ResidueNetCharge" begin
+    @testset "_protein_charge_sites: Asp side-chain oxygens resolve via _residue_charge" begin
         elms = ["c", "o", "o"]   # a bare CA plus the two carboxylate O's
         crds = [(0.0, 0.0, 0.0), (1.5, 0.0, 0.0), (-1.5, 0.0, 0.0)]
         m = elec_mol(elms, crds)
@@ -235,22 +235,22 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
         sites = _protein_charge_sites(m, residues)
         @test length(sites) == 2
         @test Set(first.(sites)) == Set([2, 3])
-        q_od1 = Interfaces.residue_charge("ASP", "OD1")
-        q_od2 = Interfaces.residue_charge("ASP", "OD2")
+        q_od1 = _residue_charge("ASP", "OD1")
+        q_od2 = _residue_charge("ASP", "OD2")
         @test Set(last.(sites)) == Set([q_od1, q_od2])
     end
 
-    @testset "_protein_charge_sites: Lys/Arg resolve to Interfaces.ResidueNetCharge's own values" begin
+    @testset "_protein_charge_sites: Lys/Arg resolve to _residue_charge's own values" begin
         elms = ["n", "n", "n", "n"]
         crds = [(0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (4.0, 0.0, 0.0), (6.0, 0.0, 0.0)]
         m = elec_mol(elms, crds)
         residues = Residues(["LYS", "ARG", "ARG", "ARG"], ["NZ", "NH1", "NH2", "NE"])
 
         sites = Dict(_protein_charge_sites(m, residues))
-        @test close_(sites[1], Interfaces.residue_charge("LYS", "NZ"))
-        @test close_(sites[2], Interfaces.residue_charge("ARG", "NH1"))
-        @test close_(sites[3], Interfaces.residue_charge("ARG", "NH2"))
-        @test close_(sites[4], Interfaces.residue_charge("ARG", "NE"))
+        @test close_(sites[1], _residue_charge("LYS", "NZ"))
+        @test close_(sites[2], _residue_charge("ARG", "NH1"))
+        @test close_(sites[3], _residue_charge("ARG", "NH2"))
+        @test close_(sites[4], _residue_charge("ARG", "NE"))
         # all three Arg atoms share the same per-atom charge, by construction
         @test close_(sites[2], sites[3]) && close_(sites[3], sites[4])
     end
