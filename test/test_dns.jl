@@ -2,7 +2,7 @@
 
 # End-to-end tests for src/Fitting/Priors/DensityOfSolvent.jl: bulk solution
 # electron density (`_ρₑ`) and its `LogNormal` prior (`ρₑ_prior`), exercised
-# through `Interfaces.ρₑ_w`/`Interfaces.ϕ°` pipeline.
+# through `PartialMolarVolumes.ρₑ_w`/`PartialMolarVolumes.ϕ°` pipeline.
 
 const FIT = BayeSol.Fitting
 using BayeSol.Fitting: Solute, Protein, NonBiological, DNA, RNA, ρₑ_prior
@@ -14,7 +14,7 @@ include(joinpath(@__DIR__, "fixtures", "sequences.jl"))      # LYSOZYME, ...
 
 """
 Independent re-derivation of the `_ρₑ`/`ρₑ_prior` formula from the live
-`Interfaces.ρₑ_w`/`Interfaces.ϕ°` calls:
+`PartialMolarVolumes.ρₑ_w`/`PartialMolarVolumes.ϕ°` calls:
 
     ρₑ = ρ_w(T) + Σ_j C_j · (N_A·Z_j/1e27 − ρ_w(T)·ϕ°_j/1e3)
     σ² = (1 − Σ_j C_j·ϕ°_j/1e3)² · σ_w²
@@ -22,16 +22,16 @@ Independent re-derivation of the `_ρₑ`/`ρₑ_prior` formula from the live
         + Σ_j (C_j·ρ_w/1e3)² · σ_ϕ°_j²
 """
 function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = 25.0)
-    ρw, σw = BayeSol.Interfaces.ρₑ_w(t)
+    ρw, σw = BayeSol.PartialMolarVolumes.ρₑ_w(t)
     ρw_k = ρw * 1e-3
 
     disp = 0.0; Δμ = 0.0; var_conc = 0.0; var_vol = 0.0
     for s in solutes
         Z, ϕ, σϕ =
-            s isa Protein       ? BayeSol.Interfaces.ϕ°(pH, s.arg; σ_pH) :
-            s isa DNA            ? BayeSol.Interfaces.ϕ°(true, pH, s.arg; σ_pH) :
-            s isa RNA            ? BayeSol.Interfaces.ϕ°(false, pH, s.arg; σ_pH) :
-            BayeSol.Interfaces.ϕ°(s.arg)
+            s isa Protein       ? BayeSol.PartialMolarVolumes.ϕ°(pH, s.arg; σ_pH) :
+            s isa DNA            ? BayeSol.PartialMolarVolumes.ϕ°(true, pH, s.arg; σ_pH) :
+            s isa RNA            ? BayeSol.PartialMolarVolumes.ϕ°(false, pH, s.arg; σ_pH) :
+            BayeSol.PartialMolarVolumes.ϕ°(s.arg)
         C, σC = s.molarity, s.molarity_uncertainty
         k = AVOGADRO * Z / 1e27 - ρw_k * ϕ
 
@@ -56,7 +56,7 @@ function ref_lognormal(μ::Real, σ::Real)
     return μ_ln, σ_ln
 end
 
-# `Interfaces.ϕ°` caches a Protein solute's result off of its sequence alone
+# `PartialMolarVolumes.ϕ°` caches a Protein solute's result off of its sequence alone
 # (documented on `ϕ°`), so re-querying the same literal sequence at a
 # different pH/σ_pH just replays the first call's cached answer. Every test
 # below that needs to vary pH/σ_pH for an otherwise-identical sequence uses a
@@ -79,7 +79,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test close_(μ, μ_ref)
         @test close_(σ, σ_ref)
         # sanity: adding a solute genuinely shifts ρₑ away from pure water.
-        ρw, _ = BayeSol.Interfaces.ρₑ_w(25.0)
+        ρw, _ = BayeSol.PartialMolarVolumes.ρₑ_w(25.0)
         @test !close_(μ, ρw; atol = 1e-9)
     end
 
@@ -103,7 +103,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
         # additivity: the two-solute mean shift equals the sum of the
         # single-solute mean shifts (linear in concentration).
-        ρw, _ = BayeSol.Interfaces.ρₑ_w(25.0)
+        ρw, _ = BayeSol.PartialMolarVolumes.ρₑ_w(25.0)
         μ_urea, _ = FIT._ρₑ(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")])
         μ_prot, _ = FIT._ρₑ(7.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, "GGGGXX")])
         @test close_(μ, ρw + (μ_urea - ρw) + (μ_prot - ρw); atol = 1e-9)
@@ -133,7 +133,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         μ_ref, σ_ref = ref_ρₑ(7.0, 0.0, solutes)
         @test close_(μ, μ_ref)
         @test close_(σ, σ_ref)
-        ρw, _ = BayeSol.Interfaces.ρₑ_w(25.0)
+        ρw, _ = BayeSol.PartialMolarVolumes.ρₑ_w(25.0)
         @test !close_(μ, ρw; atol = 1e-9)
     end
 
@@ -197,7 +197,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
     @testset "ρₑ_prior: a realistic buffer of real protein + real DNA + real RNA is internally consistent" begin
         # Cross-checks Priors.ρₑ_prior, DensityOfSolvent._ρₑ and
-        # Interfaces.ϕ° together on genuine biological sequences (see
+        # PartialMolarVolumes.ϕ° together on genuine biological sequences (see
         # test/fixtures/sequences.jl for provenance), rather than the
         # short synthetic stand-ins ("ATGC"/"AUGC"/"GGGGCC") used above to
         # isolate the DNA/RNA-vs-Protein code paths.
@@ -224,7 +224,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         # sanity: a real macromolecule-laden buffer genuinely shifts ρₑ
         # away from pure water, same qualitative check as the
         # single-solute testsets above.
-        ρw, _ = BayeSol.Interfaces.ρₑ_w(25.0)
+        ρw, _ = BayeSol.PartialMolarVolumes.ρₑ_w(25.0)
         @test !close_(μ, ρw; atol = 1e-9)
     end
 
@@ -257,7 +257,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test a == b
     end
 
-    @testset "_ρₑ: temperature is forwarded to Interfaces.ρₑ_w" begin
+    @testset "_ρₑ: temperature is forwarded to PartialMolarVolumes.ρₑ_w" begin
         solutes = Solute[NonBiological(0.5, 0.01, "urea")]
         for t in (0.0, 25.0, 37.0, 100.0)
             μ, σ = FIT._ρₑ(7.0, 0.0, solutes; t = t)

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-using BayeSol: Interfaces
+using BayeSol: AtomicRadii
 using BayeSol.Solvation.SASA: SASA, sasa, _occluded
 using .MolecularStructure: MolecularStructure, create
 
@@ -14,11 +14,11 @@ using .MolecularStructure: MolecularStructure, create
 # NOTE: `include` evaluates at module top level regardless of the enclosing
 # `@testset`, so this `struct` is legal here.
 # ---------------------------------------------------------------------------
-struct SasaTestRadii <: Interfaces.RadiiSource
+struct SasaTestRadii <: AtomicRadii.RadiiSource
     table::Dict{String,Float64}
 end
 
-function Interfaces.lookup(s::SasaTestRadii, ions::AbstractVector{<:AbstractString})
+function AtomicRadii.lookup(s::SasaTestRadii, ions::AbstractVector{<:AbstractString})
     out = Vector{Tuple{String,Union{Float64,Nothing}}}(undef, length(ions))
     for i in eachindex(ions)
         k = String(ions[i])

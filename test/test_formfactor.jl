@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises the pure-Julia form-factor backend: src/Interfaces/FormFactor/.
+# Exercises the pure-Julia form-factor backend: src/FormFactor/.
 # f(q,E) = f0(s) + f1(E) + i*f2(E), s = q/(4pi), from the bundled
 # form_factors.sqlite3 (Waasmaier-Kirfel f0, Chantler FFAST anomalous terms).
 
-const IFACE = BayeSol.Interfaces
-using BayeSol.Interfaces.FormFactor: compute_form_factors, FF, FormFactorError,
+const IFACE = BayeSol.FormFactor
+using BayeSol.FormFactor: compute_form_factors, FF, FormFactorError,
                                         FormFactorSourceTables, f0, f1f2, S_MAX
 
 check_c(a, b) = abs(a - b) < 1e3 * DEFAULT_ATOL

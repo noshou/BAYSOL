@@ -7,12 +7,27 @@ fallback chain over the bundled `atomic_radii.sqlite3` (loaded once into
 """
 module AtomicRadii
 
-import ..Interfaces
-using  ..Interfaces: RadiiSource
 using  SQLite: SQLite
 using  DBInterface: DBInterface
 
-export AtomicRadiiSource, Ion, tryparse_ion, ion_key, ion_radius, element_radius, nearest_ion, resolve_one
+export  RadiiSource, lookup, AtomicRadiiSource, Ion, 
+        tryparse_ion, ion_key, ion_radius, element_radius, 
+        nearest_ion, resolve_one
+
+"A source of atomic/ionic radii. Implement [`lookup`](@ref) for a concrete subtype."
+abstract type RadiiSource end
+
+"""
+    lookup(src::RadiiSource, ions) -> Vector{Tuple{String,Union{Float64,Nothing}}}
+
+Resolve each ion/element string to a radius in Å, or `nothing` if unknown. One
+entry per input, in input order.
+
+# Arguments
+- `src`: the radii backend to query.
+- `ions`: ion/element strings, e.g. `["fe3+", "o2-", "fe"]`.
+"""
+function lookup end
 
 # ---- ion string -> (element, signed charge) -------------------------------
 
@@ -164,8 +179,8 @@ const _MISS = _Miss()
 Batch [`resolve_one`](@ref); input order and count preserved, repeats deduped
 per call. Each entry pairs the input string with its radius (Å) or `nothing`.
 
-Named apart from `Interfaces.lookup` so that this plain function stays
-independent of any particular `RadiiSource`; the `Interfaces.lookup` method
+Named apart from `lookup` so that this plain function stays
+independent of any particular `RadiiSource`; the `lookup` method
 below is a thin wrapper over it for `AtomicRadiiSource` specifically.
 
 # Arguments
@@ -184,8 +199,8 @@ function _resolve_all(ions::AbstractVector{<:AbstractString})
     return out
 end
 
-"Concrete [`Interfaces.RadiiSource`](@ref) backed by [`_resolve_all`](@ref)."
+"Concrete [`RadiiSource`](@ref) backed by [`_resolve_all`](@ref)."
 struct AtomicRadiiSource <: RadiiSource end
-Interfaces.lookup(::AtomicRadiiSource, ions::AbstractVector{<:AbstractString}) = _resolve_all(ions)
+lookup(::AtomicRadiiSource, ions::AbstractVector{<:AbstractString}) = _resolve_all(ions)
 
 end # module AtomicRadii

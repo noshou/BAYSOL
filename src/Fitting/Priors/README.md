@@ -44,7 +44,7 @@ with `k_j = N_A·Z_j/1e27 − ρ_w·ϕ°_j/1e3`. Given `μ = ρₑ`, `σ = √σ
 ```
 
 Solutes are `Protein`, `NonBiological`, `DNA`, `RNA`, each carrying `molarity`,
-`molarity_uncertainty`, and an `arg` (sequence or name) resolved through `Interfaces.ϕ°`.
+`molarity_uncertainty`, and an `arg` (sequence or name) resolved through `PartialMolarVolumes.ϕ°`.
 
 ## ExcludedVolume.jl
 

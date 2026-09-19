@@ -4,9 +4,7 @@
 A molecule.
 """
 
-import  ..Interfaces
-using   ..Interfaces: RadiiSource, lookup
-using   ..Interfaces: AtomicRadiiSource
+using   ..AtomicRadii: RadiiSource, lookup, AtomicRadiiSource
 using   ..Helpers.Cache: Lazy, force
 
 "Raised for malformed molecule input (empty or mismatched coords, missing radii)."
