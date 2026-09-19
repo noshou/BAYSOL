@@ -249,12 +249,12 @@ Exponent coefficient of [`excluded_volume_factor`](@ref): `(4π/3)^(2/3) / 4π`.
 
 Converts CRYSOL's *radius* parameterisation into the *volume* parameterisation
 [`_gaussian_dummy`](@ref) is written in, via `V = (4π/3) r³` (which is exactly
-`Molecules.sphere_volume`, so `r_m` and the dummy volumes stay consistent).
+`MolecularStructure.sphere_volume`, so `r_m` and the dummy volumes stay consistent).
 """
 const _EV_EXP_COEFF = (4π / 3)^(2 / 3) / (4π)
 
 """
-    excluded_volume_factor(qvals, r_m, c1) -> Vector
+    excluded_volume_factor(qvals, r_m, c_1) -> Vector
 
 CRYSOL's excluded-volume envelope `G(q)`: the factor multiplying the `ex`
 species when every dummy atom's radius is expanded from the structure's mean
@@ -265,28 +265,28 @@ species when every dummy atom's radius is expanded from the structure's mean
 The approximation is exact for an atom of radius `r_m` and degrades with the
 spread of radii about it. Absorbs systemic biases introduced by atomic radii table.
 
-`c1 == 1` returns exactly `1.0` at every `q`, i.e. the uncorrected model.
+`c_1 == 1` returns exactly `1.0` at every `q`, i.e. the uncorrected model.
 
 # Arguments
 - `qvals::AbstractVector{<:Real}`, length `Q`: momentum transfer in Å⁻¹.
 - `r_m::Real`: the structure's mean atomic radius in Å; `> 0`.
-- `c1::Real`: the excluded-volume correction factor (CRYSOL's `r₀/r_m`), dimensionless; `> 0`.
+- `c_1::Real`: the excluded-volume correction factor (CRYSOL's `r₀/r_m`), dimensionless; `> 0`.
 
 # Returns
 - `Vector` of length `Q`, `eltype` promoted from the arguments.
 """
-function excluded_volume_factor(qvals::AbstractVector{<:Real}, r_m::Real, c1::Real)
+function excluded_volume_factor(qvals::AbstractVector{<:Real}, r_m::Real, c_1::Real)
     r_m > 0 || throw(DomainError(r_m, "excluded_volume_factor: r_m must be > 0"))
-    c1 > 0 || throw(DomainError(c1, "excluded_volume_factor: c1 must be > 0"))
-    k = (c1^2 - 1) * _EV_EXP_COEFF * r_m^2
-    return @. c1^3 * exp(-(qvals^2) * k)
+    c_1 > 0 || throw(DomainError(c_1, "excluded_volume_factor: c_1 must be > 0"))
+    k = (c_1^2 - 1) * _EV_EXP_COEFF * r_m^2
+    return @. c_1^3 * exp(-(qvals^2) * k)
 end
 
 """
     contrast_matrix(dns, δρ, g_ex) -> Matrix
 
 The `q`-dependent contrast that [`intensity`](@ref) contracts a [`gram`](@ref)
-against once `c1` is fitted: [`contrast_vector`](@ref)`(dns, δρ)` with the `ex`
+against once `c_1` is fitted: [`contrast_vector`](@ref)`(dns, δρ)` with the `ex`
 entry scaled by the [`excluded_volume_factor`](@ref) envelope `g_ex`.
 
 Column `k` is the contrast vector at `qvals[k]`:

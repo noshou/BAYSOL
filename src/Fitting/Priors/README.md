@@ -14,12 +14,12 @@ CRYSOL's `dro` parameters are contrast densities of the hydration shell's border
   mean = exp(σ_ln²/2) = 1.15  =>  σ_ln = √(2·ln(1.15))
   ```
 - `dro2`: `Normal(1, 0.15)`, concave beads, mostly positive but can go either way.
-- `dro3`: `Normal(μ_χ, σ_χ)`, cavity-water contrast. Defaults to a point mass at 0, matching standard CRYSOL's fixed `dr3 = 0`. `μ_χ`/`σ_χ` can be set by hand or fed from `Molecule.Electrostatics.nucleic_acid_cavity_electrostatics`, a screened-field (Debye-Huckel) signal from nucleic-acid phosphate charges.
+- `dro3`: `Normal(μ_χ, σ_χ)`, cavity-water contrast. Defaults to a point mass at 0, matching standard CRYSOL's fixed `dr3 = 0`. `μ_χ`/`σ_χ` can be set by hand or fed from `Solvation.Electrostatics.nucleic_acid_cavity_electrostatics`, a screened-field (Debye-Huckel) signal from nucleic-acid phosphate charges.
 - \`dro4` (condensed-cation layer for nucleotides, Manning theory) is not implemented yet.
 
 ## DensityOfSolvent.jl
 
-`dns_prior(pH, σ_pH, solutes; t=25.0)` returns a `LogNormal` prior for the bulk solution electron density `ρₑ` (e·Å⁻³), moment-matched to the `(μ, σ)` computed by `_ρₑ`. `LogNormal` is used since  `ρₑ` has support only on `(0, ∞)`; at the CV this model produces it agrees with `Normal` in the bulk.
+`ρₑ_prior(pH, σ_pH, solutes; t=25.0)` returns a `LogNormal` prior for the bulk solution electron density `ρₑ` (e·Å⁻³), moment-matched to the `(μ, σ)` computed by `_ρₑ`. `LogNormal` is used since  `ρₑ` has support only on `(0, ∞)`; at the CV this model produces it agrees with `Normal` in the bulk.
 
 `_ρₑ` is linear in solute concentration:
 
@@ -63,7 +63,7 @@ z = √2 · erf⁻¹(n/100)
 σ = 0.04 / z                    # 0.04 = (1.04 − 0.96) / 2
 ```
 
-then moment-matching `(μ=1, σ)` into LogNormal parameters (same transform as `dns_prior`):
+then moment-matching `(μ=1, σ)` into LogNormal parameters (same transform as `ρₑ_prior`):
 
 ```
 σ_ln = √(ln(1 + σ²))            # μ = 1 simplifies the general σ_ln = √(ln(1+σ²/μ²))

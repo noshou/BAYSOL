@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Tests for src/Fitting/Priors/ExcludedVolume.jl: the LogNormal prior over the
-# excluded-volume correction factor c1 = r0/r_m, calibrated so that z(n)
-# standard deviations around c1 = 1 exactly span CRYSOL's stated fitting bound [0.96, 1.04].
+# excluded-volume correction factor c_1 = r0/r_m, calibrated so that z(n)
+# standard deviations around c_1 = 1 exactly span CRYSOL's stated fitting bound [0.96, 1.04].
 
 using Random
 using SpecialFunctions: erfinv
 using Distributions: LogNormal, mean, var, cdf
-using ScatterNet.Fitting: c1_prior
+using BayeSol.Fitting: c1_prior
 
 include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
 
@@ -117,7 +117,7 @@ end
         end
     end
 
-    @testset "c1_prior: n = 100 is the boundary -- degenerate point mass at c1 = 1" begin
+    @testset "c1_prior: n = 100 is the boundary -- degenerate point mass at c_1 = 1" begin
         d = c1_prior(100.0)
         @test close_(mean(d), 1.0; atol = 1.0e-9)
         @test close_(var(d), 0.0; atol = 1.0e-9)

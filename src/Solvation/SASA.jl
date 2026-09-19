@@ -72,7 +72,7 @@ end # module PlasticMap
 
 using .PlasticMap: PlasticMap, Vec3
 using NearestNeighbors: KDTree, inrange
-using ..Molecules: Molecules, Molecule
+using ...MolecularStructure: Molecule, radii, r_max, coords_cartesian
 
 """
     _occluded(p, candidates, crds, rads, probe, self) -> Bool
@@ -196,7 +196,8 @@ const SHELL_MIN_POINTS = 55
 "Sample directions per atom, before occlusion and before thinning. Internal: only fine enough to resolve one atom's patch."
 const _SHELL_SAMPLE = 256
 
-"Range (Å) over which [`_bead_class`](@ref) casts escape rays. A void whose wall is further than this in every direction is bulk solvent, not a cavity."
+"Range (Å) over which [`_bead_class`](@ref) casts escape rays. A void whose wall is further than this in 
+every direction is bulk solvent, not a cavity."
 const _BEAD_RAY_RANGE = 12.0
 
 "Directions sampled by [`_bead_class`](@ref); about half fall in the outward hemisphere and are used."
@@ -355,9 +356,9 @@ function shell_points(
     probe >= 0.0 || throw(DomainError(probe, "probe must be >= 0"))
 
     pmap = PlasticMap.plastic_points(_SHELL_SAMPLE)
-    rads = Molecules.radii(mol)
-    rmax = Molecules.r_max(mol)
-    crds = Molecules.coords_cartesian(mol)
+    rads = radii(mol)
+    rmax = r_max(mol)
+    crds = coords_cartesian(mol)
     tree = KDTree(crds)
     pts, areas, nrm, counts =
         _shell_loop(tree, crds, rads, rmax, pmap, probe, _SHELL_SAMPLE)
@@ -503,9 +504,9 @@ function sasa(
     _check_sasa_args(probe, n_occ, n_exp, area_tol)
 
     pmap = PlasticMap.plastic_points(n_exp)
-    rads = Molecules.radii(mol)
-    rmax = Molecules.r_max(mol)
-    crds = Molecules.coords_cartesian(mol)
+    rads = radii(mol)
+    rmax = r_max(mol)
+    crds = coords_cartesian(mol)
 
     tree = KDTree(crds)
     n = size(crds, 2)

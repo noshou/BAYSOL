@@ -23,10 +23,10 @@
 #     given, so those tests check only the `shell_points -> B_lm -> I(q)` 
 using   .Scattering: _gaussian_dummy, vacuo, excluded, hydration, SHELL_THICKNESS,
         compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
-using   .Molecules: create, coords_cartesian, coords_spherical, to_spherical,
+using   .MolecularStructure: create, coords_cartesian, coords_spherical, to_spherical,
         radii, vols, elms, Molecule
 
-using ScatterNet.Molecule: SASA
+using BayeSol.Solvation: SASA
 
 """
 Per-element van der Waals radii in Å, EXACTLY as the live `AtomicRadii` backend
@@ -38,7 +38,7 @@ Provenance: dumped at full `Float64` precision from
 """
 const SCAT_RADII = Dict("c" => 1.77, "o" => 1.5, "h" => 1.2, "fe3+" => 0.49, "o2-" => 1.35)
 
-"Sphere volume from a hardcoded radius, written out rather than taken from `Molecules`."
+"Sphere volume from a hardcoded radius, written out rather than taken from `MolecularStructure`."
 scat_vol(e) = (4.0 / 3.0) * π * SCAT_RADII[e]^3
 
 """
@@ -312,7 +312,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # The Debye oracle only ever sees pairwise distances, so it is blind to
         # any rigid motion; it cannot catch a bug in `_center` or in
         # `to_spherical`. Both are therefore pinned here directly, against
-        # arithmetic done in the test rather than against Molecules' own helpers.
+        # arithmetic done in the test rather than against MolecularStructure's own helpers.
         X = SCAT_BLOB_X
         n = size(X, 2)
         cx = sum(X[1, :]) / n; cy = sum(X[2, :]) / n; cz = sum(X[3, :]) / n

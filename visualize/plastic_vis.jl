@@ -6,7 +6,7 @@
 # Run with:
 #   julia --project=visualize -e 'include("visualize/plastic_vis.jl"); vis_plastic_points(2000)'
 
-using ScatterNet.Molecule.SASA: PlasticMap
+using BayeSol.Solvation.SASA: PlasticMap
 using .PlasticMap: plastic_points
 using GLMakie
 

@@ -1,12 +1,16 @@
-name = "ScatterNet"
+name = "BayeSol"
 uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 version = "0.1.0"
 authors = ["noshou"]
 
 [deps]
+AdvancedHMC = "0bf59076-c3b1-5ca4-86bd-e02cd72cde3d"
 Bessels = "0e736298-9ec6-45e8-9647-e4fc86a2fe38"
 DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"
+DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FastClosures = "9aa1b823-49e4-5ca5-8b0f-3971ec8bab6a"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -18,9 +22,13 @@ SphericalHarmonics = "c489a379-e885-57ff-9236-bd896d33c250"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
+AdvancedHMC = "0.8.7"
 Bessels = "0.2"
 DBInterface = "2"
+DiffResults = "1.1.0"
 Distributions = "0.25.131"
+FastClosures = "0.3.2"
+ForwardDiff = "1.4.6"
 JSON3 = "1.14.3"
 LegendrePolynomials = "0.4"
 LinearAlgebra = "1"

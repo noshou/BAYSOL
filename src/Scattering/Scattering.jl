@@ -18,8 +18,8 @@ averaged detector intensity `I_calc(q)` out.
 - `Forward`     -   the assembled model: `species_multipoles`, `gram_matrix`,
                     `forward_cache` and `forward`. Build the geometry-only
                     `ForwardCache` once with `forward_cache`, then call
-                    `forward(cache, m, c, dns, δρ; c1)` per parameter set; or
-                    `forward(mol, qvals, lMax, energy; m, c, dns, δρ, c1)` for a
+                    `forward(cache, m, c, dns, δρ, c_1)` per parameter set; or
+                    `forward(mol, qvals, lMax, energy, m, c, dns, δρ, c_1)` for a
                     one-off.
 
 # Background
@@ -169,8 +169,8 @@ averaged detector intensity `I_calc(q)` out.
 module Scattering
 
 using ..Interfaces: Interfaces, FormFactorSource, FormFactorSourceTables
-using ..Molecule.SASA: SASA
-using ..Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
+using ..Solvation.SASA: SASA
+using ..Helpers.Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
 using StaticArrays: SVector
 
 # The public surface. `forward` is the forward model; `gram_matrix` is the

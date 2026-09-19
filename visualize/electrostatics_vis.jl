@@ -12,12 +12,12 @@
 # Numbers only, no window (works headless):
 #   julia --project=visualize -e 'include("visualize/electrostatics_vis.jl"); electrostatics_report()'
 
-using ScatterNet
-using ScatterNet.Interfaces: Interfaces, RadiiSource
-using ScatterNet.Molecule.Molecules: Molecules, Molecule
-using ScatterNet.Molecule.SASA: SASA
-using ScatterNet.Molecule.Electrostatics: Electrostatics, nucleic_acid_cavity_electrostatics, protein_cavity_electrostatics
-using ScatterNet.Molecule.ProteinResidues: Residues 
+using BayeSol
+using BayeSol.Interfaces: Interfaces, RadiiSource
+using BayeSol.MolecularStructure: MolecularStructure, Molecule
+using BayeSol.Solvation.SASA: SASA
+using BayeSol.Solvation.Electrostatics: Electrostatics, nucleic_acid_cavity_electrostatics, protein_cavity_electrostatics
+using BayeSol.MolecularStructure: Residues 
 using Printf: @printf, @sprintf
 using GLMakie
 
@@ -66,7 +66,7 @@ function nucleic_acid_cavity_scene(; probe::Float64 = 1.4, shell_r::Float64 = 8.
     ion_elms = ["p", "o", "o"]
     ion_crds = [(0.0, 0.0, 0.0), (1.5, 0.0, 0.0), (-1.5, 0.0, 0.0)]
 
-    mol = Molecules.create("nucleic-acid cavity", vcat(shell_elms, ion_elms), vcat(shell_crds, ion_crds);
+    mol = MolecularStructure.create("nucleic-acid cavity", vcat(shell_elms, ion_elms), vcat(shell_crds, ion_crds);
                             radii_source = ELEC_VIS_SRC)
     sites = Electrostatics._phosphate_charge_sites(mol)
     return (; mol, probe, sites, title = "Nucleic-acid cavity with one phosphate group")
@@ -84,7 +84,7 @@ function protein_cavity_scene(; probe::Float64 = 1.4, shell_r::Float64 = 8.0, n_
     ion_elms = ["o", "o", "n"]
     ion_crds = [(0.0, 0.0, 0.0), (1.5, 0.0, 0.0), (-2.0, 0.0, 0.0)]
 
-    mol = Molecules.create("protein cavity", vcat(shell_elms, ion_elms), vcat(shell_crds, ion_crds);
+    mol = MolecularStructure.create("protein cavity", vcat(shell_elms, ion_elms), vcat(shell_crds, ion_crds);
                             radii_source = ELEC_VIS_SRC)
     residues = Residues(
         vcat(fill("GLY", n_shell), ["ASP", "ASP", "LYS"]),
@@ -110,7 +110,7 @@ function bead_field_values(
     ionic_strength_M::Float64 = 0.15, eps_r::Float64 = 80.0, T::Float64 = 300.0,
     cutoff_debye_lengths::Float64 = 5.0,
 )
-    crds = Molecules.coords_cartesian(mol)
+    crds = MolecularStructure.coords_cartesian(mol)
     κinv = Electrostatics.debye_length(; ionic_strength_M, eps_r, T)
     cutoff = cutoff_debye_lengths * κinv
 
@@ -186,7 +186,7 @@ driving the field) with the same large magenta marker.
 """
 function electrostatics_figure(scene)
     mol, probe, sites, title = scene.mol, scene.probe, scene.sites, scene.title
-    crds = Molecules.coords_cartesian(mol)
+    crds = MolecularStructure.coords_cartesian(mol)
     pts, _, class = SASA.shell_points(mol; probe)
     sel = findall(==(SASA.CAVITY), class)
     vals = bead_field_values(mol, pts, sel, sites)

@@ -7,8 +7,8 @@ module PartialMolarVolumes
 
 import ..Interfaces
 using  ..Interfaces: PartialMolarVolumeSource
-using  ...Constants: AVOGADRO
-using  ...Cache: KeyedCache
+using  ...Helpers.Constants: AVOGADRO
+using  ...Helpers.Cache: KeyedCache
 using  JSON3: JSON3
 
 export PMVSrcTables, COMMON_TO_IUPAC

@@ -68,7 +68,7 @@ end
 
 As [`sphHarm`](@ref) above, but reading the angles from a `(2, N)` matrix whose
 rows are `θ` and `φ` and whose columns are points — the column-per-atom layout
-`Molecules.coords_spherical` produces, sliced to its two angular rows. Exactly
+`MolecularStructure.coords_spherical` produces, sliced to its two angular rows. Exactly
 `sphHarm(lMax, view(angles, 1, :), view(angles, 2, :))`.
 
 # Arguments

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Optional visual check for the Shrake-Rupley occlusion machinery in
-# `src/Molecule/SASA.jl`. Kept out of the module so the geometry core stays
+# `src/Solvation/SASA.jl`. Kept out of the module so the geometry core stays
 # free of plotting deps; GLMakie lives in visualize/Project.toml.
 #
 # Every scene uses `FixedRadii`, a test-only `RadiiSource` defined below, so the
@@ -16,11 +16,11 @@
 # Numbers only, no window (works headless):
 #   julia --project=visualize -e 'include("visualize/sasa_vis.jl"); sasa_scene_report()'
 
-using ScatterNet
-using ScatterNet.Interfaces: Interfaces, RadiiSource
-using ScatterNet.Molecule.Molecules: Molecules, Molecule
-using ScatterNet.Molecule.SASA: SASA
-using ScatterNet.Molecule.SASA.PlasticMap: plastic_points
+using BayeSol
+using BayeSol.Interfaces: Interfaces, RadiiSource
+using BayeSol.MolecularStructure: MolecularStructure, Molecule
+using BayeSol.Solvation.SASA: SASA
+using BayeSol.Solvation.SASA.PlasticMap: plastic_points
 using Printf: @printf, @sprintf
 using GLMakie
 using GLMakie.Makie: Tesselation   # not re-exported by GLMakie itself
@@ -84,8 +84,8 @@ a [`SASA.Coverage`](@ref) value, and
 `sampled` is `false` when the exact pre-filter settles the atom on its own.
 """
 function atom_point_states(mol::Molecule, i::Int, n::Int, probe::Float64)
-    crds = Molecules.coords_cartesian(mol)
-    rads = Molecules.radii(mol)
+    crds = MolecularStructure.coords_cartesian(mol)
+    rads = MolecularStructure.radii(mol)
     cands = collect(1:size(crds, 2))
 
     ρ = rads[i] + probe
@@ -146,7 +146,7 @@ candidate but occludes nothing, so every sample point on both atoms is exposed.
 """
 function exposed_scene(; probe::Float64 = 1.4)
     src = FixedRadii(Dict("A" => 1.5))
-    mol = Molecules.create("fully exposed", ["A", "A"],
+    mol = MolecularStructure.create("fully exposed", ["A", "A"],
                             [(0.0, 0.0, 0.0), (6.2, 0.0, 0.0)]; radii_source = src)
     return (; mol, probe, focus = [1, 2], title = "1. Fully exposed")
 end
@@ -161,7 +161,7 @@ is exposed. Carries `analytic_frac`, the exact cap-derived exposed fraction from
 """
 function partial_scene(; probe::Float64 = 1.4, d::Float64 = 3.5)
     src = FixedRadii(Dict("A" => 1.5))
-    mol = Molecules.create("partially occluded", ["A", "A"],
+    mol = MolecularStructure.create("partially occluded", ["A", "A"],
                             [(0.0, 0.0, 0.0), (d, 0.0, 0.0)]; radii_source = src)
     ρ = 1.5 + probe
     return (;   mol, probe, focus = [1], title = "2. Partially occluded",
@@ -180,7 +180,7 @@ sample point is occluded.
 """
 function buried_scene(; probe::Float64 = 1.4)
     src = FixedRadii(Dict("BIG" => 6.0, "SML" => 0.5))
-    mol = Molecules.create("fully buried", ["BIG", "SML"],
+    mol = MolecularStructure.create("fully buried", ["BIG", "SML"],
                             [(0.0, 0.0, 0.0), (3.0, 0.0, 0.0)]; radii_source = src)
     return (; mol, probe, focus = [2], title = "3. Fully buried")
 end
@@ -200,7 +200,7 @@ function cluster_scene(; probe::Float64 = 1.4, spacing::Float64 = 4.0)
                 ( s, 0.0, 0.0), (-s, 0.0, 0.0),
                 (0.0,  s, 0.0), (0.0, -s, 0.0),
                 (0.0, 0.0,  s), (0.0, 0.0, -s)]
-    mol = Molecules.create("cluster", fill("A", 7), coords; radii_source = src)
+    mol = MolecularStructure.create("cluster", fill("A", 7), coords; radii_source = src)
     return (; mol, probe, focus = collect(1:7), title = "4. Small cluster")
 end
 
@@ -282,8 +282,8 @@ still pins the points to a sphere. Everything else is a neutral low-alpha solid,
 since for an occluder it is the enclosed *volume* that explains the verdict.
 """
 function _draw_atoms!(ax, mol::Molecule, probe::Float64, focus)
-    crds = Molecules.coords_cartesian(mol)
-    rads = Molecules.radii(mol)
+    crds = MolecularStructure.coords_cartesian(mol)
+    rads = MolecularStructure.radii(mol)
     wire_alpha = length(focus) > 2 ? 0.18 : 0.35   # busy scenes need a fainter cage
     for i in axes(crds, 2)
         ρ = Float32(rads[i] + probe)
@@ -468,8 +468,8 @@ function sasa_molecule_figure(
     probe::Float64 = 1.4
 )
     areas = SASA.sasa(mol; n_occ = n_occ, n_exp = n_exp, probe = probe)[1]
-    crds = Molecules.coords_cartesian(mol)
-    rads = Molecules.radii(mol)
+    crds = MolecularStructure.coords_cartesian(mol)
+    rads = MolecularStructure.radii(mol)
     lo, hi = extrema(areas)
     hi = hi > lo ? hi : lo + 1.0
 
@@ -478,7 +478,7 @@ function sasa_molecule_figure(
         fig[1, 1];
         title = @sprintf(
             "%s: per-atom SASA  (probe = %.2f A, n_occ = %d, n_exp = %d)\ntotal %.2f A^2 over %d atoms",
-            Molecules.name(mol), probe, n_occ, n_exp,
+            MolecularStructure.name(mol), probe, n_occ, n_exp,
             sum(areas), length(areas)),
             titlesize = 14, aspect = :data,
             xlabel = "x", ylabel = "y", zlabel = "z")

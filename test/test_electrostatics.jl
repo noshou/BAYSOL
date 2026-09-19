@@ -1,19 +1,19 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/Molecule/Electrostatics.jl: the Debye length, the
+# Exercises src/Solvation/Electrostatics.jl: the Debye length, the
 # distance-based phosphate bond-graph classifier, the screened-field
 # formula, the cavity-bead aggregation, and its `SASA.shell_points`-driven
 # public entry point `nucleic_acid_cavity_electrostatics`.
 
-using ScatterNet: Interfaces
-using ScatterNet.Molecule.SASA: SASA
-using ScatterNet.Molecule.Molecules: create, coords_cartesian
-using ScatterNet.Molecule.Electrostatics:
+using BayeSol: Interfaces
+using BayeSol.Solvation.SASA: SASA
+using BayeSol.MolecularStructure: create, coords_cartesian
+using BayeSol.Solvation.Electrostatics:
     Electrostatics, PHOSPHATE_NET_CHARGE, debye_length, nucleic_acid_cavity_electrostatics,
     _phosphate_charge_sites, _screened_field, _aggregate, _sample_std,
     protein_cavity_electrostatics, _protein_charge_sites
-using ScatterNet.Molecule.ProteinResidues: Residues
-using ScatterNet.Fitting: δρ_prior
+using BayeSol.MolecularStructure: Residues
+using BayeSol.Fitting: δρ_prior
 using Distributions: mean, std
 
 # ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
         m = elec_mol(vcat(shell_elms, phos_elms), vcat(shell_crds, phos_crds))
 
         μχ, σχ = nucleic_acid_cavity_electrostatics(m)
-        _, _, dro3 = δρ_prior(μχ; σ_χ = σχ)
+        _, _, dro3 = δρ_prior(μ_χ = μχ, σ_χ = σχ)
 
         @test close_(mean(dro3), μχ)
         @test close_(std(dro3), σχ)
@@ -308,7 +308,7 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
         )
 
         μχ, σχ = protein_cavity_electrostatics(m, residues)
-        _, _, dro3 = δρ_prior(μχ; σ_χ = σχ)
+        _, _, dro3 = δρ_prior(μ_χ = μχ, σ_χ = σχ)
 
         @test close_(mean(dro3), μχ)
         @test close_(std(dro3), σχ)

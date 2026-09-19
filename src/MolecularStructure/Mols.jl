@@ -3,15 +3,11 @@
 """
 A molecule.
 """
-module  Molecules
 
-import  ...Interfaces
-using   ...Interfaces: RadiiSource, lookup
-using   ...Interfaces: AtomicRadiiSource
-using   ...Cache: Lazy, make, force
-
-export  Molecule, MoleculeError, create, coords_cartesian, coords_spherical,
-        to_spherical, radii, vols, r_max, elms, name, n_atoms
+import  ..Interfaces
+using   ..Interfaces: RadiiSource, lookup
+using   ..Interfaces: AtomicRadiiSource
+using   ..Helpers.Cache: Lazy, force
 
 "Raised for malformed molecule input (empty or mismatched coords, missing radii)."
 struct MoleculeError <: Exception; msg::String end
@@ -197,5 +193,3 @@ elms(m::Molecule)::Vector{String}    = m._elms
 
 "Molecule label."
 name(m::Molecule)::String            = m._name
-
-end # module

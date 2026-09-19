@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-using ScatterNet: Interfaces
-using ScatterNet.Molecule.SASA: SASA, sasa, _occluded
-using .Molecules: create
+using BayeSol: Interfaces
+using BayeSol.Solvation.SASA: SASA, sasa, _occluded
+using .MolecularStructure: MolecularStructure, create
 
 # ---------------------------------------------------------------------------
 # Injected radii source.
@@ -309,7 +309,7 @@ include(joinpath(@__DIR__, "fixtures", "geometry.jl"))   # sph
 
         # no neighbour reaches the surface -> exactly 4πρ², fully exposed
         far = sasa_mol(["q", "q"], [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0)])
-        ρ = Molecules.radii(far)[1] + probe
+        ρ = MolecularStructure.radii(far)[1] + probe
         @test sasa_atoms(far; n_occ = 1, n_exp = 1, probe = probe) == [4π * ρ^2, 4π * ρ^2]
 
         # exact tangency (d == ρᵢ + ρⱼ) cuts a measure-zero cap: still full
@@ -318,7 +318,7 @@ include(joinpath(@__DIR__, "fixtures", "geometry.jl"))   # sph
 
         # one neighbour engulfs the other -> inner is exactly 0.0, outer exactly full
         eng = sasa_mol(["c", "d"], [(3.0, 0.0, 0.0), (0.0, 0.0, 0.0)])
-        ρs = Molecules.radii(eng)[1] + probe; ρb = Molecules.radii(eng)[2] + probe
+        ρs = MolecularStructure.radii(eng)[1] + probe; ρb = MolecularStructure.radii(eng)[2] + probe
         @test 3.0 + ρs <= ρb                       # geometry really is engulfment
         for n_exp in (1, 16, 4096)
             a = sasa_atoms(eng; n_occ = 1, n_exp = n_exp, probe = probe)
@@ -371,7 +371,7 @@ include(joinpath(@__DIR__, "fixtures", "geometry.jl"))   # sph
 
         @test areas isa Vector{Float64}
         @test length(areas) == length(elms)
-        @test length(areas) == size(Molecules.coords_cartesian(m), 2)
+        @test length(areas) == size(MolecularStructure.coords_cartesian(m), 2)
         for (i, r) in enumerate(rs)
             @test areas[i] >= 0.0
             @test areas[i] <= sasa_full(r, probe)   # can never exceed a full sphere
@@ -519,7 +519,7 @@ include(joinpath(@__DIR__, "fixtures", "geometry.jl"))   # sph
         @test size(pe, 2) == 200
 
         # every point sits on the expanded sphere, in the molecule's own centred frame .
-        atom = Molecules.coords_cartesian(m)[:, 1]
+        atom = MolecularStructure.coords_cartesian(m)[:, 1]
         for k in axes(pts, 2)
             @test isapprox(sqrt(sum(abs2, pts[:, k] .- atom)), ρ; atol = 1e-10)
         end

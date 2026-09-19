@@ -6,14 +6,14 @@ using SpecialFunctions
 """
     prior(n::Real) -> LogNormal
 
-Log normal distribution over excluded volume correction factor c1. 
+Log normal distribution over excluded volume correction factor c_1. 
 
-`c1 = r0/rm`, where CRYSOL puts the following bounds: `0.96 • r_m <= r_0 <= 1.04 • rm`.
+`c_1 = r0/rm`, where CRYSOL puts the following bounds: `0.96 • r_m <= r_0 <= 1.04 • rm`.
 In other words: 
 
     r0 ∈ [0.96rm, 1.04rm] 
-    c1 ∈ [0.96, 1.04] 
-    r0 = c1 • r_m
+    c_1 ∈ [0.96, 1.04] 
+    r0 = c_1 • r_m
 
 Assuming a normal distribution, if `n%` of samples fall within z standard deviations 
 of CRYSOL's default, we have: 
@@ -40,7 +40,7 @@ Substituting `μ=1`:
 
 # Keywords
     -n: percentage ((0, 100]) of the prior mass required to fall within
-        CRYSOL's bound `[0.96, 1.04]` around its default `c1 = 1`. Higher `n` 
+        CRYSOL's bound `[0.96, 1.04]` around its default `c_1 = 1`. Higher `n` 
         concentrates more mass near the default; lower `n` allows more spread.
         Defaulted to `n = 95`; only change if more spread is needed.
 """

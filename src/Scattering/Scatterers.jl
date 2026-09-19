@@ -7,8 +7,8 @@
 # `S_ab` reduction -- diagonals and cross terms alike -- is assembled downstream
 # from the per-species `B_lm`, so nothing here calls `self_scatter`.
 using ..Interfaces: Interfaces, FormFactorSource
-using ..Molecule.SASA: SASA
-using ..Molecule.Molecules: Molecules, Molecule
+using ..Solvation.SASA: SASA
+using ..MolecularStructure: Molecule, coords_spherical, vols, to_spherical
 
 # `SHELL_THICKNESS`, `PROBE_RADIUS`, `SHELL_N_TARGET`, `SHELL_CLASSES` and
 # `FORM_FACTOR_SOURCE` are defined at the `Scattering` module level (see
@@ -61,7 +61,7 @@ species return one.
 
 # Keywords
 -   `form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE`: the
-    form-factor backend, mirroring `Molecule.create`'s `radii_source`. The
+    form-factor backend, mirroring `MolecularStructure.create`'s `radii_source`. The
     default reads the bundled tables; a stub subtype lets this be exercised
     without them.
 
@@ -77,7 +77,7 @@ function vacuo(
     _CHUNK::UInt64;
     form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE,
 )::AbstractArray{<:Complex,3}
-    crd = Molecules.coords_spherical(mol)
+    crd = coords_spherical(mol)
     tbl = Interfaces.form_factor_table(form_factor_source, energy, ions, qvals)
     amp = Interfaces.form_factors(tbl, ions, qvals)
     return compute_B_lm(crd, qvals, amp, lMax, _CHUNK)
@@ -108,8 +108,8 @@ function excluded(
     lMax::Integer,
     _CHUNK::UInt64,
 )::AbstractArray{<:Complex,3}
-    crd = Molecules.coords_spherical(mol)
-    amp = _gaussian_dummy(Molecules.vols(mol), qvals)
+    crd = coords_spherical(mol)
+    amp = _gaussian_dummy(vols(mol), qvals)
     return compute_B_lm(crd, qvals, amp, lMax, _CHUNK)
 end
 
@@ -168,7 +168,7 @@ function hydration(
 
     _shell(want) = begin
         sel = want in classes ? findall(==(want), class) : Int[]
-        crd = Molecules.to_spherical(pts[:, sel])
+        crd = to_spherical(pts[:, sel])
         amp = _gaussian_dummy(area[sel] .* thickness, qvals)
         compute_B_lm(crd, qvals, amp, lMax, _CHUNK)
     end

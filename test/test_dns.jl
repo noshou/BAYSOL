@@ -1,19 +1,19 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # End-to-end tests for src/Fitting/Priors/DensityOfSolvent.jl: bulk solution
-# electron density (`_ρₑ`) and its `LogNormal` prior (`dns_prior`), exercised
+# electron density (`_ρₑ`) and its `LogNormal` prior (`ρₑ_prior`), exercised
 # through `Interfaces.ρₑ_w`/`Interfaces.ϕ°` pipeline.
 
-const FIT = ScatterNet.Fitting
-using ScatterNet.Fitting: Solute, Protein, NonBiological, DNA, RNA, dns_prior
-using ScatterNet.Constants: AVOGADRO
+const FIT = BayeSol.Fitting
+using BayeSol.Fitting: Solute, Protein, NonBiological, DNA, RNA, ρₑ_prior
+using BayeSol.Constants: AVOGADRO
 using Distributions: mean, var, LogNormal
 
 include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
 include(joinpath(@__DIR__, "fixtures", "sequences.jl"))      # LYSOZYME, ...
 
 """
-Independent re-derivation of the `_ρₑ`/`dns_prior` formula from the live
+Independent re-derivation of the `_ρₑ`/`ρₑ_prior` formula from the live
 `Interfaces.ρₑ_w`/`Interfaces.ϕ°` calls:
 
     ρₑ = ρ_w(T) + Σ_j C_j · (N_A·Z_j/1e27 − ρ_w(T)·ϕ°_j/1e3)
@@ -22,16 +22,16 @@ Independent re-derivation of the `_ρₑ`/`dns_prior` formula from the live
         + Σ_j (C_j·ρ_w/1e3)² · σ_ϕ°_j²
 """
 function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = 25.0)
-    ρw, σw = ScatterNet.Interfaces.ρₑ_w(t)
+    ρw, σw = BayeSol.Interfaces.ρₑ_w(t)
     ρw_k = ρw * 1e-3
 
     disp = 0.0; Δμ = 0.0; var_conc = 0.0; var_vol = 0.0
     for s in solutes
         Z, ϕ, σϕ =
-            s isa Protein       ? ScatterNet.Interfaces.ϕ°(pH, s.arg; σ_pH) :
-            s isa DNA            ? ScatterNet.Interfaces.ϕ°(true, pH, s.arg; σ_pH) :
-            s isa RNA            ? ScatterNet.Interfaces.ϕ°(false, pH, s.arg; σ_pH) :
-            ScatterNet.Interfaces.ϕ°(s.arg)
+            s isa Protein       ? BayeSol.Interfaces.ϕ°(pH, s.arg; σ_pH) :
+            s isa DNA            ? BayeSol.Interfaces.ϕ°(true, pH, s.arg; σ_pH) :
+            s isa RNA            ? BayeSol.Interfaces.ϕ°(false, pH, s.arg; σ_pH) :
+            BayeSol.Interfaces.ϕ°(s.arg)
         C, σC = s.molarity, s.molarity_uncertainty
         k = AVOGADRO * Z / 1e27 - ρw_k * ϕ
 
@@ -47,8 +47,8 @@ function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = 25.
 end
 
 """
-`LogNormal` params moment-matched to `(μ, σ)` exactly as `dns_prior` does,
-independently of `dns_prior`'s own code.
+`LogNormal` params moment-matched to `(μ, σ)` exactly as `ρₑ_prior` does,
+independently of `ρₑ_prior`'s own code.
 """
 function ref_lognormal(μ::Real, σ::Real)
     σ_ln = sqrt(log(1 + (σ / μ)^2))
@@ -79,7 +79,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test close_(μ, μ_ref)
         @test close_(σ, σ_ref)
         # sanity: adding a solute genuinely shifts ρₑ away from pure water.
-        ρw, _ = ScatterNet.Interfaces.ρₑ_w(25.0)
+        ρw, _ = BayeSol.Interfaces.ρₑ_w(25.0)
         @test !close_(μ, ρw; atol = 1e-9)
     end
 
@@ -103,7 +103,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
         # additivity: the two-solute mean shift equals the sum of the
         # single-solute mean shifts (linear in concentration).
-        ρw, _ = ScatterNet.Interfaces.ρₑ_w(25.0)
+        ρw, _ = BayeSol.Interfaces.ρₑ_w(25.0)
         μ_urea, _ = FIT._ρₑ(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")])
         μ_prot, _ = FIT._ρₑ(7.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, "GGGGXX")])
         @test close_(μ, ρw + (μ_urea - ρw) + (μ_prot - ρw); atol = 1e-9)
@@ -133,7 +133,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         μ_ref, σ_ref = ref_ρₑ(7.0, 0.0, solutes)
         @test close_(μ, μ_ref)
         @test close_(σ, σ_ref)
-        ρw, _ = ScatterNet.Interfaces.ρₑ_w(25.0)
+        ρw, _ = BayeSol.Interfaces.ρₑ_w(25.0)
         @test !close_(μ, ρw; atol = 1e-9)
     end
 
@@ -185,18 +185,18 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test_throws ArgumentError FIT._ρₑ(7.0, 0.0, Solute[good, RNA(0.1, 0.01, "")])
     end
 
-    @testset "dns_prior: DNA/RNA solutes moment-match the same as Protein/NonBiological" begin
+    @testset "ρₑ_prior: DNA/RNA solutes moment-match the same as Protein/NonBiological" begin
         solutes = Solute[DNA(1.0e-4, 1.0e-6, "ATGC"), RNA(1.0e-4, 1.0e-6, "AUGC")]
         μ, σ = FIT._ρₑ(7.0, 0.0, solutes)
-        prior = dns_prior(7.0, 0.0, solutes)
+        prior = ρₑ_prior(7.0, 0.0, solutes)
         @test prior isa LogNormal{Float64}
         μ_ln_ref, σ_ln_ref = ref_lognormal(μ, σ)
         @test close_(prior.μ, μ_ln_ref)
         @test close_(prior.σ, σ_ln_ref)
     end
 
-    @testset "dns_prior: a realistic buffer of real protein + real DNA + real RNA is internally consistent" begin
-        # Cross-checks Priors.dns_prior, DensityOfSolvent._ρₑ and
+    @testset "ρₑ_prior: a realistic buffer of real protein + real DNA + real RNA is internally consistent" begin
+        # Cross-checks Priors.ρₑ_prior, DensityOfSolvent._ρₑ and
         # Interfaces.ϕ° together on genuine biological sequences (see
         # test/fixtures/sequences.jl for provenance), rather than the
         # short synthetic stand-ins ("ATGC"/"AUGC"/"GGGGCC") used above to
@@ -213,7 +213,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test close_(σ, σ_ref)
         @test σ > 0.0
 
-        prior = dns_prior(7.4, 0.05, solutes)
+        prior = ρₑ_prior(7.4, 0.05, solutes)
         @test prior isa LogNormal{Float64}
         μ_ln_ref, σ_ln_ref = ref_lognormal(μ, σ)
         @test close_(prior.μ, μ_ln_ref)
@@ -224,7 +224,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         # sanity: a real macromolecule-laden buffer genuinely shifts ρₑ
         # away from pure water, same qualitative check as the
         # single-solute testsets above.
-        ρw, _ = ScatterNet.Interfaces.ρₑ_w(25.0)
+        ρw, _ = BayeSol.Interfaces.ρₑ_w(25.0)
         @test !close_(μ, ρw; atol = 1e-9)
     end
 
@@ -288,10 +288,10 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
     end
 
     #------------------------------------------------------------------
-    #                 dns_prior -- moment-matched LogNormal
+    #                 ρₑ_prior -- moment-matched LogNormal
     #------------------------------------------------------------------
 
-    @testset "dns_prior: LogNormal is moment-matched to _ρₑ's (μ, σ) exactly" begin
+    @testset "ρₑ_prior: LogNormal is moment-matched to _ρₑ's (μ, σ) exactly" begin
         cases = [
             Solute[NonBiological(0.5, 0.01, "urea")],
             Solute[Protein(1.0e-3, 1.0e-5, "GGGGAA")],
@@ -300,7 +300,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         ]
         for solutes in cases
             μ, σ = FIT._ρₑ(7.0, 0.0, solutes)
-            prior = dns_prior(7.0, 0.0, solutes)
+            prior = ρₑ_prior(7.0, 0.0, solutes)
             @test prior isa LogNormal{Float64}
 
             μ_ln_ref, σ_ln_ref = ref_lognormal(μ, σ)
@@ -314,29 +314,29 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         end
     end
 
-    @testset "dns_prior: propagates pH/σ_pH/t like _ρₑ does" begin
+    @testset "ρₑ_prior: propagates pH/σ_pH/t like _ρₑ does" begin
         # distinct fresh sequences so ϕ°'s sequence-keyed cache doesn't
         # replay one pH's result for the other (see fresh_seq_dns above).
-        prior_lo = dns_prior(3.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, fresh_seq_dns("D"))])
-        prior_hi = dns_prior(9.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, fresh_seq_dns("D"))])
+        prior_lo = ρₑ_prior(3.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, fresh_seq_dns("D"))])
+        prior_hi = ρₑ_prior(9.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, fresh_seq_dns("D"))])
         @test !close_(mean(prior_lo), mean(prior_hi); atol = 1e-9)
 
         solutes = Solute[NonBiological(0.5, 0.01, "urea")]
-        prior_37 = dns_prior(7.0, 0.0, solutes; t = 37.0)
+        prior_37 = ρₑ_prior(7.0, 0.0, solutes; t = 37.0)
         μ37, _ = FIT._ρₑ(7.0, 0.0, solutes; t = 37.0)
         @test close_(mean(prior_37), μ37; atol = 1e-9)
     end
 
-    @testset "dns_prior: argument errors" begin
-        @test_throws ArgumentError dns_prior(7.0, 0.0, Solute[])
-        @test_throws DomainError dns_prior(7.0, -0.1, Solute[NonBiological(0.5, 0.01, "urea")])
+    @testset "ρₑ_prior: argument errors" begin
+        @test_throws ArgumentError ρₑ_prior(7.0, 0.0, Solute[])
+        @test_throws DomainError ρₑ_prior(7.0, -0.1, Solute[NonBiological(0.5, 0.01, "urea")])
         # σ_pH == 0 is allowed (boundary)
-        @test dns_prior(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")]) isa LogNormal{Float64}
+        @test ρₑ_prior(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")]) isa LogNormal{Float64}
     end
 
-    @testset "dns_prior: solute validation errors still propagate" begin
-        @test_throws DomainError dns_prior(7.0, 0.0, Solute[NonBiological(0.0, 0.01, "urea")])
-        @test_throws ArgumentError dns_prior(7.0, 0.0, Solute[Protein(0.1, 0.01, "")])
+    @testset "ρₑ_prior: solute validation errors still propagate" begin
+        @test_throws DomainError ρₑ_prior(7.0, 0.0, Solute[NonBiological(0.0, 0.01, "urea")])
+        @test_throws ArgumentError ρₑ_prior(7.0, 0.0, Solute[Protein(0.1, 0.01, "")])
     end
 
 end
