@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/Interfaces/AtomicRadii/AtomicRadii.jl: ion-string parsing, the
+# Exercises src/AtomicRadii/AtomicRadii.jl: ion-string parsing, the
 # ion_key round-trip, the raw table lookups, and the resolve_one fallback chain.
-using BayeSol.Interfaces.AtomicRadii: Ion, tryparse_ion, ion_key, ion_radius,
+using BayeSol.AtomicRadii: Ion, tryparse_ion, ion_key, ion_radius,
     element_radius, nearest_ion, resolve_one, _resolve_all, AtomicRadiiSource
 
 lookup_one(ion) = _resolve_all([ion])[1][2]
@@ -172,10 +172,10 @@ lookup_one(ion) = _resolve_all([ion])[1][2]
         @test all(k -> k isa String, first.(res))
     end
 
-    @testset "AtomicRadiiSource satisfies the Interfaces.lookup contract" begin
+    @testset "AtomicRadiiSource satisfies the lookup contract" begin
         src = AtomicRadiiSource()
-        @test src isa BayeSol.Interfaces.RadiiSource
+        @test src isa BayeSol.AtomicRadii.RadiiSource
         ions = ["fe3+", "qq3+", "rn"]
-        @test BayeSol.Interfaces.lookup(src, ions) == _resolve_all(ions)
+        @test BayeSol.AtomicRadii.lookup(src, ions) == _resolve_all(ions)
     end
 end

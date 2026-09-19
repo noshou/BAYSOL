@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/Interfaces/PartialMolarVolumes/PMV.jl: bulk water electron
+# Exercises src/PartialMolarVolumes/PMV.jl: bulk water electron
 # density (Kell-equation density -> e/A^-3, `ρₑ_w`) and protein/non-protein
 # partial molar volumes at infinite dilution (`ϕ°`), including the
 # pH-dependent titration formula, ambiguity-code (B/J/Z) averaging, the
 # uncertainty backfill for solutes with no reported error, and the
-# `Interfaces` dispatch surface (`common2iupac`, backend markers).
+# `PartialMolarVolumes` dispatch surface (`common2iupac`, backend markers).
 #
 # Data provenance for every hardcoded number below: `ρₑ_w` reference values
 # are a re-derivation of the published Kell (1975) density equation plus the same
@@ -14,13 +14,13 @@
 # `ionization.json` (Lee et al. 2008, DOI 10.1016/j.bpc.2008.02.009) as they
 # stood when this file was written.
 
-const IFACE = BayeSol.Interfaces
-using BayeSol.Interfaces.PartialMolarVolumes:
+const IFACE = BayeSol.PartialMolarVolumes
+using BayeSol.PartialMolarVolumes:
     PartialMolarVolumes, PMVSrcTables, COMMON_TO_IUPAC
 using BayeSol.Constants: AVOGADRO
 
 "Fully-qualified handle onto the submodule, for the private caches/tables below."
-const PMVMOD = BayeSol.Interfaces.PartialMolarVolumes
+const PMVMOD = BayeSol.PartialMolarVolumes
 
 include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
 include(joinpath(@__DIR__, "fixtures", "sequences.jl"))      # LYSOZYME, ...
@@ -34,7 +34,7 @@ end
 
 @testset "PartialMolarVolumes" begin
 
-    @testset "backend marker & Interfaces dispatch agreement" begin
+    @testset "backend marker & PartialMolarVolumes dispatch agreement" begin
         @test PMVSrcTables() isa IFACE.PartialMolarVolumeSource
         @test IFACE.ρₑ_w(25.0) == IFACE.ρₑ_w(PMVSrcTables(), 25.0)
         @test IFACE.ϕ°(7.0, "GGGG") == IFACE.ϕ°(PMVSrcTables(), 7.0, "GGGG")
@@ -429,7 +429,7 @@ end
     #------------------------------------------------------------------
 
     @testset "_common2iupac: hits, case-insensitivity, and misses" begin
-        # Not part of the public Interfaces surface.
+        # Not part of the public dispatch surface.
         @test PMVMOD._common2iupac("urea") == ("urea", true)
         @test PMVMOD._common2iupac("Urea") == ("urea", true)
         @test PMVMOD._common2iupac("UREA") == ("urea", true)

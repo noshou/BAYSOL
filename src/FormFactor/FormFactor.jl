@@ -15,13 +15,59 @@ Two tables back the two halves of that sum (provenance and licensing in
 """
 module FormFactor
 
-import ..Interfaces
-using  ..Interfaces: FormFactorSource
 using  SQLite: SQLite
 using  DBInterface: DBInterface
 using  LinearAlgebra: LinearAlgebra
 
-export FF, FormFactorError, FormFactorSourceTables
+export  FormFactorSource, form_factor_table, form_factors, form_factor_log,
+        FF, FormFactorError, FormFactorSourceTables
+
+"A form-factor backend. See `FormFactor` for the reference implementation."
+abstract type FormFactorSource end
+
+"""
+    form_factor_table([src::FormFactorSource,] energy::Real, ions, qvals) -> FF
+
+Build a form-factor container for `ions` at one `energy` over the `qvals` grid.
+
+# Arguments
+- `src`: the form-factor backend to query (optional).
+- `energy`: photon energy in eV.
+- `ions`: vector of ion strings.
+- `qvals`: vector of q values in Å⁻¹.
+"""
+function form_factor_table end
+
+"""
+    form_factors(t, ions, qvals) -> Matrix{ComplexF64}
+
+Per-ion form-factor rows from a container `t` previously built by
+[`form_factor_table`](@ref), as a `(length(ions), length(qvals))` matrix: row
+`i` is the row for `ions[i]`, columns aligned to `qvals` in input order. Pass
+the per-atom ion vector and the result is exactly the `f_atoms` matrix
+[`compute_B_lm`](@ref) takes — no mapping step in between.
+
+The queried `qvals` must be grid points of `t`, and every `ions[i]` must be
+present in `t`; either violation throws [`FormFactorError`](@ref).
+
+# Arguments
+    - `t`: form-factor container from [`form_factor_table`](@ref).
+    - `ions`: ion strings to fetch, one per output row.
+    - `qvals`: vector of q values; each must match a grid point of `t` exactly.
+"""
+function form_factors end
+
+"""
+    form_factor_log(t) -> Vector{String}
+
+Construction-time diagnostics for the container `t` built by
+[`form_factor_table`](@ref) — one line per ion the backend could not resolve
+in full, in the order they were encountered.
+
+# Arguments
+- `t`: form-factor container from [`form_factor_table`](@ref).
+"""
+function form_factor_log end
 
 "Raised on any failure building or querying form factors."
 struct FormFactorError <: Exception; msg::String end
@@ -34,7 +80,7 @@ struct FF
     log::Vector{String}
 end
 
-"Marker for the bundled-table backend; the default [`Interfaces.FormFactorSource`](@ref)."
+"Marker for the bundled-table backend; the default [`FormFactorSource`](@ref)."
 struct FormFactorSourceTables <: FormFactorSource end
 
 # ---------------------------------------------------------------------------
@@ -206,7 +252,7 @@ function f1f2(element::AbstractString, energy::Real)::Tuple{Float64,Float64}
 end
 
 # ---------------------------------------------------------------------------
-# Tiering + the Interfaces generics
+# Tiering + the generic functions
 # ---------------------------------------------------------------------------
 
 "Strip a trailing charge: `\"fe3+\"` -> `\"fe\"`. Mirrors `AtomicRadii`'s ion-key grammar."
@@ -307,7 +353,7 @@ function compute_form_factors(
 end
 
 """
-    Interfaces.form_factor_table([src::FormFactorSourceTables,] energy::Real, ions, qvals) -> FF
+    form_factor_table([src::FormFactorSourceTables,] energy::Real, ions, qvals) -> FF
 
 Build an [`FF`](@ref) container for `ions` at one `energy` (eV) over the `qvals`
 (Å⁻¹) grid. Thin wrapper over [`compute_form_factors`](@ref). The `src`-less
@@ -319,22 +365,22 @@ form defaults the backend to `FormFactorSourceTables()`.
 - `ions`: vector of ion strings.
 - `qvals`: vector of q values in Å⁻¹.
 """
-Interfaces.form_factor_table(::FormFactorSourceTables, energy::Real, ions, qvals)::FF =
+form_factor_table(::FormFactorSourceTables, energy::Real, ions, qvals)::FF =
     compute_form_factors(collect(String, ions), energy, collect(Float64, qvals))
 
-Interfaces.form_factor_table(energy::Real, ions, qvals)::FF =
-    Interfaces.form_factor_table(FormFactorSourceTables(), energy, ions, qvals)
+form_factor_table(energy::Real, ions, qvals)::FF =
+    form_factor_table(FormFactorSourceTables(), energy, ions, qvals)
 
 """
-    Interfaces.form_factor_log(t::FF) -> Vector{String}
+    form_factor_log(t::FF) -> Vector{String}
 
 Construction-time diagnostics for `t`: one line per ion that did not resolve in
 full, in the order encountered. Empty when every ion resolved.
 """
-Interfaces.form_factor_log(t::FF)::Vector{String} = t.log
+form_factor_log(t::FF)::Vector{String} = t.log
 
 """
-    Interfaces.form_factors(t::FF, ions, qvals) -> Matrix{ComplexF64}
+    form_factors(t::FF, ions, qvals) -> Matrix{ComplexF64}
 
 Rows of `t` for `ions`, columns selected by `qvals`, as a
 `(length(ions), length(qvals))` matrix in the layout `compute_B_lm` takes.
@@ -344,11 +390,11 @@ and every ion must be present in `t`; either violation throws
 [`FormFactorError`](@ref) rather than returning a silently wrong row.
 
 # Arguments
-- `t`: container from [`Interfaces.form_factor_table`](@ref).
+- `t`: container from [`form_factor_table`](@ref).
 - `ions`: ion strings, one per output row.
 - `qvals`: q values in Å⁻¹; each must match a grid point of `t` exactly.
 """
-function Interfaces.form_factors(
+function form_factors(
     t::FF, ions::AbstractVector{<:AbstractString}, qvals::AbstractVector{<:Real}
 )::Matrix{ComplexF64}
     cols = Vector{Int}(undef, length(qvals))

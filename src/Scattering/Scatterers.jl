@@ -6,7 +6,7 @@
 # to the shared `compute_B_lm`, and returns just that species' multipoles. The
 # `S_ab` reduction -- diagonals and cross terms alike -- is assembled downstream
 # from the per-species `B_lm`, so nothing here calls `self_scatter`.
-using ..Interfaces: Interfaces, FormFactorSource
+using ..FormFactor: FormFactor, FormFactorSource
 using ..Solvation.SASA: SASA
 using ..MolecularStructure: Molecule, coords_spherical, vols, to_spherical
 
@@ -46,7 +46,7 @@ end
 Vacuum term: the real atoms of `mol` with no solvent at all.
 
 `B_vac`, the `(C, K, Q)` multipoles feeding `S_vac,·` downstream. The amplitude
-is the true X-ray form factor per atom, pulled through the `Interfaces` facade
+is the true X-ray form factor per atom, pulled through the `FormFactor` module
 at photon energy `energy`; near an absorption edge it is complex
 (`f0 + f' + i*f''`), so `compute_B_lm` returns two channels here where the dummy
 species return one.
@@ -78,8 +78,8 @@ function vacuo(
     form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE,
 )::AbstractArray{<:Complex,3}
     crd = coords_spherical(mol)
-    tbl = Interfaces.form_factor_table(form_factor_source, energy, ions, qvals)
-    amp = Interfaces.form_factors(tbl, ions, qvals)
+    tbl = FormFactor.form_factor_table(form_factor_source, energy, ions, qvals)
+    amp = FormFactor.form_factors(tbl, ions, qvals)
     return compute_B_lm(crd, qvals, amp, lMax, _CHUNK)
 end
 

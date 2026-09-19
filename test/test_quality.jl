@@ -5,7 +5,7 @@ using Aqua, JET, ExplicitImports
 using .SphFuncs: sphHarm, sphBess, legendre_sphPlm
 using .MolecularStructure: MolecularStructure, create, coords_cartesian, coords_spherical, radii, vols, r_max,
                 elms, name, Molecule
-using BayeSol.Interfaces.AtomicRadii: AtomicRadii, resolve_one, _resolve_all, tryparse_ion, ion_key, nearest_ion
+using BayeSol.AtomicRadii: AtomicRadii, resolve_one, _resolve_all, tryparse_ion, ion_key, nearest_ion
 using BayeSol.Solvation: SASA
 
 @testset "Aqua" begin

@@ -15,8 +15,38 @@ using ...MolecularStructure: Residues, Molecule, elms, coords_cartesian, n_atoms
 using ..SASA: SASA
 using ...Helpers.Constants: ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, BOND_CUTOFF,
                             AVOGADRO, ANGSTROM, MV_PER_CM, PHOSPHATE_NET_CHARGE
-using ...Interfaces: Interfaces
+using JSON3: JSON3
 using NearestNeighbors: KDTree, inrange
+
+# ---------------------------------------------------------------------------
+#                    per-ionizable-atom net charge table
+# ---------------------------------------------------------------------------
+
+""" resname => (atomname => charge), from Grimsley/Scholtz/Pace 2009
+(DOI `10.1002/pro.19`) folded-protein-average pKa values via
+Henderson-Hasselbalch at pH 7.4. """
+const _RESIDUE_NET_CHARGE::Dict{String,Dict{String,Float64}} = JSON3.read(
+    read(joinpath(@__DIR__, "residue_net_charge.json"), String),
+    Dict{String,Dict{String,Float64}}
+)
+
+"""
+    _residue_charge(resname::AbstractString, atomname::AbstractString) -> Union{Float64,Nothing}
+
+Net fractional charge of a single ionizable atom, or `nothing` if `resname`
+has no entry in [`_RESIDUE_NET_CHARGE`](@ref) or `atomname` isn't one of its
+tracked ionizable atoms (e.g. a backbone atom, or a residue/atom this table
+doesn't track).
+
+# Arguments
+- `resname`: protein residue name, e.g. `"ASP"`, `"HIS"`.
+- `atomname`: PDB-style atom name within that residue, e.g. `"OD1"`.
+"""
+function _residue_charge(resname::AbstractString, atomname::AbstractString)::Union{Float64,Nothing}
+    atoms = get(_RESIDUE_NET_CHARGE, String(resname), nothing)
+    atoms === nothing && return nothing
+    return get(atoms, String(atomname), nothing)
+end
 
 # ---------------------------------------------------------------------------
 #                          Debye screening length
@@ -122,7 +152,7 @@ function _protein_charge_sites(mol::Molecule, residues::Residues)::Vector{Tuple{
 
     sites = Tuple{Int,Float64}[]
     @inbounds for i in 1:n
-        q = Interfaces.residue_charge(residues.resname[i], residues.atomname[i])
+        q = _residue_charge(residues.resname[i], residues.atomname[i])
         q === nothing && continue
         push!(sites, (i, q))
     end
@@ -291,7 +321,7 @@ end
 
 Screened-electrostatic cavity-water contrast signal for `DeltaRho.δρ_prior`'s
 `(μ_χ, σ_χ)` keywords, from `mol`'s ionizable protein side chains (see
-[`_protein_charge_sites`](@ref) and `Interfaces.ResidueNetCharge`). Runs
+[`_protein_charge_sites`](@ref) and [`_residue_charge`](@ref)). Runs
 `SASA.shell_points`, then delegates every `CAVITY`-class bead to
 [`_aggregate`](@ref).
 

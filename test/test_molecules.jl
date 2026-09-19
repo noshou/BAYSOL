@@ -20,14 +20,14 @@ _forced_rmax(m)  = getfield(getfield(m, :_r_max), :done)
 
 # A stand-in RadiiSource, to prove `radii_source` is actually consulted rather
 # than the default AtomicRadiiSource being hard-wired in.
-struct ConstantRadii <: BayeSol.Interfaces.RadiiSource
+struct ConstantRadii <: BayeSol.AtomicRadii.RadiiSource
     value::Float64
 end
-BayeSol.Interfaces.lookup(s::ConstantRadii, ions::AbstractVector{<:AbstractString}) =
+BayeSol.AtomicRadii.lookup(s::ConstantRadii, ions::AbstractVector{<:AbstractString}) =
     Tuple{String,Union{Float64,Nothing}}[(String(i), s.value) for i in ions]
 
-struct NeverResolves <: BayeSol.Interfaces.RadiiSource end
-BayeSol.Interfaces.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString}) =
+struct NeverResolves <: BayeSol.AtomicRadii.RadiiSource end
+BayeSol.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString}) =
     Tuple{String,Union{Float64,Nothing}}[(String(i), nothing) for i in ions]
 
 @testset "MolecularStructure" begin

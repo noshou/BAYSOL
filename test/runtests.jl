@@ -6,15 +6,14 @@
 using Test
 using ForwardDiff
 using BayeSol
-using BayeSol: Interfaces
 using BayeSol: Cache
 using BayeSol.Constants: DEFAULT_ATOL
-using BayeSol.Interfaces: AtomicRadii
+using BayeSol: AtomicRadii
 using BayeSol.MolecularStructure: MolecularStructure
 using BayeSol.Solvation.SASA: PlasticMap
 using BayeSol: Scattering
 using BayeSol.Scattering: SphFuncs
-using BayeSol.Interfaces: FormFactor
+using BayeSol: FormFactor
 
 check_float(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
 check_complex(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol

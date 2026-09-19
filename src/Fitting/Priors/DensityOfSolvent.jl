@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 using ..Helpers.Constants: AVOGADRO
-using ..Interfaces: Interfaces
+using ..PartialMolarVolumes: PartialMolarVolumes
 using Distributions
 
 abstract type Solute end
@@ -32,25 +32,25 @@ end
 
 """ Estimated bulk electron density for a non-biological solute. """
 function _ρₑ_i(s::NonBiological, ::Real, ::Real)::Tuple{Float64, Float64, Float64}
-    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(s.arg)
+    Z_j, ϕ°_j, σ_ϕ°_j = PartialMolarVolumes.ϕ°(s.arg)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
 """ Estimated bulk electron density for a protein sequence. """
 function _ρₑ_i(p::Protein, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Float64}
-    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(pH, p.arg; σ_pH)
+    Z_j, ϕ°_j, σ_ϕ°_j = PartialMolarVolumes.ϕ°(pH, p.arg; σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
 """ Estimated bulk electron density for a DNA sequence. """
 function _ρₑ_i(d::DNA, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Float64}
-    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(true, pH, d.arg; σ_pH)
+    Z_j, ϕ°_j, σ_ϕ°_j = PartialMolarVolumes.ϕ°(true, pH, d.arg; σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
 """ Estimated bulk electron density for an RNA sequence. """
 function _ρₑ_i(r::RNA, pH::Real, σ_pH::Real)::Tuple{Float64, Float64, Float64}
-    Z_j, ϕ°_j, σ_ϕ°_j = Interfaces.ϕ°(false, pH, r.arg; σ_pH)
+    Z_j, ϕ°_j, σ_ϕ°_j = PartialMolarVolumes.ϕ°(false, pH, r.arg; σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
@@ -75,13 +75,13 @@ in cm³·mol⁻¹. Uncertainty is propagated to first order assuming independenc
 where `k_j = N_A·Z_j/1e27 − ρ_w·ϕ°_j/1e3`.
 
 # Arguments
-- `pH::Real`: pH of the solution; forwarded to `Interfaces.ϕ°` for `Protein` solutes.
+- `pH::Real`: pH of the solution; forwarded to `PartialMolarVolumes.ϕ°` for `Protein` solutes.
 - `σ_pH::Real`: standard uncertainty on `pH`, propagated through each `Protein`
     solute's titration term.
 - `solutes::Vector{Solute}`: the  species in solution.
 
 # Keywords
-- `t::Real=25.0`: solution temperature in °C, forwarded to `Interfaces.ρₑ_w`.
+- `t::Real=25.0`: solution temperature in °C, forwarded to `PartialMolarVolumes.ρₑ_w`.
 - !!NOTE: as of this version, this should NOT be changed, since only water is temp dependent.
 
 # Returns
@@ -100,7 +100,7 @@ function _ρₑ(
     t::Real=25.0
 )::Tuple{Float64, Float64}
 
-    ρₑ_w, σ_w = Interfaces.ρₑ_w(t)
+    ρₑ_w, σ_w = PartialMolarVolumes.ρₑ_w(t)
     ρw_k = ρₑ_w * 1e-3   # ρ_w in units of e·Å⁻³ per cm³·mol⁻¹
 
     # Accumulators.

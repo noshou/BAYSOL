@@ -33,7 +33,7 @@ Per-element van der Waals radii in Å, EXACTLY as the live `AtomicRadii` backend
 returns them.
 
 Provenance: dumped at full `Float64` precision from
-`Interfaces.lookup(AtomicRadii.AtomicRadiiSource(), [e])` on 2026-09-06, against
+`AtomicRadii.lookup(AtomicRadii.AtomicRadiiSource(), [e])` on 2026-09-06, against
 `data/atomic_radii.sqlite3` as of commit 071e4fd.
 """
 const SCAT_RADII = Dict("c" => 1.77, "o" => 1.5, "h" => 1.2, "fe3+" => 0.49, "o2-" => 1.35)
@@ -94,8 +94,8 @@ const SCAT_BLOB_X = [
 The 5-atom molecule the opt-in `vacuo` tests use, and its form factors at
 8000 eV on `SCAT_Q`, hardcoded.
 
-Provenance: `Interfaces.form_factor_table(8000.0, ["fe3+", "o2-", "h"], SCAT_Q)`
-followed by `Interfaces.form_factors`, dumped at full `Float64` precision on
+Provenance: `FormFactor.form_factor_table(8000.0, ["fe3+", "o2-", "h"], SCAT_Q)`
+followed by `FormFactor.form_factors`, dumped at full `Float64` precision on
 2026-09-06 from the xraydb backend. Only three distinct ions are tabulated; the
 per-atom matrix is assembled from them by lookup. `fe3+`'s K edge is at ~7.1
 keV, so `f''` is large here and `compute_B_lm` must take its `C = 2` branch --
@@ -241,10 +241,10 @@ scat_shell_blm(h) = h.convex .+ h.concave .+ h.cavity
 # ===========================================================================
 # STUB FORM-FACTOR BACKEND. `vacuo` takes a `form_factor_source`, so the vacuum
 # term is drivable without a live xraydb environment. These are test-owned
-# types, so defining `Interfaces` methods on them is dispatch, not piracy.
+# types, so defining `FormFactor` methods on them is dispatch, not piracy.
 # ===========================================================================
 
-struct ScatStubFF <: Interfaces.FormFactorSource end
+struct ScatStubFF <: FormFactor.FormFactorSource end
 struct ScatStubTable
     amp :: Matrix{ComplexF64}   # (n_ions, Q), rows aligned to the ion vector
     ions :: Vector{String}
@@ -261,13 +261,13 @@ const SCAT_STUB_W = Dict("a" => 20.0 + 4.0im, "b" => 8.0 + 1.5im, "c" => 1.0 + 0
 
 scat_stub_f(e, q) = SCAT_STUB_W[e] * exp(-q)
 
-Interfaces.form_factor_table(::ScatStubFF, energy::Real, ions, qvals) =
+FormFactor.form_factor_table(::ScatStubFF, energy::Real, ions, qvals) =
     ScatStubTable(
         ComplexF64[scat_stub_f(ions[i], qvals[k]) for i in eachindex(ions), k in eachindex(qvals)],
         collect(String, ions)
     )
 
-Interfaces.form_factors(t::ScatStubTable, ions, qvals) = t.amp
+FormFactor.form_factors(t::ScatStubTable, ions, qvals) = t.amp
 
 """
 Pipeline-side molecule for the stub. The element strings are not real elements,
@@ -914,8 +914,8 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
             # Same role as the radii guard: if the xraydb tables or the backend
             # change, that reports itself here rather than as a Debye mismatch,
             # and SCAT_FF_TABLE is what needs regenerating.
-            tbl = Interfaces.form_factor_table(SCAT_FF_ENERGY, SCAT_FF_E, SCAT_Q)
-            amp = Interfaces.form_factors(tbl, SCAT_FF_E, SCAT_Q)
+            tbl = FormFactor.form_factor_table(SCAT_FF_ENERGY, SCAT_FF_E, SCAT_Q)
+            amp = FormFactor.form_factors(tbl, SCAT_FF_E, SCAT_Q)
             @test size(amp) == size(scat_ffamp)
             @test all(i -> check_complex(amp[i], scat_ffamp[i]), eachindex(scat_ffamp))
             @test any(x -> imag(x) != 0, scat_ffamp)   # the fixture really is anomalous
@@ -933,8 +933,8 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         end
 
         @testset "vacuo is compute_B_lm composed by hand from the facade" begin
-            tbl = Interfaces.form_factor_table(SCAT_FF_ENERGY, SCAT_FF_E, SCAT_Q)
-            amp = Interfaces.form_factors(tbl, SCAT_FF_E, SCAT_Q)
+            tbl = FormFactor.form_factor_table(SCAT_FF_ENERGY, SCAT_FF_E, SCAT_Q)
+            amp = FormFactor.form_factors(tbl, SCAT_FF_E, SCAT_Q)
             @test vacuo(scat_ffmol, SCAT_Q, scat_lmax, SCAT_FF_E,
                         SCAT_FF_ENERGY, scat_chunk) ==
                         compute_B_lm(coords_spherical(scat_ffmol), SCAT_Q, amp,
@@ -982,7 +982,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
     # driven without a live xraydb environment. Nothing else in the suite uses
     # it, so without these tests the seam could stop dispatching and every
     # xraydb-backed assertion above would still pass. The stub is defined on
-    # test-owned types, so adding `Interfaces` methods for it is not piracy.
+    # test-owned types, so adding `FormFactor` methods for it is not piracy.
     @testset "vacuo drives an injected form-factor backend" begin
         got = vacuo(scat_stubmol(), SCAT_Q, scat_Lconv, SCAT_STUB_E, 1234.0,
                     scat_chunk; form_factor_source = ScatStubFF())
@@ -991,7 +991,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
             # If the keyword were ignored and the default xraydb backend ran
             # instead, the amplitudes would be Fe/O/H form factors rather than
             # the stub's, and the Debye check below would fail.
-            @test Interfaces.form_factor_table(ScatStubFF(), 1234.0, SCAT_STUB_E,
+            @test FormFactor.form_factor_table(ScatStubFF(), 1234.0, SCAT_STUB_E,
                                                 SCAT_Q) isa ScatStubTable
             @test size(got, 1) == 2          # Im(f) != 0, so the C = 2 branch
             @test size(got) == (2, length(scat_wconv), length(SCAT_Q))
