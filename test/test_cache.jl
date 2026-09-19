@@ -137,11 +137,11 @@ _forced(c) = getfield(c, :done)
         end
 
         @testset "distinct caches are independent" begin
-            c1 = KeyedCache{String, Int}()
+            c_1 = KeyedCache{String, Int}()
             c2 = KeyedCache{String, Int}()
-            get!(() -> 1, c1, "k")
+            get!(() -> 1, c_1, "k")
             @test get!(() -> 2, c2, "k") == 2
-            @test get!(() -> 99, c1, "k") == 1
+            @test get!(() -> 99, c_1, "k") == 1
         end
 
         @testset "concurrent get! on the same missing key computes once" begin

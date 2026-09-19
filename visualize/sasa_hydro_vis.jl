@@ -11,11 +11,11 @@
 # Numbers only, no window (works headless):
 #   julia --project=visualize -e 'include("visualize/sasa_hydro_vis.jl"); sasa_hydro_report()'
 
-using ScatterNet
-using ScatterNet.Interfaces: Interfaces, RadiiSource
-using ScatterNet.Molecule.Molecules: Molecules, Molecule
-using ScatterNet.Molecule.SASA: SASA
-using ScatterNet.Molecule.SASA.PlasticMap: plastic_points
+using BayeSol
+using BayeSol.Interfaces: Interfaces, RadiiSource
+using BayeSol.MolecularStructure: MolecularStructure, Molecule
+using BayeSol.Solvation.SASA: SASA
+using BayeSol.Solvation.SASA.PlasticMap: plastic_points
 using Printf: @printf, @sprintf
 using GLMakie
 
@@ -80,7 +80,7 @@ function packed_cluster_scene(; probe::Float64 = 1.4, r::Float64 = 1.5, n::Int =
     ctr = ntuple(t -> sum(p[t] for p in pts) / length(pts), 3)
     keep = [p for p in pts if sqrt(sum((p[t] - ctr[t])^2 for t in 1:3)) <= a * n * frac]
     src = HydroRadii(Dict("A" => r))
-    mol = Molecules.create("packed cluster", fill("A", length(keep)), keep;
+    mol = MolecularStructure.create("packed cluster", fill("A", length(keep)), keep;
                             radii_source = src)
     return (; mol, probe, title = "Packed cluster ($(length(keep)) spheres, FCC)")
 end
@@ -108,8 +108,8 @@ every other atom.
 accessible.
 """
 function atom_sample_points(mol::Molecule, i::Int, n::Int, probe::Float64)
-    crds = Molecules.coords_cartesian(mol)
-    rads = Molecules.radii(mol)
+    crds = MolecularStructure.coords_cartesian(mol)
+    rads = MolecularStructure.radii(mol)
     cands = collect(1:size(crds, 2))
 
     ρ = rads[i] + probe
@@ -183,8 +183,8 @@ or inspected without a window.
 """
 function sasa_hydro_figure(; n_target::Union{Nothing,Int} = nothing, n_show::Int = 400, probe::Float64 = 1.4)
     sc = packed_cluster_scene(; probe)
-    crds = Molecules.coords_cartesian(sc.mol)
-    rads = Molecules.radii(sc.mol)
+    crds = MolecularStructure.coords_cartesian(sc.mol)
+    rads = MolecularStructure.radii(sc.mol)
     natoms = size(crds, 2)
     area, exposed = SASA.sasa(sc.mol; probe)
     shell, shell_area, shell_cls = SASA.shell_points(sc.mol; probe, n_target)

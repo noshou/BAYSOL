@@ -5,7 +5,7 @@ Leaf module of constant primitives.
 """
 module Constants
 
-export  DEFAULT_ATOL, SHELL_THICKNESS, PROBE_RADIUS, BOND_CUTOFF, SHELL_N_TARGET, 
+export DEFAULT_ATOL, SHELL_THICKNESS, PROBE_RADIUS, BOND_CUTOFF, SHELL_N_TARGET, 
 DRO_UNIT, B_LM_CHUNK, AVOGADRO, PHOSPHATE_NET_CHARGE, ELEMENTARY_CHARGE, 
 VACUUM_PERMITTIVITY, BOLTZMANN, ANGSTROM, MV_PER_CM
 
@@ -82,7 +82,7 @@ const PHOSPHATE_NET_CHARGE = -0.24
 """
 Covalent-bond distance cutoff, Å: generous enough for P-O (~1.5-1.6 Å) and
 C-O/C-C/C-N (~1.4-1.6 Å) single bonds, tight enough to exclude non-bonded
-contacts. `Molecule` carries no bonding table (see `Molecules.create`'s
+contacts. `Molecule` carries no bonding table (see `MolecularStructure.create`'s
 `(name, elms, coords)` signature), so interatomic distance is the only
 connectivity proxy available.
 """

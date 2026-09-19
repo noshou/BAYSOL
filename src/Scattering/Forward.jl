@@ -10,9 +10,11 @@
 #         ─► ForwardCache(G, qvals, r_m)                             forward_cache
 #         ─► I_calc(q) = m·(v(q)ᵀ G v(q)) + c                        forward
 #
-# `G(q)` depends only on geometry and beam, never on `(m, c, dns, δρ, c1)`. Build the
+# `G(q)` depends only on geometry and beam, never on `(m, c, dns, δρ, c_1)`. Build the
 # cache once per structure with `forward_cache`; every likelihood evaluation is then
-# the O(Q) `forward(cache, m, c, dns, δρ; c1)`.
+# the O(Q) `forward(cache, m, c, dns, δρ; c_1)`.
+
+using ..MolecularStructure: Molecule, elms, radii
 
 """
     species_multipoles(mol, qvals, lMax, energy; kwargs...)
@@ -42,7 +44,7 @@ edge, `1` otherwise; `C = 1` for the four dummy species).
 """
 function species_multipoles(
     mol::Molecule, qvals::AbstractVector{<:Real}, lMax::Integer, energy::Real;
-    ions::Vector{String}                 = Molecules.elms(mol),
+    ions::Vector{String}                 = elms(mol),
     chunk::Unsigned                      = B_LM_CHUNK,
     form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE,
     thickness::Real                      = SHELL_THICKNESS,
@@ -73,7 +75,15 @@ end
 The five-species Gram matrix `G_ab(q) = S_ab(q)`, shape `(5, 5, Q)`, symmetric
 and positive-semidefinite in its species axes. Depends only on geometry and beam.
 
-`kwargs` are those of [`species_multipoles`](@ref).
+# Keywords
+Forwarded verbatim to [`species_multipoles`](@ref); none of these are fit
+parameters, so you generally don't need to pass them:
+- `ions::Vector{String} = elms(mol)`: ion/element string per atom.
+- `chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size (results invariant).
+- `form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE`.
+- `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
+  `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: hydration-shell
+  geometry, forwarded to `hydration`.
 """
 gram_matrix(mol::Molecule, qvals::AbstractVector{<:Real}, lMax::Integer, energy::Real;
             kwargs...)::Array{Float64,3} =
@@ -89,7 +99,7 @@ excluded-volume correction factor `c₁` is measured against, and the point at w
 Geometry only, so it caches alongside `G`.
 """
 function mean_atomic_radius(mol::Molecule)::Float64
-    r = Molecules.radii(mol)
+    r = radii(mol)
     isempty(r) && throw(ArgumentError("mean_atomic_radius: molecule has no atoms"))
     return sum(r) / length(r)
 end
@@ -119,7 +129,18 @@ end
 
 The geometry-only pass: [`gram_matrix`](@ref) plus the `q` grid and
 [`mean_atomic_radius`](@ref) that fitting `c₁` needs. **Cache once per
-structure**; `kwargs` are those of [`species_multipoles`](@ref).
+structure.**
+
+# Keywords
+Forwarded verbatim to [`species_multipoles`](@ref) (same as [`gram_matrix`](@ref)'s);
+none of these are fit parameters, so leaving them all at their defaults is the
+common case:
+- `ions::Vector{String} = elms(mol)`: ion/element string per atom.
+- `chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size (results invariant).
+- `form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE`.
+- `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
+  `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: hydration-shell
+  geometry, forwarded to `hydration`.
 """
 forward_cache(
     mol::Molecule, 
@@ -167,29 +188,30 @@ forward(
 ) = _fused_intensity_calc(G, contrast_vector(dns, δρ), m, c)
 
 """
-    forward(cache, m, c, dns, δρ; c1 = nothing) -> Vector
+    forward(cache, m, c, dns, δρ, c_1 = nothing) -> Vector
 
     I_calc(q) = m · (v(q)ᵀ G(q) v(q)) + c
     v(q)      = [1, -dns · G_ex(q; c₁), dro₁, dro₂, dro₃]
 
 Same model as the `forward(G, m, c, dns, δρ)` method above (see its
 `# Arguments` for what `m`, `c`, `dns`, `δρ` are and where their values come
-from), plus the optional excluded-volume correction `c1`. O(Q) in the fit
-parameters, same cost as the 5-argument method when `c1` is left at its
-default.
+from), plus the optional excluded-volume correction `c_1`. O(Q) in the fit
+parameters, same cost as the 5-argument method when `c_1` is left at its
+default. All five fit-parameter arguments are positional, matching the
+`forward(G, m, c, dns, δρ)` method above, so a `ξ = (dns, δρ1, δρ2, δρ3, c1)`
+draw can be splatted straight in:
+`forward(cache, m, c, ξ[1], (ξ[2], ξ[3], ξ[4]), ξ[5])`.
 
 # Arguments
 - `cache::ForwardCache`: from [`forward_cache`](@ref). Bundles `G` with the
-    `q` grid and `r_m` that evaluating `c1` needs
+    `q` grid and `r_m` that evaluating `c_1` needs
 - `m`, `c`, `dns`, `δρ`: as in the `forward(G, m, c, dns, δρ)` method above.
-
-# Keywords
--   `c1::Union{Nothing,Real} = nothing`: CRYSOL's excluded-volume correction
+- `c_1::Union{Nothing,Real} = nothing`: CRYSOL's excluded-volume correction
     factor, dimensionless (`r₀/r_m` in CRYSOL's own radius parameterisation;
     see [`excluded_volume_factor`](@ref)). CRYSOL's own fitting range is
-    `c1 ∈ [0.96, 1.04]`. Has a prior, [`Fitting.c1_prior`](@ref)`(n)` (`n` =
-    the percentage of prior mass required within that range). `c1 = nothing`
-    (the default) or `c1 == 1` skips the correction entirely and reduces
+    `c_1 ∈ [0.96, 1.04]`. Has a prior, [`Fitting.c1_prior`](@ref)`(n)` (`n` =
+    the percentage of prior mass required within that range). `c_1 = nothing`
+    (the default) or `c_1 == 1` skips the correction entirely and reduces
     exactly to the 5-argument [`forward`](@ref) above.
 
 # Returns
@@ -200,17 +222,17 @@ function forward(
     m::Real,
     c::Real,
     dns::Real,
-    δρ::Union{Real,NTuple{3,<:Real}};
-    c1::Union{Nothing,Real} = nothing
+    δρ::Union{Real,NTuple{3,<:Real}},
+    c_1::Union{Nothing,Real} = nothing
 )
-    (c1 === nothing || c1 == 1) &&
+    (c_1 === nothing || c_1 == 1) &&
         return forward(cache.G, m, c, dns, δρ)
-    g_ex = excluded_volume_factor(cache.qvals, cache.r_m, c1)
+    g_ex = excluded_volume_factor(cache.qvals, cache.r_m, c_1)
     return _fused_intensity_calc(cache.G, contrast_matrix(dns, δρ, g_ex), m, c)
 end
 
 """
-    forward(mol, qvals, lMax, energy; m, c, dns, δρ, c1, kwargs...) -> Vector
+    forward(mol, qvals, lMax, energy, m, c, dns, δρ, c_1 = nothing; kwargs...) -> Vector
 
 The whole forward model from a molecule in one call: build the cache, then
 evaluate. A convenience for one-offs; for repeated evaluation at fixed geometry
@@ -221,25 +243,31 @@ call [`forward_cache`](@ref) once and the [`ForwardCache`](@ref) method of
 # Arguments
 - `mol::Molecule`, `qvals`, `lMax`, `energy`: as in [`forward_cache`](@ref)/
   [`species_multipoles`](@ref) — the geometry/beam setup, not fit parameters.
+- `m`, `c`, `dns`, `δρ`, `c_1`: the fit parameters, positional exactly as on the
+  `forward(cache, m, c, dns, δρ, c_1)` method above (required except `c_1`,
+  which defaults to `nothing`).
 
 # Keywords
-- `m`, `c`, `dns`, `δρ`, `c1`: the fit parameters, exactly as documented on the
-  `forward(cache, m, c, dns, δρ; c1)` method above (required except `c1`, which
-  defaults to `nothing`).
-
-`kwargs` beyond `m, c, dns, δρ, c1` are those of [`species_multipoles`](@ref).
+Any keywords are forwarded verbatim to [`species_multipoles`](@ref) (same list
+as [`forward_cache`](@ref)'s); these are geometry/beam settings, not fit
+parameters, so you generally don't need to pass them:
+- `ions::Vector{String} = elms(mol)`
+- `chunk::Unsigned = B_LM_CHUNK`
+- `form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE`
+- `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
+  `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`
 """
 function forward(
     mol::Molecule,
     qvals::AbstractVector{<:Real},
     lMax::Integer,
-    energy::Real;
+    energy::Real,
     m::Real,
     c::Real,
     dns::Real,
     δρ::Union{Real,NTuple{3,<:Real}},
-    c1::Union{Nothing,Real} = nothing,
+    c_1::Union{Nothing,Real} = nothing;
     kwargs...
 )
-    return forward(forward_cache(mol, qvals, lMax, energy; kwargs...), m, c, dns, δρ; c1 = c1)
+    return forward(forward_cache(mol, qvals, lMax, energy; kwargs...), m, c, dns, δρ, c_1)
 end

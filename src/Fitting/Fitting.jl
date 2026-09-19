@@ -7,8 +7,10 @@ include("Priors/DensityOfSolvent.jl")
 include("Priors/DeltaRho.jl")
 include("Priors/ExcludedVolume.jl")
 include("ParamTransform.jl")
+include("Sampler.jl")
 
-export WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll, reduced_chi2,
-Solute, Protein, NonBiological, dns_prior, δρ_prior, c1_prior, Θ!, Ξ!
+export  Solute, Protein, NonBiological, DNA, RNA, Seed,
+        seed_fitting, run_fitting, PROFILE, MARGINAL,
+        ρₑ_prior, δρ_prior, c1_prior
 
 end # module

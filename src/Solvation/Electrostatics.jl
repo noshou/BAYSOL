@@ -11,16 +11,12 @@ solution.
 """
 module Electrostatics
 
-using ..ProteinResidues: Residues
-using ..Molecules: Molecules, Molecule
+using ...MolecularStructure: Residues, Molecule, elms, coords_cartesian, n_atoms
 using ..SASA: SASA
-using ...Constants: ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, BOND_CUTOFF,
-                     AVOGADRO, ANGSTROM, MV_PER_CM, PHOSPHATE_NET_CHARGE
+using ...Helpers.Constants: ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, BOND_CUTOFF,
+                            AVOGADRO, ANGSTROM, MV_PER_CM, PHOSPHATE_NET_CHARGE
 using ...Interfaces: Interfaces
 using NearestNeighbors: KDTree, inrange
-
-export  debye_length, nucleic_acid_cavity_electrostatics, PHOSPHATE_NET_CHARGE,
-        protein_cavity_electrostatics
 
 # ---------------------------------------------------------------------------
 #                          Debye screening length
@@ -82,8 +78,8 @@ further heavy atom (the sugar carbon) is bridging and carries no charge.
 A molecule with no phosphorus atoms returns an empty vector.
 """
 function _phosphate_charge_sites(mol::Molecule)::Vector{Tuple{Int,Float64}}
-    els  = Molecules.elms(mol)
-    crds = Molecules.coords_cartesian(mol)
+    els  = elms(mol)
+    crds = coords_cartesian(mol)
     n    = length(els)
     n == 0 && return Tuple{Int,Float64}[]
     tree = KDTree(crds)
@@ -120,7 +116,7 @@ count. A molecule with no ionizable residues (or `residues` covering none
 of `mol`'s charged atoms) returns an empty vector.
 """
 function _protein_charge_sites(mol::Molecule, residues::Residues)::Vector{Tuple{Int,Float64}}
-    n = Molecules.n_atoms(mol)
+    n = n_atoms(mol)
     (length(residues.resname) == n && length(residues.atomname) == n) ||
         throw(ArgumentError("residues' resname/atomname must each have length $n (mol's atom count)"))
 
@@ -205,7 +201,7 @@ function _aggregate(
     isempty(sel) && return (0.0, 0.0)
     isempty(sites) && return (0.0, 0.0)
 
-    crds  = Molecules.coords_cartesian(mol)
+    crds  = coords_cartesian(mol)
     κinv  = debye_length(; ionic_strength_M = ionic_strength_M, eps_r = eps_r, T = T)
     cutoff = cutoff_debye_lengths * κinv
 

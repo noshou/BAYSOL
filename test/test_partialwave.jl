@@ -7,7 +7,7 @@
 # `self_scatter` and `cross_scatter`. 
 using .Scattering: compute_B_lm, partial_wave_weights, self_scatter, cross_scatter, _deg_contrib
 using .SphFuncs: sphHarm, sphBess
-using .Molecules: create, coords_spherical, to_spherical
+using .MolecularStructure: create, coords_spherical, to_spherical
 
 # packed row offsets, duplicated here by hand so the tests pin the convention
 # rather than inheriting it from the code under test
@@ -264,7 +264,7 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
     end
 
     @testset "compute_B_lm accepts a Molecule's own spherical coordinates" begin
-        # the documented input layout is exactly what Molecules.coords_spherical
+        # the documented input layout is exactly what MolecularStructure.coords_spherical
         # returns so it must go straight through
         mol = create("tri", ["C", "O", "N"], [(0.0, 0.0, 1.0), (1.2, -0.3, 0.5), (-0.8, 0.9, -1.1)])
         sph = coords_spherical(mol)

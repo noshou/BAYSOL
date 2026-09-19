@@ -34,13 +34,18 @@ const _δρ1_prior = LogNormal(0.0, sqrt(2 * log(1.15)))
 const _δρ2_prior = Normal(1, 0.15)
 
 """
-    δρ_prior(μ_χ, σ_χ) -> (δρ1, δρ2, δρ3)
+    δρ_prior(; μ_χ, σ_χ) -> (δρ1, δρ2, δρ3)
 
 Protein variant.
 
 # Keywords
-- `μ_χ`=0.0: mean of the total hyδρphilicity, χ, feeding δρ3's cavity-water contrast.
-- `σ_χ`=0.0: standard deviation of χ, feeding δρ3's cavity-water contrast.
+- `μ_χ`=0.0: mean, over cavity beads, of the screened-electrostatic potential χ
+    (Debye-Hückel, aggregated from nearby phosphate / ionizable-side-chain charge
+    sites — see [`Electrostatics.nucleic_acid_cavity_electrostatics`](@ref) /
+    [`Electrostatics.protein_cavity_electrostatics`](@ref)), feeding δρ3's
+    cavity-water contrast.
+- `σ_χ`=0.0: standard deviation, over cavity beads, of χ, feeding δρ3's
+    cavity-water contrast.
 
 # Returns
 - `δρ1::LogNormal`: convex-bead contrast (fixed prior, `_δρ1_prior`).
@@ -50,7 +55,7 @@ Protein variant.
                     matching standard CRYSOL's own `dr3 = 0` default.
 """
 function δρ_prior(
-    μ_χ::Real=0; 
+    ; μ_χ::Real=0,
     σ_χ::Real=0.0
 )::Tuple{LogNormal{Float64}, Normal{Float64}, Normal{Float64}}
     return (_δρ1_prior, _δρ2_prior, Normal(μ_χ, σ_χ))

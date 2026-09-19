@@ -4,8 +4,8 @@
 # f(q,E) = f0(s) + f1(E) + i*f2(E), s = q/(4pi), from the bundled
 # form_factors.sqlite3 (Waasmaier-Kirfel f0, Chantler FFAST anomalous terms).
 
-const IFACE = ScatterNet.Interfaces
-using ScatterNet.Interfaces.FormFactor: compute_form_factors, FF, FormFactorError,
+const IFACE = BayeSol.Interfaces
+using BayeSol.Interfaces.FormFactor: compute_form_factors, FF, FormFactorError,
                                         FormFactorSourceTables, f0, f1f2, S_MAX
 
 check_c(a, b) = abs(a - b) < 1e3 * DEFAULT_ATOL

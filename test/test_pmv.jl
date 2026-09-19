@@ -14,13 +14,13 @@
 # `ionization.json` (Lee et al. 2008, DOI 10.1016/j.bpc.2008.02.009) as they
 # stood when this file was written.
 
-const IFACE = ScatterNet.Interfaces
-using ScatterNet.Interfaces.PartialMolarVolumes:
+const IFACE = BayeSol.Interfaces
+using BayeSol.Interfaces.PartialMolarVolumes:
     PartialMolarVolumes, PMVSrcTables, COMMON_TO_IUPAC
-using ScatterNet.Constants: AVOGADRO
+using BayeSol.Constants: AVOGADRO
 
 "Fully-qualified handle onto the submodule, for the private caches/tables below."
-const PMVMOD = ScatterNet.Interfaces.PartialMolarVolumes
+const PMVMOD = BayeSol.Interfaces.PartialMolarVolumes
 
 include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
 include(joinpath(@__DIR__, "fixtures", "sequences.jl"))      # LYSOZYME, ...
