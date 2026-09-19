@@ -104,7 +104,7 @@ excluded-volume/shell amplitudes for the other terms).
 
 # Arguments
     -   `coords_sph::AbstractMatrix{<:Real}`, size `(3, N)`: per-atom spherical
-        coordinates in the column-per-atom layout `Molecules.coords_spherical`
+        coordinates in the column-per-atom layout `MolecularStructure.coords_spherical`
         returns — row 1 is `r`, row 2 is `θ`, row 3 is `φ`. Passed straight
         through; the `(θ, φ)` rows go to `sphHarm` as a `(2, chunk)` block and
         the `r` row to `sphBess`, with no unpacking into loose vectors.
@@ -143,10 +143,10 @@ function compute_B_lm(
     lMax < 0 && throw(ArgumentError("compute_B_lm: lMax must be non-negative"))
 
     # `coords_sph` is the column-per-atom spherical form straight from
-    # `Molecules.coords_spherical`: 3 rows, `(r, θ, φ)` in that order.
+    # `MolecularStructure.coords_spherical`: 3 rows, `(r, θ, φ)` in that order.
     size(coords_sph, 1) == 3 || throw(ArgumentError(
         "compute_B_lm: coords_sph must be a (3, N) matrix with rows (r, θ, φ), " *
-        "as returned by Molecules.coords_spherical; got $(size(coords_sph, 1)) rows"))
+        "as returned by MolecularStructure.coords_spherical; got $(size(coords_sph, 1)) rows"))
     N = size(coords_sph, 2)
     r = view(coords_sph, 1, :)   # (θ, φ) are sliced per-chunk straight from `coords_sph`
 

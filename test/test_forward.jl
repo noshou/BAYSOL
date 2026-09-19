@@ -14,9 +14,8 @@ using .Scattering:  forward, gram_matrix, species_multipoles,
                     partial_wave_weights, vacuo, excluded, hydration,
                     SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, SHELL_CLASSES,
                     DRO_UNIT, FORM_FACTOR_SOURCE, B_LM_CHUNK
-using .Molecules: create, elms
-using ScatterNet.Molecule: SASA
-using .Molecules: radii
+using .MolecularStructure: create, elms, radii
+using BayeSol.Solvation: SASA
 using LinearAlgebra: issymmetric, eigvals
 
 fwd_mol() = create("gly", ["n", "c", "c", "o", "o", "h", "h", "h"],
@@ -37,7 +36,7 @@ fwd_chunk  = UInt64(3)
         @test SHELL_CLASSES   === (SASA.CONVEX, SASA.CONCAVE, SASA.CAVITY)
         @test DRO_UNIT        === 0.03
         @test B_LM_CHUNK isa Unsigned
-        @test FORM_FACTOR_SOURCE isa ScatterNet.Interfaces.FormFactorSource
+        @test FORM_FACTOR_SOURCE isa BayeSol.Interfaces.FormFactorSource
         # the primitives really do read these as their defaults
         m = fwd_mol()
         @test   hydration(m, fwd_q, 2, fwd_chunk) ==
@@ -91,8 +90,7 @@ fwd_chunk  = UInt64(3)
     @testset "forward(mol, …) convenience == gram_matrix + forward(G, …)" begin
         m = fwd_mol()
         G = gram_matrix(m, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        got = forward(  m, fwd_q, fwd_lmax, fwd_E;
-                        m = 1.7, c = 2.5, dns = 0.334, δρ = (1.0, 1.0, 0.0),
+        got = forward(  m, fwd_q, fwd_lmax, fwd_E, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0);
                         chunk = fwd_chunk)
         @test got ≈ forward(G, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0))
     end
@@ -116,7 +114,7 @@ fwd_chunk  = UInt64(3)
     end
 
     # ---------------------------------------------------------------------
-    # CRYSOL's excluded-volume correction factor c1
+    # CRYSOL's excluded-volume correction factor c_1
     # ---------------------------------------------------------------------
 
     @testset "mean_atomic_radius is the plain mean of the per-atom radii" begin
@@ -125,34 +123,34 @@ fwd_chunk  = UInt64(3)
         @test mean_atomic_radius(mo) ≈ sum(r) / length(r)
     end
 
-    @testset "excluded_volume_factor: c1 == 1 is exactly the identity" begin
+    @testset "excluded_volume_factor: c_1 == 1 is exactly the identity" begin
         rm = 1.62
         @test excluded_volume_factor(fwd_q, rm, 1.0) == ones(length(fwd_q))
     end
 
-    @testset "excluded_volume_factor: q=0 scales the excluded volume by c1^3" begin
-        rm, c1 = 1.62, 1.0987654320987654
-        g = excluded_volume_factor([0.0], rm, c1)
-        @test g[1] ≈ c1^3
+    @testset "excluded_volume_factor: q=0 scales the excluded volume by c_1^3" begin
+        rm, c_1 = 1.62, 1.0987654320987654
+        g = excluded_volume_factor([0.0], rm, c_1)
+        @test g[1] ≈ c_1^3
     end
 
     @testset "excluded_volume_factor: exact for a dummy at the mean radius" begin
         # The single-envelope approximation is exact for an atom of radius r_m:
-        # G(q)*f(V_m, q) must equal the directly-expanded dummy f(c1^3*V_m, q).
-        rm, c1 = 1.62, 1.0555555555555556
+        # G(q)*f(V_m, q) must equal the directly-expanded dummy f(c_1^3*V_m, q).
+        rm, c_1 = 1.62, 1.0555555555555556
         vm = (4π / 3) * rm^3
         gauss(v, q) = v * exp(-q^2 * v^(2 / 3) / (4π))
-        g = excluded_volume_factor(fwd_q, rm, c1)
+        g = excluded_volume_factor(fwd_q, rm, c_1)
         for (k, q) in enumerate(fwd_q)
-            @test g[k] * gauss(vm, q) ≈ gauss(c1^3 * vm, q)
+            @test g[k] * gauss(vm, q) ≈ gauss(c_1^3 * vm, q)
         end
     end
 
-    @testset "excluded_volume_factor: c1 > 1 damps with q, c1 < 1 lifts" begin
+    @testset "excluded_volume_factor: c_1 > 1 damps with q, c_1 < 1 lifts" begin
         rm = 1.62
         up   = excluded_volume_factor(fwd_q, rm, 1.8 / 1.62)
         down = excluded_volume_factor(fwd_q, rm, 1.4 / 1.62)
-        # both start at c1^3 and move monotonically in q away from it
+        # both start at c_1^3 and move monotonically in q away from it
         @test issorted(up ./ up[1];   rev = true)
         @test issorted(down ./ down[1])
     end
@@ -192,55 +190,54 @@ fwd_chunk  = UInt64(3)
         @test fc.r_m == mean_atomic_radius(mo)
     end
 
-    @testset "forward(cache, …): c1 = nothing / 1 is the uncorrected model" begin
+    @testset "forward(cache, …): c_1 = nothing / 1 is the uncorrected model" begin
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         ref = forward(fc.G, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0))
         @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0)) == ref
-        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); c1 = nothing) == ref
-        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); c1 = 1.0) == ref
+        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0), nothing) == ref
+        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0), 1.0) == ref
     end
 
-    @testset "forward(cache, …; c1) == hand-assembled q-dependent contraction" begin
+    @testset "forward(cache, …, c_1) == hand-assembled q-dependent contraction" begin
         mo   = fwd_mol()
         fc   = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        c1   = 1.08
+        c_1   = 1.08
         pars = (0.9, -0.4, 0.331, (1.2, 0.8, -0.3))
-        g    = excluded_volume_factor(fc.qvals, fc.r_m, c1)
+        g    = excluded_volume_factor(fc.qvals, fc.r_m, c_1)
         V    = contrast_matrix(pars[3], pars[4], g)
         ref  = intensity_calc(intensity(fc.G, V), pars[1], pars[2])
-        @test forward(fc, pars...; c1 = c1) == ref
+        @test forward(fc, pars..., c_1) == ref
     end
 
-    @testset "c1 actually changes the curve, and stays non-negative" begin
+    @testset "c_1 actually changes the curve, and stays non-negative" begin
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         base = forward(fc, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0))
-        big  = forward(fc, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0); c1 = 1.15)
+        big  = forward(fc, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0), 1.15)
         @test !(big ≈ base)
-        @test all(>=(0.0), big)          # PSD ⇒ v(q)ᵀ G v(q) ≥ 0 at every c1
+        @test all(>=(0.0), big)          # PSD ⇒ v(q)ᵀ G v(q) ≥ 0 at every c_1
     end
 
-    @testset "forward(mol, …; c1) convenience == cache + forward(cache, …; c1)" begin
+    @testset "forward(mol, …, c_1) convenience == cache + forward(cache, …, c_1)" begin
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        c1 = 0.93
-        @test   forward(mo, fwd_q, fwd_lmax, fwd_E;
-                        m = 1.7, c = 2.5, dns = 0.334, δρ = (1.0, 1.0, 0.0),
-                        c1 = c1, chunk = fwd_chunk) ≈
-                forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0); c1 = c1)
+        c_1 = 0.93
+        @test   forward(mo, fwd_q, fwd_lmax, fwd_E, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0), c_1;
+                        chunk = fwd_chunk) ≈
+                forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0), c_1)
     end
 
     @testset "the whole fit-parameter path is AD-differentiable" begin
-        # c1/dns/δρ are HMC parameters in stage 1, so a Dual must survive the
+        # c_1/dns/δρ are HMC parameters in stage 1, so a Dual must survive the
         # contrast -> contraction -> detector-map chain without a Float64 cast.
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        f(p) = sum(forward(fc, p[1], p[2], p[3], (p[4], p[5], p[6]); c1 = p[7]))
+        f(p) = sum(forward(fc, p[1], p[2], p[3], (p[4], p[5], p[6]), p[7]))
         p0 = [1.7, 2.5, 0.334, 1.0, 1.0, 0.0, 1.05]
         g  = ForwardDiff.gradient(f, p0)
         @test all(isfinite, g)
-        # finite-difference check on c1, the new parameter
+        # finite-difference check on c_1, the new parameter
         h  = 1e-6
         pp = copy(p0); pp[7] += h
         pm = copy(p0); pm[7] -= h

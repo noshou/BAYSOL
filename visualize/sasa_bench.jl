@@ -22,10 +22,10 @@
 #   julia --project=visualize -e 'include("visualize/sasa_bench.jl"); vis_bench()'
 #   julia --project=visualize -e 'include("visualize/sasa_bench.jl"); save_bench_figures("bench")'
 
-using ScatterNet
-using ScatterNet.Interfaces: Interfaces, RadiiSource
-using ScatterNet.Molecule.Molecules: Molecules, Molecule
-using ScatterNet.Molecule.SASA: SASA
+using BayeSol
+using BayeSol.Interfaces: Interfaces, RadiiSource
+using BayeSol.MolecularStructure: MolecularStructure, Molecule
+using BayeSol.Solvation.SASA: SASA
 using Random, Printf, Statistics, DelimitedFiles
 
 # ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ const BENCH_RAD = Dict(
 const BENCH_SRC = BenchRadii(BENCH_RAD)
 
 "Build a molecule from the shared radii table."
-bench_mol(name, els, crds) = Molecules.create(name, els, crds; radii_source = BENCH_SRC)
+bench_mol(name, els, crds) = MolecularStructure.create(name, els, crds; radii_source = BENCH_SRC)
 
 const BENCH_PROBE = 1.4
 "Working point count for the sweeps (fast, but past the steep part of the curve)."
@@ -196,8 +196,8 @@ How many atoms `SASA._classify` resolves exactly (`exposed`, `buried`) versus
 hands to point sampling (`ambiguous`).
 """
 function classify_census(m::Molecule, probe::Float64)
-    rads = Molecules.radii(m); rmax = Molecules.r_max(m)
-    crds = Molecules.coords_cartesian(m); tree = SASA.KDTree(crds)
+    rads = MolecularStructure.radii(m); rmax = MolecularStructure.r_max(m)
+    crds = MolecularStructure.coords_cartesian(m); tree = SASA.KDTree(crds)
     c = Dict(SASA.ALL_EXPOSED => 0, SASA.ALL_BURIED => 0, SASA.AMBIGUOUS => 0)
     for i in axes(crds, 2)
         ρ = rads[i] + probe
@@ -246,7 +246,7 @@ function bench_systems()
     # 1. monoatomic, 40 radii from H-like to Cs-like
     for r in range(0.30, 3.00; length = 40)
         src = BenchRadii(Dict("X" => r))
-        m = Molecules.create("lone", ["X"], [(0.,0.,0.)]; radii_source = src)
+        m = MolecularStructure.create("lone", ["X"], [(0.,0.,0.)]; radii_source = src)
         push!(out, (@sprintf("lone_r%.2f", r), "monoatomic", m))
     end
 
@@ -254,7 +254,7 @@ function bench_systems()
     for (lbl, ra, rb) in (("1to1", 1.70, 1.70), ("2to1", 2.00, 1.00), ("5to1", 2.50, 0.50))
         src = BenchRadii(Dict("A" => ra, "B" => rb))
         for d in range(0.0, 2*(max(ra, rb) + BENCH_PROBE)*1.15; length = 40)
-            m = Molecules.create("dim", ["A","B"], [(0.,0.,0.), (d,0.,0.)]; radii_source = src)
+            m = MolecularStructure.create("dim", ["A","B"], [(0.,0.,0.), (d,0.,0.)]; radii_source = src)
             push!(out, (@sprintf("dimer_%s_d%.2f", lbl, d), "dimer", m))
         end
     end
@@ -384,7 +384,7 @@ function analytic_sweep(; probe = BENCH_PROBE, n_exp = 8192)
         for frac in range(0.08, 0.98; length = 12)
             d = 2ρ*frac
             src = BenchRadii(Dict("A" => r))
-            m = Molecules.create("pair", ["A","A"], [(0.,0.,0.), (d,0.,0.)]; radii_source = src)
+            m = MolecularStructure.create("pair", ["A","A"], [(0.,0.,0.), (d,0.,0.)]; radii_source = src)
             exact = 4π*ρ^2 - 2π*ρ*(ρ - d/2)
             got = SASA.sasa(m; probe, n_occ = 512, n_exp, area_tol = 0.0)[1][1]
             push!(rows, Any[r, ρ, d, d/(2ρ), got, exact, (got - exact)/exact])

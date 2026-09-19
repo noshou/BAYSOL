@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-using ..Constants: AVOGADRO
+using ..Helpers.Constants: AVOGADRO
 using ..Interfaces: Interfaces
 using Distributions
 
@@ -183,7 +183,7 @@ Given `μ = ρₑ, σ = √σ²`, the `LogNormal(μ_ln, σ_ln)` parameters are:
 - `ArgumentError`: thrown if `solutes` is empty.
 - `DomainError`: thrown if `σ_pH < 0`.
 """
-function dns_prior(
+function ρₑ_prior(
     pH::Real, 
     σ_pH::Real, 
     solutes::Vector{Solute}; 

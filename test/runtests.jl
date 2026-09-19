@@ -5,21 +5,21 @@
 
 using Test
 using ForwardDiff
-using ScatterNet
-using ScatterNet: Interfaces
-using ScatterNet: Cache
-using ScatterNet.Constants: DEFAULT_ATOL
-using ScatterNet.Interfaces: AtomicRadii
-using ScatterNet.Molecule: Molecules
-using ScatterNet.Molecule.SASA: PlasticMap
-using ScatterNet: Scattering
-using ScatterNet.Scattering: SphFuncs
-using ScatterNet.Interfaces: FormFactor
+using BayeSol
+using BayeSol: Interfaces
+using BayeSol: Cache
+using BayeSol.Constants: DEFAULT_ATOL
+using BayeSol.Interfaces: AtomicRadii
+using BayeSol.MolecularStructure: MolecularStructure
+using BayeSol.Solvation.SASA: PlasticMap
+using BayeSol: Scattering
+using BayeSol.Scattering: SphFuncs
+using BayeSol.Interfaces: FormFactor
 
 check_float(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
 check_complex(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
 
-@testset "ScatterNet" begin
+@testset "BayeSol" begin
     include("test_cache.jl")
     include("test_atomicradii.jl")
     include("test_molecules.jl")
@@ -38,5 +38,6 @@ check_complex(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
     include("test_deltarho.jl")
     include("test_excludedvolume.jl")
     include("test_paramtransform.jl")
+    include("test_sampler.jl")
     include("test_quality.jl")
 end

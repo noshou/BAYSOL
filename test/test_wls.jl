@@ -11,7 +11,7 @@
 
 using LinearAlgebra
 using Random
-using ScatterNet.Fitting: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll,
+using BayeSol.Fitting: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll,
     reduced_chi2
 
 """
@@ -250,14 +250,14 @@ end
         model(θ) = θ[1] .* exp.(-θ[2] .* q)   # θ = (amplitude, decay rate)
         loss(θ) = wls_marg_ll(wls_fit(model(θ), I_obs, σ))
 
-        θ0 = [2.5, 1.1]
-        g = ForwardDiff.gradient(loss, θ0)
+        θ₀ = [2.5, 1.1]
+        g = ForwardDiff.gradient(loss, θ₀)
         @test all(isfinite, g)
 
         h = 1e-6
         for i in 1:2
-            θp = copy(θ0); θp[i] += h
-            θm = copy(θ0); θm[i] -= h
+            θp = copy(θ₀); θp[i] += h
+            θm = copy(θ₀); θm[i] -= h
             @test g[i] ≈ (loss(θp) - loss(θm)) / (2h) rtol = 1e-4
         end
     end

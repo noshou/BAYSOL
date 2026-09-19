@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/Molecule/Molecules.jl: construction/centering, the two
+# Exercises src/MolecularStructure/Mols.jl: construction/centering, the two
 # coordinate frames, the lazy radii/vols/r_max accessors, and the error contract.
-using .Molecules:   Molecule, create, coords_cartesian, coords_spherical,
+using .MolecularStructure:   Molecule, create, coords_cartesian, coords_spherical,
                     radii, vols, r_max, elms, name, sphere_volume,
                     MoleculeError, _to_tuples
-using ScatterNet.Molecule: SASA
+using BayeSol.Solvation: SASA
 
 # row 1 = r, row 2 = theta, row 3 = phi
 r_(m)     = coords_spherical(m)[1, :]
@@ -20,17 +20,17 @@ _forced_rmax(m)  = getfield(getfield(m, :_r_max), :done)
 
 # A stand-in RadiiSource, to prove `radii_source` is actually consulted rather
 # than the default AtomicRadiiSource being hard-wired in.
-struct ConstantRadii <: ScatterNet.Interfaces.RadiiSource
+struct ConstantRadii <: BayeSol.Interfaces.RadiiSource
     value::Float64
 end
-ScatterNet.Interfaces.lookup(s::ConstantRadii, ions::AbstractVector{<:AbstractString}) =
+BayeSol.Interfaces.lookup(s::ConstantRadii, ions::AbstractVector{<:AbstractString}) =
     Tuple{String,Union{Float64,Nothing}}[(String(i), s.value) for i in ions]
 
-struct NeverResolves <: ScatterNet.Interfaces.RadiiSource end
-ScatterNet.Interfaces.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString}) =
+struct NeverResolves <: BayeSol.Interfaces.RadiiSource end
+BayeSol.Interfaces.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString}) =
     Tuple{String,Union{Float64,Nothing}}[(String(i), nothing) for i in ions]
 
-@testset "Molecules" begin
+@testset "MolecularStructure" begin
 
     @testset "two atoms on x axis" begin
         m = create("test", ["h", "h"], [(1.0, 0.0, 0.0), (-1.0, 0.0, 0.0)])

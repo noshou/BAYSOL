@@ -1,16 +1,20 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # package hygiene + type-stability guards.
-using Aqua, JET
+using Aqua, JET, ExplicitImports
 using .SphFuncs: sphHarm, sphBess, legendre_sphPlm
-using .Molecules: create, coords_cartesian, coords_spherical, radii, vols, r_max,
+using .MolecularStructure: MolecularStructure, create, coords_cartesian, coords_spherical, radii, vols, r_max,
                 elms, name, Molecule
-using ScatterNet.Interfaces.AtomicRadii: AtomicRadii, resolve_one, _resolve_all, tryparse_ion, ion_key, nearest_ion
-using ScatterNet.Molecule: SASA
+using BayeSol.Interfaces.AtomicRadii: AtomicRadii, resolve_one, _resolve_all, tryparse_ion, ion_key, nearest_ion
+using BayeSol.Solvation: SASA
 
 @testset "Aqua" begin
-    Aqua.test_all(ScatterNet; ambiguities = false)
-    Aqua.test_ambiguities(ScatterNet)
+    Aqua.test_all(BayeSol; ambiguities = false)
+    Aqua.test_ambiguities(BayeSol)
+end
+
+@testset "ExplicitImports: no stale `using X: a, b, c` imports anywhere" begin
+    test_no_stale_explicit_imports(BayeSol)
 end
 
 @testset "type stability (@inferred)" begin
@@ -48,16 +52,16 @@ end
     @test_opt target_modules = (SphFuncs,) sphBess([1.0, 2.0], [0.1, 0.5], 3)
     @test_opt target_modules = (SphFuncs,) sphHarm(3, [0.4, 1.2], [0.1, 2.0])
     @test_opt target_modules = (SphFuncs,) legendre_sphPlm(3, 2, 0.5)
-    @test_opt target_modules = (Molecules,) create("t", ["o", "h"],
+    @test_opt target_modules = (MolecularStructure,) create("t", ["o", "h"],
         [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)])
     @test_opt target_modules = (AtomicRadii,) resolve_one("fe3+")
     @test_opt target_modules = (AtomicRadii,) _resolve_all(["fe3+", "o2-"])
     @test_opt target_modules = (AtomicRadii,) tryparse_ion("fe3+")
 
     let m = create("t", ["o", "h", "h"], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)])
-        @test_opt target_modules = (Molecules,) radii(m)
-        @test_opt target_modules = (Molecules,) vols(m)
-        @test_opt target_modules = (Molecules,) r_max(m)
+        @test_opt target_modules = (MolecularStructure,) radii(m)
+        @test_opt target_modules = (MolecularStructure,) vols(m)
+        @test_opt target_modules = (MolecularStructure,) r_max(m)
     end
 end
 
@@ -71,7 +75,7 @@ end
         JET.get_reports(JET.report_opt(f, types; target_modules = (SASA,)))
 
     m = create("t", ["o", "h", "h"], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)])
-    crds = Molecules.coords_cartesian(m)
+    crds = MolecularStructure.coords_cartesian(m)
     TT   = typeof(SASA.KDTree(crds))
     Vec3 = SASA.PlasticMap.Vec3
 
