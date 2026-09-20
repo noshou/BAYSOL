@@ -82,12 +82,24 @@ parameters, so you generally don't need to pass them:
 - `chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size (results invariant).
 - `form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE`.
 - `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
-  `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: hydration-shell
-  geometry, forwarded to `hydration`.
+`n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: hydration-shell
+geometry, forwarded to `hydration`.
 """
-gram_matrix(mol::Molecule, qvals::AbstractVector{<:Real}, lMax::Integer, energy::Real;
-            kwargs...)::Array{Float64,3} =
-    gram(collect(species_multipoles(mol, qvals, lMax, energy; kwargs...)),
+gram_matrix(
+    mol::Molecule, qvals::AbstractVector{<:Real}, lMax::Integer, energy::Real;
+    ions::Vector{String}                 = elms(mol),
+    chunk::Unsigned                      = B_LM_CHUNK,
+    form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE,
+    thickness::Real                      = SHELL_THICKNESS,
+    probe::Real                          = PROBE_RADIUS,
+    n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
+    classes                              = SHELL_CLASSES,
+)::Array{Float64,3} =
+    gram(collect(species_multipoles(
+            mol, qvals, lMax, energy;
+            ions = ions, chunk = chunk, form_factor_source = form_factor_source,
+            thickness = thickness, probe = probe, n_target = n_target, classes = classes,
+        )),
         partial_wave_weights(lMax))
 
 """
@@ -139,19 +151,29 @@ common case:
 - `chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size (results invariant).
 - `form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE`.
 - `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
-  `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: hydration-shell
-  geometry, forwarded to `hydration`.
+`n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: hydration-shell
+geometry, forwarded to `hydration`.
 """
 forward_cache(
-    mol::Molecule, 
-    qvals::AbstractVector{<:Real}, 
+    mol::Molecule,
+    qvals::AbstractVector{<:Real},
     lMax::Integer,
-    energy::Real; 
-    kwargs...
+    energy::Real;
+    ions::Vector{String}                 = elms(mol),
+    chunk::Unsigned                      = B_LM_CHUNK,
+    form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE,
+    thickness::Real                      = SHELL_THICKNESS,
+    probe::Real                          = PROBE_RADIUS,
+    n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
+    classes                              = SHELL_CLASSES,
 )::ForwardCache =
     ForwardCache(
-        gram_matrix(mol, qvals, lMax, energy; kwargs...),
-        collect(Float64, qvals), 
+        gram_matrix(
+            mol, qvals, lMax, energy;
+            ions = ions, chunk = chunk, form_factor_source = form_factor_source,
+            thickness = thickness, probe = probe, n_target = n_target, classes = classes,
+        ),
+        collect(Float64, qvals),
         mean_atomic_radius(mol)
     )
 
@@ -242,10 +264,10 @@ call [`forward_cache`](@ref) once and the [`ForwardCache`](@ref) method of
 
 # Arguments
 - `mol::Molecule`, `qvals`, `lMax`, `energy`: as in [`forward_cache`](@ref)/
-  [`species_multipoles`](@ref) — the geometry/beam setup, not fit parameters.
+    [`species_multipoles`](@ref) — the geometry/beam setup, not fit parameters.
 - `m`, `c`, `dns`, `δρ`, `c_1`: the fit parameters, positional exactly as on the
-  `forward(cache, m, c, dns, δρ, c_1)` method above (required except `c_1`,
-  which defaults to `nothing`).
+    `forward(cache, m, c, dns, δρ, c_1)` method above (required except `c_1`,
+    which defaults to `nothing`).
 
 # Keywords
 Any keywords are forwarded verbatim to [`species_multipoles`](@ref) (same list
@@ -255,7 +277,7 @@ parameters, so you generally don't need to pass them:
 - `chunk::Unsigned = B_LM_CHUNK`
 - `form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE`
 - `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
-  `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`
+    `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`
 """
 function forward(
     mol::Molecule,
@@ -267,7 +289,18 @@ function forward(
     dns::Real,
     δρ::Union{Real,NTuple{3,<:Real}},
     c_1::Union{Nothing,Real} = nothing;
-    kwargs...
+    ions::Vector{String}                 = elms(mol),
+    chunk::Unsigned                      = B_LM_CHUNK,
+    form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE,
+    thickness::Real                      = SHELL_THICKNESS,
+    probe::Real                          = PROBE_RADIUS,
+    n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
+    classes                              = SHELL_CLASSES,
 )
-    return forward(forward_cache(mol, qvals, lMax, energy; kwargs...), m, c, dns, δρ, c_1)
+    cache = forward_cache(
+        mol, qvals, lMax, energy;
+        ions = ions, chunk = chunk, form_factor_source = form_factor_source,
+        thickness = thickness, probe = probe, n_target = n_target, classes = classes,
+    )
+    return forward(cache, m, c, dns, δρ, c_1)
 end

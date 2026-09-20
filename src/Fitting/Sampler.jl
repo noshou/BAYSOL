@@ -7,8 +7,7 @@ HMCKernel, Trajectory, MultinomialTS, GeneralisedNoUTurn
 using FastClosures, StaticArrays, Distributions, ForwardDiff, DiffResults
 
 using ..Scattering: forward, ForwardCache
-using ..MolecularStructure: Molecule, Residues, Ionization
-using ..Solvation: protein_cavity_electrostatics
+using ..Helpers.Constants: DEFAULT_TEMPERATURE_C, C1_PRIOR_MASS_PERCENT
 
 "Physical prior distributions."
 struct _ξ_priors
@@ -24,10 +23,10 @@ end
         pH::Real,
         σ_pH::Real,
         solutes::Vector{Solute};
-        t::Real = 25.0,
+        t::Real = DEFAULT_TEMPERATURE_C,
         μ_χ::Real = 0,
         σ_χ::Real = 0.0,
-        n::Real = 95
+        n::Real = C1_PRIOR_MASS_PERCENT
     ) -> _ξ_priors
 
 Generates physical prior distributions of `ξ`.
@@ -36,31 +35,30 @@ Generates physical prior distributions of `ξ`.
 - `pH::Real`: pH of the solution; forwarded to `PartialMolarVolumes.ϕ°` for `Protein` solutes.
 - `σ_pH::Real`: standard uncertainty on `pH`, propagated through each `Protein`
     solute's titration term.
-- `solutes::Vector{Solute}`: the  species in solution.
+- `solutes::Vector{Solute}`: the species in solution.
 
 # Keywords
-- `t::Real=25.0`:   solution temperature in °C, forwarded to `PartialMolarVolumes.ρₑ_w`.
-                    **!!NOTE!!: as of this version, this should NOT be changed, 
-                    since only water is temp dependent.**
-- `μ_χ`=0.0:        mean, over cavity beads, of the screened-electrostatic potential χ
-                    (Debye-Hückel, aggregated from nearby phosphate / ionizable-side-chain
-                    charge sites), feeding δρ3's cavity-water contrast.
-- `σ_χ`=0.0:        standard deviation, over cavity beads, of χ, feeding δρ3's
-                    cavity-water contrast.
-- `n`:              percentage ((0, 100]) of the prior mass required to fall within
-                    CRYSOL's bound `[0.96, 1.04]` around its default `c_1 = 1`. Higher `n`
-                    concentrates more mass near the default; lower `n` allows more spread.
-                    Defaulted to `n = 95`; only change if more spread is needed.
-
+- `t::Real = DEFAULT_TEMPERATURE_C`: solution temperature in °C, forwarded to
+    `PartialMolarVolumes.ρₑ_w`. **!!NOTE!!: as of this version, this should NOT
+    be changed, since only water is temperature-dependent.**
+- `μ_χ = 0.0`: mean, over cavity beads, of the screened-electrostatic potential χ
+    (Debye-Hückel, aggregated from nearby phosphate / ionizable-side-chain
+    charge sites), feeding δρ3's cavity-water contrast.
+- `σ_χ = 0.0`: standard deviation, over cavity beads, of χ, feeding δρ3's
+    cavity-water contrast.
+- `n::Real = C1_PRIOR_MASS_PERCENT`: percentage `(0, 100]` of the prior mass required to
+    fall within CRYSOL's bound `[0.96, 1.04]` around its default `c_1 = 1`. Higher `n`
+    concentrates more mass near the default; lower `n` allows more spread — only
+    change from the default if more spread is needed.
 """
 function _calc_ξ_priors(
     pH::Real,
     σ_pH::Real,
     solutes::Vector{Solute};
-    t::Real = 25.0,
+    t::Real = DEFAULT_TEMPERATURE_C,
     μ_χ::Real = 0,
     σ_χ::Real = 0.0,
-    n::Real = 95
+    n::Real = C1_PRIOR_MASS_PERCENT
 )::_ξ_priors
     dns = ρₑ_prior(pH, σ_pH, solutes; t=t)
     δρ1, δρ2, δρ3 = δρ_prior(; μ_χ=μ_χ, σ_χ=σ_χ)
@@ -249,16 +247,12 @@ end
 """
     Seed{T<:Real, V<:AbstractVector}
 
-Everything [`run_fitting`](@ref) needs to start a NUTS chain, built once by
-[`seed_fitting`](@ref) and reused across calls to `run_fitting` (e.g. with different
-`n_samples`/`l`/`δ`, without redrawing the initial point or rebuilding the
-priors each time).
+Everything [`run_fitting`](@ref) needs to start a NUTS chain.
 
 # Fields
 - `pr::_ξ_priors`: the physical priors over `ξ`, from [`_calc_ξ_priors`](@ref).
 - `ξ₀::SVector{5,T}`: one draw from `pr`, in physical ξ-space, from [`_ξ₀`](@ref).
-- `θ₀::SVector{5,T}`: `ξ₀` reparameterized into unconstrained θ-space via
-    [`Θ`](@ref) — the actual starting position handed to `AdvancedHMC.sample`.
+- `θ₀::SVector{5,T}`: `ξ₀` reparameterized into unconstrained θ-space via [`Θ`](@ref).
 - `fw::ForwardCache`: the structure's geometry-only cache (the Gram matrix
     `G(q)`, q-grid, and mean atomic radius), from `forward_cache`.
 - `ex::Tuple{V,V}`: `(I_exp, σ_exp)`, the measured intensity curve and its
@@ -273,71 +267,50 @@ struct Seed{T<:Real, V<:AbstractVector}
 end
 
 """
-Runs initial seeding for sampler. Computes every quantity derivable from the
-structure and solution conditions internally -- including the
-screened-electrostatic `(μ_χ, σ_χ)` cavity-water contrast signal, built here
-from a fresh [`Ionization`](@ref) (real per-residue-instance pKa's via
-Henderson-Hasselbalch, `σ_pH`-propagated) rather than accepted as a
-separately-supplied keyword. Seed fitting is "seed our fit with some
-reproducible structure": it owns every quantity derivable from `mol`/
-`residues`/`pKa_records`/`pH`/`σ_pH`, not just some of them.
+Runs initial seeding for sampler. `seed_fitting` is deliberately a thin,
+structure-agnostic step: it takes the physical priors' `(μ_χ, σ_χ)` as plain
+numbers, same as `_calc_ξ_priors` does, rather than computing them itself from
+a `Molecule`/`Residues`/pKa records. Building `Ionization` and calling
+`protein_cavity_electrostatics` is the caller's job (e.g. an orchestration
+function that already has the structure in hand) — `seed_fitting` only turns
+already-known priors and experimental data into a `Seed`.
 
 # Arguments
 - `fw::ForwardCache`: Cache of the forward model
-- `mol::Molecule`: the structure being fit; forwarded (with `residues`,
-    `ionization`) to `protein_cavity_electrostatics`.
-- `residues::Residues`: per-atom residue identity for `mol`, forwarded to
-    [`Ionization`](@ref) and to `protein_cavity_electrostatics`.
-- `pKa_records`: per-residue-instance pKa records (e.g. from
-    `propka_pKas`), forwarded to [`Ionization`](@ref).
 - `I_exp::AbstractVector`: Experimental intensity curve
 - `σ_exp::AbstractVector`: Per-q standard deviation
 - `pH::Real`: pH of the solution; forwarded to `PartialMolarVolumes.ϕ°` for
-    `Protein` solutes, and to [`Ionization`](@ref).
+    `Protein` solutes.
 - `σ_pH::Real`: standard uncertainty on `pH`, propagated through each `Protein`
-    solute's titration term and through [`Ionization`](@ref)'s `σ_charge`.
-- `solutes::Vector{Solute}`: the  species in solution.
+    solute's titration term.
+- `solutes::Vector{Solute}`: the species in solution.
 
 # Keywords
-- `t::Real=25.0`:   solution temperature in °C, forwarded to `PartialMolarVolumes.ρₑ_w`.
-                    **!!NOTE!!: as of this version, this should NOT be changed,
-                    since only water is temp dependent.**
-- `n`:              percentage ((0, 100]) of the prior mass required to fall within
-                    CRYSOL's bound `[0.96, 1.04]` around its default `c_1 = 1`. Higher `n`
-                    concentrates more mass near the default; lower `n` allows more spread.
-                    Defaulted to `n = 95`; only change if more spread is needed.
-- `probe::Float64 = 1.4`, `n_target::Union{Nothing,Int} = nothing`,
-    `ionic_strength_M::Float64 = 0.15`, `eps_r::Float64 = 80.0`,
-    `T::Float64 = 300.0`, `cutoff_debye_lengths::Float64 = 5.0`: forwarded
-    to `protein_cavity_electrostatics` (and, in turn, `debye_length`) to
-    compute `(μ_χ, σ_χ)` internally. There is no override path for
-    `(μ_χ, σ_χ)` themselves -- they are always computed here, not supplied.
+- `t::Real = DEFAULT_TEMPERATURE_C`: solution temperature in °C, forwarded to
+    `PartialMolarVolumes.ρₑ_w`. **!!NOTE!!: as of this version, this should NOT
+    be changed, since only water is temperature-dependent.**
+- `μ_χ::Real = 0`, `σ_χ::Real = 0.0`: mean/standard deviation, over cavity beads,
+    of the screened-electrostatic potential χ, feeding δρ3's cavity-water
+    contrast — forwarded straight to `_calc_ξ_priors`. Compute these with
+    `protein_cavity_electrostatics` beforehand if the structure has real
+    ionizable charge sites; left at `0`/`0.0` otherwise.
+- `n::Real = C1_PRIOR_MASS_PERCENT`: percentage `(0, 100]` of the prior mass required to
+    fall within CRYSOL's bound `[0.96, 1.04]` around its default `c_1 = 1`. Higher `n`
+    concentrates more mass near the default; lower `n` allows more spread — only
+    change from the default if more spread is needed.
 """
 function seed_fitting(
     fw::ForwardCache,
-    mol::Molecule,
-    residues::Residues,
-    pKa_records,
     I_exp::AbstractVector,
     σ_exp::AbstractVector,
     pH::Real,
     σ_pH::Real,
     solutes::Vector{Solute};
-    t::Real = 25.0,
-    n::Real = 95,
-    probe::Float64 = 1.4,
-    n_target::Union{Nothing,Int} = nothing,
-    ionic_strength_M::Float64 = 0.15,
-    eps_r::Float64 = 80.0,
-    T::Float64 = 300.0,
-    cutoff_debye_lengths::Float64 = 5.0,
+    t::Real = DEFAULT_TEMPERATURE_C,
+    μ_χ::Real = 0,
+    σ_χ::Real = 0.0,
+    n::Real = C1_PRIOR_MASS_PERCENT,
 )::Seed
-    ionization = Ionization(residues, pKa_records, pH, σ_pH)
-    μ_χ, σ_χ = protein_cavity_electrostatics(
-        mol, residues, ionization;
-        probe = probe, n_target = n_target, ionic_strength_M = ionic_strength_M,
-        eps_r = eps_r, T = T, cutoff_debye_lengths = cutoff_debye_lengths,
-    )
     pr = _calc_ξ_priors(pH, σ_pH, solutes; t=t, μ_χ=μ_χ, σ_χ=σ_χ, n=n)
     ξ₀ = _ξ₀(pr)
     θ₀, _ = Θ(ξ₀)
@@ -346,8 +319,15 @@ function seed_fitting(
 end
 
 """
-    run_fitting(seed::Seed, n_samples::Int64, n_adapt::Int64; l::LIKELIHOOD=PROFILE(), δ::Real=80)
-        -> (samples, stats)
+    run_fitting(
+        seed::Seed, 
+        n_samples::Int64, 
+        n_adapt::Int64; 
+        l::LIKELIHOOD=PROFILE(), 
+        δ::Real=80
+    ) -> (samples, stats)
+
+Identical to [`BayeSol.run_fitting`](@ref).
 
 Run NUTS on [`_logπ`](@ref) starting from `seed`, returning posterior draws
 of the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`.
@@ -425,7 +405,13 @@ function run_fitting(
     # SOneTo), which _logπ's SVector{5,<:Real} signature can't dispatch on
     # directly, so re-wrap it into an SVector first (same idiom as
     # test_paramtransform.jl's AD-differentiability tests).
-    ℓπ = @closure θ -> _logπ(SVector{5,eltype(θ)}(θ...), seed.pr, seed.ex[1], seed.ex[2], seed.fw, l)
+    ℓπ = @closure θ -> _logπ(
+        SVector{5,eltype(θ)}(θ...), 
+        seed.pr, 
+        seed.ex[1], 
+        seed.ex[2], 
+        seed.fw, l
+    )
 
     # ∂ℓπ∂θ: θ ↦ (log π(θ), ∇log π(θ)), computed in one ForwardDiff pass —
     # this is what AdvancedHMC's leapfrog integrator actually calls every step.
