@@ -191,3 +191,19 @@ elms(m::Molecule)::Vector{String}    = m._elms
 
 "Molecule label."
 name(m::Molecule)::String            = m._name
+
+"""
+Per-atom residue identity for a protein `Molecule`: resname, atom name,
+residue number, and chain ID (standard PDB identity), one entry per atom.
+
+`resnum`/`chain` distinguish different *instances* of the same residue type
+(e.g. two separate `"ASP"` residues at different sequence positions) — needed
+because per-residue-instance data (such as a PROPKA pKa prediction) is keyed
+by `(resname, resnum, chain)`, not by `resname` alone.
+"""
+struct Residues
+    resname  :: Vector{String}
+    atomname :: Vector{String}
+    resnum   :: Vector{Int}
+    chain    :: Vector{String}
+end
