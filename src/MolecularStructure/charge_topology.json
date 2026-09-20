@@ -1,0 +1,11 @@
+{
+  "ASP": {"type": "acid", "atoms": {"OD1": 0.5, "OD2": 0.5}},
+  "GLU": {"type": "acid", "atoms": {"OE1": 0.5, "OE2": 0.5}},
+  "CYS": {"type": "acid", "atoms": {"SG": 1.0}},
+  "TYR": {"type": "acid", "atoms": {"OH": 1.0}},
+  "HIS": {"type": "base", "atoms": {"ND1": 0.5, "NE2": 0.5}},
+  "LYS": {"type": "base", "atoms": {"NZ": 1.0}},
+  "ARG": {"type": "base", "atoms": {"NE": 0.333333333333, "NH1": 0.333333333333, "NH2": 0.333333333333}},
+  "N+": {"type": "base", "atoms": {"N": 1.0}},
+  "C-": {"type": "acid", "atoms": {"O": 0.5, "OXT": 0.5}}
+}

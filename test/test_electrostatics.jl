@@ -11,10 +11,18 @@ using BayeSol.MolecularStructure: create, coords_cartesian
 using BayeSol.Solvation.Electrostatics:
     Electrostatics, PHOSPHATE_NET_CHARGE, debye_length, nucleic_acid_cavity_electrostatics,
     _phosphate_charge_sites, _screened_field, _aggregate, _sample_std,
-    protein_cavity_electrostatics, _protein_charge_sites, _residue_charge
-using BayeSol.MolecularStructure: Residues
+    protein_cavity_electrostatics, _protein_charge_sites
+using BayeSol.MolecularStructure: Residues, Ionization
 using BayeSol.Fitting: δρ_prior
 using Distributions: mean, std
+
+# Synthetic pKa record + independent Henderson-Hasselbalch reference,
+# mirroring test_ionization.jl's own fixture pattern -- bypasses PROPKA
+# entirely, `Ionization`'s constructor is pure/offline.
+pKa_rec(resname, resnum, chain, pKa) = (resname = resname, resnum = resnum, chain = chain, pKa = pKa)
+ref_frac_base(pH, pKa) = 1.0 / (1.0 + 10.0^(pH - pKa))
+ref_frac_acid(pH, pKa) = 1.0 / (1.0 + 10.0^(pKa - pH))
+ref_charge(type, pH, pKa) = type == "base" ? ref_frac_base(pH, pKa) : -ref_frac_acid(pH, pKa)
 
 # ---------------------------------------------------------------------------
 # Injected radii source, real element letters (p/o/c), mirroring
@@ -137,23 +145,29 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
     #                 _aggregate -- unit-level, synthetic pts/sel
     #------------------------------------------------------------------
 
+    # _aggregate now takes (atom_index, charge, σ_charge) triples; phosphate
+    # sites (an unrelated, non-Ionization code path) carry no σ_charge, so
+    # pad with 0.0 -- mirrors what nucleic_acid_cavity_electrostatics itself
+    # does at its own call site.
+    _triple0(sites) = [(o, q, 0.0) for (o, q) in sites]
+
     @testset "_aggregate: empty selection returns (0.0, 0.0)" begin
         m = elec_mol(["c"], [(0.0, 0.0, 0.0)])
         pts = zeros(3, 0)
-        @test _aggregate(m, pts, Int[], _phosphate_charge_sites(m)) == (0.0, 0.0)
+        @test _aggregate(m, pts, Int[], _triple0(_phosphate_charge_sites(m))) == (0.0, 0.0)
     end
 
     @testset "_aggregate: no charge sites at all returns (0.0, 0.0)" begin
         m = elec_mol(["c", "c"], [(0.0, 0.0, 0.0), (5.0, 0.0, 0.0)])
         pts = reshape([2.5, 0.0, 0.0], 3, 1)
-        @test _aggregate(m, pts, [1], _phosphate_charge_sites(m)) == (0.0, 0.0)
+        @test _aggregate(m, pts, [1], _triple0(_phosphate_charge_sites(m))) == (0.0, 0.0)
     end
 
     @testset "_aggregate: bead closer to a phosphate charge scores higher" begin
         elms = ["p", "o", "o"]
         crds = [(0.0, 0.0, 0.0), (1.5, 0.0, 0.0), (-1.5, 0.0, 0.0)]
         m = elec_mol(elms, crds)
-        sites = _phosphate_charge_sites(m)
+        sites = _triple0(_phosphate_charge_sites(m))
 
         pts = [3.0 10.0; 0.0 0.0; 0.0 0.0]   # bead 1 near, bead 2 far
         μ_near, _ = _aggregate(m, pts, [1], sites)
@@ -214,45 +228,72 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
     #                 _protein_charge_sites
     #------------------------------------------------------------------
 
-    @testset "_protein_charge_sites: mismatched residues length throws ArgumentError" begin
-        m = elec_mol(["c", "c"], [(0.0, 0.0, 0.0), (5.0, 0.0, 0.0)])
-        bad = Residues(["GLY"], ["CA"])   # length 1, mol has 2 atoms
-        @test_throws ArgumentError _protein_charge_sites(m, bad)
+    @testset "_protein_charge_sites: mismatched residues/ionization length throws ArgumentError" begin
+        residues = Residues(["GLY"], ["CA"], [1], ["A"])   # length 1
+        bad_ionization = Ionization(
+            Residues(["GLY", "GLY"], ["CA", "C"], [1, 1], ["A", "A"]),  # length 2
+            [], 7.4, 0.0,
+        )
+        @test_throws ArgumentError _protein_charge_sites(residues, bad_ionization)
     end
 
     @testset "_protein_charge_sites: an all-backbone molecule has no charge sites" begin
-        m = elec_mol(["c", "c", "o"], [(0.0, 0.0, 0.0), (1.5, 0.0, 0.0), (3.0, 0.0, 0.0)])
-        residues = Residues(["GLY", "GLY", "GLY"], ["CA", "C", "O"])
-        @test isempty(_protein_charge_sites(m, residues))
+        residues = Residues(["GLY", "GLY", "GLY"], ["CA", "C", "O"], [1, 1, 1], ["A", "A", "A"])
+        ionization = Ionization(residues, [], 7.4, 0.2)   # no pKa records -> everything stays 0
+        @test isempty(_protein_charge_sites(residues, ionization))
     end
 
-    @testset "_protein_charge_sites: Asp side-chain oxygens resolve via _residue_charge" begin
-        elms = ["c", "o", "o"]   # a bare CA plus the two carboxylate O's
-        crds = [(0.0, 0.0, 0.0), (1.5, 0.0, 0.0), (-1.5, 0.0, 0.0)]
-        m = elec_mol(elms, crds)
-        residues = Residues(["ASP", "ASP", "ASP"], ["CA", "OD1", "OD2"])
+    @testset "_protein_charge_sites: Asp side-chain oxygens resolve via a synthetic Ionization" begin
+        residues = Residues(["ASP", "ASP", "ASP"], ["CA", "OD1", "OD2"], [1, 1, 1], ["A", "A", "A"])
+        pH, σ_pH, pKa = 7.4, 0.2, 3.9
+        ionization = Ionization(residues, [pKa_rec("ASP", 1, "A", pKa)], pH, σ_pH)
 
-        sites = _protein_charge_sites(m, residues)
+        sites = _protein_charge_sites(residues, ionization)
         @test length(sites) == 2
-        @test Set(first.(sites)) == Set([2, 3])
-        q_od1 = _residue_charge("ASP", "OD1")
-        q_od2 = _residue_charge("ASP", "OD2")
-        @test Set(last.(sites)) == Set([q_od1, q_od2])
+        @test Set(getindex.(sites, 1)) == Set([2, 3])
+
+        q_asp = ref_charge("acid", pH, pKa)   # Asp: acid, split 0.5/0.5 on OD1/OD2
+        for (i, q, σq) in sites
+            @test close_(q, 0.5 * q_asp)
+            @test σq > 0.0   # σ_pH > 0 -> nonzero delta-method propagation
+        end
     end
 
-    @testset "_protein_charge_sites: Lys/Arg resolve to _residue_charge's own values" begin
-        elms = ["n", "n", "n", "n"]
-        crds = [(0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (4.0, 0.0, 0.0), (6.0, 0.0, 0.0)]
-        m = elec_mol(elms, crds)
-        residues = Residues(["LYS", "ARG", "ARG", "ARG"], ["NZ", "NH1", "NH2", "NE"])
+    @testset "_protein_charge_sites: Lys/Arg resolve to independently-computed HH values" begin
+        # LYS is residue 1, ARG is residue 2 -- all three Arg atoms belong to
+        # the same residue instance.
+        residues = Residues(
+            ["LYS", "ARG", "ARG", "ARG"], ["NZ", "NH1", "NH2", "NE"],
+            [1, 2, 2, 2], ["A", "A", "A", "A"],
+        )
+        pH, σ_pH = 7.4, 0.2
+        pKa_lys, pKa_arg = 10.5, 12.5
+        ionization = Ionization(
+            residues,
+            [pKa_rec("LYS", 1, "A", pKa_lys), pKa_rec("ARG", 2, "A", pKa_arg)],
+            pH, σ_pH,
+        )
 
-        sites = Dict(_protein_charge_sites(m, residues))
-        @test close_(sites[1], _residue_charge("LYS", "NZ"))
-        @test close_(sites[2], _residue_charge("ARG", "NH1"))
-        @test close_(sites[3], _residue_charge("ARG", "NH2"))
-        @test close_(sites[4], _residue_charge("ARG", "NE"))
+        sites = Dict((i, q) for (i, q, _) in _protein_charge_sites(residues, ionization))
+        q_lys = ref_charge("base", pH, pKa_lys)
+        q_arg = ref_charge("base", pH, pKa_arg)
+        @test close_(sites[1], q_lys)                    # Lys: split 1.0 on NZ
+        @test close_(sites[2], (1.0 / 3.0) * q_arg)       # Arg: split 1/3 each
+        @test close_(sites[3], (1.0 / 3.0) * q_arg)
+        @test close_(sites[4], (1.0 / 3.0) * q_arg)
         # all three Arg atoms share the same per-atom charge, by construction
         @test close_(sites[2], sites[3]) && close_(sites[3], sites[4])
+    end
+
+    @testset "_protein_charge_sites: σ_pH = 0 -> every triple's σ_charge is exactly 0" begin
+        residues = Residues(["ASP", "ASP"], ["OD1", "OD2"], [1, 1], ["A", "A"])
+        ionization = Ionization(residues, [pKa_rec("ASP", 1, "A", 3.9)], 7.4, 0.0)
+        sites = _protein_charge_sites(residues, ionization)
+        @test length(sites) == 2
+        for (_, q, σq) in sites
+            @test q != 0.0
+            @test σq == 0.0
+        end
     end
 
     #------------------------------------------------------------------
@@ -261,14 +302,16 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
 
     @testset "protein_cavity_electrostatics: a lone atom has no CAVITY beads -> falls back to (0.0, 0.0)" begin
         m = elec_mol(["c"], [(0.0, 0.0, 0.0)])
-        residues = Residues(["GLY"], ["CA"])
-        @test protein_cavity_electrostatics(m, residues; probe = 1.4) == (0.0, 0.0)
+        residues = Residues(["GLY"], ["CA"], [1], ["A"])
+        ionization = Ionization(residues, [], 7.4, 0.2)
+        @test protein_cavity_electrostatics(m, residues, ionization; probe = 1.4) == (0.0, 0.0)
     end
 
     @testset "protein_cavity_electrostatics: an all-backbone sealed shell scores neutral" begin
         m = elec_mol(fill("c", 300), sph(4.0, 300))
-        residues = Residues(fill("GLY", 300), fill("CA", 300))
-        @test protein_cavity_electrostatics(m, residues; probe = 1.4) == (0.0, 0.0)
+        residues = Residues(fill("GLY", 300), fill("CA", 300), collect(1:300), fill("A", 300))
+        ionization = Ionization(residues, [], 7.4, 0.2)
+        @test protein_cavity_electrostatics(m, residues, ionization; probe = 1.4) == (0.0, 0.0)
     end
 
     @testset "protein_cavity_electrostatics: an Asp/Lys pair inside the cavity gives a positive χ" begin
@@ -285,11 +328,45 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
         residues = Residues(
             vcat(fill("GLY", 800), ["ASP", "ASP", "LYS"]),
             vcat(fill("CA", 800), ["OD1", "OD2", "NZ"]),
+            vcat(collect(1:800), [801, 801, 802]),
+            fill("A", 803),
+        )
+        pH, σ_pH = 7.4, 0.2
+        ionization = Ionization(
+            residues, [pKa_rec("ASP", 801, "A", 3.9), pKa_rec("LYS", 802, "A", 10.5)], pH, σ_pH,
         )
 
-        μ, σ = protein_cavity_electrostatics(m, residues; probe = 1.4)
+        μ, σ = protein_cavity_electrostatics(m, residues, ionization; probe = 1.4)
         @test μ > 0.0
         @test σ >= 0.0
+    end
+
+    @testset "protein_cavity_electrostatics: σ_pH = 0 recovers purely-spatial σ_χ (regression boundary)" begin
+        shell_elms = fill("c", 800)
+        shell_crds = sph(8.0, 800)
+        ion_elms = ["o", "o", "n"]
+        ion_crds = [(0.0, 0.0, 0.0), (1.5, 0.0, 0.0), (-2.0, 0.0, 0.0)]
+        m = elec_mol(vcat(shell_elms, ion_elms), vcat(shell_crds, ion_crds))
+        residues = Residues(
+            vcat(fill("GLY", 800), ["ASP", "ASP", "LYS"]),
+            vcat(fill("CA", 800), ["OD1", "OD2", "NZ"]),
+            vcat(collect(1:800), [801, 801, 802]),
+            fill("A", 803),
+        )
+        records = [pKa_rec("ASP", 801, "A", 3.9), pKa_rec("LYS", 802, "A", 10.5)]
+
+        ionization_0 = Ionization(residues, records, 7.4, 0.0)
+        μ0, σ0 = protein_cavity_electrostatics(m, residues, ionization_0; probe = 1.4)
+
+        ionization_pos = Ionization(residues, records, 7.4, 0.2)
+        μpos, σpos = protein_cavity_electrostatics(m, residues, ionization_pos; probe = 1.4)
+
+        # μ_χ is unaffected by σ_pH (it depends only on the point-estimate charges,
+        # which are the same at both σ_pH since pH itself didn't change).
+        @test close_(μ0, μpos)
+        # with σ_pH = 0 every site's σ_charge is 0, so σ_χ is purely spatial;
+        # with σ_pH > 0 the pH-driven quadrature term only adds spread.
+        @test σpos >= σ0
     end
 
     #------------------------------------------------------------------
@@ -305,9 +382,14 @@ include(joinpath(@__DIR__, "fixtures", "floatcompare.jl"))   # close_
         residues = Residues(
             vcat(fill("GLY", 800), ["ASP", "ASP", "LYS"]),
             vcat(fill("CA", 800), ["OD1", "OD2", "NZ"]),
+            vcat(collect(1:800), [801, 801, 802]),
+            fill("A", 803),
         )
 
-        μχ, σχ = protein_cavity_electrostatics(m, residues)
+        ionization = Ionization(
+            residues, [pKa_rec("ASP", 801, "A", 3.9), pKa_rec("LYS", 802, "A", 10.5)], 7.4, 0.2,
+        )
+        μχ, σχ = protein_cavity_electrostatics(m, residues, ionization)
         _, _, dro3 = δρ_prior(μ_χ = μχ, σ_χ = σχ)
 
         @test close_(mean(dro3), μχ)
