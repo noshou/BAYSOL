@@ -290,7 +290,8 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
     end
 
     @testset "load_molecule end-to-end on the fetched PDB ID" begin
-        mol, res = load_molecule(PDBIDSource(_TEST_PDB_ID))
+        path = resolve_structure(PDBIDSource(_TEST_PDB_ID))
+        mol, res = load_molecule(path)
         @test mol isa Molecule
         @test res isa Residues
 
@@ -395,9 +396,20 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
             end
 
             # load_molecule end-to-end: internally consistent, no garbage coords.
-            mol, res = load_molecule(LocalPathSource(path))
+            # load_molecule no longer applies heavyatomselector (it's a generic
+            # loader, not a heavy-atom-only one -- see PDB2PQR.jl/Mols.jl), so
+            # its atom count is checked against an independent standardselector
+            # -only oracle rather than the heavy-atom expected_n directly: a
+            # .cif-sourced fixture is always heavy-only after canonicalization
+            # (so the two counts coincide), but a raw .pdb-passthrough fixture
+            # may already carry its own embedded hydrogens on disk (true of
+            # e.g. 7RSA-TEST.pdb, 1IGT-TEST.pdb), which resolve_structure's
+            # pure-passthrough branch never strips.
+            standard_only_n = length(BioStructures.collectatoms(struc[1], standardselector))
+            mol, res = load_molecule(resolved)
             n = n_atoms(mol)
-            @test n == expected_n
+            @test n == standard_only_n
+            is_cif && @test n == expected_n
             @test length(res.resname) == n && length(res.atomname) == n
             @test length(res.resnum) == n && length(res.chain) == n
             cc = coords_cartesian(mol)
@@ -421,13 +433,14 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
         # "1UBQ-TEST.cif") -- distinct from PDBIDSource's uppercase-ID cache
         # key ("1UBQ.pdb"), so the two paths below resolve to genuinely
         # different cache files even though both concern the same protein.
-        mol_local, res_local = load_molecule(LocalPathSource(fixture_path))
         local_resolved = resolve_structure(LocalPathSource(fixture_path))
+        mol_local, res_local = load_molecule(local_resolved)
 
         # Force a genuine fresh network fetch for the PDB-ID path.
         net_cache = joinpath(_store_dir(), uppercase(id) * ".pdb")
         rm(net_cache; force = true)
-        mol_net, res_net = load_molecule(PDBIDSource(id))
+        net_resolved = resolve_structure(PDBIDSource(id))
+        mol_net, res_net = load_molecule(net_resolved)
 
         is_cif = lowercase(splitext(fname)[2]) in (".cif", ".mmcif")
         if is_cif

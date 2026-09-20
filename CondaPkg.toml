@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
 # Conda environment for BayeSol, managed by CondaPkg.jl. This exists solely to
-# auto-provision an isolated Python + `propka` install for
+# auto-provision an isolated Python + `propka`/`pdb2pqr` install for
 # `src/MolecularStructure/Propka.jl` (per-residue pKa prediction via the
-# `propka3` CLI) without requiring users to have Python installed themselves;
-# CondaPkg vendors its own micromamba/pixi backend.
+# `propka3` CLI) and `src/MolecularStructure/PDB2PQR.jl` (hydrogen addition
+# via the `pdb2pqr` CLI) without requiring users to have Python installed
+# themselves; CondaPkg vendors its own micromamba/pixi backend.
 
 [deps]
 # propka is pure-Python; its PyPI metadata declares `Requires-Python >=3.8`
@@ -18,3 +19,8 @@ python = ">=3.8,<3.13"
 
 [pip.deps]
 propka = ""
+# pdb2pqr adds hydrogens (its own internal propka pass decides protonation
+# state); it depends on propka itself, so rides the same <3.13 cap above for
+# the same reason (propka 3.5.1's `Parameters.__annotations__` crash on
+# CPython 3.14, confirmed empirically against pdb2pqr 3.7.1 too).
+pdb2pqr = ""

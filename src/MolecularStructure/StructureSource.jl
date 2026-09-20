@@ -3,8 +3,8 @@
 """
 Resolve a protein structure from any of three input shapes (a local file, a
 bare RCSB PDB ID, or an arbitrary URL) into one canonical `.pdb` file stored
-in [`_store_dir`](@ref), and load that file into the `Molecule`/`Residues`
-pair the rest of this package consumes.
+in [`_store_dir`](@ref). Callers who need the parsed `Molecule`/`Residues`
+pair pass the resulting path to `load_molecule` themselves.
 
 This is a flat, permanent, name-keyed local store, not a cache with
 invalidation/freshness semantics — see [`_store_dir`](@ref) for what that
@@ -12,8 +12,7 @@ means concretely for each source type below.
 """
 
 using BioStructures: BioStructures, MMCIFFormat, PDBFormat, writepdb,
-                    standardselector, heavyatomselector, retrievepdb,
-                    collectatoms, atomname, element, resname, resnumber, chainid, coords
+                    standardselector, heavyatomselector, retrievepdb
 using Downloads: Downloads
 
 "Raised for any failure resolving/converting a structure source:
@@ -222,57 +221,4 @@ function resolve_structure(source::URLSource)::String
     path = _resolve_canonical_pdb(struc, key)
     rm(tmpdir; recursive = true, force = true)
     return path
-end
-
-"""
-    load_molecule(source::StructureSource) -> Tuple{Molecule, Residues}
-
-Resolve `source` to its canonical `.pdb` path via [`resolve_structure`](@ref),
-re-parse that file (the one already-filtered source of truth, rather than
-threading through whatever in-memory structure existed during resolution),
-and build the `Molecule`/`Residues` pair the rest of this package consumes.
-
-`standardselector`/`heavyatomselector` are re-applied here too; redundant
-given the canonical file is already filtered, but cheap and removes any doubt.
-
-# Arguments
-- `source`: where to obtain the structure from.
-
-# Returns
-- `Tuple{Molecule, Residues}`: `Molecule` built from each atom's element and
-    coordinates; `Residues` built from each atom's resname, PDB atom name,
-    residue number, and chain ID.
-"""
-function load_molecule(source::StructureSource)::Tuple{Molecule, Residues}
-    path = resolve_structure(source)
-    key = splitext(basename(path))[1]
-    local struc
-    try
-        struc = BioStructures.read(path, PDBFormat)
-    catch e
-        throw(StructureSourceError("failed re-parsing canonical .pdb \"$path\": $(sprint(showerror, e))"))
-    end
-    atoms = collectatoms(struc[1], standardselector, heavyatomselector)
-
-    n = length(atoms)
-    elms_v     = Vector{String}(undef, n)
-    coords_v   = Vector{NTuple{3, Float64}}(undef, n)
-    resname_v  = Vector{String}(undef, n)
-    atomname_v = Vector{String}(undef, n)
-    resnum_v   = Vector{Int}(undef, n)
-    chain_v    = Vector{String}(undef, n)
-
-    @inbounds for (i, at) in enumerate(atoms)
-        elms_v[i]     = element(at)
-        c             = coords(at)
-        coords_v[i]   = (Float64(c[1]), Float64(c[2]), Float64(c[3]))
-        resname_v[i]  = resname(at)
-        atomname_v[i] = atomname(at)
-        resnum_v[i]   = resnumber(at)
-        chain_v[i]    = chainid(at)
-    end
-
-    mol = create(key, elms_v, coords_v)
-    res = Residues(resname_v, atomname_v, resnum_v, chain_v)
-    return (mol, res)
 end

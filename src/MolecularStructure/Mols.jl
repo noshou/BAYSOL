@@ -6,6 +6,9 @@ A molecule.
 
 using   ..AtomicRadii: RadiiSource, lookup, AtomicRadiiSource
 using   ..Helpers.Cache: Lazy, force
+using   BioStructures:  BioStructures, PDBFormat, standardselector,
+                        collectatoms, atomname, element, resname, resnumber, 
+                        chainid, coords
 
 "Raised for malformed molecule input (empty or mismatched coords, missing radii)."
 struct MoleculeError <: Exception; msg::String end
@@ -206,4 +209,57 @@ struct Residues
     atomname :: Vector{String}
     resnum   :: Vector{Int}
     chain    :: Vector{String}
+end
+
+"""
+    load_molecule(pdb_path::AbstractString) -> Tuple{Molecule, Residues}
+
+Parse whatever `.pdb` is at `pdb_path` into a `Molecule`/`Residues` pair.
+Works identically whether `pdb_path` is heavy-atom-only or hydrogenated:
+atoms are collected via `standardselector` alone (no `heavyatomselector`), so
+a heavy-only file naturally yields just its heavy atoms, and a hydrogenated
+file keeps its hydrogens too.
+
+# Arguments
+- `pdb_path`: path to any parseable `.pdb`, e.g. from `resolve_structure` or
+    `resolve_hydrogens`.
+
+# Returns
+- `Tuple{Molecule, Residues}`: `Molecule` built from each atom's element and
+    coordinates; `Residues` built from each atom's resname, PDB atom name,
+    residue number, and chain ID.
+"""
+function load_molecule(pdb_path::AbstractString)::Tuple{Molecule, Residues}
+    isfile(pdb_path) || throw(MoleculeError("no such file: $pdb_path"))
+
+    key = splitext(basename(pdb_path))[1]
+    local struc
+    try
+        struc = BioStructures.read(pdb_path, PDBFormat)
+    catch e
+        throw(MoleculeError("failed parsing .pdb \"$pdb_path\": $(sprint(showerror, e))"))
+    end
+    atoms = collectatoms(struc[1], standardselector)
+
+    n = length(atoms)
+    elms_v     = Vector{String}(undef, n)
+    coords_v   = Vector{NTuple{3, Float64}}(undef, n)
+    resname_v  = Vector{String}(undef, n)
+    atomname_v = Vector{String}(undef, n)
+    resnum_v   = Vector{Int}(undef, n)
+    chain_v    = Vector{String}(undef, n)
+
+    @inbounds for (i, at) in enumerate(atoms)
+        elms_v[i]     = element(at)
+        c             = coords(at)
+        coords_v[i]   = (Float64(c[1]), Float64(c[2]), Float64(c[3]))
+        resname_v[i]  = resname(at)
+        atomname_v[i] = atomname(at)
+        resnum_v[i]   = resnumber(at)
+        chain_v[i]    = chainid(at)
+    end
+
+    mol = create(key, elms_v, coords_v)
+    res = Residues(resname_v, atomname_v, resnum_v, chain_v)
+    return (mol, res)
 end
