@@ -380,11 +380,7 @@ forward model) from the trajectory's sample covariance.
     specific reason to retarget it.
 
 # Returns
-- `samples`: a `Vector` of posterior draws, **already decoded back to physical
-    ξ-space** (`(dns, δρ1, δρ2, δρ3, c1)`) via [`Ξ`](@ref) — NUTS itself only
-    ever sees θ-space, but callers of `run_fitting` want physical units.
-- `stats`: per-iteration `NamedTuple`s from `AdvancedHMC.jl` (acceptance rate,
-    divergence flags, tree depth, etc.), one per entry of `samples`.
+- `samples`: a `Vector` of posterior draws.
 """
 function run_fitting(
     seed::Seed,
