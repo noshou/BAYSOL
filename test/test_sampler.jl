@@ -16,6 +16,7 @@ const FIT = BayeSol.Fitting
 using BayeSol.Fitting: Solute, Protein, NonBiological, WLSFit, wls_fit,
     wls_prof_ll, wls_marg_ll, Θ, Ξ
 using BayeSol.Scattering: forward, forward_cache, ForwardCache
+using BayeSol.MolecularStructure: Residues
 using Distributions: logpdf, mean, std, LogNormal, Normal
 using StaticArrays: SVector
 using ForwardDiff
@@ -42,6 +43,17 @@ const smpl_lmax  = 3
 const smpl_chunk = UInt64(4)
 
 smpl_fw() = forward_cache(smpl_mol(), smpl_q, smpl_lmax, smpl_E; chunk = smpl_chunk)
+
+# `seed_fitting` now builds its own `Ionization`/`(μ_χ, σ_χ)` internally from
+# `(residues, pKa_records, pH, σ_pH)`; these `seed_fitting`-wiring tests don't
+# care about the electrostatics pipeline specifically (that's covered in
+# test_electrostatics.jl/test_ionization.jl), so an empty pKa record set --
+# no ionizable residues -> deterministic (μ_χ, σ_χ) = (0.0, 0.0) -- keeps
+# them focused on NUTS/priors wiring rather than re-deriving numeric χ
+# expectations. `smpl_mol()`'s 16 atoms need a length-matched `Residues`;
+# names/atomnames are arbitrary since no pKa record references them.
+smpl_residues() = Residues(fill("GLY", 16), fill("CA", 16), collect(1:16), fill("A", 16))
+smpl_pKa_records() = NamedTuple[]
 
 # A realistic solutes/pH setup shared by every priors-related test below.
 smpl_solutes() = Solute[Protein(2.0e-4, 5.0e-6, INSULIN_A), NonBiological(0.15, 0.001, "sodium chloride")]
@@ -261,8 +273,8 @@ end
     @testset "seed_fitting: fields are internally consistent" begin
         fw = smpl_fw()
         I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes();
-            μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
+        seed = FIT.seed_fitting(fw, smpl_mol(), smpl_residues(), smpl_pKa_records(),
+            I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes(); n = smpl_n_c1)
 
         @test seed isa FIT.Seed
         @test seed.fw === fw
@@ -279,8 +291,8 @@ end
     @testset "seed_fitting: propagates validation from _calc_ξ_priors" begin
         fw = smpl_fw()
         I_exp, σ_exp = synth_data(fw)
-        @test_throws ArgumentError FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, Solute[])
-        @test_throws DomainError FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, -0.1, smpl_solutes())
+        @test_throws ArgumentError FIT.seed_fitting(fw, smpl_mol(), smpl_residues(), smpl_pKa_records(), I_exp, σ_exp, smpl_pH, smpl_σ_pH, Solute[])
+        @test_throws DomainError FIT.seed_fitting(fw, smpl_mol(), smpl_residues(), smpl_pKa_records(), I_exp, σ_exp, smpl_pH, -0.1, smpl_solutes())
     end
 
     #------------------------------------------------------------------
@@ -290,8 +302,8 @@ end
     @testset "run: δ must be a percentage strictly inside (0, 100)" begin
         fw = smpl_fw()
         I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes();
-            μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
+        seed = FIT.seed_fitting(fw, smpl_mol(), smpl_residues(), smpl_pKa_records(),
+            I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes(); n = smpl_n_c1)
         @test_throws DomainError FIT.run_fitting(seed, 5, 2; δ = 0)
         @test_throws DomainError FIT.run_fitting(seed, 5, 2; δ = 100)
         @test_throws DomainError FIT.run_fitting(seed, 5, 2; δ = -10)
@@ -337,8 +349,8 @@ end
     @testset "run: PROFILE -- output shapes, physical domain, self-consistency" begin
         fw = smpl_fw()
         I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes();
-            μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
+        seed = FIT.seed_fitting(fw, smpl_mol(), smpl_residues(), smpl_pKa_records(),
+            I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes(); n = smpl_n_c1)
 
         Random.seed!(1)
         n_samples, n_adapt = 60, 30
@@ -353,8 +365,8 @@ end
     @testset "run: MARGINAL -- output shapes, physical domain, self-consistency" begin
         fw = smpl_fw()
         I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes();
-            μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
+        seed = FIT.seed_fitting(fw, smpl_mol(), smpl_residues(), smpl_pKa_records(),
+            I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes(); n = smpl_n_c1)
 
         Random.seed!(2)
         n_samples, n_adapt = 60, 30
@@ -369,8 +381,8 @@ end
     @testset "run: deterministic under a fixed global RNG seed" begin
         fw = smpl_fw()
         I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes();
-            μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
+        seed = FIT.seed_fitting(fw, smpl_mol(), smpl_residues(), smpl_pKa_records(),
+            I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes(); n = smpl_n_c1)
 
         Random.seed!(42)
         samples1, stats1 = FIT.run_fitting(seed, 20, 10; l = FIT.PROFILE())

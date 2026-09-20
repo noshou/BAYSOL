@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Conda environment for BayeSol, managed by CondaPkg.jl. This exists solely to
+# auto-provision an isolated Python + `propka` install for
+# `src/MolecularStructure/Propka.jl` (per-residue pKa prediction via the
+# `propka3` CLI) without requiring users to have Python installed themselves;
+# CondaPkg vendors its own micromamba/pixi backend.
+
+[deps]
+# propka is pure-Python; its PyPI metadata declares `Requires-Python >=3.8`
+# (its docs site suggests 3.10+), but propka 3.x reads its bundled parameter
+# file using a `Parameters.__annotations__` class attribute that CPython
+# 3.13+ no longer exposes on a plain (non-dataclass) class the way older
+# CPython did, which crashes `propka3` immediately on any input. Cap below
+# 3.13 to get a CPython where propka's parameter-file parser actually works;
+# empirically verified against 3.14 (broken) while writing this file.
+python = ">=3.8,<3.13"
+
+[pip.deps]
+propka = ""

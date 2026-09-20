@@ -22,3 +22,6 @@ __pycache__/
 
 # copyrigthed papers
 sources/
+
+# cache
+_cache/

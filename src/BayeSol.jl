@@ -22,4 +22,6 @@ using .Solvation:          Solvation
 using .Scattering:         Scattering
 using .Fitting:            Fitting
 
+# eventual orchestration to go from PDB source -> Seed goes here 
+
 end # module

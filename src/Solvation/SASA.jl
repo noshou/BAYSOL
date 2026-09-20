@@ -182,7 +182,7 @@ end
 at `≈ √SHELL_AREA_PER_POINT ≈ 2 Å`.
 
 Calibrated against CRYSOL: its default `--fb 17` puts `F(17) = 1597` points on a
-typical globular protein (~6500 Å²), i.e. ~4 Å² each. Budgeting by *area* rather
+typical globular protein (~6500 Å²), i.e. ~4 Å² each. Budgeting by area rather
 than by a fixed count keeps that spacing at every size, and since surface area
 grows as `N^(2/3)`, the point count is sub-linear in atom count rather than flat.
 CRYSOL instead caps `--fb` at `F(18) = 2584` for any structure, which
