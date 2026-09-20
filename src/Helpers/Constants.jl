@@ -5,9 +5,10 @@ Leaf module of constant primitives.
 """
 module Constants
 
-export DEFAULT_ATOL, SHELL_THICKNESS, PROBE_RADIUS, BOND_CUTOFF, SHELL_N_TARGET, 
-DRO_UNIT, B_LM_CHUNK, AVOGADRO, PHOSPHATE_NET_CHARGE, ELEMENTARY_CHARGE, 
-VACUUM_PERMITTIVITY, BOLTZMANN, ANGSTROM, MV_PER_CM
+export DEFAULT_ATOL, SHELL_THICKNESS, PROBE_RADIUS, BOND_CUTOFF, SHELL_N_TARGET,
+DRO_UNIT, B_LM_CHUNK, AVOGADRO, PHOSPHATE_NET_CHARGE, ELEMENTARY_CHARGE,
+VACUUM_PERMITTIVITY, BOLTZMANN, ANGSTROM, MV_PER_CM, IONIC_STRENGTH_M, WATER_EPS_R,
+DEBYE_TEMPERATURE_K, CUTOFF_DEBYE_LENGTHS, DEFAULT_TEMPERATURE_C, C1_PRIOR_MASS_PERCENT
 
 #-------------------------
 # Floating-point accuracy 
@@ -87,5 +88,50 @@ contacts. `Molecule` carries no bonding table (see `MolecularStructure.create`'s
 connectivity proxy available.
 """
 const BOND_CUTOFF = 1.75
+
+#----------------------------
+# Electrostatics/solution
+#----------------------------
+
+"Physiological monovalent salt concentration, mol/L (`debye_length`'s default ionic strength)."
+const IONIC_STRENGTH_M = 0.15
+
+"Water's static relative permittivity (`debye_length`'s default `eps_r`)."
+const WATER_EPS_R = 80.0
+
+"""
+Solution temperature, K, for the Debye screening-length calculation
+(`debye_length`'s default `T`). Distinct from [`DEFAULT_TEMPERATURE_C`](@ref)
+(25°C ≈ 298.15 K), which is `_ρₑ`/`ρₑ_prior`'s own default temperature for
+the bulk-electron-density calculation — the two aren't currently reconciled
+to the same value; each keeps its own pre-existing default here rather than
+silently changing either one.
+"""
+const DEBYE_TEMPERATURE_K = 300.0
+
+"""
+Charge sites beyond this many Debye lengths from a bead are dropped in the
+screened-electrostatic aggregation (`exp(-5) ≈ 0.007`, already negligible
+next to the screened `1/r` prefactor).
+"""
+const CUTOFF_DEBYE_LENGTHS = 5.0
+
+#----------------------------
+# Sampler defaults
+#----------------------------
+
+"""
+Default solution temperature, °C, for `_ρₑ`/`ρₑ_prior`'s bulk-electron
+-density calculation. **Do not change** without also checking `_ρₑ`'s own
+note: only water's density is temperature-dependent in that model as of this
+version.
+"""
+const DEFAULT_TEMPERATURE_C = 25.0
+
+"""
+Default percentage ((0, 100]) of `c1_prior`'s prior mass required to fall
+within CRYSOL's bound `[0.96, 1.04]` around its default `c_1 = 1`.
+"""
+const C1_PRIOR_MASS_PERCENT = 95
 
 end # module

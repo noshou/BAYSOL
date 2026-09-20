@@ -14,7 +14,9 @@ module Electrostatics
 using ...MolecularStructure: Residues, Molecule, Ionization, elms, coords_cartesian, n_atoms
 using ..SASA: SASA
 using ...Helpers.Constants: ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, BOND_CUTOFF,
-                            AVOGADRO, ANGSTROM, MV_PER_CM, PHOSPHATE_NET_CHARGE
+                            AVOGADRO, ANGSTROM, MV_PER_CM, PHOSPHATE_NET_CHARGE,
+                            IONIC_STRENGTH_M, WATER_EPS_R, DEBYE_TEMPERATURE_K,
+                            CUTOFF_DEBYE_LENGTHS, PROBE_RADIUS, SHELL_N_TARGET
 using JSON3: JSON3
 using NearestNeighbors: KDTree, inrange
 
@@ -32,14 +34,14 @@ keywords this evaluates to `≈ 8 Å`, matching the paper's observation that
 interfacial fields are confined to roughly the first two hydration layers.
 
 # Keywords
-- `ionic_strength_M::Float64 = 0.15`: physiological monovalent salt concentration, mol/L
-- `eps_r::Float64 = 80.0`: water's static relative permittivity.
-- `T::Float64 = 300.0`: temperature, K.
+- `ionic_strength_M::Float64 = IONIC_STRENGTH_M`: physiological monovalent salt concentration, mol/L
+- `eps_r::Float64 = WATER_EPS_R`: water's static relative permittivity.
+- `T::Float64 = DEBYE_TEMPERATURE_K`: temperature, K.
 """
-function debye_length(; 
-    ionic_strength_M::Float64 = 0.15, 
-    eps_r::Float64 = 80.0, 
-    T::Float64 = 300.0
+function debye_length(;
+    ionic_strength_M::Float64 = IONIC_STRENGTH_M,
+    eps_r::Float64 = WATER_EPS_R,
+    T::Float64 = DEBYE_TEMPERATURE_K
 )::Float64
     ionic_strength_M > 0.0 || throw(DomainError(ionic_strength_M, "ionic_strength_M must be > 0"))
     eps_r > 0.0 || throw(DomainError(eps_r, "eps_r must be > 0"))
@@ -227,10 +229,10 @@ over every `(atom_index, charge_e, σ_charge_e)` triple in `sites` within
 """
 function _aggregate(
     mol::Molecule, pts::Matrix{Float64}, sel::Vector{Int}, sites::Vector{Tuple{Int,Float64,Float64}};
-    ionic_strength_M::Float64     = 0.15,
-    eps_r::Float64                = 80.0,
-    T::Float64                    = 300.0,
-    cutoff_debye_lengths::Float64 = 5.0,
+    ionic_strength_M::Float64     = IONIC_STRENGTH_M,
+    eps_r::Float64                = WATER_EPS_R,
+    T::Float64                    = DEBYE_TEMPERATURE_K,
+    cutoff_debye_lengths::Float64 = CUTOFF_DEBYE_LENGTHS,
 )::Tuple{Float64,Float64}
     isempty(sel) && return (0.0, 0.0)
     isempty(sites) && return (0.0, 0.0)
@@ -298,23 +300,23 @@ Protein ionizable side chains carry no charge here.
     positions are used.
 
 # Keywords
-- `probe::Float64 = 1.4`: solvent probe radius, forwarded to `SASA.shell_points`.
-- `n_target::Union{Nothing,Int} = nothing`: shell point budget, forwarded to
+- `probe::Float64 = PROBE_RADIUS`: solvent probe radius, forwarded to `SASA.shell_points`.
+- `n_target::Union{Nothing,Int} = SHELL_N_TARGET`: shell point budget, forwarded to
     `SASA.shell_points`.
-- `ionic_strength_M::Float64 = 0.15`, `eps_r::Float64 = 80.0`,
-    `T::Float64 = 300.0`: forwarded to [`debye_length`](@ref).
-- `cutoff_debye_lengths::Float64 = 5.0`: charge sites beyond this many Debye
+- `ionic_strength_M::Float64 = IONIC_STRENGTH_M`, `eps_r::Float64 = WATER_EPS_R`,
+    `T::Float64 = DEBYE_TEMPERATURE_K`: forwarded to [`debye_length`](@ref).
+- `cutoff_debye_lengths::Float64 = CUTOFF_DEBYE_LENGTHS`: charge sites beyond this many Debye
     lengths from a bead are dropped (`exp(-5) ≈ 0.007`, already negligible
     next to the screened `1/r` prefactor).
 """
 function nucleic_acid_cavity_electrostatics(
     mol::Molecule;
-    probe::Float64                 = 1.4,
-    n_target::Union{Nothing,Int}   = nothing,
-    ionic_strength_M::Float64      = 0.15,
-    eps_r::Float64                 = 80.0,
-    T::Float64                     = 300.0,
-    cutoff_debye_lengths::Float64  = 5.0,
+    probe::Float64                 = PROBE_RADIUS,
+    n_target::Union{Nothing,Int}   = SHELL_N_TARGET,
+    ionic_strength_M::Float64      = IONIC_STRENGTH_M,
+    eps_r::Float64                 = WATER_EPS_R,
+    T::Float64                     = DEBYE_TEMPERATURE_K,
+    cutoff_debye_lengths::Float64  = CUTOFF_DEBYE_LENGTHS,
 )::Tuple{Float64,Float64}
     pts, _, class = SASA.shell_points(mol; probe = probe, n_target = n_target)
     sel = findall(==(SASA.CAVITY), class)
@@ -368,12 +370,12 @@ function protein_cavity_electrostatics(
     mol::Molecule,
     residues::Residues,
     ionization::Ionization;
-    probe::Float64                 = 1.4,
-    n_target::Union{Nothing,Int}   = nothing,
-    ionic_strength_M::Float64      = 0.15,
-    eps_r::Float64                 = 80.0,
-    T::Float64                     = 300.0,
-    cutoff_debye_lengths::Float64  = 5.0,
+    probe::Float64                 = PROBE_RADIUS,
+    n_target::Union{Nothing,Int}   = SHELL_N_TARGET,
+    ionic_strength_M::Float64      = IONIC_STRENGTH_M,
+    eps_r::Float64                 = WATER_EPS_R,
+    T::Float64                     = DEBYE_TEMPERATURE_K,
+    cutoff_debye_lengths::Float64  = CUTOFF_DEBYE_LENGTHS,
 )::Tuple{Float64,Float64}
     pts, _, class = SASA.shell_points(mol; probe = probe, n_target = n_target)
     sel = findall(==(SASA.CAVITY), class)
