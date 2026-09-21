@@ -1,7 +1,7 @@
 # Julia
 LocalPreferences.toml
 .CondaPkg/
-/docs/build/
+docs/build/
 *.cov
 *.jl.mem
 deps/deps.jl
