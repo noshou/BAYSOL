@@ -1,0 +1,117 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+# package hygiene + type-stability guards.
+include(joinpath(@__DIR__, "testsetup.jl"))
+
+using Aqua, JET, ExplicitImports
+using BayeSol.Scattering: SphFuncs
+using BayeSol.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm
+using BayeSol.MolecularStructure: MolecularStructure, create, coords_cartesian, coords_spherical, radii, vols, r_max,
+                elms, name, Molecule
+using BayeSol.AtomicRadii: AtomicRadii, resolve_one, _resolve_all, tryparse_ion, ion_key, nearest_ion
+using BayeSol.Solvation: SASA
+
+@testset "Aqua" begin
+    Aqua.test_all(BayeSol; ambiguities = false)
+    Aqua.test_ambiguities(BayeSol)
+end
+
+@testset "ExplicitImports: no stale `using X: a, b, c` imports anywhere" begin
+    test_no_stale_explicit_imports(BayeSol)
+end
+
+@testset "type stability (@inferred)" begin
+    θ = collect(range(0.1, π - 0.1; length = 8)); φ = collect(range(0.0, 2pi; length = 8))
+    @inferred sphHarm(4, θ, φ)
+    @inferred sphBess([1.0, 2.0], [0.1, 0.5, 1.0], 4)
+    @inferred legendre_sphPlm(3, 2, 0.5)
+    @inferred Union{Float64,Nothing} resolve_one("fe3+")
+    @inferred _resolve_all(["fe3+", "o2-"])
+    @inferred Union{AtomicRadii.Ion,Nothing} tryparse_ion("fe3+")
+    @inferred ion_key(AtomicRadii.Ion("fe", 3))
+    @inferred Union{String,Nothing} nearest_ion("fe", 5)
+
+    m = @inferred create(
+        "t", ["o", "h", "h"],
+        [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]
+    )
+    @test m isa Molecule
+    @inferred coords_cartesian(m)
+    @inferred coords_spherical(m)
+    @inferred radii(m)
+    @inferred vols(m)
+    @inferred r_max(m)
+    @inferred elms(m)
+    @inferred name(m)
+end
+
+@testset "type stability of the SASA entry point (@inferred)" begin
+    m = create("t", ["o", "h", "h"], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)])
+    @test (@inferred SASA.sasa(m; n_occ = 16, n_exp = 64, probe = 1.4)) isa Tuple{Vector{Float64},Vector{Bool}}
+    @test (@inferred SASA.shell_points(m; n_target = 64, probe = 1.4)) isa Tuple{Matrix{Float64},Vector{Float64},Vector{SASA.BeadClass}}
+end
+
+@testset "JET (focused type-stability analysis)" begin
+    @test_opt target_modules = (SphFuncs,) sphBess([1.0, 2.0], [0.1, 0.5], 3)
+    @test_opt target_modules = (SphFuncs,) sphHarm(3, [0.4, 1.2], [0.1, 2.0])
+    @test_opt target_modules = (SphFuncs,) legendre_sphPlm(3, 2, 0.5)
+    @test_opt target_modules = (MolecularStructure,) create("t", ["o", "h"],
+        [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)])
+    @test_opt target_modules = (AtomicRadii,) resolve_one("fe3+")
+    @test_opt target_modules = (AtomicRadii,) _resolve_all(["fe3+", "o2-"])
+    @test_opt target_modules = (AtomicRadii,) tryparse_ion("fe3+")
+
+    let m = create("t", ["o", "h", "h"], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)])
+        @test_opt target_modules = (MolecularStructure,) radii(m)
+        @test_opt target_modules = (MolecularStructure,) vols(m)
+        @test_opt target_modules = (MolecularStructure,) r_max(m)
+    end
+end
+
+@testset "JET: SASA's per-atom loop is free of runtime dispatch" begin
+    # `KDTree(crds)` cannot infer to a concrete type.
+    #
+    # The barrier call is itself one dynamic dispatch, but exactly one per
+    # `sasa` call rather than one `inrange` dispatch per atom (which is what
+    # this used to be, and was worth ~21% of runtime).
+    _reports(f, types) =
+        JET.get_reports(JET.report_opt(f, types; target_modules = (SASA,)))
+
+    m = create("t", ["o", "h", "h"], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)])
+    crds = MolecularStructure.coords_cartesian(m)
+    TT   = typeof(SASA.KDTree(crds))
+    Vec3 = SASA.PlasticMap.Vec3
+
+    # the loop that runs once per atom must be completely clean
+    @test isempty(_reports(SASA._sasa_loop!,
+        (   Vector{Float64}, BitVector, TT, Matrix{Float64}, Vector{Float64},
+            Float64, Vector{Vec3}, Float64, Int, Int, Float64)))
+
+    # `shell_points` crosses the same barrier for the same reason, and its loop
+    # must be just as clean.
+    @test isempty(_reports(SASA._shell_loop,
+        (   TT, Matrix{Float64}, Vector{Float64}, Float64, Vector{Vec3},
+            Float64, Int)))
+
+    @test isempty(_reports(SASA._ray_blocked,
+        (   NTuple{3,Float64}, Vec3, Vector{Int}, Matrix{Float64},
+            Vector{Float64}, Float64)))
+
+    @test isempty(_reports(SASA._prefix_thin, (Vector{Int}, Int, Int)))
+
+    @test isempty(_reports(SASA._class_loop,
+        (   TT, Matrix{Float64}, Matrix{Float64}, Matrix{Float64},
+            Vector{Float64}, Float64, Vector{Vec3})))
+
+    # the entry point carries exactly the one barrier dispatch.
+    rs = _reports(SASA.sasa, (Molecule,))
+    @test length(rs) <= 1
+    @test all(r -> occursin("_sasa_loop!", sprint(show, r)), rs)
+
+    # two barriers here, not one: the sampling loop and the classification loop
+    rp = _reports(SASA.shell_points, (Molecule,))
+    @test length(rp) <= 2
+    @test all(r -> (t = sprint(show, r);
+                    occursin("_shell_loop", t) || occursin("_class_loop", t)), rp)
+end
+
