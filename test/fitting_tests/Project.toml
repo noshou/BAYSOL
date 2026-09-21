@@ -1,0 +1,5 @@
+[deps]
+BayeSol = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"

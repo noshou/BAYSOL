@@ -11,7 +11,7 @@ solution.
 """
 module Electrostatics
 
-using ...MolecularStructure: Residues, Molecule, Ionization, elms, coords_cartesian, n_atoms
+using ...MolecularStructure: Residues, Molecule, Ionization, elms, coords_cartesian
 using ..SASA: SASA
 using ...Helpers.Constants: ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, BOND_CUTOFF,
                             AVOGADRO, ANGSTROM, MV_PER_CM, PHOSPHATE_NET_CHARGE,

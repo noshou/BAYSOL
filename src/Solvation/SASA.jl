@@ -203,7 +203,7 @@ const _BEAD_RAY_RANGE = 12.0
 "Directions sampled by [`_bead_class`](@ref); about half fall in the outward hemisphere and are used."
 const _BEAD_RAY_DIRS = 64
 
-"Escaping fraction at or above which a bead is [`CONVEX`](@ref); below it (but nonzero) [`CONCAVE`](@ref)."
+"Escaping fraction at or above which a bead is `CONVEX`; below it (but nonzero) `CONCAVE` (see [`BeadClass`](@ref))."
 const _BEAD_CONVEX_ESCAPE = 0.5
 
 """
