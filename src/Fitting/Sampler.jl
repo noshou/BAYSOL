@@ -80,6 +80,76 @@ function _ξ₀(p::_ξ_priors)::SVector{5,<:Real}
     return SVector(dns, δρ1, δρ2, δρ3, c_1)
 end
 
+"""
+    _θ_prior_moments(p::_ξ_priors) -> (μ::SVector{5}, σ::SVector{5})
+
+Each θ-space coordinate is Normal under the prior: [`Θ`](@ref) sends a
+LogNormal(μ,σ)-distributed `dns`/`δρ1`/`c_1` to its underlying Normal(μ,σ)
+exactly (θ = ln ξ), and `δρ2`/`δρ3` are already Normal and pass through `Θ`
+unchanged. So every one of `p`'s five component distributions carries a
+`(μ, σ)` that is directly θ-space's own per-coordinate prior mean/std — no
+separate derivation needed, just read `.μ`/`.σ` off each.
+
+Used by [`_standardize`](@ref)/[`_destandardize`](@ref) to rescale θ before
+handing it to `AdvancedHMC.jl`.
+"""
+function _θ_prior_moments(p::_ξ_priors)::Tuple{SVector{5,Float64},SVector{5,Float64}}
+    μ = SVector(p.dnsPrior.μ, p.δρ1Prior.μ, p.δρ2Prior.μ, p.δρ3Prior.μ, p.c_1Prior.μ)
+    σ = SVector(p.dnsPrior.σ, p.δρ1Prior.σ, p.δρ2Prior.σ, p.δρ3Prior.σ, p.c_1Prior.σ)
+    return μ, σ
+end
+
+"""
+    _standardize(θ::SVector{5,<:Real}, p::_ξ_priors) -> SVector{5,<:Real}
+    _destandardize(z::SVector{5,<:Real}, p::_ξ_priors) -> SVector{5,<:Real}
+
+Affine maps between θ-space and a prior-standardized `z`-space,
+`z = (θ - μ) / σ` / its inverse `θ = μ + σ·z`, with `(μ, σ)` from
+[`_θ_prior_moments`](@ref).
+
+# Why this exists: `find_good_stepsize`'s identity-mass-matrix blind spot
+
+`θ`'s five coordinates have wildly different natural (prior) scales -- e.g.
+`dns`'s prior σ is routinely 3-4 orders of magnitude tighter than `δρ1`'s,
+since `dns` is pinned mostly by water's precisely-known bulk electron
+density while `δρ1` carries a much looser structural prior.
+`AdvancedHMC.jl`'s `find_good_stepsize` explores from an *identity* mass
+matrix, before any mass-matrix adaptation has run, so a generic O(1)
+momentum kick is ~1 prior-σ along `δρ1` but thousands of prior-σ along
+`dns` -- routinely enough to send `dns` to an unphysical density contrast
+and blow the forward model up to a flat curve (`wls_fit`'s
+`det(XᵀWX) ≤ 0` guard) before step-size adaptation ever gets a chance to
+shrink it, i.e. the fragility this was written to fix isn't bad luck, it's
+`θ`-space's scale mismatch meeting an isotropic initial explorer.
+
+Sampling in `z`-space instead makes a generic O(1) kick ~1 prior-σ in
+*every* coordinate uniformly (each `z_i` is standard-Normal under the
+prior), so `find_good_stepsize`'s very first candidate step is no longer
+essentially guaranteed to overshoot `dns`. `DenseEuclideanMetric`
+adaptation still learns any *residual* (posterior, not prior) curvature/
+correlation on top of this once it starts -- this only fixes the
+initialization step that runs before adaptation exists to fix it.
+
+The Jacobian of this affine map (`|dθ/dz| = Πσ_i`) is a `z`-independent
+constant, so it's omitted from `_logπ`/the z-space wrapper around it: an
+additive constant to `log π` doesn't change gradients or Hamiltonian
+*differences*, which is all `AdvancedHMC.jl` ever uses (same "up to the
+additive constant NUTS doesn't need" already true of `_logπ` itself).
+
+# Arguments
+- `θ`/`z::SVector{5,<:Real}`: as above.
+- `p::_ξ_priors`: supplies `(μ, σ)` via [`_θ_prior_moments`](@ref).
+"""
+function _standardize(θ::SVector{5,<:Real}, p::_ξ_priors)
+    μ, σ = _θ_prior_moments(p)
+    return (θ .- μ) ./ σ
+end
+
+function _destandardize(z::SVector{5,<:Real}, p::_ξ_priors)
+    μ, σ = _θ_prior_moments(p)
+    return μ .+ σ .* z
+end
+
 "Dispatch tag selecting profile vs. marginal log-likelihood in [`_ll`](@ref)."
 abstract type LIKELIHOOD end
 
@@ -163,7 +233,7 @@ two ways, selected by `l`:
 - `I_exp::AbstractVector`, `σ_exp::AbstractVector`: measured intensity and
     per-point standard errors, forwarded to [`wls_fit`](@ref).
 - `ξ::SVector{5,<:Real}`: the physical fit parameters `(dns, δρ1, δρ2, δρ3, c1)`.
-- `fw::ForwardCache`: the structure's geometry-only cache, from [`forward_cache`](@ref).
+- `fw::ForwardCache`: the structure's geometry-only cache, from [`BayeSol.Scattering.forward_cache`](@ref).
 - `l::LIKELIHOOD`: `PROFILE()` or `MARGINAL()`, selecting which log-likelihood
     variant to return.
 
@@ -327,7 +397,7 @@ end
         δ::Real=80
     ) -> (samples, stats)
 
-Identical to [`BayeSol.run_fitting`](@ref).
+Identical to [`BayeSol.run_model`](@ref).
 
 Run NUTS on [`_logπ`](@ref) starting from `seed`, returning posterior draws
 of the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`.
@@ -350,10 +420,28 @@ alternating half-steps in `r` with full steps in `θ`:
 which needs `∇[log π(θ)]` at every step.
 
 Because energy is conserved, leapfrog proposes long, correlated jumps through
-parameter space far more cheaply than random-walk Metropolis. NUTS removes the 
-need to hand-pick a trajectory length: it grows the leapfrog trajectory by 
+parameter space far more cheaply than random-walk Metropolis. NUTS removes the
+need to hand-pick a trajectory length: it grows the leapfrog trajectory by
 doubling a binary tree of steps, forward and backward in time, until the trajectory
 starts to double back on itself (a "U-turn"), then samples from the valid part of that tree.
+
+# Sampling actually happens in prior-standardized z-space, not raw θ
+
+The Hamiltonian above is written in `θ` for exposition, but this function
+actually runs NUTS in `z = _standardize(θ, seed.pr)` (`_destandardize`'s the
+inverse) and only converts back to `ξ` (via `Ξ`) on the returned samples.
+`θ`'s five coordinates carry wildly different natural prior scales (`dns`'s
+prior σ is routinely orders of magnitude tighter than `δρ1`'s), and
+`find_good_stepsize` explores with an *identity* mass matrix before
+`MassMatrixAdaptor` below has adapted anything — so in raw θ, a generic
+O(1) initial momentum kick is ~1 prior-σ along one coordinate and
+thousands of prior-σ along another, reliably enough to send `dns` to an
+unphysical value and blow the forward model up (`wls_fit`'s
+`det(XᵀWX) ≤ 0` guard) before adaptation ever gets a chance to fix it.
+Standardizing first makes that same kick ~1 prior-σ in every coordinate,
+which is what removes the systematic (not just unlucky-seed) failure. See
+[`_standardize`](@ref)'s own docstring for the full argument, including why
+its Jacobian is safely omitted from `_logπ`.
 
 # Step-size adaptation
 
@@ -395,72 +483,81 @@ function run_fitting(
     end
     δ = δ / 100
 
-    # ℓπ: θ ↦ log π(θ), the value-only log-posterior (_logπ closed over the
-    # data/priors/cache/likelihood-choice fixed for this run). AdvancedHMC.jl
-    # hands this a plain-axed AbstractVector (Base.OneTo, not StaticArrays'
-    # SOneTo), which _logπ's SVector{5,<:Real} signature can't dispatch on
-    # directly, so re-wrap it into an SVector first (same idiom as
-    # test_paramtransform.jl's AD-differentiability tests).
-    ℓπ = @closure θ -> _logπ(
-        SVector{5,eltype(θ)}(θ...), 
-        seed.pr, 
-        seed.ex[1], 
-        seed.ex[2], 
+    # ℓπ: z ↦ log π(θ(z)), the value-only log-posterior in prior-standardized
+    # z-space (_logπ, unchanged, closed over the data/priors/cache/
+    # likelihood-choice fixed for this run, composed with _destandardize --
+    # see that function's docstring for why sampling happens in z rather
+    # than θ directly: θ's coordinates have wildly different natural prior
+    # scales, which makes AdvancedHMC.jl's identity-mass-matrix initial
+    # exploration in find_good_stepsize routinely blow the forward model up
+    # before adaptation gets a chance to learn that scale difference itself).
+    # AdvancedHMC.jl hands this a plain-axed AbstractVector (Base.OneTo, not
+    # StaticArrays' SOneTo), which _logπ's SVector{5,<:Real} signature can't
+    # dispatch on directly, so re-wrap it into an SVector first (same idiom
+    # as test_paramtransform.jl's AD-differentiability tests).
+    ℓπ = @closure z -> _logπ(
+        _destandardize(SVector{5,eltype(z)}(z...), seed.pr),
+        seed.pr,
+        seed.ex[1],
+        seed.ex[2],
         seed.fw, l
     )
 
-    # ∂ℓπ∂θ: θ ↦ (log π(θ), ∇log π(θ)), computed in one ForwardDiff pass —
-    # this is what AdvancedHMC's leapfrog integrator actually calls every step.
-    ∂ℓπ∂θ = @closure θ -> begin
-        result = DiffResults.GradientResult(θ)
-        ForwardDiff.gradient!(result, ℓπ, θ)
+    # ∂ℓπ∂z: z ↦ (log π(θ(z)), ∇_z log π(θ(z))), computed in one ForwardDiff
+    # pass — this is what AdvancedHMC's leapfrog integrator actually calls
+    # every step.
+    ∂ℓπ∂z = @closure z -> begin
+        result = DiffResults.GradientResult(z)
+        ForwardDiff.gradient!(result, ℓπ, z)
         (DiffResults.value(result), DiffResults.gradient(result))
     end
 
-    # DenseEuclideanMetric allows the adaptation to learn 
+    # DenseEuclideanMetric allows the adaptation to learn
     # correlations between parameters. Since we are only fitting
     # 5 or 6 params and they are highly coupled, it is worth it here.
     metric = DenseEuclideanMetric(5)
-    
+
     # combines "potential energy" (ℓπ) and kinetic energy (from metric)
-    hamiltonian = Hamiltonian(metric, ℓπ, ∂ℓπ∂θ)
+    hamiltonian = Hamiltonian(metric, ℓπ, ∂ℓπ∂z)
 
     # AdvancedHMC.jl's DiagEuclideanMetric/DenseEuclideanMetric store M⁻¹ as
     # a plain Vector/Matrix (Base.OneTo axes) and check axes(M⁻¹) against
-    # axes(θ)/axes(r); an SVector's SOneTo axes fail that check even though
-    # the ranges match. Start from a plain Vector instead of seed.θ₀ itself.
-    θ₀ = Vector(seed.θ₀)
+    # axes(z)/axes(r); an SVector's SOneTo axes fail that check even though
+    # the ranges match. Start from a plain Vector instead of an SVector
+    # directly, at z₀ = _standardize(seed.θ₀, seed.pr) (seed.θ₀ itself stays
+    # in plain, unstandardized θ-space -- see Seed's own docstring).
+    z₀ = Vector(_standardize(seed.θ₀, seed.pr))
 
     # HMC numerically integrates the Hamiltonian, so we need to
     # guess a good step size.
-    init_step_size = find_good_stepsize(hamiltonian, θ₀)
-    
-    # Leapfrog integration evaluates kinetic energy first, then 
+    init_step_size = find_good_stepsize(hamiltonian, z₀)
+
+    # Leapfrog integration evaluates kinetic energy first, then
     # "skips over" that evaluated position to the next one for potential energy.
     # (Could be flipped, not sure). Very efficient!
     integrator = Leapfrog(init_step_size)
-    
+
     # Initial step sizes are likely non-ideal, so sampler leanrs mass matrix/metric
-    # and step size as it goes along. 
+    # and step size as it goes along.
     adaptor = StanHMCAdaptor(
-        MassMatrixAdaptor(metric), 
-        StepSizeAdaptor(δ, integrator) 
+        MassMatrixAdaptor(metric),
+        StepSizeAdaptor(δ, integrator)
     )
-    
-    # the sampler in θ-space
+
+    # the sampler in z-space
     kernel = HMCKernel(Trajectory{MultinomialTS}(integrator, GeneralisedNoUTurn()))
 
     # do sampling
     samples, stats = sample(
         hamiltonian,
         kernel,
-        θ₀,
+        z₀,
         n_samples,
         adaptor,
         n_adapt;
         progress=true
     )
-    samples = [Ξ(SVector{5,Float64}(s...)) for s in samples]
+    samples = [Ξ(_destandardize(SVector{5,Float64}(s...), seed.pr)) for s in samples]
     return (samples, stats)
 
 end

@@ -41,8 +41,8 @@ Protein variant.
 # Keywords
 - `μ_χ`=0.0: mean, over cavity beads, of the screened-electrostatic potential χ
     (Debye-Hückel, aggregated from nearby phosphate / ionizable-side-chain charge
-    sites — see [`Electrostatics.nucleic_acid_cavity_electrostatics`](@ref) /
-    [`Electrostatics.protein_cavity_electrostatics`](@ref)), feeding δρ3's
+    sites — see [`BayeSol.Solvation.Electrostatics.nucleic_acid_cavity_electrostatics`](@ref) /
+    [`BayeSol.Solvation.Electrostatics.protein_cavity_electrostatics`](@ref)), feeding δρ3's
     cavity-water contrast.
 - `σ_χ`=0.0: standard deviation, over cavity beads, of χ, feeding δρ3's
     cavity-water contrast.

@@ -45,7 +45,7 @@ Per-ion form-factor rows from a container `t` previously built by
 [`form_factor_table`](@ref), as a `(length(ions), length(qvals))` matrix: row
 `i` is the row for `ions[i]`, columns aligned to `qvals` in input order. Pass
 the per-atom ion vector and the result is exactly the `f_atoms` matrix
-[`compute_B_lm`](@ref) takes — no mapping step in between.
+[`BayeSol.Scattering.compute_B_lm`](@ref) takes — no mapping step in between.
 
 The queried `qvals` must be grid points of `t`, and every `ions[i]` must be
 present in `t`; either violation throws [`FormFactorError`](@ref).
