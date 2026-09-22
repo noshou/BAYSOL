@@ -23,7 +23,7 @@ makedocs(
     pages    = [
         "Home" => "index.md",
         "API Reference" => [
-            "Helpers" => "api/helpers.md",
+            "BayesolUtils" => "api/BayesolUtils.md",
             "AtomicRadii" => "api/atomicradii.md",
             "FormFactor" => "api/formfactor.md",
             "PartialMolarVolumes" => "api/partialmolarvolumes.md",

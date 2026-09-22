@@ -315,7 +315,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # The Debye oracle only ever sees pairwise distances, so it is blind to
         # any rigid motion; it cannot catch a bug in `_center` or in
         # `to_spherical`. Both are therefore pinned here directly, against
-        # arithmetic done in the test rather than against MolecularStructure's own helpers.
+        # arithmetic done in the test rather than against MolecularStructure's own BayesolUtils.
         X = SCAT_BLOB_X
         n = size(X, 2)
         cx = sum(X[1, :]) / n; cy = sum(X[2, :]) / n; cz = sum(X[3, :]) / n

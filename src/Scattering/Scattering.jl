@@ -170,7 +170,7 @@ module Scattering
 
 using ..FormFactor: FormFactor, FormFactorSource, FormFactorSourceTables
 using ..Solvation.SASA: SASA
-using ..Helpers.Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
+using ..BayesolUtils.Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
 using StaticArrays: SVector
 
 # The public surface. `forward` is the forward model; `gram_matrix` is the

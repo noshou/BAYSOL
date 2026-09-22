@@ -10,7 +10,7 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BayeSol.MolecularStructure: MolecularStructure, Residues, Ionization
 
-include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 
 const _fraction_protonated   = MolecularStructure._fraction_protonated
 const _fraction_deprotonated = MolecularStructure._fraction_deprotonated

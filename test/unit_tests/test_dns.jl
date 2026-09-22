@@ -11,8 +11,8 @@ using BayeSol.Fitting: Solute, Protein, NonBiological, DNA, RNA, ρₑ_prior
 using BayeSol.Constants: AVOGADRO
 using Distributions: mean, var, LogNormal
 
-include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
-include(joinpath(@__DIR__, "..", "fixtures", "sequences.jl"))      # LYSOZYME, ...
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "sequences.jl"))      # LYSOZYME, ...
 
 """
 Independent re-derivation of the `_ρₑ`/`ρₑ_prior` formula from the live
@@ -200,7 +200,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
     @testset "ρₑ_prior: a realistic buffer of real protein + real DNA + real RNA is internally consistent" begin
         # Cross-checks Priors.ρₑ_prior, DensityOfSolvent._ρₑ and
         # PartialMolarVolumes.ϕ° together on genuine biological sequences (see
-        # test/fixtures/sequences.jl for provenance), rather than the
+        # test/fixtures/functions/sequences.jl for provenance), rather than the
         # short synthetic stand-ins ("ATGC"/"AUGC"/"GGGGCC") used above to
         # isolate the DNA/RNA-vs-Protein code paths.
         solutes = Solute[

@@ -15,4 +15,4 @@ shell of atoms around an enclosed void.
 - `n`: point count.
 """
 sph(R, n) = [(R * sqrt(1 - z^2) * cos(t), R * sqrt(1 - z^2) * sin(t), R * z)
-             for (z, t) in ((-1 + 2(k - 0.5) / n, π * (1 + sqrt(5)) * k) for k in 1:n)]
+            for (z, t) in ((-1 + 2(k - 0.5) / n, π * (1 + sqrt(5)) * k) for k in 1:n)]

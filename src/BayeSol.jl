@@ -5,7 +5,7 @@ module BayeSol
 using Statistics: quantile, mean, var
 using Printf: @printf
 
-include("Helpers/Helpers.jl")
+include("BayesolUtils/BayesolUtils.jl")
 include("AtomicRadii/AtomicRadii.jl")
 include("FormFactor/FormFactor.jl")
 include("PartialMolarVolumes/PMV.jl")
@@ -14,9 +14,9 @@ include("Solvation/Solvation.jl")
 include("Scattering/Scattering.jl")
 include("Fitting/Fitting.jl")
 
-using .Helpers:             Helpers
-using .Helpers.Constants:   Constants
-using .Helpers.Cache:       Cache
+using .BayesolUtils:             BayesolUtils
+using .BayesolUtils.Constants:   Constants
+using .BayesolUtils.Cache:       Cache
 using .AtomicRadii:         AtomicRadii
 using .FormFactor:          FormFactor
 using .PartialMolarVolumes: PartialMolarVolumes
@@ -32,7 +32,7 @@ using .Fitting:             Fitting
         t=DEFAULT_TEMPERATURE_C, n=C1_PRIOR_MASS_PERCENT, probe=PROBE_RADIUS,
         n_target=SHELL_N_TARGET, ionic_strength_M=IONIC_STRENGTH_M, eps_r=WATER_EPS_R, 
         T=DEBYE_TEMPERATURE_K, cutoff_debye_lengths=CUTOFF_DEBYE_LENGTHS
-    ) -> Fitting.Seed
+    ) -> Tuple{Fitting.Seed, Float64, Float64}
 
 Computes a NUTS seed from given data input:
     
@@ -79,7 +79,11 @@ Computes a NUTS seed from given data input:
     `protein_cavity_electrostatics`.
 
 # Returns
-- `Fitting.Seed`: ready to pass to [`run_model`](@ref)/`Fitting.run_fitting`.
+- `(seed, μ_χ, σ_χ)`: `seed::Fitting.Seed` is ready to pass to
+    [`run_model`](@ref)/`Fitting.run_fitting`; `μ_χ`/`σ_χ` are the same
+    screened-electrostatic cavity signal computed at step 5 above (and
+    already folded into `seed`'s priors) — returned separately so they can
+    be threaded into [`write_report`](@ref)'s diagnostics.
 
 # Exceptions
 - `DomainError`: `qvals`, `I_exp`, and `σ_exp` have mismatched lengths.
@@ -96,17 +100,17 @@ function seed_model(
     σ_pH::Real,
     solutes::Vector{Fitting.Solute};
     add_hydrogens::Bool=true,
-    blm_chunk::Unsigned = Helpers.Constants.B_LM_CHUNK,
-    thickness::Real = Helpers.Constants.SHELL_THICKNESS,
-    t::Real = Helpers.Constants.DEFAULT_TEMPERATURE_C,
-    n::Real = Helpers.Constants.C1_PRIOR_MASS_PERCENT,
-    probe::Float64 = Helpers.Constants.PROBE_RADIUS,
-    n_target::Union{Nothing,Int} = Helpers.Constants.SHELL_N_TARGET,
-    ionic_strength_M::Float64 = Helpers.Constants.IONIC_STRENGTH_M,
-    eps_r::Float64 = Helpers.Constants.WATER_EPS_R,
-    T::Float64 = Helpers.Constants.DEBYE_TEMPERATURE_K,
-    cutoff_debye_lengths::Float64 = Helpers.Constants.CUTOFF_DEBYE_LENGTHS,
-)::Fitting.Seed
+    blm_chunk::Unsigned = BayesolUtils.Constants.B_LM_CHUNK,
+    thickness::Real = BayesolUtils.Constants.SHELL_THICKNESS,
+    t::Real = BayesolUtils.Constants.DEFAULT_TEMPERATURE_C,
+    n::Real = BayesolUtils.Constants.C1_PRIOR_MASS_PERCENT,
+    probe::Float64 = BayesolUtils.Constants.PROBE_RADIUS,
+    n_target::Union{Nothing,Int} = BayesolUtils.Constants.SHELL_N_TARGET,
+    ionic_strength_M::Float64 = BayesolUtils.Constants.IONIC_STRENGTH_M,
+    eps_r::Float64 = BayesolUtils.Constants.WATER_EPS_R,
+    T::Float64 = BayesolUtils.Constants.DEBYE_TEMPERATURE_K,
+    cutoff_debye_lengths::Float64 = BayesolUtils.Constants.CUTOFF_DEBYE_LENGTHS,
+)::Tuple{Fitting.Seed, Float64, Float64}
     
     if !(length(qvals) == length(I_exp) == length(σ_exp)) 
         throw(
@@ -153,7 +157,7 @@ function seed_model(
         cutoff_debye_lengths=cutoff_debye_lengths
     )
 
-    return Fitting.seed_fitting(
+    seed = Fitting.seed_fitting(
         fw,
         I_exp,
         σ_exp,
@@ -165,6 +169,7 @@ function seed_model(
         σ_χ=σ_χ,
         n=n
     )
+    return seed, μ_χ, σ_χ
 end
 
 """
@@ -188,13 +193,7 @@ const MAPParams = Dict{String, Float64}
 """
     MAPResult = Tuple{MAPParams, Matrix{Float64}}
 
-`(params, curve)` at the MAP draw -- see [`MAPParams`](@ref). `curve` is a
-`(Q, 2)` matrix whose columns are `(q, I_calc(q))`, i.e.
-`hcat(seed.fw.qvals, fit.curves[:, max_idx])` -- `q` is carried alongside the
-curve (rather than returning `fit.curves[:, max_idx]` bare) so the MAP curve
-stays self-describing/aligned the same way [`QuantileCurves`](@ref) already
-is, instead of relying on the caller to zip it against `seed.fw.qvals`
-separately.
+`(params, curve)` at the MAP draw.
 """
 const MAPResult = Tuple{MAPParams, Matrix{Float64}}
 
@@ -202,8 +201,7 @@ const MAPResult = Tuple{MAPParams, Matrix{Float64}}
     QuantileBounds = Dict{String, Tuple{Float64, Float64}}
 
 One parameter's `"quantiles"`/`"bounds"` pair (both `(lo, hi)` tuples):
-`"quantiles"` is the raw empirical `(q_1, q_2)` quantile pair (from the
-`quantiles` keyword, e.g. the 16th/84th percentile); `"bounds"` is the
+`"quantiles"` is the raw empirical `(q_1, q_2)` quantile pair; `"bounds"` is the
 `extrema` of exactly the draws that fall within `[lo, hi]`, so it can differ
 slightly from `"quantiles"` itself (it's the tightest interval that actually
 contains data on both ends).
@@ -222,8 +220,7 @@ const QuantileParams = Dict{String, QuantileBounds}
     QuantileCurves = Dict{String, Matrix{Float64}}
 
 `"quantiles"`/`"bounds"` predicted-curve envelopes, each a `(Q, 3)` matrix
-whose columns are `(q, I_lo(q), I_hi(q))` -- the column-wise analogue of
-[`QuantileBounds`](@ref), one row per `q` in `seed.fw.qvals`.
+whose columns are `(q, I_lo(q), I_hi(q))`.
 """
 const QuantileCurves = Dict{String, Matrix{Float64}}
 
@@ -250,9 +247,7 @@ const QuantileResult = Tuple{QuantileParams, QuantileCurves}
 Run NUTS on [`Fitting._logπ`](@ref) starting from `seed`, returning posterior
 draws of the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`, one
 `(scale, bkgrnd_corr)` pair and predicted curve per draw, and
-`AdvancedHMC.jl`'s own per-iteration diagnostics. Identical to
-[`Fitting.run_fitting`](@ref) — see its docstring's `# Returns` for the full
-field-by-field breakdown of the `Fitting.FitResult` component.
+`AdvancedHMC.jl`'s diagnostics.
 
 # The Hamiltonian
 
@@ -310,16 +305,13 @@ forward model) from the trajectory's sample covariance.
 # Returns
 A 4-tuple `(fit, divergence_rate, map, curve)`:
 
-- `fit::Fitting.FitResult`: the warm-up-draw-free posterior (`n_adapt` draws
-    sliced off the front) -- see [`Fitting.run_fitting`](@ref)'s `# Returns`
-    for its field-by-field breakdown.
+- `fit::Fitting.FitResult`: the warm-up free posterior.
 - `divergence_rate::Float64`: fraction of `fit`'s draws AdvancedHMC.jl
     flagged as numerically divergent, `[0, 1]`.
 - `map`/`curve`: **either** both `nothing` (every draw diverged -- `map`/
     `curve` cannot be computed, and `divergence_rate == 1.0`), **or** a
     [`MAPResult`](@ref)/[`QuantileResult`](@ref) pair computed over the
-    non-divergent draws only. These two always come as a matched pair --
-    `map === nothing` iff `curve === nothing`.
+    non-divergent draws only. `map === nothing` iff `curve === nothing`.
 """
 function run_model(
     seed::Fitting.Seed,
@@ -394,7 +386,7 @@ function run_model(
         divergence_rate = diverged / length(fit.stats)
         
         # calculate MAP params + curves
-        # ξ = (dns, δρ1, δρ2, δρ3, c1) -- see Fitting.Seed's docstring
+        # ξ = (dns, δρ1, δρ2, δρ3, c1)
         MAP_params = Dict{String, Float64}(
             "log_density"   => max_llh,
             "slvnt_e_dns"   => getindex.(fit.samples, 1)[max_idx],
@@ -510,15 +502,15 @@ function run_model(
 
 end
 
-# Order the physical/derived parameters are reported in, by `write_report`.
+"Order the physical/derived parameters are reported in, by `write_report`."
 const _REPORT_KEYS = [
     "log_density", "slvnt_e_dns", "delta_rho_1", "delta_rho_2",
     "delta_rho_3", "excl_vol_corr", "scale", "bkgrnd_corr", "chisq_red",
 ]
 
-# Display labels for `write_report`'s text output only -- the underlying
-# `MAPParams`/`QuantileParams` Dict keys (`_REPORT_KEYS` above) are unchanged
-# and still what callers index with.
+"Display labels for `write_report`'s text output only -- the underlying
+`MAPParams`/`QuantileParams` Dict keys (`_REPORT_KEYS` above) are unchanged
+and still what callers index with."
 const _REPORT_LABELS = Dict{String, String}(
     "log_density"   => "log_density",
     "slvnt_e_dns"   => "ρₑ",
@@ -532,20 +524,35 @@ const _REPORT_LABELS = Dict{String, String}(
 )
 
 """
-    write_report(io::IO, result; quantile_label::AbstractString="16-84")
-    write_report(result; quantile_label::AbstractString="16-84")
+    write_report(
+        io::IO, result;
+        quantile_label::AbstractString="16-84",
+        μ_χ::Union{Nothing,Real}=nothing, σ_χ::Union{Nothing,Real}=nothing,
+        form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}}=nothing
+    )
+    write_report(
+        result;
+        quantile_label::AbstractString="16-84",
+        μ_χ::Union{Nothing,Real}=nothing, σ_χ::Union{Nothing,Real}=nothing,
+        form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}}=nothing
+    )
 
 Writes a human-readable summary of a [`run_model`](@ref) `result` to `io`
 (`stdout` if omitted): the divergence rate, the MAP draw's parameters (incl.
-`chisq_red`), each parameter's quantile/bound interval, and a `"===
+`chisq_red`), each parameter's quantile/bound interval, a `"===
 Diagnostics ==="` footer -- `AdvancedHMC.jl` per-chain sampler health
 computed from `fit.stats` (already the warm-up-free portion): iteration
 count, mean acceptance rate, tree depth (mean and max), mean leapfrog steps
-per iteration, and E-BFMI (Stan's energy-based Bayesian Fraction of Missing
+per iteration, E-BFMI (Stan's energy-based Bayesian Fraction of Missing
 Information -- values below ~0.2-0.3 suggest momentum resampling isn't
 exploring the Hamiltonian's energy level sets well and the model may need
-reparameterizing). The diagnostics footer is written even when every draw
-diverged, since it's most useful exactly in that failure case.
+reparameterizing), and, only when supplied, the seed's screened-electrostatic
+cavity signal `μ_χ`/`σ_χ` (see [`seed_model`](@ref)) -- and, as the final
+section, a `"=== Form-Factor Parsing Log ==="` listing any
+`ForwardCache.form_factor_log` entries (see
+[`Scattering.forward_cache`](@ref)) when `form_factor_log` is supplied and
+non-empty. The diagnostics footer is written even when every draw diverged,
+since it's most useful exactly in that failure case.
 
 # Arguments
 - `io::IO`: where to write; omit for `stdout`.
@@ -553,8 +560,23 @@ diverged, since it's most useful exactly in that failure case.
 
 # Keywords
 - `quantile_label::AbstractString="16-84"`
+- `μ_χ::Union{Nothing,Real}=nothing`, `σ_χ::Union{Nothing,Real}=nothing`:
+    the `(μ_χ, σ_χ)` returned alongside the seed by [`seed_model`](@ref).
+    Default `nothing` prints nothing for either field; passing either one
+    adds it to the `"=== Diagnostics ==="` footer.
+- `form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}}=nothing`:
+    the seed's `seed.fw.form_factor_log` (form-factor-table construction
+    diagnostics -- one line per ion the backend could not resolve in full).
+    Default `nothing`, or an empty vector, prints nothing; a non-empty vector
+    is printed verbatim, one entry per line, as the report's final section.
 """
-function write_report(io::IO, result; quantile_label::AbstractString = "16-84")
+function write_report(
+    io::IO, result;
+    quantile_label::AbstractString = "16-84",
+    μ_χ::Union{Nothing,Real} = nothing,
+    σ_χ::Union{Nothing,Real} = nothing,
+    form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}} = nothing,
+)
     fit, divergence_rate, map_result, quantile_result = result
     @printf(io, "divergence_rate = %.4f\n\n", divergence_rate)
 
@@ -599,6 +621,20 @@ function write_report(io::IO, result; quantile_label::AbstractString = "16-84")
     @printf(io, "%-14s = %.2f (max %d)\n", "tree_depth", mean(depth), maximum(depth))
     @printf(io, "%-14s = %.2f\n", "mean_n_steps", mean(nsteps))
     @printf(io, "%-14s = %.4f\n", "EBFMI", ebfmi)
+    if μ_χ !== nothing
+        @printf(io, "%-14s = %+.6g\n", "μ_χ", μ_χ)
+    end
+    if σ_χ !== nothing
+        @printf(io, "%-14s = %+.6g\n", "σ_χ", σ_χ)
+    end
+
+    if form_factor_log !== nothing && !isempty(form_factor_log)
+        println(io)
+        println(io, "=== Form-Factor Parsing Log ===")
+        for line in form_factor_log
+            println(io, line)
+        end
+    end
 
     return nothing
 end

@@ -12,9 +12,9 @@ using BayeSol.MolecularStructure: StructureSource, LocalPathSource, PDBIDSource,
                     Molecule, Residues, n_atoms, elms, coords_cartesian, _store_dir
 using BioStructures: BioStructures, MMCIFFormat, writepdb, standardselector, heavyatomselector
 
-include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 
-# Real, curated PDB structures checked into test/fixtures/structures/, spanning
+# Real, curated PDB structures checked into test/fixtures/molecules/, spanning
 # a genuine size range and mixing .pdb/.cif so both LocalPathSource branches
 # get exercised on real data (see test/fixtures/README.md for the full table).
 # Filenames carry a "-TEST" suffix (not the bare RCSB ID) so LocalPathSource's
@@ -23,7 +23,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
 # Every (chain, resname, resnum, atomname) spot-check value below was read off
 # the actual downloaded file with BioStructures directly (not from memory),
 # then cross-checked against the well-known sequence of each protein.
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "fixtures", "structures")
+const _FIXTURE_DIR = joinpath(@__DIR__, "..", "fixtures", "molecules")
 
 # id => (filename, tier, n_heavy_atoms, Dict(chain => (first_resnum, first_resname, last_resnum, last_resname)))
 const _FIXTURES = Dict(

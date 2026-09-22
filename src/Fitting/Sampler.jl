@@ -7,7 +7,7 @@ HMCKernel, Trajectory, MultinomialTS, GeneralisedNoUTurn
 using FastClosures, StaticArrays, Distributions, ForwardDiff, DiffResults
 
 using ..Scattering: forward, ForwardCache
-using ..Helpers.Constants: DEFAULT_TEMPERATURE_C, C1_PRIOR_MASS_PERCENT
+using ..BayesolUtils.Constants: DEFAULT_TEMPERATURE_C, C1_PRIOR_MASS_PERCENT
 
 "Physical prior distributions."
 struct _ξ_priors
@@ -510,8 +510,7 @@ forward model) from the trajectory's sample covariance.
                                 Stan's usual default of 80% is used.
 
 # Returns
-A [`FitResult`](@ref) -- see its own docstring for the field-by-field
-breakdown. Includes the `n_adapt` warm-up draws; a caller that wants a
+A [`FitResult`](@ref). Includes the `n_adapt` warm-up draws; a caller that wants a
 warmup-free posterior slices `n_adapt+1:end` (`curves`: `[:, n_adapt+1:end]`)
 out of every field itself.
 """

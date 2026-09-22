@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-module Helpers
+module BayesolUtils
 
 include("Constants.jl")
 include("Cache.jl")

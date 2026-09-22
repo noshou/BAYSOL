@@ -24,8 +24,8 @@ using StaticArrays: SVector
 using ForwardDiff
 using Random
 
-include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
-include(joinpath(@__DIR__, "..", "fixtures", "sequences.jl"))      # INSULIN_A
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "sequences.jl"))      # INSULIN_A
 
 # ---------------------------------------------------------------------------
 #                 fixtures: a non-trivial structure + synthetic data
