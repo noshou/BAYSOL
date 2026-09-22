@@ -25,14 +25,14 @@ using BayeSol.Fitting: Solute, Protein, NonBiological, seed_fitting, run_fitting
 using BayeSol.Scattering: forward, forward_cache, ForwardCache
 using Random
 
-include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 
 # ---------------------------------------------------------------------------
 #                    fixture: the smallest real -TEST structure
 # ---------------------------------------------------------------------------
 
 # 1CRN-TEST.pdb (crambin, 46 residues, 327 heavy atoms, single chain "A") is
-# the smallest fixture in test/fixtures/structures/ -- picked to keep the
+# the smallest fixture in test/fixtures/molecules/ -- picked to keep the
 # real NUTS run below fast. It's already legacy .pdb, so LocalPathSource
 # resolves it via pure passthrough (no local store write for the resolve
 # step itself; the `_store_dir()`-based collision policy documented in
@@ -40,7 +40,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
 # `_store_dir()` docstring only bites for the .cif-conversion/PDBIDSource/
 # URLSource branches and for PROPKA's/PDB2PQR's own `.pka`/hydrogenated-`.pdb`
 # outputs below, which this file explicitly manages/cleans).
-const _FIXTURE_PATH = joinpath(@__DIR__, "..", "fixtures", "structures", "1CRN-TEST.pdb")
+const _FIXTURE_PATH = joinpath(@__DIR__, "..", "fixtures", "molecules", "1CRN-TEST.pdb")
 
 # Crambin's sequence, read directly off 1CRN-TEST.pdb's own ATOM records (not
 # from memory): `grep "^ATOM" 1CRN-TEST.pdb | awk '{print $6, $4}' | uniq`

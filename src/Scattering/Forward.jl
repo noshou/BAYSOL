@@ -7,7 +7,7 @@
 #
 #     mol ─► (B_vac, B_ex, B_sh_convex, B_sh_concave, B_sh_cavity)   species_multipoles
 #         ─► G(q) ∈ ℝ^{5×5×Q}                                        gram_matrix
-#         ─► ForwardCache(G, qvals, r_m)                             forward_cache
+#         ─► ForwardCache(G, qvals, r_m, form_factor_log)             forward_cache
 #         ─► I_calc(q) = scale·(v(q)ᵀ G v(q)) + bkgrnd_corr           forward
 #
 # `G(q)` depends only on geometry and beam, never on `(scale, bkgrnd_corr, dns, δρ, c_1)`.
@@ -41,6 +41,8 @@ edge, `1` otherwise; `C = 1` for the four dummy species).
     `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: forwarded to
     [`hydration`](@ref). A class not in `classes` comes back an all-zero `B_lm`
     (≡ its `dro_k = 0`), so the return is always a 5-tuple.
+    - `form_factor_log::Union{Nothing,Vector{String}} = nothing`: forwarded
+    verbatim to [`vacuo`](@ref)'s `log` keyword.
 """
 function species_multipoles(
     mol::Molecule, qvals::AbstractVector{<:Real}, lMax::Integer, energy::Real;
@@ -51,16 +53,18 @@ function species_multipoles(
     probe::Real                          = PROBE_RADIUS,
     n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
     classes                              = SHELL_CLASSES,
+    form_factor_log::Union{Nothing,Vector{String}} = nothing,
 )
     _CHUNK = UInt64(chunk)
     b_vac = vacuo(
-        mol, 
-        qvals, 
-        lMax, 
-        ions, 
-        Float64(energy), 
+        mol,
+        qvals,
+        lMax,
+        ions,
+        Float64(energy),
         _CHUNK;
-        form_factor_source = form_factor_source
+        form_factor_source = form_factor_source,
+        log = form_factor_log,
     )
     b_ex  = excluded(mol, qvals, lMax, _CHUNK)
     sh    = hydration(mol, qvals, lMax, _CHUNK;
@@ -84,6 +88,8 @@ parameters, so you generally don't need to pass them:
 - `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
 `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: hydration-shell
 geometry, forwarded to `hydration`.
+- `form_factor_log::Union{Nothing,Vector{String}} = nothing`: forwarded
+verbatim to [`species_multipoles`](@ref).
 """
 gram_matrix(
     mol::Molecule, qvals::AbstractVector{<:Real}, lMax::Integer, energy::Real;
@@ -94,11 +100,13 @@ gram_matrix(
     probe::Real                          = PROBE_RADIUS,
     n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
     classes                              = SHELL_CLASSES,
+    form_factor_log::Union{Nothing,Vector{String}} = nothing,
 )::Array{Float64,3} =
     gram(collect(species_multipoles(
             mol, qvals, lMax, energy;
             ions = ions, chunk = chunk, form_factor_source = form_factor_source,
             thickness = thickness, probe = probe, n_target = n_target, classes = classes,
+            form_factor_log = form_factor_log,
         )),
         partial_wave_weights(lMax))
 
@@ -129,11 +137,17 @@ likelihood evaluation is then the O(Q) [`forward`](@ref)`(cache, …)`.
 - `G::Array{Float64,3}`, `(n, n, Q)`: from [`gram_matrix`](@ref).
 - `qvals::Vector{Float64}`, length `Q`: the grid `G` was built on.
 - `r_m::Float64`: mean atomic radius in Å.
+- `form_factor_log::Vector{String}`: construction-time diagnostics from the
+    vacuum term's [`FormFactor.form_factor_table`](@ref) build -- one line per
+    ion the backend could not resolve in full (see
+    [`FormFactor.form_factor_log`](@ref)). Empty when every ion resolved
+    cleanly.
 """
 struct ForwardCache
     G::Array{Float64,3}
     qvals::Vector{Float64}
     r_m::Float64
+    form_factor_log::Vector{String}
 end
 
 """
@@ -153,6 +167,11 @@ common case:
 - `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
 `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: hydration-shell
 geometry, forwarded to `hydration`.
+
+The vacuum term's `form_factor_table` build diagnostics are always collected
+here and stored on the returned [`ForwardCache`](@ref)'s `form_factor_log`
+field -- there is no keyword to opt out, since the cost is one `append!` per
+unresolved ion.
 """
 forward_cache(
     mol::Molecule,
@@ -166,16 +185,20 @@ forward_cache(
     probe::Real                          = PROBE_RADIUS,
     n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
     classes                              = SHELL_CLASSES,
-)::ForwardCache =
+)::ForwardCache = begin
+    form_factor_log = String[]
     ForwardCache(
         gram_matrix(
             mol, qvals, lMax, energy;
             ions = ions, chunk = chunk, form_factor_source = form_factor_source,
             thickness = thickness, probe = probe, n_target = n_target, classes = classes,
+            form_factor_log = form_factor_log,
         ),
         collect(Float64, qvals),
-        mean_atomic_radius(mol)
+        mean_atomic_radius(mol),
+        form_factor_log,
     )
+end
 
 """
     forward(G, scale, bkgrnd_corr, dns, δρ) -> Vector

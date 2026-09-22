@@ -24,8 +24,8 @@ using BayeSol.Constants: AVOGADRO
 "Fully-qualified handle onto the submodule, for the private caches/tables below."
 const PMVMOD = BayeSol.PartialMolarVolumes
 
-include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
-include(joinpath(@__DIR__, "..", "fixtures", "sequences.jl"))      # LYSOZYME, ...
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "sequences.jl"))      # LYSOZYME, ...
 
 # fresh_seq(base): a sequence that computes identically to `base` (padded
 # with inert 'X' no-ops) but is guaranteed never to have

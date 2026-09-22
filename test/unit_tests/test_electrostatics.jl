@@ -47,8 +47,8 @@ const ELEC_SRC = ElecTestRadii(Dict("c" => 1.7, "o" => 1.5, "p" => 1.9, "n" => 1
 
 elec_mol(elms, crds) = create("elec-test", elms, crds; radii_source = ELEC_SRC)
 
-include(joinpath(@__DIR__, "..", "fixtures", "geometry.jl"))       # sph
-include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))       # sph
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 
 @testset "Electrostatics" begin
 

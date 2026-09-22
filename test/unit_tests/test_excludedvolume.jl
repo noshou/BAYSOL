@@ -11,7 +11,7 @@ using SpecialFunctions: erfinv
 using Distributions: LogNormal, mean, var, cdf
 using BayeSol.Fitting: c1_prior
 
-include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 
 """
 Independent re-derivation of `c1_prior`'s z/σ/σ_ln/μ_ln pipeline from its
