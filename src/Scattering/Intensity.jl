@@ -130,24 +130,25 @@ function intensity(G::AbstractArray{<:Real,3}, V::AbstractMatrix{<:Real})
 end
 
 """
-    _fused_intensity_calc(G, v, m, c) -> Vector
-    _fused_intensity_calc(G, V, m, c) -> Vector
+    _fused_intensity_calc(G, v, scale, bkgrnd_corr) -> Vector
+    _fused_intensity_calc(G, V, scale, bkgrnd_corr) -> Vector
 
-Internal, non-exported. Same result as `intensity_calc(intensity(G, v), m, c)`
-(or the `V` variant), but computes `m * acc + c` directly inside `intensity`'s
-own accumulation loop instead of chaining two separate `Q`-length
-allocations. Exists purely for [`forward`](@ref), which sits on the
-NUTS/HMC hot path (every likelihood/gradient evaluation) — `intensity` and
-`intensity_calc` themselves are left untouched for their other callers.
+Internal, non-exported. Same result as
+`intensity_calc(intensity(G, v), scale, bkgrnd_corr)` (or the `V` variant),
+but computes `scale * acc + bkgrnd_corr` directly inside `intensity`'s own
+accumulation loop instead of chaining two separate `Q`-length allocations.
+Exists purely for [`forward`](@ref), which sits on the NUTS/HMC hot path
+(every likelihood/gradient evaluation) — `intensity` and `intensity_calc`
+themselves are left untouched for their other callers.
 """
 function _fused_intensity_calc(
-    G::AbstractArray{<:Real,3}, v::AbstractVector{<:Real}, m::Real, c::Real
+    G::AbstractArray{<:Real,3}, v::AbstractVector{<:Real}, scale::Real, bkgrnd_corr::Real
 )
     n = length(v)
     (size(G, 1) == n && size(G, 2) == n) || throw(DimensionMismatch(
         "_fused_intensity_calc: G is $(size(G, 1))×$(size(G, 2)) in its species axes but v has length $n"))
     Q = size(G, 3)
-    T = promote_type(eltype(G), eltype(v), typeof(m), typeof(c))
+    T = promote_type(eltype(G), eltype(v), typeof(scale), typeof(bkgrnd_corr))
     out = Vector{T}(undef, Q)
     @inbounds for k in 1:Q
         acc = zero(T)
@@ -157,13 +158,13 @@ function _fused_intensity_calc(
                 acc += v[a] * G[a, b, k] * vb
             end
         end
-        out[k] = m * acc + c
+        out[k] = scale * acc + bkgrnd_corr
     end
     return out
 end
 
 function _fused_intensity_calc(
-    G::AbstractArray{<:Real,3}, V::AbstractMatrix{<:Real}, m::Real, c::Real
+    G::AbstractArray{<:Real,3}, V::AbstractMatrix{<:Real}, scale::Real, bkgrnd_corr::Real
 )
     n = size(V, 1)
     (size(G, 1) == n && size(G, 2) == n) || throw(DimensionMismatch(
@@ -171,7 +172,7 @@ function _fused_intensity_calc(
     Q = size(G, 3)
     size(V, 2) == Q || throw(DimensionMismatch(
         "_fused_intensity_calc: V has $(size(V, 2)) columns but G has Q=$Q"))
-    T = promote_type(eltype(G), eltype(V), typeof(m), typeof(c))
+    T = promote_type(eltype(G), eltype(V), typeof(scale), typeof(bkgrnd_corr))
     out = Vector{T}(undef, Q)
     @inbounds for k in 1:Q
         acc = zero(T)
@@ -181,28 +182,29 @@ function _fused_intensity_calc(
                 acc += V[a, k] * G[a, b, k] * vb
             end
         end
-        out[k] = m * acc + c
+        out[k] = scale * acc + bkgrnd_corr
     end
     return out
 end
 
 """
-    intensity_calc(I, m, c) -> Vector{Float64}
+    intensity_calc(I, scale, bkgrnd_corr) -> Vector{Float64}
 
 Put the absolute model intensity `I` (from [`intensity`](@ref)) onto the
-detector's scale: `I_calc(q) = m * I(q) + c`, with `m` the overall scale
-between calculated (electrons²) and measured (arbitrary-unit) intensity and `c`
-a flat background left by imperfect buffer subtraction.
+detector's scale: `I_calc(q) = scale * I(q) + bkgrnd_corr`, with `scale` the
+overall scale between calculated (electrons²) and measured (arbitrary-unit)
+intensity and `bkgrnd_corr` a flat background left by imperfect buffer
+subtraction.
 
 # Arguments
 - `I::AbstractVector{<:Real}`, length `Q`: absolute intensity.
-- `m::Real`: overall scale.
-- `c::Real`: constant background.
+- `scale::Real`: overall scale.
+- `bkgrnd_corr::Real`: constant background correction.
 
 # Returns
 - `Vector{Float64}` of length `Q`.
 """
-intensity_calc(I::AbstractVector{<:Real}, m::Real, c::Real) = m .* I .+ c
+intensity_calc(I::AbstractVector{<:Real}, scale::Real, bkgrnd_corr::Real) = scale .* I .+ bkgrnd_corr
 
 """
     contrast_vector(dns, δρ::NTuple{3,<:Real}) -> SVector{5}

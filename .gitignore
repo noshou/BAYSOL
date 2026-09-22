@@ -20,8 +20,11 @@ __pycache__/
 *.py[codz]
 .venv/
 
-# copyrigthed papers
+# non-open source papers
 sources/
+
+# test results
+res*
 
 # cache
 _cache/

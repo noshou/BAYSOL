@@ -2,6 +2,9 @@
 
 module BayeSol
 
+using Statistics: quantile, mean, var
+using Printf: @printf
+
 include("Helpers/Helpers.jl")
 include("AtomicRadii/AtomicRadii.jl")
 include("FormFactor/FormFactor.jl")
@@ -11,25 +14,24 @@ include("Solvation/Solvation.jl")
 include("Scattering/Scattering.jl")
 include("Fitting/Fitting.jl")
 
-using .Helpers:            Helpers
-using .Helpers.Constants:  Constants
-using .Helpers.Cache:      Cache
-using .AtomicRadii:        AtomicRadii
-using .FormFactor:         FormFactor
+using .Helpers:             Helpers
+using .Helpers.Constants:   Constants
+using .Helpers.Cache:       Cache
+using .AtomicRadii:         AtomicRadii
+using .FormFactor:          FormFactor
 using .PartialMolarVolumes: PartialMolarVolumes
-using .MolecularStructure: MolecularStructure
-using .Solvation:          Solvation
-using .Scattering:         Scattering
-using .Fitting:            Fitting
+using .MolecularStructure:  MolecularStructure
+using .Solvation:           Solvation
+using .Scattering:          Scattering
+using .Fitting:             Fitting
 
 """
     seed_model(
         mol_src, lMax, energy, qvals, I_exp, σ_exp, pH, σ_pH, solutes;
         add_hydrogens=true, blm_chunk=B_LM_CHUNK, thickness=SHELL_THICKNESS,
         t=DEFAULT_TEMPERATURE_C, n=C1_PRIOR_MASS_PERCENT, probe=PROBE_RADIUS,
-        n_target=SHELL_N_TARGET, ionic_strength_M=IONIC_STRENGTH_M,
-        eps_r=WATER_EPS_R, T=DEBYE_TEMPERATURE_K,
-        cutoff_debye_lengths=CUTOFF_DEBYE_LENGTHS
+        n_target=SHELL_N_TARGET, ionic_strength_M=IONIC_STRENGTH_M, eps_r=WATER_EPS_R, 
+        T=DEBYE_TEMPERATURE_K, cutoff_debye_lengths=CUTOFF_DEBYE_LENGTHS
     ) -> Fitting.Seed
 
 Computes a NUTS seed from given data input:
@@ -166,18 +168,91 @@ function seed_model(
 end
 
 """
+    MAPParams = Dict{String, Float64}
+
+Parameter values at the single MAP (maximum a posteriori, i.e.
+highest-log-density non-divergent) draw found by [`run_model`](@ref), keyed
+by name:
+
+- `"log_density"`: the MAP draw's log-posterior density.
+- `"slvnt_e_dns"`, `"delta_rho_1"`, `"delta_rho_2"`, `"delta_rho_3"`,
+    `"excl_vol_corr"`: the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`
+    at that draw (see [`Fitting.Seed`](@ref) for the `ξ` ordering this is
+    read off of).
+- `"scale"`, `"bkgrnd_corr"`: the WLS-fit detector scale/background at that
+    draw.
+- `"chisq_red"`: the WLS fit's reduced χ² at that draw.
+"""
+const MAPParams = Dict{String, Float64}
+
+"""
+    MAPResult = Tuple{MAPParams, Matrix{Float64}}
+
+`(params, curve)` at the MAP draw -- see [`MAPParams`](@ref). `curve` is a
+`(Q, 2)` matrix whose columns are `(q, I_calc(q))`, i.e.
+`hcat(seed.fw.qvals, fit.curves[:, max_idx])` -- `q` is carried alongside the
+curve (rather than returning `fit.curves[:, max_idx]` bare) so the MAP curve
+stays self-describing/aligned the same way [`QuantileCurves`](@ref) already
+is, instead of relying on the caller to zip it against `seed.fw.qvals`
+separately.
+"""
+const MAPResult = Tuple{MAPParams, Matrix{Float64}}
+
+"""
+    QuantileBounds = Dict{String, Tuple{Float64, Float64}}
+
+One parameter's `"quantiles"`/`"bounds"` pair (both `(lo, hi)` tuples):
+`"quantiles"` is the raw empirical `(q_1, q_2)` quantile pair (from the
+`quantiles` keyword, e.g. the 16th/84th percentile); `"bounds"` is the
+`extrema` of exactly the draws that fall within `[lo, hi]`, so it can differ
+slightly from `"quantiles"` itself (it's the tightest interval that actually
+contains data on both ends).
+"""
+const QuantileBounds = Dict{String, Tuple{Float64, Float64}}
+
+"""
+    QuantileParams = Dict{String, QuantileBounds}
+
+One [`QuantileBounds`](@ref) per parameter, over the same names as
+[`MAPParams`](@ref) (plus `"log_density"`, minus none).
+"""
+const QuantileParams = Dict{String, QuantileBounds}
+
+"""
+    QuantileCurves = Dict{String, Matrix{Float64}}
+
+`"quantiles"`/`"bounds"` predicted-curve envelopes, each a `(Q, 3)` matrix
+whose columns are `(q, I_lo(q), I_hi(q))` -- the column-wise analogue of
+[`QuantileBounds`](@ref), one row per `q` in `seed.fw.qvals`.
+"""
+const QuantileCurves = Dict{String, Matrix{Float64}}
+
+"""
+    QuantileResult = Tuple{QuantileParams, QuantileCurves}
+
+`(params, curve)`, the quantile-filtered counterpart of [`MAPResult`](@ref).
+"""
+const QuantileResult = Tuple{QuantileParams, QuantileCurves}
+
+"""
     run_model(
-        seed::Seed, 
-        n_samples::Int64, 
-        n_adapt::Int64; 
-        l::LIKELIHOOD=PROFILE(), 
+        seed::Seed,
+        n_samples::Int64,
+        n_adapt::Int64;
+        quantiles::AbstractString="16-84",
+        l::LIKELIHOOD=PROFILE(),
         δ::Real=80
-    ) -> (samples, stats)
+    ) -> Union{
+            Tuple{Fitting.FitResult, Float64, MAPResult, QuantileResult},
+            Tuple{Fitting.FitResult, Float64, Nothing, Nothing}
+        }
 
-Identical to [`Fitting.run_fitting`](@ref).
-
-Run NUTS on [`Fitting._logπ`](@ref) starting from `seed`, returning posterior draws
-of the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`.
+Run NUTS on [`Fitting._logπ`](@ref) starting from `seed`, returning posterior
+draws of the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`, one
+`(scale, bkgrnd_corr)` pair and predicted curve per draw, and
+`AdvancedHMC.jl`'s own per-iteration diagnostics. Identical to
+[`Fitting.run_fitting`](@ref) — see its docstring's `# Returns` for the full
+field-by-field breakdown of the `Fitting.FitResult` component.
 
 # The Hamiltonian
 
@@ -215,11 +290,17 @@ forward model) from the trajectory's sample covariance.
 # Arguments
 - `seed::Seed`: priors, initial point, forward cache, and data.
 - `n_samples::Int64`: total number of NUTS iterations (including the
-    `n_adapt` warm-up steps, which are kept unless `drop_warmup` is set).
+    `n_adapt` warm-up steps, which are kept -- no filtering is done here).
 - `n_adapt::Int64`: number of warm-up iterations spent adapting the step
     size and mass matrix before sampling proper.
 
 # Keywords
+- `quantiles::AbstractString="16-84"`: the `"<lo>-<hi>"` empirical quantile
+    range (integer percentages, `0 <= lo < hi <= 100`) used to build
+    [`QuantileResult`](@ref)'s `"quantiles"`/`"bounds"` entries, e.g. the
+    default `"16-84"` is a ±1σ-equivalent interval for a Normal. The special
+    case `"0-0"` means *no* filtering -- internally treated as the full
+    `0`-`100` range, so `"bounds"` spans the entire (non-divergent) sample.
 - `l::LIKELIHOOD=PROFILE()`: `PROFILE()` or `MARGINAL()`, forwarded to
     [`Fitting._logπ`](@ref)/[`Fitting._ll`](@ref).
 - `δ::Real=80`: target acceptance rate as a percentage, `(0, 100)` exclusive
@@ -227,16 +308,301 @@ forward model) from the trajectory's sample covariance.
     specific reason to retarget it.
 
 # Returns
-- `samples`: a `Vector` of posterior draws.
+A 4-tuple `(fit, divergence_rate, map, curve)`:
+
+- `fit::Fitting.FitResult`: the warm-up-draw-free posterior (`n_adapt` draws
+    sliced off the front) -- see [`Fitting.run_fitting`](@ref)'s `# Returns`
+    for its field-by-field breakdown.
+- `divergence_rate::Float64`: fraction of `fit`'s draws AdvancedHMC.jl
+    flagged as numerically divergent, `[0, 1]`.
+- `map`/`curve`: **either** both `nothing` (every draw diverged -- `map`/
+    `curve` cannot be computed, and `divergence_rate == 1.0`), **or** a
+    [`MAPResult`](@ref)/[`QuantileResult`](@ref) pair computed over the
+    non-divergent draws only. These two always come as a matched pair --
+    `map === nothing` iff `curve === nothing`.
 """
 function run_model(
     seed::Fitting.Seed,
     n_samples::Int64,
     n_adapt::Int64;
+    quantiles::AbstractString="16-84",
     l::Fitting.LIKELIHOOD=Fitting.PROFILE(),
     δ::Real=80
-)
-    return Fitting.run_fitting(seed, n_samples, n_adapt; l=l, δ=δ)
+)::Union{
+    Tuple{Fitting.FitResult, Float64, MAPResult, QuantileResult},
+    Tuple{Fitting.FitResult, Float64, Nothing, Nothing}
+}
+
+    # parse quantiles
+    q_regex = r"^(\d+)-(\d+)$"
+    if !occursin(q_regex, quantiles)
+        throw(DomainError(quantiles, "quantiles must be '<#>-<#>'"))
+    else
+        q_match = match(q_regex, quantiles)
+        q_1 = parse(Int64, q_match.captures[1])
+        q_2 = parse(Int64, q_match.captures[2])
+        if ((q_1 >= q_2) || q_1 < 0 || q_1 > 100 || q_2 < 0 || q_2 > 100)
+            # special case: "0-0" means no quantile filtering
+            if !(q_1 == 0 && q_2 == 0)
+                throw(DomainError((q_1, q_2), "invalid quantile range"))
+            end
+        end
+    end
+    q_1, q_2 = q_1 / 100, q_2 / 100
+
+    # "0-0" means no quantile filtering: reuse the same quantile/map_bounds
+    # machinery below with the full 0th-100th percentile range, which by
+    # construction spans (and therefore filters out nothing from) the data.
+    if q_1 == 0 && q_2 == 0
+        q_1, q_2 = 0.0, 1.0
+    end
+
+    # calculate unfiltered fit
+    fit_unfiltered = Fitting.run_fitting(seed, n_samples, n_adapt; l=l, δ=δ)
+
+    # filter-out warmup draws
+    fit = Fitting.FitResult(
+        fit_unfiltered.samples[n_adapt+1:end],
+        fit_unfiltered.stats[n_adapt+1:end],
+        fit_unfiltered.scale[n_adapt+1:end],
+        fit_unfiltered.bkgrnd_corr[n_adapt+1:end],
+        fit_unfiltered.chisq_red[n_adapt+1:end],
+        fit_unfiltered.curves[:, n_adapt+1:end],
+        fit_unfiltered.likelihood
+    )
+
+    # Numerical instabilities can occur when the posterior has very 
+    # different curvature/scales across dimensions. Such samples are 
+    # flagged as divergent and excluded from MAP selection.
+    filter  = trues(length(fit.stats))
+    max_llh = -Inf
+    max_idx = 0
+    diverged = 0
+    @inbounds for i in 1:length(fit.stats)
+        if fit.stats[i].numerical_error
+            diverged += 1
+            filter[i] = false
+        elseif fit.stats[i].log_density > max_llh
+            max_llh = fit.stats[i].log_density
+            max_idx = i
+        end
+    end
+    if diverged == length(fit.stats)
+        println("WARNING: all runs diverged; MAP and quantiles not run!")
+        res = (fit, 1., nothing, nothing)
+    else
+        divergence_rate = diverged / length(fit.stats)
+        
+        # calculate MAP params + curves
+        # ξ = (dns, δρ1, δρ2, δρ3, c1) -- see Fitting.Seed's docstring
+        MAP_params = Dict{String, Float64}(
+            "log_density"   => max_llh,
+            "slvnt_e_dns"   => getindex.(fit.samples, 1)[max_idx],
+            "delta_rho_1"   => getindex.(fit.samples, 2)[max_idx],
+            "delta_rho_2"   => getindex.(fit.samples, 3)[max_idx],
+            "delta_rho_3"   => getindex.(fit.samples, 4)[max_idx],
+            "excl_vol_corr" => getindex.(fit.samples, 5)[max_idx],
+            "scale"         => fit.scale[max_idx],
+            "bkgrnd_corr"   => fit.bkgrnd_corr[max_idx],
+            "chisq_red"     => fit.chisq_red[max_idx]
+        )
+        MAP_curve = hcat(seed.fw.qvals, fit.curves[:, max_idx])
+        map =(MAP_params, MAP_curve)
+
+        # filter out all divergent curves
+        ll_filt      = getproperty.(fit.stats, :log_density)[filter]
+        samples_filt = fit.samples[filter]
+        scale_filt   = fit.scale[filter]
+        bkgrnd_filt  = fit.bkgrnd_corr[filter]
+        chisq_filt   = fit.chisq_red[filter]
+        curves       = fit.curves[:, filter]
+        
+        # extract parameters from ξ = (dns, δρ1, δρ2, δρ3, c1)
+        ρₑ_filt  = getindex.(samples_filt, 1)
+        δρ1_filt = getindex.(samples_filt, 2)
+        δρ2_filt = getindex.(samples_filt, 3)
+        δρ3_filt = getindex.(samples_filt, 4)
+        c_1_filt = getindex.(samples_filt, 5)
+
+        # calculate param quantiles
+        ll_lo,  ll_hi        = quantile(ll_filt,     [q_1, q_2])
+        δρ1_lo, δρ1_hi       = quantile(δρ1_filt,    [q_1, q_2])
+        δρ2_lo, δρ2_hi       = quantile(δρ2_filt,    [q_1, q_2])
+        δρ3_lo, δρ3_hi       = quantile(δρ3_filt,    [q_1, q_2])
+        ρₑ_lo,  ρₑ_hi        = quantile(ρₑ_filt,     [q_1, q_2])
+        c_1_lo, c_1_hi       = quantile(c_1_filt,    [q_1, q_2])
+        scale_lo, scale_hi   = quantile(scale_filt,  [q_1, q_2])
+        bkgrnd_lo, bkgrnd_hi = quantile(bkgrnd_filt, [q_1, q_2])
+        chisq_lo, chisq_hi   = quantile(chisq_filt,  [q_1, q_2])
+
+        # returns a tuple of (low, high) bounds; fails loudly
+        function map_bounds(lo, hi, x)
+            filtered = (item for item in x if lo <= item <= hi)
+            if (isempty(filtered))
+                error("Illegal state: filtered cannot be empty!")
+            end
+            return extrema(filtered)
+        end
+
+        # dict of parameters
+        params  = Dict{String, Dict{String, Tuple{Float64, Float64}}}(
+                "log_density"     => Dict{String, Tuple{Float64, Float64}}(
+                    "quantiles"   => (ll_lo, ll_hi),
+                    "bounds"      => map_bounds(ll_lo, ll_hi, ll_filt)
+                ),
+                "delta_rho_1"     => Dict{String, Tuple{Float64, Float64}}(
+                    "quantiles"   => (δρ1_lo, δρ1_hi),
+                    "bounds"      => map_bounds(δρ1_lo, δρ1_hi, δρ1_filt)
+                ),
+                "delta_rho_2"     => Dict{String, Tuple{Float64, Float64}}(
+                    "quantiles"   => (δρ2_lo, δρ2_hi),
+                    "bounds"      => map_bounds(δρ2_lo, δρ2_hi, δρ2_filt)
+                ),
+                "delta_rho_3"     => Dict{String, Tuple{Float64, Float64}}(
+                    "quantiles"   => (δρ3_lo, δρ3_hi),
+                    "bounds"      => map_bounds(δρ3_lo, δρ3_hi, δρ3_filt)
+                ),
+                "slvnt_e_dns"     => Dict{String, Tuple{Float64, Float64}}(
+                    "quantiles"   => (ρₑ_lo, ρₑ_hi),
+                    "bounds"      => map_bounds(ρₑ_lo, ρₑ_hi, ρₑ_filt)
+                ),
+                "excl_vol_corr"   => Dict{String, Tuple{Float64, Float64}}(
+                    "quantiles"   => (c_1_lo, c_1_hi),
+                    "bounds"      => map_bounds(c_1_lo, c_1_hi, c_1_filt)
+                ),
+                "scale"           => Dict{String, Tuple{Float64, Float64}}(
+                    "quantiles"   => (scale_lo, scale_hi),
+                    "bounds"      => map_bounds(scale_lo, scale_hi, scale_filt)
+                ),
+                "bkgrnd_corr"     => Dict{String, Tuple{Float64, Float64}}(
+                    "quantiles"   => (bkgrnd_lo, bkgrnd_hi),
+                    "bounds"      => map_bounds(bkgrnd_lo, bkgrnd_hi, bkgrnd_filt)
+                ),
+                "chisq_red"       => Dict{String, Tuple{Float64, Float64}}(
+                    "quantiles"   => (chisq_lo, chisq_hi),
+                    "bounds"      => map_bounds(chisq_lo, chisq_hi, chisq_filt)
+                )
+            )
+
+        # curve is Q x I_low(Q) x I_hi(Q)
+        qvals = seed.fw.qvals
+        Q = size(curves, 1)
+        curve_quantiles = Matrix{Float64}(undef, Q, 3)
+        curve_bounds    = Matrix{Float64}(undef, Q, 3)
+        for q in 1:Q
+            I = curves[q, :]
+
+            I_lo, I_hi = quantile(I, [q_1, q_2])
+
+            curve_quantiles[q, :] .= (qvals[q], I_lo, I_hi)
+            curve_bounds[q, :]    .= (qvals[q], map_bounds(I_lo, I_hi, I)...)
+        end
+
+        curve = Dict{String, Matrix{Float64}}(
+            "quantiles" => curve_quantiles,
+            "bounds"    => curve_bounds
+        )
+
+        res = (fit, divergence_rate, map, (params, curve))
+    end
+
+    return res
+
 end
+
+# Order the physical/derived parameters are reported in, by `write_report`.
+const _REPORT_KEYS = [
+    "log_density", "slvnt_e_dns", "delta_rho_1", "delta_rho_2",
+    "delta_rho_3", "excl_vol_corr", "scale", "bkgrnd_corr", "chisq_red",
+]
+
+# Display labels for `write_report`'s text output only -- the underlying
+# `MAPParams`/`QuantileParams` Dict keys (`_REPORT_KEYS` above) are unchanged
+# and still what callers index with.
+const _REPORT_LABELS = Dict{String, String}(
+    "log_density"   => "log_density",
+    "slvnt_e_dns"   => "ρₑ",
+    "delta_rho_1"   => "δρ1",
+    "delta_rho_2"   => "δρ2",
+    "delta_rho_3"   => "δρ3",
+    "excl_vol_corr" => "excl_vol_corr",
+    "scale"         => "scale",
+    "bkgrnd_corr"   => "bkgrnd_corr",
+    "chisq_red"     => "χ²",
+)
+
+"""
+    write_report(io::IO, result; quantile_label::AbstractString="16-84")
+    write_report(result; quantile_label::AbstractString="16-84")
+
+Writes a human-readable summary of a [`run_model`](@ref) `result` to `io`
+(`stdout` if omitted): the divergence rate, the MAP draw's parameters (incl.
+`chisq_red`), each parameter's quantile/bound interval, and a `"===
+Diagnostics ==="` footer -- `AdvancedHMC.jl` per-chain sampler health
+computed from `fit.stats` (already the warm-up-free portion): iteration
+count, mean acceptance rate, tree depth (mean and max), mean leapfrog steps
+per iteration, and E-BFMI (Stan's energy-based Bayesian Fraction of Missing
+Information -- values below ~0.2-0.3 suggest momentum resampling isn't
+exploring the Hamiltonian's energy level sets well and the model may need
+reparameterizing). The diagnostics footer is written even when every draw
+diverged, since it's most useful exactly in that failure case.
+
+# Arguments
+- `io::IO`: where to write; omit for `stdout`.
+- `result`: a `run_model` return value, `(fit, divergence_rate, map, curve)`.
+
+# Keywords
+- `quantile_label::AbstractString="16-84"`
+"""
+function write_report(io::IO, result; quantile_label::AbstractString = "16-84")
+    fit, divergence_rate, map_result, quantile_result = result
+    @printf(io, "divergence_rate = %.4f\n\n", divergence_rate)
+
+    if map_result === nothing
+        println(io, "All draws diverged; no MAP/quantiles available.")
+    else
+        map_params, _ = map_result
+        quantile_params, _ = quantile_result
+
+        println(io, "=== MAP ===")
+        for k in _REPORT_KEYS
+            @printf(io, "%-14s = %+.6g\n", _REPORT_LABELS[k], map_params[k])
+        end
+
+        println(io)
+        println(io, "=== Quantiles ($quantile_label) ===")
+        @printf(
+            io, "%-14s %16s %16s %16s %16s\n",
+            "param", "quantile_lo", "quantile_hi", "bound_lo", "bound_hi"
+        )
+        for k in _REPORT_KEYS
+            q_lo, q_hi = quantile_params[k]["quantiles"]
+            b_lo, b_hi = quantile_params[k]["bounds"]
+            @printf(io, "%-14s %+16.6g %+16.6g %+16.6g %+16.6g\n", _REPORT_LABELS[k], q_lo, q_hi, b_lo, b_hi)
+        end
+    end
+
+    println(io)
+    println(io, "=== Diagnostics ===")
+    stats  = fit.stats
+    accept = getproperty.(stats, :acceptance_rate)
+    depth  = getproperty.(stats, :tree_depth)
+    nsteps = getproperty.(stats, :n_steps)
+    H      = getproperty.(stats, :hamiltonian_energy)
+    # E-BFMI: Stan's energy-based Bayesian Fraction of Missing Information,
+    # diagnosing whether momentum resampling explores the Hamiltonian's
+    # energy level sets adequately. Values below ~0.2-0.3 are the usual
+    # "may be problematic, consider reparameterizing" threshold.
+    ebfmi = mean(diff(H) .^ 2) / var(H)
+    @printf(io, "%-14s = %d\n", "iterations", length(stats))
+    @printf(io, "%-14s = %.4f\n", "mean_accept", mean(accept))
+    @printf(io, "%-14s = %.2f (max %d)\n", "tree_depth", mean(depth), maximum(depth))
+    @printf(io, "%-14s = %.2f\n", "mean_n_steps", mean(nsteps))
+    @printf(io, "%-14s = %.4f\n", "EBFMI", ebfmi)
+
+    return nothing
+end
+
+write_report(result; kwargs...) = write_report(stdout, result; kwargs...)
 
 end # module
