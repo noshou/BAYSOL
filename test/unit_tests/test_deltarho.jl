@@ -10,7 +10,7 @@ using Distributions: LogNormal, Normal, mean, std, quantile
 
 const FIT = BayeSol.Fitting
 
-include(joinpath(@__DIR__, "..", "fixtures", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 
 @testset "DeltaRho" begin
 

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-using ..Helpers.Constants: AVOGADRO
+using ..BayesolUtils.Constants: AVOGADRO
 using ..PartialMolarVolumes: PartialMolarVolumes
 using Distributions
 
