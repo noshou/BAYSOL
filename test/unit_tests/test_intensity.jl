@@ -160,14 +160,14 @@ iy_w    = partial_wave_weights(iy_lMax)
         @test_throws DimensionMismatch intensity(G, [1.0, 2.0, 3.0])
     end
 
-    @testset "intensity_calc is affine in (m, c)" begin
+    @testset "intensity_calc is affine in (scale, bkgrnd_corr)" begin
         B = [iy_B(1, iy_lMax, iy_Q; seed = 71), iy_B(1, iy_lMax, iy_Q; seed = 72)]
         I = intensity(gram(B, iy_w), [1.0, -1.0])
         @test intensity_calc(I, 1.0, 0.0) == I
         @test all(check_float.(intensity_calc(I, 2.5, 0.0), 2.5 .* I))
         @test all(check_float.(intensity_calc(I, 1.0, 4.0), I .+ 4.0))
         @test all(check_float.(intensity_calc(I, 3.0, -1.5), 3.0 .* I .- 1.5))
-        @test intensity_calc(I, 2, 0) isa Vector{Float64}   # integer m, c accepted
+        @test intensity_calc(I, 2, 0) isa Vector{Float64}   # integer scale, bkgrnd_corr accepted
     end
 
     @testset "contrast_vector: values, length, species order" begin

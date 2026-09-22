@@ -345,7 +345,8 @@ end
 
         Random.seed!(1)
         n_samples, n_adapt = 60, 30
-        samples, stats = FIT.run_fitting(seed, n_samples, n_adapt; l = FIT.PROFILE())
+        fit = FIT.run_fitting(seed, n_samples, n_adapt; l = FIT.PROFILE())
+        samples, stats = fit.samples, fit.stats
 
         @test length(samples) == n_samples
         @test length(stats) == n_samples
@@ -361,7 +362,8 @@ end
 
         Random.seed!(2)
         n_samples, n_adapt = 60, 30
-        samples, stats = FIT.run_fitting(seed, n_samples, n_adapt; l = FIT.MARGINAL())
+        fit = FIT.run_fitting(seed, n_samples, n_adapt; l = FIT.MARGINAL())
+        samples, stats = fit.samples, fit.stats
 
         @test length(samples) == n_samples
         @test length(stats) == n_samples
@@ -376,9 +378,11 @@ end
             μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
 
         Random.seed!(42)
-        samples1, stats1 = FIT.run_fitting(seed, 20, 10; l = FIT.PROFILE())
+        fit1 = FIT.run_fitting(seed, 20, 10; l = FIT.PROFILE())
+        samples1, stats1 = fit1.samples, fit1.stats
         Random.seed!(42)
-        samples2, stats2 = FIT.run_fitting(seed, 20, 10; l = FIT.PROFILE())
+        fit2 = FIT.run_fitting(seed, 20, 10; l = FIT.PROFILE())
+        samples2, stats2 = fit2.samples, fit2.stats
 
         @test length(samples1) == length(samples2)
         for i in eachindex(samples1)

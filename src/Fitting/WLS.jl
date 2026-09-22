@@ -1,14 +1,16 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Weighted least squares for the two instrumental parameters `m`, `c` in
+# Weighted least squares for the two instrumental parameters `scale`,
+# `bkgrnd_corr` in
 #
-#     I_calc(q) = m · I(q) + c
+#     I_calc(q) = scale · I(q) + bkgrnd_corr
 #
-# `m` is the overall scale between the absolute model intensity and the
-# detector's arbitrary units; `c` is a flat background from imperfect buffer
-# subtraction. At a fixed geometry / contrast the model curve `y_model = I(q; θ)`
-# is known and `I_calc` is linear in `(m, c)`, so this is one 2-parameter
-# weighted linear regression of `I_obs` on `[y_model, 1]` with `wᵢ = 1/σᵢ²`.
+# `scale` is the overall scale between the absolute model intensity and the
+# detector's arbitrary units; `bkgrnd_corr` is a flat background from
+# imperfect buffer subtraction. At a fixed geometry / contrast the model
+# curve `y_model = I(q; θ)` is known and `I_calc` is linear in `(scale,
+# bkgrnd_corr)`, so this is one 2-parameter weighted linear regression of
+# `I_obs` on `[y_model, 1]` with `wᵢ = 1/σᵢ²`.
 #
 
 "Raised by [`wls_fit`](@ref) on invalid input or a degenerate (flat-model) fit."
@@ -20,19 +22,21 @@ Base.showerror(io::IO, e::WLSError) = print(io, "WLSError: ", e.msg)
 """
     WLSFit{T}
 
-Result of [`wls_fit`](@ref): the fitted `I_calc(q) = m·y_model(q) + c` plus
-everything needed for uncertainty propagation and for using the fit as a
-(profiled or marginalised) Gaussian log-likelihood term.
+Result of [`wls_fit`](@ref): the fitted `I_calc(q) = scale·y_model(q) +
+bkgrnd_corr` plus everything needed for uncertainty propagation and for
+using the fit as a (profiled or marginalised) Gaussian log-likelihood term.
 
 # Fields
-    - `m`, `c` — the WLS point estimate.
-    - `var_m`, `var_c`, `cov_mc` — entries of the 2×2 conditional covariance
-    `(XᵀWX)⁻¹`. Multiply by [`reduced_chi2`](@ref)`(f)` for the σ-rescaled
-    ("aposteriori") version. `var_m → ∞` is the signal that the `m`/`c` fit is
+    - `scale`, `bkgrnd_corr` — the WLS point estimate.
+    - `var_scale`, `var_bkgrnd_corr`, `cov_scale_bkgrnd_corr` — entries of the
+    2×2 conditional covariance `(XᵀWX)⁻¹`. Multiply by
+    [`reduced_chi2`](@ref)`(f)` for the σ-rescaled ("aposteriori") version.
+    `var_scale → ∞` is the signal that the `scale`/`bkgrnd_corr` fit is
     near-degenerate.
-    - `chi2` — weighted residual sum of squares `Σ wᵢ (I_obs − m·y_model − c)²` at
-    the optimum, i.e. `χ²`. See [`reduced_chi2`](@ref) for the `χ²/dof`
-    goodness-of-fit diagnostic built from this and `dof`.
+    - `chi2` — weighted residual sum of squares
+    `Σ wᵢ (I_obs − scale·y_model − bkgrnd_corr)²` at the optimum, i.e. `χ²`.
+    See [`reduced_chi2`](@ref) for the `χ²/dof` goodness-of-fit diagnostic
+    built from this and `dof`.
     - `dof` — `n − 2`.
     - `det_XtWX` — `det(XᵀWX) = SwII·Sw − SwI²`, the normalising determinant. Enters
     [`wls_marg_ll`](@ref); depends on the forward-model parameters through
@@ -40,11 +44,11 @@ everything needed for uncertainty propagation and for using the fit as a
     - `sum_log_var` — `Σ log σᵢ²`, the data-only constant of the Gaussian.
 """
 struct WLSFit{T}
-    m::T
-    c::T
-    var_m::T
-    var_c::T
-    cov_mc::T
+    scale::T
+    bkgrnd_corr::T
+    var_scale::T
+    var_bkgrnd_corr::T
+    cov_scale_bkgrnd_corr::T
     chi2::T
     dof::Int
     det_XtWX::T
@@ -54,15 +58,17 @@ end
 """
     wls_fit(y_model, I_obs, σ) -> WLSFit
 
-Fit `m, c` in `I_calc(q) = m·y_model(q) + c` by weighted least squares with
-weights `wᵢ = 1/σᵢ²` — minimise `Σ wᵢ (I_obs(qᵢ) − m·y_model(qᵢ) − c)²`.
+Fit `scale, bkgrnd_corr` in `I_calc(q) = scale·y_model(q) + bkgrnd_corr` by
+weighted least squares with weights `wᵢ = 1/σᵢ²` — minimise
+`Σ wᵢ (I_obs(qᵢ) − scale·y_model(qᵢ) − bkgrnd_corr)²`.
 
 One `O(n)` pass builds the six weighted sums:
 
-    [SwII  SwI] [m]   [SwIy]
-    [SwI   Sw ] [c] = [Swy ]
+    [SwII  SwI] [scale      ]   [SwIy]
+    [SwI   Sw ] [bkgrnd_corr] = [Swy ]
 
-then gives `m`, `c`, the conditional covariance `(XᵀWX)⁻¹`, and `χ² = Swyy − m·SwIy − c·Swy`.
+then gives `scale`, `bkgrnd_corr`, the conditional covariance `(XᵀWX)⁻¹`, and
+`χ² = Swyy − scale·SwIy − bkgrnd_corr·Swy`.
 
 # Arguments
     - `y_model::AbstractVector` — the forward-model curve `I(q; θ)`; may carry
@@ -112,30 +118,31 @@ function wls_fit(y_model::AbstractVector, I_obs::AbstractVector, σ::AbstractVec
 
     det_XtWX = SwII * Sw - SwI * SwI
     det_XtWX > 0 || throw(WLSError(
-        "det(XᵀWX) ≤ 0: y_model is flat across the q-window, so m is not determined"))
+        "det(XᵀWX) ≤ 0: y_model is flat across the q-window, so scale is not determined"))
 
-    m = (Sw * SwIy - SwI * Swy) / det_XtWX
-    c = (SwII * Swy - SwI * SwIy) / det_XtWX
+    scale = (Sw * SwIy - SwI * Swy) / det_XtWX
+    bkgrnd_corr = (SwII * Swy - SwI * SwIy) / det_XtWX
 
     # (XᵀWX)⁻¹ = [Sw -SwI; -SwI SwII] / det.
-    var_m = Sw / det_XtWX
-    var_c = SwII / det_XtWX
-    cov_mc = -SwI / det_XtWX
+    var_scale = Sw / det_XtWX
+    var_bkgrnd_corr = SwII / det_XtWX
+    cov_scale_bkgrnd_corr = -SwI / det_XtWX
 
-    # χ² at the optimum: Σ w r² collapses to Swyy − m·SwIy − c·Swy once the above
-    # equations hold. Same "difference of large sums" as det; floor the last-ulp
-    # dip a near-perfect fit can produce.
-    chi2 = max(zero(T), Swyy - m * SwIy - c * Swy)
+    # χ² at the optimum: Σ w r² collapses to Swyy − scale·SwIy − bkgrnd_corr·Swy
+    # once the above equations hold. Same "difference of large sums" as det;
+    # floor the last-ulp dip a near-perfect fit can produce.
+    chi2 = max(zero(T), Swyy - scale * SwIy - bkgrnd_corr * Swy)
 
-    return WLSFit{T}(m, c, var_m, var_c, cov_mc, chi2, n - 2, det_XtWX, sum_log_var)
+    return WLSFit{T}(scale, bkgrnd_corr, var_scale, var_bkgrnd_corr, cov_scale_bkgrnd_corr, chi2, n - 2, det_XtWX, sum_log_var)
 end
 
 """
     predict(f::WLSFit, y_model) -> Vector
 
-The fitted `I_calc = f.m .* y_model .+ f.c`, on the same curve or a fresh one.
+The fitted `I_calc = f.scale .* y_model .+ f.bkgrnd_corr`, on the same curve
+or a fresh one.
 """
-wls_predict(f::WLSFit, y_model::AbstractVector) = f.m .* y_model .+ f.c
+wls_predict(f::WLSFit, y_model::AbstractVector) = f.scale .* y_model .+ f.bkgrnd_corr
 
 """
     reduced_chi2(f::WLSFit) -> Real
@@ -149,12 +156,12 @@ reduced_chi2(f::WLSFit) = f.chi2 / f.dof
 """
     wls_prof_ll(f::WLSFit) -> Real
 
-Log-likelihood of the data with `(m, c)` fixed at their WLS optimum (the
-profile likelihood):
+Log-likelihood of the data with `(scale, bkgrnd_corr)` fixed at their WLS
+optimum (the profile likelihood):
 
     -½ χ² - ½ Σ log σᵢ² - ½ n log 2π
 
-Use when `(m, c)` are treated as plugged-in point estimates. Positive
+Use when `(scale, bkgrnd_corr)` are treated as plugged-in point estimates. Positive
 log-likelihood (not negative) so it composes by addition with the
 `Distributions.logpdf` prior terms in the rest of the log-posterior, with no
 sign to keep track of at the call site.
@@ -165,7 +172,7 @@ wls_prof_ll(f::WLSFit) =
 """
     wls_marg_ll(f::WLSFit) -> Real
 
-Log marginal-likelihood with `(m, c)` integrated out under a flat prior:
+Log marginal-likelihood with `(scale, bkgrnd_corr)` integrated out under a flat prior:
 
     wls_prof_ll(f) - ½ log det(XᵀWX) + ½ p log 2π ,   p = 2
 
