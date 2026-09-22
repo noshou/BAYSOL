@@ -13,7 +13,7 @@ module Electrostatics
 
 using ...MolecularStructure: Residues, Molecule, Ionization, elms, coords_cartesian
 using ..SASA: SASA
-using ...Helpers.Constants: ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, BOND_CUTOFF,
+using ...BayesolUtils.Constants: ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, BOND_CUTOFF,
                             AVOGADRO, ANGSTROM, MV_PER_CM, PHOSPHATE_NET_CHARGE,
                             IONIC_STRENGTH_M, WATER_EPS_R, DEBYE_TEMPERATURE_K,
                             CUTOFF_DEBYE_LENGTHS, PROBE_RADIUS, SHELL_N_TARGET

@@ -64,6 +64,11 @@ species return one.
     form-factor backend, mirroring `MolecularStructure.create`'s `radii_source`. The
     default reads the bundled tables; a stub subtype lets this be exercised
     without them.
+-   `log::Union{Nothing,Vector{String}} = nothing`: when not `nothing`,
+    [`FormFactor.form_factor_log`](@ref)'s construction-time diagnostics for
+    this call's `form_factor_table` build are `append!`ed to it in place.
+    Left at `nothing` (the default), no log is collected -- this method's
+    return stays the bare `B_lm` array it always was.
 
 # Returns
 -   `B_lm::AbstractArray{<:Complex,3}`, `(C, K, Q)` in [`compute_B_lm`](@ref).
@@ -76,10 +81,12 @@ function vacuo(
     energy::Float64,
     _CHUNK::UInt64;
     form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE,
+    log::Union{Nothing,Vector{String}} = nothing,
 )::AbstractArray{<:Complex,3}
     crd = coords_spherical(mol)
     tbl = FormFactor.form_factor_table(form_factor_source, energy, ions, qvals)
     amp = FormFactor.form_factors(tbl, ions, qvals)
+    log === nothing || append!(log, FormFactor.form_factor_log(tbl))
     return compute_B_lm(crd, qvals, amp, lMax, _CHUNK)
 end
 

@@ -879,3 +879,849 @@ adenine	adenine	C5H5N5	0	90.6	1.1	measured	10.1016/j.jct.2017.04.005
 adenine	adenine	C5H5N5	0	92.7	1.0	measured	10.1016/j.jct.2017.04.005
 adenine	adenine	C5H5N5	0	94.9	0.6	measured	10.1016/j.jct.2017.04.005
 adenine	adenine	C5H5N5	0	97.8	0.7	measured	10.1016/j.jct.2017.04.005
+Methanol	Methanol	CH4O	0	38.25		measured	10.1007/BF00646936
+Ethanol	Ethanol	C2H6O	0	55.12		measured	10.1007/BF00646936
+1-Propanol	1-Propanol	C3H8O	0	70.63		measured	10.1007/BF00646936
+2-Propanol	2-Propanol	C3H8O	0	71.93		measured	10.1007/BF00646936
+1-Butanol	1-Butanol	C4H10O	0	86.48		measured	10.1007/BF00646936
+2-Methyl-1-propanol	2-Methyl-1-propanol	C4H10O	0	86.75		measured	10.1007/BF00646936
+2-Butanol	2-Butanol	C4H10O	0	86.65		measured	10.1007/BF00646936
+2-Methyl-2-propanol	2-Methyl-2-propanol	C4H10O	0	87.73		measured	10.1007/BF00646936
+1-Pentanol	1-Pentanol	C5H12O	0	102.88		measured	10.1007/BF00646936
+2,2-Dimethyl-1-propanol	2,2-Dimethyl-1-propanol	C5H12O	0	101.87		measured	10.1007/BF00646936
+2-Pentanol	2-Pentanol	C5H12O	0	102.55		measured	10.1007/BF00646936
+3-Pentanol	3-Pentanol	C5H12O	0	101.28		measured	10.1007/BF00646936
+2-Methyl-2-butanol	2-Methyl-2-butanol	C5H12O	0	102.5		measured	10.1007/BF00646936
+1-Hexanol	1-Hexanol	C6H14O	0	117.56		measured	10.1007/BF00646936
+2-Hexanol	2-Hexanol	C6H14O	0	118.49		measured	10.1007/BF00646936
+3-Hexanol	3-Hexanol	C6H14O	0	117.14		measured	10.1007/BF00646936
+1-Heptanol	1-Heptanol	C7H16O	0	133.43		measured	10.1007/BF00646936
+2-Heptanol	2-Heptanol	C7H16O	0	134.39		measured	10.1007/BF00646936
+3-Heptanol	3-Heptanol	C7H16O	0	133.3		measured	10.1007/BF00646936
+4-Heptanol	4-Heptanol	C7H16O	0	133.2		measured	10.1007/BF00646936
+Allyl alcohol	Allyl alcohol	C3H6O	0	64.3		measured	10.1007/BF00646936
+Cyclobutanol	Cyclobutanol	C4H8O	0	75.6		measured	10.1007/BF00646936
+Cyclopentanol	Cyclopentanol	C5H10O	0	89.06		measured	10.1007/BF00646936
+Cyclohexanol	Cyclohexanol	C6H12O	0	103.54		measured	10.1007/BF00646936
+Cycloheptanol	Cycloheptanol	C7H14O	0	116.88		measured	10.1007/BF00646936
+Cyclooctanol	Cyclooctanol	C8H16O	0	129.7		measured	10.1007/BF00646936
+Cyclopropanemethanol	Cyclopropanemethanol	C4H8O	0	76.0		measured	10.1007/BF00646936
+Cyclopentanemethanol	Cyclopentanemethanol	C6H12O	0	103.6		measured	10.1007/BF00646936
+alpha-Methylcyclopentanemethanol	alpha-Methylcyclopentanemethanol	C7H14O	0	118.2		measured	10.1007/BF00646936
+Cyclohexanemethanol	Cyclohexanemethanol	C7H14O	0	118.1		measured	10.1007/BF00646936
+Phenol	Phenol	C6H6O	0	86.17		measured	10.1007/BF00646936
+Benzyl alcohol	Benzyl alcohol	C7H8O	0	100.82		measured	10.1007/BF00646936
+Diethyl ether	Diethyl ether	C4H10O	0	90.4		measured	10.1007/BF00646936
+Diisopropyl ether	Diisopropyl ether	C6H14O	0	115.0		measured	10.1007/BF00646936
+Oxirane	Oxirane	C2H4O	0	45.5		measured	10.1007/BF00646936
+Oxetane	Oxetane	C3H6O	0	61.35		measured	10.1007/BF00646936
+Tetrahydrofuran	Tetrahydrofuran	C4H8O	0	76.85		measured	10.1007/BF00646936
+2-Methyltetrahydrofuran	2-Methyltetrahydrofuran	C5H10O	0	94.0		measured	10.1007/BF00646936
+Oxepane	Oxepane	C6H12O	0	105.46		measured	10.1007/BF00646936
+2,5-Dimethyltetrahydrofuran	2,5-Dimethyltetrahydrofuran	C6H12O	0	111.0		measured	10.1007/BF00646936
+Ammonia	Ammonia	H3N	0	24.86		measured	10.1007/BF00646936
+Methylamine	Methylamine	CH5N	0	41.68		measured	10.1007/BF00646936
+Ethylamine	Ethylamine	C2H7N	0	58.37		measured	10.1007/BF00646936
+1-Propanamine	1-Propanamine	C3H9N	0	74.12		measured	10.1007/BF00646936
+2-Propanamine	2-Propanamine	C3H9N	0	75.5		measured	10.1007/BF00646936
+1-Butanamine	1-Butanamine	C4H11N	0	89.8		measured	10.1007/BF00646936
+2-Methyl-1-propanamine	2-Methyl-1-propanamine	C4H11N	0	89.5		measured	10.1007/BF00646936
+2-Butanamine	2-Butanamine	C4H11N	0	89.1		measured	10.1007/BF00646936
+2-Methyl-2-propanamine	2-Methyl-2-propanamine	C4H11N	0	93.0		measured	10.1007/BF00646936
+1-Pentanamine	1-Pentanamine	C5H13N	0	105.7		measured	10.1007/BF00646936
+1-Hexanamine	1-Hexanamine	C6H15N	0	121.6		measured	10.1007/BF00646936
+1-Heptanamine	1-Heptanamine	C7H17N	0	137.6		measured	10.1007/BF00646936
+Cyclopentanamine	Cyclopentanamine	C5H11N	0	90.98		measured	10.1007/BF00646936
+Cyclohexanamine	Cyclohexanamine	C6H13N	0	105.35		measured	10.1007/BF00646936
+Cycloheptanamine	Cycloheptanamine	C7H15N	0	118.5		measured	10.1007/BF00646936
+Cyclooctanamine	Cyclooctanamine	C8H17N	0	133.4		measured	10.1007/BF00646936
+1-Adamantanamine	1-Adamantanamine	C10H17N	0	138.9		measured	10.1007/BF00646936
+Aniline	Aniline	C6H7N	0	89.3		measured	10.1007/BF00646936
+Benzylamine	Benzylamine	C7H9N	0	104.7		measured	10.1007/BF00646936
+Dimethylamine	Dimethylamine	C2H7N	0	59.8		measured	10.1007/BF00646936
+Diethylamine	Diethylamine	C4H11N	0	91.68		measured	10.1007/BF00646936
+Dipropylamine	Dipropylamine	C6H15N	0	123.06		measured	10.1007/BF00646936
+Dibutylamine	Dibutylamine	C8H19N	0	155.4		measured	10.1007/BF00646936
+Aziridine	Aziridine	C2H5N	0	48.87		measured	10.1007/BF00646936
+Azetidine	Azetidine	C3H7N	0	63.71		measured	10.1007/BF00646936
+Hexahydro-1H-azepine	Hexahydro-1H-azepine	C6H13N	0	105.55		measured	10.1007/BF00646936
+Octahydroazocine	Octahydroazocine	C7H15N	0	120.09		measured	10.1007/BF00646936
+2,6-Dimethylpiperidine	2,6-Dimethylpiperidine	C7H15N	0	124.4		measured	10.1007/BF00646936
+N-Ethyl-N-methylethanamine	N-Ethyl-N-methylethanamine	C5H13N	0	106.77		measured	10.1007/BF00646936
+Triethylamine	Triethylamine	C6H15N	0	120.9		measured	10.1007/BF00646936
+1-Methylpyrrolidine	1-Methylpyrrolidine	C5H11N	0	97.29		measured	10.1007/BF00646936
+1-Methylpiperidine	1-Methylpiperidine	C6H13N	0	110.54		measured	10.1007/BF00646936
+2-Methylpyridine	2-Methylpyridine	C6H7N	0	94.1		measured	10.1007/BF00646936
+3-Methylpyridine	3-Methylpyridine	C6H7N	0	93.7		measured	10.1007/BF00646936
+4-Methylpyridine	4-Methylpyridine	C6H7N	0	93.7		measured	10.1007/BF00646936
+2,6-Dimethylpyridine	2,6-Dimethylpyridine	C7H9N	0	110.0		measured	10.1007/BF00646936
+Quinoline	Quinoline	C9H7N	0	115.53		measured	10.1007/BF00646936
+Acetone	Acetone	C3H6O	0	66.8		measured	10.1007/BF00646936
+2-Butanone	2-Butanone	C4H8O	0	82.9		measured	10.1007/BF00646936
+2-Pentanone	2-Pentanone	C5H10O	0	98.0		measured	10.1007/BF00646936
+3-Pentanone	3-Pentanone	C5H10O	0	98.08		measured	10.1007/BF00646936
+3-Methyl-2-butanone	3-Methyl-2-butanone	C5H10O	0	95.0		measured	10.1007/BF00646936
+Cyclobutanone	Cyclobutanone	C4H6O	0	70.9		measured	10.1007/BF00646936
+Cyclopentanone	Cyclopentanone	C5H8O	0	84.5		measured	10.1007/BF00646936
+Cyclohexanone	Cyclohexanone	C6H10O	0	99.7		measured	10.1007/BF00646936
+Cycloheptanone	Cycloheptanone	C7H12O	0	113.8		measured	10.1007/BF00646936
+Cyclooctanone	Cyclooctanone	C8H14O	0	128.0		measured	10.1007/BF00646936
+Cyclononanone	Cyclononanone	C9H16O	0	142.0		measured	10.1007/BF00646936
+Benzaldehyde	Benzaldehyde	C7H6O	0	96.08		measured	10.1007/BF00646936
+Formic acid	Formic acid	CH2O2	0	34.7		measured	10.1007/BF00646936
+Acetic acid	Acetic acid	C2H4O2	0	51.9		measured	10.1007/BF00646936
+Butanoic acid	Butanoic acid	C4H8O2	0	84.6		measured	10.1007/BF00646936
+Pentanoic acid	Pentanoic acid	C5H10O2	0	100.5		measured	10.1007/BF00646936
+2-Methylbutanoic acid	2-Methylbutanoic acid	C5H10O2	0	100.5		measured	10.1007/BF00646936
+3-Methylbutanoic acid	3-Methylbutanoic acid	C5H10O2	0	100.5		measured	10.1007/BF00646936
+2,2-Dimethylpropanoic acid	2,2-Dimethylpropanoic acid	C5H10O2	0	100.5		measured	10.1007/BF00646936
+Hexanoic acid	Hexanoic acid	C6H12O2	0	116.0		measured	10.1007/BF00646936
+Benzoic acid	Benzoic acid	C7H6O2	0	98.77		measured	10.1007/BF00646936
+Ethyl formate	Ethyl formate	C3H6O2	0	72.8		measured	10.1007/BF00646936
+Methyl acetate	Methyl acetate	C3H6O2	0	72.46		measured	10.1007/BF00646936
+Ethyl acetate	Ethyl acetate	C4H8O2	0	88.8		measured	10.1007/BF00646936
+gamma-Butyrolactone	gamma-Butyrolactone	C4H6O2	0	73.3		measured	10.1007/BF00646936
+gamma-Valerolactone	gamma-Valerolactone	C5H8O2	0	92.0		measured	10.1007/BF00646936
+Formamide	Formamide	CH3NO	0	38.523		measured	10.1007/BF00646936
+Acetamide	Acetamide	C2H5NO	0	55.824		measured	10.1007/BF00646936
+Propanamide	Propanamide	C3H7NO	0	71.54		measured	10.1007/BF00646936
+Butanamide	Butanamide	C4H9NO	0	87.1		measured	10.1007/BF00646936
+Hexanamide	Hexanamide	C6H13NO	0	119.2		measured	10.1007/BF00646936
+N-Methylformamide	N-Methylformamide	C2H5NO	0	56.784		measured	10.1007/BF00646936
+N-Ethylformamide	N-Ethylformamide	C3H7NO	0	74.019		measured	10.1007/BF00646936
+N-Methylacetamide	N-Methylacetamide	C3H7NO	0	74.039		measured	10.1007/BF00646936
+N-Propylformamide	N-Propylformamide	C4H9NO	0	87.891		measured	10.1007/BF00646936
+N-Ethylacetamide	N-Ethylacetamide	C4H9NO	0	90.718		measured	10.1007/BF00646936
+N-Methylpropanamide	N-Methylpropanamide	C4H9NO	0	89.752		measured	10.1007/BF00646936
+N-Propylacetamide	N-Propylacetamide	C5H11NO	0	105.09		measured	10.1007/BF00646936
+N-Ethylpropanamide	N-Ethylpropanamide	C5H11NO	0	105.39		measured	10.1007/BF00646936
+N-Propylpropanamide	N-Propylpropanamide	C6H13NO	0	121.526		measured	10.1007/BF00646936
+2-Piperidinone	2-Piperidinone	C5H9NO	0	90.3		measured	10.1007/BF00646936
+Hexahydro-2H-azepin-2-one	Hexahydro-2H-azepin-2-one	C6H11NO	0	105.0		measured	10.1007/BF00646936
+N,N-Dimethylformamide	N,N-Dimethylformamide	C3H7NO	0	74.5		measured	10.1007/BF00646936
+N,N-Dimethylacetamide	N,N-Dimethylacetamide	C4H9NO	0	90.51		measured	10.1007/BF00646936
+N,N-Diethylformamide	N,N-Diethylformamide	C5H11NO	0	107.146		measured	10.1007/BF00646936
+N,N-Dimethylpropanamide	N,N-Dimethylpropanamide	C5H11NO	0	105.364		measured	10.1007/BF00646936
+N,N-Diethylacetamide	N,N-Diethylacetamide	C6H13NO	0	121.681		measured	10.1007/BF00646936
+N,N-Diethylpropanamide	N,N-Diethylpropanamide	C7H15NO	0	137.667		measured	10.1007/BF00646936
+N,N-Dipropylacetamide	N,N-Dipropylacetamide	C8H17NO	0	154.216		measured	10.1007/BF00646936
+N,N-Diisopropylacetamide	N,N-Diisopropylacetamide	C8H17NO	0	152.0		measured	10.1007/BF00646936
+1-Methyl-2-pyrrolidinone	1-Methyl-2-pyrrolidinone	C5H9NO	0	90.4		measured	10.1007/BF00646936
+3-Bromo-1-propene	3-Bromo-1-propene	C3H5Br	0	77.6		measured	10.1007/BF00646936
+Diethyl sulfide	Diethyl sulfide	C4H10S	0	99.5		measured	10.1007/BF00646936
+Dimethyl sulfoxide	Dimethyl sulfoxide	C2H6OS	0	68.92		measured	10.1007/BF00646936
+Acetonitrile	Acetonitrile	C2H3N	0	47.4		measured	10.1007/BF00646936
+Thioacetamide	Thioacetamide	C2H5NS	0	66.42		measured	10.1007/BF00646936
+Dimethyl carbonate	Dimethyl carbonate	C3H6O3	0	77.6		measured	10.1007/BF00646936
+Diethyl carbonate	Diethyl carbonate	C5H10O3	0	113.1		measured	10.1007/BF00646936
+Ethylene carbonate	Ethylene carbonate	C3H4O3	0	62.3		measured	10.1007/BF00646936
+Nitrobenzene	Nitrobenzene	C6H5NO2	0	97.71		measured	10.1007/BF00646936
+Urea	Urea	CH4N2O	0	44.238		measured	10.1007/BF00646936
+Thiourea	Thiourea	CH4N2S	0	54.793		measured	10.1007/BF00646936
+Methylurea	Methylurea	C2H6N2O	0	62.2		measured	10.1007/BF00646936
+Ethylurea	Ethylurea	C3H8N2O	0	80.2		measured	10.1007/BF00646936
+Isopropylurea	Isopropylurea	C4H10N2O	0	99.0		measured	10.1007/BF00646936
+Butylurea	Butylurea	C5H12N2O	0	116.1		measured	10.1007/BF00646936
+N,N-Dimethylurea	N,N-Dimethylurea	C3H8N2O	0	78.88		measured	10.1007/BF00646936
+N,N-Diethylurea	N,N-Diethylurea	C5H12N2O	0	114.9		measured	10.1007/BF00646936
+N,N'-Dimethylurea	N,N'-Dimethylurea	C3H8N2O	0	80.04		measured	10.1007/BF00646936
+N,N'-Diethylurea	N,N'-Diethylurea	C5H12N2O	0	116.1		measured	10.1007/BF00646936
+Ethylene glycol	Ethylene glycol	C2H6O2	0	54.6		measured	10.1007/BF00646936
+1,2-Propanediol	1,2-Propanediol	C3H8O2	0	71.22		measured	10.1007/BF00646936
+1,3-Propanediol	1,3-Propanediol	C3H8O2	0	71.89		measured	10.1007/BF00646936
+2,3-Butanediol	2,3-Butanediol	C4H10O2	0	86.56		measured	10.1007/BF00646936
+1,3-Butanediol	1,3-Butanediol	C4H10O2	0	88.32		measured	10.1007/BF00646936
+1,4-Butanediol	1,4-Butanediol	C4H10O2	0	88.35		measured	10.1007/BF00646936
+2,2-Dimethyl-1,3-propanediol	2,2-Dimethyl-1,3-propanediol	C5H12O2	0	102.34		measured	10.1007/BF00646936
+2,4-Pentanediol	2,4-Pentanediol	C5H12O2	0	104.64		measured	10.1007/BF00646936
+1,5-Pentanediol	1,5-Pentanediol	C5H12O2	0	104.35		measured	10.1007/BF00646936
+2,5-Hexanediol	2,5-Hexanediol	C6H14O2	0	120.5		measured	10.1007/BF00646936
+1,6-Hexanediol	1,6-Hexanediol	C6H14O2	0	120.49		measured	10.1007/BF00646936
+1,7-Heptanediol	1,7-Heptanediol	C7H16O2	0	136.4		measured	10.1007/BF00646936
+1,8-Octanediol	1,8-Octanediol	C8H18O2	0	152.6		measured	10.1007/BF00646936
+1,10-Decanediol	1,10-Decanediol	C10H22O2	0	184.4		measured	10.1007/BF00646936
+cis-1,2-Cyclohexanediol	cis-1,2-Cyclohexanediol	C6H12O2	0	101.3		measured	10.1007/BF00646936
+trans-1,2-Cyclohexanediol	trans-1,2-Cyclohexanediol	C6H12O2	0	103.0		measured	10.1007/BF00646936
+1,4-Cyclohexanediol	1,4-Cyclohexanediol	C6H12O2	0	105.3		measured	10.1007/BF00646936
+trans-1,2-Cycloheptanediol	trans-1,2-Cycloheptanediol	C7H14O2	0	117.0		measured	10.1007/BF00646936
+cis-1,5-Cyclooctanediol	cis-1,5-Cyclooctanediol	C8H16O2	0	132.5		measured	10.1007/BF00646936
+1,3-Adamantanediol	1,3-Adamantanediol	C10H16O2	0	138.2		measured	10.1007/BF00646936
+1,4-Adamantanediol	1,4-Adamantanediol	C10H16O2	0	139.3		measured	10.1007/BF00646936
+Catechol	Catechol	C6H6O2	0	87.065		measured	10.1007/BF00646936
+Resorcinol	Resorcinol	C6H6O2	0	88.919		measured	10.1007/BF00646936
+Hydroquinone	Hydroquinone	C6H6O2	0	88.696		measured	10.1007/BF00646936
+Glycerol	Glycerol	C3H8O3	0	70.95		measured	10.1007/BF00646936
+2-(Hydroxymethyl)-2-methyl-1,3-propanediol	2-(Hydroxymethyl)-2-methyl-1,3-propanediol	C5H12O3	0	102.3		measured	10.1007/BF00646936
+meso-Erythritol	meso-Erythritol	C4H10O4	0	87.1		measured	10.1007/BF00646936
+Pentaerythritol	Pentaerythritol	C5H12O4	0	101.81		measured	10.1007/BF00646936
+D-Arabinitol	D-Arabinitol	C5H12O5	0	103.31		measured	10.1007/BF00646936
+L-Arabinitol	L-Arabinitol	C5H12O5	0	103.0		measured	10.1007/BF00646936
+D-Xylitol	D-Xylitol	C5H12O5	0	102.4		measured	10.1007/BF00646936
+Galactitol	Galactitol	C6H14O6	0	119.3		measured	10.1007/BF00646936
+D-Mannitol	D-Mannitol	C6H14O6	0	119.33		measured	10.1007/BF00646936
+Sorbitol	Sorbitol	C6H14O6	0	119.9		measured	10.1007/BF00646936
+myo-Inositol	myo-Inositol	C6H12O6	0	121		measured	10.1007/BF00646936
+Dimethoxymethane	Dimethoxymethane	C3H8O2	0	80.42		measured	10.1007/BF00646936
+Diethoxymethane	Diethoxymethane	C5H12O2	0	113.88		measured	10.1007/BF00646936
+1,2-Dimethoxyethane	1,2-Dimethoxyethane	C4H10O2	0	95.88		measured	10.1007/BF00646936
+1,2-Diethoxyethane	1,2-Diethoxyethane	C6H14O2	0	127.29		measured	10.1007/BF00646936
+1,3-Dioxolane	1,3-Dioxolane	C3H6O2	0	65.37		measured	10.1007/BF00646936
+1,3-Dioxane	1,3-Dioxane	C4H8O2	0	80.82		measured	10.1007/BF00646936
+1,4-Dioxane	1,4-Dioxane	C4H8O2	0	80.96		measured	10.1007/BF00646936
+1,3-Dioxepane	1,3-Dioxepane	C5H10O2	0	95.98		measured	10.1007/BF00646936
+Diglyme	Diglyme	C6H14O3	0	132.69		measured	10.1007/BF00646936
+Bis(2-ethoxyethyl) ether	Bis(2-ethoxyethyl) ether	C8H18O3	0	165.0		measured	10.1007/BF00646936
+1,3,5-Trioxane	1,3,5-Trioxane	C3H6O3	0	69.51		measured	10.1007/BF00646936
+Paraldehyde	Paraldehyde	C6H12O3	0	123.71		measured	10.1007/BF00646936
+2,5-Dimethoxytetrahydrofuran	2,5-Dimethoxytetrahydrofuran	C6H12O3	0	122.34		measured	10.1007/BF00646936
+Tetraglyme	Tetraglyme	C10H22O5	0	206.66		measured	10.1007/BF00646936
+2,5-Dimethoxy-2-(dimethoxymethyl)tetrahydrofuran	2,5-Dimethoxy-2-(dimethoxymethyl)tetrahydrofuran	C9H18O5	0	177.1		measured	10.1007/BF00646936
+18-Crown-6	18-Crown-6	C12H24O6	0	223.4		measured	10.1007/BF00646936
+Hydrazine	Hydrazine	H4N2	0	30.13		measured	10.1007/BF00646936
+Ethylenediamine	Ethylenediamine	C2H8N2	0	62.88		measured	10.1007/BF00646936
+1,2-Propanediamine	1,2-Propanediamine	C3H10N2	0	78.1		measured	10.1007/BF00646936
+1,3-Propanediamine	1,3-Propanediamine	C3H10N2	0	78.83		measured	10.1007/BF00646936
+Cadaverine	Cadaverine	C5H14N2	0	109.4		measured	10.1007/BF00646936
+1,6-Hexanediamine	1,6-Hexanediamine	C6H16N2	0	124.8		measured	10.1007/BF00646936
+1,7-Heptanediamine	1,7-Heptanediamine	C7H18N2	0	141.52		measured	10.1007/BF00646936
+1,8-Octanediamine	1,8-Octanediamine	C8H20N2	0	157.3		measured	10.1007/BF00646936
+1,9-Nonanediamine	1,9-Nonanediamine	C9H22N2	0	172.85		measured	10.1007/BF00646936
+1,10-Decanediamine	1,10-Decanediamine	C10H24N2	0	188.3		measured	10.1007/BF00646936
+trans-1,4-Cyclohexanediamine	trans-1,4-Cyclohexanediamine	C6H14N2	0	108.9		measured	10.1007/BF00646936
+1-Methylpiperazine	1-Methylpiperazine	C5H12N2	0	102.3		measured	10.1007/BF00646936
+1,4-Dimethylpiperazine	1,4-Dimethylpiperazine	C6H14N2	0	121.0		measured	10.1007/BF00646936
+DABCO	DABCO	C6H12N2	0	105.93		measured	10.1007/BF00646936
+Diethylenetriamine	Diethylenetriamine	C4H13N3	0	107.2		measured	10.1007/BF00646936
+Tetraethylenepentamine	Tetraethylenepentamine	C8H23N5	0	175.9		measured	10.1007/BF00646936
+2-Aminopyridine	2-Aminopyridine	C5H6N2	0	83.0		measured	10.1007/BF00646936
+3-Aminopyridine	3-Aminopyridine	C5H6N2	0	82.1		measured	10.1007/BF00646936
+4-Aminopyridine	4-Aminopyridine	C5H6N2	0	82.7		measured	10.1007/BF00646936
+Pyrazole	Pyrazole	C3H4N2	0	62.26		measured	10.1007/BF00646936
+Imidazole	Imidazole	C3H4N2	0	59.95		measured	10.1007/BF00646936
+Pyrazine	Pyrazine	C4H4N2	0	70.82		measured	10.1007/BF00646936
+4-Phenylpyrimidine	4-Phenylpyrimidine	C10H8N2	0	134.09		measured	10.1007/BF00646936
+2,2'-Bipyridine	2,2'-Bipyridine	C10H8N2	0	134.29		measured	10.1007/BF00646936
+4,4'-Bipyridine	4,4'-Bipyridine	C10H8N2	0	133.21		measured	10.1007/BF00646936
+Benzimidazole	Benzimidazole	C7H6N2	0	98.53		measured	10.1007/BF00646936
+Quinoxaline	Quinoxaline	C8H6N2	0	109.16		measured	10.1007/BF00646936
+1,10-Phenanthroline	1,10-Phenanthroline	C12H8N2	0	142.42		measured	10.1007/BF00646936
+1,3,5-Triazine	1,3,5-Triazine	C3H3N3	0	54.79		measured	10.1007/BF00646936
+Benzotriazole	Benzotriazole	C6H5N3	0	94.49		measured	10.1007/BF00646936
+Oxalic acid	Oxalic acid	C2H2O4	0	49.12		measured	10.1007/BF00646936
+Malonic acid	Malonic acid	C3H4O4	0	67.22		measured	10.1007/BF00646936
+Glutaric acid	Glutaric acid	C5H8O4	0	99.14		measured	10.1007/BF00646936
+Adipic acid	Adipic acid	C6H10O4	0	115.66		measured	10.1007/BF00646936
+Oxamide	Oxamide	C2H4N2O2	0	55.0		measured	10.1007/BF00646936
+Malonamide	Malonamide	C3H6N2O2	0	72.6		measured	10.1007/BF00646936
+Succinamide	Succinamide	C4H8N2O2	0	83.8		measured	10.1007/BF00646936
+N,N,N',N'-Tetramethyloctanediamide	N,N,N',N'-Tetramethyloctanediamide	C12H24N2O2	0	224		measured	10.1007/BF00646936
+N,N,N',N'-Tetramethylnonanediamide	N,N,N',N'-Tetramethylnonanediamide	C13H26N2O2	0	236		measured	10.1007/BF00646936
+N,N,N',N'-Tetramethyldecanediamide	N,N,N',N'-Tetramethyldecanediamide	C14H28N2O2	0	250		measured	10.1007/BF00646936
+Glycine anhydride	Glycine anhydride	C4H6N2O2	0	75.7		measured	10.1007/BF00646936
+2-Methoxyethanol	2-Methoxyethanol	C3H8O2	0	75.11		measured	10.1007/BF00646936
+2-Ethoxyethanol	2-Ethoxyethanol	C4H10O2	0	90.97		measured	10.1007/BF00646936
+2-Propoxyethanol	2-Propoxyethanol	C5H12O2	0	107.1		measured	10.1007/BF00646936
+2-Butoxyethanol	2-Butoxyethanol	C6H14O2	0	122.91		measured	10.1007/BF00646936
+Tetrahydrofurfuryl alcohol	Tetrahydrofurfuryl alcohol	C5H10O2	0	93.8		measured	10.1007/BF00646936
+Tetrahydro-2H-pyran-2-methanol	Tetrahydro-2H-pyran-2-methanol	C6H12O2	0	108.1		measured	10.1007/BF00646936
+Diethylene glycol	Diethylene glycol	C4H10O3	0	92.17		measured	10.1007/BF00646936
+Tetraethylene glycol	Tetraethylene glycol	C8H18O5	0	166.25		measured	10.1007/BF00646936
+Pentaethylene glycol	Pentaethylene glycol	C10H22O6	0	203.85		measured	10.1007/BF00646936
+Dipropylene glycol	Dipropylene glycol	C12H28O6	0	124.64		measured	10.1007/BF00646936
+Pentapropylene glycol	Pentapropylene glycol	C15H32O6	0	283.75		measured	10.1007/BF00646936
+2-Aminoethanol	2-Aminoethanol	C2H7NO	0	59.25		measured	10.1007/BF00646936
+3-Amino-1-propanol	3-Amino-1-propanol	C3H9NO	0	75.21		measured	10.1007/BF00646936
+4-Amino-1-butanol	4-Amino-1-butanol	C4H11NO	0	91.17		measured	10.1007/BF00646936
+5-Amino-1-pentanol	5-Amino-1-pentanol	C5H13NO	0	107.07		measured	10.1007/BF00646936
+6-Amino-1-hexanol	6-Amino-1-hexanol	C6H15NO	0	123.36		measured	10.1007/BF00646936
+2-(Methylamino)ethanol	2-(Methylamino)ethanol	C3H9NO	0	77.07		measured	10.1007/BF00646936
+2-(Ethylamino)ethanol	2-(Ethylamino)ethanol	C4H11NO	0	92.91		measured	10.1007/BF00646936
+2-(Dimethylamino)ethanol	2-(Dimethylamino)ethanol	C4H11NO	0	94.17		measured	10.1007/BF00646936
+2-(Diethylamino)ethanol	2-(Diethylamino)ethanol	C6H15NO	0	123.04		measured	10.1007/BF00646936
+3-Hydroxypyridine	3-Hydroxypyridine	C5H5NO	0	75.4		measured	10.1007/BF00646936
+Diethanolamine	Diethanolamine	C4H11NO2	0	94.35		measured	10.1007/BF00646936
+2,2'-(Ethylimino)diethanol	2,2'-(Ethylimino)diethanol	C6H15NO2	0	125.01		measured	10.1007/BF00646936
+Glycolic acid	Glycolic acid	C2H4O3	0	51.75		measured	10.1007/BF00646936
+Lactic acid	Lactic acid	C3H6O3	0	69.38		measured	10.1007/BF00646936
+2-Hydroxybutanoic acid	2-Hydroxybutanoic acid	C4H8O3	0	85.45		measured	10.1007/BF00646936
+2-Hydroxy-2-methylpropanoic acid	2-Hydroxy-2-methylpropanoic acid	C4H8O3	0	86.78		measured	10.1007/BF00646936
+2-Hydroxypentanoic acid	2-Hydroxypentanoic acid	C5H10O3	0	100.47		measured	10.1007/BF00646936
+2-Hydroxy-3-methylbutanoic acid	2-Hydroxy-3-methylbutanoic acid	C5H10O3	0	100.83		measured	10.1007/BF00646936
+2-Hydroxyhexanoic acid	2-Hydroxyhexanoic acid	C6H12O3	0	117.26		measured	10.1007/BF00646936
+L-Tartaric acid	L-Tartaric acid	C4H6O6	0	83.45		measured	10.1007/BF00646936
+meso-Tartaric acid	meso-Tartaric acid	C4H6O6	0	82.9		measured	10.1007/BF00646936
+Glycolamide	Glycolamide	C2H5NO2	0	56.2		measured	10.1007/BF00646936
+Lactamide	Lactamide	C3H7NO2	0	73.12		measured	10.1007/BF00646936
+4-Hydroxybutanamide	4-Hydroxybutanamide	C4H9NO2	0	88.9		measured	10.1007/BF00646936
+5-Hydroxypentanamide	5-Hydroxypentanamide	C5H11NO2	0	105.4		measured	10.1007/BF00646936
+6-Hydroxyhexanamide	6-Hydroxyhexanamide	C6H13NO2	0	121.1		measured	10.1007/BF00646936
+4-Hydroxyoctanamide	4-Hydroxyoctanamide	C8H17NO2	0	151.9		measured	10.1007/BF00646936
+4-Hydroxydecanamide	4-Hydroxydecanamide	C10H21NO2	0	183.3		measured	10.1007/BF00646936
+2-Methoxyethylamine	2-Methoxyethylamine	C3H9NO	0	79.59		measured	10.1007/BF00646936
+3-Methoxy-1-propanamine	3-Methoxy-1-propanamine	C4H11NO	0	95.55		measured	10.1007/BF00646936
+Morpholine	Morpholine	C4H9NO	0	82.56		measured	10.1007/BF00646936
+4-Methylmorpholine	4-Methylmorpholine	C5H11NO	0	101.28		measured	10.1007/BF00646936
+Dichloromethane	Dichloromethane	CH2Cl2	0	58.06		measured	10.1007/BF00646936
+Chloroform	Chloroform	CHCl3	0	72.3		measured	10.1007/BF00646936
+L-Arabinose	L-Arabinose	C5H10O5	0	93.2		measured	10.1007/BF00646936
+D-Ribose	D-Ribose	C5H10O5	0	95.2		measured	10.1007/BF00646936
+2-Deoxy-D-ribose	2-Deoxy-D-ribose	C5H10O4	0	93.8		measured	10.1007/BF00646936
+D-Xylose	D-Xylose	C5H10O5	0	95.4		measured	10.1007/BF00646936
+D-Fructose	D-Fructose	C6H12O6	0	110.4		measured	10.1007/BF00646936
+D-Galactose	D-Galactose	C6H12O6	0	110.2		measured	10.1007/BF00646936
+D-Glucose	D-Glucose	C6H12O6	0	112.04		measured	10.1007/BF00646936
+2-Deoxy-D-glucose	2-Deoxy-D-glucose	C6H12O5	0	110.4		measured	10.1007/BF00646936
+D-Mannose	D-Mannose	C6H12O6	0	111.7		measured	10.1007/BF00646936
+L-Sorbose	L-Sorbose	C6H12O6	0	110.6		measured	10.1007/BF00646936
+Cellobiose	Cellobiose	C12H22O11	0	213.6		measured	10.1007/BF00646936
+Lactose	Lactose	C12H22O11	0	209.1		measured	10.1007/BF00646936
+Maltose	Maltose	C12H22O11	0	208.8		measured	10.1007/BF00646936
+Melibiose	Melibiose	C12H22O11	0	204.0		measured	10.1007/BF00646936
+Cellotriose	Cellotriose	C18H32O16	0	309.2		measured	10.1007/BF00646936
+Maltotriose	Maltotriose	C18H32O16	0	304.8		measured	10.1007/BF00646936
+Melezitose	Melezitose	C18H32O16	0	310.0		measured	10.1007/BF00646936
+Stachyose	Stachyose	C24H42O21	0	401.0		measured	10.1007/BF00646936
+Cellotetraose	Cellotetraose	C24H42O21	0	409.0		measured	10.1007/BF00646936
+Cellopentaose	Cellopentaose	C30H52O26	0	499.6		measured	10.1007/BF00646936
+Cellohexaose	Cellohexaose	C36H62O31	0	601.7		measured	10.1007/BF00646936
+alpha-Cyclodextrin	alpha-Cyclodextrin	C36H60O30	0	602.0		measured	10.1007/BF00646936
+beta-Cyclodextrin	beta-Cyclodextrin	C42H70O35	0	710.8		measured	10.1007/BF00646936
+Methyl alpha-D-galactopyranoside	Methyl alpha-D-galactopyranoside	C7H14O6	0	132.6		measured	10.1007/BF00646936
+Methyl beta-D-galactopyranoside	Methyl beta-D-galactopyranoside	C7H14O6	0	132.9		measured	10.1007/BF00646936
+Methyl alpha-D-glucopyranoside	Methyl alpha-D-glucopyranoside	C7H14O6	0	132.6		measured	10.1007/BF00646936
+Methyl beta-D-glucopyranoside	Methyl beta-D-glucopyranoside	C7H14O6	0	133.6		measured	10.1007/BF00646936
+3-O-Methyl-D-glucose	3-O-Methyl-D-glucose	C7H14O6	0	134.0		measured	10.1007/BF00646936
+Methyl alpha-D-mannopyranoside	Methyl alpha-D-mannopyranoside	C7H14O6	0	132.9		measured	10.1007/BF00646936
+Ethyl alpha-D-glucopyranoside	Ethyl alpha-D-glucopyranoside	C8H16O6	0	149.45		measured	10.1007/BF00646936
+Phenyl beta-D-glucopyranoside	Phenyl beta-D-glucopyranoside	C12H16O6	0	177.5		measured	10.1007/BF00646936
+Galacturonic acid	Galacturonic acid	C6H10O7	0	107.6		measured	10.1007/BF00646936
+Glucuronic acid	Glucuronic acid	C6H10O7	0	110.2		measured	10.1007/BF00646936
+Dimethyl oxalate	Dimethyl oxalate	C4H6O4	0	91.4		measured	10.1007/BF00646936
+Methyl methoxyacetate	Methyl methoxyacetate	C4H8O3	0	93.3		measured	10.1007/BF00646936
+Methoxymethyl acetate	Methoxymethyl acetate	C4H8O3	0	94.4		measured	10.1007/BF00646936
+2-Thiohydantoin	2-Thiohydantoin	C3H4N2OS	0	76.5		measured	10.1007/BF00646936
+3-Hydroxybenzaldehyde	3-Hydroxybenzaldehyde	C7H6O2	0	97.87		measured	10.1007/BF00646936
+4-Hydroxybenzaldehyde	4-Hydroxybenzaldehyde	C7H6O2	0	96.94		measured	10.1007/BF00646936
+3-Nitrophenol	3-Nitrophenol	C6H5NO3	0	99.71		measured	10.1007/BF00646936
+4-Nitrophenol	4-Nitrophenol	C6H5NO3	0	98.23		measured	10.1007/BF00646936
+3-Hydroxybenzonitrile	3-Hydroxybenzonitrile	C7H5NO	0	97.5		measured	10.1007/BF00646936
+4-Hydroxybenzonitrile	4-Hydroxybenzonitrile	C7H5NO	0	98.3		measured	10.1007/BF00646936
+Caffeine	Caffeine	C8H10N4O2	0	144.2		measured	10.1007/BF00646936
+Methanol	Methanol	CH4O	0	38.17	0.1	measured	10.1007/978-3-642-71114-5_2
+Ethanol	Ethanol	C2H6O	0	55.08	0.07	measured	10.1007/978-3-642-71114-5_2
+1-Propanol	1-Propanol	C3H8O	0	70.7	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Propanol	2-Propanol	C3H8O	0	71.9	0.1	measured	10.1007/978-3-642-71114-5_2
+1-Butanol	1-Butanol	C4H10O	0	86.6	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Butanol	2-Butanol	C4H10O	0	86.62	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Methyl-1-propanol	2-Methyl-1-propanol	C4H10O	0	86.7	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Methyl-2-propanol	2-Methyl-2-propanol	C4H10O	0	87.75	0.07	measured	10.1007/978-3-642-71114-5_2
+1-Pentanol	1-Pentanol	C5H12O	0	102.68	0.13	measured	10.1007/978-3-642-71114-5_2
+2-Pentanol	2-Pentanol	C5H12O	0	102.55	0.1	measured	10.1007/978-3-642-71114-5_2
+3-Pentanol	3-Pentanol	C5H12O	0	101.21	0.1	measured	10.1007/978-3-642-71114-5_2
+2,2-Dimethyl-1-propanol	2,2-Dimethyl-1-propanol	C5H12O	0	101.87	0.06	measured	10.1007/978-3-642-71114-5_2
+1-Hexanol	1-Hexanol	C6H14O	0	118.65	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Hexanol	2-Hexanol	C6H14O	0	118.49	0.1	measured	10.1007/978-3-642-71114-5_2
+3-Hexanol	3-Hexanol	C6H14O	0	117.14	0.09	measured	10.1007/978-3-642-71114-5_2
+1-Heptanol	1-Heptanol	C7H16O	0	133.43		measured	10.1007/978-3-642-71114-5_2
+2-Heptanol	2-Heptanol	C7H16O	0	134.39	0.1	measured	10.1007/978-3-642-71114-5_2
+3-Heptanol	3-Heptanol	C7H16O	0	133.3	0.2	measured	10.1007/978-3-642-71114-5_2
+4-Heptanol	4-Heptanol	C7H16O	0	133.3	0.2	measured	10.1007/978-3-642-71114-5_2
+Cyclobutanol	Cyclobutanol	C4H8O	0	75.6	0.1	measured	10.1007/978-3-642-71114-5_2
+Cyclopentanol	Cyclopentanol	C5H10O	0	89.0	0.5	measured	10.1007/978-3-642-71114-5_2
+Cyclohexanol	Cyclohexanol	C6H12O	0	103.5	0.5	measured	10.1007/978-3-642-71114-5_2
+Cycloheptanol	Cycloheptanol	C7H14O	0	116.88	0.1	measured	10.1007/978-3-642-71114-5_2
+Cyclooctanol	Cyclooctanol	C8H16O	0	129.7	0.4	measured	10.1007/978-3-642-71114-5_2
+Cyclopropanemethanol	Cyclopropanemethanol	C4H8O	0	76.0	0.2	measured	10.1007/978-3-642-71114-5_2
+alpha-Methylcyclopropanemethanol	alpha-Methylcyclopropanemethanol	C5H10O	0	92.4	0.2	measured	10.1007/978-3-642-71114-5_2
+Cyclopentanemethanol	Cyclopentanemethanol	C6H12O	0	103.6	0.7	measured	10.1007/978-3-642-71114-5_2
+Cyclohexanemethanol	Cyclohexanemethanol	C7H14O	0	118.1	0.7	measured	10.1007/978-3-642-71114-5_2
+Ethylene glycol	Ethylene glycol	C2H6O2	0	54.63	0.08	measured	10.1007/978-3-642-71114-5_2
+1,2-Propanediol	1,2-Propanediol	C3H8O2	0	71.22	0.1	measured	10.1007/978-3-642-71114-5_2
+1,3-Propanediol	1,3-Propanediol	C3H8O2	0	71.9	0.1	measured	10.1007/978-3-642-71114-5_2
+1,3-Butanediol	1,3-Butanediol	C4H10O2	0	88.32	0.1	measured	10.1007/978-3-642-71114-5_2
+1,4-Butanediol	1,4-Butanediol	C4H10O2	0	88.33	0.1	measured	10.1007/978-3-642-71114-5_2
+2,3-Butanediol	2,3-Butanediol	C4H10O2	0	86.56	0.1	measured	10.1007/978-3-642-71114-5_2
+1,5-Pentanediol	1,5-Pentanediol	C5H12O2	0	104.39	0.1	measured	10.1007/978-3-642-71114-5_2
+2,4-Pentanediol	2,4-Pentanediol	C5H12O2	0	104.64	0.1	measured	10.1007/978-3-642-71114-5_2
+2,2-Dimethyl-1,3-propanediol	2,2-Dimethyl-1,3-propanediol	C5H12O2	0	102.34	0.01	measured	10.1007/978-3-642-71114-5_2
+1,6-Hexanediol	1,6-Hexanediol	C6H14O2	0	120.44	0.1	measured	10.1007/978-3-642-71114-5_2
+2,5-Hexanediol	2,5-Hexanediol	C6H14O2	0	120.5		measured	10.1007/978-3-642-71114-5_2
+1,7-Heptanediol	1,7-Heptanediol	C7H16O2	0	136.4	0.1	measured	10.1007/978-3-642-71114-5_2
+1,8-Octanediol	1,8-Octanediol	C8H18O2	0	152.6	0.1	measured	10.1007/978-3-642-71114-5_2
+1,10-Decanediol	1,10-Decanediol	C10H22O2	0	184.4	0.6	measured	10.1007/978-3-642-71114-5_2
+cis-1,2-Cyclohexanediol	cis-1,2-Cyclohexanediol	C6H12O2	0	101.3	0.7	measured	10.1007/978-3-642-71114-5_2
+trans-1,2-Cyclohexanediol	trans-1,2-Cyclohexanediol	C6H12O2	0	103.0	0.7	measured	10.1007/978-3-642-71114-5_2
+1,4-Cyclohexanediol	1,4-Cyclohexanediol	C6H12O2	0	105.3		measured	10.1007/978-3-642-71114-5_2
+trans-1,2-Cycloheptanediol	trans-1,2-Cycloheptanediol	C7H14O2	0	117.0	0.1	measured	10.1007/978-3-642-71114-5_2
+cis-1,5-Cyclooctanediol	cis-1,5-Cyclooctanediol	C8H16O2	0	132.5	0.3	measured	10.1007/978-3-642-71114-5_2
+1,3-Adamantanediol	1,3-Adamantanediol	C10H16O2	0	138.2	0.3	measured	10.1007/978-3-642-71114-5_2
+1,4-Adamantanediol	1,4-Adamantanediol	C10H16O2	0	139.3	0.4	measured	10.1007/978-3-642-71114-5_2
+Catechol	Catechol	C6H6O2	0	87.07		measured	10.1007/978-3-642-71114-5_2
+Resorcinol	Resorcinol	C6H6O2	0	88.92		measured	10.1007/978-3-642-71114-5_2
+Hydroquinone	Hydroquinone	C6H6O2	0	88.7		measured	10.1007/978-3-642-71114-5_2
+2-(Hydroxymethyl)-2-methyl-1,3-propanediol	2-(Hydroxymethyl)-2-methyl-1,3-propanediol	C5H12O3	0	102.3	0.01	measured	10.1007/978-3-642-71114-5_2
+Pentaerythritol	Pentaerythritol	C5H12O4	0	101.81	0.01	measured	10.1007/978-3-642-71114-5_2
+2-Methoxyethanol	2-Methoxyethanol	C3H8O2	0	75.15	0.05	measured	10.1007/978-3-642-71114-5_2
+2-Ethoxyethanol	2-Ethoxyethanol	C4H10O2	0	91.15	0.15	measured	10.1007/978-3-642-71114-5_2
+2-Propoxyethanol	2-Propoxyethanol	C5H12O2	0	107.1	0.05	measured	10.1007/978-3-642-71114-5_2
+2-Butoxyethanol	2-Butoxyethanol	C6H14O2	0	122.95	0.05	measured	10.1007/978-3-642-71114-5_2
+Tetrahydrofurfuryl alcohol	Tetrahydrofurfuryl alcohol	C5H10O2	0	93.8		measured	10.1007/978-3-642-71114-5_2
+Tetrahydro-2H-pyran-2-methanol	Tetrahydro-2H-pyran-2-methanol	C6H12O2	0	108.1		measured	10.1007/978-3-642-71114-5_2
+2-Aminoethanol	2-Aminoethanol	C2H7NO	0	59.25	0.03	measured	10.1007/978-3-642-71114-5_2
+3-Amino-1-propanol	3-Amino-1-propanol	C3H9NO	0	75.21	0.04	measured	10.1007/978-3-642-71114-5_2
+2-(Methylamino)ethanol	2-(Methylamino)ethanol	C3H9NO	0	77.07	0.02	measured	10.1007/978-3-642-71114-5_2
+2-(Dimethylamino)ethanol	2-(Dimethylamino)ethanol	C4H11NO	0	94.17	0.03	measured	10.1007/978-3-642-71114-5_2
+2-(Ethylamino)ethanol	2-(Ethylamino)ethanol	C4H11NO	0	92.91	0.02	measured	10.1007/978-3-642-71114-5_2
+2-(Diethylamino)ethanol	2-(Diethylamino)ethanol	C6H15NO	0	123.04	0.03	measured	10.1007/978-3-642-71114-5_2
+Diethylene glycol	Diethylene glycol	C4H10O3	0	92.22	0.05	measured	10.1007/978-3-642-71114-5_2
+Tetraethylene glycol	Tetraethylene glycol	C8H18O5	0	166.31	0.08	measured	10.1007/978-3-642-71114-5_2
+Phenol	Phenol	C6H6O	0	86.17	0.2	measured	10.1007/978-3-642-71114-5_2
+m-Nitrophenol	m-Nitrophenol	C6H5NO3	0	99.7		measured	10.1007/978-3-642-71114-5_2
+p-Nitrophenol	p-Nitrophenol	C6H5NO3	0	98.2		measured	10.1007/978-3-642-71114-5_2
+m-Cyanophenol	m-Cyanophenol	C7H5NO	0	97.5		measured	10.1007/978-3-642-71114-5_2
+p-Cyanophenol	p-Cyanophenol	C7H5NO	0	98.3		measured	10.1007/978-3-642-71114-5_2
+Diethyl ether	Diethyl ether	C4H10O	0	90.4	0.5	measured	10.1007/978-3-642-71114-5_2
+Diisopropyl ether	Diisopropyl ether	C6H14O	0	115.0	0.6	measured	10.1007/978-3-642-71114-5_2
+Oxetane	Oxetane	C3H6O	0	61.35	0.05	measured	10.1007/978-3-642-71114-5_2
+Tetrahydrofuran	Tetrahydrofuran	C4H8O	0	76.85	0.07	measured	10.1007/978-3-642-71114-5_2
+2-Methyltetrahydrofuran	2-Methyltetrahydrofuran	C5H10O	0	94.0	0.1	measured	10.1007/978-3-642-71114-5_2
+2,5-Dimethyltetrahydrofuran	2,5-Dimethyltetrahydrofuran	C6H12O	0	111.0	0.03	measured	10.1007/978-3-642-71114-5_2
+Oxepane	Oxepane	C6H12O	0	105.46	0.1	measured	10.1007/978-3-642-71114-5_2
+Dimethoxymethane	Dimethoxymethane	C3H8O2	0	80.42	0.1	measured	10.1007/978-3-642-71114-5_2
+1,2-Dimethoxyethane	1,2-Dimethoxyethane	C4H10O2	0	95.86	0.05	measured	10.1007/978-3-642-71114-5_2
+Diethoxymethane	Diethoxymethane	C5H12O2	0	113.88	0.03	measured	10.1007/978-3-642-71114-5_2
+1,2-Diethoxyethane	1,2-Diethoxyethane	C6H14O2	0	127.29	0.02	measured	10.1007/978-3-642-71114-5_2
+1,3-Dioxane	1,3-Dioxane	C4H8O2	0	80.82	0.02	measured	10.1007/978-3-642-71114-5_2
+1,4-Dioxane	1,4-Dioxane	C4H8O2	0	80.94	0.1	measured	10.1007/978-3-642-71114-5_2
+1,3-Dioxolane	1,3-Dioxolane	C3H6O2	0	65.37	0.1	measured	10.1007/978-3-642-71114-5_2
+1,3-Dioxepane	1,3-Dioxepane	C5H10O2	0	95.98	0.1	measured	10.1007/978-3-642-71114-5_2
+Diglyme	Diglyme	C6H14O3	0	132.7	0.1	measured	10.1007/978-3-642-71114-5_2
+Bis(2-ethoxyethyl) ether	Bis(2-ethoxyethyl) ether	C8H18O3	0	165.0		measured	10.1007/978-3-642-71114-5_2
+1,3,5-Trioxane	1,3,5-Trioxane	C3H6O3	0	69.51	0.3	measured	10.1007/978-3-642-71114-5_2
+Paraldehyde	Paraldehyde	C6H12O3	0	123.71	0.02	measured	10.1007/978-3-642-71114-5_2
+2,5-Dimethoxytetrahydrofuran	2,5-Dimethoxytetrahydrofuran	C6H12O3	0	122.34	0.04	measured	10.1007/978-3-642-71114-5_2
+Tetraglyme	Tetraglyme	C10H22O5	0	206.76	0.1	measured	10.1007/978-3-642-71114-5_2
+2,5-Dimethoxy-2-(dimethoxymethyl)tetrahydrofuran	2,5-Dimethoxy-2-(dimethoxymethyl)tetrahydrofuran	C9H18O5	0	177.1	0.7	measured	10.1007/978-3-642-71114-5_2
+12-Crown-4	12-Crown-4	C8H16O4	0	149.9	0.2	measured	10.1007/978-3-642-71114-5_2
+15-Crown-5	15-Crown-5	C10H20O5	0	186.06	0.1	measured	10.1007/978-3-642-71114-5_2
+18-Crown-6	18-Crown-6	C12H24O6	0	223.35	0.1	measured	10.1007/978-3-642-71114-5_2
+Acetone	Acetone	C3H6O	0	66.92	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Butanone	2-Butanone	C4H8O	0	82.52	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Pentanone	2-Pentanone	C5H10O	0	98.0	0.1	measured	10.1007/978-3-642-71114-5_2
+3-Methyl-2-butanone	3-Methyl-2-butanone	C5H10O	0	95.0	0.3	measured	10.1007/978-3-642-71114-5_2
+Cyclobutanone	Cyclobutanone	C4H6O	0	70.9	0.3	measured	10.1007/978-3-642-71114-5_2
+Cyclopentanone	Cyclopentanone	C5H8O	0	84.5	0.3	measured	10.1007/978-3-642-71114-5_2
+Cyclohexanone	Cyclohexanone	C6H10O	0	99.7	0.4	measured	10.1007/978-3-642-71114-5_2
+Cycloheptanone	Cycloheptanone	C7H12O	0	113.8	0.3	measured	10.1007/978-3-642-71114-5_2
+Cyclooctanone	Cyclooctanone	C8H14O	0	128.0	0.1	measured	10.1007/978-3-642-71114-5_2
+Cyclononanone	Cyclononanone	C9H16O	0	142.0	0.3	measured	10.1007/978-3-642-71114-5_2
+Acetaldehyde	Acetaldehyde	C2H4O	0	43.7	0.3	measured	10.1007/978-3-642-71114-5_2
+Benzaldehyde	Benzaldehyde	C7H6O	0	96.08		measured	10.1007/978-3-642-71114-5_2
+3-Hydroxybenzaldehyde	3-Hydroxybenzaldehyde	C7H6O2	0	97.87		measured	10.1007/978-3-642-71114-5_2
+4-Hydroxybenzaldehyde	4-Hydroxybenzaldehyde	C7H6O2	0	96.94		measured	10.1007/978-3-642-71114-5_2
+Formic acid	Formic acid	CH2O2	0	34.69	0.05	measured	10.1007/978-3-642-71114-5_2
+Acetic acid	Acetic acid	C2H4O2	0	51.92	0.1	measured	10.1007/978-3-642-71114-5_2
+Butanoic acid	Butanoic acid	C4H8O2	0	84.61	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Methylbutanoic acid	2-Methylbutanoic acid	C5H10O2	0	100.5		measured	10.1007/978-3-642-71114-5_2
+3-Methylbutanoic acid	3-Methylbutanoic acid	C5H10O2	0	100.5		measured	10.1007/978-3-642-71114-5_2
+Hexanoic acid	Hexanoic acid	C6H12O2	0	116.55	0.1	measured	10.1007/978-3-642-71114-5_2
+Glycolic acid	Glycolic acid	C2H4O3	0	71.51	0.1	measured	10.1007/978-3-642-71114-5_2
+Lactic acid	Lactic acid	C3H6O3	0	69.38	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Hydroxy-2-methylpropanoic acid	2-Hydroxy-2-methylpropanoic acid	C4H8O3	0	86.78	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Hydroxybutanoic acid	2-Hydroxybutanoic acid	C4H8O3	0	85.45	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Hydroxypentanoic acid	2-Hydroxypentanoic acid	C5H10O3	0	100.47	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Hydroxy-3-methylbutanoic acid	2-Hydroxy-3-methylbutanoic acid	C5H10O3	0	100.83	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Hydroxyhexanoic acid	2-Hydroxyhexanoic acid	C6H12O3	0	117.26	0.1	measured	10.1007/978-3-642-71114-5_2
+Galacturonic acid	Galacturonic acid	C6H10O7	0	107.6		measured	10.1007/978-3-642-71114-5_2
+Glucuronic acid	Glucuronic acid	C6H10O7	0	110.2		measured	10.1007/978-3-642-71114-5_2
+Oxalic acid	Oxalic acid	C2H2O4	0	49.12	0.1	measured	10.1007/978-3-642-71114-5_2
+Malonic acid	Malonic acid	C3H4O4	0	67.22	0.1	measured	10.1007/978-3-642-71114-5_2
+Glutaric acid	Glutaric acid	C5H8O4	0	99.14	0.1	measured	10.1007/978-3-642-71114-5_2
+Adipic acid	Adipic acid	C6H10O4	0	115.66	0.1	measured	10.1007/978-3-642-71114-5_2
+Tartaric acid	Tartaric acid	C4H6O6	0	83.99	0.1	measured	10.1007/978-3-642-71114-5_2
+Ethyl formate	Ethyl formate	C3H6O2	0	72.8	0.7	measured	10.1007/978-3-642-71114-5_2
+Methyl acetate	Methyl acetate	C3H6O2	0	72.46	0.05	measured	10.1007/978-3-642-71114-5_2
+Ethyl acetate	Ethyl acetate	C4H8O2	0	88.9	0.1	measured	10.1007/978-3-642-71114-5_2
+Dimethyl oxalate	Dimethyl oxalate	C4H6O4	0	91.4	0.5	measured	10.1007/978-3-642-71114-5_2
+Methyl methoxyacetate	Methyl methoxyacetate	C4H8O3	0	93.3	0.1	measured	10.1007/978-3-642-71114-5_2
+Methoxymethyl acetate	Methoxymethyl acetate	C4H8O3	0	94.4	0.2	measured	10.1007/978-3-642-71114-5_2
+Ammonia	Ammonia	H3N	0	24.85	0.1	measured	10.1007/978-3-642-71114-5_2
+Methylamine	Methylamine	CH5N	0	41.88	0.3	measured	10.1007/978-3-642-71114-5_2
+Ethylamine	Ethylamine	C2H7N	0	58.61	0.2	measured	10.1007/978-3-642-71114-5_2
+1-Propanamine	1-Propanamine	C3H9N	0	74.15	0.1	measured	10.1007/978-3-642-71114-5_2
+1-Butanamine	1-Butanamine	C4H11N	0	89.8	0.1	measured	10.1007/978-3-642-71114-5_2
+1-Pentanamine	1-Pentanamine	C5H13N	0	105.7	0.1	measured	10.1007/978-3-642-71114-5_2
+1-Hexanamine	1-Hexanamine	C6H15N	0	121.6	0.2	measured	10.1007/978-3-642-71114-5_2
+1-Heptanamine	1-Heptanamine	C7H17N	0	137.6	0.3	measured	10.1007/978-3-642-71114-5_2
+Cyclopentanamine	Cyclopentanamine	C5H11N	0	90.98	0.18	measured	10.1007/978-3-642-71114-5_2
+Cyclohexanamine	Cyclohexanamine	C6H13N	0	105.35	0.17	measured	10.1007/978-3-642-71114-5_2
+Cycloheptanamine	Cycloheptanamine	C7H15N	0	118.5	0.2	measured	10.1007/978-3-642-71114-5_2
+Cyclooctanamine	Cyclooctanamine	C8H17N	0	133.4	0.2	measured	10.1007/978-3-642-71114-5_2
+1-Adamantanamine	1-Adamantanamine	C10H17N	0	138.9	0.3	measured	10.1007/978-3-642-71114-5_2
+Aniline	Aniline	C6H7N	0	89.3	0.1	measured	10.1007/978-3-642-71114-5_2
+Dimethylamine	Dimethylamine	C2H7N	0	59.2	0.2	measured	10.1007/978-3-642-71114-5_2
+Diethylamine	Diethylamine	C4H11N	0	91.68	0.1	measured	10.1007/978-3-642-71114-5_2
+Dipropylamine	Dipropylamine	C6H15N	0	123.06	0.1	measured	10.1007/978-3-642-71114-5_2
+N-Ethyl-N-methylethanamine	N-Ethyl-N-methylethanamine	C5H13N	0	106.77	0.1	measured	10.1007/978-3-642-71114-5_2
+Triethylamine	Triethylamine	C6H15N	0	120.9	0.1	measured	10.1007/978-3-642-71114-5_2
+Azetidine	Azetidine	C3H7N	0	63.71	0.01	measured	10.1007/978-3-642-71114-5_2
+1-Methylpyrrolidine	1-Methylpyrrolidine	C5H11N	0	97.29	0.02	measured	10.1007/978-3-642-71114-5_2
+1-Methylpiperidine	1-Methylpiperidine	C6H13N	0	110.54	0.02	measured	10.1007/978-3-642-71114-5_2
+2,6-Dimethylpiperidine	2,6-Dimethylpiperidine	C7H15N	0	124.4	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Methylpyridine	2-Methylpyridine	C6H7N	0	94.2	0.2	measured	10.1007/978-3-642-71114-5_2
+3-Methylpyridine	3-Methylpyridine	C6H7N	0	93.7	0.1	measured	10.1007/978-3-642-71114-5_2
+4-Methylpyridine	4-Methylpyridine	C6H7N	0	94.0	0.3	measured	10.1007/978-3-642-71114-5_2
+2,6-Dimethylpyridine	2,6-Dimethylpyridine	C7H9N	0	109.9	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Aminopyridine	2-Aminopyridine	C5H6N2	0	83.02		measured	10.1007/978-3-642-71114-5_2
+3-Aminopyridine	3-Aminopyridine	C5H6N2	0	83.13		measured	10.1007/978-3-642-71114-5_2
+4-Aminopyridine	4-Aminopyridine	C5H6N2	0	82.74		measured	10.1007/978-3-642-71114-5_2
+3-Hydroxypyridine	3-Hydroxypyridine	C5H5NO	0	75.35		measured	10.1007/978-3-642-71114-5_2
+Pyrazole	Pyrazole	C3H4N2	0	62.26	0.5	measured	10.1007/978-3-642-71114-5_2
+Imidazole	Imidazole	C3H4N2	0	59.95	0.5	measured	10.1007/978-3-642-71114-5_2
+Pyrazine	Pyrazine	C4H4N2	0	70.82	0.5	measured	10.1007/978-3-642-71114-5_2
+1,3,5-Triazine	1,3,5-Triazine	C3H3N3	0	70.42	0.5	measured	10.1007/978-3-642-71114-5_2
+Benzimidazole	Benzimidazole	C7H6N2	0	74.79	0.5	measured	10.1007/978-3-642-71114-5_2
+Benzotriazole	Benzotriazole	C6H5N3	0	98.53	0.5	measured	10.1007/978-3-642-71114-5_2
+2,2'-Bipyridine	2,2'-Bipyridine	C10H8N2	0	94.49	0.5	measured	10.1007/978-3-642-71114-5_2
+4,4'-Bipyridine	4,4'-Bipyridine	C10H8N2	0	133.21	0.5	measured	10.1007/978-3-642-71114-5_2
+Ethylenediamine	Ethylenediamine	C2H8N2	0	67.7	0.2	measured	10.1007/978-3-642-71114-5_2
+1,3-Propanediamine	1,3-Propanediamine	C3H10N2	0	78.4	0.4	measured	10.1007/978-3-642-71114-5_2
+Cadaverine	Cadaverine	C5H14N2	0	109.4	0.1	measured	10.1007/978-3-642-71114-5_2
+1,6-Hexanediamine	1,6-Hexanediamine	C6H16N2	0	124.8	0.3	measured	10.1007/978-3-642-71114-5_2
+1,7-Heptanediamine	1,7-Heptanediamine	C7H18N2	0	141.52	0.1	measured	10.1007/978-3-642-71114-5_2
+1,8-Octanediamine	1,8-Octanediamine	C8H20N2	0	157.3	0.1	measured	10.1007/978-3-642-71114-5_2
+1,9-Nonanediamine	1,9-Nonanediamine	C9H22N2	0	172.85	0.1	measured	10.1007/978-3-642-71114-5_2
+1,10-Decanediamine	1,10-Decanediamine	C10H24N2	0	188.3	0.9	measured	10.1007/978-3-642-71114-5_2
+trans-1,4-Cyclohexanediamine	trans-1,4-Cyclohexanediamine	C6H14N2	0	108.9	0.9	measured	10.1007/978-3-642-71114-5_2
+1-Methylpiperazine	1-Methylpiperazine	C5H12N2	0	102.3	0.03	measured	10.1007/978-3-642-71114-5_2
+1,4-Dimethylpiperazine	1,4-Dimethylpiperazine	C6H14N2	0	121.0	0.02	measured	10.1007/978-3-642-71114-5_2
+Diethylenetriamine	Diethylenetriamine	C4H13N3	0	101.2	0.4	measured	10.1007/978-3-642-71114-5_2
+Tetraethylenepentamine	Tetraethylenepentamine	C8H23N5	0	175.9	0.6	measured	10.1007/978-3-642-71114-5_2
+4-Phenylpyrimidine	4-Phenylpyrimidine	C10H8N2	0	134.09	0.5	measured	10.1007/978-3-642-71114-5_2
+Quinoline	Quinoline	C9H7N	0	115.53	0.5	measured	10.1007/978-3-642-71114-5_2
+Quinoxaline	Quinoxaline	C8H6N2	0	109.16	0.5	measured	10.1007/978-3-642-71114-5_2
+1,10-Phenanthroline	1,10-Phenanthroline	C12H8N2	0	142.42	0.5	measured	10.1007/978-3-642-71114-5_2
+2-Methoxyethylamine	2-Methoxyethylamine	C3H9NO	0	79.59	0.03	measured	10.1007/978-3-642-71114-5_2
+Morpholine	Morpholine	C4H9NO	0	82.56	0.03	measured	10.1007/978-3-642-71114-5_2
+4-Methylmorpholine	4-Methylmorpholine	C5H11NO	0	92.99	0.03	measured	10.1007/978-3-642-71114-5_2
+3-Methoxy-1-propanamine	3-Methoxy-1-propanamine	C4H11NO	0	111.71	0.06	measured	10.1007/978-3-642-71114-5_2
+Formamide	Formamide	CH3NO	0	38.5	0.1	measured	10.1007/978-3-642-71114-5_2
+Acetamide	Acetamide	C2H5NO	0	55.7	0.2	measured	10.1007/978-3-642-71114-5_2
+Propanamide	Propanamide	C3H7NO	0	71.5	0.1	measured	10.1007/978-3-642-71114-5_2
+Butanamide	Butanamide	C4H9NO	0	87.1		measured	10.1007/978-3-642-71114-5_2
+N-Methylformamide	N-Methylformamide	C2H5NO	0	56.83	0.1	measured	10.1007/978-3-642-71114-5_2
+N-Ethylformamide	N-Ethylformamide	C3H7NO	0	74.02		measured	10.1007/978-3-642-71114-5_2
+N-Methylacetamide	N-Methylacetamide	C3H7NO	0	74.04	0.1	measured	10.1007/978-3-642-71114-5_2
+N-Propylformamide	N-Propylformamide	C4H9NO	0	87.89		measured	10.1007/978-3-642-71114-5_2
+N-Ethylacetamide	N-Ethylacetamide	C4H9NO	0	90.72		measured	10.1007/978-3-642-71114-5_2
+N-Methylpropanamide	N-Methylpropanamide	C4H9NO	0	89.75		measured	10.1007/978-3-642-71114-5_2
+N-Propylacetamide	N-Propylacetamide	C5H11NO	0	105.09		measured	10.1007/978-3-642-71114-5_2
+N,N-Dimethylformamide	N,N-Dimethylformamide	C3H7NO	0	76.85		measured	10.1007/978-3-642-71114-5_2
+N,N-Dimethylacetamide	N,N-Dimethylacetamide	C4H9NO	0	89.7	0.8	measured	10.1007/978-3-642-71114-5_2
+N,N-Dimethylpropanamide	N,N-Dimethylpropanamide	C5H11NO	0	105.36		measured	10.1007/978-3-642-71114-5_2
+N,N-Diethylformamide	N,N-Diethylformamide	C5H11NO	0	106.7	0.5	measured	10.1007/978-3-642-71114-5_2
+N,N-Diethylacetamide	N,N-Diethylacetamide	C6H13NO	0	121.5	0.3	measured	10.1007/978-3-642-71114-5_2
+N,N-Diethylpropanamide	N,N-Diethylpropanamide	C7H15NO	0	137.67		measured	10.1007/978-3-642-71114-5_2
+N,N-Dipropylacetamide	N,N-Dipropylacetamide	C8H17NO	0	154.22		measured	10.1007/978-3-642-71114-5_2
+N,N-Diisopropylacetamide	N,N-Diisopropylacetamide	C8H17NO	0	152.0		measured	10.1007/978-3-642-71114-5_2
+1-Methyl-2-pyrrolidinone	1-Methyl-2-pyrrolidinone	C5H9NO	0	90.4		measured	10.1007/978-3-642-71114-5_2
+2-Piperidinone	2-Piperidinone	C5H9NO	0	90.3	0.2	measured	10.1007/978-3-642-71114-5_2
+Hexahydro-2H-azepin-2-one	Hexahydro-2H-azepin-2-one	C6H11NO	0	105.0	0.2	measured	10.1007/978-3-642-71114-5_2
+Oxamide	Oxamide	C2H4N2O2	0	55.0	0.2	measured	10.1007/978-3-642-71114-5_2
+Malonamide	Malonamide	C3H6N2O2	0	72.6	0.3	measured	10.1007/978-3-642-71114-5_2
+Succinamide	Succinamide	C4H8N2O2	0	88.8	0.2	measured	10.1007/978-3-642-71114-5_2
+Glycolamide	Glycolamide	C2H5NO2	0	56.2		measured	10.1007/978-3-642-71114-5_2
+Lactamide	Lactamide	C3H7NO2	0	73.3	0.2	measured	10.1007/978-3-642-71114-5_2
+4-Hydroxybutanamide	4-Hydroxybutanamide	C4H9NO2	0	88.9	0.13	measured	10.1007/978-3-642-71114-5_2
+6-Hydroxyhexanamide	6-Hydroxyhexanamide	C6H13NO2	0	121.1	0.2	measured	10.1007/978-3-642-71114-5_2
+4-Hydroxyoctanamide	4-Hydroxyoctanamide	C8H17NO2	0	151.9	0.3	measured	10.1007/978-3-642-71114-5_2
+2-Thiohydantoin	2-Thiohydantoin	C3H4N2OS	0	76.5	0.3	measured	10.1007/978-3-642-71114-5_2
+Urea	Urea	CH4N2O	0	44.23	0.05	measured	10.1007/978-3-642-71114-5_2
+Methylurea	Methylurea	C2H6N2O	0	62.1	0.1	measured	10.1007/978-3-642-71114-5_2
+Ethylurea	Ethylurea	C3H8N2O	0	80.2		measured	10.1007/978-3-642-71114-5_2
+Butylurea	Butylurea	C5H12N2O	0	116.1		measured	10.1007/978-3-642-71114-5_2
+Isopropylurea	Isopropylurea	C4H10N2O	0	99.0		measured	10.1007/978-3-642-71114-5_2
+N,N-Dimethylurea	N,N-Dimethylurea	C3H8N2O	0	78.88		measured	10.1007/978-3-642-71114-5_2
+N,N'-Dimethylurea	N,N'-Dimethylurea	C3H8N2O	0	80.03	0.1	measured	10.1007/978-3-642-71114-5_2
+N,N-Diethylurea	N,N-Diethylurea	C5H12N2O	0	114.9		measured	10.1007/978-3-642-71114-5_2
+N,N'-Diethylurea	N,N'-Diethylurea	C5H12N2O	0	116.1		measured	10.1007/978-3-642-71114-5_2
+L-Arabinose	L-Arabinose	C5H10O5	0	93.2	0.3	measured	10.1007/978-3-642-71114-5_2
+D-Ribose	D-Ribose	C5H10O5	0	95.2	0.1	measured	10.1007/978-3-642-71114-5_2
+D-Xylose	D-Xylose	C5H10O5	0	95.1	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Deoxy-D-ribose	2-Deoxy-D-ribose	C5H10O4	0	93.8	0.4	measured	10.1007/978-3-642-71114-5_2
+D-Fructose	D-Fructose	C6H12O6	0	110.4	0.4	measured	10.1007/978-3-642-71114-5_2
+D-Glucose	D-Glucose	C6H12O6	0	111.7	0.3	measured	10.1007/978-3-642-71114-5_2
+D-Mannose	D-Mannose	C6H12O6	0	111.5	0.3	measured	10.1007/978-3-642-71114-5_2
+L-Sorbose	L-Sorbose	C6H12O6	0	110.6	0.4	measured	10.1007/978-3-642-71114-5_2
+2-Deoxy-D-glucose	2-Deoxy-D-glucose	C6H12O5	0	110.4	0.5	measured	10.1007/978-3-642-71114-5_2
+Cellobiose	Cellobiose	C12H22O11	0	212.0	1	measured	10.1007/978-3-642-71114-5_2
+Lactose	Lactose	C12H22O11	0	209.1	1.0	measured	10.1007/978-3-642-71114-5_2
+Maltose	Maltose	C12H22O11	0	210.0	1.0	measured	10.1007/978-3-642-71114-5_2
+Melibiose	Melibiose	C12H22O11	0	204.0	0.7	measured	10.1007/978-3-642-71114-5_2
+Cellotriose	Cellotriose	C18H32O16	0	309.2	1.0	measured	10.1007/978-3-642-71114-5_2
+Maltotriose	Maltotriose	C18H32O16	0	307.0	2	measured	10.1007/978-3-642-71114-5_2
+Melezitose	Melezitose	C18H32O16	0	308.0	2.0	measured	10.1007/978-3-642-71114-5_2
+Stachyose	Stachyose	C24H42O21	0	401.0	1.8	measured	10.1007/978-3-642-71114-5_2
+Cellotetraose	Cellotetraose	C24H42O21	0	409.0	1.0	measured	10.1007/978-3-642-71114-5_2
+Cellopentaose	Cellopentaose	C30H52O26	0	499.6	2.6	measured	10.1007/978-3-642-71114-5_2
+Cellohexaose	Cellohexaose	C36H62O31	0	601.7	2.6	measured	10.1007/978-3-642-71114-5_2
+alpha-Cyclodextrin	alpha-Cyclodextrin	C36H60O30	0	601.5	1.0	measured	10.1007/978-3-642-71114-5_2
+beta-Cyclodextrin	beta-Cyclodextrin	C42H70O35	0	710.0	1.0	measured	10.1007/978-3-642-71114-5_2
+gamma-Cyclodextrin	gamma-Cyclodextrin	C48H80O40	0	803.0		measured	10.1007/978-3-642-71114-5_2
+Methyl alpha-D-galactopyranoside	Methyl alpha-D-galactopyranoside	C7H14O6	0	132.6	0.4	measured	10.1007/978-3-642-71114-5_2
+Methyl beta-D-galactopyranoside	Methyl beta-D-galactopyranoside	C7H14O6	0	132.9	0.2	measured	10.1007/978-3-642-71114-5_2
+Methyl alpha-D-glucopyranoside	Methyl alpha-D-glucopyranoside	C7H14O6	0	132.9	0.3	measured	10.1007/978-3-642-71114-5_2
+Methyl beta-D-glucopyranoside	Methyl beta-D-glucopyranoside	C7H14O6	0	133.6	0.5	measured	10.1007/978-3-642-71114-5_2
+3-O-Methyl-D-glucose	3-O-Methyl-D-glucose	C7H14O6	0	134.0	0.5	measured	10.1007/978-3-642-71114-5_2
+Methyl alpha-D-mannopyranoside	Methyl alpha-D-mannopyranoside	C7H14O6	0	132.9	0.4	measured	10.1007/978-3-642-71114-5_2
+Ethyl alpha-D-glucopyranoside	Ethyl alpha-D-glucopyranoside	C8H16O6	0	149.45		measured	10.1007/978-3-642-71114-5_2
+Phenyl beta-D-glucopyranoside	Phenyl beta-D-glucopyranoside	C12H16O6	0	177.5	0.7	measured	10.1007/978-3-642-71114-5_2
+L-Arabitol	L-Arabitol	C5H12O5	0	103.1	0.2	measured	10.1007/978-3-642-71114-5_2
+D-Arabitol	D-Arabitol	C5H12O5	0	103.31		measured	10.1007/978-3-642-71114-5_2
+D-Xylitol	D-Xylitol	C5H12O5	0	102.4	0.3	measured	10.1007/978-3-642-71114-5_2
+Galactitol	Galactitol	C6H14O6	0	119.3	0.3	measured	10.1007/978-3-642-71114-5_2
+D-Mannitol	D-Mannitol	C6H14O6	0	119.4	0.3	measured	10.1007/978-3-642-71114-5_2
+Sorbitol	Sorbitol	C6H14O6	0	119.5	0.4	measured	10.1007/978-3-642-71114-5_2
+myo-Inositol	myo-Inositol	C6H12O6	0	121		measured	10.1007/978-3-642-71114-5_2
+meso-Erythritol	meso-Erythritol	C4H10O4	0	87.1		measured	10.1007/978-3-642-71114-5_2
+Glycine	Glycine	C2H5NO2	0	43.26	0.07	measured	10.1007/978-3-642-71114-5_2
+D-Alanine	D-Alanine	C3H7NO2	0	60.58	0.1	measured	10.1007/978-3-642-71114-5_2
+L-Alanine	L-Alanine	C3H7NO2	0	60.54	0.08	measured	10.1007/978-3-642-71114-5_2
+DL-Alanine	DL-Alanine	C3H7NO2	0	60.54	0.08	measured	10.1007/978-3-642-71114-5_2
+L-Valine	L-Valine	C5H11NO2	0	90.75	0.1	measured	10.1007/978-3-642-71114-5_2
+DL-Norvaline	DL-Norvaline	C5H11NO2	0	91.8	0.2	measured	10.1007/978-3-642-71114-5_2
+L-Leucine	L-Leucine	C6H13NO2	0	107.77	0.05	measured	10.1007/978-3-642-71114-5_2
+DL-Norleucine	DL-Norleucine	C6H13NO2	0	107.73	0.1	measured	10.1007/978-3-642-71114-5_2
+L-Isoleucine	L-Isoleucine	C6H13NO2	0	105.8	0.07	measured	10.1007/978-3-642-71114-5_2
+L-Proline	L-Proline	C5H9NO2	0	82.76	0.1	measured	10.1007/978-3-642-71114-5_2
+L-Hydroxyproline	L-Hydroxyproline	C5H9NO3	0	84.49	0.05	measured	10.1007/978-3-642-71114-5_2
+L-Phenylalanine	L-Phenylalanine	C9H11NO2	0	121.5	0.2	measured	10.1007/978-3-642-71114-5_2
+D-Tryptophan	D-Tryptophan	C11H12N2O2	0	143.82	0.13	measured	10.1007/978-3-642-71114-5_2
+DL-Tryptophan	DL-Tryptophan	C11H12N2O2	0	143.85	0.2	measured	10.1007/978-3-642-71114-5_2
+DL-Methionine	DL-Methionine	C5H11NO2S	0	105.35	0.02	measured	10.1007/978-3-642-71114-5_2
+L-Methionine	L-Methionine	C5H11NO2S	0	105.57	0.02	measured	10.1007/978-3-642-71114-5_2
+L-Serine	L-Serine	C3H7NO3	0	60.62	0.05	measured	10.1007/978-3-642-71114-5_2
+L-Threonine	L-Threonine	C4H9NO3	0	76.9	0.1	measured	10.1007/978-3-642-71114-5_2
+L-Cysteine	L-Cysteine	C3H7NO2S	0	73.45	0.03	measured	10.1007/978-3-642-71114-5_2
+L-Asparagine	L-Asparagine	C4H8N2O3	0	78.0	0.5	measured	10.1007/978-3-642-71114-5_2
+DL-Aspartic acid	DL-Aspartic acid	C4H7NO4	0	73.75	0.08	measured	10.1007/978-3-642-71114-5_2
+L-Aspartic acid	L-Aspartic acid	C4H7NO4	0	74.8	0.2	measured	10.1007/978-3-642-71114-5_2
+L-Glutamic acid	L-Glutamic acid	C5H9NO4	0	89.85	0.1	measured	10.1007/978-3-642-71114-5_2
+Lysine	Lysine	C6H14N2O2	0	108.5		measured	10.1007/978-3-642-71114-5_2
+L-Arginine	L-Arginine	C6H14N4O2	0	127.42	0.01	measured	10.1007/978-3-642-71114-5_2
+L-Histidine	L-Histidine	C6H9N3O2	0	98.3	0.1	measured	10.1007/978-3-642-71114-5_2
+2-Amino-2-methylpropanoic acid	2-Amino-2-methylpropanoic acid	C4H9NO2	0	77.55	0.15	measured	10.1007/978-3-642-71114-5_2
+2-Aminobutanoic acid	2-Aminobutanoic acid	C4H9NO2	0	75.6	0.1	measured	10.1007/978-3-642-71114-5_2
+3-Aminobutanoic acid	3-Aminobutanoic acid	C4H9NO2	0	76.3	0.2	measured	10.1007/978-3-642-71114-5_2
+4-Aminobutanoic acid	4-Aminobutanoic acid	C4H9NO2	0	73.2	0.2	measured	10.1007/978-3-642-71114-5_2
+5-Aminopentanoic acid	5-Aminopentanoic acid	C5H11NO2	0	87.6	0.6	measured	10.1007/978-3-642-71114-5_2
+6-Aminohexanoic acid	6-Aminohexanoic acid	C6H13NO2	0	104.2	0.2	measured	10.1007/978-3-642-71114-5_2
+7-Aminoheptanoic acid	7-Aminoheptanoic acid	C7H15NO2	0	120.0	0.1	measured	10.1007/978-3-642-71114-5_2
+8-Aminooctanoic acid	8-Aminooctanoic acid	C8H17NO2	0	136.1	0.1	measured	10.1007/978-3-642-71114-5_2
+9-Aminononanoic acid	9-Aminononanoic acid	C9H19NO2	0	151.3	0.1	measured	10.1007/978-3-642-71114-5_2
+10-Aminodecanoic acid	10-Aminodecanoic acid	C10H21NO2	0	167.3	0.1	measured	10.1007/978-3-642-71114-5_2
+11-Aminoundecanoic acid	11-Aminoundecanoic acid	C11H23NO2	0	182.6	0.1	measured	10.1007/978-3-642-71114-5_2
+Diglycine	Diglycine	C4H8N2O3	0	76.3	0.1	measured	10.1007/978-3-642-71114-5_2
+Pentaglycine	Pentaglycine	C10H17N5O6	0	187.1	0.1	measured	10.1007/978-3-642-71114-5_2
+Glycyl-L-alanine	Glycyl-L-alanine	C5H10N2O3	0	92.66	0.06	measured	10.1007/978-3-642-71114-5_2
+Glycyl-DL-alanine	Glycyl-DL-alanine	C5H10N2O3	0	92.37	0.02	measured	10.1007/978-3-642-71114-5_2
+Glycyl-L-valine	Glycyl-L-valine	C7H14N2O3	0	121.99	0.02	measured	10.1007/978-3-642-71114-5_2
+Glycyl-L-leucine	Glycyl-L-leucine	C8H16N2O3	0	139.7	0.07	measured	10.1007/978-3-642-71114-5_2
+Caffeine	Caffeine	C8H10N4O2	0	145.2		measured	10.1007/978-3-642-71114-5_2
+Cytidine	Cytidine	C9H13N3O5	0	153.5		measured	10.1007/978-3-642-71114-5_2
+Uridine	Uridine	C9H12N2O6	0	151.45		measured	10.1007/978-3-642-71114-5_2
+Thymidine	Thymidine	C10H14N2O5	0	167.55		measured	10.1007/978-3-642-71114-5_2
+Acetonitrile	Acetonitrile	C2H3N	0	47.42		measured	10.1007/978-3-642-71114-5_2
+Butanenitrile	Butanenitrile	C4H7N	0	80.59		measured	10.1007/978-3-642-71114-5_2
+Pentanenitrile	Pentanenitrile	C5H9N	0	96.73		measured	10.1007/978-3-642-71114-5_2
+Hexanenitrile	Hexanenitrile	C6H11N	0	111.91		measured	10.1007/978-3-642-71114-5_2
+Octanenitrile	Octanenitrile	C8H15N	0	146.18		measured	10.1007/978-3-642-71114-5_2
+Ethylene glycol	Ethylene glycol	C2H6O2	0	54.66		measured	10.1021/je00004a023
+Ethylene glycol	Ethylene glycol	C2H6O2	0	55.37	0.1	measured	10.1155/2014/639813
+2-Mercaptoethanol	2-Mercaptoethanol	C2H6OS	0	69.0	3.5	predicted	10.1021/je0497045
+Cysteamine	Cysteamine	C2H7NS	0	72.2	3.5	predicted	10.1021/je0497045
+1,2-Ethanedithiol	1,2-Ethanedithiol	C2H6S2	0	81.9	5.0	predicted	10.1021/je0497045
+2,2'-Thiodiethanol	2,2'-Thiodiethanol	C4H10O2S	0	101.4	5.0	predicted	10.1021/je0497045
+Methanethiol	Methanethiol	CH4S	0	52.97		predicted	10.1016/j.gca.2003.06.001
+Ethanethiol	Ethanethiol	C2H6S	0	67.77		predicted	10.1016/j.gca.2003.06.001
+1-Propanethiol	1-Propanethiol	C3H8S	0	83.6	1.0	predicted	10.1021/je0497045
+1-Butanethiol	1-Butanethiol	C4H10S	0	99.37		predicted	10.1016/j.gca.2003.06.001
+1-Pentanethiol	1-Pentanethiol	C5H12S	0	115.17		predicted	10.1016/j.gca.2003.06.001
+1-Hexanethiol	1-Hexanethiol	C6H14S	0	130.97		predicted	10.1016/j.gca.2003.06.001
+1-Heptanethiol	1-Heptanethiol	C7H16S	0	146.77		predicted	10.1016/j.gca.2003.06.001
+1-Octanethiol	1-Octanethiol	C8H18S	0	162.57		predicted	10.1016/j.gca.2003.06.001
+1-Nonanethiol	1-Nonanethiol	C9H20S	0	178.37		predicted	10.1016/j.gca.2003.06.001
+1-Decanethiol	1-Decanethiol	C10H22S	0	194.17		predicted	10.1016/j.gca.2003.06.001
+1-Undecanethiol	1-Undecanethiol	C11H24S	0	209.97		predicted	10.1016/j.gca.2003.06.001
+1-Dodecanethiol	1-Dodecanethiol	C12H26S	0	225.77		predicted	10.1016/j.gca.2003.06.001
+Toluene	Toluene	C7H8	0	97.71		measured	10.1007/BF00646936
+alpha-Methylcyclopropanemethanol	alpha-Methylcyclopropanemethanol	C5H10O	0	92.4		measured	10.1007/BF00646936
+Tetrahydropyran	Tetrahydropyran	C5H10O	0	91.73		measured	10.1007/BF00646936
+Pyrrolidine	Pyrrolidine	C4H9N	0	77.77		measured	10.1007/BF00646936
+Piperidine	Piperidine	C5H11N	0	92.13		measured	10.1007/BF00646936
+Trimethylamine	Trimethylamine	C3H9N	0	78.8		measured	10.1007/BF00646936
+Pyridine	Pyridine	C5H5N	0	77.3		measured	10.1007/BF00646936
+Propanoic acid	Propanoic acid	C3H6O2	0	67.9		measured	10.1007/BF00646936
+Urethane	Urethane	C3H7NO2	0	78.884		measured	10.1007/BF00646936
+Propylurea	Propylurea	C4H10N2O	0	94.9		measured	10.1007/BF00646936
+Tetramethylurea	Tetramethylurea	C5H12N2O	0	115.3		measured	10.1007/BF00646936
+Ribitol	Ribitol	C5H12O5	0	103.2		measured	10.1007/BF00646936
+Tetramethoxymethane	Tetramethoxymethane	C5H12O4	0	126.2		measured	10.1007/BF00646936
+Triglyme	Triglyme	C8H18O4	0	169.63		measured	10.1007/BF00646936
+Putrescine	Putrescine	C4H12N2	0	93.6		measured	10.1007/BF00646936
+Piperazine	Piperazine	C4H10N2	0	83.53		measured	10.1007/BF00646936
+Triethylenetetramine	Triethylenetetramine	C6H18N4	0	137.6		measured	10.1007/BF00646936
+Pyridazine	Pyridazine	C4H4N2	0	70.42		measured	10.1007/BF00646936
+Pyrimidine	Pyrimidine	C4H4N2	0	70.33		measured	10.1007/BF00646936
+Quinazoline	Quinazoline	C8H6N2	0	108.48		measured	10.1007/BF00646936
+Succinic acid	Succinic acid	C4H6O4	0	82.94		measured	10.1007/BF00646936
+Pimelic acid	Pimelic acid	C7H12O4	0	131.93		measured	10.1007/BF00646936
+Triethylene glycol	Triethylene glycol	C6H14O4	0	129.27		measured	10.1007/BF00646936
+Tetrapropylene glycol	Tetrapropylene glycol	C12H26O5	0	231.36		measured	10.1007/BF00646936
+Triethanolamine	Triethanolamine	C6H15NO3	0	127.76		measured	10.1007/BF00646936
+Sucrose	Sucrose	C12H22O11	0	211.6		measured	10.1007/BF00646936
+Trehalose	Trehalose	C12H22O11	0	206.9		measured	10.1007/BF00646936
+Raffinose	Raffinose	C18H32O16	0	307.0		measured	10.1007/BF00646936
+Thiosemicarbazide	Thiosemicarbazide	CH5N3S	0	64.0		measured	10.1007/BF00646936
+Triethylene glycol	Triethylene glycol	C6H14O4	0	129.27	0.04	measured	10.1007/978-3-642-71114-5_2
+Tetrahydropyran	Tetrahydropyran	C5H10O	0	91.74	0.05	measured	10.1007/978-3-642-71114-5_2
+Tetramethoxymethane	Tetramethoxymethane	C5H12O4	0	126.2	0.4	measured	10.1007/978-3-642-71114-5_2
+Triglyme	Triglyme	C8H18O4	0	169.73	0.1	measured	10.1007/978-3-642-71114-5_2
+Propanoic acid	Propanoic acid	C3H6O2	0	67.9	0.1	measured	10.1007/978-3-642-71114-5_2
+Succinic acid	Succinic acid	C4H6O4	0	82.94	0.1	measured	10.1007/978-3-642-71114-5_2
+Trimethylamine	Trimethylamine	C3H9N	0	79.0	0.4	measured	10.1007/978-3-642-71114-5_2
+Pyrrolidine	Pyrrolidine	C4H9N	0	77.77	0.01	measured	10.1007/978-3-642-71114-5_2
+Piperidine	Piperidine	C5H11N	0	92.3	0.5	measured	10.1007/978-3-642-71114-5_2
+Pyridine	Pyridine	C5H5N	0	77.4	0.2	measured	10.1007/978-3-642-71114-5_2
+Pyridazine	Pyridazine	C4H4N2	0	70.33	0.5	measured	10.1007/978-3-642-71114-5_2
+Putrescine	Putrescine	C4H12N2	0	93.6	0.1	measured	10.1007/978-3-642-71114-5_2
+Piperazine	Piperazine	C4H10N2	0	83.41	0.1	measured	10.1007/978-3-642-71114-5_2
+Triethylenetetramine	Triethylenetetramine	C6H18N4	0	137.6	0.5	measured	10.1007/978-3-642-71114-5_2
+Quinazoline	Quinazoline	C8H6N2	0	108.48	0.5	measured	10.1007/978-3-642-71114-5_2
+Thiosemicarbazide	Thiosemicarbazide	CH5N3S	0	64.0	0.5	measured	10.1007/978-3-642-71114-5_2
+Propylurea	Propylurea	C4H10N2O	0	94.9		measured	10.1007/978-3-642-71114-5_2
+Tetramethylurea	Tetramethylurea	C5H12N2O	0	115.6	0.2	measured	10.1007/978-3-642-71114-5_2
+Sucrose	Sucrose	C12H22O11	0	211.3	0.3	measured	10.1007/978-3-642-71114-5_2
+Trehalose	Trehalose	C12H22O11	0	206.9	0.5	measured	10.1007/978-3-642-71114-5_2
+Raffinose	Raffinose	C18H32O16	0	307.0	1.0	measured	10.1007/978-3-642-71114-5_2
+Ribitol	Ribitol	C5H12O5	0	103.2	0.2	measured	10.1007/978-3-642-71114-5_2
+beta-Alanine	beta-Alanine	C3H7NO2	0	58.28	0.09	measured	10.1007/978-3-642-71114-5_2
+Triglycine	Triglycine	C6H11N3O4	0	112.2	0.3	measured	10.1007/978-3-642-71114-5_2
+Tetraglycine	Tetraglycine	C8H14N4O5	0	149.7	0.1	measured	10.1007/978-3-642-71114-5_2
+Purine	Purine	C5H4N4	0	85.4		measured	10.1007/978-3-642-71114-5_2
+Propanenitrile	Propanenitrile	C3H5N	0	64.34		measured	10.1007/978-3-642-71114-5_2
+1-Methyl-trans-1,2-cyclohexanediol	1-Methyl-trans-1,2-cyclohexanediol	C7H14O2	0	116.6		measured	10.1007/BF00646936
+N,N,N',N'-Tetramethylheptanediamide	N,N,N',N'-Tetramethylheptanediamide	C11H22N2O2	0	211		measured	10.1007/BF00646936
+Tripropylene glycol	Tripropylene glycol	C9H20O4	0	177.61		measured	10.1007/BF00646936
+4-Hydroxypentanamide	4-Hydroxypentanamide	C5H11NO2	0	105.1		measured	10.1007/BF00646936
+4-Hydroxypentanamide	4-Hydroxypentanamide	C5H11NO2	0	105.1	0.1	measured	10.1007/978-3-642-71114-5_2
+methylammonium	methylammonium	CH6N+	1	30.7		measured	10.1007/BF00972756
+butylammonium	butylammonium	C4H12N+	1	80.05		measured	10.1007/BF00972756
+isobutylammonium	isobutylammonium	C4H12N+	1	80.18		measured	10.1007/BF00972756
+tert-butylammonium	tert-butylammonium	C4H12N+	1	82.3		measured	10.1007/BF00972756
+anilinium	anilinium	C6H8N+	1	79.54		measured	10.1007/BF00972756
+phenethylammonium	phenethylammonium	C8H12N+	1	110.08		measured	10.1007/BF00972756
+dimethylammonium	dimethylammonium	C2H8N+	1	49.27		measured	10.1007/BF00972756
+diethylammonium	diethylammonium	C4H12N+	1	83.53		measured	10.1007/BF00972756
+trimethylammonium	trimethylammonium	C3H10N+	1	67.39		measured	10.1007/BF00972756
+triethylammonium	triethylammonium	C6H16N+	1	116.07		measured	10.1007/BF00972756
+tripropylammonium	tripropylammonium	C9H22N+	1	163.55		measured	10.1007/BF00972756
+tributylammonium	tributylammonium	C12H28N+	1	215.5		measured	10.1007/BF00972756
+tetramethylammonium	tetramethylammonium	C4H12N+	1	84.25		measured	10.1007/BF00972756
+tetraethylammonium	tetraethylammonium	C8H20N+	1	143.55		measured	10.1007/BF00972756
+tetrapropylammonium	tetrapropylammonium	C12H28N+	1	209.22		measured	10.1007/BF00972756
+tetrabutylammonium	tetrabutylammonium	C16H36N+	1	270.3		measured	10.1007/BF00972756
+tetrapentylammonium	tetrapentylammonium	C20H44N+	1	333.3		measured	10.1007/BF00972756
+pyrrolidinium	pyrrolidinium	C4H10N+	1	68.5		measured	10.1007/BF00972756
+piperidinium	piperidinium	C5H12N+	1	83.6		measured	10.1007/BF00972756
+pyridinium	pyridinium	C5H6N+	1	67.52		measured	10.1007/BF00972756
+1-methylpyridinium	1-methylpyridinium	C6H8N+	1	85.0		measured	10.1007/BF00972756
+morpholinium	morpholinium	C4H10NO+	1	69.79		measured	10.1007/BF00972756
+imidazolium	imidazolium	C3H5N2+	1	54.2		measured	10.1007/BF00972756
+piperazine-1,4-diium	piperazine-1,4-diium	C4H12N2+2	2	52.86		measured	10.1007/BF00972756
+piperazin-1-ium	piperazin-1-ium	C4H11N2+	1	71.92		measured	10.1007/BF00972756
+glycine	glycine	C2H5NO2	0	43.3		measured	10.1007/BF00972756
+beta-alanine	beta-alanine	C3H7NO2	0	58.38		measured	10.1007/BF00972756
+4-aminobutanoic acid	4-aminobutanoic acid	C4H9NO2	0	73.23		measured	10.1007/BF00972756
+5-aminopentanoic acid	5-aminopentanoic acid	C5H11NO2	0	87.65		measured	10.1007/BF00972756
+6-aminohexanoic acid	6-aminohexanoic acid	C6H13NO2	0	104.09		measured	10.1007/BF00972756
+7-aminoheptanoic acid	7-aminoheptanoic acid	C7H15NO2	0	120.0		measured	10.1007/BF00972756
+8-aminooctanoic acid	8-aminooctanoic acid	C8H17NO2	0	136.03		measured	10.1007/BF00972756
+9-aminononanoic acid	9-aminononanoic acid	C9H19NO2	0	151.3		measured	10.1007/BF00972756
+10-aminodecanoic acid	10-aminodecanoic acid	C10H21NO2	0	167.3		measured	10.1007/BF00972756
+11-aminoundecanoic acid	11-aminoundecanoic acid	C11H23NO2	0	183.0		measured	10.1007/BF00972756
+alanine	alanine	C3H7NO2	0	60.5		measured	10.1007/BF00972756
+2-aminobutanoic acid	2-aminobutanoic acid	C4H9NO2	0	75.66		measured	10.1007/BF00972756
+valine	valine	C5H11NO2	0	90.78		measured	10.1007/BF00972756
+leucine	leucine	C6H13NO2	0	107.75		measured	10.1007/BF00972756
+phenylalanine	phenylalanine	C9H11NO2	0	121.48		measured	10.1007/BF00972756
+serine	serine	C3H7NO3	0	60.8		measured	10.1007/BF00972756
+tyrosine	tyrosine	C9H11NO3	0	123.6		measured	10.1007/BF00972756
+asparagine	asparagine	C4H8N2O3	0	78.0		measured	10.1007/BF00972756
+glutamine	glutamine	C5H10N2O3	0	93.9		measured	10.1007/BF00972756
+aspartic acid	aspartic acid	C4H7NO4	0	73.83		measured	10.1007/BF00972756
+methionine	methionine	C5H11NO2S	0	105.64		measured	10.1007/BF00972756
+histidine	histidine	C6H9N3O2	0	98.79		measured	10.1007/BF00972756
+formate	formate	CHO2-	-1	31.75		measured	10.1007/BF00972756
+acetate	acetate	C2H3O2-	-1	45.91		measured	10.1007/BF00972756
+propanoate	propanoate	C3H5O2-	-1	60.31		measured	10.1007/BF00972756
+butanoate	butanoate	C4H7O2-	-1	75.92		measured	10.1007/BF00972756
+hexanoate	hexanoate	C6H11O2-	-1	107.96		measured	10.1007/BF00972756
+heptanoate	heptanoate	C7H13O2-	-1	123.65		measured	10.1007/BF00972756
+octanoate	octanoate	C8H15O2-	-1	139.6		measured	10.1007/BF00972756
+nonanoate	nonanoate	C9H17O2-	-1	155.33		measured	10.1007/BF00972756
+decanoate	decanoate	C10H19O2-	-1	170.68		measured	10.1007/BF00972756
+tridecanoate	tridecanoate	C13H25O2-	-1	202.39		measured	10.1007/BF00972756
+benzoate	benzoate	C7H5O2-	-1	92.52		measured	10.1007/BF00972756
+phenylacetate	phenylacetate	C8H7O2-	-1	107.21		measured	10.1007/BF00972756
+salicylate	salicylate	C7H5O3-	-1	100.0		measured	10.1007/BF00972756
+methanesulfonate	methanesulfonate	CH3O3S-	-1	60.48		measured	10.1007/BF00972756
+ethanesulfonate	ethanesulfonate	C2H5O3S-	-1	78.16		measured	10.1007/BF00972756
+propane-1-sulfonate	propane-1-sulfonate	C3H7O3S-	-1	91.68		measured	10.1007/BF00972756
+butane-1-sulfonate	butane-1-sulfonate	C4H9O3S-	-1	107.68		measured	10.1007/BF00972756
+pentane-1-sulfonate	pentane-1-sulfonate	C5H11O3S-	-1	123.62		measured	10.1007/BF00972756
+hexane-1-sulfonate	hexane-1-sulfonate	C6H13O3S-	-1	139.58		measured	10.1007/BF00972756
+dodecane-1-sulfonate	dodecane-1-sulfonate	C12H25O3S-	-1	233.1		measured	10.1007/BF00972756
+tetradecane-1-sulfonate	tetradecane-1-sulfonate	C14H29O3S-	-1	266.6		measured	10.1007/BF00972756
+benzenesulfonate	benzenesulfonate	C6H5O3S-	-1	109.13		measured	10.1007/BF00972756
+butyl sulfate	butyl sulfate	C4H9O4S-	-1	116.6		measured	10.1007/BF00972756
+hexyl sulfate	hexyl sulfate	C6H13O4S-	-1	147.9		measured	10.1007/BF00972756
+octyl sulfate	octyl sulfate	C8H17O4S-	-1	179.2		measured	10.1007/BF00972756
+phenolate	phenolate	C6H5O-	-1	72.9		measured	10.1007/BF00972756
+tetraphenylphosphonium	tetraphenylphosphonium	C24H20P+	1	286.54		measured	10.1007/BF00972756
+tetraphenylarsonium	tetraphenylarsonium	C24H20As+	1	295.2		measured	10.1007/BF00972756
+tetraphenylborate	tetraphenylborate	C24H20B-	-1	283.01		measured	10.1007/BF00972756
+guanidinium	guanidinium	CH6N3+	1	44.6		measured	10.1007/BF00972756
+oxalate	oxalate	C2O4-2	-2	41.28		measured	10.1007/BF00972756
+succinate	succinate	C4H4O4-2	-2	67.3		measured	10.1007/BF00972756
+adipate	adipate	C6H8O4-2	-2	99.44		measured	10.1007/BF00972756
+suberate	suberate	C8H12O4-2	-2	130.81		measured	10.1007/BF00972756
+sebacate	sebacate	C10H16O4-2	-2	162.11		measured	10.1007/BF00972756
+cholate	cholate	C24H39O5-	-1	324.0		measured	10.1007/BF00972756
+deoxycholate	deoxycholate	C24H39O4-	-1	322.4		measured	10.1007/BF00972756
+chenodeoxycholate	chenodeoxycholate	C24H39O4-	-1	326.6		measured	10.1007/BF00972756
+ascorbate	ascorbate	C6H7O6-	-1	93.9		measured	10.1007/BF00972756
+propylammonium	propylammonium	C3H10N+	1	64.01		measured	10.1007/BF00972756
+pentylammonium	pentylammonium	C5H14N+	1	96.03		measured	10.1007/BF00972756
+hexylammonium	hexylammonium	C6H16N+	1	111.95		measured	10.1007/BF00972756
+octylammonium	octylammonium	C8H20N+	1	143.69		measured	10.1007/BF00972756
+benzylammonium	benzylammonium	C7H10N+	1	93.87		measured	10.1007/BF00972756
+dipropylammonium	dipropylammonium	C6H16N+	1	115.46		measured	10.1007/BF00972756
+propane-1,3-diamine dication	propane-1,3-diamine dication	C3H12N2+2	2	52.48		measured	10.1007/BF00972756
+butane-1,4-diamine dication	butane-1,4-diamine dication	C4H14N2+2	2	69.9		measured	10.1007/BF00972756
+pentane-1,5-diamine dication	pentane-1,5-diamine dication	C5H16N2+2	2	87.17		measured	10.1007/BF00972756
+1-Methylimidazole	1-methylimidazole	C4H6N2	0	78.4		derived	10.1016/j.molliq.2018.02.098
+Aziridine	Aziridine	C2H5N	0	48.87	0.02	measured	10.1007/978-3-642-71114-5_2
+Dibutylamine	Dibutylamine	C8H19N	0	155.4	0.4	measured	10.1007/978-3-642-71114-5_2
+Hexanamide	Hexanamide	C6H13NO	0	119.2		measured	10.1007/978-3-642-71114-5_2
+4-Hydroxydecanamide	4-Hydroxydecanamide	C10H21NO2	0	183.3	0.3	measured	10.1007/978-3-642-71114-5_2
+1-Methylcyclohexane-1,2-diol	1-Methylcyclohexane-1,2-diol	C7H14O2	0	116.6	0.7	measured	10.1007/978-3-642-71114-5_2
+1,2-Benzenediol	1,2-Benzenediol	C6H6O2	0	87.07		measured	10.1007/978-3-642-71114-5_2
+1,3-Benzenediol	1,3-Benzenediol	C6H6O2	0	88.92		measured	10.1007/978-3-642-71114-5_2
+1,4-Benzenediol	1,4-Benzenediol	C6H6O2	0	88.70		measured	10.1007/978-3-642-71114-5_2
+2-(Hydroxymethyl)-1,3-propanediol	2-(Hydroxymethyl)-1,3-propanediol	C4H10O3	0	102.30	0.01	measured	10.1007/978-3-642-71114-5_2
+alpha-Methylcyclopentanemethanol	alpha-Methylcyclopentanemethanol	C7H14O	0	118.2	0.7	measured	10.1007/978-3-642-71114-5_2
+Tetrahydro-2-furanmethanol	Tetrahydro-2-furanmethanol	C5H10O2	0	93.8		measured	10.1007/978-3-642-71114-5_2
+Arabinose	Arabinose	C5H10O5	0	93.2	0.3	measured	10.1007/978-3-642-71114-5_2
+Xylose	Xylose	C5H10O5	0	95.1	0.3	measured	10.1007/978-3-642-71114-5_2
+D-Glucose	D-Glucose	C6H12O6	0	110.5	0.3	measured	10.1007/978-3-642-71114-5_2

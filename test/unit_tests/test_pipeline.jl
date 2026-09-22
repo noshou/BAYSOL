@@ -13,7 +13,7 @@ using BayeSol.MolecularStructure: LocalPathSource, resolve_structure, propka_pKa
                     resolve_hydrogens, load_molecule,
                     _store_dir, Molecule, Residues, n_atoms, elms, coords_cartesian
 
-const _PIPELINE_FIXTURE = joinpath(@__DIR__, "..", "fixtures", "structures", "1CRN-TEST.pdb")
+const _PIPELINE_FIXTURE = joinpath(@__DIR__, "..", "fixtures", "molecules", "1CRN-TEST.pdb")
 
 @testset "pipeline: resolve_structure -> propka_pKas -> resolve_hydrogens -> load_molecule" begin
 

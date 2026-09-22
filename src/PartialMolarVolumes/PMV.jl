@@ -5,8 +5,8 @@ Partial molar volumes (V0, cm³/mol) and water bulk electron density.
 """
 module PartialMolarVolumes
 
-using  ..Helpers.Constants: AVOGADRO
-using  ..Helpers.Cache: KeyedCache
+using  ..BayesolUtils.Constants: AVOGADRO
+using  ..BayesolUtils.Cache: KeyedCache
 using  JSON3: JSON3
 
 export PartialMolarVolumeSource, ϕ°, ρₑ_w, PMVSrcTables, COMMON_TO_IUPAC
@@ -45,14 +45,11 @@ function ρₑ_w end
 Partial molar volume at infinite dilution, as `(electron_count, v0_cm3_per_mol, uncertainty_cm3_per_mol)`,
 for a protein/peptide sequence (one-letter codes) at solution `pH`, for a DNA/RNA sequence
 (one-letter or IUPAC ambiguity codes) at solution `pH`, or for a solute by IUPAC `name`.
-The extra leading `isDNA::Bool` on the nucleotide form is what disambiguates it from the
-protein form by arity — amino-acid and nucleotide one-letter codes collide (e.g. `"A"` is
-both alanine and adenine), so the two forms cannot be told apart by `seq` alone.
 
 # Arguments
 - `src`: the partial-molar-volume backend to query (optional).
 - `pH`/`seq`: solution pH and one-letter-code sequence, for a protein or nucleotide.
-- `isDNA`: `true` for a DNA sequence, `false` for RNA — nucleotide form only; selects
+- `isDNA`: `true` for a DNA sequence, `false` for RNA; selects
     both the `A/T/G/C` vs `A/U/G/C` alphabet and which backend table gets queried.
 - `σ_pH`: standard uncertainty on `pH`, propagated into the returned uncertainty
     via the delta method (protein/nucleotide forms only; ignored for the solute-by-name form).
@@ -98,10 +95,7 @@ relative to the curvature.
     `Protein`'s own ionization table or a nucleotide's.
 - `_dict`: `key -> (electron_count, V0, uncertainty)` value table that
     `neutral_key`/`ionized_key` are resolved against. The ionized entry's
-    `electron_count` is the *delta* relative to the neutral entry — always
-    `0`, since deprotonation removes a bare proton, not an electron (see
-    `_Protein`'s own docstring) — not an absolute count.
-- `pH`: solution pH the titration is evaluated at.
+    `electron_count` is the *delta* relative to the neutral entry.
 
 # Keywords
 - `σ_pH`: standard uncertainty on `pH`, propagated by the delta method
@@ -200,8 +194,7 @@ const _protein_ionization::Dict{String, Tuple{Tuple{Float64, String}, String}} =
 """ key => (electron_count, partial_molar_volume, uncertainty). electron_count is a
 side-chain-only increment relative to glycine (see `_backbone_electrons`), and is
 identical between a group's "-neutral" and "-acidic"/"-basic" forms since deprotonation
-only removes a bare proton (no electron) — so every ionization delta row's own
-electron_count is legitimately 0, not a placeholder. """
+only removes a bare proton (no electron). """
 const _Protein::Dict{String, Tuple{Int64, Float64, Float64}} = JSON3.read(
     read(joinpath(@__DIR__, "Protein", "protein.json"), String),
     Dict{String, Tuple{Int64, Float64, Float64}}
@@ -214,15 +207,14 @@ const _wildcards = Dict("B" => ("D", "N"), "J" => ("L", "I"), "Z" => ("E", "Q"))
 Peptide-bond backbone unit (`-CH2CONH-`, "glycyl") volume at 25°C, added once per
 residue in `ρₑ`. `Protein.json`'s per-residue entries (`A`, `V`, `L`, ... and `G`'s
 zero) are side-chain-only increments relative to glycine (Lee et al. 2008's own
-convention), not absolute residue volumes — this shared backbone term is what
-they sit on top of. Source: `Protein.tsv` CH2CONH row, `10.1039/9781782627043-00542`.
+convention), not absolute residue volumes. Source: `Protein.tsv` CH2CONH row, `10.1039/9781782627043-00542`.
 """
 const _backbone_pmv = (37.4, 0.1)
 
 """
 Peptide backbone unit (`-CH2CONH-`, neutral, C2H3NO) electron count: 2×C(6) + 3×H(1)
 + N(7) + O(8) = 30 e. Added once per residue in `ρₑ`, on the same basis as
-`_backbone_pmv` — `Protein.json`'s electron_count field is a side-chain-only
+`_backbone_pmv`. `Protein.json`'s electron_count field is a side-chain-only
 increment relative to glycine, and this is the shared unit it sits on top of.
 """
 const _backbone_electrons = 30
@@ -505,10 +497,7 @@ inline 2-way wildcard averaging, which is just this formula's `N=2` case).
 
 # Arguments
 - `bases`: the residue/base codes to average over (e.g. `["A", "G"]` for `R`).
-- `lookup`: `base::AbstractString -> (electron_count, pmv, variance)` resolver
-    called once per element of `bases` — the caller's own per-residue
-    resolver (e.g. `_nuc_residue_var` itself, for recursive reuse so a
-    wildcard's component bases are still checked for ionizability).
+- `lookup`: `base::AbstractString -> (electron_count, pmv, variance)`.
 """
 function _wildcard_var(bases::Vector{String}, lookup::Function)::Tuple{Int64,Float64,Float64}
     n = length(bases)
