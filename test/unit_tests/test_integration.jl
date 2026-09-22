@@ -253,9 +253,11 @@ end
         @test seed.ξ₀[1] > 0 && seed.ξ₀[2] > 0 && seed.ξ₀[5] > 0
 
         n_samples, n_adapt = 20, 10
+        local fit
         t_nuts = @elapsed begin
-            samples, stats = run_fitting(seed, n_samples, n_adapt; l = PROFILE())
+            fit = run_fitting(seed, n_samples, n_adapt; l = PROFILE())
         end
+        samples, stats = fit.samples, fit.stats
         @info "run_fitting ($n_samples samples, $n_adapt adapt) took $(round(t_nuts; digits = 2))s"
 
         @test length(samples) == n_samples
