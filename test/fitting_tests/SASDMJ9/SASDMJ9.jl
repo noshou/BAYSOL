@@ -3,13 +3,10 @@ using   Statistics
 using   Random
 using   GLMakie
 using   BayeSol
-using   BayeSol.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,
-        propka_pKas, resolve_hydrogens, Ionization
-using   BayeSol.Solvation: protein_cavity_electrostatics
-using   BayeSol.Scattering: forward_cache
-using   BayeSol.Fitting: Solute, Protein, NonBiological, PROFILE, seed_fitting
+using   BayeSol.MolecularStructure: LocalPathSource
+using   BayeSol.Fitting: Solute, Protein, NonBiological, PROFILE
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "SASDMJ9")
+const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDMJ9")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDMJ9.dat")
 const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDMJ9_fit1_model1.pdb")
 const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDMJ9_fit1.fit")
@@ -29,7 +26,7 @@ qvals = qvals ./ 10
 # ---------------------------------------------------------------------------
 #
 # Source: Xiao et al. 2012, J. Virol. 86(6):3144-3157 ("FCoV Nsp7 and Nsp8
-# Form a 2:1 Heterotrimer..."), test/fixtures/SASDMJ9/xiao-et-al-2012-*.pdf.
+# Form a 2:1 Heterotrimer..."), test/fixtures/experiments/SASDMJ9/xiao-et-al-2012-*.pdf.
 #
 # The buffer that matters here is the one used for the SEC step immediately
 # preceding SAXS ("SEC" paragraph, Materials and Methods):
@@ -85,7 +82,8 @@ const Q_MAX_FIT    = 0.5
 
 # lMax follows the usual q·D_max multipole-resolution rule of thumb: D_max
 # for a roughly globular dimer with Rg = 19.11 Å is ~45-65 Å, and
-# Q_MAX_FIT * D_max ≈ 0.5 * 50 ≈ 25.
+# Q_MAX_FIT * D_max ≈ 0.5 * 50 ≈ 25. (Tested lMax=50 to check whether the
+# q≈0.2-0.3 Å⁻¹ secondary maximum GNOM's fit shows.
 const LMAX = 25
 
 const ADD_HYDROGENS = true   # runs PDB2PQR at PH
@@ -103,32 +101,23 @@ end
 function run_sasdmj9(; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer = 0)
     q_fit, I_fit, σ_fit = fit_subset()
 
-    path  = resolve_structure(LocalPathSource(_PDB_PATH))
-    pKa_records = propka_pKas(path)
-    hpath = resolve_hydrogens(path, pKa_records, PH; add = ADD_HYDROGENS)
-    mol, residues = load_molecule(hpath)
-
-    fw = forward_cache(mol, q_fit, LMAX, ENERGY_EV)
-
-    ionization = Ionization(residues, pKa_records, PH, σ_PH)
-    μ_χ, σ_χ = protein_cavity_electrostatics(
-        mol, residues, ionization;
+    Random.seed!(seed)
+    s, μ_χ, σ_χ = BayeSol.seed_model(
+        LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
+        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
         ionic_strength_M = IONIC_STRENGTH_M, T = TEMPERATURE_C + 273.15,
     )
-
-    Random.seed!(seed)
-    s = seed_fitting(fw, I_fit, σ_fit, PH, σ_PH, SOLUTES; μ_χ = μ_χ, σ_χ = σ_χ, t = TEMPERATURE_C)
     res = BayeSol.run_model(s, n_samples, n_adapt; l = PROFILE())
-    return res, (q_fit, I_fit, σ_fit)
+    return res, μ_χ, σ_χ, s.fw.form_factor_log, (q_fit, I_fit, σ_fit)
 end
 
-result, (q_fit, I_fit, σ_fit) = run_sasdmj9()
+result, μ_χ, σ_χ, form_factor_log, (q_fit, I_fit, σ_fit) = run_sasdmj9()
 
 fit, divergence_rate, map_result, quantile_result = result
 
 # `@__DIR__` (this SASDMJ9/ folder), not the caller's cwd.
 open(joinpath(@__DIR__, "res.txt"), "w") do io
-    BayeSol.write_report(io, result)
+    BayeSol.write_report(io, result; μ_χ = μ_χ, σ_χ = σ_χ, form_factor_log = form_factor_log)
 end
 
 """
@@ -148,6 +137,7 @@ function sasdmj9_figure(result, data)
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
         title  = "divergence rate = $(round(divergence_rate; digits = 3))",
+        xscale = log10,
         yscale = log10,
     )
 
@@ -202,7 +192,7 @@ function sasdmj9_figure(result, data)
         lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "MAP")
     end
 
-    axislegend(ax; position = :rt, framevisible = false)
+    axislegend(ax; position = :lb, framevisible = false)
 
     # Center the view on the actual data (I_fit), not on however far the
     # errorbar whiskers/bounds band happen to extend
@@ -257,7 +247,7 @@ function sasdmj9_residuals_figure(result, data)
         ylims!(ax, lo - pad, hi + pad)
     end
 
-    axislegend(ax; position = :rt, framevisible = false)
+    axislegend(ax; position = :lb, framevisible = false)
 
     return fig
 end
@@ -293,6 +283,62 @@ function sasdmj9_posterior_hist(result)
     return fig
 end
 
+"""
+    sasdmj9_gnom_comparison_figure(result, data) -> Figure
+
+Overlays our MAP curve against the reference GNOM fit (`SASDMJ9_fit1.fit`,
+column 4 -- the paper's own P(r)-regularized fit to this same data) on the
+same log-log axes as `sasdmj9_figure`, restricted to `q ≤ Q_MAX_FIT`
+(GNOM's own q=0 extrapolation rows and any non-positive values are dropped,
+since both are invalid on a log axis).
+"""
+function sasdmj9_gnom_comparison_figure(result, data)
+    _, _, map_result, _ = result
+    q_fit, I_fit, σ_fit = data
+
+    gnom   = readdlm(_FIT_PATH; skipstart = 1)
+    q_gnom = Float64.(gnom[:, 1])
+    I_gnom = Float64.(gnom[:, 4])
+    keep   = (q_gnom .> 0) .& (q_gnom .<= Q_MAX_FIT) .& (I_gnom .> 0)
+
+    fig = Figure(size = (700, 500))
+    ax = Axis(
+        fig[1, 1],
+        xlabel = "q (Å⁻¹)",
+        ylabel = "I(q)",
+        title  = "BayeSol MAP vs. GNOM fit1 (paper)",
+        xscale = log10,
+        yscale = log10,
+    )
+
+    # Same log-symmetric errorbar treatment as `sasdmj9_figure` -- see its
+    # comment for why a raw additive I ± σ interval isn't used here.
+    log_I = log10.(I_fit)
+    log_σ = σ_fit ./ (I_fit .* log(10))
+    rangebars!(
+        ax, q_fit, exp10.(log_I .- log_σ), exp10.(log_I .+ log_σ);
+        whiskerwidth = 4, color = (:gray40, 0.6),
+    )
+    scatter!(ax, q_fit, I_fit; markersize = 4, color = :gray20, label = "data")
+
+    lines!(
+        ax, q_gnom[keep], I_gnom[keep];
+        color = :seagreen, linewidth = 2, linestyle = :dash, label = "GNOM fit1 (paper)",
+    )
+
+    if map_result !== nothing
+        _, map_curve = map_result
+        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "BayeSol MAP")
+    end
+
+    axislegend(ax; position = :lb, framevisible = false)
+
+    lo, hi = extrema(I_fit)
+    ylims!(ax, lo * 0.7, hi * 1.3)
+
+    return fig
+end
+
 fig = sasdmj9_figure(result, (q_fit, I_fit, σ_fit))
 save(joinpath(@__DIR__, "res.png"), fig)
 
@@ -301,6 +347,9 @@ save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals)
 
 fig_hist = sasdmj9_posterior_hist(result)
 save(joinpath(@__DIR__, "res_hist.png"), fig_hist)
+
+fig_gnom = sasdmj9_gnom_comparison_figure(result, (q_fit, I_fit, σ_fit))
+save(joinpath(@__DIR__, "res_gnom_comparison.png"), fig_gnom)
 
 "Display the SASDMJ9 fit figure. Blocks until the window is closed."
 vis_sasdmj9() = wait(display(fig))

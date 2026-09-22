@@ -29,7 +29,7 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
     # -----------------------------------------------------------------------
 
     "Rows of a fixture CSV, minus its header."
-    _fx(name) = Iterators.drop(eachline(joinpath(@__DIR__, "..", "fixtures", name)), 1)
+    _fx(name) = Iterators.drop(eachline(joinpath(@__DIR__, "..", "fixtures", "form-factors", name)), 1)
 
     "Agreement to within `k` units in the last place at `ref`'s own magnitude."
     _ulp(got, ref, k = 2) = abs(got - ref) <= k * eps(abs(ref))
