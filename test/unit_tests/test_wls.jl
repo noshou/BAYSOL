@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Tests for src/Fitting/WLS.jl: the 2-parameter weighted least squares fit
-# of I_calc(q) = m*y_model(q) + c, plus the profile/marginal log-likelihoods
-# and the χ²/dof diagnostic built on top of it.
+# of I_calc(q) = scale*y_model(q) + bkgrnd_corr, plus the profile/marginal
+# log-likelihoods and the χ²/dof diagnostic built on top of it.
 #
 # `ref_wls` below is an independent re-derivation via explicit normal-equation
 # matrix algebra (LinearAlgebra), not a copy of `wls_fit`'s O(n) accumulator
@@ -18,19 +18,20 @@ using BayeSol.Fitting: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_
     reduced_chi2
 
 """
-Reference (m, c, var_m, var_c, cov_mc, chi2, det_XtWX) via explicit normal
-equations `(XᵀWX) β = XᵀWy`, independent of `wls_fit`'s accumulator formulas.
+Reference (scale, bkgrnd_corr, var_scale, var_bkgrnd_corr, cov_scale_bkgrnd_corr,
+chi2, det_XtWX) via explicit normal equations `(XᵀWX) β = XᵀWy`, independent
+of `wls_fit`'s accumulator formulas.
 """
 function ref_wls(y_model::AbstractVector, I_obs::AbstractVector, σ::AbstractVector)
     X = hcat(collect(y_model), ones(length(y_model)))
     W = Diagonal(1.0 ./ σ .^ 2)
     XtWX = X' * W * X
     β = XtWX \ (X' * W * I_obs)
-    m, c = β
+    scale, bkgrnd_corr = β
     cov = inv(XtWX)
     resid = I_obs .- X * β
     chi2 = resid' * W * resid
-    return m, c, cov[1, 1], cov[2, 2], cov[1, 2], chi2, det(XtWX)
+    return scale, bkgrnd_corr, cov[1, 1], cov[2, 2], cov[1, 2], chi2, det(XtWX)
 end
 
 @testset "WLS" begin
@@ -39,29 +40,29 @@ end
     #                 wls_fit -- exact (noise-free) recovery
     #------------------------------------------------------------------
 
-    @testset "wls_fit: exact recovery of (m, c) from a noise-free linear curve" begin
+    @testset "wls_fit: exact recovery of (scale, bkgrnd_corr) from a noise-free linear curve" begin
         y_model = collect(range(0.1, 5.0; length = 20))
-        m_true, c_true = 3.7, -1.2
-        I_obs = m_true .* y_model .+ c_true
+        scale_true, bkgrnd_corr_true = 3.7, -1.2
+        I_obs = scale_true .* y_model .+ bkgrnd_corr_true
         σ = fill(0.5, length(y_model))
 
         f = wls_fit(y_model, I_obs, σ)
-        @test check_float(f.m, m_true; atol = 1e-9)
-        @test check_float(f.c, c_true; atol = 1e-9)
+        @test check_float(f.scale, scale_true; atol = 1e-9)
+        @test check_float(f.bkgrnd_corr, bkgrnd_corr_true; atol = 1e-9)
         @test check_float(f.chi2, 0.0; atol = 1e-9)
         @test f.dof == length(y_model) - 2
     end
 
     @testset "wls_fit: exact recovery holds under heteroscedastic weights too" begin
         y_model = collect(range(-2.0, 2.0; length = 15))
-        m_true, c_true = -0.8, 4.4
-        I_obs = m_true .* y_model .+ c_true
+        scale_true, bkgrnd_corr_true = -0.8, 4.4
+        I_obs = scale_true .* y_model .+ bkgrnd_corr_true
         rng = MersenneTwister(1)
         σ = 0.1 .+ rand(rng, length(y_model))   # varying per-point σ
 
         f = wls_fit(y_model, I_obs, σ)
-        @test check_float(f.m, m_true; atol = 1e-8)
-        @test check_float(f.c, c_true; atol = 1e-8)
+        @test check_float(f.scale, scale_true; atol = 1e-8)
+        @test check_float(f.bkgrnd_corr, bkgrnd_corr_true; atol = 1e-8)
         @test check_float(f.chi2, 0.0; atol = 1e-8)
     end
 
@@ -75,17 +76,17 @@ end
             n = rand(rng, 3:40)
             y_model = randn(rng, n)
             σ = 0.2 .+ rand(rng, n)
-            m_true, c_true = randn(rng), randn(rng)
-            I_obs = m_true .* y_model .+ c_true .+ σ .* randn(rng, n)
+            scale_true, bkgrnd_corr_true = randn(rng), randn(rng)
+            I_obs = scale_true .* y_model .+ bkgrnd_corr_true .+ σ .* randn(rng, n)
 
             f = wls_fit(y_model, I_obs, σ)
-            m_r, c_r, vm_r, vc_r, cov_r, chi2_r, det_r = ref_wls(y_model, I_obs, σ)
+            scale_r, bkgrnd_corr_r, vscale_r, vbkgrnd_corr_r, cov_r, chi2_r, det_r = ref_wls(y_model, I_obs, σ)
 
-            @test check_float(f.m, m_r; atol = 1e-6)
-            @test check_float(f.c, c_r; atol = 1e-6)
-            @test check_float(f.var_m, vm_r; atol = 1e-6)
-            @test check_float(f.var_c, vc_r; atol = 1e-6)
-            @test check_float(f.cov_mc, cov_r; atol = 1e-6)
+            @test check_float(f.scale, scale_r; atol = 1e-6)
+            @test check_float(f.bkgrnd_corr, bkgrnd_corr_r; atol = 1e-6)
+            @test check_float(f.var_scale, vscale_r; atol = 1e-6)
+            @test check_float(f.var_bkgrnd_corr, vbkgrnd_corr_r; atol = 1e-6)
+            @test check_float(f.cov_scale_bkgrnd_corr, cov_r; atol = 1e-6)
             @test check_float(f.chi2, chi2_r; atol = 1e-6)
             @test check_float(f.det_XtWX, det_r; atol = 1e-3)
             @test f.dof == n - 2
@@ -136,18 +137,18 @@ end
 
     @testset "wls_predict: reproduces I_obs exactly on a noise-free fit" begin
         y_model = collect(range(0.0, 10.0; length = 8))
-        m_true, c_true = 1.5, 0.3
-        I_obs = m_true .* y_model .+ c_true
+        scale_true, bkgrnd_corr_true = 1.5, 0.3
+        I_obs = scale_true .* y_model .+ bkgrnd_corr_true
         f = wls_fit(y_model, I_obs, fill(1.0, length(y_model)))
         @test all(check_float.(wls_predict(f, y_model), I_obs; atol = 1e-9))
     end
 
-    @testset "wls_predict: matches the m*y + c formula on a fresh curve" begin
+    @testset "wls_predict: matches the scale*y + bkgrnd_corr formula on a fresh curve" begin
         y_model = collect(range(0.0, 10.0; length = 8))
         I_obs = 2.0 .* y_model .+ 5.0 .+ [0.1, -0.2, 0.05, 0.0, -0.1, 0.2, -0.05, 0.1]
         f = wls_fit(y_model, I_obs, fill(1.0, length(y_model)))
         y_fresh = [0.0, 3.3, 7.7]
-        @test wls_predict(f, y_fresh) ≈ f.m .* y_fresh .+ f.c
+        @test wls_predict(f, y_fresh) ≈ f.scale .* y_fresh .+ f.bkgrnd_corr
     end
 
     #------------------------------------------------------------------
@@ -227,11 +228,11 @@ end
         # on a single (noisy, so unreliable) trial.
         rng = MersenneTwister(2026)
         y_model = collect(range(0.1, 5.0; length = 30))
-        m_true, c_true = 1.4, -0.3
+        scale_true, bkgrnd_corr_true = 1.4, -0.3
         σ = fill(0.25, length(y_model))
         vals = Float64[]
         for _ in 1:500
-            I_obs = m_true .* y_model .+ c_true .+ σ .* randn(rng, length(y_model))
+            I_obs = scale_true .* y_model .+ bkgrnd_corr_true .+ σ .* randn(rng, length(y_model))
             f = wls_fit(y_model, I_obs, σ)
             push!(vals, reduced_chi2(f))
         end

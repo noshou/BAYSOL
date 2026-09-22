@@ -81,7 +81,7 @@ fwd_chunk  = UInt64(3)
         @test G == G_ref
     end
 
-    @testset "forward(G, m, c, dns, δρ) == hand-assembled I_calc" begin
+    @testset "forward(G, scale, bkgrnd_corr, dns, δρ) == hand-assembled I_calc" begin
         m   = fwd_mol()
         G   = gram_matrix(m, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         pars = (0.9, -0.4, 0.331, (1.2, 0.8, -0.3))
@@ -98,7 +98,7 @@ fwd_chunk  = UInt64(3)
         @test got ≈ forward(G, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0))
     end
 
-    @testset "detector map: m scales, c offsets" begin
+    @testset "detector map: scale scales, bkgrnd_corr offsets" begin
         m = fwd_mol()
         G = gram_matrix(m, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         base = forward(G, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0))

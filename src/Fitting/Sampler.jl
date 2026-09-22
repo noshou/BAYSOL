@@ -155,19 +155,21 @@ abstract type LIKELIHOOD end
 
 "Log-likelihood of the data at a given `ξ = (dns, δρ1, δρ2, δρ3, c1)`. The
 forward model produces a predicted curve `y_model(q)`, but the data `I_exp(q)`
-sits at some unknown overall scale `m` and background offset `c`, i.e.
-`I_calc = m·y_model + c`. `WLS.jl` fits `(m, c)` in closed form (2-parameter
-weighted linear regression), and reports the resulting Gaussian log-likelihood
-two ways, selected by `l`:
+sits at some unknown overall scale `scale` and background offset
+`bkgrnd_corr`, i.e. `I_calc = scale·y_model + bkgrnd_corr`. `WLS.jl` fits
+`(scale, bkgrnd_corr)` in closed form (2-parameter weighted linear
+regression), and reports the resulting Gaussian log-likelihood two ways,
+selected by `l`:
 
-- `l = PROFILE()`: treat `(m, c)` as pinned at their best-fit values (a point
-    estimate) — [`wls_prof_ll`](@ref):
+- `l = PROFILE()`: treat `(scale, bkgrnd_corr)` as pinned at their best-fit
+    values (a point estimate) — [`wls_prof_ll`](@ref):
 
         -½χ² - ½ Σln(σᵢ²) - ½n·ln(2π)
 
-- `l = MARGINAL()`: instead of pinning `(m, c)`, integrate them out
-    analytically under a flat prior (Gaussian integral in closed form since
-    the problem is linear in `m,c`) — [`wls_marg_ll`](@ref). This adds a
+- `l = MARGINAL()`: instead of pinning `(scale, bkgrnd_corr)`, integrate
+    them out analytically under a flat prior (Gaussian integral in closed
+    form since the problem is linear in `scale, bkgrnd_corr`) —
+    [`wls_marg_ll`](@ref). This adds a
     correction term:
 
         -½ln(det(XᵀWX))
@@ -175,23 +177,28 @@ two ways, selected by `l`:
     which lets uncertainty in scale/background flow into the posterior on the
     physical parameters, instead of freezing it out.
 "
-struct PROFILE<:LIKELIHOOD  end
+struct PROFILE<:LIKELIHOOD  
+    type::AbstractString
+    PROFILE() = new("profile_log_likelihood")
+end
 
 "Log-likelihood of the data at a given `ξ = (dns, δρ1, δρ2, δρ3, c1)`. The
 forward model produces a predicted curve `y_model(q)`, but the data `I_exp(q)`
-sits at some unknown overall scale `m` and background offset `c`, i.e.
-`I_calc = m·y_model + c`. `WLS.jl` fits `(m, c)` in closed form (2-parameter
-weighted linear regression), and reports the resulting Gaussian log-likelihood
-two ways, selected by `l`:
+sits at some unknown overall scale `scale` and background offset
+`bkgrnd_corr`, i.e. `I_calc = scale·y_model + bkgrnd_corr`. `WLS.jl` fits
+`(scale, bkgrnd_corr)` in closed form (2-parameter weighted linear
+regression), and reports the resulting Gaussian log-likelihood two ways,
+selected by `l`:
 
-- `l = PROFILE()`: treat `(m, c)` as pinned at their best-fit values (a point
-    estimate) — [`wls_prof_ll`](@ref):
+- `l = PROFILE()`: treat `(scale, bkgrnd_corr)` as pinned at their best-fit
+    values (a point estimate) — [`wls_prof_ll`](@ref):
 
         -½χ² - ½ Σln(σᵢ²) - ½n·ln(2π)
 
-- `l = MARGINAL()`: instead of pinning `(m, c)`, integrate them out
-    analytically under a flat prior (Gaussian integral in closed form since
-    the problem is linear in `m,c`) — [`wls_marg_ll`](@ref). This adds a
+- `l = MARGINAL()`: instead of pinning `(scale, bkgrnd_corr)`, integrate
+    them out analytically under a flat prior (Gaussian integral in closed
+    form since the problem is linear in `scale, bkgrnd_corr`) —
+    [`wls_marg_ll`](@ref). This adds a
     correction term:
 
         -½ln(det(XᵀWX))
@@ -199,7 +206,10 @@ two ways, selected by `l`:
     which lets uncertainty in scale/background flow into the posterior on the
     physical parameters, instead of freezing it out.
 "
-struct MARGINAL<:LIKELIHOOD end
+struct MARGINAL<:LIKELIHOOD 
+    type::AbstractString
+    MARGINAL() = new("marginal_log_likelihood")
+end
 
 __ll(fit::WLSFit, ::PROFILE)  = wls_prof_ll(fit)
 __ll(fit::WLSFit, ::MARGINAL) = wls_marg_ll(fit)
@@ -209,19 +219,21 @@ __ll(fit::WLSFit, ::MARGINAL) = wls_marg_ll(fit)
 
 Log-likelihood of the data at a given `ξ = (dns, δρ1, δρ2, δρ3, c1)`. The
 forward model produces a predicted curve `y_model(q)`, but the data `I_exp(q)`
-sits at some unknown overall scale `m` and background offset `c`, i.e.
-`I_calc = m·y_model + c`. `WLS.jl` fits `(m, c)` in closed form (2-parameter
-weighted linear regression), and reports the resulting Gaussian log-likelihood
-two ways, selected by `l`:
+sits at some unknown overall scale `scale` and background offset
+`bkgrnd_corr`, i.e. `I_calc = scale·y_model + bkgrnd_corr`. `WLS.jl` fits
+`(scale, bkgrnd_corr)` in closed form (2-parameter weighted linear
+regression), and reports the resulting Gaussian log-likelihood two ways,
+selected by `l`:
 
-- `l = PROFILE()`: treat `(m, c)` as pinned at their best-fit values (a point
-    estimate) — [`wls_prof_ll`](@ref):
+- `l = PROFILE()`: treat `(scale, bkgrnd_corr)` as pinned at their best-fit
+    values (a point estimate) — [`wls_prof_ll`](@ref):
 
         -½χ² - ½ Σln(σᵢ²) - ½n·ln(2π)
 
-- `l = MARGINAL()`: instead of pinning `(m, c)`, integrate them out
-    analytically under a flat prior (Gaussian integral in closed form since
-    the problem is linear in `m,c`) — [`wls_marg_ll`](@ref). This adds a
+- `l = MARGINAL()`: instead of pinning `(scale, bkgrnd_corr)`, integrate
+    them out analytically under a flat prior (Gaussian integral in closed
+    form since the problem is linear in `scale, bkgrnd_corr`) —
+    [`wls_marg_ll`](@ref). This adds a
     correction term:
 
         -½ln(det(XᵀWX))
@@ -248,7 +260,7 @@ function _ll(
     l::LIKELIHOOD
 )
 
-    # initialize m and c to "no" normilization before WLS
+    # initialize scale and bkgrnd_corr to "no" normilization before WLS
     ŷ = forward(fw, 1.0, 0.0, ξ[1], (ξ[2], ξ[3], ξ[4]), ξ[5])
 
     # compute wls fit
@@ -389,18 +401,50 @@ function seed_fitting(
 end
 
 """
-    run_fitting(
-        seed::Seed, 
-        n_samples::Int64, 
-        n_adapt::Int64; 
-        l::LIKELIHOOD=PROFILE(), 
-        δ::Real=80
-    ) -> (samples, stats)
+    FitResult{S}
 
-Identical to [`BayeSol.run_model`](@ref).
+Typed return of [`run_fitting`](@ref)/`BayeSol.run_model`: the posterior
+draws of the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`, one
+`(scale, bkgrnd_corr)` pair and predicted curve per draw, and
+`AdvancedHMC.jl`'s own per-iteration diagnostics.
+
+# Fields
+- `samples::Vector{SVector{5,Float64}}`: posterior draws of `ξ`, length `n_samples`.
+- `stats::Vector{S}`: `AdvancedHMC.jl`'s per-iteration diagnostics, matching
+    `samples` index-for-index.
+- `scale::Vector{Float64}`: the WLS estimate of the scale correction at samples[i].
+-  `bkgrnd_corr::Vector{Float64}`: the WLS estimate of the background correction at samples[i].
+- `chisq_red::Vector{Float64}`:  the reduced χ² of the WLS estimate 
+- `curves::Matrix{Float64}`, `(Q, n_samples)`: the detector-scale predicted
+    curve `I_calc(q) = scale[i]·y_model(q) + bkgrnd_corr[i]` for each
+    `samples[i]`, column-matching `scale`/`bkgrnd_corr`. Equivalently
+    `curves[:, i] == forward(seed.fw, scale[i], bkgrnd_corr[i], samples[i][1],
+    (samples[i][2], samples[i][3], samples[i][4]), samples[i][5])`.
+- `likelihood::AbstractString`: the likelihood type
+"""
+struct FitResult{S}
+    samples::Vector{SVector{5,Float64}}
+    stats::Vector{S}
+    scale::Vector{Float64}
+    bkgrnd_corr::Vector{Float64}
+    chisq_red::Vector{Float64}
+    curves::Matrix{Float64}
+    likelihood::AbstractString
+end
+
+"""
+    run_fitting(
+        seed::Seed,
+        n_samples::Int64,
+        n_adapt::Int64;
+        l::LIKELIHOOD=PROFILE(),
+        δ::Real=80
+    ) -> FitResult
 
 Run NUTS on [`_logπ`](@ref) starting from `seed`, returning posterior draws
-of the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`.
+of the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`, one `(scale,
+bkgrnd_corr)` pair per draw (see `# Returns` below), and `AdvancedHMC.jl`'s
+own per-iteration diagnostics.
 
 # The Hamiltonian
 
@@ -454,21 +498,22 @@ full parameter covariance, since `dns`/`δρ`/`c1` are physically coupled throug
 forward model) from the trajectory's sample covariance.
 
 # Arguments
-- `seed::Seed`: priors, initial point, forward cache, and data.
-- `n_samples::Int64`: total number of NUTS iterations (including the
-    `n_adapt` warm-up steps, which are kept unless `drop_warmup` is set).
-- `n_adapt::Int64`: number of warm-up iterations spent adapting the step
-    size and mass matrix before sampling proper.
+- `seed::Seed`:         priors, initial point, forward cache, and data.
+- `n_samples::Int64`:   total number of NUTS iterations.
+- `n_adapt::Int64`:     number of warm-up iterations spent adapting the step
+                        size and mass matrix before sampling proper.
 
 # Keywords
-- `l::LIKELIHOOD=PROFILE()`: `PROFILE()` or `MARGINAL()`, forwarded to
-    [`_logπ`](@ref)/[`_ll`](@ref).
-- `δ::Real=80`: target acceptance rate as a percentage, `(0, 100)` exclusive
-    (validated below); Stan's usual default of 80% is used here too absent a
-    specific reason to retarget it.
+- `l::LIKELIHOOD=PROFILE()`:    `PROFILE()` or `MARGINAL()`, forwarded to
+                                [`_logπ`](@ref)/[`_ll`](@ref).
+- `δ::Real=80`:                 target acceptance rate as a percentage, `(0, 100)` exclusive; 
+                                Stan's usual default of 80% is used.
 
 # Returns
-- `samples`: a `Vector` of posterior draws.
+A [`FitResult`](@ref) -- see its own docstring for the field-by-field
+breakdown. Includes the `n_adapt` warm-up draws; a caller that wants a
+warmup-free posterior slices `n_adapt+1:end` (`curves`: `[:, n_adapt+1:end]`)
+out of every field itself.
 """
 function run_fitting(
     seed::Seed,
@@ -476,25 +521,18 @@ function run_fitting(
     n_adapt::Int64;
     l::LIKELIHOOD=PROFILE(),
     δ::Real=80
-)
+)::FitResult
 
     if δ <= 0 || δ >= 100
         throw(DomainError(δ, "0 < δ < 100"))
     end
     δ = δ / 100
 
-    # ℓπ: z ↦ log π(θ(z)), the value-only log-posterior in prior-standardized
-    # z-space (_logπ, unchanged, closed over the data/priors/cache/
-    # likelihood-choice fixed for this run, composed with _destandardize --
-    # see that function's docstring for why sampling happens in z rather
-    # than θ directly: θ's coordinates have wildly different natural prior
-    # scales, which makes AdvancedHMC.jl's identity-mass-matrix initial
-    # exploration in find_good_stepsize routinely blow the forward model up
-    # before adaptation gets a chance to learn that scale difference itself).
-    # AdvancedHMC.jl hands this a plain-axed AbstractVector (Base.OneTo, not
-    # StaticArrays' SOneTo), which _logπ's SVector{5,<:Real} signature can't
-    # dispatch on directly, so re-wrap it into an SVector first (same idiom
-    # as test_paramtransform.jl's AD-differentiability tests).
+    if n_adapt >= n_samples 
+        throw(DomainError((n_adapt, n_samples), "n_adapt must be < n_samples"))
+    end
+
+    # ℓπ: z ↦ log π(θ(z)), the value-only log-posterior in prior-standardized z-space.
     ℓπ = @closure z -> _logπ(
         _destandardize(SVector{5,eltype(z)}(z...), seed.pr),
         seed.pr,
@@ -503,9 +541,7 @@ function run_fitting(
         seed.fw, l
     )
 
-    # ∂ℓπ∂z: z ↦ (log π(θ(z)), ∇_z log π(θ(z))), computed in one ForwardDiff
-    # pass — this is what AdvancedHMC's leapfrog integrator actually calls
-    # every step.
+    # ∂ℓπ∂z: z ↦ (log π(θ(z)), ∇_z log π(θ(z))), computed in one ForwardDiff pass.
     ∂ℓπ∂z = @closure z -> begin
         result = DiffResults.GradientResult(z)
         ForwardDiff.gradient!(result, ℓπ, z)
@@ -524,8 +560,7 @@ function run_fitting(
     # a plain Vector/Matrix (Base.OneTo axes) and check axes(M⁻¹) against
     # axes(z)/axes(r); an SVector's SOneTo axes fail that check even though
     # the ranges match. Start from a plain Vector instead of an SVector
-    # directly, at z₀ = _standardize(seed.θ₀, seed.pr) (seed.θ₀ itself stays
-    # in plain, unstandardized θ-space -- see Seed's own docstring).
+    # directly, at z₀ = _standardize(seed.θ₀, seed.pr).
     z₀ = Vector(_standardize(seed.θ₀, seed.pr))
 
     # HMC numerically integrates the Hamiltonian, so we need to
@@ -558,6 +593,23 @@ function run_fitting(
         progress=true
     )
     samples = [Ξ(_destandardize(SVector{5,Float64}(s...), seed.pr)) for s in samples]
-    return (samples, stats)
+
+    # scale/bkgrnd_corr are fit in closed form (wls_fit) and discarded on
+    # every single ℓπ/gradient evaluation above.
+    scale        = Vector{Float64}(undef, n_samples)
+    bkgrnd_corr  = Vector{Float64}(undef, n_samples)
+    χ²           = Vector{Float64}(undef, n_samples) 
+    curves       = Matrix{Float64}(undef, length(seed.fw.qvals), n_samples)
+    I_exp, σ_exp = seed.ex
+    for (i, ξ) in enumerate(samples)
+        ŷ              = forward(seed.fw, 1.0, 0.0, ξ[1], (ξ[2], ξ[3], ξ[4]), ξ[5])
+        fit            = wls_fit(ŷ, I_exp, σ_exp)
+        scale[i]       = fit.scale
+        bkgrnd_corr[i] = fit.bkgrnd_corr
+        χ²[i]          = reduced_chi2(fit)
+        curves[:, i]   = wls_predict(fit, ŷ)
+    end
+    
+    return FitResult(samples, stats, scale, bkgrnd_corr, χ², curves, l.type)
 
 end

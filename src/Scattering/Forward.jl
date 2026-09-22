@@ -8,11 +8,11 @@
 #     mol ─► (B_vac, B_ex, B_sh_convex, B_sh_concave, B_sh_cavity)   species_multipoles
 #         ─► G(q) ∈ ℝ^{5×5×Q}                                        gram_matrix
 #         ─► ForwardCache(G, qvals, r_m)                             forward_cache
-#         ─► I_calc(q) = m·(v(q)ᵀ G v(q)) + c                        forward
+#         ─► I_calc(q) = scale·(v(q)ᵀ G v(q)) + bkgrnd_corr           forward
 #
-# `G(q)` depends only on geometry and beam, never on `(m, c, dns, δρ, c_1)`. Build the
-# cache once per structure with `forward_cache`; every likelihood evaluation is then
-# the O(Q) `forward(cache, m, c, dns, δρ; c_1)`.
+# `G(q)` depends only on geometry and beam, never on `(scale, bkgrnd_corr, dns, δρ, c_1)`.
+# Build the cache once per structure with `forward_cache`; every likelihood
+# evaluation is then the O(Q) `forward(cache, scale, bkgrnd_corr, dns, δρ; c_1)`.
 
 using ..MolecularStructure: Molecule, elms, radii
 
@@ -178,22 +178,23 @@ forward_cache(
     )
 
 """
-    forward(G, m, c, dns, δρ) -> Vector
+    forward(G, scale, bkgrnd_corr, dns, δρ) -> Vector
 
-The detector-scale model intensity `I_calc(q) = m · (vᵀ G(q) v) + c`, with the
-contrast vector `v = contrast_vector(dns, δρ)`.
+The detector-scale model intensity `I_calc(q) = scale · (vᵀ G(q) v) +
+bkgrnd_corr`, with the contrast vector `v = contrast_vector(dns, δρ)`.
 
 # Arguments
 -   `G::AbstractArray{<:Real,3}`, `(n, n, Q)`: the species Gram matrix, from
     [`gram_matrix`](@ref) (or [`gram`](@ref)).
--   `m::Real`: overall scale between the absolute model intensity (units of
-    electrons²) and the detector's arbitrary-unit reading. A nuisance
+-   `scale::Real`: overall scale between the absolute model intensity (units
+    of electrons²) and the detector's arbitrary-unit reading. A nuisance
     parameter with no physical prior of its own — see
-    [`BayeSol.Fitting.wls_fit`](@ref)/[`BayeSol.Fitting.wls_marg_ll`](@ref) to fit it (jointly
-    with `c`) by weighted least squares and profile or marginalise it out of
-    the likelihood, rather than giving it a prior and sampling it directly.
--   `c::Real`: flat background left by imperfect buffer subtraction, same
-    arbitrary units as the detector reading.
+    [`BayeSol.Fitting.wls_fit`](@ref)/[`BayeSol.Fitting.wls_marg_ll`](@ref) to
+    fit it (jointly with `bkgrnd_corr`) by weighted least squares and profile
+    or marginalise it out of the likelihood, rather than giving it a prior
+    and sampling it directly.
+-   `bkgrnd_corr::Real`: flat background left by imperfect buffer
+    subtraction, same arbitrary units as the detector reading.
 -   `dns::Real`: the mean electron density (e·Å⁻³) of the bulk solvent dummy atom displaces..
 -   `δρ`: dimensionless hydration-shell contrast(s); the *actual* per-species
     contrast fed into `v` is `dro_k = DRO_UNIT · δρ_k`. Either
@@ -206,28 +207,29 @@ contrast vector `v = contrast_vector(dns, δρ)`.
 - `Vector` of length `Q`: `I_calc(q)`, `eltype` promoted from the arguments.
 """
 forward(
-    G::AbstractArray{<:Real,3}, m::Real, c::Real, dns::Real, δρ::Union{Real,NTuple{3,<:Real}}
-) = _fused_intensity_calc(G, contrast_vector(dns, δρ), m, c)
+    G::AbstractArray{<:Real,3}, scale::Real, bkgrnd_corr::Real, dns::Real, δρ::Union{Real,NTuple{3,<:Real}}
+) = _fused_intensity_calc(G, contrast_vector(dns, δρ), scale, bkgrnd_corr)
 
 """
-    forward(cache, m, c, dns, δρ, c_1 = nothing) -> Vector
+    forward(cache, scale, bkgrnd_corr, dns, δρ, c_1 = nothing) -> Vector
 
-    I_calc(q) = m · (v(q)ᵀ G(q) v(q)) + c
+    I_calc(q) = scale · (v(q)ᵀ G(q) v(q)) + bkgrnd_corr
     v(q)      = [1, -dns · G_ex(q; c₁), dro₁, dro₂, dro₃]
 
-Same model as the `forward(G, m, c, dns, δρ)` method above (see its
-`# Arguments` for what `m`, `c`, `dns`, `δρ` are and where their values come
-from), plus the optional excluded-volume correction `c_1`. O(Q) in the fit
-parameters, same cost as the 5-argument method when `c_1` is left at its
-default. All five fit-parameter arguments are positional, matching the
-`forward(G, m, c, dns, δρ)` method above, so a `ξ = (dns, δρ1, δρ2, δρ3, c1)`
-draw can be splatted straight in:
-`forward(cache, m, c, ξ[1], (ξ[2], ξ[3], ξ[4]), ξ[5])`.
+Same model as the `forward(G, scale, bkgrnd_corr, dns, δρ)` method above (see
+its `# Arguments` for what `scale`, `bkgrnd_corr`, `dns`, `δρ` are and where
+their values come from), plus the optional excluded-volume correction `c_1`.
+O(Q) in the fit parameters, same cost as the 5-argument method when `c_1` is
+left at its default. All five fit-parameter arguments are positional,
+matching the `forward(G, scale, bkgrnd_corr, dns, δρ)` method above, so a
+`ξ = (dns, δρ1, δρ2, δρ3, c1)` draw can be splatted straight in:
+`forward(cache, scale, bkgrnd_corr, ξ[1], (ξ[2], ξ[3], ξ[4]), ξ[5])`.
 
 # Arguments
 - `cache::ForwardCache`: from [`forward_cache`](@ref). Bundles `G` with the
     `q` grid and `r_m` that evaluating `c_1` needs
-- `m`, `c`, `dns`, `δρ`: as in the `forward(G, m, c, dns, δρ)` method above.
+- `scale`, `bkgrnd_corr`, `dns`, `δρ`: as in the `forward(G, scale,
+    bkgrnd_corr, dns, δρ)` method above.
 - `c_1::Union{Nothing,Real} = nothing`: CRYSOL's excluded-volume correction
     factor, dimensionless (`r₀/r_m` in CRYSOL's own radius parameterisation;
     see [`excluded_volume_factor`](@ref)). CRYSOL's own fitting range is
@@ -241,20 +243,20 @@ draw can be splatted straight in:
 """
 function forward(
     cache::ForwardCache,
-    m::Real,
-    c::Real,
+    scale::Real,
+    bkgrnd_corr::Real,
     dns::Real,
     δρ::Union{Real,NTuple{3,<:Real}},
     c_1::Union{Nothing,Real} = nothing
 )
     (c_1 === nothing || c_1 == 1) &&
-        return forward(cache.G, m, c, dns, δρ)
+        return forward(cache.G, scale, bkgrnd_corr, dns, δρ)
     g_ex = excluded_volume_factor(cache.qvals, cache.r_m, c_1)
-    return _fused_intensity_calc(cache.G, contrast_matrix(dns, δρ, g_ex), m, c)
+    return _fused_intensity_calc(cache.G, contrast_matrix(dns, δρ, g_ex), scale, bkgrnd_corr)
 end
 
 """
-    forward(mol, qvals, lMax, energy, m, c, dns, δρ, c_1 = nothing; kwargs...) -> Vector
+    forward(mol, qvals, lMax, energy, scale, bkgrnd_corr, dns, δρ, c_1 = nothing; kwargs...) -> Vector
 
 The whole forward model from a molecule in one call: build the cache, then
 evaluate. A convenience for one-offs; for repeated evaluation at fixed geometry
@@ -265,9 +267,9 @@ call [`forward_cache`](@ref) once and the [`ForwardCache`](@ref) method of
 # Arguments
 - `mol::Molecule`, `qvals`, `lMax`, `energy`: as in [`forward_cache`](@ref)/
     [`species_multipoles`](@ref) — the geometry/beam setup, not fit parameters.
-- `m`, `c`, `dns`, `δρ`, `c_1`: the fit parameters, positional exactly as on the
-    `forward(cache, m, c, dns, δρ, c_1)` method above (required except `c_1`,
-    which defaults to `nothing`).
+- `scale`, `bkgrnd_corr`, `dns`, `δρ`, `c_1`: the fit parameters, positional
+    exactly as on the `forward(cache, scale, bkgrnd_corr, dns, δρ, c_1)`
+    method above (required except `c_1`, which defaults to `nothing`).
 
 # Keywords
 Any keywords are forwarded verbatim to [`species_multipoles`](@ref) (same list
@@ -284,8 +286,8 @@ function forward(
     qvals::AbstractVector{<:Real},
     lMax::Integer,
     energy::Real,
-    m::Real,
-    c::Real,
+    scale::Real,
+    bkgrnd_corr::Real,
     dns::Real,
     δρ::Union{Real,NTuple{3,<:Real}},
     c_1::Union{Nothing,Real} = nothing;
@@ -302,5 +304,5 @@ function forward(
         ions = ions, chunk = chunk, form_factor_source = form_factor_source,
         thickness = thickness, probe = probe, n_target = n_target, classes = classes,
     )
-    return forward(cache, m, c, dns, δρ, c_1)
+    return forward(cache, scale, bkgrnd_corr, dns, δρ, c_1)
 end
