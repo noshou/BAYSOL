@@ -83,7 +83,7 @@ const Q_MAX_FIT    = 0.5
 # lMax follows the usual q·D_max multipole-resolution rule of thumb: D_max
 # for a roughly globular dimer with Rg = 19.11 Å is ~45-65 Å, and
 # Q_MAX_FIT * D_max ≈ 0.5 * 50 ≈ 25. (Tested lMax=50 to check whether the
-# q≈0.2-0.3 Å⁻¹ secondary maximum GNOM's fit shows.
+# q≈0.2-0.3 Å⁻¹ secondary maximum CRYSOL's fit shows.
 const LMAX = 25
 
 const ADD_HYDROGENS = true   # runs PDB2PQR at PH
@@ -284,29 +284,29 @@ function sasdmj9_posterior_hist(result)
 end
 
 """
-    sasdmj9_gnom_comparison_figure(result, data) -> Figure
+    sasdmj9_crysol_comparison_figure(result, data) -> Figure
 
-Overlays our MAP curve against the reference GNOM fit (`SASDMJ9_fit1.fit`,
+Overlays our MAP curve against the reference CRYSOL fit (`SASDMJ9_fit1.fit`,
 column 4 -- the paper's own P(r)-regularized fit to this same data) on the
 same log-log axes as `sasdmj9_figure`, restricted to `q ≤ Q_MAX_FIT`
-(GNOM's own q=0 extrapolation rows and any non-positive values are dropped,
+(the file's own q=0 extrapolation rows and any non-positive values are dropped,
 since both are invalid on a log axis).
 """
-function sasdmj9_gnom_comparison_figure(result, data)
+function sasdmj9_crysol_comparison_figure(result, data)
     _, _, map_result, _ = result
     q_fit, I_fit, σ_fit = data
 
-    gnom   = readdlm(_FIT_PATH; skipstart = 1)
-    q_gnom = Float64.(gnom[:, 1])
-    I_gnom = Float64.(gnom[:, 4])
-    keep   = (q_gnom .> 0) .& (q_gnom .<= Q_MAX_FIT) .& (I_gnom .> 0)
+    crysol   = readdlm(_FIT_PATH; skipstart = 1)
+    q_crysol = Float64.(crysol[:, 1])
+    I_crysol = Float64.(crysol[:, 4])
+    keep   = (q_crysol .> 0) .& (q_crysol .<= Q_MAX_FIT) .& (I_crysol .> 0)
 
     fig = Figure(size = (700, 500))
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "BayeSol MAP vs. GNOM fit1 (paper)",
+        title  = "BayeSol MAP vs. CRYSOL fit1 (paper)",
         xscale = log10,
         yscale = log10,
     )
@@ -322,8 +322,8 @@ function sasdmj9_gnom_comparison_figure(result, data)
     scatter!(ax, q_fit, I_fit; markersize = 4, color = :gray20, label = "data")
 
     lines!(
-        ax, q_gnom[keep], I_gnom[keep];
-        color = :seagreen, linewidth = 2, linestyle = :dash, label = "GNOM fit1 (paper)",
+        ax, q_crysol[keep], I_crysol[keep];
+        color = :seagreen, linewidth = 2, linestyle = :dash, label = "CRYSOL fit1 (paper)",
     )
 
     if map_result !== nothing
@@ -348,8 +348,8 @@ save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals)
 fig_hist = sasdmj9_posterior_hist(result)
 save(joinpath(@__DIR__, "res_hist.png"), fig_hist)
 
-fig_gnom = sasdmj9_gnom_comparison_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_gnom_comparison.png"), fig_gnom)
+fig_crysol = sasdmj9_crysol_comparison_figure(result, (q_fit, I_fit, σ_fit))
+save(joinpath(@__DIR__, "res_crysol_comparison.png"), fig_crysol)
 
 "Display the SASDMJ9 fit figure. Blocks until the window is closed."
 vis_sasdmj9() = wait(display(fig))

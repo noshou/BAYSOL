@@ -272,7 +272,7 @@ end
     @testset "ϕ°(pH, seq): very long non-ionizable chains (closed form, N=5000)" begin
         # All-glycine: every term is 0 except the shared backbone, so the
         # totals are exact linear closed forms.
-        N = 5000
+        n = 8500
         z, v, u = IFACE.ϕ°(7.0, "G"^N)
         @test z == 30 * N + 10
         @test close_(v, 37.4 * N; atol = 1e-4)
