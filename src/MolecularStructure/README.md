@@ -28,6 +28,7 @@ ionization = Ionization(residues, pKa_records, pH, σ_pH)
 
 - `StructureSource.jl`: resolves local files, PDB IDs, and URLs.
 - `Mols.jl`: defines the internal molecule and residue representations.
+- `ExcludedVolumes.jl`: CRYSOL-style per-atom displaced-solvent volumes for the excluded-volume dummy species.
 - `Propka.jl`: predicts and parses pKa values for individual residue instances.
 - `PDB2PQR.jl`: adds hydrogens at a target pH.
 - `Ionization.jl`: computes fractional charges, protonation states, and charge uncertainty.
@@ -35,7 +36,7 @@ ionization = Ionization(residues, pKa_records, pH, σ_pH)
 
 ## `StructureSource.jl`
 
-`resolve_structure(source::StructureSource) -> String` resolves any of three input shapes to an absolute path to a canonical `.pdb` in `_store_dir()` (model 1 only, `standardselector`/`heavyatomselector`-filtered: no HETATM/ waters, no hydrogens). 
+`resolve_structure(source::StructureSource) -> String` resolves any of three input shapes to an absolute path to a canonical `.pdb` in `_store_dir()` (model 1 only, `standardselector`/`heavyatomselector`-filtered: no HETATM/ waters, no hydrogens).
 
 - **`LocalPathSource(path)`**: a structure already on local disk; if a file already exists under that name, the freshly-converted result is byte-compared against it. Identical content reuses the existing file, different content under the same name raises `StructureSourceError`.
 - **`PDBIDSource(id)`**: a structure identified by its 4-character RCSB PDB ID (e.g. `"1CRN"`), fetched via `BioStructures.retrievepdb` and stored under the uppercased ID. A repeat request for the same ID trusts an existing file's presence and skips fetching.
@@ -62,12 +63,14 @@ using BayeSol.MolecularStructure: create, coords_cartesian, coords_spherical,
 mol = create("my-mol", elements, coords) # coords: any iterable of 3-tuples/vectors
 coords_cartesian(mol) # (3, n) centered (x, y, z)
 coords_spherical(mol) # (3, n) (r, theta, phi)
-radii(mol) # per-atom radius, lazy/memoized, via AtomicRadii by default
-vols(mol) # per-atom sphere volume, (4/3)πr³ of radii(mol)
+radii(mol) # per-atom van der Waals radius, lazy/memoized, via AtomicRadii by default
+vols(mol) # per-atom CRYSOL-style excluded volume; see ExcludedVolumes.jl below
 r_max(mol) # largest per-atom radius; SASA's neighbour-filter bound
 ```
 
-`create(name, elms, coords; radii_source::RadiiSource = AtomicRadiiSource())` centers `coords` at the centroid and computes both coordinate frames eagerly; `radii`/`vols`/`r_max` are resolved (and cached) only on first  access, through `AtomicRadii.RadiiSource`. 
+`vols` is **not** `(4/3)π·radii(mol)³` for a table-covered element (see `ExcludedVolumes.jl` below) -- `radii` stays the isolated van der Waals radius throughout (SASA and hydration-shell generation need real atomic sizes), while `vols` is the smaller, bonded-atom-appropriate volume the excluded-volume scattering term needs.
+
+`create(name, elms, coords; radii_source::RadiiSource = AtomicRadiiSource())` centers `coords` at the centroid and computes both coordinate frames eagerly; `radii`/`vols`/`r_max` are resolved (and cached) only on first  access, through `AtomicRadii.RadiiSource`.
 
 ### `Residues`
 
@@ -90,7 +93,54 @@ mol, residues = load_molecule(pdb_path) # Tuple{Molecule, Residues}
 
 Parses whatever `.pdb` is at `pdb_path` into a `Molecule`/`Residues` pair.
 
-## `Propka.jl` 
+## `ExcludedVolumes.jl`
+
+`vols(mol)` needs a per-atom volume for the excluded-volume dummy species (`Scattering.excluded`/`_gaussian_dummy`), representing the solvent a bonded atom actually displaces -- not the volume of an isolated van der Waals sphere, which overcounts by roughly 50% once bonded-atom overlap is accounted for (the bug this module fixes: on the SASDMJ9 fixture, an all-vdW-sphere sum came to ~36,400 Å³ against CRYSOL's own reported 23,962 Å³ for the same structure).
+
+```julia
+using BayeSol.MolecularStructure: excluded_volume, EXCLUDED_VOLUME_TABLE
+
+excluded_volume("c", vdw_radius)   # -> 16.44 (Å³, table value; vdw_radius ignored)
+excluded_volume("rn", vdw_radius)  # -> (4/3)π·vdw_radius³ (no table entry: vdW-sphere fallback)
+```
+
+### The table
+
+Bare-atom (no merged hydrogen) CRYSOL/Fraser-MacRae-Suzuki displaced-solvent volumes, Å³:
+
+
+| Element | Volume (Å³) | Status                                                                                                                            |
+| --------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| H       | 5.15          | **Verified**: Fraser, MacRae & Suzuki (1978) empirical value, via CRYSOL (1995) Table 1 row `H*`                                  |
+| C       | 16.44         | **Verified**: Fraser, MacRae & Suzuki (1978), via CRYSOL (1995) Table 1 row `C*`                                                  |
+| N       | 2.49          | **Verified**: Fraser, MacRae & Suzuki (1978), via CRYSOL (1995) Table 1 row `N*`                                                  |
+| O       | 9.13          | **Verified**: Fraser, MacRae & Suzuki (1978), via CRYSOL (1995) Table 1 row `O*`                                                  |
+| S       | 19.86         | CRYSOL (1995) Table 1 row`S`; sphere volume of an International Tables (1968) radius, not an independent Fraser-style measurement |
+| P       | 5.73          | CRYSOL (1995) Table 1 row`P`; same caveat as S                                                                                    |
+| Mg      | 17.16         | CRYSOL (1995) Table 1 row`Mg`; same caveat as S                                                                                   |
+| Ca      | 31.89         | CRYSOL (1995) Table 1 row`Ca`; same caveat as S                                                                                   |
+| Mn      | 9.20          | CRYSOL (1995) Table 1 row`Mn`; same caveat as S                                                                                   |
+| Fe      | 7.99          | CRYSOL (1995) Table 1 row`Fe`; same caveat as S                                                                                   |
+| Cu      | 8.78          | CRYSOL (1995) Table 1 row`Cu`; same caveat as S                                                                                   |
+| Zn      | 9.85          | CRYSOL (1995) Table 1 row`Zn`; same caveat as S                                                                                   |
+
+### Sources
+
+
+| Citation                                                                                                                                                                                                  | DOI / identifier                   | Scope                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Fraser, R.D.B.; MacRae, T.P.; Suzuki, E. (1978). "An improved method for calculating the contribution of solvent to the X-ray diffraction pattern of biological molecules."*J. Appl. Cryst.* 11, 693-694. | `10.1107/S0021889878014296`        | Original empirical H/C/N/O displaced volumes                                                                                           |
+| Svergun, D.; Barberato, C.; Koch, M.H.J. (1995). "CRYSOL -- a Program to Evaluate X-ray Solution Scattering of Biological Macromolecules from Atomic Coordinates."*J. Appl. Cryst.* 28, 768-773.          | `10.1107/S0021889895007047`        | Table 1, transcribed directly above (`nm³ → Å³`); this codebase's excluded-volume/`c₁` machinery targets parity with this program |
+| International Tables for X-ray Crystallography (1968), Vol. III, Birmingham: Kynoch Press.                                                                                                                | (no DOI; pre-DOI reference volume) | Source of the S/P/metal radii CRYSOL's Table 1 uses; not independently consulted here                                                  |
+| Chatzimagas, L.; Hub, J.S. (2022). "Predicting solution scattering patterns with explicit-solvent molecular simulations." arXiv.                                                                          | `10.48550/arXiv.2204.04961`        | Cross-check only: its own Table 1 independently reproduces the same Fraser et al. (1978) H/C/N/O values used here                      |
+
+### Coverage and fallback
+
+- **Ion fallthrough**: a charge-suffixed ion string of one of the six metals above (`"fe3+"`, `"zn2+"`, `"ca2+"`, `"mg2+"`, `"mn2+"`, `"cu2+"`) is looked up by its bare element -- CRYSOL's table has no charge-resolved rows either. This does **not** extend to H/C/N/O/S/P: the only such ions this codebase ever constructs (`h1+`, `c4+`, `n5+`, Shannon-table extrapolation artifacts already clamped to `radius = 0.0`, see `AtomicRadii`'s README) are a genuinely different, near-zero-size species from an ordinary bonded atom, so they must keep falling through to the vdW-sphere fallback below rather than pick up a normal bonded atom's table volume.
+- **Fallback**: every other element/ion (halogens, alkali metals, noble gases, and anything else not listed) falls back to the isolated van der Waals sphere volume of `radii(mol)[i]`
+- **Explicit-hydrogen assumption**: the table rows above are for bare atoms with hydrogens carried as their own separate atoms (this codebase's normal state once `resolve_hydrogens(...; add = true)` has run), matching CRYSOL's `H*`/`C*`/`N*`/`O*` rows rather than its `CH`/`CH2`/`CH3`/`NH`/`NH2`/`NH3`/`OH`/`SH` merged-hydrogen rows. There is no reliable way to tell, from a bare `Molecule` alone, whether the absence of `"h"` in `elms(mol)` means "genuinely no hydrogens" or "hydrogens present but unresolved". A heavy-atom-only structure, each heavy atom's true displaced volume is somewhat larger than its table row (it implicitly includes its own bonded hydrogens), so the molecule's total excluded volume is then a modest, known **underestimate**.
+
+## `Propka.jl`
 
 A free amino acid's textbook pKa is valid only in isolation. Inside a folded protein, a titratable side chain's *actual* pKa is shifted by its local electrostatic and desolvation environment: burial away from solvent, hydrogen bonding, and proximity to other charged groups all perturb it. PROPKA computes these per-residue-instance, structure-derived pKa shifts from the folded 3D geometry, which is why `Ionization.jl` takes one pKa *per residue instance* (keyed by `(resname, resnum, chain)`) rather than one fixed value per residue *type*.
 
@@ -102,7 +152,7 @@ records = propka_pKas(pdb_path)
 # (resname::String, resnum::Int, chain::String, pKa::Float64)
 ```
 
-## `PDB2PQR.jl` 
+## `PDB2PQR.jl`
 
  A structure resolved from RCSB or a bare crystallographic `.cif`/`.pdb`  typically carries heavy atoms only. The forward-model geometry step needs an explicit, pH-consistent set of atoms (hydrogens included) to compute scattering correctly, and *which* hydrogens a titratable group carries depends on its protonation state at the solution pH being fit against (e.g. a free amine's three vs. two hydrogens, a carboxylate's presence/absence of an "HO"). `PDB2PQR.jl` runs the external `pdb2pqr` tool to add hydrogens consistent with a target pH and force field, so the geometry passed downstream matches the physical/chemical state the fit assumes.
 
@@ -171,7 +221,7 @@ using BayeSol.MolecularStructure: Ionization
 ionization = Ionization(residues, pKa_records, pH, σ_pH)
 ```
 
-Builds an `Ionization` aligned with `residues`'s atom index:  each pKa record is matched via `_matching_atoms` (handling the `"N+"`/`"C-"` special case), and every matched atom gets its `charge`, `σ_charge`, and `protonated` state computed from the math above. An atom with no matching record is left at `charge = σ_charge = 0.0`, `protonated = false`; a pKa record that matches no atom in `residues` is silently skipped. 
+Builds an `Ionization` aligned with `residues`'s atom index:  each pKa record is matched via `_matching_atoms` (handling the `"N+"`/`"C-"` special case), and every matched atom gets its `charge`, `σ_charge`, and `protonated` state computed from the math above. An atom with no matching record is left at `charge = σ_charge = 0.0`, `protonated = false`; a pKa record that matches no atom in `residues` is silently skipped.
 
 ## `charge_topology.json`
 
@@ -201,6 +251,6 @@ Builds an `Ionization` aligned with `residues`'s atom index:  each pKa record is
 "A summary of the measured pK values of the ionizable groups in folded
 proteins," *Protein Science* 18(1):247-251 (2009), DOI `10.1002/pro.19`.
 
-## `MolecularStructure.jl` 
+## `MolecularStructure.jl`
 
-Includes the five files above in dependency order (`Mols.jl`, `Ionization.jl`, `Propka.jl`, `StructureSource.jl`, `PDB2PQR.jl`) and provides `_store_dir()`, the shared `_cache/` path used throughout the module.
+Includes the six files above in dependency order (`Mols.jl`, `ExcludedVolumes.jl`, `Ionization.jl`, `Propka.jl`, `StructureSource.jl`, `PDB2PQR.jl`) and provides `_store_dir()`, the shared `_cache/` path used throughout the module.

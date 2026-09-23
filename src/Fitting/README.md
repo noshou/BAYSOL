@@ -154,7 +154,7 @@ The parameter `n` controls how much of CRYSOL's stated bound is treated as typic
 - Lower `n` allows more spread before the bound is considered met.
 - `n = 100` is the degenerate limit, a point mass at `c1 = 1`.
 
-There is no single correct `n` implied by CRYSOL's paper alone because `[0.96, 1.04]` is a stated fitting range, not a reported confidence interval. `n = 95` is a reasonable default in the absence of a stronger reason to choose another value.
+There is no single correct `n` implied by CRYSOL's paper alone because `[0.96, 1.04]` is a stated fitting range, not a reported confidence interval. `n = 85` is a reasonable default in the absence of a stronger reason to choose another value.
 
 ### Prior composition
 

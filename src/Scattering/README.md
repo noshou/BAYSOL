@@ -45,6 +45,8 @@ I(q) = Σ_a Σ_b c_a c_b S_ab(q),   S_ab(q) = 4π Σ_lm w_lm Re(B^a_lm(q) conj(B
 positive semidefinite) and reused across every parameter draw: `I(q) = vᵀ G(q) v` with contrast vector `v = [1, -dns, dro_1, dro_2, dro_3]`. Classic single-shell CRYSOL is the `n = 3` reduction with the three shell classes merged. `Forward.jl`'s module docstring in `Scattering.jl` derives this in full, including CRYSOL's excluded-volume correction factor `c_1` (an
 expansion of every dummy's radius by `r_0/r_m`) and the detector-scale model `I_calc(q) = m·I(q) + c`.
 
+`Forward.jl`'s `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defines it: the mean of each atom's own excluded-volume-dummy equivalent-sphere radius, `r_m = N⁻¹ Σᵢ cbrt(3 Vᵢ / 4π)`, where `Vᵢ` is `MolecularStructure.vols(mol)[i]` (the CRYSOL-style displaced-solvent volume, see `MolecularStructure`'s README) -- **not** the mean van der Waals radius (`radii(mol)`). The two differ whenever `vols` uses its excluded-volume table rather than the vdW-sphere fallback, which is the common case for protein atoms (H/C/N/O/S).
+
 ## Module layout
 
 - **`SphFuncs.jl`** : `sphHarm` (complex `Y_l^m`), `sphBess` (`j_l`), `legendre_sphPlm` (normalized associated Legendre `P̄_l^m`).

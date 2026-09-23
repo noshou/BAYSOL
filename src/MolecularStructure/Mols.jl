@@ -21,6 +21,10 @@ Both coordinate frames are `(3, n)` matrices sharing a column index (the atom),
 so a single atom's data is one contiguous column in either frame; the spherical
 rows are `r`, `theta`, `phi` in that order. `_n` is the atom count, captured once
 at construction from the coordinate pass rather than recomputed on demand.
+
+`radii` is always the isolated van der Waals radius (`AtomicRadii`); `vols` is
+the smaller CRYSOL-style excluded (displaced-solvent) volume from
+`ExcludedVolumes.excluded_volume`, exact only when hydrogens are explicit.
 """
 struct Molecule
     _name   :: String
@@ -161,7 +165,11 @@ function create(name::AbstractString, elms::AbstractVector{<:AbstractString}, co
     cart = _center(cs)
     sph  = to_spherical(cart)
     rad  = Lazy{Vector{Float64}}(() -> _compute_radii(radii_source, es))
-    vol  = Lazy{Vector{Float64}}(() -> sphere_volume.(force(rad)))
+    # CRYSOL-style displaced-solvent volume per atom (see ExcludedVolumes.jl),
+    # falling back to the isolated van der Waals sphere for elements with no
+    # verified displaced-volume data. Not `sphere_volume.(force(rad))`: a
+    # bonded atom does not displace a full isolated vdW sphere of solvent.
+    vol  = Lazy{Vector{Float64}}(() -> excluded_volume.(es, force(rad)))
     rmax = Lazy{Float64}(() -> maximum(force(rad)))
     return Molecule(String(name), es, n, cart, sph, rad, vol, rmax)
 end
