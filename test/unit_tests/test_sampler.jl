@@ -107,7 +107,7 @@ end
 
     @testset "_calc_ξ_priors: exactly composes ρₑ_prior/δρ_prior/c1_prior" begin
         pr = smpl_priors()
-        @test pr isa FIT._ξ_priors
+        @test pr isa FIT.ξ_priors
 
         ref_dns = BayeSol.Fitting.ρₑ_prior(smpl_pH, smpl_σ_pH, smpl_solutes())
         ref_δρ1, ref_δρ2, ref_δρ3 = BayeSol.Fitting.δρ_prior(; μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ)

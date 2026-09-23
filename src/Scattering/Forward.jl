@@ -14,7 +14,7 @@
 # Build the cache once per structure with `forward_cache`; every likelihood
 # evaluation is then the O(Q) `forward(cache, scale, bkgrnd_corr, dns, δρ; c_1)`.
 
-using ..MolecularStructure: Molecule, elms, radii
+using ..MolecularStructure: Molecule, elms, vols
 
 """
     species_multipoles(mol, qvals, lMax, energy; kwargs...)
@@ -117,11 +117,17 @@ The structure's mean atomic radius `r_m` in Å, which is the reference scale CRY
 excluded-volume correction factor `c₁` is measured against, and the point at which
 [`excluded_volume_factor`](@ref)'s single-envelope approximation is exact.
 Geometry only, so it caches alongside `G`.
+
+CRYSOL defines `r_m` as the mean of each dummy atom's *own* equivalent-sphere
+radius `r_gj = cbrt(3 V_j / 4π)` (Svergun, Barberato & Koch, 1995, text
+following their eq. 13: `r_m = N⁻¹ Σⱼ r_gj`, `r_gj` read off their Table 1),
+i.e. the radius implied by the CRYSOL-style excluded volume `V_j` each atom
+actually gets in [`excluded`](@ref) (`MolecularStructure.vols`).
 """
 function mean_atomic_radius(mol::Molecule)::Float64
-    r = radii(mol)
-    isempty(r) && throw(ArgumentError("mean_atomic_radius: molecule has no atoms"))
-    return sum(r) / length(r)
+    v = vols(mol)
+    isempty(v) && throw(ArgumentError("mean_atomic_radius: molecule has no atoms"))
+    return sum(cbrt(3.0 * vi / (4.0 * π)) for vi in v) / length(v)
 end
 
 """
@@ -138,10 +144,7 @@ likelihood evaluation is then the O(Q) [`forward`](@ref)`(cache, …)`.
 - `qvals::Vector{Float64}`, length `Q`: the grid `G` was built on.
 - `r_m::Float64`: mean atomic radius in Å.
 - `form_factor_log::Vector{String}`: construction-time diagnostics from the
-    vacuum term's [`FormFactor.form_factor_table`](@ref) build -- one line per
-    ion the backend could not resolve in full (see
-    [`FormFactor.form_factor_log`](@ref)). Empty when every ion resolved
-    cleanly.
+    vacuum term's [`FormFactor.form_factor_table`](@ref) build.
 """
 struct ForwardCache
     G::Array{Float64,3}
@@ -168,10 +171,7 @@ common case:
 `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: hydration-shell
 geometry, forwarded to `hydration`.
 
-The vacuum term's `form_factor_table` build diagnostics are always collected
-here and stored on the returned [`ForwardCache`](@ref)'s `form_factor_log`
-field -- there is no keyword to opt out, since the cost is one `append!` per
-unresolved ion.
+The vacuum term's `form_factor_table` build diagnostics are always collected.
 """
 forward_cache(
     mol::Molecule,

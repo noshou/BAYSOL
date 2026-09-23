@@ -2,11 +2,19 @@
 
 # Exercises src/MolecularStructure/Mols.jl: construction/centering, the two
 # coordinate frames, the lazy radii/vols/r_max accessors, and the error contract.
+# Also exercises the new CRYSOL-style excluded-volume table
+# (src/MolecularStructure/ExcludedVolumes.jl) it now feeds `vols` through,
+# including one real-fixture check against CRYSOL's own reported total
+# excluded volume, which needs real subprocess access for PROPKA/PDB2PQR
+# (same assumption as test_pipeline.jl/test_pdb2pqr.jl) but no network access.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BayeSol.MolecularStructure:   Molecule, create, coords_cartesian, coords_spherical,
                     radii, vols, r_max, elms, name, sphere_volume,
-                    MoleculeError, _to_tuples
+                    MoleculeError, _to_tuples, excluded_volume, EXCLUDED_VOLUME_TABLE,
+                    LocalPathSource, resolve_structure, propka_pKas, resolve_hydrogens,
+                    load_molecule, _store_dir
+using BayeSol.Scattering: mean_atomic_radius
 using BayeSol.Solvation: SASA
 
 # row 1 = r, row 2 = theta, row 3 = phi
@@ -118,15 +126,43 @@ BayeSol.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractStrin
     end
 
     @testset "vols for known elements" begin
+        # `fe` and `o` are both in the CRYSOL excluded-volume table (Fe as a
+        # metal cofactor row, O as a Fraser/MacRae/Suzuki row), so their vols
+        # are the fixed table value, NOT (4/3)πr³ of their vdW radius; `rn`
+        # (radon) has no table entry, so it still falls back to the vdW sphere.
         m = create(
             "test", ["fe", "o", "rn"],
             [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]
         )
         @test length(vols(m)) == 3
         ev(x) = (4.0 / 3.0) * π * x^3
-        @test check_float(vols(m)[1], ev(2.44))
-        @test check_float(vols(m)[3], ev(2.4))
-        @test vols(m) == sphere_volume.(radii(m))     # vols is exactly (4/3)πr³ of radii
+        @test check_float(vols(m)[1], EXCLUDED_VOLUME_TABLE["fe"])
+        @test check_float(vols(m)[2], EXCLUDED_VOLUME_TABLE["o"])
+        @test check_float(vols(m)[3], ev(2.4))                    # rn: vdW-sphere fallback
+        @test vols(m)[3] == sphere_volume(radii(m)[3])
+        @test vols(m) != sphere_volume.(radii(m))   # true for fe/o now that they're table-covered
+    end
+
+    @testset "excluded_volume: table lookup, ion fallthrough, and unlisted-element vdW fallback" begin
+        # every table-covered element returns the documented table value exactly
+        for (el, v) in EXCLUDED_VOLUME_TABLE
+            @test excluded_volume(el, 999.0) == v    # vdw_radius is ignored when the table hits
+        end
+        # a charged ion of a covered element is looked up by its bare element
+        @test excluded_volume("fe3+", 999.0) == EXCLUDED_VOLUME_TABLE["fe"]
+        @test excluded_volume("zn2+", 999.0) == EXCLUDED_VOLUME_TABLE["zn"]
+        @test excluded_volume("ca2+", 999.0) == EXCLUDED_VOLUME_TABLE["ca"]
+        # an unlisted element/ion falls back to the vdW sphere of vdw_radius, exactly
+        @test excluded_volume("rn", 2.4) == sphere_volume(2.4)
+        @test excluded_volume("cl1-", 1.75) == sphere_volume(1.75)
+        # ion-fallthrough is restricted to the six covered metals: a charged
+        # h/c/n/o/s/p ion does NOT pick up its bare-element table volume, since
+        # the only such ions this codebase constructs (h1+/c4+/n5+) are Shannon
+        # extrapolation artifacts clamped to radius 0.0, a genuinely different
+        # (near-zero-size) species from an ordinary bonded H/C/N atom.
+        @test excluded_volume("h1+", 0.0) == sphere_volume(0.0) == 0.0
+        @test excluded_volume("c4+", 0.0) == sphere_volume(0.0) == 0.0
+        @test excluded_volume("n5+", 0.0) == sphere_volume(0.0) == 0.0
     end
 
     @testset "sphere_volume closed form" begin
@@ -207,13 +243,17 @@ BayeSol.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractStrin
     end
 
     @testset "a custom radii_source is honoured" begin
+        # elements with no excluded-volume table entry, so `vols` genuinely
+        # flows through the vdW-sphere fallback (and thus `radii_source`); "o"/"h"
+        # would not work here since they're now covered by the fixed
+        # excluded-volume table regardless of `radii_source`.
         pts = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]
-        m = create("test", ["o", "h", "h"], pts; radii_source = ConstantRadii(2.5))
+        m = create("test", ["rn", "xe", "kr"], pts; radii_source = ConstantRadii(2.5))
         @test radii(m) == [2.5, 2.5, 2.5]
         @test check_float(r_max(m), 2.5)
         @test all(v -> check_float(v, sphere_volume(2.5)), vols(m))
         # the same elements through the default source give something else entirely
-        @test radii(create("test", ["o", "h", "h"], pts)) != radii(m)
+        @test radii(create("test", ["rn", "xe", "kr"], pts)) != radii(m)
         # a source that resolves nothing raises through the same MoleculeError path
         @test_throws MoleculeError radii(create("t", ["o"], [(0.0, 0.0, 0.0)];
                                                 radii_source = NeverResolves()))
@@ -294,5 +334,55 @@ BayeSol.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractStrin
         a = SASA.sasa(m; n_occ = 64, n_exp = 256, probe = 1.4)[1]
         @test length(a) == 1
         @test check_float(a[1], 4π * 1.4^2)
+    end
+
+    #-------------------------------------------------------------------------
+    #  CRYSOL-parity check: total excluded volume on the SASDMJ9 fixture
+    #-------------------------------------------------------------------------
+    #
+    # Needs real subprocess access for PROPKA/PDB2PQR (same assumption as
+    # test_pipeline.jl/test_pdb2pqr.jl); no network access, since the PDB is a
+    # local fixture. Composes the pipeline primitives exactly as
+    # `BayeSol.run_model` does (`src/BayeSol.jl`): resolve_structure ->
+    # propka_pKas -> resolve_hydrogens -> load_molecule.
+
+    @testset "total excluded volume on SASDMJ9 is close to CRYSOL's own reported Vol" begin
+        fixture_dir = joinpath(@__DIR__, "..", "fixtures", "experiments", "SASDMJ9")
+        pdb_path    = joinpath(fixture_dir, "SASDMJ9_fit1_model1.pdb")
+        fit_path    = joinpath(fixture_dir, "SASDMJ9_fit1.fit")
+        @test isfile(pdb_path) && isfile(fit_path)
+
+        # CRYSOL's own reported total excluded volume, read off the .fit
+        # header rather than hardcoded (e.g. "... Vol: 23962.  Chi^2: ...").
+        header = readline(fit_path)
+        m = match(r"Vol:\s*([0-9.]+)", header)
+        @test m !== nothing
+        crysol_vol = parse(Float64, m.captures[1])
+
+        # Clear any stale cache entries so PROPKA/PDB2PQR genuinely run fresh.
+        stem = "SASDMJ9_fit1_model1"
+        rm(joinpath(_store_dir(), "$(stem).pka"); force = true)
+        rm(joinpath(_store_dir(), "$(stem)_pH7.5.pdb"); force = true)
+
+        pH = 7.5   # matches test/fitting_tests/SASDMJ9/SASDMJ9.jl's PH
+        path        = resolve_structure(LocalPathSource(pdb_path))
+        pKa_records = propka_pKas(path)
+        hpath       = resolve_hydrogens(path, pKa_records, pH)
+        mol, _      = load_molecule(hpath)
+
+        @test any(e -> e == "h", elms(mol))   # explicit hydrogens really were added
+
+        total_vol = sum(vols(mol))
+        # approximate physical check, not exact equality: CRYSOL's own value
+        # is itself a fitted r0 (see the .fit header's `Ra:`), not a fixed
+        # constant, and this codebase's table/fallback mix is only ever
+        # approximately CRYSOL-parity.
+        @test isapprox(total_vol, crysol_vol; rtol = 0.10)
+
+        # mean_atomic_radius must have gone down relative to the old,
+        # vdW-sphere-based definition, since the new dummy volumes are
+        # smaller than an isolated vdW sphere for every table-covered atom.
+        old_style_r_m = sum(radii(mol)) / length(radii(mol))
+        @test mean_atomic_radius(mol) < old_style_r_m
     end
 end

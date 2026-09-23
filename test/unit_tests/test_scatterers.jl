@@ -41,8 +41,22 @@ Provenance: dumped at full `Float64` precision from
 """
 const SCAT_RADII = Dict("c" => 1.77, "o" => 1.5, "h" => 1.2, "fe3+" => 0.49, "o2-" => 1.35)
 
-"Sphere volume from a hardcoded radius, written out rather than taken from `MolecularStructure`."
-scat_vol(e) = (4.0 / 3.0) * π * SCAT_RADII[e]^3
+"""
+CRYSOL/Fraser-MacRae-Suzuki displaced-solvent volumes (Å³) for the bare
+elements used in this file's fixtures, transcribed independently from CRYSOL
+(Svergun, Barberato & Koch, 1995) Table 1 -- see
+`MolecularStructure.EXCLUDED_VOLUME_TABLE` for the full table and citations.
+`vols(mol)` now returns these for `c`/`o`/`h` rather than a vdW-sphere volume.
+"""
+const SCAT_EXCLUDED_VOL = Dict("c" => 16.44, "o" => 9.13, "h" => 5.15)
+
+"""
+Per-dummy volume, exactly as `MolecularStructure.vols` computes it: the
+CRYSOL/Fraser table value for a covered bare element, else the sphere volume
+of `SCAT_RADII[e]` (the ion fixtures `fe3+`/`o2-` have no table entry).
+"""
+scat_vol(e) = haskey(SCAT_EXCLUDED_VOL, e) ?
+    SCAT_EXCLUDED_VOL[e] : (4.0 / 3.0) * π * SCAT_RADII[e]^3
 
 """
 Dummy amplitude `f = v exp(-q² v^(2/3) / 4π)`, transcribed from the
