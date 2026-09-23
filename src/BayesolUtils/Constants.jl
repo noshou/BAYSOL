@@ -132,6 +132,6 @@ const DEFAULT_TEMPERATURE_C = 25.0
 Default percentage ((0, 100]) of `c1_prior`'s prior mass required to fall
 within CRYSOL's bound `[0.96, 1.04]` around its default `c_1 = 1`.
 """
-const C1_PRIOR_MASS_PERCENT = 95
+const C1_PRIOR_MASS_PERCENT = 85
 
 end # module

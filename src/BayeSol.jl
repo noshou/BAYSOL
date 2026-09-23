@@ -4,6 +4,7 @@ module BayeSol
 
 using Statistics: quantile, mean, var
 using Printf: @printf
+using StaticArrays: SVector
 
 include("BayesolUtils/BayesolUtils.jl")
 include("AtomicRadii/AtomicRadii.jl")
@@ -187,6 +188,9 @@ by name:
 - `"scale"`, `"bkgrnd_corr"`: the WLS-fit detector scale/background at that
     draw.
 - `"chisq_red"`: the WLS fit's reduced χ² at that draw.
+- `"z_slvnt_e_dns"`, `"z_delta_rho_1"`, `"z_delta_rho_2"`, `"z_delta_rho_3"`,
+    `"z_excl_vol_corr"`: how many prior standard deviations (θ-space) the
+    corresponding physical parameter's MAP value sits from its prior mean.
 """
 const MAPParams = Dict{String, Float64}
 
@@ -200,7 +204,7 @@ const MAPResult = Tuple{MAPParams, Matrix{Float64}}
 """
     QuantileBounds = Dict{String, Tuple{Float64, Float64}}
 
-One parameter's `"quantiles"`/`"bounds"` pair (both `(lo, hi)` tuples):
+One parameter's `"quantiles"`/`"bounds"`/`"z"` triple (all `(lo, hi)` tuples):
 `"quantiles"` is the raw empirical `(q_1, q_2)` quantile pair; `"bounds"` is the
 `extrema` of exactly the draws that fall within `[lo, hi]`, so it can differ
 slightly from `"quantiles"` itself (it's the tightest interval that actually
@@ -285,7 +289,7 @@ forward model) from the trajectory's sample covariance.
 # Arguments
 - `seed::Seed`: priors, initial point, forward cache, and data.
 - `n_samples::Int64`: total number of NUTS iterations (including the
-    `n_adapt` warm-up steps, which are kept -- no filtering is done here).
+    `n_adapt` warm-up steps,.
 - `n_adapt::Int64`: number of warm-up iterations spent adapting the step
     size and mass matrix before sampling proper.
 
@@ -294,8 +298,7 @@ forward model) from the trajectory's sample covariance.
     range (integer percentages, `0 <= lo < hi <= 100`) used to build
     [`QuantileResult`](@ref)'s `"quantiles"`/`"bounds"` entries, e.g. the
     default `"16-84"` is a ±1σ-equivalent interval for a Normal. The special
-    case `"0-0"` means *no* filtering -- internally treated as the full
-    `0`-`100` range, so `"bounds"` spans the entire (non-divergent) sample.
+    case `"0-0"` means *no* filtering.
 - `l::LIKELIHOOD=PROFILE()`: `PROFILE()` or `MARGINAL()`, forwarded to
     [`Fitting._logπ`](@ref)/[`Fitting._ll`](@ref).
 - `δ::Real=80`: target acceptance rate as a percentage, `(0, 100)` exclusive
@@ -308,10 +311,8 @@ A 4-tuple `(fit, divergence_rate, map, curve)`:
 - `fit::Fitting.FitResult`: the warm-up free posterior.
 - `divergence_rate::Float64`: fraction of `fit`'s draws AdvancedHMC.jl
     flagged as numerically divergent, `[0, 1]`.
-- `map`/`curve`: **either** both `nothing` (every draw diverged -- `map`/
-    `curve` cannot be computed, and `divergence_rate == 1.0`), **or** a
-    [`MAPResult`](@ref)/[`QuantileResult`](@ref) pair computed over the
-    non-divergent draws only. `map === nothing` iff `curve === nothing`.
+- `map`/`curve`: **either** both `nothing` **or** a 
+    [`MAPResult`](@ref)/[`QuantileResult`](@ref) pair.
 """
 function run_model(
     seed::Fitting.Seed,
@@ -387,6 +388,9 @@ function run_model(
         
         # calculate MAP params + curves
         # ξ = (dns, δρ1, δρ2, δρ3, c1)
+        # z_map: how many prior standard deviations (θ-space) the MAP draw
+        # sits from its own prior, one entry per physical parameter.
+        z_map = Fitting.prior_z_scores(fit.samples[max_idx], seed.pr)
         MAP_params = Dict{String, Float64}(
             "log_density"   => max_llh,
             "slvnt_e_dns"   => getindex.(fit.samples, 1)[max_idx],
@@ -396,7 +400,12 @@ function run_model(
             "excl_vol_corr" => getindex.(fit.samples, 5)[max_idx],
             "scale"         => fit.scale[max_idx],
             "bkgrnd_corr"   => fit.bkgrnd_corr[max_idx],
-            "chisq_red"     => fit.chisq_red[max_idx]
+            "chisq_red"     => fit.chisq_red[max_idx],
+            "z_slvnt_e_dns"   => z_map[1],
+            "z_delta_rho_1"   => z_map[2],
+            "z_delta_rho_2"   => z_map[3],
+            "z_delta_rho_3"   => z_map[4],
+            "z_excl_vol_corr" => z_map[5],
         )
         MAP_curve = hcat(seed.fw.qvals, fit.curves[:, max_idx])
         map =(MAP_params, MAP_curve)
@@ -426,6 +435,8 @@ function run_model(
         scale_lo, scale_hi   = quantile(scale_filt,  [q_1, q_2])
         bkgrnd_lo, bkgrnd_hi = quantile(bkgrnd_filt, [q_1, q_2])
         chisq_lo, chisq_hi   = quantile(chisq_filt,  [q_1, q_2])
+        z_lo = Fitting.prior_z_scores(SVector(ρₑ_lo, δρ1_lo, δρ2_lo, δρ3_lo, c_1_lo), seed.pr)
+        z_hi = Fitting.prior_z_scores(SVector(ρₑ_hi, δρ1_hi, δρ2_hi, δρ3_hi, c_1_hi), seed.pr)
 
         # returns a tuple of (low, high) bounds; fails loudly
         function map_bounds(lo, hi, x)
@@ -444,23 +455,28 @@ function run_model(
                 ),
                 "delta_rho_1"     => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (δρ1_lo, δρ1_hi),
-                    "bounds"      => map_bounds(δρ1_lo, δρ1_hi, δρ1_filt)
+                    "bounds"      => map_bounds(δρ1_lo, δρ1_hi, δρ1_filt),
+                    "z"           => (z_lo[2], z_hi[2]),
                 ),
                 "delta_rho_2"     => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (δρ2_lo, δρ2_hi),
-                    "bounds"      => map_bounds(δρ2_lo, δρ2_hi, δρ2_filt)
+                    "bounds"      => map_bounds(δρ2_lo, δρ2_hi, δρ2_filt),
+                    "z"           => (z_lo[3], z_hi[3]),
                 ),
                 "delta_rho_3"     => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (δρ3_lo, δρ3_hi),
-                    "bounds"      => map_bounds(δρ3_lo, δρ3_hi, δρ3_filt)
+                    "bounds"      => map_bounds(δρ3_lo, δρ3_hi, δρ3_filt),
+                    "z"           => (z_lo[4], z_hi[4]),
                 ),
                 "slvnt_e_dns"     => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (ρₑ_lo, ρₑ_hi),
-                    "bounds"      => map_bounds(ρₑ_lo, ρₑ_hi, ρₑ_filt)
+                    "bounds"      => map_bounds(ρₑ_lo, ρₑ_hi, ρₑ_filt),
+                    "z"           => (z_lo[1], z_hi[1]),
                 ),
                 "excl_vol_corr"   => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (c_1_lo, c_1_hi),
-                    "bounds"      => map_bounds(c_1_lo, c_1_hi, c_1_filt)
+                    "bounds"      => map_bounds(c_1_lo, c_1_hi, c_1_filt),
+                    "z"           => (z_lo[5], z_hi[5]),
                 ),
                 "scale"           => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (scale_lo, scale_hi),
@@ -508,9 +524,12 @@ const _REPORT_KEYS = [
     "delta_rho_3", "excl_vol_corr", "scale", "bkgrnd_corr", "chisq_red",
 ]
 
-"Display labels for `write_report`'s text output only -- the underlying
-`MAPParams`/`QuantileParams` Dict keys (`_REPORT_KEYS` above) are unchanged
-and still what callers index with."
+"The 5 physical parameters that carry a prior."
+const _PRIOR_KEYS = [
+    "slvnt_e_dns", "delta_rho_1", "delta_rho_2", "delta_rho_3", "excl_vol_corr",
+]
+
+"Display labels for `write_report`'s text output."
 const _REPORT_LABELS = Dict{String, String}(
     "log_density"   => "log_density",
     "slvnt_e_dns"   => "ρₑ",
@@ -537,22 +556,7 @@ const _REPORT_LABELS = Dict{String, String}(
         form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}}=nothing
     )
 
-Writes a human-readable summary of a [`run_model`](@ref) `result` to `io`
-(`stdout` if omitted): the divergence rate, the MAP draw's parameters (incl.
-`chisq_red`), each parameter's quantile/bound interval, a `"===
-Diagnostics ==="` footer -- `AdvancedHMC.jl` per-chain sampler health
-computed from `fit.stats` (already the warm-up-free portion): iteration
-count, mean acceptance rate, tree depth (mean and max), mean leapfrog steps
-per iteration, E-BFMI (Stan's energy-based Bayesian Fraction of Missing
-Information -- values below ~0.2-0.3 suggest momentum resampling isn't
-exploring the Hamiltonian's energy level sets well and the model may need
-reparameterizing), and, only when supplied, the seed's screened-electrostatic
-cavity signal `μ_χ`/`σ_χ` (see [`seed_model`](@ref)) -- and, as the final
-section, a `"=== Form-Factor Parsing Log ==="` listing any
-`ForwardCache.form_factor_log` entries (see
-[`Scattering.forward_cache`](@ref)) when `form_factor_log` is supplied and
-non-empty. The diagnostics footer is written even when every draw diverged,
-since it's most useful exactly in that failure case.
+Writes a summary of a [`run_model`](@ref) `result` to `io`.
 
 # Arguments
 - `io::IO`: where to write; omit for `stdout`.
@@ -565,10 +569,7 @@ since it's most useful exactly in that failure case.
     Default `nothing` prints nothing for either field; passing either one
     adds it to the `"=== Diagnostics ==="` footer.
 - `form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}}=nothing`:
-    the seed's `seed.fw.form_factor_log` (form-factor-table construction
-    diagnostics -- one line per ion the backend could not resolve in full).
-    Default `nothing`, or an empty vector, prints nothing; a non-empty vector
-    is printed verbatim, one entry per line, as the report's final section.
+    the seed's `seed.fw.form_factor_log`.
 """
 function write_report(
     io::IO, result;
@@ -601,6 +602,16 @@ function write_report(
             q_lo, q_hi = quantile_params[k]["quantiles"]
             b_lo, b_hi = quantile_params[k]["bounds"]
             @printf(io, "%-14s %+16.6g %+16.6g %+16.6g %+16.6g\n", _REPORT_LABELS[k], q_lo, q_hi, b_lo, b_hi)
+        end
+
+        println(io)
+        println(io, "=== Standard deviations from prior (θ-space z-score) ===")
+        @printf(io, "%-14s %16s %16s %16s\n", "param", "z_MAP", "z_quantile_lo", "z_quantile_hi")
+        for k in _PRIOR_KEYS
+            haskey(map_params, "z_" * k) || continue
+            z_map           = map_params["z_" * k]
+            z_lo, z_hi      = quantile_params[k]["z"]
+            @printf(io, "%-14s %+16.6g %+16.6g %+16.6g\n", _REPORT_LABELS[k], z_map, z_lo, z_hi)
         end
     end
 

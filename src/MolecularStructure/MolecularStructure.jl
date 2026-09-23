@@ -18,6 +18,7 @@ function _store_dir()::String
 end
 
 include("Mols.jl")
+include("ExcludedVolumes.jl")
 include("Ionization.jl")
 include("Propka.jl")
 include("StructureSource.jl")
@@ -27,6 +28,6 @@ export  Molecule, MoleculeError, create, coords_cartesian, coords_spherical,
         to_spherical, radii, vols, r_max, elms, name, n_atoms, Residues,
         Ionization, propka_pKas, PropkaError, StructureSource, LocalPathSource,
         PDBIDSource, URLSource, StructureSourceError, resolve_structure, load_molecule,
-        resolve_hydrogens, PDB2PQRError
+        resolve_hydrogens, PDB2PQRError, excluded_volume, EXCLUDED_VOLUME_TABLE
 
 end # module
