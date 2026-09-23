@@ -16,7 +16,7 @@ using BayeSol.Scattering:  forward, gram_matrix, species_multipoles,
                     partial_wave_weights, vacuo, excluded, hydration,
                     SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, SHELL_CLASSES,
                     DRO_UNIT, FORM_FACTOR_SOURCE, B_LM_CHUNK
-using BayeSol.MolecularStructure: create, elms, radii
+using BayeSol.MolecularStructure: create, elms, radii, vols
 using BayeSol.Solvation: SASA
 using LinearAlgebra: issymmetric, eigvals
 using ForwardDiff
@@ -120,10 +120,17 @@ fwd_chunk  = UInt64(3)
     # CRYSOL's excluded-volume correction factor c_1
     # ---------------------------------------------------------------------
 
-    @testset "mean_atomic_radius is the plain mean of the per-atom radii" begin
+    @testset "mean_atomic_radius is the mean equivalent-sphere radius of the per-atom excluded volumes" begin
+        # CRYSOL's r_m = N⁻¹ Σⱼ r_gj, r_gj = cbrt(3 V_j / 4π) -- the excluded-volume
+        # dummy's own radius, not the atom's van der Waals radius.
         mo = fwd_mol()
-        r  = radii(mo)
-        @test mean_atomic_radius(mo) ≈ sum(r) / length(r)
+        v  = vols(mo)
+        ref = sum(cbrt(3.0 * vi / (4.0 * π)) for vi in v) / length(v)
+        @test mean_atomic_radius(mo) ≈ ref
+        # this is generally NOT the mean vdW radius, since the excluded-volume
+        # table (h/c/n/o here) gives a smaller dummy than the isolated vdW sphere
+        r = radii(mo)
+        @test mean_atomic_radius(mo) < sum(r) / length(r)
     end
 
     @testset "excluded_volume_factor: c_1 == 1 is exactly the identity" begin

@@ -10,7 +10,7 @@ using ..Scattering: forward, ForwardCache
 using ..BayesolUtils.Constants: DEFAULT_TEMPERATURE_C, C1_PRIOR_MASS_PERCENT
 
 "Physical prior distributions."
-struct _ξ_priors
+struct ξ_priors
     dnsPrior::LogNormal{Float64}
     δρ1Prior::LogNormal{Float64}
     δρ2Prior::Normal{Float64}
@@ -27,7 +27,7 @@ end
         μ_χ::Real = 0,
         σ_χ::Real = 0.0,
         n::Real = C1_PRIOR_MASS_PERCENT
-    ) -> _ξ_priors
+    ) -> ξ_priors
 
 Generates physical prior distributions of `ξ`.
 
@@ -59,19 +59,19 @@ function _calc_ξ_priors(
     μ_χ::Real = 0,
     σ_χ::Real = 0.0,
     n::Real = C1_PRIOR_MASS_PERCENT
-)::_ξ_priors
+)::ξ_priors
     dns = ρₑ_prior(pH, σ_pH, solutes; t=t)
     δρ1, δρ2, δρ3 = δρ_prior(; μ_χ=μ_χ, σ_χ=σ_χ)
     c_1 = c1_prior(n)
-    return _ξ_priors(dns, δρ1, δρ2, δρ3, c_1)
+    return ξ_priors(dns, δρ1, δρ2, δρ3, c_1)
 end
 
 """
-    _ξ₀(p::_ξ_priors) -> SVector{5,<:Real}
+    _ξ₀(p::ξ_priors) -> SVector{5,<:Real}
 
 Generates intitial physical parameter vector ξ₀
 """
-function _ξ₀(p::_ξ_priors)::SVector{5,<:Real}
+function _ξ₀(p::ξ_priors)::SVector{5,<:Real}
     dns = rand(p.dnsPrior)
     δρ1 = rand(p.δρ1Prior)
     δρ2 = rand(p.δρ2Prior)
@@ -81,7 +81,7 @@ function _ξ₀(p::_ξ_priors)::SVector{5,<:Real}
 end
 
 """
-    _θ_prior_moments(p::_ξ_priors) -> (μ::SVector{5}, σ::SVector{5})
+    θ_prior_moments(p::ξ_priors) -> (μ::SVector{5}, σ::SVector{5})
 
 Each θ-space coordinate is Normal under the prior: [`Θ`](@ref) sends a
 LogNormal(μ,σ)-distributed `dns`/`δρ1`/`c_1` to its underlying Normal(μ,σ)
@@ -93,19 +93,19 @@ separate derivation needed, just read `.μ`/`.σ` off each.
 Used by [`_standardize`](@ref)/[`_destandardize`](@ref) to rescale θ before
 handing it to `AdvancedHMC.jl`.
 """
-function _θ_prior_moments(p::_ξ_priors)::Tuple{SVector{5,Float64},SVector{5,Float64}}
+function θ_prior_moments(p::ξ_priors)::Tuple{SVector{5,Float64},SVector{5,Float64}}
     μ = SVector(p.dnsPrior.μ, p.δρ1Prior.μ, p.δρ2Prior.μ, p.δρ3Prior.μ, p.c_1Prior.μ)
     σ = SVector(p.dnsPrior.σ, p.δρ1Prior.σ, p.δρ2Prior.σ, p.δρ3Prior.σ, p.c_1Prior.σ)
     return μ, σ
 end
 
 """
-    _standardize(θ::SVector{5,<:Real}, p::_ξ_priors) -> SVector{5,<:Real}
-    _destandardize(z::SVector{5,<:Real}, p::_ξ_priors) -> SVector{5,<:Real}
+    _standardize(θ::SVector{5,<:Real}, p::ξ_priors) -> SVector{5,<:Real}
+    _destandardize(z::SVector{5,<:Real}, p::ξ_priors) -> SVector{5,<:Real}
 
 Affine maps between θ-space and a prior-standardized `z`-space,
 `z = (θ - μ) / σ` / its inverse `θ = μ + σ·z`, with `(μ, σ)` from
-[`_θ_prior_moments`](@ref).
+[`θ_prior_moments`](@ref).
 
 # Why this exists: `find_good_stepsize`'s identity-mass-matrix blind spot
 
@@ -138,16 +138,43 @@ additive constant NUTS doesn't need" already true of `_logπ` itself).
 
 # Arguments
 - `θ`/`z::SVector{5,<:Real}`: as above.
-- `p::_ξ_priors`: supplies `(μ, σ)` via [`_θ_prior_moments`](@ref).
+- `p::ξ_priors`: supplies `(μ, σ)` via [`θ_prior_moments`](@ref).
 """
-function _standardize(θ::SVector{5,<:Real}, p::_ξ_priors)
-    μ, σ = _θ_prior_moments(p)
+function _standardize(θ::SVector{5,<:Real}, p::ξ_priors)
+    μ, σ = θ_prior_moments(p)
     return (θ .- μ) ./ σ
 end
 
-function _destandardize(z::SVector{5,<:Real}, p::_ξ_priors)
-    μ, σ = _θ_prior_moments(p)
+function _destandardize(z::SVector{5,<:Real}, p::ξ_priors)
+    μ, σ = θ_prior_moments(p)
     return μ .+ σ .* z
+end
+
+"""
+    prior_z_scores(ξ::SVector{5,<:Real}, p::ξ_priors) -> SVector{5,Float64}
+
+How many prior standard deviations a physical-space point `ξ = (dns, δρ1,
+δρ2, δρ3, c1)` sits from its own prior `p`, one entry per coordinate:
+`z = (θ - μ) / σ` in θ-space, where `θ = Θ(ξ)` and `(μ, σ)` are the prior's
+own per-coordinate θ-space mean/std from [`θ_prior_moments`](@ref) -- the
+same affine map [`_standardize`](@ref) uses internally for HMC, exposed here
+as a reporting utility instead of kept private to the sampler.
+
+Every `z_i` is, by construction, a standard-Normal variate under `p` alone
+(see `θ_prior_moments`'s docstring for why every θ-coordinate is exactly
+Normal under the prior), so this is a plain, general-purpose "how many
+sigmas out" readout with no per-parameter special-casing needed. Used by
+[`BayeSol.write_report`](@ref)'s "Standard deviations from prior" table, for
+both the MAP draw and the reported quantile bounds.
+
+# Arguments
+- `ξ::SVector{5,<:Real}`: the physical-space point to score.
+- `p::ξ_priors`: supplies `(μ, σ)` via [`θ_prior_moments`](@ref).
+"""
+function prior_z_scores(ξ::SVector{5,<:Real}, p::ξ_priors)::SVector{5,Float64}
+    θ, _ = Θ(ξ)
+    μ, σ = θ_prior_moments(p)
+    return (θ .- μ) ./ σ
 end
 
 "Dispatch tag selecting profile vs. marginal log-likelihood in [`_ll`](@ref)."
@@ -271,7 +298,7 @@ function _ll(
 end
 
 """ log prior """
-_lp(ξ::SVector{5,<:Real}, p::_ξ_priors) =
+_lp(ξ::SVector{5,<:Real}, p::ξ_priors) =
     logpdf(p.dnsPrior, ξ[1]) + logpdf(p.δρ1Prior, ξ[2]) + logpdf(p.δρ2Prior, ξ[3]) +
     logpdf(p.δρ3Prior, ξ[4]) + logpdf(p.c_1Prior, ξ[5])
 
@@ -297,15 +324,9 @@ giving:
 
     log π(θ) = _lp(ξ(θ), p) + _ll(I_exp, σ_exp, ξ(θ), fw, l) + (θ[1] + θ[2] + θ[5])
 
-**Pure**, like [`Θ`](@ref)/[`Ξ`](@ref) — no mutation. `θ` is decoded to `ξ` via
-[`Ξ`](@ref) rather than overwritten in place; see `Θ`'s docstring for why a
-fresh value here is no more expensive than a mutating version would have
-been, given what `AdvancedHMC.jl`/`ForwardDiff` actually hand this function
-on every call.
-
 # Arguments
 - `θ::SVector{5,<:Real}`: the current NUTS position, `(a, b, δρ2, δρ3, c)`.
-- `p::_ξ_priors`: the physical priors, forwarded to [`_lp`](@ref).
+- `p::ξ_priors`: the physical priors, forwarded to [`_lp`](@ref).
 - `I_exp`, `σ_exp`: the data, forwarded to [`_ll`](@ref).
 - `fw::ForwardCache`: the structure's geometry-only cache, forwarded to [`_ll`](@ref).
 - `l::LIKELIHOOD`: `PROFILE()` or `MARGINAL()`, forwarded to [`_ll`](@ref).
@@ -315,7 +336,7 @@ on every call.
 """
 function _logπ(
     θ::SVector{5,<:Real},
-    p::_ξ_priors,
+    p::ξ_priors,
     I_exp,
     σ_exp,
     fw::ForwardCache,
@@ -332,7 +353,7 @@ end
 Everything [`run_fitting`](@ref) needs to start a NUTS chain.
 
 # Fields
-- `pr::_ξ_priors`: the physical priors over `ξ`, from [`_calc_ξ_priors`](@ref).
+- `pr::ξ_priors`: the physical priors over `ξ`, from [`_calc_ξ_priors`](@ref).
 - `ξ₀::SVector{5,T}`: one draw from `pr`, in physical ξ-space, from [`_ξ₀`](@ref).
 - `θ₀::SVector{5,T}`: `ξ₀` reparameterized into unconstrained θ-space via [`Θ`](@ref).
 - `fw::ForwardCache`: the structure's geometry-only cache (the Gram matrix
@@ -341,7 +362,7 @@ Everything [`run_fitting`](@ref) needs to start a NUTS chain.
     per-point standard errors.
 """
 struct Seed{T<:Real, V<:AbstractVector}
-    pr::_ξ_priors
+    pr::ξ_priors
     ξ₀::SVector{5,T}
     θ₀::SVector{5,T}
     fw::ForwardCache
@@ -468,24 +489,6 @@ parameter space far more cheaply than random-walk Metropolis. NUTS removes the
 need to hand-pick a trajectory length: it grows the leapfrog trajectory by
 doubling a binary tree of steps, forward and backward in time, until the trajectory
 starts to double back on itself (a "U-turn"), then samples from the valid part of that tree.
-
-# Sampling actually happens in prior-standardized z-space, not raw θ
-
-The Hamiltonian above is written in `θ` for exposition, but this function
-actually runs NUTS in `z = _standardize(θ, seed.pr)` (`_destandardize`'s the
-inverse) and only converts back to `ξ` (via `Ξ`) on the returned samples.
-`θ`'s five coordinates carry wildly different natural prior scales (`dns`'s
-prior σ is routinely orders of magnitude tighter than `δρ1`'s), and
-`find_good_stepsize` explores with an *identity* mass matrix before
-`MassMatrixAdaptor` below has adapted anything — so in raw θ, a generic
-O(1) initial momentum kick is ~1 prior-σ along one coordinate and
-thousands of prior-σ along another, reliably enough to send `dns` to an
-unphysical value and blow the forward model up (`wls_fit`'s
-`det(XᵀWX) ≤ 0` guard) before adaptation ever gets a chance to fix it.
-Standardizing first makes that same kick ~1 prior-σ in every coordinate,
-which is what removes the systematic (not just unlucky-seed) failure. See
-[`_standardize`](@ref)'s own docstring for the full argument, including why
-its Jacobian is safely omitted from `_logπ`.
 
 # Step-size adaptation
 

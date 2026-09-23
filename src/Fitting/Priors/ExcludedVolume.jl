@@ -42,9 +42,9 @@ Substituting `μ=1`:
     -n: percentage ((0, 100]) of the prior mass required to fall within
         CRYSOL's bound `[0.96, 1.04]` around its default `c_1 = 1`. Higher `n` 
         concentrates more mass near the default; lower `n` allows more spread.
-        Defaulted to `n = 95`; only change if more spread is needed.
+        Defaulted to `n = 85`; only change if more spread is needed.
 """
-function c1_prior(n::Real=95)::LogNormal{Float64}
+function c1_prior(n::Real=50)::LogNormal{Float64}
     
     if n <= 0 || n > 100 
         throw(DomainError(n, "n ∈(0, 100]"))
