@@ -16,7 +16,7 @@
 #   julia --project=test/visualize -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points_2D(2000)'
 #   julia --project=test/visualize -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points_3D(2000)'
 
-using BayeSol.Geometry: PlasticSequence
+using BAYSOL.Geometry: PlasticSequence
 using .PlasticSequence: plastic_points
 using GLMakie
 
@@ -56,7 +56,7 @@ function vis_plastic_points_3D(n)
     r = [sqrt(p[1]^2 + p[2]^2 + p[3]^2) for p in pts]
 
     fig = Figure()
-    ax = Axis3(fig[1, 1], title = "Plastic sequence filling a spherical volume (3-D generator)", aspect = :data)
+    ax = Axis3(fig[1, 1], title = "Plastic sequence filling a spherical volume", aspect = :data)
     scatter!(ax, x, y, z, color = r, colormap = :viridis, markersize = 6)
     wait(display(fig))
 end

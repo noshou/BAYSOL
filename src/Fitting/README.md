@@ -242,12 +242,12 @@ using each coordinate's own prior mean and standard deviation from `_θ_prior_mo
 6. Destandardize every returned `z` and decode it back to `ξ` via `Ξ`. For each `ξ`, recompute `scale`, `bkgrnd_corr`, `χ²`, and the predicted curve using `wls_fit`, `wls_predict`, and `reduced_chi2`.
 
 ```julia
-using BayeSol
-using BayeSol.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,
+using BAYSOL
+using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,
     propka_pKas, resolve_hydrogens, Ionization
-using BayeSol.Solvation: protein_cavity_electrostatics
-using BayeSol.Scattering: forward_cache
-using BayeSol.Fitting: Solute, Protein, NonBiological, PROFILE, seed_fitting
+using BAYSOL.Solvation: protein_cavity_electrostatics
+using BAYSOL.Scattering: forward_cache
+using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE, seed_fitting
 
 PH, σ_PH = 7.5, 0.1
 SOLUTES = Solute[
@@ -283,8 +283,8 @@ seed = seed_fitting(
     σ_χ = σ_χ,
 )
 
-result = BayeSol.run_model(seed, 2000, 1000; l = PROFILE())
+result = BAYSOL.run_model(seed, 2000, 1000; l = PROFILE())
 
 fit, divergence_rate, map_result, quantile_result = result
-BayeSol.write_report(result)
+BAYSOL.write_report(result)
 ```

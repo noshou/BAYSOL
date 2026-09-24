@@ -7,9 +7,9 @@
 # `self_scatter` and `cross_scatter`.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.Scattering: compute_B_lm, partial_wave_weights, self_scatter, cross_scatter, _deg_contrib
-using BayeSol.Scattering.SphFuncs: sphHarm, sphBess
-using BayeSol.MolecularStructure: create, coords_spherical, to_spherical
+using BAYSOL.Scattering: compute_B_lm, partial_wave_weights, self_scatter, cross_scatter, _deg_contrib
+using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess
+using BAYSOL.MolecularStructure: create, coords_spherical, to_spherical
 
 # packed row offsets, duplicated here by hand so the tests pin the convention
 # rather than inheriting it from the code under test

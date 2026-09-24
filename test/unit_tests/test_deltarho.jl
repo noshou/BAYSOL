@@ -5,10 +5,10 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.Fitting: δρ_prior
+using BAYSOL.Fitting: δρ_prior
 using Distributions: LogNormal, Normal, mean, std, quantile
 
-const FIT = BayeSol.Fitting
+const FIT = BAYSOL.Fitting
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 

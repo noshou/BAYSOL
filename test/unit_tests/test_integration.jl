@@ -17,12 +17,12 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.MolecularStructure: LocalPathSource, resolve_structure, load_molecule, propka_pKas, PropkaError,
+using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule, propka_pKas, PropkaError,
     Ionization, resolve_hydrogens, PDB2PQRError, _store_dir,
     Molecule, Residues, n_atoms, elms, coords_cartesian
-using BayeSol.Solvation: protein_cavity_electrostatics
-using BayeSol.Fitting: Solute, Protein, NonBiological, seed_fitting, run_fitting, PROFILE
-using BayeSol.Scattering: forward, forward_cache, ForwardCache
+using BAYSOL.Solvation: protein_cavity_electrostatics
+using BAYSOL.Fitting: Solute, Protein, NonBiological, seed_fitting, run_fitting, PROFILE
+using BAYSOL.Scattering: forward, forward_cache, ForwardCache
 using Random
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
@@ -247,7 +247,7 @@ end
 
         Random.seed!(0)   # reproducibility, not survival -- see run_fitting's z-space docstring
         seed = seed_fitting(fw, I_exp, σ_exp, pH, σ_pH, solutes; μ_χ = μ_χ, σ_χ = σ_χ)
-        @test seed isa BayeSol.Fitting.Seed
+        @test seed isa BAYSOL.Fitting.Seed
         @test seed.fw === fw
         @test seed.ex == (I_exp, σ_exp)
         @test seed.ξ₀[1] > 0 && seed.ξ₀[2] > 0 && seed.ξ₀[5] > 0

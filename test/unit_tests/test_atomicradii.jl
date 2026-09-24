@@ -4,7 +4,7 @@
 # ion_key round-trip, the raw table lookups, and the resolve_one fallback chain.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.AtomicRadii: Ion, tryparse_ion, ion_key, ion_radius,
+using BAYSOL.AtomicRadii: Ion, tryparse_ion, ion_key, ion_radius,
     element_radius, nearest_ion, resolve_one, _resolve_all, AtomicRadiiSource
 
 lookup_one(ion) = _resolve_all([ion])[1][2]
@@ -176,8 +176,8 @@ lookup_one(ion) = _resolve_all([ion])[1][2]
 
     @testset "AtomicRadiiSource satisfies the lookup contract" begin
         src = AtomicRadiiSource()
-        @test src isa BayeSol.AtomicRadii.RadiiSource
+        @test src isa BAYSOL.AtomicRadii.RadiiSource
         ions = ["fe3+", "qq3+", "rn"]
-        @test BayeSol.AtomicRadii.lookup(src, ions) == _resolve_all(ions)
+        @test BAYSOL.AtomicRadii.lookup(src, ions) == _resolve_all(ions)
     end
 end
