@@ -144,7 +144,7 @@ end
 
 Resolve `source` to an absolute path to a canonical `.pdb` file in
 [`_store_dir`](@ref) (model 1 only, no HETATM/waters, no hydrogens). See
-[`StructureSource`](@ref) and its subtypes for per-variant behavior.
+[`StructureSource`](@ref) and its subtypes for per-variant behaviour.
 """
 function resolve_structure end
 

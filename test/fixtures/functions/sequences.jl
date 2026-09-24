@@ -59,7 +59,7 @@ const GFP = "MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTL" *
 
 """
 M13 forward (-21) universal sequencing primer, a standard, widely-published
-oligonucleotide (e.g. NEB/Thermo Fisher catalog; Messing 1983, "New M13
+oligonucleotide (e.g. NEB/Thermo Fisher catalogue; Messing 1983, "New M13
 vectors for cloning", Methods Enzymol. 101:20-78,
 doi:10.1016/0076-6879(83)01005-8). Short (18 nt) DNA oligo.
 """

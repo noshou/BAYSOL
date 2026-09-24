@@ -1,5147 +1,5147 @@
 {
- "chloride": [
-  18,
-  17.8,
-  null
- ],
- "(2-hydroxyethyl)dimethylazanium": [
-  50,
-  90.7,
-  2.1
- ],
- "(2-hydroxyethyl)dimethylazanium chloride": [
-  68,
-  108.5,
-  0.5
- ],
- "guanidinium chloride": [
-  50,
-  69.92,
-  0.4
- ],
- "guanidinium": [
-  32,
-  44.6,
-  null
- ],
- "sodium(1+)": [
-  10,
-  -1.21,
-  null
- ],
- "hydroxide": [
-  10,
-  -4.13,
-  null
- ],
- "tetramethylazanium": [
-  42,
-  88.2,
-  2.0
- ],
- "dihydrogen phosphate": [
-  50,
-  31.7,
-  0.7
- ],
- "hydrogen phosphate": [
-  50,
-  5.3,
-  0.5
- ],
- "phosphate": [
-  50,
-  -25.6,
-  1.0
- ],
- "sodium chloride": [
-  28,
-  16.61,
-  0.01
- ],
- "potassium chloride": [
-  36,
-  26.81,
-  0.01
- ],
- "potassium bromide": [
-  54,
-  33.75,
-  0.01
- ],
- "potassium iodide": [
-  72,
-  45.21,
-  0.01
- ],
- "tetrabutylazanium bromide": [
-  174,
-  300.38,
-  0.04
- ],
- "calcium dichloride": [
-  54,
-  17.839,
-  0.03
- ],
- "barium dichloride": [
-  90,
-  23.828,
-  0.08
- ],
- "magnesium dichloride": [
-  46,
-  14.49,
-  null
- ],
- "lanthanum trichloride": [
-  108,
-  14.28,
-  null
- ],
- "chlorane": [
-  18,
-  17.82,
-  null
- ],
- "potassium nitrate": [
-  50,
-  35.94,
-  0.07
- ],
- "disodium sulfate": [
-  70,
-  11.62,
-  null
- ],
- "dipotassium sulfate": [
-  86,
-  31.99,
-  null
- ],
- "caesium bromide": [
-  90,
-  45.32,
-  null
- ],
- "rubidium fluoride": [
-  46,
-  11.52,
-  null
- ],
- "potassium fluoride": [
-  28,
-  7.67,
-  null
- ],
- "rubidium bromide": [
-  72,
-  37.54,
-  null
- ],
- "rubidium chloride": [
-  54,
-  31.82,
-  null
- ],
- "caesium chloride": [
-  72,
-  39.06,
-  null
- ],
- "sodium bromide": [
-  46,
-  23.35,
-  null
- ],
- "sodium iodide": [
-  64,
-  34.7,
-  null
- ],
- "lithium chloride": [
-  20,
-  16.77,
-  null
- ],
- "lithium bromide": [
-  38,
-  23.53,
-  null
- ],
- "lithium iodide": [
-  56,
-  35.09,
-  null
- ],
- "disodium carbonate": [
-  52,
-  -6.48,
-  null
- ],
- "sodium hydrogen carbonate": [
-  42,
-  23.181,
-  null
- ],
- "dipotassium carbonate": [
-  68,
-  13.98,
-  null
- ],
- "potassium hydrogen carbonate": [
-  50,
-  33.41,
-  null
- ],
- "ammonium chloride": [
-  28,
-  35.85,
-  0.02
- ],
- "sodium nitrate": [
-  42,
-  28.007,
-  null
- ],
- "diammonium sulfate": [
-  70,
-  55.04,
-  0.11
- ],
- "magnesium sulfate": [
-  60,
-  -7.38,
-  2.0
- ],
- "nitric acid": [
-  32,
-  29.35,
-  null
- ],
- "ammonium nitrate": [
-  42,
-  47.24,
-  null
- ],
- "sodium hydroxide": [
-  20,
-  -5.18,
-  null
- ],
- "sodium hydrogen sulfate": [
-  60,
-  13.0,
-  null
- ],
- "sulfate": [
-  50,
-  14.213,
-  null
- ],
- "hydrogen sulfate": [
-  50,
-  36.495,
-  null
- ],
- "azanium": [
-  10,
-  18.02,
-  null
- ],
- "ammonium hydrogen sulfate": [
-  60,
-  32.23,
-  null
- ],
- "triammonium hydrogen disulfate": [
-  130,
-  82.48,
-  null
- ],
- "calcium diacetate": [
-  82,
-  72.32,
-  0.13
- ],
- "guanidinium bromide": [
-  68,
-  79.84,
-  0.38
- ],
- "guanidinium acetate": [
-  64,
-  54.94,
-  0.31
- ],
- "guanidinium perchlorate": [
-  82,
-  92.33,
-  0.62
- ],
- "diguanidinium sulfate": [
-  114,
-  18.66,
-  0.34
- ],
- "lithium acetate": [
-  34,
-  28.07,
-  0.03
- ],
- "sodium acetate": [
-  42,
-  38.44,
-  0.05
- ],
- "potassium acetate": [
-  50,
-  51.07,
-  0.04
- ],
- "magnesium diacetate": [
-  74,
-  60.23,
-  0.08
- ],
- "dilanthanum trisulfate": [
-  162,
-  -36.3,
-  null
- ],
- "(2-hydroxyethyl)trimethylazanium chloride": [
-  76,
-  123.6093,
-  null
- ],
- "sodium perchlorate": [
-  60,
-  42.94,
-  0.04
- ],
- "potassium perchlorate": [
-  68,
-  53.29,
-  0.04
- ],
- "tetramethylazanium chloride": [
-  60,
-  107.4,
-  0.2
- ],
- "tetraethylazanium chloride": [
-  92,
-  167.0,
-  0.2
- ],
- "tetrapropylazanium chloride": [
-  124,
-  232.9,
-  0.2
- ],
- "tetrabutylazanium chloride": [
-  156,
-  294.3,
-  0.2
- ],
- "tetramethylazanium bromide": [
-  78,
-  114.05,
-  0.04
- ],
- "tetraethylazanium bromide": [
-  110,
-  172.73,
-  0.04
- ],
- "tetrapropylazanium bromide": [
-  142,
-  239.6,
-  0.2
- ],
- "tetrapentylazanium bromide": [
-  206,
-  363.9,
-  0.2
- ],
- "tetramethylazanium iodide": [
-  96,
-  125.8,
-  0.2
- ],
- "tetraethylazanium iodide": [
-  128,
-  185.5,
-  0.2
- ],
- "tetrapropylazanium iodide": [
-  160,
-  250.9,
-  0.2
- ],
- "tetrabutylazanium iodide": [
-  192,
-  312.4,
-  0.2
- ],
- "carbonate": [
-  32,
-  -5.8,
-  1.6
- ],
- "hydrogen carbonate": [
-  32,
-  24.5,
-  1.0
- ],
- "magnesium(2+)": [
-  10,
-  -20.1,
-  2.0
- ],
- "strontium(2+)": [
-  36,
-  -17.3,
-  1.4
- ],
- "manganese(2+)": [
-  23,
-  -18.9,
-  1.9
- ],
- "trisodium 2-hydroxypropane-1,2,3-tricarboxylate": [
-  130,
-  57.1,
-  null
- ],
- "2-hydroxypropane-1,2,3-tricarboxylate": [
-  100,
-  72.0,
-  1.0
- ],
- "diammonium nickel disulfate": [
-  266,
-  67.9,
-  0.6
- ],
- "ammonium aluminium disulfate": [
-  240,
-  291.34,
-  0.06
- ],
- "potassium aluminium disulfate": [
-  248,
-  281.73,
-  0.88
- ],
- "diammonium hexanitratocerate(2-)": [
-  266,
-  222.19,
-  0.15
- ],
- "potassium(1+)": [
-  18,
-  9.0,
-  null
- ],
- "perchlorate": [
-  50,
-  43.99,
-  null
- ],
- "2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate": [
-  154,
-  131.0,
-  null
- ],
- "hydrogen 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate": [
-  154,
-  151.2,
-  null
- ],
- "dihydrogen 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate": [
-  154,
-  156.3,
-  null
- ],
- "sodium 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate": [
-  164,
-  148.0,
-  null
- ],
- "potassium 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate": [
-  172,
-  151.0,
-  null
- ],
- "cobalt(2+) dichloride": [
-  61,
-  8.31,
-  null
- ],
- "cobalt(2+) dibromide": [
-  97,
-  20.1,
-  null
- ],
- "cobalt(2+)": [
-  25,
-  -27.4,
-  null
- ],
- "bromide": [
-  36,
-  23.8,
-  null
- ],
- "nickel(2+) dichloride": [
-  62,
-  5.26,
-  null
- ],
- "nickel(2+) dibromide": [
-  98,
-  19.28,
-  null
- ],
- "sodium formate": [
-  34,
-  25.127,
-  0.5
- ],
- "sodium propanoate": [
-  50,
-  53.912,
-  1.0
- ],
- "sodium butanoate": [
-  58,
-  68.703,
-  0.5
- ],
- "sodium pentanoate": [
-  66,
-  85.16,
-  null
- ],
- "sodium hexanoate": [
-  74,
-  100.71,
-  null
- ],
- "sodium heptanoate": [
-  82,
-  116.04,
-  null
- ],
- "sodium octanoate": [
-  90,
-  131.56,
-  null
- ],
- "sodium nonanoate": [
-  98,
-  147.15,
-  null
- ],
- "disodium ethanedioate": [
-  66,
-  20.77,
-  0.07
- ],
- "disodium propanedioate": [
-  74,
-  35.81,
-  0.26
- ],
- "disodium butanedioate": [
-  82,
-  52.03,
-  0.15
- ],
- "disodium pentanedioate": [
-  90,
-  69.9,
-  null
- ],
- "disodium hexanedioate": [
-  98,
-  85.78,
-  null
- ],
- "disodium heptanedioate": [
-  106,
-  101.33,
-  null
- ],
- "disodium octanedioate": [
-  114,
-  116.79,
-  null
- ],
- "sodium 2-chloroacetate": [
-  58,
-  67.44,
-  null
- ],
- "sodium 1-chloropropanoate": [
-  66,
-  81.58,
-  null
- ],
- "sodium 1-chlorobutanoate": [
-  74,
-  97.31,
-  null
- ],
- "sodium 1-chloropentanoate": [
-  82,
-  113.17,
-  null
- ],
- "cobalt(2+) sulfate": [
-  75,
-  -11.3,
-  null
- ],
- "nickel(2+) sulfate": [
-  76,
-  -15.3,
-  null
- ],
- "copper(2+) sulfate": [
-  77,
-  -11.1,
-  null
- ],
- "dilithium sulfate": [
-  54,
-  12.61,
-  null
- ],
- "lithium trifluoromethanesulfonate": [
-  76,
-  74.39,
-  null
- ],
- "sodium fluoride": [
-  20,
-  -2.29,
-  0.07
- ],
- "strontium dichloride": [
-  72,
-  18.4,
-  null
- ],
- "thallium nitrate": [
-  112,
-  39.701,
-  null
- ],
- "silver nitrate": [
-  78,
-  27.558,
-  null
- ],
- "sodium dihydrogen phosphate": [
-  60,
-  24.124,
-  null
- ],
- "beryllium sulfate": [
-  52,
-  3.68,
-  null
- ],
- "potassium thiocyanate": [
-  48,
-  49.434,
-  null
- ],
- "potassium bromate": [
-  78,
-  43.034,
-  null
- ],
- "cadmium dinitrate": [
-  110,
-  43.883,
-  null
- ],
- "cobalt dinitrate": [
-  89,
-  29.569,
-  null
- ],
- "lead dinitrate": [
-  144,
-  39.769,
-  null
- ],
- "zinc dichloride": [
-  64,
-  10.08,
-  0.28
- ],
- "caesium fluoride": [
-  64,
-  20.1,
-  null
- ],
- "cadmium dichloride": [
-  82,
-  21.12,
-  null
- ],
- "cobalt dichloride": [
-  61,
-  6.8,
-  null
- ],
- "ammonium bromide": [
-  46,
-  42.92,
-  null
- ],
- "magnesium dibromide": [
-  82,
-  27.8,
-  null
- ],
- "calcium dibromide": [
-  90,
-  31.33,
-  null
- ],
- "strontium dibromide": [
-  108,
-  32.12,
-  null
- ],
- "copper dibromide": [
-  99,
-  22.29,
-  null
- ],
- "zinc dibromide": [
-  100,
-  24.58,
-  null
- ],
- "cadmium dibromide": [
-  118,
-  34.83,
-  null
- ],
- "rubidium iodide": [
-  90,
-  50.33,
-  null
- ],
- "caesium iodide": [
-  108,
-  57.53,
-  null
- ],
- "magnesium diiodide": [
-  118,
-  50.84,
-  null
- ],
- "calcium diiodide": [
-  126,
-  54.37,
-  null
- ],
- "strontium diiodide": [
-  144,
-  55.15,
-  null
- ],
- "barium diiodide": [
-  162,
-  59.73,
-  null
- ],
- "cadmium diiodide": [
-  154,
-  57.86,
-  null
- ],
- "nickel diiodide": [
-  134,
-  43.0,
-  null
- ],
- "lithium nitrate": [
-  34,
-  28.24,
-  null
- ],
- "rubidium nitrate": [
-  68,
-  43.54,
-  null
- ],
- "caesium nitrate": [
-  86,
-  50.54,
-  null
- ],
- "magnesium dinitrate": [
-  74,
-  36.86,
-  null
- ],
- "calcium dinitrate": [
-  82,
-  40.39,
-  null
- ],
- "strontium dinitrate": [
-  100,
-  41.17,
-  null
- ],
- "barium dinitrate": [
-  118,
-  45.75,
-  null
- ],
- "zinc dinitrate": [
-  92,
-  33.64,
-  null
- ],
- "nickel dinitrate": [
-  90,
-  29.01,
-  null
- ],
- "lithium chlorate": [
-  44,
-  35.7,
-  null
- ],
- "lithium perchlorate": [
-  52,
-  43.21,
-  0.03
- ],
- "silver perchlorate": [
-  96,
-  42.69,
-  null
- ],
- "thallium perchlorate": [
-  130,
-  54.83,
-  null
- ],
- "ammonium perchlorate": [
-  60,
-  62.59,
-  null
- ],
- "magnesium diperchlorate": [
-  110,
-  67.12,
-  null
- ],
- "calcium diperchlorate": [
-  118,
-  70.55,
-  null
- ],
- "potassium dihydrogen phosphate": [
-  68,
-  43.5,
-  1.8
- ],
- "thallium acetate": [
-  112,
-  50.85,
-  null
- ],
- "azanium acetate": [
-  42,
-  58.66,
-  null
- ],
- "dirubidium sulfate": [
-  122,
-  42.45,
-  null
- ],
- "dicaesium sulfate": [
-  158,
-  56.85,
-  null
- ],
- "copper sulfate": [
-  77,
-  -12.89,
-  null
- ],
- "cadmium sulfate": [
-  96,
-  -0.355,
-  null
- ],
- "zinc sulfate": [
-  78,
-  -10.6,
-  null
- ],
- "cobalt sulfate": [
-  75,
-  -14.67,
-  null
- ],
- "nickel sulfate": [
-  76,
-  -15.22,
-  null
- ],
- "lithium(1+)": [
-  2,
-  -0.98,
-  null
- ],
- "rubidium(1+)": [
-  36,
-  14.133,
-  null
- ],
- "caesium(1+)": [
-  54,
-  21.331,
-  null
- ],
- "calcium(2+)": [
-  18,
-  -18.038,
-  null
- ],
- "barium(2+)": [
-  54,
-  -12.675,
-  null
- ],
- "copper(2+)": [
-  27,
-  -27.077,
-  null
- ],
- "zinc(2+)": [
-  28,
-  -24.784,
-  null
- ],
- "nickel(2+)": [
-  26,
-  -29.404,
-  null
- ],
- "fluoride": [
-  10,
-  -1.222,
-  null
- ],
- "iodide": [
-  54,
-  36.202,
-  null
- ],
- "nitrate": [
-  32,
-  29.211,
-  null
- ],
- "acetate": [
-  32,
-  45.91,
-  null
- ],
- "silver(1+)": [
-  46,
-  -1.655,
-  null
- ],
- "thallium(1+)": [
-  80,
-  10.49,
-  null
- ],
- "cadmium(2+)": [
-  46,
-  -14.539,
-  null
- ],
- "lead(2+)": [
-  80,
-  -18.653,
-  null
- ],
- "beryllium(2+)": [
-  2,
-  -10.504,
-  null
- ],
- "chlorate": [
-  42,
-  36.657,
-  null
- ],
- "thiocyanate": [
-  30,
-  40.47,
-  null
- ],
- "bromate": [
-  60,
-  34.01,
-  null
- ],
- "tetraethylazanium": [
-  74,
-  149.12,
-  null
- ],
- "tetrapropylazanium": [
-  106,
-  214.44,
-  null
- ],
- "tetrabutylazanium": [
-  138,
-  275.66,
-  null
- ],
- "tetraphenylarsanium": [
-  196,
-  300.65,
-  null
- ],
- "iron(2+)": [
-  24,
-  -24.7,
-  null
- ],
- "mercury(2+)": [
-  78,
-  -19.3,
-  null
- ],
- "aluminium(3+)": [
-  10,
-  -42.2,
-  null
- ],
- "iron(3+)": [
-  23,
-  -43.7,
-  null
- ],
- "chromium(3+)": [
-  21,
-  -39.5,
-  null
- ],
- "lanthanum(3+)": [
-  54,
-  -39.1,
-  null
- ],
- "thorium(4+)": [
-  86,
-  -53.5,
-  null
- ],
- "nitrite": [
-  24,
-  29.0,
-  null
- ],
- "formate": [
-  24,
-  31.75,
-  null
- ],
- "iodate": [
-  78,
-  25.3,
-  null
- ],
- "permanganate": [
-  58,
-  38.5,
-  null
- ],
- "chromate": [
-  58,
-  13.6,
-  null
- ],
- "guanidinium propanoate": [
-  72,
-  103.6,
-  null
- ],
- "guanidinium benzoate": [
-  96,
-  136.4,
-  null
- ],
- "tripotassium 2-hydroxypropane-1,2,3-tricarboxylate": [
-  154,
-  95.245,
-  null
- ],
- "dipotassium ethanedioate": [
-  82,
-  41.9,
-  0.17
- ],
- "disodium 2,3-dihydroxybutanedioate": [
-  98,
-  57.35,
-  null
- ],
- "2,3-dihydroxybutanedioate": [
-  78,
-  60.1,
-  0.4
- ],
- "sodium benzoate": [
-  74,
-  89.51,
-  null
- ],
- "zinc diperchlorate": [
-  128,
-  63.14,
-  0.04
- ],
- "disodium hydrogen 2-hydroxypropane-1,2,3-tricarboxylate": [
-  120,
-  86.157,
-  null
- ],
- "sodium dihydrogen 2-hydroxypropane-1,2,3-tricarboxylate": [
-  110,
-  102.6137,
-  null
- ],
- "butyl(triethyl)azanium bromide": [
-  126,
-  203.45,
-  0.08
- ],
- "dibutyl(diethyl)azanium bromide": [
-  142,
-  224.47,
-  0.05
- ],
- "tributyl(ethyl)azanium bromide": [
-  158,
-  279.87,
-  0.04
- ],
- "praseodymium(3+) trichloride": [
-  110,
-  10.96,
-  null
- ],
- "neodymium(3+) trichloride": [
-  111,
-  10.18,
-  null
- ],
- "samarium(3+) trichloride": [
-  113,
-  11.16,
-  null
- ],
- "gadolinium(3+) trichloride": [
-  115,
-  13.08,
-  null
- ],
- "terbium(3+) trichloride": [
-  116,
-  13.25,
-  null
- ],
- "dysprosium(3+) trichloride": [
-  117,
-  12.66,
-  null
- ],
- "holmium(3+) trichloride": [
-  118,
-  11.73,
-  null
- ],
- "erbium(3+) trichloride": [
-  119,
-  10.63,
-  null
- ],
- "ytterbium(3+) trichloride": [
-  121,
-  9.27,
-  null
- ],
- "lanthanum trinitrate": [
-  150,
-  49.37,
-  null
- ],
- "neodymium(3+) trinitrate": [
-  153,
-  44.74,
-  null
- ],
- "erbium(3+) trinitrate": [
-  161,
-  45.28,
-  null
- ],
- "ytterbium(3+) trinitrate": [
-  163,
-  43.37,
-  null
- ],
- "calcium sulfate": [
-  68,
-  -3.87,
-  null
- ],
- "1H-imidazol-3-ium chloride": [
-  54,
-  76.0,
-  null
- ],
- "1H-imidazole": [
-  36,
-  60.0,
-  null
- ],
- "(2-hydroxyethyl)trimethylazanium acetate": [
-  90,
-  163.93,
-  0.022
- ],
- "potassium 3-methoxy-3-oxopropanoate": [
-  80,
-  82.939,
-  null
- ],
- "potassium 3-ethoxy-3-oxopropanoate": [
-  88,
-  99.149,
-  null
- ],
- "1-hexyl-3-methyl-1H-imidazol-3-ium chloride": [
-  110,
-  192.499,
-  null
- ],
- "dipotassium hydrogen phosphate": [
-  86,
-  34.4,
-  0.7
- ],
- "tripotassium phosphate": [
-  104,
-  25.2,
-  2.5
- ],
- "trisodium phosphate": [
-  80,
-  -12.2,
-  1.7
- ],
- "lithium dihydrogen phosphate": [
-  52,
-  34.9,
-  1.1
- ],
- "disodium hydrogen phosphate": [
-  70,
-  14.2,
-  8.4
- ],
- "sodium hydrogen 2,3-dihydroxybutanedioate": [
-  88,
-  71.01,
-  null
- ],
- "potassium sodium 2,3-dihydroxybutanedioate": [
-  106,
-  67.44,
-  null
- ],
- "diammonium 2,3-dihydroxybutanedioate": [
-  98,
-  96.06,
-  null
- ],
- "hydrogen 2,3-dihydroxybutanedioate": [
-  78,
-  72.22,
-  null
- ],
- "hydrogen 2-hydroxypropane-1,2,3-tricarboxylate": [
-  100,
-  88.5,
-  null
- ],
- "disodium 2-hydroxybutanedioate": [
-  90,
-  66.77,
-  null
- ],
- "2-hydroxybutanedioate": [
-  70,
-  69.19,
-  null
- ],
- "hydrogen 2-hydroxybutanedioate": [
-  70,
-  75.4,
-  null
- ],
- "disodium (2Z)-but-2-enedioate": [
-  80,
-  47.69,
-  null
- ],
- "(2Z)-but-2-enedioate": [
-  60,
-  50.11,
-  null
- ],
- "hydrogen (2Z)-but-2-enedioate": [
-  60,
-  61.6,
-  null
- ],
- "ethanedioate": [
-  46,
-  25.02,
-  null
- ],
- "hydrogen ethanedioate": [
-  46,
-  34.0,
-  null
- ],
- "sodium 2-hydroxypropanoate": [
-  58,
-  54.7,
-  null
- ],
- "2-hydroxypropanoate": [
-  48,
-  55.9,
-  null
- ],
- "(5R)-5-[(1S)-1,2-dihydroxyethyl]-3,4-dihydroxyfuran-2(5H)-one": [
-  92,
-  106.49,
-  0.08
- ],
- "4-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}butane-1-sulfonic acid": [
-  138,
-  169.24,
-  null
- ],
- "3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}-2-hydroxypropane-1-sulfonic acid": [
-  138,
-  153.12,
-  0.5
- ],
- "2,2'-(piperazine-1,4-diyl)bis(ethane-1-sulfonic acid)": [
-  160,
-  188.6,
-  6.4
- ],
- "2-(cyclohexylamino)ethane-1-sulfonic acid": [
-  112,
-  146.6,
-  6.4
- ],
- "3-(cyclohexylamino)propane-1-sulfonic acid": [
-  120,
-  160.0,
-  6.4
- ],
- "2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol": [
-  114,
-  152.5,
-  6.4
- ],
- "2-[bis(2-hydroxyethyl)amino]acetic acid": [
-  88,
-  115.9,
-  6.4
- ],
- "2-[bis(carboxymethyl)amino]acetamide": [
-  100,
-  122.8,
-  6.4
- ],
- "1,4-disulfanylbutane-2,3-diol": [
-  82,
-  103.6,
-  6.4
- ],
- "3,3',3''-phosphanetriyltripropanoic acid": [
-  132,
-  169.3,
-  6.4
- ],
- "2-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}acetic acid": [
-  96,
-  121.5,
-  6.4
- ],
- "3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}propane-1-sulfonic acid": [
-  130,
-  160.3,
-  6.4
- ],
- "2-hydroxypropane-1,2,3-tricarboxylic acid": [
-  100,
-  112.44,
-  null
- ],
- "2-hydroxybutanedioic acid": [
-  70,
-  88.22,
-  null
- ],
- "(2Z)-but-2-enedioic acid": [
-  60,
-  75.65,
-  null
- ],
- "2-(morpholin-4-yl)ethane-1-sulfonic acid": [
-  104,
-  129.51,
-  0.04
- ],
- "3-(morpholin-4-yl)propane-1-sulfonic acid": [
-  112,
-  145.71,
-  0.4
- ],
- "2-hydroxy-3-(morpholin-4-yl)propane-1-sulfonic acid": [
-  120,
-  145.92,
-  0.06
- ],
- "4-(morpholin-4-yl)butane-1-sulfonic acid": [
-  120,
-  160.25,
-  0.09
- ],
- "2-(dimethylamino)ethan-1-ol": [
-  50,
-  93.5,
-  0.1
- ],
- "2-amino-2-(hydroxymethyl)propane-1,3-diol": [
-  66,
-  90.63,
-  0.05
- ],
- "2-[4-(2-hydroxyethyl)piperazin-1-yl]ethane-1-sulfonic acid": [
-  128,
-  152.8,
-  3.1
- ],
- "methane": [
-  10,
-  37.3,
-  null
- ],
- "ethane": [
-  18,
-  51.2,
-  null
- ],
- "propane": [
-  26,
-  67.0,
-  null
- ],
- "fluoromethane": [
-  18,
-  35.9,
-  null
- ],
- "chloromethane": [
-  26,
-  46.2,
-  null
- ],
- "dichloromethane": [
-  42,
-  58.1,
-  null
- ],
- "trichloromethane": [
-  58,
-  72.3,
-  null
- ],
- "bromomethane": [
-  44,
-  53.0,
-  null
- ],
- "iodomethane": [
-  62,
-  63.7,
-  null
- ],
- "bromoethane": [
-  52,
-  66.7,
-  null
- ],
- "1-bromopropane": [
-  60,
-  82.2,
-  null
- ],
- "3-bromoprop-1-ene": [
-  58,
-  77.6,
-  null
- ],
- "benzene": [
-  42,
-  83.1,
-  null
- ],
- "methylbenzene": [
-  50,
-  97.7,
-  null
- ],
- "nitrobenzene": [
-  64,
-  97.7,
-  null
- ],
- "Methanol": [
-  18,
-  38.17,
-  0.1
- ],
- "Ethanol": [
-  26,
-  55.08,
-  0.07
- ],
- "prop-2-en-1-ol": [
-  32,
-  64.3,
-  null
- ],
- "butan-1-ol": [
-  42,
-  86.6,
-  null
- ],
- "hexan-1-ol": [
-  58,
-  118.7,
-  null
- ],
- "2-methoxyethan-1-ol": [
-  42,
-  75.2,
-  null
- ],
- "2-ethoxyethan-1-ol": [
-  50,
-  91.2,
-  null
- ],
- "2-propoxyethan-1-ol": [
-  58,
-  107.1,
-  null
- ],
- "2-butoxyethan-1-ol": [
-  66,
-  123.0,
-  null
- ],
- "cyclobutan-1-ol": [
-  40,
-  75.6,
-  null
- ],
- "cyclopentan-1-ol": [
-  48,
-  89.0,
-  null
- ],
- "cyclohexan-1-ol": [
-  56,
-  103.5,
-  null
- ],
- "cyclooctan-1-ol": [
-  72,
-  129.7,
-  null
- ],
- "cyclopropylmethanol": [
-  40,
-  76.0,
-  null
- ],
- "1-cyclopropylethan-1-ol": [
-  48,
-  92.4,
-  null
- ],
- "ethane-1,2-diol": [
-  34,
-  54.6,
-  null
- ],
- "propane-1,2-diol": [
-  42,
-  71.2,
-  null
- ],
- "propane-1,3-diol": [
-  42,
-  71.9,
-  null
- ],
- "butane-1,4-diol": [
-  50,
-  88.3,
-  null
- ],
- "butane-2,3-diol": [
-  50,
-  86.6,
-  null
- ],
- "hexane-1,6-diol": [
-  66,
-  120.4,
-  null
- ],
- "octane-1,8-diol": [
-  82,
-  152.6,
-  null
- ],
- "2-(2-hydroxyethoxy)ethan-1-ol": [
-  58,
-  92.2,
-  null
- ],
- "2-[2-(2-hydroxyethoxy)ethoxy]ethan-1-ol": [
-  82,
-  129.3,
-  null
- ],
- "2-{2-[2-(2-hydroxyethoxy)ethoxy]ethoxy}ethan-1-ol": [
-  106,
-  166.3,
-  null
- ],
- "propane-1,2,3-triol": [
-  50,
-  70.6,
-  null
- ],
- "meso-butane-1,2,3,4-tetrol": [
-  66,
-  87.1,
-  null
- ],
- "2,2-bis(hydroxymethyl)propane-1,3-diol": [
-  74,
-  101.8,
-  null
- ],
- "cis-cyclohexane-1,2-diol": [
-  64,
-  101.3,
-  null
- ],
- "trans-cyclohexane-1,2-diol": [
-  64,
-  103.0,
-  null
- ],
- "cyclohexane-1,4-diol": [
-  64,
-  105.3,
-  null
- ],
- "cis-cyclooctane-1,5-diol": [
-  80,
-  132.5,
-  null
- ],
- "adamantane-1,3-diol": [
-  92,
-  138.2,
-  null
- ],
- "adamantane-1,4-diol": [
-  92,
-  139.3,
-  null
- ],
- "Phenol": [
-  50,
-  86.17,
-  0.2
- ],
- "4-nitrophenol": [
-  72,
-  98.2,
-  null
- ],
- "benzene-1,2-diol": [
-  58,
-  87.1,
-  null
- ],
- "benzene-1,3-diol": [
-  58,
-  88.9,
-  null
- ],
- "benzene-1,4-diol": [
-  58,
-  88.7,
-  null
- ],
- "2-aminoethan-1-ol": [
-  34,
-  59.3,
-  null
- ],
- "3-aminopropan-1-ol": [
-  42,
-  75.2,
-  null
- ],
- "4-aminobutan-1-ol": [
-  50,
-  91.2,
-  null
- ],
- "6-aminohexan-1-ol": [
-  66,
-  123.4,
-  null
- ],
- "2-(methylamino)ethan-1-ol": [
-  42,
-  77.1,
-  null
- ],
- "2-(ethylamino)ethan-1-ol": [
-  50,
-  92.9,
-  null
- ],
- "2-(diethylamino)ethan-1-ol": [
-  66,
-  123.0,
-  null
- ],
- "2,2'-(azanediyl)bis(ethan-1-ol)": [
-  58,
-  94.4,
-  null
- ],
- "2,2'-(ethylazanediyl)bis(ethan-1-ol)": [
-  74,
-  125.0,
-  null
- ],
- "2,2',2''-nitrilotris(ethan-1-ol)": [
-  82,
-  127.8,
-  null
- ],
- "ethoxyethane": [
-  42,
-  90.4,
-  null
- ],
- "Dimethoxymethane": [
-  42,
-  80.42,
-  0.1
- ],
- "Diethoxymethane": [
-  58,
-  113.88,
-  0.03
- ],
- "Tetramethoxymethane": [
-  74,
-  126.2,
-  0.4
- ],
- "1,2-Dimethoxyethane": [
-  50,
-  95.86,
-  0.05
- ],
- "1,2-Diethoxyethane": [
-  66,
-  127.29,
-  0.02
- ],
- "1-methoxy-2-(2-methoxyethoxy)ethane": [
-  74,
-  132.7,
-  null
- ],
- "1-ethoxy-2-(2-ethoxyethoxy)ethane": [
-  90,
-  165.0,
-  null
- ],
- "2,5,8,11-tetraoxadodecane": [
-  98,
-  169.7,
-  null
- ],
- "2,5,8,11,14-pentaoxapentadecane": [
-  122,
-  206.8,
-  null
- ],
- "ethanal": [
-  24,
-  43.7,
-  null
- ],
- "benzaldehyde": [
-  56,
-  96.1,
-  null
- ],
- "3-hydroxybenzaldehyde": [
-  64,
-  97.9,
-  null
- ],
- "4-hydroxybenzaldehyde": [
-  64,
-  96.9,
-  null
- ],
- "propan-2-one": [
-  32,
-  66.9,
-  null
- ],
- "butan-2-one": [
-  40,
-  82.5,
-  null
- ],
- "pentan-2-one": [
-  48,
-  98.0,
-  null
- ],
- "hexane-2,5-dione": [
-  62,
-  111.6,
-  null
- ],
- "cyclobutan-1-one": [
-  38,
-  70.9,
-  null
- ],
- "cyclohexan-1-one": [
-  54,
-  99.7,
-  null
- ],
- "cyclooctan-1-one": [
-  70,
-  128.0,
-  null
- ],
- "cyclononan-1-one": [
-  78,
-  142.0,
-  null
- ],
- "cyclohexane-1,4-dione": [
-  60,
-  92.8,
-  null
- ],
- "adamantan-2-one": [
-  82,
-  137.2,
-  null
- ],
- "Formic acid": [
-  24,
-  34.69,
-  0.05
- ],
- "Acetic acid": [
-  32,
-  51.92,
-  0.1
- ],
- "Propanoic acid": [
-  40,
-  67.9,
-  0.1
- ],
- "Butanoic acid": [
-  48,
-  84.61,
-  0.1
- ],
- "Hexanoic acid": [
-  64,
-  116.55,
-  0.1
- ],
- "2-hydroxyacetic acid": [
-  40,
-  51.8,
-  null
- ],
- "2-hydroxypropanoic acid": [
-  48,
-  69.4,
-  null
- ],
- "2-Hydroxybutanoic acid": [
-  56,
-  85.45,
-  0.1
- ],
- "2-Hydroxyhexanoic acid": [
-  72,
-  117.26,
-  0.1
- ],
- "ethanedioic acid": [
-  46,
-  49.1,
-  null
- ],
- "propanedioic acid": [
-  54,
-  67.2,
-  null
- ],
- "butanedioic acid": [
-  62,
-  82.9,
-  null
- ],
- "hexanedioic acid": [
-  78,
-  115.7,
-  null
- ],
- "2,3-dihydroxybutanedioic acid": [
-  78,
-  84.0,
-  null
- ],
- "Ethyl formate": [
-  40,
-  72.8,
-  0.7
- ],
- "Ethyl acetate": [
-  48,
-  88.9,
-  0.1
- ],
- "dimethyl ethanedioate": [
-  62,
-  91.4,
-  null
- ],
- "Oxetane": [
-  32,
-  61.35,
-  0.05
- ],
- "oxolane": [
-  40,
-  76.9,
-  null
- ],
- "oxane": [
-  48,
-  91.7,
-  null
- ],
- "Oxepane": [
-  56,
-  105.46,
-  0.1
- ],
- "oxolan-2-ylmethanol": [
-  56,
-  93.8,
-  null
- ],
- "2,5-dimethoxyoxolane": [
-  72,
-  122.3,
-  null
- ],
- "oxan-2-ylmethanol": [
-  64,
-  108.1,
-  null
- ],
- "1,3-Dioxolane": [
-  40,
-  65.37,
-  0.1
- ],
- "1,3-Dioxane": [
-  48,
-  80.82,
-  0.02
- ],
- "1,4-Dioxane": [
-  48,
-  80.94,
-  0.1
- ],
- "1,3-Dioxepane": [
-  56,
-  95.98,
-  0.1
- ],
- "1,3,5-Trioxane": [
-  48,
-  69.51,
-  0.3
- ],
- "2,4,6-trimethyl-1,3,5-trioxane": [
-  72,
-  123.7,
-  null
- ],
- "1,4,7,10-tetraoxacyclododecane": [
-  96,
-  149.9,
-  null
- ],
- "1,4,7,10,13-pentaoxacyclopentadecane": [
-  120,
-  186.1,
-  null
- ],
- "1,4,7,10,13,16-hexaoxacyclooctadecane": [
-  144,
-  223.4,
-  null
- ],
- "methanamine": [
-  18,
-  41.9,
-  null
- ],
- "ethanamine": [
-  26,
-  58.6,
-  null
- ],
- "butan-1-amine": [
-  42,
-  89.8,
-  null
- ],
- "hexan-1-amine": [
-  58,
-  121.6,
-  null
- ],
- "N-methylmethanamine": [
-  26,
-  59.2,
-  null
- ],
- "N-ethylethanamine": [
-  42,
-  91.7,
-  null
- ],
- "N-butylbutan-1-amine": [
-  74,
-  155.4,
-  null
- ],
- "N,N-dimethylmethanamine": [
-  34,
-  79.0,
-  null
- ],
- "N,N-diethylethanamine": [
-  58,
-  120.9,
-  null
- ],
- "Cyclopentanamine": [
-  48,
-  90.98,
-  0.18
- ],
- "Cyclohexanamine": [
-  56,
-  105.35,
-  0.17
- ],
- "Cyclooctanamine": [
-  72,
-  133.4,
-  0.2
- ],
- "adamantan-1-amine": [
-  84,
-  138.9,
-  null
- ],
- "Aniline": [
-  50,
-  89.3,
-  0.1
- ],
- "ethane-1,2-diamine": [
-  34,
-  62.7,
-  null
- ],
- "propane-1,3-diamine": [
-  42,
-  78.4,
-  null
- ],
- "butane-1,4-diamine": [
-  50,
-  93.6,
-  null
- ],
- "hexane-1,6-diamine": [
-  66,
-  124.8,
-  null
- ],
- "octane-1,8-diamine": [
-  82,
-  157.3,
-  null
- ],
- "decane-1,10-diamine": [
-  98,
-  188.3,
-  null
- ],
- "trans-cyclohexane-1,4-diamine": [
-  64,
-  108.9,
-  null
- ],
- "N-(2-aminoethyl)ethane-1,2-diamine": [
-  58,
-  101.2,
-  null
- ],
- "N,N'-bis(2-aminoethyl)ethane-1,2-diamine": [
-  82,
-  137.6,
-  null
- ],
- "3,6,9-triazaundecane-1,11-diamine": [
-  106,
-  175.9,
-  null
- ],
- "Formamide": [
-  24,
-  38.5,
-  0.1
- ],
- "Acetamide": [
-  32,
-  55.7,
-  0.2
- ],
- "Propanamide": [
-  40,
-  71.5,
-  0.1
- ],
- "butanamide": [
-  48,
-  87.1,
-  null
- ],
- "hexanamide": [
-  64,
-  119.2,
-  null
- ],
- "N-Methylformamide": [
-  32,
-  56.83,
-  0.1
- ],
- "N-ethylformamide": [
-  40,
-  74.0,
-  null
- ],
- "N-propylformamide": [
-  48,
-  87.9,
-  null
- ],
- "N-Methylacetamide": [
-  40,
-  74.04,
-  0.1
- ],
- "N-ethylacetamide": [
-  48,
-  90.7,
-  null
- ],
- "N-propylacetamide": [
-  56,
-  105.1,
-  null
- ],
- "N-methylpropanamide": [
-  48,
-  89.8,
-  null
- ],
- "N-ethylpropanamide": [
-  56,
-  105.4,
-  null
- ],
- "N-propylpropanamide": [
-  64,
-  121.5,
-  null
- ],
- "N,N-dimethylformamide": [
-  40,
-  74.5,
-  null
- ],
- "N,N-Diethylformamide": [
-  56,
-  106.7,
-  0.5
- ],
- "N,N-Dimethylacetamide": [
-  48,
-  89.7,
-  0.8
- ],
- "N,N-Diethylacetamide": [
-  64,
-  121.5,
-  0.3
- ],
- "N,N-dipropylacetamide": [
-  80,
-  154.2,
-  null
- ],
- "N,N-di(propan-2-yl)acetamide": [
-  80,
-  152.0,
-  null
- ],
- "N,N-dimethylpropanamide": [
-  56,
-  105.4,
-  null
- ],
- "N,N-diethylpropanamide": [
-  72,
-  137.7,
-  null
- ],
- "2-hydroxyacetamide": [
-  40,
-  56.2,
-  null
- ],
- "2-hydroxypropanamide": [
-  48,
-  73.3,
-  null
- ],
- "4-Hydroxybutanamide": [
-  56,
-  88.9,
-  0.13
- ],
- "6-Hydroxyhexanamide": [
-  72,
-  121.1,
-  0.2
- ],
- "ethanediamide": [
-  46,
-  55.0,
-  null
- ],
- "propanediamide": [
-  54,
-  72.6,
-  null
- ],
- "butanediamide": [
-  62,
-  88.8,
-  null
- ],
- "N,N,N',N'-tetramethyloctanediamide": [
-  126,
-  224.0,
-  null
- ],
- "Urea": [
-  32,
-  44.23,
-  0.05
- ],
- "1-methylurea": [
-  40,
-  62.1,
-  null
- ],
- "1-ethylurea": [
-  48,
-  80.2,
-  null
- ],
- "1-propylurea": [
-  56,
-  94.7,
-  null
- ],
- "1-butylurea": [
-  64,
-  116.1,
-  null
- ],
- "1-(propan-2-yl)urea": [
-  56,
-  99.0,
-  null
- ],
- "1,1-dimethylurea": [
-  48,
-  78.9,
-  null
- ],
- "1,3-dimethylurea": [
-  48,
-  80.0,
-  null
- ],
- "1,1-diethylurea": [
-  64,
-  114.9,
-  null
- ],
- "1,3-diethylurea": [
-  64,
-  116.1,
-  null
- ],
- "1,1,3,3-tetramethylurea": [
-  64,
-  115.6,
-  null
- ],
- "2-(carbamoylamino)acetic acid": [
-  62,
-  77.6,
-  null
- ],
- "acetonitrile": [
-  22,
-  47.4,
-  null
- ],
- "propanenitrile": [
-  30,
-  64.3,
-  null
- ],
- "butanenitrile": [
-  38,
-  80.6,
-  null
- ],
- "hexanenitrile": [
-  54,
-  111.9,
-  null
- ],
- "octanenitrile": [
-  70,
-  146.2,
-  null
- ],
- "4-hydroxybenzonitrile": [
-  62,
-  98.3,
-  null
- ],
- "Aziridine": [
-  24,
-  48.87,
-  0.02
- ],
- "Azetidine": [
-  32,
-  63.71,
-  0.01
- ],
- "Pyrrolidine": [
-  40,
-  77.77,
-  0.01
- ],
- "Piperidine": [
-  48,
-  92.3,
-  0.5
- ],
- "azepane": [
-  56,
-  105.6,
-  null
- ],
- "azocane": [
-  64,
-  120.1,
-  null
- ],
- "Pyridine": [
-  42,
-  77.4,
-  0.2
- ],
- "1-methylpyrrolidin-2-one": [
-  54,
-  90.7,
-  null
- ],
- "pyrrolidine-2,5-dione": [
-  52,
-  72.3,
-  null
- ],
- "1-Methylpiperidine": [
-  56,
-  110.54,
-  0.02
- ],
- "piperidin-2-one": [
-  54,
-  90.3,
-  null
- ],
- "azepan-2-one": [
-  62,
-  105.0,
-  null
- ],
- "pyridin-4-amine": [
-  50,
-  82.7,
-  null
- ],
- "pyridin-3-ol": [
-  50,
-  75.4,
-  null
- ],
- "4,4'-Bipyridine": [
-  82,
-  133.21,
-  0.5
- ],
- "1H-pyrazole": [
-  36,
-  62.3,
-  null
- ],
- "Piperazine": [
-  48,
-  83.41,
-  0.1
- ],
- "Pyrazine": [
-  42,
-  70.82,
-  0.5
- ],
- "pyrimidine": [
-  42,
-  70.3,
-  null
- ],
- "Pyridazine": [
-  42,
-  70.33,
-  0.5
- ],
- "1,3,5-Triazine": [
-  42,
-  70.42,
-  0.5
- ],
- "imidazolidine-2,4-dione": [
-  52,
-  65.0,
-  null
- ],
- "1-Methylpiperazine": [
-  56,
-  102.3,
-  0.03
- ],
- "piperazine-2,5-dione": [
-  60,
-  76.7,
-  null
- ],
- "1,4-dimethylpiperazine-2,5-dione": [
-  76,
-  113.4,
-  null
- ],
- "3,6-dimethylpiperazine-2,5-dione": [
-  76,
-  112.4,
-  null
- ],
- "1,4-diazabicyclo[2.2.2]octane": [
-  62,
-  105.9,
-  null
- ],
- "1,3,5,7-tetraazatricyclo[3.3.1.1(3,7)]decane": [
-  76,
-  111.4,
-  null
- ],
- "1H-benzimidazole": [
-  62,
-  98.5,
-  null
- ],
- "1H-benzotriazole": [
-  62,
-  94.5,
-  null
- ],
- "Quinoline": [
-  68,
-  115.53,
-  0.5
- ],
- "Quinazoline": [
-  68,
-  108.48,
-  0.5
- ],
- "Quinoxaline": [
-  68,
-  109.16,
-  0.5
- ],
- "1,10-Phenanthroline": [
-  94,
-  142.42,
-  0.5
- ],
- "7H-purine": [
-  62,
-  85.4,
-  null
- ],
- "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione": [
-  102,
-  145.2,
-  null
- ],
- "Morpholine": [
-  48,
-  82.56,
-  0.03
- ],
- "4-Methylmorpholine": [
-  56,
-  92.99,
-  0.03
- ],
- "benzenethiol": [
-  58,
-  94.1,
-  null
- ],
- "methanesulfinylmethane": [
-  42,
-  68.9,
-  null
- ],
- "ethanethioamide": [
-  40,
-  66.4,
-  null
- ],
- "thiourea": [
-  40,
-  54.0,
-  null
- ],
- "hydrazinecarbothioamide": [
-  48,
-  64.0,
-  null
- ],
- "2-sulfanylideneimidazolidin-4-one": [
-  60,
-  76.5,
-  null
- ],
- "Glycine": [
-  40,
-  43.26,
-  0.07
- ],
- "(2S)-2-aminopropanoic acid": [
-  48,
-  60.5,
-  null
- ],
- "(2S)-2-amino-3-methylbutanoic acid": [
-  64,
-  90.8,
-  null
- ],
- "(2S)-2-amino-4-methylpentanoic acid": [
-  72,
-  107.8,
-  null
- ],
- "(2S,3S)-2-amino-3-methylpentanoic acid": [
-  72,
-  105.8,
-  null
- ],
- "(2S)-2-amino-3-hydroxypropanoic acid": [
-  56,
-  60.6,
-  null
- ],
- "(2S,3R)-2-amino-3-hydroxybutanoic acid": [
-  64,
-  76.9,
-  null
- ],
- "(2R)-2-amino-3-sulfanylpropanoic acid": [
-  64,
-  73.5,
-  null
- ],
- "(2S)-2-amino-4-(methylsulfanyl)butanoic acid": [
-  80,
-  105.6,
-  null
- ],
- "(2S)-pyrrolidine-2-carboxylic acid": [
-  62,
-  82.8,
-  null
- ],
- "(2S)-2-amino-3-phenylpropanoic acid": [
-  88,
-  121.5,
-  null
- ],
- "(2S)-2-amino-3-(4-hydroxyphenyl)propanoic acid": [
-  96,
-  123.6,
-  null
- ],
- "2-amino-3-(1H-indol-3-yl)propanoic acid": [
-  108,
-  143.9,
-  null
- ],
- "(2S)-2-aminobutanedioic acid": [
-  70,
-  74.8,
-  null
- ],
- "(2S)-2,4-diamino-4-oxobutanoic acid": [
-  70,
-  78.0,
-  null
- ],
- "(2S)-2-aminopentanedioic acid": [
-  78,
-  89.9,
-  null
- ],
- "(2S)-2,5-diamino-5-oxopentanoic acid": [
-  78,
-  93.9,
-  null
- ],
- "(2S)-2-amino-5-carbamimidamidopentanoic acid": [
-  94,
-  127.4,
-  null
- ],
- "(2S)-2-amino-3-(1H-imidazol-4-yl)propanoic acid": [
-  82,
-  98.3,
-  null
- ],
- "2-Aminobutanoic acid": [
-  56,
-  75.6,
-  0.1
- ],
- "3-Aminobutanoic acid": [
-  56,
-  76.3,
-  0.2
- ],
- "4-Aminobutanoic acid": [
-  56,
-  73.2,
-  0.2
- ],
- "6-Aminohexanoic acid": [
-  72,
-  104.2,
-  0.2
- ],
- "8-Aminooctanoic acid": [
-  88,
-  136.1,
-  0.1
- ],
- "2-(trimethylazaniumyl)acetate": [
-  64,
-  97.7,
-  null
- ],
- "glycylglycine": [
-  70,
-  76.3,
-  null
- ],
- "Triglycine": [
-  100,
-  112.2,
-  0.3
- ],
- "Tetraglycine": [
-  130,
-  149.7,
-  0.1
- ],
- "Pentaglycine": [
-  160,
-  187.1,
-  0.1
- ],
- "L-alanyl-L-alanine": [
-  86,
-  110.6,
-  null
- ],
- "L-alanyl-L-alanyl-L-alanine": [
-  124,
-  163.8,
-  null
- ],
- "L-alanyl-L-alanyl-L-alanyl-L-alanine": [
-  162,
-  220.1,
-  null
- ],
- "L-seryl-L-serine": [
-  102,
-  111.8,
-  null
- ],
- "L-seryl-L-seryl-L-serine": [
-  148,
-  166.0,
-  null
- ],
- "Glycyl-L-alanine": [
-  78,
-  92.66,
-  0.06
- ],
- "L-alanylglycine": [
-  78,
-  95.0,
-  null
- ],
- "glycyl-L-alanylglycine": [
-  108,
-  132.4,
-  null
- ],
- "glycyl-L-serylglycine": [
-  116,
-  133.1,
-  null
- ],
- "dihydrouracil": [
-  60,
-  76.3,
-  null
- ],
- "cytidine": [
-  128,
-  152.11,
-  0.016
- ],
- "uridine": [
-  128,
-  151.4,
-  0.015
- ],
- "thymidine": [
-  128,
-  168.2,
-  0.003
- ],
- "D-Ribose": [
-  80,
-  95.2,
-  0.1
- ],
- "2-deoxy-D-ribose": [
-  72,
-  94.7,
-  0.4
- ],
- "D-Glucose": [
-  96,
-  111.7,
-  0.3
- ],
- "2-Deoxy-D-glucose": [
-  88,
-  110.4,
-  0.5
- ],
- "D-Fructose": [
-  96,
-  110.4,
-  0.4
- ],
- "Sucrose": [
-  182,
-  211.3,
-  0.3
- ],
- "D-Mannitol": [
-  98,
-  119.4,
-  0.3
- ],
- "D-glucitol": [
-  98,
-  119.5,
-  null
- ],
- "D-glucuronic acid": [
-  102,
-  110.2,
-  null
- ],
- "uracil": [
-  58,
-  74.74,
-  0.016
- ],
- "thymine": [
-  66,
-  88.9,
-  0.006
- ],
- "adenine": [
-  70,
-  81.12,
-  0.02
- ],
- "cytosine": [
-  58,
-  75.42,
-  0.02
- ],
- "adenosine": [
-  140,
-  171.43,
-  0.18
- ],
- "adenosine 5'-monophosphate sodium salt": [
-  190,
-  189.1,
-  0.2
- ],
- "adenosine 5'-triphosphate disodium salt": [
-  280,
-  238.9,
-  0.4
- ],
- "2'-deoxyadenosine": [
-  132,
-  169.8,
-  0.6
- ],
- "inosine": [
-  140,
-  166.1,
-  0.054
- ],
- "guanosine": [
-  148,
-  178.2,
-  0.6
- ],
- "2'-deoxyuridine": [
-  120,
-  152.2,
-  0.4
- ],
- "2'-deoxyinosine": [
-  132,
-  163.677,
-  0.075
- ],
- "2'-deoxyguanosine": [
-  140,
-  169.26,
-  0.11
- ],
- "purine": [
-  62,
-  83.3,
-  0.4
- ],
- "hypoxanthine": [
-  70,
-  80.9,
-  0.4
- ],
- "2'-deoxycytidine": [
-  120,
-  153.0,
-  0.6
- ],
- "guanine": [
-  78,
-  91.6,
-  1.0
- ],
- "N-(3-aminopropyl)butane-1,4-diamine": [
-  82,
-  153.7,
-  15.0
- ],
- "N-(3-aminopropyl)butane-1,4-diaminium": [
-  82,
-  137.5,
-  15.0
- ],
- "N,N'-bis(3-aminopropyl)butane-1,4-diamine": [
-  114,
-  213.0,
-  20.0
- ],
- "N,N'-bis(3-aminopropyl)butane-1,4-diaminium": [
-  114,
-  191.4,
-  20.0
- ],
- "1-Propanol": [
-  34,
-  70.7,
-  0.1
- ],
- "2-Propanol": [
-  34,
-  71.9,
-  0.1
- ],
- "1-Butanol": [
-  42,
-  86.6,
-  0.1
- ],
- "2-Methyl-1-propanol": [
-  42,
-  86.7,
-  0.1
- ],
- "2-Butanol": [
-  42,
-  86.62,
-  0.1
- ],
- "2-Methyl-2-propanol": [
-  42,
-  87.75,
-  0.07
- ],
- "1-Pentanol": [
-  50,
-  102.68,
-  0.13
- ],
- "2,2-Dimethyl-1-propanol": [
-  50,
-  101.87,
-  0.06
- ],
- "2-Pentanol": [
-  50,
-  102.55,
-  0.1
- ],
- "3-Pentanol": [
-  50,
-  101.21,
-  0.1
- ],
- "2-Methyl-2-butanol": [
-  50,
-  102.5,
-  null
- ],
- "1-Hexanol": [
-  58,
-  118.65,
-  0.1
- ],
- "2-Hexanol": [
-  58,
-  118.49,
-  0.1
- ],
- "3-Hexanol": [
-  58,
-  117.14,
-  0.09
- ],
- "1-Heptanol": [
-  66,
-  133.43,
-  null
- ],
- "2-Heptanol": [
-  66,
-  134.39,
-  0.1
- ],
- "3-Heptanol": [
-  66,
-  133.3,
-  0.2
- ],
- "4-Heptanol": [
-  66,
-  133.3,
-  0.2
- ],
- "Allyl alcohol": [
-  32,
-  64.3,
-  null
- ],
- "Cyclobutanol": [
-  40,
-  75.6,
-  0.1
- ],
- "Cyclopentanol": [
-  48,
-  89.0,
-  0.5
- ],
- "Cyclohexanol": [
-  56,
-  103.5,
-  0.5
- ],
- "Cycloheptanol": [
-  64,
-  116.88,
-  0.1
- ],
- "Cyclooctanol": [
-  72,
-  129.7,
-  0.4
- ],
- "Cyclopropanemethanol": [
-  40,
-  76.0,
-  0.2
- ],
- "Cyclopentanemethanol": [
-  56,
-  103.6,
-  0.7
- ],
- "alpha-Methylcyclopentanemethanol": [
-  64,
-  118.2,
-  0.7
- ],
- "Cyclohexanemethanol": [
-  64,
-  118.1,
-  0.7
- ],
- "Benzyl alcohol": [
-  58,
-  100.82,
-  null
- ],
- "Diethyl ether": [
-  42,
-  90.4,
-  0.5
- ],
- "Diisopropyl ether": [
-  58,
-  115.0,
-  0.6
- ],
- "Oxirane": [
-  24,
-  45.5,
-  null
- ],
- "Tetrahydrofuran": [
-  40,
-  76.85,
-  0.07
- ],
- "2-Methyltetrahydrofuran": [
-  48,
-  94.0,
-  0.1
- ],
- "2,5-Dimethyltetrahydrofuran": [
-  56,
-  111.0,
-  0.03
- ],
- "Ammonia": [
-  10,
-  24.85,
-  0.1
- ],
- "Methylamine": [
-  18,
-  41.88,
-  0.3
- ],
- "Ethylamine": [
-  26,
-  58.61,
-  0.2
- ],
- "1-Propanamine": [
-  34,
-  74.15,
-  0.1
- ],
- "2-Propanamine": [
-  34,
-  75.5,
-  null
- ],
- "1-Butanamine": [
-  42,
-  89.8,
-  0.1
- ],
- "2-Methyl-1-propanamine": [
-  42,
-  89.5,
-  null
- ],
- "2-Butanamine": [
-  42,
-  89.1,
-  null
- ],
- "2-Methyl-2-propanamine": [
-  42,
-  93.0,
-  null
- ],
- "1-Pentanamine": [
-  50,
-  105.7,
-  0.1
- ],
- "1-Hexanamine": [
-  58,
-  121.6,
-  0.2
- ],
- "1-Heptanamine": [
-  66,
-  137.6,
-  0.3
- ],
- "Cycloheptanamine": [
-  64,
-  118.5,
-  0.2
- ],
- "1-Adamantanamine": [
-  84,
-  138.9,
-  0.3
- ],
- "Benzylamine": [
-  58,
-  104.7,
-  null
- ],
- "Dimethylamine": [
-  26,
-  59.2,
-  0.2
- ],
- "Diethylamine": [
-  42,
-  91.68,
-  0.1
- ],
- "Dipropylamine": [
-  58,
-  123.06,
-  0.1
- ],
- "Dibutylamine": [
-  74,
-  155.4,
-  0.4
- ],
- "Hexahydro-1H-azepine": [
-  56,
-  105.55,
-  null
- ],
- "Octahydroazocine": [
-  64,
-  120.09,
-  null
- ],
- "2,6-Dimethylpiperidine": [
-  64,
-  124.4,
-  0.1
- ],
- "N-Ethyl-N-methylethanamine": [
-  50,
-  106.77,
-  0.1
- ],
- "Triethylamine": [
-  58,
-  120.9,
-  0.1
- ],
- "1-Methylpyrrolidine": [
-  48,
-  97.29,
-  0.02
- ],
- "2-Methylpyridine": [
-  50,
-  94.2,
-  0.2
- ],
- "3-Methylpyridine": [
-  50,
-  93.7,
-  0.1
- ],
- "4-Methylpyridine": [
-  50,
-  94.0,
-  0.3
- ],
- "2,6-Dimethylpyridine": [
-  58,
-  109.9,
-  0.1
- ],
- "Acetone": [
-  32,
-  66.92,
-  0.1
- ],
- "2-Butanone": [
-  40,
-  82.52,
-  0.1
- ],
- "2-Pentanone": [
-  48,
-  98.0,
-  0.1
- ],
- "3-Pentanone": [
-  48,
-  98.08,
-  null
- ],
- "3-Methyl-2-butanone": [
-  48,
-  95.0,
-  0.3
- ],
- "Cyclobutanone": [
-  38,
-  70.9,
-  0.3
- ],
- "Cyclopentanone": [
-  46,
-  84.5,
-  0.3
- ],
- "Cyclohexanone": [
-  54,
-  99.7,
-  0.4
- ],
- "Cycloheptanone": [
-  62,
-  113.8,
-  0.3
- ],
- "Cyclooctanone": [
-  70,
-  128.0,
-  0.1
- ],
- "Cyclononanone": [
-  78,
-  142.0,
-  0.3
- ],
- "Pentanoic acid": [
-  56,
-  100.5,
-  null
- ],
- "2-Methylbutanoic acid": [
-  56,
-  100.5,
-  null
- ],
- "3-Methylbutanoic acid": [
-  56,
-  100.5,
-  null
- ],
- "2,2-Dimethylpropanoic acid": [
-  56,
-  100.5,
-  null
- ],
- "Benzoic acid": [
-  64,
-  98.77,
-  null
- ],
- "Methyl acetate": [
-  40,
-  72.46,
-  0.05
- ],
- "gamma-Butyrolactone": [
-  46,
-  73.3,
-  null
- ],
- "gamma-Valerolactone": [
-  54,
-  92.0,
-  null
- ],
- "2-Piperidinone": [
-  54,
-  90.3,
-  0.2
- ],
- "Hexahydro-2H-azepin-2-one": [
-  62,
-  105.0,
-  0.2
- ],
- "N,N-Diisopropylacetamide": [
-  80,
-  152.0,
-  null
- ],
- "1-Methyl-2-pyrrolidinone": [
-  54,
-  90.4,
-  null
- ],
- "3-Bromo-1-propene": [
-  58,
-  77.6,
-  null
- ],
- "Diethyl sulfide": [
-  50,
-  99.5,
-  null
- ],
- "Dimethyl sulfoxide": [
-  42,
-  68.92,
-  null
- ],
- "Thioacetamide": [
-  40,
-  66.42,
-  null
- ],
- "Dimethyl carbonate": [
-  48,
-  77.6,
-  null
- ],
- "Diethyl carbonate": [
-  64,
-  113.1,
-  null
- ],
- "Ethylene carbonate": [
-  46,
-  62.3,
-  null
- ],
- "Methylurea": [
-  40,
-  62.1,
-  0.1
- ],
- "Ethylurea": [
-  48,
-  80.2,
-  null
- ],
- "Isopropylurea": [
-  56,
-  99.0,
-  null
- ],
- "Butylurea": [
-  64,
-  116.1,
-  null
- ],
- "N,N-Dimethylurea": [
-  48,
-  78.88,
-  null
- ],
- "N,N-Diethylurea": [
-  64,
-  114.9,
-  null
- ],
- "N,N'-Dimethylurea": [
-  48,
-  80.03,
-  0.1
- ],
- "N,N'-Diethylurea": [
-  64,
-  116.1,
-  null
- ],
- "Ethylene glycol": [
-  34,
-  54.63,
-  0.08
- ],
- "1,2-Propanediol": [
-  42,
-  71.22,
-  0.1
- ],
- "1,3-Propanediol": [
-  42,
-  71.9,
-  0.1
- ],
- "2,3-Butanediol": [
-  50,
-  86.56,
-  0.1
- ],
- "1,3-Butanediol": [
-  50,
-  88.32,
-  0.1
- ],
- "1,4-Butanediol": [
-  50,
-  88.33,
-  0.1
- ],
- "2,2-Dimethyl-1,3-propanediol": [
-  58,
-  102.34,
-  0.01
- ],
- "2,4-Pentanediol": [
-  58,
-  104.64,
-  0.1
- ],
- "1,5-Pentanediol": [
-  58,
-  104.39,
-  0.1
- ],
- "2,5-Hexanediol": [
-  66,
-  120.5,
-  null
- ],
- "1,6-Hexanediol": [
-  66,
-  120.44,
-  0.1
- ],
- "1,7-Heptanediol": [
-  74,
-  136.4,
-  0.1
- ],
- "1,8-Octanediol": [
-  82,
-  152.6,
-  0.1
- ],
- "1,10-Decanediol": [
-  98,
-  184.4,
-  0.6
- ],
- "cis-1,2-Cyclohexanediol": [
-  64,
-  101.3,
-  0.7
- ],
- "trans-1,2-Cyclohexanediol": [
-  64,
-  103.0,
-  0.7
- ],
- "1,4-Cyclohexanediol": [
-  64,
-  105.3,
-  null
- ],
- "trans-1,2-Cycloheptanediol": [
-  72,
-  117.0,
-  0.1
- ],
- "cis-1,5-Cyclooctanediol": [
-  80,
-  132.5,
-  0.3
- ],
- "1,3-Adamantanediol": [
-  92,
-  138.2,
-  0.3
- ],
- "1,4-Adamantanediol": [
-  92,
-  139.3,
-  0.4
- ],
- "Catechol": [
-  58,
-  87.065,
-  null
- ],
- "Resorcinol": [
-  58,
-  88.919,
-  null
- ],
- "Hydroquinone": [
-  58,
-  88.696,
-  null
- ],
- "Glycerol": [
-  50,
-  70.95,
-  null
- ],
- "2-(Hydroxymethyl)-2-methyl-1,3-propanediol": [
-  66,
-  102.3,
-  0.01
- ],
- "meso-Erythritol": [
-  66,
-  87.1,
-  null
- ],
- "Pentaerythritol": [
-  74,
-  101.81,
-  0.01
- ],
- "D-Arabinitol": [
-  82,
-  103.31,
-  null
- ],
- "L-Arabinitol": [
-  82,
-  103.0,
-  null
- ],
- "D-Xylitol": [
-  82,
-  102.4,
-  0.3
- ],
- "Galactitol": [
-  98,
-  119.3,
-  0.3
- ],
- "Sorbitol": [
-  98,
-  119.5,
-  0.4
- ],
- "myo-Inositol": [
-  96,
-  121.0,
-  null
- ],
- "Diglyme": [
-  74,
-  132.7,
-  0.1
- ],
- "Bis(2-ethoxyethyl) ether": [
-  90,
-  165.0,
-  null
- ],
- "Paraldehyde": [
-  72,
-  123.71,
-  0.02
- ],
- "2,5-Dimethoxytetrahydrofuran": [
-  72,
-  122.34,
-  0.04
- ],
- "Tetraglyme": [
-  122,
-  206.76,
-  0.1
- ],
- "2,5-Dimethoxy-2-(dimethoxymethyl)tetrahydrofuran": [
-  112,
-  177.1,
-  0.7
- ],
- "18-Crown-6": [
-  144,
-  223.35,
-  0.1
- ],
- "Hydrazine": [
-  18,
-  30.13,
-  null
- ],
- "Ethylenediamine": [
-  34,
-  67.7,
-  0.2
- ],
- "1,2-Propanediamine": [
-  42,
-  78.1,
-  null
- ],
- "1,3-Propanediamine": [
-  42,
-  78.4,
-  0.4
- ],
- "Cadaverine": [
-  58,
-  109.4,
-  0.1
- ],
- "1,6-Hexanediamine": [
-  66,
-  124.8,
-  0.3
- ],
- "1,7-Heptanediamine": [
-  74,
-  141.52,
-  0.1
- ],
- "1,8-Octanediamine": [
-  82,
-  157.3,
-  0.1
- ],
- "1,9-Nonanediamine": [
-  90,
-  172.85,
-  0.1
- ],
- "1,10-Decanediamine": [
-  98,
-  188.3,
-  0.9
- ],
- "trans-1,4-Cyclohexanediamine": [
-  64,
-  108.9,
-  0.9
- ],
- "1,4-Dimethylpiperazine": [
-  64,
-  121.0,
-  0.02
- ],
- "DABCO": [
-  62,
-  105.93,
-  null
- ],
- "Diethylenetriamine": [
-  58,
-  101.2,
-  0.4
- ],
- "Tetraethylenepentamine": [
-  106,
-  175.9,
-  0.6
- ],
- "2-Aminopyridine": [
-  50,
-  83.0,
-  null
- ],
- "3-Aminopyridine": [
-  50,
-  82.1,
-  null
- ],
- "4-Aminopyridine": [
-  50,
-  82.7,
-  null
- ],
- "Pyrazole": [
-  36,
-  62.26,
-  0.5
- ],
- "Imidazole": [
-  36,
-  59.95,
-  0.5
- ],
- "4-Phenylpyrimidine": [
-  82,
-  134.09,
-  0.5
- ],
- "2,2'-Bipyridine": [
-  82,
-  94.49,
-  0.5
- ],
- "Benzimidazole": [
-  62,
-  74.79,
-  0.5
- ],
- "Benzotriazole": [
-  62,
-  98.53,
-  0.5
- ],
- "Oxalic acid": [
-  46,
-  49.12,
-  0.1
- ],
- "Malonic acid": [
-  54,
-  67.22,
-  0.1
- ],
- "Glutaric acid": [
-  70,
-  99.14,
-  0.1
- ],
- "Adipic acid": [
-  78,
-  115.66,
-  0.1
- ],
- "Oxamide": [
-  46,
-  55.0,
-  0.2
- ],
- "Malonamide": [
-  54,
-  72.6,
-  0.3
- ],
- "Succinamide": [
-  62,
-  88.8,
-  0.2
- ],
- "N,N,N',N'-Tetramethylnonanediamide": [
-  134,
-  236.0,
-  null
- ],
- "N,N,N',N'-Tetramethyldecanediamide": [
-  142,
-  250.0,
-  null
- ],
- "Glycine anhydride": [
-  60,
-  75.7,
-  null
- ],
- "2-Methoxyethanol": [
-  42,
-  75.15,
-  0.05
- ],
- "2-Ethoxyethanol": [
-  50,
-  91.15,
-  0.15
- ],
- "2-Propoxyethanol": [
-  58,
-  107.1,
-  0.05
- ],
- "2-Butoxyethanol": [
-  66,
-  122.95,
-  0.05
- ],
- "Tetrahydrofurfuryl alcohol": [
-  56,
-  93.8,
-  null
- ],
- "Tetrahydro-2H-pyran-2-methanol": [
-  64,
-  108.1,
-  null
- ],
- "Diethylene glycol": [
-  58,
-  92.22,
-  0.05
- ],
- "Tetraethylene glycol": [
-  106,
-  166.31,
-  0.08
- ],
- "Pentaethylene glycol": [
-  130,
-  203.85,
-  null
- ],
- "Dipropylene glycol": [
-  148,
-  124.64,
-  null
- ],
- "Pentapropylene glycol": [
-  170,
-  283.75,
-  null
- ],
- "2-Aminoethanol": [
-  34,
-  59.25,
-  0.03
- ],
- "3-Amino-1-propanol": [
-  42,
-  75.21,
-  0.04
- ],
- "4-Amino-1-butanol": [
-  50,
-  91.17,
-  null
- ],
- "5-Amino-1-pentanol": [
-  58,
-  107.07,
-  null
- ],
- "6-Amino-1-hexanol": [
-  66,
-  123.36,
-  null
- ],
- "2-(Methylamino)ethanol": [
-  42,
-  77.07,
-  0.02
- ],
- "2-(Ethylamino)ethanol": [
-  50,
-  92.91,
-  0.02
- ],
- "2-(Dimethylamino)ethanol": [
-  50,
-  94.17,
-  0.03
- ],
- "2-(Diethylamino)ethanol": [
-  66,
-  123.04,
-  0.03
- ],
- "3-Hydroxypyridine": [
-  50,
-  75.4,
-  null
- ],
- "Diethanolamine": [
-  58,
-  94.35,
-  null
- ],
- "2,2'-(Ethylimino)diethanol": [
-  74,
-  125.01,
-  null
- ],
- "Glycolic acid": [
-  40,
-  71.51,
-  0.1
- ],
- "Lactic acid": [
-  48,
-  69.38,
-  0.1
- ],
- "2-Hydroxy-2-methylpropanoic acid": [
-  56,
-  86.78,
-  0.1
- ],
- "2-Hydroxypentanoic acid": [
-  64,
-  100.47,
-  0.1
- ],
- "2-Hydroxy-3-methylbutanoic acid": [
-  64,
-  100.83,
-  0.1
- ],
- "L-Tartaric acid": [
-  78,
-  83.45,
-  null
- ],
- "meso-Tartaric acid": [
-  78,
-  82.9,
-  null
- ],
- "Glycolamide": [
-  40,
-  56.2,
-  null
- ],
- "Lactamide": [
-  48,
-  73.3,
-  0.2
- ],
- "5-Hydroxypentanamide": [
-  64,
-  105.4,
-  null
- ],
- "4-Hydroxyoctanamide": [
-  88,
-  151.9,
-  0.3
- ],
- "4-Hydroxydecanamide": [
-  104,
-  183.3,
-  0.3
- ],
- "2-Methoxyethylamine": [
-  42,
-  79.59,
-  0.03
- ],
- "3-Methoxy-1-propanamine": [
-  50,
-  111.71,
-  0.06
- ],
- "Chloroform": [
-  58,
-  72.3,
-  null
- ],
- "L-Arabinose": [
-  80,
-  93.2,
-  0.3
- ],
- "D-Xylose": [
-  80,
-  95.1,
-  0.1
- ],
- "D-Galactose": [
-  96,
-  110.2,
-  null
- ],
- "D-Mannose": [
-  96,
-  111.5,
-  0.3
- ],
- "L-Sorbose": [
-  96,
-  110.6,
-  0.4
- ],
- "Cellobiose": [
-  182,
-  212.0,
-  1.0
- ],
- "Lactose": [
-  182,
-  209.1,
-  1.0
- ],
- "Maltose": [
-  182,
-  210.0,
-  1.0
- ],
- "Melibiose": [
-  182,
-  204.0,
-  0.7
- ],
- "Cellotriose": [
-  268,
-  309.2,
-  1.0
- ],
- "Maltotriose": [
-  268,
-  307.0,
-  2.0
- ],
- "Melezitose": [
-  268,
-  308.0,
-  2.0
- ],
- "Stachyose": [
-  354,
-  401.0,
-  1.8
- ],
- "Cellotetraose": [
-  354,
-  409.0,
-  1.0
- ],
- "Cellopentaose": [
-  440,
-  499.6,
-  2.6
- ],
- "Cellohexaose": [
-  526,
-  601.7,
-  2.6
- ],
- "alpha-Cyclodextrin": [
-  516,
-  601.5,
-  1.0
- ],
- "beta-Cyclodextrin": [
-  602,
-  710.0,
-  1.0
- ],
- "Methyl alpha-D-galactopyranoside": [
-  104,
-  132.6,
-  0.4
- ],
- "Methyl beta-D-galactopyranoside": [
-  104,
-  132.9,
-  0.2
- ],
- "Methyl alpha-D-glucopyranoside": [
-  104,
-  132.9,
-  0.3
- ],
- "Methyl beta-D-glucopyranoside": [
-  104,
-  133.6,
-  0.5
- ],
- "3-O-Methyl-D-glucose": [
-  104,
-  134.0,
-  0.5
- ],
- "Methyl alpha-D-mannopyranoside": [
-  104,
-  132.9,
-  0.4
- ],
- "Ethyl alpha-D-glucopyranoside": [
-  112,
-  149.45,
-  null
- ],
- "Phenyl beta-D-glucopyranoside": [
-  136,
-  177.5,
-  0.7
- ],
- "Galacturonic acid": [
-  102,
-  107.6,
-  null
- ],
- "Glucuronic acid": [
-  102,
-  110.2,
-  null
- ],
- "Dimethyl oxalate": [
-  62,
-  91.4,
-  0.5
- ],
- "Methyl methoxyacetate": [
-  56,
-  93.3,
-  0.1
- ],
- "Methoxymethyl acetate": [
-  56,
-  94.4,
-  0.2
- ],
- "2-Thiohydantoin": [
-  60,
-  76.5,
-  0.3
- ],
- "3-Nitrophenol": [
-  72,
-  99.71,
-  null
- ],
- "3-Hydroxybenzonitrile": [
-  62,
-  97.5,
-  null
- ],
- "Caffeine": [
-  102,
-  144.2,
-  null
- ],
- "alpha-Methylcyclopropanemethanol": [
-  48,
-  92.4,
-  0.2
- ],
- "m-Nitrophenol": [
-  72,
-  99.7,
-  null
- ],
- "p-Nitrophenol": [
-  72,
-  98.2,
-  null
- ],
- "m-Cyanophenol": [
-  62,
-  97.5,
-  null
- ],
- "p-Cyanophenol": [
-  62,
-  98.3,
-  null
- ],
- "12-Crown-4": [
-  96,
-  149.9,
-  0.2
- ],
- "15-Crown-5": [
-  120,
-  186.06,
-  0.1
- ],
- "Acetaldehyde": [
-  24,
-  43.7,
-  0.3
- ],
- "Tartaric acid": [
-  78,
-  83.99,
-  0.1
- ],
- "gamma-Cyclodextrin": [
-  688,
-  803.0,
-  null
- ],
- "L-Arabitol": [
-  82,
-  103.1,
-  0.2
- ],
- "D-Arabitol": [
-  82,
-  103.31,
-  null
- ],
- "D-Alanine": [
-  48,
-  60.58,
-  0.1
- ],
- "L-Alanine": [
-  48,
-  60.54,
-  0.08
- ],
- "DL-Alanine": [
-  48,
-  60.54,
-  0.08
- ],
- "L-Valine": [
-  64,
-  90.75,
-  0.1
- ],
- "DL-Norvaline": [
-  64,
-  91.8,
-  0.2
- ],
- "L-Leucine": [
-  72,
-  107.77,
-  0.05
- ],
- "DL-Norleucine": [
-  72,
-  107.73,
-  0.1
- ],
- "L-Isoleucine": [
-  72,
-  105.8,
-  0.07
- ],
- "L-Proline": [
-  62,
-  82.76,
-  0.1
- ],
- "L-Hydroxyproline": [
-  70,
-  84.49,
-  0.05
- ],
- "L-Phenylalanine": [
-  88,
-  121.5,
-  0.2
- ],
- "D-Tryptophan": [
-  108,
-  143.82,
-  0.13
- ],
- "DL-Tryptophan": [
-  108,
-  143.85,
-  0.2
- ],
- "DL-Methionine": [
-  80,
-  105.35,
-  0.02
- ],
- "L-Methionine": [
-  80,
-  105.57,
-  0.02
- ],
- "L-Serine": [
-  56,
-  60.62,
-  0.05
- ],
- "L-Threonine": [
-  64,
-  76.9,
-  0.1
- ],
- "L-Cysteine": [
-  64,
-  73.45,
-  0.03
- ],
- "L-Asparagine": [
-  70,
-  78.0,
-  0.5
- ],
- "DL-Aspartic acid": [
-  70,
-  73.75,
-  0.08
- ],
- "L-Aspartic acid": [
-  70,
-  74.8,
-  0.2
- ],
- "L-Glutamic acid": [
-  78,
-  89.85,
-  0.1
- ],
- "Lysine": [
-  80,
-  108.5,
-  null
- ],
- "L-Arginine": [
-  94,
-  127.42,
-  0.01
- ],
- "L-Histidine": [
-  82,
-  98.3,
-  0.1
- ],
- "2-Amino-2-methylpropanoic acid": [
-  56,
-  77.55,
-  0.15
- ],
- "5-Aminopentanoic acid": [
-  64,
-  87.6,
-  0.6
- ],
- "7-Aminoheptanoic acid": [
-  80,
-  120.0,
-  0.1
- ],
- "9-Aminononanoic acid": [
-  96,
-  151.3,
-  0.1
- ],
- "10-Aminodecanoic acid": [
-  104,
-  167.3,
-  0.1
- ],
- "11-Aminoundecanoic acid": [
-  112,
-  182.6,
-  0.1
- ],
- "Diglycine": [
-  70,
-  76.3,
-  0.1
- ],
- "Glycyl-DL-alanine": [
-  78,
-  92.37,
-  0.02
- ],
- "Glycyl-L-valine": [
-  94,
-  121.99,
-  0.02
- ],
- "Glycyl-L-leucine": [
-  102,
-  139.7,
-  0.07
- ],
- "Pentanenitrile": [
-  46,
-  96.73,
-  null
- ],
- "2-Mercaptoethanol": [
-  42,
-  69.0,
-  3.5
- ],
- "Cysteamine": [
-  42,
-  72.2,
-  3.5
- ],
- "1,2-Ethanedithiol": [
-  50,
-  81.9,
-  5.0
- ],
- "2,2'-Thiodiethanol": [
-  66,
-  101.4,
-  5.0
- ],
- "Methanethiol": [
-  26,
-  52.97,
-  null
- ],
- "Ethanethiol": [
-  34,
-  67.77,
-  null
- ],
- "1-Propanethiol": [
-  42,
-  83.6,
-  1.0
- ],
- "1-Butanethiol": [
-  50,
-  99.37,
-  null
- ],
- "1-Pentanethiol": [
-  58,
-  115.17,
-  null
- ],
- "1-Hexanethiol": [
-  66,
-  130.97,
-  null
- ],
- "1-Heptanethiol": [
-  74,
-  146.77,
-  null
- ],
- "1-Octanethiol": [
-  82,
-  162.57,
-  null
- ],
- "1-Nonanethiol": [
-  90,
-  178.37,
-  null
- ],
- "1-Decanethiol": [
-  98,
-  194.17,
-  null
- ],
- "1-Undecanethiol": [
-  106,
-  209.97,
-  null
- ],
- "1-Dodecanethiol": [
-  114,
-  225.77,
-  null
- ],
- "Toluene": [
-  50,
-  97.71,
-  null
- ],
- "Tetrahydropyran": [
-  48,
-  91.74,
-  0.05
- ],
- "Trimethylamine": [
-  34,
-  79.0,
-  0.4
- ],
- "Urethane": [
-  48,
-  78.884,
-  null
- ],
- "Propylurea": [
-  56,
-  94.9,
-  null
- ],
- "Tetramethylurea": [
-  64,
-  115.6,
-  0.2
- ],
- "Ribitol": [
-  82,
-  103.2,
-  0.2
- ],
- "Triglyme": [
-  98,
-  169.73,
-  0.1
- ],
- "Putrescine": [
-  50,
-  93.6,
-  0.1
- ],
- "Triethylenetetramine": [
-  82,
-  137.6,
-  0.5
- ],
- "Succinic acid": [
-  62,
-  82.94,
-  0.1
- ],
- "Pimelic acid": [
-  86,
-  131.93,
-  null
- ],
- "Triethylene glycol": [
-  82,
-  129.27,
-  0.04
- ],
- "Tetrapropylene glycol": [
-  138,
-  231.36,
-  null
- ],
- "Triethanolamine": [
-  82,
-  127.76,
-  null
- ],
- "Trehalose": [
-  182,
-  206.9,
-  0.5
- ],
- "Raffinose": [
-  268,
-  307.0,
-  1.0
- ],
- "Thiosemicarbazide": [
-  48,
-  64.0,
-  0.5
- ],
- "beta-Alanine": [
-  48,
-  58.28,
-  0.09
- ],
- "1-Methyl-trans-1,2-cyclohexanediol": [
-  72,
-  116.6,
-  null
- ],
- "N,N,N',N'-Tetramethylheptanediamide": [
-  118,
-  211.0,
-  null
- ],
- "Tripropylene glycol": [
-  106,
-  177.61,
-  null
- ],
- "4-Hydroxypentanamide": [
-  64,
-  105.1,
-  0.1
- ],
- "methylammonium": [
-  18,
-  30.7,
-  null
- ],
- "butylammonium": [
-  42,
-  80.05,
-  null
- ],
- "isobutylammonium": [
-  42,
-  80.18,
-  null
- ],
- "tert-butylammonium": [
-  42,
-  82.3,
-  null
- ],
- "anilinium": [
-  50,
-  79.54,
-  null
- ],
- "phenethylammonium": [
-  66,
-  110.08,
-  null
- ],
- "dimethylammonium": [
-  26,
-  49.27,
-  null
- ],
- "diethylammonium": [
-  42,
-  83.53,
-  null
- ],
- "trimethylammonium": [
-  34,
-  67.39,
-  null
- ],
- "triethylammonium": [
-  58,
-  116.07,
-  null
- ],
- "tripropylammonium": [
-  82,
-  163.55,
-  null
- ],
- "tributylammonium": [
-  106,
-  215.5,
-  null
- ],
- "tetramethylammonium": [
-  42,
-  84.25,
-  null
- ],
- "tetraethylammonium": [
-  74,
-  143.55,
-  null
- ],
- "tetrapropylammonium": [
-  106,
-  209.22,
-  null
- ],
- "tetrabutylammonium": [
-  138,
-  270.3,
-  null
- ],
- "tetrapentylammonium": [
-  170,
-  333.3,
-  null
- ],
- "pyrrolidinium": [
-  40,
-  68.5,
-  null
- ],
- "piperidinium": [
-  48,
-  83.6,
-  null
- ],
- "pyridinium": [
-  42,
-  67.52,
-  null
- ],
- "1-methylpyridinium": [
-  50,
-  85.0,
-  null
- ],
- "morpholinium": [
-  48,
-  69.79,
-  null
- ],
- "imidazolium": [
-  36,
-  54.2,
-  null
- ],
- "piperazine-1,4-diium": [
-  48,
-  52.86,
-  null
- ],
- "piperazin-1-ium": [
-  48,
-  71.92,
-  null
- ],
- "alanine": [
-  48,
-  60.5,
-  null
- ],
- "valine": [
-  64,
-  90.78,
-  null
- ],
- "leucine": [
-  72,
-  107.75,
-  null
- ],
- "phenylalanine": [
-  88,
-  121.48,
-  null
- ],
- "serine": [
-  56,
-  60.8,
-  null
- ],
- "tyrosine": [
-  96,
-  123.6,
-  null
- ],
- "asparagine": [
-  70,
-  78.0,
-  null
- ],
- "glutamine": [
-  78,
-  93.9,
-  null
- ],
- "aspartic acid": [
-  70,
-  73.83,
-  null
- ],
- "methionine": [
-  80,
-  105.64,
-  null
- ],
- "histidine": [
-  82,
-  98.79,
-  null
- ],
- "propanoate": [
-  40,
-  60.31,
-  null
- ],
- "butanoate": [
-  48,
-  75.92,
-  null
- ],
- "hexanoate": [
-  64,
-  107.96,
-  null
- ],
- "heptanoate": [
-  72,
-  123.65,
-  null
- ],
- "octanoate": [
-  80,
-  139.6,
-  null
- ],
- "nonanoate": [
-  88,
-  155.33,
-  null
- ],
- "decanoate": [
-  96,
-  170.68,
-  null
- ],
- "tridecanoate": [
-  120,
-  202.39,
-  null
- ],
- "benzoate": [
-  64,
-  92.52,
-  null
- ],
- "phenylacetate": [
-  72,
-  107.21,
-  null
- ],
- "salicylate": [
-  72,
-  100.0,
-  null
- ],
- "methanesulfonate": [
-  50,
-  60.48,
-  null
- ],
- "ethanesulfonate": [
-  58,
-  78.16,
-  null
- ],
- "propane-1-sulfonate": [
-  66,
-  91.68,
-  null
- ],
- "butane-1-sulfonate": [
-  74,
-  107.68,
-  null
- ],
- "pentane-1-sulfonate": [
-  82,
-  123.62,
-  null
- ],
- "hexane-1-sulfonate": [
-  90,
-  139.58,
-  null
- ],
- "dodecane-1-sulfonate": [
-  138,
-  233.1,
-  null
- ],
- "tetradecane-1-sulfonate": [
-  154,
-  266.6,
-  null
- ],
- "benzenesulfonate": [
-  82,
-  109.13,
-  null
- ],
- "butyl sulfate": [
-  82,
-  116.6,
-  null
- ],
- "hexyl sulfate": [
-  98,
-  147.9,
-  null
- ],
- "octyl sulfate": [
-  114,
-  179.2,
-  null
- ],
- "phenolate": [
-  50,
-  72.9,
-  null
- ],
- "tetraphenylphosphonium": [
-  178,
-  286.54,
-  null
- ],
- "tetraphenylarsonium": [
-  196,
-  295.2,
-  null
- ],
- "tetraphenylborate": [
-  170,
-  283.01,
-  null
- ],
- "oxalate": [
-  46,
-  41.28,
-  null
- ],
- "succinate": [
-  62,
-  67.3,
-  null
- ],
- "adipate": [
-  78,
-  99.44,
-  null
- ],
- "suberate": [
-  94,
-  130.81,
-  null
- ],
- "sebacate": [
-  110,
-  162.11,
-  null
- ],
- "cholate": [
-  224,
-  324.0,
-  null
- ],
- "deoxycholate": [
-  216,
-  322.4,
-  null
- ],
- "chenodeoxycholate": [
-  216,
-  326.6,
-  null
- ],
- "ascorbate": [
-  92,
-  93.9,
-  null
- ],
- "propylammonium": [
-  34,
-  64.01,
-  null
- ],
- "pentylammonium": [
-  50,
-  96.03,
-  null
- ],
- "hexylammonium": [
-  58,
-  111.95,
-  null
- ],
- "octylammonium": [
-  74,
-  143.69,
-  null
- ],
- "benzylammonium": [
-  58,
-  93.87,
-  null
- ],
- "dipropylammonium": [
-  58,
-  115.46,
-  null
- ],
- "propane-1,3-diamine dication": [
-  42,
-  52.48,
-  null
- ],
- "butane-1,4-diamine dication": [
-  50,
-  69.9,
-  null
- ],
- "pentane-1,5-diamine dication": [
-  58,
-  87.17,
-  null
- ],
- "1-methylimidazole": [
-  44,
-  78.4,
-  null
- ],
- "1-Methylcyclohexane-1,2-diol": [
-  72,
-  116.6,
-  0.7
- ],
- "1,2-Benzenediol": [
-  58,
-  87.07,
-  null
- ],
- "1,3-Benzenediol": [
-  58,
-  88.92,
-  null
- ],
- "1,4-Benzenediol": [
-  58,
-  88.7,
-  null
- ],
- "2-(Hydroxymethyl)-1,3-propanediol": [
-  58,
-  102.3,
-  0.01
- ],
- "Tetrahydro-2-furanmethanol": [
-  56,
-  93.8,
-  null
- ],
- "Arabinose": [
-  80,
-  93.2,
-  0.3
- ],
- "Xylose": [
-  80,
-  95.1,
-  0.3
- ]
+  "chloride": [
+    18,
+    17.8,
+    null
+  ],
+  "(2-hydroxyethyl)dimethylazanium": [
+    50,
+    90.7,
+    2.1
+  ],
+  "(2-hydroxyethyl)dimethylazanium chloride": [
+    68,
+    108.5,
+    0.5
+  ],
+  "guanidinium chloride": [
+    50,
+    69.92,
+    0.4
+  ],
+  "guanidinium": [
+    32,
+    44.6,
+    null
+  ],
+  "sodium(1+)": [
+    10,
+    -1.21,
+    null
+  ],
+  "hydroxide": [
+    10,
+    -4.13,
+    null
+  ],
+  "tetramethylazanium": [
+    42,
+    88.2,
+    2.0
+  ],
+  "dihydrogen phosphate": [
+    50,
+    31.7,
+    0.7
+  ],
+  "hydrogen phosphate": [
+    50,
+    5.3,
+    0.5
+  ],
+  "phosphate": [
+    50,
+    -25.6,
+    1.0
+  ],
+  "sodium chloride": [
+    28,
+    16.61,
+    0.01
+  ],
+  "potassium chloride": [
+    36,
+    26.81,
+    0.01
+  ],
+  "potassium bromide": [
+    54,
+    33.75,
+    0.01
+  ],
+  "potassium iodide": [
+    72,
+    45.21,
+    0.01
+  ],
+  "tetrabutylazanium bromide": [
+    174,
+    300.38,
+    0.04
+  ],
+  "calcium dichloride": [
+    54,
+    17.839,
+    0.03
+  ],
+  "barium dichloride": [
+    90,
+    23.828,
+    0.08
+  ],
+  "magnesium dichloride": [
+    46,
+    14.49,
+    null
+  ],
+  "lanthanum trichloride": [
+    108,
+    14.28,
+    null
+  ],
+  "chlorane": [
+    18,
+    17.82,
+    null
+  ],
+  "potassium nitrate": [
+    50,
+    35.94,
+    0.07
+  ],
+  "disodium sulfate": [
+    70,
+    11.62,
+    null
+  ],
+  "dipotassium sulfate": [
+    86,
+    31.99,
+    null
+  ],
+  "caesium bromide": [
+    90,
+    45.32,
+    null
+  ],
+  "rubidium fluoride": [
+    46,
+    11.52,
+    null
+  ],
+  "potassium fluoride": [
+    28,
+    7.67,
+    null
+  ],
+  "rubidium bromide": [
+    72,
+    37.54,
+    null
+  ],
+  "rubidium chloride": [
+    54,
+    31.82,
+    null
+  ],
+  "caesium chloride": [
+    72,
+    39.06,
+    null
+  ],
+  "sodium bromide": [
+    46,
+    23.35,
+    null
+  ],
+  "sodium iodide": [
+    64,
+    34.7,
+    null
+  ],
+  "lithium chloride": [
+    20,
+    16.77,
+    null
+  ],
+  "lithium bromide": [
+    38,
+    23.53,
+    null
+  ],
+  "lithium iodide": [
+    56,
+    35.09,
+    null
+  ],
+  "disodium carbonate": [
+    52,
+    -6.48,
+    null
+  ],
+  "sodium hydrogen carbonate": [
+    42,
+    23.181,
+    null
+  ],
+  "dipotassium carbonate": [
+    68,
+    13.98,
+    null
+  ],
+  "potassium hydrogen carbonate": [
+    50,
+    33.41,
+    null
+  ],
+  "ammonium chloride": [
+    28,
+    35.85,
+    0.02
+  ],
+  "sodium nitrate": [
+    42,
+    28.007,
+    null
+  ],
+  "diammonium sulfate": [
+    70,
+    55.04,
+    0.11
+  ],
+  "magnesium sulfate": [
+    60,
+    -7.38,
+    2.0
+  ],
+  "nitric acid": [
+    32,
+    29.35,
+    null
+  ],
+  "ammonium nitrate": [
+    42,
+    47.24,
+    null
+  ],
+  "sodium hydroxide": [
+    20,
+    -5.18,
+    null
+  ],
+  "sodium hydrogen sulfate": [
+    60,
+    13.0,
+    null
+  ],
+  "sulfate": [
+    50,
+    14.213,
+    null
+  ],
+  "hydrogen sulfate": [
+    50,
+    36.495,
+    null
+  ],
+  "azanium": [
+    10,
+    18.02,
+    null
+  ],
+  "ammonium hydrogen sulfate": [
+    60,
+    32.23,
+    null
+  ],
+  "triammonium hydrogen disulfate": [
+    130,
+    82.48,
+    null
+  ],
+  "calcium diacetate": [
+    82,
+    72.32,
+    0.13
+  ],
+  "guanidinium bromide": [
+    68,
+    79.84,
+    0.38
+  ],
+  "guanidinium acetate": [
+    64,
+    54.94,
+    0.31
+  ],
+  "guanidinium perchlorate": [
+    82,
+    92.33,
+    0.62
+  ],
+  "diguanidinium sulfate": [
+    114,
+    18.66,
+    0.34
+  ],
+  "lithium acetate": [
+    34,
+    28.07,
+    0.03
+  ],
+  "sodium acetate": [
+    42,
+    38.44,
+    0.05
+  ],
+  "potassium acetate": [
+    50,
+    51.07,
+    0.04
+  ],
+  "magnesium diacetate": [
+    74,
+    60.23,
+    0.08
+  ],
+  "dilanthanum trisulfate": [
+    162,
+    -36.3,
+    null
+  ],
+  "(2-hydroxyethyl)trimethylazanium chloride": [
+    76,
+    123.6093,
+    null
+  ],
+  "sodium perchlorate": [
+    60,
+    42.94,
+    0.04
+  ],
+  "potassium perchlorate": [
+    68,
+    53.29,
+    0.04
+  ],
+  "tetramethylazanium chloride": [
+    60,
+    107.4,
+    0.2
+  ],
+  "tetraethylazanium chloride": [
+    92,
+    167.0,
+    0.2
+  ],
+  "tetrapropylazanium chloride": [
+    124,
+    232.9,
+    0.2
+  ],
+  "tetrabutylazanium chloride": [
+    156,
+    294.3,
+    0.2
+  ],
+  "tetramethylazanium bromide": [
+    78,
+    114.05,
+    0.04
+  ],
+  "tetraethylazanium bromide": [
+    110,
+    172.73,
+    0.04
+  ],
+  "tetrapropylazanium bromide": [
+    142,
+    239.6,
+    0.2
+  ],
+  "tetrapentylazanium bromide": [
+    206,
+    363.9,
+    0.2
+  ],
+  "tetramethylazanium iodide": [
+    96,
+    125.8,
+    0.2
+  ],
+  "tetraethylazanium iodide": [
+    128,
+    185.5,
+    0.2
+  ],
+  "tetrapropylazanium iodide": [
+    160,
+    250.9,
+    0.2
+  ],
+  "tetrabutylazanium iodide": [
+    192,
+    312.4,
+    0.2
+  ],
+  "carbonate": [
+    32,
+    -5.8,
+    1.6
+  ],
+  "hydrogen carbonate": [
+    32,
+    24.5,
+    1.0
+  ],
+  "magnesium(2+)": [
+    10,
+    -20.1,
+    2.0
+  ],
+  "strontium(2+)": [
+    36,
+    -17.3,
+    1.4
+  ],
+  "manganese(2+)": [
+    23,
+    -18.9,
+    1.9
+  ],
+  "trisodium 2-hydroxypropane-1,2,3-tricarboxylate": [
+    130,
+    57.1,
+    null
+  ],
+  "2-hydroxypropane-1,2,3-tricarboxylate": [
+    100,
+    72.0,
+    1.0
+  ],
+  "diammonium nickel disulfate": [
+    266,
+    67.9,
+    0.6
+  ],
+  "ammonium aluminium disulfate": [
+    240,
+    291.34,
+    0.06
+  ],
+  "potassium aluminium disulfate": [
+    248,
+    281.73,
+    0.88
+  ],
+  "diammonium hexanitratocerate(2-)": [
+    266,
+    222.19,
+    0.15
+  ],
+  "potassium(1+)": [
+    18,
+    9.0,
+    null
+  ],
+  "perchlorate": [
+    50,
+    43.99,
+    null
+  ],
+  "2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate": [
+    154,
+    131.0,
+    null
+  ],
+  "hydrogen 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate": [
+    154,
+    151.2,
+    null
+  ],
+  "dihydrogen 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate": [
+    154,
+    156.3,
+    null
+  ],
+  "sodium 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate": [
+    164,
+    148.0,
+    null
+  ],
+  "potassium 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate": [
+    172,
+    151.0,
+    null
+  ],
+  "cobalt(2+) dichloride": [
+    61,
+    8.31,
+    null
+  ],
+  "cobalt(2+) dibromide": [
+    97,
+    20.1,
+    null
+  ],
+  "cobalt(2+)": [
+    25,
+    -27.4,
+    null
+  ],
+  "bromide": [
+    36,
+    23.8,
+    null
+  ],
+  "nickel(2+) dichloride": [
+    62,
+    5.26,
+    null
+  ],
+  "nickel(2+) dibromide": [
+    98,
+    19.28,
+    null
+  ],
+  "sodium formate": [
+    34,
+    25.127,
+    0.5
+  ],
+  "sodium propanoate": [
+    50,
+    53.912,
+    1.0
+  ],
+  "sodium butanoate": [
+    58,
+    68.703,
+    0.5
+  ],
+  "sodium pentanoate": [
+    66,
+    85.16,
+    null
+  ],
+  "sodium hexanoate": [
+    74,
+    100.71,
+    null
+  ],
+  "sodium heptanoate": [
+    82,
+    116.04,
+    null
+  ],
+  "sodium octanoate": [
+    90,
+    131.56,
+    null
+  ],
+  "sodium nonanoate": [
+    98,
+    147.15,
+    null
+  ],
+  "disodium ethanedioate": [
+    66,
+    20.77,
+    0.07
+  ],
+  "disodium propanedioate": [
+    74,
+    35.81,
+    0.26
+  ],
+  "disodium butanedioate": [
+    82,
+    52.03,
+    0.15
+  ],
+  "disodium pentanedioate": [
+    90,
+    69.9,
+    null
+  ],
+  "disodium hexanedioate": [
+    98,
+    85.78,
+    null
+  ],
+  "disodium heptanedioate": [
+    106,
+    101.33,
+    null
+  ],
+  "disodium octanedioate": [
+    114,
+    116.79,
+    null
+  ],
+  "sodium 2-chloroacetate": [
+    58,
+    67.44,
+    null
+  ],
+  "sodium 1-chloropropanoate": [
+    66,
+    81.58,
+    null
+  ],
+  "sodium 1-chlorobutanoate": [
+    74,
+    97.31,
+    null
+  ],
+  "sodium 1-chloropentanoate": [
+    82,
+    113.17,
+    null
+  ],
+  "cobalt(2+) sulfate": [
+    75,
+    -11.3,
+    null
+  ],
+  "nickel(2+) sulfate": [
+    76,
+    -15.3,
+    null
+  ],
+  "copper(2+) sulfate": [
+    77,
+    -11.1,
+    null
+  ],
+  "dilithium sulfate": [
+    54,
+    12.61,
+    null
+  ],
+  "lithium trifluoromethanesulfonate": [
+    76,
+    74.39,
+    null
+  ],
+  "sodium fluoride": [
+    20,
+    -2.29,
+    0.07
+  ],
+  "strontium dichloride": [
+    72,
+    18.4,
+    null
+  ],
+  "thallium nitrate": [
+    112,
+    39.701,
+    null
+  ],
+  "silver nitrate": [
+    78,
+    27.558,
+    null
+  ],
+  "sodium dihydrogen phosphate": [
+    60,
+    24.124,
+    null
+  ],
+  "beryllium sulfate": [
+    52,
+    3.68,
+    null
+  ],
+  "potassium thiocyanate": [
+    48,
+    49.434,
+    null
+  ],
+  "potassium bromate": [
+    78,
+    43.034,
+    null
+  ],
+  "cadmium dinitrate": [
+    110,
+    43.883,
+    null
+  ],
+  "cobalt dinitrate": [
+    89,
+    29.569,
+    null
+  ],
+  "lead dinitrate": [
+    144,
+    39.769,
+    null
+  ],
+  "zinc dichloride": [
+    64,
+    10.08,
+    0.28
+  ],
+  "caesium fluoride": [
+    64,
+    20.1,
+    null
+  ],
+  "cadmium dichloride": [
+    82,
+    21.12,
+    null
+  ],
+  "cobalt dichloride": [
+    61,
+    6.8,
+    null
+  ],
+  "ammonium bromide": [
+    46,
+    42.92,
+    null
+  ],
+  "magnesium dibromide": [
+    82,
+    27.8,
+    null
+  ],
+  "calcium dibromide": [
+    90,
+    31.33,
+    null
+  ],
+  "strontium dibromide": [
+    108,
+    32.12,
+    null
+  ],
+  "copper dibromide": [
+    99,
+    22.29,
+    null
+  ],
+  "zinc dibromide": [
+    100,
+    24.58,
+    null
+  ],
+  "cadmium dibromide": [
+    118,
+    34.83,
+    null
+  ],
+  "rubidium iodide": [
+    90,
+    50.33,
+    null
+  ],
+  "caesium iodide": [
+    108,
+    57.53,
+    null
+  ],
+  "magnesium diiodide": [
+    118,
+    50.84,
+    null
+  ],
+  "calcium diiodide": [
+    126,
+    54.37,
+    null
+  ],
+  "strontium diiodide": [
+    144,
+    55.15,
+    null
+  ],
+  "barium diiodide": [
+    162,
+    59.73,
+    null
+  ],
+  "cadmium diiodide": [
+    154,
+    57.86,
+    null
+  ],
+  "nickel diiodide": [
+    134,
+    43.0,
+    null
+  ],
+  "lithium nitrate": [
+    34,
+    28.24,
+    null
+  ],
+  "rubidium nitrate": [
+    68,
+    43.54,
+    null
+  ],
+  "caesium nitrate": [
+    86,
+    50.54,
+    null
+  ],
+  "magnesium dinitrate": [
+    74,
+    36.86,
+    null
+  ],
+  "calcium dinitrate": [
+    82,
+    40.39,
+    null
+  ],
+  "strontium dinitrate": [
+    100,
+    41.17,
+    null
+  ],
+  "barium dinitrate": [
+    118,
+    45.75,
+    null
+  ],
+  "zinc dinitrate": [
+    92,
+    33.64,
+    null
+  ],
+  "nickel dinitrate": [
+    90,
+    29.01,
+    null
+  ],
+  "lithium chlorate": [
+    44,
+    35.7,
+    null
+  ],
+  "lithium perchlorate": [
+    52,
+    43.21,
+    0.03
+  ],
+  "silver perchlorate": [
+    96,
+    42.69,
+    null
+  ],
+  "thallium perchlorate": [
+    130,
+    54.83,
+    null
+  ],
+  "ammonium perchlorate": [
+    60,
+    62.59,
+    null
+  ],
+  "magnesium diperchlorate": [
+    110,
+    67.12,
+    null
+  ],
+  "calcium diperchlorate": [
+    118,
+    70.55,
+    null
+  ],
+  "potassium dihydrogen phosphate": [
+    68,
+    43.5,
+    1.8
+  ],
+  "thallium acetate": [
+    112,
+    50.85,
+    null
+  ],
+  "azanium acetate": [
+    42,
+    58.66,
+    null
+  ],
+  "dirubidium sulfate": [
+    122,
+    42.45,
+    null
+  ],
+  "dicaesium sulfate": [
+    158,
+    56.85,
+    null
+  ],
+  "copper sulfate": [
+    77,
+    -12.89,
+    null
+  ],
+  "cadmium sulfate": [
+    96,
+    -0.355,
+    null
+  ],
+  "zinc sulfate": [
+    78,
+    -10.6,
+    null
+  ],
+  "cobalt sulfate": [
+    75,
+    -14.67,
+    null
+  ],
+  "nickel sulfate": [
+    76,
+    -15.22,
+    null
+  ],
+  "lithium(1+)": [
+    2,
+    -0.98,
+    null
+  ],
+  "rubidium(1+)": [
+    36,
+    14.133,
+    null
+  ],
+  "caesium(1+)": [
+    54,
+    21.331,
+    null
+  ],
+  "calcium(2+)": [
+    18,
+    -18.038,
+    null
+  ],
+  "barium(2+)": [
+    54,
+    -12.675,
+    null
+  ],
+  "copper(2+)": [
+    27,
+    -27.077,
+    null
+  ],
+  "zinc(2+)": [
+    28,
+    -24.784,
+    null
+  ],
+  "nickel(2+)": [
+    26,
+    -29.404,
+    null
+  ],
+  "fluoride": [
+    10,
+    -1.222,
+    null
+  ],
+  "iodide": [
+    54,
+    36.202,
+    null
+  ],
+  "nitrate": [
+    32,
+    29.211,
+    null
+  ],
+  "acetate": [
+    32,
+    45.91,
+    null
+  ],
+  "silver(1+)": [
+    46,
+    -1.655,
+    null
+  ],
+  "thallium(1+)": [
+    80,
+    10.49,
+    null
+  ],
+  "cadmium(2+)": [
+    46,
+    -14.539,
+    null
+  ],
+  "lead(2+)": [
+    80,
+    -18.653,
+    null
+  ],
+  "beryllium(2+)": [
+    2,
+    -10.504,
+    null
+  ],
+  "chlorate": [
+    42,
+    36.657,
+    null
+  ],
+  "thiocyanate": [
+    30,
+    40.47,
+    null
+  ],
+  "bromate": [
+    60,
+    34.01,
+    null
+  ],
+  "tetraethylazanium": [
+    74,
+    149.12,
+    null
+  ],
+  "tetrapropylazanium": [
+    106,
+    214.44,
+    null
+  ],
+  "tetrabutylazanium": [
+    138,
+    275.66,
+    null
+  ],
+  "tetraphenylarsanium": [
+    196,
+    300.65,
+    null
+  ],
+  "iron(2+)": [
+    24,
+    -24.7,
+    null
+  ],
+  "mercury(2+)": [
+    78,
+    -19.3,
+    null
+  ],
+  "aluminium(3+)": [
+    10,
+    -42.2,
+    null
+  ],
+  "iron(3+)": [
+    23,
+    -43.7,
+    null
+  ],
+  "chromium(3+)": [
+    21,
+    -39.5,
+    null
+  ],
+  "lanthanum(3+)": [
+    54,
+    -39.1,
+    null
+  ],
+  "thorium(4+)": [
+    86,
+    -53.5,
+    null
+  ],
+  "nitrite": [
+    24,
+    29.0,
+    null
+  ],
+  "formate": [
+    24,
+    31.75,
+    null
+  ],
+  "iodate": [
+    78,
+    25.3,
+    null
+  ],
+  "permanganate": [
+    58,
+    38.5,
+    null
+  ],
+  "chromate": [
+    58,
+    13.6,
+    null
+  ],
+  "guanidinium propanoate": [
+    72,
+    103.6,
+    null
+  ],
+  "guanidinium benzoate": [
+    96,
+    136.4,
+    null
+  ],
+  "tripotassium 2-hydroxypropane-1,2,3-tricarboxylate": [
+    154,
+    95.245,
+    null
+  ],
+  "dipotassium ethanedioate": [
+    82,
+    41.9,
+    0.17
+  ],
+  "disodium 2,3-dihydroxybutanedioate": [
+    98,
+    57.35,
+    null
+  ],
+  "2,3-dihydroxybutanedioate": [
+    78,
+    60.1,
+    0.4
+  ],
+  "sodium benzoate": [
+    74,
+    89.51,
+    null
+  ],
+  "zinc diperchlorate": [
+    128,
+    63.14,
+    0.04
+  ],
+  "disodium hydrogen 2-hydroxypropane-1,2,3-tricarboxylate": [
+    120,
+    86.157,
+    null
+  ],
+  "sodium dihydrogen 2-hydroxypropane-1,2,3-tricarboxylate": [
+    110,
+    102.6137,
+    null
+  ],
+  "butyl(triethyl)azanium bromide": [
+    126,
+    203.45,
+    0.08
+  ],
+  "dibutyl(diethyl)azanium bromide": [
+    142,
+    224.47,
+    0.05
+  ],
+  "tributyl(ethyl)azanium bromide": [
+    158,
+    279.87,
+    0.04
+  ],
+  "praseodymium(3+) trichloride": [
+    110,
+    10.96,
+    null
+  ],
+  "neodymium(3+) trichloride": [
+    111,
+    10.18,
+    null
+  ],
+  "samarium(3+) trichloride": [
+    113,
+    11.16,
+    null
+  ],
+  "gadolinium(3+) trichloride": [
+    115,
+    13.08,
+    null
+  ],
+  "terbium(3+) trichloride": [
+    116,
+    13.25,
+    null
+  ],
+  "dysprosium(3+) trichloride": [
+    117,
+    12.66,
+    null
+  ],
+  "holmium(3+) trichloride": [
+    118,
+    11.73,
+    null
+  ],
+  "erbium(3+) trichloride": [
+    119,
+    10.63,
+    null
+  ],
+  "ytterbium(3+) trichloride": [
+    121,
+    9.27,
+    null
+  ],
+  "lanthanum trinitrate": [
+    150,
+    49.37,
+    null
+  ],
+  "neodymium(3+) trinitrate": [
+    153,
+    44.74,
+    null
+  ],
+  "erbium(3+) trinitrate": [
+    161,
+    45.28,
+    null
+  ],
+  "ytterbium(3+) trinitrate": [
+    163,
+    43.37,
+    null
+  ],
+  "calcium sulfate": [
+    68,
+    -3.87,
+    null
+  ],
+  "1h-imidazol-3-ium chloride": [
+    54,
+    76.0,
+    null
+  ],
+  "1h-imidazole": [
+    36,
+    60.0,
+    null
+  ],
+  "(2-hydroxyethyl)trimethylazanium acetate": [
+    90,
+    163.93,
+    0.022
+  ],
+  "potassium 3-methoxy-3-oxopropanoate": [
+    80,
+    82.939,
+    null
+  ],
+  "potassium 3-ethoxy-3-oxopropanoate": [
+    88,
+    99.149,
+    null
+  ],
+  "1-hexyl-3-methyl-1h-imidazol-3-ium chloride": [
+    110,
+    192.499,
+    null
+  ],
+  "dipotassium hydrogen phosphate": [
+    86,
+    34.4,
+    0.7
+  ],
+  "tripotassium phosphate": [
+    104,
+    25.2,
+    2.5
+  ],
+  "trisodium phosphate": [
+    80,
+    -12.2,
+    1.7
+  ],
+  "lithium dihydrogen phosphate": [
+    52,
+    34.9,
+    1.1
+  ],
+  "disodium hydrogen phosphate": [
+    70,
+    14.2,
+    8.4
+  ],
+  "sodium hydrogen 2,3-dihydroxybutanedioate": [
+    88,
+    71.01,
+    null
+  ],
+  "potassium sodium 2,3-dihydroxybutanedioate": [
+    106,
+    67.44,
+    null
+  ],
+  "diammonium 2,3-dihydroxybutanedioate": [
+    98,
+    96.06,
+    null
+  ],
+  "hydrogen 2,3-dihydroxybutanedioate": [
+    78,
+    72.22,
+    null
+  ],
+  "hydrogen 2-hydroxypropane-1,2,3-tricarboxylate": [
+    100,
+    88.5,
+    null
+  ],
+  "disodium 2-hydroxybutanedioate": [
+    90,
+    66.77,
+    null
+  ],
+  "2-hydroxybutanedioate": [
+    70,
+    69.19,
+    null
+  ],
+  "hydrogen 2-hydroxybutanedioate": [
+    70,
+    75.4,
+    null
+  ],
+  "disodium (2z)-but-2-enedioate": [
+    80,
+    47.69,
+    null
+  ],
+  "(2z)-but-2-enedioate": [
+    60,
+    50.11,
+    null
+  ],
+  "hydrogen (2z)-but-2-enedioate": [
+    60,
+    61.6,
+    null
+  ],
+  "ethanedioate": [
+    46,
+    25.02,
+    null
+  ],
+  "hydrogen ethanedioate": [
+    46,
+    34.0,
+    null
+  ],
+  "sodium 2-hydroxypropanoate": [
+    58,
+    54.7,
+    null
+  ],
+  "2-hydroxypropanoate": [
+    48,
+    55.9,
+    null
+  ],
+  "(5r)-5-[(1s)-1,2-dihydroxyethyl]-3,4-dihydroxyfuran-2(5h)-one": [
+    92,
+    106.49,
+    0.08
+  ],
+  "4-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}butane-1-sulfonic acid": [
+    138,
+    169.24,
+    null
+  ],
+  "3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}-2-hydroxypropane-1-sulfonic acid": [
+    138,
+    153.12,
+    0.5
+  ],
+  "2,2'-(piperazine-1,4-diyl)bis(ethane-1-sulfonic acid)": [
+    160,
+    188.6,
+    6.4
+  ],
+  "2-(cyclohexylamino)ethane-1-sulfonic acid": [
+    112,
+    146.6,
+    6.4
+  ],
+  "3-(cyclohexylamino)propane-1-sulfonic acid": [
+    120,
+    160.0,
+    6.4
+  ],
+  "2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol": [
+    114,
+    152.5,
+    6.4
+  ],
+  "2-[bis(2-hydroxyethyl)amino]acetic acid": [
+    88,
+    115.9,
+    6.4
+  ],
+  "2-[bis(carboxymethyl)amino]acetamide": [
+    100,
+    122.8,
+    6.4
+  ],
+  "1,4-disulfanylbutane-2,3-diol": [
+    82,
+    103.6,
+    6.4
+  ],
+  "3,3',3''-phosphanetriyltripropanoic acid": [
+    132,
+    169.3,
+    6.4
+  ],
+  "2-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}acetic acid": [
+    96,
+    121.5,
+    6.4
+  ],
+  "3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}propane-1-sulfonic acid": [
+    130,
+    160.3,
+    6.4
+  ],
+  "2-hydroxypropane-1,2,3-tricarboxylic acid": [
+    100,
+    112.44,
+    null
+  ],
+  "2-hydroxybutanedioic acid": [
+    70,
+    88.22,
+    null
+  ],
+  "(2z)-but-2-enedioic acid": [
+    60,
+    75.65,
+    null
+  ],
+  "2-(morpholin-4-yl)ethane-1-sulfonic acid": [
+    104,
+    129.51,
+    0.04
+  ],
+  "3-(morpholin-4-yl)propane-1-sulfonic acid": [
+    112,
+    145.71,
+    0.4
+  ],
+  "2-hydroxy-3-(morpholin-4-yl)propane-1-sulfonic acid": [
+    120,
+    145.92,
+    0.06
+  ],
+  "4-(morpholin-4-yl)butane-1-sulfonic acid": [
+    120,
+    160.25,
+    0.09
+  ],
+  "2-(dimethylamino)ethan-1-ol": [
+    50,
+    93.5,
+    0.1
+  ],
+  "2-amino-2-(hydroxymethyl)propane-1,3-diol": [
+    66,
+    90.63,
+    0.05
+  ],
+  "2-[4-(2-hydroxyethyl)piperazin-1-yl]ethane-1-sulfonic acid": [
+    128,
+    152.8,
+    3.1
+  ],
+  "methane": [
+    10,
+    37.3,
+    null
+  ],
+  "ethane": [
+    18,
+    51.2,
+    null
+  ],
+  "propane": [
+    26,
+    67.0,
+    null
+  ],
+  "fluoromethane": [
+    18,
+    35.9,
+    null
+  ],
+  "chloromethane": [
+    26,
+    46.2,
+    null
+  ],
+  "dichloromethane": [
+    42,
+    58.1,
+    null
+  ],
+  "trichloromethane": [
+    58,
+    72.3,
+    null
+  ],
+  "bromomethane": [
+    44,
+    53.0,
+    null
+  ],
+  "iodomethane": [
+    62,
+    63.7,
+    null
+  ],
+  "bromoethane": [
+    52,
+    66.7,
+    null
+  ],
+  "1-bromopropane": [
+    60,
+    82.2,
+    null
+  ],
+  "3-bromoprop-1-ene": [
+    58,
+    77.6,
+    null
+  ],
+  "benzene": [
+    42,
+    83.1,
+    null
+  ],
+  "methylbenzene": [
+    50,
+    97.7,
+    null
+  ],
+  "nitrobenzene": [
+    64,
+    97.7,
+    null
+  ],
+  "methanol": [
+    18,
+    38.17,
+    0.1
+  ],
+  "ethanol": [
+    26,
+    55.08,
+    0.07
+  ],
+  "prop-2-en-1-ol": [
+    32,
+    64.3,
+    null
+  ],
+  "butan-1-ol": [
+    42,
+    86.6,
+    null
+  ],
+  "hexan-1-ol": [
+    58,
+    118.7,
+    null
+  ],
+  "2-methoxyethan-1-ol": [
+    42,
+    75.2,
+    null
+  ],
+  "2-ethoxyethan-1-ol": [
+    50,
+    91.2,
+    null
+  ],
+  "2-propoxyethan-1-ol": [
+    58,
+    107.1,
+    null
+  ],
+  "2-butoxyethan-1-ol": [
+    66,
+    123.0,
+    null
+  ],
+  "cyclobutan-1-ol": [
+    40,
+    75.6,
+    null
+  ],
+  "cyclopentan-1-ol": [
+    48,
+    89.0,
+    null
+  ],
+  "cyclohexan-1-ol": [
+    56,
+    103.5,
+    null
+  ],
+  "cyclooctan-1-ol": [
+    72,
+    129.7,
+    null
+  ],
+  "cyclopropylmethanol": [
+    40,
+    76.0,
+    null
+  ],
+  "1-cyclopropylethan-1-ol": [
+    48,
+    92.4,
+    null
+  ],
+  "ethane-1,2-diol": [
+    34,
+    54.6,
+    null
+  ],
+  "propane-1,2-diol": [
+    42,
+    71.2,
+    null
+  ],
+  "propane-1,3-diol": [
+    42,
+    71.9,
+    null
+  ],
+  "butane-1,4-diol": [
+    50,
+    88.3,
+    null
+  ],
+  "butane-2,3-diol": [
+    50,
+    86.6,
+    null
+  ],
+  "hexane-1,6-diol": [
+    66,
+    120.4,
+    null
+  ],
+  "octane-1,8-diol": [
+    82,
+    152.6,
+    null
+  ],
+  "2-(2-hydroxyethoxy)ethan-1-ol": [
+    58,
+    92.2,
+    null
+  ],
+  "2-[2-(2-hydroxyethoxy)ethoxy]ethan-1-ol": [
+    82,
+    129.3,
+    null
+  ],
+  "2-{2-[2-(2-hydroxyethoxy)ethoxy]ethoxy}ethan-1-ol": [
+    106,
+    166.3,
+    null
+  ],
+  "propane-1,2,3-triol": [
+    50,
+    70.6,
+    null
+  ],
+  "meso-butane-1,2,3,4-tetrol": [
+    66,
+    87.1,
+    null
+  ],
+  "2,2-bis(hydroxymethyl)propane-1,3-diol": [
+    74,
+    101.8,
+    null
+  ],
+  "cis-cyclohexane-1,2-diol": [
+    64,
+    101.3,
+    null
+  ],
+  "trans-cyclohexane-1,2-diol": [
+    64,
+    103.0,
+    null
+  ],
+  "cyclohexane-1,4-diol": [
+    64,
+    105.3,
+    null
+  ],
+  "cis-cyclooctane-1,5-diol": [
+    80,
+    132.5,
+    null
+  ],
+  "adamantane-1,3-diol": [
+    92,
+    138.2,
+    null
+  ],
+  "adamantane-1,4-diol": [
+    92,
+    139.3,
+    null
+  ],
+  "phenol": [
+    50,
+    86.17,
+    0.2
+  ],
+  "4-nitrophenol": [
+    72,
+    98.2,
+    null
+  ],
+  "benzene-1,2-diol": [
+    58,
+    87.1,
+    null
+  ],
+  "benzene-1,3-diol": [
+    58,
+    88.9,
+    null
+  ],
+  "benzene-1,4-diol": [
+    58,
+    88.7,
+    null
+  ],
+  "2-aminoethan-1-ol": [
+    34,
+    59.3,
+    null
+  ],
+  "3-aminopropan-1-ol": [
+    42,
+    75.2,
+    null
+  ],
+  "4-aminobutan-1-ol": [
+    50,
+    91.2,
+    null
+  ],
+  "6-aminohexan-1-ol": [
+    66,
+    123.4,
+    null
+  ],
+  "2-(methylamino)ethan-1-ol": [
+    42,
+    77.1,
+    null
+  ],
+  "2-(ethylamino)ethan-1-ol": [
+    50,
+    92.9,
+    null
+  ],
+  "2-(diethylamino)ethan-1-ol": [
+    66,
+    123.0,
+    null
+  ],
+  "2,2'-(azanediyl)bis(ethan-1-ol)": [
+    58,
+    94.4,
+    null
+  ],
+  "2,2'-(ethylazanediyl)bis(ethan-1-ol)": [
+    74,
+    125.0,
+    null
+  ],
+  "2,2',2''-nitrilotris(ethan-1-ol)": [
+    82,
+    127.8,
+    null
+  ],
+  "ethoxyethane": [
+    42,
+    90.4,
+    null
+  ],
+  "dimethoxymethane": [
+    42,
+    80.42,
+    0.1
+  ],
+  "diethoxymethane": [
+    58,
+    113.88,
+    0.03
+  ],
+  "tetramethoxymethane": [
+    74,
+    126.2,
+    0.4
+  ],
+  "1,2-dimethoxyethane": [
+    50,
+    95.86,
+    0.05
+  ],
+  "1,2-diethoxyethane": [
+    66,
+    127.29,
+    0.02
+  ],
+  "1-methoxy-2-(2-methoxyethoxy)ethane": [
+    74,
+    132.7,
+    null
+  ],
+  "1-ethoxy-2-(2-ethoxyethoxy)ethane": [
+    90,
+    165.0,
+    null
+  ],
+  "2,5,8,11-tetraoxadodecane": [
+    98,
+    169.7,
+    null
+  ],
+  "2,5,8,11,14-pentaoxapentadecane": [
+    122,
+    206.8,
+    null
+  ],
+  "ethanal": [
+    24,
+    43.7,
+    null
+  ],
+  "benzaldehyde": [
+    56,
+    96.1,
+    null
+  ],
+  "3-hydroxybenzaldehyde": [
+    64,
+    97.9,
+    null
+  ],
+  "4-hydroxybenzaldehyde": [
+    64,
+    96.9,
+    null
+  ],
+  "propan-2-one": [
+    32,
+    66.9,
+    null
+  ],
+  "butan-2-one": [
+    40,
+    82.5,
+    null
+  ],
+  "pentan-2-one": [
+    48,
+    98.0,
+    null
+  ],
+  "hexane-2,5-dione": [
+    62,
+    111.6,
+    null
+  ],
+  "cyclobutan-1-one": [
+    38,
+    70.9,
+    null
+  ],
+  "cyclohexan-1-one": [
+    54,
+    99.7,
+    null
+  ],
+  "cyclooctan-1-one": [
+    70,
+    128.0,
+    null
+  ],
+  "cyclononan-1-one": [
+    78,
+    142.0,
+    null
+  ],
+  "cyclohexane-1,4-dione": [
+    60,
+    92.8,
+    null
+  ],
+  "adamantan-2-one": [
+    82,
+    137.2,
+    null
+  ],
+  "formic acid": [
+    24,
+    34.69,
+    0.05
+  ],
+  "acetic acid": [
+    32,
+    51.92,
+    0.1
+  ],
+  "propanoic acid": [
+    40,
+    67.9,
+    0.1
+  ],
+  "butanoic acid": [
+    48,
+    84.61,
+    0.1
+  ],
+  "hexanoic acid": [
+    64,
+    116.55,
+    0.1
+  ],
+  "2-hydroxyacetic acid": [
+    40,
+    51.8,
+    null
+  ],
+  "2-hydroxypropanoic acid": [
+    48,
+    69.4,
+    null
+  ],
+  "2-hydroxybutanoic acid": [
+    56,
+    85.45,
+    0.1
+  ],
+  "2-hydroxyhexanoic acid": [
+    72,
+    117.26,
+    0.1
+  ],
+  "ethanedioic acid": [
+    46,
+    49.1,
+    null
+  ],
+  "propanedioic acid": [
+    54,
+    67.2,
+    null
+  ],
+  "butanedioic acid": [
+    62,
+    82.9,
+    null
+  ],
+  "hexanedioic acid": [
+    78,
+    115.7,
+    null
+  ],
+  "2,3-dihydroxybutanedioic acid": [
+    78,
+    84.0,
+    null
+  ],
+  "ethyl formate": [
+    40,
+    72.8,
+    0.7
+  ],
+  "ethyl acetate": [
+    48,
+    88.9,
+    0.1
+  ],
+  "dimethyl ethanedioate": [
+    62,
+    91.4,
+    null
+  ],
+  "oxetane": [
+    32,
+    61.35,
+    0.05
+  ],
+  "oxolane": [
+    40,
+    76.9,
+    null
+  ],
+  "oxane": [
+    48,
+    91.7,
+    null
+  ],
+  "oxepane": [
+    56,
+    105.46,
+    0.1
+  ],
+  "oxolan-2-ylmethanol": [
+    56,
+    93.8,
+    null
+  ],
+  "2,5-dimethoxyoxolane": [
+    72,
+    122.3,
+    null
+  ],
+  "oxan-2-ylmethanol": [
+    64,
+    108.1,
+    null
+  ],
+  "1,3-dioxolane": [
+    40,
+    65.37,
+    0.1
+  ],
+  "1,3-dioxane": [
+    48,
+    80.82,
+    0.02
+  ],
+  "1,4-dioxane": [
+    48,
+    80.94,
+    0.1
+  ],
+  "1,3-dioxepane": [
+    56,
+    95.98,
+    0.1
+  ],
+  "1,3,5-trioxane": [
+    48,
+    69.51,
+    0.3
+  ],
+  "2,4,6-trimethyl-1,3,5-trioxane": [
+    72,
+    123.7,
+    null
+  ],
+  "1,4,7,10-tetraoxacyclododecane": [
+    96,
+    149.9,
+    null
+  ],
+  "1,4,7,10,13-pentaoxacyclopentadecane": [
+    120,
+    186.1,
+    null
+  ],
+  "1,4,7,10,13,16-hexaoxacyclooctadecane": [
+    144,
+    223.4,
+    null
+  ],
+  "methanamine": [
+    18,
+    41.9,
+    null
+  ],
+  "ethanamine": [
+    26,
+    58.6,
+    null
+  ],
+  "butan-1-amine": [
+    42,
+    89.8,
+    null
+  ],
+  "hexan-1-amine": [
+    58,
+    121.6,
+    null
+  ],
+  "n-methylmethanamine": [
+    26,
+    59.2,
+    null
+  ],
+  "n-ethylethanamine": [
+    42,
+    91.7,
+    null
+  ],
+  "n-butylbutan-1-amine": [
+    74,
+    155.4,
+    null
+  ],
+  "n,n-dimethylmethanamine": [
+    34,
+    79.0,
+    null
+  ],
+  "n,n-diethylethanamine": [
+    58,
+    120.9,
+    null
+  ],
+  "cyclopentanamine": [
+    48,
+    90.98,
+    0.18
+  ],
+  "cyclohexanamine": [
+    56,
+    105.35,
+    0.17
+  ],
+  "cyclooctanamine": [
+    72,
+    133.4,
+    0.2
+  ],
+  "adamantan-1-amine": [
+    84,
+    138.9,
+    null
+  ],
+  "aniline": [
+    50,
+    89.3,
+    0.1
+  ],
+  "ethane-1,2-diamine": [
+    34,
+    62.7,
+    null
+  ],
+  "propane-1,3-diamine": [
+    42,
+    78.4,
+    null
+  ],
+  "butane-1,4-diamine": [
+    50,
+    93.6,
+    null
+  ],
+  "hexane-1,6-diamine": [
+    66,
+    124.8,
+    null
+  ],
+  "octane-1,8-diamine": [
+    82,
+    157.3,
+    null
+  ],
+  "decane-1,10-diamine": [
+    98,
+    188.3,
+    null
+  ],
+  "trans-cyclohexane-1,4-diamine": [
+    64,
+    108.9,
+    null
+  ],
+  "n-(2-aminoethyl)ethane-1,2-diamine": [
+    58,
+    101.2,
+    null
+  ],
+  "n,n'-bis(2-aminoethyl)ethane-1,2-diamine": [
+    82,
+    137.6,
+    null
+  ],
+  "3,6,9-triazaundecane-1,11-diamine": [
+    106,
+    175.9,
+    null
+  ],
+  "formamide": [
+    24,
+    38.5,
+    0.1
+  ],
+  "acetamide": [
+    32,
+    55.7,
+    0.2
+  ],
+  "propanamide": [
+    40,
+    71.5,
+    0.1
+  ],
+  "butanamide": [
+    48,
+    87.1,
+    null
+  ],
+  "hexanamide": [
+    64,
+    119.2,
+    null
+  ],
+  "n-methylformamide": [
+    32,
+    56.83,
+    0.1
+  ],
+  "n-ethylformamide": [
+    40,
+    74.0,
+    null
+  ],
+  "n-propylformamide": [
+    48,
+    87.9,
+    null
+  ],
+  "n-methylacetamide": [
+    40,
+    74.04,
+    0.1
+  ],
+  "n-ethylacetamide": [
+    48,
+    90.7,
+    null
+  ],
+  "n-propylacetamide": [
+    56,
+    105.1,
+    null
+  ],
+  "n-methylpropanamide": [
+    48,
+    89.8,
+    null
+  ],
+  "n-ethylpropanamide": [
+    56,
+    105.4,
+    null
+  ],
+  "n-propylpropanamide": [
+    64,
+    121.5,
+    null
+  ],
+  "n,n-dimethylformamide": [
+    40,
+    74.5,
+    null
+  ],
+  "n,n-diethylformamide": [
+    56,
+    106.7,
+    0.5
+  ],
+  "n,n-dimethylacetamide": [
+    48,
+    89.7,
+    0.8
+  ],
+  "n,n-diethylacetamide": [
+    64,
+    121.5,
+    0.3
+  ],
+  "n,n-dipropylacetamide": [
+    80,
+    154.2,
+    null
+  ],
+  "n,n-di(propan-2-yl)acetamide": [
+    80,
+    152.0,
+    null
+  ],
+  "n,n-dimethylpropanamide": [
+    56,
+    105.4,
+    null
+  ],
+  "n,n-diethylpropanamide": [
+    72,
+    137.7,
+    null
+  ],
+  "2-hydroxyacetamide": [
+    40,
+    56.2,
+    null
+  ],
+  "2-hydroxypropanamide": [
+    48,
+    73.3,
+    null
+  ],
+  "4-hydroxybutanamide": [
+    56,
+    88.9,
+    0.13
+  ],
+  "6-hydroxyhexanamide": [
+    72,
+    121.1,
+    0.2
+  ],
+  "ethanediamide": [
+    46,
+    55.0,
+    null
+  ],
+  "propanediamide": [
+    54,
+    72.6,
+    null
+  ],
+  "butanediamide": [
+    62,
+    88.8,
+    null
+  ],
+  "n,n,n',n'-tetramethyloctanediamide": [
+    126,
+    224.0,
+    null
+  ],
+  "urea": [
+    32,
+    44.23,
+    0.05
+  ],
+  "1-methylurea": [
+    40,
+    62.1,
+    null
+  ],
+  "1-ethylurea": [
+    48,
+    80.2,
+    null
+  ],
+  "1-propylurea": [
+    56,
+    94.7,
+    null
+  ],
+  "1-butylurea": [
+    64,
+    116.1,
+    null
+  ],
+  "1-(propan-2-yl)urea": [
+    56,
+    99.0,
+    null
+  ],
+  "1,1-dimethylurea": [
+    48,
+    78.9,
+    null
+  ],
+  "1,3-dimethylurea": [
+    48,
+    80.0,
+    null
+  ],
+  "1,1-diethylurea": [
+    64,
+    114.9,
+    null
+  ],
+  "1,3-diethylurea": [
+    64,
+    116.1,
+    null
+  ],
+  "1,1,3,3-tetramethylurea": [
+    64,
+    115.6,
+    null
+  ],
+  "2-(carbamoylamino)acetic acid": [
+    62,
+    77.6,
+    null
+  ],
+  "acetonitrile": [
+    22,
+    47.4,
+    null
+  ],
+  "propanenitrile": [
+    30,
+    64.3,
+    null
+  ],
+  "butanenitrile": [
+    38,
+    80.6,
+    null
+  ],
+  "hexanenitrile": [
+    54,
+    111.9,
+    null
+  ],
+  "octanenitrile": [
+    70,
+    146.2,
+    null
+  ],
+  "4-hydroxybenzonitrile": [
+    62,
+    98.3,
+    null
+  ],
+  "aziridine": [
+    24,
+    48.87,
+    0.02
+  ],
+  "azetidine": [
+    32,
+    63.71,
+    0.01
+  ],
+  "pyrrolidine": [
+    40,
+    77.77,
+    0.01
+  ],
+  "piperidine": [
+    48,
+    92.3,
+    0.5
+  ],
+  "azepane": [
+    56,
+    105.6,
+    null
+  ],
+  "azocane": [
+    64,
+    120.1,
+    null
+  ],
+  "pyridine": [
+    42,
+    77.4,
+    0.2
+  ],
+  "1-methylpyrrolidin-2-one": [
+    54,
+    90.7,
+    null
+  ],
+  "pyrrolidine-2,5-dione": [
+    52,
+    72.3,
+    null
+  ],
+  "1-methylpiperidine": [
+    56,
+    110.54,
+    0.02
+  ],
+  "piperidin-2-one": [
+    54,
+    90.3,
+    null
+  ],
+  "azepan-2-one": [
+    62,
+    105.0,
+    null
+  ],
+  "pyridin-4-amine": [
+    50,
+    82.7,
+    null
+  ],
+  "pyridin-3-ol": [
+    50,
+    75.4,
+    null
+  ],
+  "4,4'-bipyridine": [
+    82,
+    133.21,
+    0.5
+  ],
+  "1h-pyrazole": [
+    36,
+    62.3,
+    null
+  ],
+  "piperazine": [
+    48,
+    83.41,
+    0.1
+  ],
+  "pyrazine": [
+    42,
+    70.82,
+    0.5
+  ],
+  "pyrimidine": [
+    42,
+    70.3,
+    null
+  ],
+  "pyridazine": [
+    42,
+    70.33,
+    0.5
+  ],
+  "1,3,5-triazine": [
+    42,
+    70.42,
+    0.5
+  ],
+  "imidazolidine-2,4-dione": [
+    52,
+    65.0,
+    null
+  ],
+  "1-methylpiperazine": [
+    56,
+    102.3,
+    0.03
+  ],
+  "piperazine-2,5-dione": [
+    60,
+    76.7,
+    null
+  ],
+  "1,4-dimethylpiperazine-2,5-dione": [
+    76,
+    113.4,
+    null
+  ],
+  "3,6-dimethylpiperazine-2,5-dione": [
+    76,
+    112.4,
+    null
+  ],
+  "1,4-diazabicyclo[2.2.2]octane": [
+    62,
+    105.9,
+    null
+  ],
+  "1,3,5,7-tetraazatricyclo[3.3.1.1(3,7)]decane": [
+    76,
+    111.4,
+    null
+  ],
+  "1h-benzimidazole": [
+    62,
+    98.5,
+    null
+  ],
+  "1h-benzotriazole": [
+    62,
+    94.5,
+    null
+  ],
+  "quinoline": [
+    68,
+    115.53,
+    0.5
+  ],
+  "quinazoline": [
+    68,
+    108.48,
+    0.5
+  ],
+  "quinoxaline": [
+    68,
+    109.16,
+    0.5
+  ],
+  "1,10-phenanthroline": [
+    94,
+    142.42,
+    0.5
+  ],
+  "7h-purine": [
+    62,
+    85.4,
+    null
+  ],
+  "1,3,7-trimethyl-3,7-dihydro-1h-purine-2,6-dione": [
+    102,
+    145.2,
+    null
+  ],
+  "morpholine": [
+    48,
+    82.56,
+    0.03
+  ],
+  "4-methylmorpholine": [
+    56,
+    92.99,
+    0.03
+  ],
+  "benzenethiol": [
+    58,
+    94.1,
+    null
+  ],
+  "methanesulfinylmethane": [
+    42,
+    68.9,
+    null
+  ],
+  "ethanethioamide": [
+    40,
+    66.4,
+    null
+  ],
+  "thiourea": [
+    40,
+    54.0,
+    null
+  ],
+  "hydrazinecarbothioamide": [
+    48,
+    64.0,
+    null
+  ],
+  "2-sulfanylideneimidazolidin-4-one": [
+    60,
+    76.5,
+    null
+  ],
+  "glycine": [
+    40,
+    43.26,
+    0.07
+  ],
+  "(2s)-2-aminopropanoic acid": [
+    48,
+    60.5,
+    null
+  ],
+  "(2s)-2-amino-3-methylbutanoic acid": [
+    64,
+    90.8,
+    null
+  ],
+  "(2s)-2-amino-4-methylpentanoic acid": [
+    72,
+    107.8,
+    null
+  ],
+  "(2s,3s)-2-amino-3-methylpentanoic acid": [
+    72,
+    105.8,
+    null
+  ],
+  "(2s)-2-amino-3-hydroxypropanoic acid": [
+    56,
+    60.6,
+    null
+  ],
+  "(2s,3r)-2-amino-3-hydroxybutanoic acid": [
+    64,
+    76.9,
+    null
+  ],
+  "(2r)-2-amino-3-sulfanylpropanoic acid": [
+    64,
+    73.5,
+    null
+  ],
+  "(2s)-2-amino-4-(methylsulfanyl)butanoic acid": [
+    80,
+    105.6,
+    null
+  ],
+  "(2s)-pyrrolidine-2-carboxylic acid": [
+    62,
+    82.8,
+    null
+  ],
+  "(2s)-2-amino-3-phenylpropanoic acid": [
+    88,
+    121.5,
+    null
+  ],
+  "(2s)-2-amino-3-(4-hydroxyphenyl)propanoic acid": [
+    96,
+    123.6,
+    null
+  ],
+  "2-amino-3-(1h-indol-3-yl)propanoic acid": [
+    108,
+    143.9,
+    null
+  ],
+  "(2s)-2-aminobutanedioic acid": [
+    70,
+    74.8,
+    null
+  ],
+  "(2s)-2,4-diamino-4-oxobutanoic acid": [
+    70,
+    78.0,
+    null
+  ],
+  "(2s)-2-aminopentanedioic acid": [
+    78,
+    89.9,
+    null
+  ],
+  "(2s)-2,5-diamino-5-oxopentanoic acid": [
+    78,
+    93.9,
+    null
+  ],
+  "(2s)-2-amino-5-carbamimidamidopentanoic acid": [
+    94,
+    127.4,
+    null
+  ],
+  "(2s)-2-amino-3-(1h-imidazol-4-yl)propanoic acid": [
+    82,
+    98.3,
+    null
+  ],
+  "2-aminobutanoic acid": [
+    56,
+    75.6,
+    0.1
+  ],
+  "3-aminobutanoic acid": [
+    56,
+    76.3,
+    0.2
+  ],
+  "4-aminobutanoic acid": [
+    56,
+    73.2,
+    0.2
+  ],
+  "6-aminohexanoic acid": [
+    72,
+    104.2,
+    0.2
+  ],
+  "8-aminooctanoic acid": [
+    88,
+    136.1,
+    0.1
+  ],
+  "2-(trimethylazaniumyl)acetate": [
+    64,
+    97.7,
+    null
+  ],
+  "glycylglycine": [
+    70,
+    76.3,
+    null
+  ],
+  "triglycine": [
+    100,
+    112.2,
+    0.3
+  ],
+  "tetraglycine": [
+    130,
+    149.7,
+    0.1
+  ],
+  "pentaglycine": [
+    160,
+    187.1,
+    0.1
+  ],
+  "l-alanyl-l-alanine": [
+    86,
+    110.6,
+    null
+  ],
+  "l-alanyl-l-alanyl-l-alanine": [
+    124,
+    163.8,
+    null
+  ],
+  "l-alanyl-l-alanyl-l-alanyl-l-alanine": [
+    162,
+    220.1,
+    null
+  ],
+  "l-seryl-l-serine": [
+    102,
+    111.8,
+    null
+  ],
+  "l-seryl-l-seryl-l-serine": [
+    148,
+    166.0,
+    null
+  ],
+  "glycyl-l-alanine": [
+    78,
+    92.66,
+    0.06
+  ],
+  "l-alanylglycine": [
+    78,
+    95.0,
+    null
+  ],
+  "glycyl-l-alanylglycine": [
+    108,
+    132.4,
+    null
+  ],
+  "glycyl-l-serylglycine": [
+    116,
+    133.1,
+    null
+  ],
+  "dihydrouracil": [
+    60,
+    76.3,
+    null
+  ],
+  "cytidine": [
+    128,
+    152.11,
+    0.016
+  ],
+  "uridine": [
+    128,
+    151.4,
+    0.015
+  ],
+  "thymidine": [
+    128,
+    168.2,
+    0.003
+  ],
+  "d-ribose": [
+    80,
+    95.2,
+    0.1
+  ],
+  "2-deoxy-d-ribose": [
+    72,
+    94.7,
+    0.4
+  ],
+  "d-glucose": [
+    96,
+    111.7,
+    0.3
+  ],
+  "2-deoxy-d-glucose": [
+    88,
+    110.4,
+    0.5
+  ],
+  "d-fructose": [
+    96,
+    110.4,
+    0.4
+  ],
+  "sucrose": [
+    182,
+    211.3,
+    0.3
+  ],
+  "d-mannitol": [
+    98,
+    119.4,
+    0.3
+  ],
+  "d-glucitol": [
+    98,
+    119.5,
+    null
+  ],
+  "d-glucuronic acid": [
+    102,
+    110.2,
+    null
+  ],
+  "uracil": [
+    58,
+    74.74,
+    0.016
+  ],
+  "thymine": [
+    66,
+    88.9,
+    0.006
+  ],
+  "adenine": [
+    70,
+    81.12,
+    0.02
+  ],
+  "cytosine": [
+    58,
+    75.42,
+    0.02
+  ],
+  "adenosine": [
+    140,
+    171.43,
+    0.18
+  ],
+  "adenosine 5'-monophosphate sodium salt": [
+    190,
+    189.1,
+    0.2
+  ],
+  "adenosine 5'-triphosphate disodium salt": [
+    280,
+    238.9,
+    0.4
+  ],
+  "2'-deoxyadenosine": [
+    132,
+    169.8,
+    0.6
+  ],
+  "inosine": [
+    140,
+    166.1,
+    0.054
+  ],
+  "guanosine": [
+    148,
+    178.2,
+    0.6
+  ],
+  "2'-deoxyuridine": [
+    120,
+    152.2,
+    0.4
+  ],
+  "2'-deoxyinosine": [
+    132,
+    163.677,
+    0.075
+  ],
+  "2'-deoxyguanosine": [
+    140,
+    169.26,
+    0.11
+  ],
+  "purine": [
+    62,
+    83.3,
+    0.4
+  ],
+  "hypoxanthine": [
+    70,
+    80.9,
+    0.4
+  ],
+  "2'-deoxycytidine": [
+    120,
+    153.0,
+    0.6
+  ],
+  "guanine": [
+    78,
+    91.6,
+    1.0
+  ],
+  "n-(3-aminopropyl)butane-1,4-diamine": [
+    82,
+    153.7,
+    15.0
+  ],
+  "n-(3-aminopropyl)butane-1,4-diaminium": [
+    82,
+    137.5,
+    15.0
+  ],
+  "n,n'-bis(3-aminopropyl)butane-1,4-diamine": [
+    114,
+    213.0,
+    20.0
+  ],
+  "n,n'-bis(3-aminopropyl)butane-1,4-diaminium": [
+    114,
+    191.4,
+    20.0
+  ],
+  "1-propanol": [
+    34,
+    70.7,
+    0.1
+  ],
+  "2-propanol": [
+    34,
+    71.9,
+    0.1
+  ],
+  "1-butanol": [
+    42,
+    86.6,
+    0.1
+  ],
+  "2-methyl-1-propanol": [
+    42,
+    86.7,
+    0.1
+  ],
+  "2-butanol": [
+    42,
+    86.62,
+    0.1
+  ],
+  "2-methyl-2-propanol": [
+    42,
+    87.75,
+    0.07
+  ],
+  "1-pentanol": [
+    50,
+    102.68,
+    0.13
+  ],
+  "2,2-dimethyl-1-propanol": [
+    50,
+    101.87,
+    0.06
+  ],
+  "2-pentanol": [
+    50,
+    102.55,
+    0.1
+  ],
+  "3-pentanol": [
+    50,
+    101.21,
+    0.1
+  ],
+  "2-methyl-2-butanol": [
+    50,
+    102.5,
+    null
+  ],
+  "1-hexanol": [
+    58,
+    118.65,
+    0.1
+  ],
+  "2-hexanol": [
+    58,
+    118.49,
+    0.1
+  ],
+  "3-hexanol": [
+    58,
+    117.14,
+    0.09
+  ],
+  "1-heptanol": [
+    66,
+    133.43,
+    null
+  ],
+  "2-heptanol": [
+    66,
+    134.39,
+    0.1
+  ],
+  "3-heptanol": [
+    66,
+    133.3,
+    0.2
+  ],
+  "4-heptanol": [
+    66,
+    133.3,
+    0.2
+  ],
+  "allyl alcohol": [
+    32,
+    64.3,
+    null
+  ],
+  "cyclobutanol": [
+    40,
+    75.6,
+    0.1
+  ],
+  "cyclopentanol": [
+    48,
+    89.0,
+    0.5
+  ],
+  "cyclohexanol": [
+    56,
+    103.5,
+    0.5
+  ],
+  "cycloheptanol": [
+    64,
+    116.88,
+    0.1
+  ],
+  "cyclooctanol": [
+    72,
+    129.7,
+    0.4
+  ],
+  "cyclopropanemethanol": [
+    40,
+    76.0,
+    0.2
+  ],
+  "cyclopentanemethanol": [
+    56,
+    103.6,
+    0.7
+  ],
+  "alpha-methylcyclopentanemethanol": [
+    64,
+    118.2,
+    0.7
+  ],
+  "cyclohexanemethanol": [
+    64,
+    118.1,
+    0.7
+  ],
+  "benzyl alcohol": [
+    58,
+    100.82,
+    null
+  ],
+  "diethyl ether": [
+    42,
+    90.4,
+    0.5
+  ],
+  "diisopropyl ether": [
+    58,
+    115.0,
+    0.6
+  ],
+  "oxirane": [
+    24,
+    45.5,
+    null
+  ],
+  "tetrahydrofuran": [
+    40,
+    76.85,
+    0.07
+  ],
+  "2-methyltetrahydrofuran": [
+    48,
+    94.0,
+    0.1
+  ],
+  "2,5-dimethyltetrahydrofuran": [
+    56,
+    111.0,
+    0.03
+  ],
+  "ammonia": [
+    10,
+    24.85,
+    0.1
+  ],
+  "methylamine": [
+    18,
+    41.88,
+    0.3
+  ],
+  "ethylamine": [
+    26,
+    58.61,
+    0.2
+  ],
+  "1-propanamine": [
+    34,
+    74.15,
+    0.1
+  ],
+  "2-propanamine": [
+    34,
+    75.5,
+    null
+  ],
+  "1-butanamine": [
+    42,
+    89.8,
+    0.1
+  ],
+  "2-methyl-1-propanamine": [
+    42,
+    89.5,
+    null
+  ],
+  "2-butanamine": [
+    42,
+    89.1,
+    null
+  ],
+  "2-methyl-2-propanamine": [
+    42,
+    93.0,
+    null
+  ],
+  "1-pentanamine": [
+    50,
+    105.7,
+    0.1
+  ],
+  "1-hexanamine": [
+    58,
+    121.6,
+    0.2
+  ],
+  "1-heptanamine": [
+    66,
+    137.6,
+    0.3
+  ],
+  "cycloheptanamine": [
+    64,
+    118.5,
+    0.2
+  ],
+  "1-adamantanamine": [
+    84,
+    138.9,
+    0.3
+  ],
+  "benzylamine": [
+    58,
+    104.7,
+    null
+  ],
+  "dimethylamine": [
+    26,
+    59.2,
+    0.2
+  ],
+  "diethylamine": [
+    42,
+    91.68,
+    0.1
+  ],
+  "dipropylamine": [
+    58,
+    123.06,
+    0.1
+  ],
+  "dibutylamine": [
+    74,
+    155.4,
+    0.4
+  ],
+  "hexahydro-1h-azepine": [
+    56,
+    105.55,
+    null
+  ],
+  "octahydroazocine": [
+    64,
+    120.09,
+    null
+  ],
+  "2,6-dimethylpiperidine": [
+    64,
+    124.4,
+    0.1
+  ],
+  "n-ethyl-n-methylethanamine": [
+    50,
+    106.77,
+    0.1
+  ],
+  "triethylamine": [
+    58,
+    120.9,
+    0.1
+  ],
+  "1-methylpyrrolidine": [
+    48,
+    97.29,
+    0.02
+  ],
+  "2-methylpyridine": [
+    50,
+    94.2,
+    0.2
+  ],
+  "3-methylpyridine": [
+    50,
+    93.7,
+    0.1
+  ],
+  "4-methylpyridine": [
+    50,
+    94.0,
+    0.3
+  ],
+  "2,6-dimethylpyridine": [
+    58,
+    109.9,
+    0.1
+  ],
+  "acetone": [
+    32,
+    66.92,
+    0.1
+  ],
+  "2-butanone": [
+    40,
+    82.52,
+    0.1
+  ],
+  "2-pentanone": [
+    48,
+    98.0,
+    0.1
+  ],
+  "3-pentanone": [
+    48,
+    98.08,
+    null
+  ],
+  "3-methyl-2-butanone": [
+    48,
+    95.0,
+    0.3
+  ],
+  "cyclobutanone": [
+    38,
+    70.9,
+    0.3
+  ],
+  "cyclopentanone": [
+    46,
+    84.5,
+    0.3
+  ],
+  "cyclohexanone": [
+    54,
+    99.7,
+    0.4
+  ],
+  "cycloheptanone": [
+    62,
+    113.8,
+    0.3
+  ],
+  "cyclooctanone": [
+    70,
+    128.0,
+    0.1
+  ],
+  "cyclononanone": [
+    78,
+    142.0,
+    0.3
+  ],
+  "pentanoic acid": [
+    56,
+    100.5,
+    null
+  ],
+  "2-methylbutanoic acid": [
+    56,
+    100.5,
+    null
+  ],
+  "3-methylbutanoic acid": [
+    56,
+    100.5,
+    null
+  ],
+  "2,2-dimethylpropanoic acid": [
+    56,
+    100.5,
+    null
+  ],
+  "benzoic acid": [
+    64,
+    98.77,
+    null
+  ],
+  "methyl acetate": [
+    40,
+    72.46,
+    0.05
+  ],
+  "gamma-butyrolactone": [
+    46,
+    73.3,
+    null
+  ],
+  "gamma-valerolactone": [
+    54,
+    92.0,
+    null
+  ],
+  "2-piperidinone": [
+    54,
+    90.3,
+    0.2
+  ],
+  "hexahydro-2h-azepin-2-one": [
+    62,
+    105.0,
+    0.2
+  ],
+  "n,n-diisopropylacetamide": [
+    80,
+    152.0,
+    null
+  ],
+  "1-methyl-2-pyrrolidinone": [
+    54,
+    90.4,
+    null
+  ],
+  "3-bromo-1-propene": [
+    58,
+    77.6,
+    null
+  ],
+  "diethyl sulfide": [
+    50,
+    99.5,
+    null
+  ],
+  "dimethyl sulfoxide": [
+    42,
+    68.92,
+    null
+  ],
+  "thioacetamide": [
+    40,
+    66.42,
+    null
+  ],
+  "dimethyl carbonate": [
+    48,
+    77.6,
+    null
+  ],
+  "diethyl carbonate": [
+    64,
+    113.1,
+    null
+  ],
+  "ethylene carbonate": [
+    46,
+    62.3,
+    null
+  ],
+  "methylurea": [
+    40,
+    62.1,
+    0.1
+  ],
+  "ethylurea": [
+    48,
+    80.2,
+    null
+  ],
+  "isopropylurea": [
+    56,
+    99.0,
+    null
+  ],
+  "butylurea": [
+    64,
+    116.1,
+    null
+  ],
+  "n,n-dimethylurea": [
+    48,
+    78.88,
+    null
+  ],
+  "n,n-diethylurea": [
+    64,
+    114.9,
+    null
+  ],
+  "n,n'-dimethylurea": [
+    48,
+    80.03,
+    0.1
+  ],
+  "n,n'-diethylurea": [
+    64,
+    116.1,
+    null
+  ],
+  "ethylene glycol": [
+    34,
+    54.63,
+    0.08
+  ],
+  "1,2-propanediol": [
+    42,
+    71.22,
+    0.1
+  ],
+  "1,3-propanediol": [
+    42,
+    71.9,
+    0.1
+  ],
+  "2,3-butanediol": [
+    50,
+    86.56,
+    0.1
+  ],
+  "1,3-butanediol": [
+    50,
+    88.32,
+    0.1
+  ],
+  "1,4-butanediol": [
+    50,
+    88.33,
+    0.1
+  ],
+  "2,2-dimethyl-1,3-propanediol": [
+    58,
+    102.34,
+    0.01
+  ],
+  "2,4-pentanediol": [
+    58,
+    104.64,
+    0.1
+  ],
+  "1,5-pentanediol": [
+    58,
+    104.39,
+    0.1
+  ],
+  "2,5-hexanediol": [
+    66,
+    120.5,
+    null
+  ],
+  "1,6-hexanediol": [
+    66,
+    120.44,
+    0.1
+  ],
+  "1,7-heptanediol": [
+    74,
+    136.4,
+    0.1
+  ],
+  "1,8-octanediol": [
+    82,
+    152.6,
+    0.1
+  ],
+  "1,10-decanediol": [
+    98,
+    184.4,
+    0.6
+  ],
+  "cis-1,2-cyclohexanediol": [
+    64,
+    101.3,
+    0.7
+  ],
+  "trans-1,2-cyclohexanediol": [
+    64,
+    103.0,
+    0.7
+  ],
+  "1,4-cyclohexanediol": [
+    64,
+    105.3,
+    null
+  ],
+  "trans-1,2-cycloheptanediol": [
+    72,
+    117.0,
+    0.1
+  ],
+  "cis-1,5-cyclooctanediol": [
+    80,
+    132.5,
+    0.3
+  ],
+  "1,3-adamantanediol": [
+    92,
+    138.2,
+    0.3
+  ],
+  "1,4-adamantanediol": [
+    92,
+    139.3,
+    0.4
+  ],
+  "catechol": [
+    58,
+    87.065,
+    null
+  ],
+  "resorcinol": [
+    58,
+    88.919,
+    null
+  ],
+  "hydroquinone": [
+    58,
+    88.696,
+    null
+  ],
+  "glycerol": [
+    50,
+    70.95,
+    null
+  ],
+  "2-(hydroxymethyl)-2-methyl-1,3-propanediol": [
+    66,
+    102.3,
+    0.01
+  ],
+  "meso-erythritol": [
+    66,
+    87.1,
+    null
+  ],
+  "pentaerythritol": [
+    74,
+    101.81,
+    0.01
+  ],
+  "d-arabinitol": [
+    82,
+    103.31,
+    null
+  ],
+  "l-arabinitol": [
+    82,
+    103.0,
+    null
+  ],
+  "d-xylitol": [
+    82,
+    102.4,
+    0.3
+  ],
+  "galactitol": [
+    98,
+    119.3,
+    0.3
+  ],
+  "sorbitol": [
+    98,
+    119.5,
+    0.4
+  ],
+  "myo-inositol": [
+    96,
+    121.0,
+    null
+  ],
+  "diglyme": [
+    74,
+    132.7,
+    0.1
+  ],
+  "bis(2-ethoxyethyl) ether": [
+    90,
+    165.0,
+    null
+  ],
+  "paraldehyde": [
+    72,
+    123.71,
+    0.02
+  ],
+  "2,5-dimethoxytetrahydrofuran": [
+    72,
+    122.34,
+    0.04
+  ],
+  "tetraglyme": [
+    122,
+    206.76,
+    0.1
+  ],
+  "2,5-dimethoxy-2-(dimethoxymethyl)tetrahydrofuran": [
+    112,
+    177.1,
+    0.7
+  ],
+  "18-crown-6": [
+    144,
+    223.35,
+    0.1
+  ],
+  "hydrazine": [
+    18,
+    30.13,
+    null
+  ],
+  "ethylenediamine": [
+    34,
+    67.7,
+    0.2
+  ],
+  "1,2-propanediamine": [
+    42,
+    78.1,
+    null
+  ],
+  "1,3-propanediamine": [
+    42,
+    78.4,
+    0.4
+  ],
+  "cadaverine": [
+    58,
+    109.4,
+    0.1
+  ],
+  "1,6-hexanediamine": [
+    66,
+    124.8,
+    0.3
+  ],
+  "1,7-heptanediamine": [
+    74,
+    141.52,
+    0.1
+  ],
+  "1,8-octanediamine": [
+    82,
+    157.3,
+    0.1
+  ],
+  "1,9-nonanediamine": [
+    90,
+    172.85,
+    0.1
+  ],
+  "1,10-decanediamine": [
+    98,
+    188.3,
+    0.9
+  ],
+  "trans-1,4-cyclohexanediamine": [
+    64,
+    108.9,
+    0.9
+  ],
+  "1,4-dimethylpiperazine": [
+    64,
+    121.0,
+    0.02
+  ],
+  "dabco": [
+    62,
+    105.93,
+    null
+  ],
+  "diethylenetriamine": [
+    58,
+    101.2,
+    0.4
+  ],
+  "tetraethylenepentamine": [
+    106,
+    175.9,
+    0.6
+  ],
+  "2-aminopyridine": [
+    50,
+    83.0,
+    null
+  ],
+  "3-aminopyridine": [
+    50,
+    82.1,
+    null
+  ],
+  "4-aminopyridine": [
+    50,
+    82.7,
+    null
+  ],
+  "pyrazole": [
+    36,
+    62.26,
+    0.5
+  ],
+  "imidazole": [
+    36,
+    59.95,
+    0.5
+  ],
+  "4-phenylpyrimidine": [
+    82,
+    134.09,
+    0.5
+  ],
+  "2,2'-bipyridine": [
+    82,
+    94.49,
+    0.5
+  ],
+  "benzimidazole": [
+    62,
+    74.79,
+    0.5
+  ],
+  "benzotriazole": [
+    62,
+    98.53,
+    0.5
+  ],
+  "oxalic acid": [
+    46,
+    49.12,
+    0.1
+  ],
+  "malonic acid": [
+    54,
+    67.22,
+    0.1
+  ],
+  "glutaric acid": [
+    70,
+    99.14,
+    0.1
+  ],
+  "adipic acid": [
+    78,
+    115.66,
+    0.1
+  ],
+  "oxamide": [
+    46,
+    55.0,
+    0.2
+  ],
+  "malonamide": [
+    54,
+    72.6,
+    0.3
+  ],
+  "succinamide": [
+    62,
+    88.8,
+    0.2
+  ],
+  "n,n,n',n'-tetramethylnonanediamide": [
+    134,
+    236.0,
+    null
+  ],
+  "n,n,n',n'-tetramethyldecanediamide": [
+    142,
+    250.0,
+    null
+  ],
+  "glycine anhydride": [
+    60,
+    75.7,
+    null
+  ],
+  "2-methoxyethanol": [
+    42,
+    75.15,
+    0.05
+  ],
+  "2-ethoxyethanol": [
+    50,
+    91.15,
+    0.15
+  ],
+  "2-propoxyethanol": [
+    58,
+    107.1,
+    0.05
+  ],
+  "2-butoxyethanol": [
+    66,
+    122.95,
+    0.05
+  ],
+  "tetrahydrofurfuryl alcohol": [
+    56,
+    93.8,
+    null
+  ],
+  "tetrahydro-2h-pyran-2-methanol": [
+    64,
+    108.1,
+    null
+  ],
+  "diethylene glycol": [
+    58,
+    92.22,
+    0.05
+  ],
+  "tetraethylene glycol": [
+    106,
+    166.31,
+    0.08
+  ],
+  "pentaethylene glycol": [
+    130,
+    203.85,
+    null
+  ],
+  "dipropylene glycol": [
+    148,
+    124.64,
+    null
+  ],
+  "pentapropylene glycol": [
+    170,
+    283.75,
+    null
+  ],
+  "2-aminoethanol": [
+    34,
+    59.25,
+    0.03
+  ],
+  "3-amino-1-propanol": [
+    42,
+    75.21,
+    0.04
+  ],
+  "4-amino-1-butanol": [
+    50,
+    91.17,
+    null
+  ],
+  "5-amino-1-pentanol": [
+    58,
+    107.07,
+    null
+  ],
+  "6-amino-1-hexanol": [
+    66,
+    123.36,
+    null
+  ],
+  "2-(methylamino)ethanol": [
+    42,
+    77.07,
+    0.02
+  ],
+  "2-(ethylamino)ethanol": [
+    50,
+    92.91,
+    0.02
+  ],
+  "2-(dimethylamino)ethanol": [
+    50,
+    94.17,
+    0.03
+  ],
+  "2-(diethylamino)ethanol": [
+    66,
+    123.04,
+    0.03
+  ],
+  "3-hydroxypyridine": [
+    50,
+    75.4,
+    null
+  ],
+  "diethanolamine": [
+    58,
+    94.35,
+    null
+  ],
+  "2,2'-(ethylimino)diethanol": [
+    74,
+    125.01,
+    null
+  ],
+  "glycolic acid": [
+    40,
+    71.51,
+    0.1
+  ],
+  "lactic acid": [
+    48,
+    69.38,
+    0.1
+  ],
+  "2-hydroxy-2-methylpropanoic acid": [
+    56,
+    86.78,
+    0.1
+  ],
+  "2-hydroxypentanoic acid": [
+    64,
+    100.47,
+    0.1
+  ],
+  "2-hydroxy-3-methylbutanoic acid": [
+    64,
+    100.83,
+    0.1
+  ],
+  "l-tartaric acid": [
+    78,
+    83.45,
+    null
+  ],
+  "meso-tartaric acid": [
+    78,
+    82.9,
+    null
+  ],
+  "glycolamide": [
+    40,
+    56.2,
+    null
+  ],
+  "lactamide": [
+    48,
+    73.3,
+    0.2
+  ],
+  "5-hydroxypentanamide": [
+    64,
+    105.4,
+    null
+  ],
+  "4-hydroxyoctanamide": [
+    88,
+    151.9,
+    0.3
+  ],
+  "4-hydroxydecanamide": [
+    104,
+    183.3,
+    0.3
+  ],
+  "2-methoxyethylamine": [
+    42,
+    79.59,
+    0.03
+  ],
+  "3-methoxy-1-propanamine": [
+    50,
+    111.71,
+    0.06
+  ],
+  "chloroform": [
+    58,
+    72.3,
+    null
+  ],
+  "l-arabinose": [
+    80,
+    93.2,
+    0.3
+  ],
+  "d-xylose": [
+    80,
+    95.1,
+    0.1
+  ],
+  "d-galactose": [
+    96,
+    110.2,
+    null
+  ],
+  "d-mannose": [
+    96,
+    111.5,
+    0.3
+  ],
+  "l-sorbose": [
+    96,
+    110.6,
+    0.4
+  ],
+  "cellobiose": [
+    182,
+    212.0,
+    1.0
+  ],
+  "lactose": [
+    182,
+    209.1,
+    1.0
+  ],
+  "maltose": [
+    182,
+    210.0,
+    1.0
+  ],
+  "melibiose": [
+    182,
+    204.0,
+    0.7
+  ],
+  "cellotriose": [
+    268,
+    309.2,
+    1.0
+  ],
+  "maltotriose": [
+    268,
+    307.0,
+    2.0
+  ],
+  "melezitose": [
+    268,
+    308.0,
+    2.0
+  ],
+  "stachyose": [
+    354,
+    401.0,
+    1.8
+  ],
+  "cellotetraose": [
+    354,
+    409.0,
+    1.0
+  ],
+  "cellopentaose": [
+    440,
+    499.6,
+    2.6
+  ],
+  "cellohexaose": [
+    526,
+    601.7,
+    2.6
+  ],
+  "alpha-cyclodextrin": [
+    516,
+    601.5,
+    1.0
+  ],
+  "beta-cyclodextrin": [
+    602,
+    710.0,
+    1.0
+  ],
+  "methyl alpha-d-galactopyranoside": [
+    104,
+    132.6,
+    0.4
+  ],
+  "methyl beta-d-galactopyranoside": [
+    104,
+    132.9,
+    0.2
+  ],
+  "methyl alpha-d-glucopyranoside": [
+    104,
+    132.9,
+    0.3
+  ],
+  "methyl beta-d-glucopyranoside": [
+    104,
+    133.6,
+    0.5
+  ],
+  "3-o-methyl-d-glucose": [
+    104,
+    134.0,
+    0.5
+  ],
+  "methyl alpha-d-mannopyranoside": [
+    104,
+    132.9,
+    0.4
+  ],
+  "ethyl alpha-d-glucopyranoside": [
+    112,
+    149.45,
+    null
+  ],
+  "phenyl beta-d-glucopyranoside": [
+    136,
+    177.5,
+    0.7
+  ],
+  "galacturonic acid": [
+    102,
+    107.6,
+    null
+  ],
+  "glucuronic acid": [
+    102,
+    110.2,
+    null
+  ],
+  "dimethyl oxalate": [
+    62,
+    91.4,
+    0.5
+  ],
+  "methyl methoxyacetate": [
+    56,
+    93.3,
+    0.1
+  ],
+  "methoxymethyl acetate": [
+    56,
+    94.4,
+    0.2
+  ],
+  "2-thiohydantoin": [
+    60,
+    76.5,
+    0.3
+  ],
+  "3-nitrophenol": [
+    72,
+    99.71,
+    null
+  ],
+  "3-hydroxybenzonitrile": [
+    62,
+    97.5,
+    null
+  ],
+  "caffeine": [
+    102,
+    144.2,
+    null
+  ],
+  "alpha-methylcyclopropanemethanol": [
+    48,
+    92.4,
+    0.2
+  ],
+  "m-nitrophenol": [
+    72,
+    99.7,
+    null
+  ],
+  "p-nitrophenol": [
+    72,
+    98.2,
+    null
+  ],
+  "m-cyanophenol": [
+    62,
+    97.5,
+    null
+  ],
+  "p-cyanophenol": [
+    62,
+    98.3,
+    null
+  ],
+  "12-crown-4": [
+    96,
+    149.9,
+    0.2
+  ],
+  "15-crown-5": [
+    120,
+    186.06,
+    0.1
+  ],
+  "acetaldehyde": [
+    24,
+    43.7,
+    0.3
+  ],
+  "tartaric acid": [
+    78,
+    83.99,
+    0.1
+  ],
+  "gamma-cyclodextrin": [
+    688,
+    803.0,
+    null
+  ],
+  "l-arabitol": [
+    82,
+    103.1,
+    0.2
+  ],
+  "d-arabitol": [
+    82,
+    103.31,
+    null
+  ],
+  "d-alanine": [
+    48,
+    60.58,
+    0.1
+  ],
+  "l-alanine": [
+    48,
+    60.54,
+    0.08
+  ],
+  "dl-alanine": [
+    48,
+    60.54,
+    0.08
+  ],
+  "l-valine": [
+    64,
+    90.75,
+    0.1
+  ],
+  "dl-norvaline": [
+    64,
+    91.8,
+    0.2
+  ],
+  "l-leucine": [
+    72,
+    107.77,
+    0.05
+  ],
+  "dl-norleucine": [
+    72,
+    107.73,
+    0.1
+  ],
+  "l-isoleucine": [
+    72,
+    105.8,
+    0.07
+  ],
+  "l-proline": [
+    62,
+    82.76,
+    0.1
+  ],
+  "l-hydroxyproline": [
+    70,
+    84.49,
+    0.05
+  ],
+  "l-phenylalanine": [
+    88,
+    121.5,
+    0.2
+  ],
+  "d-tryptophan": [
+    108,
+    143.82,
+    0.13
+  ],
+  "dl-tryptophan": [
+    108,
+    143.85,
+    0.2
+  ],
+  "dl-methionine": [
+    80,
+    105.35,
+    0.02
+  ],
+  "l-methionine": [
+    80,
+    105.57,
+    0.02
+  ],
+  "l-serine": [
+    56,
+    60.62,
+    0.05
+  ],
+  "l-threonine": [
+    64,
+    76.9,
+    0.1
+  ],
+  "l-cysteine": [
+    64,
+    73.45,
+    0.03
+  ],
+  "l-asparagine": [
+    70,
+    78.0,
+    0.5
+  ],
+  "dl-aspartic acid": [
+    70,
+    73.75,
+    0.08
+  ],
+  "l-aspartic acid": [
+    70,
+    74.8,
+    0.2
+  ],
+  "l-glutamic acid": [
+    78,
+    89.85,
+    0.1
+  ],
+  "lysine": [
+    80,
+    108.5,
+    null
+  ],
+  "l-arginine": [
+    94,
+    127.42,
+    0.01
+  ],
+  "l-histidine": [
+    82,
+    98.3,
+    0.1
+  ],
+  "2-amino-2-methylpropanoic acid": [
+    56,
+    77.55,
+    0.15
+  ],
+  "5-aminopentanoic acid": [
+    64,
+    87.6,
+    0.6
+  ],
+  "7-aminoheptanoic acid": [
+    80,
+    120.0,
+    0.1
+  ],
+  "9-aminononanoic acid": [
+    96,
+    151.3,
+    0.1
+  ],
+  "10-aminodecanoic acid": [
+    104,
+    167.3,
+    0.1
+  ],
+  "11-aminoundecanoic acid": [
+    112,
+    182.6,
+    0.1
+  ],
+  "diglycine": [
+    70,
+    76.3,
+    0.1
+  ],
+  "glycyl-dl-alanine": [
+    78,
+    92.37,
+    0.02
+  ],
+  "glycyl-l-valine": [
+    94,
+    121.99,
+    0.02
+  ],
+  "glycyl-l-leucine": [
+    102,
+    139.7,
+    0.07
+  ],
+  "pentanenitrile": [
+    46,
+    96.73,
+    null
+  ],
+  "2-mercaptoethanol": [
+    42,
+    69.0,
+    3.5
+  ],
+  "cysteamine": [
+    42,
+    72.2,
+    3.5
+  ],
+  "1,2-ethanedithiol": [
+    50,
+    81.9,
+    5.0
+  ],
+  "2,2'-thiodiethanol": [
+    66,
+    101.4,
+    5.0
+  ],
+  "methanethiol": [
+    26,
+    52.97,
+    null
+  ],
+  "ethanethiol": [
+    34,
+    67.77,
+    null
+  ],
+  "1-propanethiol": [
+    42,
+    83.6,
+    1.0
+  ],
+  "1-butanethiol": [
+    50,
+    99.37,
+    null
+  ],
+  "1-pentanethiol": [
+    58,
+    115.17,
+    null
+  ],
+  "1-hexanethiol": [
+    66,
+    130.97,
+    null
+  ],
+  "1-heptanethiol": [
+    74,
+    146.77,
+    null
+  ],
+  "1-octanethiol": [
+    82,
+    162.57,
+    null
+  ],
+  "1-nonanethiol": [
+    90,
+    178.37,
+    null
+  ],
+  "1-decanethiol": [
+    98,
+    194.17,
+    null
+  ],
+  "1-undecanethiol": [
+    106,
+    209.97,
+    null
+  ],
+  "1-dodecanethiol": [
+    114,
+    225.77,
+    null
+  ],
+  "toluene": [
+    50,
+    97.71,
+    null
+  ],
+  "tetrahydropyran": [
+    48,
+    91.74,
+    0.05
+  ],
+  "trimethylamine": [
+    34,
+    79.0,
+    0.4
+  ],
+  "urethane": [
+    48,
+    78.884,
+    null
+  ],
+  "propylurea": [
+    56,
+    94.9,
+    null
+  ],
+  "tetramethylurea": [
+    64,
+    115.6,
+    0.2
+  ],
+  "ribitol": [
+    82,
+    103.2,
+    0.2
+  ],
+  "triglyme": [
+    98,
+    169.73,
+    0.1
+  ],
+  "putrescine": [
+    50,
+    93.6,
+    0.1
+  ],
+  "triethylenetetramine": [
+    82,
+    137.6,
+    0.5
+  ],
+  "succinic acid": [
+    62,
+    82.94,
+    0.1
+  ],
+  "pimelic acid": [
+    86,
+    131.93,
+    null
+  ],
+  "triethylene glycol": [
+    82,
+    129.27,
+    0.04
+  ],
+  "tetrapropylene glycol": [
+    138,
+    231.36,
+    null
+  ],
+  "triethanolamine": [
+    82,
+    127.76,
+    null
+  ],
+  "trehalose": [
+    182,
+    206.9,
+    0.5
+  ],
+  "raffinose": [
+    268,
+    307.0,
+    1.0
+  ],
+  "thiosemicarbazide": [
+    48,
+    64.0,
+    0.5
+  ],
+  "beta-alanine": [
+    48,
+    58.28,
+    0.09
+  ],
+  "1-methyl-trans-1,2-cyclohexanediol": [
+    72,
+    116.6,
+    null
+  ],
+  "n,n,n',n'-tetramethylheptanediamide": [
+    118,
+    211.0,
+    null
+  ],
+  "tripropylene glycol": [
+    106,
+    177.61,
+    null
+  ],
+  "4-hydroxypentanamide": [
+    64,
+    105.1,
+    0.1
+  ],
+  "methylammonium": [
+    18,
+    30.7,
+    null
+  ],
+  "butylammonium": [
+    42,
+    80.05,
+    null
+  ],
+  "isobutylammonium": [
+    42,
+    80.18,
+    null
+  ],
+  "tert-butylammonium": [
+    42,
+    82.3,
+    null
+  ],
+  "anilinium": [
+    50,
+    79.54,
+    null
+  ],
+  "phenethylammonium": [
+    66,
+    110.08,
+    null
+  ],
+  "dimethylammonium": [
+    26,
+    49.27,
+    null
+  ],
+  "diethylammonium": [
+    42,
+    83.53,
+    null
+  ],
+  "trimethylammonium": [
+    34,
+    67.39,
+    null
+  ],
+  "triethylammonium": [
+    58,
+    116.07,
+    null
+  ],
+  "tripropylammonium": [
+    82,
+    163.55,
+    null
+  ],
+  "tributylammonium": [
+    106,
+    215.5,
+    null
+  ],
+  "tetramethylammonium": [
+    42,
+    84.25,
+    null
+  ],
+  "tetraethylammonium": [
+    74,
+    143.55,
+    null
+  ],
+  "tetrapropylammonium": [
+    106,
+    209.22,
+    null
+  ],
+  "tetrabutylammonium": [
+    138,
+    270.3,
+    null
+  ],
+  "tetrapentylammonium": [
+    170,
+    333.3,
+    null
+  ],
+  "pyrrolidinium": [
+    40,
+    68.5,
+    null
+  ],
+  "piperidinium": [
+    48,
+    83.6,
+    null
+  ],
+  "pyridinium": [
+    42,
+    67.52,
+    null
+  ],
+  "1-methylpyridinium": [
+    50,
+    85.0,
+    null
+  ],
+  "morpholinium": [
+    48,
+    69.79,
+    null
+  ],
+  "imidazolium": [
+    36,
+    54.2,
+    null
+  ],
+  "piperazine-1,4-diium": [
+    48,
+    52.86,
+    null
+  ],
+  "piperazin-1-ium": [
+    48,
+    71.92,
+    null
+  ],
+  "alanine": [
+    48,
+    60.5,
+    null
+  ],
+  "valine": [
+    64,
+    90.78,
+    null
+  ],
+  "leucine": [
+    72,
+    107.75,
+    null
+  ],
+  "phenylalanine": [
+    88,
+    121.48,
+    null
+  ],
+  "serine": [
+    56,
+    60.8,
+    null
+  ],
+  "tyrosine": [
+    96,
+    123.6,
+    null
+  ],
+  "asparagine": [
+    70,
+    78.0,
+    null
+  ],
+  "glutamine": [
+    78,
+    93.9,
+    null
+  ],
+  "aspartic acid": [
+    70,
+    73.83,
+    null
+  ],
+  "methionine": [
+    80,
+    105.64,
+    null
+  ],
+  "histidine": [
+    82,
+    98.79,
+    null
+  ],
+  "propanoate": [
+    40,
+    60.31,
+    null
+  ],
+  "butanoate": [
+    48,
+    75.92,
+    null
+  ],
+  "hexanoate": [
+    64,
+    107.96,
+    null
+  ],
+  "heptanoate": [
+    72,
+    123.65,
+    null
+  ],
+  "octanoate": [
+    80,
+    139.6,
+    null
+  ],
+  "nonanoate": [
+    88,
+    155.33,
+    null
+  ],
+  "decanoate": [
+    96,
+    170.68,
+    null
+  ],
+  "tridecanoate": [
+    120,
+    202.39,
+    null
+  ],
+  "benzoate": [
+    64,
+    92.52,
+    null
+  ],
+  "phenylacetate": [
+    72,
+    107.21,
+    null
+  ],
+  "salicylate": [
+    72,
+    100.0,
+    null
+  ],
+  "methanesulfonate": [
+    50,
+    60.48,
+    null
+  ],
+  "ethanesulfonate": [
+    58,
+    78.16,
+    null
+  ],
+  "propane-1-sulfonate": [
+    66,
+    91.68,
+    null
+  ],
+  "butane-1-sulfonate": [
+    74,
+    107.68,
+    null
+  ],
+  "pentane-1-sulfonate": [
+    82,
+    123.62,
+    null
+  ],
+  "hexane-1-sulfonate": [
+    90,
+    139.58,
+    null
+  ],
+  "dodecane-1-sulfonate": [
+    138,
+    233.1,
+    null
+  ],
+  "tetradecane-1-sulfonate": [
+    154,
+    266.6,
+    null
+  ],
+  "benzenesulfonate": [
+    82,
+    109.13,
+    null
+  ],
+  "butyl sulfate": [
+    82,
+    116.6,
+    null
+  ],
+  "hexyl sulfate": [
+    98,
+    147.9,
+    null
+  ],
+  "octyl sulfate": [
+    114,
+    179.2,
+    null
+  ],
+  "phenolate": [
+    50,
+    72.9,
+    null
+  ],
+  "tetraphenylphosphonium": [
+    178,
+    286.54,
+    null
+  ],
+  "tetraphenylarsonium": [
+    196,
+    295.2,
+    null
+  ],
+  "tetraphenylborate": [
+    170,
+    283.01,
+    null
+  ],
+  "oxalate": [
+    46,
+    41.28,
+    null
+  ],
+  "succinate": [
+    62,
+    67.3,
+    null
+  ],
+  "adipate": [
+    78,
+    99.44,
+    null
+  ],
+  "suberate": [
+    94,
+    130.81,
+    null
+  ],
+  "sebacate": [
+    110,
+    162.11,
+    null
+  ],
+  "cholate": [
+    224,
+    324.0,
+    null
+  ],
+  "deoxycholate": [
+    216,
+    322.4,
+    null
+  ],
+  "chenodeoxycholate": [
+    216,
+    326.6,
+    null
+  ],
+  "ascorbate": [
+    92,
+    93.9,
+    null
+  ],
+  "propylammonium": [
+    34,
+    64.01,
+    null
+  ],
+  "pentylammonium": [
+    50,
+    96.03,
+    null
+  ],
+  "hexylammonium": [
+    58,
+    111.95,
+    null
+  ],
+  "octylammonium": [
+    74,
+    143.69,
+    null
+  ],
+  "benzylammonium": [
+    58,
+    93.87,
+    null
+  ],
+  "dipropylammonium": [
+    58,
+    115.46,
+    null
+  ],
+  "propane-1,3-diamine dication": [
+    42,
+    52.48,
+    null
+  ],
+  "butane-1,4-diamine dication": [
+    50,
+    69.9,
+    null
+  ],
+  "pentane-1,5-diamine dication": [
+    58,
+    87.17,
+    null
+  ],
+  "1-methylimidazole": [
+    44,
+    78.4,
+    null
+  ],
+  "1-methylcyclohexane-1,2-diol": [
+    72,
+    116.6,
+    0.7
+  ],
+  "1,2-benzenediol": [
+    58,
+    87.07,
+    null
+  ],
+  "1,3-benzenediol": [
+    58,
+    88.92,
+    null
+  ],
+  "1,4-benzenediol": [
+    58,
+    88.7,
+    null
+  ],
+  "2-(hydroxymethyl)-1,3-propanediol": [
+    58,
+    102.3,
+    0.01
+  ],
+  "tetrahydro-2-furanmethanol": [
+    56,
+    93.8,
+    null
+  ],
+  "arabinose": [
+    80,
+    93.2,
+    0.3
+  ],
+  "xylose": [
+    80,
+    95.1,
+    0.3
+  ]
 }

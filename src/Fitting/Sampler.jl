@@ -526,7 +526,7 @@ function run_fitting(
 )::FitResult
 
     if δ <= 0 || δ >= 100
-        throw(DomainError(δ, "0 < δ < 100"))
+        throw(DomainError(δ, "δ must satisfy: 0 < δ < 100"))
     end
     δ = δ / 100
 

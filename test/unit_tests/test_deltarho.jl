@@ -69,7 +69,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   
         @test mean(dro3) == 0.0
         @test std(dro3) == 0.0
         # a point mass always samples its own mean -- dro3 genuinely collapses
-        # to exactly 0 by default, it isn't merely centered there
+        # to exactly 0 by default, it isn't merely centred there
         @test all(==(0.0), rand(dro3, 8))
     end
 
