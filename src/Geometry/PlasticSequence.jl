@@ -20,6 +20,7 @@ sequence and the sphere/ball it is lifted onto.
 module PlasticSequence
 
 using Roots: find_zero
+using FastClosures: @closure
 
 export  Vec2, Vec3, plastic_ratio, PLASTIC_RATIO_2, 
         PLASTIC_RATIO_3, plastic_points
@@ -40,7 +41,7 @@ and `dim = 3` layouts both build on.
 """
 function plastic_ratio(d::Int)::Float64
     d >= 1 || throw(DomainError(d, "d must be >= 1"))
-    return find_zero(x -> x^(d + 1) - x - 1, (1.0, 2.0))
+    return find_zero(@closure(x -> x^(d + 1) - x - 1), (1.0, 2.0))
 end
 
 "Plastic ratio ρ ≈ 1.324718, the real root of `x³ = x + 1` (`plastic_ratio(2)`)."

@@ -1,0 +1,14 @@
+# Font provenance
+
+* **TeX Gyre Pagella** 
+  * GUST e-foundry, v2.609.
+  * Source: [https://www.gust.org.pl/projects/e-foundry/tex-gyre/pagella
+  * License: GUST Font License (GFL), also distributed under the LPPL.
+
+- **Montserrat**
+  - Julieta Ulanovsky et al., variable font [https://github.com/google/fonts/tree/main/ofl/montserrat ](https://github.com/google/fonts/tree/main/ofl/montserrat)
+  - License: SIL Open Font License 1.1.
+- **Fira Code**
+  - Nikita Prokopov et al., v6.2, official prebuilt WOFF2 release assets
+  - Source: [https://github.com/tonsky/FiraCode/releases/tag/6.2
+  - License: SIL Open Font License 1.1.

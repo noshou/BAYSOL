@@ -6,10 +6,12 @@ A molecule.
 
 using   ..AtomicRadii: RadiiSource, lookup, AtomicRadiiSource
 using   ..BAYSOL_Utils.Cache: Lazy, force
+using   ..Geometry: sphere_volume
 using   BioStructures:  BioStructures, PDBFormat, standardselector,
                         collectatoms, atomname, element, resname, resnumber,
                         chainid, coords
 using   NearestNeighbors: KDTree
+using   FastClosures: @closure
 
 "Raised for malformed molecule input (empty or mismatched coords, missing radii)."
 struct MoleculeError <: Exception; msg::String end
@@ -24,16 +26,10 @@ rows are `r`, `theta`, `phi` in that order. `_n` is the atom count, captured onc
 at construction from the coordinate pass rather than recomputed on demand.
 
 `radii` is always the isolated van der Waals radius (`AtomicRadii`); `vols` is
-the smaller CRYSOL-style excluded (displaced-solvent) volume from
+the smaller, geometrically-computed excluded (displaced-solvent) volume from
 `ExcludedVolumes.excluded_volume`, exact only when hydrogens are explicit.
 
-`_tree` is a `KDTree` over `_cart`, built once and shared by every neighbour
-query against this molecule -- `Solvation.SASA`'s `sasa`/`shell_points` used
-to each build their own `KDTree(coords_cartesian(mol))` independently (same
-coordinates, same tree, built twice per structure); both now call
-[`neighbour_tree`](@ref) instead, and any future per-atom neighbour search
-(e.g. a geometric excluded-volume calculation) should do the same rather than
-constructing its own tree.
+`_tree` is a `KDTree` over `_cart`.
 """
 struct Molecule
     _name   :: String
@@ -46,9 +42,6 @@ struct Molecule
     _r_max  :: Lazy{Float64}         # largest per-atom radius
     _tree   :: Lazy{KDTree}          # KDTree over _cart; shared across neighbour queries
 end
-
-"Volume of a sphere of radius `rad`."
-sphere_volume(rad::Float64)::Float64 = (4.0 / 3.0) * π * rad^3
 
 """
     _center(cs::Vector{NTuple{3,Float64}}) -> Matrix{Float64}
@@ -174,14 +167,17 @@ function create(name::AbstractString, elms::AbstractVector{<:AbstractString}, co
     es = String[lowercase(e) for e in elms]   # radii/form-factor tables are lowercase-keyed
     cart = _center(cs)
     sph  = to_spherical(cart)
-    rad  = Lazy{Vector{Float64}}(() -> _compute_radii(radii_source, es))
-    # CRYSOL-style displaced-solvent volume per atom (see ExcludedVolumes.jl),
-    # falling back to the isolated van der Waals sphere for elements with no
-    # verified displaced-volume data. Not `sphere_volume.(force(rad))`: a
-    # bonded atom does not displace a full isolated vdW sphere of solvent.
-    vol  = Lazy{Vector{Float64}}(() -> excluded_volume.(es, force(rad)))
-    rmax = Lazy{Float64}(() -> maximum(force(rad)))
-    tree = Lazy{KDTree}(() -> KDTree(cart))
+    rad  = Lazy{Vector{Float64}}(@closure(() -> _compute_radii(radii_source, es)))
+    rmax = Lazy{Float64}(@closure(() -> maximum(force(rad))))
+    tree = Lazy{KDTree}(@closure(() -> KDTree(cart)))
+
+    # Per-atom displaced-solvent volume (see ExcludedVolumes.excluded_volume).
+    # Recomputes the max radius locally instead of `force(rmax)`, so that forcing
+    # `vols` does not also mark `r_max` as forced.
+    vol  = Lazy{Vector{Float64}}(@closure(() -> begin
+        rv = force(rad)
+        excluded_volume(cart, rv, force(tree), maximum(rv))
+    end))
     return Molecule(String(name), es, n, cart, sph, rad, vol, rmax, tree)
 end
 
@@ -197,7 +193,10 @@ n_atoms(m::Molecule)::Int = m._n
 "Per-atom radius; resolved and cached on first call."
 radii(m::Molecule)::Vector{Float64}  = force(m._radii)
 
-"Per-atom sphere volume; computed and cached on first call."
+"""
+Per-atom excluded (displaced-solvent) volume. This is not the isolated van der Waals
+volume; use [`BAYSOL.Geometry.sphere_volume`](@ref) on the radii.
+"""
 vols(m::Molecule)::Vector{Float64}   = force(m._vols)
 
 """

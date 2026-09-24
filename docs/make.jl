@@ -15,10 +15,10 @@ const README_PAGES = [
     "AtomicRadii"         => "AtomicRadii",
     "BAYSOL_Utils"        => "BAYSOL_Utils",
     "Fitting"              => "Fitting",
-    "FormFactor"           => "FormFactor",
+    "FormFactor"            => "FormFactor",
     "Geometry"              => "Geometry",
-    "MolecularStructure"   => "MolecularStructure",
-    "PartialMolarVolumes"  => "PartialMolarVolumes",
+    "MolecularStructure"    => "MolecularStructure",
+    "PartialMolarVolumes"   => "PartialMolarVolumes",
     "Scattering"            => "Scattering",
     "Solvation"              => "Solvation",
 ]
@@ -34,6 +34,20 @@ end
 
 makedocs(
     sitename = "BAYSOL.jl",
+    # The "academic" theme (docs/src/assets/themes/academic.scss, compiled to
+    # documenter-academic.css) isn't in Documenter's own hardcoded `THEMES`
+    # list (HTMLWriter.jl), so it can't appear in the built-in theme-picker
+    # switcher via any make.jl option. Instead it's loaded as a plain asset
+    # and force-applied unconditionally by force-academic-theme.js, which
+    # runs after Documenter's own themeswap.js and overrides whatever class
+    # that set. See force-academic-theme.js for why this is the only way to
+    # wire in a non-built-in theme.
+    format   = Documenter.HTML(
+        assets = [
+            "assets/themes/documenter-academic.css",
+            "assets/force-academic-theme.js",
+        ],
+    ),
     modules  = [
         BAYSOL,
         BAYSOL.Constants,

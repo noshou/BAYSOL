@@ -572,6 +572,29 @@ Writes a summary of a [`run_model`](@ref) `result` to `io`.
     adds it to the `"=== Diagnostics ==="` footer.
 - `form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}}=nothing`:
     the seed's `seed.fw.form_factor_log`.
+
+# EBFMI vs. `AdvancedHMC`'s own logged `EBFMI_est`
+
+The `"EBFMI"` line in this report's `"=== Diagnostics ==="` footer and the
+`EBFMI_est` `AdvancedHMC.jl` itself logs to the console during sampling use
+the *identical* formula (`mean(diff(H).^2) / var(H)`, `H` = per-draw
+Hamiltonian energy) but over different slices of the chain, so the two
+numbers legitimately disagree -- this is not a bug in either computation.
+
+`Fitting.run_fitting`'s call to `AdvancedHMC.sample` doesn't pass
+`drop_warmup`, so it defaults to `false`: `AdvancedHMC`'s own `stats` (and
+therefore its logged `EBFMI_est`) covers *every* sampling step, including
+the `n_adapt` warmup/adaptation draws. This report's `EBFMI`, by contrast,
+is computed from `fit.stats`, which [`run_model`](@ref) has already sliced
+to `fit_unfiltered.stats[n_adapt+1:end]` -- strictly post-warmup.
+
+Warmup has much more volatile `H` (the step size and mass matrix are still
+being adapted), so including vs. excluding it can swing the ratio by a
+large factor even though both are "correct" EBFMI values for the chain
+segment they're actually computed over. This report's post-warmup-only
+figure is the more standard one (matching Stan's own E-BFMI convention);
+`AdvancedHMC`'s console log is the less diagnostically meaningful of the
+two here, since it's diluted by the adaptation phase.
 """
 function write_report(
     io::IO, result;
