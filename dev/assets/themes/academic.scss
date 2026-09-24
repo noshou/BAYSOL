@@ -1,0 +1,203 @@
+// academic.scss
+// Ivory-oxford theme for Documenter.jl
+// Fonts:
+//   - Montserrat        -> titles, sidebar/nav, section eyebrow labels
+//   - TeX Gyre Pagella   -> body prose (docstring descriptions)
+//   - TeX Gyre Pagella Math -> equations, via KaTeX/MathJax (see make.jl)
+//   - Fira Code          -> code, with ligatures enabled
+//
+// Compile with:
+//   using DocumenterTools: Themes
+//   Themes.compile("academic.scss", "docs/src/assets/themes/documenter-academic.css")
+
+// Variable font: one file covers every weight Montserrat is used at here
+// (400 body default, 600 eyebrow labels, 700 headings/docstring signatures).
+@font-face {
+  font-family: "Montserrat";
+  src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"), url("fonts/Montserrat[wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Fira Code";
+  src: url("fonts/FiraCode-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Fira Code";
+  src: url("fonts/FiraCode-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-bolditalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+}
+
+$themename: "academic"; // compiled CSS file must be named academic.css
+$background: #faf7f0;
+
+$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif !default;
+$family-serif: "TeX Gyre Pagella", Palatino, Georgia, serif;
+$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace !default;
+
+$link: #1d3557;
+$link-hover: #14263e;
+
+// Base palette + admonition colors: documenter/variables.scss expects these
+// to already exist (documenter-light.scss/documenter-dark.scss each define
+// their own before importing it), so a secondary theme must too. Light-mode
+// defaults, matching documenter-light.scss's own admonition palette.
+$red: #cb3c33 !default;
+$orange: #d56c00 !default;
+$yellow: #f4c72f !default;
+$green: #259a12 !default;
+$turquoise: #00a1b7 !default;
+$cyan: #3489da !default;
+$blue: #3c5dcd !default;
+$purple: #9558b2 !default;
+$info: $blue;
+$success: $green;
+$warning: adjust-color($yellow, $hue: 2, $saturation: 10, $lightness: -24);
+$danger: $red;
+$compat: $cyan;
+$todo: $purple;
+$admonition-default: hsl(0, 0%, 29%);
+
+@import "documenter/utilities";
+@import "documenter/variables";
+@import "bulma/utilities/all";
+@import "bulma/base/minireset.sass";
+// `bulma/base/helpers.sass` is a deprecated stub in this Documenter version;
+// the real helpers now live under `bulma/helpers/all` (same content).
+@import "bulma/helpers/all";
+
+// All secondary themes must be nested in a theme--$(themename) class. Documenter
+// applies this class to <html> and disables the primary stylesheet when active.
+html.theme--#{$themename} {
+  @import "bulma/base/generic.sass";
+  @import "documenter/overrides";
+  @import "bulma/elements/all";
+  @import "bulma/form/all";
+  @import "bulma/components/all";
+  @import "bulma/grid/all";
+  @import "bulma/layout/all";
+  @import "documenter/elements";
+  @import "documenter/components/all";
+  @import "documenter/patches";
+
+  background: $background;
+  color: #2b2b2b;
+
+  body,
+  p,
+  .content,
+  .docstring > section > div {
+    font-family: $family-serif;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: $family-sans-serif;
+    font-weight: 700;
+  }
+
+  // docstring signature / function name headings
+  .docstring-binding,
+  .docstring > header {
+    font-family: $family-sans-serif;
+    font-weight: 700;
+  }
+
+  // sidebar + nav in Montserrat
+  #documenter .docs-sidebar,
+  #documenter .docs-sidebar * {
+    font-family: $family-sans-serif;
+  }
+  #documenter .docs-sidebar {
+    background: #1d3557;
+    color: #e8ecf3;
+  }
+  #documenter .docs-sidebar a {
+    color: #b7c4d6;
+  }
+  #documenter .docs-sidebar li.is-active > a,
+  #documenter .docs-sidebar .toctree-l1.current > a {
+    background: #ffffff;
+    color: #1d3557;
+    border-radius: 6px;
+  }
+
+  // section eyebrow labels ("REFERENCE" style headers above content)
+  .docs-heading-anchor-title,
+  .eyebrow-label,
+  nav.breadcrumb {
+    font-family: $family-sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #1a1a1a;
+  }
+
+  code,
+  pre,
+  .documenter-example-output,
+  .docstring pre {
+    font-family: $family-monospace;
+    font-feature-settings: "calt" 1, "liga" 1;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+  }
+
+  // four-color syntax highlighting (highlight.js token classes)
+  .hljs-keyword,
+  .hljs-function .hljs-keyword,
+  .hljs-literal {
+    color: #783ad4;
+  }
+  .hljs-title,
+  .hljs-title.function_,
+  .hljs-name {
+    color: #0e9080;
+  }
+  .hljs-type,
+  .hljs-built_in,
+  .hljs-class .hljs-title {
+    color: #827626;
+  }
+  .hljs-number,
+  .hljs-string,
+  .hljs-symbol {
+    color: #be185d;
+  }
+
+  // academic is forced unconditionally (see force-academic-theme.js) rather
+  // than selected via Documenter's built-in switcher, so the now-inert
+  // light/dark/catppuccin picker in the settings modal is hidden.
+  #documenter-settings p:has(#documenter-themepicker) {
+    display: none;
+  }
+}
