@@ -54,14 +54,14 @@ path3 = resolve_structure(URLSource("https://files.rcsb.org/download/1CRN.pdb", 
 
 ### `Molecule`
 
-Per-atom centered coordinates in both cartesian and spherical frames, with lazily computed `radii`/`vols`/`r_max`. Both coordinate frames are `(3, n)` matrices sharing a column index (the atom); the spherical rows are `r`, `theta`, `phi` in that order (`theta = acos(z/r) ∈ [0, π]`, `phi = atan(y, x) ∈ (-π, π]`). `r = 0`is handled explicitly rather than producing a`0/0`, since the angle is unobservable downstream anyway (`j_l(0) = 0`for every`l > 0`).
+Per-atom centred coordinates in both cartesian and spherical frames, with lazily computed `radii`/`vols`/`r_max`. Both coordinate frames are `(3, n)` matrices sharing a column index (the atom); the spherical rows are `r`, `theta`, `phi` in that order (`theta = acos(z/r) ∈ [0, π]`, `phi = atan(y, x) ∈ (-π, π]`). `r = 0`is handled explicitly rather than producing a`0/0`, since the angle is unobservable downstream anyway (`j_l(0) = 0`for every`l > 0`).
 
 ```julia
 using BayeSol.MolecularStructure: create, coords_cartesian, coords_spherical,
  radii, vols, r_max, elms, name, n_atoms
 
 mol = create("my-mol", elements, coords) # coords: any iterable of 3-tuples/vectors
-coords_cartesian(mol) # (3, n) centered (x, y, z)
+coords_cartesian(mol) # (3, n) centred (x, y, z)
 coords_spherical(mol) # (3, n) (r, theta, phi)
 radii(mol) # per-atom van der Waals radius, lazy/memoized, via AtomicRadii by default
 vols(mol) # per-atom CRYSOL-style excluded volume; see ExcludedVolumes.jl below
@@ -70,7 +70,7 @@ r_max(mol) # largest per-atom radius; SASA's neighbour-filter bound
 
 `vols` is **not** `(4/3)π·radii(mol)³` for a table-covered element (see `ExcludedVolumes.jl` below) -- `radii` stays the isolated van der Waals radius throughout (SASA and hydration-shell generation need real atomic sizes), while `vols` is the smaller, bonded-atom-appropriate volume the excluded-volume scattering term needs.
 
-`create(name, elms, coords; radii_source::RadiiSource = AtomicRadiiSource())` centers `coords` at the centroid and computes both coordinate frames eagerly; `radii`/`vols`/`r_max` are resolved (and cached) only on first  access, through `AtomicRadii.RadiiSource`.
+`create(name, elms, coords; radii_source::RadiiSource = AtomicRadiiSource())` centres `coords` at the centroid and computes both coordinate frames eagerly; `radii`/`vols`/`r_max` are resolved (and cached) only on first  access, through `AtomicRadii.RadiiSource`.
 
 ### `Residues`
 

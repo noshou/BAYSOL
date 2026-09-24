@@ -20,7 +20,9 @@ using BayeSol
 using BayeSol.Interfaces: Interfaces, RadiiSource
 using BayeSol.MolecularStructure: MolecularStructure, Molecule
 using BayeSol.Solvation.SASA: SASA
-using BayeSol.Solvation.SASA.PlasticMap: plastic_points
+using BayeSol.Geometry.PlasticSequence: plastic_points
+using BayeSol.Geometry.Metrics: Metrics, Coverage, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS,
+                                     classify, blocked
 using Printf: @printf, @sprintf
 using GLMakie
 using GLMakie.Makie: Tesselation   # not re-exported by GLMakie itself
@@ -64,7 +66,7 @@ const OCCLUDED_COLOR = RGBf(0.24, 0.26, 0.32)   # dark/desaturated
 
 Shrake-Rupley state of every sample point on atom `i`: the `n` plastic-sequence
 directions mapped onto the expanded sphere of radius `radii(mol)[i] + probe`,
-each tested with `SASA._occluded` against every other atom.
+each tested with `blocked` against every other atom.
 
 The demo scenes are tiny, so the full index list is passed as the candidate set
 instead of replicating `sasa`'s KD-tree range query; `i` is passed as
@@ -77,10 +79,10 @@ instead of replicating `sasa`'s KD-tree range query; `i` is passed as
 - `probe`: solvent probe radius.
 
 # Returns
-`(; pts, exposed, n_exposed, n_total, frac, area, rho, center, status, sampled)`
+`(; pts, exposed, n_exposed, n_total, frac, area, rho, centre, status, sampled)`
 where `pts` is the `n` sample points, `exposed[j]` is `true` when `pts[j]` is
 solvent accessible, `rho` is the expanded radius the points sit on, `status` is
-a [`SASA.Coverage`](@ref) value, and
+a [`Coverage`](@ref) value, and
 `sampled` is `false` when the exact pre-filter settles the atom on its own.
 """
 function atom_point_states(mol::Molecule, i::Int, n::Int, probe::Float64)
@@ -98,22 +100,22 @@ function atom_point_states(mol::Molecule, i::Int, n::Int, probe::Float64)
         ux, uy, uz = dirs[j]
         p = (cx + ρ * ux, cy + ρ * uy, cz + ρ * uz)
         pts[j] = p
-        exposed[j] = !SASA._occluded(p, cands, crds, rads, probe, i)
+        exposed[j] = !blocked(p, cands, crds, rads, probe, i)
     end
 
     n_exposed = count(exposed)
-    status = SASA._classify(i, cands, crds, rads, probe)
+    status = classify(i, cands, crds, rads, probe)
     return (;   pts, exposed, n_exposed, n_total = n, frac = n_exposed / n,
                 area = 4π * ρ^2 * (n_exposed / n), rho = ρ,
-                center = (cx, cy, cz), status,
-                sampled = status == SASA.AMBIGUOUS)
+                centre = (cx, cy, cz), status,
+                sampled = status == AMBIGUOUS)
 end
 
 """
     two_sphere_exposed_area(ρ, d) -> Float64
 
 Exact solvent-accessible area of one of two equal expanded spheres of radius `ρ`
-whose centers are `d` apart, `0 < d < 2ρ`: the full sphere less the spherical
+whose centres are `d` apart, `0 < d < 2ρ`: the full sphere less the spherical
 cap of height `ρ - d/2` that lies inside its partner,
 `4πρ² - 2πρ(ρ - d/2)`.
 
@@ -139,7 +141,7 @@ two_sphere_exposed_frac(ρ::Float64, d::Float64) = two_sphere_exposed_area(ρ, d
     exposed_scene(; probe = 1.4) -> NamedTuple
 
 Two equal atoms whose expanded spheres just fail to touch (`r = 1.5`, so
-`ρ = 2.9` at the default probe, centers `6.2` apart): the neighbour is a
+`ρ = 2.9` at the default probe, centres `6.2` apart): the neighbour is a
 candidate but occludes nothing, so every sample point on both atoms is exposed.
 
 `focus` lists the atoms whose points get drawn.
@@ -154,7 +156,7 @@ end
 """
     partial_scene(; probe = 1.4, d = 3.5) -> NamedTuple
 
-Two equal overlapping atoms (`r = 1.5`, `ρ = 2.9`, centers `d` apart) — the
+Two equal overlapping atoms (`r = 1.5`, `ρ = 2.9`, centres `d` apart) — the
 occluded points form one clean spherical cap facing the partner, everything else
 is exposed. Carries `analytic_frac`, the exact cap-derived exposed fraction from
 [`two_sphere_exposed_frac`](@ref).
@@ -173,7 +175,7 @@ end
 """
     buried_scene(; probe = 1.4) -> NamedTuple
 
-A small atom (`r = 0.5`, `ρ = 1.9`) sitting `3.0` from the center of a big one
+A small atom (`r = 0.5`, `ρ = 1.9`) sitting `3.0` from the centre of a big one
 (`r = 6.0`, `ρ = 7.4`). `3.0 + 1.9 = 4.9 < 7.4` with `2.5` Å of margin, so the
 small atom's whole expanded sphere is strictly inside the big one's and every
 sample point is occluded.
@@ -221,12 +223,12 @@ sasa_scenes(; probe::Float64 = 1.4) =
 """
     classification_label(status) -> String
 
-Human-readable name for a [`SASA._classify`](@ref) verdict, noting whether
+Human-readable name for a [`classify`](@ref) verdict, noting whether
 `sasa` samples that atom or settles it exactly from the neighbour list.
 """
-classification_label(status::SASA.Coverage) =
-    status == SASA.ALL_EXPOSED ?    "exact: no neighbour reaches it" :
-    status == SASA.ALL_BURIED  ?    "exact: engulfed by a neighbour" :
+classification_label(status::Coverage) =
+    status == ALL_EXPOSED ?    "exact: no neighbour reaches it" :
+    status == ALL_BURIED  ?    "exact: engulfed by a neighbour" :
                                     "sampled: caps overlap"
 
 """
@@ -267,7 +269,7 @@ function sasa_scene_report(;n::Int = 512, probe::Float64 = 1.4,
 end
 
 # --------------------------------------------------------------------------
-# plotting BayesolUtils
+# plotting Geometry
 # --------------------------------------------------------------------------
 
 """
@@ -387,7 +389,7 @@ end
 
 Four-panel figure over the distinct occlusion regimes — fully exposed, partially
 occluded, fully buried, and a small cluster — with every sample point coloured by
-its `SASA._occluded` verdict and each title carrying the exposed count, total,
+its `blocked` verdict and each title carrying the exposed count, total,
 fraction and resulting area. Blocks until the window is closed.
 
 # Keywords
@@ -449,7 +451,7 @@ pass). Blocks until the window is closed.
 # Keywords
 - `ns`: point counts, one panel each.
 - `probe`: solvent probe radius.
-- `d`: center separation of the overlapping pair.
+- `d`: centre separation of the overlapping pair.
 """
 vis_sasa_mesh_convergence(; ns = (64, 256, 1024, 4096), probe::Float64 = 1.4,
                             d::Float64 = 3.5) =

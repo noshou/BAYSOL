@@ -7,6 +7,7 @@ using Printf: @printf
 using StaticArrays: SVector
 
 include("BayesolUtils/BayesolUtils.jl")
+include("Geometry/Geometry.jl")
 include("AtomicRadii/AtomicRadii.jl")
 include("FormFactor/FormFactor.jl")
 include("PartialMolarVolumes/PMV.jl")
@@ -18,6 +19,7 @@ include("Fitting/Fitting.jl")
 using .BayesolUtils:             BayesolUtils
 using .BayesolUtils.Constants:   Constants
 using .BayesolUtils.Cache:       Cache
+using .Geometry:            Geometry
 using .AtomicRadii:         AtomicRadii
 using .FormFactor:          FormFactor
 using .PartialMolarVolumes: PartialMolarVolumes

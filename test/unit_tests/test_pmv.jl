@@ -272,7 +272,7 @@ end
     @testset "ϕ°(pH, seq): very long non-ionizable chains (closed form, N=5000)" begin
         # All-glycine: every term is 0 except the shared backbone, so the
         # totals are exact linear closed forms.
-        n = 8500
+        N = 5000
         z, v, u = IFACE.ϕ°(7.0, "G"^N)
         @test z == 30 * N + 10
         @test close_(v, 37.4 * N; atol = 1e-4)
@@ -370,7 +370,7 @@ end
         reported = [u for (_, _, u) in values(PMVMOD._solutes) if u !== nothing]
         avg_u = sum(reported) / length(reported)
         @test length(reported) > 0
-        for name in ("urea", "glycine", "propane-1,2,3-triol", "sucrose",
+        for name in ("lithium chloride", "sodium bromide", "propane-1,2,3-triol", "sodium iodide",
                     "trisodium 2-hydroxypropane-1,2,3-tricarboxylate",
                     "magnesium dichloride")
             e, v, u = IFACE.ϕ°(name)
@@ -379,7 +379,7 @@ end
         end
         # confirm those really are the `nothing`-uncertainty rows, i.e.
         # the test above is exercising the backfill path and not coincidence
-        for name in ("urea", "glycine", "propane-1,2,3-triol", "sucrose")
+        for name in ("lithium chloride", "sodium bromide", "propane-1,2,3-triol", "sodium iodide")
             @test PMVMOD._solutes[name][3] === nothing
         end
     end
@@ -402,7 +402,7 @@ end
     end
 
     @testset "ϕ°(name): unknown solute throws ArgumentError" begin
-        @test_throws ArgumentError IFACE.ϕ°("edta")                       # a real, just-unmapped reagent
+        @test_throws ArgumentError IFACE.ϕ°("taurine")                    # a real, just-unmapped reagent
         @test_throws ArgumentError IFACE.ϕ°("not a real solute at all")
     end
 
@@ -437,7 +437,7 @@ end
         @test PMVMOD._common2iupac("UREA") == ("urea", true)
         @test PMVMOD._common2iupac("sodium chloride") == ("sodium chloride", true)
         @test PMVMOD._common2iupac("calcium chloride") == ("calcium dichloride", true)
-        @test PMVMOD._common2iupac("edta") == ("", false)
+        @test PMVMOD._common2iupac("taurine") == ("", false)
         @test PMVMOD._common2iupac("") == ("", false)
     end
 

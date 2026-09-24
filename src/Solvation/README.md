@@ -14,10 +14,10 @@ Ionization state (pKa via PROPKA, Henderson–Hasselbalch) and partial molar vol
 
 Implements Shrake–Rupley: each atom's *expanded* sphere (`radius + probe`, `probe` = solvent probe radius, default 1.4 Å for water) is sampled at a set of directions, and a direction is *occluded* if it lands inside any other atom's expanded sphere. The exposed fraction times the sphere's full area `4π(r+probe)²` is that atom's accessible area.
 
-Sample points come from the plastic-sequence low-discrepancy set (`SASA.PlasticMap`, below) rather than i.i.d. random points or a fixed spherical-cap design, for even coverage at any point count.
+Sample points come from the plastic-sequence low-discrepancy set (`Geometry.PlasticSequence`, see `src/Geometry/README.md`) rather than i.i.d. random points or a fixed spherical-cap design, for even coverage at any point count.
 
-1. **Exact, no sampling** (`_classify`): comparing center-to-center distance `d` against `ρᵢ = rᵢ+probe`, `ρⱼ = rⱼ+probe` alone decides
-   `ALL_EXPOSED` (no neighbor reaches the surface → area is exactly `4π(r+probe)²`) or `ALL_BURIED` (one neighbor engulfs the atom whole → area is exactly `0.0`).
+1. **Exact, no sampling** (`Geometry.Metrics.classify`, see `src/Geometry/README.md`): comparing centre-to-centre distance `d` against `ρᵢ = rᵢ+probe`, `ρⱼ = rⱼ+probe` alone decides
+   `ALL_EXPOSED` (no neighbour reaches the surface → area is exactly `4π(r+probe)²`) or `ALL_BURIED` (one neighbour engulfs the atom whole → area is exactly `0.0`). This shortcut, along with the point/ray occlusion tests (`Metrics.blocked`), is a general sphere-geometry primitive independent of `SASA` — not specific to surface-area sampling.
 2. **Witness pass** (`AMBIGUOUS` case, `n_occ` points): if any of the first `n_occ` sampled directions is unoccluded, sampling continues to the full `n_exp` pass. If none is, the worst-case remaining exposed fraction is bounded by the rule of three (`3/n_occ`); if the worst-case area that  could still be hiding is under `area_tol`, the atom is treated as buried without paying for the full pass.
 3. **Full pass** (`n_exp` points): exposed fraction = (unoccluded points) / `n_exp`, giving `area = 4π(r+probe)² · (count/n_exp)`.
 
@@ -62,12 +62,23 @@ Keywords:
 - `probe::Float64 = 1.4`: solvent probe radius, Å; must be `>= 0`.
 - `n_target::Union{Nothing,Int} = nothing`: total points to keep, `> 0` if given. `nothing` derives the budget from accessible area via `SHELL_AREA_PER_POINT = 4.0` Å²/point (calibrated against CRYSOL's default `--fb 17` Fibonacci grid, ~4 Å²/point on a typical globular protein), so spacing stays fixed as the molecule grows rather than the point count staying flat. Floored at `SHELL_MIN_POINTS = 55`.
 
-### `PlasticMap` - quasi-random sphere sampling
+### Quasi-random sphere sampling
 
-`SASA.PlasticMap` generates points on the unit sphere from the 2-D plastic (R₂) low-discrepancy sequence: term `i` maps to `(frac(i/ρ), frac(i/ρ²))` (`ρ ≈ 1.324718`, the real root of `x³ = x + 1`), read as `(azimuth, height)` and lifted to the sphere via Lambert's cylindrical equal-area projection so points are uniform in area and not clustered at the poles. Chosen over a Fibonacci spiral, since the plastic sequence does not depend on a fixed input size.
+The point-sampling primitive itself is no longer part of `Solvation`: it now
+lives in the domain-agnostic `Geometry.PlasticSequence` module (see
+`src/Geometry/README.md`), built on the plastic (`R_d`) family of
+low-discrepancy sequences (Roberts, M. (2018). The Unreasonable Effectiveness of
+Quasirandom Sequences.), since it knows nothing about atoms, molecules,
+or surfaces. `SASA` calls its `plastic_points(n; dim = 3)` (default
+`shape = :surface`, points lifted onto the unit sphere via Lambert's
+cylindrical equal-area projection, uniform in area rather than clustered at
+the poles) to get its sample directions; the raw 2-D layout (`dim = 2`), the
+sphere-**volume** layout (`shape = :volume`, fills the ball rather than
+sampling its surface), and the generalized `plastic_ratio(d)` are
+general-purpose and unused here.
 
 ```julia
-using BayeSol.Solvation.SASA.PlasticMap: plastic_points, PLASTIC_RATIO
+using BayeSol.Geometry.PlasticSequence: plastic_points, PLASTIC_RATIO_2
 
 pts = plastic_points(256)   # Vector{NTuple{3,Float64}}, unit-sphere points
 ```
@@ -106,7 +117,7 @@ E(r) = |q| / (4πε₀ε_r) · exp(-κr) · (1/r² + κ/r)
 
 ### Charge-site identification
 
-- **Nucleic-acid phosphates** (`_phosphate_charge_sites`, internal): finds every `"p"` atom and its bonded `"o"` neighbors (bond cutoff `BOND_CUTOFF = 1.75` Å) purely by element symbol, since `Molecule` carries no residue identity. Non-bridging oxygens (bonded to nothing but the phosphorus) are the charge-bearing `PO₂⁻`-type sites and split `PHOSPHATE_NET_CHARGE = -0.24 e` evenly between them; if every oxygen is bridging, the charge is split across all of them as a fallback.
+- **Nucleic-acid phosphates** (`_phosphate_charge_sites`, internal): finds every `"p"` atom and its bonded `"o"` neighbours (bond cutoff `BOND_CUTOFF = 1.75` Å) purely by element symbol, since `Molecule` carries no residue identity. Non-bridging oxygens (bonded to nothing but the phosphorus) are the charge-bearing `PO₂⁻`-type sites and split `PHOSPHATE_NET_CHARGE = -0.24 e` evenly between them; if every oxygen is bridging, the charge is split across all of them as a fallback.
 - **Protein ionizable side chains** (`_protein_charge_sites`, internal): reads `MolecularStructure.Ionization`'s per-atom `(charge, σ_charge)` (already resolved from PROPKA pKa records via Henderson–Hasselbalch) and keeps every atom with a nonzero charge or charge-uncertainty.
 
 ### Aggregation over cavity beads: `_aggregate` 
