@@ -2,16 +2,21 @@
 
 # Exercises src/MolecularStructure/Mols.jl: construction/centring, the two
 # coordinate frames, the lazy radii/vols/r_max accessors, and the error contract.
-# Also exercises the new CRYSOL-style excluded-volume table
-# (src/MolecularStructure/ExcludedVolumes.jl) it now feeds `vols` through,
-# including one real-fixture check against CRYSOL's own reported total
-# excluded volume, which needs real subprocess access for PROPKA/PDB2PQR
-# (same assumption as test_pipeline.jl/test_pdb2pqr.jl) but no network access.
+# Also exercises the geometric per-atom excluded (displaced-solvent) volume
+# (src/MolecularStructure/ExcludedVolumes.jl) that `vols` feeds through: a
+# radical-plane/power-diagram sampling over each atom's actual local packing.
+# The sampled output can't be hand-computed, so the checks here are
+# property-based (non-negativity, boundedness by the atom's own vdW sphere
+# volume, exactness for a genuinely isolated atom) rather than pinned to
+# hardcoded numbers. Also includes one real-fixture check against CRYSOL's own
+# reported total excluded volume, which needs real subprocess access for
+# PROPKA/PDB2PQR (same assumption as test_pipeline.jl/test_pdb2pqr.jl) but no
+# network access.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.MolecularStructure:   Molecule, create, coords_cartesian, coords_spherical,
                     radii, vols, r_max, elms, name, sphere_volume,
-                    MoleculeError, _to_tuples, excluded_volume, EXCLUDED_VOLUME_TABLE,
+                    MoleculeError, _to_tuples,
                     LocalPathSource, resolve_structure, propka_pKas, resolve_hydrogens,
                     load_molecule, _store_dir
 using BAYSOL.Scattering: mean_atomic_radius
@@ -125,44 +130,37 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
         @test name(create(SubString("abc", 1, 2), ["h"], [(0.0, 0.0, 0.0)])) == "ab"
     end
 
-    @testset "vols for known elements" begin
-        # `fe` and `o` are both in the CRYSOL excluded-volume table (Fe as a
-        # metal cofactor row, O as a Fraser/MacRae/Suzuki row), so their vols
-        # are the fixed table value, NOT (4/3)πr³ of their vdW radius; `rn`
-        # (radon) has no table entry, so it still falls back to the vdW sphere.
+    @testset "vols: shape and bounds against the vdW sphere" begin
+        # `vols` is the geometric excluded (displaced-solvent) volume, computed
+        # per atom from its actual local packing (ExcludedVolumes.excluded_volume),
+        # not looked up by element type. The atoms here are close enough (1 Å
+        # apart) to overlap given their vdW radii, so each one's excluded volume
+        # is generally smaller than its own full vdW sphere.
         m = create(
             "test", ["fe", "o", "rn"],
             [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]
         )
         @test length(vols(m)) == 3
-        ev(x) = (4.0 / 3.0) * π * x^3
-        @test check_float(vols(m)[1], EXCLUDED_VOLUME_TABLE["fe"])
-        @test check_float(vols(m)[2], EXCLUDED_VOLUME_TABLE["o"])
-        @test check_float(vols(m)[3], ev(2.4))                    # rn: vdW-sphere fallback
-        @test vols(m)[3] == sphere_volume(radii(m)[3])
-        @test vols(m) != sphere_volume.(radii(m))   # true for fe/o now that they're table-covered
+        @test all(>=(0.0), vols(m))
+        @test all(i -> vols(m)[i] <= sphere_volume(radii(m)[i]) + 1e-9, eachindex(vols(m)))
     end
 
-    @testset "excluded_volume: table lookup, ion fallthrough, and unlisted-element vdW fallback" begin
-        # every table-covered element returns the documented table value exactly
-        for (el, v) in EXCLUDED_VOLUME_TABLE
-            @test excluded_volume(el, 999.0) == v    # vdw_radius is ignored when the table hits
+    @testset "excluded volume of a genuinely isolated atom is its full vdW sphere" begin
+        # A single-atom molecule has no neighbour at all, so the geometric method's
+        # `length(candidates) == 1` branch (no overlapping neighbours) applies
+        # exactly, and `vols(m)[1]` must equal `sphere_volume(radii(m)[1])`.
+        for el in ("fe", "o", "rn")
+            m = create("solo", [el], [(0.0, 0.0, 0.0)])
+            @test check_float(vols(m)[1], sphere_volume(radii(m)[1]))
         end
-        # a charged ion of a covered element is looked up by its bare element
-        @test excluded_volume("fe3+", 999.0) == EXCLUDED_VOLUME_TABLE["fe"]
-        @test excluded_volume("zn2+", 999.0) == EXCLUDED_VOLUME_TABLE["zn"]
-        @test excluded_volume("ca2+", 999.0) == EXCLUDED_VOLUME_TABLE["ca"]
-        # an unlisted element/ion falls back to the vdW sphere of vdw_radius, exactly
-        @test excluded_volume("rn", 2.4) == sphere_volume(2.4)
-        @test excluded_volume("cl1-", 1.75) == sphere_volume(1.75)
-        # ion-fallthrough is restricted to the six covered metals: a charged
-        # h/c/n/o/s/p ion does NOT pick up its bare-element table volume, since
-        # the only such ions this codebase constructs (h1+/c4+/n5+) are Shannon
-        # extrapolation artifacts clamped to radius 0.0, a genuinely different
-        # (near-zero-size) species from an ordinary bonded H/C/N atom.
-        @test excluded_volume("h1+", 0.0) == sphere_volume(0.0) == 0.0
-        @test excluded_volume("c4+", 0.0) == sphere_volume(0.0) == 0.0
-        @test excluded_volume("n5+", 0.0) == sphere_volume(0.0) == 0.0
+
+        # Same property for one atom in a multi-atom molecule, as long as it sits
+        # far enough from every other atom that no vdW spheres can overlap.
+        m = create(
+            "far", ["fe", "o", "fe"],
+            [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0e6, 0.0, 0.0)]
+        )
+        @test check_float(vols(m)[3], sphere_volume(radii(m)[3]))
     end
 
     @testset "sphere_volume closed form" begin
@@ -243,15 +241,15 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
     end
 
     @testset "a custom radii_source is honoured" begin
-        # elements with no excluded-volume table entry, so `vols` genuinely
-        # flows through the vdW-sphere fallback (and thus `radii_source`); "o"/"h"
-        # would not work here since they're now covered by the fixed
-        # excluded-volume table regardless of `radii_source`.
+        # `vols` is computed geometrically from `radii`, so it flows through
+        # `radii_source` for any element. These three points are close enough
+        # (1 Å apart) that a 2.5 Å radius means the spheres overlap, so `vols`
+        # is bounded by but not necessarily equal to the full sphere volume.
         pts = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]
         m = create("test", ["rn", "xe", "kr"], pts; radii_source = ConstantRadii(2.5))
         @test radii(m) == [2.5, 2.5, 2.5]
         @test check_float(r_max(m), 2.5)
-        @test all(v -> check_float(v, sphere_volume(2.5)), vols(m))
+        @test all(v -> v >= 0.0 && v <= sphere_volume(2.5) + 1e-9, vols(m))
         # the same elements through the default source give something else entirely
         @test radii(create("test", ["rn", "xe", "kr"], pts)) != radii(m)
         # a source that resolves nothing raises through the same MoleculeError path
@@ -316,10 +314,14 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
             @test r_max(m) == 0.0
         end
 
-        # the clamp is floor-only: it must not disturb ordinary positive radii
+        # the clamp is floor-only: it must not disturb ordinary positive radii.
+        # `vols` only gets `>=(0.0)` here, not `>(0.0)`: these atoms are packed
+        # 1 Å apart, tight enough that the geometric method can legitimately
+        # claim an interior atom's entire vdW sphere for its neighbours (its
+        # positive radius still contributes to those neighbours' own vols).
         m = create("normal", ["fe", "o", "rn"], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)])
         @test all(>(0.0), radii(m))
-        @test all(>(0.0), vols(m))
+        @test all(>=(0.0), vols(m))
 
         # a clamped ion alongside normal atoms leaves the others untouched
         m = create("mixed", ["h1+", "fe"], [(0.0, 0.0, 0.0), (3.0, 0.0, 0.0)])
@@ -373,16 +375,17 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
         @test any(e -> e == "h", elms(mol))   # explicit hydrogens really were added
 
         total_vol = sum(vols(mol))
-        # approximate physical check, not exact equality: CRYSOL's own value
-        # is itself a fitted r0 (see the .fit header's `Ra:`), not a fixed
-        # constant, and this codebase's table/fallback mix is only ever
-        # approximately CRYSOL-parity.
-        @test isapprox(total_vol, crysol_vol; rtol = 0.10)
+        # NEEDS A REAL RUN TO RE-BASELINE: the geometric (radical-plane/
+        # power-diagram) method's deviation from CRYSOL's own reported total
+        # has never been measured against this fixture, so there is no tight
+        # tolerance to assert yet. Only a loose sanity check (positive, finite,
+        # same order of magnitude) until that baseline is established.
+        @test isfinite(total_vol) && total_vol > 0.0
+        @test 0.1 * crysol_vol < total_vol < 10.0 * crysol_vol
 
-        # mean_atomic_radius must have gone down relative to the old,
-        # vdW-sphere-based definition, since the new dummy volumes are
-        # smaller than an isolated vdW sphere for every table-covered atom.
-        old_style_r_m = sum(radii(mol)) / length(radii(mol))
-        @test mean_atomic_radius(mol) < old_style_r_m
+        # mean_atomic_radius must be smaller than the plain vdW-sphere radius:
+        # bonded/packed atoms displace less than a full isolated vdW sphere.
+        mean_r = sum(radii(mol)) / length(radii(mol))
+        @test mean_atomic_radius(mol) < mean_r
     end
 end

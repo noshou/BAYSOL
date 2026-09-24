@@ -21,6 +21,18 @@
 #     pipeline and cannot be meaningfully hardcoded (the cloud depends on the
 #     sampling). There the oracle necessarily consumes `shell_points`' output as
 #     given, so those tests check only the `shell_points -> B_lm -> I(q)`
+#
+# `excluded`'s Debye/convergence comparisons build their per-atom amplitudes
+# from arbitrary, test-owned volumes (`scat_vol`/`SCAT_EXCLUDED_VOL`) fed
+# straight into `_gaussian_dummy`/`compute_B_lm`, not from a real `Molecule`'s
+# `vols(mol)`. This is deliberate: those comparisons are testing the Debye-sum
+# math `compute_B_lm`/`self_scatter`/`cross_scatter` implement, which does not
+# care what a volume means, only that it is consumed correctly -- so they stay
+# green regardless of how `MolecularStructure.ExcludedVolumes.excluded_volume`
+# computes a real molecule's volumes. Only the handful of tests that exist to
+# check `excluded`'s own Molecule-wrapping contract (does it call `vols` and
+# `compute_B_lm` correctly) still build a real `Molecule`; `vols`'s own
+# numerical correctness is test_molecules.jl's job.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using   BAYSOL.Scattering: _gaussian_dummy, vacuo, excluded, hydration, SHELL_THICKNESS,
@@ -42,18 +54,26 @@ Provenance: dumped at full `Float64` precision from
 const SCAT_RADII = Dict("c" => 1.77, "o" => 1.5, "h" => 1.2, "fe3+" => 0.49, "o2-" => 1.35)
 
 """
-CRYSOL/Fraser-MacRae-Suzuki displaced-solvent volumes (Å³) for the bare
-elements used in this file's fixtures, transcribed independently from CRYSOL
-(Svergun, Barberato & Koch, 1995) Table 1 -- see
-`MolecularStructure.EXCLUDED_VOLUME_TABLE` for the full table and citations.
-`vols(mol)` now returns these for `c`/`o`/`h` rather than a vdW-sphere volume.
+Arbitrary but fixed per-species volumes (Å³), used ONLY to build this file's
+own synthetic dummy amplitudes for the Debye/convergence comparisons below --
+not a claim about what `vols(mol)` returns. `vols` computes each atom's
+excluded volume geometrically from its actual local packing
+(`MolecularStructure.ExcludedVolumes.excluded_volume`), which is
+packing-dependent and has no fixed per-element value; this file has no
+business re-deriving it. The Debye-sum/convergence tests that use these
+numbers never call `vols` on a `Molecule` at all, which is the point: they
+stay green regardless of how `excluded_volume` is implemented. (These happen
+to be the CRYSOL Table 1 values, kept only because they're already a
+convenient positive, well-separated set of numbers -- not because anything
+here expects them to match a real molecule.)
 """
 const SCAT_EXCLUDED_VOL = Dict("c" => 16.44, "o" => 9.13, "h" => 5.15)
 
 """
-Per-dummy volume, exactly as `MolecularStructure.vols` computes it: the
-CRYSOL/Fraser table value for a covered bare element, else the sphere volume
-of `SCAT_RADII[e]` (the ion fixtures `fe3+`/`o2-` have no table entry).
+Per-dummy synthetic volume for element `e`: `SCAT_EXCLUDED_VOL[e]` if
+tabulated, else the sphere volume of `SCAT_RADII[e]` (the ion fixtures
+`fe3+`/`o2-` have no table entry). Feeds `_gaussian_dummy`/`compute_B_lm`
+directly in the tests below; never compared against `vols(mol)`.
 """
 scat_vol(e) = haskey(SCAT_EXCLUDED_VOL, e) ?
     SCAT_EXCLUDED_VOL[e] : (4.0 / 3.0) * π * SCAT_RADII[e]^3
@@ -178,6 +198,16 @@ scat_dummy_amp(es, qvals) = [scat_gauss(scat_vol(es[i]), qvals[k]) for i in each
 
 "Largest relative deviation of `got` from `ref`, elementwise."
 scat_relerr(got, ref) = maximum(abs.(got .- ref) ./ abs.(ref))
+
+"""
+Centred spherical coordinates for a literal `(3, N)` cartesian block, built
+without a `Molecule`. Reproduces exactly what `create` -> `coords_spherical`
+does (centre, then `to_spherical`; see "molecule frame conventions" below for
+that identity pinned directly), so the synthetic-volume `compute_B_lm` calls
+below feed it the same coordinates a real `Molecule` would, with no `vols`/
+`excluded_volume`/radii-backend dependency anywhere in the chain.
+"""
+scat_sph(X) = to_spherical(X .- (sum(X; dims = 2) ./ size(X, 2)))
 
 # ===========================================================================
 # PIPELINE-SIDE FIXTURES.
@@ -306,9 +336,18 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
     # -----------------------------------------------------------------------
 
     @testset "molecule geometry matches the hardcoded oracle constants" begin
-        # If this fails the radii backend has changed: SCAT_RADII (and the
-        # volumes derived from it) need regenerating, and every Debye test below
-        # will fail for that same single reason, not as separate bugs.
+        # If this fails the radii backend has changed: SCAT_RADII needs
+        # regenerating, and every test below that reads element strings out of
+        # these fixtures would be affected by that same single root cause.
+        #
+        # `vols(mol)` is deliberately NOT checked here against `scat_vol`:
+        # `vols` is the geometric, packing-dependent excluded volume
+        # (`ExcludedVolumes.excluded_volume`), and `scat_vol`/
+        # `SCAT_EXCLUDED_VOL` are this file's own synthetic constants, not a
+        # prediction of it. `vols`'s numerical correctness belongs to
+        # test_molecules.jl (its "vols: shape and bounds against the vdW
+        # sphere" and "excluded volume of a genuinely isolated atom..."
+        # testsets), not here.
         for (es, X) in (
             (SCAT_DIMER_E, SCAT_DIMER_X),
             (SCAT_CUBE_E, SCAT_CUBE_X),
@@ -316,11 +355,6 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         )
             mol = scat_mol("guard", es, X)
             @test radii(mol) == [SCAT_RADII[e] for e in es]
-            @test all(
-                i -> isapprox(vols(mol)[i], 
-                scat_vol(es[i]); rtol = 1e-15),
-                eachindex(es)
-            )
             @test elms(mol) == es
         end
     end
@@ -381,11 +415,15 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         for i in eachindex(v), k in eachindex(SCAT_Q)
             @test check_float(f[i, k], scat_gauss(v[i], SCAT_Q[k]))
         end
-        # and on the real fixtures, so the oracle's amplitude matrix and the
-        # pipeline's are pinned to each other before any Debye comparison
+        # and on the same element lists the Debye tests below use, so the
+        # synthetic oracle (`scat_dummy_amp`, built from `SCAT_EXCLUDED_VOL`/
+        # `scat_vol` via the independent `scat_gauss` formula) is pinned to
+        # `_gaussian_dummy` itself before any Debye comparison leans on it.
+        # No `Molecule`/`vols` involved -- that pairing is exactly what those
+        # comparisons are meant not to depend on.
         for es in (SCAT_DIMER_E, SCAT_CUBE_E, SCAT_BLOB_E)
-            mol = scat_mol("amp", es, SCAT_BLOB_X[:, 1:length(es)])
-            got = _gaussian_dummy(vols(mol), SCAT_Q)
+            v = [scat_vol(e) for e in es]
+            got = _gaussian_dummy(v, SCAT_Q)
             ref = scat_dummy_amp(es, SCAT_Q)
             @test all(i -> check_float(got[i], ref[i]), eachindex(ref))
         end
@@ -475,12 +513,19 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         @test B == Bhand   # same call, same order: bit-identical
     end
 
-    @testset "excluded's q = 0 closed form is (Σ v_i)/√(4π) in B_00 and 0 above" begin
-        # At q = 0, j_l(0) = δ_l0 kills every l > 0, and Y_00 = 1/√(4π), so: B_00(0) = (Σ_i v_i) / √(4π)
+    @testset "the l = 0 closed form at q = 0 is (Σ v_i)/√(4π), independent of excluded" begin
+        # At q = 0, j_l(0) = δ_l0 kills every l > 0, and Y_00 = 1/√(4π), so:
+        # B_00(0) = (Σ_i v_i) / √(4π). Built from `compute_B_lm` directly on
+        # synthetic volumes and literal coordinates -- no `Molecule`, no
+        # `vols` -- since this pins `compute_B_lm`'s l = 0 behaviour, not
+        # `excluded`'s Molecule-wrapping (that's "excluded is the PartialWave
+        # primitives composed by hand", above, which already covers it
+        # self-consistently against whatever `vols(mol)` returns).
         for (es, X) in ((SCAT_DIMER_E, SCAT_DIMER_X), (SCAT_CUBE_E, SCAT_CUBE_X),
                         (SCAT_BLOB_E, SCAT_BLOB_X))
-            B = excluded(scat_mol("q0", es, X), [0.0], scat_lmax, scat_chunk)
-            tot = sum(scat_vol, es)
+            v = [scat_vol(e) for e in es]
+            B = compute_B_lm(scat_sph(X), [0.0], _gaussian_dummy(v, [0.0]), scat_lmax, scat_chunk)
+            tot = sum(v)
             @test isapprox(real(B[1, 1, 1]), tot / sqrt(4π); rtol = 1e-12)
             @test check_float(imag(B[1, 1, 1]), 0.0)
             @test all(k -> check_complex(B[1, k, 1], 0.0), 2:scat_K)
@@ -499,13 +544,15 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         end
     end
 
-    @testset "excluded on a single atom at the origin" begin
-        # One atom sits at the centred origin, so r = 0 and j_l(0) = δ_l0 makes
-        # every degree above l = 0 vanish at *every* q, not just at q = 0, and
-        # B_00(q) is just that atom's amplitude over √(4π).
-        mol = create("one", ["c"], [(0.0, 0.0, 0.0)])
+    @testset "compute_B_lm on a single dummy at the origin" begin
+        # One dummy sits at the origin, so r = 0 and j_l(0) = δ_l0 makes every
+        # degree above l = 0 vanish at *every* q, not just at q = 0, and
+        # B_00(q) is just that dummy's amplitude over √(4π). A synthetic
+        # volume and a literal r = 0 coordinate -- no `Molecule` involved, so
+        # this is `compute_B_lm`'s property, not `excluded`'s.
         v = scat_vol("c")
-        B = excluded(mol, SCAT_Q, scat_lmax, scat_chunk)
+        crd = zeros(3, 1)   # r = 0 exactly; θ, φ are irrelevant since j_l(0) = δ_l0
+        B = compute_B_lm(crd, SCAT_Q, _gaussian_dummy([v], SCAT_Q), scat_lmax, scat_chunk)
         for k in eachindex(SCAT_Q)
             @test isapprox(real(B[1, 1, k]), scat_gauss(v, SCAT_Q[k]) / sqrt(4π); rtol = 1e-12)
             @test all(j -> check_complex(B[1, j, k], 0.0), 2:scat_K)
@@ -516,14 +563,20 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
     # excluded
     # -----------------------------------------------------------------------
 
-    @testset "excluded reproduces the exact Debye intensity for the dimer" begin
-        # Two identical dummies of volume v, 4 Å apart, so the double sum has
-        # four terms and collapses by hand to
+    @testset "compute_B_lm reproduces the exact Debye intensity for the dimer" begin
+        # Two identical synthetic dummies of volume v, 4 Å apart, so the
+        # double sum has four terms and collapses by hand to
         #   I(q) = 2 f(q)² (1 + j_0(4q)).
         # Written out here without calling `scat_debye` at all, so the oracle
         # itself is checked against pen and paper before it is trusted below.
+        # Built directly from `compute_B_lm`/`self_scatter` on a synthetic
+        # volume and literal (centred) coordinates -- no `excluded`, no
+        # `Molecule`, no `vols` -- since this is pinning the Debye-sum math,
+        # not `excluded`'s wiring.
         v = scat_vol("c")
-        S = self_scatter(excluded(scat_dimer(), SCAT_Q, scat_Lconv, scat_chunk), scat_wconv)
+        B = compute_B_lm(scat_sph(SCAT_DIMER_X), SCAT_Q,
+                        _gaussian_dummy([v, v], SCAT_Q), scat_Lconv, scat_chunk)
+        S = self_scatter(B, scat_wconv)
         for k in eachindex(SCAT_Q)
             q = SCAT_Q[k]
             x = 4.0 * q
@@ -532,50 +585,54 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         end
         # and the generic oracle agrees with that hand computation
         @test isapprox(scat_debye(
-            SCAT_Q, 
+            SCAT_Q,
             SCAT_DIMER_X,
-            scat_dummy_amp(SCAT_DIMER_E, SCAT_Q)), 
-            S; 
+            scat_dummy_amp(SCAT_DIMER_E, SCAT_Q)),
+            S;
             rtol = scat_tol
         )
     end
 
-    @testset "excluded converges to Debye as lMax grows" begin
+    @testset "compute_B_lm converges to Debye as lMax grows" begin
         # The multipole series truncates at lMax with an error set by q*r_max,
         # so this is asserted as a ladder rather than at one lMax: the relative
         # deviation from the exact Debye value has to fall at every rung. Run on
         # the asymmetric blob, the only fixture wide enough that lMax = 2 is
         # genuinely far from converged (the cube's symmetry puts it at the
         # Float64 floor by lMax = 8, which would make a strict ladder meaningless).
+        # Synthetic volumes + literal coordinates, no `excluded`/`Molecule`/`vols`.
+        v = [scat_vol(e) for e in SCAT_BLOB_E]
         ref = scat_debye(SCAT_Q, SCAT_BLOB_X, scat_dummy_amp(SCAT_BLOB_E, SCAT_Q))
         errs = [scat_relerr(
                 self_scatter(
-                    excluded(scat_blob(), SCAT_Q, L, UInt64(4)),
-                    partial_wave_weights(L)), 
+                    compute_B_lm(scat_sph(SCAT_BLOB_X), SCAT_Q, _gaussian_dummy(v, SCAT_Q), L, UInt64(4)),
+                    partial_wave_weights(L)),
                     ref
                 ) for L in (2, 4, 8)]
         @test all(k -> errs[k] > errs[k + 1], 1:(length(errs) - 1))
         @test errs[1] > 1e-3   # the ladder really does start unconverged
     end
 
-    @testset "excluded matches Debye to machine precision at lMax = 16" begin
+    @testset "compute_B_lm matches Debye to machine precision at lMax = 16" begin
         for (es, X) in ((SCAT_DIMER_E, SCAT_DIMER_X), (SCAT_CUBE_E, SCAT_CUBE_X),
                         (SCAT_BLOB_E, SCAT_BLOB_X))
+            v = [scat_vol(e) for e in es]
             ref = scat_debye(SCAT_Q, X, scat_dummy_amp(es, SCAT_Q))
-            got = self_scatter(excluded(scat_mol("dbg", es, X), SCAT_Q,
-                                        scat_Lconv, UInt64(4)), scat_wconv)
+            got = self_scatter(compute_B_lm(scat_sph(X), SCAT_Q, _gaussian_dummy(v, SCAT_Q),
+                                            scat_Lconv, UInt64(4)), scat_wconv)
             @test scat_relerr(got, ref) < scat_tol
         end
     end
 
-    @testset "a deliberately truncated excluded disagrees with Debye loudly" begin
+    @testset "a deliberately truncated compute_B_lm disagrees with Debye loudly" begin
         # Teeth for the tolerance above: at lMax = 1 the series is nowhere near
         # converged for a molecule this wide, so the same comparison must fail
         # by percent-level amounts. If it did not, `scat_tol` would be passing
         # everything rather than pinning anything.
+        v = [scat_vol(e) for e in SCAT_BLOB_E]
         ref = scat_debye(SCAT_Q, SCAT_BLOB_X, scat_dummy_amp(SCAT_BLOB_E, SCAT_Q))
         bad = self_scatter(
-            excluded(scat_blob(), SCAT_Q, 1, UInt64(4)),
+            compute_B_lm(scat_sph(SCAT_BLOB_X), SCAT_Q, _gaussian_dummy(v, SCAT_Q), 1, UInt64(4)),
             partial_wave_weights(1)
             )
         @test scat_relerr(bad, ref) > 1e-2
@@ -819,20 +876,27 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # the shell side is in the molecule's centred frame. Both point sets have
         # to share one origin for a cross term, so the atoms are re-centred here
         # by hand (again from the literals, not from `coords_cartesian`).
+        #
+        # The "ex" side is built from `compute_B_lm` + a synthetic per-atom
+        # volume, not `excluded(mol, ...)`, so it carries no dependency on
+        # `vols`/`excluded_volume`. The "sh" side genuinely needs `mol`: its
+        # dummies come from `hydration`'s real SASA-driven cloud, which has
+        # nothing to do with excluded volume in the first place.
         mol = scat_blob()
         n = size(SCAT_BLOB_X, 2)
         Xc = SCAT_BLOB_X .- (sum(SCAT_BLOB_X; dims = 2) ./ n)
+        v = [scat_vol(e) for e in SCAT_BLOB_E]
         fe = scat_dummy_amp(SCAT_BLOB_E, SCAT_Q)
         P, fh = scat_shell(mol, SCAT_Q; n_target = 80)
         ref = scat_debye(SCAT_Q, Xc, fe, P, fh)
-        errs = [scat_relerr(cross_scatter(  excluded(mol, SCAT_Q, L, UInt64(4)),
+        errs = [scat_relerr(cross_scatter(  compute_B_lm(scat_sph(SCAT_BLOB_X), SCAT_Q, _gaussian_dummy(v, SCAT_Q), L, UInt64(4)),
                                             scat_shell_blm(hydration(mol, SCAT_Q, L, UInt64(64);
                                                     n_target = 80)),
                                             partial_wave_weights(L)), ref)
                 for L in (4, 8)]
         @test errs[1] > errs[2]
         @test errs[1] > 1e-3
-        B_ex = excluded(mol, SCAT_Q, scat_Lconv, UInt64(4))
+        B_ex = compute_B_lm(scat_sph(SCAT_BLOB_X), SCAT_Q, _gaussian_dummy(v, SCAT_Q), scat_Lconv, UInt64(4))
         B_sh = scat_shell_blm(hydration(mol, SCAT_Q, scat_Lconv, UInt64(64); n_target = 80))
         @test scat_relerr(cross_scatter(B_ex, B_sh, scat_wconv), ref) < scat_tol
         # the cross sum is symmetric under swapping the two species
@@ -847,17 +911,22 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # Section 6 restricted to the two dummy species. Both sides use the same
         # (dns, dro); the left side goes through B_lm and the weighted inner
         # product, the right side through three independent O(N²) real-space
-        # sums. Agreement closes the loop from molecule geometry to intensity.
+        # sums. Agreement closes the loop from geometry to intensity.
+        #
+        # `B_ex` comes from `compute_B_lm` + a synthetic volume, not
+        # `excluded(mol, ...)`: `mol` is still built (and still needed) for the
+        # `hydration`/SASA side, which is unrelated to excluded volume.
         for (es, X, mkmol) in ((SCAT_CUBE_E, SCAT_CUBE_X, scat_cube),
                                 (SCAT_BLOB_E, SCAT_BLOB_X, scat_blob))
             mol = mkmol()
             Xc = X .- (sum(X; dims = 2) ./ size(X, 2))   # shared origin, see above
+            v = [scat_vol(e) for e in es]
             fe = scat_dummy_amp(es, SCAT_Q)
             P, fh = scat_shell(mol, SCAT_Q; n_target = 80)
             D_ex = scat_debye(SCAT_Q, Xc, fe)
             D_sh = scat_debye(SCAT_Q, P, fh)
             D_x  = scat_debye(SCAT_Q, Xc, fe, P, fh)
-            B_ex = excluded(mol, SCAT_Q, scat_Lconv, UInt64(4))
+            B_ex = compute_B_lm(scat_sph(X), SCAT_Q, _gaussian_dummy(v, SCAT_Q), scat_Lconv, UInt64(4))
             B_sh = scat_shell_blm(hydration(mol, SCAT_Q, scat_Lconv, UInt64(64); n_target = 80))
             for (dns, dro) in ((0.334, 0.03), (1.0, 1.0), (0.2, 0.9))
                 ref = dns^2 .* D_ex .+ dro^2 .* D_sh .- (2 * dns * dro) .* D_x
@@ -871,13 +940,16 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # totals, so the whole model becomes a perfect square:
         #   I(0) = (dns Σ_i v_i - dro * total_area * thickness)².
         # A pen-and-paper endpoint that needs neither the oracle nor B_lm.
+        # `B_ex`/`V_ex` are synthetic (as above); `mol` is only needed for the
+        # `hydration`/SASA side.
         for (es, X, mkmol) in ((SCAT_CUBE_E, SCAT_CUBE_X, scat_cube),
                                 (SCAT_BLOB_E, SCAT_BLOB_X, scat_blob))
             mol = mkmol()
             n = 80
-            B_ex = excluded(mol, [0.0], scat_Lconv, UInt64(4))
+            v = [scat_vol(e) for e in es]
+            B_ex = compute_B_lm(scat_sph(X), [0.0], _gaussian_dummy(v, [0.0]), scat_Lconv, UInt64(4))
             B_sh = scat_shell_blm(hydration(mol, [0.0], scat_Lconv, UInt64(64); n_target = n))
-            V_ex = sum(scat_vol, es)
+            V_ex = sum(v)
             V_sh = sum(SASA.shell_points(mol; n_target = n)[2]) * SHELL_THICKNESS
             @test isapprox(self_scatter(B_ex, scat_wconv)[1], V_ex^2; rtol = 1e-12)
             @test isapprox(self_scatter(B_sh, scat_wconv)[1], V_sh^2; rtol = 1e-12)
@@ -894,8 +966,10 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # ground-truth comparisons above are what actually pin the values.
         # I is, mode by mode, |dns*B_ex - dro*B_sh|², so non-negativity follows
         # from the weighted inner product being positive semi-definite.
+        # `B_ex` synthetic as above; `mol` only needed for `hydration`.
         mol = scat_blob()
-        B_ex = excluded(mol, SCAT_Q, scat_Lconv, UInt64(4))
+        v = [scat_vol(e) for e in SCAT_BLOB_E]
+        B_ex = compute_B_lm(scat_sph(SCAT_BLOB_X), SCAT_Q, _gaussian_dummy(v, SCAT_Q), scat_Lconv, UInt64(4))
         B_sh = scat_shell_blm(hydration(mol, SCAT_Q, scat_Lconv, UInt64(64); n_target = 80))
         S_ex = self_scatter(B_ex, scat_wconv)
         S_sh = self_scatter(B_sh, scat_wconv)

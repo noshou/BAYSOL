@@ -28,6 +28,6 @@ export  Molecule, MoleculeError, create, coords_cartesian, coords_spherical,
         to_spherical, radii, vols, r_max, neighbour_tree, elms, name, n_atoms, Residues,
         Ionization, propka_pKas, PropkaError, StructureSource, LocalPathSource,
         PDBIDSource, URLSource, StructureSourceError, resolve_structure, load_molecule,
-        resolve_hydrogens, PDB2PQRError, excluded_volume, EXCLUDED_VOLUME_TABLE
+        resolve_hydrogens, PDB2PQRError, excluded_volume
 
 end # module

@@ -5,6 +5,7 @@ Explicit-hydrogen structure generation via the external `pdb2pqr` CLI.
 """
 
 using CondaPkg: CondaPkg
+using FastClosures: @closure
 
 "Raised when `pdb2pqr` cannot be run or produces no usable output (bad input
 path, non-zero exit, missing expected output file), or when the requested
@@ -97,7 +98,7 @@ function resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real; add:
         tmp_out = joinpath(tmpdir, "hydrogenated.pdb")
         tmp_pqr = joinpath(tmpdir, "hydrogenated.pqr")
         try
-            CondaPkg.withenv() do
+            @closure CondaPkg.withenv() do
                 pdb2pqr = CondaPkg.which("pdb2pqr")
                 pdb2pqr === nothing && throw(PDB2PQRError("pdb2pqr not found in CondaPkg environment"))
                 cmd =  `$pdb2pqr --ff PARSE --titration-state-method propka --with-ph $pH
