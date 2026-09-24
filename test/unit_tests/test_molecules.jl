@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/MolecularStructure/Mols.jl: construction/centering, the two
+# Exercises src/MolecularStructure/Mols.jl: construction/centring, the two
 # coordinate frames, the lazy radii/vols/r_max accessors, and the error contract.
 # Also exercises the new CRYSOL-style excluded-volume table
 # (src/MolecularStructure/ExcludedVolumes.jl) it now feeds `vols` through,
@@ -51,7 +51,7 @@ BayeSol.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractStrin
         @test check_float(theta_(m)[2], π / 2) && check_float(phi_(m)[2], π)
     end
 
-    @testset "centering shifts to centroid" begin
+    @testset "centring shifts to centroid" begin
         m = create("test", ["h", "h"], [(0.0, 0.0, 0.0), (2.0, 0.0, 0.0)])
         @test check_float(r_(m)[1], 1.0) && check_float(r_(m)[2], 1.0)
     end
@@ -71,7 +71,7 @@ BayeSol.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractStrin
             d1 = sqrt(sum((c[k, i] - c[k, j])^2 for k in 1:3))
             @test check_float(d0, d1)
         end
-        # translating the input does not change the centered output at all
+        # translating the input does not change the centred output at all
         shifted = [(p[1] + 10.0, p[2] - 3.0, p[3] + 0.5) for p in pts]
         @test coords_cartesian(create("test", ["h", "h", "h", "h"], shifted)) ≈ c
     end

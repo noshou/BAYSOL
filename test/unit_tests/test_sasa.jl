@@ -3,7 +3,8 @@
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BayeSol: AtomicRadii
-using BayeSol.Solvation.SASA: SASA, sasa, _occluded
+using BayeSol.Solvation.SASA: SASA, sasa
+using BayeSol.Geometry.Metrics: blocked
 using BayeSol.MolecularStructure: MolecularStructure, create
 
 # ---------------------------------------------------------------------------
@@ -50,7 +51,7 @@ sasa_total(mol; kwargs...) = sum(sasa_atoms(mol; kwargs...))
 sasa_full(r, probe) = 4π * (r + probe)^2
 
 """
-Exposed area of one of two equal spheres of expanded radius ρ whose centers are
+Exposed area of one of two equal spheres of expanded radius ρ whose centres are
 `d` apart (0 < d < 2ρ): the occluded part is a spherical cap of area
 `2πρ(ρ - d/2)`, so the exposed part is `4πρ² - 2πρ(ρ - d/2)`.
 """
@@ -86,11 +87,11 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
     end
 
     @testset "single isolated atom is analytically exact" begin
-        # A lone atom has no candidate other than itself, and `_occluded` skips
+        # A lone atom has no candidate other than itself, and `blocked` skips
         # self, so EVERY sample point is exposed: p_exp/n_exp == 1 exactly and
         # the area is 4π(r+probe)² to the last bit, for any point counts.
         for (el, r) in (("c", 0.5), ("a", 1.0), ("q", 1.5), ("d", 5.0))
-            m = sasa_mol([el], [(3.0, -2.0, 7.0)])   # centering puts it at the origin
+            m = sasa_mol([el], [(3.0, -2.0, 7.0)])   # centring puts it at the origin
             for probe in (0.0, 1.4, 2.5)
                 for (n_occ, n_exp) in ((1, 1), (1, 100), (10, 100), (77, 1000), (250, 250))
                     @test sasa_total(m; n_occ = n_occ, n_exp = n_exp, probe = probe) == sasa_full(r, probe)
@@ -108,13 +109,13 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         @test sasa_total(m; n_occ = 20, n_exp = 1000, probe = probe) == sasa_full(1.0, probe) + sasa_full(2.0, probe)
 
         # exactly touching-but-not-overlapping expanded spheres:
-        # ρ₁ + ρ₂ = 2.4 + 3.4 = 5.8, centers 6.0 apart -> still fully exposed.
+        # ρ₁ + ρ₂ = 2.4 + 3.4 = 5.8, centres 6.0 apart -> still fully exposed.
         m2 = sasa_mol(["a", "b"], [(0.0, 0.0, 0.0), (6.0, 0.0, 0.0)])
         @test sasa_total(m2; n_occ = 20, n_exp = 1000, probe = probe) == sasa_full(1.0, probe) + sasa_full(2.0, probe)
     end
 
     @testset "complete engulfment: inner atom is exactly zero" begin
-        # r_small = 0.5, r_large = 5.0, probe = 1.0, centers 1.0 apart:
+        # r_small = 0.5, r_large = 5.0, probe = 1.0, centres 1.0 apart:
         #   d + r_small + probe = 1.0 + 1.5 = 2.5  <<  r_large + probe = 6.0
         # so the small atom's whole expanded sphere is strictly inside the
         # large one (margin 3.5 Å), and no point of the large sphere can be
@@ -137,11 +138,11 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
     end
 
     @testset "coincident identical atoms are exactly zero" begin
-        # Two atoms with the SAME center and the SAME radius. Every sample point
-        # of atom i sits at distance exactly ρ from atom j's center, and the
+        # Two atoms with the SAME centre and the SAME radius. Every sample point
+        # of atom i sits at distance exactly ρ from atom j's centre, and the
         # sampled test `dst² <= ρ_c²` is exactly on its boundary there.
         #
-        # `_classify`  decides it before any point is generated: d = 0 and
+        # `classify`  decides it before any point is generated: d = 0 and
         # ρᵢ = ρⱼ satisfies `d + ρᵢ <= ρⱼ`, so each atom is engulfed by the
         # other and both are exactly 0.
         probe = 1.4
@@ -182,7 +183,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
     end
 
     @testset "analytic spherical cap (strongest correctness check)" begin
-        # Two equal spheres, expanded radius ρ = 2.9, centers d apart with
+        # Two equal spheres, expanded radius ρ = 2.9, centres d apart with
         # 0 < d < 2ρ. Each atom's exposed area is 4πρ² - 2πρ(ρ - d/2) exactly.
         #
         # Tolerance: With n_exp = 40_000 the  measured worst relative error over these 
@@ -305,7 +306,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
     end
 
     @testset "exact pre-filter: the two decidable regimes need no sampling" begin
-        # `_classify` settles these from the neighbour list alone, so the answer
+        # `classify` settles these from the neighbour list alone, so the answer
         # is exact at any point count.
         probe = 1.4
 
@@ -332,7 +333,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
 
     @testset "regression: sasa must not be identically zero (self-occlusion)" begin
         # Every sample point of atom i lies at exactly rads[i] + probe from atom
-        # i's own center, so an occlusion test that did not skip `self` would
+        # i's own centre, so an occlusion test that did not skip `self` would
         # report `dst² <= ρ_self²` for every point of every atom and `sasa`
         # would return 0.0 for every molecule. 
         probe = 1.4
@@ -406,7 +407,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         @test check_float(v2 / v1, (5.0 / 2.5)^2)
     end
 
-    @testset "_occluded unit tests" begin
+    @testset "blocked (point test) unit tests" begin
         # atom 1 at origin (r = 1.0), atom 2 at x = 3.0 (r = 1.0), probe = 0.5
         # -> expanded radii 1.5 each.
         crds = [0.0 3.0; 0.0 0.0; 0.0 0.0]
@@ -414,35 +415,35 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         probe = 0.5
 
         # strictly inside candidate 2's expanded sphere
-        @test _occluded((3.2, 0.0, 0.0), [1, 2], crds, rads, probe, 1)
-        @test _occluded((3.0, 0.4, -0.3), [2], crds, rads, probe, 1)
+        @test blocked((3.2, 0.0, 0.0), [1, 2], crds, rads, probe, 1)
+        @test blocked((3.0, 0.4, -0.3), [2], crds, rads, probe, 1)
 
         # strictly outside every candidate's expanded sphere
-        @test !_occluded((10.0, 0.0, 0.0), [1, 2], crds, rads, probe, 1)
-        @test !_occluded((1.5 + 1e-9, 0.0, 0.0), [1, 2], crds, rads, probe, 2)
+        @test !blocked((10.0, 0.0, 0.0), [1, 2], crds, rads, probe, 1)
+        @test !blocked((1.5 + 1e-9, 0.0, 0.0), [1, 2], crds, rads, probe, 2)
 
         # `self` is skipped even for a point ON self's own expanded sphere ...
-        @test !_occluded((1.5, 0.0, 0.0), [1], crds, rads, probe, 1)
-        @test !_occluded((0.0, 0.0, 1.5), [1], crds, rads, probe, 1)
-        # ... and even for a point deep INSIDE self (self's own center)
-        @test !_occluded((0.0, 0.0, 0.0), [1], crds, rads, probe, 1)
-        @test !_occluded((0.0, 0.0, 0.0), [1, 2], crds, rads, probe, 1)
+        @test !blocked((1.5, 0.0, 0.0), [1], crds, rads, probe, 1)
+        @test !blocked((0.0, 0.0, 1.5), [1], crds, rads, probe, 1)
+        # ... and even for a point deep INSIDE self (self's own centre)
+        @test !blocked((0.0, 0.0, 0.0), [1], crds, rads, probe, 1)
+        @test !blocked((0.0, 0.0, 0.0), [1, 2], crds, rads, probe, 1)
         # the same point IS occluded once atom 1 is not `self`
-        @test _occluded((0.0, 0.0, 0.0), [1, 2], crds, rads, probe, 2)
+        @test blocked((0.0, 0.0, 0.0), [1, 2], crds, rads, probe, 2)
 
         # degenerate candidate lists
-        @test !_occluded((0.0, 0.0, 0.0), Int[], crds, rads, probe, 1)
-        @test !_occluded((3.0, 0.0, 0.0), Int[], crds, rads, probe, 1)   # inside 2, but not a candidate
-        @test !_occluded((3.0, 0.0, 0.0), [2], crds, rads, probe, 2)     # only self
+        @test !blocked((0.0, 0.0, 0.0), Int[], crds, rads, probe, 1)
+        @test !blocked((3.0, 0.0, 0.0), Int[], crds, rads, probe, 1)   # inside 2, but not a candidate
+        @test !blocked((3.0, 0.0, 0.0), [2], crds, rads, probe, 2)     # only self
 
         # boundary: `dst² <= ρ_c²` is inclusive, so exactly on the surface counts
-        @test _occluded((1.5, 0.0, 0.0), [1], crds, rads, probe, 2)
+        @test blocked((1.5, 0.0, 0.0), [1], crds, rads, probe, 2)
 
         # probe widens the occluding sphere
-        @test !_occluded((2.0, 0.0, 0.0), [1], crds, rads, 0.5, 2)   # ρ = 1.5 < 2.0
-        @test _occluded((2.0, 0.0, 0.0), [1], crds, rads, 1.5, 2)    # ρ = 2.5 > 2.0
+        @test !blocked((2.0, 0.0, 0.0), [1], crds, rads, 0.5, 2)   # ρ = 1.5 < 2.0
+        @test blocked((2.0, 0.0, 0.0), [1], crds, rads, 1.5, 2)    # ρ = 2.5 > 2.0
 
-        @test _occluded((3.2, 0.0, 0.0), [1, 2], crds, rads, probe, 1) isa Bool
+        @test blocked((3.2, 0.0, 0.0), [1, 2], crds, rads, probe, 1) isa Bool
     end
 
     @testset "larger molecule: 3x3x3 cubic lattice" begin
@@ -570,10 +571,11 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         @test area2 == sasa_atoms(m2; n_occ = 32, n_exp = 1500, probe = probe)
     end
 
-    @testset "PlasticMap is reachable through SASA" begin
-        # SASA's sampling is the plastic sequence; the submodule is re-exported
-        # from here and its own behaviour is covered in test_plasticmap.jl.
-        @test SASA.PlasticMap === BayeSol.Solvation.SASA.PlasticMap
-        @test length(SASA.PlasticMap.plastic_points(8)) == 8
+    @testset "SASA draws from the hoisted PlasticSequence module" begin
+        # SASA's sampling is the plastic sequence, now hoisted out into its own
+        # domain-agnostic module; its own behaviour is covered in
+        # test_plasticmap.jl, this just confirms the dependency is reachable
+        # and functional from here.
+        @test length(BayeSol.Geometry.PlasticSequence.plastic_points(8)) == 8
     end
 end

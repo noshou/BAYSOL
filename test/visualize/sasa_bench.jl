@@ -26,6 +26,7 @@ using BayeSol
 using BayeSol.Interfaces: Interfaces, RadiiSource
 using BayeSol.MolecularStructure: MolecularStructure, Molecule
 using BayeSol.Solvation.SASA: SASA
+using BayeSol.Geometry.Metrics: Metrics, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS, classify
 using Random, Printf, Statistics, DelimitedFiles
 
 # ---------------------------------------------------------------------------
@@ -192,20 +193,20 @@ end
 """
     classify_census(m, probe) -> NamedTuple
 
-How many atoms `SASA._classify` resolves exactly (`exposed`, `buried`) versus
+How many atoms `classify` resolves exactly (`exposed`, `buried`) versus
 hands to point sampling (`ambiguous`).
 """
 function classify_census(m::Molecule, probe::Float64)
     rads = MolecularStructure.radii(m); rmax = MolecularStructure.r_max(m)
     crds = MolecularStructure.coords_cartesian(m); tree = SASA.KDTree(crds)
-    c = Dict(SASA.ALL_EXPOSED => 0, SASA.ALL_BURIED => 0, SASA.AMBIGUOUS => 0)
+    c = Dict(ALL_EXPOSED => 0, ALL_BURIED => 0, AMBIGUOUS => 0)
     for i in axes(crds, 2)
         ρ = rads[i] + probe
         cand = SASA.inrange(tree, @view(crds[:, i]), ρ + rmax + probe)
-        c[SASA._classify(i, cand, crds, rads, probe)] += 1
+        c[classify(i, cand, crds, rads, probe)] += 1
     end
-    (exposed = c[SASA.ALL_EXPOSED], buried = c[SASA.ALL_BURIED],
-     ambiguous = c[SASA.AMBIGUOUS])
+    (exposed = c[ALL_EXPOSED], buried = c[ALL_BURIED],
+     ambiguous = c[AMBIGUOUS])
 end
 
 """
@@ -467,7 +468,7 @@ function bench_report(; csv_path = nothing)
         println()
     end
 
-    println("\n--- 3. _classify census by class (% of atoms) ---")
+    println("\n--- 3. classify census by class (% of atoms) ---")
     @printf("%-16s %9s %12s %12s %12s\n", "class", "atoms", "exact-exp", "exact-bur", "sampled")
     for c in classes
         rs = [r for r in rows if r[2] == c && r[4] == 0.0]
@@ -588,7 +589,7 @@ Six-panel summary of the accuracy sweep:
 
 1. area lost to the `area_tol` early exit, and how many atoms it skipped
 2. worst relative error per system class against `area_tol`
-3. what fraction of atoms `_classify` settles exactly vs hands to sampling
+3. what fraction of atoms `classify` settles exactly vs hands to sampling
 4. sampling error against a converged reference, by class
 5. convergence in `n_exp` for one system per class
 6. error against the analytic two-sphere cap, versus overlap
@@ -632,7 +633,7 @@ function _bench_figure(; n_exp = BENCH_NEXP, n_occ = 512, probe = BENCH_PROBE)
     end
     axislegend(ax2; position = :lb, labelsize = 9, framevisible = false)
 
-    # --- 3. _classify census ------------------------------------------------
+    # --- 3. classify census ------------------------------------------------
     ax3 = Axis( fig[1, 3]; title = "how atoms are resolved",
                 ylabel = "% of atoms", xticks = (1:length(classes), classes),
                 xticklabelrotation = pi/5, xticklabelsize = 9)

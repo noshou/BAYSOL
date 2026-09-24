@@ -15,7 +15,8 @@ using BayeSol
 using BayeSol.Interfaces: Interfaces, RadiiSource
 using BayeSol.MolecularStructure: MolecularStructure, Molecule
 using BayeSol.Solvation.SASA: SASA
-using BayeSol.Solvation.SASA.PlasticMap: plastic_points
+using BayeSol.Geometry.PlasticSequence: plastic_points
+using BayeSol.Geometry.Metrics: blocked
 using Printf: @printf, @sprintf
 using GLMakie
 
@@ -100,7 +101,7 @@ const ATOM_COLOR     = RGBf(0.55, 0.62, 0.75)
     atom_sample_points(mol, i, n, probe) -> NamedTuple
 
 The `n` plastic-sequence directions mapped onto atom `i`'s expanded sphere
-(radius `radii(mol)[i] + probe`), each tested with `SASA._occluded` against
+(radius `radii(mol)[i] + probe`), each tested with `blocked` against
 every other atom.
 
 # Returns
@@ -122,7 +123,7 @@ function atom_sample_points(mol::Molecule, i::Int, n::Int, probe::Float64)
         ux, uy, uz = dirs[j]
         p = (cx + ρ * ux, cy + ρ * uy, cz + ρ * uz)
         pts[j] = p
-        exposed[j] = !SASA._occluded(p, cands, crds, rads, probe, i)
+        exposed[j] = !blocked(p, cands, crds, rads, probe, i)
     end
     return (; pts, exposed)
 end
