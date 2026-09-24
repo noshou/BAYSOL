@@ -18,6 +18,7 @@ module FormFactor
 using  SQLite: SQLite
 using  DBInterface: DBInterface
 using  LinearAlgebra: LinearAlgebra
+using  FastClosures: @closure
 
 export  FormFactorSource, form_factor_table, form_factors, form_factor_log,
         FF, FormFactorError, FormFactorSourceTables
@@ -337,7 +338,7 @@ function compute_form_factors(
         end
 
         if anomalous
-            a, b = get!(() -> f1f2(el, E), f1f2_cache, el)
+            a, b = get!(@closure(() -> f1f2(el, E)), f1f2_cache, el)
             tbl[species] = ComplexF64[f0(key, s) + a + b * im for s in ss]
         else
             push!(log, "F0-ONLY " * species)

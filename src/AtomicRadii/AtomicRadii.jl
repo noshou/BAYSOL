@@ -9,6 +9,7 @@ module AtomicRadii
 
 using  SQLite: SQLite
 using  DBInterface: DBInterface
+using  FastClosures: @closure
 
 export  RadiiSource, lookup, AtomicRadiiSource, Ion, 
         tryparse_ion, ion_key, ion_radius, element_radius, 
@@ -106,7 +107,7 @@ function _load!(path::String = _dbpath())
             _ATOMIC[String(row.element)] = (Float64(row.radius), String(row.radius_type))
         end
         for row in DBInterface.execute(db, "SELECT element, charge FROM element_charges")
-            push!(get!(() -> Int[], _CHARGES, String(row.element)), Int(row.charge))
+            push!(get!(@closure(() -> Int[]), _CHARGES, String(row.element)), Int(row.charge))
         end
         for v in values(_CHARGES); sort!(v); end
     finally

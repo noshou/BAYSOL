@@ -145,6 +145,7 @@ function _standardize(θ::SVector{5,<:Real}, p::ξ_priors)
     return (θ .- μ) ./ σ
 end
 
+"Inverse of [`_standardize`](@ref); see its docstring for both directions."
 function _destandardize(z::SVector{5,<:Real}, p::ξ_priors)
     μ, σ = θ_prior_moments(p)
     return μ .+ σ .* z

@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "0635ddef3ab9e98a14c0c831d0adf1eb7a42bca5"
+project_hash = "f6a4f556e2ae7488b01d4804d8f80319e191ea60"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -137,6 +137,12 @@ git-tree-sha1 = "4126b08903b777c88edf1754288144a0492c05ad"
 uuid = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
 version = "0.4.8"
 
+[[deps.BAYSOL]]
+deps = ["AdvancedHMC", "Bessels", "BioStructures", "CondaPkg", "DBInterface", "DiffResults", "Distributions", "Downloads", "FastClosures", "ForwardDiff", "JSON3", "LegendrePolynomials", "LinearAlgebra", "NearestNeighbors", "Printf", "Roots", "SQLite", "SpecialFunctions", "SphericalHarmonics", "StaticArrays", "Statistics"]
+path = "../.."
+uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
+version = "0.1.0"
+
 [[deps.BangBang]]
 deps = ["Accessors", "ConstructionBase", "InitialValues", "LinearAlgebra"]
 git-tree-sha1 = "cceb62468025be98d42a5dc581b163c20896b040"
@@ -167,12 +173,6 @@ version = "1.11.0"
 git-tree-sha1 = "8c290a1b223deaeea9aea44b235d24546da8eb98"
 uuid = "18cc8868-cbac-4acf-b575-c8ff214dc66f"
 version = "1.4.0"
-
-[[deps.BAYSOL]]
-deps = ["AdvancedHMC", "Bessels", "BioStructures", "CondaPkg", "DBInterface", "DiffResults", "Distributions", "Downloads", "FastClosures", "ForwardDiff", "JSON3", "LegendrePolynomials", "LinearAlgebra", "NearestNeighbors", "Printf", "Roots", "SQLite", "SpecialFunctions", "SphericalHarmonics", "StaticArrays", "Statistics"]
-path = "../.."
-uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
-version = "0.1.0"
 
 [[deps.Bessels]]
 git-tree-sha1 = "4435559dc39793d53a9e3d278e185e920b4619ef"
