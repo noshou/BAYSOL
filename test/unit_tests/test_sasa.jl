@@ -2,10 +2,10 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol: AtomicRadii
-using BayeSol.Solvation.SASA: SASA, sasa
-using BayeSol.Geometry.Metrics: blocked
-using BayeSol.MolecularStructure: MolecularStructure, create
+using BAYSOL: AtomicRadii
+using BAYSOL.Solvation.SASA: SASA, sasa
+using BAYSOL.Geometry.Metrics: blocked
+using BAYSOL.MolecularStructure: MolecularStructure, create
 
 # ---------------------------------------------------------------------------
 # Injected radii source.
@@ -576,6 +576,6 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         # domain-agnostic module; its own behaviour is covered in
         # test_plasticmap.jl, this just confirms the dependency is reachable
         # and functional from here.
-        @test length(BayeSol.Geometry.PlasticSequence.plastic_points(8)) == 8
+        @test length(BAYSOL.Geometry.PlasticSequence.plastic_points(8)) == 8
     end
 end

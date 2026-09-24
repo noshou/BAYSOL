@@ -3,7 +3,7 @@
 # Exercises src/Cache.jl (`Lazy` / `make` / `force` and `KeyedCache`).
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.Cache: Lazy, make, force, KeyedCache
+using BAYSOL.Cache: Lazy, make, force, KeyedCache
 
 # `done` is the private "has the thunk run?" flag; reading it is the only way to
 # assert laziness without also forcing the value we are trying to prove unforced.

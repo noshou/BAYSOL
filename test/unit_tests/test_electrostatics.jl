@@ -7,15 +7,15 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol: AtomicRadii
-using BayeSol.Solvation.SASA: SASA
-using BayeSol.MolecularStructure: create, coords_cartesian
-using BayeSol.Solvation.Electrostatics:
+using BAYSOL: AtomicRadii
+using BAYSOL.Solvation.SASA: SASA
+using BAYSOL.MolecularStructure: create, coords_cartesian
+using BAYSOL.Solvation.Electrostatics:
     Electrostatics, PHOSPHATE_NET_CHARGE, debye_length, nucleic_acid_cavity_electrostatics,
     _phosphate_charge_sites, _screened_field, _aggregate, _sample_std,
     protein_cavity_electrostatics, _protein_charge_sites
-using BayeSol.MolecularStructure: Residues, Ionization
-using BayeSol.Fitting: δρ_prior
+using BAYSOL.MolecularStructure: Residues, Ionization
+using BAYSOL.Fitting: δρ_prior
 using Distributions: mean, std
 
 # Synthetic pKa record + independent Henderson-Hasselbalch reference,

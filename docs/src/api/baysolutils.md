@@ -1,4 +1,4 @@
-# BayesolUtils
+# BAYSOL_Utils
 
 Shared infrastructure used across the rest of the package: physical/numeric
 constants and the lazy-value cache primitive.
@@ -6,11 +6,11 @@ constants and the lazy-value cache primitive.
 ## Constants
 
 ```@autodocs
-Modules = [BayeSol.Constants]
+Modules = [BAYSOL.Constants]
 ```
 
 ## Cache
 
 ```@autodocs
-Modules = [BayeSol.Cache]
+Modules = [BAYSOL.Cache]
 ```

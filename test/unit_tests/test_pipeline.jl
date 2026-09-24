@@ -9,7 +9,7 @@
 # network access, since the fixture used here is a local .pdb.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.MolecularStructure: LocalPathSource, resolve_structure, propka_pKas,
+using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, propka_pKas,
                     resolve_hydrogens, load_molecule,
                     _store_dir, Molecule, Residues, n_atoms, elms, coords_cartesian
 

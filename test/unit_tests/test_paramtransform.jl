@@ -11,7 +11,7 @@ using ForwardDiff
 using LinearAlgebra
 using Random
 using StaticArrays
-using BayeSol.Fitting: Θ, Ξ, ρₑ_prior, δρ_prior, c1_prior, Solute, NonBiological
+using BAYSOL.Fitting: Θ, Ξ, ρₑ_prior, δρ_prior, c1_prior, Solute, NonBiological
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))
 

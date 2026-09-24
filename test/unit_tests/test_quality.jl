@@ -4,21 +4,21 @@
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using Aqua, JET, ExplicitImports
-using BayeSol.Scattering: SphFuncs
-using BayeSol.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm
-using BayeSol.MolecularStructure: MolecularStructure, create, coords_cartesian, coords_spherical, radii, vols, r_max,
+using BAYSOL.Scattering: SphFuncs
+using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm
+using BAYSOL.MolecularStructure: MolecularStructure, create, coords_cartesian, coords_spherical, radii, vols, r_max,
                 neighbour_tree, elms, name, Molecule
-using BayeSol.AtomicRadii: AtomicRadii, resolve_one, _resolve_all, tryparse_ion, ion_key, nearest_ion
-using BayeSol.Solvation: SASA
-using BayeSol.Geometry.Metrics: Metrics
+using BAYSOL.AtomicRadii: AtomicRadii, resolve_one, _resolve_all, tryparse_ion, ion_key, nearest_ion
+using BAYSOL.Solvation: SASA
+using BAYSOL.Geometry.Metrics: Metrics
 
 @testset "Aqua" begin
-    Aqua.test_all(BayeSol; ambiguities = false)
-    Aqua.test_ambiguities(BayeSol)
+    Aqua.test_all(BAYSOL; ambiguities = false)
+    Aqua.test_ambiguities(BAYSOL)
 end
 
 @testset "ExplicitImports: no stale `using X: a, b, c` imports anywhere" begin
-    test_no_stale_explicit_imports(BayeSol)
+    test_no_stale_explicit_imports(BAYSOL)
 end
 
 @testset "type stability (@inferred)" begin
@@ -82,7 +82,7 @@ end
     m = create("t", ["o", "h", "h"], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)])
     crds = MolecularStructure.coords_cartesian(m)
     TT   = typeof(neighbour_tree(m))
-    Vec3 = BayeSol.Geometry.PlasticSequence.Vec3
+    Vec3 = BAYSOL.Geometry.PlasticSequence.Vec3
 
     # the loop that runs once per atom must be completely clean
     @test isempty(_reports(SASA._sasa_loop!,

@@ -13,7 +13,7 @@ The workflow is:
 5. **Compute ionization** by assigning per-atom fractional charges, protonation states, and pH-related charge uncertainties using the PROPKA pKas and `charge_topology.json` (`Ionization.jl`).
 
 ```julia
-using BayeSol.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,
+using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,
  propka_pKas, resolve_hydrogens, Ionization
 
 path = resolve_structure(LocalPathSource(pdb_path))
@@ -43,7 +43,7 @@ ionization = Ionization(residues, pKa_records, pH, σ_pH)
 - **`URLSource(url, id)`**: a structure at an arbitrary `url`, in either legacy `.pdb` or mmCIF format (sniffed from the downloaded content via the literal `loop_` keyword, not the URL), stored under the caller-supplied `id`. Every call re-downloads and re-converts, unlike`PDBIDSource`, and the result is then byte-compared against any existing file under`id`with the same collision policy. Constructing a`URLSource`with an empty`id`raises`StructureSourceError`.
 
 ```julia
-using BayeSol.MolecularStructure: LocalPathSource, PDBIDSource, URLSource, resolve_structure
+using BAYSOL.MolecularStructure: LocalPathSource, PDBIDSource, URLSource, resolve_structure
 
 path1 = resolve_structure(LocalPathSource("structure.cif"))
 path2 = resolve_structure(PDBIDSource("1CRN"))
@@ -57,7 +57,7 @@ path3 = resolve_structure(URLSource("https://files.rcsb.org/download/1CRN.pdb", 
 Per-atom centred coordinates in both cartesian and spherical frames, with lazily computed `radii`/`vols`/`r_max`. Both coordinate frames are `(3, n)` matrices sharing a column index (the atom); the spherical rows are `r`, `theta`, `phi` in that order (`theta = acos(z/r) ∈ [0, π]`, `phi = atan(y, x) ∈ (-π, π]`). `r = 0`is handled explicitly rather than producing a`0/0`, since the angle is unobservable downstream anyway (`j_l(0) = 0`for every`l > 0`).
 
 ```julia
-using BayeSol.MolecularStructure: create, coords_cartesian, coords_spherical,
+using BAYSOL.MolecularStructure: create, coords_cartesian, coords_spherical,
  radii, vols, r_max, elms, name, n_atoms
 
 mol = create("my-mol", elements, coords) # coords: any iterable of 3-tuples/vectors
@@ -98,7 +98,7 @@ Parses whatever `.pdb` is at `pdb_path` into a `Molecule`/`Residues` pair.
 `vols(mol)` needs a per-atom volume for the excluded-volume dummy species (`Scattering.excluded`/`_gaussian_dummy`), representing the solvent a bonded atom actually displaces -- not the volume of an isolated van der Waals sphere, which overcounts by roughly 50% once bonded-atom overlap is accounted for (the bug this module fixes: on the SASDMJ9 fixture, an all-vdW-sphere sum came to ~36,400 Å³ against CRYSOL's own reported 23,962 Å³ for the same structure).
 
 ```julia
-using BayeSol.MolecularStructure: excluded_volume, EXCLUDED_VOLUME_TABLE
+using BAYSOL.MolecularStructure: excluded_volume, EXCLUDED_VOLUME_TABLE
 
 excluded_volume("c", vdw_radius)   # -> 16.44 (Å³, table value; vdw_radius ignored)
 excluded_volume("rn", vdw_radius)  # -> (4/3)π·vdw_radius³ (no table entry: vdW-sphere fallback)
@@ -145,7 +145,7 @@ Bare-atom (no merged hydrogen) CRYSOL/Fraser-MacRae-Suzuki displaced-solvent vol
 A free amino acid's textbook pKa is valid only in isolation. Inside a folded protein, a titratable side chain's *actual* pKa is shifted by its local electrostatic and desolvation environment: burial away from solvent, hydrogen bonding, and proximity to other charged groups all perturb it. PROPKA computes these per-residue-instance, structure-derived pKa shifts from the folded 3D geometry, which is why `Ionization.jl` takes one pKa *per residue instance* (keyed by `(resname, resnum, chain)`) rather than one fixed value per residue *type*.
 
 ```julia
-using BayeSol.MolecularStructure: propka_pKas, PropkaError
+using BAYSOL.MolecularStructure: propka_pKas, PropkaError
 
 records = propka_pKas(pdb_path)
 # Vector{<:NamedTuple}, one per standard titratable group:
@@ -157,7 +157,7 @@ records = propka_pKas(pdb_path)
  A structure resolved from RCSB or a bare crystallographic `.cif`/`.pdb`  typically carries heavy atoms only. The forward-model geometry step needs an explicit, pH-consistent set of atoms (hydrogens included) to compute scattering correctly, and *which* hydrogens a titratable group carries depends on its protonation state at the solution pH being fit against (e.g. a free amine's three vs. two hydrogens, a carboxylate's presence/absence of an "HO"). `PDB2PQR.jl` runs the external `pdb2pqr` tool to add hydrogens consistent with a target pH and force field, so the geometry passed downstream matches the physical/chemical state the fit assumes.
 
 ```julia
-using BayeSol.MolecularStructure: resolve_hydrogens, PDB2PQRError
+using BAYSOL.MolecularStructure: resolve_hydrogens, PDB2PQRError
 
 hpath = resolve_hydrogens(pdb_path, pKa_records, pH; add = true)
 ```
@@ -216,7 +216,7 @@ end
 ```
 
 ```julia
-using BayeSol.MolecularStructure: Ionization
+using BAYSOL.MolecularStructure: Ionization
 
 ionization = Ionization(residues, pKa_records, pH, σ_pH)
 ```

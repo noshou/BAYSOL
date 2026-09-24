@@ -10,7 +10,7 @@
 
 using Test
 
-@testset "BayeSol" begin
+@testset "BAYSOL" begin
     include("test_cache.jl")
     include("test_atomicradii.jl")
     include("test_molecules.jl")

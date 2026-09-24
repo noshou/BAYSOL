@@ -13,12 +13,12 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-const FIT = BayeSol.Fitting
+const FIT = BAYSOL.Fitting
 
-using BayeSol.Fitting: Solute, Protein, NonBiological, WLSFit, wls_fit,
+using BAYSOL.Fitting: Solute, Protein, NonBiological, WLSFit, wls_fit,
     wls_prof_ll, wls_marg_ll, Θ, Ξ
-using BayeSol.Scattering: forward, forward_cache, ForwardCache
-using BayeSol.MolecularStructure: MolecularStructure
+using BAYSOL.Scattering: forward, forward_cache, ForwardCache
+using BAYSOL.MolecularStructure: MolecularStructure
 using Distributions: logpdf, mean, std, LogNormal, Normal
 using StaticArrays: SVector
 using ForwardDiff
@@ -109,9 +109,9 @@ end
         pr = smpl_priors()
         @test pr isa FIT.ξ_priors
 
-        ref_dns = BayeSol.Fitting.ρₑ_prior(smpl_pH, smpl_σ_pH, smpl_solutes())
-        ref_δρ1, ref_δρ2, ref_δρ3 = BayeSol.Fitting.δρ_prior(; μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ)
-        ref_c1 = BayeSol.Fitting.c1_prior(smpl_n_c1)
+        ref_dns = BAYSOL.Fitting.ρₑ_prior(smpl_pH, smpl_σ_pH, smpl_solutes())
+        ref_δρ1, ref_δρ2, ref_δρ3 = BAYSOL.Fitting.δρ_prior(; μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ)
+        ref_c1 = BAYSOL.Fitting.c1_prior(smpl_n_c1)
 
         @test pr.dnsPrior  == ref_dns
         @test pr.δρ1Prior  == ref_δρ1

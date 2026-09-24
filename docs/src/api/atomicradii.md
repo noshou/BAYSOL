@@ -5,5 +5,5 @@ parsing, the ionic/charge-state/bare-element fallback chain, and the
 `RadiiSource` lookup contract.
 
 ```@autodocs
-Modules = [BayeSol.AtomicRadii]
+Modules = [BAYSOL.AtomicRadii]
 ```

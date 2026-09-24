@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Conda environment for BayeSol, managed by CondaPkg.jl. This exists solely to
+# Conda environment for BAYSOL, managed by CondaPkg.jl. This exists solely to
 # auto-provision an isolated Python + `propka`/`pdb2pqr` install for
 # `src/MolecularStructure/Propka.jl` (per-residue pKa prediction via the
 # `propka3` CLI) and `src/MolecularStructure/PDB2PQR.jl` (hydrogen addition
