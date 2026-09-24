@@ -1,3 +1,17 @@
 [deps]
 BAYSOL = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
+# Direct dep so this env's [preferences.CondaPkg] below is actually honoured
+# -- Preferences.jl only reads preferences for a package from environments
+# that list it as a direct dependency, not a transitive one.
+CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterTools = "35a29f4d-8980-5a13-9543-d66fff28ecb8"
+
+[compat]
+CondaPkg = "0.2"
+
+# Shared conda environment across every BAYSOL-dependent project in this
+# repo -- see ../Project.toml for the full rationale.
+[preferences.CondaPkg]
+backend = "MicroMamba"
+env = "@baysol"

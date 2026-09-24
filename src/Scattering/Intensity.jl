@@ -251,7 +251,7 @@ Exponent coefficient of [`excluded_volume_factor`](@ref): `(4π/3)^(2/3) / 4π`.
 
 Converts CRYSOL's *radius* parameterisation into the *volume* parameterisation
 [`_gaussian_dummy`](@ref) is written in, via `V = (4π/3) r³` (which is exactly
-`MolecularStructure.sphere_volume`, so `r_m` and the dummy volumes stay consistent).
+`Geometry.sphere_volume`, so `r_m` and the dummy volumes stay consistent).
 """
 const _EV_EXP_COEFF = (4π / 3)^(2 / 3) / (4π)
 

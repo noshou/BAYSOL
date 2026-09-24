@@ -7,6 +7,7 @@ in an isolated `CondaPkg`-managed Python environment.
 """
 
 using  CondaPkg: CondaPkg
+using  FastClosures: @closure
 
 "Raised when `propka3` cannot be run or its output cannot be parsed 
 (bad input path, non-zero exit, malformed `.pka` file)."
@@ -29,7 +30,7 @@ atom-type column) are skipped.
 """
 function _parse_pka(path::AbstractString)
     lines = readlines(path)
-    i = findfirst(l -> occursin("SUMMARY OF THIS PREDICTION", l), lines)
+    i = findfirst(@closure(l -> occursin("SUMMARY OF THIS PREDICTION", l)), lines)
     i === nothing && throw(PropkaError("no 'SUMMARY OF THIS PREDICTION' section in $path"))
     # line i+1 is the column header ("Group  pKa  model-pKa  ligand atom-type");
     # rows follow until a blank line or EOF.
@@ -73,10 +74,10 @@ function propka_pKas(pdb_path::AbstractString)
 
     if !isfile(pka_path)
         try
-            CondaPkg.withenv() do
+            @closure CondaPkg.withenv() do
                 propka3 = CondaPkg.which("propka3")
                 propka3 === nothing && throw(PropkaError("propka3 not found in CondaPkg environment"))
-                cd(storedir) do
+                @closure cd(storedir) do
                     run(pipeline(`$propka3 $abspdb`; stdout = devnull, stderr = devnull))
                 end
             end

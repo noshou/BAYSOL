@@ -2,8 +2,6 @@
 
 Leaf-level shared utilities
 
-`PlasticSequence` and `Metrics` have moved out of this module into their own top-level sibling module -- see `src/Geometry/README.md`.
-
 ```julia
 module BAYSOL_Utils
     include("Constants.jl")
@@ -30,7 +28,7 @@ A flat leaf module of `const` primitives, grouped by comment header into:
 
 Downstream modules `using` individual constants by name, e.g.:
 
-```julia
+```Julia
 # src/Scattering/Scattering.jl
 using ..BAYSOL_Utils.Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
 
@@ -78,8 +76,9 @@ struct Molecule
 end
 
 rad  = Lazy{Vector{Float64}}(() -> _compute_radii(radii_source, es))
-vol  = Lazy{Vector{Float64}}(() -> sphere_volume.(force(rad)))
 rmax = Lazy{Float64}(() -> maximum(force(rad)))
+tree = Lazy{KDTree}(() -> KDTree(cart))
+vol  = Lazy{Vector{Float64}}(() -> excluded_volume(cart, force(rad), force(tree), force(rmax)))
 
 radii(m::Molecule)::Vector{Float64} = force(m._radii)
 vols(m::Molecule)::Vector{Float64}  = force(m._vols)

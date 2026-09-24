@@ -273,7 +273,10 @@ function sasdmj9_posterior_hist(result)
     fig = Figure(size = (900, 550))
     for (i, (label, map_key)) in enumerate(_HIST_PARAMS)
         row, col = fldmod1(i, 3)
-        ax = Axis(fig[row, col], xlabel = label, ylabel = "count")
+        ax = Axis(
+            fig[row, col], xlabel = label, ylabel = "count",
+            xticklabelrotation = label == "dns" ? π/2 : 0.0,
+        )
         hist!(ax, getindex.(samples, i); bins = 40, color = (:dodgerblue, 0.6))
         if map_params !== nothing
             vlines!(ax, [map_params[map_key]]; color = :crimson, linewidth = 2)
