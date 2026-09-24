@@ -8,6 +8,7 @@ module PartialMolarVolumes
 using  ..BAYSOL_Utils.Constants: AVOGADRO
 using  ..BAYSOL_Utils.Cache: KeyedCache
 using  JSON3: JSON3
+using  FastClosures: @closure
 
 export PartialMolarVolumeSource, ϕ°, ρₑ_w, PMVSrcTables, COMMON_TO_IUPAC
 
@@ -161,7 +162,7 @@ function ρₑ_w(t::Real)::Tuple{Float64, Float64}
 
     # look up in cache if memoized
     key = round(Int64, t * 1000)
-    return get!(_ρₑ_w_cache, key) do
+    return @closure get!(_ρₑ_w_cache, key) do
         # calculate density of water at 1atm using the Kell equation
         ρ = (   999.83952 + 16.945176*t - 7.9870401e-3*t^2
                 - 46.170461e-6*t^3 + 105.56302e-9*t^4
@@ -264,7 +265,7 @@ function ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64, Fl
 
     key = String(seq)
 
-    return get!(_ϕ°_p_cache, key) do
+    return @closure get!(_ϕ°_p_cache, key) do
 
         # initialize accumulators
         sqr_unc = 0.0
@@ -401,7 +402,7 @@ function _ϕ°_by_iupac_name(name::AbstractString)::Tuple{Int64, Float64, Float6
 
     key = String(name)
 
-    return get!(_ϕ°_s_cache, key) do
+    return @closure get!(_ϕ°_s_cache, key) do
         res = get(_solutes, name, nothing)
 
         # name is not mapped, throw error
@@ -548,7 +549,7 @@ function _nuc_residue_var(
 
     if haskey(_wildcards_nuc, res)
         bases = _wildcards_nuc[res][isDNA ? "DNA" : "RNA"]
-        return _wildcard_var(bases, b -> _nuc_residue_var(b, isDNA, pH; σ_pH))
+        return _wildcard_var(bases, @closure(b -> _nuc_residue_var(b, isDNA, pH; σ_pH)))
     elseif haskey(ion_dict, res)
         return _titrated(res, ion_dict, value_dict, pH; σ_pH)
     elseif haskey(value_dict, res)
@@ -602,7 +603,7 @@ function ϕ°(
     cache = isDNA ? _ϕ°_d_cache : _ϕ°_r_cache
     key = String(seq)
 
-    return get!(cache, key) do
+    return @closure get!(cache, key) do
 
         sqr_unc = 0.0
         ϕ_total = 0.0

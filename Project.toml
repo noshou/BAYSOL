@@ -49,3 +49,18 @@ SphericalHarmonics = "0.1"
 StaticArrays = "1.9.20"
 Statistics = "1"
 julia = "1.10"
+
+# Committed (not LocalPreferences.toml, which is gitignored/machine-local):
+# every BAYSOL-dependent Julia environment in this repo (root, test/,
+# test/fitting_tests/, docs/) used to independently provision its own
+# ~360MB CondaPkg-managed Python env for propka/pdb2pqr (see CondaPkg.toml),
+# all resolving the identical spec. One shared, named environment (stored
+# once under the Julia depot, not per-project) replaces all of them -- see
+# the matching [preferences.CondaPkg] block in test/Project.toml,
+# test/fitting_tests/Project.toml, and docs/Project.toml. The "env"
+# preference can't be combined with the Pixi backend (CondaPkg.jl errors:
+# "cannot use pixi backend if env preference is set"), hence MicroMamba here
+# instead of Pixi -- same resolved packages, different installer.
+[preferences.CondaPkg]
+backend = "MicroMamba"
+env = "@baysol"

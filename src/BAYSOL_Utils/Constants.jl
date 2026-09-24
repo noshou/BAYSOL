@@ -43,6 +43,14 @@ an `Int` pins it.
 """
 const SHELL_N_TARGET::Union{Nothing,Int} = nothing
 
+"""
+Default number of points to generate to sample excluded volume.
+10.1016/j.bpj.2023.10.034 uses a 16³ voxel grid for each atom;
+a sphere occupies π/6 of the cube. This works out to roughly
+(π/6 * 16³) ≈ 2145 points being occupied.
+"""
+const N_VOL_SHELL::Int64 = 2145
+
 "Shell-contrast unit in e·Å⁻³ (CRYSOL's `--dro`); `dro_k = DRO_UNIT * δρ_k`."
 const DRO_UNIT = 0.03
 

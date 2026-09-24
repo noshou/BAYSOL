@@ -3,6 +3,7 @@ AdvancedHMC = "0bf59076-c3b1-5ca4-86bd-e02cd72cde3d"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 BAYSOL = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 BioStructures = "de9282ab-8554-53be-b2d6-f6c222edabfc"
+CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
@@ -16,7 +17,18 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 Aqua = "0.8"
+# CondaPkg is only a direct dep here (not just transitive via BAYSOL) because
+# Preferences.jl's load_preference only honours a [preferences.CondaPkg]
+# entry for a package from environments that list it as a *direct*
+# dependency -- needed so this env picks up the shared-conda-environment
+# preference below instead of resolving its own separate .CondaPkg.
+CondaPkg = "0.2"
 Distributions = "0.25.131"
 ExplicitImports = "1.15.0"
 ForwardDiff = "0.10, 1"
 JET = "0.9, 0.10, 0.11, 0.12"
+
+# See ../Project.toml's matching block for the full rationale.
+[preferences.CondaPkg]
+backend = "MicroMamba"
+env = "@baysol"

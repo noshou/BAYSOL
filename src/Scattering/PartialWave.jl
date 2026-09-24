@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 using .SphFuncs: sphHarm, sphBess
+using FastClosures: @closure
 
 """
     _deg_contrib(f_t, j_deg, Y_l) -> AbstractMatrix{<:Number}
@@ -162,7 +163,7 @@ function compute_B_lm(
     
     # A purely real f_atoms needs only the Re(f) channel; an imaginary part
     # (anomalous f'') needs a second channel for the ±m symmetry.
-    n_chan = any(x -> imag(x) != 0, f_atoms) ? 2 : 1
+    n_chan = any(@closure(x -> imag(x) != 0), f_atoms) ? 2 : 1
     B_lm = backend(zeros(ComplexF64, n_chan, N_reduced, Q))
 
     # Atoms are processed `_CHUNK` at a time rather than all at once: `Y`/`j`

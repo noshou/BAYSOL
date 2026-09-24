@@ -5,6 +5,10 @@ point sequences and the pairwise-sphere shortcuts/tests built on them.
 Independent of `Solvation`/`MolecularStructure` -- `Solvation.SASA` is a
 consumer, not the only one.
 
+```@autodocs
+Modules = [BAYSOL.Geometry]
+```
+
 ## PlasticSequence
 
 ```@autodocs
