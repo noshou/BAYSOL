@@ -4,7 +4,7 @@
 # and its .pka summary-table parser.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.MolecularStructure: propka_pKas, PropkaError, _parse_pka, _store_dir
+using BAYSOL.MolecularStructure: propka_pKas, PropkaError, _parse_pka, _store_dir
 
 # Real backbone/sidechain coordinates lifted from 1UBQ (residues ASP 21 and
 # LYS 6, renumbered 1/2), so bond lengths/angles are physically valid and

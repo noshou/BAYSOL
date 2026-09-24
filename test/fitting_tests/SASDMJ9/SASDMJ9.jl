@@ -2,9 +2,9 @@ using   DelimitedFiles
 using   Statistics
 using   Random
 using   GLMakie
-using   BayeSol
-using   BayeSol.MolecularStructure: LocalPathSource
-using   BayeSol.Fitting: Solute, Protein, NonBiological, PROFILE
+using   BAYSOL
+using   BAYSOL.MolecularStructure: LocalPathSource
+using   BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDMJ9")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDMJ9.dat")
@@ -102,12 +102,12 @@ function run_sasdmj9(; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer
     q_fit, I_fit, σ_fit = fit_subset()
 
     Random.seed!(seed)
-    s, μ_χ, σ_χ = BayeSol.seed_model(
+    s, μ_χ, σ_χ = BAYSOL.seed_model(
         LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
         ionic_strength_M = IONIC_STRENGTH_M, T = TEMPERATURE_C + 273.15,
     )
-    res = BayeSol.run_model(s, n_samples, n_adapt; l = PROFILE())
+    res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
     return res, μ_χ, σ_χ, s.fw.form_factor_log, (q_fit, I_fit, σ_fit)
 end
 
@@ -117,7 +117,7 @@ fit, divergence_rate, map_result, quantile_result = result
 
 # `@__DIR__` (this SASDMJ9/ folder), not the caller's cwd.
 open(joinpath(@__DIR__, "res.txt"), "w") do io
-    BayeSol.write_report(io, result; μ_χ = μ_χ, σ_χ = σ_χ, form_factor_log = form_factor_log)
+    BAYSOL.write_report(io, result; μ_χ = μ_χ, σ_χ = σ_χ, form_factor_log = form_factor_log)
 end
 
 """
@@ -306,7 +306,7 @@ function sasdmj9_crysol_comparison_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "BayeSol MAP vs. CRYSOL fit1 (paper)",
+        title  = "BAYSOL MAP vs. CRYSOL fit1 (paper)",
         xscale = log10,
         yscale = log10,
     )
@@ -328,7 +328,7 @@ function sasdmj9_crysol_comparison_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "BayeSol MAP")
+        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "BAYSOL MAP")
     end
 
     axislegend(ax; position = :lb, framevisible = false)

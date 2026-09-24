@@ -8,7 +8,7 @@
 # the live propka3 test in test_propka.jl.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.MolecularStructure: resolve_hydrogens, load_molecule, PDB2PQRError, MoleculeError,
+using BAYSOL.MolecularStructure: resolve_hydrogens, load_molecule, PDB2PQRError, MoleculeError,
                     _terminus_flags, propka_pKas, _store_dir,
                     Molecule, Residues, n_atoms, elms, coords_cartesian
 

@@ -11,12 +11,12 @@
 # Numbers only, no window (works headless):
 #   julia --project=test/visualize -e 'include("test/visualize/sasa_hydro_vis.jl"); sasa_hydro_report()'
 
-using BayeSol
-using BayeSol.Interfaces: Interfaces, RadiiSource
-using BayeSol.MolecularStructure: MolecularStructure, Molecule
-using BayeSol.Solvation.SASA: SASA
-using BayeSol.Geometry.PlasticSequence: plastic_points
-using BayeSol.Geometry.Metrics: blocked
+using BAYSOL
+using BAYSOL.Interfaces: Interfaces, RadiiSource
+using BAYSOL.MolecularStructure: MolecularStructure, Molecule
+using BAYSOL.Solvation.SASA: SASA
+using BAYSOL.Geometry.PlasticSequence: plastic_points
+using BAYSOL.Geometry.Metrics: blocked
 using Printf: @printf, @sprintf
 using GLMakie
 

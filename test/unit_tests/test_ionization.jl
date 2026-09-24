@@ -8,7 +8,7 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.MolecularStructure: MolecularStructure, Residues, Ionization
+using BAYSOL.MolecularStructure: MolecularStructure, Residues, Ionization
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 

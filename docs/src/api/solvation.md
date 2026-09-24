@@ -1,23 +1,18 @@
 # Solvation
 
 Solvent-accessible surface area and screened electrostatics
-(`src/Solvation/`): the SASA algorithm and its plastic-sequence dummy-atom
-placement, and the Debye-Huckel cavity-electrostatics model.
+(`src/Solvation/`): the SASA algorithm (sampling points via the
+[Geometry](geometry.md) module's plastic-sequence generator), and the
+Debye-Huckel cavity-electrostatics model.
 
 ## SASA
 
 ```@autodocs
-Modules = [BayeSol.Solvation.SASA]
-```
-
-## PlasticMap
-
-```@autodocs
-Modules = [BayeSol.Solvation.SASA.PlasticMap]
+Modules = [BAYSOL.Solvation.SASA]
 ```
 
 ## Electrostatics
 
 ```@autodocs
-Modules = [BayeSol.Solvation.Electrostatics]
+Modules = [BAYSOL.Solvation.Electrostatics]
 ```
