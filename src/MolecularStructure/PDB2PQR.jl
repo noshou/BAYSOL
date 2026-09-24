@@ -61,7 +61,7 @@ Resolve whether/how `pdb_path` gets explicit hydrogens.
 With `add=true` (the default), runs `pdb2pqr` on the heavy-atom `.pdb` at
 `pdb_path` and returns the path to a hydrogen-included `.pdb` stored in
 [`_store_dir`](@ref) (identical to this function's old `add_hydrogens`
-behavior). With `add=false`, this is a genuine no-op: `pdb_path` is returned
+behaviour). With `add=false`, this is a genuine no-op: `pdb_path` is returned
 unchanged, with no file write, no [`_store_dir`](@ref) entry, and no
 `pdb2pqr` subprocess invoked at all.
 
