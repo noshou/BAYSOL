@@ -9,13 +9,13 @@
 # (same assumption as test_pipeline.jl/test_pdb2pqr.jl) but no network access.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.MolecularStructure:   Molecule, create, coords_cartesian, coords_spherical,
+using BAYSOL.MolecularStructure:   Molecule, create, coords_cartesian, coords_spherical,
                     radii, vols, r_max, elms, name, sphere_volume,
                     MoleculeError, _to_tuples, excluded_volume, EXCLUDED_VOLUME_TABLE,
                     LocalPathSource, resolve_structure, propka_pKas, resolve_hydrogens,
                     load_molecule, _store_dir
-using BayeSol.Scattering: mean_atomic_radius
-using BayeSol.Solvation: SASA
+using BAYSOL.Scattering: mean_atomic_radius
+using BAYSOL.Solvation: SASA
 
 # row 1 = r, row 2 = theta, row 3 = phi
 r_(m)     = coords_spherical(m)[1, :]
@@ -30,14 +30,14 @@ _forced_rmax(m)  = getfield(getfield(m, :_r_max), :done)
 
 # A stand-in RadiiSource, to prove `radii_source` is actually consulted rather
 # than the default AtomicRadiiSource being hard-wired in.
-struct ConstantRadii <: BayeSol.AtomicRadii.RadiiSource
+struct ConstantRadii <: BAYSOL.AtomicRadii.RadiiSource
     value::Float64
 end
-BayeSol.AtomicRadii.lookup(s::ConstantRadii, ions::AbstractVector{<:AbstractString}) =
+BAYSOL.AtomicRadii.lookup(s::ConstantRadii, ions::AbstractVector{<:AbstractString}) =
     Tuple{String,Union{Float64,Nothing}}[(String(i), s.value) for i in ions]
 
-struct NeverResolves <: BayeSol.AtomicRadii.RadiiSource end
-BayeSol.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString}) =
+struct NeverResolves <: BAYSOL.AtomicRadii.RadiiSource end
+BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString}) =
     Tuple{String,Union{Float64,Nothing}}[(String(i), nothing) for i in ions]
 
 @testset "MolecularStructure" begin
@@ -343,7 +343,7 @@ BayeSol.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractStrin
     # Needs real subprocess access for PROPKA/PDB2PQR (same assumption as
     # test_pipeline.jl/test_pdb2pqr.jl); no network access, since the PDB is a
     # local fixture. Composes the pipeline primitives exactly as
-    # `BayeSol.run_model` does (`src/BayeSol.jl`): resolve_structure ->
+    # `BAYSOL.run_model` does (`src/BAYSOL.jl`): resolve_structure ->
     # propka_pKas -> resolve_hydrogens -> load_molecule.
 
     @testset "total excluded volume on SASDMJ9 is close to CRYSOL's own reported Vol" begin

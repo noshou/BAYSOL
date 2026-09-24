@@ -61,7 +61,7 @@ expansion of every dummy's radius by `r_0/r_m`) and the detector-scale model `I_
 ### Spherical harmonics and Bessel functions (`SphFuncs`)
 
 ```julia
-using BayeSol.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm
+using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm
 
 # Y_l^m for l = 0..lMax, m = 0..l, packed row = l*(l+1)÷2 + m + 1, one column per point
 y = sphHarm(2, [0.3, 1.1], [0.2, -1.0])          # (6, 2) ComplexF64
@@ -78,8 +78,8 @@ legendre_sphPlm(2, 1, 0.5)                        # normalized P̄_2^1(0.5), GSL
 ### The full forward model
 
 ```julia
-using BayeSol.Scattering: forward_cache, forward
-using BayeSol.MolecularStructure: create
+using BAYSOL.Scattering: forward_cache, forward
+using BAYSOL.MolecularStructure: create
 
 mol   = create("gly", ["n", "c", "c", "o", "o", "h", "h", "h"], coords)
 qvals = [0.0, 0.03, 0.07, 0.15, 0.31]
@@ -104,7 +104,7 @@ I_calc = forward(mol, qvals, lMax, energy, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0))
 ### Lower-level primitives
 
 ```julia
-using BayeSol.Scattering: compute_B_lm, self_scatter, cross_scatter,
+using BAYSOL.Scattering: compute_B_lm, self_scatter, cross_scatter,
                            partial_wave_weights, gram, intensity, intensity_calc,
                            contrast_vector, vacuo, excluded, hydration
 

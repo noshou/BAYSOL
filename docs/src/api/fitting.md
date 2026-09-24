@@ -6,5 +6,5 @@ reparameterization, and the NUTS sampler wiring (`AdvancedHMC.jl`) that
 drives `run_fitting`.
 
 ```@autodocs
-Modules = [BayeSol.Fitting]
+Modules = [BAYSOL.Fitting]
 ```

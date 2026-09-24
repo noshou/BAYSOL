@@ -6,8 +6,8 @@
 # aggregator includes every file in one process) is a no-op past the first hit.
 if !@isdefined(check_float)
     using Test
-    using BayeSol
-    using BayeSol.Constants: DEFAULT_ATOL
+    using BAYSOL
+    using BAYSOL.Constants: DEFAULT_ATOL
 
     check_float(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
     check_complex(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol

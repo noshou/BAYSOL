@@ -36,7 +36,7 @@ ball  = plastic_points(256, Val(3), Val(:volume))   # Vector{Vec3}, fills the sp
 or, from outside the package:
 
 ```julia
-using BayeSol.Geometry.PlasticSequence: plastic_points, PLASTIC_RATIO_2, PLASTIC_RATIO_3
+using BAYSOL.Geometry.PlasticSequence: plastic_points, PLASTIC_RATIO_2, PLASTIC_RATIO_3
 ```
 
 ## `Metrics.jl`
@@ -63,5 +63,5 @@ hit = blocked(p, dir, candidates, crds, rads, probe)        # ray test, dispatch
 or, from outside the package:
 
 ```julia
-using BayeSol.Geometry.Metrics: classify, blocked, Coverage, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS
+using BAYSOL.Geometry.Metrics: classify, blocked, Coverage, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS
 ```

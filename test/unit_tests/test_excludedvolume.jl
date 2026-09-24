@@ -9,7 +9,7 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 using Random
 using SpecialFunctions: erfinv
 using Distributions: LogNormal, mean, var, cdf
-using BayeSol.Fitting: c1_prior
+using BAYSOL.Fitting: c1_prior
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 

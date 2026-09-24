@@ -7,7 +7,7 @@ HMCKernel, Trajectory, MultinomialTS, GeneralisedNoUTurn
 using FastClosures, StaticArrays, Distributions, ForwardDiff, DiffResults
 
 using ..Scattering: forward, ForwardCache
-using ..BayesolUtils.Constants: DEFAULT_TEMPERATURE_C, C1_PRIOR_MASS_PERCENT
+using ..BAYSOL_Utils.Constants: DEFAULT_TEMPERATURE_C, C1_PRIOR_MASS_PERCENT
 
 "Physical prior distributions."
 struct ξ_priors
@@ -164,7 +164,7 @@ Every `z_i` is, by construction, a standard-Normal variate under `p` alone
 (see `θ_prior_moments`'s docstring for why every θ-coordinate is exactly
 Normal under the prior), so this is a plain, general-purpose "how many
 sigmas out" readout with no per-parameter special-casing needed. Used by
-[`BayeSol.write_report`](@ref)'s "Standard deviations from prior" table, for
+[`BAYSOL.write_report`](@ref)'s "Standard deviations from prior" table, for
 both the MAP draw and the reported quantile bounds.
 
 # Arguments
@@ -272,7 +272,7 @@ selected by `l`:
 - `I_exp::AbstractVector`, `σ_exp::AbstractVector`: measured intensity and
     per-point standard errors, forwarded to [`wls_fit`](@ref).
 - `ξ::SVector{5,<:Real}`: the physical fit parameters `(dns, δρ1, δρ2, δρ3, c1)`.
-- `fw::ForwardCache`: the structure's geometry-only cache, from [`BayeSol.Scattering.forward_cache`](@ref).
+- `fw::ForwardCache`: the structure's geometry-only cache, from [`BAYSOL.Scattering.forward_cache`](@ref).
 - `l::LIKELIHOOD`: `PROFILE()` or `MARGINAL()`, selecting which log-likelihood
     variant to return.
 
@@ -424,7 +424,7 @@ end
 """
     FitResult{S}
 
-Typed return of [`run_fitting`](@ref)/`BayeSol.run_model`: the posterior
+Typed return of [`run_fitting`](@ref)/`BAYSOL.run_model`: the posterior
 draws of the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`, one
 `(scale, bkgrnd_corr)` pair and predicted curve per draw, and
 `AdvancedHMC.jl`'s own per-iteration diagnostics.

@@ -6,9 +6,9 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-const FIT = BayeSol.Fitting
-using BayeSol.Fitting: Solute, Protein, NonBiological, DNA, RNA, ρₑ_prior
-using BayeSol.Constants: AVOGADRO
+const FIT = BAYSOL.Fitting
+using BAYSOL.Fitting: Solute, Protein, NonBiological, DNA, RNA, ρₑ_prior
+using BAYSOL.Constants: AVOGADRO
 using Distributions: mean, var, LogNormal
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
@@ -24,16 +24,16 @@ Independent re-derivation of the `_ρₑ`/`ρₑ_prior` formula from the live
         + Σ_j (C_j·ρ_w/1e3)² · σ_ϕ°_j²
 """
 function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = 25.0)
-    ρw, σw = BayeSol.PartialMolarVolumes.ρₑ_w(t)
+    ρw, σw = BAYSOL.PartialMolarVolumes.ρₑ_w(t)
     ρw_k = ρw * 1e-3
 
     disp = 0.0; Δμ = 0.0; var_conc = 0.0; var_vol = 0.0
     for s in solutes
         Z, ϕ, σϕ =
-            s isa Protein       ? BayeSol.PartialMolarVolumes.ϕ°(pH, s.arg; σ_pH) :
-            s isa DNA            ? BayeSol.PartialMolarVolumes.ϕ°(true, pH, s.arg; σ_pH) :
-            s isa RNA            ? BayeSol.PartialMolarVolumes.ϕ°(false, pH, s.arg; σ_pH) :
-            BayeSol.PartialMolarVolumes.ϕ°(s.arg)
+            s isa Protein       ? BAYSOL.PartialMolarVolumes.ϕ°(pH, s.arg; σ_pH) :
+            s isa DNA            ? BAYSOL.PartialMolarVolumes.ϕ°(true, pH, s.arg; σ_pH) :
+            s isa RNA            ? BAYSOL.PartialMolarVolumes.ϕ°(false, pH, s.arg; σ_pH) :
+            BAYSOL.PartialMolarVolumes.ϕ°(s.arg)
         C, σC = s.molarity, s.molarity_uncertainty
         k = AVOGADRO * Z / 1e27 - ρw_k * ϕ
 
@@ -81,7 +81,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test close_(μ, μ_ref)
         @test close_(σ, σ_ref)
         # sanity: adding a solute genuinely shifts ρₑ away from pure water.
-        ρw, _ = BayeSol.PartialMolarVolumes.ρₑ_w(25.0)
+        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(25.0)
         @test !close_(μ, ρw; atol = 1e-9)
     end
 
@@ -105,7 +105,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
         # additivity: the two-solute mean shift equals the sum of the
         # single-solute mean shifts (linear in concentration).
-        ρw, _ = BayeSol.PartialMolarVolumes.ρₑ_w(25.0)
+        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(25.0)
         μ_urea, _ = FIT._ρₑ(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")])
         μ_prot, _ = FIT._ρₑ(7.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, "GGGGXX")])
         @test close_(μ, ρw + (μ_urea - ρw) + (μ_prot - ρw); atol = 1e-9)
@@ -135,7 +135,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         μ_ref, σ_ref = ref_ρₑ(7.0, 0.0, solutes)
         @test close_(μ, μ_ref)
         @test close_(σ, σ_ref)
-        ρw, _ = BayeSol.PartialMolarVolumes.ρₑ_w(25.0)
+        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(25.0)
         @test !close_(μ, ρw; atol = 1e-9)
     end
 
@@ -226,7 +226,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         # sanity: a real macromolecule-laden buffer genuinely shifts ρₑ
         # away from pure water, same qualitative check as the
         # single-solute testsets above.
-        ρw, _ = BayeSol.PartialMolarVolumes.ρₑ_w(25.0)
+        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(25.0)
         @test !close_(μ, ρw; atol = 1e-9)
     end
 

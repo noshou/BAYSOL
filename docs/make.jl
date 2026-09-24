@@ -1,29 +1,65 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 using Documenter
-using BayeSol
+using BAYSOL
+
+# ---------------------------------------------------------------------------
+# Pull each module's own README.md into the generated site as a "Guides"
+# page, rather than hand-duplicating its prose into docs/src. Explicit
+# source -> destination mapping (not a directory glob) so it's obvious from
+# reading this file which READMEs are part of the docs build, and the
+# destination filename for each is stable across runs (`force = true` makes
+# a re-run reproducible rather than erroring on an existing copy).
+# ---------------------------------------------------------------------------
+const README_PAGES = [
+    "AtomicRadii"         => "AtomicRadii",
+    "BAYSOL_Utils"        => "BAYSOL_Utils",
+    "Fitting"              => "Fitting",
+    "FormFactor"           => "FormFactor",
+    "Geometry"              => "Geometry",
+    "MolecularStructure"   => "MolecularStructure",
+    "PartialMolarVolumes"  => "PartialMolarVolumes",
+    "Scattering"            => "Scattering",
+    "Solvation"              => "Solvation",
+]
+
+const GUIDES_DIR = joinpath(@__DIR__, "src", "guides")
+mkpath(GUIDES_DIR)
+
+for (name, srcdir) in README_PAGES
+    src  = joinpath(@__DIR__, "..", "src", srcdir, "README.md")
+    dest = joinpath(GUIDES_DIR, lowercase(name) * ".md")
+    cp(src, dest; force = true)
+end
 
 makedocs(
-    sitename = "BayeSol.jl",
+    sitename = "BAYSOL.jl",
     modules  = [
-        BayeSol,
-        BayeSol.Constants,
-        BayeSol.Cache,
-        BayeSol.AtomicRadii,
-        BayeSol.FormFactor,
-        BayeSol.PartialMolarVolumes,
-        BayeSol.MolecularStructure,
-        BayeSol.Scattering,
-        BayeSol.Scattering.SphFuncs,
-        BayeSol.Solvation.SASA,
-        BayeSol.Solvation.SASA.PlasticMap,
-        BayeSol.Solvation.Electrostatics,
-        BayeSol.Fitting,
+        BAYSOL,
+        BAYSOL.Constants,
+        BAYSOL.Cache,
+        BAYSOL.Geometry,
+        BAYSOL.Geometry.PlasticSequence,
+        BAYSOL.Geometry.Metrics,
+        BAYSOL.AtomicRadii,
+        BAYSOL.FormFactor,
+        BAYSOL.PartialMolarVolumes,
+        BAYSOL.MolecularStructure,
+        BAYSOL.Scattering,
+        BAYSOL.Scattering.SphFuncs,
+        BAYSOL.Solvation.SASA,
+        BAYSOL.Solvation.Electrostatics,
+        BAYSOL.Fitting,
     ],
     pages    = [
         "Home" => "index.md",
+        "Guides" => [
+            name => joinpath("guides", lowercase(name) * ".md")
+            for (name, _) in README_PAGES
+        ],
         "API Reference" => [
-            "BayesolUtils" => "api/BayesolUtils.md",
+            "BAYSOL_Utils" => "api/baysolutils.md",
+            "Geometry" => "api/geometry.md",
             "AtomicRadii" => "api/atomicradii.md",
             "FormFactor" => "api/formfactor.md",
             "PartialMolarVolumes" => "api/partialmolarvolumes.md",
@@ -46,4 +82,8 @@ makedocs(
     # should resolve for real; kept as a warn-not-fail safety net rather than
     # removed outright, since a doc `@ref` typo shouldn't block the build.
     warnonly = [:cross_references],
+)
+
+deploydocs(
+    repo = "github.com/noshou/BAYSOL.git",
 )

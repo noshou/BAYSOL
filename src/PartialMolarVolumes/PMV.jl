@@ -5,8 +5,8 @@ Partial molar volumes (V0, cm³/mol) and water bulk electron density.
 """
 module PartialMolarVolumes
 
-using  ..BayesolUtils.Constants: AVOGADRO
-using  ..BayesolUtils.Cache: KeyedCache
+using  ..BAYSOL_Utils.Constants: AVOGADRO
+using  ..BAYSOL_Utils.Cache: KeyedCache
 using  JSON3: JSON3
 
 export PartialMolarVolumeSource, ϕ°, ρₑ_w, PMVSrcTables, COMMON_TO_IUPAC

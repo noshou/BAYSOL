@@ -6,5 +6,5 @@ Pure-Julia X-ray form-factor backend (`src/FormFactor/FormFactor.jl`):
 terms).
 
 ```@autodocs
-Modules = [BayeSol.FormFactor]
+Modules = [BAYSOL.FormFactor]
 ```

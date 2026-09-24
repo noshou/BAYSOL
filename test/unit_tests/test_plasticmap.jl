@@ -2,7 +2,7 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.Geometry.PlasticSequence: Vec3, Vec2, plastic_points, PLASTIC_RATIO_2, PLASTIC_RATIO_3, plastic_ratio
+using BAYSOL.Geometry.PlasticSequence: Vec3, Vec2, plastic_points, PLASTIC_RATIO_2, PLASTIC_RATIO_3, plastic_ratio
 
 nrm(p) = sqrt(p[1]^2 + p[2]^2 + p[3]^2)
 dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]

@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-module BayeSol
+module BAYSOL
 
 using Statistics: quantile, mean, var
 using Printf: @printf
 using StaticArrays: SVector
 
-include("BayesolUtils/BayesolUtils.jl")
+include("BAYSOL_Utils/BAYSOL_Utils.jl")
 include("Geometry/Geometry.jl")
 include("AtomicRadii/AtomicRadii.jl")
 include("FormFactor/FormFactor.jl")
@@ -16,17 +16,17 @@ include("Solvation/Solvation.jl")
 include("Scattering/Scattering.jl")
 include("Fitting/Fitting.jl")
 
-using .BayesolUtils:             BayesolUtils
-using .BayesolUtils.Constants:   Constants
-using .BayesolUtils.Cache:       Cache
-using .Geometry:            Geometry
-using .AtomicRadii:         AtomicRadii
-using .FormFactor:          FormFactor
-using .PartialMolarVolumes: PartialMolarVolumes
-using .MolecularStructure:  MolecularStructure
-using .Solvation:           Solvation
-using .Scattering:          Scattering
-using .Fitting:             Fitting
+using .BAYSOL_Utils:           BAYSOL_Utils
+using .BAYSOL_Utils.Constants: Constants
+using .BAYSOL_Utils.Cache:     Cache
+using .Geometry:                Geometry
+using .AtomicRadii:             AtomicRadii
+using .FormFactor:              FormFactor
+using .PartialMolarVolumes:     PartialMolarVolumes
+using .MolecularStructure:      MolecularStructure
+using .Solvation:               Solvation
+using .Scattering:              Scattering
+using .Fitting:                 Fitting
 
 """
     seed_model(
@@ -103,16 +103,16 @@ function seed_model(
     σ_pH::Real,
     solutes::Vector{Fitting.Solute};
     add_hydrogens::Bool=true,
-    blm_chunk::Unsigned = BayesolUtils.Constants.B_LM_CHUNK,
-    thickness::Real = BayesolUtils.Constants.SHELL_THICKNESS,
-    t::Real = BayesolUtils.Constants.DEFAULT_TEMPERATURE_C,
-    n::Real = BayesolUtils.Constants.C1_PRIOR_MASS_PERCENT,
-    probe::Float64 = BayesolUtils.Constants.PROBE_RADIUS,
-    n_target::Union{Nothing,Int} = BayesolUtils.Constants.SHELL_N_TARGET,
-    ionic_strength_M::Float64 = BayesolUtils.Constants.IONIC_STRENGTH_M,
-    eps_r::Float64 = BayesolUtils.Constants.WATER_EPS_R,
-    T::Float64 = BayesolUtils.Constants.DEBYE_TEMPERATURE_K,
-    cutoff_debye_lengths::Float64 = BayesolUtils.Constants.CUTOFF_DEBYE_LENGTHS,
+    blm_chunk::Unsigned = BAYSOL_Utils.Constants.B_LM_CHUNK,
+    thickness::Real = BAYSOL_Utils.Constants.SHELL_THICKNESS,
+    t::Real = BAYSOL_Utils.Constants.DEFAULT_TEMPERATURE_C,
+    n::Real = BAYSOL_Utils.Constants.C1_PRIOR_MASS_PERCENT,
+    probe::Float64 = BAYSOL_Utils.Constants.PROBE_RADIUS,
+    n_target::Union{Nothing,Int} = BAYSOL_Utils.Constants.SHELL_N_TARGET,
+    ionic_strength_M::Float64 = BAYSOL_Utils.Constants.IONIC_STRENGTH_M,
+    eps_r::Float64 = BAYSOL_Utils.Constants.WATER_EPS_R,
+    T::Float64 = BAYSOL_Utils.Constants.DEBYE_TEMPERATURE_K,
+    cutoff_debye_lengths::Float64 = BAYSOL_Utils.Constants.CUTOFF_DEBYE_LENGTHS,
 )::Tuple{Fitting.Seed, Float64, Float64}
     
     if !(length(qvals) == length(I_exp) == length(σ_exp)) 

@@ -24,8 +24,8 @@ Sample points come from the plastic-sequence low-discrepancy set (`Geometry.Plas
 Non-existence of a witness in the coarse pass is *not* proof of burial, since a finite sample can prove exposure but never burial. This is why step 2 uses a worst-case bound (`area_tol`) rather than concluding an atom is burried.
 
 ```julia
-using BayeSol.MolecularStructure: create
-using BayeSol.Solvation.SASA: sasa
+using BAYSOL.MolecularStructure: create
+using BAYSOL.Solvation.SASA: sasa
 
 mol = create("my-mol", elements, coords_cartesian)
 area, exposed = sasa(mol; probe = 1.4, n_occ = 512, n_exp = 4096, area_tol = 2.0)
@@ -49,7 +49,7 @@ Every atom is sampled at `_SHELL_SAMPLE = 256` directions, occlusion-filtered th
 Classification (`_bead_class`) casts rays from each surviving bead: if the outward normal escapes the molecule within `_BEAD_RAY_RANGE = 12.0` Å the bead is at least `CONVEX`; otherwise rays are cast over the bead's outward hemisphere and classified by escaping fraction against `_BEAD_CONVEX_ESCAPE = 0.5`: `>= 0.5` escaping is `CONVEX`, `> 0` but `< 0.5` is `CONCAVE`, and `0` (every ray blocked) is `CAVITY`. Cavity detection is exact for voids up to `_BEAD_RAY_RANGE` across; a larger void degrades to open surface.
 
 ```julia
-using BayeSol.Solvation.SASA: shell_points, CONVEX, CONCAVE, CAVITY
+using BAYSOL.Solvation.SASA: shell_points, CONVEX, CONCAVE, CAVITY
 
 pts, areas, class = shell_points(mol; probe = 1.4, n_target = nothing)
 # pts:   (3, M) accessible points, mol's centred cartesian frame
@@ -78,7 +78,7 @@ sampling its surface), and the generalized `plastic_ratio(d)` are
 general-purpose and unused here.
 
 ```julia
-using BayeSol.Geometry.PlasticSequence: plastic_points, PLASTIC_RATIO_2
+using BAYSOL.Geometry.PlasticSequence: plastic_points, PLASTIC_RATIO_2
 
 pts = plastic_points(256)   # Vector{NTuple{3,Float64}}, unit-sphere points
 ```
@@ -96,7 +96,7 @@ Computes the linearized Poisson–Boltzmann (Debye–Hückel) screened electrost
 for a 1:1 electrolyte of ionic strength `I`. At default keywords this evaluates to ≈8 Å, matching the source paper's observation that interfacial fields are confined to roughly the first two hydration layers.
 
 ```julia
-using BayeSol.Solvation.Electrostatics: debye_length
+using BAYSOL.Solvation.Electrostatics: debye_length
 
 κinv = debye_length(; ionic_strength_M = 0.15, eps_r = 80.0, T = 300.0)  # ≈ 8 Å
 ```
@@ -140,7 +140,7 @@ Both run `SASA.shell_points`, select the `CAVITY`-class beads, and delegate
 to `_aggregate`:
 
 ```julia
-using BayeSol.Solvation.Electrostatics: nucleic_acid_cavity_electrostatics,
+using BAYSOL.Solvation.Electrostatics: nucleic_acid_cavity_electrostatics,
                                           protein_cavity_electrostatics
 
 # Nucleic-acid phosphate groups only; protein side chains carry no charge here.
@@ -156,7 +156,7 @@ Feeds `Fitting.Priors.DeltaRho.δρ_prior`'s cavity-water contrast term `δρ3` 
 structure-derived one: 
 
 ```julia
-using BayeSol.Fitting: δρ_prior
+using BAYSOL.Fitting: δρ_prior
 
 μχ, σχ = protein_cavity_electrostatics(mol, residues, ionization)
 δρ1, δρ2, δρ3 = δρ_prior(μ_χ = μχ, σ_χ = σχ)   # δρ3 == Normal(μχ, σχ)

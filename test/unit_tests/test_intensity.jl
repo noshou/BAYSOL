@@ -13,7 +13,7 @@
 # pipeline input on the reference side.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.Scattering: gram, intensity, intensity_calc, contrast_vector, DRO_UNIT,
+using BAYSOL.Scattering: gram, intensity, intensity_calc, contrast_vector, DRO_UNIT,
 partial_wave_weights, self_scatter, cross_scatter
 using LinearAlgebra: Symmetric, eigvals, issymmetric
 

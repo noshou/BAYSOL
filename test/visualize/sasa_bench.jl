@@ -22,11 +22,11 @@
 #   julia --project=test/visualize -e 'include("test/visualize/sasa_bench.jl"); vis_bench()'
 #   julia --project=test/visualize -e 'include("test/visualize/sasa_bench.jl"); save_bench_figures("bench")'
 
-using BayeSol
-using BayeSol.Interfaces: Interfaces, RadiiSource
-using BayeSol.MolecularStructure: MolecularStructure, Molecule
-using BayeSol.Solvation.SASA: SASA
-using BayeSol.Geometry.Metrics: Metrics, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS, classify
+using BAYSOL
+using BAYSOL.Interfaces: Interfaces, RadiiSource
+using BAYSOL.MolecularStructure: MolecularStructure, Molecule
+using BAYSOL.Solvation.SASA: SASA
+using BAYSOL.Geometry.Metrics: Metrics, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS, classify
 using Random, Printf, Statistics, DelimitedFiles
 
 # ---------------------------------------------------------------------------

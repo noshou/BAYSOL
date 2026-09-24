@@ -1,12 +1,11 @@
-# BayesolUtils
+# BAYSOL_Utils
 
 Leaf-level shared utilities
 
-`PlasticSequence` and `Metrics` have moved out of this module into their own
-top-level sibling module -- see `src/Geometry/README.md`.
+`PlasticSequence` and `Metrics` have moved out of this module into their own top-level sibling module -- see `src/Geometry/README.md`.
 
 ```julia
-module BayesolUtils
+module BAYSOL_Utils
     include("Constants.jl")
     include("Cache.jl")
     using .Constants: Constants
@@ -14,8 +13,8 @@ module BayesolUtils
 end
 ```
 
-`src/BayeSol.jl` re-exports `Constants` and `Cache` at the top level
-(`BayeSol.Constants`, `BayeSol.Cache`).
+`src/BAYSOL.jl` re-exports `Constants` and `Cache` at the top level
+(`BAYSOL.Constants`, `BAYSOL.Cache`).
 
 ## `Constants.jl`
 
@@ -33,19 +32,19 @@ Downstream modules `using` individual constants by name, e.g.:
 
 ```julia
 # src/Scattering/Scattering.jl
-using ..BayesolUtils.Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
+using ..BAYSOL_Utils.Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
 
 # src/Solvation/Electrostatics.jl
-using ...BayesolUtils.Constants: ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, BOND_CUTOFF, ...
+using ...BAYSOL_Utils.Constants: ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, BOND_CUTOFF, ...
 
 # src/PartialMolarVolumes/PMV.jl
-using ..BayesolUtils.Constants: AVOGADRO
+using ..BAYSOL_Utils.Constants: AVOGADRO
 ```
 
 or, from outside the package, via the top-level re-export:
 
 ```julia
-using BayeSol.Constants: AVOGADRO
+using BAYSOL.Constants: AVOGADRO
 ```
 
 ## `Cache.jl`
@@ -69,7 +68,7 @@ end
 - `force(c::Lazy{T})::T` runs `f` once, under `c`'s lock, the first time it's called; every subsequent call (concurrent or not) returns the already-computed `value` without re-running `f`.
 
 ```julia
-using ..BayesolUtils.Cache: Lazy, force
+using ..BAYSOL_Utils.Cache: Lazy, force
 
 struct Molecule
     ...
@@ -100,7 +99,7 @@ end
 - `Base.haskey(c::KeyedCache{K,V}, key::K)::Bool`: whether `key` has already been memoized, also taken under the lock.
 
 ```julia
-using ..BayesolUtils.Cache: KeyedCache
+using ..BAYSOL_Utils.Cache: KeyedCache
 
 const _ρₑ_w_cache = KeyedCache{Int64, Tuple{Float64, Float64}}()
 const _ϕ°_p_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
@@ -108,4 +107,3 @@ const _ϕ°_s_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 const _ϕ°_d_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 const _ϕ°_r_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 ```
-

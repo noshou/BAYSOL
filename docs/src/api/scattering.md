@@ -8,11 +8,11 @@ entry points.
 ## Scattering
 
 ```@autodocs
-Modules = [BayeSol.Scattering]
+Modules = [BAYSOL.Scattering]
 ```
 
 ## SphFuncs
 
 ```@autodocs
-Modules = [BayeSol.Scattering.SphFuncs]
+Modules = [BAYSOL.Scattering.SphFuncs]
 ```

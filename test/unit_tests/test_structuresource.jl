@@ -7,7 +7,7 @@
 # test_propka.jl.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.MolecularStructure: StructureSource, LocalPathSource, PDBIDSource, URLSource,
+using BAYSOL.MolecularStructure: StructureSource, LocalPathSource, PDBIDSource, URLSource,
                     StructureSourceError, resolve_structure, load_molecule,
                     Molecule, Residues, n_atoms, elms, coords_cartesian, _store_dir
 using BioStructures: BioStructures, MMCIFFormat, writepdb, standardselector, heavyatomselector

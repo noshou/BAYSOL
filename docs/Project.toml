@@ -1,3 +1,3 @@
 [deps]
-BayeSol = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
+BAYSOL = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"

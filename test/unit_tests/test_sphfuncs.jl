@@ -4,7 +4,7 @@
 # (Unsold's theorem, the Y = P̄ e^{imφ} definition, the Bessel recurrence).
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm, SphHarmError, SphBessError
+using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm, SphHarmError, SphBessError
 
 y00 = 1.0 / (2.0 * sqrt(π))
 y10(θ) = sqrt(3.0 / (4.0 * π)) * cos(θ)

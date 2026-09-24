@@ -16,13 +16,13 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-const IFACE = BayeSol.PartialMolarVolumes
-using BayeSol.PartialMolarVolumes:
+const IFACE = BAYSOL.PartialMolarVolumes
+using BAYSOL.PartialMolarVolumes:
     PartialMolarVolumes, PMVSrcTables, COMMON_TO_IUPAC
-using BayeSol.Constants: AVOGADRO
+using BAYSOL.Constants: AVOGADRO
 
 "Fully-qualified handle onto the submodule, for the private caches/tables below."
-const PMVMOD = BayeSol.PartialMolarVolumes
+const PMVMOD = BAYSOL.PartialMolarVolumes
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "sequences.jl"))      # LYSOZYME, ...

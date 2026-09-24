@@ -14,7 +14,7 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 using LinearAlgebra
 using Random
 using ForwardDiff
-using BayeSol.Fitting: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll,
+using BAYSOL.Fitting: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll,
     reduced_chi2
 
 """

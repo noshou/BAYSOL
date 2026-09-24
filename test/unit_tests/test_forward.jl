@@ -9,15 +9,15 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BayeSol.Scattering:  forward, gram_matrix, species_multipoles,
+using BAYSOL.Scattering:  forward, gram_matrix, species_multipoles,
                     forward_cache, ForwardCache, mean_atomic_radius,
                     excluded_volume_factor, contrast_matrix,
                     gram, intensity, intensity_calc, contrast_vector,
                     partial_wave_weights, vacuo, excluded, hydration,
                     SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, SHELL_CLASSES,
                     DRO_UNIT, FORM_FACTOR_SOURCE, B_LM_CHUNK
-using BayeSol.MolecularStructure: create, elms, radii, vols
-using BayeSol.Solvation: SASA
+using BAYSOL.MolecularStructure: create, elms, radii, vols
+using BAYSOL.Solvation: SASA
 using LinearAlgebra: issymmetric, eigvals
 using ForwardDiff
 
@@ -39,7 +39,7 @@ fwd_chunk  = UInt64(3)
         @test SHELL_CLASSES   === (SASA.CONVEX, SASA.CONCAVE, SASA.CAVITY)
         @test DRO_UNIT        === 0.03
         @test B_LM_CHUNK isa Unsigned
-        @test FORM_FACTOR_SOURCE isa BayeSol.FormFactor.FormFactorSource
+        @test FORM_FACTOR_SOURCE isa BAYSOL.FormFactor.FormFactorSource
         # the primitives really do read these as their defaults
         m = fwd_mol()
         @test   hydration(m, fwd_q, 2, fwd_chunk) ==
