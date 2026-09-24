@@ -3,7 +3,7 @@
 
 | file                    | what it does                                                                                                                                                                                                                                                                                     |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `plastic_vis.jl`        | scatter-plots the plastic sequence on the unit sphere                                                                                                                                                                                                                                            |
+| `plastic_vis.jl`        | scatter-plots the plastic sequence: `vis_plastic_points_2D` on a spherical *surface* (2-D generator), `vis_plastic_points_3D` filling a spherical *volume* (3-D generator)                                                                                                                       |
 | `sasa_bench.jl`         | accuracy /`area_tol` skip-firing / speed sweeps over ~450 systems, plus summary figures                                                                                                                                                                                                          |
 | `sasa_vis.jl`           | four occlusion regimes + mesh-convergence panels, points coloured by exposed/occluded state                                                                                                                                                                                                      |
 | `sasa_hydro_vis.jl`     | the`SASA.shell_points` hydration-shell dummy cloud over a packed cluster, plus an `n_target` budget table                                                                                                                                                                                        |
@@ -11,7 +11,8 @@
 
 ```
 julia --project=test/visualize -e 'include("test/visualize/sasa_vis.jl");   vis_sasa_cases()'
-julia --project=test/visualize -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points(2000)'
+julia --project=test/visualize -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points_2D(2000)'
+julia --project=test/visualize -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points_3D(2000)'
 julia --project=test/visualize -e 'include("test/visualize/sasa_hydro_vis.jl"); vis_sasa_hydro()'
 julia --project=test/visualize -e 'include("test/visualize/electrostatics_vis.jl"); vis_electrostatics_na()'
 julia --project=test/visualize -e 'include("test/visualize/electrostatics_vis.jl"); vis_electrostatics_protein()'

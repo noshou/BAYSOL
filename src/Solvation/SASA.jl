@@ -5,177 +5,10 @@ Solvent-accessible surface area estimation.
 """
 module SASA
 
-"""
-Even point set on the unit sphere, drawn from the 
-2-D plastic (R₂) low-discrepancy sequence.
-"""
-module PlasticMap
-
-using Roots: find_zero
-
-export Vec3, plastic_points, PLASTIC_RATIO
-
-"A unit vector on the sphere, `(x, y, z)`."
-const Vec3 = NTuple{3,Float64}
-
-"Cubic `x³ − x − 1`; its real root in `(1, 2)` is the plastic ratio."
-_plastic_poly(x) = x^3 - x - 1
-
-"Plastic ratio ρ ≈ 1.324718, the real root of `x³ = x + 1`."
-const PLASTIC_RATIO     = find_zero(_plastic_poly, (1.0, 2.0))
-const PLASTIC_RATIO_SQR = PLASTIC_RATIO^2
-
-"Fractional part of `x`, i.e. `x - floor(x)`, in `[0, 1)`."
-_frac(x) = x - floor(x)
-
-"""
-    _plastic_point(i::Int) -> Vec3
-
-Unit-sphere point for 1-based plastic-sequence term `i`. The 2-D term
-`(frac(i/ρ), frac(i/ρ²))` is read as (azimuth, height) and lifted to the sphere
-through the equal-area cylindrical projection, so the points are uniform in area
-rather than clustered at the poles.
-
-Division by `ρ`/`ρ²` (rather than multiplication by reciprocals) keeps the
-fractional part accurate; it degrades only once `i` nears the mantissa limit
-(~1e15), far above any SASA point count.
-"""
-@inline function _plastic_point(i::Int)::Vec3
-    φ = 2.0 * π * _frac(i / PLASTIC_RATIO)
-    z = 2.0 * _frac(i / PLASTIC_RATIO_SQR) - 1.0
-    r = sqrt(max(0.0, 1.0 - z * z))
-    sinφ, cosφ = sincos(φ)
-    return (r * cosφ, r * sinφ, z)
-end
-
-"""
-    plastic_points(n::Int) -> Vector{Vec3}
-
-The first `n` plastic-sequence points distributed uniformly on a 3D unit sphere 
-using Lambert's cylindrical  equal-area projection. The longitudinal angle φ maps 
-horizontally, while the vertical component `z` scales uniformly between [-1.0, 1.0], 
-representing the sine of the latitude.
-
-# Arguments
-- `n`: number of points to generate; `n >= 0`.
-"""
-function plastic_points(n::Int)::Vector{Vec3}
-    n < 0 && throw(DomainError(n, "n must be >= 0"))
-    pts = Vector{Vec3}(undef, n)
-    @inbounds for i in 1:n
-        pts[i] = _plastic_point(i)
-    end
-    return pts
-end
-
-end # module PlasticMap
-
-using .PlasticMap: PlasticMap, Vec3
-using NearestNeighbors: KDTree, inrange
-using ...MolecularStructure: Molecule, radii, r_max, coords_cartesian
-
-"""
-    _occluded(p, candidates, crds, rads, probe, self) -> Bool
-
-Whether point `p` lies inside the expanded sphere
-(`radius + probe`) of any candidate atom other than `self`.
-
-`self` is skipped because `p` is generated *on* atom `self`'s own expanded
-sphere: its distance to that center is exactly `rads[self] + probe`, so an
-unguarded `dst <= ρ_c` would report every point of every atom as occluded,
-and `sasa` would return `0.0` for every molecule.
-
-# Arguments
-- `p`: point to test.
-- `candidates`: indices of atoms to test against.
-- `crds`: `(3, n)` coordinate matrix.
-- `rads`: per-atom radius, indexed like `crds`'s columns.
-- `probe`: solvent probe radius.
-- `self`: index of the atom `p` was sampled on; never occludes `p`.
-"""
-function _occluded(
-    p::Vec3,
-    candidates::Vector{Int},
-    crds::Matrix{Float64},
-    rads::Vector{Float64},
-    probe::Float64,
-    self::Int
-)::Bool
-    x_p, y_p, z_p = p
-    @inbounds for c in candidates
-        c == self && continue
-        ρ_c = rads[c] + probe
-        x_c = crds[1, c]; y_c = crds[2, c]; z_c = crds[3, c]
-        dst² = (x_c - x_p)^2 + (y_c - y_p)^2 + (z_c - z_p)^2
-        if dst² <= ρ_c * ρ_c
-            return true
-        end
-    end
-    return false
-end
-
-"""
-    Coverage
-
-How much of an atom's expanded sphere its neighbours cover.
-- `ALL_EXPOSED`:    no neighbour reaches the sphere, so the exposed fraction is
-                    exactly 1 and the area is exactly `4π(r+probe)²`.
-- `ALL_BURIED`:     a single neighbour swallows the whole sphere, so the exposed
-                    fraction is exactly 0.
-- `AMBIGUOUS`:      neighbours cut caps but no single one settles it; only point
-                    sampling can estimate the fraction.
-"""
-@enum Coverage ALL_EXPOSED ALL_BURIED AMBIGUOUS
-
-"""
-    _classify(i, candidates, crds, rads, probe) -> Coverage
-
-Each neighbour `j` cuts a spherical cap out of `i`'s expanded sphere. Writing
-`ρᵢ = rads[i] + probe`, `ρⱼ = rads[j] + probe` and `d = |cᵢ - cⱼ|`, three cases
-are decidable by comparing scalars, with no point sampling at all:
-
-- `d + ρᵢ <= ρⱼ`:   `j` engulfs `i` entirely, so *every* point is occluded.
-- `d >= ρᵢ + ρⱼ`:   `j` is too far to reach `i`'s surface, so it cuts nothing.
-- `d + ρⱼ <= ρᵢ`:   `j`'s ball sits strictly inside `i`'s surface, so it also
-                    cuts nothing (`i` encloses `j`).
-
-If no neighbour cuts a cap the atom is fully exposed. Everything else is a
-union-of-caps question that this predicate deliberately does not answer.
-
-Sampling can only prove an atom is not fully covered, it can never prove burial, 
-since nothing is stoping the next point from beign covered.
-
-# Arguments
-- `i`: atom to classify.
-- `candidates`: neighbour indices from the coarse range query; may include `i`.
-- `crds`: `(3, n)` coordinate matrix.
-- `rads`: per-atom radius, indexed like `crds`'s columns.
-- `probe`: solvent probe radius.
-"""
-function _classify(
-    i::Int,
-    candidates::Vector{Int},
-    crds::Matrix{Float64},
-    rads::Vector{Float64},
-    probe::Float64
-)::Coverage
-    ρ_i = rads[i] + probe
-    x_i = crds[1, i]; y_i = crds[2, i]; z_i = crds[3, i]
-    cuts = false
-    @inbounds for j in candidates
-        j == i && continue
-        ρ_j = rads[j] + probe
-        d² = (crds[1, j] - x_i)^2 + (crds[2, j] - y_i)^2 + (crds[3, j] - z_i)^2
-
-        # a neighbour that swallows i settles it outright
-        ρ_j >= ρ_i && d² <= (ρ_j - ρ_i)^2 && return ALL_BURIED
-
-        # neighbours that never reach i's surface cut nothing
-        (d² >= (ρ_i + ρ_j)^2 || (ρ_i >= ρ_j && d² <= (ρ_i - ρ_j)^2)) && continue
-        cuts = true
-    end
-    return cuts ? AMBIGUOUS : ALL_EXPOSED
-end
+using ...Geometry.PlasticSequence: PlasticSequence, Vec3, plastic_points
+using ...Geometry.Metrics: Metrics, ALL_EXPOSED, ALL_BURIED, classify, blocked
+using NearestNeighbors: inrange
+using ...MolecularStructure: Molecule, radii, r_max, coords_cartesian, neighbour_tree
 
 """
 Å² of accessible surface each shell point stands for; sets the cloud's spacing
@@ -220,29 +53,6 @@ populations (each carries its own fitted contrast; CRYSOL's defaults are
 @enum BeadClass CONVEX CONCAVE CAVITY
 
 """
-    _ray_blocked(p, d, nb, crds, rads, probe) -> Bool
-
-Does the ray from `p` along unit `d` hit any expanded sphere in `nb`?
-
-Standard ray/sphere test: project each centre onto the ray, reject anything
-behind `p`, and compare the perpendicular offset against `r + probe`. The
-bead's own atom always projects backwards, so it never self-blocks.
-"""
-function _ray_blocked(
-    p::NTuple{3,Float64}, d::Vec3, nb::Vector{Int},
-    crds::Matrix{Float64}, rads::Vector{Float64}, probe::Float64
-)::Bool
-    @inbounds for j in nb
-        wx = crds[1, j] - p[1]; wy = crds[2, j] - p[2]; wz = crds[3, j] - p[3]
-        t = wx * d[1] + wy * d[2] + wz * d[3]
-        t <= 0.0 && continue
-        ρ = rads[j] + probe
-        (wx * wx + wy * wy + wz * wz) - t * t < ρ * ρ && return true
-    end
-    return false
-end
-
-"""
     _bead_class(p, n̂, nb, dirs, crds, rads, probe) -> BeadClass
 
 Classify one shell bead by what fraction of its outward hemisphere escapes the
@@ -255,13 +65,13 @@ function _bead_class(
     probe::Float64
 )::BeadClass
     isempty(nb) && return CONVEX
-    _ray_blocked(p, n̂, nb, crds, rads, probe) || return CONVEX
+    blocked(p, n̂, nb, crds, rads, probe) || return CONVEX
 
     esc = 0; tot = 0
     @inbounds for d in dirs
         d[1] * n̂[1] + d[2] * n̂[2] + d[3] * n̂[3] > 0.0 || continue
         tot += 1
-        _ray_blocked(p, d, nb, crds, rads, probe) || (esc += 1)
+        blocked(p, d, nb, crds, rads, probe) || (esc += 1)
     end
     tot == 0 && return CONVEX
 
@@ -355,11 +165,11 @@ function shell_points(
         throw(DomainError(n_target, "n_target must be > 0"))
     probe >= 0.0 || throw(DomainError(probe, "probe must be >= 0"))
 
-    pmap = PlasticMap.plastic_points(_SHELL_SAMPLE)
+    pmap = plastic_points(_SHELL_SAMPLE)
     rads = radii(mol)
     rmax = r_max(mol)
     crds = coords_cartesian(mol)
-    tree = KDTree(crds)
+    tree = neighbour_tree(mol)
     pts, areas, nrm, counts =
         _shell_loop(tree, crds, rads, rmax, pmap, probe, _SHELL_SAMPLE)
 
@@ -375,7 +185,7 @@ function shell_points(
     end
 
     class = _class_loop(tree, pts, nrm, crds, rads, probe,
-                        PlasticMap.plastic_points(_BEAD_RAY_DIRS))
+                        plastic_points(_BEAD_RAY_DIRS))
     return pts, areas, class
 end
 
@@ -383,8 +193,9 @@ end
     _shell_loop(tree, crds, rads, rmax, pmap, probe, n_pts) -> (pts, areas, nrm)
 
 Per-atom loop behind [`shell_points`](@ref), split out for the same reason
-[`_sasa_loop!`](@ref) is: `KDTree` over a bare `Matrix` has no concrete type at
-the call site, so the barrier lets Julia specialize.
+[`_sasa_loop!`](@ref) is: `neighbour_tree(mol)`'s `KDTree` has no concrete type
+at the call site (it's a `Molecule`-cached, non-concretely-typed field), so
+the barrier lets Julia specialize.
 """
 function _shell_loop(
     tree::T,
@@ -410,7 +221,7 @@ function _shell_loop(
         per_pt = 4 * π * ρ^2 / n_pts   # every direction stands for this much
 
         candidates = inrange(tree, @view(crds[:, i]), ρ + rmax + probe)
-        status = _classify(i, candidates, crds, rads, probe)
+        status = classify(i, candidates, crds, rads, probe)
         status == ALL_BURIED && continue
         keep_all = status == ALL_EXPOSED
 
@@ -418,7 +229,7 @@ function _shell_loop(
         @inbounds for j in 1:n_pts
             ux, uy, uz = pmap[j]
             p = (x + ρ * ux, y + ρ * uy, z + ρ * uz)
-            (keep_all || !_occluded(p, candidates, crds, rads, probe, i)) || continue
+            (keep_all || !blocked(p, candidates, crds, rads, probe, i)) || continue
             push!(xs, p[1]); push!(ys, p[2]); push!(zs, p[3])
             push!(nx, ux); push!(ny, uy); push!(nz, uz)
             push!(areas, per_pt)
@@ -503,12 +314,12 @@ function sasa(
 
     _check_sasa_args(probe, n_occ, n_exp, area_tol)
 
-    pmap = PlasticMap.plastic_points(n_exp)
+    pmap = plastic_points(n_exp)
     rads = radii(mol)
     rmax = r_max(mol)
     crds = coords_cartesian(mol)
 
-    tree = KDTree(crds)
+    tree = neighbour_tree(mol)
     n = size(crds, 2)
 
     areas   = zeros(Float64, n)
@@ -524,7 +335,7 @@ end
                 n_occ, n_exp, area_tol) -> (areas, exposed)
 
 Per-atom loop behind [`sasa`](@ref). `KDTree(crds)` can't infer a concrete tree 
-type from a bare `Matrix` (NearestNeighbors keys the tree type on point dimension, 
+type from a bare `Matrix` (Nearestneighbours keys the tree type on point dimension, 
 a runtime property of the array), so calling out to a separate function lets Julia
 specialize the whole loop on it once instead of dispatching `inrange` per atom.
 """
@@ -548,7 +359,7 @@ function _sasa_loop!(
         full = 4 * π * ρ^2
 
         candidates = inrange(tree, @view(crds[:, i]), ρ + rmax + probe)
-        status = _classify(i, candidates, crds, rads, probe)
+        status = classify(i, candidates, crds, rads, probe)
 
         if status == ALL_BURIED
             continue                                # areas/exposed stay 0/false
@@ -565,7 +376,7 @@ function _sasa_loop!(
         @inbounds for j in 1:n_occ
             ux, uy, uz = pmap[j]
             p = (x + ρ * ux, y + ρ * uy, z + ρ * uz)
-            _occluded(p, candidates, crds, rads, probe, i) || (cnt += 1)
+            blocked(p, candidates, crds, rads, probe, i) || (cnt += 1)
         end
 
         # No witness among n_occ, which can still admit a true fraction up to 
@@ -575,7 +386,7 @@ function _sasa_loop!(
         @inbounds for j in n_occ+1:n_exp
             ux, uy, uz = pmap[j]
             p = (x + ρ * ux, y + ρ * uy, z + ρ * uz)
-            _occluded(p, candidates, crds, rads, probe, i) || (cnt += 1)
+            blocked(p, candidates, crds, rads, probe, i) || (cnt += 1)
         end
 
         areas[i] = full * (cnt / n_exp)

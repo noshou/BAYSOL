@@ -53,7 +53,7 @@ const IONIC_STRENGTH_M = 0.200           # 200 mM NaCl, matches the SEC/SAXS buf
 
 # Nsp7 sequence, read directly off SASDMJ9_fit1_model1.pdb chain B (residues
 # 2-83, 82 residues). Chain C models the identical sequence plus a 2-residue
-# Gly-Ser cloning-tag remnant at residues 0-1 that's disordered (not modeled)
+# Gly-Ser cloning-tag remnant at residues 0-1 that's disordered (not modelled)
 # in chain B; the tag-free chain B sequence is used here as the dominant,
 # biologically relevant species (the paper itself describes the mature
 # protein, not the tag, as "Nsp7").
@@ -172,12 +172,12 @@ function sasdmj9_figure(result, data)
     # A linear/additive I(q) ± σ(q) interval isn't symmetric on a log10
     # axis; the lower whisker compresses toward 0 while the upper one
     # looks comparatively short, so the point visually rides near the top
-    # of its own errorbar instead of centered (and I - σ can go
+    # of its own errorbar instead of centred (and I - σ can go
     # non-positive outright once σ > I, near the noise floor). Standard
     # SAXS log-I plotting convention (PRIMUS/SASBDB-style) instead
     # propagates σ into log-space via the delta method
     # (d/dx log10(x) = 1/(x·ln10)) and plots a log-symmetric interval, which
-    # stays well-defined and visually centered no matter how large σ gets
+    # stays well-defined and visually centred no matter how large σ gets
     # relative to I.
     log_I = log10.(I_fit)
     log_σ = σ_fit ./ (I_fit .* log(10))
@@ -194,7 +194,7 @@ function sasdmj9_figure(result, data)
 
     axislegend(ax; position = :lb, framevisible = false)
 
-    # Center the view on the actual data (I_fit), not on however far the
+    # Centre the view on the actual data (I_fit), not on however far the
     # errorbar whiskers/bounds band happen to extend
     lo, hi = extrema(I_fit)
     ylims!(ax, lo * 0.7, hi * 1.3)
@@ -206,7 +206,7 @@ end
     sasdmj9_residuals_figure(result, data) -> Figure
 
 Data-minus-MAP residuals against q, with the quantile-curve envelope
-(`"bounds"`/`"quantiles"`) similarly re-centered on the MAP curve.
+(`"bounds"`/`"quantiles"`) similarly re-centred on the MAP curve.
 """
 function sasdmj9_residuals_figure(result, data)
     _, _, map_result, quantile_result = result

@@ -241,8 +241,6 @@ using each coordinate's own prior mean and standard deviation from `_θ_prior_mo
 5. Run `AdvancedHMC.sample` for `n_samples` iterations.
 6. Destandardize every returned `z` and decode it back to `ξ` via `Ξ`. For each `ξ`, recompute `scale`, `bkgrnd_corr`, `χ²`, and the predicted curve using `wls_fit`, `wls_predict`, and `reduced_chi2`.
 
-## Usage example
-
 ```julia
 using BayeSol
 using BayeSol.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,

@@ -7,15 +7,16 @@ A molecule.
 using   ..AtomicRadii: RadiiSource, lookup, AtomicRadiiSource
 using   ..BayesolUtils.Cache: Lazy, force
 using   BioStructures:  BioStructures, PDBFormat, standardselector,
-                        collectatoms, atomname, element, resname, resnumber, 
+                        collectatoms, atomname, element, resname, resnumber,
                         chainid, coords
+using   NearestNeighbors: KDTree
 
 "Raised for malformed molecule input (empty or mismatched coords, missing radii)."
 struct MoleculeError <: Exception; msg::String end
 Base.showerror(io::IO, e::MoleculeError) = print(io, "MoleculeError: ", e.msg)
 
 """
-Per-atom centered coordinates in both frames, with lazy `radii`/`vols`/`r_max`.
+Per-atom centred coordinates in both frames, with lazy `radii`/`vols`/`r_max`.
 
 Both coordinate frames are `(3, n)` matrices sharing a column index (the atom),
 so a single atom's data is one contiguous column in either frame; the spherical
@@ -25,16 +26,25 @@ at construction from the coordinate pass rather than recomputed on demand.
 `radii` is always the isolated van der Waals radius (`AtomicRadii`); `vols` is
 the smaller CRYSOL-style excluded (displaced-solvent) volume from
 `ExcludedVolumes.excluded_volume`, exact only when hydrogens are explicit.
+
+`_tree` is a `KDTree` over `_cart`, built once and shared by every neighbour
+query against this molecule -- `Solvation.SASA`'s `sasa`/`shell_points` used
+to each build their own `KDTree(coords_cartesian(mol))` independently (same
+coordinates, same tree, built twice per structure); both now call
+[`neighbour_tree`](@ref) instead, and any future per-atom neighbour search
+(e.g. a geometric excluded-volume calculation) should do the same rather than
+constructing its own tree.
 """
 struct Molecule
     _name   :: String
     _elms   :: Vector{String}
     _n      :: Int                   # atom count; set at construction, never recomputed
-    _cart   :: Matrix{Float64}       # (3, n) centered (x, y, z)
+    _cart   :: Matrix{Float64}       # (3, n) centred (x, y, z)
     _sph    :: Matrix{Float64}       # (3, n) (r, theta, phi)
     _radii  :: Lazy{Vector{Float64}}
     _vols   :: Lazy{Vector{Float64}}
     _r_max  :: Lazy{Float64}         # largest per-atom radius
+    _tree   :: Lazy{KDTree}          # KDTree over _cart; shared across neighbour queries
 end
 
 "Volume of a sphere of radius `rad`."
@@ -143,7 +153,7 @@ end
 """
     create(name, elms, coords; radii_source::RadiiSource = AtomicRadiiSource()) -> Molecule
 
-Build a `Molecule`: `coords` are centered at the centroid, both coordinate
+Build a `Molecule`: `coords` are centred at the centroid, both coordinate
 frames computed now, `radii`/`vols`/`r_max` on first access.
 
 # Arguments
@@ -171,16 +181,17 @@ function create(name::AbstractString, elms::AbstractVector{<:AbstractString}, co
     # bonded atom does not displace a full isolated vdW sphere of solvent.
     vol  = Lazy{Vector{Float64}}(() -> excluded_volume.(es, force(rad)))
     rmax = Lazy{Float64}(() -> maximum(force(rad)))
-    return Molecule(String(name), es, n, cart, sph, rad, vol, rmax)
+    tree = Lazy{KDTree}(() -> KDTree(cart))
+    return Molecule(String(name), es, n, cart, sph, rad, vol, rmax, tree)
 end
 
-"`(3, n)` centroid-centered cartesian coordinates; rows are `x`, `y`, `z`."
+"`(3, n)` centroid-centred cartesian coordinates; rows are `x`, `y`, `z`."
 coords_cartesian(m::Molecule)::Matrix{Float64} = m._cart
 
 "`(3, n)` spherical coordinates about the centroid; rows are `r`, `theta`, `phi`."
 coords_spherical(m::Molecule)::Matrix{Float64} = m._sph
 
-"Number of atoms; `O(1)`, captured at construction."
+"Number of atoms."
 n_atoms(m::Molecule)::Int = m._n
 
 "Per-atom radius; resolved and cached on first call."
@@ -196,6 +207,13 @@ SASA's coarse neighbour filter needs this to bound how far away an atom can
 still occlude another, before any individual radius is known.
 """
 r_max(m::Molecule)::Float64          = force(m._r_max)
+
+"""
+    neighbour_tree(m::Molecule) -> KDTree
+
+A `KDTree` over `coords_cartesian(m)`.
+"""
+neighbour_tree(m::Molecule)::KDTree   = force(m._tree)
 
 "Element/ion string per atom."
 elms(m::Molecule)::Vector{String}    = m._elms

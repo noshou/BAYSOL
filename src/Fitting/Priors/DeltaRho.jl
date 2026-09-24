@@ -15,7 +15,7 @@
 # CRYSOL's default is the typical convex bead, and the empirical "15% denser" finding is explained as the mean
 # being pulled up by the right tail (a few very dense convex patches)
 #
-# - δρ2: can be positive or negative, but mostly positive. A normal distribution centered at 1 is chosen.
+# - δρ2: can be positive or negative, but mostly positive. A normal distribution centred at 1 is chosen.
 #
 # - δρ3: Cavity water beads can be denser *or* sparser than surrounding water bulk density, depending
 #        on the net charge of the cavity.

@@ -107,7 +107,7 @@ end
     # Force a fresh propka3 run: propka_pKas trusts a matching `.pka`
     # filename's presence outright with no re-verification (see
     # MolecularStructure._store_dir()'s docstring and Propka.jl's caching
-    # behavior), so a leftover file from a previous session/test would make
+    # behaviour), so a leftover file from a previous session/test would make
     # this "genuinely fresh" run silently a no-op cache hit instead.
     pka_path = joinpath(_store_dir(), "1CRN-TEST.pka")
     rm(pka_path; force = true)

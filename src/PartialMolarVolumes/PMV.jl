@@ -358,28 +358,32 @@ const COMMON_TO_IUPAC::Dict{String, String} = JSON3.read(
 
 Look up a non-protein solute's IUPAC name from its common name via
 `COMMON_TO_IUPAC` (case-insensitive). Returns `(iupac_name, true)` on a hit,
-or `("", false)` if `name` has no mapping. Private: the only caller is
-`_resolve_solute_name` below, so this has no reason to be part of the
-swappable-backend `ϕ°` surface.
+with `iupac_name` always lowercase regardless of the case `COMMON_TO_IUPAC`
+happens to store its values in, or `("", false)` if `name` has no mapping.
+Private: the only caller is `_resolve_solute_name` below, so this has no
+reason to be part of the swappable-backend `ϕ°` surface.
 """
 function _common2iupac(name::AbstractString)::Tuple{String,Bool}
     iupac = get(COMMON_TO_IUPAC, lowercase(String(name)), nothing)
-    return iupac === nothing ? ("", false) : (iupac, true)
+    return iupac === nothing ? ("", false) : (lowercase(iupac), true)
 end
 
 """
     _resolve_solute_name(name::AbstractString) -> String
 
-`name` itself if it is already an `nonbiological.json` key, else its
-`COMMON_TO_IUPAC` mapping via [`_common2iupac`](@ref), else `name` unchanged
-(so `ϕ°` below still throws its own `ArgumentError` rather than a
-`KeyError` from here). Mirrors `AtomicRadii`'s fallback-chain style.
+`name` (lowercased) itself if it is already an `nonbiological.json` key,
+else its `COMMON_TO_IUPAC` mapping via [`_common2iupac`](@ref) (already
+lowercase), else `name` lowercased, unchanged otherwise (so `ϕ°` below
+still throws its own `ArgumentError` rather than a `KeyError` from here).
+`_solutes` is lowercase-keyed, so `name` is lowercased before every lookup
+here regardless of the case the caller passed in. Mirrors `AtomicRadii`'s
+fallback-chain style.
 
 # Arguments
 - `name`: common or IUPAC solute name.
 """
 function _resolve_solute_name(name::AbstractString)::String
-    s = String(name)
+    s = lowercase(String(name))
     haskey(_solutes, s) && return s
     iupac, ok = _common2iupac(s)
     return ok ? iupac : s
@@ -429,7 +433,8 @@ end
     ϕ°(name::AbstractString) -> Tuple{Int64, Float64, Float64}
 
 Takes the common or IUPAC name of a solute (resolved via
-[`_resolve_solute_name`](@ref)) and returns (electron count, pmv, uncertainty).
+[`_resolve_solute_name`](@ref), which is case-insensitive) and returns
+(electron count, pmv, uncertainty).
 """
 ϕ°(name::AbstractString)::Tuple{Int64, Float64, Float64} = _ϕ°_by_iupac_name(_resolve_solute_name(name))
 

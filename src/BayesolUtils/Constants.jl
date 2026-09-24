@@ -15,8 +15,9 @@ DEBYE_TEMPERATURE_K, CUTOFF_DEBYE_LENGTHS, DEFAULT_TEMPERATURE_C, C1_PRIOR_MASS_
 #-------------------------
 
 """
-Default absolute tolerance for floating-point equality checks (`abs(a - b) < DEFAULT_ATOL`,
-or `isapprox(a, b; atol = DEFAULT_ATOL)`): a few orders of magnitude above `Float64` roundoff.
+Default absolute tolerance for floating-point equality checks 
+(`abs(a - b) < DEFAULT_ATOL`, or `isapprox(a, b; atol = DEFAULT_ATOL)`): 
+a few orders of magnitude above `Float64` roundoff.
 """
 const DEFAULT_ATOL = 1.0e-9
 
@@ -93,7 +94,8 @@ const BOND_CUTOFF = 1.75
 # Electrostatics/solution
 #----------------------------
 
-"Physiological monovalent salt concentration, mol/L (`debye_length`'s default ionic strength)."
+"Physiological monovalent salt concentration, mol/L 
+(`debye_length`'s default ionic strength)."
 const IONIC_STRENGTH_M = 0.15
 
 "Water's static relative permittivity (`debye_length`'s default `eps_r`)."

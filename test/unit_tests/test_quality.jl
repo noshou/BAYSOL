@@ -7,9 +7,10 @@ using Aqua, JET, ExplicitImports
 using BayeSol.Scattering: SphFuncs
 using BayeSol.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm
 using BayeSol.MolecularStructure: MolecularStructure, create, coords_cartesian, coords_spherical, radii, vols, r_max,
-                elms, name, Molecule
+                neighbour_tree, elms, name, Molecule
 using BayeSol.AtomicRadii: AtomicRadii, resolve_one, _resolve_all, tryparse_ion, ion_key, nearest_ion
 using BayeSol.Solvation: SASA
+using BayeSol.Geometry.Metrics: Metrics
 
 @testset "Aqua" begin
     Aqua.test_all(BayeSol; ambiguities = false)
@@ -69,18 +70,19 @@ end
 end
 
 @testset "JET: SASA's per-atom loop is free of runtime dispatch" begin
-    # `KDTree(crds)` cannot infer to a concrete type.
+    # `neighbour_tree(mol)`'s `KDTree` cannot infer to a concrete type at the
+    # call site (it's a `Molecule`-cached, non-concretely-typed field).
     #
     # The barrier call is itself one dynamic dispatch, but exactly one per
     # `sasa` call rather than one `inrange` dispatch per atom (which is what
     # this used to be, and was worth ~21% of runtime).
-    _reports(f, types) =
-        JET.get_reports(JET.report_opt(f, types; target_modules = (SASA,)))
+    _reports(f, types; mods = (SASA,)) =
+        JET.get_reports(JET.report_opt(f, types; target_modules = mods))
 
     m = create("t", ["o", "h", "h"], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)])
     crds = MolecularStructure.coords_cartesian(m)
-    TT   = typeof(SASA.KDTree(crds))
-    Vec3 = SASA.PlasticMap.Vec3
+    TT   = typeof(neighbour_tree(m))
+    Vec3 = BayeSol.Geometry.PlasticSequence.Vec3
 
     # the loop that runs once per atom must be completely clean
     @test isempty(_reports(SASA._sasa_loop!,
@@ -93,9 +95,9 @@ end
         (   TT, Matrix{Float64}, Vector{Float64}, Float64, Vector{Vec3},
             Float64, Int)))
 
-    @test isempty(_reports(SASA._ray_blocked,
+    @test isempty(_reports(Metrics.blocked,
         (   NTuple{3,Float64}, Vec3, Vector{Int}, Matrix{Float64},
-            Vector{Float64}, Float64)))
+            Vector{Float64}, Float64); mods = (Metrics,)))
 
     @test isempty(_reports(SASA._prefix_thin, (Vector{Int}, Int, Int)))
 

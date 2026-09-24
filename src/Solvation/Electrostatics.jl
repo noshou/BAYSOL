@@ -89,11 +89,11 @@ function _phosphate_charge_sites(mol::Molecule)::Vector{Tuple{Int,Float64}}
     sites = Tuple{Int,Float64}[]
     @inbounds for p in 1:n
         els[p] == "p" || continue
-        o_neighbors = [j for j in _bonded(tree, crds, p, 0) if els[j] == "o"]
-        isempty(o_neighbors) && continue
+        o_neighbours = [j for j in _bonded(tree, crds, p, 0) if els[j] == "o"]
+        isempty(o_neighbours) && continue
 
-        nonbridging = [o for o in o_neighbors if isempty(_bonded(tree, crds, o, p))]
-        targets = isempty(nonbridging) ? o_neighbors : nonbridging
+        nonbridging = [o for o in o_neighbours if isempty(_bonded(tree, crds, o, p))]
+        targets = isempty(nonbridging) ? o_neighbours : nonbridging
 
         q_each = PHOSPHATE_NET_CHARGE / length(targets)
         for o in targets
@@ -221,7 +221,7 @@ over every `(atom_index, charge_e, σ_charge_e)` triple in `sites` within
 
 # Arguments
 - `mol`: molecule the beads belong to.
-- `pts::Matrix{Float64}`, `(3, M)`: bead positions, `mol`'s centered frame.
+- `pts::Matrix{Float64}`, `(3, M)`: bead positions, `mol`'s centred frame.
 - `sel::Vector{Int}`: column indices into `pts` to aggregate over.
 - `sites::Vector{Tuple{Int,Float64,Float64}}`: `(atom_index, charge_e,
     σ_charge_e)` triples to sum the screened field (and its pH-driven
