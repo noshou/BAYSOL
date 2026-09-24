@@ -23,13 +23,13 @@
 #     given, so those tests check only the `shell_points -> B_lm -> I(q)`
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using   BayeSol.Scattering: _gaussian_dummy, vacuo, excluded, hydration, SHELL_THICKNESS,
+using   BAYSOL.Scattering: _gaussian_dummy, vacuo, excluded, hydration, SHELL_THICKNESS,
         compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
-using   BayeSol.MolecularStructure: create, coords_cartesian, coords_spherical, to_spherical,
+using   BAYSOL.MolecularStructure: create, coords_cartesian, coords_spherical, to_spherical,
         radii, vols, elms, Molecule
 
-using BayeSol.Solvation: SASA
-using BayeSol.FormFactor: FormFactor
+using BAYSOL.Solvation: SASA
+using BAYSOL.FormFactor: FormFactor
 
 """
 Per-element van der Waals radii in Å, EXACTLY as the live `AtomicRadii` backend
@@ -329,7 +329,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # The Debye oracle only ever sees pairwise distances, so it is blind to
         # any rigid motion; it cannot catch a bug in `_center` or in
         # `to_spherical`. Both are therefore pinned here directly, against
-        # arithmetic done in the test rather than against MolecularStructure's own BayesolUtils.
+        # arithmetic done in the test rather than against MolecularStructure's own BAYSOL_Utils.
         X = SCAT_BLOB_X
         n = size(X, 2)
         cx = sum(X[1, :]) / n; cy = sum(X[2, :]) / n; cz = sum(X[3, :]) / n

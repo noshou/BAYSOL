@@ -1,7 +1,7 @@
 [deps]
 AdvancedHMC = "0bf59076-c3b1-5ca4-86bd-e02cd72cde3d"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-BayeSol = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
+BAYSOL = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 BioStructures = "de9282ab-8554-53be-b2d6-f6c222edabfc"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"

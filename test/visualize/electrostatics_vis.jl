@@ -12,12 +12,12 @@
 # Numbers only, no window (works headless):
 #   julia --project=test/visualize -e 'include("test/visualize/electrostatics_vis.jl"); electrostatics_report()'
 
-using BayeSol
-using BayeSol.Interfaces: Interfaces, RadiiSource
-using BayeSol.MolecularStructure: MolecularStructure, Molecule
-using BayeSol.Solvation.SASA: SASA
-using BayeSol.Solvation.Electrostatics: Electrostatics, nucleic_acid_cavity_electrostatics, protein_cavity_electrostatics
-using BayeSol.MolecularStructure: Residues 
+using BAYSOL
+using BAYSOL.Interfaces: Interfaces, RadiiSource
+using BAYSOL.MolecularStructure: MolecularStructure, Molecule
+using BAYSOL.Solvation.SASA: SASA
+using BAYSOL.Solvation.Electrostatics: Electrostatics, nucleic_acid_cavity_electrostatics, protein_cavity_electrostatics
+using BAYSOL.MolecularStructure: Residues 
 using Printf: @printf, @sprintf
 using GLMakie
 

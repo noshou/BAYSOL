@@ -212,7 +212,7 @@ bkgrnd_corr`, with the contrast vector `v = contrast_vector(dns, δρ)`.
 -   `scale::Real`: overall scale between the absolute model intensity (units
     of electrons²) and the detector's arbitrary-unit reading. A nuisance
     parameter with no physical prior of its own — see
-    [`BayeSol.Fitting.wls_fit`](@ref)/[`BayeSol.Fitting.wls_marg_ll`](@ref) to
+    [`BAYSOL.Fitting.wls_fit`](@ref)/[`BAYSOL.Fitting.wls_marg_ll`](@ref) to
     fit it (jointly with `bkgrnd_corr`) by weighted least squares and profile
     or marginalise it out of the likelihood, rather than giving it a prior
     and sampling it directly.
@@ -256,7 +256,7 @@ matching the `forward(G, scale, bkgrnd_corr, dns, δρ)` method above, so a
 - `c_1::Union{Nothing,Real} = nothing`: CRYSOL's excluded-volume correction
     factor, dimensionless (`r₀/r_m` in CRYSOL's own radius parameterisation;
     see [`excluded_volume_factor`](@ref)). CRYSOL's own fitting range is
-    `c_1 ∈ [0.96, 1.04]`. Has a prior, [`BayeSol.Fitting.c1_prior`](@ref)`(n)` (`n` =
+    `c_1 ∈ [0.96, 1.04]`. Has a prior, [`BAYSOL.Fitting.c1_prior`](@ref)`(n)` (`n` =
     the percentage of prior mass required within that range). `c_1 = nothing`
     (the default) or `c_1 == 1` skips the correction entirely and reduces
     exactly to the 5-argument [`forward`](@ref) above.

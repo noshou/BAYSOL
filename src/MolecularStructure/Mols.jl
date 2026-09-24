@@ -5,7 +5,7 @@ A molecule.
 """
 
 using   ..AtomicRadii: RadiiSource, lookup, AtomicRadiiSource
-using   ..BayesolUtils.Cache: Lazy, force
+using   ..BAYSOL_Utils.Cache: Lazy, force
 using   BioStructures:  BioStructures, PDBFormat, standardselector,
                         collectatoms, atomname, element, resname, resnumber,
                         chainid, coords
