@@ -79,7 +79,7 @@ At the defaults this is 80 atoms, ~2/3 exposed and ~1/3 buried.
 function packed_cluster_scene(; probe::Float64 = 1.4, r::Float64 = 1.5, n::Int = 4, a::Float64 = 2.2, frac::Float64 = 0.42)
     pts = fcc_lattice(n, a)
     ctr = ntuple(t -> sum(p[t] for p in pts) / length(pts), 3)
-    keep = [p for p in pts if sqrt(sum((p[t] - ctr[t])^2 for t in 1:3)) <= a * n * frac]
+    keep = [p for p in pts if sqrt(sum((p[t] - ctr[t])^2 for t in 1:3)) ≤ a * n * frac]
     src = HydroRadii(Dict("A" => r))
     mol = MolecularStructure.create("packed cluster", fill("A", length(keep)), keep;
                             radii_source = src)

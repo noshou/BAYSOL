@@ -2,8 +2,8 @@
 
 """
 Atomic/ionic radii: parse an ion string, then resolve its radius through a
-fallback chain over the bundled `atomic_radii.sqlite3` (loaded once into
-`Dict`s). Independent of `Molecule`.
+fallback chain over the bundled atomic_radii.sqlite3 (loaded once into
+Dicts). Independent of Molecule.
 """
 module AtomicRadii
 
@@ -21,18 +21,18 @@ abstract type RadiiSource end
 """
     lookup(src::RadiiSource, ions) -> Vector{Tuple{String,Union{Float64,Nothing}}}
 
-Resolve each ion/element string to a radius in Å, or `nothing` if unknown. One
+Resolve each ion/element string to a radius in Å, or nothing if unknown. One
 entry per input, in input order.
 
 # Arguments
 - `src`: the radii backend to query.
-- `ions`: ion/element strings, e.g. `["fe3+", "o2-", "fe"]`.
+- `ions`: ion/element strings, e.g. ["fe3+", "o2-", "fe"].
 """
 function lookup end
 
 # ---- ion string -> (element, signed charge) -------------------------------
 
-"A parsed ion, e.g. `\"fe3+\"` -> `Ion(\"fe\", 3)`."
+"A parsed ion, e.g. \"fe3+\" -> Ion(\"fe\", 3)."
 struct Ion
     element::String
     charge::Int
@@ -45,11 +45,11 @@ const _ION_RE = r"^\s*([a-z]{1,2})\s*(?:([1-9][0-9]*)\s*([+-])|([+-])\s*([1-9][0
 """
     tryparse_ion(s::AbstractString) -> Union{Ion,Nothing}
 
-Parse an ion string like `"fe3+"` or `"fe+3"`; `nothing` for a bare element
-like `"fe"` or an unparseable string.
+Parse an ion string like "fe3+" or "fe+3"; nothing for a bare element
+like "fe" or an unparseable string.
 
 # Arguments
-- `s`: `element` then optional magnitude/sign, in either order.
+- `s`: element then optional magnitude/sign, in either order.
 """
 function tryparse_ion(s::AbstractString)::Union{Ion,Nothing}
     m = match(_ION_RE, s)
@@ -65,11 +65,11 @@ end
 """
     ion_key(ion::Ion) -> String
 
-`Ion` -> `ionic_radii` table key, digits-then-sign (`Ion("fe", 3)` -> `"fe3+"`).
-Throws `ArgumentError` for charge 0.
+Ion -> ionic_radii table key, digits-then-sign (Ion("fe", 3) -> "fe3+").
+Throws ArgumentError for charge 0.
 
 # Arguments
-- `ion`: parsed ion; `ion.charge` must be non-zero.
+- `ion`: parsed ion; ion.charge must be non-zero.
 """
 function ion_key(ion::Ion)::String
     ion.charge == 0 && throw(ArgumentError("charge 0 has no ion-string form"))
@@ -82,14 +82,14 @@ const _IONIC   = Dict{String,Float64}()               # "fe3+" => radius Å
 const _ATOMIC  = Dict{String,Tuple{Float64,String}}() # "fe"   => (radius Å, type)
 const _CHARGES = Dict{String,Vector{Int}}()           # "fe"   => sorted charges
 
-"Absolute path to the bundled `atomic_radii.sqlite3`, next to this file."
+"Absolute path to the bundled atomic_radii.sqlite3, next to this file."
 _dbpath()::String = joinpath(@__DIR__, "atomic_radii.sqlite3")
 
 """
     _load!(path::String = _dbpath()) -> Nothing
 
-Clear and repopulate the module tables (`_IONIC`, `_ATOMIC`, `_CHARGES`) from
-the SQLite file, sorting each element's charge list. Called from `__init__`.
+Clear and repopulate the module tables (_IONIC, _ATOMIC, _CHARGES) from
+the SQLite file, sorting each element's charge list. Called from __init__.
 
 # Arguments
 - `path`: SQLite database file (defaults to [`_dbpath`](@ref)); must exist.
@@ -118,17 +118,17 @@ end
 
 __init__() = _load!()
 
-"Ionic radius (Å) for an `ionic_radii` key, or `nothing`."
+"Ionic radius (Å) for an ionic_radii key, or nothing."
 ion_radius(key::AbstractString)::Union{Float64,Nothing} = get(_IONIC, key, nothing)
 
-"Bare-element `(radius Å, radius_type)` for `el`, or `nothing`."
+"Bare-element (radius Å, radius_type) for el, or nothing."
 element_radius(el::AbstractString)::Union{Tuple{Float64,String},Nothing} = get(_ATOMIC, el, nothing)
 
 """
     nearest_ion(element::AbstractString, charge::Int) -> Union{String,Nothing}
 
-Ion key for the on-file charge state of `element` closest to `charge`;
-`nothing` if the element has no charge states on file.
+Ion key for the on-file charge state of element closest to charge;
+nothing if the element has no charge states on file.
 
 # Arguments
 - `element`: bare element symbol, lowercase.
@@ -148,7 +148,7 @@ end
     resolve_one(ion::AbstractString) -> Union{Float64,Nothing}
 
 Resolve one ion/element to a radius (Å) via the fallback chain: exact charge
-match, else nearest charge state, else bare element, else `nothing`.
+match, else nearest charge state, else bare element, else nothing.
 Unparseable strings go straight to the bare-element table.
 
 # Arguments
@@ -178,11 +178,11 @@ const _MISS = _Miss()
     _resolve_all(ions::AbstractVector{<:AbstractString}) -> Vector{Tuple{String,Union{Float64,Nothing}}}
 
 Batch [`resolve_one`](@ref); input order and count preserved, repeats deduped
-per call. Each entry pairs the input string with its radius (Å) or `nothing`.
+per call. Each entry pairs the input string with its radius (Å) or nothing.
 
-Named apart from `lookup` so that this plain function stays
-independent of any particular `RadiiSource`; the `lookup` method
-below is a thin wrapper over it for `AtomicRadiiSource` specifically.
+Named apart from [`lookup`](@ref) so that this plain function stays
+independent of any particular RadiiSource; the [`lookup`](@ref) method
+below is a thin wrapper over it for AtomicRadiiSource specifically.
 
 # Arguments
     - `ions`: ion/element strings to resolve.

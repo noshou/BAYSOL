@@ -416,12 +416,12 @@ end
             "hepes", "mops", "guanidinium chloride", "trisodium citrate",
             "1,4-disulfanylbutane-2,3-diol",
         ]
-        @test length(buffer_components) >= 14
+        @test length(buffer_components) ≥ 14
         for name in buffer_components
             e, v, u = IFACE.ϕ°(name)
             @test e > 0
             @test v > 0.0
-            @test u >= 0.0
+            @test u ≥ 0.0
             @test isfinite(v) && isfinite(u)
         end
     end

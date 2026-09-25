@@ -35,7 +35,7 @@ function empirical_containment(n::Real; draws::Integer = 1000, trials::Integer =
     fracs = Vector{Float64}(undef, trials)
     for t in 1:trials
         s = rand(d, draws)
-        fracs[t] = count(x -> 0.96 <= x <= 1.04, s) / draws
+        fracs[t] = count(x -> 0.96 ≤ x ≤ 1.04, s) / draws
     end
     return fracs
 end
@@ -106,12 +106,12 @@ end
     #                 c1_prior -- containment sanity (analytic cdf)
     #------------------------------------------------------------------
 
-    @testset "c1_prior: cdf(1.04) - cdf(0.96) tracks n/100 for n >= 50" begin
+    @testset "c1_prior: cdf(1.04) - cdf(0.96) tracks n/100 for n ≥ 50" begin
         # `c1_prior` moment-matches mean/variance, it does not solve for
         # exact quantiles, so this is an approximate check, not an identity.
         # For a narrow LogNormal (large n => small sigma) the two
         # constructions nearly coincide; it degrades for small n (large
-        # sigma, more lognormal skew), so only checked here for n >= 50.
+        # sigma, more lognormal skew), so only checked here for n ≥ 50.
         for n in (50.0, 68.26894921370859, 80.0, 95.0, 99.0, 99.73002039367398)
             d = c1_prior(n)
             contain = cdf(d, 1.04) - cdf(d, 0.96)

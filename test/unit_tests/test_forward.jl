@@ -104,7 +104,7 @@ fwd_chunk  = UInt64(3)
         base = forward(G, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0))
         @test forward(G, 3.0, 0.0, 0.334, (1.0, 1.0, 0.0)) ≈ 3 .* base
         @test forward(G, 1.0, 7.0, 0.334, (1.0, 1.0, 0.0)) ≈ base .+ 7
-        @test all(>=(0.0), base)                      # PSD ⇒ vᵀGv ≥ 0
+        @test all(≥(0.0), base)                      # PSD ⇒ vᵀGv ≥ 0
     end
 
     @testset "a class outside `classes` is inert (its δρ_k does nothing)" begin
@@ -226,7 +226,7 @@ fwd_chunk  = UInt64(3)
         base = forward(fc, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0))
         big  = forward(fc, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0), 1.15)
         @test !(big ≈ base)
-        @test all(>=(0.0), big)          # PSD ⇒ v(q)ᵀ G v(q) ≥ 0 at every c_1
+        @test all(≥(0.0), big)          # PSD ⇒ v(q)ᵀ G v(q) ≥ 0 at every c_1
     end
 
     @testset "forward(mol, …, c_1) convenience == cache + forward(cache, …, c_1)" begin

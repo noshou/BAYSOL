@@ -2,13 +2,9 @@
 
 """
 Resolve a protein structure from any of three input shapes (a local file, a
-bare RCSB PDB ID, or an arbitrary URL) into one canonical `.pdb` file stored
-in [`_store_dir`](@ref). Callers who need the parsed `Molecule`/`Residues`
-pair pass the resulting path to `load_molecule` themselves.
-
-This is a flat, permanent, name-keyed local store, not a cache with
-invalidation/freshness semantics — see [`_store_dir`](@ref) for what that
-means concretely for each source type below.
+bare RCSB PDB ID, or an arbitrary URL) into one canonical .pdb file stored
+in [`_store_dir`](@ref). Callers who need the parsed Molecule/Residues
+pair pass the resulting path to [`load_molecule`](@ref) themselves.
 """
 
 using BioStructures: BioStructures, MMCIFFormat, PDBFormat, writepdb,
@@ -17,22 +13,22 @@ using Downloads: Downloads
 
 "Raised for any failure resolving/converting a structure source:
 a bad or nonexistent local path, an unrecognized extension, a failed fetch/download,
-or a `BioStructures` write failure."
+or a BioStructures write failure."
 struct StructureSourceError <: Exception; msg::String end
 Base.showerror(io::IO, e::StructureSourceError) = print(io, "StructureSourceError: ", e.msg)
 
 """
 Where to obtain a protein structure from. One concrete subtype per input
 shape; [`resolve_structure`](@ref) dispatches on it to produce a canonical,
-cached local `.pdb` path.
+cached local .pdb path.
 """
 abstract type StructureSource end
 
 """
-A structure already on local disk, at `path`. A `.pdb` path is used
-in place (no storage, no copy — it's already local); a `.cif`/`.mmcif` path
-is converted to a canonical `.pdb` stored in [`_store_dir`](@ref), named
-after the file's own basename stem (e.g. `fixture.cif` → `"fixture"`).
+A structure already on local disk, at path. A .pdb path is used
+in place (no storage, no copy — it's already local); a .cif/.mmcif path
+is converted to a canonical .pdb stored in [`_store_dir`](@ref), named
+after the file's own basename stem (e.g. fixture.cif → "fixture").
 Conversion always re-runs (it's cheap and local — there's no "skip the work"
 benefit to be had here, only deduplication of the resulting file); if a file
 already exists under that name, the freshly-converted result is byte
@@ -46,8 +42,8 @@ struct LocalPathSource <: StructureSource
 end
 
 """
-A structure identified by its 4-character RCSB PDB ID, e.g. `"1CRN"`. Fetched
-via `BioStructures.retrievepdb` and stored in [`_store_dir`](@ref) under the
+A structure identified by its 4-character RCSB PDB ID, e.g. "1CRN". Fetched
+via BioStructures.retrievepdb and stored in [`_store_dir`](@ref) under the
 uppercased ID. A repeat request for the same ID trusts an existing file's
 presence outright and skips fetching — no re-verification, safe only because
 a real RCSB ID always refers to the same content.
@@ -57,17 +53,14 @@ struct PDBIDSource <: StructureSource
 end
 
 """
-A structure available at an arbitrary `url`, in either legacy `.pdb` or
+A structure available at an arbitrary url, in either legacy .pdb or
 mmCIF format (sniffed from the downloaded content, not the URL), stored in
-[`_store_dir`](@ref) under the caller-supplied `id` (never derived from the
+[`_store_dir`](@ref) under the caller-supplied id (never derived from the
 URL — there's no safe, unique way to do that automatically, so it's the
-caller's responsibility). Every call re-downloads and re-converts — unlike
-[`PDBIDSource`](@ref), a URL's content isn't assumed stable, so there is no
-skip-the-fetch fast path here at all. The freshly-fetched result is then
-byte-compared against any existing file under `id`: identical content reuses
-it, but different content under the same `id` is a collision and raises
-[`StructureSourceError`](@ref) rather than silently overwriting or renaming
-around it — remove the stale file or use a different `id`.
+caller's responsibility). Every call re-downloads and re-converts then
+byte-compared against any existing file under id: identical content reuses
+it, but different content under the same id is a collision and raises
+[`StructureSourceError`](@ref).
 """
 struct URLSource <: StructureSource
     url::String
@@ -82,32 +75,26 @@ end
 """
     _resolve_canonical_pdb(struc, key::AbstractString) -> String
 
-Shared "produce candidate `.pdb`, then compare-or-write-or-throw" step used by
+Shared "produce candidate .pdb, then compare-or-write-or-throw" step used by
 [`LocalPathSource`](@ref) and [`URLSource`](@ref) (not [`PDBIDSource`](@ref),
 which has its own simpler fetch-if-missing path). Takes model 1 of the
-already-parsed `BioStructures` structure `struc`, writes it (filtered through
-`standardselector` and `heavyatomselector`, dropping HETATM/waters and
+already-parsed BioStructures structure struc, writes it (filtered through
+standardselector and heavyatomselector, dropping HETATM/waters and
 hydrogens) to a temp file, then:
 
-- if nothing is stored under `key` yet, moves the temp file into place;
+- if nothing is stored under key yet, moves the temp file into place;
 - if something is and it's byte-identical, discards the temp file and
     returns the existing path unchanged;
 - if something is and it differs, discards the temp file and throws
-    [`StructureSourceError`](@ref) — this name already refers to different
-    stored content.
+    [`StructureSourceError`](@ref).
 
-Never leaves a half-written file at the final path: the candidate is always
-written to a temp location first and only moved into place once it's known
-to be new content.
-
-Wraps any `BioStructures.writepdb` failure (most notably: a multi-character
-chain ID, which legacy `.pdb` cannot represent) in a [`StructureSourceError`](@ref)
-rather than letting it leak as a raw internal exception.
+Wraps any BioStructures.writepdb failure (most notably: a multi-character
+chain ID, which legacy .pdb cannot represent) in a [`StructureSourceError`](@ref).
 
 # Arguments
-- `struc`: a parsed `BioStructures` structure (from `read` or `retrievepdb`).
+- `struc`: a parsed BioStructures structure (from read or retrievepdb).
 - `key`: stored filename stem, e.g. a local file's basename stem or a
-    `URLSource`'s `id`.
+    URLSource's id.
 """
 function _resolve_canonical_pdb(struc, key::AbstractString)::String
     final_path = joinpath(_store_dir(), key * ".pdb")
@@ -142,7 +129,7 @@ end
 """
     resolve_structure(source::StructureSource) -> String
 
-Resolve `source` to an absolute path to a canonical `.pdb` file in
+Resolve source to an absolute path to a canonical .pdb file in
 [`_store_dir`](@ref) (model 1 only, no HETATM/waters, no hydrogens). See
 [`StructureSource`](@ref) and its subtypes for per-variant behaviour.
 """
@@ -195,7 +182,9 @@ function resolve_structure(source::PDBIDSource)::String
     return existing
 end
 
-"Heuristic mmCIF/legacy-PDB sniff on downloaded content, per `PDBTools.jl`'s own documented approach: the literal `loop_` keyword appears in mmCIF but not legacy PDB. Not a guarantee — an unusual server response could defeat it."
+"Heuristic mmCIF/legacy-PDB sniff on downloaded content, per PDBTools.jl's 
+documented approach: the literal loop_ keyword appears in mmCIF but not 
+legacy PDB. Not a guarantee; an unusual server response could defeat it."
 function _sniff_format(path::AbstractString)
     for line in eachline(path)
         occursin("loop_", line) && return MMCIFFormat

@@ -94,7 +94,7 @@ const ADD_HYDROGENS = true   # runs PDB2PQR at PH
 `qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `I_exp > 0`.
 """
 function fit_subset()
-    keep = findall(i -> qvals[i] <= Q_MAX_FIT && I_exp[i] > 0, eachindex(qvals))
+    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && I_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
@@ -302,7 +302,7 @@ function sasdmj9_crysol_comparison_figure(result, data)
     crysol   = readdlm(_FIT_PATH; skipstart = 1)
     q_crysol = Float64.(crysol[:, 1])
     I_crysol = Float64.(crysol[:, 4])
-    keep   = (q_crysol .> 0) .& (q_crysol .<= Q_MAX_FIT) .& (I_crysol .> 0)
+    keep   = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT) .& (I_crysol .> 0)
 
     fig = Figure(size = (700, 500))
     ax = Axis(

@@ -408,7 +408,7 @@ Build (but do not display) the mesh-refinement figure; see
 function sasa_mesh_convergence_figure(; ns = (64, 256, 1024, 4096),
                                         probe::Float64 = 1.4, d::Float64 = 3.5)
     sc = partial_scene(; probe, d)
-    ncol = length(ns) <= 2 ? length(ns) : cld(length(ns), 2)
+    ncol = length(ns) ≤ 2 ? length(ns) : cld(length(ns), 2)
     fig = Figure(size = (360 * ncol + 60, 900))
     Label(fig[0, 1:ncol],
         @sprintf(
@@ -427,7 +427,7 @@ function sasa_mesh_convergence_figure(; ns = (64, 256, 1024, 4096),
                     azimuth = get(sc, :azimuth, 1.275π),
                     xlabel = "x", ylabel = "y", zlabel = "z")
         _draw_atoms!(ax, sc.mol, probe, sc.focus)
-        _draw_points!(ax, st; markersize = n <= 256 ? 9 : (n <= 1024 ? 6 : 3))
+        _draw_points!(ax, st; markersize = n ≤ 256 ? 9 : (n ≤ 1024 ? 6 : 3))
     end
 
     _state_legend!(fig, (cld(length(ns), ncol) + 1, 1:ncol))

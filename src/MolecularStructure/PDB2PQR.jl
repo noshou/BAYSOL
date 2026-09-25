@@ -1,32 +1,32 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 """
-Explicit-hydrogen structure generation via the external `pdb2pqr` CLI.
+Explicit-hydrogen structure generation via the external pdb2pqr CLI.
 """
 
 using CondaPkg: CondaPkg
 using FastClosures: @closure
 
-"Raised when `pdb2pqr` cannot be run or produces no usable output (bad input
+"Raised when pdb2pqr cannot be run or produces no usable output (bad input
 path, non-zero exit, missing expected output file), or when the requested
-N-/C-terminus override can't be represented by `pdb2pqr`'s global
-`--neutraln`/`--neutralc` flags (see [`_terminus_flags`](@ref))."
+N-/C-terminus override can't be represented by pdb2pqr's global
+--neutraln/--neutralc flags (see [`_terminus_flags`](@ref))."
 struct PDB2PQRError <: Exception; msg::String end
 Base.showerror(io::IO, e::PDB2PQRError) = print(io, "PDB2PQRError: ", e.msg)
 
 """
     _terminus_flags(pKa_records, pH::Real) -> Vector{String}
 
-Decide `pdb2pqr`'s `--neutraln`/`--neutralc` CLI flags from
-`pKa_records` (as produced by [`propka_pKas`](@ref)) and `pH`, using 
-[`_group_protonated`](@ref) rather than `pdb2pqr`'s
+Decide pdb2pqr's --neutraln/--neutralc CLI flags from
+pKa_records (as produced by [`propka_pKas`](@ref)) and pH, using 
+[`_group_protonated`](@ref) rather than pdb2pqr's
 (non-pH-driven, fixed-charged-by-default) terminus handling.
 
 # Arguments
 - `pKa_records`: records as returned by [`propka_pKas`](@ref); only
-    `resname == "N+"`/`"C-"` records are consulted.
-- `pH`: solution pH, matching the `pH` [`propka_pKas`](@ref)'s caller intends
-    to use with `pdb2pqr`.
+    resname == "N+"/"C-" records are consulted.
+- `pH`: solution pH, matching the pH [`propka_pKas`](@ref)'s caller intends
+    to use with pdb2pqr.
 """
 function _terminus_flags(pKa_records, pH::Real)::Vector{String}
     flags = String[]
@@ -57,29 +57,29 @@ end
 """
     resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real; add::Bool=true) -> String
 
-Resolve whether/how `pdb_path` gets explicit hydrogens.
+Resolve whether/how pdb_path gets explicit hydrogens.
 
-With `add=true` (the default), runs `pdb2pqr` on the heavy-atom `.pdb` at
-`pdb_path` and returns the path to a hydrogen-included `.pdb` stored in
-[`_store_dir`](@ref) (identical to this function's old `add_hydrogens`
-behaviour). With `add=false`, this is a genuine no-op: `pdb_path` is returned
+With add=true (the default), runs pdb2pqr on the heavy-atom .pdb at
+pdb_path and returns the path to a hydrogen-included .pdb stored in
+[`_store_dir`](@ref) (identical to this function's old add_hydrogens
+behaviour). With add=false, this is a genuine no-op: pdb_path is returned
 unchanged, with no file write, no [`_store_dir`](@ref) entry, and no
-`pdb2pqr` subprocess invoked at all.
+pdb2pqr subprocess invoked at all.
 
 # Arguments
-- `pdb_path`: path to a heavy-atom `.pdb` (e.g. from [`resolve_structure`](@ref)).
+- `pdb_path`: path to a heavy-atom .pdb (e.g. from [`resolve_structure`](@ref)).
 - `pKa_records`: records as returned by [`propka_pKas`](@ref) **on this same
-    structure** -- this is assumed, not re-verified, since the termini flags
+    structure**; this is assumed, not re-verified, since the termini flags
     (and hence the cache key's implicit correctness) are only valid for the
-    `pKa_records` that actually correspond to `pdb_path`. Ignored when
-    `add=false`.
-- `pH`: solution pH passed to `pdb2pqr` and used to resolve termini flags.
-    Ignored when `add=false`.
-- `add`: whether to actually add hydrogens (default `true`).
+    pKa_records that actually correspond to pdb_path. Ignored when
+    add=false.
+- `pH`: solution pH passed to pdb2pqr and used to resolve termini flags.
+    Ignored when add=false.
+- `add`: whether to actually add hydrogens (default true).
 
 # Returns
-Absolute path to the hydrogen-included `.pdb` when `add=true`, stored in
-[`_store_dir`](@ref); `pdb_path` itself, unchanged, when `add=false`.
+Absolute path to the hydrogen-included .pdb when add=true, stored in
+[`_store_dir`](@ref); pdb_path itself, unchanged, when add=false.
 """
 function resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real; add::Bool=true)::String
     add || return pdb_path

@@ -76,7 +76,7 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
         )
             for freq in (0.1, 0.25, 0.5)
                 cosθ = 1.0 - 2.0 * freq                 # cap of area fraction `freq`
-                hit = count(p -> dot3(p, u) >= cosθ, pts) / n
+                hit = count(p -> dot3(p, u) ≥ cosθ, pts) / n
                 @test abs(hit - freq) < 0.03
             end
         end
@@ -123,8 +123,8 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 
     @testset "dim=2: range sanity" begin
         for (x, y) in plastic_points(2_000, Val(2))
-            @test 0.0 <= x < 1.0
-            @test 0.0 <= y < 1.0
+            @test 0.0 ≤ x < 1.0
+            @test 0.0 ≤ y < 1.0
         end
     end
 
@@ -163,7 +163,7 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
         for p in plastic_points(5_000, Val(3), Val(:volume))
             r = nrm(p)
             @test r < 1.0
-            @test r >= 0.0
+            @test r ≥ 0.0
         end
     end
 
@@ -209,7 +209,7 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
         # 4. concentric shells hold their volume fraction: a ball of radius `ρ`
         #    holds fraction `ρ³` of the unit ball's volume.
         for ρ in (0.25, 0.5, 0.75)
-            frac = count(p -> nrm(p) <= ρ, pts) / n
+            frac = count(p -> nrm(p) ≤ ρ, pts) / n
             @test abs(frac - ρ^3) < 0.02
         end
     end

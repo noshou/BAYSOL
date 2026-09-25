@@ -314,7 +314,7 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
                 @test check_float(S[qi], ref)
             end
             # a weighted sum of squared magnitudes is non-negative by construction
-            @test all(>=(0.0), S)
+            @test all(≥(0.0), S)
         end
     end
 
