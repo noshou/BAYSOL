@@ -34,20 +34,16 @@ end
 
 makedocs(
     sitename = "BAYSOL.jl",
-    # The "academic" theme (docs/src/assets/themes/academic.scss, compiled to
-    # documenter-academic.css) isn't in Documenter's own hardcoded `THEMES`
-    # list (HTMLWriter.jl), so it can't appear in the built-in theme-picker
-    # switcher via any make.jl option. Instead it's loaded as a plain asset
-    # and force-applied unconditionally by force-academic-theme.js, which
-    # runs after Documenter's own themeswap.js and overrides whatever class
-    # that set. See force-academic-theme.js for why this is the only way to
-    # wire in a non-built-in theme.
-    format   = Documenter.HTML(
-        assets = [
-            "assets/themes/documenter-academic.css",
-            "assets/force-academic-theme.js",
-        ],
-    ),
+    # No `format` override needed: the "academic" theme (academic.scss)
+    # compiles directly to docs/src/assets/themes/documenter-light.css,
+    # overwriting Documenter's own built-in light theme file in place --
+    # Documenter copies any file the user already has over its own bundled
+    # default of the same name, so this is picked up automatically with no
+    # make.jl wiring. It's also therefore the *default* theme for free
+    # (documenter-light is what's shown with no stored preference), and
+    # dark/catppuccin-* are untouched in the picker. See academic.scss's
+    # header comment for why this route was needed (Documenter's theme
+    # picker is a hardcoded 6-name list with no way to register a 7th).
     modules  = [
         BAYSOL,
         BAYSOL.Constants,

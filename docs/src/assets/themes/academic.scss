@@ -3,35 +3,35 @@
 // academic.scss
 // Ivory-oxford theme for Documenter.jl
 // Fonts:
-//   - Montserrat        -> titles, sidebar/nav, section eyebrow labels
+//   - Montserrat        -> titles, sidebar/nav, breadcrumb
 //   - TeX Gyre Pagella   -> body prose (docstring descriptions)
-//   - TeX Gyre Pagella Math -> equations, via KaTeX/MathJax (see make.jl)
 //   - Fira Code          -> code, with ligatures enabled
+//
+// This overrides Documenter's built-in "documenter-light" theme *in place*
+// (Documenter: "Documenter copies all files under the source directory...
+// unless the user already had a file with the same name, in which case the
+// user's file overrides Documenter's file"). That's the only supported way
+// to reskin Documenter -- its theme-picker dropdown is a hardcoded Julia
+// `const THEMES = [...]` list of six built-in names inside its own bundled
+// package source, with no make.jl-level way to add a seventh. Overwriting
+// one of the six in place, rather than trying to register a new name, also
+// makes this the *default* theme for free (documenter-light is what shows
+// with no theme selected/no stored preference), and documenter-dark/the
+// four catppuccin-* themes are untouched, so switching to them still works
+// normally.
+//
+// IMPORTANT: unlike Documenter's own "custom theme" tutorial (which nests
+// everything in `html.theme--$(name) { ... }`, expecting the picker to add
+// that class to <html>), this file must NOT be scoped that way. The real
+// documenter-light.scss it replaces is entirely unscoped -- Documenter's
+// themeswap.js applies *no* class to <html> when the light/primary theme is
+// active (only non-primary themes get a `theme--<name>` class). A scoped
+// version of this file would never match anything and (as happened in an
+// earlier version of this file) silently fail to apply almost everywhere.
 //
 // Compile with:
 //   using DocumenterTools: Themes
-//   Themes.compile("academic.scss", "docs/src/assets/themes/documenter-academic.css")
-
-// Variable font: one file covers every weight Montserrat is used at here
-// (400 body default, 600 eyebrow labels, 700 headings/docstring signatures).
-@font-face {
-  font-family: "Montserrat";
-  src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"), url("fonts/Montserrat[wght].woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
-}
-@font-face {
-  font-family: "Fira Code";
-  src: url("fonts/FiraCode-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-}
-@font-face {
-  font-family: "Fira Code";
-  src: url("fonts/FiraCode-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-}
+//   Themes.compile("academic.scss", "docs/src/assets/themes/documenter-light.css")
 
 @font-face {
   font-family: "TeX Gyre Pagella";
@@ -57,21 +57,28 @@
   font-weight: 700;
   font-style: italic;
 }
+@font-face {
+  font-family: "Montserrat";
+  src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"), url("fonts/Montserrat[wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Fira Code";
+  src: url("fonts/FiraCode-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Fira Code";
+  src: url("fonts/FiraCode-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+}
 
-$themename: "academic"; // compiled CSS file must be named academic.css
-$background: #faf7f0;
-
-$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif !default;
-$family-serif: "TeX Gyre Pagella", Palatino, Georgia, serif;
-$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace !default;
-
-$link: #1d3557;
-$link-hover: #14263e;
-
-// Base palette + admonition colors: documenter/variables.scss expects these
-// to already exist (documenter-light.scss/documenter-dark.scss each define
-// their own before importing it), so a secondary theme must too. Light-mode
-// defaults, matching documenter-light.scss's own admonition palette.
+// Base palette + admonition colors, unchanged from Documenter's own
+// documenter-light.scss (documenter/variables.scss requires these to exist
+// before it's imported) -- not part of our reskin, just required plumbing.
 $red: #cb3c33 !default;
 $orange: #d56c00 !default;
 $yellow: #f4c72f !default;
@@ -87,119 +94,134 @@ $danger: $red;
 $compat: $cyan;
 $todo: $purple;
 $admonition-default: hsl(0, 0%, 29%);
+$grey: hsl(0, 0%, 42%);
+
+$background: #faf7f0;
+$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif !default;
+$family-serif: "TeX Gyre Pagella", Palatino, Georgia, serif;
+$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace !default;
+$link: #1d3557;
+$link-hover: #14263e;
 
 @import "documenter/utilities";
 @import "documenter/variables";
+
 @import "bulma/utilities/all";
-@import "bulma/base/minireset.sass";
-// `bulma/base/helpers.sass` is a deprecated stub in this Documenter version;
-// the real helpers now live under `bulma/helpers/all` (same content).
 @import "bulma/helpers/all";
+@import "bulma/base/all";
 
-// All secondary themes must be nested in a theme--$(themename) class. Documenter
-// applies this class to <html> and disables the primary stylesheet when active.
-html.theme--#{$themename} {
-  @import "bulma/base/generic.sass";
-  @import "documenter/overrides";
-  @import "bulma/elements/all";
-  @import "bulma/form/all";
-  @import "bulma/components/all";
-  @import "bulma/grid/all";
-  @import "bulma/layout/all";
-  @import "documenter/elements";
-  @import "documenter/components/all";
-  @import "documenter/patches";
+@import "documenter/overrides";
 
+@import "bulma/elements/all";
+@import "bulma/form/all";
+@import "bulma/components/all";
+@import "bulma/grid/all";
+@import "bulma/layout/all";
+
+@import "documenter/elements";
+@import "documenter/components/all";
+@import "documenter/patches";
+@import "documenter/layout/all";
+
+@import "documenter/ansicolors";
+
+// highlight.js color scheme override for the julia> prompt (kept from the
+// original documenter-light.scss)
+code.language-julia-repl > span.hljs-meta {
+  color: $ansi-green;
+  font-weight: bolder;
+}
+
+@import "highlightjs/default";
+
+.gap-4 {
+  gap: 1rem;
+}
+
+// ---- Our own reskin, unscoped (applies unconditionally, see note above) --
+
+body {
   background: $background;
   color: #2b2b2b;
+}
 
-  body,
-  p,
-  .content,
-  .docstring > section > div {
-    font-family: $family-serif;
-    line-height: 1.6;
-  }
+body,
+p,
+.content,
+.docstring > section > div {
+  font-family: $family-serif;
+  line-height: 1.6;
+}
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: $family-sans-serif;
-    font-weight: 700;
-  }
+h1, h2, h3, h4, h5, h6 {
+  font-family: $family-sans-serif;
+  font-weight: 700;
+}
 
-  // docstring signature / function name headings
-  .docstring-binding,
-  .docstring > header {
-    font-family: $family-sans-serif;
-    font-weight: 700;
-  }
+// docstring signature / function name headings
+.docstring-binding,
+.docstring > header {
+  font-family: $family-sans-serif;
+  font-weight: 700;
+}
 
-  // sidebar + nav in Montserrat
-  #documenter .docs-sidebar,
-  #documenter .docs-sidebar * {
-    font-family: $family-sans-serif;
-  }
-  #documenter .docs-sidebar {
-    background: #1d3557;
-    color: #e8ecf3;
-  }
-  #documenter .docs-sidebar a {
-    color: #b7c4d6;
-  }
-  #documenter .docs-sidebar li.is-active > a,
-  #documenter .docs-sidebar .toctree-l1.current > a {
-    background: #ffffff;
-    color: #1d3557;
-    border-radius: 6px;
-  }
+// sidebar + nav in Montserrat. Real Documenter markup: <nav
+// class="docs-sidebar"> containing <ul> of <li><a class="tocitem">...</a>;
+// the current page's link additionally gets "is-active" -- confirmed
+// against an actual local build, not guessed.
+.docs-sidebar,
+.docs-sidebar * {
+  font-family: $family-sans-serif;
+}
+.docs-sidebar {
+  background: #1d3557;
+  color: #e8ecf3;
+}
+.docs-sidebar .tocitem {
+  color: #b7c4d6;
+}
+.docs-sidebar .tocitem.is-active,
+.docs-sidebar li.is-active > .tocitem {
+  background: #ffffff;
+  color: #1d3557;
+  border-radius: 6px;
+}
 
-  // section eyebrow labels ("REFERENCE" style headers above content)
-  .docs-heading-anchor-title,
-  .eyebrow-label,
-  nav.breadcrumb {
-    font-family: $family-sans-serif;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #1a1a1a;
-  }
+nav.breadcrumb {
+  font-family: $family-sans-serif;
+  font-weight: 600;
+  color: #1a1a1a;
+}
 
-  code,
-  pre,
-  .documenter-example-output,
-  .docstring pre {
-    font-family: $family-monospace;
-    font-feature-settings: "calt" 1, "liga" 1;
-    background: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 8px;
-  }
+code,
+pre,
+.documenter-example-output,
+.docstring pre {
+  font-family: $family-monospace;
+  font-feature-settings: "calt" 1, "liga" 1;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+}
 
-  // four-color syntax highlighting (highlight.js token classes)
-  .hljs-keyword,
-  .hljs-function .hljs-keyword,
-  .hljs-literal {
-    color: #783ad4;
-  }
-  .hljs-title,
-  .hljs-title.function_,
-  .hljs-name {
-    color: #0e9080;
-  }
-  .hljs-type,
-  .hljs-built_in,
-  .hljs-class .hljs-title {
-    color: #827626;
-  }
-  .hljs-number,
-  .hljs-string,
-  .hljs-symbol {
-    color: #be185d;
-  }
-
-  // academic is forced unconditionally (see force-academic-theme.js) rather
-  // than selected via Documenter's built-in switcher, so the now-inert
-  // light/dark/catppuccin picker in the settings modal is hidden.
-  #documenter-settings p:has(#documenter-themepicker) {
-    display: none;
-  }
+// four-color syntax highlighting (highlight.js token classes)
+.hljs-keyword,
+.hljs-function .hljs-keyword,
+.hljs-literal {
+  color: #783ad4;
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-name {
+  color: #0e9080;
+}
+.hljs-type,
+.hljs-built_in,
+.hljs-class .hljs-title {
+  color: #827626;
+}
+.hljs-number,
+.hljs-string,
+.hljs-symbol {
+  color: #be185d;
 }
