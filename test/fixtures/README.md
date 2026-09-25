@@ -6,7 +6,7 @@ Fixtures are grouped by kind, one directory per kind:
 | directory                                                    | contents                                                                   |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | [`form-factors/`](#form-factor-oracle-fixtures-form-factors) | X-ray form-factor oracle data (`f0.csv`, `f1f2.csv`) from `xraydb`         |
-| [`functions/`](#shared-test-BAYSOL_Utils-functions)               | Shared`.jl` BAYSOL_Utils                                                        |
+| [`functions/`](#shared-test-BAYSOL_Utils-functions)               | Shared`.jl` `BAYSOL_Utils`                                                        |
 | [`molecules/`](#structure-fixtures-molecules)                | Real RCSB PDB/mmCIF structures, used by`StructureSource`/pipeline tests    |
 | [`experiments/`](#sasbdb-experiment-fixtures-experiments)    | Real SASBDB entries (curve + fit + model + source paper), one dir per case |
 
@@ -22,9 +22,9 @@ Reference values from xraydb (Python/sqlite3 db).
 
 Used by `test_formfactor.jl`.
 
-## Shared test BAYSOL_Utils (`functions/`)
+## Shared test `BAYSOL_Utils` (`functions/`)
 
-Shared test-geometry/data BAYSOL_Utils (`.jl`, `include`d directly).
+Shared test-geometry/data `BAYSOL_Utils` (`.jl`, `include`d directly).
 
 
 | file              | contents                                                                                                                                                                                                  |
