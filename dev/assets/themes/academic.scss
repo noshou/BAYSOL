@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-2.1-or-later
+
 // academic.scss
 // Ivory-oxford theme for Documenter.jl
 // Fonts:
@@ -8,20 +10,11 @@
 // This overrides Documenter's built-in "documenter-light" theme *in place*
 // (Documenter: "Documenter copies all files under the source directory...
 // unless the user already had a file with the same name, in which case the
-// user's file overrides Documenter's file"). That's the only supported way
-// to reskin Documenter -- its theme-picker dropdown is a hardcoded Julia
-// `const THEMES = [...]` list of six built-in names inside its own bundled
-// package source, with no make.jl-level way to add a seventh. Overwriting
-// one of the six in place, rather than trying to register a new name, also
-// makes this the *default* theme for free (documenter-light is what shows
-// with no theme selected/no stored preference), and documenter-dark/the
-// four catppuccin-* themes are untouched, so switching to them still works
-// normally.
 //
 // IMPORTANT: unlike Documenter's own "custom theme" tutorial (which nests
 // everything in `html.theme--$(name) { ... }`, expecting the picker to add
 // that class to <html>), this file must NOT be scoped that way. The real
-// documenter-light.scss it replaces is entirely unscoped -- Documenter's
+// documenter-light.scss it replaces is entirely unscoped;  Documenter's
 // themeswap.js applies *no* class to <html> when the light/primary theme is
 // active (only non-primary themes get a `theme--<name>` class). A scoped
 // version of this file would never match anything and (as happened in an
