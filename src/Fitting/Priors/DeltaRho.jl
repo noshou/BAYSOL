@@ -27,10 +27,16 @@
 
 using Distributions
 
-# median ρ = 1 (μ_ln = 0), and σ_ln chosen so the mean lands at 1.15:
-#mean      = exp(μ_ln + σ_ln²/2) = exp(σ_ln²/2) = 1.15  =>  σ_ln = √(2·ln(1.15))
+"
+Convex water beads are ~15% denser at surfaces: <https://doi.org/10.1073/pnas.082335099>.
+
+median ρ = 1 (μ_ln = 0), and σ_ln chosen so the mean lands at 1.15:
+
+mean      = exp(μ_ln + σ_ln²/2) = exp(σ_ln²/2) = 1.15  =>  σ_ln = √(2·ln(1.15))
+"
 const _δρ1_prior = LogNormal(0.0, sqrt(2 * log(1.15)))
 
+"Concave water beads can either be positive or negative."
 const _δρ2_prior = Normal(1, 0.15)
 
 """
@@ -39,20 +45,20 @@ const _δρ2_prior = Normal(1, 0.15)
 Protein variant.
 
 # Keywords
-- `μ_χ`=0.0: mean, over cavity beads, of the screened-electrostatic potential χ
+- `μχ=0.0`: mean, over cavity beads, of the screened-electrostatic potential χ
     (Debye-Hückel, aggregated from nearby phosphate / ionizable-side-chain charge
     sites — see [`BAYSOL.Solvation.Electrostatics.nucleic_acid_cavity_electrostatics`](@ref) /
     [`BAYSOL.Solvation.Electrostatics.protein_cavity_electrostatics`](@ref)), feeding δρ3's
     cavity-water contrast.
-- `σ_χ`=0.0: standard deviation, over cavity beads, of χ, feeding δρ3's
+- `σχ=0.0`: standard deviation, over cavity beads, of χ, feeding δρ3's
     cavity-water contrast.
 
 # Returns
-- `δρ1::LogNormal`: convex-bead contrast (fixed prior, `_δρ1_prior`).
-- `δρ2::Normal`:    concave-bead contrast (fixed prior, `_δρ2_prior`).
-- `δρ3::Normal`:    cavity-water contrast, `Normal(μ_χ, σ_χ)`.
-                    The default `μ_χ = 0, σ_χ = 0` is a point mass at 0,
-                    matching standard CRYSOL's own `dr3 = 0` default.
+- `δρ1::LogNormal`: convex-bead contrast (fixed prior, [`Fitting._δρ1_prior`](@ref)).
+- `δρ2::Normal`:    concave-bead contrast (fixed prior, [`Fitting._δρ2_prior`](@ref)).
+- `δρ3::Normal`:    cavity-water contrast, Normal(μχ, σχ).
+                    The default μ_χ = 0, σ_χ = 0 is a point mass at 0,
+                    matching standard CRYSOL's dr3 = 0 default.
 """
 function δρ_prior(
     ; μ_χ::Real=0,
@@ -64,25 +70,25 @@ end
 # TODO: after validating w/ CRYSOL on proteins, move on to fitting w/ nucleotides.
 
 # """
-#     δρ_prior(μ_χ, σ_χ, z, I, σ_I, ξ, σ_ξ) -> (δρ1, δρ2, δρ3, δρ4)
+#     δρprior(μχ, σχ, z, I, σI, ξ, σξ) -> (δρ1, δρ2, δρ3, δρ4)
 
 # Nucleotide variant: δρ1, δρ2, δρ3 as in the protein variant, plus δρ4 for
 # cation condensation around the phosphate backbone (Manning theory).
 
 # # Arguments
-# - `μ_χ`: mean of the total electronegativity χ, feeding δρ3's cavity-water contrast.
-# - `σ_χ`: standard deviation of χ, feeding δρ3's cavity-water contrast.
-# - `z`:   total counterion valence.
-# - `I`:   total ionic strength.
-# - `σ_I`: uncertainty in ionic strength.
-# - `ξ`:   Manning linear charge density parameter.
-# - `σ_ξ`: uncertainty in ξ.
+# - μχ: mean of the total electronegativity χ, feeding δρ3's cavity-water contrast.
+# - σχ: standard deviation of χ, feeding δρ3's cavity-water contrast.
+# - z:   total counterion valence.
+# - I:   total ionic strength.
+# - σI: uncertainty in ionic strength.
+# - ξ:   Manning linear charge density parameter.
+# - σξ: uncertainty in ξ.
 
 # # Returns
-# - `δρ1::LogNormal`: convex-bead contrast (fixed prior, `_δρ1_prior`).
-# - `δρ2::Normal`: concave-bead contrast (fixed prior, `_δρ2_prior`).
-# - `δρ3::Normal`: cavity-water contrast, `Normal(μ_χ, σ_χ)`.
-# - `δρ4::LogNormal`: condensed-cation-layer contrast, derived from `z`, `I`, `σ_I`, `ξ`, `σ_ξ`.
+# - δρ1::LogNormal: convex-bead contrast (fixed prior, δρ1prior).
+# - δρ2::Normal: concave-bead contrast (fixed prior, δρ2prior).
+# - δρ3::Normal: cavity-water contrast, Normal(μχ, σχ).
+# - δρ4::LogNormal: condensed-cation-layer contrast, derived from z, I, σI, ξ, σξ.
 # """
 # function δρ_prior(
 #     μ_χ::Real, 

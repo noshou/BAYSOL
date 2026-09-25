@@ -975,13 +975,13 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         S_sh = self_scatter(B_sh, scat_wconv)
         X = cross_scatter(B_ex, B_sh, scat_wconv)
         for k in eachindex(SCAT_Q)
-            @test abs(X[k]) <= sqrt(S_ex[k] * S_sh[k]) * (1 + 1e-10)
+            @test abs(X[k]) ≤ sqrt(S_ex[k] * S_sh[k]) * (1 + 1e-10)
         end
         for (dns, dro) in ((0.334, 0.03), (0.5, -0.2), (-1.7, 2.3))
             I = scat_toy_I(B_ex, B_sh, scat_wconv, dns, dro)
             @test I isa AbstractVector{<:Real}
             @test length(I) == length(SCAT_Q)
-            @test all(isfinite, I) && all(>=(0.0), I)
+            @test all(isfinite, I) && all(≥(0.0), I)
         end
         # switching a contrast off drops two terms exactly (0.0 * x == 0.0)
         @test scat_toy_I(B_ex, B_sh, scat_wconv, 0.7, 0.0) == 0.7^2 .* S_ex

@@ -89,8 +89,8 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
             x, y, z = c[1, j], c[2, j], c[3, j]
             r, θ, φ = s[1, j], s[2, j], s[3, j]
             @test check_float(r, sqrt(x^2 + y^2 + z^2))
-            @test 0.0 <= θ <= π
-            @test -π <= φ <= π
+            @test 0.0 ≤ θ ≤ π
+            @test -π ≤ φ ≤ π
             # round-trip back to cartesian
             @test check_float(r * sin(θ) * cos(φ), x)
             @test check_float(r * sin(θ) * sin(φ), y)
@@ -141,8 +141,8 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
             [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]
         )
         @test length(vols(m)) == 3
-        @test all(>=(0.0), vols(m))
-        @test all(i -> vols(m)[i] <= sphere_volume(radii(m)[i]) + 1e-9, eachindex(vols(m)))
+        @test all(≥(0.0), vols(m))
+        @test all(i -> vols(m)[i] ≤ sphere_volume(radii(m)[i]) + 1e-9, eachindex(vols(m)))
     end
 
     @testset "excluded volume of a genuinely isolated atom is its full vdW sphere" begin
@@ -249,7 +249,7 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
         m = create("test", ["rn", "xe", "kr"], pts; radii_source = ConstantRadii(2.5))
         @test radii(m) == [2.5, 2.5, 2.5]
         @test check_float(r_max(m), 2.5)
-        @test all(v -> v >= 0.0 && v <= sphere_volume(2.5) + 1e-9, vols(m))
+        @test all(v -> v ≥ 0.0 && v ≤ sphere_volume(2.5) + 1e-9, vols(m))
         # the same elements through the default source give something else entirely
         @test radii(create("test", ["rn", "xe", "kr"], pts)) != radii(m)
         # a source that resolves nothing raises through the same MoleculeError path
@@ -315,13 +315,13 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
         end
 
         # the clamp is floor-only: it must not disturb ordinary positive radii.
-        # `vols` only gets `>=(0.0)` here, not `>(0.0)`: these atoms are packed
+        # `vols` only gets `≥(0.0)` here, not `>(0.0)`: these atoms are packed
         # 1 Å apart, tight enough that the geometric method can legitimately
         # claim an interior atom's entire vdW sphere for its neighbours (its
         # positive radius still contributes to those neighbours' own vols).
         m = create("normal", ["fe", "o", "rn"], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)])
         @test all(>(0.0), radii(m))
-        @test all(>=(0.0), vols(m))
+        @test all(≥(0.0), vols(m))
 
         # a clamped ion alongside normal atoms leaves the others untouched
         m = create("mixed", ["h1+", "fe"], [(0.0, 0.0, 0.0), (3.0, 0.0, 0.0)])
