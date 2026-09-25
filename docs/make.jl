@@ -36,14 +36,7 @@ makedocs(
     sitename = "BAYSOL.jl",
     # No `format` override needed: the "academic" theme (academic.scss)
     # compiles directly to docs/src/assets/themes/documenter-light.css,
-    # overwriting Documenter's own built-in light theme file in place --
-    # Documenter copies any file the user already has over its own bundled
-    # default of the same name, so this is picked up automatically with no
-    # make.jl wiring. It's also therefore the *default* theme for free
-    # (documenter-light is what's shown with no stored preference), and
-    # dark/catppuccin-* are untouched in the picker. See academic.scss's
-    # header comment for why this route was needed (Documenter's theme
-    # picker is a hardcoded 6-name list with no way to register a 7th).
+    # overwriting Documenter's own built-in light theme file in place.
     modules  = [
         BAYSOL,
         BAYSOL.Constants,
