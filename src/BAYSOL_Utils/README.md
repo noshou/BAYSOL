@@ -11,22 +11,22 @@ module BAYSOL_Utils
 end
 ```
 
-`src/BAYSOL.jl` re-exports `Constants` and `Cache` at the top level
-(`BAYSOL.Constants`, `BAYSOL.Cache`).
+src/BAYSOL.jl re-exports Constants and Cache at the top level
+(BAYSOL.Constants, BAYSOL.Cache).
 
-## `Constants.jl`
+## Constants.jl
 
-A flat leaf module of `const` primitives, grouped by comment header into:
+A flat leaf module of const primitives, grouped by comment header into:
 
-- **Floating-point accuracy**  `DEFAULT_ATOL = 1.0e-9`
-- **Forward-model constants** `SHELL_THICKNESS`(3.0 Å hydration-shell thickness, CRYSOL's border-layer default),`PROBE_RADIUS`(1.4 Å water probe, forwarded to`SASA.shell_points`), `SHELL_N_TARGET` (`nothing`by default, lets`SASA.shell_points`size the hydration-shell dummy cloud from accessible area instead of a fixed count),`DRO_UNIT`(0.03 e·Å⁻³, CRYSOL's`--dro`shell-contrast unit),`B_LM_CHUNK` (`UInt64(2048)`, atoms/dummies per pass in `compute_B_lm`).
-- **Physical constants**  `AVOGADRO`, `ELEMENTARY_CHARGE`, `VACUUM_PERMITTIVITY`, `BOLTZMANN`, `ANGSTROM` (metres per Å), `MV_PER_CM`; plus two domain-derived constants: `PHOSPHATE_NET_CHARGE` (-0.24 e, the Manning-condensation-reduced net charge of a B-DNA phosphate group, derived in the docstring from Laage/Elsaesser/Hynes 2017 §5.1) and `BOND_CUTOFF`(1.75 Å covalent-bond distance cutoff, used as the only connectivity proxy available since`Molecule` carries no bonding table).
-- **Electrostatics/solution** `IONIC_STRENGTH_M`(0.15 mol/L,`debye_length`'s default ionic strength), `WATER_EPS_R` (80.0, water's relative permittivity),`DEBYE_TEMPERATURE_K`(300.0 K), `CUTOFF_DEBYE_LENGTHS` (5.0; charge sites beyond this many Debye lengths from a bead are dropped from screened-electrostatic aggregation, since`exp(-5) ≈ 0.007`is already negligible next to the screened`1/r` prefactor).
-- **Sampler defaults** `DEFAULT_TEMPERATURE_C` (25.0°C, the solution-temperature default for `_ρₑ`/`ρₑ_prior`'s bulk electron density calculation and `C1_PRIOR_MASS_PERCENT` (the default percentage of `c1_prior`'s prior mass required to fall within CRYSOL's bound `[0.96, 1.04]` around `c_1 = 1`).
+- **Floating-point accuracy**  DEFAULT_ATOL = 1.0e-9
+- **Forward-model constants** SHELL_THICKNESS (3.0 Å hydration-shell thickness, CRYSOL's border-layer default), PROBE_RADIUS (1.4 Å water probe, forwarded to [`Solvation.SASA.shell_points`](@ref BAYSOL.Solvation.SASA.shell_points)), SHELL_N_TARGET (nothing by default, lets [`Solvation.SASA.shell_points`](@ref BAYSOL.Solvation.SASA.shell_points) size the hydration-shell dummy cloud from accessible area instead of a fixed count), DRO_UNIT (0.03 e·Å⁻³, CRYSOL's --dro shell-contrast unit), B_LM_CHUNK (UInt64(2048), atoms/dummies per pass in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm)).
+- **Physical constants**  AVOGADRO, ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, ANGSTROM (metres per Å), MV_PER_CM; plus two domain-derived constants: PHOSPHATE_NET_CHARGE (-0.24 e, the Manning-condensation-reduced net charge of a B-DNA phosphate group, derived in the docstring from Laage/Elsaesser/Hynes 2017 §5.1) and BOND_CUTOFF (1.75 Å covalent-bond distance cutoff, used as the only connectivity proxy available since Molecule carries no bonding table).
+- **Electrostatics/solution** IONIC_STRENGTH_M (0.15 mol/L, [`Solvation.Electrostatics.debye_length`](@ref BAYSOL.Solvation.Electrostatics.debye_length)'s default ionic strength), WATER_EPS_R (80.0, water's relative permittivity), DEBYE_TEMPERATURE_K (300.0 K), CUTOFF_DEBYE_LENGTHS (5.0; charge sites beyond this many Debye lengths from a bead are dropped from screened-electrostatic aggregation, since exp(-5) ≈ 0.007 is already negligible next to the screened 1/r prefactor).
+- **Sampler defaults** DEFAULT_TEMPERATURE_C (25.0°C, the solution-temperature default for _ρₑ/[`Fitting.ρₑ_prior`](@ref BAYSOL.Fitting.ρₑ_prior)'s bulk electron density calculation and C1_PRIOR_MASS_PERCENT (the default percentage of [`Fitting.c1_prior`](@ref BAYSOL.Fitting.c1_prior)'s prior mass required to fall within CRYSOL's bound [0.96, 1.04] around c_1 = 1).
 
 ### Usage
 
-Downstream modules `using` individual constants by name, e.g.:
+Downstream modules using individual constants by name, e.g.:
 
 ```Julia
 # src/Scattering/Scattering.jl
@@ -45,13 +45,13 @@ or, from outside the package, via the top-level re-export:
 using BAYSOL.Constants: AVOGADRO
 ```
 
-## `Cache.jl`
+## Cache.jl
 
-Thread-safe memoization primitives, guarded by a `ReentrantLock` so concurrent callers racing on the same computation never double-compute or observe a torn store.
+Thread-safe memoization primitives, guarded by a ReentrantLock so concurrent callers racing on the same computation never double-compute or observe a torn store.
 
-### `Lazy{T}` / `make` / `force`
+### Lazy{T} / make / force
 
-A single deferred, memoized value of type `T`:
+A single deferred, memoized value of type T:
 
 ```julia
 mutable struct Lazy{T}
@@ -62,8 +62,8 @@ mutable struct Lazy{T}
 end
 ```
 
-- `make(::Type{T}, f) -> Lazy{T}` builds an unforced cache wrapping the zero-arg thunk `f`.
-- `force(c::Lazy{T})::T` runs `f` once, under `c`'s lock, the first time it's called; every subsequent call (concurrent or not) returns the already-computed `value` without re-running `f`.
+- make(::Type{T}, f) -> Lazy{T} builds an unforced cache wrapping the zero-arg thunk f.
+- force(c::Lazy{T})::T runs f once, under c's lock, the first time it's called; every subsequent call (concurrent or not) returns the already-computed value without re-running f.
 
 ```julia
 using ..BAYSOL_Utils.Cache: Lazy, force
@@ -85,7 +85,7 @@ vols(m::Molecule)::Vector{Float64}  = force(m._vols)
 r_max(m::Molecule)::Float64         = force(m._r_max)
 ```
 
-### `KeyedCache{K,V}`
+### KeyedCache{K,V}
 
 ```julia
 struct KeyedCache{K,V}
@@ -94,8 +94,8 @@ struct KeyedCache{K,V}
 end
 ```
 
-- `Base.get!(f::Union{Function,Type}, c::KeyedCache{K,V}, key::K)::V`: returns the cached value for `key`, computing it via the zero-arg thunk `f` and storing it on a cache miss.
-- `Base.haskey(c::KeyedCache{K,V}, key::K)::Bool`: whether `key` has already been memoized, also taken under the lock.
+- Base.get!(f::Union{Function,Type}, c::KeyedCache{K,V}, key::K)::V: returns the cached value for key, computing it via the zero-arg thunk f and storing it on a cache miss.
+- Base.haskey(c::KeyedCache{K,V}, key::K)::Bool: whether key has already been memoized, also taken under the lock.
 
 ```julia
 using ..BAYSOL_Utils.Cache: KeyedCache

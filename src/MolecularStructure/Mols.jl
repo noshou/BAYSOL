@@ -18,18 +18,19 @@ struct MoleculeError <: Exception; msg::String end
 Base.showerror(io::IO, e::MoleculeError) = print(io, "MoleculeError: ", e.msg)
 
 """
-Per-atom centred coordinates in both frames, with lazy `radii`/`vols`/`r_max`.
-
-Both coordinate frames are `(3, n)` matrices sharing a column index (the atom),
-so a single atom's data is one contiguous column in either frame; the spherical
-rows are `r`, `theta`, `phi` in that order. `_n` is the atom count, captured once
-at construction from the coordinate pass rather than recomputed on demand.
-
-`radii` is always the isolated van der Waals radius (`AtomicRadii`); `vols` is
-the smaller, geometrically-computed excluded (displaced-solvent) volume from
-`ExcludedVolumes.excluded_volume`, exact only when hydrogens are explicit.
-
-`_tree` is a `KDTree` over `_cart`.
+# Fields
+- `_name::String`: structure identifier (e.g. PDB ID or file stem).
+- `_elms::Vector{String}`: per-atom element symbol, length n.
+- `_n::Int`: atom count; set at construction, never recomputed.
+- `_cart::Matrix{Float64}, (3, n)`: centred Cartesian coordinates (x, y, z).
+- `_sph::Matrix{Float64}, (3, n)`: spherical coordinates (r, theta, phi),
+    sharing _cart's column index.
+- `_radii::Lazy{Vector{Float64}}`: per-atom isolated van der Waals radius
+    (AtomicRadii), length n.
+- `_vols::Lazy{Vector{Float64}}`: per-atom geometrically-computed excluded
+    volume from [`excluded_volume`](@ref), length n.
+- `_r_max::Lazy{Float64}`: largest per-atom radius in _radii.
+- `_tree::Lazy{KDTree}`: KDTree over _cart, shared across neighbour queries.
 """
 struct Molecule
     _name   :: String
@@ -46,10 +47,10 @@ end
 """
     _center(cs::Vector{NTuple{3,Float64}}) -> Matrix{Float64}
 
-Stack coordinates into a `(3, n)` matrix translated to the centroid.
+Stack coordinates into a (3, n) matrix translated to the centroid.
 
 # Arguments
-- `cs`: per-atom `(x, y, z)` tuples; must be non-empty.
+- `cs`: per-atom (x, y, z) tuples; must be non-empty.
 """
 function _center(cs::Vector{NTuple{3,Float64}})::Matrix{Float64}
     n = length(cs)
@@ -71,15 +72,15 @@ end
 """
     to_spherical(c::AbstractMatrix{<:Real}) -> Matrix{Float64}
 
-Spherical `(r, theta, phi)` per column of the `(3, n)` cartesian matrix `c`,
-returned as a `(3, n)` matrix sharing `c`'s column index (the atom/point).
-`theta = acos(z/r)` lies in `[0, π]` and `phi = atan(y, x)` in `(-π, π]`.
+Spherical (r, theta, phi) per column of the (3, n) cartesian matrix c,
+returned as a (3, n) matrix sharing c's column index (the atom/point).
+theta = acos(z/r) lies in [0, π] and phi = atan(y, x) in (-π, π].
 
-`r = 0` would make `theta` a `0/0`; it is handled without one. The angle is arbitrary there
-and unobservable downstream, since `j_l(0) = 0` for every `l > 0`.
+r = 0 would make theta a 0/0; it is handled without one. The angle is arbitrary there
+and unobservable downstream, since j_l(0) = 0 for every l > 0.
 
 # Arguments
-- `c`: `(3, n)` cartesian coordinates; rows are `x`, `y`, `z`.
+- `c`: (3, n) cartesian coordinates; rows are x, y, z.
 """
 function to_spherical(c::AbstractMatrix{<:Real})::Matrix{Float64}
     size(c, 1) == 3 || throw(MoleculeError(
@@ -100,11 +101,11 @@ end
 """
     _compute_radii(src::RadiiSource, es::Vector{String}) -> Vector{Float64}
 
-Resolve per-element radii through `src`; throws `MoleculeError` on an empty list
+Resolve per-element radii through src; throws MoleculeError on an empty list
 or any element with no radius data.
 
-A negative radius is clamped to `0.0`. Shannon's tables carry a handful of
-these (`h1+`, `c4+`, `n5+`) as extrapolation artifacts of fitting to
+A negative radius is clamped to 0.0. Shannon's tables carry a handful of
+these (h1+, c4+, n5+) as extrapolation artifacts of fitting to
 coordination-number trends, not as physical sizes.
 
 # Arguments
@@ -126,8 +127,8 @@ end
 """
     _to_tuples(cs) -> Vector{NTuple{3,Float64}}
 
-Normalize any iterable of 3-component coordinates to `Float64` tuples (identity
-when already `Vector{NTuple{3,Float64}}`). Throws `MoleculeError` if an entry
+Normalize any iterable of 3-component coordinates to Float64 tuples (identity
+when already Vector{NTuple{3,Float64}}). Throws MoleculeError if an entry
 lacks 3 components.
 
 # Arguments
@@ -146,18 +147,18 @@ end
 """
     create(name, elms, coords; radii_source::RadiiSource = AtomicRadiiSource()) -> Molecule
 
-Build a `Molecule`: `coords` are centred at the centroid, both coordinate
-frames computed now, `radii`/`vols`/`r_max` on first access.
+Build a Molecule: coords are centred at the centroid, both coordinate
+frames computed now, radii/vols/r_max on first access.
 
 # Arguments
 - `name`: molecule label.
-- `elms`: element/ion string per atom, e.g. `"c"`, `"Fe"`, `"o2-"`. Case is
+- `elms`: element/ion string per atom, e.g. "c", "Fe", "o2-". Case is
         normalized to lowercase (the radii and form-factor tables are lowercase-keyed),
-        so `elms(m)` returns the lowercased strings.
-- `coords`: per-atom `(x, y, z)` in any frame; length must match `elms`.
+        so elms(m) returns the lowercased strings.
+- `coords`: per-atom (x, y, z) in any frame; length must match elms.
 
 # Keywords
-- `radii_source`: radii backend (defaults to `AtomicRadiiSource()`).
+- `radii_source`: radii backend (defaults to AtomicRadiiSource()).
 """
 function create(name::AbstractString, elms::AbstractVector{<:AbstractString}, coords;
                 radii_source::RadiiSource = AtomicRadiiSource())
@@ -172,8 +173,8 @@ function create(name::AbstractString, elms::AbstractVector{<:AbstractString}, co
     tree = Lazy{KDTree}(@closure(() -> KDTree(cart)))
 
     # Per-atom displaced-solvent volume (see ExcludedVolumes.excluded_volume).
-    # Recomputes the max radius locally instead of `force(rmax)`, so that forcing
-    # `vols` does not also mark `r_max` as forced.
+    # Recomputes the max radius locally instead of force(rmax), so that forcing
+    # vols does not also mark r_max as forced.
     vol  = Lazy{Vector{Float64}}(@closure(() -> begin
         rv = force(rad)
         excluded_volume(cart, rv, force(tree), maximum(rv))
@@ -181,10 +182,10 @@ function create(name::AbstractString, elms::AbstractVector{<:AbstractString}, co
     return Molecule(String(name), es, n, cart, sph, rad, vol, rmax, tree)
 end
 
-"`(3, n)` centroid-centred cartesian coordinates; rows are `x`, `y`, `z`."
+"(3, n) centroid-centred cartesian coordinates; rows are x, y, z."
 coords_cartesian(m::Molecule)::Matrix{Float64} = m._cart
 
-"`(3, n)` spherical coordinates about the centroid; rows are `r`, `theta`, `phi`."
+"(3, n) spherical coordinates about the centroid; rows are r, theta, phi."
 coords_spherical(m::Molecule)::Matrix{Float64} = m._sph
 
 "Number of atoms."
@@ -200,7 +201,7 @@ volume; use [`BAYSOL.Geometry.sphere_volume`](@ref) on the radii.
 vols(m::Molecule)::Vector{Float64}   = force(m._vols)
 
 """
-Largest per-atom radius in the molecule; forces (and caches) `radii`.
+Largest per-atom radius in the molecule; forces (and caches) radii.
 
 SASA's coarse neighbour filter needs this to bound how far away an atom can
 still occlude another, before any individual radius is known.
@@ -210,7 +211,7 @@ r_max(m::Molecule)::Float64          = force(m._r_max)
 """
     neighbour_tree(m::Molecule) -> KDTree
 
-A `KDTree` over `coords_cartesian(m)`.
+A KDTree over coords_cartesian(m).
 """
 neighbour_tree(m::Molecule)::KDTree   = force(m._tree)
 
@@ -221,13 +222,11 @@ elms(m::Molecule)::Vector{String}    = m._elms
 name(m::Molecule)::String            = m._name
 
 """
-Per-atom residue identity for a protein `Molecule`: resname, atom name,
+Per-atom residue identity for a protein Molecule: resname, atom name,
 residue number, and chain ID (standard PDB identity), one entry per atom.
 
-`resnum`/`chain` distinguish different *instances* of the same residue type
-(e.g. two separate `"ASP"` residues at different sequence positions) — needed
-because per-residue-instance data (such as a PROPKA pKa prediction) is keyed
-by `(resname, resnum, chain)`, not by `resname` alone.
+resnum/chain distinguish different *instances* of the same residue type
+(e.g. two separate "ASP" residues at different sequence positions).
 """
 struct Residues
     resname  :: Vector{String}
@@ -239,19 +238,19 @@ end
 """
     load_molecule(pdb_path::AbstractString) -> Tuple{Molecule, Residues}
 
-Parse whatever `.pdb` is at `pdb_path` into a `Molecule`/`Residues` pair.
-Works identically whether `pdb_path` is heavy-atom-only or hydrogenated:
-atoms are collected via `standardselector` alone (no `heavyatomselector`), so
+Parse whatever .pdb is at pdb_path into a Molecule/Residues pair.
+Works identically whether pdb_path is heavy-atom-only or hydrogenated:
+atoms are collected via standardselector alone (no heavyatomselector), so
 a heavy-only file naturally yields just its heavy atoms, and a hydrogenated
 file keeps its hydrogens too.
 
 # Arguments
-- `pdb_path`: path to any parseable `.pdb`, e.g. from `resolve_structure` or
-    `resolve_hydrogens`.
+- `pdb_path`: path to any parseable .pdb, e.g. from [`resolve_structure`](@ref) or
+    [`resolve_hydrogens`](@ref).
 
 # Returns
-- `Tuple{Molecule, Residues}`: `Molecule` built from each atom's element and
-    coordinates; `Residues` built from each atom's resname, PDB atom name,
+- `Tuple{Molecule, Residues}`: Molecule built from each atom's element and
+    coordinates; Residues built from each atom's resname, PDB atom name,
     residue number, and chain ID.
 """
 function load_molecule(pdb_path::AbstractString)::Tuple{Molecule, Residues}

@@ -104,7 +104,7 @@ END
 
 atom_names(lines, resname, resnum) = Set(
     strip(l[13:16]) for l in lines
-    if length(l) >= 26 && startswith(l, "ATOM") &&
+    if length(l) ≥ 26 && startswith(l, "ATOM") &&
        strip(l[18:20]) == resname && parse(Int, strip(l[23:26])) == resnum
 )
 

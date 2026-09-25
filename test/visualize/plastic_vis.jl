@@ -44,7 +44,7 @@ end
 
 Scatter-plot the first `n` plastic-sequence points filling a spherical
 **volume** (the 3-D `R₃` generator, `Val(3), Val(:volume)`), blocking until
-the window is closed. Every point satisfies `0 <= |p| < 1`; colour encodes
+the window is closed. Every point satisfies `0 ≤ |p| < 1`; colour encodes
 distance from the centre so the volume-uniform (not surface-clustered)
 fill is visible.
 """

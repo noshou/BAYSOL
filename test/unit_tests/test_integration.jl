@@ -171,7 +171,7 @@ end
         μ_χ, σ_χ = protein_cavity_electrostatics(mol, residues, ion_7)
         @test isfinite(μ_χ)
         @test isfinite(σ_χ)
-        @test σ_χ >= 0.0
+        @test σ_χ ≥ 0.0
     end
 
     #------------------------------------------------------------------

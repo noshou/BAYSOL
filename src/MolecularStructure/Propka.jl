@@ -2,15 +2,15 @@
 
 """
 Per-residue-instance pKa prediction via the external 
-`propka3` CLI. PROPKA is invoked as a plain subprocess 
-in an isolated `CondaPkg`-managed Python environment.
+propka3 CLI. PROPKA is invoked as a plain subprocess 
+in an isolated CondaPkg-managed Python environment.
 """
 
 using  CondaPkg: CondaPkg
 using  FastClosures: @closure
 
-"Raised when `propka3` cannot be run or its output cannot be parsed 
-(bad input path, non-zero exit, malformed `.pka` file)."
+"Raised when propka3 cannot be run or its output cannot be parsed
+(bad input path, non-zero exit, malformed .pka file)."
 struct PropkaError <: Exception; msg::String end
 Base.showerror(io::IO, e::PropkaError) = print(io, "PropkaError: ", e.msg)
 
@@ -21,12 +21,12 @@ const _STANDARD_GROUPS = Set(["ASP", "GLU", "CYS", "TYR", "HIS", "LYS", "ARG", "
     _parse_pka(path::AbstractString) -> 
         Vector{NamedTuple{(:resname,:resnum,:chain,:pKa), Tuple{String,Int,String,Float64}}}
 
-Parse a `propka3` `.pka` output file into one record per standard titratable
+Parse a propka3 .pka output file into one record per standard titratable
 group. Non-standard rows (ligand groups, carrying a trailing ligand
 atom-type column) are skipped.
 
 # Arguments
-- `path`: path to a `.pka` file produced by `propka3`.
+- `path`: path to a .pka file produced by propka3.
 """
 function _parse_pka(path::AbstractString)
     lines = readlines(path)
@@ -54,14 +54,14 @@ end
 """
     propka_pKas(pdb_path::AbstractString) -> Vector{<:NamedTuple}
 
-Run `propka3` on a PDB structure and return one record per standard
-titratable group: `(resname::String, resnum::Int, chain::String, pKa::Float64)`.
+Run propka3 on a PDB structure and return one record per standard
+titratable group: (resname::String, resnum::Int, chain::String, pKa::Float64).
 
 # Arguments
 - `pdb_path`: path to a PDB file.
 
 # Returns
-Records for `ASP`, `GLU`, `CYS`, `TYR`, `HIS`, `LYS`, `ARG`, `N+`, `C-`
+Records for ASP, GLU, CYS, TYR, HIS, LYS, ARG, N+, C-
 groups only; ligand/hetero rows are skipped.
 """
 function propka_pKas(pdb_path::AbstractString)
