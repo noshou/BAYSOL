@@ -2,29 +2,30 @@
 
 using Distributions
 using SpecialFunctions
+using ..BAYSOL_Utils.Constants: C1_PRIOR_MASS_PERCENT
 
 """
     prior(n::Real) -> LogNormal
 
-Log normal distribution over excluded volume correction factor c_1. 
+Log normal distribution over excluded volume correction factor c1. 
 
-`c_1 = r0/rm`, where CRYSOL puts the following bounds: `0.96 • r_m <= r_0 <= 1.04 • rm`.
+c1 = r0/rm, where CRYSOL puts the following bounds: 0.96 • rm ≤ r0 ≤ 1.04 • rm.
 In other words: 
 
     r0 ∈ [0.96rm, 1.04rm] 
     c_1 ∈ [0.96, 1.04] 
     r0 = c_1 • r_m
 
-Assuming a normal distribution, if `n%` of samples fall within z standard deviations 
-of CRYSOL's default, we have: 
+Assuming a normal distribution, if n% of samples fall within z standard deviations
+of CRYSOL's default, we have:
 
     μ±z•σ = [0.96, 1.04] 
 
-where `μ = 1`. The value of z (ie: the `z-score`) is: 
+where μ = 1. The value of z (ie: the z-score) is:
     
     √2•erf⁻¹(n/100) 
     
-Given a constant `C = (1.04 − 0.96)/2` = 0.04: 
+Given a constant C = (1.04 − 0.96)/2 = 0.04:
 
     σ = C / z 
 
@@ -33,20 +34,20 @@ Which when transformed into LogNormal space gives:
     σ_ln = √(ln(1+σ²/μ²))
     μ_ln = ln(μ) − σ_ln²/2
 
-Substituting `μ=1`:
+Substituting μ=1:
 
     σ_ln = √(ln(1+σ²))
     μ_ln = -σ_ln²/2
 
 # Keywords
-    -n: percentage ((0, 100]) of the prior mass required to fall within
-        CRYSOL's bound `[0.96, 1.04]` around its default `c_1 = 1`. Higher `n` 
-        concentrates more mass near the default; lower `n` allows more spread.
-        Defaulted to `n = 85`; only change if more spread is needed.
+    - `n`: percentage ((0, 100]) of the prior mass required to fall within
+            CRYSOL's bound [0.96, 1.04] around its default c_1 = 1. Higher n
+            concentrates more mass near the default; lower n allows more spread.
+            Defaulted to n = 85; only change if more spread is needed.
 """
-function c1_prior(n::Real=50)::LogNormal{Float64}
+function c1_prior(n::Real=C1_PRIOR_MASS_PERCENT)::LogNormal{Float64}
     
-    if n <= 0 || n > 100 
+    if n ≤ 0 || n > 100 
         throw(DomainError(n, "n ∈(0, 100]"))
     end
 

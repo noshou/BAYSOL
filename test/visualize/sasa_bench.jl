@@ -176,7 +176,7 @@ end
 function metal_cluster(n, a, el)
     pts = fcc_lattice(n, a)
     ctr = ntuple(t -> sum(p[t] for p in pts)/length(pts), 3)
-    keep = [p for p in pts if sqrt(sum((p[t]-ctr[t])^2 for t in 1:3)) <= a*n*0.45]
+    keep = [p for p in pts if sqrt(sum((p[t]-ctr[t])^2 for t in 1:3)) ≤ a*n*0.45]
     keep, fill(el, length(keep))
 end
 

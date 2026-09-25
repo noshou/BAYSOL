@@ -107,12 +107,12 @@ end
 
     # the entry point carries exactly the one barrier dispatch.
     rs = _reports(SASA.sasa, (Molecule,))
-    @test length(rs) <= 1
+    @test length(rs) ≤ 1
     @test all(r -> occursin("_sasa_loop!", sprint(show, r)), rs)
 
     # two barriers here, not one: the sampling loop and the classification loop
     rp = _reports(SASA.shell_points, (Molecule,))
-    @test length(rp) <= 2
+    @test length(rp) ≤ 2
     @test all(r -> (t = sprint(show, r);
                     occursin("_shell_loop", t) || occursin("_class_loop", t)), rp)
 end

@@ -2,7 +2,6 @@
 LocalPreferences.toml
 .CondaPkg/
 docs/build/
-docs/src/guides/
 *.cov
 *.jl.mem
 deps/deps.jl

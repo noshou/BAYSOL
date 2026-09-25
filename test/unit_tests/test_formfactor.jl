@@ -32,9 +32,9 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
     _fx(name) = Iterators.drop(eachline(joinpath(@__DIR__, "..", "fixtures", "form-factors", name)), 1)
 
     "Agreement to within `k` units in the last place at `ref`'s own magnitude."
-    _ulp(got, ref, k = 2) = abs(got - ref) <= k * eps(abs(ref))
+    _ulp(got, ref, k = 2) = abs(got - ref) ≤ k * eps(abs(ref))
 
-    @testset "f0 matches the reference to <= 1 ulp over 348 species/s points" begin
+    @testset "f0 matches the reference to ≤ 1 ulp over 348 species/s points" begin
         # Exact for all but one point (u6+ at s = 1.989, 1 ulp). The residual is
         # summation order inside `c + Σ a_i exp(...)`, not a different formula --
         # the NumPy exponent association is already reproduced. Chasing the last
@@ -49,7 +49,7 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
             worst = max(worst, abs(got - r) / abs(r))
         end
         @test n == 348                      # the fixture is actually being read
-        @test exact >= 347                  # essentially all of it is bit-for-bit
+        @test exact ≥ 347                  # essentially all of it is bit-for-bit
         @test worst < 1e-15
     end
 

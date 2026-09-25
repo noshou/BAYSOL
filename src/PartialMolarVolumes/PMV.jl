@@ -12,14 +12,14 @@ using  FastClosures: @closure
 
 export PartialMolarVolumeSource, ϕ°, ρₑ_w, PMVSrcTables, COMMON_TO_IUPAC
 
-"A partial-molar-volume backend. See `PartialMolarVolumes` for the reference implementation."
+"A partial-molar-volume backend. See PartialMolarVolumes for the reference implementation."
 abstract type PartialMolarVolumeSource end
 
 """
     ρₑ_w([src::PartialMolarVolumeSource,] t::Real) -> Tuple{Float64,Float64}
 
-Bulk electron density of pure water at temperature `t` (°C), in e·Å⁻³, as
-`(ρₑ, uncertainty)`.
+Bulk electron density of pure water at temperature t (°C), in e·Å⁻³, as
+(ρₑ, uncertainty).
 
 # Arguments
 - `src`: the partial-molar-volume backend to query (optional).
@@ -43,16 +43,16 @@ function ρₑ_w end
 
     ϕ°([src::PartialMolarVolumeSource,] name::AbstractString) -> Tuple{Int64,Float64,Float64}
 
-Partial molar volume at infinite dilution, as `(electron_count, v0_cm3_per_mol, uncertainty_cm3_per_mol)`,
-for a protein/peptide sequence (one-letter codes) at solution `pH`, for a DNA/RNA sequence
-(one-letter or IUPAC ambiguity codes) at solution `pH`, or for a solute by IUPAC `name`.
+Partial molar volume at infinite dilution, as (electron_count, v0_cm3_per_mol, uncertainty_cm3_per_mol),
+for a protein/peptide sequence (one-letter codes) at solution pH, for a DNA/RNA sequence
+(one-letter or IUPAC ambiguity codes) at solution pH, or for a solute by IUPAC name.
 
 # Arguments
 - `src`: the partial-molar-volume backend to query (optional).
-- `pH`/`seq`: solution pH and one-letter-code sequence, for a protein or nucleotide.
-- `isDNA`: `true` for a DNA sequence, `false` for RNA; selects
-    both the `A/T/G/C` vs `A/U/G/C` alphabet and which backend table gets queried.
-- `σ_pH`: standard uncertainty on `pH`, propagated into the returned uncertainty
+- `pH/seq`: solution pH and one-letter-code sequence, for a protein or nucleotide.
+- `isDNA`: true for a DNA sequence, false for RNA; selects
+    both the A/T/G/C vs A/U/G/C alphabet and which backend table gets queried.
+- `σ_pH`: standard uncertainty on pH, propagated into the returned uncertainty
     via the delta method (protein/nucleotide forms only; ignored for the solute-by-name form).
 - `name`: common or IUPAC solute name, for a non-protein, non-nucleotide solute.
 """
@@ -71,36 +71,36 @@ struct PMVSrcTables <: PartialMolarVolumeSource end
     ) -> Tuple{Int64, Float64, Float64}
 
 Resolves the pH-dependent partial molar volume of an ionizable residue via
-the sigmoidal titration formula `V(pH) = V0 ∓ dV/(1+10^(±(pKa-pH)))`.
+the sigmoidal titration formula V(pH) = V0 ∓ dV/(1+10^(±(pKa-pH))).
 
-Generic over which value table is titrated: `_ionization` and `_dict` are
+Generic over which value table is titrated: _ionization and _dict are
 passed in rather than closed over, so the same function serves Protein's
-`_ionization`/`_Protein` pair and any nucleotide ionization/residue-table
+_ionization/_Protein pair and any nucleotide ionization/residue-table
 pair with the same shapes, without duplicating the titration math per
 molecule kind.
 
-`σ_pH`, the standard uncertainty on the measured `pH`, is propagated into
-`variance` by the delta method: on either branch `∂pmv/∂pH = ∓dV·ln(10)·frac·(1-frac)`,
+σ_pH, the standard uncertainty on the measured pH, is propagated into
+variance by the delta method: on either branch ∂pmv/∂pH = ∓dV·ln(10)·frac·(1-frac),
 which has the same magnitude both ways, so its contribution is
-`(dV·ln(10)·frac·(1-frac)·σ_pH)²`, added in quadrature to the existing
+(dV·ln(10)·frac·(1-frac)·σ_pH)², added in quadrature to the existing
 parameter-uncertainty term. This is a local linear approximation: it
 degrades away from the steepest part of the sigmoid only in the sense of
 the higher-order terms it drops, but blows up fastest right at
-`pH == pKa`, where the sigmoid is steepest and `σ_pH` is least negligible
+pH == pKa, where the sigmoid is steepest and σ_pH is least negligible
 relative to the curvature.
 
 # Arguments
-- `res`: residue code to look up in `_ionization` (e.g. a protein one-letter
-    code, or a nucleotide letter/`-nucleoside` key); must be a key of `_ionization`.
-- `_ionization`: `res -> ((pKa, ionized_key), neutral_key)` table, e.g.
-    `Protein`'s own ionization table or a nucleotide's.
-- `_dict`: `key -> (electron_count, V0, uncertainty)` value table that
-    `neutral_key`/`ionized_key` are resolved against. The ionized entry's
-    `electron_count` is the *delta* relative to the neutral entry.
+- `res`: residue code to look up in _ionization (e.g. a protein one-letter
+    code, or a nucleotide letter/-nucleoside key); must be a key of _ionization.
+- `_ionization`: res -> ((pKa, ionized_key), neutral_key) table, e.g.
+    Protein's own ionization table or a nucleotide's.
+- `_dict`: key -> (electron_count, V0, uncertainty) value table that
+    neutral_key/ionized_key are resolved against. The ionized entry's
+    electron_count is the *delta* relative to the neutral entry.
 
 # Keywords
-- `σ_pH`: standard uncertainty on `pH`, propagated by the delta method
-    above; default `0.0` (no propagation).
+- `σ_pH`: standard uncertainty on pH, propagated by the delta method
+    above; default 0.0 (no propagation).
 """
 function _titrated(
     res::AbstractString, 
@@ -148,7 +148,7 @@ const _Z_H2O = 10
 """
     ρₑ_w(t::Real) -> Tuple{Float64, Float64}
 
-Electron density of pure water at temperature `t` (°C) and 1 atm, in e·Å⁻³.
+Electron density of pure water at temperature t (°C) and 1 atm, in e·Å⁻³.
 
 Uses the Kell equation (1975) for mass density, valid 0–150 °C at 1 atm,
 returns (ρₑ, uncertainty)
@@ -193,7 +193,7 @@ const _protein_ionization::Dict{String, Tuple{Tuple{Float64, String}, String}} =
 )
 
 """ key => (electron_count, partial_molar_volume, uncertainty). electron_count is a
-side-chain-only increment relative to glycine (see `_backbone_electrons`), and is
+side-chain-only increment relative to glycine (see _backbone_electrons), and is
 identical between a group's "-neutral" and "-acidic"/"-basic" forms since deprotonation
 only removes a bare proton (no electron). """
 const _Protein::Dict{String, Tuple{Int64, Float64, Float64}} = JSON3.read(
@@ -205,23 +205,23 @@ const _Protein::Dict{String, Tuple{Int64, Float64, Float64}} = JSON3.read(
 const _wildcards = Dict("B" => ("D", "N"), "J" => ("L", "I"), "Z" => ("E", "Q"))
 
 """
-Peptide-bond backbone unit (`-CH2CONH-`, "glycyl") volume at 25°C, added once per
-residue in `ρₑ`. `Protein.json`'s per-residue entries (`A`, `V`, `L`, ... and `G`'s
+Peptide-bond backbone unit (-CH2CONH-, "glycyl") volume at 25°C, added once per
+residue in ρₑ. Protein.json's per-residue entries (A, V, L, ... and G's
 zero) are side-chain-only increments relative to glycine (Lee et al. 2008's own
-convention), not absolute residue volumes. Source: `Protein.tsv` CH2CONH row, `10.1039/9781782627043-00542`.
+convention), not absolute residue volumes. Source: Protein.tsv CH2CONH row, 10.1039/9781782627043-00542.
 """
 const _backbone_pmv = (37.4, 0.1)
 
 """
-Peptide backbone unit (`-CH2CONH-`, neutral, C2H3NO) electron count: 2×C(6) + 3×H(1)
-+ N(7) + O(8) = 30 e. Added once per residue in `ρₑ`, on the same basis as
-`_backbone_pmv`. `Protein.json`'s electron_count field is a side-chain-only
+Peptide backbone unit (-CH2CONH-, neutral, C2H3NO) electron count: 2×C(6) + 3×H(1)
++ N(7) + O(8) = 30 e. Added once per residue in ρₑ, on the same basis as
+_backbone_pmv. Protein.json's electron_count field is a side-chain-only
 increment relative to glycine, and this is the shared unit it sits on top of.
 """
 const _backbone_electrons = 30
 
 """
-Electrons contributed by one water molecule (`_Z_H2O`), added once per `ρₑ` call
+Electrons contributed by one water molecule (_Z_H2O), added once per ρₑ call
 (not per residue): joining N free amino acids into a chain releases (N-1) waters,
 so the repeated backbone unit above is short exactly one H2O's worth of capping
 atoms at the two open chain termini.
@@ -235,8 +235,8 @@ const _ϕ°_p_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
     _residue_var(res::AbstractString, pH::Real; σ_pH::Real = 0.0) -> (electron_count, pmv, variance)
 
 Normalizes any residue lookup (ionizable or not) to (electron_count, pmv, variance),
-so every call site in `ρₑ` accumulates uniformly. Non-ionizable residues have no
-`pH` dependence, so `σ_pH` contributes nothing for them.
+so every call site in ρₑ accumulates uniformly. Non-ionizable residues have no
+pH dependence, so σ_pH contributes nothing for them.
 """
 function _residue_var(res::AbstractString, pH::Real; σ_pH::Real = 0.0)::Tuple{Int64, Float64, Float64}
     if haskey(_protein_ionization, res)
@@ -251,9 +251,9 @@ end
     ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0) -> Tuple{Int64, Float64, Float64}
 takes a sequence of one-letter amino acid codes at a pH and returns the estimated
 partial molar volume at inifinit dilution (total electron count, partial molar volume,
-uncertainty). `σ_pH` is the standard uncertainty on `pH`, propagated by the delta
-method through each ionizable residue's titration term (see `_titrated`). The
-result is cached off of sequence only, so only the first call of `σ_pH` and `pH`
+uncertainty). σ_pH is the standard uncertainty on pH, propagated by the delta
+method through each ionizable residue's titration term (see _titrated). The
+result is cached off of sequence only, so only the first call of σ_pH and pH
 are taken into account.
 """
 function ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64, Float64, Float64}
@@ -358,11 +358,11 @@ const COMMON_TO_IUPAC::Dict{String, String} = JSON3.read(
     _common2iupac(name::AbstractString) -> Tuple{String,Bool}
 
 Look up a non-protein solute's IUPAC name from its common name via
-`COMMON_TO_IUPAC` (case-insensitive). Returns `(iupac_name, true)` on a hit,
-with `iupac_name` always lowercase regardless of the case `COMMON_TO_IUPAC`
-happens to store its values in, or `("", false)` if `name` has no mapping.
-Private: the only caller is `_resolve_solute_name` below, so this has no
-reason to be part of the swappable-backend `ϕ°` surface.
+COMMON_TO_IUPAC (case-insensitive). Returns (iupac_name, true) on a hit,
+with iupac_name always lowercase regardless of the case COMMON_TO_IUPAC
+happens to store its values in, or ("", false) if name has no mapping.
+Private: the only caller is _resolve_solute_name below, so this has no
+reason to be part of the swappable-backend ϕ° surface.
 """
 function _common2iupac(name::AbstractString)::Tuple{String,Bool}
     iupac = get(COMMON_TO_IUPAC, lowercase(String(name)), nothing)
@@ -372,12 +372,12 @@ end
 """
     _resolve_solute_name(name::AbstractString) -> String
 
-`name` (lowercased) itself if it is already an `nonbiological.json` key,
-else its `COMMON_TO_IUPAC` mapping via [`_common2iupac`](@ref) (already
-lowercase), else `name` lowercased, unchanged otherwise (so `ϕ°` below
-still throws its own `ArgumentError` rather than a `KeyError` from here).
-`_solutes` is lowercase-keyed, so `name` is lowercased before every lookup
-here regardless of the case the caller passed in. Mirrors `AtomicRadii`'s
+name (lowercased) itself if it is already an nonbiological.json key,
+else its COMMON_TO_IUPAC mapping via [`_common2iupac`](@ref) (already
+lowercase), else name lowercased, unchanged otherwise (so ϕ° below
+still throws its own ArgumentError rather than a KeyError from here).
+_solutes is lowercase-keyed, so name is lowercased before every lookup
+here regardless of the case the caller passed in. Mirrors AtomicRadii's
 fallback-chain style.
 
 # Arguments
@@ -394,7 +394,7 @@ end
     _ϕ°_by_iupac_name(name::AbstractString) -> Tuple{Int64, Float64, Float64}
 
 Takes the IUPAC name of a solute and returns (electron count, pmv, uncertainty).
-Private: `name` must already be an exact `nonbiological.json` key (see
+Private: name must already be an exact nonbiological.json key (see
 [`ϕ°(::AbstractString)`](@ref), the public entry point, which resolves a
 common name to its IUPAC form via [`_resolve_solute_name`](@ref) first).
 """
@@ -449,31 +449,31 @@ const _ϕ°_d_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 "Memoized RNA partial molar volume, keyed by sequence"
 const _ϕ°_r_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 
-""" key => (electron_count, V0, uncertainty). Strict `Float64` uncertainty
-(not `Union{Float64,Nothing}` like `_solutes`, since no `RNA/DNA` entry has
-a missing uncertainty) — matches `_Protein`'s type, required by `_titrated`. """
+""" key => (electron_count, V0, uncertainty). Strict Float64 uncertainty
+(not Union{Float64,Nothing} like _solutes, since no RNA/DNA entry has
+a missing uncertainty) — matches _Protein's type, required by _titrated. """
 const _DNA::Dict{String, Tuple{Int64, Float64, Float64}} =
     JSON3.read(
     read(joinpath(@__DIR__, "DNA", "dna.json"), String),
     Dict{String, Tuple{Int64, Float64, Float64}}
 )
 
-""" key => (electron_count, V0, uncertainty). Strict `Float64` uncertainty
-(not `Union{Float64,Nothing}` like `_solutes`, since no `RNA/DNA` entry has
-a missing uncertainty) — matches `_Protein`'s type, required by `_titrated`. """
+""" key => (electron_count, V0, uncertainty). Strict Float64 uncertainty
+(not Union{Float64,Nothing} like _solutes, since no RNA/DNA entry has
+a missing uncertainty) — matches _Protein's type, required by _titrated. """
 const _RNA::Dict{String, Tuple{Int64, Float64, Float64}} =
     JSON3.read(
     read(joinpath(@__DIR__, "RNA", "rna.json"), String),
     Dict{String, Tuple{Int64, Float64, Float64}}
 )
 
-""" key => ((pKa, ionized_key), neutral_key), same shape as `_protein_ionization`. """
+""" key => ((pKa, ionized_key), neutral_key), same shape as _protein_ionization. """
 const _DNA_ionization::Dict{String, Tuple{Tuple{Float64, String}, String}} = JSON3.read(
     read(joinpath(@__DIR__, "DNA", "ionization.json"), String),
     Dict{String, Tuple{Tuple{Float64, String}, String}}
 )
 
-""" key => ((pKa, ionized_key), neutral_key), same shape as `_protein_ionization`. """
+""" key => ((pKa, ionized_key), neutral_key), same shape as _protein_ionization. """
 const _RNA_ionization::Dict{String, Tuple{Tuple{Float64, String}, String}} = JSON3.read(
     read(joinpath(@__DIR__, "RNA", "ionization.json"), String),
     Dict{String, Tuple{Tuple{Float64, String}, String}}
@@ -497,13 +497,13 @@ const _wildcards_nuc = Dict(
 """
     _wildcard_var(bases::Vector{String}, lookup::Function) -> Tuple{Int64, Float64, Float64}
 
-N-way average of a wildcard's component residues/bases: mean `pmv` and
-electron count, `variance = sum of variances / N²` (generalizes protein's
-inline 2-way wildcard averaging, which is just this formula's `N=2` case).
+N-way average of a wildcard's component residues/bases: mean pmv and
+electron count, variance = sum of variances / N² (generalizes protein's
+inline 2-way wildcard averaging, which is just this formula's N=2 case).
 
 # Arguments
-- `bases`: the residue/base codes to average over (e.g. `["A", "G"]` for `R`).
-- `lookup`: `base::AbstractString -> (electron_count, pmv, variance)`.
+- `bases`: the residue/base codes to average over (e.g. ["A", "G"] for R).
+- `lookup`: base::AbstractString -> (electron_count, pmv, variance).
 """
 function _wildcard_var(bases::Vector{String}, lookup::Function)::Tuple{Int64,Float64,Float64}
     n = length(bases)
@@ -520,22 +520,22 @@ end
         -> Tuple{Int64, Float64, Float64}
 
 Resolves a single nucleotide letter (or IUPAC ambiguity code) to
-`(electron_count, pmv, variance)`, normalizing plain/ionizable/wildcard
-lookups the same way `_residue_var` does for protein. `isDNA` selects which
+(electron_count, pmv, variance), normalizing plain/ionizable/wildcard
+lookups the same way _residue_var does for protein. isDNA selects which
 value/ionization table pair to resolve against.
 
 # Arguments
-- `res`: one-letter nucleotide or ambiguity code (`A/U/G/C` or `A/T/G/C`,
-    or any key of `_wildcards_nuc`).
-- `isDNA`: `true` to resolve against `_DNA`/`_DNA_ionization`, `false` for
-    `_RNA`/`_RNA_ionization`.
-- `pH`: solution pH, forwarded to `_titrated` for ionizable residues.
+- `res`: one-letter nucleotide or ambiguity code (A/U/G/C or A/T/G/C,
+    or any key of _wildcards_nuc).
+- `isDNA`: true to resolve against _DNA/_DNA_ionization, false for
+    _RNA/_RNA_ionization.
+- `pH`: solution pH, forwarded to _titrated for ionizable residues.
 
 # Keywords
-- `σ_pH`: standard uncertainty on `pH`; default `0.0`.
+- `σ_pH`: standard uncertainty on pH; default 0.0.
 
 # Throws
-- `ArgumentError` if `res` is not a recognized key.
+- `ArgumentError` if res is not a recognized key.
 """
 function _nuc_residue_var(
     res::AbstractString,
@@ -560,7 +560,7 @@ function _nuc_residue_var(
     end
 end
 
-"Bulk water molar volume at 25°C (cm³/mol), same Kell-equation source as `ρₑ_w`."
+"Bulk water molar volume at 25°C (cm³/mol), same Kell-equation source as ρₑ_w."
 const _H2O_V0_25C = 18.07
 
 """
@@ -569,25 +569,25 @@ const _H2O_V0_25C = 18.07
 
 Partial molar volume at infinite dilution of a DNA/RNA sequence at a given
 pH: takes a string of one-letter nucleotide codes (or IUPAC ambiguity
-codes) and returns `(total electron count, partial molar volume, uncertainty)`.
+codes) and returns (total electron count, partial molar volume, uncertainty).
 # Arguments
-- `isDNA`: `true` for a DNA sequence, `false` for RNA.
+- `isDNA`: true for a DNA sequence, false for RNA.
 - `pH`: solution pH the titration is evaluated at.
-- `seq`: sequence of one-letter nucleotide/ambiguity codes. `*` is a
+- `seq`: sequence of one-letter nucleotide/ambiguity codes. * is a
     no-op placeholder.
 
 # Keywords
-- `σ_pH`: standard uncertainty on `pH`, propagated through each ionizable
-    residue's titration term via `_titrated`; default `0.0`.
+- `σ_pH`: standard uncertainty on pH, propagated through each ionizable
+    residue's titration term via _titrated; default 0.0.
 
 # Returns
-`(electron_count, pmv, uncertainty)`.
+`(electron_count, pmv, uncertainty)`
 
 # Throws
-- `ArgumentError` if `seq` is empty.
-- `ArgumentError` (from `_nuc_residue_var`) if `seq` contains a character
-    that isn't a valid residue, ambiguity code, or `*` for the selected
-    `isDNA` alphabet.
+- `ArgumentError` if seq is empty.
+- `ArgumentError` (from _nuc_residue_var) if seq contains a character
+    that isn't a valid residue, ambiguity code, or * for the selected
+    isDNA alphabet.
 """
 function ϕ°(
     isDNA::Bool, 
@@ -636,14 +636,14 @@ end
 #                    Backend dispatch methods
 #----------------------------------------------------------
 # ϕ°/ρₑ_w are the stable API (abstract type + generic declared above); only
-# the backend (`src`, first argument) varies. The bare (`src`-less) forms are
-# the implementations above; these `PMVSrcTables`-taking methods are thin
-# wrappers over them, same convention as `form_factor_table`.
+# the backend (src, first argument) varies. The bare (src-less) forms are
+# the implementations above; these PMVSrcTables-taking methods are thin
+# wrappers over them, same convention as form_factor_table.
 
 """
     ρₑ_w(src::PMVSrcTables, t::Real) -> (ρₑ, uncertainty)
 
-Bulk electron density of pure water at `t` (°C), in e·Å⁻³. Thin wrapper over
+Bulk electron density of pure water at t (°C), in e·Å⁻³. Thin wrapper over
 the src-less [`ρₑ_w`](@ref).
 """
 ρₑ_w(::PMVSrcTables, t::Real)::Tuple{Float64,Float64} = ρₑ_w(t)
@@ -659,9 +659,9 @@ the src-less [`ρₑ_w`](@ref).
     ϕ°(src::PMVSrcTables, name::AbstractString)
         -> (electron_count, v0, uncertainty)
 
-Partial molar volume at infinite dilution (`v0` in cm³/mol) for a protein
+Partial molar volume at infinite dilution (v0 in cm³/mol) for a protein
 sequence at a given pH, or a non-protein solute by common or IUPAC name.
-`σ_pH` is the standard uncertainty on `pH`, propagated by the delta method
+σ_pH is the standard uncertainty on pH, propagated by the delta method
 (see the src-less [`ϕ°`](@ref)). Thin wrappers over the src-less [`ϕ°`](@ref).
 """
 ϕ°(
@@ -682,10 +682,10 @@ sequence at a given pH, or a non-protein solute by common or IUPAC name.
         σ_pH::Real = 0.0
     ) -> (electron_count, v0, uncertainty)
 
-Partial molar volume at infinite dilution (`v0` in cm³/mol) for a DNA/RNA
-sequence at a given pH. `isDNA` selects the `A/T/G/C` alphabet/backend
-table when `true`, `A/U/G/C` when `false`. `σ_pH` is the standard
-uncertainty on `pH`, propagated by the delta method (see the src-less
+Partial molar volume at infinite dilution (v0 in cm³/mol) for a DNA/RNA
+sequence at a given pH. isDNA selects the A/T/G/C alphabet/backend
+table when true, A/U/G/C when false. σ_pH is the standard
+uncertainty on pH, propagated by the delta method (see the src-less
 [`ϕ°`](@ref)). Thin wrapper over the src-less [`ϕ°`](@ref).
 """
 ϕ°(

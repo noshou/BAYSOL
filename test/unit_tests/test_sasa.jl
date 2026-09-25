@@ -140,10 +140,10 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
     @testset "coincident identical atoms are exactly zero" begin
         # Two atoms with the SAME centre and the SAME radius. Every sample point
         # of atom i sits at distance exactly ρ from atom j's centre, and the
-        # sampled test `dst² <= ρ_c²` is exactly on its boundary there.
+        # sampled test `dst² ≤ ρ_c²` is exactly on its boundary there.
         #
         # `classify`  decides it before any point is generated: d = 0 and
-        # ρᵢ = ρⱼ satisfies `d + ρᵢ <= ρⱼ`, so each atom is engulfed by the
+        # ρᵢ = ρⱼ satisfies `d + ρᵢ ≤ ρⱼ`, so each atom is engulfed by the
         # other and both are exactly 0.
         probe = 1.4
         for n_exp in (1, 100, 500, 2000, 10000)
@@ -166,11 +166,11 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
             a = sasa_atoms(m; n_occ = 50, n_exp = 4000, probe = probe)
             tot = sum(a)
 
-            @test tot <= prev_tot + 1e-9            # total never increases
-            @test a[1] <= prev[1] + 1e-9            # nor does either atom
-            @test a[2] <= prev[2] + 1e-9
+            @test tot ≤ prev_tot + 1e-9            # total never increases
+            @test a[1] ≤ prev[1] + 1e-9            # nor does either atom
+            @test a[2] ≤ prev[2] + 1e-9
 
-            if d >= 2 * ρ
+            if d ≥ 2 * ρ
                 @test tot == iso                    # no overlap -> exact
             else
                 @test tot < iso                     # overlap -> strictly less
@@ -322,7 +322,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         # one neighbour engulfs the other -> inner is exactly 0.0, outer exactly full
         eng = sasa_mol(["c", "d"], [(3.0, 0.0, 0.0), (0.0, 0.0, 0.0)])
         ρs = MolecularStructure.radii(eng)[1] + probe; ρb = MolecularStructure.radii(eng)[2] + probe
-        @test 3.0 + ρs <= ρb                       # geometry really is engulfment
+        @test 3.0 + ρs ≤ ρb                       # geometry really is engulfment
         for n_exp in (1, 16, 4096)
             a = sasa_atoms(eng; n_occ = 1, n_exp = n_exp, probe = probe)
             @test a[1] == 0.0
@@ -334,7 +334,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
     @testset "regression: sasa must not be identically zero (self-occlusion)" begin
         # Every sample point of atom i lies at exactly rads[i] + probe from atom
         # i's own centre, so an occlusion test that did not skip `self` would
-        # report `dst² <= ρ_self²` for every point of every atom and `sasa`
+        # report `dst² ≤ ρ_self²` for every point of every atom and `sasa`
         # would return 0.0 for every molecule. 
         probe = 1.4
         for m in (
@@ -376,10 +376,10 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         @test length(areas) == length(elms)
         @test length(areas) == size(MolecularStructure.coords_cartesian(m), 2)
         for (i, r) in enumerate(rs)
-            @test areas[i] >= 0.0
-            @test areas[i] <= sasa_full(r, probe)   # can never exceed a full sphere
+            @test areas[i] ≥ 0.0
+            @test areas[i] ≤ sasa_full(r, probe)   # can never exceed a full sphere
         end
-        @test sasa_total(m; n_occ = 40, n_exp = 1200, probe = probe) >= 0.0
+        @test sasa_total(m; n_occ = 40, n_exp = 1200, probe = probe) ≥ 0.0
     end
 
     @testset "determinism (quasi-random, not random)" begin
@@ -436,7 +436,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         @test !blocked((3.0, 0.0, 0.0), Int[], crds, rads, probe, 1)   # inside 2, but not a candidate
         @test !blocked((3.0, 0.0, 0.0), [2], crds, rads, probe, 2)     # only self
 
-        # boundary: `dst² <= ρ_c²` is inclusive, so exactly on the surface counts
+        # boundary: `dst² ≤ ρ_c²` is inclusive, so exactly on the surface counts
         @test blocked((1.5, 0.0, 0.0), [1], crds, rads, probe, 2)
 
         # probe widens the occluding sphere
@@ -449,7 +449,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
     @testset "larger molecule: 3x3x3 cubic lattice" begin
         # spacing a = 2.0, r = 1.5, probe = 1.4 -> ρ = 2.9. A point of the
         # centre atom in direction u is occluded by the axial neighbour ê iff
-        # u·ê >= a/(2ρ) = 0.345; over the six axial neighbours the worst-case
+        # u·ê ≥ a/(2ρ) = 0.345; over the six axial neighbours the worst-case
         # direction (1,1,1)/√3 still achieves 0.577 > 0.345, so the centre atom
         # is provably occluded in every direction -> exactly 0 for any n_exp.
         probe = 1.4
@@ -461,8 +461,8 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         iso = 27 * sasa_full(r, probe)
 
         @test length(areas) == 27
-        @test all(>=(0.0), areas)
-        @test all(a -> a <= sasa_full(r, probe), areas)
+        @test all(≥(0.0), areas)
+        @test all(a -> a ≤ sasa_full(r, probe), areas)
         @test 0.0 < total < iso
         @test total == sasa_total(m; n_occ = 50, n_exp = 1000, probe = probe)
 
@@ -534,7 +534,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         # both atoms are coincident; the larger engulfs the smaller, so at most
         # one atom's worth of points can survive
         @test size(pc, 2) == length(ac)
-        @test size(pc, 2) <= SASA._SHELL_SAMPLE
+        @test size(pc, 2) ≤ SASA._SHELL_SAMPLE
 
         # Total cloud area tracks sasa's own area estimate, since each point
         # carries 1/n_pts of its atom's sphere either way.
@@ -546,7 +546,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         # the budget caps the cloud and preserves the area it represents
         for n in (16, 64, 256)
             pn, an, _ = SASA.shell_points(m2; probe = probe, n_target = n)
-            @test size(pn, 2) <= n
+            @test size(pn, 2) ≤ n
             @test isapprox(sum(an), sum(pa2); rtol = 5e-2)
         end
 

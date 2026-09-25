@@ -85,7 +85,7 @@ for el, en, f1, f2 in src.execute("SELECT element, energy, f1, f2 FROM Chantler"
 
 for k, v in [
     ("f0_source",      "Waasmaier & Kirfel (1995) Acta Cryst A51, 416-431; doi:10.1107/S0108767394013292"),
-    ("f0_form",        "f0(s) = c + sum_{i=1..5} a_i*exp(-b_i*s^2), s = q/(4*pi) [1/Ang], valid 0 <= s <= 6"),
+    ("f0_form",        "f0(s) = c + sum_{i=1..5} a_i*exp(-b_i*s^2), s = q/(4*pi) [1/Ang], valid 0 ≤ s ≤ 6"),
     ("anomalous_source","Chantler FFAST (NIST), fine grid; J. Phys. Chem. Ref. Data 24 71 (1995), 29 597 (2000)"),
     ("anomalous_form", "f1 stored as f1_FFAST - Z + f_rel(3/5 CL) + f_NT (xraydb convention); f = f0 + f1 + i*f2"),
     ("extracted_from", "xraydb 4.5.8 xraydb.sqlite"),

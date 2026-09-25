@@ -21,12 +21,12 @@ const _INV_SQRT_2PI = 1.0 / sqrt(2.0 * π)
 """
     legendre_sphPlm(l::Integer, m::Integer, x::Real) -> Float64
 
-Normalized associated Legendre P̄_l^m(x) with Condon–Shortley phase (GSL `legendre_sphPlm`).
+Normalized associated Legendre P̄_l^m(x) with Condon–Shortley phase (GSL legendre_sphPlm).
 
 # Arguments
-- `l`: degree, `l >= 0`.
-- `m`: order, `0 <= m <= l`.
-- `x`: argument, typically `cos θ` in `[-1, 1]`.
+- `l`: degree, l ≥ 0.
+- `m`: order, 0 ≤ m ≤ l.
+- `x`: argument, typically cos θ in [-1, 1].
 """
 @inline legendre_sphPlm(l::Integer, m::Integer, x::Real)::Float64 =
     Plm(float(x), l, m; norm = Val(:normalized), csphase = true) * _INV_SQRT_2PI
@@ -34,16 +34,16 @@ Normalized associated Legendre P̄_l^m(x) with Condon–Shortley phase (GSL `leg
 """
     sphHarm(lMax::Int, θ::AbstractArray{<:Real}, φ::AbstractArray{<:Real}) -> Matrix{ComplexF64}
 
-Complex spherical harmonics Y_l^m for `l = 0..lMax`, `m = 0..l`. Rows are packed as
-`l*(l+1)÷2 + m + 1`; columns are input points.
+Complex spherical harmonics Y_l^m for l = 0..lMax, m = 0..l. Rows are packed as
+l*(l+1)÷2 + m + 1; columns are input points.
 
 # Arguments
-- `lMax`: maximum degree, `lMax >= 0`.
-- `θ`: 1-D vector of polar angles; same length as `φ`.
-- `φ`: 1-D vector of azimuthal angles; same length as `θ`.
+- `lMax`: maximum degree, lMax ≥ 0.
+- `θ`: 1-D vector of polar angles; same length as φ.
+- `φ`: 1-D vector of azimuthal angles; same length as θ.
 """
 function sphHarm(lMax::Int, θ::AbstractArray{<:Real}, φ::AbstractArray{<:Real})::Matrix{ComplexF64}
-    lMax < 0 && throw(SphHarmError("lMax must be >= 0"))
+    lMax < 0 && throw(SphHarmError("lMax must be ≥ 0"))
     (ndims(θ) == 1 && ndims(φ) == 1) || throw(SphHarmError("theta/phi must be 1-D"))
     (isempty(θ) || isempty(φ)) && throw(SphHarmError("theta/phi must be non-empty"))
     length(θ) == length(φ) || throw(SphHarmError("theta/phi length mismatch"))
@@ -66,14 +66,14 @@ end
 """
     sphHarm(lMax::Int, angles::AbstractMatrix{<:Real}) -> Matrix{ComplexF64}
 
-As [`sphHarm`](@ref) above, but reading the angles from a `(2, N)` matrix whose
-rows are `θ` and `φ` and whose columns are points — the column-per-atom layout
-`MolecularStructure.coords_spherical` produces, sliced to its two angular rows. Exactly
-`sphHarm(lMax, view(angles, 1, :), view(angles, 2, :))`.
+As [`sphHarm`](@ref) above, but reading the angles from a (2, N) matrix whose
+rows are θ and φ and whose columns are points — the column-per-atom layout
+MolecularStructure.coords_spherical produces, sliced to its two angular rows. Exactly
+sphHarm(lMax, view(angles, 1, :), view(angles, 2, :)).
 
 # Arguments
-- `lMax`: maximum degree, `lMax >= 0`.
-- `angles`: `(2, N)` real matrix; row 1 is `θ`, row 2 is `φ`.
+- `lMax`: maximum degree, lMax ≥ 0.
+- `angles`: (2, N) real matrix; row 1 is θ, row 2 is φ.
 """
 function sphHarm(lMax::Int, angles::AbstractMatrix{<:Real})::Matrix{ComplexF64}
     size(angles, 1) == 2 ||
@@ -84,23 +84,23 @@ end
 """
     sphBess(r::AbstractArray{<:Real}, q::AbstractArray{<:Real}, lMax::Int) -> Array{Float64,3}
 
-Spherical Bessel functions j_l for `l = 0..lMax` over the outer product `q ⊗ r`,
-shape `(lMax+1, |q|, |r|)`.
+Spherical Bessel functions j_l for l = 0..lMax over the outer product q ⊗ r,
+shape (lMax+1, |q|, |r|).
 
 # Arguments
-- `r`: non-empty vector of radii, all `>= 0`.
-- `q`: non-empty vector of q values, all `>= 0`.
-- `lMax`: maximum order, `lMax >= 0`.
+- `r`: non-empty vector of radii, all ≥ 0.
+- `q`: non-empty vector of q values, all ≥ 0.
+- `lMax`: maximum order, lMax ≥ 0.
 """
 function sphBess(r::AbstractArray{<:Real}, q::AbstractArray{<:Real}, lMax::Int)::Array{Float64,3}
     
     isempty(r) && throw(SphBessError("radii must be non-empty"))
     isempty(q) && throw(SphBessError("q grid must be non-empty"))
     
-    any(<(0), r) && throw(SphBessError("radii must be >= 0"))
-    any(<(0), q) && throw(SphBessError("q must be >= 0"))
+    any(<(0), r) && throw(SphBessError("radii must be ≥ 0"))
+    any(<(0), q) && throw(SphBessError("q must be ≥ 0"))
     
-    lMax < 0 && throw(SphBessError("lMax must be >= 0"))
+    lMax < 0 && throw(SphBessError("lMax must be ≥ 0"))
 
     rv, qv = vec(r), vec(q)
     j = Array{Float64,3}(undef, lMax + 1, length(qv), length(rv))
