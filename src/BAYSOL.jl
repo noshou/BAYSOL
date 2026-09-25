@@ -39,58 +39,60 @@ using .Fitting:                 Fitting
 
 Computes a NUTS seed from given data input:
     
-    1. resolve `mol_src` to a structure
+    1. resolve mol_src to a structure
     2. run PROPKA on the model 
     3. optionally add hydrogens (PDB2PQR, pH-driven)
     4. build the forward-model (gram matrix) 
-    5. compute the structure's screened-electrostatic `(μ_χ, σ_χ)` signal
+    5. compute the structure's screened-electrostatic (μ_χ, σ_χ) signal
     6. produce a [`Fitting.Seed`](@ref).
 
 # Arguments
 - `mol_src::MolecularStructure.StructureSource`: where to obtain the
-    structure from (`LocalPathSource`, `PDBIDSource`, or `URLSource`).
+    structure from ([`MolecularStructure.LocalPathSource`](@ref),
+    [`MolecularStructure.PDBIDSource`](@ref), or
+    [`MolecularStructure.URLSource`](@ref)).
 - `lMax::Int64`: spherical-harmonic band limit for the forward model.
 - `energy::Real`: beam energy in eV.
 - `qvals::AbstractVector`: momentum-transfer grid, Å⁻¹.
-- `I_exp::AbstractVector`, `σ_exp::AbstractVector`: measured intensity curve
-    and its per-point standard errors; must be the same length as `qvals`.
-- `pH::Real`: solution pH — drives `Protein`/`DNA`/`RNA` solute titration,
-    PDB2PQR's hydrogen placement (when `add_hydrogens=true`), and `Ionization`.
-- `σ_pH::Real`: standard uncertainty on `pH`, propagated through solute
-    titration and through `Ionization`'s `σ_charge`.
+- `I_exp::AbstractVector, σ_exp::AbstractVector`: measured intensity curve
+    and its per-point standard errors; must be the same length as qvals.
+- `pH::Real`: solution pH — drives [`Fitting.Protein`](@ref)/[`Fitting.DNA`](@ref)/[`Fitting.RNA`](@ref) solute titration,
+    PDB2PQR's hydrogen placement (when add_hydrogens=true), and [`MolecularStructure.Ionization`](@ref).
+- `σ_pH::Real`: standard uncertainty on pH, propagated through solute
+    titration and through [`MolecularStructure.Ionization`](@ref)'s σ_charge.
 - `solutes::Vector{Fitting.Solute}`: the species in solution.
 
 # Keywords
-- `add_hydrogens::Bool=true`: whether to run PDB2PQR at all
-    (`resolve_hydrogens(...; add=add_hydrogens)`); `false` is a genuine no-op
-    — the forward model then runs on the heavy-atom-only structure.
-- `blm_chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size, forwarded to
-    `forward_cache` (results invariant, cost/memory tradeoff only).
-- `thickness::Real = SHELL_THICKNESS`, `probe::Float64 = PROBE_RADIUS`,
+-   `add_hydrogens::Bool=true`: whether to run PDB2PQR at all
+    (resolve_hydrogens(...; add=add_hydrogens)); false is a no-op
+    and the forward model then runs on the heavy-atom-only structure.
+-   `blm_chunk::Unsigned = B_LM_CHUNK`: [`Scattering.compute_B_lm`](@ref) batch size, forwarded to
+    [`Scattering.forward_cache`](@ref) (results invariant, cost/memory tradeoff only).
+-   `thickness::Real = SHELLTHICKNESS`, `probe::Float64 = PROBERADIUS`,
     `n_target::Union{Nothing,Int} = SHELL_N_TARGET`: hydration-shell geometry,
-    forwarded to both `forward_cache` and `protein_cavity_electrostatics`
+    forwarded to [`Scattering.forward_cache`](@ref) and [`Solvation.protein_cavity_electrostatics`](@ref)
     (the same solvent-accessible-surface geometry underlies both).
-- `t::Real = DEFAULT_TEMPERATURE_C`: solution temperature in °C, forwarded to
-    `seed_fitting`/`_calc_ξ_priors`. **!!NOTE!!: should NOT be changed, since
+-   `t::Real = DEFAULT_TEMPERATURE_C`: solution temperature in °C, forwarded to
+    [`Fitting.seed_fitting`](@ref)/_calc_ξ_priors. **!!NOTE!!: should NOT be changed, since
     only water is temperature-dependent in this version.**
-- `n::Real = C1_PRIOR_MASS_PERCENT`: percentage `(0, 100]` of `c1_prior`'s
-    mass required within CRYSOL's `[0.96, 1.04]` bound; forwarded to
-    `seed_fitting`.
-- `ionic_strength_M::Float64 = IONIC_STRENGTH_M`, `eps_r::Float64 = WATER_EPS_R`,
+-   `n::Real = C1_PRIOR_MASS_PERCENT`: percentage (0, 100] of [`Fitting.c1_prior`](@ref)'s
+    mass required within CRYSOL's [0.96, 1.04] bound; forwarded to
+    [`Fitting.seed_fitting`](@ref).
+-   `ionicstrengthM::Float64 = IONICSTRENGTHM`, `epsr::Float64 = WATEREPSR`,
     `T::Float64 = DEBYE_TEMPERATURE_K`, `cutoff_debye_lengths::Float64 =
     CUTOFF_DEBYE_LENGTHS`: Debye-Hückel screening parameters, forwarded to
-    `protein_cavity_electrostatics`.
+    [`Solvation.protein_cavity_electrostatics`](@ref).
 
 # Returns
-- `(seed, μ_χ, σ_χ)`: `seed::Fitting.Seed` is ready to pass to
-    [`run_model`](@ref)/`Fitting.run_fitting`; `μ_χ`/`σ_χ` are the same
+-   `(seed, μ_χ, σ_χ)`: seed::Fitting.Seed is ready to pass to
+    [`run_model`](@ref)/[`Fitting.run_fitting`](@ref); μ_χ/σ_χ are the same
     screened-electrostatic cavity signal computed at step 5 above (and
-    already folded into `seed`'s priors) — returned separately so they can
+    already folded into seed's priors) — returned separately so they can
     be threaded into [`write_report`](@ref)'s diagnostics.
 
 # Exceptions
-- `DomainError`: `qvals`, `I_exp`, and `σ_exp` have mismatched lengths.
-- `ArgumentError`: `qvals`/`I_exp`/`σ_exp` are empty.
+- `DomainError`: qvals, Iexp, and σexp have mismatched lengths.
+- `ArgumentError`: qvals/Iexp/σexp are empty.
 """
 function seed_model(
     mol_src::MolecularStructure.StructureSource,
@@ -182,16 +184,14 @@ Parameter values at the single MAP (maximum a posteriori, i.e.
 highest-log-density non-divergent) draw found by [`run_model`](@ref), keyed
 by name:
 
-- `"log_density"`: the MAP draw's log-posterior density.
-- `"slvnt_e_dns"`, `"delta_rho_1"`, `"delta_rho_2"`, `"delta_rho_3"`,
-    `"excl_vol_corr"`: the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`
-    at that draw (see [`Fitting.Seed`](@ref) for the `ξ` ordering this is
-    read off of).
-- `"scale"`, `"bkgrnd_corr"`: the WLS-fit detector scale/background at that
-    draw.
-- `"chisq_red"`: the WLS fit's reduced χ² at that draw.
-- `"z_slvnt_e_dns"`, `"z_delta_rho_1"`, `"z_delta_rho_2"`, `"z_delta_rho_3"`,
-    `"z_excl_vol_corr"`: how many prior standard deviations (θ-space) the
+-   `log_density`: the MAP draw's log-posterior density.
+-   `slvntedns`, `deltarho1`, `deltarho2`, `deltarho3`,
+    `excl_vol_corr`: the physical parameters ξ = (dns, δρ1, δρ2, δρ3, c1)
+    at that draw (see [`Fitting.Seed`](@ref) for the ξ ordering this is read off of).
+-   `scale`, `bkgrndcorr`: the WLS-fit detector scale/background at that draw.
+-   `chisqred`: the WLS fit's reduced χ² at that draw.
+-   `zslvntedns`, `zdeltarho1`, `zdeltarho2`, `zdeltarho3`,
+    `z_excl_vol_corr`: how many prior standard deviations (θ-space) the
     corresponding physical parameter's MAP value sits from its prior mean.
 """
 const MAPParams = Dict{String, Float64}
@@ -199,17 +199,17 @@ const MAPParams = Dict{String, Float64}
 """
     MAPResult = Tuple{MAPParams, Matrix{Float64}}
 
-`(params, curve)` at the MAP draw.
+(params, curve) at the MAP draw.
 """
 const MAPResult = Tuple{MAPParams, Matrix{Float64}}
 
 """
     QuantileBounds = Dict{String, Tuple{Float64, Float64}}
 
-One parameter's `"quantiles"`/`"bounds"`/`"z"` triple (all `(lo, hi)` tuples):
-`"quantiles"` is the raw empirical `(q_1, q_2)` quantile pair; `"bounds"` is the
-`extrema` of exactly the draws that fall within `[lo, hi]`, so it can differ
-slightly from `"quantiles"` itself (it's the tightest interval that actually
+One parameter's quantiles/bounds/z triple (all (lo, hi) tuples):
+quantiles is the raw empirical (q1, q2) quantile pair; bounds is the
+extrema of exactly the draws that fall within [lo, hi], so it can differ
+slightly from quantiles itself (it's the tightest interval that actually
 contains data on both ends).
 """
 const QuantileBounds = Dict{String, Tuple{Float64, Float64}}
@@ -218,22 +218,22 @@ const QuantileBounds = Dict{String, Tuple{Float64, Float64}}
     QuantileParams = Dict{String, QuantileBounds}
 
 One [`QuantileBounds`](@ref) per parameter, over the same names as
-[`MAPParams`](@ref) (plus `"log_density"`, minus none).
+[`MAPParams`](@ref) (plus "logdensity", minus none).
 """
 const QuantileParams = Dict{String, QuantileBounds}
 
 """
     QuantileCurves = Dict{String, Matrix{Float64}}
 
-`"quantiles"`/`"bounds"` predicted-curve envelopes, each a `(Q, 3)` matrix
-whose columns are `(q, I_lo(q), I_hi(q))`.
+"quantiles"/"bounds" predicted-curve envelopes, each a (Q, 3) matrix
+whose columns are (q, Ilo(q), Ihi(q)).
 """
 const QuantileCurves = Dict{String, Matrix{Float64}}
 
 """
     QuantileResult = Tuple{QuantileParams, QuantileCurves}
 
-`(params, curve)`, the quantile-filtered counterpart of [`MAPResult`](@ref).
+(params, curve), the quantile-filtered counterpart of [`MAPResult`](@ref).
 """
 const QuantileResult = Tuple{QuantileParams, QuantileCurves}
 
@@ -250,71 +250,70 @@ const QuantileResult = Tuple{QuantileParams, QuantileCurves}
             Tuple{Fitting.FitResult, Float64, Nothing, Nothing}
         }
 
-Run NUTS on [`Fitting._logπ`](@ref) starting from `seed`, returning posterior
-draws of the physical parameters `ξ = (dns, δρ1, δρ2, δρ3, c1)`, one
-`(scale, bkgrnd_corr)` pair and predicted curve per draw, and
-`AdvancedHMC.jl`'s diagnostics.
+Run NUTS on [`Fitting._logπ`](@ref) starting from seed, returning posterior
+draws of the physical parameters ξ = (dns, δρ1, δρ2, δρ3, c1), one
+(scale, bkgrndcorr) pair and predicted curve per draw, and
+AdvancedHMC.jl's diagnostics.
 
 # The Hamiltonian
 
-HMC adds an auxiliary momentum `r ~ N(0, M)` (`M` the mass matrix) and defines 
+HMC adds an auxiliary momentum r ~ N(0, M) (M the mass matrix) and defines
 a Hamiltonian:
 
     H(θ, r) = -log π(θ) + ½ rᵀM⁻¹r
 
-with potential energy as the negative log-posterior, and Gaussian kinetic energy. 
+with potential energy as the negative log-posterior, and Gaussian kinetic energy.
 Leapfrog integration simulates the system's dynamics forward in time,
-alternating half-steps in `r` with full steps in `θ`:
+alternating half-steps in r with full steps in θ:
 
     r ← r - (ε/2)·∇[-log π(θ)]
     θ ← θ + ε·M⁻¹r
     r ← r - (ε/2)·∇[-log π(θ)]
 
-which needs `∇[log π(θ)]` at every step.
+which needs ∇[log π(θ)] at every step.
 
 Because energy is conserved, leapfrog proposes long, correlated jumps through
 parameter space far more cheaply than random-walk Metropolis. NUTS removes the 
 need to hand-pick a trajectory length: it grows the leapfrog trajectory by 
 doubling a binary tree of steps, forward and backward in time, until the trajectory
-starts to double back on itself (a "U-turn"), then samples from the valid part of that tree.
+starts to double back on itself (a U-turn), then samples from the valid part of that tree.
 
 # Step-size adaptation
 
-`δ` is the target Metropolis acceptance rate. During the first `n_adapt` iterations,
-`StepSizeAdaptor` tunes the leapfrog step size `ε` via dual-averaging so the
-empirical acceptance rate converges to `δ`; too-small `ε` wastes computation
-taking tiny steps, too-large `ε` causes leapfrog's discretization error (and
-therefore the rejection rate) to blow up. `MassMatrixAdaptor` learns `M` (here the 
-full parameter covariance, since `dns`/`δρ`/`c1` are physically coupled through the 
+δ is the target Metropolis acceptance rate. During the first nadapt iterations,
+StepSizeAdaptor tunes the leapfrog step size ε via dual-averaging so the
+empirical acceptance rate converges to δ; too-small ε wastes computation
+taking tiny steps, too-large ε causes leapfrog's discretization error (and
+therefore the rejection rate) to blow up. MassMatrixAdaptor learns M (here the
+full parameter covariance, since dns/δρ/c1 are physically coupled through the
 forward model) from the trajectory's sample covariance.
 
 # Arguments
 - `seed::Seed`: priors, initial point, forward cache, and data.
 - `n_samples::Int64`: total number of NUTS iterations (including the
-    `n_adapt` warm-up steps,.
+    n_adapt warm-up steps,.
 - `n_adapt::Int64`: number of warm-up iterations spent adapting the step
     size and mass matrix before sampling proper.
 
 # Keywords
-- `quantiles::AbstractString="16-84"`: the `"<lo>-<hi>"` empirical quantile
-    range (integer percentages, `0 <= lo < hi <= 100`) used to build
-    [`QuantileResult`](@ref)'s `"quantiles"`/`"bounds"` entries, e.g. the
-    default `"16-84"` is a ±1σ-equivalent interval for a Normal. The special
-    case `"0-0"` means *no* filtering.
-- `l::LIKELIHOOD=PROFILE()`: `PROFILE()` or `MARGINAL()`, forwarded to
+- `quantiles::AbstractString="16-84"`: the "<lo>-<hi>" empirical quantile
+    range (integer percentages, 0 ≤ lo < hi ≤ 100) used to build
+    [`QuantileResult`](@ref)'s "quantiles"/"bounds" entries, e.g. the
+    default "16-84" is a ±1σ-equivalent interval for a Normal. The special
+    case "0-0" means *no* filtering.
+- `l::LIKELIHOOD=PROFILE()`: PROFILE() or MARGINAL(), forwarded to
     [`Fitting._logπ`](@ref)/[`Fitting._ll`](@ref).
-- `δ::Real=80`: target acceptance rate as a percentage, `(0, 100)` exclusive
+- `δ::Real=80`: target acceptance rate as a percentage, (0, 100) exclusive
     (validated below); Stan's usual default of 80% is used here too absent a
     specific reason to retarget it.
 
 # Returns
-A 4-tuple `(fit, divergence_rate, map, curve)`:
+A 4-tuple (fit, divergencerate, map, curve):
 
-- `fit::Fitting.FitResult`: the warm-up free posterior.
-- `divergence_rate::Float64`: fraction of `fit`'s draws AdvancedHMC.jl
-    flagged as numerically divergent, `[0, 1]`.
-- `map`/`curve`: **either** both `nothing` **or** a 
-    [`MAPResult`](@ref)/[`QuantileResult`](@ref) pair.
+-   `fit::Fitting.FitResult`: the warm-up free posterior.
+-   `divergence_rate::Float64`: fraction of fit's draws AdvancedHMC.jl
+    flagged as numerically divergent, [0, 1].
+-   `map/curve`: either both nothing or a [`MAPResult`](@ref)/[`QuantileResult`](@ref) pair.
 """
 function run_model(
     seed::Fitting.Seed,
@@ -336,7 +335,7 @@ function run_model(
         q_match = match(q_regex, quantiles)
         q_1 = parse(Int64, q_match.captures[1])
         q_2 = parse(Int64, q_match.captures[2])
-        if ((q_1 >= q_2) || q_1 < 0 || q_1 > 100 || q_2 < 0 || q_2 > 100)
+        if ((q_1 ≥ q_2) || q_1 < 0 || q_1 > 100 || q_2 < 0 || q_2 > 100)
             # special case: "0-0" means no quantile filtering
             if !(q_1 == 0 && q_2 == 0)
                 throw(DomainError((q_1, q_2), "invalid quantile range"))
@@ -442,7 +441,7 @@ function run_model(
 
         # returns a tuple of (low, high) bounds; fails loudly
         function map_bounds(lo, hi, x)
-            filtered = (item for item in x if lo <= item <= hi)
+            filtered = (item for item in x if lo ≤ item ≤ hi)
             if (isempty(filtered))
                 error("Illegal state: filtered cannot be empty!")
             end
@@ -520,7 +519,7 @@ function run_model(
 
 end
 
-"Order the physical/derived parameters are reported in, by `write_report`."
+"Order the physical/derived parameters are reported in, by [`write_report`](@ref)."
 const _REPORT_KEYS = [
     "log_density", "slvnt_e_dns", "delta_rho_1", "delta_rho_2",
     "delta_rho_3", "excl_vol_corr", "scale", "bkgrnd_corr", "chisq_red",
@@ -531,7 +530,7 @@ const _PRIOR_KEYS = [
     "slvnt_e_dns", "delta_rho_1", "delta_rho_2", "delta_rho_3", "excl_vol_corr",
 ]
 
-"Display labels for `write_report`'s text output."
+"Display labels for [`write_report`](@ref)'s text output."
 const _REPORT_LABELS = Dict{String, String}(
     "log_density"   => "log_density",
     "slvnt_e_dns"   => "ρₑ",
@@ -558,43 +557,28 @@ const _REPORT_LABELS = Dict{String, String}(
         form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}}=nothing
     )
 
-Writes a summary of a [`run_model`](@ref) `result` to `io`.
+Writes a summary of a [`run_model`](@ref) result to io.
 
 # Arguments
-- `io::IO`: where to write; omit for `stdout`.
-- `result`: a `run_model` return value, `(fit, divergence_rate, map, curve)`.
+- `io::IO`: where to write; omit for stdout.
+- `result`: a [`run_model`](@ref) return value, (fit, divergencerate, map, curve).
 
 # Keywords
-- `quantile_label::AbstractString="16-84"`
-- `μ_χ::Union{Nothing,Real}=nothing`, `σ_χ::Union{Nothing,Real}=nothing`:
-    the `(μ_χ, σ_χ)` returned alongside the seed by [`seed_model`](@ref).
-    Default `nothing` prints nothing for either field; passing either one
-    adds it to the `"=== Diagnostics ==="` footer.
-- `form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}}=nothing`:
-    the seed's `seed.fw.form_factor_log`.
+-   `quantilelabel::AbstractString="16-84"`
+-   `μχ::Union{Nothing,Real}=nothing, σχ::Union{Nothing,Real}=nothing`:
+    the (μ_χ, σ_χ) returned alongside the seed by [`seed_model`](@ref).
+    Default nothing prints nothing for either field; passing either one
+    adds it to the "=== Diagnostics ===" footer.
+- `formfactorlog::Union{Nothing,AbstractVector{<:AbstractString}}=nothing`:
+    the seed's seed.fw.form_factor_log.
 
-# EBFMI vs. `AdvancedHMC`'s own logged `EBFMI_est`
+# Logged EBFMI vs. AdvancedHMC's logged EBFMIest
 
-The `"EBFMI"` line in this report's `"=== Diagnostics ==="` footer and the
-`EBFMI_est` `AdvancedHMC.jl` itself logs to the console during sampling use
-the *identical* formula (`mean(diff(H).^2) / var(H)`, `H` = per-draw
-Hamiltonian energy) but over different slices of the chain, so the two
-numbers legitimately disagree -- this is not a bug in either computation.
-
-`Fitting.run_fitting`'s call to `AdvancedHMC.sample` doesn't pass
-`drop_warmup`, so it defaults to `false`: `AdvancedHMC`'s own `stats` (and
-therefore its logged `EBFMI_est`) covers *every* sampling step, including
-the `n_adapt` warmup/adaptation draws. This report's `EBFMI`, by contrast,
-is computed from `fit.stats`, which [`run_model`](@ref) has already sliced
-to `fit_unfiltered.stats[n_adapt+1:end]` -- strictly post-warmup.
-
-Warmup has much more volatile `H` (the step size and mass matrix are still
-being adapted), so including vs. excluding it can swing the ratio by a
-large factor even though both are "correct" EBFMI values for the chain
-segment they're actually computed over. This report's post-warmup-only
-figure is the more standard one (matching Stan's own E-BFMI convention);
-`AdvancedHMC`'s console log is the less diagnostically meaningful of the
-two here, since it's diluted by the adaptation phase.
+The "EBFMI" line in this report's "=== Diagnostics ===" footer and the
+EBFMIest AdvancedHMC.jl logs to the console during sampling use
+the same formula (mean(diff(H).^2) / var(H), H = per-draw
+Hamiltonian energy), but AdvancedHMC.jl's logs warmup draws which skews 
+its result.
 """
 function write_report(
     io::IO, result;

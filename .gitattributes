@@ -1,3 +1,13 @@
 # GitHub Linguist overrides.
 *.toml         linguist-detectable=true
 Manifest.toml  linguist-generated=false
+
+*.scss  linguist-detectable=true
+*.css   linguist-detectable=true
+*.js    linguist-detectable=true
+# Hand-written -- override Linguist's documentation heuristic, which
+# otherwise excludes anything under docs/ from language stats.
+docs/src/assets/themes/academic.scss linguist-documentation=false
+# documenter-light.css is compiled output of academic.scss (see docs/make.jl),
+# not hand-authored -- stays excluded from language stats.
+docs/src/assets/themes/documenter-light.css linguist-generated=true

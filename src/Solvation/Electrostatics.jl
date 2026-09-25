@@ -2,7 +2,7 @@
 
 """
 Screened electrostatic field at cavity beads, aggregated over
-`SASA.CAVITY`-class hydration beads. Physics follows Laage, Elsaesser &
+SASA.CAVITY-class hydration beads. Physics follows Laage, Elsaesser &
 Hynes, "Water Dynamics in the Hydration Shells of Biomolecules" (Chem. Rev.
 2017, 117, 10694-10725), section 5.1: the linearized Poisson-Boltzmann
 (Debye-Huckel) screened potential/field of a point charge in an ionic
@@ -27,10 +27,10 @@ using NearestNeighbors: KDTree, inrange
 """
     debye_length(; ionic_strength_M, eps_r, T) -> Float64
 
-Debye screening length `1/κ` (Å) of a 1:1 electrolyte, from the linearized
-Poisson-Boltzmann equation's `κ² = 2 N_A e² I / (ε₀ ε k_B T)` (Laage,
+Debye screening length 1/κ (Å) of a 1:1 electrolyte, from the linearized
+Poisson-Boltzmann equation's κ² = 2 N_A e² I / (ε₀ ε k_B T) (Laage,
 Elsaesser & Hynes 2017, section 5.1, eq. 2's screening term). At the default
-keywords this evaluates to `≈ 8 Å`, matching the paper's observation that
+keywords this evaluates to ≈ 8 Å, matching the paper's observation that
 interfacial fields are confined to roughly the first two hydration layers.
 
 # Keywords
@@ -58,8 +58,8 @@ end
 """
     _bonded(tree, crds, i, exclude) -> Vector{Int}
 
-Indices of atoms within [`BOND_CUTOFF`](@ref) of atom `i`, excluding `i`
-itself and `exclude`.
+Indices of atoms within [`BOND_CUTOFF`](@ref) of atom i, excluding i
+itself and exclude.
 """
 function _bonded(tree::KDTree, crds::Matrix{Float64}, i::Int, exclude::Int)::Vector{Int}
     nb = inrange(tree, view(crds, :, i), BOND_CUTOFF)
@@ -69,12 +69,12 @@ end
 """
     _phosphate_charge_sites(mol) -> Vector{Tuple{Int,Float64}}
 
-Every nucleic-acid phosphate group in `mol`, as `(atom_index, charge_e)`
-pairs. A phosphate group is found by element symbol  (a `"p"` atom and
-its bonded `"o"` neighbours), since `Molecule` carries no residue identity.
+Every nucleic-acid phosphate group in mol, as (atom_index, charge_e)
+pairs. A phosphate group is found by element symbol  (a "p" atom and
+its bonded "o" neighbours), since Molecule carries no residue identity.
 
 Within each group, an oxygen bonded to nothing but the phosphorus is
-non-bridging (the charge-bearing `PO₂⁻`-type oxygens); one also bonded to a
+non-bridging (the charge-bearing PO₂⁻-type oxygens); one also bonded to a
 further heavy atom (the sugar carbon) is bridging and carries no charge.
 
 A molecule with no phosphorus atoms returns an empty vector.
@@ -112,11 +112,11 @@ end
     _protein_charge_sites(residues, ionization) -> Vector{Tuple{Int,Float64,Float64}}
 
 Every atom [`Ionization`](@ref) actually assigned a nonzero charge or
-charge-uncertainty to, as `(atom_index, charge, σ_charge)` triples.
+charge-uncertainty to, as (atom_index, charge, σ_charge) triples.
 
-Throws `ArgumentError` if `residues.resname` and `ionization.charge` don't
+Throws ArgumentError if residues.resname and ionization.charge don't
 have matching length. A molecule with no ionizable residues (or an
-`ionization` that assigned zero to every atom) returns an empty vector.
+ionization that assigned zero to every atom) returns an empty vector.
 """
 function _protein_charge_sites(residues::Residues, ionization::Ionization)::Vector{Tuple{Int,Float64,Float64}}
     n = length(residues.resname)
@@ -140,12 +140,12 @@ end
     _screened_field(q_e, r_angstrom, kappa_inv_angstrom, eps_r) -> Float64
 
 Magnitude of the linearized-PB (Debye-Huckel) screened electric field, in
-MV/cm, at distance `r_angstrom` (> 0) from a point charge `q_e` (elementary-
-charge units), screened over `kappa_inv_angstrom`:
+MV/cm, at distance r_angstrom (> 0) from a point charge q_e (elementary-
+charge units), screened over kappa_inv_angstrom:
 
-`E(r) = |q|/(4πε₀ε) · exp(-κr) · (1/r² + κ/r)`
+E(r) = |q|/(4πε₀ε) · exp(-κr) · (1/r² + κ/r)
 
-The sign of `q_e` is discarded: per Merzel & Smith 2002, both cationic and
+The sign of q_e is discarded: per Merzel & Smith 2002, both cationic and
 anionic surface groups correlate with denser hydration, so only the field
 magnitude (not its direction) feeds the aggregate signal.
 """
@@ -169,7 +169,7 @@ end
 """
     _sample_std(v, μ) -> Float64
 
-Sample standard deviation of `v` about a precomputed mean `μ`; `v` must have
+Sample standard deviation of v about a precomputed mean μ; v must have
 at least 2 elements.
 """
 function _sample_std(v::Vector{Float64}, μ::Float64)::Float64
@@ -184,47 +184,29 @@ end
     _aggregate(mol, pts, sel, sites; ionic_strength_M, eps_r, T, cutoff_debye_lengths) -> (μ_χ, σ_χ)
 
 Screened-field signal at each selected bead: the sum of [`_screened_field`](@ref)
-over every `(atom_index, charge_e, σ_charge_e)` triple in `sites` within
-`cutoff_debye_lengths` Debye lengths, then the mean/std across `sel`.
+over every (atom_index, charge_e, σ_charge_e) triple in sites within
+cutoff_debye_lengths Debye lengths, then the mean/std across sel.
 
-`σ_χ` combines two genuinely different sources of spread, in quadrature
-(`σ_χ = sqrt(σ_χ,spatial² + σ_χ,pH²)`):
+σ_χ combines two genuinely different sources of spread, in quadrature
+(σ_χ = sqrt(σ_χ,spatial² + σ_χ,pH²)):
 
-- `σ_χ,spatial`: the existing purely-geometric spread of the deterministic
-  per-bead signal across `sel` (unchanged from before `Ionization` was
-  wired in) — how much the *signal itself* varies bead-to-bead.
-- `σ_χ,pH`: first-order (delta-method) propagation of each site's
-  `σ_charge` (itself derived from a shared solution `σ_pH`, see
-  [`Ionization`](@ref)) into the field. `_screened_field` is exactly linear
-  in `|q|` (`field = |q|·C(r)` for a `q`-independent `C(r)`), so a single
-  site's field-uncertainty contribution is `σ_field,i = (field_i/|q_i|)·σ_charge_i`
-  (special-cased to `0` when `q_i == 0`, since that site then contributes no
-  field and no field-uncertainty regardless).
-
-  **Documented approximation, not an exact treatment**: every site's
-  `σ_charge` ultimately derives from the *same* shared `σ_pH`, so the
-  sites' charge fluctuations are correlated, not independent — the
-  mathematically correct combination would need *signed*
-  `∂charge_i/∂pH` sensitivities summed linearly before taking a magnitude,
-  which `Ionization.σ_charge` (a magnitude-only quantity) doesn't carry.
-  Absent that sign information, each bead's per-site field-uncertainty
-  contributions are combined via quadrature too
-  (`σ_χ,pH,bead = sqrt(Σᵢ σ_field,i²)`), the same independence assumption
-  applied consistently at every level of this calculation rather than
-  mixing rigor levels arbitrarily. Per-bead `σ_χ,pH,bead` values are then
-  aggregated across `sel` the same way the spatial term already is (mean
-  of `vals`, `_sample_std` of `pH_vals` about that mean).
-
-  When every site's `σ_charge == 0` (e.g. `σ_pH == 0`), every
-  `σ_field,i == 0`, so `σ_χ,pH` is exactly `0.0`, recovering the
-  purely-spatial `σ_χ` as a special case.
+- σ_χ,spatial: the existing purely-geometric spread of the deterministic
+    per-bead signal across sel (unchanged from before Ionization was
+    wired in) — how much the *signal itself* varies bead-to-bead.
+- σ_χ,pH: first-order (delta-method) propagation of each site's
+    σ_charge (itself derived from a shared solution σ_pH, see
+    [`Ionization`](@ref)) into the field. _screened_field is exactly linear
+    in |q| (field = |q|·C(r) for a q-independent C(r)), so a single
+    site's field-uncertainty contribution is σ_field,i = (field_i/|q_i|)·σ_charge_i
+    (special-cased to 0 when q_i == 0, since that site then contributes no
+    field and no field-uncertainty regardless).
 
 # Arguments
 - `mol`: molecule the beads belong to.
-- `pts::Matrix{Float64}`, `(3, M)`: bead positions, `mol`'s centred frame.
-- `sel::Vector{Int}`: column indices into `pts` to aggregate over.
-- `sites::Vector{Tuple{Int,Float64,Float64}}`: `(atom_index, charge_e,
-    σ_charge_e)` triples to sum the screened field (and its pH-driven
+- `pts::Matrix{Float64}, (3, M)`: bead positions, mol's centred frame.
+- `sel::Vector{Int}`: column indices into pts to aggregate over.
+- `sites::Vector{Tuple{Int,Float64,Float64}}`: (atom_index, charge_e,
+    σ_charge_e) triples to sum the screened field (and its pH-driven
     uncertainty) over.
 """
 function _aggregate(
@@ -264,8 +246,8 @@ function _aggregate(
 
     # σ_χ,pH: mean across beads of each bead's own pH-driven field-uncertainty
     # (the same "fold an array of per-bead values into one scalar via their
-    # mean" reduction _aggregate already uses to turn `vals` into `μ`) --
-    # not a second std-across-beads, since `pH_vals` are themselves already
+    # mean" reduction _aggregate already uses to turn vals into μ) --
+    # not a second std-across-beads, since pH_vals are themselves already
     # per-bead uncertainties, not per-bead point estimates.
     σ_χ_pH = sum(pH_vals) / length(pH_vals)
 
@@ -288,10 +270,10 @@ end
         cutoff_debye_lengths
     ) -> (μ_χ, σ_χ)
 
-Screened-electrostatic cavity-water contrast signal for `DeltaRho.δρ_prior`'s
-`(μ_χ, σ_χ)` keywords, from `mol`'s nucleic-acid phosphate groups (see
-[`_phosphate_charge_sites`](@ref)). Runs `SASA.shell_points`, then delegates
-every `CAVITY`-class bead to [`_aggregate`](@ref).
+Screened-electrostatic cavity-water contrast signal for DeltaRho.δρ_prior's
+(μ_χ, σ_χ) keywords, from mol's nucleic-acid phosphate groups (see
+[`_phosphate_charge_sites`](@ref)). Runs SASA.shell_points, then delegates
+every CAVITY-class bead to [`_aggregate`](@ref).
 
 Protein ionizable side chains carry no charge here.
 
@@ -300,14 +282,14 @@ Protein ionizable side chains carry no charge here.
     positions are used.
 
 # Keywords
-- `probe::Float64 = PROBE_RADIUS`: solvent probe radius, forwarded to `SASA.shell_points`.
+- `probe::Float64 = PROBE_RADIUS`: solvent probe radius, forwarded to SASA.shell_points.
 - `n_target::Union{Nothing,Int} = SHELL_N_TARGET`: shell point budget, forwarded to
-    `SASA.shell_points`.
-- `ionic_strength_M::Float64 = IONIC_STRENGTH_M`, `eps_r::Float64 = WATER_EPS_R`,
-    `T::Float64 = DEBYE_TEMPERATURE_K`: forwarded to [`debye_length`](@ref).
+    SASA.shell_points.
+- ionic_strength_M::Float64 = IONIC_STRENGTH_M, eps_r::Float64 = WATER_EPS_R,
+    T::Float64 = DEBYE_TEMPERATURE_K: forwarded to [`debye_length`](@ref).
 - `cutoff_debye_lengths::Float64 = CUTOFF_DEBYE_LENGTHS`: charge sites beyond this many Debye
-    lengths from a bead are dropped (`exp(-5) ≈ 0.007`, already negligible
-    next to the screened `1/r` prefactor).
+    lengths from a bead are dropped (exp(-5) ≈ 0.007, already negligible
+    next to the screened 1/r prefactor).
 """
 function nucleic_acid_cavity_electrostatics(
     mol::Molecule;
@@ -321,7 +303,7 @@ function nucleic_acid_cavity_electrostatics(
     pts, _, class = SASA.shell_points(mol; probe = probe, n_target = n_target)
     sel = findall(==(SASA.CAVITY), class)
     # Phosphate charges carry no pH-driven uncertainty (fixed stoichiometry,
-    # not `Ionization`-derived); pad with σ_charge = 0.0 to match _aggregate's
+    # not Ionization-derived); pad with σ_charge = 0.0 to match _aggregate's
     # shared (atom_index, charge, σ_charge) triple contract -- this leaves
     # the deterministic signal and its (purely spatial) σ_χ unchanged, since
     # every σ_field this contributes is 0.
@@ -346,20 +328,20 @@ end
     cutoff_debye_lengths
 ) -> (μ_χ, σ_χ)
 
-Screened-electrostatic cavity-water contrast signal for `DeltaRho.δρ_prior`'s
-`(μ_χ, σ_χ)` keywords, from `mol`'s ionizable protein side chains (see
+Screened-electrostatic cavity-water contrast signal for DeltaRho.δρ_prior's
+(μ_χ, σ_χ) keywords, from mol's ionizable protein side chains (see
 [`_protein_charge_sites`](@ref) and [`Ionization`](@ref)). Runs
-`SASA.shell_points`, then delegates every `CAVITY`-class bead to
-[`_aggregate`](@ref), which also folds `ionization`'s per-atom `σ_charge`
-(pH-driven) into `σ_χ` alongside the purely-spatial spread across beads --
+SASA.shell_points, then delegates every CAVITY-class bead to
+[`_aggregate`](@ref), which also folds ionization's per-atom σ_charge
+(pH-driven) into σ_χ alongside the purely-spatial spread across beads --
 see [`_aggregate`](@ref)'s docstring for the exact combination.
 
 # Arguments
 - `mol`: molecule to score; only its cavity-facing surface and ionizable
     side-chain positions are used.
-- `residues::Residues`: per-atom residue identity for `mol` (only its
-    `resname` field's length is consulted here; matched against `ionization`).
-- `ionization::Ionization`: per-atom charge/σ_charge for `residues`, from
+- `residues::Residues`: per-atom residue identity for mol (only its
+    resname field's length is consulted here; matched against ionization).
+- `ionization::Ionization`: per-atom charge/σ_charge for residues, from
     real per-residue-instance pKa's via Henderson-Hasselbalch (see
     [`Ionization`](@ref)).
 

@@ -205,7 +205,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   
         m = elec_mol(vcat(shell_elms, phos_elms), vcat(shell_crds, phos_crds))
         μ, σ = nucleic_acid_cavity_electrostatics(m; probe = 1.4)
         @test μ > 0.0
-        @test σ >= 0.0
+        @test σ ≥ 0.0
     end
 
     #------------------------------------------------------------------
@@ -340,7 +340,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   
 
         μ, σ = protein_cavity_electrostatics(m, residues, ionization; probe = 1.4)
         @test μ > 0.0
-        @test σ >= 0.0
+        @test σ ≥ 0.0
     end
 
     @testset "protein_cavity_electrostatics: σ_pH = 0 recovers purely-spatial σ_χ (regression boundary)" begin
@@ -368,7 +368,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   
         @test close_(μ0, μpos)
         # with σ_pH = 0 every site's σ_charge is 0, so σ_χ is purely spatial;
         # with σ_pH > 0 the pH-driven quadrature term only adds spread.
-        @test σpos >= σ0
+        @test σpos ≥ σ0
     end
 
     #------------------------------------------------------------------

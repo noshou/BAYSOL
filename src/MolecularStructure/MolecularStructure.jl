@@ -5,11 +5,7 @@ module MolecularStructure
 """
     _store_dir() -> String
 
-Package-root-relative, gitignored local store (`_cache/`) shared by every
-part of this pipeline that persists files across runs (PROPKA's `.pka`
-output, resolved structures, etc.) without version-controlling them.
-Resolved via `pkgdir`, not `pwd()`, so it's stable regardless of the
-caller's working directory. Created on first use.
+Package-root-relative  local store (_cache/). Created on first use.
 """
 function _store_dir()::String
     dir = joinpath(pkgdir(@__MODULE__), "_cache")

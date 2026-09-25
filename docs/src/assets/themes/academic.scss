@@ -96,7 +96,42 @@ $todo: $purple;
 $admonition-default: hsl(0, 0%, 29%);
 $grey: hsl(0, 0%, 42%);
 
-$background: #faf7f0;
+// NOT `$background` -- that's Bulma's own core derived variable
+// ($background: $white-ter !default, bulma/utilities/derived-variables.sass),
+// consumed by dozens of unrelated components (tags, notifications,
+// dropdowns, modals, hr, admonitions). An earlier version of this file set
+// `$background` directly, which silently hijacked all of that.
+//
+// The actual page-background variable is `$body-background-color`
+// (bulma/base/generic.sass), which both `body` itself AND
+// `header.docs-navbar` (documenter/layout/_main.scss), footnotes, and
+// example blocks all read from -- setting it once, correctly, colors all
+// of those consistently. A hand-written `body { background: ... }` rule
+// (what an earlier version of this file did instead) only ever touches
+// `body` itself, leaving the navbar bar white and creating a visible seam
+// at the top of the page -- the actual variable is the fix, not a
+// competing CSS rule.
+$body-background-color: #faf7f0;
+// Same story for the sidebar: `#documenter .docs-sidebar { ... }` reads
+// `$documenter-sidebar-background`/`-color` and derives every hover/active
+// state from them (documenter/_overrides.scss) -- setting these directly
+// is the first-class way to theme the sidebar, and avoids re-fighting
+// Documenter's own selector specificity by hand (an earlier version of
+// this file tried plain `.docs-sidebar { background: ... }` overrides,
+// which either lost to Documenter's own higher-specificity rules or only
+// worked with `!important` in specific spots).
+$documenter-sidebar-background: #1d3557;
+$documenter-sidebar-color: #e8ecf3;
+$documenter-sidebar-menu-hover-background: #24406e;
+$documenter-sidebar-menu-hover-color: $documenter-sidebar-color;
+// No white-pill box for the active/current-page item -- text-only
+// distinction (white + bold, via the .is-active rule below), same
+// background as the rest of the sidebar.
+$documenter-sidebar-menu-active-background: $documenter-sidebar-background;
+$documenter-sidebar-menu-active-color: #ffffff;
+$documenter-sidebar-menu-active-hover-background: #24406e;
+$documenter-sidebar-menu-active-hover-color: #ffffff;
+
 $family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif !default;
 $family-serif: "TeX Gyre Pagella", Palatino, Georgia, serif;
 $family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace !default;
@@ -139,9 +174,10 @@ code.language-julia-repl > span.hljs-meta {
 }
 
 // ---- Our own reskin, unscoped (applies unconditionally, see note above) --
+// Page/navbar background and sidebar colors are set via the real Sass
+// variables above, not hand-written rules here -- see the comments there.
 
 body {
-  background: $background;
   color: #2b2b2b;
 }
 
@@ -165,32 +201,71 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 
-// sidebar + nav in Montserrat. Real Documenter markup: <nav
-// class="docs-sidebar"> containing <ul> of <li><a class="tocitem">...</a>;
-// the current page's link additionally gets "is-active" -- confirmed
-// against an actual local build, not guessed.
-.docs-sidebar,
-.docs-sidebar * {
+// Sidebar background/text/hover/active colors all come from the
+// $documenter-sidebar-* variables above (including the package-name link,
+// via #documenter .docs-sidebar .docs-package-name a { color:
+// $documenter-sidebar-color }, documenter/layout/_sidebar.scss) -- only
+// font-family, the inactive-item muted color, and the active item's
+// text weight need a rule here (no background box for the active item --
+// see $documenter-sidebar-menu-active-background above).
+#documenter .docs-sidebar,
+#documenter .docs-sidebar * {
   font-family: $family-sans-serif;
 }
-.docs-sidebar {
-  background: #1d3557;
-  color: #e8ecf3;
-}
-.docs-sidebar .tocitem {
+#documenter .docs-sidebar .tocitem {
   color: #b7c4d6;
 }
-.docs-sidebar .tocitem.is-active,
-.docs-sidebar li.is-active > .tocitem {
-  background: #ffffff;
-  color: #1d3557;
-  border-radius: 6px;
+#documenter .docs-sidebar .tocitem.is-active,
+#documenter .docs-sidebar li.is-active > .tocitem {
+  font-weight: 600;
+}
+// li.is-active gets a 1px top+bottom border by default
+// (documenter/layout/_sidebar.scss), sized for a light default sidebar;
+// against a solid navy sidebar it reads as a visible box around the
+// entry, which we don't want (no background box for active items at all
+// now, so definitely no border either).
+#documenter .docs-sidebar ul.docs-menu li.is-active {
+  border: none !important;
+}
+// ul.docs-menu itself also has a separate 1px top divider by default,
+// sitting directly above the first entry -- against navy, right above an
+// active (white-pill) first entry like "Home", it reads as a line framing
+// that entry specifically. The mockup has no divider there at all.
+#documenter .docs-sidebar ul.docs-menu {
+  border-top: none;
 }
 
 nav.breadcrumb {
   font-family: $family-sans-serif;
   font-weight: 600;
   color: #1a1a1a;
+}
+
+// The search field (<button id="documenter-search-query" class=
+// "docs-search-query input ...">) sits INSIDE the sidebar itself, directly
+// below the package-name title (confirmed against real built HTML) -- not
+// in the navbar, which an earlier version of this file incorrectly
+// assumed. It has no Documenter-specific styling of its own, so its
+// background comes from plain Bulma .input ($input-background-color,
+// pure white); setting it to match the *navbar's* cream background (what
+// this file did before) put a bright cream box on the navy sidebar,
+// which is the opposite of blending in. Matches the sidebar's own hover
+// tone instead. #documenter-search-query (an id) rather than
+// .docs-search-query so this reliably beats .input's own specificity.
+#documenter-search-query {
+  background-color: #24406e;
+  color: #e8ecf3;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+// Documenter adds a grey box-shadow to the sticky navbar once the page is
+// scrolled even slightly (.headroom--not-top, documenter/layout/_main.scss
+// via headroom.js), meant to separate it from content below. Default grey
+// (#bbb) stood out as a "boxed" look against our cream background where it
+// wouldn't against stock white -- the existing border-bottom on the navbar
+// already provides that separation, so drop the shadow entirely.
+#documenter .docs-main header.docs-navbar.headroom--not-top {
+  box-shadow: none;
 }
 
 code,
@@ -204,7 +279,10 @@ pre,
   border-radius: 8px;
 }
 
-// four-color syntax highlighting (highlight.js token classes)
+// four-color syntax highlighting (highlight.js token classes). Per
+// explicit request: types = #0e9080, names = #783ad4 -- deliberately
+// different from the reference mockup's type(#827626)/name(#0e9080)
+// mapping, not a mistake.
 .hljs-keyword,
 .hljs-function .hljs-keyword,
 .hljs-literal {
@@ -213,12 +291,12 @@ pre,
 .hljs-title,
 .hljs-title.function_,
 .hljs-name {
-  color: #0e9080;
+  color: #783ad4;
 }
 .hljs-type,
 .hljs-built_in,
 .hljs-class .hljs-title {
-  color: #827626;
+  color: #0e9080;
 }
 .hljs-number,
 .hljs-string,
