@@ -571,6 +571,9 @@ Writes a summary of a [`run_model`](@ref) result to io.
     adds it to the "=== Diagnostics ===" footer.
 - `formfactorlog::Union{Nothing,AbstractVector{<:AbstractString}}=nothing`:
     the seed's seed.fw.form_factor_log.
+- `n_atoms::Union{Nothing,Integer}=nothing`: the seed's seed.fw.n_atoms.
+    Default nothing prints nothing; passing it adds a "#atoms = <n>" line
+    at the very top of the report, before divergence_rate.
 
 # Logged EBFMI vs. AdvancedHMC's logged EBFMIest
 
@@ -586,8 +589,12 @@ function write_report(
     μ_χ::Union{Nothing,Real} = nothing,
     σ_χ::Union{Nothing,Real} = nothing,
     form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}} = nothing,
+    n_atoms::Union{Nothing,Integer} = nothing,
 )
     fit, divergence_rate, map_result, quantile_result = result
+    if n_atoms !== nothing
+        @printf(io, "#atoms = %d\n", n_atoms)
+    end
     @printf(io, "divergence_rate = %.4f\n\n", divergence_rate)
 
     if map_result === nothing
