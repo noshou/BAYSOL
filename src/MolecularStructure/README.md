@@ -109,12 +109,12 @@ excluded_volume("rn", vdw_radius)  # -> (4/3)π·vdw_radius³ (no table entry: v
 Bare-atom (no merged hydrogen) CRYSOL/Fraser-MacRae-Suzuki displaced-solvent volumes, Å³:
 
 
-| Element | Volume (Å³) | Status                                                                                                                            |
-| --------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| H       | 5.15          | **Verified**: Fraser, MacRae & Suzuki (1978) empirical value, via CRYSOL (1995) Table 1 row H*                                  |
-| C       | 16.44         | **Verified**: Fraser, MacRae & Suzuki (1978), via CRYSOL (1995) Table 1 row C*                                                  |
-| N       | 2.49          | **Verified**: Fraser, MacRae & Suzuki (1978), via CRYSOL (1995) Table 1 row N*                                                  |
-| O       | 9.13          | **Verified**: Fraser, MacRae & Suzuki (1978), via CRYSOL (1995) Table 1 row O*                                                  |
+| Element | Volume (Å³) | Status                                                                                                                           |
+| --------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| H       | 5.15          | **Verified**: Fraser, MacRae & Suzuki (1978) empirical value, via CRYSOL (1995) Table 1 row H*                                   |
+| C       | 16.44         | **Verified**: Fraser, MacRae & Suzuki (1978), via CRYSOL (1995) Table 1 row C*                                                   |
+| N       | 2.49          | **Verified**: Fraser, MacRae & Suzuki (1978), via CRYSOL (1995) Table 1 row N*                                                   |
+| O       | 9.13          | **Verified**: Fraser, MacRae & Suzuki (1978), via CRYSOL (1995) Table 1 row O*                                                   |
 | S       | 19.86         | CRYSOL (1995) Table 1 row S; sphere volume of an International Tables (1968) radius, not an independent Fraser-style measurement |
 | P       | 5.73          | CRYSOL (1995) Table 1 row P; same caveat as S                                                                                    |
 | Mg      | 17.16         | CRYSOL (1995) Table 1 row Mg; same caveat as S                                                                                   |
@@ -127,22 +127,21 @@ Bare-atom (no merged hydrogen) CRYSOL/Fraser-MacRae-Suzuki displaced-solvent vol
 ### Sources
 
 
-| Citation                                                                                                                                                                                                  | DOI / identifier                   | Scope                                                                                                                                  |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Fraser, R.D.B.; MacRae, T.P.; Suzuki, E. (1978). "An improved method for calculating the contribution of solvent to the X-ray diffraction pattern of biological molecules."*J. Appl. Cryst.* 11, 693-694. | 10.1107/S0021889878014296        | Original empirical H/C/N/O displaced volumes                                                                                           |
-| Svergun, D.; Barberato, C.; Koch, M.H.J. (1995). "CRYSOL -- a Program to Evaluate X-ray Solution Scattering of Biological Macromolecules from Atomic Coordinates."*J. Appl. Cryst.* 28, 768-773.          | 10.1107/S0021889895007047        | Table 1, transcribed directly above (nm³ → Å³); this codebase's excluded-volume/c₁ machinery targets parity with this program |
-| International Tables for X-ray Crystallography (1968), Vol. III, Birmingham: Kynoch Press.                                                                                                                | (no DOI; pre-DOI reference volume) | Source of the S/P/metal radii CRYSOL's Table 1 uses; not independently consulted here                                                  |
-| Chatzimagas, L.; Hub, J.S. (2022). "Predicting solution scattering patterns with explicit-solvent molecular simulations." arXiv.                                                                          | 10.48550/arXiv.2204.04961        | Cross-check only: its own Table 1 independently reproduces the same Fraser et al. (1978) H/C/N/O values used here                      |
+| Citation                                                                                                                                                                                                  | DOI / identifier                   | Scope                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Fraser, R.D.B.; MacRae, T.P.; Suzuki, E. (1978). "An improved method for calculating the contribution of solvent to the X-ray diffraction pattern of biological molecules."*J. Appl. Cryst.* 11, 693-694. | 10.1107/S0021889878014296          | Original empirical H/C/N/O displaced volumes                                                                                       |
+| Svergun, D.; Barberato, C.; Koch, M.H.J. (1995). "CRYSOL -- a Program to Evaluate X-ray Solution Scattering of Biological Macromolecules from Atomic Coordinates."*J. Appl. Cryst.* 28, 768-773.          | 10.1107/S0021889895007047          | Table 1, transcribed directly above (nm³ → Å³); this codebase's excluded-volume/c₁ machinery targets parity with this program |
+| International Tables for X-ray Crystallography (1968), Vol. III, Birmingham: Kynoch Press.                                                                                                                | (no DOI; pre-DOI reference volume) | Source of the S/P/metal radii CRYSOL's Table 1 uses; not independently consulted here                                              |
+| Chatzimagas, L.; Hub, J.S. (2022). "Predicting solution scattering patterns with explicit-solvent molecular simulations." arXiv.                                                                          | 10.48550/arXiv.2204.04961          | Cross-check only: its own Table 1 independently reproduces the same Fraser et al. (1978) H/C/N/O values used here                  |
 
 ### Coverage and fallback
 
 - **Ion fallthrough**: a charge-suffixed ion string of one of the six metals above ("fe3+", "zn2+", "ca2+", "mg2+", "mn2+", "cu2+") is looked up by its bare element -- CRYSOL's table has no charge-resolved rows either. This does **not** extend to H/C/N/O/S/P: the only such ions this codebase ever constructs (h1+, c4+, n5+, Shannon-table extrapolation artifacts already clamped to radius = 0.0, see AtomicRadii's README) are a genuinely different, near-zero-size species from an ordinary bonded atom, so they must keep falling through to the vdW-sphere fallback below rather than pick up a normal bonded atom's table volume.
 - **Fallback**: every other element/ion (halogens, alkali metals, noble gases, and anything else not listed) falls back to the isolated van der Waals sphere volume of radii(mol)[i]
-- **Explicit-hydrogen assumption**: the table rows above are for bare atoms with hydrogens carried as their own separate atoms (this codebase's normal state once `resolve_hydrogens(...; add = true)` has run), matching CRYSOL's H*/C*/N*/O* rows rather than its CH/CH2/CH3/NH/NH2/NH3/OH/SH merged-hydrogen rows. There is no reliable way to tell, from a bare Molecule alone, whether the absence of "h" in elms(mol) means "genuinely no hydrogens" or "hydrogens present but unresolved". A heavy-atom-only structure, each heavy atom's true displaced volume is somewhat larger than its table row (it implicitly includes its own bonded hydrogens), so the molecule's total excluded volume is then a modest, known **underestimate**.
 
 ## Propka.jl
 
-A free amino acid's textbook pKa is valid only in isolation. Inside a folded protein, a titratable side chain's *actual* pKa is shifted by its local electrostatic and desolvation environment: burial away from solvent, hydrogen bonding, and proximity to other charged groups all perturb it. PROPKA computes these per-residue-instance, structure-derived pKa shifts from the folded 3D geometry, which is why Ionization.jl takes one pKa *per residue instance* (keyed by (resname, resnum, chain)) rather than one fixed value per residue *type*.
+A free amino acid's textbook pKa is valid only in isolation. Inside a folded protein, a titratable side chain's actual pKa is shifted by its local electrostatic and desolvation environment: burial away from solvent, hydrogen bonding, and proximity to other charged groups all perturb it.
 
 ```julia
 using BAYSOL.MolecularStructure: propka_pKas, PropkaError
@@ -154,7 +153,7 @@ records = propka_pKas(pdb_path)
 
 ## PDB2PQR.jl
 
- A structure resolved from RCSB or a bare crystallographic .cif/.pdb  typically carries heavy atoms only. The forward-model geometry step needs an explicit, pH-consistent set of atoms (hydrogens included) to compute scattering correctly, and *which* hydrogens a titratable group carries depends on its protonation state at the solution pH being fit against (e.g. a free amine's three vs. two hydrogens, a carboxylate's presence/absence of an "HO"). PDB2PQR.jl runs the external pdb2pqr tool to add hydrogens consistent with a target pH and force field, so the geometry passed downstream matches the physical/chemical state the fit assumes.
+ A structure resolved from RCSB or a bare crystallographic .cif/.pdb  typically carries heavy atoms only. The forward-model geometry step needs an explicit, pH-consistent set of atoms (hydrogens included) to compute scattering correctly, and *which hydrogens a titratable group carries depends on its protonation state at the solution pH being fit against (e.g. a free amine's three vs. two hydrogens, a carboxylate's presence/absence of an "HO"). PDB2PQR.jl runs the external pdb2pqr tool to add hydrogens consistent with a target pH and force field, so the geometry passed downstream matches the physical/chemical state the fit assumes.
 
 ```julia
 using BAYSOL.MolecularStructure: resolve_hydrogens, PDB2PQRError
@@ -164,14 +163,79 @@ hpath = resolve_hydrogens(pdb_path, pKa_records, pH; add = true)
 
 `resolve_hydrogens(pdb_path, pKa_records, pH; add=true)`:
 
-- With add=true (default), runs pdb2pqr --ff PARSE --titration-state-method propka --with-ph <pH> on the heavy-atom .pdb at `pdb_path` and returns the path to a hydrogen-included .pdb stored in `_store_dir()` under `"<stem>_pH<pH>.pdb"`. A repeat call for the same (stem, pH) is a cache hit and not re-run.
+- With add=true (default), runs pdb2pqr --ff PARSE --titration-state-method propka --with-ph <pH></ph> on the heavy-atom .pdb at `pdb_path` and returns the path to a hydrogen-included .pdb stored in `_store_dir()` under `"<stem>_pH<pH>.pdb"`. A repeat call for the same (stem, pH) is a cache hit and not re-run.
 - With add=false, it is a no-op: `pdb_path` is returned unchanged.
 
 `pKa_records` must be the records [`propka_pKas`](@ref) produced **on this same structure**.
 
 ### Terminus protonation
 
-pdb2pqr's  terminus handling is not pH-driven (it defaults to a fixed charged state). `_terminus_flags(pKa_records, pH)` overrides this from the "N+"/"C-", producing pdb2pqr's --neutraln/--neutralc CLI flags. A free N-terminus gets --neutraln when it's deprotonated (neutral), a free C-terminus gets --neutralc when it's protonated (neutral). Since these flags are global (not per-chain), a structure whose multiple free N-termini (or C-termini) round to *different* protonation states at the same pH cannot be represented by a single pdb2pqr run. PDB2PQRError is raised when pdb2pqr cannot be run or produces no usable output (bad input path, non-zero exit, missing expected output file).
+pdb2pqr's  terminus handling is not pH-driven (it defaults to a fixed charged state). `_terminus_groups(pKa_records, pH, chains)` overrides this from the "N+"/"C-" records, producing, per chain, pdb2pqr's --neutraln/--neutralc CLI flags. A free N-terminus gets --neutraln when it's deprotonated (neutral), a free C-terminus gets --neutralc when it's protonated (neutral). These flags are global to a single pdb2pqr call not per-chain, so a structure whose free N-termini (or C-termini) round to different protonation states at the same pH can't be represented by one run. `resolve_hydrogens` handles this by partitioning chains into groups that share a flag, running pdb2pqr once per group, and merging each run's chains back into one hydrogenated structure. PDB2PQRError is raised when pdb2pqr cannot be run or produces no usable output (bad input path, non-zero exit, missing expected output file).
+
+```
+			  ┌───────────────────────────────────┐
+              │ 	PROPKA pKa records            │                 
+              │ propka_pKas(full_structure)       │
+ 			  │ computed once on the full complex │
+			  └───────────────┬───────────────────┘
+                              │
+                              │ 
+                              ▼
+        ┌─────────────────────┴─────────────────────┐
+        │ _terminus_groups(pKa_records, pH, chains) │                
+        │											│ 
+        │	determine, for each chain:				│
+        │ 		--neutraln?   --neutralc?		    │
+        └─────────────────────┬─────────────────────┘
+                              │   
+                              │
+                              ▼
+                  ┌───────────┴─────────────┐
+                  │group chains by identical│
+                  │terminal-flag combination│
+                  └───────────┬─────────────┘ 
+                              │
+                ┌─────────────┴────────────────┐
+                ▼    						   ▼
+      ┌─────────┴──────────┐	    ┌──────────┴─────────┐
+	  │ single flag group  │		│multiple flag groups│
+      └─────────┬──────────┘        └────────────┬───────┘     
+                │							     │
+                ▼                                ▼
+      ┌─────────┴───────────┐     ┌──────────────┴───────────────┐
+      │ Run PDB2PQR once    │     │ For each distinct flag       │
+      │ on the full         │     │ combination:                 │
+      │ structure with      │     │                              │
+      │ that group's flags. │     │  1. Run PDB2PQR on the full  │
+      └──────────┬──────────┘     │     original structure with  │
+                 │                │     this group's flags       │
+                 │                │                              │
+                 │                │  2. Keep only atoms from     │
+                 │                │     this group's chains      │
+                 │                │                              │
+                 │                │  3. Discard atoms from       │
+                 │                │     all other chains         │
+                 │                └──────────────┬───────────────┘
+                 │                               │
+                 │                               │ 
+                 │                               ▼
+                 │                ┌──────────────┴────────────┐
+                 │                │ Merge the retained atoms  │
+                 │                │ from all groups           │
+                 │                └─────────────┬─────────────┘
+                 │                				│
+                 └───────────────┬──────────────┘
+                                 │
+                                 ▼
+                  ┌──────────────┴─────────────┐
+                  │ Write one hydrogenated PDB │
+				  └──────────────┬─────────────┘ 
+			                     │
+                                 ▼
+				  ┌──────────────┴─────────────┐
+                  │ cache "<stem>_pH<pH>.pdb"  │
+				  └────────────────────────────┘
+```
 
 ## Ionization.jl
 
@@ -189,7 +253,7 @@ For an **acid** group (charged when deprotonated; Asp, Glu side chains, Cys, Tyr
 f = 1 / (1 + 10^(pKa - pH))
 ```
 
-`_fraction_deprotonated` is exactly `_fraction_protonated` with pH and pKa swapped, i.e. 1 - `_fraction_protonated`(pH, pKa). In both cases f == 0.5 at pH == pKa. A group's signed fractional charge (`_group_charge`) is +f for a base, -f for an acid, and a single atom's charge contribution (`_atom_charge`) is its split fraction of that. Whether a group carries its exchangeable hydrogen at all (`_group_protonated`) reduces to the same charged ⟺ fraction > 0.5 rule for both types: a group sitting exactly at its own pKa (f == 0.5) always rounds to its *uncharged* state, for both acid and base groups. This is the rule PDB2PQR.jl's `_terminus_flags` also uses to decide --neutraln/--neutralc.
+`_fraction_deprotonated` is exactly `_fraction_protonated` with pH and pKa swapped, i.e. 1 - `_fraction_protonated`(pH, pKa). In both cases f == 0.5 at pH == pKa. A group's signed fractional charge (`_group_charge`) is +f for a base, -f for an acid, and a single atom's charge contribution (`_atom_charge`) is its split fraction of that. Whether a group carries its exchangeable hydrogen at all (`_group_protonated`) reduces to the same charged ⟺ fraction > 0.5 rule for both types: a group sitting exactly at its own pKa (f == 0.5) always rounds to its *uncharged* state, for both acid and base groups. This is the rule PDB2PQR.jl's `_terminus_groups` also uses to decide --neutraln/--neutralc, per chain.
 
 ### σ_pH → σ_charge propagation
 
@@ -248,8 +312,7 @@ fraction values within one group sum to 1.0. type sets the Henderson-Hasselbalch
 
 ### Source
 
-"A summary of the measured pK values of the ionizable groups in folded
-proteins," *Protein Science* 18(1):247-251 (2009), DOI 10.1002/pro.19.
+"A summary of the measured pK values of the ionizable groups in folded proteins," *Protein Science* 18(1):247-251 (2009), DOI 10.1002/pro.19.
 
 ## MolecularStructure.jl
 

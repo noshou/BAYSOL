@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Exercises src/MolecularStructure/PDB2PQR.jl: the pdb2pqr subprocess wrapper
-# that adds explicit hydrogens (`resolve_hydrogens`), its pKa-record-driven
-# N-/C-terminus override (`_terminus_flags`), and the generalized
+# that adds explicit hydrogens (`resolve_hydrogens`), its pKa-record-driven,
+# per-chain N-/C-terminus override (`_terminus_groups`), and the generalized
 # Molecule/Residues loader (`load_molecule`). Needs real network/subprocess
 # access for CondaPkg to provision `pdb2pqr` on first use, same assumption as
 # the live propka3 test in test_propka.jl.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: resolve_hydrogens, load_molecule, PDB2PQRError, MoleculeError,
-                    _terminus_flags, propka_pKas, _store_dir,
+                    _terminus_groups, propka_pKas, _store_dir,
                     Molecule, Residues, n_atoms, elms, coords_cartesian
 
 # A 7-"residue" fragment (not a real contiguous chain -- each residue's real
@@ -108,6 +108,57 @@ atom_names(lines, resname, resnum) = Set(
        strip(l[18:20]) == resname && parse(Int, strip(l[23:26])) == resnum
 )
 
+# Two chains, each a 2-residue fragment (A: LYS/VAL, B: ASP/TYR), placed far
+# apart so they don't interact. Used by the "real multi-chain terminus
+# conflict" test below: their C-termini's real propka pKa values (3.03 vs.
+# 3.20, found empirically) straddle pH=3.1, giving a genuine per-chain
+# --neutralc conflict -- exactly the case that used to make _terminus_flags
+# throw, now resolved by _terminus_groups + resolve_hydrogens's per-group
+# pdb2pqr runs.
+const _TWO_CHAIN_PDB = """
+ATOM      1  N   LYS A   1      17.208  26.496  -2.120  1.00 23.56           N
+ATOM      2  CA  LYS A   1      17.586  25.166  -1.492  1.00 21.72           C
+ATOM      3  C   LYS A   1      18.376  25.526  -0.224  1.00 17.32           C
+ATOM      4  O   LYS A   1      18.800  26.649  -0.055  1.00 16.89           O
+ATOM      5  CB  LYS A   1      18.268  24.389  -2.543  1.00 27.53           C
+ATOM      6  CG  LYS A   1      19.133  23.202  -2.442  1.00 33.17           C
+ATOM      7  CD  LYS A   1      19.271  22.450  -3.786  1.00 37.31           C
+ATOM      8  CE  LYS A   1      19.911  21.079  -3.701  1.00 39.40           C
+ATOM      9  NZ  LYS A   1      19.031  19.957  -3.304  1.00 40.47           N
+ATOM     10  N   VAL A   2      40.342  16.340  16.587  1.00 16.09           N
+ATOM     11  CA  VAL A   2      41.740  15.965  16.948  1.00 17.88           C
+ATOM     12  C   VAL A   2      41.922  16.191  18.440  1.00 20.04           C
+ATOM     13  O   VAL A   2      42.843  15.448  18.971  1.00 22.34           O
+ATOM     14  CB  VAL A   2      42.762  16.713  16.059  1.00 17.92           C
+ATOM     15  CG1 VAL A   2      42.668  16.292  14.591  1.00 17.93           C
+ATOM     16  CG2 VAL A   2      42.703  18.191  16.159  1.00 18.00           C
+ATOM     17  OXT VAL A   2      41.303  16.985  19.124  1.00 18.14           O
+TER      18      VAL A   2
+ATOM     19  N   ASP B   1      67.208  26.496  -2.120  1.00 23.56           N
+ATOM     20  CA  ASP B   1      67.586  25.166  -1.492  1.00 21.72           C
+ATOM     21  C   ASP B   1      68.376  25.526  -0.224  1.00 17.32           C
+ATOM     22  O   ASP B   1      68.800  26.649  -0.055  1.00 16.89           O
+ATOM     23  CB  ASP B   1      68.268  24.389  -2.543  1.00 27.53           C
+ATOM     24  CG  ASP B   1      69.133  23.202  -2.442  1.00 33.17           C
+ATOM     25  OD1 ASP B   1      69.271  22.450  -3.786  1.00 37.31           O
+ATOM     26  OD2 ASP B   1      69.911  21.079  -3.701  1.00 39.40           O
+ATOM     27  N   TYR B   2      90.342  16.340  16.587  1.00 16.09           N
+ATOM     28  CA  TYR B   2      91.563   9.292  21.001  1.00  9.10           C
+ATOM     29  C   TYR B   2      91.753   9.343  19.494  1.00  8.84           C
+ATOM     30  O   TYR B   2      91.023  10.063  18.781  1.00  9.02           O
+ATOM     31  CB  TYR B   2      92.660  10.039  21.790  1.00  8.97           C
+ATOM     32  CG  TYR B   2      92.883  11.445  21.303  1.00  9.11           C
+ATOM     33  CD1 TYR B   2      92.139  12.521  21.821  1.00  9.78           C
+ATOM     34  CD2 TYR B   2      93.772  11.705  20.248  1.00  9.19           C
+ATOM     35  CE1 TYR B   2      92.355  13.834  21.335  1.00  9.73           C
+ATOM     36  CE2 TYR B   2      93.969  13.000  19.762  1.00  9.66           C
+ATOM     37  CZ  TYR B   2      93.247  14.020  20.299  1.00  8.73           C
+ATOM     38  OH  TYR B   2      93.459  15.292  19.765  1.00  9.89           O
+ATOM     39  OXT TYR B   2      91.303  16.985  19.124  1.00 18.14           O
+TER      40      TYR B   2
+END
+"""
+
 @testset "PDB2PQR" begin
 
     dir = mktempdir()
@@ -144,17 +195,54 @@ atom_names(lines, resname, resnum) = Set(
         @test Set(readdir(_store_dir())) == before_files   # nothing written
     end
 
-    @testset "termini flags computed directly from pKa records" begin
+    @testset "termini flags computed per chain from pKa records" begin
+        # Single-chain fixture -> _terminus_groups always returns one group
+        # covering chain "A", same flags _terminus_flags used to compute.
         # pH 1: below C-'s pKa (neutral/protonated acid -> --neutralc),
         # above N+'s pKa (protonated/charged base -> no flag).
-        @test _terminus_flags(recs, 1.0) == ["--neutralc"]
+        @test _terminus_groups(recs, 1.0, ["A"]) == Dict(["--neutralc"] => ["A"])
         # pH 10: above both pKas (deprotonated base -> --neutraln;
         # deprotonated/charged acid -> no flag).
-        @test _terminus_flags(recs, 10.0) == ["--neutraln"]
+        @test _terminus_groups(recs, 10.0, ["A"]) == Dict(["--neutraln"] => ["A"])
         # pH 7: below neither in a way that flips either from pdb2pqr's own
         # default in this fragment's case (N+ pKa ~8 -> still protonated;
-        # C- pKa ~3 -> still deprotonated) -> no flags at all.
-        @test isempty(_terminus_flags(recs, 7.0))
+        # C- pKa ~3 -> still deprotonated) -> no flags at all, one group.
+        @test _terminus_groups(recs, 7.0, ["A"]) == Dict(String[] => ["A"])
+    end
+
+    @testset "_terminus_groups: conflicting chains partition instead of colliding" begin
+        # Synthetic multi-chain pKa records (not run through real propka/
+        # pdb2pqr -- this is a pure unit test of the partitioning logic,
+        # since a real multi-chain structure with genuinely PROPKA-computed
+        # conflicting termini isn't practical to construct deterministically
+        # in a small synthetic fixture: real inter-chain electrostatic
+        # perturbation is needed to actually split two termini of the same
+        # residue type, which is what resolve_hydrogens's per-group runs
+        # are for). At pH 7:
+        #   chain A: N+ pKa=5 (pH > pKa -> mostly deprotonated -> neutral
+        #     base -> --neutraln); C- pKa=3 (pH > pKa -> mostly deprotonated
+        #     -> charged acid -> no flag).
+        #   chain B: N+ pKa=9 (pH < pKa -> mostly protonated -> charged base
+        #     -> no flag); C- pKa=10 (pH < pKa -> mostly protonated ->
+        #     neutral acid -> --neutralc).
+        # This is exactly the shape of conflict that used to make
+        # _terminus_flags throw (a single global run can't give chain A
+        # --neutraln and chain B --neutralc at once); _terminus_groups
+        # instead partitions them into two distinct flag groups.
+        recs2 = [
+            (resname = "N+", resnum = 1, chain = "A", pKa = 5.0),
+            (resname = "N+", resnum = 1, chain = "B", pKa = 9.0),
+            (resname = "C-", resnum = 99, chain = "A", pKa = 3.0),
+            (resname = "C-", resnum = 99, chain = "B", pKa = 10.0),
+        ]
+        groups = _terminus_groups(recs2, 7.0, ["A", "B"])
+        @test groups == Dict(["--neutraln"] => ["A"], ["--neutralc"] => ["B"])
+
+        # A chain with no N+/C- record at all (e.g. no free terminus) needs
+        # no override and lands in the empty-flags group alongside any
+        # other such chain, without forcing a conflict.
+        groups3 = _terminus_groups(recs2, 7.0, ["A", "B", "C"])
+        @test groups3[String[]] == ["C"]
     end
 
     @testset "resolve_hydrogens at pH 1: neutral (protonated) C-terminus, confirmed atom names" begin
@@ -239,5 +327,65 @@ atom_names(lines, resname, resnum) = Set(
         rm(joinpath(_store_dir(), "pdb2pqr-TEST_pH$(pH).pdb"); force = true)
     end
     rm(joinpath(_store_dir(), "pdb2pqr-TEST.pka"); force = true)
+
+    # -------------------------------------------------------------------
+    # Real end-to-end multi-chain conflict: two chains whose C-termini
+    # genuinely round to different protonation states under real propka,
+    # exercising resolve_hydrogens's per-group pdb2pqr + merge path (not
+    # just _terminus_groups's partitioning logic in isolation above).
+    # Found empirically: two isolated 2-residue chains (A: LYS/VAL,
+    # B: ASP/TYR) give C- pKa 3.03 (chain A) vs. 3.20 (chain B) under real
+    # propka -- close enough that pH=3.1 sits between them, so chain A's
+    # C-terminus rounds charged (pH > 3.03) while chain B's rounds neutral
+    # (pH < 3.20). This used to be exactly the case _terminus_flags threw
+    # on; resolve_hydrogens must now succeed and hydrogenate each chain's
+    # terminus correctly. (_TWO_CHAIN_PDB is defined at file scope above,
+    # next to _TEST_PDB.)
+
+    dir2 = mktempdir()
+    pdb_path2 = joinpath(dir2, "pdb2pqr-TWOCHAIN.pdb")
+    write(pdb_path2, _TWO_CHAIN_PDB)
+    rm(joinpath(_store_dir(), "pdb2pqr-TWOCHAIN_pH3.1.pdb"); force = true)
+
+    local recs2
+    try
+        recs2 = propka_pKas(pdb_path2)
+    catch e
+        rm(dir2; force = true, recursive = true)
+        rethrow(e)
+    end
+
+    @testset "resolve_hydrogens: real multi-chain terminus conflict resolves per-chain" begin
+        a_cminus = only(r for r in recs2 if r.resname == "C-" && r.chain == "A")
+        b_cminus = only(r for r in recs2 if r.resname == "C-" && r.chain == "B")
+        # Sanity check the empirically-found split still holds for this
+        # fixture/propka version; if it drifts, this test's premise (a real
+        # conflict at pH=3.1) no longer holds and needs a new pH/fixture.
+        @test a_cminus.pKa < 3.1 < b_cminus.pKa
+
+        groups = _terminus_groups(recs2, 3.1, ["A", "B"])
+        @test length(groups) == 2   # genuine per-chain conflict, not collapsed to one run
+
+        out = resolve_hydrogens(pdb_path2, recs2, 3.1)
+        @test isfile(out)
+        lines = readlines(out)
+
+        # Chain A's C-terminus (VAL 2) rounds charged/deprotonated at
+        # pH=3.1 (pH > its own pKa 3.03) -- no --neutralc, no "HO".
+        @test !("HO" in atom_names(lines, "VAL", 2))
+        # Chain B's C-terminus (TYR 2) rounds neutral/protonated (pH < its
+        # own pKa 3.20) -- --neutralc applied, gains "HO".
+        @test "HO" in atom_names(lines, "TYR", 2)
+
+        # Both chains' free N-termini (pKa 8.0 for both, well above pH=3.1
+        # -> protonated/charged, pdb2pqr's own default, no --neutraln
+        # needed for either) still got hydrogenated normally.
+        @test atom_names(lines, "LYS", 1) ⊇ Set(["H", "H2", "H3"])
+        @test atom_names(lines, "ASP", 1) ⊇ Set(["H", "H2", "H3"])
+    end
+
+    rm(dir2; force = true, recursive = true)
+    rm(joinpath(_store_dir(), "pdb2pqr-TWOCHAIN_pH3.1.pdb"); force = true)
+    rm(joinpath(_store_dir(), "pdb2pqr-TWOCHAIN.pka"); force = true)
 
 end
