@@ -1,0 +1,42 @@
+#atoms = 3621
+divergence_rate = 0.0000
+
+=== MAP ===
+log_density    = +7775.74
+ρₑ             = +0.336131
+δρ1            = +0.513385
+δρ2            = +0.952055
+δρ3            = +0
+excl_vol_corr  = +1.1664
+scale          = +4.86543e-09
+bkgrnd_corr    = -5.35633e-06
+χ²             = +0.937978
+
+=== Quantiles (16-84) ===
+param               quantile_lo      quantile_hi         bound_lo         bound_hi
+log_density            +7772.79          +7775.1         +7772.79          +7775.1
+ρₑ                     +0.33609        +0.336188         +0.33609        +0.336187
+δρ1                   +0.494617        +0.552175        +0.494619        +0.552143
+δρ2                   +0.815254          +1.1015        +0.815255         +1.10143
+δρ3                          +0               +0               +0               +0
+excl_vol_corr          +1.16173         +1.16848         +1.16173         +1.16847
+scale              +4.13864e-09     +5.26332e-09     +4.13913e-09     +5.26308e-09
+bkgrnd_corr        -8.92951e-06     -1.93569e-06      -8.9285e-06     -1.93882e-06
+χ²                    +0.937971        +0.942747        +0.937973        +0.942745
+
+=== Standard deviations from prior (θ-space z-score) ===
+param                     z_MAP    z_quantile_lo    z_quantile_hi
+ρₑ                    -0.155733        -0.934156        +0.907757
+δρ1                    -1.26107         -1.33151          -1.1233
+δρ2                   -0.319635         -1.23164        +0.676667
+δρ3                        +NaN             +NaN             +NaN
+excl_vol_corr          +5.55438         +5.40997         +5.61834
+
+=== Diagnostics ===
+iterations     = 1000
+mean_accept    = 0.9182
+tree_depth     = 5.35 (max 10)
+mean_n_steps   = 327.50
+EBFMI          = 1.1493
+μ_χ            = +0
+σ_χ            = +0

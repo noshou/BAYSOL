@@ -110,7 +110,20 @@ every coordinate uniformly (each z_i is standard-Normal under the
 prior), so find_good_stepsize's very first candidate step does not overshoot.
 
 The Jacobian of this affine map (|dθ/dz| = Πσ_i) is a z-independent
-constant, so it's omitted from _logπ/the z-space wrapper around it.
+constant, so it's omitted from _logπ/the z-space wrapper around it -- except
+this breaks down for a coordinate with σ_i = 0. δρ3Prior is legitimately
+Normal(μ_χ, σ_χ) with σ_χ = 0 whenever the caller doesn't supply a real
+cavity-electrostatics signal (DensityOfSolvent.jl/DeltaRho.jl's own
+documented "point mass at 0" default) -- not a rare edge case, since that's
+what happens for any structure with no detected cavity beads. A plain
+(θ - μ) / 0 is NaN, which _destandardize/Ξ/forward then propagate into
+every q-point of y_model, and wls_fit's det(XᵀWX) ≤ 0 guard (correctly,
+if confusingly) reports that all-NaN curve as "flat". Guarded here instead:
+a σ_i = 0 coordinate is a Dirac point mass, so its only valid value is μ_i
+regardless of z_i -- _destandardize always returns μ_i there (a constant,
+giving ForwardDiff a clean zero gradient in that direction rather than
+NaN), and _standardize maps any θ_i at that fixed point to z_i = 0
+(arbitrary but consistent, since destandardize ignores z_i there anyway).
 
 # Arguments
 - `θ/z::SVector{5,<:Real}`: as above.
@@ -118,13 +131,13 @@ constant, so it's omitted from _logπ/the z-space wrapper around it.
 """
 function _standardize(θ::SVector{5,<:Real}, p::ξ_priors)
     μ, σ = θ_prior_moments(p)
-    return (θ .- μ) ./ σ
+    return ifelse.(iszero.(σ), zero.(θ), (θ .- μ) ./ σ)
 end
 
 "Inverse of [`_standardize`](@ref); see its docstring for both directions."
 function _destandardize(z::SVector{5,<:Real}, p::ξ_priors)
     μ, σ = θ_prior_moments(p)
-    return μ .+ σ .* z
+    return ifelse.(iszero.(σ), μ, μ .+ σ .* z)
 end
 
 """
@@ -260,10 +273,26 @@ function _ll(
     return __ll(fit, l)
 end
 
+"""
+    _safe_logpdf(d, x) -> Real
+
+`logpdf(d, x)`, except a degenerate (σ = 0) distribution contributes 0
+rather than its formal Dirac-delta value (`logpdf(Normal(μ, 0), μ) == Inf`
+in Distributions.jl). δρ3Prior legitimately degenerates to Normal(0, 0)
+whenever there's no cavity-electrostatics signal (see
+[`_standardize`](@ref)'s docstring for the same σ = 0 case on the
+θ↔z-space side); an actual +Inf log-density there isn't a finite potential
+AdvancedHMC.jl's Hamiltonian can sample against, so it's dropped here the
+same way `_standardize`'s Πσ_i Jacobian constant is dropped -- both are
+z/parameter-independent constants once that coordinate is pinned to μ, so
+omitting them doesn't change what gets sampled.
+"""
+_safe_logpdf(d, x::Real)::Real = iszero(d.σ) ? zero(x) : logpdf(d, x)
+
 """ log prior """
 _lp(ξ::SVector{5,<:Real}, p::ξ_priors) =
-    logpdf(p.dnsPrior, ξ[1]) + logpdf(p.δρ1Prior, ξ[2]) + logpdf(p.δρ2Prior, ξ[3]) +
-    logpdf(p.δρ3Prior, ξ[4]) + logpdf(p.c_1Prior, ξ[5])
+    _safe_logpdf(p.dnsPrior, ξ[1]) + _safe_logpdf(p.δρ1Prior, ξ[2]) + _safe_logpdf(p.δρ2Prior, ξ[3]) +
+    _safe_logpdf(p.δρ3Prior, ξ[4]) + _safe_logpdf(p.c_1Prior, ξ[5])
 
 """
     _logπ(θ, p, I_exp, σ_exp, fw, l::LIKELIHOOD) -> Real

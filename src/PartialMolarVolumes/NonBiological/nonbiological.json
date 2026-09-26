@@ -5143,5 +5143,100 @@
     80,
     95.1,
     0.3
+  ],
+  "sodium azide": [
+    32,
+    23.47,
+    null
+  ],
+  "azide": [
+    22,
+    24.68,
+    null
+  ],
+  "sodium thiocyanate": [
+    40,
+    35.84,
+    null
+  ],
+  "sodium nitrite": [
+    34,
+    21.98,
+    null
+  ],
+  "hydron": [
+    0,
+    -5.5,
+    null
+  ],
+  "tetrahexylazanium": [
+    202,
+    395.9,
+    null
+  ],
+  "tetraheptylazanium": [
+    234,
+    458.6,
+    null
+  ],
+  "trifluoromethanesulfonate": [
+    74,
+    80.2,
+    null
+  ],
+  "tripotassium hexacyanoferrate(III)": [
+    161,
+    151.5,
+    null
+  ],
+  "potassium permanganate": [
+    76,
+    79.0,
+    null
+  ],
+  "potassium nitrite": [
+    42,
+    32.5,
+    null
+  ],
+  "disodium molybdate": [
+    96,
+    27.9,
+    null
+  ],
+  "tetrasodium diphosphate": [
+    130,
+    -2.2,
+    null
+  ],
+  "disodium sulfite": [
+    62,
+    6.0,
+    null
+  ],
+  "disodium thiosulfate": [
+    78,
+    24.8,
+    null
+  ],
+  "disodium tungstate": [
+    128,
+    27.3,
+    null
+  ],
+  "azanium aluminium disulfate": [
+    120,
+    -5.7,
+    null
+  ],
+  "diazanium ethanedioate": [
+    66,
+    56.4,
+    null
+  ],
+  "hexafluorosilicic acid": [
+    70,
+    39.5,
+    null
   ]
 }

@@ -7,7 +7,7 @@
 #
 #     mol ─► (B_vac, B_ex, B_sh_convex, B_sh_concave, B_sh_cavity)   species_multipoles
 #         ─► G(q) ∈ ℝ^{5×5×Q}                                        gram_matrix
-#         ─► ForwardCache(G, qvals, r_m, form_factor_log)             forward_cache
+#         ─► ForwardCache(G, qvals, r_m, form_factor_log, n_atoms)     forward_cache
 #         ─► I_calc(q) = scale·(v(q)ᵀ G v(q)) + bkgrnd_corr           forward
 #
 # G(q) depends only on geometry and beam, never on (scale, bkgrnd_corr, dns, δρ, c_1).
@@ -138,12 +138,15 @@ is then the O(Q) [`forward`](@ref)(cache, …).
 - `qvals::Vector{Float64}, length Q`: the grid G was built on.
 - `r_m::Float64`: mean atomic radius in Å.
 - `form_factor_log::Vector{String}`: construction-time diagnostics from [`FormFactor.form_factor_table`](@ref).
+- `n_atoms::Int`: number of atoms in the structure mol was built from
+    (length(elms(mol))), e.g. for reporting alongside the fit.
 """
 struct ForwardCache
     G::Array{Float64,3}
     qvals::Vector{Float64}
     r_m::Float64
     form_factor_log::Vector{String}
+    n_atoms::Int
 end
 
 """
@@ -185,6 +188,7 @@ forward_cache(
         collect(Float64, qvals),
         mean_atomic_radius(mol),
         form_factor_log,
+        length(ions),
     )
 end
 
