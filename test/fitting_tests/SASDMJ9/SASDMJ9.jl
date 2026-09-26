@@ -108,16 +108,16 @@ function run_sasdmj9(; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer
         ionic_strength_M = IONIC_STRENGTH_M, T = TEMPERATURE_C + 273.15,
     )
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
-    return res, μ_χ, σ_χ, s.fw.form_factor_log, (q_fit, I_fit, σ_fit)
+    return res, μ_χ, σ_χ, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
 end
 
-result, μ_χ, σ_χ, form_factor_log, (q_fit, I_fit, σ_fit) = run_sasdmj9()
+result, μ_χ, σ_χ, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdmj9()
 
 fit, divergence_rate, map_result, quantile_result = result
 
 # `@__DIR__` (this SASDMJ9/ folder), not the caller's cwd.
 open(joinpath(@__DIR__, "res.txt"), "w") do io
-    BAYSOL.write_report(io, result; μ_χ = μ_χ, σ_χ = σ_χ, form_factor_log = form_factor_log)
+    BAYSOL.write_report(io, result; μ_χ = μ_χ, σ_χ = σ_χ, form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
 """
@@ -289,11 +289,7 @@ end
 """
     sasdmj9_crysol_comparison_figure(result, data) -> Figure
 
-Overlays our MAP curve against the reference CRYSOL fit (`SASDMJ9_fit1.fit`,
-column 4 -- the paper's own P(r)-regularized fit to this same data) on the
-same log-log axes as `sasdmj9_figure`, restricted to `q ≤ Q_MAX_FIT`
-(the file's own q=0 extrapolation rows and any non-positive values are dropped,
-since both are invalid on a log axis).
+Overlays our MAP curve against the reference CRYSOL fit.
 """
 function sasdmj9_crysol_comparison_figure(result, data)
     _, _, map_result, _ = result
@@ -326,7 +322,7 @@ function sasdmj9_crysol_comparison_figure(result, data)
 
     lines!(
         ax, q_crysol[keep], I_crysol[keep];
-        color = :seagreen, linewidth = 2, linestyle = :dash, label = "CRYSOL fit1 (paper)",
+        color = :seagreen, linewidth = 2, linestyle = :dash, label = "CRYSOL fit1",
     )
 
     if map_result !== nothing
@@ -334,7 +330,7 @@ function sasdmj9_crysol_comparison_figure(result, data)
         lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "BAYSOL MAP")
     end
 
-    axislegend(ax; position = :lb, framevisible = false)
+    axislegend(ax; position = :lt, framevisible = false)
 
     lo, hi = extrema(I_fit)
     ylims!(ax, lo * 0.7, hi * 1.3)

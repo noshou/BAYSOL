@@ -1725,3 +1725,24 @@ Tetrahydro-2-furanmethanol	Tetrahydro-2-furanmethanol	C5H10O2	0	93.8		measured	1
 Arabinose	Arabinose	C5H10O5	0	93.2	0.3	measured	10.1007/978-3-642-71114-5_2
 Xylose	Xylose	C5H10O5	0	95.1	0.3	measured	10.1007/978-3-642-71114-5_2
 D-Glucose	D-Glucose	C6H12O6	0	110.5	0.3	measured	10.1007/978-3-642-71114-5_2
+sodium azide	sodium azide	NaN3	0	23.47		derived	10.1039/JR9300000100
+azide	azide	N3	-1	24.68		derived	10.1039/JR9300000100
+sodium thiocyanate	sodium thiocyanate	NaSCN	0	35.84		derived	10.1039/JR9300000100
+thiocyanate	thiocyanate	SCN	-1	37.05		derived	10.1039/JR9300000100
+sodium nitrite	sodium nitrite	NaNO2	0	21.98		derived	10.1039/JR9300000100
+nitrite	nitrite	NO2	-1	23.19		derived	10.1039/JR9300000100
+hydrogen ion	hydron	H	1	-5.5		derived	10.1021/cr030047d
+tetrahexylammonium	tetrahexylazanium	C24H52N	1	395.9		derived	10.1021/cr030047d
+tetraheptylammonium	tetraheptylazanium	C28H60N	1	458.6		derived	10.1021/cr030047d
+triflate	trifluoromethanesulfonate	CF3O3S	-1	80.2		measured	10.1021/cr030047d
+potassium ferricyanide	tripotassium hexacyanoferrate(III)	C6FeK3N6	0	151.5		derived	10.1021/je00038a004
+potassium permanganate	potassium permanganate	KMnO4	0	79.0		derived	10.1021/je00038a004
+potassium nitrite	potassium nitrite	KNO2	0	32.5		derived	10.1021/je00038a004
+sodium molybdate	disodium molybdate	Na2MoO4	0	27.9		derived	10.1021/je00038a004
+sodium pyrophosphate	tetrasodium diphosphate	Na4P2O7	0	-2.2		derived	10.1021/je00038a004
+sodium sulfite	disodium sulfite	Na2SO3	0	6.0		derived	10.1021/je00038a004
+sodium thiosulfate	disodium thiosulfate	Na2S2O3	0	24.8		derived	10.1021/je00038a004
+sodium tungstate	disodium tungstate	Na2WO4	0	27.3		derived	10.1021/je00038a004
+ammonium alum (anhydrous)	azanium aluminium disulfate	NH4AlS2O8	0	-5.7		derived	10.1021/je00038a004
+ammonium oxalate	diazanium ethanedioate	C2H8N2O4	0	56.4		derived	10.1021/je00038a004
+hexafluorosilicic acid	hexafluorosilicic acid	H2SiF6	0	39.5		derived	10.1021/je00038a004

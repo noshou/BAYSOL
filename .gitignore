@@ -23,8 +23,5 @@ __pycache__/
 # non-open source papers
 sources/
 
-# test results
-res*
-
 # cache
 _cache/

@@ -9,13 +9,42 @@ using   ..BAYSOL_Utils.Cache: Lazy, force
 using   ..Geometry: sphere_volume
 using   BioStructures:  BioStructures, PDBFormat, standardselector,
                         collectatoms, atomname, element, resname, resnumber,
-                        chainid, coords
+                        chainid, coords, ishetero
 using   NearestNeighbors: KDTree
 using   FastClosures: @closure
 
 "Raised for malformed molecule input (empty or mismatched coords, missing radii)."
 struct MoleculeError <: Exception; msg::String end
 Base.showerror(io::IO, e::MoleculeError) = print(io, "MoleculeError: ", e.msg)
+
+"Two-letter element symbols an atom name can plausibly spell out in full (HETATM ions/metals only)."
+const _TWO_LETTER_ELEMENTS = Set([
+    "FE", "ZN", "MG", "NA", "CL", "CA", "MN", "NI", "CU", "CO", "CD", "HG",
+    "BR", "SE", "AL", "SI", "AS", "LI", "BE", "NE", "AR", "KR", "SR", "MO",
+    "AG", "SN", "SB", "TE", "XE", "CS", "BA", "PT", "AU", "PB",
+])
+
+"""
+    _infer_element(name, is_hetatm) -> String
+
+Fallback element guess from an atom name, for legacy-format PDB files whose
+element column (columns 77-78) is blank -- some pre-remediation-era files
+predate that column. Digits/whitespace are stripped first (e.g. "1HB2" ->
+"HB"). For an ATOM record (standard protein/nucleic-acid naming), only the
+first letter is trusted: "CA" is always the alpha carbon (Carbon), never
+calcium, under that naming convention. For a HETATM record, a name that
+spells out a full two-letter element symbol (e.g. an ion literally named
+"FE"/"ZN"/"NA") is trusted in full; anything else falls back to one letter.
+"""
+function _infer_element(name::AbstractString, is_hetatm::Bool)::String
+    stripped = filter(isletter, name)
+    isempty(stripped) && return ""
+    if is_hetatm && length(stripped) ≥ 2
+        two = uppercase(stripped[1:2])
+        two in _TWO_LETTER_ELEMENTS && return two
+    end
+    return string(stripped[1])
+end
 
 """
 # Fields
@@ -274,7 +303,8 @@ function load_molecule(pdb_path::AbstractString)::Tuple{Molecule, Residues}
     chain_v    = Vector{String}(undef, n)
 
     @inbounds for (i, at) in enumerate(atoms)
-        elms_v[i]     = element(at)
+        el            = element(at)
+        elms_v[i]     = isempty(el) ? _infer_element(atomname(at), ishetero(at)) : el
         c             = coords(at)
         coords_v[i]   = (Float64(c[1]), Float64(c[2]), Float64(c[3]))
         resname_v[i]  = resname(at)
