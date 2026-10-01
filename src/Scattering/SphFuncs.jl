@@ -6,6 +6,7 @@ module SphFuncs
 using SphericalHarmonics: SphericalHarmonics
 using LegendrePolynomials: Plm
 using Bessels: sphericalbesselj
+using DocStringExtensions
 
 export legendre_sphPlm, sphHarm, sphBess, SphHarmError, SphBessError
 
@@ -19,7 +20,7 @@ Base.showerror(io::IO, e::SphBessError) = print(io, "SphBessError: ", e.msg)
 const _INV_SQRT_2PI = 1.0 / sqrt(2.0 * π)
 
 """
-    legendre_sphPlm(l::Integer, m::Integer, x::Real) -> Float64
+$(TYPEDSIGNATURES)
 
 Normalized associated Legendre P̄_l^m(x) with Condon–Shortley phase (GSL legendre_sphPlm).
 
@@ -32,7 +33,7 @@ Normalized associated Legendre P̄_l^m(x) with Condon–Shortley phase (GSL lege
     Plm(float(x), l, m; norm = Val(:normalized), csphase = true) * _INV_SQRT_2PI
 
 """
-    sphHarm(lMax::Int, θ::AbstractArray{<:Real}, φ::AbstractArray{<:Real}) -> Matrix{ComplexF64}
+$(TYPEDSIGNATURES)
 
 Complex spherical harmonics Y_l^m for l = 0..lMax, m = 0..l. Rows are packed as
 l*(l+1)÷2 + m + 1; columns are input points.
@@ -64,7 +65,7 @@ function sphHarm(lMax::Int, θ::AbstractArray{<:Real}, φ::AbstractArray{<:Real}
 end
 
 """
-    sphHarm(lMax::Int, angles::AbstractMatrix{<:Real}) -> Matrix{ComplexF64}
+$(TYPEDSIGNATURES)
 
 As [`sphHarm`](@ref) above, but reading the angles from a (2, N) matrix whose
 rows are θ and φ and whose columns are points — the column-per-atom layout
@@ -82,7 +83,7 @@ function sphHarm(lMax::Int, angles::AbstractMatrix{<:Real})::Matrix{ComplexF64}
 end
 
 """
-    sphBess(r::AbstractArray{<:Real}, q::AbstractArray{<:Real}, lMax::Int) -> Array{Float64,3}
+$(TYPEDSIGNATURES)
 
 Spherical Bessel functions j_l for l = 0..lMax over the outer product q ⊗ r,
 shape (lMax+1, |q|, |r|).

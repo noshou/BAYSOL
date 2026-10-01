@@ -1,0 +1,401 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+"""
+Solvent-accessible surface area estimation.
+"""
+module SASA
+
+using ..DocStringExtensions
+using ..Geometry.PlasticSequence: PlasticSequence, Vec3, plastic_points
+using ..Geometry.Metrics: Metrics, ALL_EXPOSED, ALL_BURIED, classify, blocked
+using NearestNeighbors: inrange
+using ..MolecularStructure: Molecule, radii, r_max, coords_cartesian, neighbour_tree
+
+"""
+Å² of accessible surface each shell point stands for; sets the cloud's spacing
+at ≈ √SHELL_AREA_PER_POINT ≈ 2 Å.
+
+Calibrated against CRYSOL: its default --fb 17 puts F(17) = 1597 points on a
+typical globular protein (~6500 Å²), i.e. ~4 Å² each. Budgeting by area rather
+than by a fixed count keeps that spacing at every size, and since surface area
+grows as N^(2/3), the point count is sub-linear in atom count rather than flat.
+CRYSOL instead caps --fb at F(18) = 2584 for any structure, which
+under-resolves large complexes; pass n_target explicitly to reproduce that.
+"""
+const SHELL_AREA_PER_POINT = 4.0
+
+"Floor on the derived point budget: F(10), the smallest Fibonacci grid CRYSOL's --fb accepts."
+const SHELL_MIN_POINTS = 55
+
+"Sample directions per atom, before occlusion and before thinning. 
+Internal: only fine enough to resolve one atom's patch."
+const _SHELL_SAMPLE = 256
+
+"Range (Å) over which [`_bead_class`](@ref) casts escape rays. A void whose 
+wall is further than this in every direction is bulk solvent, not a cavity."
+const _BEAD_RAY_RANGE = 12.0
+
+"Directions sampled by [`_bead_class`](@ref); about half fall in the 
+outward hemisphere and are used."
+const _BEAD_RAY_DIRS = 64
+
+"Escaping fraction at or above which a bead is CONVEX; below it (but nonzero) 
+CONCAVE (see [`BeadClass`](@ref))."
+const _BEAD_CONVEX_ESCAPE = 0.5
+
+"""
+    BeadClass
+
+Where a hydration-shell bead sits, matching CRYSOL 3's three border-layer
+populations (each carries its own fitted contrast; CRYSOL's defaults are
+1, 1, 0 in units of 0.03 e/Å³).
+
+- `CONVEX`:  outer surface, open solvent ahead of it.
+- `CONCAVE`: outer surface but recessed.
+- `CAVITY`:  enclosed interior void, unreachable from outside.
+"""
+@enum BeadClass CONVEX CONCAVE CAVITY
+
+"""
+$(TYPEDSIGNATURES)
+
+Classify one shell bead by what fraction of its outward hemisphere escapes the
+molecule. Rays are cast only over [`_BEAD_RAY_RANGE`](@ref), and the outward normal is
+tried first so open surfaces, which is the common case, costs one ray.
+"""
+function _bead_class(
+    p::NTuple{3,Float64}, n̂::NTuple{3,Float64}, nb::Vector{Int},
+    dirs::Vector{Vec3}, crds::Matrix{Float64}, rads::Vector{Float64},
+    probe::Float64
+)::BeadClass
+    isempty(nb) && return CONVEX
+    blocked(p, n̂, nb, crds, rads, probe) || return CONVEX
+
+    esc = 0; tot = 0
+    @inbounds for d in dirs
+        d[1] * n̂[1] + d[2] * n̂[2] + d[3] * n̂[3] > 0.0 || continue
+        tot += 1
+        blocked(p, d, nb, crds, rads, probe) || (esc += 1)
+    end
+    tot == 0 && return CONVEX
+
+    esc == 0 && return CAVITY
+    return esc / tot ≥ _BEAD_CONVEX_ESCAPE ? CONVEX : CONCAVE
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Indices selecting a prefix of each atom's block, sized in proportion to that
+block, totalling exactly budget out of m points.
+
+Allocation is cumulative-floor (Bresenham): atom i gets
+floor(C_i·budget/m) - floor(C_{i-1}·budget/m) where C_i is the running
+accepted count. The differences sum to budget with no rounding drift, and each
+is within one point of the proportional share.
+"""
+function _prefix_thin(counts::Vector{Int}, m::Int, budget::Int)::Vector{Int}
+    idx = Vector{Int}(undef, 0); sizehint!(idx, budget)
+    base = 0; prev = 0
+    @inbounds for c in counts
+        c == 0 && continue
+        cum = base + c
+        take = (cum * budget) ÷ m - prev
+        for t in 1:take
+            push!(idx, base + t)          # prefix of this atom's block
+        end
+        base = cum; prev = (cum * budget) ÷ m
+    end
+    return idx
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Classification pass behind [`shell_points`](@ref). A second function barrier for
+the same reason [`_shell_loop`](@ref) is one: the inrange query per bead would
+otherwise dispatch dynamically on the non-concrete tree type, once per bead.
+"""
+function _class_loop(
+    tree::T, pts::Matrix{Float64}, nrm::Matrix{Float64}, crds::Matrix{Float64},
+    rads::Vector{Float64}, probe::Float64, dirs::Vector{Vec3}
+)::Vector{BeadClass} where {T}
+    out = Vector{BeadClass}(undef, size(pts, 2))
+    @inbounds for k in axes(pts, 2)
+        nb = inrange(tree, view(pts, :, k), _BEAD_RAY_RANGE)
+        out[k] = _bead_class(
+            (pts[1, k], pts[2, k], pts[3, k]), (nrm[1, k], nrm[2, k], nrm[3, k]),
+            nb, dirs, crds, rads, probe)
+    end
+    return out
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The solvent-accessible surface of mol as a point cloud: the area each point
+stands for, and which CRYSOL border-layer population it belongs to.
+
+Each atom is sampled at [`_SHELL_SAMPLE`](@ref) directions and the cloud is then
+thinned to n_target points for the whole molecule, by keeping a prefix of
+each atom's accepted points sized in proportion to that atom's count. Every survivor 
+then carries an equal sum(area)/M, so sum(areas) still matches sum(sasa(mol)[1]).
+
+# Arguments
+- `mol`: molecule whose surface to sample.
+
+# Keywords
+-   `probe`: solvent probe radius in Å; probe ≥ 0. Default 1.4 (water).
+-   `n_target`: total points to keep; > 0. Default nothing, deriving it from
+    the accessible area via [`SHELL_AREA_PER_POINT`](@ref) so spacing stays fixed
+    as the molecule grows. A cloud already smaller than the budget is kept whole.
+
+# Returns
+-   `pts`::Matrix{Float64}, (3, M): accessible points in mol's centred
+    cartesian frame, sharing the origin coords_cartesian uses.
+-   `areas::Vector{Float64}, (M,)`: Å² per point, equal across all M.
+-   `class::Vector{BeadClass}, (M,)`: per-point [`BeadClass`](@ref). Cavity
+    detection is exact for voids up to [`_BEAD_RAY_RANGE`](@ref) across;
+    anything larger classifies as open surface.
+
+M is 0 for a molecule with no accessible surface; pts is then (3, 0).
+"""
+function shell_points(
+    mol::Molecule;
+    probe::Float64                  = 1.4,
+    n_target::Union{Nothing,Int}    = nothing
+)::Tuple{Matrix{Float64},Vector{Float64},Vector{BeadClass}}
+    n_target === nothing || n_target > 0 ||
+        throw(DomainError(n_target, "n_target must be > 0"))
+    probe ≥ 0.0 || throw(DomainError(probe, "probe must be ≥ 0"))
+
+    pmap = plastic_points(_SHELL_SAMPLE)
+    rads = radii(mol)
+    rmax = r_max(mol)
+    crds = coords_cartesian(mol)
+    tree = neighbour_tree(mol)
+    pts, areas, nrm, counts =
+        _shell_loop(tree, crds, rads, rmax, pmap, probe, _SHELL_SAMPLE)
+
+    total = sum(areas)
+    m = length(areas)
+    budget = n_target === nothing ?
+        max(SHELL_MIN_POINTS, round(Int, total / SHELL_AREA_PER_POINT)) : n_target
+
+    if m > budget
+        idx = _prefix_thin(counts, m, budget)
+        pts, nrm = pts[:, idx], nrm[:, idx]
+        areas = fill(total / length(idx), length(idx))
+    end
+
+    class = _class_loop(tree, pts, nrm, crds, rads, probe,
+                        plastic_points(_BEAD_RAY_DIRS))
+    return pts, areas, class
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Per-atom loop behind [`shell_points`](@ref), split out for the same reason
+[`_sasa_loop!`](@ref) is: neighbour_tree(mol)'s KDTree has no concrete type
+at the call site (it's a Molecule-cached, non-concretely-typed field), so
+the barrier lets Julia specialize.
+"""
+function _shell_loop(
+    tree::T,
+    crds::Matrix{Float64},
+    rads::Vector{Float64},
+    rmax::Float64,
+    pmap::Vector{Vec3},
+    probe::Float64,
+    n_pts::Int
+)::Tuple{Matrix{Float64},Vector{Float64},Matrix{Float64},Vector{Int}} where {T}
+
+    xs = Float64[]; ys = Float64[]; zs = Float64[]; areas = Float64[]
+    nx = Float64[]; ny = Float64[]; nz = Float64[]
+    upper_bound = size(crds, 2) * n_pts
+    sizehint!(xs, upper_bound); sizehint!(ys, upper_bound); sizehint!(zs, upper_bound)
+    sizehint!(areas, upper_bound)
+    sizehint!(nx, upper_bound); sizehint!(ny, upper_bound); sizehint!(nz, upper_bound)
+    counts = zeros(Int, size(crds, 2))
+
+    for i in axes(crds, 2)
+        x = crds[1, i]; y = crds[2, i]; z = crds[3, i]
+        ρ = rads[i] + probe
+        per_pt = 4 * π * ρ^2 / n_pts   # every direction stands for this much
+
+        candidates = inrange(tree, @view(crds[:, i]), ρ + rmax + probe)
+        status = classify(i, candidates, crds, rads, probe)
+        status == ALL_BURIED && continue
+        keep_all = status == ALL_EXPOSED
+
+        got = 0
+        @inbounds for j in 1:n_pts
+            ux, uy, uz = pmap[j]
+            p = (x + ρ * ux, y + ρ * uy, z + ρ * uz)
+            (keep_all || !blocked(p, candidates, crds, rads, probe, i)) || continue
+            push!(xs, p[1]); push!(ys, p[2]); push!(zs, p[3])
+            push!(nx, ux); push!(ny, uy); push!(nz, uz)
+            push!(areas, per_pt)
+            got += 1
+        end
+        counts[i] = got
+    end
+
+    pts = Matrix{Float64}(undef, 3, length(areas))
+    nrm = Matrix{Float64}(undef, 3, length(areas))
+    @inbounds for k in eachindex(areas)
+        pts[1, k] = xs[k]; pts[2, k] = ys[k]; pts[3, k] = zs[k]
+        nrm[1, k] = nx[k]; nrm[2, k] = ny[k]; nrm[3, k] = nz[k]
+    end
+    return pts, areas, nrm, counts
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Shared argument contract for [`sasa`](@ref); throws DomainError on the
+first violated constraint.
+"""
+function _check_sasa_args(probe::Float64, n_occ::Int, n_exp::Int, area_tol::Float64)::Nothing
+    if (n_occ ≤ 0)
+        throw(DomainError(n_occ, "n_occ must be > 0"))
+    elseif (n_exp ≤ 0)
+        throw(DomainError(n_exp, "n_exp must be > 0"))
+    elseif (n_exp < n_occ)
+        throw(DomainError((n_occ, n_exp), "n_occ must be ≤ n_exp"))
+    elseif (probe < 0.0)
+        throw(DomainError(probe, "probe must be ≥ 0"))
+    elseif (area_tol < 0.0)
+        throw(DomainError(area_tol, "area_tol must be ≥ 0"))
+    end
+    return nothing
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Per-atom solvent-accessible surface area of mol, via Shrake–Rupley point
+sampling over a plastic-sequence point set.
+
+If there are no neighbours reaching the surface, area is exactly 4π(r+probe)²; 
+if a single neighbour engulfs it, area is exactly 0; either way this costs 
+O(k) (k = # of neighbours) with no sampling and, for the free-exposed case,
+Only the ambiguous case must, tested with n_occ points first, and if there exists
+a single non-occluded point (a witness) or the worst-case remaining exposure exceeds
+area_tol, it is confirmed against the full n_exp set. Non-existence of a
+witness is *not* proof of burial, so by the rule of three up to 3/n_occ of
+the sphere could still be exposed.
+
+# Arguments
+- `mol`: molecule to score.
+
+# Keywords
+- `probe`:      solvent probe radius; probe ≥ 0. Default 1.4 Å is the radius of a
+                water molecule and is the convention for SASA calculations.
+- `n_occ`:      points for the witness pass; n_occ > 0. 512 is the smallest round count
+                measured to lose no area on a dense lattice. Catches any atom exposed by more
+                than ~1/512 of its sphere, about 0.2 Å²
+- `n_exp`:      Points per atom for the exposed-fraction pass. Default measured relative error
+                against the analytic two-sphere cap: 1.3 % at 64 points, 0.36 % at 1024, **0.065 %
+                at 4096**, 0.02 % at 16384. Costs ~0.09 ms/atom.
+- `area_tol`:   if no exposed point is found in n_occ samples, the atom might still
+                have a tiny exposed patch (≤ 3/n_occ of its sphere). If that worst‑case area is
+                below area_tol, we skip the full n_exp pass and treat it as buried.
+                Default 2.0 Å².
+
+# Returns
+- `area`: (n,), indexed like coords_cartesian(mol)'s columns.
+- `exposed`: (n,), true where the atom has at least one accessible point.
+"""
+function sasa(
+    mol::Molecule;
+    probe::Float64    = 1.4,
+    n_occ::Int        = 512,
+    n_exp::Int        = 4096,
+    area_tol::Float64 = 2.0
+)::Tuple{Vector{Float64},Vector{Bool}}
+
+    _check_sasa_args(probe, n_occ, n_exp, area_tol)
+
+    pmap = plastic_points(n_exp)
+    rads = radii(mol)
+    rmax = r_max(mol)
+    crds = coords_cartesian(mol)
+
+    tree = neighbour_tree(mol)
+    n = size(crds, 2)
+
+    areas   = zeros(Float64, n)
+    exposed = falses(n)
+
+    return _sasa_loop!(
+        areas, exposed, tree, crds, rads, rmax, pmap, probe, n_occ, n_exp, area_tol
+    )
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Per-atom loop behind [`sasa`](@ref). KDTree(crds) can't infer a concrete tree 
+type from a bare Matrix (Nearestneighbours keys the tree type on point dimension, 
+a runtime property of the array), so calling out to a separate function lets Julia
+specialize the whole loop on it once instead of dispatching inrange per atom.
+"""
+function _sasa_loop!(
+    areas::Vector{Float64},
+    exposed::BitVector,
+    tree::T,
+    crds::Matrix{Float64},
+    rads::Vector{Float64},
+    rmax::Float64,
+    pmap::Vector{Vec3},
+    probe::Float64,
+    n_occ::Int,
+    n_exp::Int,
+    area_tol::Float64
+)::Tuple{Vector{Float64},Vector{Bool}} where {T}
+
+    for i in axes(crds, 2)
+        x = crds[1, i]; y = crds[2, i]; z = crds[3, i]
+        ρ = rads[i] + probe
+        full = 4 * π * ρ^2
+
+        candidates = inrange(tree, @view(crds[:, i]), ρ + rmax + probe)
+        status = classify(i, candidates, crds, rads, probe)
+
+        if status == ALL_BURIED
+            continue                                # areas/exposed stay 0/false
+        elseif status == ALL_EXPOSED
+            areas[i] = full
+            exposed[i] = true
+            continue
+        end
+
+        # AMBIGUOUS: only point sampling can settle the fraction. Count the
+        # first n_occ points, and bail early if even the worst case they leave
+        # open is negligible.
+        cnt = 0
+        @inbounds for j in 1:n_occ
+            ux, uy, uz = pmap[j]
+            p = (x + ρ * ux, y + ρ * uy, z + ρ * uz)
+            blocked(p, candidates, crds, rads, probe, i) || (cnt += 1)
+        end
+
+        # No witness among n_occ, which can still admit a true fraction up to 
+        # ~3/n_occ, so only give up on it when even that much area is negligible.
+        cnt == 0 && 3.0 / n_occ * full < area_tol && continue
+
+        @inbounds for j in n_occ+1:n_exp
+            ux, uy, uz = pmap[j]
+            p = (x + ρ * ux, y + ρ * uy, z + ρ * uz)
+            blocked(p, candidates, crds, rads, probe, i) || (cnt += 1)
+        end
+
+        areas[i] = full * (cnt / n_exp)
+        cnt > 0 && (exposed[i] = true)
+    end
+    return areas, exposed
+end
+
+end # module SASA

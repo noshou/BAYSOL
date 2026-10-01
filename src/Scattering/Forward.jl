@@ -7,7 +7,7 @@
 #
 #     mol ─► (B_vac, B_ex, B_sh_convex, B_sh_concave, B_sh_cavity)   species_multipoles
 #         ─► G(q) ∈ ℝ^{5×5×Q}                                        gram_matrix
-#         ─► ForwardCache(G, qvals, r_m, form_factor_log, n_atoms)     forward_cache
+#         ─► ForwardCache(G, qvals, r_m, form_factor_log, n_atoms, lMax)   forward_cache
 #         ─► I_calc(q) = scale·(v(q)ᵀ G v(q)) + bkgrnd_corr           forward
 #
 # G(q) depends only on geometry and beam, never on (scale, bkgrnd_corr, dns, δρ, c_1).
@@ -15,10 +15,10 @@
 # evaluation is then the O(Q) forward(cache, scale, bkgrnd_corr, dns, δρ; c_1).
 
 using ..MolecularStructure: Molecule, elms, vols
+using ..BAYSOL_Utils.Timing: StageLog, timed!
 
 """
-    species_multipoles(mol, qvals, lMax, energy; kwargs...)
-        -> NTuple{5, Array{ComplexF64,3}}
+$(TYPEDSIGNATURES)
 
 The five CRYSOL-3 species' multipoles B_lm, in the fixed order
 
@@ -54,9 +54,11 @@ function species_multipoles(
     n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
     classes                              = SHELL_CLASSES,
     form_factor_log::Union{Nothing,Vector{String}} = nothing,
+    stage_log::Union{Nothing,StageLog} = nothing,
 )
     _CHUNK = UInt64(chunk)
-    b_vac = vacuo(
+    b_vac = timed!(stage_log, :static, 2, "vacuum B_lm") do
+      vacuo(
         mol,
         qvals,
         lMax,
@@ -65,16 +67,21 @@ function species_multipoles(
         _CHUNK;
         form_factor_source = form_factor_source,
         log = form_factor_log,
-    )
-    b_ex  = excluded(mol, qvals, lMax, _CHUNK)
-    sh    = hydration(mol, qvals, lMax, _CHUNK;
-                    thickness = Float64(thickness), probe = Float64(probe),
-                    n_target  = n_target, classes = classes)
+      )
+    end
+    b_ex = timed!(stage_log, :static, 2, "excluded volume (vols + B_lm)") do
+        excluded(mol, qvals, lMax, _CHUNK)
+    end
+    sh = timed!(stage_log, :static, 2, "hydration (SASA + B_lm)") do
+        hydration(mol, qvals, lMax, _CHUNK;
+                  thickness = Float64(thickness), probe = Float64(probe),
+                  n_target  = n_target, classes = classes)
+    end
     return (b_vac, b_ex, sh.convex, sh.concave, sh.cavity)
 end
 
 """
-    gram_matrix(mol, qvals, lMax, energy; kwargs...) -> Array{Float64,3}
+$(TYPEDSIGNATURES)
 
 The five-species Gram matrix G_ab(q) = S_ab(q), shape (5, 5, Q), symmetric
 and positive-semidefinite in its species axes. Depends only on geometry and beam.
@@ -109,7 +116,7 @@ gram_matrix(
         partial_wave_weights(lMax))
 
 """
-    mean_atomic_radius(mol) -> Float64
+$(TYPEDSIGNATURES)
 
 The structure's mean atomic radius r_m in Å, which is the reference scale CRYSOL's
 excluded-volume correction factor c₁ is measured against, and the point at which
@@ -140,6 +147,7 @@ is then the O(Q) [`forward`](@ref)(cache, …).
 - `form_factor_log::Vector{String}`: construction-time diagnostics from [`FormFactor.form_factor_table`](@ref).
 - `n_atoms::Int`: number of atoms in the structure mol was built from
     (length(elms(mol))), e.g. for reporting alongside the fit.
+- `lMax::Int`: the spherical-harmonic band limit G was built with.
 """
 struct ForwardCache
     G::Array{Float64,3}
@@ -147,10 +155,11 @@ struct ForwardCache
     r_m::Float64
     form_factor_log::Vector{String}
     n_atoms::Int
+    lMax::Int
 end
 
 """
-    forward_cache(mol, qvals, lMax, energy; kwargs...) -> ForwardCache
+$(TYPEDSIGNATURES)
 
 Static geometry-only and fit independent calculations.
 
@@ -161,6 +170,9 @@ Static geometry-only and fit independent calculations.
 -   `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
     `n_target = SHELL_N_TARGET`, `classes = SHELL_CLASSES`: hydration-shell
     geometry, forwarded to hydration.
+-   `stage_log::Union{Nothing,StageLog} = nothing`: if given, the vacuum,
+    excluded-volume, hydration and Gram + r_m stages are recorded in it
+    (depth 2, group `:static`).
 
 The vacuum term's form_factor_table build diagnostics are always collected.
 """
@@ -176,24 +188,23 @@ forward_cache(
     probe::Real                          = PROBE_RADIUS,
     n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
     classes                              = SHELL_CLASSES,
+    stage_log::Union{Nothing,StageLog}   = nothing,
 )::ForwardCache = begin
     form_factor_log = String[]
-    ForwardCache(
-        gram_matrix(
-            mol, qvals, lMax, energy;
-            ions = ions, chunk = chunk, form_factor_source = form_factor_source,
-            thickness = thickness, probe = probe, n_target = n_target, classes = classes,
-            form_factor_log = form_factor_log,
-        ),
-        collect(Float64, qvals),
-        mean_atomic_radius(mol),
-        form_factor_log,
-        length(ions),
+    mp = species_multipoles(
+        mol, qvals, lMax, energy;
+        ions = ions, chunk = chunk, form_factor_source = form_factor_source,
+        thickness = thickness, probe = probe, n_target = n_target, classes = classes,
+        form_factor_log = form_factor_log, stage_log = stage_log,
     )
+    G, r_m = timed!(stage_log, :static, 2, "Gram + r_m") do
+        gram(collect(mp), partial_wave_weights(lMax)), mean_atomic_radius(mol)
+    end
+    ForwardCache(G, collect(Float64, qvals), r_m, form_factor_log, length(ions), lMax)
 end
 
 """
-    forward(G, scale, bkgrnd_corr, dns, δρ) -> Vector
+$(TYPEDSIGNATURES)
 
 The detector-scale model intensity I_calc(q) = scale · (vᵀ G(q) v) +
 bkgrnd_corr, with the contrast vector v = contrast_vector(dns, δρ).
@@ -223,7 +234,7 @@ forward(
 ) = _fused_intensity_calc(G, contrast_vector(dns, δρ), scale, bkgrnd_corr)
 
 """
-    forward(cache, scale, bkgrnd_corr, dns, δρ, c_1 = nothing) -> Vector
+$(TYPEDSIGNATURES)
 
     I_calc(q) = scale · (v(q)ᵀ G(q) v(q)) + bkgrnd_corr
     v(q)      = [1, -dns · G_ex(q; c₁), dro₁, dro₂, dro₃]
@@ -236,8 +247,9 @@ forward(
 - `c_1::Union{Nothing,Real} = nothing`: CRYSOL's excluded-volume correction
     factor, dimensionless (r₀/r_m in CRYSOL's own radius parameterisation;
     see [`excluded_volume_factor`](@ref)). CRYSOL's own fitting range is
-    c_1 ∈ [0.96, 1.04]. Has a prior, [`BAYSOL.Fitting.c1_prior`](@ref)(n) (n =
-    the percentage of prior mass required within that range). c_1 = nothing
+    c_1 ∈ [0.96, 1.04]. c_1 is no longer sampled with a prior; it is
+    profiled out per draw by [`BAYSOL.Fitting.profiled_corrs`](@ref) over
+    the wider search bounds `cmin=0.8, cmax=1.3`. c_1 = nothing
     (the default) or c_1 == 1 skips the correction entirely and reduces
     exactly to the 5-argument [`forward`](@ref) above.
 
@@ -259,7 +271,7 @@ function forward(
 end
 
 """
-    forward(mol, qvals, lMax, energy, scale, bkgrnd_corr, dns, δρ, c_1 = nothing; kwargs...) -> Vector
+$(TYPEDSIGNATURES)
 
 # Arguments
 - `mol::Molecule, qvals, lMax, energy`: as in [`forward_cache`](@ref)/

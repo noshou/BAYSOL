@@ -1,33 +1,17 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-using AdvancedHMC: DenseEuclideanMetric, Hamiltonian, MassMatrixAdaptor,
-find_good_stepsize, Leapfrog, StanHMCAdaptor, StepSizeAdaptor, sample,
-HMCKernel, Trajectory, MultinomialTS, GeneralisedNoUTurn
-
-using FastClosures, StaticArrays, Distributions, ForwardDiff, DiffResults
-
+using   AdvancedHMC: DenseEuclideanMetric, Hamiltonian, MassMatrixAdaptor,
+        find_good_stepsize, Leapfrog, StanHMCAdaptor, StepSizeAdaptor, sample,
+        HMCKernel, Trajectory, MultinomialTS, GeneralisedNoUTurn
+using   FastClosures, StaticArrays, Distributions, ForwardDiff, DiffResults
+using   SpecialFunctions: digamma, trigamma
 using ..Scattering: forward, ForwardCache
-using ..BAYSOL_Utils.Constants: DEFAULT_TEMPERATURE_C, C1_PRIOR_MASS_PERCENT
-
-"Physical prior distributions."
-struct ξ_priors
-    dnsPrior::LogNormal{Float64}
-    δρ1Prior::LogNormal{Float64}
-    δρ2Prior::Normal{Float64}
-    δρ3Prior::Normal{Float64}
-    c_1Prior::LogNormal{Float64}
-end
+using ..BAYSOL_Utils.Constants: DEFAULT_TEMPERATURE_C, DRO12_CONCENTRATION, DRO3_CONCENTRATION
+using ..BAYSOL_Utils.Timing: StageLog, tick, tock!, fmt_count
+using Printf: @sprintf
 
 """
-    _calc_ξ_priors(
-        pH::Real,
-        σ_pH::Real,
-        solutes::Vector{Solute};
-        t::Real = DEFAULT_TEMPERATURE_C,
-        μ_χ::Real = 0,
-        σ_χ::Real = 0.0,
-        n::Real = C1_PRIOR_MASS_PERCENT
-    ) -> ξ_priors
+$(TYPEDSIGNATURES)
 
 Generates physical prior distributions of ξ.
 
@@ -38,123 +22,135 @@ Generates physical prior distributions of ξ.
 - `solutes::Vector{Solute}`: the species in solution.
 
 # Keywords
-- `t::Real = DEFAULT_TEMPERATURE_C`: solution temperature in °C, forwarded to
-    PartialMolarVolumes.ρₑ_w. **!!NOTE!!: as of this version, this should NOT
-    be changed, since only water is temperature-dependent.**
-- `μ_χ = 0.0`: mean, over cavity beads, of the screened-electrostatic potential χ
-    (Debye-Hückel, aggregated from nearby phosphate / ionizable-side-chain
-    charge sites), feeding δρ3's cavity-water contrast.
-- `σ_χ = 0.0`: standard deviation, over cavity beads, of χ, feeding δρ3's
-    cavity-water contrast.
-- `n::Real = C1_PRIOR_MASS_PERCENT`: percentage (0, 100] of the prior mass required to
-    fall within CRYSOL's bound [0.96, 1.04] around its default c_1 = 1. Higher n
-    concentrates more mass near the default; lower n allows more spread — only
-    change from the default if more spread is needed.
+- `t::Real = DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to
+    [`ρₑ_prior`](@ref).
+- `κ_δρ₁₂::Real = DRO12_CONCENTRATION`: concentration of the δρ₁/δρ₂ priors,
+    forwarded to [`δρ_prior`](@ref).
+- `κ_δρ₃::Real = DRO3_CONCENTRATION`: concentration of the δρ₃ prior,
+    forwarded to [`δρ_prior`](@ref).
+
+# Returns
+- `ξ_priors`: the priors. δρ₃'s bounds are fixed at the mean of the ρₑ prior.
 """
 function _calc_ξ_priors(
     pH::Real,
     σ_pH::Real,
     solutes::Vector{Solute};
     t::Real = DEFAULT_TEMPERATURE_C,
-    μ_χ::Real = 0,
-    σ_χ::Real = 0.0,
-    n::Real = C1_PRIOR_MASS_PERCENT
+    κ_δρ₁₂::Real = DRO12_CONCENTRATION,
+    κ_δρ₃::Real = DRO3_CONCENTRATION,
 )::ξ_priors
-    dns = ρₑ_prior(pH, σ_pH, solutes; t=t)
-    δρ1, δρ2, δρ3 = δρ_prior(; μ_χ=μ_χ, σ_χ=σ_χ)
-    c_1 = c1_prior(n)
-    return ξ_priors(dns, δρ1, δρ2, δρ3, c_1)
+    ρₑ = ρₑ_prior(pH, σ_pH, solutes; t=t)
+    δρ₁, δρ₂, δρ₃ = δρ_prior(κ_δρ₁₂, κ_δρ₃, mean(ρₑ))
+    return ξ_priors(ρₑ, δρ₁, δρ₂, δρ₃)
 end
 
 """
-    _ξ₀(p::ξ_priors) -> SVector{5,<:Real}
+$(TYPEDSIGNATURES)
 
-Generates intitial physical parameter vector ξ₀
+Generates an initial physical parameter vector ξ₀, one draw from each prior.
+
+# Arguments
+- `p::ξ_priors`: the priors to draw from.
+
+# Returns
+- `ξ₀::SVector{4,<:Real} = (ρₑ, δρ₁, δρ₂, δρ₃)`.
 """
-function _ξ₀(p::ξ_priors)::SVector{5,<:Real}
-    dns = rand(p.dnsPrior)
-    δρ1 = rand(p.δρ1Prior)
-    δρ2 = rand(p.δρ2Prior)
-    δρ3 = rand(p.δρ3Prior)
-    c_1 = rand(p.c_1Prior)
-    return SVector(dns, δρ1, δρ2, δρ3, c_1)
+function _ξ₀(p::ξ_priors)::SVector{4,<:Real}
+    ρₑ = rand(p.ρₑPrior)
+    δρ₁ = rand(p.δρ₁Prior)
+    δρ₂ = rand(p.δρ₂Prior)
+    δρ₃ = rand(p.δρ₃Prior)
+    return SVector(ρₑ, δρ₁, δρ₂, δρ₃)
 end
 
 """
-    θ_prior_moments(p::ξ_priors) -> (μ::SVector{5}, σ::SVector{5})
+$(TYPEDSIGNATURES)
 
-Used by [`_standardize`](@ref)/[`_destandardize`](@ref) to rescale θ before
-handing it to AdvancedHMC.jl.
+Per-coordinate prior mean and standard deviation in θ-space, used by
+[`_standardize`](@ref)/[`_destandardize`](@ref) to rescale θ before handing
+it to AdvancedHMC.jl, and by [`prior_z_scores`](@ref).
+
+All four are exact. a = ln ρₑ is Normal(μ_ln, σ_ln) under its LogNormal
+prior. For the other three coordinates, tₖ = logit(uₖ) with uₖ ~ Beta(α, β)
+the prior's unit-interval variable (uₖ = (δρₖ + 10)/12 for δρ₁, δρ₂ and
+u = (δρ₃ − L₃)/W₃ for δρ₃):
+
+    E[t] = ψ(α) - ψ(β),    Var[t] = ψ₁(α) + ψ₁(β)
+
+(ψ the digamma, ψ₁ the trigamma function).
+
+# Arguments
+- `p::ξ_priors`: the priors.
+
+# Returns
+- `(μ, σ)::Tuple{SVector{4,Float64},SVector{4,Float64}}`: per-coordinate
+    θ-space prior mean and standard deviation.
 """
-function θ_prior_moments(p::ξ_priors)::Tuple{SVector{5,Float64},SVector{5,Float64}}
-    μ = SVector(p.dnsPrior.μ, p.δρ1Prior.μ, p.δρ2Prior.μ, p.δρ3Prior.μ, p.c_1Prior.μ)
-    σ = SVector(p.dnsPrior.σ, p.δρ1Prior.σ, p.δρ2Prior.σ, p.δρ3Prior.σ, p.c_1Prior.σ)
+function θ_prior_moments(p::ξ_priors)::Tuple{SVector{4,Float64},SVector{4,Float64}}
+    μ₁, σ₁ = _logit_moments(p.δρ₁Prior.ρ)
+    μ₂, σ₂ = _logit_moments(p.δρ₂Prior.ρ)
+    μ₃, σ₃ = _logit_moments(p.δρ₃Prior.ρ)
+    μ = SVector(p.ρₑPrior.μ, μ₁, μ₂, μ₃)
+    σ = SVector(p.ρₑPrior.σ, σ₁, σ₂, σ₃)
     return μ, σ
 end
 
+"Mean and standard deviation of logit(u), u ~ b: (ψ(α) - ψ(β), √(ψ₁(α) + ψ₁(β)))."
+function _logit_moments(b::Beta)
+    α, β = params(b)
+    return digamma(α) - digamma(β), sqrt(trigamma(α) + trigamma(β))
+end
+
 """
-    _standardize(θ::SVector{5,<:Real}, p::ξ_priors) -> SVector{5,<:Real}
-    _destandardize(z::SVector{5,<:Real}, p::ξ_priors) -> SVector{5,<:Real}
+    _standardize(θ::SVector{4,<:Real}, p::ξ_priors) -> SVector{4,<:Real}
+    _destandardize(z::SVector{4,<:Real}, p::ξ_priors) -> SVector{4,<:Real}
 
 Affine maps between θ-space and a prior-standardized z-space,
 z = (θ - μ) / σ / its inverse θ = μ + σ·z, with (μ, σ) from
 [`θ_prior_moments`](@ref).
 
-
-θ's five coordinates have wildly different natural (prior) scales,
+θ's four coordinates have wildly different natural (prior) scales;
 a step in one parameter is enough to send another to an unphysical region
 and push the forward model to a flat curve (wls_fit's det(XᵀWX) ≤ 0 guard).
 
-Sampling in z-space instead makes a generic O(1) kick ~1 prior-σ in
+Sampling in z-space makes a generic O(1) kick ~1 prior-σ in
 every coordinate uniformly (each z_i is standard-Normal under the
 prior), so find_good_stepsize's very first candidate step does not overshoot.
 
-The Jacobian of this affine map (|dθ/dz| = Πσ_i) is a z-independent
-constant, so it's omitted from _logπ/the z-space wrapper around it -- except
-this breaks down for a coordinate with σ_i = 0. δρ3Prior is legitimately
-Normal(μ_χ, σ_χ) with σ_χ = 0 whenever the caller doesn't supply a real
-cavity-electrostatics signal (DensityOfSolvent.jl/DeltaRho.jl's own
-documented "point mass at 0" default) -- not a rare edge case, since that's
-what happens for any structure with no detected cavity beads. A plain
-(θ - μ) / 0 is NaN, which _destandardize/Ξ/forward then propagate into
-every q-point of y_model, and wls_fit's det(XᵀWX) ≤ 0 guard (correctly,
-if confusingly) reports that all-NaN curve as "flat". Guarded here instead:
-a σ_i = 0 coordinate is a Dirac point mass, so its only valid value is μ_i
-regardless of z_i -- _destandardize always returns μ_i there (a constant,
-giving ForwardDiff a clean zero gradient in that direction rather than
-NaN), and _standardize maps any θ_i at that fixed point to z_i = 0
-(arbitrary but consistent, since destandardize ignores z_i there anyway).
+The Jacobian of the map (|dθ/dz| = Πσ_i) is a z-independent
+constant, so it's omitted from _logπ/the z-space wrapper around it.
 
 # Arguments
-- `θ/z::SVector{5,<:Real}`: as above.
+- `θ/z::SVector{4,<:Real}`: as above.
 - `p::ξ_priors`: supplies (μ, σ) via [`θ_prior_moments`](@ref).
 """
-function _standardize(θ::SVector{5,<:Real}, p::ξ_priors)
+function _standardize(θ::SVector{4,<:Real}, p::ξ_priors)
     μ, σ = θ_prior_moments(p)
-    return ifelse.(iszero.(σ), zero.(θ), (θ .- μ) ./ σ)
+    return (θ .- μ) ./ σ
 end
 
 "Inverse of [`_standardize`](@ref); see its docstring for both directions."
-function _destandardize(z::SVector{5,<:Real}, p::ξ_priors)
+function _destandardize(z::SVector{4,<:Real}, p::ξ_priors)
     μ, σ = θ_prior_moments(p)
-    return ifelse.(iszero.(σ), μ, μ .+ σ .* z)
+    return μ .+ σ .* z
 end
 
 """
-    prior_z_scores(ξ::SVector{5,<:Real}, p::ξ_priors) -> SVector{5,Float64}
+$(TYPEDSIGNATURES)
 
-How many prior standard deviations a physical-space point ξ = (dns, δρ1,
-δρ2, δρ3, c1) sits from its own prior p.
+How many prior standard deviations a physical-space point ξ = (ρₑ, δρ₁,
+δρ₂, δρ₃) sits from its own prior p.
 
-z = (θ - μ) / σ in θ-space, where θ = Θ(ξ) and (μ, σ) are the prior's
+z = (θ - μ) / σ in θ-space, where θ = Θ(ξ, p) and (μ, σ) are the prior's
 per-coordinate θ-space mean/std from [`θ_prior_moments`](@ref).
 
 # Arguments
-- `ξ::SVector{5,<:Real}`: the physical-space point to score.
+- `ξ::SVector{4,<:Real}`: the physical-space point to score.
 - `p::ξ_priors`: supplies (μ, σ) via [`θ_prior_moments`](@ref).
 """
-function prior_z_scores(ξ::SVector{5,<:Real}, p::ξ_priors)::SVector{5,Float64}
-    θ, _ = Θ(ξ)
+function prior_z_scores(ξ::SVector{4,<:Real}, p::ξ_priors)::SVector{4,Float64}
+    θ, _ = Θ(ξ, p)
     μ, σ = θ_prior_moments(p)
     return (θ .- μ) ./ σ
 end
@@ -162,7 +158,7 @@ end
 "Dispatch tag selecting profile vs. marginal log-likelihood in [`_ll`](@ref)."
 abstract type LIKELIHOOD end
 
-"Log-likelihood of the data at a given ξ = (dns, δρ1, δρ2, δρ3, c1). The
+"Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The
 forward model produces a predicted curve y_model(q), but the data I_exp(q)
 sits at some unknown overall scale scale and background offset
 bkgrnd_corr, i.e. I_calc = scale·y_model + bkgrnd_corr. WLS.jl fits
@@ -189,7 +185,7 @@ struct PROFILE<:LIKELIHOOD
     PROFILE() = new("profile_log_likelihood")
 end
 
-"Log-likelihood of the data at a given ξ = (dns, δρ1, δρ2, δρ3, c1). The
+"Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The
 forward model produces a predicted curve y_model(q), but the data I_exp(q)
 sits at some unknown overall scale scale and background offset
 bkgrnd_corr, i.e. I_calc = scale·y_model + bkgrnd_corr. WLS.jl fits
@@ -221,7 +217,9 @@ __ll(fit::WLSFit, ::PROFILE)  = wls_prof_ll(fit)
 __ll(fit::WLSFit, ::MARGINAL) = wls_marg_ll(fit)
 
 """
-Log-likelihood of the data at a given ξ = (dns, δρ1, δρ2, δρ3, c1). The
+$(TYPEDSIGNATURES)
+
+Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The
 forward model produces a predicted curve y_model(q), but the data I_exp(q)
 sits at some unknown overall scale scale and background offset
 bkgrnd_corr, i.e. I_calc = scale·y_model + bkgrnd_corr. WLS.jl fits
@@ -245,9 +243,9 @@ selected by l:
     physical parameters, instead of freezing it out.
 
 # Arguments
-- `I_exp::AbstractVector, σ_exp::AbstractVector`: measured intensity and
-    per-point standard errors, forwarded to [`wls_fit`](@ref).
-- `ξ::SVector{5,<:Real}`: the physical fit parameters (dns, δρ1, δρ2, δρ3, c1).
+- `wls::WLSData`: precomputed data-only weighted sums over (I_exp, σ_exp),
+    from [`WLSData`](@ref); forwarded to [`profiled_corrs`](@ref).
+- `ξ::SVector{4,<:Real}`: the physical fit parameters (ρₑ, δρ₁, δρ₂, δρ₃).
 - `fw::ForwardCache`: the structure's static cache, from [`BAYSOL.Scattering.forward_cache`](@ref).
 - `l::LIKELIHOOD`: `PROFILE()` or `MARGINAL()`, selecting which log-likelihood
     variant to return.
@@ -256,74 +254,58 @@ selected by l:
 - `Real`: the log-likelihood, composing by addition with the log-prior terms.
 """
 function _ll(
-    I_exp::AbstractVector,
-    σ_exp::AbstractVector,
-    ξ::SVector{5,<:Real},
+    wls::WLSData,
+    ξ::SVector{4,<:Real},
     fw::ForwardCache,
     l::LIKELIHOOD
 )
-
-    # initialize scale and bkgrnd_corr to "no" normilization before WLS
-    ŷ = forward(fw, 1.0, 0.0, ξ[1], (ξ[2], ξ[3], ξ[4]), ξ[5])
-
-    # compute wls fit
-    fit = wls_fit(ŷ, I_exp, σ_exp)
-
-    # compute profile log likelihood
+    _, fit, _ = profiled_corrs(wls, ξ, fw)
     return __ll(fit, l)
 end
 
 """
-    _safe_logpdf(d, x) -> Real
+$(TYPEDSIGNATURES)
 
-`logpdf(d, x)`, except a degenerate (σ = 0) distribution contributes 0
-rather than its formal Dirac-delta value (`logpdf(Normal(μ, 0), μ) == Inf`
-in Distributions.jl). δρ3Prior legitimately degenerates to Normal(0, 0)
-whenever there's no cavity-electrostatics signal (see
-[`_standardize`](@ref)'s docstring for the same σ = 0 case on the
-θ↔z-space side); an actual +Inf log-density there isn't a finite potential
-AdvancedHMC.jl's Hamiltonian can sample against, so it's dropped here the
-same way `_standardize`'s Πσ_i Jacobian constant is dropped -- both are
-z/parameter-independent constants once that coordinate is pinned to μ, so
-omitting them doesn't change what gets sampled.
+Log prior density of ξ = (ρₑ, δρ₁, δρ₂, δρ₃) in ξ-space. The δρ `LocationScale`
+priors carry their own -ln W terms.
 """
-_safe_logpdf(d, x::Real)::Real = iszero(d.σ) ? zero(x) : logpdf(d, x)
-
-""" log prior """
-_lp(ξ::SVector{5,<:Real}, p::ξ_priors) =
-    _safe_logpdf(p.dnsPrior, ξ[1]) + _safe_logpdf(p.δρ1Prior, ξ[2]) + _safe_logpdf(p.δρ2Prior, ξ[3]) +
-    _safe_logpdf(p.δρ3Prior, ξ[4]) + _safe_logpdf(p.c_1Prior, ξ[5])
+_lp(ξ::SVector{4,<:Real}, p::ξ_priors) =
+    logpdf(p.ρₑPrior, ξ[1]) + logpdf(p.δρ₁Prior, ξ[2]) + logpdf(p.δρ₂Prior, ξ[3]) +
+    logpdf(p.δρ₃Prior, ξ[4])
 
 """
-    _logπ(θ, p, I_exp, σ_exp, fw, l::LIKELIHOOD) -> Real
+$(TYPEDSIGNATURES)
 
 By change of variables, a density trasnfromed from ξ-space into θ-space picks
 up the Jacobian of ξ(θ):
 
     log π(θ) = log p(ξ(θ)) + log|det(∂ξ/∂θ)|
 
-Only three of the five coordinates are reparameterized;
-    
-    - dns = eᵃ
-    - δρ1 = eᵇ
-    - c1 = eᶜ
+Every coordinate is reparameterized (see [`Θ`](@ref)):
 
-with δρ2, δρ3 carried through unchanged. So ∂ξ/∂θ is diagonal with entries (eᵃ, eᵇ, 1, 1, eᶜ) giving:
+    - ρₑ  = eᵃ
+    - δρ₁ = -10 + 12·σ(t₁)
+    - δρ₂ = -10 + 12·σ(t₂)
+    - δρ₃ = L₃ + W₃·σ(t₃)
 
-    log|det(∂ξ/∂θ)| = a + b + c = θ[1] + θ[2] + θ[5]
+So ∂ξ/∂θ is diagonal, giving:
+
+    log|det(∂ξ/∂θ)| = a + Σₖ [ln Wₖ + ln σ(tₖ) + ln(1 - σ(tₖ))]    ([`logjac`](@ref))
+
+with W₁ = W₂ = 12 and (L₃, W₃) the δρ₃ prior's location and scale.
 
 log p(ξ(θ)) is the sum of the log-prior and log-likelihood:
 
-    log p(ξ | data) = log p(ξ) + log p(data | ξ) = _lp(ξ, p) + _ll(I_exp, σ_exp, ξ, fw, l)
+    log p(ξ | data) = log p(ξ) + log p(data | ξ) = _lp(ξ, p) + _ll(wls, ξ, fw, l)
 
 giving:
 
-    log π(θ) = _lp(ξ(θ), p) + _ll(I_exp, σ_exp, ξ(θ), fw, l) + (θ[1] + θ[2] + θ[5])
+    log π(θ) = _lp(ξ(θ), p) + _ll(wls, ξ(θ), fw, l) + logjac(θ)
 
 # Arguments
-- `θ::SVector{5,<:Real}`: the current NUTS position, (a, b, δρ2, δρ3, c).
+- `θ::SVector{4,<:Real}`: the current NUTS position, (a, t₁, t₂, t₃).
 - `p::ξ_priors`: the physical priors, forwarded to [`_lp`](@ref).
-- `I_exp, σ_exp`: the data, forwarded to [`_ll`](@ref).
+- `wls::WLSData`: the precomputed data, forwarded to [`_ll`](@ref).
 - `fw::ForwardCache`: the structure's geometry-only cache, forwarded to [`_ll`](@ref).
 - `l::LIKELIHOOD`: PROFILE() or MARGINAL(), forwarded to [`_ll`](@ref).
 
@@ -331,41 +313,45 @@ giving:
 - `Real`: log π(θ), up to the additive constant NUTS doesn't need.
 """
 function _logπ(
-    θ::SVector{5,<:Real},
+    θ::SVector{4,<:Real},
     p::ξ_priors,
-    I_exp,
-    σ_exp,
+    wls::WLSData,
     fw::ForwardCache,
     l::LIKELIHOOD
 )
-    corr = θ[1] + θ[2] + θ[5] # Jacobian correction
-    ξ = Ξ(θ)  # unconstrained θ-space -> physical ξ-space
-    return _lp(ξ, p) + _ll(I_exp, σ_exp, ξ, fw, l) + corr
+    ξ = Ξ(θ, p)  # unconstrained θ-space -> physical ξ-space
+    return _lp(ξ, p) + _ll(wls, ξ, fw, l) + logjac(θ, p)
 end
 
 """
-    Seed{T<:Real, V<:AbstractVector}
+    Seed{T<:Real}
 
 Everything [`run_fitting`](@ref) needs to start a NUTS chain.
 
 # Fields
 - `pr::ξ_priors`: the physical priors over ξ, from [`_calc_ξ_priors`](@ref).
-- `ξ₀::SVector{5,T}`: one draw from pr, in physical ξ-space, from [`_ξ₀`](@ref).
-- `θ₀::SVector{5,T}`: ξ₀ reparameterized into unconstrained θ-space via [`Θ`](@ref).
+- `ξ₀::SVector{4,T}`: one draw from pr, in physical ξ-space, from [`_ξ₀`](@ref).
+- `θ₀::SVector{4,T}`: ξ₀ reparameterized into unconstrained θ-space via [`Θ`](@ref).
 - `fw::ForwardCache`: the structure's geometry-only cache (the Gram matrix
     G(q), q-grid, and mean atomic radius), from forward_cache.
-- `ex::Tuple{V,V}`: (I_exp, σ_exp), the measured intensity curve and its
-    per-point standard errors.
+- `wls::WLSData`: the measured intensity curve and its per-point standard
+    errors, precomputed into [`WLSData`](@ref) once so the NUTS hot path
+    (`_ll`/`_logπ`) never rebuilds the data-only weighted sums.
+- `timing::Union{Nothing,StageLog}`: the run's stage log, if timing is on;
+    [`run_fitting`](@ref) appends its stages and hands it on in the [`FitResult`](@ref).
 """
-struct Seed{T<:Real, V<:AbstractVector}
+struct Seed{T<:Real}
     pr::ξ_priors
-    ξ₀::SVector{5,T}
-    θ₀::SVector{5,T}
+    ξ₀::SVector{4,T}
+    θ₀::SVector{4,T}
     fw::ForwardCache
-    ex::Tuple{V,V}
+    wls::WLSData
+    timing::Union{Nothing,StageLog}
 end
 
 """
+$(TYPEDSIGNATURES)
+
 Runs initial seeding for the sampler.
 
 # Arguments
@@ -379,18 +365,14 @@ Runs initial seeding for the sampler.
 - `solutes::Vector{Solute}`: the species in solution.
 
 # Keywords
-- `t::Real = DEFAULT_TEMPERATURE_C`: solution temperature in °C, forwarded to
-    PartialMolarVolumes.ρₑ_w. **!!NOTE!!: as of this version, this should NOT
-    be changed, since only water is temperature-dependent.**
-- `μ_χ::Real = 0, σ_χ::Real = 0.0`: mean/standard deviation, over cavity beads,
-    of the screened-electrostatic potential χ, feeding δρ3's cavity-water
-    contrast — forwarded straight to _calc_ξ_priors. Compute these with
-    protein_cavity_electrostatics beforehand if the structure has real
-    ionizable charge sites; left at 0/0.0 otherwise.
-- `n::Real = C1_PRIOR_MASS_PERCENT`: percentage (0, 100] of the prior mass required to
-    fall within CRYSOL's bound [0.96, 1.04] around its default c_1 = 1. Higher n
-    concentrates more mass near the default; lower n allows more spread — only
-    change from the default if more spread is needed.
+- `t::Real = DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to
+    [`ρₑ_prior`](@ref).
+- `κ_δρ₁₂::Real = DRO12_CONCENTRATION`, `κ_δρ₃::Real = DRO3_CONCENTRATION`:
+    prior concentrations, forwarded to [`δρ_prior`](@ref).
+- `timing::Union{Nothing,StageLog} = nothing`: stored in the returned `Seed`.
+
+# Returns
+- `Seed`: priors, initial point, forward cache, and data.
 """
 function seed_fitting(
     fw::ForwardCache,
@@ -400,60 +382,60 @@ function seed_fitting(
     σ_pH::Real,
     solutes::Vector{Solute};
     t::Real = DEFAULT_TEMPERATURE_C,
-    μ_χ::Real = 0,
-    σ_χ::Real = 0.0,
-    n::Real = C1_PRIOR_MASS_PERCENT,
+    κ_δρ₁₂::Real = DRO12_CONCENTRATION,
+    κ_δρ₃::Real = DRO3_CONCENTRATION,
+    timing::Union{Nothing,StageLog} = nothing,
 )::Seed
-    pr = _calc_ξ_priors(pH, σ_pH, solutes; t=t, μ_χ=μ_χ, σ_χ=σ_χ, n=n)
+    pr = _calc_ξ_priors(pH, σ_pH, solutes; t=t, κ_δρ₁₂=κ_δρ₁₂, κ_δρ₃=κ_δρ₃)
     ξ₀ = _ξ₀(pr)
-    θ₀, _ = Θ(ξ₀)
-    ex = (I_exp, σ_exp)
-    return Seed(pr, ξ₀, θ₀, fw, ex)
+    θ₀, _ = Θ(ξ₀, pr)
+    wls = WLSData(I_exp, σ_exp)
+    return Seed(pr, ξ₀, θ₀, fw, wls, timing)
 end
 
 """
     FitResult{S}
 
 Return of [`run_fitting`](@ref)/BAYSOL.run_model: the posterior
-draws of the physical parameters ξ = (dns, δρ1, δρ2, δρ3, c1), one
-(scale, bkgrnd_corr) pair and predicted curve per draw, and
+draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
+(scale, bkgrnd_corr, c1) triple and predicted curve per draw, and
 AdvancedHMC.jl's own per-iteration diagnostics.
 
 # Fields
-- `samples::Vector{SVector{5,Float64}}`: posterior draws of ξ, length n_samples.
+- `samples::Vector{SVector{4,Float64}}`: posterior draws of ξ, length n_samples.
 - `stats::Vector{S}`: AdvancedHMC.jl's per-iteration diagnostics, matching
     samples index-for-index.
 - `scale::Vector{Float64}`: the WLS estimate of the scale correction at samples[i].
 - `bkgrnd_corr::Vector{Float64}`: the WLS estimate of the background correction at samples[i].
-- `chisq_red::Vector{Float64}`:  the reduced χ² of the WLS estimate 
+- `c1::Vector{Float64}`: the profiled excluded-volume correction
+    ([`profiled_corrs`](@ref)) at samples[i]. Profiled, not sampled -- it
+    has no prior and therefore no z-score, unlike `samples`.
+- `chisq_red::Vector{Float64}`:  the reduced χ² of the WLS estimate
 - `curves::Matrix{Float64}, (Q, n_samples)`: the detector-scale predicted
     curve I_calc(q) = scale[i]·y_model(q) + bkgrnd_corr[i] for each
     samples[i], column-matching scale/bkgrnd_corr. Equivalently
     curves[:, i] == forward(seed.fw, scale[i], bkgrnd_corr[i], samples[i][1],
-    (samples[i][2], samples[i][3], samples[i][4]), samples[i][5]).
+    samples[i][2:4], c1[i]).
 - `likelihood::AbstractString`: the likelihood type
+- `timing::Union{Nothing,StageLog}`: the run's stage log (from the `Seed`), if timing is on.
 """
 struct FitResult{S}
-    samples::Vector{SVector{5,Float64}}
+    samples::Vector{SVector{4,Float64}}
     stats::Vector{S}
     scale::Vector{Float64}
     bkgrnd_corr::Vector{Float64}
+    c1::Vector{Float64}
     chisq_red::Vector{Float64}
     curves::Matrix{Float64}
     likelihood::AbstractString
+    timing::Union{Nothing,StageLog}
 end
 
 """
-    run_fitting(
-        seed::Seed,
-        n_samples::Int64,
-        n_adapt::Int64;
-        l::LIKELIHOOD=PROFILE(),
-        δ::Real=80
-    ) -> FitResult
+$(TYPEDSIGNATURES)
 
 Run NUTS on [`_logπ`](@ref) starting from seed, returning posterior draws
-of the physical parameters ξ = (dns, δρ1, δρ2, δρ3, c1), one (scale,
+of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one (scale,
 bkgrnd_corr) pair per draw (see # Returns below), and AdvancedHMC.jl's
 own per-iteration diagnostics.
 
@@ -487,7 +469,7 @@ StepSizeAdaptor tunes the leapfrog step size ε via dual-averaging so the
 empirical acceptance rate converges to δ; too-small ε wastes computation
 taking tiny steps, too-large ε causes leapfrog's discretization error (and
 therefore the rejection rate) to blow up. MassMatrixAdaptor learns M (here the
-full parameter covariance, since dns/δρ/c1 are physically coupled through the
+full parameter covariance, since ρₑ/δρ are physically coupled through the
 forward model) from the trajectory's sample covariance.
 
 # Arguments
@@ -524,12 +506,13 @@ function run_fitting(
         throw(DomainError((n_adapt, n_samples), "n_adapt must be < n_samples"))
     end
 
+    t_setup = tick()
+
     # ℓπ: z ↦ log π(θ(z)), the value-only log-posterior in prior-standardized z-space.
     ℓπ = @closure z -> _logπ(
-        _destandardize(SVector{5,eltype(z)}(z...), seed.pr),
+        _destandardize(SVector{4,eltype(z)}(z...), seed.pr),
         seed.pr,
-        seed.ex[1],
-        seed.ex[2],
+        seed.wls,
         seed.fw, l
     )
 
@@ -542,8 +525,9 @@ function run_fitting(
 
     # DenseEuclideanMetric allows the adaptation to learn
     # correlations between parameters. Since we are only fitting
-    # 5 or 6 params and they are highly coupled, it is worth it here.
-    metric = DenseEuclideanMetric(5)
+    # 4 or 5 params (once δρ4 lands) and they are highly coupled, it is
+    # worth it here.
+    metric = DenseEuclideanMetric(4)
 
     # combines "potential energy" (ℓπ) and kinetic energy (from metric)
     hamiltonian = Hamiltonian(metric, ℓπ, ∂ℓπ∂z)
@@ -575,6 +559,8 @@ function run_fitting(
     kernel = HMCKernel(Trajectory{MultinomialTS}(integrator, GeneralisedNoUTurn()))
 
     # do sampling
+    tock!(seed.timing, :sampling, 1, "NUTS setup (Hamiltonian, step-size init)", t_setup)
+    t_nuts = tick()
     samples, stats = sample(
         hamiltonian,
         kernel,
@@ -584,24 +570,36 @@ function run_fitting(
         n_adapt;
         progress=true
     )
-    samples = [Ξ(_destandardize(SVector{5,Float64}(s...), seed.pr)) for s in samples]
+    samples = [Ξ(_destandardize(SVector{4,Float64}(s...), seed.pr), seed.pr) for s in samples]
+    if seed.timing !== nothing
+        n_lf = sum(getproperty.(stats, :n_steps))
+        ms = 1e3 * (time_ns() - t_nuts[1]) / 1e9 / max(n_lf, 1)
+        seed.timing.info["leapfrog"] = n_lf
+        tock!(seed.timing, :sampling, 1,
+            @sprintf("NUTS  (%s iters, %s leapfrog, %.1f ms/step)", fmt_count(n_samples), fmt_count(n_lf), ms),
+            t_nuts)
+    end
+    t_reprofile = tick()
 
     # scale/bkgrnd_corr are fit in closed form (wls_fit) and discarded on
     # every single ℓπ/gradient evaluation above.
     scale        = Vector{Float64}(undef, n_samples)
     bkgrnd_corr  = Vector{Float64}(undef, n_samples)
-    χ²           = Vector{Float64}(undef, n_samples) 
+    c1           = Vector{Float64}(undef, n_samples)
+    χ²           = Vector{Float64}(undef, n_samples)
     curves       = Matrix{Float64}(undef, length(seed.fw.qvals), n_samples)
-    I_exp, σ_exp = seed.ex
     for (i, ξ) in enumerate(samples)
-        ŷ              = forward(seed.fw, 1.0, 0.0, ξ[1], (ξ[2], ξ[3], ξ[4]), ξ[5])
-        fit            = wls_fit(ŷ, I_exp, σ_exp)
-        scale[i]       = fit.scale
-        bkgrnd_corr[i] = fit.bkgrnd_corr
-        χ²[i]          = reduced_chi2(fit)
-        curves[:, i]   = wls_predict(fit, ŷ)
+        # re-profile c1 at each posterior draw so the reported curve/χ²
+        # match what _ll actually evaluated at that ξ during sampling.
+        ŷ, fit, c1_star = profiled_corrs(seed.wls, ξ, seed.fw)
+        scale[i]        = fit.scale
+        bkgrnd_corr[i]  = fit.bkgrnd_corr
+        c1[i]           = c1_star
+        χ²[i]           = reduced_chi2(fit)
+        curves[:, i]    = wls_predict(fit, ŷ)
     end
-    
-    return FitResult(samples, stats, scale, bkgrnd_corr, χ², curves, l.type)
+
+    tock!(seed.timing, :sampling, 1, "per-draw c1 re-profile + curves ($(n_samples) draws)", t_reprofile)
+    return FitResult(samples, stats, scale, bkgrnd_corr, c1, χ², curves, l.type, seed.timing)
 
 end

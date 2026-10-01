@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Optional visual check for the Shrake-Rupley occlusion machinery in
-# `src/Solvation/SASA.jl`. Kept out of the module so the geometry core stays
+# `src/SASA/SASA.jl`. Kept out of the module so the geometry core stays
 # free of plotting deps; GLMakie lives in test/visualize/Project.toml.
 #
 # Every scene uses `FixedRadii`, a test-only `RadiiSource` defined below, so the
@@ -19,7 +19,7 @@
 using BAYSOL
 using BAYSOL.Interfaces: Interfaces, RadiiSource
 using BAYSOL.MolecularStructure: MolecularStructure, Molecule
-using BAYSOL.Solvation.SASA: SASA
+using BAYSOL.SASA: SASA
 using BAYSOL.Geometry.PlasticSequence: plastic_points
 using BAYSOL.Geometry.Metrics: Metrics, Coverage, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS,
                                      classify, blocked

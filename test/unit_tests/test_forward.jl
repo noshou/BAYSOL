@@ -17,7 +17,7 @@ using BAYSOL.Scattering:  forward, gram_matrix, species_multipoles,
                     SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, SHELL_CLASSES,
                     DRO_UNIT, FORM_FACTOR_SOURCE, B_LM_CHUNK
 using BAYSOL.MolecularStructure: create, elms, radii, vols
-using BAYSOL.Solvation: SASA
+using BAYSOL: SASA
 using LinearAlgebra: issymmetric, eigvals
 using ForwardDiff
 

@@ -2,7 +2,7 @@
 
 The SAXS/SANS forward model: a molecule and a q grid in, the orientationally-averaged detector intensity `I_calc(q)` out.
 
-# Overviw
+## Overview
 
 For a fixed orientation, N point-like scatterers with form factors `f_i(q)` at positions `r_i` give a coherent scattering amplitude
 
@@ -45,7 +45,9 @@ I(q) = Σ_a Σ_b c_a c_b S_ab(q),   S_ab(q) = 4π Σ_lm w_lm Re(B^a_lm(q) conj(B
 positive semidefinite) and reused across every parameter draw: I(q) = vᵀ G(q) v with contrast vector v = [1, -dns, `dro_1`, `dro_2`, `dro_3`]. Classic single-shell CRYSOL is the n = 3 reduction with the three shell classes merged. Forward.jl's module docstring in Scattering.jl derives this in full, including CRYSOL's excluded-volume correction factor `c_1` (an
 expansion of every dummy's radius by `r_0`/`r_m`) and the detector-scale model `I_calc(q)` = m·I(q) + c.
 
-Forward.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defines it: the mean of each atom's own excluded-volume-dummy equivalent-sphere radius, `r_m` = N⁻¹ Σᵢ cbrt(3 Vᵢ / 4π), where Vᵢ is MolecularStructure.vols(mol)[i] (the CRYSOL-style displaced-solvent volume, see MolecularStructure's README) -- **not** the mean van der Waals radius (radii(mol)). The two differ whenever vols uses its excluded-volume table rather than the vdW-sphere fallback, which is the common case for protein atoms (H/C/N/O/S).
+Forward.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defines it: the mean of each atom's own excluded-volume-dummy equivalent-sphere radius, `r_m` = N⁻¹ Σᵢ cbrt(3 Vᵢ / 4π), where Vᵢ is MolecularStructure.vols(mol)[i] (the displaced-solvent volume, see MolecularStructure's README) -- **not** the mean van der Waals radius (radii(mol)). vols is computed geometrically: each atom's vdW sphere is clipped by its neighbours' power-diagram planes, so Vᵢ < (4/3)π·rᵢ³ for any atom with overlapping neighbours, and the two radii differ for essentially every atom in a packed structure.
+
+`c_1` is not fitted here. `forward` takes it as an argument, and during fitting `Fitting.profiled_corrs` profiles it per likelihood evaluation within the hard bounds `EXCL_VOL_CORR_BOUNDS = (0.8, 1.3)`, with no prior (see the Fitting README).
 
 ## Module layout
 
@@ -54,7 +56,7 @@ Forward.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defines i
 - **Scatterers.jl** : one builder per species: vacuo, excluded, hydration (the last returns one `B_lm` per hydration-shell class).
 - **Intensity.jl** : gram (the `S_ab` matrix G), intensity (vᵀ G v), `intensity_calc` (m·I + c), `contrast_vector`/
   `contrast_matrix`, and `excluded_volume_factor` (the `c_1` correction).
-- **Forward.jl** : the assembled model: `species_multipoles`, `gram_matrix`, `forward_cache`, and forward.
+- **Forward.jl** : the assembled model: `species_multipoles`, `gram_matrix`, `forward_cache`, and forward. `forward_cache` returns a `ForwardCache(G, qvals, r_m, form_factor_log, n_atoms, lMax)`; `n_atoms` and `lMax` feed the report's `=== Run ===` section. Its `stage_log` keyword (a `BAYSOL_Utils.Timing.StageLog`) times the vacuum, excluded-volume, hydration (SASA + `B_lm`) and Gram + `r_m` stages for the report's `=== Timing ===` section; `BAYSOL.seed_model` passes it automatically.
 
 ## Usage
 

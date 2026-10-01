@@ -5,10 +5,11 @@ Leaf module of constant primitives.
 """
 module Constants
 
-export DEFAULT_ATOL, SHELL_THICKNESS, PROBE_RADIUS, BOND_CUTOFF, SHELL_N_TARGET,
-DRO_UNIT, B_LM_CHUNK, AVOGADRO, PHOSPHATE_NET_CHARGE, ELEMENTARY_CHARGE,
-VACUUM_PERMITTIVITY, BOLTZMANN, ANGSTROM, MV_PER_CM, IONIC_STRENGTH_M, WATER_EPS_R,
-DEBYE_TEMPERATURE_K, CUTOFF_DEBYE_LENGTHS, DEFAULT_TEMPERATURE_C, C1_PRIOR_MASS_PERCENT
+export DEFAULT_ATOL, SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET,
+DRO_UNIT, B_LM_CHUNK, AVOGADRO, DEFAULT_TEMPERATURE_C,
+PMV_REFERENCE_TEMPERATURE_C, PMV_FRACTIONAL_EXPANSIBILITY,
+EXCL_VOL_CORR_BOUNDS, EXCL_VOL_CORR_EPS, φ_max,
+DRO_BOUNDS, DRO12_CONCENTRATION, DRO3_CONCENTRATION
 
 #-------------------------
 # Floating-point accuracy 
@@ -32,12 +33,12 @@ default.
 """
 const SHELL_THICKNESS = 3.0
 
-"Solvent probe radius in Å (water), forwarded to [`Solvation.SASA.shell_points`](@ref BAYSOL.Solvation.SASA.shell_points)."
+"Solvent probe radius in Å (water), forwarded to [`SASA.shell_points`](@ref BAYSOL.SASA.shell_points)."
 const PROBE_RADIUS = 1.4
 
 """
 Default shell-dummy budget (hydration's n_target). nothing lets
-[`Solvation.SASA.shell_points`](@ref BAYSOL.Solvation.SASA.shell_points) size the cloud from the accessible area
+[`SASA.shell_points`](@ref BAYSOL.SASA.shell_points) size the cloud from the accessible area
 (≈ area / SASA.SHELL_AREA_PER_POINT, floored at SASA.SHELL_MIN_POINTS);
 an Int pins it.
 """
@@ -64,84 +65,98 @@ const B_LM_CHUNK = UInt64(2048)
 "Avogadro constant, mol⁻¹ (CODATA, exact since the 2019 SI redefinition)."
 const AVOGADRO = 6.02214076e23
 
-"Elementary charge, C (CODATA, exact since the 2019 SI redefinition)."
-const ELEMENTARY_CHARGE = 1.602176634e-19
-
-"Vacuum permittivity, F/m."
-const VACUUM_PERMITTIVITY = 8.8541878128e-12
-
-"Boltzmann constant, J/K (CODATA, exact since the 2019 SI redefinition)."
-const BOLTZMANN = 1.380649e-23
-
-"Metres per angstrom."
-const ANGSTROM = 1.0e-10
-
-"V/m per MV/cm."
-const MV_PER_CM = 1.0e8
-
-"""
-Net Manning-condensed charge of a single B-DNA phosphate group, in units of
-the elementary charge. Laage/Elsaesser/Hynes 2017 section 5.1: the bare
--1 e phosphate charge is reduced by counterion condensation to -0.24 e
-for B-DNA geometry (d_charge = 0.17 nm) with monovalent counterions at
-T = 300 K, ε = 80 (Γ = λ_B/d_charge = 4.22, η = 1 - 1/Γ = 0.76 bound
-fraction, net charge 1/(Γ) ... = -0.24).
-"""
-const PHOSPHATE_NET_CHARGE = -0.24
-
-"""
-Covalent-bond distance cutoff, Å: generous enough for P-O (~1.5-1.6 Å) and
-C-O/C-C/C-N (~1.4-1.6 Å) single bonds, tight enough to exclude non-bonded
-contacts. Molecule carries no bonding table (see MolecularStructure.create's
-(name, elms, coords) signature), so interatomic distance is the only
-connectivity proxy available.
-"""
-const BOND_CUTOFF = 1.75
-
-#----------------------------
-# Electrostatics/solution
-#----------------------------
-
-"Physiological monovalent salt concentration, mol/L
-([`Solvation.Electrostatics.debye_length`](@ref BAYSOL.Solvation.Electrostatics.debye_length)'s default ionic strength)."
-const IONIC_STRENGTH_M = 0.15
-
-"Water's static relative permittivity ([`Solvation.Electrostatics.debye_length`](@ref BAYSOL.Solvation.Electrostatics.debye_length)'s default eps_r)."
-const WATER_EPS_R = 80.0
-
-"""
-Solution temperature, K, for the Debye screening-length calculation
-([`Solvation.Electrostatics.debye_length`](@ref BAYSOL.Solvation.Electrostatics.debye_length)'s default T). Distinct from [`DEFAULT_TEMPERATURE_C`](@ref)
-(25°C ≈ 298.15 K), which is _ρₑ/[`Fitting.ρₑ_prior`](@ref)'s own default temperature for
-the bulk-electron-density calculation — the two aren't currently reconciled
-to the same value; each keeps its own pre-existing default here rather than
-silently changing either one.
-"""
-const DEBYE_TEMPERATURE_K = 300.0
-
-"""
-Charge sites beyond this many Debye lengths from a bead are dropped in the
-screened-electrostatic aggregation (exp(-5) ≈ 0.007, already negligible
-next to the screened 1/r prefactor).
-"""
-const CUTOFF_DEBYE_LENGTHS = 5.0
-
 #----------------------------
 # Sampler defaults
 #----------------------------
 
 """
 Default solution temperature, °C, for _ρₑ/[`Fitting.ρₑ_prior`](@ref)'s bulk-electron
--density calculation. **Do not change** without also checking _ρₑ's own
-note: only water's density is temperature-dependent in that model as of this
-version.
+-density calculation. Pass the sample's real temperature instead whenever it is
+known: water's density is evaluated at it exactly, and the solutes' 25 °C
+partial molar volumes get a widened uncertainty (see
+[`PMV_FRACTIONAL_EXPANSIBILITY`](@ref)).
 """
 const DEFAULT_TEMPERATURE_C = 25.0
 
 """
-Default percentage ((0, 100]) of [`Fitting.c1_prior`](@ref BAYSOL.Fitting.c1_prior)'s prior mass required to fall
-within CRYSOL's bound [0.96, 1.04] around its default c_1 = 1.
+Temperature, °C, at which the bundled partial-molar-volume tables are tabulated
+(see PartialMolarVolumes/README.md: 298.15 K unless a source says otherwise).
 """
-const C1_PRIOR_MASS_PERCENT = 85
+const PMV_REFERENCE_TEMPERATURE_C = 25.0
+
+"""
+Fractional partial-molar-volume expansibility, K⁻¹: an upper bound on
+(∂ϕ°/∂T)/ϕ° used to widen a solute's 25 °C ϕ° uncertainty when the sample is at
+another temperature, σ_T = PMV_FRACTIONAL_EXPANSIBILITY · ϕ° · |t - 25|.
+
+Derived from the multi-temperature series already bundled with the tables
+(15-35 °C: sugars, ureas and glycolurils in sources/extracted_pmv_candidates.tsv;
+18-40 °C: Chalikian et al. 2001's nucleobases/nucleosides, 10.1016/S0301-4622(01)00200-9,
+the `other-T` rows of nonbiological.tsv): across those 42 solutes the fractional
+expansibility spans 0.44-2.96 × 10⁻³ K⁻¹ (median 0.82 × 10⁻³), so 3.0 × 10⁻³
+covers every one of them. No electrolyte has multi-temperature data in the
+tables, so this bound is unverified for salts.
+"""
+const PMV_FRACTIONAL_EXPANSIBILITY = 3.0e-3
+
+"""
+Hard bounds `(cmin, cmax)` on CRYSOL's excluded-volume correction c1
+([`Fitting.profiled_corrs`](@ref BAYSOL.Fitting.profiled_corrs)), CRYSOL's
+r₀/r_m. c1 is profiled, not sampled, so these bounds -- not a prior -- are
+what stops it from absorbing model misspecification that belongs on the
+physically meaningful parameters (dns/δρ1-3) instead.
+"""
+const EXCL_VOL_CORR_BOUNDS = (0.8, 1.3)
+
+"""
+Padding/grid-resolution unit for [`Fitting.profiled_corrs`](@ref
+BAYSOL.Fitting.profiled_corrs)'s c1 search: the search actually runs on
+`(cmin - EXCL_VOL_CORR_EPS, cmax + EXCL_VOL_CORR_EPS)` so that landing
+exactly on `cmin`/`cmax` can be distinguished from genuinely wanting to go
+further (real "saturation"), and the same value is the coarse pre-scan
+grid's step size.
+"""
+const EXCL_VOL_CORR_EPS = 0.02
+
+"""
+Upper bound on the cavity occupancy φ = ρ_cavity/ρ₀. Water in a cavity can
+be at most modestly denser than bulk: the densest well-attested hydration
+water is Merzel & Smith's first layer at 1.15·ρ₀, so φ_max = 1.25 leaves
+margin above it while excluding unphysical over-dense "water" (e.g. the
+δρ3 = 4, φ ≈ 1.36, seen when δρ3 was unconstrained).
+"""
+const φ_max = 1.25
+
+"""
+CRYSOL3's fitting limits `(lo, hi)` on the convex/concave shell contrasts
+δρ₁, δρ₂, in units of [`DRO_UNIT`](@ref): "The limits during the fitting are
+-10 to 2". They are the support of the δρ₁/δρ₂ priors
+([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)) and of the scaled-logit
+maps [`Fitting.Θ`](@ref BAYSOL.Fitting.Θ)/[`Fitting.Ξ`](@ref BAYSOL.Fitting.Ξ)
+put on them.
+"""
+const DRO_BOUNDS = (-10.0, 2.0)
+
+"""
+Default concentration κ = α + β − 2 of the δρ₁/δρ₂ Beta priors
+([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)). κ = 14 gives
+Beta(83/6, 13/6) on [`DRO_BOUNDS`](@ref), with its mode at δρ = 1 and
+SD(δρ) ≈ 1.00. That is the same spread as the Normal(1, 1) δρ₂ prior it
+replaces.
+"""
+const DRO12_CONCENTRATION = 14.0
+
+"""
+Default concentration κ = α + β − 2 of the cavity-contrast (δρ₃) Beta prior
+([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)), stretched onto
+[−ρ̄ₑ/`DRO_UNIT`, (`φ_max` − 1)·ρ̄ₑ/`DRO_UNIT`]. κ = 1.25 gives Beta(2, 1.25) on
+u = (δρ₃ − X)/W, with its mode at δρ₃ = 0 (bulk-density cavity water).
+"""
+const DRO3_CONCENTRATION = 1.25
+
+@assert(
+    0 < EXCL_VOL_CORR_EPS <= (EXCL_VOL_CORR_BOUNDS[2] - EXCL_VOL_CORR_BOUNDS[1]),
+    "EXCL_VOL_CORR_EPS must be in (0, cmax-cmin]"
+)
 
 end # module

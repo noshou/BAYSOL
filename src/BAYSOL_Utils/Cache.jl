@@ -5,6 +5,8 @@ Thread safe caching primitives.
 """
 module Cache
 
+using DocStringExtensions
+
 export Lazy, make, force, KeyedCache
 
 "A cache of a value of type T. The thunk runs on the first [`force`](@ref)."
@@ -17,7 +19,7 @@ mutable struct Lazy{T}
 end
 
 """
-    make(::Type{T}, f) -> Lazy{T}
+$(TYPEDSIGNATURES)
 
 Build an unforced cache of the T-valued thunk f.
 
@@ -28,7 +30,7 @@ Build an unforced cache of the T-valued thunk f.
 make(::Type{T}, f) where {T} = Lazy{T}(f)
 
 """
-    force(c::Lazy{T}) -> T
+$(TYPEDSIGNATURES)
 
 Run c's thunk once, under its lock, then return the stored value on every call.
 
@@ -59,7 +61,7 @@ struct KeyedCache{K,V}
 end
 
 """
-    Base.get!(f::Union{Function,Type}, c::KeyedCache{K,V}, key::K) -> V
+$(TYPEDSIGNATURES)
 
 Return the cached value for key, computing it via the zero-arg thunk f
 and storing it on the first miss. The lookup, compute-on-miss, and store are
@@ -81,7 +83,7 @@ function Base.get!(f::Union{Function,Type}, c::KeyedCache{K,V}, key::K)::V where
 end
 
 """
-    Base.haskey(c::KeyedCache{K,V}, key::K) -> Bool
+$(TYPEDSIGNATURES)
 
 Whether key has already been memoized in c, taken under c's lock.
 """

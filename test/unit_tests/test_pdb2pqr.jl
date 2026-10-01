@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/MolecularStructure/PDB2PQR.jl: the pdb2pqr subprocess wrapper
+# Exercises src/MolecularStructure/Pdb2pqr.jl: the pdb2pqr subprocess wrapper
 # that adds explicit hydrogens (`resolve_hydrogens`), its pKa-record-driven,
 # per-chain N-/C-terminus override (`_terminus_groups`), and the generalized
 # Molecule/Residues loader (`load_molecule`). Needs real network/subprocess
@@ -8,7 +8,7 @@
 # the live propka3 test in test_propka.jl.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BAYSOL.MolecularStructure: resolve_hydrogens, load_molecule, PDB2PQRError, MoleculeError,
+using BAYSOL.MolecularStructure: resolve_hydrogens, load_molecule, Pdb2pqrError, MoleculeError,
                     _terminus_groups, propka_pKas, _store_dir,
                     Molecule, Residues, n_atoms, elms, coords_cartesian
 
@@ -159,7 +159,7 @@ TER      40      TYR B   2
 END
 """
 
-@testset "PDB2PQR" begin
+@testset "Pdb2pqr" begin
 
     dir = mktempdir()
     pdb_path = joinpath(dir, "pdb2pqr-TEST.pdb")
@@ -184,8 +184,8 @@ END
     @test 0 < nterm.pKa < 14
     @test 0 < cterm.pKa < 14
 
-    @testset "nonexistent input raises PDB2PQRError" begin
-        @test_throws PDB2PQRError resolve_hydrogens("/no/such/file/nope.pdb", recs, 7.0)
+    @testset "nonexistent input raises Pdb2pqrError" begin
+        @test_throws Pdb2pqrError resolve_hydrogens("/no/such/file/nope.pdb", recs, 7.0)
     end
 
     @testset "resolve_hydrogens with add=false is a genuine no-op" begin

@@ -6,6 +6,8 @@ and the pairwise-sphere shortcuts/tests built on them (Metrics).
 """
 module Geometry
 
+using DocStringExtensions
+
 include("PlasticSequence.jl")
 include("Metrics.jl")
 

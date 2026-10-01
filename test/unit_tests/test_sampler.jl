@@ -1,31 +1,29 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# End-to-end correctness tests for src/Fitting/Sampler.jl: the stage-1
-# Bayesian-fitting pipeline (priors -> initial draw -> θ-space log-posterior
-# -> NUTS via AdvancedHMC.jl). These tests check that the wiring is
-# *correct* -- independent re-derivations of every formula, purity (no
-# hidden mutation) of Θ/Ξ/_logπ, AD-differentiability, physical-domain
-# invariants, and internal self-consistency between what `run_fitting` returns and
-# what AdvancedHMC.jl itself reports. They deliberately do NOT check
-# posterior "goodness" (recovery accuracy, convergence diagnostics, effective
-# sample size) -- that is a separate concern for once this is run against
-# real data.
+# End-to-end correctness tests for src/Fitting/Sampler.jl: the Bayesian
+# fitting pipeline (priors -> initial draw -> θ-space log-posterior -> NUTS
+# via AdvancedHMC.jl). These tests check that the wiring is *correct* --
+# independent re-derivations of every formula, purity (no hidden mutation)
+# of _logπ, AD-differentiability, physical-domain invariants, and internal
+# self-consistency between what `run_fitting` returns and what AdvancedHMC.jl
+# itself reports. They deliberately do NOT check posterior "goodness"
+# (recovery accuracy, convergence diagnostics, effective sample size).
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 const FIT = BAYSOL.Fitting
 
-using BAYSOL.Fitting: Solute, Protein, NonBiological, WLSFit, wls_fit,
-    wls_prof_ll, wls_marg_ll, Θ, Ξ
+using BAYSOL.Fitting: Solute, NonBiological, WLSData, wls_fit, wls_prof_ll, wls_marg_ll,
+    profiled_corrs, Θ, Ξ
+using BAYSOL.Constants: DRO_BOUNDS, DRO12_CONCENTRATION, DRO3_CONCENTRATION
 using BAYSOL.Scattering: forward, forward_cache, ForwardCache
 using BAYSOL.MolecularStructure: MolecularStructure
-using Distributions: logpdf, mean, std, LogNormal, Normal
+using Distributions: logpdf, mean, std, params, Beta
 using StaticArrays: SVector
 using ForwardDiff
 using Random
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
-include(joinpath(@__DIR__, "..", "fixtures", "functions", "sequences.jl"))      # INSULIN_A
 
 # ---------------------------------------------------------------------------
 #                 fixtures: a non-trivial structure + synthetic data
@@ -46,27 +44,23 @@ const smpl_chunk = UInt64(4)
 
 smpl_fw() = forward_cache(smpl_mol(), smpl_q, smpl_lmax, smpl_E; chunk = smpl_chunk)
 
-# A realistic solutes/pH setup shared by every priors-related test below.
-smpl_solutes() = Solute[Protein(2.0e-4, 5.0e-6, INSULIN_A), NonBiological(0.15, 0.001, "sodium chloride")]
+# Buffer only: the measured macromolecule is never a solute (see Fitting.Solute).
+smpl_solutes() = Solute[NonBiological(0.15, 0.001, "sodium chloride")]
 const smpl_pH    = 7.4
 const smpl_σ_pH  = 0.05
-const smpl_μ_χ   = 0.02
-const smpl_σ_χ   = 0.01
-const smpl_n_c1  = 95.0
 
-smpl_priors() = FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, smpl_solutes();
-    μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
+smpl_priors() = FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, smpl_solutes())
 
-# Ground truth used to generate synthetic "experimental" data: physically
-# plausible values (dns near bulk water, δρ1/c1 near CRYSOL's defaults).
-const ξ_TRUE = (0.334, 1.05, -0.05, 0.02, 1.01)
+# Ground truth used to generate synthetic "experimental" data:
+# ξ = (ρₑ, δρ₁, δρ₂, δρ₃).
+const ξ_TRUE = (0.334, 1.05, -0.05, -1.0)
 const M_TRUE, C_TRUE = 1.7, 0.3
 
 """
 Synthetic `(I_exp, σ_exp)` from `fw` at `ξ_TRUE`/`M_TRUE`/`C_TRUE`, with small seeded Gaussian noise.
 """
 function synth_data(fw::ForwardCache)
-    y = forward(fw, 1.0, 0.0, ξ_TRUE[1], (ξ_TRUE[2], ξ_TRUE[3], ξ_TRUE[4]), ξ_TRUE[5])
+    y = forward(fw, 1.0, 0.0, ξ_TRUE[1], ξ_TRUE[2:4])
     I_true = M_TRUE .* y .+ C_TRUE
     σ_exp = max.(abs.(I_true) .* 0.01, 1.0e-6)
     Random.seed!(0x5CA77e12)
@@ -78,317 +72,243 @@ end
 #                 independent references (no calls into Sampler.jl)
 # ---------------------------------------------------------------------------
 
+"Log prior of ξ = (ρₑ, δρ₁, δρ₂, δρ₃), written out by hand."
+ref_lp(ξ, pr) =
+    logpdf(pr.ρₑPrior, ξ[1]) + logpdf(pr.δρ₁Prior, ξ[2]) + logpdf(pr.δρ₂Prior, ξ[3]) +
+    logpdf(pr.δρ₃Prior, ξ[4])
+
 """
-Independent re-derivation of `_logπ`'s formula from first principles --
-`Distributions.logpdf`, `forward`, `wls_fit`, `wls_prof_ll`/`wls_marg_ll`.
+Log-likelihood at ξ with c1 profiled: the c1 is taken from `profiled_corrs`,
+everything else (forward, contrasts, WLS, likelihood) is recomputed directly.
 """
-function ref_logπ(θ::NTuple{5,<:Real}, pr, I_exp, σ_exp, fw, l::FIT.LIKELIHOOD)
-    ξ = (exp(θ[1]), exp(θ[2]), θ[3], θ[4], exp(θ[5]))
-    lp =    logpdf(pr.dnsPrior, ξ[1]) + logpdf(pr.δρ1Prior, ξ[2]) +
-            logpdf(pr.δρ2Prior, ξ[3]) + logpdf(pr.δρ3Prior, ξ[4]) + logpdf(pr.c_1Prior, ξ[5])
-    ŷ = forward(fw, 1.0, 0.0, ξ[1], (ξ[2], ξ[3], ξ[4]), ξ[5])
-    fit = wls_fit(ŷ, I_exp, σ_exp)
-    ll = l isa FIT.PROFILE ? wls_prof_ll(fit) : wls_marg_ll(fit)
-    return lp + ll + (θ[1] + θ[2] + θ[5])
+function ref_ll(ξ, wls, fw, l::FIT.LIKELIHOOD)
+    _, _, c1 = profiled_corrs(wls, SVector{4,Float64}(ξ), fw)
+    ŷ = forward(fw, 1.0, 0.0, ξ[1], (ξ[2], ξ[3], ξ[4]), c1)
+    fit = wls_fit(ŷ, wls)
+    return l isa FIT.PROFILE ? wls_prof_ll(fit) : wls_marg_ll(fit)
 end
 
 """
-Run the pure `_logπ` on an `SVector` built from `θ`.
+Independent re-derivation of `_logπ`: decode θ by hand, add the log-Jacobian
+a + Σₖ [ln Wₖ + ln uₖ + ln(1 - uₖ)], uₖ = σ(tₖ), W = (12, 12, W₃).
 """
-function apply_logπ(θ::NTuple{5,<:Real}, pr, I_exp, σ_exp, fw, l)
-    return FIT._logπ(SVector{5,Float64}(θ), pr, I_exp, σ_exp, fw, l)
+function ref_logπ(θ::NTuple{4,<:Real}, pr, wls, fw, l::FIT.LIKELIHOOD)
+    lo, hi = DRO_BOUNDS
+    u = map(t -> 1 / (1 + exp(-t)), θ[2:4])
+    L₃, W₃ = pr.δρ₃Prior.μ, pr.δρ₃Prior.σ
+    W = (hi - lo, hi - lo, W₃)
+    ξ = (exp(θ[1]), lo + W[1] * u[1], lo + W[2] * u[2], L₃ + W₃ * u[3])
+    corr = θ[1] + sum(log(W[k]) + log(u[k]) + log(1 - u[k]) for k in 1:3)
+    return ref_lp(ξ, pr) + ref_ll(ξ, wls, fw, l) + corr
 end
+
+θ_of(ξt, pr) = Tuple(Θ(SVector{4,Float64}(ξt), pr)[1])
 
 @testset "Sampler" begin
 
-    #------------------------------------------------------------------
-    #                 _calc_ξ_priors -- composition of the 3 priors
-    #------------------------------------------------------------------
-
-    @testset "_calc_ξ_priors: exactly composes ρₑ_prior/δρ_prior/c1_prior" begin
+    @testset "_calc_ξ_priors: exactly composes ρₑ_prior/δρ_prior" begin
         pr = smpl_priors()
         @test pr isa FIT.ξ_priors
-
-        ref_dns = BAYSOL.Fitting.ρₑ_prior(smpl_pH, smpl_σ_pH, smpl_solutes())
-        ref_δρ1, ref_δρ2, ref_δρ3 = BAYSOL.Fitting.δρ_prior(; μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ)
-        ref_c1 = BAYSOL.Fitting.c1_prior(smpl_n_c1)
-
-        @test pr.dnsPrior  == ref_dns
-        @test pr.δρ1Prior  == ref_δρ1
-        @test pr.δρ2Prior  == ref_δρ2
-        @test pr.δρ3Prior  == ref_δρ3
-        @test pr.c_1Prior  == ref_c1
+        ref_ρ = FIT.ρₑ_prior(smpl_pH, smpl_σ_pH, smpl_solutes())
+        ref_δρ₁, ref_δρ₂, ref_δρ₃ = FIT.δρ_prior(DRO12_CONCENTRATION, DRO3_CONCENTRATION, mean(ref_ρ))
+        @test pr.ρₑPrior  == ref_ρ
+        @test pr.δρ₁Prior == ref_δρ₁
+        @test pr.δρ₂Prior == ref_δρ₂
+        @test pr.δρ₃Prior == ref_δρ₃
     end
 
-    @testset "_calc_ξ_priors: propagates validation from the underlying priors" begin
-        @test_throws ArgumentError FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, Solute[])
+    @testset "_calc_ξ_priors: κ keywords reach δρ_prior" begin
+        pr = FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, smpl_solutes(); κ_δρ₁₂ = 3.0, κ_δρ₃ = 7.0)
+        @test sum(params(pr.δρ₁Prior.ρ)) - 2 ≈ 3.0
+        @test sum(params(pr.δρ₃Prior.ρ)) - 2 ≈ 7.0
+        @test_throws DomainError FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, smpl_solutes(); κ_δρ₁₂ = 0.0)
+    end
+
+    @testset "_calc_ξ_priors: pure water is allowed; bad σ_pH still throws" begin
+        @test FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, Solute[]) isa FIT.ξ_priors
         @test_throws DomainError FIT._calc_ξ_priors(smpl_pH, -0.1, smpl_solutes())
     end
 
-    #------------------------------------------------------------------
-    #                 _ξ₀ -- initial draw respects each prior
-    #------------------------------------------------------------------
-
-    @testset "_ξ₀: returns an SVector{5,<:Real} inside every prior's support" begin
+    @testset "_ξ₀: draws lie in every prior's support" begin
         pr = smpl_priors()
         Random.seed!(20_260_920)
         for _ in 1:200
             ξ0 = FIT._ξ₀(pr)
-            @test ξ0 isa SVector{5,Float64}
-            @test ξ0[1] > 0   # dns:  LogNormal support
-            @test ξ0[2] > 0   # δρ1:  LogNormal support
-            @test ξ0[5] > 0   # c1:   LogNormal support
+            @test ξ0 isa SVector{4,Float64}
+            @test ξ0[1] > 0
+            @test DRO_BOUNDS[1] < ξ0[2] < DRO_BOUNDS[2] && DRO_BOUNDS[1] < ξ0[3] < DRO_BOUNDS[2]
+            @test pr.δρ₃Prior.μ < ξ0[4] < pr.δρ₃Prior.μ + pr.δρ₃Prior.σ
             @test all(isfinite, ξ0)
         end
     end
 
-    @testset "_ξ₀: empirical moments match each prior's analytic moments" begin
+    @testset "_ξ₀: empirical means match each prior's analytic mean" begin
         pr = smpl_priors()
         Random.seed!(20_260_921)
         n = 60_000
         draws = [FIT._ξ₀(pr) for _ in 1:n]
-        for (i, dist) in enumerate((pr.dnsPrior, pr.δρ1Prior, pr.δρ2Prior, pr.δρ3Prior, pr.c_1Prior))
+        for (i, μ, σ) in ((1, mean(pr.ρₑPrior),  std(pr.ρₑPrior)),
+                          (2, mean(pr.δρ₁Prior), std(pr.δρ₁Prior)),
+                          (3, mean(pr.δρ₂Prior), std(pr.δρ₂Prior)),
+                          (4, mean(pr.δρ₃Prior), std(pr.δρ₃Prior)))
             xs = getindex.(draws, i)
-            μ_emp, σ_emp = mean(xs), std(xs)
-            # generous (6 SEM) bound: deterministic seed keeps this from being flaky
-            tol = 6 * std(dist) / sqrt(n)
-            @test close_(μ_emp, mean(dist); atol = max(tol, 1.0e-3))
+            @test close_(mean(xs), μ; atol = max(6σ / sqrt(n), 1.0e-9))
         end
     end
 
-    #------------------------------------------------------------------
-    #                 _ll -- PROFILE/MARGINAL dispatch
-    #------------------------------------------------------------------
-
-    @testset "_ll: PROFILE/MARGINAL match direct forward+wls_fit+wls_*_ll calls" begin
-        fw = smpl_fw()
-        I_exp, σ_exp = synth_data(fw)
-        cases = (
-            ξ_TRUE,
-            (0.30, 0.95, 0.10, -0.03, 0.98),
-            (0.40, 1.15, -0.20, 0.05, 1.04),
-        )
-        for ξt in cases
-            ξ = SVector{5,Float64}(ξt)
-            ŷ = forward(fw, 1.0, 0.0, ξt[1], (ξt[2], ξt[3], ξt[4]), ξt[5])
-            fit = wls_fit(ŷ, I_exp, σ_exp)
-
-            @test close_(FIT._ll(I_exp, σ_exp, ξ, fw, FIT.PROFILE()), wls_prof_ll(fit))
-            @test close_(FIT._ll(I_exp, σ_exp, ξ, fw, FIT.MARGINAL()), wls_marg_ll(fit))
-            # the two variants genuinely differ (marginal isn't secretly aliased to profile)
-            @test !close_(  FIT._ll(I_exp, σ_exp, ξ, fw, FIT.PROFILE()),
-                            FIT._ll(I_exp, σ_exp, ξ, fw, FIT.MARGINAL()); atol = 1.0e-6)
+    @testset "θ_prior_moments: δρ₁, δρ₂, δρ₃ entries match the Monte Carlo moments of logit(u)" begin
+        pr = smpl_priors()
+        μ, σ = FIT.θ_prior_moments(pr)
+        Random.seed!(20_260_922)
+        for (i, b) in ((2, pr.δρ₁Prior.ρ), (3, pr.δρ₂Prior.ρ), (4, pr.δρ₃Prior.ρ))
+            u = rand(b, 400_000)
+            t = log.(u) .- log1p.(-u)
+            @test isapprox(μ[i], mean(t); atol = 0.01)
+            @test isapprox(σ[i], std(t); rtol = 0.01)
         end
+        @test μ[1] == pr.ρₑPrior.μ && σ[1] == pr.ρₑPrior.σ
     end
 
-    #------------------------------------------------------------------
-    #                 _lp -- matches a manual logpdf sum
-    #------------------------------------------------------------------
-
-    @testset "_lp: matches an independently-summed logpdf over all 5 priors" begin
+    @testset "_standardize/_destandardize are inverses" begin
         pr = smpl_priors()
-        cases = (
-            ξ_TRUE,
-            (0.30, 0.95, 0.10, -0.03, 0.98),
-            (1.0e-3, 1.0e-3, 5.0, -5.0, 1.0e-3),  # tail values: still valid support
-        )
-        for ξt in cases
-            ξ = SVector{5,Float64}(ξt)
-            ref =   logpdf(pr.dnsPrior, ξt[1]) + logpdf(pr.δρ1Prior, ξt[2]) +
-                    logpdf(pr.δρ2Prior, ξt[3]) + logpdf(pr.δρ3Prior, ξt[4]) + logpdf(pr.c_1Prior, ξt[5])
-            @test close_(FIT._lp(ξ, pr), ref)
-        end
+        θ = SVector(-1.1, 0.2, 0.9, 0.4)
+        @test all(isapprox.(FIT._destandardize(FIT._standardize(θ, pr), pr), θ; rtol = 1e-12))
     end
 
-    #------------------------------------------------------------------
-    #                 _logπ -- purity + composition + Jacobian correctness
-    #------------------------------------------------------------------
-
-    @testset "_logπ: pure -- composes _lp/_ll/Ξ exactly, no mutation of θ" begin
-        pr = smpl_priors()
+    @testset "_ll: PROFILE/MARGINAL match the independent reference" begin
         fw = smpl_fw()
-        I_exp, σ_exp = synth_data(fw)
-        θt = (log(ξ_TRUE[1]), log(ξ_TRUE[2]), ξ_TRUE[3], ξ_TRUE[4], log(ξ_TRUE[5]))
-        θ = SVector{5,Float64}(θt)
-        θ_before = Tuple(θ)
-
-        val = FIT._logπ(θ, pr, I_exp, σ_exp, fw, FIT.PROFILE())
-        @test Tuple(θ) == θ_before   # input untouched
-
-        ξ = Ξ(θ)
-        @test all(close_.(Tuple(ξ), ξ_TRUE))
-        expected = FIT._lp(ξ, pr) + FIT._ll(I_exp, σ_exp, ξ, fw, FIT.PROFILE()) + (θ[1] + θ[2] + θ[5])
-        @test close_(val, expected)
-    end
-
-    @testset "_logπ: matches the independent reference, both LIKELIHOOD variants" begin
-        pr = smpl_priors()
-        fw = smpl_fw()
-        I_exp, σ_exp = synth_data(fw)
-        cases = (
-            (log(ξ_TRUE[1]), log(ξ_TRUE[2]), ξ_TRUE[3], ξ_TRUE[4], log(ξ_TRUE[5])),
-            (log(0.30), log(0.95), 0.10, -0.03, log(0.98)),
-            (log(0.40), log(1.15), -0.20, 0.05, log(1.04)),
-        )
-        for θt in cases
+        wls = WLSData(synth_data(fw)...)
+        for ξt in (ξ_TRUE, (0.30, 0.95, 0.10, -6.0), (0.40, 1.15, -0.20, 2.5))
+            ξ = SVector{4,Float64}(ξt)
             for l in (FIT.PROFILE(), FIT.MARGINAL())
-                val = apply_logπ(θt, pr, I_exp, σ_exp, fw, l)
-                @test close_(val, ref_logπ(θt, pr, I_exp, σ_exp, fw, l); atol = 1.0e-8)
+                @test close_(FIT._ll(wls, ξ, fw, l), ref_ll(ξt, wls, fw, l))
+            end
+            @test !close_(FIT._ll(wls, ξ, fw, FIT.PROFILE()),
+                          FIT._ll(wls, ξ, fw, FIT.MARGINAL()); atol = 1.0e-6)
+        end
+    end
+
+    @testset "_ll: the forward model takes (δρ₁, δρ₂, δρ₃) straight from ξ[2:4]" begin
+        fw = smpl_fw()
+        wls = WLSData(synth_data(fw)...)
+        ξ = SVector(0.33, 1.0, 1.0, -4.0)
+        ŷ, _, c1 = profiled_corrs(wls, ξ, fw)
+        ŷ_ref = forward(fw, 1.0, 0.0, 0.33, (1.0, 1.0, -4.0), c1)
+        @test all(close_.(ŷ, ŷ_ref))
+    end
+
+    @testset "_lp: matches the hand-written log prior" begin
+        pr = smpl_priors()
+        for ξt in (ξ_TRUE, (0.30, 0.95, 0.10, -8.0), (1.0e-3, -9.9, 1.9, 1.0))
+            @test close_(FIT._lp(SVector{4,Float64}(ξt), pr), ref_lp(ξt, pr))
+        end
+    end
+
+    @testset "_logπ: pure, and matches the independent reference for both LIKELIHOODs" begin
+        pr = smpl_priors()
+        fw = smpl_fw()
+        wls = WLSData(synth_data(fw)...)
+        for ξt in (ξ_TRUE, (0.30, 0.95, 0.10, -6.0), (0.40, 1.15, -0.20, 2.5))
+            θt = θ_of(ξt, pr)
+            θ = SVector{4,Float64}(θt)
+            θ_before = Tuple(θ)
+            for l in (FIT.PROFILE(), FIT.MARGINAL())
+                val = FIT._logπ(θ, pr, wls, fw, l)
+                @test Tuple(θ) == θ_before
+                @test close_(val, ref_logπ(θt, pr, wls, fw, l); atol = 1.0e-8)
             end
         end
     end
 
-    @testset "_logπ: is AD-differentiable, gradient matches central differences" begin
+    @testset "_logπ: AD gradient matches central differences (c1 re-profiled each time)" begin
         pr = smpl_priors()
         fw = smpl_fw()
-        I_exp, σ_exp = synth_data(fw)
-        θ₀ = [log(ξ_TRUE[1]), log(ξ_TRUE[2]), ξ_TRUE[3], ξ_TRUE[4], log(ξ_TRUE[5])]
-
-        f(x) = FIT._logπ(SVector{5,eltype(x)}(x...), pr, I_exp, σ_exp, fw, FIT.PROFILE())
+        wls = WLSData(synth_data(fw)...)
+        θ₀ = collect(θ_of(ξ_TRUE, pr))
+        f(x) = FIT._logπ(SVector{4,eltype(x)}(x...), pr, wls, fw, FIT.PROFILE())
         g = ForwardDiff.gradient(f, θ₀)
         @test all(isfinite, g)
-
-        h = 1.0e-6
-        for i in 1:5
+        h = 1.0e-5
+        for i in 1:4
             xp = copy(θ₀); xp[i] += h
             xm = copy(θ₀); xm[i] -= h
-            fd = (f(xp) - f(xm)) / (2h)
-            @test g[i] ≈ fd rtol = 1.0e-4
+            @test g[i] ≈ (f(xp) - f(xm)) / (2h) rtol = 1.0e-3 atol = 1.0e-6
         end
     end
 
-    #------------------------------------------------------------------
-    #                 Seed / seed_fitting
-    #------------------------------------------------------------------
+    @testset "prior_z_scores: zero at the θ-space prior mean" begin
+        pr = smpl_priors()
+        μ, _ = FIT.θ_prior_moments(pr)
+        @test all(isapprox.(FIT.prior_z_scores(Ξ(μ, pr), pr), 0.0; atol = 1e-9))
+    end
 
     @testset "seed_fitting: fields are internally consistent" begin
         fw = smpl_fw()
         I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes();
-            μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
-
+        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes())
         @test seed isa FIT.Seed
         @test seed.fw === fw
-        @test seed.ex == (I_exp, σ_exp)
-
-        # θ₀ round-trips back to ξ₀ exactly through Ξ (independent of Θ/Ξ's
-        # own dedicated test suite -- this is checking seed_fitting's *wiring*).
-        @test all(close_.(Tuple(Ξ(seed.θ₀)), Tuple(seed.ξ₀)))
-
-        # ξ₀ itself is a genuine draw from the composed priors
-        @test seed.ξ₀[1] > 0 && seed.ξ₀[2] > 0 && seed.ξ₀[5] > 0
-    end
-
-    @testset "seed_fitting: propagates validation from _calc_ξ_priors" begin
-        fw = smpl_fw()
-        I_exp, σ_exp = synth_data(fw)
-        @test_throws ArgumentError FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, Solute[])
+        @test seed.wls.I_obs == I_exp
+        @test all(close_.(Tuple(Ξ(seed.θ₀, seed.pr)), Tuple(seed.ξ₀)))
+        @test seed.ξ₀[1] > 0 && seed.pr.δρ₃Prior.μ < seed.ξ₀[4] < seed.pr.δρ₃Prior.μ + seed.pr.δρ₃Prior.σ
         @test_throws DomainError FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, -0.1, smpl_solutes())
     end
 
-    #------------------------------------------------------------------
-    #                 run -- argument validation
-    #------------------------------------------------------------------
-
     @testset "run: δ must be a percentage strictly inside (0, 100)" begin
         fw = smpl_fw()
-        I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes();
-            μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
-        @test_throws DomainError FIT.run_fitting(seed, 5, 2; δ = 0)
-        @test_throws DomainError FIT.run_fitting(seed, 5, 2; δ = 100)
-        @test_throws DomainError FIT.run_fitting(seed, 5, 2; δ = -10)
-        @test_throws DomainError FIT.run_fitting(seed, 5, 2; δ = 150)
+        seed = FIT.seed_fitting(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        for δ in (0, 100, -10, 150)
+            @test_throws DomainError FIT.run_fitting(seed, 5, 2; δ = δ)
+        end
     end
 
-    #------------------------------------------------------------------
-    #                 run -- end to end
-    #------------------------------------------------------------------
-
-    """
-    Every sample must obey ξ's structural domain (`dns, δρ1, c1 > 0`) --
-    guaranteed by construction (Ξ always exponentiates those 3 coordinates)
-    regardless of whether the sampler converged well, so this checks the
-    decode step, not sampler quality.
-    """
-    function check_physical_domain(samples)
+    function check_physical_domain(samples, pr)
         for ξ in samples
-            @test length(ξ) == 5
+            @test length(ξ) == 4
             @test all(isfinite, ξ)
             @test ξ[1] > 0
-            @test ξ[2] > 0
-            @test ξ[5] > 0
+            @test DRO_BOUNDS[1] ≤ ξ[2] ≤ DRO_BOUNDS[2] && DRO_BOUNDS[1] ≤ ξ[3] ≤ DRO_BOUNDS[2]
+            @test pr.δρ₃Prior.μ ≤ ξ[4] ≤ pr.δρ₃Prior.μ + pr.δρ₃Prior.σ
         end
     end
 
     """
-    For a handful of returned samples, reconstruct θ from the (already
-    decoded) ξ via Θ, and check that re-evaluating `_logπ` on it lands on
-    the same `log_density` AdvancedHMC.jl itself reported for that
-    iteration -- a wiring/self-consistency check of the whole
-    ℓπ/∂ℓπ∂θ/Hamiltonian/NUTS chain, not a re-test of `_logπ`'s math (that's
-    covered above against `ref_logπ`).
+    Re-evaluating `_logπ` at Θ(sample) must land on the log_density
+    AdvancedHMC.jl reported for that iteration.
     """
     function check_log_density_self_consistency(samples, stats, seed, l)
         for i in eachindex(samples)
-            θ_check, _ = Θ(samples[i])
-            recomputed = FIT._logπ(θ_check, seed.pr, seed.ex[1], seed.ex[2], seed.fw, l)
+            θ_check, _ = Θ(samples[i], seed.pr)
+            recomputed = FIT._logπ(θ_check, seed.pr, seed.wls, seed.fw, l)
             @test close_(recomputed, stats[i].log_density; atol = 1.0e-6)
         end
     end
 
-    @testset "run: PROFILE -- output shapes, physical domain, self-consistency" begin
-        fw = smpl_fw()
-        I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes();
-            μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
-
-        Random.seed!(1)
-        n_samples, n_adapt = 60, 30
-        fit = FIT.run_fitting(seed, n_samples, n_adapt; l = FIT.PROFILE())
-        samples, stats = fit.samples, fit.stats
-
-        @test length(samples) == n_samples
-        @test length(stats) == n_samples
-        check_physical_domain(samples)
-        check_log_density_self_consistency(samples, stats, seed, FIT.PROFILE())
-    end
-
-    @testset "run: MARGINAL -- output shapes, physical domain, self-consistency" begin
-        fw = smpl_fw()
-        I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes();
-            μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
-
-        Random.seed!(2)
-        n_samples, n_adapt = 60, 30
-        fit = FIT.run_fitting(seed, n_samples, n_adapt; l = FIT.MARGINAL())
-        samples, stats = fit.samples, fit.stats
-
-        @test length(samples) == n_samples
-        @test length(stats) == n_samples
-        check_physical_domain(samples)
-        check_log_density_self_consistency(samples, stats, seed, FIT.MARGINAL())
+    for (name, l, rng) in (("PROFILE", FIT.PROFILE(), 1), ("MARGINAL", FIT.MARGINAL(), 2))
+        @testset "run: $name -- output shapes, physical domain, self-consistency" begin
+            fw = smpl_fw()
+            seed = FIT.seed_fitting(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+            Random.seed!(rng)
+            n_samples, n_adapt = 60, 30
+            fit = FIT.run_fitting(seed, n_samples, n_adapt; l = l)
+            @test length(fit.samples) == n_samples
+            @test length(fit.stats) == n_samples
+            @test length(fit.c1) == n_samples
+            check_physical_domain(fit.samples, seed.pr)
+            check_log_density_self_consistency(fit.samples, fit.stats, seed, l)
+        end
     end
 
     @testset "run: deterministic under a fixed global RNG seed" begin
         fw = smpl_fw()
-        I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes();
-            μ_χ = smpl_μ_χ, σ_χ = smpl_σ_χ, n = smpl_n_c1)
-
+        seed = FIT.seed_fitting(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         Random.seed!(42)
         fit1 = FIT.run_fitting(seed, 20, 10; l = FIT.PROFILE())
-        samples1, stats1 = fit1.samples, fit1.stats
         Random.seed!(42)
         fit2 = FIT.run_fitting(seed, 20, 10; l = FIT.PROFILE())
-        samples2, stats2 = fit2.samples, fit2.stats
-
-        @test length(samples1) == length(samples2)
-        for i in eachindex(samples1)
-            @test all(samples1[i] .== samples2[i])
-            @test stats1[i].log_density == stats2[i].log_density
+        for i in eachindex(fit1.samples)
+            @test all(fit1.samples[i] .== fit2.samples[i])
+            @test fit1.stats[i].log_density == fit2.stats[i].log_density
         end
     end
-
 end

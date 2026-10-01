@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Tests for src/Fitting/ParamTransform.jl: the ξ-space (physical fit
-# parameters, mixed domains) <-> θ-space (unconstrained ℝ⁵) bijection that
-# stage-1 HMC samples in, plus the log-Jacobian correction `Θ` returns
+# parameters, bounded/half-bounded domains) <-> θ-space (unconstrained ℝ⁴) bijection that
+# the HMC sampler runs in, plus the log-Jacobian correction `Θ` returns
 # alongside the (pure, non-mutating) transform.
 
 include(joinpath(@__DIR__, "testsetup.jl"))
@@ -11,50 +11,56 @@ using ForwardDiff
 using LinearAlgebra
 using Random
 using StaticArrays
-using BAYSOL.Fitting: Θ, Ξ, ρₑ_prior, δρ_prior, c1_prior, Solute, NonBiological
+using Distributions: mean
+using BAYSOL.Fitting: Θ, Ξ, ρₑ_prior, δρ_prior, ξ_priors, Solute, NonBiological
+using BAYSOL.Constants: DRO_BOUNDS, DRO12_CONCENTRATION, DRO3_CONCENTRATION
+
+const logjac = BAYSOL.Fitting.logjac
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))
+
+const LO, HI = DRO_BOUNDS
+
+# One fixed prior set (NaCl buffer); its δρ₃ prior supplies the interval (L₃, L₃ + W₃).
+const PR_ρ = ρₑ_prior(7.4, 0.05, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
+const PR = ξ_priors(PR_ρ, δρ_prior(DRO12_CONCENTRATION, DRO3_CONCENTRATION, mean(PR_ρ))...)
+const L3, W3 = PR.δρ₃Prior.μ, PR.δρ₃Prior.σ
 
 """
 Independent re-derivation of `Θ`'s formula from its docstring, so tests
 aren't just re-running the implementation against itself. Returns `(θ, corr)`
 as plain tuples.
 """
-function ref_Θ(x::NTuple{5,<:Real})
-    a, b, c = log(x[1]), log(x[2]), log(x[5])
-    return ((a, b, x[3], x[4], c), a + b + c)
+function ref_Θ(x::NTuple{4,<:Real})
+    a = log(x[1])
+    us = ((x[2] - LO) / (HI - LO), (x[3] - LO) / (HI - LO), (x[4] - L3) / W3)
+    Ws = (HI - LO, HI - LO, W3)
+    ts = map(u -> log(u / (1 - u)), us)
+    corr = a + sum(log(W) + log(u) + log(1 - u) for (u, W) in zip(us, Ws))
+    return ((a, ts...), corr)
 end
 
 """
 Independent re-derivation of `Ξ`'s formula from its docstring. Returns `ξ`
 as a plain tuple.
 """
-ref_Ξ(t::NTuple{5,<:Real}) = (exp(t[1]), exp(t[2]), t[3], t[4], exp(t[5]))
+ref_Ξ(t::NTuple{4,<:Real}) = (
+    exp(t[1]),
+    LO + (HI - LO) / (1 + exp(-t[2])),
+    LO + (HI - LO) / (1 + exp(-t[3])),
+    L3 + W3 / (1 + exp(-t[4])),
+)
+
+apply_Θ(x::NTuple{4,<:Real}) = (θ = Θ(SVector{4,Float64}(x), PR); (Tuple(θ[1]), θ[2]))
+apply_Ξ(t::NTuple{4,<:Real}) = Tuple(Ξ(SVector{4,Float64}(t), PR))
 
 """
-Run `Θ` on an `SVector` built from `x`; returns `(θ, corr)` as
-`(NTuple{5}, Real)`.
+Finite-difference Jacobian of `ξ` at `t`, `(4,4)`, for cross-checking the
+analytic log-Jacobian against something that doesn't share its derivation.
 """
-function apply_Θ(x::NTuple{5,<:Real})
-    θ, corr = Θ(SVector{5,Float64}(x))
-    return (Tuple(θ), corr)
-end
-
-"""
-Run `Ξ` on an `SVector` built from `t`; returns `ξ` as `NTuple{5}`.
-"""
-function apply_Ξ(t::NTuple{5,<:Real})
-    return Tuple(Ξ(SVector{5,Float64}(t)))
-end
-
-"""
-Finite-difference Jacobian of `ξ` at `t`, `(5,5)`, for cross-checking `Θ`'s
-analytic log-Jacobian correction against something that doesn't share its
-derivation.
-"""
-function numeric_ξ_jacobian(t::NTuple{5,<:Real}; h::Real = 1.0e-6)
-    J = zeros(Float64, 5, 5)
-    for j in 1:5
+function numeric_ξ_jacobian(t::NTuple{4,<:Real}; h::Real = 1.0e-6)
+    J = zeros(Float64, 4, 4)
+    for j in 1:4
         tp = collect(Float64, t); tp[j] += h
         tm = collect(Float64, t); tm[j] -= h
         J[:, j] = (collect(apply_Ξ(Tuple(tp))) .- collect(apply_Ξ(Tuple(tm)))) ./ (2h)
@@ -62,20 +68,23 @@ function numeric_ξ_jacobian(t::NTuple{5,<:Real}; h::Real = 1.0e-6)
     return J
 end
 
+const ξ_CASES = (
+    (0.334, 1.05, -0.2, 0.0),
+    (1.0, 1.0, 0.0, -3.0),
+    (0.05, 0.001, -5.0, -11.0),
+    (10.0, 1.99, -9.99, 2.7),
+)
+const θ_CASES = (
+    (0.0, 0.0, -0.2, 0.1),
+    (-3.5, 2.1, 5.0, -5.0),
+    (10.0, -10.0, 0.0, 8.0),
+    (-1.0e-3, 1.0e-3, 3.3, -3.3),
+)
+
 @testset "ParamTransform" begin
 
-    #------------------------------------------------------------------
-    #                 Θ / Ξ -- match their own docstring formulas
-    #------------------------------------------------------------------
-
     @testset "Θ: matches the independent reference derivation" begin
-        cases = (
-            (0.334, 1.05, -0.2, 0.1, 1.02),
-            (1.0, 1.0, 0.0, 0.0, 1.0),
-            (0.05, 0.001, -5.0, 5.0, 0.96),
-            (10.0, 20.0, 3.3, -3.3, 1.04),
-        )
-        for ξ0 in cases
+        for ξ0 in ξ_CASES
             res, corr = apply_Θ(ξ0)
             res_ref, corr_ref = ref_Θ(ξ0)
             @test all(close_.(res, res_ref))
@@ -84,160 +93,85 @@ end
     end
 
     @testset "Ξ: matches the independent reference derivation" begin
-        cases = (
-            (0.0, 0.0, -0.2, 0.1, 0.0),
-            (-3.5, 2.1, 5.0, -5.0, 0.02),
-            (50.0, -50.0, 0.0, 0.0, -50.0),
-            (-1.0e-3, 1.0e-3, 3.3, -3.3, 1.0e-3),
-        )
-        for θ₀ in cases
+        for θ₀ in θ_CASES
             @test all(close_.(apply_Ξ(θ₀), ref_Ξ(θ₀)))
         end
     end
 
-    #------------------------------------------------------------------
-    #                 Θ / Ξ -- round trip
-    #------------------------------------------------------------------
-
     @testset "Ξ(Θ(x)) == x for x in the valid ξ domain" begin
-        cases = (
-            (0.334, 1.05, -0.2, 0.1, 1.02),
-            (1.0, 1.0, 0.0, 0.0, 1.0),
-            (0.001, 100.0, -50.0, 50.0, 0.96),
-        )
-        for ξ0 in cases
+        for ξ0 in ξ_CASES
             res, _ = apply_Θ(ξ0)
-            @test all(close_.(apply_Ξ(res), ξ0))
+            @test all(isapprox.(apply_Ξ(res), ξ0; rtol = 1e-12, atol = 1e-12))
         end
     end
 
-    @testset "Θ(Ξ(x)) == x for x in θ-space (any reals)" begin
-        cases = (
-            (0.0, 0.0, -0.2, 0.1, 0.0),
-            (-3.5, 2.1, 5.0, -5.0, 0.02),
-            (10.0, -10.0, 0.0, 0.0, 10.0),
-        )
-        for θ₀ in cases
+    @testset "Θ(Ξ(x)) == x for x in θ-space" begin
+        for θ₀ in θ_CASES
+            res, _ = apply_Θ(apply_Ξ(θ₀))
+            @test all(isapprox.(res, θ₀; rtol = 1e-9, atol = 1e-9))
+        end
+    end
+
+    @testset "δρ₁/δρ₂: the midpoint of [-10, 2] maps to t = 0 and back" begin
+        mid = (LO + HI) / 2
+        @test apply_Θ((0.5, mid, mid, 0.7))[1][2:3] == (0.0, 0.0)
+        @test apply_Ξ((1.2, 0.0, 0.0, 0.3))[2:3] == (mid, mid)
+    end
+
+    @testset "log-Jacobian: Θ's corr == logjac(Θ(ξ)), and matches a finite-difference det" begin
+        for θ₀ in ((0.1, -0.2, 0.3, -0.4), (2.0, -2.0, 0.0, 0.0), (-5.0, 5.0, 1.0, 3.0))
             ξ0 = apply_Ξ(θ₀)
-            res, _ = apply_Θ(ξ0)
-            @test all(close_.(res, θ₀))
+            θ, corr = apply_Θ(ξ0)
+            @test isapprox(corr, logjac(SVector{4}(θ...), PR); atol = 1e-9)
+            @test isapprox(corr, log(abs(det(numeric_ξ_jacobian(θ₀)))); atol = 1.0e-6)
         end
     end
 
-    #------------------------------------------------------------------
-    #                 θ / ξ -- identity on positions 3, 4 (δρ2, δρ3)
-    #------------------------------------------------------------------
-
-    @testset "Θ: positions 3, 4 (δρ2, δρ3) pass through unchanged, exactly" begin
-        ξ0 = (0.5, 2.0, -7.25, 3.125, 1.01)
-        res, _ = apply_Θ(ξ0)
-        @test res[3] == ξ0[3]
-        @test res[4] == ξ0[4]
-    end
-
-    @testset "Ξ: positions 3, 4 (δρ2, δρ3) pass through unchanged, exactly" begin
-        θ₀ = (1.2, -0.5, -7.25, 3.125, 0.02)
-        res = apply_Ξ(θ₀)
-        @test res[3] == θ₀[3]
-        @test res[4] == θ₀[4]
-    end
-
-    #------------------------------------------------------------------
-    #                 Θ -- log-Jacobian correction
-    #------------------------------------------------------------------
-
-    @testset "Θ: corr == a + b + c exactly" begin
-        for ξ0 in ((0.334, 1.05, -0.2, 0.1, 1.02), (0.02, 0.02, 0.0, 0.0, 0.02))
-            res, corr = apply_Θ(ξ0)
-            @test corr == res[1] + res[2] + res[5]
+    @testset "logjac stays finite far out in the logit tail" begin
+        for t in (-500.0, 500.0)
+            @test isfinite(logjac(SVector(0.0, 0.0, 0.0, t), PR))
         end
     end
 
-    @testset "Θ: log-Jacobian correction matches a finite-difference Jacobian of ξ" begin
-        # Independent numerical cross-check of `corr`, via a totally
-        # different route (finite differences on ξ, not θ's own formula).
-        for θ₀ in ( (0.1, -0.2, 0.3, -0.4, 0.5), (2.0, -2.0, 0.0, 0.0, 2.0),
-                    (-5.0, 5.0, 1.0, -1.0, -5.0))
-            ξ0 = apply_Ξ(θ₀)
-            _, corr = apply_Θ(ξ0)
-            numeric_log_det = log(abs(det(numeric_ξ_jacobian(θ₀))))
-            @test isapprox(corr, numeric_log_det; atol = 1.0e-6)
-        end
-    end
-
-    #------------------------------------------------------------------
-    #                 Ξ -- positivity guarantee
-    #------------------------------------------------------------------
-
-    @testset "Ξ: positions 1, 2, 5 (dns, δρ1, c_1) are always > 0, any finite θ" begin
-        # 700 stays clear of exp's Float64 overflow point (~709.78).
-        for θ₀ in ( (0.0, 0.0, 0.0, 0.0, 0.0), (700.0, -700.0, 0.0, 0.0, 700.0),
-                    (-700.0, 700.0, 0.0, 0.0, -700.0), (37.0, -21.5, 0.0, 0.0, 8.2))
+    @testset "Ξ: ρₑ > 0, δρ₁, δρ₂ ∈ [-10, 2] and δρ₃ ∈ [L₃, L₃ + W₃] for any finite θ" begin
+        for θ₀ in ((0.0, 0.0, 0.0, 0.0), (700.0, -700.0, 700.0, 40.0),
+                   (-700.0, 700.0, -700.0, -40.0), (37.0, -21.5, 3.0, 3.0))
             res = apply_Ξ(θ₀)
-            @test res[1] > 0 && res[2] > 0 && res[5] > 0
+            @test res[1] > 0
+            @test LO ≤ res[2] ≤ HI && LO ≤ res[3] ≤ HI
+            @test L3 ≤ res[4] ≤ L3 + W3
             @test all(isfinite, res)
         end
     end
 
-    @testset "Ξ: dns/δρ1/c_1 overflow to Inf far beyond any plausible θ (documented, not a bug)" begin
-        res = apply_Ξ((1000.0, 0.0, 0.0, 0.0, 0.0))
-        @test res[1] == Inf
+    @testset "Θ: out-of-domain inputs throw DomainError" begin
+        @test_throws DomainError apply_Θ((-1.0, 1.0, 0.0, 0.0))
+        @test_throws DomainError apply_Θ((1.0, LO - 0.5, 0.0, 0.0))      # δρ₁ < -10
+        @test_throws DomainError apply_Θ((1.0, HI + 0.5, 0.0, 0.0))      # δρ₁ > 2
+        @test_throws DomainError apply_Θ((1.0, 1.0, LO - 0.5, 0.0))      # δρ₂ < -10
+        @test_throws DomainError apply_Θ((1.0, 1.0, HI + 0.5, 0.0))      # δρ₂ > 2
+        @test_throws DomainError apply_Θ((1.0, 1.0, 0.0, L3 - 0.1))        # δρ₃ < L₃
+        @test_throws DomainError apply_Θ((1.0, 1.0, 0.0, L3 + W3 + 0.1))  # δρ₃ > L₃ + W₃
     end
 
-    #------------------------------------------------------------------
-    #                 θ -- domain errors (matches Julia's own `log`)
-    #------------------------------------------------------------------
-
-    @testset "θ: non-positive dns/δρ1/c_1 throws DomainError, matching Base log" begin
-        @test_throws DomainError apply_Θ((-1.0, 1.0, 0.0, 0.0, 1.0))
-        @test_throws DomainError apply_Θ((1.0, -1.0, 0.0, 0.0, 1.0))
-        @test_throws DomainError apply_Θ((1.0, 1.0, 0.0, 0.0, -1.0))
-    end
-
-    @testset "θ: dns/δρ1/c_1 == 0 gives -Inf (Base log's own boundary behaviour, no throw)" begin
-        res, corr = apply_Θ((0.0, 1.0, 0.0, 0.0, 1.0))
-        @test res[1] == -Inf
-        @test corr == -Inf
-    end
-
-    #------------------------------------------------------------------
-    #                 purity -- no mutation of the input
-    #------------------------------------------------------------------
-
-    @testset "Θ/Ξ are pure: the input SVector is unchanged, output is correct" begin
-        x = SVector{5,Float64}(0.334, 1.05, -0.2, 0.1, 1.02)
+    @testset "Θ/Ξ are pure: inputs unchanged" begin
+        x = SVector{4,Float64}(0.334, 1.05, -0.2, -1.0)
         x_before = Tuple(x)
-        θ, corr = Θ(x)
-        @test Tuple(x) == x_before   # input untouched (trivially true for SVector, worth asserting)
-        @test θ[1] == log(0.334) && θ[2] == log(1.05) && θ[5] == log(1.02)
-        @test θ[3] == -0.2 && θ[4] == 0.1
-        @test corr == θ[1] + θ[2] + θ[5]
-
+        θ, _ = Θ(x, PR)
+        @test Tuple(x) == x_before
         θ_before = Tuple(θ)
-        ξ = Ξ(θ)
-        @test Tuple(θ) == θ_before   # input untouched
-        @test close_(ξ[1], 0.334) && close_(ξ[2], 1.05) && close_(ξ[5], 1.02)
-        @test ξ[3] == -0.2 && ξ[4] == 0.1
+        ξ = Ξ(θ, PR)
+        @test Tuple(θ) == θ_before
+        @test all(isapprox.(Tuple(ξ), x_before; rtol = 1e-12))
     end
 
-    #------------------------------------------------------------------
-    #                 AD-differentiability (stage-1 HMC needs this)
-    #------------------------------------------------------------------
-
-    @testset "Ξ is AD-differentiable" begin
-        # Ξ(θ) sits directly on the sampler's hot path: every leapfrog step
-        # unpacks the current θ into physical parameters this way, so the
-        # gradient must survive with no Float64 cast anywhere in ξ.
-        function f(t)
-            ξ = Ξ(SVector{5,eltype(t)}(t...))
-            return sum(ξ)
-        end
-        t0 = [0.1, -0.2, 0.3, -0.4, 0.5]
+    @testset "Ξ and logjac are AD-differentiable" begin
+        f(t) = sum(Ξ(SVector{4,eltype(t)}(t...), PR)) + logjac(SVector{4,eltype(t)}(t...), PR)
+        t0 = [0.1, -0.2, 0.3, -0.4]
         g = ForwardDiff.gradient(f, t0)
         @test all(isfinite, g)
-
         h = 1.0e-6
-        for i in 1:5
+        for i in 1:4
             tp = copy(t0); tp[i] += h
             tm = copy(t0); tm[i] -= h
             @test g[i] ≈ (f(tp) - f(tm)) / (2h) rtol = 1.0e-4
@@ -246,103 +180,42 @@ end
 
     @testset "Θ is AD-differentiable through its ξ argument" begin
         function f(x)
-            θ, corr = Θ(SVector{5,eltype(x)}(x...))
+            θ, corr = Θ(SVector{4,eltype(x)}(x...), PR)
             return sum(θ) + corr
         end
-        x0 = [0.334, 1.05, -0.2, 0.1, 1.02]
+        x0 = [0.334, 1.05, -0.2, -1.0]
         g = ForwardDiff.gradient(f, x0)
         @test all(isfinite, g)
-
         h = 1.0e-6
-        for i in 1:5
+        for i in 1:4
             xp = copy(x0); xp[i] += h
             xm = copy(x0); xm[i] -= h
             @test g[i] ≈ (f(xp) - f(xm)) / (2h) rtol = 1.0e-4
         end
     end
 
-    #------------------------------------------------------------------
-    #                 integration: every prior feeding θ/ξ, at volume
-    #------------------------------------------------------------------
-    #
-    # Each of ρₑ_prior/δρ_prior/c1_prior claims a support (LogNormal or
-    # Normal) that θ's domain requirements (dns, δρ1, c_1 > 0; δρ2, δρ3
-    # unrestricted) are built around. These draw at volume (250_000 draws
-    # each, 1_000_000 total) directly the priors.
-
-    @testset "priors -> θ/ξ: ρₑ_prior draws round-trip and never throw (250_000 draws)" begin
-        Random.seed!(20_260_917)
-        d_dns = ρₑ_prior(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")])
-        fixed = (1.05, -0.2, 0.1, 1.02)   # δρ1, δρ2, δρ3, c_1 held fixed
-        n = 250_000
-        finite_ok = true
-        roundtrip_ok = true
-        for _ in 1:n
-            ξ0 = (rand(d_dns), fixed...)
-            res, corr = apply_Θ(ξ0)
-            finite_ok &= isfinite(corr) && all(isfinite, res)
-            roundtrip_ok &= all(close_.(apply_Ξ(res), ξ0))
-        end
-        @test finite_ok
-        @test roundtrip_ok
+    @testset "5-parameter (nucleotide) variant: round trip and log-Jacobian" begin
+        ξ5 = SVector(0.334, 1.05, -0.2, -2.0, 0.4)
+        θ5, corr5 = Θ(ξ5, PR)
+        @test all(isapprox.(Ξ(θ5, PR), ξ5; rtol = 1e-12))
+        @test isapprox(corr5, logjac(SVector(θ5[1], θ5[2], θ5[3], θ5[4]), PR) + θ5[5]; atol = 1e-12)
     end
 
-    @testset "priors -> θ/ξ: δρ_prior draws round-trip and never throws" begin
-        Random.seed!(20_260_918)
-        δρ1_d, δρ2_d, δρ3_d = δρ_prior(μ_χ = 0.0, σ_χ = 1.5)
-        fixed_dns, fixed_c1 = 0.334, 1.0
-        n = 250_000
-        finite_ok = true
-        roundtrip_ok = true
-        for _ in 1:n
-            ξ0 = (fixed_dns, rand(δρ1_d), rand(δρ2_d), rand(δρ3_d), fixed_c1)
-            res, corr = apply_Θ(ξ0)
-            finite_ok &= isfinite(corr) && all(isfinite, res)
-            roundtrip_ok &= all(close_.(apply_Ξ(res), ξ0))
-        end
-        @test finite_ok
-        @test roundtrip_ok
-    end
-
-    @testset "priors -> θ/ξ: c1_prior draws round-trip and never throws" begin
-        Random.seed!(20_260_919)
-        fixed = (0.334, 1.05, -0.2, 0.1)   # dns, δρ1, δρ2, δρ3
-        ns = (10.0, 50.0, 95.0, 99.9)
-        per_n = 250_000 ÷ length(ns)
-        finite_ok = true
-        roundtrip_ok = true
-        for n in ns
-            d_c1 = c1_prior(n)
-            for _ in 1:per_n
-                ξ0 = (fixed..., rand(d_c1))
-                res, corr = apply_Θ(ξ0)
-                finite_ok &= isfinite(corr) && all(isfinite, res)
-                roundtrip_ok &= all(close_.(apply_Ξ(res), ξ0))
-            end
-        end
-        @test finite_ok
-        @test roundtrip_ok
-    end
-
-    @testset "priors -> θ/ξ: all three priors combined, full ξ vector" begin
+    @testset "priors -> θ/ξ: full-prior draws round-trip and never throw (250_000 draws)" begin
         Random.seed!(20_260_920)
-        d_dns = ρₑ_prior(7.4, 0.05, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
-        δρ1_d, δρ2_d, δρ3_d = δρ_prior(μ_χ = 2.0, σ_χ = 3.0)
-        d_c1 = c1_prior(95.0)
-        n = 250_000
+        d_ρ, δρ₁_d, δρ₂_d, δρ₃_d = PR.ρₑPrior, PR.δρ₁Prior, PR.δρ₂Prior, PR.δρ₃Prior
         finite_ok = true
         roundtrip_ok = true
         jacobian_ok = true
-        for _ in 1:n
-            ξ0 = (rand(d_dns), rand(δρ1_d), rand(δρ2_d), rand(δρ3_d), rand(d_c1))
+        for _ in 1:250_000
+            ξ0 = (rand(d_ρ), rand(δρ₁_d), rand(δρ₂_d), rand(δρ₃_d))
             res, corr = apply_Θ(ξ0)
             finite_ok &= isfinite(corr) && all(isfinite, res)
-            roundtrip_ok &= all(close_.(apply_Ξ(res), ξ0))
-            jacobian_ok &= corr == res[1] + res[2] + res[5]
+            roundtrip_ok &= all(isapprox.(apply_Ξ(res), ξ0; rtol = 1e-9, atol = 1e-12))
+            jacobian_ok &= isapprox(corr, logjac(SVector{4}(res...), PR); atol = 1e-9)
         end
         @test finite_ok
         @test roundtrip_ok
         @test jacobian_ok
     end
-
 end
