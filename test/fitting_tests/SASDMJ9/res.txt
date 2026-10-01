@@ -47,23 +47,23 @@ cavity_frac    = 0.0041
 excl_vol_sat   = false
 
 === Timing ===                                       seconds    % wall    (JIT)
-wall clock  (seed_model → end of report)               56.23     100.0    (3.0)
-  static build                                         24.49      43.6    (0.8)
+wall clock  (seed_model → end of report)               56.43     100.0    (3.0)
+  static build                                         24.43      43.3    (0.8)
     resolve_structure                                   0.00
     propka                [cache hit]                   0.00
     pdb2pqr               [cache hit]                   0.00
-    load_molecule                                       0.17
-    forward_cache                                      24.22
-      vacuum B_lm                                       9.23
-      excluded volume (vols + B_lm)                     7.81
-      hydration (SASA + B_lm)                           7.16
+    load_molecule                                       0.16
+    forward_cache                                      24.17
+      vacuum B_lm                                       9.15
+      excluded volume (vols + B_lm)                     7.77
+      hydration (SASA + B_lm)                           7.23
       Gram + r_m                                        0.02
     seed_fitting (priors, WLS)                          0.10
-  sampling                                             30.95      55.0    (1.5)
+  sampling                                             31.20      55.3    (1.4)
     NUTS setup (Hamiltonian, step-size init)            0.72
-    NUTS  (2k iters, 15.2k leapfrog, 1.8 ms/step)      27.15
-    per-draw c1 re-profile + curves (2000 draws)        2.98
+    NUTS  (2k iters, 15.2k leapfrog, 1.8 ms/step)      27.27
+    per-draw c1 re-profile + curves (2000 draws)        3.13
     MAP + quantiles                                     0.09
   report write                                          0.10
   unaccounted                                           0.70    (0.7)
-GC: 4.8 s
+GC: 4.7 s

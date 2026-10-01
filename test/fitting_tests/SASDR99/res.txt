@@ -47,23 +47,23 @@ cavity_frac    = 0.0442
 excl_vol_sat   = false
 
 === Timing ===                                         seconds    % wall    (JIT)
-wall clock  (seed_model → end of report)                439.52     100.0    (3.6)
-  static build                                          205.81      46.8    (1.5)
+wall clock  (seed_model → end of report)                426.00     100.0    (2.9)
+  static build                                          193.75      45.5    (0.8)
     resolve_structure                                     0.00
-    propka                [cache miss]                    2.52
-    pdb2pqr               [cache miss]                    7.16
-    load_molecule                                         0.16
-    forward_cache                                       195.88
-      vacuum B_lm                                        83.29
-      excluded volume (vols + B_lm)                      72.10
-      hydration (SASA + B_lm)                            40.45
+    propka                [cache hit]                     0.00
+    pdb2pqr               [cache hit]                     0.00
+    load_molecule                                         0.23
+    forward_cache                                       193.42
+      vacuum B_lm                                        82.40
+      excluded volume (vols + B_lm)                      70.88
+      hydration (SASA + B_lm)                            40.10
       Gram + r_m                                          0.04
     seed_fitting (priors, WLS)                            0.10
-  sampling                                              233.03      53.0    (1.4)
+  sampling                                              231.57      54.4    (1.4)
     NUTS setup (Hamiltonian, step-size init)              0.80
-    NUTS  (2k iters, 107.74k leapfrog, 2.1 ms/step)     227.84
-    per-draw c1 re-profile + curves (2000 draws)          4.27
+    NUTS  (2k iters, 107.74k leapfrog, 2.1 ms/step)     226.70
+    per-draw c1 re-profile + curves (2000 draws)          3.96
     MAP + quantiles                                       0.11
   report write                                            0.10
-  unaccounted                                             0.59    (0.6)
-GC: 29.2 s
+  unaccounted                                             0.58    (0.6)
+GC: 29.4 s

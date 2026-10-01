@@ -47,22 +47,22 @@ cavity_frac    = 0.0137
 excl_vol_sat   = false
 
 === Timing ===                                       seconds    % wall    (JIT)
-wall clock  (seed_model → end of report)               58.93     100.0    (0.0)
-  static build                                         50.17      85.1    (0.0)
+wall clock  (seed_model → end of report)               56.86     100.0    (0.0)
+  static build                                         48.18      84.7    (0.0)
     resolve_structure                                   0.00
-    propka                [cache miss]                  0.51
-    pdb2pqr               [cache miss]                  1.22
+    propka                [cache hit]                   0.00
+    pdb2pqr               [cache hit]                   0.00
     load_molecule                                       0.01
-    forward_cache                                      48.42
-      vacuum B_lm                                      17.12
-      excluded volume (vols + B_lm)                    14.81
-      hydration (SASA + B_lm)                          16.18
+    forward_cache                                      48.17
+      vacuum B_lm                                      16.89
+      excluded volume (vols + B_lm)                    14.90
+      hydration (SASA + B_lm)                          16.07
       Gram + r_m                                        0.31
     seed_fitting (priors, WLS)                          0.00
-  sampling                                              8.76      14.9    (0.0)
+  sampling                                              8.69      15.3    (0.0)
     NUTS setup (Hamiltonian, step-size init)            0.05
-    NUTS  (2k iters, 12.4k leapfrog, 0.6 ms/step)       7.67
-    per-draw c1 re-profile + curves (2000 draws)        1.02
+    NUTS  (2k iters, 12.4k leapfrog, 0.6 ms/step)       7.61
+    per-draw c1 re-profile + curves (2000 draws)        1.01
     MAP + quantiles                                     0.02
   report write                                          0.00
   unaccounted                                           0.00    (0.0)

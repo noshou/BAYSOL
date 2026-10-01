@@ -47,21 +47,21 @@ cavity_frac    = 0.0040
 excl_vol_sat   = false
 
 === Timing ===                                        seconds    % wall    (JIT)
-wall clock  (seed_model → end of report)               338.30     100.0    (3.0)
-  static build                                         306.43      90.6    (0.8)
+wall clock  (seed_model → end of report)               321.77     100.0    (3.0)
+  static build                                         289.89      90.1    (0.8)
     resolve_structure                                    0.00
-    load_molecule                                        0.18
-    forward_cache                                      306.15
-      vacuum B_lm                                      104.53
-      excluded volume (vols + B_lm)                     82.23
-      hydration (SASA + B_lm)                          118.94
+    load_molecule                                        0.17
+    forward_cache                                      289.62
+      vacuum B_lm                                       90.79
+      excluded volume (vols + B_lm)                     81.68
+      hydration (SASA + B_lm)                          116.71
       Gram + r_m                                         0.45
     seed_fitting (priors, WLS)                           0.10
-  sampling                                              31.07       9.2    (1.4)
+  sampling                                              31.07       9.7    (1.4)
     NUTS setup (Hamiltonian, step-size init)             0.65
-    NUTS  (2k iters, 33.55k leapfrog, 0.9 ms/step)      28.78
-    per-draw c1 re-profile + curves (2000 draws)         1.58
+    NUTS  (2k iters, 33.55k leapfrog, 0.9 ms/step)      28.80
+    per-draw c1 re-profile + curves (2000 draws)         1.57
     MAP + quantiles                                      0.06
-  report write                                           0.10
-  unaccounted                                            0.70    (0.7)
-GC: 41.0 s
+  report write                                           0.09
+  unaccounted                                            0.71    (0.7)
+GC: 39.0 s
