@@ -47,23 +47,23 @@ cavity_frac    = 0.0666
 excl_vol_sat   = false
 
 === Timing ===                                        seconds    % wall    (JIT)
-wall clock  (seed_model → end of report)               438.44     100.0    (0.0)
-  static build                                         425.40      97.0    (0.0)
+wall clock  (seed_model → end of report)               361.06     100.0    (0.0)
+  static build                                         348.15      96.4    (0.0)
     resolve_structure                                    0.00
-    propka                [cache miss]                  29.91
-    pdb2pqr               [cache miss]                  41.62
-    load_molecule                                        0.09
-    forward_cache                                      353.78
-      vacuum B_lm                                      144.20
-      excluded volume (vols + B_lm)                    127.82
-      hydration (SASA + B_lm)                           81.75
+    propka                [cache hit]                    0.00
+    pdb2pqr               [cache hit]                    0.00
+    load_molecule                                        0.08
+    forward_cache                                      348.07
+      vacuum B_lm                                      141.34
+      excluded volume (vols + B_lm)                    125.90
+      hydration (SASA + B_lm)                           80.81
       Gram + r_m                                         0.02
     seed_fitting (priors, WLS)                           0.00
-  sampling                                              13.04       3.0    (0.0)
-    NUTS setup (Hamiltonian, step-size init)             0.06
-    NUTS  (2k iters, 28.14k leapfrog, 0.4 ms/step)      12.20
-    per-draw c1 re-profile + curves (2000 draws)         0.77
+  sampling                                              12.91       3.6    (0.0)
+    NUTS setup (Hamiltonian, step-size init)             0.05
+    NUTS  (2k iters, 28.14k leapfrog, 0.4 ms/step)      12.08
+    per-draw c1 re-profile + curves (2000 draws)         0.76
     MAP + quantiles                                      0.02
   report write                                           0.00
   unaccounted                                            0.00    (0.0)
-GC: 51.8 s
+GC: 50.7 s

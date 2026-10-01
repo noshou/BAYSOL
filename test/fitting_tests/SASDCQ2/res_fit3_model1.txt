@@ -47,19 +47,19 @@ cavity_frac    = 0.0059
 excl_vol_sat   = false
 
 === Timing ===                                        seconds    % wall    (JIT)
-wall clock  (seed_model → end of report)                14.65     100.0    (0.0)
-  static build                                           5.55      37.9    (0.0)
+wall clock  (seed_model → end of report)                14.12     100.0    (0.0)
+  static build                                           5.01      35.5    (0.0)
     resolve_structure                                    0.00
-    propka                [cache miss]                   0.12
-    pdb2pqr               [cache miss]                   0.43
+    propka                [cache hit]                    0.00
+    pdb2pqr               [cache hit]                    0.00
     load_molecule                                        0.00
-    forward_cache                                        4.99
-      vacuum B_lm                                        1.79
-      excluded volume (vols + B_lm)                      1.40
-      hydration (SASA + B_lm)                            1.80
+    forward_cache                                        5.01
+      vacuum B_lm                                        1.78
+      excluded volume (vols + B_lm)                      1.47
+      hydration (SASA + B_lm)                            1.76
       Gram + r_m                                         0.00
     seed_fitting (priors, WLS)                           0.00
-  sampling                                               9.10      62.1    (0.0)
+  sampling                                               9.10      64.5    (0.0)
     NUTS setup (Hamiltonian, step-size init)             0.04
     NUTS  (2k iters, 21.47k leapfrog, 0.4 ms/step)       8.37
     per-draw c1 re-profile + curves (2000 draws)         0.68

@@ -47,23 +47,23 @@ cavity_frac    = 0.0632
 excl_vol_sat   = false
 
 === Timing ===                                        seconds    % wall    (JIT)
-wall clock  (seed_model → end of report)                66.07     100.0    (3.0)
-  static build                                          54.97      83.2    (0.8)
+wall clock  (seed_model → end of report)                65.15     100.0    (3.0)
+  static build                                          54.57      83.8    (0.8)
     resolve_structure                                    0.00
     propka                [cache hit]                    0.00
     pdb2pqr               [cache hit]                    0.00
-    load_molecule                                        0.19
-    forward_cache                                       54.68
-      vacuum B_lm                                       21.55
-      excluded volume (vols + B_lm)                     18.92
-      hydration (SASA + B_lm)                           14.20
+    load_molecule                                        0.18
+    forward_cache                                       54.29
+      vacuum B_lm                                       21.57
+      excluded volume (vols + B_lm)                     18.58
+      hydration (SASA + B_lm)                           14.13
       Gram + r_m                                         0.01
     seed_fitting (priors, WLS)                           0.10
-  sampling                                              10.29      15.6    (1.4)
+  sampling                                               9.77      15.0    (1.4)
     NUTS setup (Hamiltonian, step-size init)             0.58
-    NUTS  (2k iters, 16.28k leapfrog, 0.5 ms/step)       8.85
+    NUTS  (2k iters, 16.28k leapfrog, 0.5 ms/step)       8.33
     per-draw c1 re-profile + curves (2000 draws)         0.83
     MAP + quantiles                                      0.04
   report write                                           0.10
   unaccounted                                            0.71    (0.7)
-GC: 10.6 s
+GC: 10.5 s

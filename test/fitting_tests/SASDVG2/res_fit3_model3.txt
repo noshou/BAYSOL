@@ -47,23 +47,23 @@ cavity_frac    = 0.0298
 excl_vol_sat   = false
 
 === Timing ===                                        seconds    % wall    (JIT)
-wall clock  (seed_model → end of report)               255.01     100.0    (0.0)
-  static build                                         222.05      87.1    (0.0)
+wall clock  (seed_model → end of report)               246.70     100.0    (0.0)
+  static build                                         215.72      87.4    (0.0)
     resolve_structure                                    0.00
-    propka                [cache hit]                    0.01
+    propka                [cache hit]                    0.00
     pdb2pqr               [cache hit]                    0.00
-    load_molecule                                        0.07
-    forward_cache                                      221.98
-      vacuum B_lm                                       85.34
-      excluded volume (vols + B_lm)                     77.72
-      hydration (SASA + B_lm)                           58.46
-      Gram + r_m                                         0.44
+    load_molecule                                        0.03
+    forward_cache                                      215.69
+      vacuum B_lm                                       83.49
+      excluded volume (vols + B_lm)                     74.98
+      hydration (SASA + B_lm)                           56.84
+      Gram + r_m                                         0.39
     seed_fitting (priors, WLS)                           0.00
-  sampling                                              32.95      12.9    (0.0)
+  sampling                                              30.98      12.6    (0.0)
     NUTS setup (Hamiltonian, step-size init)             0.06
-    NUTS  (2k iters, 52.28k leapfrog, 0.6 ms/step)      31.73
-    per-draw c1 re-profile + curves (2000 draws)         1.14
+    NUTS  (2k iters, 52.28k leapfrog, 0.6 ms/step)      29.85
+    per-draw c1 re-profile + curves (2000 draws)         1.04
     MAP + quantiles                                      0.02
   report write                                           0.00
   unaccounted                                            0.00    (0.0)
-GC: 29.1 s
+GC: 26.9 s
