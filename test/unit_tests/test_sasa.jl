@@ -3,7 +3,7 @@
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL: AtomicRadii
-using BAYSOL.Solvation.SASA: SASA, sasa
+using BAYSOL.SASA: SASA, sasa
 using BAYSOL.Geometry.Metrics: blocked
 using BAYSOL.MolecularStructure: MolecularStructure, create
 

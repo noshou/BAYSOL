@@ -12,7 +12,7 @@
 #     5  sh_cavity   hydration shell, cavity beads   (enters with +dro_3)
 
 """
-    gram(Bs, weights) -> Array{Float64,3}
+$(TYPEDSIGNATURES)
 
 Species Gram matrix G of shape (n, n, Q) for the n multipole arrays in
 Bs (each (C, K, Q) as returned by [`compute_B_lm`](@ref); channel counts
@@ -65,8 +65,7 @@ end
 gram(Bs::Tuple, weights::AbstractVector{<:Real}) = gram(collect(Bs), weights)
 
 """
-    intensity(G, v) -> Vector
-    intensity(G, V) -> Vector
+$(TYPEDSIGNATURES)
 
 The orientationally-averaged absolute model intensity
 
@@ -130,8 +129,7 @@ function intensity(G::AbstractArray{<:Real,3}, V::AbstractMatrix{<:Real})
 end
 
 """
-    _fused_intensity_calc(G, v, scale, bkgrnd_corr) -> Vector
-    _fused_intensity_calc(G, V, scale, bkgrnd_corr) -> Vector
+$(TYPEDSIGNATURES)
 
 Internal, non-exported. Same result as
 intensity_calc(intensity(G, v), scale, bkgrnd_corr) (or the V variant),
@@ -188,7 +186,7 @@ function _fused_intensity_calc(
 end
 
 """
-    intensity_calc(I, scale, bkgrnd_corr) -> Vector{Float64}
+$(TYPEDSIGNATURES)
 
 Put the absolute model intensity I (from [`intensity`](@ref)) onto the
 detector's scale: I_calc(q) = scale * I(q) + bkgrnd_corr, with scale the
@@ -207,8 +205,7 @@ subtraction.
 intensity_calc(I::AbstractVector{<:Real}, scale::Real, bkgrnd_corr::Real) = scale .* I .+ bkgrnd_corr
 
 """
-    contrast_vector(dns, δρ::NTuple{3,<:Real}) -> SVector{5}
-    contrast_vector(dns, δρ::Real)             -> SVector{3}
+$(TYPEDSIGNATURES)
 
 The species contrast vector v that [`intensity`](@ref) contracts a [`gram`](@ref)
 against. Species order matches the file header:
@@ -256,7 +253,7 @@ Geometry.sphere_volume, so r_m and the dummy volumes stay consistent).
 const _EV_EXP_COEFF = (4π / 3)^(2 / 3) / (4π)
 
 """
-    excluded_volume_factor(qvals, r_m, c_1) -> Vector
+$(TYPEDSIGNATURES)
 
 CRYSOL's excluded-volume envelope G(q): the factor multiplying the ex
 species when every dummy atom's radius is expanded from the structure's mean
@@ -285,7 +282,7 @@ function excluded_volume_factor(qvals::AbstractVector{<:Real}, r_m::Real, c_1::R
 end
 
 """
-    contrast_matrix(dns, δρ, g_ex) -> Matrix
+$(TYPEDSIGNATURES)
 
 The q-dependent contrast that [`intensity`](@ref) contracts a [`gram`](@ref)
 against once c_1 is fitted: [`contrast_vector`](@ref)(dns, δρ) with the ex

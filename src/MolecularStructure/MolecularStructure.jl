@@ -2,8 +2,10 @@
 
 module MolecularStructure
 
+using DocStringExtensions
+
 """
-    _store_dir() -> String
+$(TYPEDSIGNATURES)
 
 Package-root-relative  local store (_cache/). Created on first use.
 """
@@ -15,15 +17,14 @@ end
 
 include("Mols.jl")
 include("ExcludedVolumes.jl")
-include("Ionization.jl")
 include("Propka.jl")
 include("StructureSource.jl")
-include("PDB2PQR.jl")
+include("Pdb2pqr.jl")
 
 export  Molecule, MoleculeError, create, coords_cartesian, coords_spherical,
         to_spherical, radii, vols, r_max, neighbour_tree, elms, name, n_atoms, Residues,
-        Ionization, propka_pKas, PropkaError, StructureSource, LocalPathSource,
+        propka_pKas, PropkaError, StructureSource, LocalPathSource,
         PDBIDSource, URLSource, StructureSourceError, resolve_structure, load_molecule,
-        resolve_hydrogens, PDB2PQRError, excluded_volume
+        resolve_hydrogens, Pdb2pqrError, excluded_volume
 
 end # module

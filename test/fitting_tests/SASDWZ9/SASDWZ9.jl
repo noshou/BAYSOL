@@ -1,21 +1,17 @@
-using   DelimitedFiles
-using   Statistics
-using   Random
-using   GLMakie
-using   BAYSOL
-using   BAYSOL.MolecularStructure: LocalPathSource
-using   BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+using DelimitedFiles
+using Statistics
+using Random
+using GLMakie
+using BAYSOL
+using BAYSOL.MolecularStructure: LocalPathSource
+using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDWZ9")
 const _PDB_PATH     = joinpath(_FIXTURE_DIR, "SASDWZ9_fit1_model1.pdb")
 const _FIT_PATH     = joinpath(_FIXTURE_DIR, "SASDWZ9_fit1.fit")
 
 # `experimental_data/` and `pddf/` are both empty for this fixture (no
-# standalone .dat and no GNOM .out were bundled) -- SASDWZ9_fit1.fit is the
-# *only* source of experimental q/I/σ we have, and it doubles as the
-# reference fit curve (see below). Header is 6 `#`-prefixed lines
-# (Pepsi-SAXS version/run/command-line/units/r0-d_rho-Chi2/column-names),
-# then columns q, I_exp, dI_exp, I_fit (Pepsi-SAXS's own fitted curve).
+# standalone .dat and no GNOM .out were bundled).
 raw = readdlm(_FIT_PATH; skipstart = 6)
 
 qvals       = Float64.(raw[:, 1])
@@ -60,10 +56,8 @@ I_pepsi_fit = Float64.(raw[:, 4])   # Pepsi-SAXS's own fitted curve, for the com
 const PH, σ_PH = 6.8, 0.1   # ±0.1 is a typical benchtop pH-meter precision
 
 const ENERGY_EV       = 12398.42 / 0.8266   # ≈ 15000 eV, from SASBDB's stated 0.08266 nm wavelength
-const TEMPERATURE_C    = 25.0   # SASBDB states 10°C, but (as in SASDMJ9) this version pins water's
-                                 # density/dielectric to DEFAULT_TEMPERATURE_C = 25.0 -- "should NOT
-                                 # be changed, since only water is temperature-dependent in this version."
-const IONIC_STRENGTH_M = 0.0545 # see derivation below
+const TEMPERATURE_C    = 10.0   # 10°C, SASBDB
+const IONIC_STRENGTH_M = 0.0545 # unused by the fit; derived from the old pKa2 = 7.2 split (see below)
 
 # SERF1a sequence, read directly off SASDWZ9_fit1_model1.pdb chain A
 # (residues 1-62, all 62 residues modelled -- this is a single filtered
@@ -81,13 +75,12 @@ const SERF1A_MOLARITY_σ = 0.05 * SERF1A_MOLARITY          # 5% relative: typica
 
 # Buffer components.
 #
-# "20 mM NaPi" is not itself a single species: at pH 6.8, with phosphoric
-# acid's second pKa ≈ 7.2 (Henderson-Hasselbalch), it is a mix of
-# dihydrogen phosphate (H2PO4⁻) and hydrogen phosphate (HPO4²⁻):
-#
-#     [HPO4²⁻]/[H2PO4⁻] = 10^(pH - pKa2) = 10^(6.8 - 7.2) ≈ 0.398
-#     => H2PO4⁻ fraction ≈ 0.715, HPO4²⁻ fraction ≈ 0.285
-#     => [NaH2PO4] ≈ 0.0143 M, [Na2HPO4] ≈ 0.0057 M  (of the 20 mM total)
+# "20 mM NaPi" is not itself a single species: at pH 6.8 it is a mix of NaH2PO4 and Na2HPO4. The HPO4²⁻
+# fraction is 0.425: pK2 from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
+# 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol, ΔCp −230 J/K/mol) at 22 °C (pH set at room temperature),
+# Davies-corrected at I ≈ 0.060 M, giving an effective pK2' ≈ 6.93. This replaces the earlier flat pKa2 =
+# 7.2, which ignored ionic strength. σ combines σ_PH, ±3 °C, ±0.02 pK, 30 % of the Davies shift and ±2 % on
+# C.
 #
 # 0.02% NaN3 (w/v) = 0.2 g/L; MW(NaN3) = 65.01 g/mol => ≈ 3.08 mM.
 #
@@ -99,10 +92,11 @@ const SERF1A_MOLARITY_σ = 0.05 * SERF1A_MOLARITY          # 5% relative: typica
 #     Na⁺ total = 0.020 + 0.01431 + 2·0.00569 + 0.00308 ≈ 0.04877 M
 #     I = ½·[0.04877·1 + 0.020·1 + 0.01431·1 + 0.00569·4 + 0.00308·1] ≈ 0.0545 M
 const SOLUTES = Solute[
-    Protein(SERF1A_MOLARITY, SERF1A_MOLARITY_σ, SERF1A_SEQ),
+    # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
+    # electron density (see Fitting.Solute).
     NonBiological(0.020,      0.0002,   "sodium chloride"),             # 20 mM NaCl, ±1%
-    NonBiological(0.014305,   0.000286, "sodium dihydrogen phosphate"), # NaPi, H2PO4⁻ fraction, ±2%
-    NonBiological(0.005695,   0.000114, "disodium hydrogen phosphate"), # NaPi, HPO4²⁻ fraction, ±2%
+    NonBiological(0.011494, 0.001491, "sodium dihydrogen phosphate"),   # 20 mM NaPi, H2PO4⁻ part
+    NonBiological(0.008506, 0.001483, "disodium hydrogen phosphate"),   # 20 mM NaPi, HPO4²⁻ part
     NonBiological(0.003076,   0.0000615,"sodium azide"),                # 0.02% w/v NaN3, ±2%
 ]
 
@@ -117,7 +111,7 @@ const Q_MAX_FIT = 0.35   # the .fit file's own full q-range (≈0.0083-0.3501 Å
 # only structure we have: the maximum pairwise distance between any two
 # heavy (non-hydrogen) atoms in SASDWZ9_fit1_model1.pdb (a single filtered
 # NMR/TAiBP-CYANA conformer of this intrinsically disordered protein,
-# MODEL 37) -- ≈101.2 Å (the Cα-only max pairwise distance is close,
+# MODEL 37) ≈101.2 Å (the Cα-only max pairwise distance is close,
 # ≈94.7 Å; heavy atoms including side chains extend it a bit further).
 # This is necessarily just this one conformer's own extent, not an
 # ensemble-averaged D_max for the IDP as a whole, but it's the only
@@ -127,9 +121,9 @@ const Q_MAX_FIT = 0.35   # the .fit file's own full q-range (≈0.0083-0.3501 Å
 # SASDMJ9: Q_MAX_FIT * D_max ≈ 0.35 * 101.2 ≈ 35.4.
 const LMAX = 35
 
-const ADD_HYDROGENS = true   # runs PDB2PQR at PH; the NMR structure already carries
-                              # modelled hydrogens, but PDB2PQR recomputes pH-consistent
-                              # protonation states from the heavy-atom positions regardless.
+const ADD_HYDROGENS = true  # runs Pdb2pqr at PH; the NMR structure already carries
+                            # modelled hydrogens, but Pdb2pqr recomputes pH-consistent
+                            # protonation states from the heavy-atom positions regardless.
 
 """
     fit_subset() -> (q, I, σ)
@@ -145,22 +139,21 @@ function run_sasdwz9(; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer
     q_fit, I_fit, σ_fit = fit_subset()
 
     Random.seed!(seed)
-    s, μ_χ, σ_χ = BAYSOL.seed_model(
+    s = BAYSOL.seed_model(
         LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
-        ionic_strength_M = IONIC_STRENGTH_M, T = TEMPERATURE_C + 273.15,
     )
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
-    return res, μ_χ, σ_χ, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
+    return res, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
 end
 
-result, μ_χ, σ_χ, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdwz9()
+result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdwz9()
 
 fit, divergence_rate, map_result, quantile_result = result
 
 # `@__DIR__` (this SASDWZ9/ folder), not the caller's cwd.
 open(joinpath(@__DIR__, "res.txt"), "w") do io
-    BAYSOL.write_report(io, result; μ_χ = μ_χ, σ_χ = σ_χ, form_factor_log = form_factor_log, n_atoms = n_atoms)
+    BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
 """
@@ -173,13 +166,17 @@ all draws diverged) the quantile-curve envelope.
 function sasdwz9_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
+    # itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     fig = Figure(size = (700, 500))
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "divergence rate = $(round(divergence_rate; digits = 3))",
+
         xscale = log10,
         yscale = log10,
     )
@@ -199,16 +196,16 @@ function sasdwz9_figure(result, data)
         quantiles = curves["quantiles"]
 
         band!(
-            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), bounds[:, 3];
-            color = (:dodgerblue, 0.15), label = "bounds",
+            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
+            color = (:darkorange, 0.15), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = :darkorange, linewidth = 1.5, label = "quantiles",
         )
         lines!(
-            ax, quantiles[:, 1], quantiles[:, 3];
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5,
+            ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
+            linestyle = :dot, color = :darkorange, linewidth = 1.5,
         )
     end
 
@@ -232,7 +229,7 @@ function sasdwz9_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "MAP")
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -256,7 +253,7 @@ function sasdwz9_residuals_figure(result, data)
     q_fit, I_fit, σ_fit = data
 
     fig = Figure(size = (700, 400))
-    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)", title = "fit residuals")
+    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
 
     map_curve = map_result === nothing ? nothing : map_result[2]
 
@@ -268,15 +265,15 @@ function sasdwz9_residuals_figure(result, data)
 
         band!(
             ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = (:dodgerblue, 0.15), label = "bounds",
+            color = (:darkorange, 1), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = :darkorange, linewidth = 2.5, label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5,
+            linestyle = :dot, color = :darkorange, linewidth = 2.5,
         )
     end
 
@@ -290,27 +287,29 @@ function sasdwz9_residuals_figure(result, data)
         ylims!(ax, lo - pad, hi + pad)
     end
 
-    axislegend(ax; position = :lb, framevisible = false)
+    axislegend(ax; position = :rt, framevisible = false)
 
     return fig
 end
 
-# ξ = (dns, δρ1, δρ2, δρ3, c1)
+# ξ = (ρₑ, δρ₁, δρ₂, δρ₃)
 const _HIST_PARAMS = [
-    ("dns", "slvnt_e_dns"), ("δρ1", "delta_rho_1"), ("δρ2", "delta_rho_2"),
-    ("δρ3", "delta_rho_3"), ("c1", "excl_vol_corr"),
+    ("ρₑ", "slvnt_e_dns"), ("δρ₁", "delta_rho_1"), ("δρ₂", "delta_rho_2"),
+    ("δρ₃", "delta_rho_3"),
+    ("scale", "scale"), ("bkgrnd_corr", "bkgrnd_corr"),
+    ("c1", "excl_vol_corr"),
 ]
 
 """
-    sasdwz9_posterior_hist(result) -> Figure
-
-Histograms of the non-divergent posterior draws for each physical parameter
-`ξ = (dns, δρ1, δρ2, δρ3, c1)`, with the MAP draw marked.
+    sasdwz9_hist(result) -> Figure
 """
-function sasdwz9_posterior_hist(result)
+function sasdwz9_hist(result)
     fit, _, map_result, _ = result
     ok = .!getproperty.(fit.stats, :numerical_error)
     samples = fit.samples[ok]
+    c1_draws = fit.c1[ok]
+    scale_draws = fit.scale[ok]
+    bkgrnd_draws = fit.bkgrnd_corr[ok]
     map_params = map_result === nothing ? nothing : map_result[1]
 
     fig = Figure(size = (900, 550))
@@ -318,9 +317,18 @@ function sasdwz9_posterior_hist(result)
         row, col = fldmod1(i, 3)
         ax = Axis(
             fig[row, col], xlabel = label, ylabel = "count",
-            xticklabelrotation = label == "dns" ? π/2 : 0.0,
+            xticklabelrotation = π/2,
         )
-        hist!(ax, getindex.(samples, i); bins = 40, color = (:dodgerblue, 0.6))
+        draws = if label == "c1"
+            c1_draws
+        elseif label == "scale"
+            scale_draws
+        elseif label == "bkgrnd_corr"
+            bkgrnd_draws
+        else
+            getindex.(samples, i)
+        end
+        hist!(ax, draws; bins = 40, color = (:darkorange, 0.6))
         if map_params !== nothing
             vlines!(ax, [map_params[map_key]]; color = :crimson, linewidth = 2)
         end
@@ -330,16 +338,17 @@ function sasdwz9_posterior_hist(result)
 end
 
 """
-    sasdwz9_pepsi_comparison_figure(result, data) -> Figure
+    sasdwz9_comparison_figure(result, data) -> Figure
 
-Overlays our MAP curve against the reference Pepsi-SAXS fit bundled in
-SASDWZ9_fit1.fit (the paper used Pepsi-SAXS, not CRYSOL, to filter/fit
-candidate conformations -- see "Filtering by SEC-SAXS Data..." in the
-paper).
+
 """
-function sasdwz9_pepsi_comparison_figure(result, data)
+function sasdwz9_comparison_figure(result, data)
     _, _, map_result, _ = result
     q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
+    # itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     keep = (qvals .> 0) .& (qvals .≤ Q_MAX_FIT) .& (I_pepsi_fit .> 0)
 
@@ -348,7 +357,6 @@ function sasdwz9_pepsi_comparison_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "BAYSOL MAP vs. Pepsi-SAXS fit1 (paper)",
         xscale = log10,
         yscale = log10,
     )
@@ -365,15 +373,15 @@ function sasdwz9_pepsi_comparison_figure(result, data)
 
     lines!(
         ax, qvals[keep], I_pepsi_fit[keep];
-        color = :seagreen, linewidth = 2, linestyle = :dash, label = "Pepsi-SAXS fit1",
+        color = :mediumturquoise, linewidth = 2, linestyle = :dash, label = "Pepsi-SAXS fit1",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "BAYSOL MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "BAYSOL MAP")
     end
 
-    axislegend(ax; position = :lt, framevisible = false)
+    axislegend(ax; position = :lb, framevisible = false)
 
     lo, hi = extrema(I_fit)
     ylims!(ax, lo * 0.7, hi * 1.3)
@@ -382,16 +390,16 @@ function sasdwz9_pepsi_comparison_figure(result, data)
 end
 
 fig = sasdwz9_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res.png"), fig)
+save(joinpath(@__DIR__, "res.png"), fig; px_per_unit = 3.5)
 
 fig_residuals = sasdwz9_residuals_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals)
+save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals; px_per_unit = 3.5)
 
-fig_hist = sasdwz9_posterior_hist(result)
-save(joinpath(@__DIR__, "res_hist.png"), fig_hist)
+fig_hist = sasdwz9_hist(result)
+save(joinpath(@__DIR__, "res_hist.png"), fig_hist; px_per_unit = 3.5)
 
-fig_pepsi = sasdwz9_pepsi_comparison_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_crysol_comparison.png"), fig_pepsi)
+fig_pepsi = sasdwz9_comparison_figure(result, (q_fit, I_fit, σ_fit))
+save(joinpath(@__DIR__, "res_comparison.png"), fig_pepsi; px_per_unit = 3.5)
 
 "Display the SASDWZ9 fit figure. Blocks until the window is closed."
 vis_sasdwz9() = wait(display(fig))

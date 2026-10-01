@@ -399,7 +399,7 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
 
             # load_molecule end-to-end: internally consistent, no garbage coords.
             # load_molecule no longer applies heavyatomselector (it's a generic
-            # loader, not a heavy-atom-only one -- see PDB2PQR.jl/Mols.jl), so
+            # loader, not a heavy-atom-only one -- see Pdb2pqr.jl/Mols.jl), so
             # its atom count is checked against an independent standardselector
             # -only oracle rather than the heavy-atom expected_n directly: a
             # .cif-sourced fixture is always heavy-only after canonicalization

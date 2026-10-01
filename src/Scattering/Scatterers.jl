@@ -7,7 +7,7 @@
 # S_ab reduction is assembled downstream from the per-species B_lm, so nothing 
 # here calls self_scatter.
 using ..FormFactor: FormFactor, FormFactorSource
-using ..Solvation.SASA: SASA
+using ..SASA: SASA
 using ..MolecularStructure: Molecule, coords_spherical, vols, to_spherical
 
 # SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, SHELL_CLASSES and
@@ -15,7 +15,7 @@ using ..MolecularStructure: Molecule, coords_spherical, vols, to_spherical
 # Scattering.jl); this file only reads them as call defaults.
 
 """
-    _gaussian_dummy(vols, qvals) -> Matrix{Float64}
+$(TYPEDSIGNATURES)
 
 Per-dummy amplitude f[i,k] = v_i * exp(-q_k² * v_i^(2/3) / 4π), the
 Fraser/MacRae/Suzuki (<https://doi.org/10.1107/S0021889878014296>) 
@@ -40,8 +40,7 @@ function _gaussian_dummy(
 end
 
 """
-    vacuo(mol, qvals, lMax, ions, energy, _CHUNK; form_factor_source) ->
-    AbstractArray{<:Complex,3}
+$(TYPEDSIGNATURES)
 
 Vacuum term: the real atoms of mol with no solvent at all.
 
@@ -91,7 +90,7 @@ function vacuo(
 end
 
 """
-    excluded(mol, qvals, lMax, _CHUNK) -> AbstractArray{<:Complex,3}
+$(TYPEDSIGNATURES)
 
 Excluded-volume term: one Gaussian dummy per atom, at the atom's own position.
 B_ex, feeding S_ex,· downstream. Bulk solvent cannot occupy the space an
@@ -121,8 +120,7 @@ function excluded(
 end
 
 """
-    hydration(mol, qvals, lMax, _CHUNK; thickness, probe, n_target, classes)
-        -> @NamedTuple{convex::Array{ComplexF64,3}, concave::Array{ComplexF64,3}, cavity::Array{ComplexF64,3}}
+$(TYPEDSIGNATURES)
 
 Hydration-shell term, split into CRYSOL 3's three border-layer populations.
 

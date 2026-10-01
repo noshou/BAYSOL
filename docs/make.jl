@@ -20,7 +20,7 @@ const README_PAGES = [
     "MolecularStructure"    => "MolecularStructure",
     "PartialMolarVolumes"   => "PartialMolarVolumes",
     "Scattering"            => "Scattering",
-    "Solvation"              => "Solvation",
+    "SASA"                    => "SASA",
 ]
 
 const GUIDES_DIR = joinpath(@__DIR__, "src", "guides")
@@ -41,6 +41,7 @@ makedocs(
         BAYSOL,
         BAYSOL.Constants,
         BAYSOL.Cache,
+        BAYSOL.Timing,
         BAYSOL.Geometry,
         BAYSOL.Geometry.PlasticSequence,
         BAYSOL.Geometry.Metrics,
@@ -50,8 +51,7 @@ makedocs(
         BAYSOL.MolecularStructure,
         BAYSOL.Scattering,
         BAYSOL.Scattering.SphFuncs,
-        BAYSOL.Solvation.SASA,
-        BAYSOL.Solvation.Electrostatics,
+        BAYSOL.SASA,
         BAYSOL.Fitting,
     ],
     pages    = [
@@ -68,7 +68,7 @@ makedocs(
             "PartialMolarVolumes" => "api/partialmolarvolumes.md",
             "MolecularStructure" => "api/molecularstructure.md",
             "Scattering" => "api/scattering.md",
-            "Solvation" => "api/solvation.md",
+            "SASA" => "api/sasa.md",
             "Fitting" => "api/fitting.md",
         ],
     ],
@@ -80,13 +80,16 @@ makedocs(
     # Left un-strict (`:none`) until there's a reason to enforce an explicit
     # public API surface.
     checkdocs = :none,
-    # Now that every submodule has its own api/*.md page, `@ref` links like
-    # [`run_fitting`](@ref)/[`_logπ`](@ref)/[`_ll`](@ref) in docstrings
-    # should resolve for real; kept as a warn-not-fail safety net rather than
-    # removed outright, since a doc `@ref` typo shouldn't block the build.
-    warnonly = [:cross_references],
+    # Strict: every `@ref` resolves as of 2026-10-01, so a broken
+    # cross-reference now fails the build (and the deploy) instead of
+    # shipping a dead link.
 )
 
+# Deploys only from CI (.github/workflows/docs.yml): a push to master builds
+# the "dev" docs, a pushed version tag builds that version and "stable".
+# Locally this prints "could not auto-detect the building environment" and
+# skips, which is expected.
 deploydocs(
     repo = "github.com/noshou/BAYSOL.git",
+    devbranch = "master",
 )

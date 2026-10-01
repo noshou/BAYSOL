@@ -9,7 +9,7 @@ using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm
 using BAYSOL.MolecularStructure: MolecularStructure, create, coords_cartesian, coords_spherical, radii, vols, r_max,
                 neighbour_tree, elms, name, Molecule
 using BAYSOL.AtomicRadii: AtomicRadii, resolve_one, _resolve_all, tryparse_ion, ion_key, nearest_ion
-using BAYSOL.Solvation: SASA
+using BAYSOL: SASA
 using BAYSOL.Geometry.Metrics: Metrics
 
 @testset "Aqua" begin

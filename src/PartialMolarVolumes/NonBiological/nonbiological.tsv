@@ -58,7 +58,7 @@ ammonium sulfate	diammonium sulfate	H8N2O4S	0	50.25		derived	10.1021/jp1089933
 letovicite	triammonium hydrogen disulfate	H13N3O8S2	0	82.48		derived	10.1021/jp1089933
 calcium acetate	calcium diacetate	C4H6CaO4	0	56.737		measured	10.2298/JSC080517049U
 guanidinium bromide	guanidinium bromide	CH6BrN3	0	79.84	0.38	measured	10.1023/A:1005231617292
-guanidinium acetate	guanidinium acetate	C3H9N3O2	0	54.94	0.31	measured	10.1023/A:1005231617292
+guanidinium acetate	guanidinium acetate	C3H9N3O2	0	54.94	0.31	rejected	10.1023/A:1005231617292
 guanidinium perchlorate	guanidinium perchlorate	CH6ClN3O4	0	92.33	0.62	measured	10.1023/A:1005231617292
 guanidinium sulfate	diguanidinium sulfate	C2H12N6O4S	0	18.66	0.34	measured	10.1023/A:1005231617292
 lithium acetate	lithium acetate	C2H3LiO2	0	28.07	0.03	measured	10.1021/je800326n
@@ -89,7 +89,7 @@ bicarbonate	hydrogen carbonate	HCO3	-1	24.5	1.0	derived	10.1016/j.jct.2003.12.00
 magnesium	magnesium(2+)	Mg	2	-20.1	2.0	derived	10.1016/j.jct.2006.09.008
 strontium	strontium(2+)	Sr	2	-17.3	1.4	derived	10.1016/j.jct.2006.09.008
 manganese(II)	manganese(2+)	Mn	2	-18.9	1.9	derived	10.1016/j.jct.2006.09.008
-trisodium citrate	trisodium 2-hydroxypropane-1,2,3-tricarboxylate	C6H5Na3O7	0	57.1		measured	10.1016/j.molliq.2004.07.014
+trisodium citrate	trisodium 2-hydroxypropane-1,2,3-tricarboxylate	C6H5Na3O7	0	57.1		rejected	10.1016/j.molliq.2004.07.014
 citrate	2-hydroxypropane-1,2,3-tricarboxylate	C6H5O7	-3	60.73		derived	10.1016/j.molliq.2004.07.014
 potassium nitrate	potassium nitrate	KNO3	0	35.94	0.07	measured	10.1016/j.molliq.2007.01.004
 ammonium sulfate	diammonium sulfate	H8N2O4S	0	55.04	0.11	measured	10.1016/j.molliq.2007.01.004
@@ -367,8 +367,8 @@ tetraethylammonium bromide	tetraethylazanium bromide	C8H20BrN	0	175.3		measured	
 tetrapropylammonium bromide	tetrapropylazanium bromide	C12H28BrN	0	240.8		measured	10.1021/j100791a042
 tetrabutylammonium bromide	tetrabutylazanium bromide	C16H36BrN	0	302.9		measured	10.1021/j100791a042
 tetrapentylammonium bromide	tetrapentylazanium bromide	C20H44BrN	0	365.6		measured	10.1021/j100791a042
-potassium dihydrogen phosphate	potassium dihydrogen phosphate	KH2PO4	0	43.5	1.8	derived	10.1016/j.jct.2013.01.012
-dipotassium hydrogen phosphate	dipotassium hydrogen phosphate	K2HPO4	0	34.4	0.7	derived	10.1016/j.jct.2013.01.012
+potassium dihydrogen phosphate	potassium dihydrogen phosphate	KH2PO4	0	43.5	1.8	rejected	10.1016/j.jct.2013.01.012
+dipotassium hydrogen phosphate	dipotassium hydrogen phosphate	K2HPO4	0	34.4	0.7	rejected	10.1016/j.jct.2013.01.012
 tripotassium phosphate	tripotassium phosphate	K3PO4	0	25.2	2.5	derived	10.1016/j.jct.2013.01.012
 trisodium phosphate	trisodium phosphate	Na3PO4	0	-12.2	1.7	derived	10.1016/j.jct.2013.01.012
 sodium dihydrogen phosphate	sodium dihydrogen phosphate	NaH2PO4	0	34.0	0.1	derived	10.1016/j.jct.2013.01.012
@@ -715,59 +715,59 @@ glucuronic acid	D-glucuronic acid	C6H10O7	0	110.2		measured	Hoiland, H. In Therm
 citric acid	2-hydroxypropane-1,2,3-tricarboxylic acid	C6H8O7	0	113.93		measured	10.1016/0378-3812(90)85049-G
 oxalic acid	ethanedioic acid	C2H2O4	0	46.33		measured	10.1016/0378-3812(90)85049-G
 lactic acid	2-hydroxypropanoic acid	C3H6O3	0	66.40		measured	10.1016/0378-3812(90)85049-G
-uracil	uracil	C4H4N2O2	0	70.66	0.10	measured	10.1007/s10953-008-9302-2
-uracil	uracil	C4H4N2O2	0	71.57	0.11	measured	10.1007/s10953-008-9302-2
-uracil	uracil	C4H4N2O2	0	72.02	0.10	measured	10.1007/s10953-008-9302-2
-thymine	thymine	C5H6N2O2	0	87.78	0.18	measured	10.1007/s10953-008-9302-2
-thymine	thymine	C5H6N2O2	0	88.40	0.15	measured	10.1007/s10953-008-9302-2
-thymine	thymine	C5H6N2O2	0	89.14	0.16	measured	10.1007/s10953-008-9302-2
-adenine	adenine	C5H5N5	0	88.59	0.22	measured	10.1007/s10953-008-9302-2
-adenine	adenine	C5H5N5	0	88.86	0.18	measured	10.1007/s10953-008-9302-2
-adenine	adenine	C5H5N5	0	89.34	0.24	measured	10.1007/s10953-008-9302-2
-adenine	adenine	C5H5N5	0	89.69	0.17	measured	10.1007/s10953-008-9302-2
-adenine	adenine	C5H5N5	0	90.02	0.19	measured	10.1007/s10953-008-9302-2
-uracil	uracil	C4H4N2O2	0	70.95	0.06	measured	10.1016/j.molliq.2020.115210
-uracil	uracil	C4H4N2O2	0	71.88	0.03	measured	10.1016/j.molliq.2020.115210
-uracil	uracil	C4H4N2O2	0	73.28	0.05	measured	10.1016/j.molliq.2020.115210
-uracil	uracil	C4H4N2O2	0	74.47	0.02	measured	10.1016/j.molliq.2020.115210
-uracil	uracil	C4H4N2O2	0	75.61	0.06	measured	10.1016/j.molliq.2020.115210
-uracil	uracil	C4H4N2O2	0	76.95	0.07	measured	10.1016/j.molliq.2020.115210
-thymine	thymine	C5H6N2O2	0	88.03	0.05	measured	10.1016/j.molliq.2020.115210
-thymine	thymine	C5H6N2O2	0	89.20	0.05	measured	10.1016/j.molliq.2020.115210
-thymine	thymine	C5H6N2O2	0	90.24	0.05	measured	10.1016/j.molliq.2020.115210
-thymine	thymine	C5H6N2O2	0	91.43	0.02	measured	10.1016/j.molliq.2020.115210
-thymine	thymine	C5H6N2O2	0	92.59	0.04	measured	10.1016/j.molliq.2020.115210
-thymine	thymine	C5H6N2O2	0	93.63	0.05	measured	10.1016/j.molliq.2020.115210
-adenine	adenine	C5H5N5	0	79.96	0.03	measured	10.1016/j.molliq.2020.115210
-adenine	adenine	C5H5N5	0	81.12	0.02	measured	10.1016/j.molliq.2020.115210
-adenine	adenine	C5H5N5	0	82.21	0.06	measured	10.1016/j.molliq.2020.115210
-adenine	adenine	C5H5N5	0	83.69	0.02	measured	10.1016/j.molliq.2020.115210
-adenine	adenine	C5H5N5	0	84.89	0.06	measured	10.1016/j.molliq.2020.115210
-adenine	adenine	C5H5N5	0	86.42	0.02	measured	10.1016/j.molliq.2020.115210
-uracil	uracil	C4H4N2O2	0	71.23	0.028	measured	10.1016/j.jct.2014.10.015
-uracil	uracil	C4H4N2O2	0	72.30	0.022	measured	10.1016/j.jct.2014.10.015
-uracil	uracil	C4H4N2O2	0	73.72	0.028	measured	10.1016/j.jct.2014.10.015
-uracil	uracil	C4H4N2O2	0	74.74	0.016	measured	10.1016/j.jct.2014.10.015
-cytosine	cytosine	C4H5N3O	0	72.22	0.057	measured	10.1016/j.jct.2014.10.015
-cytosine	cytosine	C4H5N3O	0	73.85	0.062	measured	10.1016/j.jct.2014.10.015
-cytosine	cytosine	C4H5N3O	0	74.44	0.055	measured	10.1016/j.jct.2014.10.015
-cytosine	cytosine	C4H5N3O	0	75.42	0.020	measured	10.1016/j.jct.2014.10.015
-thymine	thymine	C5H6N2O2	0	87.88	0.021	measured	10.1016/j.jct.2014.10.015
-thymine	thymine	C5H6N2O2	0	88.90	0.006	measured	10.1016/j.jct.2014.10.015
-thymine	thymine	C5H6N2O2	0	89.77	0.011	measured	10.1016/j.jct.2014.10.015
-thymine	thymine	C5H6N2O2	0	90.90	0.017	measured	10.1016/j.jct.2014.10.015
-uridine	uridine	C9H12N2O6	0	151.40	0.015	measured	10.1016/j.jct.2014.10.015
-uridine	uridine	C9H12N2O6	0	153.18	0.015	measured	10.1016/j.jct.2014.10.015
-uridine	uridine	C9H12N2O6	0	154.81	0.015	measured	10.1016/j.jct.2014.10.015
-uridine	uridine	C9H12N2O6	0	155.83	0.016	measured	10.1016/j.jct.2014.10.015
-cytidine	cytidine	C9H13N3O5	0	152.11	0.016	measured	10.1016/j.jct.2014.10.015
-cytidine	cytidine	C9H13N3O5	0	153.86	0.022	measured	10.1016/j.jct.2014.10.015
-cytidine	cytidine	C9H13N3O5	0	156.31	0.042	measured	10.1016/j.jct.2014.10.015
-cytidine	cytidine	C9H13N3O5	0	157.13	0.048	measured	10.1016/j.jct.2014.10.015
-thymidine	thymidine	C10H14N2O5	0	167.00	0.012	measured	10.1016/j.jct.2014.10.015
-thymidine	thymidine	C10H14N2O5	0	168.20	0.003	measured	10.1016/j.jct.2014.10.015
-thymidine	thymidine	C10H14N2O5	0	169.25	0.009	measured	10.1016/j.jct.2014.10.015
-thymidine	thymidine	C10H14N2O5	0	170.76	0.018	measured	10.1016/j.jct.2014.10.015
+uracil	uracil	C4H4N2O2	0	70.66	0.10	unverified-T	10.1007/s10953-008-9302-2
+uracil	uracil	C4H4N2O2	0	71.57	0.11	unverified-T	10.1007/s10953-008-9302-2
+uracil	uracil	C4H4N2O2	0	72.02	0.10	unverified-T	10.1007/s10953-008-9302-2
+thymine	thymine	C5H6N2O2	0	87.78	0.18	unverified-T	10.1007/s10953-008-9302-2
+thymine	thymine	C5H6N2O2	0	88.40	0.15	unverified-T	10.1007/s10953-008-9302-2
+thymine	thymine	C5H6N2O2	0	89.14	0.16	unverified-T	10.1007/s10953-008-9302-2
+adenine	adenine	C5H5N5	0	88.59	0.22	unverified-T	10.1007/s10953-008-9302-2
+adenine	adenine	C5H5N5	0	88.86	0.18	unverified-T	10.1007/s10953-008-9302-2
+adenine	adenine	C5H5N5	0	89.34	0.24	unverified-T	10.1007/s10953-008-9302-2
+adenine	adenine	C5H5N5	0	89.69	0.17	unverified-T	10.1007/s10953-008-9302-2
+adenine	adenine	C5H5N5	0	90.02	0.19	unverified-T	10.1007/s10953-008-9302-2
+uracil	uracil	C4H4N2O2	0	70.95	0.06	unverified-T	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	71.88	0.03	unverified-T	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	73.28	0.05	unverified-T	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	74.47	0.02	unverified-T	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	75.61	0.06	unverified-T	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	76.95	0.07	unverified-T	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	88.03	0.05	unverified-T	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	89.20	0.05	unverified-T	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	90.24	0.05	unverified-T	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	91.43	0.02	unverified-T	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	92.59	0.04	unverified-T	10.1016/j.molliq.2020.115210
+thymine	thymine	C5H6N2O2	0	93.63	0.05	unverified-T	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	79.96	0.03	unverified-T	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	81.12	0.02	unverified-T	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	82.21	0.06	unverified-T	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	83.69	0.02	unverified-T	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	84.89	0.06	unverified-T	10.1016/j.molliq.2020.115210
+adenine	adenine	C5H5N5	0	86.42	0.02	unverified-T	10.1016/j.molliq.2020.115210
+uracil	uracil	C4H4N2O2	0	71.23	0.028	unverified-T	10.1016/j.jct.2014.10.015
+uracil	uracil	C4H4N2O2	0	72.30	0.022	unverified-T	10.1016/j.jct.2014.10.015
+uracil	uracil	C4H4N2O2	0	73.72	0.028	unverified-T	10.1016/j.jct.2014.10.015
+uracil	uracil	C4H4N2O2	0	74.74	0.016	unverified-T	10.1016/j.jct.2014.10.015
+cytosine	cytosine	C4H5N3O	0	72.22	0.057	unverified-T	10.1016/j.jct.2014.10.015
+cytosine	cytosine	C4H5N3O	0	73.85	0.062	unverified-T	10.1016/j.jct.2014.10.015
+cytosine	cytosine	C4H5N3O	0	74.44	0.055	unverified-T	10.1016/j.jct.2014.10.015
+cytosine	cytosine	C4H5N3O	0	75.42	0.020	unverified-T	10.1016/j.jct.2014.10.015
+thymine	thymine	C5H6N2O2	0	87.88	0.021	unverified-T	10.1016/j.jct.2014.10.015
+thymine	thymine	C5H6N2O2	0	88.90	0.006	unverified-T	10.1016/j.jct.2014.10.015
+thymine	thymine	C5H6N2O2	0	89.77	0.011	unverified-T	10.1016/j.jct.2014.10.015
+thymine	thymine	C5H6N2O2	0	90.90	0.017	unverified-T	10.1016/j.jct.2014.10.015
+uridine	uridine	C9H12N2O6	0	151.40	0.015	unverified-T	10.1016/j.jct.2014.10.015
+uridine	uridine	C9H12N2O6	0	153.18	0.015	unverified-T	10.1016/j.jct.2014.10.015
+uridine	uridine	C9H12N2O6	0	154.81	0.015	unverified-T	10.1016/j.jct.2014.10.015
+uridine	uridine	C9H12N2O6	0	155.83	0.016	unverified-T	10.1016/j.jct.2014.10.015
+cytidine	cytidine	C9H13N3O5	0	152.11	0.016	unverified-T	10.1016/j.jct.2014.10.015
+cytidine	cytidine	C9H13N3O5	0	153.86	0.022	unverified-T	10.1016/j.jct.2014.10.015
+cytidine	cytidine	C9H13N3O5	0	156.31	0.042	unverified-T	10.1016/j.jct.2014.10.015
+cytidine	cytidine	C9H13N3O5	0	157.13	0.048	unverified-T	10.1016/j.jct.2014.10.015
+thymidine	thymidine	C10H14N2O5	0	167.00	0.012	unverified-T	10.1016/j.jct.2014.10.015
+thymidine	thymidine	C10H14N2O5	0	168.20	0.003	unverified-T	10.1016/j.jct.2014.10.015
+thymidine	thymidine	C10H14N2O5	0	169.25	0.009	unverified-T	10.1016/j.jct.2014.10.015
+thymidine	thymidine	C10H14N2O5	0	170.76	0.018	unverified-T	10.1016/j.jct.2014.10.015
 cytosine	cytosine	C4H5N3O	0	73.6	0.2	measured	10.1007/BF00650644
 uracil	uracil	C4H4N2O2	0	72.3	0.2	measured	10.1007/BF00650644
 thymine	thymine	C5H6N2O2	0	88.7	0.2	measured	10.1007/BF00650644
@@ -792,74 +792,74 @@ inosine	inosine	C10H12N4O5	0	166.10	0.054	measured	10.1021/je500458e
 2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	169.26	0.11	measured	10.1021/je500458e
 guanosine	guanosine	C10H13N5O5	0	171.68	0.15	derived	10.1021/je500458e
 thymidine	thymidine	C10H14N2O5	0	167.810	0.028	measured	10.1007/s10953-014-0162-7
-uracil	uracil	C4H4N2O2	0	70.2	0.4	measured	10.1016/S0301-4622(01)00200-9
+uracil	uracil	C4H4N2O2	0	70.2	0.4	other-T	10.1016/S0301-4622(01)00200-9
 uracil	uracil	C4H4N2O2	0	71.8	0.4	measured	10.1016/S0301-4622(01)00200-9
-uracil	uracil	C4H4N2O2	0	73.6	0.4	measured	10.1016/S0301-4622(01)00200-9
-uracil	uracil	C4H4N2O2	0	74.6	0.5	measured	10.1016/S0301-4622(01)00200-9
-thymine	thymine	C5H6N2O2	0	86.3	0.4	measured	10.1016/S0301-4622(01)00200-9
+uracil	uracil	C4H4N2O2	0	73.6	0.4	other-T	10.1016/S0301-4622(01)00200-9
+uracil	uracil	C4H4N2O2	0	74.6	0.5	other-T	10.1016/S0301-4622(01)00200-9
+thymine	thymine	C5H6N2O2	0	86.3	0.4	other-T	10.1016/S0301-4622(01)00200-9
 thymine	thymine	C5H6N2O2	0	88.7	0.4	measured	10.1016/S0301-4622(01)00200-9
-thymine	thymine	C5H6N2O2	0	90.1	0.4	measured	10.1016/S0301-4622(01)00200-9
-thymine	thymine	C5H6N2O2	0	91.6	0.4	measured	10.1016/S0301-4622(01)00200-9
-cytosine	cytosine	C4H5N3O	0	72.5	0.4	measured	10.1016/S0301-4622(01)00200-9
+thymine	thymine	C5H6N2O2	0	90.1	0.4	other-T	10.1016/S0301-4622(01)00200-9
+thymine	thymine	C5H6N2O2	0	91.6	0.4	other-T	10.1016/S0301-4622(01)00200-9
+cytosine	cytosine	C4H5N3O	0	72.5	0.4	other-T	10.1016/S0301-4622(01)00200-9
 cytosine	cytosine	C4H5N3O	0	73.5	0.4	measured	10.1016/S0301-4622(01)00200-9
-cytosine	cytosine	C4H5N3O	0	74.6	0.4	measured	10.1016/S0301-4622(01)00200-9
-cytosine	cytosine	C4H5N3O	0	75.8	0.5	measured	10.1016/S0301-4622(01)00200-9
-adenine	adenine	C5H5N5	0	88.0	0.4	measured	10.1016/S0301-4622(01)00200-9
+cytosine	cytosine	C4H5N3O	0	74.6	0.4	other-T	10.1016/S0301-4622(01)00200-9
+cytosine	cytosine	C4H5N3O	0	75.8	0.5	other-T	10.1016/S0301-4622(01)00200-9
+adenine	adenine	C5H5N5	0	88.0	0.4	other-T	10.1016/S0301-4622(01)00200-9
 adenine	adenine	C5H5N5	0	89.6	0.4	measured	10.1016/S0301-4622(01)00200-9
-adenine	adenine	C5H5N5	0	92.4	0.4	measured	10.1016/S0301-4622(01)00200-9
-adenine	adenine	C5H5N5	0	93.5	0.5	measured	10.1016/S0301-4622(01)00200-9
-7H-purine	purine	C5H4N4	0	83.3	0.4	measured	10.1016/S0301-4622(01)00200-9
+adenine	adenine	C5H5N5	0	92.4	0.4	other-T	10.1016/S0301-4622(01)00200-9
+adenine	adenine	C5H5N5	0	93.5	0.5	other-T	10.1016/S0301-4622(01)00200-9
+7H-purine	purine	C5H4N4	0	83.3	0.4	other-T	10.1016/S0301-4622(01)00200-9
 7H-purine	purine	C5H4N4	0	84.1	0.4	measured	10.1016/S0301-4622(01)00200-9
-7H-purine	purine	C5H4N4	0	85.8	0.4	measured	10.1016/S0301-4622(01)00200-9
-7H-purine	purine	C5H4N4	0	87.8	0.4	measured	10.1016/S0301-4622(01)00200-9
-hypoxanthine	hypoxanthine	C5H4N4O	0	80.9	0.4	measured	10.1016/S0301-4622(01)00200-9
+7H-purine	purine	C5H4N4	0	85.8	0.4	other-T	10.1016/S0301-4622(01)00200-9
+7H-purine	purine	C5H4N4	0	87.8	0.4	other-T	10.1016/S0301-4622(01)00200-9
+hypoxanthine	hypoxanthine	C5H4N4O	0	80.9	0.4	other-T	10.1016/S0301-4622(01)00200-9
 hypoxanthine	hypoxanthine	C5H4N4O	0	82.9	0.4	measured	10.1016/S0301-4622(01)00200-9
-hypoxanthine	hypoxanthine	C5H4N4O	0	86.3	0.4	measured	10.1016/S0301-4622(01)00200-9
-hypoxanthine	hypoxanthine	C5H4N4O	0	88.8	0.5	measured	10.1016/S0301-4622(01)00200-9
-uridine	uridine	C9H12N2O6	0	150.7	0.6	measured	10.1016/S0301-4622(01)00200-9
+hypoxanthine	hypoxanthine	C5H4N4O	0	86.3	0.4	other-T	10.1016/S0301-4622(01)00200-9
+hypoxanthine	hypoxanthine	C5H4N4O	0	88.8	0.5	other-T	10.1016/S0301-4622(01)00200-9
+uridine	uridine	C9H12N2O6	0	150.7	0.6	other-T	10.1016/S0301-4622(01)00200-9
 uridine	uridine	C9H12N2O6	0	152.2	0.6	measured	10.1016/S0301-4622(01)00200-9
-uridine	uridine	C9H12N2O6	0	153.4	0.7	measured	10.1016/S0301-4622(01)00200-9
-uridine	uridine	C9H12N2O6	0	154.8	0.7	measured	10.1016/S0301-4622(01)00200-9
-cytidine	cytidine	C9H13N3O5	0	152.2	0.6	measured	10.1016/S0301-4622(01)00200-9
+uridine	uridine	C9H12N2O6	0	153.4	0.7	other-T	10.1016/S0301-4622(01)00200-9
+uridine	uridine	C9H12N2O6	0	154.8	0.7	other-T	10.1016/S0301-4622(01)00200-9
+cytidine	cytidine	C9H13N3O5	0	152.2	0.6	other-T	10.1016/S0301-4622(01)00200-9
 cytidine	cytidine	C9H13N3O5	0	153.4	0.6	measured	10.1016/S0301-4622(01)00200-9
-cytidine	cytidine	C9H13N3O5	0	155.0	0.7	measured	10.1016/S0301-4622(01)00200-9
-cytidine	cytidine	C9H13N3O5	0	156.4	0.7	measured	10.1016/S0301-4622(01)00200-9
-adenosine	adenosine	C10H13N5O4	0	169.2	0.6	measured	10.1016/S0301-4622(01)00200-9
+cytidine	cytidine	C9H13N3O5	0	155.0	0.7	other-T	10.1016/S0301-4622(01)00200-9
+cytidine	cytidine	C9H13N3O5	0	156.4	0.7	other-T	10.1016/S0301-4622(01)00200-9
+adenosine	adenosine	C10H13N5O4	0	169.2	0.6	other-T	10.1016/S0301-4622(01)00200-9
 adenosine	adenosine	C10H13N5O4	0	170.8	0.6	measured	10.1016/S0301-4622(01)00200-9
-adenosine	adenosine	C10H13N5O4	0	173.0	0.7	measured	10.1016/S0301-4622(01)00200-9
-adenosine	adenosine	C10H13N5O4	0	175.3	0.7	measured	10.1016/S0301-4622(01)00200-9
-guanosine	guanosine	C10H13N5O5	0	172.0	0.6	measured	10.1016/S0301-4622(01)00200-9
+adenosine	adenosine	C10H13N5O4	0	173.0	0.7	other-T	10.1016/S0301-4622(01)00200-9
+adenosine	adenosine	C10H13N5O4	0	175.3	0.7	other-T	10.1016/S0301-4622(01)00200-9
+guanosine	guanosine	C10H13N5O5	0	172.0	0.6	other-T	10.1016/S0301-4622(01)00200-9
 guanosine	guanosine	C10H13N5O5	0	175.4	0.6	measured	10.1016/S0301-4622(01)00200-9
-guanosine	guanosine	C10H13N5O5	0	177.0	0.7	measured	10.1016/S0301-4622(01)00200-9
-guanosine	guanosine	C10H13N5O5	0	177.8	0.7	measured	10.1016/S0301-4622(01)00200-9
-inosine	inosine	C10H12N4O5	0	162.2	0.6	measured	10.1016/S0301-4622(01)00200-9
+guanosine	guanosine	C10H13N5O5	0	177.0	0.7	other-T	10.1016/S0301-4622(01)00200-9
+guanosine	guanosine	C10H13N5O5	0	177.8	0.7	other-T	10.1016/S0301-4622(01)00200-9
+inosine	inosine	C10H12N4O5	0	162.2	0.6	other-T	10.1016/S0301-4622(01)00200-9
 inosine	inosine	C10H12N4O5	0	165.5	0.6	measured	10.1016/S0301-4622(01)00200-9
-inosine	inosine	C10H12N4O5	0	167.3	0.7	measured	10.1016/S0301-4622(01)00200-9
-inosine	inosine	C10H12N4O5	0	168.9	0.7	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	149.4	0.6	measured	10.1016/S0301-4622(01)00200-9
+inosine	inosine	C10H12N4O5	0	167.3	0.7	other-T	10.1016/S0301-4622(01)00200-9
+inosine	inosine	C10H12N4O5	0	168.9	0.7	other-T	10.1016/S0301-4622(01)00200-9
+2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	149.4	0.6	other-T	10.1016/S0301-4622(01)00200-9
 2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	151.9	0.6	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	152.7	0.7	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	154.6	0.7	measured	10.1016/S0301-4622(01)00200-9
-thymidine	thymidine	C10H14N2O5	0	166.4	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	152.7	0.7	other-T	10.1016/S0301-4622(01)00200-9
+2'-deoxyuridine	2'-deoxyuridine	C9H12N2O5	0	154.6	0.7	other-T	10.1016/S0301-4622(01)00200-9
+thymidine	thymidine	C10H14N2O5	0	166.4	0.6	other-T	10.1016/S0301-4622(01)00200-9
 thymidine	thymidine	C10H14N2O5	0	167.6	0.6	measured	10.1016/S0301-4622(01)00200-9
-thymidine	thymidine	C10H14N2O5	0	169.0	0.7	measured	10.1016/S0301-4622(01)00200-9
-thymidine	thymidine	C10H14N2O5	0	170.4	0.7	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	153.0	0.6	measured	10.1016/S0301-4622(01)00200-9
+thymidine	thymidine	C10H14N2O5	0	169.0	0.7	other-T	10.1016/S0301-4622(01)00200-9
+thymidine	thymidine	C10H14N2O5	0	170.4	0.7	other-T	10.1016/S0301-4622(01)00200-9
+2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	153.0	0.6	other-T	10.1016/S0301-4622(01)00200-9
 2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	154.0	0.6	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	155.8	0.7	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	157.1	0.7	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	168.9	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	155.8	0.7	other-T	10.1016/S0301-4622(01)00200-9
+2'-deoxycytidine	2'-deoxycytidine	C9H13N3O4	0	157.1	0.7	other-T	10.1016/S0301-4622(01)00200-9
+2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	168.9	0.6	other-T	10.1016/S0301-4622(01)00200-9
 2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	170.3	0.6	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	172.0	0.7	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	175.3	0.7	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	172.0	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	172.0	0.7	other-T	10.1016/S0301-4622(01)00200-9
+2'-deoxyadenosine	2'-deoxyadenosine	C10H13N5O3	0	175.3	0.7	other-T	10.1016/S0301-4622(01)00200-9
+2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	172.0	0.6	other-T	10.1016/S0301-4622(01)00200-9
 2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	173.4	0.6	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	175.1	0.7	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	178.3	0.7	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	161.7	0.6	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	175.1	0.7	other-T	10.1016/S0301-4622(01)00200-9
+2'-deoxyguanosine	2'-deoxyguanosine	C10H13N5O4	0	178.3	0.7	other-T	10.1016/S0301-4622(01)00200-9
+2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	161.7	0.6	other-T	10.1016/S0301-4622(01)00200-9
 2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	162.8	0.6	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	163.9	0.7	measured	10.1016/S0301-4622(01)00200-9
-2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	166.2	0.7	measured	10.1016/S0301-4622(01)00200-9
+2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	163.9	0.7	other-T	10.1016/S0301-4622(01)00200-9
+2'-deoxyinosine	2'-deoxyinosine	C10H12N4O4	0	166.2	0.7	other-T	10.1016/S0301-4622(01)00200-9
 guanine	guanine	C5H5N5O	0	91.6	1.0	derived	10.1002/jcc.23608
 guanine	guanine	C5H5N5O	0	97.5	1.2	derived	10.1002/jcc.23608
 spermidine	N-(3-aminopropyl)butane-1,4-diamine	C7H19N3	0	153.7	15	predicted	10.1002/jcc.23608
@@ -874,11 +874,11 @@ uridine	uridine	C9H12N2O6	0	152.32	0.12	measured
 thymidine	thymidine	C10H14N2O5	0	168.03	0.15	measured	
 adenosine	adenosine	C10H13N5O4	0	171.43	0.18	measured	
 adenine	adenine	C5H5N5	0	90.39	0.26	measured	
-adenine	adenine	C5H5N5	0	89.1	1.1	measured	10.1016/j.jct.2017.04.005
-adenine	adenine	C5H5N5	0	90.6	1.1	measured	10.1016/j.jct.2017.04.005
-adenine	adenine	C5H5N5	0	92.7	1.0	measured	10.1016/j.jct.2017.04.005
-adenine	adenine	C5H5N5	0	94.9	0.6	measured	10.1016/j.jct.2017.04.005
-adenine	adenine	C5H5N5	0	97.8	0.7	measured	10.1016/j.jct.2017.04.005
+adenine	adenine	C5H5N5	0	89.1	1.1	unverified-T	10.1016/j.jct.2017.04.005
+adenine	adenine	C5H5N5	0	90.6	1.1	unverified-T	10.1016/j.jct.2017.04.005
+adenine	adenine	C5H5N5	0	92.7	1.0	unverified-T	10.1016/j.jct.2017.04.005
+adenine	adenine	C5H5N5	0	94.9	0.6	unverified-T	10.1016/j.jct.2017.04.005
+adenine	adenine	C5H5N5	0	97.8	0.7	unverified-T	10.1016/j.jct.2017.04.005
 Methanol	Methanol	CH4O	0	38.25		measured	10.1007/BF00646936
 Ethanol	Ethanol	C2H6O	0	55.12		measured	10.1007/BF00646936
 1-Propanol	1-Propanol	C3H8O	0	70.63		measured	10.1007/BF00646936
@@ -1325,7 +1325,7 @@ Butanoic acid	Butanoic acid	C4H8O2	0	84.61	0.1	measured	10.1007/978-3-642-71114-
 2-Methylbutanoic acid	2-Methylbutanoic acid	C5H10O2	0	100.5		measured	10.1007/978-3-642-71114-5_2
 3-Methylbutanoic acid	3-Methylbutanoic acid	C5H10O2	0	100.5		measured	10.1007/978-3-642-71114-5_2
 Hexanoic acid	Hexanoic acid	C6H12O2	0	116.55	0.1	measured	10.1007/978-3-642-71114-5_2
-Glycolic acid	Glycolic acid	C2H4O3	0	71.51	0.1	measured	10.1007/978-3-642-71114-5_2
+Glycolic acid	Glycolic acid	C2H4O3	0	71.51	0.1	rejected	10.1007/978-3-642-71114-5_2
 Lactic acid	Lactic acid	C3H6O3	0	69.38	0.1	measured	10.1007/978-3-642-71114-5_2
 2-Hydroxy-2-methylpropanoic acid	2-Hydroxy-2-methylpropanoic acid	C4H8O3	0	86.78	0.1	measured	10.1007/978-3-642-71114-5_2
 2-Hydroxybutanoic acid	2-Hydroxybutanoic acid	C4H8O3	0	85.45	0.1	measured	10.1007/978-3-642-71114-5_2
@@ -1379,12 +1379,12 @@ Azetidine	Azetidine	C3H7N	0	63.71	0.01	measured	10.1007/978-3-642-71114-5_2
 Pyrazole	Pyrazole	C3H4N2	0	62.26	0.5	measured	10.1007/978-3-642-71114-5_2
 Imidazole	Imidazole	C3H4N2	0	59.95	0.5	measured	10.1007/978-3-642-71114-5_2
 Pyrazine	Pyrazine	C4H4N2	0	70.82	0.5	measured	10.1007/978-3-642-71114-5_2
-1,3,5-Triazine	1,3,5-Triazine	C3H3N3	0	70.42	0.5	measured	10.1007/978-3-642-71114-5_2
-Benzimidazole	Benzimidazole	C7H6N2	0	74.79	0.5	measured	10.1007/978-3-642-71114-5_2
-Benzotriazole	Benzotriazole	C6H5N3	0	98.53	0.5	measured	10.1007/978-3-642-71114-5_2
-2,2'-Bipyridine	2,2'-Bipyridine	C10H8N2	0	94.49	0.5	measured	10.1007/978-3-642-71114-5_2
+1,3,5-Triazine	1,3,5-Triazine	C3H3N3	0	70.42	0.5	rejected	10.1007/978-3-642-71114-5_2
+Benzimidazole	Benzimidazole	C7H6N2	0	74.79	0.5	rejected	10.1007/978-3-642-71114-5_2
+Benzotriazole	Benzotriazole	C6H5N3	0	98.53	0.5	rejected	10.1007/978-3-642-71114-5_2
+2,2'-Bipyridine	2,2'-Bipyridine	C10H8N2	0	94.49	0.5	rejected	10.1007/978-3-642-71114-5_2
 4,4'-Bipyridine	4,4'-Bipyridine	C10H8N2	0	133.21	0.5	measured	10.1007/978-3-642-71114-5_2
-Ethylenediamine	Ethylenediamine	C2H8N2	0	67.7	0.2	measured	10.1007/978-3-642-71114-5_2
+Ethylenediamine	Ethylenediamine	C2H8N2	0	67.7	0.2	rejected	10.1007/978-3-642-71114-5_2
 1,3-Propanediamine	1,3-Propanediamine	C3H10N2	0	78.4	0.4	measured	10.1007/978-3-642-71114-5_2
 Cadaverine	Cadaverine	C5H14N2	0	109.4	0.1	measured	10.1007/978-3-642-71114-5_2
 1,6-Hexanediamine	1,6-Hexanediamine	C6H16N2	0	124.8	0.3	measured	10.1007/978-3-642-71114-5_2
@@ -1395,7 +1395,7 @@ Cadaverine	Cadaverine	C5H14N2	0	109.4	0.1	measured	10.1007/978-3-642-71114-5_2
 trans-1,4-Cyclohexanediamine	trans-1,4-Cyclohexanediamine	C6H14N2	0	108.9	0.9	measured	10.1007/978-3-642-71114-5_2
 1-Methylpiperazine	1-Methylpiperazine	C5H12N2	0	102.3	0.03	measured	10.1007/978-3-642-71114-5_2
 1,4-Dimethylpiperazine	1,4-Dimethylpiperazine	C6H14N2	0	121.0	0.02	measured	10.1007/978-3-642-71114-5_2
-Diethylenetriamine	Diethylenetriamine	C4H13N3	0	101.2	0.4	measured	10.1007/978-3-642-71114-5_2
+Diethylenetriamine	Diethylenetriamine	C4H13N3	0	101.2	0.4	rejected	10.1007/978-3-642-71114-5_2
 Tetraethylenepentamine	Tetraethylenepentamine	C8H23N5	0	175.9	0.6	measured	10.1007/978-3-642-71114-5_2
 4-Phenylpyrimidine	4-Phenylpyrimidine	C10H8N2	0	134.09	0.5	measured	10.1007/978-3-642-71114-5_2
 Quinoline	Quinoline	C9H7N	0	115.53	0.5	measured	10.1007/978-3-642-71114-5_2
@@ -1403,8 +1403,8 @@ Quinoxaline	Quinoxaline	C8H6N2	0	109.16	0.5	measured	10.1007/978-3-642-71114-5_2
 1,10-Phenanthroline	1,10-Phenanthroline	C12H8N2	0	142.42	0.5	measured	10.1007/978-3-642-71114-5_2
 2-Methoxyethylamine	2-Methoxyethylamine	C3H9NO	0	79.59	0.03	measured	10.1007/978-3-642-71114-5_2
 Morpholine	Morpholine	C4H9NO	0	82.56	0.03	measured	10.1007/978-3-642-71114-5_2
-4-Methylmorpholine	4-Methylmorpholine	C5H11NO	0	92.99	0.03	measured	10.1007/978-3-642-71114-5_2
-3-Methoxy-1-propanamine	3-Methoxy-1-propanamine	C4H11NO	0	111.71	0.06	measured	10.1007/978-3-642-71114-5_2
+4-Methylmorpholine	4-Methylmorpholine	C5H11NO	0	92.99	0.03	rejected	10.1007/978-3-642-71114-5_2
+3-Methoxy-1-propanamine	3-Methoxy-1-propanamine	C4H11NO	0	111.71	0.06	rejected	10.1007/978-3-642-71114-5_2
 Formamide	Formamide	CH3NO	0	38.5	0.1	measured	10.1007/978-3-642-71114-5_2
 Acetamide	Acetamide	C2H5NO	0	55.7	0.2	measured	10.1007/978-3-642-71114-5_2
 Propanamide	Propanamide	C3H7NO	0	71.5	0.1	measured	10.1007/978-3-642-71114-5_2
@@ -1429,7 +1429,7 @@ N,N-Diisopropylacetamide	N,N-Diisopropylacetamide	C8H17NO	0	152.0		measured	10.1
 Hexahydro-2H-azepin-2-one	Hexahydro-2H-azepin-2-one	C6H11NO	0	105.0	0.2	measured	10.1007/978-3-642-71114-5_2
 Oxamide	Oxamide	C2H4N2O2	0	55.0	0.2	measured	10.1007/978-3-642-71114-5_2
 Malonamide	Malonamide	C3H6N2O2	0	72.6	0.3	measured	10.1007/978-3-642-71114-5_2
-Succinamide	Succinamide	C4H8N2O2	0	88.8	0.2	measured	10.1007/978-3-642-71114-5_2
+Succinamide	Succinamide	C4H8N2O2	0	88.8	0.2	rejected	10.1007/978-3-642-71114-5_2
 Glycolamide	Glycolamide	C2H5NO2	0	56.2		measured	10.1007/978-3-642-71114-5_2
 Lactamide	Lactamide	C3H7NO2	0	73.3	0.2	measured	10.1007/978-3-642-71114-5_2
 4-Hydroxybutanamide	4-Hydroxybutanamide	C4H9NO2	0	88.9	0.13	measured	10.1007/978-3-642-71114-5_2
@@ -1746,3 +1746,270 @@ sodium tungstate	disodium tungstate	Na2WO4	0	27.3		derived	10.1021/je00038a004
 ammonium alum (anhydrous)	azanium aluminium disulfate	NH4AlS2O8	0	-5.7		derived	10.1021/je00038a004
 ammonium oxalate	diazanium ethanedioate	C2H8N2O4	0	56.4		derived	10.1021/je00038a004
 hexafluorosilicic acid	hexafluorosilicic acid	H2SiF6	0	39.5		derived	10.1021/je00038a004
+lactulose	lactulose	C12H22O11	0	208.65	0.07	measured	10.1039/A604656H
+methyl-alpha-d-xylopyranoside	methyl alpha-d-xylopyranoside	C6H12O5	0	116.89	0.01	measured	10.1016/j.jct.2008.11.009
+methyl-beta-d-xylopyranoside	methyl beta-d-xylopyranoside	C6H12O5	0	117.45	0.01	measured	10.1016/j.jct.2008.11.009
+maltotetraose	maltotetraose	C24H42O21	0	400.6	3.3	measured	Hourston, D. J. (1967). Physicochemical studies on starches and other polymers in solution (PhD thesis).
+maltopentaose	maltopentaose	C30H52O26	0	500.6	3.3	measured	Hourston, D. J. (1967). Physicochemical studies on starches and other polymers in solution (PhD thesis).
+maltohexaose	maltohexaose	C36H62O31	0	596.5	5	measured	Hourston, D. J. (1967). Physicochemical studies on starches and other polymers in solution (PhD thesis).
+maltoheptaose	maltoheptaose	C42H72O36	0	694.8	5.8	measured	Hourston, D. J. (1967). Physicochemical studies on starches and other polymers in solution (PhD thesis).
+maltooctaose	maltooctaose	C48H82O41	0	814.7	24.4	derived	10.1111/j.1365-2621.1965.tb00297.x
+maltononaose	maltononaose	C54H92O46	0	889.9	26.7	derived	10.1111/j.1365-2621.1965.tb00297.x
+maltodecaose	maltodecaose	C60H102O51	0	997.8	29.9	derived	10.1111/j.1365-2621.1965.tb00297.x
+2,4-dimethylglycoluril	2,4-dimethyl-2,4,6,8-tetraazabicyclo[3.3.0]octane-3,7-dione	C6H10N4O2	0	124.67	0.03	measured	10.1016/j.molliq.2020.113134
+2,8-dimethylglycoluril	2,8-dimethyl-2,4,6,8-tetraazabicyclo[3.3.0]octane-3,7-dione	C6H10N4O2	0	123.94	0.03	measured	10.1016/j.molliq.2020.113134
+2,2,2-trifluoroethanol	2,2,2-trifluoroethan-1-ol	C2H3F3O	0	65.7		measured	10.1016/j.fluid.2024.114258
+pentafluoropropanol	2,2,3,3,3-pentafluoropropan-1-ol	C3H3F5O	0	89.7		measured	10.1016/j.fluid.2024.114258
+heptafluorobutanol	2,2,3,3,4,4,4-heptafluorobutan-1-ol	C4H3F7O	0	115.4		measured	10.1016/j.fluid.2024.114258
+nonafluoropentanol	2,2,3,3,4,4,5,5,5-nonafluoropentan-1-ol	C5H3F9O	0	141.2		measured	10.1016/j.fluid.2024.114258
+nonafluoro-tert-butanol	1,1,1,3,3,3-hexafluoro-2-(trifluoromethyl)propan-2-ol	C4HF9O	0	124.6		measured	10.1016/j.fluid.2024.114258
+3-dimethylamino-1-propanol	3-(dimethylamino)propan-1-ol	C5H13NO	0	107.3	1.1	derived	10.1016/j.jct.2023.107018
+nicotinic acid	pyridine-3-carboxylic acid	C6H5NO2	0	80.21	0.05	measured	10.1016/j.jct.2016.03.010
+udenafil	3-(1-methyl-7-oxo-3-propyl-6,7-dihydro-1H-pyrazolo[4,3-d]pyrimidin-5-yl)-N-[2-(1-methylpyrrolidin-2-yl)ethyl]-4-propoxybenzene-1-sulfonamide	C25H36N6O4S	0	399.6	16.0	predicted	BAYSOL estimate: RDKit vdW volume + polar-site regression on 50 measured neutral solutes (see PartialMolarVolumes/README.md, "Adding a missing solute")
+pmsf	phenylmethanesulfonyl fluoride	C7H7FO2S	0	127.2	5.0	predicted	BAYSOL estimate: RDKit vdW volume + polar-site regression on 50 measured neutral solutes (see PartialMolarVolumes/README.md, "Adding a missing solute")
+1-ethyl-3-methylimidazolium bromide	1-ethyl-3-methylimidazol-3-ium bromide	C6H11BrN2	0	137.68	0.06	measured	10.1016/j.jct.2010.04.025
+1-ethyl-3-methylimidazolium bromide	1-ethyl-3-methylimidazol-3-ium bromide	C6H11BrN2	0	138.19	0.06	other-T	10.1016/j.jct.2010.04.025 [T=303.15 K]
+1-ethyl-3-methylimidazolium bromide	1-ethyl-3-methylimidazol-3-ium bromide	C6H11BrN2	0	138.94	0.06	other-T	10.1016/j.jct.2010.04.025 [T=308.15 K]
+1-ethyl-3-methylimidazolium bromide	1-ethyl-3-methylimidazol-3-ium bromide	C6H11BrN2	0	140.07	0.06	other-T	10.1016/j.jct.2010.04.025 [T=313.15 K]
+1-ethyl-3-methylimidazolium bromide	1-ethyl-3-methylimidazol-3-ium bromide	C6H11BrN2	0	141.7	0.06	other-T	10.1016/j.jct.2010.04.025 [T=318.15 K]
+1-hexyl-3-methylimidazolium chloride	1-hexyl-3-methyl-1H-imidazol-3-ium chloride	C10H19ClN2	0	193.038	0.502	other-T	10.1016/j.molliq.2024.125878 [T=293.15 K; derived]
+1-hexyl-3-methylimidazolium chloride	1-hexyl-3-methyl-1H-imidazol-3-ium chloride	C10H19ClN2	0	193.92	0.47	derived	10.1016/j.molliq.2024.125878
+1-hexyl-3-methylimidazolium chloride	1-hexyl-3-methyl-1H-imidazol-3-ium chloride	C10H19ClN2	0	195.091	0.403	other-T	10.1016/j.molliq.2024.125878 [T=303.15 K; derived]
+1-hexyl-3-methylimidazolium chloride	1-hexyl-3-methyl-1H-imidazol-3-ium chloride	C10H19ClN2	0	196.172	0.368	other-T	10.1016/j.molliq.2024.125878 [T=308.15 K; derived]
+1-hexyl-3-methylimidazolium chloride	1-hexyl-3-methyl-1H-imidazol-3-ium chloride	C10H19ClN2	0	197.039	0.421	other-T	10.1016/j.molliq.2024.125878 [T=313.15 K; derived]
+1-hexyl-3-methylimidazolium chloride	1-hexyl-3-methyl-1H-imidazol-3-ium chloride	C10H19ClN2	0	197.943	0.391	other-T	10.1016/j.molliq.2024.125878 [T=318.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	95.814	0.264	other-T	10.1016/j.cdc.2023.101087 [T=293.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	96.173	0.232	derived	10.1016/j.cdc.2023.101087
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	96.536	0.204	other-T	10.1016/j.cdc.2023.101087 [T=303.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	96.915	0.19	other-T	10.1016/j.cdc.2023.101087 [T=308.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	97.257	0.158	other-T	10.1016/j.cdc.2023.101087 [T=313.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	97.645	0.154	other-T	10.1016/j.cdc.2023.101087 [T=318.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	97.498	0.136	other-T	10.1016/j.cdc.2023.101087 [T=323.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	97.891	0.14	other-T	10.1016/j.cdc.2023.101087 [T=328.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	98.213	0.205	other-T	10.1016/j.cdc.2023.101087 [T=333.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	98.612	0.216	other-T	10.1016/j.cdc.2023.101087 [T=338.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	99.014	0.235	other-T	10.1016/j.cdc.2023.101087 [T=343.15 K; derived]
+diglycolamine	2-(2-aminoethoxy)ethanol	C4H11NO2	0	99.41	0.427	other-T	10.1016/j.cdc.2023.101087 [T=348.15 K; derived]
+2-(Dimethylamino)ethanol	2-(Dimethylamino)ethanol	C4H11NO	0	93.393	1.031	other-T	10.1016/j.jct.2017.05.001 [T=293.15 K; derived]
+2-(Dimethylamino)ethanol	2-(Dimethylamino)ethanol	C4H11NO	0	94.517	0.547	other-T	10.1016/j.jct.2017.05.001 [T=313.15 K; derived]
+2-(Dimethylamino)ethanol	2-(Dimethylamino)ethanol	C4H11NO	0	96.018	0.251	other-T	10.1016/j.jct.2017.05.001 [T=333.15 K; derived]
+2-(Dimethylamino)ethanol	2-(Dimethylamino)ethanol	C4H11NO	0	97.724	0.055	other-T	10.1016/j.jct.2017.05.001 [T=353.15 K; derived]
+2-deoxy-d-glucose	2-deoxy-D-glucose	C6H12O5	0	111.84		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+2-deoxy-d-glucose	2-deoxy-D-glucose	C6H12O5	0	112.71		measured	10.1016/j.molliq.2014.04.001
+2-deoxy-d-glucose	2-deoxy-D-glucose	C6H12O5	0	113.5		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+2-deoxy-d-glucose	2-deoxy-D-glucose	C6H12O5	0	114.33		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+2-deoxy-d-ribose	2-deoxy-D-ribose	C5H10O4	0	93.81		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+2-deoxy-d-ribose	2-deoxy-D-ribose	C5H10O4	0	94.33		measured	10.1016/j.molliq.2014.04.001
+2-deoxy-d-ribose	2-deoxy-D-ribose	C5H10O4	0	95.02		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+2-deoxy-d-ribose	2-deoxy-D-ribose	C5H10O4	0	96.15		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+3-Amino-1-propanol	3-Amino-1-propanol	C3H9NO	0	74.78		derived	10.1016/j.molliq.2022.120516
+3-Amino-1-propanol	3-Amino-1-propanol	C3H9NO	0	75.024		other-T	10.1016/j.molliq.2022.120516 [T=303.15 K; derived]
+3-Amino-1-propanol	3-Amino-1-propanol	C3H9NO	0	75.244		other-T	10.1016/j.molliq.2022.120516 [T=308.15 K; derived]
+3-Amino-1-propanol	3-Amino-1-propanol	C3H9NO	0	75.489		other-T	10.1016/j.molliq.2022.120516 [T=313.15 K; derived]
+3-Amino-1-propanol	3-Amino-1-propanol	C3H9NO	0	75.749		other-T	10.1016/j.molliq.2022.120516 [T=318.15 K; derived]
+3-Amino-1-propanol	3-Amino-1-propanol	C3H9NO	0	76.008		other-T	10.1016/j.molliq.2022.120516 [T=323.15 K; derived]
+acetamide	acetamide	C2H5NO	0	59.5		derived	10.1016/j.jct.2006.04.007
+Caffeine	Caffeine	C8H10N4O2	0	140.297	0.043	other-T	10.1021/acs.jced.6b00273 [T=288.15 K; derived]
+Caffeine	Caffeine	C8H10N4O2	0	144.019	0.031	derived	10.1021/acs.jced.6b00273
+Caffeine	Caffeine	C8H10N4O2	0	147.879	0.048	other-T	10.1021/acs.jced.6b00273 [T=308.15 K; derived]
+Caffeine	Caffeine	C8H10N4O2	0	152.064	0.071	other-T	10.1021/acs.jced.6b00273 [T=318.15 K; derived]
+Cellobiose	Cellobiose	C12H22O11	0	210.29		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+Cellobiose	Cellobiose	C12H22O11	0	211.43		measured	10.1016/j.molliq.2014.04.001
+Cellobiose	Cellobiose	C12H22O11	0	212.55		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+Cellobiose	Cellobiose	C12H22O11	0	213.65		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+fructose	D-fructose	C6H12O6	0	110.01		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+fructose	D-fructose	C6H12O6	0	111.06		measured	10.1016/j.molliq.2014.04.001
+fructose	D-fructose	C6H12O6	0	112.02		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+fructose	D-fructose	C6H12O6	0	112.88		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+D-glucosamine	(3R,4R,5S,6R)-3-amino-6-(hydroxymethyl)oxane-2,4,5-triol	C6H13NO5	0	124.4	0.13	other-T	10.14233/ajchem.2021.22997 [T=278.15 K]
+D-glucosamine	(3R,4R,5S,6R)-3-amino-6-(hydroxymethyl)oxane-2,4,5-triol	C6H13NO5	0	126.8	0.1	other-T	10.14233/ajchem.2021.22997 [T=288.15 K]
+D-glucosamine	(3R,4R,5S,6R)-3-amino-6-(hydroxymethyl)oxane-2,4,5-triol	C6H13NO5	0	129.75	0.07	other-T	10.1016/j.molliq.2024.125878 [T=293.15 K]
+D-glucosamine	(3R,4R,5S,6R)-3-amino-6-(hydroxymethyl)oxane-2,4,5-triol	C6H13NO5	0	130.45	0.15	measured	10.1016/j.molliq.2024.125878
+D-glucosamine	(3R,4R,5S,6R)-3-amino-6-(hydroxymethyl)oxane-2,4,5-triol	C6H13NO5	0	130.6	0.07	measured	10.14233/ajchem.2021.22997
+D-glucosamine	(3R,4R,5S,6R)-3-amino-6-(hydroxymethyl)oxane-2,4,5-triol	C6H13NO5	0	130.93	0.09	other-T	10.1016/j.molliq.2024.125878 [T=303.15 K]
+D-glucosamine	(3R,4R,5S,6R)-3-amino-6-(hydroxymethyl)oxane-2,4,5-triol	C6H13NO5	0	131.27	0.11	other-T	10.1016/j.molliq.2024.125878 [T=308.15 K]
+D-glucosamine	(3R,4R,5S,6R)-3-amino-6-(hydroxymethyl)oxane-2,4,5-triol	C6H13NO5	0	131.67	0.15	other-T	10.1016/j.molliq.2024.125878 [T=313.15 K]
+D-glucosamine	(3R,4R,5S,6R)-3-amino-6-(hydroxymethyl)oxane-2,4,5-triol	C6H13NO5	0	131.83	0.07	other-T	10.1016/j.molliq.2024.125878 [T=318.15 K]
+glucose	D-glucose	C6H12O6	0	110.82		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+glucose	D-glucose	C6H12O6	0	111.59		measured	10.1016/j.molliq.2014.04.001
+glucose	D-glucose	C6H12O6	0	111.6	0.11	measured	10.1016/j.molliq.2016.02.033
+glucose	D-glucose	C6H12O6	0	111.98	0.04	other-T	10.1016/j.molliq.2016.02.033 [T=303.15 K]
+glucose	D-glucose	C6H12O6	0	112.34	0.12	other-T	10.1016/j.molliq.2016.02.033 [T=308.15 K]
+glucose	D-glucose	C6H12O6	0	112.51		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+glucose	D-glucose	C6H12O6	0	112.48	0.03	other-T	10.1016/j.molliq.2016.02.033 [T=313.15 K]
+glucose	D-glucose	C6H12O6	0	112.51	0.05	other-T	10.1016/j.molliq.2016.02.033 [T=318.15 K]
+glucose	D-glucose	C6H12O6	0	113.5		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+glucose	D-glucose	C6H12O6	0	112.65	0.02	other-T	10.1016/j.molliq.2016.02.033 [T=323.15 K]
+D-Mannose	D-Mannose	C6H12O6	0	110.95		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+D-Mannose	D-Mannose	C6H12O6	0	111.59		measured	10.1016/j.molliq.2014.04.001
+D-Mannose	D-Mannose	C6H12O6	0	112.21		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+D-Mannose	D-Mannose	C6H12O6	0	112.88		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+ribose	D-ribose	C5H10O5	0	94.45		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+ribose	D-ribose	C5H10O5	0	94.781	0.003	other-T	10.1016/j.jct.2019.105877 [T=288.15 K; derived]
+ribose	D-ribose	C5H10O5	0	95.23		measured	10.1016/j.molliq.2014.04.001
+ribose	D-ribose	C5H10O5	0	96.141		derived	10.1016/j.jct.2019.105877
+ribose	D-ribose	C5H10O5	0	96.13		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+ribose	D-ribose	C5H10O5	0	96.681	0.003	other-T	10.1016/j.jct.2019.105877 [T=308.15 K; derived]
+ribose	D-ribose	C5H10O5	0	97.12		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+ribose	D-ribose	C5H10O5	0	97.171	0.004	other-T	10.1016/j.jct.2019.105877 [T=318.15 K; derived]
+D-Xylose	D-Xylose	C5H10O5	0	94.13	0.006	other-T	10.1016/j.jct.2019.105877 [T=288.15 K; derived]
+D-Xylose	D-Xylose	C5H10O5	0	94.98		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+D-Xylose	D-Xylose	C5H10O5	0	95.55		measured	10.1016/j.molliq.2014.04.001
+D-Xylose	D-Xylose	C5H10O5	0	95.65		derived	10.1016/j.jct.2019.105877
+D-Xylose	D-Xylose	C5H10O5	0	96.19		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+D-Xylose	D-Xylose	C5H10O5	0	96.3	0.006	other-T	10.1016/j.jct.2019.105877 [T=308.15 K; derived]
+D-Xylose	D-Xylose	C5H10O5	0	96.84		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+D-Xylose	D-Xylose	C5H10O5	0	96.841	0.005	other-T	10.1016/j.jct.2019.105877 [T=318.15 K; derived]
+Diethanolamine	Diethanolamine	C4H11NO2	0	93.865	0.263	other-T	10.1016/j.jct.2017.05.001 [T=293.15 K; derived]
+Diethanolamine	Diethanolamine	C4H11NO2	0	94.726	0.118	other-T	10.1016/j.jct.2017.05.001 [T=313.15 K; derived]
+Diethanolamine	Diethanolamine	C4H11NO2	0	96.009	0.128	other-T	10.1016/j.jct.2017.05.001 [T=333.15 K; derived]
+Diethanolamine	Diethanolamine	C4H11NO2	0	96.959	0.012	other-T	10.1016/j.jct.2017.05.001 [T=353.15 K; derived]
+dihydrogen phosphate	dihydrogen phosphate	H2PO4	-1	31.45		measured	10.1021/j100473a005
+dipotassium hydrogen phosphate	dipotassium hydrogen phosphate	K2HPO4	0	20.95	7.1	derived	10.1016/j.jct.2012.03.032
+disodium hydrogen phosphate	disodium hydrogen phosphate	Na2HPO4	0	3.13		measured	10.1021/j100473a005
+Ethylenediamine	Ethylenediamine	C2H8N2	0	62.426	0.401	other-T	10.1016/j.cdc.2023.101087 [T=293.15 K; derived]
+Ethylenediamine	Ethylenediamine	C2H8N2	0	62.634	0.361	derived	10.1016/j.cdc.2023.101087
+Ethylenediamine	Ethylenediamine	C2H8N2	0	62.888	0.351	other-T	10.1016/j.cdc.2023.101087 [T=303.15 K; derived]
+Ethylenediamine	Ethylenediamine	C2H8N2	0	63.111	0.327	other-T	10.1016/j.cdc.2023.101087 [T=308.15 K; derived]
+Ethylenediamine	Ethylenediamine	C2H8N2	0	63.334	0.309	other-T	10.1016/j.cdc.2023.101087 [T=313.15 K; derived]
+Ethylenediamine	Ethylenediamine	C2H8N2	0	63.618	0.39	other-T	10.1016/j.cdc.2023.101087 [T=318.15 K; derived]
+Ethylenediamine	Ethylenediamine	C2H8N2	0	64.174	0.477	other-T	10.1016/j.cdc.2023.101087 [T=323.15 K; derived]
+Ethylenediamine	Ethylenediamine	C2H8N2	0	64.392	0.46	other-T	10.1016/j.cdc.2023.101087 [T=328.15 K; derived]
+Ethylenediamine	Ethylenediamine	C2H8N2	0	64.662	0.466	other-T	10.1016/j.cdc.2023.101087 [T=333.15 K; derived]
+Ethylenediamine	Ethylenediamine	C2H8N2	0	64.651	0.322	other-T	10.1016/j.cdc.2023.101087 [T=338.15 K; derived]
+Ethylenediamine	Ethylenediamine	C2H8N2	0	64.907	0.318	other-T	10.1016/j.cdc.2023.101087 [T=343.15 K; derived]
+Ethylenediamine	Ethylenediamine	C2H8N2	0	65.14	0.299	other-T	10.1016/j.cdc.2023.101087 [T=348.15 K; derived]
+hydrogen phosphate	hydrogen phosphate	HPO4	-2	5.6		measured	10.1021/j100473a005
+L-Glutamic acid	L-Glutamic acid	C5H9NO4	0	85.7	0.1	other-T	10.1016/j.molliq.2022.119578 [T=293.15 K]
+L-Glutamic acid	L-Glutamic acid	C5H9NO4	0	86.3	0.1	measured	10.1016/j.molliq.2022.119578
+L-Glutamic acid	L-Glutamic acid	C5H9NO4	0	89.2	0.1	other-T	10.1016/j.molliq.2022.119578 [T=303.15 K]
+L-Glutamic acid	L-Glutamic acid	C5H9NO4	0	91.2	0.1	other-T	10.1016/j.molliq.2022.119578 [T=308.15 K]
+L-Glutamic acid	L-Glutamic acid	C5H9NO4	0	93.6	0.1	other-T	10.1016/j.molliq.2022.119578 [T=313.15 K]
+l-lysine hydrochloride	(2S)-2,6-diaminohexanoic acid;hydrochloride	C6H15ClN2O2	0	121.1	0.1	other-T	10.14233/ajchem.2021.22997 [T=278.15 K]
+l-lysine hydrochloride	(2S)-2,6-diaminohexanoic acid;hydrochloride	C6H15ClN2O2	0	122.2	0.1	other-T	10.14233/ajchem.2021.22997 [T=288.15 K]
+l-lysine hydrochloride	(2S)-2,6-diaminohexanoic acid;hydrochloride	C6H15ClN2O2	0	124.8	0.12	measured	10.14233/ajchem.2021.22997
+L-Serine	L-Serine	C3H7NO3	0	60.02	0.11	other-T	10.1016/j.jct.2020.106335 [T=293.15 K]
+L-Serine	L-Serine	C3H7NO3	0	60.39	0.19	measured	10.1016/j.jct.2020.106335
+L-Serine	L-Serine	C3H7NO3	0	60.76	0.05	other-T	10.1016/j.jct.2020.106335 [T=303.15 K]
+L-Serine	L-Serine	C3H7NO3	0	61.19	0.05	other-T	10.1016/j.jct.2020.106335 [T=308.15 K]
+L-Serine	L-Serine	C3H7NO3	0	61.54	0.09	other-T	10.1016/j.jct.2020.106335 [T=313.15 K]
+L-Serine	L-Serine	C3H7NO3	0	61.84	0.04	other-T	10.1016/j.jct.2020.106335 [T=318.15 K]
+L-Serine	L-Serine	C3H7NO3	0	62.19	0.06	other-T	10.1016/j.jct.2020.106335 [T=323.15 K]
+L-Valine	L-Valine	C5H11NO2	0	90.26	0.06	other-T	10.1016/j.jct.2020.106335 [T=293.15 K]
+L-Valine	L-Valine	C5H11NO2	0	90.65	0.04	measured	10.1016/j.jct.2020.106335
+L-Valine	L-Valine	C5H11NO2	0	90.97	0.06	other-T	10.1016/j.jct.2020.106335 [T=303.15 K]
+L-Valine	L-Valine	C5H11NO2	0	91.3	0.07	other-T	10.1016/j.jct.2020.106335 [T=308.15 K]
+L-Valine	L-Valine	C5H11NO2	0	91.62	0.04	other-T	10.1016/j.jct.2020.106335 [T=313.15 K]
+L-Valine	L-Valine	C5H11NO2	0	91.88	0.06	other-T	10.1016/j.jct.2020.106335 [T=318.15 K]
+L-Valine	L-Valine	C5H11NO2	0	92.24	0.05	other-T	10.1016/j.jct.2020.106335 [T=323.15 K]
+Lactose	Lactose	C12H22O11	0	207.73		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+Lactose	Lactose	C12H22O11	0	209.01		measured	10.1016/j.molliq.2014.04.001
+Lactose	Lactose	C12H22O11	0	210.22		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+Lactose	Lactose	C12H22O11	0	211.57		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+Maltose	Maltose	C12H22O11	0	208.63		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+Maltose	Maltose	C12H22O11	0	210.15		measured	10.1016/j.molliq.2014.04.001
+Maltose	Maltose	C12H22O11	0	211.66		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+Maltose	Maltose	C12H22O11	0	213		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+Melezitose	Melezitose	C18H32O16	0	319.04		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+Melezitose	Melezitose	C18H32O16	0	319.9		measured	10.1016/j.molliq.2014.04.001
+Melezitose	Melezitose	C18H32O16	0	321.12		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+Melezitose	Melezitose	C18H32O16	0	323		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+Methyl alpha-D-glucopyranoside	Methyl alpha-D-glucopyranoside	C7H14O6	0	131.95		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+Methyl alpha-D-glucopyranoside	Methyl alpha-D-glucopyranoside	C7H14O6	0	133.11		measured	10.1016/j.molliq.2014.04.001
+Methyl alpha-D-glucopyranoside	Methyl alpha-D-glucopyranoside	C7H14O6	0	134.28		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+Methyl alpha-D-glucopyranoside	Methyl alpha-D-glucopyranoside	C7H14O6	0	135.52		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+Methyl alpha-D-mannopyranoside	Methyl alpha-D-mannopyranoside	C7H14O6	0	132.14		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+Methyl alpha-D-mannopyranoside	Methyl alpha-D-mannopyranoside	C7H14O6	0	132.56		measured	10.1016/j.molliq.2014.04.001
+Methyl alpha-D-mannopyranoside	Methyl alpha-D-mannopyranoside	C7H14O6	0	133.38		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+Methyl alpha-D-mannopyranoside	Methyl alpha-D-mannopyranoside	C7H14O6	0	134.6		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	143.144	1.9	other-T	10.1016/j.jct.2006.04.007 [T=278.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	143.697	1.9	other-T	10.1016/j.jct.2006.04.007 [T=283.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	144.23	1.9	other-T	10.1016/j.jct.2006.04.007 [T=288.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	144.746	1.9	other-T	10.1016/j.jct.2006.04.007 [T=293.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	148.62	0.02	other-T	10.1016/j.molliq.2024.125878 [T=293.15 K]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	145.242	1.9	derived	10.1016/j.jct.2006.04.007
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	149.15	0.02	measured	10.1016/j.molliq.2024.125878
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	145.72	1.9	other-T	10.1016/j.jct.2006.04.007 [T=303.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	149.79	0.02	other-T	10.1016/j.molliq.2024.125878 [T=303.15 K]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	146.179	1.9	other-T	10.1016/j.jct.2006.04.007 [T=308.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	150.33	0.04	other-T	10.1016/j.molliq.2024.125878 [T=308.15 K]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	146.62	1.9	other-T	10.1016/j.jct.2006.04.007 [T=313.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	150.83	0.04	other-T	10.1016/j.molliq.2024.125878 [T=313.15 K]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	147.042	1.9	other-T	10.1016/j.jct.2006.04.007 [T=318.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	151.24	0.06	other-T	10.1016/j.molliq.2024.125878 [T=318.15 K]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	147.445	1.9	other-T	10.1016/j.jct.2006.04.007 [T=323.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	147.83	1.9	other-T	10.1016/j.jct.2006.04.007 [T=328.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	148.196	1.9	other-T	10.1016/j.jct.2006.04.007 [T=333.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	148.544	1.9	other-T	10.1016/j.jct.2006.04.007 [T=338.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	148.873	1.9	other-T	10.1016/j.jct.2006.04.007 [T=343.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	149.183	1.9	other-T	10.1016/j.jct.2006.04.007 [T=348.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	149.475	1.9	other-T	10.1016/j.jct.2006.04.007 [T=353.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	149.748	1.9	other-T	10.1016/j.jct.2006.04.007 [T=358.15 K; derived]
+n-acetyl-d-glucosamine	N-[(3R,4R,5S,6R)-2,4,5-trihydroxy-6-(hydroxymethyl)oxan-3-yl]acetamide	C8H15NO6	0	150.002	1.9	other-T	10.1016/j.jct.2006.04.007 [T=363.15 K; derived]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	72.955	0.02	other-T	10.1016/j.jct.2006.04.007 [T=278.15 K; derived]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	73.164	0.02	other-T	10.1016/j.jct.2006.04.007 [T=283.15 K; derived]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	73.383	0.02	other-T	10.1016/j.jct.2006.04.007 [T=288.15 K; derived]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	73.852	0.02	derived	10.1016/j.jct.2006.04.007
+n-methylacetamide	N-methylacetamide	C3H7NO	0	74.11	0.02	other-T	10.1016/j.jct.2006.04.007 [T=303.15 K]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	74.362	0.02	other-T	10.1016/j.jct.2006.04.007 [T=308.15 K; derived]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	74.914	0.02	other-T	10.1016/j.jct.2006.04.007 [T=318.15 K; derived]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	75.506	0.02	other-T	10.1016/j.jct.2006.04.007 [T=328.15 K; derived]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	76.141	0.02	other-T	10.1016/j.jct.2006.04.007 [T=338.15 K; derived]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	76.816	0.02	other-T	10.1016/j.jct.2006.04.007 [T=348.15 K; derived]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	77.533	0.02	other-T	10.1016/j.jct.2006.04.007 [T=358.15 K; derived]
+n-methylacetamide	N-methylacetamide	C3H7NO	0	78.291	0.02	other-T	10.1016/j.jct.2006.04.007 [T=368.15 K; derived]
+phosphate	phosphate	PO4	-3	-30.36		measured	10.1021/j100473a005
+phosphoric acid	phosphoric acid	H3O4P	0	47.71		measured	10.1021/j100473a005
+potassium dihydrogen phosphate	potassium dihydrogen phosphate	KH2PO4	0	33.11	4.64	derived	10.1016/j.jct.2012.03.032
+potassium sorbate	potassium (2E,4E)-hexa-2,4-dienoate	C6H7KO2	0	104.7	1.2	derived	10.1016/j.molliq.2022.119578
+Raffinose	Raffinose	C18H32O16	0	305.35		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+Raffinose	Raffinose	C18H32O16	0	307.03		measured	10.1016/j.molliq.2014.04.001
+Raffinose	Raffinose	C18H32O16	0	308.37		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+Raffinose	Raffinose	C18H32O16	0	309.43		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+rhamnose	6-Deoxy-D-mannose	C6H12O5	0	128.28		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+rhamnose	6-Deoxy-D-mannose	C6H12O5	0	128.69		measured	10.1016/j.molliq.2014.04.001
+rhamnose	6-Deoxy-D-mannose	C6H12O5	0	129.62		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+rhamnose	6-Deoxy-D-mannose	C6H12O5	0	131.09		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+sarcosine	2-(methylamino)acetic acid	C3H7NO2	0	62.51	0.05	measured	10.1016/j.molliq.2016.02.033
+sarcosine	2-(methylamino)acetic acid	C3H7NO2	0	63.71	0.02	other-T	10.1016/j.molliq.2016.02.033 [T=303.15 K]
+sarcosine	2-(methylamino)acetic acid	C3H7NO2	0	64.87	0.03	other-T	10.1016/j.molliq.2016.02.033 [T=308.15 K]
+sarcosine	2-(methylamino)acetic acid	C3H7NO2	0	65.02	0.02	other-T	10.1016/j.molliq.2016.02.033 [T=313.15 K]
+sarcosine	2-(methylamino)acetic acid	C3H7NO2	0	65.17	0.02	other-T	10.1016/j.molliq.2016.02.033 [T=318.15 K]
+sarcosine	2-(methylamino)acetic acid	C3H7NO2	0	65.42	0.01	other-T	10.1016/j.molliq.2016.02.033 [T=323.15 K]
+sodium benzoate	sodium benzoate	C7H5NaO2	0	90.4	2.9	derived	10.1016/j.molliq.2022.119578
+sodium chloride	sodium chloride	NaCl	0	16.34	0.75	derived	10.1016/j.jct.2020.106335
+sodium chloride	sodium chloride	NaCl	0	16.57	0.67	derived	10.1021/acs.jced.6b00273
+sodium dibutyl phosphate	sodium dibutyl phosphate	C8H18NaO4P	0	170.1		measured	10.1246/bcsj.60.1225
+sodium diethyl phosphate	sodium diethyl phosphate	C4H10NaO4P	0	105.95		measured	10.1246/bcsj.60.1225
+sodium dihydrogen phosphate	sodium dihydrogen phosphate	NaH2PO4	0	25.997		other-T	10.1016/j.jct.2008.01.018 [T=283.15 K]
+sodium dihydrogen phosphate	sodium dihydrogen phosphate	NaH2PO4	0	27.242		other-T	10.1016/j.jct.2008.01.018 [T=288.15 K]
+sodium dihydrogen phosphate	sodium dihydrogen phosphate	NaH2PO4	0	28.298		other-T	10.1016/j.jct.2008.01.018 [T=293.15 K]
+sodium dihydrogen phosphate	sodium dihydrogen phosphate	NaH2PO4	0	29.167		measured	10.1016/j.jct.2008.01.018
+sodium dihydrogen phosphate	sodium dihydrogen phosphate	NaH2PO4	0	30.21		measured	10.1021/j100473a005
+sodium dihydrogen phosphate	sodium dihydrogen phosphate	NaH2PO4	0	29.847		other-T	10.1016/j.jct.2008.01.018 [T=303.15 K]
+sodium dimethyl phosphate	sodium dimethyl phosphate	C2H6NaO4P	0	76.64		measured	10.1246/bcsj.60.1225
+sucrose	sucrose	C12H22O11	0	210.77		other-T	10.1016/j.molliq.2014.04.001 [T=288.15 K]
+sucrose	sucrose	C12H22O11	0	211.59		measured	10.1016/j.molliq.2014.04.001
+sucrose	sucrose	C12H22O11	0	212.64		other-T	10.1016/j.molliq.2014.04.001 [T=308.15 K]
+sucrose	sucrose	C12H22O11	0	213.77		other-T	10.1016/j.molliq.2014.04.001 [T=318.15 K]
+theobromine	3,7-dimethylpurine-2,6-dione	C7H8N4O2	0	126.402	0.005	other-T	10.1021/acs.jced.6b00273 [T=288.15 K; derived]
+theobromine	3,7-dimethylpurine-2,6-dione	C7H8N4O2	0	129.312	0.008	derived	10.1021/acs.jced.6b00273
+theobromine	3,7-dimethylpurine-2,6-dione	C7H8N4O2	0	131.946	0.004	other-T	10.1021/acs.jced.6b00273 [T=308.15 K; derived]
+theobromine	3,7-dimethylpurine-2,6-dione	C7H8N4O2	0	133.42	0.011	other-T	10.1021/acs.jced.6b00273 [T=318.15 K; derived]
+theophylline	1,3-dimethyl-7H-purine-2,6-dione	C7H8N4O2	0	126.432	0.026	other-T	10.1021/acs.jced.6b00273 [T=288.15 K; derived]
+theophylline	1,3-dimethyl-7H-purine-2,6-dione	C7H8N4O2	0	129.911	0.058	derived	10.1021/acs.jced.6b00273
+theophylline	1,3-dimethyl-7H-purine-2,6-dione	C7H8N4O2	0	131.479	0.033	other-T	10.1021/acs.jced.6b00273 [T=308.15 K; derived]
+theophylline	1,3-dimethyl-7H-purine-2,6-dione	C7H8N4O2	0	133.72	0.028	other-T	10.1021/acs.jced.6b00273 [T=318.15 K; derived]
+triammonium citrate	triazanium;2-hydroxypropane-1,2,3-tricarboxylate	C6H17N3O7	0	128.19	1.2	other-T	10.1016/j.jct.2019.105877 [T=288.15 K; derived]
+triammonium citrate	triazanium;2-hydroxypropane-1,2,3-tricarboxylate	C6H17N3O7	0	130.47	1.16	derived	10.1016/j.jct.2019.105877
+triammonium citrate	triazanium;2-hydroxypropane-1,2,3-tricarboxylate	C6H17N3O7	0	131.935	1.156	other-T	10.1016/j.jct.2019.105877 [T=308.15 K; derived]
+triammonium citrate	triazanium;2-hydroxypropane-1,2,3-tricarboxylate	C6H17N3O7	0	132.851	1.159	other-T	10.1016/j.jct.2019.105877 [T=318.15 K; derived]
+Triethanolamine	Triethanolamine	C6H15NO3	0	127.073	0.167	other-T	10.1016/j.jct.2017.05.001 [T=293.15 K; derived]
+Triethanolamine	Triethanolamine	C6H15NO3	0	127.943	0.581	other-T	10.1016/j.jct.2017.05.001 [T=313.15 K; derived]
+Triethanolamine	Triethanolamine	C6H15NO3	0	129.981	0.5	other-T	10.1016/j.jct.2017.05.001 [T=333.15 K; derived]
+Triethanolamine	Triethanolamine	C6H15NO3	0	131.117	0.814	other-T	10.1016/j.jct.2017.05.001 [T=353.15 K; derived]
+tripotassium phosphate	tripotassium phosphate	K3PO4	0	8.58	9.75	derived	10.1016/j.jct.2010.04.025
+trisodium phosphate	trisodium phosphate	Na3PO4	0	-34.12		measured	10.1021/j100473a005
+imp disodium salt	inosine 5'-monophosphate disodium salt	C10H11N4Na2O8P	0	179.9	6.0	predicted	BAYSOL estimate: inosine (10.1021/je500458e) + phosphate increment AMP·Na−adenosine 17.7 (10.1007/BF00650644) + Na+ −1.21 + 0.96×pKa2 ionization ΔV −2.85 (Krausz 1972, 10.1021/ja00781a034); pH 7.5 dianion (see PartialMolarVolumes/README.md)
+potassium dihydrogen phosphate	potassium dihydrogen phosphate	KH2PO4	0	40.41	0.5	derived	BAYSOL estimate: measured NaH2PO4 30.21 (10.1021/j100473a005) + 1x[V(KCl)-V(NaCl)] = 1x(26.81-16.61) (Na->K swap, same table); ion additivity reproduces NaH2PO4 to 0.03 (see PartialMolarVolumes/README.md)
+dipotassium hydrogen phosphate	dipotassium hydrogen phosphate	K2HPO4	0	23.53	1.0	derived	BAYSOL estimate: measured Na2HPO4 3.13 (10.1021/j100473a005) + 2x[V(KCl)-V(NaCl)] = 2x(26.81-16.61) (Na->K swap, same table); ion additivity reproduces NaH2PO4 to 0.03 (see PartialMolarVolumes/README.md)

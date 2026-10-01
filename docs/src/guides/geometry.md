@@ -6,8 +6,13 @@ module Geometry
     include("Metrics.jl")
     using .PlasticSequence: PlasticSequence
     using .Metrics:         Metrics
+
+    sphere_volume(rad::Float64)::Float64 = (4.0 / 3.0) * π * rad^3
+    export sphere_volume
 end
 ```
+
+Consumers: `SASA` (surface sampling, `Metrics` shortcuts) and `MolecularStructure.excluded_volume`, which uses `plastic_points(N_VOL_SHELL, Val(3), Val(:volume))` and `sphere_volume` for the power-diagram per-atom volumes.
 
 ## PlasticSequence.jl
 
@@ -17,8 +22,7 @@ Even point sets drawn from the plastic (R_d) family of additive low-discrepancy 
 - PLASTIC_RATIO_2, PLASTIC_RATIO_3: plastic_ratio(2)/plastic_ratio(3), precomputed.
 - Vec2, Vec3: NTuple{2,Float64}/NTuple{3,Float64} point types.
 - plastic_points(n::Int, ::Val{2}) -> Vector{Vec2}: the first n raw 2-D R₂ terms (frac(i/ρ), frac(i/ρ²)), uniform on [0, 1)².
-- plastic_points(n::Int, ::Val{3}) -> Vector{Vec3} (same as Val{3}, Val{:surface}): those same 2-D R₂ terms read as (azimuth, height) and lifted onto the **surface** of the unit sphere via
-- Lambert's cylindrical equal-area projection. Points are uniform in *area*, |p| == 1 .
+- plastic_points(n::Int, ::Val{3}) -> Vector{Vec3} (same as Val{3}, Val{:surface}): those same 2-D R₂ terms read as (azimuth, height) and lifted onto the **surface** of the unit sphere via Lambert's cylindrical equal-area projection. Points are uniform in *area*, |p| == 1 .
 - plastic_points(n::Int, ::Val{3}, ::Val{:volume}) -> Vector{Vec3}: the 3-D R₃ terms lifted to **fill** the unit ball, a 3-D region built from the R₃ generator (the extra coordinate becomes a radius, inverse-CDF-corrected for the sphere's r²dr volume element). Points are uniform in *volume*, 0 ≤ |p| < 1.
 - plastic_points(n::Int; dim::Int=3, shape::Symbol=:surface): keyword convenience dispatching to the Val methods above; shape is only consulted when dim == 3.
 

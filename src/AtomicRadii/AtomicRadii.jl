@@ -10,6 +10,7 @@ module AtomicRadii
 using  SQLite: SQLite
 using  DBInterface: DBInterface
 using  FastClosures: @closure
+using  DocStringExtensions
 
 export  RadiiSource, lookup, AtomicRadiiSource, Ion, 
         tryparse_ion, ion_key, ion_radius, element_radius, 
@@ -43,7 +44,7 @@ end
 const _ION_RE = r"^\s*([a-z]{1,2})\s*(?:([1-9][0-9]*)\s*([+-])|([+-])\s*([1-9][0-9]*)?)?\s*$"
 
 """
-    tryparse_ion(s::AbstractString) -> Union{Ion,Nothing}
+$(TYPEDSIGNATURES)
 
 Parse an ion string like "fe3+" or "fe+3"; nothing for a bare element
 like "fe" or an unparseable string.
@@ -63,7 +64,7 @@ function tryparse_ion(s::AbstractString)::Union{Ion,Nothing}
 end
 
 """
-    ion_key(ion::Ion) -> String
+$(TYPEDSIGNATURES)
 
 Ion -> ionic_radii table key, digits-then-sign (Ion("fe", 3) -> "fe3+").
 Throws ArgumentError for charge 0.
@@ -86,7 +87,7 @@ const _CHARGES = Dict{String,Vector{Int}}()           # "fe"   => sorted charges
 _dbpath()::String = joinpath(@__DIR__, "atomic_radii.sqlite3")
 
 """
-    _load!(path::String = _dbpath()) -> Nothing
+$(TYPEDSIGNATURES)
 
 Clear and repopulate the module tables (_IONIC, _ATOMIC, _CHARGES) from
 the SQLite file, sorting each element's charge list. Called from __init__.
@@ -125,7 +126,7 @@ ion_radius(key::AbstractString)::Union{Float64,Nothing} = get(_IONIC, key, nothi
 element_radius(el::AbstractString)::Union{Tuple{Float64,String},Nothing} = get(_ATOMIC, el, nothing)
 
 """
-    nearest_ion(element::AbstractString, charge::Int) -> Union{String,Nothing}
+$(TYPEDSIGNATURES)
 
 Ion key for the on-file charge state of element closest to charge;
 nothing if the element has no charge states on file.
@@ -145,7 +146,7 @@ function nearest_ion(element::AbstractString, charge::Int)::Union{String,Nothing
 end
 
 """
-    resolve_one(ion::AbstractString) -> Union{Float64,Nothing}
+$(TYPEDSIGNATURES)
 
 Resolve one ion/element to a radius (Å) via the fallback chain: exact charge
 match, else nearest charge state, else bare element, else nothing.
@@ -175,7 +176,7 @@ struct _Miss end
 const _MISS = _Miss()
 
 """
-    _resolve_all(ions::AbstractVector{<:AbstractString}) -> Vector{Tuple{String,Union{Float64,Nothing}}}
+$(TYPEDSIGNATURES)
 
 Batch [`resolve_one`](@ref); input order and count preserved, repeats deduped
 per call. Each entry pairs the input string with its radius (Å) or nothing.
