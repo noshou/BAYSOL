@@ -25,7 +25,7 @@
 using BAYSOL
 using BAYSOL.Interfaces: Interfaces, RadiiSource
 using BAYSOL.MolecularStructure: MolecularStructure, Molecule
-using BAYSOL.Solvation.SASA: SASA
+using BAYSOL.SASA: SASA
 using BAYSOL.Geometry.Metrics: Metrics, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS, classify
 using Random, Printf, Statistics, DelimitedFiles
 

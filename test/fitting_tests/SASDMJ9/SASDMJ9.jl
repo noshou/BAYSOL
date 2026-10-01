@@ -1,10 +1,10 @@
-using   DelimitedFiles
-using   Statistics
-using   Random
-using   GLMakie
-using   BAYSOL
-using   BAYSOL.MolecularStructure: LocalPathSource
-using   BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+using DelimitedFiles
+using Statistics
+using Random
+using GLMakie
+using BAYSOL
+using BAYSOL.MolecularStructure: LocalPathSource
+using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDMJ9")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDMJ9.dat")
@@ -25,8 +25,9 @@ qvals = qvals ./ 10
 #                            Solution conditions
 # ---------------------------------------------------------------------------
 #
-# Source: Xiao et al. 2012, J. Virol. 86(6):3144-3157 ("FCoV Nsp7 and Nsp8
-# Form a 2:1 Heterotrimer..."), test/fixtures/experiments/SASDMJ9/xiao-et-al-2012-*.pdf.
+# Source: Xiao et al. 2012, J. Virol. 86(8):4444-4454 ("FCoV Nsp7 and Nsp8
+# Form a 2:1 Heterotrimer..."), DOI 10.1128/JVI.06635-11. Not open access
+# (© ASM, all rights reserved), so the PDF is not bundled with the fixtures.
 #
 # The buffer that matters here is the one used for the SEC step immediately
 # preceding SAXS ("SEC" paragraph, Materials and Methods):
@@ -42,13 +43,12 @@ qvals = qvals ./ 10
 #
 # X33 (EMBL BioSAXS, DORIS storage ring, DESY Hamburg) recorded at a stated
 # wavelength of 1.54 Å ("SAXS" paragraph) => energy = hc/λ ≈ 8051 eV
-# (hc = 12398.42 eV·Å). Sample temperature was stated explicitly as 20°C;
-# but we use 25 since 20 is not supported.
+# (hc = 12398.42 eV·Å). Sample temperature was stated explicitly as 20°C.
 
 const PH, σ_PH = 7.5, 0.1   # ±0.1 is a typical benchtop pH-meter precision
 
 const ENERGY_EV      = 12398.42 / 1.54   # ≈ 8051 eV, from X33's stated 1.54 Å wavelength
-const TEMPERATURE_C   = 25.0             # 20C is given in paper, but version only supports 20C
+const TEMPERATURE_C   = 20.0             # 20°C, stated in the paper
 const IONIC_STRENGTH_M = 0.200           # 200 mM NaCl, matches the SEC/SAXS buffer above
 
 # Nsp7 sequence, read directly off SASDMJ9_fit1_model1.pdb chain B (residues
@@ -57,7 +57,9 @@ const IONIC_STRENGTH_M = 0.200           # 200 mM NaCl, matches the SEC/SAXS buf
 # in chain B; the tag-free chain B sequence is used here as the dominant,
 # biologically relevant species (the paper itself describes the mature
 # protein, not the tag, as "Nsp7").
-const NSP7_SEQ = "KLTEMKCTNVVLLGLLSKMHVESNSKEWNYCVGLHNEINLCDDPDAVLEKLLALIAFFLSKHNTCDLSDLIESYFENTTILQ"
+const NSP7_SEQ = 
+    "KLTEMKCTNVVLLGLLSKMHVESNSKEWNYCVGLHNEINLCDDPDAVLEKLLALIAFFLS" *
+    "KHNTCDLSDLIESYFENTTILQ"
 
 # Average mass from NSP7_SEQ (ExPASy average residue masses + one water for
 # the terminal H/OH).
@@ -67,11 +69,21 @@ const NSP7_MOLARITY   = NSP7_CONC_MG_ML / NSP7_MW   # ≈ 0.504 mM
 const NSP7_MOLARITY_σ = 0.05 * NSP7_MOLARITY        # 5% relative: typical A280/mg-ml
 
 # Buffer components
+# Counter-ions (added 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
+# not list. Assumed: 10 mM Tris titrated with HCl -> Cl⁻ = C·0.859 (pK(22 °C) = 8.156). The pH is taken as
+# set at room temperature (22 ± 3 °C), which fixes the counter-ion amount whatever the measurement
+# temperature. pK(T) from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
+# 10.1063/1.1416902) pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.209 M. σ combines σ_PH, ±3 °C,
+# ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is modelled; the volume change of
+# the buffer's own (de)protonation is not. Titrant: not stated; HCl for amine bases (Tris, imidazole,
+# histidine), NaOH for Good's buffers.
 const SOLUTES = Solute[
-    Protein(NSP7_MOLARITY, NSP7_MOLARITY_σ, NSP7_SEQ),
+    # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
+    # electron density (see Fitting.Solute).
     NonBiological(0.200, 0.002,   "sodium chloride"),   # 200 mM NaCl, ±1%
     NonBiological(0.010, 0.0002,  "tris"),              # 10 mM Tris-HCl, ±2%
     NonBiological(0.005, 0.0001,  "dtt"),               # 5 mM DTT, ±2%
+    NonBiological(0.008588, 0.000422, "chloride"),   # Cl⁻ counter-ion from HCl titration of Tris (see note above)
 ]
 
 # ---------------------------------------------------------------------------
@@ -82,11 +94,10 @@ const Q_MAX_FIT    = 0.5
 
 # lMax follows the usual q·D_max multipole-resolution rule of thumb: D_max
 # for a roughly globular dimer with Rg = 19.11 Å is ~45-65 Å, and
-# Q_MAX_FIT * D_max ≈ 0.5 * 50 ≈ 25. (Tested lMax=50 to check whether the
-# q≈0.2-0.3 Å⁻¹ secondary maximum CRYSOL's fit shows.
+# Q_MAX_FIT * D_max ≈ 0.5 * 50 = 25.
 const LMAX = 25
 
-const ADD_HYDROGENS = true   # runs PDB2PQR at PH
+const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
@@ -102,22 +113,21 @@ function run_sasdmj9(; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer
     q_fit, I_fit, σ_fit = fit_subset()
 
     Random.seed!(seed)
-    s, μ_χ, σ_χ = BAYSOL.seed_model(
+    s = BAYSOL.seed_model(
         LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
-        ionic_strength_M = IONIC_STRENGTH_M, T = TEMPERATURE_C + 273.15,
     )
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
-    return res, μ_χ, σ_χ, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
+    return res, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
 end
 
-result, μ_χ, σ_χ, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdmj9()
+result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdmj9()
 
 fit, divergence_rate, map_result, quantile_result = result
 
 # `@__DIR__` (this SASDMJ9/ folder), not the caller's cwd.
 open(joinpath(@__DIR__, "res.txt"), "w") do io
-    BAYSOL.write_report(io, result; μ_χ = μ_χ, σ_χ = σ_χ, form_factor_log = form_factor_log, n_atoms = n_atoms)
+    BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
 """
@@ -130,13 +140,17 @@ all draws diverged) the quantile-curve envelope.
 function sasdmj9_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
+    # itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     fig = Figure(size = (700, 500))
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "divergence rate = $(round(divergence_rate; digits = 3))",
+
         xscale = log10,
         yscale = log10,
     )
@@ -156,16 +170,16 @@ function sasdmj9_figure(result, data)
         quantiles = curves["quantiles"]
 
         band!(
-            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), bounds[:, 3];
-            color = (:dodgerblue, 0.15), label = "bounds",
+            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
+            color = (:darkorange, 0.15), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = :darkorange, linewidth = 1.5, label = "quantiles",
         )
         lines!(
-            ax, quantiles[:, 1], quantiles[:, 3];
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5,
+            ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
+            linestyle = :dot, color = :darkorange, linewidth = 1.5,
         )
     end
 
@@ -189,7 +203,7 @@ function sasdmj9_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "MAP")
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -213,7 +227,7 @@ function sasdmj9_residuals_figure(result, data)
     q_fit, I_fit, σ_fit = data
 
     fig = Figure(size = (700, 400))
-    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)", title = "fit residuals")
+    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
 
     map_curve = map_result === nothing ? nothing : map_result[2]
 
@@ -225,15 +239,15 @@ function sasdmj9_residuals_figure(result, data)
 
         band!(
             ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = (:dodgerblue, 0.15), label = "bounds",
+            color = (:darkorange, 1), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = :darkorange, linewidth = 2.5, label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5,
+            linestyle = :dot, color = :darkorange, linewidth = 2.5,
         )
     end
 
@@ -247,27 +261,30 @@ function sasdmj9_residuals_figure(result, data)
         ylims!(ax, lo - pad, hi + pad)
     end
 
-    axislegend(ax; position = :lb, framevisible = false)
+    axislegend(ax; position = :rt, framevisible = false)
 
     return fig
 end
 
-# ξ = (dns, δρ1, δρ2, δρ3, c1)
 const _HIST_PARAMS = [
-    ("dns", "slvnt_e_dns"), ("δρ1", "delta_rho_1"), ("δρ2", "delta_rho_2"),
-    ("δρ3", "delta_rho_3"), ("c1", "excl_vol_corr"),
+    ("ρₑ", "slvnt_e_dns"), ("δρ₁", "delta_rho_1"), ("δρ₂", "delta_rho_2"),
+    ("δρ₃", "delta_rho_3"),
+    ("scale", "scale"), ("bkgrnd_corr", "bkgrnd_corr"),
+    ("c1", "excl_vol_corr"),
 ]
 
 """
-    sasdmj9_posterior_hist(result) -> Figure
+    sasdmj9_hist(result) -> Figure
 
 Histograms of the non-divergent posterior draws for each physical parameter
-`ξ = (dns, δρ1, δρ2, δρ3, c1)`, with the MAP draw marked.
 """
-function sasdmj9_posterior_hist(result)
+function sasdmj9_hist(result)
     fit, _, map_result, _ = result
     ok = .!getproperty.(fit.stats, :numerical_error)
     samples = fit.samples[ok]
+    c1_draws = fit.c1[ok]
+    scale_draws = fit.scale[ok]
+    bkgrnd_draws = fit.bkgrnd_corr[ok]
     map_params = map_result === nothing ? nothing : map_result[1]
 
     fig = Figure(size = (900, 550))
@@ -275,9 +292,18 @@ function sasdmj9_posterior_hist(result)
         row, col = fldmod1(i, 3)
         ax = Axis(
             fig[row, col], xlabel = label, ylabel = "count",
-            xticklabelrotation = label == "dns" ? π/2 : 0.0,
+            xticklabelrotation = π/2,
         )
-        hist!(ax, getindex.(samples, i); bins = 40, color = (:dodgerblue, 0.6))
+        draws = if label == "c1"
+            c1_draws
+        elseif label == "scale"
+            scale_draws
+        elseif label == "bkgrnd_corr"
+            bkgrnd_draws
+        else
+            getindex.(samples, i)
+        end
+        hist!(ax, draws; bins = 40, color = (:darkorange, 0.6))
         if map_params !== nothing
             vlines!(ax, [map_params[map_key]]; color = :crimson, linewidth = 2)
         end
@@ -287,13 +313,17 @@ function sasdmj9_posterior_hist(result)
 end
 
 """
-    sasdmj9_crysol_comparison_figure(result, data) -> Figure
+    sasdmj9_comparison_figure(result, data) -> Figure
 
 Overlays our MAP curve against the reference CRYSOL fit.
 """
-function sasdmj9_crysol_comparison_figure(result, data)
+function sasdmj9_comparison_figure(result, data)
     _, _, map_result, _ = result
     q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
+    # itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     crysol   = readdlm(_FIT_PATH; skipstart = 1)
     q_crysol = Float64.(crysol[:, 1])
@@ -305,7 +335,6 @@ function sasdmj9_crysol_comparison_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "BAYSOL MAP vs. CRYSOL fit1 (paper)",
         xscale = log10,
         yscale = log10,
     )
@@ -322,15 +351,15 @@ function sasdmj9_crysol_comparison_figure(result, data)
 
     lines!(
         ax, q_crysol[keep], I_crysol[keep];
-        color = :seagreen, linewidth = 2, linestyle = :dash, label = "CRYSOL fit1",
+        color = :mediumturquoise, linewidth = 2, linestyle = :dash, label = "CRYSOL fit1",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "BAYSOL MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "BAYSOL MAP")
     end
 
-    axislegend(ax; position = :lt, framevisible = false)
+    axislegend(ax; position = :lb, framevisible = false)
 
     lo, hi = extrema(I_fit)
     ylims!(ax, lo * 0.7, hi * 1.3)
@@ -339,16 +368,16 @@ function sasdmj9_crysol_comparison_figure(result, data)
 end
 
 fig = sasdmj9_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res.png"), fig)
+save(joinpath(@__DIR__, "res.png"), fig; px_per_unit = 3.5)
 
 fig_residuals = sasdmj9_residuals_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals)
+save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals; px_per_unit = 3.5)
 
-fig_hist = sasdmj9_posterior_hist(result)
-save(joinpath(@__DIR__, "res_hist.png"), fig_hist)
+fig_hist = sasdmj9_hist(result)
+save(joinpath(@__DIR__, "res_hist.png"), fig_hist; px_per_unit = 3.5)
 
-fig_crysol = sasdmj9_crysol_comparison_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_crysol_comparison.png"), fig_crysol)
+fig_crysol = sasdmj9_comparison_figure(result, (q_fit, I_fit, σ_fit))
+save(joinpath(@__DIR__, "res_comparison.png"), fig_crysol; px_per_unit = 3.5)
 
 "Display the SASDMJ9 fit figure. Blocks until the window is closed."
 vis_sasdmj9() = wait(display(fig))

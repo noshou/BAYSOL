@@ -4,7 +4,7 @@ using .SphFuncs: sphHarm, sphBess
 using FastClosures: @closure
 
 """
-    _deg_contrib(f_t, j_deg, Y_l) -> AbstractMatrix{<:Number}
+$(TYPEDSIGNATURES)
 
 Per-degree B_lm contribution: Y_l * (f_t' .* j_deg)'.
 
@@ -40,7 +40,7 @@ function _deg_contrib(
 end
 
 """
-    partial_wave_weights(lMax) -> Vector{Float64}
+$(TYPEDSIGNATURES)
 
 ±m symmetry weights: m = 0 -> 1, m > 0 -> 2.
 
@@ -92,8 +92,7 @@ function partial_wave_weights(lMax::Integer)::Vector{Float64}
 end
 
 """
-    compute_B_lm(coords_sph, qvals, f_atoms, lMax; _CHUNK, backend=Array)
-    -> AbstractArray{<:Complex,3}
+$(TYPEDSIGNATURES)
 
 Compute `B_lm(q) = Σ_i f_atoms[i](q) * j_l(q*r_i) * conj(Y_lm(θ_i, φ_i))`.
 
@@ -209,7 +208,7 @@ function compute_B_lm(
 end
 
 """
-    self_scatter(B_lm, weights) -> AbstractVector{<:Real}
+$(TYPEDSIGNATURES)
 
 S(q) = 4π * Σ_c Σ_lm w_lm * |B_lm(q)|².
 
@@ -237,7 +236,7 @@ function self_scatter(
 end
 
 """
-    cross_scatter(B_lm_a, B_lm_b, weights) -> AbstractVector{<:Real}
+$(TYPEDSIGNATURES)
 
 S(q) = 4π * Σ_c Σ_lm w_lm * Re(B_a(q) * conj(B_b(q))).
 

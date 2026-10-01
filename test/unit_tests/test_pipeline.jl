@@ -19,7 +19,7 @@ const _PIPELINE_FIXTURE = joinpath(@__DIR__, "..", "fixtures", "molecules", "1CR
 
     @test isfile(_PIPELINE_FIXTURE)
 
-    # Clear any stale cache entries from a previous run so the PROPKA/PDB2PQR
+    # Clear any stale cache entries from a previous run so the PROPKA/Pdb2pqr
     # steps below are guaranteed to run fresh, not reuse leftovers.
     stem = "1CRN-TEST"
     rm(joinpath(_store_dir(), "$(stem).pka"); force = true)

@@ -1,100 +1,69 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/Fitting/Priors/DeltaRho.jl: the fixed dro1/dro2 priors and the
-# dro3 = Normal(μ_χ, σ_χ) cavity-water contrast δρ_prior builds per call.
+# Exercises src/Fitting/DeltaRho.jl: the κ-parameterised bounded-Beta
+# δρ₁/δρ₂/δρ₃ priors.
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.Fitting: δρ_prior
-using Distributions: LogNormal, Normal, mean, std, quantile
-
-const FIT = BAYSOL.Fitting
+using BAYSOL.Constants: DRO_UNIT, DRO_BOUNDS, φ_max, DRO12_CONCENTRATION, DRO3_CONCENTRATION
+using Distributions: LocationScale, Continuous, Beta, mode, var, cdf, params, minimum, maximum
+using StaticArrays: SVector
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 
+const ρ̄ = 0.3346
+const BB = LocationScale{Float64,Continuous,Beta{Float64}}
+
 @testset "DeltaRho" begin
 
-    #------------------------------------------------------------------
-    #                 δρ_prior -- return shape and types
-    #------------------------------------------------------------------
-
-    @testset "δρ_prior: returns a 3-tuple of the documented distribution types" begin
-        out = δρ_prior(μ_χ = 0.0, σ_χ = 0.3)
-        @test out isa Tuple{LogNormal,Normal,Normal}
-        dro1, dro2, dro3 = out
-        @test dro1 isa LogNormal
-        @test dro2 isa Normal
-        @test dro3 isa Normal
+    @testset "δρ_prior: returns three Float64 bounded Betas" begin
+        out = δρ_prior(DRO12_CONCENTRATION, DRO3_CONCENTRATION, ρ̄)
+        @test out isa Tuple{BB,BB,BB}
     end
 
-    #------------------------------------------------------------------
-    #                 dro1 -- fixed convex-bead prior
-    #------------------------------------------------------------------
-
-    @testset "dro1: median ρ = 1, mean pulled up to 1.15 by right-skew" begin
-        dro1, _, _ = δρ_prior()
-        @test close_(quantile(dro1, 0.5), 1.0)
-        @test close_(mean(dro1), 1.15)
-        # dro1 is the same object on every call
-        dro1_b, _, _ = δρ_prior(μ_χ = 3.7, σ_χ = 9.0)
-        @test dro1 === dro1_b
-    end
-
-    #------------------------------------------------------------------
-    #                 dro2 -- fixed concave-bead prior
-    #------------------------------------------------------------------
-
-    @testset "dro2: Normal(1, 0.15), fixed regardless of arguments" begin
-        _, dro2, _ = δρ_prior()
-        @test close_(mean(dro2), 1.0)
-        @test close_(std(dro2), 0.15)
-        _, dro2_b, _ = δρ_prior(μ_χ = -4.0, σ_χ = 2.0)
-        @test dro2 === dro2_b
-    end
-
-    #------------------------------------------------------------------
-    #                 dro3 -- cavity-water contrast, built from the arguments
-    #------------------------------------------------------------------
-
-    @testset "dro3: Normal(μ_χ, σ_χ), tracking whatever is passed in" begin
-        for (μ_χ, σ_χ) in ((0.0, 1.0), (1.15, 0.3), (-2.0, 0.05), (5.0, 10.0))
-            _, _, dro3 = δρ_prior(μ_χ = μ_χ, σ_χ = σ_χ)
-            @test close_(mean(dro3), μ_χ)
-            @test close_(std(dro3), σ_χ)
+    @testset "δρ₁/δρ₂: support is CRYSOL's [-10, 2], mode at 1, for any κ" begin
+        for κ in (0.5, 2.0, 14.0, 100.0)
+            d1, d2, _ = δρ_prior(κ, 1.0, ρ̄)
+            @test d1 == d2
+            @test (minimum(d1), maximum(d1)) == DRO_BOUNDS
+            @test close_(d1.μ + d1.σ * mode(d1.ρ), 1.0)
+            @test close_(sum(params(d1.ρ)) - 2, κ)                 # κ = α + β - 2
+            # the variance formula in the docstring
+            σ²u = (1 + 11κ / 12) * (1 + κ / 12) / ((κ + 2)^2 * (κ + 3))
+            @test close_(var(d1), 144σ²u)
         end
     end
 
-    @testset "dro3: defaults are μ_χ = 0, σ_χ = 0 -- a point mass at 0, matching standard CRYSOL's dr3 = 0" begin
-        _, _, dro3 = δρ_prior()
-        @test mean(dro3) == 0.0
-        @test std(dro3) == 0.0
-        # a point mass always samples its own mean -- dro3 genuinely collapses
-        # to exactly 0 by default, it isn't merely centred there
-        @test all(==(0.0), rand(dro3, 8))
+    @testset "δρ₁/δρ₂: default κ gives SD ≈ 1" begin
+        d1, _, _ = δρ_prior(DRO12_CONCENTRATION, DRO3_CONCENTRATION, ρ̄)
+        @test 0.99 < sqrt(var(d1)) < 1.01
     end
 
-    @testset "dro3: σ_χ = 0 (default or explicit) collapses to a point mass at whatever μ_χ is" begin
-        _, _, dro3 = δρ_prior(μ_χ = 2.5)   # σ_χ left at its default
-        @test std(dro3) == 0.0
-        @test mean(dro3) == 2.5
-        @test all(==(2.5), rand(dro3, 8))
-
-        _, _, dro3_b = δρ_prior(μ_χ = 2.5, σ_χ = 0.0)   # same thing, spelled explicitly
-        @test mean(dro3_b) == 2.5
-        @test std(dro3_b) == 0.0
+    @testset "δρ₃: support is [-ρ̄ₑ/DRO_UNIT, (φ_max - 1)ρ̄ₑ/DRO_UNIT], mode at 0" begin
+        for κ in (0.5, 1.25, 10.0)
+            _, _, d3 = δρ_prior(1.0, κ, ρ̄)
+            @test close_(minimum(d3), -ρ̄ / DRO_UNIT)
+            @test close_(maximum(d3), (φ_max - 1) * ρ̄ / DRO_UNIT)
+            @test close_(d3.μ + d3.σ * mode(d3.ρ), 0.0; atol = 1e-12)
+            @test close_(φ_max * mode(d3.ρ), 1.0)
+            @test close_(sum(params(d3.ρ)) - 2, κ)
+            σ²u = (1 + κ / φ_max) * (1 + (1 - 1 / φ_max) * κ) / ((κ + 2)^2 * (κ + 3))
+            @test close_(var(d3), (φ_max * ρ̄ / DRO_UNIT)^2 * σ²u)
+        end
     end
 
-    @testset "dro3: negative σ_χ is rejected by the underlying Normal" begin
-        @test_throws DomainError δρ_prior(μ_χ = 0.0, σ_χ = -1.0)
-        @test_throws DomainError δρ_prior(μ_χ = 0.0, σ_χ = -0.01)
+    @testset "δρ₃: default κ gives Beta(2, 1.25) on the unit interval" begin
+        _, _, d3 = δρ_prior(DRO12_CONCENTRATION, DRO3_CONCENTRATION, ρ̄)
+        @test all(close_.(params(d3.ρ), (2.0, 1.25)))
+        # partially and nearly empty cavities stay reachable
+        @test 0.15 < cdf(d3.ρ, 0.5 / φ_max) < 0.3
+        @test 0.01 < cdf(d3.ρ, 0.2 / φ_max) < 0.1
     end
 
-    @testset "dro3: μ_χ and σ_χ are independent keywords, each defaulting to 0" begin
-        a = δρ_prior()
-        b = δρ_prior(μ_χ = 0.0)
-        c = δρ_prior(μ_χ = 0.0, σ_χ = 0.0)
-        @test mean(a[3]) == mean(b[3]) == mean(c[3])
-        @test std(a[3]) == std(b[3]) == std(c[3])
+    @testset "δρ_prior: non-positive κ or ρ̄ₑ throws DomainError" begin
+        @test_throws DomainError δρ_prior(0.0, 1.0, ρ̄)
+        @test_throws DomainError δρ_prior(1.0, -1.0, ρ̄)
+        @test_throws DomainError δρ_prior(1.0, 1.0, 0.0)
     end
-
 end

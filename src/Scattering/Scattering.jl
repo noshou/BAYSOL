@@ -169,9 +169,10 @@ averaged detector intensity I_calc(q) out.
 module Scattering
 
 using ..FormFactor: FormFactor, FormFactorSource, FormFactorSourceTables
-using ..Solvation.SASA: SASA
+using ..SASA: SASA
 using ..BAYSOL_Utils.Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
 using StaticArrays: SVector
+using DocStringExtensions
 
 # The public surface. forward is the forward model; gram_matrix is the
 # geometry-only pass to cache when sweeping fit parameters. Everything the

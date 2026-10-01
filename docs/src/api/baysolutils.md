@@ -1,7 +1,7 @@
 # BAYSOL_Utils
 
 Shared infrastructure used across the rest of the package: physical/numeric
-constants and the lazy-value cache primitive.
+constants, the lazy-value cache primitives, and per-stage run timing.
 
 ## Constants
 
@@ -13,4 +13,10 @@ Modules = [BAYSOL.Constants]
 
 ```@autodocs
 Modules = [BAYSOL.Cache]
+```
+
+## Timing
+
+```@autodocs
+Modules = [BAYSOL.Timing]
 ```

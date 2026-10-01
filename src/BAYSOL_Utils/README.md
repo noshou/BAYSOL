@@ -6,23 +6,24 @@ Leaf-level shared utilities
 module BAYSOL_Utils
     include("Constants.jl")
     include("Cache.jl")
+    include("Timing.jl")
     using .Constants: Constants
     using .Cache:     Cache
+    using .Timing:    Timing
 end
 ```
 
-src/BAYSOL.jl re-exports Constants and Cache at the top level
-(BAYSOL.Constants, BAYSOL.Cache).
+src/BAYSOL.jl re-exports Constants, Cache and Timing at the top level
+(BAYSOL.Constants, BAYSOL.Cache, BAYSOL.Timing).
 
 ## Constants.jl
 
 A flat leaf module of const primitives, grouped by comment header into:
 
 - **Floating-point accuracy**  `DEFAULT_ATOL = 1.0e-9`
-- **Forward-model constants** `SHELL_THICKNESS` (3.0 Å hydration-shell thickness, CRYSOL's border-layer default), `PROBE_RADIUS` (1.4 Å water probe, forwarded to [`Solvation.SASA.shell_points`](@ref BAYSOL.Solvation.SASA.shell_points)), `SHELL_N_TARGET` (nothing by default, lets [`Solvation.SASA.shell_points`](@ref BAYSOL.Solvation.SASA.shell_points) size the hydration-shell dummy cloud from accessible area instead of a fixed count), `DRO_UNIT` (0.03 e·Å⁻³, CRYSOL's --dro shell-contrast unit), `B_LM_CHUNK` (`UInt64(2048)`, atoms/dummies per pass in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm)).
-- **Physical constants**  `AVOGADRO`, `ELEMENTARY_CHARGE`, `VACUUM_PERMITTIVITY`, `BOLTZMANN`, `ANGSTROM` (metres per Å), `MV_PER_CM`; plus two domain-derived constants: `PHOSPHATE_NET_CHARGE` (-0.24 e, the Manning-condensation-reduced net charge of a B-DNA phosphate group, derived in the docstring from Laage/Elsaesser/Hynes 2017 §5.1) and `BOND_CUTOFF` (1.75 Å covalent-bond distance cutoff, used as the only connectivity proxy available since Molecule carries no bonding table).
-- **Electrostatics/solution** `IONIC_STRENGTH_M` (0.15 mol/L, [`Solvation.Electrostatics.debye_length`](@ref BAYSOL.Solvation.Electrostatics.debye_length)'s default ionic strength), `WATER_EPS_R` (80.0, water's relative permittivity), `DEBYE_TEMPERATURE_K` (300.0 K), `CUTOFF_DEBYE_LENGTHS` (5.0; charge sites beyond this many Debye lengths from a bead are dropped from screened-electrostatic aggregation, since exp(-5) ≈ 0.007 is already negligible next to the screened 1/r prefactor).
-- **Sampler defaults** `DEFAULT_TEMPERATURE_C` (25.0°C, the solution-temperature default for `_ρₑ`/[`Fitting.ρₑ_prior`](@ref BAYSOL.Fitting.ρₑ_prior)'s bulk electron density calculation and `C1_PRIOR_MASS_PERCENT` (the default percentage of [`Fitting.c1_prior`](@ref BAYSOL.Fitting.c1_prior)'s prior mass required to fall within CRYSOL's bound [0.96, 1.04] around `c_1` = 1).
+- **Forward-model constants** `SHELL_THICKNESS` (3.0 Å hydration-shell thickness, CRYSOL's border-layer default), `PROBE_RADIUS` (1.4 Å water probe, forwarded to [`SASA.shell_points`](@ref BAYSOL.SASA.shell_points)), `SHELL_N_TARGET` (nothing by default, lets [`SASA.shell_points`](@ref BAYSOL.SASA.shell_points) size the hydration-shell dummy cloud from accessible area instead of a fixed count), `N_VOL_SHELL` (2145 quasi-random points per atom for the power-diagram excluded-volume estimate in `MolecularStructure.excluded_volume`), `DRO_UNIT` (0.03 e·Å⁻³, CRYSOL's --dro shell-contrast unit), `B_LM_CHUNK` (`UInt64(2048)`, atoms/dummies per pass in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm)).
+- **Physical constants**  `AVOGADRO`.
+- **Sampler defaults** `DEFAULT_TEMPERATURE_C` (25.0°C, the default sample temperature for `_ρₑ`/[`Fitting.ρₑ_prior`](@ref BAYSOL.Fitting.ρₑ_prior)'s bulk electron density calculation; pass the real one), `PMV_REFERENCE_TEMPERATURE_C` (25.0°C, the temperature the partial-molar-volume tables are tabulated at) and `PMV_FRACTIONAL_EXPANSIBILITY` (3.0 × 10⁻³ K⁻¹, the bound used to widen a solute's 25°C ϕ° uncertainty away from 25°C; derivation in its docstring). `c1` is no longer a sampled parameter with its own prior — it is profiled out per posterior draw by [`Fitting.profiled_corrs`](@ref BAYSOL.Fitting.profiled_corrs) over `EXCL_VOL_CORR_BOUNDS = (cmin=0.8, cmax=1.3)`, searched with an `EXCL_VOL_CORR_EPS = 0.02` padding/grid-step (see [`Fitting.profiled_corrs`](@ref BAYSOL.Fitting.profiled_corrs)'s own docstring for the exact search and the grid-size formula, `((cmax+eps)-(cmin-eps))/eps + 1`, if tuning `eps` away from the default). Hydration-shell prior constants: `DRO_BOUNDS = (-10, 2)` (CRYSOL3's δρ₁/δρ₂ fitting limits), `φ_max = 1.25` (upper bound on cavity occupancy, fixing δρ₃'s upper bound), and the Beta-prior concentrations `DRO12_CONCENTRATION = 14` and `DRO3_CONCENTRATION = 1.25` (see [`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)).
 
 ### Usage
 
@@ -31,9 +32,6 @@ Downstream modules using individual constants by name, e.g.:
 ```Julia
 # src/Scattering/Scattering.jl
 using ..BAYSOL_Utils.Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK
-
-# src/Solvation/Electrostatics.jl
-using ...BAYSOL_Utils.Constants: ELEMENTARY_CHARGE, VACUUM_PERMITTIVITY, BOLTZMANN, BOND_CUTOFF, ...
 
 # src/PartialMolarVolumes/PMV.jl
 using ..BAYSOL_Utils.Constants: AVOGADRO
@@ -106,3 +104,8 @@ const _ϕ°_s_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 const _ϕ°_d_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 const _ϕ°_r_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 ```
+
+## Timing.jl
+
+`StageLog` records wall-clock, JIT-compile and GC seconds per named stage of a run. `seed_model` creates one (so the wall clock starts at the top of `seed_model`), hands it to `forward_cache(...; stage_log=)` and `seed_fitting(...; timing=)`, and it rides in `Seed.timing` → `FitResult.timing`. `write_report` ends with a `=== Timing ===` section (static build vs sampling, per-stage, plus `report write` and `unaccounted`) and starts with `=== Run ===` (n_atoms, lMax, n_q, n_samples, n_adapt). Everything is a no-op when the log is `nothing`. `unaccounted` on a cold session is first-call JIT of `run_model`/`run_fitting`/`write_report`, which compiles before their own stages begin; the `(JIT)` column on that line shows it.
+

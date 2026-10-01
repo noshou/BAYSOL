@@ -40,7 +40,7 @@ using   BAYSOL.Scattering: _gaussian_dummy, vacuo, excluded, hydration, SHELL_TH
 using   BAYSOL.MolecularStructure: create, coords_cartesian, coords_spherical, to_spherical,
         radii, vols, elms, Molecule
 
-using BAYSOL.Solvation: SASA
+using BAYSOL: SASA
 using BAYSOL.FormFactor: FormFactor
 
 """

@@ -2,7 +2,7 @@
 
 Domain-agnostic geometric primitives (`src/Geometry/`): low-discrepancy
 point sequences and the pairwise-sphere shortcuts/tests built on them.
-Independent of `Solvation`/`MolecularStructure` -- `Solvation.SASA` is a
+Independent of `SASA`/`MolecularStructure` -- `SASA` is a
 consumer, not the only one.
 
 ```@autodocs

@@ -1,10 +1,10 @@
-using   DelimitedFiles
-using   Statistics
-using   Random
-using   GLMakie
-using   BAYSOL
-using   BAYSOL.MolecularStructure: LocalPathSource
-using   BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+using DelimitedFiles
+using Statistics
+using Random
+using GLMakie
+using BAYSOL
+using BAYSOL.MolecularStructure: LocalPathSource
+using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDN32")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "SASDN32_fit1.dat")
@@ -19,17 +19,6 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDN32_fit1_model1.pdb")
 #   # offset = ..., scaling c = ..., Chi^2 = ...
 #   #  q       exp_intensity   model_intensity error
 # i.e. 3 comment/header lines, then 1211 data rows in columns
-# (q, exp_intensity, model_intensity, error) -- this is itself a CRYSOL/FoXS-
-# style four-column fit file (SASBDB's own reference fit), reused here as the
-# plain experimental-curve source: we read columns 1/2/4 (q, exp_intensity,
-# error) and ignore column 3 (model_intensity, someone else's fit, not ours).
-# No separate CRYSOL/FoXS reference-fit file is bundled for this case (unlike
-# SASDMJ9's `.fit`), so -- as instructed -- there is no CRYSOL-comparison
-# plot/function below (column 3 of this same .dat *is* someone else's model
-# curve, but we deliberately don't build a comparison figure around it).
-# q is already in Å⁻¹ (q_max ≈ 0.3455 Å⁻¹, consistent with the paper's stated
-# SEC-SAXS q range of 0.005-0.35 Å⁻¹, see below) -- no nm⁻¹→Å⁻¹ conversion
-# needed, unlike SASDMJ9.
 raw = readdlm(_DATA_PATH; skipstart = 3)
 
 qvals   = Float64.(raw[:, 1])
@@ -43,80 +32,33 @@ I_exp   = Float64.(raw[:, 2])
 # Source: Cerqueira et al. 2022, J. Biol. Chem. 298(5):101896, "Sas20 is a
 # highly flexible starch-binding protein in the Ruminococcus bromii
 # cell-surface amylosome", test/fixtures/experiments/SASDN32/PIIS0021925822003362.pdf.
-# This is the SAME paper backing sibling case SASDMZ9 (test/fitting_tests/SASDMZ9/),
-# but a DIFFERENT one of its six SASBDB entries and a DIFFERENT construct.
 #
 # The paper's "Data availability" paragraph (p.16) lists six SASBDB
-# accessions for its SEC-SAXS runs -- SASDMX9, SASDMY9, SASDMZ9, SASDN22,
-# SASDN32, SASDN42 -- one per construct/ligand condition. SASDMZ9 was
-# identified (see that script) as Sas20d1-2 apo (the full two-domain
-# construct, no ligand). SASDN32 is a DISTINCT entry/construct, identified
-# here as **Sas20d2 (domain 2 of Sas20) WITH 5 mM maltoheptaose bound**:
-#
-#   * Sequence match: the 245-residue sequence read off
-#     SASDN32_fit1_model1.pdb (below) is an EXACT substring of the tail of
-#     SASDMZ9's own Sas20d1-2 sequence (SASDMZ9_fit1_model1.pdb chain A,
-#     residues 32-555) -- i.e. this construct is the C-terminal domain of
-#     the same two-domain protein, matching the paper's own domain split
-#     (Sas20d1 = N-terminal CBM26-like domain, Sas20d2 = C-terminal domain;
-#     "Discussion", p.11-12).
-#   * Structural extent: the maximum pairwise heavy-atom distance computed
-#     directly from SASDN32_fit1_model1.pdb's own coordinates is ≈ 74.1 Å
-#     (see LMAX below), matching Table 4's (p.10) "Sas20d2 + maltoheptaose"
-#     row almost exactly: Rg = 20.8 ± 0.04 Å, D_max(solution) = 74 Å,
-#     D_max(model) = 67.5 Å, SAXS MW = 25.9 kDa -- as against the apo
-#     "Sas20d2" row's D_max(solution) = 78 Å / Rg = 23.1 Å. (Sas20d2 itself
-#     was never crystallized -- the paper instead fit the SAXS data with a
-#     Phyre2-generated homology model built from the Sca5X25-2 crystal
-#     structure, p.9-10 -- which is presumably the origin of this bundled
-#     PDB "model1"; the absence of HETATM ligand atoms in the file just
-#     reflects that it's a protein-only structural model, NOT that the
-#     underlying SAXS sample was ligand-free.)
-#   * SASBDB entry metadata itself (sasbdb.org/data/SASDN32/, fetched
-#     directly): "Dockerin domain-containing protein, starch adherence
-#     system 20 (Sas20), domain 2"; UniProt A0A2N0URA4; monomer; MW 25.9 kDa
-#     (experimental ≈ 26 kDa); buffer "phosphate buffered saline, 1 mM
-#     TCEP, pH 7"; 23°C; protein concentration 10.00 mg/ml; ligand
-#     maltoheptaose; BioCAT 18ID (APS, Argonne), λ = 0.1033 nm,
-#     sample-detector distance 3.6 m; Rg = 2.1 nm (21 Å), D_max = 7.4 nm
-#     (74 Å) -- all consistent with the "+ maltoheptaose" row above, not the
-#     apo row.
-#   * The paper's own text confirms the 5 mM maltoheptaose concentration
-#     used for this specific SEC-SAXS run, in the Figure 5 caption (p.11):
-#     "SAXS scattering profile (points) and MultiFoXS fit (black line) for
-#     ... Sas20d2 with 5 mM maltoheptaose"; and separately (p.9-10,
-#     "Sas20 domains are flexible and extended in solution") states the SEC-
-#     SAXS experiments were run "with and without maltoheptaose" for both
-#     Sas20d1 and Sas20d2 (Table S4, not bundled).
+# accessions for its SEC-SAXS runs: SASDMX9, SASDMY9, SASDMZ9, SASDN22,
+# SASDN32, SASDN42.
 #
 # Buffer: same generic SEC-SAXS Materials & Methods paragraph as SASDMZ9
-# (p.16, "SEC–SAXS experiments") applies -- BioCAT 18ID, in-line SEC-SAXS,
-# Superdex 200 Increase 10/300 GL, 0.6 ml/min, q range 0.005-0.35 Å⁻¹
-# (matching this file's q_max above). The buffer composition itself comes
-# from SASBDB's "phosphate buffered saline, 1 mM TCEP, pH 7" (see above),
-# combined with the paper's own explicit PBS recipe stated elsewhere (p.14,
-# "Growth and proteomic analysis of R. bromii"): "PBS (137 mM NaCl, 2.7 mM
-# KCl, 10 mM Na2HPO4, and 1.8 mM KH2PO4 [pH = 7.4])" -- SASBDB rounds this
-# to "pH 7" for the SAXS sample specifically; pH = 7.0 (SASBDB's stated
-# value) is used here over the paper's generic PBS-recipe pH 7.4, since
-# it's the more specific figure for this measurement (same reasoning as
-# SASDMZ9).
+# (p.16, "SEC–SAXS experiments") applies.
 
-const PH, σ_PH = 7.0, 0.1   # ±0.1 is a typical benchtop pH-meter precision
+# pH: the PBS recipe quoted above (p.14, pH 7.4) is from the paper's cell-washing / mass-spec methods, not
+# the SAXS section, which names no buffer. The SAXS buffer is only given by SASBDB ('phosphate buffered
+# saline, 1 mM TCEP, pH 7'), so pH 7.0 is used. The recipe's NaCl/KCl and total phosphate (11.8 mM) are
+# kept; the phosphate is re-split at pH 7.0 (HPO4²⁻ fraction 0.592): pK2 from Goldberg, Kishore & Lennen
+# 2002 (DOI 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol, ΔCp −230 J/K/mol) at 22 °C, Davies-corrected at I ≈
+# 0.166 M (pK2' ≈ 6.84). The 1.8 mM KH2PO4 is kept as the K⁺ carrier and the rest is sodium phosphate.
+const PH, σ_PH = 7.0, 0.1   # SASBDB; ±0.1 is a typical benchtop pH-meter precision
 
-const ENERGY_EV       = 12398.42 / 1.033   # ≈ 12001 eV, from SASBDB's stated λ = 0.1033 nm = 1.033 Å
-const TEMPERATURE_C    = 25.0              # 23°C stated (SASBDB); 25 used, close enough and matches BAYSOL's defaults
-const IONIC_STRENGTH_M = 0.171             # PBS ionic strength, identical buffer recipe to SASDMZ9 -- see its
-                                            # comment for the I = 0.5 * Σ cᵢzᵢ² derivation (≈ 0.1715 M)
+const ENERGY_EV       = 12398.42 / 1.033 # ≈ 12001 eV, from SASBDB's stated λ = 0.1033 nm = 1.033 Å
+const TEMPERATURE_C    = 23.0            # 23°C, SASBDB
+const IONIC_STRENGTH_M = 0.171           # PBS ionic strength, identical buffer recipe to SASDMZ9 
 
-# Sas20d2 sequence, read directly off SASDN32_fit1_model1.pdb (single,
-# unlabeled chain -- the ATOM records carry a blank chain identifier, and
-# there is exactly one MODEL/ENDMDL block), residues 311-555 (full-length
-# Sas20d1-2 numbering, 245 contiguous residues, no gaps, no HETATM). This
-# span is an exact substring of SASDMZ9's SAS20D1_2_SEQ tail (confirmed by
-# direct string comparison), i.e. this construct is domain 2 of the same
-# two-domain protein modelled in full by SASDMZ9.
-const SAS20D2_SEQ = "ADATQYVVAGVESLTGYEWQGSPALAPENVMTKSGDVYTKTFTAVPVGKSYQLKVVANTGDEQKWIGLDGTDNNVTFDVESACDVTVTFNPATNEIAVTGDGVKMVTDLEINSITVVGNGENSWLNGVAWGVDAEVNHMTQIADKVYQITYTGVESADAAYQFKFAVNDDWAANWGLPEQSAATIGEDFDLTFNGENMLLNTVSAGYPEDSLVDVTITLDLTKFDYPSRSGAKANIKIDGNRVLL"
+# Sas20d2 sequence, read directly off SASDN32_fit1_model1.pdb
+const SAS20D2_SEQ = 
+    "ADATQYVVAGVESLTGYEWQGSPALAPENVMTKSGDVYTKTFTAVPVGKSYQLKVVANTG" *
+    "DEQKWIGLDGTDNNVTFDVESACDVTVTFNPATNEIAVTGDGVKMVTDLEINSITVVGNG" *
+    "ENSWLNGVAWGVDAEVNHMTQIADKVYQITYTGVESADAAYQFKFAVNDDWAANWGLPEQ" *
+    "SAATIGEDFDLTFNGENMLLNTVSAGYPEDSLVDVTITLDLTKFDYPSRSGAKANIKIDG" *
+    "NRVLL"
 
 # Average mass from SAS20D2_SEQ (ExPASy average residue masses + one water
 # for the terminal H/OH); ≈ 26.32 kDa, matching Table 4's Sas20d2 sequence
@@ -131,29 +73,21 @@ const SAS20D2_MOLARITY_σ = 0.05 * SAS20D2_MOLARITY           # 5% relative: typ
 # solution-conditions discussion above) plus the 5 mM maltoheptaose ligand
 # this entry was collected with.
 #
-# All buffer salts cross-checked against
-# src/PartialMolarVolumes/NonBiological/common_to_iupac.json (case-
-# insensitive) and its sibling .tsv -- "sodium chloride", "potassium
-# chloride", "disodium hydrogen phosphate", "potassium dihydrogen
-# phosphate", and "tcep" are all present with real data.
-#
-# MISSING FROM PMV LOOKUP: maltoheptaose. Neither "maltoheptaose" nor any
-# synonym appears in common_to_iupac.json or the sibling .tsv (only
-# "maltose" and "maltotriose" are present -- no 7-unit malto-oligosaccharide
-# entry). Adding it as a NonBiological solute would error out of
-# PartialMolarVolumes.ϕ°, so -- following the same precedent as SASDZC6's
-# omitted udenafil -- it is simply left out of SOLUTES below rather than
-# stubbed in. Unlike SASDZC6's 3 μM inhibitor, 5 mM maltoheptaose is not
-# negligible next to the 137 mM NaCl / 10 mM phosphate buffer components,
-# so this is a real, if unavoidable, gap in the excluded-volume accounting
-# for this case (no PMV data exists for this ligand to do otherwise).
+# maltoheptaose: V0 = 694.8 ± 5.8 cm³/mol (Hourston 1967 PhD thesis,
+# Table 6.1, 25 °C, measured from the partial specific volume 0.600 ±
+# 0.005 mL/g); it now resolves in src/PartialMolarVolumes/NonBiological.
+# 5 mM is not negligible next to the 137 mM NaCl / 10 mM phosphate buffer
+# components, so it is included (previously omitted because no entry existed).
 const SOLUTES = Solute[
-    Protein(SAS20D2_MOLARITY, SAS20D2_MOLARITY_σ, SAS20D2_SEQ),
+    # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
+    # electron density (see Fitting.Solute).
     NonBiological(0.137,  0.00137,   "sodium chloride"),               # 137 mM NaCl, ±1%
     NonBiological(0.0027, 0.000027,  "potassium chloride"),            # 2.7 mM KCl, ±1%
-    NonBiological(0.010,  0.0002,    "disodium hydrogen phosphate"),   # 10 mM Na2HPO4, ±2%
-    NonBiological(0.0018, 0.000036,  "potassium dihydrogen phosphate"),# 1.8 mM KH2PO4, ±2%
+    NonBiological(0.001800, 0.000036, "potassium dihydrogen phosphate"),   # PBS phosphate at pH 7.0, H2PO4⁻ part
+    NonBiological(0.003014, 0.000988, "sodium dihydrogen phosphate"),   # PBS phosphate at pH 7.0, H2PO4⁻ part
+    NonBiological(0.006986, 0.000993, "disodium hydrogen phosphate"),   # PBS phosphate at pH 7.0, HPO4²⁻ part
     NonBiological(0.001,  0.00002,   "tcep"),                          # 1 mM TCEP, ±2%
+    NonBiological(0.005,  0.0001,    "maltoheptaose"),                 # 5 mM maltoheptaose ligand, ±2%
 ]
 
 # ---------------------------------------------------------------------------
@@ -173,7 +107,7 @@ const Q_MAX_FIT    = 0.3
 # 0.3 * 74.1 ≈ 22.2.
 const LMAX = 22
 
-const ADD_HYDROGENS = true   # runs PDB2PQR at PH
+const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
@@ -189,22 +123,21 @@ function run_sasdn32(; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer
     q_fit, I_fit, σ_fit = fit_subset()
 
     Random.seed!(seed)
-    s, μ_χ, σ_χ = BAYSOL.seed_model(
+    s = BAYSOL.seed_model(
         LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
-        ionic_strength_M = IONIC_STRENGTH_M, T = TEMPERATURE_C + 273.15,
     )
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
-    return res, μ_χ, σ_χ, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
+    return res, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
 end
 
-result, μ_χ, σ_χ, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdn32()
+result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdn32()
 
 fit, divergence_rate, map_result, quantile_result = result
 
 # `@__DIR__` (this SASDN32/ folder), not the caller's cwd.
 open(joinpath(@__DIR__, "res.txt"), "w") do io
-    BAYSOL.write_report(io, result; μ_χ = μ_χ, σ_χ = σ_χ, form_factor_log = form_factor_log, n_atoms = n_atoms)
+    BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
 """
@@ -217,13 +150,17 @@ all draws diverged) the quantile-curve envelope.
 function sasdn32_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
+    # itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     fig = Figure(size = (700, 500))
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "divergence rate = $(round(divergence_rate; digits = 3))",
+
         xscale = log10,
         yscale = log10,
     )
@@ -243,16 +180,16 @@ function sasdn32_figure(result, data)
         quantiles = curves["quantiles"]
 
         band!(
-            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), bounds[:, 3];
-            color = (:dodgerblue, 0.15), label = "bounds",
+            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
+            color = (:darkorange, 0.15), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = :darkorange, linewidth = 1.5, label = "quantiles",
         )
         lines!(
-            ax, quantiles[:, 1], quantiles[:, 3];
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5,
+            ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
+            linestyle = :dot, color = :darkorange, linewidth = 1.5,
         )
     end
 
@@ -276,7 +213,7 @@ function sasdn32_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "MAP")
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -300,7 +237,7 @@ function sasdn32_residuals_figure(result, data)
     q_fit, I_fit, σ_fit = data
 
     fig = Figure(size = (700, 400))
-    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)", title = "fit residuals")
+    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
 
     map_curve = map_result === nothing ? nothing : map_result[2]
 
@@ -312,15 +249,15 @@ function sasdn32_residuals_figure(result, data)
 
         band!(
             ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = (:dodgerblue, 0.15), label = "bounds",
+            color = (:darkorange, 1), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = :darkorange, linewidth = 2.5, label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5,
+            linestyle = :dot, color = :darkorange, linewidth = 2.5,
         )
     end
 
@@ -334,27 +271,28 @@ function sasdn32_residuals_figure(result, data)
         ylims!(ax, lo - pad, hi + pad)
     end
 
-    axislegend(ax; position = :lb, framevisible = false)
+    axislegend(ax; position = :rt, framevisible = false)
 
     return fig
 end
 
-# ξ = (dns, δρ1, δρ2, δρ3, c1)
 const _HIST_PARAMS = [
-    ("dns", "slvnt_e_dns"), ("δρ1", "delta_rho_1"), ("δρ2", "delta_rho_2"),
-    ("δρ3", "delta_rho_3"), ("c1", "excl_vol_corr"),
+    ("ρₑ", "slvnt_e_dns"), ("δρ₁", "delta_rho_1"), ("δρ₂", "delta_rho_2"),
+    ("δρ₃", "delta_rho_3"),
+    ("scale", "scale"), ("bkgrnd_corr", "bkgrnd_corr"),
+    ("c1", "excl_vol_corr"),
 ]
 
 """
-    sasdn32_posterior_hist(result) -> Figure
-
-Histograms of the non-divergent posterior draws for each physical parameter
-`ξ = (dns, δρ1, δρ2, δρ3, c1)`, with the MAP draw marked.
+    sasdn32_hist(result) -> Figure
 """
-function sasdn32_posterior_hist(result)
+function sasdn32_hist(result)
     fit, _, map_result, _ = result
     ok = .!getproperty.(fit.stats, :numerical_error)
     samples = fit.samples[ok]
+    c1_draws = fit.c1[ok]
+    scale_draws = fit.scale[ok]
+    bkgrnd_draws = fit.bkgrnd_corr[ok]
     map_params = map_result === nothing ? nothing : map_result[1]
 
     fig = Figure(size = (900, 550))
@@ -362,9 +300,18 @@ function sasdn32_posterior_hist(result)
         row, col = fldmod1(i, 3)
         ax = Axis(
             fig[row, col], xlabel = label, ylabel = "count",
-            xticklabelrotation = label == "dns" ? π/2 : 0.0,
+            xticklabelrotation = π/2,
         )
-        hist!(ax, getindex.(samples, i); bins = 40, color = (:dodgerblue, 0.6))
+        draws = if label == "c1"
+            c1_draws
+        elseif label == "scale"
+            scale_draws
+        elseif label == "bkgrnd_corr"
+            bkgrnd_draws
+        else
+            getindex.(samples, i)
+        end
+        hist!(ax, draws; bins = 40, color = (:darkorange, 0.6))
         if map_params !== nothing
             vlines!(ax, [map_params[map_key]]; color = :crimson, linewidth = 2)
         end
@@ -377,16 +324,16 @@ end
 # `.fit` reference file, SASDN32 has no separate CRYSOL/FoXS reference fit
 # shipped alongside it (`SASDN32_fit1.dat`'s own "model_intensity" column is
 # itself just someone else's fit curve, not a distinct reference file to
-# overlay), so `sasdn32_crysol_comparison_figure` is intentionally omitted.
+# overlay), so `sasdn32_comparison_figure` is intentionally omitted.
 
 fig = sasdn32_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res.png"), fig)
+save(joinpath(@__DIR__, "res.png"), fig; px_per_unit = 3.5)
 
 fig_residuals = sasdn32_residuals_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals)
+save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals; px_per_unit = 3.5)
 
-fig_hist = sasdn32_posterior_hist(result)
-save(joinpath(@__DIR__, "res_hist.png"), fig_hist)
+fig_hist = sasdn32_hist(result)
+save(joinpath(@__DIR__, "res_hist.png"), fig_hist; px_per_unit = 3.5)
 
 "Display the SASDN32 fit figure. Blocks until the window is closed."
 vis_sasdn32() = wait(display(fig))

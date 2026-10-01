@@ -19,6 +19,7 @@ using  SQLite: SQLite
 using  DBInterface: DBInterface
 using  LinearAlgebra: LinearAlgebra
 using  FastClosures: @closure
+using  DocStringExtensions
 
 export  FormFactorSource, form_factor_table, form_factors, form_factor_log,
         FF, FormFactorError, FormFactorSourceTables
@@ -104,7 +105,7 @@ const _LOADED = Ref(false)
 _dbpath() = joinpath(@__DIR__, "form_factors.sqlite3")
 
 """
-    _load!() -> Nothing
+$(TYPEDSIGNATURES)
 
 Populate _WK/_CH from form_factors.sqlite3 on first use.
 """
@@ -140,7 +141,7 @@ end
 const S_MAX = 6.0
 
 """
-    f0(species::AbstractString, s::Real) -> Float64
+$(TYPEDSIGNATURES)
 
 Non-resonant atomic form factor c + Σ_{i=1..5} a_i exp(-b_i s²) for species
 (an ion key like "fe3+" or a bare element like "fe"), at s = q/(4π) in Å⁻¹.
@@ -167,7 +168,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    _window(n, j) -> UnitRange{Int}
+$(TYPEDSIGNATURES)
 
 The 7-point interpolation window around grid index j (the last point at or
 below the requested energy), clamped to 1:n.
@@ -180,7 +181,7 @@ interpolated value.
 _window(n::Int, j::Int)::UnitRange{Int} = max(1, j - 3):min(n, j + 3)
 
 """
-    _notaknot(x, y, t) -> Float64
+$(TYPEDSIGNATURES)
 
 Interpolating cubic spline through every (x, y) with not-a-knot end
 conditions, evaluated at t.
@@ -214,7 +215,7 @@ function _notaknot(x::AbstractVector{Float64}, y::AbstractVector{Float64}, t::Fl
 end
 
 """
-    f1f2(element::AbstractString, energy::Real) -> Tuple{Float64,Float64}
+$(TYPEDSIGNATURES)
 
 Anomalous corrections (f1, f2) for a bare element at energy in eV.
 
@@ -261,7 +262,7 @@ _element(species::AbstractString)::String =
     String(replace(species, r"[0-9]*[+-]+$" => ""))
 
 """
-    _tier(species) -> Symbol
+$(TYPEDSIGNATURES)
 
 Which formula applies: :dummy (no f0 data at all ie not a real scatterer),
 :f0_only (has f0 but no anomalous data for its element), or :full.
@@ -277,7 +278,7 @@ function _tier(species::AbstractString)::Symbol
 end
 
 """
-    compute_form_factors(ions, energy::Real, qvals) -> FF
+$(TYPEDSIGNATURES)
 
 Form factors for a batch of ions at one energy (eV) over a q grid (Å⁻¹); one
 row per unique ion, aligned to the returned container's q index.
@@ -354,11 +355,12 @@ function compute_form_factors(
 end
 
 """
-    form_factor_table([src::FormFactorSourceTables,] energy::Real, ions, qvals) -> FF
+$(TYPEDSIGNATURES)
 
 Build an [`FF`](@ref) container for ions at one energy (eV) over the qvals
-(Å⁻¹) grid. Thin wrapper over [`compute_form_factors`](@ref). The src-less
-form defaults the backend to FormFactorSourceTables().
+(Å⁻¹) grid. Thin wrapper over [`compute_form_factors`](@ref). A second,
+src-less method (not shown above) defaults the backend to
+FormFactorSourceTables().
 
 # Arguments
 - `src`: the bundled-table backend marker (optional).
@@ -373,7 +375,7 @@ form_factor_table(energy::Real, ions, qvals)::FF =
     form_factor_table(FormFactorSourceTables(), energy, ions, qvals)
 
 """
-    form_factor_log(t::FF) -> Vector{String}
+$(TYPEDSIGNATURES)
 
 Construction-time diagnostics for t: one line per ion that did not resolve in
 full, in the order encountered. Empty when every ion resolved.
@@ -381,7 +383,7 @@ full, in the order encountered. Empty when every ion resolved.
 form_factor_log(t::FF)::Vector{String} = t.log
 
 """
-    form_factors(t::FF, ions, qvals) -> Matrix{ComplexF64}
+$(TYPEDSIGNATURES)
 
 t's rows selected by ions, columns selected by qvals, as a
 (length(ions), length(qvals)) matrix in the layout [`BAYSOL.Scattering.compute_B_lm`](@ref) takes.

@@ -18,8 +18,7 @@ Base.showerror(io::IO, e::PropkaError) = print(io, "PropkaError: ", e.msg)
 const _STANDARD_GROUPS = Set(["ASP", "GLU", "CYS", "TYR", "HIS", "LYS", "ARG", "N+", "C-"])
 
 """
-    _parse_pka(path::AbstractString) -> 
-        Vector{NamedTuple{(:resname,:resnum,:chain,:pKa), Tuple{String,Int,String,Float64}}}
+$(TYPEDSIGNATURES)
 
 Parse a propka3 .pka output file into one record per standard titratable
 group. Non-standard rows (ligand groups, carrying a trailing ligand
@@ -51,8 +50,12 @@ function _parse_pka(path::AbstractString)
     return out
 end
 
+"Where [`propka_pKas`](@ref) caches the .pka for `pdb_path` (present ⟺ a cache hit)."
+_pka_path(pdb_path::AbstractString) =
+    joinpath(_store_dir(), splitext(basename(abspath(pdb_path)))[1] * ".pka")
+
 """
-    propka_pKas(pdb_path::AbstractString) -> Vector{<:NamedTuple}
+$(TYPEDSIGNATURES)
 
 Run propka3 on a PDB structure and return one record per standard
 titratable group: (resname::String, resnum::Int, chain::String, pKa::Float64).
@@ -68,9 +71,8 @@ function propka_pKas(pdb_path::AbstractString)
     isfile(pdb_path) || throw(PropkaError("no such file: $pdb_path"))
 
     abspdb = abspath(pdb_path)
-    base = splitext(basename(abspdb))[1]
     storedir = _store_dir()
-    pka_path = joinpath(storedir, base * ".pka")
+    pka_path = _pka_path(abspdb)
 
     if !isfile(pka_path)
         try

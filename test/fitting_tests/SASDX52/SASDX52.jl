@@ -1,10 +1,10 @@
-using   DelimitedFiles
-using   Statistics
-using   Random
-using   GLMakie
-using   BAYSOL
-using   BAYSOL.MolecularStructure: LocalPathSource
-using   BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+using DelimitedFiles
+using Statistics
+using Random
+using GLMakie
+using BAYSOL
+using BAYSOL.MolecularStructure: LocalPathSource
+using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
 
 # =============================================================================
 #                                *** CAUTION ***
@@ -33,14 +33,8 @@ const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "
 const _PDB_PATH     = joinpath(_FIXTURE_DIR, "SASDX52_fit1_model1.pdb")
 const _FIT_PATH     = joinpath(_FIXTURE_DIR, "SASDX52_fit1.fit")
 
-# No experimental_data/*.dat bundled: SASDX52_fit1.fit is the ONLY source of
-# q/I/σ. Its header (inspected directly):
-#
-#   # SAXS profile: number of points = 409, q_min = 0.0101155983284116, q_max = 0.169964402914047, delta_q = 0.000391786285749107
-#   # offset = 0.00000000000000, scaling c = 3.05570716557694e-09, Chi^2 = 0.698835430001557
-#   #  q       exp_intensity   error model_intensity
-#
-# i.e. 3 '#' header lines, 4 columns: q, exp_intensity, error, model_intensity.
+# No experimental_data/*.dat bundled: SASDX52_fit1.fit is the only source of
+# q/I/σ. 3 '#' header lines, 4 columns: q, exp_intensity, error, model_intensity.
 # q is already in Å⁻¹ (SASBDB .fit outputs are Å⁻¹, unlike some raw .dat
 # files which come in nm⁻¹ and need /10 -- no such conversion here).
 raw = readdlm(_FIT_PATH; skipstart = 3)
@@ -71,13 +65,6 @@ I_exp = Float64.(raw[:, 2])
 #                 enzymological studies of the long chain fatty acyl-CoA
 #                 synthetase FadD5 from the mce1 operon of Mycobacterium
 #                 tuberculosis", Biochem Biophys Res Commun 769:151960.
-#                 (Not bundled here; not independently checked against this
-#                 script's values.)
-#
-# Crystallization-vs-SAXS-buffer caveat does not apply here (no crystal
-# structure/crystallization buffer involved -- the model is AlphaFold, and
-# SASBDB's listed buffer is explicitly the SAXS sample buffer), but the page
-# metadata itself is still unverified against the primary paper.
 
 const PH, σ_PH = 7.5, 0.1   # [SASBDB] ±0.1 is a typical benchtop pH-meter precision (not stated by SASBDB)
 
@@ -85,21 +72,9 @@ const PH, σ_PH = 7.5, 0.1   # [SASBDB] ±0.1 is a typical benchtop pH-meter pre
 # (hc = 12398.42 eV·Å).
 const ENERGY_EV = 12398.42 / 0.9537   # ≈ 13000.3 eV
 
-# [DEFAULT] Real experimental temperature was 4°C [SASBDB], but
-# `t`/DEFAULT_TEMPERATURE_C drives BAYSOL_Utils.Constants._ρₑ's bulk
-# solvent-electron-density calculation, which is explicitly documented
-# (Constants.jl, DEFAULT_TEMPERATURE_C docstring) as *only* supporting
-# water's density at 25°C in this version -- "do not change". So t=25.0
-# here, NOT the real 4°C.
-const TEMPERATURE_C = 25.0
+# [SASBDB] 4°C.
+const TEMPERATURE_C = 4.0
 
-# [SASBDB] `T` (Debye screening temperature, Kelvin) is a *separate*
-# parameter from `t` above -- Constants.jl's DEBYE_TEMPERATURE_K docstring
-# states explicitly the two "aren't currently reconciled to the same
-# value" and each keeps its own default. Unlike `t`, nothing restricts `T`
-# to 25°C, so the real measured temperature (4°C) is used here rather than
-# defaulting/reconciling to TEMPERATURE_C, as done for the Debye
-# screening-length calculation.
 const DEBYE_T_K = 4.0 + 273.15   # 277.15 K
 
 # [SASBDB] buffer-derived ionic strength: I = 1/2 Σ cᵢzᵢ².
@@ -110,13 +85,18 @@ const DEBYE_T_K = 4.0 + 273.15   # 277.15 K
 const IONIC_STRENGTH_M = 0.515
 
 # FadD5 sequence, read directly off SASDX52_fit1_model1.pdb chain A SEQRES
-# (554 residues). The model contains two chains, A and B, with IDENTICAL
-# sequence/length (554 residues each) -- consistent with SASBDB's listed
-# dimer oligomeric state, i.e. two copies of the same AlphaFold monomer
-# prediction docked together by the depositors. Chain A is used here as the
-# representative protomer sequence (arbitrary choice between two identical
-# chains).
-const FADD5_SEQ = "MTAQLASHLTRALTLAQQQPYLARRQNWVNQLERHAMMQPDAPALRFVGNTMTWADLRRRVAALAGALSGRGVGFGDRVMILMLNRTEFVESVLAANMIGAIAVPLNFRLTPTEIAVLVEDCVAHVMLTEAALAPVAIGVRNIQPLLSVIVVAGGSSQDSVFGYEDLLNEAGDVHEPVDIPNDSPALIMYTSGTTGRPKGAVLTHANLTGQAMTALYTSGANINSDVGFVGVPLFHIAGIGNMLTGLLLGLPTVIYPLGAFDPGQLLDVLEAEKVTGIFLVPAQWQAVCTEQQARPRDLRLRVLSWGAAPAPDALLRQMSATFPETQILAAFGQTEMSPVTCMLLGEDAIAKRGSVGRVIPTVAARVVDQNMNDVPVGEVGEIVYRAPTLMSCYWNNPEATAEAFAGGWFHSGDLVRMDSDGYVWVVDRKKDMIISGGENIYCAELENVLASHPDIAEVAVIGRADEKWGEVPIAVAAVTNDDLRIEDLGEFLTDRLARYKHPKALEIVDALPRNPAGKVLKTELRLRYGACVNVERRSASAGFTERRENRQKL"
+# (554 residues). 
+const FADD5_SEQ = 
+    "MTAQLASHLTRALTLAQQQPYLARRQNWVNQLERHAMMQPDAPALRFVGNTMTWADLRRR" *
+    "VAALAGALSGRGVGFGDRVMILMLNRTEFVESVLAANMIGAIAVPLNFRLTPTEIAVLVE" *
+    "DCVAHVMLTEAALAPVAIGVRNIQPLLSVIVVAGGSSQDSVFGYEDLLNEAGDVHEPVDI" *
+    "PNDSPALIMYTSGTTGRPKGAVLTHANLTGQAMTALYTSGANINSDVGFVGVPLFHIAGI" *
+    "GNMLTGLLLGLPTVIYPLGAFDPGQLLDVLEAEKVTGIFLVPAQWQAVCTEQQARPRDLR" *
+    "LRVLSWGAAPAPDALLRQMSATFPETQILAAFGQTEMSPVTCMLLGEDAIAKRGSVGRVI" *
+    "PTVAARVVDQNMNDVPVGEVGEIVYRAPTLMSCYWNNPEATAEAFAGGWFHSGDLVRMDS" *
+    "DGYVWVVDRKKDMIISGGENIYCAELENVLASHPDIAEVAVIGRADEKWGEVPIAVAAVT" *
+    "NDDLRIEDLGEFLTDRLARYKHPKALEIVDALPRNPAGKVLKTELRLRYGACVNVERRSA" *
+    "SAGFTERRENRQKL"
 
 # Average mass from FADD5_SEQ (ExPASy average residue masses + one water for
 # the terminal H/OH) => ≈59.91 kDa, close to (but not identical to) SASBDB's
@@ -126,8 +106,8 @@ const FADD5_MW = 59905.88   # g/mol
 
 # [SASBDB] 4.00 mg/ml protein concentration / sequence-derived monomer MW.
 const FADD5_CONC_MG_ML = 4.00
-const FADD5_MOLARITY   = FADD5_CONC_MG_ML / FADD5_MW   # ≈ 6.68e-5 M
-const FADD5_MOLARITY_σ = 0.05 * FADD5_MOLARITY         # 5% relative: typical A280/mg-ml (not stated by SASBDB)
+const FADD5_MOLARITY   = FADD5_CONC_MG_ML / FADD5_MW # ≈ 6.68e-5 M
+const FADD5_MOLARITY_σ = 0.05 * FADD5_MOLARITY       # 5% relative: typical A280/mg-ml (not stated by SASBDB)
 
 # Buffer components. All four species below were cross-checked against
 # src/PartialMolarVolumes/NonBiological/common_to_iupac.json and found
@@ -136,12 +116,22 @@ const FADD5_MOLARITY_σ = 0.05 * FADD5_MOLARITY         # 5% relative: typical A
 #   "magnesium chloride" -> "magnesium dichloride"
 #   "hepes"               -> "2-[4-(2-hydroxyethyl)piperazin-1-yl]ethane-1-sulfonic acid"
 #   "2-mercaptoethanol"   -> "2-mercaptoethanol"
+# Counter-ions (added 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
+# not list. Assumed: 20 mM HEPES titrated with NaOH -> Na⁺ = C·0.519 (pK(22 °C) = 7.6). The pH is taken as
+# set at room temperature (22 ± 3 °C), which fixes the counter-ion amount whatever the measurement
+# temperature. pK(T) from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
+# 10.1063/1.1416902) pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.525 M. σ combines σ_PH, ±3 °C,
+# ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is modelled; the volume change of
+# the buffer's own (de)protonation is not. Titrant: not stated; HCl for amine bases (Tris, imidazole,
+# histidine), NaOH for Good's buffers.
 const SOLUTES = Solute[
-    Protein(FADD5_MOLARITY, FADD5_MOLARITY_σ, FADD5_SEQ),
-    NonBiological(0.500, 0.005,   "sodium chloride"),      # 500 mM NaCl, ±1%
-    NonBiological(0.020, 0.0004,  "hepes"),                # 20 mM HEPES, ±2%
-    NonBiological(0.005, 0.0001,  "magnesium chloride"),   # 5 mM MgCl2, ±2%
-    NonBiological(0.001, 0.00005, "2-mercaptoethanol"),    # 1 mM BME, ±5% (small conc., degrades/evaporates)
+    # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
+    # electron density (see Fitting.Solute).
+    NonBiological(0.500, 0.005,   "sodium chloride"),    # 500 mM NaCl, ±1%
+    NonBiological(0.020, 0.0004,  "hepes"),              # 20 mM HEPES, ±2%
+    NonBiological(0.005, 0.0001,  "magnesium chloride"), # 5 mM MgCl2, ±2%
+    NonBiological(0.001, 0.00005, "2-mercaptoethanol"),  # 1 mM BME, ±5% (small conc., degrades/evaporates)
+    NonBiological(0.010382, 0.001346, "sodium(1+)"),   # Na⁺ counter-ion from NaOH titration of HEPES (see note above)
 ]
 
 # ---------------------------------------------------------------------------
@@ -159,10 +149,10 @@ const Q_MAX_FIT = 0.17
 # estimated from the PDB structure's own coordinate extent instead of a
 # GNOM Dmax: max pairwise Cα-Cα distance over all 1108 Cα atoms (both
 # chains) = 208.05 Å. Using the usual q·D_max multipole-resolution rule of
-# thumb: Q_MAX_FIT * D_max ≈ 0.17 * 208 ≈ 35.4 => lMax = 35.
-const LMAX = 35
+# thumb: Q_MAX_FIT * D_max ≈ 0.17 * 208 ≈ 35.4 => lMax = 36.
+const LMAX = 36
 
-const ADD_HYDROGENS = true   # runs PDB2PQR at PH
+const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
@@ -178,22 +168,21 @@ function run_sasdx52(; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer
     q_fit, I_fit, σ_fit = fit_subset()
 
     Random.seed!(seed)
-    s, μ_χ, σ_χ = BAYSOL.seed_model(
+    s = BAYSOL.seed_model(
         LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
-        ionic_strength_M = IONIC_STRENGTH_M, T = DEBYE_T_K,
     )
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
-    return res, μ_χ, σ_χ, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
+    return res, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
 end
 
-result, μ_χ, σ_χ, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdx52()
+result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdx52()
 
 fit, divergence_rate, map_result, quantile_result = result
 
 # `@__DIR__` (this SASDX52/ folder), not the caller's cwd.
 open(joinpath(@__DIR__, "res.txt"), "w") do io
-    BAYSOL.write_report(io, result; μ_χ = μ_χ, σ_χ = σ_χ, form_factor_log = form_factor_log, n_atoms = n_atoms)
+    BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
 """
@@ -206,13 +195,17 @@ all draws diverged) the quantile-curve envelope.
 function sasdx52_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
+    # itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     fig = Figure(size = (700, 500))
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "divergence rate = $(round(divergence_rate; digits = 3))",
+
         xscale = log10,
         yscale = log10,
     )
@@ -232,16 +225,16 @@ function sasdx52_figure(result, data)
         quantiles = curves["quantiles"]
 
         band!(
-            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), bounds[:, 3];
-            color = (:dodgerblue, 0.15), label = "bounds",
+            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
+            color = (:darkorange, 0.15), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = :darkorange, linewidth = 1.5, label = "quantiles",
         )
         lines!(
-            ax, quantiles[:, 1], quantiles[:, 3];
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5,
+            ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
+            linestyle = :dot, color = :darkorange, linewidth = 1.5,
         )
     end
 
@@ -265,7 +258,7 @@ function sasdx52_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "MAP")
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -289,7 +282,7 @@ function sasdx52_residuals_figure(result, data)
     q_fit, I_fit, σ_fit = data
 
     fig = Figure(size = (700, 400))
-    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)", title = "fit residuals")
+    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
 
     map_curve = map_result === nothing ? nothing : map_result[2]
 
@@ -301,15 +294,15 @@ function sasdx52_residuals_figure(result, data)
 
         band!(
             ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = (:dodgerblue, 0.15), label = "bounds",
+            color = (:darkorange, 1), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = :darkorange, linewidth = 2.5, label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5,
+            linestyle = :dot, color = :darkorange, linewidth = 2.5,
         )
     end
 
@@ -323,27 +316,28 @@ function sasdx52_residuals_figure(result, data)
         ylims!(ax, lo - pad, hi + pad)
     end
 
-    axislegend(ax; position = :lb, framevisible = false)
+    axislegend(ax; position = :rt, framevisible = false)
 
     return fig
 end
 
-# ξ = (dns, δρ1, δρ2, δρ3, c1)
 const _HIST_PARAMS = [
-    ("dns", "slvnt_e_dns"), ("δρ1", "delta_rho_1"), ("δρ2", "delta_rho_2"),
-    ("δρ3", "delta_rho_3"), ("c1", "excl_vol_corr"),
+    ("ρₑ", "slvnt_e_dns"), ("δρ₁", "delta_rho_1"), ("δρ₂", "delta_rho_2"),
+    ("δρ₃", "delta_rho_3"),
+    ("scale", "scale"), ("bkgrnd_corr", "bkgrnd_corr"),
+    ("c1", "excl_vol_corr"),
 ]
 
 """
-    sasdx52_posterior_hist(result) -> Figure
-
-Histograms of the non-divergent posterior draws for each physical parameter
-`ξ = (dns, δρ1, δρ2, δρ3, c1)`, with the MAP draw marked.
+    sasdx52_hist(result) -> Figure
 """
-function sasdx52_posterior_hist(result)
+function sasdx52_hist(result)
     fit, _, map_result, _ = result
     ok = .!getproperty.(fit.stats, :numerical_error)
     samples = fit.samples[ok]
+    c1_draws = fit.c1[ok]
+    scale_draws = fit.scale[ok]
+    bkgrnd_draws = fit.bkgrnd_corr[ok]
     map_params = map_result === nothing ? nothing : map_result[1]
 
     fig = Figure(size = (900, 550))
@@ -351,9 +345,18 @@ function sasdx52_posterior_hist(result)
         row, col = fldmod1(i, 3)
         ax = Axis(
             fig[row, col], xlabel = label, ylabel = "count",
-            xticklabelrotation = label == "dns" ? π/2 : 0.0,
+            xticklabelrotation = π/2,
         )
-        hist!(ax, getindex.(samples, i); bins = 40, color = (:dodgerblue, 0.6))
+        draws = if label == "c1"
+            c1_draws
+        elseif label == "scale"
+            scale_draws
+        elseif label == "bkgrnd_corr"
+            bkgrnd_draws
+        else
+            getindex.(samples, i)
+        end
+        hist!(ax, draws; bins = 40, color = (:darkorange, 0.6))
         if map_params !== nothing
             vlines!(ax, [map_params[map_key]]; color = :crimson, linewidth = 2)
         end
@@ -363,21 +366,18 @@ function sasdx52_posterior_hist(result)
 end
 
 """
-    sasdx52_crysol_comparison_figure(result, data) -> Figure
+    sasdx52_comparison_figure(result, data) -> Figure
 
-Overlays our MAP curve against SASDX52_fit1.fit's own bundled reference
-curve (`model_intensity` column). NOTE: unlike the other cases in this test
-family, the fitting *method* behind that reference curve is not confirmed to
-be CRYSOL specifically -- there is no bundled paper here to check Methods
-against, and `fit1_model1.pdb` is itself a depositor-docked dimer built from
-an AlphaFold monomer prediction, so the reference curve may come from a
-rigid-body/oligomer fitting tool (e.g. CORAL/SASREF-style) rather than a
-plain CRYSOL run. It is labelled "SASBDB fit1" below rather than "CRYSOL"
-for that reason.
+Overlays our MAP curve against SASDX52_fit1.fit's own reference
+curve (`model_intensity` column). 
 """
-function sasdx52_crysol_comparison_figure(result, data)
+function sasdx52_comparison_figure(result, data)
     _, _, map_result, _ = result
     q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
+    # itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     ref      = readdlm(_FIT_PATH; skipstart = 3)
     q_ref    = Float64.(ref[:, 1])
@@ -389,13 +389,11 @@ function sasdx52_crysol_comparison_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "BAYSOL MAP vs. SASBDB fit1 (method unconfirmed)",
         xscale = log10,
         yscale = log10,
     )
 
-    # Same log-symmetric errorbar treatment as `sasdx52_figure` -- see its
-    # comment for why a raw additive I ± σ interval isn't used here.
+    # Same log-symmetric errorbar treatment as `sasdx52_figure`.
     log_I = log10.(I_fit)
     log_σ = σ_fit ./ (I_fit .* log(10))
     rangebars!(
@@ -406,15 +404,15 @@ function sasdx52_crysol_comparison_figure(result, data)
 
     lines!(
         ax, q_ref[keep], I_ref[keep];
-        color = :seagreen, linewidth = 2, linestyle = :dash, label = "SASBDB fit1",
+        color = :mediumturquoise, linewidth = 2, linestyle = :dash, label = "SASBDB fit1",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "BAYSOL MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "BAYSOL MAP")
     end
 
-    axislegend(ax; position = :lt, framevisible = false)
+    axislegend(ax; position = :lb, framevisible = false)
 
     lo, hi = extrema(I_fit)
     ylims!(ax, lo * 0.7, hi * 1.3)
@@ -423,16 +421,16 @@ function sasdx52_crysol_comparison_figure(result, data)
 end
 
 fig = sasdx52_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res.png"), fig)
+save(joinpath(@__DIR__, "res.png"), fig; px_per_unit = 3.5)
 
 fig_residuals = sasdx52_residuals_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals)
+save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals; px_per_unit = 3.5)
 
-fig_hist = sasdx52_posterior_hist(result)
-save(joinpath(@__DIR__, "res_hist.png"), fig_hist)
+fig_hist = sasdx52_hist(result)
+save(joinpath(@__DIR__, "res_hist.png"), fig_hist; px_per_unit = 3.5)
 
-fig_crysol = sasdx52_crysol_comparison_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_crysol_comparison.png"), fig_crysol)
+fig_crysol = sasdx52_comparison_figure(result, (q_fit, I_fit, σ_fit))
+save(joinpath(@__DIR__, "res_comparison.png"), fig_crysol; px_per_unit = 3.5)
 
 "Display the SASDX52 fit figure. Blocks until the window is closed."
 vis_sasdx52() = wait(display(fig))

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# End-to-end tests for src/Fitting/Priors/DensityOfSolvent.jl: bulk solution
+# End-to-end tests for src/Fitting/DensityOfSolvent.jl: bulk solution
 # electron density (`_ρₑ`) and its `LogNormal` prior (`ρₑ_prior`), exercised
 # through `PartialMolarVolumes.ρₑ_w`/`PartialMolarVolumes.ϕ°` pipeline.
 
@@ -21,11 +21,12 @@ Independent re-derivation of the `_ρₑ`/`ρₑ_prior` formula from the live
     ρₑ = ρ_w(T) + Σ_j C_j · (N_A·Z_j/1e27 − ρ_w(T)·ϕ°_j/1e3)
     σ² = (1 − Σ_j C_j·ϕ°_j/1e3)² · σ_w²
         + Σ_j k_j² · σ_C_j²
-        + Σ_j (C_j·ρ_w/1e3)² · σ_ϕ°_j²
+        + Σ_j (C_j·ρ_w/1e3)² · (σ_ϕ°_j² + (α·ϕ°_j·|t − 25|)²)
 """
 function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = 25.0)
     ρw, σw = BAYSOL.PartialMolarVolumes.ρₑ_w(t)
     ρw_k = ρw * 1e-3
+    α = BAYSOL.Constants.PMV_FRACTIONAL_EXPANSIBILITY
 
     disp = 0.0; Δμ = 0.0; var_conc = 0.0; var_vol = 0.0
     for s in solutes
@@ -40,7 +41,7 @@ function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = 25.
         disp     += C * ϕ / 1e3
         Δμ       += C * k
         var_conc += k^2 * σC^2
-        var_vol  += (C * ρw_k)^2 * σϕ^2
+        var_vol  += (C * ρw_k)^2 * (σϕ^2 + (α * abs(ϕ) * abs(t - 25.0))^2)
     end
 
     μ = ρw + Δμ
@@ -198,7 +199,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
     end
 
     @testset "ρₑ_prior: a realistic buffer of real protein + real DNA + real RNA is internally consistent" begin
-        # Cross-checks Priors.ρₑ_prior, DensityOfSolvent._ρₑ and
+        # Cross-checks DensityOfSolvent.ρₑ_prior, DensityOfSolvent._ρₑ and
         # PartialMolarVolumes.ϕ° together on genuine biological sequences (see
         # test/fixtures/functions/sequences.jl for provenance), rather than the
         # short synthetic stand-ins ("ATGC"/"AUGC"/"GGGGCC") used above to
@@ -329,8 +330,23 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test close_(mean(prior_37), μ37; atol = 1e-9)
     end
 
+    @testset "_ρₑ: 25 °C solute volumes get a σ widened linearly in |t − 25|" begin
+        solutes = Solute[NonBiological(1.0, 0.0, "glycerol")]
+        _, σ25 = FIT._ρₑ(7.0, 0.0, solutes; t = 25.0)
+        _, σ15 = FIT._ρₑ(7.0, 0.0, solutes; t = 15.0)
+        _, σ35 = FIT._ρₑ(7.0, 0.0, solutes; t = 35.0)
+        _, σ05 = FIT._ρₑ(7.0, 0.0, solutes; t = 5.0)
+        @test σ15 > σ25 && σ35 > σ25 && σ05 > σ15
+        μ15, _ = FIT._ρₑ(7.0, 0.0, solutes; t = 15.0)
+        μ15_ref, σ15_ref = ref_ρₑ(7.0, 0.0, solutes; t = 15.0)
+        @test close_(μ15, μ15_ref) && close_(σ15, σ15_ref)
+        # water itself is evaluated exactly at t, not at 25 °C
+        @test close_(FIT._ρₑ(7.0, 0.0, Solute[]; t = 10.0)[1], BAYSOL.PartialMolarVolumes.ρₑ_w(10.0)[1])
+    end
+
     @testset "ρₑ_prior: argument errors" begin
-        @test_throws ArgumentError ρₑ_prior(7.0, 0.0, Solute[])
+        # an empty solute list is pure water, not an error
+        @test close_(mean(ρₑ_prior(7.0, 0.0, Solute[])), BAYSOL.PartialMolarVolumes.ρₑ_w(25.0)[1]; atol = 1e-9)
         @test_throws DomainError ρₑ_prior(7.0, -0.1, Solute[NonBiological(0.5, 0.01, "urea")])
         # σ_pH == 0 is allowed (boundary)
         @test ρₑ_prior(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")]) isa LogNormal{Float64}

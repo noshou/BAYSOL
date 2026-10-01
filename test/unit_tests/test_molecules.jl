@@ -10,7 +10,7 @@
 # volume, exactness for a genuinely isolated atom) rather than pinned to
 # hardcoded numbers. Also includes one real-fixture check against CRYSOL's own
 # reported total excluded volume, which needs real subprocess access for
-# PROPKA/PDB2PQR (same assumption as test_pipeline.jl/test_pdb2pqr.jl) but no
+# PROPKA/Pdb2pqr (same assumption as test_pipeline.jl/test_pdb2pqr.jl) but no
 # network access.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
@@ -20,7 +20,7 @@ using BAYSOL.MolecularStructure:   Molecule, create, coords_cartesian, coords_sp
                     LocalPathSource, resolve_structure, propka_pKas, resolve_hydrogens,
                     load_molecule, _store_dir
 using BAYSOL.Scattering: mean_atomic_radius
-using BAYSOL.Solvation: SASA
+using BAYSOL: SASA
 
 # row 1 = r, row 2 = theta, row 3 = phi
 r_(m)     = coords_spherical(m)[1, :]
@@ -342,7 +342,7 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
     #  CRYSOL-parity check: total excluded volume on the SASDMJ9 fixture
     #-------------------------------------------------------------------------
     #
-    # Needs real subprocess access for PROPKA/PDB2PQR (same assumption as
+    # Needs real subprocess access for PROPKA/Pdb2pqr (same assumption as
     # test_pipeline.jl/test_pdb2pqr.jl); no network access, since the PDB is a
     # local fixture. Composes the pipeline primitives exactly as
     # `BAYSOL.run_model` does (`src/BAYSOL.jl`): resolve_structure ->
@@ -361,7 +361,7 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
         @test m !== nothing
         crysol_vol = parse(Float64, m.captures[1])
 
-        # Clear any stale cache entries so PROPKA/PDB2PQR genuinely run fresh.
+        # Clear any stale cache entries so PROPKA/Pdb2pqr genuinely run fresh.
         stem = "SASDMJ9_fit1_model1"
         rm(joinpath(_store_dir(), "$(stem).pka"); force = true)
         rm(joinpath(_store_dir(), "$(stem)_pH7.5.pdb"); force = true)
@@ -375,13 +375,12 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
         @test any(e -> e == "h", elms(mol))   # explicit hydrogens really were added
 
         total_vol = sum(vols(mol))
-        # NEEDS A REAL RUN TO RE-BASELINE: the geometric (radical-plane/
-        # power-diagram) method's deviation from CRYSOL's own reported total
-        # has never been measured against this fixture, so there is no tight
-        # tolerance to assert yet. Only a loose sanity check (positive, finite,
-        # same order of magnitude) until that baseline is established.
+        # vols sums to the vdW-union volume, which leaves out the packing
+        # voids between atoms. Measured 2026-09-29 with hydrogens: 0.66 of
+        # CRYSOL's fitted Vol on SASDA52 (0.73 of the sequence partial molar
+        # volume); the profiled c1 absorbs the difference (c1³ ≈ 1.5-1.6).
         @test isfinite(total_vol) && total_vol > 0.0
-        @test 0.1 * crysol_vol < total_vol < 10.0 * crysol_vol
+        @test 0.5 * crysol_vol < total_vol < 0.9 * crysol_vol
 
         # mean_atomic_radius must be smaller than the plain vdW-sphere radius:
         # bonded/packed atoms displace less than a full isolated vdW sphere.

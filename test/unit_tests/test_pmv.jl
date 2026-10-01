@@ -386,11 +386,13 @@ end
 
     @testset "ϕ°(name): trisodium citrate is sussy" begin
         # NonBiological/README.md flags this row as having two disagreeing
-        # published sources (57.1 vs 69.32 cm3/mol); the currently-selected
-        # value is pinned here so a future data revision is caught..
+        # published sources (57.1 vs 69.32 cm3/mol). The 2026-09 audit marked
+        # 57.1 `rejected` in favour of Apelblat & Manzurola's 69.32
+        # (10.1016/0378-3812(90)85049-G). The selected value is pinned here so
+        # a future data revision is caught.
         e, v, u = IFACE.ϕ°("trisodium citrate")
         @test e == 130
-        @test close_(v, 57.1)
+        @test close_(v, 69.32)
     end
 
     @testset "ϕ°(name): resolves through the common-name fallback even for a mis-cased IUPAC name" begin
