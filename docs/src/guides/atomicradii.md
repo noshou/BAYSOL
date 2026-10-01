@@ -1,4 +1,8 @@
-# atomic_radii
+# AtomicRadii
+
+Element/ion string → radius lookup (`lookup(src::RadiiSource, ions)`, default backend `AtomicRadiiSource()`), independent of residue identity. `MolecularStructure.create` uses it for `radii(mol)`, the isolated van der Waals radii that SASA, hydration-shell generation and the power-diagram excluded volumes are all built on.
+
+## atomic_radii.sqlite3
 
 atomic_radii.sqlite3 holds three tables: empirical **ionic** radii (charged species only), a bare-**element** fallback radius for every element in the periodic table, and a cache of which charge states each element actually has data for.
 

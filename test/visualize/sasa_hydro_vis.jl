@@ -14,7 +14,7 @@
 using BAYSOL
 using BAYSOL.Interfaces: Interfaces, RadiiSource
 using BAYSOL.MolecularStructure: MolecularStructure, Molecule
-using BAYSOL.Solvation.SASA: SASA
+using BAYSOL.SASA: SASA
 using BAYSOL.Geometry.PlasticSequence: plastic_points
 using BAYSOL.Geometry.Metrics: blocked
 using Printf: @printf, @sprintf

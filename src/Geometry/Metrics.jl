@@ -7,6 +7,7 @@ what "probe" means to the caller).
 """
 module Metrics
 
+using ..DocStringExtensions
 using ..PlasticSequence: Vec3
 
 export Coverage, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS, classify, blocked
@@ -25,7 +26,7 @@ How much of a sphere its neighbours cover.
 @enum Coverage ALL_EXPOSED ALL_BURIED AMBIGUOUS
 
 """
-    classify(i, candidates, crds, rads, probe) -> Coverage
+$(TYPEDSIGNATURES)
 
 Each neighbour j cuts a spherical cap out of i's expanded sphere. Writing
 ρᵢ = rads[i] + probe, ρⱼ = rads[j] + probe and d = |cᵢ - cⱼ|, three cases
@@ -75,7 +76,7 @@ function classify(
 end
 
 """
-    blocked(p, candidates, crds, rads, probe, self) -> Bool
+$(TYPEDSIGNATURES)
 
 Whether point p lies inside the expanded sphere (radius + probe) of any
 candidate sphere other than self.
@@ -115,7 +116,7 @@ function blocked(
 end
 
 """
-    blocked(p, d, candidates, crds, rads, probe) -> Bool
+$(TYPEDSIGNATURES)
 
 Does the ray from p along unit direction d hit any expanded sphere
 (radius + probe) among candidates?

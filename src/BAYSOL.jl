@@ -3,8 +3,9 @@
 module BAYSOL
 
 using Statistics: quantile, mean, var
-using Printf: @printf
+using Printf: @printf, @sprintf
 using StaticArrays: SVector
+using DocStringExtensions
 
 include("BAYSOL_Utils/BAYSOL_Utils.jl")
 include("Geometry/Geometry.jl")
@@ -12,39 +13,33 @@ include("AtomicRadii/AtomicRadii.jl")
 include("FormFactor/FormFactor.jl")
 include("PartialMolarVolumes/PMV.jl")
 include("MolecularStructure/MolecularStructure.jl")
-include("Solvation/Solvation.jl")
+include("SASA/SASA.jl")
 include("Scattering/Scattering.jl")
 include("Fitting/Fitting.jl")
 
 using .BAYSOL_Utils:           BAYSOL_Utils
 using .BAYSOL_Utils.Constants: Constants
 using .BAYSOL_Utils.Cache:     Cache
+using .BAYSOL_Utils.Timing:    Timing
 using .Geometry:                Geometry
 using .AtomicRadii:             AtomicRadii
 using .FormFactor:              FormFactor
 using .PartialMolarVolumes:     PartialMolarVolumes
 using .MolecularStructure:      MolecularStructure
-using .Solvation:               Solvation
+using .SASA:                     SASA
 using .Scattering:              Scattering
 using .Fitting:                 Fitting
 
 """
-    seed_model(
-        mol_src, lMax, energy, qvals, I_exp, σ_exp, pH, σ_pH, solutes;
-        add_hydrogens=true, blm_chunk=B_LM_CHUNK, thickness=SHELL_THICKNESS,
-        t=DEFAULT_TEMPERATURE_C, n=C1_PRIOR_MASS_PERCENT, probe=PROBE_RADIUS,
-        n_target=SHELL_N_TARGET, ionic_strength_M=IONIC_STRENGTH_M, eps_r=WATER_EPS_R, 
-        T=DEBYE_TEMPERATURE_K, cutoff_debye_lengths=CUTOFF_DEBYE_LENGTHS
-    ) -> Tuple{Fitting.Seed, Float64, Float64}
+$(TYPEDSIGNATURES)
 
 Computes a NUTS seed from given data input:
-    
+
     1. resolve mol_src to a structure
-    2. run PROPKA on the model 
-    3. optionally add hydrogens (PDB2PQR, pH-driven)
-    4. build the forward-model (gram matrix) 
-    5. compute the structure's screened-electrostatic (μ_χ, σ_χ) signal
-    6. produce a [`Fitting.Seed`](@ref).
+    2. if add_hydrogens, run PROPKA on the model (its pKas drive Pdb2pqr's
+       terminus protonation) and add hydrogens (Pdb2pqr, pH-driven)
+    3. build the forward-model (gram matrix)
+    4. produce a [`Fitting.Seed`](@ref).
 
 # Arguments
 - `mol_src::MolecularStructure.StructureSource`: where to obtain the
@@ -56,43 +51,33 @@ Computes a NUTS seed from given data input:
 - `qvals::AbstractVector`: momentum-transfer grid, Å⁻¹.
 - `I_exp::AbstractVector, σ_exp::AbstractVector`: measured intensity curve
     and its per-point standard errors; must be the same length as qvals.
-- `pH::Real`: solution pH — drives [`Fitting.Protein`](@ref)/[`Fitting.DNA`](@ref)/[`Fitting.RNA`](@ref) solute titration,
-    PDB2PQR's hydrogen placement (when add_hydrogens=true), and [`MolecularStructure.Ionization`](@ref).
-- `σ_pH::Real`: standard uncertainty on pH, propagated through solute
-    titration and through [`MolecularStructure.Ionization`](@ref)'s σ_charge.
-- `solutes::Vector{Fitting.Solute}`: the species in solution.
+- `pH::Real`: solution pH — drives [`Fitting.Protein`](@ref)/[`Fitting.DNA`](@ref)/[`Fitting.RNA`](@ref)
+    solute titration and Pdb2pqr's hydrogen placement (when add_hydrogens=true).
+- `σ_pH::Real`: standard uncertainty on pH, propagated through solute titration.
+- `solutes::Vector{Fitting.Solute}`: the buffer's components, **excluding the
+    measured macromolecule** (see [`Fitting.Solute`](@ref)).
 
 # Keywords
--   `add_hydrogens::Bool=true`: whether to run PDB2PQR at all
-    (resolve_hydrogens(...; add=add_hydrogens)); false is a no-op
-    and the forward model then runs on the heavy-atom-only structure.
+-   `add_hydrogens::Bool=true`: whether to run PROPKA + Pdb2pqr at all.
+    false skips both and the forward model runs on the structure exactly as
+    given (heavy-atom-only, unless the file already carries hydrogens).
 -   `blm_chunk::Unsigned = B_LM_CHUNK`: [`Scattering.compute_B_lm`](@ref) batch size, forwarded to
     [`Scattering.forward_cache`](@ref) (results invariant, cost/memory tradeoff only).
--   `thickness::Real = SHELLTHICKNESS`, `probe::Float64 = PROBERADIUS`,
+-   `thickness::Real = SHELL_THICKNESS`, `probe::Float64 = PROBE_RADIUS`,
     `n_target::Union{Nothing,Int} = SHELL_N_TARGET`: hydration-shell geometry,
-    forwarded to [`Scattering.forward_cache`](@ref) and [`Solvation.protein_cavity_electrostatics`](@ref)
-    (the same solvent-accessible-surface geometry underlies both).
--   `t::Real = DEFAULT_TEMPERATURE_C`: solution temperature in °C, forwarded to
-    [`Fitting.seed_fitting`](@ref)/_calc_ξ_priors. **!!NOTE!!: should NOT be changed, since
-    only water is temperature-dependent in this version.**
--   `n::Real = C1_PRIOR_MASS_PERCENT`: percentage (0, 100] of [`Fitting.c1_prior`](@ref)'s
-    mass required within CRYSOL's [0.96, 1.04] bound; forwarded to
+    forwarded to [`Scattering.forward_cache`](@ref).
+-   `t::Real = DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to
     [`Fitting.seed_fitting`](@ref).
--   `ionicstrengthM::Float64 = IONICSTRENGTHM`, `epsr::Float64 = WATEREPSR`,
-    `T::Float64 = DEBYE_TEMPERATURE_K`, `cutoff_debye_lengths::Float64 =
-    CUTOFF_DEBYE_LENGTHS`: Debye-Hückel screening parameters, forwarded to
-    [`Solvation.protein_cavity_electrostatics`](@ref).
+-   `κ_δρ₁₂::Real = DRO12_CONCENTRATION`, `κ_δρ₃::Real = DRO3_CONCENTRATION`:
+    concentrations of the δρ₁/δρ₂ and δρ₃ priors, forwarded to
+    [`Fitting.seed_fitting`](@ref).
 
 # Returns
--   `(seed, μ_χ, σ_χ)`: seed::Fitting.Seed is ready to pass to
-    [`run_model`](@ref)/[`Fitting.run_fitting`](@ref); μ_χ/σ_χ are the same
-    screened-electrostatic cavity signal computed at step 5 above (and
-    already folded into seed's priors) — returned separately so they can
-    be threaded into [`write_report`](@ref)'s diagnostics.
+-   `seed::Fitting.Seed`, ready to pass to [`run_model`](@ref)/[`Fitting.run_fitting`](@ref).
 
 # Exceptions
-- `DomainError`: qvals, Iexp, and σexp have mismatched lengths.
-- `ArgumentError`: qvals/Iexp/σexp are empty.
+- `DomainError`: qvals, I_exp, and σ_exp have mismatched lengths.
+- `ArgumentError`: qvals/I_exp/σ_exp are empty.
 """
 function seed_model(
     mol_src::MolecularStructure.StructureSource,
@@ -108,16 +93,15 @@ function seed_model(
     blm_chunk::Unsigned = BAYSOL_Utils.Constants.B_LM_CHUNK,
     thickness::Real = BAYSOL_Utils.Constants.SHELL_THICKNESS,
     t::Real = BAYSOL_Utils.Constants.DEFAULT_TEMPERATURE_C,
-    n::Real = BAYSOL_Utils.Constants.C1_PRIOR_MASS_PERCENT,
     probe::Float64 = BAYSOL_Utils.Constants.PROBE_RADIUS,
     n_target::Union{Nothing,Int} = BAYSOL_Utils.Constants.SHELL_N_TARGET,
-    ionic_strength_M::Float64 = BAYSOL_Utils.Constants.IONIC_STRENGTH_M,
-    eps_r::Float64 = BAYSOL_Utils.Constants.WATER_EPS_R,
-    T::Float64 = BAYSOL_Utils.Constants.DEBYE_TEMPERATURE_K,
-    cutoff_debye_lengths::Float64 = BAYSOL_Utils.Constants.CUTOFF_DEBYE_LENGTHS,
-)::Tuple{Fitting.Seed, Float64, Float64}
-    
-    if !(length(qvals) == length(I_exp) == length(σ_exp)) 
+    κ_δρ₁₂::Real = BAYSOL_Utils.Constants.DRO12_CONCENTRATION,
+    κ_δρ₃::Real = BAYSOL_Utils.Constants.DRO3_CONCENTRATION,
+)::Fitting.Seed
+    # the run's clock starts here; write_report reads the wall clock off it
+    log = Timing.StageLog()
+
+    if !(length(qvals) == length(I_exp) == length(σ_exp))
         throw(
             DomainError(
                 (
@@ -129,52 +113,48 @@ function seed_model(
     elseif (length(qvals) == 0)
         throw(ArgumentError("qvals, I_exp, and σ_exp cannot be empty"))
     end
-    
-    # load pdb into cache and load residues w/o hydrogens, then resolve if needed
-    path            = MolecularStructure.resolve_structure(mol_src)
-    pKa_records     = MolecularStructure.propka_pKas(path)
-    hpath           = MolecularStructure.resolve_hydrogens(path, pKa_records, pH; add=add_hydrogens)
-    mol, residues   = MolecularStructure.load_molecule(hpath)
+
+    # load pdb into cache, then add hydrogens if requested. PROPKA's pKas are
+    # only consumed by resolve_hydrogens, so it is skipped entirely when
+    # add_hydrogens is false.
+    path = Timing.timed!(log, :static, 1, "resolve_structure") do
+        MolecularStructure.resolve_structure(mol_src)
+    end
+    hpath = path
+    if add_hydrogens
+        hit(f) = isfile(f) ? "[cache hit]" : "[cache miss]"
+        pKas = Timing.timed!(log, :static, 1, "propka"; note = hit(MolecularStructure._pka_path(path))) do
+            MolecularStructure.propka_pKas(path)
+        end
+        hpath = Timing.timed!(log, :static, 1, "pdb2pqr"; note = hit(MolecularStructure._hydrogens_path(path, pH))) do
+            MolecularStructure.resolve_hydrogens(path, pKas, pH)
+        end
+    end
+    mol, _ = Timing.timed!(log, :static, 1, "load_molecule") do
+        MolecularStructure.load_molecule(hpath)
+    end
 
     # calculate forward model
-    fw = Scattering.forward_cache(
-        mol,
-        qvals,
-        lMax,
-        energy;
-        chunk=blm_chunk,
-        thickness=thickness,
-        probe=probe,
-        n_target=n_target
-    )
+    fw = Timing.timed!(log, :static, 1, "forward_cache") do
+        Scattering.forward_cache(
+            mol,
+            qvals,
+            lMax,
+            energy;
+            chunk=blm_chunk,
+            thickness=thickness,
+            probe=probe,
+            n_target=n_target,
+            stage_log=log,
+        )
+    end
 
-    # calculate ionization + electrostatics
-    ionization = MolecularStructure.Ionization(residues, pKa_records, pH, σ_pH)
-    μ_χ, σ_χ = Solvation.protein_cavity_electrostatics(
-        mol,
-        residues,
-        ionization;
-        probe=probe,
-        n_target=n_target,
-        ionic_strength_M=ionic_strength_M,
-        eps_r=eps_r,
-        T=T,
-        cutoff_debye_lengths=cutoff_debye_lengths
-    )
-
-    seed = Fitting.seed_fitting(
-        fw,
-        I_exp,
-        σ_exp,
-        pH,
-        σ_pH,
-        solutes;
-        t=t,
-        μ_χ=μ_χ,
-        σ_χ=σ_χ,
-        n=n
-    )
-    return seed, μ_χ, σ_χ
+    return Timing.timed!(log, :static, 1, "seed_fitting (priors, WLS)") do
+        Fitting.seed_fitting(
+            fw, I_exp, σ_exp, pH, σ_pH, solutes;
+            t=t, κ_δρ₁₂=κ_δρ₁₂, κ_δρ₃=κ_δρ₃, timing=log,
+        )
+    end
 end
 
 """
@@ -185,13 +165,16 @@ highest-log-density non-divergent) draw found by [`run_model`](@ref), keyed
 by name:
 
 -   `log_density`: the MAP draw's log-posterior density.
--   `slvntedns`, `deltarho1`, `deltarho2`, `deltarho3`,
-    `excl_vol_corr`: the physical parameters ξ = (dns, δρ1, δρ2, δρ3, c1)
-    at that draw (see [`Fitting.Seed`](@ref) for the ξ ordering this is read off of).
+-   `slvnt_e_dns`, `delta_rho_1`, `delta_rho_2`, `delta_rho_3`: the shell
+    parameters at that draw (see [`Fitting.Seed`](@ref) for the ξ ordering this
+    is read off of).
+-   `cavity_shell_frac`: fraction of the hydration-shell volume carried by
+    cavity beads (from the Gram matrix at the lowest q). When it is ~0, δρ₃ has
+    essentially no likelihood and its posterior is just its prior.
 -   `scale`, `bkgrndcorr`: the WLS-fit detector scale/background at that draw.
 -   `chisqred`: the WLS fit's reduced χ² at that draw.
--   `zslvntedns`, `zdeltarho1`, `zdeltarho2`, `zdeltarho3`,
-    `z_excl_vol_corr`: how many prior standard deviations (θ-space) the
+-   `z_slvnt_e_dns`, `z_delta_rho_1`, `z_delta_rho_2`,
+    `z_delta_rho_3`: how many prior standard deviations (θ-space) the
     corresponding physical parameter's MAP value sits from its prior mean.
 """
 const MAPParams = Dict{String, Float64}
@@ -238,20 +221,10 @@ const QuantileCurves = Dict{String, Matrix{Float64}}
 const QuantileResult = Tuple{QuantileParams, QuantileCurves}
 
 """
-    run_model(
-        seed::Seed,
-        n_samples::Int64,
-        n_adapt::Int64;
-        quantiles::AbstractString="16-84",
-        l::LIKELIHOOD=PROFILE(),
-        δ::Real=80
-    ) -> Union{
-            Tuple{Fitting.FitResult, Float64, MAPResult, QuantileResult},
-            Tuple{Fitting.FitResult, Float64, Nothing, Nothing}
-        }
+$(TYPEDSIGNATURES)
 
 Run NUTS on [`Fitting._logπ`](@ref) starting from seed, returning posterior
-draws of the physical parameters ξ = (dns, δρ1, δρ2, δρ3, c1), one
+draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
 (scale, bkgrndcorr) pair and predicted curve per draw, and
 AdvancedHMC.jl's diagnostics.
 
@@ -285,7 +258,7 @@ StepSizeAdaptor tunes the leapfrog step size ε via dual-averaging so the
 empirical acceptance rate converges to δ; too-small ε wastes computation
 taking tiny steps, too-large ε causes leapfrog's discretization error (and
 therefore the rejection rate) to blow up. MassMatrixAdaptor learns M (here the
-full parameter covariance, since dns/δρ/c1 are physically coupled through the
+full parameter covariance, since dns/δρ are physically coupled through the
 forward model) from the trajectory's sample covariance.
 
 # Arguments
@@ -351,8 +324,17 @@ function run_model(
         q_1, q_2 = 0.0, 1.0
     end
 
+    if seed.timing !== nothing
+        seed.timing.info["n_atoms"]   = seed.fw.n_atoms
+        seed.timing.info["lMax"]      = seed.fw.lMax
+        seed.timing.info["n_q"]       = length(seed.fw.qvals)
+        seed.timing.info["n_samples"] = n_samples
+        seed.timing.info["n_adapt"]   = n_adapt
+    end
+
     # calculate unfiltered fit
     fit_unfiltered = Fitting.run_fitting(seed, n_samples, n_adapt; l=l, δ=δ)
+    t_post = Timing.tick()
 
     # filter-out warmup draws
     fit = Fitting.FitResult(
@@ -360,9 +342,11 @@ function run_model(
         fit_unfiltered.stats[n_adapt+1:end],
         fit_unfiltered.scale[n_adapt+1:end],
         fit_unfiltered.bkgrnd_corr[n_adapt+1:end],
+        fit_unfiltered.c1[n_adapt+1:end],
         fit_unfiltered.chisq_red[n_adapt+1:end],
         fit_unfiltered.curves[:, n_adapt+1:end],
-        fit_unfiltered.likelihood
+        fit_unfiltered.likelihood,
+        fit_unfiltered.timing
     )
 
     # Numerical instabilities can occur when the posterior has very 
@@ -388,26 +372,37 @@ function run_model(
         divergence_rate = diverged / length(fit.stats)
         
         # calculate MAP params + curves
-        # ξ = (dns, δρ1, δρ2, δρ3, c1)
+        # ξ = (ρₑ, δρ₁, δρ₂, δρ₃)
         # z_map: how many prior standard deviations (θ-space) the MAP draw
         # sits from its own prior, one entry per physical parameter.
-        z_map = Fitting.prior_z_scores(fit.samples[max_idx], seed.pr)
+        ξ_map = fit.samples[max_idx]
+        z_map = Fitting.prior_z_scores(ξ_map, seed.pr)
         MAP_params = Dict{String, Float64}(
-            "log_density"   => max_llh,
-            "slvnt_e_dns"   => getindex.(fit.samples, 1)[max_idx],
-            "delta_rho_1"   => getindex.(fit.samples, 2)[max_idx],
-            "delta_rho_2"   => getindex.(fit.samples, 3)[max_idx],
-            "delta_rho_3"   => getindex.(fit.samples, 4)[max_idx],
-            "excl_vol_corr" => getindex.(fit.samples, 5)[max_idx],
+            "log_density"      => max_llh,
+            "slvnt_e_dns"      => ξ_map[1],
+            "delta_rho_1"      => ξ_map[2],
+            "delta_rho_2"      => ξ_map[3],
+            "delta_rho_3"      => ξ_map[4],
+            "cavity_shell_frac" => _cavity_shell_frac(seed.fw),
             "scale"         => fit.scale[max_idx],
             "bkgrnd_corr"   => fit.bkgrnd_corr[max_idx],
+            "excl_vol_corr" => fit.c1[max_idx],
             "chisq_red"     => fit.chisq_red[max_idx],
             "z_slvnt_e_dns"   => z_map[1],
             "z_delta_rho_1"   => z_map[2],
             "z_delta_rho_2"   => z_map[3],
             "z_delta_rho_3"   => z_map[4],
-            "z_excl_vol_corr" => z_map[5],
         )
+        # c1 is profiled (no prior), so saturation against its physical
+        # bounds is checked once, here, on the single MAP value -- not per
+        # posterior draw, since transient saturation during warmup is
+        # expected (see BAYSOL_Utils.Constants.EXCL_VOL_CORR_BOUNDS) and
+        # not itself diagnostic.
+        excl_vol_sat = Fitting.excl_vol_saturation(fit.c1[max_idx])
+        MAP_params["excl_vol_sat"] = Float64(excl_vol_sat)
+        if excl_vol_sat != 0
+            @warn "excluded-volume correction c1 saturated at the $(excl_vol_sat > 0 ? "upper" : "lower") profiling bound" c1=fit.c1[max_idx]
+        end
         MAP_curve = hcat(seed.fw.qvals, fit.curves[:, max_idx])
         map =(MAP_params, MAP_curve)
 
@@ -416,28 +411,28 @@ function run_model(
         samples_filt = fit.samples[filter]
         scale_filt   = fit.scale[filter]
         bkgrnd_filt  = fit.bkgrnd_corr[filter]
+        c1_filt      = fit.c1[filter]
         chisq_filt   = fit.chisq_red[filter]
         curves       = fit.curves[:, filter]
-        
-        # extract parameters from ξ = (dns, δρ1, δρ2, δρ3, c1)
+
+        # extract parameters from ξ = (ρₑ, δρ₁, δρ₂, δρ₃)
         ρₑ_filt  = getindex.(samples_filt, 1)
-        δρ1_filt = getindex.(samples_filt, 2)
-        δρ2_filt = getindex.(samples_filt, 3)
-        δρ3_filt = getindex.(samples_filt, 4)
-        c_1_filt = getindex.(samples_filt, 5)
+        δρ₁_filt = getindex.(samples_filt, 2)
+        δρ₂_filt = getindex.(samples_filt, 3)
+        δρ₃_filt = getindex.(samples_filt, 4)
 
         # calculate param quantiles
         ll_lo,  ll_hi        = quantile(ll_filt,     [q_1, q_2])
-        δρ1_lo, δρ1_hi       = quantile(δρ1_filt,    [q_1, q_2])
-        δρ2_lo, δρ2_hi       = quantile(δρ2_filt,    [q_1, q_2])
-        δρ3_lo, δρ3_hi       = quantile(δρ3_filt,    [q_1, q_2])
+        δρ₁_lo, δρ₁_hi       = quantile(δρ₁_filt,    [q_1, q_2])
+        δρ₂_lo, δρ₂_hi       = quantile(δρ₂_filt,    [q_1, q_2])
+        δρ₃_lo, δρ₃_hi       = quantile(δρ₃_filt,    [q_1, q_2])
         ρₑ_lo,  ρₑ_hi        = quantile(ρₑ_filt,     [q_1, q_2])
-        c_1_lo, c_1_hi       = quantile(c_1_filt,    [q_1, q_2])
         scale_lo, scale_hi   = quantile(scale_filt,  [q_1, q_2])
         bkgrnd_lo, bkgrnd_hi = quantile(bkgrnd_filt, [q_1, q_2])
+        c1_lo, c1_hi         = quantile(c1_filt,     [q_1, q_2])
         chisq_lo, chisq_hi   = quantile(chisq_filt,  [q_1, q_2])
-        z_lo = Fitting.prior_z_scores(SVector(ρₑ_lo, δρ1_lo, δρ2_lo, δρ3_lo, c_1_lo), seed.pr)
-        z_hi = Fitting.prior_z_scores(SVector(ρₑ_hi, δρ1_hi, δρ2_hi, δρ3_hi, c_1_hi), seed.pr)
+        z_lo = Fitting.prior_z_scores(SVector(ρₑ_lo, δρ₁_lo, δρ₂_lo, δρ₃_lo), seed.pr)
+        z_hi = Fitting.prior_z_scores(SVector(ρₑ_hi, δρ₁_hi, δρ₂_hi, δρ₃_hi), seed.pr)
 
         # returns a tuple of (low, high) bounds; fails loudly
         function map_bounds(lo, hi, x)
@@ -455,29 +450,24 @@ function run_model(
                     "bounds"      => map_bounds(ll_lo, ll_hi, ll_filt)
                 ),
                 "delta_rho_1"     => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (δρ1_lo, δρ1_hi),
-                    "bounds"      => map_bounds(δρ1_lo, δρ1_hi, δρ1_filt),
+                    "quantiles"   => (δρ₁_lo, δρ₁_hi),
+                    "bounds"      => map_bounds(δρ₁_lo, δρ₁_hi, δρ₁_filt),
                     "z"           => (z_lo[2], z_hi[2]),
                 ),
                 "delta_rho_2"     => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (δρ2_lo, δρ2_hi),
-                    "bounds"      => map_bounds(δρ2_lo, δρ2_hi, δρ2_filt),
+                    "quantiles"   => (δρ₂_lo, δρ₂_hi),
+                    "bounds"      => map_bounds(δρ₂_lo, δρ₂_hi, δρ₂_filt),
                     "z"           => (z_lo[3], z_hi[3]),
                 ),
                 "delta_rho_3"     => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (δρ3_lo, δρ3_hi),
-                    "bounds"      => map_bounds(δρ3_lo, δρ3_hi, δρ3_filt),
+                    "quantiles"   => (δρ₃_lo, δρ₃_hi),
+                    "bounds"      => map_bounds(δρ₃_lo, δρ₃_hi, δρ₃_filt),
                     "z"           => (z_lo[4], z_hi[4]),
                 ),
                 "slvnt_e_dns"     => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (ρₑ_lo, ρₑ_hi),
                     "bounds"      => map_bounds(ρₑ_lo, ρₑ_hi, ρₑ_filt),
                     "z"           => (z_lo[1], z_hi[1]),
-                ),
-                "excl_vol_corr"   => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (c_1_lo, c_1_hi),
-                    "bounds"      => map_bounds(c_1_lo, c_1_hi, c_1_filt),
-                    "z"           => (z_lo[5], z_hi[5]),
                 ),
                 "scale"           => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (scale_lo, scale_hi),
@@ -486,6 +476,10 @@ function run_model(
                 "bkgrnd_corr"     => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (bkgrnd_lo, bkgrnd_hi),
                     "bounds"      => map_bounds(bkgrnd_lo, bkgrnd_hi, bkgrnd_filt)
+                ),
+                "excl_vol_corr"   => Dict{String, Tuple{Float64, Float64}}(
+                    "quantiles"   => (c1_lo, c1_hi),
+                    "bounds"      => map_bounds(c1_lo, c1_hi, c1_filt)
                 ),
                 "chisq_red"       => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (chisq_lo, chisq_hi),
@@ -515,6 +509,7 @@ function run_model(
         res = (fit, divergence_rate, map, (params, curve))
     end
 
+    Timing.tock!(seed.timing, :sampling, 1, "MAP + quantiles", t_post)
     return res
 
 end
@@ -522,42 +517,119 @@ end
 "Order the physical/derived parameters are reported in, by [`write_report`](@ref)."
 const _REPORT_KEYS = [
     "log_density", "slvnt_e_dns", "delta_rho_1", "delta_rho_2",
-    "delta_rho_3", "excl_vol_corr", "scale", "bkgrnd_corr", "chisq_red",
+    "delta_rho_3", "scale", "bkgrnd_corr", "excl_vol_corr", "chisq_red",
 ]
 
-"The 5 physical parameters that carry a prior."
+"The 4 physical parameters that carry a prior."
 const _PRIOR_KEYS = [
-    "slvnt_e_dns", "delta_rho_1", "delta_rho_2", "delta_rho_3", "excl_vol_corr",
+    "slvnt_e_dns", "delta_rho_1", "delta_rho_2", "delta_rho_3",
 ]
+
+"""
+$(TYPEDSIGNATURES)
+
+Fraction of the hydration-shell volume carried by cavity beads, read off the
+Gram matrix at the lowest q (where S_kk → (Σ bead volumes)², so √S_kk is the
+species' total volume). 0 when the structure has no cavity beads.
+"""
+function _cavity_shell_frac(fw::Scattering.ForwardCache)::Float64
+    v = [sqrt(max(fw.G[k, k, 1], 0.0)) for k in 3:5]
+    tot = sum(v)
+    return tot > 0 ? v[3] / tot : 0.0
+end
 
 "Display labels for [`write_report`](@ref)'s text output."
 const _REPORT_LABELS = Dict{String, String}(
     "log_density"   => "log_density",
     "slvnt_e_dns"   => "ρₑ",
-    "delta_rho_1"   => "δρ1",
-    "delta_rho_2"   => "δρ2",
-    "delta_rho_3"   => "δρ3",
-    "excl_vol_corr" => "excl_vol_corr",
+    "delta_rho_1"   => "δρ₁",
+    "delta_rho_2"   => "δρ₂",
+    "delta_rho_3"   => "δρ₃",
     "scale"         => "scale",
     "bkgrnd_corr"   => "bkgrnd_corr",
+    "excl_vol_corr" => "excl_vol_corr",
     "chisq_red"     => "χ²",
 )
 
 """
-    write_report(
-        io::IO, result;
-        quantile_label::AbstractString="16-84",
-        μ_χ::Union{Nothing,Real}=nothing, σ_χ::Union{Nothing,Real}=nothing,
-        form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}}=nothing
-    )
-    write_report(
-        result;
-        quantile_label::AbstractString="16-84",
-        μ_χ::Union{Nothing,Real}=nothing, σ_χ::Union{Nothing,Real}=nothing,
-        form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}}=nothing
-    )
+$(TYPEDSIGNATURES)
+
+The report's `=== Run ===` section: n_atoms, lMax, n_q and the NUTS sizes, as recorded in
+the run's [`Timing.StageLog`](@ref). `n_atoms`, if given, overrides the logged count.
+Writes nothing when there is neither a log nor an `n_atoms`.
+"""
+function _write_run_info(io::IO, log::Union{Nothing,Timing.StageLog}; n_atoms::Union{Nothing,Integer} = nothing)
+    info = log === nothing ? Dict{String,Any}() : copy(log.info)
+    n_atoms === nothing || (info["n_atoms"] = n_atoms)
+    isempty(info) && return nothing
+    println(io, "=== Run ===")
+    for k in ("n_atoms", "lMax", "n_q", "n_samples", "n_adapt")
+        haskey(info, k) && @printf(io, "%-10s = %d\n", k, info[k])
+    end
+    println(io)
+    return nothing
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The report's `=== Timing ===` section, written last. The wall clock runs from the
+creation of `log` (the start of [`seed_model`](@ref)) to now, i.e. to the end of the report.
+`t_report` is the [`Timing.tick`](@ref) taken when [`write_report`](@ref) began, so the
+`report write` line is the time spent writing every section before this one.
+Nothing is written when `log` is `nothing`.
+
+Stages print in the order they were recorded, indented two spaces per depth, with
+the group lines (static build, sampling) summing their depth-1 stages. The label
+column is as wide as the longest label so the seconds column always lines up.
+"""
+function _write_timing(io::IO, log::Union{Nothing,Timing.StageLog}, t_report)
+    log === nothing && return nothing
+    report_s = (time_ns() - t_report[1]) / 1e9
+    report_c = (Base.cumulative_compile_time_ns()[1] - t_report[2]) / 1e9
+    total_c  = (Base.cumulative_compile_time_ns()[1] - log.compile0) / 1e9
+    wall = (time_ns() - log.t0) / 1e9
+    st, st_c, st_g = Timing.stage_seconds(log, :static)
+    sp, sp_c, sp_g = Timing.stage_seconds(log, :sampling)
+    unacc = wall - st - sp - report_s
+    # compile time not inside any stage: the first call of run_model, run_fitting and
+    # write_report compiles before their bodies (and so their stages) begin
+    unacc_c = total_c - st_c - sp_c - report_c
+
+    # (label, seconds, % of wall, JIT seconds); the last two are nothing on plain stage lines
+    rows = Tuple{String,Float64,Union{Nothing,Float64},Union{Nothing,Float64}}[]
+    push!(rows, ("wall clock  (seed_model → end of report)", wall, 100.0, total_c))
+    for (group, label, tot, comp) in ((:static, "static build", st, st_c), (:sampling, "sampling", sp, sp_c))
+        push!(rows, ("  " * label, tot, 100 * tot / wall, comp))
+        for stage in log.stages
+            stage.group === group || continue
+            name = stage.note == "" ? stage.name : rpad(stage.name, 22) * stage.note
+            push!(rows, ("  "^(stage.depth + 1) * name, stage.seconds, nothing, nothing))
+        end
+    end
+    push!(rows, ("  report write", report_s, nothing, nothing))
+    push!(rows, ("  unaccounted", unacc, nothing, max(unacc_c, 0.0)))
+
+    w = maximum(length(r[1]) for r in rows)
+    println(io)
+    @printf(io, "%-*s %10s %9s %8s\n", w, "=== Timing ===", "seconds", "% wall", "(JIT)")
+    for (label, secs, pct, jit) in rows
+        @printf(io, "%-*s %10.2f", w, label, secs)
+        pct === nothing || @printf(io, " %9.1f", pct)
+        jit === nothing || @printf(io, " %8s", @sprintf("(%.1f)", jit))
+        println(io)
+    end
+    @printf(io, "GC: %.1f s\n", st_g + sp_g)
+    return nothing
+end
+
+"""
+$(TYPEDSIGNATURES)
 
 Writes a summary of a [`run_model`](@ref) result to io.
+
+There is also a convenience overload `write_report(result; kwargs...)` that
+defaults `io` to `stdout`; see its own one-line definition below.
 
 # Arguments
 - `io::IO`: where to write; omit for stdout.
@@ -565,15 +637,11 @@ Writes a summary of a [`run_model`](@ref) result to io.
 
 # Keywords
 -   `quantilelabel::AbstractString="16-84"`
--   `μχ::Union{Nothing,Real}=nothing, σχ::Union{Nothing,Real}=nothing`:
-    the (μ_χ, σ_χ) returned alongside the seed by [`seed_model`](@ref).
-    Default nothing prints nothing for either field; passing either one
-    adds it to the "=== Diagnostics ===" footer.
 - `formfactorlog::Union{Nothing,AbstractVector{<:AbstractString}}=nothing`:
     the seed's seed.fw.form_factor_log.
-- `n_atoms::Union{Nothing,Integer}=nothing`: the seed's seed.fw.n_atoms.
-    Default nothing prints nothing; passing it adds a "#atoms = <n>" line
-    at the very top of the report, before divergence_rate.
+- `n_atoms::Union{Nothing,Integer}=nothing`: the seed's seed.fw.n_atoms, printed
+    as the `n_atoms` line of the `=== Run ===` section. Default nothing uses the
+    count recorded in the run's timing log (none is printed if neither exists).
 
 # Logged EBFMI vs. AdvancedHMC's logged EBFMIest
 
@@ -586,16 +654,13 @@ its result.
 function write_report(
     io::IO, result;
     quantile_label::AbstractString = "16-84",
-    μ_χ::Union{Nothing,Real} = nothing,
-    σ_χ::Union{Nothing,Real} = nothing,
     form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}} = nothing,
     n_atoms::Union{Nothing,Integer} = nothing,
 )
+    t_report = Timing.tick()
     fit, divergence_rate, map_result, quantile_result = result
-    if n_atoms !== nothing
-        @printf(io, "#atoms = %d\n", n_atoms)
-    end
     @printf(io, "divergence_rate = %.4f\n\n", divergence_rate)
+    _write_run_info(io, fit.timing; n_atoms = n_atoms)
 
     if map_result === nothing
         println(io, "All draws diverged; no MAP/quantiles available.")
@@ -648,11 +713,21 @@ function write_report(
     @printf(io, "%-14s = %.2f (max %d)\n", "tree_depth", mean(depth), maximum(depth))
     @printf(io, "%-14s = %.2f\n", "mean_n_steps", mean(nsteps))
     @printf(io, "%-14s = %.4f\n", "EBFMI", ebfmi)
-    if μ_χ !== nothing
-        @printf(io, "%-14s = %+.6g\n", "μ_χ", μ_χ)
+    if map_result !== nothing && haskey(map_params, "cavity_shell_frac")
+        f_cav = map_params["cavity_shell_frac"]
+        @printf(io, "%-14s = %.4f\n", "cavity_frac", f_cav)
     end
-    if σ_χ !== nothing
-        @printf(io, "%-14s = %+.6g\n", "σ_χ", σ_χ)
+
+    # c1 is profiled, not sampled with a prior, so this reports whether the
+    # MAP draw's profiled c1 hit the physical bound in BAYSOL_Utils.Constants
+    # .EXCL_VOL_CORR_BOUNDS -- see Fitting.excl_vol_saturation.
+    excl_vol_sat = map_result === nothing ? 0.0 : get(map_params, "excl_vol_sat", 0.0)
+    if excl_vol_sat == 0.0
+        @printf(io, "%-14s = false\n", "excl_vol_sat")
+    elseif excl_vol_sat > 0
+        @printf(io, "%-14s = true, c1 -> +∞\n", "excl_vol_sat")
+    else
+        @printf(io, "%-14s = true, c1 -> -∞\n", "excl_vol_sat")
     end
 
     if form_factor_log !== nothing && !isempty(form_factor_log)
@@ -663,6 +738,7 @@ function write_report(
         end
     end
 
+    _write_timing(io, fit.timing, t_report)
     return nothing
 end
 

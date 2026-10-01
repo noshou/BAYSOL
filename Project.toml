@@ -11,13 +11,16 @@ CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
 DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"
 DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 FastClosures = "9aa1b823-49e4-5ca5-8b0f-3971ec8bab6a"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
 NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 SQLite = "0aa819cd-b072-5ff4-a722-6bc24af294d9"
@@ -34,13 +37,16 @@ CondaPkg = "0.2"
 DBInterface = "2"
 DiffResults = "1.1.0"
 Distributions = "0.25.131"
+DocStringExtensions = "0.9.5"
 Downloads = "1.7.0"
 FastClosures = "0.3.2"
 ForwardDiff = "1.4.6"
 JSON3 = "1.14.3"
 LegendrePolynomials = "0.4"
 LinearAlgebra = "1"
+LogExpFunctions = "1.0.1"
 NearestNeighbors = "0.4.29"
+Optim = "2.3.2"
 Printf = "1"
 Roots = "3.0.8"
 SQLite = "1"
@@ -50,17 +56,6 @@ StaticArrays = "1.9.20"
 Statistics = "1"
 julia = "1.10"
 
-# Committed (not LocalPreferences.toml, which is gitignored/machine-local):
-# every BAYSOL-dependent Julia environment in this repo (root, test/,
-# test/fitting_tests/, docs/) used to independently provision its own
-# ~360MB CondaPkg-managed Python env for propka/pdb2pqr (see CondaPkg.toml),
-# all resolving the identical spec. One shared, named environment (stored
-# once under the Julia depot, not per-project) replaces all of them -- see
-# the matching [preferences.CondaPkg] block in test/Project.toml,
-# test/fitting_tests/Project.toml, and docs/Project.toml. The "env"
-# preference can't be combined with the Pixi backend (CondaPkg.jl errors:
-# "cannot use pixi backend if env preference is set"), hence MicroMamba here
-# instead of Pixi -- same resolved packages, different installer.
 [preferences.CondaPkg]
 backend = "MicroMamba"
 env = "@baysol"

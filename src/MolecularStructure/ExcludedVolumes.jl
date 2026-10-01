@@ -20,7 +20,7 @@ Points to map onto the volume of a sphere.
 const _pts::Vector{Vec3} = plastic_points(N_VOL_SHELL, Val(3), Val(:volume))
 
 """
-    excluded_volume(cart, rads, tree, rmax) -> Vector{Float64}
+$(TYPEDSIGNATURES)
 
 Per-atom excluded (displaced-solvent) volume in Å³. Algorithm adapted from Chamberlain,
 Moore & Grant (2023), DOI 10.1016/j.bpj.2023.10.034 "Fitting high-resolution

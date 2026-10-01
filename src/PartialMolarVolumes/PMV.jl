@@ -9,6 +9,7 @@ using  ..BAYSOL_Utils.Constants: AVOGADRO
 using  ..BAYSOL_Utils.Cache: KeyedCache
 using  JSON3: JSON3
 using  FastClosures: @closure
+using  DocStringExtensions
 
 export PartialMolarVolumeSource, ϕ°, ρₑ_w, PMVSrcTables, COMMON_TO_IUPAC
 
@@ -62,13 +63,7 @@ function ϕ° end
 struct PMVSrcTables <: PartialMolarVolumeSource end
 
 """
-    _titrated(
-        res::AbstractString,
-        _ionization::Dict{String, Tuple{Tuple{Float64, String}, String}},
-        _dict::Dict{String, Tuple{Int64, Float64, Float64}},
-        pH::Real;
-        σ_pH::Real = 0.0
-    ) -> Tuple{Int64, Float64, Float64}
+$(TYPEDSIGNATURES)
 
 Resolves the pH-dependent partial molar volume of an ionizable residue via
 the sigmoidal titration formula V(pH) = V0 ∓ dV/(1+10^(±(pKa-pH))).
@@ -146,7 +141,7 @@ const _M_H2O = 18.015268
 const _Z_H2O = 10
 
 """
-    ρₑ_w(t::Real) -> Tuple{Float64, Float64}
+$(TYPEDSIGNATURES)
 
 Electron density of pure water at temperature t (°C) and 1 atm, in e·Å⁻³.
 
@@ -232,7 +227,7 @@ const _formation_water_electrons = _Z_H2O
 const _ϕ°_p_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 
 """
-    _residue_var(res::AbstractString, pH::Real; σ_pH::Real = 0.0) -> (electron_count, pmv, variance)
+$(TYPEDSIGNATURES)
 
 Normalizes any residue lookup (ionizable or not) to (electron_count, pmv, variance),
 so every call site in ρₑ accumulates uniformly. Non-ionizable residues have no
@@ -248,7 +243,8 @@ function _residue_var(res::AbstractString, pH::Real; σ_pH::Real = 0.0)::Tuple{I
 end
 
 """
-    ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0) -> Tuple{Int64, Float64, Float64}
+$(TYPEDSIGNATURES)
+
 takes a sequence of one-letter amino acid codes at a pH and returns the estimated
 partial molar volume at inifinit dilution (total electron count, partial molar volume,
 uncertainty). σ_pH is the standard uncertainty on pH, propagated by the delta
@@ -341,6 +337,12 @@ end
 "Memoized solute partial molar volume, keyed by iupac name"
 const _ϕ°_s_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
 
+# The two JSON tables below are read into `const`s at precompile time; declare
+# them as dependencies so editing them invalidates the precompile cache
+# (otherwise stale values/keys keep being served after a table edit).
+include_dependency(joinpath(@__DIR__, "NonBiological", "nonbiological.json"))
+include_dependency(joinpath(@__DIR__, "NonBiological", "common_to_iupac.json"))
+
 """ iupac name => (electron count, pmv, uncertainty) """
 const _solutes::Dict{String, Tuple{Int64, Float64, Union{Float64, Nothing}}} =
     JSON3.read(
@@ -355,7 +357,7 @@ const COMMON_TO_IUPAC::Dict{String, String} = JSON3.read(
 )
 
 """
-    _common2iupac(name::AbstractString) -> Tuple{String,Bool}
+$(TYPEDSIGNATURES)
 
 Look up a non-protein solute's IUPAC name from its common name via
 COMMON_TO_IUPAC (case-insensitive). Returns (iupac_name, true) on a hit,
@@ -370,7 +372,7 @@ function _common2iupac(name::AbstractString)::Tuple{String,Bool}
 end
 
 """
-    _resolve_solute_name(name::AbstractString) -> String
+$(TYPEDSIGNATURES)
 
 name (lowercased) itself if it is already an nonbiological.json key,
 else its COMMON_TO_IUPAC mapping via [`_common2iupac`](@ref) (already
@@ -391,7 +393,7 @@ function _resolve_solute_name(name::AbstractString)::String
 end
 
 """
-    _ϕ°_by_iupac_name(name::AbstractString) -> Tuple{Int64, Float64, Float64}
+$(TYPEDSIGNATURES)
 
 Takes the IUPAC name of a solute and returns (electron count, pmv, uncertainty).
 Private: name must already be an exact nonbiological.json key (see
@@ -431,7 +433,7 @@ function _ϕ°_by_iupac_name(name::AbstractString)::Tuple{Int64, Float64, Float6
 end
 
 """
-    ϕ°(name::AbstractString) -> Tuple{Int64, Float64, Float64}
+$(TYPEDSIGNATURES)
 
 Takes the common or IUPAC name of a solute (resolved via
 [`_resolve_solute_name`](@ref), which is case-insensitive) and returns
@@ -495,7 +497,7 @@ const _wildcards_nuc = Dict(
 )
 
 """
-    _wildcard_var(bases::Vector{String}, lookup::Function) -> Tuple{Int64, Float64, Float64}
+$(TYPEDSIGNATURES)
 
 N-way average of a wildcard's component residues/bases: mean pmv and
 electron count, variance = sum of variances / N² (generalizes protein's
@@ -516,8 +518,7 @@ function _wildcard_var(bases::Vector{String}, lookup::Function)::Tuple{Int64,Flo
 end
 
 """
-    _nuc_residue_var(res::AbstractString, isDNA::Bool, pH::Real; σ_pH::Real = 0.0)
-        -> Tuple{Int64, Float64, Float64}
+$(TYPEDSIGNATURES)
 
 Resolves a single nucleotide letter (or IUPAC ambiguity code) to
 (electron_count, pmv, variance), normalizing plain/ionizable/wildcard
@@ -564,8 +565,7 @@ end
 const _H2O_V0_25C = 18.07
 
 """
-    ϕ°(isDNA::Bool, pH::Real, seq::AbstractString; σ_pH::Real = 0.0)
-        -> Tuple{Int64, Float64, Float64}
+$(TYPEDSIGNATURES)
 
 Partial molar volume at infinite dilution of a DNA/RNA sequence at a given
 pH: takes a string of one-letter nucleotide codes (or IUPAC ambiguity
@@ -641,7 +641,7 @@ end
 # wrappers over them, same convention as form_factor_table.
 
 """
-    ρₑ_w(src::PMVSrcTables, t::Real) -> (ρₑ, uncertainty)
+$(TYPEDSIGNATURES)
 
 Bulk electron density of pure water at t (°C), in e·Å⁻³. Thin wrapper over
 the src-less [`ρₑ_w`](@ref).
@@ -649,20 +649,15 @@ the src-less [`ρₑ_w`](@ref).
 ρₑ_w(::PMVSrcTables, t::Real)::Tuple{Float64,Float64} = ρₑ_w(t)
 
 """
-    ϕ°(
-        src::PMVSrcTables,
-        pH::Real,
-        seq::AbstractString;
-        σ_pH::Real = 0.0
-    ) -> (electron_count, v0, uncertainty)
-
-    ϕ°(src::PMVSrcTables, name::AbstractString)
-        -> (electron_count, v0, uncertainty)
+$(TYPEDSIGNATURES)
 
 Partial molar volume at infinite dilution (v0 in cm³/mol) for a protein
-sequence at a given pH, or a non-protein solute by common or IUPAC name.
-σ_pH is the standard uncertainty on pH, propagated by the delta method
-(see the src-less [`ϕ°`](@ref)). Thin wrappers over the src-less [`ϕ°`](@ref).
+sequence at a given pH. σ_pH is the standard uncertainty on pH, propagated
+by the delta method (see the src-less [`ϕ°`](@ref)). Thin wrapper over the
+src-less [`ϕ°`](@ref).
+
+There is also a convenience overload `ϕ°(src::PMVSrcTables, name::AbstractString)`
+for a non-protein solute by common or IUPAC name; see its own docstring below.
 """
 ϕ°(
     ::PMVSrcTables,
@@ -674,13 +669,7 @@ sequence at a given pH, or a non-protein solute by common or IUPAC name.
 ϕ°(::PMVSrcTables, name::AbstractString)::Tuple{Int64,Float64,Float64} = ϕ°(name)
 
 """
-    ϕ°(
-        src::PMVSrcTables,
-        isDNA::Bool,
-        pH::Real,
-        seq::AbstractString;
-        σ_pH::Real = 0.0
-    ) -> (electron_count, v0, uncertainty)
+$(TYPEDSIGNATURES)
 
 Partial molar volume at infinite dilution (v0 in cm³/mol) for a DNA/RNA
 sequence at a given pH. isDNA selects the A/T/G/C alphabet/backend

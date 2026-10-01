@@ -1,25 +1,20 @@
-using   DelimitedFiles
-using   Statistics
-using   Random
-using   GLMakie
-using   BAYSOL
-using   BAYSOL.MolecularStructure: LocalPathSource
-using   BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+using DelimitedFiles
+using Statistics
+using Random
+using GLMakie
+using BAYSOL
+using BAYSOL.MolecularStructure: LocalPathSource
+using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDF42")
 const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDF42_fit1_model1.pdb")
 const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDF42_fit1.fit")
 
-# `experimental_data/` and `pddf/` are both empty for this entry -- no
-# separate SASBDB .dat file and no bundled GNOM .out pddf were shipped with
-# the fixture. SASDF42_fit1.fit is therefore the ONLY source of both the
-# experimental curve and the reference (CRYSOL/SASREF) model curve: its
-# header is
+# `experimental_data/` and `pddf/` are both empty for this entry
 #
 #     sExp iExp Err iFit // ChiExp =   1.45
 #
-# i.e. column 1 = q (already Å⁻¹, e.g. 0.008-0.5 -- CRYSOL .fit convention,
-# unlike SASDMJ9's raw .dat which was in nm⁻¹ and needed /10), column 2 =
+# i.e. column 1 = q, column 2 =
 # I_exp, column 3 = σ_exp, column 4 = the paper's own fitted/reference
 # curve (χ² = 1.45 quoted in the header). Single header line, so
 # `skipstart = 1`.
@@ -40,11 +35,10 @@ I_exp   = Float64.(raw[:, 2])
 # Table 2 ("SAXS Data") lists three SAXS entries; the third column,
 # "HSA:somapacitan" (molar ratio 1:2, 6.3 mg/mL, MicroMax-007 HF (Rigaku),
 # λ = 1.54187 Å, 20 °C, exposure 3600 s, Rg = 41 Å, Dmax = 139 Å, MW ≈ 113
-# kDa theoretical), carries the SASDB accession code SASDF42 -- this is our
-# entry.
+# kDa theoretical), carries the SASDB accession code SASDF42.
 #
 # Buffer: the "HSA:Somapacitan Complex Formation Studied by SEC" paragraph
-# describes exactly this 1:2 HSA:somapacitan preparation (Figure 3a, "1:2
+# describes this as a 1:2 HSA:somapacitan preparation (Figure 3a, "1:2
 # molar ratio (gray)"), run on "a Superdex 200 10/300 GL column (GE
 # Healthcare) equilibrated with a 100 mM MES, 140 mM sodium chloride, pH
 # 6.5 buffer".
@@ -52,21 +46,19 @@ I_exp   = Float64.(raw[:, 2])
 # X-ray source for this data set (Table 2, third column): MicroMax-007 HF
 # (Rigaku) rotating anode, wavelength stated as 1.54187 Å (Cu Kα) =>
 # energy = hc/λ ≈ 8043 eV (hc = 12398.42 eV·Å). Table 2 states the sample
-# temperature explicitly as 20 °C; as in SASDMJ9, 25 °C is used instead
-# (project convention -- the partial-molar-volume/electron-density priors
-# this pipeline draws on are calibrated at 25 °C).
+# temperature explicitly as 20 °C.
 
 const PH, σ_PH = 6.5, 0.1   # ±0.1 is a typical benchtop pH-meter precision
 
-const ENERGY_EV       = 12398.42 / 1.54187   # ≈ 8043 eV, from the stated 1.54187 Å wavelength
-const TEMPERATURE_C    = 25.0                # 20°C is given in Table 2, but see note above
-const IONIC_STRENGTH_M = 0.140               # 140 mM NaCl, matches the SEC/SAXS buffer above
+const ENERGY_EV       = 12398.42 / 1.54187 # ≈ 8043 eV, from the stated 1.54187 Å wavelength
+const TEMPERATURE_C    = 20.0              # 20°C, Table 2 (SASBDB says 25 °C; the paper's explicit Table 2 value is used)
+const IONIC_STRENGTH_M = 0.140             # 140 mM NaCl, matches the SEC/SAXS buffer above
 
 # ---------------------------------------------------------------------------
 #                        Sequences (read from the PDB itself)
 # ---------------------------------------------------------------------------
 #
-# SASDF42_fit1_model1.pdb has no SEQRES records, so both sequences below
+# SASDF42_fit1_model1.pdb has no SEQRES records, so both sequences
 # were read directly off its own ATOM/CA records (three-letter -> one-letter
 # translation of each chain's residues, in residue-number order). The
 # REMARKs at the top of the file ("Cond Sub Res ... Dist Pen", Euler-angle
@@ -82,26 +74,39 @@ const IONIC_STRENGTH_M = 0.140               # 140 mM NaCl, matches the SEC/SAXS
 # P02768, residues 1-585) starting "DAHKSEV..." (chain A starts at residue
 # 3 = "H", i.e. D1/A2 are simply not resolved in this model), missing only
 # the very last residue (585, Leu). No bound fatty acid (octadecanoic
-# acid) is present as HETATM in this file -- the rigid-body model here is
-# coordinates-only.
+# acid) is present as HETATM in this file.
 #
-# Chains B and C (residues 2-190, 186 residues each, identical sequence --
-# diffed byte-for-byte) are the two growth hormone (somapacitan) copies;
+# Chains B and C (residues 2-190, 186 residues each, identical sequence) 
+# are the two growth hormone (somapacitan) copies;
 # both have an internal gap at residues 37-39 (a flexible loop not modelled
 # in either copy). Chain B's sequence is used below as the representative
 # growth-hormone sequence; its second copy (chain C) is folded into the
 # solute molarity below (2x) rather than listed twice, since it is
 # chemically the same dissolved species.
-const HSA_SEQ = "HKSEVAHRFKDLGEENFKALVLIAFAQYLQQCPFEDHVKLVNEVTEFAKTCVADESAENCDKSLHTLFGDKLCTVATLRETYGEMADCCAKQEPERNECFLQHKDDNPNLPRLVRPEVDVMCTAFHDNEETFLKKYLYEIARRHPYFYAPELLFFAKRYKAAFTECCQAADKAACLLPKLDELRDEGKASSAKQRLKCASLQKFGERAFKAWAVARLSQRFPKAEFAEVSKLVTDLTKVHTECCHGDLLECADDRADLAKYICENQDSISSKLKECCEKPLLEKSHCIAEVENDEMPADLPSLAADFVESKDVCKNYAEAKDVFLGMFLYEYARRHPDYSVVLLLRLAKTYETTLEKCCAAADPHECYAKVFDEFKPLVEEPQNLIKQNCELFEQLGEYKFQNALLVRYTKKVPQVSTPTLVEVSRNLGKVGSKCCKHPEAKRMPCAEDYLSVVLNQLCVLHEKTPVSDRVTKCCTESLVNRRPCFSALEVDETYVPKEFNAETFTFHADICTLSEKERQIKKQTALVELVKHKPKATKEQLKAVMDDFAAFVEKCCKADDKETCFAEEGKKLVAASQAALG"
+const HSA_SEQ = 
+    "HKSEVAHRFKDLGEENFKALVLIAFAQYLQQCPFEDHVKLVNEVTEFAKTCVADESAENC" *
+    "DKSLHTLFGDKLCTVATLRETYGEMADCCAKQEPERNECFLQHKDDNPNLPRLVRPEVDV" *
+    "MCTAFHDNEETFLKKYLYEIARRHPYFYAPELLFFAKRYKAAFTECCQAADKAACLLPKL" *
+    "DELRDEGKASSAKQRLKCASLQKFGERAFKAWAVARLSQRFPKAEFAEVSKLVTDLTKVH" *
+    "TECCHGDLLECADDRADLAKYICENQDSISSKLKECCEKPLLEKSHCIAEVENDEMPADL" *
+    "PSLAADFVESKDVCKNYAEAKDVFLGMFLYEYARRHPDYSVVLLLRLAKTYETTLEKCCA" *
+    "AADPHECYAKVFDEFKPLVEEPQNLIKQNCELFEQLGEYKFQNALLVRYTKKVPQVSTPT" *
+    "LVEVSRNLGKVGSKCCKHPEAKRMPCAEDYLSVVLNQLCVLHEKTPVSDRVTKCCTESLV" *
+    "NRRPCFSALEVDETYVPKEFNAETFTFHADICTLSEKERQIKKQTALVELVKHKPKATKE" *
+    "QLKAVMDDFAAFVEKCCKADDKETCFAEEGKKLVAASQAALG"
 
-const GH_SEQ = "PTIPLSRLFQNAMLRAHRLHQLAFDTYEEFEEAYIQKYSFLQAPQASLCFSESIPTPSNREQAQQKSNLQLLRISLLLIQSWLEPVGFLRSVFANSCVYGASDSDVYDLLKDLEEGIQTLMGRLEDGSPRTGQAFKQTYAKFDANSHNDDALLKNYGLLYCFRKDMDKVETFLRIVQCRSVEGSCG"
+const GH_SEQ = 
+    "PTIPLSRLFQNAMLRAHRLHQLAFDTYEEFEEAYIQKYSFLQAPQASLCFSESIPTPSNR" *
+    "EQAQQKSNLQLLRISLLLIQSWLEPVGFLRSVFANSCVYGASDSDVYDLLKDLEEGIQTL" *
+    "MGRLEDGSPRTGQAFKQTYAKFDANSHNDDALLKNYGLLYCFRKDMDKVETFLRIVQCRS" *
+    "VEGSCG"
 
 # Average masses from HSA_SEQ/GH_SEQ (ExPASy average residue masses + one
-# water for the terminal H/OH), computed from the PDB-resolved sequences
-# above -- i.e. these are slightly smaller than the full mature-protein
+# water for the terminal H/OH), computed from the PDB-resolved sequences. 
+# these are slightly smaller than the full mature-protein
 # masses (HSA is missing 3 N-/C-terminal residues; growth hormone is
 # missing 5 residues incl. the 37-39 loop), and the growth hormone mass
-# in particular excludes somapacitan's non-protein modification (the
+# in excludes somapacitan's non-protein modification (the
 # tetrazole/linker/C18-diacid albumin-binding side chain of Figure 2d),
 # since that side chain has no resolved coordinates in this rigid-body
 # model. Both are therefore approximations, noted here rather than
@@ -129,11 +134,20 @@ const GH_MOLARITY    = 2 * _COMPLEX_MOLARITY
 const GH_MOLARITY_σ  = 0.05 * GH_MOLARITY
 
 # Buffer components
+# Counter-ions (added 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
+# not list. Assumed: 100 mM MES titrated with NaOH -> Na⁺ = C·0.682 (pK(22 °C) = 6.296). The pH is taken as
+# set at room temperature (22 ± 3 °C), which fixes the counter-ion amount whatever the measurement
+# temperature. pK(T) from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
+# 10.1063/1.1416902) pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.208 M. σ combines σ_PH, ±3 °C,
+# ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is modelled; the volume change of
+# the buffer's own (de)protonation is not. Titrant: not stated; HCl for amine bases (Tris, imidazole,
+# histidine), NaOH for Good's buffers.
 const SOLUTES = Solute[
-    Protein(HSA_MOLARITY, HSA_MOLARITY_σ, HSA_SEQ),
-    Protein(GH_MOLARITY,  GH_MOLARITY_σ,  GH_SEQ),
+    # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
+    # electron density (see Fitting.Solute).
     NonBiological(0.140, 0.0014, "sodium chloride"),   # 140 mM NaCl, ±1%
     NonBiological(0.100, 0.002,  "mes"),                # 100 mM MES, ±2%
+    NonBiological(0.068195, 0.005764, "sodium(1+)"),   # Na⁺ counter-ion from NaOH titration of MES (see note above)
 ]
 
 # ---------------------------------------------------------------------------
@@ -145,18 +159,16 @@ const SOLUTES = Solute[
 const Q_MAX_FIT = 0.5
 
 # No GNOM pddf was bundled for this entry (pddf/ is empty), so Dmax was
-# estimated directly from SASDF42_fit1_model1.pdb's own coordinate extent
+# estimated directly from SASDF42_fit1_model1.pdb's coordinate file
 # (exact all-atom max pairwise distance over all 7623 ATOM records, brute
 # force) rather than from a P(r) inversion: Dmax ≈ 139.29 Å. This lines up
-# almost exactly with the paper's own GNOM-derived Dmax = 139 Å quoted for
+# almost exactly with the paper's GNOM-derived Dmax = 139 Å quoted for
 # this entry in Table 2, which is a useful cross-check that the
 # coordinate-extent estimate is reasonable here.
-#
-# Same q·Dmax rule of thumb as SASDMJ9: Q_MAX_FIT * Dmax ≈ 0.5 * 139.29 ≈
-# 69.6, rounded to 70.
+# Q_MAX_FIT * Dmax ≈ 0.5 * 139.29 ≈ 69.6, rounded to 70.
 const LMAX = 70
 
-const ADD_HYDROGENS = true   # runs PDB2PQR at PH; real crystal/rigid-body structure, not a dummy-bead model
+const ADD_HYDROGENS = true
 
 """
     fit_subset() -> (q, I, σ)
@@ -172,22 +184,21 @@ function run_sasdf42(; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer
     q_fit, I_fit, σ_fit = fit_subset()
 
     Random.seed!(seed)
-    s, μ_χ, σ_χ = BAYSOL.seed_model(
+    s = BAYSOL.seed_model(
         LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
-        ionic_strength_M = IONIC_STRENGTH_M, T = TEMPERATURE_C + 273.15,
     )
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
-    return res, μ_χ, σ_χ, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
+    return res, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
 end
 
-result, μ_χ, σ_χ, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdf42()
+result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdf42()
 
 fit, divergence_rate, map_result, quantile_result = result
 
 # `@__DIR__` (this SASDF42/ folder), not the caller's cwd.
 open(joinpath(@__DIR__, "res.txt"), "w") do io
-    BAYSOL.write_report(io, result; μ_χ = μ_χ, σ_χ = σ_χ, form_factor_log = form_factor_log, n_atoms = n_atoms)
+    BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
 """
@@ -200,13 +211,17 @@ all draws diverged) the quantile-curve envelope.
 function sasdf42_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
+    # itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     fig = Figure(size = (700, 500))
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "divergence rate = $(round(divergence_rate; digits = 3))",
+
         xscale = log10,
         yscale = log10,
     )
@@ -226,16 +241,16 @@ function sasdf42_figure(result, data)
         quantiles = curves["quantiles"]
 
         band!(
-            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), bounds[:, 3];
-            color = (:dodgerblue, 0.15), label = "bounds",
+            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
+            color = (:darkorange, 0.15), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = :darkorange, linewidth = 1.5, label = "quantiles",
         )
         lines!(
-            ax, quantiles[:, 1], quantiles[:, 3];
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5,
+            ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
+            linestyle = :dot, color = :darkorange, linewidth = 1.5,
         )
     end
 
@@ -259,7 +274,7 @@ function sasdf42_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "MAP")
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -283,7 +298,7 @@ function sasdf42_residuals_figure(result, data)
     q_fit, I_fit, σ_fit = data
 
     fig = Figure(size = (700, 400))
-    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)", title = "fit residuals")
+    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
 
     map_curve = map_result === nothing ? nothing : map_result[2]
 
@@ -295,15 +310,15 @@ function sasdf42_residuals_figure(result, data)
 
         band!(
             ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = (:dodgerblue, 0.15), label = "bounds",
+            color = (:darkorange, 1), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = :darkorange, linewidth = 2.5, label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = :dodgerblue, linewidth = 1.5,
+            linestyle = :dot, color = :darkorange, linewidth = 2.5,
         )
     end
 
@@ -317,27 +332,28 @@ function sasdf42_residuals_figure(result, data)
         ylims!(ax, lo - pad, hi + pad)
     end
 
-    axislegend(ax; position = :lb, framevisible = false)
+    axislegend(ax; position = :rt, framevisible = false)
 
     return fig
 end
 
-# ξ = (dns, δρ1, δρ2, δρ3, c1)
 const _HIST_PARAMS = [
-    ("dns", "slvnt_e_dns"), ("δρ1", "delta_rho_1"), ("δρ2", "delta_rho_2"),
-    ("δρ3", "delta_rho_3"), ("c1", "excl_vol_corr"),
+    ("ρₑ", "slvnt_e_dns"), ("δρ₁", "delta_rho_1"), ("δρ₂", "delta_rho_2"),
+    ("δρ₃", "delta_rho_3"),
+    ("scale", "scale"), ("bkgrnd_corr", "bkgrnd_corr"),
+    ("c1", "excl_vol_corr"),
 ]
 
 """
-    sasdf42_posterior_hist(result) -> Figure
-
-Histograms of the non-divergent posterior draws for each physical parameter
-`ξ = (dns, δρ1, δρ2, δρ3, c1)`, with the MAP draw marked.
+    sasdf42_hist(result) -> Figure
 """
-function sasdf42_posterior_hist(result)
+function sasdf42_hist(result)
     fit, _, map_result, _ = result
     ok = .!getproperty.(fit.stats, :numerical_error)
     samples = fit.samples[ok]
+    c1_draws = fit.c1[ok]
+    scale_draws = fit.scale[ok]
+    bkgrnd_draws = fit.bkgrnd_corr[ok]
     map_params = map_result === nothing ? nothing : map_result[1]
 
     fig = Figure(size = (900, 550))
@@ -345,9 +361,18 @@ function sasdf42_posterior_hist(result)
         row, col = fldmod1(i, 3)
         ax = Axis(
             fig[row, col], xlabel = label, ylabel = "count",
-            xticklabelrotation = label == "dns" ? π/2 : 0.0,
+            xticklabelrotation = π/2,
         )
-        hist!(ax, getindex.(samples, i); bins = 40, color = (:dodgerblue, 0.6))
+        draws = if label == "c1"
+            c1_draws
+        elseif label == "scale"
+            scale_draws
+        elseif label == "bkgrnd_corr"
+            bkgrnd_draws
+        else
+            getindex.(samples, i)
+        end
+        hist!(ax, draws; bins = 40, color = (:darkorange, 0.6))
         if map_params !== nothing
             vlines!(ax, [map_params[map_key]]; color = :crimson, linewidth = 2)
         end
@@ -357,14 +382,18 @@ function sasdf42_posterior_hist(result)
 end
 
 """
-    sasdf42_crysol_comparison_figure(result, data) -> Figure
+    sasdf42_comparison_figure(result, data) -> Figure
 
 Overlays our MAP curve against the reference model curve from the paper's
 own SASDF42_fit1.fit (column 4, χ² = 1.45 per its header).
 """
-function sasdf42_crysol_comparison_figure(result, data)
+function sasdf42_comparison_figure(result, data)
     _, _, map_result, _ = result
     q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
+    # itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     crysol   = readdlm(_FIT_PATH; skipstart = 1)
     q_crysol = Float64.(crysol[:, 1])
@@ -376,7 +405,6 @@ function sasdf42_crysol_comparison_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-        title  = "BAYSOL MAP vs. SASREF fit1 (paper)",
         xscale = log10,
         yscale = log10,
     )
@@ -393,15 +421,15 @@ function sasdf42_crysol_comparison_figure(result, data)
 
     lines!(
         ax, q_crysol[keep], I_crysol[keep];
-        color = :seagreen, linewidth = 2, linestyle = :dash, label = "SASREF fit1",
+        color = :mediumturquoise, linewidth = 2, linestyle = :dash, label = "SASREF fit1",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map_curve[:, 2]; color = :crimson, linewidth = 2, label = "BAYSOL MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "BAYSOL MAP")
     end
 
-    axislegend(ax; position = :lt, framevisible = false)
+    axislegend(ax; position = :lb, framevisible = false)
 
     lo, hi = extrema(I_fit)
     ylims!(ax, lo * 0.7, hi * 1.3)
@@ -410,16 +438,13 @@ function sasdf42_crysol_comparison_figure(result, data)
 end
 
 fig = sasdf42_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res.png"), fig)
+save(joinpath(@__DIR__, "res.png"), fig; px_per_unit = 3.5)
 
 fig_residuals = sasdf42_residuals_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals)
+save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals; px_per_unit = 3.5)
 
-fig_hist = sasdf42_posterior_hist(result)
-save(joinpath(@__DIR__, "res_hist.png"), fig_hist)
+fig_hist = sasdf42_hist(result)
+save(joinpath(@__DIR__, "res_hist.png"), fig_hist; px_per_unit = 3.5)
 
-fig_crysol = sasdf42_crysol_comparison_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_crysol_comparison.png"), fig_crysol)
-
-"Display the SASDF42 fit figure. Blocks until the window is closed."
-vis_sasdf42() = wait(display(fig))
+fig_crysol = sasdf42_comparison_figure(result, (q_fit, I_fit, σ_fit))
+save(joinpath(@__DIR__, "res_comparison.png"), fig_crysol; px_per_unit = 3.5)

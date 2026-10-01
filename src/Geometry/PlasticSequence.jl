@@ -15,6 +15,7 @@ coordinate).
 """
 module PlasticSequence
 
+using ..DocStringExtensions
 using Roots: find_zero
 using FastClosures: @closure
 
@@ -28,7 +29,7 @@ const Vec2 = NTuple{2,Float64}
 const Vec3 = NTuple{3,Float64}
 
 """
-    plastic_ratio(d::Int) -> Float64
+$(TYPEDSIGNATURES)
 
 The generalized d-dimensional plastic ("harmonious") ratio: the real root
 in (1, 2) of x^(d+1) = x + 1. d = 2 recovers the classic plastic ratio
@@ -53,7 +54,7 @@ const _PLASTIC_RATIO_3_CUBE = PLASTIC_RATIO_3^3
 _frac(x) = x - floor(x)
 
 """
-    _plastic_term(i::Int) -> (Float64, Float64)
+$(TYPEDSIGNATURES)
 
 1-based term i of the 2-D R₂ additive recurrence: (frac(i/ρ), frac(i/ρ²)).
 Shared by the plane and surface layouts below so a dim = 3 (:surface)
@@ -68,7 +69,7 @@ fractional part accurate; it degrades only once i nears the mantissa limit
 end
 
 """
-    _plastic_term3(i::Int) -> (Float64, Float64, Float64)
+$(TYPEDSIGNATURES)
 
 1-based term i of the 3-D R₃ additive recurrence: (frac(i/ρ₃), frac(i/ρ₃²), frac(i/ρ₃³)),
 ρ₃ = plastic_ratio(3). A genuinely 3-D generator, distinct from _plastic_term
@@ -79,7 +80,7 @@ end
 end
 
 """
-    _plastic_point_2d(i::Int) -> Vec2
+$(TYPEDSIGNATURES)
 
 Raw 2-D term i, in [0, 1)².
 """
@@ -88,7 +89,7 @@ Raw 2-D term i, in [0, 1)².
 end
 
 """
-    _plastic_point_surface(i::Int) -> Vec3
+$(TYPEDSIGNATURES)
 
 Unit sphere **surface** point for 1-based plastic-sequence term i. The 2-D
 term is read as (azimuth, height) and lifted to the sphere through the
@@ -105,7 +106,7 @@ rather than clustered at the poles. |p| == 1 for every point.
 end
 
 """
-    _plastic_point_volume(i::Int) -> Vec3
+$(TYPEDSIGNATURES)
 
 Unit-sphere **volume** point for 1-based plastic-sequence term i, built from
 the 3-D R₃ generator ([`_plastic_term3`](@ref)). The first two terms are
@@ -126,11 +127,11 @@ clustered at the centre.
 end
 
 """
-    plastic_points(n::Int, ::Val{2}) -> Vector{Vec2}
-    plastic_points(n::Int, ::Val{3}) -> Vector{Vec3}
-    plastic_points(n::Int, ::Val{3}, ::Val{:surface}) -> Vector{Vec3}
-    plastic_points(n::Int, ::Val{3}, ::Val{:volume}) -> Vector{Vec3}
-    plastic_points(n::Int; dim::Int=3, shape::Symbol=:surface) -> Vector{Vec2} or Vector{Vec3}
+$(TYPEDSIGNATURES)
+
+Also has overloaded forms `plastic_points(n, ::Val{3}, ::Val{:surface})`,
+`plastic_points(n, ::Val{3}, ::Val{:volume})`, and a keyword form
+`plastic_points(n; dim=3, shape=:surface)`; see below.
 
 The first n terms of the plastic low-discrepancy sequence:
 

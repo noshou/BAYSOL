@@ -8,7 +8,7 @@ pair pass the resulting path to [`load_molecule`](@ref) themselves.
 """
 
 using BioStructures: BioStructures, MMCIFFormat, PDBFormat, writepdb,
-                    standardselector, heavyatomselector, retrievepdb
+                    standardselector, heavyatomselector, retrievepdb, collectmodels
 using Downloads: Downloads
 
 "Raised for any failure resolving/converting a structure source:
@@ -73,7 +73,7 @@ struct URLSource <: StructureSource
 end
 
 """
-    _resolve_canonical_pdb(struc, key::AbstractString) -> String
+$(TYPEDSIGNATURES)
 
 Shared "produce candidate .pdb, then compare-or-write-or-throw" step used by
 [`LocalPathSource`](@ref) and [`URLSource`](@ref) (not [`PDBIDSource`](@ref),
@@ -100,7 +100,7 @@ function _resolve_canonical_pdb(struc, key::AbstractString)::String
     final_path = joinpath(_store_dir(), key * ".pdb")
     tmpdir = mktempdir()
     tmp_path = joinpath(tmpdir, key * ".pdb")
-    model = struc[1]
+    model = first(collectmodels(struc))   # first model whatever its number
     try
         writepdb(tmp_path, model, standardselector, heavyatomselector)
     catch e
@@ -170,7 +170,7 @@ function resolve_structure(source::PDBIDSource)::String
         rm(tmpdir; recursive = true, force = true)
         throw(StructureSourceError("failed fetching PDB ID \"$id\": $(sprint(showerror, e))"))
     end
-    model = struc[1]
+    model = first(collectmodels(struc))   # first model whatever its number
     try
         writepdb(existing, model, standardselector, heavyatomselector)
     catch e
