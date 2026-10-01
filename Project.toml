@@ -1,6 +1,6 @@
 name = "BAYSOL"
 uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["noshou"]
 
 [deps]

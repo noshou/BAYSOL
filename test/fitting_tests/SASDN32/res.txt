@@ -47,22 +47,22 @@ cavity_frac    = 0.0062
 excl_vol_sat   = false
 
 === Timing ===                                        seconds    % wall    (JIT)
-wall clock  (seed_model → end of report)                63.27     100.0    (3.7)
-  static build                                          18.39      29.1    (1.4)
+wall clock  (seed_model → end of report)                61.86     100.0    (3.0)
+  static build                                          16.93      27.4    (0.8)
     resolve_structure                                    0.00
     propka                [cache hit]                    0.00
-    pdb2pqr               [cache miss]                   1.66
+    pdb2pqr               [cache hit]                    0.00
     load_molecule                                        0.17
-    forward_cache                                       16.47
-      vacuum B_lm                                        6.28
-      excluded volume (vols + B_lm)                      5.64
-      hydration (SASA + B_lm)                            4.29
+    forward_cache                                       16.66
+      vacuum B_lm                                        6.32
+      excluded volume (vols + B_lm)                      5.78
+      hydration (SASA + B_lm)                            4.31
       Gram + r_m                                         0.26
     seed_fitting (priors, WLS)                           0.10
-  sampling                                              44.09      69.7    (1.4)
+  sampling                                              44.13      71.3    (1.4)
     NUTS setup (Hamiltonian, step-size init)             0.65
-    NUTS  (2k iters, 41.86k leapfrog, 1.0 ms/step)      41.26
-    per-draw c1 re-profile + curves (2000 draws)         2.10
+    NUTS  (2k iters, 41.86k leapfrog, 1.0 ms/step)      41.57
+    per-draw c1 re-profile + curves (2000 draws)         1.84
     MAP + quantiles                                      0.07
   report write                                           0.10
   unaccounted                                            0.70    (0.7)
