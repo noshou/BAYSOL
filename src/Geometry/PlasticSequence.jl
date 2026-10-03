@@ -16,39 +16,16 @@ coordinate).
 module PlasticSequence
 
 using ..DocStringExtensions
-using Roots: find_zero
-using FastClosures: @closure
+using ...BAYSOL_Utils.Constants: PLASTIC_RATIO_2, _PLASTIC_RATIO_SQR,
+PLASTIC_RATIO_3, _PLASTIC_RATIO_3_SQR, _PLASTIC_RATIO_3_CUBE
 
-export  Vec2, Vec3, plastic_ratio, PLASTIC_RATIO_2, 
-        PLASTIC_RATIO_3, plastic_points
+export  Vec2, Vec3, plastic_points
 
 "A point in the plane, (x, y)."
 const Vec2 = NTuple{2,Float64}
 
 "A unit vector on the sphere, (x, y, z)."
 const Vec3 = NTuple{3,Float64}
-
-"""
-$(TYPEDSIGNATURES)
-
-The generalized d-dimensional plastic ("harmonious") ratio: the real root
-in (1, 2) of x^(d+1) = x + 1. d = 2 recovers the classic plastic ratio
-ρ ≈ 1.324718 (root of x³ = x + 1), the constant this module's dim = 2
-and dim = 3 layouts both build on.
-"""
-function plastic_ratio(d::Int)::Float64
-    d ≥ 1 || throw(DomainError(d, "d must be ≥ 1"))
-    return find_zero(@closure(x -> x^(d + 1) - x - 1), (1.0, 2.0))
-end
-
-"Plastic ratio ρ ≈ 1.324718, the real root of x³ = x + 1 (`plastic_ratio(2)`)."
-const PLASTIC_RATIO_2     = plastic_ratio(2)
-const _PLASTIC_RATIO_SQR = PLASTIC_RATIO_2^2
-
-"3-D plastic ratio, the real root of x⁴ = x + 1 (`plastic_ratio(3)`)."
-const PLASTIC_RATIO_3      = plastic_ratio(3)
-const _PLASTIC_RATIO_3_SQR  = PLASTIC_RATIO_3^2
-const _PLASTIC_RATIO_3_CUBE = PLASTIC_RATIO_3^3
 
 "Fractional part of x, i.e. x - floor(x), in [0, 1)."
 _frac(x) = x - floor(x)

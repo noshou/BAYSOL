@@ -144,8 +144,8 @@ contrast dro_k downstream (CRYSOL's δρ = (1, 1, 0) defaults).
     - `probe::Float64 = PROBE_RADIUS`: solvent probe radius, forwarded to shell_points.
     - `n_target::Union{Nothing,Int} = SHELL_N_TARGET`: total shell dummies before the class
     split, the analogue of CRYSOL's --fb. nothing lets SASA.shell_points
-    size the cloud from the accessible area (≈ area / SASA.SHELL_AREA_PER_POINT,
-    floored at SASA.SHELL_MIN_POINTS); pass an Int to pin it. Runtime is
+    size the cloud from the accessible area (≈ area / SHELL_AREA_PER_POINT,
+    floored at SHELL_MIN_POINTS); pass an Int to pin it. Runtime is
     linear in it.
     - `classes = SHELL_CLASSES`: which populations to actually build. A class left
     out still appears in the result as an all-zero B_lm (equivalent to

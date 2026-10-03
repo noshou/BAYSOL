@@ -18,8 +18,7 @@ Consumers: `SASA` (surface sampling, `Metrics` shortcuts) and `MolecularStructur
 
 Even point sets drawn from the plastic (R_d) family of additive low-discrepancy sequences (Roberts, M. (2018). The Unreasonable Effectiveness of Quasirandom Sequences.).
 
-- plastic_ratio(d::Int) -> Float64: the generalized d-dimensional plastic ("harmonious") ratio, the real root in (1, 2) of x^(d+1) = x + 1. d = 2 recovers the classic plastic ratio ρ ≈ 1.324718 (root of x³ = x + 1); d = 3 gives ρ ≈ 1.220744 (real root of x⁴ = x + 1).
-- PLASTIC_RATIO_2, PLASTIC_RATIO_3: plastic_ratio(2)/plastic_ratio(3), precomputed.
+- The plastic ratios themselves are constants in `BAYSOL_Utils.Constants`, not part of this module: `PLASTIC_RATIO_2` ≈ 1.324718 (real root of x³ = x + 1) and `PLASTIC_RATIO_3` ≈ 1.220744 (real root of x⁴ = x + 1), plus the precomputed powers `_PLASTIC_RATIO_SQR`, `_PLASTIC_RATIO_3_SQR` and `_PLASTIC_RATIO_3_CUBE`. They are hardcoded rather than solved for at load time, so the package no longer depends on Roots.jl.
 - Vec2, Vec3: NTuple{2,Float64}/NTuple{3,Float64} point types.
 - plastic_points(n::Int, ::Val{2}) -> Vector{Vec2}: the first n raw 2-D R₂ terms (frac(i/ρ), frac(i/ρ²)), uniform on [0, 1)².
 - plastic_points(n::Int, ::Val{3}) -> Vector{Vec3} (same as Val{3}, Val{:surface}): those same 2-D R₂ terms read as (azimuth, height) and lifted onto the **surface** of the unit sphere via Lambert's cylindrical equal-area projection. Points are uniform in *area*, |p| == 1 .
@@ -29,18 +28,19 @@ Even point sets drawn from the plastic (R_d) family of additive low-discrepancy 
 Surface vs. volume is  **multiple dispatch** on Val{:surface}/Val{:volume} (a second Val argument); both layouts are deterministic and prefix-stable, term i never changes as n grows, so plastic_points(k, args...) == plastic_points(n, args...)[1:k] for any k ≤ n.
 
 ```julia
-using ..Geometry.PlasticSequence: plastic_points, plastic_ratio, PLASTIC_RATIO_2, PLASTIC_RATIO_3
+using ..Geometry.PlasticSequence: plastic_points
+using ..BAYSOL_Utils.Constants: PLASTIC_RATIO_2, PLASTIC_RATIO_3
 
 pts2d = plastic_points(500, Val(2))                 # Vector{Vec2}, [0,1)^2
 surf  = plastic_points(256)                         # Vector{Vec3}, sphere surface (default)
 ball  = plastic_points(256, Val(3), Val(:volume))   # Vector{Vec3}, fills the sphere volume
-ρ4    = plastic_ratio(4)                            # generalized 4-D plastic ratio
 ```
 
 or, from outside the package:
 
 ```julia
-using BAYSOL.Geometry.PlasticSequence: plastic_points, PLASTIC_RATIO_2, PLASTIC_RATIO_3
+using BAYSOL.Geometry.PlasticSequence: plastic_points
+using BAYSOL.Constants: PLASTIC_RATIO_2, PLASTIC_RATIO_3
 ```
 
 ## Metrics.jl

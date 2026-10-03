@@ -26,7 +26,7 @@ using .AtomicRadii:             AtomicRadii
 using .FormFactor:              FormFactor
 using .PartialMolarVolumes:     PartialMolarVolumes
 using .MolecularStructure:      MolecularStructure
-using .SASA:                     SASA
+using .SASA:                    SASA
 using .Scattering:              Scattering
 using .Fitting:                 Fitting
 
@@ -35,11 +35,11 @@ $(TYPEDSIGNATURES)
 
 Computes a NUTS seed from given data input:
 
-    1. resolve mol_src to a structure
-    2. if add_hydrogens, run PROPKA on the model (its pKas drive Pdb2pqr's
-       terminus protonation) and add hydrogens (Pdb2pqr, pH-driven)
-    3. build the forward-model (gram matrix)
-    4. produce a [`Fitting.Seed`](@ref).
+    1.  resolve mol_src to a structure
+    2.  if add_hydrogens, run PROPKA on the model (its pKas drive Pdb2pqr's
+        terminus protonation) and add hydrogens (Pdb2pqr, pH-driven)
+    3.  build the forward-model (gram matrix)
+    4.  produce a [`Fitting.Seed`](@ref).
 
 # Arguments
 - `mol_src::MolecularStructure.StructureSource`: where to obtain the
@@ -269,7 +269,7 @@ forward model) from the trajectory's sample covariance.
     size and mass matrix before sampling proper.
 
 # Keywords
-- `quantiles::AbstractString="16-84"`: the "<lo>-<hi>" empirical quantile
+- `quantiles::AbstractString=DEFAULT_QUANTILES`: the "<lo>-<hi>" empirical quantile
     range (integer percentages, 0 ≤ lo < hi ≤ 100) used to build
     [`QuantileResult`](@ref)'s "quantiles"/"bounds" entries, e.g. the
     default "16-84" is a ±1σ-equivalent interval for a Normal. The special
@@ -292,7 +292,7 @@ function run_model(
     seed::Fitting.Seed,
     n_samples::Int64,
     n_adapt::Int64;
-    quantiles::AbstractString="16-84",
+    quantiles::AbstractString=BAYSOL_Utils.Constants.DEFAULT_QUANTILES,
     l::Fitting.LIKELIHOOD=Fitting.PROFILE(),
     δ::Real=80
 )::Union{

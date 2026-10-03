@@ -17,12 +17,11 @@
 #   julia --project=test/visualize -e 'include("test/visualize/sasa_vis.jl"); sasa_scene_report()'
 
 using BAYSOL
-using BAYSOL.Interfaces: Interfaces, RadiiSource
+using BAYSOL.AtomicRadii: AtomicRadii, RadiiSource
 using BAYSOL.MolecularStructure: MolecularStructure, Molecule
 using BAYSOL.SASA: SASA
 using BAYSOL.Geometry.PlasticSequence: plastic_points
-using BAYSOL.Geometry.Metrics: Metrics, Coverage, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS,
-                                     classify, blocked
+using BAYSOL.Geometry.Metrics: Metrics, Coverage, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS, classify, blocked
 using Printf: @printf, @sprintf
 using GLMakie
 using GLMakie.Makie: Tesselation   # not re-exported by GLMakie itself
@@ -45,7 +44,7 @@ end
 
 Resolve each label against `src.table`, `nothing` for anything absent.
 """
-function Interfaces.lookup(src::FixedRadii, ions)
+function AtomicRadii.lookup(src::FixedRadii, ions)
     out = Vector{Tuple{String,Union{Float64,Nothing}}}(undef, length(ions))
     for (i, ion) in enumerate(ions)
         s = String(ion)
@@ -147,7 +146,7 @@ candidate but occludes nothing, so every sample point on both atoms is exposed.
 `focus` lists the atoms whose points get drawn.
 """
 function exposed_scene(; probe::Float64 = 1.4)
-    src = FixedRadii(Dict("A" => 1.5))
+    src = FixedRadii(Dict("a" => 1.5))
     mol = MolecularStructure.create("fully exposed", ["A", "A"],
                             [(0.0, 0.0, 0.0), (6.2, 0.0, 0.0)]; radii_source = src)
     return (; mol, probe, focus = [1, 2], title = "1. Fully exposed")
@@ -162,7 +161,7 @@ is exposed. Carries `analytic_frac`, the exact cap-derived exposed fraction from
 [`two_sphere_exposed_frac`](@ref).
 """
 function partial_scene(; probe::Float64 = 1.4, d::Float64 = 3.5)
-    src = FixedRadii(Dict("A" => 1.5))
+    src = FixedRadii(Dict("a" => 1.5))
     mol = MolecularStructure.create("partially occluded", ["A", "A"],
                             [(0.0, 0.0, 0.0), (d, 0.0, 0.0)]; radii_source = src)
     ρ = 1.5 + probe
@@ -181,7 +180,7 @@ small atom's whole expanded sphere is strictly inside the big one's and every
 sample point is occluded.
 """
 function buried_scene(; probe::Float64 = 1.4)
-    src = FixedRadii(Dict("BIG" => 6.0, "SML" => 0.5))
+    src = FixedRadii(Dict("big" => 6.0, "sml" => 0.5))
     mol = MolecularStructure.create("fully buried", ["BIG", "SML"],
                             [(0.0, 0.0, 0.0), (3.0, 0.0, 0.0)]; radii_source = src)
     return (; mol, probe, focus = [2], title = "3. Fully buried")
@@ -196,7 +195,7 @@ patches that peek between neighbours while the shell atoms stay mostly exposed,
 so a single scene shows the whole spread of per-atom states.
 """
 function cluster_scene(; probe::Float64 = 1.4, spacing::Float64 = 4.0)
-    src = FixedRadii(Dict("A" => 1.5))
+    src = FixedRadii(Dict("a" => 1.5))
     s = spacing
     coords = [  (0.0, 0.0, 0.0),
                 ( s, 0.0, 0.0), (-s, 0.0, 0.0),
