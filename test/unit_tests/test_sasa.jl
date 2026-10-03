@@ -4,7 +4,8 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL: AtomicRadii
 using BAYSOL.SASA: SASA, sasa
-using BAYSOL.Constants: SHELL_MIN_POINTS, _SHELL_SAMPLE
+using BAYSOL.Constants: SHELL_MIN_POINTS, _SHELL_SAMPLE, PROBE_RADIUS, SASA_N_OCC, SASA_N_EXP,
+    SASA_AREA_TOL
 using BAYSOL.Geometry.Metrics: blocked
 using BAYSOL.MolecularStructure: MolecularStructure, create
 
@@ -275,7 +276,8 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         m = sasa_mol(["q", "q"], [(0.0, 0.0, 0.0), (3.0, 0.0, 0.0)])
 
         # a bare call == spelling every default out explicitly
-        ref = sasa_atoms(m; probe = 1.4, n_occ = 512, n_exp = 4096, area_tol = 2.0)
+        ref = sasa_atoms(m; probe = PROBE_RADIUS, n_occ = SASA_N_OCC, n_exp = SASA_N_EXP,
+                         area_tol = SASA_AREA_TOL)
         @test sasa_atoms(m) == ref
         @test sasa_total(m) == sum(ref)
         @test sasa_total(m) isa Float64
@@ -287,7 +289,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         @test sasa_atoms(m; n_exp = 512) != ref
 
         # a lone atom is still exact through the default path
-        @test sasa_total(sasa_mol(["q"], [(0.0, 0.0, 0.0)])) == sasa_full(1.5, 1.4)
+        @test sasa_total(sasa_mol(["q"], [(0.0, 0.0, 0.0)])) == sasa_full(1.5, PROBE_RADIUS)
     end
 
     @testset "the default n_exp is accurate enough to not be the limiting error" begin
@@ -525,7 +527,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         # every point sits on the expanded sphere, in the molecule's own centred frame .
         atom = MolecularStructure.coords_cartesian(m)[:, 1]
         for k in axes(pts, 2)
-            @test isapprox(sqrt(sum(abs2, pts[:, k] .- atom)), ρ; atol = 1e-10)
+            @test isapprox(sqrt(sum(abs2, pts[:, k] .- atom)), ρ; atol = 1e-1 * DEFAULT_ATOL)
         end
 
         # A fully engulfed atom contributes no points at all: the cloud is the

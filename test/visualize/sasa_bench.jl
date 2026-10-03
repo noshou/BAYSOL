@@ -26,6 +26,7 @@ using BAYSOL
 using BAYSOL.AtomicRadii: AtomicRadii, RadiiSource
 using BAYSOL.MolecularStructure: MolecularStructure, Molecule
 using BAYSOL.SASA: SASA
+using BAYSOL.Constants: PROBE_RADIUS
 using BAYSOL.Geometry.Metrics: Metrics, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS, classify
 using Random, Printf, Statistics, DelimitedFiles
 
@@ -56,7 +57,7 @@ const BENCH_SRC = BenchRadii(BENCH_RAD)
 "Build a molecule from the shared radii table."
 bench_mol(name, els, crds) = MolecularStructure.create(name, els, crds; radii_source = BENCH_SRC)
 
-const BENCH_PROBE = 1.4
+const BENCH_PROBE = PROBE_RADIUS
 "Working point count for the sweeps (fast, but past the steep part of the curve)."
 const BENCH_NEXP  = 2048
 "Converged reference point count."

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-using ..BAYSOL_Utils.Constants: AVOGADRO, PMV_REFERENCE_TEMPERATURE_C, PMV_FRACTIONAL_EXPANSIBILITY
+using ..BAYSOL_Utils.Constants: AVOGADRO, ANGSTROM3_PER_LITER, CM3_PER_LITER, DEFAULT_TEMPERATURE_C, PMV_REFERENCE_TEMPERATURE_C, PMV_FRACTIONAL_EXPANSIBILITY
 using ..PartialMolarVolumes: PartialMolarVolumes
 using Distributions
 
@@ -62,7 +62,7 @@ where k_j = N_A·Z_j/1e27 − ρ_w·ϕ°_j/1e3.
     macromolecule** (see [`Solute`](@ref)). Empty means pure water.
 
 # Keywords
-- `t::Real=25.0`: sample temperature in °C, forwarded to PartialMolarVolumes.ρₑ_w.
+- `t::Real=DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to PartialMolarVolumes.ρₑ_w.
 
 # Returns
 - `Tuple{Float64, Float64}`: (ρₑ, σρₑ), the bulk electron density and its
@@ -77,11 +77,11 @@ function _ρₑ(
     pH::Real,
     σ_pH::Real,
     solutes::Vector{Solute};
-    t::Real=25.0
+    t::Real=DEFAULT_TEMPERATURE_C
 )::Tuple{Float64, Float64}
 
     ρₑ_w, σ_w = PartialMolarVolumes.ρₑ_w(t)
-    ρw_k = ρₑ_w * 1e-3   # ρ_w in units of e·Å⁻³ per cm³·mol⁻¹
+    ρw_k = ρₑ_w / CM3_PER_LITER   # ρ_w per cm³·mol⁻¹ of ϕ° at 1 mol·L⁻¹
     ΔT   = abs(t - PMV_REFERENCE_TEMPERATURE_C)
 
     # Accumulators.
@@ -106,9 +106,9 @@ function _ρₑ(
         σ_C_j = s.molarity_uncertainty
         σ_T_j = PMV_FRACTIONAL_EXPANSIBILITY * abs(ϕ°_j) * ΔT
 
-        k_j = AVOGADRO * Z_j / 1e27 - ρw_k * ϕ°_j
+        k_j = AVOGADRO * Z_j / ANGSTROM3_PER_LITER - ρw_k * ϕ°_j
 
-        disp     += C_j * ϕ°_j / 1e3
+        disp     += C_j * ϕ°_j / CM3_PER_LITER
         Δμ       += C_j * k_j
         var_conc += k_j^2 * σ_C_j^2
         var_vol  += (C_j * ρw_k)^2 * (σ_ϕ°_j^2 + σ_T_j^2)
@@ -140,7 +140,7 @@ Given μ = ρₑ, σ = √σ², the LogNormal(μln, σln) parameters are:
     macromolecule** (see [`Solute`](@ref)). Empty means pure water.
 
 # Keywords
-- `t::Real=25.0`: sample temperature in °C, forwarded to _ρₑ.
+- `t::Real=DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to _ρₑ.
 
 # Returns
 - `LogNormal{Float64}`: prior distribution over ρₑ.
@@ -152,7 +152,7 @@ function ρₑ_prior(
     pH::Real,
     σ_pH::Real,
     solutes::Vector{Solute};
-    t::Real=25.0
+    t::Real=DEFAULT_TEMPERATURE_C
 )::LogNormal{Float64}
 
     σ_pH < 0 && throw(DomainError(σ_pH, "σ_pH must be ≥ 0"))

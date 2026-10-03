@@ -14,7 +14,7 @@
 # Build the cache once per structure with forward_cache; every likelihood
 # evaluation is then the O(Q) forward(cache, scale, bkgrnd_corr, dns, δρ; c_1).
 
-using ..MolecularStructure: Molecule, elms, vols
+using ..MolecularStructure: Molecule, elms, vols, coords_spherical
 using ..BAYSOL_Utils.Timing: StageLog, timed!
 
 """
@@ -41,8 +41,18 @@ edge, 1 otherwise; C = 1 for the four dummy species).
     n_target = SHELL_N_TARGET, classes = SHELL_CLASSES: forwarded to
     [`hydration`](@ref). A class not in classes comes back an all-zero B_lm
     (== its dro_k = 0), so the return is always a 5-tuple.
-    - `form_factor_log::Union{Nothing,Vector{String}} = nothing`: forwarded
-    verbatim to [`vacuo`](@ref)'s log keyword.
+    - `form_factor_log::Union{Nothing,Vector{String}} = nothing`: when not nothing,
+    the form-factor table's construction diagnostics are appended to it (as
+    [`vacuo`](@ref)'s log keyword).
+    - `stage_log::Union{Nothing,StageLog} = nothing`: if given, records the
+    "vacuum + excluded volume (vols + B_lm)" and "hydration (SASA + B_lm)" stages.
+
+The vacuum and excluded-volume multipoles are computed together by
+[`_compute_B_lm`](@ref) (one shared pass over the atoms); the result equals
+[`vacuo`](@ref) and [`excluded`](@ref) called separately, up to rounding.
+
+# Returns
+- `NTuple{5,Array{ComplexF64,3}}`: (vac, ex, sh_convex, sh_concave, sh_cavity).
 """
 function species_multipoles(
     mol::Molecule, qvals::AbstractVector{<:Real}, lMax::Integer, energy::Real;
@@ -57,20 +67,14 @@ function species_multipoles(
     stage_log::Union{Nothing,StageLog} = nothing,
 )
     _CHUNK = UInt64(chunk)
-    b_vac = timed!(stage_log, :static, 2, "vacuum B_lm") do
-      vacuo(
-        mol,
-        qvals,
-        lMax,
-        ions,
-        Float64(energy),
-        _CHUNK;
-        form_factor_source = form_factor_source,
-        log = form_factor_log,
-      )
-    end
-    b_ex = timed!(stage_log, :static, 2, "excluded volume (vols + B_lm)") do
-        excluded(mol, qvals, lMax, _CHUNK)
+    # vacuum and excluded volume sit on the same atoms, so one pass computes both:
+    # one spherical-harmonic evaluation and one Bessel sweep per atom, shared by the
+    # form-factor and dummy amplitudes (same result as vacuo / excluded separately)
+    b_vac, b_ex = timed!(stage_log, :static, 2, "vacuum + excluded volume (vols + B_lm)") do
+        amp_vac = _vacuo_amplitude(qvals, ions, Float64(energy);
+                                   form_factor_source = form_factor_source, log = form_factor_log)
+        amp_ex  = _gaussian_dummy(vols(mol), qvals)
+        _compute_B_lm(coords_spherical(mol), qvals, (amp_vac, amp_ex), lMax, _CHUNK)
     end
     sh = timed!(stage_log, :static, 2, "hydration (SASA + B_lm)") do
         hydration(mol, qvals, lMax, _CHUNK;

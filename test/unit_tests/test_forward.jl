@@ -87,23 +87,23 @@ fwd_chunk  = UInt64(3)
         pars = (0.9, -0.4, 0.331, (1.2, 0.8, -0.3))
         v    = contrast_vector(pars[3], pars[4])
         ref  = intensity_calc(intensity(G, v), pars[1], pars[2])
-        @test forward(G, pars...) == ref
+        @test forward(G, pars...) ≈ ref rtol = 1e-14   # the fused contraction sums the upper triangle
     end
 
     @testset "forward(mol, …) convenience == gram_matrix + forward(G, …)" begin
         m = fwd_mol()
         G = gram_matrix(m, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        got = forward(  m, fwd_q, fwd_lmax, fwd_E, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0);
+        got = forward(  m, fwd_q, fwd_lmax, fwd_E, 1.7, 2.5, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0);
                         chunk = fwd_chunk)
-        @test got ≈ forward(G, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0))
+        @test got ≈ forward(G, 1.7, 2.5, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0))
     end
 
     @testset "detector map: scale scales, bkgrnd_corr offsets" begin
         m = fwd_mol()
         G = gram_matrix(m, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        base = forward(G, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0))
-        @test forward(G, 3.0, 0.0, 0.334, (1.0, 1.0, 0.0)) ≈ 3 .* base
-        @test forward(G, 1.0, 7.0, 0.334, (1.0, 1.0, 0.0)) ≈ base .+ 7
+        base = forward(G, 1.0, 0.0, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0))
+        @test forward(G, 3.0, 0.0, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0)) ≈ 3 .* base
+        @test forward(G, 1.0, 7.0, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0)) ≈ base .+ 7
         @test all(≥(0.0), base)                      # PSD ⇒ vᵀGv ≥ 0
     end
 
@@ -111,8 +111,8 @@ fwd_chunk  = UInt64(3)
         m  = fwd_mol()
         G  = gram_matrix(m, fwd_q, fwd_lmax, fwd_E;
                         chunk = fwd_chunk, classes = (SASA.CONVEX, SASA.CONCAVE))
-        a  = forward(G, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0))
-        b  = forward(G, 1.0, 0.0, 0.334, (1.0, 1.0, 42.0))   # cavity unbuilt ⇒ B=0
+        a  = forward(G, 1.0, 0.0, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0))
+        b  = forward(G, 1.0, 0.0, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 42.0))   # cavity unbuilt ⇒ B=0
         @test a ≈ b
     end
 
@@ -172,8 +172,8 @@ fwd_chunk  = UInt64(3)
 
     @testset "contrast_matrix scales only the ex species" begin
         g = excluded_volume_factor(fwd_q, 1.62, 1.75 / 1.62)
-        v = contrast_vector(0.334, (1.2, 0.8, -0.3))
-        V = contrast_matrix(0.334, (1.2, 0.8, -0.3), g)
+        v = contrast_vector(CRYSOL_SOLVENT_DENSITY, (1.2, 0.8, -0.3))
+        V = contrast_matrix(CRYSOL_SOLVENT_DENSITY, (1.2, 0.8, -0.3), g)
         @test size(V) == (5, length(fwd_q))
         for k in eachindex(g)
             @test V[2, k] ≈ v[2] * g[k]
@@ -186,7 +186,7 @@ fwd_chunk  = UInt64(3)
     @testset "intensity(G, V) reduces to intensity(G, v) on a constant V" begin
         mo = fwd_mol()
         G  = gram_matrix(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        v  = contrast_vector(0.334, (1.0, 1.0, 0.0))
+        v  = contrast_vector(CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0))
         V  = repeat(v, 1, length(fwd_q))
         @test intensity(G, V) ≈ intensity(G, v)
     end
@@ -203,10 +203,10 @@ fwd_chunk  = UInt64(3)
     @testset "forward(cache, …): c_1 = nothing / 1 is the uncorrected model" begin
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        ref = forward(fc.G, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0))
-        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0)) == ref
-        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0), nothing) == ref
-        @test forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0), 1.0) == ref
+        ref = forward(fc.G, 1.7, 2.5, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0))
+        @test forward(fc, 1.7, 2.5, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0)) == ref
+        @test forward(fc, 1.7, 2.5, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0), nothing) == ref
+        @test forward(fc, 1.7, 2.5, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0), 1.0) == ref
     end
 
     @testset "forward(cache, …, c_1) == hand-assembled q-dependent contraction" begin
@@ -217,14 +217,14 @@ fwd_chunk  = UInt64(3)
         g    = excluded_volume_factor(fc.qvals, fc.r_m, c_1)
         V    = contrast_matrix(pars[3], pars[4], g)
         ref  = intensity_calc(intensity(fc.G, V), pars[1], pars[2])
-        @test forward(fc, pars..., c_1) == ref
+        @test forward(fc, pars..., c_1) ≈ ref rtol = 1e-14   # the fused contraction sums the upper triangle
     end
 
     @testset "c_1 actually changes the curve, and stays non-negative" begin
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
-        base = forward(fc, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0))
-        big  = forward(fc, 1.0, 0.0, 0.334, (1.0, 1.0, 0.0), 1.15)
+        base = forward(fc, 1.0, 0.0, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0))
+        big  = forward(fc, 1.0, 0.0, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0), 1.15)
         @test !(big ≈ base)
         @test all(≥(0.0), big)          # PSD ⇒ v(q)ᵀ G v(q) ≥ 0 at every c_1
     end
@@ -233,9 +233,9 @@ fwd_chunk  = UInt64(3)
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         c_1 = 0.93
-        @test   forward(mo, fwd_q, fwd_lmax, fwd_E, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0), c_1;
+        @test   forward(mo, fwd_q, fwd_lmax, fwd_E, 1.7, 2.5, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0), c_1;
                         chunk = fwd_chunk) ≈
-                forward(fc, 1.7, 2.5, 0.334, (1.0, 1.0, 0.0), c_1)
+                forward(fc, 1.7, 2.5, CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0), c_1)
     end
 
     @testset "the whole fit-parameter path is AD-differentiable" begin
@@ -244,7 +244,7 @@ fwd_chunk  = UInt64(3)
         mo = fwd_mol()
         fc = forward_cache(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         f(p) = sum(forward(fc, p[1], p[2], p[3], (p[4], p[5], p[6]), p[7]))
-        p0 = [1.7, 2.5, 0.334, 1.0, 1.0, 0.0, 1.05]
+        p0 = [1.7, 2.5, CRYSOL_SOLVENT_DENSITY, 1.0, 1.0, 0.0, 1.05]
         g  = ForwardDiff.gradient(f, p0)
         @test all(isfinite, g)
         # finite-difference check on c_1, the new parameter

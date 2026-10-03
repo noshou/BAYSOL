@@ -5,7 +5,8 @@ Partial molar volumes (V0, cm³/mol) and water bulk electron density.
 """
 module PartialMolarVolumes
 
-using  ..BAYSOL_Utils.Constants: AVOGADRO
+using  ..BAYSOL_Utils.Constants: AVOGADRO, WATER_MOLAR_MASS, WATER_ELECTRONS, ANGSTROM3_PER_LITER,
+    CM3_PER_LITER, PMV_REFERENCE_TEMPERATURE_C, BACKBONE_PMV, BACKBONE_ELECTRONS
 using  ..BAYSOL_Utils.Cache: KeyedCache
 using  JSON3: JSON3
 using  FastClosures: @closure
@@ -134,11 +135,17 @@ end
 "Memoized water electron bulk density"
 const _ρₑ_w_cache = KeyedCache{Int64, Tuple{Float64, Float64}}()
 
-"Molar mass of H₂O, g·mol⁻¹ (IAPWS-95 value)."
-const _M_H2O = 18.015268
+"""
+$(TYPEDSIGNATURES)
 
-"Electrons per H₂O molecule (2 from H, 8 from O), in e."
-const _Z_H2O = 10
+Mass density of pure water at temperature t (°C) and 1 atm, kg·m⁻³, from the Kell
+equation (1975), valid 0–150 °C.
+"""
+_kell_density(t::Real)::Float64 =
+    (   999.83952 + 16.945176*t - 7.9870401e-3*t^2
+        - 46.170461e-6*t^3 + 105.56302e-9*t^4
+        - 280.54253e-12*t^5
+    ) / (1 + 16.879850e-3*t)
 
 """
 $(TYPEDSIGNATURES)
@@ -158,18 +165,15 @@ function ρₑ_w(t::Real)::Tuple{Float64, Float64}
     # look up in cache if memoized
     key = round(Int64, t * 1000)
     return @closure get!(_ρₑ_w_cache, key) do
-        # calculate density of water at 1atm using the Kell equation
-        ρ = (   999.83952 + 16.945176*t - 7.9870401e-3*t^2
-                - 46.170461e-6*t^3 + 105.56302e-9*t^4
-                - 280.54253e-12*t^5
-            ) / (1 + 16.879850e-3*t)
+        # density of water at 1 atm (Kell equation), kg·m⁻³
+        ρ = _kell_density(t)
 
-        # molar mass / density; ρ is kg·m⁻³ and M_H2O is g·mol⁻¹, so v is
-        # numerically 1e-3 m³·mol⁻¹ (= 1e27 Å³·mol⁻¹ per unit)
-        v = _M_H2O / ρ
+        # molar mass / density; ρ is kg·m⁻³ and the molar mass is g·mol⁻¹, so v is
+        # in 10⁻³ m³·mol⁻¹ = L·mol⁻¹
+        v = WATER_MOLAR_MASS / ρ
 
         # calculate electron density, e·Å⁻³
-        ρₑ_w = (AVOGADRO * _Z_H2O) / (1e27 * v)
+        ρₑ_w = (AVOGADRO * WATER_ELECTRONS) / (ANGSTROM3_PER_LITER * v)
 
         # relative uncertainty = 0.02 / ρ(t)   ≈ 2×10⁻⁵ (≈20 ppm), nearly constant 0-150°C
         # absolute uncertainty on ρₑ_w(t) = ρₑ_w(t) × (0.02 / ρ(t))
@@ -188,7 +192,7 @@ const _protein_ionization::Dict{String, Tuple{Tuple{Float64, String}, String}} =
 )
 
 """ key => (electron_count, partial_molar_volume, uncertainty). electron_count is a
-side-chain-only increment relative to glycine (see _backbone_electrons), and is
+side-chain-only increment relative to glycine (see [`BACKBONE_ELECTRONS`](@ref)), and is
 identical between a group's "-neutral" and "-acidic"/"-basic" forms since deprotonation
 only removes a bare proton (no electron). """
 const _Protein::Dict{String, Tuple{Int64, Float64, Float64}} = JSON3.read(
@@ -200,28 +204,12 @@ const _Protein::Dict{String, Tuple{Int64, Float64, Float64}} = JSON3.read(
 const _wildcards = Dict("B" => ("D", "N"), "J" => ("L", "I"), "Z" => ("E", "Q"))
 
 """
-Peptide-bond backbone unit (-CH2CONH-, "glycyl") volume at 25°C, added once per
-residue in ρₑ. Protein.json's per-residue entries (A, V, L, ... and G's
-zero) are side-chain-only increments relative to glycine (Lee et al. 2008's own
-convention), not absolute residue volumes. Source: Protein.tsv CH2CONH row, 10.1039/9781782627043-00542.
-"""
-const _backbone_pmv = (37.4, 0.1)
-
-"""
-Peptide backbone unit (-CH2CONH-, neutral, C2H3NO) electron count: 2×C(6) + 3×H(1)
-+ N(7) + O(8) = 30 e. Added once per residue in ρₑ, on the same basis as
-_backbone_pmv. Protein.json's electron_count field is a side-chain-only
-increment relative to glycine, and this is the shared unit it sits on top of.
-"""
-const _backbone_electrons = 30
-
-"""
-Electrons contributed by one water molecule (_Z_H2O), added once per ρₑ call
+Electrons contributed by one water molecule (`WATER_ELECTRONS`), added once per ρₑ call
 (not per residue): joining N free amino acids into a chain releases (N-1) waters,
-so the repeated backbone unit above is short exactly one H2O's worth of capping
-atoms at the two open chain termini.
+so the repeated backbone unit ([`BACKBONE_PMV`](@ref), [`BACKBONE_ELECTRONS`](@ref)) is
+short exactly one H2O's worth of capping atoms at the two open chain termini.
 """
-const _formation_water_electrons = _Z_H2O
+const _formation_water_electrons = WATER_ELECTRONS
 
 "Memoized protein partial molar volume, keyed by sequence"
 const _ϕ°_p_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
@@ -280,9 +268,9 @@ function ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64, Fl
 
             # every real residue contributes one shared peptide backbone unit,
             # on top of which the side-chain increment below sits
-            ϕ° += _backbone_pmv[1]
-            sqr_unc += _backbone_pmv[2]^2
-            z_i += _backbone_electrons
+            ϕ° += BACKBONE_PMV[1]
+            sqr_unc += BACKBONE_PMV[2]^2
+            z_i += BACKBONE_ELECTRONS
 
             # need to be averaged between two residues
             if (haskey(_wildcards, aa))
@@ -561,8 +549,8 @@ function _nuc_residue_var(
     end
 end
 
-"Bulk water molar volume at 25°C (cm³/mol), same Kell-equation source as ρₑ_w."
-const _H2O_V0_25C = 18.07
+"Bulk water molar volume at the PMV reference temperature (25 °C), cm³·mol⁻¹, from the same Kell equation as ρₑ_w (≈ 18.0686)."
+const _H2O_V0_25C = WATER_MOLAR_MASS / _kell_density(PMV_REFERENCE_TEMPERATURE_C) * CM3_PER_LITER
 
 """
 $(TYPEDSIGNATURES)
@@ -625,7 +613,7 @@ function ϕ°(
         # Each per-letter value is a FREE (fully-hydrated) 5'-monophosphate,
         # unlike Protein's already-anhydrous backbone unit. Subtract per bond.
         n_bonds = max(n_real - 1, 0)
-        z_i -= n_bonds * _Z_H2O
+        z_i -= n_bonds * WATER_ELECTRONS
         ϕ_total -= n_bonds * _H2O_V0_25C
 
         (z_i, ϕ_total, sqrt(sqr_unc))

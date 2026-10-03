@@ -56,7 +56,7 @@ const INTEG_CHUNK  = UInt64(8)
 # as test_sampler.jl's `synth_data` (physically plausible values: dns near
 # bulk water, δρ₁ near CRYSOL's default, cavity water near bulk density).
 # ξ = (ρₑ, δρ₁, δρ₂, δρ₃).
-const INTEG_ξ_TRUE = (0.334, 1.05, -0.05, -0.55)
+const INTEG_ξ_TRUE = (CRYSOL_SOLVENT_DENSITY, 1.05, -0.05, -0.55)
 const INTEG_M_TRUE, INTEG_C_TRUE = 1.7, 0.3
 
 function integ_synth_data(fw::ForwardCache)

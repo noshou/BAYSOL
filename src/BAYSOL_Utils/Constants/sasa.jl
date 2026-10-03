@@ -35,3 +35,24 @@ const _BEAD_RAY_DIRS = 64
 "Escaping fraction at or above which a bead is CONVEX; below it (but nonzero) 
 CONCAVE (see [`BeadClass`](@ref BAYSOL.SASA.BeadClass))."
 const _BEAD_CONVEX_ESCAPE = 0.5
+"""
+Default witness-pass point count per atom in [`SASA.sasa`](@ref BAYSOL.SASA.sasa):
+the smallest round count measured to lose no area on a dense lattice. Catches any
+atom exposed by more than ~1/512 of its sphere (about 0.2 Å²).
+"""
+const SASA_N_OCC = 512
+
+"""
+Default exposed-fraction point count per atom in [`SASA.sasa`](@ref BAYSOL.SASA.sasa).
+Measured relative error against the analytic two-sphere cap: 1.3 % at 64 points,
+0.36 % at 1024, 0.065 % at 4096, 0.02 % at 16384; costs ~0.09 ms/atom.
+"""
+const SASA_N_EXP = 4096
+
+"""
+Default area tolerance (Å²) in [`SASA.sasa`](@ref BAYSOL.SASA.sasa): an atom with no
+witness in the [`SASA_N_OCC`](@ref) pass may still expose up to 3/n_occ of its
+sphere (rule of three); if that worst-case area is below this, the full
+[`SASA_N_EXP`](@ref) pass is skipped and the atom is treated as buried.
+"""
+const SASA_AREA_TOL = 2.0

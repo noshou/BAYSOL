@@ -19,6 +19,11 @@ Points to map onto the volume of a sphere.
 """
 const _pts::Vector{Vec3} = plastic_points(N_VOL_SHELL, Val(3), Val(:volume))
 
+"The same points as three coordinate vectors, so the per-plane test below vectorizes over points."
+const _ux::Vector{Float64} = [u[1] for u in _pts]
+const _uy::Vector{Float64} = [u[2] for u in _pts]
+const _uz::Vector{Float64} = [u[3] for u in _pts]
+
 """
 $(TYPEDSIGNATURES)
 
@@ -69,6 +74,12 @@ function excluded_volume(
     # excluded volumes
     vols = Vector{Float64}(undef, size(cart, 2))
 
+    # per-atom scratch, reused: the sample points mapped onto atom i's sphere
+    # (coordinate vectors) and whether each is claimed by some neighbour
+    npts = length(_pts)
+    xs, ys, zs = Vector{Float64}(undef, npts), Vector{Float64}(undef, npts), Vector{Float64}(undef, npts)
+    hit = Vector{Bool}(undef, npts)
+
     # iterate over columns for each atom coord
     i = 1
     @inbounds for (x, y, z) in eachcol(cart)
@@ -115,15 +126,27 @@ function excluded_volume(
             # break on first violation, since a point is a victim at most
             # once regardless of how many planes it fails.
             # survivors = N_VOL_SHELL - victims.
+            #
+            # Vectorized over points rather than breaking early per point: map every
+            # point onto the sphere once, then test each plane against all of them,
+            # OR-ing the result. The comparison is exactly dot(x, n) > thresh as before
+            # (same terms, same order), so the count is unchanged.
             victims = 0
-            for u in _pts
-                x = p_i .+ rads[i] .* u
+            if !isempty(planes)
+                r = rads[i]
+                @simd for p in 1:npts
+                    xs[p] = x + r * _ux[p]
+                    ys[p] = y + r * _uy[p]
+                    zs[p] = z + r * _uz[p]
+                    hit[p] = false
+                end
                 for (n, thresh) in planes
-                    if dot(x, n) > thresh
-                        victims += 1
-                        break
+                    nx, ny, nz = n
+                    @simd for p in 1:npts
+                        hit[p] |= (xs[p] * nx + ys[p] * ny) + zs[p] * nz > thresh
                     end
                 end
+                victims = count(hit)
             end
 
             # scale vdW volume by num of survivors

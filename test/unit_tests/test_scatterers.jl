@@ -35,7 +35,7 @@
 # numerical correctness is test_molecules.jl's job.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using   BAYSOL.Scattering: _gaussian_dummy, vacuo, excluded, hydration, SHELL_THICKNESS,
+using   BAYSOL.Scattering: _gaussian_dummy, vacuo, excluded, hydration, SHELL_THICKNESS, PROBE_RADIUS, DRO_UNIT,
         compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
 using   BAYSOL.MolecularStructure: create, coords_cartesian, coords_spherical, to_spherical,
         radii, vols, elms, Molecule
@@ -268,7 +268,7 @@ The shell dummies `hydration` would build for `mol`: cartesian positions and
 `(M, Q)` amplitudes, obtained by applying the same `classes` filter and
 `area * thickness` volume rule the implementation applies.
 """
-function scat_shell(mol, qvals; n_target = 80, probe = 1.4,
+function scat_shell(mol, qvals; n_target = 80, probe = PROBE_RADIUS,
                     thickness = SHELL_THICKNESS,
                     classes = (SASA.CONVEX, SASA.CONCAVE, SASA.CAVITY))
     pts, area, class = SASA.shell_points(mol; probe = probe, n_target = n_target)
@@ -783,13 +783,13 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
 
     @testset "hydration forwards probe to shell_points" begin
         mol = scat_water()
-        # The default probe is water's 1.4 Å ...
+        # The default probe is water's (PROBE_RADIUS, 1.4 Å) ...
         @test   hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 60) ==
-                hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 60, probe = 1.4)
+                hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 60, probe = PROBE_RADIUS)
         # ... and a bigger probe inflates the accessible surface, which the
         # forward multipole sees exactly via total area * thickness.
         big = scat_shell_blm(hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 60, probe = 2.5))
-        small = scat_shell_blm(hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 60, probe = 1.4))
+        small = scat_shell_blm(hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 60, probe = PROBE_RADIUS))
         @test real(big[1, 1, 1]) > real(small[1, 1, 1])
         area = sum(SASA.shell_points(mol; probe = 2.5, n_target = 60)[2])
         @test isapprox(real(big[1, 1, 1]), area * SHELL_THICKNESS / sqrt(4π); rtol = 1e-12)
@@ -928,7 +928,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
             D_x  = scat_debye(SCAT_Q, Xc, fe, P, fh)
             B_ex = compute_B_lm(scat_sph(X), SCAT_Q, _gaussian_dummy(v, SCAT_Q), scat_Lconv, UInt64(4))
             B_sh = scat_shell_blm(hydration(mol, SCAT_Q, scat_Lconv, UInt64(64); n_target = 80))
-            for (dns, dro) in ((0.334, 0.03), (1.0, 1.0), (0.2, 0.9))
+            for (dns, dro) in ((CRYSOL_SOLVENT_DENSITY, DRO_UNIT), (1.0, 1.0), (0.2, 0.9))
                 ref = dns^2 .* D_ex .+ dro^2 .* D_sh .- (2 * dns * dro) .* D_x
                 @test scat_relerr(scat_toy_I(B_ex, B_sh, scat_wconv, dns, dro), ref) < 1e-9
             end
@@ -954,7 +954,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
             @test isapprox(self_scatter(B_ex, scat_wconv)[1], V_ex^2; rtol = 1e-12)
             @test isapprox(self_scatter(B_sh, scat_wconv)[1], V_sh^2; rtol = 1e-12)
             @test isapprox(cross_scatter(B_ex, B_sh, scat_wconv)[1], V_ex * V_sh; rtol = 1e-12)
-            for (dns, dro) in ((0.334, 0.03), (1.0, 0.0), (0.2, 0.9))
+            for (dns, dro) in ((CRYSOL_SOLVENT_DENSITY, DRO_UNIT), (1.0, 0.0), (0.2, 0.9))
                 @test isapprox(scat_toy_I(B_ex, B_sh, scat_wconv, dns, dro)[1],
                                (dns * V_ex - dro * V_sh)^2; rtol = 1e-10)
             end
@@ -977,7 +977,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         for k in eachindex(SCAT_Q)
             @test abs(X[k]) ≤ sqrt(S_ex[k] * S_sh[k]) * (1 + 1e-10)
         end
-        for (dns, dro) in ((0.334, 0.03), (0.5, -0.2), (-1.7, 2.3))
+        for (dns, dro) in ((CRYSOL_SOLVENT_DENSITY, DRO_UNIT), (0.5, -0.2), (-1.7, 2.3))
             I = scat_toy_I(B_ex, B_sh, scat_wconv, dns, dro)
             @test I isa AbstractVector{<:Real}
             @test length(I) == length(SCAT_Q)

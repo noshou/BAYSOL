@@ -13,6 +13,8 @@ All fits use 2000 NUTS iterations: the first 1000 are warmup (step-size and mass
 posterior draws. The seed is 0. Each script defines `run_<id>(; n_samples, n_adapt, seed)` if you want to change these values;
 `n_samples` is the *total* iteration count, including the `n_adapt` warmup, and the scripts use these defaults. The temperature is each entry's stated sample temperature (25 °C when none is given). Hydrogens are added with Pdb2pqr at the stated pH unless noted. 
 
+Settings shared by every script live in `common.jl`, which each script includes: the sampler defaults (`N_SAMPLES`, `N_ADAPT`, `SAMPLER_SEED`), the default pH σ (`PH_METER_SIGMA` = 0.1) and macromolecule-molarity σ (`MOLARITY_REL_SIGMA` = 5 %), the nm⁻¹ → Å⁻¹ conversion and q-unit sanity check, the `.dat`/fit-file readers, and the plot styling (sizes, colours, line widths). Change them there, not in individual scripts. A script that deliberately differs keeps its own value inline, with a comment.
+
 ## Results
 
  Bold marks a parameter at a hard prior bound (δρ₁, δρ₂ ≤ 2; δρ₃ ∈ [−ρ̄ₑ/0.03, (φ_max − 1)·ρ̄ₑ/0.03] ≈ [−11.1, 2.8]), `c1` profiling saturation, or a chain with >5% divergent transitions. `"` repeats the line above: the members of one deposited multi-model fit share a single depositor χ², which belongs to their **weighted mixture**, not to any one member (see "Ensemble and multi-model entries" below).

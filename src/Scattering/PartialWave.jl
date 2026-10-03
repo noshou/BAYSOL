@@ -1,50 +1,13 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-using .SphFuncs: sphHarm, sphBess
+using .SphFuncs: sphHarm, sphBess, sphBessRatios!, sphBessStep
 using FastClosures: @closure
-
-"""
-$(TYPEDSIGNATURES)
-
-Per-degree B_lm contribution: Y_l * (f_t' .* j_deg)'.
-
-Computes the contraction of the spherical-harmonic matrix for degree l
-against the elementwise product of the (transposed) per-atom amplitude and
-the degree-l spherical Bessel factors.
-
-# Arguments
-    - `f_t::AbstractMatrix`: (chunk, Q) — per-atom amplitude for this chunk
-        (real or imaginary channel), evaluated on the q-grid. May be complex
-        (both channels are cast to a common complex element type upstream so
-        the contraction is uniform regardless of channel).
-    - `j_deg::AbstractMatrix`: (Q, chunk) — j_l(q·r) for this degree, laid
-        out the same way as f_t' (i.e. (Q, chunk)). Always real-valued.
-    - `Y_l::AbstractMatrix`: (l+1, chunk) — the l+1 orders m = 0, …, l of
-        Y_l^m for every atom in the chunk. Complex-valued.
-
-# Returns
-    - `AbstractMatrix{<:Number} of size (l+1, Q)`: Y_l * (f_t' .* j_deg)'.
-        Complex-valued whenever f_t or Y_l is complex, matching their
-        promoted element type.
-
-# Details
-    - W = f_t' .* j_deg — elementwise product, (Q, chunk).
-    - W' — transpose back to (chunk, Q).
-    - Y_l * W' — matrix product, (l+1, chunk) * (chunk, Q) → (l+1, Q).
-"""
-function _deg_contrib(
-    f_t::AbstractMatrix, j_deg::AbstractMatrix, Y_l::AbstractMatrix
-)::AbstractMatrix{<:Number}
-    W = transpose(f_t) .* j_deg   # (Q, chunk)  .* (Q, chunk) -> (Q, chunk)
-    return Y_l * transpose(W)     # (l+1, chunk) * (chunk, Q) -> (l+1, Q)
-end
+using LinearAlgebra: mul!
 
 """
 $(TYPEDSIGNATURES)
 
 ±m symmetry weights: m = 0 -> 1, m > 0 -> 2.
-
-Folding a complex f directly is not rotationally invariant (measured 3% error with Fe at 8 keV).
 
 # Arguments
 - `lMax::Integer`: maximum spherical harmonic degree. Must be non-negative.
@@ -78,13 +41,12 @@ real-coefficient sum of Y_lm's conjugates flips it back to Y_lm:
 
     B_{l,-m} = (-1)^m * conj(B_lm)   =>   |B_{l,-m}|² = |B_lm|²
 
-
 Every negative-m term is a free duplicate of its positive-m partner, so:
 
     Σ_{m=-l}^{l} |B_lm|²    = |B_l0|² + Σ_{m=1}^{l} (|B_lm|² + |B_{l,-m}|²)
                             = 1·|B_l0|² + Σ_{m=1}^{l} 2·|B_lm|²
 
-which is exactly the 1-for-m=0, 2-for-m>0 weighting returned here.
+which is the 1-for-m=0, 2-for-m>0 weighting returned here.
 """
 function partial_wave_weights(lMax::Integer)::Vector{Float64}
     lMax < 0 && throw(ArgumentError("partial_wave_weights: lMax must be non-negative"))
@@ -98,46 +60,85 @@ Compute `B_lm(q) = Σ_i f_atoms[i](q) * j_l(q*r_i) * conj(Y_lm(θ_i, φ_i))`.
 
 f_atoms carries whatever per-atom complex scattering amplitude the
 caller wants (element form factors for the vacuum term, dummy-atom
-excluded-volume/shell amplitudes for the other terms).
+excluded-volume/shell amplitudes for the other terms). The work is done by
+[`_compute_B_lm`](@ref), which this calls with a single amplitude set.
 
 # Arguments
     - `coords_sph::AbstractMatrix{<:Real}, size (3, N)`: per-atom spherical
         coordinates in the column-per-atom layout MolecularStructure.coords_spherical
-        returns — row 1 is r, row 2 is θ, row 3 is φ. Passed straight
-        through; the (θ, φ) rows go to sphHarm as a (2, chunk) block and
-        the r row to sphBess, with no unpacking into loose vectors.
-    - `qvals::AbstractVector{<:Real}, length Q`: momentum transfer grid.
+        returns — row 1 is r, row 2 is θ, row 3 is φ.
+    - `qvals::AbstractVector{<:Real}, length Q`: momentum transfer grid, all ≥ 0.
     - `f_atoms::AbstractMatrix{<:Number}, size (N, Q)`: per-atom scattering
-        amplitude, already evaluated on qvals. Real or complex — a purely
-        real matrix is handled directly, with no need to pre-cast it to complex.
+        amplitude, already evaluated on qvals. Real or complex.
     - `lMax::Integer`: maximum spherical harmonic degree. Must be non-negative.
-    - `_CHUNK::UInt64`: number of atoms to process in one pass.
-    - `backend::Type{<:AbstractArray} = Array`: array type used for the
-        per-chunk compute buffers. Pass e.g. CUDA.CuArray to run on GPU.
+    - `_CHUNK::UInt64`: number of atoms to process in one pass (results invariant
+        up to rounding).
 
 # Returns
-    - `AbstractArray{<:Complex,3} of size (C, (lMax+1)(lMax+2)÷2, Q)`, backed
-        by backend. C = 1 when f_atoms is real, C = 2 when it has a
-        nonzero imaginary part (anomalous f''): channel 1 from Re(f_atoms),
-        channel 2 from Im(f_atoms). The two channels add incoherently in the
-        m-summed invariant (see [`self_scatter`](@ref)/[`cross_scatter`](@ref))
-    —   they must not be recombined into one complex B_lm.
+    - `Array{ComplexF64,3}` of size (C, (lMax+1)(lMax+2)÷2, Q). C = 1 when
+        f_atoms is real, C = 2 when it has a nonzero imaginary part (anomalous
+        f''): channel 1 from Re(f_atoms), channel 2 from Im(f_atoms). The two
+        channels add incoherently in the m-summed invariant (see
+        [`self_scatter`](@ref)/[`cross_scatter`](@ref)) — they must not be
+        recombined into one complex B_lm.
+
+# Exceptions
+    - `DomainError`: _CHUNK == 0.
+    - `ArgumentError`: lMax < 0, coords_sph not (3, N), f_atoms not (N, Q), or a
+        negative q.
 """
-function compute_B_lm(
+compute_B_lm(
     coords_sph::AbstractMatrix{<:Real},
     qvals::AbstractVector{<:Real},
     f_atoms::AbstractMatrix{<:Number},
     lMax::Integer,
     _CHUNK::UInt64,
-    backend::Type{<:AbstractArray}=Array
-)::AbstractArray{<:Complex,3}
+)::Array{ComplexF64,3} = only(_compute_B_lm(coords_sph, qvals, (f_atoms,), lMax, _CHUNK))
 
+"""
+$(TYPEDSIGNATURES)
+
+[`compute_B_lm`](@ref) for several amplitude sets on the same points (e.g. the
+vacuum form factors and the excluded-volume dummies of one molecule), sharing one
+spherical-harmonic evaluation and one spherical Bessel sweep per atom.
+
+Real arithmetic throughout. Write Ȳ_lm = Re Y_lm − i·Im Y_lm (the conjugate). Every
+amplitude column c (one per set and channel: Re f, and Im f when f is anomalous)
+is real, so per degree l
+
+    [Re B_l; Im B_l] (2(l+1) × Q) = [Re Y_l; −Im Y_l] (2(l+1) × atoms) · W_l (atoms × Q),
+    W_l[i, q] = f_c(i, q)·j_l(q·r_i),
+
+one real matrix product per degree and column, done by OpenBLAS (`mul!`, 5-arg,
+accumulating in place).
+
+W is never stored as a full j array. For each atom the Gautschi sweep runs over a
+q-tile: [`SphFuncs.sphBessRatios!`](@ref) (pass 1), then upward with
+[`SphFuncs.sphBessStep`](@ref) (pass 2); each jₗ comes out normalized and is
+multiplied straight into W_l for every column. W covers one tile of atoms
+([`B_LM_TILE`](@ref)) and one q-tile, sized so that every degree fits in
+[`B_LM_W_BYTES`](@ref); all buffers are allocated once per call.
+
+# Arguments
+    - `coords_sph`, `qvals`, `lMax`, `_CHUNK`: as [`compute_B_lm`](@ref).
+    - `f_sets`: tuple of amplitude matrices, each (N, Q), real or complex.
+
+# Returns
+    - `Tuple` of `Array{ComplexF64,3}`, one per set, each as [`compute_B_lm`](@ref)'s.
+
+# Exceptions
+    - As [`compute_B_lm`](@ref), for every set.
+"""
+function _compute_B_lm(
+    coords_sph::AbstractMatrix{<:Real},
+    qvals::AbstractVector{<:Real},
+    f_sets::Tuple{Vararg{AbstractMatrix{<:Number}}},
+    lMax::Integer,
+    _CHUNK::UInt64,
+)
     # _CHUNK == 0 would make the 1:_CHUNK:N range below step by zero,
     # looping forever instead of raising.
-    if _CHUNK == 0
-        throw(DomainError(_CHUNK, "_CHUNK must be > 0"))
-    end
-
+    _CHUNK == 0 && throw(DomainError(_CHUNK, "_CHUNK must be > 0"))
     lMax < 0 && throw(ArgumentError("compute_B_lm: lMax must be non-negative"))
 
     # coords_sph is the column-per-atom spherical form straight from
@@ -146,65 +147,167 @@ function compute_B_lm(
         "compute_B_lm: coords_sph must be a (3, N) matrix with rows (r, θ, φ), " *
         "as returned by MolecularStructure.coords_spherical; got $(size(coords_sph, 1)) rows"))
     N = size(coords_sph, 2)
-    r = view(coords_sph, 1, :)   # (θ, φ) are sliced per-chunk straight from coords_sph
-
     Q = length(qvals)
-    size(f_atoms, 1) == N ||
-        throw(ArgumentError("compute_B_lm: f_atoms must have N rows matching coords_sph's columns"))
-    size(f_atoms, 2) == Q ||
-        throw(ArgumentError("compute_B_lm: f_atoms must have Q columns matching qvals"))
+    # validated once here: the per-radius Bessel sweep below does not re-check q
+    any(<(0), qvals) && throw(ArgumentError("compute_B_lm: qvals must all be ≥ 0"))
+    for f in f_sets
+        size(f, 1) == N ||
+            throw(ArgumentError("compute_B_lm: f_atoms must have N rows matching coords_sph's columns"))
+        size(f, 2) == Q ||
+            throw(ArgumentError("compute_B_lm: f_atoms must have Q columns matching qvals"))
+    end
 
+    L = Int(lMax)
     # Packed (l,m) row count for m = 0..l only; see partial_wave_weights for
     # why the m < 0 half never needs to be stored.
-    N_reduced = (lMax + 1) * (lMax + 2) ÷ 2
-    
-    # A purely real f_atoms needs only the Re(f) channel; an imaginary part
+    K = (L + 1) * (L + 2) ÷ 2
+
+    # A purely real set needs only the Re(f) channel; an imaginary part
     # (anomalous f'') needs a second channel for the ±m symmetry.
-    n_chan = any(@closure(x -> imag(x) != 0), f_atoms) ? 2 : 1
-    B_lm = backend(zeros(ComplexF64, n_chan, N_reduced, Q))
+    nchan = map(f -> (eltype(f) <: Real || !any(@closure(x -> imag(x) != 0), f)) ? 1 : 2, f_sets)
+    ncol = sum(nchan)
 
-    # Atoms are processed _CHUNK at a time rather than all at once: Y/j
-    # below are (N_reduced, N) / (lMax+1, Q, N) in the worst case, so doing
-    # every atom in one shot would allocate an O(N*Q*lMax) buffer per array
-    # even though the actual output B_lm is only O(lMax^2 * Q). Chunking
-    # bounds that intermediate memory to O(_CHUNK*Q*lMax) regardless of N.
-    for start in 1:_CHUNK:N
-        stop = min(start + _CHUNK - 1, N)
-        # _CHUNK is a UInt64, so start:stop would be a UInt64 range;
-        # reindexing the nested view(coords_sph, 2:3, idx) against one
-        # underflows to typemax(UInt64) and throws. Keep the index Int.
-        idx = Int(start):Int(stop)
+    # Acc[2k0 + 1 : 2k0 + l + 1, (c-1)Q + q] = Re B_lm, the next l + 1 rows Im B_lm,
+    # for degree l (k0 = l(l+1)/2) and amplitude column c
+    Acc = zeros(Float64, 2K, ncol * Q)
 
-        # rows 2:3 of coords_sph are (θ, φ): handed to sphHarm as a
-        # (2, chunk) angle block, not split into loose vectors.
-        Y = sphHarm(Int(lMax), view(coords_sph, 2:3, idx))  # (N_reduced, chunk), complex
-        j = sphBess(view(r, idx), qvals, Int(lMax))         # (lMax+1, Q, chunk), real
+    if N > 0
+        nchunk = min(Int(_CHUNK), N)
+        T = min(B_LM_TILE, nchunk)
+        # q-tile length so that W (every column, every degree, T atoms) fits the budget
+        Qt = clamp(B_LM_W_BYTES ÷ (sizeof(Float64) * ncol * T * (L + 1)), 1, Q)
+        qv = Vector{Float64}(qvals)
+        qtiles = [qv[q0:min(q0 + Qt - 1, Q)] for q0 in 1:Qt:Q]
 
-        # _deg_contrib is called lMax+1 times per channel per chunk,
-        # so hoisting the conjugation out of that loop saves (lMax+1)x work.
-        Y_dev = backend(ComplexF64.(conj.(Y)))
-        j_dev = backend(Float64.(j))
+        A  = Matrix{Float64}(undef, 2K, nchunk)       # [Re Y_l; −Im Y_l] stacked per degree
+        Ft = Array{Float64,3}(undef, Q, ncol, nchunk)  # Ft[q, c, i]: amplitude column c of atom i
+        W  = Array{Float64,3}(undef, ncol * Qt, T, L + 1)   # W[(c-1)Qt + k, t, l+1]
+        sb = sphBess(Qt, L)
 
-        # Re(f) and Im(f) are each a real amplitude, so each channel's
-        # B_lm obeys the ±m conjugate symmetry partial_wave_weights assumes.
-        for chan in 1:n_chan
-            part = chan == 1 ? real.(view(f_atoms, idx, :)) : imag.(view(f_atoms, idx, :))
-            f_t = backend(ComplexF64.(part))  # (chunk, Q)
+        for start in 1:Int(_CHUNK):N
+            # _CHUNK is a UInt64; keep the index Int (a UInt64 range underflows
+            # when reindexed by a nested view)
+            idx = start:min(start + Int(_CHUNK) - 1, N)
+            nc = length(idx)
 
-            for deg in 0:lMax
-                
-                # k0 is the packed-row offset of degree deg's (m=0..deg)
-                # block; matches the offset partial_wave_weights assumes.
-                k0 = deg * (deg + 1) ÷ 2
-                rows = (k0 + 1):(k0 + deg + 1)
-                Y_l = view(Y_dev, rows, :)          # (l+1, chunk)
-                j_deg = view(j_dev, deg + 1, :, :)  # (Q, chunk)
-                B_lm[chan, rows, :] .+= _deg_contrib(f_t, j_deg, Y_l)
+            # rows 2:3 of coords_sph are (θ, φ): handed to sphHarm as a (2, chunk) block
+            Y = sphHarm(L, view(coords_sph, 2:3, idx))   # (K, nc), complex
+            @inbounds for i in 1:nc, l in 0:L
+                k0 = l * (l + 1) ÷ 2
+                @simd for m in 0:l
+                    y = Y[k0 + m + 1, i]
+                    A[2k0 + m + 1, i] = real(y)
+                    A[2k0 + l + 1 + m + 1, i] = -imag(y)
+                end
+            end
+
+            # amplitudes, q-contiguous per atom and column
+            c = 0
+            for (s, f) in enumerate(f_sets), ch in 1:nchan[s]
+                c += 1
+                # real part for channel 1, imaginary for channel 2 (branch outside the copy)
+                if ch == 1
+                    @inbounds for i in 1:nc
+                        @simd for q in 1:Q
+                            Ft[q, c, i] = real(f[idx[i], q])
+                        end
+                    end
+                else
+                    @inbounds for i in 1:nc
+                        @simd for q in 1:Q
+                            Ft[q, c, i] = imag(f[idx[i], q])
+                        end
+                    end
+                end
+            end
+
+            for t0 in 1:T:nc
+                ts = t0:min(t0 + T - 1, nc)
+                for (ti, qt) in enumerate(qtiles)
+                    q0 = (ti - 1) * Qt + 1
+                    nq = length(qt)
+
+                    # W for every atom of the tile, every degree, every column
+                    for (tt, i) in enumerate(ts)
+                        sphBessRatios!(sb, Float64(coords_sph[1, idx[i]]), qt, L)
+                        jm1, jm2 = sb.jm1, sb.jm2      # j₁, j₀ after pass 1
+                        _write_W!(W, Ft, jm2, ncol, q0, nq, Qt, tt, i, 0)
+                        L ≥ 1 && _write_W!(W, Ft, jm1, ncol, q0, nq, Qt, tt, i, 1)
+                        for l in 2:L
+                            lup, invx, R = sb.lup, sb.invx, sb.R
+                            @inbounds @fastmath @simd for k in 1:nq
+                                v = sphBessStep(jm1[k], jm2[k], l, lup[k], invx[k], R[k, l])
+                                jm2[k] = jm1[k]
+                                jm1[k] = v
+                            end
+                            _write_W!(W, Ft, jm1, ncol, q0, nq, Qt, tt, i, l)
+                        end
+                    end
+
+                    # one real product per degree and column, accumulated in place (BLAS)
+                    nt = length(ts)
+                    for l in 0:L
+                        k0 = l * (l + 1) ÷ 2
+                        rows = (2k0 + 1):(2k0 + 2(l + 1))
+                        Al = view(A, rows, ts)
+                        for c in 1:ncol
+                            mul!(view(Acc, rows, (c - 1) * Q .+ (q0:(q0 + nq - 1))), Al,
+                                 transpose(view(W, (c - 1) * Qt .+ (1:nq), 1:nt, l + 1)), 1.0, 1.0)
+                        end
+                    end
+                end
             end
         end
     end
 
-    return B_lm
+    # unpack into the public (C, K, Q) complex layout, one array per set;
+    # set s owns amplitude columns c0[s] + 1 .. c0[s] + nchan[s]
+    c0 = cumsum((0, Base.front(nchan)...))
+    return map(Tuple(1:length(f_sets))) do s
+        B = Array{ComplexF64,3}(undef, nchan[s], K, Q)
+        for ch in 1:nchan[s]
+            c = c0[s] + ch
+            @inbounds for q in 1:Q, l in 0:L
+                k0 = l * (l + 1) ÷ 2
+                col = (c - 1) * Q + q
+                @simd for m in 0:l
+                    B[ch, k0 + m + 1, q] = complex(Acc[2k0 + m + 1, col], Acc[2k0 + l + 1 + m + 1, col])
+                end
+            end
+        end
+        B
+    end
+end
+
+
+"""
+$(TYPEDSIGNATURES)
+
+W[(c−1)Qt + k, tt, l+1] = Ft[q0+k−1, c, i]·j[k] for every amplitude column c and
+k = 1..nq: degree l's slice of W for one atom, from its normalized jₗ over the q-tile.
+
+# Returns
+- `nothing`.
+"""
+@inline function _write_W!(
+    W::Array{Float64,3}, 
+    Ft::Array{Float64,3}, 
+    j::Vector{Float64},
+    ncol::Int, 
+    q0::Int, 
+    nq::Int, 
+    Qt::Int, 
+    tt::Int, 
+    i::Int, 
+    l::Int
+)::Nothing
+    @inbounds for c in 1:ncol
+        off = (c - 1) * Qt
+        @fastmath @simd for k in 1:nq
+            W[off + k, tt, l + 1] = Ft[q0 + k - 1, c, i] * j[k]
+        end
+    end
+    return nothing
 end
 
 """
@@ -225,14 +328,22 @@ function self_scatter(
     B_lm::AbstractArray{<:Complex,3}, weights::AbstractVector{<:Real}
 )::AbstractVector{<:Real}
     
-    # weights is (K,); reshape to (1, K, 1) so it broadcasts against B_lm's
-    # (C, K, Q) over the channel and q axes without being repeated by hand.
-    w = reshape(weights, 1, :, 1)
-    
-    # abs2.(B_lm) is |B_lm|^2 per (channel, l/m, q) entry; summing over dims
-    # (1, 2) collapses channel and l/m, leaving one number per q.
-    # vec drops the resulting (1, 1, Q) down to a plain (Q,) vector.
-    return vec(sum(w .* abs2.(B_lm); dims=(1, 2))) .* (4π)
+    C, K, Q = size(B_lm)
+    length(weights) == K || throw(DimensionMismatch("self_scatter: weights has length $(length(weights)), B_lm has K = $K"))
+    T = promote_type(real(eltype(B_lm)), eltype(weights))
+    # Σ_c Σ_lm w_lm·|B_lm|² per q. Each q's (C, K) block is one contiguous run, so it
+    # is summed as a single vector with the weights repeated per channel.
+    Bq = reshape(B_lm, C * K, Q)
+    wc = repeat(weights, inner = C)
+    S = Vector{T}(undef, Q)
+    @inbounds for q in 1:Q
+        acc = zero(T)
+        @fastmath @simd for j in 1:(C * K)
+            acc += wc[j] * abs2(Bq[j, q])
+        end
+        S[q] = 4π * acc
+    end
+    return S
 end
 
 """
@@ -260,7 +371,36 @@ function cross_scatter(
     
     # Re(B_a * conj(B_b)) per (channel, l/m, q) entry, matching self_scatter
     # with |B_lm|^2 (= Re(B_lm * conj(B_lm))) generalised to two operands.
-    cross = real.(view(B_lm_a, 1:n_chan, :, :) .* conj.(view(B_lm_b, 1:n_chan, :, :)))
-    w = reshape(weights, 1, :, 1)  # see self_scatter for this broadcast shape
-    return vec(sum(w .* cross; dims=(1, 2))) .* (4π)
+    K, Q = size(B_lm_a, 2), size(B_lm_a, 3)
+    (size(B_lm_b, 2) == K && size(B_lm_b, 3) == Q && length(weights) == K) || throw(DimensionMismatch(
+        "cross_scatter: B_lm_a is (_, $K, $Q), B_lm_b is $(size(B_lm_b)), weights has length $(length(weights))"))
+    T = promote_type(real(eltype(B_lm_a)), real(eltype(B_lm_b)), eltype(weights))
+    S = zeros(T, Q)
+    if size(B_lm_a, 1) == size(B_lm_b, 1) == n_chan
+        # same channel count: each q's (C, K) block is one contiguous run in both,
+        # summed as a single vector (as self_scatter)
+        Aq = reshape(B_lm_a, n_chan * K, Q)
+        Bq = reshape(B_lm_b, n_chan * K, Q)
+        wc = repeat(weights, inner = n_chan)
+        @inbounds for q in 1:Q
+            acc = zero(T)
+            @fastmath @simd for j in 1:(n_chan * K)
+                a = Aq[j, q]; b = Bq[j, q]
+                acc += wc[j] * (real(a) * real(b) + imag(a) * imag(b))
+            end
+            S[q] = acc
+        end
+    else
+        # mixed channel counts (e.g. the 2-channel vacuum term against a dummy):
+        # pair only the shared channels
+        @inbounds for q in 1:Q, c in 1:n_chan
+            acc = zero(T)
+            @fastmath @simd for k in 1:K
+                a = B_lm_a[c, k, q]; b = B_lm_b[c, k, q]
+                acc += weights[k] * (real(a) * real(b) + imag(a) * imag(b))
+            end
+            S[q] += acc
+        end
+    end
+    return S .* (4π)
 end

@@ -5,6 +5,7 @@ using GLMakie
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDMZ9")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1.dat")
@@ -60,9 +61,9 @@ I_exp   = Float64.(raw[:, 2])
 # kept; the phosphate is re-split at pH 7.0 (HPO4²⁻ fraction 0.592): pK2 from Goldberg, Kishore & Lennen
 # 2002 (DOI 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol, ΔCp −230 J/K/mol) at 22 °C, Davies-corrected at I ≈
 # 0.166 M (pK2' ≈ 6.84). The 1.8 mM KH2PO4 is kept as the K⁺ carrier and the rest is sodium phosphate.
-const PH, σ_PH = 7.0, 0.1   # SASBDB; ±0.1 is a typical benchtop pH-meter precision
+const PH, σ_PH = 7.0, PH_METER_SIGMA   # SASBDB
 
-const ENERGY_EV        = 12398.42 / 1.033 # ≈ 12001 eV, from SASBDB's stated λ = 0.1033 nm = 1.033 Å
+const ENERGY_EV        = HC_EV_ANGSTROM / 1.033 # ≈ 12001 eV, from SASBDB's stated λ = 0.1033 nm = 1.033 Å
 const TEMPERATURE_C    = 23.0            # 23°C, SASBDB
 const IONIC_STRENGTH_M = 0.171           # PBS ionic strength, computed below
 
@@ -102,7 +103,7 @@ const SAS20D1_2_SEQ =
 const SAS20D1_2_MW = 56385.18   # g/mol
 const SAS20D1_2_CONC_MG_ML = 5.0   # SASBDB: 5 mg/ml
 const SAS20D1_2_MOLARITY   = SAS20D1_2_CONC_MG_ML / SAS20D1_2_MW   # ≈ 8.87e-5 M ≈ 0.0887 mM
-const SAS20D1_2_MOLARITY_σ = 0.05 * SAS20D1_2_MOLARITY             # 5% relative: typical A280/mg-ml
+const SAS20D1_2_MOLARITY_σ = MOLARITY_REL_SIGMA * SAS20D1_2_MOLARITY
 
 # Buffer components: PBS + 1 mM TCEP
 const SOLUTES = Solute[
@@ -145,13 +146,6 @@ function fit_subset()
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
-const _HIST_PARAMS = [
-    ("ρₑ", "slvnt_e_dns"), ("δρ₁", "delta_rho_1"), ("δρ₂", "delta_rho_2"),
-    ("δρ₃", "delta_rho_3"),
-    ("scale", "scale"), ("bkgrnd_corr", "bkgrnd_corr"),
-    ("c1", "excl_vol_corr"),
-]
-
 # ---------------------------------------------------------------------------
 #                         Shared plotting helpers
 # ---------------------------------------------------------------------------
@@ -193,7 +187,7 @@ end
 #                         Generic run model function
 # ---------------------------------------------------------------------------
 
-function run_sasdmz9_model(pdb_path::String, lmax::Int; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer = 0)
+function run_sasdmz9_model(pdb_path::String, lmax::Int; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
 
     Random.seed!(seed)
@@ -231,7 +225,7 @@ function sasdmz9_figure(result, data)
 
     y_floor = _positive_log_floor(I_plot)
 
-    fig = Figure(size = (700, 500))
+    fig = Figure(size = FIG_SIZE_CURVE)
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
@@ -264,7 +258,7 @@ function sasdmz9_figure(result, data)
                 q_bounds[valid_bounds],
                 lo_bounds[valid_bounds],
                 hi_bounds[valid_bounds];
-                color = (:darkorange, 0.15),
+                color = COLOR_BAND,
                 label = "bounds",
             )
         end
@@ -287,8 +281,8 @@ function sasdmz9_figure(result, data)
                 q_quant[valid_quant],
                 lo_quant[valid_quant];
                 linestyle = :dot,
-                color = :darkorange,
-                linewidth = 1.5,
+                color = COLOR_POSTERIOR,
+                linewidth = LW_QUANTILE,
                 label = "quantiles",
             )
             lines!(
@@ -296,8 +290,8 @@ function sasdmz9_figure(result, data)
                 q_quant[valid_quant],
                 hi_quant[valid_quant];
                 linestyle = :dot,
-                color = :darkorange,
-                linewidth = 1.5,
+                color = COLOR_POSTERIOR,
+                linewidth = LW_QUANTILE,
             )
         end
     end
@@ -324,12 +318,12 @@ function sasdmz9_figure(result, data)
             q_plot[valid_errors],
             err_lo[valid_errors],
             err_hi[valid_errors];
-            whiskerwidth = 4,
-            color = (:gray40, 0.6),
+            whiskerwidth = WHISKERWIDTH,
+            color = COLOR_ERRORBAR,
         )
     end
 
-    scatter!(ax, q_plot, I_plot; markersize = 4, color = :gray20, label = "data")
+    scatter!(ax, q_plot, I_plot; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
 
     # MAP curve
     if map_result !== nothing
@@ -348,8 +342,8 @@ function sasdmz9_figure(result, data)
                 ax,
                 q_map[valid_map],
                 max.(I_map[valid_map], y_floor);
-                color = :crimson,
-                linewidth = 2,
+                color = COLOR_MAP,
+                linewidth = LW_MAP,
                 label = "MAP",
             )
         end
@@ -360,8 +354,8 @@ function sasdmz9_figure(result, data)
     lo, hi = extrema(I_plot)
     lo = max(lo, y_floor)
     hi = max(hi, lo * 1.3)
-    ymin = max(lo * 0.7, eps(Float64))
-    ymax = max(hi * 1.3, ymin * 1.01)
+    ymin = max(lo * YLIM_LOG_LO, eps(Float64))
+    ymax = max(hi * YLIM_LOG_HI, ymin * 1.01)
     ylims!(ax, ymin, ymax)
 
     return fig
@@ -375,7 +369,7 @@ function sasdmz9_residuals_figure(result, data)
     _, _, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
 
-    fig = Figure(size = (700, 400))
+    fig = Figure(size = FIG_SIZE_RESIDUALS)
     ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
 
     map_curve = map_result === nothing ? nothing : map_result[2]
@@ -404,7 +398,7 @@ function sasdmz9_residuals_figure(result, data)
                     q_bounds[valid_bounds],
                     lo_bounds[valid_bounds] .- I_map[valid_bounds],
                     hi_bounds[valid_bounds] .- I_map[valid_bounds];
-                    color = (:darkorange, 1),
+                    color = COLOR_BAND_RESID,
                     label = "bounds",
                 )
             end
@@ -425,8 +419,8 @@ function sasdmz9_residuals_figure(result, data)
                     q_quant[valid_quant],
                     lo_quant[valid_quant] .- I_map[valid_quant];
                     linestyle = :dot,
-                    color = :darkorange,
-                    linewidth = 2.5,
+                    color = COLOR_POSTERIOR,
+                    linewidth = LW_QUANTILE_RESID,
                     label = "quantiles",
                 )
                 lines!(
@@ -434,8 +428,8 @@ function sasdmz9_residuals_figure(result, data)
                     q_quant[valid_quant],
                     hi_quant[valid_quant] .- I_map[valid_quant];
                     linestyle = :dot,
-                    color = :darkorange,
-                    linewidth = 2.5,
+                    color = COLOR_POSTERIOR,
+                    linewidth = LW_QUANTILE_RESID,
                 )
             end
         end
@@ -455,24 +449,24 @@ function sasdmz9_residuals_figure(result, data)
                 q_fit[valid_resid],
                 resid[valid_resid],
                 σ_fit[valid_resid];
-                whiskerwidth = 4,
-                color = (:gray40, 0.6),
+                whiskerwidth = WHISKERWIDTH,
+                color = COLOR_ERRORBAR,
             )
             scatter!(
                 ax,
                 q_fit[valid_resid],
                 resid[valid_resid];
-                markersize = 4,
-                color = :gray20,
+                markersize = MARKERSIZE,
+                color = COLOR_DATA,
                 label = "data - MAP",
             )
-            hlines!(ax, [0.0]; color = :crimson, linewidth = 1.5)
+            hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
 
             lo, hi = extrema(resid[valid_resid])
             if lo == hi
                 pad = max(abs(lo) * 0.3, 1.0)
             else
-                pad = 0.3 * (hi - lo)
+                pad = YLIM_LIN_PAD_FRAC * (hi - lo)
             end
             ylims!(ax, lo - pad, hi + pad)
         end
@@ -495,8 +489,8 @@ function sasdmz9_hist(result)
     bkgrnd_draws = fit.bkgrnd_corr[ok]
     map_params = map_result === nothing ? nothing : map_result[1]
 
-    fig = Figure(size = (900, 550))
-    for (i, (label, map_key)) in enumerate(_HIST_PARAMS)
+    fig = Figure(size = FIG_SIZE_HIST)
+    for (i, (label, map_key)) in enumerate(HIST_PARAMS)
         row, col = fldmod1(i, 3)
         ax = Axis(
             fig[row, col],
@@ -516,12 +510,12 @@ function sasdmz9_hist(result)
         valid = isfinite.(values)
         values = values[valid]
         if !isempty(values)
-            hist!(ax, values; bins = 40, color = (:darkorange, 0.6))
+            hist!(ax, values; bins = HIST_BINS, color = COLOR_HIST)
         end
         if map_params !== nothing
             map_value = map_params[map_key]
             if isfinite(map_value)
-                vlines!(ax, [map_value]; color = :crimson, linewidth = 2)
+                vlines!(ax, [map_value]; color = COLOR_MAP, linewidth = LW_MAP)
             end
         end
     end
@@ -556,13 +550,13 @@ open(joinpath(@__DIR__, "res_model1.txt"), "w") do io
 end
 
 fig1 = sasdmz9_figure(result1, (q_fit1, I_fit1, σ_fit1))
-save(joinpath(@__DIR__, "res_model1.png"), fig1; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_model1.png"), fig1; px_per_unit = PX_PER_UNIT)
 
 fig_residuals1 = sasdmz9_residuals_figure(result1, (q_fit1, I_fit1, σ_fit1))
-save(joinpath(@__DIR__, "res_model1_residuals.png"), fig_residuals1; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_model1_residuals.png"), fig_residuals1; px_per_unit = PX_PER_UNIT)
 
 fig_hist1 = sasdmz9_hist(result1)
-save(joinpath(@__DIR__, "res_model1_hist.png"), fig_hist1; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_model1_hist.png"), fig_hist1; px_per_unit = PX_PER_UNIT)
 
 # ---------------------------------------------------------------------------
 #                               Model 2
@@ -586,13 +580,13 @@ open(joinpath(@__DIR__, "res_model2.txt"), "w") do io
 end
 
 fig2 = sasdmz9_figure(result2, (q_fit2, I_fit2, σ_fit2))
-save(joinpath(@__DIR__, "res_model2.png"), fig2; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_model2.png"), fig2; px_per_unit = PX_PER_UNIT)
 
 fig_residuals2 = sasdmz9_residuals_figure(result2, (q_fit2, I_fit2, σ_fit2))
-save(joinpath(@__DIR__, "res_model2_residuals.png"), fig_residuals2; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_model2_residuals.png"), fig_residuals2; px_per_unit = PX_PER_UNIT)
 
 fig_hist2 = sasdmz9_hist(result2)
-save(joinpath(@__DIR__, "res_model2_hist.png"), fig_hist2; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_model2_hist.png"), fig_hist2; px_per_unit = PX_PER_UNIT)
 
 # ---------------------------------------------------------------------------
 #                               Model 3
@@ -616,10 +610,10 @@ open(joinpath(@__DIR__, "res_model3.txt"), "w") do io
 end
 
 fig3 = sasdmz9_figure(result3, (q_fit3, I_fit3, σ_fit3))
-save(joinpath(@__DIR__, "res_model3.png"), fig3; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_model3.png"), fig3; px_per_unit = PX_PER_UNIT)
 
 fig_residuals3 = sasdmz9_residuals_figure(result3, (q_fit3, I_fit3, σ_fit3))
-save(joinpath(@__DIR__, "res_model3_residuals.png"), fig_residuals3; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_model3_residuals.png"), fig_residuals3; px_per_unit = PX_PER_UNIT)
 
 fig_hist3 = sasdmz9_hist(result3)
-save(joinpath(@__DIR__, "res_model3_hist.png"), fig_hist3; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_model3_hist.png"), fig_hist3; px_per_unit = PX_PER_UNIT)

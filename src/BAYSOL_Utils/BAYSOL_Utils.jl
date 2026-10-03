@@ -9,7 +9,7 @@ include("Cache.jl")
 include("Timing.jl")
 
 using .Constants: Constants
-using .Cache:      Cache
-using .Timing:     Timing
+using .Cache:     Cache
+using .Timing:    Timing
 
 end # module

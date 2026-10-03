@@ -1,14 +1,15 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Exercises src/Scattering/PartialWave.jl at the unit level: the packed (l, m)
-# ordering shared by `partial_wave_weights` and `compute_B_lm`, the `_deg_contrib`
-# contraction, the real/imaginary two-channel split, chunking invariance,
+# ordering shared by `partial_wave_weights` and `compute_B_lm`, the real/imaginary
+# two-channel split, chunking invariance,
 # linearity/additivity of B_lm, and the algebraic identities relating
 # `self_scatter` and `cross_scatter`.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BAYSOL.Scattering: compute_B_lm, partial_wave_weights, self_scatter, cross_scatter, _deg_contrib
-using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess
+using BAYSOL.Scattering: compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
+using BAYSOL.Scattering.SphFuncs: sphHarm
+using SpecialFunctions: sphericalbesselj
 using BAYSOL.MolecularStructure: create, coords_spherical, to_spherical
 
 # packed row offsets, duplicated here by hand so the tests pin the convention
@@ -24,11 +25,10 @@ function pw_naive_B(coords_sph, qvals, f_atoms, lMax)
     B = zeros(ComplexF64, pw_nrows(lMax), Q)
     for i in 1:N
         Y = sphHarm(lMax, [coords_sph[2, i]], [coords_sph[3, i]])   # (K, 1)
-        j = sphBess([coords_sph[1, i]], qvals, lMax)                # (lMax+1, Q, 1)
         for l in 0:lMax, m in 0:l
             k = pw_idx(l, m)
             for qi in 1:Q
-                B[k, qi] += f_atoms[i, qi] * j[l + 1, qi, 1] * conj(Y[k, 1])
+                B[k, qi] += f_atoms[i, qi] * sphericalbesselj(l, qvals[qi] * coords_sph[1, i]) * conj(Y[k, 1])
             end
         end
     end
@@ -77,37 +77,6 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         @test_throws ArgumentError partial_wave_weights(-4)
         # lMax = 0 is the boundary of the valid range, not an error
         @test partial_wave_weights(0) == [1.0]
-    end
-
-    @testset "_deg_contrib equals the explicit triple loop" begin
-        # the docstring promises Y_l * (f_t' .* j_deg)', i.e.
-        #   out[m, q] = Σ_i Y_l[m, i] * f_t[i, q] * j_deg[q, i]
-        chunk, Q, l = 4, 3, 2
-        f_t = ComplexF64[(0.7i - 0.2q) + 0.0im for i in 1:chunk, q in 1:Q]
-        j_deg = Float64[0.1 * q + 0.05 * i for q in 1:Q, i in 1:chunk]
-        Y_l = ComplexF64[cis(0.3m + 0.11i) * (1.0 + 0.1i) for m in 0:l, i in 1:chunk]
-
-        out = _deg_contrib(f_t, j_deg, Y_l)
-        @test size(out) == (l + 1, Q)
-        for m in 1:(l + 1), q in 1:Q
-            ref = sum(Y_l[m, i] * f_t[i, q] * j_deg[q, i] for i in 1:chunk)
-            @test check_complex(out[m, q], ref)
-        end
-    end
-
-    @testset "_deg_contrib is linear in f_t and handles complex amplitude" begin
-        chunk, Q, l = 3, 2, 1
-        j_deg = Float64[0.2q + 0.3i for q in 1:Q, i in 1:chunk]
-        Y_l = ComplexF64[cis(0.4m - 0.2i) for m in 0:l, i in 1:chunk]
-        f1 = ComplexF64[0.5i + 0.1q for i in 1:chunk, q in 1:Q]
-        # a genuinely complex amplitude, to show the contraction is agnostic to it
-        f2 = ComplexF64[0.3i - 0.7q + 0.9im * i for i in 1:chunk, q in 1:Q]
-        a, b = -1.5, 2.25
-
-        lhs = _deg_contrib(a .* f1 .+ b .* f2, j_deg, Y_l)
-        rhs = a .* _deg_contrib(f1, j_deg, Y_l) .+ b .* _deg_contrib(f2, j_deg, Y_l)
-        @test all(check_complex(lhs[k], rhs[k]) for k in eachindex(lhs))
-        @test eltype(_deg_contrib(f2, j_deg, Y_l)) <: Complex
     end
 
     @testset "compute_B_lm matches the naive Σ_i f j_l conj(Y_lm) definition" begin

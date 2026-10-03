@@ -20,13 +20,16 @@ src/BAYSOL.jl re-exports Constants, Cache and Timing at the top level
 
 A flat leaf module of const primitives, grouped by comment header into:
 
-- **Floating-point accuracy**  `DEFAULT_ATOL = 1.0e-9`
-- **Forward-model constants** `SHELL_THICKNESS` (3.0 Å hydration-shell thickness, CRYSOL's border-layer default), `PROBE_RADIUS` (1.4 Å water probe, forwarded to [`SASA.shell_points`](@ref BAYSOL.SASA.shell_points)), `SHELL_N_TARGET` (nothing by default, lets [`SASA.shell_points`](@ref BAYSOL.SASA.shell_points) size the hydration-shell dummy cloud from accessible area instead of a fixed count), `N_VOL_SHELL` (2145 quasi-random points per atom for the power-diagram excluded-volume estimate in `MolecularStructure.excluded_volume`), `DRO_UNIT` (0.03 e·Å⁻³, CRYSOL's --dro shell-contrast unit), `B_LM_CHUNK` (`UInt64(2048)`, atoms/dummies per pass in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm)).
+- **Floating-point accuracy**  `DEFAULT_ATOL = 1.0e-9`, the unit for every absolute floating-point tolerance: tests compare with `DEFAULT_ATOL` or `k * DEFAULT_ATOL`, never a bare literal. (Method tolerances, e.g. finite-difference or Monte Carlo checks, and the c1 search step `EXCL_VOL_CORR_EPS` are separate.)
+- **Forward-model constants** `SHELL_THICKNESS` (3.0 Å hydration-shell thickness, CRYSOL's border-layer default), `PROBE_RADIUS` (1.4 Å water probe, forwarded to [`SASA.shell_points`](@ref BAYSOL.SASA.shell_points)), `SHELL_N_TARGET` (nothing by default, lets [`SASA.shell_points`](@ref BAYSOL.SASA.shell_points) size the hydration-shell dummy cloud from accessible area instead of a fixed count), `N_VOL_SHELL` (2145 quasi-random points per atom for the power-diagram excluded-volume estimate in `MolecularStructure.excluded_volume`), `DRO_UNIT` (0.03 e·Å⁻³, CRYSOL's --dro shell-contrast unit), `B_LM_CHUNK` (`UInt64(2048)`, atoms/dummies per pass in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm)), `B_LM_TILE` (256 atoms per inner tile, the inner dimension of each per-degree BLAS product) and `B_LM_W_BYTES` (64 MiB budget for the per-tile W buffer, which sets the q-tile length).
 - **Plastic-sequence constants** `PLASTIC_RATIO_2` (≈ 1.324718, real root of x³ = x + 1), `PLASTIC_RATIO_3` (≈ 1.220744, real root of x⁴ = x + 1) and their precomputed powers `_PLASTIC_RATIO_SQR`, `_PLASTIC_RATIO_3_SQR`, `_PLASTIC_RATIO_3_CUBE`, used by `Geometry.PlasticSequence`. Hardcoded rather than root-solved at load time.
-- **SASA bead classification** `SHELL_AREA_PER_POINT`, `SHELL_MIN_POINTS`, `_SHELL_SAMPLE`, `_BEAD_RAY_RANGE`, `_BEAD_RAY_DIRS`, `_BEAD_CONVEX_ESCAPE` (see the SASA README).
-- **Run defaults** `DEFAULT_QUANTILES` (`"16-84"`, the default `quantiles` of `run_model`).
-- **Physical constants**  `AVOGADRO`.
-- **Sampler defaults** `DEFAULT_TEMPERATURE_C` (25.0°C, the default sample temperature for `_ρₑ`/[`Fitting.ρₑ_prior`](@ref BAYSOL.Fitting.ρₑ_prior)'s bulk electron density calculation; pass the real one), `PMV_REFERENCE_TEMPERATURE_C` (25.0°C, the temperature the partial-molar-volume tables are tabulated at) and `PMV_FRACTIONAL_EXPANSIBILITY` (3.0 × 10⁻³ K⁻¹, the bound used to widen a solute's 25°C ϕ° uncertainty away from 25°C; derivation in its docstring). `c1` is no longer a sampled parameter with its own prior — it is profiled out per posterior draw by [`Fitting.profiled_corrs`](@ref BAYSOL.Fitting.profiled_corrs) over `EXCL_VOL_CORR_BOUNDS = (cmin=0.8, cmax=1.3)`, searched with an `EXCL_VOL_CORR_EPS = 0.02` padding/grid-step (see [`Fitting.profiled_corrs`](@ref BAYSOL.Fitting.profiled_corrs)'s own docstring for the exact search and the grid-size formula, `((cmax+eps)-(cmin-eps))/eps + 1`, if tuning `eps` away from the default). Hydration-shell prior constants: `DRO_BOUNDS = (-10, 2)` (CRYSOL3's δρ₁/δρ₂ fitting limits), `φ_max = 1.25` (upper bound on cavity occupancy, fixing δρ₃'s upper bound), and the Beta-prior concentrations `DRO12_CONCENTRATION = 14` and `DRO3_CONCENTRATION = 1.25` (see [`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)).
+- **SASA bead classification** `SHELL_AREA_PER_POINT`, `SHELL_MIN_POINTS`, `_SHELL_SAMPLE`, `_BEAD_RAY_RANGE`, `_BEAD_RAY_DIRS`, `_BEAD_CONVEX_ESCAPE` (see the SASA README), and the defaults of `SASA.sasa`: `SASA_N_OCC = 512` and `SASA_N_EXP = 4096` (sphere points per atom in the occlusion-witness and exposed-fraction passes) and `SASA_AREA_TOL = 2.0` (Å²: if an atom with no witness in the occlusion pass could still expose less than this, the exposure pass is skipped and it is treated as buried).
+- **Run defaults** `DEFAULT_QUANTILES` (`"16-84"`, the default `quantiles` of `run_model`), `DEFAULT_TARGET_ACCEPT` (80, the default NUTS target acceptance rate `δ`, in percent, of `run_model`/`Fitting.run_fitting`; Stan's usual default).
+- **Physical constants**  `AVOGADRO`, `WATER_MOLAR_MASS` (18.015268 g·mol⁻¹, IAPWS-95), `WATER_ELECTRONS` (10), and the unit conversions `ANGSTROM3_PER_LITER` (10²⁷) and `CM3_PER_LITER` (10³) used by the solvent electron-density calculation. Peptide backbone unit, added once per residue by the protein partial-molar-volume backend: `BACKBONE_PMV = (37.4, 0.1)` cm³·mol⁻¹ (value, uncertainty) and `BACKBONE_ELECTRONS = 30`.
+- **Form factors** `WK_S_MAX = 6.0` (upper bound of the Waasmaier–Kirfel f0 parameterisation's s range) and `F2_LOG_FLOOR = 1e-99` (floor applied to Chantler f2 before log-log interpolation).
+- **Timing** `NS_PER_S` (10⁹, nanoseconds per second; converts `time_ns()` and Base's `*_time_ns()` counters to seconds in `Timing` and the report's `=== Timing ===` section).
+- **Spherical Bessel functions** `GAUTSCHI_MARGIN` (`(16, 6.0)`): the continued-fraction start order in [`Scattering.SphFuncs.sphBessRatios!`](@ref BAYSOL.Scattering.SphFuncs.sphBessRatios!) is max(lMax, ⌈x⌉) + 16 + ⌈6·x^(1/3)⌉.
+- **Sampler defaults** `DEFAULT_TEMPERATURE_C` (25.0°C, the default sample temperature for `_ρₑ`/[`Fitting.ρₑ_prior`](@ref BAYSOL.Fitting.ρₑ_prior)'s bulk electron density calculation; pass the real one), `PMV_REFERENCE_TEMPERATURE_C` (25.0°C, the temperature the partial-molar-volume tables are tabulated at) and `PMV_FRACTIONAL_EXPANSIBILITY` (3.0 × 10⁻³ K⁻¹, the bound used to widen a solute's 25°C ϕ° uncertainty away from 25°C; derivation in its docstring). `c1` is no longer a sampled parameter with its own prior — it is profiled out per posterior draw by [`Fitting.profiled_corrs`](@ref BAYSOL.Fitting.profiled_corrs) over `EXCL_VOL_CORR_BOUNDS = (cmin=0.8, cmax=1.3)`, searched with an `EXCL_VOL_CORR_EPS = 0.02` padding/grid-step (see [`Fitting.profiled_corrs`](@ref BAYSOL.Fitting.profiled_corrs)'s own docstring for the exact search and the grid-size formula, `((cmax+eps)-(cmin-eps))/eps + 1`, if tuning `eps` away from the default). Hydration-shell prior constants: `DRO_BOUNDS = (-10, 2)` (CRYSOL3's δρ₁/δρ₂ fitting limits), `DRO12_MODE = 1` (CRYSOL3's default δρ₁ = δρ₂, the prior mode; the Beta parameters are derived from it and `DRO_BOUNDS`), `φ_max = 1.25` (upper bound on cavity occupancy, fixing δρ₃'s upper bound), and the Beta-prior concentrations `DRO12_CONCENTRATION = 14` and `DRO3_CONCENTRATION = 1.25` (see [`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)).
 
 ### Usage
 
@@ -50,7 +53,7 @@ using BAYSOL.Constants: AVOGADRO
 
 Thread-safe memoization primitives, guarded by a ReentrantLock so concurrent callers racing on the same computation never double-compute or observe a torn store.
 
-### Lazy {T} / make / force
+### Lazy {T} / force
 
 A single deferred, memoized value of type T:
 
@@ -63,7 +66,7 @@ mutable struct Lazy{T}
 end
 ```
 
-- make(::Type{T}, f) -> Lazy{T} builds an unforced cache wrapping the zero-arg thunk f.
+- Lazy{T}(f) builds an unforced cache wrapping the zero-arg thunk f.
 - force(c::Lazy{T})::T runs f once, under c's lock, the first time it's called; every subsequent call (concurrent or not) returns the already-computed value without re-running f.
 
 ```julia
