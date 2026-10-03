@@ -20,6 +20,7 @@ using  DBInterface: DBInterface
 using  LinearAlgebra: LinearAlgebra
 using  FastClosures: @closure
 using  DocStringExtensions
+using  ..BAYSOL_Utils.Constants: WK_S_MAX, F2_LOG_FLOOR
 
 export  FormFactorSource, form_factor_table, form_factors, form_factor_log,
         FF, FormFactorError, FormFactorSourceTables
@@ -137,9 +138,6 @@ end
 # f0: Waasmaier-Kirfel
 # ---------------------------------------------------------------------------
 
-"Upper end of the Waasmaier-Kirfel fit range, in Å⁻¹. Beyond it the ion fits diverge; see README."
-const S_MAX = 6.0
-
 """
 $(TYPEDSIGNATURES)
 
@@ -151,8 +149,8 @@ function f0(species::AbstractString, s::Real)::Float64
     p = get(_WK, species, nothing)
     p === nothing && throw(FormFactorError("no Waasmaier-Kirfel entry for \"$species\""))
     sf = Float64(s)
-    (0.0 ≤ sf ≤ S_MAX) ||
-        throw(FormFactorError("s = $sf outside the Waasmaier-Kirfel range [0, $S_MAX]"))
+    (0.0 ≤ sf ≤ WK_S_MAX) ||
+        throw(FormFactorError("s = $sf outside the Waasmaier-Kirfel range [0, $WK_S_MAX]"))
     r = p[1]
     # exp(((-b)*s)*s), not exp(-(b*s^2)): this is the association NumPy uses
     # for -e*q*q, and matching it makes the result bit-identical to the
@@ -244,8 +242,8 @@ function f1f2(element::AbstractString, energy::Real)::Tuple{Float64,Float64}
     # the clamp keeps the log finite where the table stores an exact zero.
     y2 = view(ch.f2, w)
     j = clamp(searchsortedlast(x, E), 1, length(x) - 1)
-    lo = abs(y2[j])     < 1e-99 ? 1e-99 : y2[j]
-    hi = abs(y2[j + 1]) < 1e-99 ? 1e-99 : y2[j + 1]
+    lo = abs(y2[j])     < F2_LOG_FLOOR ? F2_LOG_FLOOR : y2[j]
+    hi = abs(y2[j + 1]) < F2_LOG_FLOOR ? F2_LOG_FLOOR : y2[j + 1]
     lx1, lx2 = log(x[j]), log(x[j + 1])
     ly1, ly2 = log(lo), log(hi)
     slope = (ly2 - ly1) / (lx2 - lx1)
@@ -412,7 +410,7 @@ function form_factors(
         row = get(t.tbl, String(ions[r]), nothing)
         row === nothing &&
             throw(FormFactorError("ion \"$(ions[r])\" is not in this form-factor table"))
-        for k in eachindex(cols)
+        @simd for k in eachindex(cols)
             out[r, k] = row[cols[k]]
         end
     end

@@ -171,11 +171,11 @@ iy_w    = partial_wave_weights(iy_lMax)
     end
 
     @testset "contrast_vector: values, length, species order" begin
-        @test contrast_vector(0.334, (1.0, 1.0, 0.0))       == [1.0, -0.334, 0.03, 0.03, 0.0]
-        @test contrast_vector(0.334, 1.0)                   == [1.0, -0.334, 0.03]
+        @test contrast_vector(CRYSOL_SOLVENT_DENSITY, (1.0, 1.0, 0.0))       == [1.0, -CRYSOL_SOLVENT_DENSITY, DRO_UNIT, DRO_UNIT, 0.0]
+        @test contrast_vector(CRYSOL_SOLVENT_DENSITY, 1.0)                   == [1.0, -CRYSOL_SOLVENT_DENSITY, DRO_UNIT]
         @test length(contrast_vector(0.3, (1.0, 1.0, 1.0))) == 5
         @test length(contrast_vector(0.3, 1.0))             == 3
         @test contrast_vector(0.3, (1.0, 0.0, 0.0))[4:5]    == [0.0, 0.0] # δρ = 0 zeroes a shell
-        @test contrast_vector(0.334, (1, 1, 0)) isa AbstractVector{Float64}  # integer δρ accepted, SVector-backed
+        @test contrast_vector(CRYSOL_SOLVENT_DENSITY, (1, 1, 0)) isa AbstractVector{Float64}  # integer δρ accepted, SVector-backed
     end
 end

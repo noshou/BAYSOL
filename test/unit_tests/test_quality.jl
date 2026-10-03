@@ -5,7 +5,7 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 
 using Aqua, JET, ExplicitImports
 using BAYSOL.Scattering: SphFuncs
-using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm
+using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, sphBessRatios!, sphBessStep
 using BAYSOL.MolecularStructure: MolecularStructure, create, coords_cartesian, coords_spherical, radii, vols, r_max,
                 neighbour_tree, elms, name, Molecule
 using BAYSOL.AtomicRadii: AtomicRadii, resolve_one, _resolve_all, tryparse_ion, ion_key, nearest_ion
@@ -24,8 +24,8 @@ end
 @testset "type stability (@inferred)" begin
     θ = collect(range(0.1, π - 0.1; length = 8)); φ = collect(range(0.0, 2pi; length = 8))
     @inferred sphHarm(4, θ, φ)
-    @inferred sphBess([1.0, 2.0], [0.1, 0.5, 1.0], 4)
-    @inferred legendre_sphPlm(3, 2, 0.5)
+    @inferred sphBessRatios!(sphBess(3, 4), 2.0, [0.1, 0.5, 1.0], 4)
+    @inferred sphBessStep(1.0, 0.5, 3, 5, 0.5, 0.25)
     @inferred Union{Float64,Nothing} resolve_one("fe3+")
     @inferred _resolve_all(["fe3+", "o2-"])
     @inferred Union{AtomicRadii.Ion,Nothing} tryparse_ion("fe3+")
@@ -53,9 +53,9 @@ end
 end
 
 @testset "JET (focused type-stability analysis)" begin
-    @test_opt target_modules = (SphFuncs,) sphBess([1.0, 2.0], [0.1, 0.5], 3)
+    @test_opt target_modules = (SphFuncs,) sphBessRatios!(sphBess(2, 3), 2.0, [0.1, 0.5], 3)
+    @test_opt target_modules = (SphFuncs,) sphBessStep(1.0, 0.5, 3, 5, 0.5, 0.25)
     @test_opt target_modules = (SphFuncs,) sphHarm(3, [0.4, 1.2], [0.1, 2.0])
-    @test_opt target_modules = (SphFuncs,) legendre_sphPlm(3, 2, 0.5)
     @test_opt target_modules = (MolecularStructure,) create("t", ["o", "h"],
         [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)])
     @test_opt target_modules = (AtomicRadii,) resolve_one("fe3+")

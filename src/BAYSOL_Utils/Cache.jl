@@ -7,9 +7,9 @@ module Cache
 
 using DocStringExtensions
 
-export Lazy, make, force, KeyedCache
+export Lazy, force, KeyedCache
 
-"A cache of a value of type T. The thunk runs on the first [`force`](@ref)."
+"A cache of a value of type T, built unforced as `Lazy{T}(f)` from a zero-arg thunk f; f runs on the first [`force`](@ref)."
 mutable struct Lazy{T}
     const f::Any
     const lock::ReentrantLock
@@ -17,17 +17,6 @@ mutable struct Lazy{T}
     value::T
     Lazy{T}(f) where {T} = new{T}(f, ReentrantLock(), false)
 end
-
-"""
-$(TYPEDSIGNATURES)
-
-Build an unforced cache of the T-valued thunk f.
-
-# Arguments
-    - `::Type{T}`: element type the thunk returns.
-    - `f`: zero-arg thunk, run once on the first [`force`](@ref).
-"""
-make(::Type{T}, f) where {T} = Lazy{T}(f)
 
 """
 $(TYPEDSIGNATURES)

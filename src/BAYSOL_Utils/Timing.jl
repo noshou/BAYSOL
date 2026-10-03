@@ -9,6 +9,7 @@ is `nothing`.
 module Timing
 
 using DocStringExtensions
+using ..Constants: NS_PER_S
 
 export Stage, StageLog, tick, tock!, timed!, stage_seconds, fmt_count
 
@@ -61,9 +62,9 @@ end
 tock!(::Nothing, args...; kw...) = nothing
 
 _deltas(t) = (
-    (time_ns() - t[1]) / 1e9,
-    (Base.cumulative_compile_time_ns()[1] - t[2]) / 1e9,
-    (Base.gc_time_ns() - t[3]) / 1e9,
+    (time_ns() - t[1]) / NS_PER_S,
+    (Base.cumulative_compile_time_ns()[1] - t[2]) / NS_PER_S,
+    (Base.gc_time_ns() - t[3]) / NS_PER_S,
 )
 
 """

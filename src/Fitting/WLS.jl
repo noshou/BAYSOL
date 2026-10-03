@@ -110,7 +110,7 @@ function wls_fit(
     I_obs = data.I_obs
     weights = data.weights
 
-    @inbounds @simd for i in 1:n
+    @inbounds @fastmath @simd for i in 1:n
         wi = weights[i]
         xi = y_model[i]
         yi = I_obs[i]

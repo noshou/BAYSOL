@@ -137,7 +137,9 @@ but computes scale * acc + bkgrnd_corr directly inside intensity's own
 accumulation loop instead of chaining two separate Q-length allocations.
 Exists purely for [`forward`](@ref), which sits on the NUTS/HMC hot path
 (every likelihood/gradient evaluation) — intensity and intensity_calc
-themselves are left untouched for their other callers.
+themselves are left untouched for their other callers. Unlike them, it assumes G
+is symmetric in its species axes (always true of [`gram`](@ref)'s output) and sums
+only the upper triangle.
 """
 function _fused_intensity_calc(
     G::AbstractArray{<:Real,3}, v::AbstractVector{<:Real}, scale::Real, bkgrnd_corr::Real
@@ -148,13 +150,17 @@ function _fused_intensity_calc(
     Q = size(G, 3)
     T = promote_type(eltype(G), eltype(v), typeof(scale), typeof(bkgrnd_corr))
     out = Vector{T}(undef, Q)
+    # G is symmetric (it comes from gram), so vᵀGv = Σ_b v_b²G_bb + 2·Σ_{a<b} v_a v_b G_ab:
+    # 15 products per q instead of 25
     @inbounds for k in 1:Q
         acc = zero(T)
         for b in 1:n
             vb = v[b]
-            for a in 1:n
-                acc += v[a] * G[a, b, k] * vb
+            t = zero(T)
+            @fastmath @simd for a in 1:(b - 1)
+                t += v[a] * G[a, b, k]
             end
+            acc += (vb * G[b, b, k] + 2 * t) * vb
         end
         out[k] = scale * acc + bkgrnd_corr
     end
@@ -172,13 +178,16 @@ function _fused_intensity_calc(
         "_fused_intensity_calc: V has $(size(V, 2)) columns but G has Q=$Q"))
     T = promote_type(eltype(G), eltype(V), typeof(scale), typeof(bkgrnd_corr))
     out = Vector{T}(undef, Q)
+    # symmetric G, as the vector method above
     @inbounds for k in 1:Q
         acc = zero(T)
         for b in 1:n
             vb = V[b, k]
-            for a in 1:n
-                acc += V[a, k] * G[a, b, k] * vb
+            t = zero(T)
+            @fastmath @simd for a in 1:(b - 1)
+                t += V[a, k] * G[a, b, k]
             end
+            acc += (vb * G[b, b, k] + 2 * t) * vb
         end
         out[k] = scale * acc + bkgrnd_corr
     end
@@ -306,8 +315,18 @@ function contrast_matrix(dns::Real, δρ, g_ex::AbstractVector{<:Real})
     v = contrast_vector(dns, δρ)
     T = promote_type(eltype(v), eltype(g_ex))
     V = Matrix{T}(undef, length(v), length(g_ex))
-    @inbounds for k in eachindex(g_ex), a in eachindex(v)
-        V[a, k] = a == 2 ? v[a] * g_ex[k] : v[a]
+    # row by row, so the ex row's branch is not evaluated per element
+    @inbounds for a in eachindex(v)
+        va = v[a]
+        if a == 2
+            @simd for k in eachindex(g_ex)
+                V[a, k] = va * g_ex[k]
+            end
+        else
+            @simd for k in eachindex(g_ex)
+                V[a, k] = va
+            end
+        end
     end
     return V
 end

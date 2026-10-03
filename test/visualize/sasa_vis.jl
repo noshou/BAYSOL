@@ -20,6 +20,7 @@ using BAYSOL
 using BAYSOL.AtomicRadii: AtomicRadii, RadiiSource
 using BAYSOL.MolecularStructure: MolecularStructure, Molecule
 using BAYSOL.SASA: SASA
+using BAYSOL.Constants: PROBE_RADIUS
 using BAYSOL.Geometry.PlasticSequence: plastic_points
 using BAYSOL.Geometry.Metrics: Metrics, Coverage, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS, classify, blocked
 using Printf: @printf, @sprintf
@@ -137,7 +138,7 @@ two_sphere_exposed_frac(ρ::Float64, d::Float64) = two_sphere_exposed_area(ρ, d
 # --------------------------------------------------------------------------
 
 """
-    exposed_scene(; probe = 1.4) -> NamedTuple
+    exposed_scene(; probe = PROBE_RADIUS) -> NamedTuple
 
 Two equal atoms whose expanded spheres just fail to touch (`r = 1.5`, so
 `ρ = 2.9` at the default probe, centres `6.2` apart): the neighbour is a
@@ -145,7 +146,7 @@ candidate but occludes nothing, so every sample point on both atoms is exposed.
 
 `focus` lists the atoms whose points get drawn.
 """
-function exposed_scene(; probe::Float64 = 1.4)
+function exposed_scene(; probe::Float64 = PROBE_RADIUS)
     src = FixedRadii(Dict("a" => 1.5))
     mol = MolecularStructure.create("fully exposed", ["A", "A"],
                             [(0.0, 0.0, 0.0), (6.2, 0.0, 0.0)]; radii_source = src)
@@ -153,14 +154,14 @@ function exposed_scene(; probe::Float64 = 1.4)
 end
 
 """
-    partial_scene(; probe = 1.4, d = 3.5) -> NamedTuple
+    partial_scene(; probe = PROBE_RADIUS, d = 3.5) -> NamedTuple
 
 Two equal overlapping atoms (`r = 1.5`, `ρ = 2.9`, centres `d` apart) — the
 occluded points form one clean spherical cap facing the partner, everything else
 is exposed. Carries `analytic_frac`, the exact cap-derived exposed fraction from
 [`two_sphere_exposed_frac`](@ref).
 """
-function partial_scene(; probe::Float64 = 1.4, d::Float64 = 3.5)
+function partial_scene(; probe::Float64 = PROBE_RADIUS, d::Float64 = 3.5)
     src = FixedRadii(Dict("a" => 1.5))
     mol = MolecularStructure.create("partially occluded", ["A", "A"],
                             [(0.0, 0.0, 0.0), (d, 0.0, 0.0)]; radii_source = src)
@@ -172,14 +173,14 @@ function partial_scene(; probe::Float64 = 1.4, d::Float64 = 3.5)
 end
 
 """
-    buried_scene(; probe = 1.4) -> NamedTuple
+    buried_scene(; probe = PROBE_RADIUS) -> NamedTuple
 
 A small atom (`r = 0.5`, `ρ = 1.9`) sitting `3.0` from the centre of a big one
 (`r = 6.0`, `ρ = 7.4`). `3.0 + 1.9 = 4.9 < 7.4` with `2.5` Å of margin, so the
 small atom's whole expanded sphere is strictly inside the big one's and every
 sample point is occluded.
 """
-function buried_scene(; probe::Float64 = 1.4)
+function buried_scene(; probe::Float64 = PROBE_RADIUS)
     src = FixedRadii(Dict("big" => 6.0, "sml" => 0.5))
     mol = MolecularStructure.create("fully buried", ["BIG", "SML"],
                             [(0.0, 0.0, 0.0), (3.0, 0.0, 0.0)]; radii_source = src)
@@ -187,14 +188,14 @@ function buried_scene(; probe::Float64 = 1.4)
 end
 
 """
-    cluster_scene(; probe = 1.4, spacing = 4.0) -> NamedTuple
+    cluster_scene(; probe = PROBE_RADIUS, spacing = 4.0) -> NamedTuple
 
 Seven equal atoms (`r = 1.5`): one at the origin caged by six octahedral
 neighbours at `±spacing` along each axis. The caged atom keeps only the small
 patches that peek between neighbours while the shell atoms stay mostly exposed,
 so a single scene shows the whole spread of per-atom states.
 """
-function cluster_scene(; probe::Float64 = 1.4, spacing::Float64 = 4.0)
+function cluster_scene(; probe::Float64 = PROBE_RADIUS, spacing::Float64 = 4.0)
     src = FixedRadii(Dict("a" => 1.5))
     s = spacing
     coords = [  (0.0, 0.0, 0.0),
@@ -206,12 +207,12 @@ function cluster_scene(; probe::Float64 = 1.4, spacing::Float64 = 4.0)
 end
 
 """
-    sasa_scenes(; probe = 1.4) -> Vector
+    sasa_scenes(; probe = PROBE_RADIUS) -> Vector
 
 The four demo scenes in panel order: fully exposed, partially occluded, fully
 buried, small cluster.
 """
-sasa_scenes(; probe::Float64 = 1.4) =
+sasa_scenes(; probe::Float64 = PROBE_RADIUS) =
     [   exposed_scene(; probe), partial_scene(; probe), buried_scene(; probe),
         cluster_scene(; probe)]
 
@@ -231,14 +232,14 @@ classification_label(status::Coverage) =
                                     "sampled: caps overlap"
 
 """
-    sasa_scene_report(; n = 512, probe = 1.4, ns = (64, 256, 1024, 4096)) -> Nothing
+    sasa_scene_report(; n = 512, probe = PROBE_RADIUS, ns = (64, 256, 1024, 4096)) -> Nothing
 
 Print every number the figures annotate — per-atom exposed counts, fractions and
 areas for the four scenes, the analytic cross-check on the overlapping pair, and
 the mesh-refinement sweep — without opening a window. Handy on a headless box,
 and the thing to run first if a panel ever looks wrong.
 """
-function sasa_scene_report(;n::Int = 512, probe::Float64 = 1.4,
+function sasa_scene_report(;n::Int = 512, probe::Float64 = PROBE_RADIUS,
                             ns = (64, 256, 1024, 4096))
     for sc in sasa_scenes(; probe)
         println(sc.title, "  (probe = ", probe, ", n = ", n, ")")
@@ -334,13 +335,13 @@ end
 # --------------------------------------------------------------------------
 
 """
-    sasa_cases_figure(; n = 512, probe = 1.4) -> Figure
+    sasa_cases_figure(; n = 512, probe = PROBE_RADIUS) -> Figure
 
 Build (but do not display) the four-regime figure. Split out from
 [`vis_sasa_cases`](@ref) so the plot can be assembled, saved or inspected without
 a window.
 """
-function sasa_cases_figure(; n::Int = 512, probe::Float64 = 1.4)
+function sasa_cases_figure(; n::Int = 512, probe::Float64 = PROBE_RADIUS)
     scenes = sasa_scenes(; probe)
     fig = Figure(size = (1400, 950))
     Label(  fig[0, 1:2],
@@ -384,7 +385,7 @@ function sasa_cases_figure(; n::Int = 512, probe::Float64 = 1.4)
 end
 
 """
-    vis_sasa_cases(; n = 512, probe = 1.4) -> Nothing
+    vis_sasa_cases(; n = 512, probe = PROBE_RADIUS) -> Nothing
 
 Four-panel figure over the distinct occlusion regimes — fully exposed, partially
 occluded, fully buried, and a small cluster — with every sample point coloured by
@@ -395,17 +396,17 @@ fraction and resulting area. Blocks until the window is closed.
 - `n`: sample points per atom.
 - `probe`: solvent probe radius.
 """
-vis_sasa_cases(; n::Int = 512, probe::Float64 = 1.4) =
+vis_sasa_cases(; n::Int = 512, probe::Float64 = PROBE_RADIUS) =
     wait(display(sasa_cases_figure(; n, probe)))
 
 """
-    sasa_mesh_convergence_figure(; ns = (64, 256, 1024, 4096), probe = 1.4, d = 3.5) -> Figure
+    sasa_mesh_convergence_figure(; ns = (64, 256, 1024, 4096), probe = PROBE_RADIUS, d = 3.5) -> Figure
 
 Build (but do not display) the mesh-refinement figure; see
 [`vis_sasa_mesh_convergence`](@ref).
 """
 function sasa_mesh_convergence_figure(; ns = (64, 256, 1024, 4096),
-                                        probe::Float64 = 1.4, d::Float64 = 3.5)
+                                        probe::Float64 = PROBE_RADIUS, d::Float64 = 3.5)
     sc = partial_scene(; probe, d)
     ncol = length(ns) ≤ 2 ? length(ns) : cld(length(ns), 2)
     fig = Figure(size = (360 * ncol + 60, 900))
@@ -434,7 +435,7 @@ function sasa_mesh_convergence_figure(; ns = (64, 256, 1024, 4096),
 end
 
 """
-    vis_sasa_mesh_convergence(; ns = (64, 256, 1024, 4096), probe = 1.4, d = 3.5) -> Nothing
+    vis_sasa_mesh_convergence(; ns = (64, 256, 1024, 4096), probe = PROBE_RADIUS, d = 3.5) -> Nothing
 
 The *same* two-overlapping-atom scene rendered once per entry of `ns`, so the
 effect of mesh density is visible directly: coarse meshes give a ragged cap edge
@@ -452,12 +453,12 @@ pass). Blocks until the window is closed.
 - `probe`: solvent probe radius.
 - `d`: centre separation of the overlapping pair.
 """
-vis_sasa_mesh_convergence(; ns = (64, 256, 1024, 4096), probe::Float64 = 1.4,
+vis_sasa_mesh_convergence(; ns = (64, 256, 1024, 4096), probe::Float64 = PROBE_RADIUS,
                             d::Float64 = 3.5) =
     wait(display(sasa_mesh_convergence_figure(; ns, probe, d)))
 
 """
-    sasa_molecule_figure(mol; n_occ = 128, n_exp = 1024, probe = 1.4) -> Figure
+    sasa_molecule_figure(mol; n_occ = 128, n_exp = 1024, probe = PROBE_RADIUS) -> Figure
 
 Build (but do not display) the per-atom SASA figure; see
 [`vis_sasa_molecule`](@ref).
@@ -466,7 +467,7 @@ function sasa_molecule_figure(
     mol::Molecule; 
     n_occ::Int = 128, 
     n_exp::Int = 1024,
-    probe::Float64 = 1.4
+    probe::Float64 = PROBE_RADIUS
 )
     areas = SASA.sasa(mol; n_occ = n_occ, n_exp = n_exp, probe = probe)[1]
     crds = MolecularStructure.coords_cartesian(mol)
@@ -495,7 +496,7 @@ function sasa_molecule_figure(
 end
 
 """
-    vis_sasa_molecule(mol; n_occ = 128, n_exp = 1024, probe = 1.4) -> Nothing
+    vis_sasa_molecule(mol; n_occ = 128, n_exp = 1024, probe = PROBE_RADIUS) -> Nothing
 
 Colour a whole molecule's atoms by their per-atom area from
 `SASA.sasa`: each atom is drawn as a sphere at its expanded radius
@@ -510,5 +511,5 @@ colourbar in absolute Å². Blocks until the window is closed.
 - `n_exp`: points for the finer exposed-fraction pass.
 - `probe`: solvent probe radius.
 """
-vis_sasa_molecule(mol::Molecule; n_occ::Int = 128, n_exp::Int = 1024, probe::Float64 = 1.4) =
+vis_sasa_molecule(mol::Molecule; n_occ::Int = 128, n_exp::Int = 1024, probe::Float64 = PROBE_RADIUS) =
     wait(display(sasa_molecule_figure(mol; n_occ, n_exp, probe)))

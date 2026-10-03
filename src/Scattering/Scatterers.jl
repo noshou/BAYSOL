@@ -82,11 +82,34 @@ function vacuo(
     form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE,
     log::Union{Nothing,Vector{String}} = nothing,
 )::AbstractArray{<:Complex,3}
-    crd = coords_spherical(mol)
+    amp = _vacuo_amplitude(qvals, ions, energy; form_factor_source = form_factor_source, log = log)
+    return compute_B_lm(coords_spherical(mol), qvals, amp, lMax, _CHUNK)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The vacuum term's per-atom amplitude: the X-ray form factor of each ion at photon
+energy `energy`, on qvals ((N, Q), complex near an absorption edge). Shared by
+[`vacuo`](@ref) and [`species_multipoles`](@ref), which evaluates the vacuum and
+excluded-volume multipoles in one pass.
+
+# Keywords
+- `form_factor_source`, `log`: as [`vacuo`](@ref).
+
+# Returns
+- `Matrix{ComplexF64}`, (N, Q), in [`compute_B_lm`](@ref)'s f_atoms layout.
+"""
+function _vacuo_amplitude(
+    qvals::AbstractVector{<:Real},
+    ions::Vector{String},
+    energy::Float64;
+    form_factor_source::FormFactorSource = FORM_FACTOR_SOURCE,
+    log::Union{Nothing,Vector{String}} = nothing,
+)
     tbl = FormFactor.form_factor_table(form_factor_source, energy, ions, qvals)
-    amp = FormFactor.form_factors(tbl, ions, qvals)
     log === nothing || append!(log, FormFactor.form_factor_log(tbl))
-    return compute_B_lm(crd, qvals, amp, lMax, _CHUNK)
+    return FormFactor.form_factors(tbl, ions, qvals)
 end
 
 """

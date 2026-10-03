@@ -6,7 +6,7 @@
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.Fitting: δρ_prior
-using BAYSOL.Constants: DRO_UNIT, DRO_BOUNDS, φ_max, DRO12_CONCENTRATION, DRO3_CONCENTRATION
+using BAYSOL.Constants: DRO_UNIT, DRO_BOUNDS, DRO12_MODE, φ_max, DRO12_CONCENTRATION, DRO3_CONCENTRATION
 using Distributions: LocationScale, Continuous, Beta, mode, var, cdf, params, minimum, maximum
 using StaticArrays: SVector
 
@@ -27,11 +27,14 @@ const BB = LocationScale{Float64,Continuous,Beta{Float64}}
             d1, d2, _ = δρ_prior(κ, 1.0, ρ̄)
             @test d1 == d2
             @test (minimum(d1), maximum(d1)) == DRO_BOUNDS
-            @test close_(d1.μ + d1.σ * mode(d1.ρ), 1.0)
+            @test close_(d1.μ + d1.σ * mode(d1.ρ), DRO12_MODE)
             @test close_(sum(params(d1.ρ)) - 2, κ)                 # κ = α + β - 2
-            # the variance formula in the docstring
-            σ²u = (1 + 11κ / 12) * (1 + κ / 12) / ((κ + 2)^2 * (κ + 3))
-            @test close_(var(d1), 144σ²u)
+            # the variance formula in the docstring, from the constants: mode m of u,
+            # width W of DRO_BOUNDS (11/12 and 12 for CRYSOL's defaults)
+            W = DRO_BOUNDS[2] - DRO_BOUNDS[1]
+            m = (DRO12_MODE - DRO_BOUNDS[1]) / W
+            σ²u = (1 + m * κ) * (1 + (1 - m) * κ) / ((κ + 2)^2 * (κ + 3))
+            @test close_(var(d1), W^2 * σ²u)
         end
     end
 
@@ -45,7 +48,7 @@ const BB = LocationScale{Float64,Continuous,Beta{Float64}}
             _, _, d3 = δρ_prior(1.0, κ, ρ̄)
             @test close_(minimum(d3), -ρ̄ / DRO_UNIT)
             @test close_(maximum(d3), (φ_max - 1) * ρ̄ / DRO_UNIT)
-            @test close_(d3.μ + d3.σ * mode(d3.ρ), 0.0; atol = 1e-12)
+            @test close_(d3.μ + d3.σ * mode(d3.ρ), 0.0; atol = 1e-3 * DEFAULT_ATOL)
             @test close_(φ_max * mode(d3.ρ), 1.0)
             @test close_(sum(params(d3.ρ)) - 2, κ)
             σ²u = (1 + κ / φ_max) * (1 + (1 - 1 / φ_max) * κ) / ((κ + 2)^2 * (κ + 3))

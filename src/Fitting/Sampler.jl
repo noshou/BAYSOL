@@ -6,7 +6,8 @@ using   AdvancedHMC: DenseEuclideanMetric, Hamiltonian, MassMatrixAdaptor,
 using   FastClosures, StaticArrays, Distributions, ForwardDiff, DiffResults
 using   SpecialFunctions: digamma, trigamma
 using ..Scattering: forward, ForwardCache
-using ..BAYSOL_Utils.Constants: DEFAULT_TEMPERATURE_C, DRO12_CONCENTRATION, DRO3_CONCENTRATION
+using ..BAYSOL_Utils.Constants: DEFAULT_TEMPERATURE_C, DRO12_CONCENTRATION, DRO3_CONCENTRATION,
+                                DEFAULT_TARGET_ACCEPT, NS_PER_S
 using ..BAYSOL_Utils.Timing: StageLog, tick, tock!, fmt_count
 using Printf: @sprintf
 
@@ -481,8 +482,9 @@ forward model) from the trajectory's sample covariance.
 # Keywords
 - `l::LIKELIHOOD=PROFILE()`: PROFILE() or MARGINAL(), forwarded to
                                 [`_logπ`](@ref)/[`_ll`](@ref).
-- `δ::Real=80`: target acceptance rate as a percentage, (0, 100) exclusive;
-                                Stan's usual default of 80% is used.
+- `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
+                                (0, 100) exclusive; the default,
+                                [`DEFAULT_TARGET_ACCEPT`](@ref), is Stan's usual 80%.
 
 # Returns
 A [`FitResult`](@ref). Includes the n_adapt warm-up draws; a caller that wants a
@@ -494,7 +496,7 @@ function run_fitting(
     n_samples::Int64,
     n_adapt::Int64;
     l::LIKELIHOOD=PROFILE(),
-    δ::Real=80
+    δ::Real=DEFAULT_TARGET_ACCEPT
 )::FitResult
 
     if δ ≤ 0 || δ ≥ 100
@@ -527,7 +529,8 @@ function run_fitting(
     # correlations between parameters. Since we are only fitting
     # 4 or 5 params (once δρ4 lands) and they are highly coupled, it is
     # worth it here.
-    metric = DenseEuclideanMetric(4)
+    # sized from the parameter vector itself, so it follows θ when δρ4 widens it
+    metric = DenseEuclideanMetric(length(seed.θ₀))
 
     # combines "potential energy" (ℓπ) and kinetic energy (from metric)
     hamiltonian = Hamiltonian(metric, ℓπ, ∂ℓπ∂z)
@@ -573,7 +576,7 @@ function run_fitting(
     samples = [Ξ(_destandardize(SVector{4,Float64}(s...), seed.pr), seed.pr) for s in samples]
     if seed.timing !== nothing
         n_lf = sum(getproperty.(stats, :n_steps))
-        ms = 1e3 * (time_ns() - t_nuts[1]) / 1e9 / max(n_lf, 1)
+        ms = 1e3 * (time_ns() - t_nuts[1]) / NS_PER_S / max(n_lf, 1)   # ms per leapfrog step
         seed.timing.info["leapfrog"] = n_lf
         tock!(seed.timing, :sampling, 1,
             @sprintf("NUTS  (%s iters, %s leapfrog, %.1f ms/step)", fmt_count(n_samples), fmt_count(n_lf), ms),
