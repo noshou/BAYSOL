@@ -2,7 +2,9 @@
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BAYSOL.Geometry.PlasticSequence: Vec3, Vec2, plastic_points, PLASTIC_RATIO_2, PLASTIC_RATIO_3, plastic_ratio
+using BAYSOL.Geometry.PlasticSequence: Vec3, Vec2, plastic_points
+using BAYSOL.Constants: PLASTIC_RATIO_2, PLASTIC_RATIO_3
+using BAYSOL.Constants: _PLASTIC_RATIO_SQR, _PLASTIC_RATIO_3_SQR, _PLASTIC_RATIO_3_CUBE
 
 nrm(p) = sqrt(p[1]^2 + p[2]^2 + p[3]^2)
 dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
@@ -88,11 +90,10 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
         @inferred plastic_points(16, Val(3))
     end
 
-    @testset "plastic_ratio" begin
-        @test plastic_ratio(2) == PLASTIC_RATIO_2
-        @test plastic_ratio(3) == PLASTIC_RATIO_3
-        @test check_float(plastic_ratio(1), (1.0 + sqrt(5.0)) / 2.0)
-        @test_throws DomainError plastic_ratio(0)
+    @testset "precomputed powers of the plastic ratios" begin
+        @test check_float(_PLASTIC_RATIO_SQR, PLASTIC_RATIO_2^2)
+        @test check_float(_PLASTIC_RATIO_3_SQR, PLASTIC_RATIO_3^2)
+        @test check_float(_PLASTIC_RATIO_3_CUBE, PLASTIC_RATIO_3^3)
     end
 
     @testset "PLASTIC_RATIO_3 is the real root of x⁴ = x + 1" begin

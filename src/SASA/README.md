@@ -44,7 +44,7 @@ The accessible surface as a (3, M) point cloud plus per-point area and a BeadCla
 
 Every atom is sampled at `_SHELL_SAMPLE` = 256 directions, occlusion-filtered the same way sasa does it, then thinned to a target point budget proportional to each atom's accepted-point share (`_prefix_thin`, cumulative-floor/Bresenham allocation). Points thinned this way all carry an equal share of the total area, so sum(areas) still matches sum(sasa(mol)[1]).
 
-Classification (`_bead_class`) casts rays from each surviving bead: if the outward normal escapes the molecule within `_BEAD_RAY_RANGE` = 12.0 Å the bead is at least CONVEX; otherwise rays (`_BEAD_RAY_DIRS` = 64 sampled directions, about half in the outward hemisphere) are cast over the bead's outward hemisphere and classified by escaping fraction against `_BEAD_CONVEX_ESCAPE` = 0.5: ≥ 0.5 escaping is CONVEX, > 0 but < 0.5 is CONCAVE, and 0 (every ray blocked) is CAVITY. Cavity detection is exact for voids up to `_BEAD_RAY_RANGE` across; a larger void degrades to open surface.
+Classification (constants below live in `BAYSOL_Utils.Constants`) (`_bead_class`) casts rays from each surviving bead: if the outward normal escapes the molecule within `_BEAD_RAY_RANGE` = 12.0 Å the bead is at least CONVEX; otherwise rays (`_BEAD_RAY_DIRS` = 64 sampled directions, about half in the outward hemisphere) are cast over the bead's outward hemisphere and classified by escaping fraction against `_BEAD_CONVEX_ESCAPE` = 0.5: ≥ 0.5 escaping is CONVEX, > 0 but < 0.5 is CONCAVE, and 0 (every ray blocked) is CAVITY. Cavity detection is exact for voids up to `_BEAD_RAY_RANGE` across; a larger void degrades to open surface.
 
 ```julia
 using BAYSOL.SASA: shell_points, CONVEX, CONCAVE, CAVITY

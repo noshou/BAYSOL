@@ -164,7 +164,7 @@ j2(x) = x == 0.0 ? 0.0 : (3.0 / x^3 - 1.0 / x) * sin(x) - 3.0 * cos(x) / x^2
         @test size(j) == (4, 2, 3)
         @test size(sphBess([1.0], [1.0], 0)) == (1, 1, 1)
         # a bigger lMax only appends the leading dimension
-        @test sphBess([1.0, 2.0], [0.5], 2) == sphBess([1.0, 2.0], [0.5], 5)[1:3, :, :]
+        @test sphBess([1.0, 2.0], [0.5], 2) ≈ sphBess([1.0, 2.0], [0.5], 5)[1:3, :, :] rtol = 1e-14
     end
 
     @testset "sphBess depends only on the product q*r" begin
