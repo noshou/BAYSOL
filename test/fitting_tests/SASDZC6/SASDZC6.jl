@@ -5,6 +5,7 @@ using GLMakie
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDZC6")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "SASDZC6_fit1.dat")
@@ -67,7 +68,7 @@ I_exp   = Float64.(raw[:, 2])
 # but the paper's SAXS Methods ("SAXS data collection and analysis") explicitly describe acquisition at room
 # temperature, so the paper is followed (4 °C is most likely the sample-storage temperature).
 
-const PH, σ_PH = 8.0, 0.1   # ±0.1 is a typical benchtop pH-meter precision
+const PH, σ_PH = 8.0, PH_METER_SIGMA
 
 const ENERGY_EV       = 11_300.0   # 11.3 keV, stated directly (CHESS 7A1)
 const TEMPERATURE_C    = 25.0      # "room temperature"; no exact value stated
@@ -163,9 +164,9 @@ const GAT_MOLARITY = 2 * PDE6_MOLARITY   # ≈ 2.77 μM
 # molarity is likewise 2× the complex molarity.
 const PDE6G_MOLARITY = 2 * PDE6_MOLARITY   # ≈ 2.77 μM
 
-const PDE6_MOLARITY_σ  = 0.05 * PDE6_MOLARITY     # 5% relative: typical A280/mg-ml
-const PDE6G_MOLARITY_σ = 0.05 * PDE6G_MOLARITY
-const GAT_MOLARITY_σ   = 0.05 * GAT_MOLARITY
+const PDE6_MOLARITY_σ  = MOLARITY_REL_SIGMA * PDE6_MOLARITY
+const PDE6G_MOLARITY_σ = MOLARITY_REL_SIGMA * PDE6G_MOLARITY
+const GAT_MOLARITY_σ   = MOLARITY_REL_SIGMA * GAT_MOLARITY
 
 # udenafil (the 3 μM small-molecule PDE6 inhibitor in this sample): no
 # measured V0 exists, so the table entry is our own estimate,
@@ -228,7 +229,7 @@ function fit_subset()
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
-function run_sasdzc6(; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer = 0)
+function run_sasdzc6(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
 
     Random.seed!(seed)
@@ -264,7 +265,7 @@ function sasdzc6_figure(result, data)
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
-    fig = Figure(size = (700, 500))
+    fig = Figure(size = FIG_SIZE_CURVE)
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
@@ -274,10 +275,7 @@ function sasdzc6_figure(result, data)
         yscale = log10,
     )
 
-    # Floor for the quantile/bounds curve's lower edge on this log10 y-axis.
-    # See SASDMJ9_figure's comment for why this is tied to I_fit's own
-    # smallest value rather than an arbitrary tiny constant.
-    y_floor = minimum(I_fit) / 2
+    y_floor = log_axis_floor(I_fit)   # see log_axis_floor in common.jl
 
     if quantile_result !== nothing
         _, curves = quantile_result
@@ -286,15 +284,15 @@ function sasdzc6_figure(result, data)
 
         band!(
             ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
-            color = (:darkorange, 1), label = "bounds",
+            color = (:darkorange, 1), label = "bounds",   # NB: shared COLOR_BAND is (:darkorange, 0.15); this script's plot style is kept as-is
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = :darkorange, linewidth = 2.5, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 2.5, label = "quantiles",   # NB: shared LW_QUANTILE is 1.5; this script's plot style is kept as-is
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
-            linestyle = :dot, color = :darkorange, linewidth = 2.5,
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 2.5,   # NB: shared LW_QUANTILE is 1.5; this script's plot style is kept as-is
         )
     end
 
@@ -303,19 +301,19 @@ function sasdzc6_figure(result, data)
     log_σ = σ_fit ./ (I_fit .* log(10))
     rangebars!(
         ax, q_fit, exp10.(log_I .- log_σ), exp10.(log_I .+ log_σ);
-        whiskerwidth = 4, color = (:gray40, 0.6),
+        whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR,
     )
-    scatter!(ax, q_fit, I_fit; markersize = 4, color = :gray20, label = "data")
+    scatter!(ax, q_fit, I_fit; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "MAP")
     end
 
     axislegend(ax; position = :lb, framevisible = false)
 
     lo, hi = extrema(I_fit)
-    ylims!(ax, lo * 0.7, hi * 1.3)
+    ylims!(ax, lo * YLIM_LOG_LO, hi * YLIM_LOG_HI)
 
     return fig
 end
@@ -330,7 +328,7 @@ function sasdzc6_residuals_figure(result, data)
     _, _, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
 
-    fig = Figure(size = (700, 400))
+    fig = Figure(size = FIG_SIZE_RESIDUALS)
     ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
 
     map_curve = map_result === nothing ? nothing : map_result[2]
@@ -343,25 +341,25 @@ function sasdzc6_residuals_figure(result, data)
 
         band!(
             ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = (:darkorange, 0.15), label = "bounds",
+            color = (:darkorange, 0.15), label = "bounds",   # NB: shared COLOR_BAND_RESID is (:darkorange, 1); this script's plot style is kept as-is
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = :darkorange, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5, label = "quantiles",   # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = :darkorange, linewidth = 1.5,
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5,   # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
         )
     end
 
     if map_curve !== nothing
         resid = I_fit .- map_curve[:, 2]
-        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = 4, color = (:gray40, 0.6))
-        scatter!(ax, q_fit, resid; markersize = 4, color = :gray20, label = "data - MAP")
-        hlines!(ax, [0.0]; color = :crimson, linewidth = 1.5)
+        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR)
+        scatter!(ax, q_fit, resid; markersize = MARKERSIZE, color = COLOR_DATA, label = "data - MAP")
+        hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
         lo, hi = extrema(resid)
-        pad = 0.3 * (hi - lo)
+        pad = YLIM_LIN_PAD_FRAC * (hi - lo)
         ylims!(ax, lo - pad, hi + pad)
     end
 
@@ -369,13 +367,6 @@ function sasdzc6_residuals_figure(result, data)
 
     return fig
 end
-
-const _HIST_PARAMS = [
-    ("ρₑ", "slvnt_e_dns"), ("δρ₁", "delta_rho_1"), ("δρ₂", "delta_rho_2"),
-    ("δρ₃", "delta_rho_3"),
-    ("scale", "scale"), ("bkgrnd_corr", "bkgrnd_corr"),
-    ("c1", "excl_vol_corr"),
-]
 
 """
     sasdzc6_hist(result) -> Figure
@@ -389,8 +380,8 @@ function sasdzc6_hist(result)
     bkgrnd_draws = fit.bkgrnd_corr[ok]
     map_params = map_result === nothing ? nothing : map_result[1]
 
-    fig = Figure(size = (900, 550))
-    for (i, (label, map_key)) in enumerate(_HIST_PARAMS)
+    fig = Figure(size = FIG_SIZE_HIST)
+    for (i, (label, map_key)) in enumerate(HIST_PARAMS)
         row, col = fldmod1(i, 3)
         ax = Axis(
             fig[row, col], xlabel = label, ylabel = "count",
@@ -405,9 +396,9 @@ function sasdzc6_hist(result)
         else
             getindex.(samples, i)
         end
-        hist!(ax, draws; bins = 40, color = (:darkorange, 0.6))
+        hist!(ax, draws; bins = HIST_BINS, color = COLOR_HIST)
         if map_params !== nothing
-            vlines!(ax, [map_params[map_key]]; color = :crimson, linewidth = 2)
+            vlines!(ax, [map_params[map_key]]; color = COLOR_MAP, linewidth = LW_MAP)
         end
     end
 
@@ -415,13 +406,13 @@ function sasdzc6_hist(result)
 end
 
 fig = sasdzc6_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res.png"), fig; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res.png"), fig; px_per_unit = PX_PER_UNIT)
 
 fig_residuals = sasdzc6_residuals_figure(result, (q_fit, I_fit, σ_fit))
-save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_residuals.png"), fig_residuals; px_per_unit = PX_PER_UNIT)
 
 fig_hist = sasdzc6_hist(result)
-save(joinpath(@__DIR__, "res_hist.png"), fig_hist; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_hist.png"), fig_hist; px_per_unit = PX_PER_UNIT)
 
 "Display the SASDZC6 fit figure. Blocks until the window is closed."
 vis_sasdzc6() = wait(display(fig))

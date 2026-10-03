@@ -5,6 +5,7 @@ using   GLMakie
 using   BAYSOL
 using   BAYSOL.MolecularStructure: LocalPathSource
 using   BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR_FIT1 = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDA52")
 const _DATA_PATH_FIT1   = joinpath(_FIXTURE_DIR_FIT1, "experimental_data", "SASDA52.dat")
@@ -25,7 +26,7 @@ I_exp_fit1   = Float64.(raw_fit1[1:2168, 2])
 # qvals are in nm⁻¹ (SASBDB REMARK 265 in SASDA52_fit2_model1.pdb states
 # "ANGLE RANGE(MIN-MAX) (INVERSE NANOMETERS): 0.087-6.014", matching this
 # file's raw range exactly); must convert to Å⁻¹.
-qvals_fit1 = qvals_fit1 ./ 10
+qvals_fit1 = qvals_fit1 ./ NM_INV_PER_ANGSTROM_INV
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -55,9 +56,9 @@ qvals_fit1 = qvals_fit1 ./ 10
 # "BUFFER PH-PK: 7.400-7.000" is read as pH 7.4 (standard PBS pH) with the
 # second figure an adjacent (mislabeled) pKa-ish field, not a second pH.
 
-const PH_FIT1, σ_PH_FIT1 = 7.4, 0.1   # ±0.1 is a typical benchtop pH-meter precision
+const PH_FIT1, σ_PH_FIT1 = 7.4, PH_METER_SIGMA
 
-const ENERGY_EV_FIT1        = 12398.42 / 1.5   # ≈ 8266 eV, X33 at (corrected) 1.5 Å
+const ENERGY_EV_FIT1        = HC_EV_ANGSTROM / 1.5   # ≈ 8266 eV, X33 at (corrected) 1.5 Å
 const TEMPERATURE_C_FIT1    = 10.0             # 10°C, SASBDB metadata
 const IONIC_STRENGTH_M_FIT1 = 0.172           # standard 1x PBS, see SOLUTES_FIT1 below
 
@@ -81,7 +82,7 @@ const ADH1_SEQ_FIT1 =
 const ADH1_MW_FIT1 = 147396.0 / 4   # ≈ 36849 g/mol
 const ADH1_CONC_MG_ML_FIT1 = 24.890
 const ADH1_MOLARITY_FIT1   = ADH1_CONC_MG_ML_FIT1 / ADH1_MW_FIT1  # ≈ 0.676 mM
-const ADH1_MOLARITY_σ_FIT1 = 0.05 * ADH1_MOLARITY_FIT1            # 5% relative: typical A280/mg-ml
+const ADH1_MOLARITY_σ_FIT1 = MOLARITY_REL_SIGMA * ADH1_MOLARITY_FIT1
 
 # Buffer components. "PBS" is named in the SASBDB metadata with no explicit
 # recipe given (and the structure paper doesn't describe the SAXS buffer at
@@ -120,7 +121,7 @@ function fit_subset_fit1()
     return qvals_fit1[keep], I_exp_fit1[keep], σ_exp_fit1[keep]
 end
 
-function run_sasda52_fit1(; n_samples::Int = 2000, n_adapt::Int = 1000, seed::Integer = 0)
+function run_sasda52_fit1(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset_fit1()
 
     Random.seed!(seed)
@@ -157,7 +158,7 @@ function sasda52_fit1_figure(result, data)
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
-    fig = Figure(size = (700, 500))
+    fig = Figure(size = FIG_SIZE_CURVE)
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
@@ -167,14 +168,7 @@ function sasda52_fit1_figure(result, data)
         yscale = log10,
     )
 
-    # Floor for the quantile/bounds curve's lower edge on this log10 y-axis.
-    # The model curve is always > 0 in principle, but can numerically
-    # graze 0 near the high-q noise floor, and log10 of a non-positive value
-    # errors. Tied to I_fit's own smallest value (halved) rather than an
-    # arbitrary tiny constant: clamping down to, say, 1e-6 would plot it
-    # many decades below the data's real range, which on a log axis renders
-    # as a huge, misleading spike.
-    y_floor = minimum(I_fit) / 2
+    y_floor = log_axis_floor(I_fit)   # see log_axis_floor in common.jl
 
     if quantile_result !== nothing
         _, curves = quantile_result
@@ -183,15 +177,15 @@ function sasda52_fit1_figure(result, data)
 
         band!(
             ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
-            color = (:darkorange, 1), label = "bounds",
+            color = (:darkorange, 1), label = "bounds",   # NB: shared COLOR_BAND is (:darkorange, 0.15); this script's plot style is kept as-is
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = :darkorange, linewidth = 2.5, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 2.5, label = "quantiles",   # NB: shared LW_QUANTILE is 1.5; this script's plot style is kept as-is
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
-            linestyle = :dot, color = :darkorange, linewidth = 2.5,
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 2.5,   # NB: shared LW_QUANTILE is 1.5; this script's plot style is kept as-is
         )
     end
 
@@ -209,13 +203,13 @@ function sasda52_fit1_figure(result, data)
     log_σ = σ_fit ./ (I_fit .* log(10))
     rangebars!(
         ax, q_fit, exp10.(log_I .- log_σ), exp10.(log_I .+ log_σ);
-        whiskerwidth = 4, color = (:gray40, 0.6),
+        whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR,
     )
-    scatter!(ax, q_fit, I_fit; markersize = 4, color = :gray20, label = "data")
+    scatter!(ax, q_fit, I_fit; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "MAP")
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -223,7 +217,7 @@ function sasda52_fit1_figure(result, data)
     # Centre the view on the actual data (I_fit), not on however far the
     # errorbar whiskers/bounds band happen to extend
     lo, hi = extrema(I_fit)
-    ylims!(ax, lo * 0.7, hi * 1.3)
+    ylims!(ax, lo * YLIM_LOG_LO, hi * YLIM_LOG_HI)
 
     return fig
 end
@@ -238,7 +232,7 @@ function sasda52_fit1_residuals_figure(result, data)
     _, _, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
 
-    fig = Figure(size = (700, 400))
+    fig = Figure(size = FIG_SIZE_RESIDUALS)
     ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
 
     map_curve = map_result === nothing ? nothing : map_result[2]
@@ -251,25 +245,25 @@ function sasda52_fit1_residuals_figure(result, data)
 
         band!(
             ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = (:darkorange, 0.15), label = "bounds",
+            color = (:darkorange, 0.15), label = "bounds",   # NB: shared COLOR_BAND_RESID is (:darkorange, 1); this script's plot style is kept as-is
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = :darkorange, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5, label = "quantiles",   # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = :darkorange, linewidth = 1.5,
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5,   # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
         )
     end
 
     if map_curve !== nothing
         resid = I_fit .- map_curve[:, 2]
-        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = 4, color = (:gray40, 0.6))
-        scatter!(ax, q_fit, resid; markersize = 4, color = :gray20, label = "data - MAP")
-        hlines!(ax, [0.0]; color = :crimson, linewidth = 1.5)
+        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR)
+        scatter!(ax, q_fit, resid; markersize = MARKERSIZE, color = COLOR_DATA, label = "data - MAP")
+        hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
         lo, hi = extrema(resid)
-        pad = 0.3 * (hi - lo)
+        pad = YLIM_LIN_PAD_FRAC * (hi - lo)
         ylims!(ax, lo - pad, hi + pad)
     end
 
@@ -277,13 +271,6 @@ function sasda52_fit1_residuals_figure(result, data)
 
     return fig
 end
-
-const _HIST_PARAMS_FIT1 = [
-    ("ρₑ", "slvnt_e_dns"), ("δρ₁", "delta_rho_1"), ("δρ₂", "delta_rho_2"),
-    ("δρ₃", "delta_rho_3"),
-    ("scale", "scale"), ("bkgrnd_corr", "bkgrnd_corr"),
-    ("c1", "excl_vol_corr"),
-]
 
 """
     sasda52_fit1_hist(result) -> Figure
@@ -297,8 +284,8 @@ function sasda52_fit1_hist(result)
     bkgrnd_draws = fit.bkgrnd_corr[ok]
     map_params = map_result === nothing ? nothing : map_result[1]
 
-    fig = Figure(size = (900, 550))
-    for (i, (label, map_key)) in enumerate(_HIST_PARAMS_FIT1)
+    fig = Figure(size = FIG_SIZE_HIST)
+    for (i, (label, map_key)) in enumerate(HIST_PARAMS)
         row, col = fldmod1(i, 3)
         ax = Axis(
             fig[row, col], xlabel = label, ylabel = "count",
@@ -313,9 +300,9 @@ function sasda52_fit1_hist(result)
         else
             getindex.(samples, i)
         end
-        hist!(ax, draws; bins = 40, color = (:darkorange, 0.6))
+        hist!(ax, draws; bins = HIST_BINS, color = COLOR_HIST)
         if map_params !== nothing
-            vlines!(ax, [map_params[map_key]]; color = :crimson, linewidth = 2)
+            vlines!(ax, [map_params[map_key]]; color = COLOR_MAP, linewidth = LW_MAP)
         end
     end
 
@@ -340,7 +327,7 @@ function sasda52_fit1_comparison_figure(result, data)
     I_crysol = Float64.(crysol[:, 4])
     keep   = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT_FIT1) .& (I_crysol .> 0)
 
-    fig = Figure(size = (700, 500))
+    fig = Figure(size = FIG_SIZE_CURVE)
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
@@ -355,36 +342,36 @@ function sasda52_fit1_comparison_figure(result, data)
     log_σ = σ_fit ./ (I_fit .* log(10))
     rangebars!(
         ax, q_fit, exp10.(log_I .- log_σ), exp10.(log_I .+ log_σ);
-        whiskerwidth = 4, color = (:gray40, 0.6),
+        whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR,
     )
-    scatter!(ax, q_fit, I_fit; markersize = 4, color = :gray20, label = "data")
+    scatter!(ax, q_fit, I_fit; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
 
     lines!(
         ax, q_crysol[keep], I_crysol[keep];
-        color = :mediumturquoise, linewidth = 2, linestyle = :dash, label = "CRYSOL fit1",
+        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = "CRYSOL fit1",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "BAYSOL MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "BAYSOL MAP")
     end
 
     axislegend(ax; position = :lt, framevisible = false)
 
     lo, hi = extrema(I_fit)
-    ylims!(ax, lo * 0.7, hi * 1.3)
+    ylims!(ax, lo * YLIM_LOG_LO, hi * YLIM_LOG_HI)
 
     return fig
 end
 
 fig_fit1 = sasda52_fit1_figure(resf1, (qf1, If1, σf1))
-save(joinpath(@__DIR__, "res_fit1.png"), fig_fit1; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_fit1.png"), fig_fit1; px_per_unit = PX_PER_UNIT)
 
 fig_residuals_fit1 = sasda52_fit1_residuals_figure(resf1, (qf1, If1, σf1))
-save(joinpath(@__DIR__, "res_fit1_residuals.png"), fig_residuals_fit1; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_fit1_residuals.png"), fig_residuals_fit1; px_per_unit = PX_PER_UNIT)
 
 fig_hist_fit1 = sasda52_fit1_hist(resf1)
-save(joinpath(@__DIR__, "res_fit1_hist.png"), fig_hist_fit1; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_fit1_hist.png"), fig_hist_fit1; px_per_unit = PX_PER_UNIT)
 
 fig_crysol_fit1 = sasda52_fit1_comparison_figure(resf1, (qf1, If1, σf1))
-save(joinpath(@__DIR__, "res_fit1_comparison.png"), fig_crysol_fit1; px_per_unit = 3.5)
+save(joinpath(@__DIR__, "res_fit1_comparison.png"), fig_crysol_fit1; px_per_unit = PX_PER_UNIT)

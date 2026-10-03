@@ -46,6 +46,15 @@ put on them.
 const DRO_BOUNDS = (-10.0, 2.0)
 
 """
+CRYSOL3's default convex/concave shell contrast δρ₁ = δρ₂, in units of
+[`DRO_UNIT`](@ref): "The default parameters of the contrasts for the three types
+of water beads are 1, 1, 0". The mode of the δρ₁/δρ₂ priors
+([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)); must lie inside
+[`DRO_BOUNDS`](@ref).
+"""
+const DRO12_MODE = 1.0
+
+"""
 Default concentration κ = α + β − 2 of the δρ₁/δρ₂ Beta priors
 ([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)). κ = 14 gives
 Beta(83/6, 13/6) on [`DRO_BOUNDS`](@ref), with its mode at δρ = 1 and
@@ -61,6 +70,8 @@ Default concentration κ = α + β − 2 of the cavity-contrast (δρ₃) Beta p
 u = (δρ₃ − X)/W, with its mode at δρ₃ = 0 (bulk-density cavity water).
 """
 const DRO3_CONCENTRATION = 1.25
+
+@assert(DRO_BOUNDS[1] < DRO12_MODE < DRO_BOUNDS[2], "DRO12_MODE must lie inside DRO_BOUNDS")
 
 @assert(
     0 < EXCL_VOL_CORR_EPS <= (EXCL_VOL_CORR_BOUNDS[2] - EXCL_VOL_CORR_BOUNDS[1]),

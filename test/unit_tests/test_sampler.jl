@@ -53,7 +53,7 @@ smpl_priors() = FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, smpl_solutes())
 
 # Ground truth used to generate synthetic "experimental" data:
 # ξ = (ρₑ, δρ₁, δρ₂, δρ₃).
-const ξ_TRUE = (0.334, 1.05, -0.05, -1.0)
+const ξ_TRUE = (CRYSOL_SOLVENT_DENSITY, 1.05, -0.05, -1.0)
 const M_TRUE, C_TRUE = 1.7, 0.3
 
 """
@@ -184,7 +184,7 @@ end
                 @test close_(FIT._ll(wls, ξ, fw, l), ref_ll(ξt, wls, fw, l))
             end
             @test !close_(FIT._ll(wls, ξ, fw, FIT.PROFILE()),
-                          FIT._ll(wls, ξ, fw, FIT.MARGINAL()); atol = 1.0e-6)
+                          FIT._ll(wls, ξ, fw, FIT.MARGINAL()); atol = 1e3 * DEFAULT_ATOL)
         end
     end
 
@@ -215,7 +215,7 @@ end
             for l in (FIT.PROFILE(), FIT.MARGINAL())
                 val = FIT._logπ(θ, pr, wls, fw, l)
                 @test Tuple(θ) == θ_before
-                @test close_(val, ref_logπ(θt, pr, wls, fw, l); atol = 1.0e-8)
+                @test close_(val, ref_logπ(θt, pr, wls, fw, l); atol = 1e1 * DEFAULT_ATOL)
             end
         end
     end
@@ -239,7 +239,7 @@ end
     @testset "prior_z_scores: zero at the θ-space prior mean" begin
         pr = smpl_priors()
         μ, _ = FIT.θ_prior_moments(pr)
-        @test all(isapprox.(FIT.prior_z_scores(Ξ(μ, pr), pr), 0.0; atol = 1e-9))
+        @test all(isapprox.(FIT.prior_z_scores(Ξ(μ, pr), pr), 0.0; atol = DEFAULT_ATOL))
     end
 
     @testset "seed_fitting: fields are internally consistent" begin
@@ -280,7 +280,7 @@ end
         for i in eachindex(samples)
             θ_check, _ = Θ(samples[i], seed.pr)
             recomputed = FIT._logπ(θ_check, seed.pr, seed.wls, seed.fw, l)
-            @test close_(recomputed, stats[i].log_density; atol = 1.0e-6)
+            @test close_(recomputed, stats[i].log_density; atol = 1e3 * DEFAULT_ATOL)
         end
     end
 

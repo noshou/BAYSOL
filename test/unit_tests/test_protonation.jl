@@ -35,13 +35,13 @@ ref_frac_acid(pH, pKa) = 1.0 / (1.0 + 10.0^(pKa - pH))
     end
 
     @testset "HH: base group -> protonated fraction -> 1 well below pKa, -> 0 well above" begin
-        @test close_(_fraction_protonated(0.0, 10.0), 1.0; atol = 1.0e-6)
-        @test close_(_fraction_protonated(20.0, 10.0), 0.0; atol = 1.0e-6)
+        @test close_(_fraction_protonated(0.0, 10.0), 1.0; atol = 1e3 * DEFAULT_ATOL)
+        @test close_(_fraction_protonated(20.0, 10.0), 0.0; atol = 1e3 * DEFAULT_ATOL)
     end
 
     @testset "HH: acid group -> deprotonated fraction -> 0 well below pKa, -> 1 well above" begin
-        @test close_(_fraction_deprotonated(0.0, 10.0), 0.0; atol = 1.0e-6)
-        @test close_(_fraction_deprotonated(20.0, 10.0), 1.0; atol = 1.0e-6)
+        @test close_(_fraction_deprotonated(0.0, 10.0), 0.0; atol = 1e3 * DEFAULT_ATOL)
+        @test close_(_fraction_deprotonated(20.0, 10.0), 1.0; atol = 1e3 * DEFAULT_ATOL)
     end
 
     @testset "HH: matches an independent reference re-derivation" begin

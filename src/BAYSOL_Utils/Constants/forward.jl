@@ -33,3 +33,18 @@ const N_VOL_SHELL::Int64 = 2145
 
 "Atoms/dummies per pass in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm)."
 const B_LM_CHUNK = UInt64(2048)
+
+"""
+Atoms per inner tile of [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm):
+the inner dimension of each per-degree BLAS product. Large enough that `dgemm`
+runs near peak (measured at 256), small enough to bound the W buffer together
+with [`B_LM_W_BYTES`](@ref). Results are tile-invariant up to rounding.
+"""
+const B_LM_TILE = 256
+
+"""
+Memory budget, in bytes, for the per-tile W buffer (all degrees ≤ lMax, every
+amplitude column, a q-tile) in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm);
+the q-tile length is chosen to fit it.
+"""
+const B_LM_W_BYTES = 64 * 2^20

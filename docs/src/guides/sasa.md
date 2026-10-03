@@ -24,19 +24,22 @@ Non-existence of a witness in the coarse pass is *not* proof of burial, since a 
 ```julia
 using BAYSOL.MolecularStructure: create
 using BAYSOL.SASA: sasa
+using BAYSOL.Constants: PROBE_RADIUS, SASA_N_OCC, SASA_N_EXP, SASA_AREA_TOL
 
 mol = create("my-mol", elements, coords_cartesian)
-area, exposed = sasa(mol; probe = 1.4, n_occ = 512, n_exp = 4096, area_tol = 2.0)
+# every keyword spelled out at its default; `sasa(mol)` is equivalent
+area, exposed = sasa(mol; probe = PROBE_RADIUS, n_occ = SASA_N_OCC, n_exp = SASA_N_EXP,
+                     area_tol = SASA_AREA_TOL)
 # area:    (n,) Å² per atom, indexed like coords_cartesian(mol)'s columns
 # exposed: (n,) Bool, true where the atom has ≥ 1 accessible sample point
 ```
 
 Keywords:
 
-- probe::Float64 = 1.4: solvent probe radius, Å; must be ≥ 0.
-- `n_occ`::Int = 512: points for the witness pass; must be > 0 and ≤ `n_exp`.
-- `n_exp`::Int = 4096: points for the full exposed-fraction pass; measured relative error against the analytic two-sphere-cap solution is ~0.065% at 4096 points.
-- `area_tol`::Float64 = 2.0: Å² worst-case-exposed-area threshold below which an unwitnessed atom is called buried without the full pass.
+- `probe`::Float64 = `PROBE_RADIUS` (1.4): solvent probe radius, Å; must be ≥ 0.
+- `n_occ`::Int = `SASA_N_OCC` (512): points for the witness pass; must be > 0 and ≤ `n_exp`.
+- `n_exp`::Int = `SASA_N_EXP` (4096): points for the full exposed-fraction pass; measured relative error against the analytic two-sphere-cap solution is ~0.065% at 4096 points.
+- `area_tol`::Float64 = `SASA_AREA_TOL` (2.0): Å² worst-case-exposed-area threshold below which an unwitnessed atom is called buried without the full pass.
 
 ### Point cloud: `shell_points`
 
@@ -48,8 +51,9 @@ Classification (constants below live in `BAYSOL_Utils.Constants`) (`_bead_class`
 
 ```julia
 using BAYSOL.SASA: shell_points, CONVEX, CONCAVE, CAVITY
+using BAYSOL.Constants: PROBE_RADIUS
 
-pts, areas, class = shell_points(mol; probe = 1.4, n_target = nothing)
+pts, areas, class = shell_points(mol; probe = PROBE_RADIUS, n_target = nothing)
 # pts:   (3, M) accessible points, mol's centred cartesian frame
 # areas: (M,) Å² per point, equal across all M
 # class: (M,) BeadClass per point
@@ -57,5 +61,5 @@ pts, areas, class = shell_points(mol; probe = 1.4, n_target = nothing)
 
 Keywords:
 
-- probe::Float64 = 1.4: solvent probe radius, Å; must be ≥ 0.
+- `probe`::Float64 = `PROBE_RADIUS` (1.4): solvent probe radius, Å; must be ≥ 0.
 - `n_target`::Union{Nothing,Int} = nothing: total points to keep, > 0 if given. nothing derives the budget from accessible area via `SHELL_AREA_PER_POINT` = 4.0 Å²/point (calibrated against CRYSOL's default --fb 17 Fibonacci grid, ~4 Å²/point on a typical globular protein), so spacing stays fixed as the molecule grows rather than the point count staying flat. Floored at `SHELL_MIN_POINTS` = 55.

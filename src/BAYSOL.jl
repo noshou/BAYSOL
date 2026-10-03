@@ -272,13 +272,13 @@ forward model) from the trajectory's sample covariance.
 - `quantiles::AbstractString=DEFAULT_QUANTILES`: the "<lo>-<hi>" empirical quantile
     range (integer percentages, 0 ≤ lo < hi ≤ 100) used to build
     [`QuantileResult`](@ref)'s "quantiles"/"bounds" entries, e.g. the
-    default "16-84" is a ±1σ-equivalent interval for a Normal. The special
+    default ("16-84") is a ±1σ-equivalent interval for a Normal. The special
     case "0-0" means *no* filtering.
 - `l::LIKELIHOOD=PROFILE()`: PROFILE() or MARGINAL(), forwarded to
     [`Fitting._logπ`](@ref)/[`Fitting._ll`](@ref).
-- `δ::Real=80`: target acceptance rate as a percentage, (0, 100) exclusive
-    (validated below); Stan's usual default of 80% is used here too absent a
-    specific reason to retarget it.
+- `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
+    (0, 100) exclusive (validated below); the default, `DEFAULT_TARGET_ACCEPT`,
+    is Stan's usual 80%, used here too absent a specific reason to retarget it.
 
 # Returns
 A 4-tuple (fit, divergencerate, map, curve):
@@ -294,7 +294,7 @@ function run_model(
     n_adapt::Int64;
     quantiles::AbstractString=BAYSOL_Utils.Constants.DEFAULT_QUANTILES,
     l::Fitting.LIKELIHOOD=Fitting.PROFILE(),
-    δ::Real=80
+    δ::Real=BAYSOL_Utils.Constants.DEFAULT_TARGET_ACCEPT
 )::Union{
     Tuple{Fitting.FitResult, Float64, MAPResult, QuantileResult},
     Tuple{Fitting.FitResult, Float64, Nothing, Nothing}
@@ -585,10 +585,10 @@ column is as wide as the longest label so the seconds column always lines up.
 """
 function _write_timing(io::IO, log::Union{Nothing,Timing.StageLog}, t_report)
     log === nothing && return nothing
-    report_s = (time_ns() - t_report[1]) / 1e9
-    report_c = (Base.cumulative_compile_time_ns()[1] - t_report[2]) / 1e9
-    total_c  = (Base.cumulative_compile_time_ns()[1] - log.compile0) / 1e9
-    wall = (time_ns() - log.t0) / 1e9
+    report_s = (time_ns() - t_report[1]) / BAYSOL_Utils.Constants.NS_PER_S
+    report_c = (Base.cumulative_compile_time_ns()[1] - t_report[2]) / BAYSOL_Utils.Constants.NS_PER_S
+    total_c  = (Base.cumulative_compile_time_ns()[1] - log.compile0) / BAYSOL_Utils.Constants.NS_PER_S
+    wall = (time_ns() - log.t0) / BAYSOL_Utils.Constants.NS_PER_S
     st, st_c, st_g = Timing.stage_seconds(log, :static)
     sp, sp_c, sp_g = Timing.stage_seconds(log, :sampling)
     unacc = wall - st - sp - report_s
@@ -636,7 +636,8 @@ defaults `io` to `stdout`; see its own one-line definition below.
 - `result`: a [`run_model`](@ref) return value, (fit, divergencerate, map, curve).
 
 # Keywords
--   `quantilelabel::AbstractString="16-84"`
+-   `quantile_label::AbstractString=DEFAULT_QUANTILES`: the quantile range the report's
+    `=== Quantiles ===` header names; pass the `quantiles` given to [`run_model`](@ref).
 - `formfactorlog::Union{Nothing,AbstractVector{<:AbstractString}}=nothing`:
     the seed's seed.fw.form_factor_log.
 - `n_atoms::Union{Nothing,Integer}=nothing`: the seed's seed.fw.n_atoms, printed
@@ -653,7 +654,7 @@ its result.
 """
 function write_report(
     io::IO, result;
-    quantile_label::AbstractString = "16-84",
+    quantile_label::AbstractString = BAYSOL_Utils.Constants.DEFAULT_QUANTILES,
     form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}} = nothing,
     n_atoms::Union{Nothing,Integer} = nothing,
 )

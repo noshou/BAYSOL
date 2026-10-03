@@ -2,7 +2,7 @@
 
 using Distributions
 using StaticArrays: SVector
-using ..BAYSOL_Utils.Constants: DRO_UNIT, DRO_BOUNDS, φ_max
+using ..BAYSOL_Utils.Constants: DRO_UNIT, DRO_BOUNDS, DRO12_MODE, φ_max
 
 """
 $(TYPEDSIGNATURES)
@@ -83,6 +83,11 @@ The corresponding variance of δρ is:
 
 Thus κ controls the concentration of the prior while preserving its mode at δρ = 1.
 
+The code computes the general form from the constants rather than the literals above,
+so the mode stays at [`DRO12_MODE`](@ref) if [`DRO_BOUNDS`](@ref) ever changes:
+
+    m = (DRO12_MODE − X)/W,    α = 1 + m·κ,    β = 1 + (1 − m)·κ,    W = Y − X
+
 # Arguments
 - `κ::Real`: the concentration κ = α + β − 2 > 0 shared by both priors
     (default in the sampler: [`DRO12_CONCENTRATION`](@ref)).
@@ -99,12 +104,14 @@ function _δρ₁₂_priors(κ::Real)::Tuple{BoundedBeta, BoundedBeta}
         throw(DomainError(κ, "failed assertion: κ > 0"))
     end
 
-    α = 1 + 11κ/12
-    β = 1 + κ/12
-    u = Beta(α, β)
-
     X = DRO_BOUNDS[1]
     W = DRO_BOUNDS[2] - DRO_BOUNDS[1]
+
+    # mode of u that puts δρ's mode at DRO12_MODE (= 11/12 for CRYSOL's 1 on [-10, 2])
+    m = (DRO12_MODE - X) / W
+    α = 1 + m * κ
+    β = 1 + (1 - m) * κ
+    u = Beta(α, β)
 
     return (LocationScale(X, W, u), LocationScale(X, W, u))
 end

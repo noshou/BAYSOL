@@ -34,7 +34,7 @@ const pc_q = collect(range(0.02, 0.35; length = 12))
 pc_fw() = forward_cache(pc_mol(), pc_q, 3, 9000.0; chunk = UInt64(4))
 
 # ξ = (ρₑ, δρ₁, δρ₂, δρ₃). This toy helix has no cavity beads, so δρ₃ does not affect the curve.
-const ξ_TRUE = SVector(0.334, 1.5, 0.5, -1.0)
+const ξ_TRUE = SVector(CRYSOL_SOLVENT_DENSITY, 1.5, 0.5, -1.0)
 
 """
 Synthetic WLSData generated from `fw` at `ξ_TRUE`/`c1_true`, with the given
@@ -75,7 +75,7 @@ end
         ŷ, fit, c1_star = profiled_corrs(wls, ξ_TRUE, fw)
 
         @test close_(c1_star, c1_true; atol = 1.0e-4)
-        @test close_(fit.chi2, 0.0; atol = 1.0e-6)
+        @test close_(fit.chi2, 0.0; atol = 1e3 * DEFAULT_ATOL)
         @test excl_vol_saturation(c1_star) == 0
         @test ŷ == forward(fw, 1.0, 0.0, ξ_TRUE[1], (ξ_TRUE[2], ξ_TRUE[3], ξ_TRUE[4]), c1_star)
     end
