@@ -10,38 +10,8 @@ using ..Geometry.PlasticSequence: PlasticSequence, Vec3, plastic_points
 using ..Geometry.Metrics: Metrics, ALL_EXPOSED, ALL_BURIED, classify, blocked
 using NearestNeighbors: inrange
 using ..MolecularStructure: Molecule, radii, r_max, coords_cartesian, neighbour_tree
-
-"""
-Å² of accessible surface each shell point stands for; sets the cloud's spacing
-at ≈ √SHELL_AREA_PER_POINT ≈ 2 Å.
-
-Calibrated against CRYSOL: its default --fb 17 puts F(17) = 1597 points on a
-typical globular protein (~6500 Å²), i.e. ~4 Å² each. Budgeting by area rather
-than by a fixed count keeps that spacing at every size, and since surface area
-grows as N^(2/3), the point count is sub-linear in atom count rather than flat.
-CRYSOL instead caps --fb at F(18) = 2584 for any structure, which
-under-resolves large complexes; pass n_target explicitly to reproduce that.
-"""
-const SHELL_AREA_PER_POINT = 4.0
-
-"Floor on the derived point budget: F(10), the smallest Fibonacci grid CRYSOL's --fb accepts."
-const SHELL_MIN_POINTS = 55
-
-"Sample directions per atom, before occlusion and before thinning. 
-Internal: only fine enough to resolve one atom's patch."
-const _SHELL_SAMPLE = 256
-
-"Range (Å) over which [`_bead_class`](@ref) casts escape rays. A void whose 
-wall is further than this in every direction is bulk solvent, not a cavity."
-const _BEAD_RAY_RANGE = 12.0
-
-"Directions sampled by [`_bead_class`](@ref); about half fall in the 
-outward hemisphere and are used."
-const _BEAD_RAY_DIRS = 64
-
-"Escaping fraction at or above which a bead is CONVEX; below it (but nonzero) 
-CONCAVE (see [`BeadClass`](@ref))."
-const _BEAD_CONVEX_ESCAPE = 0.5
+using ..BAYSOL_Utils.Constants: SHELL_AREA_PER_POINT, SHELL_MIN_POINTS, _SHELL_SAMPLE,
+    _BEAD_RAY_RANGE, _BEAD_RAY_DIRS, _BEAD_CONVEX_ESCAPE
 
 """
     BeadClass

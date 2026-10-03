@@ -12,7 +12,7 @@
 #   julia --project=test/visualize -e 'include("test/visualize/sasa_hydro_vis.jl"); sasa_hydro_report()'
 
 using BAYSOL
-using BAYSOL.Interfaces: Interfaces, RadiiSource
+using BAYSOL.AtomicRadii: AtomicRadii, RadiiSource
 using BAYSOL.MolecularStructure: MolecularStructure, Molecule
 using BAYSOL.SASA: SASA
 using BAYSOL.Geometry.PlasticSequence: plastic_points
@@ -38,7 +38,7 @@ end
 
 Resolve each label against `src.table`, `nothing` for anything absent.
 """
-function Interfaces.lookup(src::HydroRadii, ions)
+function AtomicRadii.lookup(src::HydroRadii, ions)
     out = Vector{Tuple{String,Union{Float64,Nothing}}}(undef, length(ions))
     for (i, ion) in enumerate(ions)
         s = String(ion)
@@ -80,7 +80,7 @@ function packed_cluster_scene(; probe::Float64 = 1.4, r::Float64 = 1.5, n::Int =
     pts = fcc_lattice(n, a)
     ctr = ntuple(t -> sum(p[t] for p in pts) / length(pts), 3)
     keep = [p for p in pts if sqrt(sum((p[t] - ctr[t])^2 for t in 1:3)) ≤ a * n * frac]
-    src = HydroRadii(Dict("A" => r))
+    src = HydroRadii(Dict("a" => r))
     mol = MolecularStructure.create("packed cluster", fill("A", length(keep)), keep;
                             radii_source = src)
     return (; mol, probe, title = "Packed cluster ($(length(keep)) spheres, FCC)")
@@ -249,7 +249,7 @@ function sasa_hydro_figure(; n_target::Union{Nothing,Int} = nothing, n_show::Int
 end
 
 """
-    vis_sasa_hydro(; n_target = SASA.SHELL_POINTS, n_show = 400, probe = 1.4) -> Nothing
+    vis_sasa_hydro(; n_target = nothing, n_show = 400, probe = 1.4) -> Nothing
 
 Display [`sasa_hydro_figure`](@ref): the whole hydration-shell dummy cloud on a
 real ~80-atom packed cluster, plus the raw sample points on one buried and one

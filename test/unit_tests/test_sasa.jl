@@ -4,6 +4,7 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL: AtomicRadii
 using BAYSOL.SASA: SASA, sasa
+using BAYSOL.Constants: SHELL_MIN_POINTS, _SHELL_SAMPLE
 using BAYSOL.Geometry.Metrics: blocked
 using BAYSOL.MolecularStructure: MolecularStructure, create
 
@@ -511,9 +512,9 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         m = sasa_mol(["q"], [(3.0, -2.0, 7.0)])
         pts, pa, cls = SASA.shell_points(m; probe = probe)
 
-        @test size(pts) == (3, SASA.SHELL_MIN_POINTS)
-        @test length(pa) == SASA.SHELL_MIN_POINTS
-        @test all(a -> a ≈ 4π * ρ^2 / SASA.SHELL_MIN_POINTS, pa)
+        @test size(pts) == (3, SHELL_MIN_POINTS)
+        @test length(pa) == SHELL_MIN_POINTS
+        @test all(a -> a ≈ 4π * ρ^2 / SHELL_MIN_POINTS, pa)
         @test sum(pa) ≈ sasa_full(r, probe)
         @test all(==(SASA.CONVEX), cls)      # a lone sphere is convex everywhere
 
@@ -534,7 +535,7 @@ include(joinpath(@__DIR__, "..", "fixtures", "functions", "geometry.jl"))   # sp
         # both atoms are coincident; the larger engulfs the smaller, so at most
         # one atom's worth of points can survive
         @test size(pc, 2) == length(ac)
-        @test size(pc, 2) ≤ SASA._SHELL_SAMPLE
+        @test size(pc, 2) ≤ _SHELL_SAMPLE
 
         # Total cloud area tracks sasa's own area estimate, since each point
         # carries 1/n_pts of its atom's sphere either way.
