@@ -8,62 +8,62 @@ n_samples  = 2000
 n_adapt    = 1000
 
 === MAP ===
-log_density    = +1805.31
-ρₑ             = +0.33511
-δρ₁            = +0.11743
-δρ₂            = -2.19754
-δρ₃            = -9.6826
-scale          = +5.93324e-08
-bkgrnd_corr    = -0.00616831
-excl_vol_corr  = +1.17557
+log_density    = +1805.3
+ρₑ             = +0.335095
+δρ₁            = +0.1172
+δρ₂            = -2.1964
+δρ₃            = -9.68394
+scale          = +5.93611e-08
+bkgrnd_corr    = -0.00617073
+excl_vol_corr  = +1.17559
 χ²             = +14.1894
 
 === Quantiles (16-84) ===
 param               quantile_lo      quantile_hi         bound_lo         bound_hi
-log_density            +1801.98         +1804.63         +1801.98         +1804.63
-ρₑ                     +0.33503        +0.335167        +0.335031        +0.335167
-δρ₁                   +0.114108        +0.120306         +0.11411          +0.1203
-δρ₂                    -2.21622         -2.18006          -2.2162         -2.18007
-δρ₃                    -9.78067         -9.60872         -9.78065         -9.60877
-scale              +5.90141e-08     +5.95793e-08     +5.90141e-08     +5.95788e-08
-bkgrnd_corr         -0.00624852      -0.00610033       -0.0062485       -0.0061004
+log_density            +1801.94         +1804.56         +1801.94         +1804.56
+ρₑ                    +0.335023        +0.335174        +0.335023        +0.335174
+δρ₁                   +0.114122        +0.120196        +0.114122        +0.120196
+δρ₂                    -2.21665         -2.18147         -2.21663         -2.18147
+δρ₃                    -9.78409         -9.61179         -9.78403         -9.61185
+scale              +5.89991e-08     +5.95683e-08     +5.89996e-08      +5.9568e-08
+bkgrnd_corr         -0.00624981      -0.00610738       -0.0062498      -0.00610739
 excl_vol_corr          +1.17536         +1.17574         +1.17536         +1.17574
-χ²                     +14.1897         +14.1917         +14.1897         +14.1917
+χ²                     +14.1897         +14.1916         +14.1897         +14.1916
 
 === Standard deviations from prior (θ-space z-score) ===
 param                     z_MAP    z_quantile_lo    z_quantile_hi
-ρₑ                    -0.134994         -1.22197         +0.65873
-δρ₁                    -0.47294        -0.475517        -0.470706
-δρ₂                    -1.78098         -1.78941         -1.77309
-δρ₃                    -2.04562         -2.10162         -2.00554
+ρₑ                    -0.337397         -1.32234        +0.751595
+δρ₁                   -0.473119        -0.475506        -0.470791
+δρ₂                    -1.78047          -1.7896         -1.77372
+δρ₃                    -2.04636         -2.10363         -2.00718
 
 === Diagnostics ===
 iterations     = 1000
-mean_accept    = 0.9244
-tree_depth     = 4.45 (max 6)
-mean_n_steps   = 27.30
-EBFMI          = 1.1968
+mean_accept    = 0.9531
+tree_depth     = 4.71 (max 6)
+mean_n_steps   = 36.65
+EBFMI          = 1.0932
 cavity_frac    = 0.0442
 excl_vol_sat   = false
 
 === Timing ===                                         seconds    % wall    (JIT)
-wall clock  (seed_model → end of report)                426.00     100.0    (2.9)
-  static build                                          193.75      45.5    (0.8)
+wall clock  (seed_model → end of report)                362.04     100.0    (2.8)
+  static build                                           71.47      19.7    (0.8)
     resolve_structure                                     0.00
     propka                [cache hit]                     0.00
     pdb2pqr               [cache hit]                     0.00
-    load_molecule                                         0.23
-    forward_cache                                       193.42
-      vacuum B_lm                                        82.40
-      excluded volume (vols + B_lm)                      70.88
-      hydration (SASA + B_lm)                            40.10
-      Gram + r_m                                          0.04
+    load_molecule                                         0.18
+    forward_cache                                        71.19
+      vacuum B_lm                                        35.11
+      excluded volume (vols + B_lm)                      23.18
+      hydration (SASA + B_lm)                            12.61
+      Gram + r_m                                          0.29
     seed_fitting (priors, WLS)                            0.10
-  sampling                                              231.57      54.4    (1.4)
-    NUTS setup (Hamiltonian, step-size init)              0.80
-    NUTS  (2k iters, 107.74k leapfrog, 2.1 ms/step)     226.70
-    per-draw c1 re-profile + curves (2000 draws)          3.96
+  sampling                                              289.90      80.1    (1.4)
+    NUTS setup (Hamiltonian, step-size init)              0.76
+    NUTS  (2k iters, 135.32k leapfrog, 2.1 ms/step)     284.81
+    per-draw c1 re-profile + curves (2000 draws)          4.22
     MAP + quantiles                                       0.11
-  report write                                            0.10
+  report write                                            0.09
   unaccounted                                             0.58    (0.6)
-GC: 29.4 s
+GC: 35.5 s

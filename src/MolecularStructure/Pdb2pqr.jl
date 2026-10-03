@@ -7,7 +7,7 @@ Explicit-hydrogen structure generation via the external pdb2pqr CLI.
 using CondaPkg: CondaPkg
 using FastClosures: @closure
 using BioStructures: BioStructures, PDBFormat, writepdb, collectatoms,
-                     chainid, chainids, collectmodels
+                    chainid, chainids, collectmodels
 
 "Raised when pdb2pqr cannot be run or produces no usable output (bad input
 path, non-zero exit, missing expected output file)."

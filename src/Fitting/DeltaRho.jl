@@ -133,9 +133,8 @@ The forward model builds a contrast vector v = [1, −dns·g_ex(c1), ρ₁, ρ�
 
 The cavity-bead contrast ρ₃ is the excess electron density relative to bulk:
 
-    ρ₃  = DRO_UNIT·δρ₃
-        = (φ − 1)·ρₑ
-        = ρ_cavity − ρₑ.
+    DRO_UNIT·δρ₃    = (φ − 1)·ρₑ
+                    = ρ_cavity − ρₑ.
 
 Thus φ is a reparameterisation of the cavity beads' excess electron density over the bulk,
 and δρ₃ is that excess in units of 0.03.

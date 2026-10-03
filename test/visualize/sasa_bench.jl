@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Accuracy + performance harness for `src/Molecule/SASA.jl`. Lives here rather
+# Accuracy + performance harness for `src/SASA/SASA.jl`. Lives here rather
 # than under test/ because the summary figures need GLMakie; nothing in this
 # file runs under `Pkg.test()`.
 #
@@ -23,7 +23,7 @@
 #   julia --project=test/visualize -e 'include("test/visualize/sasa_bench.jl"); save_bench_figures("bench")'
 
 using BAYSOL
-using BAYSOL.Interfaces: Interfaces, RadiiSource
+using BAYSOL.AtomicRadii: AtomicRadii, RadiiSource
 using BAYSOL.MolecularStructure: MolecularStructure, Molecule
 using BAYSOL.SASA: SASA
 using BAYSOL.Geometry.Metrics: Metrics, ALL_EXPOSED, ALL_BURIED, AMBIGUOUS, classify
@@ -37,19 +37,19 @@ using Random, Printf, Statistics, DelimitedFiles
 struct BenchRadii <: RadiiSource
     table::Dict{String,Float64}
 end
-Interfaces.lookup(s::BenchRadii, ions::AbstractVector{<:AbstractString}) =
+AtomicRadii.lookup(s::BenchRadii, ions::AbstractVector{<:AbstractString}) =
     Tuple{String,Union{Float64,Nothing}}[
         (String(i), get(s.table, String(i), nothing)) for i in ions
     ]
 
 "Alvarez (2013) van der Waals radii (Å); `*_i` entries are Shannon ionic radii."
 const BENCH_RAD = Dict(
-    "H"=>1.20, "C"=>1.77, "N"=>1.66, "O"=>1.50, "F"=>1.46, "P"=>1.90, "S"=>1.89,
-    "Cl"=>1.82, "Br"=>1.86, "I"=>2.04, "Si"=>2.19, "B"=>1.91,
-    "Na"=>2.50, "K"=>2.73, "Cs"=>3.48, "Mg"=>2.51, "Ca"=>2.62,
-    "Fe"=>2.44, "Cu"=>2.38, "Zn"=>2.39, "Ni"=>2.40, "Pt"=>2.32, "Ru"=>2.46,
-    "Mo"=>2.45, "Ti"=>2.45,
-    "Na_i"=>1.16, "Cl_i"=>1.81, "Cs_i"=>1.81, "O_i"=>1.40)
+    "h"=>1.20, "c"=>1.77, "n"=>1.66, "o"=>1.50, "f"=>1.46, "p"=>1.90, "s"=>1.89,
+    "cl"=>1.82, "br"=>1.86, "i"=>2.04, "si"=>2.19, "b"=>1.91,
+    "na"=>2.50, "k"=>2.73, "cs"=>3.48, "mg"=>2.51, "ca"=>2.62,
+    "fe"=>2.44, "cu"=>2.38, "zn"=>2.39, "ni"=>2.40, "pt"=>2.32, "ru"=>2.46,
+    "mo"=>2.45, "ti"=>2.45,
+    "na_i"=>1.16, "cl_i"=>1.81, "cs_i"=>1.81, "o_i"=>1.40)
 
 const BENCH_SRC = BenchRadii(BENCH_RAD)
 
@@ -198,7 +198,7 @@ hands to point sampling (`ambiguous`).
 """
 function classify_census(m::Molecule, probe::Float64)
     rads = MolecularStructure.radii(m); rmax = MolecularStructure.r_max(m)
-    crds = MolecularStructure.coords_cartesian(m); tree = SASA.KDTree(crds)
+    crds = MolecularStructure.coords_cartesian(m); tree = MolecularStructure.neighbour_tree(m)
     c = Dict(ALL_EXPOSED => 0, ALL_BURIED => 0, AMBIGUOUS => 0)
     for i in axes(crds, 2)
         ρ = rads[i] + probe
@@ -246,14 +246,14 @@ function bench_systems()
 
     # 1. monoatomic, 40 radii from H-like to Cs-like
     for r in range(0.30, 3.00; length = 40)
-        src = BenchRadii(Dict("X" => r))
+        src = BenchRadii(Dict("x" => r))
         m = MolecularStructure.create("lone", ["X"], [(0.,0.,0.)]; radii_source = src)
         push!(out, (@sprintf("lone_r%.2f", r), "monoatomic", m))
     end
 
     # 2. dimers, 40 separations each, at three radius ratios
     for (lbl, ra, rb) in (("1to1", 1.70, 1.70), ("2to1", 2.00, 1.00), ("5to1", 2.50, 0.50))
-        src = BenchRadii(Dict("A" => ra, "B" => rb))
+        src = BenchRadii(Dict("a" => ra, "b" => rb))
         for d in range(0.0, 2*(max(ra, rb) + BENCH_PROBE)*1.15; length = 40)
             m = MolecularStructure.create("dim", ["A","B"], [(0.,0.,0.), (d,0.,0.)]; radii_source = src)
             push!(out, (@sprintf("dimer_%s_d%.2f", lbl, d), "dimer", m))
@@ -263,7 +263,7 @@ function bench_systems()
     # 3. elemental crystals, 40 packing densities each
     for (nm, build, el, nn) in (("SC", sc_lattice, "C", 4), ("BCC", bcc_lattice, "Fe", 3),
                                 ("FCC", fcc_lattice, "Cu", 3), ("diamond", diamond_lattice, "Si", 2))
-        r = BENCH_RAD[el]
+        r = BENCH_RAD[lowercase(el)]
         for a in range(1.2r, 5.0r; length = 40)
             pts = build(nn, a)
             push!(out, (@sprintf("%s_a%.2f", nm, a), "crystal", bench_mol(nm, fill(el, length(pts)), pts)))
@@ -384,7 +384,7 @@ function analytic_sweep(; probe = BENCH_PROBE, n_exp = 8192)
         ρ = r + probe
         for frac in range(0.08, 0.98; length = 12)
             d = 2ρ*frac
-            src = BenchRadii(Dict("A" => r))
+            src = BenchRadii(Dict("a" => r))
             m = MolecularStructure.create("pair", ["A","A"], [(0.,0.,0.), (d,0.,0.)]; radii_source = src)
             exact = 4π*ρ^2 - 2π*ρ*(ρ - d/2)
             got = SASA.sasa(m; probe, n_occ = 512, n_exp, area_tol = 0.0)[1][1]
