@@ -193,7 +193,7 @@ using each coordinate's own prior mean and standard deviation in θ-space from `
 
 ### NUTS via AdvancedHMC.jl
 
-`run_fitting(seed, n_samples, n_adapt; l=PROFILE(), δ=80)` proceeds as follows:
+`run_fitting(seed, n_samples, n_adapt; l=PROFILE(), δ=DEFAULT_TARGET_ACCEPT)` (`DEFAULT_TARGET_ACCEPT = 80`, Stan's usual target acceptance rate) proceeds as follows:
 
 1. Wrap `_logπ` ∘ `_destandardize` as ℓπ: z ↦ log π(θ(z)), and compute its gradient using one ForwardDiff.gradient! pass (∂ℓπ/∂z).
 2. Build a DenseEuclideanMetric(4) and a Hamiltonian(metric, ℓπ, ∂ℓπ/∂z), with:

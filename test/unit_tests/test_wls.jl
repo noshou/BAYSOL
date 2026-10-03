@@ -47,9 +47,9 @@ end
         σ = fill(0.5, length(y_model))
 
         f = wls_fit(y_model, I_obs, σ)
-        @test check_float(f.scale, scale_true; atol = 1e-9)
-        @test check_float(f.bkgrnd_corr, bkgrnd_corr_true; atol = 1e-9)
-        @test check_float(f.chi2, 0.0; atol = 1e-9)
+        @test check_float(f.scale, scale_true)
+        @test check_float(f.bkgrnd_corr, bkgrnd_corr_true)
+        @test check_float(f.chi2, 0.0)
         @test f.dof == length(y_model) - 2
     end
 
@@ -61,9 +61,9 @@ end
         σ = 0.1 .+ rand(rng, length(y_model))   # varying per-point σ
 
         f = wls_fit(y_model, I_obs, σ)
-        @test check_float(f.scale, scale_true; atol = 1e-8)
-        @test check_float(f.bkgrnd_corr, bkgrnd_corr_true; atol = 1e-8)
-        @test check_float(f.chi2, 0.0; atol = 1e-8)
+        @test check_float(f.scale, scale_true; atol = 1e1 * DEFAULT_ATOL)
+        @test check_float(f.bkgrnd_corr, bkgrnd_corr_true; atol = 1e1 * DEFAULT_ATOL)
+        @test check_float(f.chi2, 0.0; atol = 1e1 * DEFAULT_ATOL)
     end
 
     #------------------------------------------------------------------
@@ -82,13 +82,13 @@ end
             f = wls_fit(y_model, I_obs, σ)
             scale_r, bkgrnd_corr_r, vscale_r, vbkgrnd_corr_r, cov_r, chi2_r, det_r = ref_wls(y_model, I_obs, σ)
 
-            @test check_float(f.scale, scale_r; atol = 1e-6)
-            @test check_float(f.bkgrnd_corr, bkgrnd_corr_r; atol = 1e-6)
-            @test check_float(f.var_scale, vscale_r; atol = 1e-6)
-            @test check_float(f.var_bkgrnd_corr, vbkgrnd_corr_r; atol = 1e-6)
-            @test check_float(f.cov_scale_bkgrnd_corr, cov_r; atol = 1e-6)
-            @test check_float(f.chi2, chi2_r; atol = 1e-6)
-            @test check_float(f.det_XtWX, det_r; atol = 1e-3)
+            @test check_float(f.scale, scale_r; atol = 1e3 * DEFAULT_ATOL)
+            @test check_float(f.bkgrnd_corr, bkgrnd_corr_r; atol = 1e3 * DEFAULT_ATOL)
+            @test check_float(f.var_scale, vscale_r; atol = 1e3 * DEFAULT_ATOL)
+            @test check_float(f.var_bkgrnd_corr, vbkgrnd_corr_r; atol = 1e3 * DEFAULT_ATOL)
+            @test check_float(f.cov_scale_bkgrnd_corr, cov_r; atol = 1e3 * DEFAULT_ATOL)
+            @test check_float(f.chi2, chi2_r; atol = 1e3 * DEFAULT_ATOL)
+            @test check_float(f.det_XtWX, det_r; atol = 1e6 * DEFAULT_ATOL)
             @test f.dof == n - 2
         end
     end
@@ -98,7 +98,7 @@ end
         I_obs = 2.0 .* y_model .+ 1.0
         σ = collect(range(0.3, 1.7; length = 10))
         f = wls_fit(y_model, I_obs, σ)
-        @test check_float(f.sum_log_var, sum(2 .* log.(σ)); atol = 1e-9)
+        @test check_float(f.sum_log_var, sum(2 .* log.(σ)); atol = DEFAULT_ATOL)
     end
 
     #------------------------------------------------------------------
@@ -140,7 +140,7 @@ end
         scale_true, bkgrnd_corr_true = 1.5, 0.3
         I_obs = scale_true .* y_model .+ bkgrnd_corr_true
         f = wls_fit(y_model, I_obs, fill(1.0, length(y_model)))
-        @test all(check_float.(wls_predict(f, y_model), I_obs; atol = 1e-9))
+        @test all(check_float.(wls_predict(f, y_model), I_obs; atol = DEFAULT_ATOL))
     end
 
     @testset "wls_predict: matches the scale*y + bkgrnd_corr formula on a fresh curve" begin
@@ -162,7 +162,7 @@ end
         f = wls_fit(y_model, I_obs, σ)
 
         expected = -(f.chi2 + f.sum_log_var) / 2 - (f.dof + 2) * log(2π) / 2
-        @test check_float(wls_prof_ll(f), expected; atol = 1e-9)
+        @test check_float(wls_prof_ll(f), expected)
     end
 
     @testset "wls_marg_ll: matches its closed form directly from WLSFit fields" begin
@@ -172,7 +172,7 @@ end
         f = wls_fit(y_model, I_obs, σ)
 
         expected = wls_prof_ll(f) - log(f.det_XtWX) / 2 + log(2π)
-        @test check_float(wls_marg_ll(f), expected; atol = 1e-9)
+        @test check_float(wls_marg_ll(f), expected)
     end
 
     @testset "wls_prof_ll: a perfect (chi2 == 0) fit is just the data-normalisation constant" begin
@@ -180,9 +180,9 @@ end
         I_obs = 2.0 .* y_model .- 1.0
         σ = fill(1.0, length(y_model))
         f = wls_fit(y_model, I_obs, σ)
-        @test check_float(f.chi2, 0.0; atol = 1e-9)
+        @test check_float(f.chi2, 0.0)
         expected = -f.sum_log_var / 2 - (f.dof + 2) * log(2π) / 2
-        @test check_float(wls_prof_ll(f), expected; atol = 1e-9)
+        @test check_float(wls_prof_ll(f), expected)
     end
 
     @testset "wls_prof_ll / wls_marg_ll: exact sign flip of the old NLL formulas" begin
@@ -197,8 +197,8 @@ end
 
         nll_prof = (f.chi2 + f.sum_log_var) / 2 + (f.dof + 2) * log(2π) / 2
         nll_marg = nll_prof + log(f.det_XtWX) / 2 - log(2π)
-        @test check_float(wls_prof_ll(f), -nll_prof; atol = 1e-9)
-        @test check_float(wls_marg_ll(f), -nll_marg; atol = 1e-9)
+        @test check_float(wls_prof_ll(f), -nll_prof)
+        @test check_float(wls_marg_ll(f), -nll_marg)
     end
 
     #------------------------------------------------------------------
@@ -210,7 +210,7 @@ end
         I_obs = 1.3 .* y_model .+ 0.4 .+ [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
         σ = fill(0.3, length(y_model))
         f = wls_fit(y_model, I_obs, σ)
-        @test check_float(reduced_chi2(f), f.chi2 / f.dof; atol = 1e-12)
+        @test check_float(reduced_chi2(f), f.chi2 / f.dof; atol = 1e-3 * DEFAULT_ATOL)
     end
 
     @testset "reduced_chi2: a perfect (chi2 == 0) fit gives (numerically) 0" begin
@@ -218,7 +218,7 @@ end
         I_obs = 2.0 .* y_model .- 1.0
         σ = fill(1.0, length(y_model))
         f = wls_fit(y_model, I_obs, σ)
-        @test check_float(reduced_chi2(f), 0.0; atol = 1e-9)
+        @test check_float(reduced_chi2(f), 0.0)
     end
 
     @testset "reduced_chi2: matches the true noise level on average over many trials" begin

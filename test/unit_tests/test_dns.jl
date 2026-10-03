@@ -8,7 +8,8 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 
 const FIT = BAYSOL.Fitting
 using BAYSOL.Fitting: Solute, Protein, NonBiological, DNA, RNA, ρₑ_prior
-using BAYSOL.Constants: AVOGADRO
+using BAYSOL.Constants: AVOGADRO, ANGSTROM3_PER_LITER, CM3_PER_LITER, DEFAULT_TEMPERATURE_C,
+    PMV_REFERENCE_TEMPERATURE_C
 using Distributions: mean, var, LogNormal
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
@@ -23,9 +24,9 @@ Independent re-derivation of the `_ρₑ`/`ρₑ_prior` formula from the live
         + Σ_j k_j² · σ_C_j²
         + Σ_j (C_j·ρ_w/1e3)² · (σ_ϕ°_j² + (α·ϕ°_j·|t − 25|)²)
 """
-function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = 25.0)
+function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = DEFAULT_TEMPERATURE_C)
     ρw, σw = BAYSOL.PartialMolarVolumes.ρₑ_w(t)
-    ρw_k = ρw * 1e-3
+    ρw_k = ρw / CM3_PER_LITER
     α = BAYSOL.Constants.PMV_FRACTIONAL_EXPANSIBILITY
 
     disp = 0.0; Δμ = 0.0; var_conc = 0.0; var_vol = 0.0
@@ -36,12 +37,12 @@ function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = 25.
             s isa RNA            ? BAYSOL.PartialMolarVolumes.ϕ°(false, pH, s.arg; σ_pH) :
             BAYSOL.PartialMolarVolumes.ϕ°(s.arg)
         C, σC = s.molarity, s.molarity_uncertainty
-        k = AVOGADRO * Z / 1e27 - ρw_k * ϕ
+        k = AVOGADRO * Z / ANGSTROM3_PER_LITER - ρw_k * ϕ
 
-        disp     += C * ϕ / 1e3
+        disp     += C * ϕ / CM3_PER_LITER
         Δμ       += C * k
         var_conc += k^2 * σC^2
-        var_vol  += (C * ρw_k)^2 * (σϕ^2 + (α * abs(ϕ) * abs(t - 25.0))^2)
+        var_vol  += (C * ρw_k)^2 * (σϕ^2 + (α * abs(ϕ) * abs(t - PMV_REFERENCE_TEMPERATURE_C))^2)
     end
 
     μ = ρw + Δμ
@@ -82,8 +83,8 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         @test close_(μ, μ_ref)
         @test close_(σ, σ_ref)
         # sanity: adding a solute genuinely shifts ρₑ away from pure water.
-        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(25.0)
-        @test !close_(μ, ρw; atol = 1e-9)
+        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(DEFAULT_TEMPERATURE_C)
+        @test !close_(μ, ρw)
     end
 
     @testset "_ρₑ: single non-ionizable Protein solute matches the reference formula" begin
@@ -106,10 +107,10 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
         # additivity: the two-solute mean shift equals the sum of the
         # single-solute mean shifts (linear in concentration).
-        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(25.0)
+        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(DEFAULT_TEMPERATURE_C)
         μ_urea, _ = FIT._ρₑ(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")])
         μ_prot, _ = FIT._ρₑ(7.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, "GGGGXX")])
-        @test close_(μ, ρw + (μ_urea - ρw) + (μ_prot - ρw); atol = 1e-9)
+        @test close_(μ, ρw + (μ_urea - ρw) + (μ_prot - ρw))
     end
 
     @testset "_ρₑ: multiple real Protein + a real small molecule" begin
@@ -136,8 +137,8 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         μ_ref, σ_ref = ref_ρₑ(7.0, 0.0, solutes)
         @test close_(μ, μ_ref)
         @test close_(σ, σ_ref)
-        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(25.0)
-        @test !close_(μ, ρw; atol = 1e-9)
+        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(DEFAULT_TEMPERATURE_C)
+        @test !close_(μ, ρw)
     end
 
     @testset "_ρₑ: single RNA solute matches the reference formula" begin
@@ -153,7 +154,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         # μ/σ comes only from the DNA vs RNA backend tables and alphabet.
         μ_dna, σ_dna = FIT._ρₑ(7.0, 0.0, Solute[DNA(1.0e-4, 1.0e-6, "ATGC")])
         μ_rna, σ_rna = FIT._ρₑ(7.0, 0.0, Solute[RNA(1.0e-4, 1.0e-6, "AUGC")])
-        @test !close_(μ_dna, μ_rna; atol = 1e-9)
+        @test !close_(μ_dna, μ_rna)
     end
 
     @testset "_ρₑ: Protein + DNA + RNA + NonBiological mix sums correctly" begin
@@ -221,14 +222,14 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         μ_ln_ref, σ_ln_ref = ref_lognormal(μ, σ)
         @test close_(prior.μ, μ_ln_ref)
         @test close_(prior.σ, σ_ln_ref)
-        @test close_(mean(prior), μ; atol = 1e-9)
-        @test close_(sqrt(var(prior)), σ; atol = 1e-9)
+        @test close_(mean(prior), μ)
+        @test close_(sqrt(var(prior)), σ; atol = DEFAULT_ATOL)
 
         # sanity: a real macromolecule-laden buffer genuinely shifts ρₑ
         # away from pure water, same qualitative check as the
         # single-solute testsets above.
-        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(25.0)
-        @test !close_(μ, ρw; atol = 1e-9)
+        ρw, _ = BAYSOL.PartialMolarVolumes.ρₑ_w(DEFAULT_TEMPERATURE_C)
+        @test !close_(μ, ρw)
     end
 
     #------------------------------------------------------------------
@@ -250,7 +251,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
         μ_lo, _ = FIT._ρₑ(3.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, fresh_seq_dns("D"))])
         μ_hi, _ = FIT._ρₑ(9.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, fresh_seq_dns("D"))])
-        @test !close_(μ_lo, μ_hi; atol = 1e-9)   # titration genuinely moves ρₑ
+        @test !close_(μ_lo, μ_hi)   # titration genuinely moves ρₑ
     end
 
     @testset "_ρₑ: pH/σ_pH do not affect NonBiological-only solutions" begin
@@ -312,8 +313,8 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
             # the moment-matching identity: LogNormal(μ_ln, σ_ln) built this
             # way has mean == μ and std == σ exactly (up to float roundoff).
-            @test close_(mean(prior), μ; atol = 1e-9)
-            @test close_(sqrt(var(prior)), σ; atol = 1e-9)
+            @test close_(mean(prior), μ)
+            @test close_(sqrt(var(prior)), σ; atol = DEFAULT_ATOL)
         end
     end
 
@@ -322,17 +323,17 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
         # replay one pH's result for the other (see fresh_seq_dns above).
         prior_lo = ρₑ_prior(3.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, fresh_seq_dns("D"))])
         prior_hi = ρₑ_prior(9.0, 0.0, Solute[Protein(1.0e-3, 1.0e-5, fresh_seq_dns("D"))])
-        @test !close_(mean(prior_lo), mean(prior_hi); atol = 1e-9)
+        @test !close_(mean(prior_lo), mean(prior_hi))
 
         solutes = Solute[NonBiological(0.5, 0.01, "urea")]
         prior_37 = ρₑ_prior(7.0, 0.0, solutes; t = 37.0)
         μ37, _ = FIT._ρₑ(7.0, 0.0, solutes; t = 37.0)
-        @test close_(mean(prior_37), μ37; atol = 1e-9)
+        @test close_(mean(prior_37), μ37)
     end
 
     @testset "_ρₑ: 25 °C solute volumes get a σ widened linearly in |t − 25|" begin
         solutes = Solute[NonBiological(1.0, 0.0, "glycerol")]
-        _, σ25 = FIT._ρₑ(7.0, 0.0, solutes; t = 25.0)
+        _, σ25 = FIT._ρₑ(7.0, 0.0, solutes; t = PMV_REFERENCE_TEMPERATURE_C)
         _, σ15 = FIT._ρₑ(7.0, 0.0, solutes; t = 15.0)
         _, σ35 = FIT._ρₑ(7.0, 0.0, solutes; t = 35.0)
         _, σ05 = FIT._ρₑ(7.0, 0.0, solutes; t = 5.0)
@@ -346,7 +347,7 @@ fresh_seq_dns(base::AbstractString) = base * String(rand(('X', '*'), 48))
 
     @testset "ρₑ_prior: argument errors" begin
         # an empty solute list is pure water, not an error
-        @test close_(mean(ρₑ_prior(7.0, 0.0, Solute[])), BAYSOL.PartialMolarVolumes.ρₑ_w(25.0)[1]; atol = 1e-9)
+        @test close_(mean(ρₑ_prior(7.0, 0.0, Solute[])), BAYSOL.PartialMolarVolumes.ρₑ_w(DEFAULT_TEMPERATURE_C)[1]; atol = DEFAULT_ATOL)
         @test_throws DomainError ρₑ_prior(7.0, -0.1, Solute[NonBiological(0.5, 0.01, "urea")])
         # σ_pH == 0 is allowed (boundary)
         @test ρₑ_prior(7.0, 0.0, Solute[NonBiological(0.5, 0.01, "urea")]) isa LogNormal{Float64}

@@ -1,35 +1,17 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"Complex spherical harmonics and spherical Bessel functions over point/grid inputs."
+"Complex spherical harmonics and Gautschi's continued-fraction method for spherical Bessel functions."
 module SphFuncs
 
 using SphericalHarmonics: SphericalHarmonics
-using LegendrePolynomials: Plm
 using DocStringExtensions
+using ...BAYSOL_Utils.Constants: GAUTSCHI_MARGIN
 
-export legendre_sphPlm, sphHarm, sphBess, SphHarmError, SphBessError
+export sphHarm, SphHarmError
 
 "Raised by [`sphHarm`](@ref) on invalid input."
 struct SphHarmError <: Exception; msg::String end
-"Raised by [`sphBess`](@ref) on invalid input."
-struct SphBessError <: Exception; msg::String end
 Base.showerror(io::IO, e::SphHarmError) = print(io, "SphHarmError: ", e.msg)
-Base.showerror(io::IO, e::SphBessError) = print(io, "SphBessError: ", e.msg)
-
-const _INV_SQRT_2PI = 1.0 / sqrt(2.0 * π)
-
-"""
-$(TYPEDSIGNATURES)
-
-Normalized associated Legendre P̄_l^m(x) with Condon–Shortley phase (GSL legendre_sphPlm).
-
-# Arguments
-- `l`: degree, l ≥ 0.
-- `m`: order, 0 ≤ m ≤ l.
-- `x`: argument, typically cos θ in [-1, 1].
-"""
-@inline legendre_sphPlm(l::Integer, m::Integer, x::Real)::Float64 =
-    Plm(float(x), l, m; norm = Val(:normalized), csphase = true) * _INV_SQRT_2PI
 
 """
 $(TYPEDSIGNATURES)
@@ -41,6 +23,12 @@ l*(l+1)÷2 + m + 1; columns are input points.
 - `lMax`: maximum degree, lMax ≥ 0.
 - `θ`: 1-D vector of polar angles; same length as φ.
 - `φ`: 1-D vector of azimuthal angles; same length as θ.
+
+# Returns
+- `Matrix{ComplexF64}`, ((lMax+1)(lMax+2)/2, |θ|): Y_l^m(θᵢ, φᵢ), one column per point.
+
+# Exceptions
+- `SphHarmError`: lMax < 0, or θ/φ not 1-D, empty, or of different lengths.
 """
 function sphHarm(lMax::Int, θ::AbstractArray{<:Real}, φ::AbstractArray{<:Real})::Matrix{ComplexF64}
     lMax < 0 && throw(SphHarmError("lMax must be ≥ 0"))
@@ -74,6 +62,12 @@ sphHarm(lMax, view(angles, 1, :), view(angles, 2, :)).
 # Arguments
 - `lMax`: maximum degree, lMax ≥ 0.
 - `angles`: (2, N) real matrix; row 1 is θ, row 2 is φ.
+
+# Returns
+- `Matrix{ComplexF64}`, ((lMax+1)(lMax+2)/2, N): as the (θ, φ) method.
+
+# Exceptions
+- `SphHarmError`: angles does not have 2 rows, or as the (θ, φ) method.
 """
 function sphHarm(lMax::Int, angles::AbstractMatrix{<:Real})::Matrix{ComplexF64}
     size(angles, 1) == 2 ||
@@ -82,143 +76,206 @@ function sphHarm(lMax::Int, angles::AbstractMatrix{<:Real})::Matrix{ComplexF64}
 end
 
 """
+    sphBess
+
+Per-q state of the spherical Bessel sweep for one radius, reused across radii so
+the sweep allocates nothing. [`sphBessRatios!`](@ref) fills it (pass 1); the
+caller's pass 2 then steps the values upward with [`sphBessStep`](@ref).
+
+# Fields
+- `x::Vector{Float64}`, `invx::Vector{Float64}`: x = q·r and 1/x (0 at x = 0) per q.
+- `lup::Vector{Int}`: ⌊x⌋, the last order taken from the upward recurrence.
+- `N::Vector{Int}`: start order of the ratio sweep (−1 when ⌊x⌋ ≥ lMax: no ratios needed).
+- `rp::Vector{Float64}`: rₗ₊₁ during the ratio sweep (scratch).
+- `jm1::Vector{Float64}`, `jm2::Vector{Float64}`: jₗ₋₁ and jₗ₋₂ per q; pass 1
+    leaves j₁ and j₀ in them, pass 2 updates them as it steps up.
+- `R::Matrix{Float64}`, (|q|, lMax): R[k, l] = rₗ(x_k), contiguous in q.
+"""
+struct sphBess
+    x::Vector{Float64}
+    invx::Vector{Float64}
+    lup::Vector{Int}
+    N::Vector{Int}
+    rp::Vector{Float64}
+    jm1::Vector{Float64}
+    jm2::Vector{Float64}
+    R::Matrix{Float64}
+end
+
+"""
 $(TYPEDSIGNATURES)
 
-Spherical Bessel functions jₗ for l = 0..lMax over the outer product q ⊗ r,
-shape (lMax+1, |q|, |r|):
+Zeroed buffers for up to `nq` q values and orders up to `lMax`.
 
-    jₗ(x) = √(π / (2·x)) · Jₗ₊₀.₅(x)
+# Returns
+- `sphBess` with length-`nq` vectors and an `nq` × max(lMax, 1) ratio matrix.
 
-Upward recurrence is unstable once l > x, so use Miller's downward recurrence
-algorithm. With ĵ an unnormalized estimate,
+# Exceptions
+- `DomainError`: nq < 0 or lMax < 0.
+"""
+function sphBess(nq::Int, lMax::Int)
+    nq ≥ 0 || throw(DomainError(nq, "sphBess: nq must be ≥ 0"))
+    lMax ≥ 0 || throw(DomainError(lMax, "sphBess: lMax must be ≥ 0"))
+    return sphBess(
+        zeros(nq), 
+        zeros(nq), 
+        zeros(Int, nq), 
+        zeros(Int, nq),
+        zeros(nq), 
+        zeros(nq), 
+        zeros(nq), 
+        zeros(nq, max(lMax, 1))
+    )
+end
 
-    ĵₗ₋₁(x) = ((2l + 1)/x)·ĵₗ(x) − ĵₗ₊₁(x),    ĵ_{N+1} = 0,  ĵ_N = 2⁻⁵⁰⁰
+"""
+$(TYPEDSIGNATURES)
 
-started at N = max(lMax, ⌈x⌉) + 16 + ⌈6·x^(1/3)⌉, deep enough that every
-returned order is converged to the Float64 rounding floor (checked against a
-512-bit reference for x ≤ 300, lMax ≤ 200: |Δjₗ| ≤ 8e-15·maxₖ|jₖ(x)|). One
-sweep yields every order, so the cost per value does not depend on l.
+One upward step of the spherical Bessel sweep: jₗ(x) for l ≥ 2 from the two orders
+below it,
 
-Loop layout: for a fixed r, the recurrence is sequential in l (each order needs
-the two above it), but different q values never interact. So instead of running
-one x at a time, the recurrence state (ĵₗ₊₁, ĵₗ₊₂ and the running normalization
-sum) is held as length-|q| vectors, and every q is stepped down one order
-together. That inner loop over q has no dependencies between iterations, which
-lets the compiler vectorize it (@simd) and keeps several independent
-multiply-adds in flight instead of waiting on one chain.
+    jₗ(x) = ((2l − 1)/x)·jₗ₋₁(x) − jₗ₋₂(x)    for l ≤ ⌊x⌋ (upward recurrence, stable here),
+    jₗ(x) = jₗ₋₁(x)·rₗ(x)                    for l > ⌊x⌋ (ratio from [`sphBessRatios!`](@ref)).
 
-Each q needs its own start order N(x). The sweep runs from the largest N on the
-grid; a q whose N has not been reached yet holds ĵ = 0, which the recurrence maps
-to 0, and is seeded with ĵ_N exactly at its own N. Its result is therefore the
-same as if it had been computed alone.
-
-The estimate is normalized with the sum rule (DLMF 10.60.12)
-
-    Σₗ (2l + 1)·jₗ(x)² = 1 => jₗ(x) = ĵₗ(x) / √(Σₗ (2l + 1)·ĵₗ(x)²)
-
-rather than with j₀(x) = sin(x)/x, which vanishes at x = kπ and would then
-mis-scale every order. ĵ_N > 0 and j_N(x) > 0 for N > x, so the sign is right.
-
-For small x and large lMax, ĵ would overflow over the sweep (it grows like
-(2N+1)!!/x^N). N is then lowered to the last order whose estimated growth,
-from jₗ(x) ≈ xˡ/(2l+1)!!, stays below e⁶⁰⁰; the orders above it are below
-~1e-260 and returned as 0.
-
-For x = 0, use the convention:
-
-    j₀(0) = 1
-    jₗ(0) = 0  for l > 0
-
-Sources:
-    Arfken, George (1985). Mathematical Methods for Physicists (3rd ed.).
-    Academic Press. p. 622.
-    NIST DLMF, eq. 10.60.12, <https://dlmf.nist.gov/10.60.E12>.
+The two are selected branch-free, so a loop over q calling this vectorizes.
 
 # Arguments
-- `r`: non-empty vector of radii, all ≥ 0.
-- `q`: non-empty vector of q values, all ≥ 0.
-- `lMax`: maximum order, lMax ≥ 0.
+- `jm1`, `jm2`: jₗ₋₁(x), jₗ₋₂(x).
+- `l`: the order to produce, ≥ 2.
+- `lup`: ⌊x⌋.
+- `invx`: 1/x (0 at x = 0).
+- `rl`: rₗ(x) = jₗ(x)/jₗ₋₁(x).
+
+# Returns
+- `Float64`: jₗ(x), already normalized.
 """
-function sphBess(
-    r::AbstractArray{Float64},
-    q::AbstractArray{Float64},
-    lMax::Int
-)::Array{Float64,3}
+@inline sphBessStep(jm1::Float64, jm2::Float64, l::Int, lup::Int, invx::Float64, rl::Float64)::Float64 =
+    ifelse(l ≤ lup, muladd((2l - 1) * invx, jm1, -jm2), jm1 * rl)
 
-    isempty(r) && throw(SphBessError("radii must be non-empty"))
-    isempty(q) && throw(SphBessError("q grid must be non-empty"))
+"""
+$(TYPEDSIGNATURES)
 
-    any(<(0), r) && throw(SphBessError("radii must be ≥ 0"))
-    any(<(0), q) && throw(SphBessError("q must be ≥ 0"))
+Pass 1 of the spherical Bessel sweep for one radius r over every q: everything
+[`sphBessStep`](@ref) needs to step jₗ(x), x = q·r, upward from l = 2 to lMax.
 
-    lMax < 0 && throw(SphBessError("lMax must be ≥ 0"))
+All orders satisfy the three-term recurrence
 
-    rv, qv = Float64.(vec(r)), Float64.(vec(q))
-    nq = length(qv)
-    j = zeros(Float64, lMax + 1, nq, length(rv))
+    jₗ₋₁(x) + jₗ₊₁(x) = ((2l + 1)/x)·jₗ(x).
 
-    # start order above max(lMax, x); ĵ_N = 2⁻⁵⁰⁰ and growth ≤ e⁶⁰⁰ keep ĵ² finite
-    margin(x) = 16 + ceil(Int, 6 * cbrt(x))
-    seed, log_budget = 2.0^-500, -600.0
+Upward recurrence is stable while l ≤ x and unstable above, where jₗ is the
+decaying (minimal) solution. So use Gautschi's hybrid:
 
-    # ldf[l+1] = ln((2l+1)!!), up to the deepest start order on this grid
-    xmax = maximum(qv) * maximum(rv)
-    ldf = cumsum([0.0; log.(3.0:2.0:(2 * (max(lMax, ceil(Int, xmax)) + margin(xmax)) + 1))])
+1.  For l > ⌊x⌋, the ratios rₗ = jₗ/jₗ₋₁ from the continued fraction, evaluated
+    downward from a start order N:
 
-    # recurrence state, one entry per q (see "Loop layout" above):
-    # 1/x, start order N(x), ĵₗ₊₁, ĵₗ₊₂, and the running sum Σ(2l+1)ĵₗ²
-    invx, N = zeros(nq), zeros(Int, nq)
-    jp1, jp2, S = zeros(nq), zeros(nq), zeros(nq)
+        rₗ(x) = x / ((2l + 1) − x·rₗ₊₁(x)),    r_{N+1} = 0,
 
-    @inbounds for (ri, rr) in enumerate(rv)
-        for k in 1:nq
-            x = qv[k] * rr
-            invx[k] = x == 0 ? 0.0 : inv(x)
-            N[k] = x == 0 ? -1 : max(lMax, ceil(Int, x)) + margin(x)
-            # lower N when the growth estimate l·ln x − ln((2l+1)!!) leaves the budget;
-            # it decreases past l = (x−1)/2, so bisect for the last order inside it
-            if x != 0 && N[k] * log(x) - ldf[N[k] + 1] < log_budget
-                lo, hi, lx = max(0, floor(Int, (x - 1) / 2)), N[k], log(x)
-                while hi - lo > 1
-                    mid = (lo + hi) >>> 1
-                    mid * lx - ldf[mid + 1] ≥ log_budget ? (lo = mid) : (hi = mid)
-                end
-                N[k] = lo
+    with N = max(lMax, ⌈x⌉) + 16 + ⌈6·x^(1/3)⌉
+    ([`GAUTSCHI_MARGIN`](@ref)), deep enough that
+    every ratio is converged to the Float64 rounding floor. The ratios stay bounded
+    (rₗ ≈ x/(2l + 1) for l ≫ x), so nothing can overflow; orders too small for
+    Float64 underflow to 0.
+2.  The anchors in closed form,
+
+        j₀(x) = sin(x)/x,    j₁(x) = sin(x)/x² − cos(x)/x,
+
+    except j₁ = j₀·r₁ for x < 1 (⌊x⌋ = 0), where the closed form cancels
+    catastrophically. Pass 2 then takes jₗ by the upward recurrence for l ≤ ⌊x⌋ and
+    jₗ = jₗ₋₁·rₗ above it. The switch point is safe: jₗ has no zero below
+    x ≈ l + 1.86·l^(1/3), so the anchor j_⌊x⌋(x) is never near 0.
+
+Every value comes out normalized, so the caller can use it as it is produced.
+Against a 512-bit reference (x ≤ 300, lMax ≤ 200): |Δjₗ| ≤ 1.5e-14·maxₖ|jₖ(x)|,
+and ≤ 2.2e-14 relative in the decaying tail.
+
+A q with ⌊x⌋ ≥ lMax needs no ratios (every order it needs comes from the upward
+recurrence), so N = −1 and it takes no part in the downward sweep.
+
+Loop layout: for a fixed r, the sweep is sequential in l, but different q values
+never interact. So every q is stepped one order at a time together; that inner
+loop over q has no dependencies between iterations, which lets the compiler
+vectorize it (@simd) and keeps several independent operations in flight instead of
+waiting on one chain. The sweep runs from the largest N on the grid; a q holds
+r = 0 until l reaches its own N, so its result is the same as if it had been
+computed alone.
+
+x = 0 gives 1/x = 0 and every rₗ = 0, so j₀(0) = 1 and jₗ(0) = 0 for l > 0.
+
+Sources:
+    Gautschi, W. (1967). Computational aspects of three-term recurrence relations.
+    SIAM Review 9(1), 24–82. doi:10.1137/1009002.
+
+# Arguments
+- `b::sphBess`: buffers for ≥ |q| values and orders up to ≥ lMax.
+- `r`: the radius, ≥ 0.
+- `q`: the q grid, every entry ≥ 0 (not checked here; it is the caller's grid,
+    validated once rather than once per radius).
+- `lMax`: maximum order, ≥ 0.
+
+# Returns
+- `nothing`. Writes, for the first |q| entries, `x`, `invx`, `lup`, `N`,
+    `R[:, 1:lMax]`, and j₁, j₀ into `jm1`, `jm2`.
+
+# Exceptions
+- `ArgumentError`: the buffers in b hold fewer than |q| values or fewer than lMax orders.
+- `DomainError`: r < 0 or lMax < 0.
+"""
+function sphBessRatios!(b::sphBess, r::Float64, q::Vector{Float64}, lMax::Int)::Nothing
+    nq = length(q)
+    length(b.x) ≥ nq || throw(ArgumentError("sphBessRatios!: buffers hold $(length(b.x)) q values, need $nq"))
+    size(b.R, 2) ≥ lMax || throw(ArgumentError("sphBessRatios!: buffers hold $(size(b.R, 2)) orders, need $lMax"))
+    r ≥ 0 || throw(DomainError(r, "sphBessRatios!: r must be ≥ 0"))
+    lMax ≥ 0 || throw(DomainError(lMax, "sphBessRatios!: lMax must be ≥ 0"))
+    x, invx, lup, N, rp, jm1, jm2, R = b.x, b.invx, b.lup, b.N, b.rp, b.jm1, b.jm2, b.R
+
+    d0, d1 = GAUTSCHI_MARGIN
+    Nmax = 0
+    # integer start orders (floor/ceil/cbrt and a branch): scalar loop
+    @inbounds for k in 1:nq
+        xk = q[k] * r
+        x[k] = xk
+        lup[k] = floor(Int, xk)
+        N[k] = lup[k] ≥ lMax ? -1 : max(lMax, ceil(Int, xk)) + d0 + ceil(Int, d1 * cbrt(xk))
+        Nmax = max(Nmax, N[k])
+    end
+
+    # anchors jm2 = j₀, jm1 = j₁ in closed form (j₁ is replaced below for x < 1).
+    # 1/x is set to 0 at x = 0, so j₀(0) = 1 by the select and j₁(0) = (0 − 1)·0 = 0,
+    # with no NaN to mask.
+    @inbounds @simd for k in 1:nq
+        xk = x[k]
+        ix = ifelse(xk == 0.0, 0.0, inv(xk))
+        invx[k] = ix
+        sk = sin(xk)
+        ck = cos(xk)
+        jm2[k] = ifelse(xk == 0.0, 1.0, sk * ix)
+        jm1[k] = (sk * ix - ck) * ix
+        rp[k] = 0.0
+    end
+
+    # downward: rₗ = x/((2l+1) − x·rₗ₊₁) for every q, 0 until l reaches its own N;
+    # stored for l ≤ lMax (the branch on l is outside the vectorized loop)
+    for l in Nmax:-1:1
+        if l ≤ lMax
+            @inbounds @simd for k in 1:nq
+                v = ifelse(l > N[k], 0.0, x[k] / ((2l + 1) - x[k] * rp[k]))
+                rp[k] = v
+                R[k, l] = v
             end
-        end
-
-        # step every q down one order at a time; a q stays 0 until l reaches its
-        # own N, where it is seeded, so it doesn't see the others' start orders
-        fill!(jp1, 0.0); fill!(jp2, 0.0); fill!(S, 0.0)
-        for l in maximum(N):-1:0
-            @fastmath @simd for k in 1:nq
-                # ĵₗ = ((2l+3)/x)·ĵₗ₊₁ − ĵₗ₊₂, or the seed at l = N
-                v = ifelse(N[k] == l, seed, muladd((2l + 3) * invx[k], jp1[k], -jp2[k]))
-                S[k] = muladd(2l + 1, v * v, S[k])
-                jp2[k], jp1[k] = jp1[k], v
-            end
-            if l ≤ lMax
-                for k in 1:nq
-                    j[l + 1, k, ri] = jp1[k]
-                end
-            end
-        end
-
-        for k in 1:nq
-            if invx[k] == 0
-                j[1, k, ri] = 1.0
-            else
-                s = inv(sqrt(S[k]))
-                @simd for l in 1:(lMax + 1)
-                    j[l, k, ri] *= s
-                end
+        else
+            @inbounds @simd for k in 1:nq
+                rp[k] = ifelse(l > N[k], 0.0, x[k] / ((2l + 1) - x[k] * rp[k]))
             end
         end
     end
 
-    return j
+    # x < 1: j₁ = j₀·r₁, since the closed form cancels catastrophically at small x
+    if lMax ≥ 1
+        @inbounds @simd for k in 1:nq
+            jm1[k] = ifelse(lup[k] ≥ 1, jm1[k], jm2[k] * R[k, 1])
+        end
+    end
+    return nothing
 end
-
-sphBess(r::AbstractArray{<:Real}, q::AbstractArray{<:Real}, lMax::Int) = sphBess(Float64.(vec(r)), Float64.(vec(q)), lMax)
 
 end # module

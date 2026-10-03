@@ -8,8 +8,8 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+LegendrePolynomials = "3db4a2ba-fc88-11e8-3e01-49c72059a882"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
@@ -17,18 +17,13 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 Aqua = "0.8"
-# CondaPkg is only a direct dep here (not just transitive via BAYSOL) because
-# Preferences.jl's load_preference only honours a [preferences.CondaPkg]
-# entry for a package from environments that list it as a *direct*
-# dependency -- needed so this env picks up the shared-conda-environment
-# preference below instead of resolving its own separate .CondaPkg.
 CondaPkg = "0.2"
 Distributions = "0.25.131"
 ExplicitImports = "1.15.0"
 ForwardDiff = "0.10, 1"
 JET = "0.9, 0.10, 0.11, 0.12"
+LegendrePolynomials = "0.4"
 
-# See ../Project.toml's matching block for the full rationale.
 [preferences.CondaPkg]
 backend = "MicroMamba"
 env = "@baysol"

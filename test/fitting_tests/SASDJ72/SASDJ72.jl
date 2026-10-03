@@ -5,6 +5,7 @@ using GLMakie
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDJ72")
 const _PDB_PATHS = (
@@ -47,7 +48,7 @@ I_exp = Float64.(raw[:, 2])
 #
 # Instrument: SIBYLS beamline 12.3.1 (Advanced Light Source, Berkeley),
 # MAR 165 CCD, stated wavelength λ = 0.11 nm = 1.1 Å
-# => energy = hc/λ ≈ 12398.42/1.1 ≈ 11271.29 eV (hc = 12398.42 eV·Å).
+# => energy = hc/λ ≈ HC_EV_ANGSTROM / 1.1 ≈ 11271.29 eV (hc = 12398.42 eV·Å).
 #
 # Temperature: SASBDB states 20°C measurement (10°C storage); 20°C is used.
 #
@@ -59,9 +60,9 @@ I_exp = Float64.(raw[:, 2])
 # range) is used with a wide (40%) relative uncertainty on molarity to
 # reflect that ambiguity, rather than fabricating a precise number.
 
-const PH, σ_PH = 7.5, 0.1   # ±0.1 is a typical benchtop pH-meter precision
+const PH, σ_PH = 7.5, PH_METER_SIGMA
 
-const ENERGY_EV        = 12398.42 / 1.1   # ≈ 11271.29 eV, from stated λ = 0.11 nm
+const ENERGY_EV        = HC_EV_ANGSTROM / 1.1   # ≈ 11271.29 eV, from stated λ = 0.11 nm
 const TEMPERATURE_C     = 20.0            # 20°C measurement, SASBDB
 const IONIC_STRENGTH_M  = 0.150           # 150 mM NaCl
 
@@ -152,9 +153,9 @@ end
 
 function run_sasdj72(
     model::Symbol; 
-    n_samples::Int = 2000, 
-    n_adapt::Int = 1000, 
-    seed::Integer = 0
+    n_samples::Int = N_SAMPLES, 
+    n_adapt::Int = N_ADAPT, 
+    seed::Integer = SAMPLER_SEED
 )
     q_fit, I_fit, σ_fit = fit_subset()
 
@@ -183,7 +184,7 @@ function sasdj72_figure(result, data)
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
-    fig = Figure(size = (700, 500))
+    fig = Figure(size = FIG_SIZE_CURVE)
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
@@ -193,14 +194,7 @@ function sasdj72_figure(result, data)
         yscale = log10,
     )
 
-    # Floor for the quantile/bounds curve's lower edge on this log10 y-axis.
-    # The model curve is always > 0 in principle, but can numerically
-    # graze 0 near the high-q noise floor, and log10 of a non-positive value
-    # errors. Tied to I_fit's own smallest value (halved) rather than an
-    # arbitrary tiny constant: clamping down to, say, 1e-6 would plot it
-    # many decades below the data's real range, which on a log axis renders
-    # as a huge, misleading spike.
-    y_floor = minimum(I_fit) / 2
+    y_floor = log_axis_floor(I_fit)   # see log_axis_floor in common.jl
 
     if quantile_result !== nothing
         _, curves = quantile_result
@@ -209,15 +203,15 @@ function sasdj72_figure(result, data)
 
         band!(
             ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
-            color = (:darkorange, 0.15), label = "bounds",
+            color = COLOR_BAND, label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = :darkorange, linewidth = 1.5, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE, label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
-            linestyle = :dot, color = :darkorange, linewidth = 1.5,
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
         )
     end
 
@@ -235,13 +229,13 @@ function sasdj72_figure(result, data)
     log_σ = σ_fit ./ (I_fit .* log(10))
     rangebars!(
         ax, q_fit, exp10.(log_I .- log_σ), exp10.(log_I .+ log_σ);
-        whiskerwidth = 4, color = (:gray40, 0.6),
+        whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR,
     )
-    scatter!(ax, q_fit, I_fit; markersize = 4, color = :gray20, label = "data")
+    scatter!(ax, q_fit, I_fit; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "MAP")
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -249,7 +243,7 @@ function sasdj72_figure(result, data)
     # Centre the view on the actual data (I_fit), not on however far the
     # errorbar whiskers/bounds band happen to extend
     lo, hi = extrema(I_fit)
-    ylims!(ax, lo * 0.7, hi * 1.3)
+    ylims!(ax, lo * YLIM_LOG_LO, hi * YLIM_LOG_HI)
 
     return fig
 end
@@ -264,7 +258,7 @@ function sasdj72_residuals_figure(result, data)
     _, _, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
 
-    fig = Figure(size = (700, 400))
+    fig = Figure(size = FIG_SIZE_RESIDUALS)
     ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
 
     map_curve = map_result === nothing ? nothing : map_result[2]
@@ -277,25 +271,25 @@ function sasdj72_residuals_figure(result, data)
 
         band!(
             ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = (:darkorange, 1), label = "bounds",
+            color = COLOR_BAND_RESID, label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = :darkorange, linewidth = 2.5, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID, label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = :darkorange, linewidth = 2.5,
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID,
         )
     end
 
     if map_curve !== nothing
         resid = I_fit .- map_curve[:, 2]
-        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = 4, color = (:gray40, 0.6))
-        scatter!(ax, q_fit, resid; markersize = 4, color = :gray20, label = "data - MAP")
-        hlines!(ax, [0.0]; color = :crimson, linewidth = 1.5)
+        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR)
+        scatter!(ax, q_fit, resid; markersize = MARKERSIZE, color = COLOR_DATA, label = "data - MAP")
+        hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
         lo, hi = extrema(resid)
-        pad = 0.3 * (hi - lo)
+        pad = YLIM_LIN_PAD_FRAC * (hi - lo)
         ylims!(ax, lo - pad, hi + pad)
     end
 
@@ -303,13 +297,6 @@ function sasdj72_residuals_figure(result, data)
 
     return fig
 end
-
-const _HIST_PARAMS = [
-    ("ρₑ", "slvnt_e_dns"), ("δρ₁", "delta_rho_1"), ("δρ₂", "delta_rho_2"),
-    ("δρ₃", "delta_rho_3"),
-    ("scale", "scale"), ("bkgrnd_corr", "bkgrnd_corr"),
-    ("c1", "excl_vol_corr"),
-]
 
 """
     sasdj72_hist(result) -> Figure
@@ -323,8 +310,8 @@ function sasdj72_hist(result)
     bkgrnd_draws = fit.bkgrnd_corr[ok]
     map_params = map_result === nothing ? nothing : map_result[1]
 
-    fig = Figure(size = (900, 550))
-    for (i, (label, map_key)) in enumerate(_HIST_PARAMS)
+    fig = Figure(size = FIG_SIZE_HIST)
+    for (i, (label, map_key)) in enumerate(HIST_PARAMS)
         row, col = fldmod1(i, 3)
         ax = Axis(
             fig[row, col], xlabel = label, ylabel = "count",
@@ -339,9 +326,9 @@ function sasdj72_hist(result)
         else
             getindex.(samples, i)
         end
-        hist!(ax, draws; bins = 40, color = (:darkorange, 0.6))
+        hist!(ax, draws; bins = HIST_BINS, color = COLOR_HIST)
         if map_params !== nothing
-            vlines!(ax, [map_params[map_key]]; color = :crimson, linewidth = 2)
+            vlines!(ax, [map_params[map_key]]; color = COLOR_MAP, linewidth = LW_MAP)
         end
     end
 
@@ -367,7 +354,7 @@ function sasdj72_comparison_figure(result, data)
     I_crysol = Float64.(crysol[:, 4])
     keep   = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT) .& (I_crysol .> 0)
 
-    fig = Figure(size = (700, 500))
+    fig = Figure(size = FIG_SIZE_CURVE)
     ax = Axis(
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
@@ -382,24 +369,24 @@ function sasdj72_comparison_figure(result, data)
     log_σ = σ_fit ./ (I_fit .* log(10))
     rangebars!(
         ax, q_fit, exp10.(log_I .- log_σ), exp10.(log_I .+ log_σ);
-        whiskerwidth = 4, color = (:gray40, 0.6),
+        whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR,
     )
-    scatter!(ax, q_fit, I_fit; markersize = 4, color = :gray20, label = "data")
+    scatter!(ax, q_fit, I_fit; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
 
     lines!(
         ax, q_crysol[keep], I_crysol[keep];
-        color = :mediumturquoise, linewidth = 2, linestyle = :dash, label = "CRYSOL fit1",
+        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = "CRYSOL fit1",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = :crimson, linewidth = 2, label = "BAYSOL MAP")
+        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "BAYSOL MAP")
     end
 
     axislegend(ax; position = :lb, framevisible = false)
 
     lo, hi = extrema(I_fit)
-    ylims!(ax, lo * 0.7, hi * 1.3)
+    ylims!(ax, lo * YLIM_LOG_LO, hi * YLIM_LOG_HI)
 
     return fig
 end
@@ -415,14 +402,14 @@ for model in (:model1, :model2)
     end
 
     fig = sasdj72_figure(result, (q_fit, I_fit, σ_fit))
-    save(joinpath(@__DIR__, "res_$(model).png"), fig; px_per_unit = 3.5)
+    save(joinpath(@__DIR__, "res_$(model).png"), fig; px_per_unit = PX_PER_UNIT)
 
     fig_residuals = sasdj72_residuals_figure(result, (q_fit, I_fit, σ_fit))
-    save(joinpath(@__DIR__, "res_$(model)_residuals.png"), fig_residuals; px_per_unit = 3.5)
+    save(joinpath(@__DIR__, "res_$(model)_residuals.png"), fig_residuals; px_per_unit = PX_PER_UNIT)
 
     fig_hist = sasdj72_hist(result)
-    save(joinpath(@__DIR__, "res_$(model)_hist.png"), fig_hist; px_per_unit = 3.5)
+    save(joinpath(@__DIR__, "res_$(model)_hist.png"), fig_hist; px_per_unit = PX_PER_UNIT)
 
     fig_crysol = sasdj72_comparison_figure(result, (q_fit, I_fit, σ_fit))
-    save(joinpath(@__DIR__, "res_$(model)_comparison.png"), fig_crysol; px_per_unit = 3.5)
+    save(joinpath(@__DIR__, "res_$(model)_comparison.png"), fig_crysol; px_per_unit = PX_PER_UNIT)
 end

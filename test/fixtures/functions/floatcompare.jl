@@ -1,15 +1,14 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Shared float-comparison helper for tests that need an explicit, looser
-# absolute tolerance than runtests.jl's own `check_float`.
+# Shared float-comparison helper with an explicit, per-call absolute tolerance.
 
 """
-    close_(a, b; atol = 1.0e-9) -> Bool
+    close_(a, b; atol = DEFAULT_ATOL) -> Bool
 
-Absolute-tolerance float compare with an explicit `atol`. `check_float` from
-`runtests.jl` pins a fixed `DEFAULT_ATOL` that is too tight for tests summing
-across many accumulated terms (e.g. residue-by-residue partial molar volumes,
-or values built from several chained physical formulas), so those files use
-this looser, locally-tunable comparison instead.
+Absolute-tolerance float compare. Floating-point tolerances are expressed in
+units of `DEFAULT_ATOL` (`k * DEFAULT_ATOL`) so they all scale together; tests
+summing many accumulated terms (residue-by-residue partial molar volumes, values
+built from several chained physical formulas) pass a larger multiple.
+Requires `DEFAULT_ATOL` in scope (testsetup.jl provides it).
 """
-close_(a, b; atol = 1.0e-9) = abs(a - b) < atol
+close_(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol

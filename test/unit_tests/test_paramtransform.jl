@@ -69,7 +69,7 @@ function numeric_ξ_jacobian(t::NTuple{4,<:Real}; h::Real = 1.0e-6)
 end
 
 const ξ_CASES = (
-    (0.334, 1.05, -0.2, 0.0),
+    (CRYSOL_SOLVENT_DENSITY, 1.05, -0.2, 0.0),
     (1.0, 1.0, 0.0, -3.0),
     (0.05, 0.001, -5.0, -11.0),
     (10.0, 1.99, -9.99, 2.7),
@@ -101,14 +101,14 @@ const θ_CASES = (
     @testset "Ξ(Θ(x)) == x for x in the valid ξ domain" begin
         for ξ0 in ξ_CASES
             res, _ = apply_Θ(ξ0)
-            @test all(isapprox.(apply_Ξ(res), ξ0; rtol = 1e-12, atol = 1e-12))
+            @test all(isapprox.(apply_Ξ(res), ξ0; rtol = 1e-12, atol = 1e-3 * DEFAULT_ATOL))
         end
     end
 
     @testset "Θ(Ξ(x)) == x for x in θ-space" begin
         for θ₀ in θ_CASES
             res, _ = apply_Θ(apply_Ξ(θ₀))
-            @test all(isapprox.(res, θ₀; rtol = 1e-9, atol = 1e-9))
+            @test all(isapprox.(res, θ₀; rtol = 1e-9, atol = DEFAULT_ATOL))
         end
     end
 
@@ -122,7 +122,7 @@ const θ_CASES = (
         for θ₀ in ((0.1, -0.2, 0.3, -0.4), (2.0, -2.0, 0.0, 0.0), (-5.0, 5.0, 1.0, 3.0))
             ξ0 = apply_Ξ(θ₀)
             θ, corr = apply_Θ(ξ0)
-            @test isapprox(corr, logjac(SVector{4}(θ...), PR); atol = 1e-9)
+            @test isapprox(corr, logjac(SVector{4}(θ...), PR); atol = DEFAULT_ATOL)
             @test isapprox(corr, log(abs(det(numeric_ξ_jacobian(θ₀)))); atol = 1.0e-6)
         end
     end
@@ -155,7 +155,7 @@ const θ_CASES = (
     end
 
     @testset "Θ/Ξ are pure: inputs unchanged" begin
-        x = SVector{4,Float64}(0.334, 1.05, -0.2, -1.0)
+        x = SVector{4,Float64}(CRYSOL_SOLVENT_DENSITY, 1.05, -0.2, -1.0)
         x_before = Tuple(x)
         θ, _ = Θ(x, PR)
         @test Tuple(x) == x_before
@@ -183,7 +183,7 @@ const θ_CASES = (
             θ, corr = Θ(SVector{4,eltype(x)}(x...), PR)
             return sum(θ) + corr
         end
-        x0 = [0.334, 1.05, -0.2, -1.0]
+        x0 = [CRYSOL_SOLVENT_DENSITY, 1.05, -0.2, -1.0]
         g = ForwardDiff.gradient(f, x0)
         @test all(isfinite, g)
         h = 1.0e-6
@@ -195,10 +195,10 @@ const θ_CASES = (
     end
 
     @testset "5-parameter (nucleotide) variant: round trip and log-Jacobian" begin
-        ξ5 = SVector(0.334, 1.05, -0.2, -2.0, 0.4)
+        ξ5 = SVector(CRYSOL_SOLVENT_DENSITY, 1.05, -0.2, -2.0, 0.4)
         θ5, corr5 = Θ(ξ5, PR)
         @test all(isapprox.(Ξ(θ5, PR), ξ5; rtol = 1e-12))
-        @test isapprox(corr5, logjac(SVector(θ5[1], θ5[2], θ5[3], θ5[4]), PR) + θ5[5]; atol = 1e-12)
+        @test isapprox(corr5, logjac(SVector(θ5[1], θ5[2], θ5[3], θ5[4]), PR) + θ5[5]; atol = 1e-3 * DEFAULT_ATOL)
     end
 
     @testset "priors -> θ/ξ: full-prior draws round-trip and never throw (250_000 draws)" begin
@@ -211,8 +211,8 @@ const θ_CASES = (
             ξ0 = (rand(d_ρ), rand(δρ₁_d), rand(δρ₂_d), rand(δρ₃_d))
             res, corr = apply_Θ(ξ0)
             finite_ok &= isfinite(corr) && all(isfinite, res)
-            roundtrip_ok &= all(isapprox.(apply_Ξ(res), ξ0; rtol = 1e-9, atol = 1e-12))
-            jacobian_ok &= isapprox(corr, logjac(SVector{4}(res...), PR); atol = 1e-9)
+            roundtrip_ok &= all(isapprox.(apply_Ξ(res), ξ0; rtol = 1e-9, atol = 1e-3 * DEFAULT_ATOL))
+            jacobian_ok &= isapprox(corr, logjac(SVector{4}(res...), PR); atol = DEFAULT_ATOL)
         end
         @test finite_ok
         @test roundtrip_ok

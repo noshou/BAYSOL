@@ -51,7 +51,7 @@ Forward.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defines i
 
 ## Module layout
 
-- **SphFuncs.jl** : sphHarm (complex `Y_l^m`), sphBess (`j_l`), legendre_sphPlm (normalized associated Legendre `P̄_l^m`).
+- **SphFuncs.jl** : sphHarm (complex `Y_l^m`) and Gautschi's continued-fraction method for `j_l`: `sphBessRatios!` (pass 1: ratios `r_l = j_l/j_{l-1}`, start orders and the closed-form anchors `j_0`, `j_1`), `sphBessStep` (one upward step of pass 2), and their `sphBess` buffers.
 - **PartialWave.jl** : `compute_B_lm` (the multipole moments themselves), plus `self_scatter`/`cross_scatter`/`partial_wave_weights` (the reductions to `S_ab(q)`).
 - **Scatterers.jl** : one builder per species: vacuo, excluded, hydration (the last returns one `B_lm` per hydration-shell class).
 - **Intensity.jl** : gram (the `S_ab` matrix G), intensity (vᵀ G v), `intensity_calc` (m·I + c), `contrast_vector`/
@@ -63,7 +63,7 @@ Forward.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defines i
 ### Spherical harmonics and Bessel functions (SphFuncs)
 
 ```julia
-using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm
+using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, sphBessRatios!, sphBessStep
 
 # Y_l^m for l = 0..lMax, m = 0..l, packed row = l*(l+1)÷2 + m + 1, one column per point
 y = sphHarm(2, [0.3, 1.1], [0.2, -1.0])          # (6, 2) ComplexF64
@@ -71,10 +71,18 @@ y = sphHarm(2, [0.3, 1.1], [0.2, -1.0])          # (6, 2) ComplexF64
 # same, reading θ/φ straight off MolecularStructure.coords_spherical's layout
 y = sphHarm(2, angles)                            # angles :: (2, N), row 1 = θ, row 2 = φ
 
-# j_l over the outer product q ⊗ r, shape (lMax+1, |q|, |r|)
-j = sphBess([1.0, 2.5], [0.0, 0.1, 0.2], 3)
-
-legendre_sphPlm(2, 1, 0.5)                        # normalized P̄_2^1(0.5), GSL convention
+# j_l(q·r) for l = 0..lMax at one radius, every q: pass 1 fills the ratios and the
+# anchors j₀ (jm2), j₁ (jm1); pass 2 steps upward, each value already normalized
+q, r, lMax = [0.0, 0.1, 0.2], 2.5, 3
+b = sphBess(length(q), lMax)
+sphBessRatios!(b, r, q, lMax)
+j = zeros(lMax + 1, length(q))
+j[1, :] .= b.jm2[1:3]; j[2, :] .= b.jm1[1:3]
+for l in 2:lMax, k in eachindex(q)
+    v = sphBessStep(b.jm1[k], b.jm2[k], l, b.lup[k], b.invx[k], b.R[k, l])
+    b.jm2[k], b.jm1[k] = b.jm1[k], v
+    j[l + 1, k] = v
+end
 ```
 
 ### The full forward model
@@ -121,4 +129,4 @@ v  = contrast_vector(0.334, 1.0)                    # 3-species [1, -dns, dro]
 I_calc = intensity_calc(intensity(G, v), 1.0, 0.0)
 ```
 
-`compute_B_lm` accepts a backend::Type{<:AbstractArray} keyword (default Array) so per-chunk compute buffers can be moved off-CPU (e.g. CUDA.CuArray) without changing the call site.
+`compute_B_lm` works in real arithmetic. Per degree l, `[Re B_l; Im B_l] = [Re Y_l; −Im Y_l] · W_l`, with `W_l[i, q] = f(i, q)·j_l(q·r_i)` for each real amplitude column (Re f, plus Im f when f is anomalous). That is one OpenBLAS product per degree and column, accumulated in place. W is filled directly by the spherical Bessel sweep (`sphBessRatios!`, then `sphBessStep` upward), so no j array is ever stored. It is built for `B_LM_TILE` atoms and a q-tile sized to fit `B_LM_W_BYTES`; all buffers are allocated once per call. `species_multipoles` computes the vacuum and excluded-volume multipoles in one shared pass (`_compute_B_lm` with both amplitude sets), timed as the single stage "vacuum + excluded volume (vols + B_lm)". OpenBLAS's own thread count applies to the products (default 4); set `LinearAlgebra.BLAS.set_num_threads(1)` if Julia-level threads are added later.

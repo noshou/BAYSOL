@@ -15,6 +15,7 @@ using BAYSOL
 using BAYSOL.AtomicRadii: AtomicRadii, RadiiSource
 using BAYSOL.MolecularStructure: MolecularStructure, Molecule
 using BAYSOL.SASA: SASA
+using BAYSOL.Constants: PROBE_RADIUS
 using BAYSOL.Geometry.PlasticSequence: plastic_points
 using BAYSOL.Geometry.Metrics: blocked
 using Printf: @printf, @sprintf
@@ -70,13 +71,13 @@ function fcc_lattice(n::Int, a::Float64)
 end
 
 """
-    packed_cluster_scene(; probe = 1.4, r = 1.5, n = 4, a = 2.2, frac = 0.42) -> NamedTuple
+    packed_cluster_scene(; probe = PROBE_RADIUS, r = 1.5, n = 4, a = 2.2, frac = 0.42) -> NamedTuple
 
 A real packed object: `n³` FCC conventional cells of equal spheres (`r = 1.5`
 by default), trimmed to the sites within `a*n*frac` of the centroid 
 At the defaults this is 80 atoms, ~2/3 exposed and ~1/3 buried.
 """
-function packed_cluster_scene(; probe::Float64 = 1.4, r::Float64 = 1.5, n::Int = 4, a::Float64 = 2.2, frac::Float64 = 0.42)
+function packed_cluster_scene(; probe::Float64 = PROBE_RADIUS, r::Float64 = 1.5, n::Int = 4, a::Float64 = 2.2, frac::Float64 = 0.42)
     pts = fcc_lattice(n, a)
     ctr = ntuple(t -> sum(p[t] for p in pts) / length(pts), 3)
     keep = [p for p in pts if sqrt(sum((p[t] - ctr[t])^2 for t in 1:3)) ≤ a * n * frac]
@@ -133,14 +134,14 @@ end
 # --------------------------------------------------------------------------
 
 """
-    sasa_hydro_report(; probe = 1.4, n_target = nothing) -> Nothing
+    sasa_hydro_report(; probe = PROBE_RADIUS, n_target = nothing) -> Nothing
 
 Print the hydration-shell dummy cloud on [`packed_cluster_scene`](@ref): buried
 vs exposed atoms, and how the cloud behaves as the global budget varies. The
 area column should stay flat Budgets shown bracket CRYSOL's `--fb` range (`F(10) = 55` to
 `F(18) = 2584`, default `F(17) = 1597`).
 """
-function sasa_hydro_report(; probe::Float64 = 1.4, n_target::Union{Nothing,Int} = nothing)
+function sasa_hydro_report(; probe::Float64 = PROBE_RADIUS, n_target::Union{Nothing,Int} = nothing)
     sc = packed_cluster_scene(; probe)
     area, exposed = SASA.sasa(sc.mol; probe)
     println(sc.title, "  (probe = ", probe, ")")
@@ -168,7 +169,7 @@ end
 # --------------------------------------------------------------------------
 
 """
-    sasa_hydro_figure(; n_target = nothing, n_show = 400, probe = 1.4) -> Figure
+    sasa_hydro_figure(; n_target = nothing, n_show = 400, probe = PROBE_RADIUS) -> Figure
 
 The hydration-shell dummy cloud on a real packed object
 ([`packed_cluster_scene`](@ref), ~80 atoms): every accessible sample point from
@@ -182,7 +183,7 @@ test rather than being asserted alongside it.
 Split out from [`vis_sasa_hydro`](@ref) so the plot can be assembled, saved
 or inspected without a window.
 """
-function sasa_hydro_figure(; n_target::Union{Nothing,Int} = nothing, n_show::Int = 400, probe::Float64 = 1.4)
+function sasa_hydro_figure(; n_target::Union{Nothing,Int} = nothing, n_show::Int = 400, probe::Float64 = PROBE_RADIUS)
     sc = packed_cluster_scene(; probe)
     crds = MolecularStructure.coords_cartesian(sc.mol)
     rads = MolecularStructure.radii(sc.mol)
@@ -249,7 +250,7 @@ function sasa_hydro_figure(; n_target::Union{Nothing,Int} = nothing, n_show::Int
 end
 
 """
-    vis_sasa_hydro(; n_target = nothing, n_show = 400, probe = 1.4) -> Nothing
+    vis_sasa_hydro(; n_target = nothing, n_show = 400, probe = PROBE_RADIUS) -> Nothing
 
 Display [`sasa_hydro_figure`](@ref): the whole hydration-shell dummy cloud on a
 real ~80-atom packed cluster, plus the raw sample points on one buried and one
@@ -262,5 +263,5 @@ closed.
 -   `n_show`:   sample points drawn for the two highlighted atoms only.
 -   `probe`:    solvent probe radius.
 """
-vis_sasa_hydro(; n_target::Union{Nothing,Int} = nothing, n_show::Int = 400, probe::Float64 = 1.4) =
+vis_sasa_hydro(; n_target::Union{Nothing,Int} = nothing, n_show::Int = 400, probe::Float64 = PROBE_RADIUS) =
     wait(display(sasa_hydro_figure(; n_target, n_show, probe)))

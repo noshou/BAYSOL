@@ -8,7 +8,8 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 
 const IFACE = BAYSOL.FormFactor
 using BAYSOL.FormFactor: compute_form_factors, FF, FormFactorError,
-                                        FormFactorSourceTables, f0, f1f2, S_MAX
+                                        FormFactorSourceTables, f0, f1f2
+using BAYSOL.Constants: WK_S_MAX
 
 check_c(a, b) = abs(a - b) < 1e3 * DEFAULT_ATOL
 qvals = [0.1, 0.2]
@@ -69,7 +70,7 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
             w1 = max(w1, abs(g1 - a)); w2 = max(w2, abs(g2 - b) / abs(b))
         end
         @test n == 852
-        @test w1 < 1e-11                    # measured ~6e-14
+        @test w1 < 1e-2 * DEFAULT_ATOL      # measured ~6e-14
         @test exact2 / n > 0.98
         @test w2 < 1e-15
     end
@@ -207,8 +208,8 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
     @testset "f0 is guarded against out-of-range s rather than extrapolating" begin
         # The ionic fits carry large negative constant terms (fe3+: c = -61.93)
         # and go negative well past their fit range, so this is a hard error.
-        @test f0("fe3+", S_MAX) isa Float64
-        @test_throws FormFactorError f0("fe3+", S_MAX + 1e-9)
+        @test f0("fe3+", WK_S_MAX) isa Float64
+        @test_throws FormFactorError f0("fe3+", WK_S_MAX + 1e-9)
         @test_throws FormFactorError f0("fe3+", -1e-9)
         @test_throws FormFactorError f0("not_an_ion", 0.1)
     end

@@ -85,13 +85,13 @@ function _center(cs::Vector{NTuple{3,Float64}})::Matrix{Float64}
     n = length(cs)
     n == 0 && throw(MoleculeError("Empty coordinates"))
     sx = 0.0; sy = 0.0; sz = 0.0
-    @inbounds for c in cs
+    @inbounds @simd for c in cs
         sx += c[1]; sy += c[2]; sz += c[3]
     end
     nf = Float64(n)
     mx = sx / nf; my = sy / nf; mz = sz / nf
     out = Matrix{Float64}(undef, 3, n)
-    @inbounds for j in 1:n
+    @inbounds @simd for j in 1:n
         c = cs[j]
         out[1, j] = c[1] - mx; out[2, j] = c[2] - my; out[3, j] = c[3] - mz
     end

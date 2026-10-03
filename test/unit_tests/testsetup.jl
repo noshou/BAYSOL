@@ -11,4 +11,8 @@ if !@isdefined(check_float)
 
     check_float(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
     check_complex(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
+
+    # CRYSOL's default bulk-solvent electron density (its fixed --dns), e·Å⁻³: the
+    # conventional "bulk water" ρₑ input. Test-only, so it lives here, not in Constants.
+    const CRYSOL_SOLVENT_DENSITY = 0.334
 end

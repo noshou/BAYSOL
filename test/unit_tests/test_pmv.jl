@@ -19,7 +19,7 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 const IFACE = BAYSOL.PartialMolarVolumes
 using BAYSOL.PartialMolarVolumes:
     PartialMolarVolumes, PMVSrcTables, COMMON_TO_IUPAC
-using BAYSOL.Constants: AVOGADRO
+using BAYSOL.Constants: AVOGADRO, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER
 
 "Fully-qualified handle onto the submodule, for the private caches/tables below."
 const PMVMOD = BAYSOL.PartialMolarVolumes
@@ -64,8 +64,8 @@ end
         ]
         for (t, ρe_expected, u_expected) in ref
             ρe, u = IFACE.ρₑ_w(t)
-            @test close_(ρe, ρe_expected; atol = 1e-12)
-            @test close_(u, u_expected; atol = 1e-15)
+            @test close_(ρe, ρe_expected; atol = 1e-3 * DEFAULT_ATOL)
+            @test close_(u, u_expected; atol = 1e-6 * DEFAULT_ATOL)
         end
     end
 
@@ -76,7 +76,7 @@ end
         # every temperature.
         u_ref = IFACE.ρₑ_w(0.0)[2]
         for t in (1.0, 22.5, 49.9, 88.0, 133.3, 150.0)
-            @test close_(IFACE.ρₑ_w(t)[2], u_ref; atol = 1e-19)
+            @test close_(IFACE.ρₑ_w(t)[2], u_ref; atol = 1e-10 * DEFAULT_ATOL)
         end
     end
 
@@ -122,8 +122,8 @@ end
         first  = IFACE.ρₑ_w(t_a)
         second = IFACE.ρₑ_w(t_b)                  # served from t_a's cache slot
         @test second === first
-        @test !close_(second[1], 0.3175976147955338; atol = 1e-12)  # t_b's *true* value
-        @test close_(second[1], 0.317597717642839; atol = 1e-12)    # t_a's value, reused
+        @test !close_(second[1], 0.3175976147955338; atol = 1e-3 * DEFAULT_ATOL)  # t_b's *true* value
+        @test close_(second[1], 0.317597717642839; atol = 1e-3 * DEFAULT_ATOL)    # t_a's value, reused
     end
 
     #------------------------------------------------------------------
@@ -169,7 +169,7 @@ end
             e, v, u = IFACE.ϕ°(4.0, fresh_seq("D"); σ_pH = σ)
             @test e == 70          # backbone(30) + D(30) + formation-water(10)
             @test close_(v, v_expected)
-            @test close_(u, u_expected; atol = 1e-9)
+            @test close_(u, u_expected)
         end
     end
 
@@ -190,8 +190,8 @@ end
         pKa = 4.0
         quiet = IFACE.ϕ°(pKa - 30.0, fresh_seq("D"); σ_pH = 5.0)
         hush  = IFACE.ϕ°(pKa - 30.0, fresh_seq("D"); σ_pH = 0.0)
-        @test close_(quiet[2], hush[2]; atol = 1e-6)
-        @test close_(quiet[3], hush[3]; atol = 1e-6)
+        @test close_(quiet[2], hush[2]; atol = 1e3 * DEFAULT_ATOL)
+        @test close_(quiet[3], hush[3]; atol = 1e3 * DEFAULT_ATOL)
     end
 
     @testset "ϕ°(pH, seq; σ_pH): wildcard averaging applies σ_pH only to the ionizable half" begin
@@ -202,7 +202,7 @@ end
         e, v, u = IFACE.ϕ°(4.0, "B"; σ_pH = 0.2)
         @test e == 70                     # backbone(30) + round((30+30)/2) + formation-water(10)
         @test close_(v, v_expected)
-        @test close_(u, 0.7194837134862498; atol = 1e-9)
+        @test close_(u, 0.7194837134862498)
     end
 
     @testset "ϕ°(pH, seq): every ionizable residue saturates correctly at extreme pH" begin
@@ -217,7 +217,7 @@ end
             e_lo, v_lo, _ = IFACE.ϕ°(pKa - 30.0, fresh_seq(res))
             e_hi, v_hi, _ = IFACE.ϕ°(pKa + 30.0, fresh_seq(res))
             @test e_lo == e_hi          # electron count is pH-independent everywhere
-            @test close_(v_lo - v_hi, dv; atol = 1e-6)
+            @test close_(v_lo - v_hi, dv; atol = 1e3 * DEFAULT_ATOL)
         end
     end
 
@@ -240,21 +240,21 @@ end
         # J = Leu/Ile, both non-ionizable -> pH-independent closed form.
         z, v, u = IFACE.ϕ°(7.0, "J"^1000)
         @test z == 62010
-        @test close_(v, 102000.0; atol = 1e-6)
-        @test close_(u, 4.743416490252559; atol = 1e-6)
+        @test close_(v, 102000.0; atol = 1e3 * DEFAULT_ATOL)
+        @test close_(u, 4.743416490252559; atol = 1e3 * DEFAULT_ATOL)
 
         # B = Asp/Asn, Asp ionizable -> evaluated at Asp's own pKa (4.0) for
         # an exact 0.5 sigmoid midpoint.
         zb, vb, ub = IFACE.ϕ°(4.0, "B"^1500)
         @test zb == 90010
-        @test close_(vb, 100837.49999999524; atol = 1e-4)
-        @test close_(ub, 6.982120021884522; atol = 1e-6)
+        @test close_(vb, 100837.49999999524; atol = 1e5 * DEFAULT_ATOL)
+        @test close_(ub, 6.982120021884522; atol = 1e3 * DEFAULT_ATOL)
 
         # Z = Glu/Gln, Glu ionizable -> evaluated at Glu's own pKa (4.4).
         zz, vz, uz = IFACE.ϕ°(4.4, "Z"^800)
         @test zz == 54410
-        @test close_(vz, 66960.00000000169; atol = 1e-6)
-        @test close_(uz, 10.770329614269151; atol = 1e-6)
+        @test close_(vz, 66960.00000000169; atol = 1e3 * DEFAULT_ATOL)
+        @test close_(uz, 10.770329614269151; atol = 1e3 * DEFAULT_ATOL)
     end
 
     @testset "ϕ°(pH, seq): 'X'/'*' are no-ops" begin
@@ -275,8 +275,8 @@ end
         N = 5000
         z, v, u = IFACE.ϕ°(7.0, "G"^N)
         @test z == 30 * N + 10
-        @test close_(v, 37.4 * N; atol = 1e-4)
-        @test close_(u, sqrt(N * 0.1^2); atol = 1e-9)
+        @test close_(v, 37.4 * N; atol = 1e5 * DEFAULT_ATOL)
+        @test close_(u, sqrt(N * 0.1^2))
     end
 
     @testset "ϕ°(pH, seq): very long ionizable chain at its own pKa (closed form, N=3000)" begin
@@ -285,8 +285,8 @@ end
         @test z == 60 * N + 10
         per_v = 37.4 + (31.7 - 12.1 * 0.5)
         per_sqr_u = 0.1^2 + (0.1^2 + (0.4 * 0.5)^2)
-        @test close_(v, per_v * N; atol = 1e-4)
-        @test close_(u, sqrt(per_sqr_u * N); atol = 1e-6)
+        @test close_(v, per_v * N; atol = 1e5 * DEFAULT_ATOL)
+        @test close_(u, sqrt(per_sqr_u * N); atol = 1e3 * DEFAULT_ATOL)
     end
 
     @testset "ϕ°(pH, seq): real protein (hen egg-white lysozyme, 129 aa)" begin
@@ -302,8 +302,8 @@ end
             # different computation at each of the 3 pH values.
             e, v, u = IFACE.ϕ°(pH, fresh_seq(LYSOZYME))
             @test e == e_expected
-            @test close_(v, v_expected; atol = 1e-6)
-            @test close_(u, u_expected; atol = 1e-6)
+            @test close_(v, v_expected; atol = 1e3 * DEFAULT_ATOL)
+            @test close_(u, u_expected; atol = 1e3 * DEFAULT_ATOL)
         end
         # Textbook globular-protein partial specific volume is ~0.70-0.75
         # cm3/g (see e.g. Svergun/Koch SAXS reviews); lysozyme's mature-chain
@@ -320,8 +320,8 @@ end
         k = 50
         zk, vk, uk = IFACE.ϕ°(7.4, LYSOZYME^k)
         @test zk == k * (z1 - 10) + 10
-        @test close_(vk, k * v1; atol = 1e-3)
-        @test close_(uk, sqrt(k) * u1; atol = 1e-6)
+        @test close_(vk, k * v1; atol = 1e6 * DEFAULT_ATOL)
+        @test close_(uk, sqrt(k) * u1; atol = 1e3 * DEFAULT_ATOL)
     end
 
     @testset "ϕ°(pH, seq): argument errors" begin
@@ -338,8 +338,8 @@ end
         low_pH_result  = IFACE.ϕ°(1.0, seq)   # nearly fully protonated
         high_pH_result = IFACE.ϕ°(13.0, seq)  # nearly fully deprotonated -- ignored!
         @test high_pH_result == low_pH_result
-        @test close_(low_pH_result[2], 276.35164835164835; atol = 1e-6)   # the pH=1 answer...
-        @test !close_(high_pH_result[2], 228.0000000484; atol = 1e-3)     # ...NOT the pH=13 one
+        @test close_(low_pH_result[2], 276.35164835164835; atol = 1e3 * DEFAULT_ATOL)   # the pH=1 answer...
+        @test !close_(high_pH_result[2], 228.0000000484; atol = 1e6 * DEFAULT_ATOL)     # ...NOT the pH=13 one
     end
 
     @testset "ϕ°(pH, seq): non-String AbstractString inputs (e.g. SubString) work" begin
@@ -375,7 +375,7 @@ end
                     "magnesium dichloride")
             e, v, u = IFACE.ϕ°(name)
             @test (e, v) == (PMVMOD._solutes[name][1], PMVMOD._solutes[name][2])
-            @test close_(u, avg_u; atol = 1e-6)
+            @test close_(u, avg_u; atol = 1e3 * DEFAULT_ATOL)
         end
         # confirm those really are the `nothing`-uncertainty rows, i.e.
         # the test above is exercising the backfill path and not coincidence
@@ -456,12 +456,12 @@ end
         # per PMV.jl's own comment on that line), then convert to cm3/mol:
         # 1e27*v is in A^3/mol, and 1 A^3 = 1e-24 cm3, so v0_water_cm3_per_mol
         # = (1e27*v) * 1e-24 = 1e3*v = AVOGADRO*10/(1e24*rho_e_w25).
-        v0_water = AVOGADRO * 10 / (1e24 * ρe_w25)
+        v0_water = AVOGADRO * WATER_ELECTRONS / (ANGSTROM3_PER_LITER / CM3_PER_LITER * ρe_w25)
         @test close_(v0_water, 18.0687; atol = 1e-3)  # textbook molar volume of water, ~18.07 cm3/mol
 
         n_water = 1000.0 / v0_water                    # mol water per 1 L reference volume
         baseline_volume = n_water * v0_water
-        @test close_(baseline_volume, 1000.0; atol = 1e-9)
+        @test close_(baseline_volume, 1000.0)
 
         _, v_tris, _ = IFACE.ϕ°("tris")
         _, v_nacl, _ = IFACE.ϕ°("sodium chloride")

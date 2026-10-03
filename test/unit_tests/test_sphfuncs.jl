@@ -4,7 +4,29 @@
 # (Unsold's theorem, the Y = P̄ e^{imφ} definition, the Bessel recurrence).
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, legendre_sphPlm, SphHarmError, SphBessError
+using BAYSOL.Scattering.SphFuncs: sphHarm, SphHarmError, sphBess, sphBessRatios!, sphBessStep
+using LegendrePolynomials: Plm
+using SpecialFunctions: sphericalbesselj
+
+# independent reference for sphHarm: normalized P̄_l^m(x), Condon–Shortley phase (GSL convention)
+legendre_sphPlm(l, m, x) = Plm(float(x), l, m; norm = Val(:normalized), csphase = true) / sqrt(2π)
+
+# jₗ(q·r) for l = 0..lMax, every q, from the two passes a caller runs:
+# sphBessRatios! (pass 1), then sphBessStep upward from j₀, j₁ (pass 2)
+function bess(r, q::Vector{Float64}, lMax; b = sphBess(length(q), lMax))
+    sphBessRatios!(b, Float64(r), q, lMax)
+    j = zeros(lMax + 1, length(q))
+    for k in eachindex(q)
+        j[1, k] = b.jm2[k]
+        lMax ≥ 1 && (j[2, k] = b.jm1[k])
+    end
+    for l in 2:lMax, k in eachindex(q)
+        v = sphBessStep(b.jm1[k], b.jm2[k], l, b.lup[k], b.invx[k], b.R[k, l])
+        b.jm2[k], b.jm1[k] = b.jm1[k], v
+        j[l + 1, k] = v
+    end
+    return j
+end
 
 y00 = 1.0 / (2.0 * sqrt(π))
 y10(θ) = sqrt(3.0 / (4.0 * π)) * cos(θ)
@@ -139,97 +161,116 @@ j2(x) = x == 0.0 ? 0.0 : (3.0 / x^3 - 1.0 / x) * sin(x) - 3.0 * cos(x) / x^2
         @test size(sphHarm(0, [1.0], [1.0])) == (1, 1)
     end
 
-    @testset "sphBess known values" begin
-        for x in (1.0, 0.0)
-            j = sphBess([x], [1.0], 1)
-            @test check_float(j0(x), j[1, 1, 1])
-            @test check_float(j1(x), j[2, 1, 1])
-        end
-    end
-
-    @testset "sphBess closed forms for l = 0, 1, 2" begin
-        rs = [0.0, 0.5, 1.0, 3.7]; qs = [0.0, 0.25, 2.0]
-        j = sphBess(rs, qs, 2)
-        for (qi, q) in enumerate(qs), (ri, r) in enumerate(rs)
-            x = q * r
-            @test check_float(j[1, qi, ri], j0(x))
-            @test check_float(j[2, qi, ri], j1(x))
-            @test check_float(j[3, qi, ri], j2(x))
-        end
-    end
-
-    @testset "sphBess shape is (lMax+1, |q|, |r|)" begin
-        j = sphBess([1.0, 2.0, 3.0], [0.1, 0.2], 3)
-        @test j isa Array{Float64,3}
-        @test size(j) == (4, 2, 3)
-        @test size(sphBess([1.0], [1.0], 0)) == (1, 1, 1)
-        # a bigger lMax only appends the leading dimension
-        @test sphBess([1.0, 2.0], [0.5], 2) ≈ sphBess([1.0, 2.0], [0.5], 5)[1:3, :, :] rtol = 1e-14
-    end
-
-    @testset "sphBess depends only on the product q*r" begin
-        @test sphBess([2.0], [3.0], 4)[:, 1, 1] == sphBess([3.0], [2.0], 4)[:, 1, 1]
-        @test sphBess([1.0], [6.0], 4)[:, 1, 1] == sphBess([6.0], [1.0], 4)[:, 1, 1]
-        # and the (q, r) grid really is the outer product
-        j = sphBess([1.0, 2.0], [3.0, 5.0], 3)
-        for (qi, q) in enumerate([3.0, 5.0]), (ri, r) in enumerate([1.0, 2.0])
-            @test j[:, qi, ri] == sphBess([q * r], [1.0], 3)[:, 1, 1]
-        end
-    end
-
-    @testset "sphBess: j_l(0) = delta_{l0}" begin
-        for (rs, qs) in (([0.0], [1.0]), ([1.0], [0.0]), ([0.0], [0.0]))
-            j = sphBess(rs, qs, 5)
-            @test check_float(j[1, 1, 1], 1.0)
-            @test all(l -> check_float(j[l, 1, 1], 0.0), 2:6)
-        end
-    end
-
-    @testset "sphBess satisfies the three-term recurrence" begin
-        # j_{l-1}(x) + j_{l+1}(x) = (2l+1)/x * j_l(x)
-        lMax = 8
-        for x in (0.1, 1.0, 2.5, 7.3, 30.0)
-            j = sphBess([x], [1.0], lMax)
-            for l in 1:(lMax - 1)
-                @test check_float(j[l, 1, 1] + j[l + 2, 1, 1], (2l + 1) / x * j[l + 1, 1, 1])
+    @testset "Gautschi sweep: closed forms for l = 0, 1, 2" begin
+        q = [0.0, 0.25, 0.5, 1.0, 2.0, 3.7, 7.4]
+        for r in (0.0, 1.0, 2.3)
+            j = bess(r, q, 2)
+            for (k, qk) in enumerate(q)
+                x = qk * r
+                @test check_float(j[1, k], j0(x))
+                @test check_float(j[2, k], j1(x))
+                @test check_float(j[3, k], j2(x))
             end
         end
     end
 
-    @testset "sphBess: bounds and small-x asymptotics" begin
-        j = sphBess([1.0], collect(0.05:0.37:10.0), 6)
-        @test all(isfinite, j)
-        @test all(v -> abs(v) ≤ 1.0 + 1e-12, j)      # |j_l(x)| ≤ 1 for real x ≥ 0
-        # j_l(x) -> x^l / (2l+1)!! as x -> 0
-        x = 1.0e-3
-        js = sphBess([x], [1.0], 4)
-        dfact = 1.0
-        for l in 0:4
-            l > 0 && (dfact *= (2l + 1))
-            @test isapprox(js[l + 1, 1, 1], x^l / dfact; rtol = 1e-5)
+    @testset "Gautschi sweep matches SpecialFunctions.sphericalbesselj" begin
+        # includes zeros of j₀ (x = kπ), the switch point near x ≈ l, and x on both
+        # sides of lMax
+        xs = vcat([1e-6, 1e-3, 0.1, 0.999, 1.0, 1.001, π, 2π, 4.4934, 25.0, 25.5, 26.0],
+                  collect(range(0.05, 120.0; length = 300)))
+        for lMax in (0, 1, 5, 25, 60)
+            j = bess(1.0, xs, lMax)
+            for (k, x) in enumerate(xs)
+                ref = [sphericalbesselj(l, x) for l in 0:lMax]
+                # error relative to the largest |jₗ(x)| over all orders, not just ≤ lMax:
+                # with lMax = 0 near a zero of j₀ that scale would itself be ~0
+                scale = maximum(abs(sphericalbesselj(l, x)) for l in 0:(ceil(Int, x) + 10))
+                @test maximum(abs.(j[:, k] .- ref)) ≤ 1e-13 * scale
+            end
         end
     end
 
-    @testset "sphBess accepts non-Float64 inputs" begin
-        @test sphBess([1, 2], [1], 2) ≈ sphBess([1.0, 2.0], [1.0], 2)
-        @test sphBess(0.0:1.0:2.0, 1.0:1.0:1.0, 2) ≈ sphBess([0.0, 1.0, 2.0], [1.0], 2)
+    @testset "Gautschi sweep: j_l(0) = delta_{l0} exactly" begin
+        for (r, q) in ((0.0, [1.0]), (1.0, [0.0]), (0.0, [0.0]))
+            @test bess(r, q, 5)[:, 1] == [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        end
     end
 
-    @testset "sphBess exception contract" begin
-        @test_throws SphBessError sphBess(Float64[], [1.0], 1)
-        @test_throws SphBessError sphBess([1.0], Float64[], 1)
-        @test_throws SphBessError sphBess(Float64[], Float64[], 1)
-        @test_throws SphBessError sphBess([-1.0], [1.0], 1)
-        @test_throws SphBessError sphBess([1.0, -1e-12], [1.0], 1)   # any negative entry
-        @test_throws SphBessError sphBess([1.0], [-1.0], 1)
-        @test_throws SphBessError sphBess([1.0], [1.0, -1.0], 1)
-        @test_throws SphBessError sphBess([1.0], [1.0], -1)
-        @test_throws SphBessError sphBess([1.0], [1.0], -7)
+    @testset "Gautschi sweep satisfies the three-term recurrence" begin
+        # j_{l-1}(x) + j_{l+1}(x) = (2l+1)/x * j_l(x), on both sides of the switch point
+        lMax = 8
+        xs = [0.1, 1.0, 2.5, 7.3, 30.0]
+        j = bess(1.0, xs, lMax)
+        for (k, x) in enumerate(xs), l in 1:(lMax - 1)
+            @test check_float(j[l, k] + j[l + 2, k], (2l + 1) / x * j[l + 1, k])
+        end
+    end
+
+    @testset "Gautschi sweep: bounds and small-x asymptotics" begin
+        j = bess(1.0, collect(0.05:0.37:10.0), 6)
+        @test all(isfinite, j)
+        @test all(v -> abs(v) ≤ 1.0 + 1e-12, j)      # |j_l(x)| ≤ 1 for real x ≥ 0
+        # j_l(x) -> x^l / (2l+1)!! as x -> 0 (j₁ here comes from j₀·r₁, not the
+        # closed form, which cancels catastrophically at this x)
+        x = 1.0e-3
+        js = bess(x, [1.0], 4)
+        dfact = 1.0
+        for l in 0:4
+            l > 0 && (dfact *= (2l + 1))
+            @test isapprox(js[l + 1, 1], x^l / dfact; rtol = 1e-5)
+        end
+    end
+
+    @testset "Gautschi sweep: no overflow at small x and large lMax" begin
+        # the ratios stay bounded; orders too small for Float64 underflow to 0
+        j = bess(1.0, [1e-300, 1e-100, 1e-6, 1e-3, 0.5], 200)
+        @test all(isfinite, j)
+        @test check_float(j[1, 1], 1.0)
+        @test isapprox(j[3, 4], (1e-3)^2 / 15; rtol = 1e-6)
+    end
+
+    @testset "sphBessRatios!: each q is independent of the rest of the grid" begin
+        q = [0.0, 0.05, 0.3, 1.1, 4.0, 9.5]
+        j = bess(2.0, q, 10)
+        for (k, qk) in enumerate(q)
+            @test j[:, k] == bess(2.0, [qk], 10)[:, 1]
+        end
+        # and only the product q*r matters
+        @test bess(2.0, [3.0], 4) == bess(3.0, [2.0], 4)
+    end
+
+    @testset "sphBessRatios!: outputs" begin
+        q = [0.0, 0.1, 0.3, 3.0]                        # x = 0, 1, 3, 30
+        b = sphBess(6, 8)                               # buffers may be larger than needed
+        @test sphBessRatios!(b, 10.0, q, 5) === nothing
+        @test b.x[1:4] == 10.0 .* q
+        @test b.invx[1] == 0.0 && b.invx[2:4] ≈ 1 ./ (10.0 .* q[2:4])
+        @test b.lup[1:4] == floor.(Int, 10.0 .* q)
+        @test b.N[4] == -1                              # ⌊x⌋ = 30 ≥ lMax: no ratios needed
+        @test all(b.N[2:3] .≥ max.(5, ceil.(Int, 10.0 .* q[2:3])))
+        @test b.jm2[1] == 1.0 && b.jm1[1] == 0.0        # j₀(0), j₁(0)
+        @test bess(10.0, q, 5; b = sphBess(6, 8)) == bess(10.0, q, 5)
+    end
+
+    @testset "sphBessStep: recurrence up to ⌊x⌋, ratio above" begin
+        @test sphBessStep(2.0, 1.0, 3, 5, 0.5, 0.25) == muladd(5 * 0.5, 2.0, -1.0)   # l ≤ ⌊x⌋
+        @test sphBessStep(2.0, 1.0, 6, 5, 0.5, 0.25) == 2.0 * 0.25                  # l > ⌊x⌋
+        @test sphBessStep(2.0, 1.0, 3, 5, 0.5, 0.25) isa Float64
+    end
+
+    @testset "sphBess / sphBessRatios! exception contract" begin
+        @test_throws DomainError sphBess(-1, 2)
+        @test_throws DomainError sphBess(2, -1)
+        @test_throws ArgumentError sphBessRatios!(sphBess(2, 2), 1.0, [0.1, 0.2, 0.3], 2)   # too few q
+        @test_throws ArgumentError sphBessRatios!(sphBess(3, 2), 1.0, [0.1, 0.2, 0.3], 4)   # too few orders
+        @test_throws DomainError sphBessRatios!(sphBess(1, 2), -1.0, [0.1], 2)
+        @test_throws DomainError sphBessRatios!(sphBess(1, 2), 1.0, [0.1], -1)
         # 0 is on the allowed side of every boundary
-        @test size(sphBess([0.0], [0.0], 0)) == (1, 1, 1)
+        @test sphBessRatios!(sphBess(1, 0), 0.0, [0.0], 0) === nothing
     end
 
-    @testset "legendre_sphPlm closed forms" begin
+    @testset "reference P̄_l^m closed forms" begin
         for x in (-1.0, -0.6, 0.0, 0.25, 1.0)
             @test check_float(legendre_sphPlm(0, 0, x), 1.0 / (2.0 * sqrt(π)))
             @test check_float(legendre_sphPlm(1, 0, x), sqrt(3.0 / (4.0 * π)) * x)

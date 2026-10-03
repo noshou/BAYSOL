@@ -11,7 +11,8 @@ using ..Geometry.Metrics: Metrics, ALL_EXPOSED, ALL_BURIED, classify, blocked
 using NearestNeighbors: inrange
 using ..MolecularStructure: Molecule, radii, r_max, coords_cartesian, neighbour_tree
 using ..BAYSOL_Utils.Constants: SHELL_AREA_PER_POINT, SHELL_MIN_POINTS, _SHELL_SAMPLE,
-    _BEAD_RAY_RANGE, _BEAD_RAY_DIRS, _BEAD_CONVEX_ESCAPE
+    _BEAD_RAY_RANGE, _BEAD_RAY_DIRS, _BEAD_CONVEX_ESCAPE, PROBE_RADIUS, SHELL_N_TARGET,
+    SASA_N_OCC, SASA_N_EXP, SASA_AREA_TOL
 
 """
     BeadClass
@@ -115,8 +116,8 @@ then carries an equal sum(area)/M, so sum(areas) still matches sum(sasa(mol)[1])
 - `mol`: molecule whose surface to sample.
 
 # Keywords
--   `probe`: solvent probe radius in Å; probe ≥ 0. Default 1.4 (water).
--   `n_target`: total points to keep; > 0. Default nothing, deriving it from
+-   `probe`: solvent probe radius in Å; probe ≥ 0. Default [`PROBE_RADIUS`](@ref) (water, 1.4).
+-   `n_target`: total points to keep; > 0. Default [`SHELL_N_TARGET`](@ref) (nothing), deriving it from
     the accessible area via [`SHELL_AREA_PER_POINT`](@ref) so spacing stays fixed
     as the molecule grows. A cloud already smaller than the budget is kept whole.
 
@@ -132,8 +133,8 @@ M is 0 for a molecule with no accessible surface; pts is then (3, 0).
 """
 function shell_points(
     mol::Molecule;
-    probe::Float64                  = 1.4,
-    n_target::Union{Nothing,Int}    = nothing
+    probe::Float64                  = PROBE_RADIUS,
+    n_target::Union{Nothing,Int}    = SHELL_N_TARGET
 )::Tuple{Matrix{Float64},Vector{Float64},Vector{BeadClass}}
     n_target === nothing || n_target > 0 ||
         throw(DomainError(n_target, "n_target must be > 0"))
@@ -214,7 +215,7 @@ function _shell_loop(
 
     pts = Matrix{Float64}(undef, 3, length(areas))
     nrm = Matrix{Float64}(undef, 3, length(areas))
-    @inbounds for k in eachindex(areas)
+    @inbounds @simd for k in eachindex(areas)
         pts[1, k] = xs[k]; pts[2, k] = ys[k]; pts[3, k] = zs[k]
         nrm[1, k] = nx[k]; nrm[2, k] = ny[k]; nrm[3, k] = nz[k]
     end
@@ -261,18 +262,18 @@ the sphere could still be exposed.
 - `mol`: molecule to score.
 
 # Keywords
-- `probe`:      solvent probe radius; probe ≥ 0. Default 1.4 Å is the radius of a
+- `probe`:      solvent probe radius; probe ≥ 0. Default [`PROBE_RADIUS`](@ref) (1.4 Å) is the radius of a
                 water molecule and is the convention for SASA calculations.
-- `n_occ`:      points for the witness pass; n_occ > 0. 512 is the smallest round count
-                measured to lose no area on a dense lattice. Catches any atom exposed by more
-                than ~1/512 of its sphere, about 0.2 Å²
-- `n_exp`:      Points per atom for the exposed-fraction pass. Default measured relative error
-                against the analytic two-sphere cap: 1.3 % at 64 points, 0.36 % at 1024, **0.065 %
-                at 4096**, 0.02 % at 16384. Costs ~0.09 ms/atom.
+- `n_occ`:      points for the witness pass; 0 < n_occ ≤ n_exp. Default [`SASA_N_OCC`](@ref)
+                (512) is the smallest round count measured to lose no area on a dense lattice.
+                Catches any atom exposed by more than ~1/512 of its sphere, about 0.2 Å²
+- `n_exp`:      Points per atom for the exposed-fraction pass. Default [`SASA_N_EXP`](@ref)
+                (4096); measured relative error against the analytic two-sphere cap: 1.3 % at
+                64 points, 0.36 % at 1024, **0.065 % at 4096**, 0.02 % at 16384. Costs ~0.09 ms/atom.
 - `area_tol`:   if no exposed point is found in n_occ samples, the atom might still
                 have a tiny exposed patch (≤ 3/n_occ of its sphere). If that worst‑case area is
-                below area_tol, we skip the full n_exp pass and treat it as buried.
-                Default 2.0 Å².
+                below area_tol, we skip the full n_exp pass and treat it as buried; area_tol ≥ 0.
+                Default [`SASA_AREA_TOL`](@ref) (2.0 Å²).
 
 # Returns
 - `area`: (n,), indexed like coords_cartesian(mol)'s columns.
@@ -280,10 +281,10 @@ the sphere could still be exposed.
 """
 function sasa(
     mol::Molecule;
-    probe::Float64    = 1.4,
-    n_occ::Int        = 512,
-    n_exp::Int        = 4096,
-    area_tol::Float64 = 2.0
+    probe::Float64    = PROBE_RADIUS,
+    n_occ::Int        = SASA_N_OCC,
+    n_exp::Int        = SASA_N_EXP,
+    area_tol::Float64 = SASA_AREA_TOL
 )::Tuple{Vector{Float64},Vector{Bool}}
 
     _check_sasa_args(probe, n_occ, n_exp, area_tol)
