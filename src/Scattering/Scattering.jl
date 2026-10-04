@@ -171,7 +171,7 @@ module Scattering
 using ..FormFactor: FormFactor, FormFactorSource, FormFactorSourceTables
 using ..SASA: SASA
 using ..BAYSOL_Utils.Constants: SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, DRO_UNIT, B_LM_CHUNK,
-    B_LM_TILE, B_LM_W_BYTES
+    B_LM_TILE, B_LM_W_BYTES, BESSEL_CUTOFF
 using StaticArrays: SVector
 using DocStringExtensions
 

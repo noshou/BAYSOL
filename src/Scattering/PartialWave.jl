@@ -184,6 +184,21 @@ function _compute_B_lm(
         W  = Array{Float64,3}(undef, ncol * Qt, T, L + 1)   # W[(c-1)Qt + k, t, l+1]
         sb = sphBess(Qt, L)
 
+        # Negligible-Bessel cut: |jₗ(x)| ≤ xˡ/(2l+1)!! for all x ≥ 0 (from
+        # |J_ν(x)| ≤ (x/2)^ν/Γ(ν+1), ν ≥ −1/2), so jₗ(x) ≤ BESSEL_CUTOFF whenever
+        # x < x_cut(l) = (BESSEL_CUTOFF·(2l+1)!!)^(1/l). For a tile with largest radius
+        # r_max, degree l contributes nothing at q < x_cut(l)/r_max; with q ascending
+        # those columns are a prefix, skipped below in the W writes and the product.
+        # Unsorted q: no cut.
+        qsorted = issorted(qv)
+        xcut = zeros(L + 1)
+        lndf = 0.0                      # ln((2l+1)!!)
+        for l in 1:L
+            lndf += log(2l + 1.0)
+            xcut[l + 1] = exp((log(BESSEL_CUTOFF) + lndf) / l)
+        end
+        ks = ones(Int, L + 1)           # first q column (within the q-tile) kept for degree l
+
         for start in 1:Int(_CHUNK):N
             # _CHUNK is a UInt64; keep the index Int (a UInt64 range underflows
             # when reindexed by a nested view)
@@ -226,13 +241,19 @@ function _compute_B_lm(
                 for (ti, qt) in enumerate(qtiles)
                     q0 = (ti - 1) * Qt + 1
                     nq = length(qt)
+                    if qsorted
+                        rmax = maximum(i -> Float64(coords_sph[1, idx[i]]), ts)
+                        for l in 1:L
+                            ks[l + 1] = searchsortedfirst(qt, xcut[l + 1] / rmax)
+                        end
+                    end
 
                     # W for every atom of the tile, every degree, every column
                     for (tt, i) in enumerate(ts)
                         sphBessRatios!(sb, Float64(coords_sph[1, idx[i]]), qt, L)
                         jm1, jm2 = sb.jm1, sb.jm2      # j₁, j₀ after pass 1
-                        _write_W!(W, Ft, jm2, ncol, q0, nq, Qt, tt, i, 0)
-                        L ≥ 1 && _write_W!(W, Ft, jm1, ncol, q0, nq, Qt, tt, i, 1)
+                        _write_W!(W, Ft, jm2, ncol, q0, ks[1], nq, Qt, tt, i, 0)
+                        L ≥ 1 && _write_W!(W, Ft, jm1, ncol, q0, ks[2], nq, Qt, tt, i, 1)
                         for l in 2:L
                             lup, invx, R = sb.lup, sb.invx, sb.R
                             @inbounds @fastmath @simd for k in 1:nq
@@ -240,19 +261,21 @@ function _compute_B_lm(
                                 jm2[k] = jm1[k]
                                 jm1[k] = v
                             end
-                            _write_W!(W, Ft, jm1, ncol, q0, nq, Qt, tt, i, l)
+                            _write_W!(W, Ft, jm1, ncol, q0, ks[l + 1], nq, Qt, tt, i, l)
                         end
                     end
 
                     # one real product per degree and column, accumulated in place (BLAS)
                     nt = length(ts)
                     for l in 0:L
+                        kk = ks[l + 1]
+                        kk > nq && continue     # the whole q-tile is below the cut
                         k0 = l * (l + 1) ÷ 2
                         rows = (2k0 + 1):(2k0 + 2(l + 1))
                         Al = view(A, rows, ts)
                         for c in 1:ncol
-                            mul!(view(Acc, rows, (c - 1) * Q .+ (q0:(q0 + nq - 1))), Al,
-                                 transpose(view(W, (c - 1) * Qt .+ (1:nq), 1:nt, l + 1)), 1.0, 1.0)
+                            mul!(view(Acc, rows, (c - 1) * Q .+ ((q0 + kk - 1):(q0 + nq - 1))), Al,
+                                 transpose(view(W, (c - 1) * Qt .+ (kk:nq), 1:nt, l + 1)), 1.0, 1.0)
                         end
                     end
                 end
@@ -284,7 +307,8 @@ end
 $(TYPEDSIGNATURES)
 
 W[(c−1)Qt + k, tt, l+1] = Ft[q0+k−1, c, i]·j[k] for every amplitude column c and
-k = 1..nq: degree l's slice of W for one atom, from its normalized jₗ over the q-tile.
+k = kstart..nq: degree l's slice of W for one atom, from its normalized jₗ over the
+q-tile (columns below kstart are under the negligible-Bessel cut and not used).
 
 # Returns
 - `nothing`.
@@ -295,6 +319,7 @@ k = 1..nq: degree l's slice of W for one atom, from its normalized jₗ over the
     j::Vector{Float64},
     ncol::Int, 
     q0::Int, 
+    kstart::Int, 
     nq::Int, 
     Qt::Int, 
     tt::Int, 
@@ -303,7 +328,7 @@ k = 1..nq: degree l's slice of W for one atom, from its normalized jₗ over the
 )::Nothing
     @inbounds for c in 1:ncol
         off = (c - 1) * Qt
-        @fastmath @simd for k in 1:nq
+        @fastmath @simd for k in kstart:nq
             W[off + k, tt, l + 1] = Ft[q0 + k - 1, c, i] * j[k]
         end
     end
