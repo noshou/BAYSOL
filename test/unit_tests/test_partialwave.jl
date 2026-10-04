@@ -8,6 +8,7 @@
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.Scattering: compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
+using BAYSOL.Constants: BESSEL_CUTOFF
 using BAYSOL.Scattering.SphFuncs: sphHarm
 using SpecialFunctions: sphericalbesselj
 using BAYSOL.MolecularStructure: create, coords_spherical, to_spherical
@@ -90,6 +91,24 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
                 @test check_complex(B[1, k, qi], ref[k, qi])
             end
         end
+    end
+
+    @testset "compute_B_lm: negligible-Bessel cut still matches the naive definition" begin
+        # small radii (x = q·r ≲ 2.4) at lMax = 12: most high-degree columns fall
+        # below x_cut(l) and are skipped, yet B must still match the full sum
+        lMax = 12
+        B = compute_B_lm(pw_sph, pw_q, pw_f, lMax, UInt64(2))
+        ref = pw_naive_B(pw_sph, pw_q, pw_f, lMax)
+        # each skipped term is ≤ BESSEL_CUTOFF·|f|·|Y_lm|, and |Y_lm| ≤ √((2l+1)/4π)
+        bound = size(pw_sph, 2) * BESSEL_CUTOFF * maximum(abs, pw_f) * sqrt((2lMax + 1) / 4π) + DEFAULT_ATOL
+        for k in 1:pw_nrows(lMax), qi in eachindex(pw_q)
+            @test abs(B[1, k, qi] - ref[k, qi]) ≤ bound
+        end
+        # unsorted q takes the uncut path: the same result within that bound
+        perm = [3, 1, 4, 2]
+        Bu = compute_B_lm(pw_sph, pw_q[perm], pw_f[:, perm], lMax, UInt64(2))
+        @test all(abs(Bu[1, k, j] - B[1, k, perm[j]]) ≤ bound for k in 1:pw_nrows(lMax), j in 1:4)
+        @test all(check_complex(Bu[1, k, j], ref[k, perm[j]]) for k in 1:pw_nrows(lMax), j in 1:4)
     end
 
     @testset "compute_B_lm output shape and element type" begin
