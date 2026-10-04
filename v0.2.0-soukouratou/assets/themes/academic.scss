@@ -1,0 +1,296 @@
+// SPDX-License-Identifier: LGPL-2.1-or-later
+
+// academic.scss
+// Ivory-oxford theme for Documenter.jl
+// Fonts:
+//   - Montserrat        -> titles, sidebar/nav, breadcrumb
+//   - TeX Gyre Pagella   -> body prose (docstring descriptions)
+//   - Fira Code          -> code, with ligatures enabled
+//
+// This overrides Documenter's built-in "documenter-light" theme *in place*
+// (Documenter: "Documenter copies all files under the source directory...
+// unless the user already had a file with the same name, in which case the
+//
+// IMPORTANT: unlike Documenter's own "custom theme" tutorial (which nests
+// everything in `html.theme--$(name) { ... }`, expecting the picker to add
+// that class to <html>), this file must NOT be scoped that way. The real
+// documenter-light.scss it replaces is entirely unscoped;  Documenter's
+// themeswap.js applies *no* class to <html> when the light/primary theme is
+// active (only non-primary themes get a `theme--<name>` class). A scoped
+// version of this file would never match anything and (as happened in an
+// earlier version of this file) silently fail to apply almost everywhere.
+//
+// Compile with:
+//   using DocumenterTools: Themes
+//   Themes.compile("academic.scss", "docs/src/assets/themes/documenter-light.css")
+
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-bolditalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Montserrat";
+  src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"), url("fonts/Montserrat[wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Fira Code";
+  src: url("fonts/FiraCode-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Fira Code";
+  src: url("fonts/FiraCode-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+}
+
+// Base palette + admonition colors, unchanged from Documenter's own
+// documenter-light.scss (documenter/variables.scss requires these to exist
+// before it's imported) -- not part of our reskin, just required plumbing.
+$red: #cb3c33 !default;
+$orange: #d56c00 !default;
+$yellow: #f4c72f !default;
+$green: #259a12 !default;
+$turquoise: #00a1b7 !default;
+$cyan: #3489da !default;
+$blue: #3c5dcd !default;
+$purple: #9558b2 !default;
+$info: $blue;
+$success: $green;
+$warning: adjust-color($yellow, $hue: 2, $saturation: 10, $lightness: -24);
+$danger: $red;
+$compat: $cyan;
+$todo: $purple;
+$admonition-default: hsl(0, 0%, 29%);
+$grey: hsl(0, 0%, 42%);
+
+// NOT `$background` -- that's Bulma's own core derived variable
+// ($background: $white-ter !default, bulma/utilities/derived-variables.sass),
+// consumed by dozens of unrelated components (tags, notifications,
+// dropdowns, modals, hr, admonitions). An earlier version of this file set
+// `$background` directly, which silently hijacked all of that.
+//
+// The actual page-background variable is `$body-background-color`
+// (bulma/base/generic.sass), which both `body` itself AND
+// `header.docs-navbar` (documenter/layout/_main.scss), footnotes, and
+// example blocks all read from -- setting it once, correctly, colors all
+// of those consistently. A hand-written `body { background: ... }` rule
+// (what an earlier version of this file did instead) only ever touches
+// `body` itself, leaving the navbar bar white and creating a visible seam
+// at the top of the page -- the actual variable is the fix, not a
+// competing CSS rule.
+$body-background-color: #faf7f0;
+// Same story for the sidebar: `#documenter .docs-sidebar { ... }` reads
+// `$documenter-sidebar-background`/`-color` and derives every hover/active
+// state from them (documenter/_overrides.scss) -- setting these directly
+// is the first-class way to theme the sidebar, and avoids re-fighting
+// Documenter's own selector specificity by hand (an earlier version of
+// this file tried plain `.docs-sidebar { background: ... }` overrides,
+// which either lost to Documenter's own higher-specificity rules or only
+// worked with `!important` in specific spots).
+$documenter-sidebar-background: #1d3557;
+$documenter-sidebar-color: #e8ecf3;
+$documenter-sidebar-menu-hover-background: #24406e;
+$documenter-sidebar-menu-hover-color: $documenter-sidebar-color;
+// No white-pill box for the active/current-page item -- text-only
+// distinction (white + bold, via the .is-active rule below), same
+// background as the rest of the sidebar.
+$documenter-sidebar-menu-active-background: $documenter-sidebar-background;
+$documenter-sidebar-menu-active-color: #ffffff;
+$documenter-sidebar-menu-active-hover-background: #24406e;
+$documenter-sidebar-menu-active-hover-color: #ffffff;
+
+$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif !default;
+$family-serif: "TeX Gyre Pagella", Palatino, Georgia, serif;
+$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace !default;
+$link: #1d3557;
+$link-hover: #14263e;
+
+@import "documenter/utilities";
+@import "documenter/variables";
+
+@import "bulma/utilities/all";
+@import "bulma/helpers/all";
+@import "bulma/base/all";
+
+@import "documenter/overrides";
+
+@import "bulma/elements/all";
+@import "bulma/form/all";
+@import "bulma/components/all";
+@import "bulma/grid/all";
+@import "bulma/layout/all";
+
+@import "documenter/elements";
+@import "documenter/components/all";
+@import "documenter/patches";
+@import "documenter/layout/all";
+
+@import "documenter/ansicolors";
+
+// highlight.js color scheme override for the julia> prompt (kept from the
+// original documenter-light.scss)
+code.language-julia-repl > span.hljs-meta {
+  color: $ansi-green;
+  font-weight: bolder;
+}
+
+@import "highlightjs/default";
+
+.gap-4 {
+  gap: 1rem;
+}
+
+// ---- Our own reskin, unscoped (applies unconditionally, see note above) --
+// Page/navbar background and sidebar colors are set via the real Sass
+// variables above, not hand-written rules here -- see the comments there.
+
+body {
+  color: #2b2b2b;
+}
+
+body,
+p,
+.content,
+.docstring > section > div {
+  font-family: $family-serif;
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: $family-sans-serif;
+  font-weight: 700;
+}
+
+// docstring signature / function name headings
+.docstring-binding,
+.docstring > header {
+  font-family: $family-sans-serif;
+  font-weight: 700;
+}
+
+// Sidebar background/text/hover/active colors all come from the
+// $documenter-sidebar-* variables above (including the package-name link,
+// via #documenter .docs-sidebar .docs-package-name a { color:
+// $documenter-sidebar-color }, documenter/layout/_sidebar.scss) -- only
+// font-family, the inactive-item muted color, and the active item's
+// text weight need a rule here (no background box for the active item --
+// see $documenter-sidebar-menu-active-background above).
+#documenter .docs-sidebar,
+#documenter .docs-sidebar * {
+  font-family: $family-sans-serif;
+}
+#documenter .docs-sidebar .tocitem {
+  color: #b7c4d6;
+}
+#documenter .docs-sidebar .tocitem.is-active,
+#documenter .docs-sidebar li.is-active > .tocitem {
+  font-weight: 600;
+}
+// li.is-active gets a 1px top+bottom border by default
+// (documenter/layout/_sidebar.scss), sized for a light default sidebar;
+// against a solid navy sidebar it reads as a visible box around the
+// entry, which we don't want (no background box for active items at all
+// now, so definitely no border either).
+#documenter .docs-sidebar ul.docs-menu li.is-active {
+  border: none !important;
+}
+// ul.docs-menu itself also has a separate 1px top divider by default,
+// sitting directly above the first entry -- against navy, right above an
+// active (white-pill) first entry like "Home", it reads as a line framing
+// that entry specifically. The mockup has no divider there at all.
+#documenter .docs-sidebar ul.docs-menu {
+  border-top: none;
+}
+
+nav.breadcrumb {
+  font-family: $family-sans-serif;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+// The search field (<button id="documenter-search-query" class=
+// "docs-search-query input ...">) sits INSIDE the sidebar itself, directly
+// below the package-name title (confirmed against real built HTML) -- not
+// in the navbar, which an earlier version of this file incorrectly
+// assumed. It has no Documenter-specific styling of its own, so its
+// background comes from plain Bulma .input ($input-background-color,
+// pure white); setting it to match the *navbar's* cream background (what
+// this file did before) put a bright cream box on the navy sidebar,
+// which is the opposite of blending in. Matches the sidebar's own hover
+// tone instead. #documenter-search-query (an id) rather than
+// .docs-search-query so this reliably beats .input's own specificity.
+#documenter-search-query {
+  background-color: #24406e;
+  color: #e8ecf3;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+// Documenter adds a grey box-shadow to the sticky navbar once the page is
+// scrolled even slightly (.headroom--not-top, documenter/layout/_main.scss
+// via headroom.js), meant to separate it from content below. Default grey
+// (#bbb) stood out as a "boxed" look against our cream background where it
+// wouldn't against stock white -- the existing border-bottom on the navbar
+// already provides that separation, so drop the shadow entirely.
+#documenter .docs-main header.docs-navbar.headroom--not-top {
+  box-shadow: none;
+}
+
+code,
+pre,
+.documenter-example-output,
+.docstring pre {
+  font-family: $family-monospace;
+  font-feature-settings: "calt" 1, "liga" 1;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+}
+
+// four-color syntax highlighting (highlight.js token classes). Per
+// explicit request: types = #0e9080, names = #783ad4 -- deliberately
+// different from the reference mockup's type(#827626)/name(#0e9080)
+// mapping, not a mistake.
+.hljs-keyword,
+.hljs-function .hljs-keyword,
+.hljs-literal {
+  color: #783ad4;
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-name {
+  color: #783ad4;
+}
+.hljs-type,
+.hljs-built_in,
+.hljs-class .hljs-title {
+  color: #0e9080;
+}
+.hljs-number,
+.hljs-string,
+.hljs-symbol {
+  color: #be185d;
+}
