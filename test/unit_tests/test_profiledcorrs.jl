@@ -77,7 +77,7 @@ end
         @test close_(c1_star, c1_true; atol = 1.0e-4)
         @test close_(fit.chi2, 0.0; atol = 1e3 * DEFAULT_ATOL)
         @test excl_vol_saturation(c1_star) == 0
-        @test ŷ == forward(fw, 1.0, 0.0, ξ_TRUE[1], (ξ_TRUE[2], ξ_TRUE[3], ξ_TRUE[4]), c1_star)
+        @test ŷ ≈ forward(fw, 1.0, 0.0, ξ_TRUE[1], (ξ_TRUE[2], ξ_TRUE[3], ξ_TRUE[4]), c1_star)   # fused A + g·B + g²·C differs from forward by rounding only
     end
 
     #------------------------------------------------------------------

@@ -5,7 +5,7 @@ using   AdvancedHMC: DenseEuclideanMetric, Hamiltonian, MassMatrixAdaptor,
         HMCKernel, Trajectory, MultinomialTS, GeneralisedNoUTurn
 using   FastClosures, StaticArrays, Distributions, ForwardDiff, DiffResults
 using   SpecialFunctions: digamma, trigamma
-using ..Scattering: forward, ForwardCache
+using ..Scattering: ForwardCache
 using ..BAYSOL_Utils.Constants: DEFAULT_TEMPERATURE_C, DRO12_CONCENTRATION, DRO3_CONCENTRATION,
                                 DEFAULT_TARGET_ACCEPT, NS_PER_S
 using ..BAYSOL_Utils.Timing: StageLog, tick, tock!, fmt_count
@@ -258,9 +258,10 @@ function _ll(
     wls::WLSData,
     ξ::SVector{4,<:Real},
     fw::ForwardCache,
-    l::LIKELIHOOD
+    l::LIKELIHOOD;
+    tab::Union{Nothing,_C1Tables} = nothing,
 )
-    _, fit, _ = profiled_corrs(wls, ξ, fw)
+    _, fit, _ = profiled_corrs(wls, ξ, fw; tables = tab)
     return __ll(fit, l)
 end
 
@@ -318,10 +319,11 @@ function _logπ(
     p::ξ_priors,
     wls::WLSData,
     fw::ForwardCache,
-    l::LIKELIHOOD
+    l::LIKELIHOOD;
+    tab::Union{Nothing,_C1Tables} = nothing,
 )
     ξ = Ξ(θ, p)  # unconstrained θ-space -> physical ξ-space
-    return _lp(ξ, p) + _ll(wls, ξ, fw, l) + logjac(θ, p)
+    return _lp(ξ, p) + _ll(wls, ξ, fw, l; tab = tab) + logjac(θ, p)
 end
 
 """
@@ -340,6 +342,9 @@ Everything [`run_fitting`](@ref) needs to start a NUTS chain.
     (`_ll`/`_logπ`) never rebuilds the data-only weighted sums.
 - `timing::Union{Nothing,StageLog}`: the run's stage log, if timing is on;
     [`run_fitting`](@ref) appends its stages and hands it on in the [`FitResult`](@ref).
+- `c1tab::_C1Tables`: the static c1-search tables for fw ([`_C1Tables`](@ref)), built
+    once here and passed to every [`profiled_corrs`](@ref) call; read-only, so safe to
+    share across threads.
 """
 struct Seed{T<:Real}
     pr::ξ_priors
@@ -348,6 +353,7 @@ struct Seed{T<:Real}
     fw::ForwardCache
     wls::WLSData
     timing::Union{Nothing,StageLog}
+    c1tab::_C1Tables
 end
 
 """
@@ -391,7 +397,7 @@ function seed_fitting(
     ξ₀ = _ξ₀(pr)
     θ₀, _ = Θ(ξ₀, pr)
     wls = WLSData(I_exp, σ_exp)
-    return Seed(pr, ξ₀, θ₀, fw, wls, timing)
+    return Seed(pr, ξ₀, θ₀, fw, wls, timing, _C1Tables(fw))
 end
 
 """
@@ -515,7 +521,8 @@ function run_fitting(
         _destandardize(SVector{4,eltype(z)}(z...), seed.pr),
         seed.pr,
         seed.wls,
-        seed.fw, l
+        seed.fw, l;
+        tab = seed.c1tab,
     )
 
     # ∂ℓπ∂z: z ↦ (log π(θ(z)), ∇_z log π(θ(z))), computed in one ForwardDiff pass.
@@ -594,7 +601,7 @@ function run_fitting(
     for (i, ξ) in enumerate(samples)
         # re-profile c1 at each posterior draw so the reported curve/χ²
         # match what _ll actually evaluated at that ξ during sampling.
-        ŷ, fit, c1_star = profiled_corrs(seed.wls, ξ, seed.fw)
+        ŷ, fit, c1_star = profiled_corrs(seed.wls, ξ, seed.fw; tables = seed.c1tab)
         scale[i]        = fit.scale
         bkgrnd_corr[i]  = fit.bkgrnd_corr
         c1[i]           = c1_star
