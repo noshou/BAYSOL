@@ -120,6 +120,31 @@ function wls_fit(
         SwIy += wi * xi * yi
     end
 
+    return _wls_from_sums(SwI, SwII, SwIy, n, data)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The closed-form weighted least-squares fit behind [`wls_fit`](@ref), from the three
+model-dependent sums Σwᵢyᵢ, Σwᵢyᵢ², Σwᵢyᵢ·Iᵢ (y = y_model, I = I_obs) and the
+data-only sums in `data`. Shared with the c1 search in [`profiled_corrs`](@ref), which
+gets those sums without forming y_model.
+
+# Arguments
+- `SwI`, `SwII`, `SwIy`: the three model-dependent weighted sums.
+- `n::Int`: number of data points.
+- `data::WLSData`: the data-only sums.
+
+# Returns
+- `WLSFit{T}`, T the promoted type of the sums and the data.
+
+# Exceptions
+- `WLSError`: det(XᵀWX) ≤ 0 (the model is flat across the q-window).
+"""
+function _wls_from_sums(SwI, SwII, SwIy, n::Int, data::WLSData)::WLSFit
+    T = promote_type(typeof(SwI), typeof(SwII), typeof(SwIy), typeof(data.Sw))
+
     Sw = data.Sw
     Swy = data.Swy
     Swyy = data.Swyy
