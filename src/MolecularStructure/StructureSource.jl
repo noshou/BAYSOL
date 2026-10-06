@@ -3,17 +3,19 @@
 """
 Resolve a protein structure from any of three input shapes (a local file, a
 bare RCSB PDB ID, or an arbitrary URL) into one canonical .pdb file stored
-in [`_store_dir`](@ref). Callers who need the parsed Molecule/Residues
-pair pass the resulting path to [`load_molecule`](@ref) themselves.
+in [`_store_dir`](@ref). Callers who need the parsed Molecule
+pass the resulting path to [`load_molecule`](@ref) themselves.
 """
 
 using BioStructures: BioStructures, MMCIFFormat, PDBFormat, writepdb,
                     standardselector, heavyatomselector, retrievepdb, collectmodels
 using Downloads: Downloads
 
-"Raised for any failure resolving/converting a structure source:
+"""
+Raised for any failure resolving/converting a structure source:
 a bad or nonexistent local path, an unrecognized extension, a failed fetch/download,
-or a BioStructures write failure."
+or a BioStructures write failure.
+"""
 struct StructureSourceError <: Exception; msg::String end
 Base.showerror(io::IO, e::StructureSourceError) = print(io, "StructureSourceError: ", e.msg)
 
@@ -73,8 +75,6 @@ struct URLSource <: StructureSource
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Shared "produce candidate .pdb, then compare-or-write-or-throw" step used by
 [`LocalPathSource`](@ref) and [`URLSource`](@ref) (not [`PDBIDSource`](@ref),
 which has its own simpler fetch-if-missing path). Takes model 1 of the
@@ -182,9 +182,11 @@ function resolve_structure(source::PDBIDSource)::String
     return existing
 end
 
-"Heuristic mmCIF/legacy-PDB sniff on downloaded content, per PDBTools.jl's 
-documented approach: the literal loop_ keyword appears in mmCIF but not 
-legacy PDB. Not a guarantee; an unusual server response could defeat it."
+"""
+Heuristic mmCIF/legacy-PDB sniff on downloaded content, per PDBTools.jl's 
+documented approach: the literal `loop_` keyword appears in mmCIF but not 
+legacy PDB. Not a guarantee; an unusual server response could defeat it.
+"""
 function _sniff_format(path::AbstractString)
     for line in eachline(path)
         occursin("loop_", line) && return MMCIFFormat

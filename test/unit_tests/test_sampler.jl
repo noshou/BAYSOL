@@ -15,11 +15,11 @@ const FIT = BAYSOL.Fitting
 
 using BAYSOL.Fitting: Solute, NonBiological, WLSData, wls_fit, wls_prof_ll, wls_marg_ll,
     profiled_corrs, Θ, Ξ
-using BAYSOL.Constants: DRO_BOUNDS, DRO12_CONCENTRATION, DRO3_CONCENTRATION
-using BAYSOL.Scattering: forward, forward_cache, ForwardCache
+using BAYSOL.Fitting: DRO_BOUNDS, DRO12_CONCENTRATION, DRO3_CONCENTRATION
+using BAYSOL.Scattering: forward_cache, ForwardCache
 using BAYSOL.MolecularStructure: MolecularStructure
 using Distributions: logpdf, mean, std, params, Beta
-using StaticArrays: SVector
+using StaticArrays: SVector, @SMatrix
 using ForwardDiff
 using Random
 
@@ -60,7 +60,7 @@ const M_TRUE, C_TRUE = 1.7, 0.3
 Synthetic `(I_exp, σ_exp)` from `fw` at `ξ_TRUE`/`M_TRUE`/`C_TRUE`, with small seeded Gaussian noise.
 """
 function synth_data(fw::ForwardCache)
-    y = forward(fw, 1.0, 0.0, ξ_TRUE[1], ξ_TRUE[2:4])
+    y = reference_intensity(fw, 1.0, 0.0, ξ_TRUE[1], ξ_TRUE[2:4])
     I_true = M_TRUE .* y .+ C_TRUE
     σ_exp = max.(abs.(I_true) .* 0.01, 1.0e-6)
     Random.seed!(0x5CA77e12)
@@ -79,11 +79,11 @@ ref_lp(ξ, pr) =
 
 """
 Log-likelihood at ξ with c1 profiled: the c1 is taken from `profiled_corrs`,
-everything else (forward, contrasts, WLS, likelihood) is recomputed directly.
+everything else (contrasts, WLS, likelihood) is recomputed directly.
 """
 function ref_ll(ξ, wls, fw, l::FIT.LIKELIHOOD)
     _, _, c1 = profiled_corrs(wls, SVector{4,Float64}(ξ), fw)
-    ŷ = forward(fw, 1.0, 0.0, ξ[1], (ξ[2], ξ[3], ξ[4]), c1)
+    ŷ = reference_intensity(fw, 1.0, 0.0, ξ[1], (ξ[2], ξ[3], ξ[4]), c1)
     fit = wls_fit(ŷ, wls)
     return l isa FIT.PROFILE ? wls_prof_ll(fit) : wls_marg_ll(fit)
 end
@@ -169,10 +169,15 @@ end
         @test μ[1] == pr.ρₑPrior.μ && σ[1] == pr.ρₑPrior.σ
     end
 
-    @testset "_standardize/_destandardize are inverses" begin
+    @testset "_θ_of_w inverts _standardize and the whitening" begin
         pr = smpl_priors()
+        μ, σ = FIT.θ_prior_moments(pr)
         θ = SVector(-1.1, 0.2, 0.9, 0.4)
-        @test all(isapprox.(FIT._destandardize(FIT._standardize(θ, pr), pr), θ; rtol = 1e-12))
+        ẑ = SVector(0.3, -0.2, 0.1, 0.5)
+        S = @SMatrix [2.0 0.1 0.0 0.0; 0.0 0.5 0.2 0.0; 0.0 0.0 1.5 0.3; 0.1 0.0 0.0 0.7]
+        sp = FIT._SamplingSpace(μ, σ, ẑ, S, 1, 1, true)
+        w = S \ (FIT._standardize(θ, pr) - ẑ)
+        @test all(isapprox.(FIT._θ_of_w(w, sp), θ; rtol = 1e-12))
     end
 
     @testset "_ll: PROFILE/MARGINAL match the independent reference" begin
@@ -193,7 +198,7 @@ end
         wls = WLSData(synth_data(fw)...)
         ξ = SVector(0.33, 1.0, 1.0, -4.0)
         ŷ, _, c1 = profiled_corrs(wls, ξ, fw)
-        ŷ_ref = forward(fw, 1.0, 0.0, 0.33, (1.0, 1.0, -4.0), c1)
+        ŷ_ref = reference_intensity(fw, 1.0, 0.0, 0.33, (1.0, 1.0, -4.0), c1)
         @test all(close_.(ŷ, ŷ_ref))
     end
 
@@ -249,8 +254,8 @@ end
         @test seed isa FIT.Seed
         @test seed.fw === fw
         @test seed.wls.I_obs == I_exp
-        @test all(close_.(Tuple(Ξ(seed.θ₀, seed.pr)), Tuple(seed.ξ₀)))
-        @test seed.ξ₀[1] > 0 && seed.pr.δρ₃Prior.μ < seed.ξ₀[4] < seed.pr.δρ₃Prior.μ + seed.pr.δρ₃Prior.σ
+        ξ₀ = Ξ(seed.θ₀, seed.pr)
+        @test ξ₀[1] > 0 && seed.pr.δρ₃Prior.μ < ξ₀[4] < seed.pr.δρ₃Prior.μ + seed.pr.δρ₃Prior.σ
         @test_throws DomainError FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, -0.1, smpl_solutes())
     end
 

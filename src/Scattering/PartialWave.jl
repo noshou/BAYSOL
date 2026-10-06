@@ -5,8 +5,6 @@ using FastClosures: @closure
 using LinearAlgebra: mul!
 
 """
-$(TYPEDSIGNATURES)
-
 ±m symmetry weights: m = 0 -> 1, m > 0 -> 2.
 
 # Arguments
@@ -16,7 +14,7 @@ $(TYPEDSIGNATURES)
     - `Vector{Float64} of length (lMax+1)(lMax+2)/2`, one weight per stored
         (l, m) pair with m = 0, …, l, flattened in the same
         (0,0), (1,0), (1,1), (2,0), (2,1), (2,2), … degree-major order used to
-        index B_lm elsewhere (i.e. k0 = l*(l+1)/2 gives the offset of degree l's block).
+        index `B_lm` elsewhere (i.e. k0 = l*(l+1)/2 gives the offset of degree l's block).
 
 # Mathematical derivation
 
@@ -29,15 +27,15 @@ with
 
     B_lm(q) = Σ_i f_i(q) * j_l(q r_i) * conj(Y_lm(θ_i, φ_i))
 
-Spherical harmonics satisfy Y_{l,-m} = (-1)^m * conj(Y_lm). Plugging into B_{l,-m}:
+Spherical harmonics satisfy `Y_{l,-m}` = (-1)^m * conj(`Y_lm`). Plugging into `B_{l,-m}`:
 
     B_{l,-m} = Σ_i f_i * j_l * conj(Y_{l,-m})
          = Σ_i f_i * j_l * conj[(-1)^m * conj(Y_lm)]
          = (-1)^m * Σ_i f_i * j_l * Y_lm
 
 
-If f_i is real, that last sum is just conj(B_lm), since conjugating a
-real-coefficient sum of Y_lm's conjugates flips it back to Y_lm:
+If `f_i` is real, that last sum is just conj(`B_lm`), since conjugating a
+real-coefficient sum of `Y_lm`'s conjugates flips it back to `Y_lm`:
 
     B_{l,-m} = (-1)^m * conj(B_lm)   =>   |B_{l,-m}|² = |B_lm|²
 
@@ -54,18 +52,16 @@ function partial_wave_weights(lMax::Integer)::Vector{Float64}
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Compute `B_lm(q) = Σ_i f_atoms[i](q) * j_l(q*r_i) * conj(Y_lm(θ_i, φ_i))`.
 
-f_atoms carries whatever per-atom complex scattering amplitude the
+`f_atoms` carries whatever per-atom complex scattering amplitude the
 caller wants (element form factors for the vacuum term, dummy-atom
 excluded-volume/shell amplitudes for the other terms). The work is done by
 [`_compute_B_lm`](@ref), which this calls with a single amplitude set.
 
 # Arguments
     - `coords_sph::AbstractMatrix{<:Real}, size (3, N)`: per-atom spherical
-        coordinates in the column-per-atom layout MolecularStructure.coords_spherical
+        coordinates in the column-per-atom layout `MolecularStructure.coords_spherical`
         returns — row 1 is r, row 2 is θ, row 3 is φ.
     - `qvals::AbstractVector{<:Real}, length Q`: momentum transfer grid, all ≥ 0.
     - `f_atoms::AbstractMatrix{<:Number}, size (N, Q)`: per-atom scattering
@@ -76,15 +72,15 @@ excluded-volume/shell amplitudes for the other terms). The work is done by
 
 # Returns
     - `Array{ComplexF64,3}` of size (C, (lMax+1)(lMax+2)÷2, Q). C = 1 when
-        f_atoms is real, C = 2 when it has a nonzero imaginary part (anomalous
-        f''): channel 1 from Re(f_atoms), channel 2 from Im(f_atoms). The two
+        `f_atoms` is real, C = 2 when it has a nonzero imaginary part (anomalous
+        f''): channel 1 from Re(`f_atoms`), channel 2 from Im(`f_atoms`). The two
         channels add incoherently in the m-summed invariant (see
         [`self_scatter`](@ref)/[`cross_scatter`](@ref)) — they must not be
-        recombined into one complex B_lm.
+        recombined into one complex `B_lm`.
 
 # Exceptions
-    - `DomainError`: _CHUNK == 0.
-    - `ArgumentError`: lMax < 0, coords_sph not (3, N), f_atoms not (N, Q), or a
+    - `DomainError`: `_CHUNK` == 0.
+    - `ArgumentError`: lMax < 0, `coords_sph` not (3, N), `f_atoms` not (N, Q), or a
         negative q.
 """
 compute_B_lm(
@@ -96,13 +92,11 @@ compute_B_lm(
 )::Array{ComplexF64,3} = only(_compute_B_lm(coords_sph, qvals, (f_atoms,), lMax, _CHUNK))
 
 """
-$(TYPEDSIGNATURES)
-
 [`compute_B_lm`](@ref) for several amplitude sets on the same points (e.g. the
 vacuum form factors and the excluded-volume dummies of one molecule), sharing one
 spherical-harmonic evaluation and one spherical Bessel sweep per atom.
 
-Real arithmetic throughout. Write Ȳ_lm = Re Y_lm − i·Im Y_lm (the conjugate). Every
+Real arithmetic throughout. Write `Ȳ_lm` = Re `Y_lm` − i·Im `Y_lm` (the conjugate). Every
 amplitude column c (one per set and channel: Re f, and Im f when f is anomalous)
 is real, so per degree l
 
@@ -115,7 +109,7 @@ accumulating in place).
 W is never stored as a full j array. For each atom the Gautschi sweep runs over a
 q-tile: [`SphFuncs.sphBessRatios!`](@ref) (pass 1), then upward with
 [`SphFuncs.sphBessStep`](@ref) (pass 2); each jₗ comes out normalized and is
-multiplied straight into W_l for every column. W covers one tile of atoms
+multiplied straight into `W_l` for every column. W covers one tile of atoms
 ([`B_LM_TILE`](@ref)) and one q-tile, sized so that every degree fits in
 [`B_LM_W_BYTES`](@ref); all buffers are allocated once per call.
 
@@ -125,9 +119,6 @@ multiplied straight into W_l for every column. W covers one tile of atoms
 
 # Returns
     - `Tuple` of `Array{ComplexF64,3}`, one per set, each as [`compute_B_lm`](@ref)'s.
-
-# Exceptions
-    - As [`compute_B_lm`](@ref), for every set.
 """
 function _compute_B_lm(
     coords_sph::AbstractMatrix{<:Real},
@@ -304,8 +295,6 @@ end
 
 
 """
-$(TYPEDSIGNATURES)
-
 W[(c−1)Qt + k, tt, l+1] = Ft[q0+k−1, c, i]·j[k] for every amplitude column c and
 k = kstart..nq: degree l's slice of W for one atom, from its normalized jₗ over the
 q-tile (columns below kstart are under the negligible-Bessel cut and not used).
@@ -336,9 +325,7 @@ q-tile (columns below kstart are under the negligible-Bessel cut and not used).
 end
 
 """
-$(TYPEDSIGNATURES)
-
-S(q) = 4π * Σ_c Σ_lm w_lm * |B_lm(q)|².
+S(q) = 4π * `Σ_c` `Σ_lm` `w_lm` * |`B_lm(q)`|².
 
 Channels (real/imaginary amplitude) add incoherently: the cross terms
 between them cancel identically once summed over the full -l..l range ofm.
@@ -372,9 +359,7 @@ function self_scatter(
 end
 
 """
-$(TYPEDSIGNATURES)
-
-S(q) = 4π * Σ_c Σ_lm w_lm * Re(B_a(q) * conj(B_b(q))).
+S(q) = 4π * `Σ_c` `Σ_lm` `w_lm` * Re(`B_a(q)` * conj(`B_b(q)`)).
 
 # Arguments
 - `B_lm_a::AbstractArray{<:Complex,3}, size (C_a, K, Q)`

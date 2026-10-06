@@ -8,8 +8,9 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 
 const FIT = BAYSOL.Fitting
 using BAYSOL.Fitting: Solute, Protein, NonBiological, DNA, RNA, ρₑ_prior
-using BAYSOL.Constants: AVOGADRO, ANGSTROM3_PER_LITER, CM3_PER_LITER, DEFAULT_TEMPERATURE_C,
-    PMV_REFERENCE_TEMPERATURE_C
+using BAYSOL.PhysicalConstants: AVOGADRO, ANGSTROM3_PER_LITER, CM3_PER_LITER
+using BAYSOL.Fitting: DEFAULT_TEMPERATURE_C
+using BAYSOL.PartialMolarVolumes: PMV_REFERENCE_TEMPERATURE_C
 using Distributions: mean, var, LogNormal
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
@@ -27,7 +28,7 @@ Independent re-derivation of the `_ρₑ`/`ρₑ_prior` formula from the live
 function ref_ρₑ(pH::Real, σ_pH::Real, solutes::Vector{Solute}; t::Real = DEFAULT_TEMPERATURE_C)
     ρw, σw = BAYSOL.PartialMolarVolumes.ρₑ_w(t)
     ρw_k = ρw / CM3_PER_LITER
-    α = BAYSOL.Constants.PMV_FRACTIONAL_EXPANSIBILITY
+    α = BAYSOL.PartialMolarVolumes.PMV_FRACTIONAL_EXPANSIBILITY
 
     disp = 0.0; Δμ = 0.0; var_conc = 0.0; var_vol = 0.0
     for s in solutes

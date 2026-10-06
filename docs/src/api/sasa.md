@@ -1,8 +1,8 @@
 # SASA
 
-Solvent-accessible surface area (`src/SASA/`): the SASA algorithm
-(sampling points via the [Geometry](geometry.md) module's plastic-sequence
-generator) and the convex / concave / cavity classification of the
+Solvent-accessible surface (`src/SASA/`): `sasa` (sampling directions from the
+plastic-sequence generator in [PlasticSequence](plasticsequence.md), occlusion shortcuts and
+tests in `Metrics.jl`) and the convex / concave / cavity classification of the
 hydration-shell point cloud.
 
 ## SASA

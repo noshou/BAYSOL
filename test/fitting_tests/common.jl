@@ -8,17 +8,9 @@
 #                              Physical constants
 # ---------------------------------------------------------------------------
 
-"""
-h·c in eV·Å, from the exact SI values of h, c and e (2019 redefinition):
-≈ 12398.41984. Photon energy from wavelength: E (eV) = HC_EV_ANGSTROM / λ (Å).
-"""
-const HC_EV_ANGSTROM = 6.62607015e-34 * 299_792_458 / 1.602176634e-19 * 1e10
-
-"""
-nm⁻¹ per Å⁻¹ (1 Å⁻¹ = 10 nm⁻¹). A curve deposited in nm⁻¹ is converted with
-`q ./ NM_INV_PER_ANGSTROM_INV`. (An integer, so the division is bit-identical to `q ./ 10`.)
-"""
-const NM_INV_PER_ANGSTROM_INV = 10
+# h·c (eV·Å, for photon energy from wavelength) and the nm⁻¹ → Å⁻¹ conversion come from the
+# package, so the scripts and BAYSOL share one definition.
+using BAYSOL.PhysicalConstants: HC_EV_ANGSTROM, NM_INV_PER_ANGSTROM_INV
 
 # ---------------------------------------------------------------------------
 #                                   Sampler

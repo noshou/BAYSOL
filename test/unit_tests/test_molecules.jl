@@ -33,18 +33,6 @@ _forced_radii(m) = getfield(getfield(m, :_radii), :done)
 _forced_vols(m)  = getfield(getfield(m, :_vols),  :done)
 _forced_rmax(m)  = getfield(getfield(m, :_r_max), :done)
 
-# A stand-in RadiiSource, to prove `radii_source` is actually consulted rather
-# than the default AtomicRadiiSource being hard-wired in.
-struct ConstantRadii <: BAYSOL.AtomicRadii.RadiiSource
-    value::Float64
-end
-BAYSOL.AtomicRadii.lookup(s::ConstantRadii, ions::AbstractVector{<:AbstractString}) =
-    Tuple{String,Union{Float64,Nothing}}[(String(i), s.value) for i in ions]
-
-struct NeverResolves <: BAYSOL.AtomicRadii.RadiiSource end
-BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString}) =
-    Tuple{String,Union{Float64,Nothing}}[(String(i), nothing) for i in ions]
-
 @testset "MolecularStructure" begin
 
     @testset "two atoms on x axis" begin
@@ -240,24 +228,11 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
         @test radii(m) === radii(m)          # lazy accessor: memoized, same object on repeat
     end
 
-    @testset "a custom radii_source is honoured" begin
-        # `vols` is computed geometrically from `radii`, so it flows through
-        # `radii_source` for any element. These three points are close enough
-        # (1 Å apart) that a 2.5 Å radius means the spheres overlap, so `vols`
-        # is bounded by but not necessarily equal to the full sphere volume.
-        pts = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]
-        m = create("test", ["rn", "xe", "kr"], pts; radii_source = ConstantRadii(2.5))
-        @test radii(m) == [2.5, 2.5, 2.5]
-        @test check_float(r_max(m), 2.5)
-        @test all(v -> v ≥ 0.0 && v ≤ sphere_volume(2.5) + 1e-9, vols(m))
-        # the same elements through the default source give something else entirely
-        @test radii(create("test", ["rn", "xe", "kr"], pts)) != radii(m)
-        # a source that resolves nothing raises through the same MoleculeError path
-        @test_throws MoleculeError radii(create("t", ["o"], [(0.0, 0.0, 0.0)];
-                                                radii_source = NeverResolves()))
-        # a custom source also lets otherwise-unknown element labels work
-        mystery = create("t", ["zzzz"], [(0.0, 0.0, 0.0)]; radii_source = ConstantRadii(1.0))
-        @test radii(mystery) == [1.0]
+    @testset "a zero-radius atom still has a well-defined SASA" begin
+        # clamped to r = 0, the atom is a bare probe-radius sphere rather than an inverted one.
+        m = create("proton", ["h1+"], [(0.0, 0.0, 0.0)])
+        areas = SASA.sasa(m; probe = 1.4)[2]
+        @test check_float(sum(areas), 4π * 1.4^2)
     end
 
     @testset "_to_tuples accepts any iterable of 3 components" begin
@@ -306,7 +281,7 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
 
     @testset "negative ionic radii are clamped to zero" begin
         # Shannon's table stores h1+/c4+/n5+ with negative radii. `_compute_radii` 
-        # clamps them to 0.0 so volumes stay non-negative and SASA's `r + probe` never inverts.
+        # clamps them to 0.0 so volumes stay non-negative and a shell sphere's `r + probe` never inverts.
         for ion in ("h1+", "c4+", "n5+")
             m = create("artifact", [ion], [(0.0, 0.0, 0.0)])
             @test radii(m) == [0.0]
@@ -328,14 +303,6 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
         @test radii(m)[1] == 0.0
         @test check_float(radii(m)[2], 2.44)
         @test r_max(m) == radii(m)[2]     # the clamped atom never wins r_max
-    end
-
-    @testset "a zero-radius atom still has a well-defined SASA" begin
-        # clamped to r = 0, the atom is a bare probe-radius sphere rather than an inverted one.
-        m = create("proton", ["h1+"], [(0.0, 0.0, 0.0)])
-        a = SASA.sasa(m; n_occ = 64, n_exp = 256, probe = 1.4)[1]
-        @test length(a) == 1
-        @test check_float(a[1], 4π * 1.4^2)
     end
 
     #-------------------------------------------------------------------------
@@ -370,7 +337,7 @@ BAYSOL.AtomicRadii.lookup(::NeverResolves, ions::AbstractVector{<:AbstractString
         path        = resolve_structure(LocalPathSource(pdb_path))
         pKa_records = propka_pKas(path)
         hpath       = resolve_hydrogens(path, pKa_records, pH)
-        mol, _      = load_molecule(hpath)
+        mol         = load_molecule(hpath)
 
         @test any(e -> e == "h", elms(mol))   # explicit hydrogens really were added
 

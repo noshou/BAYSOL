@@ -12,15 +12,18 @@ using BAYSOL
 # a re-run reproducible rather than erroring on an existing copy).
 # ---------------------------------------------------------------------------
 const README_PAGES = [
+    "PhysicalConstants"   => "PhysicalConstants",
+    "Cache"               => "Cache",
+    "Timing"              => "Timing",
+    "PlasticSequence"     => "PlasticSequence",
     "AtomicRadii"         => "AtomicRadii",
-    "BAYSOL_Utils"        => "BAYSOL_Utils",
     "Fitting"              => "Fitting",
     "FormFactor"            => "FormFactor",
-    "Geometry"              => "Geometry",
     "MolecularStructure"    => "MolecularStructure",
     "PartialMolarVolumes"   => "PartialMolarVolumes",
     "Scattering"            => "Scattering",
     "SASA"                    => "SASA",
+    "Report"                  => "Report",
 ]
 
 const GUIDES_DIR = joinpath(@__DIR__, "src", "guides")
@@ -39,12 +42,10 @@ makedocs(
     # overwriting Documenter's own built-in light theme file in place.
     modules  = [
         BAYSOL,
-        BAYSOL.Constants,
+        BAYSOL.PhysicalConstants,
         BAYSOL.Cache,
         BAYSOL.Timing,
-        BAYSOL.Geometry,
-        BAYSOL.Geometry.PlasticSequence,
-        BAYSOL.Geometry.Metrics,
+        BAYSOL.PlasticSequence,
         BAYSOL.AtomicRadii,
         BAYSOL.FormFactor,
         BAYSOL.PartialMolarVolumes,
@@ -53,6 +54,7 @@ makedocs(
         BAYSOL.Scattering.SphFuncs,
         BAYSOL.SASA,
         BAYSOL.Fitting,
+        BAYSOL.Report,
     ],
     pages    = [
         "Home" => "index.md",
@@ -61,15 +63,21 @@ makedocs(
             for (name, _) in README_PAGES
         ],
         "API Reference" => [
-            "BAYSOL_Utils" => "api/baysolutils.md",
-            "Geometry" => "api/geometry.md",
+            "PhysicalConstants" => "api/physicalconstants.md",
+            "Cache" => "api/cache.md",
+            "Timing" => "api/timing.md",
+            "PlasticSequence" => "api/plasticsequence.md",
             "AtomicRadii" => "api/atomicradii.md",
             "FormFactor" => "api/formfactor.md",
             "PartialMolarVolumes" => "api/partialmolarvolumes.md",
             "MolecularStructure" => "api/molecularstructure.md",
             "Scattering" => "api/scattering.md",
             "SASA" => "api/sasa.md",
-            "Fitting" => "api/fitting.md",
+            "Fitting" => [
+                "Model and priors" => "api/fitting.md",
+                "Sampler" => "api/fitting_sampler.md",
+            ],
+            "Report" => "api/report.md",
         ],
     ],
     # :exports would require every exported docstring across every submodule

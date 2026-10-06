@@ -4,12 +4,10 @@
 A molecule.
 """
 
-using   ..AtomicRadii: RadiiSource, lookup, AtomicRadiiSource
-using   ..BAYSOL_Utils.Cache: Lazy, force
-using   ..Geometry: sphere_volume
+using   ..AtomicRadii: lookup
+using   ..Cache: Lazy, force
 using   BioStructures:  BioStructures, PDBFormat, standardselector,
-                        collectatoms, collectmodels, atomname, element, resname, resnumber,
-                        chainid, coords, ishetero
+                        collectatoms, collectmodels, atomname, element, coords, ishetero
 using   NearestNeighbors: KDTree
 using   FastClosures: @closure
 
@@ -25,8 +23,6 @@ const _TWO_LETTER_ELEMENTS = Set([
 ])
 
 """
-$(TYPEDSIGNATURES)
-
 Fallback element guess from an atom name, for legacy-format PDB files whose
 element column (columns 77-78) is blank -- some pre-remediation-era files
 predate that column. Digits/whitespace are stripped first (e.g. "1HB2" ->
@@ -53,13 +49,13 @@ end
 - `_n::Int`: atom count; set at construction, never recomputed.
 - `_cart::Matrix{Float64}, (3, n)`: centred Cartesian coordinates (x, y, z).
 - `_sph::Matrix{Float64}, (3, n)`: spherical coordinates (r, theta, phi),
-    sharing _cart's column index.
+    sharing `_cart`'s column index.
 - `_radii::Lazy{Vector{Float64}}`: per-atom isolated van der Waals radius
     (AtomicRadii), length n.
 - `_vols::Lazy{Vector{Float64}}`: per-atom geometrically-computed excluded
     volume from [`excluded_volume`](@ref), length n.
-- `_r_max::Lazy{Float64}`: largest per-atom radius in _radii.
-- `_tree::Lazy{KDTree}`: KDTree over _cart, shared across neighbour queries.
+- `_r_max::Lazy{Float64}`: largest per-atom radius in `_radii`.
+- `_tree::Lazy{KDTree}`: KDTree over `_cart`, shared across neighbour queries.
 """
 struct Molecule
     _name   :: String
@@ -74,8 +70,6 @@ struct Molecule
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Stack coordinates into a (3, n) matrix translated to the centroid.
 
 # Arguments
@@ -99,14 +93,12 @@ function _center(cs::Vector{NTuple{3,Float64}})::Matrix{Float64}
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Spherical (r, theta, phi) per column of the (3, n) cartesian matrix c,
 returned as a (3, n) matrix sharing c's column index (the atom/point).
 theta = acos(z/r) lies in [0, π] and phi = atan(y, x) in (-π, π].
 
 r = 0 would make theta a 0/0; it is handled without one. The angle is arbitrary there
-and unobservable downstream, since j_l(0) = 0 for every l > 0.
+and unobservable downstream, since `j_l(0)` = 0 for every l > 0.
 
 # Arguments
 - `c`: (3, n) cartesian coordinates; rows are x, y, z.
@@ -128,9 +120,7 @@ function to_spherical(c::AbstractMatrix{<:Real})::Matrix{Float64}
 end
 
 """
-$(TYPEDSIGNATURES)
-
-Resolve per-element radii through src; throws MoleculeError on an empty list
+Resolve per-element radii through [`AtomicRadii.lookup`](@ref BAYSOL.AtomicRadii.lookup); throws MoleculeError on an empty list
 or any element with no radius data.
 
 A negative radius is clamped to 0.0. Shannon's tables carry a handful of
@@ -138,12 +128,11 @@ these (h1+, c4+, n5+) as extrapolation artifacts of fitting to
 coordination-number trends, not as physical sizes.
 
 # Arguments
-- `src`: radii backend to query.
 - `es`: element/ion strings, one per atom.
 """
-function _compute_radii(src::S, es::Vector{String})::Vector{Float64} where {S<:RadiiSource}
+function _compute_radii(es::Vector{String})::Vector{Float64}
     isempty(es) && throw(MoleculeError("Empty elements"))
-    pairs = lookup(src, es)
+    pairs = lookup(es)
     out = Vector{Float64}(undef, length(pairs))
     @inbounds for i in eachindex(pairs)
         el, rad = pairs[i]
@@ -174,10 +163,8 @@ function _to_tuples(cs)
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Build a Molecule: coords are centred at the centroid, both coordinate
-frames computed now, radii/vols/r_max on first access.
+frames computed now, `radii/vols/r_max` on first access.
 
 # Arguments
 - `name`: molecule label.
@@ -185,19 +172,25 @@ frames computed now, radii/vols/r_max on first access.
         normalized to lowercase (the radii and form-factor tables are lowercase-keyed),
         so elms(m) returns the lowercased strings.
 - `coords`: per-atom (x, y, z) in any frame; length must match elms.
-
-# Keywords
-- `radii_source`: radii backend (defaults to AtomicRadiiSource()).
 """
-function create(name::AbstractString, elms::AbstractVector{<:AbstractString}, coords;
-                radii_source::RadiiSource = AtomicRadiiSource())
+function create(name::AbstractString, elms::AbstractVector{<:AbstractString}, coords)
+    es = String[lowercase(e) for e in elms]   # radii/form-factor tables are lowercase-keyed
+    return _build(name, es, coords, @closure(() -> _compute_radii(es)))
+end
+
+"""
+[`create`](@ref)'s body: `es` are the already-lowercased element strings and
+`radii` the zero-argument thunk that supplies the per-atom radii on first access.
+Unexported; [`create`](@ref) is the only production caller, and the unit tests and
+`test/visualize` scripts call it directly to build molecules with hand-picked radii.
+"""
+function _build(name::AbstractString, es::Vector{String}, coords, radii)
     cs = _to_tuples(coords)
     n  = length(cs)
-    n == length(elms) || throw(MoleculeError("coords and elms length mismatch"))
-    es = String[lowercase(e) for e in elms]   # radii/form-factor tables are lowercase-keyed
+    n == length(es) || throw(MoleculeError("coords and elms length mismatch"))
     cart = _center(cs)
     sph  = to_spherical(cart)
-    rad  = Lazy{Vector{Float64}}(@closure(() -> _compute_radii(radii_source, es)))
+    rad  = Lazy{Vector{Float64}}(radii)
     rmax = Lazy{Float64}(@closure(() -> maximum(force(rad))))
     tree = Lazy{KDTree}(@closure(() -> KDTree(cart)))
 
@@ -224,16 +217,12 @@ n_atoms(m::Molecule)::Int = m._n
 radii(m::Molecule)::Vector{Float64}  = force(m._radii)
 
 """
-$(TYPEDSIGNATURES)
-
 Per-atom excluded (displaced-solvent) volume. This is not the isolated van der Waals
-volume; use [`BAYSOL.Geometry.sphere_volume`](@ref) on the radii.
+volume; use [`BAYSOL.MolecularStructure.sphere_volume`](@ref) on the radii.
 """
 vols(m::Molecule)::Vector{Float64}   = force(m._vols)
 
 """
-$(TYPEDSIGNATURES)
-
 Largest per-atom radius in the molecule; forces (and caches) radii.
 
 SASA's coarse neighbour filter needs this to bound how far away an atom can
@@ -242,9 +231,7 @@ still occlude another, before any individual radius is known.
 r_max(m::Molecule)::Float64          = force(m._r_max)
 
 """
-$(TYPEDSIGNATURES)
-
-A KDTree over coords_cartesian(m).
+A KDTree over `coords_cartesian(m)`.
 """
 neighbour_tree(m::Molecule)::KDTree   = force(m._tree)
 
@@ -255,24 +242,8 @@ elms(m::Molecule)::Vector{String}    = m._elms
 name(m::Molecule)::String            = m._name
 
 """
-Per-atom residue identity for a protein Molecule: resname, atom name,
-residue number, and chain ID (standard PDB identity), one entry per atom.
-
-resnum/chain distinguish different *instances* of the same residue type
-(e.g. two separate "ASP" residues at different sequence positions).
-"""
-struct Residues
-    resname  :: Vector{String}
-    atomname :: Vector{String}
-    resnum   :: Vector{Int}
-    chain    :: Vector{String}
-end
-
-"""
-$(TYPEDSIGNATURES)
-
-Parse whatever .pdb is at pdb_path into a Molecule/Residues pair.
-Works identically whether pdb_path is heavy-atom-only or hydrogenated:
+Parse whatever .pdb is at `pdb_path` into a Molecule.
+Works identically whether `pdb_path` is heavy-atom-only or hydrogenated:
 atoms are collected via standardselector alone (no heavyatomselector), so
 a heavy-only file naturally yields just its heavy atoms, and a hydrogenated
 file keeps its hydrogens too.
@@ -282,11 +253,9 @@ file keeps its hydrogens too.
     [`resolve_hydrogens`](@ref).
 
 # Returns
-- `Tuple{Molecule, Residues}`: Molecule built from each atom's element and
-    coordinates; Residues built from each atom's resname, PDB atom name,
-    residue number, and chain ID.
+- `Molecule` built from each atom's element and coordinates.
 """
-function load_molecule(pdb_path::AbstractString)::Tuple{Molecule, Residues}
+function load_molecule(pdb_path::AbstractString)::Molecule
     isfile(pdb_path) || throw(MoleculeError("no such file: $pdb_path"))
 
     key = splitext(basename(pdb_path))[1]
@@ -302,23 +271,13 @@ function load_molecule(pdb_path::AbstractString)::Tuple{Molecule, Residues}
     n = length(atoms)
     elms_v     = Vector{String}(undef, n)
     coords_v   = Vector{NTuple{3, Float64}}(undef, n)
-    resname_v  = Vector{String}(undef, n)
-    atomname_v = Vector{String}(undef, n)
-    resnum_v   = Vector{Int}(undef, n)
-    chain_v    = Vector{String}(undef, n)
 
     @inbounds for (i, at) in enumerate(atoms)
         el            = element(at)
         elms_v[i]     = isempty(el) ? _infer_element(atomname(at), ishetero(at)) : el
         c             = coords(at)
         coords_v[i]   = (Float64(c[1]), Float64(c[2]), Float64(c[3]))
-        resname_v[i]  = resname(at)
-        atomname_v[i] = atomname(at)
-        resnum_v[i]   = resnumber(at)
-        chain_v[i]    = chainid(at)
     end
 
-    mol = create(key, elms_v, coords_v)
-    res = Residues(resname_v, atomname_v, resnum_v, chain_v)
-    return (mol, res)
+    return create(key, elms_v, coords_v)
 end

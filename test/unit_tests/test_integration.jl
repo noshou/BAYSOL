@@ -18,11 +18,12 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule, propka_pKas, PropkaError,
     resolve_hydrogens, Pdb2pqrError, _store_dir,
-    Molecule, Residues, n_atoms, elms, coords_cartesian
-using BAYSOL.Fitting: Solute, NonBiological, seed_fitting, run_fitting, PROFILE
-using BAYSOL.Constants: φ_max, DRO_UNIT, DRO_BOUNDS
+    Molecule, n_atoms, elms, coords_cartesian
+using BAYSOL.Fitting: Solute, NonBiological, seed_fitting, run_fitting, PROFILE, Ξ
+using BAYSOL.Fitting: φ_max, DRO_BOUNDS
+using BAYSOL.PhysicalConstants: DRO_UNIT
 using StaticArrays: SVector
-using BAYSOL.Scattering: forward, forward_cache, ForwardCache
+using BAYSOL.Scattering: forward_cache, ForwardCache
 using Random
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
@@ -60,7 +61,7 @@ const INTEG_ξ_TRUE = (CRYSOL_SOLVENT_DENSITY, 1.05, -0.05, -0.55)
 const INTEG_M_TRUE, INTEG_C_TRUE = 1.7, 0.3
 
 function integ_synth_data(fw::ForwardCache)
-    y = forward(fw, 1.0, 0.0, INTEG_ξ_TRUE[1], INTEG_ξ_TRUE[2:4])
+    y = reference_intensity(fw, 1.0, 0.0, INTEG_ξ_TRUE[1], INTEG_ξ_TRUE[2:4])
     I_true = INTEG_M_TRUE .* y .+ INTEG_C_TRUE
     σ_exp = max.(abs.(I_true) .* 0.01, 1.0e-6)
     Random.seed!(0xC2A11234)
@@ -93,7 +94,7 @@ end
     # -----------------------------------------------------------------
     @test isfile(_FIXTURE_PATH)
     resolved_path = resolve_structure(LocalPathSource(_FIXTURE_PATH))
-    mol, residues = load_molecule(resolved_path)
+    mol = load_molecule(resolved_path)
 
     # Force a fresh propka3 run: propka_pKas trusts a matching `.pka`
     # filename's presence outright with no re-verification (see
@@ -150,9 +151,8 @@ end
         @info "pdb2pqr (fresh) on 1CRN-TEST.pdb took $(round(t_pdb2pqr; digits = 2))s"
         @test isfile(hyd_path)
 
-        mol_h, residues_h = load_molecule(hyd_path)
+        mol_h = load_molecule(hyd_path)
         @test mol_h isa Molecule
-        @test residues_h isa Residues
 
         n_h = n_atoms(mol_h)
         @test n_h > n_atoms(mol)   # hydrogens genuinely added
@@ -162,29 +162,9 @@ end
         @test size(cc_h) == (3, n_h)
         @test all(isfinite, cc_h)
 
-        @test length(residues_h.resname)  == n_h
-        @test length(residues_h.atomname) == n_h
-        @test length(residues_h.resnum)   == n_h
-        @test length(residues_h.chain)    == n_h
-
-        # Key "do these two independently-built pieces agree on the
-        # underlying structure" check: every *heavy* atom present in the
-        # hydrogen-included structure must carry the same resname at the
-        # same (chain, resnum, atomname) as the original heavy-atom-only.
         els_h = elms(mol_h)
         heavy_h_idx = findall(e -> lowercase(e) != "h", els_h)
         @test length(heavy_h_idx) == n_atoms(mol)   # same heavy-atom count
-
-        orig_key(i) = (residues.chain[i], residues.resnum[i], residues.atomname[i])
-        orig_map = Dict(orig_key(i) => residues.resname[i] for i in 1:n_atoms(mol))
-
-        @test length(orig_map) == n_atoms(mol)   # keys are genuinely unique
-
-        for i in heavy_h_idx
-            key = (residues_h.chain[i], residues_h.resnum[i], residues_h.atomname[i])
-            @test haskey(orig_map, key)
-            @test orig_map[key] == residues_h.resname[i]
-        end
     end
 
     #------------------------------------------------------------------
@@ -207,7 +187,8 @@ end
         @test seed isa BAYSOL.Fitting.Seed
         @test seed.fw === fw
         @test seed.wls.I_obs == I_exp
-        @test seed.ξ₀[1] > 0 && seed.ξ₀[2] > 0
+        ξ₀ = Ξ(seed.θ₀, seed.pr)
+        @test ξ₀[1] > 0 && ξ₀[2] > 0
 
         n_samples, n_adapt = 20, 10
         local fit

@@ -5,9 +5,9 @@
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.AtomicRadii: Ion, tryparse_ion, ion_key, ion_radius,
-    element_radius, nearest_ion, resolve_one, _resolve_all, AtomicRadiiSource
+    element_radius, nearest_ion, resolve_one, lookup
 
-lookup_one(ion) = _resolve_all([ion])[1][2]
+lookup_one(ion) = lookup([ion])[1][2]
 
 @testset "AtomicRadii" begin
 
@@ -142,9 +142,9 @@ lookup_one(ion) = _resolve_all([ion])[1][2]
         end
     end
 
-    @testset "_resolve_all: order/count preserved, repeats deduped" begin
+    @testset "lookup: order/count preserved, repeats deduped" begin
         input = ["fe3+", "zzzz9+", "fe3+", "rn"]
-        res = _resolve_all(input)
+        res = lookup(input)
         @test res isa Vector{Tuple{String,Union{Float64,Nothing}}}
         @test length(res) == length(input)
         @test [k for (k, _) in res] == input
@@ -152,32 +152,26 @@ lookup_one(ion) = _resolve_all([ion])[1][2]
         @test r1 !== nothing && m === nothing && r3 !== nothing && check_float(r1, r2)
     end
 
-    @testset "_resolve_all: repeated misses are deduped too" begin
-        res = _resolve_all(["qq3+", "qq3+", "fe", "qq3+"])
+    @testset "lookup: repeated misses are deduped too" begin
+        res = lookup(["qq3+", "qq3+", "fe", "qq3+"])
         @test [v for (_, v) in res] == [nothing, nothing, resolve_one("fe"), nothing]
     end
 
-    @testset "_resolve_all agrees with resolve_one entry by entry" begin
+    @testset "lookup agrees with resolve_one entry by entry" begin
         input = ["fe3+", "fe+3", "fe5+", "rn3+", "o2-", "h", "qq3+", "fe!!"]
-        @test [v for (_, v) in _resolve_all(input)] == [resolve_one(s) for s in input]
+        @test [v for (_, v) in lookup(input)] == [resolve_one(s) for s in input]
     end
 
-    @testset "_resolve_all: empty input" begin
-        res = _resolve_all(String[])
+    @testset "lookup: empty input" begin
+        res = lookup(String[])
         @test isempty(res)
         @test res isa Vector{Tuple{String,Union{Float64,Nothing}}}
     end
 
-    @testset "_resolve_all: non-String element types are normalized to String" begin
-        res = _resolve_all(SubString.(["fe3+", "rn"]))
+    @testset "lookup: non-String element types are normalized to String" begin
+        res = lookup(SubString.(["fe3+", "rn"]))
         @test [k for (k, _) in res] == ["fe3+", "rn"]
         @test all(k -> k isa String, first.(res))
     end
 
-    @testset "AtomicRadiiSource satisfies the lookup contract" begin
-        src = AtomicRadiiSource()
-        @test src isa BAYSOL.AtomicRadii.RadiiSource
-        ions = ["fe3+", "qq3+", "rn"]
-        @test BAYSOL.AtomicRadii.lookup(src, ions) == _resolve_all(ions)
-    end
 end

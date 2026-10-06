@@ -2,11 +2,11 @@
 
 # Exercises the Henderson-Hasselbalch protonation helpers in
 # src/MolecularStructure/Pdb2pqr.jl (used to choose pdb2pqr's
-# --neutraln/--neutralc terminus flags), and Residues' resnum/chain fields.
+# --neutraln/--neutralc terminus flags).
 
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using BAYSOL.MolecularStructure: MolecularStructure, Residues
+using BAYSOL.MolecularStructure: MolecularStructure
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
 
@@ -20,14 +20,6 @@ ref_frac_base(pH, pKa) = 1.0 / (1.0 + 10.0^(pH - pKa))
 ref_frac_acid(pH, pKa) = 1.0 / (1.0 + 10.0^(pKa - pH))
 
 @testset "Protonation" begin
-
-    @testset "Residues: resnum/chain round-trip" begin
-        r = Residues(["ASP", "LYS"], ["OD1", "NZ"], [12, 45], ["A", "B"])
-        @test r.resname == ["ASP", "LYS"]
-        @test r.atomname == ["OD1", "NZ"]
-        @test r.resnum == [12, 45]
-        @test r.chain == ["A", "B"]
-    end
 
     @testset "HH: pH == pKa -> fraction is exactly 0.5, both acid and base" begin
         @test close_(_fraction_protonated(7.0, 7.0), 0.5)

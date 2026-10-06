@@ -9,7 +9,7 @@ The workflow is:
 1. **Resolve** a structure source to a canonical local .pdb (StructureSource.jl).
 2. **Predict** per-residue-instance pKa values using external PROPKA (Propka.jl).
 3. **Add hydrogens** for a target pH using Pdb2pqr, with pKa predictions used to resolve free-terminal protonation states (Pdb2pqr.jl).
-4. **Parse** the structure into the internal Molecule/Residues representation (Mols.jl).
+4. **Parse** the structure into the internal Molecule representation (Mols.jl).
 
 Steps 2 and 3 are optional. PROPKA's pKas have exactly one consumer, the terminus protonation in step 3. So `BAYSOL.seed_model(...; add_hydrogens=false)` skips both and runs the forward model on the structure exactly as given. Use that for pre-hydrogenated models, which pdb2pqr refuses (e.g. SASDP48). Both steps cache their output in `_store_dir()`: `<stem>.pka` (`_pka_path`) and `<stem>_pH<pH>.pdb` (`_hydrogens_path`). The run report marks each one `[cache hit]`/`[cache miss]` in its timing section.
 
@@ -19,8 +19,8 @@ using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecu
 
 path = resolve_structure(LocalPathSource(pdb_path))
 pKa_records = propka_pKas(path)
-hpath = resolve_hydrogens(path, pKa_records, pH; add = true)
-mol, residues = load_molecule(hpath)
+hpath = resolve_hydrogens(path, pKa_records, pH)
+mol = load_molecule(hpath)
 ```
 
 ## Module components
@@ -51,7 +51,7 @@ path3 = resolve_structure(URLSource("https://files.rcsb.org/download/1CRN.pdb", 
 
 ### Molecule
 
-Per-atom centred coordinates in both cartesian and spherical frames, with lazily computed radii/vols/`r_max`. Both coordinate frames are (3, n) matrices sharing a column index (the atom); the spherical rows are r, theta, phi in that order (theta = acos(z/r) ∈ [0, π], phi = atan(y, x) ∈ (-π, π]). r = 0 is handled explicitly rather than producing a 0/0, since the angle is unobservable downstream anyway (j_l(0) = 0 for every l > 0).
+Per-atom centred coordinates in both cartesian and spherical frames, with lazily computed radii/vols/`r_max`. Both coordinate frames are (3, n) matrices sharing a column index (the atom); the spherical rows are r, theta, phi in that order (theta = acos(z/r) ∈ [0, π], phi = atan(y, x) ∈ (-π, π]). r = 0 is handled explicitly rather than producing a 0/0, since the angle is unobservable downstream anyway (`j_l(0)` = 0 for every l > 0).
 
 ```julia
 using BAYSOL.MolecularStructure: create, coords_cartesian, coords_spherical,
@@ -67,36 +67,23 @@ r_max(mol) # largest per-atom radius; SASA's neighbour-filter bound
 
 vols is **not** (4/3)π·radii(mol)³ (see ExcludedVolumes.jl below).
 
-`create(name, elms, coords; radii_source::RadiiSource = AtomicRadiiSource())` centres coords at the centroid and computes both coordinate frames eagerly; radii/vols/`r_max` are resolved (and cached) only on first  access, through AtomicRadii.RadiiSource.
-
-### Residues
-
-```julia
-struct Residues
- resname :: Vector{String}
- atomname :: Vector{String}
- resnum :: Vector{Int}
- chain :: Vector{String}
-end
-```
-
-Per-atom residue identity for a protein Molecule: standard PDB identity, one entry per atom, aligned with Molecule's own atom index. resnum/chain distinguish different *instances* of the same residue type (two separate "ASP" residues at different sequence positions). Nothing in the fitting pipeline consumes it at present: its only consumer, `Ionization.jl`, was removed along with the cavity electrostatics, and `seed_model` discards it.
+`create(name, elms, coords)` centres coords at the centroid and computes both coordinate frames eagerly; radii/vols/`r_max` are resolved (and cached) only on first  access, through `AtomicRadii.lookup`.
 
 ### `load_molecule`
 
 ```julia
-mol, residues = load_molecule(pdb_path) # Tuple{Molecule, Residues}
+mol = load_molecule(pdb_path)
 ```
 
-Parses whatever .pdb is at `pdb_path` into a Molecule/Residues pair. Only the first model is read, whatever its MODEL number, so an ensemble member extracted to its own file (e.g. `MODEL 63`) loads correctly.
+Parses whatever .pdb is at `pdb_path` into a Molecule. Only the first model is read, whatever its MODEL number, so an ensemble member extracted to its own file (e.g. `MODEL 63`) loads correctly.
 
 ## ExcludedVolumes.jl
 
-vols(mol) is the per-atom volume of the excluded-volume dummy species (`Scattering.excluded`/`_gaussian_dummy`): the solvent volume the atom displaces. `excluded_volume(cart, rads, tree, rmax)` computes it geometrically, adapted from Chamberlain, Moore & Grant (2023), 10.1016/j.bpj.2023.10.034: each atom's van der Waals sphere is clipped by the radical (power-diagram) planes of its overlapping neighbours, and the surviving volume is estimated by quasi-random sampling (`N_VOL_SHELL` = 2145 plastic-sequence points per atom). An atom with no overlapping neighbour keeps its whole sphere.
+`sphere_volume(r)` (4π/3·r³, defined in ExcludedVolumes.jl) is the volume of an isolated sphere. vols(mol) is the per-atom volume of the excluded-volume dummy species (`Scattering._gaussian_dummy`): the solvent volume the atom displaces. `excluded_volume(cart, rads, tree, rmax)` computes it geometrically, adapted from Chamberlain, Moore & Grant (2023), 10.1016/j.bpj.2023.10.034: each atom's van der Waals sphere is clipped by the radical (power-diagram) planes of its overlapping neighbours, and the surviving volume is estimated by quasi-random sampling (`N_VOL_SHELL` = 2145 plastic-sequence points per atom). An atom with no overlapping neighbour keeps its whole sphere.
 
-The per-atom volumes sum to the volume of the vdW union. That leaves out the packing voids between atoms that no solvent can reach (with hydrogens, Σvols ≈ 0.73 of the sequence partial molar volume and ≈ 0.66 of CRYSOL's fitted `Vol` on SASDA52). Chamberlain et al. correct for this with per-atom-type scale factors fitted to lysozyme data; BAYSOL instead leaves it to the profiled excluded-volume correction c1. Across the fitting tests c1 ≈ 1.15–1.22, so c1³ ≈ 1.5–1.8 (see test/fitting_tests/README.md).
+The per-atom volumes sum to the volume of the vdW union. That leaves out the packing voids between atoms that no solvent can reach (with hydrogens, Σvols ≈ 0.73 of the sequence partial molar volume and ≈ 0.66 of CRYSOL's fitted `Vol` on SASDA52). Chamberlain et al. correct for this with per-atom-type scale factors fitted to lysozyme data; BAYSOL instead leaves it to the profiled excluded-volume correction c1. Across the fitting tests c1 ≈ 1.15–1.22, so c1³ ≈ 1.5–1.8 (see `test/fitting_tests/README.md`).
 
-A solvent-excluded-surface (SES) partition that includes those voids was tried on 2026-09-29 and reverted: with it, every tested dataset's best fit required a negative convex-shell contrast (δρ₁ < 0), which the δρ priors exclude, and under the priors SASDA52's fit degraded from χ²_red ≈ 6 to ≈ 19.
+A solvent-excluded-surface (SES) partition that includes those voids was tried on 2026-09-29 and reverted: with it, every tested dataset's best fit required a negative convex-shell contrast (δρ₁ < 0), which the δρ priors exclude, and under the priors SASDA52's fit degraded from `χ²_red` ≈ 6 to ≈ 19.
 
 radii stays the isolated van der Waals radius throughout (SASA and hydration-shell generation need real atomic sizes); vols is **not** (4/3)π·radii³.
 
@@ -119,13 +106,10 @@ records = propka_pKas(pdb_path)
 ```julia
 using BAYSOL.MolecularStructure: resolve_hydrogens, Pdb2pqrError
 
-hpath = resolve_hydrogens(pdb_path, pKa_records, pH; add = true)
+hpath = resolve_hydrogens(pdb_path, pKa_records, pH)
 ```
 
-`resolve_hydrogens(pdb_path, pKa_records, pH; add=true)`:
-
-- With add=true (default), runs pdb2pqr --ff PARSE --titration-state-method propka --with-ph <pH></ph> on the heavy-atom .pdb at `pdb_path` and returns the path to a hydrogen-included .pdb stored in `_store_dir()` under `"<stem>_pH<pH>.pdb"`. A repeat call for the same (stem, pH) is a cache hit and not re-run.
-- With add=false, it is a no-op: `pdb_path` is returned unchanged.
+`resolve_hydrogens(pdb_path, pKa_records, pH)` runs pdb2pqr --ff PARSE --titration-state-method propka --with-ph <pH></ph> on the heavy-atom .pdb at `pdb_path` and returns the path to a hydrogen-included .pdb stored in `_store_dir()` under `"<stem>_pH<pH>.pdb"`. A repeat call for the same (stem, pH) is a cache hit and not re-run.
 
 `pKa_records` must be the records [`propka_pKas`](@ref BAYSOL.MolecularStructure.propka_pKas) produced **on this same structure**. PARSE has no nucleotide parameters, so this path is protein-only (see CLAUDE.md, "Nucleotide support").
 
@@ -217,3 +201,10 @@ f = 1 / (1 + 10^(pKa - pH))
 ## MolecularStructure.jl
 
 Includes the five files above in dependency order (Mols.jl, ExcludedVolumes.jl, Propka.jl, StructureSource.jl, Pdb2pqr.jl) and provides `_store_dir()`, the shared `_cache/` path used throughout the module.
+
+## Constants
+
+Defined at module level in `MolecularStructure.jl`.
+
+
+`N_VOL_SHELL` (2145 quasi-random points per atom for the power-diagram excluded-volume estimate in `MolecularStructure.excluded_volume`)

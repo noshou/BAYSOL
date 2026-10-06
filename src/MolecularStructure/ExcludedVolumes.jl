@@ -8,11 +8,12 @@
 # excluded_volume below) rather than looked up from a per-element table.
 
 using NearestNeighbors: inrange, KDTree
-using ..Geometry: sphere_volume
-using ..Geometry.PlasticSequence: plastic_points, Vec3
-using ..BAYSOL_Utils.Constants: N_VOL_SHELL
+using ..PlasticSequence: plastic_points, Vec3
 using LinearAlgebra: dot
 using StaticArrays: SVector
+
+"Volume of a sphere of radius rad."
+sphere_volume(rad::Float64)::Float64 = (4.0 / 3.0) * π * rad^3
 
 """
 Points to map onto the volume of a sphere.
@@ -25,8 +26,6 @@ const _uy::Vector{Float64} = [u[2] for u in _pts]
 const _uz::Vector{Float64} = [u[3] for u in _pts]
 
 """
-$(TYPEDSIGNATURES)
-
 Per-atom excluded (displaced-solvent) volume in Å³. Algorithm adapted from Chamberlain,
 Moore & Grant (2023), DOI 10.1016/j.bpj.2023.10.034 "Fitting high-resolution
 electron density maps from atomic models to solution scattering data".
@@ -37,32 +36,32 @@ i's excluded volume is the intersection
 
     S_i = {x : |x - p_i| ≤ r_i ∧ power_i(x) ≤ power_j(x) ∀ overlapping neighbour j}
 
-where power_k(x) = |x - p_k|² - r_k², and x is a point within i's vdW radius.
+where `power_k(x)` = |x - `p_k`|² - `r_k²`, and x is a point within i's vdW radius.
 
-Rather than computing S_i exactly (the volume of a ball clipped by the
+Rather than computing `S_i` exactly (the volume of a ball clipped by the
 half-spaces, which has no simple closed  form once more than one neighbour
-cuts the same region), S_i is estimated by sampling: N_VOL_SHELL points
+cuts the same region), `S_i` is estimated by sampling: `N_VOL_SHELL` points
 from [`_pts`](@ref) are scaled/translated onto i's sphere,
 each is tested against every overlapping neighbour's radical plane
-(dot(x - p_i, n) ≤ plane_dist, computed as dot(x, n) ≤ plane_dist +
-dot(p_i, n) to avoid re-translating every sample point), and the surviving
-fraction scales [`sphere_volume`](@ref)(r_i).
+(dot(x - `p_i`, n) ≤ `plane_dist`, computed as dot(x, n) ≤ `plane_dist` +
+dot(`p_i`, n) to avoid re-translating every sample point), and the surviving
+fraction scales [`sphere_volume`](@ref)(`r_i`).
 
 An atom with no overlapping neighbours skips sampling and returns its full 
-sphere_volume; an atom whose sphere is entirely engulfed by its neighbours 
+`sphere_volume`; an atom whose sphere is entirely engulfed by its neighbours 
 returns 0.0.
 
 # Arguments
 - `cart::Matrix{Float64}`: (3, n) centroid-centred cartesian coordinates,
-    i.e. coords_cartesian(mol).
+    i.e. `coords_cartesian(mol)`.
 - `rads::Vector{Float64}`: per-atom van der Waals radius, i.e. radii(mol).
-- `tree::KDTree`: neighbour-query tree over cart, i.e. neighbour_tree(mol).
-- `rmax::Float64`: largest per-atom radius in rads, i.e. r_max(mol); bounds
-    the candidate search per atom (d_ij < r_i + r_j ≤ r_i + rmax).
+- `tree::KDTree`: neighbour-query tree over cart, i.e. `neighbour_tree(mol)`.
+- `rmax::Float64`: largest per-atom radius in rads, i.e. `r_max(mol)`; bounds
+    the candidate search per atom (`d_ij` < `r_i` + `r_j` ≤ `r_i` + rmax).
 
 # Returns
 - `Vector{Float64}`: one excluded volume per atom, in the same order as
-    cart's columns / rads; each entry is ≥ 0 and ≤ sphere_volume(rads[i]).
+    cart's columns / rads; each entry is ≥ 0 and ≤ `sphere_volume(rads[i])`.
 """
 function excluded_volume(
     cart::Matrix{Float64},

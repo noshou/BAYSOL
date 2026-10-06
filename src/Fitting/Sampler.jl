@@ -6,14 +6,11 @@ using   AdvancedHMC: DenseEuclideanMetric, Hamiltonian, MassMatrixAdaptor,
 using   FastClosures, StaticArrays, Distributions, ForwardDiff, DiffResults
 using   SpecialFunctions: digamma, trigamma
 using ..Scattering: ForwardCache
-using ..BAYSOL_Utils.Constants: DEFAULT_TEMPERATURE_C, DRO12_CONCENTRATION, DRO3_CONCENTRATION,
-                                DEFAULT_TARGET_ACCEPT, NS_PER_S
-using ..BAYSOL_Utils.Timing: StageLog, tick, tock!, fmt_count
+using ..PhysicalConstants: NS_PER_S, MS_PER_S
+using ..Timing: StageLog, tick, tock!, fmt_count
 using Printf: @sprintf
 
 """
-$(TYPEDSIGNATURES)
-
 Generates physical prior distributions of ξ.
 
 # Arguments
@@ -47,8 +44,6 @@ function _calc_ξ_priors(
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Generates an initial physical parameter vector ξ₀, one draw from each prior.
 
 # Arguments
@@ -66,13 +61,11 @@ function _ξ₀(p::ξ_priors)::SVector{4,<:Real}
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Per-coordinate prior mean and standard deviation in θ-space, used by
-[`_standardize`](@ref)/[`_destandardize`](@ref) to rescale θ before handing
-it to AdvancedHMC.jl, and by [`prior_z_scores`](@ref).
+[`_standardize`](@ref) and the [`_SamplingSpace`](@ref) map to rescale θ before
+handing it to AdvancedHMC.jl, and by [`prior_z_scores`](@ref).
 
-All four are exact. a = ln ρₑ is Normal(μ_ln, σ_ln) under its LogNormal
+All four are exact. a = ln ρₑ is Normal(`μ_ln`, `σ_ln`) under its LogNormal
 prior. For the other three coordinates, tₖ = logit(uₖ) with uₖ ~ Beta(α, β)
 the prior's unit-interval variable (uₖ = (δρₖ + 10)/12 for δρ₁, δρ₂ and
 u = (δρ₃ − L₃)/W₃ for δρ₃):
@@ -104,42 +97,31 @@ function _logit_moments(b::Beta)
 end
 
 """
-    _standardize(θ::SVector{4,<:Real}, p::ξ_priors) -> SVector{4,<:Real}
-    _destandardize(z::SVector{4,<:Real}, p::ξ_priors) -> SVector{4,<:Real}
+Affine map from θ-space to a prior-standardized z-space, z = (θ - μ) / σ, with (μ, σ)
+from [`θ_prior_moments`](@ref).
 
-Affine maps between θ-space and a prior-standardized z-space,
-z = (θ - μ) / σ / its inverse θ = μ + σ·z, with (μ, σ) from
-[`θ_prior_moments`](@ref).
+θ's four coordinates have wildly different natural (prior) scales. In z-space each
+`z_i` is standard-Normal-like under the prior, so the MAP search's L-BFGS starts
+(see [`_SamplingSpace`](@ref)) and its first Hessian probe step see O(1) scales in
+every coordinate. NUTS itself samples a further whitened coordinate w,
+z = ẑ + S·w; the inverse map back to θ is [`_θ_of_w`](@ref).
 
-θ's four coordinates have wildly different natural (prior) scales;
-a step in one parameter is enough to send another to an unphysical region
-and push the forward model to a flat curve (wls_fit's det(XᵀWX) ≤ 0 guard).
-
-Sampling in z-space makes a generic O(1) kick ~1 prior-σ in
-every coordinate uniformly (each z_i is standard-Normal under the
-prior), so find_good_stepsize's very first candidate step does not overshoot.
-
-The Jacobian of the map (|dθ/dz| = Πσ_i) is a z-independent
-constant, so it's omitted from _logπ/the z-space wrapper around it.
+The Jacobian of the map (|dθ/dz| = `Πσ_i`) is a z-independent constant, so it is
+omitted from the log-density in z (and w) space.
 
 # Arguments
-- `θ/z::SVector{4,<:Real}`: as above.
+- `θ::SVector{4,<:Real}`: a θ-space point.
 - `p::ξ_priors`: supplies (μ, σ) via [`θ_prior_moments`](@ref).
+
+# Returns
+- `SVector{4,<:Real}`: z.
 """
 function _standardize(θ::SVector{4,<:Real}, p::ξ_priors)
     μ, σ = θ_prior_moments(p)
     return (θ .- μ) ./ σ
 end
 
-"Inverse of [`_standardize`](@ref); see its docstring for both directions."
-function _destandardize(z::SVector{4,<:Real}, p::ξ_priors)
-    μ, σ = θ_prior_moments(p)
-    return μ .+ σ .* z
-end
-
 """
-$(TYPEDSIGNATURES)
-
 How many prior standard deviations a physical-space point ξ = (ρₑ, δρ₁,
 δρ₂, δρ₃) sits from its own prior p.
 
@@ -159,83 +141,85 @@ end
 "Dispatch tag selecting profile vs. marginal log-likelihood in [`_ll`](@ref)."
 abstract type LIKELIHOOD end
 
-"Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The
-forward model produces a predicted curve y_model(q), but the data I_exp(q)
+"""
+Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The
+forward model produces a predicted curve `y_model(q)`, but the data `I_exp(q)`
 sits at some unknown overall scale scale and background offset
-bkgrnd_corr, i.e. I_calc = scale·y_model + bkgrnd_corr. WLS.jl fits
-(scale, bkgrnd_corr) in closed form (2-parameter weighted linear
+`bkgrnd_corr`, i.e. `I_calc` = scale·`y_model` + `bkgrnd_corr`. WLS.jl fits
+(scale, `bkgrnd_corr`) in closed form (2-parameter weighted linear
 regression), and reports the resulting Gaussian log-likelihood two ways,
 selected by l:
 
-- `l = PROFILE()`: treat (scale, bkgrnd_corr) as pinned at their best-fit
+- `l = PROFILE()`: treat (scale, `bkgrnd_corr`) as pinned at their best-fit
     values (a point estimate) [`wls_prof_ll`](@ref):
 
         -½χ² - ½ Σln(σᵢ²) - ½n·ln(2π)
 
-- `l = MARGINAL()`: instead of pinning (scale, bkgrnd_corr), integrate
+- `l = MARGINAL()`: instead of pinning (scale, `bkgrnd_corr`), integrate
     them out analytically under a flat prior (Gaussian integral in closed
-    form since the problem is linear in scale, bkgrnd_corr) [`wls_marg_ll`](@ref). 
+    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref). 
     This adds a correction term:
 
         -½ln(det(XᵀWX))
 
     which lets uncertainty in scale/background flow into the posterior on the
-    physical parameters, instead of freezing it out. "
+    physical parameters, instead of freezing it out.
+"""
 struct PROFILE<:LIKELIHOOD
     type::AbstractString
     PROFILE() = new("profile_log_likelihood")
 end
 
-"Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The
-forward model produces a predicted curve y_model(q), but the data I_exp(q)
+"""
+Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The
+forward model produces a predicted curve `y_model(q)`, but the data `I_exp(q)`
 sits at some unknown overall scale scale and background offset
-bkgrnd_corr, i.e. I_calc = scale·y_model + bkgrnd_corr. WLS.jl fits
-(scale, bkgrnd_corr) in closed form (2-parameter weighted linear
+`bkgrnd_corr`, i.e. `I_calc` = scale·`y_model` + `bkgrnd_corr`. WLS.jl fits
+(scale, `bkgrnd_corr`) in closed form (2-parameter weighted linear
 regression), and reports the resulting Gaussian log-likelihood two ways,
 selected by l:
 
-- `l = PROFILE()`: treat (scale, bkgrnd_corr) as pinned at their best-fit
+- `l = PROFILE()`: treat (scale, `bkgrnd_corr`) as pinned at their best-fit
     values (a point estimate) [`wls_prof_ll`](@ref):
 
         -½χ² - ½ Σln(σᵢ²) - ½n·ln(2π)
 
-- `l = MARGINAL()`: instead of pinning (scale, bkgrnd_corr), integrate
+- `l = MARGINAL()`: instead of pinning (scale, `bkgrnd_corr`), integrate
     them out analytically under a flat prior (Gaussian integral in closed
-    form since the problem is linear in scale, bkgrnd_corr) [`wls_marg_ll`](@ref). 
+    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref). 
     This adds a correction term:
 
         -½ln(det(XᵀWX))
 
     which lets uncertainty in scale/background flow into the posterior on the
-    physical parameters, instead of freezing it out. "
+    physical parameters, instead of freezing it out.
+"""
 struct MARGINAL<:LIKELIHOOD
     type::AbstractString
     MARGINAL() = new("marginal_log_likelihood")
 end
 
-""" Returns the log likelhihoods """
+""" Returns the log-likelihood of a WLS fit under the given likelihood type. """
 __ll(fit::WLSFit, ::PROFILE)  = wls_prof_ll(fit)
 __ll(fit::WLSFit, ::MARGINAL) = wls_marg_ll(fit)
 
 """
-$(TYPEDSIGNATURES)
-
 Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The
-forward model produces a predicted curve y_model(q), but the data I_exp(q)
+forward model produces a predicted curve `y_model(q)`, but the data `I_exp(q)`
 sits at some unknown overall scale scale and background offset
-bkgrnd_corr, i.e. I_calc = scale·y_model + bkgrnd_corr. WLS.jl fits
-(scale, bkgrnd_corr) in closed form (2-parameter weighted linear
+`bkgrnd_corr`, i.e. `I_calc` = scale·`y_model` + `bkgrnd_corr`. WLS.jl fits
+(scale, `bkgrnd_corr`) in closed form (2-parameter weighted linear
 regression), and reports the resulting Gaussian log-likelihood two ways,
 selected by l:
 
-- `l = PROFILE()`: treat (scale, bkgrnd_corr) as pinned at their best-fit
+- `l = PROFILE()`: treat (scale, `bkgrnd_corr`) as pinned at their best-fit
     values (a point estimate) [`wls_prof_ll`](@ref):
 
         -½χ² - ½ Σln(σᵢ²) - ½n·ln(2π)
 
-- `l = MARGINAL()`: instead of pinning (scale, bkgrnd_corr), integrate
+- `l = MARGINAL()`: instead of pinning (scale, `bkgrnd_corr`), integrate
     them out analytically under a flat prior (Gaussian integral in closed
-    form since the problem is linear in scale, bkgrnd_corr) [`wls_marg_ll`](@ref). 
+    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref). 
     This adds a correction term:
 
         -½ln(det(XᵀWX))
@@ -244,12 +228,16 @@ selected by l:
     physical parameters, instead of freezing it out.
 
 # Arguments
-- `wls::WLSData`: precomputed data-only weighted sums over (I_exp, σ_exp),
+- `wls::WLSData`: precomputed data-only weighted sums over (`I_exp`, `σ_exp`),
     from [`WLSData`](@ref); forwarded to [`profiled_corrs`](@ref).
 - `ξ::SVector{4,<:Real}`: the physical fit parameters (ρₑ, δρ₁, δρ₂, δρ₃).
 - `fw::ForwardCache`: the structure's static cache, from [`BAYSOL.Scattering.forward_cache`](@ref).
 - `l::LIKELIHOOD`: `PROFILE()` or `MARGINAL()`, selecting which log-likelihood
     variant to return.
+
+# Keywords
+- `tab::Union{Nothing,_C1Tables} = nothing`, `c1_tol = EXCL_VOL_CORR_TOL`: forwarded to
+    [`profiled_corrs`](@ref) as `tables`/`tol`.
 
 # Returns
 - `Real`: the log-likelihood, composing by addition with the log-prior terms.
@@ -260,14 +248,13 @@ function _ll(
     fw::ForwardCache,
     l::LIKELIHOOD;
     tab::Union{Nothing,_C1Tables} = nothing,
+    c1_tol::Float64 = EXCL_VOL_CORR_TOL,
 )
-    _, fit, _ = profiled_corrs(wls, ξ, fw; tables = tab)
+    _, fit, _ = profiled_corrs(wls, ξ, fw; tables = tab, tol = c1_tol)
     return __ll(fit, l)
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Log prior density of ξ = (ρₑ, δρ₁, δρ₂, δρ₃) in ξ-space. The δρ `LocationScale`
 priors carry their own -ln W terms.
 """
@@ -276,8 +263,6 @@ _lp(ξ::SVector{4,<:Real}, p::ξ_priors) =
     logpdf(p.δρ₃Prior, ξ[4])
 
 """
-$(TYPEDSIGNATURES)
-
 By change of variables, a density trasnfromed from ξ-space into θ-space picks
 up the Jacobian of ξ(θ):
 
@@ -311,6 +296,9 @@ giving:
 - `fw::ForwardCache`: the structure's geometry-only cache, forwarded to [`_ll`](@ref).
 - `l::LIKELIHOOD`: PROFILE() or MARGINAL(), forwarded to [`_ll`](@ref).
 
+# Keywords
+- `tab`, `c1_tol`: forwarded to [`_ll`](@ref).
+
 # Returns
 - `Real`: log π(θ), up to the additive constant NUTS doesn't need.
 """
@@ -321,9 +309,10 @@ function _logπ(
     fw::ForwardCache,
     l::LIKELIHOOD;
     tab::Union{Nothing,_C1Tables} = nothing,
+    c1_tol::Float64 = EXCL_VOL_CORR_TOL,
 )
     ξ = Ξ(θ, p)  # unconstrained θ-space -> physical ξ-space
-    return _lp(ξ, p) + _ll(wls, ξ, fw, l; tab = tab) + logjac(θ, p)
+    return _lp(ξ, p) + _ll(wls, ξ, fw, l; tab = tab, c1_tol = c1_tol) + logjac(θ, p)
 end
 
 """
@@ -333,10 +322,10 @@ Everything [`run_fitting`](@ref) needs to start a NUTS chain.
 
 # Fields
 - `pr::ξ_priors`: the physical priors over ξ, from [`_calc_ξ_priors`](@ref).
-- `ξ₀::SVector{4,T}`: one draw from pr, in physical ξ-space, from [`_ξ₀`](@ref).
-- `θ₀::SVector{4,T}`: ξ₀ reparameterized into unconstrained θ-space via [`Θ`](@ref).
+- `θ₀::SVector{4,T}`: one draw from pr ([`_ξ₀`](@ref)), reparameterized into
+    unconstrained θ-space via [`Θ`](@ref); the first start of the MAP search.
 - `fw::ForwardCache`: the structure's geometry-only cache (the Gram matrix
-    G(q), q-grid, and mean atomic radius), from forward_cache.
+    G(q), q-grid, and mean atomic radius), from `forward_cache`.
 - `wls::WLSData`: the measured intensity curve and its per-point standard
     errors, precomputed into [`WLSData`](@ref) once so the NUTS hot path
     (`_ll`/`_logπ`) never rebuilds the data-only weighted sums.
@@ -348,7 +337,6 @@ Everything [`run_fitting`](@ref) needs to start a NUTS chain.
 """
 struct Seed{T<:Real}
     pr::ξ_priors
-    ξ₀::SVector{4,T}
     θ₀::SVector{4,T}
     fw::ForwardCache
     wls::WLSData
@@ -357,8 +345,6 @@ struct Seed{T<:Real}
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Runs initial seeding for the sampler.
 
 # Arguments
@@ -397,19 +383,19 @@ function seed_fitting(
     ξ₀ = _ξ₀(pr)
     θ₀, _ = Θ(ξ₀, pr)
     wls = WLSData(I_exp, σ_exp)
-    return Seed(pr, ξ₀, θ₀, fw, wls, timing, _C1Tables(fw))
+    return Seed(pr, θ₀, fw, wls, timing, _C1Tables(fw))
 end
 
 """
     FitResult{S}
 
-Return of [`run_fitting`](@ref)/BAYSOL.run_model: the posterior
+Return of [`run_fitting`](@ref)`/BAYSOL.run_model`: the posterior
 draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
-(scale, bkgrnd_corr, c1) triple and predicted curve per draw, and
+(scale, `bkgrnd_corr`, c1) triple and predicted curve per draw, and
 AdvancedHMC.jl's own per-iteration diagnostics.
 
 # Fields
-- `samples::Vector{SVector{4,Float64}}`: posterior draws of ξ, length n_samples.
+- `samples::Vector{SVector{4,Float64}}`: posterior draws of ξ, length `n_samples`.
 - `stats::Vector{S}`: AdvancedHMC.jl's per-iteration diagnostics, matching
     samples index-for-index.
 - `scale::Vector{Float64}`: the WLS estimate of the scale correction at samples[i].
@@ -419,10 +405,9 @@ AdvancedHMC.jl's own per-iteration diagnostics.
     has no prior and therefore no z-score, unlike `samples`.
 - `chisq_red::Vector{Float64}`:  the reduced χ² of the WLS estimate
 - `curves::Matrix{Float64}, (Q, n_samples)`: the detector-scale predicted
-    curve I_calc(q) = scale[i]·y_model(q) + bkgrnd_corr[i] for each
-    samples[i], column-matching scale/bkgrnd_corr. Equivalently
-    curves[:, i] == forward(seed.fw, scale[i], bkgrnd_corr[i], samples[i][1],
-    samples[i][2:4], c1[i]).
+    curve `I_calc(q)` = scale[i]·`y_model(q)` + `bkgrnd_corr[i]` for each
+    samples[i], column-matching `scale/bkgrnd_corr`, with the model `y_model` the
+    five-species contraction v(q)ᵀ G(q) v(q) at samples[i] and c1[i].
 - `likelihood::AbstractString`: the likelihood type
 - `timing::Union{Nothing,StageLog}`: the run's stage log (from the `Seed`), if timing is on.
 """
@@ -439,11 +424,9 @@ struct FitResult{S}
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Run NUTS on [`_logπ`](@ref) starting from seed, returning posterior draws
 of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one (scale,
-bkgrnd_corr) pair per draw (see # Returns below), and AdvancedHMC.jl's
+`bkgrnd_corr`) pair per draw (see # Returns below), and AdvancedHMC.jl's
 own per-iteration diagnostics.
 
 # The Hamiltonian
@@ -469,9 +452,19 @@ need to hand-pick a trajectory length: it grows the leapfrog trajectory by
 doubling a binary tree of steps, forward and backward in time, until the trajectory
 starts to double back on itself (a "U-turn"), then samples from the valid part of that tree.
 
+# MAP search and whitening
+
+Before NUTS, [`_sampling_space`](@ref) runs multi-start L-BFGS on the same log π
+to find its mode, takes a central-difference Hessian there, and NUTS then samples
+w with θ = μ + σ·(ẑ + S·w), in which the posterior is ≈ N(0, I) and the chain
+starts at the mode. The map is affine, so the target is unchanged; it only puts
+Stan's adaptation (identity starting metric, covariance shrunk toward 1e-3·I) on
+the O(1) scales it assumes, instead of posteriors up to ~10⁴ times narrower
+than the prior along some directions.
+
 # Step-size adaptation
 
-δ is the target Metropolis acceptance rate. During the first n_adapt iterations,
+δ is the target Metropolis acceptance rate. During the first `n_adapt` iterations,
 StepSizeAdaptor tunes the leapfrog step size ε via dual-averaging so the
 empirical acceptance rate converges to δ; too-small ε wastes computation
 taking tiny steps, too-large ε causes leapfrog's discretization error (and
@@ -493,8 +486,8 @@ forward model) from the trajectory's sample covariance.
                                 [`DEFAULT_TARGET_ACCEPT`](@ref), is Stan's usual 80%.
 
 # Returns
-A [`FitResult`](@ref). Includes the n_adapt warm-up draws; a caller that wants a
-warmup-free posterior slices n_adapt+1:end (curves: [:, n_adapt+1:end])
+A [`FitResult`](@ref). Includes the `n_adapt` warm-up draws; a caller that wants a
+warmup-free posterior slices `n_adapt`+1:end (curves: [:, `n_adapt`+1:end])
 out of every field itself.
 """
 function run_fitting(
@@ -514,44 +507,56 @@ function run_fitting(
         throw(DomainError((n_adapt, n_samples), "n_adapt must be < n_samples"))
     end
 
+    # MAP search + Laplace whitening (MAP.jl): NUTS samples w, θ = μ + σ·(ẑ + S·w),
+    # in which the posterior is ≈ N(0, I) and the chain starts at the MAP.
+    t_map = tick()
+    sp = _sampling_space(seed, l)
+    if seed.timing !== nothing
+        seed.timing.info["map_modes"] = sp.n_modes
+        tock!(seed.timing, :sampling, 1,
+            "MAP search + whitening ($(sp.n_ok)/$(MAP_N_STARTS) starts, $(sp.n_modes) " *
+            "mode$(sp.n_modes == 1 ? "" : "s")$(sp.whitened ? "" : ", not whitened"))",
+            t_map)
+    end
+
     t_setup = tick()
 
-    # ℓπ: z ↦ log π(θ(z)), the value-only log-posterior in prior-standardized z-space.
-    ℓπ = @closure z -> _logπ(
-        _destandardize(SVector{4,eltype(z)}(z...), seed.pr),
+    # ℓπ: w ↦ log π(θ(w)), the value-only log-posterior in NUTS's coordinates w.
+    ℓπ = @closure w -> _logπ(
+        _θ_of_w(SVector{4,eltype(w)}(w...), sp),
         seed.pr,
         seed.wls,
         seed.fw, l;
         tab = seed.c1tab,
     )
 
-    # ∂ℓπ∂z: z ↦ (log π(θ(z)), ∇_z log π(θ(z))), computed in one ForwardDiff pass.
-    ∂ℓπ∂z = @closure z -> begin
-        result = DiffResults.GradientResult(z)
-        ForwardDiff.gradient!(result, ℓπ, z)
+    # ∂ℓπ∂w: w ↦ (log π(θ(w)), ∇_w log π(θ(w))), computed in one ForwardDiff pass.
+    ∂ℓπ∂w = @closure w -> begin
+        result = DiffResults.GradientResult(w)
+        ForwardDiff.gradient!(result, ℓπ, w)
         (DiffResults.value(result), DiffResults.gradient(result))
     end
 
     # DenseEuclideanMetric allows the adaptation to learn
     # correlations between parameters. Since we are only fitting
     # 4 or 5 params (once δρ4 lands) and they are highly coupled, it is
-    # worth it here.
+    # worth it here. After the whitening it starts (M⁻¹ = I) close to right.
     # sized from the parameter vector itself, so it follows θ when δρ4 widens it
     metric = DenseEuclideanMetric(length(seed.θ₀))
 
     # combines "potential energy" (ℓπ) and kinetic energy (from metric)
-    hamiltonian = Hamiltonian(metric, ℓπ, ∂ℓπ∂z)
+    hamiltonian = Hamiltonian(metric, ℓπ, ∂ℓπ∂w)
 
     # AdvancedHMC.jl's DiagEuclideanMetric/DenseEuclideanMetric store M⁻¹ as
     # a plain Vector/Matrix (Base.OneTo axes) and check axes(M⁻¹) against
-    # axes(z)/axes(r); an SVector's SOneTo axes fail that check even though
+    # axes(w)/axes(r); an SVector's SOneTo axes fail that check even though
     # the ranges match. Start from a plain Vector instead of an SVector
-    # directly, at z₀ = _standardize(seed.θ₀, seed.pr).
-    z₀ = Vector(_standardize(seed.θ₀, seed.pr))
+    # directly, at w₀ = 0, the MAP.
+    w₀ = zeros(Float64, length(seed.θ₀))
 
     # HMC numerically integrates the Hamiltonian, so we need to
     # guess a good step size.
-    init_step_size = find_good_stepsize(hamiltonian, z₀)
+    init_step_size = find_good_stepsize(hamiltonian, w₀)
 
     # Leapfrog integration evaluates kinetic energy first, then
     # "skips over" that evaluated position to the next one for potential energy.
@@ -565,7 +570,7 @@ function run_fitting(
         StepSizeAdaptor(δ, integrator)
     )
 
-    # the sampler in z-space
+    # the sampler in w-space
     kernel = HMCKernel(Trajectory{MultinomialTS}(integrator, GeneralisedNoUTurn()))
 
     # do sampling
@@ -574,16 +579,16 @@ function run_fitting(
     samples, stats = sample(
         hamiltonian,
         kernel,
-        z₀,
+        w₀,
         n_samples,
         adaptor,
         n_adapt;
         progress=true
     )
-    samples = [Ξ(_destandardize(SVector{4,Float64}(s...), seed.pr), seed.pr) for s in samples]
+    samples = [Ξ(_θ_of_w(SVector{4,Float64}(s...), sp), seed.pr) for s in samples]
     if seed.timing !== nothing
         n_lf = sum(getproperty.(stats, :n_steps))
-        ms = 1e3 * (time_ns() - t_nuts[1]) / NS_PER_S / max(n_lf, 1)   # ms per leapfrog step
+        ms = MS_PER_S * (time_ns() - t_nuts[1]) / NS_PER_S / max(n_lf, 1)   # ms per leapfrog step
         seed.timing.info["leapfrog"] = n_lf
         tock!(seed.timing, :sampling, 1,
             @sprintf("NUTS  (%s iters, %s leapfrog, %.1f ms/step)", fmt_count(n_samples), fmt_count(n_lf), ms),

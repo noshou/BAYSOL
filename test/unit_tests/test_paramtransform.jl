@@ -13,7 +13,7 @@ using Random
 using StaticArrays
 using Distributions: mean
 using BAYSOL.Fitting: Θ, Ξ, ρₑ_prior, δρ_prior, ξ_priors, Solute, NonBiological
-using BAYSOL.Constants: DRO_BOUNDS, DRO12_CONCENTRATION, DRO3_CONCENTRATION
+using BAYSOL.Fitting: DRO_BOUNDS, DRO12_CONCENTRATION, DRO3_CONCENTRATION
 
 const logjac = BAYSOL.Fitting.logjac
 
