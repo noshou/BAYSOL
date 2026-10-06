@@ -9,8 +9,10 @@ using FastClosures: @closure
 using BioStructures: BioStructures, PDBFormat, writepdb, collectatoms,
                     chainid, chainids, collectmodels
 
-"Raised when pdb2pqr cannot be run or produces no usable output (bad input
-path, non-zero exit, missing expected output file)."
+"""
+Raised when pdb2pqr cannot be run or produces no usable output (bad input
+path, non-zero exit, missing expected output file).
+"""
 struct Pdb2pqrError <: Exception; msg::String end
 Base.showerror(io::IO, e::Pdb2pqrError) = print(io, "Pdb2pqrError: ", e.msg)
 
@@ -19,8 +21,6 @@ Base.showerror(io::IO, e::Pdb2pqrError) = print(io, "Pdb2pqrError: ", e.msg)
 # ---------------------------------------------------------------------------
 
 """
-$(TYPEDSIGNATURES)
-
 Henderson-Hasselbalch fraction of a **base** group's titratable atoms that
 are protonated (and therefore, for a base, charged) at solution pH:
 
@@ -31,8 +31,6 @@ f -> 1 for pH ≪ pKa, f -> 0 for pH ≫ pKa, and f == 0.5 at pH == pKa.
 _fraction_protonated(pH::Real, pKa::Real)::Real = 1 / (1 + 10^(pH - pKa))
 
 """
-$(TYPEDSIGNATURES)
-
 Henderson-Hasselbalch fraction of an **acid** group's titratable atoms that
 are deprotonated (and therefore, for an acid, charged) at solution pH:
 
@@ -43,8 +41,6 @@ i.e. 1 - [`_fraction_protonated`](@ref)(pH, pKa).
 _fraction_deprotonated(pH::Real, pKa::Real)::Real = 1 / (1 + 10^(pKa - pH))
 
 """
-$(TYPEDSIGNATURES)
-
 Whether an ionizable group of type ("acid" or "base") carries its
 titratable hydrogen at solution pH. For a base, protonated ⟺ charged; for an
 acid, protonated ⟺ neutral. Both reduce to the same rule on the group's
@@ -62,8 +58,6 @@ function _group_protonated(type::AbstractString, pH::Real, pKa::Real)::Bool
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Partition `chains` by the pdb2pqr --neutraln/--neutralc flag combination
 each one individually needs, using [`_group_protonated`](@ref) per chain's
 own N+/C- record rather than demanding one global decision across the whole
@@ -109,25 +103,21 @@ function _terminus_groups(
 end
 
 """
-$(TYPEDSIGNATURES)
-
-Every chain with at least one N+/C- record in pKa_records -- derived from
-pKa_records alone, no structure file I/O. A chain absent from this list has
+Every chain with at least one N+/C- record in `pKa_records` -- derived from
+`pKa_records` alone, no structure file I/O. A chain absent from this list has
 no free terminus to override and is therefore guaranteed to need no
 --neutraln/--neutralc flags regardless of what [`_terminus_groups`](@ref)
 decides for the chains that do, which is what lets [`resolve_hydrogens`](@ref)
-check for a termini conflict up front without needing to parse pdb_path at
+check for a termini conflict up front without needing to parse `pdb_path` at
 all in the (overwhelmingly common) no-conflict case.
 """
 _termini_chains(pKa_records)::Vector{String} =
     unique(String(r.chain) for r in pKa_records if r.resname == "N+" || r.resname == "C-")
 
 """
-$(TYPEDSIGNATURES)
-
-Run pdb2pqr on in_path with the given global --neutraln/--neutralc flags,
-writing hydrogenated output to out_path. Throws [`Pdb2pqrError`](@ref) if
-pdb2pqr isn't found, exits non-zero, or doesn't produce out_path.
+Run pdb2pqr on `in_path` with the given global --neutraln/--neutralc flags,
+writing hydrogenated output to `out_path`. Throws [`Pdb2pqrError`](@ref) if
+pdb2pqr isn't found, exits non-zero, or doesn't produce `out_path`.
 """
 function _run_pdb2pqr(
     in_path::AbstractString, flags::Vector{String}, pH::Real, out_path::AbstractString
@@ -150,35 +140,21 @@ _hydrogens_path(pdb_path::AbstractString, pH::Real) =
     joinpath(_store_dir(), "$(splitext(basename(abspath(pdb_path)))[1])_pH$(Float64(pH)).pdb")
 
 """
-$(TYPEDSIGNATURES)
-
-Resolve whether/how pdb_path gets explicit hydrogens.
-
-With add=true (the default), runs pdb2pqr on the heavy-atom .pdb at
-pdb_path and returns the path to a hydrogen-included .pdb stored in
-[`_store_dir`](@ref) (identical to this function's old add_hydrogens
-behaviour). With add=false, this is a genuine no-op: pdb_path is returned
-unchanged, with no file write, no [`_store_dir`](@ref) entry, and no
-pdb2pqr subprocess invoked at all.
+Add explicit hydrogens: runs pdb2pqr on the heavy-atom .pdb at `pdb_path` and
+returns the path to a hydrogen-included .pdb stored in [`_store_dir`](@ref).
 
 # Arguments
 - `pdb_path`: path to a heavy-atom .pdb (e.g. from [`resolve_structure`](@ref)).
 - `pKa_records`: records as returned by [`propka_pKas`](@ref) **on this same
     structure**; this is assumed, not re-verified, since the termini flags
     (and hence the cache key's implicit correctness) are only valid for the
-    pKa_records that actually correspond to pdb_path. Ignored when
-    add=false.
+    `pKa_records` that actually correspond to `pdb_path`.
 - `pH`: solution pH passed to pdb2pqr and used to resolve termini flags.
-    Ignored when add=false.
-- `add`: whether to actually add hydrogens (default true).
 
 # Returns
-Absolute path to the hydrogen-included .pdb when add=true, stored in
-[`_store_dir`](@ref); pdb_path itself, unchanged, when add=false.
+Absolute path to the hydrogen-included .pdb, stored in [`_store_dir`](@ref).
 """
-function resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real; add::Bool=true)::String
-    add || return pdb_path
-
+function resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::String
     isfile(pdb_path) || throw(Pdb2pqrError("no such file: $pdb_path"))
 
     abspdb = abspath(pdb_path)

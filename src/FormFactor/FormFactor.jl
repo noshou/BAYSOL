@@ -2,13 +2,13 @@
 
 """
 X-ray form factors f(q,E) = f0(s) + f1(E) + i*f2(E), s = q/(4π) in Å⁻¹,
-computed in pure Julia from the bundled form_factors.sqlite3.
+computed in pure Julia from the bundled `form_factors.sqlite3`.
 
 Two tables back the two halves of that sum (provenance and licensing in
 README.md next to this file, and in the database's own provenance table):
 
 -   `waasmaier`: Waasmaier & Kirfel (1995) Gaussian coefficients for the
-    non-resonant term, f0(s) = c + Σ_{i=1..5} a_i exp(-b_i s²). 211 species,
+    non-resonant term, f0(s) = c + `Σ_{i=1..5}` `a_i` exp(-`b_i` s²). 211 species,
     neutral atoms and ions alike.
 -   `chantler`: Chantler FFAST (NIST) anomalous terms on their fine energy
     grid, Z = 1..92, 1.01 eV … 966 keV.
@@ -19,58 +19,20 @@ using  SQLite: SQLite
 using  DBInterface: DBInterface
 using  LinearAlgebra: LinearAlgebra
 using  FastClosures: @closure
-using  DocStringExtensions
-using  ..BAYSOL_Utils.Constants: WK_S_MAX, F2_LOG_FLOOR
-
-export  FormFactorSource, form_factor_table, form_factors, form_factor_log,
-        FF, FormFactorError, FormFactorSourceTables
-
-"A form-factor backend. See FormFactor for the reference implementation."
-abstract type FormFactorSource end
+"""
+Upper end of the Waasmaier-Kirfel f0 fit range, s = sin θ/λ in Å⁻¹. 
+Beyond it the ion fits diverge; see the FormFactor README.
+"""
+const WK_S_MAX = 6.0
 
 """
-    form_factor_table([src::FormFactorSource,] energy::Real, ions, qvals) -> FF
-
-Build a form-factor container for ions at one energy over the qvals grid.
-
-# Arguments
-- `src`: the form-factor backend to query (optional).
-- `energy`: photon energy in eV.
-- `ions`: vector of ion strings.
-- `qvals`: vector of q values in Å⁻¹.
+Floor applied to Chantler f2 table values before the log-log interpolation in
+`FormFactor.f1f2`: f2 is positive and spans decades, and the floor keeps the log
+finite where the table stores an exact zero.
 """
-function form_factor_table end
+const F2_LOG_FLOOR = 1e-99
 
-"""
-    form_factors(t, ions, qvals) -> Matrix{ComplexF64}
-
-Per-ion form-factor rows from a container t previously built by
-[`form_factor_table`](@ref), as a (length(ions), length(qvals)) matrix: row
-i is the row for ions[i], columns aligned to qvals in input order. Pass
-the per-atom ion vector and the result is exactly the f_atoms matrix
-[`BAYSOL.Scattering.compute_B_lm`](@ref) takes: no mapping step in between.
-
-The queried qvals must be grid points of t, and every ions[i] must be
-present in t; either violation throws [`FormFactorError`](@ref).
-
-# Arguments
-    - `t`: form-factor container from [`form_factor_table`](@ref).
-    - `ions`: ion strings to fetch, one per output row.
-    - `qvals`: vector of q values; each must match a grid point of t exactly.
-"""
-function form_factors end
-
-"""
-    form_factor_log(t) -> Vector{String}
-
-Construction-time diagnostics for the container t built by
-[`form_factor_table`](@ref): one line per ion the backend could not resolve
-in full, in the order they were encountered.
-
-# Arguments
-- `t`: form-factor container from [`form_factor_table`](@ref).
-"""
-function form_factor_log end
+export  form_factor_table, form_factors, form_factor_log, FF, FormFactorError
 
 "Raised on any failure building or querying form factors."
 struct FormFactorError <: Exception; msg::String end
@@ -82,9 +44,6 @@ struct FF
     qmp::Dict{Float64,Int}
     log::Vector{String}
 end
-
-"Marker for the bundled-table backend; the default [`FormFactorSource`](@ref)."
-struct FormFactorSourceTables <: FormFactorSource end
 
 # ---------------------------------------------------------------------------
 # Bundled tables, read once on first use.
@@ -106,9 +65,7 @@ const _LOADED = Ref(false)
 _dbpath() = joinpath(@__DIR__, "form_factors.sqlite3")
 
 """
-$(TYPEDSIGNATURES)
-
-Populate _WK/_CH from form_factors.sqlite3 on first use.
+Populate `_WK`/`_CH` from `form_factors.sqlite3` on first use.
 """
 function _load!()::Nothing
     _LOADED[] && return nothing
@@ -139,9 +96,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-$(TYPEDSIGNATURES)
-
-Non-resonant atomic form factor c + Σ_{i=1..5} a_i exp(-b_i s²) for species
+Non-resonant atomic form factor c + `Σ_{i=1..5}` `a_i` exp(-`b_i` s²) for species
 (an ion key like "fe3+" or a bare element like "fe"), at s = q/(4π) in Å⁻¹.
 """
 function f0(species::AbstractString, s::Real)::Float64
@@ -166,8 +121,6 @@ end
 # ---------------------------------------------------------------------------
 
 """
-$(TYPEDSIGNATURES)
-
 The 7-point interpolation window around grid index j (the last point at or
 below the requested energy), clamped to 1:n.
 
@@ -179,8 +132,6 @@ interpolated value.
 _window(n::Int, j::Int)::UnitRange{Int} = max(1, j - 3):min(n, j + 3)
 
 """
-$(TYPEDSIGNATURES)
-
 Interpolating cubic spline through every (x, y) with not-a-knot end
 conditions, evaluated at t.
 
@@ -213,15 +164,13 @@ function _notaknot(x::AbstractVector{Float64}, y::AbstractVector{Float64}, t::Fl
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Anomalous corrections (f1, f2) for a bare element at energy in eV.
 
 f1 comes from a cubic spline over the local 7-point window; f2 from linear
 interpolation in log-log space. The two differ because f2 spans orders of
 magnitude across an absorption edge while f1 changes sign through one.
 
-f1 is stored as f1_FFAST - Z + f_rel(3/5 CL) + f_NT, so it is the
+f1 is stored as `f1_FFAST` - Z + `f_rel`(3/5 CL) + `f_NT`, so it is the
 correction alone (f = f0 + f1 + i f2, with no separate Z), and it tends to
 a small non-zero constant rather than to 0 at high energy.
 """
@@ -260,10 +209,8 @@ _element(species::AbstractString)::String =
     String(replace(species, r"[0-9]*[+-]+$" => ""))
 
 """
-$(TYPEDSIGNATURES)
-
 Which formula applies: :dummy (no f0 data at all ie not a real scatterer),
-:f0_only (has f0 but no anomalous data for its element), or :full.
+:`f0_only` (has f0 but no anomalous data for its element), or :full.
 
 The energy check is separate, in [`compute_form_factors`](@ref), because it is
 the only part that depends on the photon energy.
@@ -276,8 +223,6 @@ function _tier(species::AbstractString)::Symbol
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Form factors for a batch of ions at one energy (eV) over a q grid (Å⁻¹); one
 row per unique ion, aligned to the returned container's q index.
 
@@ -353,38 +298,32 @@ function compute_form_factors(
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Build an [`FF`](@ref) container for ions at one energy (eV) over the qvals
-(Å⁻¹) grid. Thin wrapper over [`compute_form_factors`](@ref). A second,
-src-less method (not shown above) defaults the backend to
-FormFactorSourceTables().
+(Å⁻¹) grid. Thin wrapper over [`compute_form_factors`](@ref).
 
 # Arguments
-- `src`: the bundled-table backend marker (optional).
 - `energy`: photon energy in eV.
 - `ions`: vector of ion strings.
 - `qvals`: vector of q values in Å⁻¹.
 """
-form_factor_table(::FormFactorSourceTables, energy::Real, ions, qvals)::FF =
+form_factor_table(energy::Real, ions, qvals)::FF =
     compute_form_factors(collect(String, ions), energy, collect(Float64, qvals))
 
-form_factor_table(energy::Real, ions, qvals)::FF =
-    form_factor_table(FormFactorSourceTables(), energy, ions, qvals)
-
 """
-$(TYPEDSIGNATURES)
+Construction-time diagnostics for the container t built by
+[`form_factor_table`](@ref): one line per ion that did not resolve in full,
+in the order encountered. Empty when every ion resolved.
 
-Construction-time diagnostics for t: one line per ion that did not resolve in
-full, in the order encountered. Empty when every ion resolved.
+# Arguments
+- `t`: form-factor container from [`form_factor_table`](@ref).
 """
 form_factor_log(t::FF)::Vector{String} = t.log
 
 """
-$(TYPEDSIGNATURES)
-
 t's rows selected by ions, columns selected by qvals, as a
-(length(ions), length(qvals)) matrix in the layout [`BAYSOL.Scattering.compute_B_lm`](@ref) takes.
+(length(ions), length(qvals)) matrix: row i is the row for ions[i], columns
+aligned to qvals in input order. Pass the per-atom ion vector and the result
+is exactly the `f_atoms` matrix [`BAYSOL.Scattering.compute_B_lm`](@ref) takes.
 
 Every qval must be a grid point of t (matched exactly, not to a tolerance)
 and every ion must be present in t; either violation throws

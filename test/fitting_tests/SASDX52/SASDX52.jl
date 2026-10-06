@@ -22,7 +22,7 @@ include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 #               paper (Rahman, Dalwani & Venkatesan 2025, Biochem Biophys Res
 #               Commun 769:151960) because no PDF is bundled here. Treat as
 #               provisional, SASBDB-page-sourced metadata, not paper-verified.
-#   [DEFAULT]   this package's own default (BAYSOL_Utils/Constants.jl),
+#   [DEFAULT]   this package's own default (a module-level constant of the owning module),
 #               used because nothing case-specific was available.
 #   [PLACEHOLDER] a best-effort, UNVERIFIED guess with no direct source at
 #               all -- flagged loudly inline.

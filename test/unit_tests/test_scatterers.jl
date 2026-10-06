@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Exercises src/Scattering/Scatterers.jl, the per-species partial-wave terms:
-# `_gaussian_dummy` (the Fraser/MacRae/Suzuki dummy amplitude), `excluded`,
-# `hydration`, `vacuo` and the `SHELL_THICKNESS` constant. 
+# `_gaussian_dummy` (the Fraser/MacRae/Suzuki dummy amplitude),
+# `hydration` and the `SHELL_THICKNESS` constant, plus `compute_B_lm` fed the vacuum
+# (complex form factor) and dummy amplitudes. 
 # The backbone of the file is a comparison against the Debye double sum
 #
 #     I(q) = Re Σ_i Σ_j f_i(q) conj(f_j(q)) j_0(q r_ij),   r_ij = |r_i - r_j|
@@ -17,10 +18,10 @@
 #   * The Debye sum depends only on pairwise distances, so it is invariant under
 #     any rigid motion and cannot see a bug in `_center` or in the cartesian ->
 #     spherical conversion. "molecule frame conventions" tests those directly.
-#   * `hydration`'s dummy positions come from `SASA.shell_points`, which is
+#   * `hydration`'s dummy positions come from `SASA.sasa`, which is
 #     pipeline and cannot be meaningfully hardcoded (the cloud depends on the
-#     sampling). There the oracle necessarily consumes `shell_points`' output as
-#     given, so those tests check only the `shell_points -> B_lm -> I(q)`
+#     sampling). There the oracle necessarily consumes `sasa`' output as
+#     given, so those tests check only the `sasa -> B_lm -> I(q)`
 #
 # `excluded`'s Debye/convergence comparisons build their per-atom amplitudes
 # from arbitrary, test-owned volumes (`scat_vol`/`SCAT_EXCLUDED_VOL`) fed
@@ -35,8 +36,9 @@
 # numerical correctness is test_molecules.jl's job.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
-using   BAYSOL.Scattering: _gaussian_dummy, vacuo, excluded, hydration, SHELL_THICKNESS, PROBE_RADIUS, DRO_UNIT,
+using   BAYSOL.Scattering: _gaussian_dummy, hydration, SHELL_THICKNESS, PROBE_RADIUS,
         compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
+using BAYSOL.PhysicalConstants: DRO_UNIT
 using   BAYSOL.MolecularStructure: create, coords_cartesian, coords_spherical, to_spherical,
         radii, vols, elms, Molecule
 
@@ -48,7 +50,7 @@ Per-element van der Waals radii in Å, EXACTLY as the live `AtomicRadii` backend
 returns them.
 
 Provenance: dumped at full `Float64` precision from
-`AtomicRadii.lookup(AtomicRadii.AtomicRadiiSource(), [e])` on 2026-09-06, against
+`AtomicRadii.lookup([e])` on 2026-09-06, against
 `data/atomic_radii.sqlite3` as of commit 071e4fd.
 """
 const SCAT_RADII = Dict("c" => 1.77, "o" => 1.5, "h" => 1.2, "fe3+" => 0.49, "o2-" => 1.35)
@@ -128,7 +130,7 @@ const SCAT_BLOB_X = [
 ]
 
 """
-The 5-atom molecule the opt-in `vacuo` tests use, and its form factors at
+The 5-atom molecule the vacuum-amplitude tests use, and its form factors at
 8000 eV on `SCAT_Q`, hardcoded.
 
 Provenance: `FormFactor.form_factor_table(8000.0, ["fe3+", "o2-", "h"], SCAT_Q)`
@@ -250,7 +252,7 @@ scat_wconv = partial_wave_weights(scat_Lconv)
 scat_tol = 1e-11                      # measured errors at scat_Lconv are ~1e-13
 
 """
-Section 6's expansion restricted to the two dummy species (no `vacuo`, hence no
+Section 6's expansion restricted to the two dummy species (no vacuum term, hence no
 Python): with `A = -dns*A_ex + dro*A_sh`,
 
     I(q) = dns² S_ex,ex + dro² S_sh,sh - 2 dns dro S_ex,sh
@@ -265,16 +267,14 @@ scat_toy_I(B_ex, B_sh, w, dns, dro) =
 
 """
 The shell dummies `hydration` would build for `mol`: cartesian positions and
-`(M, Q)` amplitudes, obtained by applying the same `classes` filter and
-`area * thickness` volume rule the implementation applies.
+`(M, Q)` amplitudes, obtained by applying the same `area * thickness` volume
+rule the implementation applies.
 """
 function scat_shell(mol, qvals; n_target = 80, probe = PROBE_RADIUS,
-                    thickness = SHELL_THICKNESS,
-                    classes = (SASA.CONVEX, SASA.CONCAVE, SASA.CAVITY))
-    pts, area, class = SASA.shell_points(mol; probe = probe, n_target = n_target)
-    keep = findall(c -> c in classes, class)
-    amp = [scat_gauss(area[keep][i] * thickness, qvals[k]) for i in eachindex(keep), k in eachindex(qvals)]
-    return pts[:, keep], amp
+                    thickness = SHELL_THICKNESS)
+    pts, area, _ = SASA.sasa(mol; probe = probe, n_target = n_target)
+    amp = [scat_gauss(area[i] * thickness, qvals[k]) for i in eachindex(area), k in eachindex(qvals)]
+    return pts, amp
 end
 
 """
@@ -286,16 +286,11 @@ against. Every check below that wants "the whole shell" routes through this.
 scat_shell_blm(h) = h.convex .+ h.concave .+ h.cavity
 
 # ===========================================================================
-# STUB FORM-FACTOR BACKEND. `vacuo` takes a `form_factor_source`, so the vacuum
-# term is drivable without a live xraydb environment. These are test-owned
-# types, so defining `FormFactor` methods on them is dispatch, not piracy.
+# STUB FORM-FACTOR AMPLITUDE. Element labels that are not real elements with a
+# hand-picked complex amplitude per ion, so the two-channel (Re f, Im f)
+# partial-wave split can be checked against an oracle that shares nothing with
+# the FormFactor tables.
 # ===========================================================================
-
-struct ScatStubFF <: FormFactor.FormFactorSource end
-struct ScatStubTable
-    amp :: Matrix{ComplexF64}   # (n_ions, Q), rows aligned to the ion vector
-    ions :: Vector{String}
-end
 
 const SCAT_STUB_E = ["a", "b", "c", "b"]
 # One row per axis: a newline inside a matrix literal starts a new row, so
@@ -308,19 +303,11 @@ const SCAT_STUB_W = Dict("a" => 20.0 + 4.0im, "b" => 8.0 + 1.5im, "c" => 1.0 + 0
 
 scat_stub_f(e, q) = SCAT_STUB_W[e] * exp(-q)
 
-FormFactor.form_factor_table(::ScatStubFF, energy::Real, ions, qvals) =
-    ScatStubTable(
-        ComplexF64[scat_stub_f(ions[i], qvals[k]) for i in eachindex(ions), k in eachindex(qvals)],
-        collect(String, ions)
-    )
-
-FormFactor.form_factors(t::ScatStubTable, ions, qvals) = t.amp
-
 """
 Pipeline-side molecule for the stub. The element strings are not real elements,
-which is fine here and only here: `create` resolves radii lazily, and `vacuo`
-touches only `coords_spherical`, so nothing ever queries the radii backend for
-them. Calling `radii`/`vols` on this molecule would throw.
+which is fine here and only here: `create` resolves radii lazily, and the tests
+that use it touch only `coords_spherical`, so nothing ever queries the radii
+table for them. Calling `radii`/`vols` on this molecule would throw.
 """
 scat_stubmol() = scat_mol("stub", SCAT_STUB_E, SCAT_STUB_X)
 
@@ -363,7 +350,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # The Debye oracle only ever sees pairwise distances, so it is blind to
         # any rigid motion; it cannot catch a bug in `_center` or in
         # `to_spherical`. Both are therefore pinned here directly, against
-        # arithmetic done in the test rather than against MolecularStructure's own BAYSOL_Utils.
+        # arithmetic done in the test rather than against MolecularStructure's own helpers.
         X = SCAT_BLOB_X
         n = size(X, 2)
         cx = sum(X[1, :]) / n; cy = sum(X[2, :]) / n; cz = sum(X[3, :]) / n
@@ -482,45 +469,11 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         @test _gaussian_dummy([1, 8], SCAT_Q) isa Matrix{Float64}
     end
 
-    # -----------------------------------------------------------------------
-    # excluded
-    # -----------------------------------------------------------------------
-
-    @testset "excluded returns a bare B_lm array, not a (B_lm, S) tuple" begin
-        B = excluded(scat_water(), SCAT_Q, scat_lmax, scat_chunk)
-        # This is exactly the contract that changed: the S_ab reduction moved
-        # downstream, so nothing is returned here but the multipoles.
-        @test !(B isa Tuple)
-        @test B isa AbstractArray{<:Complex,3}
-        @test eltype(B) <: Complex
-        # C == 1 is documented: a dummy sphere's amplitude is real, so there is
-        # no anomalous f'' channel to carry.
-        @test size(B, 1) == 1
-        @test size(B) == (1, scat_K, length(SCAT_Q))
-        @test all(isfinite, B)
-    end
-
-    @testset "excluded is the PartialWave primitives composed by hand" begin
-        mol = scat_water()
-        B = excluded(mol, SCAT_Q, scat_lmax, scat_chunk)
-        Bhand = compute_B_lm(
-            coords_spherical(mol), 
-            SCAT_Q,
-            _gaussian_dummy(vols(mol), SCAT_Q), 
-            scat_lmax, 
-            scat_chunk
-        )
-        @test B == Bhand   # same call, same order: bit-identical
-    end
-
-    @testset "the l = 0 closed form at q = 0 is (Σ v_i)/√(4π), independent of excluded" begin
+    @testset "the l = 0 closed form at q = 0 is (Σ v_i)/√(4π)" begin
         # At q = 0, j_l(0) = δ_l0 kills every l > 0, and Y_00 = 1/√(4π), so:
         # B_00(0) = (Σ_i v_i) / √(4π). Built from `compute_B_lm` directly on
         # synthetic volumes and literal coordinates -- no `Molecule`, no
-        # `vols` -- since this pins `compute_B_lm`'s l = 0 behaviour, not
-        # `excluded`'s Molecule-wrapping (that's "excluded is the PartialWave
-        # primitives composed by hand", above, which already covers it
-        # self-consistently against whatever `vols(mol)` returns).
+        # `vols` -- since this pins `compute_B_lm`'s l = 0 behaviour.
         for (es, X) in ((SCAT_DIMER_E, SCAT_DIMER_X), (SCAT_CUBE_E, SCAT_CUBE_X),
                         (SCAT_BLOB_E, SCAT_BLOB_X))
             v = [scat_vol(e) for e in es]
@@ -532,24 +485,12 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         end
     end
 
-    @testset "excluded is invariant to _CHUNK" begin
-        # _CHUNK only sets how many atoms are batched per pass. It changes the
-        # summation order, so agreement is tight but not bit-exact.
-        mol = scat_blob()
-        ref = excluded(mol, SCAT_Q, scat_lmax, UInt64(1))
-        for c in (UInt64(2), UInt64(5), UInt64(20), UInt64(1000))
-            got = excluded(mol, SCAT_Q, scat_lmax, c)
-            @test size(got) == size(ref)
-            @test all(i -> check_complex(got[i], ref[i]), eachindex(ref))
-        end
-    end
-
     @testset "compute_B_lm on a single dummy at the origin" begin
         # One dummy sits at the origin, so r = 0 and j_l(0) = δ_l0 makes every
         # degree above l = 0 vanish at *every* q, not just at q = 0, and
         # B_00(q) is just that dummy's amplitude over √(4π). A synthetic
         # volume and a literal r = 0 coordinate -- no `Molecule` involved, so
-        # this is `compute_B_lm`'s property, not `excluded`'s.
+        # this is `compute_B_lm`'s property.
         v = scat_vol("c")
         crd = zeros(3, 1)   # r = 0 exactly; θ, φ are irrelevant since j_l(0) = δ_l0
         B = compute_B_lm(crd, SCAT_Q, _gaussian_dummy([v], SCAT_Q), scat_lmax, scat_chunk)
@@ -560,7 +501,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
     end
 
     # -----------------------------------------------------------------------
-    # excluded
+    # compute_B_lm against Debye
     # -----------------------------------------------------------------------
 
     @testset "compute_B_lm reproduces the exact Debye intensity for the dimer" begin
@@ -665,13 +606,13 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
     @testset "the three shell classes partition the accessible surface" begin
         for mk in (scat_water, scat_blob, scat_cube, scat_canyon)
             mol = mk()
-            cls = SASA.shell_points(mol; n_target = 100)[3]
+            cls = SASA.sasa(mol; n_target = 100)[3]
             @test   count(==(SASA.CONVEX), cls) + count(==(SASA.CONCAVE), cls) +
                     count(==(SASA.CAVITY), cls) == length(cls)
             # B_lm is linear in the disjoint bead sets: the three B_00(0) add up
             # to the whole surface's total area * thickness / √(4π).
             h = hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 100)
-            total = sum(SASA.shell_points(mol; n_target = 100)[2])
+            total = sum(SASA.sasa(mol; n_target = 100)[2])
             @test isapprox( real(h.convex[1, 1, 1]) + real(h.concave[1, 1, 1]) +
                             real(h.cavity[1, 1, 1]),
                             total * SHELL_THICKNESS / sqrt(4π); rtol = 1e-12)
@@ -686,14 +627,13 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         mol = scat_water()
         @test_throws ArgumentError hydration(mol, SCAT_Q, scat_lmax, scat_hchunk; thickness = 0.0, n_target = 60)
         @test_throws ArgumentError hydration(mol, SCAT_Q, scat_lmax, scat_hchunk; thickness = -1.0, n_target = 60)
-        @test_throws ArgumentError hydration(mol, SCAT_Q, scat_lmax, scat_hchunk; classes = (), n_target = 60)
     end
 
-    @testset "SASA.shell_points is deterministic" begin
+    @testset "SASA.sasa is deterministic" begin
         # The plastic sequence carries no RNG, so repeated calls must agree bit-for-bit.
         mol = scat_water()
-        a = SASA.shell_points(mol; n_target = 60)
-        b = SASA.shell_points(mol; n_target = 60)
+        a = SASA.sasa(mol; n_target = 60)
+        b = SASA.sasa(mol; n_target = 60)
         @test a[1] == b[1] && a[2] == b[2] && a[3] == b[3]
         @test   hydration(mol, SCAT_Q, scat_lmax, scat_hchunk; n_target = 60) == 
                 hydration(mol, SCAT_Q, scat_lmax, scat_hchunk; n_target = 60)
@@ -701,11 +641,11 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
 
     @testset "hydration's q = 0 closed form is (total area * thickness)/√(4π)" begin
         # Same l = 0 collapse as `excluded`, with each dummy's volume now
-        # `area_i * thickness`; `shell_points` gives every point an equal area,
+        # `area_i * thickness`; `sasa` gives every point an equal area,
         # so B_00(0) = (Σ_i area_i * thickness)/√(4π) = total_area*Δ/√(4π).
         mol = scat_water()
         for n in (40, 60, 90)
-            area = sum(SASA.shell_points(mol; n_target = n)[2])
+            area = sum(SASA.sasa(mol; n_target = n)[2])
             B = scat_shell_blm(hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = n))
             @test isapprox(real(B[1, 1, 1]), area * SHELL_THICKNESS / sqrt(4π); rtol = 1e-12)
             @test check_float(imag(B[1, 1, 1]), 0.0)
@@ -722,8 +662,8 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
             @test isapprox(scat_shell_blm(hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = n))[1, 1, 1], ref; rtol = 1e-10)
         end
         # n_target really does change the dummy count, so this is not vacuous
-        @test length(SASA.shell_points(mol; n_target = 40)[2]) == 40
-        @test length(SASA.shell_points(mol; n_target = 90)[2]) == 90
+        @test length(SASA.sasa(mol; n_target = 40)[2]) == 40
+        @test length(SASA.sasa(mol; n_target = 90)[2]) == 90
     end
 
     @testset "hydration scales linearly in thickness at q = 0 only" begin
@@ -740,27 +680,14 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         end
     end
 
-    @testset "classes selects which populations are built; the rest stay zero" begin
-        # Water's accessible surface is entirely CONVEX, so which non-convex
-        # classes appear in `classes` cannot matter there.
-        wat = scat_water()
-        @test all(==(SASA.CONVEX), SASA.shell_points(wat; n_target = 60)[3])
-        @test   hydration(wat, SCAT_Q, scat_lmax, scat_hchunk;
-                        n_target = 60, classes = (SASA.CONVEX, SASA.CONCAVE)) ==
-                hydration(wat, SCAT_Q, scat_lmax, scat_hchunk;
-                        n_target = 60, classes = (SASA.CONVEX,))
-
-        # The canyon really does have recessed CONCAVE beads.
+    @testset "the canyon has recessed CONCAVE beads, and the classes partition the surface" begin
+        # Water's accessible surface is entirely CONVEX; the canyon really does
+        # have recessed CONCAVE beads.
+        @test all(==(SASA.CONVEX), SASA.sasa(scat_water(); n_target = 60)[3])
         can = scat_canyon()
-        cls = SASA.shell_points(can; n_target = 120)[3]
+        cls = SASA.sasa(can; n_target = 120)[3]
         @test count(==(SASA.CONCAVE), cls) > 0            # the fixture is doing its job
-        all3  = hydration(can, [0.0], scat_lmax, scat_hchunk; n_target = 120)
-        onlyC = hydration(can, [0.0], scat_lmax, scat_hchunk;
-                          n_target = 120, classes = (SASA.CONVEX,))
-        # excluding CONCAVE zeroes exactly that field, leaving the others identical
-        @test onlyC.convex == all3.convex
-        @test onlyC.cavity == all3.cavity
-        @test all(iszero, onlyC.concave)
+        all3 = hydration(can, [0.0], scat_lmax, scat_hchunk; n_target = 120)
         @test !all(iszero, all3.concave)
         # the classes partition the surface, so the per-class B_00(0) add back up
         @test real(all3.concave[1, 1, 1]) > 0.0
@@ -773,7 +700,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # Two atoms stacked at one point occlude each other completely; the
         # docstring promises an all-zero B_lm rather than an error.
         mol = scat_buried()
-        @test size(SASA.shell_points(mol)[1], 2) == 0
+        @test size(SASA.sasa(mol)[1], 2) == 0
         h = hydration(mol, SCAT_Q, scat_lmax, scat_hchunk)
         @test all(iszero, h.convex) && all(iszero, h.concave) && all(iszero, h.cavity)
         B = scat_shell_blm(h)
@@ -781,7 +708,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         @test all(iszero, B)
     end
 
-    @testset "hydration forwards probe to shell_points" begin
+    @testset "hydration forwards probe to sasa" begin
         mol = scat_water()
         # The default probe is water's (PROBE_RADIUS, 1.4 Å) ...
         @test   hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 60) ==
@@ -791,7 +718,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         big = scat_shell_blm(hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 60, probe = 2.5))
         small = scat_shell_blm(hydration(mol, [0.0], scat_lmax, scat_hchunk; n_target = 60, probe = PROBE_RADIUS))
         @test real(big[1, 1, 1]) > real(small[1, 1, 1])
-        area = sum(SASA.shell_points(mol; probe = 2.5, n_target = 60)[2])
+        area = sum(SASA.sasa(mol; probe = 2.5, n_target = 60)[2])
         @test isapprox(real(big[1, 1, 1]), area * SHELL_THICKNESS / sqrt(4π); rtol = 1e-12)
     end
 
@@ -840,26 +767,12 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
     end
 
     @testset "hydration matches Debye under a non-default probe and thickness" begin
-        # The keywords have to reach `shell_points`/`_gaussian_dummy` intact for
+        # The keywords have to reach `sasa`/`_gaussian_dummy` intact for
         # the reference (built from the same keywords by hand) to match.
         mol = scat_blob()
         P, fh = scat_shell(mol, SCAT_Q; n_target = 70, probe = 2.0, thickness = 5.0)
         got = self_scatter(scat_shell_blm(hydration(mol, SCAT_Q, scat_Lconv, UInt64(64);
                                     n_target = 70, probe = 2.0, thickness = 5.0)), scat_wconv)
-        @test scat_relerr(got, scat_debye(SCAT_Q, P, fh)) < scat_tol
-    end
-
-    @testset "hydration matches Debye over a CONVEX-only sub-cloud" begin
-        # Filtering by class must drop exactly the beads the reference drops --
-        # a mismatched filter would change r_max and the amplitudes together and
-        # would not cancel out of the comparison. The non-CONVEX fields are zero,
-        # so summing them back in is a no-op here.
-        mol = scat_canyon()
-        cls = (SASA.CONVEX,)
-        P, fh = scat_shell(mol, SCAT_Q; n_target = 120, classes = cls)
-        h = hydration(mol, SCAT_Q, scat_Lconv, UInt64(64); n_target = 120, classes = cls)
-        @test all(iszero, h.concave) && all(iszero, h.cavity)
-        got = self_scatter(scat_shell_blm(h), scat_wconv)
         @test scat_relerr(got, scat_debye(SCAT_Q, P, fh)) < scat_tol
     end
 
@@ -878,8 +791,8 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # by hand (again from the literals, not from `coords_cartesian`).
         #
         # The "ex" side is built from `compute_B_lm` + a synthetic per-atom
-        # volume, not `excluded(mol, ...)`, so it carries no dependency on
-        # `vols`/`excluded_volume`. The "sh" side genuinely needs `mol`: its
+        # volume, not the molecule's own `vols`, so it carries no dependency on
+        # `excluded_volume`. The "sh" side genuinely needs `mol`: its
         # dummies come from `hydration`'s real SASA-driven cloud, which has
         # nothing to do with excluded volume in the first place.
         mol = scat_blob()
@@ -914,7 +827,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         # sums. Agreement closes the loop from geometry to intensity.
         #
         # `B_ex` comes from `compute_B_lm` + a synthetic volume, not
-        # `excluded(mol, ...)`: `mol` is still built (and still needed) for the
+        # the molecule's own `vols`: `mol` is still built (and still needed) for the
         # `hydration`/SASA side, which is unrelated to excluded volume.
         for (es, X, mkmol) in ((SCAT_CUBE_E, SCAT_CUBE_X, scat_cube),
                                 (SCAT_BLOB_E, SCAT_BLOB_X, scat_blob))
@@ -950,7 +863,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
             B_ex = compute_B_lm(scat_sph(X), [0.0], _gaussian_dummy(v, [0.0]), scat_Lconv, UInt64(4))
             B_sh = scat_shell_blm(hydration(mol, [0.0], scat_Lconv, UInt64(64); n_target = n))
             V_ex = sum(v)
-            V_sh = sum(SASA.shell_points(mol; n_target = n)[2]) * SHELL_THICKNESS
+            V_sh = sum(SASA.sasa(mol; n_target = n)[2]) * SHELL_THICKNESS
             @test isapprox(self_scatter(B_ex, scat_wconv)[1], V_ex^2; rtol = 1e-12)
             @test isapprox(self_scatter(B_sh, scat_wconv)[1], V_sh^2; rtol = 1e-12)
             @test isapprox(cross_scatter(B_ex, B_sh, scat_wconv)[1], V_ex * V_sh; rtol = 1e-12)
@@ -993,50 +906,45 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
     end
 
     # -----------------------------------------------------------------------
-    # vacuo
+    # The vacuum amplitude (two-channel complex form factors) through compute_B_lm
     # -----------------------------------------------------------------------
 
     let
         scat_ffmol = scat_mol("ffmol", SCAT_FF_E, SCAT_FF_X)
         # oracle-side per-atom amplitude, assembled from the hardcoded table only
         scat_ffamp = reduce(vcat, [permutedims(SCAT_FF_TABLE[e]) for e in SCAT_FF_E])
+        # pipeline-side amplitude: the live FormFactor tables, as species_multipoles builds it
+        scat_ffamp_live(q, energy) =
+            FormFactor.form_factors(FormFactor.form_factor_table(energy, SCAT_FF_E, q), SCAT_FF_E, q)
 
         @testset "the live form factors match the hardcoded oracle table" begin
             # Same role as the radii guard: if the xraydb tables or the backend
             # change, that reports itself here rather than as a Debye mismatch,
             # and SCAT_FF_TABLE is what needs regenerating.
-            tbl = FormFactor.form_factor_table(SCAT_FF_ENERGY, SCAT_FF_E, SCAT_Q)
-            amp = FormFactor.form_factors(tbl, SCAT_FF_E, SCAT_Q)
+            amp = scat_ffamp_live(SCAT_Q, SCAT_FF_ENERGY)
             @test size(amp) == size(scat_ffamp)
             @test all(i -> check_complex(amp[i], scat_ffamp[i]), eachindex(scat_ffamp))
             @test any(x -> imag(x) != 0, scat_ffamp)   # the fixture really is anomalous
         end
 
-        @testset "vacuo returns a bare B_lm array with two channels near an edge" begin
-            B = vacuo(scat_ffmol, SCAT_Q, scat_lmax, SCAT_FF_E, SCAT_FF_ENERGY, scat_chunk)
-            @test !(B isa Tuple)
-            @test B isa AbstractArray{<:Complex,3}
+        @testset "compute_B_lm on complex form factors has two channels near an edge" begin
+            B = compute_B_lm(coords_spherical(scat_ffmol), SCAT_Q,
+                             scat_ffamp_live(SCAT_Q, SCAT_FF_ENERGY), scat_lmax, scat_chunk)
             @test size(B) == (2, scat_K, length(SCAT_Q))   # f'' != 0 at 8 keV
             @test all(isfinite, B)
             # ... and a real amplitude collapses back to one channel: at 1 eV
             # the tabulated f'' is zero (test_formfactor.jl pins that too).
-            @test size(vacuo(scat_ffmol, SCAT_Q, scat_lmax, SCAT_FF_E, 1.0, scat_chunk), 1) == 1
+            B1 = compute_B_lm(coords_spherical(scat_ffmol), SCAT_Q,
+                              scat_ffamp_live(SCAT_Q, 1.0), scat_lmax, scat_chunk)
+            @test size(B1, 1) == 1
         end
 
-        @testset "vacuo is compute_B_lm composed by hand from the facade" begin
-            tbl = FormFactor.form_factor_table(SCAT_FF_ENERGY, SCAT_FF_E, SCAT_Q)
-            amp = FormFactor.form_factors(tbl, SCAT_FF_E, SCAT_Q)
-            @test vacuo(scat_ffmol, SCAT_Q, scat_lmax, SCAT_FF_E,
-                        SCAT_FF_ENERGY, scat_chunk) ==
-                        compute_B_lm(coords_spherical(scat_ffmol), SCAT_Q, amp,
-                            scat_lmax, scat_chunk)
-        end
-
-        @testset "vacuo's q = 0 limit is Σ_i f_i(0)/√(4π), channel by channel" begin
+        @testset "the q = 0 limit is Σ_i f_i(0)/√(4π), channel by channel" begin
             # Same l = 0 collapse as the dummy species, but Re(f) and Im(f) land
             # in separate channels rather than being folded together. Both sums
             # come from the hardcoded table.
-            B = vacuo(scat_ffmol, [0.0], scat_lmax, SCAT_FF_E, SCAT_FF_ENERGY, scat_chunk)
+            B = compute_B_lm(coords_spherical(scat_ffmol), [0.0],
+                             scat_ffamp_live([0.0], SCAT_FF_ENERGY), scat_lmax, scat_chunk)
             @test isapprox(real(B[1, 1, 1]),
                             sum(real, scat_ffamp[:, 1]) / sqrt(4π); rtol = 1e-10)
             @test isapprox(real(B[2, 1, 1]),
@@ -1046,88 +954,44 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
             end
         end
 
-        @testset "vacuo reproduces the exact complex-f Debye intensity" begin
+        @testset "the complex-f partial-wave sum reproduces the exact Debye intensity" begin
             # The general complex Debye form, Re Σ_ij f_i conj(f_j) j_0(q r_ij),
-            # against the two-channel partial-wave sum. `partial_wave_weights`' 
-            # docstring records a MEASURED 3% error from folding a complex f directly 
+            # against the two-channel partial-wave sum. `partial_wave_weights`'
+            # docstring records a MEASURED 3% error from folding a complex f directly
             # instead of splitting it, so a mismatch here that does not shrink with lMax
             # would mean the channel split is wrong, not that lMax is too small.
             ref = scat_debye(SCAT_Q, SCAT_FF_X, scat_ffamp)
-            errs = [scat_relerr(self_scatter(vacuo(scat_ffmol, SCAT_Q, L, SCAT_FF_E,
-                                                    SCAT_FF_ENERGY, UInt64(4)),
-                                                partial_wave_weights(L)), ref)
-                    for L in (1, 2, 4)]
+            vac(L) = compute_B_lm(coords_spherical(scat_ffmol), SCAT_Q,
+                                  scat_ffamp_live(SCAT_Q, SCAT_FF_ENERGY), L, UInt64(4))
+            errs = [scat_relerr(self_scatter(vac(L), partial_wave_weights(L)), ref) for L in (1, 2, 4)]
             @test all(k -> errs[k] > errs[k + 1], 1:(length(errs) - 1))
             @test errs[1] > 1e-3
-            @test scat_relerr(self_scatter(vacuo(scat_ffmol, SCAT_Q, scat_Lconv,
-                                                SCAT_FF_E, SCAT_FF_ENERGY, UInt64(4)),
-                                            scat_wconv), ref) < scat_tol
+            @test scat_relerr(self_scatter(vac(scat_Lconv), scat_wconv), ref) < scat_tol
         end
     end
 
-    # -----------------------------------------------------------------------
-    # vacuo
-    # -----------------------------------------------------------------------
-
-    # `vacuo`'s `form_factor_source` keyword exists so the vacuum term can be
-    # driven without a live xraydb environment. Nothing else in the suite uses
-    # it, so without these tests the seam could stop dispatching and every
-    # xraydb-backed assertion above would still pass. The stub is defined on
-    # test-owned types, so adding `FormFactor` methods for it is not piracy.
-    @testset "vacuo drives an injected form-factor backend" begin
-        got = vacuo(scat_stubmol(), SCAT_Q, scat_Lconv, SCAT_STUB_E, 1234.0,
-                    scat_chunk; form_factor_source = ScatStubFF())
-
-        @testset "the stub really is what answered" begin
-            # If the keyword were ignored and the default xraydb backend ran
-            # instead, the amplitudes would be Fe/O/H form factors rather than
-            # the stub's, and the Debye check below would fail.
-            @test FormFactor.form_factor_table(ScatStubFF(), 1234.0, SCAT_STUB_E,
-                                                SCAT_Q) isa ScatStubTable
-            @test size(got, 1) == 2          # Im(f) != 0, so the C = 2 branch
-            @test size(got) == (2, length(scat_wconv), length(SCAT_Q))
-        end
-
-        @testset "an injected backend needs no xraydb call" begin
-            # The stub path must not reach the extension at all. `energy` is
-            # 1234.0 eV, which is below Fe's tabulated range: had the real
-            # backend answered, it would have logged an F0-ONLY downgrade and
-            # returned a purely real f, collapsing this to one channel.
-            @test size(got, 1) == 2
-        end
-
-        @testset "vacuo reproduces the exact Debye intensity through the stub" begin
-            # Same ground-truth comparison as the xraydb fixture, but with an
-            # amplitude this file defines outright, so the oracle shares nothing
-            # with the backend under test.
-            ref = scat_debye(SCAT_Q, SCAT_STUB_X, scat_stubamp)
-            @test scat_relerr(self_scatter(got, scat_wconv), ref) < scat_tol
-        end
-
-        @testset "the channel split survives an f'' as large as f'" begin
-            # `partial_wave_weights`' docstring records a MEASURED 3% error from
-            # folding a complex f directly instead of splitting it. Real 8 keV
-            # f''/f' is ~0.15; here it is 1.0, which magnifies that failure mode
-            # by ~an order of magnitude. Converging to the Float64 floor anyway
-            # is strong evidence the two channels are combined correctly.
-            heavy = ComplexF64[(1.0 + 1.0im) * scat_stubamp[i, k]
-                                for i in axes(scat_stubamp, 1), k in axes(scat_stubamp, 2)]
-            B = compute_B_lm(coords_spherical(scat_stubmol()), SCAT_Q, heavy,
-                                scat_Lconv, scat_chunk)
-            @test size(B, 1) == 2
-            @test scat_relerr(self_scatter(B, scat_wconv),
-                                scat_debye(SCAT_Q, SCAT_STUB_X, heavy)) < scat_tol
-        end
-
-        @testset "a real-amplitude stub collapses to one channel" begin
-            # The same seam with Im(f) identically zero must take the C = 1
-            # branch, and still match Debye.
-            re = ComplexF64.(real.(scat_stubamp))
-            B = compute_B_lm(coords_spherical(scat_stubmol()), SCAT_Q, re,
+    @testset "the channel split survives an f'' as large as f'" begin
+        # `partial_wave_weights`' docstring records a MEASURED 3% error from
+        # folding a complex f directly instead of splitting it. Real 8 keV
+        # f''/f' is ~0.15; here it is 1.0, which magnifies that failure mode
+        # by ~an order of magnitude. Converging to the Float64 floor anyway
+        # is strong evidence the two channels are combined correctly.
+        heavy = ComplexF64[(1.0 + 1.0im) * scat_stubamp[i, k]
+                            for i in axes(scat_stubamp, 1), k in axes(scat_stubamp, 2)]
+        B = compute_B_lm(coords_spherical(scat_stubmol()), SCAT_Q, heavy,
                             scat_Lconv, scat_chunk)
-            @test size(B, 1) == 1
-            @test scat_relerr(self_scatter(B, scat_wconv),
-                                scat_debye(SCAT_Q, SCAT_STUB_X, re)) < scat_tol
-        end
+        @test size(B, 1) == 2
+        @test scat_relerr(self_scatter(B, scat_wconv),
+                            scat_debye(SCAT_Q, SCAT_STUB_X, heavy)) < scat_tol
+    end
+
+    @testset "a real-amplitude stub collapses to one channel" begin
+        # Im(f) identically zero must take the C = 1 branch, and still match Debye.
+        re = ComplexF64.(real.(scat_stubamp))
+        B = compute_B_lm(coords_spherical(scat_stubmol()), SCAT_Q, re,
+                        scat_Lconv, scat_chunk)
+        @test size(B, 1) == 1
+        @test scat_relerr(self_scatter(B, scat_wconv),
+                            scat_debye(SCAT_Q, SCAT_STUB_X, re)) < scat_tol
     end
 end

@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/BAYSOL_Utils/Timing.jl (`StageLog`, `timed!`, `tick`/`tock!`,
+# Exercises src/Timing/Timing.jl (`StageLog`, `timed!`, `tick`/`tock!`,
 # `fmt_count`) and the report's `=== Run ===` / `=== Timing ===` sections.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.Timing: StageLog, Stage, timed!, tick, tock!, stage_seconds, fmt_count
-using BAYSOL: _write_timing, _write_run_info
+using BAYSOL.Report: _write_timing, _write_run_info
 
 @testset "Timing" begin
     @testset "fmt_count: plain below 1000, else thousands with trimmed decimals" begin

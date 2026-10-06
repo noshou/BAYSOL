@@ -3,14 +3,14 @@
 # Exercises src/MolecularStructure/Pdb2pqr.jl: the pdb2pqr subprocess wrapper
 # that adds explicit hydrogens (`resolve_hydrogens`), its pKa-record-driven,
 # per-chain N-/C-terminus override (`_terminus_groups`), and the generalized
-# Molecule/Residues loader (`load_molecule`). Needs real network/subprocess
+# Molecule loader (`load_molecule`). Needs real network/subprocess
 # access for CondaPkg to provision `pdb2pqr` on first use, same assumption as
 # the live propka3 test in test_propka.jl.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: resolve_hydrogens, load_molecule, Pdb2pqrError, MoleculeError,
                     _terminus_groups, propka_pKas, _store_dir,
-                    Molecule, Residues, n_atoms, elms, coords_cartesian
+                    Molecule, n_atoms, elms, coords_cartesian
 
 # A 7-"residue" fragment (not a real contiguous chain -- each residue's real
 # coordinates are lifted from unrelated, spatially distant positions in 7RSA,
@@ -188,13 +188,6 @@ END
         @test_throws Pdb2pqrError resolve_hydrogens("/no/such/file/nope.pdb", recs, 7.0)
     end
 
-    @testset "resolve_hydrogens with add=false is a genuine no-op" begin
-        before_files = Set(readdir(_store_dir()))
-        out = resolve_hydrogens(pdb_path, recs, 7.0; add = false)
-        @test out === pdb_path
-        @test Set(readdir(_store_dir())) == before_files   # nothing written
-    end
-
     @testset "termini flags computed per chain from pKa records" begin
         # Single-chain fixture -> _terminus_groups always returns one group
         # covering chain "A", same flags _terminus_flags used to compute.
@@ -299,9 +292,8 @@ END
 
     @testset "load_molecule: more atoms than heavy-only, no non-finite coords" begin
         out = resolve_hydrogens(pdb_path, recs, 7.0)
-        mol, res = load_molecule(out)
+        mol = load_molecule(out)
         @test mol isa Molecule
-        @test res isa Residues
 
         n = n_atoms(mol)
         n_heavy = count(l -> startswith(l, "ATOM"), split(_TEST_PDB, '\n'))
@@ -311,11 +303,6 @@ END
         cc = coords_cartesian(mol)
         @test size(cc) == (3, n)
         @test all(isfinite, cc)
-
-        @test length(res.resname) == n
-        @test length(res.atomname) == n
-        @test length(res.resnum) == n
-        @test length(res.chain) == n
     end
 
     @testset "load_molecule: nonexistent input raises MoleculeError" begin

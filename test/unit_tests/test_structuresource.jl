@@ -2,14 +2,14 @@
 
 # Exercises src/MolecularStructure/StructureSource.jl: resolving a local path,
 # a bare RCSB PDB ID, or a URL into a canonical, cached .pdb, and loading that
-# into a Molecule/Residues pair. The PDB-ID and URL branches need real network
+# into a Molecule. The PDB-ID and URL branches need real network
 # access (RCSB / files.rcsb.org), same assumption as the live propka3 test in
 # test_propka.jl.
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: StructureSource, LocalPathSource, PDBIDSource, URLSource,
                     StructureSourceError, resolve_structure, load_molecule,
-                    Molecule, Residues, n_atoms, elms, coords_cartesian, _store_dir
+                    Molecule, n_atoms, elms, coords_cartesian, _store_dir
 using BioStructures: BioStructures, MMCIFFormat, writepdb, standardselector, heavyatomselector
 
 include(joinpath(@__DIR__, "..", "fixtures", "functions", "floatcompare.jl"))   # close_
@@ -293,25 +293,13 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
 
     @testset "load_molecule end-to-end on the fetched PDB ID" begin
         path = resolve_structure(PDBIDSource(_TEST_PDB_ID))
-        mol, res = load_molecule(path)
+        mol = load_molecule(path)
         @test mol isa Molecule
-        @test res isa Residues
 
         n = n_atoms(mol)
         @test n > 0
         @test length(elms(mol)) == n
         @test size(coords_cartesian(mol)) == (3, n)
-        @test length(res.resname) == n
-        @test length(res.atomname) == n
-        @test length(res.resnum) == n
-        @test length(res.chain) == n
-
-        # 1CRN is a single-chain, 46-residue peptide (crambin); chain should
-        # be uniformly "A" and residue numbers should span 1:46.
-        @test all(==("A"), res.chain)
-        @test minimum(res.resnum) == 1
-        @test maximum(res.resnum) == 46
-        @test !any(isempty, res.resname)
         @test !any(e -> lowercase(e) == "h", elms(mol))   # heavy atoms only
     end
 
@@ -408,16 +396,13 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
             # e.g. 7RSA-TEST.pdb, 1IGT-TEST.pdb), which resolve_structure's
             # pure-passthrough branch never strips.
             standard_only_n = length(BioStructures.collectatoms(struc[1], standardselector))
-            mol, res = load_molecule(resolved)
+            mol = load_molecule(resolved)
             n = n_atoms(mol)
             @test n == standard_only_n
             is_cif && @test n == expected_n
-            @test length(res.resname) == n && length(res.atomname) == n
-            @test length(res.resnum) == n && length(res.chain) == n
             cc = coords_cartesian(mol)
             @test size(cc) == (3, n)
             @test all(isfinite, cc)
-            @test Set(res.chain) == Set(keys(expected_chains))
         finally
             # Clean up any cache entry the .cif branch wrote, both to keep
             # the shared _cache/ scratch dir tidy and -- more importantly --
@@ -436,13 +421,13 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
         # key ("1UBQ.pdb"), so the two paths below resolve to genuinely
         # different cache files even though both concern the same protein.
         local_resolved = resolve_structure(LocalPathSource(fixture_path))
-        mol_local, res_local = load_molecule(local_resolved)
+        mol_local = load_molecule(local_resolved)
 
         # Force a genuine fresh network fetch for the PDB-ID path.
         net_cache = joinpath(_store_dir(), uppercase(id) * ".pdb")
         rm(net_cache; force = true)
         net_resolved = resolve_structure(PDBIDSource(id))
-        mol_net, res_net = load_molecule(net_resolved)
+        mol_net = load_molecule(net_resolved)
 
         is_cif = lowercase(splitext(fname)[2]) in (".cif", ".mmcif")
         if is_cif
@@ -450,10 +435,6 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
         end
 
         @test n_atoms(mol_local) == n_atoms(mol_net)
-        @test res_local.resname == res_net.resname
-        @test res_local.resnum  == res_net.resnum
-        @test res_local.chain   == res_net.chain
-        @test res_local.atomname == res_net.atomname
         @test elms(mol_local) == elms(mol_net)
 
         cc_local = coords_cartesian(mol_local)

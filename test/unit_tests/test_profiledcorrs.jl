@@ -8,9 +8,9 @@
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.Fitting: WLSData, wls_fit, reduced_chi2, profiled_corrs, excl_vol_saturation
-using BAYSOL.Scattering: forward, forward_cache, ForwardCache
+using BAYSOL.Scattering: forward_cache, ForwardCache
 using BAYSOL.MolecularStructure: MolecularStructure
-using BAYSOL.Constants: EXCL_VOL_CORR_BOUNDS, EXCL_VOL_CORR_EPS
+using BAYSOL.Fitting: EXCL_VOL_CORR_BOUNDS, EXCL_VOL_CORR_EPS
 using StaticArrays: SVector
 using ForwardDiff
 using Random
@@ -42,7 +42,7 @@ relative noise (0 => an exact/noiseless curve, for recovery tests where the
 true c1 must be located essentially exactly).
 """
 function synth_wls(fw::ForwardCache, c1_true::Real; rel_noise::Real = 0.0)
-    y = forward(fw, 2.0, 0.0005, ξ_TRUE[1], (ξ_TRUE[2], ξ_TRUE[3], ξ_TRUE[4]), c1_true)
+    y = reference_intensity(fw, 2.0, 0.0005, ξ_TRUE[1], (ξ_TRUE[2], ξ_TRUE[3], ξ_TRUE[4]), c1_true)
     σ = fill(max(rel_noise, 1.0e-3) * maximum(abs.(y)), length(y))
     Random.seed!(0xC1_5EED)
     I_exp = rel_noise == 0 ? y : y .+ σ .* randn(length(y))
@@ -77,7 +77,7 @@ end
         @test close_(c1_star, c1_true; atol = 1.0e-4)
         @test close_(fit.chi2, 0.0; atol = 1e3 * DEFAULT_ATOL)
         @test excl_vol_saturation(c1_star) == 0
-        @test ŷ ≈ forward(fw, 1.0, 0.0, ξ_TRUE[1], (ξ_TRUE[2], ξ_TRUE[3], ξ_TRUE[4]), c1_star)   # fused A + g·B + g²·C differs from forward by rounding only
+        @test ŷ ≈ reference_intensity(fw, 1.0, 0.0, ξ_TRUE[1], (ξ_TRUE[2], ξ_TRUE[3], ξ_TRUE[4]), c1_star)   # fused A + g·B + g²·C differs from the plain double sum by rounding only
     end
 
     #------------------------------------------------------------------
@@ -118,7 +118,7 @@ end
         _, fit, c1_star = profiled_corrs(wls, ξ_TRUE, fw)
 
         χ²_at = c1 -> reduced_chi2(wls_fit(
-            forward(fw, 1.0, 0.0, ξ_TRUE[1], (ξ_TRUE[2], ξ_TRUE[3], ξ_TRUE[4]), c1), wls
+            reference_intensity(fw, 1.0, 0.0, ξ_TRUE[1], (ξ_TRUE[2], ξ_TRUE[3], ξ_TRUE[4]), c1), wls
         ))
         fine_grid = range(CMIN - EPS, CMAX + EPS; length = 4001)
         best_fine = minimum(χ²_at(c1) for c1 in fine_grid)

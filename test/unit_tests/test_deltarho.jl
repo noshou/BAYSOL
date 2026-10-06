@@ -6,7 +6,8 @@
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.Fitting: δρ_prior
-using BAYSOL.Constants: DRO_UNIT, DRO_BOUNDS, DRO12_MODE, φ_max, DRO12_CONCENTRATION, DRO3_CONCENTRATION
+using BAYSOL.PhysicalConstants: DRO_UNIT
+using BAYSOL.Fitting: DRO_BOUNDS, DRO12_MODE, φ_max, DRO12_CONCENTRATION, DRO3_CONCENTRATION
 using Distributions: LocationScale, Continuous, Beta, mode, var, cdf, params, minimum, maximum
 using StaticArrays: SVector
 

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Visual check for the hydration-shell dummy cloud `SASA.shell_points`
+# Visual check for the hydration-shell dummy cloud `SASA.sasa`
 # builds; every solvent-accessible sample point becomes one dummy, so the
 # shell is a resolved layer over the molecular surface rather than one marker
 # per exposed atom. 
@@ -12,12 +12,11 @@
 #   julia --project=test/visualize -e 'include("test/visualize/sasa_hydro_vis.jl"); sasa_hydro_report()'
 
 using BAYSOL
-using BAYSOL.AtomicRadii: AtomicRadii, RadiiSource
 using BAYSOL.MolecularStructure: MolecularStructure, Molecule
 using BAYSOL.SASA: SASA
-using BAYSOL.Constants: PROBE_RADIUS
-using BAYSOL.Geometry.PlasticSequence: plastic_points
-using BAYSOL.Geometry.Metrics: blocked
+using BAYSOL.SASA: PROBE_RADIUS
+using BAYSOL.PlasticSequence: plastic_points
+using BAYSOL.SASA: blocked
 using Printf: @printf, @sprintf
 using GLMakie
 
@@ -26,26 +25,22 @@ using GLMakie
 # --------------------------------------------------------------------------
 
 """
-Test-only [`RadiiSource`](@ref) mapping element labels to hand-picked radii,
+Test-only table mapping element labels to hand-picked radii,
 so the packed-sphere scene has exact, reproducible geometry instead of
 whatever the atomic-radii database happens to hold.
 """
-struct HydroRadii <: RadiiSource
+struct HydroRadii
     table::Dict{String,Float64}
 end
 
 """
-    lookup(src::HydroRadii, ions) -> Vector{Tuple{String,Union{Float64,Nothing}}}
-
-Resolve each label against `src.table`, `nothing` for anything absent.
+Build a molecule whose per-atom radii come from `src.table` (element label -> Å),
+through `MolecularStructure._build`, the lazy-radii constructor `create` itself
+uses. Labels are lowercased as `create` does.
 """
-function AtomicRadii.lookup(src::HydroRadii, ions)
-    out = Vector{Tuple{String,Union{Float64,Nothing}}}(undef, length(ions))
-    for (i, ion) in enumerate(ions)
-        s = String(ion)
-        out[i] = (s, get(src.table, s, nothing))
-    end
-    return out
+function radii_mol(name, elms, crds, src)
+    es = String[lowercase(e) for e in elms]
+    return MolecularStructure._build(name, es, crds, () -> Float64[src.table[e] for e in es])
 end
 
 # --------------------------------------------------------------------------
@@ -82,8 +77,7 @@ function packed_cluster_scene(; probe::Float64 = PROBE_RADIUS, r::Float64 = 1.5,
     ctr = ntuple(t -> sum(p[t] for p in pts) / length(pts), 3)
     keep = [p for p in pts if sqrt(sum((p[t] - ctr[t])^2 for t in 1:3)) ≤ a * n * frac]
     src = HydroRadii(Dict("a" => r))
-    mol = MolecularStructure.create("packed cluster", fill("A", length(keep)), keep;
-                            radii_source = src)
+    mol = radii_mol("packed cluster", fill("A", length(keep)), keep, src)
     return (; mol, probe, title = "Packed cluster ($(length(keep)) spheres, FCC)")
 end
 
@@ -129,6 +123,24 @@ function atom_sample_points(mol::Molecule, i::Int, n::Int, probe::Float64)
     return (; pts, exposed)
 end
 
+"""
+    atom_accessibility(mol, probe; n = 1024) -> NamedTuple
+
+Per-atom accessible area (Å²) and exposed flag, by sampling each atom's expanded
+sphere at `n` plastic-sequence directions ([`atom_sample_points`](@ref)): area =
+4π(r+probe)² × exposed fraction, exposed = at least one accessible point.
+"""
+function atom_accessibility(mol::Molecule, probe::Float64; n::Int = 1024)
+    rads = MolecularStructure.radii(mol)
+    na = length(rads)
+    area = Vector{Float64}(undef, na)
+    for i in 1:na
+        frac = count(atom_sample_points(mol, i, n, probe).exposed) / n
+        area[i] = 4π * (rads[i] + probe)^2 * frac
+    end
+    return (; area, exposed = area .> 0)
+end
+
 # --------------------------------------------------------------------------
 # headless report
 # --------------------------------------------------------------------------
@@ -143,7 +155,7 @@ area column should stay flat Budgets shown bracket CRYSOL's `--fb` range (`F(10)
 """
 function sasa_hydro_report(; probe::Float64 = PROBE_RADIUS, n_target::Union{Nothing,Int} = nothing)
     sc = packed_cluster_scene(; probe)
-    area, exposed = SASA.sasa(sc.mol; probe)
+    (; area, exposed) = atom_accessibility(sc.mol, probe)
     println(sc.title, "  (probe = ", probe, ")")
     @printf("  %d atoms: %d exposed, %d buried\n",
             length(area), count(exposed), count(!, exposed))
@@ -152,13 +164,13 @@ function sasa_hydro_report(; probe::Float64 = PROBE_RADIUS, n_target::Union{Noth
     @printf("  %-10s %-9s %-14s %-8s %-8s %-8s\n",
             "n_target", "dummies", "shell area A^2", "convex", "concave", "cavity")
     for n in (55, 233, 610, 1597, 2584)
-        pts, pa, cl = SASA.shell_points(sc.mol; probe, n_target = n)
+        pts, pa, cl = SASA.sasa(sc.mol; probe, n_target = n)
         @printf("  %-10d %-9d %-14.3f %-8d %-8d %-8d\n", n, size(pts, 2), sum(pa),
                 count(==(SASA.CONVEX), cl), count(==(SASA.CONCAVE), cl),
                 count(==(SASA.CAVITY), cl))
     end
 
-    pts, pa, _ = SASA.shell_points(sc.mol; probe, n_target)
+    pts, pa, _ = SASA.sasa(sc.mol; probe, n_target)
     @printf("\n  auto budget: %d dummies, %.4f A^2 each\n",
             size(pts, 2), isempty(pa) ? 0.0 : first(pa))
     return nothing
@@ -173,7 +185,7 @@ end
 
 The hydration-shell dummy cloud on a real packed object
 ([`packed_cluster_scene`](@ref), ~80 atoms): every accessible sample point from
-`SASA.shell_points` is drawn as one dummy, so the shell reads as a layer
+`SASA.sasa` is drawn as one dummy, so the shell reads as a layer
 coating the cluster's outside with its buried core visibly left uncoated.
 
 Raw sample points for one exposed and one buried atom are overlaid in the
@@ -188,8 +200,8 @@ function sasa_hydro_figure(; n_target::Union{Nothing,Int} = nothing, n_show::Int
     crds = MolecularStructure.coords_cartesian(sc.mol)
     rads = MolecularStructure.radii(sc.mol)
     natoms = size(crds, 2)
-    area, exposed = SASA.sasa(sc.mol; probe)
-    shell, shell_area, shell_cls = SASA.shell_points(sc.mol; probe, n_target)
+    (; area, exposed) = atom_accessibility(sc.mol, probe)
+    shell, shell_area, shell_cls = SASA.sasa(sc.mol; probe, n_target)
 
     exp_idx = findall(exposed)
     bur_idx = findall(!, exposed)

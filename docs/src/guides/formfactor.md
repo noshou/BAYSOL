@@ -25,14 +25,14 @@ f0(s) = c + Σ_{i=1..5} a_i · exp(-b_i·s²),   s = q/(4π)  [Å⁻¹]
 ```
 
 211 (c, a1..a5, b1..b5) rows, keyed by lowercase ion string ("fe3+", "o2-") or bare element ("fe"). Valid for 0 ≤ s ≤ `WK_S_MAX` = 6.0 Å⁻¹; the fits go non-physical (some ionic c terms are large and negative, e.g.
-fe3+'s c = -61.93) if extrapolated past that range, so f0 throws rather than extrapolating (f0("fe3+", WK_S_MAX + eps) raises FormFactorError). 
+fe3+'s c = -61.93) if extrapolated past that range, so f0 throws rather than extrapolating (f0("fe3+", `WK_S_MAX` + eps) raises FormFactorError). 
 
 At q → 0, f0 recovers the electron count: Z - charge for an ion, Z for a neutral atom (checked in tests to atol = 5e-3, the Cromer-Mann parameterization's own residual at s = 0).
 
 ### f1/f2: Chantler FFAST (anomalous / resonant)
 
 - **f1**: interpolating **cubic spline with not-a-knot end conditions**, fitted to the local **7-point window** around the requested energy  (max(1, j-3):min(n, j+3), where j is the last grid point at or below the query. f1 is stored as
-  f1_FFAST - Z + f_rel(3/5·CL) + f_NT
+  `f1_FFAST` - Z + `f_rel(3/5·CL)` + `f_NT`
 - **f2**: **linear interpolation in log-log space** over the same local window (values below `F2_LOG_FLOOR` = 1e-99 in magnitude are clamped to it before taking the log, since the table can store an exact zero). f2 is used in log-log rather than cubic-spline form because it spans orders of magnitude across an absorption edge, whereas f1 changes sign through one.
 
 # Tiering
@@ -45,3 +45,10 @@ Not every ion has both halves of the sum. [`compute_form_factors`](@ref BAYSOL.F
 - Anything not logged is **full**: both f0 and f1/f2 resolved for the requested ion and energy.
 
 Ions are deduplicated on build, preserving first-seen order, so a batch like ["fe3+", "fe3+", "o2-", "fe3+"] produces one fe3+ row in t.tbl, while [`form_factors`](@ref BAYSOL.FormFactor.form_factors) still returns one output row per requested (possibly repeated) ion.
+
+## Constants
+
+Defined at module level in `FormFactor.jl`.
+
+
+`WK_S_MAX = 6.0` (upper bound of the Waasmaier–Kirfel f0 parameterisation's s range), `F2_LOG_FLOOR = 1e-99` (floor applied to Chantler f2 before log-log interpolation)

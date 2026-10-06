@@ -10,7 +10,7 @@ Four parameters with priors, ξ = (ρₑ, δρ₁, δρ₂, δρ₃):
 
 - ρₑ ∈ (0,∞): bulk electron density of the buffer (CRYSOL's dns), displaced by the solute's excluded volume.
 - δρ₁, δρ₂ ∈ (−10, 2): CRYSOL-style hydration-shell contrasts of the convex and concave dummy beads, in units of 0.03 e·Å⁻³.
-- δρ₃ ∈ (−ρ̄ₑ/0.03, (φ_max − 1)·ρ̄ₑ/0.03): the contrast of the enclosed-cavity beads, in the same units. It is the excess electron density of cavity water over the bulk, written through the cavity occupancy φ = ρ_cavity/ρₑ as δρ₃ = (φ − 1)·ρₑ/0.03. φ is only the derivation of the bounds; it is not a parameter.
+- δρ₃ ∈ (−ρ̄ₑ/0.03, (`φ_max` − 1)·ρ̄ₑ/0.03): the contrast of the enclosed-cavity beads, in the same units. It is the excess electron density of cavity water over the bulk, written through the cavity occupancy φ = `ρ_cavity/ρₑ` as δρ₃ = (φ − 1)·ρₑ/0.03. φ is only the derivation of the bounds; it is not a parameter.
 
 CRYSOL's excluded-volume correction c1 is **not** part of ξ (see `Scattering.excluded_volume_factor`) -- it rescales the excluded-volume species by a single population-mean radius `r_m`, a mean-field bookkeeping trick over the already individually-computed per-atom volumes (`MolecularStructure.ExcludedVolumes`), not an independently identifiable physical unknown, so there is no defensible prior width to put on it. Instead it is profiled out at each ξ rather than sampled -- see `ProfiledCorrs.jl` below.
 
@@ -61,18 +61,18 @@ Since c1 has no defensible prior (see above), it's profiled out by direct optimi
 
 The search is entirely gradient-free, in two stages:
 
-1. A coarse pre-scan over the grid `(cmin-eps):eps:(cmax+eps)` -- one `forward` + `wls_fit` per point, no autodiff. Grid size ≈ `((cmax+eps) - (cmin-eps)) / eps + 1`, so `eps` controls both the padding described below *and* this scan's cost; at the shipped defaults (`cmin=0.8, cmax=1.3, eps=0.02`) that's 28 points, trivial, but tightening `eps` for a finer saturation test grows this proportionally (e.g. `eps=1e-4` → 5401 points) -- tune with that trade-off in mind if overriding the defaults.
-2. `Optim.jl`'s `Brent()`, bracketed around the best grid point (its two grid neighbours, or the padded edge if the best point is first/last), polishes to full precision.
+1. A coarse pre-scan over the grid `(cmin-eps):eps:(cmax+eps)` -- one fused pass over q per point (g read from the precomputed table), no autodiff. Grid size ≈ `((cmax+eps) - (cmin-eps)) / eps + 1`, so `eps` controls both the padding described below *and* this scan's cost; at the shipped defaults (`cmin=0.8, cmax=1.3, eps=0.02`) that's 28 points, trivial, but tightening `eps` for a finer saturation test grows this proportionally (e.g. `eps=1e-4` → 5401 points) -- tune with that trade-off in mind if overriding the defaults.
+2. `Optim.jl`'s `Brent()`, bracketed around the best grid point (its two grid neighbours, or the padded edge if the best point is first/last), polishes to an absolute tolerance `tol = EXCL_VOL_CORR_TOL` (1e-5) on c1. χ² is quadratic in the c1 error at the optimum, so the profiled log-likelihood is unaffected at any level that matters; the reported c1 is good to about 1e-5.
 
-c1 enters the forward model only through the excluded-volume envelope g(q; c1) on species 2, so at a fixed ξ the curve is exactly ŷ(q; c1) = A(q) + g·B(q) + g²·C(q), with A, B, C built from the Gram matrix and the contrast vector. `profiled_corrs` therefore builds A, B, C once per call (two products against `_C1Tables.Gc`, the Gram entries repacked contiguous in q) instead of running a full `forward` pass per trial c1. The coarse scan expands the weighted sums Σwŷ, Σwŷ², Σwŷ·I in powers of g, so each scan point is one fused pass over q reading g from a precomputed table (`_C1Tables.g1`); each Brent step is one fused pass with a single `exp` per q. The closed-form scale/background solve is shared with `wls_fit` via `_wls_from_sums`. The search itself (scan grid, bracket, `Brent()`, padded bounds) is unchanged, so results differ from the previous implementation only at floating-point rounding level. `_C1Tables` depends only on the `ForwardCache` and the scan settings, is built once in `seed_fitting` (`Seed.c1tab`), is read-only, and is passed to every `profiled_corrs` call through the `tables` keyword (`_ll`/`_logπ` take it as `tab`); omitted, `profiled_corrs` builds it for that call.
+c1 enters the forward model only through the excluded-volume envelope g(q; c1) on species 2, so at a fixed ξ the curve is exactly ŷ(q; c1) = A(q) + g·B(q) + g²·C(q), with A, B, C built from the Gram matrix and the contrast vector. `profiled_corrs` therefore builds A, B, C once per call (two products against `_C1Tables.Gc`, the Gram entries repacked contiguous in q) instead of running a full `forward` pass per trial c1. The coarse scan expands the weighted sums Σwŷ, Σwŷ², Σwŷ·I in powers of g, so each scan point is one fused pass over q reading g from a precomputed table (`_C1Tables.g1`); each Brent step is one fused pass with a single `exp` per q. The closed-form scale/background solve is shared with `wls_fit` via `_wls_from_sums`. The search itself (scan grid, bracket, `Brent()`, padded bounds) is unchanged. `_C1Tables` depends only on the `ForwardCache` and the scan settings, is built once in `seed_fitting` (`Seed.c1tab`), is read-only, and is passed to every `profiled_corrs` call through the `tables` keyword (`_ll`/`_logπ` take it as `tab`); omitted, `profiled_corrs` builds it for that call.
 
-Both stages search directly on a bounded interval, so -- unlike an earlier unconstrained-reparameterization approach -- there is nothing that can run away chasing an asymptote when the true optimum lies at or beyond a bound; the search just converges to the bound itself. The bounds actually searched are padded by `eps` past the nominal `(cmin, cmax)` on purpose: landing exactly on `cmin`/`cmax` from a search that could have gone slightly further (and didn't) is then distinguishable from a search that's still improving right up to the edge of its padded room -- see `excl_vol_saturation` below, which classifies c1_star against the *un*-padded `(cmin, cmax)` to make that call. c1_star itself is returned exactly as found, including outside `(cmin, cmax)` proper (but still inside the padded window) -- nothing clamps it back.
+Both stages search directly on a bounded interval, so -- unlike an earlier unconstrained-reparameterization approach -- there is nothing that can run away chasing an asymptote when the true optimum lies at or beyond a bound; the search just converges to the bound itself. The bounds actually searched are padded by `eps` past the nominal `(cmin, cmax)` on purpose: landing exactly on `cmin`/`cmax` from a search that could have gone slightly further (and didn't) is then distinguishable from a search that's still improving right up to the edge of its padded room -- see `excl_vol_saturation` below, which classifies `c1_star` against the *un*-padded `(cmin, cmax)` to make that call. `c1_star` itself is returned exactly as found, including outside `(cmin, cmax)` proper (but still inside the padded window) -- nothing clamps it back.
 
-If called from inside a NUTS log-density evaluation, ξ must be stripped to Float64 first: c1_star (and its WLSFit) are meant to be plugged back into the surrounding Dual evaluation as fixed constants. This is valid by the envelope theorem -- at a true optimum ∂χ²/∂c1 = 0, so the total derivative of the profiled likelihood w.r.t. the outer ξ equals its partial derivative holding c1 fixed at c1_star.
+If called from inside a NUTS log-density evaluation, ξ must be stripped to Float64 first: `c1_star` (and its WLSFit) are meant to be plugged back into the surrounding Dual evaluation as fixed constants. This is valid by the envelope theorem -- at a true optimum ∂χ²/∂c1 = 0, so the total derivative of the profiled likelihood w.r.t. the outer ξ equals its partial derivative holding c1 fixed at `c1_star`.
 
 `profiled_corrs` takes the same `WLSData` as `_ll`, so the inner c1 search reuses the precomputed data-only sums rather than rebuilding them per trial c1. It's wired into both `Sampler.jl`'s hot path (`_ll` calls it on every log-density/gradient evaluation) and `run_fitting`'s posterior-draw loop (re-profiled per draw for reporting; see `FitResult.c1`).
 
-`excl_vol_saturation(c1; cmin, cmax)` is a free (no re-solve) classification of a profiled c1_star against the physical bounds: `-1`/`+1` if it landed outside `(cmin, cmax)` even with the padded window's extra room (genuine saturation, not a hard-clamp artifact), `0` otherwise. It's meant to be called once, on a single reported value (`BAYSOL.run_model` calls it on the MAP draw's c1 only) -- transient saturation on some posterior draws, especially during warmup, is expected and not itself diagnostic.
+`excl_vol_saturation(c1; cmin, cmax)` is a free (no re-solve) classification of a profiled `c1_star` against the physical bounds: `-1`/`+1` if it landed outside `(cmin, cmax)` even with the padded window's extra room (genuine saturation, not a hard-clamp artifact), `0` otherwise. It's meant to be called once, on a single reported value (`BAYSOL.run_model` calls it on the MAP draw's c1 only) -- transient saturation on some posterior draws, especially during warmup, is expected and not itself diagnostic.
 
 ## Prior distributions
 
@@ -91,7 +91,7 @@ CRYSOL's own default is dr1 = dr2 = 1.0, dr3 = 0.
 `δρ_prior(κ_δρ₁₂, κ_δρ₃, ρ̄ₑ)` returns (δρ₁, δρ₂, δρ₃) priors. Each is a Beta stretched onto a bounded interval, `LocationScale(L, W, Beta(α, β))`, with its mode at CRYSOL's default. The concentration κ = α + β − 2 > 0 sets the spread without moving the mode. `seed_fitting`/`seed_model` take `κ_δρ₁₂`/`κ_δρ₃` keywords, which default to `DRO12_CONCENTRATION`/`DRO3_CONCENTRATION`. ρ̄ₑ is the mean of the ρₑ prior.
 
 - **δρ₁, δρ₂**: support [−10, 2] (`DRO_BOUNDS`, CRYSOL3's fitting limits), mode 1, α = 1 + 11κ/12, β = 1 + κ/12. The default κ = 14 gives SD(δρ) ≈ 1.00 (the spread of the Normal(1, 1) δρ₂ prior it replaced), mean ≈ 0.38 and P(δρ < 0) ≈ 30%. The prior is left-skewed because the mode sits near the upper bound. Note that some older single-shell CRYSOL fits in the SASBDB fixtures report `Dro` ≈ 0.075–0.083 e·Å⁻³ (δρ ≈ 2.5–2.8), above the upper bound.
-- **δρ₃ (cavity contrast)**: support δρ₃ ∈ [−ρ̄ₑ/0.03, (φ_max − 1)·ρ̄ₑ/0.03] ≈ [−11.2, 2.8], from φ ∈ [0, φ_max] (an empty void up to φ_max = 1.25) with ρₑ fixed at the prior mean ρ̄ₑ. Mode at δρ₃ = 0 (φ = 1, bulk-density cavity water), α = 1 + κ/φ_max, β = 1 + (1 − 1/φ_max)·κ. The default κ = 1.25 gives Beta(2, 1.25) on the unit interval: ~21% of the mass is below half occupancy (φ < 0.5) and ~3.5% below φ = 0.2. The sampler draws δρ₃ directly from this prior. Fixing ρₑ at ρ̄ₑ leaves φ = 1 + 0.03·δρ₃/ρₑ within the relative uncertainty of ρₑ of [0, φ_max], at most ~0.06% for the buffers checked. When a structure has almost no cavity beads, δρ₃ has no likelihood and simply samples its prior; the report's `cavity_frac` line flags this.
+- **δρ₃ (cavity contrast)**: support δρ₃ ∈ [−ρ̄ₑ/0.03, (`φ_max` − 1)·ρ̄ₑ/0.03] ≈ [−11.2, 2.8], from φ ∈ [0, `φ_max`] (an empty void up to `φ_max` = 1.25) with ρₑ fixed at the prior mean ρ̄ₑ. Mode at δρ₃ = 0 (φ = 1, bulk-density cavity water), α = 1 + `κ/φ_max`, β = 1 + (1 − `1/φ_max`)·κ. The default κ = 1.25 gives Beta(2, 1.25) on the unit interval: ~21% of the mass is below half occupancy (φ < 0.5) and ~3.5% below φ = 0.2. The sampler draws δρ₃ directly from this prior. Fixing ρₑ at ρ̄ₑ leaves φ = 1 + 0.03·δρ₃/ρₑ within the relative uncertainty of ρₑ of [0, `φ_max`], at most ~0.06% for the buffers checked. When a structure has almost no cavity beads, δρ₃ has no likelihood and simply samples its prior; the report's `cavity_frac` line flags this.
 - **δρ4**: The condensed-cation layer for nucleotides based on Manning theory is not implemented yet.
 
 ### DensityOfSolvent.jl
@@ -104,7 +104,7 @@ The model is linear in solute concentration:
 ρₑ = ρ_w(T) + Σ_j C_j · (N_A·Z_j/1e27 − ρ_w(T)·ϕ°_j/1e3)
 ```
 
-Here, `ϕ°_j` is solute j's partial molar volume at infinite dilution (cm³/mol). Water's density ρ_w(T) is evaluated at the sample temperature t exactly. The ϕ° tables are 25 °C values; away from 25 °C their temperature drift is not modelled but folded into the uncertainty, σ_ϕ°,T = `PMV_FRACTIONAL_EXPANSIBILITY` · ϕ° · |t − 25| (3.0 × 10⁻³ K⁻¹, an upper bound over the 42 multi-temperature series bundled with the tables; unverified for electrolytes). Uncertainty is propagated to first order, assuming independence:
+Here, `ϕ°_j` is solute j's partial molar volume at infinite dilution (cm³/mol). Water's density `ρ_w(T)` is evaluated at the sample temperature t exactly. The ϕ° tables are 25 °C values; away from 25 °C their temperature drift is not modelled but folded into the uncertainty, `σ_ϕ°`,T = `PMV_FRACTIONAL_EXPANSIBILITY` · ϕ° · |t − 25| (3.0 × 10⁻³ K⁻¹, an upper bound over the 42 multi-temperature series bundled with the tables; unverified for electrolytes). Uncertainty is propagated to first order, assuming independence:
 
 ```text
 σ² = (1 − Σ_j C_j·ϕ°_j/1e3)² · σ_w² + Σ_j k_j² · σ_C_j² + Σ_j (C_j·ρ_w/1e3)² · (σ_ϕ°_j² + σ_ϕ°_j,T²)
@@ -191,14 +191,24 @@ log π(θ) = _lp(ξ(θ), priors) + _ll(wls, ξ(θ), fw, l) + logjac(θ)
 θ ↦ z = (θ - μ) / σ
 ```
 
-using each coordinate's own prior mean and standard deviation in θ-space from `θ_prior_moments` (exact for all four: a is Normal under ρₑ's LogNormal prior, and for each t = logit(u), u ~ Beta(α, β), E[t] = ψ(α) − ψ(β) and Var[t] = ψ₁(α) + ψ₁(β)). Sampling in z-space makes a generic kick approximately one prior standard deviation in every coordinate. `_destandardize` inverts this mapping. The affine map's Jacobian, Πσᵢ, is constant and independent of z, so it is omitted from the `_logπ` wrapper in standardized space. NUTS only needs Hamiltonian differences, so this constant does not affect sampling.
+using each coordinate's own prior mean and standard deviation in θ-space from `θ_prior_moments` (exact for all four: a is Normal under ρₑ's LogNormal prior, and for each t = logit(u), u ~ Beta(α, β), E[t] = ψ(α) − ψ(β) and Var[t] = ψ₁(α) + ψ₁(β)). In z-space a generic kick is approximately one prior standard deviation in every coordinate.
+
+### MAP search and Laplace whitening (`MAP.jl`)
+
+Prior standardization is not enough on its own: the posterior is often far narrower than the prior (posterior `σ_z` down to ~1e-4 along δρ₁/δρ₂ in the fitting tests), and Stan's windowed adaptation, which AdvancedHMC.jl copies, assumes O(1) scales. It starts from M⁻¹ = I and shrinks every covariance estimate toward 1e-3·I (weight 5/(n+5)), which then dominates the narrow directions and forces tiny steps and deep trees throughout warmup. Across the 53 fitting-test runs, the narrowest posterior `σ_z` and warmup leapfrog steps per iteration had a Spearman correlation of −0.78. So `run_fitting` first calls `_sampling_space(seed, l)`:
+
+1. L-BFGS (`Optim.jl`) on −log π in z-space, from the seed's θ₀ and `MAP_N_STARTS − 1` further prior draws, with c1 profiled to `EXCL_VOL_CORR_TOL` (the same objective NUTS samples). Non-finite values and `WLSError` (a flat model curve) count as +Inf. The best optimum is the MAP ẑ. Because the θ Jacobian is included, the density always has an interior mode.
+2. A symmetrized central-difference Hessian H of −log π at ẑ, from the exact envelope-theorem gradient, in two passes: step `MAP_HESS_STEP`, then `MAP_HESS_REL_STEP` × each coordinate's Laplace σ from the first pass. These gradient calls profile c1 to `EXCL_VOL_CORR_TOL_FINE`, because central differences divide the gradient's O(c1-error) noise by the step.
+3. H = V·diag(λ)·Vᵀ, eigenvalues floored at `MAP_HESS_EIG_FLOOR` = 1 (a ridge, saddle, or direction wider than the prior keeps the prior scaling), and S = V·diag(λ)^(−1/2).
+
+NUTS then samples w with θ = μ + σ·(ẑ + S·w) (`_θ_of_w`), in which the posterior is ≈ N(0, I) and the chain starts at the mode (w₀ = 0). If no start reaches a finite optimum, ẑ = z₀ and S = I; if the Hessian is non-finite, S = I. The whole map θ ↔ w is affine, so its Jacobian is a constant, omitted from the log density; the target distribution is unchanged, only the chain's path is, and `stats.log_density` is still log π(θ) up to the same additive constant. The optima are also clustered (Mahalanobis distance under H greater than `MAP_MODE_SEP` = distinct), and the number of distinct modes is recorded in the timing log (`info["map_modes"]` and the stage name) as a multimodality diagnostic: NUTS explores the best mode's basin.
 
 ### NUTS via AdvancedHMC.jl
 
 `run_fitting(seed, n_samples, n_adapt; l=PROFILE(), δ=DEFAULT_TARGET_ACCEPT)` (`DEFAULT_TARGET_ACCEPT = 80`, Stan's usual target acceptance rate) proceeds as follows:
 
-1. Wrap `_logπ` ∘ `_destandardize` as ℓπ: z ↦ log π(θ(z)), and compute its gradient using one ForwardDiff.gradient! pass (∂ℓπ/∂z).
-2. Build a DenseEuclideanMetric(4) and a Hamiltonian(metric, ℓπ, ∂ℓπ/∂z), with:
+1. Run the MAP search and whitening above, then wrap `_logπ` ∘ `_θ_of_w` as ℓπ: w ↦ log π(θ(w)), and compute its gradient using one ForwardDiff.gradient! pass (∂ℓπ/∂w).
+2. Build a DenseEuclideanMetric(4) and a Hamiltonian(metric, ℓπ, ∂ℓπ/∂w), with:
 
    ```text
    H(θ, r) = -log π(θ) + ½rᵀM⁻¹r
@@ -218,8 +228,8 @@ using each coordinate's own prior mean and standard deviation in θ-space from `
    ```
 
    Leapfrog trajectories grow by doubling a binary tree until a U-turn occurs, after which a draw is taken from the valid part of the tree using multinomial trajectory sampling.
-5. Run AdvancedHMC.sample for `n_samples` iterations.
-6. Destandardize every returned z and decode it back to ξ via Ξ. For each ξ, re-profile c1 with `profiled_corrs` and recompute scale, `bkgrnd_corr`, c1, χ², and the predicted curve (`wls_predict`, `reduced_chi2`). When the seed carries a `Timing.StageLog`, NUTS setup, sampling (with leapfrog count and ms/step) and this re-profile loop are recorded in it.
+5. Run AdvancedHMC.sample for `n_samples` iterations, starting at w₀ = 0 (the MAP).
+6. Map every returned w back to θ (`_θ_of_w`) and decode it to ξ via Ξ. For each ξ, re-profile c1 with `profiled_corrs` and recompute scale, `bkgrnd_corr`, c1, χ², and the predicted curve (`wls_predict`, `reduced_chi2`). When the seed carries a `Timing.StageLog`, the MAP search, NUTS setup, sampling (with leapfrog count and ms/step) and this re-profile loop are recorded in it.
 
 ```julia
 using BAYSOL
@@ -238,8 +248,8 @@ SOLUTES = Solute[
 
 path = resolve_structure(LocalPathSource(pdb_path))
 pKa_records = propka_pKas(path)
-hpath = resolve_hydrogens(path, pKa_records, PH; add = true)
-mol, _ = load_molecule(hpath)
+hpath = resolve_hydrogens(path, pKa_records, PH)
+mol = load_molecule(hpath)
 
 fw = forward_cache(mol, q_fit, lMax, energy_eV)
 
@@ -250,3 +260,14 @@ result = BAYSOL.run_model(seed, 2000, 1000; l = PROFILE())
 fit, divergence_rate, map_result, quantile_result = result
 BAYSOL.write_report(result)
 ```
+
+## Constants
+
+Defined at module level in `Fitting.jl`.
+
+
+In three sections:
+
+- **Priors**: `DEFAULT_TEMPERATURE_C` (25.0 °C, the default sample temperature for [`Fitting.ρₑ_prior`](@ref BAYSOL.Fitting.ρₑ_prior)'s bulk electron density; pass the real one), `DRO_BOUNDS = (-10, 2)` (CRYSOL3's δρ₁/δρ₂ fitting limits; `DRO_LOWER`, `DRO_WIDTH` are the derived lower end and width the scaled-logit map uses), `DRO12_MODE = 1` (CRYSOL3's default δρ₁ = δρ₂, the prior mode), the Beta-prior concentrations `DRO12_CONCENTRATION = 14` and `DRO3_CONCENTRATION = 1.25` (see [`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)), and `φ_max = 1.25` (upper bound on cavity occupancy, fixing δρ₃'s upper bound)
+- **Profiled c1**: c1 is profiled out per evaluation by [`Fitting.profiled_corrs`](@ref BAYSOL.Fitting.profiled_corrs), not sampled: `EXCL_VOL_CORR_BOUNDS = (0.8, 1.3)`, `EXCL_VOL_CORR_EPS = 0.02` (padding and scan step; grid size `((cmax+eps)-(cmin-eps))/eps + 1`), `EXCL_VOL_CORR_TOL = 1e-5` (Brent's tolerance on c1) and `EXCL_VOL_CORR_TOL_FINE = 1e-8` (for the MAP Hessian's gradient calls)
+- **Sampler**: `DEFAULT_TARGET_ACCEPT` (80, the default NUTS target acceptance rate `δ` in percent; Stan's usual default) and the pre-NUTS MAP search and whitening settings `MAP_N_STARTS`, `MAP_MAX_ITER`, `MAP_G_TOL`, `MAP_HESS_STEP`, `MAP_HESS_REL_STEP`, `MAP_HESS_EIG_FLOOR`, `MAP_MODE_SEP` (see the Fitting README)

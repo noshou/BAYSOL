@@ -7,31 +7,6 @@
 # ---------------------------------------------------------------------------
 
 """
-Human oxytocin, mature nonapeptide (UniProt P01178, oxytocin-neurophysin 1
-proprotein, residues 3-11 of the precursor). Sequence corresponds to the
-nonapeptide first synthesized by du Vigneaud et al. 1953, "The Synthesis of
-an Octapeptide Amide with the Hormonal Activity of Oxytocin", J. Am. Chem.
-Soc. 75:4879-4880, doi:10.1021/ja01115a553.
-"""
-const OXYTOCIN = "CYIQNCPLG"
-
-"""
-Human insulin A chain (UniProt P01308, INS_HUMAN, residues 90-110 of the
-preproinsulin precursor; gene sequence from Bell, Pictet, Rutter, Cordell,
-Tischer & Goodman 1980, "Sequence of the human insulin gene", Nature
-284:26-32, doi:10.1038/284026a0). Short (21 aa), mildly ionizable (one E).
-"""
-const INSULIN_A = "GIVEQCCTSICSLYQLENYCN"
-
-"""
-Human insulin B chain (UniProt P01308, INS_HUMAN, residues 25-54 of the
-preproinsulin precursor; gene sequence from Bell et al. 1980, Nature
-284:26-32, doi:10.1038/284026a0). Short (30 aa), "non-regular": ionizable-heavy
-(H, E, K, R all present).
-"""
-const INSULIN_B = "FVNQHLCGSHLVEALYLVCGERGFFYTPKT"
-
-"""
 Hen egg-white lysozyme (UniProt P00698, mature chain, 129 aa; sequence from
 Canfield 1963, "The Amino Acid Sequence of Egg White Lysozyme", J. Biol.
 Chem. 238:2698-2707, doi:10.1016/S0021-9258(18)67888-3). Medium length;
@@ -39,19 +14,6 @@ moderately ionizable.
 """
 const LYSOZYME =    "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAKFESNFNTQATNRNTDGSTDYGILQINSRW" *
                     "WCNDGRTPGSRNLCNIPCSALLSSDITASVNCAKKIVSDGNGMNAWVAWRNRCKGTDVQAWIRGCRL"
-
-"""
-Green fluorescent protein, *Aequorea victoria* (UniProt P42212, GFP_AEQVI,
-full 238 aa mature chain; sequence from Prasher, Eckenrode, Ward,
-Prendergast & Cormier 1992, "Primary structure of the Aequorea victoria
-green-fluorescent protein", Gene 111:229-233,
-doi:10.1016/0378-1119(92)90691-H). Long; "non-regular": ionizable-heavy
-(D/E/K/R throughout).
-"""
-const GFP = "MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTL" *
-            "VTTFSYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLV" *
-            "NRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLAD" *
-            "HYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK"
 
 # ---------------------------------------------------------------------------
 # DNA

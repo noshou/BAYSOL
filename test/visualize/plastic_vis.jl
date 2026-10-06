@@ -16,7 +16,7 @@
 #   julia --project=test/visualize -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points_2D(2000)'
 #   julia --project=test/visualize -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points_3D(2000)'
 
-using BAYSOL.Geometry: PlasticSequence
+using BAYSOL: PlasticSequence
 using .PlasticSequence: plastic_points
 using GLMakie
 

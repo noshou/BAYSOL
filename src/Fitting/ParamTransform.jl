@@ -1,24 +1,15 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 using StaticArrays
-using ..BAYSOL_Utils.Constants: DRO_BOUNDS
 using LogExpFunctions: logit, logistic, loglogistic
 
-"Lower end L and width W of the δρ₁/δρ₂ support [L, L + W] = [`DRO_BOUNDS`](@ref)."
-const _DRO_L = DRO_BOUNDS[1]
-const _DRO_W = DRO_BOUNDS[2] - DRO_BOUNDS[1]
-
 """
-$(TYPEDSIGNATURES)
-
 log|dx/dt| of the scaled-logistic map x = L + W·σ(t): log W + log σ(t) + log(1 - σ(t)),
 written with `loglogistic` so it stays finite for any t.
 """
 _t_logjac(t::Real, W::Real) = log(W) + loglogistic(t) + loglogistic(-t)
 
 """
-$(TYPEDSIGNATURES)
-
     ξ ∈ (0,∞) × (-10,2) × (-10,2) × (L₃,L₃+W₃)
     │
     │ Θ: ξ ⤇ (θ, corr)
@@ -33,7 +24,7 @@ Let the following parameters be:
     - δρ₂ ∈ (L, L + W)  the contrast of concave water beads
     - δρ₃ ∈ (L₃, L₃ + W₃)  the contrast of cavity water beads
 
-with (L, L + W) = DRO_BOUNDS = (-10, 2), CRYSOL3's fitting limits, and (L₃, L₃ + W₃) the
+with (L, L + W) = `DRO_BOUNDS` = (-10, 2), CRYSOL3's fitting limits, and (L₃, L₃ + W₃) the
 support of the δρ₃ prior (the `LocationScale`'s μ and σ; [`_δρ₃_prior`](@ref)).
 
 We therefore have the following parameter vector ξ:
@@ -79,16 +70,14 @@ result is log-concave in tₖ.
 """
 function Θ(ξ::SVector{4,<:Real}, p::ξ_priors)
     a  = log(ξ[1])
-    t₁ = logit((ξ[2] - _DRO_L) / _DRO_W)
-    t₂ = logit((ξ[3] - _DRO_L) / _DRO_W)
+    t₁ = logit((ξ[2] - DRO_LOWER) / DRO_WIDTH)
+    t₂ = logit((ξ[3] - DRO_LOWER) / DRO_WIDTH)
     t₃ = logit((ξ[4] - p.δρ₃Prior.μ) / p.δρ₃Prior.σ)
     θ = SVector{4}(a, t₁, t₂, t₃)
     return θ, logjac(θ, p)
 end
 
 """
-$(TYPEDSIGNATURES)
-
     θ ∈ ℝ⁴
     │
     │ Ξ: θ ⤇ ξ
@@ -108,15 +97,13 @@ Inverse of [`Θ`](@ref): θ-space (unconstrained ℝ⁴) back to ξ-space.
 function Ξ(θ::SVector{4,<:Real}, p::ξ_priors)
     return SVector{4}(
         exp(θ[1]),
-        _DRO_L + _DRO_W * logistic(θ[2]),
-        _DRO_L + _DRO_W * logistic(θ[3]),
+        DRO_LOWER + DRO_WIDTH * logistic(θ[2]),
+        DRO_LOWER + DRO_WIDTH * logistic(θ[3]),
         p.δρ₃Prior.μ + p.δρ₃Prior.σ * logistic(θ[4]),
     )
 end
 
 """
-$(TYPEDSIGNATURES)
-
 ln|det(∂ξ/∂θ)| of [`Ξ`](@ref) at θ, the Jacobian correction [`_logπ`](@ref)
 adds; identical to the `corr` [`Θ`](@ref) returns for ξ = Ξ(θ):
 
@@ -130,12 +117,10 @@ adds; identical to the `corr` [`Θ`](@ref) returns for ξ = Ξ(θ):
 - `Real`: the log-Jacobian.
 """
 logjac(θ::SVector{4,<:Real}, p::ξ_priors) =
-    θ[1] + _t_logjac(θ[2], _DRO_W) + _t_logjac(θ[3], _DRO_W) + _t_logjac(θ[4], p.δρ₃Prior.σ)
+    θ[1] + _t_logjac(θ[2], DRO_WIDTH) + _t_logjac(θ[3], DRO_WIDTH) + _t_logjac(θ[4], p.δρ₃Prior.σ)
 
 
 """
-$(TYPEDSIGNATURES)
-
     ξ ∈ (0,∞) × (-10,2) × (-10,2) × (L₃,L₃+W₃) × (0,∞)
     │
     │ Θ: ξ ⤇ (θ, corr)
@@ -164,8 +149,6 @@ function Θ(ξ::SVector{5,<:Real}, p::ξ_priors)
 end
 
 """
-$(TYPEDSIGNATURES)
-
     θ ∈ ℝ⁵
     │
     │ Ξ: θ ⤇ ξ

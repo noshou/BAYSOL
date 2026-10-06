@@ -18,8 +18,8 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 
 const IFACE = BAYSOL.PartialMolarVolumes
 using BAYSOL.PartialMolarVolumes:
-    PartialMolarVolumes, PMVSrcTables, COMMON_TO_IUPAC
-using BAYSOL.Constants: AVOGADRO, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER
+    PartialMolarVolumes, COMMON_TO_IUPAC
+using BAYSOL.PhysicalConstants: AVOGADRO, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER
 
 "Fully-qualified handle onto the submodule, for the private caches/tables below."
 const PMVMOD = BAYSOL.PartialMolarVolumes
@@ -35,15 +35,6 @@ let _fresh_n = Ref(0)
 end
 
 @testset "PartialMolarVolumes" begin
-
-    @testset "backend marker & PartialMolarVolumes dispatch agreement" begin
-        @test PMVSrcTables() isa IFACE.PartialMolarVolumeSource
-        @test IFACE.ρₑ_w(25.0) == IFACE.ρₑ_w(PMVSrcTables(), 25.0)
-        @test IFACE.ϕ°(7.0, "GGGG") == IFACE.ϕ°(PMVSrcTables(), 7.0, "GGGG")
-        @test IFACE.ϕ°("urea") == IFACE.ϕ°(PMVSrcTables(), "urea")
-        dispatch_seq = fresh_seq("D")
-        @test IFACE.ϕ°(4.0, dispatch_seq; σ_pH = 0.3) == IFACE.ϕ°(PMVSrcTables(), 4.0, dispatch_seq; σ_pH = 0.3)
-    end
 
     #------------------------------------------------------------------
     #                    ρₑ_w -- bulk water electron density

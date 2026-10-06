@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-using ..BAYSOL_Utils.Constants: AVOGADRO, ANGSTROM3_PER_LITER, CM3_PER_LITER, DEFAULT_TEMPERATURE_C, PMV_REFERENCE_TEMPERATURE_C, PMV_FRACTIONAL_EXPANSIBILITY
-using ..PartialMolarVolumes: PartialMolarVolumes
+using ..PhysicalConstants: AVOGADRO, ANGSTROM3_PER_LITER, CM3_PER_LITER
+using ..PartialMolarVolumes: PartialMolarVolumes, PMV_REFERENCE_TEMPERATURE_C, PMV_FRACTIONAL_EXPANSIBILITY
 using Distributions
 
 
@@ -31,29 +31,27 @@ end
 
 
 """
-$(TYPEDSIGNATURES)
-
 Bulk electron density of the buffer at temperature t (°C), in e·Å⁻³.
 
 The model is linear in solute concentration:
 
     ρₑ = ρ_w(T) + Σ_j C_j · (N_A·Z_j/1e27 − ρ_w(T)·ϕ°_j/1e3)
 
-with ϕ°_j the partial molar volume of solute j at infinite dilution in
-cm³·mol⁻¹. Water's density ρ_w(T) is evaluated at t exactly. The ϕ°_j tables
-are 25 °C values (PMV_REFERENCE_TEMPERATURE_C); away from 25 °C their
+with `ϕ°_j` the partial molar volume of solute j at infinite dilution in
+cm³·mol⁻¹. Water's density `ρ_w(T)` is evaluated at t exactly. The `ϕ°_j` tables
+are 25 °C values (`PMV_REFERENCE_TEMPERATURE_C`); away from 25 °C their
 temperature drift is not modelled but folded into the uncertainty as
 
     σ_ϕ°_j,T = PMV_FRACTIONAL_EXPANSIBILITY · ϕ°_j · |t − 25|
 
-added in quadrature to the tabulated σ_ϕ°_j. Uncertainty is propagated to first
+added in quadrature to the tabulated `σ_ϕ°_j`. Uncertainty is propagated to first
 order assuming independence:
 
     σ² = (1 − Σ_j C_j·ϕ°_j/1e3)² · σ_w²
         + Σ_j k_j² · σ_C_j²
         + Σ_j (C_j·ρ_w/1e3)² · (σ_ϕ°_j² + σ_ϕ°_j,T²)
 
-where k_j = N_A·Z_j/1e27 − ρ_w·ϕ°_j/1e3.
+where `k_j` = `N_A`·`Z_j/1e27` − `ρ_w`·`ϕ°_j/1e3`.
 
 # Arguments
 - `pH::Real`: pH of the solution; forwarded to PartialMolarVolumes.ϕ° for Protein/DNA/RNA solutes.
@@ -62,14 +60,14 @@ where k_j = N_A·Z_j/1e27 − ρ_w·ϕ°_j/1e3.
     macromolecule** (see [`Solute`](@ref)). Empty means pure water.
 
 # Keywords
-- `t::Real=DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to PartialMolarVolumes.ρₑ_w.
+- `t::Real=DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to `PartialMolarVolumes.ρₑ_w`.
 
 # Returns
 - `Tuple{Float64, Float64}`: (ρₑ, σρₑ), the bulk electron density and its
     propagated standard uncertainty, both in e·Å⁻³.
 
 # Exceptions
-- `DomainError`: thrown if any solute's molarity_uncertainty < 0 or
+- `DomainError`: thrown if any solute's `molarity_uncertainty` < 0 or
     molarity ≤ 0.
 - `ArgumentError`: thrown if a solute's sequence/name is empty.
 """
@@ -122,8 +120,6 @@ function _ρₑ(
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Prior distribution for the bulk electron density ρₑ, as a LogNormal moment-matched
 to the mean and standard deviation returned by [`_ρₑ`](@ref) (see it for the
 model, including how temperatures away from 25 °C are handled).
@@ -134,19 +130,19 @@ Given μ = ρₑ, σ = √σ², the LogNormal(μln, σln) parameters are:
     μ_ln = ln(μ) − σ_ln²/2
 
 # Arguments
-- `pH::Real`: pH of the solution; forwarded to _ρₑ.
+- `pH::Real`: pH of the solution; forwarded to `_ρₑ`.
 - `σ_pH::Real`: standard uncertainty on pH; must be ≥ 0.
 - `solutes::Vector{Solute}`: the buffer's components, **excluding the measured
     macromolecule** (see [`Solute`](@ref)). Empty means pure water.
 
 # Keywords
-- `t::Real=DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to _ρₑ.
+- `t::Real=DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to `_ρₑ`.
 
 # Returns
 - `LogNormal{Float64}`: prior distribution over ρₑ.
 
 # Exceptions
-- `DomainError`: thrown if σ_pH < 0.
+- `DomainError`: thrown if `σ_pH` < 0.
 """
 function ρₑ_prior(
     pH::Real,

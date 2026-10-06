@@ -2,13 +2,13 @@
 
 """
 Weighted least squares for the two instrumental parameters scale,
-bkgrnd_corr in
+`bkgrnd_corr` in
 
     I_calc(q) = scale · I(q) + bkgrnd_corr
 
-The measured data I_obs and σ are fixed during inference, so all
+The measured data `I_obs` and σ are fixed during inference, so all
 data-only weighted sums are precomputed in WLSData. The hot-path
-wls_fit(y_model, data) therefore only needs three weighted reductions:
+`wls_fit`(`y_model`, data) therefore only needs three weighted reductions:
 
     SwI  = Σ wᵢ y_modelᵢ
     SwII = Σ wᵢ y_modelᵢ²
@@ -26,11 +26,9 @@ Base.showerror(io::IO, e::WLSError) = print(io, "WLSError: ", e.msg)
 
 
 """
-$(TYPEDSIGNATURES)
-
 Construct the precomputed weighted data used by [`wls_fit`](@ref).
 
-I_obs and σ are assumed to remain unchanged for subsequent fits.
+`I_obs` and σ are assumed to remain unchanged for subsequent fits.
 """
 function WLSData(
     I_obs::AbstractVector,
@@ -81,9 +79,7 @@ end
 
 
 """
-$(TYPEDSIGNATURES)
-
-Fit scale and bkgrnd_corr in
+Fit scale and `bkgrnd_corr` in
 
     I_calc(q) = scale·y_model(q) + bkgrnd_corr
 
@@ -124,12 +120,10 @@ function wls_fit(
 end
 
 """
-$(TYPEDSIGNATURES)
-
 The closed-form weighted least-squares fit behind [`wls_fit`](@ref), from the three
-model-dependent sums Σwᵢyᵢ, Σwᵢyᵢ², Σwᵢyᵢ·Iᵢ (y = y_model, I = I_obs) and the
+model-dependent sums Σwᵢyᵢ, Σwᵢyᵢ², Σwᵢyᵢ·Iᵢ (y = `y_model`, I = `I_obs`) and the
 data-only sums in `data`. Shared with the c1 search in [`profiled_corrs`](@ref), which
-gets those sums without forming y_model.
+gets those sums without forming `y_model`.
 
 # Arguments
 - `SwI`, `SwII`, `SwIy`: the three model-dependent weighted sums.
@@ -157,10 +151,6 @@ function _wls_from_sums(SwI, SwII, SwIy, n::Int, data::WLSData)::WLSFit
     scale = (Sw * SwIy - SwI * Swy) / det_XtWX
     bkgrnd_corr = (SwII * Swy - SwI * SwIy) / det_XtWX
 
-    var_scale = Sw / det_XtWX
-    var_bkgrnd_corr = SwII / det_XtWX
-    cov_scale_bkgrnd_corr = -SwI / det_XtWX
-
     chi2 = max(
         zero(T),
         Swyy - scale * SwIy - bkgrnd_corr * Swy,
@@ -169,9 +159,6 @@ function _wls_from_sums(SwI, SwII, SwIy, n::Int, data::WLSData)::WLSFit
     return WLSFit{T}(
         scale,
         bkgrnd_corr,
-        var_scale,
-        var_bkgrnd_corr,
-        cov_scale_bkgrnd_corr,
         chi2,
         n - 2,
         det_XtWX,
@@ -181,8 +168,6 @@ end
 
 
 """
-$(TYPEDSIGNATURES)
-
 Convenience interface for a one-off weighted least-squares fit.
 
 For repeated fits against the same data, construct `WLSData(I_obs, σ)`
@@ -198,25 +183,19 @@ end
 
 
 """
-$(TYPEDSIGNATURES)
-
-The fitted I_calc = f.scale .* y_model .+ f.bkgrnd_corr.
+The fitted `I_calc` = f.scale .* `y_model` .+ `f.bkgrnd_corr`.
 """
 wls_predict(f::WLSFit, y_model::AbstractVector) =
     f.scale .* y_model .+ f.bkgrnd_corr
 
 
 """
-$(TYPEDSIGNATURES)
-
 χ²/dof.
 """
 reduced_chi2(f::WLSFit) = f.chi2 / f.dof
 
 
 """
-$(TYPEDSIGNATURES)
-
 Profile log-likelihood with scale and background fitted at their WLS optimum.
 """
 wls_prof_ll(f::WLSFit) =
@@ -225,8 +204,6 @@ wls_prof_ll(f::WLSFit) =
 
 
 """
-$(TYPEDSIGNATURES)
-
 Log marginal-likelihood with scale and background integrated out under
 a flat prior.
 """
