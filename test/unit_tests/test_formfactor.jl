@@ -7,9 +7,8 @@
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 const IFACE = BAYSOL.FormFactor
-using BAYSOL.FormFactor: compute_form_factors, FF, FormFactorError,
-                                        FormFactorSourceTables, f0, f1f2
-using BAYSOL.Constants: WK_S_MAX
+using BAYSOL.FormFactor: compute_form_factors, FF, FormFactorError, f0, f1f2
+using BAYSOL.FormFactor: WK_S_MAX
 
 check_c(a, b) = abs(a - b) < 1e3 * DEFAULT_ATOL
 qvals = [0.1, 0.2]
@@ -17,8 +16,7 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
 
 @testset "FormFactor" begin
 
-    @testset "backend marker" begin
-        @test FormFactorSourceTables() isa IFACE.FormFactorSource
+    @testset "FormFactorError" begin
         @test sprint(showerror, FormFactorError("boom")) == "FormFactorError: boom"
         @test FormFactorError("boom") isa Exception
     end

@@ -8,7 +8,7 @@
 include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.Scattering: compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
-using BAYSOL.Constants: BESSEL_CUTOFF
+using BAYSOL.Scattering: BESSEL_CUTOFF
 using BAYSOL.Scattering.SphFuncs: sphHarm
 using SpecialFunctions: sphericalbesselj
 using BAYSOL.MolecularStructure: create, coords_spherical, to_spherical

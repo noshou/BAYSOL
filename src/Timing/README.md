@@ -1,0 +1,3 @@
+# Timing
+
+`StageLog` records wall-clock, JIT-compile and GC seconds per named stage of a run. `seed_model` creates one (so the wall clock starts at the top of `seed_model`), hands it to `forward_cache(...; stage_log=)` and `seed_fitting(...; timing=)`, and it rides in `Seed.timing` → `FitResult.timing`. `write_report` ends with a `=== Timing ===` section (static build vs sampling, per-stage, plus `report write` and `unaccounted`) and starts with `=== Run ===` (`n_atoms`, lMax, `n_q`, `n_samples`, `n_adapt`). Everything is a no-op when the log is `nothing`. `unaccounted` on a cold session is first-call JIT of `run_model`/`run_fitting`/`write_report`, which compiles before their own stages begin; the `(JIT)` column on that line shows it.

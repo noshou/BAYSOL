@@ -9,8 +9,10 @@ in an isolated CondaPkg-managed Python environment.
 using  CondaPkg: CondaPkg
 using  FastClosures: @closure
 
-"Raised when propka3 cannot be run or its output cannot be parsed
-(bad input path, non-zero exit, malformed .pka file)."
+"""
+Raised when propka3 cannot be run or its output cannot be parsed
+(bad input path, non-zero exit, malformed .pka file).
+"""
 struct PropkaError <: Exception; msg::String end
 Base.showerror(io::IO, e::PropkaError) = print(io, "PropkaError: ", e.msg)
 
@@ -18,8 +20,6 @@ Base.showerror(io::IO, e::PropkaError) = print(io, "PropkaError: ", e.msg)
 const _STANDARD_GROUPS = Set(["ASP", "GLU", "CYS", "TYR", "HIS", "LYS", "ARG", "N+", "C-"])
 
 """
-$(TYPEDSIGNATURES)
-
 Parse a propka3 .pka output file into one record per standard titratable
 group. Non-standard rows (ligand groups, carrying a trailing ligand
 atom-type column) are skipped.
@@ -55,8 +55,6 @@ _pka_path(pdb_path::AbstractString) =
     joinpath(_store_dir(), splitext(basename(abspath(pdb_path)))[1] * ".pka")
 
 """
-$(TYPEDSIGNATURES)
-
 Run propka3 on a PDB structure and return one record per standard
 titratable group: (resname::String, resnum::Int, chain::String, pKa::Float64).
 

@@ -59,7 +59,7 @@ const PH, σ_PH = 7.5, PH_METER_SIGMA
 # wavelength 0.1127 nm = 1.127 Å => energy = hc/λ (hc = 12398.42 eV·Å)
 const ENERGY_EV        = HC_EV_ANGSTROM / 1.127   # ≈ 11001.2 eV
 const TEMPERATURE_C     = 20.0              # 20°C, paper/SASBDB
-                                            # (Constants.jl); see seed_model's t= docstring note.
+                                            # (Fitting.jl); see seed_model's t= docstring note.
 const IONIC_STRENGTH_M  = 0.200             # 200 mM NaCl, matches the SEC/SAXS buffer above
 
 # XRCC1 sequence (P18887, residues 1-633), read directly off this model's

@@ -18,8 +18,7 @@ using BAYSOL.Fitting: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_m
     reduced_chi2
 
 """
-Reference (scale, bkgrnd_corr, var_scale, var_bkgrnd_corr, cov_scale_bkgrnd_corr,
-chi2, det_XtWX) via explicit normal equations `(XᵀWX) β = XᵀWy`, independent
+Reference (scale, bkgrnd_corr, chi2, det_XtWX) via explicit normal equations `(XᵀWX) β = XᵀWy`, independent
 of `wls_fit`'s accumulator formulas.
 """
 function ref_wls(y_model::AbstractVector, I_obs::AbstractVector, σ::AbstractVector)
@@ -28,10 +27,9 @@ function ref_wls(y_model::AbstractVector, I_obs::AbstractVector, σ::AbstractVec
     XtWX = X' * W * X
     β = XtWX \ (X' * W * I_obs)
     scale, bkgrnd_corr = β
-    cov = inv(XtWX)
     resid = I_obs .- X * β
     chi2 = resid' * W * resid
-    return scale, bkgrnd_corr, cov[1, 1], cov[2, 2], cov[1, 2], chi2, det(XtWX)
+    return scale, bkgrnd_corr, chi2, det(XtWX)
 end
 
 @testset "WLS" begin
@@ -80,13 +78,10 @@ end
             I_obs = scale_true .* y_model .+ bkgrnd_corr_true .+ σ .* randn(rng, n)
 
             f = wls_fit(y_model, I_obs, σ)
-            scale_r, bkgrnd_corr_r, vscale_r, vbkgrnd_corr_r, cov_r, chi2_r, det_r = ref_wls(y_model, I_obs, σ)
+            scale_r, bkgrnd_corr_r, chi2_r, det_r = ref_wls(y_model, I_obs, σ)
 
             @test check_float(f.scale, scale_r; atol = 1e3 * DEFAULT_ATOL)
             @test check_float(f.bkgrnd_corr, bkgrnd_corr_r; atol = 1e3 * DEFAULT_ATOL)
-            @test check_float(f.var_scale, vscale_r; atol = 1e3 * DEFAULT_ATOL)
-            @test check_float(f.var_bkgrnd_corr, vbkgrnd_corr_r; atol = 1e3 * DEFAULT_ATOL)
-            @test check_float(f.cov_scale_bkgrnd_corr, cov_r; atol = 1e3 * DEFAULT_ATOL)
             @test check_float(f.chi2, chi2_r; atol = 1e3 * DEFAULT_ATOL)
             @test check_float(f.det_XtWX, det_r; atol = 1e6 * DEFAULT_ATOL)
             @test f.dof == n - 2

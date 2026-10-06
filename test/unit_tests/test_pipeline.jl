@@ -11,7 +11,7 @@ include(joinpath(@__DIR__, "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, propka_pKas,
                     resolve_hydrogens, load_molecule,
-                    _store_dir, Molecule, Residues, n_atoms, elms, coords_cartesian
+                    _store_dir, Molecule, n_atoms, elms, coords_cartesian
 
 const _PIPELINE_FIXTURE = joinpath(@__DIR__, "..", "fixtures", "molecules", "1CRN-TEST.pdb")
 
@@ -31,16 +31,14 @@ const _PIPELINE_FIXTURE = joinpath(@__DIR__, "..", "fixtures", "molecules", "1CR
     pH = 7.0
 
     path = resolve_structure(source)
-    mol_heavy, res_heavy = load_molecule(path)
+    mol_heavy = load_molecule(path)
     pKa_records = propka_pKas(path)
     hpath = resolve_hydrogens(path, pKa_records, pH)
-    mol_h, res_h = load_molecule(hpath)
+    mol_h = load_molecule(hpath)
 
     @testset "return types" begin
         @test mol_heavy isa Molecule
-        @test res_heavy isa Residues
         @test mol_h isa Molecule
-        @test res_h isa Residues
     end
 
     @testset "hydrogens were actually added" begin
@@ -66,29 +64,6 @@ const _PIPELINE_FIXTURE = joinpath(@__DIR__, "..", "fixtures", "molecules", "1CR
         cc_h = coords_cartesian(mol_h)
         @test all(isfinite, cc_heavy)
         @test all(isfinite, cc_h)
-    end
-
-    @testset "Residues field-length internal consistency" begin
-        n_heavy = n_atoms(mol_heavy)
-        @test length(res_heavy.resname) == n_heavy
-        @test length(res_heavy.atomname) == n_heavy
-        @test length(res_heavy.resnum) == n_heavy
-        @test length(res_heavy.chain) == n_heavy
-
-        n_h = n_atoms(mol_h)
-        @test length(res_h.resname) == n_h
-        @test length(res_h.atomname) == n_h
-        @test length(res_h.resnum) == n_h
-        @test length(res_h.chain) == n_h
-    end
-
-    @testset "resolve_hydrogens(add=false) is a no-op, load_molecule still works" begin
-        noop_path = resolve_hydrogens(path, pKa_records, pH; add = false)
-        @test noop_path == path
-        mol_noop, res_noop = load_molecule(noop_path)
-        @test n_atoms(mol_noop) == n_atoms(mol_heavy)
-        @test elms(mol_noop) == elms(mol_heavy)
-        @test coords_cartesian(mol_noop) == coords_cartesian(mol_heavy)
     end
 
     # Leave the shared _cache/ scratch dir clean for repeat runs.

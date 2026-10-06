@@ -2,11 +2,9 @@
 
 using Distributions
 using StaticArrays: SVector
-using ..BAYSOL_Utils.Constants: DRO_UNIT, DRO_BOUNDS, DRO12_MODE, φ_max
+using ..PhysicalConstants: DRO_UNIT
 
 """
-$(TYPEDSIGNATURES)
-
 Prior distributions for δρ₁ and δρ₂, the changes in bulk solvent electron density at the
 surface for convex and concave beads respectively.
 
@@ -118,8 +116,6 @@ end
 
 
 """
-$(TYPEDSIGNATURES)
-
 Prior distribution for the change in solvent density in cavities, δρ₃.
 
 "Cavity" is a SASA classification. In SASA.jl, a shell point is CAVITY if it
@@ -134,7 +130,7 @@ where:
     - φ = 1 is bulk-density water.
     - φ = 0 is an empty void.
 
-The forward model builds a contrast vector v = [1, −dns·g_ex(c1), ρ₁, ρ₂, ρ₃] and computes
+The forward model builds a contrast vector v = [1, −dns·`g_ex(c1)`, ρ₁, ρ₂, ρ₃] and computes
 
     I = scale·vᵀG(q)v + bkg
 
@@ -147,12 +143,12 @@ Thus φ is a reparameterisation of the cavity beads' excess electron density ove
 and δρ₃ is that excess in units of 0.03.
 
 Because ρₑ appears in it, δρ₃ is not independent of the solvent density. By fixing ρₑ to ρ̄ₑ,
-we get a fixed value for the bulk electron density. Since ρ_cavity ≥ 0, we require φ ≥ 0,
+we get a fixed value for the bulk electron density. Since `ρ_cavity` ≥ 0, we require φ ≥ 0,
 which gives the lower bound:
 
     δρ₃ ≥ −ρ̄ₑ/DRO_UNIT.
 
-If we additionally impose an upper bound φ ≤ φ_max, then the corresponding upper bound is
+If we additionally impose an upper bound φ ≤ `φ_max`, then the corresponding upper bound is
 
     δρ₃ ≤ (φ_max − 1)·ρ̄ₑ/DRO_UNIT.
 
@@ -161,8 +157,8 @@ Therefore:
     δρ₃ ∈ [−ρ̄ₑ/DRO_UNIT, (φ_max − 1)·ρ̄ₑ/DRO_UNIT]
 
 Let u ~ Beta(α, β), which gives u ∈ [0, 1]. To stretch it onto a new
-interval [X, Y], scale by the width (Y-X) and shift by X. If X = −ρ̄ₑ/DRO_UNIT
-and Y = (φ_max − 1)·ρ̄ₑ/DRO_UNIT:
+interval [X, Y], scale by the width (Y-X) and shift by X. If X = −`ρ̄ₑ/DRO_UNIT`
+and Y = (`φ_max` − 1)·`ρ̄ₑ/DRO_UNIT`:
 
     δρ₃ = X + (Y − X)·u  
         = −ρ̄ₑ/DRO_UNIT + ((φ_max − 1)·ρ̄ₑ/DRO_UNIT - −ρ̄ₑ/DRO_UNIT)·u 
@@ -174,7 +170,7 @@ If we want the mode of δρ₃ to equal 0 (CRYSOL3's defaults) we get:
     0 = φ_max·u - 1
     u = φ_max⁻¹
 
-Which means the distribution must have a mode of φ_max⁻¹.
+Which means the distribution must have a mode of `φ_max`⁻¹.
 
 The mode of a beta distribution is:
 
@@ -185,7 +181,7 @@ Let m be the mode. For a constant c = (α + β) > 2 we have:
     α = m(c - 2) + 1
     β = (1 - m)(c - 2) + 1
 
-Substituting m = φ_max⁻¹:
+Substituting m = `φ_max`⁻¹:
 
     α = (c - 2)/φ_max + 1
     β = (2 - c)/φ_max + c - 1
@@ -209,13 +205,13 @@ and therefore:
 
 The corresponding variance of δρ₃ is:
 
-σ²[δρ₃] = (φ_max·ρ̄ₑ/DRO_UNIT)²·σ²[u].
+σ²[δρ₃] = (`φ_max`·`ρ̄ₑ/DRO_UNIT`)²·σ²[u].
 
 Thus κ controls the concentration of the prior while preserving its mode at δρ₃ = 0.
 
 The sampler samples δρ₃ directly, with u = (δρ₃ − X)/(Y − X) ~ Beta(α, β) as above, on
-these fixed bounds. Because ρ̄ₑ is fixed rather than the sampled ρₑ, φ = 1 + DRO_UNIT·δρ₃/ρₑ
-can leave [0, φ_max] by the relative uncertainty of ρₑ, at most ~0.06% for the buffers
+these fixed bounds. Because ρ̄ₑ is fixed rather than the sampled ρₑ, φ = 1 + `DRO_UNIT`·δρ₃/ρₑ
+can leave [0, `φ_max`] by the relative uncertainty of ρₑ, at most ~0.06% for the buffers
 checked. φ is not a parameter; it is only the derivation of the bounds and the mode.
 
 # Arguments
@@ -225,8 +221,8 @@ checked. φ is not a parameter; it is only the derivation of the bounds and the 
     (the sampler passes the mean of [`ρₑ_prior`](@ref)).
 
 # Returns
-- `δρ₃::BoundedBeta`: `LocationScale(−ρ̄ₑ/DRO_UNIT, φ_max·ρ̄ₑ/DRO_UNIT,
-    Beta(1 + κ/φ_max, 1 + (1 − 1/φ_max)·κ))`.
+- `δρ₃::BoundedBeta`:
+    `LocationScale(−ρ̄ₑ/DRO_UNIT, φ_max·ρ̄ₑ/DRO_UNIT, Beta(1 + κ/φ_max, 1 + (1 − 1/φ_max)·κ))`.
 
 # Exceptions
 - `DomainError`: κ ≤ 0 or ρ̄ₑ ≤ 0.
@@ -249,8 +245,6 @@ function _δρ₃_prior(κ::Real, ρ̄ₑ::Real)::BoundedBeta
 end
 
 """
-$(TYPEDSIGNATURES)
-
 Priors on the three hydration-shell contrasts (δρ₁, δρ₂, δρ₃), in units of
 [`DRO_UNIT`](@ref). Each is a Beta stretched onto a bounded
 interval with its mode at CRYSOL3's default (1, 1, 0). See [`_δρ₁₂_priors`](@ref) and
@@ -265,10 +259,10 @@ interval with its mode at CRYSOL3's default (1, 1, 0). See [`_δρ₁₂_priors`
 - `δρ₁::BoundedBeta`: convex-bead contrast prior on [-10, 2].
 - `δρ₂::BoundedBeta`: concave-bead contrast prior on [-10, 2].
 - `δρ₃::BoundedBeta`: cavity-bead contrast prior on
-    [−ρ̄ₑ/DRO_UNIT, (φ_max − 1)·ρ̄ₑ/DRO_UNIT].
+    [−`ρ̄ₑ/DRO_UNIT`, (`φ_max` − 1)·`ρ̄ₑ/DRO_UNIT`].
 
 # Exceptions
-- `DomainError`: κ_δρ₁₂ ≤ 0, κ_δρ₃ ≤ 0 or ρ̄ₑ ≤ 0.
+- `DomainError`: `κ_δρ₁₂` ≤ 0, `κ_δρ₃` ≤ 0 or ρ̄ₑ ≤ 0.
 """
 function δρ_prior(
     κ_δρ₁₂::Real,
