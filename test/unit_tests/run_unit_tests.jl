@@ -35,5 +35,6 @@ using Test
     include("test_deltarho.jl")
     include("test_paramtransform.jl")
     include("test_sampler.jl")
+    include("test_seed_diagnostics.jl")
     include("test_quality.jl")
 end

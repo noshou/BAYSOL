@@ -468,7 +468,9 @@ than the prior along some directions.
 StepSizeAdaptor tunes the leapfrog step size ε via dual-averaging so the
 empirical acceptance rate converges to δ; too-small ε wastes computation
 taking tiny steps, too-large ε causes leapfrog's discretization error (and
-therefore the rejection rate) to blow up. MassMatrixAdaptor learns M (here the
+therefore the rejection rate) to blow up. A gradient that is inconsistent with the value
+(a loosely profiled c1, see [`EXCL_VOL_CORR_TOL`](@ref)) has the same effect and shows up as a
+step size far below what the local curvature allows. MassMatrixAdaptor learns M (here the
 full parameter covariance, since ρₑ/δρ are physically coupled through the
 forward model) from the trajectory's sample covariance.
 
