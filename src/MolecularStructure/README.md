@@ -28,7 +28,7 @@ mol = load_molecule(hpath)
 - StructureSource.jl: resolves local files, PDB IDs, and URLs.
 - Mols.jl: defines the internal molecule and residue representations.
 - ExcludedVolumes.jl: per-atom displaced-solvent volumes (power-diagram share of each vdW sphere) for the excluded-volume dummy species.
-- Propka.jl: predicts and parses pKa values for individual residue instances (only consumed by Pdb2pqr.jl's terminus protonation; there is no other ionization/charge model since `Ionization.jl` and the cavity electrostatics were removed).
+- Propka.jl: predicts and parses pKa values for individual residue instances (only consumed by Pdb2pqr.jl's terminus protonation; there is no other ionization/charge model; the former `Ionization.jl` and the cavity electrostatics were removed).
 - Pdb2pqr.jl: adds hydrogens at a target pH (and holds the Henderson-Hasselbalch helpers that pick each chain's terminus protonation).
 
 ## StructureSource.jl

@@ -14,8 +14,8 @@ using ForwardDiff, DiffResults
 #
 #   1. multi-start L-BFGS on −log π(z) finds the MAP ẑ (same density NUTS samples,
 #      Jacobian included, so it always has an interior mode);
-#   2. a central-difference Hessian H of −log π at ẑ (of the exact envelope-theorem
-#      gradient; c1 profiled tightly for these calls);
+#   2. a central-difference Hessian H of −log π at ẑ (of the envelope-theorem gradient,
+#      which is exact only if c1 is profiled tightly: see `EXCL_VOL_CORR_TOL`);
 #   3. NUTS samples w with z = ẑ + S·w, S = V·diag(λ)^(-1/2) from H = V·diag(λ)·Vᵀ,
 #      so the posterior is ≈ N(0, I) in w and starts at its mode.
 #
@@ -80,8 +80,8 @@ end
 
 """
 Symmetrized central-difference Hessian of [`_neglogπ`](@ref) at z, step `h[i]` along
-coordinate i, from its exact (envelope-theorem) gradient, with c1 profiled to
-`EXCL_VOL_CORR_TOL_FINE`.
+coordinate i, from its envelope-theorem gradient, with c1 profiled to
+`EXCL_VOL_CORR_TOL`.
 
 # Returns
 - `SMatrix{4,4,Float64}`: may contain non-finite entries if a probe hit a flat model.
@@ -89,8 +89,8 @@ coordinate i, from its exact (envelope-theorem) gradient, with c1 profiled to
 function _fd_hessian(z::SVector{4,Float64}, h::SVector{4,Float64}, μ, σ, seed::Seed, l::LIKELIHOOD)
     cols = ntuple(4) do i
         e = SVector(ntuple(j -> j == i ? h[i] : 0.0, 4))
-        (_neglogπ_grad(z + e, μ, σ, seed, l, EXCL_VOL_CORR_TOL_FINE) -
-        _neglogπ_grad(z - e, μ, σ, seed, l, EXCL_VOL_CORR_TOL_FINE)) / (2h[i])
+        (_neglogπ_grad(z + e, μ, σ, seed, l, EXCL_VOL_CORR_TOL) -
+        _neglogπ_grad(z - e, μ, σ, seed, l, EXCL_VOL_CORR_TOL)) / (2h[i])
     end
     H = hcat(cols...)
     return (H + H') / 2

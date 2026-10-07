@@ -56,7 +56,7 @@ end
 
 """
 1-based term i of the 3-D R₃ additive recurrence: (frac(i/ρ₃), frac(i/ρ₃²), frac(i/ρ₃³)),
-ρ₃ = `plastic_ratio(3)`. A genuinely 3-D generator, distinct from `_plastic_term`
+ρ₃ = `PLASTIC_RATIO_3`. A genuinely 3-D generator, distinct from `_plastic_term`
 (which only ever has 2 degrees of freedom).
 """
 @inline function _plastic_term3(i::Int)::Tuple{Float64,Float64,Float64}

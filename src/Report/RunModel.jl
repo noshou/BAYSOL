@@ -5,7 +5,7 @@
 """
 Run NUTS on [`Fitting._logπ`](@ref) starting from seed, returning posterior
 draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
-(scale, bkgrndcorr) pair and predicted curve per draw, and
+(scale, `bkgrnd_corr`) pair and predicted curve per draw, and
 AdvancedHMC.jl's diagnostics.
 
 # The Hamiltonian
@@ -31,15 +31,26 @@ need to hand-pick a trajectory length: it grows the leapfrog trajectory by
 doubling a binary tree of steps, forward and backward in time, until the trajectory
 starts to double back on itself (a U-turn), then samples from the valid part of that tree.
 
+# MAP search and whitening
+
+Before NUTS, [`Fitting.run_fitting`](@ref) finds the mode of the same log π with a multi-start
+L-BFGS search and takes a central-difference Hessian there. NUTS then samples coordinates w with
+θ = μ + σ·(ẑ + S·w), in which the posterior is ≈ N(0, I) and the chain starts at the mode. The map
+is affine, so the target distribution is unchanged; it only puts the adaptation below on the O(1)
+scales Stan's defaults assume. c1 is profiled out at every evaluation, to `EXCL_VOL_CORR_TOL`.
+
 # Step-size adaptation
 
-δ is the target Metropolis acceptance rate. During the first nadapt iterations,
+δ is the target Metropolis acceptance rate. During the first `n_adapt` iterations,
 StepSizeAdaptor tunes the leapfrog step size ε via dual-averaging so the
 empirical acceptance rate converges to δ; too-small ε wastes computation
 taking tiny steps, too-large ε causes leapfrog's discretization error (and
-therefore the rejection rate) to blow up. MassMatrixAdaptor learns M (here the
-full parameter covariance, since dns/δρ are physically coupled through the
-forward model) from the trajectory's sample covariance.
+therefore the rejection rate) to blow up. A gradient that is inconsistent with the value
+(a loosely profiled c1, see `EXCL_VOL_CORR_TOL`) has the same effect and is the usual cause of a
+step size far below what the local curvature allows. MassMatrixAdaptor learns M (here the
+full parameter covariance, since ρₑ/δρ are physically coupled through the
+forward model) from the trajectory's sample covariance, starting from the identity in the
+whitened coordinates.
 
 # Arguments
 - `seed::Seed`: priors, initial point, forward cache, and data.

@@ -95,8 +95,8 @@ END
 # Real pKa values PROPKA predicts for this fragment (obtained empirically
 # while writing this test, via `propka_pKas` on the fixture above): N+ ~8.00,
 # C- ~3.03. These drive which of the two termini test pH values below trigger
-# which flag, via `_group_protonated`'s own Henderson-Hasselbalch rounding
-# (see Ionization.jl): at pH 1 (< C-'s pKa, > N+'s pKa) the acid group is
+# which flag, via `_group_protonated`'s own Henderson-Hasselbalch rounding:
+# at pH 1 (< C-'s pKa, > N+'s pKa) the acid group is
 # protonated/neutral (--neutralc) and the base group is protonated/charged
 # (pdb2pqr's own default, no flag); at pH 10 (> both pKas) the base group is
 # deprotonated/neutral (--neutraln) and the acid group is deprotonated/

@@ -120,7 +120,7 @@ _forced_rmax(m)  = getfield(getfield(m, :_r_max), :done)
 
     @testset "vols: shape and bounds against the vdW sphere" begin
         # `vols` is the geometric excluded (displaced-solvent) volume, computed
-        # per atom from its actual local packing (ExcludedVolumes.excluded_volume),
+        # per atom from its actual local packing (`excluded_volume`),
         # not looked up by element type. The atoms here are close enough (1 Å
         # apart) to overlap given their vdW radii, so each one's excluded volume
         # is generally smaller than its own full vdW sphere.

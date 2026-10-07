@@ -5,7 +5,9 @@ The SAXS/SANS forward model: a molecule and a q grid in, the orientationally
 averaged detector intensity `I_calc(q)` out. 
 # Module layout
 
-- `SphFuncs`    -   `Y_lm`, `j_l`, normalised Legendre.
+One submodule and three included files (all but `SphFuncs` are plain files `include`d into `Scattering`):
+
+- `SphFuncs`    -   (submodule `Scattering.SphFuncs`) `Y_lm`, `j_l`, normalised Legendre.
 - `PartialWave` -   `compute_B_lm` (the multipole moments), plus
                     `self_scatter` / `cross_scatter` / `partial_wave_weights`
                     (the reductions to `S_ab(q)`).
@@ -31,7 +33,7 @@ averaged detector intensity `I_calc(q)` out.
     (SAXS/SANS), molecules tumble freely, so the measured intensity
     is the square of this amplitude averaged over every possible orientation:
 
-        I(q) = < |A(q)|² >`_orientations`
+        I(q) = ⟨|A(q)|²⟩_orientations
 
     which is computationally intractible to calculate exactly for large molecules.
 \\
@@ -216,7 +218,7 @@ const GAUTSCHI_MARGIN = (16, 6.0)
 """
 Threshold below which a spherical Bessel value jₗ(q·r) is treated as zero in
 [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm): degree-l columns with
-q·`r_max` < `x_cut(l)`, where xˡ/(2l+1)!! = `BESSEL_CUTOFF` (an upper bound on |jₗ|), are
+q·`r_max` < `x_cut(l)` (`xcut` in `compute_B_lm`), where xˡ/(2l+1)!! = `BESSEL_CUTOFF` (an upper bound on |jₗ|), are
 skipped. Each skipped term is below `BESSEL_CUTOFF`·|f|, far under any tolerance on G.
 """
 const BESSEL_CUTOFF = 1e-9

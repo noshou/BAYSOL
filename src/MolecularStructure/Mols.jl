@@ -194,7 +194,7 @@ function _build(name::AbstractString, es::Vector{String}, coords, radii)
     rmax = Lazy{Float64}(@closure(() -> maximum(force(rad))))
     tree = Lazy{KDTree}(@closure(() -> KDTree(cart)))
 
-    # Per-atom displaced-solvent volume (see ExcludedVolumes.excluded_volume).
+    # Per-atom displaced-solvent volume (see `excluded_volume` in ExcludedVolumes.jl).
     # Recomputes the max radius locally instead of force(rmax), so that forcing
     # vols does not also mark r_max as forced.
     vol  = Lazy{Vector{Float64}}(@closure(() -> begin

@@ -238,8 +238,8 @@ toward and would have no way to tell you it missed the other one.
     intensity/per-point standard errors, from [`WLSData`](@ref); forwarded
     to every trial-c1 call of [`wls_fit`](@ref) inside the inner search
     without rebuilding those sums each time.
-- `ξ::SVector{4,<:Real}` or `ξ::SVector{5,<:Real}`: (ρₑ, δρ₁, δρ₂, δρ₃[, δρ4]),
-    held fixed during the c1 search.
+- `ξ::SVector{4,<:Real}`: (ρₑ, δρ₁, δρ₂, δρ₃), held fixed during the c1 search. (There is no
+    `SVector{5}` method yet; the δρ4 extension is not implemented.)
 - `fw::ForwardCache`: the structure's geometry-only cache: its Gram matrix G and
     mean radius `r_m` are all the c1 search reads.
 
@@ -247,7 +247,9 @@ toward and would have no way to tell you it missed the other one.
 - `cmin, cmax = EXCL_VOL_CORR_BOUNDS`: the physical c1 bounds.
 - `eps = EXCL_VOL_CORR_EPS`: both the amount the search window is padded
     past `(cmin, cmax)` and the coarse pre-scan's grid step.
-- `tol = EXCL_VOL_CORR_TOL`: absolute tolerance on c1 of the `Brent()` polish.
+- `tol = EXCL_VOL_CORR_TOL`: absolute tolerance on c1 of the `Brent()` polish. It sets the
+    accuracy of the *gradient* taken through this function to first order, not just of c1 (the
+    envelope-theorem gradient is exact only at the exact optimum); see [`EXCL_VOL_CORR_TOL`](@ref).
 - `tables::Union{Nothing,_C1Tables} = nothing`: static tables for fw and these scan
     settings ([`_C1Tables`](@ref), built once per run by [`seed_fitting`](@ref) and
     read-only, so safe to share across threads). `nothing` builds them for this call.
