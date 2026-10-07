@@ -10,8 +10,8 @@
 # Data provenance for every hardcoded number below: `ρₑ_w` reference values
 # are a re-derivation of the published Kell (1975) density equation plus the same
 # ideal mass-density -> electron-density conversion PMV.jl uses. Protein
-# values are hand-derived closed forms from `Protein.json`/
-# `ionization.json` (Lee et al. 2008, DOI 10.1016/j.bpc.2008.02.009) as they
+# values are hand-derived closed forms from `Protein/protein.json`/
+# `Protein/ionization.json` (Lee et al. 2008, DOI 10.1016/j.bpc.2008.02.009) as they
 # stood when this file was written.
 
 include(joinpath(@__DIR__, "testsetup.jl"))

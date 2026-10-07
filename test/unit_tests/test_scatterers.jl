@@ -29,7 +29,7 @@
 # `vols(mol)`. This is deliberate: those comparisons are testing the Debye-sum
 # math `compute_B_lm`/`self_scatter`/`cross_scatter` implement, which does not
 # care what a volume means, only that it is consumed correctly -- so they stay
-# green regardless of how `MolecularStructure.ExcludedVolumes.excluded_volume`
+# green regardless of how `MolecularStructure.excluded_volume`
 # computes a real molecule's volumes. Only the handful of tests that exist to
 # check `excluded`'s own Molecule-wrapping contract (does it call `vols` and
 # `compute_B_lm` correctly) still build a real `Molecule`; `vols`'s own
@@ -60,7 +60,7 @@ Arbitrary but fixed per-species volumes (Å³), used ONLY to build this file's
 own synthetic dummy amplitudes for the Debye/convergence comparisons below --
 not a claim about what `vols(mol)` returns. `vols` computes each atom's
 excluded volume geometrically from its actual local packing
-(`MolecularStructure.ExcludedVolumes.excluded_volume`), which is
+(`MolecularStructure.excluded_volume`), which is
 packing-dependent and has no fixed per-element value; this file has no
 business re-deriving it. The Debye-sum/convergence tests that use these
 numbers never call `vols` on a `Molecule` at all, which is the point: they
@@ -329,7 +329,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         #
         # `vols(mol)` is deliberately NOT checked here against `scat_vol`:
         # `vols` is the geometric, packing-dependent excluded volume
-        # (`ExcludedVolumes.excluded_volume`), and `scat_vol`/
+        # (`MolecularStructure.excluded_volume`), and `scat_vol`/
         # `SCAT_EXCLUDED_VOL` are this file's own synthetic constants, not a
         # prediction of it. `vols`'s numerical correctness belongs to
         # test_molecules.jl (its "vols: shape and bounds against the vdW

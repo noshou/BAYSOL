@@ -31,6 +31,7 @@ Shared test-geometry/data helpers (`.jl`, `include`d directly).
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `geometry.jl`     | `sph(R, n)` — Fibonacci-sphere point set, used by `test_sasa.jl` to build a sealed shell of atoms around an enclosed void                                                   |
 | `floatcompare.jl` | `close_(a, b; atol = 1.0e-9)`; tolerance float compare, used by `test_dns.jl`, `test_pmv.jl`, `test_deltarho.jl`, `test_paramtransform.jl`, `test_sampler.jl`, `test_profiledcorrs.jl`, `test_protonation.jl`, `test_integration.jl` and `test_structuresource.jl` |
+| `seed_diagnostics.jl` | module `SeedDiagnostics`: sampler diagnostics over any `Fitting.Seed` (NUTS replica, gradient error vs the c1 tolerance, local curvature, L-BFGS starts, Hessian sensitivity, mode masses, axis scans, shell-contrast ablation, the `diagnose` / `tolerance_sweep` reports); used by `test_seed_diagnostics.jl` and `test/fitting_tests/diagnose.jl`. Include it once per process |
 | `sequences.jl`    | Protein/DNA/RNA sequences, used by `test_dns.jl` and `test_pmv.jl`.                                                                                                                                                                                |
 
 ### `sequences.jl` provenance

@@ -99,19 +99,25 @@ const EXCL_VOL_CORR_EPS = 0.02
 
 """
 Absolute tolerance on c1 of [`Fitting.profiled_corrs`](@ref
-`BAYSOL.Fitting.profiled_corrs`)'s `Brent()` polish, used during sampling and the MAP
-search. χ² is quadratic in the c1 error at the optimum, so 1e-5 leaves the profiled
-log-likelihood exact to far below its Monte Carlo noise; the reported c1 is good to
-about this much.
-"""
-const EXCL_VOL_CORR_TOL = 1e-5
+`BAYSOL.Fitting.profiled_corrs`)'s `Brent()` polish, used everywhere c1 is profiled
+(the MAP search, its Hessian, and every NUTS log-density and gradient call).
 
+The tolerance has to be judged on the *gradient*, not the value. χ² is quadratic in the
+c1 error δ at the optimum, so the profiled log-likelihood is accurate to O(δ²). But the
+gradient comes from the envelope theorem, which makes ∂ₓf exact only at the exact optimum:
+at c1* + δ it is off by (∂²f/∂c1∂ξ)·δ, first order in δ. That second derivative grows with χ²
+and with how narrow the posterior is, so the error is negligible for a good fit and as large as
+the true gradient for a poor one. Measured in NUTS's whitened coordinates (posterior ≈ N(0, I),
+true gradient norm 1.7–2.1) on the fits that ran at the tree-depth limit, the median gradient error
+is 1.0–1.5 at 1e-5 (SASDBS6 model 3, SASDLP4 model 3, SASDEP6 model 2), 0.02–0.18 at 1e-6, and at
+most 0.007 at 1e-8, falling linearly with the tolerance; a well-behaved fit (SASDMJ9) is 0.03 at
+1e-5. A gradient that disagrees with the value inflates the leapfrog energy error, so step-size
+adaptation shrinks ε from about 0.6 to 0.001–0.03 and the trees grow to 100–1000 steps, with a cost
+that depends on the RNG seed (SASDMZ9 model 3 at 1e-5: 13 to 820 steps per iteration over four seeds;
+at 1e-6: 6.0 to 6.2). The price of the tight tolerance is a 15–40 % slower profiled
+evaluation.
 """
-Tight c1 tolerance for the finite-difference Hessian at the MAP: the envelope-theorem
-gradient is off by O(c1 error), and central differences divide that by their step,
-so the Hessian's gradient calls profile c1 to about Optim's own default precision.
-"""
-const EXCL_VOL_CORR_TOL_FINE = 1e-8
+const EXCL_VOL_CORR_TOL = 1e-8
 
 @assert(
     0 < EXCL_VOL_CORR_EPS <= (EXCL_VOL_CORR_BOUNDS[2] - EXCL_VOL_CORR_BOUNDS[1]),
