@@ -6,14 +6,15 @@ BAYSOL builds the five-species (vacuum, excluded volume, convex/concave/cavity h
 
 - Documentation: [BAYSOL](https://noshou.github.io/BAYSOL/). Each module's README under `src/` is also a Guides page there.
 - Worked analyses of 27 SASBDB entries: [fitting tests](test/fitting_tests/)
+- Test runners and developer tools (fitting tests, result comparison, sampler diagnostics, benchmarks): [test/run](test/run/README.md), [test/utils](test/utils/README.md)
 
 ```
 # unit tests
-julia --project=test test/unit_tests/run_unit_tests.jl
+julia --project=test test/run/unittests.jl
 
 # example of an end-to-end fit
 julia --project=test/fitting_tests test/fitting_tests/SASDMJ9/SASDMJ9.jl
 
-# build the docs (copies src/*/README.md into docs/src/guides/)
+# build the docs (copies src/*/README.md into docs/src/guides/ and the test READMEs into docs/src/testing/)
 julia --project=docs docs/make.jl
 ```

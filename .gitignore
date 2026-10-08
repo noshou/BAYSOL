@@ -28,3 +28,6 @@ _cache/
 
 # manuscript
 manuscript/
+
+# benchmark runs that are not baselines (test/baselines/README.md)
+test/baselines/results/
