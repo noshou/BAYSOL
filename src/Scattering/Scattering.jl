@@ -5,9 +5,10 @@ The SAXS/SANS forward model: a molecule and a q grid in, the orientationally
 averaged detector intensity `I_calc(q)` out. 
 # Module layout
 
-One submodule and three included files (all but `SphFuncs` are plain files `include`d into `Scattering`):
+One submodule and four included files (all but `SphFuncs` are plain files `include`d into `Scattering`):
 
 - `SphFuncs`    -   (submodule `Scattering.SphFuncs`) `Y_lm`, `j_l`, normalised Legendre.
+- `FormFactor` -   X-ray atomic form factors from the bundled `form_factors.sqlite3`.
 - `PartialWave` -   `compute_B_lm` (the multipole moments), plus
                     `self_scatter` / `cross_scatter` / `partial_wave_weights`
                     (the reductions to `S_ab(q)`).
@@ -167,7 +168,10 @@ One submodule and three included files (all but `SphFuncs` are plain files `incl
 """
 module Scattering
 
-using ..FormFactor: FormFactor
+using  SQLite: SQLite
+using  DBInterface: DBInterface
+using  FastClosures: @closure
+using  LinearAlgebra: LinearAlgebra
 using ..SASA: PROBE_RADIUS, SHELL_N_TARGET
 using ..PhysicalConstants: DRO_UNIT
 using LinearAlgebra: mul!
@@ -226,9 +230,11 @@ const BESSEL_CUTOFF = 1e-9
 # The public surface: forward_cache builds the geometry-only ForwardCache.
 # Everything the includes below bring in (compute_B_lm, hydration, gram, …)
 # is the machinery it composes.
-export forward_cache
+export forward_cache,
+       form_factor_table, form_factors, form_factor_log, FF, FormFactorError
 
 include("SphFuncs.jl")
+include("FormFactor.jl")
 include("PartialWave.jl")
 include("Scatterers.jl")
 include("ForwardCache.jl")

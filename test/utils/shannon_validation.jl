@@ -68,16 +68,16 @@ function main(args)
         lMax = full_seed.shannon.lMax
         full = map_summary(full_seed)
         for k in vcat(ks, "12d", "raw-d")
-            opts = k == "12d"   ? (; rebin = 12, lMax, drop_nonpositive = true) :
-                   k == "raw-d" ? (; rebin = nothing, lMax, drop_nonpositive = true) :
-                                  (; rebin = k, lMax, drop_nonpositive = false)
+            opts =  k == "12d"   ?  (; rebin = 12, lMax, drop_nonpositive = true) :
+                    k == "raw-d" ?  (; rebin = nothing, lMax, drop_nonpositive = true) :
+                                    (; rebin = k, lMax, drop_nonpositive = false)
             seed, _, _ = load_fit_seed(String(id), String(tag); makie = false, seed_options = opts)
-            b = map_summary(seed)
+            b     = map_summary(seed)
             shift = maximum(abs.(b.ẑ .- full.ẑ) ./ full.σz)
             ratio = b.σz ./ full.σz
-            rel = (b.χ²_raw - full.χ²_raw) / full.χ²_raw
-            row = (; fit = label, k, n_full = full.n, n_binned = b.n, shift, rmin = minimum(ratio), rmax = maximum(ratio),
-                   χ²_full = full.χ²_raw, χ²_b = b.χ²_raw, rel, c1_full = full.c1, c1_b = b.c1)
+            rel   = (b.χ²_raw - full.χ²_raw) / full.χ²_raw
+            row   = (; fit = label, k, n_full = full.n, n_binned = b.n, shift, rmin = minimum(ratio), rmax = maximum(ratio),
+                    χ²_full = full.χ²_raw, χ²_b = b.χ²_raw, rel, c1_full = full.c1, c1_b = b.c1)
             push!(rows, row)
             line = @sprintf("%s\t%s\t%d\t%d\t%.3f\t%.3f\t%.3f\t%.4f\t%.4f\t%+.4f\t%.4f\t%.4f", row.fit, k, row.n_full, row.n_binned,
                             shift, row.rmin, row.rmax, row.χ²_full, row.χ²_b, rel, row.c1_full, row.c1_b)

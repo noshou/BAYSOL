@@ -4,7 +4,6 @@
 A molecule.
 """
 
-using   ..AtomicRadii: lookup
 using   ..Cache: Lazy, force
 using   BioStructures:  BioStructures, PDBFormat, standardselector,
                         collectatoms, collectmodels, atomname, element, coords, ishetero
@@ -120,7 +119,7 @@ function to_spherical(c::AbstractMatrix{<:Real})::Matrix{Float64}
 end
 
 """
-Resolve per-element radii through [`AtomicRadii.lookup`](@ref BAYSOL.AtomicRadii.lookup); throws MoleculeError on an empty list
+Resolve per-element radii through [`lookup_radii`](@ref BAYSOL.MolecularStructure.lookup_radii); throws MoleculeError on an empty list
 or any element with no radius data.
 
 A negative radius is clamped to 0.0. Shannon's tables carry a handful of
@@ -132,7 +131,7 @@ coordination-number trends, not as physical sizes.
 """
 function _compute_radii(es::Vector{String})::Vector{Float64}
     isempty(es) && throw(MoleculeError("Empty elements"))
-    pairs = lookup(es)
+    pairs = lookup_radii(es)
     out = Vector{Float64}(undef, length(pairs))
     @inbounds for i in eachindex(pairs)
         el, rad = pairs[i]

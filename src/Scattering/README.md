@@ -53,6 +53,7 @@ ForwardCache.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defi
 
 - **SphFuncs.jl** : sphHarm (complex `Y_l^m`) and Gautschi's continued-fraction method for `j_l`: `sphBessRatios!` (pass 1: ratios `r_l = j_l/j_{l-1}`, start orders and the closed-form anchors `j_0`, `j_1`), `sphBessStep` (one upward step of pass 2), and their `sphBess` buffers.
 - **PartialWave.jl** : `compute_B_lm` (the multipole moments themselves), plus `self_scatter`/`cross_scatter`/`partial_wave_weights` (the reductions to `S_ab(q)`).
+- **FormFactor.jl** : X-ray atomic form factors f(q, E) from the bundled `form_factors.sqlite3` (`form_factor_table`, `form_factors`, `compute_form_factors`), consumed by the vacuum amplitude in Scatterers.jl.
 - **Scatterers.jl** : one builder per species (vacuum amplitude, excluded-volume dummies, and `hydration`, the last returning one `B_lm` per hydration-shell class), assembled by `species_multipoles`, which computes the vacuum and excluded-volume multipoles in one shared pass.
 - **ForwardCache.jl** : `gram` (the `S_ab` matrix G), `excluded_volume_factor` (the `c_1` correction), `mean_atomic_radius`, and the geometry-only `ForwardCache`. `forward_cache` returns a `ForwardCache(G, qvals, r_m, form_factor_log, n_atoms, lMax)`; `n_atoms` and `lMax` feed the report's `=== Run ===` section. Its `shell` keyword takes a precomputed `SASA.sasa` result (`seed_model` computes the accessible surface first, because the diameter of the whole scatterer cloud sets the band limit). Its `stage_log` keyword (a `Timing.StageLog`) times the vacuum, excluded-volume, hydration (SASA + `B_lm`) and Gram + `r_m` stages for the report's `=== Timing ===` section; `BAYSOL.seed_model` passes it automatically. The contraction I(q) = v(q)ᵀ G(q) v(q) lives in `Fitting.profiled_corrs`.
 
@@ -114,6 +115,61 @@ G  = gram(collect(Bs), w)                           # (5, 5, Q) Gram matrix
 ```
 
 `compute_B_lm` works in real arithmetic. Per degree l, `[Re B_l; Im B_l] = [Re Y_l; −Im Y_l] · W_l`, with `W_l[i, q] = f(i, q)·j_l(q·r_i)` for each real amplitude column (Re f, plus Im f when f is anomalous). That is one OpenBLAS product per degree and column, accumulated in place. W is filled directly by the spherical Bessel sweep (`sphBessRatios!`, then `sphBessStep` upward), so no j array is ever stored. It is built for `B_LM_TILE` atoms and a q-tile sized to fit `B_LM_W_BYTES`; all buffers are allocated once per call. Negligible terms are skipped: since |jₗ(x)| ≤ xˡ/(2l+1)!!, jₗ ≤ `BESSEL_CUTOFF` (1e-9) for x below `x_cut(l)` (`xcut` in `compute_B_lm`) = (`BESSEL_CUTOFF`·(2l+1)!!)^(1/l), so for each tile (largest radius `r_max`) and degree l the columns q < `x_cut(l)/r_max` are left out of both the W writes and the product. That needs q in ascending order (the full range is used otherwise); each skipped term is below `BESSEL_CUTOFF`·|f|, changing G by ~1e-12 relative or less. `species_multipoles` computes the vacuum and excluded-volume multipoles in one shared pass (`_compute_B_lm` with both amplitude sets), timed as the single stage `"vacuum + excluded volume (vols + B_lm)"`. OpenBLAS's own thread count applies to the products (default 4); set `LinearAlgebra.BLAS.set_num_threads(1)` if Julia-level threads are added later.
+
+## FormFactor.jl
+
+X-ray atomic scattering factors, f(q, E) = f0(s) + f1(E) + i·f2(E) with s = q/(4π) in Å⁻¹.
+
+The data and interpolation scheme follow the Python package XrayDB, but nothing calls Python at runtime. `form_factors.sqlite3` (tables `waasmaier`, `chantler`, `provenance`) is bundled, and `test/utils/extract_formfactor.tcl` is the offline script (Tcl 9 with the `sqlite3` package, Fedora `sqlite-tcl`) that regenerates it. Consumer: `Scatterers.jl` (`_vacuo_amplitude`), via `form_factor_table`. Each ion that could not be fully resolved is logged (see Tiering below) into `ForwardCache.form_factor_log` and printed in the run report.
+
+Data:
+
+- **waasmaier**: Waasmaier & Kirfel (1995) Gaussian coefficients for the non-resonant term f0. 211 species.
+- **chantler**: Chantler FFAST (NIST) anomalous corrections f1/f2, spanning roughly 1.01 eV to 966 keV.
+
+
+| Citation                                                                                                                                                                      | DOI                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| Waasmaier, D. & Kirfel, A. (1995). New analytical scattering-factor functions for free atoms and ions.*Acta Cryst.* A51, 416–431.                                            | 10.1107/S0108767394013292 |
+| Chantler, C.T. (1995). Theoretical Form Factor, Attenuation, and Scattering Tabulation for Z = 1–92 from E = 1–10 eV to E = 0.4–1.0 MeV.*J. Phys. Chem. Ref. Data* 24, 71. | —                          |
+| Chantler, C.T. (2000). Detailed Tabulation of Atomic Form Factors...*J. Phys. Chem. Ref. Data* 29, 597.                                                                       | —                          |
+
+### Math
+
+#### f0: Waasmaier-Kirfel (non-resonant)
+
+```
+f0(s) = c + Σ_{i=1..5} a_i · exp(-b_i·s²),   s = q/(4π)  [Å⁻¹]
+```
+
+211 (c, a1..a5, b1..b5) rows, keyed by lowercase ion string ("fe3+", "o2-") or bare element ("fe"). Valid for 0 ≤ s ≤ `WK_S_MAX` = 6.0 Å⁻¹; the fits go non-physical (some ionic c terms are large and negative, e.g.
+fe3+'s c = -61.93) if extrapolated past that range, so f0 throws rather than extrapolating (f0("fe3+", `WK_S_MAX` + eps) raises FormFactorError).
+
+At q → 0, f0 recovers the electron count: Z - charge for an ion, Z for a neutral atom (checked in tests to atol = 5e-3, the Cromer-Mann parameterization's own residual at s = 0).
+
+#### f1/f2: Chantler FFAST (anomalous / resonant)
+
+- **f1**: interpolating **cubic spline with not-a-knot end conditions**, fitted to the local **7-point window** around the requested energy  (max(1, j-3):min(n, j+3), where j is the last grid point at or below the query. f1 is stored as
+  `f1_FFAST` - Z + `f_rel(3/5·CL)` + `f_NT`
+- **f2**: **linear interpolation in log-log space** over the same local window (values below `F2_LOG_FLOOR` = 1e-99 in magnitude are clamped to it before taking the log, since the table can store an exact zero). f2 is used in log-log rather than cubic-spline form because it spans orders of magnitude across an absorption edge, whereas f1 changes sign through one.
+
+### Tiering
+
+Not every ion has both halves of the sum. [`compute_form_factors`](@ref BAYSOL.Scattering.compute_form_factors) classifies each requested species into one of three tiers and logs anything short of a full resolution ([`form_factor_log`](@ref BAYSOL.Scattering.form_factor_log)):
+
+- **DUMMY**: no f0 entry at all for the species or its bare element.
+- **F0-ONLY**: has f0 but no Chantler data for its element, or the requested energy falls outside that element's tabulated range (e.g. Pu, or Fe at 1 eV, below the Chantler floor); the row is real-valued (imag(f) == 0).
+- **NEUTRAL**: no waasmaier entry for the exact charge state requested (e.g. "fe4+"), so the neutral atom's f0 is substituted.
+- Anything not logged is **full**: both f0 and f1/f2 resolved for the requested ion and energy.
+
+Ions are deduplicated on build, preserving first-seen order, so a batch like ["fe3+", "fe3+", "o2-", "fe3+"] produces one fe3+ row in t.tbl, while [`form_factors`](@ref BAYSOL.Scattering.form_factors) still returns one output row per requested (possibly repeated) ion.
+
+### Constants
+
+Defined at module level in `FormFactor.jl` (a file of the `Scattering` module).
+
+
+`WK_S_MAX = 6.0` (upper bound of the Waasmaier–Kirfel f0 parameterisation's s range), `F2_LOG_FLOOR = 1e-99` (floor applied to Chantler f2 before log-log interpolation)
 
 ## Constants
 

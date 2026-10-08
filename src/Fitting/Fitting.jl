@@ -4,6 +4,7 @@ module Fitting
 
 using Distributions: Beta, Continuous, LocationScale, LogNormal
 using ..PhysicalConstants: STANDARD_TEMPERATURE_C
+using ..Shannon: ShannonInfo
 
 #----------------
 # Priors
@@ -16,7 +17,7 @@ known: water's density is evaluated at it exactly, and the solutes' 25 °C
 partial molar volumes get a widened uncertainty (see
 [`PMV_FRACTIONAL_EXPANSIBILITY`](@ref BAYSOL.PartialMolarVolumes.PMV_FRACTIONAL_EXPANSIBILITY)).
 Defaults to the standard reference temperature, [`STANDARD_TEMPERATURE_C`](@ref
-`BAYSOL.PhysicalConstants.STANDARD_TEMPERATURE_C`), the same temperature the PMV tables are
+`BAYSOL.Utils.PhysicalConstants.STANDARD_TEMPERATURE_C`), the same temperature the PMV tables are
 given at, so the default never widens their uncertainty.
 """
 const DEFAULT_TEMPERATURE_C = STANDARD_TEMPERATURE_C
@@ -266,7 +267,6 @@ struct ξ_priors
     δρ₃Prior::BoundedBeta
 end
 
-include("Shannon.jl")
 include("WLS.jl")
 include("ProfiledCorrs.jl")
 include("DensityOfSolvent.jl")
@@ -279,7 +279,6 @@ export  Solute, Protein, NonBiological, DNA, RNA, Seed, FitResult,
         seed_fitting, run_fitting, PROFILE, MARGINAL,
         ρₑ_prior, δρ_prior, prior_z_scores,
         ξ_priors, θ_prior_moments, profiled_corrs, excl_vol_saturation,
-        WLSData, wls_fit,
-        ShannonInfo, cloud_diameter, auto_lmax, shannon_data, bin_bias_ratio, model_on_raw, residual_structure
+        WLSData, wls_fit
 
 end # module

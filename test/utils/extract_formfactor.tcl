@@ -3,7 +3,7 @@
 
 # Extract data from xraydb.sqlite into one compact db.
 #
-#     tclsh test/utils/extract_formfactor.tcl xraydb.sqlite src/FormFactor/form_factors.sqlite3
+#     tclsh test/utils/extract_formfactor.tcl xraydb.sqlite src/Scattering/form_factors.sqlite3
 #
 # Source: xraydb 4.5.8's xraydb.sqlite. Its LICENSE places xraydb.sqlite and data_sources/ in the
 # public domain via CC0 1.0.

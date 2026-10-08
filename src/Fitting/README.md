@@ -16,20 +16,9 @@ CRYSOL's excluded-volume correction c1 is **not** part of ξ (see `Scattering.ex
 
 Two linear parameters, scale and `bkgrnd_corr` (`I_calc(q)` = scale · `y_model(q)` + `bkgrnd_corr`), are **not** sampled via HMC. At a fixed ξ, the forward-model curve `y_model(q)` is known, so (scale, `bkgrnd_corr`) is a closed-form two-parameter weighted linear regression (WLS.jl), refit at every ξ the sampler visits.
 
-## Shannon sampling of the data: `Shannon.jl`
+## Shannon sampling of the data
 
-A particle of diameter D scatters a curve that carries no information at a q spacing finer than π/D (one *Shannon channel*), so a curve of thousands of points holds only N_s = (q_max − q_min)·D/π independent values: the median fitting test had 62 points per channel. Fitting all of them costs time in every forward-model evaluation and makes the Gaussian likelihood claim far more independent data than exist. `Shannon.jl` is the data reduction that precedes the fit (an included file of `Fitting`, not a module):
-
-- `cloud_diameter(points)`: the exact diameter of a `(3, n)` point cloud. The farthest pair of a set always lies on its convex hull, so the hull is built with [Quickhull.jl](https://github.com/augustt198/Quickhull.jl) and only its vertices (~100 of thousands of points) are compared pairwise; fewer than four points or a degenerate (collinear, coplanar, repeated) cloud is compared directly. `seed_model` applies it to the atoms **and** the hydration-shell beads (the actual scatterer cloud, 5-6 Å wider than the atoms alone).
-- `shannon_data(q, I, σ; D, rebin, lMax, drop_nonpositive)`: inverse-variance binning of the curve to `rebin` bins per channel (bin width π/(rebin·D); each bin carries the weighted-mean q and I and σ = 1/√Σw, which keeps Σw·I and Σw, the sufficient statistics of the linear fit, unchanged), the drop of bins with non-positive mean intensity, and the band limit `auto_lmax(D, q_max) = ceil(q_max·D)`. It returns a `ShannonInfo` (also stored as `Seed.shannon`) with both the fitted and the raw curve. `SHANNON_REBIN = 12` is the default.
-- `model_on_raw(info, y)`: the model curve on the measured grid (local cubic interpolation, error 0.001 σ for 1 % data at the default `rebin`), which gives the reduced χ² on the measured points that a depositor's χ² refers to.
-- `residual_structure(r)`: lag-1 autocorrelation and runs-test z-score of the normalized residuals. White residuals have both ≈ 0; the fits are far from that (lag-1 up to 0.89 on the unbinned curves), which means the posterior widths are optimistic by the factor the residual correlation implies. Binning does not cure that (it assumes independent errors, as the likelihood does); it is reported in the `=== Residuals at the MAP ===` section so the claim is checkable.
-
-Dropping non-positive points is not neutral: it removes the negative half of the noise at high q, so what remains is biased upwards. It is the default (`drop_nonpositive = true`, as the fitting scripts always did, but after binning rather than before, where it removes far fewer points). `test/utils/shannon_validation.jl` is a per-fit screen of the effect of the binning and of the filter on the MAP and the Laplace width. Per-fit shifts measured in the unbinned σ are a poor judge (that σ is overconfident), so the default `rebin = 12` is judged by distributions over the 53 fitting tests against the committed unbinned results, with criteria fixed before that rerun:
-
-1. **Fit quality:** the median χ² on the measured grid within ±2 % and the quartiles within ±5 %; at most 3 fits worse by more than 5 % (better fits are not penalized).
-2. **Parameter distribution** (MAP δρ₁, δρ₂, δρ₃, ρₑ, c1 across fits): each median moves by less than 0.25 of its interquartile range; the counts of fits at a prior bound, with c1 saturated, or beyond 3σ from the δρ₃ prior change by at most 3.
-3. **Health of the regression:** fits with more than 1 % divergent transitions increase by at most 2; the median steps per iteration and the median tree depth are not more than 25 % worse; E-BFMI stays above 0.3 where it was; no chain fails outright; the MAP search finds the same number of modes (±1) in at least 90 % of the fits.
+The data reduction that precedes the fit (binning of the measured curve to its information content, the diameter of the scatterer cloud, `lMax`) is the `Shannon` module of [`Utils`](@ref BAYSOL.Utils); `Seed.shannon` holds its `ShannonInfo`.
 
 ## Weighted least squares
 
