@@ -12,8 +12,24 @@ function _write_run_info(io::IO, log::Union{Nothing,Timing.StageLog}; n_atoms::U
     n_atoms === nothing || (info["n_atoms"] = n_atoms)
     isempty(info) && return nothing
     println(io, "=== Run ===")
-    for k in ("n_atoms", "lMax", "n_q", "n_samples", "n_adapt")
+    for k in ("n_atoms", "lMax", "n_q_raw", "n_q", "n_samples", "n_adapt")
         haskey(info, k) && @printf(io, "%-10s = %d\n", k, info[k])
+    end
+    if haskey(info, "D")
+        println(io)
+        println(io, "=== Data (Shannon) ===")
+        @printf(io, "%-14s = %.1f Å (atoms and hydration-shell beads)\n", "D", info["D"])
+        @printf(io, "%-14s = %.1f (q range × D / π)\n", "channels", info["n_channels"])
+        if info["rebin"] > 0
+            @printf(io, "%-14s = %d per channel: %d measured → %d fitted points (%d non-positive dropped)\n",
+                    "rebin", info["rebin"], info["n_q_raw"], info["n_q"], info["n_nonpositive"])
+            b = info["bin_bias"]
+            @printf(io, "%-14s = %.2f of the smallest binned σ (worst-case bound)%s\n", "bin bias", b,
+                    b > 0.3 ? "; above 0.3: this curve is precise enough that a larger rebin is advisable" : "")
+        else
+            @printf(io, "%-14s = none: %d measured → %d fitted points (%d non-positive dropped)\n",
+                    "rebin", info["n_q_raw"], info["n_q"], info["n_nonpositive"])
+        end
     end
     println(io)
     return nothing

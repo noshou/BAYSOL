@@ -126,28 +126,24 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# No GNOM pddf was bundled for this case (pddf/ directory exists but is
-# empty), so Dmax is estimated directly from this model's PDB
-# coordinates instead: the maximum pairwise distance among the 922 Cα atoms
-# of MODEL 1 in SASDJ72_fit1_model1.pdb is ≈176.4 Å. Restricting the
-# fit to q ≤ Q_MAX_FIT = 0.30 Å⁻¹ (dropping the noisiest tail points above
-# that, where relative errors balloon to 20-40%) and applying the usual
-# q·D_max multipole-resolution rule of thumb: lMax ≈ 0.30 * 176.4 ≈ 53.
-# for model 2, the maximum pairwise distance is ≈212.0 Å and applying the
-# multipole-resolution rule of thumb: lMax ≈ 0.30 * 212.0 ≈ 64.
+# Restricting the fit to q ≤ Q_MAX_FIT = 0.30 Å⁻¹ drops the noisiest tail points above that, where relative
+# errors balloon to 20-40%.
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
+# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
+# that diameter allows (see `rebin` there).
 
 const Q_MAX_FIT = 0.30
-const LMAX = (model1 = 53, model2 = 64)
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `I_exp > 0`.
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
+with non-positive intensity.)
 """
 function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && I_exp[i] > 0, eachindex(qvals))
+    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
@@ -159,11 +155,11 @@ function seed_sasdj72(model::Symbol; seed::Integer = SAMPLER_SEED)
 
     Random.seed!(seed)
     s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATHS[model]), LMAX[model], ENERGY_EV,
+        LocalPathSource(_PDB_PATHS[model]), ENERGY_EV,
         q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
-    return s, (q_fit, I_fit, σ_fit)
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
 function run_sasdj72(

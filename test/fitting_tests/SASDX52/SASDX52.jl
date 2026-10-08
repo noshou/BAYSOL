@@ -146,22 +146,20 @@ const SOLUTES = Solute[
 # against any I_exp ≤ 0 points.
 const Q_MAX_FIT = 0.17
 
-# No GNOM pddf bundled for this case (no pddf/ directory at all), so lMax is
-# estimated from the PDB structure's own coordinate extent instead of a
-# GNOM Dmax: max pairwise Cα-Cα distance over all 1108 Cα atoms (both
-# chains) = 208.05 Å. Using the usual q·D_max multipole-resolution rule of
-# thumb: Q_MAX_FIT * D_max ≈ 0.17 * 208 ≈ 35.4 => lMax = 36.
-const LMAX = 36
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
+# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
+# that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `I_exp > 0`.
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
+with non-positive intensity.)
 """
 function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && I_exp[i] > 0, eachindex(qvals))
+    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
@@ -173,10 +171,10 @@ function seed_sasdx52(; seed::Integer = SAMPLER_SEED)
 
     Random.seed!(seed)
     s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
+        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
-    return s, (q_fit, I_fit, σ_fit)
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
 function run_sasdx52(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)

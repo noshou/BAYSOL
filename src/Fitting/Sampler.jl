@@ -334,6 +334,8 @@ Everything [`run_fitting`](@ref) needs to start a NUTS chain.
 - `c1tab::_C1Tables`: the static c1-search tables for fw ([`_C1Tables`](@ref)), built
     once here and passed to every [`profiled_corrs`](@ref) call; read-only, so safe to
     share across threads.
+- `shannon::Union{Nothing,ShannonInfo}`: how the measured curve was reduced to the data `wls` holds
+    (diameter, band limit, binning, raw data), when it came through [`shannon_data`](@ref); `nothing` otherwise.
 """
 struct Seed{T<:Real}
     pr::ξ_priors
@@ -342,6 +344,7 @@ struct Seed{T<:Real}
     wls::WLSData
     timing::Union{Nothing,StageLog}
     c1tab::_C1Tables
+    shannon::Union{Nothing,ShannonInfo}
 end
 
 """
@@ -363,6 +366,7 @@ Runs initial seeding for the sampler.
 - `κ_δρ₁₂::Real = DRO12_CONCENTRATION`, `κ_δρ₃::Real = DRO3_CONCENTRATION`:
     prior concentrations, forwarded to [`δρ_prior`](@ref).
 - `timing::Union{Nothing,StageLog} = nothing`: stored in the returned `Seed`.
+- `shannon::Union{Nothing,ShannonInfo} = nothing`: stored in the returned `Seed`.
 
 # Returns
 - `Seed`: priors, initial point, forward cache, and data.
@@ -378,12 +382,13 @@ function seed_fitting(
     κ_δρ₁₂::Real = DRO12_CONCENTRATION,
     κ_δρ₃::Real = DRO3_CONCENTRATION,
     timing::Union{Nothing,StageLog} = nothing,
+    shannon::Union{Nothing,ShannonInfo} = nothing,
 )::Seed
     pr = _calc_ξ_priors(pH, σ_pH, solutes; t=t, κ_δρ₁₂=κ_δρ₁₂, κ_δρ₃=κ_δρ₃)
     ξ₀ = _ξ₀(pr)
     θ₀, _ = Θ(ξ₀, pr)
     wls = WLSData(I_exp, σ_exp)
-    return Seed(pr, θ₀, fw, wls, timing, _C1Tables(fw))
+    return Seed(pr, θ₀, fw, wls, timing, _C1Tables(fw), shannon)
 end
 
 """

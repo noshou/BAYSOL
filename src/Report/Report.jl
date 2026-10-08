@@ -16,9 +16,9 @@ using StaticArrays: SVector
 using ..PhysicalConstants: NS_PER_S
 using ..Timing: Timing
 using ..MolecularStructure: MolecularStructure
-using ..SASA: PROBE_RADIUS, SHELL_N_TARGET
+using ..SASA: SASA, PROBE_RADIUS, SHELL_N_TARGET
 using ..Scattering: Scattering, B_LM_CHUNK, SHELL_THICKNESS
-using ..Fitting: Fitting, DEFAULT_TEMPERATURE_C, DRO12_CONCENTRATION, DRO3_CONCENTRATION,
+using ..Fitting: Fitting, SHANNON_REBIN, DEFAULT_TEMPERATURE_C, DRO12_CONCENTRATION, DRO3_CONCENTRATION,
         DEFAULT_TARGET_ACCEPT
 
         """

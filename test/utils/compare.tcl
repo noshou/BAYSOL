@@ -182,8 +182,8 @@ namespace eval compare {
         set common 0; set lower 0; set higher 0
         dict for {k r} $new {
             if {![dict exists $old $k]} continue
-            set a [dict get $r chi2]
-            set b [dict get $old $k chi2]
+            set a [dict get $r chi2_cmp]
+            set b [dict get $old $k chi2_cmp]
             if {$a eq "" || $b eq ""} continue
             incr common
             if {$a < 0.99 * $b} { incr lower } elseif {$a > 1.01 * $b} { incr higher }
@@ -193,7 +193,7 @@ namespace eval compare {
 
     # One row of the distribution table: fit quality and parameter distributions of a set of reports.
     proc distribution {reports name} {
-        set chi2 [column $reports chi2]
+        set chi2 [column $reports chi2_cmp]
         set d3 [column $reports d3]
         set steps [column $reports steps]
         set z {}
@@ -424,11 +424,11 @@ namespace eval compare {
 
         # --- per-fit CSV (every column, a fixed list of keys; blank where a revision lacks a value)
         if {$csv ne ""} {
-            set keys {chi2 steps depth nuts wall_ex div c1 d1 d2 d3 z3 n_modes}
+            set keys {chi2_cmp steps depth nuts wall_ex div c1 d1 d2 d3 z3 n_modes}
             set ch [open $csv w]
             fconfigure $ch -encoding utf-8
             set head {}
-            foreach n $names { foreach k $keys { lappend head "$n:$k" } }
+            foreach n $names { foreach k $keys { lappend head "$n:[string map {chi2_cmp chi2} $k]" } }
             puts $ch "fit,[join $head ,]"
             foreach k [lsort [dict keys $new]] {
                 set vals {}

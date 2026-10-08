@@ -11,15 +11,14 @@
 
 # Scripts whose `seed_*` entry point is not `seed_<id>(run)` (RUNS) or `seed_<id>()` (single run):
 # id => (module, tag) -> Seed. SASDMZ9 builds three models from one function; SASDJ72 takes a model Symbol.
-const SASDMZ9_LMAX = Dict("model1" => 48, "model2" => 35, "model3" => 35)   # the script's LMAX1-3
 const SEED_ENTRY_OVERRIDES = Dict{String,Function}(
     "SASDMZ9" => (mod, tag) -> Core.eval(mod, :(seed_sasdmz9_model(
-        joinpath(_FIXTURE_DIR, $("SASDMZ9_fit1_$(tag).pdb")), $(SASDMZ9_LMAX[tag])))),
+        joinpath(_FIXTURE_DIR, $("SASDMZ9_fit1_$(tag).pdb"))))),
     "SASDJ72" => (mod, tag) -> Core.eval(mod, :(seed_sasdj72($(QuoteNode(Symbol(tag)))))),
 )
 
 """
-    load_fit_seed(id, tag = ""; data_transform = nothing, makie = true) -> (seed, reference, label)
+    load_fit_seed(id, tag = ""; seed_options = (;), makie = true) -> (seed, reference, label)
 
 The `Seed` that `test/fitting_tests/<id>/<id>.jl` builds for run `tag`, plus the depositor's reference
 curve for it (`nothing` if the script has none) as the `reference` argument of `SeedDiagnostics.diagnose`.
@@ -27,8 +26,8 @@ curve for it (`nothing` if the script has none) as the `reference` argument of `
 # Keywords
 - `makie = true`: set `false` to skip the script's `using GLMakie` (the figure functions then can't be called);
     the benchmark driver uses this to stay in the package's own environment.
-- `data_transform = nothing`: a function `(q, I, σ) -> (q′, I′, σ′)` applied to the script's fitted data subset
-    before the seed is built (used to try rebinned data without editing the script).
+- `seed_options = (;)`: keywords added to the script's `BAYSOL.seed_model` call, e.g. `(; rebin = 8)` or
+    `(; rebin = nothing)` to try another binning without editing the script.
 
 # Returns
 - `(seed::Fitting.Seed, reference, label::String)`.
@@ -36,7 +35,7 @@ curve for it (`nothing` if the script has none) as the `reference` argument of `
 # Exceptions
 - `ErrorException` if the script has no recognizable entry point, `tag` names no run, or the folder is missing.
 """
-function load_fit_seed(id::AbstractString, tag::AbstractString = ""; data_transform = nothing, makie::Bool = true)
+function load_fit_seed(id::AbstractString, tag::AbstractString = ""; seed_options::NamedTuple = (;), makie::Bool = true)
     fit_dir = joinpath(@__DIR__, "..", "fitting_tests")
     dir = joinpath(fit_dir, id)
     isdir(dir) || error("no fitting test folder $dir")
@@ -54,13 +53,12 @@ function load_fit_seed(id::AbstractString, tag::AbstractString = ""; data_transf
     src = src[1:m.offset-1]
     makie || (src = replace(src, r"^using GLMakie[^\n]*\n"m => ""))   # plotting is not needed to build a seed
 
+    # the script's `BAYSOL.seed_model(...)` call gets `seed_options` appended (a no-op when there are none)
+    src = replace(src, "BAYSOL.seed_model(" => "_seed_model(")
     mod = Module(Symbol("Fit_", id))
     Core.eval(mod, :(include(p::AbstractString) = Base.include($mod, p)))
+    Core.eval(mod, :(_seed_model(args...; kw...) = BAYSOL.seed_model(args...; kw..., $seed_options...)))
     Base.include_string(mod, src, path)
-    if data_transform !== nothing   # replace the script's data subset by a transformed copy (e.g. rebinned)
-        tq, tI, tσ = data_transform(Base.invokelatest(Core.eval(mod, :fit_subset))...)
-        Core.eval(mod, :(fit_subset() = ($tq, $tI, $tσ)))
-    end
 
     runs = isdefined(mod, :RUNS) ? Core.eval(mod, :RUNS) : nothing
     entry = Symbol("seed_", lowercase(splitext(script)[1]))   # SASDBS6.jl -> seed_sasdbs6, SASDA52_fit1.jl -> seed_sasda52_fit1

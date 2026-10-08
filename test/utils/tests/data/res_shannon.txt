@@ -1,0 +1,29 @@
+divergence_rate = 0.0000
+
+=== Run ===
+n_atoms    = 327
+lMax       = 38
+n_q_raw    = 1803
+n_q        = 121
+n_samples  = 2000
+n_adapt    = 1000
+
+=== Data (Shannon) ===
+D              = 117.4 Å (atoms and hydration-shell beads)
+channels       = 10.0 (q range × D / π)
+rebin          = 12 per channel: 1803 measured → 121 fitted points (0 non-positive dropped)
+
+=== MAP ===
+log_density    = -100.5
+ρₑ             = +0.336156
+δρ₁            = -1.09317
+δρ₂            = +1.95561
+δρ₃            = -5.67044
+scale          = +1.1
+bkgrnd_corr    = +0.0
+excl_vol_corr  = +1.2486
+χ²             = +0.912345
+
+=== Residuals at the MAP (white residuals: lag-1 ≈ 0, runs z ≈ 0) ===
+fitted grid    lag-1 +0.210   runs z -1.20
+measured grid  lag-1 +0.300   runs z -2.50   χ²_red 0.951234

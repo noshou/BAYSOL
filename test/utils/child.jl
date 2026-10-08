@@ -31,6 +31,7 @@ function one_fit()
         "stage_seconds" => [s.seconds for s in st], "stage_compile" => [s.compile for s in st],
         "stage_gc" => [s.gc for s in st],
         "n_atoms" => seed.fw.n_atoms, "n_q" => length(seed.fw.qvals), "lMax" => seed.fw.lMax,
+        "n_q_raw" => length(seed.shannon.q_raw), "rebin" => seed.shannon.rebin, "D" => seed.shannon.D,
     )
 end
 

@@ -7,6 +7,6 @@ and the MAP search and whitening before it, are on [Fitting: sampler](@ref).
 
 ```@autodocs
 Modules = [BAYSOL.Fitting]
-Pages   = ["Fitting.jl", "WLS.jl", "ProfiledCorrs.jl", "DensityOfSolvent.jl",
+Pages   = ["Fitting.jl", "Shannon.jl", "WLS.jl", "ProfiledCorrs.jl", "DensityOfSolvent.jl",
            "DeltaRho.jl", "ParamTransform.jl"]
 ```

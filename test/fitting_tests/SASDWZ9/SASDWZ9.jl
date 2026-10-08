@@ -107,20 +107,9 @@ const SOLUTES = Solute[
 
 const Q_MAX_FIT = 0.35   # the .fit file's own full q-range (≈0.0083-0.3501 Å⁻¹)
 
-# No GNOM pddf was bundled for this case (pddf/ is empty), so there is no
-# fitted D_max to read off. Instead, D_max is estimated directly from the
-# only structure we have: the maximum pairwise distance between any two
-# heavy (non-hydrogen) atoms in SASDWZ9_fit1_model1.pdb (a single filtered
-# NMR/TAiBP-CYANA conformer of this intrinsically disordered protein,
-# MODEL 37) ≈101.2 Å (the Cα-only max pairwise distance is close,
-# ≈94.7 Å; heavy atoms including side chains extend it a bit further).
-# This is necessarily just this one conformer's own extent, not an
-# ensemble-averaged D_max for the IDP as a whole, but it's the only
-# structural information this fixture provides.
-#
-# lMax follows the same q·D_max multipole-resolution rule of thumb used in
-# SASDMJ9: Q_MAX_FIT * D_max ≈ 0.35 * 101.2 ≈ 35.4.
-const LMAX = 35
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
+# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
+# that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true  # runs Pdb2pqr at PH; the NMR structure already carries
                             # modelled hydrogens, but Pdb2pqr recomputes pH-consistent
@@ -129,10 +118,11 @@ const ADD_HYDROGENS = true  # runs Pdb2pqr at PH; the NMR structure already carr
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `I_exp > 0`.
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
+with non-positive intensity.)
 """
 function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && I_exp[i] > 0, eachindex(qvals))
+    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
@@ -144,10 +134,10 @@ function seed_sasdwz9(; seed::Integer = SAMPLER_SEED)
 
     Random.seed!(seed)
     s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
+        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
-    return s, (q_fit, I_fit, σ_fit)
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
 function run_sasdwz9(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)

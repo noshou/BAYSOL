@@ -91,6 +91,9 @@ contrast `dro_k` downstream (CRYSOL's δρ = (1, 1, 0) defaults).
     size the cloud from the accessible area (≈ area / `SHELL_AREA_PER_POINT`,
     floored at `SHELL_MIN_POINTS`); pass an Int to pin it. Runtime is
     linear in it.
+    - `shell::Union{Nothing,Tuple} = nothing`: the accessible surface, `SASA.sasa(mol; probe, n_target)`,
+    when the caller has already computed it (e.g. to size the band limit from the shell's extent);
+    `nothing` computes it here. `probe` and `n_target` are then ignored.
 
 # Returns
 - @NamedTuple{convex, concave, cavity} of (C, K, Q) Array{ComplexF64,3},
@@ -104,10 +107,11 @@ function hydration(
     thickness::Float64           = SHELL_THICKNESS,
     probe::Float64               = PROBE_RADIUS,
     n_target::Union{Nothing,Int} = SHELL_N_TARGET,
+    shell::Union{Nothing,Tuple} = nothing,
 )::@NamedTuple{convex::Array{ComplexF64,3}, concave::Array{ComplexF64,3}, cavity::Array{ComplexF64,3}}
     thickness > 0.0 || throw(ArgumentError("hydration: thickness must be > 0"))
 
-    pts, area, class = SASA.sasa(mol; probe = probe, n_target = n_target)
+    pts, area, class = shell === nothing ? SASA.sasa(mol; probe = probe, n_target = n_target) : shell
 
     _shell(want) = begin
         sel = findall(==(want), class)
@@ -143,7 +147,7 @@ sweep per atom, shared by the form-factor and dummy amplitudes.
 # Keywords
 - `chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size (results invariant).
 - thickness::Real = `SHELL_THICKNESS`, probe::Real = `PROBE_RADIUS`,
-    `n_target` = `SHELL_N_TARGET`: forwarded to [`hydration`](@ref).
+    `n_target` = `SHELL_N_TARGET`, `shell` = nothing: forwarded to [`hydration`](@ref).
 - `form_factor_log::Union{Nothing,Vector{String}} = nothing`: when not nothing,
     the form-factor table's construction diagnostics are appended to it.
 - `stage_log::Union{Nothing,StageLog} = nothing`: if given, records the
@@ -158,6 +162,7 @@ function species_multipoles(
     thickness::Real                      = SHELL_THICKNESS,
     probe::Real                          = PROBE_RADIUS,
     n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
+    shell::Union{Nothing,Tuple}          = nothing,
     form_factor_log::Union{Nothing,Vector{String}} = nothing,
     stage_log::Union{Nothing,StageLog} = nothing,
 )
@@ -167,7 +172,7 @@ function species_multipoles(
         amp_ex  = _gaussian_dummy(vols(mol), qvals)
         _compute_B_lm(coords_spherical(mol), qvals, (amp_vac, amp_ex), lMax, _CHUNK)
     end
-    sh = timed!(stage_log, :static, 2, "hydration (SASA + B_lm)") do
+    sh = timed!(stage_log, :static, 2, shell === nothing ? "hydration (SASA + B_lm)" : "hydration (B_lm)") do
         hydration(
             mol, 
             qvals, 
@@ -175,7 +180,8 @@ function species_multipoles(
             _CHUNK;
             thickness = Float64(thickness), 
             probe = Float64(probe),
-            n_target  = n_target
+            n_target  = n_target,
+            shell = shell,
         )
     end
     return (b_vac, b_ex, sh.convex, sh.concave, sh.cavity)
