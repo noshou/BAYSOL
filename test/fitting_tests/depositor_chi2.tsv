@@ -1,0 +1,58 @@
+# Depositor's fit quality for each run in the Results table of README.md (read by test/utils/results_table.tcl).
+# One line per run, tab-separated: the run label as the table shows it, then the depositor's χ² and the method
+# that produced it. The members of one deposited multi-model fit repeat the same text; the table prints a
+# repeat as ″. This is the only column of the table that is not computed from the reports.
+# run	depositor
+SASDA52 fit1	CRYSOL χ² 2.48 (χ² ≈ 6.2)
+SASDBS6 fit2_model1	EOM ensemble 11.3
+SASDBS6 fit2_model2	EOM ensemble 11.3
+SASDBS6 fit2_model3	EOM ensemble 11.3
+SASDBS6 fit2_model4	EOM ensemble 11.3
+SASDBS6 fit2_model5	EOM ensemble 11.3
+SASDCQ2 fit2_model1	MultiFoXS 1-state 0.85
+SASDCQ2 fit3_model1	MultiFoXS 2-state 0.79
+SASDCQ2 fit3_model2	MultiFoXS 2-state 0.79
+SASDD88 fit2_model1	FoXS 4.50
+SASDD88 fit3_model1	FoXS 2.79
+SASDEP6 fit1_model1	OLIGOMER 2-state 8.31 (w 0.59)
+SASDEP6 fit1_model2	″ (w 0.41)
+SASDF42 —	2.10
+SASDJ62 model1	—
+SASDJ72 model1	MultiFoXS 2-state 2.91
+SASDJ72 model2	MultiFoXS 2-state 2.91
+SASDJY2 —	CRYSOL 4.68
+SASDKQ8 —	CRYSOL 14.3
+SASDLP4 fit1_model1	OLIGOMER 3-state 1.09
+SASDLP4 fit1_model2	OLIGOMER 3-state 1.09
+SASDLP4 fit1_model3	OLIGOMER 3-state 1.09
+SASDLP4 fit2_model1	CRYSOL 1.06
+SASDMJ9 —	CRYSOL 1.37
+SASDMZ9 model1	MultiFoXS 3-state 2.65
+SASDMZ9 model2	MultiFoXS 3-state 2.65
+SASDMZ9 model3	MultiFoXS 3-state 2.65
+SASDN32 —	FoXS 1.01
+SASDP48 —	CRYSOL 59.5
+SASDR99 —	29.6 (MDFF model)
+SASDRN5 fit2_model1	SREFLEX 3.04
+SASDRN5 fit3_model1	CRYSOL 12.0
+SASDRW2 —	CRYSOL 3.03
+SASDTK5 fit2_model1	CRYSOL 1.14
+SASDTK5 fit3_model1	CRYSOL 1.17
+SASDTK5 fit4_model1	CRYSOL 5.22
+SASDTK5 fit5_model1	CRYSOL 1.81
+SASDTK5 fit6_model1	CRYSOL 1.03
+SASDTK5 fit7_model1	CRYSOL 6.09
+SASDUN5 fit1_model1	OLIGOMER 2-state 2.21
+SASDUN5 fit1_model2	OLIGOMER 2-state 2.21
+SASDV94 fit1	CRYSOL 1.28
+SASDVG2 fit1_model1	MultiFoXS 1-state 2.10
+SASDVG2 fit2_model1	MultiFoXS 2-state 1.27
+SASDVG2 fit2_model2	MultiFoXS 2-state 1.27
+SASDVG2 fit3_model1	MultiFoXS 3-state 1.29
+SASDVG2 fit3_model2	MultiFoXS 3-state 1.29
+SASDVG2 fit3_model3	MultiFoXS 3-state 1.29
+SASDWZ9 —	Pepsi-SAXS 0.62
+SASDX52 —	0.70 (method unconfirmed)
+SASDYW6 fit2	CRYSOL 3.74
+SASDZC6 —	FoXS 1.68
+SASDZZ9 fit1	CRYSOL ≈ 34.5

@@ -121,7 +121,10 @@ function fit_subset_fit1()
     return qvals_fit1[keep], I_exp_fit1[keep], σ_exp_fit1[keep]
 end
 
-function run_sasda52_fit1(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+# Builds the Seed that `run_sasda52_fit1` samples. It is separate only because the developer tools in test/utils/ build
+# a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
+# `run_sasda52_fit1` below is the whole story (build the seed, then sample it).
+function seed_sasda52_fit1(; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset_fit1()
 
     Random.seed!(seed)
@@ -130,8 +133,13 @@ function run_sasda52_fit1(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, 
         PH_FIT1, σ_PH_FIT1, SOLUTES_FIT1;
         add_hydrogens = ADD_HYDROGENS_FIT1, t = TEMPERATURE_C_FIT1,
     )
+    return s, (q_fit, I_fit, σ_fit)
+end
+
+function run_sasda52_fit1(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+    s, data = seed_sasda52_fit1(; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
-    return res, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
+    return res, s.fw.form_factor_log, s.fw.n_atoms, data
 end
 
 resf1, fflogf1, natmsf1, (qf1, If1, σf1) = run_sasda52_fit1()
