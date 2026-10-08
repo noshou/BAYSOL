@@ -1,20 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
-Atomic/ionic radii: parse an ion string, then resolve its radius through a
-fallback chain over the bundled `atomic_radii.sqlite3` (loaded once into
-Dicts). Independent of Molecule.
-"""
-module AtomicRadii
-
-using  SQLite: SQLite
-using  DBInterface: DBInterface
-using  FastClosures: @closure
-using  ..PhysicalConstants: PM_PER_ANGSTROM
-
-export  lookup, Ion,
-        tryparse_ion, ion_key, ion_radius, element_radius,
-        nearest_ion, resolve_one
+# Atomic/ionic radii: parse an ion string, then resolve its radius through a fallback chain over the bundled
+# `atomic_radii.sqlite3` (loaded once into Dicts at module load). Included into MolecularStructure; independent
+# of Molecule.
 
 # ---- ion string -> (element, signed charge) -------------------------------
 
@@ -24,7 +12,7 @@ struct Ion
     charge::Int
 end
 
-# element = 1-2 lowercase; magnitude has a non-zero 
+# element = 1-2 lowercase; magnitude has a non-zero
 # leading digit (no charge 0); a bare sign means +/-1.
 const _ION_RE = r"^\s*([a-z]{1,2})\s*(?:([1-9][0-9]*)\s*([+-])|([+-])\s*([1-9][0-9]*)?)?\s*$"
 
@@ -161,7 +149,7 @@ call. Each entry pairs the input string with its radius or nothing.
 # Returns
 - `Vector{Tuple{String,Union{Float64,Nothing}}}`, one entry per input.
 """
-function lookup(ions::AbstractVector{<:AbstractString})
+function lookup_radii(ions::AbstractVector{<:AbstractString})
     cache = Dict{String,Union{Float64,Nothing}}()
     out = Vector{Tuple{String,Union{Float64,Nothing}}}(undef, length(ions))
     @inbounds for i in eachindex(ions)
@@ -173,5 +161,3 @@ function lookup(ions::AbstractVector{<:AbstractString})
     end
     return out
 end
-
-end # module AtomicRadii

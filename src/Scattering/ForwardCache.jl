@@ -157,7 +157,7 @@ per structure with [`forward_cache`](@ref); every likelihood evaluation
     in q for the contrast contraction ([`intensity_terms`](@ref)).
 - `qvals::Vector{Float64}, length Q`: the grid G was built on.
 - `r_m::Float64`: mean atomic radius in Å.
-- `form_factor_log::Vector{String}`: construction-time diagnostics from [`FormFactor.form_factor_table`](@ref).
+- `form_factor_log::Vector{String}`: construction-time diagnostics from [`form_factor_table`](@ref BAYSOL.Scattering.form_factor_table).
 - `n_atoms::Int`: number of atoms in the structure mol was built from
     (length(elms(mol))), e.g. for reporting alongside the fit.
 - `lMax::Int`: the spherical-harmonic band limit G was built with.

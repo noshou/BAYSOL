@@ -199,12 +199,12 @@ function run_model(
         if seed.shannon !== nothing
             sh = seed.shannon
             y_map = fit.curves[:, max_idx]
-            rs = Fitting.residual_structure((sh.I .- y_map) ./ sh.σ)
+            rs = Shannon.residual_structure((sh.I .- y_map) ./ sh.σ)
             MAP_params["resid_lag1"]   = rs.lag1
             MAP_params["resid_runs_z"] = rs.runs_z
             if sh.rebin > 0
-                r_raw = (sh.I_raw .- Fitting.model_on_raw(sh, y_map)) ./ sh.σ_raw
-                rs_raw = Fitting.residual_structure(r_raw)
+                r_raw = (sh.I_raw .- Shannon.model_on_raw(sh, y_map)) ./ sh.σ_raw
+                rs_raw = Shannon.residual_structure(r_raw)
                 MAP_params["chisq_red_raw"]    = sum(abs2, r_raw) / (length(r_raw) - 2)
                 MAP_params["resid_lag1_raw"]   = rs_raw.lag1
                 MAP_params["resid_runs_z_raw"] = rs_raw.runs_z

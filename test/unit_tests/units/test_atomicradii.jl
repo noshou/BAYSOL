@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/AtomicRadii/AtomicRadii.jl: ion-string parsing, the
+# Exercises src/MolecularStructure/AtomicRadii.jl: ion-string parsing, the
 # ion_key round-trip, the raw table lookups, and the resolve_one fallback chain.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.AtomicRadii: Ion, tryparse_ion, ion_key, ion_radius,
-    element_radius, nearest_ion, resolve_one, lookup
+using BAYSOL.MolecularStructure: Ion, tryparse_ion, ion_key, ion_radius,
+    element_radius, nearest_ion, resolve_one, lookup_radii
 
-lookup_one(ion) = lookup([ion])[1][2]
+lookup_one(ion) = lookup_radii([ion])[1][2]
 
 @testset "AtomicRadii" begin
 
@@ -144,7 +144,7 @@ lookup_one(ion) = lookup([ion])[1][2]
 
     @testset "lookup: order/count preserved, repeats deduped" begin
         input = ["fe3+", "zzzz9+", "fe3+", "rn"]
-        res = lookup(input)
+        res = lookup_radii(input)
         @test res isa Vector{Tuple{String,Union{Float64,Nothing}}}
         @test length(res) == length(input)
         @test [k for (k, _) in res] == input
@@ -153,23 +153,23 @@ lookup_one(ion) = lookup([ion])[1][2]
     end
 
     @testset "lookup: repeated misses are deduped too" begin
-        res = lookup(["qq3+", "qq3+", "fe", "qq3+"])
+        res = lookup_radii(["qq3+", "qq3+", "fe", "qq3+"])
         @test [v for (_, v) in res] == [nothing, nothing, resolve_one("fe"), nothing]
     end
 
     @testset "lookup agrees with resolve_one entry by entry" begin
         input = ["fe3+", "fe+3", "fe5+", "rn3+", "o2-", "h", "qq3+", "fe!!"]
-        @test [v for (_, v) in lookup(input)] == [resolve_one(s) for s in input]
+        @test [v for (_, v) in lookup_radii(input)] == [resolve_one(s) for s in input]
     end
 
     @testset "lookup: empty input" begin
-        res = lookup(String[])
+        res = lookup_radii(String[])
         @test isempty(res)
         @test res isa Vector{Tuple{String,Union{Float64,Nothing}}}
     end
 
     @testset "lookup: non-String element types are normalized to String" begin
-        res = lookup(SubString.(["fe3+", "rn"]))
+        res = lookup_radii(SubString.(["fe3+", "rn"]))
         @test [k for (k, _) in res] == ["fe3+", "rn"]
         @test all(k -> k isa String, first.(res))
     end

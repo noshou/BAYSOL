@@ -11,3 +11,6 @@ docs/src/assets/themes/academic.scss linguist-documentation=false
 # documenter-light.css is compiled output of academic.scss (see docs/make.jl),
 # not hand-authored -- stays excluded from language stats.
 docs/src/assets/themes/documenter-light.css linguist-generated=true
+
+# The Tcl tools' tcltest files (test/utils/tests/*.test) are Tcl.
+*.test  linguist-language=Tcl

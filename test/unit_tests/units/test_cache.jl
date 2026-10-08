@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/Cache.jl (`Lazy` / `force` and `KeyedCache`).
+# Exercises src/Utils/Cache.jl (`Lazy` / `force` and `KeyedCache`).
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.Cache: Lazy, force, KeyedCache

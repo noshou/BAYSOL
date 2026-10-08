@@ -1,38 +1,20 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
-X-ray form factors f(q,E) = f0(s) + f1(E) + i*f2(E), s = q/(4π) in Å⁻¹,
-computed in pure Julia from the bundled `form_factors.sqlite3`.
+# X-ray atomic scattering factors, f(q, E) = f0(s) + f1(E) + i·f2(E), from the bundled `form_factors.sqlite3`
+# (Waasmaier-Kirfel f0, Chantler FFAST f1/f2). Included into Scattering; see the FormFactor.jl section of its README.
 
-Two tables back the two halves of that sum (provenance and licensing in
-README.md next to this file, and in the database's own provenance table):
-
--   `waasmaier`: Waasmaier & Kirfel (1995) Gaussian coefficients for the
-    non-resonant term, f0(s) = c + `Σ_{i=1..5}` `a_i` exp(-`b_i` s²). 211 species,
-    neutral atoms and ions alike.
--   `chantler`: Chantler FFAST (NIST) anomalous terms on their fine energy
-    grid, Z = 1..92, 1.01 eV … 966 keV.
 """
-module FormFactor
-
-using  SQLite: SQLite
-using  DBInterface: DBInterface
-using  LinearAlgebra: LinearAlgebra
-using  FastClosures: @closure
-"""
-Upper end of the Waasmaier-Kirfel f0 fit range, s = sin θ/λ in Å⁻¹. 
+Upper end of the Waasmaier-Kirfel f0 fit range, s = sin θ/λ in Å⁻¹.
 Beyond it the ion fits diverge; see the FormFactor README.
 """
 const WK_S_MAX = 6.0
 
 """
 Floor applied to Chantler f2 table values before the log-log interpolation in
-`FormFactor.f1f2`: f2 is positive and spans decades, and the floor keeps the log
+`f1f2`: f2 is positive and spans decades, and the floor keeps the log
 finite where the table stores an exact zero.
 """
 const F2_LOG_FLOOR = 1e-99
-
-export  form_factor_table, form_factors, form_factor_log, FF, FormFactorError
 
 "Raised on any failure building or querying form factors."
 struct FormFactorError <: Exception; msg::String end
@@ -355,5 +337,3 @@ function form_factors(
     end
     return out
 end
-
-end # module

@@ -1,7 +1,17 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Shannon sampling of a SAXS curve: the data reduction that precedes the fit (see the Fitting README).
+"""
+Shannon sampling of a SAXS curve: a particle of diameter `D` has a scattering curve that carries no
+information at a q spacing finer than `π/D` (one *Shannon channel*), so a curve of thousands of points holds
+only `(q_max - q_min)·D/π` independent values. [`shannon_data`](@ref) bins the measured curve to that
+resolution and picks the band limit [`auto_lmax`](@ref) the binned q range needs; [`cloud_diameter`](@ref)
+supplies `D`; [`model_on_raw`](@ref) and [`residual_structure`](@ref) check the result against the measured data.
+"""
+module Shannon
+
 using Quickhull: Quickhull
+
+export ShannonInfo, SHANNON_REBIN, cloud_diameter, auto_lmax, shannon_data, bin_bias_ratio, model_on_raw, residual_structure
 
 """
 Default number of bins per Shannon channel (`k`): the bin width is `π/(k·D)`. Binning at `k ≥ 8`
@@ -279,3 +289,4 @@ function residual_structure(r::AbstractVector{<:Real})
     return (; lag1, runs_z = z)
 end
 
+end # module

@@ -9,7 +9,7 @@ Shared helpers behind the tests: glue around the Julia package (reading reports,
 | `results_table.tcl`      | Generates the Results table of`test/fitting_tests/README.md` from the reports (`--update` rewrites it in place, `--check` exits 1 if it is stale). Only the depositor's χ² column is kept by hand, in `test/fitting_tests/depositor_chi2.tsv`.                                                                    |
 | `bench.tcl`              | The cold / steady-state benchmark driver (protocol below). Prepares a throwaway depot and repository copy (deleted afterwards, unless `--keep`), starts`child.jl` once per fit and writes one JSON result (to `test/baselines/results/` by default). **Only runs with `--approved`**, which must be passed only after the owner has approved that particular run. |
 | `diagnose.tcl`           | Command line for the sampler diagnostics on a fitting test (`report`, `tolerance`, `ablate`, and `list` to show the available fits and tags). Checks the arguments, then starts `diagnose.jl`.                                                                                    |
-| `extract_formfactor.tcl` | Rebuilds`src/FormFactor/form_factors.sqlite3` from xraydb's `xraydb.sqlite` (Waasmaier-Kirfel f0 and Chantler f1/f2). Offline; the result is checked in.                                                                                                                          |
+| `extract_formfactor.tcl` | Rebuilds`src/Scattering/form_factors.sqlite3` from xraydb's `xraydb.sqlite` (Waasmaier-Kirfel f0 and Chantler f1/f2). Offline; the result is checked in.                                                                                                                          |
 | `common.tcl`             | Shared by the Tcl scripts, not run: the repository root, the report-number regex,`usage`, the git / file helpers, `latest_release` / `baseline_for` and the symlink-safe `rm_tree`.                                                                                                                                                             |
 | `report.tcl`             | Parses one fitting-test report (`res*.txt`) into a dict of numbers; used by `compare.tcl` and `results_table.tcl`.                                                                                                                                                                |
 | `child.jl`               | The process`bench.tcl` measures: runs one fit twice in a fresh process and prints the timings as JSON. Not run by hand.                                                                                                                                                           |
@@ -31,7 +31,7 @@ tclsh test/utils/results_table.tcl --check        # exit 1 if that table is stal
 tclsh test/utils/diagnose.tcl list
 tclsh test/utils/diagnose.tcl report SASDBS6:fit2_model3
 tclsh test/utils/bench.tcl --approved --state cold --out test/baselines/<name>.json SASDMJ9 SASDBS6:fit2_model3
-tclsh test/utils/extract_formfactor.tcl xraydb.sqlite src/FormFactor/form_factors.sqlite3
+tclsh test/utils/extract_formfactor.tcl xraydb.sqlite src/Scattering/form_factors.sqlite3
 ```
 
 Every Tcl script prints its usage with `--help`. They start with `#!/usr/bin/env tclsh`, so they can also be

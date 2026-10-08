@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises the pure-Julia form-factor backend: src/FormFactor/.
+# Exercises the pure-Julia form-factor backend: src/Scattering/FormFactor.jl.
 # f(q,E) = f0(s) + f1(E) + i*f2(E), s = q/(4pi), from the bundled
 # form_factors.sqlite3 (Waasmaier-Kirfel f0, Chantler FFAST anomalous terms).
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-const IFACE = BAYSOL.FormFactor
-using BAYSOL.FormFactor: compute_form_factors, FF, FormFactorError, f0, f1f2
-using BAYSOL.FormFactor: WK_S_MAX
+const IFACE = BAYSOL.Scattering
+using BAYSOL.Scattering: compute_form_factors, FF, FormFactorError, f0, f1f2
+using BAYSOL.Scattering: WK_S_MAX
 
 check_c(a, b) = abs(a - b) < 1e3 * DEFAULT_ATOL
 qvals = [0.1, 0.2]

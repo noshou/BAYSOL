@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests for src/Fitting/Shannon.jl: the exact point-cloud diameter, the Shannon binning of a measured
+# Tests for src/Utils/Shannon.jl: the exact point-cloud diameter, the Shannon binning of a measured
 # curve, the model curve on the measured grid, and the residual-structure statistics.
 #
 # `brute_diameter` below is the plain O(n²) farthest pair, written independently of the convex-hull path
@@ -11,7 +11,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using Random
 using Statistics
 using LinearAlgebra
-using BAYSOL.Fitting: ShannonInfo, SHANNON_REBIN, cloud_diameter, auto_lmax, shannon_data, model_on_raw,
+using BAYSOL.Shannon: ShannonInfo, SHANNON_REBIN, cloud_diameter, auto_lmax, shannon_data, model_on_raw,
     residual_structure, bin_bias_ratio
 using BAYSOL.Fitting: NonBiological, Solute
 using BAYSOL.Scattering: forward_cache, hydration

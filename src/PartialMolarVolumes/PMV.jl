@@ -17,7 +17,7 @@ using ..PhysicalConstants: STANDARD_TEMPERATURE_C
 """
 Temperature, °C, at which the bundled partial-molar-volume tables are tabulated
 (see PartialMolarVolumes/README.md: 298.15 K unless a source says otherwise): the
-standard reference temperature, [`STANDARD_TEMPERATURE_C`](@ref BAYSOL.PhysicalConstants.STANDARD_TEMPERATURE_C).
+standard reference temperature, [`STANDARD_TEMPERATURE_C`](@ref BAYSOL.Utils.PhysicalConstants.STANDARD_TEMPERATURE_C).
 """
 const PMV_REFERENCE_TEMPERATURE_C = STANDARD_TEMPERATURE_C
 

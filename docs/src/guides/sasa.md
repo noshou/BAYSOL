@@ -8,7 +8,7 @@ SASA is a top-level module (`BAYSOL.SASA`). It used to live under the removed `S
 
 ## SASA - solvent-accessible surface
 
-Each atom's *expanded* sphere (radius + probe, probe = solvent probe radius, default 1.4 Å for water) is sampled at `SHELL_SAMPLE` = 256 directions, and a direction is *occluded* if it lands inside any other atom's expanded sphere. Every accepted point stands for 4π(r+probe)²/256 of area, so the cloud's total area is the Shrake–Rupley accessible-area estimate. Sample directions come from the plastic-sequence low-discrepancy set (`PlasticSequence`, see src/PlasticSequence/README.md) rather than i.i.d. random points or a fixed spherical-cap design, for even coverage at any point count.
+Each atom's *expanded* sphere (radius + probe, probe = solvent probe radius, default 1.4 Å for water) is sampled at `SHELL_SAMPLE` = 256 directions, and a direction is *occluded* if it lands inside any other atom's expanded sphere. Every accepted point stands for 4π(r+probe)²/256 of area, so the cloud's total area is the Shrake–Rupley accessible-area estimate. Sample directions come from the plastic-sequence low-discrepancy set (`PlasticSequence`, see the Utils README) rather than i.i.d. random points or a fixed spherical-cap design, for even coverage at any point count.
 
 ### Metrics.jl: the occlusion shortcut and tests
 

@@ -12,12 +12,7 @@ using BAYSOL
 # (plus its README and api page).
 # ---------------------------------------------------------------------------
 const DOC_MODULES = [
-    "PhysicalConstants"   => BAYSOL.PhysicalConstants,
-    "Cache"               => BAYSOL.Cache,
-    "Timing"              => BAYSOL.Timing,
-    "PlasticSequence"     => BAYSOL.PlasticSequence,
-    "AtomicRadii"         => BAYSOL.AtomicRadii,
-    "FormFactor"          => BAYSOL.FormFactor,
+    "Utils"               => BAYSOL.Utils,
     "PartialMolarVolumes" => BAYSOL.PartialMolarVolumes,
     "MolecularStructure"  => BAYSOL.MolecularStructure,
     "Scattering"          => BAYSOL.Scattering,
@@ -27,7 +22,8 @@ const DOC_MODULES = [
 ]
 
 # Documented modules that have no page of their own: they are covered by their parent's page.
-const DOC_SUBMODULES = [BAYSOL.Scattering.SphFuncs]
+const DOC_SUBMODULES = [BAYSOL.Scattering.SphFuncs, BAYSOL.PhysicalConstants, BAYSOL.Cache, BAYSOL.Timing,
+                        BAYSOL.PlasticSequence, BAYSOL.Shannon]
 
 # A module whose API reference spans several pages lists them here (title => page); every other
 # module has the single page `api/<lowercase name>.md`.

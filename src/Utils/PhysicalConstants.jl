@@ -3,7 +3,7 @@
 """
 Physical constants and units shared across the package, defined once so they cannot
 drift between modules. Loaded first; every other module imports what it needs from
-here (`using ..PhysicalConstants: AVOGADRO`). 
+here (`using ..PhysicalConstants: AVOGADRO`).
 """
 module PhysicalConstants
 
