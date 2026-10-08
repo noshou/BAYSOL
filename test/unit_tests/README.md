@@ -25,6 +25,8 @@ julia --project=test test/unit_tests/units/test_atomicradii.jl
 | `test_propka.jl`, `test_pdb2pqr.jl` | the propka3 and pdb2pqr subprocess wrappers (need both tools installed) |
 | `test_protonation.jl` | the Henderson-Hasselbalch protonation helpers |
 | `test_pipeline.jl` | the structure-loading primitives composed end to end (resolve, pKa, hydrogens, load) |
+| `test_shannon.jl` | `Utils.Shannon`: the exact diameter, the Shannon binning and its band limit, the interpolation back to the measured grid, the residual statistics, and `seed_model` → `run_model` → `write_report` end to end on crambin |
+| `test_gcpause.jl` | `GCPause`: the collector off inside a pause, nesting, restoration on exceptions, the byte-budget checkpoint |
 | `test_formfactor.jl` | `FormFactor` against the xraydb oracle values in `fixtures/form-factors/` |
 | `test_pmv.jl` | `PartialMolarVolumes`: bulk water, protein, non-biological solutes, memoization per `(sequence, pH, σ_pH)` |
 | `test_plasticmap.jl` | `PlasticSequence`: the low-discrepancy point sets |

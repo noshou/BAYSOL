@@ -165,7 +165,7 @@ uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 version = "1.11.0"
 
 [[deps.BAYSOL]]
-deps = ["AdvancedHMC", "BioStructures", "CondaPkg", "DBInterface", "DiffResults", "Distributions", "Downloads", "FastClosures", "ForwardDiff", "JSON3", "LinearAlgebra", "LogExpFunctions", "NearestNeighbors", "Optim", "Printf", "Quickhull", "SQLite", "SpecialFunctions", "SphericalHarmonics", "StaticArrays", "Statistics"]
+deps = ["AdvancedHMC", "BioStructures", "Bumper", "CondaPkg", "DBInterface", "Dierckx", "DiffResults", "Distributions", "Downloads", "FastClosures", "ForwardDiff", "HypothesisTests", "JSON3", "LinearAlgebra", "LogExpFunctions", "NearestNeighbors", "Optim", "PrecompileTools", "Printf", "Quickhull", "SQLite", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase"]
 path = ".."
 uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 version = "0.2.0"
@@ -232,6 +232,12 @@ deps = ["PrecompileTools"]
 git-tree-sha1 = "41e42d326ff01d12167f3f8a218b318bf7429d0f"
 uuid = "3c28c6f8-a34d-59c4-9654-267d177fcfa9"
 version = "5.2.0"
+
+[[deps.Bumper]]
+deps = ["UnsafeArrays"]
+git-tree-sha1 = "d8f7e73bde2cd6ea8a6273dc42af76c354bd5406"
+uuid = "8ce10254-0962-460f-a3d8-1f77fea1446e"
+version = "0.7.2"
 
 [[deps.CEnum]]
 git-tree-sha1 = "389ad5c84de1ae7cf0e28e381131c98ea87d54fc"
@@ -352,6 +358,18 @@ version = "1.0.0"
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 version = "1.11.0"
+
+[[deps.Dierckx]]
+deps = ["Dierckx_jll"]
+git-tree-sha1 = "7da4b14cc4c3443a1afc64abee17f4fcb45ad837"
+uuid = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
+version = "0.5.4"
+
+[[deps.Dierckx_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "3251f44b3cac6fec4cec8db45d3ab0bfed51c4d8"
+uuid = "cd4c43a9-7502-52ba-aa6d-59fb2a88580b"
+version = "0.2.0+0"
 
 [[deps.DiffResults]]
 deps = ["StaticArraysCore"]
@@ -575,6 +593,12 @@ deps = ["Gamma", "LinearAlgebra"]
 git-tree-sha1 = "31bb6c92405c084617facc1d7ed9eb6c402d061e"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.30"
+
+[[deps.HypothesisTests]]
+deps = ["Combinatorics", "Distributions", "LinearAlgebra", "Printf", "Random", "Roots", "Statistics", "StatsAPI", "StatsBase", "StatsFuns"]
+git-tree-sha1 = "0b7026cbe6b5380b8f8a5c2a7306363e2ebd2146"
+uuid = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
+version = "0.12.2"
 
 [[deps.InitialValues]]
 git-tree-sha1 = "4da0f88e9a39111c2fa3add390ab15f3a44f3ca3"
@@ -1178,23 +1202,6 @@ version = "2.9.0"
     [deps.SpecialFunctions.weakdeps]
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 
-[[deps.SphericalHarmonicArrays]]
-deps = ["SphericalHarmonicModes", "TupleTools"]
-git-tree-sha1 = "cace97afd6be1088619c9413c732d7012dc46f96"
-uuid = "9dd28c12-4719-4e7d-b634-e7b733a6d046"
-version = "0.4.12"
-
-[[deps.SphericalHarmonicModes]]
-git-tree-sha1 = "ac0df3386523fa1807aa9e53e882964da70f881a"
-uuid = "0e9554e2-b38b-11e9-16d7-9d9abfec665a"
-version = "0.4.16"
-
-[[deps.SphericalHarmonics]]
-deps = ["IrrationalConstants", "Printf", "Setfield", "SpecialFunctions", "SphericalHarmonicArrays", "SphericalHarmonicModes", "StaticArrays"]
-git-tree-sha1 = "928779f6245a9bbdc3b8266d928092df3631b7b5"
-uuid = "c489a379-e885-57ff-9236-bd896d33c250"
-version = "0.1.20"
-
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "PrecompileTools", "Random", "StaticArraysCore"]
 git-tree-sha1 = "39e70e0ab5d7f89833a62ab7c79df15d4fc417c1"
@@ -1358,11 +1365,6 @@ git-tree-sha1 = "0c45878dcfdcfa8480052b6ab162cdd138781742"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.11.3"
 
-[[deps.TupleTools]]
-git-tree-sha1 = "41e43b9dc950775eac654b9f845c839cd2f1821e"
-uuid = "9d95972d-f1c8-5527-a6e0-b4b365fa01f6"
-version = "1.6.0"
-
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
@@ -1371,6 +1373,11 @@ version = "1.11.0"
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 version = "1.11.0"
+
+[[deps.UnsafeArrays]]
+git-tree-sha1 = "c63023bd84f46f9df786c90180d4f79dbfdafa2a"
+uuid = "c4a57d5a-5b31-53a6-b365-19f8c011fbd6"
+version = "1.0.9"
 
 [[deps.WeakRefStrings]]
 deps = ["DataAPI", "InlineStrings"]

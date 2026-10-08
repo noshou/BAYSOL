@@ -83,6 +83,8 @@ function seed_model(
     κ_δρ₁₂::Real = DRO12_CONCENTRATION,
     κ_δρ₃::Real = DRO3_CONCENTRATION,
 )::Fitting.Seed
+    # the static build allocates large temporaries; collect once per byte budget instead of whenever the heap grows
+    return GCPause.with_gc_paused() do
     # the run's clock starts here; write_report reads the wall clock off it
     log = Timing.StageLog()
 
@@ -158,4 +160,5 @@ function seed_model(
             t=t, κ_δρ₁₂=κ_δρ₁₂, κ_δρ₃=κ_δρ₃, timing=log, shannon=info,
         )
     end
+    end   # with_gc_paused
 end

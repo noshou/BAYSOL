@@ -4,7 +4,7 @@
 # (Unsold's theorem, the Y = P̄ e^{imφ} definition, the Bessel recurrence).
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Scattering.SphFuncs: sphHarm, SphHarmError, sphBess, sphBessRatios!, sphBessStep
+using BAYSOL.Scattering.SphFuncs: SphHarmError, sphBess, sphBessRatios!, sphBessStep
 using LegendrePolynomials: Plm
 using SpecialFunctions: sphericalbesselj
 
@@ -247,7 +247,7 @@ j2(x) = x == 0.0 ? 0.0 : (3.0 / x^3 - 1.0 / x) * sin(x) - 3.0 * cos(x) / x^2
         @test b.x[1:4] == 10.0 .* q
         @test b.invx[1] == 0.0 && b.invx[2:4] ≈ 1 ./ (10.0 .* q[2:4])
         @test b.lup[1:4] == floor.(Int, 10.0 .* q)
-        @test b.N[4] == -1                              # ⌊x⌋ = 30 ≥ lMax: no ratios needed
+        @test b.N[4] ≥ 30                               # ⌊x⌋ = 30 ≥ lMax: the sweep would start above x, but no ratio of this q is read
         @test all(b.N[2:3] .≥ max.(5, ceil.(Int, 10.0 .* q[2:3])))
         @test b.jm2[1] == 1.0 && b.jm1[1] == 0.0        # j₀(0), j₁(0)
         @test bess(10.0, q, 5; b = sphBess(6, 8)) == bess(10.0, q, 5)

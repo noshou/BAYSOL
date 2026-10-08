@@ -18,6 +18,7 @@ using ..Timing: Timing
 using ..MolecularStructure: MolecularStructure
 using ..SASA: SASA, PROBE_RADIUS, SHELL_N_TARGET
 using ..Shannon: Shannon, SHANNON_REBIN
+using ..GCPause: GCPause
 using ..Scattering: Scattering, B_LM_CHUNK, SHELL_THICKNESS
 using ..Fitting: Fitting, DEFAULT_TEMPERATURE_C, DRO12_CONCENTRATION, DRO3_CONCENTRATION,
         DEFAULT_TARGET_ACCEPT
