@@ -103,21 +103,20 @@ const SOLUTES_FIT1 = Solute[
 
 const Q_MAX_FIT_FIT1 = 0.5   # matches SASDA52_fit1.fit's q-range (0 to 0.5 Å⁻¹)
 
-# lMax follows the q·D_max multipole-resolution rule of thumb, using
-# the GNOM P(r) output (test/fixtures/experiments/SASDA52/pddf/SASDA52.out):
-# "Real space range: from 0.00 to 8.93" which GNOM ran on the raw nm⁻¹ data, so
-# this is D_max = 8.93 nm = 89.3 Å. Q_MAX_FIT * D_max ≈ 0.5 * 89.3 ≈ 44.65, rounded to 45.
-const LMAX_FIT1 = 45
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
+# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
+# that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS_FIT1 = true   # runs Pdb2pqr at PH_FIT1
 
 """
     fit_subset_fit1() -> (q, I, σ)
 
-`qvals_fit1`/`I_exp_fit1`/`σ_exp_fit1` restricted to `q ≤ Q_MAX_FIT_FIT1` and `I_exp > 0`.
+`qvals_fit1`/`I_exp_fit1`/`σ_exp_fit1` restricted to `q ≤ Q_MAX_FIT_FIT1` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
+with non-positive intensity.)
 """
 function fit_subset_fit1()
-    keep = findall(i -> qvals_fit1[i] ≤ Q_MAX_FIT_FIT1 && I_exp_fit1[i] > 0, eachindex(qvals_fit1))
+    keep = findall(i -> qvals_fit1[i] ≤ Q_MAX_FIT_FIT1 && σ_exp_fit1[i] > 0, eachindex(qvals_fit1))
     return qvals_fit1[keep], I_exp_fit1[keep], σ_exp_fit1[keep]
 end
 
@@ -129,11 +128,11 @@ function seed_sasda52_fit1(; seed::Integer = SAMPLER_SEED)
 
     Random.seed!(seed)
     s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH_FIT1), LMAX_FIT1, ENERGY_EV_FIT1, q_fit, I_fit, σ_fit,
+        LocalPathSource(_PDB_PATH_FIT1), ENERGY_EV_FIT1, q_fit, I_fit, σ_fit,
         PH_FIT1, σ_PH_FIT1, SOLUTES_FIT1;
         add_hydrogens = ADD_HYDROGENS_FIT1, t = TEMPERATURE_C_FIT1,
     )
-    return s, (q_fit, I_fit, σ_fit)
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
 function run_sasda52_fit1(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)

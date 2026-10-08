@@ -266,6 +266,7 @@ struct ξ_priors
     δρ₃Prior::BoundedBeta
 end
 
+include("Shannon.jl")
 include("WLS.jl")
 include("ProfiledCorrs.jl")
 include("DensityOfSolvent.jl")
@@ -278,6 +279,7 @@ export  Solute, Protein, NonBiological, DNA, RNA, Seed, FitResult,
         seed_fitting, run_fitting, PROFILE, MARGINAL,
         ρₑ_prior, δρ_prior, prior_z_scores,
         ξ_priors, θ_prior_moments, profiled_corrs, excl_vol_saturation,
-        WLSData, wls_fit
+        WLSData, wls_fit,
+        ShannonInfo, cloud_diameter, auto_lmax, shannon_data, bin_bias_ratio, model_on_raw, residual_structure
 
 end # module

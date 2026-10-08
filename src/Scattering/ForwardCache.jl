@@ -187,6 +187,7 @@ multipoles ([`species_multipoles`](@ref)), reduced to the Gram matrix G(q), plus
 -   `chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size (results invariant).
 -   `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
     `n_target = SHELL_N_TARGET`: hydration-shell geometry, forwarded to hydration.
+-   `shell::Union{Nothing,Tuple} = nothing`: a precomputed `SASA.sasa` result, see [`hydration`](@ref).
 -   `stage_log::Union{Nothing,StageLog} = nothing`: if given, the vacuum,
     excluded-volume, hydration and Gram + `r_m` stages are recorded in it
     (depth 2, group `:static`).
@@ -202,13 +203,14 @@ forward_cache(
     thickness::Real                      = SHELL_THICKNESS,
     probe::Real                          = PROBE_RADIUS,
     n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
+    shell::Union{Nothing,Tuple}          = nothing,
     stage_log::Union{Nothing,StageLog}   = nothing,
 )::ForwardCache = begin
     form_factor_log = String[]
     mp = species_multipoles(
         mol, qvals, lMax, energy;
         chunk = chunk,
-        thickness = thickness, probe = probe, n_target = n_target,
+        thickness = thickness, probe = probe, n_target = n_target, shell = shell,
         form_factor_log = form_factor_log, stage_log = stage_log,
     )
     G, r_m = timed!(stage_log, :static, 2, "Gram + r_m") do

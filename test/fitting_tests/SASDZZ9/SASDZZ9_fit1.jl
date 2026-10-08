@@ -93,26 +93,24 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# No GNOM pddf was bundled with this fixture (pddf/ is empty), so lMax can't
-# be read off a P(r) Dmax. Instead Dmax is estimated directly from the .pdb's
-# own coordinate extent: max pairwise heavy-atom distance among chain-A ATOM
-# records (Python/itertools brute force over all pairs) = 70.63 Å. Q_MAX_FIT
-# is set to just above the file's q_max (0.387528). lmax = Q_MAX_FIT * D_max ≈ 0.39 * 70.6
-# ≈ 27.5, rounded up to 28.
+# Q_MAX_FIT is set to just above the file's q_max (0.387528).
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
+# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
+# that diameter allows (see `rebin` there).
 const Q_MAX_FIT = 0.39
-const LMAX      = 28
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `I_exp > 0`. The
-`I_exp > 0` filter also drops this file's own leading q<0.0213 placeholder
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
+with non-positive intensity.) The
+`σ_exp > 0` filter also drops this file's own leading q<0.0213 placeholder
 rows (I_exp = σ_exp = 0, no experimental coverage there).
 """
 function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && I_exp[i] > 0, eachindex(qvals))
+    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
@@ -124,10 +122,10 @@ function seed_sasdzz9_fit1(; seed::Integer = SAMPLER_SEED)
 
     Random.seed!(seed)
     s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
+        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
-    return s, (q_fit, I_fit, σ_fit)
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
 function run_sasdzz9_fit1(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)

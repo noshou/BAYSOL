@@ -3,7 +3,7 @@
 **Note:** Entries in `BAYSOL.PartialMolarVolumes` without uncertainties use an uncertainty estimated from the mean of the available experimental uncertainties. As the table grows, this estimate may change slightly, so fit results may change.
 
 End-to-end BAYSOL fits of 27 SASBDB entries (protein-only structures): load a structure, build its buffer, find the mode with a multi-start L-BFGS search and whiten around it, run the NUTS sampler over `ξ = (ρₑ, δρ₁, δρ₂, δρ₃)` with the excluded-volume correction `c1` profiled at every evaluation (to `EXCL_VOL_CORR_TOL` = 1e-8; see the Fitting README for why that tight), and write the MAP/posterior report and figures
-next to the script. The fitted curve is the deposited SASBDB curve (q in Å⁻¹, truncated at each script's `Q_MAX_FIT`).
+next to the script. The fitted curve is the deposited SASBDB curve (q in Å⁻¹, truncated at each script's `Q_MAX_FIT`), which `seed_model` bins to 12 bins per Shannon channel π/D (D: the diameter of the structure and its hydration shell) and from which it takes `lMax = ceil(q_max·D)`; the lMax and point counts below are those of the latest run, and each report's `=== Data (Shannon) ===` section lists D, the channels and the points before and after binning. χ² is reported on the measured q grid (the binned fit's model interpolated onto it, over all measured points), the convention of FoXS's own χ², and so of the depositors' numbers.
 
 ```
 julia --project=test/fitting_tests test/fitting_tests/<ID>/<script>.jl
@@ -18,64 +18,61 @@ Settings shared by every script live in `common.jl`, which each script includes:
 
  The table is generated from the reports (`tclsh test/utils/results_table.tcl --update`); only the depositor column is  kept by hand, in `depositor_chi2.tsv`. Bold marks a parameter at a hard prior bound (δρ₁, δρ₂ ≤ 2; δρ₃ ∈ [−ρ̄ₑ/0.03, (φ_max − 1)·ρ̄ₑ/0.03] ≈ [−11.1, 2.8]), `c1` profiling saturation, or a chain with >5% divergent transitions. ″ repeats the line above: the members of one deposited multi-model fit share a single depositor χ², which belongs to their **weighted mixture**, not to any one member (see "Ensemble and multi-model entries" below).
 
-
-
-| Run                 | χ² (MAP) | depositor's χ² (method)      | δρ₁   | δρ₂   | δρ₃      | c1                    | divergences |
-| --------------------- | ------------ | -------------------------------- | ---------- | ---------- | ------------- | ----------------------- | ------------- |
-| SASDA52 fit1        | 5.33       | CRYSOL χ² 2.48 (χ² ≈ 6.2) | 0.09     | 0.08     | **2.77**    | 1.160                 | 0.1 %       |
-| SASDBS6 fit2_model1 | 60.3       | EOM ensemble 11.3              | **2.00** | −1.29   | **−11.27** | 0.927                 | 0           |
-| SASDBS6 fit2_model2 | 89.1       | ″                             | −0.37   | **2.00** | **2.83**    | 1.241                 | 0           |
-| SASDBS6 fit2_model3 | 21.5       | ″                             | 0.04     | 1.67     | **2.82**    | 1.201                 | 0           |
-| SASDBS6 fit2_model4 | 23.8       | ″                             | 0.09     | 1.12     | **2.82**    | 1.196                 | 0           |
-| SASDBS6 fit2_model5 | 51.7       | ″                             | −0.25   | **2.00** | 0.81        | 1.233                 | 0           |
-| SASDCQ2 fit2_model1 | 0.818      | MultiFoXS 1-state 0.85         | 0.54     | −0.63   | −6.75      | 1.160                 | 0           |
-| SASDCQ2 fit3_model1 | 1.22       | MultiFoXS 2-state 0.79         | −0.19   | −0.83   | −8.40      | 1.242                 | 0           |
-| SASDCQ2 fit3_model2 | 51.1       | ″                             | 0.36     | −1.54   | 2.71        | 1.129                 | 0           |
-| SASDD88 fit2_model1 | 0.987      | FoXS 4.50                      | −0.09   | 1.45     | −0.86      | 1.229                 | 0           |
-| SASDD88 fit3_model1 | 0.909      | FoXS 2.79                      | 0.32     | −2.85   | −6.29      | 1.215                 | 0           |
-| SASDEP6 fit1_model1 | 2.4        | OLIGOMER 2-state 8.31 (w 0.59) | −0.78   | 1.87     | −9.46      | 1.235                 | 3.0 %       |
-| SASDEP6 fit1_model2 | 2.88       | ″ (w 0.41)                    | −0.44   | 1.89     | −6.36      | 1.221                 | 0.1 %       |
-| SASDF42 —          | 1.27       | 2.10                           | −0.69   | 0.90     | −5.53      | 1.242                 | 0           |
-| SASDJ62 model1      | 3.27       | —                             | 0.22     | 0.87     | **−11.21** | 1.193                 | 0           |
-| SASDJ72 model1      | 51.3       | MultiFoXS 2-state 2.91         | 0.19     | **1.99** | **2.87**    | 1.197                 | 0           |
-| SASDJ72 model2      | 2.38       | ″                             | −0.26   | 1.00     | −7.55      | 1.216                 | 0           |
-| SASDJY2 —          | 0.635      | CRYSOL 4.68                    | 0.80     | −7.06   | −1.38      | 1.163                 | 0           |
-| SASDKQ8 —          | 1.5        | CRYSOL 14.3                    | 0.78     | −6.49   | −3.53      | 1.171                 | 0           |
-| SASDLP4 fit1_model1 | 3.35       | OLIGOMER 3-state 1.09          | 0.78     | −3.59   | **2.77**    | 1.204                 | 0           |
-| SASDLP4 fit1_model2 | 1.1        | ″                             | 0.15     | −2.09   | −1.08      | 1.256                 | 1.4 %       |
-| SASDLP4 fit1_model3 | 7.73       | ″                             | 0.53     | −0.97   | **2.79**    | 1.226                 | 0           |
-| SASDLP4 fit2_model1 | 1.1        | CRYSOL 1.06                    | 0.15     | −2.09   | −1.08      | 1.256                 | 1.4 %       |
-| SASDMJ9 —          | 0.868      | CRYSOL 1.37                    | −1.09   | **1.96** | −5.67      | 1.249                 | 0           |
-| SASDMZ9 model1      | 6.99       | MultiFoXS 3-state 2.65         | −0.04   | −1.18   | −1.27      | 1.185                 | 0           |
-| SASDMZ9 model2      | 6.48       | ″                             | −0.29   | −1.14   | −0.42      | 1.203                 | 0           |
-| SASDMZ9 model3      | 55         | ″                             | 0.23     | −2.51   | **2.79**    | 1.181                 | 0           |
-| SASDN32 —          | 0.894      | FoXS 1.01                      | 0.38     | −2.64   | 1.64        | 1.191                 | 0           |
-| SASDP48 —          | 15.8       | CRYSOL 59.5                    | −0.05   | 0.38     | **2.77**    | 1.214                 | 0           |
-| SASDR99 —          | 14.5       | 29.6 (MDFF model)              | 0.15     | −1.99   | −8.70      | 1.178                 | 0           |
-| SASDRN5 fit2_model1 | 2.85       | SREFLEX 3.04                   | 0.30     | 1.30     | 0.36        | 1.189                 | 0           |
-| SASDRN5 fit3_model1 | 7.18       | CRYSOL 12.0                    | −0.01   | −0.24   | −9.00      | 1.210                 | 0           |
-| SASDRW2 —          | 2.02       | CRYSOL 3.03                    | −0.19   | −7.32   | −3.08      | **0.780 (saturated)** | 0           |
-| SASDTK5 fit2_model1 | 0.939      | CRYSOL 1.14                    | −0.94   | −5.68   | −1.70      | 1.257                 | 0           |
-| SASDTK5 fit3_model1 | 1.19       | CRYSOL 1.17                    | 0.53     | 1.58     | 2.43        | 1.186                 | 0           |
-| SASDTK5 fit4_model1 | 1.6        | CRYSOL 5.22                    | −0.11   | −3.84   | **−11.23** | 1.216                 | 0           |
-| SASDTK5 fit5_model1 | 0.924      | CRYSOL 1.81                    | −0.15   | −5.52   | 1.45        | 1.228                 | 0.1 %       |
-| SASDTK5 fit6_model1 | 0.923      | CRYSOL 1.03                    | 0.63     | 1.79     | 2.20        | 1.177                 | 0           |
-| SASDTK5 fit7_model1 | 1.81       | CRYSOL 6.09                    | −0.02   | −3.14   | **−11.27** | 1.216                 | 0           |
-| SASDUN5 fit1_model1 | 1.63       | OLIGOMER 2-state 2.21          | −0.35   | −1.39   | −1.90      | 1.211                 | 0           |
-| SASDUN5 fit1_model2 | 11.2       | ″                             | −0.57   | −2.61   | **−11.26** | 1.178                 | 0           |
-| SASDV94 fit1        | 1.86       | CRYSOL 1.28                    | **1.98** | −7.99   | 2.61        | 1.134                 | 0           |
-| SASDVG2 fit1_model1 | 2.44       | MultiFoXS 1-state 2.10         | 0.00     | 0.69     | −2.55      | 1.177                 | 0           |
-| SASDVG2 fit2_model1 | 2.3        | MultiFoXS 2-state 1.27         | −0.28   | 1.70     | −0.72      | 1.171                 | 0.2 %       |
-| SASDVG2 fit2_model2 | 4          | ″                             | 0.89     | −2.40   | 2.05        | 1.168                 | 0.2 %       |
-| SASDVG2 fit3_model1 | 4          | MultiFoXS 3-state 1.29         | 1.39     | −9.02   | −10.20     | 1.261                 | 0.1 %       |
-| SASDVG2 fit3_model2 | 5.84       | ″                             | 0.44     | −1.29   | −2.97      | 1.199                 | 0           |
-| SASDVG2 fit3_model3 | 21.6       | ″                             | 0.24     | −0.63   | −2.91      | 1.203                 | 0           |
-| SASDWZ9 —          | 0.578      | Pepsi-SAXS 0.62                | 0.26     | 1.51     | −0.16      | 1.277                 | 0           |
-| SASDX52 —          | 0.307      | 0.70 (method unconfirmed)      | −0.19   | −3.04   | 1.22        | 1.233                 | 0.3 %       |
-| SASDYW6 fit2        | 2.92       | CRYSOL 3.74                    | −0.16   | −1.48   | −6.44      | 1.197                 | 0           |
-| SASDZC6 —          | 1.61       | FoXS 1.68                      | −0.80   | 0.30     | −1.42      | 1.076                 | 0           |
-| SASDZZ9 fit1        | 14.6       | CRYSOL ≈ 34.5                 | −0.47   | **1.99** | −5.52      | 1.231                 | 0           |
-
+| Run | χ² (MAP) | depositor's χ² (method) | δρ₁ | δρ₂ | δρ₃ | c1 | divergences |
+|---|---|---|---|---|---|---|---|
+| SASDA52 fit1 | 5.34 | CRYSOL χ² 2.48 (χ² ≈ 6.2) | 0.08 | 0.09 | **2.76** | 1.160 | 0.1 % |
+| SASDBS6 fit2_model1 | 60.3 | EOM ensemble 11.3 | **2.00** | −1.23 | **−11.27** | 0.927 | 0 |
+| SASDBS6 fit2_model2 | 89.1 | ″ | −0.37 | **2.00** | **2.83** | 1.241 | 0 |
+| SASDBS6 fit2_model3 | 21.5 | ″ | 0.04 | 1.67 | **2.82** | 1.201 | 0 |
+| SASDBS6 fit2_model4 | 23.8 | ″ | 0.09 | 1.12 | **2.82** | 1.196 | 0 |
+| SASDBS6 fit2_model5 | 51.7 | ″ | −0.25 | **2.00** | 0.81 | 1.233 | 0.3 % |
+| SASDCQ2 fit2_model1 | 0.819 | MultiFoXS 1-state 0.85 | 0.54 | −0.62 | −6.70 | 1.161 | 0 |
+| SASDCQ2 fit3_model1 | 1.23 | MultiFoXS 2-state 0.79 | −0.18 | −0.84 | −7.50 | 1.242 | 0 |
+| SASDCQ2 fit3_model2 | 51.1 | ″ | 0.36 | −1.51 | 2.70 | 1.130 | 0 |
+| SASDD88 fit2_model1 | 0.986 | FoXS 4.50 | −0.08 | 1.47 | −0.16 | 1.230 | 0 |
+| SASDD88 fit3_model1 | 0.91 | FoXS 2.79 | 0.32 | −2.57 | −6.97 | 1.216 | 0 |
+| SASDEP6 fit1_model1 | 2.4 | OLIGOMER 2-state 8.31 (w 0.59) | −0.79 | 1.87 | −9.59 | 1.235 | 0 |
+| SASDEP6 fit1_model2 | 2.88 | ″ (w 0.41) | −0.44 | 1.90 | −6.44 | 1.221 | 0.2 % |
+| SASDF42 — | 1.36 | 2.10 | −0.69 | 0.93 | −5.67 | 1.241 | 0 |
+| SASDJ62 model1 | 3.39 | — | 0.23 | 0.88 | **−11.22** | 1.194 | 0 |
+| SASDJ72 model1 | 51.3 | MultiFoXS 2-state 2.91 | 0.19 | **1.98** | **2.87** | 1.197 | 0 |
+| SASDJ72 model2 | 2.38 | ″ | −0.27 | 1.01 | −7.61 | 1.215 | 0 |
+| SASDJY2 — | 0.635 | CRYSOL 4.68 | 0.80 | −7.05 | −1.15 | 1.163 | 0 |
+| SASDKQ8 — | 1.5 | CRYSOL 14.3 | 0.78 | −6.52 | −3.85 | 1.170 | 0 |
+| SASDLP4 fit1_model1 | 3.45 | OLIGOMER 3-state 1.09 | 0.79 | −3.59 | **2.77** | 1.204 | 0 |
+| SASDLP4 fit1_model2 | 1.21 | ″ | 0.15 | −2.06 | −1.29 | 1.256 | 2.1 % |
+| SASDLP4 fit1_model3 | 7.83 | ″ | 0.52 | −0.97 | **2.79** | 1.226 | 0 |
+| SASDLP4 fit2_model1 | 1.21 | CRYSOL 1.06 | 0.15 | −2.06 | −1.29 | 1.256 | 2.1 % |
+| SASDMJ9 — | 0.874 | CRYSOL 1.37 | −1.08 | **1.95** | −6.07 | 1.248 | 0 |
+| SASDMZ9 model1 | 6.99 | MultiFoXS 3-state 2.65 | −0.04 | −1.18 | −1.27 | 1.185 | 0 |
+| SASDMZ9 model2 | 6.48 | ″ | −0.28 | −1.14 | −0.42 | 1.203 | 0 |
+| SASDMZ9 model3 | 55 | ″ | 0.23 | −2.51 | **2.79** | 1.181 | 0 |
+| SASDN32 — | 0.975 | FoXS 1.01 | 0.41 | −2.41 | 1.45 | 1.187 | 0 |
+| SASDP48 — | 15.9 | CRYSOL 59.5 | −0.05 | 0.38 | **2.77** | 1.214 | 0.2 % |
+| SASDR99 — | 14.5 | 29.6 (MDFF model) | 0.15 | −1.99 | −8.68 | 1.179 | 0 |
+| SASDRN5 fit2_model1 | 2.85 | SREFLEX 3.04 | 0.30 | 1.29 | 0.45 | 1.189 | 0 |
+| SASDRN5 fit3_model1 | 7.18 | CRYSOL 12.0 | −0.01 | −0.24 | −8.83 | 1.210 | 0 |
+| SASDRW2 — | 2.02 | CRYSOL 3.03 | −0.21 | −7.49 | −2.30 | **0.780 (saturated)** | 0 |
+| SASDTK5 fit2_model1 | 0.937 | CRYSOL 1.14 | −0.92 | −5.83 | −0.75 | 1.257 | 0 |
+| SASDTK5 fit3_model1 | 1.2 | CRYSOL 1.17 | 0.53 | 1.55 | 2.36 | 1.186 | 0 |
+| SASDTK5 fit4_model1 | 1.6 | CRYSOL 5.22 | −0.11 | −3.81 | **−11.25** | 1.216 | 0 |
+| SASDTK5 fit5_model1 | 0.922 | CRYSOL 1.81 | −0.16 | −5.71 | 1.56 | 1.229 | 0 |
+| SASDTK5 fit6_model1 | 0.924 | CRYSOL 1.03 | 0.64 | 1.77 | 2.06 | 1.176 | 0 |
+| SASDTK5 fit7_model1 | 1.81 | CRYSOL 6.09 | −0.02 | −3.10 | **−11.27** | 1.216 | 0 |
+| SASDUN5 fit1_model1 | 1.87 | OLIGOMER 2-state 2.21 | −0.34 | −1.47 | −1.49 | 1.212 | 0 |
+| SASDUN5 fit1_model2 | 11.4 | ″ | −0.55 | −2.76 | **−11.26** | 1.177 | 0 |
+| SASDV94 fit1 | 1.87 | CRYSOL 1.28 | **1.97** | −7.99 | 2.63 | 1.134 | 0.1 % |
+| SASDVG2 fit1_model1 | 2.43 | MultiFoXS 1-state 2.10 | 0.01 | 0.67 | −2.51 | 1.177 | 0 |
+| SASDVG2 fit2_model1 | 2.29 | MultiFoXS 2-state 1.27 | −0.28 | 1.72 | −0.75 | 1.170 | 0 |
+| SASDVG2 fit2_model2 | 3.99 | ″ | 0.91 | −2.46 | 2.14 | 1.167 | 0 |
+| SASDVG2 fit3_model1 | 3.97 | MultiFoXS 3-state 1.29 | 1.39 | −9.06 | −10.15 | 1.261 | 0 |
+| SASDVG2 fit3_model2 | 5.82 | ″ | 0.44 | −1.30 | −3.00 | 1.199 | 0 |
+| SASDVG2 fit3_model3 | 21.4 | ″ | 0.24 | −0.63 | −2.91 | 1.203 | 0 |
+| SASDWZ9 — | 0.576 | Pepsi-SAXS 0.62 | 0.26 | 1.61 | −0.56 | 1.279 | 0 |
+| SASDX52 — | 0.305 | 0.70 (method unconfirmed) | −0.22 | −3.34 | 1.19 | 1.234 | 0.5 % |
+| SASDYW6 fit2 | 2.88 | CRYSOL 3.74 | −0.11 | −1.54 | −6.39 | 1.198 | 0 |
+| SASDZC6 — | 1.66 | FoXS 1.68 | −0.80 | −0.15 | 0.74 | 1.092 | 0.4 % |
+| SASDZZ9 fit1 | 14.6 | CRYSOL ≈ 34.5 | −0.48 | **1.99** | −5.52 | 1.231 | 0 |
 
 **How to read these MAPs.**
 
@@ -183,7 +180,7 @@ compares a run with the latest release's baseline in `test/baselines/` (or name 
 julia --project=test/fitting_tests test/fitting_tests/SASDA52/SASDA52_fit1.jl
 ```
 
-Fits the ADH1 tetramer (PDB 4W6Z, 347-residue chains; 24.89 mg/mL) with q ≤ 0.5 Å⁻¹ and lMax 45 (from the GNOM D_max of 89.3 Å), pH 7.4. **Unique:** the SASBDB entry only says "PBS", so the standard 1× PBS recipe (137 mM NaCl, 2.7 mM KCl, 10 mM Na₂HPO₄, 1.8 mM KH₂PO₄, each ±5 %) is assumed; the beamline wavelength "0.15" is read as a unit slip for 1.5 Å (8.27 keV); the experimental file is in nm⁻¹ and is converted. Overlays our MAP curve on SASBDB's CRYSOL fit1 (`res_fit1_comparison.png`).
+Fits the ADH1 tetramer (PDB 4W6Z, 347-residue chains; 24.89 mg/mL) with q ≤ 0.5 Å⁻¹ and lMax 56 (scatterer-cloud diameter 110.7 Å; the GNOM D_max is 89.3 Å), pH 7.4. **Unique:** the SASBDB entry only says "PBS", so the standard 1× PBS recipe (137 mM NaCl, 2.7 mM KCl, 10 mM Na₂HPO₄, 1.8 mM KH₂PO₄, each ±5 %) is assumed; the beamline wavelength "0.15" is read as a unit slip for 1.5 Å (8.27 keV); the experimental file is in nm⁻¹ and is converted. Overlays our MAP curve on SASBDB's CRYSOL fit1 (`res_fit1_comparison.png`).
 
 ### SASDF42: human serum albumin + somapacitan complex, MES/NaCl
 
@@ -191,7 +188,7 @@ Fits the ADH1 tetramer (PDB 4W6Z, 347-residue chains; 24.89 mg/mL) with q ≤ 0.
 julia --project=test/fitting_tests test/fitting_tests/SASDF42/SASDF42.jl
 ```
 
-Fits a SASREF rigid-body model of HSA with two growth-hormone (somapacitan) copies, 6.3 mg/mL total, pH 6.5, 100 mM MES + 140 mM NaCl, q ≤ 0.5 Å⁻¹, lMax 70. **Unique:** a three-chain complex of two different proteins (the proteins are not buffer solutes, see above). Compared against the deposited fit column of the SASBDB `.fit` file, whose header quotes `ChiExp = 1.45`; recomputed from the file's own columns that is χ, i.e. χ² = 2.10.
+Fits a SASREF rigid-body model of HSA with two growth-hormone (somapacitan) copies, 6.3 mg/mL total, pH 6.5, 100 mM MES + 140 mM NaCl, q ≤ 0.5 Å⁻¹, lMax 73. **Unique:** a three-chain complex of two different proteins (the proteins are not buffer solutes, see above). Compared against the deposited fit column of the SASBDB `.fit` file, whose header quotes `ChiExp = 1.45`; recomputed from the file's own columns that is χ, i.e. χ² = 2.10.
 
 ### SASDJ62: XRCC1 (DNA-repair scaffold), glycerol buffer
 
@@ -199,7 +196,7 @@ Fits a SASREF rigid-body model of HSA with two growth-hormone (somapacitan) copi
 julia --project=test/fitting_tests test/fitting_tests/SASDJ62/SASDJ62_model1.jl
 ```
 
-Fits the 633-residue XRCC1 model 1 (monomer of 69.5 kDa, 5.9 mg/mL) in 200 mM NaCl, 20 mM Tris, 2 % glycerol, pH 7.5, q ≤ 0.5 Å⁻¹, lMax 107 (the largest in the suite). **Unique:** the PDB already carries CHARMM hydrogens, so Pdb2pqr is skipped (`ADD_HYDROGENS = false`); the "2 % glycerol" is converted to 0.274 M with a wide ±10 % uncertainty; D_max (212 Å) comes from the Cα hull because no GNOM file exists; SASBDB's measured mass (110 kDa) hints at a dimer but a monomer is modeled; no reference curve is bundled, so there is no comparison figure.
+Fits the 633-residue XRCC1 model 1 (monomer of 69.5 kDa, 5.9 mg/mL) in 200 mM NaCl, 20 mM Tris, 2 % glycerol, pH 7.5, q ≤ 0.5 Å⁻¹, lMax 112 (the largest in the suite). **Unique:** the PDB already carries CHARMM hydrogens, so Pdb2pqr is skipped (`ADD_HYDROGENS = false`); the "2 % glycerol" is converted to 0.274 M with a wide ±10 % uncertainty; the diameter that sets lMax (222.9 Å) is that of the structure and its hydration shell, since no GNOM file exists; SASBDB's measured mass (110 kDa) hints at a dimer but a monomer is modeled; no reference curve is bundled, so there is no comparison figure.
 
 ### SASDJ72: DNA ligase IIIα, two candidate models
 
@@ -207,7 +204,7 @@ Fits the 633-residue XRCC1 model 1 (monomer of 69.5 kDa, 5.9 mg/mL) in 200 mM Na
 julia --project=test/fitting_tests test/fitting_tests/SASDJ72/SASDJ72.jl
 ```
 
-Fits the 922-residue ligase with both models of the depositor's MultiFoXS 2-state ensemble (BILBOMD conformers; mixture χ² 2.91; `model1` lMax 53, `model2` lMax 64) separately against the same curve in one run (q ≤ 0.30 Å⁻¹, pH 7.5, 150 mM NaCl, 25 mM Tris, 2 mM DTT, 10 % glycerol). **Unique:** a two-model comparison from a single script; the data are a concentration-merged curve (1–5 mg/mL); 10 % v/v glycerol becomes 1.369 M (±5 %), one of the most concentrated cosolutes in the suite. Each model is overlaid on the CRYSOL fit1 curve.
+Fits the 922-residue ligase with both models of the depositor's MultiFoXS 2-state ensemble (BILBOMD conformers; mixture χ² 2.91; `model1` lMax 57, `model2` lMax 68) separately against the same curve in one run (q ≤ 0.30 Å⁻¹, pH 7.5, 150 mM NaCl, 25 mM Tris, 2 mM DTT, 10 % glycerol). **Unique:** a two-model comparison from a single script; the data are a concentration-merged curve (1–5 mg/mL); 10 % v/v glycerol becomes 1.369 M (±5 %), one of the most concentrated cosolutes in the suite. Each model is overlaid on the CRYSOL fit1 curve.
 
 ### SASDMJ9: feline coronavirus Nsp7 (validation case)
 
@@ -215,7 +212,7 @@ Fits the 922-residue ligase with both models of the depositor's MultiFoXS 2-stat
 julia --project=test/fitting_tests test/fitting_tests/SASDMJ9/SASDMJ9.jl
 ```
 
-Fits Nsp7 (chain B, 82 residues, 4.7 mg/mL) in 200 mM NaCl, 10 mM Tris, 5 mM DTT, pH 7.5, q ≤ 0.5 Å⁻¹, lMax 25. **Unique:** the reference case for the method and the script the other fits were modeled on. Under the current bounded-Beta δρ priors and profiled c1 the MAP χ² is 0.87 (16–84 % band 0.867–0.871), against CRYSOL's 1.37 recomputed on the same points (1.370; 1.365 with a free scale and offset). It was 1.13 before the MAP search and the 1e-8 c1 tolerance, and 1.08 under the earlier LogNormal/Normal priors with a sampled c1. δρ₂ sits at its upper bound of 2 (1.96). One shared shell contrast already gives 1.07, so most of the gain over CRYSOL is not the extra contrasts. q is converted from nm⁻¹ and the X33 wavelength is 1.54 Å. Overlays CRYSOL's curve (`res_comparison.png`).
+Fits Nsp7 (chain B, 82 residues, 4.7 mg/mL) in 200 mM NaCl, 10 mM Tris, 5 mM DTT, pH 7.5, q ≤ 0.5 Å⁻¹, lMax 32. **Unique:** the reference case for the method and the script the other fits were modeled on. Under the current bounded-Beta δρ priors and profiled c1 the MAP χ² is 0.87 (16–84 % band 0.867–0.871), against CRYSOL's 1.37 recomputed on the same points (1.370; 1.365 with a free scale and offset). It was 1.13 before the MAP search and the 1e-8 c1 tolerance, and 1.08 under the earlier LogNormal/Normal priors with a sampled c1. δρ₂ sits at its upper bound of 2 (1.96). One shared shell contrast already gives 1.07, so most of the gain over CRYSOL is not the extra contrasts. q is converted from nm⁻¹ and the X33 wavelength is 1.54 Å. Overlays CRYSOL's curve (`res_comparison.png`).
 
 ### SASDMZ9: Sas20d1-2, a flexible two-domain starch-binding protein
 
@@ -223,7 +220,7 @@ Fits Nsp7 (chain B, 82 residues, 4.7 mg/mL) in 200 mM NaCl, 10 mM Tris, 5 mM DTT
 julia --project=test/fitting_tests test/fitting_tests/SASDMZ9/SASDMZ9.jl
 ```
 
-Fits three deposited conformers (model1/2/3, lMax 48/68/35) one after another to the same curve, in PBS + 1 mM TCEP, q ≤ 0.3 Å⁻¹, and writes `res_model{1,2,3}.*`. **Unique:** the three models are the members of the depositor's MultiFoXS **3-state ensemble** (mixture χ² 2.65, from the `.dat` header); BAYSOL fits each alone (6.99 / 6.48 / 55.0), see "Ensemble and multi-model entries". The model column of the SASBDB `.fit` file is deliberately ignored, so there is no overlay. **pH 7.0** (changed 2026-10-01): the paper's "PBS … pH 7.4" recipe is from its mass-spectrometry methods, while SASBDB gives pH 7 for the SAXS buffer; the recipe's NaCl/KCl and 11.8 mM total phosphate are kept and the phosphate is re-split at pH 7.0. Model1's chain failed in v0.2.0 (96.8 % divergent); it samples cleanly now.
+Fits three deposited conformers (model1/2/3, lMax 51/70/38) one after another to the same curve, in PBS + 1 mM TCEP, q ≤ 0.3 Å⁻¹, and writes `res_model{1,2,3}.*`. **Unique:** the three models are the members of the depositor's MultiFoXS **3-state ensemble** (mixture χ² 2.65, from the `.dat` header); BAYSOL fits each alone (6.99 / 6.48 / 55.0), see "Ensemble and multi-model entries". The model column of the SASBDB `.fit` file is deliberately ignored, so there is no overlay. **pH 7.0** (changed 2026-10-01): the paper's "PBS … pH 7.4" recipe is from its mass-spectrometry methods, while SASBDB gives pH 7 for the SAXS buffer; the recipe's NaCl/KCl and 11.8 mM total phosphate are kept and the phosphate is re-split at pH 7.0. Model1's chain failed in v0.2.0 (96.8 % divergent); it samples cleanly now.
 
 ### SASDN32: Sas20d2 with 5 mM maltoheptaose
 
@@ -231,7 +228,7 @@ Fits three deposited conformers (model1/2/3, lMax 48/68/35) one after another to
 julia --project=test/fitting_tests test/fitting_tests/SASDN32/SASDN32.jl
 ```
 
-Fits Sas20d2 (26.3 kDa, 10 mg/mL), same PBS + TCEP buffer as SASDMZ9, q ≤ 0.3 Å⁻¹, lMax 22. **Unique:** the buffer includes 5 mM maltoheptaose, a solute that was previously left out because it had no volume data; it now uses the measured 694.8 ± 5.8 cm³/mol (Hourston 1967, thesis Table 6.1) and, at 5 mM, it is a real contribution to the solvent electron density. Single fit, no reference overlay.
+Fits Sas20d2 (26.3 kDa, 10 mg/mL), same PBS + TCEP buffer as SASDMZ9, q ≤ 0.3 Å⁻¹, lMax 24. **Unique:** the buffer includes 5 mM maltoheptaose, a solute that was previously left out because it had no volume data; it now uses the measured 694.8 ± 5.8 cm³/mol (Hourston 1967, thesis Table 6.1) and, at 5 mM, it is a real contribution to the solvent electron density. Single fit, no reference overlay.
 
 ### SASDV94: phospholipase C (PLC H) bound to its chaperone PLC R2, merged injections
 
@@ -239,7 +236,7 @@ Fits Sas20d2 (26.3 kDa, 10 mg/mL), same PBS + TCEP buffer as SASDMZ9, q ≤ 0.3 
 julia --project=test/fitting_tests test/fitting_tests/SASDV94/SASDV94_fit1.jl
 ```
 
-Fits the atomistic chains B (PLC H, residues 27-730) and D (PLC R2, residues 65-207; 1:1 complex) in 100 mM NaCl, 25 mM Tris, 3 mM β-mercaptoethanol, pH 7.5, 10 keV, q ≤ 0.434 Å⁻¹, lMax 39. **Unique:** the deposited model mixes real chains with two CA-only dummy-bead chains, so the script fits an extracted `SASDV94_fit1_model1_PLCH_R2.pdb` containing only the atomistic chains; the merged 3.5/7/14 mg/mL injections have no single concentration (series mean, widened uncertainty); the mercaptoethanol volume is itself an estimate (69.0 ± 3.5). Overlays CRYSOL (χ² 1.284).
+Fits the atomistic chains B (PLC H, residues 27-730) and D (PLC R2, residues 65-207; 1:1 complex) in 100 mM NaCl, 25 mM Tris, 3 mM β-mercaptoethanol, pH 7.5, 10 keV, q ≤ 0.434 Å⁻¹, lMax 44. **Unique:** the deposited model mixes real chains with two CA-only dummy-bead chains, so the script fits an extracted `SASDV94_fit1_model1_PLCH_R2.pdb` containing only the atomistic chains; the merged 3.5/7/14 mg/mL injections have no single concentration (series mean, widened uncertainty); the mercaptoethanol volume is itself an estimate (69.0 ± 3.5). Overlays CRYSOL (χ² 1.284).
 
 ### SASDWZ9: SERF1a (small NMR-structured protein), sodium phosphate + azide
 
@@ -247,7 +244,7 @@ Fits the atomistic chains B (PLC H, residues 27-730) and D (PLC R2, residues 65-
 julia --project=test/fitting_tests test/fitting_tests/SASDWZ9/SASDWZ9.jl
 ```
 
-Fits one NMR conformer (MODEL 37, 62 residues, 15 mg/mL) at 15 keV, pH 6.8, q ≤ 0.35 Å⁻¹, lMax 35. **Unique:** the 20 mM sodium phosphate is split into H₂PO₄⁻ and HPO₄²⁻ (Goldberg pK₂ with a Davies correction, see "Buffers" above; HPO₄²⁻ fraction 0.43) and 0.02 % NaN₃ is added; it is the only fit compared against Pepsi-SAXS (not CRYSOL); its NaN₃ and NaH₂PO₄ entries have no stated uncertainty (table default is used).
+Fits one NMR conformer (MODEL 37, 62 residues, 15 mg/mL) at 15 keV, pH 6.8, q ≤ 0.35 Å⁻¹, lMax 38. **Unique:** the 20 mM sodium phosphate is split into H₂PO₄⁻ and HPO₄²⁻ (Goldberg pK₂ with a Davies correction, see "Buffers" above; HPO₄²⁻ fraction 0.43) and 0.02 % NaN₃ is added; it is the only fit compared against Pepsi-SAXS (not CRYSOL); its NaN₃ and NaH₂PO₄ entries have no stated uncertainty (table default is used).
 
 ### SASDX52: FadD5 (fatty acyl-CoA synthetase) dimer
 
@@ -255,7 +252,7 @@ Fits one NMR conformer (MODEL 37, 62 residues, 15 mg/mL) at 15 keV, pH 6.8, q �
 julia --project=test/fitting_tests test/fitting_tests/SASDX52/SASDX52.jl
 ```
 
-Fits an AlphaFold-derived, depositor-docked dimer (4 mg/mL) in 500 mM NaCl, 20 mM HEPES, 5 mM MgCl₂, 1 mM mercaptoethanol, pH 7.5, 13 keV, lMax 35. **Unique:** only the low-q region is fitted (q ≤ 0.17 Å⁻¹); the bundled reference curve has χ² = 0.699 (below 1) and its method is not confirmed to be CRYSOL, so the overlay is labelled "SASBDB fit1"; the model is predicted rather than experimentally determined.
+Fits an AlphaFold-derived, depositor-docked dimer (4 mg/mL) in 500 mM NaCl, 20 mM HEPES, 5 mM MgCl₂, 1 mM mercaptoethanol, pH 7.5, 13 keV, lMax 38. **Unique:** only the low-q region is fitted (q ≤ 0.17 Å⁻¹); the bundled reference curve has χ² = 0.699 (below 1) and its method is not confirmed to be CRYSOL, so the overlay is labelled "SASBDB fit1"; the model is predicted rather than experimentally determined.
 
 ### SASDYW6: fructose-bisphosphate aldolase (Fba1) dimer, imidazole buffer
 
@@ -263,7 +260,7 @@ Fits an AlphaFold-derived, depositor-docked dimer (4 mg/mL) in 500 mM NaCl, 20 m
 julia --project=test/fitting_tests test/fitting_tests/SASDYW6/SASDYW6_fit2.jl
 ```
 
-Fits the AlphaFold3 dimer (`fit2`; the GASBOR dummy-bead `fit1` is not fitted) at pH 8.5, 13.2 keV, q ≤ 0.25 Å⁻¹, lMax 24. **Unique:** the highest ionic strength in the suite (≈ 0.67 M): 500 mM NaCl, 500 mM imidazole (with ~23 mM Cl⁻ counter-ion) and 50 mM sodium phosphate speciated at pH 8.5; SASBDB's structured buffer field (Tris/NaCl, pH 8.0) conflicts with the entry's own description and is most likely copied from the sibling SASDYV6, so the entry description is used; 1 mM PMSF is included with an **estimated** volume (127.2 ± 5.0 cm³/mol, geometric estimate, not measured). Compared against the CRYSOL fit (χ² 3.737).
+Fits the AlphaFold3 dimer (`fit2`; the GASBOR dummy-bead `fit1` is not fitted) at pH 8.5, 13.2 keV, q ≤ 0.25 Å⁻¹, lMax 26. **Unique:** the highest ionic strength in the suite (≈ 0.67 M): 500 mM NaCl, 500 mM imidazole (with ~23 mM Cl⁻ counter-ion) and 50 mM sodium phosphate speciated at pH 8.5; SASBDB's structured buffer field (Tris/NaCl, pH 8.0) conflicts with the entry's own description and is most likely copied from the sibling SASDYV6, so the entry description is used; 1 mM PMSF is included with an **estimated** volume (127.2 ± 5.0 cm³/mol, geometric estimate, not measured). Compared against the CRYSOL fit (χ² 3.737).
 
 ### SASDZC6: PDE6 / transducin-α* complex with udenafil
 
@@ -271,7 +268,7 @@ Fits the AlphaFold3 dimer (`fit2`; the GASBOR dummy-bead `fit1` is not fitted) a
 julia --project=test/fitting_tests test/fitting_tests/SASDZC6/SASDZC6.jl
 ```
 
-Fits PDB 7JSN (PDE6α, PDE6β, 2 × PDE6γ, 2 × GαT*; 0.3 mg/mL PDE6) in 100 mM NaCl, 25 mM Tris, 2 mM MgCl₂, 2 % glycerol, pH 8.0, 11.3 keV (stated directly), q ≤ 0.3 Å⁻¹, lMax 49. **Unique:** a six-chain complex of four protein species (at pH 8.0 its chains' N-terminus pKas straddle the pH, so Pdb2pqr runs once per terminus-flag group and the chains are merged); the 3 µM udenafil inhibitor has no measured volume, so an **estimate** (399.6 ± 16.0 cm³/mol) is used; the bundled reference is FoXS (χ² 1.676) but it is not plotted here.
+Fits PDB 7JSN (PDE6α, PDE6β, 2 × PDE6γ, 2 × GαT*; 0.3 mg/mL PDE6) in 100 mM NaCl, 25 mM Tris, 2 mM MgCl₂, 2 % glycerol, pH 8.0, 11.3 keV (stated directly), q ≤ 0.3 Å⁻¹, lMax 53. **Unique:** a six-chain complex of four protein species (at pH 8.0 its chains' N-terminus pKas straddle the pH, so Pdb2pqr runs once per terminus-flag group and the chains are merged); the 3 µM udenafil inhibitor has no measured volume, so an **estimate** (399.6 ± 16.0 cm³/mol) is used; the bundled reference is FoXS (χ² 1.676) but it is not plotted here.
 
 ### SASDZZ9: NodB (chitooligosaccharide deacetylase), poorly matching crystal model
 
@@ -279,4 +276,4 @@ Fits PDB 7JSN (PDE6α, PDE6β, 2 × PDE6γ, 2 × GαT*; 0.3 mg/mL PDE6) in 100 m
 julia --project=test/fitting_tests test/fitting_tests/SASDZZ9/SASDZZ9_fit1.jl
 ```
 
-Fits the 404-residue crystal-structure model (PDB 8YFP, monomer) in 100 mM NaCl, 20 mM Tris at a 0.137 nm wavelength, q ≤ 0.39 Å⁻¹, lMax 28. **Unique:** the deposited reference fit for this rigid model is poor (χ² ≈ 34.5) while an ab initio bead model gets ≈ 0.002 (not used), so the deposited structure does not describe the solution well. Overlays the CRYSOL fit1 curve.
+Fits the 404-residue crystal-structure model (PDB 8YFP, monomer) in 100 mM NaCl, 20 mM Tris at a 0.137 nm wavelength, q ≤ 0.39 Å⁻¹, lMax 30. **Unique:** the deposited reference fit for this rigid model is poor (χ² ≈ 34.5) while an ab initio bead model gets ≈ 0.002 (not used), so the deposited structure does not describe the solution well. Overlays the CRYSOL fit1 curve.

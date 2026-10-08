@@ -22,6 +22,14 @@ test parse-v0.2.0 {the v0.2.0 format: fields it lacks are empty, the others pars
     fields res_v020.txt {chi2 c1 d1 d2 d3 steps wall fwd map_s n_modes leapfrog nuts z3 wall_ex}
 } -result {+1.13124 +1.12324 +1.97557 -2.15674 -9.83588 6.18 56.43 24.17 {} {} 15200.0 27.27 -2.11641 56.43}
 
+test parse-shannon {a Shannon-binned report: chi2 is the fit's own, chi2_raw the measured-grid one, chi2_cmp the latter} -body {
+    fields res_shannon.txt {chi2 chi2_raw chi2_cmp c1 d3}
+} -result {+0.912345 0.951234 0.951234 +1.2486 -5.67044}
+
+test chi2-cmp-without-raw {an older report has no measured-grid line: chi2_cmp falls back to chi2} -body {
+    fields res_current.txt {chi2_raw chi2_cmp}
+} -result {{} +0.868097}
+
 test count {iteration and leapfrog counts with k and M suffixes} -body {
     list [report::count 496.68k] [report::count 12.4k] [report::count 1.2M] [report::count 750]
 } -result {496680.0 12400.0 1200000.0 750.0}

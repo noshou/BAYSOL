@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Runs the full unit-test suite:
-#   julia --project=test test/run/unittests.jl
+# Runs the unit-test suite:
+#   julia --project=test test/run/unittests.jl            # all of it
+#   julia --project=test test/run/unittests.jl shannon wls  # only the files whose name contains one of these
 #
 # Every ../unit_tests/units/test_*.jl is self-contained (each `include`s its own testsetup.jl and declares
 # its own `using`s), so it can also be run on its own, e.g.:
@@ -21,8 +22,12 @@ const TEST_FILES = let files = sort!(filter(f -> startswith(f, "test_") && endsw
     [filter(!=(LAST), files); filter(==(LAST), files)]
 end
 
+# Command-line words select files by substring; naming a word that matches no file is an error.
+const SELECTED = isempty(ARGS) ? TEST_FILES : filter(f -> any(occursin(a, f) for a in ARGS), TEST_FILES)
+isempty(SELECTED) && error("no test file in $UNITS_DIR matches: $(join(ARGS, ", "))")
+
 @testset "BAYSOL" begin
-    for file in TEST_FILES
+    for file in SELECTED
         include(joinpath(UNITS_DIR, file))
     end
 end

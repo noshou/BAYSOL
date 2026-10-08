@@ -82,25 +82,26 @@ const SOLUTES = Solute[
 
 const Q_MAX_FIT = 0.3
 
-# lMax follows the usual q·D_max multipole-resolution rule of thumb, lMax = ceil(Q_MAX_FIT * D_max), with D_max the
-# farthest atom pair of the model (convex-hull); for the existing scripts this rule reproduces their LMAX to within
-# 3% (ratio 0.97-1.02) at Q_MAX_FIT up to 0.5.
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
+# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
+# that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 # One run per atomic model with a deposited fit; `fit` is that model's reference curve (q scaled to Å⁻¹ by `fit_scale`; the fitted intensity is column `fit_col`; `rescale` = the file is normalized, scale it to the data).
 const RUNS = [
-    (tag = "fit1_model1", pdb = "SASDUN5_fit1_model1.pdb", fit = "SASDUN5_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER", lmax = 49),   # D_max ≈ 160 Å; deposited χ² = 2.21
-    (tag = "fit1_model2", pdb = "SASDUN5_fit1_model2.pdb", fit = "SASDUN5_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER", lmax = 51),   # D_max ≈ 167 Å; deposited χ² = 2.21
+    (tag = "fit1_model1", pdb = "SASDUN5_fit1_model1.pdb", fit = "SASDUN5_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER"),   # D_max ≈ 160 Å; deposited χ² = 2.21
+    (tag = "fit1_model2", pdb = "SASDUN5_fit1_model2.pdb", fit = "SASDUN5_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER"),   # D_max ≈ 167 Å; deposited χ² = 2.21
 ]
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT`, `I_exp > 0` and `σ_exp > 0`.
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
+with non-positive intensity.)
 """
 function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && I_exp[i] > 0 && σ_exp[i] > 0, eachindex(qvals))
+    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
@@ -112,10 +113,10 @@ function seed_sasdun5(run; seed::Integer = SAMPLER_SEED)
 
     Random.seed!(seed)
     s = BAYSOL.seed_model(
-        LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), run.lmax, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
+        LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
-    return s, (q_fit, I_fit, σ_fit)
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
 function run_sasdun5(run; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)

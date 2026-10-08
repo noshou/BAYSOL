@@ -148,24 +148,20 @@ const SOLUTES = Solute[
 
 const Q_MAX_FIT = 0.434   # SASDV94_fit1.fit's own q_max (≈0.434015 Å⁻¹); no truncation needed
 
-# No GNOM pddf was bundled for this fixture (pddf/ is empty). lMax is
-# sized off Dmax estimated from the PDB coordinates: the
-# maximum pairwise Cα-Cα distance over SASDV94_fit1_model1_PLCH_R2.pdb's 847
-# resolved Cα atoms (chains B+D only, dummy bead chains excluded,
-# since including the dummy chains inflates this to ≈115 Å), computed
-# via a convex hull to keep the pairwise search tractable, is ≈88.82 Å.
-# Q_MAX_FIT * Dmax ≈ 0.434 * 88.82 ≈ 38.55.
-const LMAX = 39
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
+# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
+# that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # real atomistic structure (chains B/D only); runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `I_exp > 0`.
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
+with non-positive intensity.)
 """
 function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && I_exp[i] > 0, eachindex(qvals))
+    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
@@ -177,10 +173,10 @@ function seed_sasdv94_fit1(; seed::Integer = SAMPLER_SEED)
 
     Random.seed!(seed)
     s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
+        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
-    return s, (q_fit, I_fit, σ_fit)
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
 function run_sasdv94_fit1(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)

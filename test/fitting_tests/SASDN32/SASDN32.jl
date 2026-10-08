@@ -13,7 +13,7 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDN32_fit1_model1.pdb")
 
 # As with SASDMZ9, `experimental_data/` and `pddf/` are EMPTY for this case;
 # the experimental curve ships directly as `SASDN32_fit1.dat` in the case
-# root, and no GNOM .out pddf file is bundled (see LMAX discussion below).
+# root, and no GNOM .out pddf file is bundled.
 #
 # `SASDN32_fit1.dat` header:
 #   # SAXS profile: number of points = 1211, q_min = 0.00297234626486897, q_max = 0.345499873161316, ...
@@ -97,26 +97,20 @@ const SOLUTES = Solute[
 
 const Q_MAX_FIT    = 0.3
 
-# lMax follows the usual q·D_max multipole-resolution rule of thumb. No GNOM
-# pddf is bundled for this case (pddf/ is empty), so D_max is instead
-# estimated directly from this PDB's own coordinate extent: the maximum
-# pairwise heavy-atom (all-ATOM, no waters/HETATM present) distance in
-# SASDN32_fit1_model1.pdb is ≈ 74.1 Å (computed once offline over its 1854
-# atoms) -- in close agreement with both the paper's own Table 4 D_max
-# (solution) = 74 Å and SASBDB's own stated D_max = 7.4 nm for this entry
-# (see solution-conditions discussion above). Q_MAX_FIT * D_max ≈
-# 0.3 * 74.1 ≈ 22.2.
-const LMAX = 22
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
+# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
+# that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `I_exp > 0`.
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
+with non-positive intensity.)
 """
 function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && I_exp[i] > 0, eachindex(qvals))
+    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
@@ -128,10 +122,10 @@ function seed_sasdn32(; seed::Integer = SAMPLER_SEED)
 
     Random.seed!(seed)
     s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
+        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
-    return s, (q_fit, I_fit, σ_fit)
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
 function run_sasdn32(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)

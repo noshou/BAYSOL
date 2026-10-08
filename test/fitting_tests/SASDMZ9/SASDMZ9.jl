@@ -12,7 +12,7 @@ const _DATA_PATH   = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1.dat")
 
 # Unlike SASDMJ9, `experimental_data/` and `pddf/` are EMPTY for this case;
 # the experimental curve ships directly as `SASDMZ9_fit1.dat` in the case
-# root, and no GNOM .out pddf file is bundled (see LMAX discussion below).
+# root, and no GNOM .out pddf file is bundled.
 #
 # `SASDMZ9_fit1.dat` header:
 #   # SAXS profile: number of points = 1211, q_min = 0.00297234626486897, q_max = 0.345499873161316, ...
@@ -190,19 +190,19 @@ end
 # Builds the Seed that `run_sasdmz9_model` samples. It is separate only because the developer tools in test/utils/ build
 # a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
 # `run_sasdmz9_model` below is the whole story (build the seed, then sample it).
-function seed_sasdmz9_model(pdb_path::String, lmax::Int; seed::Integer = SAMPLER_SEED)
+function seed_sasdmz9_model(pdb_path::String; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
 
     Random.seed!(seed)
     s = BAYSOL.seed_model(
-        LocalPathSource(pdb_path), lmax, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
+        LocalPathSource(pdb_path), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
-    return s, (q_fit, I_fit, σ_fit)
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdmz9_model(pdb_path::String, lmax::Int; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
-    s, data = seed_sasdmz9_model(pdb_path, lmax; seed)
+function run_sasdmz9_model(pdb_path::String; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+    s, data = seed_sasdmz9_model(pdb_path; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
 end
@@ -536,22 +536,15 @@ end
 
 const _PDB_PATH1 = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1_model1.pdb")
 
-# lMax follows the usual q·D_max multipole-resolution rule of thumb. No GNOM
-# pddf is bundled for this case (pddf/ is empty), so D_max is instead
-# estimated directly from this PDB's own coordinate extent: the maximum
-# pairwise heavy-atom (all-ATOM, no waters/HETATM present) distance in
-# SASDMZ9_fit1_model1.pdb is ≈ 160.5 Å (computed once offline over its 3968
-# atoms). This is one of the three flexible-ensemble conformers described
-# above (see solution-conditions discussion) -- it is the intermediate-extent
-# one of the three models (model2 ≈ 227.7 Å, model3 ≈ 117.8 Å; see those
-# scripts' own LMAX comments), consistent with the paper's own solution-SAXS
-# D_max for unliganded Sas20d1-2 (Table 4: D_max ≈ 190-203 Å depending on
-# method, itself an average/envelope over this same flexible ensemble).
-# Q_MAX_FIT * D_max ≈ 0.3 * 160.5 ≈ 48.
-const LMAX1 = 48
+# Model 1 is the intermediate-extent one of the three flexible-ensemble conformers described above (see
+# solution-conditions discussion); the paper's own solution-SAXS D_max for unliganded Sas20d1-2 (Table 4:
+# D_max ≈ 190-203 Å depending on method) is an average/envelope over this same flexible ensemble.
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
+# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
+# that diameter allows (see `rebin` there).
 
 result1, form_factor_log1, n_atoms1, (q_fit1, I_fit1, σ_fit1) =
-    run_sasdmz9_model(_PDB_PATH1, LMAX1)
+    run_sasdmz9_model(_PDB_PATH1)
 
 open(joinpath(@__DIR__, "res_model1.txt"), "w") do io
     BAYSOL.write_report(io, result1; form_factor_log = form_factor_log1, n_atoms = n_atoms1)
@@ -572,16 +565,10 @@ save(joinpath(@__DIR__, "res_model1_hist.png"), fig_hist1; px_per_unit = PX_PER_
 
 const _PDB_PATH2 = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1_model2.pdb")
 
-# Dmax estimated from SASDMZ9_fit1_model2.pdb:
-#
-# Dmax ≈ 227.7 Å
-# Q_MAX_FIT * Dmax ≈ 68
-#
-# No GNOM pddf is bundled for this case.
-const LMAX2 = 68
+# (lMax and the Shannon binning: see model 1.)
 
 result2, form_factor_log2, n_atoms2, (q_fit2, I_fit2, σ_fit2) =
-    run_sasdmz9_model(_PDB_PATH2, LMAX2)
+    run_sasdmz9_model(_PDB_PATH2)
 
 open(joinpath(@__DIR__, "res_model2.txt"), "w") do io
     BAYSOL.write_report(io, result2; form_factor_log = form_factor_log2, n_atoms = n_atoms2)
@@ -602,16 +589,10 @@ save(joinpath(@__DIR__, "res_model2_hist.png"), fig_hist2; px_per_unit = PX_PER_
 
 const _PDB_PATH3 = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1_model3.pdb")
 
-# model3 coordinate extent:
-#
-# Dmax ≈ 117.8 Å
-# Q_MAX_FIT * Dmax ≈ 35
-#
-# Therefore:
-const LMAX3 = 35
+# (lMax and the Shannon binning: see model 1.)
 
 result3, form_factor_log3, n_atoms3, (q_fit3, I_fit3, σ_fit3) =
-    run_sasdmz9_model(_PDB_PATH3, LMAX3)
+    run_sasdmz9_model(_PDB_PATH3)
 
 open(joinpath(@__DIR__, "res_model3.txt"), "w") do io
     BAYSOL.write_report(io, result3; form_factor_log = form_factor_log3, n_atoms = n_atoms3)
