@@ -203,6 +203,22 @@ end
         integ_check_physical_domain(samples)
     end
 
+    #------------------------------------------------------------------
+    #   Test 4: the MAP search's f-stop on a real structure
+    #------------------------------------------------------------------
+    @testset "MAP search on crambin: the f-stop finds the gradient-only mode with fewer evaluations" begin
+        fw = forward_cache(mol, INTEG_Q, INTEG_LMAX, INTEG_E; chunk = INTEG_CHUNK)
+        seed = seed_fitting(fw, integ_synth_data(fw)..., 7.0, 0.1, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
+        Random.seed!(3)
+        sp_f = BAYSOL.Fitting._sampling_space(seed, PROFILE())
+        Random.seed!(3)                                                  # the same starting points
+        sp_g = BAYSOL.Fitting._sampling_space(seed, PROFILE(); f_abstol = 0.0, successive_f_tol = 1)
+        nlp(sp, z) = BAYSOL.Fitting._neglogπ(z, sp.μ, sp.σ, seed, PROFILE(), BAYSOL.Fitting.EXCL_VOL_CORR_TOL)
+        @test abs(nlp(sp_f, sp_f.ẑ) - nlp(sp_g, sp_g.ẑ)) < 1e-4          # same optimum, to 1e-4 nats
+        @test sp_f.n_evals < sp_g.n_evals
+        @test sp_f.n_ok == sp_g.n_ok && abs(sp_f.n_modes - sp_g.n_modes) ≤ 1
+    end
+
     # Clean up this file's own store entries so a repeat run genuinely
     # re-exercises "fresh" PROPKA/pdb2pqr, rather than leaving state that
     # would make the freshness checks above silently pass on a stale cache

@@ -35,7 +35,7 @@ proc usage {file} {
 }
 
 namespace eval util {
-    namespace export git resolve slurp find_julia ids script_of tags_of single_run latest_release baseline_for rm_tree
+    namespace export git resolve slurp find_julia ids script_of tags_of specs_of single_run latest_release baseline_for rm_tree
 
     # Output of `git -C $ROOT ARGS`, decoded as UTF-8 (tag and path names can be non-ASCII).
     # A failing git raises an error.
@@ -144,6 +144,15 @@ namespace eval util {
         set tags {}
         foreach {m tag} [regexp -all -inline {tag = "([^"]+)"} $table] { lappend tags $tag }
         return $tags
+    }
+
+    # The `ID[:tag]` specs of the fitting tests $selected: one per tag, or the bare ID for a single-run script.
+    proc specs_of {selected} {
+        set out {}
+        foreach id $selected {
+            foreach tag [tags_of $id] { lappend out [expr {$tag eq "" ? $id : "$id:$tag"}] }
+        }
+        return $out
     }
 
     # The ids of all fitting tests, sorted.

@@ -175,7 +175,7 @@ end
         θ = SVector(-1.1, 0.2, 0.9, 0.4)
         ẑ = SVector(0.3, -0.2, 0.1, 0.5)
         S = @SMatrix [2.0 0.1 0.0 0.0; 0.0 0.5 0.2 0.0; 0.0 0.0 1.5 0.3; 0.1 0.0 0.0 0.7]
-        sp = FIT._SamplingSpace(μ, σ, ẑ, S, 1, 1, true)
+        sp = FIT._SamplingSpace(μ, σ, ẑ, S, 1, 1, true, 0)
         w = S \ (FIT._standardize(θ, pr) - ẑ)
         @test all(isapprox.(FIT._θ_of_w(w, sp), θ; rtol = 1e-12))
     end
@@ -257,6 +257,25 @@ end
         ξ₀ = Ξ(seed.θ₀, seed.pr)
         @test ξ₀[1] > 0 && seed.pr.δρ₃Prior.μ < ξ₀[4] < seed.pr.δρ₃Prior.μ + seed.pr.δρ₃Prior.σ
         @test_throws DomainError FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, -0.1, smpl_solutes())
+    end
+
+    @testset "MAP search: the f-stop does not stop short of the optimum" begin
+        fw = smpl_fw()
+        seed = FIT.seed_fitting(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        Random.seed!(11)
+        sp = FIT._sampling_space(seed, FIT.PROFILE())
+        f(z) = FIT._neglogπ(SVector{4}(z...), sp.μ, sp.σ, seed, FIT.PROFILE(), FIT.EXCL_VOL_CORR_TOL)
+        g!(G, z) = (G .= ForwardDiff.gradient(f, z); G)
+        # polish the reported mode with a gradient-only search 1000× tighter and 10× longer
+        res = FIT.optimize(FIT.OnceDifferentiable(f, g!, Vector(sp.ẑ)), Vector(sp.ẑ), FIT.LBFGS(),
+                           FIT.Options(g_abstol = 1e-9, iterations = 5000))
+        @test f(sp.ẑ) - FIT.Optim.minimum(res) < 1e-4          # nats left on the table by the f-stop
+        @test FIT.MAP_F_ABSTOL == 1e-6 && FIT.MAP_F_SUCCESSIVE == 3
+        # and it costs fewer evaluations than the gradient test alone, for the same optimum
+        Random.seed!(11)
+        sp_g = FIT._sampling_space(seed, FIT.PROFILE(); f_abstol = 0.0, successive_f_tol = 1)
+        @test sp.n_evals < sp_g.n_evals
+        @test abs(f(sp.ẑ) - f(sp_g.ẑ)) < 1e-4
     end
 
     @testset "run: δ must be a percentage strictly inside (0, 100)" begin

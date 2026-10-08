@@ -43,6 +43,9 @@ const TEST_GUIDES = [
     "Utilities"       => "test/utils/README.md",
     "Baselines"       => "test/baselines/README.md",
     "Fixtures"        => "test/fixtures/README.md",
+    "Validation"      => "test/validation/README.md",
+    "Shannon binning" => "test/validation/shannon_binning/README.md",
+    "MAP f-stop"      => "test/validation/map_fstop/README.md",
     "Fitting tests"   => "test/fitting_tests/README.md",
     "Visualizations"  => "test/visualize/README.md",
 ]

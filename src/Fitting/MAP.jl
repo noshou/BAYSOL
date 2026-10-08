@@ -37,6 +37,7 @@ the MAP search found. Immutable, built once per [`run_fitting`](@ref) call.
 - `n_modes::Int`: distinct optima among them (Mahalanobis distance > `MAP_MODE_SEP`
     under the MAP Hessian).
 - `whitened::Bool`: whether `S` comes from the Hessian (`false`: identity fallback).
+- `n_evals::Int`: objective evaluations (value and gradient) over all L-BFGS starts.
 """
 struct _SamplingSpace
     μ::SVector{4,Float64}
@@ -46,6 +47,7 @@ struct _SamplingSpace
     n_ok::Int
     n_modes::Int
     whitened::Bool
+    n_evals::Int
 end
 
 "θ = μ + σ·(ẑ + S·w): NUTS coordinates w to θ-space (see [`_SamplingSpace`](@ref))."
@@ -126,7 +128,8 @@ taken in two central-difference passes: step `MAP_HESS_STEP`, then
     z₀ and S the identity (plain prior standardization, as without this step). If the
     Hessian is non-finite, ẑ is kept and S is the identity.
 """
-function _sampling_space(seed::Seed, l::LIKELIHOOD)::_SamplingSpace
+function _sampling_space(seed::Seed, l::LIKELIHOOD;
+                         f_abstol::Real = MAP_F_ABSTOL, successive_f_tol::Int = MAP_F_SUCCESSIVE)::_SamplingSpace
     μ, σ = θ_prior_moments(seed.pr)
     f  = z -> _neglogπ(SVector{4}(z...), μ, σ, seed, l, EXCL_VOL_CORR_TOL)
     fg! = (G, z) -> begin
@@ -136,23 +139,26 @@ function _sampling_space(seed::Seed, l::LIKELIHOOD)::_SamplingSpace
         DiffResults.value(dr)
     end
     g! = (G, z) -> (fg!(G, z); G)
-    opts = Options(g_abstol = MAP_G_TOL, iterations = MAP_MAX_ITER)
+    opts = Options(g_abstol = MAP_G_TOL, f_abstol = f_abstol, successive_f_tol = successive_f_tol,
+                   iterations = MAP_MAX_ITER)
 
     z₀ = _standardize(seed.θ₀, seed.pr)
     starts = vcat([z₀], [_standardize(Θ(_ξ₀(seed.pr), seed.pr)[1], seed.pr) for _ in 2:MAP_N_STARTS])
     optima = Tuple{SVector{4,Float64},Float64}[]
+    n_evals = 0
     for zs in starts
         isfinite(f(Vector(zs))) || continue
         res = optimize(OnceDifferentiable(f, g!, fg!, Vector(zs)), Vector(zs), LBFGS(), opts)
+        n_evals += Optim.f_calls(res)
         v = Optim.minimum(res)
         isfinite(v) && push!(optima, (SVector{4}(minimizer(res)...), v))
     end
     I4 = one(SMatrix{4,4,Float64})
-    isempty(optima) && return _SamplingSpace(μ, σ, z₀, I4, 0, 0, false)
+    isempty(optima) && return _SamplingSpace(μ, σ, z₀, I4, 0, 0, false, n_evals)
 
     ẑ = optima[argmin(last.(optima))][1]
     H₁ = _fd_hessian(ẑ, MAP_HESS_STEP .* ones(SVector{4,Float64}), μ, σ, seed, l)
-    all(isfinite, H₁) || return _SamplingSpace(μ, σ, ẑ, I4, length(optima), 1, false)
+    all(isfinite, H₁) || return _SamplingSpace(μ, σ, ẑ, I4, length(optima), 1, false, n_evals)
     λ₁, V₁ = _floored_eigen(H₁)
     σ_lap = sqrt.(diag(V₁ * ((1 ./ λ₁) .* V₁')))   # Laplace σ per coordinate
     H = _fd_hessian(ẑ, MAP_HESS_REL_STEP .* σ_lap, μ, σ, seed, l)
@@ -166,5 +172,5 @@ function _sampling_space(seed::Seed, l::LIKELIHOOD)::_SamplingSpace
         any(m -> sqrt((z - m)' * Hf * (z - m)) ≤ MAP_MODE_SEP, modes) || push!(modes, z)
     end
     S = V .* (1 ./ sqrt.(λ))'    # V·diag(λ)^(-1/2): Sᵀ·H·S = I
-    return _SamplingSpace(μ, σ, ẑ, S, length(optima), length(modes), true)
+    return _SamplingSpace(μ, σ, ẑ, S, length(optima), length(modes), true, n_evals)
 end

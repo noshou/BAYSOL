@@ -153,6 +153,18 @@ L-BFGS start of the MAP search counts as converged.
 const MAP_G_TOL = 1e-6
 
 """
+Absolute decrease of −log π (nats) below which an L-BFGS start of the MAP search counts as
+stalled, once it has stayed below it for `MAP_F_SUCCESSIVE` successive iterations. The problem is
+conditioned ~1e6 in z-space, so the gradient test alone ([`MAP_G_TOL`](@ref)) keeps iterating long
+after f has stopped changing in the fourth digit; the f test ends such a start. 1e-5 stopped some
+starts too early (SASDMZ9 model 2 missed its best mode); 1e-6 lost none on 51 of the fitting tests.
+"""
+const MAP_F_ABSTOL = 1e-6
+
+"Successive iterations with a decrease below [`MAP_F_ABSTOL`](@ref) that end an L-BFGS start."
+const MAP_F_SUCCESSIVE = 3
+
+"""
 Central-difference step, in prior-standardized z-space, of the first Hessian pass at
 the MAP. The second pass rescales it per coordinate to `MAP_HESS_REL_STEP` times that
 coordinate's Laplace standard deviation from the first pass.

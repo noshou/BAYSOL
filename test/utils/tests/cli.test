@@ -59,16 +59,24 @@ test fittings-dry-run-approved {--approved is forwarded to the benchmark only wh
     list $s [string match "*bench.tcl --approved SASDMJ9*" $out]
 } -result {0 1}
 
-test fittings-shannon-plan {--shannon without --approved only prints its plan, and --no-fit skips the fits} -body {
-    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --no-fit --shannon --dry-run] s out
-    list $s [string match "*not running*" $out] [string match "*shannon_validation.jl*SASDMJ9*" $out] [regexp -all {=== fit:} $out] \
-         [regexp -all {\$ \S*julia} $out]
-} -result {0 1 1 0 0}
+test validate-list-and-unknown {the validations are listed with their question; an unknown name or fit stops with status 2} -body {
+    lassign [status_and [file join $RUN validate.tcl] --list] s1 out1
+    lassign [status_and [file join $RUN validate.tcl] nonsense] s2 out2
+    lassign [status_and [file join $RUN validate.tcl] map_fstop NOPE --approved --dry-run] s3 out3
+    list $s1 [string match "*shannon_binning*" $out1] [string match "*map_fstop*" $out1] $s2 [string match "*no validation 'nonsense'*" $out2] \
+         $s3 [string match "*no fitting test folder for: NOPE*" $out3]
+} -result {0 1 1 2 1 2 1}
 
-test fittings-shannon-approved {--shannon --approved runs (here: prints, with --dry-run) the validation command} -body {
-    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --no-fit --shannon --approved --dry-run] s out
-    list $s [string match "*not running*" $out] [regexp -all {\$ \S*julia\S* .*shannon_validation.jl --out \S*shannon-\S*\.tsv SASDMJ9} $out]
-} -result {0 0 1}
+test validate-plan-needs-approval {without --approved the plan is printed and nothing runs; with it the command is the script} -body {
+    lassign [status_and [file join $RUN validate.tcl] map_fstop SASDMJ9] s1 out1
+    lassign [status_and [file join $RUN validate.tcl] map_fstop SASDMJ9 --approved --dry-run] s2 out2
+    list $s1 [string match "*not running*" $out1] [regexp {^\$ } $out1] $s2 [regexp -all {map_fstop/validate.jl --out \S*map_fstop/results/map_fstop-\S*\.tsv SASDMJ9} $out2]
+} -result {0 1 0 0 1}
+
+test validate-bare-id-expands {a bare ID stands for every run of its script} -body {
+    lassign [status_and [file join $RUN validate.tcl] shannon_binning SASDEP6 --approved --dry-run] s out
+    list $s [string match "* SASDEP6:fit1_model1 SASDEP6:fit1_model2*" $out]
+} -result {0 1}
 
 test fittings-table {--table runs results_table.tcl --update on the whole table} -body {
     lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --no-fit --table --dry-run] s out

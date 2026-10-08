@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Does Shannon binning change the fit? For each fitting test, the MAP and the Laplace posterior width found
+# Does Shannon binning change the fit? (See README.md in this folder for the criteria and the decision.) For each fitting test, the MAP and the Laplace posterior width found
 # on the unbinned curve (`rebin = nothing`) are compared with those found on the curve binned to k bins per
 # Shannon channel, at the same band limit lMax. No sampling: only the MAP search and its Hessian.
 #
-#   tclsh test/run/fittings.tcl [ID ...] --no-fit --shannon --approved     # the entry point: prints its plan without --approved
+#   tclsh test/run/validate.tcl shannon_binning [ID ...] --approved     # the entry point: prints its plan without --approved
 #
 # which runs
 #
-#   julia --project=test/fitting_tests test/utils/shannon_validation.jl [--ks 8,12,16] [--out FILE.tsv] ID[:tag] ...
+#   julia --project=test/fitting_tests test/validation/shannon_binning/validate.jl [--ks 8,12,16] [--out FILE.tsv] ID[:tag] ...
 #
 # This tool is a per-fit SCREEN, not the verdict. Its first criteria (fixed 2026-10-08 before the first run) were:
 # in at least 95 % of the fits every MAP coordinate moves by at most 0.5 σ_full, every Laplace σ is within [0.95, 1.05]
@@ -29,7 +29,7 @@
 using Printf, Random, LinearAlgebra, Statistics
 using BAYSOL
 const Fit = BAYSOL.Fitting
-include(joinpath(@__DIR__, "fit_seed.jl"))
+include(joinpath(@__DIR__, "..", "..", "utils", "fit_seed.jl"))
 
 const MAP_SHIFT_MAX   = 0.5
 const SIGMA_RATIO     = (0.95, 1.05)

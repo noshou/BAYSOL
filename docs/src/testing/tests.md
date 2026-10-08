@@ -5,10 +5,11 @@ supports them.
 
 | directory | contents |
 |---|---|
-| [`run/`](run.md) | the entry points: `unittests.jl`, `fittings.tcl` (fitting tests, with optional benchmark, report and diagnostics), `vis.tcl` (visual checks), `tcltests.tcl` (tests of the Tcl tools) and `precommit.tcl` (every check to run before a commit) |
+| [`run/`](run.md) | the entry points: `unittests.jl`, `fittings.tcl` (fitting tests, with optional benchmark, report and diagnostics), `vis.tcl` (visual checks), `validate.tcl` (the validations), `tcltests.tcl` (tests of the Tcl tools) and `precommit.tcl` (every check to run before a commit) |
 | [`unit_tests/`](unit_tests.md) | the unit and integration suite: one `test_*.jl` per module in `units/`, and the setup they share (`testsetup.jl`) |
 | [`utils/`](utils.md) | the tools and shared helpers: result comparison, the Results-table generator, sampler diagnostics, the benchmark driver, the form-factor table builder, and the float-compare and geometry helpers the unit tests include, and the tests of those Tcl tools (`utils/tests/`) |
 | [`baselines/`](baselines.md) | the reference benchmark run of each release, which `compare.tcl --bench` compares a new run with (and an untracked `results/` for runs that are not baselines) |
+| [`validation/`](validation.md) | slow, suite-wide validations of one change against criteria fixed before the run (Shannon binning, the MAP f-stop), run by `run/validate.tcl`, each with its evidence |
 | [`fixtures/`](fixtures.md) | the data the tests read: real PDB/mmCIF structures, the sequence corpus, form-factor oracle values and the SASBDB entries |
 | [`fitting_tests/`](fitting_tests.md) | 27 end-to-end SASBDB fits (53 runs), each a script that doubles as a worked example, with the report and figures it wrote |
 | [`visualize/`](visualize.md) | optional visual checks for the geometry code (plotting; not part of the suite) and static `.xyz` snapshots |
