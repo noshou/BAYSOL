@@ -51,6 +51,10 @@ namespace eval report {
             d2      {^δρ₂\s+= @N@}
             d3      {^δρ₃\s+= @N@}
         } $text
+        # the Shannon-binned fit's χ² on the measured grid (reports since Shannon binning only), and the χ² every
+        # comparison uses: the measured-grid one when there is one, else the (unbinned) fit's own
+        dict set d chi2_raw [grab $text {^measured grid\s+lag-1.*χ²_red\s+@N@}]
+        dict set d chi2_cmp [dict get $d [expr {[dict get $d chi2_raw] ne "" ? "chi2_raw" : "chi2"}]]
         # timing section
         grab_all d {
             wall      {^wall clock.*\s@N@\s+100\.0}

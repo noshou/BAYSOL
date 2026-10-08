@@ -194,6 +194,22 @@ function run_model(
         if excl_vol_sat != 0
             @warn "excluded-volume correction c1 saturated at the $(excl_vol_sat > 0 ? "upper" : "lower") profiling bound" c1=fit.c1[max_idx]
         end
+        # are the residuals white, as the likelihood assumes; and, when the curve was binned, the fit's
+        # quality on the measured q grid, which is what a depositor's χ² refers to
+        if seed.shannon !== nothing
+            sh = seed.shannon
+            y_map = fit.curves[:, max_idx]
+            rs = Fitting.residual_structure((sh.I .- y_map) ./ sh.σ)
+            MAP_params["resid_lag1"]   = rs.lag1
+            MAP_params["resid_runs_z"] = rs.runs_z
+            if sh.rebin > 0
+                r_raw = (sh.I_raw .- Fitting.model_on_raw(sh, y_map)) ./ sh.σ_raw
+                rs_raw = Fitting.residual_structure(r_raw)
+                MAP_params["chisq_red_raw"]    = sum(abs2, r_raw) / (length(r_raw) - 2)
+                MAP_params["resid_lag1_raw"]   = rs_raw.lag1
+                MAP_params["resid_runs_z_raw"] = rs_raw.runs_z
+            end
+        end
         MAP_curve = hcat(seed.fw.qvals, fit.curves[:, max_idx])
         map =(MAP_params, MAP_curve)
 

@@ -43,7 +43,7 @@ test fittings-unknown-id {unknown folder: nothing runs, status 2, the available 
     list $s [string match "*no fitting test folder for: NOPE*" $out] [string match "*=== fit*" $out]
 } -result {2 1 0}
 
-test fittings-approved-needs-bench {--approved alone is an error} -body {
+test fittings-approved-needs-a-step {--approved alone is an error} -body {
     lindex [status_and [file join $RUN fittings.tcl] SASDMJ9 --approved --dry-run] 0
 } -result 2
 
@@ -57,6 +57,22 @@ test fittings-dry-run {--dry-run prints the fits, the benchmark (without --appro
 test fittings-dry-run-approved {--approved is forwarded to the benchmark only when given} -body {
     lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --bench --approved --dry-run] s out
     list $s [string match "*bench.tcl --approved SASDMJ9*" $out]
+} -result {0 1}
+
+test fittings-shannon-plan {--shannon without --approved only prints its plan, and --no-fit skips the fits} -body {
+    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --no-fit --shannon --dry-run] s out
+    list $s [string match "*not running*" $out] [string match "*shannon_validation.jl*SASDMJ9*" $out] [regexp -all {=== fit:} $out] \
+         [regexp -all {\$ \S*julia} $out]
+} -result {0 1 1 0 0}
+
+test fittings-shannon-approved {--shannon --approved runs (here: prints, with --dry-run) the validation command} -body {
+    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --no-fit --shannon --approved --dry-run] s out
+    list $s [string match "*not running*" $out] [regexp -all {\$ \S*julia\S* .*shannon_validation.jl --out \S*shannon-\S*\.tsv SASDMJ9} $out]
+} -result {0 0 1}
+
+test fittings-table {--table runs results_table.tcl --update on the whole table} -body {
+    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --no-fit --table --dry-run] s out
+    list $s [string match "*results_table.tcl --update*" $out]
 } -result {0 1}
 
 test vis-list-and-unknown {the visual checks are listed; an unknown one stops} -body {

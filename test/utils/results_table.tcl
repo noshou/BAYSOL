@@ -8,7 +8,8 @@
 #     tclsh test/utils/results_table.tcl --update       rewrite it in test/fitting_tests/README.md
 #     tclsh test/utils/results_table.tcl --check        exit 1 if the table in that README is not up to date
 #
-# One row per `test/fitting_tests/*/res*.txt`: the MAP χ², the MAP δρ₁, δρ₂, δρ₃, the profiled c1 and the
+# One row per `test/fitting_tests/*/res*.txt`: the MAP χ² (on the measured q grid, which for a Shannon-binned fit is the
+# line `measured grid` of the report's residual section, so it stays comparable with the depositor's), the MAP δρ₁, δρ₂, δρ₃, the profiled c1 and the
 # share of divergent transitions, all read from the report. The depositor's χ² column cannot be computed;
 # it comes from test/fitting_tests/depositor_chi2.tsv (one line per run). A run whose depositor text is
 # the same as the row above it (same entry) prints ″, as the members of one deposited multi-model fit do.
@@ -92,7 +93,7 @@ namespace eval results_table {
         set div [dict get $r div]
         set divtext [expr {$div == 0 ? "0" : "[format %.1f [expr {$div * 100}]] %"}]
         return [list $label \
-            [format %.3g [dict get $r chi2]] \
+            [format %.3g [dict get $r chi2_cmp]] \
             $depositor \
             [bold [minus [format %.2f $d1]] [at_bound $d1 $DRO_LOWER $DRO_UPPER $TOL_DRO12]] \
             [bold [minus [format %.2f $d2]] [at_bound $d2 $DRO_LOWER $DRO_UPPER $TOL_DRO12]] \

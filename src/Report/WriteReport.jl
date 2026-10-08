@@ -75,6 +75,16 @@ function write_report(
             @printf(io, "%-14s = %+.6g\n", _REPORT_LABELS[k], map_params[k])
         end
 
+        if haskey(map_params, "resid_lag1")
+            println(io)
+            println(io, "=== Residuals at the MAP (white residuals: lag-1 ≈ 0, runs z ≈ 0) ===")
+            @printf(io, "%-14s lag-1 %+.3f   runs z %+.2f\n", "fitted grid", map_params["resid_lag1"], map_params["resid_runs_z"])
+            if haskey(map_params, "chisq_red_raw")
+                @printf(io, "%-14s lag-1 %+.3f   runs z %+.2f   χ²_red %.4g\n", "measured grid",
+                        map_params["resid_lag1_raw"], map_params["resid_runs_z_raw"], map_params["chisq_red_raw"])
+            end
+        end
+
         println(io)
         println(io, "=== Quantiles ($quantile_label) ===")
         @printf(

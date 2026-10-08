@@ -67,29 +67,30 @@ const SOLUTES = Solute[
 
 const Q_MAX_FIT = 0.3
 
-# lMax follows the usual q·D_max multipole-resolution rule of thumb, lMax = ceil(Q_MAX_FIT * D_max), with D_max the
-# farthest atom pair of the model (convex-hull); for the existing scripts this rule reproduces their LMAX to within
-# 3% (ratio 0.97-1.02) at Q_MAX_FIT up to 0.5.
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
+# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
+# that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 # One run per atomic model with a deposited fit; `fit` is that model's reference curve (q scaled to Å⁻¹ by `fit_scale`; the fitted intensity is column `fit_col`; `rescale` = the file is normalized, scale it to the data).
 const RUNS = [
-    (tag = "fit1_model1", pdb = "SASDVG2_fit1_model1.pdb", fit = "SASDVG2_fit1.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS", lmax = 58),   # D_max ≈ 192 Å; deposited χ² = 2.103
-    (tag = "fit2_model1", pdb = "SASDVG2_fit2_model1.pdb", fit = "SASDVG2_fit2.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS", lmax = 52),   # D_max ≈ 173 Å; deposited χ² = 1.274
-    (tag = "fit2_model2", pdb = "SASDVG2_fit2_model2.pdb", fit = "SASDVG2_fit2.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS", lmax = 63),   # D_max ≈ 208 Å; deposited χ² = 1.274
-    (tag = "fit3_model1", pdb = "SASDVG2_fit3_model1.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS", lmax = 54),   # D_max ≈ 178 Å; deposited χ² = 1.294
-    (tag = "fit3_model2", pdb = "SASDVG2_fit3_model2.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS", lmax = 69),   # D_max ≈ 229 Å; deposited χ² = 1.294
-    (tag = "fit3_model3", pdb = "SASDVG2_fit3_model3.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS", lmax = 65),   # D_max ≈ 214 Å; deposited χ² = 1.294
+    (tag = "fit1_model1", pdb = "SASDVG2_fit1_model1.pdb", fit = "SASDVG2_fit1.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 192 Å; deposited χ² = 2.103
+    (tag = "fit2_model1", pdb = "SASDVG2_fit2_model1.pdb", fit = "SASDVG2_fit2.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 173 Å; deposited χ² = 1.274
+    (tag = "fit2_model2", pdb = "SASDVG2_fit2_model2.pdb", fit = "SASDVG2_fit2.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 208 Å; deposited χ² = 1.274
+    (tag = "fit3_model1", pdb = "SASDVG2_fit3_model1.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 178 Å; deposited χ² = 1.294
+    (tag = "fit3_model2", pdb = "SASDVG2_fit3_model2.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 229 Å; deposited χ² = 1.294
+    (tag = "fit3_model3", pdb = "SASDVG2_fit3_model3.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 214 Å; deposited χ² = 1.294
 ]
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT`, `I_exp > 0` and `σ_exp > 0`.
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
+with non-positive intensity.)
 """
 function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && I_exp[i] > 0 && σ_exp[i] > 0, eachindex(qvals))
+    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
@@ -101,10 +102,10 @@ function seed_sasdvg2(run; seed::Integer = SAMPLER_SEED)
 
     Random.seed!(seed)
     s = BAYSOL.seed_model(
-        LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), run.lmax, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
+        LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
-    return s, (q_fit, I_fit, σ_fit)
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
 function run_sasdvg2(run; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)

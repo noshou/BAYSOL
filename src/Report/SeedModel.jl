@@ -8,19 +8,23 @@ Computes a NUTS seed from given data input:
     1.  resolve mol_src to a structure
     2.  if add_hydrogens, run PROPKA on the model (its pKas drive Pdb2pqr's
         terminus protonation) and add hydrogens (Pdb2pqr, pH-driven)
-    3.  build the forward-model (gram matrix)
-    4.  produce a [`Fitting.Seed`](@ref).
+    3.  compute the accessible surface (the hydration-shell beads), take the diameter `D` of the
+        whole scatterer cloud (atoms and beads), bin the measured curve to the Shannon channels
+        that diameter allows ([`Fitting.shannon_data`](@ref)) and pick the band limit from it
+    4.  build the forward-model (gram matrix) on the binned q grid
+    5.  produce a [`Fitting.Seed`](@ref).
 
 # Arguments
 - `mol_src::MolecularStructure.StructureSource`: where to obtain the
     structure from ([`MolecularStructure.LocalPathSource`](@ref),
     [`MolecularStructure.PDBIDSource`](@ref), or
     [`MolecularStructure.URLSource`](@ref)).
-- `lMax::Int64`: spherical-harmonic band limit for the forward model.
 - `energy::Real`: beam energy in eV.
 - `qvals::AbstractVector`: momentum-transfer grid, Å⁻¹.
 - `I_exp::AbstractVector, σ_exp::AbstractVector`: measured intensity curve
-    and its per-point standard errors; must be the same length as qvals.
+    and its per-point standard errors; must be the same length as qvals. Pass the curve
+    as measured over the q range to be fitted: it is binned here, and the bins with
+    non-positive intensity are dropped here.
 - `pH::Real`: solution pH — drives [`Fitting.Protein`](@ref)/[`Fitting.DNA`](@ref)/[`Fitting.RNA`](@ref)
     solute titration and Pdb2pqr's hydrogen placement (when `add_hydrogens`=true).
 - `σ_pH::Real`: standard uncertainty on pH, propagated through solute titration.
@@ -28,6 +32,14 @@ Computes a NUTS seed from given data input:
     measured macromolecule** (see [`Fitting.Solute`](@ref)).
 
 # Keywords
+-   `rebin::Union{Nothing,Integer} = SHANNON_REBIN`: bins per Shannon channel `π/D` (the bin
+    width is `π/(rebin·D)`, `D` the diameter of the scatterer cloud); `nothing` fits the
+    unbinned curve. The data the fit used, the raw data and the choices made are in
+    `seed.shannon` ([`Fitting.ShannonInfo`](@ref)).
+-   `lMax::Union{Nothing,Integer} = nothing`: spherical-harmonic band limit for the forward model;
+    `nothing` takes `ceil(q_max·D)` ([`Fitting.auto_lmax`](@ref)), `q_max` the largest binned q.
+-   `drop_nonpositive::Bool = true`: drop the (binned) points whose intensity is not positive
+    ([`Fitting.shannon_data`](@ref)).
 -   `add_hydrogens::Bool=true`: whether to run PROPKA + Pdb2pqr at all.
     false skips both and the forward model runs on the structure exactly as
     given (heavy-atom-only, unless the file already carries hydrogens).
@@ -46,12 +58,12 @@ Computes a NUTS seed from given data input:
 -   `seed::Fitting.Seed`, ready to pass to [`run_model`](@ref)/[`Fitting.run_fitting`](@ref).
 
 # Exceptions
-- `DomainError`: qvals, `I_exp`, and `σ_exp` have mismatched lengths.
-- `ArgumentError`: `qvals/I_exp/σ_exp` are empty.
+- `DomainError`: qvals, `I_exp`, and `σ_exp` have mismatched lengths, or hold non-finite
+    values, or `σ_exp` is not positive, or `rebin < 1`.
+- `ArgumentError`: `qvals/I_exp/σ_exp` are empty, or no point has a positive intensity after binning.
 """
 function seed_model(
     mol_src::MolecularStructure.StructureSource,
-    lMax::Int64,
     energy::Real,
     qvals::AbstractVector,
     I_exp::AbstractVector,
@@ -59,6 +71,9 @@ function seed_model(
     pH::Real,
     σ_pH::Real,
     solutes::Vector{Fitting.Solute};
+    rebin::Union{Nothing,Integer} = SHANNON_REBIN,
+    lMax::Union{Nothing,Integer} = nothing,
+    drop_nonpositive::Bool = true,
     add_hydrogens::Bool=true,
     blm_chunk::Unsigned = B_LM_CHUNK,
     thickness::Real = SHELL_THICKNESS,
@@ -104,25 +119,43 @@ function seed_model(
         MolecularStructure.load_molecule(hpath)
     end
 
+    # the data the forward model is built for: the accessible surface is needed first, since the diameter
+    # of the whole scatterer cloud fixes the Shannon width and the band limit
+    shell = Timing.timed!(log, :static, 1, "SASA") do
+        SASA.sasa(mol; probe = probe, n_target = n_target)
+    end
+    info = Timing.timed!(log, :static, 1, "shannon (diameter, binning)") do
+        D = Fitting.cloud_diameter(hcat(MolecularStructure.coords_cartesian(mol), shell[1]))
+        Fitting.shannon_data(qvals, I_exp, σ_exp; D = D, rebin = rebin, lMax = lMax, drop_nonpositive = drop_nonpositive)
+    end
+    log.info["lMax"]          = info.lMax
+    log.info["n_q_raw"]       = length(info.q_raw)
+    log.info["rebin"]         = info.rebin
+    log.info["D"]             = info.D
+    log.info["n_channels"]    = info.n_channels
+    log.info["n_nonpositive"] = info.n_nonpositive
+    log.info["bin_bias"]      = Fitting.bin_bias_ratio(info)
+
     # calculate forward model
     fw = Timing.timed!(log, :static, 1, "forward_cache") do
         Scattering.forward_cache(
             mol,
-            qvals,
-            lMax,
+            info.q,
+            info.lMax,
             energy;
             chunk=blm_chunk,
             thickness=thickness,
             probe=probe,
             n_target=n_target,
+            shell=shell,
             stage_log=log,
         )
     end
 
     return Timing.timed!(log, :static, 1, "seed_fitting (priors, WLS)") do
         Fitting.seed_fitting(
-            fw, I_exp, σ_exp, pH, σ_pH, solutes;
-            t=t, κ_δρ₁₂=κ_δρ₁₂, κ_δρ₃=κ_δρ₃, timing=log,
+            fw, info.I, info.σ, pH, σ_pH, solutes;
+            t=t, κ_δρ₁₂=κ_δρ₁₂, κ_δρ₃=κ_δρ₃, timing=log, shannon=info,
         )
     end
 end
