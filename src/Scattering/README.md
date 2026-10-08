@@ -51,8 +51,8 @@ ForwardCache.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defi
 
 ## Module layout
 
-- **SphFuncs.jl** : sphHarm (complex `Y_l^m`) and Gautschi's continued-fraction method for `j_l`: `sphBessRatios!` (pass 1: ratios `r_l = j_l/j_{l-1}`, start orders and the closed-form anchors `j_0`, `j_1`), `sphBessStep` (one upward step of pass 2), and their `sphBess` buffers.
-- **PartialWave.jl** : `compute_B_lm` (the multipole moments themselves), plus `self_scatter`/`cross_scatter`/`partial_wave_weights` (the reductions to `S_ab(q)`).
+- **SphFuncs.jl** : `sphHarm!` (`Y_l^m` by the Legendre recurrence, written in place in the real [Re; −Im] layout of the `B_lm` product, with `sphHarmCache`) and Gautschi's continued-fraction method for `j_l`: `sphBessRatios!` (pass 1: ratios `r_l = j_l/j_{l-1}`, start orders and the closed-form anchors `j_0`, `j_1`), `sphBessStep` (one upward step of pass 2), and their `sphBess` buffers.
+- **PartialWave.jl** : `compute_B_lm` (the multipole moments themselves: atoms are processed in order of radius so each tile's negligible-Bessel cut is tight, `Y_lm` and the Bessel sweep run only up to a tile's last live degree and over the q columns that need them, and an amplitude shared by all scatterers is a `SharedAmplitude`, e.g. the hydration beads of one class), plus `self_scatter`/`cross_scatter`/`partial_wave_weights` (the reductions to `S_ab(q)`).
 - **FormFactor.jl** : X-ray atomic form factors f(q, E) from the bundled `form_factors.sqlite3` (`form_factor_table`, `form_factors`, `compute_form_factors`), consumed by the vacuum amplitude in Scatterers.jl.
 - **Scatterers.jl** : one builder per species (vacuum amplitude, excluded-volume dummies, and `hydration`, the last returning one `B_lm` per hydration-shell class), assembled by `species_multipoles`, which computes the vacuum and excluded-volume multipoles in one shared pass.
 - **ForwardCache.jl** : `gram` (the `S_ab` matrix G), `excluded_volume_factor` (the `c_1` correction), `mean_atomic_radius`, and the geometry-only `ForwardCache`. `forward_cache` returns a `ForwardCache(G, qvals, r_m, form_factor_log, n_atoms, lMax)`; `n_atoms` and `lMax` feed the report's `=== Run ===` section. Its `shell` keyword takes a precomputed `SASA.sasa` result (`seed_model` computes the accessible surface first, because the diameter of the whole scatterer cloud sets the band limit). Its `stage_log` keyword (a `Timing.StageLog`) times the vacuum, excluded-volume, hydration (SASA + `B_lm`) and Gram + `r_m` stages for the report's `=== Timing ===` section; `BAYSOL.seed_model` passes it automatically. The contraction I(q) = v(q)ᵀ G(q) v(q) lives in `Fitting.profiled_corrs`.
@@ -62,13 +62,13 @@ ForwardCache.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defi
 ### Spherical harmonics and Bessel functions (SphFuncs)
 
 ```julia
-using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, sphBessRatios!, sphBessStep
+using BAYSOL.Scattering.SphFuncs: sphHarm!, sphHarmCache, sphBess, sphBessRatios!, sphBessStep
 
-# Y_l^m for l = 0..lMax, m = 0..l, packed row = l*(l+1)÷2 + m + 1, one column per point
-y = sphHarm(2, [0.3, 1.1], [0.2, -1.0])          # (6, 2) ComplexF64
-
-# same, reading θ/φ straight off MolecularStructure.coords_spherical's layout
-y = sphHarm(2, angles)                            # angles :: (2, N), row 1 = θ, row 2 = φ
+# Y_l^m for l = 0..lMax, m = 0..l, by the Legendre recurrence, one column per point, written in place in the real layout
+# the B_lm product consumes: for degree l (k0 = l(l+1)÷2) rows 2k0+1..2k0+l+1 hold Re Y_l^m and the next l+1 rows −Im Y_l^m.
+# The workspace from sphHarmCache is reusable across calls; θ and φ may be views (e.g. rows of coords_spherical).
+A = Matrix{Float64}(undef, (2 + 1) * (2 + 2), 2)
+sphHarm!(A, sphHarmCache(2), 2, [0.3, 1.1], [0.2, -1.0])     # (12, 2)
 
 # j_l(q·r) for l = 0..lMax at one radius, every q: pass 1 fills the ratios and the
 # anchors j₀ (jm2), j₁ (jm1); pass 2 steps upward, each value already normalized

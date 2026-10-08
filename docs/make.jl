@@ -23,7 +23,7 @@ const DOC_MODULES = [
 
 # Documented modules that have no page of their own: they are covered by their parent's page.
 const DOC_SUBMODULES = [BAYSOL.Scattering.SphFuncs, BAYSOL.PhysicalConstants, BAYSOL.Cache, BAYSOL.Timing,
-                        BAYSOL.PlasticSequence, BAYSOL.Shannon]
+                        BAYSOL.GCPause, BAYSOL.PlasticSequence, BAYSOL.Shannon]
 
 # A module whose API reference spans several pages lists them here (title => page); every other
 # module has the single page `api/<lowercase name>.md`.

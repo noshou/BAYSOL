@@ -130,6 +130,18 @@ namespace eval bench {
             note [json::write string $note]]
     }
 
+    # The JSON object a child process printed: the last line that is a whole object (opens and closes with a curly
+    # brace). The child's stdout can carry other text before it (CondaPkg's "Transaction ... All requested packages
+    # already installed" when PROPKA first runs).
+    proc json_line {out} {
+        set found ""
+        foreach line [split $out "\n"] {
+            set t [string trim $line]
+            if {[string index $t 0] eq "\{" && [string index $t end] eq "\}"} { set found $t }
+        }
+        return $found
+    }
+
     # Runs a command and returns {wall-seconds stdout}. The command's stderr goes to ours, and the
     # environment variables in the dict $env are set for its duration only.
     proc timed {env args} {
@@ -205,7 +217,7 @@ Re-run with --approved once the run has been approved."
         set fits {}
         foreach spec $specs {
             lassign [timed $childenv $julia --project=$repo [file join $repo test utils child.jl] $repo $spec $samples $adapt] t_proc raw
-            set raw [string trim $raw]
+            set raw [json_line $raw]
             if {![string match "\{*\}" $raw] || $raw eq "\{\}"} { error "child.jl printed something other than a non-empty JSON object for $spec:\n$raw" }
             set r [json::json2dict $raw]            ;# parse check, and the numbers for the progress line
             # the parent measured the process wall time; add it to the child's object, then check the result parses

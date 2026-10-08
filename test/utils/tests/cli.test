@@ -78,6 +78,12 @@ test validate-bare-id-expands {a bare ID stands for every run of its script} -bo
     list $s [string match "* SASDEP6:fit1_model1 SASDEP6:fit1_model2*" $out]
 } -result {0 1}
 
+test fittings-trace-compile {--trace-compile FILE is passed to julia for the fits, and needs a value} -body {
+    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --trace-compile /tmp/x.jl --dry-run] s out
+    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --trace-compile] s2 out2
+    list $s [string match "*--trace-compile=/tmp/x.jl*SASDMJ9.jl*" $out] $s2 [string match "*needs a value*" $out2]
+} -result {0 1 2 1}
+
 test fittings-table {--table runs results_table.tcl --update on the whole table} -body {
     lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --no-fit --table --dry-run] s out
     list $s [string match "*results_table.tcl --update*" $out]

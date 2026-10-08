@@ -5,7 +5,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using Aqua, JET, ExplicitImports
 using BAYSOL.Scattering: SphFuncs
-using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, sphBessRatios!, sphBessStep
+using BAYSOL.Scattering.SphFuncs: sphBess, sphBessRatios!, sphBessStep
 using BAYSOL.MolecularStructure: MolecularStructure, create, coords_cartesian, coords_spherical, radii, vols, r_max,
                 neighbour_tree, elms, name, Molecule
 using BAYSOL.MolecularStructure: Ion, resolve_one, lookup_radii, tryparse_ion, ion_key, nearest_ion

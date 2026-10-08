@@ -18,6 +18,7 @@ using .Utils:               Utils
 using .Utils.PhysicalConstants: PhysicalConstants
 using .Utils.Cache:         Cache
 using .Utils.Timing:        Timing
+using .Utils.GCPause:       GCPause
 using .Utils.PlasticSequence: PlasticSequence
 using .Utils.Shannon:       Shannon
 
@@ -38,5 +39,7 @@ using .Report:              Report, seed_model, run_model, write_report
 # The pipeline entry points, reached qualified (`BAYSOL.seed_model`), not exported. Their
 # result types live in Report (`BAYSOL.Report.MAPParams`, …).
 public seed_model, run_model, write_report
+
+include("Precompile.jl")
 
 end # module

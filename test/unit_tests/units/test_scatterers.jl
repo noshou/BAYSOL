@@ -36,7 +36,7 @@
 # numerical correctness is test_molecules.jl's job.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using   BAYSOL.Scattering: _gaussian_dummy, hydration, SHELL_THICKNESS, PROBE_RADIUS,
+using   BAYSOL.Scattering: _gaussian_dummy, _gaussian_dummy_shared, hydration, SHELL_THICKNESS, PROBE_RADIUS,
         compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
 using BAYSOL.PhysicalConstants: DRO_UNIT
 using   BAYSOL.MolecularStructure: create, coords_cartesian, coords_spherical, to_spherical,
@@ -413,6 +413,15 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
             got = _gaussian_dummy(v, SCAT_Q)
             ref = scat_dummy_amp(es, SCAT_Q)
             @test all(i -> check_float(got[i], ref[i]), eachindex(ref))
+        end
+    end
+
+    @testset "_gaussian_dummy_shared: the equal-volume rows of _gaussian_dummy as one vector" begin
+        q = [0.0, 0.1, 0.35, 0.8]
+        for v in (3.7, 25.0)
+            sh = _gaussian_dummy_shared(v, 6, q)
+            @test size(sh) == (6, 4)
+            @test all(sh[i, :] ≈ _gaussian_dummy(fill(v, 6), q)[i, :] for i in 1:6)
         end
     end
 

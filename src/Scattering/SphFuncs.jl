@@ -1,99 +1,118 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"Complex spherical harmonics and Gautschi's continued-fraction method for spherical Bessel functions."
+"Spherical harmonics (by recurrence) and Gautschi's continued-fraction method for spherical Bessel functions."
 module SphFuncs
 
-using SphericalHarmonics: SphericalHarmonics
 using ..Scattering: GAUTSCHI_MARGIN
 
-export sphHarm, SphHarmError
+export sphHarm!, sphHarmCache, SphHarmCache, SphHarmError
 
-"Exception thrown by [`sphHarm`](@ref) when its arguments are invalid."
+"Exception thrown by [`sphHarm!`](@ref) when its arguments are invalid."
 struct SphHarmError <: Exception; msg::String end
 Base.showerror(io::IO, e::SphHarmError) = print(io, "SphHarmError: ", e.msg)
 
 """
-Compute the complex spherical harmonics `Yₗᵐ(θ, φ)` for all degrees
-`0 ≤ l ≤ lMax` and orders `0 ≤ m ≤ l`.
-
-The harmonics are packed into a single row index
-
-    i(l, m) = l(l + 1) ÷ 2 + m + 1
-
-so that each column corresponds to one input point and each row to one
-`(l, m)` pair.
-
-Only non-negative orders `m` are returned. The normalization, phase convention,
-and harmonic values are those provided by `SphericalHarmonics.jl`.
-
-# Arguments
-- `lMax`: maximum degree, must satisfy `lMax ≥ 0`.
-- `θ`: one-dimensional array of polar angles, in radians.
-- `φ`: one-dimensional array of azimuthal angles, in radians. Must have the
-  same length as `θ`.
-
-# Returns
-A `Matrix{ComplexF64}` of size
-`((lMax + 1)(lMax + 2) ÷ 2, length(θ))`. Entry
-`[l(l + 1) ÷ 2 + m + 1, i]` is `Yₗᵐ(θ[i], φ[i])`.
-
-# Throws
-- `SphHarmError`: if `lMax < 0`, either angle array is not one-dimensional,
-  either array is empty, or the two arrays have different lengths.
+Workspace of [`sphHarm!`](@ref) for degrees up to `lMax`: the recurrence coefficients (they depend only on `(l, m)`,
+so they are built once) and scratch vectors. Build it once with [`sphHarmCache`](@ref) and reuse it; it is mutable
+state, so one task at a time.
 """
-function sphHarm(lMax::Int, θ::AbstractArray{<:Real}, φ::AbstractArray{<:Real})::Matrix{ComplexF64}
-    lMax < 0 && throw(SphHarmError("lMax must be ≥ 0"))
-    (ndims(θ) == 1 && ndims(φ) == 1) || throw(SphHarmError("theta/phi must be 1-D"))
-    (isempty(θ) || isempty(φ)) && throw(SphHarmError("theta/phi must be non-empty"))
-    length(θ) == length(φ) || throw(SphHarmError("theta/phi length mismatch"))
-
-    npts = length(θ)
-    y = Matrix{ComplexF64}(undef, (lMax + 1) * (lMax + 2) ÷ 2, npts)
-    S = SphericalHarmonics.cache(Int(lMax))
-    θv, φv = vec(θ), vec(φ)
-
-    # Each point is independent, but S is shared mutable workspace.
-    @inbounds for i in 1:npts
-        θi = Float64(θv[i])
-        SphericalHarmonics.computePlmcostheta!(S, θi, lMax)
-        Yi = SphericalHarmonics.computeYlm!(S, θi, Float64(φv[i]), lMax)
-        for l in 0:lMax, m in 0:l
-            y[l * (l + 1) ÷ 2 + m + 1, i] = Yi[(l, m)]
-        end
-    end
-    return y
+struct SphHarmCache
+    lMax::Int
+    a::Vector{Float64}       # a(l, m) = √((4l² − 1)/(l² − m²)), at the packed index of (l, m), l ≥ m + 2
+    b::Vector{Float64}       # b(l, m) = √(((l − 1)² − m²)/(4(l − 1)² − 1))
+    p0::Vector{Float64}      # P̄_l^m (m = 0..l) for the degree being computed, and the two before it
+    p1::Vector{Float64}
+    p2::Vector{Float64}
+    cr::Vector{Float64}      # cos(mφ), sin(mφ), m = 0..lMax
+    ci::Vector{Float64}
 end
 
 """
-Compute complex spherical harmonics from angles stored in a `(2, N)` matrix.
-
-The first row contains the polar angles `θ` and the second row contains the
-azimuthal angles `φ`. Each column therefore represents one angular point.
-
-This method is equivalent to
-
-    sphHarm(lMax, view(angles, 1, :), view(angles, 2, :))
-
-and uses the same harmonic convention and packed `(l, m)` indexing as the
-one-dimensional-array method.
-
-# Arguments
-- `lMax`: maximum degree, must satisfy `lMax ≥ 0`.
-- `angles`: real `(2, N)` matrix whose first row contains `θ` and second row
-  contains `φ`.
-
-# Returns
-A `Matrix{ComplexF64}` of size
-`((lMax + 1)(lMax + 2) ÷ 2, N)`, with one column per input point.
+The workspace [`sphHarm!`](@ref) needs for degrees up to `lMax ≥ 0`; build it once and reuse it across calls.
 
 # Throws
-- `SphHarmError`: if `angles` does not have exactly two rows, or if the
-  underlying [`sphHarm`](@ref) call rejects the angle data.
+- `SphHarmError`: `lMax < 0`.
 """
-function sphHarm(lMax::Int, angles::AbstractMatrix{<:Real})::Matrix{ComplexF64}
-    size(angles, 1) == 2 ||
-        throw(SphHarmError("angles matrix must have 2 rows (θ, φ); got $(size(angles, 1))"))
-    return sphHarm(lMax, view(angles, 1, :), view(angles, 2, :))
+function sphHarmCache(lMax::Int)
+    lMax ≥ 0 || throw(SphHarmError("lMax must be ≥ 0"))
+    K = (lMax + 1) * (lMax + 2) ÷ 2
+    a = zeros(K); b = zeros(K)
+    for l in 2:lMax, m in 0:(l - 2)
+        i = l * (l + 1) ÷ 2 + m + 1
+        a[i] = sqrt((4l^2 - 1) / (l^2 - m^2))
+        b[i] = sqrt(((l - 1)^2 - m^2) / (4 * (l - 1)^2 - 1))
+    end
+    return SphHarmCache(lMax, a, b, zeros(lMax + 1), zeros(lMax + 1), zeros(lMax + 1), zeros(lMax + 1), zeros(lMax + 1))
+end
+
+"""
+Compute the complex spherical harmonics `Yₗᵐ(θ, φ) = P̄ₗᵐ(cos θ) e^{imφ}` for all degrees `0 ≤ l ≤ lMax` and orders
+`0 ≤ m ≤ l` (orthonormal, Condon–Shortley phase; the orders `m < 0` follow from `Yₗ₋ₘ = (−1)ᵐ conj(Yₗᵐ)` and are not
+stored), into a preallocated matrix, with no allocation per call.
+
+`P̄ₗᵐ` comes from the standard recurrences: the diagonal `P̄ₗˡ = −√((2l+1)/2l) sin θ P̄ₗ₋₁ˡ⁻¹` from `P̄₀⁰ = 1/√(4π)`, the
+sub-diagonal `P̄ₗˡ⁻¹ = √(2l+1) cos θ P̄ₗ₋₁ˡ⁻¹`, and `P̄ₗᵐ = aₗₘ (cos θ P̄ₗ₋₁ᵐ − bₗₘ P̄ₗ₋₂ᵐ)` above; `e^{imφ}` comes from a
+sine/cosine table. The inner loop over `m` is vectorized.
+
+The output is the real layout the multipole product in [`compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm) consumes: for degree `l`, with
+`k0 = l(l + 1) ÷ 2`, rows `2k0 + 1 … 2k0 + l + 1` hold `Re Yₗᵐ` for `m = 0..l` and rows `2k0 + l + 2 … 2k0 + 2l + 2` hold
+`−Im Yₗᵐ`; the rows of degree `l` are `2k0 + 1 … 2k0 + 2(l + 1)`.
+
+# Arguments
+- `A::AbstractMatrix{Float64}`: output with `size(A, 1) ≥ (lMax + 1)(lMax + 2)` rows and one column per point; may be a view.
+- `S::SphHarmCache`: from [`sphHarmCache`](@ref)`(lMax′)` with `lMax′ ≥ lMax`.
+- `lMax::Int`: maximum degree, `lMax ≥ 0`.
+- `θ`, `φ`: one-dimensional arrays (or views) of polar angles in `[0, π]` and azimuthal angles, in radians, of equal,
+    non-zero length.
+
+# Returns
+- `A`.
+
+# Throws
+- `SphHarmError`: if `lMax < 0` or exceeds the cache's, either angle array is not one-dimensional, either is empty, the two
+    have different lengths, or `A` has the wrong size.
+"""
+function sphHarm!(A::AbstractMatrix{Float64}, S::SphHarmCache, lMax::Int, θ::AbstractArray{<:Real}, φ::AbstractArray{<:Real})
+    lMax < 0 && throw(SphHarmError("lMax must be ≥ 0"))
+    lMax ≤ S.lMax || throw(SphHarmError("lMax = $lMax exceeds the workspace's $(S.lMax)"))
+    (ndims(θ) == 1 && ndims(φ) == 1) || throw(SphHarmError("theta/phi must be 1-D"))
+    (isempty(θ) || isempty(φ)) && throw(SphHarmError("theta/phi must be non-empty"))
+    length(θ) == length(φ) || throw(SphHarmError("theta/phi length mismatch"))
+    (size(A, 1) ≥ (lMax + 1) * (lMax + 2) && size(A, 2) == length(θ)) ||
+        throw(SphHarmError("A must have ≥ $((lMax + 1) * (lMax + 2)) rows and $(length(θ)) columns, got $(size(A))"))
+    p0, p1, p2, cr, ci, a, b = S.p0, S.p1, S.p2, S.cr, S.ci, S.a, S.b
+    P00 = 1 / sqrt(4π)
+    @inbounds for t in eachindex(θ)
+        i = t - firstindex(θ) + 1
+        x = cos(Float64(θ[t])); sn = sin(Float64(θ[t]))
+        sφ, cφ = sincos(Float64(φ[t]))
+        cr[1] = 1.0; ci[1] = 0.0                       # index m + 1
+        for m in 1:lMax
+            cr[m + 1] = cr[m] * cφ - ci[m] * sφ
+            ci[m + 1] = cr[m] * sφ + ci[m] * cφ
+        end
+        # degree 0
+        pa, pb, pc = p0, p1, p2                        # current, previous, one before
+        pa[1] = P00
+        A[1, i] = P00; A[2, i] = -0.0
+        for l in 1:lMax
+            pa, pb, pc = pc, pa, pb                    # rotate: pb holds degree l − 1, pc degree l − 2
+            k0 = l * (l + 1) ÷ 2
+            pa[l + 1] = -sqrt((2l + 1) / (2l)) * sn * pb[l]          # m = l
+            pa[l]     = sqrt(2l + 1) * x * pb[l]                       # m = l − 1
+            @fastmath @simd for m in 1:(l - 1)                         # m = 0 .. l − 2, shifted by one
+                ia = k0 + m
+                pa[m] = a[ia] * (x * pb[m] - b[ia] * pc[m])
+            end
+            r0 = 2k0
+            @fastmath @simd for m in 1:(l + 1)
+                pv = pa[m]
+                A[r0 + m, i] = pv * cr[m]
+                A[r0 + l + 1 + m, i] = -(pv * ci[m])
+            end
+        end
+    end
+    return A
 end
 
 """
@@ -108,17 +127,17 @@ the subsequent upward sweep, avoiding allocation for each radius.
 - `x`: `x[k] = q[k] * r` for the current radius.
 - `invx`: `1 / x[k]`, with `0.0` substituted when `x[k] == 0`.
 - `lup`: `floor(Int, x[k])`, the largest order for which the upward recurrence
-  is used.
+    is used.
 - `N`: starting order of the downward continued-fraction recurrence. A value
-  of `-1` indicates that `floor(x[k]) ≥ lMax` and no ratios are required.
+    of `-1` indicates that `floor(x[k]) ≥ lMax` and no ratios are required.
 - `rp`: scratch storage for the current continued-fraction ratio during the
-  downward sweep.
+    downward sweep.
 - `jm1`: current `jₗ₋₁(x[k])` value for the upward sweep. After
-  [`sphBessRatios!`](@ref), it contains `j₁(x[k])`.
+    [`sphBessRatios!`](@ref), it contains `j₁(x[k])`.
 - `jm2`: current `jₗ₋₂(x[k])` value for the upward sweep. After
-  [`sphBessRatios!`](@ref), it contains `j₀(x[k])`.
+    [`sphBessRatios!`](@ref), it contains `j₀(x[k])`.
 - `R`: ratio table with `R[k, l] = jₗ(x[k]) / jₗ₋₁(x[k])` for the orders
-  required by the sweep. The first dimension is contiguous in `q`.
+    required by the sweep. The first dimension is contiguous in `q`.
 """
 struct sphBess
     x::Vector{Float64}
@@ -237,12 +256,14 @@ instead obtained from `j₀ r₁`. At `x = 0`, the limiting values are used:
 `j₀(0) = 1` and `jₗ(0) = 0` for `l > 0`.
 
 For a q value with `floor(x) ≥ lMax`, every required order lies within the
-stable upward-recurrence region, so no continued-fraction ratios are needed
-and its `N` value is set to `-1`.
+stable upward-recurrence region and no ratio is ever read for it (it only drops out of the sweep window below).
 
-The downward ratio sweep is performed simultaneously for all q values. Each q
-has an independent recurrence, allowing the inner loop to be vectorized. A q
-value remains at zero until the sweep reaches its own starting order `N`.
+The downward ratio sweep is performed simultaneously for the q values that need it. Each q has an independent
+recurrence, allowing the inner loop to be vectorized. At order `l` only the q values with `l ≤ N[k]` (the sweep has
+started) and `l > floor(x[k])` (a ratio is needed) are swept; for q ascending that is a contiguous window of k,
+so the work is the number of (q, order) pairs that need a ratio, not `nq` times the highest start order.
+The optional `ltop` gives the highest order wanted at each q (default `lMax` everywhere), which lowers the start
+order of q values whose high orders are negligible and unused.
 
 Gautschi's method is described in:
 
@@ -259,17 +280,23 @@ non-negative; q-grid validation is intentionally performed by the caller
 rather than for every radius.
 - `lMax`: maximum spherical-Bessel order, with `lMax ≥ 0`.
 
+# Keywords
+- `ltop::Union{Nothing,AbstractVector{Int}} = nothing`: the highest order wanted at each q (`≤ lMax`), nondecreasing for
+    a sorted q grid; `nothing` means `lMax` for every q. The ratios of orders above `ltop[k]` at `q[k]` are not valid.
+
 # Returns
 `nothing`. The workspace is updated in place. For the first `length(q)` q
-values, the routine fills `x`, `invx`, `lup`, `N`, the required columns of
-`R`, and the initial recurrence values `jm1 = j₁` and `jm2 = j₀`.
+values, the routine fills `x`, `invx`, `lup`, `N` (the start order of each q's
+downward sweep), the needed entries of `R`, and the initial recurrence values `jm1 = j₁` and `jm2 = j₀`.
 
 # Throws
 - `ArgumentError`: if the workspace does not have enough q entries or ratio
 columns for the requested computation.
 - `DomainError`: if `r < 0` or `lMax < 0`.
 """
-function sphBessRatios!(b::sphBess, r::Float64, q::Vector{Float64}, lMax::Int)::Nothing
+function sphBessRatios!(
+    b::sphBess, r::Float64, q::Vector{Float64}, lMax::Int; ltop::Union{Nothing,AbstractVector{Int}} = nothing,
+)::Nothing
     nq = length(q)
     length(b.x) ≥ nq || throw(
             ArgumentError(
@@ -283,31 +310,29 @@ function sphBessRatios!(b::sphBess, r::Float64, q::Vector{Float64}, lMax::Int)::
         )
     r ≥ 0 || throw(DomainError(r, "sphBessRatios!: r must be ≥ 0"))
     lMax ≥ 0 || throw(DomainError(lMax, "sphBessRatios!: lMax must be ≥ 0"))
-    
+    ltop === nothing || length(ltop) ≥ nq ||
+        throw(ArgumentError("sphBessRatios!: ltop has $(length(ltop)) entries, need $nq"))
+
     x    = b.x
     invx = b.invx
     lup  = b.lup
     N    = b.N
     rp   = b.rp
     jm1  = b.jm1
-    jm2  = b.jm2    
+    jm2  = b.jm2
     R    = b.R
 
     d0, d1 = GAUTSCHI_MARGIN
-    Nmax = 0
 
-    # Independent per-q work is SIMD-vectorized; 
-    # Nmax is reduced separately to avoid a loop-carried dependency.
-    @inbounds @simd for k in 1:nq
+    # Start order of each q's downward sweep: above the highest order wanted at that q (`ltop[k]`, or `lMax`) and
+    # above x, plus the convergence margin. Independent per-q work, SIMD-vectorized.
+    @inbounds for k in 1:nq
         xk = q[k] * r
         x[k] = xk
         lup[k] = floor(Int, xk)
-        N[k] = lup[k] ≥ lMax ? -1 :
-            max(lMax, ceil(Int, xk)) + d0 + ceil(Int, d1 * cbrt(xk))
+        top = ltop === nothing ? lMax : ltop[k]
+        N[k] = max(top, ceil(Int, xk)) + d0 + ceil(Int, d1 * cbrt(xk))
     end
-
-    # Separate reduction keeps the per-q loop SIMD-friendly and avoids a second temporary allocation.
-    Nmax = maximum(@view N[1:nq])
 
     # anchors jm2 = j₀, jm1 = j₁ in closed form (j₁ is replaced below for x < 1).
     # 1/x is set to 0 at x = 0, so j₀(0) = 1 by the select and j₁(0) = (0 − 1)·0 = 0,
@@ -323,26 +348,28 @@ function sphBessRatios!(b::sphBess, r::Float64, q::Vector{Float64}, lMax::Int)::
         rp[k] = 0.0
     end
 
-    # Downward sweep above lMax does not store ratios; splitting the ranges removes
-    # the outer branch from the hot SIMD loops.
-    if Nmax > lMax
-        for l in Nmax:-1:(lMax + 1)
-            two_l_plus_one = 2l + 1
-            @inbounds @simd for k in 1:nq
-                rp[k] = ifelse(l > N[k], 0.0,
-                    x[k] / (two_l_plus_one - x[k] * rp[k]))
-            end
+    # The sweep needs, at order l, only the q values that have started (l ≤ N[k]) and still need a ratio there
+    # (l > ⌊x⌋, below which the upward recurrence is used). For q ascending, N and ⌊x⌋ are nondecreasing in k, so
+    # those q form a contiguous window [lo, hi] that moves as l decreases; otherwise every q is swept at every l.
+    mono = issorted(view(N, 1:nq)) && issorted(view(lup, 1:nq))
+    Nmax = nq == 0 ? 0 : (mono ? N[nq] : maximum(view(N, 1:nq)))
+    lo = nq + 1; hi = nq
+    for l in Nmax:-1:1
+        if mono
+            while lo > 1 && N[lo - 1] ≥ l; lo -= 1; end
+            while hi ≥ 1 && lup[hi] ≥ l; hi -= 1; end
+        else
+            lo = 1; hi = nq
         end
-    end
-
-    # The ratio table is stored with q as the first dimension so the SIMD loop
-    # accesses contiguous memory in R[k, l].
-    if lMax ≥ 1
-        for l in min(Nmax, lMax):-1:1
-            two_l_plus_one = 2l + 1
-            @inbounds @simd for k in 1:nq
-                v = ifelse(l > N[k], 0.0,
-                    x[k] / (two_l_plus_one - x[k] * rp[k]))
+        lo > hi && continue
+        two_l_plus_one = 2l + 1
+        if l > lMax          # above the requested orders only the continued fraction is advanced
+            @inbounds @fastmath @simd for k in lo:hi
+                rp[k] = ifelse(l > N[k], 0.0, x[k] / (two_l_plus_one - x[k] * rp[k]))
+            end
+        else                 # the ratio table is stored with q as the first dimension: contiguous R[k, l]
+            @inbounds @fastmath @simd for k in lo:hi
+                v = ifelse(l > N[k], 0.0, x[k] / (two_l_plus_one - x[k] * rp[k]))
                 rp[k] = v
                 R[k, l] = v
             end

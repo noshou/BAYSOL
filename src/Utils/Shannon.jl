@@ -10,6 +10,9 @@ supplies `D`; [`model_on_raw`](@ref) and [`residual_structure`](@ref) check the 
 module Shannon
 
 using Quickhull: Quickhull
+using StatsBase: autocor
+using HypothesisTests: WaldWolfowitzTest
+using Dierckx: Spline1D
 
 export ShannonInfo, SHANNON_REBIN, cloud_diameter, auto_lmax, shannon_data, bin_bias_ratio, model_on_raw, residual_structure
 
@@ -218,11 +221,11 @@ function bin_bias_ratio(info::ShannonInfo)::Float64
 end
 
 """
-A model curve given on the fitted (binned) grid, interpolated onto the measured grid by local cubic
-(4-point Lagrange) interpolation in q; linear interpolation when the fitted grid has fewer than four
-points, and the end intervals extrapolate from the nearest four nodes. Cubics are reproduced exactly. On
-crambin's forward model the worst error is 0.001 σ for 1 % data at the default `rebin` (0.06 σ at
-`rebin = 4`), where linear interpolation reaches 0.25 σ (1.8 σ).
+A model curve given on the fitted (binned) grid, interpolated onto the measured grid by an interpolating cubic
+spline in q (FITPACK through Dierckx.jl: not-a-knot ends, non-uniform knots, linear extrapolation beyond the end bins;
+a lower degree when the fitted grid has fewer than four points). Cubics are reproduced exactly. On crambin's forward
+model the worst error is 0.001 σ for 1 % data at the default `rebin` (0.06 σ at `rebin = 4`), where linear
+interpolation reaches 0.25 σ (1.8 σ); a natural spline (zero curvature at the ends) was tried and is 200× worse there.
 
 # Arguments
 - `info::ShannonInfo`.
@@ -237,29 +240,9 @@ crambin's forward model the worst error is 0.001 σ for 1 % data at the default 
 """
 function model_on_raw(info::ShannonInfo, y::AbstractVector{<:Real})::Vector{Float64}
     length(y) == length(info.q) || throw(DimensionMismatch("model has $(length(y)) points, the fitted grid $(length(info.q))"))
-    n = length(info.q)
-    n ≥ 2 || throw(ArgumentError("model_on_raw: need at least two fitted points"))
-    xs = info.q
-    out = Vector{Float64}(undef, length(info.q_raw))
-    @inbounds for (i, x) in enumerate(info.q_raw)
-        j = clamp(searchsortedlast(xs, x), 1, n - 1)         # x lies in [xs[j], xs[j+1]] (or beyond an end)
-        if n < 4
-            t = (x - xs[j]) / (xs[j+1] - xs[j])
-            out[i] = (1 - t) * y[j] + t * y[j+1]
-        else
-            lo = clamp(j - 1, 1, n - 3)                        # the four nodes lo:lo+3 around the interval
-            acc = 0.0
-            for a in lo:lo+3
-                w = 1.0
-                for b in lo:lo+3
-                    b == a || (w *= (x - xs[b]) / (xs[a] - xs[b]))
-                end
-                acc += w * y[a]
-            end
-            out[i] = acc
-        end
-    end
-    return out
+    length(info.q) ≥ 2 || throw(ArgumentError("model_on_raw: need at least two fitted points"))
+    k = min(3, length(info.q) - 1)                      # cubic where the grid allows it
+    return Spline1D(info.q, Float64.(y); k = k, bc = "extrapolate")(info.q_raw)
 end
 
 """
@@ -272,21 +255,9 @@ A named tuple:
     when residuals come in long same-sign runs (`NaN` if all residuals have one sign).
 """
 function residual_structure(r::AbstractVector{<:Real})
-    n = length(r)
-    n ≥ 3 || throw(ArgumentError("residual_structure: need at least 3 residuals"))
-    ss = sum(abs2, r)
-    lag1 = ss > 0 ? sum(r[i] * r[i+1] for i in 1:n-1) / ss : 0.0
-    pos = r .> 0
-    np = count(pos); nn = n - np
-    runs = 1 + count(i -> pos[i] != pos[i+1], 1:n-1)
-    z = if np == 0 || nn == 0
-        NaN
-    else
-        μ = 2np * nn / n + 1
-        v = (μ - 1) * (μ - 2) / (n - 1)
-        v > 0 ? (runs - μ) / sqrt(v) : NaN
-    end
-    return (; lag1, runs_z = z)
+    length(r) ≥ 3 || throw(ArgumentError("residual_structure: need at least 3 residuals"))
+    lag1 = all(iszero, r) ? 0.0 : autocor(r, [1]; demean = false)[1]    # Σ rᵢrᵢ₊₁ / Σ rᵢ²
+    return (; lag1, runs_z = WaldWolfowitzTest(r .> 0).z)               # runs of the residual signs
 end
 
 end # module

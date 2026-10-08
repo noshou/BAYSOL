@@ -32,9 +32,19 @@ function _gaussian_dummy(
     vols::AbstractVector{<:Real}, qvals::AbstractVector{<:Real}
 )::Matrix{Float64}
     any(<(0), vols) && throw(ArgumentError("_gaussian_dummy: volumes must be ≥ 0"))
+    # v^(2/3) once per dummy: left inside the fused broadcast it is a `pow` per (dummy, q) pair
+    v23 = vols .^ (2 / 3)
     # (N,) against (1, Q) broadcasts to the (N, Q) f_atoms layout.
-    return vols .* exp.(.-(qvals' .^ 2) .* (vols .^ (2 / 3)) ./ (4π))
+    return vols .* exp.(.-(qvals' .^ 2) .* v23 ./ (4π))
 end
+
+"""
+The amplitude of `n` dummies that all have volume `v`, as a [`SharedAmplitude`](@ref): the same values as
+`_gaussian_dummy(fill(v, n), qvals)` without the (n, Q) matrix (every row is the same Q-vector). The hydration beads
+of one class all carry the same area, hence the same volume.
+"""
+_gaussian_dummy_shared(v::Real, n::Integer, qvals::AbstractVector{<:Real}) =
+    SharedAmplitude(vec(_gaussian_dummy([Float64(v)], qvals)), n)
 
 """
 Vacuum term's per-atom amplitude: the X-ray form factor of each ion at photon
@@ -115,7 +125,9 @@ function hydration(
     _shell(want) = begin
         sel = findall(==(want), class)
         crd = to_spherical(pts[:, sel])
-        amp = _gaussian_dummy(area[sel] .* thickness, qvals)
+        v = area[sel] .* thickness
+        # beads of a class carry equal areas: one amplitude vector for all of them, not an (N, Q) matrix of equal rows
+        amp = !isempty(v) && allequal(v) ? _gaussian_dummy_shared(v[1], length(v), qvals) : _gaussian_dummy(v, qvals)
         compute_B_lm(crd, qvals, amp, lMax, _CHUNK)
     end
 

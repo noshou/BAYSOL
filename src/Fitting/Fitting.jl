@@ -5,6 +5,7 @@ module Fitting
 using Distributions: Beta, Continuous, LocationScale, LogNormal
 using ..PhysicalConstants: STANDARD_TEMPERATURE_C
 using ..Shannon: ShannonInfo
+using ..GCPause: with_gc_paused, gc_checkpoint
 
 #----------------
 # Priors

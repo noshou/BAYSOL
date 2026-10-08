@@ -174,6 +174,7 @@ using  FastClosures: @closure
 using  LinearAlgebra: LinearAlgebra
 using ..SASA: PROBE_RADIUS, SHELL_N_TARGET
 using ..PhysicalConstants: DRO_UNIT
+using ..GCPause: gc_checkpoint
 using LinearAlgebra: mul!
 
 """

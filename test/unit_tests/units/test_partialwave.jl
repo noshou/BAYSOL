@@ -7,9 +7,9 @@
 # `self_scatter` and `cross_scatter`.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Scattering: compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
+using Random
+using BAYSOL.Scattering: SharedAmplitude, compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
 using BAYSOL.Scattering: BESSEL_CUTOFF
-using BAYSOL.Scattering.SphFuncs: sphHarm
 using SpecialFunctions: sphericalbesselj
 using BAYSOL.MolecularStructure: create, coords_spherical, to_spherical
 
@@ -109,6 +109,36 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         Bu = compute_B_lm(pw_sph, pw_q[perm], pw_f[:, perm], lMax, UInt64(2))
         @test all(abs(Bu[1, k, j] - B[1, k, perm[j]]) ≤ bound for k in 1:pw_nrows(lMax), j in 1:4)
         @test all(check_complex(Bu[1, k, j], ref[k, perm[j]]) for k in 1:pw_nrows(lMax), j in 1:4)
+    end
+
+    @testset "SharedAmplitude: the multipoles of an explicit matrix of equal rows, without building it" begin
+        n = size(pw_sph, 2)
+        for fvec in ([exp(-0.3 * q^2) for q in pw_q], [(1.0 + 0.5im) * exp(-0.3 * q^2) for q in pw_q])
+            for lMax in (0, 2, 4)
+                Bs = compute_B_lm(pw_sph, pw_q, SharedAmplitude(fvec, n), lMax, UInt64(2))
+                Bm = compute_B_lm(pw_sph, pw_q, repeat(reshape(fvec, 1, :), n, 1), lMax, UInt64(2))
+                @test size(Bs) == size(Bm)
+                @test isapprox(Bs, Bm; rtol = 1e-12, atol = 1e-14)
+            end
+        end
+        @test size(SharedAmplitude([1.0, 2.0, 3.0], 5)) == (5, 3)
+        @test SharedAmplitude([1.0, 2.0, 3.0], 5)[4, 2] == 2.0
+    end
+
+    @testset "compute_B_lm does not depend on the order of the atoms (they are processed by radius)" begin
+        rng = MersenneTwister(4)
+        cart = 6 .* randn(rng, 3, 60)
+        sph = to_spherical(cart)
+        q = collect(range(0.0, 0.5; length = 25))
+        f = [(1.0 + 0.1 * i) * exp(-0.2 * qq^2) + 0.05im * i for i in 1:60, qq in q]
+        for lMax in (3, 12)
+            B = compute_B_lm(sph, q, f, lMax, UInt64(7))
+            perm = randperm(rng, 60)
+            Bp = compute_B_lm(sph[:, perm], q, f[perm, :], lMax, UInt64(7))
+            @test isapprox(Bp, B; rtol = 1e-11, atol = 1e-13 * maximum(abs, B))
+            # another chunk size regroups the atoms into tiles, hence other negligible-Bessel cuts: equal up to that cut (1e-9)
+            @test isapprox(compute_B_lm(sph, q, f, lMax, UInt64(60)), B; rtol = 0, atol = 1e-8 * maximum(abs, B))
+        end
     end
 
     @testset "compute_B_lm output shape and element type" begin

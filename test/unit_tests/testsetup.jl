@@ -15,6 +15,22 @@ if !@isdefined(check_float)
     const DEFAULT_ATOL = 1.0e-9
 
     check_float(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
+
+    # Complex `Yₗᵐ` (packed row l(l+1)÷2 + m + 1, one column per point) from the one implementation, the in-place
+    # `SphFuncs.sphHarm!`, which writes the real layout [Re Y; −Im Y] per degree: builds the output and the workspace and
+    # converts (an invalid `lMax` or shape reaches `sphHarm!`, which throws SphHarmError).
+    function sphHarm(lMax::Int, θ, φ)
+        SF = BAYSOL.Scattering.SphFuncs
+        n = length(θ)
+        A = Matrix{Float64}(undef, max((lMax + 1) * (lMax + 2), 0), n)
+        SF.sphHarm!(A, SF.sphHarmCache(max(lMax, 0)), lMax, θ, φ)
+        y = Matrix{ComplexF64}(undef, (lMax + 1) * (lMax + 2) ÷ 2, n)
+        for i in 1:n, l in 0:lMax, m in 0:l
+            k0 = l * (l + 1) ÷ 2
+            y[k0 + m + 1, i] = complex(A[2k0 + m + 1, i], -A[2k0 + l + 1 + m + 1, i])
+        end
+        return y
+    end
     check_complex(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
 
     # CRYSOL's default bulk-solvent electron density (its fixed --dns), e·Å⁻³: the

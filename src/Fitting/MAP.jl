@@ -133,6 +133,7 @@ function _sampling_space(seed::Seed, l::LIKELIHOOD;
     μ, σ = θ_prior_moments(seed.pr)
     f  = z -> _neglogπ(SVector{4}(z...), μ, σ, seed, l, EXCL_VOL_CORR_TOL)
     fg! = (G, z) -> begin
+        gc_checkpoint()
         dr = DiffResults.GradientResult(z)
         ForwardDiff.gradient!(dr, f, z)
         G === nothing || (G .= DiffResults.gradient(dr))

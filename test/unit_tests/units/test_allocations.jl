@@ -9,8 +9,8 @@
 #    allocation is removed, never raise one without saying why in the commit message.
 #
 # Context: GC was ~23 % of the 53-fit wall clock and 37-53 % of the MAP/NUTS/re-profile stages.
-# One gradient call allocated ~260 bytes per q point, 62 % of it ForwardDiff Dual vectors and
-# 25 % the eight temporaries of `_scan_chi2`.
+# One gradient call allocated ~260 bytes per q point (62 % ForwardDiff Dual vectors, 25 % the eight temporaries of
+# `_scan_chi2`, now `_scan_chi2!`) until the analytic profile-likelihood gradient and Bumper temporaries (2026-10-08): now ~6.
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
@@ -63,13 +63,17 @@ end
         g(x) = ForwardDiff.gradient(z -> ALC._logπ(SVector{4}(z...), pr, wls, fw, ALC.PROFILE(); tab = tab), x)
         x0 = collect(ALC.Θ(ξ, pr)[1])
         # warm up, then measure
-        g(x0); profiled_corrs(wls, ξ, fw; tables = tab); ALC._scan_chi2(A, B, C, tab, wls)
+        chis = Vector{Float64}(undef, length(tab.cs))
+        g(x0); profiled_corrs(wls, ξ, fw; tables = tab); ALC._scan_chi2!(chis, A, B, C, tab, wls)
         ALC.intensity_terms(fw, ξ[1], (ξ[2], ξ[3], ξ[4]))
 
-        # measured 2026-10-07 at Q = 400: 25 / 65 / 133 / 267 bytes per q point
+        # measured at Q = 400, bytes per q point: intensity_terms 25 (unchanged), profiled_corrs 133 -> 8.5 (Bumper temporaries, one output vector); 2026-10-08: the
+        # scan 65 -> 0.7 (Bumper work vectors), a whole gradient call 267 -> 6.1 (analytic gradient through
+        # `_profile_ll_grad`, no dual-number vectors, Bumper temporaries)
         @test (@allocated ALC.intensity_terms(fw, ξ[1], (ξ[2], ξ[3], ξ[4]))) ≤ 30 * ALC_Q
-        @test (@allocated ALC._scan_chi2(A, B, C, tab, wls)) ≤ 75 * ALC_Q
-        @test (@allocated profiled_corrs(wls, ξ, fw; tables = tab)) ≤ 155 * ALC_Q
-        @test (@allocated g(x0)) ≤ 310 * ALC_Q
+        @test (@allocated ALC._scan_chi2!(chis, A, B, C, tab, wls)) ≤ 1 * ALC_Q
+        @test (@allocated profiled_corrs(wls, ξ, fw; tables = tab)) ≤ 10 * ALC_Q
+        @test (@allocated g(x0)) ≤ 7 * ALC_Q
+        @test (@allocated ALC._profile_ll_grad(wls, ξ, fw, tab, 1e-8)) ≤ 1 * ALC_Q
     end
 end

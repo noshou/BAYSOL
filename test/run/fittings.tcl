@@ -4,7 +4,7 @@
 # Runs the end-to-end fitting tests (test/fitting_tests/<ID>/): each is a script that fits one SASBDB entry
 # and writes its report and figures next to it.
 #
-#     tclsh test/run/fittings.tcl [ID ...] [--no-fit] [--bench] [--approved] [--report] [--table] [--fixme] [--dry-run]
+#     tclsh test/run/fittings.tcl [ID ...] [--no-fit] [--bench] [--approved] [--report] [--table] [--fixme] [--trace-compile FILE] [--dry-run]
 #
 #   ID         the fitting-test folders to run (SASDMJ9, SASDBS6, ...). Every one must exist, or nothing runs.
 #              With none given, every fitting test runs.
@@ -18,6 +18,8 @@
 #   --table    afterwards, rewrite the Results table in test/fitting_tests/README.md from all the reports
 #              (test/utils/results_table.tcl --update); covers every fit, whatever IDs are named
 #   --fixme    afterwards, run the sampler diagnostics on the selected fits (test/utils/diagnose.tcl report)
+#   --trace-compile FILE  run the fits with Julia's --trace-compile=FILE (the methods each fit's process compiles at run time,
+#              which a precompile workload should have covered; one file for all the fits, appended)
 #   --dry-run  print what would be run, run nothing
 #
 # The steps run in that order: the fits, the benchmark, the report, the table, the diagnostics. A failing fit does not
@@ -32,6 +34,7 @@ namespace eval fittings {
     namespace path ::util
 
     variable FLAGS {--bench --approved --no-fit --report --table --fixme --dry-run}
+    variable VALUED {--trace-compile}      ;# options that take a value
 
     # Stops with a message (and exit status 2) when the command line is wrong.
     proc fail {msg} { puts stderr "fittings.tcl: $msg"; exit 2 }
@@ -49,11 +52,17 @@ namespace eval fittings {
         variable FLAGS
         if {"--help" in $argv || "-h" in $argv} { ::usage $::SCRIPT; return }
 
+        variable VALUED
         set flags {}
         set requested {}
-        foreach a $argv {
-            if {[string match --* $a]} {
-                if {$a ni $FLAGS} { fail "unknown option $a (one of: [join $FLAGS {, }])" }
+        set trace ""
+        for {set i 0} {$i < [llength $argv]} {incr i} {
+            set a [lindex $argv $i]
+            if {$a in $VALUED} {
+                if {[incr i] >= [llength $argv]} { fail "option $a needs a value" }
+                set trace [file normalize [lindex $argv $i]]
+            } elseif {[string match --* $a]} {
+                if {$a ni $FLAGS} { fail "unknown option $a (one of: [join [concat $FLAGS $VALUED] {, }])" }
                 lappend flags $a
             } else {
                 lappend requested $a
@@ -78,7 +87,9 @@ namespace eval fittings {
         # 1. the fits
         foreach id [expr {"--no-fit" in $flags ? {} : $selected}] {
             puts "\n=== fit: $id"
-            if {![sh $dry $julia --startup-file=no --project=[file join $ROOT test fitting_tests] [script_of $id]]} {
+            set jl [list $julia --startup-file=no]
+            if {$trace ne ""} { lappend jl --trace-compile=$trace }
+            if {![sh $dry {*}$jl --project=[file join $ROOT test fitting_tests] [script_of $id]]} {
                 lappend failed "fit $id"
             }
         }

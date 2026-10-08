@@ -9,6 +9,7 @@ The entry points that run the tests.
 | `unittests.jl` | the unit and integration suite: everything in`../unit_tests/units/`, in name order with `test_quality.jl` last                                                  |
 | `fittings.tcl` | the end-to-end fitting tests in`../fitting_tests/`: the ones you name, or all of them; optionally the benchmark, the report and the sampler diagnostics on them |
 | `vis.tcl`      | the visual checks in`../visualize/`: the ones you name, or all of them                                                                                          |
+| `profile.tcl` | where the static build of a fitting test spends its time, by function (`../utils/profile_seed.jl`; development tooling, not a benchmark) |
 | `validate.tcl` | the validations in `../validation/`: slow, suite-wide checks of one change against criteria fixed before the run (`--list`; needs `--approved` to run) |
 | `tcltests.tcl` | the tests of the Tcl tools in `../utils/` (`../utils/tests/*.test`, tcltest; ~1 s)                                                                               |
 | `precommit.tcl` | everything to run before a commit: whitespace, Results table, Tcl-tool tests, unit suite, docs build (never a fit or a benchmark)                              |
@@ -39,7 +40,7 @@ stop with a message before running anything if a name you give does not exist.
 ## `fittings.tcl`
 
 ```
-tclsh test/run/fittings.tcl [ID ...] [--no-fit] [--bench] [--approved] [--report] [--table] [--fixme] [--dry-run]
+tclsh test/run/fittings.tcl [ID ...] [--no-fit] [--bench] [--approved] [--report] [--table] [--fixme] [--trace-compile FILE] [--dry-run]
 ```
 
 - **`ID ...`** are folders of `test/fitting_tests/` (`SASDMJ9`, `SASDBS6`, ...). If none exist, nothing runs and the available folders are listed. With none given, every fitting test runs. Each fit is its script run with the `test/fitting_tests` environment; it rewrites its `res*.txt` and figures.
@@ -48,7 +49,16 @@ tclsh test/run/fittings.tcl [ID ...] [--no-fit] [--bench] [--approved] [--report
 - **`--bench`** also runs the cold / steady-state benchmark (`../utils/bench.tcl`) on the selected fits, one `ID[:tag]` per run of each script. **Without `--approved` this only prints the benchmark's plan and runs nothing.** **`--approved`** is passed to the benchmark. It exists because benchmark timings are only meaningful on a *quiet machine*, and AI agents tend to start a benchmark without checking that the machine is quiet; so a benchmark runs only after the repository owner has said yes to that run, which means they have confirmed nothing else is running. `--approved` without `--bench` is an error.
 - **`--report`** prints the Results-table rows of the selected fits (`../utils/results_table.tcl`), from the reports the fits just wrote. To rewrite the table in `fitting_tests/README.md`, use `tclsh test/utils/results_table.tcl --update`.
 - **`--table`** rewrites the Results table in `fitting_tests/README.md` from every report (`../utils/results_table.tcl --update`), whatever IDs are named.
+- **`--trace-compile FILE`** runs the fits with Julia's `--trace-compile=FILE`: the file lists the methods each fit's process had to compile at run time, i.e. what a precompile workload has not covered.
 - **`--fixme`** runs the sampler diagnostics (`../utils/diagnose.tcl report`) on every run of the selected fits: MAP starts, Hessian, step size and tree depth, gradient error, modes. Use it when a fit looks wrong.
+
+## `profile.tcl`
+
+```
+tclsh test/run/profile.tcl ID[:tag] [ID[:tag] ...] [--delay SECONDS] [--dry-run]
+```
+
+Builds the `Seed` of each fitting test twice in one process (the first call warms the compiler) and profiles the second with Julia's sampling profiler: the stage timings of that build and the samples by function, charged to the innermost BAYSOL function (its own code plus the libraries it calls) and inclusive. The profiler slows the code by a factor of several, so read the proportions, not the seconds. It is how the time in `forward_cache` was found; use `fittings.tcl --bench --approved` or the reports to measure a change.
 
 ## `validate.tcl`
 

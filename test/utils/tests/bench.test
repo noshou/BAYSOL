@@ -45,4 +45,12 @@ test make_depot-links-only-sources {the cold depot links source dirs and has no 
     file delete -force $scratch
 } -result {{artifacts packages} link}
 
+test json_line {the child's JSON is its last {...} line, whatever came before it} -body {
+    bench::json_line "Transaction\n\n  Prefix: /x\n\nTransaction finished\n\n\{\"a\":1,\"b\":\{\"c\":2\}\}\n"
+} -result {{"a":1,"b":{"c":2}}}
+
+test json_line-none {no JSON line gives an empty string} -body {
+    bench::json_line "Transaction finished\nsomething else\n"
+} -result {}
+
 cleanupTests
