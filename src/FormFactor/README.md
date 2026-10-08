@@ -2,7 +2,7 @@
 
 X-ray atomic scattering factors, f(q, E) = f0(s) + f1(E) + i·f2(E) with s = q/(4π) in Å⁻¹.
 
-The data and interpolation scheme follow the Python package XrayDB, but nothing calls Python at runtime. `form_factors.sqlite3` (tables `waasmaier`, `chantler`, `provenance`) is bundled, and `extract.py` is the offline script that regenerates it. Consumer: `Scattering.vacuo`, via `form_factor_table`. Each ion that could not be fully resolved is logged (see Tiering below) into `ForwardCache.form_factor_log` and printed in the run report.
+The data and interpolation scheme follow the Python package XrayDB, but nothing calls Python at runtime. `form_factors.sqlite3` (tables `waasmaier`, `chantler`, `provenance`) is bundled, and `test/utils/extract_formfactor.tcl` is the offline script (Tcl 9 with the `sqlite3` package, Fedora `sqlite-tcl`) that regenerates it. Consumer: `Scattering.vacuo`, via `form_factor_table`. Each ion that could not be fully resolved is logged (see Tiering below) into `ForwardCache.form_factor_log` and printed in the run report.
 
 Data:
 

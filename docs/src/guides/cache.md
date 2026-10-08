@@ -54,8 +54,8 @@ end
 using ..Cache: KeyedCache
 
 const _ρₑ_w_cache = KeyedCache{Int64, Tuple{Float64, Float64}}()
-const _ϕ°_p_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
+const _ϕ°_p_cache  = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, Float64, Float64}}()   # (sequence, pH, σ_pH)
 const _ϕ°_s_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
-const _ϕ°_d_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
-const _ϕ°_r_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
+const _ϕ°_d_cache  = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, Float64, Float64}}()   # (sequence, pH, σ_pH)
+const _ϕ°_r_cache  = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, Float64, Float64}}()   # (sequence, pH, σ_pH)
 ```

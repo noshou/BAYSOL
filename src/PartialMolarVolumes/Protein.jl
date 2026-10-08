@@ -18,8 +18,8 @@ const _Protein::Dict{String, Tuple{Int64, Float64, Float64}} = JSON3.read(
 """ maps ambiguity codes to the two amino acids. Average must be taken. """
 const _wildcards = Dict("B" => ("D", "N"), "J" => ("L", "I"), "Z" => ("E", "Q"))
 
-"Memoized protein partial molar volume, keyed by sequence"
-const _ϕ°_p_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
+"Memoized protein partial molar volume, keyed by `(sequence, pH, σ_pH)`: the result depends on all three"
+const _ϕ°_p_cache = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, Float64, Float64}}()
 
 """
 Normalizes any residue lookup (ionizable or not) to (`electron_count`, pmv, variance),
@@ -40,8 +40,8 @@ takes a sequence of one-letter amino acid codes at a pH and returns the estimate
 partial molar volume at inifinit dilution (total electron count, partial molar volume,
 uncertainty). `σ_pH` is the standard uncertainty on pH, propagated by the delta
 method through each ionizable residue's titration term (see `_titrated`). The
-result is cached off of sequence only, so only the first call of `σ_pH` and pH
-are taken into account.
+result is memoized per `(seq, pH, σ_pH)`, so a repeated call with the same three
+arguments is free and a call at another pH or `σ_pH` is computed afresh.
 """
 function ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64, Float64, Float64}
 
@@ -50,7 +50,7 @@ function ϕ°(pH::Real, seq::AbstractString; σ_pH::Real = 0.0)::Tuple{Int64, Fl
         throw(ArgumentError("Sequence is empty!"))
     end
 
-    key = String(seq)
+    key = (String(seq), Float64(pH), Float64(σ_pH))
 
     return @closure get!(_ϕ°_p_cache, key) do
 

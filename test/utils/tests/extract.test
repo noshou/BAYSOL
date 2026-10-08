@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+# Tests of extract_formfactor.tcl on a tiny synthetic xraydb.sqlite: the rows and blobs it writes, the
+# de-duplication of repeated grid energies, and that a failure leaves an existing output untouched.
+
+source [file join [file dirname [info script]] helpers.tcl]
+source [file join $UTILS_DIR common.tcl]
+tcltest::testConstraint sqlite [expr {![catch {package require sqlite3}]}]
+
+set scratch [scratch_dir]
+
+# a source database; $waasmaier_scale is the JSON text of the amplitudes (wrong length => the script must fail)
+proc make_source {path waasmaier_scale} {
+    sqlite3 s $path
+    s eval {
+        CREATE TABLE Waasmaier (atomic_number INTEGER, element TEXT, ion TEXT, offset REAL, scale TEXT, exponents TEXT);
+        CREATE TABLE Chantler (element TEXT, energy TEXT, f1 TEXT, f2 TEXT);
+        CREATE TABLE elements (element TEXT, atomic_number INTEGER);
+        INSERT INTO Waasmaier VALUES (6, 'C', 'C', 0.2156, $waasmaier_scale, '[20.8439, 10.2075, 0.5687, 51.6512, 0.2156]');
+        INSERT INTO elements VALUES ('C', 6);
+        INSERT INTO Chantler VALUES ('C', '[1.0, 2.0, 2.0, 3.0]', '[0.1, 0.2, 0.3, 0.4]', '[1.1, 1.2, 1.3, 1.4]');
+    }
+    s close
+}
+
+test builds-rows {rows, lower-cased names, de-duplicated grid, blobs of little-endian doubles} -constraints sqlite -setup {
+    make_source $scratch/src.sqlite {[2.31, 1.02, 1.5886, 0.865, 0.2156]}
+} -body {
+    lassign [run_tool [file join $UTILS_DIR extract_formfactor.tcl] $scratch/src.sqlite $scratch/out.sqlite3] status text
+    sqlite3 o $scratch/out.sqlite3 -readonly 1
+    set w [o eval {SELECT ion, element, z, c, a1, a5, b1 FROM waasmaier}]
+    set c [o eval {SELECT element, z, npts, emin, emax, length(energy) FROM chantler}]
+    binary scan [o eval {SELECT f1 FROM chantler}] q* f1
+    set tables [lsort [o eval {SELECT name FROM sqlite_master WHERE type='table'}]]
+    set f0form [lindex [o eval {SELECT value FROM provenance WHERE key='f0_form'}] 0]
+    o close
+    list $status $w $c $f1 $tables [string match "*valid 0 <= s <= 6" $f0form]
+} -result {0 {c c 6 0.2156 2.31 0.2156 20.8439} {c 6 3 1.0 3.0 24} {0.1 0.2 0.4} {chantler provenance waasmaier} 1}
+
+test failure-keeps-existing-output {a bad source leaves the old output byte for byte and no .part file} -constraints sqlite -setup {
+    make_source $scratch/good.sqlite {[2.31, 1.02, 1.5886, 0.865, 0.2156]}
+    make_source $scratch/bad.sqlite {[1, 2, 3]}
+    exec [info nameofexecutable] [file join $UTILS_DIR extract_formfactor.tcl] $scratch/good.sqlite $scratch/keep.sqlite3
+    file copy $scratch/keep.sqlite3 $scratch/keep.copy
+} -body {
+    lassign [run_tool [file join $UTILS_DIR extract_formfactor.tcl] $scratch/bad.sqlite $scratch/keep.sqlite3] status text
+    list [expr {$status != 0}] [string match "*expected 5 amplitudes*" $text] \
+         [expr {[read_binary $scratch/keep.sqlite3] eq [read_binary $scratch/keep.copy]}] [file exists $scratch/keep.sqlite3.part]
+} -result {1 1 1 0}
+
+test missing-atomic-number {an element with no atomic number is an error, not a dropped element} -constraints sqlite -setup {
+    make_source $scratch/z.sqlite {[2.31, 1.02, 1.5886, 0.865, 0.2156]}
+    sqlite3 s $scratch/z.sqlite
+    s eval {DELETE FROM elements}
+    s close
+} -body {
+    lassign [run_tool [file join $UTILS_DIR extract_formfactor.tcl] $scratch/z.sqlite $scratch/z.out] status text
+    list [expr {$status != 0}] [string match "*no atomic number*" $text] [file exists $scratch/z.out]
+} -result {1 1 0}
+
+test usage {no arguments: usage and status 2} -body {
+    lindex [run_tool [file join $UTILS_DIR extract_formfactor.tcl]] 0
+} -result 2
+
+file delete -force $scratch
+cleanupTests

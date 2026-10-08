@@ -1,5 +1,6 @@
 [deps]
 AdvancedHMC = "0bf59076-c3b1-5ca4-86bd-e02cd72cde3d"
+AllocCheck = "9b6a8646-10ed-4001-bbdc-1d2f46dfbb1a"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 BAYSOL = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 BioStructures = "de9282ab-8554-53be-b2d6-f6c222edabfc"
@@ -16,6 +17,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
+AllocCheck = "0.2"
 Aqua = "0.8"
 CondaPkg = "0.2"
 Distributions = "0.25.131"

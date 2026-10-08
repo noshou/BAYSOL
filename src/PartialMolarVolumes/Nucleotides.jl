@@ -30,11 +30,11 @@ const _RNA_ionization::Dict{String, Tuple{Tuple{Float64, String}, String}} = JSO
     Dict{String, Tuple{Tuple{Float64, String}, String}}
 )
 
-"Memoized DNA partial molar volume, keyed by sequence"
-const _ϕ°_d_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
+"Memoized DNA partial molar volume, keyed by `(sequence, pH, σ_pH)`: the result depends on all three"
+const _ϕ°_d_cache = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, Float64, Float64}}()
 
-"Memoized RNA partial molar volume, keyed by sequence"
-const _ϕ°_r_cache = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
+"Memoized RNA partial molar volume, keyed by `(sequence, pH, σ_pH)`: the result depends on all three"
+const _ϕ°_r_cache = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, Float64, Float64}}()
 
 "Maps IUPAC nucleotide ambiguity codes to the bases they average over."
 const _wildcards_nuc = Dict(
@@ -128,7 +128,7 @@ function ϕ°(
     end
 
     cache = isDNA ? _ϕ°_d_cache : _ϕ°_r_cache
-    key = String(seq)
+    key = (String(seq), Float64(pH), Float64(σ_pH))
 
     return @closure get!(cache, key) do
 

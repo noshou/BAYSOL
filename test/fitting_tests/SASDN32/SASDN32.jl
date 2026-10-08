@@ -120,7 +120,10 @@ function fit_subset()
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
-function run_sasdn32(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+# Builds the Seed that `run_sasdn32` samples. It is separate only because the developer tools in test/utils/ build
+# a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
+# `run_sasdn32` below is the whole story (build the seed, then sample it).
+function seed_sasdn32(; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
 
     Random.seed!(seed)
@@ -128,8 +131,13 @@ function run_sasdn32(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed:
         LocalPathSource(_PDB_PATH), LMAX, ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
         add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
+    return s, (q_fit, I_fit, σ_fit)
+end
+
+function run_sasdn32(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+    s, data = seed_sasdn32(; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
-    return res, s.fw.form_factor_log, s.fw.n_atoms, (q_fit, I_fit, σ_fit)
+    return res, s.fw.form_factor_log, s.fw.n_atoms, data
 end
 
 result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdn32()

@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+# Tests of results_table.tcl: the bold rules for one row, the table-cell normalisation behind --check, and
+# --check itself on the real README (the table must be up to date).
+
+source [file join [file dirname [info script]] helpers.tcl]
+source [file join $UTILS_DIR results_table.tcl]
+
+proc report_dict {args} {
+    # a parsed-report dict with sensible defaults, overridden by key/value pairs
+    set d [dict create chi2 +21.485 rho_e +0.34 d1 +0.04 d2 +1.67 d3 +0.50 c1 +1.201 sat false div 0.0000]
+    dict for {k v} $args { dict set d $k $v }
+    return $d
+}
+
+test row-plain {nothing at a bound: no bold, a true minus sign, 3 significant digits} -body {
+    results_table::row "SASDX one" [report_dict d1 -0.37 d3 -2.5] "EOM 11.3"
+} -result {{SASDX one} 21.5 {EOM 11.3} −0.37 1.67 −2.50 1.201 0}
+
+test row-bounds {contrasts within tolerance of their bounds are bold} -body {
+    # rho_e 0.34: delta-rho3 bounds are -11.33 and 2.833
+    results_table::row r [report_dict d1 +1.99 d2 -9.97 d3 +2.83] -
+} -result {r 21.5 - **1.99** **−9.97** **2.83** 1.201 0}
+
+test row-lower-bound-d3 {the lower delta-rho3 bound} -body {
+    lindex [results_table::row r [report_dict d3 -11.30] -] 5
+} -result **−11.30**
+
+test row-saturated-c1 {a saturated c1 is bold and says so} -body {
+    lindex [results_table::row r [report_dict c1 +0.780 sat true] -] 6
+} -result {**0.780 (saturated)**}
+
+test row-divergences {divergences print as a percentage, bold above 5 %} -body {
+    list [lindex [results_table::row r [report_dict div 0.0030] -] 7] \
+         [lindex [results_table::row r [report_dict div 0.0600] -] 7] \
+         [lindex [results_table::row r [report_dict div 0.0500] -] 7]
+} -result {{0.3 %} {**6.0 %**} {5.0 %}}
+
+test table_cells {padding, spacing and the separator row do not matter} -body {
+    set a "| A   |  b  | c |\n| --- | :-: | -- |\n|  1  | 2   |  3 |"
+    set b "|A|b|c|\n|---|---|---|\n|1|2|3|"
+    expr {[results_table::table_cells $a] eq [results_table::table_cells $b]}
+} -result 1
+
+test table_cells-detects-a-change {a changed cell is a difference} -body {
+    expr {[results_table::table_cells "| a | 1 |"] eq [results_table::table_cells "| a | 2 |"]}
+} -result 0
+
+test label {run labels from report paths} -body {
+    list [results_table::label x/SASDMJ9/res.txt] [results_table::label x/SASDBS6/res_fit2_model1.txt]
+} -result {{SASDMJ9 —} {SASDBS6 fit2_model1}}
+
+test check-readme {the Results table of fitting_tests/README.md is up to date} -body {
+    lassign [run_tool [file join $UTILS_DIR results_table.tcl] --check] status out
+    list $status [string match "*is up to date*" $out]
+} -result {0 1}
+
+test check-rejects-ids {--check covers the whole table} -body {
+    lindex [run_tool [file join $UTILS_DIR results_table.tcl] --check SASDMJ9] 0
+} -result 2
+
+cleanupTests

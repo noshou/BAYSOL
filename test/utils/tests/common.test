@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+# Tests of common.tcl: the git helpers (in a throwaway repository), the fitting-test lookups and the
+# symlink-safe directory removal.
+
+source [file join [file dirname [info script]] helpers.tcl]
+source [file join $UTILS_DIR common.tcl]
+
+# A throwaway git repository with three commits of increasing dates and the given tags on them.
+proc make_repo {dir tagsAt} {
+    file mkdir $dir
+    set git [list git -C $dir -c user.name=t -c user.email=t@example.com]
+    exec {*}$git init -q
+    set n 0
+    foreach {date tags} $tagsAt {
+        write_file [file join $dir f$n.txt] $n
+        exec {*}$git add .
+        set ::env(GIT_COMMITTER_DATE) $date
+        set ::env(GIT_AUTHOR_DATE) $date
+        exec {*}$git commit -q -m c$n
+        foreach t $tags { exec {*}$git tag $t }
+        incr n
+    }
+    unset ::env(GIT_COMMITTER_DATE) ::env(GIT_AUTHOR_DATE)
+}
+
+set scratch [scratch_dir]
+
+test latest_release-newest-v-tag-by-date {the newest tag that looks like a release, not the newest tag} -setup {
+    make_repo $scratch/r1 {
+        2020-01-01T00:00:00 v0.1.0-a
+        2021-01-01T00:00:00 v0.2.0-b
+        2022-01-01T00:00:00 {nightly vnext}
+    }
+    set saved $::ROOT
+    set ::ROOT $scratch/r1
+} -body {
+    util::latest_release
+} -cleanup {
+    set ::ROOT $saved
+} -result v0.2.0-b
+
+test latest_release-no-release {no v<digit> tag means no release} -setup {
+    make_repo $scratch/r2 {2020-01-01T00:00:00 nightly}
+    set saved $::ROOT
+    set ::ROOT $scratch/r2
+} -body {
+    util::latest_release
+} -cleanup {
+    set ::ROOT $saved
+} -result {}
+
+test resolve-known-and-unknown {resolve gives a hash for a known revision and "" otherwise} -setup {
+    set saved $::ROOT
+    set ::ROOT $scratch/r1
+} -body {
+    list [expr {[string length [util::resolve v0.1.0-a]] == 40}] [util::resolve no-such-rev]
+} -cleanup {
+    set ::ROOT $saved
+} -result {1 {}}
+
+test baseline_for-newest-by-name {the newest baseline file of a tag, "" when there is none} -setup {
+    set saved $::ROOT
+    set ::ROOT $scratch/root
+    write_file $scratch/root/test/baselines/v1.0.0-x-cold-hostA.json {}
+    write_file $scratch/root/test/baselines/v1.0.0-x-cold-hostB.json {}
+    write_file $scratch/root/test/baselines/v2.0.0-y-cold-hostA.json {}
+} -body {
+    list [file tail [util::baseline_for v1.0.0-x]] [file tail [util::baseline_for v2.0.0-y]] [util::baseline_for v9.9.9]
+} -cleanup {
+    set ::ROOT $saved
+} -result {v1.0.0-x-cold-hostB.json v2.0.0-y-cold-hostA.json {}}
+
+test single_run {only the one-empty-tag list is a single run} -body {
+    list [util::single_run {{}}] [util::single_run {a}] [util::single_run {a b}] [util::single_run {}]
+} -result {1 0 0 0}
+
+test tags_of-and-ids {the real fitting tests: ids, a RUNS table, a single-run script, the special scripts} -body {
+    list [expr {[llength [util::ids]] == 27}] [util::tags_of SASDBS6] [util::tags_of SASDMJ9] [util::tags_of SASDMZ9] [util::tags_of SASDJ72]
+} -result {1 {fit2_model1 fit2_model2 fit2_model3 fit2_model4 fit2_model5} {{}} {model1 model2 model3} {model1 model2}}
+
+test script_of {<id>.jl when it exists, else the folder's only script} -body {
+    list [file tail [util::script_of SASDMJ9]] [file tail [util::script_of SASDA52]]
+} -result {SASDMJ9.jl SASDA52_fit1.jl}
+
+test rm_tree-never-follows-links {removes the tree, unlinks a symlink, leaves its target alone} -setup {
+    file mkdir $scratch/target/sub
+    write_file $scratch/target/sub/sentinel.txt keep
+    set d $scratch/baysol-bench-x
+    file mkdir $d/inner/.hiddendir
+    write_file $d/inner/f.txt x
+    write_file $d/.dotfile x
+    file link -symbolic $d/link $scratch/target
+} -body {
+    util::rm_tree $d
+    list [file exists $d] [file exists $scratch/target/sub/sentinel.txt]
+} -result {0 1}
+
+test rm_tree-refuses-other-names {a directory not named baysol-bench-* is never deleted} -body {
+    catch {util::rm_tree $scratch/target} msg
+    list $msg [file isdirectory $scratch/target]
+} -result "{rm_tree: refusing to delete $scratch/target} 1"
+
+file delete -force $scratch
+cleanupTests
