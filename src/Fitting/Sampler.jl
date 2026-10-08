@@ -255,6 +255,28 @@ function _ll(
 end
 
 """
+[`_ll`](@ref) for the profile likelihood at a ForwardDiff dual ξ: the value and the gradient with respect to ξ
+come from [`_profile_ll_grad`](@ref) (analytic, no dual-number vectors through the forward model), and are
+composed with the partials of ξ, so `ForwardDiff.gradient` of any function of θ sees the exact chain rule.
+The marginal likelihood keeps the generic path above.
+"""
+function _ll(
+    wls::WLSData,
+    ξ::SVector{4,D},
+    fw::ForwardCache,
+    ::PROFILE;
+    tab::Union{Nothing,_C1Tables} = nothing,
+    c1_tol::Float64 = EXCL_VOL_CORR_TOL,
+) where {D<:ForwardDiff.Dual{<:Any,Float64}}
+    tb = tab === nothing ? _C1Tables(fw) : tab
+    ll, g = _profile_ll_grad(wls, SVector{4,Float64}(ForwardDiff.value.(ξ)), fw, tb, c1_tol)
+    N = ForwardDiff.npartials(D)
+    parts = ntuple(j -> g[1] * ForwardDiff.partials(ξ[1], j) + g[2] * ForwardDiff.partials(ξ[2], j) +
+                        g[3] * ForwardDiff.partials(ξ[3], j) + g[4] * ForwardDiff.partials(ξ[4], j), Val(N))
+    return ForwardDiff.Dual{ForwardDiff.tagtype(D)}(ll, ForwardDiff.Partials(parts))
+end
+
+"""
 Log prior density of ξ = (ρₑ, δρ₁, δρ₂, δρ₃) in ξ-space. The δρ `LocationScale`
 priors carry their own -ln W terms.
 """
@@ -504,6 +526,21 @@ function run_fitting(
     l::LIKELIHOOD=PROFILE(),
     δ::Real=DEFAULT_TARGET_ACCEPT
 )::FitResult
+    return with_gc_paused(() -> _run_fitting(seed, n_samples, n_adapt; l = l, δ = δ))
+end
+
+"""
+The body of [`run_fitting`](@ref), run with the garbage collector paused (see [`with_gc_paused`](@ref
+BAYSOL.Utils.GCPause.with_gc_paused)): the MAP objective, the NUTS gradient and the re-profile loop call
+[`gc_checkpoint`](@ref BAYSOL.Utils.GCPause.gc_checkpoint), which collects once per byte budget.
+"""
+function _run_fitting(
+    seed::Seed,
+    n_samples::Int64,
+    n_adapt::Int64;
+    l::LIKELIHOOD=PROFILE(),
+    δ::Real=DEFAULT_TARGET_ACCEPT
+)::FitResult
 
     if δ ≤ 0 || δ ≥ 100
         throw(DomainError(δ, "δ must satisfy: 0 < δ < 100"))
@@ -539,6 +576,7 @@ function run_fitting(
 
     # ∂ℓπ∂w: w ↦ (log π(θ(w)), ∇_w log π(θ(w))), computed in one ForwardDiff pass.
     ∂ℓπ∂w = @closure w -> begin
+        gc_checkpoint()
         result = DiffResults.GradientResult(w)
         ForwardDiff.gradient!(result, ℓπ, w)
         (DiffResults.value(result), DiffResults.gradient(result))
@@ -611,6 +649,7 @@ function run_fitting(
     χ²           = Vector{Float64}(undef, n_samples)
     curves       = Matrix{Float64}(undef, length(seed.fw.qvals), n_samples)
     for (i, ξ) in enumerate(samples)
+        gc_checkpoint()
         # re-profile c1 at each posterior draw so the reported curve/χ²
         # match what _ll actually evaluated at that ξ during sampling.
         ŷ, fit, c1_star = profiled_corrs(seed.wls, ξ, seed.fw; tables = seed.c1tab)

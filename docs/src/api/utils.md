@@ -27,6 +27,12 @@ Modules = [BAYSOL.Cache]
 Modules = [BAYSOL.Timing]
 ```
 
+## GCPause
+
+```@autodocs
+Modules = [BAYSOL.GCPause]
+```
+
 ## PlasticSequence
 
 ```@autodocs

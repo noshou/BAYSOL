@@ -4,6 +4,8 @@ using StaticArrays
 using Optim: minimizer, optimize, Brent
 using ForwardDiff
 using ..Scattering: ForwardCache, excluded_volume_factor, intensity_terms, model_intensity, EV_EXP_COEFF
+using ..PhysicalConstants: DRO_UNIT
+using Bumper: @no_escape, @alloc
 using FastClosures
 
 # ---------------------------------------------------------------------------
@@ -77,9 +79,9 @@ the fly (the Brent step). Same g formula as `Scattering.excluded_volume_factor`.
 - `(SwI, SwII, SwIy)::NTuple{3,Float64}`.
 """
 function _sums_at(
-    A::Vector{Float64}, 
-    B::Vector{Float64}, 
-    C::Vector{Float64},
+    A::AbstractVector{Float64},
+    B::AbstractVector{Float64},
+    C::AbstractVector{Float64},
     tab::_C1Tables, 
     wls::WLSData, 
     c1::Float64
@@ -117,87 +119,222 @@ Expanding the sums in powers of g,
 the seven coefficient vectors are built once in a fused pass, then each scan point is
 one fused `@simd` pass over q in Horner form (three accumulators, g read from `tab.g1`).
 
+Writes into `chis` (length `length(tab.cs)`) and takes the eight length-Q work vectors from the task's Bumper
+buffer, so the call allocates nothing on the heap. `A`, `B`, `C` may be Bumper arrays.
+
+# Arguments
+- `chis::AbstractVector{Float64}`: output, one entry per scan point.
+
 # Returns
-- `Vector{Float64}`: reduced χ² per scan point.
+- `chis`: the reduced χ² per scan point.
 
 # Exceptions
 - `WLSError`: as [`wls_fit`](@ref), if the model is flat at a scan point.
 """
-function _scan_chi2(
-    A::Vector{Float64}, 
-    B::Vector{Float64}, 
-    C::Vector{Float64},
-    tab::_C1Tables, 
+function _scan_chi2!(
+    chis::AbstractVector{Float64},
+    A::AbstractVector{Float64},
+    B::AbstractVector{Float64},
+    C::AbstractVector{Float64},
+    tab::_C1Tables,
     wls::WLSData
-)::Vector{Float64}
-    
+)
     Q = length(A)
     w = wls.weights
     y = wls.I_obs
-    
-    # Σwŷ: wB
-    r11 = Vector{Float64}(undef, Q)
-    
-    # Σwŷ: wC
-    r21 = Vector{Float64}(undef, Q)   
-    
-    # Σwŷ·I: wIB
-    r12 = Vector{Float64}(undef, Q)
-    
-    # Σwŷ·I: wIC
-    r22 = Vector{Float64}(undef, Q)  
-
-    # Σwŷ²: 2wAB
-    r13 = Vector{Float64}(undef, Q)
-    
-    # Σwŷ²: w(B² + 2AC)
-    r23 = Vector{Float64}(undef, Q)   
-    
-    # Σwŷ²: 2wBC
-    r33 = Vector{Float64}(undef, Q)
-    
-    # Σwŷ²:wC²
-    r43 = Vector{Float64}(undef, Q)   #        
-    
-    # ⟨w, A⟩
-    SA  = 0.0
-    
-    # ⟨wI, A⟩
-    SAy = 0.0
-
-    # ⟨w, A²⟩
-    SA2 = 0.0      
-    
-    @inbounds @fastmath @simd for i in 1:Q
-        wi = w[i]
-        a = A[i]; b = B[i]; c = C[i]; wy = wi * y[i]
-        SA += wi * a; SAy += wy * a; SA2 += wi * a * a
-        r11[i] = wi * b;      r21[i] = wi * c
-        r12[i] = wy * b;      r22[i] = wy * c
-        r13[i] = 2wi * a * b; r23[i] = wi * (b * b + 2a * c)
-        r33[i] = 2wi * b * c; r43[i] = wi * c * c
-    end
     g1 = tab.g1
-    chis = Vector{Float64}(undef, length(tab.cs))
-    @inbounds for j in eachindex(chis)
-        SwI = 0.0; SwIy = 0.0; SwII = 0.0
-        @fastmath @simd for i in 1:Q
-            g = g1[i, j]
-            SwI  += g * (r11[i] + g * r21[i])
-            SwIy += g * (r12[i] + g * r22[i])
-            SwII += g * (r13[i] + g * (r23[i] + g * (r33[i] + g * r43[i])))
+    @no_escape begin
+        r11 = @alloc(Float64, Q)   # Σwŷ: wB
+        r21 = @alloc(Float64, Q)   # Σwŷ: wC
+        r12 = @alloc(Float64, Q)   # Σwŷ·I: wIB
+        r22 = @alloc(Float64, Q)   # Σwŷ·I: wIC
+        r13 = @alloc(Float64, Q)   # Σwŷ²: 2wAB
+        r23 = @alloc(Float64, Q)   # Σwŷ²: w(B² + 2AC)
+        r33 = @alloc(Float64, Q)   # Σwŷ²: 2wBC
+        r43 = @alloc(Float64, Q)   # Σwŷ²: wC²
+
+        SA = 0.0; SAy = 0.0; SA2 = 0.0      # ⟨w, A⟩, ⟨wI, A⟩, ⟨w, A²⟩
+        @inbounds @fastmath @simd for i in 1:Q
+            wi = w[i]
+            a = A[i]; b = B[i]; c = C[i]; wy = wi * y[i]
+            SA += wi * a; SAy += wy * a; SA2 += wi * a * a
+            r11[i] = wi * b;      r21[i] = wi * c
+            r12[i] = wy * b;      r22[i] = wy * c
+            r13[i] = 2wi * a * b; r23[i] = wi * (b * b + 2a * c)
+            r33[i] = 2wi * b * c; r43[i] = wi * c * c
         end
-        chis[j] = reduced_chi2(
-                    _wls_from_sums(
-                        SA + SwI, 
-                        SA2 + SwII, 
-                        SAy + SwIy, 
-                        Q, 
-                        wls
-                    )
-                )
+        @inbounds for j in eachindex(chis)
+            SwI = 0.0; SwIy = 0.0; SwII = 0.0
+            @fastmath @simd for i in 1:Q
+                g = g1[i, j]
+                SwI  += g * (r11[i] + g * r21[i])
+                SwIy += g * (r12[i] + g * r22[i])
+                SwII += g * (r13[i] + g * (r23[i] + g * (r33[i] + g * r43[i])))
+            end
+            chis[j] = reduced_chi2(_wls_from_sums(SA + SwI, SA2 + SwII, SAy + SwIy, Q, wls))
+        end
     end
     return chis
+end
+
+"""
+The profiled c1 for given A, B, C: the coarse scan over the precomputed g table, then `Brent()` inside the
+bracket of the best scan point, to an absolute tolerance `tol` on c1 (see [`profiled_corrs`](@ref)). The scan's
+work vectors come from the Bumper buffer.
+
+# Returns
+- `Float64`: the c1 minimising the reduced χ² (within the padded window `cmin - eps .. cmax + eps`).
+"""
+function _c1_search(
+    A::AbstractVector{Float64}, B::AbstractVector{Float64}, C::AbstractVector{Float64}, tab::_C1Tables, wls::WLSData, tol::Float64,
+)::Float64
+    n = length(A)
+    cs = tab.cs
+    lo, hi = tab.cmin - tab.eps, tab.cmax + tab.eps
+    lo_b = lo; hi_b = hi
+    @no_escape begin
+        chis = @alloc(Float64, length(cs))
+        _scan_chi2!(chis, A, B, C, tab, wls)
+        i_best = argmin(chis)
+        lo_b = i_best == 1          ? lo : cs[i_best-1]
+        hi_b = i_best == length(cs) ? hi : cs[i_best+1]
+    end
+
+    # polish: Brent on the same objective, one fused pass per step.
+    # No assignments inside the closure: a name assigned both in a closure and in
+    # this enclosing body is one shared, Core.Box'ed variable (type-unstable).
+    χ²_at_c1 = @closure c1 -> reduced_chi2(_wls_from_sums(_sums_at(A, B, C, tab, wls, c1)..., n, wls))
+    return minimizer(optimize(χ²_at_c1, lo_b, hi_b, Brent(); abs_tol = tol, rel_tol = 0.0))
+end
+
+"""
+[`intensity_terms`](@ref) for Float64 arguments, writing A, B, C in place (column by column over the packed Gram
+matrix `Gc`) and taking `s1, s2, s3 = DRO_UNIT·(δρ₁, δρ₂, δρ₃)`: no heap allocation.
+"""
+function _intensity_terms!(
+    A::AbstractVector{Float64}, B::AbstractVector{Float64}, C::AbstractVector{Float64},
+    Gc::Matrix{Float64}, ρ::Float64, s1::Float64, s2::Float64, s3::Float64,
+)
+    Q = size(Gc, 1)
+    kA = (1.0, 2s1, 2s2, 2s3, s1 * s1, 2s1 * s2, 2s1 * s3, s2 * s2, 2s2 * s3, s3 * s3)
+    kB = (-2ρ, -2ρ * s1, -2ρ * s2, -2ρ * s3)
+    ρ2 = ρ * ρ
+    @inbounds @fastmath @simd for q in 1:Q
+        A[q] = kA[1] * Gc[q, 1]
+        B[q] = kB[1] * Gc[q, 11]
+        C[q] = ρ2 * Gc[q, 15]
+    end
+    @inbounds for c in 2:10
+        k = kA[c]
+        @fastmath @simd for q in 1:Q
+            A[q] += k * Gc[q, c]
+        end
+    end
+    @inbounds for c in 2:4
+        k = kB[c]
+        @fastmath @simd for q in 1:Q
+            B[q] += k * Gc[q, 10 + c]
+        end
+    end
+    return nothing
+end
+
+"Σᵢ Gc[i, c]·v[i] over one column of the packed Gram matrix."
+function _dotcol(Gc::Matrix{Float64}, c::Int, v::AbstractVector{Float64})
+    s = 0.0
+    @inbounds @fastmath @simd for i in eachindex(v)
+        s += Gc[i, c] * v[i]
+    end
+    return s
+end
+
+"""
+The profile log-likelihood of [`wls_prof_ll`](@ref) at ξ, with its gradient with respect to ξ, without automatic
+differentiation: the model is ŷ = A + g·B + g²·C with A, B, C linear/quadratic in (ρₑ, s = DRO_UNIT·δρ) through the
+packed Gram matrix, and scale, background and c1 are optima of the same objective, so (envelope theorem) the
+gradient of the profiled χ² is its partial gradient at the fitted scale m, background b and c1:
+
+    ∂ℓ/∂ξₖ = m · Σᵢ pᵢ ∂ŷᵢ/∂ξₖ,    pᵢ = wᵢ(Iᵢ − m·ŷᵢ − b).
+
+The contractions Σᵢ pᵢ·gⁿ·Gc[i, c] for the 15 Gram columns are all it needs. This is the same quantity that
+ForwardDiff gave through `profiled_corrs` (c1 held at its profiled value), without the dual-number vectors.
+All temporaries are Bumper-allocated.
+
+# Keywords
+- `c1::Union{Nothing,Float64} = nothing`: evaluate at this c1 instead of searching for it (the tests compare the
+    formula with ForwardDiff at one and the same c1, since the gradient depends on c1 to first order).
+
+# Returns
+- `(ll::Float64, ∇ξℓ::SVector{4,Float64})`.
+
+# Exceptions
+- `WLSError`: as [`wls_fit`](@ref), if the model is flat.
+"""
+function _profile_ll_grad(
+    wls::WLSData, ξ::SVector{4,Float64}, fw::ForwardCache, tab::_C1Tables, tol::Float64;
+    c1::Union{Nothing,Float64} = nothing,
+)::Tuple{Float64,SVector{4,Float64}}
+    c1_fixed = c1
+    Gc = fw.Gc
+    Q = size(Gc, 1)
+    ρ = ξ[1]; s1 = DRO_UNIT * ξ[2]; s2 = DRO_UNIT * ξ[3]; s3 = DRO_UNIT * ξ[4]
+    q = tab.qvals; w = wls.weights; y = wls.I_obs
+    ll = 0.0
+    grad = SVector(0.0, 0.0, 0.0, 0.0)
+    @no_escape begin
+        A = @alloc(Float64, Q); B = @alloc(Float64, Q); C = @alloc(Float64, Q)
+        _intensity_terms!(A, B, C, Gc, ρ, s1, s2, s3)
+        c1 = c1_fixed === nothing ? _c1_search(A, B, C, tab, wls, tol) : c1_fixed
+        fit = _wls_from_sums(_sums_at(A, B, C, tab, wls, c1)..., Q, wls)
+        m = fit.scale; b = fit.bkgrnd_corr
+
+        p = @alloc(Float64, Q); pg = @alloc(Float64, Q); pgg = @alloc(Float64, Q)
+        k = (c1^2 - 1) * EV_EXP_COEFF * tab.r_m^2
+        c3 = c1^3
+        @inbounds @fastmath @simd for i in 1:Q
+            g = c3 * exp(-(q[i]^2) * k)
+            ŷ = A[i] + g * (B[i] + g * C[i])
+            pi_ = w[i] * (y[i] - m * ŷ - b)
+            p[i] = pi_; pg[i] = pi_ * g; pgg[i] = pi_ * g * g
+        end
+        TA = ntuple(c -> _dotcol(Gc, c, p), Val(10))
+        TB = ntuple(c -> _dotcol(Gc, 10 + c, pg), Val(4))
+        TC = _dotcol(Gc, 15, pgg)
+
+        d_ρ  = -2 * (TB[1] + s1 * TB[2] + s2 * TB[3] + s3 * TB[4]) + 2ρ * TC
+        d_s1 = 2TA[2] + 2s1 * TA[5] + 2s2 * TA[6] + 2s3 * TA[7] - 2ρ * TB[2]
+        d_s2 = 2TA[3] + 2s1 * TA[6] + 2s2 * TA[8] + 2s3 * TA[9] - 2ρ * TB[3]
+        d_s3 = 2TA[4] + 2s1 * TA[7] + 2s2 * TA[9] + 2s3 * TA[10] - 2ρ * TB[4]
+        grad = SVector(m * d_ρ, m * DRO_UNIT * d_s1, m * DRO_UNIT * d_s2, m * DRO_UNIT * d_s3)
+        ll = wls_prof_ll(fit)
+    end
+    return ll, grad
+end
+
+"""
+[`profiled_corrs`](@ref) for a plain Float64 ξ: A, B, C and the c1 search's work vectors come from the Bumper buffer,
+ŷ is written in one fused pass (the only heap allocation besides the returned fit), no dual numbers.
+
+# Returns
+- `(ŷ::Vector{Float64}, fit::WLSFit, c1_star::Float64)`, as [`profiled_corrs`](@ref).
+"""
+function _profiled_value(wls::WLSData, ξ::SVector{4,Float64}, fw::ForwardCache, tab::_C1Tables, tol::Float64)
+    Q = length(tab.qvals)
+    ŷ = Vector{Float64}(undef, Q)
+    c1_star = 0.0
+    @no_escape begin
+        A = @alloc(Float64, Q); B = @alloc(Float64, Q); C = @alloc(Float64, Q)
+        _intensity_terms!(A, B, C, fw.Gc, ξ[1], DRO_UNIT * ξ[2], DRO_UNIT * ξ[3], DRO_UNIT * ξ[4])
+        c1_star = _c1_search(A, B, C, tab, wls, tol)
+        k = (c1_star^2 - 1) * EV_EXP_COEFF * tab.r_m^2
+        c3 = c1_star^3
+        q = tab.qvals
+        @inbounds @fastmath @simd for i in 1:Q
+            g = c3 * exp(-(q[i]^2) * k)
+            ŷ[i] = A[i] + g * (B[i] + g * C[i])
+        end
+    end
+    return ŷ, wls_fit(ŷ, wls), c1_star
 end
 
 """
@@ -289,37 +426,18 @@ function profiled_corrs(
     tab.r_m == fw.r_m && tab.qvals == fw.qvals) ||
         throw(ArgumentError("profiled_corrs: tables were built for a different q grid, r_m or scan settings"))
 
+    # plain Float64 ξ (the per-draw re-profile, the report): no dual numbers, Bumper temporaries, one output vector
+    ξ isa SVector{4,Float64} && return _profiled_value(wls, ξ, fw, tab, tol)
+
+    # c1 from the same A, B, C construction as every other path (so value and gradient agree on c1 exactly)
     ξ_val = ForwardDiff.value.(ξ)
-    A, B, C = intensity_terms(fw, ξ_val[1], (ξ_val[2], ξ_val[3], ξ_val[4]))
-    n = length(A)
-
-    # scan: reduced χ² at every scan point from the precomputed g powers
-    chis = _scan_chi2(A, B, C, tab, wls)
-    lo, hi = cmin - eps, cmax + eps
-    cs = tab.cs
-    i_best = argmin(chis)
-    lo_b = i_best == 1         ? lo : cs[i_best-1]
-    hi_b = i_best == length(cs) ? hi : cs[i_best+1]
-
-    # polish: Brent on the same objective, one fused pass per step.
-    # No assignments inside the closure: a name assigned both in a closure and in
-    # this enclosing body is one shared, Core.Box'ed variable (type-unstable).
-    χ²_at_c1 = @closure c1 -> reduced_chi2(
-                    _wls_from_sums(
-                        _sums_at(
-                            A, 
-                            B, 
-                            C, 
-                            tab, 
-                            wls, 
-                            c1
-                        )..., 
-                        n, 
-                        wls
-                    )
-                )
-    res = optimize(χ²_at_c1, lo_b, hi_b, Brent(); abs_tol = tol, rel_tol = 0.0)
-    c1_star = minimizer(res)
+    Q = length(tab.qvals)
+    c1_star = 0.0
+    @no_escape begin
+        A = @alloc(Float64, Q); B = @alloc(Float64, Q); C = @alloc(Float64, Q)
+        _intensity_terms!(A, B, C, fw.Gc, ξ_val[1], DRO_UNIT * ξ_val[2], DRO_UNIT * ξ_val[3], DRO_UNIT * ξ_val[4])
+        c1_star = _c1_search(A, B, C, tab, wls, tol)
+    end
 
     # the one fit that matters: at the caller's real (possibly Dual) ξ
     Ad, Bd, Cd = intensity_terms(fw, ξ[1], (ξ[2], ξ[3], ξ[4]))
