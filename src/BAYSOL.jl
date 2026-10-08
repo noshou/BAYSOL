@@ -11,12 +11,16 @@ BAYSOL.Report) so they are reachable as `BAYSOL.seed_model`, `BAYSOL.run_model` 
 """
 module BAYSOL
 
-include("PhysicalConstants/PhysicalConstants.jl")
-include("Cache/Cache.jl")
-include("Timing/Timing.jl")
-include("PlasticSequence/PlasticSequence.jl")
-include("AtomicRadii/AtomicRadii.jl")
-include("FormFactor/FormFactor.jl")
+include("Utils/Utils.jl")
+
+# The Utils submodules are bound here, before the modules that import them by name are included.
+using .Utils:               Utils
+using .Utils.PhysicalConstants: PhysicalConstants
+using .Utils.Cache:         Cache
+using .Utils.Timing:        Timing
+using .Utils.PlasticSequence: PlasticSequence
+using .Utils.Shannon:       Shannon
+
 include("PartialMolarVolumes/PMV.jl")
 include("MolecularStructure/MolecularStructure.jl")
 include("SASA/SASA.jl")
@@ -24,12 +28,6 @@ include("Scattering/Scattering.jl")
 include("Fitting/Fitting.jl")
 include("Report/Report.jl")
 
-using .PhysicalConstants:   PhysicalConstants
-using .Cache:               Cache
-using .Timing:              Timing
-using .PlasticSequence:     PlasticSequence
-using .AtomicRadii:         AtomicRadii
-using .FormFactor:          FormFactor
 using .PartialMolarVolumes: PartialMolarVolumes
 using .MolecularStructure:  MolecularStructure
 using .SASA:                SASA

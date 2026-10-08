@@ -8,7 +8,7 @@ using BAYSOL.Scattering: SphFuncs
 using BAYSOL.Scattering.SphFuncs: sphHarm, sphBess, sphBessRatios!, sphBessStep
 using BAYSOL.MolecularStructure: MolecularStructure, create, coords_cartesian, coords_spherical, radii, vols, r_max,
                 neighbour_tree, elms, name, Molecule
-using BAYSOL.AtomicRadii: AtomicRadii, resolve_one, lookup, tryparse_ion, ion_key, nearest_ion
+using BAYSOL.MolecularStructure: Ion, resolve_one, lookup_radii, tryparse_ion, ion_key, nearest_ion
 using BAYSOL: SASA
 
 @testset "Aqua" begin
@@ -26,9 +26,9 @@ end
     @inferred sphBessRatios!(sphBess(3, 4), 2.0, [0.1, 0.5, 1.0], 4)
     @inferred sphBessStep(1.0, 0.5, 3, 5, 0.5, 0.25)
     @inferred Union{Float64,Nothing} resolve_one("fe3+")
-    @inferred lookup(["fe3+", "o2-"])
-    @inferred Union{AtomicRadii.Ion,Nothing} tryparse_ion("fe3+")
-    @inferred ion_key(AtomicRadii.Ion("fe", 3))
+    @inferred lookup_radii(["fe3+", "o2-"])
+    @inferred Union{Ion,Nothing} tryparse_ion("fe3+")
+    @inferred ion_key(Ion("fe", 3))
     @inferred Union{String,Nothing} nearest_ion("fe", 5)
 
     m = @inferred create(
@@ -56,9 +56,9 @@ end
     @test_opt target_modules = (SphFuncs,) sphHarm(3, [0.4, 1.2], [0.1, 2.0])
     @test_opt target_modules = (MolecularStructure,) create("t", ["o", "h"],
         [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)])
-    @test_opt target_modules = (AtomicRadii,) resolve_one("fe3+")
-    @test_opt target_modules = (AtomicRadii,) lookup(["fe3+", "o2-"])
-    @test_opt target_modules = (AtomicRadii,) tryparse_ion("fe3+")
+    @test_opt target_modules = (MolecularStructure,) resolve_one("fe3+")
+    @test_opt target_modules = (MolecularStructure,) lookup_radii(["fe3+", "o2-"])
+    @test_opt target_modules = (MolecularStructure,) tryparse_ion("fe3+")
 
     let m = create("t", ["o", "h", "h"], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)])
         @test_opt target_modules = (MolecularStructure,) radii(m)

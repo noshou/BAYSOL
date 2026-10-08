@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Exercises src/Timing/Timing.jl (`StageLog`, `timed!`, `tick`/`tock!`,
+# Exercises src/Utils/Timing.jl (`StageLog`, `timed!`, `tick`/`tock!`,
 # `fmt_count`) and the report's `=== Run ===` / `=== Timing ===` sections.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 

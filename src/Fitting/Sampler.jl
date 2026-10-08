@@ -335,7 +335,7 @@ Everything [`run_fitting`](@ref) needs to start a NUTS chain.
     once here and passed to every [`profiled_corrs`](@ref) call; read-only, so safe to
     share across threads.
 - `shannon::Union{Nothing,ShannonInfo}`: how the measured curve was reduced to the data `wls` holds
-    (diameter, band limit, binning, raw data), when it came through [`shannon_data`](@ref); `nothing` otherwise.
+    (diameter, band limit, binning, raw data), when it came through [`Shannon.shannon_data`](@ref BAYSOL.Utils.Shannon.shannon_data); `nothing` otherwise.
 """
 struct Seed{T<:Real}
     pr::ξ_priors

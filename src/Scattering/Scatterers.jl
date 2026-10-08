@@ -6,7 +6,6 @@
 # it to the shared compute_B_lm; species_multipoles assembles all five. The
 # S_ab reduction is assembled downstream from the per-species B_lm, so nothing
 # here calls self_scatter.
-using ..FormFactor: FormFactor
 using ..SASA: SASA
 using ..MolecularStructure: Molecule, elms, coords_spherical, vols, to_spherical
 using ..Timing: StageLog, timed!
@@ -48,7 +47,7 @@ vacuum and excluded-volume multipoles in one pass from this and
 
 # Keywords
 - `log::Union{Nothing,Vector{String}} = nothing`: when not nothing,
-    [`FormFactor.form_factor_log`](@ref)'s construction-time diagnostics for
+    [`form_factor_log`](@ref BAYSOL.Scattering.form_factor_log)'s construction-time diagnostics for
     this call's `form_factor_table` build are append!ed to it in place.
 
 # Returns
@@ -60,9 +59,9 @@ function _vacuo_amplitude(
     energy::Float64;
     log::Union{Nothing,Vector{String}} = nothing,
 )
-    tbl = FormFactor.form_factor_table(energy, ions, qvals)
-    log === nothing || append!(log, FormFactor.form_factor_log(tbl))
-    return FormFactor.form_factors(tbl, ions, qvals)
+    tbl = form_factor_table(energy, ions, qvals)
+    log === nothing || append!(log, form_factor_log(tbl))
+    return form_factors(tbl, ions, qvals)
 end
 
 """

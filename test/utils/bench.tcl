@@ -70,9 +70,9 @@ namespace eval bench {
     # Docs, the visual-check snapshots, the fitting tests' result files and untracked benchmark results
     # are: none of them is needed to build a Seed and fit it.
     proc excluded {f} {
-        expr {[string match docs/* $f] || [string match test/visualize/xyz/* $f] ||
-              [string match test/baselines/results/* $f] ||
-              [regexp {^test/fitting_tests/.*/res[^/]*\.(txt|png)$} $f]}
+        expr {  [string match docs/* $f] || [string match test/visualize/xyz/* $f] ||
+                [string match test/baselines/results/* $f] ||
+                [regexp {^test/fitting_tests/.*/res[^/]*\.(txt|png)$} $f]}
     }
 
     # Copies the repository's tracked and untracked-but-not-ignored files (minus the excluded ones) to

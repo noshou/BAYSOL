@@ -43,14 +43,14 @@ using   BAYSOL.MolecularStructure: create, coords_cartesian, coords_spherical, t
         radii, vols, elms, Molecule
 
 using BAYSOL: SASA
-using BAYSOL.FormFactor: FormFactor
+using BAYSOL.Scattering: form_factor_table, form_factors
 
 """
 Per-element van der Waals radii in Å, EXACTLY as the live `AtomicRadii` backend
 returns them.
 
 Provenance: dumped at full `Float64` precision from
-`AtomicRadii.lookup([e])` on 2026-09-06, against
+`lookup_radii([e])` on 2026-09-06, against
 `data/atomic_radii.sqlite3` as of commit 071e4fd.
 """
 const SCAT_RADII = Dict("c" => 1.77, "o" => 1.5, "h" => 1.2, "fe3+" => 0.49, "o2-" => 1.35)
@@ -915,7 +915,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         scat_ffamp = reduce(vcat, [permutedims(SCAT_FF_TABLE[e]) for e in SCAT_FF_E])
         # pipeline-side amplitude: the live FormFactor tables, as species_multipoles builds it
         scat_ffamp_live(q, energy) =
-            FormFactor.form_factors(FormFactor.form_factor_table(energy, SCAT_FF_E, q), SCAT_FF_E, q)
+            form_factors(form_factor_table(energy, SCAT_FF_E, q), SCAT_FF_E, q)
 
         @testset "the live form factors match the hardcoded oracle table" begin
             # Same role as the radii guard: if the xraydb tables or the backend
