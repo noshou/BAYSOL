@@ -29,14 +29,18 @@ namespace eval formfactor {
         set out {}
         foreach tok [split [string trim $json "\[\] \n\t"] ,] {
             set tok [string trim $tok]
-            if {![string is double -strict $tok]} { error "$what: '$tok' is not a number" }
+            if {![string is double -strict $tok]} {
+                error "$what: '$tok' is not a number"
+            }
             lappend out [expr {double($tok)}]
         }
         return $out
     }
 
     # A list of doubles as a little-endian Float64 blob (bound to SQLite as a BLOB).
-    proc blob {xs} { binary format q* $xs }
+    proc blob {xs} {
+        binary format q* $xs
+    }
 
 
     # The schema, written out verbatim (not indented or reformatted), because the DDL text is stored in
@@ -68,10 +72,19 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     # it is complete, so a failure midway leaves any existing $dst untouched and no partial file behind.
     proc run {argv} {
         package require sqlite3
-        if {"--help" in $argv || "-h" in $argv} { ::usage $::SCRIPT; return }
+        if {"--help" in $argv || "-h" in $argv} {
+            ::usage $::SCRIPT
+            return
+        }
         lassign $argv src dst
-        if {$dst eq ""} { puts stderr "usage: extract_formfactor.tcl xraydb.sqlite form_factors.sqlite3"; exit 2 }
-        if {![file isfile $src]} { puts stderr "no such file: $src"; exit 1 }
+        if {$dst eq ""} {
+            puts stderr "usage: extract_formfactor.tcl xraydb.sqlite form_factors.sqlite3"
+            exit 2
+        }
+        if {![file isfile $src]} {
+            puts stderr "no such file: $src"
+            exit 1
+        }
         set part $dst.part
         file delete $part
         try {
@@ -103,7 +116,10 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         # The source keeps the two five-element lists as JSON text.
 
         srcdb eval {SELECT atomic_number, element, ion, offset, scale, exponents FROM Waasmaier} row {
-            lassign [list $row(atomic_number) $row(element) $row(ion) $row(offset)] z element ion offset
+            set z $row(atomic_number)
+            set element $row(element)
+            set ion $row(ion)
+            set offset $row(offset)
             set a [numbers $row(scale) "Waasmaier $ion scale"]
             set b [numbers $row(exponents) "Waasmaier $ion exponents"]
             if {[llength $a] != 5 || [llength $b] != 5} {
@@ -113,7 +129,13 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             lassign $b b1 b2 b3 b4 b5
             set ion [string tolower $ion]
             set element [string tolower $element]
-            dstdb eval {INSERT INTO waasmaier VALUES ($ion, $element, $z, $offset, $a1, $a2, $a3, $a4, $a5, $b1, $b2, $b3, $b4, $b5)}
+            dstdb eval {
+                INSERT INTO waasmaier VALUES (
+                    $ion, $element, $z, $offset,
+                    $a1, $a2, $a3, $a4, $a5,
+                    $b1, $b2, $b3, $b4, $b5
+                )
+            }
             incr n_w
         }
 
@@ -121,10 +143,15 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         # One row per element: the energy grid and f1, f2 on it, packed as Float64 blobs.
         # A missing atomic number is an error (LEFT JOIN, then checked) rather than a silently dropped element.
 
-        srcdb eval {SELECT c.element AS element, c.energy AS energy, c.f1 AS f1, c.f2 AS f2, e.atomic_number AS z
-                FROM Chantler c LEFT JOIN elements e ON e.element = c.element} row {
+        srcdb eval {
+            SELECT c.element AS element, c.energy AS energy, c.f1 AS f1, c.f2 AS f2,
+                   e.atomic_number AS z
+            FROM Chantler c LEFT JOIN elements e ON e.element = c.element
+        } row {
             set el $row(element)
-            if {$row(z) eq ""} { error "Chantler $el has no atomic number in the elements table" }
+            if {$row(z) eq ""} {
+                error "Chantler $el has no atomic number in the elements table"
+            }
             set e  [numbers $row(energy) "Chantler $el energy"]
             set y1 [numbers $row(f1) "Chantler $el f1"]
             set y2 [numbers $row(f2) "Chantler $el f2"]
@@ -139,13 +166,18 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             set keep {0}
             set last [lindex $e 0]
             for {set i 1} {$i < [llength $e]} {incr i} {
-                if {[lindex $e $i] > $last} { lappend keep $i; set last [lindex $e $i] }
+                if {[lindex $e $i] > $last} {
+                    lappend keep $i
+                    set last [lindex $e $i]
+                }
             }
             if {[llength $keep] != [llength $e]} {
                 puts "  deduped $el: [llength $e] -> [llength $keep] points"
                 foreach var {e y1 y2} {
                     set picked {}
-                    foreach i $keep { lappend picked [lindex [set $var] $i] }
+                    foreach i $keep {
+                        lappend picked [lindex [set $var] $i]
+                    }
                     set $var $picked
                 }
             }
@@ -158,7 +190,11 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             set energy [blob $e]
             set f1 [blob $y1]
             set f2 [blob $y2]
-            dstdb eval {INSERT INTO chantler VALUES ($element, $z, $npts, $emin, $emax, $energy, $f1, $f2)}
+            dstdb eval {
+                INSERT INTO chantler VALUES (
+                    $element, $z, $npts, $emin, $emax, $energy, $f1, $f2
+                )
+            }
             incr n_c
             incr tot $npts
         }

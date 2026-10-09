@@ -1,7 +1,6 @@
 using DelimitedFiles
 using Statistics
 using Random
-using GLMakie
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
@@ -395,6 +394,9 @@ function sasdj72_comparison_figure(result, data)
     return fig
 end
 
+# the results of both models, kept for the figures below
+fits = Dict{Symbol,Any}()
+
 for model in (:model1, :model2)
     result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdj72(model)
 
@@ -405,15 +407,25 @@ for model in (:model1, :model2)
         BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
     end
 
-    fig = sasdj72_figure(result, (q_fit, I_fit, σ_fit))
+    fits[model] = (result, (q_fit, I_fit, σ_fit))
+end
+
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
+# then recompile (about 40 % of a fit's wall clock).
+using GLMakie
+
+for model in (:model1, :model2)
+    result, data = fits[model]
+
+    fig = sasdj72_figure(result, data)
     save(joinpath(@__DIR__, "res_$(model).png"), fig; px_per_unit = PX_PER_UNIT)
 
-    fig_residuals = sasdj72_residuals_figure(result, (q_fit, I_fit, σ_fit))
+    fig_residuals = sasdj72_residuals_figure(result, data)
     save(joinpath(@__DIR__, "res_$(model)_residuals.png"), fig_residuals; px_per_unit = PX_PER_UNIT)
 
     fig_hist = sasdj72_hist(result)
     save(joinpath(@__DIR__, "res_$(model)_hist.png"), fig_hist; px_per_unit = PX_PER_UNIT)
 
-    fig_crysol = sasdj72_comparison_figure(result, (q_fit, I_fit, σ_fit))
+    fig_crysol = sasdj72_comparison_figure(result, data)
     save(joinpath(@__DIR__, "res_$(model)_comparison.png"), fig_crysol; px_per_unit = PX_PER_UNIT)
 end

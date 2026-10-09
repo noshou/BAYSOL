@@ -116,7 +116,7 @@ One submodule and four included files (all but `SphFuncs` are plain files `inclu
 \\
 5.  The dummy species do not carry the true local electron density
 
-        v = (1, -dns, `dro_1`, `dro_2`, `dro_3`),     `dro_k` = `DRO_UNIT` * `δρ_k`
+        v = (1, -dns, `dro_1`, `dro_2`, `dro_3`),     `dro_k` = `UNIT_OF_δρ` * `δρ_k`
 
     - dns rescales `A_ex` to the mean electron density of the displaced
             bulk solvent (≈ 0.334 e·Å⁻³).
@@ -173,8 +173,9 @@ using  DBInterface: DBInterface
 using  FastClosures: @closure
 using  LinearAlgebra: LinearAlgebra
 using ..SASA: PROBE_RADIUS, SHELL_N_TARGET
-using ..PhysicalConstants: DRO_UNIT
+using ..PhysicalConstants: UNIT_OF_δρ
 using ..GCPause: gc_checkpoint
+using ..Cache: Lazy, force
 using LinearAlgebra: mul!
 
 """
@@ -203,11 +204,14 @@ the q-tile length is chosen to fit it.
 const B_LM_W_BYTES = 64 * 2^20
 
 """
-Exponent coefficient of [`excluded_volume_factor`](@ref BAYSOL.Scattering.excluded_volume_factor): (4π/3)^(2/3) / 4π.
+Coefficients of
+[`excluded_volume_factor`](@ref BAYSOL.Scattering.excluded_volume_factor):
+(4π/3)^(2/3) / 4π.
 
 Converts CRYSOL's *radius* parameterisation into the *volume* parameterisation
-[`_gaussian_dummy`](@ref BAYSOL.Scattering._gaussian_dummy) is written in, via V = (4π/3) r³ (which is exactly
-`MolecularStructure.sphere_volume`, so `r_m` and the dummy volumes stay consistent).
+[`_gaussian_dummy`](@ref BAYSOL.Scattering._gaussian_dummy) is written in,
+via V = (4π/3) r³ (which is exactly `MolecularStructure.sphere_volume`,
+so `r_m` and the dummy volumes stay consistent).
 """
 const EV_EXP_COEFF = (4π / 3)^(2 / 3) / (4π)
 
@@ -216,23 +220,24 @@ Start order of the continued-fraction sweep in
 [`Scattering.SphFuncs.sphBessRatios!`](@ref BAYSOL.Scattering.SphFuncs.sphBessRatios!):
 N = max(lMax, ⌈x⌉) + `GAUTSCHI_MARGIN[1]` + ⌈`GAUTSCHI_MARGIN[2]`·x^(1/3)⌉. Deep enough
 that every ratio is converged to the Float64 rounding floor (the floor is reached at
-(12, 5) against a 512-bit reference; (16, 6) leaves a safety step).
+(12, 5) against a 512-bit reference, which is the margin used; the earlier (16, 6) left a safety step
+that only cost sweep time).
 """
-const GAUTSCHI_MARGIN = (16, 6.0)
+const GAUTSCHI_MARGIN = (12, 5.0)
 
 """
 Threshold below which a spherical Bessel value jₗ(q·r) is treated as zero in
 [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm): degree-l columns with
-q·`r_max` < `x_cut(l)` (`xcut` in `compute_B_lm`), where xˡ/(2l+1)!! = `BESSEL_CUTOFF` (an upper bound on |jₗ|), are
-skipped. Each skipped term is below `BESSEL_CUTOFF`·|f|, far under any tolerance on G.
+q·`r_max` < `x_cut(l)` (`xcut` in `compute_B_lm`), where xˡ/(2l+1)!! = `BESS_CUT`
+(an upper bound on |jₗ|), are skipped. Each skipped term is below `BESS_CUT`·|f|,
+far under any tolerance on G.
 """
-const BESSEL_CUTOFF = 1e-9
+const BESS_CUT = 1e-9
 
 # The public surface: forward_cache builds the geometry-only ForwardCache.
 # Everything the includes below bring in (compute_B_lm, hydration, gram, …)
 # is the machinery it composes.
-export forward_cache,
-       form_factor_table, form_factors, form_factor_log, FF, FormFactorError
+export forward_cache, form_factor_table, form_factors, form_factor_log, FF, FormFactorError
 
 include("SphFuncs.jl")
 include("FormFactor.jl")

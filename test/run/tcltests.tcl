@@ -13,6 +13,9 @@
 package require tcltest
 
 set here [file dirname [file normalize [info script]]]
-tcltest::configure -testdir [file normalize [file join $here .. utils tests]] -verbose {error} {*}$argv
+tcltest::configure \
+    -testdir [file normalize [file join $here .. utils tests]] \
+    -verbose {error} \
+    {*}$argv
 tcltest::runAllTests
 exit [expr {$tcltest::numTests(Failed) > 0}]

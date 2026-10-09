@@ -7,7 +7,7 @@
 if !@isdefined(check_float)
     using Test
     using BAYSOL
-    using BAYSOL.PhysicalConstants: DRO_UNIT
+    using BAYSOL.PhysicalConstants: UNIT_OF_δρ
 
     # Default absolute tolerance for floating-point equality checks
     # (abs(a - b) < DEFAULT_ATOL): a few orders of magnitude above Float64 roundoff.
@@ -39,12 +39,12 @@ if !@isdefined(check_float)
 
     # Reference detector-scale intensity from a ForwardCache: the plain double sum
     #     I_calc(q) = scale · Σ_ab v_a(q) v_b(q) G_ab(q) + bkgrnd_corr,
-    #     v(q) = (1, -dns·g(q; c_1), dro_1, dro_2, dro_3),  dro_k = DRO_UNIT·δρ_k,
+    #     v(q) = (1, -dns·g(q; c_1), dro_1, dro_2, dro_3),  dro_k = UNIT_OF_δρ·δρ_k,
     # g the excluded-volume envelope (c_1 = 1 ⇒ g ≡ 1). Written independently of the
     # fused A + g·B + g²·C path in BAYSOL.Fitting.profiled_corrs, so it can cross-check it.
     function reference_intensity(fw, scale, bkgrnd_corr, dns, δρ, c_1 = 1.0)
         g = BAYSOL.Scattering.excluded_volume_factor(fw.qvals, fw.r_m, c_1)
-        d = DRO_UNIT .* δρ
+        d = UNIT_OF_δρ .* δρ
         out = Vector{Float64}(undef, length(g))
         for k in eachindex(g)
             v = (1.0, -dns * g[k], d[1], d[2], d[3])

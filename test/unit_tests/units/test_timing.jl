@@ -61,6 +61,8 @@ using BAYSOL.Report: _write_timing, _write_run_info
         log.info["n_atoms"] = 602; log.info["lMax"] = 12; log.info["n_q"] = 60; log.info["n_samples"] = 2000; log.info["n_adapt"] = 1000
         push!(log.stages, Stage(:static, 1, "pdb2pqr", 21.3, 0.0, 0.0, "[cache miss]"))
         push!(log.stages, Stage(:static, 1, "forward_cache", 25.9, 0.0, 0.0, ""))
+        push!(log.stages, Stage(:static, 1, "resolve_structure", 0.0023, 0.0, 0.0, ""))
+        push!(log.stages, Stage(:static, 1, "seed_fitting (priors, WLS)", 0.0, 0.0, 0.0, ""))
         push!(log.stages, Stage(:static, 2, "hydration (SASA + B_lm)", 19.8, 0.0, 0.0, ""))
         push!(log.stages, Stage(:sampling, 1, "NUTS  (2k iters, 14.21k leapfrog, 4.8 ms/step)", 68.0, 0.0, 0.0, ""))
         io = IOBuffer()
@@ -81,6 +83,11 @@ using BAYSOL.Report: _write_timing, _write_run_info
         @test any(l -> startswith(l, "      hydration (SASA + B_lm)"), lines)   # depth 2 → 6 spaces
         @test any(l -> startswith(l, "  report write"), lines) && any(l -> startswith(l, "  unaccounted"), lines)
         @test startswith(lines[end], "GC: ")
+        # a stage of a few milliseconds is not rounded to 0.00: it prints in scientific notation
+        @test any(l -> startswith(l, "    resolve_structure") && occursin(r"2\.3e-03\s*$", l), lines)
+        @test any(l -> startswith(l, "    seed_fitting") && occursin(r"\s0\s*$", l), lines)
+        @test BAYSOL.Report._fmt_seconds(25.9) == "25.90" && BAYSOL.Report._fmt_seconds(0.01) == "0.01" &&
+              BAYSOL.Report._fmt_seconds(0.0099) == "9.9e-03" && BAYSOL.Report._fmt_seconds(0) == "0"
         # the seconds column ends at the same character on every stage line
         # (character positions, not byte offsets: the wall-clock label contains "→")
         charend(l, r) = length(l[1:something(findfirst(r, l)).stop])
