@@ -341,7 +341,7 @@ end
 """
     sasdj72_comparison_figure(result, data) -> Figure
 
-Overlays our MAP curve against the reference CRYSOL fit
+Overlays our MAP curve against the deposited MultiFoXS 2-state fit
 (SASDJ72_fit1.fit's 4th column, `I_crysol_fit`).
 """
 function sasdj72_comparison_figure(result, data)
@@ -378,7 +378,7 @@ function sasdj72_comparison_figure(result, data)
 
     lines!(
         ax, q_crysol[keep], I_crysol[keep];
-        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = "CRYSOL fit1",
+        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = "MultiFoXS 2-state",
     )
 
     if map_result !== nothing

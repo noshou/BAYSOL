@@ -9,7 +9,7 @@ next to the script. The fitted curve is the deposited SASBDB curve (q in Å⁻¹
 julia --project=test/fitting_tests test/fitting_tests/<ID>/<script>.jl
 ```
 
-All fits use 2000 NUTS iterations: the first 1000 are warmup (step-size and mass-matrix adaptation) and are discarded, leaving 1000
+All fits use 1000 NUTS iterations (`BAYSOL.Report.DEFAULT_N_SAMPLES`): the first 300 are warmup (step-size and mass-matrix adaptation) and are discarded, leaving 700
 posterior draws. The seed is 0. Each script defines `run_<id>(; n_samples, n_adapt, seed)` if you want to change these values; `n_samples` is the *total* iteration count, including the `n_adapt` warmup, and the scripts use these defaults. Each script also has a `seed_<id>(...)` that builds the `Seed` its `run_<id>` then samples. It only for the tools in `test/utils/`, which inspect a fit without running it; if you don't need extra tooling skip `seed_<id>`. The temperature is each entry's stated sample temperature (25 °C when none is given). Hydrogens are added with Pdb2pqr at the stated pH unless noted.
 
 Settings shared by every script live in `common.jl`, which each script includes: the sampler defaults (`N_SAMPLES`, `N_ADAPT`, `SAMPLER_SEED`), the default pH σ (`PH_METER_SIGMA` = 0.1) and macromolecule-molarity σ (`MOLARITY_REL_SIGMA` = 5 %), the nm⁻¹ → Å⁻¹ conversion and q-unit sanity check, the `.dat`/fit-file readers, and the plot styling (sizes, colours, line widths). Change them there, not in individual scripts. A script that deliberately differs keeps its own value inline, with a comment.
@@ -20,67 +20,67 @@ Settings shared by every script live in `common.jl`, which each script includes:
 
 | Run | χ² (MAP) | depositor's χ² (method) | δρ₁ | δρ₂ | δρ₃ | c1 | divergences |
 |---|---|---|---|---|---|---|---|
-| SASDA52 fit1 | 5.34 | CRYSOL χ² 2.48 (χ² ≈ 6.2) | 0.08 | 0.08 | **2.76** | 1.160 | 0 |
-| SASDBS6 fit2_model1 | 60.4 | EOM ensemble 11.3 | **2.00** | −1.29 | **−11.28** | 0.927 | 0 |
+| SASDA52 fit1 | 5.34 | CRYSOL χ² 2.48 (χ² ≈ 6.2) | 0.08 | 0.09 | **2.76** | 1.160 | 0 |
+| SASDBS6 fit2_model1 | 60.4 | EOM ensemble 11.3 | **2.00** | −1.28 | **−11.27** | 0.927 | 0 |
 | SASDBS6 fit2_model2 | 89.3 | ″ | −0.37 | **2.00** | **2.83** | 1.241 | 0 |
 | SASDBS6 fit2_model3 | 21.5 | ″ | 0.04 | 1.67 | **2.82** | 1.201 | 0 |
 | SASDBS6 fit2_model4 | 23.9 | ″ | 0.09 | 1.12 | **2.82** | 1.196 | 0 |
-| SASDBS6 fit2_model5 | 51.8 | ″ | −0.25 | **2.00** | 0.81 | 1.233 | 0 |
-| SASDCQ2 fit2_model1 | 0.822 | MultiFoXS 1-state 0.85 | 0.51 | −0.59 | −6.36 | 1.163 | 0.1 % |
-| SASDCQ2 fit3_model1 | 1.23 | MultiFoXS 2-state 0.79 | −0.19 | −0.84 | −7.73 | 1.242 | 0 |
-| SASDCQ2 fit3_model2 | 51.2 | ″ | 0.35 | −1.53 | 2.67 | 1.129 | 0 |
-| SASDD88 fit2_model1 | 0.988 | FoXS 4.50 | −0.09 | 1.45 | −0.37 | 1.230 | 0 |
-| SASDD88 fit3_model1 | 0.911 | FoXS 2.79 | 0.32 | −2.77 | −6.87 | 1.216 | 0 |
-| SASDEP6 fit1_model1 | 2.4 | OLIGOMER 2-state 8.31 (w 0.59) | −0.79 | 1.86 | −9.53 | 1.236 | 0.1 % |
-| SASDEP6 fit1_model2 | 2.88 | ″ (w 0.41) | −0.45 | 1.90 | −6.47 | 1.221 | 0.6 % |
-| SASDF42 — | 1.37 | 2.10 | −0.69 | 0.91 | −5.62 | 1.242 | 0 |
-| SASDJ62 model1 | 3.39 | — | 0.23 | 0.89 | **−11.21** | 1.194 | 0 |
-| SASDJ72 model1 | 51.4 | MultiFoXS 2-state 2.91 | 0.19 | **1.99** | **2.87** | 1.196 | 0 |
-| SASDJ72 model2 | 2.38 | ″ | −0.27 | 1.01 | −7.63 | 1.215 | 0 |
-| SASDJY2 — | 0.636 | CRYSOL 4.68 | 0.79 | −7.04 | −1.58 | 1.163 | 0 |
-| SASDKQ8 — | 1.51 | CRYSOL 14.3 | 0.78 | −6.58 | −4.31 | 1.170 | 0 |
-| SASDLP4 fit1_model1 | 3.46 | OLIGOMER 3-state 1.09 | 0.78 | −3.58 | **2.78** | 1.205 | 0 |
-| SASDLP4 fit1_model2 | 1.21 | ″ | 0.14 | −2.13 | −1.39 | 1.258 | 0.7 % |
+| SASDBS6 fit2_model5 | 51.8 | ″ | −0.25 | **2.00** | 0.82 | 1.233 | 0 |
+| SASDCQ2 fit2_model1 | 0.821 | MultiFoXS 1-state 0.85 | 0.53 | −0.62 | −6.69 | 1.161 | 0 |
+| SASDCQ2 fit3_model1 | 1.23 | MultiFoXS 2-state 0.79 | −0.19 | −0.84 | −8.12 | 1.242 | 0 |
+| SASDCQ2 fit3_model2 | 51.2 | ″ | 0.36 | −1.52 | 2.70 | 1.129 | 0 |
+| SASDD88 fit2_model1 | 0.989 | FoXS 4.50 | −0.08 | 1.35 | 0.07 | 1.229 | 0 |
+| SASDD88 fit3_model1 | 0.912 | FoXS 2.79 | 0.32 | −2.74 | −6.28 | 1.216 | 0 |
+| SASDEP6 fit1_model1 | 2.4 | OLIGOMER 2-state 8.31 (w 0.59) | −0.78 | 1.88 | −9.52 | 1.235 | 0.1 % |
+| SASDEP6 fit1_model2 | 2.88 | ″ (w 0.41) | −0.44 | 1.89 | −6.37 | 1.221 | 0.1 % |
+| SASDF42 — | 1.36 | 2.10 | −0.69 | 0.94 | −5.70 | 1.242 | 0 |
+| SASDJ62 model1 | 3.39 | — | 0.23 | 0.88 | **−11.22** | 1.194 | 0 |
+| SASDJ72 model1 | 51.4 | MultiFoXS 2-state 2.91 | 0.19 | **1.98** | **2.87** | 1.197 | 0 |
+| SASDJ72 model2 | 2.38 | ″ | −0.26 | 0.99 | −7.48 | 1.215 | 0 |
+| SASDJY2 — | 0.635 | CRYSOL 4.68 | 0.81 | −7.12 | −1.44 | 1.162 | 0 |
+| SASDKQ8 — | 1.51 | CRYSOL 14.3 | 0.77 | −6.48 | −3.72 | 1.171 | 0 |
+| SASDLP4 fit1_model1 | 3.46 | OLIGOMER 3-state 1.09 | 0.78 | −3.57 | **2.78** | 1.205 | 0 |
+| SASDLP4 fit1_model2 | 1.21 | ″ | 0.15 | −2.05 | −0.91 | 1.256 | 0 |
 | SASDLP4 fit1_model3 | 7.84 | ″ | 0.52 | −0.96 | **2.79** | 1.226 | 0 |
-| SASDLP4 fit2_model1 | 1.21 | CRYSOL 1.06 | 0.14 | −2.13 | −1.39 | 1.258 | 0.7 % |
-| SASDMJ9 — | 0.875 | CRYSOL 1.37 | −1.06 | **1.95** | −5.05 | 1.248 | 0 |
-| SASDMZ9 model1 | 7 | MultiFoXS 3-state 2.65 | −0.04 | −1.18 | −1.28 | 1.185 | 0 |
-| SASDMZ9 model2 | 6.49 | ″ | −0.29 | −1.14 | −0.42 | 1.203 | 0 |
+| SASDLP4 fit2_model1 | 1.21 | CRYSOL 1.06 | 0.15 | −2.05 | −0.91 | 1.256 | 0 |
+| SASDMJ9 — | 0.874 | CRYSOL 1.37 | −1.07 | **1.96** | −5.99 | 1.248 | 0 |
+| SASDMZ9 model1 | 7 | MultiFoXS 3-state 2.65 | −0.04 | −1.18 | −1.27 | 1.185 | 0 |
+| SASDMZ9 model2 | 6.49 | ″ | −0.28 | −1.14 | −0.40 | 1.203 | 0 |
 | SASDMZ9 model3 | 55 | ″ | 0.23 | −2.51 | **2.79** | 1.181 | 0 |
-| SASDN32 — | 0.975 | FoXS 1.01 | 0.41 | −2.48 | 1.71 | 1.187 | 0 |
+| SASDN32 — | 0.975 | FoXS 1.01 | 0.41 | −2.46 | 1.74 | 1.187 | 0 |
 | SASDP48 — | 15.9 | CRYSOL 59.5 | −0.05 | 0.38 | **2.77** | 1.214 | 0 |
-| SASDR99 — | 14.5 | 29.6 (MDFF model) | 0.15 | −1.99 | −8.69 | 1.179 | 0 |
-| SASDRN5 fit2_model1 | 2.85 | SREFLEX 3.04 | 0.31 | 1.27 | 0.67 | 1.188 | 0 |
-| SASDRN5 fit3_model1 | 7.18 | CRYSOL 12.0 | −0.01 | −0.25 | −8.87 | 1.210 | 0 |
-| SASDRW2 — | 2.02 | CRYSOL 3.03 | −0.23 | −7.44 | −2.59 | **0.780 (saturated)** | 0 |
-| SASDTK5 fit2_model1 | 0.94 | CRYSOL 1.14 | −0.94 | −5.75 | −1.85 | 1.257 | 0 |
-| SASDTK5 fit3_model1 | 1.2 | CRYSOL 1.17 | 0.52 | 1.53 | 2.44 | 1.187 | 0 |
-| SASDTK5 fit4_model1 | 1.61 | CRYSOL 5.22 | −0.11 | −3.82 | **−11.24** | 1.216 | 0 |
-| SASDTK5 fit5_model1 | 0.924 | CRYSOL 1.81 | −0.18 | −5.75 | 1.23 | 1.229 | 0 |
-| SASDTK5 fit6_model1 | 0.926 | CRYSOL 1.03 | 0.63 | 1.79 | 1.96 | 1.177 | 0 |
-| SASDTK5 fit7_model1 | 1.81 | CRYSOL 6.09 | −0.02 | −3.11 | **−11.27** | 1.216 | 0 |
-| SASDUN5 fit1_model1 | 1.87 | OLIGOMER 2-state 2.21 | −0.34 | −1.52 | −1.46 | 1.212 | 0 |
-| SASDUN5 fit1_model2 | 11.4 | ″ | −0.55 | −2.76 | **−11.26** | 1.177 | 0 |
-| SASDV94 fit1 | 1.87 | CRYSOL 1.28 | **1.98** | −8.00 | 2.64 | 1.134 | 0 |
-| SASDVG2 fit1_model1 | 2.44 | MultiFoXS 1-state 2.10 | 0.00 | 0.69 | −2.58 | 1.176 | 0 |
-| SASDVG2 fit2_model1 | 2.3 | MultiFoXS 2-state 1.27 | −0.27 | 1.68 | −0.78 | 1.171 | 2.5 % |
-| SASDVG2 fit2_model2 | 4 | ″ | 0.91 | −2.46 | 2.13 | 1.167 | 0 |
-| SASDVG2 fit3_model1 | 3.98 | MultiFoXS 3-state 1.29 | 1.38 | −9.02 | −10.20 | 1.261 | 0 |
-| SASDVG2 fit3_model2 | 5.83 | ″ | 0.44 | −1.29 | −2.99 | 1.199 | 0 |
+| SASDR99 — | 14.5 | 29.6 (MDFF model) | 0.15 | −1.99 | −8.68 | 1.179 | 0 |
+| SASDRN5 fit2_model1 | 2.85 | SREFLEX 3.04 | 0.31 | 1.29 | 0.70 | 1.189 | 0 |
+| SASDRN5 fit3_model1 | 7.18 | CRYSOL 12.0 | −0.01 | −0.23 | −9.02 | 1.210 | 0 |
+| SASDRW2 — | 2.02 | CRYSOL 3.03 | −0.22 | −7.27 | −2.66 | **0.780 (saturated)** | 0 |
+| SASDTK5 fit2_model1 | 0.942 | CRYSOL 1.14 | −0.91 | −5.54 | −1.90 | 1.256 | 0 |
+| SASDTK5 fit3_model1 | 1.2 | CRYSOL 1.17 | 0.54 | 1.58 | 2.40 | 1.186 | 0 |
+| SASDTK5 fit4_model1 | 1.6 | CRYSOL 5.22 | −0.11 | −3.86 | **−11.25** | 1.216 | 0 |
+| SASDTK5 fit5_model1 | 0.931 | CRYSOL 1.81 | −0.13 | −5.06 | 1.38 | 1.227 | 0.6 % |
+| SASDTK5 fit6_model1 | 0.926 | CRYSOL 1.03 | 0.62 | 1.76 | 2.18 | 1.177 | 0 |
+| SASDTK5 fit7_model1 | 1.82 | CRYSOL 6.09 | −0.02 | −3.13 | **−11.26** | 1.216 | 0 |
+| SASDUN5 fit1_model1 | 1.87 | OLIGOMER 2-state 2.21 | −0.36 | −1.51 | −1.56 | 1.213 | 0 |
+| SASDUN5 fit1_model2 | 11.4 | ″ | −0.55 | −2.77 | **−11.26** | 1.177 | 0 |
+| SASDV94 fit1 | 1.87 | CRYSOL 1.28 | **1.98** | −8.00 | 2.62 | 1.134 | 0 |
+| SASDVG2 fit1_model1 | 2.44 | MultiFoXS 1-state 2.10 | 0.01 | 0.67 | −2.47 | 1.177 | 0 |
+| SASDVG2 fit2_model1 | 2.3 | MultiFoXS 2-state 1.27 | −0.28 | 1.69 | −0.76 | 1.171 | 0.4 % |
+| SASDVG2 fit2_model2 | 4 | ″ | 0.91 | −2.47 | 2.13 | 1.167 | 0 |
+| SASDVG2 fit3_model1 | 3.98 | MultiFoXS 3-state 1.29 | 1.40 | −9.10 | −10.27 | 1.261 | 0 |
+| SASDVG2 fit3_model2 | 5.83 | ″ | 0.44 | −1.29 | −3.00 | 1.199 | 0 |
 | SASDVG2 fit3_model3 | 21.4 | ″ | 0.24 | −0.63 | −2.91 | 1.203 | 0 |
-| SASDWZ9 — | 0.579 | Pepsi-SAXS 0.62 | 0.27 | 1.56 | −0.69 | 1.278 | 0 |
-| SASDX52 — | 0.305 | 0.70 (method unconfirmed) | −0.22 | −3.53 | 0.92 | 1.231 | 1.3 % |
-| SASDYW6 fit2 | 2.88 | CRYSOL 3.74 | −0.11 | −1.52 | −6.40 | 1.198 | 0 |
-| SASDZC6 — | 1.66 | FoXS 1.68 | −0.67 | −0.18 | 0.48 | 1.114 | 0.1 % |
-| SASDZZ9 fit1 | 14.6 | CRYSOL ≈ 34.5 | −0.47 | **1.99** | −5.50 | 1.231 | 0 |
+| SASDWZ9 — | 0.578 | Pepsi-SAXS 0.62 | 0.26 | 1.56 | −0.08 | 1.278 | 0.3 % |
+| SASDX52 — | 0.306 | 0.70 (method unconfirmed) | −0.23 | −3.36 | 1.10 | 1.234 | 0 |
+| SASDYW6 fit2 | 2.88 | CRYSOL 3.74 | −0.11 | −1.55 | −6.36 | 1.198 | 0 |
+| SASDZC6 — | 1.66 | FoXS 1.68 | −0.71 | −0.12 | 0.73 | 1.107 | 0.7 % |
+| SASDZZ9 fit1 | 14.6 | CRYSOL ≈ 34.5 | −0.48 | **1.99** | −5.51 | 1.231 | 0 |
 
 **How to read these MAPs.**
 
-- **The reported MAP is the best NUTS draw**, not the L-BFGS mode that seeds the sampler (their χ² agrees to 4-5 digits, e.g. 60.2652 vs 60.2657 for SASDBS6 model1). Parameters the data barely constrain (δρ₃ on fits with almost no cavity beads, for one) move between reruns because the best of 1000 draws moves, with the χ² unchanged; judge those from the quantile table in each `res*.txt`, not from this table.
+- **The reported MAP is the best NUTS draw**, not the L-BFGS mode that seeds the sampler (their χ² agrees to 4-5 digits, e.g. 60.2652 vs 60.2657 for SASDBS6 model1). Parameters the data barely constrain (δρ₃ on fits with almost no cavity beads, for one) move between reruns because the best of 700 draws moves, with the χ² unchanged; judge those from the quantile table in each `res*.txt`, not from this table.
 - **No chain fails.** The two failed chains of v0.2.0 (SASDMZ9 model1, 96.8 % divergent; SASDJY2, 81 %) sample cleanly. Three runs have 1-5 % divergent transitions and are not bold: SASDEP6 `fit1_model1` (3.0 %) and SASDLP4 `fit1_model2` / `fit2_model1` (1.4 %, the same structure and curve). The divergences are geometric, not numerical error in the gradient (they persist at c1 tolerance 1e-10) and they disappear at a target acceptance of 0.9 (SASDLP4 `fit1_model2`: 6-61 per 1000 draws at 0.8, 0-3 at 0.9, for 1.5× the NUTS time); the default stays 0.8 so timings remain comparable. In both fits the δρ₃ posterior is 2-4× wider than the Laplace whitening predicts, because δρ₃ is barely constrained.
 - **Other optima are not competing modes.** The MAP search often reports 2-5 "modes", but every one besides the best is at least 260 nats lower in log density (usually thousands), so it carries no posterior mass; the count is a number of distinct local optima, not of modes of the posterior.
 - **Many fits put δρ₃ at its upper bound** (~+2.8, i.e. φ ≈ φ_max): SASDA52, SASDBS6 model2-4, SASDJ72 model1, SASDLP4 `fit1_model1`/3, SASDMZ9 model3, SASDP48. At its **lower** bound (−11.1, empty cavities): SASDBS6 model1, SASDJ62, SASDTK5 fit4/7 and SASDUN5 model2. The bound is usually reached together with a poor or mediocre χ²: the cavity contrast is absorbing model-data mismatch (wrong conformer, missing ensemble members) rather than representing physical cavity hydration.
-- **What buys the low χ² on poorly fitting single conformers is the split of the first two contrasts.** Refitting with one shared shell contrast (δρ₁ = δρ₂ = δρ₃, c1, scale and background still profiled; `diagnose.jl ablate`) gives:
+- **What buys the low χ² on poorly fitting single conformers is the split of the first two contrasts.** Refitting with one shared shell contrast (δρ₁ = δρ₂ = δρ₃, c1, scale and background still profiled; `tclsh test/run/diagnose.tcl --ablate`) gives:
 
 
   | fit                             | one shared contrast     | δρ₁ = δρ₂, δρ₃ free | full model (this table)   |
@@ -122,7 +122,7 @@ Three scripts work on the results without rerunning a fit:
 
 ```
 # sampler diagnostics on any fit: MAP starts, Hessian, step size and tree depth, gradient error, modes
-tclsh test/utils/diagnose.tcl --report SASDBS6:fit2_model3
+tclsh test/run/diagnose.tcl --report SASDBS6:fit2_model3
 #   other commands: `tolerance --tols 1e-5,1e-8 --seeds 1,2,3` (NUTS vs the c1 tolerance), `ablate` (shell-contrast nesting)
 
 # compare results between git revisions / tags and the working tree (timing totals, χ² and parameter distributions)
@@ -137,7 +137,7 @@ Cold-start and steady-state benchmarks (compile and precompile time reported apa
 wiped cache state) live in `test/utils/` (see `test/utils/README.md`); `tclsh test/utils/compare.tcl --bench new.json`
 compares a run with the latest release's baseline in `test/baselines/` (or name two files). Benchmarks are only run with the repository owner's approval (`--approved`), because they need a quiet machine and AI agents tend not to check for one; see `test/utils/README.md`.
 
-`test/utils/diagnose.tcl` builds the `Seed` a script would sample without fitting it (through the script's `seed_<id>()`, above); the diagnostics themselves are generic functions in `test/utils/seed_diagnostics.jl`, tested in `test/unit_tests/units/test_seed_diagnostics.jl`. `compare.tcl` reads the committed `res*.txt` of each revision with `git show`, so no checkout is needed; the wall clock excludes PROPKA/pdb2pqr.
+`test/run/diagnose.tcl` (through `test/utils/diagnose.tcl`) builds the `Seed` a script would sample without fitting it (through the script's `seed_<id>()`, above); the diagnostics themselves are generic functions in `test/utils/seed_diagnostics.jl`, tested in `test/unit_tests/units/test_seed_diagnostics.jl`. `compare.tcl` reads the committed `res*.txt` of each revision with `git show`, so no checkout is needed; the wall clock excludes PROPKA/pdb2pqr.
 
 ## Entry summary
 

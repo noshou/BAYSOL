@@ -77,11 +77,11 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 # One run per atomic model with a deposited fit; `fit` is that model's reference curve (q scaled to Å⁻¹ by `fit_scale`; the fitted intensity is column `fit_col`; `rescale` = the file is normalized, scale it to the data).
 const RUNS = [
-    (tag = "fit2_model1", pdb = "SASDBS6_fit2_model1.pdb", fit = "SASDBS6_fit2.fit", fit_scale = 1.0, fit_col = 3, rescale = false, software = "fit"),   # D_max ≈ 141 Å; deposited χ² = 11.4
-    (tag = "fit2_model2", pdb = "SASDBS6_fit2_model2.pdb", fit = "SASDBS6_fit2.fit", fit_scale = 1.0, fit_col = 3, rescale = false, software = "fit"),   # D_max ≈ 160 Å; deposited χ² = 11.4
-    (tag = "fit2_model3", pdb = "SASDBS6_fit2_model3.pdb", fit = "SASDBS6_fit2.fit", fit_scale = 1.0, fit_col = 3, rescale = false, software = "fit"),   # D_max ≈ 151 Å; deposited χ² = 11.4
-    (tag = "fit2_model4", pdb = "SASDBS6_fit2_model4.pdb", fit = "SASDBS6_fit2.fit", fit_scale = 1.0, fit_col = 3, rescale = false, software = "fit"),   # D_max ≈ 141 Å; deposited χ² = 11.4
-    (tag = "fit2_model5", pdb = "SASDBS6_fit2_model5.pdb", fit = "SASDBS6_fit2.fit", fit_scale = 1.0, fit_col = 3, rescale = false, software = "fit"),   # D_max ≈ 108 Å; deposited χ² = 11.4
+    (tag = "fit2_model1", pdb = "SASDBS6_fit2_model1.pdb", fit = "SASDBS6_fit2.fit", fit_scale = 1.0, fit_col = 3, rescale = false, software = "EOM ensemble"),   # D_max ≈ 141 Å; deposited χ² = 11.4
+    (tag = "fit2_model2", pdb = "SASDBS6_fit2_model2.pdb", fit = "SASDBS6_fit2.fit", fit_scale = 1.0, fit_col = 3, rescale = false, software = "EOM ensemble"),   # D_max ≈ 160 Å; deposited χ² = 11.4
+    (tag = "fit2_model3", pdb = "SASDBS6_fit2_model3.pdb", fit = "SASDBS6_fit2.fit", fit_scale = 1.0, fit_col = 3, rescale = false, software = "EOM ensemble"),   # D_max ≈ 151 Å; deposited χ² = 11.4
+    (tag = "fit2_model4", pdb = "SASDBS6_fit2_model4.pdb", fit = "SASDBS6_fit2.fit", fit_scale = 1.0, fit_col = 3, rescale = false, software = "EOM ensemble"),   # D_max ≈ 141 Å; deposited χ² = 11.4
+    (tag = "fit2_model5", pdb = "SASDBS6_fit2_model5.pdb", fit = "SASDBS6_fit2.fit", fit_scale = 1.0, fit_col = 3, rescale = false, software = "EOM ensemble"),   # D_max ≈ 108 Å; deposited χ² = 11.4
 ]
 
 """

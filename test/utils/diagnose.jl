@@ -3,23 +3,19 @@
 # Sampler diagnostics on any SASBDB fitting test, without rerunning its fit or report. Normally started
 # through the Tcl front end, which checks the arguments first:
 #
-#   tclsh test/utils/diagnose.tcl --<command> [options] ID[:tag] ...
+#   tclsh test/utils/diagnose.tcl --<part> [options] ID[:tag] ...
 #
 # or directly:
 #
-#   julia --project=test/fitting_tests test/utils/diagnose.jl --<command> [options] ID[:tag] ...
+#   julia --project=test/fitting_tests test/utils/diagnose.jl --<part> [options] ID[:tag] ...
 #
-# Commands (the work is done by test/utils/seed_diagnostics.jl):
+# Parts (the work is done by test/utils/seed_diagnostics.jl; the options are listed in diagnose.tcl):
 #   --report     MAP starts, Hessian, NUTS step size and depth, Laplace agreement, modes, gradient error
-#   --tolerance  NUTS at several c1 profiling tolerances and RNG seeds (is the tolerance tight enough?)
 #   --ablate     χ² with one shared shell contrast / δρ₁=δρ₂ + δρ₃ / the full model
 #   --residuals  are the residuals at the MAP white (lag-1 and runs z) and the reduced χ², on the fitted grid and on the
 #                measured grid (the MAP search only; no sampling)
-#
-# Options:  --out FILE   write here instead of stdout
-#           --tols 1e-5,1e-8     c1 tolerances for `tolerance`
-#           --seeds 1,2,3        RNG seeds for `tolerance`
-#           --samples N --adapt N   NUTS iterations (default 2000 / 1000)
+#   --warmup     how short can the warm-up be and how many draws are enough
+#   --tolerance  NUTS at several c1 profiling tolerances and RNG seeds (is the tolerance tight enough?)
 #
 # `ID` is a folder under test/fitting_tests/ (SASDBS6); `tag` picks one run of a script that has several
 # (fit2_model3); scripts with a single run take no tag. SASDMZ9 and SASDJ72 take model1|model2(|model3).
@@ -72,26 +68,29 @@ end
 function main(args)
     if isempty(args)
         println("usage: julia --project=test/fitting_tests test/utils/diagnose.jl ",
-            "--report|--tolerance|--ablate|--residuals [--out FILE] [--tols 1e-5,1e-8] [--seeds 1,2,3] [--samples N] [--adapt N] ID[:tag] ...")
+            "--report|--ablate|--residuals|--warmup|--tolerance [--out FILE] [--tols 1e-5,1e-8] [--seeds 1,2,3] [--samples N] [--adapt N] ID[:tag] ...")
         return
     end
     cmd, rest = args[1], args[2:end]
-    cmd in ("--report", "--tolerance", "--ablate", "--residuals") || error("unknown command $cmd (--report | --tolerance | --ablate | --residuals)")
+    cmd in ("--report", "--ablate", "--residuals", "--warmup", "--tolerance") ||
+        error("unknown part $cmd (--report | --ablate | --residuals | --warmup | --tolerance)")
     cmd = cmd[3:end]
     opts, specs = parse_cli(rest)
     isempty(specs) && error("give at least one ID[:tag]")
-    n_samples = parse(Int, get(opts, "samples", "2000")); n_adapt = parse(Int, get(opts, "adapt", "1000"))
+    n_samples = parse(Int, get(opts, "samples", string(BAYSOL.Report.DEFAULT_N_SAMPLES))); n_adapt = parse(Int, get(opts, "adapt", string(BAYSOL.Report.DEFAULT_N_ADAPT)))
     tols = Tuple(parse.(Float64, split(get(opts, "tols", "1e-5,1e-8"), ",")))
     rngs = Tuple(parse.(Int, split(get(opts, "seeds", "7"), ",")))
     out = haskey(opts, "out") ? open(opts["out"], "w") : stdout
     try
         for spec in specs
             id, tag = occursin(':', spec) ? String.(split(spec, ":"; limit = 2)) : (spec, "")
-            seed, reference, label = load_fit_seed(id, tag; makie = cmd != "residuals")
+            seed, reference, label = load_fit_seed(id, tag; makie = !(cmd in ("residuals", "warmup")))
             if cmd == "report"
                 diagnose(out, seed; label, reference, n_samples, n_adapt)
             elseif cmd == "tolerance"
                 tolerance_sweep(out, seed; label, tols, rng_seeds = rngs, n_samples, n_adapt)
+            elseif cmd == "warmup"
+                warmup_study(out, seed; label, rng_seeds = rngs)
             elseif cmd == "residuals"
                 residual_report(out, seed; label)
             else

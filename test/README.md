@@ -12,7 +12,7 @@ supports them.
 | [`validation/`](validation/README.md) | slow, suite-wide validations of one change against criteria fixed before the run (Shannon binning, the MAP f-stop), run by `run/validate.tcl`, each with its evidence |
 | [`fixtures/`](fixtures/README.md) | the data the tests read: real PDB/mmCIF structures, the sequence corpus, form-factor oracle values and the SASBDB entries |
 | [`fitting_tests/`](fitting_tests/README.md) | 27 end-to-end SASBDB fits (53 runs), each a script that doubles as a worked example, with the report and figures it wrote |
-| [`visualize/`](visualize/README.md) | optional visual checks for the geometry code (plotting; not part of the suite) and static `.xyz` snapshots |
+| [`visualize/`](visualize/README.md) | optional visual checks for the geometry code (plotting; not part of the suite) |
 
 Four Julia environments are involved: `test/` (the unit suite), `test/fitting_tests/` (adds GLMakie for the figures),
 `test/visualize/` (GLMakie for the visual checks), and the root package.

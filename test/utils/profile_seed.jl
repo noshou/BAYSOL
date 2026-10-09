@@ -4,7 +4,7 @@
 # the compiler), profiles the second with Julia's sampling profiler, and prints the stage timings of that build and
 # the samples by function: exclusive (the function was running) and inclusive (it was on the stack), for frames in
 # BAYSOL's own source. With `--nuts` it then does the same for the sampling: one short run to warm the compiler, then a
-# profiled `run_fitting` of 2000 iterations (1000 adaptation). Started through
+# profiled `run_fitting` of the `run_model` default iterations (`Report.DEFAULT_N_SAMPLES`, `DEFAULT_N_ADAPT`). Started through
 # `tclsh test/run/profile.tcl ID[:tag] [--delay 0.0005] [--nuts]`; development tooling, not a test.
 
 using Printf
@@ -45,8 +45,8 @@ end
 function profile_nuts(seed, delay, spec)
     BAYSOL.Fitting.run_fitting(seed, 200, 100)
     Profile.clear(); Profile.init(n = 10^7, delay = delay)
-    t = @elapsed (Profile.@profile BAYSOL.Fitting.run_fitting(seed, 2000, 1000))
-    println("\n=== $spec: run_fitting of 2000 iterations (1000 adaptation) took $(round(t; digits = 2)) s")
+    t = @elapsed (Profile.@profile BAYSOL.Fitting.run_fitting(seed, BAYSOL.Report.DEFAULT_N_SAMPLES, BAYSOL.Report.DEFAULT_N_ADAPT))
+    println("\n=== $spec: run_fitting of $(BAYSOL.Report.DEFAULT_N_SAMPLES) iterations ($(BAYSOL.Report.DEFAULT_N_ADAPT) adaptation) took $(round(t; digits = 2)) s")
     print_profile()
 end
 

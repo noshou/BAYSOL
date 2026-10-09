@@ -225,6 +225,9 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
         h2 = hydration(mol, qraw[1:6], 4, UInt64(8); shell = shell)
         @test h1.convex ≈ h2.convex && h1.concave ≈ h2.concave && h1.cavity ≈ h2.cavity
 
+        R = BAYSOL.Report
+        @test (R.DEFAULT_N_ADAPT, R.DEFAULT_N_DRAWS, R.DEFAULT_N_SAMPLES) == (300, 700, 1000)
+        @test hasmethod(BAYSOL.run_model, Tuple{typeof(s)})                 # n_samples / n_adapt default to the constants
         res = BAYSOL.run_model(s, 120, 60)
         map_params = res[3][1]
         # the reported χ² is the one on the measured points (not the binned fit's own), n − 3 degrees of freedom

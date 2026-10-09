@@ -66,10 +66,11 @@ whitened coordinates.
 
 # Arguments
 - `seed::Seed`: priors, initial point, forward cache, and data.
-- `n_samples::Int64`: total number of NUTS iterations (including the
-    `n_adapt` warm-up steps,.
-- `n_adapt::Int64`: number of warm-up iterations spent adapting the step
-    size and mass matrix before sampling proper.
+- `n_samples::Int64=DEFAULT_N_SAMPLES`: total number of NUTS iterations (including the
+    `n_adapt` warm-up steps); the default is 1000.
+- `n_adapt::Int64=DEFAULT_N_ADAPT`: number of warm-up iterations spent adapting the step
+    size and mass matrix before sampling proper; the default is 300, leaving
+    `DEFAULT_N_DRAWS` = 700 posterior draws.
 
 # Keywords
 - `quantiles::AbstractString=DEFAULT_QUANTILES`: the "<lo>-<hi>" empirical quantile
@@ -93,8 +94,8 @@ A 4-tuple (fit, divergencerate, map, curve):
 """
 function run_model(
     seed::Fitting.Seed,
-    n_samples::Int64,
-    n_adapt::Int64;
+    n_samples::Int64=DEFAULT_N_SAMPLES,
+    n_adapt::Int64=DEFAULT_N_ADAPT;
     quantiles::AbstractString=DEFAULT_QUANTILES,
     l::Fitting.LIKELIHOOD=Fitting.PROFILE(),
     δ::Real=DEFAULT_TARGET_ACCEPT
