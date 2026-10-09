@@ -3,7 +3,7 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDYW6")
@@ -105,7 +105,7 @@ const FBA1_MOLARITY_σ = MOLARITY_REL_SIGMA * FBA1_MOLARITY
 # grep) and the sibling nonbiological.tsv.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Fitting.Solute).
+    # electron density (see Inference.Solute).
     NonBiological(0.500, 0.005, "sodium chloride"),   # 500 mM NaCl, ±1%
     NonBiological(0.500, 0.010, "imidazole"),          # 500 mM imidazole, ±2%
     # Cl⁻ counter-ion (added 2026-10-01): imidazole taken as titrated with HCl at 22 °C; protonated

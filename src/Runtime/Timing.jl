@@ -7,7 +7,7 @@ to whatever should be timed; everything is a no-op when the log is `nothing`.
 """
 module Timing
 
-using ..PhysicalConstants: NS_PER_S
+using ...PhysicalConstants: NS_PER_S
 
 export Stage, StageLog, tick, tock!, timed!, stage_seconds, fmt_count
 

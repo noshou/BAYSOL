@@ -28,7 +28,7 @@ using Base.CoreLogging: with_logger, NullLogger   # (the Logging stdlib is not a
     q = collect(range(0.02, 0.30; length = 60))
     I = 100 .* exp.(-(q .* 6) .^ 2 ./ 3) .+ 0.5
     σ = 0.02 .* I
-    solutes = Fitting.Solute[Fitting.NonBiological(0.15, 0.001, "sodium chloride")]
+    solutes = Inference.Solute[Inference.NonBiological(0.15, 0.001, "sodium chloride")]
 
     @compile_workload begin
         # a failing workload must cost only speed, never the package: warn and carry on

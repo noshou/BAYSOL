@@ -1,6 +1,6 @@
  
 
-# Fitting
+# Inference
 
 Given a measured SAXS/SANS curve `I_exp(q)` ± `σ_exp(q)` and a molecular structure's geometry-only forward-model cache (ForwardCache from `Scattering.forward_cache`), sample the posterior over four physical contrast/scale parameters using NUTS (No-U-Turn Sampler) via AdvancedHMC.jl, then fit background correction/scale parameters via WLS.
 
@@ -26,9 +26,9 @@ The data reduction that precedes the fit (binning of the measured curve to its i
 
 `I_exp`/`σ_exp` are fixed for an entire NUTS run; only `y_model(q)` changes between evaluations. `WLSData(I_exp, σ_exp)` precomputes everything that doesn't depend on `y_model` once -- the per-point weights wᵢ = 1/σᵢ², and the data-only weighted sums Sw, Swy, Swyy, Σ log σᵢ². `wls_fit(y_model, data::WLSData)` is the hot-path entry point: at a given ξ, forward produces `y_model(q)`, and `wls_fit` only has to accumulate the three model-dependent sums (SwI, SwII, SwIy) to solve the 2×2 normal equations for (scale, `bkgrnd_corr`), in one O(n) pass with no allocation. A `wls_fit(y_model, I_exp, σ_exp)` convenience overload builds a `WLSData` on the fly for one-off fits outside the sampler.
 
-`Seed` holds a `WLSData` (built once in `seed_fitting`) rather than raw `I_exp`/`σ_exp`, so `_ll`/`_logπ` and `ProfiledCorrs.jl`'s c1 search below all reuse the same precomputed sums instead of rebuilding them on every gradient evaluation.
+`Seed` holds a `WLSData` (built once in `seed_sampler`) rather than raw `I_exp`/`σ_exp`, so `_ll`/`_logπ` and `ProfiledCorrs.jl`'s c1 search below all reuse the same precomputed sums instead of rebuilding them on every gradient evaluation.
 
-The sampler, the MAP search, the likelihood and the report are written for any number `N` of sampled parameters (`Seed{T,N}`, `FitResult{S,N}`, and the analytic gradient of the profiled likelihood takes its Gram-column bookkeeping from `N`), so a parameterization with more parameters, such as the planned counterion contrast for nucleic acids, adds methods and no rewrite. `nparams(priors)` is the number (4 for `ξ_priors`) and `param_keys(priors)` names the coordinates in the report; only the transform `Θ`/`Ξ`, `θ_prior_moments` and the log-prior are specific to the four-parameter priors, and the Gram matrix stays five-species.
+The sampler, the MAP search, the likelihood and the report are written for any number `N` of sampled parameters (`Seed{T,N}`, `Inferred{S,N}`, and the analytic gradient of the profiled likelihood takes its Gram-column bookkeeping from `N`), so a parameterization with more parameters, such as the planned counterion contrast for nucleic acids, adds methods and no rewrite. `nparams(priors)` is the number (4 for `ξ_priors`) and `param_keys(priors)` names the coordinates in the report; only the transform `Θ`/`Ξ`, `θ_prior_moments` and the log-prior are specific to the four-parameter priors, and the Gram matrix stays five-species.
 
 It returns WLSFit, containing:
 
@@ -70,9 +70,9 @@ The search is entirely gradient-free, in two stages:
 1. A coarse pre-scan over the grid `(cmin-eps):eps:(cmax+eps)` -- one fused pass over q per point (g read from the precomputed table), no autodiff. Grid size ≈ `((cmax+eps) - (cmin-eps)) / eps + 1`, so `eps` controls both the padding described below *and* this scan's cost; at the shipped defaults (`cmin=0.8, cmax=1.3, eps=0.02`) that's 28 points, trivial, but tightening `eps` for a finer saturation test grows this proportionally (e.g. `eps=1e-4` → 5401 points) -- tune with that trade-off in mind if overriding the defaults.
 2. `Optim.jl`'s `Brent()`, bracketed around the best grid point (its two grid neighbours, or the padded edge if the best point is first/last), polishes to an absolute tolerance `tol = EXCL_VOL_CORR_TOL` (1e-8) on c1. χ² is quadratic in the c1 error at the optimum, so the profiled log-likelihood would tolerate a far looser value, but the *gradient* would not: it comes from the envelope theorem, which is exact only at the exact optimum and otherwise off by (∂²f/∂c1∂ξ)·(c1 error), first order. At 1e-5 that error was as large as the true gradient on the poorly fitting fits, which collapsed NUTS's step size (see the NUTS section); 1e-8 removes it at a modest per-evaluation cost, and the reported c1 is good to about 1e-8.
 
-c1 enters the forward model only through the excluded-volume envelope g(q; c1) on species 2, so at a fixed ξ the curve is exactly ŷ(q; c1) = A(q) + g·B(q) + g²·C(q), with A, B, C built from the Gram matrix and the contrast vector. `profiled_corrs` therefore builds A, B, C once per call (two products against `_C1Tables.Gc`, the Gram entries repacked contiguous in q) instead of running a full `forward` pass per trial c1. The coarse scan expands the weighted sums Σwŷ, Σwŷ², Σwŷ·I in powers of g, so each scan point is one fused pass over q reading g from a precomputed table (`_C1Tables.g1`); each Brent step is one fused pass over q too, with g anchored on that table: every c1 the search visits lies within half a grid step of a grid point cⱼ, so g(q; c1) = g(q; cⱼ)·(c1/cⱼ)³·exp(−q²Δk) with a tiny Δk = k(c1) − k(cⱼ), and a degree-8 Taylor polynomial gives the exponential to full precision with no library call (about 4× faster per pass; the library exponential is the fallback when q²·|Δk| exceeds `ENVELOPE_TAYLOR_LIMIT`). The closed-form scale/background solve is shared with `wls_fit` via `_wls_from_sums`. The search itself (scan grid, bracket, `Brent()`, padded bounds) is unchanged. `_C1Tables` depends only on the `ForwardCache` and the scan settings, is built once in `seed_fitting` (`Seed.c1tab`), is read-only, and is passed to every `profiled_corrs` call through the `tables` keyword (`_ll`/`_logπ` take it as `tab`); omitted, `profiled_corrs` builds it for that call.
+c1 enters the forward model only through the excluded-volume envelope g(q; c1) on species 2, so at a fixed ξ the curve is exactly ŷ(q; c1) = A(q) + g·B(q) + g²·C(q), with A, B, C built from the Gram matrix and the contrast vector. `profiled_corrs` therefore builds A, B, C once per call (two products against `_C1Tables.Gc`, the Gram entries repacked contiguous in q) instead of running a full `forward` pass per trial c1. The coarse scan expands the weighted sums Σwŷ, Σwŷ², Σwŷ·I in powers of g, so each scan point is one fused pass over q reading g from a precomputed table (`_C1Tables.g1`); each Brent step is one fused pass over q too, with g anchored on that table: every c1 the search visits lies within half a grid step of a grid point cⱼ, so g(q; c1) = g(q; cⱼ)·(c1/cⱼ)³·exp(−q²Δk) with a tiny Δk = k(c1) − k(cⱼ), and a degree-8 Taylor polynomial gives the exponential to full precision with no library call (about 4× faster per pass; the library exponential is the fallback when q²·|Δk| exceeds `ENVELOPE_TAYLOR_LIMIT`). The closed-form scale/background solve is shared with `wls_fit` via `_wls_from_sums`. The search itself (scan grid, bracket, `Brent()`, padded bounds) is unchanged. `_C1Tables` depends only on the `ForwardCache` and the scan settings, is built once in `seed_sampler` (`Seed.c1tab`), is read-only, and is passed to every `profiled_corrs` call through the `tables` keyword (`_ll`/`_logπ` take it as `tab`); omitted, `profiled_corrs` builds it for that call.
 
-`profiled_corrs` takes the same `WLSData` as `_ll`, so the inner c1 search reuses the precomputed data-only sums rather than rebuilding them per trial c1. It's wired into both `Sampler.jl`'s hot path (`_ll` calls it on every log-density/gradient evaluation) and `run_fitting`'s posterior-draw loop (re-profiled per draw for reporting; see `FitResult.c1`).
+`profiled_corrs` takes the same `WLSData` as `_ll`, so the inner c1 search reuses the precomputed data-only sums rather than rebuilding them per trial c1. It's wired into both `Sampler.jl`'s hot path (`_ll` calls it on every log-density/gradient evaluation) and `infer`'s posterior-draw loop (re-profiled per draw for reporting; see `Inferred.c1`).
 
 `excl_vol_saturation(c1; cmin, cmax)` is a free (no re-solve) classification of a profiled `c1_star` against the physical bounds: `-1`/`+1` if it landed outside `(cmin, cmax)` even with the padded window's extra room (genuine saturation, not a hard-clamp artifact), `0` otherwise.
 
@@ -90,9 +90,9 @@ CRYSOL's dro ("delta rho" ) parameters, which are the change in electron density
 
 CRYSOL's own default is dr1 = dr2 = 1.0, dr3 = 0.
 
-`δρ_prior(κ_δρ₁₂, κ_δρ₃, ρ̄ₑ)` returns (δρ₁, δρ₂, δρ₃) priors. Each is a Beta stretched onto a bounded interval, `LocationScale(L, W, Beta(α, β))`, with its mode at CRYSOL's default. The concentration κ = α + β − 2 > 0 sets the spread without moving the mode. `seed_fitting`/`seed_model` take `κ_δρ₁₂`/`κ_δρ₃` keywords, which default to `DRO12_CONCENTRATION`/`DRO3_CONCENTRATION`. ρ̄ₑ is the mean of the ρₑ prior.
+`δρ_prior(κ_δρ₁₂, κ_δρ₃, ρ̄ₑ)` returns (δρ₁, δρ₂, δρ₃) priors. Each is a Beta stretched onto a bounded interval, `LocationScale(L, W, Beta(α, β))`, with its mode at CRYSOL's default. The concentration κ = α + β − 2 > 0 sets the spread without moving the mode. `seed_sampler`/`seed_model` take `κ_δρ₁₂`/`κ_δρ₃` keywords, which default to `κ_δρ₁₂`/`κ_δρ₃`. ρ̄ₑ is the mean of the ρₑ prior.
 
-- **δρ₁, δρ₂**: support [−10, 2] (`DRO_BOUNDS`, CRYSOL3's fitting limits), mode 1, α = 1 + 11κ/12, β = 1 + κ/12. The default κ = 14 gives SD(δρ) ≈ 1.00 (the spread of the Normal(1, 1) δρ₂ prior it replaced), mean ≈ 0.38 and P(δρ < 0) ≈ 30%. The prior is left-skewed because the mode sits near the upper bound. Note that some older single-shell CRYSOL fits in the SASBDB fixtures report `Dro` ≈ 0.075–0.083 e·Å⁻³ (δρ ≈ 2.5–2.8), above the upper bound.
+- **δρ₁, δρ₂**: support [−10, 2] (`BOUNDS_δρ₁₂`, CRYSOL3's fitting limits), mode 1, α = 1 + 11κ/12, β = 1 + κ/12. The default κ = 14 gives SD(δρ) ≈ 1.00 (the spread of the Normal(1, 1) δρ₂ prior it replaced), mean ≈ 0.38 and P(δρ < 0) ≈ 30%. The prior is left-skewed because the mode sits near the upper bound. Note that some older single-shell CRYSOL fits in the SASBDB fixtures report `Dro` ≈ 0.075–0.083 e·Å⁻³ (δρ ≈ 2.5–2.8), above the upper bound.
 - **δρ₃ (cavity contrast)**: support δρ₃ ∈ [−ρ̄ₑ/0.03, (`φ_max` − 1)·ρ̄ₑ/0.03] ≈ [−11.2, 2.8], from φ ∈ [0, `φ_max`] (an empty void up to `φ_max` = 1.25) with ρₑ fixed at the prior mean ρ̄ₑ. Mode at δρ₃ = 0 (φ = 1, bulk-density cavity water), α = 1 + `κ/φ_max`, β = 1 + (1 − `1/φ_max`)·κ. The default κ = 1.25 gives Beta(2, 1.25) on the unit interval: ~21% of the mass is below half occupancy (φ < 0.5) and ~3.5% below φ = 0.2. The sampler draws δρ₃ directly from this prior. Fixing ρₑ at ρ̄ₑ leaves φ = 1 + 0.03·δρ₃/ρₑ within the relative uncertainty of ρₑ of [0, `φ_max`], at most ~0.06% for the buffers checked. When a structure has almost no cavity beads, δρ₃ has no likelihood and simply samples its prior; the report's `cavity_frac` line flags this.
 - **δρ4**: The condensed-cation layer for nucleotides based on Manning theory is not implemented yet.
 
@@ -187,7 +187,7 @@ log π(θ) = _lp(ξ(θ), priors) + _ll(wls, ξ(θ), fw, l) + logjac(θ)
 
 ### Seeding and initialization
 
-`seed_fitting` draws one ξ₀ from the composed priors (`_ξ₀`) and transforms it to θ₀ (Θ), packaging it with the priors, the ForwardCache, and the data -- precomputed once into a `WLSData` -- into a Seed. `run_fitting` does **not** run NUTS directly in raw θ-space. The four coordinates of θ have substantially different prior scales; for example, ρₑ's prior standard deviation can be orders of magnitude tighter than δρ₁'s. Meanwhile, AdvancedHMC.jl's `find_good_stepsize` initially explores using an identity mass matrix, before mass-matrix adaptation has run. This can create severe instabilities: a step size that is appropriate for one dimension may push another dimension into a nonphysical region. The forward model can then fail, triggering `wls_fit`'s det(XᵀWX) ≤ 0 guard before adaptation has a chance to correct the scale mismatch. To address this, `_standardize` maps:
+`seed_sampler` draws one ξ₀ from the composed priors (`_ξ₀`) and transforms it to θ₀ (Θ), packaging it with the priors, the ForwardCache, and the data -- precomputed once into a `WLSData` -- into a Seed. `infer` does **not** run NUTS directly in raw θ-space. The four coordinates of θ have substantially different prior scales; for example, ρₑ's prior standard deviation can be orders of magnitude tighter than δρ₁'s. Meanwhile, AdvancedHMC.jl's `find_good_stepsize` initially explores using an identity mass matrix, before mass-matrix adaptation has run. This can create severe instabilities: a step size that is appropriate for one dimension may push another dimension into a nonphysical region. The forward model can then fail, triggering `wls_fit`'s det(XᵀWX) ≤ 0 guard before adaptation has a chance to correct the scale mismatch. To address this, `_standardize` maps:
 
 ```text
 θ ↦ z = (θ - μ) / σ
@@ -197,7 +197,7 @@ using each coordinate's own prior mean and standard deviation in θ-space from `
 
 ### MAP search and Laplace whitening (`MAP.jl`)
 
-Prior standardization is not enough on its own: the posterior is often far narrower than the prior (posterior `σ_z` down to ~1e-4 along δρ₁/δρ₂ in the fitting tests), and Stan's windowed adaptation, which AdvancedHMC.jl copies, assumes O(1) scales. It starts from M⁻¹ = I and shrinks every covariance estimate toward 1e-3·I (weight 5/(n+5)), which then dominates the narrow directions and forces tiny steps and deep trees throughout warmup. So `run_fitting` first calls `_sampling_space(seed, l)`:
+Prior standardization is not enough on its own: the posterior is often far narrower than the prior (posterior `σ_z` down to ~1e-4 along δρ₁/δρ₂ in the fitting tests), and Stan's windowed adaptation, which AdvancedHMC.jl copies, assumes O(1) scales. It starts from M⁻¹ = I and shrinks every covariance estimate toward 1e-3·I (weight 5/(n+5)), which then dominates the narrow directions and forces tiny steps and deep trees throughout warmup. So `infer` first calls `_sampling_space(seed, l)`:
 
 1. L-BFGS (`Optim.jl`) on −log π in z-space, from the seed's θ₀ and `MAP_N_STARTS − 1` further prior draws, with c1 profiled to `EXCL_VOL_CORR_TOL` (the same objective NUTS samples). Non-finite values and `WLSError` (a flat model curve) count as +Inf. Each start ends at the gradient tolerance `MAP_G_TOL`, at `MAP_F_SUCCESSIVE` successive decreases of f below `MAP_F_ABSTOL` (the problem is conditioned ~1e6, so f stalls in the fourth digit long before the gradient test passes), or at `MAP_MAX_ITER`. The best optimum is the MAP ẑ. Because the θ Jacobian is included, the density always has an interior mode.
 2. A symmetrized central-difference Hessian H of −log π at ẑ, from the envelope-theorem gradient, in two passes: step `MAP_HESS_STEP`, then `MAP_HESS_REL_STEP` × each coordinate's Laplace σ from the first pass. c1 is profiled to the same `EXCL_VOL_CORR_TOL` as everywhere else, which matters most here: central differences divide the gradient's O(c1-error) noise by the step.
@@ -207,7 +207,9 @@ NUTS then samples w with θ = μ + σ·(ẑ + S·w) (`_θ_of_w`), in which the p
 
 ### NUTS via AdvancedHMC.jl
 
-`run_fitting(seed, n_samples, n_adapt; l=PROFILE(), δ=DEFAULT_TARGET_ACCEPT)` (`DEFAULT_TARGET_ACCEPT = 80`, Stan's usual target acceptance rate) proceeds as follows:
+`infer` returns an `Inferred{S,N}`: the result of one sampling run, holding the posterior draws of ξ (warm-up included), AdvancedHMC.jl's per-iteration statistics, and for every draw its re-profiled scale, `bkgrnd_corr`, c1, reduced χ² and predicted curve, plus the likelihood type and the run's stage log. `BAYSOL.run_model` hands back the same type with the first `n_adapt` draws dropped.
+
+`infer(seed, n_samples, n_adapt; l=PROFILE(), δ=DEFAULT_TARGET_ACCEPT)` (`DEFAULT_TARGET_ACCEPT = 80`, Stan's usual target acceptance rate) proceeds as follows:
 
 1. Run the MAP search and whitening above, then wrap `_logπ` ∘ `_θ_of_w` as ℓπ: w ↦ log π(θ(w)), and compute its gradient using one ForwardDiff.gradient! pass (∂ℓπ/∂w).
 2. Build a DenseEuclideanMetric(4) and a Hamiltonian(metric, ℓπ, ∂ℓπ/∂w), with:
@@ -238,7 +240,7 @@ using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,
     propka_pKas, resolve_hydrogens
 using BAYSOL.Scattering: forward_cache
-using BAYSOL.Fitting: Solute, NonBiological, PROFILE, seed_fitting
+using BAYSOL.Inference: Solute, NonBiological, PROFILE, seed_sampler
 
 PH, σ_PH, T_C = 7.5, 0.1, 20.0
 # buffer only -- the measured protein is not a solute
@@ -255,7 +257,7 @@ mol = load_molecule(hpath)
 
 fw = forward_cache(mol, q_fit, lMax, energy_eV)
 
-seed = seed_fitting(fw, I_fit, σ_fit, PH, σ_PH, SOLUTES; t = T_C)
+seed = seed_sampler(fw, I_fit, σ_fit, PH, σ_PH, SOLUTES; t = T_C)
 
 result = BAYSOL.run_model(seed, 1000, 300; l = PROFILE())
 
@@ -265,10 +267,10 @@ BAYSOL.write_report(result)
 
 ## Constants
 
-Defined at module level in `Fitting.jl`.
+Defined at module level in `Inference.jl`.
 
 In three sections:
 
-- **Priors**: `DEFAULT_TEMPERATURE_C` (25.0 °C, the default sample temperature for [`Fitting.ρₑ_prior`](@ref BAYSOL.Fitting.ρₑ_prior)'s bulk electron density; pass the real one), `DRO_BOUNDS = (-10, 2)` (CRYSOL3's δρ₁/δρ₂ fitting limits; `DRO_LOWER`, `DRO_WIDTH` are the derived lower end and width the scaled-logit map uses), `DRO12_MODE = 1` (CRYSOL3's default δρ₁ = δρ₂, the prior mode), the Beta-prior concentrations `DRO12_CONCENTRATION = 14` and `DRO3_CONCENTRATION = 1.25` (see [`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)), and `φ_max = 1.25` (upper bound on cavity occupancy, fixing δρ₃'s upper bound)
-- **Profiled c1**: c1 is profiled out per evaluation by [`Fitting.profiled_corrs`](@ref BAYSOL.Fitting.profiled_corrs), not sampled: `EXCL_VOL_CORR_BOUNDS = (0.8, 1.3)`, `EXCL_VOL_CORR_EPS = 0.02` (padding and scan step; grid size `((cmax+eps)-(cmin-eps))/eps + 1`), `EXCL_VOL_CORR_TOL = 1e-8` (Brent's tolerance on c1, for the MAP search, its Hessian and every NUTS evaluation; set by the gradient's accuracy, see the profiled-c1 section)
-- **Sampler**: `DEFAULT_TARGET_ACCEPT` (80, the default NUTS target acceptance rate `δ` in percent; Stan's usual default) and the pre-NUTS MAP search and whitening settings `MAP_N_STARTS`, `MAP_MAX_ITER`, `MAP_G_TOL`, `MAP_F_ABSTOL`, `MAP_F_SUCCESSIVE`, `MAP_HESS_STEP`, `MAP_HESS_REL_STEP`, `MAP_HESS_EIG_FLOOR`, `MAP_MODE_SEP` (see the Fitting README)
+- **Priors**: `DEFAULT_TEMPERATURE_C` (25.0 °C, the default sample temperature for [`Inference.ρₑ_prior`](@ref BAYSOL.Inference.ρₑ_prior)'s bulk electron density; pass the real one), `BOUNDS_δρ₁₂ = (-10, 2)` (CRYSOL3's δρ₁/δρ₂ fitting limits; `LOWER_BOUND_δρ₁₂`, `WIDTH_δρ₁₂` are the derived lower end and width the scaled-logit map uses), `MODE_δρ₁₂ = 1` (CRYSOL3's default δρ₁ = δρ₂, the prior mode), the Beta-prior concentrations `κ_δρ₁₂ = 14` and `κ_δρ₃ = 1.25` (see [`Inference.δρ_prior`](@ref BAYSOL.Inference.δρ_prior)), and `φ_max = 1.25` (upper bound on cavity occupancy, fixing δρ₃'s upper bound)
+- **Profiled c1**: c1 is profiled out per evaluation by [`Inference.profiled_corrs`](@ref BAYSOL.Inference.profiled_corrs), not sampled: `EXCL_VOL_CORR_BOUNDS = (0.8, 1.3)`, `EXCL_VOL_CORR_EPS = 0.02` (padding and scan step; grid size `((cmax+eps)-(cmin-eps))/eps + 1`), `EXCL_VOL_CORR_TOL = 1e-8` (Brent's tolerance on c1, for the MAP search, its Hessian and every NUTS evaluation; set by the gradient's accuracy, see the profiled-c1 section)
+- **Sampler**: `DEFAULT_TARGET_ACCEPT` (80, the default NUTS target acceptance rate `δ` in percent; Stan's usual default) and the pre-NUTS MAP search and whitening settings `MAP_N_STARTS`, `MAP_MAX_ITER`, `MAP_G_TOL`, `MAP_F_ABSTOL`, `MAP_F_SUCCESSIVE`, `MAP_HESS_STEP`, `MAP_HESS_REL_STEP`, `MAP_HESS_EIG_FLOOR`, `MAP_MODE_SEP` (see the Inference README)

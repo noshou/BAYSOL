@@ -15,7 +15,7 @@ function _chisq_measured(sh::Shannon.ShannonInfo, y::AbstractVector{<:Real})::Fl
 end
 
 """
-Run NUTS on [`Fitting._logπ`](@ref) starting from seed, returning posterior
+Run NUTS on [`Inference._logπ`](@ref) starting from seed, returning posterior
 draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
 (scale, `bkgrnd_corr`) pair and predicted curve per draw, and
 AdvancedHMC.jl's diagnostics.
@@ -38,14 +38,14 @@ alternating half-steps in r with full steps in θ:
 which needs ∇[log π(θ)] at every step.
 
 Because energy is conserved, leapfrog proposes long, correlated jumps through
-parameter space far more cheaply than random-walk Metropolis. NUTS removes the 
-need to hand-pick a trajectory length: it grows the leapfrog trajectory by 
+parameter space far more cheaply than random-walk Metropolis. NUTS removes the
+need to hand-pick a trajectory length: it grows the leapfrog trajectory by
 doubling a binary tree of steps, forward and backward in time, until the trajectory
 starts to double back on itself (a U-turn), then samples from the valid part of that tree.
 
 # MAP search and whitening
 
-Before NUTS, [`Fitting.run_fitting`](@ref) finds the mode of the same log π with a multi-start
+Before NUTS, [`Inference.infer`](@ref) finds the mode of the same log π with a multi-start
 L-BFGS search and takes a central-difference Hessian there. NUTS then samples coordinates w with
 θ = μ + σ·(ẑ + S·w), in which the posterior is ≈ N(0, I) and the chain starts at the mode. The map
 is affine, so the target distribution is unchanged; it only puts the adaptation below on the O(1)
@@ -79,7 +79,7 @@ whitened coordinates.
     default ("16-84") is a ±1σ-equivalent interval for a Normal. The special
     case "0-0" means *no* filtering.
 - `l::LIKELIHOOD=PROFILE()`: PROFILE() or MARGINAL(), forwarded to
-    [`Fitting._logπ`](@ref)/[`Fitting._ll`](@ref).
+    [`Inference._logπ`](@ref)/[`Inference._ll`](@ref).
 - `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
     (0, 100) exclusive (validated below); the default, `DEFAULT_TARGET_ACCEPT`,
     is Stan's usual 80%, used here too absent a specific reason to retarget it.
@@ -87,21 +87,21 @@ whitened coordinates.
 # Returns
 A 4-tuple (fit, divergencerate, map, curve):
 
--   `fit::Fitting.FitResult`: the warm-up free posterior.
+-   `fit::Inference.Inferred`: the warm-up free posterior.
 -   `divergence_rate::Float64`: fraction of fit's draws AdvancedHMC.jl
     flagged as numerically divergent, [0, 1].
 -   `map/curve`: either both nothing or a [`MAPResult`](@ref)/[`QuantileResult`](@ref) pair.
 """
 function run_model(
-    seed::Fitting.Seed,
+    seed::Inference.Seed,
     n_samples::Int64=DEFAULT_N_SAMPLES,
     n_adapt::Int64=DEFAULT_N_ADAPT;
     quantiles::AbstractString=DEFAULT_QUANTILES,
-    l::Fitting.LIKELIHOOD=Fitting.PROFILE(),
+    l::Inference.LIKELIHOOD=Inference.PROFILE(),
     δ::Real=DEFAULT_TARGET_ACCEPT
 )::Union{
-    Tuple{Fitting.FitResult, Float64, MAPResult, QuantileResult},
-    Tuple{Fitting.FitResult, Float64, Nothing, Nothing}
+    Tuple{Inference.Inferred, Float64, MAPResult, QuantileResult},
+    Tuple{Inference.Inferred, Float64, Nothing, Nothing}
 }
 
     # parse quantiles
@@ -137,11 +137,11 @@ function run_model(
     end
 
     # calculate unfiltered fit
-    fit_unfiltered = Fitting.run_fitting(seed, n_samples, n_adapt; l=l, δ=δ)
+    fit_unfiltered = Inference.infer(seed, n_samples, n_adapt; l=l, δ=δ)
     t_post = Timing.tick()
 
     # filter-out warmup draws
-    fit = Fitting.FitResult(
+    fit = Inference.Inferred(
         fit_unfiltered.samples[n_adapt+1:end],
         fit_unfiltered.stats[n_adapt+1:end],
         fit_unfiltered.scale[n_adapt+1:end],
@@ -164,8 +164,8 @@ function run_model(
         fit.chisq_red
     end
 
-    # Numerical instabilities can occur when the posterior has very 
-    # different curvature/scales across dimensions. Such samples are 
+    # Numerical instabilities can occur when the posterior has very
+    # different curvature/scales across dimensions. Such samples are
     # flagged as divergent and excluded from MAP selection.
     filter  = trues(length(fit.stats))
     max_llh = -Inf
@@ -185,13 +185,13 @@ function run_model(
         res = (fit, 1., nothing, nothing)
     else
         divergence_rate = diverged / length(fit.stats)
-        
+
         # calculate MAP params + curves
-        # ξ = (ρₑ, δρ₁, δρ₂, δρ₃) for the protein parameterization, see Fitting.param_keys
+        # ξ = (ρₑ, δρ₁, δρ₂, δρ₃) for the protein parameterization, see Inference.param_keys
         # z_map: how many prior standard deviations (θ-space) the MAP draw
         # sits from its own prior, one entry per physical parameter.
         ξ_map = fit.samples[max_idx]
-        z_map = Fitting.prior_z_scores(ξ_map, seed.pr)
+        z_map = Inference.prior_z_scores(ξ_map, seed.pr)
         MAP_params = Dict{String, Float64}(
             "log_density"       => max_llh,
             "cavity_shell_frac" => Scattering.cavity_shell_fraction(seed.fw),
@@ -200,7 +200,7 @@ function run_model(
             "excl_vol_corr"     => fit.c1[max_idx],
             "chisq_red"         => chisq_meas[max_idx],
         )
-        pkeys = Fitting.param_keys(seed.pr)
+        pkeys = Inference.param_keys(seed.pr)
         for (k, key) in enumerate(pkeys)
             MAP_params[key]        = ξ_map[k]
             MAP_params["z_" * key] = z_map[k]
@@ -210,7 +210,7 @@ function run_model(
         # posterior draw, since transient saturation during warmup is
         # expected (see EXCL_VOL_CORR_BOUNDS) and
         # not itself diagnostic.
-        excl_vol_sat = Fitting.excl_vol_saturation(fit.c1[max_idx])
+        excl_vol_sat = Inference.excl_vol_saturation(fit.c1[max_idx])
         MAP_params["excl_vol_sat"] = Float64(excl_vol_sat)
         if excl_vol_sat != 0
             @warn "excluded-volume correction c1 saturated at the $(excl_vol_sat > 0 ? "upper" : "lower") profiling bound" c1=fit.c1[max_idx]
@@ -231,8 +231,8 @@ function run_model(
         ξ_filt = [getindex.(samples_filt, k) for k in eachindex(pkeys)]
         ξ_q    = [quantile(v, [q_1, q_2]) for v in ξ_filt]
         N      = length(pkeys)
-        z_lo = Fitting.prior_z_scores(SVector{N,Float64}(first.(ξ_q)), seed.pr)
-        z_hi = Fitting.prior_z_scores(SVector{N,Float64}(last.(ξ_q)), seed.pr)
+        z_lo = Inference.prior_z_scores(SVector{N,Float64}(first.(ξ_q)), seed.pr)
+        z_hi = Inference.prior_z_scores(SVector{N,Float64}(last.(ξ_q)), seed.pr)
 
         # calculate the quantiles of the remaining quantities
         ll_lo,  ll_hi        = quantile(ll_filt,     [q_1, q_2])

@@ -1,12 +1,12 @@
 # PartialMolarVolumes
 
-Partial molar volume (V0, cm3/mol) data for solutes and solvent. It is used to build the prior on the **buffer's** bulk electron density ρₑ (`Fitting.ρₑ_prior`, see the Fitting README). The measured macromolecule itself is never a solute here.
+Partial molar volume (V0, cm3/mol) data for solutes and solvent. It is used to build the prior on the **buffer's** bulk electron density ρₑ (`Inference.ρₑ_prior`, see the Inference README). The measured macromolecule itself is never a solute here.
 
 ## General assumptions
 
 - At typical buffer  concentrations (~10-150 mM) a few cm3/mol of V0 error moves the electron density by a fraction of a percent. Exact protonation state, temperature correction, etc. are only worth  chasing for solutes pushed to molar concentration (ex: 6 M urea, 50% w/w glycerol), where V0 error propagates enough to bias the fit. Users must input custum arguments to make it work.
 - **Additivity / dilute-limit assumption.** Solution volume is taken as V(solution) ≈ V0(water) + Σ nᵢ·V0(soluteᵢ) at infinite dilution. Young's rule / ideal-mixing hold that the rules for low concentrations, and assume zero interactions between solutes.
-- **Units**: V0 in cm3/mol, at 298.15 K and ~0.1 MPa unless a source states otherwise. `uncertainty_cm3_per_mol` is the source's own reported standard error, not a subjective error bar; left blank where a source doesn't report one. At lookup (`ϕ°(name)`), a blank uncertainty is replaced by the **mean of every stated uncertainty in nonbiological.json**, so adding rows can shift it slightly (and with it the fits). Away from 25 °C, `Fitting._ρₑ` widens each ϕ° uncertainty by `PMV_FRACTIONAL_EXPANSIBILITY · ϕ° · |t − 25|` (3.0 × 10⁻³ K⁻¹; derived from the multi-temperature sugar/urea/glycoluril/nucleobase series in these tables, and exceeded by some electrolytes, e.g. NaH2PO4 ≈ 5.3 × 10⁻³ K⁻¹).
+- **Units**: V0 in cm3/mol, at 298.15 K and ~0.1 MPa unless a source states otherwise. `uncertainty_cm3_per_mol` is the source's own reported standard error, not a subjective error bar; left blank where a source doesn't report one. At lookup (`ϕ°(name)`), a blank uncertainty is replaced by the **mean of every stated uncertainty in nonbiological.json**, so adding rows can shift it slightly (and with it the fits). Away from 25 °C, `Inference._ρₑ` widens each ϕ° uncertainty by `PMV_FRACTIONAL_EXPANSIBILITY · ϕ° · |t − 25|` (3.0 × 10⁻³ K⁻¹; derived from the multi-temperature sugar/urea/glycoluril/nucleobase series in these tables, and exceeded by some electrolytes, e.g. NaH2PO4 ≈ 5.3 × 10⁻³ K⁻¹).
 
 ## NonBiological/
 
@@ -125,4 +125,4 @@ V0(residue) = V0(free nucleoside) + V0(phosphate group increment). The phosphate
 Defined at module level in `PMV.jl`.
 
 
-`PMV_REFERENCE_TEMPERATURE_C` (25.0 °C, the temperature the partial-molar-volume tables are tabulated at), `PMV_FRACTIONAL_EXPANSIBILITY` (3.0 × 10⁻³ K⁻¹, the bound used to widen a solute's 25 °C ϕ° uncertainty away from 25 °C; derivation in its docstring), and the peptide backbone unit added once per residue: `BACKBONE_PMV = (37.4, 0.1)` cm³·mol⁻¹ (value, uncertainty), `BACKBONE_ELECTRONS = 30` Fitting's `DensityOfSolvent` imports `PMV_REFERENCE_TEMPERATURE_C` and `PMV_FRACTIONAL_EXPANSIBILITY` from here.
+`PMV_REFERENCE_TEMPERATURE_C` (25.0 °C, the temperature the partial-molar-volume tables are tabulated at), `PMV_FRACTIONAL_EXPANSIBILITY` (3.0 × 10⁻³ K⁻¹, the bound used to widen a solute's 25 °C ϕ° uncertainty away from 25 °C; derivation in its docstring), and the peptide backbone unit added once per residue: `BACKBONE_PMV = (37.4, 0.1)` cm³·mol⁻¹ (value, uncertainty), `BACKBONE_ELECTRONS = 30` Inference's `DensityOfSolvent` imports `PMV_REFERENCE_TEMPERATURE_C` and `PMV_FRACTIONAL_EXPANSIBILITY` from here.

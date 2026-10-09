@@ -53,8 +53,8 @@ function _write_diagnostics(io::IO, fit, divergence_rate::Real, map_params)
     end
 
     # c1 is profiled, not sampled with a prior, so this reports whether the
-    # MAP draw's profiled c1 hit the physical bound in Fitting's
-    # EXCL_VOL_CORR_BOUNDS -- see Fitting.excl_vol_saturation.
+    # MAP draw's profiled c1 hit the physical bound in Inference's
+    # EXCL_VOL_CORR_BOUNDS -- see Inference.excl_vol_saturation.
     excl_vol_sat = map_params === nothing ? 0.0 : get(map_params, "excl_vol_sat", 0.0)
     if excl_vol_sat == 0.0
         @printf(io, "%-14s = false\n", "excl_vol_sat")
@@ -92,7 +92,7 @@ defaults `io` to `stdout`; see its own one-line definition below.
 The "EBFMI" line in this report's "=== Diagnostics ===" block and the
 EBFMIest AdvancedHMC.jl logs to the console during sampling use
 the same formula (mean(diff(H).^2) / var(H), H = per-draw
-Hamiltonian energy), but AdvancedHMC.jl's logs warmup draws which skews 
+Hamiltonian energy), but AdvancedHMC.jl's logs warmup draws which skews
 its result.
 """
 function write_report(

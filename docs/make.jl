@@ -13,12 +13,13 @@ using BAYSOL
 # ---------------------------------------------------------------------------
 const DOC_MODULES = [
     "Utils"               => BAYSOL.Utils,
+    "Runtime"             => BAYSOL.Runtime,
     "PartialMolarVolumes" => BAYSOL.PartialMolarVolumes,
     "MolecularStructure"  => BAYSOL.MolecularStructure,
     "Scattering"          => BAYSOL.Scattering,
     "SASA"                => BAYSOL.SASA,
-    "Fitting"             => BAYSOL.Fitting,
-    "Report"              => BAYSOL.Report,
+    "Inference"           => BAYSOL.Inference,
+    "Pipeline"            => BAYSOL.Pipeline,
 ]
 
 # Documented modules that have no page of their own: they are covered by their parent's page.
@@ -28,7 +29,7 @@ const DOC_SUBMODULES = [BAYSOL.Scattering.SphFuncs, BAYSOL.PhysicalConstants, BA
 # A module whose API reference spans several pages lists them here (title => page); every other
 # module has the single page `api/<lowercase name>.md`.
 const API_PAGE_OVERRIDES = Dict(
-    "Fitting" => ["Model and priors" => "api/fitting.md", "Sampler" => "api/fitting_sampler.md"],
+    "Inference" => ["Model and priors" => "api/inference.md", "Sampler" => "api/inference_sampler.md"],
 )
 
 api_pages(name) = get(API_PAGE_OVERRIDES, name, "api/" * lowercase(name) * ".md")

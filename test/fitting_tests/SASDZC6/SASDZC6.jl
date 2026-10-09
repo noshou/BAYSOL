@@ -3,7 +3,7 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDZC6")
@@ -188,7 +188,7 @@ const GAT_MOLARITY_σ   = MOLARITY_REL_SIGMA * GAT_MOLARITY
 # histidine), NaOH for Good's buffers.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Fitting.Solute).
+    # electron density (see Inference.Solute).
     NonBiological(0.100, 0.001,   "sodium chloride"),   # 100 mM NaCl, ±1%
     NonBiological(0.025, 0.0005,  "tris"),              # 25 mM Tris pH 8.0, ±2%
     NonBiological(0.002, 0.00004, "magnesium chloride"),# 2 mM MgCl2, ±2%

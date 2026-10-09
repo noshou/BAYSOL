@@ -57,7 +57,7 @@ function _write_timing(io::IO, log::Union{Nothing,Timing.StageLog}, t_report)
     st, st_c, st_g = Timing.stage_seconds(log, :static)
     sp, sp_c, sp_g = Timing.stage_seconds(log, :sampling)
     unacc = wall - st - sp - report_s
-    # compile time not inside any stage: the first call of run_model, run_fitting and
+    # compile time not inside any stage: the first call of run_model, infer and
     # write_report compiles before their bodies (and so their stages) begin
     unacc_c = total_c - st_c - sp_c - report_c
 

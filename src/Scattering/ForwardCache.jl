@@ -4,7 +4,7 @@
 # species Gram matrix G(q), and bundles G with what the fit needs to evaluate
 # the excluded-volume correction c₁ (ForwardCache). The orientationally-averaged
 # intensity itself, I(q) = v(q)ᵀ G(q) v(q), is contracted downstream in
-# BAYSOL.Fitting.ProfiledCorrs.
+# BAYSOL.Inference.ProfiledCorrs.
 #
 # SPECIES ORDERING:
 #
@@ -155,7 +155,7 @@ end
 
 Static structure calculations, independent of fit parameters. Build one
 per structure with [`forward_cache`](@ref); every likelihood evaluation
-([`BAYSOL.Fitting.profiled_corrs`](@ref)) then works from G and `r_m` alone.
+([`BAYSOL.Inference.profiled_corrs`](@ref)) then works from G and `r_m` alone.
 
 # Fields
 -   `G::Array{Float64,3}, (5, 5, Q)`: the species Gram matrix, from [`gram`](@ref).

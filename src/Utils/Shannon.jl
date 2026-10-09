@@ -34,7 +34,7 @@ bin's smallest error bar.
 const BIN_BIAS_MAX = 0.3
 
 """
-Everything [`shannon_data`](@ref) decided about a measured curve, kept in the `Fitting.Seed` so
+Everything [`shannon_data`](@ref) decided about a measured curve, kept in the `Inference.Seed` so
 the report and the fitting scripts can reach both the data the fit used and the raw data.
 
 # Fields

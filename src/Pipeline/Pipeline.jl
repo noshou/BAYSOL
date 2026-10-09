@@ -2,13 +2,13 @@
 
 """
 The pipeline entry points and the run report: [`seed_model`](@ref) builds a
-[`Fitting.Seed`](@ref) from a structure, a measured curve and a buffer,
+[`Inference.Seed`](@ref) from a structure, a measured curve and a buffer,
 [`run_model`](@ref) samples it and summarizes the posterior, and
 [`write_report`](@ref) writes the text report. `BAYSOL.seed_model`,
 `BAYSOL.run_model` and `BAYSOL.write_report` are these functions, re-exported by the
 package root.
 """
-module Report
+module Pipeline
 
 using Statistics: quantile, mean, var
 using Printf: @printf, @sprintf
@@ -20,29 +20,31 @@ using ..SASA: SASA, PROBE_RADIUS, SHELL_N_TARGET
 using ..Shannon: Shannon, SHANNON_REBIN
 using ..GCPause: GCPause
 using ..Scattering: Scattering, B_LM_CHUNK, SHELL_THICKNESS
-using ..Fitting: Fitting, DEFAULT_TEMPERATURE_C, DRO12_CONCENTRATION, DRO3_CONCENTRATION,
+using ..Inference: Inference, DEFAULT_TEMPERATURE_C, κ_δρ₁₂, κ_δρ₃,
         DEFAULT_TARGET_ACCEPT
 
         """
-"lo-hi" empirical quantile range (integer percentages, 0 ≤ lo < hi ≤ 100) 
-used to build "quantiles"/"bounds" entries. The default "16-84" is a ±1σ-equivalent interval for a Normal. The special
-case "0-0" means *no* filtering.
+"lo-hi" empirical quantile range (integer percentages, 0 ≤ lo < hi ≤ 100)
+used to build "quantiles"/"bounds" entries. The default "16-84" is a ±1σ-equivalent
+interval for a Normal. The special case "0-0" means *no* filtering.
 """
 const DEFAULT_QUANTILES = "16-84"
 
 """
-Default warm-up of [`run_model`](@ref): 300 NUTS iterations of step-size and mass-matrix adaptation, discarded from the
-posterior.
+Default warm-up of [`run_model`](@ref): NUTS iterations of step-size and mass-matrix
+adaptation, discarded from the posterior.
 """
 const DEFAULT_N_ADAPT = 300
 
 """
-Default number of posterior draws of [`run_model`](@ref), after the `DEFAULT_N_ADAPT` warm-up iterations: 700.
+Default number of posterior draws of [`run_model`](@ref), after the `DEFAULT_N_ADAPT`
+warm-up iterations.
 """
 const DEFAULT_N_DRAWS = 700
 
 """
-Default total number of NUTS iterations of [`run_model`](@ref), warm-up included: `DEFAULT_N_ADAPT + DEFAULT_N_DRAWS` = 1000.
+Default total number of NUTS iterations of [`run_model`](@ref), warm-up included:
+`DEFAULT_N_ADAPT + DEFAULT_N_DRAWS`.
 """
 const DEFAULT_N_SAMPLES = DEFAULT_N_ADAPT + DEFAULT_N_DRAWS
 
@@ -55,7 +57,7 @@ by name:
 
 -   `log_density`: the MAP draw's log-posterior density.
 -   `slvnt_e_dns`, `delta_rho_1`, `delta_rho_2`, `delta_rho_3`: the shell
-    parameters at that draw (see [`Fitting.Seed`](@ref) for the ξ ordering this
+    parameters at that draw (see [`Inference.Seed`](@ref) for the ξ ordering this
     is read off of).
 -   `cavity_shell_frac`: fraction of the hydration-shell volume carried by
     cavity beads (from the Gram matrix at the lowest q). When it is ~0, δρ₃ has

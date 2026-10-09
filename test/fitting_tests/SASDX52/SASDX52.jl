@@ -3,7 +3,7 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 # =============================================================================
@@ -126,7 +126,7 @@ const FADD5_MOLARITY_σ = MOLARITY_REL_SIGMA * FADD5_MOLARITY   # σ not stated 
 # histidine), NaOH for Good's buffers.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Fitting.Solute).
+    # electron density (see Inference.Solute).
     NonBiological(0.500, 0.005,   "sodium chloride"),    # 500 mM NaCl, ±1%
     NonBiological(0.020, 0.0004,  "hepes"),              # 20 mM HEPES, ±2%
     NonBiological(0.005, 0.0001,  "magnesium chloride"), # 5 mM MgCl2, ±2%

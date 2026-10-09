@@ -209,7 +209,7 @@ iy_w    = partial_wave_weights(iy_lMax)
     end
 
     # ---------------------------------------------------------------------
-    # The contrast contraction (A, B, C), moved from Fitting into Scattering
+    # The contrast contraction (A, B, C), moved from Inference into Scattering
     # ---------------------------------------------------------------------
 
     @testset "forward_cache: Gc is G repacked contiguous in q, pairs in _GRAM_PAIRS order" begin

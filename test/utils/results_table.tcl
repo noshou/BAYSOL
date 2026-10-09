@@ -32,8 +32,8 @@ set SCRIPT [info script]
 namespace eval results_table {
     namespace path {::util ::report}
 
-    # Bounds of the sampled contrasts, as in src/Fitting/Fitting.jl (DRO_BOUNDS, UNIT_OF_δρ, φ_max).
-    variable DRO_LOWER -10.0
+    # Bounds of the sampled contrasts, as in src/Inference/Inference.jl (BOUNDS_δρ₁₂, UNIT_OF_δρ, φ_max).
+    variable LOWER_BOUND_δρ₁₂ -10.0
     variable DRO_UPPER 2.0
     variable UNIT_OF_δρ 0.03
     variable PHI_MAX 1.25
@@ -94,7 +94,7 @@ namespace eval results_table {
 
     # The cells of one table row from a parsed report.
     proc row {label r depositor} {
-        variable DRO_LOWER
+        variable LOWER_BOUND_δρ₁₂
         variable DRO_UPPER
         variable UNIT_OF_δρ
         variable PHI_MAX
@@ -121,8 +121,8 @@ namespace eval results_table {
         return [list $label \
             [format %.3g [dict get $r chi2_cmp]] \
             $depositor \
-            [bold [minus [format %.2f $d1]] [at_bound $d1 $DRO_LOWER $DRO_UPPER $TOL_DRO12]] \
-            [bold [minus [format %.2f $d2]] [at_bound $d2 $DRO_LOWER $DRO_UPPER $TOL_DRO12]] \
+            [bold [minus [format %.2f $d1]] [at_bound $d1 ${LOWER_BOUND_δρ₁₂} $DRO_UPPER $TOL_DRO12]] \
+            [bold [minus [format %.2f $d2]] [at_bound $d2 ${LOWER_BOUND_δρ₁₂} $DRO_UPPER $TOL_DRO12]] \
             [bold [minus [format %.2f $d3]] [at_bound $d3 $d3_lo $d3_hi $TOL_DRO3]] \
             $c1 \
             [bold $divtext [expr {$div > $DIVERGENT_FLAG}]]]
