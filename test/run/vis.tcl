@@ -22,57 +22,106 @@ namespace eval vis {
 
     # The checks, in the order they run: name, script in test/visualize/, Julia call, one-line description.
     variable CHECKS {
-        plastic_2d         {plastic_vis.jl     {vis_plastic_points_2D(2000)} {plastic sequence on a spherical surface (2-D generator)}}
-        plastic_3d         {plastic_vis.jl     {vis_plastic_points_3D(2000)} {plastic sequence filling a spherical volume (3-D generator)}}
-        sasa_hydro         {sasa_hydro_vis.jl  {vis_sasa_hydro()}            {SASA hydration-shell dummy cloud over a packed cluster}}
-        sasa_hydro_report  {sasa_hydro_vis.jl  {sasa_hydro_report()}         {the same, numbers only, no window (works headless)}}
+        plastic_2d {
+            plastic_vis.jl
+            {vis_plastic_points_2D(2000)}
+            {plastic sequence on a spherical surface (2-D generator)}
+        }
+        plastic_3d {
+            plastic_vis.jl
+            {vis_plastic_points_3D(2000)}
+            {plastic sequence filling a spherical volume (3-D generator)}
+        }
+        sasa_hydro {
+            sasa_hydro_vis.jl
+            {vis_sasa_hydro()}
+            {SASA hydration-shell dummy cloud over a packed cluster}
+        }
+        sasa_hydro_report {
+            sasa_hydro_vis.jl
+            {sasa_hydro_report()}
+            {the same, numbers only, no window (works headless)}
+        }
     }
 
-    proc fail {msg} { puts stderr "vis.tcl: $msg"; exit 2 }
+    proc fail {msg} {
+        puts stderr "vis.tcl: $msg"
+        exit 2
+    }
 
     # Entry point.
     proc run {argv} {
         global ROOT
         variable CHECKS
-        if {"--help" in $argv || "-h" in $argv} { ::usage $::SCRIPT; return }
+        if {"--help" in $argv || "-h" in $argv} {
+            ::usage $::SCRIPT
+            return
+        }
 
         set names {}
         set list 0
         set dry 0
         foreach a $argv {
             switch -- $a {
-                --list    { set list 1 }
-                --dry-run { set dry 1 }
+                --list {
+                    set list 1
+                }
+                --dry-run {
+                    set dry 1
+                }
                 default {
-                    if {[string match --* $a]} { fail "unknown option $a (one of: --list, --dry-run)" }
+                    if {[string match --* $a]} {
+                        fail "unknown option $a (one of: --list, --dry-run)"
+                    }
                     lappend names $a
                 }
             }
         }
         if {$list} {
-            dict for {name spec} $CHECKS { puts [format "%-18s %s" $name [lindex $spec 2]] }
+            dict for {name spec} $CHECKS {
+                puts [format "%-18s %s" $name [lindex $spec 2]]
+            }
             return
         }
 
         set missing {}
-        foreach n $names { if {![dict exists $CHECKS $n]} { lappend missing $n } }
+        foreach n $names {
+            if {![dict exists $CHECKS $n]} {
+                lappend missing $n
+            }
+        }
         if {[llength $missing]} {
             fail "no visual check named: [join $missing {, }] (available: [join [dict keys $CHECKS] { }])"
         }
-        if {![llength $names]} { set names [dict keys $CHECKS] }
+        if {![llength $names]} {
+            set names [dict keys $CHECKS]
+        }
 
-        if {[catch {find_julia} julia]} { fail $julia }
+        if {[catch {find_julia} julia]} {
+            fail $julia
+        }
         set failed {}
         foreach n $names {
             lassign [dict get $CHECKS $n] script call
             set code "include(\"[file join $ROOT test visualize $script]\"); $call"
-            set cmd [list $julia --startup-file=no --project=[file join $ROOT test visualize] -e $code]
+            set cmd [list \
+                $julia --startup-file=no \
+                --project=[file join $ROOT test visualize] \
+                -e $code \
+            ]
             puts "\n=== $n"
             puts "\$ [join $cmd { }]"
-            if {$dry} continue
-            if {[catch {exec {*}$cmd <@stdin >@stdout 2>@stderr}]} { lappend failed $n }
+            if {$dry} {
+                continue
+            }
+            if {[catch {exec {*}$cmd <@stdin >@stdout 2>@stderr}]} {
+                lappend failed $n
+            }
         }
-        if {[llength $failed]} { puts stderr "\nvis.tcl: failed: [join $failed {, }]"; exit 1 }
+        if {[llength $failed]} {
+            puts stderr "\nvis.tcl: failed: [join $failed {, }]"
+            exit 1
+        }
     }
 }
 

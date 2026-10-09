@@ -3,10 +3,13 @@
 using .SphFuncs: sphHarm!, sphHarmCache, sphBess, sphBessRatios!, sphBessStep
 
 """
-An amplitude shared by all `n` scatterers: `f[q]`, the same for every one (the hydration beads of a class all carry
-the same area, so the same Gaussian amplitude). An `(n, length(f))` matrix by interface, stored as one vector.
-[`compute_B_lm`](@ref) recognizes it: the amplitude factors out of the sum over scatterers, so it computes the
-multipoles with unit amplitude once and scales them by `f(q)`, which costs no `Ft` fill and no per-scatterer multiply.
+An amplitude shared by all `n` scatterers: `f[q]`, the same for every
+one (the hydration beads of a class all carry the same area, so the
+same Gaussian amplitude). An `(n, length(f))` matrix by interface,
+stored as one vector. [`compute_B_lm`](@ref) recognizes it: the amplitude
+factors out of the sum over scatterers, so it computes the multipoles with
+unit amplitude once and scales them by `f(q)`, which costs no `Ft` fill and
+no per-scatterer multiply.
 """
 struct SharedAmplitude{T<:Number} <: AbstractMatrix{T}
     f::Vector{T}
@@ -152,13 +155,20 @@ function _compute_B_lm(
         "as returned by MolecularStructure.coords_spherical; got $(size(coords_sph, 1)) rows"))
     N = size(coords_sph, 2)
     Q = length(qvals)
+
     # validated once here: the per-radius Bessel sweep below does not re-check q
     any(<(0), qvals) && throw(ArgumentError("compute_B_lm: qvals must all be ≥ 0"))
     for f in f_sets
         size(f, 1) == N ||
-            throw(ArgumentError("compute_B_lm: f_atoms must have N rows matching coords_sph's columns"))
+            throw(ArgumentError(
+                "compute_B_lm: f_atoms must have N rows matching coords_sph's columns"
+                )
+            )
         size(f, 2) == Q ||
-            throw(ArgumentError("compute_B_lm: f_atoms must have Q columns matching qvals"))
+            throw(ArgumentError(
+                "compute_B_lm: f_atoms must have Q columns matching qvals"
+                )
+            )
     end
 
     L = Int(lMax)
@@ -168,12 +178,14 @@ function _compute_B_lm(
 
     # A purely real set needs only the Re(f) channel; an imaginary part
     # (anomalous f'') needs a second channel for the ±m symmetry.
-    has_imag(f::AbstractMatrix) = !(eltype(f) <: Real) && any(@closure(x -> imag(x) != 0), f)
-    has_imag(f::SharedAmplitude) = !(eltype(f) <: Real) && any(@closure(x -> imag(x) != 0), f.f)
+    has_imag(f::AbstractMatrix)  = !(eltype(f)<:Real) && any(@closure(x -> imag(x) != 0), f)
+    has_imag(f::SharedAmplitude) = !(eltype(f)<:Real) && any(@closure(x -> imag(x) != 0), f.f)
     nchan = map(f -> has_imag(f) ? 2 : 1, f_sets)
-    # Internal amplitude columns of the accumulator: a shared amplitude is one column with unit amplitude (scaled
-    # by f(q) when unpacking); any other set has one column per channel. `fidx[c]` is the column's slot in `Ft`
-    # (0 for a shared one, which has no per-atom amplitude to copy).
+    # Internal amplitude columns of the accumulator: a shared
+    # amplitude is one column with unit amplitude (scaled by
+    # f(q) when unpacking); any other set has one column per
+    # channel. `fidx[c]` is the column's slot in `Ft` (0 for
+    # a shared one, which has no per-atom amplitude to copy).
     ncols = map(f -> f isa SharedAmplitude ? 1 : (has_imag(f) ? 2 : 1), f_sets)
     ncol = sum(ncols)
     colstart = cumsum((0, Base.front(ncols)...))
@@ -194,60 +206,74 @@ function _compute_B_lm(
     if N > 0
         nchunk = min(Int(_CHUNK), N)
         T = min(B_LM_TILE, nchunk)
+
         # q-tile length so that W (every column, every degree, T atoms) fits the budget
         Qt = clamp(B_LM_W_BYTES ÷ (sizeof(Float64) * ncol * T * (L + 1)), 1, Q)
         qv = Vector{Float64}(qvals)
         qtiles = [qv[q0:min(q0 + Qt - 1, Q)] for q0 in 1:Qt:Q]
 
-        A  = Matrix{Float64}(undef, 2K, T)            # [Re Y_l; −Im Y_l] stacked per degree, of the atoms of one tile
-        Ft = Array{Float64,3}(undef, Q, ncolF, nchunk)  # Ft[q, c, i]: amplitude column c of atom i (per-atom sets only)
-        W  = Array{Float64,3}(undef, ncol * Qt, T, L + 1)   # W[(c-1)Qt + k, t, l+1]
+        # [Re Y_l; −Im Y_l] stacked per degree, of the atoms of one tile
+        A  = Matrix{Float64}(undef, 2K, T)
+
+        # Ft[q, c, i]: amplitude column c of atom i (per-atom sets only)
+        Ft = Array{Float64,3}(undef, Q, ncolF, nchunk)
+
+        # W[(c-1)Qt + k, t, l+1]
+        W  = Array{Float64,3}(undef, ncol * Qt, T, L + 1)
+
         sb = sphBess(Qt, L)
         Scache = sphHarmCache(L)
-        ltopbuf = Vector{Int}(undef, Qt)              # per q: the highest degree kept there (see below)
+        ltopbuf = Vector{Int}(undef, Qt) # per q: the highest degree kept there (see below)
 
-        # Negligible-Bessel cut: |jₗ(x)| ≤ xˡ/(2l+1)!! for all x ≥ 0 (from
-        # |J_ν(x)| ≤ (x/2)^ν/Γ(ν+1), ν ≥ −1/2), so jₗ(x) ≤ BESSEL_CUTOFF whenever
-        # x < x_cut(l) = (BESSEL_CUTOFF·(2l+1)!!)^(1/l). For a tile with largest radius
-        # r_max, degree l contributes nothing at q < x_cut(l)/r_max; with q ascending
-        # those columns are a prefix, skipped below in the W writes and the product.
+        # Negligible-Bessel cut: |jₗ(x)| ≤ xˡ/(2l+1)!! for all x ≥ 0
+        # (from |J_ν(x)| ≤ (x/2)^ν/Γ(ν+1), ν ≥ −1/2), so jₗ(x) ≤ BESS_CUT
+        # whenever x < x_cut(l) = (BESS_CUT·(2l+1)!!)^(1/l). For a tile
+        # with largest radius r_max, degree l contributes nothing at
+        # q < x_cut(l)/r_max; with q ascending those columns are a prefix,
+        # skipped below in the W writes and the product.
+
         # Unsorted q: no cut.
         qsorted = issorted(qv)
         xcut = zeros(L + 1)
-        lndf = 0.0                      # ln((2l+1)!!)
+        lndf = 0.0 # ln((2l+1)!!)
         for l in 1:L
             lndf += log(2l + 1.0)
-            xcut[l + 1] = exp((log(BESSEL_CUTOFF) + lndf) / l)
+            xcut[l + 1] = exp((log(BESS_CUT) + lndf) / l)
         end
-        ks = ones(Int, L + 1)           # first q column (within the q-tile) kept for degree l
+        ks = ones(Int, L + 1) # first q column (within the q-tile) kept for degree l
 
-        # Atoms in order of increasing radius: the sum over atoms does not care, and each tile then holds atoms of
-        # similar radius, so its negligible-Bessel cut (set by the tile's largest radius) is tight: far fewer
-        # degrees and q columns survive in the inner tiles.
+        # Atoms in order of increasing radius: the sum over atoms
+        # does not care, and each tile then holds atoms of similar
+        # radius, so its negligible-Bessel cut (set by the tile's
+        # largest radius) is tight: far fewer degrees and q columns
+        # survive in the inner tiles.
         order = sortperm(@view coords_sph[1, :])
         for start in 1:Int(_CHUNK):N
-            # _CHUNK is a UInt64; keep the index Int (a UInt64 range underflows
-            # when reindexed by a nested view)
+            # _CHUNK is a UInt64; keep the index Int
+            # (a UInt64 range underflows when reindexed
+            # by a nested view)
             idx = @view order[start:min(start + Int(_CHUNK) - 1, N)]
             nc = length(idx)
             gc_checkpoint()
 
-            # amplitudes, q-contiguous per atom and column (shared sets have none: unit amplitude)
+            # amplitudes, q-contiguous per atom and column
+            # (shared sets have none: unit amplitude)
             c = 0
             for (s, f) in enumerate(f_sets)
                 f isa SharedAmplitude && continue
                 for ch in 1:ncols[s]
                     c += 1
-                    # real part for channel 1, imaginary for channel 2 (branch outside the copy)
+                    # real part for channel 1, imaginary for
+                    # channel 2 (branch outside the copy)
                     if ch == 1
                         @inbounds for i in 1:nc
-                            @simd for q in 1:Q
+                            @fastmath @simd for q in 1:Q
                                 Ft[q, c, i] = real(f[idx[i], q])
                             end
                         end
                     else
                         @inbounds for i in 1:nc
-                            @simd for q in 1:Q
+                            @fastmath @simd for q in 1:Q
                                 Ft[q, c, i] = imag(f[idx[i], q])
                             end
                         end
@@ -259,8 +285,10 @@ function _compute_B_lm(
                 ts = t0:min(t0 + T - 1, nc)
                 nt = length(ts)
 
-                # Highest degree with any kept q column in this tile (its largest radius, the largest q): Y_lm is
-                # needed only up to it, and the inner tiles of the radius-sorted atoms stop far below lMax.
+                # Highest degree with any kept q column in this
+                # tile (its largest radius, the largest q): Y_lm is
+                # needed only up to it, and the inner tiles of the
+                # radius-sorted atoms stop far below lMax.
                 Ltile = L
                 if qsorted
                     rmax = maximum(i -> Float64(coords_sph[1, idx[i]]), ts)
@@ -270,27 +298,35 @@ function _compute_B_lm(
                     end
                 end
                 tile = view(idx, ts)
-                # [Re Y; −Im Y] of the tile's atoms, straight into the product operand A (degrees 0..Ltile)
-                sphHarm!(view(A, :, 1:nt), Scache, Ltile, view(coords_sph, 2, tile), view(coords_sph, 3, tile))
+                # [Re Y; −Im Y] of the tile's atoms, straight
+                # into the product operand A (degrees 0..Ltile)
+                sphHarm!(
+                    view(A, :, 1:nt),
+                    Scache,
+                    Ltile,
+                    view(coords_sph, 2, tile),
+                    view(coords_sph, 3, tile)
+                )
 
                 for (ti, qt) in enumerate(qtiles)
                     q0 = (ti - 1) * Qt + 1
                     nq = length(qt)
-                    Lt = L                      # last degree with a kept q column in this tile
+                    Lt = L # last degree with a kept q column in this tile
                     if qsorted
                         rmax = maximum(i -> Float64(coords_sph[1, idx[i]]), ts)
                         Lt = 0
                         for l in 1:L
                             ks[l + 1] = searchsortedfirst(qt, xcut[l + 1] / rmax)
-                            ks[l + 1] ≤ nq && (Lt = l)      # xcut grows with l: the kept degrees are 0..Lt
+                            ks[l + 1] ≤ nq && (Lt = l) # xcut grows w/ l; kept degrees are 0..Lt
                         end
                     end
-                    # ltop[k]: the highest degree kept at q column k (ks is nondecreasing in l, so the kept degrees at k
+                    # ltop[k]: the highest degree kept at q column k
+                    # (ks is nondecreasing in l, so the kept degrees at k
                     # are 0..ltop[k]): the Bessel ratios are needed only up to it
                     if qsorted
                         for l in 0:Lt
                             lo = ks[l + 1]; hi = l < Lt ? ks[l + 2] - 1 : nq
-                            @inbounds for k in lo:hi
+                            @inbounds @simd for k in lo:hi
                                 ltopbuf[k] = l
                             end
                         end
@@ -300,13 +336,20 @@ function _compute_B_lm(
 
                     # W for every atom of the tile, every degree, every column
                     for (tt, i) in enumerate(ts)
-                        sphBessRatios!(sb, Float64(coords_sph[1, idx[i]]), qt, Lt; ltop = view(ltopbuf, 1:nq))
+                        sphBessRatios!(
+                            sb,
+                            Float64(coords_sph[1, idx[i]]),
+                            qt,
+                            Lt;
+                            ltop = view(ltopbuf, 1:nq)
+                        )
                         jm1, jm2 = sb.jm1, sb.jm2      # j₁, j₀ after pass 1
                         _write_W!(W, Ft, jm2, fidx, q0, ks[1], nq, Qt, tt, i, 0)
                         Lt ≥ 1 && _write_W!(W, Ft, jm1, fidx, q0, ks[2], nq, Qt, tt, i, 1)
                         for l in 2:Lt
                             lup, invx, R = sb.lup, sb.invx, sb.R
-                            # q columns below ks[l+1] are under the cut at this degree and every higher one: not advanced
+                            # q columns below ks[l+1] are under the cut at
+                            # this degree and every higher one: not advanced
                             @inbounds @fastmath @simd for k in ks[l + 1]:nq
                                 v = sphBessStep(jm1[k], jm2[k], l, lup[k], invx[k], R[k, l])
                                 jm2[k] = jm1[k]
@@ -319,13 +362,28 @@ function _compute_B_lm(
                     # one real product per degree and column, accumulated in place (BLAS)
                     for l in 0:L
                         kk = ks[l + 1]
-                        kk > nq && continue     # the whole q-tile is below the cut
+                        kk > nq && continue # the whole q-tile is below the cut
                         k0 = l * (l + 1) ÷ 2
                         rows = (2k0 + 1):(2k0 + 2(l + 1))
                         Al = view(A, rows, 1:nt)
                         for c in 1:ncol
-                            mul!(view(Acc, rows, (c - 1) * Q .+ ((q0 + kk - 1):(q0 + nq - 1))), Al,
-                                 transpose(view(W, (c - 1) * Qt .+ (kk:nq), 1:nt, l + 1)), 1.0, 1.0)
+                            mul!(
+                                view(
+                                    Acc,
+                                    rows,
+                                    (c - 1) * Q .+ ((q0 + kk - 1):(q0 + nq - 1))
+                                ),
+                                Al,
+                                transpose(
+                                    view(
+                                        W,
+                                        (c - 1) * Qt .+ (kk:nq),
+                                        1:nt,
+                                        l + 1
+                                    )
+                                ),
+                                1.0, 1.0
+                            )
                         end
                     end
                 end
@@ -339,15 +397,21 @@ function _compute_B_lm(
         B = Array{ComplexF64,3}(undef, nchan[s], K, Q)
         f = f_sets[s]
         for ch in 1:nchan[s]
-            # a shared set has one accumulator column holding the unit-amplitude multipoles, scaled here by f(q)
+            # a shared set has one accumulator column holding the
+            # unit-amplitude multipoles, scaled here by f(q)
             c = f isa SharedAmplitude ? colstart[s] + 1 : colstart[s] + ch
-            scale(q) = f isa SharedAmplitude ? (ch == 1 ? real(f.f[q]) : imag(f.f[q])) : 1.0
+            scale(q) = f isa SharedAmplitude ? (
+                ch == 1 ? real(f.f[q]) : imag(f.f[q])
+            ) : 1.0
             @inbounds for q in 1:Q, l in 0:L
                 k0 = l * (l + 1) ÷ 2
                 col = (c - 1) * Q + q
                 sc = scale(q)
                 @fastmath @simd for m in 0:l
-                    B[ch, k0 + m + 1, q] = sc * complex(Acc[2k0 + m + 1, col], Acc[2k0 + l + 1 + m + 1, col])
+                    B[ch, k0 + m + 1, q] = sc * complex(
+                            Acc[2k0 + m + 1, col],
+                            Acc[2k0 + l + 1 + m + 1, col]
+                        )
                 end
             end
         end
@@ -357,9 +421,11 @@ end
 
 
 """
-W[(c−1)Qt + k, tt, l+1] = Ft[q0+k−1, fidx[c], i]·j[k] (just j[k] for a shared column, `fidx[c] == 0`) for every amplitude column c and
-k = kstart..nq: degree l's slice of W for one atom, from its normalized jₗ over the
-q-tile (columns below kstart are under the negligible-Bessel cut and not used).
+W[(c−1)Qt + k, tt, l+1] = Ft[q0+k−1, fidx[c], i]·j[k] (just j[k]
+for a shared column, `fidx[c] == 0`) for every amplitude column c and
+k = kstart..nq: degree l's slice of W for one atom, from its normalized
+jₗ over the q-tile (columns below kstart are under the negligible-Bessel
+cut and not used).
 
 # Returns
 - `nothing`.
@@ -380,8 +446,8 @@ q-tile (columns below kstart are under the negligible-Bessel cut and not used).
     @inbounds for c in eachindex(fidx)
         off = (c - 1) * Qt
         fc = fidx[c]
-        if fc == 0                      # shared amplitude: unit, scaled when unpacking
-            @simd for k in kstart:nq
+        if fc == 0 # shared amplitude: unit, scaled when unpacking
+            @fastmath @simd for k in kstart:nq
                 W[off + k, tt, l + 1] = j[k]
             end
         else

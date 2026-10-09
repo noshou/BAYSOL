@@ -3,6 +3,18 @@
 # run_model: NUTS on a Seed, then the MAP draw and the posterior quantiles.
 
 """
+The reduced χ² of the model curve `y` (on the fitted grid of `sh`) against the measured curve: `y` is interpolated onto the
+measured q points ([`Shannon.model_on_raw`](@ref BAYSOL.Utils.Shannon.model_on_raw)) and the sum of squared normalized
+residuals is divided by the number of measured points less the three parameters fitted to the curve by minimization (scale,
+background and the excluded-volume correction c1). This is the χ² on the grid a program such as CRYSOL or FoXS evaluates,
+whatever binning the fit used.
+"""
+function _chisq_measured(sh::Shannon.ShannonInfo, y::AbstractVector{<:Real})::Float64
+    r = (sh.I_raw .- Shannon.model_on_raw(sh, y)) ./ sh.σ_raw
+    return sum(abs2, r) / (length(r) - 3)
+end
+
+"""
 Run NUTS on [`Fitting._logπ`](@ref) starting from seed, returning posterior
 draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
 (scale, `bkgrnd_corr`) pair and predicted curve per draw, and
@@ -140,6 +152,17 @@ function run_model(
         fit_unfiltered.timing
     )
 
+    # The χ² every program compares is the reduced χ² on the measured points. For a Shannon-binned fit that is not the
+    # fit's own (the fitted grid is the binned curve, whose smaller σ makes a smooth misfit count several times more),
+    # so it is evaluated on the measured grid for every draw, from the curve interpolated onto it.
+    binned = seed.shannon !== nothing && seed.shannon.rebin > 0
+    chisq_meas = if binned
+        sh_ = seed.shannon
+        [_chisq_measured(sh_, view(fit.curves, :, j)) for j in axes(fit.curves, 2)]
+    else
+        fit.chisq_red
+    end
+
     # Numerical instabilities can occur when the posterior has very 
     # different curvature/scales across dimensions. Such samples are 
     # flagged as divergent and excluded from MAP selection.
@@ -163,27 +186,24 @@ function run_model(
         divergence_rate = diverged / length(fit.stats)
         
         # calculate MAP params + curves
-        # ξ = (ρₑ, δρ₁, δρ₂, δρ₃)
+        # ξ = (ρₑ, δρ₁, δρ₂, δρ₃) for the protein parameterization, see Fitting.param_keys
         # z_map: how many prior standard deviations (θ-space) the MAP draw
         # sits from its own prior, one entry per physical parameter.
         ξ_map = fit.samples[max_idx]
         z_map = Fitting.prior_z_scores(ξ_map, seed.pr)
         MAP_params = Dict{String, Float64}(
-            "log_density"      => max_llh,
-            "slvnt_e_dns"      => ξ_map[1],
-            "delta_rho_1"      => ξ_map[2],
-            "delta_rho_2"      => ξ_map[3],
-            "delta_rho_3"      => ξ_map[4],
+            "log_density"       => max_llh,
             "cavity_shell_frac" => Scattering.cavity_shell_fraction(seed.fw),
-            "scale"         => fit.scale[max_idx],
-            "bkgrnd_corr"   => fit.bkgrnd_corr[max_idx],
-            "excl_vol_corr" => fit.c1[max_idx],
-            "chisq_red"     => fit.chisq_red[max_idx],
-            "z_slvnt_e_dns"   => z_map[1],
-            "z_delta_rho_1"   => z_map[2],
-            "z_delta_rho_2"   => z_map[3],
-            "z_delta_rho_3"   => z_map[4],
+            "scale"             => fit.scale[max_idx],
+            "bkgrnd_corr"       => fit.bkgrnd_corr[max_idx],
+            "excl_vol_corr"     => fit.c1[max_idx],
+            "chisq_red"         => chisq_meas[max_idx],
         )
+        pkeys = Fitting.param_keys(seed.pr)
+        for (k, key) in enumerate(pkeys)
+            MAP_params[key]        = ξ_map[k]
+            MAP_params["z_" * key] = z_map[k]
+        end
         # c1 is profiled (no prior), so saturation against its physical
         # bounds is checked once, here, on the single MAP value -- not per
         # posterior draw, since transient saturation during warmup is
@@ -194,22 +214,6 @@ function run_model(
         if excl_vol_sat != 0
             @warn "excluded-volume correction c1 saturated at the $(excl_vol_sat > 0 ? "upper" : "lower") profiling bound" c1=fit.c1[max_idx]
         end
-        # are the residuals white, as the likelihood assumes; and, when the curve was binned, the fit's
-        # quality on the measured q grid, which is what a depositor's χ² refers to
-        if seed.shannon !== nothing
-            sh = seed.shannon
-            y_map = fit.curves[:, max_idx]
-            rs = Shannon.residual_structure((sh.I .- y_map) ./ sh.σ)
-            MAP_params["resid_lag1"]   = rs.lag1
-            MAP_params["resid_runs_z"] = rs.runs_z
-            if sh.rebin > 0
-                r_raw = (sh.I_raw .- Shannon.model_on_raw(sh, y_map)) ./ sh.σ_raw
-                rs_raw = Shannon.residual_structure(r_raw)
-                MAP_params["chisq_red_raw"]    = sum(abs2, r_raw) / (length(r_raw) - 2)
-                MAP_params["resid_lag1_raw"]   = rs_raw.lag1
-                MAP_params["resid_runs_z_raw"] = rs_raw.runs_z
-            end
-        end
         MAP_curve = hcat(seed.fw.qvals, fit.curves[:, max_idx])
         map =(MAP_params, MAP_curve)
 
@@ -219,27 +223,22 @@ function run_model(
         scale_filt   = fit.scale[filter]
         bkgrnd_filt  = fit.bkgrnd_corr[filter]
         c1_filt      = fit.c1[filter]
-        chisq_filt   = fit.chisq_red[filter]
+        chisq_filt   = chisq_meas[filter]
         curves       = fit.curves[:, filter]
 
-        # extract parameters from ξ = (ρₑ, δρ₁, δρ₂, δρ₃)
-        ρₑ_filt  = getindex.(samples_filt, 1)
-        δρ₁_filt = getindex.(samples_filt, 2)
-        δρ₂_filt = getindex.(samples_filt, 3)
-        δρ₃_filt = getindex.(samples_filt, 4)
+        # per-parameter draws, quantiles and prior z-scores, one entry per coordinate of ξ
+        ξ_filt = [getindex.(samples_filt, k) for k in eachindex(pkeys)]
+        ξ_q    = [quantile(v, [q_1, q_2]) for v in ξ_filt]
+        N      = length(pkeys)
+        z_lo = Fitting.prior_z_scores(SVector{N,Float64}(first.(ξ_q)), seed.pr)
+        z_hi = Fitting.prior_z_scores(SVector{N,Float64}(last.(ξ_q)), seed.pr)
 
-        # calculate param quantiles
+        # calculate the quantiles of the remaining quantities
         ll_lo,  ll_hi        = quantile(ll_filt,     [q_1, q_2])
-        δρ₁_lo, δρ₁_hi       = quantile(δρ₁_filt,    [q_1, q_2])
-        δρ₂_lo, δρ₂_hi       = quantile(δρ₂_filt,    [q_1, q_2])
-        δρ₃_lo, δρ₃_hi       = quantile(δρ₃_filt,    [q_1, q_2])
-        ρₑ_lo,  ρₑ_hi        = quantile(ρₑ_filt,     [q_1, q_2])
         scale_lo, scale_hi   = quantile(scale_filt,  [q_1, q_2])
         bkgrnd_lo, bkgrnd_hi = quantile(bkgrnd_filt, [q_1, q_2])
         c1_lo, c1_hi         = quantile(c1_filt,     [q_1, q_2])
         chisq_lo, chisq_hi   = quantile(chisq_filt,  [q_1, q_2])
-        z_lo = Fitting.prior_z_scores(SVector(ρₑ_lo, δρ₁_lo, δρ₂_lo, δρ₃_lo), seed.pr)
-        z_hi = Fitting.prior_z_scores(SVector(ρₑ_hi, δρ₁_hi, δρ₂_hi, δρ₃_hi), seed.pr)
 
         # returns a tuple of (low, high) bounds; fails loudly
         function map_bounds(lo, hi, x)
@@ -255,26 +254,6 @@ function run_model(
                 "log_density"     => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (ll_lo, ll_hi),
                     "bounds"      => map_bounds(ll_lo, ll_hi, ll_filt)
-                ),
-                "delta_rho_1"     => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (δρ₁_lo, δρ₁_hi),
-                    "bounds"      => map_bounds(δρ₁_lo, δρ₁_hi, δρ₁_filt),
-                    "z"           => (z_lo[2], z_hi[2]),
-                ),
-                "delta_rho_2"     => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (δρ₂_lo, δρ₂_hi),
-                    "bounds"      => map_bounds(δρ₂_lo, δρ₂_hi, δρ₂_filt),
-                    "z"           => (z_lo[3], z_hi[3]),
-                ),
-                "delta_rho_3"     => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (δρ₃_lo, δρ₃_hi),
-                    "bounds"      => map_bounds(δρ₃_lo, δρ₃_hi, δρ₃_filt),
-                    "z"           => (z_lo[4], z_hi[4]),
-                ),
-                "slvnt_e_dns"     => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (ρₑ_lo, ρₑ_hi),
-                    "bounds"      => map_bounds(ρₑ_lo, ρₑ_hi, ρₑ_filt),
-                    "z"           => (z_lo[1], z_hi[1]),
                 ),
                 "scale"           => Dict{String, Tuple{Float64, Float64}}(
                     "quantiles"   => (scale_lo, scale_hi),
@@ -293,6 +272,14 @@ function run_model(
                     "bounds"      => map_bounds(chisq_lo, chisq_hi, chisq_filt)
                 )
             )
+        for (k, key) in enumerate(pkeys)
+            lo, hi = ξ_q[k]
+            params[key] = Dict{String, Tuple{Float64, Float64}}(
+                "quantiles" => (lo, hi),
+                "bounds"    => map_bounds(lo, hi, ξ_filt[k]),
+                "z"         => (z_lo[k], z_hi[k]),
+            )
+        end
 
         # curve is Q x I_low(Q) x I_hi(Q)
         qvals = seed.fw.qvals

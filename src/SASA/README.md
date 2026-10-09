@@ -4,8 +4,6 @@ Models the molecule's solvent-accessible surface, as input to the CRYSOL-style h
 
 - **SASA.jl**: `sasa`, the solvent-accessible surface by Shrake–Rupley point sampling, returned as a classified point cloud (convex / concave / cavity) standing in for CRYSOL's three hydration-shell bead populations. `sum(areas)` is the solvent-accessible surface area.
 
-SASA is a top-level module (`BAYSOL.SASA`). It used to live under the removed `Solvation` module, together with the Debye-Hückel cavity electrostatics. Its consumer is `Scattering.hydration`, which turns `sasa`'s point cloud into the three hydration-shell species.
-
 ## SASA - solvent-accessible surface
 
 Each atom's *expanded* sphere (radius + probe, probe = solvent probe radius, default 1.4 Å for water) is sampled at `SHELL_SAMPLE` = 256 directions, and a direction is *occluded* if it lands inside any other atom's expanded sphere. Every accepted point stands for 4π(r+probe)²/256 of area, so the cloud's total area is the Shrake–Rupley accessible-area estimate. Sample directions come from the plastic-sequence low-discrepancy set (`PlasticSequence`, see the Utils README) rather than i.i.d. random points or a fixed spherical-cap design, for even coverage at any point count.
@@ -49,6 +47,5 @@ Keywords:
 ## Constants
 
 Defined at module level in `SASA.jl`.
-
 
 `PROBE_RADIUS` (1.4 Å water probe), `SHELL_N_TARGET` (nothing by default: [`SASA.sasa`](@ref BAYSOL.SASA.sasa) sizes the hydration-shell cloud from the accessible area), `SHELL_AREA_PER_POINT`, `SHELL_MIN_POINTS`, `SHELL_SAMPLE`, `BEAD_RAY_RANGE`, `BEAD_RAY_DIRS`, `BEAD_CONVEX_ESCAPE`, `SASA_N_OCC` (104, the witness-pass prefix and its accepted area error; see the SASA README) `PROBE_RADIUS` and `SHELL_N_TARGET` are also the hydration-shell defaults that Scattering and `seed_model` forward.

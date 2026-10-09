@@ -6,7 +6,7 @@
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.Fitting: δρ_prior
-using BAYSOL.PhysicalConstants: DRO_UNIT
+using BAYSOL.PhysicalConstants: UNIT_OF_δρ
 using BAYSOL.Fitting: DRO_BOUNDS, DRO12_MODE, φ_max, DRO12_CONCENTRATION, DRO3_CONCENTRATION
 using Distributions: LocationScale, Continuous, Beta, mode, var, cdf, params, minimum, maximum
 using StaticArrays: SVector
@@ -44,16 +44,16 @@ const BB = LocationScale{Float64,Continuous,Beta{Float64}}
         @test 0.99 < sqrt(var(d1)) < 1.01
     end
 
-    @testset "δρ₃: support is [-ρ̄ₑ/DRO_UNIT, (φ_max - 1)ρ̄ₑ/DRO_UNIT], mode at 0" begin
+    @testset "δρ₃: support is [-ρ̄ₑ/UNIT_OF_δρ, (φ_max - 1)ρ̄ₑ/UNIT_OF_δρ], mode at 0" begin
         for κ in (0.5, 1.25, 10.0)
             _, _, d3 = δρ_prior(1.0, κ, ρ̄)
-            @test close_(minimum(d3), -ρ̄ / DRO_UNIT)
-            @test close_(maximum(d3), (φ_max - 1) * ρ̄ / DRO_UNIT)
+            @test close_(minimum(d3), -ρ̄ / UNIT_OF_δρ)
+            @test close_(maximum(d3), (φ_max - 1) * ρ̄ / UNIT_OF_δρ)
             @test close_(d3.μ + d3.σ * mode(d3.ρ), 0.0; atol = 1e-3 * DEFAULT_ATOL)
             @test close_(φ_max * mode(d3.ρ), 1.0)
             @test close_(sum(params(d3.ρ)) - 2, κ)
             σ²u = (1 + κ / φ_max) * (1 + (1 - 1 / φ_max) * κ) / ((κ + 2)^2 * (κ + 3))
-            @test close_(var(d3), (φ_max * ρ̄ / DRO_UNIT)^2 * σ²u)
+            @test close_(var(d3), (φ_max * ρ̄ / UNIT_OF_δρ)^2 * σ²u)
         end
     end
 

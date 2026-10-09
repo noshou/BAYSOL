@@ -17,7 +17,7 @@
 #   --report   afterwards, print the Results-table rows of the selected fits (test/utils/results_table.tcl)
 #   --table    afterwards, rewrite the Results table in test/fitting_tests/README.md from all the reports
 #              (test/utils/results_table.tcl --update); covers every fit, whatever IDs are named
-#   --fixme    afterwards, run the sampler diagnostics on the selected fits (test/utils/diagnose.tcl report)
+#   --fixme    afterwards, run the sampler diagnostics on the selected fits (test/utils/diagnose.tcl --report)
 #   --trace-compile FILE  run the fits with Julia's --trace-compile=FILE (the methods each fit's process compiles at run time,
 #              which a precompile workload should have covered; one file for all the fits, appended)
 #   --dry-run  print what would be run, run nothing
@@ -37,20 +37,31 @@ namespace eval fittings {
     variable VALUED {--trace-compile}      ;# options that take a value
 
     # Stops with a message (and exit status 2) when the command line is wrong.
-    proc fail {msg} { puts stderr "fittings.tcl: $msg"; exit 2 }
+    proc fail {msg} {
+        puts stderr "fittings.tcl: $msg"
+        exit 2
+    }
 
     # Prints a command and, unless $dry, runs it with our terminal. True when it succeeded.
     proc sh {dry args} {
         puts "\$ [join $args { }]"
-        if {$dry} { return 1 }
-        return [expr {![catch {exec {*}$args <@stdin >@stdout 2>@stderr}]}]
+        if {$dry} {
+            return 1
+        }
+        set failed [catch {
+            exec {*}$args <@stdin >@stdout 2>@stderr
+        }]
+        return [expr {!$failed}]
     }
 
     # Entry point.
     proc run {argv} {
         global ROOT
         variable FLAGS
-        if {"--help" in $argv || "-h" in $argv} { ::usage $::SCRIPT; return }
+        if {"--help" in $argv || "-h" in $argv} {
+            ::usage $::SCRIPT
+            return
+        }
 
         variable VALUED
         set flags {}
@@ -59,27 +70,39 @@ namespace eval fittings {
         for {set i 0} {$i < [llength $argv]} {incr i} {
             set a [lindex $argv $i]
             if {$a in $VALUED} {
-                if {[incr i] >= [llength $argv]} { fail "option $a needs a value" }
+                if {[incr i] >= [llength $argv]} {
+                    fail "option $a needs a value"
+                }
                 set trace [file normalize [lindex $argv $i]]
             } elseif {[string match --* $a]} {
-                if {$a ni $FLAGS} { fail "unknown option $a (one of: [join [concat $FLAGS $VALUED] {, }])" }
+                if {$a ni $FLAGS} {
+                    fail "unknown option $a (one of: [join [concat $FLAGS $VALUED] {, }])"
+                }
                 lappend flags $a
             } else {
                 lappend requested $a
             }
         }
-        if {"--approved" in $flags && "--bench" ni $flags} { fail "--approved only applies together with --bench" }
+        if {"--approved" in $flags && "--bench" ni $flags} {
+            fail "--approved only applies together with --bench"
+        }
         set dry [expr {"--dry-run" in $flags}]
 
         # the folders to run: every one asked for must exist; none asked for means all of them
         set missing {}
-        foreach id $requested { if {$id ni [ids]} { lappend missing $id } }
+        foreach id $requested {
+            if {$id ni [ids]} {
+                lappend missing $id
+            }
+        }
         if {[llength $missing]} {
             fail "no fitting test folder for: [join $missing {, }] (available: [join [ids] { }])"
         }
         set selected [expr {[llength $requested] ? $requested : [ids]}]
 
-        if {[catch {find_julia} julia]} { fail $julia }
+        if {[catch {find_julia} julia]} {
+            fail $julia
+        }
         set tclsh [info nameofexecutable]
         set utils [file join $ROOT test utils]
         set failed {}
@@ -88,7 +111,9 @@ namespace eval fittings {
         foreach id [expr {"--no-fit" in $flags ? {} : $selected}] {
             puts "\n=== fit: $id"
             set jl [list $julia --startup-file=no]
-            if {$trace ne ""} { lappend jl --trace-compile=$trace }
+            if {$trace ne ""} {
+                lappend jl --trace-compile=$trace
+            }
             if {![sh $dry {*}$jl --project=[file join $ROOT test fitting_tests] [script_of $id]]} {
                 lappend failed "fit $id"
             }
@@ -98,29 +123,42 @@ namespace eval fittings {
         if {"--bench" in $flags} {
             puts "\n=== benchmark"
             set cmd [list $tclsh [file join $utils bench.tcl]]
-            if {"--approved" in $flags} { lappend cmd --approved }
-            if {![sh $dry {*}$cmd {*}[specs_of $selected]]} { lappend failed benchmark }
+            if {"--approved" in $flags} {
+                lappend cmd --approved
+            }
+            if {![sh $dry {*}$cmd {*}[specs_of $selected]]} {
+                lappend failed benchmark
+            }
         }
 
         # 3. the report: the Results-table rows of the selected fits
         if {"--report" in $flags} {
             puts "\n=== report"
-            if {![sh $dry $tclsh [file join $utils results_table.tcl] {*}$requested]} { lappend failed report }
+            if {![sh $dry $tclsh [file join $utils results_table.tcl] {*}$requested]} {
+                lappend failed report
+            }
         }
 
         # 3b. the Results table of the fitting tests' README
         if {"--table" in $flags} {
             puts "\n=== table"
-            if {![sh $dry $tclsh [file join $utils results_table.tcl] --update]} { lappend failed table }
+            if {![sh $dry $tclsh [file join $utils results_table.tcl] --update]} {
+                lappend failed table
+            }
         }
 
         # 4. the diagnostics
         if {"--fixme" in $flags} {
             puts "\n=== diagnostics"
-            if {![sh $dry $tclsh [file join $utils diagnose.tcl] report {*}[specs_of $selected]]} { lappend failed diagnostics }
+            if {![sh $dry $tclsh [file join $utils diagnose.tcl] --report {*}[specs_of $selected]]} {
+                lappend failed diagnostics
+            }
         }
 
-        if {[llength $failed]} { puts stderr "\nfittings.tcl: failed: [join $failed {, }]"; exit 1 }
+        if {[llength $failed]} {
+            puts stderr "\nfittings.tcl: failed: [join $failed {, }]"
+            exit 1
+        }
     }
 }
 

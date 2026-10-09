@@ -3,8 +3,11 @@
 package require Tcl 9.0-
 
 # Repository root: the directory two levels above test/utils/ (BAYSOL_ROOT overrides it, for testing elsewhere).
-set ROOT [expr {[info exists ::env(BAYSOL_ROOT)] ? $::env(BAYSOL_ROOT)
-                : [file normalize [file join [file dirname [info script]] .. ..]]}]
+if {[info exists ::env(BAYSOL_ROOT)]} {
+    set ROOT $::env(BAYSOL_ROOT)
+} else {
+    set ROOT [file normalize [file join [file dirname [info script]] .. ..]]
+}
 set FIT_DIR test/fitting_tests
 
 # A decimal number as a regex fragment, one capture group: optional sign, fraction and exponent.
@@ -16,10 +19,14 @@ set NUM {([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)}
 proc main {cmd args} {
     fconfigure stdout -encoding utf-8
     if {[catch {{*}$cmd {*}$args} err opts]} {
-        if {[string match {*broken pipe*} $err]} { exit 0 }
+        if {[string match {*broken pipe*} $err]} {
+            exit 0
+        }
         return -options $opts $err
     }
-    if {[catch {flush stdout} err]} { exit 0 }
+    if {[catch {flush stdout} err]} {
+        exit 0
+    }
 }
 
 # Prints the header comment (the usage text) of the script $file: the lines after the shebang, the SPDX
@@ -27,7 +34,9 @@ proc main {cmd args} {
 proc usage {file} {
     set ch [open $file r]
     fconfigure $ch -encoding utf-8
-    gets $ch; gets $ch; gets $ch
+    gets $ch
+    gets $ch
+    gets $ch
     while {[gets $ch line] >= 0 && [string index $line 0] eq "#"} {
         puts [regsub {^# ?} $line {}]
     }
@@ -35,7 +44,9 @@ proc usage {file} {
 }
 
 namespace eval util {
-    namespace export git resolve slurp find_julia ids script_of tags_of specs_of single_run latest_release baseline_for rm_tree
+    namespace export \
+        git resolve slurp find_julia ids script_of tags_of specs_of \
+        single_run latest_release baseline_for rm_tree
 
     # Output of `git -C $ROOT ARGS`, decoded as UTF-8 (tag and path names can be non-ASCII).
     # A failing git raises an error.
@@ -50,7 +61,9 @@ namespace eval util {
 
     # The commit hash of $rev, or "" if git does not know it.
     proc resolve {rev} {
-        if {[catch {git rev-parse --verify --quiet "$rev^\{commit\}"} hash]} { return "" }
+        if {[catch {git rev-parse --verify --quiet "$rev^\{commit\}"} hash]} {
+            return ""
+        }
         return [string trim $hash]
     }
 
@@ -60,7 +73,9 @@ namespace eval util {
     proc latest_release {} {
         set tags [git for-each-ref --sort=-creatordate --format=%(refname:short) refs/tags]
         foreach t [split [string trim $tags] "\n"] {
-            if {[regexp {^v\d} $t]} { return $t }
+            if {[regexp {^v\d} $t]} {
+                return $t
+            }
         }
         return ""
     }
@@ -69,19 +84,29 @@ namespace eval util {
     # test/baselines/$tag*.json, or "" if there is none. Baselines are captured when a release is made.
     proc baseline_for {tag} {
         global ROOT
-        set files [lsort [glob -nocomplain -directory [file join $ROOT test baselines] ${tag}*.json]]
-        return [expr {[llength $files] ? [lindex $files end] : ""}]
+        set dir [file join $ROOT test baselines]
+        set files [lsort [glob -nocomplain -directory $dir ${tag}*.json]]
+        if {[llength $files]} {
+            return [lindex $files end]
+        }
+        return ""
     }
 
     # True for the tag list of a script with a single run, which is the one empty tag {""}.
-    proc single_run {tags} { expr {[llength $tags] == 1 && [lindex $tags 0] eq ""} }
+    proc single_run {tags} {
+        expr {[llength $tags] == 1 && [lindex $tags 0] eq ""}
+    }
 
     # Deletes the benchmark's throwaway directory $dir and everything in it, never following a symbolic link:
     # a link is unlinked and its target left alone (the cold state's depot is made of links into the real one).
     # Refuses any directory that is not named baysol-bench-*, so a wrong argument cannot delete anything else.
     proc rm_tree {dir} {
-        if {![string match baysol-bench-* [file tail $dir]]} { error "rm_tree: refusing to delete $dir" }
-        if {![file isdirectory $dir]} return
+        if {![string match baysol-bench-* [file tail $dir]]} {
+            error "rm_tree: refusing to delete $dir"
+        }
+        if {![file isdirectory $dir]} {
+            return
+        }
         rm_entry $dir
     }
 
@@ -89,7 +114,9 @@ namespace eval util {
     proc entries {dir} {
         set out {}
         foreach path [glob -nocomplain -directory $dir * .*] {
-            if {[file tail $path] ni {. ..}} { lappend out $path }
+            if {[file tail $path] ni {. ..}} {
+                lappend out $path
+            }
         }
         return $out
     }
@@ -97,15 +124,23 @@ namespace eval util {
     # One entry of rm_tree: a link or file is deleted; a real directory is emptied first.
     proc rm_entry {path} {
         if {[file type $path] eq "directory"} {
-            foreach entry [entries $path] { rm_entry $entry }
+            foreach entry [entries $path] {
+                rm_entry $entry
+            }
         }
         file delete $path
     }
 
     # The Julia executable: $JULIA if set, else `julia` from the PATH. An error if it cannot be found.
     proc find_julia {} {
-        set julia [expr {[info exists ::env(JULIA)] ? $::env(JULIA) : "julia"}]
-        if {[auto_execok $julia] eq ""} { error "julia not found (set JULIA to its path)" }
+        if {[info exists ::env(JULIA)]} {
+            set julia $::env(JULIA)
+        } else {
+            set julia julia
+        }
+        if {[auto_execok $julia] eq ""} {
+            error "julia not found (set JULIA to its path)"
+        }
         return $julia
     }
 
@@ -129,8 +164,12 @@ namespace eval util {
         global ROOT FIT_DIR
         set dir [file join $ROOT $FIT_DIR $id]
         set scripts [glob -nocomplain -tails -directory $dir *.jl]
-        if {"$id.jl" in $scripts} { return [file join $dir $id.jl] }
-        if {[llength $scripts] == 1} { return [file join $dir [lindex $scripts 0]] }
+        if {"$id.jl" in $scripts} {
+            return [file join $dir $id.jl]
+        }
+        if {[llength $scripts] == 1} {
+            return [file join $dir [lindex $scripts 0]]
+        }
         error "$dir: expected $id.jl or a single script, found $scripts"
     }
 
@@ -138,11 +177,17 @@ namespace eval util {
     # special scripts, or {""} for a script with a single run.
     proc tags_of {id} {
         variable SPECIAL_TAGS
-        if {[dict exists $SPECIAL_TAGS $id]} { return [dict get $SPECIAL_TAGS $id] }
+        if {[dict exists $SPECIAL_TAGS $id]} {
+            return [dict get $SPECIAL_TAGS $id]
+        }
         set src [slurp [script_of $id]]
-        if {![regexp {const RUNS = \[(.*?)\n\]} $src -> table]} { return [list ""] }
+        if {![regexp {const RUNS = \[(.*?)\n\]} $src -> table]} {
+            return [list ""]
+        }
         set tags {}
-        foreach {m tag} [regexp -all -inline {tag = "([^"]+)"} $table] { lappend tags $tag }
+        foreach {m tag} [regexp -all -inline {tag = "([^"]+)"} $table] {
+            lappend tags $tag
+        }
         return $tags
     }
 
@@ -150,7 +195,13 @@ namespace eval util {
     proc specs_of {selected} {
         set out {}
         foreach id $selected {
-            foreach tag [tags_of $id] { lappend out [expr {$tag eq "" ? $id : "$id:$tag"}] }
+            foreach tag [tags_of $id] {
+                if {$tag eq ""} {
+                    lappend out $id
+                } else {
+                    lappend out "$id:$tag"
+                }
+            }
         }
         return $out
     }
@@ -159,7 +210,10 @@ namespace eval util {
     proc ids {} {
         global ROOT FIT_DIR
         set out {}
-        foreach d [lsort [glob -nocomplain -tails -directory [file join $ROOT $FIT_DIR] SASD*]] { lappend out $d }
+        set dir [file join $ROOT $FIT_DIR]
+        foreach d [lsort [glob -nocomplain -tails -directory $dir SASD*]] {
+            lappend out $d
+        }
         return $out
     }
 }

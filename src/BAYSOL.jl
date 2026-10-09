@@ -13,7 +13,9 @@ module BAYSOL
 
 include("Utils/Utils.jl")
 
-# The Utils submodules are bound here, before the modules that import them by name are included.
+# The Utils submodules are bound here,
+# before the modules that import them by
+# name are included.
 using .Utils:               Utils
 using .Utils.PhysicalConstants: PhysicalConstants
 using .Utils.Cache:         Cache
@@ -36,7 +38,8 @@ using .Scattering:          Scattering
 using .Fitting:             Fitting
 using .Report:              Report, seed_model, run_model, write_report
 
-# The pipeline entry points, reached qualified (`BAYSOL.seed_model`), not exported. Their
+# The pipeline entry points, reached qualified
+# (`BAYSOL.seed_model`), not exported. Their
 # result types live in Report (`BAYSOL.Report.MAPParams`, …).
 public seed_model, run_model, write_report
 

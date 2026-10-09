@@ -8,8 +8,9 @@
 #     tclsh test/utils/results_table.tcl --update       rewrite it in test/fitting_tests/README.md
 #     tclsh test/utils/results_table.tcl --check        exit 1 if the table in that README is not up to date
 #
-# One row per `test/fitting_tests/*/res*.txt`: the MAP χ² (on the measured q grid, which for a Shannon-binned fit is the
-# line `measured grid` of the report's residual section, so it stays comparable with the depositor's), the MAP δρ₁, δρ₂, δρ₃, the profiled c1 and the
+# One row per `test/fitting_tests/*/res*.txt`: the MAP χ² (the report's `χ²` line, on the measured q grid whatever the binning of the fit, so it is
+# comparable with the depositor's; reports from before 2026-10-09 print the binned fit's own there and the measured-grid value in their
+# `measured grid` residual line, which is read when present), the MAP δρ₁, δρ₂, δρ₃, the profiled c1 and the
 # share of divergent transitions, all read from the report. The depositor's χ² column cannot be computed;
 # it comes from test/fitting_tests/depositor_chi2.tsv (one line per run). A run whose depositor text is
 # the same as the row above it (same entry) prints ″, as the members of one deposited multi-model fit do.
@@ -31,10 +32,10 @@ set SCRIPT [info script]
 namespace eval results_table {
     namespace path {::util ::report}
 
-    # Bounds of the sampled contrasts, as in src/Fitting/Fitting.jl (DRO_BOUNDS, DRO_UNIT, φ_max).
+    # Bounds of the sampled contrasts, as in src/Fitting/Fitting.jl (DRO_BOUNDS, UNIT_OF_δρ, φ_max).
     variable DRO_LOWER -10.0
     variable DRO_UPPER 2.0
-    variable DRO_UNIT 0.03
+    variable UNIT_OF_δρ 0.03
     variable PHI_MAX 1.25
 
     # How close to a bound counts as "at" it (see the header).
@@ -50,9 +51,13 @@ namespace eval results_table {
     # The run label as the table shows it: "SASDBS6 fit2_model1", or "SASDZC6 —" for a report without a tag.
     proc label {path} {
         set id [file tail [file dirname $path]]
-        set tag [string range [file rootname [file tail $path]] 3 end]       ;# res.txt -> "", res_fit1.txt -> "_fit1"
+        # res.txt -> "", res_fit1.txt -> "_fit1"
+        set tag [string range [file rootname [file tail $path]] 3 end]
         set tag [string trimleft $tag _]
-        return "$id [expr {$tag eq "" ? "—" : $tag}]"
+        if {$tag eq ""} {
+            set tag "—"
+        }
+        return "$id $tag"
     }
 
     # Depositor text for every run, from the side file: dict of label -> text.
@@ -60,7 +65,9 @@ namespace eval results_table {
         global ROOT FIT_DIR
         set out [dict create]
         foreach line [split [slurp [file join $ROOT $FIT_DIR depositor_chi2.tsv]] "\n"] {
-            if {$line eq "" || [string index $line 0] eq "#"} continue
+            if {$line eq "" || [string index $line 0] eq "#"} {
+                continue
+            }
             lassign [split $line "\t"] run text
             dict set out $run $text
         }
@@ -68,30 +75,49 @@ namespace eval results_table {
     }
 
     # A number with a true minus sign, as the README prints them.
-    proc minus {s} { string map {- −} $s }
+    proc minus {s} {
+        string map {- −} $s
+    }
 
     # `**text**` when $flag is true. (No `expr` on the text: it would turn "2.10" into "2.1".)
     proc bold {text flag} {
-        if {$flag} { return "**$text**" }
+        if {$flag} {
+            return "**$text**"
+        }
         return $text
     }
 
     # Is the contrast value $v within $tol of either end of [$lo, $hi]?
-    proc at_bound {v lo hi tol} { expr {$v >= $hi - $tol || $v <= $lo + $tol} }
+    proc at_bound {v lo hi tol} {
+        expr {$v >= $hi - $tol || $v <= $lo + $tol}
+    }
 
     # The cells of one table row from a parsed report.
     proc row {label r depositor} {
-        variable DRO_LOWER; variable DRO_UPPER; variable DRO_UNIT; variable PHI_MAX
-        variable TOL_DRO12; variable TOL_DRO3; variable DIVERGENT_FLAG
+        variable DRO_LOWER
+        variable DRO_UPPER
+        variable UNIT_OF_δρ
+        variable PHI_MAX
+        variable TOL_DRO12
+        variable TOL_DRO3
+        variable DIVERGENT_FLAG
         set rho [dict get $r rho_e]
-        set d3_lo [expr {-$rho / $DRO_UNIT}]
-        set d3_hi [expr {($PHI_MAX - 1) * $rho / $DRO_UNIT}]
-        foreach k {d1 d2} { set $k [dict get $r $k] }
+        set d3_lo [expr {-$rho / ${UNIT_OF_δρ}}]
+        set d3_hi [expr {($PHI_MAX - 1) * $rho / ${UNIT_OF_δρ}}]
+        foreach k {d1 d2} {
+            set $k [dict get $r $k]
+        }
         set d3 [dict get $r d3]
         set c1 [format %.3f [dict get $r c1]]
-        if {[dict get $r sat] eq "true"} { set c1 "**$c1 (saturated)**" }
+        if {[dict get $r sat] eq "true"} {
+            set c1 "**$c1 (saturated)**"
+        }
         set div [dict get $r div]
-        set divtext [expr {$div == 0 ? "0" : "[format %.1f [expr {$div * 100}]] %"}]
+        if {$div == 0} {
+            set divtext "0"
+        } else {
+            set divtext "[format %.1f [expr {$div * 100}]] %"
+        }
         return [list $label \
             [format %.3g [dict get $r chi2_cmp]] \
             $depositor \
@@ -114,12 +140,18 @@ namespace eval results_table {
         set prev_dep ""
         foreach path [lsort [glob -directory [file join $ROOT $FIT_DIR] */res*.txt]] {
             set label [label $path]
-            if {[llength $only] && [lindex [split $label] 0] ni $only} continue
-            if {![dict exists $deps $label]} { error "no depositor line for '$label' in depositor_chi2.tsv" }
+            if {[llength $only] && [lindex [split $label] 0] ni $only} {
+                continue
+            }
+            if {![dict exists $deps $label]} {
+                error "no depositor line for '$label' in depositor_chi2.tsv"
+            }
             set dep [dict get $deps $label]
             set id [lindex [split $label] 0]
             set shown $dep
-            if {$id eq $prev_id && $dep eq $prev_dep} { set shown ″ }
+            if {$id eq $prev_id && $dep eq $prev_dep} {
+                set shown ″
+            }
             set prev_id $id
             set prev_dep $dep
             lappend lines "| [join [row $label [parse [slurp $path]] $shown] { | }] |"
@@ -133,9 +165,13 @@ namespace eval results_table {
         set rows {}
         foreach line [split $text "\n"] {
             set line [string trim $line]
-            if {![string match |* $line] || [regexp {^\|[\s:|-]+$} $line]} continue
+            if {![string match |* $line] || [regexp {^\|[\s:|-]+$} $line]} {
+                continue
+            }
             set cells {}
-            foreach c [split [string range $line 1 end-1] |] { lappend cells [regsub -all {\s+} [string trim $c] { }] }
+            foreach c [split [string range $line 1 end-1] |] {
+                lappend cells [regsub -all {\s+} [string trim $c] { }]
+            }
             lappend rows $cells
         }
         return $rows
@@ -155,7 +191,8 @@ namespace eval results_table {
             puts stderr "results_table.tcl: the markers\n  $BEGIN_MARK\n  $END_MARK\nare not in $readme"
             exit 1
         }
-        return [list $readme [string range $text [expr {$b + [string length $BEGIN_MARK]}] [expr {$e - 1}]]]
+        set first [expr {$b + [string length $BEGIN_MARK]}]
+        return [list $readme [string range $text $first [expr {$e - 1}]]]
     }
 
     # --check: is the README table the generated one? Prints the differing rows and returns 1 if not.
@@ -167,7 +204,8 @@ namespace eval results_table {
             puts "Results table in $readme is up to date ([llength $want] rows)"
             return 0
         }
-        puts stderr "Results table in $readme is out of date; regenerate it with: tclsh test/utils/results_table.tcl --update"
+        puts stderr "Results table in $readme is out of date; regenerate it with:\
+            tclsh test/utils/results_table.tcl --update"
         set n [expr {max([llength $have], [llength $want])}]
         set shown 0
         for {set i 0} {$i < $n && $shown < 10} {incr i} {
@@ -187,25 +225,47 @@ namespace eval results_table {
         global ROOT FIT_DIR
         variable BEGIN_MARK
         variable END_MARK
-        if {"--help" in $argv || "-h" in $argv} { ::usage $::SCRIPT; return }
+        if {"--help" in $argv || "-h" in $argv} {
+            ::usage $::SCRIPT
+            return
+        }
         set update [expr {"--update" in $argv}]
         set check [expr {"--check" in $argv}]
-        set only [lsearch -all -inline -not -exact [lsearch -all -inline -not -exact $argv --update] --check]
+        set only [lsearch -all -inline -not -exact $argv --update]
+        set only [lsearch -all -inline -not -exact $only --check]
         foreach id $only {
-            if {$id ni [ids]} { puts stderr "results_table.tcl: no fitting test '$id'"; exit 2 }
+            if {$id ni [ids]} {
+                puts stderr "results_table.tcl: no fitting test '$id'"
+                exit 2
+            }
         }
-        if {$update && $check} { puts stderr "results_table.tcl: give --update or --check, not both"; exit 2 }
-        if {($update || $check) && [llength $only]} { puts stderr "results_table.tcl: --update and --check cover the whole table; give no ID"; exit 2 }
+        if {$update && $check} {
+            puts stderr "results_table.tcl: give --update or --check, not both"
+            exit 2
+        }
+        if {($update || $check) && [llength $only]} {
+            puts stderr "results_table.tcl: --update and --check cover the whole table; give no ID"
+            exit 2
+        }
         set table [join [table $only] "\n"]
-        if {$check} { exit [check $table] }
-        if {!$update} { puts $table; return }
+        if {$check} {
+            exit [check $table]
+        }
+        if {!$update} {
+            puts $table
+            return
+        }
 
         lassign [readme_region] readme _
         set text [slurp $readme]
         set b [string first $BEGIN_MARK $text]
         set e [string first $END_MARK $text]
-        set new "[string range $text 0 [expr {$b + [string length $BEGIN_MARK] - 1}]]\n$table\n[string range $text $e end]"
-        if {$new eq $text} { puts "README.md already up to date"; return }
+        set head [string range $text 0 [expr {$b + [string length $BEGIN_MARK] - 1}]]
+        set new "$head\n$table\n[string range $text $e end]"
+        if {$new eq $text} {
+            puts "README.md already up to date"
+            return
+        }
         set ch [open $readme w]
         fconfigure $ch -encoding utf-8
         puts -nonewline $ch $new

@@ -19,8 +19,12 @@ molecule. Rays are cast only over [`BEAD_RAY_RANGE`](@ref), and the outward norm
 tried first so open surfaces, which is the common case, costs one ray.
 """
 function _bead_class(
-    p::NTuple{3,Float64}, n̂::NTuple{3,Float64}, nb::Vector{Int},
-    dirs::Vector{Vec3}, crds::Matrix{Float64}, rads::Vector{Float64},
+    p::NTuple{3,Float64},
+    n̂::NTuple{3,Float64},
+    nb::Vector{Int},
+    dirs::Vector{Vec3},
+    crds::Matrix{Float64},
+    rads::Vector{Float64},
     probe::Float64
 )::BeadClass
     isempty(nb) && return CONVEX
@@ -57,7 +61,8 @@ function _prefix_thin(counts::Vector{Int}, m::Int, budget::Int)::Vector{Int}
         for t in 1:take
             push!(idx, base + t)          # prefix of this atom's block
         end
-        base = cum; prev = (cum * budget) ÷ m
+        base = cum
+        prev = (cum * budget) ÷ m
     end
     return idx
 end
@@ -75,8 +80,14 @@ function _class_loop(
     @inbounds for k in axes(pts, 2)
         nb = inrange(tree, view(pts, :, k), BEAD_RAY_RANGE)
         out[k] = _bead_class(
-            (pts[1, k], pts[2, k], pts[3, k]), (nrm[1, k], nrm[2, k], nrm[3, k]),
-            nb, dirs, crds, rads, probe)
+            (pts[1, k], pts[2, k], pts[3, k]),
+            (nrm[1, k], nrm[2, k], nrm[3, k]),
+            nb,
+            dirs,
+            crds,
+            rads,
+            probe
+        )
     end
     return out
 end
@@ -95,9 +106,11 @@ then carries an equal sum(area)/M, so sum(areas) is the solvent-accessible area.
 
 # Keywords
 -   `probe`: solvent probe radius in Å; probe ≥ 0. Default [`PROBE_RADIUS`](@ref) (water, 1.4).
--   `n_target`: total points to keep; > 0. Default [`SHELL_N_TARGET`](@ref) (nothing), deriving it from
-    the accessible area via [`SHELL_AREA_PER_POINT`](@ref) so spacing stays fixed
-    as the molecule grows. A cloud already smaller than the budget is kept whole.
+-   `n_target`: total points to keep; > 0. Default
+    [`SHELL_N_TARGET`](@ref) (nothing), deriving it from
+    the accessible area via [`SHELL_AREA_PER_POINT`](@ref)
+    so spacing stays fixed as the molecule grows. A cloud
+    already smaller than the budget is kept whole.
 
 # Returns
 -   `pts`::Matrix{Float64}, (3, M): accessible points in mol's centred
@@ -242,7 +255,7 @@ function _sasa_loop(
 
     pts = Matrix{Float64}(undef, 3, length(areas))
     nrm = Matrix{Float64}(undef, 3, length(areas))
-    @inbounds @simd for k in eachindex(areas)
+    @inbounds @fastmath @simd for k in eachindex(areas)
         pts[1, k] = xs[k]; pts[2, k] = ys[k]; pts[3, k] = zs[k]
         nrm[1, k] = nx[k]; nrm[2, k] = ny[k]; nrm[3, k] = nz[k]
     end
@@ -272,7 +285,7 @@ function _occlude!(
     cx::Vector{Float64}, cy::Vector{Float64}, cz::Vector{Float64}, ct::Vector{Float64},
     K::Int, lo::Int, hi::Int
 )::Nothing
-    @inbounds @simd for j in lo:hi
+    @inbounds @fastmath @simd for j in lo:hi
         hit[j] = 0x00
     end
     @inbounds for k in 1:K

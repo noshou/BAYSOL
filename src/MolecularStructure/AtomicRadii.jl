@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Atomic/ionic radii: parse an ion string, then resolve its radius through a fallback chain over the bundled
-# `atomic_radii.sqlite3` (loaded once into Dicts at module load). Included into MolecularStructure; independent
+# `atomic_radii.sqlite3` (read once, on first use, into a `Lazy` table). Included into MolecularStructure; independent
 # of Molecule.
 
 # ---- ion string -> (element, signed charge) -------------------------------
@@ -48,49 +48,58 @@ end
 
 # ---- static tables -------------------------------------------------------
 
-const _IONIC   = Dict{String,Float64}()               # "fe3+" => radius Å
-const _ATOMIC  = Dict{String,Tuple{Float64,String}}() # "fe"   => (radius Å, type)
-const _CHARGES = Dict{String,Vector{Int}}()           # "fe"   => sorted charges
+"""
+The radius tables, immutable once built: `ionic` ("fe3+" => radius Å), `atomic`
+("fe" => (radius Å, type)) and `charges` ("fe" => sorted charges).
+"""
+struct _RadiiTables
+    ionic   :: Dict{String,Float64}
+    atomic  :: Dict{String,Tuple{Float64,String}}
+    charges :: Dict{String,Vector{Int}}
+end
 
 "Absolute path to the bundled `atomic_radii.sqlite3`, next to this file."
 _dbpath()::String = joinpath(@__DIR__, "atomic_radii.sqlite3")
+include_dependency(_dbpath())
 
 """
-Clear and repopulate the module tables (`_IONIC`, `_ATOMIC`, `_CHARGES`) from
-the SQLite file, sorting each element's charge list. Called from `__init__`.
+Read the SQLite file into a [`_RadiiTables`](@ref), sorting each element's charge list.
 
 # Arguments
 - `path`: SQLite database file (defaults to [`_dbpath`](@ref)); must exist.
 """
-function _load!(path::String = _dbpath())
-    empty!(_IONIC); empty!(_ATOMIC); empty!(_CHARGES)
+function _read_tables(path::String = _dbpath())::_RadiiTables
     isfile(path) || error("AtomicRadii: missing data file $path")
+    ionic   = Dict{String,Float64}()
+    atomic  = Dict{String,Tuple{Float64,String}}()
+    charges = Dict{String,Vector{Int}}()
     db = SQLite.DB(path)
     try
         DBInterface.execute(db, "PRAGMA query_only = ON;")
         for row in DBInterface.execute(db, "SELECT ion, radius FROM ionic_radii")
-            _IONIC[String(row.ion)] = Float64(row.radius) / PM_PER_ANGSTROM
+            ionic[String(row.ion)] = Float64(row.radius) / PM_PER_ANGSTROM
         end
         for row in DBInterface.execute(db, "SELECT element, radius, radius_type FROM atomic_radii")
-            _ATOMIC[String(row.element)] = (Float64(row.radius), String(row.radius_type))
+            atomic[String(row.element)] = (Float64(row.radius), String(row.radius_type))
         end
         for row in DBInterface.execute(db, "SELECT element, charge FROM element_charges")
-            push!(get!(@closure(() -> Int[]), _CHARGES, String(row.element)), Int(row.charge))
+            push!(get!(@closure(() -> Int[]), charges, String(row.element)), Int(row.charge))
         end
-        for v in values(_CHARGES); sort!(v); end
+        for v in values(charges); sort!(v); end
     finally
         DBInterface.close!(db)
     end
-    return nothing
+    return _RadiiTables(ionic, atomic, charges)
 end
 
-__init__() = _load!()
+"The tables, read from the database on first use (thread safe, built once)."
+const _TABLES = Lazy{_RadiiTables}(_read_tables)
 
 "Ionic radius (Å) for an `ionic_radii` key, or nothing."
-ion_radius(key::AbstractString)::Union{Float64,Nothing} = get(_IONIC, key, nothing)
+ion_radius(key::AbstractString)::Union{Float64,Nothing} = get(force(_TABLES).ionic, key, nothing)
 
 "Bare-element (radius Å, `radius_type`) for el, or nothing."
-element_radius(el::AbstractString)::Union{Tuple{Float64,String},Nothing} = get(_ATOMIC, el, nothing)
+element_radius(el::AbstractString)::Union{Tuple{Float64,String},Nothing} = get(force(_TABLES).atomic, el, nothing)
 
 """
 Ion key for the on-file charge state of element closest to charge;
@@ -101,7 +110,7 @@ nothing if the element has no charge states on file.
 - `charge`: desired signed charge.
 """
 function nearest_ion(element::AbstractString, charge::Int)::Union{String,Nothing}
-    cs = get(_CHARGES, element, nothing)
+    cs = get(force(_TABLES).charges, element, nothing)
     cs === nothing && return nothing
     best = cs[1]
     for c in cs

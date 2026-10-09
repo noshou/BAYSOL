@@ -6,6 +6,7 @@ using  SQLite: SQLite
 using  DBInterface: DBInterface
 using  FastClosures: @closure
 using  ..PhysicalConstants: PM_PER_ANGSTROM
+using  ..Cache: Lazy, force
 
 """
 Default number of points to generate to sample excluded volume.

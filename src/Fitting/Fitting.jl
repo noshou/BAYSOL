@@ -12,8 +12,8 @@ using ..GCPause: with_gc_paused, gc_checkpoint
 #----------------
 
 """
-Default solution temperature, °C, for `_ρₑ`/[`Fitting.ρₑ_prior`](@ref BAYSOL.Fitting.ρₑ_prior)'s bulk-electron
--density calculation. Pass the sample's real temperature instead whenever it is
+Default solution temperature, °C, for `_ρₑ`/[`Fitting.ρₑ_prior`](@ref BAYSOL.Fitting.ρₑ_prior)'s
+bulk electron density calculation. Pass the sample's real temperature instead whenever it is
 known: water's density is evaluated at it exactly, and the solutes' 25 °C
 partial molar volumes get a widened uncertainty (see
 [`PMV_FRACTIONAL_EXPANSIBILITY`](@ref BAYSOL.PartialMolarVolumes.PMV_FRACTIONAL_EXPANSIBILITY)).
@@ -25,7 +25,7 @@ const DEFAULT_TEMPERATURE_C = STANDARD_TEMPERATURE_C
 
 """
 CRYSOL3's fitting limits `(lo, hi)` on the convex/concave shell contrasts
-δρ₁, δρ₂, in units of [`DRO_UNIT`](@ref): "The limits during the fitting are
+δρ₁, δρ₂, in units of [`UNIT_OF_δρ`](@ref): "The limits during the fitting are
 -10 to 2". They are the support of the δρ₁/δρ₂ priors
 ([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)) and of the scaled-logit
 maps [`Fitting.Θ`](@ref BAYSOL.Fitting.Θ)/[`Fitting.Ξ`](@ref BAYSOL.Fitting.Ξ)
@@ -41,7 +41,7 @@ const DRO_WIDTH = DRO_BOUNDS[2] - DRO_BOUNDS[1]
 
 """
 CRYSOL3's default convex/concave shell contrast δρ₁ = δρ₂, in units of
-[`DRO_UNIT`](@ref): "The default parameters of the contrasts for the three types
+[`UNIT_OF_δρ`](@ref): "The default parameters of the contrasts for the three types
 of water beads are 1, 1, 0". The mode of the δρ₁/δρ₂ priors
 ([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)); must lie inside
 [`DRO_BOUNDS`](@ref).
@@ -60,7 +60,7 @@ const DRO12_CONCENTRATION = 14.0
 """
 Default concentration κ = α + β − 2 of the cavity-contrast (δρ₃) Beta prior
 ([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)), stretched onto
-[−ρ̄ₑ/`DRO_UNIT`, (`φ_max` − 1)·ρ̄ₑ/`DRO_UNIT`]. κ = 1.25 gives Beta(2, 1.25) on
+[−ρ̄ₑ/`UNIT_OF_δρ`, (`φ_max` − 1)·ρ̄ₑ/`UNIT_OF_δρ`]. κ = 1.25 gives Beta(2, 1.25) on
 u = (δρ₃ − X)/W, with its mode at δρ₃ = 0 (bulk-density cavity water).
 """
 const DRO3_CONCENTRATION = 1.25
@@ -279,6 +279,21 @@ struct ξ_priors
     δρ₂Prior::BoundedBeta
     δρ₃Prior::BoundedBeta
 end
+
+"""
+The number of sampled physical parameters ξ of `p`'s parameterization: 4 for [`ξ_priors`](@ref)
+(ρₑ, δρ₁, δρ₂, δρ₃). The sampler, the MAP search, the likelihood and the report are written for
+any `N`; only the prior-specific pieces (the transform [`Θ`](@ref)/[`Ξ`](@ref), [`θ_prior_moments`](@ref),
+the log-prior) know the parameterization, and a parameterization with more parameters adds methods
+of this function and of those.
+"""
+nparams(::ξ_priors) = 4
+
+"""
+The report key of each coordinate of ξ for `p`, in ξ order (the keys of `run_model`'s parameter
+dictionaries).
+"""
+param_keys(::ξ_priors) = ("slvnt_e_dns", "delta_rho_1", "delta_rho_2", "delta_rho_3")
 
 include("WLS.jl")
 include("ProfiledCorrs.jl")

@@ -1,6 +1,5 @@
 using Statistics
 using Random
-using GLMakie
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.Fitting: Solute, NonBiological, PROFILE
@@ -337,6 +336,9 @@ function sasdtk5_comparison_figure(result, data, fit_curve, label)
 end
 
 
+# the results of every run, kept for the figures below
+fits = Dict{String,Any}()
+
 for run in RUNS
     # one set of outputs per run; a single-run entry keeps the plain `res*` names
     suffix = length(RUNS) == 1 ? "" : "_" * run.tag
@@ -348,7 +350,17 @@ for run in RUNS
         BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
     end
 
-    data = (q_fit, I_fit, σ_fit)
+    fits[run.tag] = (result, (q_fit, I_fit, σ_fit))
+end
+
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
+# then recompile (about 40 % of a fit's wall clock).
+using GLMakie
+
+for run in RUNS
+    suffix = length(RUNS) == 1 ? "" : "_" * run.tag
+    result, data = fits[run.tag]
+    q_fit, I_fit, σ_fit = data
 
     fig = sasdtk5_figure(result, data)
     save(joinpath(@__DIR__, "res$(suffix).png"), fig; px_per_unit = PX_PER_UNIT)

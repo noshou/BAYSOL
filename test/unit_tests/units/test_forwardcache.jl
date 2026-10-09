@@ -20,7 +20,7 @@ using BAYSOL.Scattering:  species_multipoles, forward_cache, ForwardCache, mean_
                     intensity_terms, model_intensity, cavity_shell_fraction,
                     SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, B_LM_CHUNK
 using BAYSOL.MolecularStructure: create, radii, vols
-using BAYSOL.PhysicalConstants: DRO_UNIT
+using BAYSOL.PhysicalConstants: UNIT_OF_δρ
 using LinearAlgebra: Symmetric, issymmetric, eigvals
 using ForwardDiff
 
@@ -149,8 +149,8 @@ iy_w    = partial_wave_weights(iy_lMax)
     end
 
 
-    @testset "DRO_UNIT is CRYSOL's --dro contrast unit" begin
-        @test DRO_UNIT == 0.03
+    @testset "UNIT_OF_δρ is CRYSOL's --dro contrast unit" begin
+        @test UNIT_OF_δρ == 0.03
     end
 
     @testset "gram: shape, symmetry, and the self / cross diagonal identity" begin

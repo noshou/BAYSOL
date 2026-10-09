@@ -35,7 +35,8 @@ under-resolves large complexes; pass `n_target` explicitly to reproduce that.
 """
 const SHELL_AREA_PER_POINT = 4.0
 
-"Floor on the derived point budget: F(10), the smallest Fibonacci grid CRYSOL's --fb accepts."
+"Floor on the derived point budget: F(10), the
+smallest Fibonacci grid CRYSOL's --fb accepts."
 const SHELL_MIN_POINTS = 55
 
 """
@@ -45,20 +46,21 @@ Internal: only fine enough to resolve one atom's patch.
 const SHELL_SAMPLE = 256
 
 """
-Range (Å) over which [`_bead_class`](@ref BAYSOL.SASA._bead_class) casts escape rays. A void whose 
-wall is further than this in every direction is bulk solvent, not a cavity.
+Range (Å) over which [`_bead_class`](@ref BAYSOL.SASA._bead_class)
+casts escape rays. A void whose wall is further than this in every
+direction is bulk solvent, not a cavity.
 """
 const BEAD_RAY_RANGE = 12.0
 
 """
-Directions sampled by [`_bead_class`](@ref BAYSOL.SASA._bead_class); about half fall in the 
-outward hemisphere and are used.
+Directions sampled by [`_bead_class`](@ref BAYSOL.SASA._bead_class);
+about half fall in the outward hemisphere and are used.
 """
 const BEAD_RAY_DIRS = 64
 
 """
-Escaping fraction at or above which a bead is CONVEX; below it (but nonzero) 
-CONCAVE (see [`BeadClass`](@ref BAYSOL.SASA.BeadClass)).
+Escaping fraction at or above which a bead is CONVEX; below it
+(but nonzero) CONCAVE (see [`BeadClass`](@ref BAYSOL.SASA.BeadClass)).
 """
 const BEAD_CONVEX_ESCAPE = 0.5
 
@@ -73,12 +75,14 @@ skips the remaining directions and contributes no points.
 256-direction sampling is off by up to 0.92 % on the analytic two-sphere cap
 (`test_sasa.jl`, `SASA_CAP_RTOL`). 80 is the shortest prefix within that on the fixtures,
 but with almost no margin and only ~5 ms saved per fit over 128, so 104 is used: about
-half of 80's loss, a comfortable margin, and nearly all of the speed. Measured loss of total accessible area against sampling every
-direction, on the protein fixtures (crambin, BPTI, RNase A, hemoglobin, IgG):
+half of 80's loss, a comfortable margin, and nearly all of the speed.
+Measured loss of total accessible area against sampling every direction, on the protein
+fixtures (crambin, BPTI, RNase A, hemoglobin, IgG):
+
 
 | `SASA_N_OCC` | 48 | 56 | 64 | 80 | 96 | **104** | 128 |
-|---|---|---|---|---|---|---|---|
-| worst loss | 2.02 % | 1.83 % | 1.40 % | 0.90 % | 0.66 % | **0.57 %** | 0.40 % |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **worst loss** | 2.02 % | 1.83 % | 1.40 % | 0.90 % | 0.66 % | **0.57 %** | 0.40 % |
 
 At 104 the loss is 0.31–0.57 % (always a loss, never a gain: dropped atoms have a real but
 small exposed patch); 40–58 % of atoms bail, and with the packed cap test the sampling

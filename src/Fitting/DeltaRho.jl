@@ -2,7 +2,7 @@
 
 using Distributions
 using StaticArrays: SVector
-using ..PhysicalConstants: DRO_UNIT
+using ..PhysicalConstants: UNIT_OF_δρ
 
 """
 Prior distributions for δρ₁ and δρ₂, the changes in bulk solvent electron density at the
@@ -136,7 +136,7 @@ The forward model builds a contrast vector v = [1, −dns·`g_ex(c1)`, ρ₁, ρ
 
 The cavity-bead contrast ρ₃ is the excess electron density relative to bulk:
 
-    DRO_UNIT·δρ₃    = (φ − 1)·ρₑ
+    UNIT_OF_δρ·δρ₃    = (φ − 1)·ρₑ
                     = ρ_cavity − ρₑ.
 
 Thus φ is a reparameterisation of the cavity beads' excess electron density over the bulk,
@@ -146,27 +146,27 @@ Because ρₑ appears in it, δρ₃ is not independent of the solvent density. 
 we get a fixed value for the bulk electron density. Since `ρ_cavity` ≥ 0, we require φ ≥ 0,
 which gives the lower bound:
 
-    δρ₃ ≥ −ρ̄ₑ/DRO_UNIT.
+    δρ₃ ≥ −ρ̄ₑ/UNIT_OF_δρ.
 
 If we additionally impose an upper bound φ ≤ `φ_max`, then the corresponding upper bound is
 
-    δρ₃ ≤ (φ_max − 1)·ρ̄ₑ/DRO_UNIT.
+    δρ₃ ≤ (φ_max − 1)·ρ̄ₑ/UNIT_OF_δρ.
 
 Therefore:
 
-    δρ₃ ∈ [−ρ̄ₑ/DRO_UNIT, (φ_max − 1)·ρ̄ₑ/DRO_UNIT]
+    δρ₃ ∈ [−ρ̄ₑ/UNIT_OF_δρ, (φ_max − 1)·ρ̄ₑ/UNIT_OF_δρ]
 
 Let u ~ Beta(α, β), which gives u ∈ [0, 1]. To stretch it onto a new
-interval [X, Y], scale by the width (Y-X) and shift by X. If X = −`ρ̄ₑ/DRO_UNIT`
-and Y = (`φ_max` − 1)·`ρ̄ₑ/DRO_UNIT`:
+interval [X, Y], scale by the width (Y-X) and shift by X. If X = −`ρ̄ₑ/UNIT_OF_δρ`
+and Y = (`φ_max` − 1)·`ρ̄ₑ/UNIT_OF_δρ`:
 
     δρ₃ = X + (Y − X)·u  
-        = −ρ̄ₑ/DRO_UNIT + ((φ_max − 1)·ρ̄ₑ/DRO_UNIT - −ρ̄ₑ/DRO_UNIT)·u 
-        = ρ̄ₑ(φ_max·u - 1) / DRO_UNIT
+        = −ρ̄ₑ/UNIT_OF_δρ + ((φ_max − 1)·ρ̄ₑ/UNIT_OF_δρ - −ρ̄ₑ/UNIT_OF_δρ)·u
+        = ρ̄ₑ(φ_max·u - 1) / UNIT_OF_δρ
 
 If we want the mode of δρ₃ to equal 0 (CRYSOL3's defaults) we get:
 
-    0 = ρ̄ₑ(φ_max·u - 1) / DRO_UNIT
+    0 = ρ̄ₑ(φ_max·u - 1) / UNIT_OF_δρ
     0 = φ_max·u - 1
     u = φ_max⁻¹
 
@@ -205,12 +205,12 @@ and therefore:
 
 The corresponding variance of δρ₃ is:
 
-σ²[δρ₃] = (`φ_max`·`ρ̄ₑ/DRO_UNIT`)²·σ²[u].
+σ²[δρ₃] = (`φ_max`·`ρ̄ₑ/UNIT_OF_δρ`)²·σ²[u].
 
 Thus κ controls the concentration of the prior while preserving its mode at δρ₃ = 0.
 
 The sampler samples δρ₃ directly, with u = (δρ₃ − X)/(Y − X) ~ Beta(α, β) as above, on
-these fixed bounds. Because ρ̄ₑ is fixed rather than the sampled ρₑ, φ = 1 + `DRO_UNIT`·δρ₃/ρₑ
+these fixed bounds. Because ρ̄ₑ is fixed rather than the sampled ρₑ, φ = 1 + `UNIT_OF_δρ`·δρ₃/ρₑ
 can leave [0, `φ_max`] by the relative uncertainty of ρₑ, at most ~0.06% for the buffers
 checked. φ is not a parameter; it is only the derivation of the bounds and the mode.
 
@@ -222,7 +222,7 @@ checked. φ is not a parameter; it is only the derivation of the bounds and the 
 
 # Returns
 - `δρ₃::BoundedBeta`:
-    `LocationScale(−ρ̄ₑ/DRO_UNIT, φ_max·ρ̄ₑ/DRO_UNIT, Beta(1 + κ/φ_max, 1 + (1 − 1/φ_max)·κ))`.
+    `LocationScale(−ρ̄ₑ/UNIT_OF_δρ, φ_max·ρ̄ₑ/UNIT_OF_δρ, Beta(1 + κ/φ_max, 1 + (1 − 1/φ_max)·κ))`.
 
 # Exceptions
 - `DomainError`: κ ≤ 0 or ρ̄ₑ ≤ 0.
@@ -234,8 +234,8 @@ function _δρ₃_prior(κ::Real, ρ̄ₑ::Real)::BoundedBeta
         throw(DomainError(ρ̄ₑ, "failed assertion: ρ̄ₑ > 0"))
     end
 
-    X = -ρ̄ₑ / DRO_UNIT
-    W = φ_max * ρ̄ₑ / DRO_UNIT
+    X = -ρ̄ₑ / UNIT_OF_δρ
+    W = φ_max * ρ̄ₑ / UNIT_OF_δρ
 
     α = 1 + κ/φ_max
     β = 1 + (1 - 1/φ_max) * κ
@@ -246,7 +246,7 @@ end
 
 """
 Priors on the three hydration-shell contrasts (δρ₁, δρ₂, δρ₃), in units of
-[`DRO_UNIT`](@ref). Each is a Beta stretched onto a bounded
+[`UNIT_OF_δρ`](@ref). Each is a Beta stretched onto a bounded
 interval with its mode at CRYSOL3's default (1, 1, 0). See [`_δρ₁₂_priors`](@ref) and
 [`_δρ₃_prior`](@ref) for the derivations.
 
@@ -259,7 +259,7 @@ interval with its mode at CRYSOL3's default (1, 1, 0). See [`_δρ₁₂_priors`
 - `δρ₁::BoundedBeta`: convex-bead contrast prior on [-10, 2].
 - `δρ₂::BoundedBeta`: concave-bead contrast prior on [-10, 2].
 - `δρ₃::BoundedBeta`: cavity-bead contrast prior on
-    [−`ρ̄ₑ/DRO_UNIT`, (`φ_max` − 1)·`ρ̄ₑ/DRO_UNIT`].
+    [−`ρ̄ₑ/UNIT_OF_δρ`, (`φ_max` − 1)·`ρ̄ₑ/UNIT_OF_δρ`].
 
 # Exceptions
 - `DomainError`: `κ_δρ₁₂` ≤ 0, `κ_δρ₃` ≤ 0 or ρ̄ₑ ≤ 0.

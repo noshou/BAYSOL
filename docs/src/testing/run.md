@@ -50,7 +50,7 @@ tclsh test/run/fittings.tcl [ID ...] [--no-fit] [--bench] [--approved] [--report
 - **`--report`** prints the Results-table rows of the selected fits (`../utils/results_table.tcl`), from the reports the fits just wrote. To rewrite the table in `fitting_tests/README.md`, use `tclsh test/utils/results_table.tcl --update`.
 - **`--table`** rewrites the Results table in `fitting_tests/README.md` from every report (`../utils/results_table.tcl --update`), whatever IDs are named.
 - **`--trace-compile FILE`** runs the fits with Julia's `--trace-compile=FILE`: the file lists the methods each fit's process had to compile at run time, i.e. what a precompile workload has not covered.
-- **`--fixme`** runs the sampler diagnostics (`../utils/diagnose.tcl report`) on every run of the selected fits: MAP starts, Hessian, step size and tree depth, gradient error, modes. Use it when a fit looks wrong.
+- **`--fixme`** runs the sampler diagnostics (`../utils/diagnose.tcl --report`) on every run of the selected fits: MAP starts, Hessian, step size and tree depth, gradient error, modes. Use it when a fit looks wrong.
 
 ## `profile.tcl`
 

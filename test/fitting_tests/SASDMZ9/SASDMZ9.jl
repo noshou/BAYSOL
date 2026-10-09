@@ -1,7 +1,6 @@
 using DelimitedFiles
 using Statistics
 using Random
-using GLMakie
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
@@ -550,15 +549,6 @@ open(joinpath(@__DIR__, "res_model1.txt"), "w") do io
     BAYSOL.write_report(io, result1; form_factor_log = form_factor_log1, n_atoms = n_atoms1)
 end
 
-fig1 = sasdmz9_figure(result1, (q_fit1, I_fit1, σ_fit1))
-save(joinpath(@__DIR__, "res_model1.png"), fig1; px_per_unit = PX_PER_UNIT)
-
-fig_residuals1 = sasdmz9_residuals_figure(result1, (q_fit1, I_fit1, σ_fit1))
-save(joinpath(@__DIR__, "res_model1_residuals.png"), fig_residuals1; px_per_unit = PX_PER_UNIT)
-
-fig_hist1 = sasdmz9_hist(result1)
-save(joinpath(@__DIR__, "res_model1_hist.png"), fig_hist1; px_per_unit = PX_PER_UNIT)
-
 # ---------------------------------------------------------------------------
 #                               Model 2
 # ---------------------------------------------------------------------------
@@ -574,15 +564,6 @@ open(joinpath(@__DIR__, "res_model2.txt"), "w") do io
     BAYSOL.write_report(io, result2; form_factor_log = form_factor_log2, n_atoms = n_atoms2)
 end
 
-fig2 = sasdmz9_figure(result2, (q_fit2, I_fit2, σ_fit2))
-save(joinpath(@__DIR__, "res_model2.png"), fig2; px_per_unit = PX_PER_UNIT)
-
-fig_residuals2 = sasdmz9_residuals_figure(result2, (q_fit2, I_fit2, σ_fit2))
-save(joinpath(@__DIR__, "res_model2_residuals.png"), fig_residuals2; px_per_unit = PX_PER_UNIT)
-
-fig_hist2 = sasdmz9_hist(result2)
-save(joinpath(@__DIR__, "res_model2_hist.png"), fig_hist2; px_per_unit = PX_PER_UNIT)
-
 # ---------------------------------------------------------------------------
 #                               Model 3
 # ---------------------------------------------------------------------------
@@ -597,6 +578,28 @@ result3, form_factor_log3, n_atoms3, (q_fit3, I_fit3, σ_fit3) =
 open(joinpath(@__DIR__, "res_model3.txt"), "w") do io
     BAYSOL.write_report(io, result3; form_factor_log = form_factor_log3, n_atoms = n_atoms3)
 end
+
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
+# then recompile (about 40 % of a fit's wall clock).
+using GLMakie
+
+fig1 = sasdmz9_figure(result1, (q_fit1, I_fit1, σ_fit1))
+save(joinpath(@__DIR__, "res_model1.png"), fig1; px_per_unit = PX_PER_UNIT)
+
+fig_residuals1 = sasdmz9_residuals_figure(result1, (q_fit1, I_fit1, σ_fit1))
+save(joinpath(@__DIR__, "res_model1_residuals.png"), fig_residuals1; px_per_unit = PX_PER_UNIT)
+
+fig_hist1 = sasdmz9_hist(result1)
+save(joinpath(@__DIR__, "res_model1_hist.png"), fig_hist1; px_per_unit = PX_PER_UNIT)
+
+fig2 = sasdmz9_figure(result2, (q_fit2, I_fit2, σ_fit2))
+save(joinpath(@__DIR__, "res_model2.png"), fig2; px_per_unit = PX_PER_UNIT)
+
+fig_residuals2 = sasdmz9_residuals_figure(result2, (q_fit2, I_fit2, σ_fit2))
+save(joinpath(@__DIR__, "res_model2_residuals.png"), fig_residuals2; px_per_unit = PX_PER_UNIT)
+
+fig_hist2 = sasdmz9_hist(result2)
+save(joinpath(@__DIR__, "res_model2_hist.png"), fig_hist2; px_per_unit = PX_PER_UNIT)
 
 fig3 = sasdmz9_figure(result3, (q_fit3, I_fit3, σ_fit3))
 save(joinpath(@__DIR__, "res_model3.png"), fig3; px_per_unit = PX_PER_UNIT)

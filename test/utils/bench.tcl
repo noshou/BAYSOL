@@ -56,8 +56,13 @@ namespace eval bench {
             set a [lindex $args $i]
             if {[string match --* $a]} {
                 set key [string range $a 2 end]
-                if {$key in $FLAGS} { dict set opts $key 1; continue }
-                if {$i + 1 >= [llength $args]} { error "option $a needs a value" }
+                if {$key in $FLAGS} {
+                    dict set opts $key 1
+                    continue
+                }
+                if {$i + 1 >= [llength $args]} {
+                    error "option $a needs a value"
+                }
                 dict set opts $key [lindex $args [incr i]]
             } else {
                 lappend specs $a
@@ -70,9 +75,12 @@ namespace eval bench {
     # Docs, the visual-check snapshots, the fitting tests' result files and untracked benchmark results
     # are: none of them is needed to build a Seed and fit it.
     proc excluded {f} {
-        expr {  [string match docs/* $f] || [string match test/visualize/xyz/* $f] ||
-                [string match test/baselines/results/* $f] ||
-                [regexp {^test/fitting_tests/.*/res[^/]*\.(txt|png)$} $f]}
+        expr {
+            [string match docs/* $f]
+            || [string match test/visualize/xyz/* $f]
+            || [string match test/baselines/results/* $f]
+            || [regexp {^test/fitting_tests/.*/res[^/]*\.(txt|png)$} $f]
+        }
     }
 
     # Copies the repository's tracked and untracked-but-not-ignored files (minus the excluded ones) to
@@ -81,8 +89,12 @@ namespace eval bench {
         global ROOT
         set n 0
         foreach f [split [git -c core.quotepath=false ls-files -co --exclude-standard] "\n"] {
-            if {$f eq "" || [excluded $f]} continue
-            if {![file isfile [file join $ROOT $f]]} continue
+            if {$f eq "" || [excluded $f]} {
+                continue
+            }
+            if {![file isfile [file join $ROOT $f]]} {
+                continue
+            }
             file mkdir [file dirname [file join $dest $f]]
             file copy -force [file join $ROOT $f] [file join $dest $f]
             incr n
@@ -104,7 +116,10 @@ namespace eval bench {
 
     # Julia's version, CPU name, hardware threads and first depot, from one short Julia call.
     proc julia_facts {julia} {
-        set out [exec $julia --startup-file=no -e {print(join((VERSION, Sys.CPU_NAME, Sys.CPU_THREADS, first(DEPOT_PATH)), "\n"))}]
+        set facts_code {
+            print(join((VERSION, Sys.CPU_NAME, Sys.CPU_THREADS, first(DEPOT_PATH)), "\n"))
+        }
+        set out [exec $julia --startup-file=no -e $facts_code]
         lassign [split $out "\n"] version cpu cores depot
         return [dict create version $version cpu $cpu cores $cores depot $depot]
     }
@@ -112,9 +127,12 @@ namespace eval bench {
     # The "meta" object of a result, as a JSON object string.
     proc meta {facts state repo} {
         set rev [string trim [git rev-parse --short HEAD]]
-        if {[string trim [git status --porcelain]] ne ""} { append rev +dirty }
+        if {[string trim [git status --porcelain]] ne ""} {
+            append rev +dirty
+        }
         if {$state eq "cold"} {
-            set note "compiled caches, _cache/ and result files wiped; conda env and package sources kept (provisioning is not measured)"
+            set note "compiled caches, _cache/ and result files wiped;\
+                conda env and package sources kept (provisioning is not measured)"
         } else {
             set note "real depot and repo; caches warm"
         }
@@ -137,7 +155,9 @@ namespace eval bench {
         set found ""
         foreach line [split $out "\n"] {
             set t [string trim $line]
-            if {[string index $t 0] eq "\{" && [string index $t end] eq "\}"} { set found $t }
+            if {[string index $t 0] eq "\{" && [string index $t end] eq "\}"} {
+                set found $t
+            }
         }
         return $found
     }
@@ -145,19 +165,37 @@ namespace eval bench {
     # Runs a command and returns {wall-seconds stdout}. The command's stderr goes to ours, and the
     # environment variables in the dict $env are set for its duration only.
     proc timed {env args} {
-        dict for {k v} $env { set saved($k) [expr {[info exists ::env($k)] ? $::env($k) : ""}]; set ::env($k) $v }
+        dict for {k v} $env {
+            if {[info exists ::env($k)]} {
+                set saved($k) $::env($k)
+            } else {
+                set saved($k) ""
+            }
+            set ::env($k) $v
+        }
         set t0 [clock microseconds]
         set rc [catch {exec {*}$args 2>@stderr} out]
         set t1 [clock microseconds]
-        dict for {k v} $env { if {$saved($k) eq ""} { unset ::env($k) } else { set ::env($k) $saved($k) } }
-        if {$rc} { error "command failed: [lrange $args 0 3] ...\n$out" }
+        dict for {k v} $env {
+            if {$saved($k) eq ""} {
+                unset ::env($k)
+            } else {
+                set ::env($k) $saved($k)
+            }
+        }
+        if {$rc} {
+            error "command failed: [lrange $args 0 3] ...\n$out"
+        }
         return [list [expr {($t1 - $t0) / 1e6}] $out]
     }
 
     # Runs the benchmark. Without --approved it only prints the plan.
     proc run {argv} {
         global ROOT
-        if {"--help" in $argv || "-h" in $argv} { ::usage $::SCRIPT; return }
+        if {"--help" in $argv || "-h" in $argv} {
+            ::usage $::SCRIPT
+            return
+        }
 
         # Benchmarks only run with the owner's approval, because they need a quiet machine and an agent will
         # not check for one on its own: without `--approved` this prints the plan and stops.
@@ -172,11 +210,25 @@ Re-run with --approved once the run has been approved."
         }
         set argv [lsearch -all -inline -not -exact $argv --approved]
         lassign [parse_args {*}$argv] opts specs
-        if {![llength $specs]} { error "usage: bench.tcl --approved \[--state cold|warm\] \[--out FILE.json\] \[--samples N --adapt N\] ID\[:tag\] ..." }
-        set state [expr {[dict exists $opts state] ? [dict get $opts state] : "cold"}]
-        if {$state ni {cold warm}} { error "--state must be cold or warm" }
-        set samples [expr {[dict exists $opts samples] ? [dict get $opts samples] : 2000}]
-        set adapt   [expr {[dict exists $opts adapt] ? [dict get $opts adapt] : 1000}]
+        if {![llength $specs]} {
+            error "usage: bench.tcl --approved \[--state cold|warm\] \[--out FILE.json\]\
+                \[--samples N --adapt N\] ID\[:tag\] ..."
+        }
+        set state cold
+        if {[dict exists $opts state]} {
+            set state [dict get $opts state]
+        }
+        if {$state ni {cold warm}} {
+            error "--state must be cold or warm"
+        }
+        set samples 2000
+        if {[dict exists $opts samples]} {
+            set samples [dict get $opts samples]
+        }
+        set adapt 1000
+        if {[dict exists $opts adapt]} {
+            set adapt [dict get $opts adapt]
+        }
         if {[dict exists $opts out]} {
             set out [dict get $opts out]
         } else {
@@ -201,14 +253,25 @@ Re-run with --approved once the run has been approved."
             puts "  copied [copy_repo $repo] files"
             make_depot $depot [dict get $facts depot]
             set childenv [dict create JULIA_DEPOT_PATH $depot]
-            set script {using Pkg; Pkg.instantiate(); t = @elapsed Pkg.precompile(); println("PRECOMPILE_S=", t)}
+            set script {
+                using Pkg
+                Pkg.instantiate()
+                t = @elapsed Pkg.precompile()
+                println("PRECOMPILE_S=", t)
+            }
             lassign [timed $childenv $julia --project=$repo -e $script] t_pre txt
-            if {![regexp {PRECOMPILE_S=([0-9.eE+-]+)} $txt -> pre]} { error "no PRECOMPILE_S in the precompile output" }
+            if {![regexp {PRECOMPILE_S=([0-9.eE+-]+)} $txt -> pre]} {
+                error "no PRECOMPILE_S in the precompile output"
+            }
             puts [format "  instantiate + precompile: %.1f s (precompile alone %.1f s)" $t_pre $pre]
             set install [json::write object instantiate_and_precompile_s $t_pre precompile_s $pre]
         } else {
             set repo $ROOT
-            lassign [timed {} $julia --project=$repo -e {using Pkg; Pkg.precompile()}] t_pre txt
+            set script {
+                using Pkg
+                Pkg.precompile()
+            }
+            lassign [timed {} $julia --project=$repo -e $script] t_pre txt
             set install [json::write object instantiate_and_precompile_s $t_pre precompile_s $t_pre]
         }
         set meta [meta $facts $state $repo]
@@ -216,17 +279,32 @@ Re-run with --approved once the run has been approved."
         # --- one fresh process per fit; child.jl prints its measurements as one JSON object
         set fits {}
         foreach spec $specs {
-            lassign [timed $childenv $julia --project=$repo [file join $repo test utils child.jl] $repo $spec $samples $adapt] t_proc raw
+            lassign [timed $childenv \
+                $julia --project=$repo [file join $repo test utils child.jl] \
+                $repo $spec $samples $adapt \
+            ] t_proc raw
             set raw [json_line $raw]
-            if {![string match "\{*\}" $raw] || $raw eq "\{\}"} { error "child.jl printed something other than a non-empty JSON object for $spec:\n$raw" }
-            set r [json::json2dict $raw]            ;# parse check, and the numbers for the progress line
+            if {![string match "\{*\}" $raw] || $raw eq "\{\}"} {
+                error "child.jl printed something other than a non-empty JSON object for $spec:\n$raw"
+            }
+            # parse check, and the numbers for the progress line
+            set r [json::json2dict $raw]
             # the parent measured the process wall time; add it to the child's object, then check the result parses
             set merged "[string range $raw 0 end-1],\"process_wall_s\":$t_proc\}"
-            if {[catch {json::json2dict $merged} chk] || ![dict exists $chk process_wall_s]} { error "could not add process_wall_s to the result for $spec" }
+            if {[catch {json::json2dict $merged} chk] || ![dict exists $chk process_wall_s]} {
+                error "could not add process_wall_s to the result for $spec"
+            }
             lappend fits $spec $merged
-            puts [format "  %-22s process %6.1f s | using BAYSOL %5.1f s | first fit %6.1f s (seed %5.1f + run %5.1f) | steady fit %6.1f s" \
-                $spec $t_proc [dict get $r using_baysol_s] [dict get $r first total_s] \
-                [dict get $r first seed_s] [dict get $r first run_s] [dict get $r second total_s]]
+            puts [format \
+                "  %-22s process %6.1f s | using BAYSOL %5.1f s | first fit %6.1f s\
+                (seed %5.1f + run %5.1f) | steady fit %6.1f s" \
+                $spec $t_proc \
+                [dict get $r using_baysol_s] \
+                [dict get $r first total_s] \
+                [dict get $r first seed_s] \
+                [dict get $r first run_s] \
+                [dict get $r second total_s] \
+            ]
         }
 
         set ch [open $out w]

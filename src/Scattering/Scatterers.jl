@@ -10,8 +10,9 @@ using ..SASA: SASA
 using ..MolecularStructure: Molecule, elms, coords_spherical, vols, to_spherical
 using ..Timing: StageLog, timed!
 
-# SHELL_THICKNESS is a Scattering module constant (Scattering.jl); PROBE_RADIUS and SHELL_N_TARGET are SASA's
-# (imported in Scattering.jl); this file only reads them as call defaults.
+# SHELL_THICKNESS is a Scattering module constant (Scattering.jl);
+# PROBE_RADIUS and SHELL_N_TARGET are SASA's (imported in Scattering.jl);
+# this file only reads them as call defaults.
 
 """
 Per-dummy amplitude f[i,k] = `v_i` * exp(-`q_k²` * `v_i`^(2/3) / 4π), the
@@ -32,16 +33,20 @@ function _gaussian_dummy(
     vols::AbstractVector{<:Real}, qvals::AbstractVector{<:Real}
 )::Matrix{Float64}
     any(<(0), vols) && throw(ArgumentError("_gaussian_dummy: volumes must be ≥ 0"))
-    # v^(2/3) once per dummy: left inside the fused broadcast it is a `pow` per (dummy, q) pair
+
+    # v^(2/3) once per dummy: if inside the fused broadcast it is a `pow` per (dummy, q) pair
     v23 = vols .^ (2 / 3)
     # (N,) against (1, Q) broadcasts to the (N, Q) f_atoms layout.
     return vols .* exp.(.-(qvals' .^ 2) .* v23 ./ (4π))
 end
 
 """
-The amplitude of `n` dummies that all have volume `v`, as a [`SharedAmplitude`](@ref): the same values as
-`_gaussian_dummy(fill(v, n), qvals)` without the (n, Q) matrix (every row is the same Q-vector). The hydration beads
-of one class all carry the same area, hence the same volume.
+The amplitude of `n` dummies that all have volume `v`,
+as a [`SharedAmplitude`](@ref): the same values as
+`_gaussian_dummy(fill(v, n), qvals)` without the (n, Q)
+matrix (every row is the same Q-vector). The hydration
+beads of one class all carry the same area, hence the
+same volume.
 """
 _gaussian_dummy_shared(v::Real, n::Integer, qvals::AbstractVector{<:Real}) =
     SharedAmplitude(vec(_gaussian_dummy([Float64(v)], qvals)), n)
@@ -56,9 +61,10 @@ vacuum and excluded-volume multipoles in one pass from this and
 [`_gaussian_dummy`](@ref).
 
 # Keywords
-- `log::Union{Nothing,Vector{String}} = nothing`: when not nothing,
-    [`form_factor_log`](@ref BAYSOL.Scattering.form_factor_log)'s construction-time diagnostics for
-    this call's `form_factor_table` build are append!ed to it in place.
+-   `log::Union{Nothing,Vector{String}} = nothing`: when not nothing,
+    [`form_factor_log`](@ref BAYSOL.Scattering.form_factor_log)'s
+    construction-time diagnostics for this call's `form_factor_table`
+    build are append!ed to it in place.
 
 # Returns
 - `Matrix{ComplexF64}`, (N, Q), in [`compute_B_lm`](@ref)'s `f_atoms` layout.
@@ -83,7 +89,9 @@ Hydration-shell term, split into CRYSOL 3's three border-layer populations.
 it stands for, so the cloud tiles the layer rather than approximating it with an
 envelope. The three arrays are the `sh_convex` / `sh_concave` / `sh_cavity`
 species of the five-species expansion
+
     `A_total` = `A_vac` - dns·`A_ex` + `Σ_k` `dro_k`·`A_sh_k`; each takes its own fitted
+
 contrast `dro_k` downstream (CRYSOL's δρ = (1, 1, 0) defaults).
 
 # Arguments
@@ -100,8 +108,10 @@ contrast `dro_k` downstream (CRYSOL's δρ = (1, 1, 0) defaults).
     size the cloud from the accessible area (≈ area / `SHELL_AREA_PER_POINT`,
     floored at `SHELL_MIN_POINTS`); pass an Int to pin it. Runtime is
     linear in it.
-    - `shell::Union{Nothing,Tuple} = nothing`: the accessible surface, `SASA.sasa(mol; probe, n_target)`,
-    when the caller has already computed it (e.g. to size the band limit from the shell's extent);
+    - `shell::Union{Nothing,Tuple} = nothing`: the accessible surface,
+    `SASA.sasa(mol; probe, n_target)`,
+    when the caller has already computed it (e.g. to size the band
+    limit from the shell's extent);
     `nothing` computes it here. `probe` and `n_target` are then ignored.
 
 # Returns
@@ -117,17 +127,25 @@ function hydration(
     probe::Float64               = PROBE_RADIUS,
     n_target::Union{Nothing,Int} = SHELL_N_TARGET,
     shell::Union{Nothing,Tuple} = nothing,
-)::@NamedTuple{convex::Array{ComplexF64,3}, concave::Array{ComplexF64,3}, cavity::Array{ComplexF64,3}}
+)::@NamedTuple{
+    convex::Array{ComplexF64,3},
+    concave::Array{ComplexF64,3},
+    cavity::Array{ComplexF64,3}
+}
     thickness > 0.0 || throw(ArgumentError("hydration: thickness must be > 0"))
 
-    pts, area, class = shell === nothing ? SASA.sasa(mol; probe = probe, n_target = n_target) : shell
+    pts, area, class = shell === nothing ?
+        SASA.sasa(mol; probe = probe, n_target = n_target) : shell
 
     _shell(want) = begin
         sel = findall(==(want), class)
         crd = to_spherical(pts[:, sel])
         v = area[sel] .* thickness
-        # beads of a class carry equal areas: one amplitude vector for all of them, not an (N, Q) matrix of equal rows
-        amp = !isempty(v) && allequal(v) ? _gaussian_dummy_shared(v[1], length(v), qvals) : _gaussian_dummy(v, qvals)
+        # beads of a class carry equal areas: one amplitude vector
+        # for all of them, not an (N, Q) matrix of equal rows
+        amp = !isempty(v) && allequal(v) ? _gaussian_dummy_shared(
+            v[1], length(v), qvals
+        ) : _gaussian_dummy(v, qvals)
         compute_B_lm(crd, qvals, amp, lMax, _CHUNK)
     end
 
@@ -183,7 +201,10 @@ function species_multipoles(
         amp_ex  = _gaussian_dummy(vols(mol), qvals)
         _compute_B_lm(coords_spherical(mol), qvals, (amp_vac, amp_ex), lMax, _CHUNK)
     end
-    sh = timed!(stage_log, :static, 2, shell === nothing ? "hydration (SASA + B_lm)" : "hydration (B_lm)") do
+    sh = timed!(
+        stage_log,
+        :static, 2, shell === nothing ? "hydration (SASA + B_lm)" : "hydration (B_lm)"
+    ) do
         hydration(
             mol, 
             qvals, 

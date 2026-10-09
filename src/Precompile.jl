@@ -11,7 +11,6 @@ using PrecompileTools: @setup_workload, @compile_workload
 using Base.CoreLogging: with_logger, NullLogger   # (the Logging stdlib is not a dependency)
 
 @setup_workload begin
-    MolecularStructure._load!()   # the radius tables are filled by `__init__`, which has not run while this package precompiles
     # 16 atoms on a helix, as ATOM records of four alanines (N, CA, C, O)
     pdb = mktempdir()
     path = joinpath(pdb, "precompile.pdb")

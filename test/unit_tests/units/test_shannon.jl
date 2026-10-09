@@ -11,7 +11,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using Random
 using Statistics
 using LinearAlgebra
-using BAYSOL.Shannon: ShannonInfo, SHANNON_REBIN, cloud_diameter, auto_lmax, shannon_data, model_on_raw,
+using BAYSOL.Shannon: ShannonInfo, SHANNON_REBIN, BIN_BIAS_MAX, cloud_diameter, auto_lmax, shannon_data, model_on_raw,
     residual_structure, bin_bias_ratio
 using BAYSOL.Fitting: NonBiological, Solute
 using BAYSOL.Scattering: forward_cache, hydration
@@ -72,7 +72,7 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
         σ = [1.0, 2.0, 1.0, 0.5, 0.5, 1.0]
 
         @testset "inverse-variance bins" begin
-            info = shannon_data(q, I, σ; D, rebin = 1)
+            info = shannon_data(q, I, σ; D, rebin = 1, max_bin_bias = Inf)
             # bins from q_min = 0.001: [0.001,0.011) holds points 1-3; [0.011,0.021) points 4-5; [0.031,0.041) point 6
             w1 = 1 ./ σ[1:3] .^ 2; w2 = 1 ./ σ[4:5] .^ 2
             @test info.q ≈ [sum(w1 .* q[1:3]) / sum(w1), sum(w2 .* q[4:5]) / sum(w2), q[6]]
@@ -85,7 +85,7 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
         end
 
         @testset "narrower bins than the data's spacing change nothing" begin
-            info = shannon_data(q, I, σ; D, rebin = 1000)
+            info = shannon_data(q, I, σ; D, rebin = 1000, max_bin_bias = Inf)
             @test info.q == q && info.I == I && info.σ == σ && info.bin == 1:6
         end
 
@@ -97,7 +97,7 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
         @testset "binning conserves Σ w·I and Σ w (the sufficient statistics of a linear fit)" begin
             rng = MersenneTwister(2)
             qq = sort(rand(rng, 500) .* 0.3); σσ = 0.5 .+ rand(rng, 500); II = 5 .+ randn(rng, 500)
-            info = shannon_data(qq, II, σσ; D = 80.0, rebin = 4)
+            info = shannon_data(qq, II, σσ; D = 80.0, rebin = 4, max_bin_bias = Inf)
             @test check_float(sum(info.I ./ info.σ .^ 2), sum(II ./ σσ .^ 2); atol = 1e-8)
             @test check_float(sum(1 ./ info.σ .^ 2), sum(1 ./ σσ .^ 2); atol = 1e-8)
             @test issorted(info.q)
@@ -107,7 +107,7 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
 
         @testset "non-positive bins are dropped and the bin map follows" begin
             Ineg = [10.0, 12.0, 14.0, -9.0, -7.0, 3.0]                  # the middle bin averages negative
-            info = shannon_data(q, Ineg, σ; D, rebin = 1)
+            info = shannon_data(q, Ineg, σ; D, rebin = 1, max_bin_bias = Inf)
             @test info.n_nonpositive == 1
             @test length(info.q) == 2 && info.I == [info.I[1], 3.0]
             @test info.bin == [1, 1, 1, 0, 0, 2]
@@ -115,7 +115,7 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
 
         @testset "drop_nonpositive = false keeps the bins with non-positive intensity" begin
             Ineg = [10.0, 12.0, 14.0, -9.0, -7.0, 3.0]
-            info = shannon_data(q, Ineg, σ; D, rebin = 1, drop_nonpositive = false)
+            info = shannon_data(q, Ineg, σ; D, rebin = 1, max_bin_bias = Inf, drop_nonpositive = false)
             @test info.n_nonpositive == 0 && length(info.q) == 3 && info.bin == [1, 1, 1, 2, 2, 3]
             @test info.I[2] < 0
             raw = shannon_data(q, Ineg, σ; D, rebin = nothing, drop_nonpositive = false)
@@ -123,15 +123,15 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
         end
 
         @testset "bin_bias_ratio" begin
-            info = shannon_data(q, I, σ; D, rebin = 4)
+            info = shannon_data(q, I, σ; D, rebin = 4, max_bin_bias = Inf)
             @test check_float(bin_bias_ratio(info), π^2 / (96 * 16) / minimum(info.σ ./ info.I))
             @test isnan(bin_bias_ratio(shannon_data(q, I, σ; D, rebin = nothing)))
-            tight = shannon_data(q, I, σ ./ 1000; D, rebin = 1)           # 1000× more precise points: the ratio grows by ≥ 1000/√n
-            @test bin_bias_ratio(tight) > 100 * bin_bias_ratio(shannon_data(q, I, σ; D, rebin = 1))
+            tight = shannon_data(q, I, σ ./ 1000; D, rebin = 1, max_bin_bias = Inf)           # 1000× more precise points: the ratio grows by ≥ 1000/√n
+            @test bin_bias_ratio(tight) > 100 * bin_bias_ratio(shannon_data(q, I, σ; D, rebin = 1, max_bin_bias = Inf))
         end
 
         @testset "band limit" begin
-            info = shannon_data(q, I, σ; D = 100.0)
+            info = shannon_data(q, I, σ; D = 100.0, max_bin_bias = Inf)
             @test info.lMax == auto_lmax(100.0, maximum(info.q))
             @test info.rebin == SHANNON_REBIN
             @test shannon_data(q, I, σ; D = 100.0, lMax = 7).lMax == 7
@@ -150,13 +150,13 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
 
     @testset "model_on_raw" begin
         q = collect(0.0:0.01:0.2); I = 1 .+ q; σ = fill(0.1, length(q))
-        info = shannon_data(q, I, σ; D = 50.0, rebin = 1)
+        info = shannon_data(q, I, σ; D = 50.0, rebin = 1, max_bin_bias = Inf)
         f(x) = 3 .+ 2 .* x .- 40 .* x .^ 2 .+ 300 .* x .^ 3
         @test model_on_raw(info, f(info.q)) ≈ f(info.q_raw)                 # cubics are interpolated exactly (also at the ends)
         two = shannon_data([0.1, 0.2, 0.3], [1.0, 2.0, 3.0], [0.1, 0.1, 0.1]; D = 5.0, rebin = nothing)
         @test model_on_raw(two, [1.0, 2.0, 3.0]) ≈ [1.0, 2.0, 3.0]          # fewer than four nodes: linear
         @test_throws DimensionMismatch model_on_raw(info, zeros(length(info.q) + 1))
-        one_bin = shannon_data([0.1, 0.101], [1.0, 1.0], [0.1, 0.1]; D = 5.0, rebin = 1)
+        one_bin = shannon_data([0.1, 0.101], [1.0, 1.0], [0.1, 0.1]; D = 5.0, rebin = 1, max_bin_bias = Inf)
         @test_throws ArgumentError model_on_raw(one_bin, [1.0])
 
         @testset "against the forward model on the measured grid (crambin)" begin
@@ -166,7 +166,7 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
             lMax = auto_lmax(D, maximum(qraw))
             fw_raw = forward_cache(mol, qraw, lMax, 9000.0; chunk = UInt64(64))
             y_raw = reference_intensity(fw_raw, 1.0, 0.0, CRYSOL_SOLVENT_DENSITY, (1.0, 0.0, -0.5))
-            info = shannon_data(qraw, y_raw, 0.01 .* y_raw; D, rebin = SHANNON_REBIN, lMax)
+            info = shannon_data(qraw, y_raw, 0.01 .* y_raw; D, rebin = SHANNON_REBIN, max_bin_bias = Inf, lMax)
             @test length(info.q) < length(qraw)                              # the binning really coarsened the grid
             fw_b = forward_cache(mol, info.q, lMax, 9000.0; chunk = UInt64(64))
             y_b = reference_intensity(fw_b, 1.0, 0.0, CRYSOL_SOLVENT_DENSITY, (1.0, 0.0, -0.5))
@@ -227,14 +227,49 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
 
         res = BAYSOL.run_model(s, 120, 60)
         map_params = res[3][1]
-        @test haskey(map_params, "chisq_red_raw") && isfinite(map_params["chisq_red_raw"])
-        @test all(isfinite, (map_params["resid_lag1"], map_params["resid_lag1_raw"]))
+        # the reported χ² is the one on the measured points (not the binned fit's own), n − 3 degrees of freedom
+        fitres = res[1]
+        sh = s.shannon
+        y_map = fitres.curves[:, argmax(getproperty.(fitres.stats, :log_density))]
+        r_map = (sh.I_raw .- model_on_raw(sh, y_map)) ./ sh.σ_raw
+        @test map_params["chisq_red"] ≈ sum(abs2, r_map) / (length(r_map) - 3)
+        @test !haskey(map_params, "resid_lag1") && !haskey(map_params, "chisq_red_raw")   # residual statistics are a dev tool
         buf = IOBuffer()
         BAYSOL.write_report(buf, res; n_atoms = s.fw.n_atoms)
         txt = String(take!(buf))
-        for needle in ("=== Data (Shannon) ===", "bin bias", "=== Residuals at the MAP", "measured grid", "n_q_raw")
+        for needle in ("=== Run ===", "n_q_raw", "rebin", "channels", "=== Diagnostics ===", "divergence_rate")
             @test occursin(needle, txt)
         end
+        @test !occursin("Residuals at the MAP", txt) && !occursin("=== Data (Shannon) ===", txt)
         @test occursin(r"^χ²\s+= "m, txt)                                  # the line the Tcl report parser reads is unchanged
+        # section order: Run, Diagnostics, MAP, Quantiles, z-scores, Timing
+        order = [first(findfirst(h, txt)) for h in ("=== Run ===", "=== Diagnostics ===", "=== MAP ===", "=== Quantiles", "=== Standard deviations", "=== Timing ===")]
+        @test issorted(order)
     end
+    @testset "shannon_data raises the rebin until the binning's worst-case bias is acceptable" begin
+        D = 100.0
+        q = collect(range(0.01, 0.30; length = 2000))
+        I = 1000 .* exp.(-(q .* D / 3) .^ 2 ./ 3) .+ 1.0
+        # a precise curve (0.01 % errors): at the default 12 bins per channel the bound is far above BIN_BIAS_MAX
+        σ_precise = 1e-4 .* I
+        pinned = shannon_data(q, I, σ_precise; D, rebin = 12, max_bin_bias = Inf)
+        @test pinned.rebin == 12 && bin_bias_ratio(pinned) > BIN_BIAS_MAX
+        auto = shannon_data(q, I, σ_precise; D, rebin = 12)
+        @test auto.rebin > 12 && length(auto.q) > length(pinned.q)
+        @test auto.rebin == 0 || bin_bias_ratio(auto) ≤ BIN_BIAS_MAX
+        # a coarse curve (5 % errors) keeps the requested rebin
+        σ_coarse = 5e-2 .* I
+        @test shannon_data(q, I, σ_coarse; D, rebin = 12).rebin == 12
+        # more precise than any binning can use: the curve is fitted as measured
+        σ_extreme = 1e-9 .* I
+        @test shannon_data(q, I, σ_extreme; D, rebin = 12).rebin == 0
+        # a threshold of Inf (or a loose one) never raises it; a tighter one raises it further
+        @test shannon_data(q, I, σ_precise; D, rebin = 12, max_bin_bias = 1e6).rebin == 12
+        tighter = shannon_data(q, I, σ_precise; D, rebin = 12, max_bin_bias = 0.1)
+        @test tighter.rebin ≥ auto.rebin
+        # the bin map, band limit and channel count are those of the binning that was kept
+        @test length(auto.bin) == length(q) && maximum(auto.bin) == length(auto.q)
+        @test auto.lMax == auto_lmax(D, maximum(auto.q))
+    end
+
 end

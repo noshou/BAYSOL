@@ -33,8 +33,10 @@ Computes a NUTS seed from given data input:
 
 # Keywords
 -   `rebin::Union{Nothing,Integer} = SHANNON_REBIN`: bins per Shannon channel `π/D` (the bin
-    width is `π/(rebin·D)`, `D` the diameter of the scatterer cloud); `nothing` fits the
-    unbinned curve. The data the fit used, the raw data and the choices made are in
+    width is `π/(rebin·D)`, `D` the diameter of the scatterer cloud), at least this many: a precise
+    curve gets finer bins, until the binning's worst-case bias is below `max_bin_bias` of its smallest
+    error bar (the number used is the report's `rebin` line); `nothing` fits the unbinned curve.
+-   `max_bin_bias::Real = Shannon.BIN_BIAS_MAX`: that bound, 0.3 by default; `Inf` keeps `rebin` as given. The data the fit used, the raw data and the choices made are in
     `seed.shannon` ([`Shannon.ShannonInfo`](@ref BAYSOL.Utils.Shannon.ShannonInfo)).
 -   `lMax::Union{Nothing,Integer} = nothing`: spherical-harmonic band limit for the forward model;
     `nothing` takes `ceil(q_max·D)` ([`Shannon.auto_lmax`](@ref BAYSOL.Utils.Shannon.auto_lmax)), `q_max` the largest binned q.
@@ -72,6 +74,7 @@ function seed_model(
     σ_pH::Real,
     solutes::Vector{Fitting.Solute};
     rebin::Union{Nothing,Integer} = SHANNON_REBIN,
+    max_bin_bias::Real = Shannon.BIN_BIAS_MAX,
     lMax::Union{Nothing,Integer} = nothing,
     drop_nonpositive::Bool = true,
     add_hydrogens::Bool=true,
@@ -128,7 +131,9 @@ function seed_model(
     end
     info = Timing.timed!(log, :static, 1, "shannon (diameter, binning)") do
         D = Shannon.cloud_diameter(hcat(MolecularStructure.coords_cartesian(mol), shell[1]))
-        Shannon.shannon_data(qvals, I_exp, σ_exp; D = D, rebin = rebin, lMax = lMax, drop_nonpositive = drop_nonpositive)
+        Shannon.shannon_data(
+            qvals, I_exp, σ_exp; D = D, rebin = rebin, max_bin_bias = max_bin_bias, lMax = lMax, drop_nonpositive = drop_nonpositive
+        )
     end
     log.info["lMax"]          = info.lMax
     log.info["n_q_raw"]       = length(info.q_raw)
@@ -136,7 +141,6 @@ function seed_model(
     log.info["D"]             = info.D
     log.info["n_channels"]    = info.n_channels
     log.info["n_nonpositive"] = info.n_nonpositive
-    log.info["bin_bias"]      = Shannon.bin_bias_ratio(info)
 
     # calculate forward model
     fw = Timing.timed!(log, :static, 1, "forward_cache") do

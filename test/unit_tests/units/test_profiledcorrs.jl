@@ -157,3 +157,105 @@ end
     end
 
 end
+
+@testset "Gram column layout and A, B, C are generic in the number of contrasts" begin
+    PC = BAYSOL.Fitting
+
+    @testset "_pair_col enumerates the envelope-free pairs in _GRAM_PAIRS order" begin
+        nonex = (1, 3, 4, 5)   # species that carry a contrast in the five-species model
+        for (c, (a, b)) in enumerate(BAYSOL.Scattering._GRAM_PAIRS[1:10])
+            i, j = findfirst(==(a), nonex), findfirst(==(b), nonex)
+            @test PC._pair_col(i, j, 4) == c
+        end
+        # the layout for any M is a bijection onto 1:M(M+1)/2
+        for M in 1:7
+            cols = [PC._pair_col(i, j, M) for i in 1:M for j in i:M]
+            @test cols == collect(1:(M * (M + 1) ÷ 2))
+        end
+    end
+
+    @testset "_intensity_terms! equals the quadratic form vᵀGv for M = 3, 4, 5, 6 contrast species" begin
+        rng = MersenneTwister(7)
+        Q = 9
+        for M in (3, 4, 5, 6)
+            nA = M * (M + 1) ÷ 2
+            Gc = rand(rng, Q, nA + M + 1)
+            ρ = 0.33
+            a = (1.0, (0.3 * randn(rng) for _ in 2:M)...)
+            # rebuild the symmetric (M+1)×(M+1) Gram matrix per q; the excluded-volume species is last
+            A = zeros(Q); B = zeros(Q); C = zeros(Q)
+            PC._intensity_terms!(A, B, C, Gc, ρ, a)
+            for q in 1:Q
+                G = zeros(M + 1, M + 1)
+                for i in 1:M, j in i:M
+                    G[i, j] = G[j, i] = Gc[q, PC._pair_col(i, j, M)]
+                end
+                for i in 1:M
+                    G[i, M + 1] = G[M + 1, i] = Gc[q, nA + i]
+                end
+                G[M + 1, M + 1] = Gc[q, nA + M + 1]
+                v = [collect(a); -ρ]
+                @test close_(A[q] + B[q] + C[q], v' * G * v; atol = 1e-12)   # g = 1
+                vA = [collect(a); 0.0]
+                @test close_(A[q], vA' * G * vA; atol = 1e-12)
+            end
+        end
+    end
+end
+
+@testset "the anchored envelope of the c1 passes" begin
+    PC = BAYSOL.Fitting
+    fw = pc_fw()
+    tab = PC._C1Tables(fw)
+    ev = BAYSOL.Scattering.EV_EXP_COEFF
+    lo, hi = tab.cmin - tab.eps, tab.cmax + tab.eps
+    cs_test = vcat(collect(range(lo, hi; length = 301)), [lo, hi, tab.cs[3], tab.cs[3] + tab.eps / 2, 1.0])
+    # g(q; c1) = c1³·exp(−q²·(c1² − 1)·EV·r_m²), straight from the definition
+    g_ref(c) = c^3 .* exp.(-(tab.qvals .^ 2) .* ((c^2 - 1) * ev * tab.r_m^2))
+
+    @testset "_envelope! agrees with the definition over the whole window" begin
+        g = zeros(length(tab.qvals))
+        for c in cs_test
+            PC._envelope!(g, tab, c)
+            @test maximum(abs.(g ./ g_ref(c) .- 1)) ≤ 2e-15
+        end
+    end
+
+    @testset "the Taylor branch is used where its argument is small, the exponential otherwise" begin
+        # a table whose q-range is huge forces the fallback; both branches give the same envelope
+        big = PC._C1Tables(tab.cs, tab.g1, tab.qvals, tab.r_m, tab.cmin, tab.cmax, tab.eps, 1e6)
+        g1 = zeros(length(tab.qvals)); g2 = zeros(length(tab.qvals))
+        for c in (0.9, 1.07, 1.2)
+            PC._envelope!(g1, tab, c); PC._envelope!(g2, big, c)
+            @test maximum(abs.(g1 ./ g2 .- 1)) ≤ 2e-15
+        end
+        @test 1e6 * abs(PC._anchor(tab, 1.07, (1.07^2 - 1) * ev * tab.r_m^2)[3]) > PC.ENVELOPE_TAYLOR_LIMIT
+        @test tab.q2max * 0.03 ≤ PC.ENVELOPE_TAYLOR_LIMIT        # a realistic offset is well inside the Taylor domain
+    end
+
+    @testset "_sums_at equals the sums of the definition (and of the fallback branch)" begin
+        ξ = ξ_TRUE
+        A, B, C = BAYSOL.Scattering.intensity_terms(fw, ξ[1], (ξ[2], ξ[3], ξ[4]))
+        wls = synth_wls(fw, 1.1; rel_noise = 0.01)
+        big = PC._C1Tables(tab.cs, tab.g1, tab.qvals, tab.r_m, tab.cmin, tab.cmax, tab.eps, 1e6)
+        for c in cs_test
+            g = g_ref(c)
+            ŷ = A .+ g .* (B .+ g .* C)
+            ref = (sum(wls.weights .* ŷ), sum(wls.weights .* ŷ .^ 2), sum(wls.weights .* ŷ .* wls.I_obs))
+            @test all(isapprox.(PC._sums_at(A, B, C, tab, wls, c), ref; rtol = 1e-13))
+            @test all(isapprox.(PC._sums_at(A, B, C, big, wls, c), ref; rtol = 1e-13))
+        end
+    end
+
+    @testset "the c1 search result is unchanged by the anchoring" begin
+        for c1_true in (0.9, 1.05, 1.2), rel_noise in (0.0, 0.01)
+            wls = synth_wls(fw, c1_true; rel_noise)
+            ŷ, fit, c1_star = profiled_corrs(wls, ξ_TRUE, fw)
+            big = PC._C1Tables(tab.cs, tab.g1, tab.qvals, tab.r_m, tab.cmin, tab.cmax, tab.eps, 1e6)
+            _, _, c1_exp = profiled_corrs(wls, ξ_TRUE, fw; tables = big)
+            # two evaluations of the same χ² differing by ~1e-15 give Brent paths that end up to about its own accuracy
+            # apart (a value-only minimizer locates c1 to about √eps relative to the curvature, here up to ~1e-5)
+            @test abs(c1_star - c1_exp) ≤ 1e-5
+        end
+    end
+end

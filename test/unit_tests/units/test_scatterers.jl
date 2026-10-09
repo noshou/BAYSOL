@@ -38,7 +38,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using   BAYSOL.Scattering: _gaussian_dummy, _gaussian_dummy_shared, hydration, SHELL_THICKNESS, PROBE_RADIUS,
         compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
-using BAYSOL.PhysicalConstants: DRO_UNIT
+using BAYSOL.PhysicalConstants: UNIT_OF_δρ
 using   BAYSOL.MolecularStructure: create, coords_cartesian, coords_spherical, to_spherical,
         radii, vols, elms, Molecule
 
@@ -850,7 +850,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
             D_x  = scat_debye(SCAT_Q, Xc, fe, P, fh)
             B_ex = compute_B_lm(scat_sph(X), SCAT_Q, _gaussian_dummy(v, SCAT_Q), scat_Lconv, UInt64(4))
             B_sh = scat_shell_blm(hydration(mol, SCAT_Q, scat_Lconv, UInt64(64); n_target = 80))
-            for (dns, dro) in ((CRYSOL_SOLVENT_DENSITY, DRO_UNIT), (1.0, 1.0), (0.2, 0.9))
+            for (dns, dro) in ((CRYSOL_SOLVENT_DENSITY, UNIT_OF_δρ), (1.0, 1.0), (0.2, 0.9))
                 ref = dns^2 .* D_ex .+ dro^2 .* D_sh .- (2 * dns * dro) .* D_x
                 @test scat_relerr(scat_toy_I(B_ex, B_sh, scat_wconv, dns, dro), ref) < 1e-9
             end
@@ -876,7 +876,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
             @test isapprox(self_scatter(B_ex, scat_wconv)[1], V_ex^2; rtol = 1e-12)
             @test isapprox(self_scatter(B_sh, scat_wconv)[1], V_sh^2; rtol = 1e-12)
             @test isapprox(cross_scatter(B_ex, B_sh, scat_wconv)[1], V_ex * V_sh; rtol = 1e-12)
-            for (dns, dro) in ((CRYSOL_SOLVENT_DENSITY, DRO_UNIT), (1.0, 0.0), (0.2, 0.9))
+            for (dns, dro) in ((CRYSOL_SOLVENT_DENSITY, UNIT_OF_δρ), (1.0, 0.0), (0.2, 0.9))
                 @test isapprox(scat_toy_I(B_ex, B_sh, scat_wconv, dns, dro)[1],
                                (dns * V_ex - dro * V_sh)^2; rtol = 1e-10)
             end
@@ -899,7 +899,7 @@ const scat_stubamp = ComplexF64[scat_stub_f(SCAT_STUB_E[i], SCAT_Q[k])
         for k in eachindex(SCAT_Q)
             @test abs(X[k]) ≤ sqrt(S_ex[k] * S_sh[k]) * (1 + 1e-10)
         end
-        for (dns, dro) in ((CRYSOL_SOLVENT_DENSITY, DRO_UNIT), (0.5, -0.2), (-1.7, 2.3))
+        for (dns, dro) in ((CRYSOL_SOLVENT_DENSITY, UNIT_OF_δρ), (0.5, -0.2), (-1.7, 2.3))
             I = scat_toy_I(B_ex, B_sh, scat_wconv, dns, dro)
             @test I isa AbstractVector{<:Real}
             @test length(I) == length(SCAT_Q)
