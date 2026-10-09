@@ -257,7 +257,7 @@ fw = forward_cache(mol, q_fit, lMax, energy_eV)
 
 seed = seed_fitting(fw, I_fit, σ_fit, PH, σ_PH, SOLUTES; t = T_C)
 
-result = BAYSOL.run_model(seed, 2000, 1000; l = PROFILE())
+result = BAYSOL.run_model(seed, 1000, 300; l = PROFILE())
 
 fit, divergence_rate, map_result, quantile_result = result
 BAYSOL.write_report(result)

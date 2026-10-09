@@ -9,6 +9,7 @@ The entry points that run the tests.
 | `unittests.jl` | the unit and integration suite: everything in`../unit_tests/units/`, in name order with `test_quality.jl` last                                                  |
 | `fittings.tcl` | the end-to-end fitting tests in`../fitting_tests/`: the ones you name, or all of them; optionally the benchmark, the report and the sampler diagnostics on them |
 | `vis.tcl`      | the visual checks in`../visualize/`: the ones you name, or all of them                                                                                          |
+| `diagnose.tcl` | the sampler diagnostics (`../utils/diagnose.tcl`, one part per call) on fitting tests, without rerunning their fits: all five parts by default, or the ones named with `--report`, `--ablate`, `--residuals`, `--warmup`, `--tolerance` |
 | `profile.tcl` | where the static build of a fitting test spends its time, by function (`../utils/profile_seed.jl`; development tooling, not a benchmark) |
 | `validate.tcl` | the validations in `../validation/`: slow, suite-wide checks of one change against criteria fixed before the run (`--list`; needs `--approved` to run) |
 | `tcltests.tcl` | the tests of the Tcl tools in `../utils/` (`../utils/tests/*.test`, tcltest; ~1 s)                                                                               |
@@ -27,6 +28,10 @@ tclsh test/run/fittings.tcl SASDMJ9 --bench --approved          # runs the bench
 tclsh test/run/validate.tcl --list                              # the validations and their questions
 tclsh test/run/validate.tcl map_fstop                           # prints the validation's plan; runs nothing
 tclsh test/run/validate.tcl map_fstop --approved                # runs it on every fit (see below)
+tclsh test/run/diagnose.tcl --warmup                            # no fit named: every run of every fitting test (53)
+tclsh test/run/diagnose.tcl SASDMJ9                              # every diagnostic part on this fit
+tclsh test/run/diagnose.tcl --warmup --seeds 1,2,3 SASDMJ9      # only the warm-up study, three RNG seeds
+tclsh test/run/diagnose.tcl --report --out /tmp/d SASDBS6:fit2_model3   # one part, written to /tmp/d/report.txt
 tclsh test/run/vis.tcl --list                                  # the visual checks
 tclsh test/run/vis.tcl plastic_2d sasa_hydro_report            # just these
 tclsh test/run/tcltests.tcl                                    # the Tcl tools' tests
@@ -50,7 +55,7 @@ tclsh test/run/fittings.tcl [ID ...] [--no-fit] [--bench] [--approved] [--report
 - **`--report`** prints the Results-table rows of the selected fits (`../utils/results_table.tcl`), from the reports the fits just wrote. To rewrite the table in `fitting_tests/README.md`, use `tclsh test/utils/results_table.tcl --update`.
 - **`--table`** rewrites the Results table in `fitting_tests/README.md` from every report (`../utils/results_table.tcl --update`), whatever IDs are named.
 - **`--trace-compile FILE`** runs the fits with Julia's `--trace-compile=FILE`: the file lists the methods each fit's process had to compile at run time, i.e. what a precompile workload has not covered.
-- **`--fixme`** runs the sampler diagnostics (`../utils/diagnose.tcl --report`) on every run of the selected fits: MAP starts, Hessian, step size and tree depth, gradient error, modes. Use it when a fit looks wrong.
+- **`--fixme`** runs the sampler diagnostics (`diagnose.tcl --report`) on every run of the selected fits: MAP starts, Hessian, step size and tree depth, gradient error, modes. Use it when a fit looks wrong.
 
 ## `profile.tcl`
 

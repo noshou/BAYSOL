@@ -89,8 +89,8 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 # One run per atomic model with a deposited fit; `fit` is that model's reference curve (q scaled to Å⁻¹ by `fit_scale`; the fitted intensity is column `fit_col`; `rescale` = the file is normalized, scale it to the data).
 const RUNS = [
-    (tag = "fit1_model1", pdb = "SASDUN5_fit1_model1.pdb", fit = "SASDUN5_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER"),   # D_max ≈ 160 Å; deposited χ² = 2.21
-    (tag = "fit1_model2", pdb = "SASDUN5_fit1_model2.pdb", fit = "SASDUN5_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER"),   # D_max ≈ 167 Å; deposited χ² = 2.21
+    (tag = "fit1_model1", pdb = "SASDUN5_fit1_model1.pdb", fit = "SASDUN5_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER 2-state"),   # D_max ≈ 160 Å; deposited χ² = 2.21
+    (tag = "fit1_model2", pdb = "SASDUN5_fit1_model2.pdb", fit = "SASDUN5_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER 2-state"),   # D_max ≈ 167 Å; deposited χ² = 2.21
 ]
 
 """

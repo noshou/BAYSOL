@@ -5,14 +5,16 @@
 #
 #   julia --project=<repo> child.jl <repo> <ID[:tag]> [n_samples n_adapt]
 #
+# Without n_samples and n_adapt the fit uses whatever `run_model` defaults to in <repo>, so the benchmark follows the code it measures;
+# the iterations actually used are recorded in the result.
+#
 # It does the same fit twice in one process. The first is the "first fit" (JIT included); the second is
 # "steady state" (everything compiled). Plotting is skipped (`makie = false`), so GLMakie is never loaded.
 
 using JSON3
 const T_PROC = time()
 const REPO, SPEC = ARGS[1], ARGS[2]
-const N_SAMPLES = length(ARGS) ≥ 3 ? parse(Int, ARGS[3]) : 2000
-const N_ADAPT = length(ARGS) ≥ 4 ? parse(Int, ARGS[4]) : 1000
+const ITERATIONS = length(ARGS) ≥ 4 ? (parse(Int, ARGS[3]), parse(Int, ARGS[4])) : nothing   # (n_samples, n_adapt), or the defaults
 
 t_using = @elapsed using BAYSOL
 t_tool = @elapsed include(joinpath(REPO, "test", "utils", "fit_seed.jl"))
@@ -22,7 +24,7 @@ function one_fit()
     local seed
     seed_s = @elapsed (seed, _, _) = load_fit_seed(id, tag; makie = false)
     run_s = @elapsed redirect_stderr(devnull) do
-        BAYSOL.run_model(seed, N_SAMPLES, N_ADAPT)
+        ITERATIONS === nothing ? BAYSOL.run_model(seed) : BAYSOL.run_model(seed, ITERATIONS...)
     end
     st = seed.timing.stages
     return Dict{String,Any}(
@@ -30,6 +32,7 @@ function one_fit()
         "stage_name" => [s.name for s in st], "stage_depth" => [s.depth for s in st],
         "stage_seconds" => [s.seconds for s in st], "stage_compile" => [s.compile for s in st],
         "stage_gc" => [s.gc for s in st],
+        "n_samples" => seed.timing.info["n_samples"], "n_adapt" => seed.timing.info["n_adapt"],
         "n_atoms" => seed.fw.n_atoms, "n_q" => length(seed.fw.qvals), "lMax" => seed.fw.lMax,
         "n_q_raw" => length(seed.shannon.q_raw), "rebin" => seed.shannon.rebin, "D" => seed.shannon.D,
     )

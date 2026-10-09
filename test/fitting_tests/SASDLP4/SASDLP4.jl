@@ -75,9 +75,9 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 # One run per atomic model with a deposited fit; `fit` is that model's reference curve (q scaled to Å⁻¹ by `fit_scale`; the fitted intensity is column `fit_col`; `rescale` = the file is normalized, scale it to the data).
 const RUNS = [
-    (tag = "fit1_model1", pdb = "SASDLP4_fit1_model1.pdb", fit = "SASDLP4_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER"),   # D_max ≈ 53 Å; deposited χ² = 1.09
-    (tag = "fit1_model2", pdb = "SASDLP4_fit1_model2.pdb", fit = "SASDLP4_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER"),   # D_max ≈ 74 Å; deposited χ² = 1.09
-    (tag = "fit1_model3", pdb = "SASDLP4_fit1_model3.pdb", fit = "SASDLP4_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER"),   # D_max ≈ 113 Å; deposited χ² = 1.09
+    (tag = "fit1_model1", pdb = "SASDLP4_fit1_model1.pdb", fit = "SASDLP4_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER 3-state"),   # D_max ≈ 53 Å; deposited χ² = 1.09
+    (tag = "fit1_model2", pdb = "SASDLP4_fit1_model2.pdb", fit = "SASDLP4_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER 3-state"),   # D_max ≈ 74 Å; deposited χ² = 1.09
+    (tag = "fit1_model3", pdb = "SASDLP4_fit1_model3.pdb", fit = "SASDLP4_fit1.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "OLIGOMER 3-state"),   # D_max ≈ 113 Å; deposited χ² = 1.09
     (tag = "fit2_model1", pdb = "SASDLP4_fit2_model1.pdb", fit = "SASDLP4_fit2.fit", fit_scale = 1.0, fit_col = 4, rescale = false, software = "CRYSOL"),   # D_max ≈ 74 Å; deposited χ² = 1.058
 ]
 

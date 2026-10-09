@@ -3,7 +3,7 @@
 
 |                      | contents                                                                                                                                      |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Report.jl`         | the module: imports, the module-level constant `DEFAULT_QUANTILES` (`"16-84"`, the default `quantiles` of `run_model` and the label `write_report` prints), the result types `MAPParams`, `MAPResult`, `QuantileBounds`, `QuantileParams`, `QuantileCurves`, `QuantileResult`, includes, exports |
+| `Report.jl`         | the module: imports, the module-level constants `DEFAULT_QUANTILES` (`"16-84"`, the default `quantiles` of `run_model` and the label `write_report` prints) and `DEFAULT_N_ADAPT` / `DEFAULT_N_DRAWS` / `DEFAULT_N_SAMPLES` (300 / 700 / 1000, the default NUTS iterations of `run_model`), the result types `MAPParams`, `MAPResult`, `QuantileBounds`, `QuantileParams`, `QuantileCurves`, `QuantileResult`, includes, exports |
 | `SeedModel.jl`      | `seed_model`: resolve the structure, PROPKA + Pdb2pqr, SASA and the diameter of the scatterer cloud, `Fitting.shannon_data` (binning and `lMax`), `Scattering.forward_cache`, `Fitting.seed_fitting`; starts the run's `Timing.StageLog` |
 | `RunModel.jl`       | `run_model`: `Fitting.run_fitting`, drop warmup, pick the MAP draw (highest non-divergent log density), compute parameter and curve quantiles |
 | `ReportSections.jl` | `_write_run_info` (`=== Run ===`) and `_write_timing` (`=== Timing ===`) |
@@ -14,7 +14,7 @@ The package root re-binds `seed_model`, `run_model` and `write_report`, so they 
 ```julia
 using BAYSOL
 seed = BAYSOL.seed_model(src, energy, q, I, σ, pH, σ_pH, solutes)   # rebin = 12 per Shannon channel, lMax from the structure
-res  = BAYSOL.run_model(seed, 2000, 1000)
+res  = BAYSOL.run_model(seed)                                        # 300 warm-up + 700 draws; run_model(seed, n_samples, n_adapt) to change
 BAYSOL.write_report(res)
 ```
 
