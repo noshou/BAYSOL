@@ -18,3 +18,5 @@ julia --project=test/fitting_tests test/fitting_tests/SASDMJ9/SASDMJ9.jl
 # build the docs (copies src/*/README.md into docs/src/guides/ and the test READMEs into docs/src/testing/)
 julia --project=docs docs/make.jl
 ```
+
+ BAYSOL’s reported parameters and uncertainties are conditional on the gaussian scattering model, measurement errors, and priors. Validation across 53 fits and three synthetic cases found no general justification for global error inflation, while an experimental correlated-discrepancy model risked absorbing systematic misfit and shifting estimates.

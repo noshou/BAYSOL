@@ -4,8 +4,7 @@
 # agnostic to what "probe" means to the caller). `_caps!` (behind `classify`) is the exact,
 # sampling-free shortcut `_sasa_loop` tries first for every atom, and packs the caps its
 # vectorized point test then runs against; `blocked` is the point/ray occlusion test
-# (`_bead_class` uses the ray form). Included into the SASA module (not a module of its own): SASA is
-# the only consumer.
+# (`_bead_class` uses the ray form).
 
 """
     Coverage

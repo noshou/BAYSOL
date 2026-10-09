@@ -1,7 +1,6 @@
 using   DelimitedFiles
 using   Statistics
 using   Random
-using   GLMakie
 using   BAYSOL
 using   BAYSOL.MolecularStructure: LocalPathSource
 using   BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
@@ -149,6 +148,10 @@ fit_fit1, divergence_rate_fit1, map_resf1, quantile_resf1 = resf1
 open(joinpath(@__DIR__, "res_fit1.txt"), "w") do io
     BAYSOL.write_report(io, resf1; form_factor_log = fflogf1, n_atoms = natmsf1)
 end
+
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
+# then recompile (about 40 % of a fit's wall clock).
+using GLMakie
 
 """
     sasda52_fit1_figure(result, data) -> Figure

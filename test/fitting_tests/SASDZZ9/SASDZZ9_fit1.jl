@@ -1,7 +1,6 @@
 using DelimitedFiles
 using Statistics
 using Random
-using GLMakie
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
@@ -147,6 +146,10 @@ open(joinpath(@__DIR__, "res_fit1.txt"), "w") do io
         n_atoms = n_atoms
     )
 end
+
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
+# then recompile (about 40 % of a fit's wall clock).
+using GLMakie
 
 """
     sasdzz9_fit1_figure(result, data) -> Figure

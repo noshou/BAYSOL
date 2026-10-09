@@ -83,9 +83,10 @@ spread of radii about it. Absorbs systemic biases introduced by atomic radii tab
 `c_1` == 1 returns exactly 1.0 at every q, i.e. the uncorrected model.
 
 # Arguments
-- `qvals::AbstractVector{<:Real}, length Q`: momentum transfer in Å⁻¹.
-- `r_m::Real`: the structure's mean atomic radius in Å; > 0.
-- `c_1::Real`: the excluded-volume correction factor (CRYSOL's `r₀/r_m`), dimensionless; > 0.
+-   `qvals::AbstractVector{<:Real}, length Q`: momentum transfer in Å⁻¹.
+-   `r_m::Real`: the structure's mean atomic radius in Å; > 0.
+-   `c_1::Real`: the excluded-volume correction factor (CRYSOL's `r₀/r_m`),
+    dimensionless; > 0.
 
 # Returns
 - `Vector of length Q`, eltype promoted from the arguments.
@@ -114,9 +115,11 @@ function mean_atomic_radius(mol::Molecule)::Float64
 end
 
 """
-Species pairs (a, b), a ≤ b, in [`ForwardCache`](@ref)'s `Gc` column order, species numbered
-as in the file header (1 vac, 2 ex, 3-5 shells): the 10 pairs of {1, 3, 4, 5} (the
-envelope-free terms, "A"), then the 4 pairs (2, b), b ∈ {1, 3, 4, 5} ("B"), then (2, 2) ("C").
+Species pairs (a, b), a ≤ b, in [`ForwardCache`](@ref)'s `Gc`
+column order, species numbered as in the file header
+(1 vac, 2 ex, 3-5 shells): the 10 pairs of {1, 3, 4, 5} (the
+envelope-free terms, "A"), then the 4 pairs (2, b),
+b ∈ {1, 3, 4, 5} ("B"), then (2, 2) ("C").
 """
 const _GRAM_PAIRS = (
     (1, 1), (1, 3), (1, 4), (1, 5), (3, 3),
@@ -125,19 +128,22 @@ const _GRAM_PAIRS = (
 )
 
 """
-Repack the five-species Gram matrix G, (5, 5, Q), into `Gc`, (Q, 15), contiguous in q, with
-the columns in `_GRAM_PAIRS` order.
+Repack the five-species Gram matrix G, (5, 5, Q),
+into `Gc`, (Q, 15), contiguous in q, with the
+columns in `_GRAM_PAIRS` order.
 
 # Exceptions
 - `ArgumentError`: G is not five-species.
 """
 function _pack_gram(G::Array{Float64,3})::Matrix{Float64}
-    (size(G, 1) == 5 && size(G, 2) == 5) ||
-        throw(ArgumentError("_pack_gram: needs the five-species Gram matrix; got $(size(G, 1))×$(size(G, 2))"))
+    err1 = "_pack_gram: needs the five-species Gram matrix;"
+    err2 = " got $(size(G, 1))×$(size(G, 2))"
+    err  = err1 * err2
+    (size(G, 1) == 5 && size(G, 2) == 5) || throw(ArgumentError(err))
     Q = size(G, 3)
     Gc = Matrix{Float64}(undef, Q, length(_GRAM_PAIRS))
     @inbounds for (j, (a, b)) in enumerate(_GRAM_PAIRS)
-        @simd for q in 1:Q
+        @fastmath @simd for q in 1:Q
             Gc[q, j] = G[a, b, q]
         end
     end
@@ -152,15 +158,16 @@ per structure with [`forward_cache`](@ref); every likelihood evaluation
 ([`BAYSOL.Fitting.profiled_corrs`](@ref)) then works from G and `r_m` alone.
 
 # Fields
-- `G::Array{Float64,3}, (5, 5, Q)`: the species Gram matrix, from [`gram`](@ref).
-- `Gc::Matrix{Float64}, (Q, 15)`: `G_ab(q)` for the pairs in `_GRAM_PAIRS`, repacked contiguous
-    in q for the contrast contraction ([`intensity_terms`](@ref)).
-- `qvals::Vector{Float64}, length Q`: the grid G was built on.
-- `r_m::Float64`: mean atomic radius in Å.
-- `form_factor_log::Vector{String}`: construction-time diagnostics from [`form_factor_table`](@ref BAYSOL.Scattering.form_factor_table).
-- `n_atoms::Int`: number of atoms in the structure mol was built from
+-   `G::Array{Float64,3}, (5, 5, Q)`: the species Gram matrix, from [`gram`](@ref).
+-   `Gc::Matrix{Float64}, (Q, 15)`: `G_ab(q)` for the pairs in `_GRAM_PAIRS`,
+    repacked contiguous in q for the contrast contraction ([`intensity_terms`](@ref)).
+-   `qvals::Vector{Float64}, length Q`: the grid G was built on.
+-   `r_m::Float64`: mean atomic radius in Å.
+-   `form_factor_log::Vector{String}`: construction-time diagnostics from
+    [`form_factor_table`](@ref BAYSOL.Scattering.form_factor_table).
+-   `n_atoms::Int`: number of atoms in the structure mol was built from
     (length(elms(mol))), e.g. for reporting alongside the fit.
-- `lMax::Int`: the spherical-harmonic band limit G was built with.
+-   `lMax::Int`: the spherical-harmonic band limit G was built with.
 """
 struct ForwardCache
     G::Array{Float64,3}
@@ -187,7 +194,8 @@ multipoles ([`species_multipoles`](@ref)), reduced to the Gram matrix G(q), plus
 -   `chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size (results invariant).
 -   `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
     `n_target = SHELL_N_TARGET`: hydration-shell geometry, forwarded to hydration.
--   `shell::Union{Nothing,Tuple} = nothing`: a precomputed `SASA.sasa` result, see [`hydration`](@ref).
+-   `shell::Union{Nothing,Tuple} = nothing`: a precomputed `SASA.sasa`
+    result, see [`hydration`](@ref).
 -   `stage_log::Union{Nothing,StageLog} = nothing`: if given, the vacuum,
     excluded-volume, hydration and Gram + `r_m` stages are recorded in it
     (depth 2, group `:static`).
@@ -199,12 +207,12 @@ forward_cache(
     qvals::AbstractVector{<:Real},
     lMax::Integer,
     energy::Real;
-    chunk::Unsigned                      = B_LM_CHUNK,
-    thickness::Real                      = SHELL_THICKNESS,
-    probe::Real                          = PROBE_RADIUS,
-    n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
-    shell::Union{Nothing,Tuple}          = nothing,
-    stage_log::Union{Nothing,StageLog}   = nothing,
+    chunk::Unsigned                    = B_LM_CHUNK,
+    thickness::Real                    = SHELL_THICKNESS,
+    probe::Real                        = PROBE_RADIUS,
+    n_target::Union{Nothing,Integer}   = SHELL_N_TARGET,
+    shell::Union{Nothing,Tuple}        = nothing,
+    stage_log::Union{Nothing,StageLog} = nothing,
 )::ForwardCache = begin
     form_factor_log = String[]
     mp = species_multipoles(
@@ -216,7 +224,15 @@ forward_cache(
     G, r_m = timed!(stage_log, :static, 2, "Gram + r_m") do
         gram(collect(mp), partial_wave_weights(lMax)), mean_atomic_radius(mol)
     end
-    ForwardCache(G, _pack_gram(G), collect(Float64, qvals), r_m, form_factor_log, length(elms(mol)), lMax)
+    ForwardCache(
+        G,
+        _pack_gram(G),
+        collect(Float64, qvals),
+        r_m,
+        form_factor_log,
+        length(elms(mol)),
+        lMax
+    )
 end
 
 """
@@ -225,68 +241,68 @@ excluded-volume envelope g(q; c₁) ([`excluded_volume_factor`](@ref)) on specie
 
     I(q; c₁) = v(q)ᵀ G(q) v(q) = A(q) + g·B(q) + g²·C(q)
 
-with contrast vector v = (1, −ρₑ·g, dro₁, dro₂, dro₃), `dro_k` = `DRO_UNIT`·`δρ_k`, and
+with contrast vector
 
-    A = Σ_{a,b ∈ S} v_a v_b G_ab,   B = −2ρₑ Σ_{b ∈ S} v_b G_2b,   C = ρₑ² G_22,   S = {1, 3, 4, 5}.
+    v = (1, −ρₑ·g, dro₁, dro₂, dro₃)
+    `dro_k` = `UNIT_OF_δρ`·`δρ_k`
 
-c₁ enters only through g, so A, B, C depend on (ρₑ, δρ) and the structure alone: build them once
-per parameter point, then evaluate any c₁ cheaply ([`model_intensity`](@ref)). Two products
-against the repacked `fw.Gc` (BLAS for Float64; Julia's generic product when ρₑ/δρ carry
-ForwardDiff dual numbers).
+and
+
+    A = Σ_{a,b ∈ S} v_a v_b G_ab
+    B = −2ρₑ Σ_{b ∈ S} v_b G_2b
+    C = ρₑ² G_22,   S = {1, 3, 4, 5}.
+
+c₁ enters only through g, so A, B, C depend on (ρₑ, δρ) and the
+structure alone: build them once per parameter point, then evaluate
+any c₁ cheaply ([`model_intensity`](@ref)). Two products against the
+repacked `fw.Gc` (BLAS for Float64; Julia's generic product when ρₑ/δρ
+carry ForwardDiff dual numbers).
 
 # Arguments
 - `fw::ForwardCache`: the structure's geometry-only cache.
 - `ρ::Real`: the buffer's bulk electron density ρₑ, e·Å⁻³.
-- `δρ::NTuple{3,<:Real}`: dimensionless (convex, concave, cavity) shell contrasts.
+- `δρ::NTuple{S,<:Real}`: dimensionless shell contrasts, (convex, concave, cavity) for the five-species
+    model (`S = 3`); the packed Gram matrix must have the `(S+1)(S+2)/2 + S + 2` columns of that many species.
 
 # Returns
 - `(A, B, C)`, three length-Q vectors with the eltype of ρₑ/δρ.
 """
-function intensity_terms(fw::ForwardCache, ρ::Real, δρ::NTuple{3,<:Real})
+function intensity_terms(fw::ForwardCache, ρ::Real, δρ::NTuple{S,<:Real}) where {S}
     T  = promote_type(typeof(ρ), eltype(δρ), Float64)
-    v1 = one(T)
-    v3 = T(DRO_UNIT * δρ[1])
-    v4 = T(DRO_UNIT * δρ[2])
-    v5 = T(DRO_UNIT * δρ[3])
-    kA = T[
-            v1^2,
-            2v1 * v3,
-            2v1 * v4,
-            2v1 * v5,
-            v3^2,
-            2v3 * v4,
-            2v3 * v5,
-            v4^2,
-            2v4 * v5,
-            v5^2
-        ]
-    kB = T[
-            -2ρ * v1,
-            -2ρ * v3,
-            -2ρ * v4,
-            -2ρ * v5
-        ]
+    M  = S + 1              # species that carry a contrast: vac (weight 1) and the S shells
+    nA = M * (M + 1) ÷ 2    # envelope-free pairs, row-major upper triangle
     Gc = fw.Gc
+    size(Gc, 2) == nA + M + 1 || throw(ArgumentError(
+        "intensity_terms: $S contrasts need $(nA + M + 1) Gram columns, got $(size(Gc, 2))"))
+    v  = (one(T), ntuple(k -> T(UNIT_OF_δρ * δρ[k]), Val(S))...)
+    kA = T[(i == j ? v[i] * v[j] : 2v[i] * v[j]) for i in 1:M for j in i:M]
+    kB = T[-2ρ * v[i] for i in 1:M]
     Q  = size(Gc, 1)
     A = Vector{T}(undef, Q); B = Vector{T}(undef, Q)
-    mul!(A, view(Gc, :, 1:10), kA)
-    mul!(B, view(Gc, :, 11:14), kB)
+    mul!(A, view(Gc, :, 1:nA), kA)
+    mul!(B, view(Gc, :, (nA + 1):(nA + M)), kB)
     ρ2 = T(ρ)^2
     C = Vector{T}(undef, Q)
     @inbounds @fastmath @simd for q in 1:Q
-        C[q] = ρ2 * Gc[q, 15]
+        C[q] = ρ2 * Gc[q, nA + M + 1]
     end
     return A, B, C
 end
 
 """
-The model intensity A + g·(B + g·C) at the envelope `g` (from [`excluded_volume_factor`](@ref)),
-for A, B, C from [`intensity_terms`](@ref); scale 1, no background.
+The model intensity A + g·(B + g·C) at the envelope `g`
+(from [`excluded_volume_factor`](@ref)), for A, B, C from
+[`intensity_terms`](@ref); scale 1, no background.
 
 # Returns
 - `Vector of length Q`, eltype promoted from the arguments.
 """
-function model_intensity(A::AbstractVector, B::AbstractVector, C::AbstractVector, g::AbstractVector)
+function model_intensity(
+    A::AbstractVector,
+    B::AbstractVector,
+    C::AbstractVector,
+    g::AbstractVector
+)
     ŷ = similar(A, promote_type(eltype(A), eltype(B), eltype(C), eltype(g)))
     @inbounds @fastmath @simd for i in eachindex(ŷ)
         ŷ[i] = A[i] + g[i] * (B[i] + g[i] * C[i])
@@ -295,8 +311,9 @@ function model_intensity(A::AbstractVector, B::AbstractVector, C::AbstractVector
 end
 
 """
-Fraction of the hydration-shell volume carried by cavity beads, read off the Gram matrix
-at the lowest q (where `S_kk` → (Σ bead volumes)², so √`S_kk` is the species' total volume).
+Fraction of the hydration-shell volume carried by cavity beads,
+read off the Gram matrix at the lowest q (where `S_kk` →
+(Σ bead volumes)², so √`S_kk` is the species' total volume).
 0 when the structure has no cavity beads.
 """
 function cavity_shell_fraction(fw::ForwardCache)::Float64

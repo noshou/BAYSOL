@@ -110,13 +110,13 @@ The Jacobian of the map (|dθ/dz| = `Πσ_i`) is a z-independent constant, so it
 omitted from the log-density in z (and w) space.
 
 # Arguments
-- `θ::SVector{4,<:Real}`: a θ-space point.
+- `θ::SVector{N,<:Real}`: a θ-space point.
 - `p::ξ_priors`: supplies (μ, σ) via [`θ_prior_moments`](@ref).
 
 # Returns
-- `SVector{4,<:Real}`: z.
+- `SVector{N,<:Real}`: z.
 """
-function _standardize(θ::SVector{4,<:Real}, p::ξ_priors)
+function _standardize(θ::SVector{N,<:Real}, p::ξ_priors) where {N}
     μ, σ = θ_prior_moments(p)
     return (θ .- μ) ./ σ
 end
@@ -129,10 +129,10 @@ z = (θ - μ) / σ in θ-space, where θ = Θ(ξ, p) and (μ, σ) are the prior'
 per-coordinate θ-space mean/std from [`θ_prior_moments`](@ref).
 
 # Arguments
-- `ξ::SVector{4,<:Real}`: the physical-space point to score.
+- `ξ::SVector{N,<:Real}`: the physical-space point to score.
 - `p::ξ_priors`: supplies (μ, σ) via [`θ_prior_moments`](@ref).
 """
-function prior_z_scores(ξ::SVector{4,<:Real}, p::ξ_priors)::SVector{4,Float64}
+function prior_z_scores(ξ::SVector{N,<:Real}, p::ξ_priors)::SVector{N,Float64} where {N}
     θ, _ = Θ(ξ, p)
     μ, σ = θ_prior_moments(p)
     return (θ .- μ) ./ σ
@@ -228,11 +228,12 @@ selected by l:
     physical parameters, instead of freezing it out.
 
 # Arguments
-- `wls::WLSData`: precomputed data-only weighted sums over (`I_exp`, `σ_exp`),
+-   `wls::WLSData`: precomputed data-only weighted sums over (`I_exp`, `σ_exp`),
     from [`WLSData`](@ref); forwarded to [`profiled_corrs`](@ref).
-- `ξ::SVector{4,<:Real}`: the physical fit parameters (ρₑ, δρ₁, δρ₂, δρ₃).
-- `fw::ForwardCache`: the structure's static cache, from [`BAYSOL.Scattering.forward_cache`](@ref).
-- `l::LIKELIHOOD`: `PROFILE()` or `MARGINAL()`, selecting which log-likelihood
+-   `ξ::SVector{N,<:Real}`: the physical fit parameters, (ρₑ, δρ₁, δρ₂, δρ₃) for `N = 4`.
+-   `fw::ForwardCache`: the structure's static cache, from
+    [`BAYSOL.Scattering.forward_cache`](@ref).
+-   `l::LIKELIHOOD`: `PROFILE()` or `MARGINAL()`, selecting which log-likelihood
     variant to return.
 
 # Keywords
@@ -244,36 +245,42 @@ selected by l:
 """
 function _ll(
     wls::WLSData,
-    ξ::SVector{4,<:Real},
+    ξ::SVector{N,<:Real},
     fw::ForwardCache,
     l::LIKELIHOOD;
     tab::Union{Nothing,_C1Tables} = nothing,
     c1_tol::Float64 = EXCL_VOL_CORR_TOL,
-)
+) where {N}
     _, fit, _ = profiled_corrs(wls, ξ, fw; tables = tab, tol = c1_tol)
     return __ll(fit, l)
 end
 
 """
-[`_ll`](@ref) for the profile likelihood at a ForwardDiff dual ξ: the value and the gradient with respect to ξ
-come from [`_profile_ll_grad`](@ref) (analytic, no dual-number vectors through the forward model), and are
-composed with the partials of ξ, so `ForwardDiff.gradient` of any function of θ sees the exact chain rule.
-The marginal likelihood keeps the generic path above.
+[`_ll`](@ref) for the profile likelihood at a ForwardDiff dual ξ: the
+value and the gradient with respect to ξ come from [`_profile_ll_grad`](@ref)
+(analytic, no dual-number vectors through the forward model), and are
+composed with the partials of ξ, so `ForwardDiff.gradient` of any
+function of θ sees the exact chain rule. The marginal likelihood keeps
+the generic path above.
 """
 function _ll(
     wls::WLSData,
-    ξ::SVector{4,D},
+    ξ::SVector{N,D},
     fw::ForwardCache,
     ::PROFILE;
     tab::Union{Nothing,_C1Tables} = nothing,
     c1_tol::Float64 = EXCL_VOL_CORR_TOL,
-) where {D<:ForwardDiff.Dual{<:Any,Float64}}
+) where {N,D<:ForwardDiff.Dual{<:Any,Float64}}
     tb = tab === nothing ? _C1Tables(fw) : tab
-    ll, g = _profile_ll_grad(wls, SVector{4,Float64}(ForwardDiff.value.(ξ)), fw, tb, c1_tol)
-    N = ForwardDiff.npartials(D)
-    parts = ntuple(j -> g[1] * ForwardDiff.partials(ξ[1], j) + g[2] * ForwardDiff.partials(ξ[2], j) +
-                        g[3] * ForwardDiff.partials(ξ[3], j) + g[4] * ForwardDiff.partials(ξ[4], j), Val(N))
-    return ForwardDiff.Dual{ForwardDiff.tagtype(D)}(ll, ForwardDiff.Partials(parts))
+    ll, g = _profile_ll_grad(wls, SVector{N,Float64}(ForwardDiff.value.(ξ)), fw, tb, c1_tol)
+    parts = ntuple(
+        j -> sum(ntuple(k -> g[k] * ForwardDiff.partials(ξ[k], j), Val(N))),
+        Val(ForwardDiff.npartials(D))
+    )
+    return ForwardDiff.Dual{ForwardDiff.tagtype(D)}(
+        ll,
+        ForwardDiff.Partials(parts)
+    )
 end
 
 """
@@ -281,7 +288,9 @@ Log prior density of ξ = (ρₑ, δρ₁, δρ₂, δρ₃) in ξ-space. The δ
 priors carry their own -ln W terms.
 """
 _lp(ξ::SVector{4,<:Real}, p::ξ_priors) =
-    logpdf(p.ρₑPrior, ξ[1]) + logpdf(p.δρ₁Prior, ξ[2]) + logpdf(p.δρ₂Prior, ξ[3]) +
+    logpdf(p.ρₑPrior, ξ[1]) +
+    logpdf(p.δρ₁Prior, ξ[2]) +
+    logpdf(p.δρ₂Prior, ξ[3]) +
     logpdf(p.δρ₃Prior, ξ[4])
 
 """
@@ -299,7 +308,7 @@ Every coordinate is reparameterized (see [`Θ`](@ref)):
 
 So ∂ξ/∂θ is diagonal, giving:
 
-    log|det(∂ξ/∂θ)| = a + Σₖ [ln Wₖ + ln σ(tₖ) + ln(1 - σ(tₖ))]    ([`logjac`](@ref))
+    log|det(∂ξ/∂θ)| = a + Σₖ [ln Wₖ + ln σ(tₖ) + ln(1 - σ(tₖ))] ([`logjac`](@ref))
 
 with W₁ = W₂ = 12 and (L₃, W₃) the δρ₃ prior's location and scale.
 
@@ -312,7 +321,7 @@ giving:
     log π(θ) = _lp(ξ(θ), p) + _ll(wls, ξ(θ), fw, l) + logjac(θ)
 
 # Arguments
-- `θ::SVector{4,<:Real}`: the current NUTS position, (a, t₁, t₂, t₃).
+- `θ::SVector{N,<:Real}`: the current NUTS position, (a, t₁, t₂, t₃) for `N = 4`.
 - `p::ξ_priors`: the physical priors, forwarded to [`_lp`](@ref).
 - `wls::WLSData`: the precomputed data, forwarded to [`_ll`](@ref).
 - `fw::ForwardCache`: the structure's geometry-only cache, forwarded to [`_ll`](@ref).
@@ -325,43 +334,45 @@ giving:
 - `Real`: log π(θ), up to the additive constant NUTS doesn't need.
 """
 function _logπ(
-    θ::SVector{4,<:Real},
+    θ::SVector{N,<:Real},
     p::ξ_priors,
     wls::WLSData,
     fw::ForwardCache,
     l::LIKELIHOOD;
     tab::Union{Nothing,_C1Tables} = nothing,
     c1_tol::Float64 = EXCL_VOL_CORR_TOL,
-)
+) where {N}
     ξ = Ξ(θ, p)  # unconstrained θ-space -> physical ξ-space
     return _lp(ξ, p) + _ll(wls, ξ, fw, l; tab = tab, c1_tol = c1_tol) + logjac(θ, p)
 end
 
 """
-    Seed{T<:Real}
+    Seed{T<:Real,N}
 
 Everything [`run_fitting`](@ref) needs to start a NUTS chain.
 
 # Fields
-- `pr::ξ_priors`: the physical priors over ξ, from [`_calc_ξ_priors`](@ref).
-- `θ₀::SVector{4,T}`: one draw from pr ([`_ξ₀`](@ref)), reparameterized into
+-   `pr::ξ_priors`: the physical priors over ξ, from [`_calc_ξ_priors`](@ref).
+-   `θ₀::SVector{N,T}`: one draw from pr ([`_ξ₀`](@ref)), reparameterized into
     unconstrained θ-space via [`Θ`](@ref); the first start of the MAP search.
-- `fw::ForwardCache`: the structure's geometry-only cache (the Gram matrix
+-   `fw::ForwardCache`: the structure's geometry-only cache (the Gram matrix
     G(q), q-grid, and mean atomic radius), from `forward_cache`.
-- `wls::WLSData`: the measured intensity curve and its per-point standard
+-   `wls::WLSData`: the measured intensity curve and its per-point standard
     errors, precomputed into [`WLSData`](@ref) once so the NUTS hot path
     (`_ll`/`_logπ`) never rebuilds the data-only weighted sums.
-- `timing::Union{Nothing,StageLog}`: the run's stage log, if timing is on;
+-   `timing::Union{Nothing,StageLog}`: the run's stage log, if timing is on;
     [`run_fitting`](@ref) appends its stages and hands it on in the [`FitResult`](@ref).
-- `c1tab::_C1Tables`: the static c1-search tables for fw ([`_C1Tables`](@ref)), built
+-   `c1tab::_C1Tables`: the static c1-search tables for fw ([`_C1Tables`](@ref)), built
     once here and passed to every [`profiled_corrs`](@ref) call; read-only, so safe to
     share across threads.
-- `shannon::Union{Nothing,ShannonInfo}`: how the measured curve was reduced to the data `wls` holds
-    (diameter, band limit, binning, raw data), when it came through [`Shannon.shannon_data`](@ref BAYSOL.Utils.Shannon.shannon_data); `nothing` otherwise.
+-   `shannon::Union{Nothing,ShannonInfo}`: how the measured curve was reduced to the
+    data `wls` holds (diameter, band limit, binning, raw data), when it came
+    through [`Shannon.shannon_data`](@ref BAYSOL.Utils.Shannon.shannon_data);
+    `nothing` otherwise.
 """
-struct Seed{T<:Real}
+struct Seed{T<:Real,N}
     pr::ξ_priors
-    θ₀::SVector{4,T}
+    θ₀::SVector{N,T}
     fw::ForwardCache
     wls::WLSData
     timing::Union{Nothing,StageLog}
@@ -414,7 +425,7 @@ function seed_fitting(
 end
 
 """
-    FitResult{S}
+    FitResult{S,N}
 
 Return of [`run_fitting`](@ref)`/BAYSOL.run_model`: the posterior
 draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
@@ -422,7 +433,7 @@ draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
 AdvancedHMC.jl's own per-iteration diagnostics.
 
 # Fields
-- `samples::Vector{SVector{4,Float64}}`: posterior draws of ξ, length `n_samples`.
+- `samples::Vector{SVector{N,Float64}}`: posterior draws of ξ, length `n_samples`.
 - `stats::Vector{S}`: AdvancedHMC.jl's per-iteration diagnostics, matching
     samples index-for-index.
 - `scale::Vector{Float64}`: the WLS estimate of the scale correction at samples[i].
@@ -438,8 +449,8 @@ AdvancedHMC.jl's own per-iteration diagnostics.
 - `likelihood::AbstractString`: the likelihood type
 - `timing::Union{Nothing,StageLog}`: the run's stage log (from the `Seed`), if timing is on.
 """
-struct FitResult{S}
-    samples::Vector{SVector{4,Float64}}
+struct FitResult{S,N}
+    samples::Vector{SVector{N,Float64}}
     stats::Vector{S}
     scale::Vector{Float64}
     bkgrnd_corr::Vector{Float64}
@@ -530,17 +541,19 @@ function run_fitting(
 end
 
 """
-The body of [`run_fitting`](@ref), run with the garbage collector paused (see [`with_gc_paused`](@ref
-BAYSOL.Utils.GCPause.with_gc_paused)): the MAP objective, the NUTS gradient and the re-profile loop call
-[`gc_checkpoint`](@ref BAYSOL.Utils.GCPause.gc_checkpoint), which collects once per byte budget.
+The body of [`run_fitting`](@ref), run with the garbage collector paused
+(see [`with_gc_paused`](@ref BAYSOL.Utils.GCPause.with_gc_paused)): the MAP
+objective, the NUTS gradient and the re-profile loop call
+[`gc_checkpoint`](@ref BAYSOL.Utils.GCPause.gc_checkpoint),
+which collects once per byte budget.
 """
 function _run_fitting(
-    seed::Seed,
+    seed::Seed{<:Real,N},
     n_samples::Int64,
     n_adapt::Int64;
     l::LIKELIHOOD=PROFILE(),
     δ::Real=DEFAULT_TARGET_ACCEPT
-)::FitResult
+)::FitResult where {N}
 
     if δ ≤ 0 || δ ≥ 100
         throw(DomainError(δ, "δ must satisfy: 0 < δ < 100"))
@@ -567,7 +580,7 @@ function _run_fitting(
 
     # ℓπ: w ↦ log π(θ(w)), the value-only log-posterior in NUTS's coordinates w.
     ℓπ = @closure w -> _logπ(
-        _θ_of_w(SVector{4,eltype(w)}(w...), sp),
+        _θ_of_w(SVector{N,eltype(w)}(w...), sp),
         seed.pr,
         seed.wls,
         seed.fw, l;
@@ -584,10 +597,9 @@ function _run_fitting(
 
     # DenseEuclideanMetric allows the adaptation to learn
     # correlations between parameters. Since we are only fitting
-    # 4 or 5 params (once δρ4 lands) and they are highly coupled, it is
+    # a handful of params and they are highly coupled, it is
     # worth it here. After the whitening it starts (M⁻¹ = I) close to right.
-    # sized from the parameter vector itself, so it follows θ when δρ4 widens it
-    metric = DenseEuclideanMetric(length(seed.θ₀))
+    metric = DenseEuclideanMetric(N)
 
     # combines "potential energy" (ℓπ) and kinetic energy (from metric)
     hamiltonian = Hamiltonian(metric, ℓπ, ∂ℓπ∂w)
@@ -597,7 +609,7 @@ function _run_fitting(
     # axes(w)/axes(r); an SVector's SOneTo axes fail that check even though
     # the ranges match. Start from a plain Vector instead of an SVector
     # directly, at w₀ = 0, the MAP.
-    w₀ = zeros(Float64, length(seed.θ₀))
+    w₀ = zeros(Float64, N)
 
     # HMC numerically integrates the Hamiltonian, so we need to
     # guess a good step size.
@@ -630,13 +642,18 @@ function _run_fitting(
         n_adapt;
         progress=true
     )
-    samples = [Ξ(_θ_of_w(SVector{4,Float64}(s...), sp), seed.pr) for s in samples]
+    samples = [Ξ(_θ_of_w(SVector{N,Float64}(s...), sp), seed.pr) for s in samples]
     if seed.timing !== nothing
         n_lf = sum(getproperty.(stats, :n_steps))
         ms = MS_PER_S * (time_ns() - t_nuts[1]) / NS_PER_S / max(n_lf, 1)   # ms per leapfrog step
         seed.timing.info["leapfrog"] = n_lf
         tock!(seed.timing, :sampling, 1,
-            @sprintf("NUTS  (%s iters, %s leapfrog, %.1f ms/step)", fmt_count(n_samples), fmt_count(n_lf), ms),
+            @sprintf(
+                "NUTS  (%s iters, %s leapfrog, %.1f ms/step)",
+                fmt_count(n_samples),
+                fmt_count(n_lf),
+                ms
+            ),
             t_nuts)
     end
     t_reprofile = tick()
@@ -660,7 +677,22 @@ function _run_fitting(
         curves[:, i]    = wls_predict(fit, ŷ)
     end
 
-    tock!(seed.timing, :sampling, 1, "per-draw c1 re-profile + curves ($(n_samples) draws)", t_reprofile)
-    return FitResult(samples, stats, scale, bkgrnd_corr, c1, χ², curves, l.type, seed.timing)
-
+    tock!(
+        seed.timing,
+        :sampling,
+        1,
+        "per-draw c1 re-profile + curves ($(n_samples) draws)",
+        t_reprofile
+    )
+    return FitResult(
+        samples,
+        stats,
+        scale,
+        bkgrnd_corr,
+        c1,
+        χ²,
+        curves,
+        l.type,
+        seed.timing
+    )
 end

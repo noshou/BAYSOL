@@ -4,8 +4,6 @@
 Explicit-hydrogen structure generation via the external pdb2pqr CLI.
 """
 
-using CondaPkg: CondaPkg
-using FastClosures: @closure
 using BioStructures: BioStructures, PDBFormat, writepdb, collectatoms,
                     chainid, chainids, collectmodels
 
@@ -123,13 +121,12 @@ function _run_pdb2pqr(
     in_path::AbstractString, flags::Vector{String}, pH::Real, out_path::AbstractString
 )::Nothing
     tmp_pqr = out_path * ".pqr"
-    @closure CondaPkg.withenv() do
-        pdb2pqr = CondaPkg.which("pdb2pqr")
-        pdb2pqr === nothing && throw(Pdb2pqrError("pdb2pqr not found in CondaPkg environment"))
-        cmd =  `$pdb2pqr --ff PARSE --titration-state-method propka --with-ph $pH
-                $flags --pdb-output $out_path $in_path $tmp_pqr`
-        run(pipeline(cmd; stdout = devnull, stderr = devnull))
-    end
+    tools = force(_CONDA[])
+    pdb2pqr = tools.pdb2pqr
+    pdb2pqr === nothing && throw(Pdb2pqrError("pdb2pqr not found in CondaPkg environment"))
+    cmd =  `$pdb2pqr --ff PARSE --titration-state-method propka --with-ph $pH
+            $flags --pdb-output $out_path $in_path $tmp_pqr`
+    run(pipeline(setenv(cmd, tools.env); stdout = devnull, stderr = devnull))
     isfile(out_path) || throw(Pdb2pqrError(
         "pdb2pqr did not produce expected output for \"$in_path\" at pH=$pH"))
     return nothing
@@ -156,6 +153,15 @@ Absolute path to the hydrogen-included .pdb, stored in [`_store_dir`](@ref).
 """
 function resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::String
     isfile(pdb_path) || throw(Pdb2pqrError("no such file: $pdb_path"))
+    out_path = _hydrogens_path(abspath(pdb_path), pH)
+    isfile(out_path) && return out_path
+    # one pdb2pqr run per (structure, pH); concurrent callers wait, then find the cached file
+    return @lock _path_lock(out_path) _resolve_hydrogens(pdb_path, pKa_records, pH)
+end
+
+"The body of [`resolve_hydrogens`](@ref), run under the lock of its output path."
+function _resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::String
+    isfile(pdb_path) || throw(Pdb2pqrError("no such file: $pdb_path"))
 
     abspdb = abspath(pdb_path)
     storedir = _store_dir()
@@ -174,7 +180,8 @@ function resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::Str
         # needed to read it.
         cheap_groups = _terminus_groups(pKa_records, pH, _termini_chains(pKa_records))
 
-        tmpdir = mktempdir()
+        # inside the store, so the final move is a rename within one directory (a reader sees the whole file or none)
+        tmpdir = mktempdir(storedir)
         try
             if length(cheap_groups) ≤ 1
                 # Common case: every chain (if any even has a free terminus)
@@ -183,12 +190,9 @@ function resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::Str
                 flags = isempty(cheap_groups) ? String[] : only(keys(cheap_groups))
                 tmp_out = joinpath(tmpdir, "hydrogenated.pdb")
                 _run_pdb2pqr(abspdb, flags, pH, tmp_out)
-                # A concurrent resolve_hydrogens call for this same (stem, pH)
-                # may have finished first between the isfile(out_path) check
-                # above and this mv -- (stem, pH) fully determines the
-                # output, so reuse whatever's already there instead of
-                # erroring; tmp_out is discarded with the rest of tmpdir below.
-                isfile(out_path) || mv(tmp_out, out_path)
+                # Callers for this (stem, pH) are serialized by `resolve_hydrogens`'s lock, and
+                # (stem, pH) fully determines the output, so replacing an existing file is harmless.
+                mv(tmp_out, out_path; force = true)
             else
                 # Genuine conflict: NOW the full chain list is needed (so a
                 # chain with no free terminus of its own still ends up kept
@@ -222,7 +226,9 @@ function resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::Str
                     kept = collectatoms(first(collectmodels(run_struc)), at -> chainid(at) in group_chains)
                     append!(merged_atoms, kept)
                 end
-                writepdb(out_path, merged_atoms)
+                merged = joinpath(tmpdir, "merged.pdb")
+                writepdb(merged, merged_atoms)
+                mv(merged, out_path; force = true)
             end
         catch e
             e isa Pdb2pqrError && rethrow()

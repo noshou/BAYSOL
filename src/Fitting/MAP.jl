@@ -30,20 +30,20 @@ The affine map from NUTS's coordinates w to θ-space, θ = μ + σ·(ẑ + S·w)
 the MAP search found. Immutable, built once per [`run_fitting`](@ref) call.
 
 # Fields
-- `μ`, `σ::SVector{4,Float64}`: the prior standardization, from [`θ_prior_moments`](@ref).
-- `ẑ::SVector{4,Float64}`: the MAP in z-space (the seed's z₀ if every start failed).
-- `S::SMatrix{4,4,Float64,16}`: the whitening matrix (identity if the Hessian was unusable).
+- `μ`, `σ::SVector{N,Float64}`: the prior standardization, from [`θ_prior_moments`](@ref).
+- `ẑ::SVector{N,Float64}`: the MAP in z-space (the seed's z₀ if every start failed).
+- `S::SMatrix{N,N,Float64,L}`: the whitening matrix (identity if the Hessian was unusable).
 - `n_ok::Int`: L-BFGS starts that reached a finite optimum.
 - `n_modes::Int`: distinct optima among them (Mahalanobis distance > `MAP_MODE_SEP`
     under the MAP Hessian).
 - `whitened::Bool`: whether `S` comes from the Hessian (`false`: identity fallback).
 - `n_evals::Int`: objective evaluations (value and gradient) over all L-BFGS starts.
 """
-struct _SamplingSpace
-    μ::SVector{4,Float64}
-    σ::SVector{4,Float64}
-    ẑ::SVector{4,Float64}
-    S::SMatrix{4,4,Float64,16}
+struct _SamplingSpace{N,L}
+    μ::SVector{N,Float64}
+    σ::SVector{N,Float64}
+    ẑ::SVector{N,Float64}
+    S::SMatrix{N,N,Float64,L}
     n_ok::Int
     n_modes::Int
     whitened::Bool
@@ -51,7 +51,7 @@ struct _SamplingSpace
 end
 
 "θ = μ + σ·(ẑ + S·w): NUTS coordinates w to θ-space (see [`_SamplingSpace`](@ref))."
-_θ_of_w(w::SVector{4,<:Real}, sp::_SamplingSpace) = sp.μ .+ sp.σ .* (sp.ẑ .+ sp.S * w)
+_θ_of_w(w::SVector{N,<:Real}, sp::_SamplingSpace{N}) where {N} = sp.μ .+ sp.σ .* (sp.ẑ .+ sp.S * w)
 
 """
 −log π at prior-standardized z, with c1 profiled to `tol`. Non-finite values and
@@ -60,7 +60,14 @@ _θ_of_w(w::SVector{4,<:Real}, sp::_SamplingSpace) = sp.μ .+ sp.σ .* (sp.ẑ .
 # Returns
 - `Real`: −log π(θ(z)), or `+Inf`.
 """
-function _neglogπ(z::SVector{4,T}, μ, σ, seed::Seed, l::LIKELIHOOD, tol::Float64)::T where {T<:Real}
+function _neglogπ(
+    z::SVector{N,T},
+    μ,
+    σ,
+    seed::Seed,
+    l::LIKELIHOOD,
+    tol::Float64
+)::T where {N,T<:Real}
     v = try
         -_logπ(μ .+ σ .* z, seed.pr, seed.wls, seed.fw, l; tab = seed.c1tab, c1_tol = tol)
     catch e
@@ -74,9 +81,9 @@ end
 Gradient of [`_neglogπ`](@ref) at z (one ForwardDiff pass).
 
 # Returns
-- `SVector{4,Float64}` (non-finite where −log π is `+Inf`).
+- `SVector{N,Float64}` (non-finite where −log π is `+Inf`).
 """
-function _neglogπ_grad(z::SVector{4,Float64}, μ, σ, seed::Seed, l::LIKELIHOOD, tol::Float64)
+function _neglogπ_grad(z::SVector{N,Float64}, μ, σ, seed::Seed, l::LIKELIHOOD, tol::Float64) where {N}
     return ForwardDiff.gradient(x -> _neglogπ(x, μ, σ, seed, l, tol), z)
 end
 
@@ -86,11 +93,13 @@ coordinate i, from its envelope-theorem gradient, with c1 profiled to
 `EXCL_VOL_CORR_TOL`.
 
 # Returns
-- `SMatrix{4,4,Float64}`: may contain non-finite entries if a probe hit a flat model.
+- `SMatrix{N,N,Float64}`: may contain non-finite entries if a probe hit a flat model.
 """
-function _fd_hessian(z::SVector{4,Float64}, h::SVector{4,Float64}, μ, σ, seed::Seed, l::LIKELIHOOD)
-    cols = ntuple(4) do i
-        e = SVector(ntuple(j -> j == i ? h[i] : 0.0, 4))
+function _fd_hessian(
+    z::SVector{N,Float64}, h::SVector{N,Float64}, μ, σ, seed::Seed, l::LIKELIHOOD
+) where {N}
+    cols = ntuple(Val(N)) do i
+        e = SVector(ntuple(j -> j == i ? h[i] : 0.0, Val(N)))
         (_neglogπ_grad(z + e, μ, σ, seed, l, EXCL_VOL_CORR_TOL) -
         _neglogπ_grad(z - e, μ, σ, seed, l, EXCL_VOL_CORR_TOL)) / (2h[i])
     end
@@ -104,10 +113,10 @@ Eigen-decompose a symmetric Hessian and floor its eigenvalues at `MAP_HESS_EIG_F
 # Returns
 - `(λ, V)`: floored eigenvalues and eigenvectors, H ≈ V·diag(λ)·Vᵀ.
 """
-function _floored_eigen(H::SMatrix{4,4,Float64})
+function _floored_eigen(H::SMatrix{N,N,Float64}) where {N}
     E = eigen(Symmetric(Matrix(H)))
-    λ = SVector{4}(max.(E.values, MAP_HESS_EIG_FLOOR))
-    return λ, SMatrix{4,4}(E.vectors)
+    λ = SVector{N}(max.(E.values, MAP_HESS_EIG_FLOOR))
+    return λ, SMatrix{N,N}(E.vectors)
 end
 
 """
@@ -128,10 +137,14 @@ taken in two central-difference passes: step `MAP_HESS_STEP`, then
     z₀ and S the identity (plain prior standardization, as without this step). If the
     Hessian is non-finite, ẑ is kept and S is the identity.
 """
-function _sampling_space(seed::Seed, l::LIKELIHOOD;
-                         f_abstol::Real = MAP_F_ABSTOL, successive_f_tol::Int = MAP_F_SUCCESSIVE)::_SamplingSpace
+function _sampling_space(
+    seed::Seed{<:Real,N},
+    l::LIKELIHOOD;
+    f_abstol::Real = MAP_F_ABSTOL,
+    successive_f_tol::Int = MAP_F_SUCCESSIVE
+)::_SamplingSpace where {N}
     μ, σ = θ_prior_moments(seed.pr)
-    f  = z -> _neglogπ(SVector{4}(z...), μ, σ, seed, l, EXCL_VOL_CORR_TOL)
+    f  = z -> _neglogπ(SVector{N}(z...), μ, σ, seed, l, EXCL_VOL_CORR_TOL)
     fg! = (G, z) -> begin
         gc_checkpoint()
         dr = DiffResults.GradientResult(z)
@@ -140,26 +153,33 @@ function _sampling_space(seed::Seed, l::LIKELIHOOD;
         DiffResults.value(dr)
     end
     g! = (G, z) -> (fg!(G, z); G)
-    opts = Options(g_abstol = MAP_G_TOL, f_abstol = f_abstol, successive_f_tol = successive_f_tol,
-                   iterations = MAP_MAX_ITER)
+    opts = Options(
+        g_abstol = MAP_G_TOL,
+        f_abstol = f_abstol,
+        successive_f_tol = successive_f_tol,
+        iterations = MAP_MAX_ITER
+    )
 
     z₀ = _standardize(seed.θ₀, seed.pr)
-    starts = vcat([z₀], [_standardize(Θ(_ξ₀(seed.pr), seed.pr)[1], seed.pr) for _ in 2:MAP_N_STARTS])
-    optima = Tuple{SVector{4,Float64},Float64}[]
+    starts = vcat(
+        [z₀],
+        [_standardize(Θ(_ξ₀(seed.pr), seed.pr)[1], seed.pr) for _ in 2:MAP_N_STARTS]
+    )
+    optima = Tuple{SVector{N,Float64},Float64}[]
     n_evals = 0
     for zs in starts
         isfinite(f(Vector(zs))) || continue
         res = optimize(OnceDifferentiable(f, g!, fg!, Vector(zs)), Vector(zs), LBFGS(), opts)
         n_evals += Optim.f_calls(res)
         v = Optim.minimum(res)
-        isfinite(v) && push!(optima, (SVector{4}(minimizer(res)...), v))
+        isfinite(v) && push!(optima, (SVector{N}(minimizer(res)...), v))
     end
-    I4 = one(SMatrix{4,4,Float64})
-    isempty(optima) && return _SamplingSpace(μ, σ, z₀, I4, 0, 0, false, n_evals)
+    I_N = one(SMatrix{N,N,Float64})
+    isempty(optima) && return _SamplingSpace(μ, σ, z₀, I_N, 0, 0, false, n_evals)
 
     ẑ = optima[argmin(last.(optima))][1]
-    H₁ = _fd_hessian(ẑ, MAP_HESS_STEP .* ones(SVector{4,Float64}), μ, σ, seed, l)
-    all(isfinite, H₁) || return _SamplingSpace(μ, σ, ẑ, I4, length(optima), 1, false, n_evals)
+    H₁ = _fd_hessian(ẑ, MAP_HESS_STEP .* ones(SVector{N,Float64}), μ, σ, seed, l)
+    all(isfinite, H₁) || return _SamplingSpace(μ, σ, ẑ, I_N, length(optima), 1, false, n_evals)
     λ₁, V₁ = _floored_eigen(H₁)
     σ_lap = sqrt.(diag(V₁ * ((1 ./ λ₁) .* V₁')))   # Laplace σ per coordinate
     H = _fd_hessian(ẑ, MAP_HESS_REL_STEP .* σ_lap, μ, σ, seed, l)
@@ -168,7 +188,7 @@ function _sampling_space(seed::Seed, l::LIKELIHOOD;
 
     # distinct modes: greedy clustering of the optima, Mahalanobis distance under H
     Hf = V * (λ .* V')
-    modes = SVector{4,Float64}[]
+    modes = SVector{N,Float64}[]
     for (z, _) in optima
         any(m -> sqrt((z - m)' * Hf * (z - m)) ≤ MAP_MODE_SEP, modes) || push!(modes, z)
     end

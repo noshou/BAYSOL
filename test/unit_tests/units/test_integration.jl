@@ -22,7 +22,7 @@ using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecu
 using BAYSOL.Fitting: Solute, NonBiological, seed_fitting, run_fitting, PROFILE, Ξ
 using ForwardDiff
 using BAYSOL.Fitting: φ_max, DRO_BOUNDS
-using BAYSOL.PhysicalConstants: DRO_UNIT
+using BAYSOL.PhysicalConstants: UNIT_OF_δρ
 using StaticArrays: SVector
 using BAYSOL.Scattering: forward_cache, ForwardCache
 using Random
@@ -72,7 +72,7 @@ end
 
 """
 Every sample must obey ξ's structural domain (ρₑ > 0, δρ₁, δρ₂ ∈ [-10, 2],
-δρ₃ ∈ [-ρₑ/DRO_UNIT, (φ_max - 1)ρₑ/DRO_UNIT], to ~1%), same
+δρ₃ ∈ [-ρₑ/UNIT_OF_δρ, (φ_max - 1)ρₑ/UNIT_OF_δρ], to ~1%), same
 physical-domain check test_sampler.jl's own `check_physical_domain` performs.
 """
 function integ_check_physical_domain(samples)
@@ -82,7 +82,7 @@ function integ_check_physical_domain(samples)
         @test ξ[1] > 0
         @test DRO_BOUNDS[1] ≤ ξ[2] ≤ DRO_BOUNDS[2]
         @test DRO_BOUNDS[1] ≤ ξ[3] ≤ DRO_BOUNDS[2]
-        @test -1.01 * ξ[1] / DRO_UNIT ≤ ξ[4] ≤ 1.01 * (φ_max - 1) * ξ[1] / DRO_UNIT
+        @test -1.01 * ξ[1] / UNIT_OF_δρ ≤ ξ[4] ≤ 1.01 * (φ_max - 1) * ξ[1] / UNIT_OF_δρ
     end
 end
 

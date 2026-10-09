@@ -178,7 +178,7 @@ j2(x) = x == 0.0 ? 0.0 : (3.0 / x^3 - 1.0 / x) * sin(x) - 3.0 * cos(x) / x^2
         # includes zeros of j₀ (x = kπ), the switch point near x ≈ l, and x on both
         # sides of lMax
         xs = vcat([1e-6, 1e-3, 0.1, 0.999, 1.0, 1.001, π, 2π, 4.4934, 25.0, 25.5, 26.0],
-                  collect(range(0.05, 120.0; length = 300)))
+                  collect(range(0.05, 120.0; length = 300)), [150.0, 200.5, 300.0, 400.0])
         for lMax in (0, 1, 5, 25, 60)
             j = bess(1.0, xs, lMax)
             for (k, x) in enumerate(xs)

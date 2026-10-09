@@ -3,14 +3,16 @@
 
 # Sampler diagnostics on a SASBDB fitting test, without rerunning its fit or report.
 #
-#     tclsh test/utils/diagnose.tcl list
-#     tclsh test/utils/diagnose.tcl report|tolerance|ablate [options] ID[:tag] ...
+#     tclsh test/utils/diagnose.tcl --list
+#     tclsh test/utils/diagnose.tcl --report|--tolerance|--ablate|--residuals [options] ID[:tag] ...
 #
-# Commands (the work is done by diagnose.jl and seed_diagnostics.jl, in Julia):
-#   list       the fitting tests and their tags
-#   report     MAP starts, Hessian, NUTS step size and depth, Laplace agreement, modes, gradient error
-#   tolerance  NUTS at several c1 profiling tolerances and RNG seeds (is the tolerance tight enough?)
-#   ablate     chi-squared with one shared shell contrast / drho1=drho2 + drho3 / the full model
+# Commands, exactly one per call (the work is done by diagnose.jl and seed_diagnostics.jl, in Julia):
+#   --list       the fitting tests and their tags
+#   --report     MAP starts, Hessian, NUTS step size and depth, Laplace agreement, modes, gradient error
+#   --tolerance  NUTS at several c1 profiling tolerances and RNG seeds (is the tolerance tight enough?)
+#   --ablate     chi-squared with one shared shell contrast / drho1=drho2 + drho3 / the full model
+#   --residuals  are the residuals at the MAP white (lag-1, runs z) and the reduced chi-squared, on the fitted grid and
+#                the measured grid; the MAP search only, no sampling
 #
 # Options:  --out FILE            write here instead of stdout
 #           --tols 1e-5,1e-8      c1 tolerances for `tolerance`
@@ -28,42 +30,72 @@ set SCRIPT [info script]
 namespace eval diagnose {
     namespace path ::util
 
+    variable COMMANDS {--list --report --tolerance --ablate --residuals}
     variable OPTIONS {--out --tols --seeds --samples --adapt}
 
     # Prints every fitting test with the tags it accepts.
     proc list_fits {} {
         foreach id [ids] {
             set tags [tags_of $id]
-            puts [format "%-8s %s" $id [expr {[single_run $tags] ? "(single run, no tag)" : [join $tags { }]}]]
+            if {[single_run $tags]} {
+                set shown "(single run, no tag)"
+            } else {
+                set shown [join $tags { }]
+            }
+            puts [format "%-8s %s" $id $shown]
         }
     }
 
     # Stops with a message (and exit status 2) when the command line is wrong.
-    proc fail {msg} { puts stderr "diagnose.tcl: $msg"; exit 2 }
+    proc fail {msg} {
+        puts stderr "diagnose.tcl: $msg"
+        exit 2
+    }
 
     # Checks the options and specs; returns nothing.
     proc validate {opts specs} {
         dict for {key value} $opts {
             switch -- $key {
                 --samples - --adapt {
-                    if {![string is integer -strict $value] || $value < 1} { fail "$key needs a positive integer, got '$value'" }
+                    if {![string is integer -strict $value] || $value < 1} {
+                        fail "$key needs a positive integer, got '$value'"
+                    }
                 }
                 --seeds {
-                    foreach s [split $value ,] { if {![string is integer -strict $s]} { fail "--seeds needs integers separated by commas, got '$value'" } }
+                    foreach s [split $value ,] {
+                        if {![string is integer -strict $s]} {
+                            fail "--seeds needs integers separated by commas, got '$value'"
+                        }
+                    }
                 }
                 --tols {
-                    foreach t [split $value ,] { if {![string is double -strict $t] || $t <= 0} { fail "--tols needs positive numbers separated by commas, got '$value'" } }
+                    foreach t [split $value ,] {
+                        if {![string is double -strict $t] || $t <= 0} {
+                            fail "--tols needs positive numbers separated by commas, got '$value'"
+                        }
+                    }
                 }
             }
         }
-        if {![llength $specs]} { fail "give at least one ID\[:tag\] (see: diagnose.tcl list)" }
+        if {![llength $specs]} {
+            fail "give at least one ID\[:tag\] (see: diagnose.tcl --list)"
+        }
         foreach spec $specs {
             lassign [split $spec :] id tag
-            if {$id ni [ids]} { fail "no fitting test '$id' (see: diagnose.tcl list)" }
+            if {$id ni [ids]} {
+                fail "no fitting test '$id' (see: diagnose.tcl --list)"
+            }
             set tags [tags_of $id]
             if {$tag ni $tags} {
-                if {[single_run $tags]} { fail "$id has a single run and takes no tag, got '$tag'" }
-                fail "$id needs a tag, one of: [join $tags {, }] (got '[expr {$tag eq "" ? "none" : $tag}]')"
+                if {[single_run $tags]} {
+                    fail "$id has a single run and takes no tag, got '$tag'"
+                }
+                if {$tag eq ""} {
+                    set got none
+                } else {
+                    set got $tag
+                }
+                fail "$id needs a tag, one of: [join $tags {, }] (got '$got')"
             }
         }
     }
@@ -72,33 +104,59 @@ namespace eval diagnose {
     proc run {argv} {
         global ROOT
         variable OPTIONS
-        if {![llength $argv] || [lindex $argv 0] in {-h --help help}} { ::usage $::SCRIPT; return }
-        set cmd [lindex $argv 0]
-        if {$cmd eq "list"} { list_fits; return }
-        if {$cmd ni {report tolerance ablate}} { fail "unknown command '$cmd' (list | report | tolerance | ablate)" }
-
+        if {![llength $argv] || [lindex $argv 0] in {-h --help}} {
+            ::usage $::SCRIPT
+            return
+        }
+        variable COMMANDS
+        set cmd ""
         set opts [dict create]
         set specs {}
-        set rest [lrange $argv 1 end]
-        for {set i 0} {$i < [llength $rest]} {incr i} {
-            set a [lindex $rest $i]
-            if {[string match --* $a]} {
-                if {$a ni $OPTIONS} { fail "unknown option $a (one of: [join $OPTIONS {, }])" }
-                if {$i + 1 >= [llength $rest]} { fail "option $a needs a value" }
-                dict set opts $a [lindex $rest [incr i]]
+        for {set i 0} {$i < [llength $argv]} {incr i} {
+            set a [lindex $argv $i]
+            if {$a in $COMMANDS} {
+                if {$cmd ne ""} {
+                    fail "give one command, not both $cmd and $a"
+                }
+                set cmd $a
+            } elseif {[string match --* $a]} {
+                if {$a ni $OPTIONS} {
+                    fail "unknown option $a (commands: [join $COMMANDS {, }]; options: [join $OPTIONS {, }])"
+                }
+                if {$i + 1 >= [llength $argv]} {
+                    fail "option $a needs a value"
+                }
+                dict set opts $a [lindex $argv [incr i]]
             } else {
                 lappend specs $a
             }
         }
+        if {$cmd eq ""} {
+            fail "give a command ([join $COMMANDS { | }])"
+        }
+        if {$cmd eq "--list"} {
+            list_fits
+            return
+        }
+
         validate $opts $specs
 
-        if {[catch {find_julia} julia]} { fail $julia }
+        if {[catch {find_julia} julia]} {
+            fail $julia
+        }
         # options go through as `--key value` pairs, specs last
-        set cmdline [list $julia --startup-file=no --project=[file join $ROOT test fitting_tests] \
-            [file join $ROOT test utils diagnose.jl] $cmd]
-        dict for {k v} $opts { lappend cmdline $k $v }
+        set cmdline [list \
+            $julia --startup-file=no \
+            --project=[file join $ROOT test fitting_tests] \
+            [file join $ROOT test utils diagnose.jl] $cmd \
+        ]
+        dict for {k v} $opts {
+            lappend cmdline $k $v
+        }
         lappend cmdline {*}$specs
-        if {[catch {exec {*}$cmdline <@stdin >@stdout 2>@stderr} err]} { exit 1 }
+        if {[catch {exec {*}$cmdline <@stdin >@stdout 2>@stderr} err]} {
+            exit 1
+        }
     }
 }
 

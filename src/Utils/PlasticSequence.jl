@@ -55,12 +55,17 @@ fractional part accurate; it degrades only once i nears the mantissa limit
 end
 
 """
-1-based term i of the 3-D R₃ additive recurrence: (frac(i/ρ₃), frac(i/ρ₃²), frac(i/ρ₃³)),
-ρ₃ = `PLASTIC_RATIO_3`. A genuinely 3-D generator, distinct from `_plastic_term`
+1-based term i of the 3-D R₃ additive recurrence:
+(frac(i/ρ₃), frac(i/ρ₃²), frac(i/ρ₃³)), ρ₃ = `PLASTIC_RATIO_3`.
+A genuinely 3-D generator, distinct from `_plastic_term`
 (which only ever has 2 degrees of freedom).
 """
 @inline function _plastic_term3(i::Int)::Tuple{Float64,Float64,Float64}
-    return (_frac(i / PLASTIC_RATIO_3), _frac(i / PLASTIC_RATIO_3_SQR), _frac(i / PLASTIC_RATIO_3_CUBE))
+    return (
+        _frac(i / PLASTIC_RATIO_3),
+        _frac(i / PLASTIC_RATIO_3_SQR),
+        _frac(i / PLASTIC_RATIO_3_CUBE)
+    )
 end
 
 """
@@ -97,9 +102,9 @@ clustered at the centre.
 @inline function _plastic_point_volume(i::Int)::Vec3
     u, v, w = _plastic_term3(i)
     φ  = 2.0 * π * u
-    ct = 2.0 * v - 1.0                          # cosθ
+    ct = 2.0 * v - 1.0                     # cosθ
     r  = cbrt(w)
-    s  = r * sqrt(max(0.0, 1.0 - ct * ct))      # r * sinθ
+    s  = r * sqrt(max(0.0, 1.0 - ct * ct)) # r * sinθ
     sinφ, cosφ = sincos(φ)
     return (s * cosφ, s * sinφ, r * ct)
 end
@@ -160,8 +165,16 @@ function plastic_points(n::Int, ::Val{d}) where {d}
     throw(DomainError(d, "dim must be 2 or 3"))
 end
 
-Base.@constprop :aggressive function plastic_points(n::Int; dim::Int=3, shape::Symbol=:surface)
-    return dim == 3 ? plastic_points(n, Val(3), Val(shape)) : plastic_points(n, Val(dim))
+Base.@constprop :aggressive function plastic_points(
+    n::Int;
+    dim::Int=3,
+    shape::Symbol=:surface
+    )
+    return dim == 3 ? plastic_points(
+        n,
+        Val(3),
+        Val(shape)
+    ) : plastic_points(n, Val(dim))
 end
 
 end # module PlasticSequence

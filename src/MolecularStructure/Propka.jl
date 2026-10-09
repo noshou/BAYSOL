@@ -8,6 +8,32 @@ in an isolated CondaPkg-managed Python environment.
 
 using  CondaPkg: CondaPkg
 using  FastClosures: @closure
+using  ..Cache: KeyedCache
+
+"""
+The CondaPkg environment's variables and the paths of the two tools run from it, captured once.
+`CondaPkg.withenv` edits the process-wide `ENV` for the duration of its block, which is not safe
+beside other tasks; the subprocesses are given this environment explicitly instead (`setenv`).
+"""
+struct _CondaTools
+    env      :: Dict{String,String}
+    propka3  :: Union{Nothing,String}
+    pdb2pqr  :: Union{Nothing,String}
+end
+
+function _read_conda_tools()::_CondaTools
+    CondaPkg.withenv() do
+        _CondaTools(Dict{String,String}(ENV), CondaPkg.which("propka3"), CondaPkg.which("pdb2pqr"))
+    end
+end
+
+"The CondaPkg tools, resolved on first use (thread safe, once per process; reset in `__init__`)."
+const _CONDA = Ref(Lazy{_CondaTools}(_read_conda_tools))
+__init__() = (_CONDA[] = Lazy{_CondaTools}(_read_conda_tools))
+
+"One lock per output path, so concurrent callers for the same structure run the external tool once."
+const _PATH_LOCKS = KeyedCache{String,ReentrantLock}()
+_path_lock(path::AbstractString) = get!(ReentrantLock, _PATH_LOCKS, String(path))
 
 """
 Raised when propka3 cannot be run or its output cannot be parsed
@@ -55,6 +81,34 @@ _pka_path(pdb_path::AbstractString) =
     joinpath(_store_dir(), splitext(basename(abspath(pdb_path)))[1] * ".pka")
 
 """
+Run propka3 on `abspdb` in a private temporary directory inside `storedir` (no change of the process's
+working directory) and move its `.pka` to `pka_path`. The move is a rename within one directory, so a
+reader sees the whole file or none.
+
+# Exceptions
+- `PropkaError`: propka3 is missing, fails, or writes no `.pka`.
+"""
+function _run_propka3(abspdb::String, storedir::String, pka_path::String)::Nothing
+    tools = force(_CONDA[])
+    tools.propka3 === nothing && throw(PropkaError("propka3 not found in CondaPkg environment"))
+    tmp = mktempdir(storedir)
+    try
+        try
+            cmd = setenv(`$(tools.propka3) $abspdb`, tools.env; dir = tmp)
+            run(pipeline(cmd; stdout = devnull, stderr = devnull))
+        catch e
+            throw(PropkaError("propka3 failed on $abspdb: $(sprint(showerror, e))"))
+        end
+        made = joinpath(tmp, basename(pka_path))
+        isfile(made) || throw(PropkaError("propka3 did not produce expected output $pka_path"))
+        mv(made, pka_path; force = true)
+    finally
+        rm(tmp; recursive = true, force = true)
+    end
+    return nothing
+end
+
+"""
 Run propka3 on a PDB structure and return one record per standard
 titratable group: (resname::String, resnum::Int, chain::String, pKa::Float64).
 
@@ -73,19 +127,10 @@ function propka_pKas(pdb_path::AbstractString)
     pka_path = _pka_path(abspdb)
 
     if !isfile(pka_path)
-        try
-            @closure CondaPkg.withenv() do
-                propka3 = CondaPkg.which("propka3")
-                propka3 === nothing && throw(PropkaError("propka3 not found in CondaPkg environment"))
-                @closure cd(storedir) do
-                    run(pipeline(`$propka3 $abspdb`; stdout = devnull, stderr = devnull))
-                end
-            end
-        catch e
-            e isa PropkaError && rethrow()
-            throw(PropkaError("propka3 failed on $pdb_path: $(sprint(showerror, e))"))
+        # one propka3 run per structure; others wait, then find the cached file
+        @lock _path_lock(pka_path) begin
+            isfile(pka_path) || _run_propka3(abspdb, storedir, pka_path)
         end
-        isfile(pka_path) || throw(PropkaError("propka3 did not produce expected output $pka_path"))
     end
 
     return _parse_pka(pka_path)

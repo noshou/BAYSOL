@@ -9,7 +9,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using Random
 using BAYSOL.Scattering: SharedAmplitude, compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
-using BAYSOL.Scattering: BESSEL_CUTOFF
+using BAYSOL.Scattering: BESS_CUT
 using SpecialFunctions: sphericalbesselj
 using BAYSOL.MolecularStructure: create, coords_spherical, to_spherical
 
@@ -99,8 +99,8 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         lMax = 12
         B = compute_B_lm(pw_sph, pw_q, pw_f, lMax, UInt64(2))
         ref = pw_naive_B(pw_sph, pw_q, pw_f, lMax)
-        # each skipped term is ≤ BESSEL_CUTOFF·|f|·|Y_lm|, and |Y_lm| ≤ √((2l+1)/4π)
-        bound = size(pw_sph, 2) * BESSEL_CUTOFF * maximum(abs, pw_f) * sqrt((2lMax + 1) / 4π) + DEFAULT_ATOL
+        # each skipped term is ≤ BESS_CUT·|f|·|Y_lm|, and |Y_lm| ≤ √((2l+1)/4π)
+        bound = size(pw_sph, 2) * BESS_CUT * maximum(abs, pw_f) * sqrt((2lMax + 1) / 4π) + DEFAULT_ATOL
         for k in 1:pw_nrows(lMax), qi in eachindex(pw_q)
             @test abs(B[1, k, qi] - ref[k, qi]) ≤ bound
         end

@@ -3,9 +3,10 @@
 # write_report's `=== Run ===` and `=== Timing ===` sections.
 
 """
-The report's `=== Run ===` section: `n_atoms`, lMax, `n_q` and the NUTS sizes, as recorded in
-the run's [`Timing.StageLog`](@ref). `n_atoms`, if given, overrides the logged count.
-Writes nothing when there is neither a log nor an `n_atoms`.
+The report's `=== Run ===` section: `n_atoms`, lMax, the measured and fitted point counts and the NUTS sizes, then how
+the measured curve was reduced to the fitted one (the scatterer cloud's maximum diameter `Dₘₐₓ`, the Shannon channels, the
+binning), as recorded in the run's [`Timing.StageLog`](@ref). `n_atoms`, if
+given, overrides the logged count. Writes nothing when there is neither a log nor an `n_atoms`.
 """
 function _write_run_info(io::IO, log::Union{Nothing,Timing.StageLog}; n_atoms::Union{Nothing,Integer} = nothing)
     info = log === nothing ? Dict{String,Any}() : copy(log.info)
@@ -13,19 +14,14 @@ function _write_run_info(io::IO, log::Union{Nothing,Timing.StageLog}; n_atoms::U
     isempty(info) && return nothing
     println(io, "=== Run ===")
     for k in ("n_atoms", "lMax", "n_q_raw", "n_q", "n_samples", "n_adapt")
-        haskey(info, k) && @printf(io, "%-10s = %d\n", k, info[k])
+        haskey(info, k) && @printf(io, "%-14s = %d\n", k, info[k])
     end
     if haskey(info, "D")
-        println(io)
-        println(io, "=== Data (Shannon) ===")
-        @printf(io, "%-14s = %.1f Å (atoms and hydration-shell beads)\n", "D", info["D"])
+        @printf(io, "%-14s = %.1f Å (atoms and hydration-shell beads)\n", "Dₘₐₓ", info["D"])
         @printf(io, "%-14s = %.1f (q range × D / π)\n", "channels", info["n_channels"])
         if info["rebin"] > 0
             @printf(io, "%-14s = %d per channel: %d measured → %d fitted points (%d non-positive dropped)\n",
                     "rebin", info["rebin"], info["n_q_raw"], info["n_q"], info["n_nonpositive"])
-            b = info["bin_bias"]
-            @printf(io, "%-14s = %.2f of the smallest binned σ (worst-case bound)%s\n", "bin bias", b,
-                    b > 0.3 ? "; above 0.3: this curve is precise enough that a larger rebin is advisable" : "")
         else
             @printf(io, "%-14s = none: %d measured → %d fitted points (%d non-positive dropped)\n",
                     "rebin", info["n_q_raw"], info["n_q"], info["n_nonpositive"])
@@ -34,6 +30,12 @@ function _write_run_info(io::IO, log::Union{Nothing,Timing.StageLog}; n_atoms::U
     println(io)
     return nothing
 end
+
+"""
+Seconds as the timing table prints them: two decimals, or, below 0.01 s, in scientific notation with two significant
+figures (`3.0e-03`), so a stage that took a few milliseconds is not shown as a block of zeros. Exactly 0 prints as `0`.
+"""
+_fmt_seconds(x::Real) = x == 0 ? "0" : abs(x) < 0.01 ? @sprintf("%.1e", x) : @sprintf("%.2f", x)
 
 """
 The report's `=== Timing ===` section, written last. The wall clock runs from the
@@ -77,11 +79,11 @@ function _write_timing(io::IO, log::Union{Nothing,Timing.StageLog}, t_report)
     println(io)
     @printf(io, "%-*s %10s %9s %8s\n", w, "=== Timing ===", "seconds", "% wall", "(JIT)")
     for (label, secs, pct, jit) in rows
-        @printf(io, "%-*s %10.2f", w, label, secs)
+        @printf(io, "%-*s %10s", w, label, _fmt_seconds(secs))
         pct === nothing || @printf(io, " %9.1f", pct)
         jit === nothing || @printf(io, " %8s", @sprintf("(%.1f)", jit))
         println(io)
     end
-    @printf(io, "GC: %.1f s\n", st_g + sp_g)
+    @printf(io, "GC: %s s\n", _fmt_seconds(st_g + sp_g))
     return nothing
 end
