@@ -23,7 +23,7 @@
 
 using Printf, Random, Statistics
 using BAYSOL
-const Fit = BAYSOL.Fitting
+const Fit = BAYSOL.Inference
 include(joinpath(@__DIR__, "..", "..", "utils", "fit_seed.jl"))
 
 # Mode of one MAP search run: coordinates (ρₑ, δρ₁, δρ₂, δρ₃, c1), −log π, reduced χ², evaluations, modes, starts, whitened.

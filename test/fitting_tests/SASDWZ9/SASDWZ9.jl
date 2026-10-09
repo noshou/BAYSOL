@@ -3,7 +3,7 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDWZ9")
@@ -93,7 +93,7 @@ const SERF1A_MOLARITY_σ = MOLARITY_REL_SIGMA * SERF1A_MOLARITY   # σ not state
 #     I = ½·[0.04877·1 + 0.020·1 + 0.01431·1 + 0.00569·4 + 0.00308·1] ≈ 0.0545 M
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Fitting.Solute).
+    # electron density (see Inference.Solute).
     NonBiological(0.020,      0.0002,   "sodium chloride"),             # 20 mM NaCl, ±1%
     NonBiological(0.011494, 0.001491, "sodium dihydrogen phosphate"),   # 20 mM NaPi, H2PO4⁻ part
     NonBiological(0.008506, 0.001483, "disodium hydrogen phosphate"),   # 20 mM NaPi, HPO4²⁻ part

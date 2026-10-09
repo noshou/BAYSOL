@@ -24,7 +24,7 @@ using FastClosures
 
 Static per-run tables for [`profiled_corrs`](@ref)'s c1 search: everything that depends
 only on the structure's [`ForwardCache`](@ref BAYSOL.Scattering.ForwardCache) and the scan
-settings, not on ξ. Built once (by [`seed_fitting`](@ref), or on the fly), then only ever
+settings, not on ξ. Built once (by [`seed_sampler`](@ref), or on the fly), then only ever
 read: no field is modified after construction, so one instance can be shared by any
 number of threads. Per-evaluation scratch is never stored here.
 
@@ -47,8 +47,8 @@ struct _C1Tables
 end
 
 """
-Build the static c1-search tables for `fw` (see [`_C1Tables`](@ref)). 
-g is evaluated with `Scattering.excluded_volume_factor`, the same 
+Build the static c1-search tables for `fw` (see [`_C1Tables`](@ref)).
+g is evaluated with `Scattering.excluded_volume_factor`, the same
 function the forward model uses.
 
 # Keywords
@@ -140,8 +140,8 @@ function _sums_at(
     A::AbstractVector{Float64},
     B::AbstractVector{Float64},
     C::AbstractVector{Float64},
-    tab::_C1Tables, 
-    wls::WLSData, 
+    tab::_C1Tables,
+    wls::WLSData,
     c1::Float64
 )
     k = (c1^2 - 1) * EV_EXP_COEFF * tab.r_m^2
@@ -491,8 +491,8 @@ gradient-free:
     edge, if the best point is first/last) and run `Brent()` inside that
     bracket, to an absolute tolerance `tol` on c1.
 
-χ²(c1) is not globally monotone once ξ is badly wrong; 
-a bare `Brent()` bracketed only by `(cmin-eps, cmax+eps)` 
+χ²(c1) is not globally monotone once ξ is badly wrong;
+a bare `Brent()` bracketed only by `(cmin-eps, cmax+eps)`
 could converge to whichever of these basins it starts exploring
 toward and would have no way to tell you it missed the other one.
 
@@ -514,7 +514,7 @@ toward and would have no way to tell you it missed the other one.
     accuracy of the *gradient* taken through this function to first order, not just of c1 (the
     envelope-theorem gradient is exact only at the exact optimum); see [`EXCL_VOL_CORR_TOL`](@ref).
 - `tables::Union{Nothing,_C1Tables} = nothing`: static tables for fw and these scan
-    settings ([`_C1Tables`](@ref), built once per run by [`seed_fitting`](@ref) and
+    settings ([`_C1Tables`](@ref), built once per run by [`seed_sampler`](@ref) and
     read-only, so safe to share across threads). `nothing` builds them for this call.
 
 # Implementation

@@ -27,7 +27,7 @@ using ForwardDiff, DiffResults
     _SamplingSpace
 
 The affine map from NUTS's coordinates w to θ-space, θ = μ + σ·(ẑ + S·w), plus what
-the MAP search found. Immutable, built once per [`run_fitting`](@ref) call.
+the MAP search found. Immutable, built once per [`infer`](@ref) call.
 
 # Fields
 - `μ`, `σ::SVector{N,Float64}`: the prior standardization, from [`θ_prior_moments`](@ref).

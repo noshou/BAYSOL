@@ -22,9 +22,9 @@ Generates physical prior distributions of ξ.
 # Keywords
 - `t::Real = DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to
     [`ρₑ_prior`](@ref).
-- `κ_δρ₁₂::Real = DRO12_CONCENTRATION`: concentration of the δρ₁/δρ₂ priors,
+- `κ_δρ₁₂::Real = κ_δρ₁₂`: concentration of the δρ₁/δρ₂ priors,
     forwarded to [`δρ_prior`](@ref).
-- `κ_δρ₃::Real = DRO3_CONCENTRATION`: concentration of the δρ₃ prior,
+- `κ_δρ₃::Real = κ_δρ₃`: concentration of the δρ₃ prior,
     forwarded to [`δρ_prior`](@ref).
 
 # Returns
@@ -35,8 +35,8 @@ function _calc_ξ_priors(
     σ_pH::Real,
     solutes::Vector{Solute};
     t::Real = DEFAULT_TEMPERATURE_C,
-    κ_δρ₁₂::Real = DRO12_CONCENTRATION,
-    κ_δρ₃::Real = DRO3_CONCENTRATION,
+    κ_δρ₁₂::Real = κ_δρ₁₂,
+    κ_δρ₃::Real = κ_δρ₃,
 )::ξ_priors
     ρₑ = ρₑ_prior(pH, σ_pH, solutes; t=t)
     δρ₁, δρ₂, δρ₃ = δρ_prior(κ_δρ₁₂, κ_δρ₃, mean(ρₑ))
@@ -157,7 +157,7 @@ selected by l:
 
 - `l = MARGINAL()`: instead of pinning (scale, `bkgrnd_corr`), integrate
     them out analytically under a flat prior (Gaussian integral in closed
-    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref). 
+    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref).
     This adds a correction term:
 
         -½ln(det(XᵀWX))
@@ -186,7 +186,7 @@ selected by l:
 
 - `l = MARGINAL()`: instead of pinning (scale, `bkgrnd_corr`), integrate
     them out analytically under a flat prior (Gaussian integral in closed
-    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref). 
+    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref).
     This adds a correction term:
 
         -½ln(det(XᵀWX))
@@ -219,7 +219,7 @@ selected by l:
 
 - `l = MARGINAL()`: instead of pinning (scale, `bkgrnd_corr`), integrate
     them out analytically under a flat prior (Gaussian integral in closed
-    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref). 
+    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref).
     This adds a correction term:
 
         -½ln(det(XᵀWX))
@@ -349,7 +349,7 @@ end
 """
     Seed{T<:Real,N}
 
-Everything [`run_fitting`](@ref) needs to start a NUTS chain.
+Everything [`infer`](@ref) needs to start a NUTS chain.
 
 # Fields
 -   `pr::ξ_priors`: the physical priors over ξ, from [`_calc_ξ_priors`](@ref).
@@ -361,7 +361,7 @@ Everything [`run_fitting`](@ref) needs to start a NUTS chain.
     errors, precomputed into [`WLSData`](@ref) once so the NUTS hot path
     (`_ll`/`_logπ`) never rebuilds the data-only weighted sums.
 -   `timing::Union{Nothing,StageLog}`: the run's stage log, if timing is on;
-    [`run_fitting`](@ref) appends its stages and hands it on in the [`FitResult`](@ref).
+    [`infer`](@ref) appends its stages and hands it on in the [`Inferred`](@ref).
 -   `c1tab::_C1Tables`: the static c1-search tables for fw ([`_C1Tables`](@ref)), built
     once here and passed to every [`profiled_corrs`](@ref) call; read-only, so safe to
     share across threads.
@@ -396,7 +396,7 @@ Runs initial seeding for the sampler.
 # Keywords
 - `t::Real = DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to
     [`ρₑ_prior`](@ref).
-- `κ_δρ₁₂::Real = DRO12_CONCENTRATION`, `κ_δρ₃::Real = DRO3_CONCENTRATION`:
+- `κ_δρ₁₂::Real = κ_δρ₁₂`, `κ_δρ₃::Real = κ_δρ₃`:
     prior concentrations, forwarded to [`δρ_prior`](@ref).
 - `timing::Union{Nothing,StageLog} = nothing`: stored in the returned `Seed`.
 - `shannon::Union{Nothing,ShannonInfo} = nothing`: stored in the returned `Seed`.
@@ -404,7 +404,7 @@ Runs initial seeding for the sampler.
 # Returns
 - `Seed`: priors, initial point, forward cache, and data.
 """
-function seed_fitting(
+function seed_sampler(
     fw::ForwardCache,
     I_exp::AbstractVector,
     σ_exp::AbstractVector,
@@ -412,8 +412,8 @@ function seed_fitting(
     σ_pH::Real,
     solutes::Vector{Solute};
     t::Real = DEFAULT_TEMPERATURE_C,
-    κ_δρ₁₂::Real = DRO12_CONCENTRATION,
-    κ_δρ₃::Real = DRO3_CONCENTRATION,
+    κ_δρ₁₂::Real = κ_δρ₁₂,
+    κ_δρ₃::Real = κ_δρ₃,
     timing::Union{Nothing,StageLog} = nothing,
     shannon::Union{Nothing,ShannonInfo} = nothing,
 )::Seed
@@ -425,9 +425,9 @@ function seed_fitting(
 end
 
 """
-    FitResult{S,N}
+    Inferred{S,N}
 
-Return of [`run_fitting`](@ref)`/BAYSOL.run_model`: the posterior
+The result of [`infer`](@ref) (and, minus the warm-up draws, of `BAYSOL.run_model`): the posterior
 draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
 (scale, `bkgrnd_corr`, c1) triple and predicted curve per draw, and
 AdvancedHMC.jl's own per-iteration diagnostics.
@@ -449,7 +449,7 @@ AdvancedHMC.jl's own per-iteration diagnostics.
 - `likelihood::AbstractString`: the likelihood type
 - `timing::Union{Nothing,StageLog}`: the run's stage log (from the `Seed`), if timing is on.
 """
-struct FitResult{S,N}
+struct Inferred{S,N}
     samples::Vector{SVector{N,Float64}}
     stats::Vector{S}
     scale::Vector{Float64}
@@ -526,41 +526,41 @@ forward model) from the trajectory's sample covariance.
                                 [`DEFAULT_TARGET_ACCEPT`](@ref), is Stan's usual 80%.
 
 # Returns
-A [`FitResult`](@ref). Includes the `n_adapt` warm-up draws; a caller that wants a
+An [`Inferred`](@ref). Includes the `n_adapt` warm-up draws; a caller that wants a
 warmup-free posterior slices `n_adapt`+1:end (curves: [:, `n_adapt`+1:end])
 out of every field itself.
 """
-function run_fitting(
+function infer(
     seed::Seed,
     n_samples::Int64,
     n_adapt::Int64;
     l::LIKELIHOOD=PROFILE(),
     δ::Real=DEFAULT_TARGET_ACCEPT
-)::FitResult
-    return with_gc_paused(() -> _run_fitting(seed, n_samples, n_adapt; l = l, δ = δ))
+)::Inferred
+    return with_gc_paused(() -> _infer(seed, n_samples, n_adapt; l = l, δ = δ))
 end
 
 """
-The body of [`run_fitting`](@ref), run with the garbage collector paused
-(see [`with_gc_paused`](@ref BAYSOL.Utils.GCPause.with_gc_paused)): the MAP
+The body of [`infer`](@ref), run with the garbage collector paused
+(see [`with_gc_paused`](@ref BAYSOL.Runtime.GCPause.with_gc_paused)): the MAP
 objective, the NUTS gradient and the re-profile loop call
-[`gc_checkpoint`](@ref BAYSOL.Utils.GCPause.gc_checkpoint),
+[`gc_checkpoint`](@ref BAYSOL.Runtime.GCPause.gc_checkpoint),
 which collects once per byte budget.
 """
-function _run_fitting(
+function _infer(
     seed::Seed{<:Real,N},
     n_samples::Int64,
     n_adapt::Int64;
     l::LIKELIHOOD=PROFILE(),
     δ::Real=DEFAULT_TARGET_ACCEPT
-)::FitResult where {N}
+)::Inferred where {N}
 
     if δ ≤ 0 || δ ≥ 100
         throw(DomainError(δ, "δ must satisfy: 0 < δ < 100"))
     end
     δ = δ / 100
 
-    if n_adapt ≥ n_samples 
+    if n_adapt ≥ n_samples
         throw(DomainError((n_adapt, n_samples), "n_adapt must be < n_samples"))
     end
 
@@ -684,7 +684,7 @@ function _run_fitting(
         "per-draw c1 re-profile + curves ($(n_samples) draws)",
         t_reprofile
     )
-    return FitResult(
+    return Inferred(
         samples,
         stats,
         scale,

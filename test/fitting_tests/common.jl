@@ -20,10 +20,10 @@ using BAYSOL.PhysicalConstants: HC_EV_ANGSTROM, NM_INV_PER_ANGSTROM_INV
 
 "Total NUTS iterations per fit, including the `N_ADAPT`
 warmup (default of every `run_<id>`)."
-const N_SAMPLES = BAYSOL.Report.DEFAULT_N_SAMPLES
+const N_SAMPLES = BAYSOL.Pipeline.DEFAULT_N_SAMPLES
 
 "Warmup (step-size and mass-matrix adaptation) iterations, discarded from the posterior."
-const N_ADAPT = BAYSOL.Report.DEFAULT_N_ADAPT
+const N_ADAPT = BAYSOL.Pipeline.DEFAULT_N_ADAPT
 
 "RNG seed passed to `Random.seed!` before each fit."
 const SAMPLER_SEED = 0

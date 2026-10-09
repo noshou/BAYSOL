@@ -13,7 +13,7 @@ using Statistics
 using LinearAlgebra
 using BAYSOL.Shannon: ShannonInfo, SHANNON_REBIN, BIN_BIAS_MAX, cloud_diameter, auto_lmax, shannon_data, model_on_raw,
     residual_structure, bin_bias_ratio
-using BAYSOL.Fitting: NonBiological, Solute
+using BAYSOL.Inference: NonBiological, Solute
 using BAYSOL.Scattering: forward_cache, hydration
 using BAYSOL.SASA: sasa
 using BAYSOL.MolecularStructure: LocalPathSource, load_molecule, coords_cartesian
@@ -225,7 +225,7 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
         h2 = hydration(mol, qraw[1:6], 4, UInt64(8); shell = shell)
         @test h1.convex ≈ h2.convex && h1.concave ≈ h2.concave && h1.cavity ≈ h2.cavity
 
-        R = BAYSOL.Report
+        R = BAYSOL.Pipeline
         @test (R.DEFAULT_N_ADAPT, R.DEFAULT_N_DRAWS, R.DEFAULT_N_SAMPLES) == (300, 700, 1000)
         @test hasmethod(BAYSOL.run_model, Tuple{typeof(s)})                 # n_samples / n_adapt default to the constants
         res = BAYSOL.run_model(s, 120, 60)

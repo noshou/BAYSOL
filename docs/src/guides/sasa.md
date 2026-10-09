@@ -1,6 +1,6 @@
 # SASA
 
-Models the molecule's solvent-accessible surface, as input to the CRYSOL-style hydration-shell contrast terms (δρ₁/δρ₂ and the cavity contrast δρ₃, see src/Fitting/DeltaRho.jl) used by the forward scattering model.
+Models the molecule's solvent-accessible surface, as input to the CRYSOL-style hydration-shell contrast terms (δρ₁/δρ₂ and the cavity contrast δρ₃, see src/Inference/DeltaRho.jl) used by the forward scattering model.
 
 - **SASA.jl**: `sasa`, the solvent-accessible surface by Shrake–Rupley point sampling, returned as a classified point cloud (convex / concave / cavity) standing in for CRYSOL's three hydration-shell bead populations. `sum(areas)` is the solvent-accessible surface area.
 

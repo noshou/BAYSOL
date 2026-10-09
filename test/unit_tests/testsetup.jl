@@ -41,7 +41,7 @@ if !@isdefined(check_float)
     #     I_calc(q) = scale · Σ_ab v_a(q) v_b(q) G_ab(q) + bkgrnd_corr,
     #     v(q) = (1, -dns·g(q; c_1), dro_1, dro_2, dro_3),  dro_k = UNIT_OF_δρ·δρ_k,
     # g the excluded-volume envelope (c_1 = 1 ⇒ g ≡ 1). Written independently of the
-    # fused A + g·B + g²·C path in BAYSOL.Fitting.profiled_corrs, so it can cross-check it.
+    # fused A + g·B + g²·C path in BAYSOL.Inference.profiled_corrs, so it can cross-check it.
     function reference_intensity(fw, scale, bkgrnd_corr, dns, δρ, c_1 = 1.0)
         g = BAYSOL.Scattering.excluded_volume_factor(fw.qvals, fw.r_m, c_1)
         d = UNIT_OF_δρ .* δρ

@@ -32,10 +32,10 @@ julia --project=test test/unit_tests/units/test_atomicradii.jl
 | `test_plasticmap.jl` | `PlasticSequence`: the low-discrepancy point sets |
 | `test_sasa.jl` | `SASA`: accessible surface, the shell classes, the sphere-occlusion tests |
 | `test_sphfuncs.jl`, `test_partialwave.jl`, `test_scatterers.jl`, `test_forwardcache.jl` | the scattering stack from spherical functions up to the `ForwardCache` |
-| `test_dns.jl` | `Fitting.DensityOfSolvent`: the buffer electron density and its prior, including DNA/RNA and mixed buffers |
+| `test_dns.jl` | `Inference.DensityOfSolvent`: the buffer electron density and its prior, including DNA/RNA and mixed buffers |
 | `test_deltarho.jl`, `test_paramtransform.jl` | the δρ priors and the ξ ↔ θ parameter transform |
 | `test_wls.jl`, `test_profiledcorrs.jl` | closed-form scale/background and the profiled c1 correction |
-| `test_sampler.jl` | `Fitting.Sampler` and the MAP-whitened NUTS pipeline, end to end |
+| `test_sampler.jl` | `Inference.Sampler` and the MAP-whitened NUTS pipeline, end to end |
 | `test_seed_diagnostics.jl` | `test/utils/seed_diagnostics.jl` on a small toy seed, so the sampler diagnostics cannot rot unnoticed |
 | `test_allocations.jl` | allocation guards for the fitting hot path (AllocCheck) |
 | `test_integration.jl` | the whole pipeline from structure to posterior on a small protein |

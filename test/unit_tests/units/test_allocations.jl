@@ -15,14 +15,14 @@
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using AllocCheck
-using BAYSOL.Fitting: WLSData, WLSFit, profiled_corrs, Solute, NonBiological
+using BAYSOL.Inference: WLSData, WLSFit, profiled_corrs, Solute, NonBiological
 using BAYSOL.Scattering: forward_cache
 using BAYSOL.MolecularStructure: MolecularStructure
 using StaticArrays: SVector
 using ForwardDiff
 using Random
 
-const ALC = BAYSOL.Fitting
+const ALC = BAYSOL.Inference
 
 # 16 atoms on a helix (mixed n/c/o, non-planar), self-contained per this directory's convention.
 function alc_mol()
@@ -40,7 +40,7 @@ function alc_seed()
     σ = max.(abs.(y) .* 0.01, 1.0e-6)
     Random.seed!(0xA110C)
     I_exp = y .+ randn(length(y)) .* σ
-    return ALC.seed_fitting(fw, I_exp, σ, 7.4, 0.05, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
+    return ALC.seed_sampler(fw, I_exp, σ, 7.4, 0.05, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
 end
 
 @testset "Allocations" begin

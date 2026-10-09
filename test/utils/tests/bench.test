@@ -28,7 +28,7 @@ test parse_args-missing-value {an option without its value is an error} -body {
 
 test excluded {what the cold state's repository copy leaves out} -body {
     set files {docs/x.md test/visualize/xyz/a.xyz test/baselines/results/r.json test/fitting_tests/SASDMJ9/res.txt
-               test/fitting_tests/SASDMJ9/res_hist.png test/fitting_tests/SASDMJ9/SASDMJ9.jl src/Fitting/Fitting.jl
+               test/fitting_tests/SASDMJ9/res_hist.png test/fitting_tests/SASDMJ9/SASDMJ9.jl src/Inference/Inference.jl
                test/baselines/README.md test/utils/bench.tcl}
     set out {}
     foreach f $files { lappend out [bench::excluded $f] }
