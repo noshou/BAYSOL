@@ -3,7 +3,7 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Fitting: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDJ62")
@@ -58,7 +58,7 @@ const PH, σ_PH = 7.5, PH_METER_SIGMA
 # wavelength 0.1127 nm = 1.127 Å => energy = hc/λ (hc = 12398.42 eV·Å)
 const ENERGY_EV        = HC_EV_ANGSTROM / 1.127   # ≈ 11001.2 eV
 const TEMPERATURE_C     = 20.0              # 20°C, paper/SASBDB
-                                            # (Fitting.jl); see seed_model's t= docstring note.
+                                            # (Inference.jl); see seed_model's t= docstring note.
 const IONIC_STRENGTH_M  = 0.200             # 200 mM NaCl, matches the SEC/SAXS buffer above
 
 # XRCC1 sequence (P18887, residues 1-633), read directly off this model's
@@ -101,7 +101,7 @@ const XRCC1_MOLARITY_σ = MOLARITY_REL_SIGMA * XRCC1_MOLARITY
 # histidine), NaOH for Good's buffers.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Fitting.Solute).
+    # electron density (see Inference.Solute).
     NonBiological(0.200, 0.002,   "sodium chloride"),   # 200 mM NaCl, ±1%
     NonBiological(0.020, 0.0004,  "tris"),              # 20 mM Tris-HCl, ±2%
     NonBiological(0.274, 0.027,   "glycerol"),          # ≈2% v/v glycerol, ±10% (conversion assumption)

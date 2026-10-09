@@ -1,28 +1,28 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Diagnostics for the MAP-whitened NUTS pipeline, generic over any `Fitting.Seed` (a unit-test
+# Diagnostics for the MAP-whitened NUTS pipeline, generic over any `Inference.Seed` (a unit-test
 # toy, a SASBDB fit, ...). A developer tool: test/utils/diagnose.jl is its command line, and
 # test/unit_tests/units/test_seed_diagnostics.jl keeps it from rotting. Functions only: nothing runs on include. Plain data comes back from
 # the measuring functions and `diagnose` / `tolerance_sweep` print it, so a test can assert on the
 # numbers and a script can print them.
 #
 # Needs only `BAYSOL` and the standard library, and borrows StaticArrays / ForwardDiff /
-# DiffResults from `BAYSOL.Fitting`'s own bindings, so it loads in any environment that has BAYSOL
-# (test/, test/fitting_tests/ and test/utils/ alike). It reaches into `Fitting` internals (`_logπ`,
+# DiffResults from `BAYSOL.Inference`'s own bindings, so it loads in any environment that has BAYSOL
+# (test/, test/fitting_tests/ and test/utils/ alike). It reaches into `Inference` internals (`_logπ`,
 # `_sampling_space`, `_fd_hessian`, ...) on purpose, as the unit tests do; keep it in step with them.
 #
 # Include it once per process (a second include replaces the module).
 #
 # Coordinates: z is the prior-standardized space L-BFGS runs in, w the whitened space NUTS samples,
-# θ = μ + σ·(ẑ + S·w) (see Fitting/MAP.jl).
+# θ = μ + σ·(ẑ + S·w) (see Inference/MAP.jl).
 
 module SeedDiagnostics
 
 using Random, LinearAlgebra, Statistics, Printf
 using BAYSOL
 
-const F = BAYSOL.Fitting
-const R = BAYSOL.Report
+const F = BAYSOL.Inference
+const R = BAYSOL.Pipeline
 const SVector = F.SVector
 const ForwardDiff = F.ForwardDiff
 const DiffResults = F.DiffResults
@@ -86,7 +86,7 @@ end
 ∇_w log π(θ(w)) as NUTS computes it, with c1 profiled to `tol`.
 
 # Arguments
-- `seed::Fitting.Seed`, `sp`: the seed and its `_SamplingSpace` (whitening).
+- `seed::Inference.Seed`, `sp`: the seed and its `_SamplingSpace` (whitening).
 - `w`: a point in NUTS coordinates.
 
 # Returns
@@ -104,16 +104,16 @@ gradient_w(seed, sp, w; l = F.PROFILE(), tol = F.EXCL_VOL_CORR_TOL) =
 """
     nuts_replica(seed; l, c1_tol, n_samples, n_adapt, δ, rng_seed, sp) -> NamedTuple
 
-`run_fitting` re-implemented step for step (MAP search and whitening, then NUTS with the same
+`infer` re-implemented step for step (MAP search and whitening, then NUTS with the same
 adaptor), but with the c1 profiling tolerance `c1_tol` chosen by the caller and the adapted
 metric, step size and per-iteration statistics returned. With `rng_seed === nothing` the global RNG
-is left alone, so a call right after `F._sampling_space(seed, l)` is bit-identical to `run_fitting`.
+is left alone, so a call right after `F._sampling_space(seed, l)` is bit-identical to `infer`.
 
 # Arguments
-- `seed::Fitting.Seed`.
+- `seed::Inference.Seed`.
 
 # Keywords
-- `l = F.PROFILE()`, `n_samples = Report.DEFAULT_N_SAMPLES`, `n_adapt = Report.DEFAULT_N_ADAPT` (the `run_model` defaults), `δ = 0.8` (target acceptance).
+- `l = F.PROFILE()`, `n_samples = Pipeline.DEFAULT_N_SAMPLES`, `n_adapt = Pipeline.DEFAULT_N_ADAPT` (the `run_model` defaults), `δ = 0.8` (target acceptance).
 - `c1_tol = F.EXCL_VOL_CORR_TOL`: tolerance for the NUTS log density and gradient (the MAP search
     always uses the package default).
 - `rng_seed = nothing`: `Random.seed!` this before NUTS.
@@ -383,12 +383,12 @@ function shell_contrast_ablation(seed::F.Seed; l = F.PROFILE(), tol = F.EXCL_VOL
     end
     lo3, hi3 = pr.δρ₃Prior.μ, pr.δρ₃Prior.μ + pr.δρ₃Prior.σ
     m1 = (chi2 = Inf, d = NaN, c1 = NaN)
-    for d in range(F.DRO_LOWER, F.DRO_LOWER + F.DRO_WIDTH, length = 481)
+    for d in range(F.LOWER_BOUND_δρ₁₂, F.LOWER_BOUND_δρ₁₂ + F.WIDTH_δρ₁₂, length = 481)
         c, c1 = χ((ρ0, d, d, d))
         c < m1.chi2 && (m1 = (chi2 = c, d, c1))
     end
     m2 = (chi2 = Inf, d12 = NaN, d3 = NaN, c1 = NaN)
-    for d12 in range(F.DRO_LOWER, F.DRO_LOWER + F.DRO_WIDTH, length = 121), d3 in range(lo3, hi3, length = 121)
+    for d12 in range(F.LOWER_BOUND_δρ₁₂, F.LOWER_BOUND_δρ₁₂ + F.WIDTH_δρ₁₂, length = 121), d3 in range(lo3, hi3, length = 121)
         c, c1 = χ((ρ0, d12, d12, d3))
         c < m2.chi2 && (m2 = (chi2 = c, d12, d3, c1))
     end
@@ -443,7 +443,7 @@ mode is the best point NUTS found, gradient error from the c1 tolerance, and loc
 - `io`, `seed`.
 
 # Keywords
-- `label = ""`, `l = F.PROFILE()`, `n_samples`, `n_adapt` (default: the `run_model` defaults, `Report.DEFAULT_N_SAMPLES`, `DEFAULT_N_ADAPT`).
+- `label = ""`, `l = F.PROFILE()`, `n_samples`, `n_adapt` (default: the `run_model` defaults, `Pipeline.DEFAULT_N_SAMPLES`, `DEFAULT_N_ADAPT`).
 - `reference = nothing`: `(; q, I, σ, q_ref, I_ref)` to add the reference curve's χ² on the same points.
 
 # Returns
@@ -460,7 +460,7 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
     p("="^100)
     p("$label   n_q=$(length(seed.fw.qvals))  n_atoms=$(seed.fw.n_atoms)  lMax=$(seed.fw.lMax)  c1 tol=$(F.EXCL_VOL_CORR_TOL)")
     p("δρ₃ support = [", @sprintf("%.4g", pr.δρ₃Prior.μ), ", ", @sprintf("%.4g", pr.δρ₃Prior.μ + pr.δρ₃Prior.σ),
-        "]   δρ₁,₂ support = [", F.DRO_LOWER, ", ", F.DRO_LOWER + F.DRO_WIDTH, "]")
+        "]   δρ₁,₂ support = [", F.LOWER_BOUND_δρ₁₂, ", ", F.LOWER_BOUND_δρ₁₂ + F.WIDTH_δρ₁₂, "]")
     if reference !== nothing
         c = curve_chi2(reference.q, reference.I, reference.σ, reference.q_ref, reference.I_ref)
         p(@sprintf("reference curve on our q-set (n=%d): χ²_red raw = %.3f, with free scale+offset = %.3f", c.n, c.raw, c.fitted))
@@ -491,7 +491,7 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
 
     # distance to the support bounds
     ξs = [F.Ξ(F._θ_of_w(SVector{4}(post[:, k]...), sp), pr) for k in 1:size(post, 2)]
-    bnd = ((0.0, Inf), (F.DRO_LOWER, F.DRO_LOWER + F.DRO_WIDTH), (F.DRO_LOWER, F.DRO_LOWER + F.DRO_WIDTH),
+    bnd = ((0.0, Inf), (F.LOWER_BOUND_δρ₁₂, F.LOWER_BOUND_δρ₁₂ + F.WIDTH_δρ₁₂), (F.LOWER_BOUND_δρ₁₂, F.LOWER_BOUND_δρ₁₂ + F.WIDTH_δρ₁₂),
         (pr.δρ₃Prior.μ, pr.δρ₃Prior.μ + pr.δρ₃Prior.σ))
     p("coordinate   median ξ       sd ξ     distance to nearest support bound / sd")
     for (k, nm) in enumerate(("ρₑ", "δρ₁", "δρ₂", "δρ₃"))

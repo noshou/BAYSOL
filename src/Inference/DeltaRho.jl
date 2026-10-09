@@ -10,15 +10,15 @@ surface for convex and concave beads respectively.
 
 From the CRYSOL3 manual:
 
-    "The default parameters of the contrasts for the three types of water beads 
+    "The default parameters of the contrasts for the three types of water beads
     are 1, 1, 0 in relative units (where 1 corresponds to dro = 0.03 e/A3)"
 
-    "The limits during the fitting are -10 to 2, where negative value corresponds 
-    to the space in fact inaccessible to water and therefore indirectly contributing 
+    "The limits during the fitting are -10 to 2, where negative value corresponds
+    to the space in fact inaccessible to water and therefore indirectly contributing
     to the total excluded volume"
 
-CRYSOL limits all three bead contrasts to −10 ≤ c ≤ 2 in units of 0.03 
-([`DRO_BOUNDS`](@ref)).
+CRYSOL limits all three bead contrasts to −10 ≤ c ≤ 2 in units of 0.03
+([`BOUNDS_δρ₁₂`](@ref)).
 
 At ρₑ = 0.334 that's ρ₁ ∈ [0.034, 0.394]: from nearly empty to 18% denser than bulk.
 δρ₁ and δρ₂ use these limits. δρ₃ uses the physical bounds of the cavity occupancy
@@ -27,7 +27,7 @@ instead (see [`_δρ₃_prior`](@ref)).
 Let u ~ Beta(α, β), which gives u ∈ [0, 1]. To stretch it onto a new interval [X, Y],
 scale by the width (Y-X) and shift by X. If X = -10 and Y = 2:
 
-    δρ  = X + (Y − X)·u 
+    δρ  = X + (Y − X)·u
         = -10 + (2 - (-10))·u
         = -10 + 12·u
 
@@ -72,7 +72,7 @@ The variance of the beta distribution is:
     σ²[u] = αβ / (c²(c + 1))
 
 and therefore:
-    
+
     σ²[u] = (1 + 11κ/12)(1 + κ/12) / ((κ + 2)²(κ + 3))
 
 The corresponding variance of δρ is:
@@ -82,13 +82,13 @@ The corresponding variance of δρ is:
 Thus κ controls the concentration of the prior while preserving its mode at δρ = 1.
 
 The code computes the general form from the constants rather than the literals above,
-so the mode stays at [`DRO12_MODE`](@ref) if [`DRO_BOUNDS`](@ref) ever changes:
+so the mode stays at [`MODE_δρ₁₂`](@ref) if [`BOUNDS_δρ₁₂`](@ref) ever changes:
 
-    m = (DRO12_MODE − X)/W,    α = 1 + m·κ,    β = 1 + (1 − m)·κ,    W = Y − X
+    m = (MODE_δρ₁₂ − X)/W,    α = 1 + m·κ,    β = 1 + (1 − m)·κ,    W = Y − X
 
 # Arguments
 - `κ::Real`: the concentration κ = α + β − 2 > 0 shared by both priors
-    (default in the sampler: [`DRO12_CONCENTRATION`](@ref)).
+    (default in the sampler: [`κ_δρ₁₂`](@ref)).
 
 # Returns
 - `(δρ₁, δρ₂)::NTuple{2,BoundedBeta}`: two identical
@@ -102,11 +102,11 @@ function _δρ₁₂_priors(κ::Real)::Tuple{BoundedBeta, BoundedBeta}
         throw(DomainError(κ, "failed assertion: κ > 0"))
     end
 
-    X = DRO_BOUNDS[1]
-    W = DRO_BOUNDS[2] - DRO_BOUNDS[1]
+    X = BOUNDS_δρ₁₂[1]
+    W = BOUNDS_δρ₁₂[2] - BOUNDS_δρ₁₂[1]
 
-    # mode of u that puts δρ's mode at DRO12_MODE (= 11/12 for CRYSOL's 1 on [-10, 2])
-    m = (DRO12_MODE - X) / W
+    # mode of u that puts δρ's mode at MODE_δρ₁₂ (= 11/12 for CRYSOL's 1 on [-10, 2])
+    m = (MODE_δρ₁₂ - X) / W
     α = 1 + m * κ
     β = 1 + (1 - m) * κ
     u = Beta(α, β)
@@ -160,7 +160,7 @@ Let u ~ Beta(α, β), which gives u ∈ [0, 1]. To stretch it onto a new
 interval [X, Y], scale by the width (Y-X) and shift by X. If X = −`ρ̄ₑ/UNIT_OF_δρ`
 and Y = (`φ_max` − 1)·`ρ̄ₑ/UNIT_OF_δρ`:
 
-    δρ₃ = X + (Y − X)·u  
+    δρ₃ = X + (Y − X)·u
         = −ρ̄ₑ/UNIT_OF_δρ + ((φ_max − 1)·ρ̄ₑ/UNIT_OF_δρ - −ρ̄ₑ/UNIT_OF_δρ)·u
         = ρ̄ₑ(φ_max·u - 1) / UNIT_OF_δρ
 
@@ -216,7 +216,7 @@ checked. φ is not a parameter; it is only the derivation of the bounds and the 
 
 # Arguments
 - `κ::Real`: the concentration κ = α + β − 2 > 0 (default in the sampler:
-    [`DRO3_CONCENTRATION`](@ref)).
+    [`κ_δρ₃`](@ref)).
 - `ρ̄ₑ::Real`: the bulk solvent electron density fixing the bounds, e·Å⁻³
     (the sampler passes the mean of [`ρₑ_prior`](@ref)).
 

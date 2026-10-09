@@ -1,15 +1,15 @@
-# Report
+# Pipeline
 
 
 |                      | contents                                                                                                                                      |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Report.jl`         | the module: imports, the module-level constants `DEFAULT_QUANTILES` (`"16-84"`, the default `quantiles` of `run_model` and the label `write_report` prints) and `DEFAULT_N_ADAPT` / `DEFAULT_N_DRAWS` / `DEFAULT_N_SAMPLES` (300 / 700 / 1000, the default NUTS iterations of `run_model`), the result types `MAPParams`, `MAPResult`, `QuantileBounds`, `QuantileParams`, `QuantileCurves`, `QuantileResult`, includes, exports |
-| `SeedModel.jl`      | `seed_model`: resolve the structure, PROPKA + Pdb2pqr, SASA and the diameter of the scatterer cloud, `Fitting.shannon_data` (binning and `lMax`), `Scattering.forward_cache`, `Fitting.seed_fitting`; starts the run's `Timing.StageLog` |
-| `RunModel.jl`       | `run_model`: `Fitting.run_fitting`, drop warmup, pick the MAP draw (highest non-divergent log density), compute parameter and curve quantiles |
+| `Pipeline.jl`         | the module: imports, the module-level constants `DEFAULT_QUANTILES` (`"16-84"`, the default `quantiles` of `run_model` and the label `write_report` prints) and `DEFAULT_N_ADAPT` / `DEFAULT_N_DRAWS` / `DEFAULT_N_SAMPLES` (300 / 700 / 1000, the default NUTS iterations of `run_model`), the result types `MAPParams`, `MAPResult`, `QuantileBounds`, `QuantileParams`, `QuantileCurves`, `QuantileResult`, includes, exports |
+| `SeedModel.jl`      | `seed_model`: resolve the structure, PROPKA + Pdb2pqr, SASA and the diameter of the scatterer cloud, `Inference.shannon_data` (binning and `lMax`), `Scattering.forward_cache`, `Inference.seed_sampler`; starts the run's `Timing.StageLog` |
+| `RunModel.jl`       | `run_model`: `Inference.infer`, drop warmup, pick the MAP draw (highest non-divergent log density), compute parameter and curve quantiles |
 | `ReportSections.jl` | `_write_run_info` (`=== Run ===`) and `_write_timing` (`=== Timing ===`) |
 | `WriteReport.jl`    | `write_report` and the parameter order/labels it prints |
 
-The package root re-binds `seed_model`, `run_model` and `write_report`, so they are reachable as `BAYSOL.seed_model` etc.; the result types are `BAYSOL.Report.MAPParams` etc.:
+The package root re-binds `seed_model`, `run_model` and `write_report`, so they are reachable as `BAYSOL.seed_model` etc.; the result types are `BAYSOL.Pipeline.MAPParams` etc.:
 
 ```julia
 using BAYSOL

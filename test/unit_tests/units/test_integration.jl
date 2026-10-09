@@ -2,11 +2,11 @@
 
 # Broad end-to-end integration test proving the whole pipeline built across
 # this package composes correctly on real data: structure -> real PROPKA ->
-# (separately) real Pdb2pqr hydrogenation -> the full seed_fitting/run_fitting
+# (separately) real Pdb2pqr hydrogenation -> the full seed_sampler/infer
 # NUTS chain. Every stage below calls the existing lower-level functions
 # directly (LocalPathSource, resolve_structure, load_molecule, propka_pKas,
 # resolve_hydrogens, forward_cache,
-# seed_fitting, run_fitting) rather than any single convenience orchestrator,
+# seed_sampler, infer) rather than any single convenience orchestrator,
 # so this is genuinely exercising composition, not one already-tested wrapper
 # function.
 #
@@ -19,9 +19,9 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule, propka_pKas, PropkaError,
     resolve_hydrogens, Pdb2pqrError, _store_dir,
     Molecule, n_atoms, elms, coords_cartesian
-using BAYSOL.Fitting: Solute, NonBiological, seed_fitting, run_fitting, PROFILE, Ξ
+using BAYSOL.Inference: Solute, NonBiological, seed_sampler, infer, PROFILE, Ξ
 using ForwardDiff
-using BAYSOL.Fitting: φ_max, DRO_BOUNDS
+using BAYSOL.Inference: φ_max, BOUNDS_δρ₁₂
 using BAYSOL.PhysicalConstants: UNIT_OF_δρ
 using StaticArrays: SVector
 using BAYSOL.Scattering: forward_cache, ForwardCache
@@ -80,8 +80,8 @@ function integ_check_physical_domain(samples)
         @test length(ξ) == 4
         @test all(isfinite, ξ)
         @test ξ[1] > 0
-        @test DRO_BOUNDS[1] ≤ ξ[2] ≤ DRO_BOUNDS[2]
-        @test DRO_BOUNDS[1] ≤ ξ[3] ≤ DRO_BOUNDS[2]
+        @test BOUNDS_δρ₁₂[1] ≤ ξ[2] ≤ BOUNDS_δρ₁₂[2]
+        @test BOUNDS_δρ₁₂[1] ≤ ξ[3] ≤ BOUNDS_δρ₁₂[2]
         @test -1.01 * ξ[1] / UNIT_OF_δρ ≤ ξ[4] ≤ 1.01 * (φ_max - 1) * ξ[1] / UNIT_OF_δρ
     end
 end
@@ -171,7 +171,7 @@ end
     #------------------------------------------------------------------
     #   Test 3: full chain into a real (short) NUTS run
     #------------------------------------------------------------------
-    @testset "forward_cache -> synthetic data -> seed_fitting -> run_fitting (real NUTS)" begin
+    @testset "forward_cache -> synthetic data -> seed_sampler -> infer (real NUTS)" begin
         t_fw = @elapsed begin
             fw = forward_cache(mol, INTEG_Q, INTEG_LMAX, INTEG_E; chunk = INTEG_CHUNK)
         end
@@ -179,13 +179,13 @@ end
 
         I_exp, σ_exp = integ_synth_data(fw)
 
-        # buffer only: the measured protein is never a solute (see Fitting.Solute)
+        # buffer only: the measured protein is never a solute (see Inference.Solute)
         solutes = Solute[NonBiological(0.15, 0.001, "sodium chloride")]
         pH, σ_pH = 7.0, 0.1
 
-        Random.seed!(0)   # reproducibility, not survival -- see run_fitting's z-space docstring
-        seed = seed_fitting(fw, I_exp, σ_exp, pH, σ_pH, solutes)
-        @test seed isa BAYSOL.Fitting.Seed
+        Random.seed!(0)   # reproducibility, not survival -- see infer's z-space docstring
+        seed = seed_sampler(fw, I_exp, σ_exp, pH, σ_pH, solutes)
+        @test seed isa BAYSOL.Inference.Seed
         @test seed.fw === fw
         @test seed.wls.I_obs == I_exp
         ξ₀ = Ξ(seed.θ₀, seed.pr)
@@ -194,10 +194,10 @@ end
         n_samples, n_adapt = 20, 10
         local fit
         t_nuts = @elapsed begin
-            fit = run_fitting(seed, n_samples, n_adapt; l = PROFILE())
+            fit = infer(seed, n_samples, n_adapt; l = PROFILE())
         end
         samples, stats = fit.samples, fit.stats
-        @info "run_fitting ($n_samples samples, $n_adapt adapt) took $(round(t_nuts; digits = 2))s"
+        @info "infer ($n_samples samples, $n_adapt adapt) took $(round(t_nuts; digits = 2))s"
 
         @test length(samples) == n_samples
         @test length(stats) == n_samples
@@ -209,12 +209,12 @@ end
     #------------------------------------------------------------------
     @testset "MAP search on crambin: the f-stop finds the gradient-only mode with fewer evaluations" begin
         fw = forward_cache(mol, INTEG_Q, INTEG_LMAX, INTEG_E; chunk = INTEG_CHUNK)
-        seed = seed_fitting(fw, integ_synth_data(fw)..., 7.0, 0.1, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
+        seed = seed_sampler(fw, integ_synth_data(fw)..., 7.0, 0.1, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
         Random.seed!(3)
-        sp_f = BAYSOL.Fitting._sampling_space(seed, PROFILE())
+        sp_f = BAYSOL.Inference._sampling_space(seed, PROFILE())
         Random.seed!(3)                                                  # the same starting points
-        sp_g = BAYSOL.Fitting._sampling_space(seed, PROFILE(); f_abstol = 0.0, successive_f_tol = 1)
-        nlp(sp, z) = BAYSOL.Fitting._neglogπ(z, sp.μ, sp.σ, seed, PROFILE(), BAYSOL.Fitting.EXCL_VOL_CORR_TOL)
+        sp_g = BAYSOL.Inference._sampling_space(seed, PROFILE(); f_abstol = 0.0, successive_f_tol = 1)
+        nlp(sp, z) = BAYSOL.Inference._neglogπ(z, sp.μ, sp.σ, seed, PROFILE(), BAYSOL.Inference.EXCL_VOL_CORR_TOL)
         @test abs(nlp(sp_f, sp_f.ẑ) - nlp(sp_g, sp_g.ẑ)) < 1e-4          # same optimum, to 1e-4 nats
         @test sp_f.n_evals < sp_g.n_evals
         @test sp_f.n_ok == sp_g.n_ok && abs(sp_f.n_modes - sp_g.n_modes) ≤ 1
@@ -224,13 +224,13 @@ end
     #   Test 5: the analytic profile-likelihood gradient on a real structure
     #------------------------------------------------------------------
     @testset "analytic ∂ℓ/∂ξ equals ForwardDiff through profiled_corrs (crambin, data that constrain ξ)" begin
-        FITM = BAYSOL.Fitting
+        FITM = BAYSOL.Inference
         q = collect(range(0.02, 0.30; length = 80))
         fw = forward_cache(mol, q, 8, INTEG_E; chunk = INTEG_CHUNK)
         y = reference_intensity(fw, INTEG_M_TRUE, INTEG_C_TRUE, INTEG_ξ_TRUE[1], INTEG_ξ_TRUE[2:4])
         σ = 0.01 .* abs.(y)
         Random.seed!(5)
-        seed = seed_fitting(fw, y .+ σ .* randn(length(y)), σ, 7.0, 0.1, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
+        seed = seed_sampler(fw, y .+ σ .* randn(length(y)), σ, 7.0, 0.1, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
         wls, tab = seed.wls, seed.c1tab
         steep = 0
         for x in (SVector(0.40, 1.0, 0.0, -1.0), SVector(0.30, 1.5, 0.5, -2.0), SVector(0.336, 1.05, -0.05, -0.55),

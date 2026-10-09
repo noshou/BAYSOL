@@ -6,7 +6,7 @@
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Fitting: Solute, NonBiological
+using BAYSOL.Inference: Solute, NonBiological
 using BAYSOL.Scattering: forward_cache, ForwardCache
 using BAYSOL.MolecularStructure: MolecularStructure
 using StaticArrays: SVector
@@ -16,7 +16,7 @@ using Statistics: mean, median
 include(joinpath(@__DIR__, "..", "..", "utils", "seed_diagnostics.jl"))
 using .SeedDiagnostics
 
-const SDF = BAYSOL.Fitting
+const SDF = BAYSOL.Inference
 
 # 16 atoms on a helix (mixed n/c/o, non-planar), the same shape of fixture as test_sampler.jl,
 # self-contained here per this directory's one-file-one-concern convention.
@@ -36,7 +36,7 @@ function sdg_seed(; rel_noise = 0.01)
     Random.seed!(0x5D6)
     I_exp = y .+ randn(length(y)) .* σ
     Random.seed!(0x5D7)   # θ₀ and the MAP starts are drawn from the global RNG
-    return SDF.seed_fitting(fw, I_exp, σ, 7.4, 0.05, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
+    return SDF.seed_sampler(fw, I_exp, σ, 7.4, 0.05, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
 end
 
 @testset "SeedDiagnostics" begin
@@ -159,8 +159,8 @@ end
     @testset "shell_contrast_ablation: finite χ², contrasts inside their supports" begin
         a = shell_contrast_ablation(seed)
         @test all(isfinite, (a.M1.chi2, a.M2.chi2, a.M3.chi2))
-        @test SDF.DRO_LOWER ≤ a.M1.d ≤ SDF.DRO_LOWER + SDF.DRO_WIDTH
-        @test SDF.DRO_LOWER ≤ a.M2.d12 ≤ SDF.DRO_LOWER + SDF.DRO_WIDTH
+        @test SDF.LOWER_BOUND_δρ₁₂ ≤ a.M1.d ≤ SDF.LOWER_BOUND_δρ₁₂ + SDF.WIDTH_δρ₁₂
+        @test SDF.LOWER_BOUND_δρ₁₂ ≤ a.M2.d12 ≤ SDF.LOWER_BOUND_δρ₁₂ + SDF.WIDTH_δρ₁₂
         # one more free contrast cannot fit worse than a shared one, up to the grid resolution
         @test a.M2.chi2 ≤ a.M1.chi2 * 1.05 + 1e-6
     end

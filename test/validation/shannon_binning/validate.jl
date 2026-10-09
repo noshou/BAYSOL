@@ -19,7 +19,7 @@
 # criteria were therefore replaced, after the data was seen, by distribution-level ones on a fresh full rerun of the
 # 53 fits compared with the committed unbinned results (`test/utils/compare.tcl`): fit quality (χ² on the measured
 # grid), the distribution of the fitted parameters, and the health of the regression (see the Shannon section of
-# src/Fitting/README.md). The rows below stay as evidence.
+# src/Inference/README.md). The rows below stay as evidence.
 #
 # Neither curve drops non-positive points (`drop_nonpositive = false`), so that only the binning differs. The
 # extra variants show what the filter does: `12d` bins at k = 12 *with* the default drop of non-positive bins, and
@@ -28,7 +28,7 @@
 
 using Printf, Random, LinearAlgebra, Statistics
 using BAYSOL
-const Fit = BAYSOL.Fitting
+const Fit = BAYSOL.Inference
 include(joinpath(@__DIR__, "..", "..", "utils", "fit_seed.jl"))
 
 const MAP_SHIFT_MAX   = 0.5

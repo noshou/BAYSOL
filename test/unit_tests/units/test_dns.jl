@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# End-to-end tests for src/Fitting/DensityOfSolvent.jl: bulk solution
+# End-to-end tests for src/Inference/DensityOfSolvent.jl: bulk solution
 # electron density (`_ρₑ`) and its `LogNormal` prior (`ρₑ_prior`), exercised
 # through `PartialMolarVolumes.ρₑ_w`/`PartialMolarVolumes.ϕ°` pipeline.
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-const FIT = BAYSOL.Fitting
-using BAYSOL.Fitting: Solute, Protein, NonBiological, DNA, RNA, ρₑ_prior
+const FIT = BAYSOL.Inference
+using BAYSOL.Inference: Solute, Protein, NonBiological, DNA, RNA, ρₑ_prior
 using BAYSOL.PhysicalConstants: AVOGADRO, ANGSTROM3_PER_LITER, CM3_PER_LITER
-using BAYSOL.Fitting: DEFAULT_TEMPERATURE_C
+using BAYSOL.Inference: DEFAULT_TEMPERATURE_C
 using BAYSOL.PartialMolarVolumes: PMV_REFERENCE_TEMPERATURE_C
 using Distributions: mean, var, LogNormal
 

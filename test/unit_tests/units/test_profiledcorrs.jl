@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests for src/Fitting/ProfiledCorrs.jl: the grid-pre-scan + Brent()
+# Tests for src/Inference/ProfiledCorrs.jl: the grid-pre-scan + Brent()
 # profile search for c1 (CRYSOL's excluded-volume correction, no longer
 # sampled with a prior) and the excl_vol_saturation classifier built on
 # top of it.
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Fitting: WLSData, wls_fit, reduced_chi2, profiled_corrs, excl_vol_saturation
+using BAYSOL.Inference: WLSData, wls_fit, reduced_chi2, profiled_corrs, excl_vol_saturation
 using BAYSOL.Scattering: forward_cache, ForwardCache
 using BAYSOL.MolecularStructure: MolecularStructure
-using BAYSOL.Fitting: EXCL_VOL_CORR_BOUNDS, EXCL_VOL_CORR_EPS
+using BAYSOL.Inference: EXCL_VOL_CORR_BOUNDS, EXCL_VOL_CORR_EPS
 using StaticArrays: SVector
 using ForwardDiff
 using Random
@@ -159,7 +159,7 @@ end
 end
 
 @testset "Gram column layout and A, B, C are generic in the number of contrasts" begin
-    PC = BAYSOL.Fitting
+    PC = BAYSOL.Inference
 
     @testset "_pair_col enumerates the envelope-free pairs in _GRAM_PAIRS order" begin
         nonex = (1, 3, 4, 5)   # species that carry a contrast in the five-species model
@@ -204,7 +204,7 @@ end
 end
 
 @testset "the anchored envelope of the c1 passes" begin
-    PC = BAYSOL.Fitting
+    PC = BAYSOL.Inference
     fw = pc_fw()
     tab = PC._C1Tables(fw)
     ev = BAYSOL.Scattering.EV_EXP_COEFF

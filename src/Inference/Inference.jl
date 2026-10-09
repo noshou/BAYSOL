@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-module Fitting
+module Inference
 
 using Distributions: Beta, Continuous, LocationScale, LogNormal
 using ..PhysicalConstants: STANDARD_TEMPERATURE_C
@@ -12,7 +12,7 @@ using ..GCPause: with_gc_paused, gc_checkpoint
 #----------------
 
 """
-Default solution temperature, °C, for `_ρₑ`/[`Fitting.ρₑ_prior`](@ref BAYSOL.Fitting.ρₑ_prior)'s
+Default solution temperature, °C, for `_ρₑ`/[`Inference.ρₑ_prior`](@ref BAYSOL.Inference.ρₑ_prior)'s
 bulk electron density calculation. Pass the sample's real temperature instead whenever it is
 known: water's density is evaluated at it exactly, and the solutes' 25 °C
 partial molar volumes get a widened uncertainty (see
@@ -27,43 +27,43 @@ const DEFAULT_TEMPERATURE_C = STANDARD_TEMPERATURE_C
 CRYSOL3's fitting limits `(lo, hi)` on the convex/concave shell contrasts
 δρ₁, δρ₂, in units of [`UNIT_OF_δρ`](@ref): "The limits during the fitting are
 -10 to 2". They are the support of the δρ₁/δρ₂ priors
-([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)) and of the scaled-logit
-maps [`Fitting.Θ`](@ref BAYSOL.Fitting.Θ)/[`Fitting.Ξ`](@ref BAYSOL.Fitting.Ξ)
+([`Inference.δρ_prior`](@ref BAYSOL.Inference.δρ_prior)) and of the scaled-logit
+maps [`Inference.Θ`](@ref BAYSOL.Inference.Θ)/[`Inference.Ξ`](@ref BAYSOL.Inference.Ξ)
 put on them.
 """
-const DRO_BOUNDS = (-10.0, 2.0)
+const BOUNDS_δρ₁₂ = (-10.0, 2.0)
 
-"Lower end L of the δρ₁/δρ₂ support [L, L + W] = [`DRO_BOUNDS`](@ref)."
-const DRO_LOWER = DRO_BOUNDS[1]
+"Lower end L of the δρ₁/δρ₂ support [L, L + W] = [`BOUNDS_δρ₁₂`](@ref)."
+const LOWER_BOUND_δρ₁₂ = BOUNDS_δρ₁₂[1]
 
-"Width W of the δρ₁/δρ₂ support [L, L + W] = [`DRO_BOUNDS`](@ref)."
-const DRO_WIDTH = DRO_BOUNDS[2] - DRO_BOUNDS[1]
+"Width W of the δρ₁/δρ₂ support [L, L + W] = [`BOUNDS_δρ₁₂`](@ref)."
+const WIDTH_δρ₁₂ = BOUNDS_δρ₁₂[2] - BOUNDS_δρ₁₂[1]
 
 """
 CRYSOL3's default convex/concave shell contrast δρ₁ = δρ₂, in units of
 [`UNIT_OF_δρ`](@ref): "The default parameters of the contrasts for the three types
 of water beads are 1, 1, 0". The mode of the δρ₁/δρ₂ priors
-([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)); must lie inside
-[`DRO_BOUNDS`](@ref).
+([`Inference.δρ_prior`](@ref BAYSOL.Inference.δρ_prior)); must lie inside
+[`BOUNDS_δρ₁₂`](@ref).
 """
-const DRO12_MODE = 1.0
+const MODE_δρ₁₂ = 1.0
 
 """
 Default concentration κ = α + β − 2 of the δρ₁/δρ₂ Beta priors
-([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)). κ = 14 gives
-Beta(83/6, 13/6) on [`DRO_BOUNDS`](@ref), with its mode at δρ = 1 and
+([`Inference.δρ_prior`](@ref BAYSOL.Inference.δρ_prior)). κ = 14 gives
+Beta(83/6, 13/6) on [`BOUNDS_δρ₁₂`](@ref), with its mode at δρ = 1 and
 SD(δρ) ≈ 1.00. That is the same spread as the Normal(1, 1) δρ₂ prior it
 replaces.
 """
-const DRO12_CONCENTRATION = 14.0
+const κ_δρ₁₂ = 14.0
 
 """
 Default concentration κ = α + β − 2 of the cavity-contrast (δρ₃) Beta prior
-([`Fitting.δρ_prior`](@ref BAYSOL.Fitting.δρ_prior)), stretched onto
+([`Inference.δρ_prior`](@ref BAYSOL.Inference.δρ_prior)), stretched onto
 [−ρ̄ₑ/`UNIT_OF_δρ`, (`φ_max` − 1)·ρ̄ₑ/`UNIT_OF_δρ`]. κ = 1.25 gives Beta(2, 1.25) on
 u = (δρ₃ − X)/W, with its mode at δρ₃ = 0 (bulk-density cavity water).
 """
-const DRO3_CONCENTRATION = 1.25
+const κ_δρ₃ = 1.25
 
 """
 Upper bound on the cavity occupancy φ = `ρ_cavity/ρ₀`. Water in a cavity can
@@ -74,7 +74,7 @@ margin above it while excluding unphysical over-dense "water" (e.g. the
 """
 const φ_max = 1.25
 
-@assert(DRO_BOUNDS[1] < DRO12_MODE < DRO_BOUNDS[2], "DRO12_MODE must lie inside DRO_BOUNDS")
+@assert(BOUNDS_δρ₁₂[1] < MODE_δρ₁₂ < BOUNDS_δρ₁₂[2], "MODE_δρ₁₂ must lie inside BOUNDS_δρ₁₂")
 
 #----------------
 # Profiled c1
@@ -82,7 +82,7 @@ const φ_max = 1.25
 
 """
 Hard bounds `(cmin, cmax)` on CRYSOL's excluded-volume correction c1
-([`Fitting.profiled_corrs`](@ref BAYSOL.Fitting.profiled_corrs)), CRYSOL's
+([`Inference.profiled_corrs`](@ref BAYSOL.Inference.profiled_corrs)), CRYSOL's
 `r₀/r_m`. c1 is profiled, not sampled, so these bounds -- not a prior -- are
 what stops it from absorbing model misspecification that belongs on the
 physically meaningful parameters (dns/δρ1-3) instead.
@@ -90,8 +90,8 @@ physically meaningful parameters (dns/δρ1-3) instead.
 const EXCL_VOL_CORR_BOUNDS = (0.8, 1.3)
 
 """
-Padding/grid-resolution unit for [`Fitting.profiled_corrs`](@ref
-`BAYSOL.Fitting.profiled_corrs`)'s c1 search: the search actually runs on
+Padding/grid-resolution unit for [`Inference.profiled_corrs`](@ref
+`BAYSOL.Inference.profiled_corrs`)'s c1 search: the search actually runs on
 `(cmin - EXCL_VOL_CORR_EPS, cmax + EXCL_VOL_CORR_EPS)` so that landing
 exactly on `cmin`/`cmax` can be distinguished from genuinely wanting to go
 further (real "saturation"), and the same value is the coarse pre-scan
@@ -100,8 +100,8 @@ grid's step size.
 const EXCL_VOL_CORR_EPS = 0.02
 
 """
-Absolute tolerance on c1 of [`Fitting.profiled_corrs`](@ref
-`BAYSOL.Fitting.profiled_corrs`)'s `Brent()` polish, used everywhere c1 is profiled
+Absolute tolerance on c1 of [`Inference.profiled_corrs`](@ref
+`BAYSOL.Inference.profiled_corrs`)'s `Brent()` polish, used everywhere c1 is profiled
 (the MAP search, its Hessian, and every NUTS log-density and gradient call).
 
 The tolerance has to be judged on the *gradient*, not the value. χ² is quadratic in the
@@ -132,14 +132,14 @@ const EXCL_VOL_CORR_TOL = 1e-8
 
 """
 Default NUTS target acceptance rate, as a percentage in (0, 100), for
-[`run_model`](@ref BAYSOL.Report.run_model) / [`Fitting.run_fitting`](@ref BAYSOL.Fitting.run_fitting):
+[`run_model`](@ref BAYSOL.Pipeline.run_model) / [`Inference.infer`](@ref BAYSOL.Inference.infer):
 Stan's usual default of 80 %.
 """
 const DEFAULT_TARGET_ACCEPT = 80
 
 """
 Number of L-BFGS starts of the pre-NUTS MAP search
-([`Fitting.run_fitting`](@ref BAYSOL.Fitting.run_fitting)): the seed's own initial
+([`Inference.infer`](@ref BAYSOL.Inference.infer)): the seed's own initial
 point plus `MAP_N_STARTS - 1` further prior draws.
 """
 const MAP_N_STARTS = 8
@@ -303,8 +303,8 @@ include("ParamTransform.jl")
 include("Sampler.jl")
 include("MAP.jl")
 
-export  Solute, Protein, NonBiological, DNA, RNA, Seed, FitResult,
-        seed_fitting, run_fitting, PROFILE, MARGINAL,
+export  Solute, Protein, NonBiological, DNA, RNA, Seed, Inferred,
+        seed_sampler, infer, PROFILE, MARGINAL,
         ρₑ_prior, δρ_prior, prior_z_scores,
         ξ_priors, θ_prior_moments, profiled_corrs, excl_vol_saturation,
         WLSData, wls_fit

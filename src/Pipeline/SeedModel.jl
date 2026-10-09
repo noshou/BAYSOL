@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# seed_model: structure + data + buffer -> Fitting.Seed (the static build of a run).
+# seed_model: structure + data + buffer -> Inference.Seed (the static build of a run).
 
 """
 Computes a NUTS seed from given data input:
@@ -12,7 +12,7 @@ Computes a NUTS seed from given data input:
         whole scatterer cloud (atoms and beads), bin the measured curve to the Shannon channels
         that diameter allows ([`Shannon.shannon_data`](@ref BAYSOL.Utils.Shannon.shannon_data)) and pick the band limit from it
     4.  build the forward-model (gram matrix) on the binned q grid
-    5.  produce a [`Fitting.Seed`](@ref).
+    5.  produce a [`Inference.Seed`](@ref).
 
 # Arguments
 - `mol_src::MolecularStructure.StructureSource`: where to obtain the
@@ -25,11 +25,11 @@ Computes a NUTS seed from given data input:
     and its per-point standard errors; must be the same length as qvals. Pass the curve
     as measured over the q range to be fitted: it is binned here, and the bins with
     non-positive intensity are dropped here.
-- `pH::Real`: solution pH — drives [`Fitting.Protein`](@ref)/[`Fitting.DNA`](@ref)/[`Fitting.RNA`](@ref)
+- `pH::Real`: solution pH — drives [`Inference.Protein`](@ref)/[`Inference.DNA`](@ref)/[`Inference.RNA`](@ref)
     solute titration and Pdb2pqr's hydrogen placement (when `add_hydrogens`=true).
 - `σ_pH::Real`: standard uncertainty on pH, propagated through solute titration.
-- `solutes::Vector{Fitting.Solute}`: the buffer's components, **excluding the
-    measured macromolecule** (see [`Fitting.Solute`](@ref)).
+- `solutes::Vector{Inference.Solute}`: the buffer's components, **excluding the
+    measured macromolecule** (see [`Inference.Solute`](@ref)).
 
 # Keywords
 -   `rebin::Union{Nothing,Integer} = SHANNON_REBIN`: bins per Shannon channel `π/D` (the bin
@@ -51,13 +51,13 @@ Computes a NUTS seed from given data input:
     `n_target::Union{Nothing,Int} = SHELL_N_TARGET`: hydration-shell geometry,
     forwarded to [`Scattering.forward_cache`](@ref).
 -   `t::Real = DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to
-    [`Fitting.seed_fitting`](@ref).
--   `κ_δρ₁₂::Real = DRO12_CONCENTRATION`, `κ_δρ₃::Real = DRO3_CONCENTRATION`:
+    [`Inference.seed_sampler`](@ref).
+-   `κ_δρ₁₂::Real = κ_δρ₁₂`, `κ_δρ₃::Real = κ_δρ₃`:
     concentrations of the δρ₁/δρ₂ and δρ₃ priors, forwarded to
-    [`Fitting.seed_fitting`](@ref).
+    [`Inference.seed_sampler`](@ref).
 
 # Returns
--   `seed::Fitting.Seed`, ready to pass to [`run_model`](@ref)/[`Fitting.run_fitting`](@ref).
+-   `seed::Inference.Seed`, ready to pass to [`run_model`](@ref)/[`Inference.infer`](@ref).
 
 # Exceptions
 - `DomainError`: qvals, `I_exp`, and `σ_exp` have mismatched lengths, or hold non-finite
@@ -72,7 +72,7 @@ function seed_model(
     σ_exp::AbstractVector,
     pH::Real,
     σ_pH::Real,
-    solutes::Vector{Fitting.Solute};
+    solutes::Vector{Inference.Solute};
     rebin::Union{Nothing,Integer} = SHANNON_REBIN,
     max_bin_bias::Real = Shannon.BIN_BIAS_MAX,
     lMax::Union{Nothing,Integer} = nothing,
@@ -83,9 +83,9 @@ function seed_model(
     t::Real = DEFAULT_TEMPERATURE_C,
     probe::Float64 = PROBE_RADIUS,
     n_target::Union{Nothing,Int} = SHELL_N_TARGET,
-    κ_δρ₁₂::Real = DRO12_CONCENTRATION,
-    κ_δρ₃::Real = DRO3_CONCENTRATION,
-)::Fitting.Seed
+    κ_δρ₁₂::Real = κ_δρ₁₂,
+    κ_δρ₃::Real = κ_δρ₃,
+)::Inference.Seed
     # the static build allocates large temporaries; collect once per byte budget instead of whenever the heap grows
     return GCPause.with_gc_paused() do
     # the run's clock starts here; write_report reads the wall clock off it
@@ -158,8 +158,8 @@ function seed_model(
         )
     end
 
-    return Timing.timed!(log, :static, 1, "seed_fitting (priors, WLS)") do
-        Fitting.seed_fitting(
+    return Timing.timed!(log, :static, 1, "seed_sampler (priors, WLS)") do
+        Inference.seed_sampler(
             fw, info.I, info.σ, pH, σ_pH, solutes;
             t=t, κ_δρ₁₂=κ_δρ₁₂, κ_δρ₃=κ_δρ₃, timing=log, shannon=info,
         )

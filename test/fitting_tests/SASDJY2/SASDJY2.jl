@@ -2,7 +2,7 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Fitting: Solute, NonBiological, PROFILE
+using BAYSOL.Inference: Solute, NonBiological, PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDJY2")
@@ -27,7 +27,7 @@ const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDJY2.dat")
 # Buffer as deposited: "20 mM Tris–HCl pH 7.5, 200 mM KCl, 0.1 mM EDTA, 0.01% (w/v) sodium
 # azide, 1 mM DTT", pH 7.5. Only the components with a partial-molar-volume entry and a stated
 # concentration are modelled below; the measured macromolecule is deliberately NOT a solute (see
-# Fitting.Solute).
+# Inference.Solute).
 #
 # Curve units: the SASBDB .dat is in nm⁻¹ and is converted to Å⁻¹ (÷10). The reference fit files
 # are read from the same folder; each run's comparison curve is the depositor's fit for that

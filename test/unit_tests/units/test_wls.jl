@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests for src/Fitting/WLS.jl: the 2-parameter weighted least squares fit
+# Tests for src/Inference/WLS.jl: the 2-parameter weighted least squares fit
 # of I_calc(q) = scale*y_model(q) + bkgrnd_corr, plus the profile/marginal
 # log-likelihoods and the χ²/dof diagnostic built on top of it.
 #
@@ -14,7 +14,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using LinearAlgebra
 using Random
 using ForwardDiff
-using BAYSOL.Fitting: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll,
+using BAYSOL.Inference: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll,
     reduced_chi2
 
 """

@@ -47,7 +47,7 @@ end
 # z (0 for white) with the reduced χ², on the fitted grid and, for a binned fit, on the measured grid (the grid CRYSOL
 # and FoXS evaluate). Nothing is sampled: the MAP search of the fit is enough.
 function residual_report(out, seed; label)
-    Fit = BAYSOL.Fitting
+    Fit = BAYSOL.Inference
     sp = Fit._sampling_space(seed, Fit.PROFILE())
     ξ = Fit.Ξ(sp.μ .+ sp.σ .* sp.ẑ, seed.pr)
     ŷ, wfit, _ = Fit.profiled_corrs(seed.wls, ξ, seed.fw; tables = seed.c1tab)
@@ -77,7 +77,7 @@ function main(args)
     cmd = cmd[3:end]
     opts, specs = parse_cli(rest)
     isempty(specs) && error("give at least one ID[:tag]")
-    n_samples = parse(Int, get(opts, "samples", string(BAYSOL.Report.DEFAULT_N_SAMPLES))); n_adapt = parse(Int, get(opts, "adapt", string(BAYSOL.Report.DEFAULT_N_ADAPT)))
+    n_samples = parse(Int, get(opts, "samples", string(BAYSOL.Pipeline.DEFAULT_N_SAMPLES))); n_adapt = parse(Int, get(opts, "adapt", string(BAYSOL.Pipeline.DEFAULT_N_ADAPT)))
     tols = Tuple(parse.(Float64, split(get(opts, "tols", "1e-5,1e-8"), ",")))
     rngs = Tuple(parse.(Int, split(get(opts, "seeds", "7"), ",")))
     out = haskey(opts, "out") ? open(opts["out"], "w") : stdout

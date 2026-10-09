@@ -20,7 +20,7 @@ One submodule and four included files (all but `SphFuncs` are plain files `inclu
                     ForwardCache built once per structure by `forward_cache`, and
                     the contraction I(q) = v(q)ᵀ G(q) v(q) at fit parameters
                     (`intensity_terms`, `model_intensity`). Profiling c₁ against
-                    data is BAYSOL.Fitting's job.
+                    data is BAYSOL.Inference's job.
 
 # Background
 

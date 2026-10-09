@@ -2,7 +2,7 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Fitting: Solute, NonBiological, PROFILE
+using BAYSOL.Inference: Solute, NonBiological, PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDRN5")
@@ -28,7 +28,7 @@ const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDRN5.dat")
 #
 # Buffer as deposited: "50 mM HNa2PO4, 300 mM NaCl, 5% glycerol (v/v), 1 mM DTT", pH 7.5. Only
 # the components with a partial-molar-volume entry and a stated concentration are modelled
-# below; the measured macromolecule is deliberately NOT a solute (see Fitting.Solute).
+# below; the measured macromolecule is deliberately NOT a solute (see Inference.Solute).
 #
 # '50 mM HNa2PO4' is disodium hydrogen phosphate (Na2HPO4), which is in the PMV table; titrated to pH 7.5
 # (titrant not stated) it is a Na2HPO4/NaH2PO4 mixture, so it is split into its two species with Na⁺ as

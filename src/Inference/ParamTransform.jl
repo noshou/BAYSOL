@@ -15,7 +15,7 @@ _t_logjac(t::Real, W::Real) = log(W) + loglogistic(t) + loglogistic(-t)
     │ Θ: ξ ⤇ (θ, corr)
     │
     ▼
-    θ ∈ ℝ⁴ 
+    θ ∈ ℝ⁴
 
 Let the following parameters be:
 
@@ -24,7 +24,7 @@ Let the following parameters be:
     - δρ₂ ∈ (L, L + W)  the contrast of concave water beads
     - δρ₃ ∈ (L₃, L₃ + W₃)  the contrast of cavity water beads
 
-with (L, L + W) = `DRO_BOUNDS` = (-10, 2), CRYSOL3's fitting limits, and (L₃, L₃ + W₃) the
+with (L, L + W) = `BOUNDS_δρ₁₂` = (-10, 2), CRYSOL3's fitting limits, and (L₃, L₃ + W₃) the
 support of the δρ₃ prior (the `LocationScale`'s μ and σ; [`_δρ₃_prior`](@ref)).
 
 We therefore have the following parameter vector ξ:
@@ -40,7 +40,7 @@ and define the following inverse bijection:
     ρₑ  = eᵃ
     δρ₁ = L + W·σ(t₁)
     δρ₂ = L + W·σ(t₂)
-    δρ₃ = L₃ + W₃·σ(t₃),   
+    δρ₃ = L₃ + W₃·σ(t₃),
 
 giving the θ-space parameter vector:
 
@@ -70,8 +70,8 @@ result is log-concave in tₖ.
 """
 function Θ(ξ::SVector{4,<:Real}, p::ξ_priors)
     a  = log(ξ[1])
-    t₁ = logit((ξ[2] - DRO_LOWER) / DRO_WIDTH)
-    t₂ = logit((ξ[3] - DRO_LOWER) / DRO_WIDTH)
+    t₁ = logit((ξ[2] - LOWER_BOUND_δρ₁₂) / WIDTH_δρ₁₂)
+    t₂ = logit((ξ[3] - LOWER_BOUND_δρ₁₂) / WIDTH_δρ₁₂)
     t₃ = logit((ξ[4] - p.δρ₃Prior.μ) / p.δρ₃Prior.σ)
     θ = SVector{4}(a, t₁, t₂, t₃)
     return θ, logjac(θ, p)
@@ -97,8 +97,8 @@ Inverse of [`Θ`](@ref): θ-space (unconstrained ℝ⁴) back to ξ-space.
 function Ξ(θ::SVector{4,<:Real}, p::ξ_priors)
     return SVector{4}(
         exp(θ[1]),
-        DRO_LOWER + DRO_WIDTH * logistic(θ[2]),
-        DRO_LOWER + DRO_WIDTH * logistic(θ[3]),
+        LOWER_BOUND_δρ₁₂ + WIDTH_δρ₁₂ * logistic(θ[2]),
+        LOWER_BOUND_δρ₁₂ + WIDTH_δρ₁₂ * logistic(θ[3]),
         p.δρ₃Prior.μ + p.δρ₃Prior.σ * logistic(θ[4]),
     )
 end
@@ -117,7 +117,7 @@ adds; identical to the `corr` [`Θ`](@ref) returns for ξ = Ξ(θ):
 - `Real`: the log-Jacobian.
 """
 logjac(θ::SVector{4,<:Real}, p::ξ_priors) =
-    θ[1] + _t_logjac(θ[2], DRO_WIDTH) + _t_logjac(θ[3], DRO_WIDTH) + _t_logjac(θ[4], p.δρ₃Prior.σ)
+    θ[1] + _t_logjac(θ[2], WIDTH_δρ₁₂) + _t_logjac(θ[3], WIDTH_δρ₁₂) + _t_logjac(θ[4], p.δρ₃Prior.σ)
 
 
 """

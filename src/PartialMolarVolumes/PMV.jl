@@ -5,7 +5,8 @@ Partial molar volumes (V0, cm³/mol) and water bulk electron density.
 """
 module PartialMolarVolumes
 
-using  ..PhysicalConstants: AVOGADRO, WATER_MOLAR_MASS, WATER_DENSITY_UNCERTAINTY, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER,
+using  ..PhysicalConstants: AVOGADRO, WATER_MOLAR_MASS, WATER_DENSITY_UNCERTAINTY,
+        WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER,
         KELL_DENSITY_NUM, KELL_DENSITY_DEN, BACKBONE_ELECTRONS
 using  ..Cache: KeyedCache
 using  JSON3: JSON3
@@ -17,14 +18,17 @@ using ..PhysicalConstants: STANDARD_TEMPERATURE_C
 """
 Temperature, °C, at which the bundled partial-molar-volume tables are tabulated
 (see PartialMolarVolumes/README.md: 298.15 K unless a source says otherwise): the
-standard reference temperature, [`STANDARD_TEMPERATURE_C`](@ref BAYSOL.Utils.PhysicalConstants.STANDARD_TEMPERATURE_C).
+standard reference temperature,
+[`STANDARD_TEMPERATURE_C`](@ref BAYSOL.Utils.PhysicalConstants.STANDARD_TEMPERATURE_C).
 """
 const PMV_REFERENCE_TEMPERATURE_C = STANDARD_TEMPERATURE_C
 
 """
 Fractional partial-molar-volume expansibility, K⁻¹: an upper bound on
 (∂ϕ°/∂T)/ϕ° used to widen a solute's 25 °C ϕ° uncertainty when the sample is at
-another temperature, `σ_T` = `PMV_FRACTIONAL_EXPANSIBILITY` · ϕ° · |t − [`PMV_REFERENCE_TEMPERATURE_C`](@ref)|.
+another temperature
+
+    `σ_T` = `PMV_FRACTIONAL_EXPANSIBILITY` · ϕ° · |t − [`PMV_REFERENCE_TEMPERATURE_C`](@ref)|.
 
 Derived from the multi-temperature series bundled with the tables
 (15-35 °C: sugars, ureas and glycolurils in `sources/extracted_pmv_candidates.tsv`;
@@ -49,7 +53,8 @@ const BACKBONE_PMV = (37.4, 0.1)
 # Water.jl first: _H2O_V0_25C below calls its _kell_density at load time.
 include("Water.jl")
 
-"Bulk water molar volume at the PMV reference temperature (25 °C), cm³·mol⁻¹, from the same Kell equation as `ρₑ_w` (≈ 18.0686)."
+"Bulk water molar volume at the PMV reference temperature (25 °C), cm³·mol⁻¹,
+from the same Kell equation as `ρₑ_w` (≈ 18.0686)."
 const _H2O_V0_25C = WATER_MOLAR_MASS / _kell_density(PMV_REFERENCE_TEMPERATURE_C) * CM3_PER_LITER
 
 """ Returns the partial molar volume at infinite dilution of a solute. """

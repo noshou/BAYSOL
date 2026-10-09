@@ -2,7 +2,7 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Fitting: Solute, NonBiological, PROFILE
+using BAYSOL.Inference: Solute, NonBiological, PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDEP6")
@@ -30,7 +30,7 @@ const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDEP6.dat")
 # Buffer as deposited: "20 mM Tris-HCl, 150 mM NaCl, 10 mM MgCl2, 5 mM DTT, 0.2 M D-glucosamine,
 # 1 mM ATP", pH 8.0. Only the components with a partial-molar-volume entry and a stated
 # concentration are modelled below; the measured macromolecule is deliberately NOT a solute (see
-# Fitting.Solute).
+# Inference.Solute).
 #
 # '0.2 M D-glucosamine' resolves in the PMV table ('d-glucosamine' -> 130.6 ± 0.07 cm³/mol, Moses
 # 2021, measured as the hydrochloride with the HCl counter-ion ignored; see

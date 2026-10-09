@@ -30,7 +30,7 @@ curve for it (`nothing` if the script has none) as the `reference` argument of `
     `(; rebin = nothing)` to try another binning without editing the script.
 
 # Returns
-- `(seed::Fitting.Seed, reference, label::String)`.
+- `(seed::Inference.Seed, reference, label::String)`.
 
 # Exceptions
 - `ErrorException` if the script has no recognizable entry point, `tag` names no run, or the folder is missing.

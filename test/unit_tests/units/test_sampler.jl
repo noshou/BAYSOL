@@ -1,21 +1,21 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# End-to-end correctness tests for src/Fitting/Sampler.jl: the Bayesian
+# End-to-end correctness tests for src/Inference/Sampler.jl: the Bayesian
 # fitting pipeline (priors -> initial draw -> θ-space log-posterior -> NUTS
 # via AdvancedHMC.jl). These tests check that the wiring is *correct* --
 # independent re-derivations of every formula, purity (no hidden mutation)
 # of _logπ, AD-differentiability, physical-domain invariants, and internal
-# self-consistency between what `run_fitting` returns and what AdvancedHMC.jl
+# self-consistency between what `infer` returns and what AdvancedHMC.jl
 # itself reports. They deliberately do NOT check posterior "goodness"
 # (recovery accuracy, convergence diagnostics, effective sample size).
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-const FIT = BAYSOL.Fitting
+const FIT = BAYSOL.Inference
 
-using BAYSOL.Fitting: Solute, NonBiological, WLSData, wls_fit, wls_prof_ll, wls_marg_ll,
+using BAYSOL.Inference: Solute, NonBiological, WLSData, wls_fit, wls_prof_ll, wls_marg_ll,
     profiled_corrs, Θ, Ξ
-using BAYSOL.Fitting: DRO_BOUNDS, DRO12_CONCENTRATION, DRO3_CONCENTRATION
+using BAYSOL.Inference: BOUNDS_δρ₁₂, κ_δρ₁₂, κ_δρ₃
 using BAYSOL.Scattering: forward_cache, ForwardCache
 using BAYSOL.MolecularStructure: MolecularStructure
 using Distributions: logpdf, mean, std, params, Beta
@@ -44,7 +44,7 @@ const smpl_chunk = UInt64(4)
 
 smpl_fw() = forward_cache(smpl_mol(), smpl_q, smpl_lmax, smpl_E; chunk = smpl_chunk)
 
-# Buffer only: the measured macromolecule is never a solute (see Fitting.Solute).
+# Buffer only: the measured macromolecule is never a solute (see Inference.Solute).
 smpl_solutes() = Solute[NonBiological(0.15, 0.001, "sodium chloride")]
 const smpl_pH    = 7.4
 const smpl_σ_pH  = 0.05
@@ -93,7 +93,7 @@ Independent re-derivation of `_logπ`: decode θ by hand, add the log-Jacobian
 a + Σₖ [ln Wₖ + ln uₖ + ln(1 - uₖ)], uₖ = σ(tₖ), W = (12, 12, W₃).
 """
 function ref_logπ(θ::NTuple{4,<:Real}, pr, wls, fw, l::FIT.LIKELIHOOD)
-    lo, hi = DRO_BOUNDS
+    lo, hi = BOUNDS_δρ₁₂
     u = map(t -> 1 / (1 + exp(-t)), θ[2:4])
     L₃, W₃ = pr.δρ₃Prior.μ, pr.δρ₃Prior.σ
     W = (hi - lo, hi - lo, W₃)
@@ -110,7 +110,7 @@ end
         pr = smpl_priors()
         @test pr isa FIT.ξ_priors
         ref_ρ = FIT.ρₑ_prior(smpl_pH, smpl_σ_pH, smpl_solutes())
-        ref_δρ₁, ref_δρ₂, ref_δρ₃ = FIT.δρ_prior(DRO12_CONCENTRATION, DRO3_CONCENTRATION, mean(ref_ρ))
+        ref_δρ₁, ref_δρ₂, ref_δρ₃ = FIT.δρ_prior(κ_δρ₁₂, κ_δρ₃, mean(ref_ρ))
         @test pr.ρₑPrior  == ref_ρ
         @test pr.δρ₁Prior == ref_δρ₁
         @test pr.δρ₂Prior == ref_δρ₂
@@ -136,7 +136,7 @@ end
             ξ0 = FIT._ξ₀(pr)
             @test ξ0 isa SVector{4,Float64}
             @test ξ0[1] > 0
-            @test DRO_BOUNDS[1] < ξ0[2] < DRO_BOUNDS[2] && DRO_BOUNDS[1] < ξ0[3] < DRO_BOUNDS[2]
+            @test BOUNDS_δρ₁₂[1] < ξ0[2] < BOUNDS_δρ₁₂[2] && BOUNDS_δρ₁₂[1] < ξ0[3] < BOUNDS_δρ₁₂[2]
             @test pr.δρ₃Prior.μ < ξ0[4] < pr.δρ₃Prior.μ + pr.δρ₃Prior.σ
             @test all(isfinite, ξ0)
         end
@@ -247,21 +247,21 @@ end
         @test all(isapprox.(FIT.prior_z_scores(Ξ(μ, pr), pr), 0.0; atol = DEFAULT_ATOL))
     end
 
-    @testset "seed_fitting: fields are internally consistent" begin
+    @testset "seed_sampler: fields are internally consistent" begin
         fw = smpl_fw()
         I_exp, σ_exp = synth_data(fw)
-        seed = FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes())
+        seed = FIT.seed_sampler(fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, smpl_solutes())
         @test seed isa FIT.Seed
         @test seed.fw === fw
         @test seed.wls.I_obs == I_exp
         ξ₀ = Ξ(seed.θ₀, seed.pr)
         @test ξ₀[1] > 0 && seed.pr.δρ₃Prior.μ < ξ₀[4] < seed.pr.δρ₃Prior.μ + seed.pr.δρ₃Prior.σ
-        @test_throws DomainError FIT.seed_fitting(fw, I_exp, σ_exp, smpl_pH, -0.1, smpl_solutes())
+        @test_throws DomainError FIT.seed_sampler(fw, I_exp, σ_exp, smpl_pH, -0.1, smpl_solutes())
     end
 
     @testset "MAP search: the f-stop does not stop short of the optimum" begin
         fw = smpl_fw()
-        seed = FIT.seed_fitting(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         Random.seed!(11)
         sp = FIT._sampling_space(seed, FIT.PROFILE())
         f(z) = FIT._neglogπ(SVector{4}(z...), sp.μ, sp.σ, seed, FIT.PROFILE(), FIT.EXCL_VOL_CORR_TOL)
@@ -280,9 +280,9 @@ end
 
     @testset "run: δ must be a percentage strictly inside (0, 100)" begin
         fw = smpl_fw()
-        seed = FIT.seed_fitting(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         for δ in (0, 100, -10, 150)
-            @test_throws DomainError FIT.run_fitting(seed, 5, 2; δ = δ)
+            @test_throws DomainError FIT.infer(seed, 5, 2; δ = δ)
         end
     end
 
@@ -291,7 +291,7 @@ end
             @test length(ξ) == 4
             @test all(isfinite, ξ)
             @test ξ[1] > 0
-            @test DRO_BOUNDS[1] ≤ ξ[2] ≤ DRO_BOUNDS[2] && DRO_BOUNDS[1] ≤ ξ[3] ≤ DRO_BOUNDS[2]
+            @test BOUNDS_δρ₁₂[1] ≤ ξ[2] ≤ BOUNDS_δρ₁₂[2] && BOUNDS_δρ₁₂[1] ≤ ξ[3] ≤ BOUNDS_δρ₁₂[2]
             @test pr.δρ₃Prior.μ ≤ ξ[4] ≤ pr.δρ₃Prior.μ + pr.δρ₃Prior.σ
         end
     end
@@ -313,10 +313,10 @@ end
     for (name, l, rng) in (("PROFILE", FIT.PROFILE(), 1), ("MARGINAL", FIT.MARGINAL(), 2))
         @testset "run: $name -- output shapes, physical domain, self-consistency" begin
             fw = smpl_fw()
-            seed = FIT.seed_fitting(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+            seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
             Random.seed!(rng)
             n_samples, n_adapt = 60, 30
-            fit = FIT.run_fitting(seed, n_samples, n_adapt; l = l)
+            fit = FIT.infer(seed, n_samples, n_adapt; l = l)
             @test length(fit.samples) == n_samples
             @test length(fit.stats) == n_samples
             @test length(fit.c1) == n_samples
@@ -327,11 +327,11 @@ end
 
     @testset "run: deterministic under a fixed global RNG seed" begin
         fw = smpl_fw()
-        seed = FIT.seed_fitting(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         Random.seed!(42)
-        fit1 = FIT.run_fitting(seed, 20, 10; l = FIT.PROFILE())
+        fit1 = FIT.infer(seed, 20, 10; l = FIT.PROFILE())
         Random.seed!(42)
-        fit2 = FIT.run_fitting(seed, 20, 10; l = FIT.PROFILE())
+        fit2 = FIT.infer(seed, 20, 10; l = FIT.PROFILE())
         for i in eachindex(fit1.samples)
             @test all(fit1.samples[i] .== fit2.samples[i])
             @test fit1.stats[i].log_density == fit2.stats[i].log_density

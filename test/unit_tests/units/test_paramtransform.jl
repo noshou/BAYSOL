@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests for src/Fitting/ParamTransform.jl: the ξ-space (physical fit
+# Tests for src/Inference/ParamTransform.jl: the ξ-space (physical fit
 # parameters, bounded/half-bounded domains) <-> θ-space (unconstrained ℝ⁴) bijection that
 # the HMC sampler runs in, plus the log-Jacobian correction `Θ` returns
 # alongside the (pure, non-mutating) transform.
@@ -12,18 +12,18 @@ using LinearAlgebra
 using Random
 using StaticArrays
 using Distributions: mean
-using BAYSOL.Fitting: Θ, Ξ, ρₑ_prior, δρ_prior, ξ_priors, Solute, NonBiological
-using BAYSOL.Fitting: DRO_BOUNDS, DRO12_CONCENTRATION, DRO3_CONCENTRATION
+using BAYSOL.Inference: Θ, Ξ, ρₑ_prior, δρ_prior, ξ_priors, Solute, NonBiological
+using BAYSOL.Inference: BOUNDS_δρ₁₂, κ_δρ₁₂, κ_δρ₃
 
-const logjac = BAYSOL.Fitting.logjac
+const logjac = BAYSOL.Inference.logjac
 
 include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))
 
-const LO, HI = DRO_BOUNDS
+const LO, HI = BOUNDS_δρ₁₂
 
 # One fixed prior set (NaCl buffer); its δρ₃ prior supplies the interval (L₃, L₃ + W₃).
 const PR_ρ = ρₑ_prior(7.4, 0.05, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
-const PR = ξ_priors(PR_ρ, δρ_prior(DRO12_CONCENTRATION, DRO3_CONCENTRATION, mean(PR_ρ))...)
+const PR = ξ_priors(PR_ρ, δρ_prior(κ_δρ₁₂, κ_δρ₃, mean(PR_ρ))...)
 const L3, W3 = PR.δρ₃Prior.μ, PR.δρ₃Prior.σ
 
 """

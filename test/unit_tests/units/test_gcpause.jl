@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests for src/Utils/GCPause.jl: the garbage collector paused around a call, nested pauses, restoration on an
+# Tests for src/Runtime/GCPause.jl: the garbage collector paused around a call, nested pauses, restoration on an
 # exception, and the byte-budget checkpoint.
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))

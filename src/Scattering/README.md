@@ -47,7 +47,7 @@ expansion of every dummy's radius by `r_0`/`r_m`) and the detector-scale model `
 
 ForwardCache.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defines it: the mean of each atom's own excluded-volume-dummy equivalent-sphere radius, `r_m` = N⁻¹ Σᵢ cbrt(3 Vᵢ / 4π), where Vᵢ is MolecularStructure.vols(mol)[i] (the displaced-solvent volume, see MolecularStructure's README) -- **not** the mean van der Waals radius (radii(mol)). vols is computed geometrically: each atom's vdW sphere is clipped by its neighbours' power-diagram planes, so Vᵢ < (4/3)π·rᵢ³ for any atom with overlapping neighbours, and the two radii differ for essentially every atom in a packed structure.
 
-`c_1` is not fitted here: the cache stores `r_m`, and during fitting `Fitting.profiled_corrs` profiles `c_1` per likelihood evaluation, from the cached G(q) and `excluded_volume_factor`, within the hard bounds `EXCL_VOL_CORR_BOUNDS = (0.8, 1.3)`, with no prior (see the Fitting README).
+`c_1` is not fitted here: the cache stores `r_m`, and during fitting `Inference.profiled_corrs` profiles `c_1` per likelihood evaluation, from the cached G(q) and `excluded_volume_factor`, within the hard bounds `EXCL_VOL_CORR_BOUNDS = (0.8, 1.3)`, with no prior (see the Inference README).
 
 ## Module layout
 
@@ -55,7 +55,7 @@ ForwardCache.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defi
 - **PartialWave.jl** : `compute_B_lm` (the multipole moments themselves: atoms are processed in order of radius so each tile's negligible-Bessel cut is tight, `Y_lm` and the Bessel sweep run only up to a tile's last live degree and over the q columns that need them, and an amplitude shared by all scatterers is a `SharedAmplitude`, e.g. the hydration beads of one class), plus `self_scatter`/`cross_scatter`/`partial_wave_weights` (the reductions to `S_ab(q)`).
 - **FormFactor.jl** : X-ray atomic form factors f(q, E) from the bundled `form_factors.sqlite3` (`form_factor_table`, `form_factors`, `compute_form_factors`), consumed by the vacuum amplitude in Scatterers.jl.
 - **Scatterers.jl** : one builder per species (vacuum amplitude, excluded-volume dummies, and `hydration`, the last returning one `B_lm` per hydration-shell class), assembled by `species_multipoles`, which computes the vacuum and excluded-volume multipoles in one shared pass.
-- **ForwardCache.jl** : `gram` (the `S_ab` matrix G), `excluded_volume_factor` (the `c_1` correction), `mean_atomic_radius`, and the geometry-only `ForwardCache`. `forward_cache` returns a `ForwardCache(G, qvals, r_m, form_factor_log, n_atoms, lMax)`; `n_atoms` and `lMax` feed the report's `=== Run ===` section. Its `shell` keyword takes a precomputed `SASA.sasa` result (`seed_model` computes the accessible surface first, because the diameter of the whole scatterer cloud sets the band limit). Its `stage_log` keyword (a `Timing.StageLog`) times the vacuum, excluded-volume, hydration (SASA + `B_lm`) and Gram + `r_m` stages for the report's `=== Timing ===` section; `BAYSOL.seed_model` passes it automatically. The contraction I(q) = v(q)ᵀ G(q) v(q) lives in `Fitting.profiled_corrs`.
+- **ForwardCache.jl** : `gram` (the `S_ab` matrix G), `excluded_volume_factor` (the `c_1` correction), `mean_atomic_radius`, and the geometry-only `ForwardCache`. `forward_cache` returns a `ForwardCache(G, qvals, r_m, form_factor_log, n_atoms, lMax)`; `n_atoms` and `lMax` feed the report's `=== Run ===` section. Its `shell` keyword takes a precomputed `SASA.sasa` result (`seed_model` computes the accessible surface first, because the diameter of the whole scatterer cloud sets the band limit). Its `stage_log` keyword (a `Timing.StageLog`) times the vacuum, excluded-volume, hydration (SASA + `B_lm`) and Gram + `r_m` stages for the report's `=== Timing ===` section; `BAYSOL.seed_model` passes it automatically. The contraction I(q) = v(q)ᵀ G(q) v(q) lives in `Inference.profiled_corrs`.
 
 ## Usage
 
@@ -97,7 +97,7 @@ energy = 9000.0   # eV
 
 # geometry-only pass: build the (5,5,Q) species Gram matrix G(q) once per structure
 cache = forward_cache(mol, qvals, lMax, energy)
-cache.G, cache.r_m   # what Fitting.profiled_corrs contracts against (v, c_1) per draw
+cache.G, cache.r_m   # what Inference.profiled_corrs contracts against (v, c_1) per draw
 ```
 
 ### Lower-level primitives
