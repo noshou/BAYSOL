@@ -221,13 +221,13 @@ Re-run with --approved once the run has been approved."
         if {$state ni {cold warm}} {
             error "--state must be cold or warm"
         }
-        set samples 2000
-        if {[dict exists $opts samples]} {
-            set samples [dict get $opts samples]
-        }
-        set adapt 1000
-        if {[dict exists $opts adapt]} {
-            set adapt [dict get $opts adapt]
+        # NUTS iterations: only when given; otherwise the child uses the run_model defaults of the code it measures
+        set iterations {}
+        if {[dict exists $opts samples] || [dict exists $opts adapt]} {
+            if {![dict exists $opts samples] || ![dict exists $opts adapt]} {
+                error "give --samples and --adapt together, or neither"
+            }
+            set iterations [list [dict get $opts samples] [dict get $opts adapt]]
         }
         if {[dict exists $opts out]} {
             set out [dict get $opts out]
@@ -281,7 +281,7 @@ Re-run with --approved once the run has been approved."
         foreach spec $specs {
             lassign [timed $childenv \
                 $julia --project=$repo [file join $repo test utils child.jl] \
-                $repo $spec $samples $adapt \
+                $repo $spec {*}$iterations \
             ] t_proc raw
             set raw [json_line $raw]
             if {![string match "\{*\}" $raw] || $raw eq "\{\}"} {

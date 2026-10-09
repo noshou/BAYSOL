@@ -17,7 +17,7 @@
 #   --report   afterwards, print the Results-table rows of the selected fits (test/utils/results_table.tcl)
 #   --table    afterwards, rewrite the Results table in test/fitting_tests/README.md from all the reports
 #              (test/utils/results_table.tcl --update); covers every fit, whatever IDs are named
-#   --fixme    afterwards, run the sampler diagnostics on the selected fits (test/utils/diagnose.tcl --report)
+#   --fixme    afterwards, run the sampler diagnostics on the selected fits (test/run/diagnose.tcl --report)
 #   --trace-compile FILE  run the fits with Julia's --trace-compile=FILE (the methods each fit's process compiles at run time,
 #              which a precompile workload should have covered; one file for all the fits, appended)
 #   --dry-run  print what would be run, run nothing
@@ -150,7 +150,7 @@ namespace eval fittings {
         # 4. the diagnostics
         if {"--fixme" in $flags} {
             puts "\n=== diagnostics"
-            if {![sh $dry $tclsh [file join $utils diagnose.tcl] --report {*}[specs_of $selected]]} {
+            if {![sh $dry $tclsh [file join $ROOT test run diagnose.tcl] --report {*}[specs_of $selected]]} {
                 lappend failed diagnostics
             }
         }

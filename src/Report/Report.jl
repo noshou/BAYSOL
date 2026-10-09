@@ -31,6 +31,22 @@ case "0-0" means *no* filtering.
 const DEFAULT_QUANTILES = "16-84"
 
 """
+Default warm-up of [`run_model`](@ref): 300 NUTS iterations of step-size and mass-matrix adaptation, discarded from the
+posterior.
+"""
+const DEFAULT_N_ADAPT = 300
+
+"""
+Default number of posterior draws of [`run_model`](@ref), after the `DEFAULT_N_ADAPT` warm-up iterations: 700.
+"""
+const DEFAULT_N_DRAWS = 700
+
+"""
+Default total number of NUTS iterations of [`run_model`](@ref), warm-up included: `DEFAULT_N_ADAPT + DEFAULT_N_DRAWS` = 1000.
+"""
+const DEFAULT_N_SAMPLES = DEFAULT_N_ADAPT + DEFAULT_N_DRAWS
+
+"""
     MAPParams = Dict{String, Float64}
 
 Parameter values at the single MAP (maximum a posteriori, i.e.

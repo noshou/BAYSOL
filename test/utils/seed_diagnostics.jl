@@ -22,12 +22,14 @@ using Random, LinearAlgebra, Statistics, Printf
 using BAYSOL
 
 const F = BAYSOL.Fitting
+const R = BAYSOL.Report
 const SVector = F.SVector
 const ForwardDiff = F.ForwardDiff
 const DiffResults = F.DiffResults
 
 export nuts_replica, gradient_w, gradient_noise, local_curvature, lbfgs_starts, hessian_sensitivity,
-    axis_scan, mode_table, shell_contrast_ablation, curve_chi2, ess, diagnose, tolerance_sweep
+    axis_scan, mode_table, shell_contrast_ablation, curve_chi2, ess, diagnose, tolerance_sweep,
+    warmup_study
 
 # ---------------------------------------------------------------------------
 #                                   helpers
@@ -111,7 +113,7 @@ is left alone, so a call right after `F._sampling_space(seed, l)` is bit-identic
 - `seed::Fitting.Seed`.
 
 # Keywords
-- `l = F.PROFILE()`, `n_samples = 2000`, `n_adapt = 1000`, `δ = 0.8` (target acceptance).
+- `l = F.PROFILE()`, `n_samples = Report.DEFAULT_N_SAMPLES`, `n_adapt = Report.DEFAULT_N_ADAPT` (the `run_model` defaults), `δ = 0.8` (target acceptance).
 - `c1_tol = F.EXCL_VOL_CORR_TOL`: tolerance for the NUTS log density and gradient (the MAP search
     always uses the package default).
 - `rng_seed = nothing`: `Random.seed!` this before NUTS.
@@ -124,8 +126,8 @@ is left alone, so a call right after `F._sampling_space(seed, l)` is bit-identic
 # Exceptions
 - `ArgumentError` if `n_adapt ≥ n_samples`.
 """
-function nuts_replica(seed::F.Seed; l = F.PROFILE(), c1_tol = F.EXCL_VOL_CORR_TOL, n_samples = 2000,
-    n_adapt = 1000, δ = 0.8, rng_seed = nothing, sp = F._sampling_space(seed, l))
+function nuts_replica(seed::F.Seed; l = F.PROFILE(), c1_tol = F.EXCL_VOL_CORR_TOL, n_samples = R.DEFAULT_N_SAMPLES,
+    n_adapt = R.DEFAULT_N_ADAPT, δ = 0.8, rng_seed = nothing, sp = F._sampling_space(seed, l))
     n_adapt < n_samples || throw(ArgumentError("n_adapt must be < n_samples"))
     ℓπ = w -> F._logπ(F._θ_of_w(SVector{4,eltype(w)}(w...), sp), seed.pr, seed.wls, seed.fw, l;
         tab = seed.c1tab, c1_tol = c1_tol)
@@ -441,7 +443,7 @@ mode is the best point NUTS found, gradient error from the c1 tolerance, and loc
 - `io`, `seed`.
 
 # Keywords
-- `label = ""`, `l = F.PROFILE()`, `n_samples = 2000`, `n_adapt = 1000`.
+- `label = ""`, `l = F.PROFILE()`, `n_samples`, `n_adapt` (default: the `run_model` defaults, `Report.DEFAULT_N_SAMPLES`, `DEFAULT_N_ADAPT`).
 - `reference = nothing`: `(; q, I, σ, q_ref, I_ref)` to add the reference curve's χ² on the same points.
 
 # Returns
@@ -451,7 +453,7 @@ mode is the best point NUTS found, gradient error from the c1 tolerance, and loc
 - None beyond those of the functions it calls.
 """
 function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.PROFILE(),
-    n_samples = 2000, n_adapt = 1000)
+    n_samples = R.DEFAULT_N_SAMPLES, n_adapt = R.DEFAULT_N_ADAPT)
     p(args...) = (println(io, args...); flush(io))
     pr = seed.pr
     μ, σ, ξ_of = _space(seed)
@@ -547,7 +549,7 @@ ESS, divergent transitions and posterior sd in w. Shows whether a tolerance is t
 - None beyond those of [`nuts_replica`](@ref).
 """
 function tolerance_sweep(io::IO, seed::F.Seed; label = "", tols = (1e-5, 1e-8), rng_seeds = (7,),
-    l = F.PROFILE(), n_samples = 2000, n_adapt = 1000)
+    l = F.PROFILE(), n_samples = R.DEFAULT_N_SAMPLES, n_adapt = R.DEFAULT_N_ADAPT)
     sp = F._sampling_space(seed, l)
     out = NamedTuple[]
     for tol in tols, rs in rng_seeds
@@ -564,6 +566,72 @@ function tolerance_sweep(io::IO, seed::F.Seed; label = "", tols = (1e-5, 1e-8), 
         flush(io)
     end
     return out
+end
+
+# Posterior summary of a block of draws (rows: parameters) against a reference block: the largest mean shift in
+# reference sd units, the largest |log sd ratio|, the smallest ESS.
+function _vs_reference(P, μr, σr)
+    dm = maximum(abs.(vec(mean(P, dims = 2)) .- μr) ./ σr)
+    ds = maximum(abs.(log.(vec(std(P, dims = 2)) ./ σr)))
+    return (; dm, ds, min_ess = minimum(ess(P[i, :]) for i in 1:size(P, 1)))
+end
+
+"""
+    warmup_study(io, seed; label, adapts, n_post, n_ref, n_adapt_ref, rng_seeds, l) -> NamedTuple
+
+How short can the warm-up be, and how many draws are enough? One long reference run (`n_adapt_ref` = 1000 adaptation
+iterations, then `n_ref` draws) fixes the posterior in w. Then (1) `WARMUP` lines: its step size ε at
+chosen warm-up iterations (Stan's windowed schedule resets the step-size averaging at each window
+end); (2) `ADAPT` lines: runs with `a` adaptation iterations in `adapts` and `n_post` draws each, per
+RNG seed: final ε, steps per iteration, divergent fraction, smallest ESS, ESS per gradient evaluation,
+and the largest mean shift (reference sd units) and |log sd ratio| against the reference; (3) `DRAWS`
+lines: the same statistics on the first `n` draws of the reference (biased low, those draws are part of
+the reference), and the first `n` in steps of 100 with smallest ESS ≥ 400.
+
+# Returns
+- `(; trace, adapt, draws, n_ess400)`.
+
+# Exceptions
+- None beyond those of [`nuts_replica`](@ref).
+"""
+function warmup_study(io::IO, seed::F.Seed; label = "", adapts = (50, 100, 200, 300, 500, 1000), n_post = 1000,
+    n_ref = 4000, n_adapt_ref = 1000, rng_seeds = (7,), l = F.PROFILE())
+    sp = F._sampling_space(seed, l)
+    ref = nuts_replica(seed; l, n_samples = n_adapt_ref + n_ref, n_adapt = n_adapt_ref, rng_seed = 101, sp)
+    R = ref.post
+    μr = vec(mean(R, dims = 2)); σr = vec(std(R, dims = 2))
+    marks = filter(≤(n_adapt_ref), (10, 25, 50, 75, 100, 150, 250, 450, 950, 1000))
+    trace = [(i, ref.stats[i].step_size) for i in marks]
+    println(io, label, " WARMUP  ", join((@sprintf("%d:%.4f", i, e) for (i, e) in trace), "  "),
+        @sprintf("  final=%.4f  steps/it=%.1f", ref.ε, mean(getproperty.(ref.stats[n_adapt_ref+1:end], :n_steps))))
+    adapt = NamedTuple[]
+    for a in adapts, rs in rng_seeds
+        r = nuts_replica(seed; l, n_samples = a + n_post, n_adapt = a, rng_seed = rs, sp)
+        st = r.stats[a+1:end]
+        steps = mean(getproperty.(st, :n_steps))
+        v = _vs_reference(r.post, μr, σr)
+        row = (; a, rng_seed = rs, ε = r.ε, steps, div = mean(getproperty.(st, :numerical_error)),
+            v.min_ess, ess_per_grad = v.min_ess / sum(getproperty.(st, :n_steps)), v.dm, v.ds, seconds = r.seconds)
+        push!(adapt, row)
+        println(io, @sprintf("%s ADAPT  a=%4d seed=%s  ε=%.4f  steps=%6.1f  div=%.4f  minESS=%7.1f  ess/grad=%.5f  dm=%.3f  dsd=%.3f  t=%.2fs",
+            label, a, rs, row.ε, steps, row.div, row.min_ess, row.ess_per_grad, row.dm, row.ds, row.seconds))
+    end
+    draws = NamedTuple[]
+    for n in (100, 250, 500, 1000, 2000, n_ref)
+        n ≤ size(R, 2) || continue
+        v = _vs_reference(R[:, 1:n], μr, σr)
+        push!(draws, (; n, v...))
+        println(io, @sprintf("%s DRAWS  n=%5d  minESS=%7.1f  dm=%.3f  dsd=%.3f", label, n, v.min_ess, v.dm, v.ds))
+    end
+    n_ess400 = nothing
+    for n in 100:100:size(R, 2)
+        if minimum(ess(R[i, 1:n]) for i in 1:size(R, 1)) ≥ 400
+            n_ess400 = n
+            break
+        end
+    end
+    println(io, label, " ESS400  first n with min ESS ≥ 400: ", n_ess400 === nothing ? "none within $(size(R, 2))" : n_ess400)
+    return (; trace, adapt, draws, n_ess400)
 end
 
 end # module SeedDiagnostics

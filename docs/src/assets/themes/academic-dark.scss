@@ -1,0 +1,336 @@
+// SPDX-License-Identifier: LGPL-2.1-or-later
+
+// academic-dark.scss
+// Midnight-oxford dark variant of academic.scss for Documenter.jl.
+// Same typography (Montserrat titles/nav, TeX Gyre Pagella prose, Fira Code
+// with ligatures) and the same structure as the light theme; only the palette
+// is inverted: ink-navy page, deeper navy sidebar, ivory text.
+//
+// This overrides Documenter's built-in "documenter-dark" theme *in place*.
+//
+// Unlike academic.scss (the primary theme, which must be unscoped), a
+// secondary theme MUST be nested in `html.theme--documenter-dark { ... }`:
+// themeswap.js puts that class on <html> when the dark theme is picked and
+// disables the primary stylesheet. This mirrors Documenter's own
+// documenter-dark.scss.
+//
+// Compile with:
+//   using DocumenterTools: Themes
+//   Themes.compile("academic-dark.scss", "docs/src/assets/themes/documenter-dark.css")
+
+@charset "UTF-8";
+
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "TeX Gyre Pagella";
+  src: url("fonts/texgyrepagella-bolditalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Montserrat";
+  src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"), url("fonts/Montserrat[wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Fira Code";
+  src: url("fonts/FiraCode-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Fira Code";
+  src: url("fonts/FiraCode-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+}
+
+$themename: "documenter-dark"; // CSS file must be called `$(themename).css`
+
+// Darkly wants to @import the Lato font by default, but we don't need it.
+$bulmaswatch-import-font: false;
+
+@import "darkly/variables";
+$body-size: 16px;
+$size-6: 1rem;
+$size-7: 0.75rem;
+
+$documenter-is-dark-theme: true;
+
+// Darkly sets the font variables, so they are overridden here (after the import).
+$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+$family-serif: "TeX Gyre Pagella", Palatino, Georgia, serif;
+$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+
+// Admonition base colors, as in Documenter's dark theme.
+$red: #cb3c33;
+$orange: #d56c00;
+$yellow: #f4c72f;
+$green: #259a12;
+$turquoise: #00a1b7;
+$cyan: #3489da;
+$blue: #3c5dcd;
+$purple: #9558b2;
+$info: $blue;
+$success: $green;
+$warning: $yellow;
+$danger: $red;
+$compat: $cyan;
+$todo: $purple;
+
+// ---- Palette ---------------------------------------------------------------
+// Page background is `$body-background-color` (not Bulma's `$background`; see
+// the note in academic.scss): body, navbar, footnotes and example blocks all
+// read it. Darkly defines it, so it is reassigned after the import above.
+$body-background-color: #0f2238;
+$text: #d2c6b0;          // warm cream, kept low in luminance to avoid halation on the navy
+$text-strong: #ddd0b9;
+$link: #a9bdd9;
+$link-hover: #cbd8ea;
+$border: rgba(255, 255, 255, 0.10);
+$background: #172d47;    // Bulma-derived surfaces (tags, dropdowns, admonition bodies)
+$admonition-default: $text;
+
+$admonition-background: (
+  'default': $background, 'info': $background, 'success': $background, 'warning': $background,
+  'danger': $background, 'compat': $background
+);
+// Initialized in _admonition.scss normally; set here because that file is not
+// loaded at the top level (https://github.com/JuliaDocs/Documenter.jl/issues/1766).
+$admonition-header-background: ();
+$admonition-header-color: ();
+$admonition-body-color: ();
+$admonition-border-color: ();
+
+$shadow: #0a0e15;
+
+// Sidebar: a deeper navy than the page, so it recedes instead of glowing as
+// the light theme's navy sidebar does against cream. Hover/active states are
+// derived from these in documenter/_overrides.scss.
+$documenter-sidebar-background: #070b12;
+$documenter-sidebar-color: $text;
+$documenter-sidebar-menu-hover-background: #151f2e;
+$documenter-sidebar-menu-hover-color: $documenter-sidebar-color;
+// Text-only active item (white + bold), same as the light theme.
+$documenter-sidebar-menu-active-background: $documenter-sidebar-background;
+$documenter-sidebar-menu-active-color: $text-strong;
+$documenter-sidebar-menu-active-hover-background: #151f2e;
+$documenter-sidebar-menu-active-hover-color: $text-strong;
+
+$border-width: 1px;
+$lightness-unit: -8%;
+
+@import "documenter/utilities";
+@import "documenter/variables";
+
+$code: #ddd0b9;
+$code-background: #172d47;
+
+$documenter-docstring-shadow: none;
+
+@import "bulma/utilities/all";
+@import "bulma/base/minireset.sass";
+@import "bulma/helpers/all";
+
+// Search box, version selector etc.
+$input-color: $text;
+$input-background-color: #121c2c;
+$input-border-color: rgba(255, 255, 255, 0.15);
+$input-placeholder-color: rgba(210, 198, 176, 0.55);
+
+$search-result-link-border-color: #00d4aa;
+$search-result-link-text-color: #333;
+$search-result-link-text-background-color: #f1f5f9;
+$search-result-title-text-color: whitesmoke;
+$search-modal-kbd-color: rgba(245, 245, 245, 0.6);
+
+$button-static-color: $text;
+$button-static-background-color: $background;
+$button-static-border-color: $border;
+
+html.theme--#{$themename} {
+  @import "bulma/base/generic.sass";
+
+  @import "documenter/overrides";
+
+  @import "bulma/elements/all";
+  @import "bulma/form/all";
+  @import "bulma/components/all";
+  @import "bulma/grid/all";
+  @import "bulma/layout/all";
+
+  @import "darkly/overrides";
+
+  @import "documenter/elements";
+  @import "documenter/components/all";
+  @import "documenter/patches";
+  @import "documenter/layout/all";
+
+  @import "documenter/theme_overrides";
+
+  @import "documenter/ansicolors";
+
+  code.language-julia-repl > span.hljs-meta {
+    color: $ansi-green;
+    font-weight: bolder;
+  }
+
+  // highlight.js base scheme; the four token colours are re-tinted below.
+  @import "highlightjs/a11y-dark";
+  .hljs-subst {
+    color: #f8f8f2;
+  }
+
+  .search-result-link {
+    border-radius: 0.7em;
+    transition: all 300ms;
+  }
+  .search-result-link:hover, .search-result-link:focus {
+    background-color: rgba(0, 128, 128, 0.1);
+  }
+  .search-result-link .property-search-result-badge {
+    transition: all 300ms;
+  }
+  .search-result-link:hover .property-search-result-badge, .search-result-link:focus .property-search-result-badge {
+    color: #333 !important;
+    background-color: #f1f5f9 !important;
+  }
+  .search-result-title {
+    color: whitesmoke;
+  }
+  .search-result-highlight {
+    background-color: greenyellow;
+    color: black;
+  }
+  .search-divider {
+    border-bottom: 1px solid #5e6d6f50;
+  }
+  .w-100 {
+    width: 100%;
+  }
+  .gap-2 {
+    gap: 0.5rem;
+  }
+  .gap-4 {
+    gap: 1rem;
+  }
+
+  // ---- Our own reskin (mirrors academic.scss) ------------------------------
+
+  body {
+    color: $text;
+  }
+
+  body,
+  p,
+  .content,
+  .docstring > section > div {
+    font-family: $family-serif;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: $family-sans-serif;
+    font-weight: 700;
+    color: $text-strong;
+  }
+
+  .docstring-binding,
+  .docstring > header {
+    font-family: $family-sans-serif;
+    font-weight: 700;
+  }
+
+  #documenter .docs-sidebar,
+  #documenter .docs-sidebar * {
+    font-family: $family-sans-serif;
+  }
+  #documenter .docs-sidebar .docs-package-name a,
+  #documenter .docs-sidebar .docs-package-name {
+    color: $text;
+  }
+  #documenter .docs-sidebar .tocitem {
+    color: $text;
+  }
+  #documenter .docs-sidebar .tocitem.is-active,
+  #documenter .docs-sidebar li.is-active > .tocitem {
+    font-weight: 600;
+  }
+  // No box or divider around the active entry (see academic.scss).
+  #documenter .docs-sidebar ul.docs-menu li.is-active {
+    border: none !important;
+  }
+  #documenter .docs-sidebar ul.docs-menu {
+    border-top: none;
+  }
+
+  nav.breadcrumb {
+    font-family: $family-sans-serif;
+    font-weight: 600;
+    color: $text;
+  }
+
+  // Search field lives inside the sidebar; id selector to beat plain `.input`.
+  #documenter-search-query {
+    background-color: #121c2c;
+    color: $text;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  // The border-bottom on the navbar already separates it from the content.
+  #documenter .docs-main header.docs-navbar.headroom--not-top {
+    box-shadow: none;
+  }
+
+  code,
+  pre,
+  .documenter-example-output,
+  .docstring pre {
+    font-family: $family-monospace;
+    font-feature-settings: "calt" 1, "liga" 1;
+    background: #172d47;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+  }
+
+  // Four-colour syntax highlighting: the light theme's hues, lifted to read on
+  // a dark ground (#783ad4 -> #a692d0, #0e9080 -> #5fb4a6, #be185d -> #cf8bae).
+  .hljs-keyword,
+  .hljs-function .hljs-keyword,
+  .hljs-literal {
+    color: #a692d0;
+  }
+  .hljs-title,
+  .hljs-title.function_,
+  .hljs-name {
+    color: #a692d0;
+  }
+  .hljs-type,
+  .hljs-built_in,
+  .hljs-class .hljs-title {
+    color: #5fb4a6;
+  }
+  .hljs-number,
+  .hljs-string,
+  .hljs-symbol {
+    color: #cf8bae;
+  }
+}

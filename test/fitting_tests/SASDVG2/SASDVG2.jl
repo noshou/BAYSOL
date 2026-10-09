@@ -74,12 +74,12 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 # One run per atomic model with a deposited fit; `fit` is that model's reference curve (q scaled to Å⁻¹ by `fit_scale`; the fitted intensity is column `fit_col`; `rescale` = the file is normalized, scale it to the data).
 const RUNS = [
-    (tag = "fit1_model1", pdb = "SASDVG2_fit1_model1.pdb", fit = "SASDVG2_fit1.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 192 Å; deposited χ² = 2.103
-    (tag = "fit2_model1", pdb = "SASDVG2_fit2_model1.pdb", fit = "SASDVG2_fit2.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 173 Å; deposited χ² = 1.274
-    (tag = "fit2_model2", pdb = "SASDVG2_fit2_model2.pdb", fit = "SASDVG2_fit2.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 208 Å; deposited χ² = 1.274
-    (tag = "fit3_model1", pdb = "SASDVG2_fit3_model1.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 178 Å; deposited χ² = 1.294
-    (tag = "fit3_model2", pdb = "SASDVG2_fit3_model2.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 229 Å; deposited χ² = 1.294
-    (tag = "fit3_model3", pdb = "SASDVG2_fit3_model3.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "FoXS"),   # D_max ≈ 214 Å; deposited χ² = 1.294
+    (tag = "fit1_model1", pdb = "SASDVG2_fit1_model1.pdb", fit = "SASDVG2_fit1.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MultiFoXS 1-state"),   # D_max ≈ 192 Å; deposited χ² = 2.103
+    (tag = "fit2_model1", pdb = "SASDVG2_fit2_model1.pdb", fit = "SASDVG2_fit2.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MultiFoXS 2-state"),   # D_max ≈ 173 Å; deposited χ² = 1.274
+    (tag = "fit2_model2", pdb = "SASDVG2_fit2_model2.pdb", fit = "SASDVG2_fit2.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MultiFoXS 2-state"),   # D_max ≈ 208 Å; deposited χ² = 1.274
+    (tag = "fit3_model1", pdb = "SASDVG2_fit3_model1.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MultiFoXS 3-state"),   # D_max ≈ 178 Å; deposited χ² = 1.294
+    (tag = "fit3_model2", pdb = "SASDVG2_fit3_model2.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MultiFoXS 3-state"),   # D_max ≈ 229 Å; deposited χ² = 1.294
+    (tag = "fit3_model3", pdb = "SASDVG2_fit3_model3.pdb", fit = "SASDVG2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MultiFoXS 3-state"),   # D_max ≈ 214 Å; deposited χ² = 1.294
 ]
 
 """

@@ -77,9 +77,9 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 # One run per atomic model with a deposited fit; `fit` is that model's reference curve (q scaled to Å⁻¹ by `fit_scale`; the fitted intensity is column `fit_col`; `rescale` = the file is normalized, scale it to the data).
 const RUNS = [
-    (tag = "fit2_model1", pdb = "SASDCQ2_fit2_model1.pdb", fit = "SASDCQ2_fit2.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MES-FoXS"),   # D_max ≈ 69 Å; deposited χ² = 0.85
-    (tag = "fit3_model1", pdb = "SASDCQ2_fit3_model1.pdb", fit = "SASDCQ2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MES-FoXS"),   # D_max ≈ 71 Å; deposited χ² = 0.79
-    (tag = "fit3_model2", pdb = "SASDCQ2_fit3_model2.pdb", fit = "SASDCQ2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MES-FoXS"),   # D_max ≈ 60 Å; deposited χ² = 0.79
+    (tag = "fit2_model1", pdb = "SASDCQ2_fit2_model1.pdb", fit = "SASDCQ2_fit2.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MultiFoXS 1-state"),   # D_max ≈ 69 Å; deposited χ² = 0.85
+    (tag = "fit3_model1", pdb = "SASDCQ2_fit3_model1.pdb", fit = "SASDCQ2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MultiFoXS 2-state"),   # D_max ≈ 71 Å; deposited χ² = 0.79
+    (tag = "fit3_model2", pdb = "SASDCQ2_fit3_model2.pdb", fit = "SASDCQ2_fit3.dat", fit_scale = 1.0, fit_col = 3, rescale = false, software = "MultiFoXS 2-state"),   # D_max ≈ 60 Å; deposited χ² = 0.79
 ]
 
 """

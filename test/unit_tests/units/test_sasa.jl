@@ -16,8 +16,7 @@ using BAYSOL.MolecularStructure: MolecularStructure
 # `MolecularStructure._build` takes the radii thunk directly.
 # ---------------------------------------------------------------------------
 
-# element letter -> radius (Å): `SASA_RADII`, in test/utils/geometry.jl (shared
-# with the static snapshots in test/visualize/xyz/, which were written from these geometries).
+# element letter -> radius (Å): `SASA_RADII`, in test/utils/geometry.jl.
 include(joinpath(@__DIR__, "..", "..", "utils", "geometry.jl"))   # SASA_RADII, sph, lattices
 
 function sasa_mol(elms, crds)

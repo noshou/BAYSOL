@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Tests for test/utils/seed_diagnostics.jl, the sampler diagnostics used on the SASBDB fitting tests
-# (through test/utils/diagnose.tcl). They run on a small toy seed so that the
+# (through test/run/diagnose.tcl). They run on a small toy seed so that the
 # diagnostics cannot rot unnoticed; the numbers they produce on real fits are not asserted here.
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
@@ -175,5 +175,17 @@ end
         rows = tolerance_sweep(io, seed; label = "toy", tols = (1e-5, 1e-8), rng_seeds = (1, 2), n_samples = 120, n_adapt = 60)
         @test length(rows) == 4 && all(r -> r.ε > 0 && r.steps ≥ 1, rows)
         @test count(==('\n'), String(take!(io))) == 4
+    end
+
+    @testset "warmup_study: step-size trace, one row per (adaptation length, seed), draw statistics" begin
+        io = IOBuffer()
+        r = warmup_study(io, seed; label = "toy", adapts = (30, 60), n_post = 100, n_ref = 200, n_adapt_ref = 60, rng_seeds = (1, 2))
+        txt = String(take!(io))
+        for key in ("toy WARMUP", "toy ADAPT", "toy DRAWS", "toy ESS400")
+            @test occursin(key, txt)
+        end
+        @test length(r.adapt) == 4 && all(x -> x.ε > 0 && x.steps ≥ 1 && x.dm ≥ 0 && x.ds ≥ 0, r.adapt)
+        @test [d.n for d in r.draws] == [100, 200] && all(d -> d.min_ess > 0, r.draws)
+        @test all(e -> e[2] > 0, r.trace) && last(r.trace)[1] ≤ 60
     end
 end
