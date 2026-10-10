@@ -1,0 +1,17 @@
+fit	base	threads	stage	fingerprint	seconds	n_evals	n_modes
+SASDUN5:fit1_model2	0	8	sasa	-	0.3059	0	0
+SASDUN5:fit1_model2	0	8	forward_cache	4f007b1712b902bc	1.4310	0	0
+SASDUN5:fit1_model2	0	8	vac_exvol	-	1.1324	0	0
+SASDUN5:fit1_model2	0	8	hydration	-	0.2910	0	0
+SASDJ62:model1	0	8	sasa	-	0.0812	0	0
+SASDJ62:model1	0	8	forward_cache	2355f71effd82d3f	2.2722	0	0
+SASDJ62:model1	0	8	vac_exvol	-	1.5549	0	0
+SASDJ62:model1	0	8	hydration	-	0.6860	0	0
+SASDVG2:fit3_model2	0	8	sasa	-	0.1098	0	0
+SASDVG2:fit3_model2	0	8	forward_cache	a5acf6b7a7f6d27f	1.2545	0	0
+SASDVG2:fit3_model2	0	8	vac_exvol	-	0.9233	0	0
+SASDVG2:fit3_model2	0	8	hydration	-	0.3066	0	0
+SASDMJ9	0	8	sasa	-	0.0389	0	0
+SASDMJ9	0	8	forward_cache	146583ec821bde40	0.1056	0	0
+SASDMJ9	0	8	vac_exvol	-	0.0806	0	0
+SASDMJ9	0	8	hydration	-	0.0243	0	0

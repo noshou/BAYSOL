@@ -8,6 +8,10 @@
 # The steps, in order (all of them run even if one fails; the exit status is 1 if any failed):
 #   tcl-tests      the tests of the Tcl tools (`test/run/tcltests.tcl`)
 #   unit-tests     the unit and integration suite (`julia --project=test test/run/unittests.jl`, ~90 s)
+#   concurrency-tests  the concurrency and race tests again with six Julia threads and an interactive one
+#                  (`julia -t 6,1 test/run/unittests.jl concurrency parallel gcpause cache`, ~1 min): the full unit-tests step
+#                  runs with the thread count given by `--threads` (default one), where the parallel paths are not
+#                  exercised by real threads
 #   whitespace     trailing whitespace on the lines you changed is stripped (`git diff --check HEAD` finds the lines
 #                  of tracked files; every line of an untracked, unignored text file is stripped) and reported, never
 #                  a failure; a leftover conflict marker cannot be fixed by a tool and is a failure
@@ -17,7 +21,8 @@
 #                  regenerates the copies of the READMEs under docs/src/, and the files it changed are listed
 #                  so they go into the commit
 #
-#   --quick     skip the two Julia steps (unit-tests, docs-build): the checks that take a second
+#   --quick     skip the Julia steps (unit-tests, concurrency-tests, docs-build): the checks that take a second
+#   --threads N  run the Julia processes with N threads (as `julia -t N`: 4, auto, 4,1); default one
 #   --dry-run   print what would run, run nothing
 #
 # It never runs a fitting test or a benchmark (those need a quiet machine and the owner's approval). Needs Tcl 9
@@ -172,6 +177,11 @@ namespace eval precommit {
                 JULIA --startup-file=no \
                 --project=[file join $ROOT test] \
                 [file join $run unittests.jl] \
+            ]] \
+            [list concurrency-tests 0 [list \
+                JULIA --startup-file=no -t 6,1 \
+                --project=[file join $ROOT test] \
+                [file join $run unittests.jl] concurrency parallel gcpause cache \
             ]] \
             [list whitespace 1 {}] \
             [list results-table 1 [list \

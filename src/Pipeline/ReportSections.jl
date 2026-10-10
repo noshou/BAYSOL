@@ -5,7 +5,8 @@
 """
 The report's `=== Run ===` section: `n_atoms`, lMax, the measured and fitted point counts and the NUTS sizes, then how
 the measured curve was reduced to the fitted one (the scatterer cloud's maximum diameter `Dₘₐₓ`, the Shannon channels, the
-binning), as recorded in the run's [`Timing.StageLog`](@ref). `n_atoms`, if
+binning), as recorded in the run's [`Timing.StageLog`](@ref). The sampler's diagnostics follow directly, in the same
+section (no blank line, no header of their own). `n_atoms`, if
 given, overrides the logged count. Writes nothing when there is neither a log nor an `n_atoms`.
 """
 function _write_run_info(io::IO, log::Union{Nothing,Timing.StageLog}; n_atoms::Union{Nothing,Integer} = nothing)
@@ -13,7 +14,7 @@ function _write_run_info(io::IO, log::Union{Nothing,Timing.StageLog}; n_atoms::U
     n_atoms === nothing || (info["n_atoms"] = n_atoms)
     isempty(info) && return nothing
     println(io, "=== Run ===")
-    for k in ("n_atoms", "lMax", "n_q_raw", "n_q", "n_samples", "n_adapt")
+    for k in ("n_atoms", "lMax", "n_q_raw", "n_q", "n_samples", "n_adapt", "rng_seed")
         haskey(info, k) && @printf(io, "%-14s = %d\n", k, info[k])
     end
     if haskey(info, "D")
@@ -27,7 +28,6 @@ function _write_run_info(io::IO, log::Union{Nothing,Timing.StageLog}; n_atoms::U
                     "rebin", info["n_q_raw"], info["n_q"], info["n_nonpositive"])
         end
     end
-    println(io)
     return nothing
 end
 

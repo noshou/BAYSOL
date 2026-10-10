@@ -106,8 +106,7 @@ gradient_w(seed, sp, w; l = F.PROFILE(), tol = F.EXCL_VOL_CORR_TOL) =
 
 `infer` re-implemented step for step (MAP search and whitening, then NUTS with the same
 adaptor), but with the c1 profiling tolerance `c1_tol` chosen by the caller and the adapted
-metric, step size and per-iteration statistics returned. With `rng_seed === nothing` the global RNG
-is left alone, so a call right after `F._sampling_space(seed, l)` is bit-identical to `infer`.
+metric, step size and per-iteration statistics returned. It draws from the global RNG (the MAP starts, the step-size search and the sampler), which `rng_seed` seeds first; `infer` itself derives its streams from its own `rng_seed`, so the two give statistically equivalent, not identical, chains.
 
 # Arguments
 - `seed::Inference.Seed`.
@@ -127,8 +126,12 @@ is left alone, so a call right after `F._sampling_space(seed, l)` is bit-identic
 - `ArgumentError` if `n_adapt ≥ n_samples`.
 """
 function nuts_replica(seed::F.Seed; l = F.PROFILE(), c1_tol = F.EXCL_VOL_CORR_TOL, n_samples = R.DEFAULT_N_SAMPLES,
-    n_adapt = R.DEFAULT_N_ADAPT, δ = 0.8, rng_seed = nothing, sp = F._sampling_space(seed, l))
+    n_adapt = R.DEFAULT_N_ADAPT, δ = 0.8, rng_seed = nothing, sp = nothing)
     n_adapt < n_samples || throw(ArgumentError("n_adapt must be < n_samples"))
+    # seed first: the MAP starts (when `sp` is not given), the step-size search and the sampler all draw from this RNG
+    rng_seed === nothing || Random.seed!(rng_seed)
+    sp === nothing && (sp = F._sampling_space(seed, l))
+    rng_seed === nothing || Random.seed!(rng_seed)    # again: computing `sp` consumed draws, a given `sp` did not
     ℓπ = w -> F._logπ(F._θ_of_w(SVector{4,eltype(w)}(w...), sp), seed.pr, seed.wls, seed.fw, l;
         tab = seed.c1tab, c1_tol = c1_tol)
     ∂ = w -> begin
@@ -138,12 +141,11 @@ function nuts_replica(seed::F.Seed; l = F.PROFILE(), c1_tol = F.EXCL_VOL_CORR_TO
     end
     metric = F.DenseEuclideanMetric(4)
     ham = F.Hamiltonian(metric, ℓπ, ∂)
-    ε0 = F.find_good_stepsize(ham, zeros(4))
+    ε0 = F.find_good_stepsize(Random.default_rng(), ham, zeros(4))
     integ = F.Leapfrog(ε0)
     adaptor = F.StanHMCAdaptor(F.MassMatrixAdaptor(metric), F.StepSizeAdaptor(δ, integ))
     kernel = F.HMCKernel(F.Trajectory{F.MultinomialTS}(integ, F.GeneralisedNoUTurn()))
-    rng_seed === nothing || Random.seed!(rng_seed)
-    seconds = @elapsed samples, stats = F.sample(ham, kernel, zeros(4), n_samples, adaptor, n_adapt; progress = false, verbose = false)
+    seconds = @elapsed samples, stats = F.sample(Random.default_rng(), ham, kernel, zeros(4), n_samples, adaptor, n_adapt; progress = false, verbose = false)
     W = reduce(hcat, samples)
     return (; sp, ε0, ε = stats[end].step_size, W, post = W[:, n_adapt+1:end], stats,
         seconds, n_leapfrog = sum(getproperty.(stats, :n_steps)))

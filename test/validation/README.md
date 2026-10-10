@@ -23,5 +23,6 @@ Each validation is a folder with:
 |---|---|
 | [`shannon_binning/`](shannon_binning/README.md) | Does fitting the curve binned to Shannon channels give the same answer as fitting every point? |
 | [`map_fstop/`](map_fstop/README.md) | Does stopping each MAP start on f (not only on the gradient) change what the MAP search finds? |
+| [`threading/`](threading/README.md) | Does threading a stage change what it computes (bit for bit) and is it faster? |
 
 The feature-level correctness of what a validation covers is a unit test (for example `test_shannon.jl`, and the f-stop test in `test_sampler.jl`); the validation answers whether the change is safe on real data.

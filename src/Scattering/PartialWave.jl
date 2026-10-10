@@ -19,6 +19,7 @@ Base.size(a::SharedAmplitude) = (a.n, length(a.f))
 Base.getindex(a::SharedAmplitude, i::Int, q::Int) = a.f[q]
 using FastClosures: @closure
 using LinearAlgebra: mul!
+using ..Parallel: tmap_items, tmap_blocks, with_blas_single, worker_count
 
 """
 ±m symmetry weights: m = 0 -> 1, m > 0 -> 2.
@@ -207,30 +208,19 @@ function _compute_B_lm(
         nchunk = min(Int(_CHUNK), N)
         T = min(B_LM_TILE, nchunk)
 
-        # q-tile length so that W (every column, every degree, T atoms) fits the budget
+        # q-tile length so that W (every column, every degree, T atoms) fits the budget of one worker,
+        # B_LM_W_BYTES. A constant, not a function of the thread count or the group count, so the tile shapes
+        # (and with them the rounding) are the same at any number of threads.
         Qt = clamp(B_LM_W_BYTES ÷ (sizeof(Float64) * ncol * T * (L + 1)), 1, Q)
         qv = Vector{Float64}(qvals)
         qtiles = [qv[q0:min(q0 + Qt - 1, Q)] for q0 in 1:Qt:Q]
-
-        # [Re Y_l; −Im Y_l] stacked per degree, of the atoms of one tile
-        A  = Matrix{Float64}(undef, 2K, T)
-
-        # Ft[q, c, i]: amplitude column c of atom i (per-atom sets only)
-        Ft = Array{Float64,3}(undef, Q, ncolF, nchunk)
-
-        # W[(c-1)Qt + k, t, l+1]
-        W  = Array{Float64,3}(undef, ncol * Qt, T, L + 1)
-
-        sb = sphBess(Qt, L)
-        Scache = sphHarmCache(L)
-        ltopbuf = Vector{Int}(undef, Qt) # per q: the highest degree kept there (see below)
 
         # Negligible-Bessel cut: |jₗ(x)| ≤ xˡ/(2l+1)!! for all x ≥ 0
         # (from |J_ν(x)| ≤ (x/2)^ν/Γ(ν+1), ν ≥ −1/2), so jₗ(x) ≤ BESS_CUT
         # whenever x < x_cut(l) = (BESS_CUT·(2l+1)!!)^(1/l). For a tile
         # with largest radius r_max, degree l contributes nothing at
         # q < x_cut(l)/r_max; with q ascending those columns are a prefix,
-        # skipped below in the W writes and the product.
+        # skipped in the W writes and the product.
 
         # Unsorted q: no cut.
         qsorted = issorted(qv)
@@ -240,7 +230,6 @@ function _compute_B_lm(
             lndf += log(2l + 1.0)
             xcut[l + 1] = exp((log(BESS_CUT) + lndf) / l)
         end
-        ks = ones(Int, L + 1) # first q column (within the q-tile) kept for degree l
 
         # Atoms in order of increasing radius: the sum over atoms
         # does not care, and each tile then holds atoms of similar
@@ -248,142 +237,61 @@ function _compute_B_lm(
         # largest radius) is tight: far fewer degrees and q columns
         # survive in the inner tiles.
         order = sortperm(@view coords_sph[1, :])
+
+        # The tiles (positions in `order`), within chunks of `_CHUNK` atoms, dealt round-robin to at most
+        # B_LM_GROUPS groups (so every group gets tiles of all radii). Each group sums its tiles, in order, into
+        # its own accumulator; the accumulators are then added in group order. Fixed by the constants and the
+        # input, never by the thread count, so the groups can run on any number of threads, or serially, and
+        # give identical bits.
+        tiles = Tuple{Int,Int}[]
         for start in 1:Int(_CHUNK):N
-            # _CHUNK is a UInt64; keep the index Int
-            # (a UInt64 range underflows when reindexed
-            # by a nested view)
-            idx = @view order[start:min(start + Int(_CHUNK) - 1, N)]
-            nc = length(idx)
-            gc_checkpoint()
-
-            # amplitudes, q-contiguous per atom and column
-            # (shared sets have none: unit amplitude)
-            c = 0
-            for (s, f) in enumerate(f_sets)
-                f isa SharedAmplitude && continue
-                for ch in 1:ncols[s]
-                    c += 1
-                    # real part for channel 1, imaginary for
-                    # channel 2 (branch outside the copy)
-                    if ch == 1
-                        @inbounds for i in 1:nc
-                            @fastmath @simd for q in 1:Q
-                                Ft[q, c, i] = real(f[idx[i], q])
-                            end
-                        end
-                    else
-                        @inbounds for i in 1:nc
-                            @fastmath @simd for q in 1:Q
-                                Ft[q, c, i] = imag(f[idx[i], q])
-                            end
-                        end
-                    end
-                end
+            stop = min(start + Int(_CHUNK) - 1, N)
+            for t0 in start:T:stop
+                push!(tiles, (t0, min(t0 + T - 1, stop)))
             end
-
-            for t0 in 1:T:nc
-                ts = t0:min(t0 + T - 1, nc)
-                nt = length(ts)
-
-                # Highest degree with any kept q column in this
-                # tile (its largest radius, the largest q): Y_lm is
-                # needed only up to it, and the inner tiles of the
-                # radius-sorted atoms stop far below lMax.
-                Ltile = L
-                if qsorted
-                    rmax = maximum(i -> Float64(coords_sph[1, idx[i]]), ts)
-                    Ltile = 0
-                    for l in 1:L
-                        xcut[l + 1] ≤ qv[end] * rmax && (Ltile = l)
+        end
+        nF = ncolF   # immutable copy: the group closures below run on other threads
+        # B_LM_GROUPS groups (fewer only when there are fewer tiles): fixed by the input, whatever the thread count
+        ng = max(1, min(B_LM_GROUPS, length(tiles)))
+        groups = [tiles[g:ng:end] for g in 1:ng]
+        run_group!(Acc_g, tl, buf) = _b_lm_tiles!(
+            Acc_g, tl, buf, order, coords_sph, qv, qtiles, Qt, qsorted, xcut,
+            f_sets, ncols, fidx, ncol, T, L, Q
+        )
+        # The groups run in waves of one group per worker, each into a reused scratch accumulator, and every
+        # finished accumulator is added to Acc in group order. The additions are Acc + g₁ + g₂ + … in that
+        # order whatever the wave size, so the bits do not depend on the thread count, and the memory is one
+        # accumulator per worker (not one per group).
+        # Small inputs stay on one thread (and on OpenBLAS's own threads): with few tiles there is too little to
+        # spread, and one BLAS thread per group would lose more than the groups gain. The test is on the input
+        # only, and the groups are the same either way, so the result is too.
+        # The workers hold one accumulator each, so their number is also capped by B_LM_ACC_BYTES (the grouping, and
+        # with it the result, is not: the wave size does not change the order of the additions).
+        nw = (worker_count() > 1 && length(tiles) * Q ≥ B_LM_PARALLEL_MIN) ?
+             max(1, min(worker_count(), ng, B_LM_ACC_BYTES ÷ max(sizeof(Acc), 1))) : 1
+        pool = [zeros(Float64, size(Acc)) for _ in 1:nw]
+        # the work buffers, one set per worker, allocated here once (not inside the tasks)
+        bufs = [_b_lm_buffers(T, L, K, Q, ncol, nF, Qt) for _ in 1:nw]
+        if nw == 1
+            for g in 1:ng
+                fill!(pool[1], 0.0)
+                run_group!(pool[1], groups[g], bufs[1])
+                Acc .+= pool[1]
+            end
+        else
+            with_blas_single() do
+                for g0 in 1:nw:ng
+                    wave = g0:min(g0 + nw - 1, ng)
+                    tmap_items(1:length(wave)) do j
+                        fill!(pool[j], 0.0)
+                        run_group!(pool[j], groups[wave[j]], bufs[j])
                     end
-                end
-                tile = view(idx, ts)
-                # [Re Y; −Im Y] of the tile's atoms, straight
-                # into the product operand A (degrees 0..Ltile)
-                sphHarm!(
-                    view(A, :, 1:nt),
-                    Scache,
-                    Ltile,
-                    view(coords_sph, 2, tile),
-                    view(coords_sph, 3, tile)
-                )
-
-                for (ti, qt) in enumerate(qtiles)
-                    q0 = (ti - 1) * Qt + 1
-                    nq = length(qt)
-                    Lt = L # last degree with a kept q column in this tile
-                    if qsorted
-                        rmax = maximum(i -> Float64(coords_sph[1, idx[i]]), ts)
-                        Lt = 0
-                        for l in 1:L
-                            ks[l + 1] = searchsortedfirst(qt, xcut[l + 1] / rmax)
-                            ks[l + 1] ≤ nq && (Lt = l) # xcut grows w/ l; kept degrees are 0..Lt
-                        end
-                    end
-                    # ltop[k]: the highest degree kept at q column k
-                    # (ks is nondecreasing in l, so the kept degrees at k
-                    # are 0..ltop[k]): the Bessel ratios are needed only up to it
-                    if qsorted
-                        for l in 0:Lt
-                            lo = ks[l + 1]; hi = l < Lt ? ks[l + 2] - 1 : nq
-                            @inbounds @simd for k in lo:hi
-                                ltopbuf[k] = l
+                    # Acc += the wave's accumulators, in group order for every element, column blocks in parallel
+                    tmap_blocks(size(Acc, 2), B_LM_REDUCE_COLS) do cols
+                        @inbounds for j in 1:length(wave), c in cols
+                            @simd for r in axes(Acc, 1)
+                                Acc[r, c] += pool[j][r, c]
                             end
-                        end
-                    else
-                        fill!(view(ltopbuf, 1:nq), L)
-                    end
-
-                    # W for every atom of the tile, every degree, every column
-                    for (tt, i) in enumerate(ts)
-                        sphBessRatios!(
-                            sb,
-                            Float64(coords_sph[1, idx[i]]),
-                            qt,
-                            Lt;
-                            ltop = view(ltopbuf, 1:nq)
-                        )
-                        jm1, jm2 = sb.jm1, sb.jm2      # j₁, j₀ after pass 1
-                        _write_W!(W, Ft, jm2, fidx, q0, ks[1], nq, Qt, tt, i, 0)
-                        Lt ≥ 1 && _write_W!(W, Ft, jm1, fidx, q0, ks[2], nq, Qt, tt, i, 1)
-                        for l in 2:Lt
-                            lup, invx, R = sb.lup, sb.invx, sb.R
-                            # q columns below ks[l+1] are under the cut at
-                            # this degree and every higher one: not advanced
-                            @inbounds @fastmath @simd for k in ks[l + 1]:nq
-                                v = sphBessStep(jm1[k], jm2[k], l, lup[k], invx[k], R[k, l])
-                                jm2[k] = jm1[k]
-                                jm1[k] = v
-                            end
-                            _write_W!(W, Ft, jm1, fidx, q0, ks[l + 1], nq, Qt, tt, i, l)
-                        end
-                    end
-
-                    # one real product per degree and column, accumulated in place (BLAS)
-                    for l in 0:L
-                        kk = ks[l + 1]
-                        kk > nq && continue # the whole q-tile is below the cut
-                        k0 = l * (l + 1) ÷ 2
-                        rows = (2k0 + 1):(2k0 + 2(l + 1))
-                        Al = view(A, rows, 1:nt)
-                        for c in 1:ncol
-                            mul!(
-                                view(
-                                    Acc,
-                                    rows,
-                                    (c - 1) * Q .+ ((q0 + kk - 1):(q0 + nq - 1))
-                                ),
-                                Al,
-                                transpose(
-                                    view(
-                                        W,
-                                        (c - 1) * Qt .+ (kk:nq),
-                                        1:nt,
-                                        l + 1
-                                    )
-                                ),
-                                1.0, 1.0
-                            )
                         end
                     end
                 end
@@ -419,6 +327,198 @@ function _compute_B_lm(
     end
 end
 
+
+"""
+The work buffers of one worker of [`_compute_B_lm`](@ref) (see [`_b_lm_tiles!`](@ref)): allocated by the caller, once
+per worker, so the tasks that use them allocate nothing large.
+
+# Returns
+- `NamedTuple` `(A, Ft, W, sb, Scache, ltopbuf, ks)`.
+
+# Exceptions
+- `OutOfMemoryError` if the buffers do not fit.
+"""
+function _b_lm_buffers(T::Int, L::Int, K::Int, Q::Int, ncol::Int, ncolF::Int, Qt::Int)
+    return (;
+        # [Re Y_l; −Im Y_l] stacked per degree, of the atoms of one tile
+        A  = Matrix{Float64}(undef, 2K, T),
+        # Ft[q, c, tt]: amplitude column c of the tile's atom tt (per-atom sets only)
+        Ft = Array{Float64,3}(undef, Q, ncolF, T),
+        # W[(c-1)Qt + k, t, l+1]
+        W  = Array{Float64,3}(undef, ncol * Qt, T, L + 1),
+        sb = sphBess(Qt, L),
+        Scache = sphHarmCache(L),
+        ltopbuf = Vector{Int}(undef, Qt),  # per q: the highest degree kept there (see below)
+        ks = ones(Int, L + 1),             # first q column (within the q-tile) kept for degree l
+    )
+end
+
+"""
+The tiles `tl` of [`_compute_B_lm`](@ref) (pairs of positions in `order`, ascending), summed into `Acc_g`
+(`2K × ncol·Q`): for each tile the amplitude columns, the spherical harmonics of its atoms, and for each q-tile
+the Bessel sweep, W and the per-degree products, using the work buffers `buf` ([`_b_lm_buffers`](@ref)); groups
+that run concurrently need different `buf` and `Acc_g`. `Acc_g` must be zero on entry.
+
+# Returns
+- `nothing`; `Acc_g` is updated in place.
+
+# Exceptions
+- `BoundsError` if the buffers or tiles do not match the inputs' sizes (a caller error).
+"""
+function _b_lm_tiles!(
+    Acc_g::Matrix{Float64},
+    tl::Vector{Tuple{Int,Int}},
+    buf,
+    order::Vector{Int},
+    coords_sph::AbstractMatrix{<:Real},
+    qv::Vector{Float64},
+    qtiles::Vector{Vector{Float64}},
+    Qt::Int,
+    qsorted::Bool,
+    xcut::Vector{Float64},
+    f_sets::Tuple{Vararg{AbstractMatrix{<:Number}}},
+    ncols::Tuple{Vararg{Int}},
+    fidx::Vector{Int},
+    ncol::Int,
+    T::Int,
+    L::Int,
+    Q::Int
+)::Nothing
+    A, Ft, W, sb, Scache, ltopbuf, ks = buf.A, buf.Ft, buf.W, buf.sb, buf.Scache, buf.ltopbuf, buf.ks
+
+    for (a, b) in tl
+        tile = view(order, a:b)
+        nt = length(tile)
+        gc_checkpoint()
+
+        # amplitudes, q-contiguous per atom and column
+        # (shared sets have none: unit amplitude)
+        c = 0
+        for (s, f) in enumerate(f_sets)
+            f isa SharedAmplitude && continue
+            for ch in 1:ncols[s]
+                c += 1
+                # real part for channel 1, imaginary for
+                # channel 2 (branch outside the copy)
+                if ch == 1
+                    @inbounds for i in 1:nt
+                        @fastmath @simd for q in 1:Q
+                            Ft[q, c, i] = real(f[tile[i], q])
+                        end
+                    end
+                else
+                    @inbounds for i in 1:nt
+                        @fastmath @simd for q in 1:Q
+                            Ft[q, c, i] = imag(f[tile[i], q])
+                        end
+                    end
+                end
+            end
+        end
+
+        # Highest degree with any kept q column in this
+        # tile (its largest radius, the largest q): Y_lm is
+        # needed only up to it, and the inner tiles of the
+        # radius-sorted atoms stop far below lMax.
+        rmax = qsorted ? maximum(i -> Float64(coords_sph[1, i]), tile) : 0.0
+        Ltile = L
+        if qsorted
+            Ltile = 0
+            for l in 1:L
+                xcut[l + 1] ≤ qv[end] * rmax && (Ltile = l)
+            end
+        end
+        # [Re Y; −Im Y] of the tile's atoms, straight
+        # into the product operand A (degrees 0..Ltile)
+        sphHarm!(
+            view(A, :, 1:nt),
+            Scache,
+            Ltile,
+            view(coords_sph, 2, tile),
+            view(coords_sph, 3, tile)
+        )
+
+        for (ti, qt) in enumerate(qtiles)
+            q0 = (ti - 1) * Qt + 1
+            nq = length(qt)
+            Lt = L # last degree with a kept q column in this tile
+            if qsorted
+                Lt = 0
+                for l in 1:L
+                    ks[l + 1] = searchsortedfirst(qt, xcut[l + 1] / rmax)
+                    ks[l + 1] ≤ nq && (Lt = l) # xcut grows w/ l; kept degrees are 0..Lt
+                end
+            end
+            # ltop[k]: the highest degree kept at q column k
+            # (ks is nondecreasing in l, so the kept degrees at k
+            # are 0..ltop[k]): the Bessel ratios are needed only up to it
+            if qsorted
+                for l in 0:Lt
+                    lo = ks[l + 1]; hi = l < Lt ? ks[l + 2] - 1 : nq
+                    @inbounds @simd for k in lo:hi
+                        ltopbuf[k] = l
+                    end
+                end
+            else
+                fill!(view(ltopbuf, 1:nq), L)
+            end
+
+            # W for every atom of the tile, every degree, every column
+            for tt in 1:nt
+                sphBessRatios!(
+                    sb,
+                    Float64(coords_sph[1, tile[tt]]),
+                    qt,
+                    Lt;
+                    ltop = view(ltopbuf, 1:nq)
+                )
+                jm1, jm2 = sb.jm1, sb.jm2      # j₁, j₀ after pass 1
+                _write_W!(W, Ft, jm2, fidx, q0, ks[1], nq, Qt, tt, tt, 0)
+                Lt ≥ 1 && _write_W!(W, Ft, jm1, fidx, q0, ks[2], nq, Qt, tt, tt, 1)
+                for l in 2:Lt
+                    lup, invx, R = sb.lup, sb.invx, sb.R
+                    # q columns below ks[l+1] are under the cut at
+                    # this degree and every higher one: not advanced
+                    @inbounds @fastmath @simd for k in ks[l + 1]:nq
+                        v = sphBessStep(jm1[k], jm2[k], l, lup[k], invx[k], R[k, l])
+                        jm2[k] = jm1[k]
+                        jm1[k] = v
+                    end
+                    _write_W!(W, Ft, jm1, fidx, q0, ks[l + 1], nq, Qt, tt, tt, l)
+                end
+            end
+
+            # one real product per degree and column, accumulated in place (BLAS)
+            for l in 0:L
+                kk = ks[l + 1]
+                kk > nq && continue # the whole q-tile is below the cut
+                k0 = l * (l + 1) ÷ 2
+                rows = (2k0 + 1):(2k0 + 2(l + 1))
+                Al = view(A, rows, 1:nt)
+                for c in 1:ncol
+                    mul!(
+                        view(
+                            Acc_g,
+                            rows,
+                            (c - 1) * Q .+ ((q0 + kk - 1):(q0 + nq - 1))
+                        ),
+                        Al,
+                        transpose(
+                            view(
+                                W,
+                                (c - 1) * Qt .+ (kk:nq),
+                                1:nt,
+                                l + 1
+                            )
+                        ),
+                        1.0, 1.0
+                    )
+                end
+            end
+        end
+    end
+    return nothing
+end
 
 """
 W[(c−1)Qt + k, tt, l+1] = Ft[q0+k−1, fidx[c], i]·j[k] (just j[k]

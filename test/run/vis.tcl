@@ -9,6 +9,7 @@
 #   NAME       the checks to run (see --list). Every one must exist, or nothing runs.
 #              With none given, every check runs, one after the other.
 #   --list     show the checks and what each one does
+#   --threads N  run the Julia processes with N threads (as `julia -t N`: 4, auto, 4,1); default one
 #   --dry-run  print what would be run, run nothing
 #
 # Each check is one call in a fresh Julia process in test/visualize/'s own environment. Needs Tcl 9 and `julia`

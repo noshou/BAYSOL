@@ -207,6 +207,8 @@ NUTS then samples w with θ = μ + σ·(ẑ + S·w) (`_θ_of_w`), in which the p
 
 ### NUTS via AdvancedHMC.jl
 
+`infer(...; rng_seed)` makes the run reproducible: one `UInt64` (the `rng_seed`, or a draw from the default RNG, so `Random.seed!` before the call also fixes it) is mixed with each random draw's purpose and index into that draw's own stream (`Parallel.stream`): MAP start `i`, the NUTS chain. The value is printed in the report's `=== Run ===` section; passing it back reproduces the fit exactly, at any number of Julia threads. The MAP search stays serial: warm it takes about 8 ms, so threading it was measured slower (`test/validation/threading/`).
+
 `infer` returns an `Inferred{S,N}`: the result of one sampling run, holding the posterior draws of ξ (warm-up included), AdvancedHMC.jl's per-iteration statistics, and for every draw its re-profiled scale, `bkgrnd_corr`, c1, reduced χ² and predicted curve, plus the likelihood type and the run's stage log. `BAYSOL.run_model` hands back the same type with the first `n_adapt` draws dropped.
 
 `infer(seed, n_samples, n_adapt; l=PROFILE(), δ=DEFAULT_TARGET_ACCEPT)` (`DEFAULT_TARGET_ACCEPT = 80`, Stan's usual target acceptance rate) proceeds as follows:

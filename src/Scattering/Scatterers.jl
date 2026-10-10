@@ -34,10 +34,23 @@ function _gaussian_dummy(
 )::Matrix{Float64}
     any(<(0), vols) && throw(ArgumentError("_gaussian_dummy: volumes must be ≥ 0"))
 
-    # v^(2/3) once per dummy: if inside the fused broadcast it is a `pow` per (dummy, q) pair
-    v23 = vols .^ (2 / 3)
-    # (N,) against (1, Q) broadcasts to the (N, Q) f_atoms layout.
-    return vols .* exp.(.-(qvals' .^ 2) .* v23 ./ (4π))
+    # v^(2/3) once per dummy: if inside the loop it is a `pow` per (dummy, q) pair
+    v23 = Float64.(vols .^ (2 / 3))
+    v = Float64.(vols)
+    q2 = Float64.(qvals) .^ 2
+    N, Q = length(v), length(q2)
+    # the (N, Q) f_atoms layout, filled in blocks of rows on the Julia threads (every entry is independent, and
+    # the arithmetic is the broadcast's: v · exp(−q² · v^(2/3) / 4π))
+    out = Matrix{Float64}(undef, N, Q)
+    tmap_blocks(N, ATOM_BLOCK; threaded = N ≥ ATOM_PARALLEL_MIN) do blk
+        @inbounds for k in 1:Q
+            mq2 = -q2[k]
+            for i in blk
+                out[i, k] = v[i] * exp(mq2 * v23[i] / (4π))
+            end
+        end
+    end
+    return out
 end
 
 """

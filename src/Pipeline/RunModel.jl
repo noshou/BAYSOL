@@ -83,6 +83,9 @@ whitened coordinates.
 - `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
     (0, 100) exclusive (validated below); the default, `DEFAULT_TARGET_ACCEPT`,
     is Stan's usual 80%, used here too absent a specific reason to retarget it.
+- `rng_seed::Union{Nothing,Integer}=nothing`: the run's random seed (see [`Inference.infer`](@ref)).
+    To reproduce a fit exactly, pass the `rng_seed` printed in its report's `=== Run ===` section; `nothing`
+    picks a fresh one (so `Random.seed!` before the call also fixes the run).
 
 # Returns
 A 4-tuple (fit, divergencerate, map, curve):
@@ -98,7 +101,8 @@ function run_model(
     n_adapt::Int64=DEFAULT_N_ADAPT;
     quantiles::AbstractString=DEFAULT_QUANTILES,
     l::Inference.LIKELIHOOD=Inference.PROFILE(),
-    δ::Real=DEFAULT_TARGET_ACCEPT
+    δ::Real=DEFAULT_TARGET_ACCEPT,
+    rng_seed::Union{Nothing,Integer}=nothing
 )::Union{
     Tuple{Inference.Inferred, Float64, MAPResult, QuantileResult},
     Tuple{Inference.Inferred, Float64, Nothing, Nothing}
@@ -137,7 +141,7 @@ function run_model(
     end
 
     # calculate unfiltered fit
-    fit_unfiltered = Inference.infer(seed, n_samples, n_adapt; l=l, δ=δ)
+    fit_unfiltered = Inference.infer(seed, n_samples, n_adapt; l=l, δ=δ, rng_seed=rng_seed)
     t_post = Timing.tick()
 
     # filter-out warmup draws

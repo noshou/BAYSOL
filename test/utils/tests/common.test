@@ -101,5 +101,23 @@ test rm_tree-refuses-other-names {a directory not named baysol-bench-* is never 
     list $msg [file isdirectory $scratch/target]
 } -result "{rm_tree: refusing to delete $scratch/target} 1"
 
+# --threads N is taken out of an argument list and becomes JULIA_NUM_THREADS.
+test take_threads-1 {--threads leaves the other arguments and sets the environment} -body {
+    set had [info exists ::env(JULIA_NUM_THREADS)]
+    if {$had} { set old $::env(JULIA_NUM_THREADS) }
+    set rest [take_threads {SASDMJ9 --threads 4,1 --report}]
+    set got [list $rest $::env(JULIA_NUM_THREADS)]
+    if {$had} { set ::env(JULIA_NUM_THREADS) $old } else { unset ::env(JULIA_NUM_THREADS) }
+    set got
+} -result {{SASDMJ9 --report} 4,1}
+
+test take_threads-2 {no --threads: arguments unchanged, environment untouched} -body {
+    take_threads {SASDMJ9 --report}
+} -result {SASDMJ9 --report}
+
+test take_threads-3 {--threads without a value is an error} -body {
+    take_threads {--threads}
+} -returnCodes error -result {--threads needs a value (e.g. 4, auto, 4,1)}
+
 file delete -force $scratch
 cleanupTests
