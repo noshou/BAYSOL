@@ -20,6 +20,20 @@ version = "1.24.0"
     ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
     EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
 
+[[deps.AbstractFFTs]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "d92ad398961a3ed262d8bf04a1a2b8340f915fef"
+uuid = "621f4979-c628-5d54-868e-fcf4e3e8185c"
+version = "1.5.0"
+
+    [deps.AbstractFFTs.extensions]
+    AbstractFFTsChainRulesCoreExt = "ChainRulesCore"
+    AbstractFFTsTestExt = "Test"
+
+    [deps.AbstractFFTs.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
 [[deps.AbstractMCMC]]
 deps = ["BangBang", "ConsoleProgressMonitor", "Dates", "Distributed", "LogDensityProblems", "Logging", "LoggingExtras", "ProgressLogging", "Random", "StatsBase", "TerminalLoggers", "UUIDs"]
 git-tree-sha1 = "328c7d50f307c66308a915abb20d9889e5aab48b"
@@ -165,7 +179,7 @@ uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 version = "1.11.0"
 
 [[deps.BAYSOL]]
-deps = ["AdvancedHMC", "BioStructures", "Bumper", "CondaPkg", "DBInterface", "Dierckx", "DiffResults", "Distributions", "Downloads", "FastClosures", "ForwardDiff", "HypothesisTests", "JSON3", "LinearAlgebra", "LogExpFunctions", "NearestNeighbors", "OhMyThreads", "Optim", "PrecompileTools", "Printf", "Quickhull", "Random", "SQLite", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase"]
+deps = ["AdvancedHMC", "BioStructures", "Bumper", "CondaPkg", "DBInterface", "Dierckx", "DiffResults", "Distributions", "Downloads", "FastClosures", "ForwardDiff", "HypothesisTests", "JSON3", "LinearAlgebra", "LogExpFunctions", "MCMCDiagnosticTools", "NearestNeighbors", "OhMyThreads", "Optim", "PrecompileTools", "Printf", "Quickhull", "Random", "SQLite", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase"]
 path = ".."
 uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 version = "0.2.0"
@@ -857,6 +871,18 @@ git-tree-sha1 = "e16fd69604bef06cb3fe9da09b315005c9c34564"
 uuid = "6f1432cf-f94c-5a45-995e-cdbf5db27b0b"
 version = "3.9.0"
 
+[[deps.MCMCDiagnosticTools]]
+deps = ["AbstractFFTs", "DataAPI", "DataStructures", "Distributions", "LinearAlgebra", "MLJModelInterface", "Random", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "Tables"]
+git-tree-sha1 = "345bedeaf7d650f673fefa042dd8384c63de6c68"
+uuid = "be115224-59cd-429b-ad48-344e309966f0"
+version = "0.3.19"
+
+[[deps.MLJModelInterface]]
+deps = ["InteractiveUtils", "REPL", "Random", "ScientificTypesBase", "StatisticalTraits"]
+git-tree-sha1 = "c275fae2e693206b4527dd9d2382aa15359ef3ed"
+uuid = "e80e1ace-859a-464e-9ed9-23947d8ae3ea"
+version = "1.12.1"
+
 [[deps.MacroTools]]
 git-tree-sha1 = "1e0228a030642014fe5cfe68c2c0a818f9e3f522"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
@@ -1180,6 +1206,12 @@ git-tree-sha1 = "1ccd7f7235fe700bfb57dd6dd9984cce08f517d2"
 uuid = "76ed43ae-9a5d-5a62-8c75-30186b810ce8"
 version = "3.53.4+0"
 
+[[deps.ScientificTypesBase]]
+deps = ["InteractiveUtils"]
+git-tree-sha1 = "e785eaa35a0f5518a388f9010e66fda64ea95ede"
+uuid = "30f210dd-8aff-4c5f-94ba-8e64358c1161"
+version = "3.1.0"
+
 [[deps.ScopedValues]]
 deps = ["HashArrayMappedTries", "Logging"]
 git-tree-sha1 = "67a144433c4ce877ee6d1ada69a124d6b1ecf7be"
@@ -1252,6 +1284,12 @@ version = "1.9.22"
 git-tree-sha1 = "6ab403037779dae8c514bad259f32a447262455a"
 uuid = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 version = "1.4.4"
+
+[[deps.StatisticalTraits]]
+deps = ["ScientificTypesBase"]
+git-tree-sha1 = "89f86d9376acd18a1a4fbef66a56335a3a7633b8"
+uuid = "64bff920-2084-43da-a3e6-9bb72801c0c9"
+version = "3.5.0"
 
 [[deps.Statistics]]
 deps = ["LinearAlgebra"]

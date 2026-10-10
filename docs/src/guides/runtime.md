@@ -91,6 +91,6 @@ What runs on the threads, and what it buys on the three largest fitting tests (S
 
 - the multipole expansion of the forward cache (`compute_B_lm`: the atoms are cut into tiles, dealt to 24 groups fixed by the input, summed per group and added in group order), the excluded volumes, the SASA surface and the bead classification, and the amplitude fills (`_gaussian_dummy`, `form_factors`);
 - `forward_cache` plus SASA take about 2.1× less time at 4 threads and about 2.5× at 6–8 (the largest structure's `forward_cache` alone goes from 3.4 s to 1.2 s at 8 threads, 2.8×), and the vacuum + excluded-volume `B_lm` pass alone about 2.4× at 6; the gain flattens above four threads because the efficiency cores are slower than the performance cores and every wave of groups waits for its slowest worker;
-- not threaded: the MAP search and its Hessian (the whole search is about 8 ms warm, and threading it measured 0.71×, slower), the NUTS chain (sequential by nature; several chains are the way to use more cores there), and PROPKA and pdb2pqr (external processes).
+- not threaded: the MAP search and its Hessian (the whole search is about 8 ms warm, and threading it measured 0.71×, slower), each NUTS chain (sequential by nature; the chains run side by side, one task each, see `Inference.infer`), and PROPKA and pdb2pqr (external processes).
 
 The details and the criteria these numbers were judged against are in the threading validation (`test/validation/threading/`).
