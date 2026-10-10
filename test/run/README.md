@@ -28,6 +28,7 @@ tclsh test/run/fittings.tcl SASDMJ9 --bench --approved          # runs the bench
 tclsh test/run/validate.tcl --list                              # the validations and their questions
 tclsh test/run/validate.tcl map_fstop                           # prints the validation's plan; runs nothing
 tclsh test/run/validate.tcl map_fstop --approved                # runs it on every fit (see below)
+tclsh test/run/validate.tcl threading --threads 4 --approved     # any entry point takes --threads N (JULIA_NUM_THREADS: 4, auto, 4,1)
 tclsh test/run/diagnose.tcl --warmup                            # no fit named: every run of every fitting test (53)
 tclsh test/run/diagnose.tcl SASDMJ9                              # every diagnostic part on this fit
 tclsh test/run/diagnose.tcl --warmup --seeds 1,2,3 SASDMJ9      # only the warm-up study, three RNG seeds
@@ -97,7 +98,7 @@ Runs the [tcltest](https://www.tcl-lang.org/man/tcl9.0/TclCmd/tcltest.html) file
 tclsh test/run/precommit.tcl [--quick] [--dry-run]
 ```
 
-The single entry point to run before a commit. Steps, in order: **tcl-tests**, **unit-tests** (~90 s), **whitespace** (trailing whitespace on the lines you changed, untracked files included, is stripped and reported, never a failure; only a leftover conflict marker fails), **results-table** (`results_table.tcl --check`: the Results table in `fitting_tests/README.md` is the one generated from the reports) and **docs-build** (~20 s, strict; the files it regenerates under `docs/src/` are listed, since they belong in the commit). Every step runs even if an earlier one failed, a summary says which did, and the exit status is 1 if any failed. `--quick` skips the two Julia steps; `--dry-run` prints the plan. It never runs a fitting test or a benchmark.
+The single entry point to run before a commit. Steps, in order: **tcl-tests**, **unit-tests** (~90 s), **whitespace** (trailing whitespace on the lines you changed, untracked files included, is stripped and reported, never a failure; only a leftover conflict marker fails), **results-table** (`results_table.tcl --check`: the Results table in `fitting_tests/README.md` is the one generated from the reports) and **concurrency-tests** (~1 min: the concurrency and race tests again with six Julia threads and an interactive one, so the parallel paths run on real threads), **docs-build** (~20 s, strict; the files it regenerates under `docs/src/` are listed, since they belong in the commit). Every step runs even if an earlier one failed, a summary says which did, and the exit status is 1 if any failed. `--quick` skips the Julia steps; `--dry-run` prints the plan. It never runs a fitting test or a benchmark.
 
 ## Requirements
 

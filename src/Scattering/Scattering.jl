@@ -8,7 +8,7 @@ averaged detector intensity `I_calc(q)` out.
 One submodule and four included files (all but `SphFuncs` are plain files `include`d into `Scattering`):
 
 - `SphFuncs`    -   (submodule `Scattering.SphFuncs`) `Y_lm`, `j_l`, normalised Legendre.
-- `FormFactor` -   X-ray atomic form factors from the bundled `form_factors.sqlite3`.
+- `FormFactor`  -   X-ray atomic form factors from the bundled `form_factors.sqlite3`.
 - `PartialWave` -   `compute_B_lm` (the multipole moments), plus
                     `self_scatter` / `cross_scatter` / `partial_wave_weights`
                     (the reductions to `S_ab(q)`).
@@ -176,6 +176,8 @@ using ..SASA: PROBE_RADIUS, SHELL_N_TARGET
 using ..PhysicalConstants: UNIT_OF_δρ
 using ..GCPause: gc_checkpoint
 using ..Cache: Lazy, force
+using ..Parallel: tmap_blocks
+using ..MolecularStructure: ATOM_BLOCK, ATOM_PARALLEL_MIN
 using LinearAlgebra: mul!
 
 """
@@ -197,11 +199,40 @@ with [`B_LM_W_BYTES`](@ref). Results are tile-invariant up to rounding.
 const B_LM_TILE = 256
 
 """
-Memory budget, in bytes, for the per-tile W buffer (all degrees ≤ lMax, every
-amplitude column, a q-tile) in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm);
-the q-tile length is chosen to fit it.
+Memory budget, in bytes, for the W buffer of one worker (all degrees ≤ lMax, every amplitude column, a q-tile) in
+[`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm); the q-tile length is chosen to fit it. 8 MiB: wider
+tiles measured no faster, and every worker holds one.
 """
-const B_LM_W_BYTES = 64 * 2^20
+const B_LM_W_BYTES = 8 * 2^20
+
+"""
+Number of tile groups of [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm): the tiles are dealt
+round-robin to this many groups, each summed into its own accumulator (memory: this many `2K × ncol·Q` matrices),
+and the groups run on the Julia threads in waves of one group per worker. A constant, not the thread count, so the
+result is bit-identical at any number of threads. 24 divides evenly over 1, 2, 3, 4, 6, 8 and 12 workers (and
+fills 7 to 86 %), so ordinary core counts all stay busy; the cost is one more accumulator addition per group.
+"""
+const B_LM_GROUPS = 24
+
+"""
+Memory budget, in bytes, for the accumulators of the workers of
+[`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm) (one `2K × ncol·Q` matrix of doubles each, up to
+~125 MB for the largest fitting test): the number of workers is cut when they would not fit, which keeps the memory
+of a threaded build modest on an ordinary laptop. It limits parallelism only, never the grouping or the result. 1 GiB.
+"""
+const B_LM_ACC_BYTES = 1024 * 2^20
+
+"""
+Smallest `tiles × Q` for which [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm) spreads its tile
+groups over the Julia threads. Below it the work (a few tens of milliseconds) is run on one thread, with OpenBLAS
+threaded, which measured faster than the groups on several threads (SASDMJ9: 11 tiles × 121 q = 1331 was 1.3–1.8×
+slower threaded; SASDJ62: 38 × 411 ≈ 15,600 was 2× faster). The decision depends on the input only, so the result
+does not depend on it.
+"""
+const B_LM_PARALLEL_MIN = 4096
+
+"Columns of the accumulator per task when the tile groups' sums are added up in parallel in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm)."
+const B_LM_REDUCE_COLS = 16
 
 """
 Coefficients of

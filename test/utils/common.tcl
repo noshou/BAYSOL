@@ -14,10 +14,29 @@ set FIT_DIR test/fitting_tests
 # The report patterns write it as @N@.
 set NUM {([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)}
 
+# Takes `--threads N` (N as `julia -t` takes it: `4`, `auto`, `4,1` for four workers and one interactive thread)
+# out of an argument list and sets JULIA_NUM_THREADS from it, which every Julia process started afterwards
+# inherits. Returns the list without the option. An error if N is missing.
+proc take_threads {argv} {
+    set i [lsearch -exact $argv --threads]
+    if {$i < 0} {
+        return $argv
+    }
+    if {$i + 1 >= [llength $argv]} {
+        error "--threads needs a value (e.g. 4, auto, 4,1)"
+    }
+    set ::env(JULIA_NUM_THREADS) [lindex $argv $i+1]
+    return [lreplace $argv $i $i+1]
+}
+
 # Runs `cmd args` as a script's main program: UTF-8 stdout, and a closed pipe (`... | head`) ends the
-# program quietly instead of with a stack trace.
+# program quietly instead of with a stack trace. A `--threads N` among the arguments (the entry points pass
+# their whole argument list as the one argument) is taken out first, see `take_threads`.
 proc main {cmd args} {
     fconfigure stdout -encoding utf-8
+    if {[llength $args] == 1} {
+        set args [list [take_threads [lindex $args 0]]]
+    }
     if {[catch {{*}$cmd {*}$args} err opts]} {
         if {[string match {*broken pipe*} $err]} {
             exit 0

@@ -132,6 +132,11 @@ taken in two central-difference passes: step `MAP_HESS_STEP`, then
 - `seed::Seed`: priors, data, forward cache and c1 tables; `seed.θ₀` is the first start.
 - `l::LIKELIHOOD`: `PROFILE()` or `MARGINAL()`, as [`_logπ`](@ref).
 
+# Keywords
+- `f_abstol`, `successive_f_tol`: the f-based stopping rule of each L-BFGS start.
+- `base::UInt64`: the run's random base value; start `i ≥ 2` draws its prior sample from the stream
+    `stream(base, _RNG_MAP_STARTS, i)`. Default: a fresh draw from the default RNG.
+
 # Returns
 - [`_SamplingSpace`](@ref). If no start reaches a finite optimum, ẑ is the seed's
     z₀ and S the identity (plain prior standardization, as without this step). If the
@@ -141,7 +146,8 @@ function _sampling_space(
     seed::Seed{<:Real,N},
     l::LIKELIHOOD;
     f_abstol::Real = MAP_F_ABSTOL,
-    successive_f_tol::Int = MAP_F_SUCCESSIVE
+    successive_f_tol::Int = MAP_F_SUCCESSIVE,
+    base::UInt64 = draw_base()
 )::_SamplingSpace where {N}
     μ, σ = θ_prior_moments(seed.pr)
     f  = z -> _neglogπ(SVector{N}(z...), μ, σ, seed, l, EXCL_VOL_CORR_TOL)
@@ -161,10 +167,14 @@ function _sampling_space(
     )
 
     z₀ = _standardize(seed.θ₀, seed.pr)
+    # start i ≥ 2 draws from its own stream, so the starts do not depend on the order they run in
     starts = vcat(
         [z₀],
-        [_standardize(Θ(_ξ₀(seed.pr), seed.pr)[1], seed.pr) for _ in 2:MAP_N_STARTS]
+        [_standardize(Θ(_ξ₀(seed.pr, stream(base, _RNG_MAP_STARTS, i)), seed.pr)[1], seed.pr)
+         for i in 2:MAP_N_STARTS]
     )
+    # serial on purpose: the whole search is ~8 ms warm (a start is ~1 ms), so threading it was measured
+    # slower (0.71× at 4 threads, test/validation/threading/)
     optima = Tuple{SVector{N,Float64},Float64}[]
     n_evals = 0
     for zs in starts

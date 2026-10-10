@@ -20,6 +20,7 @@
 #   --tols 1e-5,1e-8        c1 tolerances (tolerance)
 #   --seeds 1,2,3           RNG seeds (warmup, tolerance; default 7)
 #   --out DIR               write DIR/<part>.txt for each part instead of stdout
+#   --threads N  run the Julia processes with N threads (as `julia -t N`: 4, auto, 4,1); default one
 #   --dry-run               print the commands, run nothing
 #   --list                  the fitting tests and their tags
 #
