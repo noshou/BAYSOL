@@ -43,14 +43,18 @@ function _write_diagnostics(io::IO, fit, divergence_rate::Real, map_params)
     # diagnosing whether momentum resampling explores the Hamiltonian's
     # energy level sets adequately. Values below ~0.2-0.3 are the usual
     # "may be problematic, consider reparameterizing" threshold.
-    ebfmi = mean(diff(H) .^ 2) / var(H)
-    @printf(io, "%-14s = %d\n", "iterations", length(stats))
-    @printf(io, "%-14s = %.4f\n", "mean_accept", mean(accept))
-    @printf(io, "%-14s = %.2f (max %d)\n", "tree_depth", mean(depth), maximum(depth))
-    @printf(io, "%-14s = %.2f\n", "mean_n_steps", mean(nsteps))
-    @printf(io, "%-14s = %.4f\n", "EBFMI", ebfmi)
+    # (per chain, since the chains' energies are not one sequence;
+    # the worst chain is reported)
+    ebfmi = minimum(
+        (h = H[fit.chain .== c]; mean(diff(h) .^ 2) / var(h)) for c in unique(fit.chain)
+    )
+    @printf(io, "%-15s = %d\n", "iterations", length(stats))
+    @printf(io, "%-15s = %.4f\n", "mean_accept", mean(accept))
+    @printf(io, "%-15s = %.2f (max %d)\n", "tree_depth", mean(depth), maximum(depth))
+    @printf(io, "%-15s = %.2f\n", "mean_n_steps", mean(nsteps))
+    @printf(io, "%-15s = %.4f\n", "EBFMI", ebfmi)
     if map_params !== nothing && haskey(map_params, "cavity_shell_frac")
-        @printf(io, "%-14s = %.4f\n", "cavity_frac", map_params["cavity_shell_frac"])
+        @printf(io, "%-15s = %.4f\n", "cavity_frac", map_params["cavity_shell_frac"])
     end
 
     # c1 is profiled, not sampled with a prior, so this reports whether the
@@ -58,14 +62,59 @@ function _write_diagnostics(io::IO, fit, divergence_rate::Real, map_params)
     # EXCL_VOL_CORR_BOUNDS -- see Inference.excl_vol_saturation.
     excl_vol_sat = map_params === nothing ? 0.0 : get(map_params, "excl_vol_sat", 0.0)
     if excl_vol_sat == 0.0
-        @printf(io, "%-14s = false\n", "excl_vol_sat")
+        @printf(io, "%-15s = false\n", "excl_vol_sat")
     elseif excl_vol_sat > 0
-        @printf(io, "%-14s = true, c1 -> +∞\n", "excl_vol_sat")
+        @printf(io, "%-15s = true, c1 -> +∞\n", "excl_vol_sat")
     else
-        @printf(io, "%-14s = true, c1 -> -∞\n", "excl_vol_sat")
+        @printf(io, "%-15s = true, c1 -> -∞\n", "excl_vol_sat")
     end
-    @printf(io, "%-14s = %.4f\n", "divergence_rate", divergence_rate)
+    @printf(io, "%-15s = %.4f\n", "divergence_rate", divergence_rate)
+    _write_chains(io, fit.diagnostics)
     println(io)
+    return nothing
+end
+
+"""
+The chain lines of the diagnostics: how many chains were pooled and why any was not, the posterior modes the chains
+settled in with their mass shares (when there is more than one; flagged when the shares are uncertain),
+and the worst rank-normalized split R̂ and the smallest bulk and tail effective sample
+sizes over the four parameters and the log density of the pooled draws, flagged when
+R̂ exceeds `Inference.RHAT_OK`.
+"""
+function _write_chains(io::IO, d::Inference.ChainDiagnostics)
+    npool = count(d.pooled)
+    @printf(io, "%-15s = %d pooled of %d\n", "chains", npool, d.n_chains)
+    if length(d.mode_weight) > 1
+        note = d.weights_uncertain ?
+            "mass shares by bridge sampling are uncertain: the chains of the modes that can matter are pooled as they came" :
+            "mass shares by bridge sampling; the pooled draws carry them"
+        @printf(io, "%-15s = %d (%s)\n", "modes", length(d.mode_weight), note)
+        for m in eachindex(d.mode_weight)
+            @printf(io, "%-15s = chains %s, share %.3f (log mass %+.2f ± %.2f)\n", "mode_$m",
+                    join(findall(==(m), d.mode), ","), d.mode_weight[m], d.mode_logmass[m], d.mode_err[m])
+        end
+    end
+    for k in 1:d.n_chains
+        d.pooled[k] || @printf(
+                                io,
+                                "%-15s = chain %d not pooled: %s\n",
+                                "chain_dropped",
+                                k,
+                                d.reason[k]
+                            )
+    end
+    d.rewhitened > 0 && @printf(
+            io,
+            "%-15s = %.1f nats (the chains found a better basin than the MAP search)\n",
+            "rewhitened", d.rewhitened
+        )
+    rhat = filter(!isnan, d.rhat)
+    if !isempty(rhat)
+        flag = maximum(rhat) > Inference.RHAT_OK ? "  (> $(Inference.RHAT_OK): not converged)" : ""
+        @printf(io, "%-15s = %.4f%s\n", "rhat_max", maximum(rhat), flag)
+        @printf(io, "%-15s = %.0f\n", "ess_min", minimum(filter(!isnan, d.ess)))
+        @printf(io, "%-15s = %.0f\n", "ess_tail_min", minimum(filter(!isnan, d.ess_tail)))
+    end
     return nothing
 end
 

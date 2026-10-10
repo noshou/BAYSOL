@@ -9,6 +9,7 @@ using ..Scattering: ForwardCache
 using ..PhysicalConstants: NS_PER_S, MS_PER_S
 using ..Timing: StageLog, tick, tock!, fmt_count
 using Printf: @sprintf
+using ..Parallel: tmap_items
 
 """
 Generates physical prior distributions of ξ.
@@ -433,7 +434,7 @@ draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
 AdvancedHMC.jl's own per-iteration diagnostics.
 
 # Fields
-- `samples::Vector{SVector{N,Float64}}`: posterior draws of ξ, length `n_samples`.
+- `samples::Vector{SVector{N,Float64}}`: posterior draws of ξ, `n_samples` per pooled chain.
 - `stats::Vector{S}`: AdvancedHMC.jl's per-iteration diagnostics, matching
     samples index-for-index.
 - `scale::Vector{Float64}`: the WLS estimate of the scale correction at samples[i].
@@ -446,6 +447,11 @@ AdvancedHMC.jl's own per-iteration diagnostics.
     curve `I_calc(q)` = scale[i]·`y_model(q)` + `bkgrnd_corr[i]` for each
     samples[i], column-matching `scale/bkgrnd_corr`, with the model `y_model` the
     five-species contraction v(q)ᵀ G(q) v(q) at samples[i] and c1[i].
+- `chain::Vector{Int}`: the chain each draw comes from (only the pooled chains are kept, see
+    [`ChainDiagnostics`](@ref)); the draws are stored chain after chain.
+- `iteration::Vector{Int}`: the draw's iteration within its chain, 1 to `n_samples` (the first `n_adapt` are warm-up).
+- `diagnostics::ChainDiagnostics`: which chains were pooled and why not, the start scale of each, and the split R̂ and
+    ESS of the pooled post-warm-up draws.
 - `likelihood::AbstractString`: the likelihood type
 - `timing::Union{Nothing,StageLog}`: the run's stage log (from the `Seed`), if timing is on.
 """
@@ -457,6 +463,9 @@ struct Inferred{S,N}
     c1::Vector{Float64}
     chisq_red::Vector{Float64}
     curves::Matrix{Float64}
+    chain::Vector{Int}
+    iteration::Vector{Int}
+    diagnostics::ChainDiagnostics
     likelihood::AbstractString
     timing::Union{Nothing,StageLog}
 end
@@ -464,6 +473,8 @@ end
 "Purpose tags of [`Parallel.stream`](@ref BAYSOL.Runtime.Parallel.stream): which use of randomness a stream is for."
 const _RNG_MAP_STARTS = 1
 const _RNG_NUTS       = 2
+const _RNG_JITTER     = 3
+const _RNG_BRIDGE     = 4
 
 """
 Run NUTS on [`_logπ`](@ref) starting from seed, returning posterior draws
@@ -528,6 +539,14 @@ forward model) from the trajectory's sample covariance.
 - `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
                                 (0, 100) exclusive; the default,
                                 [`DEFAULT_TARGET_ACCEPT`](@ref), is Stan's usual 80%.
+- `n_chains::Int=DEFAULT_N_CHAINS`: number of NUTS chains ([`DEFAULT_N_CHAINS`](@ref) = 8, whatever the number of
+                                Julia threads; the threads only decide how many run at once). Chain 1 starts at the MAP,
+                                the others at deterministic distances from it ([`chain_radius`](@ref)). Each chain
+                                adapts on its own; chains that did not fail are pooled, the modes they settled in weighted
+                                by their mass (see [`bridge_logmass`](@ref)). With `n_chains = 1` the run is the
+                                single-chain run of earlier versions.
+- `jitter_seed::Integer=DEFAULT_JITTER_SEED`: seed of the jittered starts, separate from `rng_seed`: the same
+                                `jitter_seed` gives the same starts whatever the `rng_seed` or the thread count.
 - `rng_seed::Union{Nothing,Integer}=nothing`: the run's random seed. Every random draw of the run (the extra
                                 MAP starts, the NUTS chain) comes from a stream derived from it by the draw's
                                 index, so the same `rng_seed` reproduces the run exactly, whatever the number of
@@ -535,9 +554,12 @@ forward model) from the trajectory's sample covariance.
                                 before the call also fixes it); it is printed in the report's `=== Run ===` section.
 
 # Returns
-An [`Inferred`](@ref). Includes the `n_adapt` warm-up draws; a caller that wants a
-warmup-free posterior slices `n_adapt`+1:end (curves: [:, `n_adapt`+1:end])
-out of every field itself.
+An [`Inferred`](@ref) of the pooled chains, chain after chain. Includes the `n_adapt` warm-up draws of each chain;
+a caller that wants a warm-up-free posterior drops the draws with `iteration ≤ n_adapt` out of every field itself.
+
+# Exceptions
+- `DomainError` for `n_chains < 1`, `δ` outside (0, 100) or `n_adapt ≥ n_samples`.
+- The first chain's error if no chain could be run.
 """
 function infer(
     seed::Seed,
@@ -545,10 +567,14 @@ function infer(
     n_adapt::Int64;
     l::LIKELIHOOD=PROFILE(),
     δ::Real=DEFAULT_TARGET_ACCEPT,
-    rng_seed::Union{Nothing,Integer}=nothing
+    rng_seed::Union{Nothing,Integer}=nothing,
+    n_chains::Int=DEFAULT_N_CHAINS,
+    jitter_seed::Integer=DEFAULT_JITTER_SEED
 )::Inferred
+    n_chains ≥ 1 || throw(DomainError(n_chains, "n_chains must be ≥ 1"))
     base = rng_seed === nothing ? draw_base() : (rng_seed % UInt64)
-    return with_gc_paused(() -> _infer(seed, n_samples, n_adapt; l = l, δ = δ, base = base))
+    return with_gc_paused(() -> _infer(seed, n_samples, n_adapt; l = l, δ = δ, base = base,
+                                       n_chains = n_chains, jitter_base = jitter_seed % UInt64))
 end
 
 """
@@ -564,7 +590,9 @@ function _infer(
     n_adapt::Int64;
     l::LIKELIHOOD=PROFILE(),
     δ::Real=DEFAULT_TARGET_ACCEPT,
-    base::UInt64=draw_base()
+    base::UInt64=draw_base(),
+    n_chains::Int=DEFAULT_N_CHAINS,
+    jitter_base::UInt64=DEFAULT_JITTER_SEED
 )::Inferred where {N}
 
     if δ ≤ 0 || δ ≥ 100
@@ -589,6 +617,180 @@ function _infer(
             t_map)
     end
 
+    # the chains; if their best draw beats the MAP the sampler was whitened at, the MAP search missed a better basin:
+    # re-whiten there (L-BFGS from that draw, the heaviest basin wins) and run the chains once more
+    post = n_adapt+1:n_samples
+    chains = _run_chains(seed, l, sp, n_samples, n_adapt, δ, base, jitter_base, n_chains)
+    rewhitened = 0.0
+    best = _best_draw(chains.runs, post)
+    if best.ld > sp.logπ + BASIN_RESTART_NATS
+        t_re = tick()
+        z_best = _standardize(Θ(best.ξ, seed.pr)[1], seed.pr)
+        sp2 = _sampling_space(seed, l; base = base, extra_starts = [z_best])
+        tock!(seed.timing, :sampling, 1,
+              @sprintf("re-whitening: a chain found a basin %.1f nats above the MAP", best.ld - sp.logπ), t_re)
+        if sp2.logπ > sp.logπ
+            rewhitened = sp2.logπ - sp.logπ
+            sp = sp2
+            chains = _run_chains(seed, l, sp, n_samples, n_adapt, δ, base, jitter_base, n_chains)
+        end
+    end
+    runs, starts, t_nuts = chains.runs, chains.starts, chains.t_nuts
+    n_lf = sum(r -> r.stats === nothing ? 0 : sum(getproperty.(r.stats, :n_steps)), runs)
+
+    # which chains are pooled (every chain that ran and did not mostly diverge)
+    ran = [r.error === nothing for r in runs]
+    any(ran) || throw(first(r.error for r in runs))   # no chain ran: the error is the caller's to see
+    ld = zeros(length(post), n_chains)
+    div_rate = zeros(n_chains)
+    for r in runs
+        r.error === nothing || continue
+        ld[:, r.k] = getproperty.(r.stats[post], :log_density)
+        div_rate[r.k] = mean(getproperty.(r.stats[post], :numerical_error))
+    end
+    pooled, reason = select_chains(div_rate, [r.error === nothing ? nothing : sprint(showerror, r.error) for r in runs])
+    if !any(pooled)
+        # every chain that ran was rejected (e.g. all diverged): pool them all so the caller's own all-diverged
+        # handling applies, as with a single chain
+        for k in findall(ran)
+            pooled[k] = true
+            reason[k] = reason[k] * " (no chain passed: pooled anyway)"
+        end
+    end
+    pk = findall(pooled)
+
+    if seed.timing !== nothing
+        seed.timing.info["n_chains"]        = n_chains
+        seed.timing.info["n_chains_pooled"] = length(pk)
+        seed.timing.info["leapfrog"]        = n_lf
+        ms = MS_PER_S * sum(r -> r.seconds, runs) / max(n_lf, 1)   # chain-seconds per leapfrog step
+        tock!(seed.timing, :sampling, 1,
+            @sprintf(
+                "NUTS  (%s iters, %s leapfrog, %.3f ms/step)",
+                fmt_count(n_chains * n_samples),
+                fmt_count(n_lf),
+                ms
+            ),
+            t_nuts)
+    end
+
+    # draws × chains × (ξ₁…ξ_N, log π) of the pooled chains, after the warm-up
+    cube = Array{Float64,3}(undef, length(post), length(pk), N + 1)
+    for (c, k) in enumerate(pk)
+        for i in 1:N
+            cube[:, c, i] = getindex.(runs[k].ξ[post], i)
+        end
+        cube[:, c, N+1] = ld[:, k]
+    end
+
+    # The modes the chains settled in, their mass and the draws each keeps. NUTS chains do not jump between modes, so
+    # chains pooled as they come would weight the modes by how many started in each: the mass of each mode is
+    # estimated by bridge sampling (from its chains' draws and the density), and the draws are thinned to those shares.
+    t_modes = tick()
+    mode_of = chain_modes(cube)
+    M = maximum(mode_of)
+    logZ = zeros(M)
+    err = zeros(M)
+    if M > 1
+        ℓπ = _value_target(seed, l, sp)
+        for m in 1:M
+            cs = findall(==(m), mode_of)
+            W = reduce(vcat, (_draws_w(seed, sp, runs[pk[c]].ξ[post]) for c in cs))
+            logZ[m], err[m] = bridge_logmass(W, reduce(vcat, (ld[:, pk[c]] for c in cs)), ℓπ,
+                                              stream(base, _RNG_BRIDGE, m))
+        end
+    end
+    chains_in = [count(==(m), mode_of) for m in 1:M]
+    uncertain = M > 1 && weights_uncertain(logZ, err)
+    # an error too large to determine the shares: the chains of the modes that can matter are pooled as they came, the
+    # modes that are negligible even at their most optimistic estimate are dropped (and the report says so)
+    weights = M == 1 ? [1.0] : uncertain ? uncertain_weights(logZ, err, chains_in) : mode_weights(logZ)
+    keep = uncertain ? [w > 0 ? length(post) : 0 for w in weights] : draws_per_chain(weights, chains_in, length(post))
+    if M > 1 && seed.timing !== nothing
+        tock!(seed.timing, :sampling, 1,
+              @sprintf("%d posterior modes: mass by bridge sampling%s", M, uncertain ? " (weights uncertain, not applied)" : ""),
+              t_modes)
+    end
+
+    # the rows each pooled chain contributes: its warm-up rows, and the post-warm-up rows its mode keeps
+    rows = [vcat(1:n_adapt, n_adapt .+ even_indices(length(post), keep[mode_of[c]])) for c in eachindex(pk)]
+
+    t_reprofile = tick()
+    # scale/bkgrnd_corr are fit in closed form (wls_fit) and discarded on
+    # every single ℓπ/gradient evaluation above; re-profile c1 at each posterior draw so the reported
+    # curve/χ² match what _ll actually evaluated at that ξ during sampling.
+    reprof = tmap_items(c -> _reprofile(seed, runs[pk[c]].ξ[rows[c]]), eachindex(pk))
+    tock!(
+        seed.timing,
+        :sampling,
+        1,
+        "per-draw c1 re-profile + curves ($(sum(length, rows)) draws)",
+        t_reprofile
+    )
+
+    # convergence of the chains of each mode (between modes they differ by construction); the worst mode is reported.
+    # A mode below MODE_NEGLIGIBLE keeps no draws, so what its chains did is not part of the posterior: not diagnosed.
+    live = [m for m in 1:M if weights[m] ≥ MODE_NEGLIGIBLE]
+    cvs = [convergence(cube[:, findall(==(m), mode_of), :]) for m in (isempty(live) ? (1:M) : live)]
+    # (NaN entries, from modes too short to judge, are left out; NaN if nothing is left)
+    worst(f, init) = [(v = filter(!isnan, getindex.(getproperty.(cvs, init), q)); isempty(v) ? NaN : f(v)) for q in 1:N+1]
+    diag = ChainDiagnostics(n_chains, [starts[k][2] for k in 1:n_chains], pooled, reason,
+                            worst(maximum, :rhat), worst(minimum, :ess), worst(minimum, :ess_tail),
+                            rewhitened, [k in pk ? mode_of[findfirst(==(k), pk)] : 0 for k in 1:n_chains],
+                            weights, logZ, err, uncertain)
+
+    return Inferred(
+        reduce(vcat, (runs[pk[c]].ξ[rows[c]] for c in eachindex(pk))),
+        reduce(vcat, (runs[pk[c]].stats[rows[c]] for c in eachindex(pk))),
+        reduce(vcat, (r.scale for r in reprof)),
+        reduce(vcat, (r.bkgrnd_corr for r in reprof)),
+        reduce(vcat, (r.c1 for r in reprof)),
+        reduce(vcat, (r.χ² for r in reprof)),
+        reduce(hcat, (r.curves for r in reprof)),
+        reduce(vcat, (fill(pk[c], length(rows[c])) for c in eachindex(pk))),
+        reduce(vcat, (rows[c] for c in eachindex(pk))),
+        diag,
+        l.type,
+        seed.timing
+    )
+end
+
+"""
+The draws `ξs` in NUTS's whitened coordinates, one draw per row.
+
+# Returns
+- `Matrix{Float64}`, `length(ξs) × N`.
+"""
+function _draws_w(seed::Seed{<:Real,N}, sp, ξs::AbstractVector) where {N}
+    W = Matrix{Float64}(undef, length(ξs), N)
+    @inbounds for (i, ξ) in enumerate(ξs)
+        w = _w_of_θ(Θ(ξ, seed.pr)[1], sp)
+        for j in 1:N
+            W[i, j] = w[j]
+        end
+    end
+    return W
+end
+
+"""
+ℓπ: w ↦ log π(θ(w)), the value-only log-posterior in NUTS's coordinates w (the target the chains sample and bridge
+sampling integrates).
+"""
+function _value_target(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp) where {N}
+    return w -> _logπ(_θ_of_w(SVector{N,eltype(w)}(w...), sp), seed.pr, seed.wls, seed.fw, l; tab = seed.c1tab)
+end
+
+"""
+Runs the `n_chains` NUTS chains on the whitened target of `sp`, one task each, from their starts ([`_chain_start`](@ref)).
+`δ` is the target acceptance as a fraction. Every chain has its own metric, Hamiltonian, adaptor and random stream (the
+stream belongs to the chain index, not to the thread that happens to run it) and shares only the read-only seed.
+
+# Returns
+- `NamedTuple` `(runs, starts, t_nuts)`: the [`_ChainRun`](@ref)s in chain order, the starts and the timer started when
+  the chains began.
+"""
+function _run_chains(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, n_samples::Int64, n_adapt::Int64, δ::Real,
+                     base::UInt64, jitter_base::UInt64, n_chains::Int) where {N}
     t_setup = tick()
 
     # ℓπ: w ↦ log π(θ(w)), the value-only log-posterior in NUTS's coordinates w.
@@ -608,82 +810,145 @@ function _infer(
         (DiffResults.value(result), DiffResults.gradient(result))
     end
 
-    # DenseEuclideanMetric allows the adaptation to learn
-    # correlations between parameters. Since we are only fitting
-    # a handful of params and they are highly coupled, it is
-    # worth it here. After the whitening it starts (M⁻¹ = I) close to right.
-    metric = DenseEuclideanMetric(N)
+    # The starts: mirrored jittered pairs, or the MAP for a single chain (deterministically, see `_chain_start`).
+    # Chosen serially and up front, so neither the starts nor which chain gets which depend on the threads.
+    starts = [_chain_start(k, n_chains, N, ℓπ, ∂ℓπ∂w, jitter_base) for k in 1:n_chains]
+    show_progress = n_chains == 1   # concurrent progress bars would overwrite each other
 
-    # combines "potential energy" (ℓπ) and kinetic energy (from metric)
-    hamiltonian = Hamiltonian(metric, ℓπ, ∂ℓπ∂w)
+    # One NUTS chain. Every chain has its own metric, Hamiltonian, adaptor and random stream (the stream belongs to
+    # the chain index, not to the thread that happens to run it), and shares only the read-only seed.
+    run_chain = k -> begin
+        w₀, _ = starts[k]
+        t0 = time_ns()
+        try
+            # DenseEuclideanMetric allows the adaptation to learn
+            # correlations between parameters. Since we are only fitting
+            # a handful of params and they are highly coupled, it is
+            # worth it here. After the whitening it starts (M⁻¹ = I) close to right.
+            metric = DenseEuclideanMetric(N)
 
-    # AdvancedHMC.jl's DiagEuclideanMetric/DenseEuclideanMetric store M⁻¹ as
-    # a plain Vector/Matrix (Base.OneTo axes) and check axes(M⁻¹) against
-    # axes(w)/axes(r); an SVector's SOneTo axes fail that check even though
-    # the ranges match. Start from a plain Vector instead of an SVector
-    # directly, at w₀ = 0, the MAP.
-    w₀ = zeros(Float64, N)
+            # combines "potential energy" (ℓπ) and kinetic energy (from metric)
+            hamiltonian = Hamiltonian(metric, ℓπ, ∂ℓπ∂w)
 
-    # HMC numerically integrates the Hamiltonian, so we need to
-    # guess a good step size.
-    rng = stream(base, _RNG_NUTS, 1)   # the chain's own stream: the step-size search and the sampler both draw from it
-    init_step_size = find_good_stepsize(rng, hamiltonian, w₀)
+            # the chain's own stream: the step-size search and the sampler both draw from it
+            rng = stream(base, _RNG_NUTS, k)
 
-    # Leapfrog integration evaluates kinetic energy first, then
-    # "skips over" that evaluated position to the next one for potential energy.
-    # (Could be flipped, not sure). Very efficient!
-    integrator = Leapfrog(init_step_size)
+            # HMC numerically integrates the Hamiltonian, so we need to guess a good step size.
+            init_step_size = find_good_stepsize(rng, hamiltonian, copy(w₀))
 
-    # Initial step sizes are likely non-ideal, so sampler leanrs mass matrix/metric
-    # and step size as it goes along.
-    adaptor = StanHMCAdaptor(
-        MassMatrixAdaptor(metric),
-        StepSizeAdaptor(δ, integrator)
-    )
+            # Leapfrog integration evaluates kinetic energy first, then
+            # "skips over" that evaluated position to the next one for potential energy.
+            integrator = Leapfrog(init_step_size)
 
-    # the sampler in w-space
-    kernel = HMCKernel(Trajectory{MultinomialTS}(integrator, GeneralisedNoUTurn()))
+            # Initial step sizes are likely non-ideal, so sampler learns mass matrix/metric
+            # and step size as it goes along.
+            adaptor = StanHMCAdaptor(
+                MassMatrixAdaptor(metric),
+                StepSizeAdaptor(δ, integrator)
+            )
 
-    # do sampling
-    tock!(seed.timing, :sampling, 1, "NUTS setup (Hamiltonian, step-size init)", t_setup)
-    t_nuts = tick()
-    samples, stats = sample(
-        rng,
-        hamiltonian,
-        kernel,
-        w₀,
-        n_samples,
-        adaptor,
-        n_adapt;
-        progress=true
-    )
-    samples = [Ξ(_θ_of_w(SVector{N,Float64}(s...), sp), seed.pr) for s in samples]
-    if seed.timing !== nothing
-        n_lf = sum(getproperty.(stats, :n_steps))
-        ms = MS_PER_S * (time_ns() - t_nuts[1]) / NS_PER_S / max(n_lf, 1)   # ms per leapfrog step
-        seed.timing.info["leapfrog"] = n_lf
-        tock!(seed.timing, :sampling, 1,
-            @sprintf(
-                "NUTS  (%s iters, %s leapfrog, %.1f ms/step)",
-                fmt_count(n_samples),
-                fmt_count(n_lf),
-                ms
-            ),
-            t_nuts)
+            # the sampler in w-space
+            kernel = HMCKernel(Trajectory{MultinomialTS}(integrator, GeneralisedNoUTurn()))
+
+            ws, stats = sample(
+                rng,
+                hamiltonian,
+                kernel,
+                copy(w₀),
+                n_samples,
+                adaptor,
+                n_adapt;
+                progress = show_progress,
+                verbose = show_progress
+            )
+            ξs = [Ξ(_θ_of_w(SVector{N,Float64}(s...), sp), seed.pr) for s in ws]
+            return _ChainRun(k, ξs, stats, nothing, (time_ns() - t0) / NS_PER_S)
+        catch e
+            e isa InterruptException && rethrow()
+            return _ChainRun(k, SVector{N,Float64}[], nothing, e, (time_ns() - t0) / NS_PER_S)
+        end
     end
-    t_reprofile = tick()
 
-    # scale/bkgrnd_corr are fit in closed form (wls_fit) and discarded on
-    # every single ℓπ/gradient evaluation above.
-    scale        = Vector{Float64}(undef, n_samples)
-    bkgrnd_corr  = Vector{Float64}(undef, n_samples)
-    c1           = Vector{Float64}(undef, n_samples)
-    χ²           = Vector{Float64}(undef, n_samples)
-    curves       = Matrix{Float64}(undef, length(seed.fw.qvals), n_samples)
-    for (i, ξ) in enumerate(samples)
+    tock!(seed.timing, :sampling, 1, "NUTS setup (starts, Hamiltonian)", t_setup)
+    t_nuts = tick()
+    runs = tmap_items(run_chain, 1:n_chains)
+    return (runs = runs, starts = starts, t_nuts = t_nuts)
+end
+
+"""
+The highest post-warm-up log density among the non-divergent draws of the chains that ran, and its ξ.
+
+# Returns
+- `NamedTuple` `(ld, ξ)`; `ld = -Inf` if there is no such draw.
+"""
+function _best_draw(runs, post)
+    best = (ld = -Inf, ξ = nothing)
+    for r in runs
+        r.error === nothing || continue
+        for i in post
+            st = r.stats[i]
+            st.numerical_error || st.log_density <= best.ld || (best = (ld = st.log_density, ξ = r.ξ[i]))
+        end
+    end
+    return best
+end
+
+"What one NUTS chain returned: its draws and diagnostics, or the error that stopped it (then `stats` is `nothing`)."
+struct _ChainRun{N,S}
+    k::Int
+    ξ::Vector{SVector{N,Float64}}
+    stats::S
+    error::Union{Nothing,Exception}
+    seconds::Float64
+end
+
+"""
+Start of chain `k` of `n` in NUTS's whitened coordinates w, with its signed distance from the MAP in posterior standard
+deviations ([`chain_radius`](@ref)). The start is `r·u` for a direction `u` on the unit sphere: a single chain, and chain 1,
+at the MAP (`w = 0`); chain 2 also at the MAP (its own random stream makes it an independent chain); chains 3 and up in mirrored pairs,
+chains `2p+1` and `2p+2` at `+r_p·u_p` and `-r_p·u_p`. The directions come from streams of `jitter_base`
+([`DEFAULT_JITTER_SEED`](@ref) unless the caller gave a `jitter_seed`; never the run's `rng_seed`). A start where log π or
+its gradient is not finite is pulled halfway back toward the MAP, up to [`CHAIN_JITTER_MAX_HALVINGS`](@ref) times, and the
+distance returned is the one used; a start that never becomes usable is the MAP itself (0).
+
+# Returns
+- `(w₀::Vector{Float64}, r::Float64)`.
+"""
+function _chain_start(k::Int, n::Int, N::Int, ℓπ, ∂ℓπ∂w, jitter_base::UInt64)
+    r = chain_radius(k, n)
+    r == 0 && return zeros(N), 0.0
+    z = randn(stream(jitter_base, _RNG_JITTER, (k - 1) ÷ 2), N)
+    u = z ./ sqrt(sum(abs2, z))
+    for _ in 0:CHAIN_JITTER_MAX_HALVINGS
+        w = r .* u
+        usable = try
+            v, g = ∂ℓπ∂w(w)
+            isfinite(v) && all(isfinite, g)
+        catch e
+            e isa InterruptException && rethrow()
+            false
+        end
+        usable && return w, r
+        r /= 2
+    end
+    return zeros(N), 0.0
+end
+
+"""
+The (scale, `bkgrnd_corr`, c1, reduced χ², curve) of every draw `ξs`, c1 re-profiled at each.
+
+# Returns
+- `NamedTuple` of `Vector`s `scale`, `bkgrnd_corr`, `c1`, `χ²` and the matrix `curves` (Q × draws).
+"""
+function _reprofile(seed::Seed, ξs::AbstractVector)
+    n = length(ξs)
+    scale        = Vector{Float64}(undef, n)
+    bkgrnd_corr  = Vector{Float64}(undef, n)
+    c1           = Vector{Float64}(undef, n)
+    χ²           = Vector{Float64}(undef, n)
+    curves       = Matrix{Float64}(undef, length(seed.fw.qvals), n)
+    for (i, ξ) in enumerate(ξs)
         gc_checkpoint()
-        # re-profile c1 at each posterior draw so the reported curve/χ²
-        # match what _ll actually evaluated at that ξ during sampling.
         ŷ, fit, c1_star = profiled_corrs(seed.wls, ξ, seed.fw; tables = seed.c1tab)
         scale[i]        = fit.scale
         bkgrnd_corr[i]  = fit.bkgrnd_corr
@@ -691,23 +956,5 @@ function _infer(
         χ²[i]           = reduced_chi2(fit)
         curves[:, i]    = wls_predict(fit, ŷ)
     end
-
-    tock!(
-        seed.timing,
-        :sampling,
-        1,
-        "per-draw c1 re-profile + curves ($(n_samples) draws)",
-        t_reprofile
-    )
-    return Inferred(
-        samples,
-        stats,
-        scale,
-        bkgrnd_corr,
-        c1,
-        χ²,
-        curves,
-        l.type,
-        seed.timing
-    )
+    return (; scale, bkgrnd_corr, c1, χ², curves)
 end

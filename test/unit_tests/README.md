@@ -38,6 +38,7 @@ julia --project=test test/unit_tests/units/test_atomicradii.jl
 | `test_deltarho.jl`, `test_paramtransform.jl` | the δρ priors and the ξ ↔ θ parameter transform |
 | `test_wls.jl`, `test_profiledcorrs.jl` | closed-form scale/background and the profiled c1 correction |
 | `test_sampler.jl` | `Inference.Sampler` and the MAP-whitened NUTS pipeline, end to end |
+| `test_chains.jl` | `Inference.Chains`: split R̂ and the effective sample size against known cases (independent draws, shifted and drifting chains, AR(1)), and which chains are pooled |
 | `test_seed_diagnostics.jl` | `test/utils/seed_diagnostics.jl` on a small toy seed, so the sampler diagnostics cannot rot unnoticed |
 | `test_allocations.jl` | allocation guards for the fitting hot path (AllocCheck) |
 | `test_integration.jl` | the whole pipeline from structure to posterior on a small protein |

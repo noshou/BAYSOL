@@ -194,7 +194,7 @@ end
         n_samples, n_adapt = 20, 10
         local fit
         t_nuts = @elapsed begin
-            fit = infer(seed, n_samples, n_adapt; l = PROFILE())
+            fit = infer(seed, n_samples, n_adapt; l = PROFILE(), n_chains = 1)
         end
         samples, stats = fit.samples, fit.stats
         @info "infer ($n_samples samples, $n_adapt adapt) took $(round(t_nuts; digits = 2))s"

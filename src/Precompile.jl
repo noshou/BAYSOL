@@ -58,9 +58,14 @@ using Base.CoreLogging: with_logger, NullLogger   # (the Logging stdlib is not a
                         seed = seed_model(MolecularStructure.LocalPathSource(path), 9000.0, q, I, σ, 7.0, 0.1, solutes;
                                           add_hydrogens = false)
                         result = run_model(seed, 40, 20)
+                        # the chains run as tasks only when more than one worker is available, which the one-thread
+                        # precompilation process is not: run them once as tasks too, so that first fits with several
+                        # threads find the task machinery compiled
+                        Runtime.Parallel.with_workers(4) do
+                            run_model(seed, 40, 20)
+                        end
                         write_report(IOBuffer(), result)
-                        # the static build of a structure above the thread thresholds, as tasks: the threaded paths are only taken when more
-                        # than one worker is available, which the one-thread precompilation process is not
+                        # the static build of a structure above the thread thresholds, as tasks
                         Runtime.Parallel.with_workers(4) do
                             seed_model(MolecularStructure.LocalPathSource(big), 9000.0, q_big, I_big, 0.02 .* I_big, 7.0, 0.1,
                                        solutes; add_hydrogens = false)

@@ -11,6 +11,7 @@ package root.
 module Pipeline
 
 using Statistics: quantile, mean, var
+using ..Parallel: tmap_blocks
 using Printf: @printf, @sprintf
 using StaticArrays: SVector
 using ..PhysicalConstants: NS_PER_S

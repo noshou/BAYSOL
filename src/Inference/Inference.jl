@@ -142,9 +142,15 @@ const DEFAULT_TARGET_ACCEPT = 80
 """
 Number of L-BFGS starts of the pre-NUTS MAP search
 ([`Inference.infer`](@ref BAYSOL.Inference.infer)): the seed's own initial
-point plus `MAP_N_STARTS - 1` further prior draws.
+point plus `MAP_N_STARTS - 1` further prior draws (32: the search takes tens of milliseconds, and a narrow basin can attract only a few starts).
 """
-const MAP_N_STARTS = 8
+const MAP_N_STARTS = 32
+
+"""
+How many of the distinct basins the MAP search finds (lowest optimum first) are compared by their Laplace mass
+(`−f − ½ log det H`, one Hessian each) to choose the one the sampler is whitened at.
+"""
+const MAP_MAX_BASINS = 4
 
 "Iteration cap of each L-BFGS start of the MAP search."
 const MAP_MAX_ITER = 500
@@ -302,11 +308,13 @@ include("ProfiledCorrs.jl")
 include("DensityOfSolvent.jl")
 include("DeltaRho.jl")
 include("ParamTransform.jl")
+include("Chains.jl")
+include("Modes.jl")
 include("Sampler.jl")
 include("MAP.jl")
 
 export  Solute, Protein, NonBiological, DNA, RNA, Seed, Inferred,
-        seed_sampler, infer, PROFILE, MARGINAL,
+        seed_sampler, infer, PROFILE, MARGINAL, ChainDiagnostics, DEFAULT_N_CHAINS,
         ρₑ_prior, δρ_prior, prior_z_scores,
         ξ_priors, θ_prior_moments, profiled_corrs, excl_vol_saturation,
         WLSData, wls_fit

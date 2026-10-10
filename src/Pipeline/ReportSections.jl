@@ -15,16 +15,16 @@ function _write_run_info(io::IO, log::Union{Nothing,Timing.StageLog}; n_atoms::U
     isempty(info) && return nothing
     println(io, "=== Run ===")
     for k in ("n_atoms", "lMax", "n_q_raw", "n_q", "n_samples", "n_adapt", "rng_seed")
-        haskey(info, k) && @printf(io, "%-14s = %d\n", k, info[k])
+        haskey(info, k) && @printf(io, "%-15s = %d\n", k, info[k])
     end
     if haskey(info, "D")
-        @printf(io, "%-14s = %.1f Å (atoms and hydration-shell beads)\n", "Dₘₐₓ", info["D"])
-        @printf(io, "%-14s = %.1f (q range × D / π)\n", "channels", info["n_channels"])
+        @printf(io, "%-15s = %.1f Å (atoms and hydration-shell beads)\n", "Dₘₐₓ", info["D"])
+        @printf(io, "%-15s = %.1f (q range × D / π)\n", "channels", info["n_channels"])
         if info["rebin"] > 0
-            @printf(io, "%-14s = %d per channel: %d measured → %d fitted points (%d non-positive dropped)\n",
+            @printf(io, "%-15s = %d per channel: %d measured → %d fitted points (%d non-positive dropped)\n",
                     "rebin", info["rebin"], info["n_q_raw"], info["n_q"], info["n_nonpositive"])
         else
-            @printf(io, "%-14s = none: %d measured → %d fitted points (%d non-positive dropped)\n",
+            @printf(io, "%-15s = none: %d measured → %d fitted points (%d non-positive dropped)\n",
                     "rebin", info["n_q_raw"], info["n_q"], info["n_nonpositive"])
         end
     end

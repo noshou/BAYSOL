@@ -3,6 +3,45 @@
 # run_model: NUTS on a Seed, then the MAP draw and the posterior quantiles.
 
 """
+The posterior band of the predicted curve at every q: for the draws `curves[q, :]` of each q, the `p_lo` and `p_hi`
+empirical quantiles and the smallest and largest draw inside them. Each q's draws are sorted once (on a contiguous copy,
+q's in parallel), and the quantiles and the bounds both read the sorted draws.
+
+# Arguments
+- `qvals::AbstractVector`: the q grid.
+- `curves::AbstractMatrix`: the predicted curves, `Q × draws`.
+- `p_lo`, `p_hi`: the quantile levels in [0, 1].
+
+# Returns
+- `(quantiles, bounds)`: two `Q × 3` matrices with the columns (q, low, high).
+
+# Exceptions
+- `ErrorException` if no draw lies between the two quantiles of some q.
+"""
+function _curve_bands(qvals::AbstractVector, curves::AbstractMatrix, p_lo::Real, p_hi::Real)
+    Q, n = size(curves)
+    draws = Matrix{Float64}(undef, n, Q)                      # one q per column, contiguous
+    @inbounds for q in 1:Q, i in 1:n
+        draws[i, q] = curves[q, i]
+    end
+    quantiles = Matrix{Float64}(undef, Q, 3)
+    bounds = Matrix{Float64}(undef, Q, 3)
+    tmap_blocks(Q, 32) do blk
+        for q in blk
+            col = view(draws, :, q)
+            sort!(col)
+            lo, hi = quantile(col, (p_lo, p_hi); sorted = true)
+            first_in, last_in = searchsortedfirst(col, lo), searchsortedlast(col, hi)
+            first_in ≤ last_in || error("Illegal state: filtered cannot be empty!")
+            quantiles[q, :] .= (qvals[q], lo, hi)
+            bounds[q, :] .= (qvals[q], col[first_in], col[last_in])
+        end
+        nothing
+    end
+    return quantiles, bounds
+end
+
+"""
 The reduced χ² of the model curve `y` (on the fitted grid of `sh`) against the measured curve: `y` is interpolated onto the
 measured q points ([`Shannon.model_on_raw`](@ref BAYSOL.Utils.Shannon.model_on_raw)) and the sum of squared normalized
 residuals is divided by the number of measured points less the three parameters fitted to the curve by minimization (scale,
@@ -87,10 +126,15 @@ whitened coordinates.
     To reproduce a fit exactly, pass the `rng_seed` printed in its report's `=== Run ===` section; `nothing`
     picks a fresh one (so `Random.seed!` before the call also fixes the run).
 
+- `n_chains::Int=Inference.DEFAULT_N_CHAINS`: number of NUTS chains (8; chain 1 at the MAP, the others at deterministic distances
+    from it, in mirrored pairs); see [`Inference.infer`](@ref). The draws of the chains that did not fail are pooled, and the report gives
+    the split R̂ and ESS of the pool.
+- `jitter_seed::Integer=Inference.DEFAULT_JITTER_SEED`: seed of the jittered chain starts, separate from `rng_seed`.
+
 # Returns
 A 4-tuple (fit, divergencerate, map, curve):
 
--   `fit::Inference.Inferred`: the warm-up free posterior.
+-   `fit::Inference.Inferred`: the warm-up free posterior, the pooled chains' draws together.
 -   `divergence_rate::Float64`: fraction of fit's draws AdvancedHMC.jl
     flagged as numerically divergent, [0, 1].
 -   `map/curve`: either both nothing or a [`MAPResult`](@ref)/[`QuantileResult`](@ref) pair.
@@ -102,7 +146,9 @@ function run_model(
     quantiles::AbstractString=DEFAULT_QUANTILES,
     l::Inference.LIKELIHOOD=Inference.PROFILE(),
     δ::Real=DEFAULT_TARGET_ACCEPT,
-    rng_seed::Union{Nothing,Integer}=nothing
+    rng_seed::Union{Nothing,Integer}=nothing,
+    n_chains::Int=Inference.DEFAULT_N_CHAINS,
+    jitter_seed::Integer=Inference.DEFAULT_JITTER_SEED
 )::Union{
     Tuple{Inference.Inferred, Float64, MAPResult, QuantileResult},
     Tuple{Inference.Inferred, Float64, Nothing, Nothing}
@@ -141,18 +187,23 @@ function run_model(
     end
 
     # calculate unfiltered fit
-    fit_unfiltered = Inference.infer(seed, n_samples, n_adapt; l=l, δ=δ, rng_seed=rng_seed)
+    fit_unfiltered = Inference.infer(seed, n_samples, n_adapt; l=l, δ=δ, rng_seed=rng_seed,
+                                     n_chains=n_chains, jitter_seed=jitter_seed)
     t_post = Timing.tick()
 
-    # filter-out warmup draws
+    # filter-out the warm-up draws of every chain
+    keep = findall(>(n_adapt), fit_unfiltered.iteration)
     fit = Inference.Inferred(
-        fit_unfiltered.samples[n_adapt+1:end],
-        fit_unfiltered.stats[n_adapt+1:end],
-        fit_unfiltered.scale[n_adapt+1:end],
-        fit_unfiltered.bkgrnd_corr[n_adapt+1:end],
-        fit_unfiltered.c1[n_adapt+1:end],
-        fit_unfiltered.chisq_red[n_adapt+1:end],
-        fit_unfiltered.curves[:, n_adapt+1:end],
+        fit_unfiltered.samples[keep],
+        fit_unfiltered.stats[keep],
+        fit_unfiltered.scale[keep],
+        fit_unfiltered.bkgrnd_corr[keep],
+        fit_unfiltered.c1[keep],
+        fit_unfiltered.chisq_red[keep],
+        fit_unfiltered.curves[:, keep],
+        fit_unfiltered.chain[keep],
+        fit_unfiltered.iteration[keep],
+        fit_unfiltered.diagnostics,
         fit_unfiltered.likelihood,
         fit_unfiltered.timing
     )
@@ -288,17 +339,7 @@ function run_model(
 
         # curve is Q x I_low(Q) x I_hi(Q)
         qvals = seed.fw.qvals
-        Q = size(curves, 1)
-        curve_quantiles = Matrix{Float64}(undef, Q, 3)
-        curve_bounds    = Matrix{Float64}(undef, Q, 3)
-        for q in 1:Q
-            I = curves[q, :]
-
-            I_lo, I_hi = quantile(I, [q_1, q_2])
-
-            curve_quantiles[q, :] .= (qvals[q], I_lo, I_hi)
-            curve_bounds[q, :]    .= (qvals[q], map_bounds(I_lo, I_hi, I)...)
-        end
+        curve_quantiles, curve_bounds = _curve_bands(qvals, curves, q_1, q_2)
 
         curve = Dict{String, Matrix{Float64}}(
             "quantiles" => curve_quantiles,

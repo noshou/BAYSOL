@@ -175,7 +175,7 @@ end
         θ = SVector(-1.1, 0.2, 0.9, 0.4)
         ẑ = SVector(0.3, -0.2, 0.1, 0.5)
         S = @SMatrix [2.0 0.1 0.0 0.0; 0.0 0.5 0.2 0.0; 0.0 0.0 1.5 0.3; 0.1 0.0 0.0 0.7]
-        sp = FIT._SamplingSpace(μ, σ, ẑ, S, 1, 1, true, 0)
+        sp = FIT._SamplingSpace(μ, σ, ẑ, S, 1, 1, true, 0, 0.0)
         w = S \ (FIT._standardize(θ, pr) - ẑ)
         @test all(isapprox.(FIT._θ_of_w(w, sp), θ; rtol = 1e-12))
     end
@@ -333,7 +333,7 @@ end
             seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
             Random.seed!(rng)
             n_samples, n_adapt = 60, 30
-            fit = FIT.infer(seed, n_samples, n_adapt; l = l)
+            fit = FIT.infer(seed, n_samples, n_adapt; l = l, n_chains = 1)
             @test length(fit.samples) == n_samples
             @test length(fit.stats) == n_samples
             @test length(fit.c1) == n_samples
@@ -353,6 +353,60 @@ end
             @test all(fit1.samples[i] .== fit2.samples[i])
             @test fit1.stats[i].log_density == fit2.stats[i].log_density
         end
+    end
+
+    @testset "chains: mirrored starts, pooling and determinism" begin
+        fw = smpl_fw()
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        n_samples, n_adapt = 60, 30
+        r = FIT.infer(seed, n_samples, n_adapt; rng_seed = 5)
+        d = r.diagnostics
+        @test d.n_chains == FIT.DEFAULT_N_CHAINS == 8
+        # chains 1 and 2 at the MAP, then mirrored pairs at the CHAIN_START_RADII (never farther than nominal, nearer
+        # only if a start had to be pulled back)
+        @test d.start_scale[1] == 0 && d.start_scale[2] == 0
+        for p in 1:3
+            rad = FIT.CHAIN_START_RADII[p]
+            @test d.start_scale[2p+1] > 0 && d.start_scale[2p+2] < 0 && d.start_scale[2p+1] ≤ rad && -d.start_scale[2p+2] ≤ rad
+        end
+        @test [FIT.chain_radius(k, 8) for k in 1:8] == [0, 0, 4, -4, 10, -10, 20, -20]
+        @test FIT.chain_radius(1, 1) == 0 && FIT.chain_radius(2, 2) == 0 && FIT.chain_radius(9, 10) == 20
+        # chains 1 and 2 start at the same point but are different chains
+        @test r.samples[r.chain .== 1] != r.samples[r.chain .== 2]
+        # pooled chains are kept whole, chain after chain
+        pk = findall(d.pooled)
+        @test !isempty(pk)
+        @test length(r.samples) == length(pk) * n_samples == length(r.stats) == length(r.c1) == size(r.curves, 2)
+        @test r.chain == vcat((fill(k, n_samples) for k in pk)...)
+        @test r.iteration == repeat(1:n_samples, length(pk))
+        @test length(d.rhat) == length(d.ess) == length(d.ess_tail) == 5
+        @test d.rewhitened ≥ 0
+        # every pooled chain is in a mode; the modes' shares sum to one; one chain is one mode of weight one
+        @test length(d.mode) == d.n_chains && all(d.mode[pk] .> 0) && all(d.mode[setdiff(1:d.n_chains, pk)] .== 0)
+        @test sum(d.mode_weight) ≈ 1 && length(d.mode_weight) == length(d.mode_logmass) == length(d.mode_err) == maximum(d.mode)
+        @test d.weights_uncertain isa Bool && (length(d.mode_weight) > 1 || !d.weights_uncertain)
+        # one chain starts at the MAP
+        one = FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, n_chains = 1)
+        @test length(one.samples) == n_samples && one.diagnostics.start_scale == [0.0] && one.diagnostics.mode == [1] && one.diagnostics.mode_weight == [1.0]
+        # same seeds, same run, at one worker and at several (a chain belongs to its index, not to a thread)
+        again = BAYSOL.Runtime.Parallel.with_workers(() -> FIT.infer(seed, n_samples, n_adapt; rng_seed = 5), 1)
+        @test again.samples == r.samples && again.chain == r.chain
+        # the jitter seed is separate from the rng seed: it changes the starts, the rng seed does not
+        @test FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, jitter_seed = 99).samples != r.samples
+        @test FIT.infer(seed, n_samples, n_adapt; rng_seed = 6).diagnostics.start_scale == d.start_scale
+        @test_throws DomainError FIT.infer(seed, n_samples, n_adapt; n_chains = 0)
+    end
+
+    @testset "MAP search: log π at the MAP, more starts, a start added by the caller" begin
+        fw = smpl_fw()
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        sp = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x77))
+        @test FIT.MAP_N_STARTS == 32 && sp.n_ok ≥ 1
+        μ, σ = FIT.θ_prior_moments(seed.pr)
+        @test sp.logπ ≈ -FIT._neglogπ(sp.ẑ, μ, σ, seed, FIT.PROFILE(), FIT.EXCL_VOL_CORR_TOL)
+        # a start handed in (here the MAP itself) can only add to the optima, never lower log π at the MAP
+        sp2 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x77), extra_starts = [sp.ẑ])
+        @test sp2.logπ ≥ sp.logπ - 1e-6
     end
 
 end
