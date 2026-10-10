@@ -61,7 +61,10 @@ Asserts that `maximum(q)` lies inside `Q_SANITY_RANGE`, i.e. that `q` is in Å�
 """
 function check_q_angstrom(q)
     lo, hi = Q_SANITY_RANGE
-    @assert lo < maximum(q) < hi "q range looks wrong (expected Å⁻¹ after conversion): $(extrema(q))"
+    @assert lo < maximum(q) < hi (
+        "q range looks wrong (expected Å⁻¹ " *
+        "after conversion): $(extrema(q))"
+    )
 end
 
 """
@@ -73,13 +76,17 @@ and any trailing beam information. The first three
 columns are q, I(q) and σ(q).
 """
 function _read_curve(path)
-    q = Float64[]; I = Float64[]; σ = Float64[]
+    q = Float64[]
+    I = Float64[]
+    σ = Float64[]
     for line in eachline(path)
         t = split(replace(strip(line), ',' => ' '))
         length(t) ≥ 3 || continue
         v = tryparse.(Float64, t[1:3])
         any(isnothing, v) && continue
-        push!(q, v[1]); push!(I, v[2]); push!(σ, v[3])
+        push!(q, v[1])
+        push!(I, v[2])
+        push!(σ, v[3])
     end
     return q, I, σ
 end
@@ -94,13 +101,15 @@ CRYSOL, FoXS, OLIGOMER and EOM files). Returns `nothing` if there
 are no such rows.
 """
 function _read_fit(path, q_scale, col)
-    q = Float64[]; I = Float64[]
+    q = Float64[]
+    I = Float64[]
     for line in eachline(path)
         t = split(replace(strip(line), ',' => ' '))
         length(t) ≥ max(col, 3) || continue
         v = tryparse.(Float64, t[1:col])
         any(isnothing, v) && continue
-        push!(q, v[1] * q_scale); push!(I, v[col])
+        push!(q, v[1] * q_scale)
+        push!(I, v[col])
     end
     return isempty(q) ? nothing : (q, I)
 end
@@ -113,8 +122,11 @@ Least-squares scale of a normalized fit curve onto the data
 """
 function _rescale_fit(fit_curve, q_data, I_data)
     qf, If = fit_curve
-    p = sortperm(qf); qf = qf[p]; If = If[p]
-    Ii = zeros(length(q_data)); ok = falses(length(q_data))
+    p = sortperm(qf)
+    qf = qf[p]
+    If = If[p]
+    Ii = zeros(length(q_data))
+    ok = falses(length(q_data))
     for (k, x) in enumerate(q_data)
         (qf[1] ≤ x ≤ qf[end]) || continue
         j = clamp(searchsortedlast(qf, x), 1, length(qf) - 1)
@@ -193,9 +205,9 @@ the data's real range, which on a log axis renders as a huge, misleading spike.
 log_axis_floor(I) = minimum(I) / 2
 
 """
-(axis label, MAP-report key) for each posterior histogram panel. The first four are the sampled
-`ξ = (ρₑ, δρ₁, δρ₂, δρ₃)` in sample order (the histogram code indexes draws by position); scale,
-background and c1 are per-draw profiled/WLS quantities.
+(axis label, MAP-report key) for each posterior histogram panel. The first four are
+the sampled `ξ = (ρₑ, δρ₁, δρ₂, δρ₃)` in sample order (the histogram code indexes
+draws by position); scale, background and c1 are per-draw profiled/WLS quantities.
 """
 const HIST_PARAMS = [
     ("ρₑ", "slvnt_e_dns"), ("δρ₁", "delta_rho_1"), ("δρ₂", "delta_rho_2"),

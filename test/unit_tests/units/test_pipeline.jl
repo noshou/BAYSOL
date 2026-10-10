@@ -10,12 +10,14 @@
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, propka_pKas,
-                    resolve_hydrogens, load_molecule,
-                    _store_dir, Molecule, n_atoms, elms, coords_cartesian
+    resolve_hydrogens, load_molecule,
+    _store_dir, Molecule, n_atoms, elms, coords_cartesian
 
-const _PIPELINE_FIXTURE = joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1CRN-TEST.pdb")
+const _PIPELINE_FIXTURE =
+    joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1CRN-TEST.pdb")
 
-@testset "pipeline: resolve_structure -> propka_pKas -> resolve_hydrogens -> load_molecule" begin
+# …load_molecule
+@testset "pipeline: resolve_structure -> propka_pKas -> resolve_hydrogens ->" begin
 
     @test isfile(_PIPELINE_FIXTURE)
 

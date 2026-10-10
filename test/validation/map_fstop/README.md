@@ -3,7 +3,7 @@
 Does stopping each L-BFGS start of the MAP search once f stops decreasing (`MAP_F_ABSTOL = 1e-6` for `MAP_F_SUCCESSIVE = 3` iterations), instead of only at the gradient tolerance, change what the search finds? The change exists to make the MAP stage faster (an earlier sweep measured 10.7× fewer objective evaluations).
 
 ```bash
-tclsh test/run/validate.tcl map_fstop --approved        # prints its plan without --approved
+tclsh dev/validate.tcl map_fstop --approved        # prints its plan without --approved
 ```
 
 The script (`validate.jl`) runs the multi-start MAP search of each fit twice from the same starting points, with the f-stop (the default) and with the gradient test alone (`f_abstol = 0`, as before), on three RNG seeds, and writes one row per fit and seed to `results/map-<stamp>.tsv`. It never samples.

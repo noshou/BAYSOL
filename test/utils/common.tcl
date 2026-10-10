@@ -2,7 +2,8 @@
 
 package require Tcl 9.0-
 
-# Repository root: the directory two levels above test/utils/ (BAYSOL_ROOT overrides it, for testing elsewhere).
+# Repository root: the directory two levels above test/utils/
+# (BAYSOL_ROOT overrides it, for testing elsewhere).
 if {[info exists ::env(BAYSOL_ROOT)]} {
     set ROOT $::env(BAYSOL_ROOT)
 } else {
@@ -10,12 +11,13 @@ if {[info exists ::env(BAYSOL_ROOT)]} {
 }
 set FIT_DIR test/fitting_tests
 
-# A decimal number as a regex fragment, one capture group: optional sign, fraction and exponent.
-# The report patterns write it as @N@.
+# A decimal number as a regex fragment, one capture group: optional
+# sign, fraction and exponent. The report patterns write it as @N@.
 set NUM {([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)}
 
-# Takes `--threads N` (N as `julia -t` takes it: `4`, `auto`, `4,1` for four workers and one interactive thread)
-# out of an argument list and sets JULIA_NUM_THREADS from it, which every Julia process started afterwards
+# Takes `--threads N` (N as `julia -t` takes it: `4`, `auto`, `4,1` for
+# four workers and one interactive thread) out of an argument list and sets
+# JULIA_NUM_THREADS from it, which every Julia process started afterwards
 # inherits. Returns the list without the option. An error if N is missing.
 proc take_threads {argv} {
     set i [lsearch -exact $argv --threads]
@@ -29,9 +31,10 @@ proc take_threads {argv} {
     return [lreplace $argv $i $i+1]
 }
 
-# Runs `cmd args` as a script's main program: UTF-8 stdout, and a closed pipe (`... | head`) ends the
-# program quietly instead of with a stack trace. A `--threads N` among the arguments (the entry points pass
-# their whole argument list as the one argument) is taken out first, see `take_threads`.
+# Runs `cmd args` as a script's main program: UTF-8 stdout, and a closed pipe
+# (`... | head`) ends the program quietly instead of with a stack trace. A
+# `--threads N` among the arguments (the entry points pass their whole
+# argument list as the one argument) is taken out first, see `take_threads`.
 proc main {cmd args} {
     fconfigure stdout -encoding utf-8
     if {[llength $args] == 1} {
@@ -48,8 +51,8 @@ proc main {cmd args} {
     }
 }
 
-# Prints the header comment (the usage text) of the script $file: the lines after the shebang, the SPDX
-# line and the blank one, up to the first non-comment line.
+# Prints the header comment (the usage text) of the script $file: the lines after
+# the shebang, the SPDX line and the blank one, up to the first non-comment line.
 proc usage {file} {
     set ch [open $file r]
     fconfigure $ch -encoding utf-8
@@ -65,7 +68,26 @@ proc usage {file} {
 namespace eval util {
     namespace export \
         git resolve slurp find_julia ids script_of tags_of specs_of \
-        single_run latest_release baseline_for rm_tree
+        single_run latest_release baseline_for rm_tree fail sh \
+        split_args check_specs check_folders list_fits
+
+    # Stops the program with "who: msg" on stderr and exit status 2 (a wrong command line).
+    proc fail {who msg} {
+        puts stderr "$who: $msg"
+        exit 2
+    }
+
+    # Prints a command and, unless $dry, runs it with our terminal. True when it succeeded.
+    proc sh {dry args} {
+        puts "\$ [join $args { }]"
+        if {$dry} {
+            return 1
+        }
+        set failed [catch {
+            exec {*}$args <@stdin >@stdout 2>@stderr
+        }]
+        return [expr {!$failed}]
+    }
 
     # Output of `git -C $ROOT ARGS`, decoded as UTF-8 (tag and path names can be non-ASCII).
     # A failing git raises an error.
@@ -86,9 +108,9 @@ namespace eval util {
         return [string trim $hash]
     }
 
-    # The newest release tag: the most recently created tag whose name starts with "v" and a digit
-    # (v0.2.0-soukouratou, ...), or "" if there is none. This is what results are compared against by
-    # default; pass explicit revisions to compare against anything else.
+    # The newest release tag: the most recently created tag whose name starts with "v" and a
+    # digit (v0.2.0-soukouratou, ...), or "" if there is none. This is what results are
+    # compared against by default; pass explicit revisions to compare against anything else.
     proc latest_release {} {
         set tags [git for-each-ref --sort=-creatordate --format=%(refname:short) refs/tags]
         foreach t [split [string trim $tags] "\n"] {
@@ -99,8 +121,9 @@ namespace eval util {
         return ""
     }
 
-    # The newest benchmark baseline recorded for release $tag: the last (by name) of
-    # test/baselines/$tag*.json, or "" if there is none. Baselines are captured when a release is made.
+    # The newest benchmark baseline recorded for release $tag: the
+    # last (by name) of test/baselines/$tag*.json, or "" if there
+    # is none. Baselines are captured when a release is made.
     proc baseline_for {tag} {
         global ROOT
         set dir [file join $ROOT test baselines]
@@ -116,9 +139,10 @@ namespace eval util {
         expr {[llength $tags] == 1 && [lindex $tags 0] eq ""}
     }
 
-    # Deletes the benchmark's throwaway directory $dir and everything in it, never following a symbolic link:
-    # a link is unlinked and its target left alone (the cold state's depot is made of links into the real one).
-    # Refuses any directory that is not named baysol-bench-*, so a wrong argument cannot delete anything else.
+    # Deletes the benchmark's throwaway directory $dir and everything in it, never
+    # following a symbolic link: a link is unlinked and its target left alone (the cold
+    # state's depot is made of links into the real one). Refuses any directory that is
+    # not named baysol-bench-*, so a wrong argument cannot delete anything else.
     proc rm_tree {dir} {
         if {![string match baysol-bench-* [file tail $dir]]} {
             error "rm_tree: refusing to delete $dir"
@@ -150,7 +174,8 @@ namespace eval util {
         file delete $path
     }
 
-    # The Julia executable: $JULIA if set, else `julia` from the PATH. An error if it cannot be found.
+    # The Julia executable: $JULIA if set, else `julia`
+    # from the PATH. An error if it cannot be found.
     proc find_julia {} {
         if {[info exists ::env(JULIA)]} {
             set julia $::env(JULIA)
@@ -172,10 +197,11 @@ namespace eval util {
         return $text
     }
 
-    # --- the fitting tests under test/fitting_tests/ ---------------------------------------------------------
+    # --- the fitting tests under test/fitting_tests/
+    # ---------------------------------------------------------
 
-    # Scripts whose tags are not in a `const RUNS = [...]` table; the Julia side of these is the
-    # SEED_ENTRY_OVERRIDES table in fit_seed.jl.
+    # Scripts whose tags are not in a `const RUNS = [...]` table; the Julia
+    # side of these is the SEED_ENTRY_OVERRIDES table in fit_seed.jl.
     variable SPECIAL_TAGS {SASDMZ9 {model1 model2 model3} SASDJ72 {model1 model2}}
 
     # The script of fitting test $id: <id>.jl, or the folder's only .jl file.
@@ -192,8 +218,8 @@ namespace eval util {
         error "$dir: expected $id.jl or a single script, found $scripts"
     }
 
-    # The tags a fitting test accepts: the `tag = "..."` entries of its RUNS table, a fixed list for the
-    # special scripts, or {""} for a script with a single run.
+    # The tags a fitting test accepts: the `tag = "..."` entries of its RUNS table,
+    # a fixed list for the special scripts, or {""} for a script with a single run.
     proc tags_of {id} {
         variable SPECIAL_TAGS
         if {[dict exists $SPECIAL_TAGS $id]} {
@@ -210,7 +236,8 @@ namespace eval util {
         return $tags
     }
 
-    # The `ID[:tag]` specs of the fitting tests $selected: one per tag, or the bare ID for a single-run script.
+    # The `ID[:tag]` specs of the fitting tests $selected:
+    # one per tag, or the bare ID for a single-run script.
     proc specs_of {selected} {
         set out {}
         foreach id $selected {
@@ -234,5 +261,88 @@ namespace eval util {
             lappend out $d
         }
         return $out
+    }
+
+    # --- command lines of the front ends in dev/
+    # ------------------------------------------------------
+
+    # Splits $argv into the options of the list $allowed (each `--key value`,
+    # returned as a dict), the flags of the list $flags (returned as a list) and
+    # the positional specs: {opts got specs}. Anything else starting with -- is
+    # an error that names the accepted ones after $word (default "options").
+    proc split_args {who allowed flags argv {word options}} {
+        set opts [dict create]
+        set got {}
+        set specs {}
+        for {set i 0} {$i < [llength $argv]} {incr i} {
+            set a [lindex $argv $i]
+            if {$a in $flags} {
+                lappend got $a
+            } elseif {[string match --* $a]} {
+                if {$a ni $allowed} {
+                    fail $who \
+                        "unknown option $a ($word: [join [concat $allowed $flags] {, }])"
+                }
+                if {$i + 1 >= [llength $argv]} {
+                    fail $who "option $a needs a value"
+                }
+                dict set opts $a [lindex $argv [incr i]]
+            } else {
+                lappend specs $a
+            }
+        }
+        return [list $opts $got $specs]
+    }
+
+    # Checks the ID[:tag] specs: at least one, each a
+    # fitting test (with a tag where it has several runs).
+    proc check_specs {who specs} {
+        if {![llength $specs]} {
+            fail $who "give at least one ID\[:tag\] (see: --list)"
+        }
+        foreach spec $specs {
+            lassign [split $spec :] id tag
+            if {$id ni [ids]} {
+                fail $who "no fitting test '$id' (see: --list)"
+            }
+            set tags [tags_of $id]
+            if {$tag ni $tags} {
+                if {[single_run $tags]} {
+                    fail $who "$id has a single run and takes no tag, got '$tag'"
+                }
+                set got [expr {$tag eq "" ? "none" : $tag}]
+                fail $who "$id needs a tag, one of: [join $tags {, }] (got '$got')"
+            }
+        }
+    }
+
+    # Stops unless every one of $specs names a fitting-test folder; only
+    # the ID before a `:` counts when $tagged is true (the default), the
+    # whole word otherwise. The message lists the folders that exist.
+    proc check_folders {who specs {tagged 1}} {
+        set bad {}
+        foreach s $specs {
+            set id [expr {$tagged ? [lindex [split $s :] 0] : $s}]
+            if {$id ni [ids]} {
+                lappend bad $s
+            }
+        }
+        if {[llength $bad]} {
+            fail $who "no fitting test folder for: [join \
+    $bad {, }] (available: [join [ids] { }])"
+        }
+    }
+
+    # Prints every fitting test with the tags it accepts.
+    proc list_fits {} {
+        foreach id [ids] {
+            set tags [tags_of $id]
+            if {[single_run $tags]} {
+                set shown "(single run, no tag)"
+            } else {
+                set shown [join $tags { }]
+            }
+            puts [format "%-8s %s" $id $shown]
+        }
     }
 }

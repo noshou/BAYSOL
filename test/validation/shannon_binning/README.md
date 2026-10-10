@@ -3,7 +3,7 @@
 Does fitting the curve binned to `rebin` bins per Shannon channel π/D give the same answer as fitting every measured point? Run on the 53 fitting tests, 2026-10-08, for the default `rebin = 12` (and 8 and 16).
 
 ```bash
-tclsh test/run/validate.tcl shannon_binning --approved        # prints its plan without --approved
+tclsh dev/validate.tcl shannon_binning --approved        # prints its plan without --approved
 ```
 
 The script (`validate.jl`) finds the MAP and the Laplace posterior width on the unbinned curve (`rebin = nothing`, same `lMax`) and on the binned curve, per fit and per k, and writes one row each to `results/shannon-<stamp>.tsv` (the committed run is `results/shannon-20261008-0112.tsv`). Two extra variants show what dropping non-positive points does: `12d` bins at k = 12 *with* the default drop of non-positive bins, `raw-d` leaves the curve unbinned but drops its non-positive points (what the fitting scripts used to do).

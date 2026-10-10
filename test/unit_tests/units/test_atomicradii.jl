@@ -12,13 +12,13 @@ lookup_one(ion) = lookup_radii([ion])[1][2]
 @testset "AtomicRadii" begin
 
     @testset "tryparse_ion: magnitude-then-sign and sign-then-magnitude" begin
-        @test tryparse_ion("fe3+")  == Ion("fe", 3)
-        @test tryparse_ion("fe+3")  == Ion("fe", 3)
-        @test tryparse_ion("fe3-")  == Ion("fe", -3)
-        @test tryparse_ion("fe-3")  == Ion("fe", -3)
+        @test tryparse_ion("fe3+") == Ion("fe", 3)
+        @test tryparse_ion("fe+3") == Ion("fe", 3)
+        @test tryparse_ion("fe3-") == Ion("fe", -3)
+        @test tryparse_ion("fe-3") == Ion("fe", -3)
         @test tryparse_ion("fe12+") == Ion("fe", 12)     # multi-digit magnitude
-        @test tryparse_ion("h1+")   == Ion("h", 1)
-        @test tryparse_ion("x+")    == Ion("x", 1)        # 1-letter element
+        @test tryparse_ion("h1+") == Ion("h", 1)
+        @test tryparse_ion("x+") == Ion("x", 1)        # 1-letter element
     end
 
     @testset "tryparse_ion: a bare sign means +/-1" begin
@@ -29,8 +29,8 @@ lookup_one(ion) = lookup_radii([ion])[1][2]
     end
 
     @testset "tryparse_ion: surrounding and interior whitespace is tolerated" begin
-        @test tryparse_ion(" fe3+ ")  == Ion("fe", 3)
-        @test tryparse_ion("fe 3 +")  == Ion("fe", 3)
+        @test tryparse_ion(" fe3+ ") == Ion("fe", 3)
+        @test tryparse_ion("fe 3 +") == Ion("fe", 3)
         @test tryparse_ion("\tfe+3\n") == Ion("fe", 3)
     end
 
@@ -38,7 +38,7 @@ lookup_one(ion) = lookup_radii([ion])[1][2]
         # `nothing` here is the signal that sends resolve_one straight to the
         # bare-element table, so it is a contract, not an error.
         @test tryparse_ion("fe") === nothing
-        @test tryparse_ion("h")  === nothing
+        @test tryparse_ion("h") === nothing
         @test tryparse_ion("rn") === nothing
     end
 
@@ -50,27 +50,27 @@ lookup_one(ion) = lookup_radii([ion])[1][2]
     end
 
     @testset "tryparse_ion: unparseable junk" begin
-        @test tryparse_ion("")       === nothing
-        @test tryparse_ion("Fe3+")   === nothing   # uppercase: table keys are lowercase
-        @test tryparse_ion("fe3")    === nothing   # magnitude with no sign
-        @test tryparse_ion("abc3+")  === nothing   # element is 1-2 letters
-        @test tryparse_ion("3+")     === nothing   # no element
-        @test tryparse_ion("fe!!")   === nothing
-        @test tryparse_ion("fe3++")  === nothing
+        @test tryparse_ion("") === nothing
+        @test tryparse_ion("Fe3+") === nothing   # uppercase: table keys are lowercase
+        @test tryparse_ion("fe3") === nothing   # magnitude with no sign
+        @test tryparse_ion("abc3+") === nothing   # element is 1-2 letters
+        @test tryparse_ion("3+") === nothing   # no element
+        @test tryparse_ion("fe!!") === nothing
+        @test tryparse_ion("fe3++") === nothing
         @test tryparse_ion("fe3.5+") === nothing
     end
 
     @testset "ion_key: canonical digits-then-sign form, charge 0 rejected" begin
-        @test ion_key(Ion("fe", 3))  == "fe3+"
+        @test ion_key(Ion("fe", 3)) == "fe3+"
         @test ion_key(Ion("fe", -3)) == "fe3-"
-        @test ion_key(Ion("fe", 1))  == "fe1+"
+        @test ion_key(Ion("fe", 1)) == "fe1+"
         @test ion_key(Ion("au", -1)) == "au1-"
         @test_throws ArgumentError ion_key(Ion("fe", 0))
     end
 
     @testset "ion_key normalizes either token order to one key" begin
         @test ion_key(tryparse_ion("fe+3")) == ion_key(tryparse_ion("fe3+")) == "fe3+"
-        @test ion_key(tryparse_ion("fe-"))  == "fe1-"
+        @test ion_key(tryparse_ion("fe-")) == "fe1-"
     end
 
     @testset "raw table lookups" begin
@@ -99,7 +99,7 @@ lookup_one(ion) = lookup_radii([ion])[1][2]
     @testset "resolve_one, step 1: exact ionic match, both token orderings" begin
         @test check_float(0.49, resolve_one("fe3+"))
         @test check_float(0.49, resolve_one("fe+3"))
-        @test check_float(2.2,  resolve_one("au1-"))
+        @test check_float(2.2, resolve_one("au1-"))
         @test check_float(1.35, resolve_one("o2-"))
         @test resolve_one("fe3+") === ion_radius("fe3+")   # straight from the ionic table
     end
@@ -123,9 +123,9 @@ lookup_one(ion) = lookup_radii([ion])[1][2]
 
     @testset "resolve_one: unparseable strings go straight to the bare table" begin
         @test check_float(2.44, resolve_one("fe"))
-        @test check_float(2.4,  resolve_one("rn"))
-        @test check_float(1.2,  resolve_one("h"))
-        @test resolve_one("Fe")   === nothing   # unparseable AND not a table key
+        @test check_float(2.4, resolve_one("rn"))
+        @test check_float(1.2, resolve_one("h"))
+        @test resolve_one("Fe") === nothing   # unparseable AND not a table key
         @test resolve_one("fe!!") === nothing
     end
 

@@ -4,22 +4,18 @@
 A molecule.
 """
 
-using   ..Cache: Lazy, force
-using   BioStructures:  BioStructures, PDBFormat, standardselector,
-                        collectatoms, collectmodels, atomname, element, coords, ishetero
-using   NearestNeighbors: KDTree
-using   FastClosures: @closure
+using ..Runtime: Lazy, force
+using BioStructures: BioStructures, PDBFormat, standardselector,
+    collectatoms, collectmodels, atomname, element, coords, ishetero
+using NearestNeighbors: KDTree
+using FastClosures: @closure
 
 "Raised for malformed molecule input (empty or mismatched coords, missing radii)."
-struct MoleculeError <: Exception; msg::String end
+struct MoleculeError <: Exception
+    msg::String
+end
 Base.showerror(io::IO, e::MoleculeError) = print(io, "MoleculeError: ", e.msg)
 
-"Two-letter element symbols an atom name can plausibly spell out in full (HETATM ions/metals only)."
-const _TWO_LETTER_ELEMENTS = Set([
-    "FE", "ZN", "MG", "NA", "CL", "CA", "MN", "NI", "CU", "CO", "CD", "HG",
-    "BR", "SE", "AL", "SI", "AS", "LI", "BE", "NE", "AR", "KR", "SR", "MO",
-    "AG", "SN", "SB", "TE", "XE", "CS", "BA", "PT", "AU", "PB",
-])
 
 """
 Fallback element guess from an atom name, for legacy-format PDB files whose
@@ -41,32 +37,6 @@ function _infer_element(name::AbstractString, is_hetatm::Bool)::String
     return string(stripped[1])
 end
 
-"""
-# Fields
-- `_name::String`: structure identifier (e.g. PDB ID or file stem).
-- `_elms::Vector{String}`: per-atom element symbol, length n.
-- `_n::Int`: atom count; set at construction, never recomputed.
-- `_cart::Matrix{Float64}, (3, n)`: centred Cartesian coordinates (x, y, z).
-- `_sph::Matrix{Float64}, (3, n)`: spherical coordinates (r, theta, phi),
-    sharing `_cart`'s column index.
-- `_radii::Lazy{Vector{Float64}}`: per-atom isolated van der Waals radius
-    (AtomicRadii), length n.
-- `_vols::Lazy{Vector{Float64}}`: per-atom geometrically-computed excluded
-    volume from [`excluded_volume`](@ref), length n.
-- `_r_max::Lazy{Float64}`: largest per-atom radius in `_radii`.
-- `_tree::Lazy{KDTree}`: KDTree over `_cart`, shared across neighbour queries.
-"""
-struct Molecule
-    _name   :: String
-    _elms   :: Vector{String}
-    _n      :: Int                   # atom count; set at construction, never recomputed
-    _cart   :: Matrix{Float64}       # (3, n) centred (x, y, z)
-    _sph    :: Matrix{Float64}       # (3, n) (r, theta, phi)
-    _radii  :: Lazy{Vector{Float64}}
-    _vols   :: Lazy{Vector{Float64}}
-    _r_max  :: Lazy{Float64}         # largest per-atom radius
-    _tree   :: Lazy{KDTree}          # KDTree over _cart; shared across neighbour queries
-end
 
 """
 Stack coordinates into a (3, n) matrix translated to the centroid.
@@ -77,16 +47,24 @@ Stack coordinates into a (3, n) matrix translated to the centroid.
 function _center(cs::Vector{NTuple{3,Float64}})::Matrix{Float64}
     n = length(cs)
     n == 0 && throw(MoleculeError("Empty coordinates"))
-    sx = 0.0; sy = 0.0; sz = 0.0
+    sx = 0.0
+    sy = 0.0
+    sz = 0.0
     @inbounds @simd for c in cs
-        sx += c[1]; sy += c[2]; sz += c[3]
+        sx += c[1]
+        sy += c[2]
+        sz += c[3]
     end
     nf = Float64(n)
-    mx = sx / nf; my = sy / nf; mz = sz / nf
+    mx = sx / nf
+    my = sy / nf
+    mz = sz / nf
     out = Matrix{Float64}(undef, 3, n)
     @inbounds @simd for j in 1:n
         c = cs[j]
-        out[1, j] = c[1] - mx; out[2, j] = c[2] - my; out[3, j] = c[3] - mz
+        out[1, j] = c[1] - mx
+        out[2, j] = c[2] - my
+        out[3, j] = c[3] - mz
     end
     return out
 end
@@ -103,12 +81,18 @@ and unobservable downstream, since `j_l(0)` = 0 for every l > 0.
 - `c`: (3, n) cartesian coordinates; rows are x, y, z.
 """
 function to_spherical(c::AbstractMatrix{<:Real})::Matrix{Float64}
-    size(c, 1) == 3 || throw(MoleculeError(
-        "to_spherical: expected a (3, n) matrix with rows (x, y, z); got $(size(c, 1)) rows"))
+    size(c, 1) == 3 || throw(
+        MoleculeError(
+            "to_spherical: expected a (3, n) matrix with rows (x, y, z); " *
+            "got $(size(c, 1)) rows",
+        ),
+    )
     n = size(c, 2)
     out = Matrix{Float64}(undef, 3, n)
     @inbounds for j in 1:n
-        x = Float64(c[1, j]); y = Float64(c[2, j]); z = Float64(c[3, j])
+        x = Float64(c[1, j])
+        y = Float64(c[2, j])
+        z = Float64(c[3, j])
         rj = sqrt(x * x + y * y + z * z)
         rsafe = rj > 0.0 ? rj : 1.0   # see the r = 0 note above
         out[1, j] = rj
@@ -119,8 +103,9 @@ function to_spherical(c::AbstractMatrix{<:Real})::Matrix{Float64}
 end
 
 """
-Resolve per-element radii through [`lookup_radii`](@ref BAYSOL.MolecularStructure.lookup_radii); throws MoleculeError on an empty list
-or any element with no radius data.
+Resolve per-element radii through
+[`lookup_radii`](@ref BAYSOL.MolecularStructure.lookup_radii); throws
+MoleculeError on an empty list or any element with no radius data.
 
 A negative radius is clamped to 0.0. Shannon's tables carry a handful of
 these (h1+, c4+, n5+) as extrapolation artifacts of fitting to
@@ -193,13 +178,15 @@ function _build(name::AbstractString, es::Vector{String}, coords, radii)
     rmax = Lazy{Float64}(@closure(() -> maximum(force(rad))))
     tree = Lazy{KDTree}(@closure(() -> KDTree(cart)))
 
-    # Per-atom displaced-solvent volume (see `excluded_volume` in ExcludedVolumes.jl).
-    # Recomputes the max radius locally instead of force(rmax), so that forcing
-    # vols does not also mark r_max as forced.
-    vol  = Lazy{Vector{Float64}}(@closure(() -> begin
-        rv = force(rad)
-        excluded_volume(cart, rv, force(tree), maximum(rv))
-    end))
+    # Per-atom displaced-solvent volume (see `excluded_volume`,
+    # Geometry/ExcludedVolumes.jl). Recomputes the max radius locally instead
+    # of force(rmax), so that forcing vols does not also mark r_max as forced.
+    vol = Lazy{Vector{Float64}}(
+        @closure(() -> begin
+            rv = force(rad)
+            excluded_volume(cart, rv, force(tree), maximum(rv))
+        end)
+    )
     return Molecule(String(name), es, n, cart, sph, rad, vol, rmax, tree)
 end
 
@@ -213,32 +200,32 @@ coords_spherical(m::Molecule)::Matrix{Float64} = m._sph
 n_atoms(m::Molecule)::Int = m._n
 
 "Per-atom radius; resolved and cached on first call."
-radii(m::Molecule)::Vector{Float64}  = force(m._radii)
+radii(m::Molecule)::Vector{Float64} = force(m._radii)
 
 """
 Per-atom excluded (displaced-solvent) volume. This is not the isolated van der Waals
-volume; use [`BAYSOL.MolecularStructure.sphere_volume`](@ref) on the radii.
+volume; use [`BAYSOL.Geometry.sphere_volume`](@ref) on the radii.
 """
-vols(m::Molecule)::Vector{Float64}   = force(m._vols)
+vols(m::Molecule)::Vector{Float64} = force(m._vols)
 
 """
 Largest per-atom radius in the molecule; forces (and caches) radii.
 
-SASA's coarse neighbour filter needs this to bound how far away an atom can
-still occlude another, before any individual radius is known.
+[`sasa`](@ref BAYSOL.Geometry.sasa)'s coarse neighbour filter needs this to bound how
+far away an atom can still occlude another, before any individual radius is known.
 """
-r_max(m::Molecule)::Float64          = force(m._r_max)
+r_max(m::Molecule)::Float64 = force(m._r_max)
 
 """
 A KDTree over `coords_cartesian(m)`.
 """
-neighbour_tree(m::Molecule)::KDTree   = force(m._tree)
+neighbour_tree(m::Molecule)::KDTree = force(m._tree)
 
 "Element/ion string per atom."
-elms(m::Molecule)::Vector{String}    = m._elms
+elms(m::Molecule)::Vector{String} = m._elms
 
 "Molecule label."
-name(m::Molecule)::String            = m._name
+name(m::Molecule)::String = m._name
 
 """
 Parse whatever .pdb is at `pdb_path` into a Molecule.
@@ -264,18 +251,19 @@ function load_molecule(pdb_path::AbstractString)::Molecule
     catch e
         throw(MoleculeError("failed parsing .pdb \"$pdb_path\": $(sprint(showerror, e))"))
     end
-    # first model whatever its number (an ensemble member extracted to its own file keeps e.g. MODEL 63)
+    # first model whatever its number (an ensemble member
+    # extracted to its own file keeps e.g. MODEL 63)
     atoms = collectatoms(first(collectmodels(struc)), standardselector)
 
-    n = length(atoms)
-    elms_v     = Vector{String}(undef, n)
-    coords_v   = Vector{NTuple{3, Float64}}(undef, n)
+    n        = length(atoms)
+    elms_v   = Vector{String}(undef, n)
+    coords_v = Vector{NTuple{3,Float64}}(undef, n)
 
     @inbounds for (i, at) in enumerate(atoms)
-        el            = element(at)
-        elms_v[i]     = isempty(el) ? _infer_element(atomname(at), ishetero(at)) : el
-        c             = coords(at)
-        coords_v[i]   = (Float64(c[1]), Float64(c[2]), Float64(c[3]))
+        el          = element(at)
+        elms_v[i]   = isempty(el) ? _infer_element(atomname(at), ishetero(at)) : el
+        c           = coords(at)
+        coords_v[i] = (Float64(c[1]), Float64(c[2]), Float64(c[3]))
     end
 
     return create(key, elms_v, coords_v)

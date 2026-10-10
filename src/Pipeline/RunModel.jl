@@ -3,9 +3,10 @@
 # run_model: NUTS on a Seed, then the MAP draw and the posterior quantiles.
 
 """
-The posterior band of the predicted curve at every q: for the draws `curves[q, :]` of each q, the `p_lo` and `p_hi`
-empirical quantiles and the smallest and largest draw inside them. Each q's draws are sorted once (on a contiguous copy,
-q's in parallel), and the quantiles and the bounds both read the sorted draws.
+The posterior band of the predicted curve at every q: for the draws `curves[q, :]`
+of each q, the `p_lo` and `p_hi` empirical quantiles and the smallest and largest
+draw inside them. Each q's draws are sorted once (on a contiguous copy, q's in
+parallel), and the quantiles and the bounds both read the sorted draws.
 
 # Arguments
 - `qvals::AbstractVector`: the q grid.
@@ -42,11 +43,13 @@ function _curve_bands(qvals::AbstractVector, curves::AbstractMatrix, p_lo::Real,
 end
 
 """
-The reduced χ² of the model curve `y` (on the fitted grid of `sh`) against the measured curve: `y` is interpolated onto the
-measured q points ([`Shannon.model_on_raw`](@ref BAYSOL.Utils.Shannon.model_on_raw)) and the sum of squared normalized
-residuals is divided by the number of measured points less the three parameters fitted to the curve by minimization (scale,
-background and the excluded-volume correction c1). This is the χ² on the grid a program such as CRYSOL or FoXS evaluates,
-whatever binning the fit used.
+The reduced χ² of the model curve `y` (on the fitted grid of `sh`) against
+the measured curve: `y` is interpolated onto the measured q points
+([`Shannon.model_on_raw`](@ref BAYSOL.Utils.Shannon.model_on_raw)) and the
+sum of squared normalized residuals is divided by the number of measured
+points less the three parameters fitted to the curve by minimization (scale,
+background and the excluded-volume correction c1). This is the χ² on the grid
+a program such as CRYSOL or FoXS evaluates, whatever binning the fit used.
 """
 function _chisq_measured(sh::Shannon.ShannonInfo, y::AbstractVector{<:Real})::Float64
     r = (sh.I_raw .- Shannon.model_on_raw(sh, y)) ./ sh.σ_raw
@@ -84,24 +87,24 @@ starts to double back on itself (a U-turn), then samples from the valid part of 
 
 # MAP search and whitening
 
-Before NUTS, [`Inference.infer`](@ref) finds the mode of the same log π with a multi-start
-L-BFGS search and takes a central-difference Hessian there. NUTS then samples coordinates w with
-θ = μ + σ·(ẑ + S·w), in which the posterior is ≈ N(0, I) and the chain starts at the mode. The map
-is affine, so the target distribution is unchanged; it only puts the adaptation below on the O(1)
-scales Stan's defaults assume. c1 is profiled out at every evaluation, to `EXCL_VOL_CORR_TOL`.
+Before NUTS, [`Inference.infer`](@ref) finds the mode of the same log π with a
+multi-start L-BFGS search and takes a central-difference Hessian there. NUTS then
+samples coordinates w with θ = μ + σ·(ẑ + S·w), in which the posterior is ≈ N(0,
+I) and the chain starts at the mode. The map is affine, so the target distribution
+is unchanged; it only puts the adaptation below on the O(1) scales Stan's defaults
+assume. c1 is profiled out at every evaluation, to `EXCL_VOL_CORR_TOL`.
 
 # Step-size adaptation
 
 δ is the target Metropolis acceptance rate. During the first `n_adapt` iterations,
-StepSizeAdaptor tunes the leapfrog step size ε via dual-averaging so the
-empirical acceptance rate converges to δ; too-small ε wastes computation
-taking tiny steps, too-large ε causes leapfrog's discretization error (and
-therefore the rejection rate) to blow up. A gradient that is inconsistent with the value
-(a loosely profiled c1, see `EXCL_VOL_CORR_TOL`) has the same effect and is the usual cause of a
-step size far below what the local curvature allows. MassMatrixAdaptor learns M (here the
-full parameter covariance, since ρₑ/δρ are physically coupled through the
-forward model) from the trajectory's sample covariance, starting from the identity in the
-whitened coordinates.
+StepSizeAdaptor tunes the leapfrog step size ε via dual-averaging so the empirical
+acceptance rate converges to δ; too-small ε wastes computation taking tiny steps,
+too-large ε causes leapfrog's discretization error (and therefore the rejection rate) to
+blow up. A gradient that is inconsistent with the value (a loosely profiled c1, see
+`EXCL_VOL_CORR_TOL`) has the same effect and is the usual cause of a step size far below
+what the local curvature allows. MassMatrixAdaptor learns M (here the full parameter
+covariance, since ρₑ/δρ are physically coupled through the forward model) from the
+trajectory's sample covariance, starting from the identity in the whitened coordinates.
 
 # Arguments
 - `seed::Seed`: priors, initial point, forward cache, and data.
@@ -122,36 +125,40 @@ whitened coordinates.
 - `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
     (0, 100) exclusive (validated below); the default, `DEFAULT_TARGET_ACCEPT`,
     is Stan's usual 80%, used here too absent a specific reason to retarget it.
-- `rng_seed::Union{Nothing,Integer}=nothing`: the run's random seed (see [`Inference.infer`](@ref)).
-    To reproduce a fit exactly, pass the `rng_seed` printed in its report's `=== Run ===` section; `nothing`
-    picks a fresh one (so `Random.seed!` before the call also fixes the run).
+- `rng_seed::Union{Nothing,Integer}=nothing`: the run's random seed (see
+    [`Inference.infer`](@ref)). To reproduce a fit exactly, pass the
+    `rng_seed` printed in its report's `=== Run ===` section; `nothing` picks
+    a fresh one (so `Random.seed!` before the call also fixes the run).
 
-- `n_chains::Int=Inference.DEFAULT_N_CHAINS`: number of NUTS chains (8; chain 1 at the MAP, the others at deterministic distances
-    from it, in mirrored pairs); see [`Inference.infer`](@ref). The draws of the chains that did not fail are pooled, and the report gives
-    the split R̂ and ESS of the pool.
-- `jitter_seed::Integer=Inference.DEFAULT_JITTER_SEED`: seed of the jittered chain starts, separate from `rng_seed`.
+- `n_chains::Int=Inference.DEFAULT_N_CHAINS`: number of NUTS chains (8; chain
+    1 at the MAP, the others at deterministic distances from it, in mirrored
+    pairs); see [`Inference.infer`](@ref). The draws of the chains that did not
+    fail are pooled, and the report gives the split R̂ and ESS of the pool.
+- `jitter_seed::Integer=Inference.DEFAULT_JITTER_SEED`: seed
+    of the jittered chain starts, separate from `rng_seed`.
 
 # Returns
 A 4-tuple (fit, divergencerate, map, curve):
 
--   `fit::Inference.Inferred`: the warm-up free posterior, the pooled chains' draws together.
+-   `fit::Inference.Inferred`: the warm-up free
+    posterior, the pooled chains' draws together.
 -   `divergence_rate::Float64`: fraction of fit's draws AdvancedHMC.jl
     flagged as numerically divergent, [0, 1].
 -   `map/curve`: either both nothing or a [`MAPResult`](@ref)/[`QuantileResult`](@ref) pair.
 """
 function run_model(
     seed::Inference.Seed,
-    n_samples::Int64=DEFAULT_N_SAMPLES,
-    n_adapt::Int64=DEFAULT_N_ADAPT;
-    quantiles::AbstractString=DEFAULT_QUANTILES,
-    l::Inference.LIKELIHOOD=Inference.PROFILE(),
-    δ::Real=DEFAULT_TARGET_ACCEPT,
-    rng_seed::Union{Nothing,Integer}=nothing,
-    n_chains::Int=Inference.DEFAULT_N_CHAINS,
-    jitter_seed::Integer=Inference.DEFAULT_JITTER_SEED
+    n_samples::Int64 = DEFAULT_N_SAMPLES,
+    n_adapt::Int64 = DEFAULT_N_ADAPT;
+    quantiles::AbstractString = DEFAULT_QUANTILES,
+    l::Inference.LIKELIHOOD = Inference.PROFILE(),
+    δ::Real = DEFAULT_TARGET_ACCEPT,
+    rng_seed::Union{Nothing,Integer} = nothing,
+    n_chains::Int = Inference.DEFAULT_N_CHAINS,
+    jitter_seed::Integer = Inference.DEFAULT_JITTER_SEED,
 )::Union{
-    Tuple{Inference.Inferred, Float64, MAPResult, QuantileResult},
-    Tuple{Inference.Inferred, Float64, Nothing, Nothing}
+    Tuple{Inference.Inferred,Float64,MAPResult,QuantileResult},
+    Tuple{Inference.Inferred,Float64,Nothing,Nothing},
 }
 
     # parse quantiles
@@ -187,9 +194,10 @@ function run_model(
     end
 
     # calculate unfiltered fit
-    fit_unfiltered = Inference.infer(seed, n_samples, n_adapt; l=l, δ=δ, rng_seed=rng_seed,
-                                     n_chains=n_chains, jitter_seed=jitter_seed)
-    t_post = Timing.tick()
+    fit_unfiltered =
+        Inference.infer(seed, n_samples, n_adapt; l = l, δ = δ, rng_seed = rng_seed,
+            n_chains = n_chains, jitter_seed = jitter_seed)
+    t_post = tick()
 
     # filter-out the warm-up draws of every chain
     keep = findall(>(n_adapt), fit_unfiltered.iteration)
@@ -205,12 +213,13 @@ function run_model(
         fit_unfiltered.iteration[keep],
         fit_unfiltered.diagnostics,
         fit_unfiltered.likelihood,
-        fit_unfiltered.timing
+        fit_unfiltered.timing,
     )
 
-    # The χ² every program compares is the reduced χ² on the measured points. For a Shannon-binned fit that is not the
-    # fit's own (the fitted grid is the binned curve, whose smaller σ makes a smooth misfit count several times more),
-    # so it is evaluated on the measured grid for every draw, from the curve interpolated onto it.
+    # The χ² every program compares is the reduced χ² on the measured points. For a
+    # Shannon-binned fit that is not the fit's own (the fitted grid is the binned curve,
+    # whose smaller σ makes a smooth misfit count several times more), so it is evaluated
+    # on the measured grid for every draw, from the curve interpolated onto it.
     binned = seed.shannon !== nothing && seed.shannon.rebin > 0
     chisq_meas = if binned
         sh_ = seed.shannon
@@ -222,7 +231,7 @@ function run_model(
     # Numerical instabilities can occur when the posterior has very
     # different curvature/scales across dimensions. Such samples are
     # flagged as divergent and excluded from MAP selection.
-    filter  = trues(length(fit.stats))
+    filter = trues(length(fit.stats))
     max_llh = -Inf
     max_idx = 0
     diverged = 0
@@ -237,7 +246,7 @@ function run_model(
     end
     if diverged == length(fit.stats)
         println("WARNING: all runs diverged; MAP and quantiles not run!")
-        res = (fit, 1., nothing, nothing)
+        res = (fit, 1.0, nothing, nothing)
     else
         divergence_rate = diverged / length(fit.stats)
 
@@ -247,7 +256,7 @@ function run_model(
         # sits from its own prior, one entry per physical parameter.
         ξ_map = fit.samples[max_idx]
         z_map = Inference.prior_z_scores(ξ_map, seed.pr)
-        MAP_params = Dict{String, Float64}(
+        MAP_params = Dict{String,Float64}(
             "log_density"       => max_llh,
             "cavity_shell_frac" => Scattering.cavity_shell_fraction(seed.fw),
             "scale"             => fit.scale[max_idx],
@@ -257,8 +266,8 @@ function run_model(
         )
         pkeys = Inference.param_keys(seed.pr)
         for (k, key) in enumerate(pkeys)
-            MAP_params[key]        = ξ_map[k]
-            MAP_params["z_" * key] = z_map[k]
+            MAP_params[key]      = ξ_map[k]
+            MAP_params["z_"*key] = z_map[k]
         end
         # c1 is profiled (no prior), so saturation against its physical
         # bounds is checked once, here, on the single MAP value -- not per
@@ -268,10 +277,14 @@ function run_model(
         excl_vol_sat = Inference.excl_vol_saturation(fit.c1[max_idx])
         MAP_params["excl_vol_sat"] = Float64(excl_vol_sat)
         if excl_vol_sat != 0
-            @warn "excluded-volume correction c1 saturated at the $(excl_vol_sat > 0 ? "upper" : "lower") profiling bound" c1=fit.c1[max_idx]
+            side = excl_vol_sat > 0 ? "upper" : "lower"
+            @warn(
+                "excluded-volume correction c1 saturated at the $side profiling bound",
+                c1 = fit.c1[max_idx],
+            )
         end
         MAP_curve = hcat(seed.fw.qvals, fit.curves[:, max_idx])
-        map =(MAP_params, MAP_curve)
+        map = (MAP_params, MAP_curve)
 
         # filter out all divergent curves
         ll_filt      = getproperty.(fit.stats, :log_density)[filter]
@@ -286,15 +299,15 @@ function run_model(
         ξ_filt = [getindex.(samples_filt, k) for k in eachindex(pkeys)]
         ξ_q    = [quantile(v, [q_1, q_2]) for v in ξ_filt]
         N      = length(pkeys)
-        z_lo = Inference.prior_z_scores(SVector{N,Float64}(first.(ξ_q)), seed.pr)
-        z_hi = Inference.prior_z_scores(SVector{N,Float64}(last.(ξ_q)), seed.pr)
+        z_lo   = Inference.prior_z_scores(SVector{N,Float64}(first.(ξ_q)), seed.pr)
+        z_hi   = Inference.prior_z_scores(SVector{N,Float64}(last.(ξ_q)), seed.pr)
 
         # calculate the quantiles of the remaining quantities
-        ll_lo,  ll_hi        = quantile(ll_filt,     [q_1, q_2])
-        scale_lo, scale_hi   = quantile(scale_filt,  [q_1, q_2])
+        ll_lo, ll_hi         = quantile(ll_filt, [q_1, q_2])
+        scale_lo, scale_hi   = quantile(scale_filt, [q_1, q_2])
         bkgrnd_lo, bkgrnd_hi = quantile(bkgrnd_filt, [q_1, q_2])
-        c1_lo, c1_hi         = quantile(c1_filt,     [q_1, q_2])
-        chisq_lo, chisq_hi   = quantile(chisq_filt,  [q_1, q_2])
+        c1_lo, c1_hi         = quantile(c1_filt, [q_1, q_2])
+        chisq_lo, chisq_hi   = quantile(chisq_filt, [q_1, q_2])
 
         # returns a tuple of (low, high) bounds; fails loudly
         function map_bounds(lo, hi, x)
@@ -306,31 +319,31 @@ function run_model(
         end
 
         # dict of parameters
-        params  = Dict{String, Dict{String, Tuple{Float64, Float64}}}(
-                "log_density"     => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (ll_lo, ll_hi),
-                    "bounds"      => map_bounds(ll_lo, ll_hi, ll_filt)
-                ),
-                "scale"           => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (scale_lo, scale_hi),
-                    "bounds"      => map_bounds(scale_lo, scale_hi, scale_filt)
-                ),
-                "bkgrnd_corr"     => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (bkgrnd_lo, bkgrnd_hi),
-                    "bounds"      => map_bounds(bkgrnd_lo, bkgrnd_hi, bkgrnd_filt)
-                ),
-                "excl_vol_corr"   => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (c1_lo, c1_hi),
-                    "bounds"      => map_bounds(c1_lo, c1_hi, c1_filt)
-                ),
-                "chisq_red"       => Dict{String, Tuple{Float64, Float64}}(
-                    "quantiles"   => (chisq_lo, chisq_hi),
-                    "bounds"      => map_bounds(chisq_lo, chisq_hi, chisq_filt)
-                )
-            )
+        params = Dict{String,Dict{String,Tuple{Float64,Float64}}}(
+            "log_density"   => Dict{String,Tuple{Float64,Float64}}(
+            "quantiles" => (ll_lo, ll_hi),
+            "bounds"    => map_bounds(ll_lo, ll_hi, ll_filt)
+    ),
+            "scale"         => Dict{String,Tuple{Float64,Float64}}(
+            "quantiles" => (scale_lo, scale_hi),
+            "bounds"    => map_bounds(scale_lo, scale_hi, scale_filt)
+    ),
+            "bkgrnd_corr"   => Dict{String,Tuple{Float64,Float64}}(
+            "quantiles" => (bkgrnd_lo, bkgrnd_hi),
+            "bounds"    => map_bounds(bkgrnd_lo, bkgrnd_hi, bkgrnd_filt)
+    ),
+            "excl_vol_corr" => Dict{String,Tuple{Float64,Float64}}(
+            "quantiles" => (c1_lo, c1_hi),
+            "bounds"    => map_bounds(c1_lo, c1_hi, c1_filt)
+    ),
+            "chisq_red"     => Dict{String,Tuple{Float64,Float64}}(
+            "quantiles" => (chisq_lo, chisq_hi),
+            "bounds"    => map_bounds(chisq_lo, chisq_hi, chisq_filt)
+    ),
+        )
         for (k, key) in enumerate(pkeys)
             lo, hi = ξ_q[k]
-            params[key] = Dict{String, Tuple{Float64, Float64}}(
+            params[key] = Dict{String,Tuple{Float64,Float64}}(
                 "quantiles" => (lo, hi),
                 "bounds"    => map_bounds(lo, hi, ξ_filt[k]),
                 "z"         => (z_lo[k], z_hi[k]),
@@ -341,15 +354,15 @@ function run_model(
         qvals = seed.fw.qvals
         curve_quantiles, curve_bounds = _curve_bands(qvals, curves, q_1, q_2)
 
-        curve = Dict{String, Matrix{Float64}}(
+        curve = Dict{String,Matrix{Float64}}(
             "quantiles" => curve_quantiles,
-            "bounds"    => curve_bounds
+            "bounds"    => curve_bounds,
         )
 
         res = (fit, divergence_rate, map, (params, curve))
     end
 
-    Timing.tock!(seed.timing, :sampling, 1, "MAP + quantiles", t_post)
+    tock!(seed.timing, :sampling, 1, "MAP + quantiles", t_post)
     return res
 
 end

@@ -3,7 +3,8 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
+using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDMZ9")
@@ -14,7 +15,8 @@ const _DATA_PATH   = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1.dat")
 # root, and no GNOM .out pddf file is bundled.
 #
 # `SASDMZ9_fit1.dat` header:
-#   # SAXS profile: number of points = 1211, q_min = 0.00297234626486897, q_max = 0.345499873161316, ...
+#   # SAXS profile: number of points = 1211, q_min = 0.00297234626486897,
+#   #   q_max = 0.345499873161316, ...
 #   # offset = ..., scaling c = ..., Chi^2 = ...
 #   #  q       exp_intensity   model_intensity error
 # i.e. 3 comment/header lines, then 1211 data rows in columns
@@ -27,9 +29,9 @@ const _DATA_PATH   = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1.dat")
 # unlike SASDMJ9.
 raw = readdlm(_DATA_PATH; skipstart = 3)
 
-qvals   = Float64.(raw[:, 1])
-I_exp   = Float64.(raw[:, 2])
-σ_exp   = Float64.(raw[:, 4])
+qvals = Float64.(raw[:, 1])
+I_exp = Float64.(raw[:, 2])
+σ_exp = Float64.(raw[:, 4])
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -39,13 +41,14 @@ I_exp   = Float64.(raw[:, 2])
 # highly flexible starch-binding protein in the Ruminococcus bromii
 # cell-surface amylosome".
 #
-# The paperlists six SASBDB entries: SASDMX9, SASDMY9, SASDMZ9, SASDN22, SASDN32, SASDN42;
-# one per construct/ligand condition (p.16). Cross-checking residue coverage against Table 4 
-# and the SASBDB entry itself identifies # SASDMZ9 specifically as Sas20d1-2 without ligands.
-# SASBDB lists UniProt A0A2N0URA4 residues 27-559 and MW 57.2 kDa for this entry, matching 
-# Table 4's Sas20d1-2 (no maltoheptaose) sequence MW of 57.2 kDa, an order of magnitude larger than
-# either single domain (Sas20d1 ≈ 25.9 kDa, Sas20d2 ≈ 26.5 kDa). The entry paper also singles it out 
-# as highly flexible. The three PDBs are taken to be three representative conformers of the flexible ensemble.
+# The paperlists six SASBDB entries: SASDMX9, SASDMY9, SASDMZ9, SASDN22, SASDN32,
+# SASDN42; one per construct/ligand condition (p.16). Cross-checking residue coverage
+# against Table 4 and the SASBDB entry itself identifies # SASDMZ9 specifically as
+# Sas20d1-2 without ligands. SASBDB lists UniProt A0A2N0URA4 residues 27-559 and MW
+# 57.2 kDa for this entry, matching Table 4's Sas20d1-2 (no maltoheptaose) sequence MW
+# of 57.2 kDa, an order of magnitude larger than either single domain (Sas20d1 ≈ 25.9
+# kDa, Sas20d2 ≈ 26.5 kDa). The entry paper also singles it out as highly flexible. The
+# three PDBs are taken to be three representative conformers of the flexible ensemble.
 #
 # SASBDB entry metadata for SASDMZ9 (sasbdb.org/data/SASDMZ9/):
 #   buffer: "phosphate buffered saline, 1 mM TCEP, pH 7"; 5 mg/ml; 23°C;
@@ -54,15 +57,18 @@ I_exp   = Float64.(raw[:, 2])
 #
 # p.14: "PBS (137 mM NaCl, 2.7 mM KCl, 10 mM Na2HPO4, and 1.8 mM KH2PO4 [pH = 7.4])". 
 
-# pH: the PBS recipe quoted above (p.14, pH 7.4) is from the paper's cell-washing / mass-spec methods, not
-# the SAXS section, which names no buffer. The SAXS buffer is only given by SASBDB ('phosphate buffered
-# saline, 1 mM TCEP, pH 7'), so pH 7.0 is used. The recipe's NaCl/KCl and total phosphate (11.8 mM) are
-# kept; the phosphate is re-split at pH 7.0 (HPO4²⁻ fraction 0.592): pK2 from Goldberg, Kishore & Lennen
-# 2002 (DOI 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol, ΔCp −230 J/K/mol) at 22 °C, Davies-corrected at I ≈
-# 0.166 M (pK2' ≈ 6.84). The 1.8 mM KH2PO4 is kept as the K⁺ carrier and the rest is sodium phosphate.
+# pH: the PBS recipe quoted above (p.14, pH 7.4) is from the paper's cell-washing
+# / mass-spec methods, not the SAXS section, which names no buffer. The SAXS
+# buffer is only given by SASBDB ('phosphate buffered saline, 1 mM TCEP, pH 7'),
+# so pH 7.0 is used. The recipe's NaCl/KCl and total phosphate (11.8 mM) are
+# kept; the phosphate is re-split at pH 7.0 (HPO4²⁻ fraction 0.592): pK2 from
+# Goldberg, Kishore & Lennen 2002 (DOI 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol,
+# ΔCp −230 J/K/mol) at 22 °C, Davies-corrected at I ≈ 0.166 M (pK2' ≈ 6.84). The
+# 1.8 mM KH2PO4 is kept as the K⁺ carrier and the rest is sodium phosphate.
 const PH, σ_PH = 7.0, PH_METER_SIGMA   # SASBDB
 
-const ENERGY_EV        = HC_EV_ANGSTROM / 1.033 # ≈ 12001 eV, from SASBDB's stated λ = 0.1033 nm = 1.033 Å
+# ≈ 12001 eV, from SASBDB's stated λ = 0.1033 nm = 1.033 Å
+const ENERGY_EV        = HC_EV_ANGSTROM / 1.033
 const TEMPERATURE_C    = 23.0            # 23°C, SASBDB
 const IONIC_STRENGTH_M = 0.171           # PBS ionic strength, computed below
 
@@ -84,7 +90,7 @@ const IONIC_STRENGTH_M = 0.171           # PBS ionic strength, computed below
 # share this exact sequence. This is a truncated span of the full Sas20d1-2 construct
 # (UniProt A0A2N0URA4 residues 27-559 per SASBDB); the missing N-/C-terminal
 # residues are presumably disordered/unmodelled in this structure.
-const SAS20D1_2_SEQ = 
+const SAS20D1_2_SEQ =
     "EETDTKIYFDASNLPAEWGTTKTVYCHLYAVAGDDLPETSWQGKAEKCKKDTATGLYYFD" *
     "TAKLKSADGTNHGGLKDNADYAVIFSTIDTKSQSHQTCNVTLGKPCLGDTIYLTGGTVEN" *
     "TEDSSKRDFAATWKNNSDNYGPKAAITSLGHVTEGRFPIYLSRAEMVAQAIFNWAVKNPK" *
@@ -99,7 +105,7 @@ const SAS20D1_2_SEQ =
 # for the terminal H/OH); close to (but smaller than, since this modelled
 # span is shorter than the full UniProt range) the paper's Table 4 sequence
 # MW for Sas20d1-2 of 57.2 kDa.
-const SAS20D1_2_MW = 56385.18   # g/mol
+const SAS20D1_2_MW         = 56385.18   # g/mol
 const SAS20D1_2_CONC_MG_ML = 5.0   # SASBDB: 5 mg/ml
 const SAS20D1_2_MOLARITY   = SAS20D1_2_CONC_MG_ML / SAS20D1_2_MW   # ≈ 8.87e-5 M ≈ 0.0887 mM
 const SAS20D1_2_MOLARITY_σ = MOLARITY_REL_SIGMA * SAS20D1_2_MOLARITY
@@ -107,20 +113,23 @@ const SAS20D1_2_MOLARITY_σ = MOLARITY_REL_SIGMA * SAS20D1_2_MOLARITY
 # Buffer components: PBS + 1 mM TCEP
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Inference.Solute).
-    NonBiological(0.137,  0.00137,   "sodium chloride"),                # 137 mM NaCl, ±1%
-    NonBiological(0.0027, 0.000027,  "potassium chloride"),             # 2.7 mM KCl, ±1%
-    NonBiological(0.001800, 0.000036, "potassium dihydrogen phosphate"),   # PBS phosphate at pH 7.0, H2PO4⁻ part
-    NonBiological(0.003014, 0.000988, "sodium dihydrogen phosphate"),   # PBS phosphate at pH 7.0, H2PO4⁻ part
-    NonBiological(0.006986, 0.000993, "disodium hydrogen phosphate"),   # PBS phosphate at pH 7.0, HPO4²⁻ part
-    NonBiological(0.001,  0.00002,   "tcep"),                           # 1 mM TCEP, ±2%
+    # electron density (see BulkElectronDensity.Solute).
+    NonBiological(0.137, 0.00137, "sodium chloride"),                # 137 mM NaCl, ±1%
+    NonBiological(0.0027, 0.000027, "potassium chloride"),             # 2.7 mM KCl, ±1%
+    # PBS phosphate at pH 7.0, H2PO4⁻ part
+    NonBiological(0.001800, 0.000036, "potassium dihydrogen phosphate"),
+    # PBS phosphate at pH 7.0, H2PO4⁻ part
+    NonBiological(0.003014, 0.000988, "sodium dihydrogen phosphate"),
+    # PBS phosphate at pH 7.0, HPO4²⁻ part
+    NonBiological(0.006986, 0.000993, "disodium hydrogen phosphate"),
+    NonBiological(0.001, 0.00002, "tcep"),                           # 1 mM TCEP, ±2%
 ]
 
 # ---------------------------------------------------------------------------
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-const Q_MAX_FIT    = 0.3
+const Q_MAX_FIT = 0.3
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
@@ -159,8 +168,7 @@ This is used only for visualization on logarithmic axes.
 """
 function _positive_log_floor(values)
     positive = values[
-        isfinite.(values) .&
-        (values .> 0)
+        isfinite.(values) .& (values .> 0)
     ]
     if isempty(positive)
         return eps(Float64)
@@ -186,8 +194,9 @@ end
 #                         Generic run model function
 # ---------------------------------------------------------------------------
 
-# Builds the Seed that `run_sasdmz9_model` samples. It is separate only because the developer tools in test/utils/ build
-# a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
+# Builds the Seed that `run_sasdmz9_model` samples. It is separate only because
+# the developer tools in test/utils/ build a fit's Seed without running the fit;
+# if you are reading this script as an example you can skip it:
 # `run_sasdmz9_model` below is the whole story (build the seed, then sample it).
 function seed_sasdmz9_model(pdb_path::String; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
@@ -200,7 +209,12 @@ function seed_sasdmz9_model(pdb_path::String; seed::Integer = SAMPLER_SEED)
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdmz9_model(pdb_path::String; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+function run_sasdmz9_model(
+    pdb_path::String;
+    n_samples::Int = N_SAMPLES,
+    n_adapt::Int = N_ADAPT,
+    seed::Integer = SAMPLER_SEED,
+)
     s, data = seed_sasdmz9_model(pdb_path; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
@@ -330,7 +344,14 @@ function sasdmz9_figure(result, data)
         )
     end
 
-    scatter!(ax, q_plot, I_plot; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
+    scatter!(
+        ax,
+        q_plot,
+        I_plot;
+        markersize = MARKERSIZE,
+        color = COLOR_DATA,
+        label = "data",
+    )
 
     # MAP curve
     if map_result !== nothing
@@ -535,12 +556,13 @@ end
 
 const _PDB_PATH1 = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1_model1.pdb")
 
-# Model 1 is the intermediate-extent one of the three flexible-ensemble conformers described above (see
-# solution-conditions discussion); the paper's own solution-SAXS D_max for unliganded Sas20d1-2 (Table 4:
-# D_max ≈ 190-203 Å depending on method) is an average/envelope over this same flexible ensemble.
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
-# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
-# that diameter allows (see `rebin` there).
+# Model 1 is the intermediate-extent one of the three flexible-ensemble conformers
+# described above (see solution-conditions discussion); the paper's own
+# solution-SAXS D_max for unliganded Sas20d1-2 (Table 4: D_max ≈ 190-203 Å depending
+# on method) is an average/envelope over this same flexible ensemble. The
+# spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the
+# diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 result1, form_factor_log1, n_atoms1, (q_fit1, I_fit1, σ_fit1) =
     run_sasdmz9_model(_PDB_PATH1)
@@ -579,15 +601,19 @@ open(joinpath(@__DIR__, "res_model3.txt"), "w") do io
     BAYSOL.write_report(io, result3; form_factor_log = form_factor_log3, n_atoms = n_atoms3)
 end
 
-# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
-# then recompile (about 40 % of a fit's wall clock).
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL
+# methods, which every fit would then recompile (about 40 % of a fit's wall clock).
 using GLMakie
 
 fig1 = sasdmz9_figure(result1, (q_fit1, I_fit1, σ_fit1))
 save(joinpath(@__DIR__, "res_model1.png"), fig1; px_per_unit = PX_PER_UNIT)
 
 fig_residuals1 = sasdmz9_residuals_figure(result1, (q_fit1, I_fit1, σ_fit1))
-save(joinpath(@__DIR__, "res_model1_residuals.png"), fig_residuals1; px_per_unit = PX_PER_UNIT)
+save(
+    joinpath(@__DIR__, "res_model1_residuals.png"),
+    fig_residuals1;
+    px_per_unit = PX_PER_UNIT,
+)
 
 fig_hist1 = sasdmz9_hist(result1)
 save(joinpath(@__DIR__, "res_model1_hist.png"), fig_hist1; px_per_unit = PX_PER_UNIT)
@@ -596,7 +622,11 @@ fig2 = sasdmz9_figure(result2, (q_fit2, I_fit2, σ_fit2))
 save(joinpath(@__DIR__, "res_model2.png"), fig2; px_per_unit = PX_PER_UNIT)
 
 fig_residuals2 = sasdmz9_residuals_figure(result2, (q_fit2, I_fit2, σ_fit2))
-save(joinpath(@__DIR__, "res_model2_residuals.png"), fig_residuals2; px_per_unit = PX_PER_UNIT)
+save(
+    joinpath(@__DIR__, "res_model2_residuals.png"),
+    fig_residuals2;
+    px_per_unit = PX_PER_UNIT,
+)
 
 fig_hist2 = sasdmz9_hist(result2)
 save(joinpath(@__DIR__, "res_model2_hist.png"), fig_hist2; px_per_unit = PX_PER_UNIT)
@@ -605,7 +635,11 @@ fig3 = sasdmz9_figure(result3, (q_fit3, I_fit3, σ_fit3))
 save(joinpath(@__DIR__, "res_model3.png"), fig3; px_per_unit = PX_PER_UNIT)
 
 fig_residuals3 = sasdmz9_residuals_figure(result3, (q_fit3, I_fit3, σ_fit3))
-save(joinpath(@__DIR__, "res_model3_residuals.png"), fig_residuals3; px_per_unit = PX_PER_UNIT)
+save(
+    joinpath(@__DIR__, "res_model3_residuals.png"),
+    fig_residuals3;
+    px_per_unit = PX_PER_UNIT,
+)
 
 fig_hist3 = sasdmz9_hist(result3)
 save(joinpath(@__DIR__, "res_model3_hist.png"), fig_hist3; px_per_unit = PX_PER_UNIT)

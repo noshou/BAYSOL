@@ -6,12 +6,12 @@
 # it to the shared compute_B_lm; species_multipoles assembles all five. The
 # S_ab reduction is assembled downstream from the per-species B_lm, so nothing
 # here calls self_scatter.
-using ..SASA: SASA
+using ..Geometry: sasa, CONVEX, CONCAVE, CAVITY
 using ..MolecularStructure: Molecule, elms, coords_spherical, vols, to_spherical
-using ..Timing: StageLog, timed!
+using ..Runtime: StageLog, timed!
 
 # SHELL_THICKNESS is a Scattering module constant (Scattering.jl);
-# PROBE_RADIUS and SHELL_N_TARGET are SASA's (imported in Scattering.jl);
+# PROBE_RADIUS and SHELL_N_TARGET are Geometry's (imported in Scattering.jl);
 # this file only reads them as call defaults.
 
 """
@@ -30,7 +30,7 @@ at q -> 0 it scatters as `v_i`, decaying as a Gaussian whose width is set by `v_
 - `Matrix{Float64}, (N, Q)`, in [`compute_B_lm`](@ref)'s `f_atoms` layout.
 """
 function _gaussian_dummy(
-    vols::AbstractVector{<:Real}, qvals::AbstractVector{<:Real}
+    vols::AbstractVector{<:Real}, qvals::AbstractVector{<:Real},
 )::Matrix{Float64}
     any(<(0), vols) && throw(ArgumentError("_gaussian_dummy: volumes must be ≥ 0"))
 
@@ -39,8 +39,8 @@ function _gaussian_dummy(
     v = Float64.(vols)
     q2 = Float64.(qvals) .^ 2
     N, Q = length(v), length(q2)
-    # the (N, Q) f_atoms layout, filled in blocks of rows on the Julia threads (every entry is independent, and
-    # the arithmetic is the broadcast's: v · exp(−q² · v^(2/3) / 4π))
+    # the (N, Q) f_atoms layout, filled in blocks of rows on the Julia threads (every entry
+    # is independent, and the arithmetic is the broadcast's: v · exp(−q² · v^(2/3) / 4π))
     out = Matrix{Float64}(undef, N, Q)
     tmap_blocks(N, ATOM_BLOCK; threaded = N ≥ ATOM_PARALLEL_MIN) do blk
         @inbounds for k in 1:Q
@@ -96,8 +96,8 @@ end
 """
 Hydration-shell term, split into CRYSOL 3's three border-layer populations.
 
-[`SASA.sasa`](@ref) is run once; its beads are partitioned by
-[`SASA.BeadClass`](@ref) and each class gets its own `B_lm` via
+[`sasa`](@ref BAYSOL.Geometry.sasa) is run once; its beads are partitioned by
+[`BeadClass`](@ref BAYSOL.Geometry.BeadClass) and each class gets its own `B_lm` via
 [`compute_B_lm`](@ref), every bead carrying the area * thickness slab of shell
 it stands for, so the cloud tiles the layer rather than approximating it with an
 envelope. The three arrays are the `sh_convex` / `sh_concave` / `sh_cavity`
@@ -117,12 +117,12 @@ contrast `dro_k` downstream (CRYSOL's δρ = (1, 1, 0) defaults).
     - `thickness::Float64 = SHELL_THICKNESS`: shell thickness in Å; > 0.
     - `probe::Float64 = PROBE_RADIUS`: solvent probe radius, forwarded to sasa.
     - `n_target::Union{Nothing,Int} = SHELL_N_TARGET`: total shell dummies before the class
-    split, the analogue of CRYSOL's --fb. nothing lets SASA.sasa
+    split, the analogue of CRYSOL's --fb. nothing lets sasa
     size the cloud from the accessible area (≈ area / `SHELL_AREA_PER_POINT`,
     floored at `SHELL_MIN_POINTS`); pass an Int to pin it. Runtime is
     linear in it.
     - `shell::Union{Nothing,Tuple} = nothing`: the accessible surface,
-    `SASA.sasa(mol; probe, n_target)`,
+    `sasa(mol; probe, n_target)`,
     when the caller has already computed it (e.g. to size the band
     limit from the shell's extent);
     `nothing` computes it here. `probe` and `n_target` are then ignored.
@@ -139,16 +139,17 @@ function hydration(
     thickness::Float64           = SHELL_THICKNESS,
     probe::Float64               = PROBE_RADIUS,
     n_target::Union{Nothing,Int} = SHELL_N_TARGET,
-    shell::Union{Nothing,Tuple} = nothing,
+    shell::Union{Nothing,Tuple}  = nothing,
 )::@NamedTuple{
     convex::Array{ComplexF64,3},
     concave::Array{ComplexF64,3},
-    cavity::Array{ComplexF64,3}
+    cavity::Array{ComplexF64,3},
 }
     thickness > 0.0 || throw(ArgumentError("hydration: thickness must be > 0"))
 
-    pts, area, class = shell === nothing ?
-        SASA.sasa(mol; probe = probe, n_target = n_target) : shell
+    pts, area, class =
+        shell === nothing ?
+        sasa(mol; probe = probe, n_target = n_target) : shell
 
     _shell(want) = begin
         sel = findall(==(want), class)
@@ -156,15 +157,17 @@ function hydration(
         v = area[sel] .* thickness
         # beads of a class carry equal areas: one amplitude vector
         # for all of them, not an (N, Q) matrix of equal rows
-        amp = !isempty(v) && allequal(v) ? _gaussian_dummy_shared(
-            v[1], length(v), qvals
-        ) : _gaussian_dummy(v, qvals)
+        amp =
+            !isempty(v) && allequal(v) ?
+            _gaussian_dummy_shared(
+                v[1], length(v), qvals,
+            ) : _gaussian_dummy(v, qvals)
         compute_B_lm(crd, qvals, amp, lMax, _CHUNK)
     end
 
-    return (convex  = _shell(SASA.CONVEX),
-            concave = _shell(SASA.CONCAVE),
-            cavity  = _shell(SASA.CAVITY))
+    return (convex  = _shell(CONVEX),
+        concave = _shell(CONCAVE),
+        cavity  = _shell(CAVITY))
 end
 
 """
@@ -200,11 +203,11 @@ sweep per atom, shared by the form-factor and dummy amplitudes.
 """
 function species_multipoles(
     mol::Molecule, qvals::AbstractVector{<:Real}, lMax::Integer, energy::Real;
-    chunk::Unsigned                      = B_LM_CHUNK,
-    thickness::Real                      = SHELL_THICKNESS,
-    probe::Real                          = PROBE_RADIUS,
-    n_target::Union{Nothing,Integer}     = SHELL_N_TARGET,
-    shell::Union{Nothing,Tuple}          = nothing,
+    chunk::Unsigned = B_LM_CHUNK,
+    thickness::Real = SHELL_THICKNESS,
+    probe::Real = PROBE_RADIUS,
+    n_target::Union{Nothing,Integer} = SHELL_N_TARGET,
+    shell::Union{Nothing,Tuple} = nothing,
     form_factor_log::Union{Nothing,Vector{String}} = nothing,
     stage_log::Union{Nothing,StageLog} = nothing,
 )
@@ -216,17 +219,17 @@ function species_multipoles(
     end
     sh = timed!(
         stage_log,
-        :static, 2, shell === nothing ? "hydration (SASA + B_lm)" : "hydration (B_lm)"
+        :static, 2, shell === nothing ? "hydration (SASA + B_lm)" : "hydration (B_lm)",
     ) do
         hydration(
-            mol, 
-            qvals, 
-            lMax, 
+            mol,
+            qvals,
+            lMax,
             _CHUNK;
-            thickness = Float64(thickness), 
-            probe = Float64(probe),
+            thickness = Float64(thickness),
+            probe     = Float64(probe),
             n_target  = n_target,
-            shell = shell,
+            shell     = shell,
         )
     end
     return (b_vac, b_ex, sh.convex, sh.concave, sh.cavity)

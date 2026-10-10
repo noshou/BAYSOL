@@ -3,10 +3,10 @@
 Slow, suite-wide checks that a change does what it should, run once per change against criteria written down before the run. They are not unit tests (those take seconds and run on every commit, `../unit_tests/`), not fitting tests (worked examples, `../fitting_tests/`) and not benchmarks (timings on a quiet machine, `../utils/bench.tcl`): a validation runs part of the fitting pipeline (the MAP search, the Hessian) on every fitting test, takes minutes of one core, and its verdict is a statement about distributions over the 53 fits, not about one fit.
 
 ```bash
-tclsh test/run/validate.tcl --list                       # the validations and the question each answers
-tclsh test/run/validate.tcl map_fstop                    # prints the plan; runs nothing
-tclsh test/run/validate.tcl map_fstop --approved         # runs it on every fitting test
-tclsh test/run/validate.tcl map_fstop SASDMJ9 SASDBS6 --approved   # or on some
+tclsh dev/validate.tcl --list                       # the validations and the question each answers
+tclsh dev/validate.tcl map_fstop                    # prints the plan; runs nothing
+tclsh dev/validate.tcl map_fstop --approved         # runs it on every fitting test
+tclsh dev/validate.tcl map_fstop SASDMJ9 SASDBS6 --approved   # or on some
 ```
 
 Like the benchmark, a validation only runs with `--approved`, after the repository owner has approved that run.

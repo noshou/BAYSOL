@@ -15,10 +15,12 @@
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Scattering:  species_multipoles, forward_cache, ForwardCache, mean_atomic_radius,
-                    excluded_volume_factor, gram, partial_wave_weights, self_scatter, cross_scatter, hydration,
-                    intensity_terms, model_intensity, cavity_shell_fraction,
-                    SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, B_LM_CHUNK
+using BAYSOL.Scattering: species_multipoles, forward_cache, ForwardCache,
+    mean_atomic_radius,
+    excluded_volume_factor, gram, partial_wave_weights, self_scatter, cross_scatter,
+    hydration,
+    intensity_terms, model_intensity, cavity_shell_fraction,
+    SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, B_LM_CHUNK
 using BAYSOL.MolecularStructure: create, radii, vols
 using BAYSOL.PhysicalConstants: UNIT_OF_δρ
 using LinearAlgebra: Symmetric, issymmetric, eigvals
@@ -26,12 +28,12 @@ using ForwardDiff
 
 fwd_mol() = create("gly", ["n", "c", "c", "o", "o", "h", "h", "h"],
     [(-1.9, 0.2, 0.1), (-0.5, -0.3, 0.0), (0.6, 0.7, -0.1),
-    ( 1.8, 0.2, 0.0), (0.4, 1.9, -0.2), (-2.6, -0.5, 0.0),
-    (-0.4, -1.0, 0.8), (0.7, 1.3, 0.8)])
-fwd_q      = [0.0, 0.03, 0.07, 0.15, 0.31]
-fwd_E      = 9000.0
-fwd_lmax   = 4
-fwd_chunk  = UInt64(3)
+        (1.8, 0.2, 0.0), (0.4, 1.9, -0.2), (-2.6, -0.5, 0.0),
+        (-0.4, -1.0, 0.8), (0.7, 1.3, 0.8)])
+fwd_q = [0.0, 0.03, 0.07, 0.15, 0.31]
+fwd_E = 9000.0
+fwd_lmax = 4
+fwd_chunk = UInt64(3)
 
 # A packed-(l,m) B_lm array (C, K, Q) filled from a deterministic LCG so every
 # run and every reader sees the same numbers.
@@ -39,7 +41,8 @@ function iy_B(C::Int, lMax::Int, Q::Int; seed::Int = 0)
     K = (lMax + 1) * (lMax + 2) ÷ 2
     B = Array{ComplexF64,3}(undef, C, K, Q)
     s = UInt64(seed) + 0x9e3779b97f4a7c15
-    nextf() = (s = 6364136223846793005 * s + 1442695040888963407; Float64(s >> 11) / 2.0^53 - 0.5)
+    nextf() =
+        (s = 6364136223846793005 * s + 1442695040888963407; Float64(s >> 11) / 2.0^53 - 0.5)
     @inbounds for i in eachindex(B)
         B[i] = complex(nextf(), nextf())
     end
@@ -54,14 +57,14 @@ iy_w    = partial_wave_weights(iy_lMax)
 
     @testset "module-level config constants" begin
         @test SHELL_THICKNESS === 3.0
-        @test PROBE_RADIUS    === 1.4
-        @test SHELL_N_TARGET  === nothing
+        @test PROBE_RADIUS === 1.4
+        @test SHELL_N_TARGET === nothing
         @test B_LM_CHUNK isa Unsigned
         # the primitives really do read these as their defaults
         m = fwd_mol()
-        @test   hydration(m, fwd_q, 2, fwd_chunk) ==
-                hydration(m, fwd_q, 2, fwd_chunk; thickness = SHELL_THICKNESS,
-                        probe = PROBE_RADIUS, n_target = SHELL_N_TARGET)
+        @test hydration(m, fwd_q, 2, fwd_chunk) ==
+              hydration(m, fwd_q, 2, fwd_chunk; thickness = SHELL_THICKNESS,
+            probe = PROBE_RADIUS, n_target = SHELL_N_TARGET)
     end
 
     @testset "species_multipoles: 5 species in canonical order" begin
@@ -74,17 +77,18 @@ iy_w    = partial_wave_weights(iy_lMax)
         @test all(B -> size(B, 1) == 1, Bs[2:5])      # dummies: one real channel
 
         # the shell species are element-by-element identical to calling hydration directly
-        ref_sh  = hydration(m, fwd_q, fwd_lmax, fwd_chunk)
+        ref_sh = hydration(m, fwd_q, fwd_lmax, fwd_chunk)
         @test Bs[3] == ref_sh.convex
         @test Bs[4] == ref_sh.concave
         @test Bs[5] == ref_sh.cavity
     end
 
-    @testset "mean_atomic_radius is the mean equivalent-sphere radius of the per-atom excluded volumes" begin
+    # …of the per-atom excluded volumes
+    @testset "mean_atomic_radius is the mean equivalent-sphere radius" begin
         # CRYSOL's r_m = N⁻¹ Σⱼ r_gj, r_gj = cbrt(3 V_j / 4π) -- the excluded-volume
         # dummy's own radius, not the atom's van der Waals radius.
         mo = fwd_mol()
-        v  = vols(mo)
+        v = vols(mo)
         ref = sum(cbrt(3.0 * vi / (4.0 * π)) for vi in v) / length(v)
         @test mean_atomic_radius(mo) ≈ ref
         # this is generally NOT the mean vdW radius, since the excluded-volume
@@ -117,11 +121,11 @@ iy_w    = partial_wave_weights(iy_lMax)
     end
 
     @testset "excluded_volume_factor: c_1 > 1 damps with q, c_1 < 1 lifts" begin
-        rm = 1.62
+        rm   = 1.62
         up   = excluded_volume_factor(fwd_q, rm, 1.8 / 1.62)
         down = excluded_volume_factor(fwd_q, rm, 1.4 / 1.62)
         # both start at c_1^3 and move monotonically in q away from it
-        @test issorted(up ./ up[1];   rev = true)
+        @test issorted(up ./ up[1]; rev = true)
         @test issorted(down ./ down[1])
     end
 
@@ -139,8 +143,9 @@ iy_w    = partial_wave_weights(iy_lMax)
             @test issymmetric(fc.G[:, :, k])
             @test minimum(eigvals(fc.G[:, :, k])) > -1e-9
         end
-        G_ref = gram(collect(species_multipoles(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)),
-                     partial_wave_weights(fwd_lmax))
+        G_ref =
+            gram(collect(species_multipoles(mo, fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)),
+                partial_wave_weights(fwd_lmax))
         @test fc.G == G_ref
         @test fc.qvals == collect(Float64, fwd_q)
         @test fc.r_m == mean_atomic_radius(mo)
@@ -203,16 +208,20 @@ iy_w    = partial_wave_weights(iy_lMax)
 
     @testset "gram: shape guards" begin
         good = iy_B(1, iy_lMax, iy_Q; seed = 25)
-        @test_throws ArgumentError gram(typeof(good)[], iy_w)                                # no species
-        @test_throws ArgumentError gram([good], partial_wave_weights(iy_lMax + 1))           # K mismatch
-        @test_throws ArgumentError gram([good, iy_B(1, iy_lMax, iy_Q + 1; seed = 26)], iy_w) # Q mismatch
+        # no species
+        @test_throws ArgumentError gram(typeof(good)[], iy_w)
+        # K mismatch
+        @test_throws ArgumentError gram([good], partial_wave_weights(iy_lMax + 1))
+        # Q mismatch
+        @test_throws ArgumentError gram([good, iy_B(1, iy_lMax, iy_Q + 1; seed = 26)], iy_w)
     end
 
     # ---------------------------------------------------------------------
     # The contrast contraction (A, B, C), moved from Inference into Scattering
     # ---------------------------------------------------------------------
 
-    @testset "forward_cache: Gc is G repacked contiguous in q, pairs in _GRAM_PAIRS order" begin
+    # …in _GRAM_PAIRS order
+    @testset "forward_cache: Gc is G repacked contiguous in q, pairs" begin
         fc = forward_cache(fwd_mol(), fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         @test size(fc.Gc) == (length(fwd_q), 15)
         for (j, (a, b)) in enumerate(BAYSOL.Scattering._GRAM_PAIRS)
@@ -221,14 +230,16 @@ iy_w    = partial_wave_weights(iy_lMax)
         @test_throws ArgumentError BAYSOL.Scattering._pack_gram(zeros(3, 3, 4))
     end
 
-    @testset "intensity_terms + model_intensity == the plain double sum vᵀGv, at every c₁" begin
+    # …at every c₁
+    @testset "intensity_terms + model_intensity == the plain double sum vᵀGv" begin
         fc = forward_cache(fwd_mol(), fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         ρ, δρ = 0.334, (1.2, -0.4, -2.5)
         A, B, C = intensity_terms(fc, ρ, δρ)
         @test length(A) == length(B) == length(C) == length(fwd_q)
         for c1 in (0.8, 1.0, 1.13, 1.3)
             g = excluded_volume_factor(fc.qvals, fc.r_m, c1)
-            @test model_intensity(A, B, C, g) ≈ reference_intensity(fc, 1.0, 0.0, ρ, δρ, c1) rtol = 1e-10
+            want = reference_intensity(fc, 1.0, 0.0, ρ, δρ, c1)
+            @test model_intensity(A, B, C, g) ≈ want rtol = 1e-10
         end
     end
 
@@ -241,13 +252,16 @@ iy_w    = partial_wave_weights(iy_lMax)
         @test all(isfinite, grad)
         h = 1e-6
         for k in 1:4
-            pp = copy(p0); pp[k] += h
-            pm = copy(p0); pm[k] -= h
+            pp = copy(p0)
+            pp[k] += h
+            pm = copy(p0)
+            pm[k] -= h
             @test grad[k] ≈ (f(pp) - f(pm)) / (2h) rtol = 1e-5
         end
     end
 
-    @testset "cavity_shell_fraction: the cavity species' share of the shell volume, in [0, 1]" begin
+    # …in [0, 1]
+    @testset "cavity_shell_fraction: the cavity species' share of the shell volume" begin
         fc = forward_cache(fwd_mol(), fwd_q, fwd_lmax, fwd_E; chunk = fwd_chunk)
         f = cavity_shell_fraction(fc)
         @test 0.0 ≤ f ≤ 1.0

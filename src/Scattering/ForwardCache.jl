@@ -15,7 +15,7 @@
 #     5  sh_cavity   hydration shell, cavity beads   (enters with +dro_3)
 
 using ..MolecularStructure: Molecule, elms, vols
-using ..Timing: StageLog, timed!
+using ..Runtime: StageLog, timed!
 
 """
 Species Gram matrix G of shape (n, n, Q) for the n multipole arrays in
@@ -41,15 +41,18 @@ G[:, :, k] is real, symmetric and positive semidefinite.
 - `Array{Float64,3} of size (n, n, Q)`, symmetric in its first two axes.
 """
 function gram(
-    Bs::AbstractVector{<:AbstractArray{<:Complex,3}}, weights::AbstractVector{<:Real}
+    Bs::AbstractVector{<:AbstractArray{<:Complex,3}}, weights::AbstractVector{<:Real},
 )::Array{Float64,3}
     n = length(Bs)
     n ≥ 1 || throw(ArgumentError("gram: need at least one species"))
     K = length(weights)
     Q = size(Bs[1], 3)
     for a in 1:n
-        size(Bs[a], 2) == K || throw(ArgumentError(
-            "gram: Bs[$a] has $(size(Bs[a], 2)) (l,m) rows but weights has length $K"))
+        size(Bs[a], 2) == K || throw(
+            ArgumentError(
+                "gram: Bs[$a] has $(size(Bs[a], 2)) (l,m) rows but weights has length $K",
+            ),
+        )
         size(Bs[a], 3) == Q || throw(ArgumentError(
             "gram: Bs[$a] has Q=$(size(Bs[a], 3)) but Bs[1] has Q=$Q"))
     end
@@ -57,7 +60,7 @@ function gram(
     G = Array{Float64,3}(undef, n, n, Q)
     @inbounds for a in 1:n
         G[a, a, :] .= self_scatter(Bs[a], weights)
-        for b in (a + 1):n
+        for b in (a+1):n
             s = cross_scatter(Bs[a], Bs[b], weights)
             G[a, b, :] .= s
             G[b, a, :] .= s
@@ -114,18 +117,6 @@ function mean_atomic_radius(mol::Molecule)::Float64
     return sum(cbrt(3.0 * vi / (4.0 * π)) for vi in v) / length(v)
 end
 
-"""
-Species pairs (a, b), a ≤ b, in [`ForwardCache`](@ref)'s `Gc`
-column order, species numbered as in the file header
-(1 vac, 2 ex, 3-5 shells): the 10 pairs of {1, 3, 4, 5} (the
-envelope-free terms, "A"), then the 4 pairs (2, b),
-b ∈ {1, 3, 4, 5} ("B"), then (2, 2) ("C").
-"""
-const _GRAM_PAIRS = (
-    (1, 1), (1, 3), (1, 4), (1, 5), (3, 3),
-    (3, 4), (3, 5), (4, 4), (4, 5), (5, 5),
-    (1, 2), (2, 3), (2, 4), (2, 5), (2, 2)
-)
 
 """
 Repack the five-species Gram matrix G, (5, 5, Q),
@@ -194,7 +185,7 @@ multipoles ([`species_multipoles`](@ref)), reduced to the Gram matrix G(q), plus
 -   `chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size (results invariant).
 -   `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
     `n_target = SHELL_N_TARGET`: hydration-shell geometry, forwarded to hydration.
--   `shell::Union{Nothing,Tuple} = nothing`: a precomputed `SASA.sasa`
+-   `shell::Union{Nothing,Tuple} = nothing`: a precomputed `sasa`
     result, see [`hydration`](@ref).
 -   `stage_log::Union{Nothing,StageLog} = nothing`: if given, the vacuum,
     excluded-volume, hydration and Gram + `r_m` stages are recorded in it
@@ -231,7 +222,7 @@ forward_cache(
         r_m,
         form_factor_log,
         length(elms(mol)),
-        lMax
+        lMax,
     )
 end
 
@@ -261,8 +252,9 @@ carry ForwardDiff dual numbers).
 # Arguments
 - `fw::ForwardCache`: the structure's geometry-only cache.
 - `ρ::Real`: the buffer's bulk electron density ρₑ, e·Å⁻³.
-- `δρ::NTuple{S,<:Real}`: dimensionless shell contrasts, (convex, concave, cavity) for the five-species
-    model (`S = 3`); the packed Gram matrix must have the `(S+1)(S+2)/2 + S + 2` columns of that many species.
+- `δρ::NTuple{S,<:Real}`: dimensionless shell contrasts, (convex, concave,
+    cavity) for the five-species model (`S = 3`); the packed Gram matrix
+    must have the `(S+1)(S+2)/2 + S + 2` columns of that many species.
 
 # Returns
 - `(A, B, C)`, three length-Q vectors with the eltype of ρₑ/δρ.
@@ -272,19 +264,24 @@ function intensity_terms(fw::ForwardCache, ρ::Real, δρ::NTuple{S,<:Real}) whe
     M  = S + 1              # species that carry a contrast: vac (weight 1) and the S shells
     nA = M * (M + 1) ÷ 2    # envelope-free pairs, row-major upper triangle
     Gc = fw.Gc
-    size(Gc, 2) == nA + M + 1 || throw(ArgumentError(
-        "intensity_terms: $S contrasts need $(nA + M + 1) Gram columns, got $(size(Gc, 2))"))
+    size(Gc, 2) == nA + M + 1 || throw(
+        ArgumentError(
+            "intensity_terms: $S contrasts need $(nA + M + 1) Gram columns, " *
+            "got $(size(Gc, 2))",
+        ),
+    )
     v  = (one(T), ntuple(k -> T(UNIT_OF_δρ * δρ[k]), Val(S))...)
     kA = T[(i == j ? v[i] * v[j] : 2v[i] * v[j]) for i in 1:M for j in i:M]
     kB = T[-2ρ * v[i] for i in 1:M]
     Q  = size(Gc, 1)
-    A = Vector{T}(undef, Q); B = Vector{T}(undef, Q)
+    A  = Vector{T}(undef, Q)
+    B  = Vector{T}(undef, Q)
     mul!(A, view(Gc, :, 1:nA), kA)
-    mul!(B, view(Gc, :, (nA + 1):(nA + M)), kB)
+    mul!(B, view(Gc, :, (nA+1):(nA+M)), kB)
     ρ2 = T(ρ)^2
     C = Vector{T}(undef, Q)
     @inbounds @fastmath @simd for q in 1:Q
-        C[q] = ρ2 * Gc[q, nA + M + 1]
+        C[q] = ρ2 * Gc[q, nA+M+1]
     end
     return A, B, C
 end
@@ -301,7 +298,7 @@ function model_intensity(
     A::AbstractVector,
     B::AbstractVector,
     C::AbstractVector,
-    g::AbstractVector
+    g::AbstractVector,
 )
     ŷ = similar(A, promote_type(eltype(A), eltype(B), eltype(C), eltype(g)))
     @inbounds @fastmath @simd for i in eachindex(ŷ)
