@@ -38,8 +38,9 @@ the MAP search found. Immutable, built once per [`infer`](@ref) call.
     under the MAP Hessian).
 - `whitened::Bool`: whether `S` comes from the Hessian (`false`: identity fallback).
 - `n_evals::Int`: objective evaluations (value and gradient) over all L-BFGS starts.
-- `logπ::Float64`: log π at the MAP (`NaN` if every start failed): the value NUTS's chains are measured against
-    (a draw that beats it by [`BASIN_RESTART_NATS`](@ref) shows that a better basin exists).
+- `logπ::Float64`: log π at the MAP (`NaN` if every start failed):
+    the value NUTS's chains are measured against (a draw that beats it
+    by [`BASIN_RESTART_NATS`](@ref) shows that a better basin exists).
 """
 struct _SamplingSpace{N,L}
     μ::SVector{N,Float64}
@@ -54,12 +55,15 @@ struct _SamplingSpace{N,L}
 end
 
 "θ = μ + σ·(ẑ + S·w): NUTS coordinates w to θ-space (see [`_SamplingSpace`](@ref))."
-_θ_of_w(w::SVector{N,<:Real}, sp::_SamplingSpace{N}) where {N} = sp.μ .+ sp.σ .* (sp.ẑ .+ sp.S * w)
+_θ_of_w(w::SVector{N,<:Real}, sp::_SamplingSpace{N}) where {N} =
+    sp.μ .+ sp.σ .* (sp.ẑ .+ sp.S * w)
 
 """
-w = S⁻¹·((θ − μ)/σ − ẑ): θ-space back to NUTS's coordinates, the inverse of [`_θ_of_w`](@ref).
+w = S⁻¹·((θ − μ)/σ − ẑ): θ-space back to NUTS's
+coordinates, the inverse of [`_θ_of_w`](@ref).
 """
-_w_of_θ(θ::SVector{N,<:Real}, sp::_SamplingSpace{N}) where {N} = sp.S \ ((θ .- sp.μ) ./ sp.σ .- sp.ẑ)
+_w_of_θ(θ::SVector{N,<:Real}, sp::_SamplingSpace{N}) where {N} =
+    sp.S \ ((θ .- sp.μ) ./ sp.σ .- sp.ẑ)
 
 """
 −log π at prior-standardized z, with c1 profiled to `tol`. Non-finite values and
@@ -74,7 +78,7 @@ function _neglogπ(
     σ,
     seed::Seed,
     l::LIKELIHOOD,
-    tol::Float64
+    tol::Float64,
 )::T where {N,T<:Real}
     v = try
         -_logπ(μ .+ σ .* z, seed.pr, seed.wls, seed.fw, l; tab = seed.c1tab, c1_tol = tol)
@@ -91,7 +95,14 @@ Gradient of [`_neglogπ`](@ref) at z (one ForwardDiff pass).
 # Returns
 - `SVector{N,Float64}` (non-finite where −log π is `+Inf`).
 """
-function _neglogπ_grad(z::SVector{N,Float64}, μ, σ, seed::Seed, l::LIKELIHOOD, tol::Float64) where {N}
+function _neglogπ_grad(
+    z::SVector{N,Float64},
+    μ,
+    σ,
+    seed::Seed,
+    l::LIKELIHOOD,
+    tol::Float64,
+) where {N}
     return ForwardDiff.gradient(x -> _neglogπ(x, μ, σ, seed, l, tol), z)
 end
 
@@ -104,12 +115,14 @@ coordinate i, from its envelope-theorem gradient, with c1 profiled to
 - `SMatrix{N,N,Float64}`: may contain non-finite entries if a probe hit a flat model.
 """
 function _fd_hessian(
-    z::SVector{N,Float64}, h::SVector{N,Float64}, μ, σ, seed::Seed, l::LIKELIHOOD
+    z::SVector{N,Float64}, h::SVector{N,Float64}, μ, σ, seed::Seed, l::LIKELIHOOD,
 ) where {N}
     cols = ntuple(Val(N)) do i
         e = SVector(ntuple(j -> j == i ? h[i] : 0.0, Val(N)))
-        (_neglogπ_grad(z + e, μ, σ, seed, l, EXCL_VOL_CORR_TOL) -
-        _neglogπ_grad(z - e, μ, σ, seed, l, EXCL_VOL_CORR_TOL)) / (2h[i])
+        (
+            _neglogπ_grad(z + e, μ, σ, seed, l, EXCL_VOL_CORR_TOL) -
+            _neglogπ_grad(z - e, μ, σ, seed, l, EXCL_VOL_CORR_TOL)
+        ) / (2h[i])
     end
     H = hcat(cols...)
     return (H + H') / 2
@@ -130,13 +143,14 @@ end
 """
 Pre-NUTS MAP search and Laplace whitening (see the note at the top of `MAP.jl`).
 
-L-BFGS runs from the seed's θ₀ and `MAP_N_STARTS - 1` further prior draws (and any `extra_starts`), on
-−log π in prior-standardized z-space with c1 profiled to `EXCL_VOL_CORR_TOL`
-(the same objective NUTS then samples). The distinct basins among the optima (Mahalanobis distance under the Hessian
-at the lowest one) are compared by their Laplace mass, `−f − ½ log det H`, for the best `MAP_MAX_BASINS` of them: a
-narrow basin can have the lowest f and still carry less mass than a wide one. The heaviest basin's optimum is the MAP
-ẑ. Its Hessian is taken in two central-difference passes: step `MAP_HESS_STEP`, then
-`MAP_HESS_REL_STEP` × each coordinate's Laplace σ from the first pass.
+L-BFGS runs from the seed's θ₀ and `MAP_N_STARTS - 1` further prior draws (and any
+`extra_starts`), on −log π in prior-standardized z-space with c1 profiled to
+`EXCL_VOL_CORR_TOL` (the same objective NUTS then samples). The distinct basins among the
+optima (Mahalanobis distance under the Hessian at the lowest one) are compared by their
+Laplace mass, `−f − ½ log det H`, for the best `MAP_MAX_BASINS` of them: a narrow basin can
+have the lowest f and still carry less mass than a wide one. The heaviest basin's optimum
+is the MAP ẑ. Its Hessian is taken in two central-difference passes: step `MAP_HESS_STEP`,
+then `MAP_HESS_REL_STEP` × each coordinate's Laplace σ from the first pass.
 
 # Arguments
 - `seed::Seed`: priors, data, forward cache and c1 tables; `seed.θ₀` is the first start.
@@ -144,10 +158,11 @@ narrow basin can have the lowest f and still carry less mass than a wide one. Th
 
 # Keywords
 - `f_abstol`, `successive_f_tol`: the f-based stopping rule of each L-BFGS start.
-- `base::UInt64`: the run's random base value; start `i ≥ 2` draws its prior sample from the stream
-    `stream(base, _RNG_MAP_STARTS, i)`. Default: a fresh draw from the default RNG.
-- `extra_starts`: further L-BFGS starts in z-space (the sampler passes the best draw of a first round of chains here,
-    to re-whiten at a better basin).
+- `base::UInt64`: the run's random base value; start `i ≥ 2` draws its
+    prior sample from the stream `stream(base, _RNG_MAP_STARTS, i)`.
+    Default: a fresh draw from the default RNG.
+- `extra_starts`: further L-BFGS starts in z-space (the sampler passes the
+    best draw of a first round of chains here, to re-whiten at a better basin).
 
 # Returns
 - [`_SamplingSpace`](@ref). If no start reaches a finite optimum, ẑ is the seed's
@@ -160,10 +175,10 @@ function _sampling_space(
     f_abstol::Real = MAP_F_ABSTOL,
     successive_f_tol::Int = MAP_F_SUCCESSIVE,
     base::UInt64 = draw_base(),
-    extra_starts::AbstractVector = SVector{N,Float64}[]
+    extra_starts::AbstractVector = SVector{N,Float64}[],
 )::_SamplingSpace where {N}
     μ, σ = θ_prior_moments(seed.pr)
-    f  = z -> _neglogπ(SVector{N}(z...), μ, σ, seed, l, EXCL_VOL_CORR_TOL)
+    f = z -> _neglogπ(SVector{N}(z...), μ, σ, seed, l, EXCL_VOL_CORR_TOL)
     fg! = (G, z) -> begin
         gc_checkpoint()
         dr = DiffResults.GradientResult(z)
@@ -176,24 +191,31 @@ function _sampling_space(
         g_abstol = MAP_G_TOL,
         f_abstol = f_abstol,
         successive_f_tol = successive_f_tol,
-        iterations = MAP_MAX_ITER
+        iterations = MAP_MAX_ITER,
     )
 
     z₀ = _standardize(seed.θ₀, seed.pr)
-    # start i ≥ 2 draws from its own stream, so the starts do not depend on the order they run in
+    # start i ≥ 2 draws from its own stream, so the
+    # starts do not depend on the order they run in
     starts = vcat(
         [z₀],
-        [_standardize(Θ(_ξ₀(seed.pr, stream(base, _RNG_MAP_STARTS, i)), seed.pr)[1], seed.pr)
-         for i in 2:MAP_N_STARTS],
-        [SVector{N,Float64}(z) for z in extra_starts]
+        [
+            _standardize(
+                Θ(_ξ₀(seed.pr, stream(base, _RNG_MAP_STARTS, i)), seed.pr)[1],
+                seed.pr,
+            )
+            for i in 2:MAP_N_STARTS
+        ],
+        [SVector{N,Float64}(z) for z in extra_starts],
     )
-    # serial on purpose: the whole search is ~8 ms warm (a start is ~1 ms), so threading it was measured
-    # slower (0.71× at 4 threads, test/validation/threading/)
+    # serial on purpose: the whole search is ~8 ms warm (a start is ~1 ms), so
+    # threading it was measured slower (0.71× at 4 threads, test/validation/threading/)
     optima = Tuple{SVector{N,Float64},Float64}[]
     n_evals = 0
     for zs in starts
         isfinite(f(Vector(zs))) || continue
-        res = optimize(OnceDifferentiable(f, g!, fg!, Vector(zs)), Vector(zs), LBFGS(), opts)
+        res =
+            optimize(OnceDifferentiable(f, g!, fg!, Vector(zs)), Vector(zs), LBFGS(), opts)
         n_evals += Optim.f_calls(res)
         v = Optim.minimum(res)
         isfinite(v) && push!(optima, (SVector{N}(minimizer(res)...), v))
@@ -205,15 +227,20 @@ function _sampling_space(
     ẑ, f_mode = optima[1]
     h₀ = MAP_HESS_STEP .* ones(SVector{N,Float64})
     H₁ = _fd_hessian(ẑ, h₀, μ, σ, seed, l)
-    all(isfinite, H₁) || return _SamplingSpace(μ, σ, ẑ, I_N, length(optima), 1, false, n_evals, -f_mode)
+    all(isfinite, H₁) ||
+        return _SamplingSpace(μ, σ, ẑ, I_N, length(optima), 1, false, n_evals, -f_mode)
     λ₁, V₁ = _floored_eigen(H₁)
 
-    # The heaviest basin, not just the lowest optimum: representatives of the distinct basins (the lowest optimum of
-    # each, Mahalanobis distance under H₁), the best MAP_MAX_BASINS of them compared by Laplace mass −f − ½ log det H.
+    # The heaviest basin, not just the lowest optimum: representatives of the
+    # distinct basins (the lowest optimum of each, Mahalanobis distance under H₁),
+    # the best MAP_MAX_BASINS of them compared by Laplace mass −f − ½ log det H.
     H₁f = V₁ * (λ₁ .* V₁')
     reps = Int[]
     for (i, (z, _)) in enumerate(optima)
-        any(j -> sqrt((z - optima[j][1])' * H₁f * (z - optima[j][1])) ≤ MAP_MODE_SEP, reps) || push!(reps, i)
+        any(
+            j -> sqrt((z - optima[j][1])' * H₁f * (z - optima[j][1])) ≤ MAP_MODE_SEP,
+            reps,
+        ) || push!(reps, i)
     end
     mass₁ = -f_mode - sum(log, λ₁) / 2
     for i in reps[2:min(end, MAP_MAX_BASINS)]

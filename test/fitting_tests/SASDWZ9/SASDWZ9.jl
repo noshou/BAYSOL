@@ -3,12 +3,13 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
+using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDWZ9")
-const _PDB_PATH     = joinpath(_FIXTURE_DIR, "SASDWZ9_fit1_model1.pdb")
-const _FIT_PATH     = joinpath(_FIXTURE_DIR, "SASDWZ9_fit1.fit")
+const _PDB_PATH = joinpath(_FIXTURE_DIR, "SASDWZ9_fit1_model1.pdb")
+const _FIT_PATH = joinpath(_FIXTURE_DIR, "SASDWZ9_fit1.fit")
 
 # `experimental_data/` and `pddf/` are both empty for this fixture (no
 # standalone .dat and no GNOM .out were bundled).
@@ -28,7 +29,7 @@ I_pepsi_fit = Float64.(raw[:, 4])   # Pepsi-SAXS's own fitted curve, for the com
 # ---------------------------------------------------------------------------
 #
 # Source: Huang et al. 2026, ACS Omega 11:2614-2627 ("pH Sensitivity of the
-# SERF1a Conformational Ensemble"), test/fixtures/experiments/SASDWZ9/ao5c07620.pdf,
+# SERF1a Conformational Ensemble"), doi:10.1021/acsomega.5c07620,
 # "Materials and Methods" / "Purification and Preparation of Samples" (the
 # only Methods paragraph in the bundled main-text PDF; a separate
 # Supporting Information PDF with further experimental detail is referenced
@@ -55,9 +56,11 @@ I_pepsi_fit = Float64.(raw[:, 4])   # Pepsi-SAXS's own fitted curve, for the com
 
 const PH, σ_PH = 6.8, PH_METER_SIGMA
 
-const ENERGY_EV       = HC_EV_ANGSTROM / 0.8266   # ≈ 15000 eV, from SASBDB's stated 0.08266 nm wavelength
-const TEMPERATURE_C    = 10.0   # 10°C, SASBDB
-const IONIC_STRENGTH_M = 0.0545 # unused by the fit; derived from the old pKa2 = 7.2 split (see below)
+# ≈ 15000 eV, from SASBDB's stated 0.08266 nm wavelength
+const ENERGY_EV     = HC_EV_ANGSTROM / 0.8266
+const TEMPERATURE_C = 10.0   # 10°C, SASBDB
+# unused by the fit; derived from the old pKa2 = 7.2 split (see below)
+const IONIC_STRENGTH_M = 0.0545
 
 # SERF1a sequence, read directly off SASDWZ9_fit1_model1.pdb chain A
 # (residues 1-62, all 62 residues modelled -- this is a single filtered
@@ -69,18 +72,19 @@ const SERF1A_SEQ = "MARGNQRELARQKNMKKTQEISKGKRKEDSLTASQRKQRDSEIMQEKQKAANEKKSMQTR
 # Average mass from SERF1A_SEQ (ExPASy average residue masses + one water
 # for the terminal H/OH).
 const SERF1A_MW = 7336.37   # g/mol
-const SERF1A_CONC_MG_ML = 15.00   # SASBDB metadata (not stated in the bundled main-text PDF)
+# SASBDB metadata (not stated in the bundled main-text PDF)
+const SERF1A_CONC_MG_ML = 15.00
 const SERF1A_MOLARITY   = SERF1A_CONC_MG_ML / SERF1A_MW   # ≈ 2.045 mM
 const SERF1A_MOLARITY_σ = MOLARITY_REL_SIGMA * SERF1A_MOLARITY   # σ not stated
 
 # Buffer components.
 #
-# "20 mM NaPi" is not itself a single species: at pH 6.8 it is a mix of NaH2PO4 and Na2HPO4. The HPO4²⁻
-# fraction is 0.425: pK2 from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
-# 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol, ΔCp −230 J/K/mol) at 22 °C (pH set at room temperature),
-# Davies-corrected at I ≈ 0.060 M, giving an effective pK2' ≈ 6.93. This replaces the earlier flat pKa2 =
-# 7.2, which ignored ionic strength. σ combines σ_PH, ±3 °C, ±0.02 pK, 30 % of the Davies shift and ±2 % on
-# C.
+# "20 mM NaPi" is not itself a single species: at pH 6.8 it is a mix of NaH2PO4 and
+# Na2HPO4. The HPO4²⁻ fraction is 0.425: pK2 from Goldberg, Kishore & Lennen 2002 (J.
+# Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol, ΔCp −230
+# J/K/mol) at 22 °C (pH set at room temperature), Davies-corrected at I ≈ 0.060 M, giving
+# an effective pK2' ≈ 6.93. This replaces the earlier flat pKa2 = 7.2, which ignored ionic
+# strength. σ combines σ_PH, ±3 °C, ±0.02 pK, 30 % of the Davies shift and ±2 % on C.
 #
 # 0.02% NaN3 (w/v) = 0.2 g/L; MW(NaN3) = 65.01 g/mol => ≈ 3.08 mM.
 #
@@ -93,11 +97,13 @@ const SERF1A_MOLARITY_σ = MOLARITY_REL_SIGMA * SERF1A_MOLARITY   # σ not state
 #     I = ½·[0.04877·1 + 0.020·1 + 0.01431·1 + 0.00569·4 + 0.00308·1] ≈ 0.0545 M
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Inference.Solute).
-    NonBiological(0.020,      0.0002,   "sodium chloride"),             # 20 mM NaCl, ±1%
-    NonBiological(0.011494, 0.001491, "sodium dihydrogen phosphate"),   # 20 mM NaPi, H2PO4⁻ part
-    NonBiological(0.008506, 0.001483, "disodium hydrogen phosphate"),   # 20 mM NaPi, HPO4²⁻ part
-    NonBiological(0.003076,   0.0000615,"sodium azide"),                # 0.02% w/v NaN3, ±2%
+    # electron density (see BulkElectronDensity.Solute).
+    NonBiological(0.020, 0.0002, "sodium chloride"),             # 20 mM NaCl, ±1%
+    # 20 mM NaPi, H2PO4⁻ part
+    NonBiological(0.011494, 0.001491, "sodium dihydrogen phosphate"),
+    # 20 mM NaPi, HPO4²⁻ part
+    NonBiological(0.008506, 0.001483, "disodium hydrogen phosphate"),
+    NonBiological(0.003076, 0.0000615, "sodium azide"),                # 0.02% w/v NaN3, ±2%
 ]
 
 # ---------------------------------------------------------------------------
@@ -106,27 +112,28 @@ const SOLUTES = Solute[
 
 const Q_MAX_FIT = 0.35   # the .fit file's own full q-range (≈0.0083-0.3501 Å⁻¹)
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
-# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
-# that diameter allows (see `rebin` there).
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true  # runs Pdb2pqr at PH; the NMR structure already carries
-                            # modelled hydrogens, but Pdb2pqr recomputes pH-consistent
-                            # protonation states from the heavy-atom positions regardless.
+# modelled hydrogens, but Pdb2pqr recomputes pH-consistent
+# protonation states from the heavy-atom positions regardless.
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
-with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
+(`seed_model` bins the curve and drops the bins with non-positive intensity.)
 """
 function fit_subset()
     keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdwz9` samples. It is separate only because the developer tools in test/utils/ build
-# a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
+# Builds the Seed that `run_sasdwz9` samples. It is separate only because
+# the developer tools in test/utils/ build a fit's Seed without running
+# the fit; if you are reading this script as an example you can skip it:
 # `run_sasdwz9` below is the whole story (build the seed, then sample it).
 function seed_sasdwz9(; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
@@ -139,7 +146,11 @@ function seed_sasdwz9(; seed::Integer = SAMPLER_SEED)
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdwz9(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+function run_sasdwz9(;
+    n_samples::Int = N_SAMPLES,
+    n_adapt::Int = N_ADAPT,
+    seed::Integer = SAMPLER_SEED,
+)
     s, data = seed_sasdwz9(; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
@@ -154,8 +165,8 @@ open(joinpath(@__DIR__, "res.txt"), "w") do io
     BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
-# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
-# then recompile (about 40 % of a fit's wall clock).
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL
+# methods, which every fit would then recompile (about 40 % of a fit's wall clock).
 using GLMakie
 
 """
@@ -168,8 +179,8 @@ all draws diverged) the quantile-curve envelope.
 function sasdwz9_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
@@ -178,7 +189,6 @@ function sasdwz9_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-
         xscale = log10,
         yscale = log10,
     )
@@ -196,7 +206,8 @@ function sasdwz9_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
@@ -224,7 +235,14 @@ function sasdwz9_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -264,7 +282,8 @@ function sasdwz9_residuals_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
@@ -274,8 +293,22 @@ function sasdwz9_residuals_figure(result, data)
 
     if map_curve !== nothing
         resid = I_fit .- map_curve[:, 2]
-        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR)
-        scatter!(ax, q_fit, resid; markersize = MARKERSIZE, color = COLOR_DATA, label = "data - MAP")
+        errorbars!(
+            ax,
+            q_fit,
+            resid,
+            σ_fit;
+            whiskerwidth = WHISKERWIDTH,
+            color = COLOR_ERRORBAR,
+        )
+        scatter!(
+            ax,
+            q_fit,
+            resid;
+            markersize = MARKERSIZE,
+            color = COLOR_DATA,
+            label = "data - MAP",
+        )
         hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
         lo, hi = extrema(resid)
         pad = YLIM_LIN_PAD_FRAC * (hi - lo)
@@ -333,8 +366,8 @@ end
 function sasdwz9_comparison_figure(result, data)
     _, _, map_result, _ = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
@@ -361,12 +394,20 @@ function sasdwz9_comparison_figure(result, data)
 
     lines!(
         ax, qvals[keep], I_pepsi_fit[keep];
-        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = "Pepsi-SAXS fit1",
+        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash,
+        label = "Pepsi-SAXS fit1",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "BAYSOL MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "BAYSOL MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)

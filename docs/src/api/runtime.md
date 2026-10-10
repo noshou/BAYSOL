@@ -1,34 +1,8 @@
 # Runtime
 
-The process machinery the others run on (`src/Runtime/`): thread-safe memoization, per-stage timing and
-garbage-collector pausing.
-
-## Runtime
+The process machinery the others run on (`src/Runtime/`): thread-safe memoization, per-stage timing,
+garbage-collector pausing and the threading helpers.
 
 ```@autodocs
 Modules = [BAYSOL.Runtime]
-```
-
-## Cache
-
-```@autodocs
-Modules = [BAYSOL.Cache]
-```
-
-## Timing
-
-```@autodocs
-Modules = [BAYSOL.Timing]
-```
-
-## GCPause
-
-```@autodocs
-Modules = [BAYSOL.GCPause]
-```
-
-## Parallel
-
-```@autodocs
-Modules = [BAYSOL.Parallel]
 ```

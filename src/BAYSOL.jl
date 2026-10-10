@@ -15,34 +15,31 @@ include("Utils/Utils.jl")
 
 # The Utils submodules are bound here,
 # before the modules that import them by
-# name are included.
-using .Utils:               Utils
+# name are included. Utils is the only module
+# with submodules; every other module is one module.
+using .Utils: Utils
 using .Utils.PhysicalConstants: PhysicalConstants
-using .Utils.PlasticSequence: PlasticSequence
-using .Utils.Shannon:       Shannon
+using .Utils.Shannon: Shannon
 
 # Runtime needs PhysicalConstants (Timing), so it comes second.
 include("Runtime/Runtime.jl")
+using .Runtime: Runtime
 
-using .Runtime:             Runtime
-using .Runtime.Cache:       Cache
-using .Runtime.Timing:      Timing
-using .Runtime.GCPause:     GCPause
-using .Runtime.Parallel:    Parallel
-
-include("PartialMolarVolumes/PMV.jl")
+# Geometry (point sets, excluded volumes, SASA) needs
+# only Runtime; MolecularStructure builds on it.
+include("Geometry/Geometry.jl")
+include("BulkElectronDensity/BulkElectronDensity.jl")
 include("MolecularStructure/MolecularStructure.jl")
-include("SASA/SASA.jl")
 include("Scattering/Scattering.jl")
 include("Inference/Inference.jl")
 include("Pipeline/Pipeline.jl")
 
-using .PartialMolarVolumes: PartialMolarVolumes
-using .MolecularStructure:  MolecularStructure
-using .SASA:                SASA
-using .Scattering:          Scattering
-using .Inference:             Inference
-using .Pipeline:              Pipeline, seed_model, run_model, write_report
+using .Geometry: Geometry
+using .BulkElectronDensity: BulkElectronDensity
+using .MolecularStructure: MolecularStructure
+using .Scattering: Scattering
+using .Inference: Inference
+using .Pipeline: Pipeline, seed_model, run_model, write_report
 
 # The pipeline entry points, reached qualified
 # (`BAYSOL.seed_model`), not exported. Their

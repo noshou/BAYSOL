@@ -25,46 +25,47 @@
 //   Themes.compile("academic.scss", "docs/src/assets/themes/documenter-light.css")
 
 @font-face {
-  font-family: "TeX Gyre Pagella";
-  src: url("fonts/texgyrepagella-regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
 }
 @font-face {
-  font-family: "TeX Gyre Pagella";
-  src: url("fonts/texgyrepagella-italic.woff2") format("woff2");
-  font-weight: 400;
-  font-style: italic;
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-italic.woff2") format("woff2");
+    font-weight: 400;
+    font-style: italic;
 }
 @font-face {
-  font-family: "TeX Gyre Pagella";
-  src: url("fonts/texgyrepagella-bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
 }
 @font-face {
-  font-family: "TeX Gyre Pagella";
-  src: url("fonts/texgyrepagella-bolditalic.woff2") format("woff2");
-  font-weight: 700;
-  font-style: italic;
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-bolditalic.woff2") format("woff2");
+    font-weight: 700;
+    font-style: italic;
 }
 @font-face {
-  font-family: "Montserrat";
-  src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"), url("fonts/Montserrat[wght].woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
+    font-family: "Montserrat";
+    src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"),
+        url("fonts/Montserrat[wght].woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
 }
 @font-face {
-  font-family: "Fira Code";
-  src: url("fonts/FiraCode-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
+    font-family: "Fira Code";
+    src: url("fonts/FiraCode-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
 }
 @font-face {
-  font-family: "Fira Code";
-  src: url("fonts/FiraCode-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
+    font-family: "Fira Code";
+    src: url("fonts/FiraCode-Bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
 }
 
 // Base palette + admonition colors, unchanged from Documenter's own
@@ -123,9 +124,11 @@ $documenter-sidebar-menu-active-color: #ffffff;
 $documenter-sidebar-menu-active-hover-background: #24406e;
 $documenter-sidebar-menu-active-hover-color: #ffffff;
 
-$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif !default;
+$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Helvetica Neue", sans-serif !default;
 $family-serif: "TeX Gyre Pagella", Palatino, Georgia, serif;
-$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace !default;
+$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas",
+    "Liberation Mono", monospace !default;
 $link: #1d3557;
 $link-hover: #14263e;
 
@@ -154,14 +157,14 @@ $link-hover: #14263e;
 // highlight.js color scheme override for the julia> prompt (kept from the
 // original documenter-light.scss)
 code.language-julia-repl > span.hljs-meta {
-  color: $ansi-green;
-  font-weight: bolder;
+    color: $ansi-green;
+    font-weight: bolder;
 }
 
 @import "highlightjs/default";
 
 .gap-4 {
-  gap: 1rem;
+    gap: 1rem;
 }
 
 // ---- Our own reskin, unscoped (applies unconditionally, see note above) --
@@ -169,27 +172,27 @@ code.language-julia-repl > span.hljs-meta {
 // variables above, not hand-written rules here -- see the comments there.
 
 body {
-  color: #2b2b2b;
+    color: #2b2b2b;
 }
 
 body,
 p,
 .content,
 .docstring > section > div {
-  font-family: $family-serif;
-  line-height: 1.6;
+    font-family: $family-serif;
+    line-height: 1.6;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: $family-sans-serif;
-  font-weight: 700;
+    font-family: $family-sans-serif;
+    font-weight: 700;
 }
 
 // docstring signature / function name headings
 .docstring-binding,
 .docstring > header {
-  font-family: $family-sans-serif;
-  font-weight: 700;
+    font-family: $family-sans-serif;
+    font-weight: 700;
 }
 
 // Sidebar background/text/hover/active colors all come from the
@@ -201,14 +204,14 @@ h1, h2, h3, h4, h5, h6 {
 // see $documenter-sidebar-menu-active-background above).
 #documenter .docs-sidebar,
 #documenter .docs-sidebar * {
-  font-family: $family-sans-serif;
+    font-family: $family-sans-serif;
 }
 #documenter .docs-sidebar .tocitem {
-  color: #b7c4d6;
+    color: #b7c4d6;
 }
 #documenter .docs-sidebar .tocitem.is-active,
 #documenter .docs-sidebar li.is-active > .tocitem {
-  font-weight: 600;
+    font-weight: 600;
 }
 // li.is-active gets a 1px top+bottom border by default
 // (documenter/layout/_sidebar.scss), sized for a light default sidebar;
@@ -216,20 +219,20 @@ h1, h2, h3, h4, h5, h6 {
 // entry, which we don't want (no background box for active items at all
 // now, so definitely no border either).
 #documenter .docs-sidebar ul.docs-menu li.is-active {
-  border: none !important;
+    border: none !important;
 }
 // ul.docs-menu itself also has a separate 1px top divider by default,
 // sitting directly above the first entry -- against navy, right above an
 // active (white-pill) first entry like "Home", it reads as a line framing
 // that entry specifically. The mockup has no divider there at all.
 #documenter .docs-sidebar ul.docs-menu {
-  border-top: none;
+    border-top: none;
 }
 
 nav.breadcrumb {
-  font-family: $family-sans-serif;
-  font-weight: 600;
-  color: #1a1a1a;
+    font-family: $family-sans-serif;
+    font-weight: 600;
+    color: #1a1a1a;
 }
 
 // The search field (<button id="documenter-search-query" class=
@@ -244,9 +247,9 @@ nav.breadcrumb {
 // tone instead. #documenter-search-query (an id) rather than
 // .docs-search-query so this reliably beats .input's own specificity.
 #documenter-search-query {
-  background-color: #24406e;
-  color: #e8ecf3;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+    background-color: #24406e;
+    color: #e8ecf3;
+    border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 // Documenter adds a grey box-shadow to the sticky navbar once the page is
@@ -256,18 +259,18 @@ nav.breadcrumb {
 // wouldn't against stock white -- the existing border-bottom on the navbar
 // already provides that separation, so drop the shadow entirely.
 #documenter .docs-main header.docs-navbar.headroom--not-top {
-  box-shadow: none;
+    box-shadow: none;
 }
 
 code,
 pre,
 .documenter-example-output,
 .docstring pre {
-  font-family: $family-monospace;
-  font-feature-settings: "calt" 1, "liga" 1;
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
+    font-family: $family-monospace;
+    font-feature-settings: "calt" 1, "liga" 1;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
 }
 
 // four-color syntax highlighting (highlight.js token classes). Per
@@ -277,20 +280,20 @@ pre,
 .hljs-keyword,
 .hljs-function .hljs-keyword,
 .hljs-literal {
-  color: #783ad4;
+    color: #783ad4;
 }
 .hljs-title,
 .hljs-title.function_,
 .hljs-name {
-  color: #783ad4;
+    color: #783ad4;
 }
 .hljs-type,
 .hljs-built_in,
 .hljs-class .hljs-title {
-  color: #0e9080;
+    color: #0e9080;
 }
 .hljs-number,
 .hljs-string,
 .hljs-symbol {
-  color: #be185d;
+    color: #be185d;
 }

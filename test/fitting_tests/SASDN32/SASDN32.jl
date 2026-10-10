@@ -3,7 +3,8 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
+using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDN32")
@@ -15,15 +16,16 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDN32_fit1_model1.pdb")
 # root, and no GNOM .out pddf file is bundled.
 #
 # `SASDN32_fit1.dat` header:
-#   # SAXS profile: number of points = 1211, q_min = 0.00297234626486897, q_max = 0.345499873161316, ...
+#   # SAXS profile: number of points = 1211, q_min = 0.00297234626486897,
+#   #   q_max = 0.345499873161316, ...
 #   # offset = ..., scaling c = ..., Chi^2 = ...
 #   #  q       exp_intensity   model_intensity error
 # i.e. 3 comment/header lines, then 1211 data rows in columns
 raw = readdlm(_DATA_PATH; skipstart = 3)
 
-qvals   = Float64.(raw[:, 1])
-I_exp   = Float64.(raw[:, 2])
-σ_exp   = Float64.(raw[:, 4])
+qvals = Float64.(raw[:, 1])
+I_exp = Float64.(raw[:, 2])
+σ_exp = Float64.(raw[:, 4])
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -31,7 +33,7 @@ I_exp   = Float64.(raw[:, 2])
 #
 # Source: Cerqueira et al. 2022, J. Biol. Chem. 298(5):101896, "Sas20 is a
 # highly flexible starch-binding protein in the Ruminococcus bromii
-# cell-surface amylosome", test/fixtures/experiments/SASDN32/PIIS0021925822003362.pdf.
+# cell-surface amylosome", doi:10.1016/j.jbc.2022.101896.
 #
 # The paper's "Data availability" paragraph (p.16) lists six SASBDB
 # accessions for its SEC-SAXS runs: SASDMX9, SASDMY9, SASDMZ9, SASDN22,
@@ -40,20 +42,24 @@ I_exp   = Float64.(raw[:, 2])
 # Buffer: same generic SEC-SAXS Materials & Methods paragraph as SASDMZ9
 # (p.16, "SEC–SAXS experiments") applies.
 
-# pH: the PBS recipe quoted above (p.14, pH 7.4) is from the paper's cell-washing / mass-spec methods, not
-# the SAXS section, which names no buffer. The SAXS buffer is only given by SASBDB ('phosphate buffered
-# saline, 1 mM TCEP, pH 7'), so pH 7.0 is used. The recipe's NaCl/KCl and total phosphate (11.8 mM) are
-# kept; the phosphate is re-split at pH 7.0 (HPO4²⁻ fraction 0.592): pK2 from Goldberg, Kishore & Lennen
-# 2002 (DOI 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol, ΔCp −230 J/K/mol) at 22 °C, Davies-corrected at I ≈
-# 0.166 M (pK2' ≈ 6.84). The 1.8 mM KH2PO4 is kept as the K⁺ carrier and the rest is sodium phosphate.
+# pH: the PBS recipe quoted above (p.14, pH 7.4) is from the paper's cell-washing
+# / mass-spec methods, not the SAXS section, which names no buffer. The SAXS
+# buffer is only given by SASBDB ('phosphate buffered saline, 1 mM TCEP, pH 7'),
+# so pH 7.0 is used. The recipe's NaCl/KCl and total phosphate (11.8 mM) are
+# kept; the phosphate is re-split at pH 7.0 (HPO4²⁻ fraction 0.592): pK2 from
+# Goldberg, Kishore & Lennen 2002 (DOI 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol,
+# ΔCp −230 J/K/mol) at 22 °C, Davies-corrected at I ≈ 0.166 M (pK2' ≈ 6.84). The
+# 1.8 mM KH2PO4 is kept as the K⁺ carrier and the rest is sodium phosphate.
 const PH, σ_PH = 7.0, PH_METER_SIGMA   # SASBDB
 
-const ENERGY_EV       = HC_EV_ANGSTROM / 1.033 # ≈ 12001 eV, from SASBDB's stated λ = 0.1033 nm = 1.033 Å
-const TEMPERATURE_C    = 23.0            # 23°C, SASBDB
-const IONIC_STRENGTH_M = 0.171           # PBS ionic strength, identical buffer recipe to SASDMZ9 
+# ≈ 12001 eV, from SASBDB's stated λ = 0.1033 nm = 1.033 Å
+const ENERGY_EV     = HC_EV_ANGSTROM / 1.033
+const TEMPERATURE_C = 23.0            # 23°C, SASBDB
+# PBS ionic strength, identical buffer recipe to SASDMZ9
+const IONIC_STRENGTH_M = 0.171
 
 # Sas20d2 sequence, read directly off SASDN32_fit1_model1.pdb
-const SAS20D2_SEQ = 
+const SAS20D2_SEQ =
     "ADATQYVVAGVESLTGYEWQGSPALAPENVMTKSGDVYTKTFTAVPVGKSYQLKVVANTG" *
     "DEQKWIGLDGTDNNVTFDVESACDVTVTFNPATNEIAVTGDGVKMVTDLEINSITVVGNG" *
     "ENSWLNGVAWGVDAEVNHMTQIADKVYQITYTGVESADAAYQFKFAVNDDWAANWGLPEQ" *
@@ -64,7 +70,7 @@ const SAS20D2_SEQ =
 # for the terminal H/OH); ≈ 26.32 kDa, matching Table 4's Sas20d2 sequence
 # MW of 26.5 kDa (small difference from the exact modelled span vs. the
 # paper's own construct boundary) and SASBDB's own stated MW (25.9 kDa).
-const SAS20D2_MW = 26319.06   # g/mol
+const SAS20D2_MW         = 26319.06   # g/mol
 const SAS20D2_CONC_MG_ML = 10.0   # SASBDB: 10.00 mg/ml
 const SAS20D2_MOLARITY   = SAS20D2_CONC_MG_ML / SAS20D2_MW   # ≈ 3.80e-4 M ≈ 0.380 mM
 const SAS20D2_MOLARITY_σ = MOLARITY_REL_SIGMA * SAS20D2_MOLARITY
@@ -75,46 +81,51 @@ const SAS20D2_MOLARITY_σ = MOLARITY_REL_SIGMA * SAS20D2_MOLARITY
 #
 # maltoheptaose: V0 = 694.8 ± 5.8 cm³/mol (Hourston 1967 PhD thesis,
 # Table 6.1, 25 °C, measured from the partial specific volume 0.600 ±
-# 0.005 mL/g); it now resolves in src/PartialMolarVolumes/NonBiological.
+# 0.005 mL/g); it now resolves in src/BulkElectronDensity/NonBiological.
 # 5 mM is not negligible next to the 137 mM NaCl / 10 mM phosphate buffer
 # components, so it is included (previously omitted because no entry existed).
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Inference.Solute).
-    NonBiological(0.137,  0.00137,   "sodium chloride"),               # 137 mM NaCl, ±1%
-    NonBiological(0.0027, 0.000027,  "potassium chloride"),            # 2.7 mM KCl, ±1%
-    NonBiological(0.001800, 0.000036, "potassium dihydrogen phosphate"),   # PBS phosphate at pH 7.0, H2PO4⁻ part
-    NonBiological(0.003014, 0.000988, "sodium dihydrogen phosphate"),   # PBS phosphate at pH 7.0, H2PO4⁻ part
-    NonBiological(0.006986, 0.000993, "disodium hydrogen phosphate"),   # PBS phosphate at pH 7.0, HPO4²⁻ part
-    NonBiological(0.001,  0.00002,   "tcep"),                          # 1 mM TCEP, ±2%
-    NonBiological(0.005,  0.0001,    "maltoheptaose"),                 # 5 mM maltoheptaose ligand, ±2%
+    # electron density (see BulkElectronDensity.Solute).
+    NonBiological(0.137, 0.00137, "sodium chloride"),               # 137 mM NaCl, ±1%
+    NonBiological(0.0027, 0.000027, "potassium chloride"),            # 2.7 mM KCl, ±1%
+    # PBS phosphate at pH 7.0, H2PO4⁻ part
+    NonBiological(0.001800, 0.000036, "potassium dihydrogen phosphate"),
+    # PBS phosphate at pH 7.0, H2PO4⁻ part
+    NonBiological(0.003014, 0.000988, "sodium dihydrogen phosphate"),
+    # PBS phosphate at pH 7.0, HPO4²⁻ part
+    NonBiological(0.006986, 0.000993, "disodium hydrogen phosphate"),
+    NonBiological(0.001, 0.00002, "tcep"),                          # 1 mM TCEP, ±2%
+    # 5 mM maltoheptaose ligand, ±2%
+    NonBiological(0.005, 0.0001, "maltoheptaose"),
 ]
 
 # ---------------------------------------------------------------------------
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-const Q_MAX_FIT    = 0.3
+const Q_MAX_FIT = 0.3
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
-# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
-# that diameter allows (see `rebin` there).
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
-with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
+(`seed_model` bins the curve and drops the bins with non-positive intensity.)
 """
 function fit_subset()
     keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdn32` samples. It is separate only because the developer tools in test/utils/ build
-# a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
+# Builds the Seed that `run_sasdn32` samples. It is separate only because
+# the developer tools in test/utils/ build a fit's Seed without running
+# the fit; if you are reading this script as an example you can skip it:
 # `run_sasdn32` below is the whole story (build the seed, then sample it).
 function seed_sasdn32(; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
@@ -127,7 +138,11 @@ function seed_sasdn32(; seed::Integer = SAMPLER_SEED)
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdn32(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+function run_sasdn32(;
+    n_samples::Int = N_SAMPLES,
+    n_adapt::Int = N_ADAPT,
+    seed::Integer = SAMPLER_SEED,
+)
     s, data = seed_sasdn32(; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
@@ -142,8 +157,8 @@ open(joinpath(@__DIR__, "res.txt"), "w") do io
     BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
-# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
-# then recompile (about 40 % of a fit's wall clock).
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL
+# methods, which every fit would then recompile (about 40 % of a fit's wall clock).
 using GLMakie
 
 """
@@ -156,8 +171,8 @@ all draws diverged) the quantile-curve envelope.
 function sasdn32_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
@@ -166,7 +181,6 @@ function sasdn32_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-
         xscale = log10,
         yscale = log10,
     )
@@ -184,7 +198,8 @@ function sasdn32_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
@@ -212,7 +227,14 @@ function sasdn32_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -252,7 +274,8 @@ function sasdn32_residuals_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
@@ -262,8 +285,22 @@ function sasdn32_residuals_figure(result, data)
 
     if map_curve !== nothing
         resid = I_fit .- map_curve[:, 2]
-        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR)
-        scatter!(ax, q_fit, resid; markersize = MARKERSIZE, color = COLOR_DATA, label = "data - MAP")
+        errorbars!(
+            ax,
+            q_fit,
+            resid,
+            σ_fit;
+            whiskerwidth = WHISKERWIDTH,
+            color = COLOR_ERRORBAR,
+        )
+        scatter!(
+            ax,
+            q_fit,
+            resid;
+            markersize = MARKERSIZE,
+            color = COLOR_DATA,
+            label = "data - MAP",
+        )
         hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
         lo, hi = extrema(resid)
         pad = YLIM_LIN_PAD_FRAC * (hi - lo)
