@@ -1,0 +1,26 @@
+# Chains
+
+Do eight NUTS chains (two at the MAP (independent random streams) and three mirrored pairs at distances 4, 10 and 20 posterior standard deviations from the MAP along a random direction each) converge to one posterior, does a better basin that the MAP search missed get found, and does pooling change the answer the single chain started at the MAP gives? It also checks that the jitter scales are neither too small to test anything nor so large that chains are dropped.
+
+```bash
+tclsh test/run/validate.tcl chains --approved        # prints its plan without --approved
+```
+
+The script (`validate.jl`) runs `infer` with the defaults (8 chains, the `run_model` warm-up and draws) on each fit and each RNG seed, and a second time with `n_chains = 1` (the single chain started at the MAP, as in earlier versions); it compares the pooled post-warm-up draws with that single chain.
+
+## Criteria (fixed 2026-10-10, before the first run of this eight-chain version; the four-chain version failed 1 and 2, see Outcome)
+
+Judged over distributions, not per fit:
+
+1. **Convergence, within each posterior mode** (chains in different modes differ by construction, and their mass shares are estimated by bridge sampling): at least 95 % of the (fit, seed) runs have a rank-normalized split R̂ ≤ 1.01 for every parameter and log π, none above 1.05, the median smallest bulk ESS is at least 800 and the median smallest tail ESS at least 400 (100 and 50 per chain).
+2. **Starts and basins:** at least 95 % of the (run, chain) pairs are pooled; at least 90 % of the starts keep their nominal scale (no halving toward the MAP); and no run ends with a pool that has a chain better than its MAP by more than `BASIN_RESTART_NATS` (a rewhitening, when it happens, must have resolved it: counted and listed); chains are only dropped for an error or for mostly divergent transitions, never for sitting in a poorer mode.
+3. **Agreement with the single chain, over the runs with one posterior mode:** over the fits (mean over seeds), each of ρₑ, δρ₁, δρ₂, δρ₃ and c1 has its median moved by less than 0.05 of its interquartile range between the single chain and the pool; the reduced χ² of the best draw changes by at most 0.1 % (median) and 1 % (95th percentile of |·|). Runs with several modes are listed with their bridge-sampled shares, not judged here.
+4. **Cost** (reported, not judged): leapfrog steps of the pool over those of the single chain, and the seconds of both.
+
+## Outcome
+
+Runs so far (all 53 fits × 2 seeds, 2026-10-10), oldest first:
+
+1. **Four chains** (chain 1 at the MAP, the others at +1, +2, +3 along random directions; classical R̂; the per-run file was not kept): criterion 1 failed (93 % of runs at R̂ ≤ 1.01, worst 1.08), criterion 2 failed once (SASDX52 seed 1: chains 1-3 sat 24 nats below chain 4, the MAP search had missed the good basin), criterion 3 passed (shifts < 0.004 IQR). This prompted the 32-start basin search chosen by Laplace mass, the re-whitening, the rank-normalized R̂ with bulk and tail ESS, and the eight mirrored chains.
+2. **Eight chains at per-coordinate scales ±1…±4, modes weighted by bridge sampling** (`results/chains-20261010-124514.tsv`): criterion 1 failed (89.6 % of runs at R̂ ≤ 1.01 within modes, worst 1.084; all 11 runs above 1.01 are on the known hard fits SASDEP6, SASDRN5, SASDVG2, SASDLP4, SASDN32, SASDWZ9, SASDX52), criteria 2 and 3 passed (all chains pooled, no rewhitening needed, shifts ≤ 0.007 IQR, best-draw χ² change 0.17 % at the 95th percentile). Seven fits had a second posterior mode, with the same shares for both seeds: SASDZC6 0.81 / 0.19, SASDWZ9 0.83 / 0.17, SASDN32 0.95 / 0.05, and four with a minor mode of no mass (SASDX52, SASDLP4 ×2, SASDTK5). The leapfrog steps were 8.1× those of one chain (median), the wall time of the sampling 2.7×.
+3. **Current starts** (two chains at the MAP, mirrored pairs at distances 4, 10 and 20 posterior standard deviations; `results/chains-20261010-134724.tsv`): criterion 1 failed (91.5 % of runs at R̂ ≤ 1.01; the 9 runs above are on the hard fits SASDKQ8, SASDLP4 ×2, SASDN32, SASDVG2 and SASDX52, accepted as such), criteria 2 and 3 passed (no start had to be pulled back, including the ±20 ones; no rewhitening; 99.9 % of chains pooled; shifts ≤ 0.008 IQR, best-draw χ² change 0.23 % at the 95th percentile). The far starts find more second modes than before (23 runs, 12 fits), nearly all of no mass; the ones with mass are SASDZC6 0.81 / 0.19, SASDWZ9 0.84 / 0.16, SASDKQ8 0.96 / 0.04 and SASDN32 0.95 / 0.05. Leapfrog steps 8.0× those of one chain (median). One run, SASDX52 seed 1, exposed a weakness: the bridge-sampling error of one mode (a single chain) was ±6.3 nats, and applying its nominal share discarded the draws of every other chain. The weights are now not applied when an error that can change the pool exceeds `BRIDGE_MAX_ERR` = 1 nat (`weights_uncertain`): the modes that are negligible even at their most optimistic estimate are dropped and the chains of the others are pooled as they came, which the report states. Rerun of SASDX52 (`results/chains-20261010-*.tsv`, the latest): seed 1 now pools the two modes that can matter (0.83 / 0.17) and still reports R̂ 1.68 (bulk ESS 3), because the second mode is one chain that has not mixed; seed 2 is unchanged.
