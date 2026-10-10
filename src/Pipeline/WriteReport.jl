@@ -27,12 +27,13 @@ const _REPORT_LABELS = Dict{String, String}(
 )
 
 """
-The report's `=== Diagnostics ===` block, right after the run block: the sampler's iterations, mean acceptance, tree depth
-and steps, E-BFMI, the cavity fraction of the hydration shell, whether the profiled c1 hit its bound, and the share of
-divergent transitions. `map_params` is `nothing` when every draw diverged (the MAP-based lines are then left out).
+The sampler diagnostics, written as the last lines of the report's `=== Run ===` section
+(no header of their own): the sampler's iterations, mean acceptance, tree depth and steps,
+E-BFMI, the cavity fraction of the hydration shell, whether the profiled c1 hit its bound,
+and the share of divergent transitions. `map_params` is `nothing` when every draw diverged
+(the MAP-based lines are then left out).
 """
 function _write_diagnostics(io::IO, fit, divergence_rate::Real, map_params)
-    println(io, "=== Diagnostics ===")
     stats  = fit.stats
     accept = getproperty.(stats, :acceptance_rate)
     depth  = getproperty.(stats, :tree_depth)
@@ -89,7 +90,7 @@ defaults `io` to `stdout`; see its own one-line definition below.
 
 # Logged EBFMI vs. AdvancedHMC's logged EBFMIest
 
-The "EBFMI" line in this report's "=== Diagnostics ===" block and the
+The "EBFMI" line in this report's "=== Run ===" section and the
 EBFMIest AdvancedHMC.jl logs to the console during sampling use
 the same formula (mean(diff(H).^2) / var(H), H = per-draw
 Hamiltonian energy), but AdvancedHMC.jl's logs warmup draws which skews
@@ -115,29 +116,59 @@ function write_report(
 
         println(io, "=== MAP ===")
         for k in _REPORT_KEYS
-            @printf(io, "%-14s = %+.6g\n", _REPORT_LABELS[k], map_params[k])
+            @printf(
+                io,
+                "%-14s = %+.6g\n",
+                _REPORT_LABELS[k],
+                map_params[k]
+            )
         end
 
         println(io)
         println(io, "=== Quantiles ($quantile_label) ===")
         @printf(
-            io, "%-14s %16s %16s %16s %16s\n",
+            io, "%-16s %16s %16s %16s %16s\n",
             "param", "quantile_lo", "quantile_hi", "bound_lo", "bound_hi"
         )
         for k in _REPORT_KEYS
             q_lo, q_hi = quantile_params[k]["quantiles"]
             b_lo, b_hi = quantile_params[k]["bounds"]
-            @printf(io, "%-14s %+16.6g %+16.6g %+16.6g %+16.6g\n", _REPORT_LABELS[k], q_lo, q_hi, b_lo, b_hi)
+            @printf(
+                io,
+                "%-16s %+16.6g %+16.6g %+16.6g %+16.6g\n",
+                _REPORT_LABELS[k] * "_Q",
+                q_lo,
+                q_hi,
+                b_lo,
+                b_hi
+            )
         end
 
         println(io)
-        println(io, "=== Standard deviations from prior (θ-space z-score) ===")
-        @printf(io, "%-14s %16s %16s %16s\n", "param", "z_MAP", "z_quantile_lo", "z_quantile_hi")
+        println(
+            io,
+            "=== Standard deviations from prior (θ-space z-score) ==="
+        )
+        @printf(
+            io,
+            "%-16s %16s %16s %16s\n",
+            "param",
+            "z_MAP",
+            "z_quantile_lo",
+            "z_quantile_hi"
+        )
         for k in _PRIOR_KEYS
             haskey(map_params, "z_" * k) || continue
             z_map           = map_params["z_" * k]
             z_lo, z_hi      = quantile_params[k]["z"]
-            @printf(io, "%-14s %+16.6g %+16.6g %+16.6g\n", _REPORT_LABELS[k], z_map, z_lo, z_hi)
+            @printf(
+                io,
+                "%-16s %+16.6g %+16.6g %+16.6g\n",
+                _REPORT_LABELS[k] * "_Z",
+                z_map,
+                z_lo,
+                z_hi
+            )
         end
     end
 
@@ -153,4 +184,7 @@ function write_report(
     return nothing
 end
 
-write_report(result; kwargs...) = write_report(stdout, result; kwargs...)
+write_report(
+    result;
+    kwargs...
+) = write_report(stdout, result; kwargs...)

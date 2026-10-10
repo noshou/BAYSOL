@@ -28,6 +28,7 @@ using .Runtime:             Runtime
 using .Runtime.Cache:       Cache
 using .Runtime.Timing:      Timing
 using .Runtime.GCPause:     GCPause
+using .Runtime.Parallel:    Parallel
 
 include("PartialMolarVolumes/PMV.jl")
 include("MolecularStructure/MolecularStructure.jl")

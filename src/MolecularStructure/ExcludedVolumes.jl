@@ -11,6 +11,7 @@ using NearestNeighbors: inrange, KDTree
 using ..PlasticSequence: plastic_points, Vec3
 using LinearAlgebra: dot
 using StaticArrays: SVector
+using ..Parallel: tmap_blocks
 
 "Volume of a sphere of radius rad."
 sphere_volume(rad::Float64)::Float64 = (4.0 / 3.0) * π * rad^3
@@ -70,18 +71,41 @@ function excluded_volume(
     rmax::Float64
 )::Vector{Float64}
     
-    # excluded volumes
     vols = Vector{Float64}(undef, size(cart, 2))
+    n = size(cart, 2)
+    # every atom is independent and writes only vols[i], so the blocks run on the Julia threads (large inputs)
+    tmap_blocks(n, ATOM_BLOCK; threaded = n ≥ ATOM_PARALLEL_MIN) do blk
+        _excluded_volume_block!(vols, cart, rads, tree, rmax, blk)
+    end
+    return vols
+end
 
-    # per-atom scratch, reused: the sample points mapped onto atom i's sphere
+"""
+[`excluded_volume`](@ref) for the atoms `blk` only, written into `vols[blk]`. Owns its scratch, so blocks can run
+concurrently.
+
+# Returns
+- `nothing`.
+
+# Exceptions
+- `BoundsError` if `blk` does not match `cart` or `rads` (a caller error).
+"""
+function _excluded_volume_block!(
+    vols::Vector{Float64},
+    cart::Matrix{Float64},
+    rads::Vector{Float64},
+    tree::KDTree,
+    rmax::Float64,
+    blk::UnitRange{Int}
+)::Nothing
+    # per-block scratch, reused: the sample points mapped onto atom i's sphere
     # (coordinate vectors) and whether each is claimed by some neighbour
     npts = length(_pts)
     xs, ys, zs = Vector{Float64}(undef, npts), Vector{Float64}(undef, npts), Vector{Float64}(undef, npts)
     hit = Vector{Bool}(undef, npts)
 
-    # iterate over columns for each atom coord
-    i = 1
-    @inbounds for (x, y, z) in eachcol(cart)
+    @inbounds for i in blk
+        x = cart[1, i]; y = cart[2, i]; z = cart[3, i]
 
         p_i = (x, y, z)
 
@@ -152,7 +176,6 @@ function excluded_volume(
             vols[i] = sphere_volume(rads[i]) * (N_VOL_SHELL - victims) / N_VOL_SHELL
 
         end
-        i+=1
     end
-    return vols
+    return nothing
 end

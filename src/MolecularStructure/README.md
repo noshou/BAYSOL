@@ -294,4 +294,4 @@ Includes the five files above in dependency order (Mols.jl, ExcludedVolumes.jl, 
 Defined at module level in `MolecularStructure.jl`.
 
 
-`N_VOL_SHELL` (2145 quasi-random points per atom for the power-diagram excluded-volume estimate in `MolecularStructure.excluded_volume`)
+`N_VOL_SHELL` (2145 quasi-random points per atom for the power-diagram excluded-volume estimate in `MolecularStructure.excluded_volume`), `ATOM_BLOCK` (64 atoms per task in the threaded loops over atoms; the result does not depend on it) and `ATOM_PARALLEL_MIN` (4096: below this many atoms or hydration beads the loops run in a plain loop, because the tasks would cost more than they save)

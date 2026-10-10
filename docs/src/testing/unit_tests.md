@@ -26,7 +26,9 @@ julia --project=test test/unit_tests/units/test_atomicradii.jl
 | `test_protonation.jl` | the Henderson-Hasselbalch protonation helpers |
 | `test_pipeline.jl` | the structure-loading primitives composed end to end (resolve, pKa, hydrogens, load) |
 | `test_shannon.jl` | `Utils.Shannon`: the exact diameter, the Shannon binning and its band limit, the interpolation back to the measured grid, the residual statistics, and `seed_model` → `run_model` → `write_report` end to end on crambin |
-| `test_gcpause.jl` | `GCPause`: the collector off inside a pause, nesting, restoration on exceptions, the byte-budget checkpoint |
+| `test_gcpause.jl` | `GCPause`: the collector off inside a pause, nesting, restoration on exceptions, the byte-budget checkpoint, and that a checkpoint on a worker thread neither collects nor leaves the collector off |
+| `test_parallel.jl` | `Parallel`: the per-item random streams (SplitMix64 pinned), the ordered task map, the BLAS scope |
+| `test_concurrency.jl` | the concurrency and race tests: every threaded kernel (excluded volumes, SASA, amplitudes, `compute_B_lm`, the whole static build) bit-identical at 1, 2, 3, 5, 7, 8 and 24 workers under chaos scheduling, concurrent callers, nested regions, exceptions in tasks, BLAS-scope and GC-pause stress, leak check; most meaningful with several threads (`precommit.tcl` runs it with `-t 6,1`) |
 | `test_formfactor.jl` | `FormFactor` against the xraydb oracle values in `fixtures/form-factors/` |
 | `test_pmv.jl` | `PartialMolarVolumes`: bulk water, protein, non-biological solutes, memoization per `(sequence, pH, σ_pH)` |
 | `test_plasticmap.jl` | `PlasticSequence`: the low-discrepancy point sets |

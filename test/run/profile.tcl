@@ -9,6 +9,7 @@
 #   ID[:tag]   fitting tests to profile (SASDMJ9, SASDBS6:fit2_model3, ...); every ID must exist
 #   --delay    the profiler's sampling interval (default 0.0005 s)
 #   --nuts     also profile the sampling (MAP search and NUTS) of each fit, after a short run that warms the compiler
+#   --threads N  run the Julia processes with N threads (as `julia -t N`: 4, auto, 4,1); default one
 #   --dry-run  print the command, run nothing
 #
 # Each is built twice in one process (the first call warms the compiler) and the second build is profiled

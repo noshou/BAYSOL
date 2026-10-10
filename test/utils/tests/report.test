@@ -42,4 +42,32 @@ test number-trap {a number capture keeps all its digits (no lazy quantifier in f
     report::grab "mean_n_steps   = 215.45" {^mean_n_steps\s+= @N@}
 } -result 215.45
 
+test parse-all-lines {every line of the report parses} -body {
+    fields res_chains.txt {n_atoms lMax n_q_raw n_q n_samples n_adapt dmax channels rebin_per_channel rebin_measured rebin_fitted rebin_dropped
+        iterations accept depth depth_max steps ebfmi cavity_frac sat div lgdn_MAP rho_e_MAP dro3_MAP chi2_MAP quantile_lo quantile_hi}
+} -result {2592 32 1803 121 1000 300 63.9 10.0 12 1803 121 0 700 0.9094 2.51 3 5.72 1.1027 0.0029 false 0.0000 +152.294 +0.336164 -5.99051 +0.873836 16 84}
+
+test parse-tables {the quantile, bound and z-score columns of every parameter} -body {
+    fields res_chains.txt {lgdn_QUANT_LO lgdn_QUANT_HI lgdn_BOUND_LO lgdn_BOUND_HI dro3_QUANT_LO dro3_BOUND_HI scale_QUANT_HI excl_BOUND_LO chi2_BOUND_HI
+        rho_e_Z_MAP dro2_Z_QUANT_LO dro3_Z_QUANT_HI}
+} -result {+148.612 +151.649 +148.614 +151.648 -8.49667 -2.09783 +9.2958e-06 +1.24652 +0.876655 +0.287019 +3.90118 -0.0218302}
+
+test parse-timing-stages {every stage of the timing table, the MAP search and NUTS metadata} -body {
+    fields res_chains.txt {static_build resolve_structure propka pdb2pqr load_molecule sasa shannon fwd vacuum_excluded hydration gram_rm
+        seed_fitting sampling map_s nuts_setup nuts reprofile map_quantiles report_write unaccounted gc
+        map_starts_ok map_starts_total map_modes nuts_iters leapfrog ms_per_step draws}
+} -result {0.13 6.4e-05 9.4e-04 1.1e-05 6.8e-03 0.03 4.3e-03 0.09 0.07 0.02 6.7e-04 1.8e-04 0.72 0.02 2.0e-04 0.64 6.0e-03 0.06 0.11 0.62 0.01 8 8 2 4000 18420.0 0.1 3000}
+
+test parse-chains {the chain lines: pooled and total, dropped, the worst R-hat and the smallest ESS} -body {
+    fields res_chains.txt {chains_pooled chains_total chains_dropped rhat_max ess_min ess_tail_min}
+} -result {3 4 1 1.0032 1843 1211}
+
+test parse-modes {the modes line and the shares of the modes} -body {
+    fields res_chains.txt {modes mode_share_max mode_share_min}
+} -result {2 0.81 0.19}
+
+test parse-chains-absent {a report from before the chains has none of them} -body {
+    fields res_current.txt {chains_pooled chains_total rhat_max ess_min ess_tail_min chains_dropped modes mode_share_max}
+} -result {{} {} {} {} {} 0 {} {}}
+
 cleanupTests

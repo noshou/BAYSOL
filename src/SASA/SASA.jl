@@ -9,7 +9,11 @@ module SASA
 
 using ..PlasticSequence: Vec3, plastic_points
 using NearestNeighbors: inrange, inrange!
-using ..MolecularStructure: Molecule, radii, r_max, coords_cartesian, neighbour_tree
+using ..MolecularStructure: Molecule, radii, r_max, coords_cartesian, neighbour_tree, ATOM_BLOCK, ATOM_PARALLEL_MIN
+using ..Parallel: tmap_blocks
+
+"Beads per task in the threaded classification loop of [`SASA.sasa`](@ref BAYSOL.SASA.sasa); the result does not depend on it."
+const CLASS_BLOCK = 256
 
 "Solvent probe radius in Å (water), forwarded to [`SASA.sasa`](@ref BAYSOL.SASA.sasa)."
 const PROBE_RADIUS = 1.4

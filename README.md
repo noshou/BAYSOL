@@ -6,6 +6,7 @@ BAYSOL builds the five-species (vacuum, excluded volume, convex/concave/cavity h
 
 - Documentation: [BAYSOL](https://noshou.github.io/BAYSOL/). Each module's README under `src/` is also a Guides page there.
 - Worked analyses of 27 SASBDB entries: [fitting tests](test/fitting_tests/)
+- Several threads: start Julia with `julia -t auto` (or `-t 6,1`) to use them; results are bit-identical at any thread count. What is threaded and what it buys: the Parallel section of the [Runtime guide](src/Runtime/README.md)
 - Test runners and developer tools (fitting tests, result comparison, sampler diagnostics, benchmarks): [test/run](test/run/README.md), [test/utils](test/utils/README.md)
 
 ```

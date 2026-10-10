@@ -26,3 +26,9 @@ Modules = [BAYSOL.Timing]
 ```@autodocs
 Modules = [BAYSOL.GCPause]
 ```
+
+## Parallel
+
+```@autodocs
+Modules = [BAYSOL.Parallel]
+```

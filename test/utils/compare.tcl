@@ -3,7 +3,7 @@
 
 # Compare fitting-test results between git revisions and the working tree.
 #
-#     tclsh test/utils/compare.tcl [REV ...] [--no-tree] [--csv out.csv]
+#     tclsh test/utils/compare.tcl [REV ...] [--no-tree] [--csv out.csv] [--csv-all all.csv]
 #     tclsh test/utils/compare.tcl --bench old.json new.json
 #
 # Each REV is any git revision (tag, branch, commit hash, `HEAD~3`, ...). With none given the
@@ -15,10 +15,13 @@
 # the working tree, so the last REV is judged instead.
 #
 # Reads every `test/fitting_tests/*/res*.txt` at each REV via `git show` (no checkout, nothing
-# rerun) and prints timing totals, fit-quality and parameter distributions, and the fits that do the
-# most NUTS work. Per-fit numbers go to `--csv` if given. `--bench` instead compares the JSON results
-# of `bench.tcl` (cold/steady benchmarks): the last file is the one judged, and with a single file it
-# is compared with the newest baseline of the latest release in test/baselines/ (README there).
+# rerun) and prints, over the fits present in every column: the time of every stage, fit quality (the
+# χ² spread and the parameter distributions), sampler health (acceptance, tree depth, steps, E-BFMI,
+# divergences, chains, R-hat, ESS), the MAP search, the problem sizes, the posterior widths and the
+# worst fits. `--csv` writes a fixed set of per-fit numbers, `--csv-all` every parsed key. `--bench`
+# instead compares the JSON results of `bench.tcl` (cold/steady benchmarks): the last file is the one
+# judged, and with a single file it is compared with the newest baseline of the latest release in
+# test/baselines/ (README there).
 #
 # Examples:
 #     compare.tcl v0.1.0-sɩngre v0.2.0-soukouratou HEAD     # three tags/commits against the tree
@@ -175,11 +178,15 @@ namespace eval compare {
     proc timing_table {sets names} {
         set cur [lindex $names end]
         set others [lrange $names 0 end-1]
+        # every stage of the report's timing table (a revision whose report lacks one shows -)
         set rows {
-            {forward_cache fwd}
-            {{MAP search + whitening} map_s}
-            {NUTS nuts}
-            {{per-draw c1 re-profile} reprofile}
+            {{static build} static_build} {{  propka} propka} {{  pdb2pqr} pdb2pqr}
+            {{  load_molecule} load_molecule} {{  SASA} sasa} {{  shannon} shannon}
+            {{  forward_cache} fwd} {{    vacuum + excluded volume} vacuum_excluded}
+            {{    hydration} hydration} {{    Gram + r_m} gram_rm} {{  seed_fitting} seed_fitting}
+            {sampling sampling} {{  MAP search + whitening} map_s} {{  NUTS setup} nuts_setup}
+            {{  NUTS} nuts} {{  per-draw c1 re-profile} reprofile} {{  MAP + quantiles} map_quantiles}
+            {{report write} report_write} {unaccounted unaccounted} {GC gc}
             {{wall clock excl. PROPKA/pdb2pqr} wall_ex}
             {{leapfrog steps (x1e6)} leapfrog}
         }
@@ -187,8 +194,9 @@ namespace eval compare {
         foreach n $others {
             lappend vs "$cur vs $n"
         }
-        puts "| (all fits, summed) | [join $names { | }] | [join $vs { | }] |"
-        puts "|---|[string repeat ---| [expr {[llength $names] + [llength $others]}]]"
+        puts "| (all fits, summed) | [join $names { | }] | [join $vs { | }] | % of wall |"
+        puts "|---|[string repeat ---| [expr {[llength $names] + [llength $others] + 1}]]"
+        set wall [total [dict get $sets $cur] wall]
         foreach row $rows {
             lassign $row label key
             set v {}
@@ -203,7 +211,7 @@ namespace eval compare {
                 } elseif {$key eq "leapfrog"} {
                     set text [commas [expr {$x * 1e-6}] 2]
                 } else {
-                    set text "[commas $x 0] s"
+                    set text "[commas $x [expr {$x < 10 ? 2 : 0}]] s"
                 }
                 lappend cells $text
             }
@@ -213,7 +221,11 @@ namespace eval compare {
                 set x [dict get $v $n]
                 lappend ratios [ratio $x $denom]
             }
-            puts "| $label | [join $cells { | }] | [join $ratios { | }] |"
+            set share -
+            if {$denom ne "" && $wall ne "" && $key ne "leapfrog"} {
+                set share "[format %.1f [expr {100 * $denom / $wall}]] %"
+            }
+            puts "| $label | [join $cells { | }] | [join $ratios { | }] | $share |"
         }
         puts "\n(ratio > 1: the last column is faster / does less work than that revision)"
     }
@@ -278,6 +290,199 @@ namespace eval compare {
         }
         puts "| $name | [dict size $reports] | [med $chi2 %.2f] | $quartiles | $div | $sat\
             | [count_if $z {$x > 3}] | [med $d3 %+.2f] | $deep | [med $steps %.1f] |"
+    }
+
+
+    # --- the expanded tables: fit quality spread, sampler health, MAP search, sizes, posterior widths ---------
+
+    proc mean {xs} {
+        expr {[tcl::mathop::+ {*}$xs] / double([llength $xs])}
+    }
+
+    # $fmt applied to ($fn applied to the known values of $key), or '-' when no report has the key.
+    # $fn is a command prefix given the list of values.
+    proc stat {reports key fn fmt} {
+        set xs [column $reports $key]
+        if {![llength $xs]} {
+            return -
+        }
+        return [format $fmt [{*}$fn $xs]]
+    }
+    proc vmin {xs} { tcl::mathfunc::min {*}$xs }
+    proc vmax {xs} { tcl::mathfunc::max {*}$xs }
+    proc p90 {xs} { pct $xs 0.9 }
+
+    # The header and rule lines of a markdown table.
+    proc head {cells} {
+        puts "| [join $cells { | }] |"
+        puts "|[string repeat ---| [llength $cells]]"
+    }
+
+    # A markdown heading.
+    proc heading {text} {
+        puts "\n### $text\n"
+    }
+
+    # The χ² distribution of a column: spread, geometric mean and how many fits are above a few thresholds.
+    proc chi2_row {reports name} {
+        set x [column $reports chi2_cmp]
+        set logs {}
+        foreach v $x {
+            lappend logs [expr {log($v)}]
+        }
+        puts "| $name | [dict size $reports] | [format %.3g [pct $x 0]] | [format %.3g [pct $x .25]]\
+            | [format %.3g [median $x]] | [format %.3g [pct $x .75]] | [format %.3g [pct $x .9]]\
+            | [format %.3g [pct $x 1]] | [format %.3g [expr {exp([mean $logs])}]]\
+            | [count_if $x {$x < 1.5}] | [count_if $x {$x > 5}] | [count_if $x {$x > 10}] |"
+    }
+
+    # Sampler health of a column: acceptance, tree depth and steps, E-BFMI, divergences, and (reports with
+    # chains) the worst R-hat and the smallest ESS.
+    proc sampler_row {reports name} {
+        set rhat [column $reports rhat_max]
+        set div [column $reports div]
+        set divmean -
+        if {[llength $div]} {
+            set divmean [format %.3f [expr {100 * [mean $div]}]]
+        }
+        set rhatcell -
+        if {[llength $rhat]} {
+            set rhatcell "[format %.3f [vmax $rhat]] ([count_if $rhat {$x > 1.01}])"
+        }
+        set dropped -
+        if {[llength [column $reports chains_total]]} {
+            set dropped [expr {int([total $reports chains_dropped])}]
+        }
+        puts "| $name | [med [column $reports accept] %.3f] | [stat $reports accept vmin %.3f]\
+            | [med [column $reports depth] %.2f] | [stat $reports depth_max vmax %d]\
+            | [med [column $reports steps] %.1f] | [stat $reports steps p90 %.1f]\
+            | [med [column $reports ms_per_step] %.2f] | [stat $reports ebfmi vmin %.2f]\
+            | [count_if [column $reports ebfmi] {$x < 0.3}]\
+            | [count_if [column $reports div] {$x > 0}] | $divmean | $rhatcell\
+            | [med [column $reports ess_min] %.0f] | [med [column $reports ess_tail_min] %.0f] | $dropped\
+            | [count_if [column $reports modes] {$x > 1}] | [stat $reports mode_share_max vmin %.3f] |"
+    }
+
+    # The MAP search of a column: modes, starts that converged, its time and its share of the wall clock.
+    proc map_row {reports name} {
+        set starts -
+        set ok [column $reports map_starts_ok]
+        if {[llength $ok]} {
+            set starts [format %.2f [mean $ok]]
+        }
+        set share -
+        set m [total $reports map_s]
+        set w [total $reports wall_ex]
+        if {$m ne "" && $w ne ""} {
+            set share "[format %.1f [expr {100 * $m / $w}]] %"
+        }
+        puts "| $name | [med [column $reports map_modes] %.0f]\
+            | [count_if [column $reports map_modes] {$x > 1}] | $starts\
+            | [med [column $reports map_s] %.3f] | $share |"
+    }
+
+    # What the fits were (a rebinned or re-sized problem is not comparable 1:1): medians of the problem sizes.
+    proc size_row {reports name} {
+        set cells {}
+        foreach {key fmt} {n_atoms %.0f lMax %.0f n_q_raw %.0f n_q %.0f dmax %.1f n_samples %.0f n_adapt %.0f} {
+            lappend cells [med [column $reports $key] $fmt]
+        }
+        puts "| $name | [join $cells { | }] |"
+    }
+
+    # One parameter's posterior: the median MAP z-score, how many fits have it beyond 3 sigma of the prior,
+    # and the width of the quantile interval in prior standard deviations (z_hi - z_lo): median, p10, p90.
+    proc width_row {reports label prefix} {
+        set zmap [column $reports ${prefix}_Z_MAP]
+        set w {}
+        dict for {path r} $reports {
+            set lo [dict get $r ${prefix}_Z_QUANT_LO]
+            set hi [dict get $r ${prefix}_Z_QUANT_HI]
+            if {$lo ne "" && $hi ne ""} {
+                lappend w [expr {$hi - $lo}]
+            }
+        }
+        set cells [list $label - 0 - - -]
+        if {[llength $zmap]} {
+            lset cells 1 [format %.2f [median $zmap]]
+            lset cells 2 [count_if $zmap {abs($x) > 3}]
+        }
+        if {[llength $w]} {
+            lset cells 3 [format %.3f [median $w]]
+            lset cells 4 [format %.3f [pct $w .1]]
+            lset cells 5 [format %.3f [pct $w .9]]
+        }
+        puts "| [join $cells { | }] |"
+    }
+
+    # The eight worst fits of the judged column by $key, with every column's cell (made by $cellproc from a report).
+    proc worst {title sets names key cellproc} {
+        global FIT_DIR
+        set cur [lindex $names end]
+        set new [dict get $sets $cur]
+        set ranked [lsort -decreasing -real -index 1 [lmap k [lsort [dict keys $new]] {
+            list $k [orzero [dict get $new $k $key]]
+        }]]
+        if {[lindex $ranked 0 1] == 0} {
+            return
+        }
+        puts "\n$title (columns: [join $names { | }])"
+        foreach item [lrange $ranked 0 7] {
+            set k [lindex $item 0]
+            set cells {}
+            foreach n $names {
+                if {[dict exists $sets $n $k]} {
+                    lappend cells [{*}$cellproc [dict get $sets $n $k]]
+                } else {
+                    lappend cells -
+                }
+            }
+            puts [format "  %-42s %s" [string map [list "$FIT_DIR/" ""] $k] [join $cells { | }]]
+        }
+    }
+    proc cell_nuts {r} {
+        return "[fmt_or_dash %.1f [dict get $r steps]] / [fmt_or_dash %.1f [dict get $r nuts]]s"
+    }
+    proc cell_chi2 {r} {
+        return "[format %.3g [orzero [dict get $r chi2_cmp]]] / [fmt_or_dash %.4f [dict get $r div]]"
+    }
+    proc cell_rhat {r} {
+        return "[fmt_or_dash %.3f [dict get $r rhat_max]] / [fmt_or_dash %.0f [dict get $r ess_min]]\
+            / [fmt_or_dash %.0f [dict get $r ess_tail_min]]"
+    }
+
+    # Every expanded table, over the common fits ($agg: name -> reports) and the judged column's full sets.
+    proc detail_tables {agg sets names} {
+        set cur [lindex $names end]
+        heading "Fit quality, spread"
+        head {{} fits min Q1 median Q3 p90 max {geo. mean} {χ² <1.5} {χ² >5} {χ² >10}}
+        foreach n $names { chi2_row [dict get $agg $n] $n }
+
+        heading "Sampler health"
+        head {{} {median accept} {min accept} {median depth} {max depth} {median steps/iter} {p90 steps/iter}
+            {median ms/step} {min E-BFMI} {E-BFMI <0.3} {fits with divergences} {mean divergence %}
+            {R-hat max (fits >1.01)} {median min bulk ESS} {median min tail ESS} {chains dropped}
+            {fits with >1 mode} {smallest share of the top mode}}
+        foreach n $names { sampler_row [dict get $agg $n] $n }
+
+        heading "MAP search"
+        head {{} {median modes} {fits with >1 mode} {mean starts ok} {median MAP s} {share of wall}}
+        foreach n $names { map_row [dict get $agg $n] $n }
+
+        heading "Problem sizes (medians)"
+        head {{} atoms lMax {measured points} {fitted points} {Dmax Å} iterations warm-up}
+        foreach n $names { size_row [dict get $agg $n] $n }
+
+        heading "Posterior of $cur (z in prior standard deviations)"
+        head {parameter {median MAP z} {fits |z|>3} {median width} {width p10} {width p90}}
+        foreach {label prefix} {ρₑ rho_e δρ₁ dro1 δρ₂ dro2 δρ₃ dro3} {
+            width_row [dict get $agg $cur] $label $prefix
+        }
+
+        heading "Worst fits"
+        worst "Most NUTS work: steps/iter / NUTS seconds" $sets $names steps cell_nuts
+        worst "Highest χ²: χ² / divergent share" $sets $names chi2_cmp cell_chi2
+        worst "Least converged chains: R-hat max / min bulk ESS / min tail ESS" $sets $names rhat_max cell_rhat
     }
 
     # --- the benchmark comparison (--bench) -------------------------------------------------------------
@@ -459,6 +664,7 @@ namespace eval compare {
         set no_tree 0
         set bench 0
         set csv ""
+        set csv_all ""
         for {set i 0} {$i < [llength $argv]} {incr i} {
             set a [lindex $argv $i]
             switch -- $a {
@@ -471,13 +677,16 @@ namespace eval compare {
                 --csv {
                     set csv [lindex $argv [incr i]]
                 }
+                --csv-all {
+                    set csv_all [lindex $argv [incr i]]
+                }
                 -h - --help {
                     ::usage $::SCRIPT
                     return
                 }
                 default {
                     if {[string match --* $a]} {
-                        puts stderr "usage: compare.tcl \[REV ...\] \[--no-tree\] \[--csv FILE\] | --bench FILE.json ..."
+                        puts stderr "usage: compare.tcl \[REV ...\] \[--no-tree\] \[--csv FILE\] \[--csv-all FILE\] | --bench FILE.json ..."
                         exit 2
                     }
                     lappend revs $a
@@ -575,24 +784,36 @@ namespace eval compare {
             quality [dict get $agg $cur] [dict get $agg $n] $n $cur
         }
 
-        # the fits with the deepest trees in the judged column (ties keep path order), every column's numbers
+        detail_tables $agg $sets $names
+
         set new [dict get $sets $cur]
-        puts "\nFits with the most NUTS work in $cur (columns: [join $names { | }]): steps/iter / NUTS seconds"
-        set by_steps [lsort -decreasing -real -index 1 [lmap k [lsort [dict keys $new]] {
-            list $k [orzero [dict get $new $k steps]]
-        }]]
-        foreach item [lrange $by_steps 0 7] {
-            set k [lindex $item 0]
-            set cells {}
+
+        # --- every parsed key of every column (the keys of the judged column's first report)
+        if {$csv_all ne ""} {
+            set keys [dict keys [dict get $new [lindex [lsort [dict keys $new]] 0]]]
+            set ch [open $csv_all w]
+            fconfigure $ch -encoding utf-8
+            set head {}
             foreach n $names {
-                if {[dict exists $sets $n $k]} {
-                    lappend cells [cell [dict get $sets $n $k]]
-                } else {
-                    lappend cells [cell ""]
+                foreach k $keys {
+                    lappend head "$n:$k"
                 }
             }
-            set shown [string map [list "$FIT_DIR/" ""] $k]
-            puts [format "  %-42s %s" $shown [join $cells { | }]]
+            puts $ch "fit,[join $head ,]"
+            foreach k [lsort [dict keys $new]] {
+                set vals {}
+                foreach n $names {
+                    foreach key $keys {
+                        set v ""
+                        if {[dict exists $sets $n $k]} {
+                            set v [dict get $sets $n $k $key]
+                        }
+                        lappend vals $v
+                    }
+                }
+                puts $ch "[string map [list "$FIT_DIR/" ""] $k],[join $vals ,]"
+            }
+            close $ch
         }
 
         # --- per-fit CSV (every column, a fixed list of keys; blank where a revision lacks a value)

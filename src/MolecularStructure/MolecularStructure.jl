@@ -17,6 +17,20 @@ a sphere occupies π/6 of the cube. This works out to roughly
 const N_VOL_SHELL::Int64 = 2145
 
 """
+Atoms per task in the threaded loops over atoms ([`excluded_volume`](@ref BAYSOL.MolecularStructure.excluded_volume)).
+Each atom's result is independent, so the blocks can run in any order and on any number of threads with
+identical output; the size only trades task overhead against load balance.
+"""
+const ATOM_BLOCK::Int = 64
+
+"""
+Smallest number of atoms (or hydration beads) for which the loops over atoms are spread over the Julia threads:
+below it they run in a plain loop, because the tasks then cost more than they save (a 2,592-atom fit was 1.3×
+slower threaded). The decision depends on the input only, and the results do not depend on it.
+"""
+const ATOM_PARALLEL_MIN::Int = 4096
+
+"""
 Package-root-relative  local store (`_cache`/). Created on first use.
 """
 function _store_dir()::String

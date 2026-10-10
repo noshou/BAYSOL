@@ -12,6 +12,7 @@
 #   --approved  the owner has approved this run. Without it the validation is a no-op that only prints its plan. Why: a
 #               validation runs the MAP search (or more) of dozens of fits, minutes of one core, and AI agents tend to start
 #               such runs unasked, so the owner's per-run approval is a small safeguard.
+#   --threads N  run the Julia processes with N threads (as `julia -t N`: 4, auto, 4,1); default one
 #   --dry-run   print the command, run nothing
 #
 # With --approved the validation's script runs (Julia, in the test/fitting_tests environment) and writes its per-fit rows to
@@ -123,7 +124,7 @@ namespace eval validate {
         if {[catch {find_julia} julia]} {
             fail $julia
         }
-        set stamp [clock format [clock seconds] -format %Y%m%d-%H%M]
+        set stamp [clock format [clock seconds] -format %Y%m%d-%H%M%S]
         set out [file join $ROOT test validation $name results $name-$stamp.tsv]
         set cmd [list \
             $julia --startup-file=no \

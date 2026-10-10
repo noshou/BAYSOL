@@ -240,13 +240,14 @@ brute_diameter(P) = maximum(norm_ij for norm_ij in
         buf = IOBuffer()
         BAYSOL.write_report(buf, res; n_atoms = s.fw.n_atoms)
         txt = String(take!(buf))
-        for needle in ("=== Run ===", "n_q_raw", "rebin", "channels", "=== Diagnostics ===", "divergence_rate")
+        for needle in ("=== Run ===", "n_q_raw", "rebin", "channels", "divergence_rate")
             @test occursin(needle, txt)
         end
         @test !occursin("Residuals at the MAP", txt) && !occursin("=== Data (Shannon) ===", txt)
         @test occursin(r"^χ²\s+= "m, txt)                                  # the line the Tcl report parser reads is unchanged
-        # section order: Run, Diagnostics, MAP, Quantiles, z-scores, Timing
-        order = [first(findfirst(h, txt)) for h in ("=== Run ===", "=== Diagnostics ===", "=== MAP ===", "=== Quantiles", "=== Standard deviations", "=== Timing ===")]
+        @test !occursin("=== Diagnostics ===", txt)                       # merged into the Run section
+        # section order: Run (with the diagnostics), MAP, Quantiles, z-scores, Timing
+        order = [first(findfirst(h, txt)) for h in ("=== Run ===", "divergence_rate", "=== MAP ===", "=== Quantiles", "=== Standard deviations", "=== Timing ===")]
         @test issorted(order)
     end
     @testset "shannon_data raises the rebin until the binning's worst-case bias is acceptable" begin

@@ -397,16 +397,20 @@ function form_factors(
         cols[k] = i
     end
     out = Matrix{ComplexF64}(undef, length(ions), length(qvals))
-    @inbounds for r in eachindex(ions)
-        row = get(t.tbl, String(ions[r]), nothing)
-        row === nothing &&
-            throw(
-                FormFactorError(
-                    "ion \"$(ions[r])\" is not in this form-factor table"
+    n = length(ions)
+    # every row is independent: blocks of rows are filled on the Julia threads
+    tmap_blocks(n, ATOM_BLOCK; threaded = n ≥ ATOM_PARALLEL_MIN) do blk
+        @inbounds for r in blk
+            row = get(t.tbl, String(ions[r]), nothing)
+            row === nothing &&
+                throw(
+                    FormFactorError(
+                        "ion \"$(ions[r])\" is not in this form-factor table"
+                    )
                 )
-            )
-        @fastmath @simd for k in eachindex(cols)
-            out[r, k] = row[cols[k]]
+            @fastmath @simd for k in eachindex(cols)
+                out[r, k] = row[cols[k]]
+            end
         end
     end
     return out

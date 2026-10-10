@@ -79,4 +79,21 @@ n_collections() = Base.gc_num().pause
     @testset "the default budget" begin
         @test GC_PAUSE_BUDGET == 2^30
     end
+
+    @testset "a checkpoint called on a worker thread neither collects nor leaves the collector off" begin
+        # GC.enable is a per-thread switch: a worker's GC.enable(true) does nothing and its GC.enable(false) would
+        # keep the collector off after the pause. Only the thread that began the pause collects.
+        before = Base.gc_num().pause
+        with_gc_paused(; budget = 1) do
+            fetch(Threads.@spawn begin
+                x = zeros(2^20)       # allocates past the 1-byte budget
+                gc_checkpoint()
+                sum(x)
+            end)
+        end
+        @test gc_enabled()
+        n = Base.gc_num().pause
+        GC.gc()
+        @test Base.gc_num().pause > n     # the collector runs again after the pause
+    end
 end

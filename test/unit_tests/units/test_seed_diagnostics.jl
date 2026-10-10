@@ -85,7 +85,7 @@ end
     end
 
     @testset "gradient_w: matches a central difference of log π(θ(w))" begin
-        w = rep.post[:, 5]
+        w = [0.3, -0.2, 0.5, -0.1]     # a fixed point near the mode (a sampled one can sit at a kink of the profiled c1)
         g = gradient_w(seed, sp, w; tol = 1e-11)
         @test length(g) == 4 && all(isfinite, g)
         f(x) = SDF._logπ(SDF._θ_of_w(SVector{4}(x...), sp), seed.pr, seed.wls, seed.fw, l; tab = seed.c1tab, c1_tol = 1e-11)

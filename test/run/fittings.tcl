@@ -20,6 +20,7 @@
 #   --fixme    afterwards, run the sampler diagnostics on the selected fits (test/run/diagnose.tcl --report)
 #   --trace-compile FILE  run the fits with Julia's --trace-compile=FILE (the methods each fit's process compiles at run time,
 #              which a precompile workload should have covered; one file for all the fits, appended)
+#   --threads N  run the Julia processes with N threads (as `julia -t N`: 4, auto, 4,1); default one
 #   --dry-run  print what would be run, run nothing
 #
 # The steps run in that order: the fits, the benchmark, the report, the table, the diagnostics. A failing fit does not

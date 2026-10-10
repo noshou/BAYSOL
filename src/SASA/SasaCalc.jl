@@ -77,17 +77,21 @@ function _class_loop(
     rads::Vector{Float64}, probe::Float64, dirs::Vector{Vec3}
 )::Vector{BeadClass} where {T}
     out = Vector{BeadClass}(undef, size(pts, 2))
-    @inbounds for k in axes(pts, 2)
-        nb = inrange(tree, view(pts, :, k), BEAD_RAY_RANGE)
-        out[k] = _bead_class(
-            (pts[1, k], pts[2, k], pts[3, k]),
-            (nrm[1, k], nrm[2, k], nrm[3, k]),
-            nb,
-            dirs,
-            crds,
-            rads,
-            probe
-        )
+    m = size(pts, 2)
+    # beads are independent (each writes only out[k]), so the blocks run on the Julia threads (large inputs)
+    tmap_blocks(m, CLASS_BLOCK; threaded = m ≥ ATOM_PARALLEL_MIN) do blk
+        @inbounds for k in blk
+            nb = inrange(tree, view(pts, :, k), BEAD_RAY_RANGE)
+            out[k] = _bead_class(
+                (pts[1, k], pts[2, k], pts[3, k]),
+                (nrm[1, k], nrm[2, k], nrm[3, k]),
+                nb,
+                dirs,
+                crds,
+                rads,
+                probe
+            )
+        end
     end
     return out
 end
@@ -200,25 +204,67 @@ function _sasa_loop(
     n_occ::Int
 )::Tuple{Matrix{Float64},Vector{Float64},Matrix{Float64},Vector{Int}} where {T}
 
-    xs = Float64[]; ys = Float64[]; zs = Float64[]; areas = Float64[]
-    nx = Float64[]; ny = Float64[]; nz = Float64[]
-    upper_bound = size(crds, 2) * n_pts
-    sizehint!(xs, upper_bound); sizehint!(ys, upper_bound); sizehint!(zs, upper_bound)
-    sizehint!(areas, upper_bound)
-    sizehint!(nx, upper_bound); sizehint!(ny, upper_bound); sizehint!(nz, upper_bound)
-    counts = zeros(Int, size(crds, 2))
-
     # directions as coordinate vectors, so the per-cap test vectorizes over points
     ux = [pmap[j][1] for j in 1:n_pts]
     uy = [pmap[j][2] for j in 1:n_pts]
     uz = [pmap[j][3] for j in 1:n_pts]
+
+    n = size(crds, 2)
+    counts = zeros(Int, n)
+    # atoms are independent; each block owns its scratch and its slice of counts, and the blocks run on the
+    # Julia threads (large inputs). Their points are concatenated in block order, so the cloud is the serial one,
+    # bit for bit.
+    parts = tmap_blocks(n, ATOM_BLOCK; threaded = n ≥ ATOM_PARALLEL_MIN) do blk
+        _sasa_block(tree, crds, rads, rmax, ux, uy, uz, probe, n_pts, n_occ, blk, counts)
+    end
+
+    m = sum(length(p[4]) for p in parts)
+    pts = Matrix{Float64}(undef, 3, m)
+    nrm = Matrix{Float64}(undef, 3, m)
+    areas = Vector{Float64}(undef, m)
+    off = 0
+    for (xs, ys, zs, ar, nx, ny, nz) in parts
+        @inbounds @fastmath @simd for k in eachindex(ar)
+            pts[1, off + k] = xs[k]; pts[2, off + k] = ys[k]; pts[3, off + k] = zs[k]
+            nrm[1, off + k] = nx[k]; nrm[2, off + k] = ny[k]; nrm[3, off + k] = nz[k]
+            areas[off + k] = ar[k]
+        end
+        off += length(ar)
+    end
+    return pts, areas, nrm, counts
+end
+
+"""
+[`_sasa_loop`](@ref) for the atoms `blk` only: their accepted points, areas and normals (as vectors, in atom
+order), and `counts[i]` for each of them. Owns its scratch, so blocks can run concurrently.
+
+# Returns
+- `(xs, ys, zs, areas, nx, ny, nz)`.
+
+# Exceptions
+- `BoundsError` if `blk` or `counts` do not match `crds` (a caller error).
+"""
+function _sasa_block(
+    tree::T,
+    crds::Matrix{Float64},
+    rads::Vector{Float64},
+    rmax::Float64,
+    ux::Vector{Float64}, uy::Vector{Float64}, uz::Vector{Float64},
+    probe::Float64,
+    n_pts::Int,
+    n_occ::Int,
+    blk::UnitRange{Int},
+    counts::Vector{Int}
+)::NTuple{7,Vector{Float64}} where {T}
+    xs = Float64[]; ys = Float64[]; zs = Float64[]; areas = Float64[]
+    nx = Float64[]; ny = Float64[]; nz = Float64[]
     hit = zeros(UInt8, n_pts)                 # 0x01 where some cap occludes direction j
 
     # per-atom scratch, reused: neighbour candidates and the packed caps
     candidates = Int[]
     cx = Float64[]; cy = Float64[]; cz = Float64[]; ct = Float64[]
 
-    for i in axes(crds, 2)
+    for i in blk
         x = crds[1, i]; y = crds[2, i]; z = crds[3, i]
         ρ = rads[i] + probe
         full = 4 * π * ρ^2
@@ -252,14 +298,7 @@ function _sasa_loop(
         end
         counts[i] = got
     end
-
-    pts = Matrix{Float64}(undef, 3, length(areas))
-    nrm = Matrix{Float64}(undef, 3, length(areas))
-    @inbounds @fastmath @simd for k in eachindex(areas)
-        pts[1, k] = xs[k]; pts[2, k] = ys[k]; pts[3, k] = zs[k]
-        nrm[1, k] = nx[k]; nrm[2, k] = ny[k]; nrm[3, k] = nz[k]
-    end
-    return pts, areas, nrm, counts
+    return xs, ys, zs, areas, nx, ny, nz
 end
 
 "Number of open (unoccluded) directions in hit[lo:hi]."

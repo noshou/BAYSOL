@@ -52,11 +52,11 @@ Generates an initial physical parameter vector ξ₀, one draw from each prior.
 # Returns
 - `ξ₀::SVector{4,<:Real} = (ρₑ, δρ₁, δρ₂, δρ₃)`.
 """
-function _ξ₀(p::ξ_priors)::SVector{4,<:Real}
-    ρₑ = rand(p.ρₑPrior)
-    δρ₁ = rand(p.δρ₁Prior)
-    δρ₂ = rand(p.δρ₂Prior)
-    δρ₃ = rand(p.δρ₃Prior)
+function _ξ₀(p::ξ_priors, rng::AbstractRNG = Random.default_rng())::SVector{4,<:Real}
+    ρₑ = rand(rng, p.ρₑPrior)
+    δρ₁ = rand(rng, p.δρ₁Prior)
+    δρ₂ = rand(rng, p.δρ₂Prior)
+    δρ₃ = rand(rng, p.δρ₃Prior)
     return SVector(ρₑ, δρ₁, δρ₂, δρ₃)
 end
 
@@ -461,6 +461,10 @@ struct Inferred{S,N}
     timing::Union{Nothing,StageLog}
 end
 
+"Purpose tags of [`Parallel.stream`](@ref BAYSOL.Runtime.Parallel.stream): which use of randomness a stream is for."
+const _RNG_MAP_STARTS = 1
+const _RNG_NUTS       = 2
+
 """
 Run NUTS on [`_logπ`](@ref) starting from seed, returning posterior draws
 of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one (scale,
@@ -524,6 +528,11 @@ forward model) from the trajectory's sample covariance.
 - `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
                                 (0, 100) exclusive; the default,
                                 [`DEFAULT_TARGET_ACCEPT`](@ref), is Stan's usual 80%.
+- `rng_seed::Union{Nothing,Integer}=nothing`: the run's random seed. Every random draw of the run (the extra
+                                MAP starts, the NUTS chain) comes from a stream derived from it by the draw's
+                                index, so the same `rng_seed` reproduces the run exactly, whatever the number of
+                                Julia threads. `nothing` draws a fresh one from the default RNG (so `Random.seed!`
+                                before the call also fixes it); it is printed in the report's `=== Run ===` section.
 
 # Returns
 An [`Inferred`](@ref). Includes the `n_adapt` warm-up draws; a caller that wants a
@@ -535,9 +544,11 @@ function infer(
     n_samples::Int64,
     n_adapt::Int64;
     l::LIKELIHOOD=PROFILE(),
-    δ::Real=DEFAULT_TARGET_ACCEPT
+    δ::Real=DEFAULT_TARGET_ACCEPT,
+    rng_seed::Union{Nothing,Integer}=nothing
 )::Inferred
-    return with_gc_paused(() -> _infer(seed, n_samples, n_adapt; l = l, δ = δ))
+    base = rng_seed === nothing ? draw_base() : (rng_seed % UInt64)
+    return with_gc_paused(() -> _infer(seed, n_samples, n_adapt; l = l, δ = δ, base = base))
 end
 
 """
@@ -552,7 +563,8 @@ function _infer(
     n_samples::Int64,
     n_adapt::Int64;
     l::LIKELIHOOD=PROFILE(),
-    δ::Real=DEFAULT_TARGET_ACCEPT
+    δ::Real=DEFAULT_TARGET_ACCEPT,
+    base::UInt64=draw_base()
 )::Inferred where {N}
 
     if δ ≤ 0 || δ ≥ 100
@@ -567,7 +579,8 @@ function _infer(
     # MAP search + Laplace whitening (MAP.jl): NUTS samples w, θ = μ + σ·(ẑ + S·w),
     # in which the posterior is ≈ N(0, I) and the chain starts at the MAP.
     t_map = tick()
-    sp = _sampling_space(seed, l)
+    seed.timing === nothing || (seed.timing.info["rng_seed"] = base)
+    sp = _sampling_space(seed, l; base = base)
     if seed.timing !== nothing
         seed.timing.info["map_modes"] = sp.n_modes
         tock!(seed.timing, :sampling, 1,
@@ -613,7 +626,8 @@ function _infer(
 
     # HMC numerically integrates the Hamiltonian, so we need to
     # guess a good step size.
-    init_step_size = find_good_stepsize(hamiltonian, w₀)
+    rng = stream(base, _RNG_NUTS, 1)   # the chain's own stream: the step-size search and the sampler both draw from it
+    init_step_size = find_good_stepsize(rng, hamiltonian, w₀)
 
     # Leapfrog integration evaluates kinetic energy first, then
     # "skips over" that evaluated position to the next one for potential energy.
@@ -634,6 +648,7 @@ function _infer(
     tock!(seed.timing, :sampling, 1, "NUTS setup (Hamiltonian, step-size init)", t_setup)
     t_nuts = tick()
     samples, stats = sample(
+        rng,
         hamiltonian,
         kernel,
         w₀,

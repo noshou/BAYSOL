@@ -278,6 +278,23 @@ end
         @test abs(f(sp.ẑ) - f(sp_g.ẑ)) < 1e-4
     end
 
+    @testset "rng_seed: the MAP search and the whole run are reproducible, and a different seed gives a different run" begin
+        fw = smpl_fw()
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        sp1 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x1234))
+        sp2 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x1234))
+        @test sp1.ẑ == sp2.ẑ && sp1.S == sp2.S && sp1.n_evals == sp2.n_evals
+        r1 = FIT.infer(seed, 40, 20; rng_seed = 7)
+        r2 = FIT.infer(seed, 40, 20; rng_seed = 7)
+        r3 = FIT.infer(seed, 40, 20; rng_seed = 8)
+        @test r1.samples == r2.samples
+        @test r1.samples != r3.samples
+        # Random.seed! before the call fixes the run when no rng_seed is given
+        Random.seed!(3); q1 = FIT.infer(seed, 40, 20)
+        Random.seed!(3); q2 = FIT.infer(seed, 40, 20)
+        @test q1.samples == q2.samples
+    end
+
     @testset "run: δ must be a percentage strictly inside (0, 100)" begin
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
@@ -337,4 +354,5 @@ end
             @test fit1.stats[i].log_density == fit2.stats[i].log_density
         end
     end
+
 end
