@@ -2,7 +2,7 @@
 
 # Shared baseline so every units/test_*.jl can run standalone
 # (`julia --project=test test/unit_tests/units/test_X.jl`) or aggregated via
-# run/unittests.jl. Include-guarded so re-including it (as happens when the
+# dev/unittests.jl. Include-guarded so re-including it (as happens when the
 # aggregator includes every file in one process) is a no-op past the first hit.
 if !@isdefined(check_float)
     using Test
@@ -16,18 +16,19 @@ if !@isdefined(check_float)
 
     check_float(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
 
-    # Complex `Yₗᵐ` (packed row l(l+1)÷2 + m + 1, one column per point) from the one implementation, the in-place
-    # `SphFuncs.sphHarm!`, which writes the real layout [Re Y; −Im Y] per degree: builds the output and the workspace and
-    # converts (an invalid `lMax` or shape reaches `sphHarm!`, which throws SphHarmError).
+    # Complex `Yₗᵐ` (packed row l(l+1)÷2 + m + 1, one column per point) from the one
+    # implementation, the in-place `SphFuncs.sphHarm!`, which writes the real layout
+    # [Re Y; −Im Y] per degree: builds the output and the workspace and converts (an
+    # invalid `lMax` or shape reaches `sphHarm!`, which throws SphHarmError).
     function sphHarm(lMax::Int, θ, φ)
-        SF = BAYSOL.Scattering.SphFuncs
+        SF = BAYSOL.Scattering
         n = length(θ)
         A = Matrix{Float64}(undef, max((lMax + 1) * (lMax + 2), 0), n)
         SF.sphHarm!(A, SF.sphHarmCache(max(lMax, 0)), lMax, θ, φ)
         y = Matrix{ComplexF64}(undef, (lMax + 1) * (lMax + 2) ÷ 2, n)
         for i in 1:n, l in 0:lMax, m in 0:l
             k0 = l * (l + 1) ÷ 2
-            y[k0 + m + 1, i] = complex(A[2k0 + m + 1, i], -A[2k0 + l + 1 + m + 1, i])
+            y[k0+m+1, i] = complex(A[2k0+m+1, i], -A[2k0+l+1+m+1, i])
         end
         return y
     end
@@ -40,8 +41,8 @@ if !@isdefined(check_float)
     # Reference detector-scale intensity from a ForwardCache: the plain double sum
     #     I_calc(q) = scale · Σ_ab v_a(q) v_b(q) G_ab(q) + bkgrnd_corr,
     #     v(q) = (1, -dns·g(q; c_1), dro_1, dro_2, dro_3),  dro_k = UNIT_OF_δρ·δρ_k,
-    # g the excluded-volume envelope (c_1 = 1 ⇒ g ≡ 1). Written independently of the
-    # fused A + g·B + g²·C path in BAYSOL.Inference.profiled_corrs, so it can cross-check it.
+    # g the excluded-volume envelope (c_1 = 1 ⇒ g ≡ 1). Written independently of the fused
+    # A + g·B + g²·C path in BAYSOL.Inference.profiled_corrs, so it can cross-check it.
     function reference_intensity(fw, scale, bkgrnd_corr, dns, δρ, c_1 = 1.0)
         g = BAYSOL.Scattering.excluded_volume_factor(fw.qvals, fw.r_m, c_1)
         d = UNIT_OF_δρ .* δρ

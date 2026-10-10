@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests for test/utils/seed_diagnostics.jl, the sampler diagnostics used on the SASBDB fitting tests
-# (through test/run/diagnose.tcl). They run on a small toy seed so that the
-# diagnostics cannot rot unnoticed; the numbers they produce on real fits are not asserted here.
+# Tests for test/utils/seed_diagnostics.jl, the sampler diagnostics
+# used on the SASBDB fitting tests (through dev/diagnose.tcl). They run
+# on a small toy seed so that the diagnostics cannot rot unnoticed; the
+# numbers they produce on real fits are not asserted here.
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Inference: Solute, NonBiological
+using BAYSOL.BulkElectronDensity: Solute, NonBiological
 using BAYSOL.Scattering: forward_cache, ForwardCache
 using BAYSOL.MolecularStructure: MolecularStructure
 using StaticArrays: SVector
@@ -18,17 +19,21 @@ using .SeedDiagnostics
 
 const SDF = BAYSOL.Inference
 
-# 16 atoms on a helix (mixed n/c/o, non-planar), the same shape of fixture as test_sampler.jl,
-# self-contained here per this directory's one-file-one-concern convention.
+# 16 atoms on a helix (mixed n/c/o, non-planar), the same shape of fixture as
+# test_sampler.jl, self-contained here per this directory's one-file-one-concern convention.
 function sdg_mol()
     elms = repeat(["n", "c", "c", "o"], 4)
-    crds = [(1.6 * cos(0.85 * i), 1.6 * sin(0.85 * i), 0.55 * i) for i in 0:(length(elms) - 1)]
+    crds =
+        [(1.6 * cos(0.85 * i), 1.6 * sin(0.85 * i), 0.55 * i) for i in 0:(length(elms)-1)]
     return MolecularStructure.create("sdg", elms, crds)
 end
 
 const sdg_q = collect(range(0.0, 0.35; length = 10))
 
-"A `Seed` on the toy helix with synthetic data (ξ_TRUE, c1 = 1.1) at ~1 % noise: smooth, well-posed, fast."
+"""
+A `Seed` on the toy helix with synthetic data (ξ_TRUE,
+c1 = 1.1) at ~1 % noise: smooth, well-posed, fast.
+"""
 function sdg_seed(; rel_noise = 0.01)
     fw = forward_cache(sdg_mol(), sdg_q, 3, 9000.0; chunk = UInt64(4))
     y = reference_intensity(fw, 1.7, 0.3, CRYSOL_SOLVENT_DENSITY, (1.05, -0.05, -1.0), 1.1)
@@ -36,7 +41,14 @@ function sdg_seed(; rel_noise = 0.01)
     Random.seed!(0x5D6)
     I_exp = y .+ randn(length(y)) .* σ
     Random.seed!(0x5D7)   # θ₀ and the MAP starts are drawn from the global RNG
-    return SDF.seed_sampler(fw, I_exp, σ, 7.4, 0.05, Solute[NonBiological(0.15, 0.001, "sodium chloride")])
+    return SDF.seed_sampler(
+        fw,
+        I_exp,
+        σ,
+        7.4,
+        0.05,
+        Solute[NonBiological(0.15, 0.001, "sodium chloride")],
+    )
 end
 
 @testset "SeedDiagnostics" begin
@@ -54,7 +66,8 @@ end
         @test isnan(ess(fill(2.0, 100)))
     end
 
-    @testset "curve_chi2: an exact curve gives 0, a rescaled one is recovered by the free scale+offset" begin
+    # …by the free scale+offset
+    @testset "curve_chi2: an exact curve gives 0, a rescaled one is recovered" begin
         q = collect(range(0.01, 0.3; length = 50))
         I = 100 .* exp.(-q .^ 2 .* 200)
         σ = 0.01 .* I
@@ -78,20 +91,31 @@ end
         @test_throws ArgumentError nuts_replica(seed; n_samples = 10, n_adapt = 10)
     end
 
-    @testset "nuts_replica: same rng_seed reproduces the chain; the whitening is reused" begin
+    # …the whitening is reused
+    @testset "nuts_replica: same rng_seed reproduces the chain" begin
         again = nuts_replica(seed; n_samples = 160, n_adapt = 80, rng_seed = 11, sp = sp)
         @test again.W == rep.W
         @test again.sp === sp
     end
 
     @testset "gradient_w: matches a central difference of log π(θ(w))" begin
-        w = [0.3, -0.2, 0.5, -0.1]     # a fixed point near the mode (a sampled one can sit at a kink of the profiled c1)
+        # a fixed point near the mode (a sampled one can sit at a kink of the profiled c1)
+        w = [0.3, -0.2, 0.5, -0.1]
         g = gradient_w(seed, sp, w; tol = 1e-11)
         @test length(g) == 4 && all(isfinite, g)
-        f(x) = SDF._logπ(SDF._θ_of_w(SVector{4}(x...), sp), seed.pr, seed.wls, seed.fw, l; tab = seed.c1tab, c1_tol = 1e-11)
+        f(x) = SDF._logπ(
+            SDF._θ_of_w(SVector{4}(x...), sp),
+            seed.pr,
+            seed.wls,
+            seed.fw,
+            l;
+            tab = seed.c1tab,
+            c1_tol = 1e-11,
+        )
         h = 1e-5
         for i in 1:4
-            e = zeros(4); e[i] = h
+            e = zeros(4)
+            e[i] = h
             @test g[i] ≈ (f(w .+ e) - f(w .- e)) / 2h rtol = 1e-3 atol = 1e-5
         end
     end
@@ -106,11 +130,13 @@ end
         @test maximum(tight.noise) ≤ maximum(loose.noise)
     end
 
-    @testset "regression: the default c1 tolerance keeps NUTS's gradient accurate on a stiff fit" begin
-        # With σ = 1e-5·I the posterior is narrow and ∂²f/∂c1∂ξ large, so a c1 error δ perturbs the envelope-
-        # theorem gradient by about (∂²f/∂c1∂ξ)·δ, first order. At the old tolerance 1e-5 that error is of the
-        # order of the gradient itself (the sampler's step size collapses on real fits like this); at the
-        # package default it must be negligible. The first assertion fails if the fixture stops being stiff.
+    # …on a stiff fit
+    @testset "regression: the default c1 tolerance keeps NUTS's gradient accurate" begin
+        # With σ = 1e-5·I the posterior is narrow and ∂²f/∂c1∂ξ large, so a c1 error δ
+        # perturbs the envelope- theorem gradient by about (∂²f/∂c1∂ξ)·δ, first order. At
+        # the old tolerance 1e-5 that error is of the order of the gradient itself (the
+        # sampler's step size collapses on real fits like this); at the package default it
+        # must be negligible. The first assertion fails if the fixture stops being stiff.
         stiff = sdg_seed(; rel_noise = 1e-5)
         r = nuts_replica(stiff; n_samples = 200, n_adapt = 100, rng_seed = 5)
         old = gradient_noise(stiff, r.sp, r.post; tol = 1e-5, n = 12)
@@ -133,16 +159,19 @@ end
             @test isfinite(o.f) && o.iters ≥ 0 && o.grad_gap ≥ 0
             @test o.ξ[1] > 0 && 0.7 < o.c1 < 1.4
         end
-        @test lbfgs_starts(seed; rng_seed = 3, n_starts = 4) == starts   # reproducible under rng_seed
+        # reproducible under rng_seed
+        @test lbfgs_starts(seed; rng_seed = 3, n_starts = 4) == starts
     end
 
-    @testset "hessian_sensitivity: eigenvalues for every step size; a well-posed MAP is step-independent" begin
+    # …a well-posed MAP is step-independent
+    @testset "hessian_sensitivity: eigenvalues for every step size" begin
         hs = hessian_sensitivity(seed, sp.ẑ; rels = (0.3, 0.1))
         @test length(hs.pass1) == 4 && sort(collect(keys(hs.pass2))) == [0.1, 0.3]
         @test all(isfinite, hs.pass2[0.1]) && all(hs.σ_lap .> 0)
     end
 
-    @testset "mode_table: best mode first, Laplace mass finite only for a positive-definite Hessian" begin
+    # …for a positive-definite Hessian
+    @testset "mode_table: best mode first, Laplace mass finite only" begin
         modes = mode_table(seed, starts, sp)
         @test !isempty(modes) && issorted(getproperty.(modes, :f))
         @test all(m -> length(m.λ) == 4, modes)
@@ -152,7 +181,10 @@ end
     @testset "axis_scan: four axes, ratios finite, no c1 regime jump on a smooth fit" begin
         scans = axis_scan(seed, sp; grid = 41)
         @test length(scans) == 4 && [a.axis for a in scans] == 1:4
-        @test all(a -> all(isfinite, a.ratio) && a.noise ≥ 0 && a.f2_max ≥ a.f2_median, scans)
+        @test all(
+            a -> all(isfinite, a.ratio) && a.noise ≥ 0 && a.f2_max ≥ a.f2_median,
+            scans,
+        )
         @test all(a -> a.c1_range[1] ≤ a.c1_range[2], scans)
     end
 
@@ -161,7 +193,8 @@ end
         @test all(isfinite, (a.M1.chi2, a.M2.chi2, a.M3.chi2))
         @test SDF.LOWER_BOUND_δρ₁₂ ≤ a.M1.d ≤ SDF.LOWER_BOUND_δρ₁₂ + SDF.WIDTH_δρ₁₂
         @test SDF.LOWER_BOUND_δρ₁₂ ≤ a.M2.d12 ≤ SDF.LOWER_BOUND_δρ₁₂ + SDF.WIDTH_δρ₁₂
-        # one more free contrast cannot fit worse than a shared one, up to the grid resolution
+        # one more free contrast cannot fit worse than
+        # a shared one, up to the grid resolution
         @test a.M2.chi2 ≤ a.M1.chi2 * 1.05 + 1e-6
     end
 
@@ -169,22 +202,48 @@ end
         io = IOBuffer()
         diagnose(io, seed; label = "toy", n_samples = 120, n_adapt = 60)
         txt = String(take!(io))
-        for key in ("toy", "MAP search", "NUTS:", "L-BFGS starts", "gradient error", "distinct optima")
+        for key in (
+            "toy",
+            "MAP search",
+            "NUTS:",
+            "L-BFGS starts",
+            "gradient error",
+            "distinct optima",
+        )
             @test occursin(key, txt)
         end
-        rows = tolerance_sweep(io, seed; label = "toy", tols = (1e-5, 1e-8), rng_seeds = (1, 2), n_samples = 120, n_adapt = 60)
+        rows = tolerance_sweep(
+            io,
+            seed;
+            label = "toy",
+            tols = (1e-5, 1e-8),
+            rng_seeds = (1, 2),
+            n_samples = 120,
+            n_adapt = 60,
+        )
         @test length(rows) == 4 && all(r -> r.ε > 0 && r.steps ≥ 1, rows)
         @test count(==('\n'), String(take!(io))) == 4
     end
 
-    @testset "warmup_study: step-size trace, one row per (adaptation length, seed), draw statistics" begin
+    # …draw statistics
+    @testset "warmup_study: step-size trace, one row per (adaptation length, seed)" begin
         io = IOBuffer()
-        r = warmup_study(io, seed; label = "toy", adapts = (30, 60), n_post = 100, n_ref = 200, n_adapt_ref = 60, rng_seeds = (1, 2))
+        r = warmup_study(
+            io,
+            seed;
+            label = "toy",
+            adapts = (30, 60),
+            n_post = 100,
+            n_ref = 200,
+            n_adapt_ref = 60,
+            rng_seeds = (1, 2),
+        )
         txt = String(take!(io))
         for key in ("toy WARMUP", "toy ADAPT", "toy DRAWS", "toy ESS400")
             @test occursin(key, txt)
         end
-        @test length(r.adapt) == 4 && all(x -> x.ε > 0 && x.steps ≥ 1 && x.dm ≥ 0 && x.ds ≥ 0, r.adapt)
+        @test length(r.adapt) == 4 &&
+              all(x -> x.ε > 0 && x.steps ≥ 1 && x.dm ≥ 0 && x.ds ≥ 0, r.adapt)
         @test [d.n for d in r.draws] == [100, 200] && all(d -> d.min_ess > 0, r.draws)
         @test all(e -> e[2] > 0, r.trace) && last(r.trace)[1] ≤ 60
     end

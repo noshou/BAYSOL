@@ -7,7 +7,7 @@ MolecularStructure converts a PDB ID, a local .pdb/.cif file, or an arbitrary UR
 The workflow is:
 
 1. **Resolve** a structure source to a canonical local .pdb (StructureSource.jl).
-2. **Predict** per-residue-instance pKa values using external PROPKA (Propka.jl).
+2. **Predict** per-residue-instance pKa values using external PROPKA (Pdb2pqr.jl).
 3. **Add hydrogens** for a target pH using Pdb2pqr, with pKa predictions used to resolve free-terminal protonation states (Pdb2pqr.jl).
 4. **Parse** the structure into the internal Molecule representation (Mols.jl).
 
@@ -28,9 +28,9 @@ mol = load_molecule(hpath)
 - AtomicRadii.jl: element/ion string → radius lookup over the bundled `atomic_radii.sqlite3` (`lookup_radii`), the radii `Mols.jl` builds `radii(mol)` from.
 - StructureSource.jl: resolves local files, PDB IDs, and URLs.
 - Mols.jl: defines the internal molecule and residue representations.
-- ExcludedVolumes.jl: per-atom displaced-solvent volumes (power-diagram share of each vdW sphere) for the excluded-volume dummy species.
-- Propka.jl: predicts and parses pKa values for individual residue instances (only consumed by Pdb2pqr.jl's terminus protonation; there is no other ionization/charge model; the former `Ionization.jl` and the cavity electrostatics were removed).
-- Pdb2pqr.jl: adds hydrogens at a target pH (and holds the Henderson-Hasselbalch helpers that pick each chain's terminus protonation).
+- Pdb2pqr.jl: predicts per-residue-instance pKa values with PROPKA (`propka_pKas`; its only consumer is the terminus protonation, there is no other ionization/charge model; the former `Ionization.jl` and the cavity electrostatics were removed) and adds hydrogens at a target pH with pdb2pqr (with the Henderson-Hasselbalch helpers that pick each chain's terminus protonation).
+
+The per-atom excluded volumes that `vols(mol)` returns, and the surface sampling, are computed by [`Geometry`](@ref BAYSOL.Geometry); `Molecule` is a `Geometry.SphereCloud`.
 
 ## StructureSource.jl
 
@@ -62,11 +62,11 @@ mol = create("my-mol", elements, coords) # coords: any iterable of 3-tuples/vect
 coords_cartesian(mol) # (3, n) centred (x, y, z)
 coords_spherical(mol) # (3, n) (r, theta, phi)
 radii(mol) # per-atom van der Waals radius, lazy/memoized, via `lookup_radii` (AtomicRadii.jl) by default
-vols(mol) # per-atom excluded volume; see ExcludedVolumes.jl below
-r_max(mol) # largest per-atom radius; SASA's neighbour-filter bound
+vols(mol) # per-atom excluded volume; see the Geometry README
+r_max(mol) # largest per-atom radius; `Geometry.sasa`'s neighbour-filter bound
 ```
 
-vols is **not** (4/3)π·radii(mol)³ (see ExcludedVolumes.jl below).
+vols is **not** (4/3)π·radii(mol)³ (see the Geometry README).
 
 `create(name, elms, coords)` centres coords at the centroid and computes both coordinate frames eagerly; radii/vols/`r_max` are resolved (and cached) only on first  access, through `AtomicRadii.lookup`.
 
@@ -78,17 +78,7 @@ mol = load_molecule(pdb_path)
 
 Parses whatever .pdb is at `pdb_path` into a Molecule. Only the first model is read, whatever its MODEL number, so an ensemble member extracted to its own file (e.g. `MODEL 63`) loads correctly.
 
-## ExcludedVolumes.jl
-
-`sphere_volume(r)` (4π/3·r³, defined in ExcludedVolumes.jl) is the volume of an isolated sphere. vols(mol) is the per-atom volume of the excluded-volume dummy species (`Scattering._gaussian_dummy`): the solvent volume the atom displaces. `excluded_volume(cart, rads, tree, rmax)` computes it geometrically, adapted from Chamberlain, Moore & Grant (2023), 10.1016/j.bpj.2023.10.034: each atom's van der Waals sphere is clipped by the radical (power-diagram) planes of its overlapping neighbours, and the surviving volume is estimated by quasi-random sampling (`N_VOL_SHELL` = 2145 plastic-sequence points per atom). An atom with no overlapping neighbour keeps its whole sphere.
-
-The per-atom volumes sum to the volume of the vdW union. That leaves out the packing voids between atoms that no solvent can reach (with hydrogens, Σvols ≈ 0.73 of the sequence partial molar volume and ≈ 0.66 of CRYSOL's fitted `Vol` on SASDA52). Chamberlain et al. correct for this with per-atom-type scale factors fitted to lysozyme data; BAYSOL instead leaves it to the profiled excluded-volume correction c1. Across the fitting tests c1 ≈ 1.15–1.22, so c1³ ≈ 1.5–1.8 (see `test/fitting_tests/README.md`).
-
-A solvent-excluded-surface (SES) partition that includes those voids was tried on 2026-09-29 and reverted: with it, every tested dataset's best fit required a negative convex-shell contrast (δρ₁ < 0), which the δρ priors exclude, and under the priors SASDA52's fit degraded from `χ²_red` ≈ 6 to ≈ 19.
-
-radii stays the isolated van der Waals radius throughout (SASA and hydration-shell generation need real atomic sizes); vols is **not** (4/3)π·radii³.
-
-## Propka.jl
+## PROPKA (`propka_pKas`, in Pdb2pqr.jl)
 
 A free amino acid's textbook pKa is valid only in isolation. Inside a folded protein, a titratable side chain's actual pKa is shifted by its local electrostatic and desolvation environment: burial away from solvent, hydrogen bonding, and proximity to other charged groups all perturb it.
 
@@ -100,7 +90,7 @@ records = propka_pKas(pdb_path)
 # (resname::String, resnum::Int, chain::String, pKa::Float64)
 ```
 
-## Pdb2pqr.jl
+## pdb2pqr (`resolve_hydrogens`, in Pdb2pqr.jl)
 
  A structure resolved from RCSB or a bare crystallographic .cif/.pdb  typically carries heavy atoms only. The forward-model geometry step needs an explicit, pH-consistent set of atoms (hydrogens included) to compute scattering correctly, and *which hydrogens a titratable group carries depends on its protonation state at the solution pH being fit against (e.g. a free amine's three vs. two hydrogens, a carboxylate's presence/absence of an "HO"). Pdb2pqr.jl runs the external pdb2pqr tool to add hydrogens consistent with a target pH and force field, so the geometry passed downstream matches the physical/chemical state the fit assumes.
 
@@ -120,7 +110,7 @@ pdb2pqr's  terminus handling is not pH-driven (it defaults to a fixed charged st
 
 ```
 			  ┌───────────────────────────────────┐
-              │ 	PROPKA pKa records            │                 
+              │ 	PROPKA pKa records            │
               │ propka_pKas(full_structure)       │
  			  │ computed once on the full complex │
 			  └───────────────┬───────────────────┘
@@ -128,7 +118,7 @@ pdb2pqr's  terminus handling is not pH-driven (it defaults to a fixed charged st
                               │ 
                               ▼
         ┌─────────────────────┴─────────────────────┐
-        │ _terminus_groups(pKa_records, pH, chains) │                
+        │ _terminus_groups(pKa_records, pH, chains) │
         │											│ 
         │	determine, for each chain:				│
         │ 		--neutraln?   --neutralc?		    │
@@ -145,7 +135,7 @@ pdb2pqr's  terminus handling is not pH-driven (it defaults to a fixed charged st
                 ▼    						   ▼
       ┌─────────┴──────────┐	    ┌──────────┴─────────┐
 	  │ single flag group  │		│multiple flag groups│
-      └─────────┬──────────┘        └────────────┬───────┘     
+      └─────────┬──────────┘        └────────────┬───────┘
                 │							     │
                 ▼                                ▼
       ┌─────────┴───────────┐     ┌──────────────┴───────────────┐
@@ -223,11 +213,11 @@ Three rows have a negative radius. These are genuine Shannon (1976) values,  Sha
 #### Sources
 
 
-| Citation                                                                                                                                                      | DOI / identifier                       | Ions     |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ---------- |
-| Shannon, R.D. (1976). Revised effective ionic radii and systematic studies of interatomic distances in halides and chalcogenides.*Acta Cryst.* A32, 751–767. | 10.1107/S0567739476001551            | 210 ions |
-| Feldmann, C. (1995). Zur kristallchemischen Ähnlichkeit von Aurid- und Halogenid-Ionen.*Z. Anorg. Allg. Chem.* 621, 1907–1912.                              | 10.1002/zaac.19956211113             | au1-   |
-| Pauling, L. (1960).*The Nature of the Chemical Bond*, 3rd ed. Cornell University Press.                                                                       | ISBN 0-8014-0333-2 (pre-DOI monograph) | h1-    |
+| Citation                                                                                                                                                      | DOI / identifier          | Ions     |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------- |
+| Shannon, R.D. (1976). Revised effective ionic radii and systematic studies of interatomic distances in halides and chalcogenides.*Acta Cryst.* A32, 751–767. | 10.1107/S0567739476001551 | 210 ions |
+| Feldmann, C. (1995). Zur kristallchemischen Ähnlichkeit von Aurid- und Halogenid-Ionen.*Z. Anorg. Allg. Chem.* 621, 1907–1912.                              | 10.1002/zaac.19956211113  | au1-     |
+| Pauling, L. (1960).*The Nature of the Chemical Bond*, 3rd ed. Cornell University Press.                                                                       | ISBN 0-8014-0333-2        | h1-      |
 
 ### `atomic_radii`
 
@@ -247,19 +237,19 @@ CREATE TABLE atomic_radii (
 
 | `radius_type` | Elements                                                                        | Count |
 | --------------- | --------------------------------------------------------------------------------- | ------- |
-| vdw         | Alvarez-covered elements (H–Es, minus Po/At/Fr/Ra), plus Po/At/Fr/Ra (Mantina) | 98    |
-| metallic    | Pm (no Alvarez data; Teatum 1968 fallback)                                      | 1     |
-| covalent    | Fm–Lr, transactinides/superheavies Rf–Og (no Alvarez data)                    | 19    |
+| vdw           | Alvarez-covered elements (H–Es, minus Po/At/Fr/Ra), plus Po/At/Fr/Ra (Mantina) | 98    |
+| metallic      | Pm (no Alvarez data; Teatum 1968 fallback)                                      | 1     |
+| covalent      | Fm–Lr, transactinides/superheavies Rf–Og (no Alvarez data)                    | 19    |
 
 #### Sources
 
 
-| Citation                                                                                                                                                                                                                 | DOI / identifier         | `radius_type` | Elements                                                                                                |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------- | --------------------------------------------------------------------------------------------------------- |
-| Alvarez, S. (2013). A cartography of the van der Waals territories.*Dalton Trans.* 42, 8617–8636.                                                                                                                       | 10.1039/c3dt50599e     | vdw         | 94 elements: main group, transition metals, and lanthanides/actinides through Es (minus Po, At, Fr, Ra) |
-| Mantina, M.; Chamberlin, A.C.; Valero, R.; Cramer, C.J.; Truhlar, D.G. (2009). Consistent van der Waals Radii for the Whole Main Group.*J. Phys. Chem. A* 113, 5806–5812.                                               | 10.1021/jp8111556      | vdw         | Po, At, Fr, Ra — no Alvarez data                                                                       |
-| Teatum, E.T.; Gschneidner, K.A. Jr.; Waber, J.T. (1968). Compilation of Calculated Data Useful in Predicting Metallurgical Behavior of the Elements in Binary Alloy Systems.*LA-4003*, Los Alamos Scientific Laboratory. | (LASL report; no DOI)    | metallic    | Pm — no Alvarez data                                                                                   |
-| Pyykkö, P.; Atsumi, M. (2009). Molecular Single-Bond Covalent Radii for Elements 1–118.*Chem. Eur. J.* 15, 186–197.                                                                                                   | 10.1002/chem.200800987 | covalent    | 19 elements: Fm–Lr and transactinides/superheavies Rf–Og — no Alvarez data                           |
+| Citation                                                                                                                                                                                                                 | DOI / identifier       | `radius_type` | Elements                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------------- | --------------------------------------------------------------------------------------------------------- |
+| Alvarez, S. (2013). A cartography of the van der Waals territories.*Dalton Trans.* 42, 8617–8636.                                                                                                                       | 10.1039/c3dt50599e     | vdw           | 94 elements: main group, transition metals, and lanthanides/actinides through Es (minus Po, At, Fr, Ra) |
+| Mantina, M.; Chamberlin, A.C.; Valero, R.; Cramer, C.J.; Truhlar, D.G. (2009). Consistent van der Waals Radii for the Whole Main Group.*J. Phys. Chem. A* 113, 5806–5812.                                               | 10.1021/jp8111556      | vdw           | Po, At, Fr, Ra — no Alvarez data                                                                       |
+| Teatum, E.T.; Gschneidner, K.A. Jr.; Waber, J.T. (1968). Compilation of Calculated Data Useful in Predicting Metallurgical Behavior of the Elements in Binary Alloy Systems.*LA-4003*, Los Alamos Scientific Laboratory. | (LASL report; no DOI)  | metallic      | Pm                                                                                                      |
+| Pyykkö, P.; Atsumi, M. (2009). Molecular Single-Bond Covalent Radii for Elements 1–118.*Chem. Eur. J.* 15, 186–197.                                                                                                   | 10.1002/chem.200800987 | covalent      | 19 elements: Fm–Lr and transactinides/superheavies Rf–Og                                              |
 
 ### **`element_charges`**
 
@@ -287,11 +277,4 @@ WHERE element = 'fe' ORDER BY ABS(charge - 5) LIMIT 1;
 
 ## MolecularStructure.jl
 
-Includes the five files above in dependency order (Mols.jl, ExcludedVolumes.jl, Propka.jl, StructureSource.jl, Pdb2pqr.jl) and provides `_store_dir()`, the shared `_cache/` path used throughout the module.
-
-## Constants
-
-Defined at module level in `MolecularStructure.jl`.
-
-
-`N_VOL_SHELL` (2145 quasi-random points per atom for the power-diagram excluded-volume estimate in `MolecularStructure.excluded_volume`), `ATOM_BLOCK` (64 atoms per task in the threaded loops over atoms; the result does not depend on it) and `ATOM_PARALLEL_MIN` (4096: below this many atoms or hydration beads the loops run in a plain loop, because the tasks would cost more than they save)
+Includes AtomicRadii.jl, Mols.jl, StructureSource.jl and Pdb2pqr.jl in dependency order and provides `_store_dir()`, the shared `_cache/` path used throughout the module. The geometry constants (`N_VOL_SHELL`, `ATOM_BLOCK`, `ATOM_PARALLEL_MIN`) are in `Geometry`.

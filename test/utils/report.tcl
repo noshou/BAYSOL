@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Parsing one fitting-test report (`res*.txt`) into a dict of numbers. Sourced by compare.tcl and
-# results_table.tcl, not run. A value a report format lacks is the empty string, so "defined" means
-# `$v ne ""`. Needs common.tcl (for `NUM`) to be sourced first.
+# Parsing one fitting-test report (`res*.txt`) into a dict of numbers. Sourced by
+# compare.tcl and results_table.tcl, not run. A value a report format lacks is the empty
+# string, so "defined" means `$v ne ""`. Needs common.tcl (for `NUM`) to be sourced first.
 
-# NOTE on patterns: Tcl gives a whole regex the greediness of its first quantifier, so one lazy `.*?`
-# would make the number capture lazy too (it would return only the first digit). The patterns below
-# therefore use greedy `.*` followed by `\s` before the number, which finds the same number: the last
-# whitespace-delimited one on the line, and each of these lines holds one.
+# NOTE on patterns: Tcl gives a whole regex the greediness of its first
+# quantifier, so one lazy `.*?` would make the number capture lazy too (it
+# would return only the first digit). The patterns below therefore use greedy
+# `.*` followed by `\s` before the number, which finds the same number: the
+# last whitespace-delimited one on the line, and each of these lines holds one.
 
 namespace eval report {
     # '496.68k' -> 496680; '12.4k' -> 12400; '1.2M' -> 1.2e6.
@@ -27,8 +28,8 @@ namespace eval report {
         return [expr {double(round([string trimright $tok kM] * $scale * 1e6)) / 1e6}]
     }
 
-    # First capture group of $pattern in $text ("" if absent); @N@ in the pattern is a number.
-    # Line mode: ^ and $ match at line ends and . stops at a newline.
+    # First capture group of $pattern in $text ("" if absent); @N@ in the pattern
+    # is a number. Line mode: ^ and $ match at line ends and . stops at a newline.
     proc grab {text pattern} {
         if {[regexp -line -- [expand $pattern] $text -> v]} {
             return $v
@@ -36,9 +37,9 @@ namespace eval report {
         return ""
     }
 
-    # The pattern with its tokens replaced by their regexes, @N@ and @FLP@ a number (one capture
-    # group), @NUM@ the same number without a capture group (to skip a column), @QTY@ a number with an optional
-    # k (x1000) or M (x1000000) suffix (one capture group).
+    # The pattern with its tokens replaced by their regexes, @N@ and @FLP@ a number (one
+    # capture group), @NUM@ the same number without a capture group (to skip a column),
+    # @QTY@ a number with an optional k (x1000) or M (x1000000) suffix (one capture group).
     proc expand {pattern} {
         global NUM
         set bare {[-+]?\d+\.?\d*(?:[eE][-+]?\d+)?}
@@ -46,7 +47,8 @@ namespace eval report {
         return [string map [list @N@ $NUM @FLP@ $NUM @NUM@ $bare @QTY@ $qty] $pattern]
     }
 
-    # Sets each key of the {key pattern ...} list in the dict variable $var to its grabbed value.
+    # Sets each key of the {key pattern ...} list in
+    # the dict variable $var to its grabbed value.
     proc grab_all {var pairs text} {
         upvar 1 $var d
         foreach {key pattern} $pairs {
@@ -54,9 +56,9 @@ namespace eval report {
         }
     }
 
-    # Every number of a report: {key pattern ...}. A line a report lacks gives "". The keys of `parse` below
-    # (chi2, c1, d1, ...) predate this table and stay, because compare.tcl and results_table.tcl use them; where
-    # the two name the same line the values are equal.
+    # Every number of a report: {key pattern ...}. A line a report lacks gives "". The keys
+    # of `parse` below (chi2, c1, d1, ...) predate this table and stay, because compare.tcl
+    # and results_table.tcl use them; where the two name the same line the values are equal.
     variable ENTRIES {
         n_atoms           {^n_atoms\s+= (\d+)}
         lMax              {^lMax\s+= (\d+)}
@@ -70,7 +72,8 @@ namespace eval report {
         rebin_per_channel {^rebin\s+= (\d+) per channel}
         rebin_measured    {^rebin\s+= \d+ per channel: (\d+) measured}
         rebin_fitted      {^rebin\s+= \d+ per channel: \d+ measured → (\d+) fitted points}
-        rebin_dropped     {^rebin\s+= \d+ per channel: \d+ measured → \d+ fitted points \((\d+) non-positive dropped\)}
+        rebin_dropped     {^rebin\s+= \d+ per channel: \d+ measured\
+            → \d+ fitted points \((\d+) non-positive dropped\)}
         iterations        {^iterations\s+= (\d+)}
         accept            {^mean_accept\s+= @FLP@}
         depth             {^tree_depth\s+= @FLP@}
@@ -133,8 +136,9 @@ namespace eval report {
         draws             {^\s+per-draw c1 re-profile.*\((\d+) draws\)}
     }
 
-    # The parameter rows: {prefix label}. Each has a MAP value, the quantile and bound columns of the
-    # `=== Quantiles ===` table, and (the four with a prior) the z-score columns.
+    # The parameter rows: {prefix label}. Each has a MAP value,
+    # the quantile and bound columns of the `=== Quantiles ===`
+    # table, and (the four with a prior) the z-score columns.
     variable PARAMS {
         {lgdn   log_density}
         {rho_e  ρₑ}
@@ -147,8 +151,9 @@ namespace eval report {
         {chi2   χ²}
     }
 
-    # Adds the columns of the quantile and z-score tables to the dict variable $var: <prefix>_QUANT_LO, _QUANT_HI,
-    # _BOUND_LO, _BOUND_HI for every parameter row, <prefix>_Z_MAP, _Z_QUANT_LO, _Z_QUANT_HI for the four with a prior.
+    # Adds the columns of the quantile and z-score tables to the dict variable
+    # $var: <prefix>_QUANT_LO, _QUANT_HI, _BOUND_LO, _BOUND_HI for every parameter
+    # row, <prefix>_Z_MAP, _Z_QUANT_LO, _Z_QUANT_HI for the four with a prior.
     proc grab_tables {var text} {
         variable PARAMS
         upvar 1 $var d
@@ -183,7 +188,8 @@ namespace eval report {
         # every line of the report
         foreach {key pattern} $ENTRIES {
             set v [grab $text $pattern]
-            # a quantity with a k or M suffix is stored as the plain number (an integer when it is a whole one)
+            # a quantity with a k or M suffix is stored as the
+            # plain number (an integer when it is a whole one)
             if {[string first @QTY@ $pattern] >= 0 && $v ne ""} {
                 set v [count $v]
                 if {$v == entier($v)} {
@@ -193,13 +199,17 @@ namespace eval report {
             dict set d $key $v
         }
         grab_tables d $text
-        # the mass shares of the posterior modes (each has a `mode_<k>` line); 1 for a single mode
+        # the mass shares of the posterior modes (each
+        # has a `mode_<k>` line); 1 for a single mode
         set shares {}
-        foreach {m share} [regexp -all -line -inline -- {^mode_\d+\s+= chains [\d,]+, share ([\d.]+)} $text] {
+        foreach {m share} [regexp -all -line -inline -- \
+            {^mode_\d+\s+= chains [\d,]+, share ([\d.]+)} $text] {
             lappend shares $share
         }
-        dict set d mode_share_max [expr {[llength $shares] ? [tcl::mathfunc::max {*}$shares] : ""}]
-        dict set d mode_share_min [expr {[llength $shares] ? [tcl::mathfunc::min {*}$shares] : ""}]
+        dict set d mode_share_max \
+            [expr {[llength $shares] ? [tcl::mathfunc::max {*}$shares] : ""}]
+        dict set d mode_share_min \
+            [expr {[llength $shares] ? [tcl::mathfunc::min {*}$shares] : ""}]
         # chains that were not pooled (each has a `chain_dropped` line)
         dict set d chains_dropped [count_lines $text {^chain_dropped\s+=}]
         # sampler quality
@@ -220,8 +230,9 @@ namespace eval report {
             d2      {^δρ₂\s+= @N@}
             d3      {^δρ₃\s+= @N@}
         } $text
-        # the Shannon-binned fit's χ² on the measured grid (reports since Shannon binning only), and the χ² every
-        # comparison uses: the measured-grid one when there is one, else the (unbinned) fit's own
+        # the Shannon-binned fit's χ² on the measured grid (reports since
+        # Shannon binning only), and the χ² every comparison uses: the
+        # measured-grid one when there is one, else the (unbinned) fit's own
         dict set d chi2_raw [grab $text {^measured grid\s+lag-1.*χ²_red\s+@N@}]
         if {[dict get $d chi2_raw] ne ""} {
             dict set d chi2_cmp [dict get $d chi2_raw]
@@ -250,10 +261,14 @@ namespace eval report {
             dict set d ms_step $ms
             dict set d nuts $secs
         }
-        # z-score of the MAP δρ₃ from the prior (θ-space): first number of its row in that table.
-        # The label is found first (lazily, across lines, so no -line), then the number after it.
+        # z-score of the MAP δρ₃ from the prior (θ-space): first number
+        # of its row in that table. The label is found first (lazily,
+        # across lines, so no -line), then the number after it.
         dict set d z3 ""
-        if {[regexp -indices -lineanchor {=== Standard deviations from prior.*?^δρ₃} $text where]} {
+        if {
+            [regexp -indices -lineanchor {=== Standard\
+            deviations from prior.*?^δρ₃} $text where]
+        } {
             set rest [string range $text [expr {[lindex $where 1] + 1}] end]
             set z_pattern [string map [list @N@ $::NUM] {\A\s*@N@}]
             if {[regexp -- $z_pattern $rest -> z]} {
@@ -265,8 +280,10 @@ namespace eval report {
             dict set d z3 [dict get $d dro3_Z_MAP]
         }
         # number of distinct local optima the MAP search found
-        dict set d n_modes [grab $text {MAP search \+ whitening \(\d+/\d+ starts, (\d+) modes?}]
-        # wall clock without the PROPKA / pdb2pqr subprocesses, the convention for every comparison
+        dict set d n_modes \
+            [grab $text {MAP search \+ whitening \(\d+/\d+ starts, (\d+) modes?}]
+        # wall clock without the PROPKA / pdb2pqr
+        # subprocesses, the convention for every comparison
         set wall [dict get $d wall]
         if {$wall eq ""} {
             dict set d wall_ex ""

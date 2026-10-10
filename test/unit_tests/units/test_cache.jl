@@ -3,7 +3,7 @@
 # Exercises src/Runtime/Cache.jl (`Lazy` / `force` and `KeyedCache`).
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Cache: Lazy, force, KeyedCache
+using BAYSOL.Runtime: Lazy, force, KeyedCache
 
 # `done` is the private "has the thunk run?" flag; reading it is the only way to
 # assert laziness without also forcing the value we are trying to prove unforced.
@@ -21,10 +21,13 @@ _forced(c) = getfield(c, :done)
     @testset "force memoizes: thunk runs exactly once" begin
         calls = Ref(0)
         c = Lazy{Int}(() -> (calls[] += 1; 42))
-        a = force(c); b = force(c)
+        a = force(c)
+        b = force(c)
         @test a == 42 && b == 42 && calls[] == 1
         # ...and stays at one however many more times it is forced
-        for _ in 1:10; force(c); end
+        for _ in 1:10
+            force(c)
+        end
         @test calls[] == 1
     end
 
@@ -99,7 +102,8 @@ _forced(c) = getfield(c, :done)
     @testset "distinct caches are independent" begin
         @test force(Lazy{Int}(() -> 1)) == 1
         @test force(Lazy{Int}(() -> 2)) == 2
-        a = Lazy{Vector{Int}}(() -> Int[]); b = Lazy{Vector{Int}}(() -> Int[])
+        a = Lazy{Vector{Int}}(() -> Int[])
+        b = Lazy{Vector{Int}}(() -> Int[])
         @test force(a) !== force(b)          # equal values, separate objects
         # forcing one cache leaves an unrelated one untouched
         c = Lazy{Vector{Int}}(() -> Int[])
@@ -116,7 +120,7 @@ _forced(c) = getfield(c, :done)
     @testset "KeyedCache" begin
         @testset "get! computes once then reuses" begin
             calls = Ref(0)
-            c = KeyedCache{String, Int}()
+            c = KeyedCache{String,Int}()
             v1 = get!(c, "a") do
                 calls[] += 1
                 1
@@ -130,7 +134,7 @@ _forced(c) = getfield(c, :done)
         end
 
         @testset "distinct keys don't collide" begin
-            c = KeyedCache{String, Int}()
+            c = KeyedCache{String,Int}()
             a = get!(() -> 1, c, "a")
             b = get!(() -> 2, c, "b")
             @test a == 1 && b == 2
@@ -139,8 +143,8 @@ _forced(c) = getfield(c, :done)
         end
 
         @testset "distinct caches are independent" begin
-            c_1 = KeyedCache{String, Int}()
-            c2 = KeyedCache{String, Int}()
+            c_1 = KeyedCache{String,Int}()
+            c2 = KeyedCache{String,Int}()
             get!(() -> 1, c_1, "k")
             @test get!(() -> 2, c2, "k") == 2
             @test get!(() -> 99, c_1, "k") == 1
@@ -148,7 +152,7 @@ _forced(c) = getfield(c, :done)
 
         @testset "concurrent get! on the same missing key computes once" begin
             calls = Threads.Atomic{Int}(0)
-            c = KeyedCache{Int, Vector{Int}}()
+            c = KeyedCache{Int,Vector{Int}}()
             results = Vector{Vector{Int}}(undef, 16)
             @sync for i in 1:16
                 Threads.@spawn results[i] = get!(c, 1) do

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# End-to-end correctness tests for src/Inference/Sampler.jl: the Bayesian
+# End-to-end correctness tests for src/Inference/{Infer,NUTS,Posterior}.jl: the Bayesian
 # fitting pipeline (priors -> initial draw -> θ-space log-posterior -> NUTS
 # via AdvancedHMC.jl). These tests check that the wiring is *correct* --
 # independent re-derivations of every formula, purity (no hidden mutation)
@@ -13,7 +13,8 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 const FIT = BAYSOL.Inference
 
-using BAYSOL.Inference: Solute, NonBiological, WLSData, wls_fit, wls_prof_ll, wls_marg_ll,
+using BAYSOL.BulkElectronDensity: Solute, NonBiological
+using BAYSOL.Inference: WLSData, wls_fit, wls_prof_ll, wls_marg_ll,
     profiled_corrs, Θ, Ξ
 using BAYSOL.Inference: BOUNDS_δρ₁₂, κ_δρ₁₂, κ_δρ₃
 using BAYSOL.Scattering: forward_cache, ForwardCache
@@ -33,7 +34,7 @@ include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
 function smpl_mol()
     elms = repeat(["n", "c", "c", "o"], 4)
     n = length(elms)
-    crds = [(1.6 * cos(0.85 * i), 1.6 * sin(0.85 * i), 0.55 * i) for i in 0:(n - 1)]
+    crds = [(1.6 * cos(0.85 * i), 1.6 * sin(0.85 * i), 0.55 * i) for i in 0:(n-1)]
     return MolecularStructure.create("smpl", elms, crds)
 end
 
@@ -44,10 +45,11 @@ const smpl_chunk = UInt64(4)
 
 smpl_fw() = forward_cache(smpl_mol(), smpl_q, smpl_lmax, smpl_E; chunk = smpl_chunk)
 
-# Buffer only: the measured macromolecule is never a solute (see Inference.Solute).
-smpl_solutes() = Solute[NonBiological(0.15, 0.001, "sodium chloride")]
-const smpl_pH    = 7.4
-const smpl_σ_pH  = 0.05
+# Buffer only: the measured macromolecule is never
+# a solute (see BulkElectronDensity.Solute).
+smpl_solutes()  = Solute[NonBiological(0.15, 0.001, "sodium chloride")]
+const smpl_pH   = 7.4
+const smpl_σ_pH = 0.05
 
 smpl_priors() = FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, smpl_solutes())
 
@@ -57,7 +59,8 @@ const ξ_TRUE = (CRYSOL_SOLVENT_DENSITY, 1.05, -0.05, -1.0)
 const M_TRUE, C_TRUE = 1.7, 0.3
 
 """
-Synthetic `(I_exp, σ_exp)` from `fw` at `ξ_TRUE`/`M_TRUE`/`C_TRUE`, with small seeded Gaussian noise.
+Synthetic `(I_exp, σ_exp)` from `fw` at
+`ξ_TRUE`/`M_TRUE`/`C_TRUE`, with small seeded Gaussian noise.
 """
 function synth_data(fw::ForwardCache)
     y = reference_intensity(fw, 1.0, 0.0, ξ_TRUE[1], ξ_TRUE[2:4])
@@ -69,7 +72,7 @@ function synth_data(fw::ForwardCache)
 end
 
 # ---------------------------------------------------------------------------
-#                 independent references (no calls into Sampler.jl)
+#                 independent references (no calls into the sampler files)
 # ---------------------------------------------------------------------------
 
 "Log prior of ξ = (ρₑ, δρ₁, δρ₂, δρ₃), written out by hand."
@@ -111,17 +114,28 @@ end
         @test pr isa FIT.ξ_priors
         ref_ρ = FIT.ρₑ_prior(smpl_pH, smpl_σ_pH, smpl_solutes())
         ref_δρ₁, ref_δρ₂, ref_δρ₃ = FIT.δρ_prior(κ_δρ₁₂, κ_δρ₃, mean(ref_ρ))
-        @test pr.ρₑPrior  == ref_ρ
+        @test pr.ρₑPrior == ref_ρ
         @test pr.δρ₁Prior == ref_δρ₁
         @test pr.δρ₂Prior == ref_δρ₂
         @test pr.δρ₃Prior == ref_δρ₃
     end
 
     @testset "_calc_ξ_priors: κ keywords reach δρ_prior" begin
-        pr = FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, smpl_solutes(); κ_δρ₁₂ = 3.0, κ_δρ₃ = 7.0)
+        pr = FIT._calc_ξ_priors(
+            smpl_pH,
+            smpl_σ_pH,
+            smpl_solutes();
+            κ_δρ₁₂ = 3.0,
+            κ_δρ₃ = 7.0,
+        )
         @test sum(params(pr.δρ₁Prior.ρ)) - 2 ≈ 3.0
         @test sum(params(pr.δρ₃Prior.ρ)) - 2 ≈ 7.0
-        @test_throws DomainError FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, smpl_solutes(); κ_δρ₁₂ = 0.0)
+        @test_throws DomainError FIT._calc_ξ_priors(
+            smpl_pH,
+            smpl_σ_pH,
+            smpl_solutes();
+            κ_δρ₁₂ = 0.0,
+        )
     end
 
     @testset "_calc_ξ_priors: pure water is allowed; bad σ_pH still throws" begin
@@ -136,7 +150,8 @@ end
             ξ0 = FIT._ξ₀(pr)
             @test ξ0 isa SVector{4,Float64}
             @test ξ0[1] > 0
-            @test BOUNDS_δρ₁₂[1] < ξ0[2] < BOUNDS_δρ₁₂[2] && BOUNDS_δρ₁₂[1] < ξ0[3] < BOUNDS_δρ₁₂[2]
+            @test BOUNDS_δρ₁₂[1] < ξ0[2] < BOUNDS_δρ₁₂[2] &&
+                  BOUNDS_δρ₁₂[1] < ξ0[3] < BOUNDS_δρ₁₂[2]
             @test pr.δρ₃Prior.μ < ξ0[4] < pr.δρ₃Prior.μ + pr.δρ₃Prior.σ
             @test all(isfinite, ξ0)
         end
@@ -147,16 +162,17 @@ end
         Random.seed!(20_260_921)
         n = 60_000
         draws = [FIT._ξ₀(pr) for _ in 1:n]
-        for (i, μ, σ) in ((1, mean(pr.ρₑPrior),  std(pr.ρₑPrior)),
-                          (2, mean(pr.δρ₁Prior), std(pr.δρ₁Prior)),
-                          (3, mean(pr.δρ₂Prior), std(pr.δρ₂Prior)),
-                          (4, mean(pr.δρ₃Prior), std(pr.δρ₃Prior)))
+        for (i, μ, σ) in ((1, mean(pr.ρₑPrior), std(pr.ρₑPrior)),
+            (2, mean(pr.δρ₁Prior), std(pr.δρ₁Prior)),
+            (3, mean(pr.δρ₂Prior), std(pr.δρ₂Prior)),
+            (4, mean(pr.δρ₃Prior), std(pr.δρ₃Prior)))
             xs = getindex.(draws, i)
             @test close_(mean(xs), μ; atol = max(6σ / sqrt(n), 1.0e-9))
         end
     end
 
-    @testset "θ_prior_moments: δρ₁, δρ₂, δρ₃ entries match the Monte Carlo moments of logit(u)" begin
+    # …of logit(u)
+    @testset "θ_prior_moments: δρ₁, δρ₂, δρ₃ entries match the Monte Carlo moments" begin
         pr = smpl_priors()
         μ, σ = FIT.θ_prior_moments(pr)
         Random.seed!(20_260_922)
@@ -189,7 +205,7 @@ end
                 @test close_(FIT._ll(wls, ξ, fw, l), ref_ll(ξt, wls, fw, l))
             end
             @test !close_(FIT._ll(wls, ξ, fw, FIT.PROFILE()),
-                          FIT._ll(wls, ξ, fw, FIT.MARGINAL()); atol = 1e3 * DEFAULT_ATOL)
+                FIT._ll(wls, ξ, fw, FIT.MARGINAL()); atol = 1e3 * DEFAULT_ATOL)
         end
     end
 
@@ -225,7 +241,8 @@ end
         end
     end
 
-    @testset "_logπ: AD gradient matches central differences (c1 re-profiled each time)" begin
+    # …(c1 re-profiled each time)
+    @testset "_logπ: AD gradient matches central differences" begin
         pr = smpl_priors()
         fw = smpl_fw()
         wls = WLSData(synth_data(fw)...)
@@ -235,8 +252,10 @@ end
         @test all(isfinite, g)
         h = 1.0e-5
         for i in 1:4
-            xp = copy(θ₀); xp[i] += h
-            xm = copy(θ₀); xm[i] -= h
+            xp = copy(θ₀)
+            xp[i] += h
+            xm = copy(θ₀)
+            xm[i] -= h
             @test g[i] ≈ (f(xp) - f(xm)) / (2h) rtol = 1.0e-3 atol = 1.0e-6
         end
     end
@@ -255,8 +274,16 @@ end
         @test seed.fw === fw
         @test seed.wls.I_obs == I_exp
         ξ₀ = Ξ(seed.θ₀, seed.pr)
-        @test ξ₀[1] > 0 && seed.pr.δρ₃Prior.μ < ξ₀[4] < seed.pr.δρ₃Prior.μ + seed.pr.δρ₃Prior.σ
-        @test_throws DomainError FIT.seed_sampler(fw, I_exp, σ_exp, smpl_pH, -0.1, smpl_solutes())
+        @test ξ₀[1] > 0 &&
+              seed.pr.δρ₃Prior.μ < ξ₀[4] < seed.pr.δρ₃Prior.μ + seed.pr.δρ₃Prior.σ
+        @test_throws DomainError FIT.seed_sampler(
+            fw,
+            I_exp,
+            σ_exp,
+            smpl_pH,
+            -0.1,
+            smpl_solutes(),
+        )
     end
 
     @testset "MAP search: the f-stop does not stop short of the optimum" begin
@@ -264,21 +291,32 @@ end
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         Random.seed!(11)
         sp = FIT._sampling_space(seed, FIT.PROFILE())
-        f(z) = FIT._neglogπ(SVector{4}(z...), sp.μ, sp.σ, seed, FIT.PROFILE(), FIT.EXCL_VOL_CORR_TOL)
+        f(z) = FIT._neglogπ(
+            SVector{4}(z...),
+            sp.μ,
+            sp.σ,
+            seed,
+            FIT.PROFILE(),
+            FIT.EXCL_VOL_CORR_TOL,
+        )
         g!(G, z) = (G .= ForwardDiff.gradient(f, z); G)
         # polish the reported mode with a gradient-only search 1000× tighter and 10× longer
-        res = FIT.optimize(FIT.OnceDifferentiable(f, g!, Vector(sp.ẑ)), Vector(sp.ẑ), FIT.LBFGS(),
-                           FIT.Options(g_abstol = 1e-9, iterations = 5000))
-        @test f(sp.ẑ) - FIT.Optim.minimum(res) < 1e-4          # nats left on the table by the f-stop
+        res = FIT.optimize(FIT.OnceDifferentiable(f, g!, Vector(sp.ẑ)), Vector(sp.ẑ),
+            FIT.LBFGS(),
+            FIT.Options(g_abstol = 1e-9, iterations = 5000))
+        # nats left on the table by the f-stop
+        @test f(sp.ẑ) - FIT.Optim.minimum(res) < 1e-4
         @test FIT.MAP_F_ABSTOL == 1e-6 && FIT.MAP_F_SUCCESSIVE == 3
         # and it costs fewer evaluations than the gradient test alone, for the same optimum
         Random.seed!(11)
-        sp_g = FIT._sampling_space(seed, FIT.PROFILE(); f_abstol = 0.0, successive_f_tol = 1)
+        sp_g =
+            FIT._sampling_space(seed, FIT.PROFILE(); f_abstol = 0.0, successive_f_tol = 1)
         @test sp.n_evals < sp_g.n_evals
         @test abs(f(sp.ẑ) - f(sp_g.ẑ)) < 1e-4
     end
 
-    @testset "rng_seed: the MAP search and the whole run are reproducible, and a different seed gives a different run" begin
+    # …and a different seed gives a different run
+    @testset "rng_seed: the MAP search and the whole run are reproducible" begin
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         sp1 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x1234))
@@ -290,8 +328,10 @@ end
         @test r1.samples == r2.samples
         @test r1.samples != r3.samples
         # Random.seed! before the call fixes the run when no rng_seed is given
-        Random.seed!(3); q1 = FIT.infer(seed, 40, 20)
-        Random.seed!(3); q2 = FIT.infer(seed, 40, 20)
+        Random.seed!(3)
+        q1 = FIT.infer(seed, 40, 20)
+        Random.seed!(3)
+        q2 = FIT.infer(seed, 40, 20)
         @test q1.samples == q2.samples
     end
 
@@ -308,7 +348,8 @@ end
             @test length(ξ) == 4
             @test all(isfinite, ξ)
             @test ξ[1] > 0
-            @test BOUNDS_δρ₁₂[1] ≤ ξ[2] ≤ BOUNDS_δρ₁₂[2] && BOUNDS_δρ₁₂[1] ≤ ξ[3] ≤ BOUNDS_δρ₁₂[2]
+            @test BOUNDS_δρ₁₂[1] ≤ ξ[2] ≤ BOUNDS_δρ₁₂[2] &&
+                  BOUNDS_δρ₁₂[1] ≤ ξ[3] ≤ BOUNDS_δρ₁₂[2]
             @test pr.δρ₃Prior.μ ≤ ξ[4] ≤ pr.δρ₃Prior.μ + pr.δρ₃Prior.σ
         end
     end
@@ -321,8 +362,10 @@ end
         for i in eachindex(samples)
             θ_check, _ = Θ(samples[i], seed.pr)
             recomputed = FIT._logπ(θ_check, seed.pr, seed.wls, seed.fw, l)
-            # Θ(Ξ(θ)) differs from θ by rounding, and the profiled c1 is located by a value-only minimizer, which is only as
-            # accurate as √eps relative to the curvature (up to ~1e-6 in c1): the log density moves by its second-order effect
+            # Θ(Ξ(θ)) differs from θ by rounding, and the profiled c1
+            # is located by a value-only minimizer, which is only as
+            # accurate as √eps relative to the curvature (up to ~1e-6
+            # in c1): the log density moves by its second-order effect
             @test close_(recomputed, stats[i].log_density; atol = 1e5 * DEFAULT_ATOL)
         end
     end
@@ -330,7 +373,8 @@ end
     for (name, l, rng) in (("PROFILE", FIT.PROFILE(), 1), ("MARGINAL", FIT.MARGINAL(), 2))
         @testset "run: $name -- output shapes, physical domain, self-consistency" begin
             fw = smpl_fw()
-            seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+            seed =
+                FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
             Random.seed!(rng)
             n_samples, n_adapt = 60, 30
             fit = FIT.infer(seed, n_samples, n_adapt; l = l, n_chains = 1)
@@ -362,38 +406,54 @@ end
         r = FIT.infer(seed, n_samples, n_adapt; rng_seed = 5)
         d = r.diagnostics
         @test d.n_chains == FIT.DEFAULT_N_CHAINS == 8
-        # chains 1 and 2 at the MAP, then mirrored pairs at the CHAIN_START_RADII (never farther than nominal, nearer
-        # only if a start had to be pulled back)
+        # chains 1 and 2 at the MAP, then mirrored pairs at the CHAIN_START_RADII
+        # (never farther than nominal, nearer only if a start had to be pulled back)
         @test d.start_scale[1] == 0 && d.start_scale[2] == 0
         for p in 1:3
             rad = FIT.CHAIN_START_RADII[p]
-            @test d.start_scale[2p+1] > 0 && d.start_scale[2p+2] < 0 && d.start_scale[2p+1] ≤ rad && -d.start_scale[2p+2] ≤ rad
+            @test d.start_scale[2p+1] > 0 && d.start_scale[2p+2] < 0 &&
+                  d.start_scale[2p+1] ≤ rad && -d.start_scale[2p+2] ≤ rad
         end
         @test [FIT.chain_radius(k, 8) for k in 1:8] == [0, 0, 4, -4, 10, -10, 20, -20]
-        @test FIT.chain_radius(1, 1) == 0 && FIT.chain_radius(2, 2) == 0 && FIT.chain_radius(9, 10) == 20
+        @test FIT.chain_radius(1, 1) == 0 && FIT.chain_radius(2, 2) == 0 &&
+              FIT.chain_radius(9, 10) == 20
         # chains 1 and 2 start at the same point but are different chains
         @test r.samples[r.chain .== 1] != r.samples[r.chain .== 2]
         # pooled chains are kept whole, chain after chain
         pk = findall(d.pooled)
         @test !isempty(pk)
-        @test length(r.samples) == length(pk) * n_samples == length(r.stats) == length(r.c1) == size(r.curves, 2)
+        @test length(r.samples) == length(pk) * n_samples == length(r.stats) ==
+              length(r.c1) == size(r.curves, 2)
         @test r.chain == vcat((fill(k, n_samples) for k in pk)...)
         @test r.iteration == repeat(1:n_samples, length(pk))
         @test length(d.rhat) == length(d.ess) == length(d.ess_tail) == 5
         @test d.rewhitened ≥ 0
-        # every pooled chain is in a mode; the modes' shares sum to one; one chain is one mode of weight one
-        @test length(d.mode) == d.n_chains && all(d.mode[pk] .> 0) && all(d.mode[setdiff(1:d.n_chains, pk)] .== 0)
-        @test sum(d.mode_weight) ≈ 1 && length(d.mode_weight) == length(d.mode_logmass) == length(d.mode_err) == maximum(d.mode)
-        @test d.weights_uncertain isa Bool && (length(d.mode_weight) > 1 || !d.weights_uncertain)
+        # every pooled chain is in a mode; the modes' shares
+        # sum to one; one chain is one mode of weight one
+        @test length(d.mode) == d.n_chains && all(d.mode[pk] .> 0) &&
+              all(d.mode[setdiff(1:d.n_chains, pk)] .== 0)
+        @test sum(d.mode_weight) ≈ 1 &&
+              length(d.mode_weight) == length(d.mode_logmass) == length(d.mode_err) ==
+              maximum(d.mode)
+        @test d.weights_uncertain isa Bool &&
+              (length(d.mode_weight) > 1 || !d.weights_uncertain)
         # one chain starts at the MAP
         one = FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, n_chains = 1)
-        @test length(one.samples) == n_samples && one.diagnostics.start_scale == [0.0] && one.diagnostics.mode == [1] && one.diagnostics.mode_weight == [1.0]
-        # same seeds, same run, at one worker and at several (a chain belongs to its index, not to a thread)
-        again = BAYSOL.Runtime.Parallel.with_workers(() -> FIT.infer(seed, n_samples, n_adapt; rng_seed = 5), 1)
+        @test length(one.samples) == n_samples && one.diagnostics.start_scale == [0.0] &&
+              one.diagnostics.mode == [1] && one.diagnostics.mode_weight == [1.0]
+        # same seeds, same run, at one worker and at several
+        # (a chain belongs to its index, not to a thread)
+        again = BAYSOL.Runtime.with_workers(
+            () -> FIT.infer(seed, n_samples, n_adapt; rng_seed = 5),
+            1,
+        )
         @test again.samples == r.samples && again.chain == r.chain
-        # the jitter seed is separate from the rng seed: it changes the starts, the rng seed does not
-        @test FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, jitter_seed = 99).samples != r.samples
-        @test FIT.infer(seed, n_samples, n_adapt; rng_seed = 6).diagnostics.start_scale == d.start_scale
+        # the jitter seed is separate from the rng seed:
+        # it changes the starts, the rng seed does not
+        @test FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, jitter_seed = 99).samples !=
+              r.samples
+        @test FIT.infer(seed, n_samples, n_adapt; rng_seed = 6).diagnostics.start_scale ==
+              d.start_scale
         @test_throws DomainError FIT.infer(seed, n_samples, n_adapt; n_chains = 0)
     end
 
@@ -403,9 +463,16 @@ end
         sp = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x77))
         @test FIT.MAP_N_STARTS == 32 && sp.n_ok ≥ 1
         μ, σ = FIT.θ_prior_moments(seed.pr)
-        @test sp.logπ ≈ -FIT._neglogπ(sp.ẑ, μ, σ, seed, FIT.PROFILE(), FIT.EXCL_VOL_CORR_TOL)
-        # a start handed in (here the MAP itself) can only add to the optima, never lower log π at the MAP
-        sp2 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x77), extra_starts = [sp.ẑ])
+        @test sp.logπ ≈
+              -FIT._neglogπ(sp.ẑ, μ, σ, seed, FIT.PROFILE(), FIT.EXCL_VOL_CORR_TOL)
+        # a start handed in (here the MAP itself) can only
+        # add to the optima, never lower log π at the MAP
+        sp2 = FIT._sampling_space(
+            seed,
+            FIT.PROFILE();
+            base = UInt64(0x77),
+            extra_starts = [sp.ẑ],
+        )
         @test sp2.logπ ≥ sp.logπ - 1e-6
     end
 

@@ -1,0 +1,24 @@
+# JuliaFormatter.jl settings (applied by `tclsh dev/format.tcl`). The aim is the 92-character line limit
+# with the least restyling: line breaks the author chose are kept wherever they fit.
+margin = 92
+indent = 4
+always_for_in = true
+style = "default"
+join_lines_based_on_source = true
+annotate_untyped_fields_with_any = false
+remove_extra_newlines = false
+whitespace_ops_in_indices = false
+whitespace_typedefs = false
+format_docstrings = false
+format_markdown = false
+conditional_to_if = false
+short_to_long_function_def = false
+long_to_short_function_def = false
+always_use_return = false
+pipe_to_function_call = false
+import_to_using = false
+align_assignment = true
+align_struct_field = true
+align_conditional = true
+align_pair_arrow = true
+normalize_line_endings = "unix"

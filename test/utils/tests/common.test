@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests of common.tcl: the git helpers (in a throwaway repository), the fitting-test lookups and the
-# symlink-safe directory removal.
+# Tests of common.tcl: the git helpers (in a throwaway repository),
+# the fitting-test lookups and the symlink-safe directory removal.
 
 source [file join [file dirname [info script]] helpers.tcl]
 source [file join $UTILS_DIR common.tcl]
 
-# A throwaway git repository with three commits of increasing dates and the given tags on them.
+# A throwaway git repository with three commits
+# of increasing dates and the given tags on them.
 proc make_repo {dir tagsAt} {
     file mkdir $dir
     set git [list git -C $dir -c user.name=t -c user.email=t@example.com]
@@ -18,7 +19,7 @@ proc make_repo {dir tagsAt} {
         set ::env(GIT_COMMITTER_DATE) $date
         set ::env(GIT_AUTHOR_DATE) $date
         exec {*}$git commit -q -m c$n
-        foreach t $tags { exec {*}$git tag $t }
+        foreach t $tags {exec {*}$git tag $t}
         incr n
     }
     unset ::env(GIT_COMMITTER_DATE) ::env(GIT_AUTHOR_DATE)
@@ -26,7 +27,8 @@ proc make_repo {dir tagsAt} {
 
 set scratch [scratch_dir]
 
-test latest_release-newest-v-tag-by-date {the newest tag that looks like a release, not the newest tag} -setup {
+test latest_release-newest-v-tag-by-date \
+    {the newest tag that looks like a release, not the newest tag} -setup {
     make_repo $scratch/r1 {
         2020-01-01T00:00:00 v0.1.0-a
         2021-01-01T00:00:00 v0.2.0-b
@@ -50,7 +52,8 @@ test latest_release-no-release {no v<digit> tag means no release} -setup {
     set ::ROOT $saved
 } -result {}
 
-test resolve-known-and-unknown {resolve gives a hash for a known revision and "" otherwise} -setup {
+test resolve-known-and-unknown \
+    {resolve gives a hash for a known revision and "" otherwise} -setup {
     set saved $::ROOT
     set ::ROOT $scratch/r1
 } -body {
@@ -59,31 +62,39 @@ test resolve-known-and-unknown {resolve gives a hash for a known revision and ""
     set ::ROOT $saved
 } -result {1 {}}
 
-test baseline_for-newest-by-name {the newest baseline file of a tag, "" when there is none} -setup {
+test baseline_for-newest-by-name \
+    {the newest baseline file of a tag, "" when there is none} -setup {
     set saved $::ROOT
     set ::ROOT $scratch/root
     write_file $scratch/root/test/baselines/v1.0.0-x-cold-hostA.json {}
     write_file $scratch/root/test/baselines/v1.0.0-x-cold-hostB.json {}
     write_file $scratch/root/test/baselines/v2.0.0-y-cold-hostA.json {}
 } -body {
-    list [file tail [util::baseline_for v1.0.0-x]] [file tail [util::baseline_for v2.0.0-y]] [util::baseline_for v9.9.9]
+    list [file tail [util::baseline_for v1.0.0-x]] \
+        [file tail [util::baseline_for v2.0.0-y]] [util::baseline_for v9.9.9]
 } -cleanup {
     set ::ROOT $saved
 } -result {v1.0.0-x-cold-hostB.json v2.0.0-y-cold-hostA.json {}}
 
 test single_run {only the one-empty-tag list is a single run} -body {
-    list [util::single_run {{}}] [util::single_run {a}] [util::single_run {a b}] [util::single_run {}]
+    list [util::single_run {{}}] [util::single_run {a}] \
+        [util::single_run {a b}] [util::single_run {}]
 } -result {1 0 0 0}
 
-test tags_of-and-ids {the real fitting tests: ids, a RUNS table, a single-run script, the special scripts} -body {
-    list [expr {[llength [util::ids]] == 27}] [util::tags_of SASDBS6] [util::tags_of SASDMJ9] [util::tags_of SASDMZ9] [util::tags_of SASDJ72]
-} -result {1 {fit2_model1 fit2_model2 fit2_model3 fit2_model4 fit2_model5} {{}} {model1 model2 model3} {model1 model2}}
+test tags_of-and-ids \
+    {the real fitting tests: ids, a RUNS table, a single-run script, the special scripts} \
+    -body {
+    list [expr {[llength [util::ids]] == 27}] [util::tags_of SASDBS6] \
+        [util::tags_of SASDMJ9] [util::tags_of SASDMZ9] [util::tags_of SASDJ72]
+} -result {1 {fit2_model1 fit2_model2 fit2_model3 fit2_model4\
+    fit2_model5} {{}} {model1 model2 model3} {model1 model2}}
 
 test script_of {<id>.jl when it exists, else the folder's only script} -body {
     list [file tail [util::script_of SASDMJ9]] [file tail [util::script_of SASDA52]]
 } -result {SASDMJ9.jl SASDA52_fit1.jl}
 
-test rm_tree-never-follows-links {removes the tree, unlinks a symlink, leaves its target alone} -setup {
+test rm_tree-never-follows-links \
+    {removes the tree, unlinks a symlink, leaves its target alone} -setup {
     file mkdir $scratch/target/sub
     write_file $scratch/target/sub/sentinel.txt keep
     set d $scratch/baysol-bench-x
@@ -96,7 +107,8 @@ test rm_tree-never-follows-links {removes the tree, unlinks a symlink, leaves it
     list [file exists $d] [file exists $scratch/target/sub/sentinel.txt]
 } -result {0 1}
 
-test rm_tree-refuses-other-names {a directory not named baysol-bench-* is never deleted} -body {
+test rm_tree-refuses-other-names \
+    {a directory not named baysol-bench-* is never deleted} -body {
     catch {util::rm_tree $scratch/target} msg
     list $msg [file isdirectory $scratch/target]
 } -result "{rm_tree: refusing to delete $scratch/target} 1"
@@ -120,4 +132,28 @@ test take_threads-3 {--threads without a value is an error} -body {
 } -returnCodes error -result {--threads needs a value (e.g. 4, auto, 4,1)}
 
 file delete -force $scratch
+test split_args-splits-options-flags-specs \
+    {options with values, flags and positional specs are separated} -body {
+    util::split_args t.tcl {--out --n} {--dry-run} {A --out x --dry-run B:c --n 3}
+} -result {{--out x --n 3} --dry-run {A B:c}}
+
+test split_args-rejects-bad-options \
+    {an unknown option or a missing value exits 2 with a message} -body {
+    set script [file join [scratch_dir] parse_probe.tcl]
+    write_file $script "source [list [file join $::UTILS_DIR\
+        common.tcl]]\nutil::split_args t.tcl --out --x \$argv one"
+    set r {}
+    foreach args {{--bad} {--out}} {
+        lassign [run_tool $script {*}$args] status out
+        lappend r $status [string match "t.tcl: *" $out]
+    }
+    set r
+} -result {2 1 2 1}
+
+test list_fits-names-every-test {every fitting test is listed with its tags} -body {
+    set out [exec [info nameofexecutable] \
+        [file join $::UTILS_DIR .. .. dev diagnose.tcl] --list]
+    list [llength [split $out \n]] [string match "*SASDMJ9  (single run, no tag)*" $out]
+} -result {27 1}
+
 cleanupTests

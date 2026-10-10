@@ -8,9 +8,10 @@
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: StructureSource, LocalPathSource, PDBIDSource, URLSource,
-                    StructureSourceError, resolve_structure, load_molecule,
-                    Molecule, n_atoms, elms, coords_cartesian, _store_dir
-using BioStructures: BioStructures, MMCIFFormat, writepdb, standardselector, heavyatomselector
+    StructureSourceError, resolve_structure, load_molecule,
+    Molecule, n_atoms, elms, coords_cartesian, _store_dir
+using BioStructures:
+    BioStructures, MMCIFFormat, writepdb, standardselector, heavyatomselector
 
 include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
 
@@ -25,33 +26,34 @@ include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
 # then cross-checked against the well-known sequence of each protein.
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "molecules")
 
-# id => (filename, tier, n_heavy_atoms, Dict(chain => (first_resnum, first_resname, last_resnum, last_resname)))
+# id => (filename, tier, n_heavy_atoms, Dict(chain =>
+# (first_resnum, first_resname, last_resnum, last_resname)))
 const _FIXTURES = Dict(
-    "1CRN" => ("1CRN-TEST.pdb", :small,  327,
+    "1CRN" => ("1CRN-TEST.pdb", :small, 327,
         Dict("A" => (1, "THR", 46, "ASN"))),
-    "1UBQ" => ("1UBQ-TEST.cif", :small,  602,
+    "1UBQ" => ("1UBQ-TEST.cif", :small, 602,
         Dict("A" => (1, "MET", 76, "GLY"))),
-    "6PTI" => ("6PTI-TEST.pdb", :small,  445,
+    "6PTI" => ("6PTI-TEST.pdb", :small, 445,
         Dict("A" => (1, "ARG", 57, "GLY"))),
-    "1ZNI" => ("1ZNI-TEST.cif", :small,  806,
+    "1ZNI" => ("1ZNI-TEST.cif", :small, 806,
         Dict("A" => (1, "GLY", 21, "ASN"), "B" => (1, "PHE", 30, "ALA"),
-             "C" => (1, "GLY", 21, "ASN"), "D" => (1, "PHE", 30, "ALA"))),
+            "C" => (1, "GLY", 21, "ASN"), "D" => (1, "PHE", 30, "ALA"))),
     "6LYZ" => ("6LYZ-TEST.cif", :medium, 1001,
         Dict("A" => (1, "LYS", 129, "LEU"))),
     "7RSA" => ("7RSA-TEST.pdb", :medium, 951,
         Dict("A" => (1, "LYS", 124, "VAL"))),
     "1MBN" => ("1MBN-TEST.cif", :medium, 1216,
         Dict("A" => (1, "VAL", 153, "GLY"))),
-    "4HHB" => ("4HHB-TEST.pdb", :large,  4384,
+    "4HHB" => ("4HHB-TEST.pdb", :large, 4384,
         Dict("A" => (1, "VAL", 141, "ARG"), "B" => (1, "VAL", 146, "HIS"),
-             "C" => (1, "VAL", 141, "ARG"), "D" => (1, "VAL", 146, "HIS"))),
-    "1FBI" => ("1FBI-TEST.cif", :large,  8521,
+            "C" => (1, "VAL", 141, "ARG"), "D" => (1, "VAL", 146, "HIS"))),
+    "1FBI" => ("1FBI-TEST.cif", :large, 8521,
         Dict("H" => (1, "GLN", 221, "PRO"), "L" => (1, "ASP", 214, "CYS"),
-             "P" => (1, "ASP", 214, "CYS"), "Q" => (1, "GLN", 221, "PRO"),
-             "X" => (1, "LYS", 129, "LEU"), "Y" => (1, "LYS", 129, "LEU"))),
-    "1IGT" => ("1IGT-TEST.pdb", :large,  10214,
+            "P" => (1, "ASP", 214, "CYS"), "Q" => (1, "GLN", 221, "PRO"),
+            "X" => (1, "LYS", 129, "LEU"), "Y" => (1, "LYS", 129, "LEU"))),
+    "1IGT" => ("1IGT-TEST.pdb", :large, 10214,
         Dict("A" => (1, "ASP", 214, "CYS"), "B" => (1, "GLU", 474, "ARG"),
-             "C" => (1, "ASP", 214, "CYS"), "D" => (1, "GLU", 474, "ARG"))),
+            "C" => (1, "ASP", 214, "CYS"), "D" => (1, "GLU", 474, "ARG"))),
 )
 
 # A tiny single-chain mmCIF fixture: one GLY residue (4 heavy atoms + 1 H) in
@@ -141,10 +143,13 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
     @testset "local .pdb passthrough: same path, no cache write" begin
         dir = mktempdir()
         pdb_path = joinpath(dir, "passthrough-TEST.pdb")
-        write(pdb_path, """
-        ATOM      1  N   GLY A   1       1.000   2.000   3.000  1.00 10.00           N
-        END
-        """)
+        write(
+            pdb_path,
+            """
+ATOM      1  N   GLY A   1       1.000   2.000   3.000  1.00 10.00           N
+END
+""",
+        )
         before = isfile(joinpath(_store_dir(), "passthrough-TEST.pdb"))
         resolved = resolve_structure(LocalPathSource(pdb_path))
         @test resolved == abspath(pdb_path)
@@ -184,7 +189,8 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
         rm(resolved; force = true)
     end
 
-    @testset "local .cif conversion: identical repeat call returns the same file, no rewrite" begin
+    # …no rewrite
+    @testset "local .cif conversion: identical repeat call returns the same file" begin
         dir = mktempdir()
         cif_path = joinpath(dir, "repeat-TEST.cif")
         write(cif_path, _TEST_CIF)
@@ -204,7 +210,8 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
         rm(cache_path; force = true)
     end
 
-    @testset "local .cif conversion: colliding content under the same name raises StructureSourceError" begin
+    # …StructureSourceError
+    @testset "local .cif conversion: colliding content under the same name raises" begin
         dir = mktempdir()
         cif_path = joinpath(dir, "collide-TEST.cif")
         cache_path = joinpath(_store_dir(), "collide-TEST.pdb")
@@ -268,7 +275,10 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
 
     @testset "bad URL raises StructureSourceError" begin
         @test_throws StructureSourceError resolve_structure(
-            URLSource("https://this-host-should-not-resolve.invalid/nope.pdb", "bad-url-TEST"))
+            URLSource(
+                "https://this-host-should-not-resolve.invalid/nope.pdb",
+                "bad-url-TEST",
+            ))
     end
 
     @testset "live PDB-ID fetch: caches, second call does not re-fetch" begin
@@ -327,7 +337,8 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
         rm(cache_path; force = true)
     end
 
-    @testset "live URL fetch: colliding content under the same id raises StructureSourceError" begin
+    # …StructureSourceError
+    @testset "live URL fetch: colliding content under the same id raises" begin
         real_url = "https://files.rcsb.org/download/1CRN.pdb"
         other_url = "https://files.rcsb.org/download/1UBQ.pdb"
         id = "collide-url-TEST"
@@ -349,8 +360,9 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
         rm(cache_path; force = true)
     end
 
-    @testset "LocalPathSource resolution over curated real fixtures ($id, $(meta[2]), $(meta[1]))" for
-            (id, meta) in sort(collect(_FIXTURES))
+    fixtures = sort(collect(_FIXTURES))
+    @testset "LocalPathSource: $(fx[1]), $(fx[2][2]), $(fx[2][1])" for fx in fixtures
+        id, meta = fx
         fname, tier, expected_n, expected_chains = meta
         path = joinpath(_FIXTURE_DIR, fname)
         @test isfile(path)
@@ -370,13 +382,14 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
             # Spot-check atom identity/geometry straight off the resolved
             # canonical .pdb via BioStructures, independent of load_molecule.
             struc = BioStructures.read(resolved, BioStructures.PDBFormat)
-            atoms = BioStructures.collectatoms(struc[1], standardselector, heavyatomselector)
+            atoms =
+                BioStructures.collectatoms(struc[1], standardselector, heavyatomselector)
             @test length(atoms) == expected_n
             @test all(a -> BioStructures.element(a) != "H", atoms)   # no hydrogens
             for (chain, (fr_num, fr_name, la_num, la_name)) in expected_chains
                 chain_atoms = filter(a -> BioStructures.chainid(a) == chain, atoms)
                 @test !isempty(chain_atoms)
-                nums = [BioStructures.resnumber(a) for a in chain_atoms]
+                nums    = [BioStructures.resnumber(a) for a in chain_atoms]
                 first_a = chain_atoms[argmin(nums)]
                 last_a  = chain_atoms[argmax(nums)]
                 @test BioStructures.resnumber(first_a) == fr_num
@@ -411,8 +424,11 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
         end
     end
 
-    @testset "cross-consistency: local fixture vs live PDBIDSource fetch ($id)" for
-            id in ["1UBQ", "6LYZ", "4HHB"]
+    @testset "cross-consistency: local fixture vs live PDBIDSource fetch ($id)" for id in [
+        "1UBQ",
+        "6LYZ",
+        "4HHB",
+    ]
         fname, _, _, _ = _FIXTURES[id]
         fixture_path = joinpath(_FIXTURE_DIR, fname)
 
@@ -431,7 +447,8 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
 
         is_cif = lowercase(splitext(fname)[2]) in (".cif", ".mmcif")
         if is_cif
-            @test local_resolved != net_cache   # distinct cache keys ("-TEST" suffix vs bare ID)
+            # distinct cache keys ("-TEST" suffix vs bare ID)
+            @test local_resolved != net_cache
         end
 
         @test n_atoms(mol_local) == n_atoms(mol_net)
@@ -440,7 +457,9 @@ const _TEST_PDB_ID = "1CRN"   # small, real, single-chain, well-known
         cc_local = coords_cartesian(mol_local)
         cc_net   = coords_cartesian(mol_net)
         @test size(cc_local) == size(cc_net)
-        @test all(close_(cc_local[i], cc_net[i]; atol = 1.0e-3) for i in eachindex(cc_local))
+        @test all(
+            close_(cc_local[i], cc_net[i]; atol = 1.0e-3) for i in eachindex(cc_local)
+        )
 
         is_cif && rm(local_resolved; force = true)
     end

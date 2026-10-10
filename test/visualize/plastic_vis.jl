@@ -13,11 +13,13 @@
 # coordinate the surface case has no use for.
 #
 # Run with:
-#   julia --project=test/visualize -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points_2D(2000)'
-#   julia --project=test/visualize -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points_3D(2000)'
+#   julia --project=test/visualize \
+#       -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points_2D(2000)'
+#   julia --project=test/visualize \
+#       -e 'include("test/visualize/plastic_vis.jl"); vis_plastic_points_3D(2000)'
 
-using BAYSOL: PlasticSequence
-using .PlasticSequence: plastic_points
+using BAYSOL: Geometry
+using .Geometry: plastic_points
 using GLMakie
 
 """
@@ -34,7 +36,11 @@ function vis_plastic_points_2D(n)
     z = [p[3] for p in pts]
 
     fig = Figure()
-    ax = Axis3(fig[1, 1], title = "Plastic sequence on a spherical surface (2-D generator)", aspect = :data)
+    ax = Axis3(
+        fig[1, 1],
+        title = "Plastic sequence on a spherical surface (2-D generator)",
+        aspect = :data,
+    )
     scatter!(ax, x, y, z, color = z, colormap = :viridis, markersize = 6)
     wait(display(fig))
 end
@@ -56,7 +62,11 @@ function vis_plastic_points_3D(n)
     r = [sqrt(p[1]^2 + p[2]^2 + p[3]^2) for p in pts]
 
     fig = Figure()
-    ax = Axis3(fig[1, 1], title = "Plastic sequence filling a spherical volume", aspect = :data)
+    ax = Axis3(
+        fig[1, 1],
+        title = "Plastic sequence filling a spherical volume",
+        aspect = :data,
+    )
     scatter!(ax, x, y, z, color = r, colormap = :viridis, markersize = 6)
     wait(display(fig))
 end

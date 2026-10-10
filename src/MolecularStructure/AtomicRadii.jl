@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Atomic/ionic radii: parse an ion string, then resolve its radius through a fallback chain over the bundled
-# `atomic_radii.sqlite3` (read once, on first use, into a `Lazy` table). Included into MolecularStructure; independent
-# of Molecule.
+# Atomic/ionic radii: parse an ion string, then resolve its radius through a
+# fallback chain over the bundled # `atomic_radii.sqlite3` (read once, on first
+# use, into a `Lazy` table). Included into MolecularStructure; independent of Molecule.
 
 # ---- ion string -> (element, signed charge) -------------------------------
 
@@ -12,9 +12,6 @@ struct Ion
     charge::Int
 end
 
-# element = 1-2 lowercase; magnitude has a non-zero
-# leading digit (no charge 0); a bare sign means +/-1.
-const _ION_RE = r"^\s*([a-z]{1,2})\s*(?:([1-9][0-9]*)\s*([+-])|([+-])\s*([1-9][0-9]*)?)?\s*$"
 
 """
 Parse an ion string like "fe3+" or "fe+3"; nothing for a bare element
@@ -73,33 +70,43 @@ function _read_tables(path::String = _dbpath())::_RadiiTables
     ionic   = Dict{String,Float64}()
     atomic  = Dict{String,Tuple{Float64,String}}()
     charges = Dict{String,Vector{Int}}()
-    db = SQLite.DB(path)
+    db      = SQLite.DB(path)
     try
         DBInterface.execute(db, "PRAGMA query_only = ON;")
         for row in DBInterface.execute(db, "SELECT ion, radius FROM ionic_radii")
             ionic[String(row.ion)] = Float64(row.radius) / PM_PER_ANGSTROM
         end
-        for row in DBInterface.execute(db, "SELECT element, radius, radius_type FROM atomic_radii")
+        for row in
+            DBInterface.execute(db, "SELECT element, radius, radius_type FROM atomic_radii")
             atomic[String(row.element)] = (Float64(row.radius), String(row.radius_type))
         end
         for row in DBInterface.execute(db, "SELECT element, charge FROM element_charges")
-            push!(get!(@closure(() -> Int[]), charges, String(row.element)), Int(row.charge))
+            push!(
+                get!(@closure(() -> Int[]), charges, String(row.element)),
+                Int(row.charge),
+            )
         end
-        for v in values(charges); sort!(v); end
+        for v in values(charges)
+            sort!(v)
+        end
     finally
         DBInterface.close!(db)
     end
     return _RadiiTables(ionic, atomic, charges)
 end
 
-"The tables, read from the database on first use (thread safe, built once)."
-const _TABLES = Lazy{_RadiiTables}(_read_tables)
 
 "Ionic radius (Å) for an `ionic_radii` key, or nothing."
-ion_radius(key::AbstractString)::Union{Float64,Nothing} = get(force(_TABLES).ionic, key, nothing)
+ion_radius(key::AbstractString)::Union{
+    Float64,
+    Nothing,
+} = get(force(_TABLES).ionic, key, nothing)
 
 "Bare-element (radius Å, `radius_type`) for el, or nothing."
-element_radius(el::AbstractString)::Union{Tuple{Float64,String},Nothing} = get(force(_TABLES).atomic, el, nothing)
+element_radius(el::AbstractString)::Union{
+    Tuple{Float64,String},
+    Nothing,
+} = get(force(_TABLES).atomic, el, nothing)
 
 """
 Ion key for the on-file charge state of element closest to charge;
@@ -145,7 +152,6 @@ function resolve_one(ion::AbstractString)::Union{Float64,Nothing}
 end
 
 struct _Miss end
-const _MISS = _Miss()
 
 """
 Batch [`resolve_one`](@ref): resolve each ion/element string to a radius in Å,

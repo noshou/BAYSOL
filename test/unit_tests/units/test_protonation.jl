@@ -26,12 +26,14 @@ ref_frac_acid(pH, pKa) = 1.0 / (1.0 + 10.0^(pKa - pH))
         @test close_(_fraction_deprotonated(7.0, 7.0), 0.5)
     end
 
-    @testset "HH: base group -> protonated fraction -> 1 well below pKa, -> 0 well above" begin
+    # …-> 0 well above
+    @testset "HH: base group -> protonated fraction -> 1 well below pKa" begin
         @test close_(_fraction_protonated(0.0, 10.0), 1.0; atol = 1e3 * DEFAULT_ATOL)
         @test close_(_fraction_protonated(20.0, 10.0), 0.0; atol = 1e3 * DEFAULT_ATOL)
     end
 
-    @testset "HH: acid group -> deprotonated fraction -> 0 well below pKa, -> 1 well above" begin
+    # …-> 1 well above
+    @testset "HH: acid group -> deprotonated fraction -> 0 well below pKa" begin
         @test close_(_fraction_deprotonated(0.0, 10.0), 0.0; atol = 1e3 * DEFAULT_ATOL)
         @test close_(_fraction_deprotonated(20.0, 10.0), 1.0; atol = 1e3 * DEFAULT_ATOL)
     end

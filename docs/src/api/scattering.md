@@ -9,9 +9,3 @@ Gram-matrix reduction, and the geometry-only `forward_cache` entry point.
 ```@autodocs
 Modules = [BAYSOL.Scattering]
 ```
-
-## SphFuncs
-
-```@autodocs
-Modules = [BAYSOL.Scattering.SphFuncs]
-```

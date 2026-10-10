@@ -1,17 +1,163 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
-Explicit-hydrogen structure generation via the external pdb2pqr CLI.
-"""
+# Protonation, through two external command-line tools run as plain
+# subprocesses in an isolated CondaPkg-managed Python environment:
+# propka3 (per-residue-instance pKa prediction, `propka_pKas`) and
+# pdb2pqr (explicit-hydrogen structure generation, `resolve_hydrogens`),
+# which uses the pKa records to choose each chain's terminus protonation.
 
-using BioStructures: BioStructures, PDBFormat, writepdb, collectatoms,
-                    chainid, chainids, collectmodels
+using CondaPkg: CondaPkg
+using FastClosures: @closure
+using ..Runtime: KeyedCache
+using BioStructures:
+    BioStructures, PDBFormat, writepdb, collectatoms,
+    chainid, chainids, collectmodels
+
+# ---------------------------------------------------------------------------
+#                         PROPKA: per-residue pKa prediction
+# ---------------------------------------------------------------------------
+
+"""
+The CondaPkg environment's variables and the paths of the two tools run
+from it, captured once. `CondaPkg.withenv` edits the process-wide `ENV`
+for the duration of its block, which is not safe beside other tasks; the
+subprocesses are given this environment explicitly instead (`setenv`).
+"""
+struct _CondaTools
+    env     :: Dict{String,String}
+    propka3 :: Union{Nothing,String}
+    pdb2pqr :: Union{Nothing,String}
+end
+
+function _read_conda_tools()::_CondaTools
+    CondaPkg.withenv() do
+        _CondaTools(
+            Dict{String,String}(ENV),
+            CondaPkg.which("propka3"),
+            CondaPkg.which("pdb2pqr"),
+        )
+    end
+end
+
+__init__() = (_CONDA[] = Lazy{_CondaTools}(_read_conda_tools))
+
+_path_lock(path::AbstractString) = get!(ReentrantLock, _PATH_LOCKS, String(path))
+
+"""
+Raised when propka3 cannot be run or its output cannot be parsed
+(bad input path, non-zero exit, malformed .pka file).
+"""
+struct PropkaError <: Exception
+    msg::String
+end
+Base.showerror(io::IO, e::PropkaError) = print(io, "PropkaError: ", e.msg)
+
+
+"""
+Parse a propka3 .pka output file into one record per standard titratable
+group. Non-standard rows (ligand groups, carrying a trailing ligand
+atom-type column) are skipped.
+
+# Arguments
+- `path`: path to a .pka file produced by propka3.
+"""
+function _parse_pka(path::AbstractString)
+    lines = readlines(path)
+    i = findfirst(@closure(l -> occursin("SUMMARY OF THIS PREDICTION", l)), lines)
+    i === nothing && throw(PropkaError("no 'SUMMARY OF THIS PREDICTION' section in $path"))
+    # line i+1 is the column header ("Group  pKa  model-pKa  ligand atom-type");
+    # rows follow until a blank line or EOF.
+    out = NamedTuple{(:resname, :resnum, :chain, :pKa),Tuple{String,Int,String,Float64}}[]
+    for line in @view lines[(i+2):end]
+        stripped = strip(line)
+        isempty(stripped) && break
+        toks = split(stripped)
+        length(toks) < 4 && continue
+        resname = String(toks[1])
+        resname in _STANDARD_GROUPS || continue
+        resnum = tryparse(Int, toks[2])
+        # trailing '*' flags a coupled residue
+        pka = tryparse(Float64, rstrip(toks[4], '*'))
+        (resnum === nothing || pka === nothing) && continue
+        chain = String(toks[3])
+        push!(out, (resname = resname, resnum = resnum, chain = chain, pKa = pka))
+    end
+    return out
+end
+
+"Where [`propka_pKas`](@ref) caches the .pka for `pdb_path` (present ⟺ a cache hit)."
+_pka_path(pdb_path::AbstractString) =
+    joinpath(_store_dir(), splitext(basename(abspath(pdb_path)))[1] * ".pka")
+
+"""
+Run propka3 on `abspdb` in a private temporary directory inside `storedir` (no
+change of the process's working directory) and move its `.pka` to `pka_path`. The
+move is a rename within one directory, so a reader sees the whole file or none.
+
+# Exceptions
+- `PropkaError`: propka3 is missing, fails, or writes no `.pka`.
+"""
+function _run_propka3(abspdb::String, storedir::String, pka_path::String)::Nothing
+    tools = force(_CONDA[])
+    tools.propka3 === nothing &&
+        throw(PropkaError("propka3 not found in CondaPkg environment"))
+    tmp = mktempdir(storedir)
+    try
+        try
+            cmd = setenv(`$(tools.propka3) $abspdb`, tools.env; dir = tmp)
+            run(pipeline(cmd; stdout = devnull, stderr = devnull))
+        catch e
+            throw(PropkaError("propka3 failed on $abspdb: $(sprint(showerror, e))"))
+        end
+        made = joinpath(tmp, basename(pka_path))
+        isfile(made) ||
+            throw(PropkaError("propka3 did not produce expected output $pka_path"))
+        mv(made, pka_path; force = true)
+    finally
+        rm(tmp; recursive = true, force = true)
+    end
+    return nothing
+end
+
+"""
+Run propka3 on a PDB structure and return one record per standard
+titratable group: (resname::String, resnum::Int, chain::String, pKa::Float64).
+
+# Arguments
+- `pdb_path`: path to a PDB file.
+
+# Returns
+Records for ASP, GLU, CYS, TYR, HIS, LYS, ARG, N+, C-
+groups only; ligand/hetero rows are skipped.
+"""
+function propka_pKas(pdb_path::AbstractString)
+    isfile(pdb_path) || throw(PropkaError("no such file: $pdb_path"))
+
+    abspdb = abspath(pdb_path)
+    storedir = _store_dir()
+    pka_path = _pka_path(abspdb)
+
+    if !isfile(pka_path)
+        # one propka3 run per structure; others wait, then find the cached file
+        @lock _path_lock(pka_path) begin
+            isfile(pka_path) || _run_propka3(abspdb, storedir, pka_path)
+        end
+    end
+
+    return _parse_pka(pka_path)
+end
+
+# ---------------------------------------------------------------------------
+#                    pdb2pqr: explicit-hydrogen structure generation
+# ---------------------------------------------------------------------------
 
 """
 Raised when pdb2pqr cannot be run or produces no usable output (bad input
 path, non-zero exit, missing expected output file).
 """
-struct Pdb2pqrError <: Exception; msg::String end
+struct Pdb2pqrError <: Exception
+    msg::String
+end
 Base.showerror(io::IO, e::Pdb2pqrError) = print(io, "Pdb2pqrError: ", e.msg)
 
 # ---------------------------------------------------------------------------
@@ -51,7 +197,11 @@ function _group_protonated(type::AbstractString, pH::Real, pKa::Real)::Bool
     elseif type == "acid"
         return !(_fraction_deprotonated(pH, pKa) > 0.5)
     else
-        throw(ArgumentError("unknown charge-group type $(repr(type)) (expected \"acid\" or \"base\")"))
+        throw(
+            ArgumentError(
+                "unknown charge-group type $(repr(type)) (expected \"acid\" or \"base\")",
+            ),
+        )
     end
 end
 
@@ -77,20 +227,20 @@ by running pdb2pqr once per group.
     so a chain with no N+/C- record still appears in exactly one group.
 """
 function _terminus_groups(
-    pKa_records, pH::Real, chains::AbstractVector{<:AbstractString}
-)::Dict{Vector{String}, Vector{String}}
-    n_neutral = Dict{String, Bool}()
+    pKa_records, pH::Real, chains::AbstractVector{<:AbstractString},
+)::Dict{Vector{String},Vector{String}}
+    n_neutral = Dict{String,Bool}()
     for r in pKa_records
         r.resname == "N+" || continue
         n_neutral[r.chain] = !_group_protonated("base", pH, r.pKa)
     end
-    c_neutral = Dict{String, Bool}()
+    c_neutral = Dict{String,Bool}()
     for r in pKa_records
         r.resname == "C-" || continue
         c_neutral[r.chain] = _group_protonated("acid", pH, r.pKa)
     end
 
-    groups = Dict{Vector{String}, Vector{String}}()
+    groups = Dict{Vector{String},Vector{String}}()
     for chain in chains
         flags = String[]
         get(n_neutral, chain, false) && push!(flags, "--neutraln")
@@ -118,23 +268,31 @@ writing hydrogenated output to `out_path`. Throws [`Pdb2pqrError`](@ref) if
 pdb2pqr isn't found, exits non-zero, or doesn't produce `out_path`.
 """
 function _run_pdb2pqr(
-    in_path::AbstractString, flags::Vector{String}, pH::Real, out_path::AbstractString
+    in_path::AbstractString, flags::Vector{String}, pH::Real, out_path::AbstractString,
 )::Nothing
     tmp_pqr = out_path * ".pqr"
     tools = force(_CONDA[])
     pdb2pqr = tools.pdb2pqr
     pdb2pqr === nothing && throw(Pdb2pqrError("pdb2pqr not found in CondaPkg environment"))
-    cmd =  `$pdb2pqr --ff PARSE --titration-state-method propka --with-ph $pH
+    cmd = `$pdb2pqr --ff PARSE --titration-state-method propka --with-ph $pH
             $flags --pdb-output $out_path $in_path $tmp_pqr`
     run(pipeline(setenv(cmd, tools.env); stdout = devnull, stderr = devnull))
-    isfile(out_path) || throw(Pdb2pqrError(
-        "pdb2pqr did not produce expected output for \"$in_path\" at pH=$pH"))
+    isfile(out_path) || throw(
+        Pdb2pqrError(
+            "pdb2pqr did not produce expected output for \"$in_path\" at pH=$pH"),
+    )
     return nothing
 end
 
-"Where [`resolve_hydrogens`](@ref) caches the hydrogenated .pdb for `(pdb_path, pH)` (present ⟺ a cache hit)."
+"""
+Where [`resolve_hydrogens`](@ref) caches the hydrogenated
+.pdb for `(pdb_path, pH)` (present ⟺ a cache hit).
+"""
 _hydrogens_path(pdb_path::AbstractString, pH::Real) =
-    joinpath(_store_dir(), "$(splitext(basename(abspath(pdb_path)))[1])_pH$(Float64(pH)).pdb")
+    joinpath(
+        _store_dir(),
+        "$(splitext(basename(abspath(pdb_path)))[1])_pH$(Float64(pH)).pdb",
+    )
 
 """
 Add explicit hydrogens: runs pdb2pqr on the heavy-atom .pdb at `pdb_path` and
@@ -155,7 +313,8 @@ function resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::Str
     isfile(pdb_path) || throw(Pdb2pqrError("no such file: $pdb_path"))
     out_path = _hydrogens_path(abspath(pdb_path), pH)
     isfile(out_path) && return out_path
-    # one pdb2pqr run per (structure, pH); concurrent callers wait, then find the cached file
+    # one pdb2pqr run per (structure, pH); concurrent
+    # callers wait, then find the cached file
     return @lock _path_lock(out_path) _resolve_hydrogens(pdb_path, pKa_records, pH)
 end
 
@@ -180,7 +339,8 @@ function _resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::St
         # needed to read it.
         cheap_groups = _terminus_groups(pKa_records, pH, _termini_chains(pKa_records))
 
-        # inside the store, so the final move is a rename within one directory (a reader sees the whole file or none)
+        # inside the store, so the final move is a rename within
+        # one directory (a reader sees the whole file or none)
         tmpdir = mktempdir(storedir)
         try
             if length(cheap_groups) ≤ 1
@@ -190,8 +350,9 @@ function _resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::St
                 flags = isempty(cheap_groups) ? String[] : only(keys(cheap_groups))
                 tmp_out = joinpath(tmpdir, "hydrogenated.pdb")
                 _run_pdb2pqr(abspdb, flags, pH, tmp_out)
-                # Callers for this (stem, pH) are serialized by `resolve_hydrogens`'s lock, and
-                # (stem, pH) fully determines the output, so replacing an existing file is harmless.
+                # Callers for this (stem, pH) are serialized by
+                # `resolve_hydrogens`'s lock, and (stem, pH) fully determines
+                # the output, so replacing an existing file is harmless.
                 mv(tmp_out, out_path; force = true)
             else
                 # Genuine conflict: NOW the full chain list is needed (so a
@@ -202,9 +363,15 @@ function _resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::St
                 try
                     struc = BioStructures.read(abspdb, PDBFormat)
                 catch e
-                    throw(Pdb2pqrError("failed reading \"$pdb_path\" to partition its conflicting chain termini: $(sprint(showerror, e))"))
+                    throw(
+                        Pdb2pqrError(
+                            "failed reading \"$pdb_path\" to partition its " *
+                            "conflicting chain termini: $(sprint(showerror, e))",
+                        ),
+                    )
                 end
-                groups = _terminus_groups(pKa_records, pH, chainids(first(collectmodels(struc))))
+                groups =
+                    _terminus_groups(pKa_records, pH, chainids(first(collectmodels(struc))))
                 # Different chains need different --neutraln/--neutralc
                 # settings, which pdb2pqr can't apply per-chain in one run.
                 # Run pdb2pqr once per needed flag combination -- always on
@@ -223,7 +390,10 @@ function _resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::St
                     tmp_out = joinpath(tmpdir, "run$(i).pdb")
                     _run_pdb2pqr(abspdb, flags, pH, tmp_out)
                     run_struc = BioStructures.read(tmp_out, PDBFormat)
-                    kept = collectatoms(first(collectmodels(run_struc)), at -> chainid(at) in group_chains)
+                    kept = collectatoms(
+                        first(collectmodels(run_struc)),
+                        at -> chainid(at) in group_chains,
+                    )
                     append!(merged_atoms, kept)
                 end
                 merged = joinpath(tmpdir, "merged.pdb")
@@ -232,7 +402,11 @@ function _resolve_hydrogens(pdb_path::AbstractString, pKa_records, pH::Real)::St
             end
         catch e
             e isa Pdb2pqrError && rethrow()
-            throw(Pdb2pqrError("pdb2pqr failed on \"$pdb_path\" at pH=$pH: $(sprint(showerror, e))"))
+            throw(
+                Pdb2pqrError(
+                    "pdb2pqr failed on \"$pdb_path\" at pH=$pH: $(sprint(showerror, e))",
+                ),
+            )
         finally
             rm(tmpdir; recursive = true, force = true)
         end

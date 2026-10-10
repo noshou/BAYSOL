@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/Inference/DeltaRho.jl: the κ-parameterised bounded-Beta
+# Exercises src/Inference/Priors.jl: the κ-parameterised bounded-Beta
 # δρ₁/δρ₂/δρ₃ priors.
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
@@ -8,7 +8,8 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using BAYSOL.Inference: δρ_prior
 using BAYSOL.PhysicalConstants: UNIT_OF_δρ
 using BAYSOL.Inference: BOUNDS_δρ₁₂, MODE_δρ₁₂, φ_max, κ_δρ₁₂, κ_δρ₃
-using Distributions: LocationScale, Continuous, Beta, mode, var, cdf, params, minimum, maximum
+using Distributions:
+    LocationScale, Continuous, Beta, mode, var, cdf, params, minimum, maximum
 using StaticArrays: SVector
 
 include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_

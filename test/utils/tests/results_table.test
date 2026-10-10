@@ -1,23 +1,26 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests of results_table.tcl: the bold rules for one row, the table-cell normalisation behind --check, and
-# --check itself on the real README (the table must be up to date).
+# Tests of results_table.tcl: the bold rules for one row, the table-cell normalisation
+# behind --check, and --check itself on the real README (the table must be up to date).
 
 source [file join [file dirname [info script]] helpers.tcl]
 source [file join $UTILS_DIR results_table.tcl]
 
 proc report_dict {args} {
     # a parsed-report dict with sensible defaults, overridden by key/value pairs
-    set d [dict create chi2 +21.485 chi2_cmp +21.485 rho_e +0.34 d1 +0.04 d2 +1.67 d3 +0.50 c1 +1.201 sat false div 0.0000]
-    dict for {k v} $args { dict set d $k $v }
+    set d [dict create chi2 +21.485 chi2_cmp +21.485 rho_e +0.34 \
+        d1 +0.04 d2 +1.67 d3 +0.50 c1 +1.201 sat false div 0.0000]
+    dict for {k v} $args {dict set d $k $v}
     return $d
 }
 
-test row-plain {nothing at a bound: no bold, a true minus sign, 3 significant digits} -body {
+test row-plain \
+    {nothing at a bound: no bold, a true minus sign, 3 significant digits} -body {
     results_table::row "SASDX one" [report_dict d1 -0.37 d3 -2.5] "EOM 11.3"
 } -result {{SASDX one} 21.5 {EOM 11.3} −0.37 1.67 −2.50 1.201 0}
 
-test row-uses-measured-grid-chi2 {the table shows the comparison chi2 (the measured-grid one for a binned fit)} -body {
+test row-uses-measured-grid-chi2 \
+    {the table shows the comparison chi2 (the measured-grid one for a binned fit)} -body {
     lindex [results_table::row r [report_dict chi2 +0.9 chi2_cmp +1.2] -] 1
 } -result 1.2
 
@@ -47,11 +50,13 @@ test table_cells {padding, spacing and the separator row do not matter} -body {
 } -result 1
 
 test table_cells-detects-a-change {a changed cell is a difference} -body {
-    expr {[results_table::table_cells "| a | 1 |"] eq [results_table::table_cells "| a | 2 |"]}
+    expr {[results_table::table_cells "| a | 1 |"]\
+        eq [results_table::table_cells "| a | 2 |"]}
 } -result 0
 
 test label {run labels from report paths} -body {
-    list [results_table::label x/SASDMJ9/res.txt] [results_table::label x/SASDBS6/res_fit2_model1.txt]
+    list [results_table::label x/SASDMJ9/res.txt] \
+        [results_table::label x/SASDBS6/res_fit2_model1.txt]
 } -result {{SASDMJ9 —} {SASDBS6 fit2_model1}}
 
 test check-readme {the Results table of fitting_tests/README.md is up to date} -body {

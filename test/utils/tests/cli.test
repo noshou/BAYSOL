@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# The command lines of the front ends: a wrong argument must stop with a message and the documented exit
-# status BEFORE Julia would start, and --dry-run must print the commands without running anything.
+# The command lines of the front ends: a wrong argument must stop with
+# a message and the documented exit status BEFORE Julia would start,
+# and --dry-run must print the commands without running anything.
 
 source [file join [file dirname [info script]] helpers.tcl]
-set RUN [file join $REPO_DIR test run]
+set RUN [file join $REPO_DIR dev]
 
 proc status_and {script args} {
     lassign [run_tool $script {*}$args] status out
@@ -27,23 +28,35 @@ test diagnose-single-run-takes-no-tag {a single-run script rejects a tag} -body 
 } -result {2 1}
 
 test diagnose-bad-numbers {option values are checked} -body {
-    list [lindex [status_and [file join $RUN diagnose.tcl] --tolerance --tols 1e-5,abc SASDMJ9] 0] \
-         [lindex [status_and [file join $RUN diagnose.tcl] --tolerance --seeds 1,x SASDMJ9] 0] \
+    list [lindex \
+        [status_and [file join $RUN diagnose.tcl] --tolerance --tols 1e-5,abc SASDMJ9] \
+        0] \
+         [lindex \
+             [status_and [file join $RUN diagnose.tcl] --tolerance --seeds 1,x SASDMJ9] \
+             0] \
          [lindex [status_and [file join $RUN diagnose.tcl] --report --samples 0 SASDMJ9] 0]
 } -result {2 2 2}
 
 test diagnose-list {list names every fitting test with its tags} -body {
     lassign [status_and [file join $RUN diagnose.tcl] --list] s out
-    list $s [llength [split [string trim $out] \n]] [string match "*SASDBS6  fit2_model1 fit2_model2*" $out] \
+    list $s [llength [split [string trim $out] \n]] \
+        [string match "*SASDBS6  fit2_model1 fit2_model2*" $out] \
          [string match "*SASDMJ9  (single run, no tag)*" $out]
 } -result {0 27 1 1}
 
-test diagnose-parts-default-all {no part flag runs all five parts, in order, each with only its own options} -body {
-    lassign [status_and [file join $RUN diagnose.tcl] --seeds 1,2 --samples 50 --out /nowhere --dry-run SASDMJ9] s out
+test diagnose-parts-default-all \
+    {no part flag runs all five parts, in order, each with only its own options} -body {
+    lassign [status_and [file join $RUN diagnose.tcl] --seeds \
+        1,2 --samples 50 --out /nowhere --dry-run SASDMJ9] s out
     list $s [regexp -all {=== diagnose: } $out] \
-         [regexp {=== diagnose: report.*=== diagnose: ablate.*=== diagnose: residuals.*=== diagnose: warmup.*=== diagnose: tolerance} [string map [list \n { }] $out]] \
-         [string match "*diagnose.tcl --warmup --seeds 1,2 --out /nowhere/warmup.txt SASDMJ9*" $out] \
-         [string match "*diagnose.tcl --report --samples 50 --out /nowhere/report.txt SASDMJ9*" $out]
+         [regexp {=== diagnose: report.*=== diagnose: ablate.*=== diagnose:\
+                 residuals.*=== diagnose: warmup.*=== diagnose: tolerance} \
+             [string map [list \n { }] $out]] \
+         [string match \
+             "*diagnose.jl --warmup --seeds 1,2 --out /nowhere/warmup.txt SASDMJ9*" \
+             $out] \
+         [string match \
+             "*diagnose.jl --report --samples 50 --out /nowhere/report.txt SASDMJ9*" $out]
 } -result {0 5 1 1 1}
 
 test diagnose-default-all-fits {with no ID, every run of every fitting test} -body {
@@ -52,70 +65,88 @@ test diagnose-default-all-fits {with no ID, every run of every fitting test} -bo
 } -result {0 53}
 
 test diagnose-parts-select {part flags run only those parts} -body {
-    lassign [status_and [file join $RUN diagnose.tcl] --warmup --residuals --dry-run SASDMJ9] s out
-    list $s [regexp -all {=== diagnose: } $out] [string match "*diagnose.tcl --report*" $out]
+    lassign [status_and [file join $RUN diagnose.tcl] \
+        --warmup --residuals --dry-run SASDMJ9] s out
+    list $s [regexp -all {=== diagnose: } $out] [string match "*diagnose.jl --report*" $out]
 } -result {0 2 0}
 
-test diagnose-one-part {diagnose.tcl takes one part and checks that part's options} -body {
-    lassign [status_and [file join $UTILS_DIR diagnose.tcl] --warmup --samples 5 SASDMJ9] s out
-    list $s [string match "*--samples is not an option of --warmup*" $out]
-} -result {2 1}
-
-test fittings-unknown-id {unknown folder: nothing runs, status 2, the available ones are listed} -body {
+test fittings-unknown-id \
+    {unknown folder: nothing runs, status 2, the available ones are listed} -body {
     lassign [status_and [file join $RUN fittings.tcl] NOPE SASDMJ9 --dry-run] s out
-    list $s [string match "*no fitting test folder for: NOPE*" $out] [string match "*=== fit*" $out]
+    list $s [string match "*no fitting test folder for: NOPE*" $out] \
+        [string match "*=== fit*" $out]
 } -result {2 1 0}
 
 test fittings-approved-needs-a-step {--approved alone is an error} -body {
     lindex [status_and [file join $RUN fittings.tcl] SASDMJ9 --approved --dry-run] 0
 } -result 2
 
-test fittings-dry-run {--dry-run prints the fits, the benchmark (without --approved), the report and the diagnostics} -body {
-    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 SASDEP6 --bench --report --fixme --dry-run] s out
-    list $s [regexp -all {=== fit:} $out] [string match "*bench.tcl SASDMJ9 SASDEP6:fit1_model1 SASDEP6:fit1_model2*" $out] \
-         [string match "*--approved*" $out] [string match "*results_table.tcl SASDMJ9 SASDEP6*" $out] \
+test fittings-dry-run {--dry-run prints the fits, the benchmark\
+    (without --approved), the report and the diagnostics} -body {
+    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 \
+        SASDEP6 --bench --report --fixme --dry-run] s out
+    list $s [regexp -all {=== fit:} $out] [string match \
+        "*bench.tcl SASDMJ9 SASDEP6:fit1_model1 SASDEP6:fit1_model2*" $out] \
+         [string match "*--approved*" $out] \
+             [string match "*results_table.tcl SASDMJ9 SASDEP6*" $out] \
          [string match "*diagnose.tcl --report SASDMJ9 SASDEP6:fit1_model1*" $out]
 } -result {0 2 1 0 1 1}
 
-test fittings-dry-run-approved {--approved is forwarded to the benchmark only when given} -body {
-    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --bench --approved --dry-run] s out
+test fittings-dry-run-approved \
+    {--approved is forwarded to the benchmark only when given} -body {
+    lassign \
+        [status_and [file join $RUN fittings.tcl] SASDMJ9 --bench --approved --dry-run] \
+        s out
     list $s [string match "*bench.tcl --approved SASDMJ9*" $out]
 } -result {0 1}
 
-test validate-list-and-unknown {the validations are listed with their question; an unknown name or fit stops with status 2} -body {
+test validate-list-and-unknown {the validations are listed with\
+    their question; an unknown name or fit stops with status 2} -body {
     lassign [status_and [file join $RUN validate.tcl] --list] s1 out1
     lassign [status_and [file join $RUN validate.tcl] nonsense] s2 out2
-    lassign [status_and [file join $RUN validate.tcl] map_fstop NOPE --approved --dry-run] s3 out3
-    list $s1 [string match "*shannon_binning*" $out1] [string match "*map_fstop*" $out1] $s2 [string match "*no validation 'nonsense'*" $out2] \
+    lassign [status_and [file join $RUN validate.tcl] map_fstop NOPE --approved --dry-run] \
+        s3 out3
+    list $s1 [string match "*shannon_binning*" $out1] [string match "*map_fstop*" $out1] \
+        $s2 [string match "*no validation 'nonsense'*" $out2] \
          $s3 [string match "*no fitting test folder for: NOPE*" $out3]
 } -result {0 1 1 2 1 2 1}
 
-test validate-plan-needs-approval {without --approved the plan is printed and nothing runs; with it the command is the script} -body {
+test validate-plan-needs-approval {without --approved the plan is\
+    printed and nothing runs; with it the command is the script} -body {
     lassign [status_and [file join $RUN validate.tcl] map_fstop SASDMJ9] s1 out1
-    lassign [status_and [file join $RUN validate.tcl] map_fstop SASDMJ9 --approved --dry-run] s2 out2
-    list $s1 [string match "*not running*" $out1] [regexp {^\$ } $out1] $s2 [regexp -all {map_fstop/validate.jl --out \S*map_fstop/results/map_fstop-\S*\.tsv SASDMJ9} $out2]
+    lassign [status_and [file join $RUN validate.tcl] \
+        map_fstop SASDMJ9 --approved --dry-run] s2 out2
+    list $s1 [string match "*not running*" $out1] [regexp {^\$ } $out1] $s2 [regexp \
+        -all {map_fstop/validate.jl --out \S*map_fstop/results/map_fstop-\S*\.tsv SASDMJ9} \
+        $out2]
 } -result {0 1 0 0 1}
 
 test validate-bare-id-expands {a bare ID stands for every run of its script} -body {
-    lassign [status_and [file join $RUN validate.tcl] shannon_binning SASDEP6 --approved --dry-run] s out
+    lassign [status_and [file join $RUN validate.tcl] \
+        shannon_binning SASDEP6 --approved --dry-run] s out
     list $s [string match "* SASDEP6:fit1_model1 SASDEP6:fit1_model2*" $out]
 } -result {0 1}
 
-test fittings-trace-compile {--trace-compile FILE is passed to julia for the fits, and needs a value} -body {
-    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --trace-compile /tmp/x.jl --dry-run] s out
+test fittings-trace-compile \
+    {--trace-compile FILE is passed to julia for the fits, and needs a value} -body {
+    lassign [status_and [file join $RUN fittings.tcl] \
+        SASDMJ9 --trace-compile /tmp/x.jl --dry-run] s out
     lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --trace-compile] s2 out2
-    list $s [string match "*--trace-compile=/tmp/x.jl*SASDMJ9.jl*" $out] $s2 [string match "*needs a value*" $out2]
+    list $s [string match "*--trace-compile=/tmp/x.jl*SASDMJ9.jl*" $out] \
+        $s2 [string match "*needs a value*" $out2]
 } -result {0 1 2 1}
 
 test fittings-table {--table runs results_table.tcl --update on the whole table} -body {
-    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --no-fit --table --dry-run] s out
+    lassign [status_and [file join $RUN fittings.tcl] SASDMJ9 --no-fit --table --dry-run] \
+        s out
     list $s [string match "*results_table.tcl --update*" $out]
 } -result {0 1}
 
 test vis-list-and-unknown {the visual checks are listed; an unknown one stops} -body {
     lassign [status_and [file join $RUN vis.tcl] --list] s1 out1
     lassign [status_and [file join $RUN vis.tcl] nonsense] s2 out2
-    list $s1 [string match "*sasa_hydro_report*" $out1] $s2 [string match "*no visual check named: nonsense*" $out2]
+    list $s1 [string match "*sasa_hydro_report*" $out1] $s2 \
+        [string match "*no visual check named: nonsense*" $out2]
 } -result {0 1 2 1}
 
 cleanupTests

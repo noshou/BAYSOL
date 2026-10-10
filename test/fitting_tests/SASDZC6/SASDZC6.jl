@@ -3,7 +3,8 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
+using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDZC6")
@@ -28,16 +29,16 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDZC6_fit1_model1.pdb")
 # so no nm⁻¹ → Å⁻¹ conversion is needed here.
 raw = readdlm(_DATA_PATH; skipstart = 3)
 
-qvals   = Float64.(raw[:, 1])
-I_exp   = Float64.(raw[:, 2])
-σ_exp   = Float64.(raw[:, 4])   # column 3 is FoXS's own model curve, not used
+qvals = Float64.(raw[:, 1])
+I_exp = Float64.(raw[:, 2])
+σ_exp = Float64.(raw[:, 4])   # column 3 is FoXS's own model curve, not used
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
 # ---------------------------------------------------------------------------
 #
-# Source: bioRxiv preprint 2026.04.01.715611v3 (posted 2026-07-30, this
-# fixture: test/fixtures/experiments/SASDZC6/2026.04.01.715611v3.full.pdf),
+# Source: bioRxiv preprint 2026.04.01.715611v3 (posted 2026-07-30,
+# doi:10.64898/2026.04.01.715611),
 # "SAXS sample preparation" and "SAXS data collection and analysis"
 # paragraphs (Materials & Methods).
 #
@@ -61,15 +62,15 @@ I_exp   = Float64.(raw[:, 2])
 # descriptions are roughly consistent given PDE6's ~1.4 μM molarity
 # at 0.3 mg/mL, so we take the explicit "3 μM" figure from Methods as authoritative).
 #
-# Beamline: CHESS 7A1 station, x-ray energy stated directly as 11.3 keV
-# ("SAXS data collection and analysis" paragraph.
-# Temperature: "continuously oscillated at room temperature"; 25°C used. SASBDB's cell_temperature is 4 °C,
-# but the paper's SAXS Methods ("SAXS data collection and analysis") explicitly describe acquisition at room
-# temperature, so the paper is followed (4 °C is most likely the sample-storage temperature).
+# Beamline: CHESS 7A1 station, x-ray energy stated directly as 11.3 keV ("SAXS data
+# collection and analysis" paragraph. Temperature: "continuously oscillated at room
+# temperature"; 25°C used. SASBDB's cell_temperature is 4 °C, but the paper's SAXS Methods
+# ("SAXS data collection and analysis") explicitly describe acquisition at room temperature,
+# so the paper is followed (4 °C is most likely the sample-storage temperature).
 
 const PH, σ_PH = 8.0, PH_METER_SIGMA
 
-const ENERGY_EV       = 11_300.0   # 11.3 keV, stated directly (CHESS 7A1)
+const ENERGY_EV        = 11_300.0   # 11.3 keV, stated directly (CHESS 7A1)
 const TEMPERATURE_C    = 25.0      # "room temperature"; no exact value stated
 const IONIC_STRENGTH_M = 0.100 + 3 * 0.002
 # 100 mM NaCl (1:1, contributes its own molarity to I) + 2 mM MgCl2
@@ -94,7 +95,7 @@ const IONIC_STRENGTH_M = 0.100 + 3 * 0.002
 # each unique chain is represented by one Protein solute below, at a
 # molarity that accounts for its per-complex number (see PDE6G_MOLARITY, GAT_MOLARITY).
 
-const PDE6A_SEQ = 
+const PDE6A_SEQ =
     "MGEVTAEEVEKFLDSNVSFAKQYYNLRYRAKVISDLLGPREAAVDFSNYHALNSVEESEI" *
     "IFDLLRDFQDNLQAEKCVFNVMKKLCFLLQADRMSLFMYRARNGIAELATRLFNVHKDAV" *
     "LEECLVAPDSEIVFPLDMGVVGHVALSKKIVNVPNTEEDEHFCDFVDTLTEYQTKNILAS" *
@@ -111,7 +112,7 @@ const PDE6A_SEQ =
     "CTFVYKEFSRFHEEITPMLDGITNNRKEWKALADEYETKMKGLEEEKQKQQAANQAAAGS" *
     "QHGGKQPGGGPASKSCCVQ"
 
-const PDE6B_SEQ = 
+const PDE6B_SEQ =
     "MSLSEGQVHRFLDQNPGFADQYFGRKLSPEDVANACEDGCPEGCTSFRELCQVEESAALF" *
     "ELVQDMQENVNMERVVFKILRRLCSILHADRCSLFMYRQRNGVAELATRLFSVQPDSVLE" *
     "DCLVPPDSEIVFPLDIGVVGHVAQTKKMVNVQDVMECPHFSSFADELTDYVTRNILATPI" *
@@ -128,11 +129,11 @@ const PDE6B_SEQ =
     "FVYKEFSRFHEEILPMFDRLQNNRKEWKALADEYEAKVKALEEDQKKETTAKKVGTEICN" *
     "GGPAPRSSTCRIL"
 
-const PDE6G_SEQ = 
+const PDE6G_SEQ =
     "MNLEPPKAEIRSATRVMGGPVTPRKGPPKFKQRQTRQFKSKPPKKGVQGFGDDIPGMEGL" *
     "GTDITVICPWEAFNHLELHELAQYGII"
 
-const GAT_SEQ   = 
+const GAT_SEQ =
     "MAHHHHHHAMGAGASAEEKHSRELEKKLKEDAEKDARTVKLLLLGAGESGKSTIVKQMKI" *
     "IHQDGYSLEECLEFIAIIYGNTLQSILAIVRAMTTLNIQYGDSARQDDARKLMHMADTIE" *
     "EGTMPKEMSDIIQRLWKDSGIQACFDRASEYQLNDSAGYYLSDLERLVTPGYVPTEQDVL" *
@@ -145,7 +146,7 @@ const GAT_SEQ   =
 # water for the terminal H/OH), same convention as SASDMJ9.
 const PDE6A_MW = 99_340.97   # g/mol
 const PDE6B_MW = 98_330.79   # g/mol
-const PDE6G_MW =  9_669.23   # g/mol  (per PDE6γ monomer)
+const PDE6G_MW = 9_669.23   # g/mol  (per PDE6γ monomer)
 const GAT_MW   = 42_163.08   # g/mol  (per GαT* monomer)
 
 # One PDE6 holoenzyme complex = PDE6α + PDE6β + 2×PDE6γ.
@@ -170,31 +171,34 @@ const GAT_MOLARITY_σ   = MOLARITY_REL_SIGMA * GAT_MOLARITY
 # udenafil (the 3 μM small-molecule PDE6 inhibitor in this sample): no
 # measured V0 exists, so the table entry is our own estimate,
 # 399.6 ± 16.0 cm³/mol (basis=predicted; RDKit vdW-volume + polar-site
-# regression, method and validation in PartialMolarVolumes/README.md,
+# regression, method and validation in BulkElectronDensity/README.md,
 # "Adding a missing solute"). At 3 μM (roughly 2000× more dilute than the
 # 100 mM NaCl / 25 mM Tris buffer components) its contribution to the bulk
 # electron density is negligible regardless, so the estimate's ±4 % error
 # is irrelevant here; it is included so the solute list is complete.
 
 # Buffer components. Tris/NaCl/MgCl2/glycerol all resolve against
-# src/PartialMolarVolumes/NonBiological/common_to_iupac.json.
-# Counter-ions (added 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
-# not list. Assumed: 25 mM Tris titrated with HCl -> Cl⁻ = C·0.650 (pK(22 °C) = 8.156). The pH is taken as
-# set at room temperature (22 ± 3 °C), which fixes the counter-ion amount whatever the measurement
-# temperature. pK(T) from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
-# 10.1063/1.1416902) pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.122 M. σ combines σ_PH, ±3 °C,
-# ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is modelled; the volume change of
-# the buffer's own (de)protonation is not. Titrant: not stated; HCl for amine bases (Tris, imidazole,
-# histidine), NaOH for Good's buffers.
+# src/BulkElectronDensity/NonBiological/common_to_iupac.json. Counter-ions (added
+# 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
+# not list. Assumed: 25 mM Tris titrated with HCl -> Cl⁻ = C·0.650 (pK(22 °C) =
+# 8.156). The pH is taken as set at room temperature (22 ± 3 °C), which fixes the
+# counter-ion amount whatever the measurement temperature. pK(T) from Goldberg,
+# Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902)
+# pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.122 M. σ combines σ_PH, ±3 °C,
+# ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is modelled;
+# the volume change of the buffer's own (de)protonation is not. Titrant: not stated;
+# HCl for amine bases (Tris, imidazole, histidine), NaOH for Good's buffers.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Inference.Solute).
-    NonBiological(0.100, 0.001,   "sodium chloride"),   # 100 mM NaCl, ±1%
-    NonBiological(0.025, 0.0005,  "tris"),              # 25 mM Tris pH 8.0, ±2%
+    # electron density (see BulkElectronDensity.Solute).
+    NonBiological(0.100, 0.001, "sodium chloride"),   # 100 mM NaCl, ±1%
+    NonBiological(0.025, 0.0005, "tris"),              # 25 mM Tris pH 8.0, ±2%
     NonBiological(0.002, 0.00004, "magnesium chloride"),# 2 mM MgCl2, ±2%
-    NonBiological(0.274, 0.0055,  "glycerol"),          # 2% v/v ≈ 0.274 M (ρ=1.261 g/mL, MW=92.09 g/mol), ±2%
+    # 2% v/v ≈ 0.274 M (ρ=1.261 g/mL, MW=92.09 g/mol), ±2%
+    NonBiological(0.274, 0.0055, "glycerol"),
     NonBiological(0.000003, 0.00000015, "udenafil"),    # 3 μM udenafil (Methods), ±5%
-    NonBiological(0.016258, 0.001823, "chloride"),   # Cl⁻ counter-ion from HCl titration of Tris (see note above)
+    # Cl⁻ counter-ion from HCl titration of Tris (see note above)
+    NonBiological(0.016258, 0.001823, "chloride"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -203,9 +207,9 @@ const SOLUTES = Solute[
 
 const Q_MAX_FIT = 0.3   # SASDZC6_fit1.dat's q_max (≈0.2999 Å⁻¹)
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
-# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
-# that diameter allows (see `rebin` there).
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 # PDB 7JSN's four chains each start with a different free
 # N-terminal residue (chain A/PDE6α: Glu8, chain B/PDE6β: Ala19, chains
@@ -216,16 +220,17 @@ const ADD_HYDROGENS = true
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
-with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
+(`seed_model` bins the curve and drops the bins with non-positive intensity.)
 """
 function fit_subset()
     keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdzc6` samples. It is separate only because the developer tools in test/utils/ build
-# a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
+# Builds the Seed that `run_sasdzc6` samples. It is separate only because
+# the developer tools in test/utils/ build a fit's Seed without running
+# the fit; if you are reading this script as an example you can skip it:
 # `run_sasdzc6` below is the whole story (build the seed, then sample it).
 function seed_sasdzc6(; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
@@ -238,7 +243,11 @@ function seed_sasdzc6(; seed::Integer = SAMPLER_SEED)
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdzc6(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+function run_sasdzc6(;
+    n_samples::Int = N_SAMPLES,
+    n_adapt::Int = N_ADAPT,
+    seed::Integer = SAMPLER_SEED,
+)
     s, data = seed_sasdzc6(; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
@@ -253,8 +262,8 @@ open(joinpath(@__DIR__, "res.txt"), "w") do io
     BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
-# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
-# then recompile (about 40 % of a fit's wall clock).
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL
+# methods, which every fit would then recompile (about 40 % of a fit's wall clock).
 using GLMakie
 
 """
@@ -267,8 +276,8 @@ all draws diverged) the quantile-curve envelope.
 function sasdzc6_figure(result, data)
     _, _, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
@@ -277,7 +286,6 @@ function sasdzc6_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-
         xscale = log10,
         yscale = log10,
     )
@@ -291,15 +299,19 @@ function sasdzc6_figure(result, data)
 
         band!(
             ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
-            color = (:darkorange, 1), label = "bounds",   # NB: shared COLOR_BAND is (:darkorange, 0.15); this script's plot style is kept as-is
+            # NB: shared COLOR_BAND is (:darkorange, 0.15);
+            # this script's plot style is kept as-is
+            color = (:darkorange, 1), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 2.5, label = "quantiles",   # NB: shared LW_QUANTILE is 1.5; this script's plot style is kept as-is
+            # NB: shared LW_QUANTILE is 1.5; this script's plot style is kept as-is
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 2.5, label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 2.5,   # NB: shared LW_QUANTILE is 1.5; this script's plot style is kept as-is
+            # NB: shared LW_QUANTILE is 1.5; this script's plot style is kept as-is
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 2.5,
         )
     end
 
@@ -314,7 +326,14 @@ function sasdzc6_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -348,22 +367,40 @@ function sasdzc6_residuals_figure(result, data)
 
         band!(
             ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = (:darkorange, 0.15), label = "bounds",   # NB: shared COLOR_BAND_RESID is (:darkorange, 1); this script's plot style is kept as-is
+            # NB: shared COLOR_BAND_RESID is (:darkorange,
+            # 1); this script's plot style is kept as-is
+            color = (:darkorange, 0.15), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5, label = "quantiles",   # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
+            # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5, label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5,   # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
+            # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5,
         )
     end
 
     if map_curve !== nothing
         resid = I_fit .- map_curve[:, 2]
-        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR)
-        scatter!(ax, q_fit, resid; markersize = MARKERSIZE, color = COLOR_DATA, label = "data - MAP")
+        errorbars!(
+            ax,
+            q_fit,
+            resid,
+            σ_fit;
+            whiskerwidth = WHISKERWIDTH,
+            color = COLOR_ERRORBAR,
+        )
+        scatter!(
+            ax,
+            q_fit,
+            resid;
+            markersize = MARKERSIZE,
+            color = COLOR_DATA,
+            label = "data - MAP",
+        )
         hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
         lo, hi = extrema(resid)
         pad = YLIM_LIN_PAD_FRAC * (hi - lo)

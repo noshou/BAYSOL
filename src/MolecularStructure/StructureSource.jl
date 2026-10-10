@@ -8,7 +8,7 @@ pass the resulting path to [`load_molecule`](@ref) themselves.
 """
 
 using BioStructures: BioStructures, MMCIFFormat, PDBFormat, writepdb,
-                    standardselector, heavyatomselector, retrievepdb, collectmodels
+    standardselector, heavyatomselector, retrievepdb, collectmodels
 using Downloads: Downloads
 
 """
@@ -16,7 +16,9 @@ Raised for any failure resolving/converting a structure source:
 a bad or nonexistent local path, an unrecognized extension, a failed fetch/download,
 or a BioStructures write failure.
 """
-struct StructureSourceError <: Exception; msg::String end
+struct StructureSourceError <: Exception
+    msg::String
+end
 Base.showerror(io::IO, e::StructureSourceError) = print(io, "StructureSourceError: ", e.msg)
 
 """
@@ -105,8 +107,10 @@ function _resolve_canonical_pdb(struc, key::AbstractString)::String
         writepdb(tmp_path, model, standardselector, heavyatomselector)
     catch e
         rm(tmpdir; recursive = true, force = true)
-        throw(StructureSourceError(
-            "failed writing canonical .pdb for \"$key\": $(sprint(showerror, e))"))
+        throw(
+            StructureSourceError(
+                "failed writing canonical .pdb for \"$key\": $(sprint(showerror, e))"),
+        )
     end
 
     if !isfile(final_path)
@@ -121,9 +125,11 @@ function _resolve_canonical_pdb(struc, key::AbstractString)::String
     end
 
     rm(tmpdir; recursive = true, force = true)
-    throw(StructureSourceError(
-        "name \"$key\" already refers to different stored content at " *
-        "\"$final_path\"; remove the stale file or use a different name/id"))
+    throw(
+        StructureSourceError(
+            "name \"$key\" already refers to different stored content at " *
+            "\"$final_path\"; remove the stale file or use a different name/id"),
+    )
 end
 
 """
@@ -148,12 +154,20 @@ function resolve_structure(source::LocalPathSource)::String
         try
             struc = BioStructures.read(path, MMCIFFormat)
         catch e
-            throw(StructureSourceError("failed parsing mmCIF \"$path\": $(sprint(showerror, e))"))
+            throw(
+                StructureSourceError(
+                    "failed parsing mmCIF \"$path\": $(sprint(showerror, e))",
+                ),
+            )
         end
         return _resolve_canonical_pdb(struc, key)
     else
-        throw(StructureSourceError(
-            "unrecognized structure file extension \"$ext\" for \"$path\"; expected .pdb, .cif, or .mmcif"))
+        throw(
+            StructureSourceError(
+                "unrecognized structure file extension \"$ext\" for \"$path\"; " *
+                "expected .pdb, .cif, or .mmcif",
+            ),
+        )
     end
 end
 
@@ -168,15 +182,19 @@ function resolve_structure(source::PDBIDSource)::String
         struc = retrievepdb(id; dir = tmpdir, format = MMCIFFormat)
     catch e
         rm(tmpdir; recursive = true, force = true)
-        throw(StructureSourceError("failed fetching PDB ID \"$id\": $(sprint(showerror, e))"))
+        throw(
+            StructureSourceError("failed fetching PDB ID \"$id\": $(sprint(showerror, e))"),
+        )
     end
     model = first(collectmodels(struc))   # first model whatever its number
     try
         writepdb(existing, model, standardselector, heavyatomselector)
     catch e
         rm(tmpdir; recursive = true, force = true)
-        throw(StructureSourceError(
-            "failed writing canonical .pdb for \"$id\": $(sprint(showerror, e))"))
+        throw(
+            StructureSourceError(
+                "failed writing canonical .pdb for \"$id\": $(sprint(showerror, e))"),
+        )
     end
     rm(tmpdir; recursive = true, force = true)
     return existing
@@ -207,7 +225,11 @@ function resolve_structure(source::URLSource)::String
         struc = BioStructures.read(raw, fmt)
     catch e
         rm(tmpdir; recursive = true, force = true)
-        throw(StructureSourceError("failed fetching/parsing URL \"$url\": $(sprint(showerror, e))"))
+        throw(
+            StructureSourceError(
+                "failed fetching/parsing URL \"$url\": $(sprint(showerror, e))",
+            ),
+        )
     end
     path = _resolve_canonical_pdb(struc, key)
     rm(tmpdir; recursive = true, force = true)

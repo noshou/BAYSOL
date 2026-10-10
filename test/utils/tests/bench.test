@@ -1,24 +1,30 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests of bench.tcl. No benchmark is run: the approval guard is tested by running the script WITHOUT --approved
-# (it must print its plan and do nothing), and the rest are the pure procs.
+# Tests of bench.tcl. No benchmark is run: the approval guard is
+# tested by running the script WITHOUT --approved (it must print
+# its plan and do nothing), and the rest are the pure procs.
 
 source [file join [file dirname [info script]] helpers.tcl]
 source [file join $UTILS_DIR bench.tcl]
 
-test guard-prints-plan-only {without --approved the script refuses and says what it would run} -body {
+test guard-prints-plan-only \
+    {without --approved the script refuses and says what it would run} -body {
     lassign [run_tool [file join $UTILS_DIR bench.tcl] --state cold SASDMJ9] status text
-    list $status [string match "*not running*" $text] [string match "*Planned: --state cold SASDMJ9*" $text] \
+    list $status [string match "*not running*" $text] \
+        [string match "*Planned: --state cold SASDMJ9*" $text] \
          [string match "*cold state in*" $text]
 } -result {0 1 1 0}
 
 test guard-also-for-warm {the warm state needs approval too} -body {
-    lassign [run_tool [file join $UTILS_DIR bench.tcl] --state warm SASDMJ9 SASDBS6:fit2_model3] status text
+    lassign [run_tool [file join $UTILS_DIR bench.tcl] \
+        --state warm SASDMJ9 SASDBS6:fit2_model3] status text
     list $status [string match "*not running*" $text]
 } -result {0 1}
 
 test parse_args {options with a value, the --keep flag, and positional specs} -body {
-    lassign [bench::parse_args --state cold --keep --samples 5 SASDMJ9 SASDBS6:fit2_model3] opts specs
+    lassign \
+        [bench::parse_args --state cold --keep --samples 5 SASDMJ9 SASDBS6:fit2_model3] \
+        opts specs
     list $opts $specs
 } -result {{state cold keep 1 samples 5} {SASDMJ9 SASDBS6:fit2_model3}}
 
@@ -27,26 +33,31 @@ test parse_args-missing-value {an option without its value is an error} -body {
 } -returnCodes error -result {option --out needs a value}
 
 test excluded {what the cold state's repository copy leaves out} -body {
-    set files {docs/x.md test/visualize/xyz/a.xyz test/baselines/results/r.json test/fitting_tests/SASDMJ9/res.txt
-               test/fitting_tests/SASDMJ9/res_hist.png test/fitting_tests/SASDMJ9/SASDMJ9.jl src/Inference/Inference.jl
+    set files {docs/x.md test/visualize/xyz/a.xyz\
+        test/baselines/results/r.json test/fitting_tests/SASDMJ9/res.txt
+               test/fitting_tests/SASDMJ9/res_hist.png \
+                   test/fitting_tests/SASDMJ9/SASDMJ9.jl src/Inference/Inference.jl
                test/baselines/README.md test/utils/bench.tcl}
     set out {}
     foreach f $files { lappend out [bench::excluded $f] }
     set out
 } -result {1 1 1 1 1 0 0 0 0}
 
-test make_depot-links-only-sources {the cold depot links source dirs and has no compiled/ cache} -setup {
+test make_depot-links-only-sources \
+    {the cold depot links source dirs and has no compiled/ cache} -setup {
     set scratch [scratch_dir]
     file mkdir $scratch/real/packages $scratch/real/compiled $scratch/real/artifacts
 } -body {
     bench::make_depot $scratch/depot $scratch/real
-    list [lsort [glob -tails -directory $scratch/depot *]] [file type $scratch/depot/packages]
+    list [lsort [glob -tails -directory $scratch/depot *]] \
+        [file type $scratch/depot/packages]
 } -cleanup {
     file delete -force $scratch
 } -result {{artifacts packages} link}
 
 test json_line {the child's JSON is its last {...} line, whatever came before it} -body {
-    bench::json_line "Transaction\n\n  Prefix: /x\n\nTransaction finished\n\n\{\"a\":1,\"b\":\{\"c\":2\}\}\n"
+    bench::json_line "Transaction\n\n  Prefix: /x\n\nTransaction\
+        finished\n\n\{\"a\":1,\"b\":\{\"c\":2\}\}\n"
 } -result {{"a":1,"b":{"c":2}}}
 
 test json_line-none {no JSON line gives an empty string} -body {

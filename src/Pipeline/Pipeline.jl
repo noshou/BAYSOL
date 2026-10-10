@@ -11,20 +11,19 @@ package root.
 module Pipeline
 
 using Statistics: quantile, mean, var
-using ..Parallel: tmap_blocks
 using Printf: @printf, @sprintf
 using StaticArrays: SVector
 using ..PhysicalConstants: NS_PER_S
-using ..Timing: Timing
+using ..Runtime: StageLog, tick, tock!, timed!, stage_seconds, with_gc_paused, tmap_blocks
 using ..MolecularStructure: MolecularStructure
-using ..SASA: SASA, PROBE_RADIUS, SHELL_N_TARGET
+using ..Geometry: sasa, PROBE_RADIUS, SHELL_N_TARGET
 using ..Shannon: Shannon, SHANNON_REBIN
-using ..GCPause: GCPause
 using ..Scattering: Scattering, B_LM_CHUNK, SHELL_THICKNESS
-using ..Inference: Inference, DEFAULT_TEMPERATURE_C, κ_δρ₁₂, κ_δρ₃,
-        DEFAULT_TARGET_ACCEPT
+using ..BulkElectronDensity: Solute, DEFAULT_TEMPERATURE_C
+using ..Inference: Inference, κ_δρ₁₂, κ_δρ₃,
+    DEFAULT_TARGET_ACCEPT
 
-        """
+"""
 "lo-hi" empirical quantile range (integer percentages, 0 ≤ lo < hi ≤ 100)
 used to build "quantiles"/"bounds" entries. The default "16-84" is a ±1σ-equivalent
 interval for a Normal. The special case "0-0" means *no* filtering.
@@ -69,14 +68,14 @@ by name:
     `z_delta_rho_3`: how many prior standard deviations (θ-space) the
     corresponding physical parameter's MAP value sits from its prior mean.
 """
-const MAPParams = Dict{String, Float64}
+const MAPParams = Dict{String,Float64}
 
 """
     MAPResult = Tuple{MAPParams, Matrix{Float64}}
 
 (params, curve) at the MAP draw.
 """
-const MAPResult = Tuple{MAPParams, Matrix{Float64}}
+const MAPResult = Tuple{MAPParams,Matrix{Float64}}
 
 """
     QuantileBounds = Dict{String, Tuple{Float64, Float64}}
@@ -87,7 +86,7 @@ extrema of exactly the draws that fall within [lo, hi], so it can differ
 slightly from quantiles itself (it's the tightest interval that actually
 contains data on both ends).
 """
-const QuantileBounds = Dict{String, Tuple{Float64, Float64}}
+const QuantileBounds = Dict{String,Tuple{Float64,Float64}}
 
 """
     QuantileParams = Dict{String, QuantileBounds}
@@ -95,7 +94,7 @@ const QuantileBounds = Dict{String, Tuple{Float64, Float64}}
 One [`QuantileBounds`](@ref) per parameter, over the same names as
 [`MAPParams`](@ref) (plus "logdensity", minus none).
 """
-const QuantileParams = Dict{String, QuantileBounds}
+const QuantileParams = Dict{String,QuantileBounds}
 
 """
     QuantileCurves = Dict{String, Matrix{Float64}}
@@ -103,19 +102,44 @@ const QuantileParams = Dict{String, QuantileBounds}
 "quantiles"/"bounds" predicted-curve envelopes, each a (Q, 3) matrix
 whose columns are (q, Ilo(q), Ihi(q)).
 """
-const QuantileCurves = Dict{String, Matrix{Float64}}
+const QuantileCurves = Dict{String,Matrix{Float64}}
 
 """
     QuantileResult = Tuple{QuantileParams, QuantileCurves}
 
 (params, curve), the quantile-filtered counterpart of [`MAPResult`](@ref).
 """
-const QuantileResult = Tuple{QuantileParams, QuantileCurves}
+const QuantileResult = Tuple{QuantileParams,QuantileCurves}
+
+# Report constants (used by Report.jl).
+
+"Order the physical/derived parameters are reported in, by [`write_report`](@ref)."
+const _REPORT_KEYS = [
+    "log_density", "slvnt_e_dns", "delta_rho_1", "delta_rho_2",
+    "delta_rho_3", "scale", "bkgrnd_corr", "excl_vol_corr", "chisq_red",
+]
+
+"The 4 physical parameters that carry a prior."
+const _PRIOR_KEYS = [
+    "slvnt_e_dns", "delta_rho_1", "delta_rho_2", "delta_rho_3",
+]
+
+"Display labels for [`write_report`](@ref)'s text output."
+const _REPORT_LABELS = Dict{String,String}(
+    "log_density"   => "log_density",
+    "slvnt_e_dns"   => "ρₑ",
+    "delta_rho_1"   => "δρ₁",
+    "delta_rho_2"   => "δρ₂",
+    "delta_rho_3"   => "δρ₃",
+    "scale"         => "scale",
+    "bkgrnd_corr"   => "bkgrnd_corr",
+    "excl_vol_corr" => "excl_vol_corr",
+    "chisq_red"     => "χ²",
+)
 
 include("SeedModel.jl")
 include("RunModel.jl")
-include("ReportSections.jl")
-include("WriteReport.jl")
+include("Report.jl")
 
 export seed_model, run_model, write_report
 public MAPParams, MAPResult, QuantileBounds, QuantileParams, QuantileCurves, QuantileResult

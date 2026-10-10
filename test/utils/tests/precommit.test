@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests of precommit.tcl's whitespace step on a scratch git repository: trailing whitespace on changed lines is stripped
-# (and only there), untracked files are stripped whole, a conflict marker is a failure.
+# Tests of precommit.tcl's whitespace step on a scratch git repository:
+# trailing whitespace on changed lines is stripped (and only there),
+# untracked files are stripped whole, a conflict marker is a failure.
 
 source [file join [file dirname [info script]] helpers.tcl]
-source [file join $REPO_DIR test run precommit.tcl]
+source [file join $REPO_DIR dev precommit.tcl]
 
-# a scratch repository with one committed file ("a.jl": three lines, the second already ends in blanks)
+# a scratch repository with one committed file ("a.jl":
+# three lines, the second already ends in blanks)
 proc scratch_repo {} {
     set dir [file normalize [file join [info script] .. scratch-precommit-[pid]]]
     file delete -force $dir
@@ -27,11 +29,14 @@ proc read_file {path} {
     return $text
 }
 
-test whitespace-strips-only-changed-lines {changed and untracked lines are stripped, a line git did not see change is not} -body {
+test whitespace-strips-only-changed-lines \
+    {changed and untracked lines are stripped, a line git did not see change is not} \
+    -body {
     set dir [scratch_repo]
     set ::ROOT $dir
     set ch [open [file join $dir a.jl] w]
-    puts -nonewline $ch "one \ntwo  \nthree\t\nfour\n"      ;# lines 1 and 3 changed with blanks, line 2 untouched
+    puts -nonewline $ch "one \ntwo  \nthree\t\nfour\n" ;# \
+        lines 1 and 3 changed with blanks, line 2 untouched
     close $ch
     set ch [open [file join $dir new.md] w]
     puts -nonewline $ch "x  \ny\n"
@@ -43,7 +48,8 @@ test whitespace-strips-only-changed-lines {changed and untracked lines are strip
     list $ok [string map {\n |} $a] [string map {\n |} $b]
 } -result {1 {one|two  |three|four|} x|y|}
 
-test whitespace-conflict-marker-fails {a conflict marker in an untracked file is reported and fails} -body {
+test whitespace-conflict-marker-fails \
+    {a conflict marker in an untracked file is reported and fails} -body {
     set dir [scratch_repo]
     set ::ROOT $dir
     set ch [open [file join $dir b.jl] w]
@@ -54,7 +60,8 @@ test whitespace-conflict-marker-fails {a conflict marker in an untracked file is
     set ok
 } -result 0
 
-test whitespace-clean-tree {nothing to strip: true and the files are byte for byte the same} -body {
+test whitespace-clean-tree \
+    {nothing to strip: true and the files are byte for byte the same} -body {
     set dir [scratch_repo]
     set ::ROOT $dir
     set before [read_file [file join $dir a.jl]]

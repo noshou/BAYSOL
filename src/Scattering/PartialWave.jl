@@ -1,25 +1,11 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-using .SphFuncs: sphHarm!, sphHarmCache, sphBess, sphBessRatios!, sphBessStep
 
-"""
-An amplitude shared by all `n` scatterers: `f[q]`, the same for every
-one (the hydration beads of a class all carry the same area, so the
-same Gaussian amplitude). An `(n, length(f))` matrix by interface,
-stored as one vector. [`compute_B_lm`](@ref) recognizes it: the amplitude
-factors out of the sum over scatterers, so it computes the multipoles with
-unit amplitude once and scales them by `f(q)`, which costs no `Ft` fill and
-no per-scatterer multiply.
-"""
-struct SharedAmplitude{T<:Number} <: AbstractMatrix{T}
-    f::Vector{T}
-    n::Int
-end
 Base.size(a::SharedAmplitude) = (a.n, length(a.f))
 Base.getindex(a::SharedAmplitude, i::Int, q::Int) = a.f[q]
 using FastClosures: @closure
 using LinearAlgebra: mul!
-using ..Parallel: tmap_items, tmap_blocks, with_blas_single, worker_count
+using ..Runtime: tmap_items, tmap_blocks, with_blas_single, worker_count
 
 """
 ±m symmetry weights: m = 0 -> 1, m > 0 -> 2.
@@ -124,8 +110,8 @@ one real matrix product per degree and column, done by OpenBLAS (`mul!`, 5-arg,
 accumulating in place).
 
 W is never stored as a full j array. For each atom the Gautschi sweep runs over a
-q-tile: [`SphFuncs.sphBessRatios!`](@ref) (pass 1), then upward with
-[`SphFuncs.sphBessStep`](@ref) (pass 2); each jₗ comes out normalized and is
+q-tile: [`sphBessRatios!`](@ref) (pass 1), then upward with
+[`sphBessStep`](@ref) (pass 2); each jₗ comes out normalized and is
 multiplied straight into `W_l` for every column. W covers one tile of atoms
 ([`B_LM_TILE`](@ref)) and one q-tile, sized so that every degree fits in
 [`B_LM_W_BYTES`](@ref); all buffers are allocated once per call.
@@ -151,9 +137,13 @@ function _compute_B_lm(
 
     # coords_sph is the column-per-atom spherical form straight from
     # MolecularStructure.coords_spherical: 3 rows, (r, θ, φ) in that order.
-    size(coords_sph, 1) == 3 || throw(ArgumentError(
-        "compute_B_lm: coords_sph must be a (3, N) matrix with rows (r, θ, φ), " *
-        "as returned by MolecularStructure.coords_spherical; got $(size(coords_sph, 1)) rows"))
+    size(coords_sph, 1) == 3 || throw(
+        ArgumentError(
+            "compute_B_lm: coords_sph must be a (3, N) matrix with rows (r, θ, φ), " *
+            "as returned by MolecularStructure.coords_spherical; " *
+            "got $(size(coords_sph, 1)) rows",
+        ),
+    )
     N = size(coords_sph, 2)
     Q = length(qvals)
 
@@ -161,14 +151,15 @@ function _compute_B_lm(
     any(<(0), qvals) && throw(ArgumentError("compute_B_lm: qvals must all be ≥ 0"))
     for f in f_sets
         size(f, 1) == N ||
-            throw(ArgumentError(
-                "compute_B_lm: f_atoms must have N rows matching coords_sph's columns"
-                )
+            throw(
+                ArgumentError(
+                    "compute_B_lm: f_atoms must have N rows matching coords_sph's columns",
+                ),
             )
         size(f, 2) == Q ||
             throw(ArgumentError(
-                "compute_B_lm: f_atoms must have Q columns matching qvals"
-                )
+                "compute_B_lm: f_atoms must have Q columns matching qvals",
+            )
             )
     end
 
@@ -180,8 +171,9 @@ function _compute_B_lm(
     # A purely real set needs only the Re(f) channel; an imaginary part
     # (anomalous f'') needs a second channel for the ±m symmetry.
     has_imag(f::AbstractMatrix)  = !(eltype(f)<:Real) && any(@closure(x -> imag(x) != 0), f)
-    has_imag(f::SharedAmplitude) = !(eltype(f)<:Real) && any(@closure(x -> imag(x) != 0), f.f)
-    nchan = map(f -> has_imag(f) ? 2 : 1, f_sets)
+    has_imag(f::SharedAmplitude) =
+    !(eltype(f)<:Real) && any(@closure(x -> imag(x) != 0), f.f)
+    nchan                        = map(f -> has_imag(f) ? 2 : 1, f_sets)
     # Internal amplitude columns of the accumulator: a shared
     # amplitude is one column with unit amplitude (scaled by
     # f(q) when unpacking); any other set has one column per
@@ -196,7 +188,7 @@ function _compute_B_lm(
         f isa SharedAmplitude && continue
         for ch in 1:ncols[s]
             ncolF += 1
-            fidx[colstart[s] + ch] = ncolF
+            fidx[colstart[s]+ch] = ncolF
         end
     end
 
@@ -208,12 +200,13 @@ function _compute_B_lm(
         nchunk = min(Int(_CHUNK), N)
         T = min(B_LM_TILE, nchunk)
 
-        # q-tile length so that W (every column, every degree, T atoms) fits the budget of one worker,
-        # B_LM_W_BYTES. A constant, not a function of the thread count or the group count, so the tile shapes
-        # (and with them the rounding) are the same at any number of threads.
+        # q-tile length so that W (every column, every degree, T atoms) fits
+        # the budget of one worker, B_LM_W_BYTES. A constant, not a function
+        # of the thread count or the group count, so the tile shapes (and
+        # with them the rounding) are the same at any number of threads.
         Qt = clamp(B_LM_W_BYTES ÷ (sizeof(Float64) * ncol * T * (L + 1)), 1, Q)
         qv = Vector{Float64}(qvals)
-        qtiles = [qv[q0:min(q0 + Qt - 1, Q)] for q0 in 1:Qt:Q]
+        qtiles = [qv[q0:min(q0+Qt-1, Q)] for q0 in 1:Qt:Q]
 
         # Negligible-Bessel cut: |jₗ(x)| ≤ xˡ/(2l+1)!! for all x ≥ 0
         # (from |J_ν(x)| ≤ (x/2)^ν/Γ(ν+1), ν ≥ −1/2), so jₗ(x) ≤ BESS_CUT
@@ -228,7 +221,7 @@ function _compute_B_lm(
         lndf = 0.0 # ln((2l+1)!!)
         for l in 1:L
             lndf += log(2l + 1.0)
-            xcut[l + 1] = exp((log(BESS_CUT) + lndf) / l)
+            xcut[l+1] = exp((log(BESS_CUT) + lndf) / l)
         end
 
         # Atoms in order of increasing radius: the sum over atoms
@@ -238,11 +231,12 @@ function _compute_B_lm(
         # survive in the inner tiles.
         order = sortperm(@view coords_sph[1, :])
 
-        # The tiles (positions in `order`), within chunks of `_CHUNK` atoms, dealt round-robin to at most
-        # B_LM_GROUPS groups (so every group gets tiles of all radii). Each group sums its tiles, in order, into
-        # its own accumulator; the accumulators are then added in group order. Fixed by the constants and the
-        # input, never by the thread count, so the groups can run on any number of threads, or serially, and
-        # give identical bits.
+        # The tiles (positions in `order`), within chunks of `_CHUNK` atoms,
+        # dealt round-robin to at most B_LM_GROUPS groups (so every group gets
+        # tiles of all radii). Each group sums its tiles, in order, into its own
+        # accumulator; the accumulators are then added in group order. Fixed by
+        # the constants and the input, never by the thread count, so the groups
+        # can run on any number of threads, or serially, and give identical bits.
         tiles = Tuple{Int,Int}[]
         for start in 1:Int(_CHUNK):N
             stop = min(start + Int(_CHUNK) - 1, N)
@@ -251,24 +245,28 @@ function _compute_B_lm(
             end
         end
         nF = ncolF   # immutable copy: the group closures below run on other threads
-        # B_LM_GROUPS groups (fewer only when there are fewer tiles): fixed by the input, whatever the thread count
+        # B_LM_GROUPS groups (fewer only when there are fewer
+        # tiles): fixed by the input, whatever the thread count
         ng = max(1, min(B_LM_GROUPS, length(tiles)))
         groups = [tiles[g:ng:end] for g in 1:ng]
         run_group!(Acc_g, tl, buf) = _b_lm_tiles!(
             Acc_g, tl, buf, order, coords_sph, qv, qtiles, Qt, qsorted, xcut,
-            f_sets, ncols, fidx, ncol, T, L, Q
+            f_sets, ncols, fidx, ncol, T, L, Q,
         )
-        # The groups run in waves of one group per worker, each into a reused scratch accumulator, and every
-        # finished accumulator is added to Acc in group order. The additions are Acc + g₁ + g₂ + … in that
-        # order whatever the wave size, so the bits do not depend on the thread count, and the memory is one
-        # accumulator per worker (not one per group).
-        # Small inputs stay on one thread (and on OpenBLAS's own threads): with few tiles there is too little to
-        # spread, and one BLAS thread per group would lose more than the groups gain. The test is on the input
-        # only, and the groups are the same either way, so the result is too.
-        # The workers hold one accumulator each, so their number is also capped by B_LM_ACC_BYTES (the grouping, and
-        # with it the result, is not: the wave size does not change the order of the additions).
-        nw = (worker_count() > 1 && length(tiles) * Q ≥ B_LM_PARALLEL_MIN) ?
-             max(1, min(worker_count(), ng, B_LM_ACC_BYTES ÷ max(sizeof(Acc), 1))) : 1
+        # The groups run in waves of one group per worker, each into a reused scratch
+        # accumulator, and every finished accumulator is added to Acc in group order.
+        # The additions are Acc + g₁ + g₂ + … in that order whatever the wave size,
+        # so the bits do not depend on the thread count, and the memory is one
+        # accumulator per worker (not one per group). Small inputs stay on one thread
+        # (and on OpenBLAS's own threads): with few tiles there is too little to
+        # spread, and one BLAS thread per group would lose more than the groups gain.
+        # The test is on the input only, and the groups are the same either way, so
+        # the result is too. The workers hold one accumulator each, so their number
+        # is also capped by B_LM_ACC_BYTES (the grouping, and with it the result, is
+        # not: the wave size does not change the order of the additions).
+        nw =
+            (worker_count() > 1 && length(tiles) * Q ≥ B_LM_PARALLEL_MIN) ?
+            max(1, min(worker_count(), ng, B_LM_ACC_BYTES ÷ max(sizeof(Acc), 1))) : 1
         pool = [zeros(Float64, size(Acc)) for _ in 1:nw]
         # the work buffers, one set per worker, allocated here once (not inside the tasks)
         bufs = [_b_lm_buffers(T, L, K, Q, ncol, nF, Qt) for _ in 1:nw]
@@ -281,12 +279,13 @@ function _compute_B_lm(
         else
             with_blas_single() do
                 for g0 in 1:nw:ng
-                    wave = g0:min(g0 + nw - 1, ng)
+                    wave = g0:min(g0+nw-1, ng)
                     tmap_items(1:length(wave)) do j
                         fill!(pool[j], 0.0)
                         run_group!(pool[j], groups[wave[j]], bufs[j])
                     end
-                    # Acc += the wave's accumulators, in group order for every element, column blocks in parallel
+                    # Acc += the wave's accumulators, in group order
+                    # for every element, column blocks in parallel
                     tmap_blocks(size(Acc, 2), B_LM_REDUCE_COLS) do cols
                         @inbounds for j in 1:length(wave), c in cols
                             @simd for r in axes(Acc, 1)
@@ -316,9 +315,10 @@ function _compute_B_lm(
                 col = (c - 1) * Q + q
                 sc = scale(q)
                 @fastmath @simd for m in 0:l
-                    B[ch, k0 + m + 1, q] = sc * complex(
-                            Acc[2k0 + m + 1, col],
-                            Acc[2k0 + l + 1 + m + 1, col]
+                    B[ch, k0+m+1, q] =
+                        sc * complex(
+                            Acc[2k0+m+1, col],
+                            Acc[2k0+l+1+m+1, col],
                         )
                 end
             end
@@ -329,8 +329,8 @@ end
 
 
 """
-The work buffers of one worker of [`_compute_B_lm`](@ref) (see [`_b_lm_tiles!`](@ref)): allocated by the caller, once
-per worker, so the tasks that use them allocate nothing large.
+The work buffers of one worker of [`_compute_B_lm`](@ref) (see [`_b_lm_tiles!`](@ref)):
+allocated by the caller, once per worker, so the tasks that use them allocate nothing large.
 
 # Returns
 - `NamedTuple` `(A, Ft, W, sb, Scache, ltopbuf, ks)`.
@@ -341,22 +341,25 @@ per worker, so the tasks that use them allocate nothing large.
 function _b_lm_buffers(T::Int, L::Int, K::Int, Q::Int, ncol::Int, ncolF::Int, Qt::Int)
     return (;
         # [Re Y_l; −Im Y_l] stacked per degree, of the atoms of one tile
-        A  = Matrix{Float64}(undef, 2K, T),
+        A = Matrix{Float64}(undef, 2K, T),
         # Ft[q, c, tt]: amplitude column c of the tile's atom tt (per-atom sets only)
         Ft = Array{Float64,3}(undef, Q, ncolF, T),
         # W[(c-1)Qt + k, t, l+1]
-        W  = Array{Float64,3}(undef, ncol * Qt, T, L + 1),
+        W = Array{Float64,3}(undef, ncol * Qt, T, L + 1),
         sb = sphBess(Qt, L),
         Scache = sphHarmCache(L),
-        ltopbuf = Vector{Int}(undef, Qt),  # per q: the highest degree kept there (see below)
-        ks = ones(Int, L + 1),             # first q column (within the q-tile) kept for degree l
+        # per q: the highest degree kept there (see below)
+        ltopbuf = Vector{Int}(undef, Qt),
+        # first q column (within the q-tile) kept for degree l
+        ks = ones(Int, L + 1),
     )
 end
 
 """
-The tiles `tl` of [`_compute_B_lm`](@ref) (pairs of positions in `order`, ascending), summed into `Acc_g`
-(`2K × ncol·Q`): for each tile the amplitude columns, the spherical harmonics of its atoms, and for each q-tile
-the Bessel sweep, W and the per-degree products, using the work buffers `buf` ([`_b_lm_buffers`](@ref)); groups
+The tiles `tl` of [`_compute_B_lm`](@ref) (pairs of positions in `order`, ascending),
+summed into `Acc_g` (`2K × ncol·Q`): for each tile the amplitude columns, the
+spherical harmonics of its atoms, and for each q-tile the Bessel sweep, W and the
+per-degree products, using the work buffers `buf` ([`_b_lm_buffers`](@ref)); groups
 that run concurrently need different `buf` and `Acc_g`. `Acc_g` must be zero on entry.
 
 # Returns
@@ -382,9 +385,10 @@ function _b_lm_tiles!(
     ncol::Int,
     T::Int,
     L::Int,
-    Q::Int
+    Q::Int,
 )::Nothing
-    A, Ft, W, sb, Scache, ltopbuf, ks = buf.A, buf.Ft, buf.W, buf.sb, buf.Scache, buf.ltopbuf, buf.ks
+    A, Ft, W, sb, Scache, ltopbuf, ks =
+        buf.A, buf.Ft, buf.W, buf.sb, buf.Scache, buf.ltopbuf, buf.ks
 
     for (a, b) in tl
         tile = view(order, a:b)
@@ -425,7 +429,7 @@ function _b_lm_tiles!(
         if qsorted
             Ltile = 0
             for l in 1:L
-                xcut[l + 1] ≤ qv[end] * rmax && (Ltile = l)
+                xcut[l+1] ≤ qv[end] * rmax && (Ltile = l)
             end
         end
         # [Re Y; −Im Y] of the tile's atoms, straight
@@ -435,7 +439,7 @@ function _b_lm_tiles!(
             Scache,
             Ltile,
             view(coords_sph, 2, tile),
-            view(coords_sph, 3, tile)
+            view(coords_sph, 3, tile),
         )
 
         for (ti, qt) in enumerate(qtiles)
@@ -445,8 +449,8 @@ function _b_lm_tiles!(
             if qsorted
                 Lt = 0
                 for l in 1:L
-                    ks[l + 1] = searchsortedfirst(qt, xcut[l + 1] / rmax)
-                    ks[l + 1] ≤ nq && (Lt = l) # xcut grows w/ l; kept degrees are 0..Lt
+                    ks[l+1] = searchsortedfirst(qt, xcut[l+1] / rmax)
+                    ks[l+1] ≤ nq && (Lt = l) # xcut grows w/ l; kept degrees are 0..Lt
                 end
             end
             # ltop[k]: the highest degree kept at q column k
@@ -454,7 +458,8 @@ function _b_lm_tiles!(
             # are 0..ltop[k]): the Bessel ratios are needed only up to it
             if qsorted
                 for l in 0:Lt
-                    lo = ks[l + 1]; hi = l < Lt ? ks[l + 2] - 1 : nq
+                    lo = ks[l+1]
+                    hi = l < Lt ? ks[l+2] - 1 : nq
                     @inbounds @simd for k in lo:hi
                         ltopbuf[k] = l
                     end
@@ -470,7 +475,7 @@ function _b_lm_tiles!(
                     Float64(coords_sph[1, tile[tt]]),
                     qt,
                     Lt;
-                    ltop = view(ltopbuf, 1:nq)
+                    ltop = view(ltopbuf, 1:nq),
                 )
                 jm1, jm2 = sb.jm1, sb.jm2      # j₁, j₀ after pass 1
                 _write_W!(W, Ft, jm2, fidx, q0, ks[1], nq, Qt, tt, tt, 0)
@@ -479,28 +484,28 @@ function _b_lm_tiles!(
                     lup, invx, R = sb.lup, sb.invx, sb.R
                     # q columns below ks[l+1] are under the cut at
                     # this degree and every higher one: not advanced
-                    @inbounds @fastmath @simd for k in ks[l + 1]:nq
+                    @inbounds @fastmath @simd for k in ks[l+1]:nq
                         v = sphBessStep(jm1[k], jm2[k], l, lup[k], invx[k], R[k, l])
                         jm2[k] = jm1[k]
                         jm1[k] = v
                     end
-                    _write_W!(W, Ft, jm1, fidx, q0, ks[l + 1], nq, Qt, tt, tt, l)
+                    _write_W!(W, Ft, jm1, fidx, q0, ks[l+1], nq, Qt, tt, tt, l)
                 end
             end
 
             # one real product per degree and column, accumulated in place (BLAS)
             for l in 0:L
-                kk = ks[l + 1]
+                kk = ks[l+1]
                 kk > nq && continue # the whole q-tile is below the cut
                 k0 = l * (l + 1) ÷ 2
-                rows = (2k0 + 1):(2k0 + 2(l + 1))
+                rows = (2k0+1):(2k0+2(l+1))
                 Al = view(A, rows, 1:nt)
                 for c in 1:ncol
                     mul!(
                         view(
                             Acc_g,
                             rows,
-                            (c - 1) * Q .+ ((q0 + kk - 1):(q0 + nq - 1))
+                            (c - 1) * Q .+ ((q0+kk-1):(q0+nq-1)),
                         ),
                         Al,
                         transpose(
@@ -508,10 +513,10 @@ function _b_lm_tiles!(
                                 W,
                                 (c - 1) * Qt .+ (kk:nq),
                                 1:nt,
-                                l + 1
-                            )
+                                l + 1,
+                            ),
                         ),
-                        1.0, 1.0
+                        1.0, 1.0,
                     )
                 end
             end
@@ -541,18 +546,18 @@ cut and not used).
     Qt::Int,
     tt::Int,
     i::Int,
-    l::Int
+    l::Int,
 )::Nothing
     @inbounds for c in eachindex(fidx)
         off = (c - 1) * Qt
         fc = fidx[c]
         if fc == 0 # shared amplitude: unit, scaled when unpacking
             @fastmath @simd for k in kstart:nq
-                W[off + k, tt, l + 1] = j[k]
+                W[off+k, tt, l+1] = j[k]
             end
         else
             @fastmath @simd for k in kstart:nq
-                W[off + k, tt, l + 1] = Ft[q0 + k - 1, fc, i] * j[k]
+                W[off+k, tt, l+1] = Ft[q0+k-1, fc, i] * j[k]
             end
         end
     end
@@ -567,16 +572,21 @@ between them cancel identically once summed over the full -l..l range ofm.
 
 # Arguments
 - `B_lm::AbstractArray{<:Complex,3}, size (C, K, Q)`: as returned by [`compute_B_lm`](@ref).
-- `weights::AbstractVector{<:Real}, length K`: as returned by [`partial_wave_weights`](@ref).
+- `weights::AbstractVector{<:Real}, length K`:
+    as returned by [`partial_wave_weights`](@ref).
 
 # Returns
 - `AbstractVector{<:Real} of length Q`."""
 function self_scatter(
-    B_lm::AbstractArray{<:Complex,3}, weights::AbstractVector{<:Real}
+    B_lm::AbstractArray{<:Complex,3}, weights::AbstractVector{<:Real},
 )::AbstractVector{<:Real}
-    
+
     C, K, Q = size(B_lm)
-    length(weights) == K || throw(DimensionMismatch("self_scatter: weights has length $(length(weights)), B_lm has K = $K"))
+    length(weights) == K || throw(
+        DimensionMismatch(
+            "self_scatter: weights has length $(length(weights)), B_lm has K = $K",
+        ),
+    )
     T = promote_type(real(eltype(B_lm)), eltype(weights))
     # Σ_c Σ_lm w_lm·|B_lm|² per q. Each q's (C, K) block is one contiguous run, so it
     # is summed as a single vector with the weights repeated per channel.
@@ -585,7 +595,7 @@ function self_scatter(
     S = Vector{T}(undef, Q)
     @inbounds for q in 1:Q
         acc = zero(T)
-        @fastmath @simd for j in 1:(C * K)
+        @fastmath @simd for j in 1:(C*K)
             acc += wc[j] * abs2(Bq[j, q])
         end
         S[q] = 4π * acc
@@ -599,7 +609,8 @@ S(q) = 4π * `Σ_c` `Σ_lm` `w_lm` * Re(`B_a(q)` * conj(`B_b(q)`)).
 # Arguments
 - `B_lm_a::AbstractArray{<:Complex,3}, size (C_a, K, Q)`
 - `B_lm_b::AbstractArray{<:Complex,3}, size (C_b, K, Q)`
-- `weights::AbstractVector{<:Real}, length K`: as returned by [`partial_wave_weights`](@ref).
+- `weights::AbstractVector{<:Real}, length K`: as returned by
+    [`partial_wave_weights`](@ref).
 
 # Returns
 - `AbstractVector{<:Real} of length Q`
@@ -609,16 +620,20 @@ function cross_scatter(
     B_lm_b::AbstractArray{<:Complex,3},
     weights::AbstractVector{<:Real},
 )::AbstractVector{<:Real}
-    
+
     # Only the channels both operands actually have can be paired up; a real
     # amplitude's missing second channel would otherwise have nothing to mul against.
     n_chan = min(size(B_lm_a, 1), size(B_lm_b, 1))
-    
+
     # Re(B_a * conj(B_b)) per (channel, l/m, q) entry, matching self_scatter
     # with |B_lm|^2 (= Re(B_lm * conj(B_lm))) generalised to two operands.
     K, Q = size(B_lm_a, 2), size(B_lm_a, 3)
-    (size(B_lm_b, 2) == K && size(B_lm_b, 3) == Q && length(weights) == K) || throw(DimensionMismatch(
-        "cross_scatter: B_lm_a is (_, $K, $Q), B_lm_b is $(size(B_lm_b)), weights has length $(length(weights))"))
+    (size(B_lm_b, 2) == K && size(B_lm_b, 3) == Q && length(weights) == K) || throw(
+        DimensionMismatch(
+            "cross_scatter: B_lm_a is (_, $K, $Q), B_lm_b is $(size(B_lm_b)), " *
+            "weights has length $(length(weights))",
+        ),
+    )
     T = promote_type(real(eltype(B_lm_a)), real(eltype(B_lm_b)), eltype(weights))
     S = zeros(T, Q)
     if size(B_lm_a, 1) == size(B_lm_b, 1) == n_chan
@@ -629,8 +644,9 @@ function cross_scatter(
         wc = repeat(weights, inner = n_chan)
         @inbounds for q in 1:Q
             acc = zero(T)
-            @fastmath @simd for j in 1:(n_chan * K)
-                a = Aq[j, q]; b = Bq[j, q]
+            @fastmath @simd for j in 1:(n_chan*K)
+                a = Aq[j, q]
+                b = Bq[j, q]
                 acc += wc[j] * (real(a) * real(b) + imag(a) * imag(b))
             end
             S[q] = acc
@@ -641,7 +657,8 @@ function cross_scatter(
         @inbounds for q in 1:Q, c in 1:n_chan
             acc = zero(T)
             @fastmath @simd for k in 1:K
-                a = B_lm_a[c, k, q]; b = B_lm_b[c, k, q]
+                a = B_lm_a[c, k, q]
+                b = B_lm_b[c, k, q]
                 acc += weights[k] * (real(a) * real(b) + imag(a) * imag(b))
             end
             S[q] += acc

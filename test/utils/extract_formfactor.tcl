@@ -3,28 +3,32 @@
 
 # Extract data from xraydb.sqlite into one compact db.
 #
-#     tclsh test/utils/extract_formfactor.tcl xraydb.sqlite src/Scattering/form_factors.sqlite3
+#     tclsh test/utils/extract_formfactor.tcl \
+#         xraydb.sqlite src/Scattering/form_factors.sqlite3
 #
-# Source: xraydb 4.5.8's xraydb.sqlite. Its LICENSE places xraydb.sqlite and data_sources/ in the
-# public domain via CC0 1.0.
+# Source: xraydb 4.5.8's xraydb.sqlite. Its LICENSE places
+# xraydb.sqlite and data_sources/ in the public domain via CC0 1.0.
 #     - Waasmaier & Kirfel (1995) Acta Cryst A51, 416   -> f0 Gaussian coefficients
 #     - Chantler FFAST (NIST, fine grid)                -> f1/f2 anomalous terms
 # Energy/f1/f2 are stored as little-endian Float64 BLOBs.
 #
-# Offline script, not runtime code. Needs Tcl 9 and its `sqlite3` package (Fedora: sqlite-tcl).
+# Offline script, not runtime code. Needs Tcl 9
+# and its `sqlite3` package (Fedora: sqlite-tcl).
 #
-# The output was checked against the bundled form_factors.sqlite3: the same schema text, and every row
-# equal cell for cell (floats compared exactly, not through a text dump).
+# The output was checked against the bundled form_factors.sqlite3: the same schema text,
+# and every row equal cell for cell (floats compared exactly, not through a text dump).
 
 source [file join [file dirname [info script]] common.tcl]
 set SCRIPT [info script]
 
 namespace eval formfactor {
-    # --- helpers ----------------------------------------------------------------------------------------
+    # --- helpers
+    # ----------------------------------------------------------------------------------
 
-    # The numbers of a JSON array of plain numbers ("[1, 2.5, 3e-4]") as a list of doubles. Anything else
-    # in it is an error. `double()` converts each with Tcl's correctly rounded parser; the value is then
-    # bound as a real, so no digits are lost on the way into SQLite.
+    # The numbers of a JSON array of plain numbers ("[1, 2.5, 3e-4]") as
+    # a list of doubles. Anything else in it is an error. `double()`
+    # converts each with Tcl's correctly rounded parser; the value is
+    # then bound as a real, so no digits are lost on the way into SQLite.
     proc numbers {json what} {
         set out {}
         foreach tok [split [string trim $json "\[\] \n\t"] ,] {
@@ -43,15 +47,16 @@ namespace eval formfactor {
     }
 
 
-    # The schema, written out verbatim (not indented or reformatted), because the DDL text is stored in
-    # sqlite_master and the bundled database has this exact text.
+    # The schema, written out verbatim (not indented or reformatted), because the DDL
+    # text is stored in sqlite_master and the bundled database has this exact text.
     variable SCHEMA {
 CREATE TABLE waasmaier (
     ion     TEXT PRIMARY KEY,
     element TEXT NOT NULL,
     z       INTEGER NOT NULL,
     c       REAL NOT NULL,
-    a1 REAL NOT NULL, a2 REAL NOT NULL, a3 REAL NOT NULL, a4 REAL NOT NULL, a5 REAL NOT NULL,
+    a1 REAL NOT NULL, a2 REAL NOT NULL, a3 REAL \
+        NOT NULL, a4 REAL NOT NULL, a5 REAL NOT NULL,
     b1 REAL NOT NULL, b2 REAL NOT NULL, b3 REAL NOT NULL, b4 REAL NOT NULL, b5 REAL NOT NULL
 );
 CREATE INDEX idx_waasmaier_element ON waasmaier(element);
@@ -68,8 +73,9 @@ CREATE TABLE chantler (
 CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 }
 
-    # Entry point: builds the database in a temporary file next to $dst and renames it over $dst only when
-    # it is complete, so a failure midway leaves any existing $dst untouched and no partial file behind.
+    # Entry point: builds the database in a temporary file next to $dst and
+    # renames it over $dst only when it is complete, so a failure midway
+    # leaves any existing $dst untouched and no partial file behind.
     proc run {argv} {
         package require sqlite3
         if {"--help" in $argv || "-h" in $argv} {
@@ -98,7 +104,8 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         puts "size: [file size $dst] bytes"
     }
 
-    # Reads the source database $src and writes the compact database $dst (which must not exist).
+    # Reads the source database $src and writes the
+    # compact database $dst (which must not exist).
     proc build {src dst} {
         variable SCHEMA
         sqlite3 srcdb $src -readonly 1
@@ -111,11 +118,14 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
         dstdb eval BEGIN
 
-        # --- Waasmaier-Kirfel f0 coefficients ---------------------------------------------------------------
-        # One row per ion: offset c, five Gaussian amplitudes a1..a5 and five exponents b1..b5.
-        # The source keeps the two five-element lists as JSON text.
+        # --- Waasmaier-Kirfel f0 coefficients
+        # --------------------------------------------------------------- One row
+        # per ion: offset c, five Gaussian amplitudes a1..a5 and five exponents
+        # b1..b5. The source keeps the two five-element lists as JSON text.
 
-        srcdb eval {SELECT atomic_number, element, ion, offset, scale, exponents FROM Waasmaier} row {
+        srcdb eval \
+            {SELECT atomic_number, element, ion, offset, scale, exponents FROM Waasmaier} \
+            row {
             set z $row(atomic_number)
             set element $row(element)
             set ion $row(ion)
@@ -123,7 +133,8 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             set a [numbers $row(scale) "Waasmaier $ion scale"]
             set b [numbers $row(exponents) "Waasmaier $ion exponents"]
             if {[llength $a] != 5 || [llength $b] != 5} {
-                error "Waasmaier $ion: expected 5 amplitudes and 5 exponents, got [llength $a] and [llength $b]"
+                error "Waasmaier $ion: expected 5 amplitudes and\
+                    5 exponents, got [llength $a] and [llength $b]"
             }
             lassign $a a1 a2 a3 a4 a5
             lassign $b b1 b2 b3 b4 b5
@@ -139,9 +150,11 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             incr n_w
         }
 
-        # --- Chantler FFAST anomalous terms -----------------------------------------------------------------
-        # One row per element: the energy grid and f1, f2 on it, packed as Float64 blobs.
-        # A missing atomic number is an error (LEFT JOIN, then checked) rather than a silently dropped element.
+        # --- Chantler FFAST anomalous terms
+        # ------------------------------------------------------------------------------
+        # One row per element: the energy grid and f1, f2 on it, packed as
+        # Float64 blobs. A missing atomic number is an error (LEFT JOIN,
+        # then checked) rather than a silently dropped element.
 
         srcdb eval {
             SELECT c.element AS element, c.energy AS energy, c.f1 AS f1, c.f2 AS f2,
@@ -156,13 +169,15 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             set y1 [numbers $row(f1) "Chantler $el f1"]
             set y2 [numbers $row(f2) "Chantler $el f2"]
             if {[llength $e] != [llength $y1] || [llength $e] != [llength $y2]} {
-                error "Chantler $el: grid lengths differ ([llength $e], [llength $y1], [llength $y2])"
+                error "Chantler $el: grid lengths differ\
+                    ([llength $e], [llength $y1], [llength $y2])"
             }
 
-            # Cs has duplicate grid energies upstream, which makes the s=0 spline throw. Drop them, keeping
-            # the first occurrence, so the grid is strictly increasing for every element. A point is kept only
-            # if it is above the last point *kept* (the original compared with the previous raw point, which
-            # could keep a point below an earlier one if the grid ever dipped; the data has no such case).
+            # Cs has duplicate grid energies upstream, which makes the s=0 spline throw.
+            # Drop them, keeping the first occurrence, so the grid is strictly increasing
+            # for every element. A point is kept only if it is above the last point *kept*
+            # (the original compared with the previous raw point, which could keep a point
+            # below an earlier one if the grid ever dipped; the data has no such case).
             set keep {0}
             set last [lindex $e 0]
             for {set i 1} {$i < [llength $e]} {incr i} {
@@ -199,30 +214,39 @@ CREATE TABLE provenance (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             incr tot $npts
         }
 
-        # --- provenance -------------------------------------------------------------------------------------
-        # The f0_form text is plain ASCII (`<=`), as in the bundled database; the earlier script wrote `≤`,
-        # so regenerating would have changed that row.
+        # --- provenance
+        # ------------------------------------------------------------------------------
+        # The f0_form text is plain ASCII (`<=`), as in the bundled database; the earlier
+        # script wrote `≤`, so regenerating would have changed that row.
 
         foreach {key value} {
-            f0_source        {Waasmaier & Kirfel (1995) Acta Cryst A51, 416-431; doi:10.1107/S0108767394013292}
-            f0_form          {f0(s) = c + sum_{i=1..5} a_i*exp(-b_i*s^2), s = q/(4*pi) [1/Ang], valid 0 <= s <= 6}
-            anomalous_source {Chantler FFAST (NIST), fine grid; J. Phys. Chem. Ref. Data 24 71 (1995), 29 597 (2000)}
-            anomalous_form   {f1 stored as f1_FFAST - Z + f_rel(3/5 CL) + f_NT (xraydb convention); f = f0 + f1 + i*f2}
+            f0_source        {Waasmaier & Kirfel (1995) Acta\
+                Cryst A51, 416-431; doi:10.1107/S0108767394013292}
+            f0_form          {f0(s) = c + sum_{i=1..5}\
+                a_i*exp(-b_i*s^2), s = q/(4*pi) [1/Ang], valid 0 <= s <= 6}
+            anomalous_source {Chantler FFAST (NIST), fine grid;\
+                J. Phys. Chem. Ref. Data 24 71 (1995), 29 597 (2000)}
+            anomalous_form   {f1 stored as f1_FFAST - Z + f_rel(3/5\
+                CL) + f_NT (xraydb convention); f = f0 + f1 + i*f2}
             extracted_from   {xraydb 4.5.8 xraydb.sqlite}
-            license          {CC0 1.0 - xraydb LICENSE dedicates xraydb.sqlite and data_sources/ to the public domain}
+            license          {CC0 1.0 - xraydb LICENSE dedicates\
+                xraydb.sqlite and data_sources/ to the public domain}
         } {
             dstdb eval {INSERT INTO provenance VALUES ($key, $value)}
         }
 
-        # --- write ------------------------------------------------------------------------------------------
-        # VACUUM packs the file; it cannot run inside the transaction, hence the COMMIT first.
+        # --- write
+        # ------------------------------------------------------------------------------
+        # VACUUM packs the file; it cannot run inside the transaction, hence the COMMIT
+        # first.
 
         dstdb eval COMMIT
         dstdb eval VACUUM
         dstdb close
         srcdb close
 
-        puts [format "waasmaier: %d species, chantler: %d elements / %d grid points" $n_w $n_c $tot]
+        puts [format "waasmaier: %d species, chantler: %d elements / %d grid points" \
+            $n_w $n_c $tot]
     }
 }
 

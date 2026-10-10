@@ -1,13 +1,10 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
-Named stage of a run, for the report's `=== Timing ===` section.
-A [`StageLog`](@ref) is created when a run starts and is handed down
-to whatever should be timed; everything is a no-op when the log is `nothing`.
-"""
-module Timing
+# Named stage of a run, for the report's `=== Timing ===` section.
+# A [`StageLog`](@ref) is created when a run starts and is handed down
+# to whatever should be timed; everything is a no-op when the log is `nothing`.
 
-using ...PhysicalConstants: NS_PER_S
+using ..PhysicalConstants: NS_PER_S
 
 export Stage, StageLog, tick, tock!, timed!, stage_seconds, fmt_count
 
@@ -45,7 +42,7 @@ mutable struct StageLog
             Base.cumulative_compile_time_ns()[1],
             Stage[],
             Dict{String,Any}(),
-            ReentrantLock()
+            ReentrantLock(),
         )
     end
 end
@@ -65,12 +62,12 @@ function tock!(
     depth::Integer,
     name::AbstractString,
     t;
-    note::AbstractString = ""
+    note::AbstractString = "",
 )
     secs, comp, gc = _deltas(t)
     @lock log.lock push!(
         log.stages,
-        Stage(group, depth, name, secs, comp, gc, note)
+        Stage(group, depth, name, secs, comp, gc, note),
     )
     return secs, comp, gc
 end
@@ -92,7 +89,7 @@ function timed!(
     group::Symbol,
     depth::Integer,
     name::AbstractString;
-    note::AbstractString = ""
+    note::AbstractString = "",
 )
     idx = @lock log.lock begin
         push!(log.stages, Stage(group, depth, name, 0.0, 0.0, 0.0, note))
@@ -102,14 +99,14 @@ function timed!(
     v = f()
     secs, comp, gc = _deltas(t)
     @lock log.lock log.stages[idx] = Stage(
-                                            group,
-                                            depth,
-                                            name,
-                                            secs,
-                                            comp,
-                                            gc,
-                                            note
-                                        )
+        group,
+        depth,
+        name,
+        secs,
+        comp,
+        gc,
+        note,
+    )
     return v
 end
 timed!(f, ::Nothing, args...; kw...) = f()
@@ -121,7 +118,9 @@ function stage_seconds(log::StageLog, group::Symbol)
     s = c = g = 0.0
     @lock log.lock for st in log.stages
         (st.group === group && st.depth == 1) || continue
-        s += st.seconds; c += st.compile; g += st.gc
+        s += st.seconds
+        c += st.compile
+        g += st.gc
     end
     return s, c, g
 end
@@ -136,5 +135,3 @@ function fmt_count(n::Integer)
     x = string(round(n / 1000; digits = 2))
     return rstrip(rstrip(x, '0'), '.') * "k"
 end
-
-end # module

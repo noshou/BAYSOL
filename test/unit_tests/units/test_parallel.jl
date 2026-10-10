@@ -1,18 +1,20 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests for src/Runtime/Parallel.jl: the per-item random streams (deterministic, distinct, independent of the
-# order they are asked for), the ordered task map, and the BLAS scope. Thread-count independence of the
-# results built on them is checked where they are used (MAP search in test_sampler.jl).
+# Tests for src/Runtime/Parallel.jl: the per-item random streams (deterministic,
+# distinct, independent of the order they are asked for), the ordered task map,
+# and the BLAS scope. Thread-count independence of the results built on them is
+# checked where they are used (MAP search in test_sampler.jl).
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Parallel: worker_count, draw_base, stream, tmap_items, with_blas_single
+using BAYSOL.Runtime: worker_count, draw_base, stream, tmap_items, with_blas_single
 using LinearAlgebra: BLAS
 using Random
 
 @testset "Parallel" begin
 
-    @testset "stream: the same (base, purpose, index) is the same stream; any change of them is a different one" begin
+    # …of them is a different one
+    @testset "stream: the same (base, purpose, index) is the same stream; any change" begin
         draws(s) = rand(s, 8)
         @test draws(stream(UInt64(0x1234), 1, 1)) == draws(stream(UInt64(0x1234), 1, 1))
         @test draws(stream(UInt64(0x1234), 1, 1)) != draws(stream(UInt64(0x1234), 1, 2))
@@ -29,14 +31,18 @@ using Random
         @test allunique(a)
     end
 
-    @testset "stream: the mixing is SplitMix64 itself, so a published seed means the same on every Julia version" begin
-        # the first output of the reference SplitMix64 generator seeded with 0 (state 0 + γ, then the mix)
-        @test BAYSOL.Parallel._splitmix(0x9e3779b97f4a7c15) == 0xe220a8397b1dcdaf
+    # …so a published seed means the same on every Julia version
+    @testset "stream: the mixing is SplitMix64 itself" begin
+        # the first output of the reference SplitMix64
+        # generator seeded with 0 (state 0 + γ, then the mix)
+        @test BAYSOL.Runtime._splitmix(0x9e3779b97f4a7c15) == 0xe220a8397b1dcdaf
     end
 
     @testset "draw_base: follows Random.seed!" begin
-        Random.seed!(5); a = draw_base()
-        Random.seed!(5); b = draw_base()
+        Random.seed!(5)
+        a = draw_base()
+        Random.seed!(5)
+        b = draw_base()
         @test a == b && a isa UInt64
         @test draw_base() != a
     end
@@ -55,7 +61,8 @@ using Random
         end
     end
 
-    @testset "with_blas_single: one BLAS thread inside when Julia has several, restored after; nests" begin
+    # …restored after; nests
+    @testset "with_blas_single: one BLAS thread inside when Julia has several" begin
         before = BLAS.get_num_threads()
         inside = with_blas_single() do
             with_blas_single() do

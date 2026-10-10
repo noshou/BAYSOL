@@ -1,15 +1,14 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"Spherical harmonics (by recurrence) and Gautschi's continued-fraction
-method for spherical Bessel functions."
-module SphFuncs
-
-using ..Scattering: GAUTSCHI_MARGIN
+# Spherical harmonics (by recurrence) and Gautschi's continued-fraction
+# method for spherical Bessel functions.
 
 export sphHarm!, sphHarmCache, SphHarmCache, SphHarmError
 
 "Exception thrown by [`sphHarm!`](@ref) when its arguments are invalid."
-struct SphHarmError <: Exception; msg::String end
+struct SphHarmError <: Exception
+    msg::String
+end
 Base.showerror(io::IO, e::SphHarmError) = print(io, "SphHarmError: ", e.msg)
 
 """
@@ -21,7 +20,8 @@ state, so one task at a time.
 """
 struct SphHarmCache
     lMax::Int
-    a::Vector{Float64}  # a(l, m) = √((4l² − 1)/(l² − m²)), at packed idx of (l, m), l ≥ m + 2
+    # a(l, m) = √((4l² − 1)/(l² − m²)), at packed idx of (l, m), l ≥ m + 2
+    a::Vector{Float64}
     b::Vector{Float64}  # b(l, m) = √(((l − 1)² − m²)/(4(l − 1)² − 1))
     p0::Vector{Float64} # P̄_l^m (m = 0..l) for the degree being computed + two before it
     p1::Vector{Float64}
@@ -40,8 +40,9 @@ The workspace [`sphHarm!`](@ref) needs for degrees up to
 function sphHarmCache(lMax::Int)
     lMax ≥ 0 || throw(SphHarmError("lMax must be ≥ 0"))
     K = (lMax + 1) * (lMax + 2) ÷ 2
-    a = zeros(K); b = zeros(K)
-    for l in 2:lMax, m in 0:(l - 2)
+    a = zeros(K)
+    b = zeros(K)
+    for l in 2:lMax, m in 0:(l-2)
         i = l * (l + 1) ÷ 2 + m + 1
         a[i] = sqrt((4l^2 - 1) / (l^2 - m^2))
         b[i] = sqrt(((l - 1)^2 - m^2) / (4 * (l - 1)^2 - 1))
@@ -54,7 +55,7 @@ function sphHarmCache(lMax::Int)
         zeros(lMax + 1),
         zeros(lMax + 1),
         zeros(lMax + 1),
-        zeros(lMax + 1)
+        zeros(lMax + 1),
     )
 end
 
@@ -105,11 +106,12 @@ hold
 the rows of degree `l` are `2k0 + 1 … 2k0 + 2(l + 1)`.
 
 # Arguments
-- `A::AbstractMatrix{Float64}`: output with `size(A, 1) ≥ (lMax + 1)(lMax + 2)` rows and one column per point; may be a view.
+- `A::AbstractMatrix{Float64}`: output with `size(A, 1) ≥ (lMax + 1)(lMax + 2)`
+    rows and one column per point; may be a view.
 - `S::SphHarmCache`: from [`sphHarmCache`](@ref)`(lMax′)` with `lMax′ ≥ lMax`.
 - `lMax::Int`: maximum degree, `lMax ≥ 0`.
-- `θ`, `φ`: one-dimensional arrays (or views) of polar angles in `[0, π]` and azimuthal angles, in radians, of equal,
-    non-zero length.
+- `θ`, `φ`: one-dimensional arrays (or views) of polar angles in
+    `[0, π]` and azimuthal angles, in radians, of equal, non-zero length.
 
 # Returns
 - `A`.
@@ -124,7 +126,7 @@ function sphHarm!(
     S::SphHarmCache,
     lMax::Int,
     θ::AbstractArray{<:Real},
-    φ::AbstractArray{<:Real}
+    φ::AbstractArray{<:Real},
 )
 
     # assertion checks
@@ -145,71 +147,40 @@ function sphHarm!(
     P00 = 1 / sqrt(4π)
     @inbounds for t in eachindex(θ)
         i = t - firstindex(θ) + 1
-        x = cos(Float64(θ[t])); sn = sin(Float64(θ[t]))
+        x = cos(Float64(θ[t]))
+        sn = sin(Float64(θ[t]))
         sφ, cφ = sincos(Float64(φ[t]))
-        cr[1] = 1.0; ci[1] = 0.0                       # index m + 1
+        cr[1] = 1.0
+        ci[1] = 0.0                       # index m + 1
         for m in 1:lMax
-            cr[m + 1] = cr[m] * cφ - ci[m] * sφ
-            ci[m + 1] = cr[m] * sφ + ci[m] * cφ
+            cr[m+1] = cr[m] * cφ - ci[m] * sφ
+            ci[m+1] = cr[m] * sφ + ci[m] * cφ
         end
         # degree 0
         pa, pb, pc = p0, p1, p2 # current, previous, one before
         pa[1] = P00
-        A[1, i] = P00; A[2, i] = -0.0
+        A[1, i] = P00
+        A[2, i] = -0.0
         for l in 1:lMax
             pa, pb, pc = pc, pa, pb # rotate: pb holds degree l − 1, pc degree l − 2
             k0 = l * (l + 1) ÷ 2
-            pa[l + 1] = -sqrt((2l + 1) / (2l)) * sn * pb[l] # m = l
-            pa[l]     = sqrt(2l + 1) * x * pb[l] # m = l − 1
-            @fastmath @simd for m in 1:(l - 1) # m = 0 .. l − 2, shifted by one
+            pa[l+1] = -sqrt((2l + 1) / (2l)) * sn * pb[l] # m = l
+            pa[l] = sqrt(2l + 1) * x * pb[l] # m = l − 1
+            @fastmath @simd for m in 1:(l-1) # m = 0 .. l − 2, shifted by one
                 ia = k0 + m
                 pa[m] = a[ia] * (x * pb[m] - b[ia] * pc[m])
             end
             r0 = 2k0
-            @fastmath @simd for m in 1:(l + 1)
+            @fastmath @simd for m in 1:(l+1)
                 pv = pa[m]
-                A[r0 + m, i] = pv * cr[m]
-                A[r0 + l + 1 + m, i] = -(pv * ci[m])
+                A[r0+m, i] = pv * cr[m]
+                A[r0+l+1+m, i] = -(pv * ci[m])
             end
         end
     end
     return A
 end
 
-"""
-Reusable workspace for evaluating spherical Bessel functions over a fixed
-`q` grid.
-
-The workspace is used by [`sphBessRatios!`](@ref) to perform the first pass of
-the spherical-Bessel recurrence. It stores the per-`q` quantities needed by
-the subsequent upward sweep, avoiding allocation for each radius.
-
-# Fields
-- `x`: `x[k] = q[k] * r` for the current radius.
-- `invx`: `1 / x[k]`, with `0.0` substituted when `x[k] == 0`.
-- `lup`: `floor(Int, x[k])`, the largest order for which the upward recurrence
-    is used.
-- `N`: starting order of the downward continued-fraction recurrence. A value
-    of `-1` indicates that `floor(x[k]) ≥ lMax` and no ratios are required.
-- `rp`: scratch storage for the current continued-fraction ratio during the
-    downward sweep.
-- `jm1`: current `jₗ₋₁(x[k])` value for the upward sweep. After
-    [`sphBessRatios!`](@ref), it contains `j₁(x[k])`.
-- `jm2`: current `jₗ₋₂(x[k])` value for the upward sweep. After
-    [`sphBessRatios!`](@ref), it contains `j₀(x[k])`.
-- `R`: ratio table with `R[k, l] = jₗ(x[k]) / jₗ₋₁(x[k])` for the orders
-    required by the sweep. The first dimension is contiguous in `q`.
-"""
-struct sphBess
-    x::Vector{Float64}
-    invx::Vector{Float64}
-    lup::Vector{Int}
-    N::Vector{Int}
-    rp::Vector{Float64}
-    jm1::Vector{Float64}
-    jm2::Vector{Float64}
-    R::Matrix{Float64}
-end
 
 """
 Allocate a zero-initialized [`sphBess`](@ref) workspace.
@@ -235,14 +206,14 @@ function sphBess(nq::Int, lMax::Int)
     nq ≥ 0 || throw(DomainError(nq, "sphBess: nq must be ≥ 0"))
     lMax ≥ 0 || throw(DomainError(lMax, "sphBess: lMax must be ≥ 0"))
     return sphBess(
-        zeros(nq), 
-        zeros(nq), 
-        zeros(Int, nq), 
+        zeros(nq),
+        zeros(nq),
         zeros(Int, nq),
-        zeros(nq), 
-        zeros(nq), 
-        zeros(nq), 
-        zeros(nq, max(lMax, 1))
+        zeros(Int, nq),
+        zeros(nq),
+        zeros(nq),
+        zeros(nq),
+        zeros(nq, max(lMax, 1)),
     )
 end
 
@@ -285,7 +256,7 @@ The returned value is on the same normalization as the supplied anchor values
     l::Int,
     lup::Int,
     invx::Float64,
-    rl::Float64
+    rl::Float64,
 )::Float64 =
     ifelse(l ≤ lup, muladd((2l - 1) * invx, jm1, -jm2), jm1 * rl)
 
@@ -377,15 +348,15 @@ function sphBessRatios!(
 )::Nothing
     nq = length(q)
     length(b.x) ≥ nq || throw(
-            ArgumentError(
-                "sphBessRatios!: buffers hold $(length(b.x)) q values, need $nq"
-            )
-        )
+        ArgumentError(
+            "sphBessRatios!: buffers hold $(length(b.x)) q values, need $nq",
+        ),
+    )
     size(b.R, 2) ≥ lMax || throw(
-            ArgumentError(
-                "sphBessRatios!: buffers hold $(size(b.R, 2)) orders, need $lMax"
-            )
-        )
+        ArgumentError(
+            "sphBessRatios!: buffers hold $(size(b.R, 2)) orders, need $lMax",
+        ),
+    )
     r ≥ 0 || throw(DomainError(r, "sphBessRatios!: r must be ≥ 0"))
     lMax ≥ 0 || throw(DomainError(lMax, "sphBessRatios!: lMax must be ≥ 0"))
     ltop === nothing || length(ltop) ≥ nq ||
@@ -436,13 +407,19 @@ function sphBessRatios!(
     # otherwise every q is swept at every l.
     mono = issorted(view(N, 1:nq)) && issorted(view(lup, 1:nq))
     Nmax = nq == 0 ? 0 : (mono ? N[nq] : maximum(view(N, 1:nq)))
-    lo = nq + 1; hi = nq
+    lo = nq + 1
+    hi = nq
     for l in Nmax:-1:1
         if mono
-            while lo > 1 && N[lo - 1] ≥ l; lo -= 1; end
-            while hi ≥ 1 && lup[hi] ≥ l; hi -= 1; end
+            while lo > 1 && N[lo-1] ≥ l
+                lo -= 1
+            end
+            while hi ≥ 1 && lup[hi] ≥ l
+                hi -= 1
+            end
         else
-            lo = 1; hi = nq
+            lo = 1
+            hi = nq
         end
         lo > hi && continue
         two_l_plus_one = 2l + 1
@@ -467,5 +444,3 @@ function sphBessRatios!(
     end
     return nothing
 end
-
-end # module

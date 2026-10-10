@@ -28,7 +28,10 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
     # -----------------------------------------------------------------------
 
     "Rows of a fixture CSV, minus its header."
-    _fx(name) = Iterators.drop(eachline(joinpath(@__DIR__, "..", "..", "fixtures", "form-factors", name)), 1)
+    _fx(name) = Iterators.drop(
+        eachline(joinpath(@__DIR__, "..", "..", "fixtures", "form-factors", name)),
+        1,
+    )
 
     "Agreement to within `k` units in the last place at `ref`'s own magnitude."
     _ulp(got, ref, k = 2) = abs(got - ref) ≤ k * eps(abs(ref))
@@ -39,11 +42,15 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
         # the NumPy exponent association is already reproduced. Chasing the last
         # ulp would pin us to a NumPy implementation detail for no physical gain:
         # independent form-factor tabulations disagree at the 0.4% level.
-        n = 0; exact = 0; worst = 0.0
+        n = 0
+        exact = 0
+        worst = 0.0
         for ln in _fx("f0.csv")
             ion, s_, ref = split(ln, ',')
-            got = f0(String(ion), parse(Float64, s_)); r = parse(Float64, ref)
-            n += 1; got === r && (exact += 1)
+            got = f0(String(ion), parse(Float64, s_))
+            r = parse(Float64, ref)
+            n += 1
+            got === r && (exact += 1)
             @test _ulp(got, r)
             worst = max(worst, abs(got - r) / abs(r))
         end
@@ -58,14 +65,20 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
         # libm difference, not an algorithmic one, and it is not matchable.
         # f1 additionally carries a 7x7 dense solve for the spline coefficients,
         # hence the looser (but still ~5 orders inside the suite's 1e-6) bound.
-        n = 0; exact2 = 0; w1 = 0.0; w2 = 0.0
+        n = 0
+        exact2 = 0
+        w1 = 0.0
+        w2 = 0.0
         for ln in _fx("f1f2.csv")
             el, E, r1, r2 = split(ln, ',')
             g1, g2 = f1f2(String(el), parse(Float64, E))
-            a = parse(Float64, r1); b = parse(Float64, r2)
-            n += 1; g2 === b && (exact2 += 1)
+            a = parse(Float64, r1)
+            b = parse(Float64, r2)
+            n += 1
+            g2 === b && (exact2 += 1)
             @test _ulp(g2, b)
-            w1 = max(w1, abs(g1 - a)); w2 = max(w2, abs(g2 - b) / abs(b))
+            w1 = max(w1, abs(g1 - a))
+            w2 = max(w2, abs(g2 - b) / abs(b))
         end
         @test n == 852
         @test w1 < 1e-2 * DEFAULT_ATOL      # measured ~6e-14
@@ -93,7 +106,7 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
             8000.0,
             ["fe3+"], qvals).tbl == compute_form_factors(["fe3+"],
             8000.0,
-            qvals
+            qvals,
         ).tbl #form_factor_table is a thin wrapper
     end
 
@@ -115,7 +128,7 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
         t = IFACE.form_factor_table(8000.0, ["fe3+", "o2-", "h"], qgrid)
         for row in values(t.tbl)
             re = real.(row)
-            @test all(i -> re[i] > re[i + 1], 1:(length(re) - 1))
+            @test all(i -> re[i] > re[i+1], 1:(length(re)-1))
         end
     end
 
@@ -125,8 +138,8 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
         t = IFACE.form_factor_table(1.0, ["fe3+", "o2-", "h"], [0.0])
         # atol covers the Cromer-Mann parameterization's own residual at s = 0
         @test isapprox(real(t.tbl["fe3+"][1]), 23.0; atol = 5e-3)   # Fe: Z = 26
-        @test isapprox(real(t.tbl["o2-"][1]), 10.0;  atol = 5e-3)   # O:  Z = 8
-        @test isapprox(real(t.tbl["h"][1]),    1.0;  atol = 5e-3)
+        @test isapprox(real(t.tbl["o2-"][1]), 10.0; atol = 5e-3)   # O:  Z = 8
+        @test isapprox(real(t.tbl["h"][1]), 1.0; atol = 5e-3)
     end
 
     @testset "f0-only tier is logged and has no imaginary part" begin
@@ -140,7 +153,8 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
         @test all(v -> imag(v) != 0.0, full.tbl["fe3+"])
     end
 
-    @testset "dummy ion is logged, dropped from the table, and rejected by form_factors" begin
+    # …by form_factors
+    @testset "dummy ion is logged, dropped from the table, and rejected" begin
         t = IFACE.form_factor_table(8000.0, ["fe3+", "xx"], qvals)
         @test any(==("DUMMY   xx"), IFACE.form_factor_log(t))
         @test !haskey(t.tbl, "xx")
@@ -158,7 +172,8 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
 
     @testset "form_factors rows follow the requested ion order" begin
         t = IFACE.form_factor_table(8000.0, ["fe3+", "o2-", "h"], qvals)
-        ref = Dict(i => IFACE.form_factors(t, [i], qvals)[1, :] for i in ("fe3+", "o2-", "h"))
+        ref =
+            Dict(i => IFACE.form_factors(t, [i], qvals)[1, :] for i in ("fe3+", "o2-", "h"))
         got = IFACE.form_factors(t, ["h", "fe3+", "o2-"], qvals)
         @test got[1, :] == ref["h"] && got[2, :] == ref["fe3+"] && got[3, :] == ref["o2-"]
         got2 = IFACE.form_factors(t, ["o2-", "h"], qvals)
@@ -183,15 +198,18 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
     @testset "form_factors rejects an ion never in the container" begin
         t = IFACE.form_factor_table(8000.0, ["fe3+"], qvals)
         @test_throws FormFactorError IFACE.form_factors(t, ["not_built"], qvals)
-        @test_throws FormFactorError IFACE.form_factors(t, ["fe2+"], qvals)   # a different charge state is a miss
+        # a different charge state is a miss
+        @test_throws FormFactorError IFACE.form_factors(t, ["fe2+"], qvals)
     end
 
     @testset "lookup at an off-grid q raises" begin
         t = IFACE.form_factor_table(8000.0, ["fe3+"], qvals)
         @test_throws FormFactorError IFACE.form_factors(t, ["fe3+"], [0.15])
         @test_throws FormFactorError IFACE.form_factors(t, ["fe3+"], [0.1, 0.15])
-        @test_throws FormFactorError IFACE.form_factors(t, ["fe3+"], [nextfloat(0.1)])  # exact match only
-        @test_throws FormFactorError IFACE.form_factors(t, String[], [0.15])            # q checked first
+        # exact match only
+        @test_throws FormFactorError IFACE.form_factors(t, ["fe3+"], [nextfloat(0.1)])
+        # q checked first
+        @test_throws FormFactorError IFACE.form_factors(t, String[], [0.15])
     end
 
     @testset "compute_form_factors input guards raise" begin
@@ -217,7 +235,11 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
         # 26 electrons instead of 22 is a real approximation, so it is logged.
         t = IFACE.form_factor_table(8000.0, ["fe4+"], qvals)
         @test any(==("NEUTRAL fe4+"), IFACE.form_factor_log(t))
-        @test check_c(real(t.tbl["fe4+"][1]) - real(IFACE.form_factor_table(8000.0, ["fe"], qvals).tbl["fe"][1]), 0.0)
+        @test check_c(
+            real(t.tbl["fe4+"][1]) -
+            real(IFACE.form_factor_table(8000.0, ["fe"], qvals).tbl["fe"][1]),
+            0.0,
+        )
     end
 
     @testset "f1f2 rejects an element with no Chantler data or an out-of-range energy" begin
@@ -234,11 +256,18 @@ qgrid = [0.0, 0.1, 0.5, 1.0]
     @testset "integer-typed energy and q are accepted" begin
         t = compute_form_factors(["fe3+"], 8000, [0, 1])
         @test sort(collect(keys(t.qmp))) == [0.0, 1.0]
-        @test t.tbl["fe3+"] == IFACE.form_factor_table(8000.0, ["fe3+"], [0.0, 1.0]).tbl["fe3+"]
+        @test t.tbl["fe3+"] ==
+              IFACE.form_factor_table(8000.0, ["fe3+"], [0.0, 1.0]).tbl["fe3+"]
     end
 
     @testset "log is empty when every ion resolves fully" begin
-        @test isempty(IFACE.form_factor_log(IFACE.form_factor_table(8000.0, ["fe3+"], qvals)))
-        @test isempty(IFACE.form_factor_log(IFACE.form_factor_table(8000.0, ["fe3+", "o2-", "h"], qvals)))
+        @test isempty(
+            IFACE.form_factor_log(IFACE.form_factor_table(8000.0, ["fe3+"], qvals)),
+        )
+        @test isempty(
+            IFACE.form_factor_log(
+                IFACE.form_factor_table(8000.0, ["fe3+", "o2-", "h"], qvals),
+            ),
+        )
     end
 end

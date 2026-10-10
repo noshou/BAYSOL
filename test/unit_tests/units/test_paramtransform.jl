@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests for src/Inference/ParamTransform.jl: the ξ-space (physical fit
+# Tests for src/Inference/Priors.jl: the ξ-space (physical fit
 # parameters, bounded/half-bounded domains) <-> θ-space (unconstrained ℝ⁴) bijection that
 # the HMC sampler runs in, plus the log-Jacobian correction `Θ` returns
 # alongside the (pure, non-mutating) transform.
@@ -12,7 +12,8 @@ using LinearAlgebra
 using Random
 using StaticArrays
 using Distributions: mean
-using BAYSOL.Inference: Θ, Ξ, ρₑ_prior, δρ_prior, ξ_priors, Solute, NonBiological
+using BAYSOL.Inference: Θ, Ξ, ρₑ_prior, δρ_prior, ξ_priors
+using BAYSOL.BulkElectronDensity: Solute, NonBiological
 using BAYSOL.Inference: BOUNDS_δρ₁₂, κ_δρ₁₂, κ_δρ₃
 
 const logjac = BAYSOL.Inference.logjac
@@ -61,8 +62,10 @@ analytic log-Jacobian against something that doesn't share its derivation.
 function numeric_ξ_jacobian(t::NTuple{4,<:Real}; h::Real = 1.0e-6)
     J = zeros(Float64, 4, 4)
     for j in 1:4
-        tp = collect(Float64, t); tp[j] += h
-        tm = collect(Float64, t); tm[j] -= h
+        tp = collect(Float64, t)
+        tp[j] += h
+        tm = collect(Float64, t)
+        tm[j] -= h
         J[:, j] = (collect(apply_Ξ(Tuple(tp))) .- collect(apply_Ξ(Tuple(tm)))) ./ (2h)
     end
     return J
@@ -118,7 +121,8 @@ const θ_CASES = (
         @test apply_Ξ((1.2, 0.0, 0.0, 0.3))[2:3] == (mid, mid)
     end
 
-    @testset "log-Jacobian: Θ's corr == logjac(Θ(ξ)), and matches a finite-difference det" begin
+    # …and matches a finite-difference det
+    @testset "log-Jacobian: Θ's corr == logjac(Θ(ξ))" begin
         for θ₀ in ((0.1, -0.2, 0.3, -0.4), (2.0, -2.0, 0.0, 0.0), (-5.0, 5.0, 1.0, 3.0))
             ξ0 = apply_Ξ(θ₀)
             θ, corr = apply_Θ(ξ0)
@@ -135,7 +139,7 @@ const θ_CASES = (
 
     @testset "Ξ: ρₑ > 0, δρ₁, δρ₂ ∈ [-10, 2] and δρ₃ ∈ [L₃, L₃ + W₃] for any finite θ" begin
         for θ₀ in ((0.0, 0.0, 0.0, 0.0), (700.0, -700.0, 700.0, 40.0),
-                   (-700.0, 700.0, -700.0, -40.0), (37.0, -21.5, 3.0, 3.0))
+            (-700.0, 700.0, -700.0, -40.0), (37.0, -21.5, 3.0, 3.0))
             res = apply_Ξ(θ₀)
             @test res[1] > 0
             @test LO ≤ res[2] ≤ HI && LO ≤ res[3] ≤ HI
@@ -166,14 +170,17 @@ const θ_CASES = (
     end
 
     @testset "Ξ and logjac are AD-differentiable" begin
-        f(t) = sum(Ξ(SVector{4,eltype(t)}(t...), PR)) + logjac(SVector{4,eltype(t)}(t...), PR)
+        f(t) =
+            sum(Ξ(SVector{4,eltype(t)}(t...), PR)) + logjac(SVector{4,eltype(t)}(t...), PR)
         t0 = [0.1, -0.2, 0.3, -0.4]
         g = ForwardDiff.gradient(f, t0)
         @test all(isfinite, g)
         h = 1.0e-6
         for i in 1:4
-            tp = copy(t0); tp[i] += h
-            tm = copy(t0); tm[i] -= h
+            tp = copy(t0)
+            tp[i] += h
+            tm = copy(t0)
+            tm[i] -= h
             @test g[i] ≈ (f(tp) - f(tm)) / (2h) rtol = 1.0e-4
         end
     end
@@ -188,8 +195,10 @@ const θ_CASES = (
         @test all(isfinite, g)
         h = 1.0e-6
         for i in 1:4
-            xp = copy(x0); xp[i] += h
-            xm = copy(x0); xm[i] -= h
+            xp = copy(x0)
+            xp[i] += h
+            xm = copy(x0)
+            xm[i] -= h
             @test g[i] ≈ (f(xp) - f(xm)) / (2h) rtol = 1.0e-4
         end
     end
@@ -198,10 +207,15 @@ const θ_CASES = (
         ξ5 = SVector(CRYSOL_SOLVENT_DENSITY, 1.05, -0.2, -2.0, 0.4)
         θ5, corr5 = Θ(ξ5, PR)
         @test all(isapprox.(Ξ(θ5, PR), ξ5; rtol = 1e-12))
-        @test isapprox(corr5, logjac(SVector(θ5[1], θ5[2], θ5[3], θ5[4]), PR) + θ5[5]; atol = 1e-3 * DEFAULT_ATOL)
+        @test isapprox(
+            corr5,
+            logjac(SVector(θ5[1], θ5[2], θ5[3], θ5[4]), PR) + θ5[5];
+            atol = 1e-3 * DEFAULT_ATOL,
+        )
     end
 
-    @testset "priors -> θ/ξ: full-prior draws round-trip and never throw (250_000 draws)" begin
+    # …(250_000 draws)
+    @testset "priors -> θ/ξ: full-prior draws round-trip and never throw" begin
         Random.seed!(20_260_920)
         d_ρ, δρ₁_d, δρ₂_d, δρ₃_d = PR.ρₑPrior, PR.δρ₁Prior, PR.δρ₂Prior, PR.δρ₃Prior
         finite_ok = true
@@ -211,8 +225,10 @@ const θ_CASES = (
             ξ0 = (rand(d_ρ), rand(δρ₁_d), rand(δρ₂_d), rand(δρ₃_d))
             res, corr = apply_Θ(ξ0)
             finite_ok &= isfinite(corr) && all(isfinite, res)
-            roundtrip_ok &= all(isapprox.(apply_Ξ(res), ξ0; rtol = 1e-9, atol = 1e-3 * DEFAULT_ATOL))
-            jacobian_ok &= isapprox(corr, logjac(SVector{4}(res...), PR); atol = DEFAULT_ATOL)
+            roundtrip_ok &=
+                all(isapprox.(apply_Ξ(res), ξ0; rtol = 1e-9, atol = 1e-3 * DEFAULT_ATOL))
+            jacobian_ok &=
+                isapprox(corr, logjac(SVector{4}(res...), PR); atol = DEFAULT_ATOL)
         end
         @test finite_ok
         @test roundtrip_ok

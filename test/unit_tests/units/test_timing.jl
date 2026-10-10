@@ -4,7 +4,7 @@
 # `fmt_count`) and the report's `=== Run ===` / `=== Timing ===` sections.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Timing: StageLog, Stage, timed!, tick, tock!, stage_seconds, fmt_count
+using BAYSOL.Runtime: StageLog, Stage, timed!, tick, tock!, stage_seconds, fmt_count
 using BAYSOL.Pipeline: _write_timing, _write_run_info
 
 @testset "Timing" begin
@@ -50,7 +50,8 @@ using BAYSOL.Pipeline: _write_timing, _write_run_info
     @testset "_write_run_info / _write_timing write nothing without a log" begin
         io = IOBuffer()
         @test _write_run_info(io, nothing) === nothing
-        _write_run_info(io, nothing; n_atoms = 327)       # a bare n_atoms still gets a Run section
+        # a bare n_atoms still gets a Run section
+        _write_run_info(io, nothing; n_atoms = 327)
         @test occursin(r"=== Run ===\nn_atoms\s+= 327", String(take!(io)))
         @test _write_timing(io, nothing, tick()) === nothing
         @test isempty(take!(io))
@@ -58,13 +59,31 @@ using BAYSOL.Pipeline: _write_timing, _write_run_info
 
     @testset "_write_timing: sections, nesting, and an aligned seconds column" begin
         log = StageLog()
-        log.info["n_atoms"] = 602; log.info["lMax"] = 12; log.info["n_q"] = 60; log.info["n_samples"] = 2000; log.info["n_adapt"] = 1000
+        log.info["n_atoms"] = 602
+        log.info["lMax"] = 12
+        log.info["n_q"] = 60
+        log.info["n_samples"] = 2000
+        log.info["n_adapt"] = 1000
         push!(log.stages, Stage(:static, 1, "pdb2pqr", 21.3, 0.0, 0.0, "[cache miss]"))
         push!(log.stages, Stage(:static, 1, "forward_cache", 25.9, 0.0, 0.0, ""))
         push!(log.stages, Stage(:static, 1, "resolve_structure", 0.0023, 0.0, 0.0, ""))
-        push!(log.stages, Stage(:static, 1, "seed_sampler (priors, WLS)", 0.0, 0.0, 0.0, ""))
+        push!(
+            log.stages,
+            Stage(:static, 1, "seed_sampler (priors, WLS)", 0.0, 0.0, 0.0, ""),
+        )
         push!(log.stages, Stage(:static, 2, "hydration (SASA + B_lm)", 19.8, 0.0, 0.0, ""))
-        push!(log.stages, Stage(:sampling, 1, "NUTS  (2k iters, 14.21k leapfrog, 4.8 ms/step)", 68.0, 0.0, 0.0, ""))
+        push!(
+            log.stages,
+            Stage(
+                :sampling,
+                1,
+                "NUTS  (2k iters, 14.21k leapfrog, 4.8 ms/step)",
+                68.0,
+                0.0,
+                0.0,
+                "",
+            ),
+        )
         io = IOBuffer()
         _write_run_info(io, log)
         run_txt = String(take!(io))
@@ -76,23 +95,34 @@ using BAYSOL.Pipeline: _write_timing, _write_run_info
         _write_timing(io, log, tick())
         lines = split(String(take!(io)), '\n'; keepempty = false)
         @test startswith(lines[1], "=== Timing ===")
-        @test occursin("seconds", lines[1]) && occursin("% wall", lines[1]) && occursin("(JIT)", lines[1])
+        @test occursin("seconds", lines[1]) && occursin("% wall", lines[1]) &&
+              occursin("(JIT)", lines[1])
         @test any(startswith("wall clock  (seed_model → end of report)"), lines)
         @test any(l -> startswith(l, "  static build"), lines)
         @test any(l -> startswith(l, "    pdb2pqr") && occursin("[cache miss]", l), lines)
-        @test any(l -> startswith(l, "      hydration (SASA + B_lm)"), lines)   # depth 2 → 6 spaces
-        @test any(l -> startswith(l, "  report write"), lines) && any(l -> startswith(l, "  unaccounted"), lines)
+        # depth 2 → 6 spaces
+        @test any(l -> startswith(l, "      hydration (SASA + B_lm)"), lines)
+        @test any(l -> startswith(l, "  report write"), lines) &&
+              any(l -> startswith(l, "  unaccounted"), lines)
         @test startswith(lines[end], "GC: ")
-        # a stage of a few milliseconds is not rounded to 0.00: it prints in scientific notation
-        @test any(l -> startswith(l, "    resolve_structure") && occursin(r"2\.3e-03\s*$", l), lines)
+        # a stage of a few milliseconds is not rounded
+        # to 0.00: it prints in scientific notation
+        @test any(
+            l -> startswith(l, "    resolve_structure") && occursin(r"2\.3e-03\s*$", l),
+            lines,
+        )
         @test any(l -> startswith(l, "    seed_sampler") && occursin(r"\s0\s*$", l), lines)
-        @test BAYSOL.Pipeline._fmt_seconds(25.9) == "25.90" && BAYSOL.Pipeline._fmt_seconds(0.01) == "0.01" &&
-              BAYSOL.Pipeline._fmt_seconds(0.0099) == "9.9e-03" && BAYSOL.Pipeline._fmt_seconds(0) == "0"
+        @test BAYSOL.Pipeline._fmt_seconds(25.9) == "25.90" &&
+              BAYSOL.Pipeline._fmt_seconds(0.01) == "0.01" &&
+              BAYSOL.Pipeline._fmt_seconds(0.0099) == "9.9e-03" &&
+              BAYSOL.Pipeline._fmt_seconds(0) == "0"
         # the seconds column ends at the same character on every stage line
         # (character positions, not byte offsets: the wall-clock label contains "→")
         charend(l, r) = length(l[1:something(findfirst(r, l)).stop])
-        ends = [charend(l, r"\d+\.\d\d(?=( |$))") for l in lines[2:end-1]
-                if occursin(r"^\s*\S.*\d+\.\d\d", l)]
+        ends = [
+            charend(l, r"\d+\.\d\d(?=( |$))") for l in lines[2:(end-1)]
+            if occursin(r"^\s*\S.*\d+\.\d\d", l)
+        ]
         @test length(ends) ≥ 6
         header_end = charend(lines[1], r"seconds")
         @test all(==(header_end), ends)

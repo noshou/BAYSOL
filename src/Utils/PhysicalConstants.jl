@@ -7,11 +7,11 @@ here (`using ..PhysicalConstants: AVOGADRO`).
 """
 module PhysicalConstants
 
-export  AVOGADRO, PLANCK_CONSTANT, SPEED_OF_LIGHT, ELEMENTARY_CHARGE, ANGSTROM_PER_METER,
-        HC_EV_ANGSTROM, WATER_MOLAR_MASS, WATER_DENSITY_UNCERTAINTY, KELL_DENSITY_NUM,
-        KELL_DENSITY_DEN, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER,
-        PM_PER_ANGSTROM, NM_INV_PER_ANGSTROM_INV, UNIT_OF_δρ, NS_PER_S, MS_PER_S,
-        STANDARD_TEMPERATURE_C, BACKBONE_ELECTRONS
+export AVOGADRO, PLANCK_CONSTANT, SPEED_OF_LIGHT, ELEMENTARY_CHARGE, ANGSTROM_PER_METER,
+    HC_EV_ANGSTROM, WATER_MOLAR_MASS, WATER_DENSITY_UNCERTAINTY, KELL_DENSITY_NUM,
+    KELL_DENSITY_DEN, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER,
+    PM_PER_ANGSTROM, NM_INV_PER_ANGSTROM_INV, UNIT_OF_δρ, NS_PER_S, MS_PER_S,
+    STANDARD_TEMPERATURE_C, BACKBONE_ELECTRONS
 
 "Avogadro constant, mol⁻¹ (CODATA, exact since the 2019 SI redefinition)."
 const AVOGADRO = 6.02214076e23
@@ -56,7 +56,7 @@ const KELL_DENSITY_NUM = (
     -7.9870401e-3,
     -46.170461e-6,
     105.56302e-9,
-    -280.54253e-12
+    -280.54253e-12,
 )
 
 "Denominator coefficient b of the Kell equation
@@ -69,7 +69,7 @@ const WATER_ELECTRONS = 10
 """
 Peptide backbone unit (-CH2CONH-, neutral, C2H3NO) electron count:
 2×C(6) + 3×H(1) + N(7) + O(8) = 30 e. Added once per residue on the
-same basis as [`BACKBONE_PMV`](@ref BAYSOL.PartialMolarVolumes.BACKBONE_PMV);
+same basis as [`BACKBONE_PMV`](@ref BAYSOL.BulkElectronDensity.BACKBONE_PMV);
 Protein.json's `electron_count` field is a side-chain-only increment
 relative to glycine.
 """

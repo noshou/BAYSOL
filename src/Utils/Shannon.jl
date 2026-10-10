@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 """
-Shannon sampling of a SAXS curve: a particle of diameter `D` has a scattering curve that
-carries no information at a q spacing finer than `π/D` (one *Shannon channel*), so a curve
-of thousands of points holds only `(q_max - q_min)·D/π` independent values.
-[`shannon_data`](@ref) bins the measured curve to that resolution and picks the band limit
-[`auto_lmax`](@ref) the binned q range needs; [`cloud_diameter`](@ref) supplies `D`;
-[`model_on_raw`](@ref) and [`residual_structure`](@ref) check the result against the measured data.
+Shannon sampling of a SAXS curve: a particle of diameter `D` has a scattering
+curve that carries no information at a q spacing finer than `π/D` (one *Shannon
+channel*), so a curve of thousands of points holds only `(q_max - q_min)·D/π`
+independent values. [`shannon_data`](@ref) bins the measured curve to that
+resolution and picks the band limit [`auto_lmax`](@ref) the binned q range
+needs; [`cloud_diameter`](@ref) supplies `D`; [`model_on_raw`](@ref) and
+[`residual_structure`](@ref) check the result against the measured data.
 """
 module Shannon
 
@@ -16,26 +17,28 @@ using HypothesisTests: WaldWolfowitzTest
 using Dierckx: Spline1D
 
 export ShannonInfo, SHANNON_REBIN, BIN_BIAS_MAX, cloud_diameter, auto_lmax,
-shannon_data, bin_bias_ratio, model_on_raw, residual_structure
+    shannon_data, bin_bias_ratio, model_on_raw, residual_structure
 
 """
-Default number of bins per Shannon channel (`k`): the bin width is `π/(k·D)`. Binning at `k ≥ 8`
-preserved the Laplace posterior width and moved the MAP by less than the posterior σ on the
-fitting tests (see the Shannon section of the Fitting-test README).
+Default number of bins per Shannon channel (`k`): the bin width is `π/(k·D)`. Binning
+at `k ≥ 8` preserved the Laplace posterior width and moved the MAP by less than the
+posterior σ on the fitting tests (see the Shannon section of the Fitting-test README).
 """
 const SHANNON_REBIN = 12
 
 """
-Largest worst-case bias of the binning, as a fraction of the smallest binned relative error ([`bin_bias_ratio`](@ref)),
-that [`shannon_data`](@ref) accepts: if the requested `rebin` gives more, the bins are made finer until the bound is
-met (or the curve is fitted unbinned). 0.3 keeps the binning's systematic shift of any bin under a third of that
-bin's smallest error bar.
+Largest worst-case bias of the binning, as a fraction of the smallest binned
+relative error ([`bin_bias_ratio`](@ref)), that [`shannon_data`](@ref)
+accepts: if the requested `rebin` gives more, the bins are made finer until
+the bound is met (or the curve is fitted unbinned). 0.3 keeps the binning's
+systematic shift of any bin under a third of that bin's smallest error bar.
 """
 const BIN_BIAS_MAX = 0.3
 
 """
-Everything [`shannon_data`](@ref) decided about a measured curve, kept in the `Inference.Seed` so
-the report and the fitting scripts can reach both the data the fit used and the raw data.
+Everything [`shannon_data`](@ref) decided about a measured curve,
+kept in the `Inference.Seed` so the report and the fitting
+scripts can reach both the data the fit used and the raw data.
 
 # Fields
 -   `D::Float64`: diameter of the scatterer cloud (atoms and hydration-shell beads), Å.
@@ -67,10 +70,10 @@ end
 function _brute_max_sq(P::AbstractMatrix{<:Real})
     n = size(P, 2)
     best = 0.0
-    @inbounds for i in 1:n-1
+    @inbounds for i in 1:(n-1)
         xi, yi, zi = P[1, i], P[2, i], P[3, i]
         m = 0.0
-        @fastmath @simd for j in i+1:n
+        @fastmath @simd for j in (i+1):n
             m = max(m, (P[1, j] - xi)^2 + (P[2, j] - yi)^2 + (P[3, j] - zi)^2)
         end
         best = max(best, m)
@@ -99,22 +102,24 @@ and is compared pair by pair.
 function cloud_diameter(points::AbstractMatrix{<:Real})::Float64
     size(points, 1) == 3 || throw(
         ArgumentError(
-            "cloud_diameter: points must be 3-by-n, got $(size(points, 1))-by-$(size(points, 2))"
-        )
+            "cloud_diameter: points must be 3-by-n, " *
+            "got $(size(points, 1))-by-$(size(points, 2))",
+        ),
     )
     n = size(points, 2)
     n ≥ 1 || throw(ArgumentError("cloud_diameter: at least one point is needed"))
     if n ≥ 4
         tuples = [
             (Float64(points[1, i]),
-            Float64(points[2, i]),
-            Float64(points[3, i]))
+                Float64(points[2, i]),
+                Float64(points[3, i]))
             for i in 1:n
         ]
         hull = try
             Quickhull.quickhull(tuples)
         catch e
-            e isa ArgumentError || rethrow()   # "all the points are coplanar": handled below
+            # "all the points are coplanar": handled below
+            e isa ArgumentError || rethrow()
             nothing
         end
         if hull !== nothing
@@ -141,8 +146,8 @@ function auto_lmax(D::Real, q_max::Real)::Int
     (isfinite(D) && D > 0) || throw(
         DomainError(
             D,
-            "auto_lmax: D must be positive and finite"
-        )
+            "auto_lmax: D must be positive and finite",
+        ),
     )
     (isfinite(q_max) && q_max > 0) || throw(DomainError(
         q_max, "auto_lmax: q_max must be positive and finite")
@@ -150,8 +155,9 @@ function auto_lmax(D::Real, q_max::Real)::Int
     return max(1, ceil(Int, q_max * D))
 end
 
-# The curve binned to `k` bins per channel (as measured when `k === nothing`), the non-positive bins dropped when asked:
-# (q, I, σ, per raw point the index of its bin (0 if dropped), the number of bins dropped).
+# The curve binned to `k` bins per channel (as measured when
+# `k === nothing`), the non-positive bins dropped when asked: (q, I, σ, per
+# raw point the index of its bin (0 if dropped), the number of bins dropped).
 function _bin_and_keep(qr, Ir, σr, D, k, drop_nonpositive)
     if k === nothing
         qb, Ib, σb, bin = copy(qr), copy(Ir), copy(σr), collect(1:length(qr))
@@ -179,15 +185,19 @@ function _rebin(
     q::Vector{Float64},
     I::Vector{Float64},
     σ::Vector{Float64},
-    Δ::Float64
+    Δ::Float64,
 )
     q0 = minimum(q)
     b = [floor(Int, (x - q0) / Δ) + 1 for x in q]
     nb = maximum(b)
-    Sw = zeros(nb); SwI = zeros(nb); Swq = zeros(nb)
+    Sw = zeros(nb)
+    SwI = zeros(nb)
+    Swq = zeros(nb)
     @inbounds for i in eachindex(q)
         w = 1 / σ[i]^2
-        Sw[b[i]] += w; SwI[b[i]] += w * I[i]; Swq[b[i]] += w * q[i]
+        Sw[b[i]] += w
+        SwI[b[i]] += w * I[i]
+        Swq[b[i]] += w * q[i]
     end
     used = findall(>(0), Sw)
     remap = zeros(Int, nb)
@@ -213,11 +223,12 @@ the noise at high q, so the surviving points are biased upwards.
 
 # Keywords
 -   `D::Real`: diameter of the scatterer cloud in Å (see [`cloud_diameter`](@ref)).
--   `rebin::Union{Nothing,Integer} = SHANNON_REBIN`: bins per Shannon channel, at least this many (see
-    `max_bin_bias`), or `nothing` for no binning.
--   `max_bin_bias::Real = BIN_BIAS_MAX`: if [`bin_bias_ratio`](@ref) of the binned curve exceeds this, `rebin` is raised
-    until it does not (a precise curve needs finer bins), and the curve is fitted as measured once the bins are as
-    fine as its points; `Inf` keeps `rebin` as given.
+-   `rebin::Union{Nothing,Integer} = SHANNON_REBIN`: bins per Shannon channel,
+    at least this many (see `max_bin_bias`), or `nothing` for no binning.
+-   `max_bin_bias::Real = BIN_BIAS_MAX`: if [`bin_bias_ratio`](@ref) of
+    the binned curve exceeds this, `rebin` is raised until it does not (a
+    precise curve needs finer bins), and the curve is fitted as measured
+    once the bins are as fine as its points; `Inf` keeps `rebin` as given.
 -   `lMax::Union{Nothing,Integer} = nothing`: band limit; `nothing` takes
     [`auto_lmax`](@ref)`(D, q_max)` with `q_max` the largest binned q.
 -   `drop_nonpositive::Bool = true`: drop the bins whose mean intensity is not positive.
@@ -242,22 +253,23 @@ function shannon_data(
 )::ShannonInfo
     length(q) == length(I) == length(σ) || throw(
         DomainError(
-            (   length(q),
+            (length(q),
                 length(I),
-                length(σ)
+                length(σ),
             ),
-            "q, I and σ must have the same length"
-        )
+            "q, I and σ must have the same length",
+        ),
     )
     isempty(q) && throw(ArgumentError("q, I and σ cannot be empty"))
     (all(isfinite, q) && all(isfinite, I) && all(isfinite, σ)) || throw(
-        DomainError("non-finite", "q, I and σ must be finite")
+        DomainError("non-finite", "q, I and σ must be finite"),
     )
     all(>(0), σ) || throw(DomainError(minimum(σ), "σ must be positive"))
     (isfinite(D) && D > 0) || throw(DomainError(D, "D must be positive and finite"))
-    rebin === nothing || rebin ≥ 1 || throw(
-        DomainError(rebin, "rebin must be at least 1 (or nothing)")
-    )
+    rebin === nothing || rebin ≥ 1 ||
+        throw(
+            DomainError(rebin, "rebin must be at least 1 (or nothing)"),
+        )
 
     qr, Ir, σr = Float64.(q), Float64.(I), Float64.(σ)
     k = rebin
@@ -267,13 +279,18 @@ function shannon_data(
         k === nothing && break
         ratio = (π^2 / (96 * k^2)) / minimum(σb ./ Ib)
         ratio ≤ max_bin_bias && break
-        # the bound falls as 1/k² (and faster, since finer bins hold fewer points and so have larger errors):
-        # jump to the k that meets it, and fit the curve as measured once the bins are as fine as its points
-        k = length(qb) ≥ 0.9 * length(qr) ? nothing : max(k + 1, ceil(Int, k * sqrt(ratio / max_bin_bias)))
+        # the bound falls as 1/k² (and faster, since finer bins hold fewer
+        # points and so have larger errors): jump to the k that meets it, and
+        # fit the curve as measured once the bins are as fine as its points
+        k =
+            length(qb) ≥ 0.9 * length(qr) ? nothing :
+            max(k + 1, ceil(Int, k * sqrt(ratio / max_bin_bias)))
     end
-    # bins finer than the points, reached only by raising a coarser request: nothing left to average
+    # bins finer than the points, reached only by
+    # raising a coarser request: nothing left to average
     if k !== nothing && k != rebin && length(qb) ≥ length(qr)
-        qb, Ib, σb, bin, n_nonpositive = _bin_and_keep(qr, Ir, σr, D, nothing, drop_nonpositive)
+        qb, Ib, σb, bin, n_nonpositive =
+            _bin_and_keep(qr, Ir, σr, D, nothing, drop_nonpositive)
         k = nothing
     end
 
@@ -290,7 +307,7 @@ function shannon_data(
         Ib,
         σb,
         bin,
-        n_nonpositive
+        n_nonpositive,
     )
 end
 
@@ -337,13 +354,13 @@ spline (zero curvature at the ends) was tried and is 200× worse there.
 function model_on_raw(info::ShannonInfo, y::AbstractVector{<:Real})::Vector{Float64}
     length(y) == length(info.q) || throw(
         DimensionMismatch(
-            "model has $(length(y)) points, the fitted grid $(length(info.q))"
-        )
+            "model has $(length(y)) points, the fitted grid $(length(info.q))",
+        ),
     )
     length(info.q) ≥ 2 || throw(
         ArgumentError(
-            "model_on_raw: need at least two fitted points"
-        )
+            "model_on_raw: need at least two fitted points",
+        ),
     )
     k = min(3, length(info.q) - 1) # cubic where the grid allows it
     return Spline1D(info.q, Float64.(y); k = k, bc = "extrapolate")(info.q_raw)

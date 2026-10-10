@@ -1,25 +1,26 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests for src/Inference/WLS.jl: the 2-parameter weighted least squares fit
+# Tests for src/Inference/ProfiledCorrs.jl: the 2-parameter weighted least squares fit
 # of I_calc(q) = scale*y_model(q) + bkgrnd_corr, plus the profile/marginal
 # log-likelihoods and the χ²/dof diagnostic built on top of it.
 #
 # `ref_wls` below is an independent re-derivation via explicit normal-equation
 # matrix algebra (LinearAlgebra), not a copy of `wls_fit`'s O(n) accumulator
 # loop, so agreement between the two is a genuine cross-check of the closed
-# forms in WLS.jl rather than a tautology.
+# forms in ProfiledCorrs.jl rather than a tautology.
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using LinearAlgebra
 using Random
 using ForwardDiff
-using BAYSOL.Inference: WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll,
+using BAYSOL.Inference:
+    WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll,
     reduced_chi2
 
 """
-Reference (scale, bkgrnd_corr, chi2, det_XtWX) via explicit normal equations `(XᵀWX) β = XᵀWy`, independent
-of `wls_fit`'s accumulator formulas.
+Reference (scale, bkgrnd_corr, chi2, det_XtWX) via explicit normal equations
+`(XᵀWX) β = XᵀWy`, independent of `wls_fit`'s accumulator formulas.
 """
 function ref_wls(y_model::AbstractVector, I_obs::AbstractVector, σ::AbstractVector)
     X = hcat(collect(y_model), ones(length(y_model)))
@@ -38,7 +39,8 @@ end
     #                 wls_fit -- exact (noise-free) recovery
     #------------------------------------------------------------------
 
-    @testset "wls_fit: exact recovery of (scale, bkgrnd_corr) from a noise-free linear curve" begin
+    # …bkgrnd_corr) from a noise-free linear curve
+    @testset "wls_fit: exact recovery of (scale" begin
         y_model = collect(range(0.1, 5.0; length = 20))
         scale_true, bkgrnd_corr_true = 3.7, -1.2
         I_obs = scale_true .* y_model .+ bkgrnd_corr_true
@@ -152,7 +154,9 @@ end
 
     @testset "wls_prof_ll: matches its closed form directly from WLSFit fields" begin
         y_model = collect(range(0.1, 5.0; length = 12))
-        I_obs = 1.3 .* y_model .+ 0.4 .+ [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
+        I_obs =
+            1.3 .* y_model .+ 0.4 .+
+            [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
         σ = fill(0.3, length(y_model))
         f = wls_fit(y_model, I_obs, σ)
 
@@ -162,7 +166,9 @@ end
 
     @testset "wls_marg_ll: matches its closed form directly from WLSFit fields" begin
         y_model = collect(range(0.1, 5.0; length = 12))
-        I_obs = 1.3 .* y_model .+ 0.4 .+ [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
+        I_obs =
+            1.3 .* y_model .+ 0.4 .+
+            [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
         σ = fill(0.3, length(y_model))
         f = wls_fit(y_model, I_obs, σ)
 
@@ -170,7 +176,8 @@ end
         @test check_float(wls_marg_ll(f), expected)
     end
 
-    @testset "wls_prof_ll: a perfect (chi2 == 0) fit is just the data-normalisation constant" begin
+    # …constant
+    @testset "wls_prof_ll: a perfect (chi2 == 0) fit is just the data-normalisation" begin
         y_model = collect(range(0.0, 4.0; length = 6))
         I_obs = 2.0 .* y_model .- 1.0
         σ = fill(1.0, length(y_model))
@@ -186,7 +193,9 @@ end
         # be caught even if both sides of the wls_prof_ll test above shared
         # the same (wrong) sign by copy-paste.
         y_model = collect(range(0.2, 6.0; length = 9))
-        I_obs = -0.7 .* y_model .+ 2.2 .+ [0.05, -0.02, 0.1, -0.05, 0.0, 0.03, -0.08, 0.02, -0.01]
+        I_obs =
+            -0.7 .* y_model .+ 2.2 .+
+            [0.05, -0.02, 0.1, -0.05, 0.0, 0.03, -0.08, 0.02, -0.01]
         σ = fill(0.4, length(y_model))
         f = wls_fit(y_model, I_obs, σ)
 
@@ -202,7 +211,9 @@ end
 
     @testset "reduced_chi2: equals chi2 / dof exactly" begin
         y_model = collect(range(0.1, 5.0; length = 12))
-        I_obs = 1.3 .* y_model .+ 0.4 .+ [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
+        I_obs =
+            1.3 .* y_model .+ 0.4 .+
+            [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
         σ = fill(0.3, length(y_model))
         f = wls_fit(y_model, I_obs, σ)
         @test check_float(reduced_chi2(f), f.chi2 / f.dof; atol = 1e-3 * DEFAULT_ATOL)
@@ -227,7 +238,9 @@ end
         σ = fill(0.25, length(y_model))
         vals = Float64[]
         for _ in 1:500
-            I_obs = scale_true .* y_model .+ bkgrnd_corr_true .+ σ .* randn(rng, length(y_model))
+            I_obs =
+                scale_true .* y_model .+ bkgrnd_corr_true .+
+                σ .* randn(rng, length(y_model))
             f = wls_fit(y_model, I_obs, σ)
             push!(vals, reduced_chi2(f))
         end
@@ -243,7 +256,9 @@ end
         # it will be when this feeds stage-1 HMC; the gradient must survive
         # with no Float64 cast anywhere in wls_fit/wls_prof_ll/wls_marg_ll.
         q = collect(range(0.1, 2.0; length = 10))
-        I_obs = 3.0 .* exp.(-q) .+ 0.5 .+ [0.02, -0.01, 0.03, 0.0, -0.02, 0.01, -0.03, 0.02, 0.0, -0.01]
+        I_obs =
+            3.0 .* exp.(-q) .+ 0.5 .+
+            [0.02, -0.01, 0.03, 0.0, -0.02, 0.01, -0.03, 0.02, 0.0, -0.01]
         σ = fill(0.2, length(q))
 
         model(θ) = θ[1] .* exp.(-θ[2] .* q)   # θ = (amplitude, decay rate)
@@ -255,8 +270,10 @@ end
 
         h = 1e-6
         for i in 1:2
-            θp = copy(θ₀); θp[i] += h
-            θm = copy(θ₀); θm[i] -= h
+            θp = copy(θ₀)
+            θp[i] += h
+            θm = copy(θ₀)
+            θm[i] -= h
             @test g[i] ≈ (loss(θp) - loss(θm)) / (2h) rtol = 1e-4
         end
     end

@@ -2,9 +2,9 @@
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.PlasticSequence: Vec3, Vec2, plastic_points
-using BAYSOL.PlasticSequence: PLASTIC_RATIO_2, PLASTIC_RATIO_3
-using BAYSOL.PlasticSequence: PLASTIC_RATIO_2_SQR, PLASTIC_RATIO_3_SQR, PLASTIC_RATIO_3_CUBE
+using BAYSOL.Geometry: Vec3, Vec2, plastic_points
+using BAYSOL.Geometry: PLASTIC_RATIO_2, PLASTIC_RATIO_3
+using BAYSOL.Geometry: PLASTIC_RATIO_2_SQR, PLASTIC_RATIO_3_SQR, PLASTIC_RATIO_3_CUBE
 
 nrm(p) = sqrt(p[1]^2 + p[2]^2 + p[3]^2)
 dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
@@ -32,7 +32,8 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 
     @testset "every point is a unit vector" begin
         for p in plastic_points(5_000)
-            @test abs(nrm(p) - 1.0) < 1e-3 * DEFAULT_ATOL   # tighter: direct closed-form identity, short op chain
+            # tighter: direct closed-form identity, short op chain
+            @test abs(nrm(p) - 1.0) < 1e-3 * DEFAULT_ATOL
         end
     end
 
@@ -60,7 +61,7 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
         # 2. octants are balanced
         oct = zeros(Int, 8)
         for p in pts
-            oct[1 + (p[1] > 0) + 2 * (p[2] > 0) + 4 * (p[3] > 0)] += 1
+            oct[1+(p[1]>0)+2*(p[2]>0)+4*(p[3]>0)] += 1
         end
         @test all(c -> abs(c - n / 8) < 0.12 * n / 8, oct)
 
@@ -72,9 +73,9 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
         @test all(c -> abs(c - n / 10) < 0.15 * n / 10, zb)
 
         # 4. spherical caps hold their area fraction, for a few axes and sizes
-        for u in (  Vec3((1.0, 0.0, 0.0)),
-                    Vec3((0.0, 0.0, 1.0)),
-                    Vec3((1, 1, 1) ./ sqrt(3))
+        for u in (Vec3((1.0, 0.0, 0.0)),
+            Vec3((0.0, 0.0, 1.0)),
+            Vec3((1, 1, 1) ./ sqrt(3)),
         )
             for freq in (0.1, 0.25, 0.5)
                 cosθ = 1.0 - 2.0 * freq                 # cap of area fraction `freq`
@@ -149,12 +150,14 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
         @test eltype(p) === NTuple{3,Float64}
         @test length(p) == 50
         @test isempty(plastic_points(0, Val(3), Val(:volume)))
-        @test plastic_points(1, Val(3), Val(:volume)) == [plastic_points(3, Val(3), Val(:volume))[1]]
+        @test plastic_points(1, Val(3), Val(:volume)) ==
+              [plastic_points(3, Val(3), Val(:volume))[1]]
         @test plastic_points(50; dim = 3, shape = :volume) == p
     end
 
     @testset "dim=3, shape=:volume: deterministic" begin
-        @test plastic_points(200, Val(3), Val(:volume)) == plastic_points(200, Val(3), Val(:volume))
+        @test plastic_points(200, Val(3), Val(:volume)) ==
+              plastic_points(200, Val(3), Val(:volume))
     end
 
     @testset "dim=3, shape=:volume: every point is strictly inside the unit ball" begin
@@ -168,7 +171,8 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
         end
     end
 
-    @testset "dim=3, shape=:volume: prefix stability: coarse set is an exact prefix of any finer set" begin
+    # …of any finer set
+    @testset "dim=3, shape=:volume: prefix stability: coarse set is an exact prefix" begin
         fine = plastic_points(1_000, Val(3), Val(:volume))
         for k in (0, 1, 2, 7, 64, 257, 999)
             @test plastic_points(k, Val(3), Val(:volume)) == fine[1:k]
@@ -194,7 +198,7 @@ dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
         # 2. octants are balanced (same sanity check as the surface case)
         oct = zeros(Int, 8)
         for p in pts
-            oct[1 + (p[1] > 0) + 2 * (p[2] > 0) + 4 * (p[3] > 0)] += 1
+            oct[1+(p[1]>0)+2*(p[2]>0)+4*(p[3]>0)] += 1
         end
         @test all(c -> abs(c - n / 8) < 0.12 * n / 8, oct)
 

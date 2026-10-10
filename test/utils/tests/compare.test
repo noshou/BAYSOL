@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests of compare.tcl: its numeric helpers, and a golden file for its per-fit CSV (the CSV produced from the
-# committed reports of three fixed revisions equals the one verified against the original Python tool).
+# Tests of compare.tcl: its numeric helpers, and a golden file for its
+# per-fit CSV (the CSV produced from the committed reports of three fixed
+# revisions equals the one verified against the original Python tool).
 
 source [file join [file dirname [info script]] helpers.tcl]
 source [file join $UTILS_DIR compare.tcl]
@@ -11,15 +12,18 @@ test median {odd and even counts} -body {
 } -result {2 2.5}
 
 test pct {linear interpolation between order statistics} -body {
-    list [compare::pct {1 2 3 4 5} 0.5] [compare::pct {1 2 3 4 5} 0.25] [compare::pct {1 2 3 4 5} 1.0] [compare::pct {7} 0.3]
+    list [compare::pct {1 2 3 4 5} 0.5] [compare::pct {1 2 3 4 5} 0.25] \
+        [compare::pct {1 2 3 4 5} 1.0] [compare::pct {7} 0.3]
 } -result {3.0 2.0 5.0 7.0}
 
 test commas {thousands separators} -body {
-    list [compare::commas 4782.4 0] [compare::commas 1234567.891 2] [compare::commas 12.3 1] [compare::commas -4782.4 0]
+    list [compare::commas 4782.4 0] [compare::commas 1234567.891 2] \
+        [compare::commas 12.3 1] [compare::commas -4782.4 0]
 } -result {4,782 1,234,567.89 12.3 -4,782}
 
 test ratio {a ratio, or n/a when a side is missing or zero} -body {
-    list [compare::ratio 6 3] [compare::ratio {} 3] [compare::ratio 6 0] [compare::ratio 0 3]
+    list [compare::ratio 6 3] [compare::ratio {} 3] \
+        [compare::ratio 6 0] [compare::ratio 0 3]
 } -result {2.00x n/a n/a n/a}
 
 test fmt_or_dash {formatting with a dash for empty} -body {
@@ -35,11 +39,15 @@ test count_if {counting by an expression over x} -body {
     compare::count_if {1 5 7 2 9} {$x > 4}
 } -result 3
 
-test csv-golden {the per-fit CSV for three fixed revisions equals the verified golden file} -constraints gitHistory -setup {
+test csv-golden \
+    {the per-fit CSV for three fixed revisions equals the verified golden file} \
+    -constraints gitHistory -setup {
     set out [file join [file tempdir tcltests-]  cmp.csv]
 } -body {
-    lassign [run_tool [file join $UTILS_DIR compare.tcl] 23151ec dc36a4b 2068a68 --no-tree --csv $out] status text
-    list $status [expr {[util::slurp $out] eq [util::slurp [file join $::DATA_DIR compare_golden.csv]]}]
+    lassign [run_tool [file join $UTILS_DIR compare.tcl] \
+        30f55ea 81cf301 24af397 --no-tree --csv $out] status text
+    list $status [expr \
+        {[util::slurp $out] eq [util::slurp [file join $::DATA_DIR compare_golden.csv]]}]
 } -cleanup {
     file delete -force [file dirname $out]
 } -result {0 1}
@@ -49,9 +57,11 @@ test unknown-revision {an unknown revision stops with status 1 and names the tag
     list $status [string match "*unknown git revision 'no-such-rev'*" $text]
 } -result {1 1}
 
-test default-is-latest-release {with no revision the baseline is the latest release tag} -constraints gitHistory -body {
+test default-is-latest-release {with no revision the baseline is the latest release tag} \
+    -constraints gitHistory -body {
     lassign [run_tool [file join $UTILS_DIR compare.tcl]] status text
-    list $status [string match "baseline: [util::latest_release], the latest release*" $text]
+    list $status \
+        [string match "baseline: [util::latest_release], the latest release*" $text]
 } -result {0 1}
 
 cleanupTests

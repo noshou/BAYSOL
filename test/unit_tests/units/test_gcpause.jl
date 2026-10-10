@@ -1,18 +1,20 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Tests for src/Runtime/GCPause.jl: the garbage collector paused around a call, nested pauses, restoration on an
-# exception, and the byte-budget checkpoint.
+# Tests for src/Runtime/GCPause.jl: the garbage collector paused around a call,
+# nested pauses, restoration on an exception, and the byte-budget checkpoint.
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.GCPause: with_gc_paused, gc_checkpoint, GC_PAUSE_BUDGET
+using BAYSOL.Runtime: with_gc_paused, gc_checkpoint, GC_PAUSE_BUDGET
 
-gc_enabled() = (prev = GC.enable(true); GC.enable(prev); prev)     # GC.enable returns the previous state
+# GC.enable returns the previous state
+gc_enabled() = (prev = GC.enable(true); GC.enable(prev); prev)
 n_collections() = Base.gc_num().pause
 
 @testset "GCPause" begin
 
-    @testset "the collector is off inside a pause and back on after, with the call's value returned" begin
+    # …with the call's value returned
+    @testset "the collector is off inside a pause and back on after" begin
         @test gc_enabled()
         v = with_gc_paused() do
             @test !gc_enabled()
@@ -35,7 +37,9 @@ n_collections() = Base.gc_num().pause
     @testset "an exception restores the collector" begin
         @test_throws ErrorException with_gc_paused(() -> error("boom"))
         @test gc_enabled()
-        @test_throws ErrorException with_gc_paused(() -> with_gc_paused(() -> error("inner")))
+        @test_throws ErrorException with_gc_paused(
+            () -> with_gc_paused(() -> error("inner")),
+        )
         @test gc_enabled()
     end
 
@@ -52,18 +56,26 @@ n_collections() = Base.gc_num().pause
         @test gc_enabled()
     end
 
-    @testset "gc_checkpoint collects once the heap has grown past the budget, and stays quiet before" begin
-        garbage(n) = [zeros(Float64, 2^17) for _ in 1:n]            # n × 1 MiB, dropped at once
+    # …and stays quiet before
+    @testset "gc_checkpoint collects once the heap has grown past the budget" begin
+        # n × 1 MiB, dropped at once
+        garbage(n) = [zeros(Float64, 2^17) for _ in 1:n]
         with_gc_paused(budget = 8 * 2^20) do
             c0 = n_collections()
-            garbage(2); gc_checkpoint()
-            @test n_collections() == c0                             # 2 MiB: under the budget
-            garbage(12); gc_checkpoint()
-            @test n_collections() > c0                              # 14 MiB: over it, one young collection ran
-            @test !gc_enabled()                                     # and the pause is still in force
+            garbage(2)
+            gc_checkpoint()
+            # 2 MiB: under the budget
+            @test n_collections() == c0
+            garbage(12)
+            gc_checkpoint()
+            # 14 MiB: over it, one young collection ran
+            @test n_collections() > c0
+            # and the pause is still in force
+            @test !gc_enabled()
             c1 = n_collections()
             gc_checkpoint()
-            @test n_collections() == c1                             # the baseline was reset: nothing to do now
+            # the baseline was reset: nothing to do now
+            @test n_collections() == c1
         end
         @test gc_enabled()
     end
@@ -80,9 +92,11 @@ n_collections() = Base.gc_num().pause
         @test GC_PAUSE_BUDGET == 2^30
     end
 
-    @testset "a checkpoint called on a worker thread neither collects nor leaves the collector off" begin
-        # GC.enable is a per-thread switch: a worker's GC.enable(true) does nothing and its GC.enable(false) would
-        # keep the collector off after the pause. Only the thread that began the pause collects.
+    # …collector off
+    @testset "a checkpoint called on a worker thread neither collects nor leaves the" begin
+        # GC.enable is a per-thread switch: a worker's GC.enable(true) does
+        # nothing and its GC.enable(false) would keep the collector off
+        # after the pause. Only the thread that began the pause collects.
         before = Base.gc_num().pause
         with_gc_paused(; budget = 1) do
             fetch(Threads.@spawn begin

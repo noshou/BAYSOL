@@ -1,13 +1,234 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
+# The profiled likelihood: weighted least squares for the scale and background (WLS),
+# and the excluded-volume correction c1 profiled out per evaluation (ProfiledCorrs).
+
 using StaticArrays
 using Optim: minimizer, optimize, Brent
 using ForwardDiff
-using ..Scattering: ForwardCache, excluded_volume_factor, intensity_terms,
-                    model_intensity, EV_EXP_COEFF
+using ..Scattering:
+    ForwardCache, excluded_volume_factor, intensity_terms,
+    model_intensity, EV_EXP_COEFF
 using ..PhysicalConstants: UNIT_OF_δρ
 using Bumper: @no_escape, @alloc
 using FastClosures
+
+# ---------------------------------------------------------------------------
+#   Weighted least squares for scale and background
+# ---------------------------------------------------------------------------
+
+
+# Weighted least squares for the two instrumental parameters scale,
+# `bkgrnd_corr` in
+#
+#     I_calc(q) = scale · I(q) + bkgrnd_corr
+#
+# The measured data `I_obs` and σ are fixed during inference, so all
+# data-only weighted sums are precomputed in WLSData. The hot-path
+# `wls_fit`(`y_model`, data) therefore only needs three weighted reductions:
+#
+#     SwI  = Σ wᵢ y_modelᵢ
+#     SwII = Σ wᵢ y_modelᵢ²
+#     SwIy = Σ wᵢ y_modelᵢ I_obsᵢ
+#
+# Sw, Swy, Swyy, and Σ log σᵢ² are all data-only.
+
+
+Base.showerror(io::IO, e::WLSError) = print(io, "WLSError: ", e.msg)
+
+
+"""
+Construct the precomputed weighted data used by [`wls_fit`](@ref).
+
+`I_obs` and σ are assumed to remain unchanged for subsequent fits.
+"""
+function WLSData(
+    I_obs::AbstractVector,
+    σ::AbstractVector,
+)
+    n = length(I_obs)
+
+    length(σ) == n || throw(WLSError(
+        "I_obs and σ must have equal length; got $n and $(length(σ))"))
+
+    n ≥ 3 || throw(
+        WLSError(
+            "need n ≥ 3 points for a 2-parameter fit with a residual; got n = $n"),
+    )
+
+    T = promote_type(eltype(I_obs), eltype(σ))
+
+    weights = similar(I_obs, T)
+
+    Sw = zero(T)
+    Swy = zero(T)
+    Swyy = zero(T)
+    sum_log_var = zero(T)
+
+    @inbounds for i in 1:n
+        σi = σ[i]
+        σi > 0 || throw(WLSError(
+            "σ[$i] = $σi is not positive"))
+
+        yi = I_obs[i]
+        wi = inv(σi * σi)
+
+        weights[i] = wi
+
+        Sw += wi
+        Swy += wi * yi
+        Swyy += wi * yi * yi
+        sum_log_var += 2 * log(σi)
+    end
+
+    return WLSData(
+        I_obs,
+        weights,
+        Sw,
+        Swy,
+        Swyy,
+        sum_log_var,
+    )
+end
+
+
+"""
+Fit scale and `bkgrnd_corr` in
+
+    I_calc(q) = scale·y_model(q) + bkgrnd_corr
+
+using precomputed [`WLSData`](@ref).
+
+This is the NUTS hot-path implementation. Since the measured data and
+uncertainties are already preprocessed, only the three model-dependent
+weighted sums are calculated here.
+"""
+function wls_fit(
+    y_model::AbstractVector,
+    data::WLSData,
+)::WLSFit
+    n = length(y_model)
+    n == length(data.I_obs) || throw(
+        WLSError(
+            "y_model and WLSData must have equal length; got $n and $(length(data.I_obs))",
+        ),
+    )
+
+    T = promote_type(eltype(y_model), typeof(data.Sw))
+
+    SwI  = zero(T)
+    SwII = zero(T)
+    SwIy = zero(T)
+
+    I_obs = data.I_obs
+    weights = data.weights
+
+    @inbounds @fastmath @simd for i in 1:n
+        wi = weights[i]
+        xi = y_model[i]
+        yi = I_obs[i]
+
+        SwI += wi * xi
+        SwII += wi * xi * xi
+        SwIy += wi * xi * yi
+    end
+
+    return _wls_from_sums(SwI, SwII, SwIy, n, data)
+end
+
+"""
+The closed-form weighted least-squares fit behind [`wls_fit`](@ref), from the three
+model-dependent sums Σwᵢyᵢ, Σwᵢyᵢ², Σwᵢyᵢ·Iᵢ (y = `y_model`, I = `I_obs`) and the
+data-only sums in `data`. Shared with the c1 search in [`profiled_corrs`](@ref), which
+gets those sums without forming `y_model`.
+
+# Arguments
+- `SwI`, `SwII`, `SwIy`: the three model-dependent weighted sums.
+- `n::Int`: number of data points.
+- `data::WLSData`: the data-only sums.
+
+# Returns
+- `WLSFit{T}`, T the promoted type of the sums and the data.
+
+# Exceptions
+- `WLSError`: det(XᵀWX) ≤ 0 (the model is flat across the q-window).
+"""
+function _wls_from_sums(SwI, SwII, SwIy, n::Int, data::WLSData)::WLSFit
+    T = promote_type(typeof(SwI), typeof(SwII), typeof(SwIy), typeof(data.Sw))
+
+    Sw = data.Sw
+    Swy = data.Swy
+    Swyy = data.Swyy
+
+    det_XtWX = SwII * Sw - SwI * SwI
+
+    det_XtWX > 0 || throw(
+        WLSError(
+            "det(XᵀWX) ≤ 0: y_model is flat across the q-window, " *
+            "so scale is not determined",
+        ),
+    )
+
+    scale = (Sw * SwIy - SwI * Swy) / det_XtWX
+    bkgrnd_corr = (SwII * Swy - SwI * SwIy) / det_XtWX
+
+    chi2 = max(
+        zero(T),
+        Swyy - scale * SwIy - bkgrnd_corr * Swy,
+    )
+
+    return WLSFit{T}(
+        scale,
+        bkgrnd_corr,
+        chi2,
+        n - 2,
+        det_XtWX,
+        data.sum_log_var,
+    )
+end
+
+
+"""
+Convenience interface for a one-off weighted least-squares fit.
+
+For repeated fits against the same data, construct `WLSData(I_obs, σ)`
+once and use `wls_fit(y_model, data)` instead.
+"""
+function wls_fit(
+    y_model::AbstractVector,
+    I_obs::AbstractVector,
+    σ::AbstractVector,
+)::WLSFit
+    return wls_fit(y_model, WLSData(I_obs, σ))
+end
+
+
+"""
+The fitted `I_calc` = f.scale .* `y_model` .+ `f.bkgrnd_corr`.
+"""
+wls_predict(f::WLSFit, y_model::AbstractVector) =
+    f.scale .* y_model .+ f.bkgrnd_corr
+
+
+"""
+χ²/dof.
+"""
+reduced_chi2(f::WLSFit) = f.chi2 / f.dof
+
+
+"""
+Profile log-likelihood with scale and background fitted at their WLS optimum.
+"""
+wls_prof_ll(f::WLSFit) =
+    -(f.chi2 + f.sum_log_var) / 2 -
+    (f.dof + 2) * log(2π) / 2
+
+
+"""
+Log marginal-likelihood with scale and background integrated out under
+a flat prior.
+"""
+wls_marg_ll(f::WLSFit) = wls_prof_ll(f) - log(f.det_XtWX) / 2 + log(2π)
 
 # ---------------------------------------------------------------------------
 # c1 only enters through the excluded-volume envelope g(q; c1), so for a fixed ξ the
@@ -19,32 +240,6 @@ using FastClosures
 # scan and Brent polish, and the saturation test.
 # ---------------------------------------------------------------------------
 
-"""
-    _C1Tables
-
-Static per-run tables for [`profiled_corrs`](@ref)'s c1 search: everything that depends
-only on the structure's [`ForwardCache`](@ref BAYSOL.Scattering.ForwardCache) and the scan
-settings, not on ξ. Built once (by [`seed_sampler`](@ref), or on the fly), then only ever
-read: no field is modified after construction, so one instance can be shared by any
-number of threads. Per-evaluation scratch is never stored here.
-
-# Fields
-- `cs::Vector{Float64}`: the scan points (cmin − eps):eps:(cmax + eps).
-- `g1::Matrix{Float64}`, (Q, length(cs)): g(q; cᵢ) at every scan point.
-- `qvals::Vector{Float64}`, `r_m::Float64`: the grid and mean atomic radius g is built on.
-- `cmin`, `cmax`, `eps::Float64`: the scan settings the tables were built for.
-- `q2max::Float64`: the largest q², which bounds the argument of the anchored envelope (see [`_anchor`](@ref)).
-"""
-struct _C1Tables
-    cs::Vector{Float64}
-    g1::Matrix{Float64}
-    qvals::Vector{Float64}
-    r_m::Float64
-    cmin::Float64
-    cmax::Float64
-    eps::Float64
-    q2max::Float64
-end
 
 """
 Build the static c1-search tables for `fw` (see [`_C1Tables`](@ref)).
@@ -60,42 +255,46 @@ function the forward model uses.
 """
 function _C1Tables(
     fw::ForwardCache;
-    cmin::Float64=EXCL_VOL_CORR_BOUNDS[1],
-    cmax::Float64=EXCL_VOL_CORR_BOUNDS[2],
-    eps::Float64=EXCL_VOL_CORR_EPS,
+    cmin::Float64 = EXCL_VOL_CORR_BOUNDS[1],
+    cmax::Float64 = EXCL_VOL_CORR_BOUNDS[2],
+    eps::Float64 = EXCL_VOL_CORR_EPS,
 )::_C1Tables
     Q = length(fw.qvals)
-    cs = collect(Float64, (cmin - eps):eps:(cmax + eps))
+    cs = collect(Float64, (cmin-eps):eps:(cmax+eps))
     g1 = Matrix{Float64}(undef, Q, length(cs))
     for (i, c) in enumerate(cs)
         g1[:, i] = excluded_volume_factor(fw.qvals, fw.r_m, c)
     end
-    return _C1Tables(cs, g1, copy(fw.qvals), fw.r_m, cmin, cmax, eps, maximum(abs2, fw.qvals))
+    return _C1Tables(
+        cs,
+        g1,
+        copy(fw.qvals),
+        fw.r_m,
+        cmin,
+        cmax,
+        eps,
+        maximum(abs2, fw.qvals),
+    )
 end
 
-# ---------------------------------------------------------------------------
-# The envelope g(q; c1) = c1³·exp(−q²·k(c1)) is needed once per q in every pass of the c1 search, and the library
-# exponential is a scalar call that costs several times the rest of the pass. But the scan table already holds
-# g(q; cⱼ) on the grid, and every c1 the search visits is within half a grid step of a grid point cⱼ, so
+# --------------------------------------------------------------------------- The
+# envelope g(q; c1) = c1³·exp(−q²·k(c1)) is needed once per q in every pass of the
+# c1 search, and the library exponential is a scalar call that costs several times
+# the rest of the pass. But the scan table already holds g(q; cⱼ) on the grid, and
+# every c1 the search visits is within half a grid step of a grid point cⱼ, so
 #
 #     g(q; c1) = g(q; cⱼ) · (c1/cⱼ)³ · exp(−q²·(k(c1) − k(cⱼ)))
 #
-# needs the exponential only of a tiny argument (|q²·Δk| ≲ 0.02), which a short Taylor polynomial gives to full
-# precision: no library call, no branch, so the loop vectorizes (about 5× faster per pass on the fitting tests).
+# needs the exponential only of a tiny argument (|q²·Δk| ≲ 0.02), which a
+# short Taylor polynomial gives to full precision: no library call, no branch,
+# so the loop vectorizes (about 5× faster per pass on the fitting tests).
 # ---------------------------------------------------------------------------
 
-"""
-Largest `q²·|k(c1) − k(cⱼ)|` for which the anchored envelope's Taylor polynomial is used; its truncation error there is
-below 6e-18 relative. Beyond it (a very large q or mean radius) the passes use the library exponential.
-"""
-const ENVELOPE_TAYLOR_LIMIT = 0.05
-
-# 1/0!, 1/1!, …, 1/8!: the Taylor polynomial of eˣ, degree 8
-const _EXP_TAYLOR = ntuple(n -> 1 / factorial(n - 1), 9)
 
 """
-The anchor of the envelope at `c1` (whose exponent coefficient is `k = k(c1)`): the index `j` of the grid point of `tab`
-nearest to `c1`, the factor `(c1/cⱼ)³`, and `Δk = k(c1) − k(cⱼ)`. Then g(q; c1) = g1[q, j]·(c1/cⱼ)³·exp(−q²Δk).
+The anchor of the envelope at `c1` (whose exponent coefficient is `k = k(c1)`):
+the index `j` of the grid point of `tab` nearest to `c1`, the factor `(c1/cⱼ)³`,
+and `Δk = k(c1) − k(cⱼ)`. Then g(q; c1) = g1[q, j]·(c1/cⱼ)³·exp(−q²Δk).
 """
 @inline function _anchor(tab::_C1Tables, c1::Float64, k::Float64)
     cs = tab.cs
@@ -106,8 +305,9 @@ nearest to `c1`, the factor `(c1/cⱼ)³`, and `Δk = k(c1) − k(cⱼ)`. Then g
 end
 
 """
-g(q; c1) for every q, written into `g`: from the anchored table column and a Taylor polynomial where its argument
-is small enough ([`ENVELOPE_TAYLOR_LIMIT`](@ref)), from the library exponential otherwise.
+g(q; c1) for every q, written into `g`: from the anchored table column and
+a Taylor polynomial where its argument is small enough
+([`ENVELOPE_TAYLOR_LIMIT`](@ref)), from the library exponential otherwise.
 """
 function _envelope!(g::AbstractVector{Float64}, tab::_C1Tables, c1::Float64)
     k = (c1^2 - 1) * EV_EXP_COEFF * tab.r_m^2
@@ -128,10 +328,10 @@ function _envelope!(g::AbstractVector{Float64}, tab::_C1Tables, c1::Float64)
 end
 
 """
-The three model-dependent weighted sums of the fit, Σwŷ, Σwŷ², Σwŷ·I, for
-ŷ = A + g·B + g²·C at one arbitrary c1, in a single fused pass with g evaluated on
-the fly from the anchored table column (the Brent step). Same g as `Scattering.excluded_volume_factor`
-(see the note above [`_anchor`](@ref)).
+The three model-dependent weighted sums of the fit, Σwŷ, Σwŷ², Σwŷ·I, for ŷ =
+A + g·B + g²·C at one arbitrary c1, in a single fused pass with g evaluated
+on the fly from the anchored table column (the Brent step). Same g as
+`Scattering.excluded_volume_factor` (see the note above [`_anchor`](@ref)).
 
 # Returns
 - `(SwI, SwII, SwIy)::NTuple{3,Float64}`.
@@ -142,7 +342,7 @@ function _sums_at(
     C::AbstractVector{Float64},
     tab::_C1Tables,
     wls::WLSData,
-    c1::Float64
+    c1::Float64,
 )
     k = (c1^2 - 1) * EV_EXP_COEFF * tab.r_m^2
     j, ratio, Δk = _anchor(tab, c1, k)
@@ -208,7 +408,7 @@ function _scan_chi2!(
     B::AbstractVector{Float64},
     C::AbstractVector{Float64},
     tab::_C1Tables,
-    wls::WLSData
+    wls::WLSData,
 )
     Q = length(A)
     w = wls.weights
@@ -224,25 +424,45 @@ function _scan_chi2!(
         r33 = @alloc(Float64, Q)   # Σwŷ²: 2wBC
         r43 = @alloc(Float64, Q)   # Σwŷ²: wC²
 
-        SA = 0.0; SAy = 0.0; SA2 = 0.0      # ⟨w, A⟩, ⟨wI, A⟩, ⟨w, A²⟩
+        SA = 0.0
+        SAy = 0.0
+        SA2 = 0.0      # ⟨w, A⟩, ⟨wI, A⟩, ⟨w, A²⟩
         @inbounds @fastmath @simd for i in 1:Q
             wi = w[i]
-            a = A[i]; b = B[i]; c = C[i]; wy = wi * y[i]
-            SA += wi * a; SAy += wy * a; SA2 += wi * a * a
-            r11[i] = wi * b;      r21[i] = wi * c
-            r12[i] = wy * b;      r22[i] = wy * c
-            r13[i] = 2wi * a * b; r23[i] = wi * (b * b + 2a * c)
-            r33[i] = 2wi * b * c; r43[i] = wi * c * c
+            a = A[i]
+            b = B[i]
+            c = C[i]
+            wy = wi * y[i]
+            SA += wi * a
+            SAy += wy * a
+            SA2 += wi * a * a
+            r11[i] = wi * b
+            r21[i] = wi * c
+            r12[i] = wy * b
+            r22[i] = wy * c
+            r13[i] = 2wi * a * b
+            r23[i] = wi * (b * b + 2a * c)
+            r33[i] = 2wi * b * c
+            r43[i] = wi * c * c
         end
         @inbounds for j in eachindex(chis)
-            SwI = 0.0; SwIy = 0.0; SwII = 0.0
+            SwI = 0.0
+            SwIy = 0.0
+            SwII = 0.0
             @fastmath @simd for i in 1:Q
-                g = g1[i, j]
+                g    = g1[i, j]
                 SwI  += g * (r11[i] + g * r21[i])
                 SwIy += g * (r12[i] + g * r22[i])
                 SwII += g * (r13[i] + g * (r23[i] + g * (r33[i] + g * r43[i])))
             end
-            chis[j] = reduced_chi2(_wls_from_sums(SA + SwI, SA2 + SwII, SAy + SwIy, Q, wls))
+            chis[j] = reduced_chi2(
+                _wls_from_sums(
+                    SA + SwI, SA2 + SwII,
+                    SAy + SwIy,
+                    Q,
+                    wls,
+                ),
+            )
         end
     end
     return chis
@@ -265,17 +485,18 @@ function _c1_search(
     C::AbstractVector{Float64},
     tab::_C1Tables,
     wls::WLSData,
-    tol::Float64
+    tol::Float64,
 )::Float64
     n = length(A)
     cs = tab.cs
     lo, hi = tab.cmin - tab.eps, tab.cmax + tab.eps
-    lo_b = lo; hi_b = hi
+    lo_b = lo
+    hi_b = hi
     @no_escape begin
         chis = @alloc(Float64, length(cs))
         _scan_chi2!(chis, A, B, C, tab, wls)
         i_best = argmin(chis)
-        lo_b = i_best == 1          ? lo : cs[i_best-1]
+        lo_b = i_best == 1 ? lo : cs[i_best-1]
         hi_b = i_best == length(cs) ? hi : cs[i_best+1]
     end
 
@@ -283,40 +504,47 @@ function _c1_search(
     # No assignments inside the closure: a name assigned both in a closure and in
     # this enclosing body is one shared, Core.Box'ed variable (type-unstable).
     χ²_at_c1 = @closure c1 -> reduced_chi2(
-        _wls_from_sums(_sums_at(A, B, C, tab, wls, c1)..., n, wls)
+        _wls_from_sums(_sums_at(A, B, C, tab, wls, c1)..., n, wls),
     )
     return minimizer(optimize(χ²_at_c1, lo_b, hi_b, Brent(); abs_tol = tol, rel_tol = 0.0))
 end
 
 """
-Column of the packed Gram matrix of the pair (i, j), i ≤ j, among the `M` species that carry a contrast
-(vac and the shells): the row-major upper triangle, the envelope-free ("A") block of `_GRAM_PAIRS`.
+Column of the packed Gram matrix of the pair (i, j), i ≤ j, among the
+`M` species that carry a contrast (vac and the shells): the row-major
+upper triangle, the envelope-free ("A") block of `_GRAM_PAIRS`.
 """
-@inline _pair_col(i::Int, j::Int, M::Int) = (i - 1) * M - ((i - 1) * (i - 2)) ÷ 2 + (j - i + 1)
+@inline _pair_col(i::Int, j::Int, M::Int) =
+    (i - 1) * M - ((i - 1) * (i - 2)) ÷ 2 + (j - i + 1)
 
 """
-The contrast weights of the species that carry one, `a = (1, UNIT_OF_δρ·δρ₁, …)`, from ξ = (ρₑ, δρ₁, …).
+The contrast weights of the species that carry one,
+`a = (1, UNIT_OF_δρ·δρ₁, …)`, from ξ = (ρₑ, δρ₁, …).
 """
-@inline _contrasts(ξ::SVector{N}) where {N} = ntuple(k -> k == 1 ? 1.0 : UNIT_OF_δρ * ξ[k], Val(N))
+@inline _contrasts(ξ::SVector{N}) where {N} =
+    ntuple(k -> k == 1 ? 1.0 : UNIT_OF_δρ * ξ[k], Val(N))
 
 """
-[`intensity_terms`](@ref) for Float64 arguments, writing A, B, C in place (column by column over the packed Gram
-matrix `Gc`) and taking `ρ` and the contrast weights `a = (1, s₁, …)` of [`_contrasts`](@ref): no heap
-allocation. The columns are the `M(M+1)/2` envelope-free pairs, then the `M` pairs with the excluded-volume
-species, then its self term (`M = length(a)`; 15 columns for the five-species model).
+[`intensity_terms`](@ref) for Float64 arguments, writing A, B, C in place (column by
+column over the packed Gram matrix `Gc`) and taking `ρ` and the contrast weights
+`a = (1, s₁, …)` of [`_contrasts`](@ref): no heap allocation. The columns are the
+`M(M+1)/2` envelope-free pairs, then the `M` pairs with the excluded-volume species,
+then its self term (`M = length(a)`; 15 columns for the five-species model).
 """
 function _intensity_terms!(
-    A::AbstractVector{Float64}, B::AbstractVector{Float64}, C::AbstractVector{Float64},
+    A::AbstractVector{Float64},
+    B::AbstractVector{Float64},
+    C::AbstractVector{Float64},
     Gc::Matrix{Float64}, ρ::Float64, a::NTuple{M,Float64},
 ) where {M}
-    Q  = size(Gc, 1)
+    Q = size(Gc, 1)
     nA = M * (M + 1) ÷ 2
     ρ2 = ρ * ρ
     kB1 = -2ρ * a[1]
     @inbounds @fastmath @simd for q in 1:Q
         A[q] = a[1] * a[1] * Gc[q, 1]
-        B[q] = kB1 * Gc[q, nA + 1]
-        C[q] = ρ2 * Gc[q, nA + M + 1]
+        B[q] = kB1 * Gc[q, nA+1]
+        C[q] = ρ2 * Gc[q, nA+M+1]
     end
     @inbounds for i in 1:M, j in i:M
         (i == 1 && j == 1) && continue
@@ -329,7 +557,7 @@ function _intensity_terms!(
     @inbounds for i in 2:M
         k = -2ρ * a[i]
         @fastmath @simd for q in 1:Q
-            B[q] += k * Gc[q, nA + i]
+            B[q] += k * Gc[q, nA+i]
         end
     end
     return nothing
@@ -381,27 +609,40 @@ function _profile_ll_grad(
     Gc = fw.Gc
     Q = size(Gc, 1)
     nA = N * (N + 1) ÷ 2
-    size(Gc, 2) == nA + N + 1 || throw(ArgumentError(
-        "_profile_ll_grad: ξ has $N parameters, which need $(nA + N + 1) Gram columns, got $(size(Gc, 2))"))
+    size(Gc, 2) == nA + N + 1 || throw(
+        ArgumentError(
+            "_profile_ll_grad: ξ has $N parameters, which need $(nA + N + 1) " *
+            "Gram columns, got $(size(Gc, 2))",
+        ),
+    )
     ρ = ξ[1]
     a = _contrasts(ξ)
-    q = tab.qvals; w = wls.weights; y = wls.I_obs
+    q = tab.qvals
+    w = wls.weights
+    y = wls.I_obs
     ll = 0.0
     grad = zero(SVector{N,Float64})
     @no_escape begin
-        A = @alloc(Float64, Q); B = @alloc(Float64, Q); C = @alloc(Float64, Q)
+        A = @alloc(Float64, Q)
+        B = @alloc(Float64, Q)
+        C = @alloc(Float64, Q)
         _intensity_terms!(A, B, C, Gc, ρ, a)
         c1 = c1_fixed === nothing ? _c1_search(A, B, C, tab, wls, tol) : c1_fixed
         fit = _wls_from_sums(_sums_at(A, B, C, tab, wls, c1)..., Q, wls)
-        m = fit.scale; b = fit.bkgrnd_corr
+        m = fit.scale
+        b = fit.bkgrnd_corr
 
-        p = @alloc(Float64, Q); pg = @alloc(Float64, Q); pgg = @alloc(Float64, Q)
+        p = @alloc(Float64, Q)
+        pg = @alloc(Float64, Q)
+        pgg = @alloc(Float64, Q)
         gv = _envelope!(@alloc(Float64, Q), tab, c1)
         @inbounds @fastmath @simd for i in 1:Q
             g = gv[i]
             ŷ = A[i] + g * (B[i] + g * C[i])
             pi_ = w[i] * (y[i] - m * ŷ - b)
-            p[i] = pi_; pg[i] = pi_ * g; pgg[i] = pi_ * g * g
+            p[i] = pi_
+            pg[i] = pi_ * g
+            pgg[i] = pi_ * g * g
         end
         TA = ntuple(c -> _dotcol(Gc, c, p), Val(nA))
         TB = ntuple(i -> _dotcol(Gc, nA + i, pg), Val(N))
@@ -414,17 +655,19 @@ function _profile_ll_grad(
         end
         d_ρ = -2 * accρ + 2ρ * TC
         # ∂/∂sᵢ (i ≥ 2): A = Σ_{j≤k} wⱼₖ aⱼ aₖ Gⱼₖ gives 2 Σⱼ aⱼ Gᵢⱼ, B gives −2ρ G_i,ex
-        grad = SVector{N,Float64}(ntuple(Val(N)) do i
-            if i == 1
-                m * d_ρ
-            else
-                acc = 0.0
-                for j in 1:N
-                    acc += 2a[j] * TA[_pair_col(min(i, j), max(i, j), N)]
+        grad = SVector{N,Float64}(
+            ntuple(Val(N)) do i
+                if i == 1
+                    m * d_ρ
+                else
+                    acc = 0.0
+                    for j in 1:N
+                        acc += 2a[j] * TA[_pair_col(min(i, j), max(i, j), N)]
+                    end
+                    m * UNIT_OF_δρ * (acc - 2ρ * TB[i])
                 end
-                m * UNIT_OF_δρ * (acc - 2ρ * TB[i])
-            end
-        end)
+            end,
+        )
         ll = wls_prof_ll(fit)
     end
     return ll, grad
@@ -445,7 +688,7 @@ function _profiled_value(
     ξ::SVector{N,Float64},
     fw::ForwardCache,
     tab::_C1Tables,
-    tol::Float64
+    tol::Float64,
 ) where {N}
     Q = length(tab.qvals)
     ŷ = Vector{Float64}(undef, Q)
@@ -501,8 +744,9 @@ toward and would have no way to tell you it missed the other one.
     intensity/per-point standard errors, from [`WLSData`](@ref); forwarded
     to every trial-c1 call of [`wls_fit`](@ref) inside the inner search
     without rebuilding those sums each time.
-- `ξ::SVector{N,<:Real}`: (ρₑ, δρ₁, δρ₂, δρ₃) for the five-species model, held fixed during the c1 search;
-    `N` follows the number of species of the packed Gram matrix (see [`intensity_terms`](@ref)).
+- `ξ::SVector{N,<:Real}`: (ρₑ, δρ₁, δρ₂, δρ₃) for the five-species
+    model, held fixed during the c1 search; `N` follows the number of
+    species of the packed Gram matrix (see [`intensity_terms`](@ref)).
 - `fw::ForwardCache`: the structure's geometry-only cache: its Gram matrix G and
     mean radius `r_m` are all the c1 search reads.
 
@@ -510,9 +754,10 @@ toward and would have no way to tell you it missed the other one.
 - `cmin, cmax = EXCL_VOL_CORR_BOUNDS`: the physical c1 bounds.
 - `eps = EXCL_VOL_CORR_EPS`: both the amount the search window is padded
     past `(cmin, cmax)` and the coarse pre-scan's grid step.
-- `tol = EXCL_VOL_CORR_TOL`: absolute tolerance on c1 of the `Brent()` polish. It sets the
-    accuracy of the *gradient* taken through this function to first order, not just of c1 (the
-    envelope-theorem gradient is exact only at the exact optimum); see [`EXCL_VOL_CORR_TOL`](@ref).
+- `tol = EXCL_VOL_CORR_TOL`: absolute tolerance on c1 of the `Brent()`
+    polish. It sets the accuracy of the *gradient* taken through this
+    function to first order, not just of c1 (the envelope-theorem gradient
+    is exact only at the exact optimum); see [`EXCL_VOL_CORR_TOL`](@ref).
 - `tables::Union{Nothing,_C1Tables} = nothing`: static tables for fw and these scan
     settings ([`_C1Tables`](@ref), built once per run by [`seed_sampler`](@ref) and
     read-only, so safe to share across threads). `nothing` builds them for this call.
@@ -532,7 +777,7 @@ per trial c1. The search itself (scan points, bracket, `Brent()`) is unchanged.
 # Returns
 - `(ŷ::Vector, fit::WLSFit, c1_star::Float64)`: the `c1_star`-corrected model
     curve (at the caller's real ξ), its WLS fit, and the profiled c1 itself.
-    `Sampler.jl`'s hot-path likelihood call drops `ŷ`/`c1_star`; its
+    `Posterior.jl`'s hot-path likelihood call drops `ŷ`/`c1_star`; its
     posterior-draw curve/report loop needs all three.
 """
 function profiled_corrs end
@@ -541,19 +786,22 @@ function profiled_corrs(
     wls::WLSData,
     ξ::SVector{N,<:Real},
     fw::ForwardCache;
-    cmin::Float64=EXCL_VOL_CORR_BOUNDS[1],
-    cmax::Float64=EXCL_VOL_CORR_BOUNDS[2],
-    eps::Float64=EXCL_VOL_CORR_EPS,
-    tol::Float64=EXCL_VOL_CORR_TOL,
-    tables::Union{Nothing,_C1Tables}=nothing,
+    cmin::Float64 = EXCL_VOL_CORR_BOUNDS[1],
+    cmax::Float64 = EXCL_VOL_CORR_BOUNDS[2],
+    eps::Float64 = EXCL_VOL_CORR_EPS,
+    tol::Float64 = EXCL_VOL_CORR_TOL,
+    tables::Union{Nothing,_C1Tables} = nothing,
 ) where {N}
     tab = tables === nothing ? _C1Tables(fw; cmin = cmin, cmax = cmax, eps = eps) : tables
-    (tab.cmin == cmin && tab.cmax == cmax && tab.eps == eps &&
-    tab.r_m == fw.r_m && tab.qvals == fw.qvals) ||
+    (
+        tab.cmin == cmin && tab.cmax == cmax && tab.eps == eps &&
+        tab.r_m == fw.r_m && tab.qvals == fw.qvals
+    ) ||
         throw(
             ArgumentError(
-                "profiled_corrs: tables were built for a different q grid, r_m or scan settings"
-            )
+                "profiled_corrs: tables were built for a different q grid, " *
+                "r_m or scan settings",
+            ),
         )
 
     # plain Float64 ξ (the per-draw re-profile, the report): no dual numbers,
@@ -572,7 +820,7 @@ function profiled_corrs(
     end
 
     # the one fit that matters: at the caller's real (possibly Dual) ξ
-    Ad, Bd, Cd = intensity_terms(fw, ξ[1], ntuple(k -> ξ[k + 1], Val(N - 1)))
+    Ad, Bd, Cd = intensity_terms(fw, ξ[1], ntuple(k -> ξ[k+1], Val(N - 1)))
     ŷ = model_intensity(Ad, Bd, Cd, excluded_volume_factor(tab.qvals, tab.r_m, c1_star))
     return ŷ, wls_fit(ŷ, wls), c1_star
 end
@@ -591,8 +839,8 @@ c1), not per posterior draw or inside the sampler's hot path.
 """
 function excl_vol_saturation(
     c1::Real;
-    cmin::Float64=EXCL_VOL_CORR_BOUNDS[1],
-    cmax::Float64=EXCL_VOL_CORR_BOUNDS[2],
+    cmin::Float64 = EXCL_VOL_CORR_BOUNDS[1],
+    cmax::Float64 = EXCL_VOL_CORR_BOUNDS[2],
 )::Int
     c1 < cmin && return -1
     c1 > cmax && return 1

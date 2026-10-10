@@ -8,9 +8,10 @@
 # the live propka3 test in test_propka.jl.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.MolecularStructure: resolve_hydrogens, load_molecule, Pdb2pqrError, MoleculeError,
-                    _terminus_groups, propka_pKas, _store_dir,
-                    Molecule, n_atoms, elms, coords_cartesian
+using BAYSOL.MolecularStructure: resolve_hydrogens, load_molecule, Pdb2pqrError,
+    MoleculeError,
+    _terminus_groups, propka_pKas, _store_dir,
+    Molecule, n_atoms, elms, coords_cartesian
 
 # A 7-"residue" fragment (not a real contiguous chain -- each residue's real
 # coordinates are lifted from unrelated, spatially distant positions in 7RSA,
@@ -105,7 +106,7 @@ END
 atom_names(lines, resname, resnum) = Set(
     strip(l[13:16]) for l in lines
     if length(l) ≥ 26 && startswith(l, "ATOM") &&
-       strip(l[18:20]) == resname && parse(Int, strip(l[23:26])) == resnum
+        strip(l[18:20]) == resname && parse(Int, strip(l[23:26])) == resnum
 )
 
 # Two chains, each a 2-residue fragment (A: LYS/VAL, B: ASP/TYR), placed far
@@ -238,7 +239,8 @@ END
         @test groups3[String[]] == ["C"]
     end
 
-    @testset "resolve_hydrogens at pH 1: neutral (protonated) C-terminus, confirmed atom names" begin
+    # …confirmed atom names
+    @testset "resolve_hydrogens at pH 1: neutral (protonated) C-terminus" begin
         out = resolve_hydrogens(pdb_path, recs, 1.0)
         @test isfile(out)
         @test dirname(out) == _store_dir()
@@ -342,7 +344,8 @@ END
         rethrow(e)
     end
 
-    @testset "resolve_hydrogens: real multi-chain terminus conflict resolves per-chain" begin
+    # …per-chain
+    @testset "resolve_hydrogens: real multi-chain terminus conflict resolves" begin
         a_cminus = only(r for r in recs2 if r.resname == "C-" && r.chain == "A")
         b_cminus = only(r for r in recs2 if r.resname == "C-" && r.chain == "B")
         # Sanity check the empirically-found split still holds for this

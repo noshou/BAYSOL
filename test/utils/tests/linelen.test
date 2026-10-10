@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+# Tests of linelen.tcl's re-wrapping: balanced lines,
+# nothing but whitespace changed, structure kept.
+
+source [file join [file dirname [info script]] helpers.tcl]
+source [file join $REPO_DIR dev linelen.tcl]
+
+proc words_of {lines} {
+    return [regexp -all -inline {\S+} [join $lines " "]]
+}
+
+test balanced-no-orphan \
+    {a paragraph that overflows by a word gets even lines, not a one-word last line} \
+    -body {
+    set words [lrepeat 19 "abcdefghi"]
+    set lines [linelen::balanced $words 92]
+    list [llength $lines] [expr {[string length [lindex $lines end]] > 40}]
+} -result {3 1}
+
+test balanced-keeps-words {no word is lost, added or changed} -body {
+    set words [split \
+        "the quick brown fox jumps over the lazy dog and keeps running far away" " "]
+    expr {[words_of [linelen::balanced $words 30]] eq $words}
+} -result 1
+
+test balanced-code-span-in-one-piece {a backtick span with spaces is never split} -body {
+    set text "text before `a span with spaces` and\
+        text after, enough words to need wrapping here"
+    set ok 1
+    foreach l [linelen::balanced [linelen::words $text] 30] {
+        if {[regexp -all {`} $l] % 2} {
+            set ok 0
+        }
+    }
+    set ok
+} -result 1
+
+test balanced-no-markdown-start \
+    {a continuation line never starts like a list, heading or table} -body {
+    set words [split \
+        "aaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbb - cccccccccccccccccccc dddd" " "]
+    set bad 0
+    foreach l [lrange [linelen::balanced $words 45] 1 end] {
+        if {[linelen::bad_start $l]} {
+            set bad 1
+        }
+    }
+    set bad
+} -result 0
+
+test reflow-comment-block \
+    {a comment block with a long line is re-wrapped under the same prefix} -body {
+    set long "    # [string repeat "word " 25]end"
+    set new [linelen::reflow_lines [list $long] .jl]
+    list [llength $new] [expr {[lsearch -glob $new "    # *"] == 0}] \
+        [expr {[lsearch -all -inline -not [words_of $new] #] eq \
+               [lsearch -all -inline -not [words_of [list $long]] #]}] \
+        [expr {[tcl::mathfunc::max {*}[lmap l $new {string length $l}]] <= 92}]
+} -result {2 1 1 1}
+
+test reflow-leaves-short-lines {nothing changes when no line is too long} -body {
+    set lines [list "# a short comment" "# and another" "x = 1"]
+    expr {[linelen::reflow_lines $lines .jl] eq $lines}
+} -result 1
+
+test reflow-leaves-code-blocks {indented text in a docstring is not re-wrapped} -body {
+    set lines [list {"""} "    [string repeat x 120]" {"""}]
+    expr {[linelen::reflow_lines $lines .jl] eq $lines}
+} -result 1
+
+test reflow-trailing-comment \
+    {a trailing comment that makes a Julia line too long moves above it} -body {
+    set code "    x = f(y)"
+    set line "$code  # [string repeat "word " 20]end"
+    set new [linelen::reflow_lines [list $line] .jl]
+    list [lindex $new end] [expr {[string index [lindex $new 0] 4] eq "#"}]
+} -result {{    x = f(y)} 1}
+
+cleanupTests

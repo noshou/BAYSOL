@@ -27,8 +27,10 @@ shell of atoms around an enclosed void.
 - `R`: sphere radius.
 - `n`: point count.
 """
-sph(R, n) = [(R * sqrt(1 - z^2) * cos(t), R * sqrt(1 - z^2) * sin(t), R * z)
-            for (z, t) in ((-1 + 2(k - 0.5) / n, π * (1 + sqrt(5)) * k) for k in 1:n)]
+sph(R, n) = [
+    (R * sqrt(1 - z^2) * cos(t), R * sqrt(1 - z^2) * sin(t), R * z)
+    for (z, t) in ((-1 + 2(k - 0.5) / n, π * (1 + sqrt(5)) * k) for k in 1:n)
+]
 
 """
     jittered_lattice(n; a = 2.3) -> Vector{NTuple{3,Float64}}
@@ -39,7 +41,10 @@ interior, exposed faces, and partly cut edges. Spans [0, a·(n-1)] (plus the off
 each axis; its top layer sits near z = a·(n-1).
 """
 jittered_lattice(n; a = 2.3) =
-    vec([(a * i + 0.1j, a * j + 0.05k, a * k + 0.07i) for i in 0:n-1, j in 0:n-1, k in 0:n-1])
+    vec([
+        (a * i + 0.1j, a * j + 0.05k, a * k + 0.07i) for
+        i in 0:(n-1), j in 0:(n-1), k in 0:(n-1)
+    ])
 
 """
     witness_lattice() -> Vector{NTuple{3,Float64}}
@@ -83,11 +88,15 @@ function surface_atom_cases(; n = 6, a = 2.3, r_lattice = 1.5, probe = 1.4, step
     for (e, r) in SURFACE_ATOM_RADII
         h_e = sas_top - top - (r + probe)
         for h in range(h_e - 0.3, h_e + 0.6, length = steps),
-                (dx, dy) in ((0.31, -0.17), (1.07, 0.55), (-0.83, 0.92), (0.0, 0.0))
+            (dx, dy) in ((0.31, -0.17), (1.07, 0.55), (-0.83, 0.92), (0.0, 0.0))
+
             crds = [base; (top / 2 + dx, top / 2 + dy, top + h)]
             elms = [fill("q", length(base)); e]
-            push!(cases, (label = "r=$(r) h=$(round(h, digits = 3)) dx=$(dx) dy=$(dy)",
-                          elms = elms, crds = crds, r = r, h = h))
+            push!(
+                cases,
+                (label = "r=$(r) h=$(round(h, digits = 3)) dx=$(dx) dy=$(dy)",
+                    elms = elms, crds = crds, r = r, h = h),
+            )
         end
     end
     return cases

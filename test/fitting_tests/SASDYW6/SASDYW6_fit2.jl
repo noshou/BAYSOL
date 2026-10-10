@@ -3,13 +3,15 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
+using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDYW6")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "SASDYW6_fit2.fit")
 const _CIF_PATH    = joinpath(_FIXTURE_DIR, "SASDYW6_fit2_model1.cif")
-const _FIT_PATH    = _DATA_PATH   # CRYSOL .fit carries the reference fit curve itself (col 4)
+# CRYSOL .fit carries the reference fit curve itself (col 4)
+const _FIT_PATH = _DATA_PATH
 
 # ---------------------------------------------------------------------------
 #                       SASDYW6_fit2_model1.cif structure
@@ -24,7 +26,8 @@ const _FIT_PATH    = _DATA_PATH   # CRYSOL .fit carries the reference fit curve 
 # `_entity_poly_seq` records list two polypeptide entities, strand IDs A
 # and B, 360 residues each, and their `mon_id` sequences are byte-identical.
 
-raw = readdlm(_DATA_PATH; skipstart = 1)   # 1 header line: " Dro: 0.083 Rg: 28.56 Vol: 97845. Chi^2: 3.737"
+# 1 header line: " Dro: 0.083 Rg: 28.56 Vol: 97845. Chi^2: 3.737"
+raw = readdlm(_DATA_PATH; skipstart = 1)
 
 # CRYSOL .fit column layout (own inspection, same convention as
 # SASDMJ9.jl's _FIT_PATH): q, Iexp, err, Ifit. SASBDB stores this already
@@ -43,7 +46,8 @@ I_exp = Float64.(raw[:, 2])
 #
 #   Sample:      Candida glabrata (Nakaseomyces glabratus) fructose-1,6-
 #                bisphosphate aldolase (Fba1), dimer, monomer MW ~37 kDa
-#   Buffer (structured field, REST API 2026-10-01): "20 mM Tris-HCl pH, 300 mM NaCl", pH 8.0,
+#   Buffer (structured field, REST API 2026-10-01): "20 mM Tris-HCl pH, 300 mM
+#                NaCl", pH 8.0,
 #                λ = 0.09464 nm -- identical to the sibling Pyruvate Kinase entry SASDYV6,
 #                so most likely copied from it.
 #   Buffer (this entry's own free-text description): 50 mM sodium phosphate,
@@ -60,8 +64,8 @@ I_exp = Float64.(raw[:, 2])
 #                Prediction", DOI 10.1021/acsomega.6c06099
 const PH, σ_PH = 8.5, PH_METER_SIGMA   # paper/SASBDB: "pH 8.5"
 
-const ENERGY_EV       = HC_EV_ANGSTROM / 0.94    # ≈ 13191 eV, from λ = 0.094 nm = 0.94 Å
-const TEMPERATURE_C    = 15.0    # 15°C, SASBDB (both datasets)
+const ENERGY_EV = HC_EV_ANGSTROM / 0.94    # ≈ 13191 eV, from λ = 0.094 nm = 0.94 Å
+const TEMPERATURE_C = 15.0    # 15°C, SASBDB (both datasets)
 # I = ½Σcᵢzᵢ² over Na⁺ (NaCl + both NaPi fractions), Cl⁻, H2PO4⁻ (z=1), and
 # HPO4²⁻ (z=2, enters with weight 4) -- same careful multi-species treatment
 # SASDWZ9.jl uses for its own NaPi buffer, now that phosphate has real PMV
@@ -76,7 +80,7 @@ const IONIC_STRENGTH_M = 0.6452   # unused by the fit; from the old pKa2 = 7.2 s
 # `_entity_poly_seq` records (entity 1, chain A, 360 residues; entity 2/
 # chain B is byte-identical, confirming the homodimer). Converted from the
 # file's 3-letter `mon_id` codes to 1-letter via the standard 20-residue table.
-const FBA1_SEQ = 
+const FBA1_SEQ =
     "MGVQEVLKRKTGVIVGDDVRALFDYAKEHKFAIPAINVTSSSTVVAALEAARDAKSPIIL" *
     "QTSNGGAAYFAGKGVSNDGQNASIRGSIAAAHYIRSIAPAYGIPVVLHSDHCAKKLLPWY" *
     "DGMLEADEAYFKEHGEPLFSSHMLDLSEETDDENIATCVKYFKRMAAMNQWLEMEIGITG" *
@@ -101,30 +105,34 @@ const FBA1_MOLARITY   = FBA1_CONC_MG_ML / FBA1_MW    # ≈ 2.548e-5 M ≈ 25.5 �
 const FBA1_MOLARITY_σ = MOLARITY_REL_SIGMA * FBA1_MOLARITY
 
 # Buffer components. Cross-checked against
-# src/PartialMolarVolumes/NonBiological/common_to_iupac.json (case-insensitive
+# src/BulkElectronDensity/NonBiological/common_to_iupac.json (case-insensitive
 # grep) and the sibling nonbiological.tsv.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Inference.Solute).
+    # electron density (see BulkElectronDensity.Solute).
     NonBiological(0.500, 0.005, "sodium chloride"),   # 500 mM NaCl, ±1%
     NonBiological(0.500, 0.010, "imidazole"),          # 500 mM imidazole, ±2%
-    # Cl⁻ counter-ion (added 2026-10-01): imidazole taken as titrated with HCl at 22 °C; protonated
-    # fraction 0.046 with pK from Goldberg, Kishore & Lennen 2002 (DOI 10.1063/1.1416902; 6.993, ΔH 36.64
+    # Cl⁻ counter-ion (added 2026-10-01): imidazole taken as titrated with
+    # HCl at 22 °C; protonated fraction 0.046 with pK from Goldberg,
+    # Kishore & Lennen 2002 (DOI 10.1063/1.1416902; 6.993, ΔH 36.64
     # kJ/mol), Davies-corrected at I ≈ 0.671 M. The titrant is not stated.
     NonBiological(0.023086, 0.006466, "chloride"),   # Cl⁻ from HCl titration of imidazole
-    # 50 mM sodium phosphate at pH 8.5 is split into NaH2PO4/Na2HPO4 (no single "sodium phosphate" PMV key). The
-    # HPO4²⁻ fraction is 0.979: pK2 from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
-    # 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol, ΔCp −230 J/K/mol) at 22 °C (pH set at room temperature),
-    # Davies-corrected at I ≈ 0.671 M, giving an effective pK2' ≈ 6.82. This replaces the earlier flat pKa2 =
-    # 7.2, which ignored ionic strength. σ combines σ_PH, ±3 °C, ±0.02 pK, 30 % of the Davies shift and ±2 % on
-    # C.
-    NonBiological(0.001032, 0.000357, "sodium dihydrogen phosphate"),   # 50 mM NaPi, H2PO4⁻ part
-    NonBiological(0.048968, 0.001042, "disodium hydrogen phosphate"),   # 50 mM NaPi, HPO4²⁻ part
+    # 50 mM sodium phosphate at pH 8.5 is split into NaH2PO4/Na2HPO4 (no single
+    # "sodium phosphate" PMV key). The HPO4²⁻ fraction is 0.979: pK2 from Goldberg,
+    # Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
+    # 10.1063/1.1416902; 7.198, ΔH 3.6 kJ/mol, ΔCp −230 J/K/mol) at 22 °C (pH set at
+    # room temperature), Davies-corrected at I ≈ 0.671 M, giving an effective pK2' ≈
+    # 6.82. This replaces the earlier flat pKa2 = 7.2, which ignored ionic strength.
+    # σ combines σ_PH, ±3 °C, ±0.02 pK, 30 % of the Davies shift and ±2 % on C.
+    # 50 mM NaPi, H2PO4⁻ part
+    NonBiological(0.001032, 0.000357, "sodium dihydrogen phosphate"),
+    # 50 mM NaPi, HPO4²⁻ part
+    NonBiological(0.048968, 0.001042, "disodium hydrogen phosphate"),
     # PMSF / phenylmethylsulfonyl fluoride (1 mM): no measured aqueous V0
     # exists (it hydrolyzes in water); the table entry
     # ("phenylmethanesulfonyl fluoride", resolves from "pmsf") is our own
     # estimate, 127.2 ± 5.0 cm³/mol (basis=predicted; see
-    # PartialMolarVolumes/README.md, "Adding a missing solute"). It is the
+    # BulkElectronDensity/README.md, "Adding a missing solute"). It is the
     # smallest-concentration component by far, so its ρₑ impact is minimal.
     NonBiological(0.001, 0.00005, "pmsf"),  # 1 mM PMSF, ±5% (unstable stock)
 ]
@@ -135,25 +143,26 @@ const SOLUTES = Solute[
 
 const Q_MAX_FIT = 0.25   # the .fit file's own max q (0.249981 Å⁻¹); no further cut needed
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
-# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
-# that diameter allows (see `rebin` there).
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
-with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
+(`seed_model` bins the curve and drops the bins with non-positive intensity.)
 """
 function fit_subset()
     keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdyw6_fit2` samples. It is separate only because the developer tools in test/utils/ build
-# a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
+# Builds the Seed that `run_sasdyw6_fit2` samples. It is separate only because
+# the developer tools in test/utils/ build a fit's Seed without running the
+# fit; if you are reading this script as an example you can skip it:
 # `run_sasdyw6_fit2` below is the whole story (build the seed, then sample it).
 function seed_sasdyw6_fit2(; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
@@ -166,7 +175,11 @@ function seed_sasdyw6_fit2(; seed::Integer = SAMPLER_SEED)
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdyw6_fit2(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+function run_sasdyw6_fit2(;
+    n_samples::Int = N_SAMPLES,
+    n_adapt::Int = N_ADAPT,
+    seed::Integer = SAMPLER_SEED,
+)
     s, data = seed_sasdyw6_fit2(; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
@@ -181,8 +194,8 @@ open(joinpath(@__DIR__, "res_fit2.txt"), "w") do io
     BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
-# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
-# then recompile (about 40 % of a fit's wall clock).
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL
+# methods, which every fit would then recompile (about 40 % of a fit's wall clock).
 using GLMakie
 
 """
@@ -196,8 +209,8 @@ diverged) the quantile-curve envelope.
 function sasdyw6_fit2_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
@@ -223,7 +236,8 @@ function sasdyw6_fit2_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
@@ -241,7 +255,14 @@ function sasdyw6_fit2_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -275,22 +296,40 @@ function sasdyw6_fit2_residuals_figure(result, data)
 
         band!(
             ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = (:darkorange, 0.15), label = "bounds",   # NB: shared COLOR_BAND_RESID is (:darkorange, 1); this script's plot style is kept as-is
+            # NB: shared COLOR_BAND_RESID is (:darkorange,
+            # 1); this script's plot style is kept as-is
+            color = (:darkorange, 0.15), label = "bounds",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5, label = "quantiles",   # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
+            # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5, label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5,   # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
+            # NB: shared LW_QUANTILE_RESID is 2.5; this script's plot style is kept as-is
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = 1.5,
         )
     end
 
     if map_curve !== nothing
         resid = I_fit .- map_curve[:, 2]
-        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR)
-        scatter!(ax, q_fit, resid; markersize = MARKERSIZE, color = COLOR_DATA, label = "data - MAP")
+        errorbars!(
+            ax,
+            q_fit,
+            resid,
+            σ_fit;
+            whiskerwidth = WHISKERWIDTH,
+            color = COLOR_ERRORBAR,
+        )
+        scatter!(
+            ax,
+            q_fit,
+            resid;
+            markersize = MARKERSIZE,
+            color = COLOR_DATA,
+            label = "data - MAP",
+        )
         hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
         lo, hi = extrema(resid)
         pad = YLIM_LIN_PAD_FRAC * (hi - lo)
@@ -349,15 +388,15 @@ Overlays our MAP curve against the reference CRYSOL fit.
 function sasdyw6_fit2_comparison_figure(result, data)
     _, _, map_result, _ = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     crysol   = readdlm(_FIT_PATH; skipstart = 1)
     q_crysol = Float64.(crysol[:, 1])
     I_crysol = Float64.(crysol[:, 4])
-    keep   = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT) .& (I_crysol .> 0)
+    keep     = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT) .& (I_crysol .> 0)
 
     fig = Figure(size = FIG_SIZE_CURVE)
     ax = Axis(
@@ -378,12 +417,20 @@ function sasdyw6_fit2_comparison_figure(result, data)
 
     lines!(
         ax, q_crysol[keep], I_crysol[keep];
-        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = "CRYSOL fit2",
+        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash,
+        label = "CRYSOL fit2",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "BAYSOL MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "BAYSOL MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)

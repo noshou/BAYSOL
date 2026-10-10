@@ -5,9 +5,9 @@ The SAXS/SANS forward model: a molecule and a q grid in, the orientationally
 averaged detector intensity `I_calc(q)` out. 
 # Module layout
 
-One submodule and four included files (all but `SphFuncs` are plain files `include`d into `Scattering`):
+Five files `include`d into the one module `Scattering`:
 
-- `SphFuncs`    -   (submodule `Scattering.SphFuncs`) `Y_lm`, `j_l`, normalised Legendre.
+- `SphFuncs`    -   `Y_lm`, `j_l`, normalised Legendre.
 - `FormFactor`  -   X-ray atomic form factors from the bundled `form_factors.sqlite3`.
 - `PartialWave` -   `compute_B_lm` (the multipole moments), plus
                     `self_scatter` / `cross_scatter` / `partial_wave_weights`
@@ -133,10 +133,10 @@ One submodule and four included files (all but `SphFuncs` are plain files `inclu
     G depends only on geometry and beam; v only on the fit parameters, so
     G is built once per structure and reused across every parameter set.
 \\
-6.  A table of atomic radii gets the *displaced* volume wrong. CRYSOL's fix is one
-    global expansion factor `c_1` = `r_0/r_m` over all dummies, `r_0` fitted and `r_m`
-    the structure's mean atomic radius. Expanding a dummy's radius sends `V_j` -> `c_1`^3 `V_j`
-    in the Gaussian of (4), i.e.
+6.  A table of atomic radii gets the *displaced* volume wrong. CRYSOL's fix
+    is one global expansion factor `c_1` = `r_0/r_m` over all dummies, `r_0`
+    fitted and `r_m` the structure's mean atomic radius. Expanding a dummy's
+    radius sends `V_j` -> `c_1`^3 `V_j` in the Gaussian of (4), i.e.
 
         `f_j(q)` -> `c_1`^3 * `f_j(q)` * exp(-q^2 (`c_1`^2 - 1) `V_j`^(2/3) / 4π)
 
@@ -168,16 +168,13 @@ One submodule and four included files (all but `SphFuncs` are plain files `inclu
 """
 module Scattering
 
-using  SQLite: SQLite
-using  DBInterface: DBInterface
-using  FastClosures: @closure
-using  LinearAlgebra: LinearAlgebra
-using ..SASA: PROBE_RADIUS, SHELL_N_TARGET
+using SQLite: SQLite
+using DBInterface: DBInterface
+using FastClosures: @closure
+using LinearAlgebra: LinearAlgebra
+using ..Geometry: PROBE_RADIUS, SHELL_N_TARGET, ATOM_BLOCK, ATOM_PARALLEL_MIN
 using ..PhysicalConstants: UNIT_OF_δρ
-using ..GCPause: gc_checkpoint
-using ..Cache: Lazy, force
-using ..Parallel: tmap_blocks
-using ..MolecularStructure: ATOM_BLOCK, ATOM_PARALLEL_MIN
+using ..Runtime: gc_checkpoint, Lazy, force, tmap_blocks
 using LinearAlgebra: mul!
 
 """
@@ -187,7 +184,9 @@ default.
 """
 const SHELL_THICKNESS = 3.0
 
-"Atoms/dummies per pass in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm)."
+"""
+Atoms/dummies per pass in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm).
+"""
 const B_LM_CHUNK = UInt64(2048)
 
 """
@@ -199,39 +198,47 @@ with [`B_LM_W_BYTES`](@ref). Results are tile-invariant up to rounding.
 const B_LM_TILE = 256
 
 """
-Memory budget, in bytes, for the W buffer of one worker (all degrees ≤ lMax, every amplitude column, a q-tile) in
-[`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm); the q-tile length is chosen to fit it. 8 MiB: wider
-tiles measured no faster, and every worker holds one.
+Memory budget, in bytes, for the W buffer of one worker (all degrees ≤ lMax, every
+amplitude column, a q-tile) in
+[`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm); the q-tile length is
+chosen to fit it. 8 MiB: wider tiles measured no faster, and every worker holds one.
 """
 const B_LM_W_BYTES = 8 * 2^20
 
 """
-Number of tile groups of [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm): the tiles are dealt
-round-robin to this many groups, each summed into its own accumulator (memory: this many `2K × ncol·Q` matrices),
-and the groups run on the Julia threads in waves of one group per worker. A constant, not the thread count, so the
-result is bit-identical at any number of threads. 24 divides evenly over 1, 2, 3, 4, 6, 8 and 12 workers (and
-fills 7 to 86 %), so ordinary core counts all stay busy; the cost is one more accumulator addition per group.
+Number of tile groups of [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm):
+the tiles are dealt round-robin to this many groups, each summed into its own accumulator
+(memory: this many `2K × ncol·Q` matrices), and the groups run on the Julia threads in
+waves of one group per worker. A constant, not the thread count, so the result is
+bit-identical at any number of threads. 24 divides evenly over 1, 2, 3, 4, 6, 8 and 12
+workers (and fills 7 to 86 %), so ordinary core counts all stay busy; the cost is one more
+accumulator addition per group.
 """
 const B_LM_GROUPS = 24
 
 """
 Memory budget, in bytes, for the accumulators of the workers of
-[`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm) (one `2K × ncol·Q` matrix of doubles each, up to
-~125 MB for the largest fitting test): the number of workers is cut when they would not fit, which keeps the memory
-of a threaded build modest on an ordinary laptop. It limits parallelism only, never the grouping or the result. 1 GiB.
+[`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm) (one `2K × ncol·Q` matrix
+of doubles each, up to ~125 MB for the largest fitting test): the number of workers is cut
+when they would not fit, which keeps the memory of a threaded build modest on an ordinary
+laptop. It limits parallelism only, never the grouping or the result. 1 GiB.
 """
 const B_LM_ACC_BYTES = 1024 * 2^20
 
 """
-Smallest `tiles × Q` for which [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm) spreads its tile
-groups over the Julia threads. Below it the work (a few tens of milliseconds) is run on one thread, with OpenBLAS
-threaded, which measured faster than the groups on several threads (SASDMJ9: 11 tiles × 121 q = 1331 was 1.3–1.8×
-slower threaded; SASDJ62: 38 × 411 ≈ 15,600 was 2× faster). The decision depends on the input only, so the result
-does not depend on it.
+Smallest `tiles × Q` for which
+[`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm) spreads its tile groups
+over the Julia threads. Below it the work (a few tens of milliseconds) is run on one thread,
+with OpenBLAS threaded, which measured faster than the groups on several threads (SASDMJ9:
+11 tiles × 121 q = 1331 was 1.3–1.8× slower threaded; SASDJ62: 38 × 411 ≈ 15,600 was 2×
+faster). The decision depends on the input only, so the result does not depend on it.
 """
 const B_LM_PARALLEL_MIN = 4096
 
-"Columns of the accumulator per task when the tile groups' sums are added up in parallel in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm)."
+"""
+Columns of the accumulator per task when the tile groups' sums are added up in
+parallel in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm).
+"""
 const B_LM_REDUCE_COLS = 16
 
 """
@@ -241,18 +248,18 @@ Coefficients of
 
 Converts CRYSOL's *radius* parameterisation into the *volume* parameterisation
 [`_gaussian_dummy`](@ref BAYSOL.Scattering._gaussian_dummy) is written in,
-via V = (4π/3) r³ (which is exactly `MolecularStructure.sphere_volume`,
+via V = (4π/3) r³ (which is exactly `Geometry.sphere_volume`,
 so `r_m` and the dummy volumes stay consistent).
 """
 const EV_EXP_COEFF = (4π / 3)^(2 / 3) / (4π)
 
 """
 Start order of the continued-fraction sweep in
-[`Scattering.SphFuncs.sphBessRatios!`](@ref BAYSOL.Scattering.SphFuncs.sphBessRatios!):
-N = max(lMax, ⌈x⌉) + `GAUTSCHI_MARGIN[1]` + ⌈`GAUTSCHI_MARGIN[2]`·x^(1/3)⌉. Deep enough
-that every ratio is converged to the Float64 rounding floor (the floor is reached at
-(12, 5) against a 512-bit reference, which is the margin used; the earlier (16, 6) left a safety step
-that only cost sweep time).
+[`sphBessRatios!`](@ref BAYSOL.Scattering.sphBessRatios!): N = max(lMax,
+⌈x⌉) + `GAUTSCHI_MARGIN[1]` + ⌈`GAUTSCHI_MARGIN[2]`·x^(1/3)⌉. Deep enough
+that every ratio is converged to the Float64 rounding floor (the floor is
+reached at (12, 5) against a 512-bit reference, which is the margin used;
+the earlier (16, 6) left a safety step that only cost sweep time).
 """
 const GAUTSCHI_MARGIN = (12, 5.0)
 
@@ -265,6 +272,83 @@ far under any tolerance on G.
 """
 const BESS_CUT = 1e-9
 
+"""
+Upper end of the Waasmaier-Kirfel f0 fit range, s = sin θ/λ in Å⁻¹.
+Beyond it the ion fits diverge; see the FormFactor README.
+"""
+const WK_S_MAX = 6.0
+
+"""
+Floor applied to Chantler f2 table values before the log-log interpolation
+`f1f2`: f2 is positive and spans decades, and the floor keeps the log finite
+where the table stores an exact zero.
+"""
+const F2_LOG_FLOOR = 1e-99
+
+"""
+Species pairs (a, b), a ≤ b, in [`ForwardCache`](@ref)'s `Gc`
+column order, species numbered as in the file header
+(1 vac, 2 ex, 3-5 shells): the 10 pairs of {1, 3, 4, 5} (the
+envelope-free terms, "A"), then the 4 pairs (2, b),
+b ∈ {1, 3, 4, 5} ("B"), then (2, 2) ("C").
+"""
+const _GRAM_PAIRS = (
+    (1, 1), (1, 3), (1, 4), (1, 5), (3, 3),
+    (3, 4), (3, 5), (4, 4), (4, 5), (5, 5),
+    (1, 2), (2, 3), (2, 4), (2, 5), (2, 2),
+)
+
+# Types shared by several files of the module, defined before the includes.
+
+"""
+An amplitude shared by all `n` scatterers: `f[q]`, the same for every
+one (the hydration beads of a class all carry the same area, so the
+same Gaussian amplitude). An `(n, length(f))` matrix by interface,
+stored as one vector. [`compute_B_lm`](@ref) recognizes it: the amplitude
+factors out of the sum over scatterers, so it computes the multipoles with
+unit amplitude once and scales them by `f(q)`, which costs no `Ft` fill and
+no per-scatterer multiply.
+"""
+struct SharedAmplitude{T<:Number} <: AbstractMatrix{T}
+    f::Vector{T}
+    n::Int
+end
+
+"""
+Reusable workspace for evaluating spherical Bessel functions over a fixed
+`q` grid.
+
+The workspace is used by [`sphBessRatios!`](@ref) to perform the first pass of
+the spherical-Bessel recurrence. It stores the per-`q` quantities needed by
+the subsequent upward sweep, avoiding allocation for each radius.
+
+# Fields
+- `x`: `x[k] = q[k] * r` for the current radius.
+- `invx`: `1 / x[k]`, with `0.0` substituted when `x[k] == 0`.
+- `lup`: `floor(Int, x[k])`, the largest order for which the upward recurrence
+    is used.
+- `N`: starting order of the downward continued-fraction recurrence. A value
+    of `-1` indicates that `floor(x[k]) ≥ lMax` and no ratios are required.
+- `rp`: scratch storage for the current continued-fraction ratio during the
+    downward sweep.
+- `jm1`: current `jₗ₋₁(x[k])` value for the upward sweep. After
+    [`sphBessRatios!`](@ref), it contains `j₁(x[k])`.
+- `jm2`: current `jₗ₋₂(x[k])` value for the upward sweep. After
+    [`sphBessRatios!`](@ref), it contains `j₀(x[k])`.
+- `R`: ratio table with `R[k, l] = jₗ(x[k]) / jₗ₋₁(x[k])` for the orders
+    required by the sweep. The first dimension is contiguous in `q`.
+"""
+struct sphBess
+    x::Vector{Float64}
+    invx::Vector{Float64}
+    lup::Vector{Int}
+    N::Vector{Int}
+    rp::Vector{Float64}
+    jm1::Vector{Float64}
+    jm2::Vector{Float64}
+    R::Matrix{Float64}
+end
+
 # The public surface: forward_cache builds the geometry-only ForwardCache.
 # Everything the includes below bring in (compute_B_lm, hydration, gram, …)
 # is the machinery it composes.
@@ -276,6 +360,9 @@ include("PartialWave.jl")
 include("Scatterers.jl")
 include("ForwardCache.jl")
 
-using .SphFuncs: SphFuncs
+# Defined after the includes: its initializer `_read_tables` and the type `_FFTables`
+# live in FormFactor.jl, and nothing included uses `_TABLES` outside function bodies.
+"The tables, read from the database on first use (thread safe, built once)."
+const _TABLES = Lazy{_FFTables}(_read_tables)
 
 end # module

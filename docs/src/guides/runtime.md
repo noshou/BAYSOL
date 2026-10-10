@@ -1,5 +1,7 @@
 # Runtime
 
+The process machinery the other modules run on, in one module (`BAYSOL.Runtime`, four files): `Cache.jl`, `Timing.jl`, `GCPause.jl` and `Parallel.jl`. Every name is imported from `Runtime` (`using ..Runtime: Lazy, tmap_items`).
+
 ## Cache
 
 Thread-safe memoization primitives, guarded by a ReentrantLock so concurrent callers racing on the same computation never double-compute or observe a torn store.
@@ -21,7 +23,7 @@ end
 - force(c::Lazy{T})::T runs f once, under c's lock, the first time it's called; every subsequent call (concurrent or not) returns the already-computed value without re-running f.
 
 ```julia
-using ..Cache: Lazy, force
+using ..Runtime: Lazy, force
 
 struct Molecule
     ...
@@ -53,7 +55,7 @@ end
 - Base.haskey(c::KeyedCache{K,V}, key::K)::Bool: whether key has already been memoized, also taken under the lock.
 
 ```julia
-using ..Cache: KeyedCache
+using ..Runtime: KeyedCache
 
 const _ρₑ_w_cache = KeyedCache{Int64, Tuple{Float64, Float64}}()
 const _ϕ°_p_cache  = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, Float64, Float64}}()   # (sequence, pH, σ_pH)
@@ -70,7 +72,7 @@ const _ϕ°_r_cache  = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, 
 
 Julia collects whenever the heap has grown by an adaptive amount; with a small live heap and large temporary arrays that is often, and GC was a fifth of the wall clock of the fitting tests (37.6 of 185 s, unchanged by cutting the gradient's allocations: it sits in the static build). `with_gc_paused(f; budget)` runs `f` with automatic collection off (re-entrant: pauses nest, the collector comes back when the outermost ends, also on an exception, and only if it was on before) and `gc_checkpoint()`, called in the loops that allocate, runs one young collection (`GC.gc(false)`) once the live heap has grown by more than `budget` (default 1 GiB, `GC_PAUSE_BUDGET`) since the last one. `seed_model` and `infer` run inside a pause; checkpoints sit in the `B_lm` chunk loop, the MAP objective, the NUTS gradient and the re-profile loop. Garbage is thus bounded by the budget and cleared in a few large young collections.
 
-With several Julia threads the pause has one rule: **only the thread that began it collects.** `GC.enable` is a per-thread switch (the collector is off while any thread has switched it off), so a worker thread's `GC.enable(true)` does nothing and its `GC.enable(false)` would leave the collector off for the rest of the process. `gc_checkpoint()` therefore returns at once on any other thread, and `Parallel.tmap_items` has the pausing thread call it while it waits for its tasks. The byte budget counts what all threads allocated (`Base.gc_bytes()`, not the live-heap counter, which does not see worker allocations until a collection).
+With several Julia threads the pause has one rule: **only the thread that began it collects.** `GC.enable` is a per-thread switch (the collector is off while any thread has switched it off), so a worker thread's `GC.enable(true)` does nothing and its `GC.enable(false)` would leave the collector off for the rest of the process. `gc_checkpoint()` therefore returns at once on any other thread, and `tmap_items` has the pausing thread call it while it waits for its tasks. The byte budget counts what all threads allocated (`Base.gc_bytes()`, not the live-heap counter, which does not see worker allocations until a collection).
 
 ## Parallel
 

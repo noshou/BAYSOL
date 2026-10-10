@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/MolecularStructure/Propka.jl: the propka3 subprocess wrapper
+# Exercises src/MolecularStructure/Pdb2pqr.jl: the propka3 subprocess wrapper
 # and its .pka summary-table parser.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
@@ -60,7 +60,8 @@ END
         end
         @test length(recs) == 4
         @test recs[1] == (resname = "ASP", resnum = 25, chain = "A", pKa = 5.07)
-        @test recs[2] == (resname = "ASP", resnum = 29, chain = "A", pKa = 3.11)  # '*' stripped
+        # '*' stripped
+        @test recs[2] == (resname = "ASP", resnum = 29, chain = "A", pKa = 3.11)
         @test recs[3] == (resname = "LYS", resnum = 30, chain = "A", pKa = 10.20)
         @test recs[4] == (resname = "N+", resnum = 1, chain = "A", pKa = 7.75)
         # the KNI ligand row must not appear

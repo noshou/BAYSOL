@@ -3,9 +3,9 @@
 Does running a stage on several Julia threads change what it computes? Every threaded stage must give **bit-identical** results at any thread count (each random draw belongs to a work item, not a thread: `Parallel.stream`), and should be faster. Stages are added to this validation as they are threaded; so far: the static build (SASA, excluded volumes, `B_lm`, the Gram matrix) and, for the record, the multi-start MAP search.
 
 ```bash
-tclsh test/run/validate.tcl threading --threads 1 --approved    # one run per thread count; prints its plan without --approved
-tclsh test/run/validate.tcl threading --threads 4 --approved
-tclsh test/run/validate.tcl threading SASDMJ9 SASDBS6 --threads 4 --approved   # or on some fits
+tclsh dev/validate.tcl threading --threads 1 --approved    # one run per thread count; prints its plan without --approved
+tclsh dev/validate.tcl threading --threads 4 --approved
+tclsh dev/validate.tcl threading SASDMJ9 SASDBS6 --threads 4 --approved   # or on some fits
 ```
 
 The script (`validate.jl`) runs the MAP search of each fit for three base values (`--bases 1,2,3`) and writes a fingerprint (a hash of the mode ẑ, the whitening S, the evaluation and mode counts, bit for bit) and the warm wall time per (fit, base) to `results/threading-<stamp>.tsv`. Each run then compares itself with every earlier file in `results/` made with another thread count.

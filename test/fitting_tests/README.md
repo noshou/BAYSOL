@@ -1,6 +1,6 @@
 # Fitting tests
 
-**Note:** Entries in `BAYSOL.PartialMolarVolumes` without uncertainties use an uncertainty estimated from the mean of the available experimental uncertainties. As the table grows, this estimate may change slightly, so fit results may change.
+**Note:** Entries in `BAYSOL.BulkElectronDensity` without uncertainties use an uncertainty estimated from the mean of the available experimental uncertainties. As the table grows, this estimate may change slightly, so fit results may change.
 
 End-to-end BAYSOL fits of 27 SASBDB entries (protein-only structures): load a structure, build its buffer, find the mode with a multi-start L-BFGS search and whiten around it, run the NUTS sampler over `ξ = (ρₑ, δρ₁, δρ₂, δρ₃)` with the excluded-volume correction `c1` profiled at every evaluation (to `EXCL_VOL_CORR_TOL` = 1e-8; see the Inference README for why that tight), and write the MAP/posterior report and figures
 next to the script. The fitted curve is the deposited SASBDB curve (q in Å⁻¹, truncated at each script's `Q_MAX_FIT`), which `seed_model` bins to at least 12 bins per Shannon channel π/D (D: the diameter of the structure and its hydration shell; a precise curve gets finer bins, up to the point of being fitted as measured, so that the binning's worst-case bias stays under 0.3 of its smallest error bar) and from which it takes `lMax = ceil(q_max·D)`; the lMax and point counts below are those of the latest run, and each report's `=== Run ===` block lists `Dₘₐₓ`, the channels, the `rebin` used and the points before and after binning. χ² is reported on the measured q grid (the binned fit's model interpolated onto it, over all measured points), the convention of FoXS's own χ², and so of the depositors' numbers (a reduced χ² with N − 3 degrees of freedom: scale, background and c1).
@@ -82,7 +82,7 @@ Settings shared by every script live in `common.jl`, which each script includes:
 - **No chain fails.** The two failed chains of v0.2.0 (SASDMZ9 model1, 96.8 % divergent; SASDJY2, 81 %) sample cleanly. Three runs have 1-5 % divergent transitions and are not bold: SASDEP6 `fit1_model1` (3.0 %) and SASDLP4 `fit1_model2` / `fit2_model1` (1.4 %, the same structure and curve). The divergences are geometric, not numerical error in the gradient (they persist at c1 tolerance 1e-10) and they disappear at a target acceptance of 0.9 (SASDLP4 `fit1_model2`: 6-61 per 1000 draws at 0.8, 0-3 at 0.9, for 1.5× the NUTS time); the default stays 0.8 so timings remain comparable. In both fits the δρ₃ posterior is 2-4× wider than the Laplace whitening predicts, because δρ₃ is barely constrained.
 - **Other optima are not competing modes.** The MAP search often reports 2-5 "modes", but every one besides the best is at least 260 nats lower in log density (usually thousands), so it carries no posterior mass; the count is a number of distinct local optima, not of modes of the posterior.
 - **Many fits put δρ₃ at its upper bound** (~+2.8, i.e. φ ≈ φ_max): SASDA52, SASDBS6 model2-4, SASDJ72 model1, SASDLP4 `fit1_model1`/3, SASDMZ9 model3, SASDP48. At its **lower** bound (−11.1, empty cavities): SASDBS6 model1, SASDJ62, SASDTK5 fit4/7 and SASDUN5 model2. The bound is usually reached together with a poor or mediocre χ²: the cavity contrast is absorbing model-data mismatch (wrong conformer, missing ensemble members) rather than representing physical cavity hydration.
-- **What buys the low χ² on poorly fitting single conformers is the split of the first two contrasts.** Refitting with one shared shell contrast (δρ₁ = δρ₂ = δρ₃, c1, scale and background still profiled; `tclsh test/run/diagnose.tcl --ablate`) gives:
+- **What buys the low χ² on poorly fitting single conformers is the split of the first two contrasts.** Refitting with one shared shell contrast (δρ₁ = δρ₂ = δρ₃, c1, scale and background still profiled; `tclsh dev/diagnose.tcl --ablate`) gives:
 
 
   | fit                             | one shared contrast     | δρ₁ = δρ₂, δρ₃ free | full model (this table)   |
@@ -124,7 +124,7 @@ Three scripts work on the results without rerunning a fit:
 
 ```
 # sampler diagnostics on any fit: MAP starts, Hessian, step size and tree depth, gradient error, modes
-tclsh test/run/diagnose.tcl --report SASDBS6:fit2_model3
+tclsh dev/diagnose.tcl --report SASDBS6:fit2_model3
 #   other commands: `tolerance --tols 1e-5,1e-8 --seeds 1,2,3` (NUTS vs the c1 tolerance), `ablate` (shell-contrast nesting)
 
 # compare results between git revisions / tags and the working tree (timing totals, χ² and parameter distributions)
@@ -139,7 +139,7 @@ Cold-start and steady-state benchmarks (compile and precompile time reported apa
 wiped cache state) live in `test/utils/` (see `test/utils/README.md`); `tclsh test/utils/compare.tcl --bench new.json`
 compares a run with the latest release's baseline in `test/baselines/` (or name two files). Benchmarks are only run with the repository owner's approval (`--approved`), because they need a quiet machine and AI agents tend not to check for one; see `test/utils/README.md`.
 
-`test/run/diagnose.tcl` (through `test/utils/diagnose.tcl`) builds the `Seed` a script would sample without fitting it (through the script's `seed_<id>()`, above); the diagnostics themselves are generic functions in `test/utils/seed_diagnostics.jl`, tested in `test/unit_tests/units/test_seed_diagnostics.jl`. `compare.tcl` reads the committed `res*.txt` of each revision with `git show`, so no checkout is needed; the wall clock excludes PROPKA/pdb2pqr.
+`dev/diagnose.tcl` builds the `Seed` a script would sample without fitting it (through the script's `seed_<id>()`, above); the diagnostics themselves are generic functions in `test/utils/seed_diagnostics.jl`, tested in `test/unit_tests/units/test_seed_diagnostics.jl`. `compare.tcl` reads the committed `res*.txt` of each revision with `git show`, so no checkout is needed; the wall clock excludes PROPKA/pdb2pqr.
 
 ## Entry summary
 

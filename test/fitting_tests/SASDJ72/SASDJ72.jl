@@ -3,13 +3,14 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
+using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDJ72")
-const _PDB_PATHS = (
-    model1 = joinpath(_FIXTURE_DIR, "SASDJ72_fit1_model1.pdb"),
-    model2 = joinpath(_FIXTURE_DIR, "SASDJ72_fit1_model2.pdb"),
+const _PDB_PATHS   = (
+model1 = joinpath(_FIXTURE_DIR, "SASDJ72_fit1_model1.pdb"),
+model2 = joinpath(_FIXTURE_DIR, "SASDJ72_fit1_model2.pdb")
 )
 const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDJ72_fit1.fit")
 
@@ -62,8 +63,8 @@ I_exp = Float64.(raw[:, 2])
 const PH, σ_PH = 7.5, PH_METER_SIGMA
 
 const ENERGY_EV        = HC_EV_ANGSTROM / 1.1   # ≈ 11271.29 eV, from stated λ = 0.11 nm
-const TEMPERATURE_C     = 20.0            # 20°C measurement, SASBDB
-const IONIC_STRENGTH_M  = 0.150           # 150 mM NaCl
+const TEMPERATURE_C    = 20.0            # 20°C measurement, SASBDB
+const IONIC_STRENGTH_M = 0.150           # 150 mM NaCl
 
 # LigIIIα sequence, read off SASDJ72_fit1_model1.pdb (MODEL 1;
 # the file contains two MODEL records; load_molecule only reads struc[1],
@@ -71,7 +72,7 @@ const IONIC_STRENGTH_M  = 0.150           # 150 mM NaCl
 # in either PDB file (column is blank); single continuous chain, 922
 # residues, CA-verified against SASDJ72_fit1_model2.pdb (identical
 # sequence, confirming both candidate models represent the same construct).
-const LIGIII_SEQ = 
+const LIGIII_SEQ =
     "MAEQRFCVDYAKRGTAGCKKCKEKIVKGVCRIGKVVPNPFSESGGDMKEWYHIKCMFEKL" *
     "ERARATTKKIEDLTELEGWEELEDNEKEQITQHIADLSSKAAGTPKKKAVVQAKLTTTGQ" *
     "VTSPVKGASFVTSTNPRKFSGFSAKPNNSGEAPSSPTPKRSLSSSKCDPRHKDCLLREFR" *
@@ -93,43 +94,45 @@ const LIGIII_SEQ =
 # for the terminal H/OH) = 102690.9 Da, matching SASBDB's reported
 # 102.69 kDa monomer MW almost exactly.
 const LIGIII_MW = 102690.9   # g/mol
-const LIGIII_CONC_MG_ML = 3.0   # midpoint of SASBDB's stated 1-5 mg/ml range; see note above
+# midpoint of SASBDB's stated 1-5 mg/ml range; see note above
+const LIGIII_CONC_MG_ML = 3.0
 const LIGIII_MOLARITY   = LIGIII_CONC_MG_ML / LIGIII_MW # ≈ 2.92e-5 M (≈ 0.0292 mM)
 const LIGIII_MOLARITY_σ = 0.40 * LIGIII_MOLARITY        # 40% merged-curve estimate
 
-# Buffer components. 
-# Counter-ions (added 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
-# not list. Assumed: 25 mM Tris titrated with HCl -> Cl⁻ = C·0.857 (pK(22 °C) = 8.156). The pH is taken as
-# set at room temperature (22 ± 3 °C), which fixes the counter-ion amount whatever the measurement
-# temperature. pK(T) from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
-# 10.1063/1.1416902) pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.171 M. σ combines σ_PH, ±3 °C,
-# ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is modelled; the volume change of
-# the buffer's own (de)protonation is not. Titrant: not stated; HCl for amine bases (Tris, imidazole,
-# histidine), NaOH for Good's buffers.
+# Buffer components. Counter-ions (added 2026-10-01). Setting the pH adds titrant
+# counter-ions that the deposited recipe does not list. Assumed: 25 mM Tris titrated with
+# HCl -> Cl⁻ = C·0.857 (pK(22 °C) = 8.156). The pH is taken as set at room temperature (22
+# ± 3 °C), which fixes the counter-ion amount whatever the measurement temperature. pK(T)
+# from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
+# 10.1063/1.1416902) pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.171 M. σ combines
+# σ_PH, ±3 °C, ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is
+# modelled; the volume change of the buffer's own (de)protonation is not. Titrant: not
+# stated; HCl for amine bases (Tris, imidazole, histidine), NaOH for Good's buffers.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Inference.Solute).
-    NonBiological(0.150, 0.0015,  "sodium chloride"), # 150 mM NaCl, ±1%
-    NonBiological(0.025, 0.0005,  "tris"),            # 25 mM Tris-HCl, ±2%
+    # electron density (see BulkElectronDensity.Solute).
+    NonBiological(0.150, 0.0015, "sodium chloride"), # 150 mM NaCl, ±1%
+    NonBiological(0.025, 0.0005, "tris"),            # 25 mM Tris-HCl, ±2%
     NonBiological(0.002, 0.00004, "dtt"),             # 2 mM DTT, ±2%
     # 10% v/v glycerol -> molarity via pure-glycerol density (1.2613 g/mL)
     # and MW (92.094 g/mol): 10 mL glycerol/100 mL soln * 1.2613 g/mL /
     # 92.094 g/mol * 1000 ≈ 1.369 M. Wider (5%) relative uncertainty than
     # the other components since this is a v/v -> molarity approximation
     # (ignores mixing non-ideality), not a directly-stated molar concentration.
-    NonBiological(1.369, 0.0685,  "glycerol"),
-    NonBiological(0.021436, 0.001060, "chloride"),   # Cl⁻ counter-ion from HCl titration of Tris (see note above)
+    NonBiological(1.369, 0.0685, "glycerol"),
+    # Cl⁻ counter-ion from HCl titration of Tris (see note above)
+    NonBiological(0.021436, 0.001060, "chloride"),
 ]
 
 # ---------------------------------------------------------------------------
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# Restricting the fit to q ≤ Q_MAX_FIT = 0.30 Å⁻¹ drops the noisiest tail points above that, where relative
-# errors balloon to 20-40%.
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
-# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
-# that diameter allows (see `rebin` there).
+# Restricting the fit to q ≤ Q_MAX_FIT = 0.30 Å⁻¹ drops the noisiest tail points
+# above that, where relative errors balloon to 20-40%. The spherical-harmonic
+# band limit lMax is not set here: `seed_model` takes it from the diameter of
+# the scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the
+# curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const Q_MAX_FIT = 0.30
 
@@ -138,16 +141,17 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
-with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
+(`seed_model` bins the curve and drops the bins with non-positive intensity.)
 """
 function fit_subset()
     keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdj72` samples. It is separate only because the developer tools in test/utils/ build
-# a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
+# Builds the Seed that `run_sasdj72` samples. It is separate only because
+# the developer tools in test/utils/ build a fit's Seed without running
+# the fit; if you are reading this script as an example you can skip it:
 # `run_sasdj72` below is the whole story (build the seed, then sample it).
 function seed_sasdj72(model::Symbol; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
@@ -165,7 +169,7 @@ function run_sasdj72(
     model::Symbol;
     n_samples::Int = N_SAMPLES,
     n_adapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED
+    seed::Integer = SAMPLER_SEED,
 )
     s, data = seed_sasdj72(model; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
@@ -182,8 +186,8 @@ Plots the SASDJ72 fit: the experimental data (`data = (q_fit, I_fit,
 function sasdj72_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
@@ -192,7 +196,6 @@ function sasdj72_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-
         xscale = log10,
         yscale = log10,
     )
@@ -210,7 +213,8 @@ function sasdj72_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
@@ -238,7 +242,14 @@ function sasdj72_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -278,7 +289,8 @@ function sasdj72_residuals_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
@@ -288,8 +300,22 @@ function sasdj72_residuals_figure(result, data)
 
     if map_curve !== nothing
         resid = I_fit .- map_curve[:, 2]
-        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR)
-        scatter!(ax, q_fit, resid; markersize = MARKERSIZE, color = COLOR_DATA, label = "data - MAP")
+        errorbars!(
+            ax,
+            q_fit,
+            resid,
+            σ_fit;
+            whiskerwidth = WHISKERWIDTH,
+            color = COLOR_ERRORBAR,
+        )
+        scatter!(
+            ax,
+            q_fit,
+            resid;
+            markersize = MARKERSIZE,
+            color = COLOR_DATA,
+            label = "data - MAP",
+        )
         hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
         lo, hi = extrema(resid)
         pad = YLIM_LIN_PAD_FRAC * (hi - lo)
@@ -347,15 +373,15 @@ Overlays our MAP curve against the deposited MultiFoXS 2-state fit
 function sasdj72_comparison_figure(result, data)
     _, _, map_result, _ = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     crysol   = readdlm(_FIT_PATH; skipstart = 3)
     q_crysol = Float64.(crysol[:, 1])
     I_crysol = Float64.(crysol[:, 4])
-    keep   = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT) .& (I_crysol .> 0)
+    keep     = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT) .& (I_crysol .> 0)
 
     fig = Figure(size = FIG_SIZE_CURVE)
     ax = Axis(
@@ -378,12 +404,20 @@ function sasdj72_comparison_figure(result, data)
 
     lines!(
         ax, q_crysol[keep], I_crysol[keep];
-        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = "MultiFoXS 2-state",
+        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash,
+        label = "MultiFoXS 2-state",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "BAYSOL MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "BAYSOL MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -404,14 +438,19 @@ for model in (:model1, :model2)
 
     # `@__DIR__` (this SASDJ72/ folder), not the caller's cwd.
     open(joinpath(@__DIR__, "res_$(model).txt"), "w") do io
-        BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
+        BAYSOL.write_report(
+            io,
+            result;
+            form_factor_log = form_factor_log,
+            n_atoms = n_atoms,
+        )
     end
 
     fits[model] = (result, (q_fit, I_fit, σ_fit))
 end
 
-# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
-# then recompile (about 40 % of a fit's wall clock).
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL
+# methods, which every fit would then recompile (about 40 % of a fit's wall clock).
 using GLMakie
 
 for model in (:model1, :model2)
@@ -421,11 +460,19 @@ for model in (:model1, :model2)
     save(joinpath(@__DIR__, "res_$(model).png"), fig; px_per_unit = PX_PER_UNIT)
 
     fig_residuals = sasdj72_residuals_figure(result, data)
-    save(joinpath(@__DIR__, "res_$(model)_residuals.png"), fig_residuals; px_per_unit = PX_PER_UNIT)
+    save(
+        joinpath(@__DIR__, "res_$(model)_residuals.png"),
+        fig_residuals;
+        px_per_unit = PX_PER_UNIT,
+    )
 
     fig_hist = sasdj72_hist(result)
     save(joinpath(@__DIR__, "res_$(model)_hist.png"), fig_hist; px_per_unit = PX_PER_UNIT)
 
     fig_crysol = sasdj72_comparison_figure(result, data)
-    save(joinpath(@__DIR__, "res_$(model)_comparison.png"), fig_crysol; px_per_unit = PX_PER_UNIT)
+    save(
+        joinpath(@__DIR__, "res_$(model)_comparison.png"),
+        fig_crysol;
+        px_per_unit = PX_PER_UNIT,
+    )
 end

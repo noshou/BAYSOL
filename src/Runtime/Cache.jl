@@ -1,9 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
-Thread safe caching primitives.
-"""
-module Cache
+# Thread safe caching primitives.
 
 export Lazy, force, KeyedCache
 
@@ -65,7 +62,7 @@ key never double-store or observe a torn Dict.
 function Base.get!(
     f::Union{Function,Type},
     c::KeyedCache{K,V},
-    key::K
+    key::K,
 )::V where {K,V}
     @lock c.lock begin
         haskey(c.store, key) && return c.store[key]
@@ -80,7 +77,5 @@ Whether key has already been memoized in c, taken under c's lock.
 """
 Base.haskey(
     c::KeyedCache{K,V},
-    key::K
+    key::K,
 ) where {K,V} = @lock c.lock haskey(c.store, key)
-
-end # module Cache

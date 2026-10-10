@@ -29,8 +29,8 @@ The unit tests `include` three shared helpers. `geometry.jl` and `floatcompare.j
 | file              | contents                                                                                                                                                                                                  |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `utils/geometry.jl`     | `sph(R, n)` — Fibonacci-sphere point set, used by `test_sasa.jl` to build a sealed shell of atoms around an enclosed void                                                   |
-| `utils/floatcompare.jl` | `close_(a, b; atol = 1.0e-9)`; tolerance float compare, used by `test_dns.jl`, `test_pmv.jl`, `test_deltarho.jl`, `test_paramtransform.jl`, `test_sampler.jl`, `test_profiledcorrs.jl`, `test_protonation.jl`, `test_integration.jl` and `test_structuresource.jl` |
-| `molecules/sequences.jl`    | Protein/DNA/RNA sequences, used by `test_dns.jl` and `test_pmv.jl`.                                                                                                                                                                                |
+| `utils/floatcompare.jl` | `close_(a, b; atol = 1.0e-9)`; tolerance float compare, used by `test_dns.jl`, `test_bulkelectrondensity.jl`, `test_deltarho.jl`, `test_paramtransform.jl`, `test_sampler.jl`, `test_profiledcorrs.jl`, `test_protonation.jl`, `test_integration.jl` and `test_structuresource.jl` |
+| `molecules/sequences.jl`    | Protein/DNA/RNA sequences, used by `test_dns.jl` and `test_bulkelectrondensity.jl`.                                                                                                                                                                                |
 
 ### `sequences.jl` provenance
 
@@ -73,11 +73,9 @@ Filenames carry a `-TEST` suffix (distinct from the bare RCSB ID, e.g. `1CRN-TES
 case): the experimental scattering curve (`experimental_data/`), the
 deposited P(r) (`pddf/`), the depositors' own regularized fit(s)
 (`<CASE>_fit*.fit`/`.fir`/`.dat`), the fitted/source model coordinates
-(`<CASE>_fit*_model*.pdb`/`.cif`), and the source paper PDF when its
-license allows redistribution (every bundled PDF is open access: CC BY,
-CC BY-NC(-ND) or ACS AuthorChoice; SASDCQ2's IUCr PDF carries an Open
-Access badge but prints no license, so check it on the IUCr page). SASDMJ9's paper is not open access, so
-only its DOI is given.
+(`<CASE>_fit*_model*.pdb`/`.cif`), and a small `README.txt` naming the
+source paper and its DOI. The publishers' PDFs are not kept in the repository (they were 85 MB, and
+redistribution terms vary); fetch a paper from its DOI, which is also in the table below.
 
 
 | SASBDB id | source paper                                                                                                                                                                                                                                                                   | fitting test                            |
@@ -107,5 +105,5 @@ only its DOI is given.
 | `SASDWZ9` | Huang, Shih, Jeng, Chang, Lin & Malliavin (2026)*ACS Omega*, "pH Sensitivity of the SERF1a Conformational Ensemble". [10.1021/acsomega.5c07620](https://doi.org/10.1021/acsomega.5c07620) | `test/fitting_tests/SASDWZ9/SASDWZ9.jl` |
 | `SASDX52` | Rahman, Dalwani & Venkatesan (2025)*Biochem Biophys Res Commun*, "Structural enzymological studies of ... FadD5 ... of Mycobacterium tuberculosis". [10.1016/j.bbrc.2025.151960](https://doi.org/10.1016/j.bbrc.2025.151960) | `test/fitting_tests/SASDX52/SASDX52.jl` |
 | `SASDYW6` | Cuéllar-Cruz, Siliqi & Moreno (2026)*ACS Omega*, "Insights into the Solution Structure and Oligomeric State of Fructose-1,6-bisphosphate Aldolase and Pyruvate Kinase from Nakaseomyces glabratus". [10.1021/acsomega.6c06099](https://doi.org/10.1021/acsomega.6c06099) | `test/fitting_tests/SASDYW6/SASDYW6_fit2.jl` |
-| `SASDZC6` | "A highly dynamic active state for transducin-bound phosphodiesterase-6 in vertebrate phototransduction" -- bioRxiv preprint, accession`2026.04.01.715611` (`v3`). No DOI resolves yet as of writing; not linked to a publication in SASBDB's own metadata either. | `test/fitting_tests/SASDZC6/SASDZC6.jl` |
+| `SASDZC6` | "A highly dynamic active state for transducin-bound phosphodiesterase-6 in vertebrate phototransduction" -- bioRxiv preprint, accession`2026.04.01.715611` (`v3`). The DOI printed on the preprint is [10.64898/2026.04.01.715611](https://doi.org/10.64898/2026.04.01.715611) (it may not resolve yet); not linked to a publication in SASBDB's own metadata either. | `test/fitting_tests/SASDZC6/SASDZC6.jl` |
 | `SASDZZ9` | Pongnan, Robinson, Kamonsutthipaijit, Fukamizo & Suginta (2026)*Biophys Rep (N Y)*, "The oligomeric state of chitooligosaccharide deacetylase from ... Vibrio campbellii". [10.1016/j.bpr.2026.100275](https://doi.org/10.1016/j.bpr.2026.100275) | `test/fitting_tests/SASDZZ9/SASDZZ9_fit1.jl` |

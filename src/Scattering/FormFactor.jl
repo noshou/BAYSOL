@@ -5,21 +5,10 @@
 # Chantler FFAST f1/f2). Included into Scattering; see the
 # FormFactor.jl section of its README.
 
-"""
-Upper end of the Waasmaier-Kirfel f0 fit range, s = sin θ/λ in Å⁻¹.
-Beyond it the ion fits diverge; see the FormFactor README.
-"""
-const WK_S_MAX = 6.0
-
-"""
-Floor applied to Chantler f2 table values before the log-log interpolation
-`f1f2`: f2 is positive and spans decades, and the floor keeps the log finite
-where the table stores an exact zero.
-"""
-const F2_LOG_FLOOR = 1e-99
-
 "Raised on any failure building or querying form factors."
-struct FormFactorError <: Exception; msg::String end
+struct FormFactorError <: Exception
+    msg::String
+end
 Base.showerror(io::IO, e::FormFactorError) = print(io, "FormFactorError: ", e.msg)
 
 "Per-batch form factors: tbl ion => row aligned
@@ -47,8 +36,8 @@ The bundled tables, immutable once built: `wk` the Waasmaier-Kirfel coefficients
 (c, a1..a5, b1..b5) by ion key, `ch` the Chantler grids by element.
 """
 struct _FFTables
-    wk :: Dict{String,NTuple{11,Float64}}
-    ch :: Dict{String,_Chantler}
+    wk::Dict{String,NTuple{11,Float64}}
+    ch::Dict{String,_Chantler}
 end
 
 "Path to the bundled database."
@@ -64,9 +53,9 @@ function _read_tables()::_FFTables
     db = SQLite.DB(_dbpath())
     try
         for r in DBInterface.execute(
-                db,
-                "SELECT ion,c,a1,a2,a3,a4,a5,b1,b2,b3,b4,b5 FROM waasmaier"
-            )
+            db,
+            "SELECT ion,c,a1,a2,a3,a4,a5,b1,b2,b3,b4,b5 FROM waasmaier",
+        )
             wk[r.ion] = (
                 r.c,
                 r.a1,
@@ -78,33 +67,31 @@ function _read_tables()::_FFTables
                 r.b2,
                 r.b3,
                 r.b4,
-                r.b5
+                r.b5,
             )
         end
         for r in DBInterface.execute(
-                db,
-                "SELECT element,energy,f1,f2 FROM chantler"
-            )
+            db,
+            "SELECT element,energy,f1,f2 FROM chantler",
+        )
             ch[r.element] = _Chantler(
                 collect(reinterpret(Float64, r.energy)),
                 collect(reinterpret(Float64, r.f1)),
-                collect(reinterpret(Float64, r.f2))
+                collect(reinterpret(Float64, r.f2)),
             )
         end
     finally
         DBInterface.close!(db)
     end
     isempty(wk) && throw(
-        FormFactorError("form_factors.sqlite3 has no waasmaier rows")
+        FormFactorError("form_factors.sqlite3 has no waasmaier rows"),
     )
     isempty(ch) && throw(
-        FormFactorError("form_factors.sqlite3 has no chantler rows")
+        FormFactorError("form_factors.sqlite3 has no chantler rows"),
     )
     return _FFTables(wk, ch)
 end
 
-"The tables, read from the database on first use (thread safe, built once)."
-const _TABLES = Lazy{_FFTables}(_read_tables)
 
 # ---------------------------------------------------------------------------
 # f0: Waasmaier-Kirfel
@@ -118,21 +105,21 @@ a bare element like "fe"), at s = q/(4π) in Å⁻¹.
 function f0(species::AbstractString, s::Real)::Float64
     p = get(force(_TABLES).wk, species, nothing)
     p === nothing && throw(
-        FormFactorError("no Waasmaier-Kirfel entry for \"$species\"")
+        FormFactorError("no Waasmaier-Kirfel entry for \"$species\""),
     )
     sf = Float64(s)
     (0.0 ≤ sf ≤ WK_S_MAX) ||
         throw(
             FormFactorError(
-                "s = $sf outside the Waasmaier-Kirfel range [0, $WK_S_MAX]"
-            )
+                "s = $sf outside the Waasmaier-Kirfel range [0, $WK_S_MAX]",
+            ),
         )
     r = p[1]
     # exp(((-b)*s)*s), not exp(-(b*s^2)): this is the association NumPy uses
     # for -e*q*q, and matching it makes the result bit-identical to the
     # reference implementation rather than 1-3 ulp away on some species.
     @inbounds for i in 1:5
-        r += p[1 + i] * exp(((-p[6 + i]) * sf) * sf)
+        r += p[1+i] * exp(((-p[6+i]) * sf) * sf)
     end
     return r
 end
@@ -150,7 +137,7 @@ Deliberately reproduces the reference implementation's asymmetric bounds
 fitted to these points and nothing else, so widening it would shift every
 interpolated value.
 """
-_window(n::Int, j::Int)::UnitRange{Int} = max(1, j - 3):min(n, j + 3)
+_window(n::Int, j::Int)::UnitRange{Int} = max(1, j-3):min(n, j+3)
 
 """
 Interpolating cubic spline through every (x, y) with not-a-knot end
@@ -163,33 +150,33 @@ edge, where the grid is dense and the curvature large.
 function _notaknot(
     x::AbstractVector{Float64},
     y::AbstractVector{Float64},
-    t::Float64
+    t::Float64,
 )::Float64
     n = length(x)
     n ≥ 4 || throw(FormFactorError("_notaknot needs at least 4 points, got $n"))
     h = diff(x)
     A = zeros(Float64, n, n)
     b = zeros(Float64, n)
-    @inbounds for i in 2:(n - 1)
-        A[i, i - 1] = h[i - 1]
-        A[i, i]     = 2 * (h[i - 1] + h[i])
-        A[i, i + 1] = h[i]
-        b[i]        = 3 * ((y[i + 1] - y[i]) / h[i] - (y[i] - y[i - 1]) / h[i - 1])
+    @inbounds for i in 2:(n-1)
+        A[i, i-1] = h[i-1]
+        A[i, i]   = 2 * (h[i-1] + h[i])
+        A[i, i+1] = h[i]
+        b[i]      = 3 * ((y[i+1] - y[i]) / h[i] - (y[i] - y[i-1]) / h[i-1])
     end
 
     # not-a-knot: the third derivative is continuous across the second and
     # second-to-last knots, i.e. the first two (and last two) cubics are one cubic.
-    A[1, 1] = h[2]
-    A[1, 2] = -(h[1] + h[2])
-    A[1, 3] = h[1]
-    A[n, n - 2] = h[n - 1]
-    A[n, n - 1] = -(h[n - 2] + h[n - 1])
-    A[n, n] = h[n - 2]
-    c = A \ b
-    i = clamp(searchsortedlast(x, t), 1, n - 1)
-    dx = t - x[i]
-    bi = (y[i + 1] - y[i]) / h[i] - h[i] * (2c[i] + c[i + 1]) / 3
-    di = (c[i + 1] - c[i]) / (3 * h[i])
+    A[1, 1]   = h[2]
+    A[1, 2]   = -(h[1] + h[2])
+    A[1, 3]   = h[1]
+    A[n, n-2] = h[n-1]
+    A[n, n-1] = -(h[n-2] + h[n-1])
+    A[n, n]   = h[n-2]
+    c         = A \ b
+    i         = clamp(searchsortedlast(x, t), 1, n - 1)
+    dx        = t - x[i]
+    bi        = (y[i+1] - y[i]) / h[i] - h[i] * (2c[i] + c[i+1]) / 3
+    di        = (c[i+1] - c[i]) / (3 * h[i])
     return y[i] + bi * dx + c[i] * dx^2 + di * dx^3
 end
 
@@ -207,9 +194,9 @@ a small non-zero constant rather than to 0 at high energy.
 function f1f2(element::AbstractString, energy::Real)::Tuple{Float64,Float64}
     ch = get(force(_TABLES).ch, element, nothing)
     ch === nothing && throw(
-        FormFactorError("no Chantler data for element \"$element\"")
+        FormFactorError("no Chantler data for element \"$element\""),
     )
-    E = Float64(energy)
+    E       = Float64(energy)
     errmsg1 = "energy $E eV outside the Chantler range"
     errmsg2 = " [$(ch.e[1]), $(ch.e[end])] for \"$element\""
     errmsg  = errmsg1 * errmsg2
@@ -226,9 +213,9 @@ function f1f2(element::AbstractString, energy::Real)::Tuple{Float64,Float64}
     # table stores an exact zero.
     y2 = view(ch.f2, w)
     j = clamp(searchsortedlast(x, E), 1, length(x) - 1)
-    lo = abs(y2[j])     < F2_LOG_FLOOR ? F2_LOG_FLOOR : y2[j]
-    hi = abs(y2[j + 1]) < F2_LOG_FLOOR ? F2_LOG_FLOOR : y2[j + 1]
-    lx1, lx2 = log(x[j]), log(x[j + 1])
+    lo = abs(y2[j]) < F2_LOG_FLOOR ? F2_LOG_FLOOR : y2[j]
+    hi = abs(y2[j+1]) < F2_LOG_FLOOR ? F2_LOG_FLOOR : y2[j+1]
+    lx1, lx2 = log(x[j]), log(x[j+1])
     ly1, ly2 = log(lo), log(hi)
     slope = (ly2 - ly1) / (lx2 - lx1)
     b = exp(slope * (log(E) - lx1) + ly1)
@@ -284,19 +271,19 @@ The build log carries one line per ion that did not resolve in full:
 function compute_form_factors(
     ions::AbstractVector{<:AbstractString},
     energy::Real,
-    qvals::AbstractVector{<:Real}
+    qvals::AbstractVector{<:Real},
 )::FF
-    isempty(ions)  && throw(
-        FormFactorError("compute_form_factors: ions must not be empty")
+    isempty(ions) && throw(
+        FormFactorError("compute_form_factors: ions must not be empty"),
     )
-    energy > 0     || throw(
-        FormFactorError("compute_form_factors: energy must be > 0")
+    energy > 0 || throw(
+        FormFactorError("compute_form_factors: energy must be > 0"),
     )
     isempty(qvals) && throw(
-        FormFactorError("compute_form_factors: qvals must not be empty")
+        FormFactorError("compute_form_factors: qvals must not be empty"),
     )
     any(<(0), qvals) && throw(
-        FormFactorError("compute_form_factors: qvals must be ≥ 0")
+        FormFactorError("compute_form_factors: qvals must be ≥ 0"),
     )
     t = force(_TABLES)
 
@@ -383,7 +370,7 @@ and every ion must be present in t; either violation throws
 - `qvals`: q values in Å⁻¹; each must match a grid point of t exactly.
 """
 function form_factors(
-    t::FF, ions::AbstractVector{<:AbstractString}, qvals::AbstractVector{<:Real}
+    t::FF, ions::AbstractVector{<:AbstractString}, qvals::AbstractVector{<:Real},
 )::Matrix{ComplexF64}
     cols = Vector{Int}(undef, length(qvals))
     @inbounds for k in eachindex(qvals)
@@ -391,8 +378,8 @@ function form_factors(
         i = get(t.qmp, q, 0)
         i == 0 && throw(
             FormFactorError(
-                "q = $q is not a grid point of this form-factor table"
-            )
+                "q = $q is not a grid point of this form-factor table",
+            ),
         )
         cols[k] = i
     end
@@ -405,8 +392,8 @@ function form_factors(
             row === nothing &&
                 throw(
                     FormFactorError(
-                        "ion \"$(ions[r])\" is not in this form-factor table"
-                    )
+                        "ion \"$(ions[r])\" is not in this form-factor table",
+                    ),
                 )
             @fastmath @simd for k in eachindex(cols)
                 out[r, k] = row[cols[k]]

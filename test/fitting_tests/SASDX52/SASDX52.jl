@@ -3,7 +3,8 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
+using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 # =============================================================================
@@ -30,8 +31,8 @@ include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 # =============================================================================
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDX52")
-const _PDB_PATH     = joinpath(_FIXTURE_DIR, "SASDX52_fit1_model1.pdb")
-const _FIT_PATH     = joinpath(_FIXTURE_DIR, "SASDX52_fit1.fit")
+const _PDB_PATH = joinpath(_FIXTURE_DIR, "SASDX52_fit1_model1.pdb")
+const _FIT_PATH = joinpath(_FIXTURE_DIR, "SASDX52_fit1.fit")
 
 # No experimental_data/*.dat bundled: SASDX52_fit1.fit is the only source of
 # q/I/σ. 3 '#' header lines, 4 columns: q, exp_intensity, error, model_intensity.
@@ -86,7 +87,7 @@ const IONIC_STRENGTH_M = 0.515
 
 # FadD5 sequence, read directly off SASDX52_fit1_model1.pdb chain A SEQRES
 # (554 residues). 
-const FADD5_SEQ = 
+const FADD5_SEQ =
     "MTAQLASHLTRALTLAQQQPYLARRQNWVNQLERHAMMQPDAPALRFVGNTMTWADLRRR" *
     "VAALAGALSGRGVGFGDRVMILMLNRTEFVESVLAANMIGAIAVPLNFRLTPTEIAVLVE" *
     "DCVAHVMLTEAALAPVAIGVRNIQPLLSVIVVAGGSSQDSVFGYEDLLNEAGDVHEPVDI" *
@@ -110,28 +111,31 @@ const FADD5_MOLARITY   = FADD5_CONC_MG_ML / FADD5_MW # ≈ 6.68e-5 M
 const FADD5_MOLARITY_σ = MOLARITY_REL_SIGMA * FADD5_MOLARITY   # σ not stated by SASBDB
 
 # Buffer components. All four species below were cross-checked against
-# src/PartialMolarVolumes/NonBiological/common_to_iupac.json and found
+# src/BulkElectronDensity/NonBiological/common_to_iupac.json and found
 # present (no MISSING FROM PMV LOOKUP entries for this case):
 #   "sodium chloride"    -> "sodium chloride"
 #   "magnesium chloride" -> "magnesium dichloride"
 #   "hepes"               -> "2-[4-(2-hydroxyethyl)piperazin-1-yl]ethane-1-sulfonic acid"
 #   "2-mercaptoethanol"   -> "2-mercaptoethanol"
-# Counter-ions (added 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
-# not list. Assumed: 20 mM HEPES titrated with NaOH -> Na⁺ = C·0.519 (pK(22 °C) = 7.6). The pH is taken as
-# set at room temperature (22 ± 3 °C), which fixes the counter-ion amount whatever the measurement
-# temperature. pK(T) from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
-# 10.1063/1.1416902) pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.525 M. σ combines σ_PH, ±3 °C,
-# ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is modelled; the volume change of
-# the buffer's own (de)protonation is not. Titrant: not stated; HCl for amine bases (Tris, imidazole,
-# histidine), NaOH for Good's buffers.
+# Counter-ions (added 2026-10-01). Setting the pH adds titrant counter-ions that the
+# deposited recipe does not list. Assumed: 20 mM HEPES titrated with NaOH -> Na⁺ = C·0.519
+# (pK(22 °C) = 7.6). The pH is taken as set at room temperature (22 ± 3 °C), which fixes
+# the counter-ion amount whatever the measurement temperature. pK(T) from Goldberg,
+# Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902)
+# pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.525 M. σ combines σ_PH, ±3 °C,
+# ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is modelled; the
+# volume change of the buffer's own (de)protonation is not. Titrant: not stated; HCl for
+# amine bases (Tris, imidazole, histidine), NaOH for Good's buffers.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Inference.Solute).
-    NonBiological(0.500, 0.005,   "sodium chloride"),    # 500 mM NaCl, ±1%
-    NonBiological(0.020, 0.0004,  "hepes"),              # 20 mM HEPES, ±2%
-    NonBiological(0.005, 0.0001,  "magnesium chloride"), # 5 mM MgCl2, ±2%
-    NonBiological(0.001, 0.00005, "2-mercaptoethanol"),  # 1 mM BME, ±5% (small conc., degrades/evaporates)
-    NonBiological(0.010382, 0.001346, "sodium(1+)"),   # Na⁺ counter-ion from NaOH titration of HEPES (see note above)
+    # electron density (see BulkElectronDensity.Solute).
+    NonBiological(0.500, 0.005, "sodium chloride"),    # 500 mM NaCl, ±1%
+    NonBiological(0.020, 0.0004, "hepes"),              # 20 mM HEPES, ±2%
+    NonBiological(0.005, 0.0001, "magnesium chloride"), # 5 mM MgCl2, ±2%
+    # 1 mM BME, ±5% (small conc., degrades/evaporates)
+    NonBiological(0.001, 0.00005, "2-mercaptoethanol"),
+    # Na⁺ counter-ion from NaOH titration of HEPES (see note above)
+    NonBiological(0.010382, 0.001346, "sodium(1+)"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -145,25 +149,26 @@ const SOLUTES = Solute[
 # against any I_exp ≤ 0 points.
 const Q_MAX_FIT = 0.17
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
-# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
-# that diameter allows (see `rebin` there).
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`. (`seed_model` bins the curve and drops the bins
-with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
+(`seed_model` bins the curve and drops the bins with non-positive intensity.)
 """
 function fit_subset()
     keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdx52` samples. It is separate only because the developer tools in test/utils/ build
-# a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
+# Builds the Seed that `run_sasdx52` samples. It is separate only because
+# the developer tools in test/utils/ build a fit's Seed without running
+# the fit; if you are reading this script as an example you can skip it:
 # `run_sasdx52` below is the whole story (build the seed, then sample it).
 function seed_sasdx52(; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
@@ -176,7 +181,11 @@ function seed_sasdx52(; seed::Integer = SAMPLER_SEED)
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdx52(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+function run_sasdx52(;
+    n_samples::Int = N_SAMPLES,
+    n_adapt::Int = N_ADAPT,
+    seed::Integer = SAMPLER_SEED,
+)
     s, data = seed_sasdx52(; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
@@ -191,8 +200,8 @@ open(joinpath(@__DIR__, "res.txt"), "w") do io
     BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
-# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL methods, which every fit would
-# then recompile (about 40 % of a fit's wall clock).
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL
+# methods, which every fit would then recompile (about 40 % of a fit's wall clock).
 using GLMakie
 
 """
@@ -205,8 +214,8 @@ all draws diverged) the quantile-curve envelope.
 function sasdx52_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
@@ -215,7 +224,6 @@ function sasdx52_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-
         xscale = log10,
         yscale = log10,
     )
@@ -233,7 +241,8 @@ function sasdx52_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
@@ -261,7 +270,14 @@ function sasdx52_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -301,7 +317,8 @@ function sasdx52_residuals_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
@@ -311,8 +328,22 @@ function sasdx52_residuals_figure(result, data)
 
     if map_curve !== nothing
         resid = I_fit .- map_curve[:, 2]
-        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR)
-        scatter!(ax, q_fit, resid; markersize = MARKERSIZE, color = COLOR_DATA, label = "data - MAP")
+        errorbars!(
+            ax,
+            q_fit,
+            resid,
+            σ_fit;
+            whiskerwidth = WHISKERWIDTH,
+            color = COLOR_ERRORBAR,
+        )
+        scatter!(
+            ax,
+            q_fit,
+            resid;
+            markersize = MARKERSIZE,
+            color = COLOR_DATA,
+            label = "data - MAP",
+        )
         hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
         lo, hi = extrema(resid)
         pad = YLIM_LIN_PAD_FRAC * (hi - lo)
@@ -370,15 +401,15 @@ curve (`model_intensity` column).
 function sasdx52_comparison_figure(result, data)
     _, _, map_result, _ = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
-    ref      = readdlm(_FIT_PATH; skipstart = 3)
-    q_ref    = Float64.(ref[:, 1])
-    I_ref    = Float64.(ref[:, 4])
-    keep     = (q_ref .> 0) .& (q_ref .≤ Q_MAX_FIT) .& (I_ref .> 0)
+    ref   = readdlm(_FIT_PATH; skipstart = 3)
+    q_ref = Float64.(ref[:, 1])
+    I_ref = Float64.(ref[:, 4])
+    keep  = (q_ref .> 0) .& (q_ref .≤ Q_MAX_FIT) .& (I_ref .> 0)
 
     fig = Figure(size = FIG_SIZE_CURVE)
     ax = Axis(
@@ -400,12 +431,20 @@ function sasdx52_comparison_figure(result, data)
 
     lines!(
         ax, q_ref[keep], I_ref[keep];
-        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = "SASBDB fit1",
+        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash,
+        label = "SASBDB fit1",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "BAYSOL MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "BAYSOL MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)

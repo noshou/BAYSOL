@@ -21,46 +21,47 @@
 @charset "UTF-8";
 
 @font-face {
-  font-family: "TeX Gyre Pagella";
-  src: url("fonts/texgyrepagella-regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
 }
 @font-face {
-  font-family: "TeX Gyre Pagella";
-  src: url("fonts/texgyrepagella-italic.woff2") format("woff2");
-  font-weight: 400;
-  font-style: italic;
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-italic.woff2") format("woff2");
+    font-weight: 400;
+    font-style: italic;
 }
 @font-face {
-  font-family: "TeX Gyre Pagella";
-  src: url("fonts/texgyrepagella-bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
 }
 @font-face {
-  font-family: "TeX Gyre Pagella";
-  src: url("fonts/texgyrepagella-bolditalic.woff2") format("woff2");
-  font-weight: 700;
-  font-style: italic;
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-bolditalic.woff2") format("woff2");
+    font-weight: 700;
+    font-style: italic;
 }
 @font-face {
-  font-family: "Montserrat";
-  src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"), url("fonts/Montserrat[wght].woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
+    font-family: "Montserrat";
+    src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"),
+        url("fonts/Montserrat[wght].woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
 }
 @font-face {
-  font-family: "Fira Code";
-  src: url("fonts/FiraCode-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
+    font-family: "Fira Code";
+    src: url("fonts/FiraCode-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
 }
 @font-face {
-  font-family: "Fira Code";
-  src: url("fonts/FiraCode-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
+    font-family: "Fira Code";
+    src: url("fonts/FiraCode-Bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
 }
 
 $themename: "documenter-dark"; // CSS file must be called `$(themename).css`
@@ -76,9 +77,11 @@ $size-7: 0.75rem;
 $documenter-is-dark-theme: true;
 
 // Darkly sets the font variables, so they are overridden here (after the import).
-$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Helvetica Neue", sans-serif;
 $family-serif: "TeX Gyre Pagella", Palatino, Georgia, serif;
-$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas",
+    "Liberation Mono", monospace;
 
 // Admonition base colors, as in Documenter's dark theme.
 $red: #cb3c33;
@@ -110,8 +113,9 @@ $background: #172d47;    // Bulma-derived surfaces (tags, dropdowns, admonition 
 $admonition-default: $text;
 
 $admonition-background: (
-  'default': $background, 'info': $background, 'success': $background, 'warning': $background,
-  'danger': $background, 'compat': $background
+    'default': $background, 'info': $background, 'success': $background,
+    'warning': $background,
+    'danger': $background, 'compat': $background
 );
 // Initialized in _admonition.scss normally; set here because that file is not
 // loaded at the top level (https://github.com/JuliaDocs/Documenter.jl/issues/1766).
@@ -167,170 +171,171 @@ $button-static-background-color: $background;
 $button-static-border-color: $border;
 
 html.theme--#{$themename} {
-  @import "bulma/base/generic.sass";
+    @import "bulma/base/generic.sass";
 
-  @import "documenter/overrides";
+    @import "documenter/overrides";
 
-  @import "bulma/elements/all";
-  @import "bulma/form/all";
-  @import "bulma/components/all";
-  @import "bulma/grid/all";
-  @import "bulma/layout/all";
+    @import "bulma/elements/all";
+    @import "bulma/form/all";
+    @import "bulma/components/all";
+    @import "bulma/grid/all";
+    @import "bulma/layout/all";
 
-  @import "darkly/overrides";
+    @import "darkly/overrides";
 
-  @import "documenter/elements";
-  @import "documenter/components/all";
-  @import "documenter/patches";
-  @import "documenter/layout/all";
+    @import "documenter/elements";
+    @import "documenter/components/all";
+    @import "documenter/patches";
+    @import "documenter/layout/all";
 
-  @import "documenter/theme_overrides";
+    @import "documenter/theme_overrides";
 
-  @import "documenter/ansicolors";
+    @import "documenter/ansicolors";
 
-  code.language-julia-repl > span.hljs-meta {
-    color: $ansi-green;
-    font-weight: bolder;
-  }
+    code.language-julia-repl > span.hljs-meta {
+        color: $ansi-green;
+        font-weight: bolder;
+    }
 
-  // highlight.js base scheme; the four token colours are re-tinted below.
-  @import "highlightjs/a11y-dark";
-  .hljs-subst {
-    color: #f8f8f2;
-  }
+    // highlight.js base scheme; the four token colours are re-tinted below.
+    @import "highlightjs/a11y-dark";
+    .hljs-subst {
+        color: #f8f8f2;
+    }
 
-  .search-result-link {
-    border-radius: 0.7em;
-    transition: all 300ms;
-  }
-  .search-result-link:hover, .search-result-link:focus {
-    background-color: rgba(0, 128, 128, 0.1);
-  }
-  .search-result-link .property-search-result-badge {
-    transition: all 300ms;
-  }
-  .search-result-link:hover .property-search-result-badge, .search-result-link:focus .property-search-result-badge {
-    color: #333 !important;
-    background-color: #f1f5f9 !important;
-  }
-  .search-result-title {
-    color: whitesmoke;
-  }
-  .search-result-highlight {
-    background-color: greenyellow;
-    color: black;
-  }
-  .search-divider {
-    border-bottom: 1px solid #5e6d6f50;
-  }
-  .w-100 {
-    width: 100%;
-  }
-  .gap-2 {
-    gap: 0.5rem;
-  }
-  .gap-4 {
-    gap: 1rem;
-  }
+    .search-result-link {
+        border-radius: 0.7em;
+        transition: all 300ms;
+    }
+    .search-result-link:hover, .search-result-link:focus {
+        background-color: rgba(0, 128, 128, 0.1);
+    }
+    .search-result-link .property-search-result-badge {
+        transition: all 300ms;
+    }
+    .search-result-link:hover .property-search-result-badge,
+    .search-result-link:focus .property-search-result-badge {
+        color: #333 !important;
+        background-color: #f1f5f9 !important;
+    }
+    .search-result-title {
+        color: whitesmoke;
+    }
+    .search-result-highlight {
+        background-color: greenyellow;
+        color: black;
+    }
+    .search-divider {
+        border-bottom: 1px solid #5e6d6f50;
+    }
+    .w-100 {
+        width: 100%;
+    }
+    .gap-2 {
+        gap: 0.5rem;
+    }
+    .gap-4 {
+        gap: 1rem;
+    }
 
-  // ---- Our own reskin (mirrors academic.scss) ------------------------------
+    // ---- Our own reskin (mirrors academic.scss) ------------------------------
 
-  body {
-    color: $text;
-  }
+    body {
+        color: $text;
+    }
 
-  body,
-  p,
-  .content,
-  .docstring > section > div {
-    font-family: $family-serif;
-    line-height: 1.6;
-  }
+    body,
+    p,
+    .content,
+    .docstring > section > div {
+        font-family: $family-serif;
+        line-height: 1.6;
+    }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: $family-sans-serif;
-    font-weight: 700;
-    color: $text-strong;
-  }
+    h1, h2, h3, h4, h5, h6 {
+        font-family: $family-sans-serif;
+        font-weight: 700;
+        color: $text-strong;
+    }
 
-  .docstring-binding,
-  .docstring > header {
-    font-family: $family-sans-serif;
-    font-weight: 700;
-  }
+    .docstring-binding,
+    .docstring > header {
+        font-family: $family-sans-serif;
+        font-weight: 700;
+    }
 
-  #documenter .docs-sidebar,
-  #documenter .docs-sidebar * {
-    font-family: $family-sans-serif;
-  }
-  #documenter .docs-sidebar .docs-package-name a,
-  #documenter .docs-sidebar .docs-package-name {
-    color: $text;
-  }
-  #documenter .docs-sidebar .tocitem {
-    color: $text;
-  }
-  #documenter .docs-sidebar .tocitem.is-active,
-  #documenter .docs-sidebar li.is-active > .tocitem {
-    font-weight: 600;
-  }
-  // No box or divider around the active entry (see academic.scss).
-  #documenter .docs-sidebar ul.docs-menu li.is-active {
-    border: none !important;
-  }
-  #documenter .docs-sidebar ul.docs-menu {
-    border-top: none;
-  }
+    #documenter .docs-sidebar,
+    #documenter .docs-sidebar * {
+        font-family: $family-sans-serif;
+    }
+    #documenter .docs-sidebar .docs-package-name a,
+    #documenter .docs-sidebar .docs-package-name {
+        color: $text;
+    }
+    #documenter .docs-sidebar .tocitem {
+        color: $text;
+    }
+    #documenter .docs-sidebar .tocitem.is-active,
+    #documenter .docs-sidebar li.is-active > .tocitem {
+        font-weight: 600;
+    }
+    // No box or divider around the active entry (see academic.scss).
+    #documenter .docs-sidebar ul.docs-menu li.is-active {
+        border: none !important;
+    }
+    #documenter .docs-sidebar ul.docs-menu {
+        border-top: none;
+    }
 
-  nav.breadcrumb {
-    font-family: $family-sans-serif;
-    font-weight: 600;
-    color: $text;
-  }
+    nav.breadcrumb {
+        font-family: $family-sans-serif;
+        font-weight: 600;
+        color: $text;
+    }
 
-  // Search field lives inside the sidebar; id selector to beat plain `.input`.
-  #documenter-search-query {
-    background-color: #121c2c;
-    color: $text;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-  }
+    // Search field lives inside the sidebar; id selector to beat plain `.input`.
+    #documenter-search-query {
+        background-color: #121c2c;
+        color: $text;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+    }
 
-  // The border-bottom on the navbar already separates it from the content.
-  #documenter .docs-main header.docs-navbar.headroom--not-top {
-    box-shadow: none;
-  }
+    // The border-bottom on the navbar already separates it from the content.
+    #documenter .docs-main header.docs-navbar.headroom--not-top {
+        box-shadow: none;
+    }
 
-  code,
-  pre,
-  .documenter-example-output,
-  .docstring pre {
-    font-family: $family-monospace;
-    font-feature-settings: "calt" 1, "liga" 1;
-    background: #172d47;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-  }
+    code,
+    pre,
+    .documenter-example-output,
+    .docstring pre {
+        font-family: $family-monospace;
+        font-feature-settings: "calt" 1, "liga" 1;
+        background: #172d47;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+    }
 
-  // Four-colour syntax highlighting: the light theme's hues, lifted to read on
-  // a dark ground (#783ad4 -> #a692d0, #0e9080 -> #5fb4a6, #be185d -> #cf8bae).
-  .hljs-keyword,
-  .hljs-function .hljs-keyword,
-  .hljs-literal {
-    color: #a692d0;
-  }
-  .hljs-title,
-  .hljs-title.function_,
-  .hljs-name {
-    color: #a692d0;
-  }
-  .hljs-type,
-  .hljs-built_in,
-  .hljs-class .hljs-title {
-    color: #5fb4a6;
-  }
-  .hljs-number,
-  .hljs-string,
-  .hljs-symbol {
-    color: #cf8bae;
-  }
+    // Four-colour syntax highlighting: the light theme's hues, lifted to read on
+    // a dark ground (#783ad4 -> #a692d0, #0e9080 -> #5fb4a6, #be185d -> #cf8bae).
+    .hljs-keyword,
+    .hljs-function .hljs-keyword,
+    .hljs-literal {
+        color: #a692d0;
+    }
+    .hljs-title,
+    .hljs-title.function_,
+    .hljs-name {
+        color: #a692d0;
+    }
+    .hljs-type,
+    .hljs-built_in,
+    .hljs-class .hljs-title {
+        color: #5fb4a6;
+    }
+    .hljs-number,
+    .hljs-string,
+    .hljs-symbol {
+        color: #cf8bae;
+    }
 }

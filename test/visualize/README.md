@@ -6,9 +6,9 @@ This directory has its own environment (`Project.toml`).
 | file | what it does |
 |---|---|
 | `plastic_vis.jl` | scatter-plots the plastic sequence: `vis_plastic_points_2D` on a spherical *surface* (2-D generator), `vis_plastic_points_3D` filling a spherical *volume* (3-D generator) |
-| `sasa_hydro_vis.jl` | the `SASA.sasa` hydration-shell dummy cloud over a packed cluster, plus an `n_target` budget table |
+| `sasa_hydro_vis.jl` | the `Geometry.sasa` hydration-shell dummy cloud over a packed cluster, plus an `n_target` budget table |
 
-Run them through [`../run/vis.tcl`](../run/README.md) (`tclsh test/run/vis.tcl --list` shows the checks; name some to run
+Run them through [`../../dev/vis.tcl`](../../dev/README.md) (`tclsh dev/vis.tcl --list` shows the checks; name some to run
 just those, or none to run all of them), or directly:
 
 ```bash

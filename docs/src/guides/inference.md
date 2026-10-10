@@ -22,7 +22,7 @@ The data reduction that precedes the fit (binning of the measured curve to its i
 
 ## Weighted least squares
 
-### WLS.jl
+### `WLSData` and `wls_fit` (`WLSData` in Inference.jl, `wls_fit` in ProfiledCorrs.jl)
 
 `I_exp`/`σ_exp` are fixed for an entire NUTS run; only `y_model(q)` changes between evaluations. `WLSData(I_exp, σ_exp)` precomputes everything that doesn't depend on `y_model` once -- the per-point weights wᵢ = 1/σᵢ², and the data-only weighted sums Sw, Swy, Swyy, Σ log σᵢ². `wls_fit(y_model, data::WLSData)` is the hot-path entry point: at a given ξ, forward produces `y_model(q)`, and `wls_fit` only has to accumulate the three model-dependent sums (SwI, SwII, SwIy) to solve the 2×2 normal equations for (scale, `bkgrnd_corr`), in one O(n) pass with no allocation. A `wls_fit(y_model, I_exp, σ_exp)` convenience overload builds a `WLSData` on the fly for one-off fits outside the sampler.
 
@@ -72,7 +72,7 @@ The search is entirely gradient-free, in two stages:
 
 c1 enters the forward model only through the excluded-volume envelope g(q; c1) on species 2, so at a fixed ξ the curve is exactly ŷ(q; c1) = A(q) + g·B(q) + g²·C(q), with A, B, C built from the Gram matrix and the contrast vector. `profiled_corrs` therefore builds A, B, C once per call (two products against `_C1Tables.Gc`, the Gram entries repacked contiguous in q) instead of running a full `forward` pass per trial c1. The coarse scan expands the weighted sums Σwŷ, Σwŷ², Σwŷ·I in powers of g, so each scan point is one fused pass over q reading g from a precomputed table (`_C1Tables.g1`); each Brent step is one fused pass over q too, with g anchored on that table: every c1 the search visits lies within half a grid step of a grid point cⱼ, so g(q; c1) = g(q; cⱼ)·(c1/cⱼ)³·exp(−q²Δk) with a tiny Δk = k(c1) − k(cⱼ), and a degree-8 Taylor polynomial gives the exponential to full precision with no library call (about 4× faster per pass; the library exponential is the fallback when q²·|Δk| exceeds `ENVELOPE_TAYLOR_LIMIT`). The closed-form scale/background solve is shared with `wls_fit` via `_wls_from_sums`. The search itself (scan grid, bracket, `Brent()`, padded bounds) is unchanged. `_C1Tables` depends only on the `ForwardCache` and the scan settings, is built once in `seed_sampler` (`Seed.c1tab`), is read-only, and is passed to every `profiled_corrs` call through the `tables` keyword (`_ll`/`_logπ` take it as `tab`); omitted, `profiled_corrs` builds it for that call.
 
-`profiled_corrs` takes the same `WLSData` as `_ll`, so the inner c1 search reuses the precomputed data-only sums rather than rebuilding them per trial c1. It's wired into both `Sampler.jl`'s hot path (`_ll` calls it on every log-density/gradient evaluation) and `infer`'s posterior-draw loop (re-profiled per draw for reporting; see `Inferred.c1`).
+`profiled_corrs` takes the same `WLSData` as `_ll`, so the inner c1 search reuses the precomputed data-only sums rather than rebuilding them per trial c1. It's wired into both `Posterior.jl`'s hot path (`_ll` calls it on every log-density/gradient evaluation) and `infer`'s posterior-draw loop (re-profiled per draw for reporting; see `Inferred.c1`).
 
 `excl_vol_saturation(c1; cmin, cmax)` is a free (no re-solve) classification of a profiled `c1_star` against the physical bounds: `-1`/`+1` if it landed outside `(cmin, cmax)` even with the padded window's extra room (genuine saturation, not a hard-clamp artifact), `0` otherwise.
 
@@ -80,7 +80,7 @@ c1 enters the forward model only through the excluded-volume envelope g(q; c1) o
 
 The prior modules define distributions over fit parameters, allowing HMC to sample over a distribution of possible parameters instead of fixing them to single values.
 
-### DeltaRho.jl
+### Hydration-shell contrasts (Priors.jl)
 
 CRYSOL's dro ("delta rho" ) parameters, which are the change in electron density of water beads at the hydration layer:
 
@@ -96,49 +96,22 @@ CRYSOL's own default is dr1 = dr2 = 1.0, dr3 = 0.
 - **δρ₃ (cavity contrast)**: support δρ₃ ∈ [−ρ̄ₑ/0.03, (`φ_max` − 1)·ρ̄ₑ/0.03] ≈ [−11.2, 2.8], from φ ∈ [0, `φ_max`] (an empty void up to `φ_max` = 1.25) with ρₑ fixed at the prior mean ρ̄ₑ. Mode at δρ₃ = 0 (φ = 1, bulk-density cavity water), α = 1 + `κ/φ_max`, β = 1 + (1 − `1/φ_max`)·κ. The default κ = 1.25 gives Beta(2, 1.25) on the unit interval: ~21% of the mass is below half occupancy (φ < 0.5) and ~3.5% below φ = 0.2. The sampler draws δρ₃ directly from this prior. Fixing ρₑ at ρ̄ₑ leaves φ = 1 + 0.03·δρ₃/ρₑ within the relative uncertainty of ρₑ of [0, `φ_max`], at most ~0.06% for the buffers checked. When a structure has almost no cavity beads, δρ₃ has no likelihood and simply samples its prior; the report's `cavity_frac` line flags this.
 - **δρ4**: The condensed-cation layer for nucleotides based on Manning theory is not implemented yet.
 
-### DensityOfSolvent.jl
+### Bulk electron density (Priors.jl)
 
-ρₑ corresponds to CRYSOL's dns ("density of solvent") parameter, the bulk electron density of the **buffer**. Buffer-subtracted SAXS measures contrast against the buffer, so the solutes list describes the buffer only: **never list the measured macromolecule itself** (other copies of it are separate scatterers, and the volume they displace only changes the flat buffer-subtraction baseline, which `bkgrnd_corr` absorbs). `ρₑ_prior(pH, σ_pH, solutes; t=25.0)` returns a LogNormal prior for the bulk solution electron density ρₑ (e·Å⁻³), moment-matched to the (μ, σ) computed by `_ρₑ`. LogNormal is used because ρₑ has support only on (0, ∞); at the coefficient of variation, this model agrees with a normal approximation in the bulk.
+ρₑ corresponds to CRYSOL's dns ("density of solvent") parameter, the bulk electron density of the **buffer**. The physics lives in `BulkElectronDensity` (see its README): the solute types (`Solute`, `Protein`, `NonBiological`, `DNA`, `RNA`), the partial-molar-volume model, the water density, the first-order uncertainty propagation and the single function `BulkElectronDensity.ρₑ(pH, σ_pH, solutes; t)` returning `(ρₑ, σρₑ)`. Buffer-subtracted SAXS measures contrast against the buffer, so the solutes list describes the buffer only: **never list the measured macromolecule itself** (other copies of it are separate scatterers, and the volume they displace only changes the flat buffer-subtraction baseline, which `bkgrnd_corr` absorbs). An empty solutes list is pure water.
 
-The model is linear in solute concentration:
-
-```text
-ρₑ = ρ_w(T) + Σ_j C_j · (N_A·Z_j/1e27 − ρ_w(T)·ϕ°_j/1e3)
-```
-
-Here, `ϕ°_j` is solute j's partial molar volume at infinite dilution (cm³/mol). Water's density `ρ_w(T)` is evaluated at the sample temperature t exactly. The ϕ° tables are 25 °C values; away from 25 °C their temperature drift is not modelled but folded into the uncertainty, `σ_ϕ°`,T = `PMV_FRACTIONAL_EXPANSIBILITY` · ϕ° · |t − 25| (3.0 × 10⁻³ K⁻¹, an upper bound over the 42 multi-temperature series bundled with the tables; unverified for electrolytes). Uncertainty is propagated to first order, assuming independence:
-
-```text
-σ² = (1 − Σ_j C_j·ϕ°_j/1e3)² · σ_w² + Σ_j k_j² · σ_C_j² + Σ_j (C_j·ρ_w/1e3)² · (σ_ϕ°_j² + σ_ϕ°_j,T²)
-```
-
-where:
-
-```text
-k_j = N_A·Z_j/1e27 − ρ_w·ϕ°_j/1e3
-```
-
-Given μ = ρₑ and σ = √σ², the corresponding LogNormal parameters are:
+`Priors.jl` only builds the prior: `ρₑ_prior(pH, σ_pH, solutes; t=25.0)` takes `(μ, σ)` from `BulkElectronDensity.ρₑ` and returns a LogNormal moment-matched to it. LogNormal is used because ρₑ has support only on (0, ∞); at the coefficient of variation, this model agrees with a normal approximation in the bulk. Given μ = ρₑ and σ = σρₑ, the LogNormal parameters are:
 
 ```text
 σ_ln = √(ln(1 + σ²/μ²))
 μ_ln = ln(μ) − σ_ln²/2
 ```
 
-An empty solutes list is pure water. Supported solute types are:
-
-- Protein (a buffer component such as a carrier protein, not the measured species)
-- NonBiological
-- DNA *note: not yet validated end to end, but calculations work*
-- RNA *note: not yet validated end to end, but calculations work*
-
-Each solute carries molarity, `molarity_uncertainty`, and an arg (sequence or name) resolved through PartialMolarVolumes.ϕ°.
-
 ### Prior composition
 
 `_calc_ξ_priors` composes the ρₑ prior and the three δρ priors into one `ξ_priors` struct (δρ₃'s bounds fixed at the ρₑ prior's mean), and `_ξ₀` draws an initial ξ from that composition.
 
-## Parameter transform: ParamTransform.jl
+## Parameter transform (Priors.jl)
 
 ### ξ-space ↔ θ-space
 
@@ -207,7 +180,7 @@ NUTS then samples w with θ = μ + σ·(ẑ + S·w) (`_θ_of_w`), in which the p
 
 ### NUTS via AdvancedHMC.jl
 
-`infer(...; rng_seed)` makes the run reproducible: one `UInt64` (the `rng_seed`, or a draw from the default RNG, so `Random.seed!` before the call also fixes it) is mixed with each random draw's purpose and index into that draw's own stream (`Parallel.stream`): MAP start `i`, NUTS chain `k`; the jittered chain starts come from the separate `jitter_seed`. The value is printed in the report's `=== Run ===` section; passing it back reproduces the fit exactly, at any number of Julia threads. The MAP search stays serial: warm it takes about 8 ms, so threading it was measured slower (`test/validation/threading/`).
+`infer(...; rng_seed)` makes the run reproducible: one `UInt64` (the `rng_seed`, or a draw from the default RNG, so `Random.seed!` before the call also fixes it) is mixed with each random draw's purpose and index into that draw's own stream (`stream`): MAP start `i`, NUTS chain `k`; the jittered chain starts come from the separate `jitter_seed`. The value is printed in the report's `=== Run ===` section; passing it back reproduces the fit exactly, at any number of Julia threads. The MAP search stays serial: warm it takes about 8 ms, so threading it was measured slower (`test/validation/threading/`).
 
 ### Chains
 
@@ -252,7 +225,8 @@ using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,
     propka_pKas, resolve_hydrogens
 using BAYSOL.Scattering: forward_cache
-using BAYSOL.Inference: Solute, NonBiological, PROFILE, seed_sampler
+using BAYSOL.BulkElectronDensity: Solute, NonBiological
+using BAYSOL.Inference: PROFILE, seed_sampler
 
 PH, σ_PH, T_C = 7.5, 0.1, 20.0
 # buffer only -- the measured protein is not a solute

@@ -1,6 +1,6 @@
 # Utils
 
-`BAYSOL.Utils` groups the small scientific helpers every other module builds on. Each stays a named submodule, re-bound at the package root, so `BAYSOL.PhysicalConstants`, `BAYSOL.PlasticSequence` and `BAYSOL.Shannon` are the names to import from (`using BAYSOL.PhysicalConstants: AVOGADRO`). `Utils` is loaded first, in dependency order: `PhysicalConstants`, `PlasticSequence`, `Shannon`. The process machinery (`Cache`, `Timing`, `GCPause`) lives in [`Runtime`](@ref BAYSOL.Runtime).
+`BAYSOL.Utils` groups the small scientific helpers every other module builds on. Each stays a named submodule, re-bound at the package root, so `BAYSOL.PhysicalConstants` and `BAYSOL.Shannon` are the names to import from (`using BAYSOL.PhysicalConstants: AVOGADRO`). `Utils` is loaded first, in dependency order: `PhysicalConstants`, `Shannon`. The process machinery (caching, timing, GC pausing, threading) lives in [`Runtime`](@ref BAYSOL.Runtime) and the point sets, excluded volumes and SASA in [`Geometry`](@ref BAYSOL.Geometry);
 
 ## PhysicalConstants
 
@@ -9,7 +9,7 @@ so they cannot drift between modules. It is the first module loaded; every other
 imports what it needs by name:
 
 ```julia
-# src/PartialMolarVolumes/PMV.jl
+# src/BulkElectronDensity/BulkElectronDensity.jl
 using ..PhysicalConstants: AVOGADRO, WATER_MOLAR_MASS
 ```
 
@@ -17,41 +17,20 @@ or, from outside the package, `using BAYSOL.PhysicalConstants: AVOGADRO`.
 
 | constant | value | used by |
 |---|---|---|
-| `AVOGADRO` | 6.02214076 × 10²³ mol⁻¹ (exact, 2019 SI) | PartialMolarVolumes, Inference |
+| `AVOGADRO` | 6.02214076 × 10²³ mol⁻¹ (exact, 2019 SI) | BulkElectronDensity, Inference |
 | `PLANCK_CONSTANT`, `SPEED_OF_LIGHT`, `ELEMENTARY_CHARGE` | exact 2019 SI values of h, c, e | `HC_EV_ANGSTROM` |
 | `HC_EV_ANGSTROM` | h·c ≈ 12398.42 eV·Å; E (eV) = `HC_EV_ANGSTROM` / λ (Å) | fitting scripts |
-| `WATER_MOLAR_MASS` | 18.015268 g·mol⁻¹ (IAPWS-95) | PartialMolarVolumes |
-| `WATER_ELECTRONS` | 10 | PartialMolarVolumes |
-| `WATER_DENSITY_UNCERTAINTY` | 0.02 kg·m⁻³, absolute uncertainty on the Kell water density | PartialMolarVolumes |
-| `KELL_DENSITY_NUM`, `KELL_DENSITY_DEN` | Kell (1975) coefficients: `ρ_w(t)` = Σ aₖtᵏ / (1 + b·t), kg·m⁻³, 0–150 °C | PartialMolarVolumes |
-| `ANGSTROM3_PER_LITER`, `CM3_PER_LITER`, `ANGSTROM_PER_METER`, `PM_PER_ANGSTROM` | 10²⁷, 10³, 10¹⁰, 100 | PartialMolarVolumes, Inference, AtomicRadii |
+| `WATER_MOLAR_MASS` | 18.015268 g·mol⁻¹ (IAPWS-95) | BulkElectronDensity |
+| `WATER_ELECTRONS` | 10 | BulkElectronDensity |
+| `WATER_DENSITY_UNCERTAINTY` | 0.02 kg·m⁻³, absolute uncertainty on the Kell water density | BulkElectronDensity |
+| `KELL_DENSITY_NUM`, `KELL_DENSITY_DEN` | Kell (1975) coefficients: `ρ_w(t)` = Σ aₖtᵏ / (1 + b·t), kg·m⁻³, 0–150 °C | BulkElectronDensity |
+| `ANGSTROM3_PER_LITER`, `CM3_PER_LITER`, `ANGSTROM_PER_METER`, `PM_PER_ANGSTROM` | 10²⁷, 10³, 10¹⁰, 100 | BulkElectronDensity, Inference, AtomicRadii |
 | `NM_INV_PER_ANGSTROM_INV` | 10 (an integer, so `q ./ NM_INV_PER_ANGSTROM_INV` is bit-identical to `q ./ 10`) | fitting scripts |
 | `UNIT_OF_δρ` | 0.03 e·Å⁻³, CRYSOL's --dro shell-contrast unit | Scattering, Inference |
 | `NS_PER_S`, `MS_PER_S` | 10⁹, 10³ | Timing, Inference, Pipeline |
-| `STANDARD_TEMPERATURE_C` | 25 °C (298.15 K), the standard reference temperature; backs `PMV_REFERENCE_TEMPERATURE_C` and `DEFAULT_TEMPERATURE_C` so they cannot drift apart | PartialMolarVolumes, Inference |
+| `STANDARD_TEMPERATURE_C` | 25 °C (298.15 K), the standard reference temperature; backs `PMV_REFERENCE_TEMPERATURE_C` and `DEFAULT_TEMPERATURE_C` so they cannot drift apart | BulkElectronDensity, Inference |
 
 Every other tunable is a module-level constant in its owning module (see that module's README).
-
-## PlasticSequence
-
-Even point sets drawn from the plastic (`R_d`) family of additive low-discrepancy sequences (Roberts, M. (2018). The Unreasonable Effectiveness of Quasirandom Sequences.). Consumers: `SASA` (surface sampling directions) and `MolecularStructure.excluded_volume` (`plastic_points(N_VOL_SHELL, Val(3), Val(:volume))`).
-
-- The plastic ratios are module-level constants in `PlasticSequence.jl`: `PLASTIC_RATIO_2` ≈ 1.324718 (real root of x³ = x + 1) and `PLASTIC_RATIO_3` ≈ 1.220744 (real root of x⁴ = x + 1), plus the precomputed powers `PLASTIC_RATIO_2_SQR`, `PLASTIC_RATIO_3_SQR` and `PLASTIC_RATIO_3_CUBE`. They are hardcoded rather than solved for at load time, so the package no longer depends on Roots.jl.
-- Vec2, Vec3: NTuple{2,Float64}/NTuple{3,Float64} point types.
-- `plastic_points`(n::Int, ::Val{2}) -> Vector{Vec2}: the first n raw 2-D R₂ terms (frac(i/ρ), frac(i/ρ²)), uniform on [0, 1)².
-- `plastic_points`(n::Int, ::Val{3}) -> Vector{Vec3} (same as Val{3}, Val{:surface}): those same 2-D R₂ terms read as (azimuth, height) and lifted onto the **surface** of the unit sphere via Lambert's cylindrical equal-area projection. Points are uniform in *area*, |p| == 1 .
-- `plastic_points`(n::Int, ::Val{3}, ::Val{:volume}) -> Vector{Vec3}: the 3-D R₃ terms lifted to **fill** the unit ball, a 3-D region built from the R₃ generator (the extra coordinate becomes a radius, inverse-CDF-corrected for the sphere's r²dr volume element). Points are uniform in *volume*, 0 ≤ |p| < 1.
-- `plastic_points`(n::Int; dim::Int=3, shape::Symbol=:surface): keyword convenience dispatching to the Val methods above; shape is only consulted when dim == 3.
-
-Both 3-D layouts are deterministic and prefix-stable, term i never changes as n grows, so `plastic_points`(k, args...) == `plastic_points`(n, args...)[1:k] for any k ≤ n.
-
-```julia
-using BAYSOL.PlasticSequence: plastic_points
-
-pts2d = plastic_points(500, Val(2))                 # Vector{Vec2}, [0,1)^2
-surf  = plastic_points(256)                         # Vector{Vec3}, sphere surface (default)
-ball  = plastic_points(256, Val(3), Val(:volume))   # Vector{Vec3}, fills the sphere volume
-```
 
 ## Shannon
 
@@ -60,9 +39,9 @@ A particle of diameter D scatters a curve that carries no information at a q spa
 - `cloud_diameter(points)`: the exact diameter of a `(3, n)` point cloud. The farthest pair of a set always lies on its convex hull, so the hull is built with [Quickhull.jl](https://github.com/augustt198/Quickhull.jl) and only its vertices (~100 of thousands of points) are compared pairwise; fewer than four points or a degenerate (collinear, coplanar, repeated) cloud is compared directly. `seed_model` applies it to the atoms **and** the hydration-shell beads (the actual scatterer cloud, 5-6 Å wider than the atoms alone).
 - `shannon_data(q, I, σ; D, rebin, max_bin_bias, lMax, drop_nonpositive)`: inverse-variance binning of the curve to `rebin` bins per channel (bin width π/(rebin·D); each bin carries the weighted-mean q and I and σ = 1/√Σw, which keeps Σw·I and Σw, the sufficient statistics of the linear fit, unchanged), the drop of bins with non-positive mean intensity, and the band limit `auto_lmax(D, q_max) = ceil(q_max·D)`. It returns a `ShannonInfo` (also stored as `Inference.Seed.shannon`) with both the fitted and the raw curve. `SHANNON_REBIN = 12` is the default and a minimum: a bin is the mean of the curve over its width, not its value at the mean q, which shifts a bin by at most π²/(96·`rebin`²) of its value whatever the particle (`bin_bias_ratio` divides that bound by the curve's smallest relative error), so a precise curve needs finer bins. `shannon_data` therefore raises `rebin` until that ratio is at most `BIN_BIAS_MAX` = 0.3 (`max_bin_bias = Inf` keeps `rebin` as given), and fits the curve as measured once the bins are as fine as its points. The `rebin` the report prints is the one used.
 - `model_on_raw(info, y)`: the model curve on the measured grid (an interpolating cubic spline from Dierckx.jl/FITPACK, error 0.001 σ for 1 % data at the default `rebin`), which gives the reduced χ² on the measured points that a depositor's χ² refers to.
-- `residual_structure(r)`: lag-1 autocorrelation (StatsBase.jl) and Wald–Wolfowitz runs-test z-score (HypothesisTests.jl) of the normalized residuals. White residuals have both ≈ 0; the fits are often far from that (lag-1 up to 0.89 on the unbinned curves), a smooth misfit of the conventional model. The statistics are not in the report; `tclsh test/run/diagnose.tcl --residuals ID` prints them for a fit (fitted and measured grid).
+- `residual_structure(r)`: lag-1 autocorrelation (StatsBase.jl) and Wald–Wolfowitz runs-test z-score (HypothesisTests.jl) of the normalized residuals. White residuals have both ≈ 0; the fits are often far from that (lag-1 up to 0.89 on the unbinned curves), a smooth misfit of the conventional model. The statistics are not in the report; `tclsh dev/diagnose.tcl --residuals ID` prints them for a fit (fitted and measured grid).
 
-Dropping non-positive points is not neutral: it removes the negative half of the noise at high q, so what remains is biased upwards. It is the default (`drop_nonpositive = true`, as the fitting scripts always did, but after binning rather than before, where it removes far fewer points). `test/validation/shannon_binning/` is a per-fit screen of the effect of the binning and of the filter on the MAP and the Laplace width (run by `tclsh test/run/validate.tcl shannon_binning`). Per-fit shifts measured in the unbinned σ are a poor judge (that σ is overconfident), so the default `rebin = 12` is judged by distributions over the 53 fitting tests against the committed unbinned results, with criteria fixed before that rerun:
+Dropping non-positive points is not neutral: it removes the negative half of the noise at high q, so what remains is biased upwards. It is the default (`drop_nonpositive = true`, as the fitting scripts always did, but after binning rather than before, where it removes far fewer points). `test/validation/shannon_binning/` is a per-fit screen of the effect of the binning and of the filter on the MAP and the Laplace width (run by `tclsh dev/validate.tcl shannon_binning`). Per-fit shifts measured in the unbinned σ are a poor judge (that σ is overconfident), so the default `rebin = 12` is judged by distributions over the 53 fitting tests against the committed unbinned results, with criteria fixed before that rerun:
 
 1. **Fit quality:** the median χ² on the measured grid within ±2 % and the quartiles within ±5 %; at most 3 fits worse by more than 5 % (better fits are not penalized).
 2. **Parameter distribution** (MAP δρ₁, δρ₂, δρ₃, ρₑ, c1 across fits): each median moves by less than 0.25 of its interquartile range; the counts of fits at a prior bound, with c1 saturated, or beyond 3σ from the δρ₃ prior change by at most 3.

@@ -1,32 +1,35 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Concurrency and race tests for the threaded stages. A real race detector is not available for Julia code,
-# so these tests stress the architecture instead:
+# Concurrency and race tests for the threaded stages. A real race detector is
+# not available for Julia code, so these tests stress the architecture instead:
 #
-#   * results are bit-identical at every worker count (1, 2, 3, 5, 7, 8, 24) and under "chaos" scheduling
-#     (every task starts after a random delay, so start and finish orders change on every run);
-#   * the same kernels called from several tasks at once give each caller its own serial result (no hidden
-#     shared state);
-#   * the primitives (`tmap_items`, `tmap_blocks`, `with_blas_single`, the GC pause) behave under nesting,
-#     exceptions, and many tasks at once;
-#   * repeated threaded builds leave nothing behind (the garbage-collector bug of 2026-10-09 left the collector
-#     off and the heap growing to 6 GB).
+#   * results are bit-identical at every worker count (1, 2, 3, 5, 7,
+#     8, 24) and under "chaos" scheduling (every task starts after a
+#     random delay, so start and finish orders change on every run);
+#   * the same kernels called from several tasks at once give
+#     each caller its own serial result (no hidden shared state);
+#   * the primitives (`tmap_items`, `tmap_blocks`, `with_blas_single`, the
+#     GC pause) behave under nesting, exceptions, and many tasks at once;
+#   * repeated threaded builds leave nothing behind (the garbage-collector
+#     bug of 2026-10-09 left the collector off and the heap growing to 6 GB).
 #
-# `Parallel.with_workers(n)` makes the stages split their work for n workers (1 forces the serial paths) and
-# `Parallel.with_chaos(d)` delays every task by a random time up to d seconds, so the matrix of worker counts is
-# exercised in one process whatever `-t` it was started with. The suite is most meaningful with several Julia
+# `Parallel.with_workers(n)` makes the stages split their work for n workers (1
+# forces the serial paths) and `Parallel.with_chaos(d)` delays every task by a random
+# time up to d seconds, so the matrix of worker counts is exercised in one process
+# whatever `-t` it was started with. The suite is most meaningful with several Julia
 # threads: `precommit.tcl` also runs it with `-t 6,1`; run by hand with
-#   julia --project=test -t 6,1 test/run/unittests.jl concurrency
+#   julia --project=test -t 6,1 dev/unittests.jl concurrency
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 include(joinpath(@__DIR__, "..", "..", "utils", "geometry.jl"))   # jittered_lattice
 
-using BAYSOL.Parallel: worker_count, stream, tmap_items, tmap_blocks, with_blas_single, with_workers, with_chaos
-using BAYSOL.GCPause: with_gc_paused, gc_checkpoint
-using BAYSOL.Cache: Lazy, force, KeyedCache
+using BAYSOL.Runtime: worker_count, stream, tmap_items, tmap_blocks, with_blas_single,
+    with_workers, with_chaos
+using BAYSOL.Runtime: with_gc_paused, gc_checkpoint
+using BAYSOL.Runtime: Lazy, force, KeyedCache
 using BAYSOL.MolecularStructure: create, vols
 using BAYSOL.Scattering: species_multipoles, SharedAmplitude
-using BAYSOL.SASA: sasa
+using BAYSOL.Geometry: sasa
 using LinearAlgebra: BLAS
 using Random
 
@@ -34,16 +37,21 @@ using Random
 # helpers
 # ---------------------------------------------------------------------------
 
-"A fingerprint of a result: a hash of the bits of every float (so -0.0, NaN payloads and last-bit differences count)."
+"""
+A fingerprint of a result: a hash of the bits of every float
+(so -0.0, NaN payloads and last-bit differences count).
+"""
 fpr(x::AbstractArray{Float64}) = hash(reinterpret(UInt64, vec(collect(x))))
-fpr(x::AbstractArray{ComplexF64}) = hash(reinterpret(UInt64, vec(collect(reinterpret(Float64, vec(collect(x)))))))
+fpr(x::AbstractArray{ComplexF64}) =
+    hash(reinterpret(UInt64, vec(collect(reinterpret(Float64, vec(collect(x)))))))
 fpr(x::AbstractArray) = hash(Int.(vec(collect(x))))        # enums such as the bead classes
 fpr(t::Tuple) = hash(map(fpr, t))
 fpr(x) = hash(x)
 
 """
-Whether `f()` gives the same bits at every worker count in `workers` under chaos scheduling as with the serial
-paths (`with_workers(1)`); `reps` repeats per count. Reports the first mismatching count.
+Whether `f()` gives the same bits at every worker count in `workers`
+under chaos scheduling as with the serial paths (`with_workers(1)`);
+`reps` repeats per count. Reports the first mismatching count.
 """
 function identical_across_workers(f; workers = (2, 3, 5, 7, 8, 24), chaos = 0.003, reps = 1)
     ref = fpr(with_workers(f, 1))
@@ -53,19 +61,29 @@ function identical_across_workers(f; workers = (2, 3, 5, 7, 8, 24), chaos = 0.00
                 f()
             end
         end
-        fpr(got) == ref || (@info "result differs from the serial one" workers = n repetition = r; return false)
+        fpr(got) == ref || (
+            @info "result differs from the serial one" workers = n repetition = r;
+            return false
+        )
     end
     return true
 end
 
-"A protein-sized synthetic molecule: a 17³ jittered lattice (4,913 atoms, above every size threshold)."
+"""
+A protein-sized synthetic molecule: a 17³ jittered
+lattice (4,913 atoms, above every size threshold).
+"""
 function conc_mol(n = 17)
     pts = jittered_lattice(n; a = 2.2)
-    els = String[("c", "n", "o", "c", "c", "s", "c", "n")[mod1(i, 8)] for i in eachindex(pts)]
+    els =
+        String[("c", "n", "o", "c", "c", "s", "c", "n")[mod1(i, 8)] for i in eachindex(pts)]
     return create("conc", els, pts)
 end
 
-"Random multipole-expansion inputs: spherical coordinates (r, θ, φ), q grid, per-atom amplitudes."
+"""
+Random multipole-expansion inputs: spherical
+coordinates (r, θ, φ), q grid, per-atom amplitudes.
+"""
 function conc_blm_inputs(seed; N = 5120, Q = 210, lMax = 10)
     rng = Xoshiro(seed)
     sph = vcat(1.0 .+ 29.0 .* rand(rng, 1, N), π .* rand(rng, 1, N), 2π .* rand(rng, 1, N))
@@ -81,7 +99,10 @@ n_collections() = Base.gc_num().pause
 
 @testset "Concurrency" begin
 
-    @info "concurrency tests: $(Threads.nthreads()) Julia threads, worker_count() = $(worker_count())"
+    @info (
+        "concurrency tests: $(Threads.nthreads()) Julia " *
+        "threads, worker_count() = $(worker_count())"
+    )
 
     # -----------------------------------------------------------------------
     @testset "the test hooks" begin
@@ -90,7 +111,8 @@ n_collections() = Base.gc_num().pause
         @test worker_count() == base                              # restored
         @test_throws ArgumentError with_workers(() -> 1, 0)
         @test_throws ErrorException with_workers(() -> error("x"), 3)
-        @test worker_count() == base                              # restored after an exception
+        # restored after an exception
+        @test worker_count() == base
     end
 
     # -----------------------------------------------------------------------
@@ -104,13 +126,15 @@ n_collections() = Base.gc_num().pause
                     end
                 end
             end
-            @test out == [i^2 for i in 1:n]                       # input order, whatever order the tasks finish in
+            # input order, whatever order the tasks finish in
+            @test out == [i^2 for i in 1:n]
         end
         empty_out = with_workers(() -> tmap_items(identity, Int[]), 4)
         one_out = with_workers(() -> tmap_items(x -> 2x, [21]), 4)
         @test empty_out == Int[] && one_out == [42]
 
-        # three nested parallel regions: must finish (a deadlock would hang the suite, hence the timeout)
+        # three nested parallel regions: must finish (a
+        # deadlock would hang the suite, hence the timeout)
         t = Threads.@spawn with_workers(4) do
             with_chaos(0.002) do
                 tmap_items(1:4) do i
@@ -125,7 +149,8 @@ n_collections() = Base.gc_num().pause
         @test timedwait(() -> istaskdone(t), 120.0) === :ok
         @test fetch(t) == [i * sum(j * sum(k for k in 1:3) for j in 1:4) for i in 1:4]
 
-        # an exception in some tasks comes back as itself, and the machinery works afterwards
+        # an exception in some tasks comes back as
+        # itself, and the machinery works afterwards
         with_workers(4) do
             for chaos in (0.0, 0.003)
                 with_chaos(chaos) do
@@ -141,13 +166,17 @@ n_collections() = Base.gc_num().pause
 
     # -----------------------------------------------------------------------
     @testset "tmap_blocks: every index exactly once" begin
-        for n in (0, 1, 63, 64, 65, 255, 256, 1000, 4097), block in (1, 7, 64, 256), threaded in (false, true)
+        for n in (0, 1, 63, 64, 65, 255, 256, 1000, 4097),
+            block in (1, 7, 64, 256),
+            threaded in (false, true)
+
             hits = zeros(Int, n)
             with_workers(5) do
                 with_chaos(0.001) do
                     tmap_blocks(n, block; threaded = threaded) do blk
                         for i in blk
-                            hits[i] += 1                          # blocks are disjoint, so no atomics are needed
+                            # blocks are disjoint, so no atomics are needed
+                            hits[i] += 1
                         end
                     end
                 end
@@ -187,13 +216,14 @@ n_collections() = Base.gc_num().pause
             end
         end
         @test all(==(1), inside)
-        @test BLAS.get_num_threads() == before                    # restored once the last scope ended
-        @test BAYSOL.Parallel._BLAS_DEPTH[] == 0
+        # restored once the last scope ended
+        @test BLAS.get_num_threads() == before
+        @test BAYSOL.Runtime._BLAS_DEPTH[] == 0
         # an exception inside a scope still restores it
         with_workers(4) do
             @test_throws ErrorException with_blas_single(() -> error("boom"))
         end
-        @test BLAS.get_num_threads() == before && BAYSOL.Parallel._BLAS_DEPTH[] == 0
+        @test BLAS.get_num_threads() == before && BAYSOL.Runtime._BLAS_DEPTH[] == 0
     end
 
     # -----------------------------------------------------------------------
@@ -206,30 +236,39 @@ n_collections() = Base.gc_num().pause
         kc = KeyedCache{Int,Int}()
         counts = [Threads.Atomic{Int}(0) for _ in 1:8]
         keyed(i) = get!(kc, 1 + (i % 8)) do
-            Threads.atomic_add!(counts[1 + (i % 8)], 1); sleep(0.002); 10 * (1 + (i % 8))
+            Threads.atomic_add!(counts[1+(i%8)], 1)
+            sleep(0.002)
+            10 * (1 + (i % 8))
         end
         res = fetch.([Threads.@spawn(keyed(i)) for i in 0:127])
         @test res == [10 * (1 + (i % 8)) for i in 0:127]
-        @test all(c -> c[] == 1, counts)                          # each key computed exactly once
+        # each key computed exactly once
+        @test all(c -> c[] == 1, counts)
     end
 
     # -----------------------------------------------------------------------
     @testset "the garbage-collector pause under threads" begin
-        # allocating tasks under a tiny budget: the pausing thread collects while it waits, the collector is back on
+        # allocating tasks under a tiny budget: the pausing thread
+        # collects while it waits, the collector is back on
         # afterwards, and it really works (a forced collection counts)
         n0 = n_collections()
         with_gc_paused(; budget = 1 << 20) do
             with_workers(4) do
                 tmap_items(1:12) do i
                     x = zeros(2^21)                                # 16 MB each
-                    gc_checkpoint()                                # a worker's checkpoint is a no-op
+                    # a worker's checkpoint is a no-op
+                    gc_checkpoint()
                     sum(x) + i
                 end
             end
-            gc_checkpoint()          # the owner (this thread) collects: 192 MB were allocated against a 1 MiB budget
+            # the owner (this thread) collects: 192 MB were allocated against a 1 MiB budget
+            gc_checkpoint()
         end
-        @test n_collections() > n0                                # the owner collected during the pause
-        n1 = n_collections(); GC.gc(); @test n_collections() > n1  # and the collector is on again
+        # the owner collected during the pause
+        @test n_collections() > n0
+        n1 = n_collections()
+        GC.gc()
+        @test n_collections() > n1  # and the collector is on again
 
         # an exception in a worker leaves the collector on
         @test_throws ArgumentError (with_gc_paused() do
@@ -240,11 +279,13 @@ n_collections() = Base.gc_num().pause
                 end
             end
         end)
-        n2 = n_collections(); GC.gc(); @test n_collections() > n2
+        n2 = n_collections()
+        GC.gc()
+        @test n_collections() > n2
 
         # a pause begun and ended inside a worker task does not disturb the outer one
         with_gc_paused() do
-            d0 = BAYSOL.GCPause._DEPTH[]
+            d0 = BAYSOL.Runtime._DEPTH[]
             with_workers(4) do
                 tmap_items(1:8) do i
                     with_gc_paused() do
@@ -253,9 +294,11 @@ n_collections() = Base.gc_num().pause
                     end
                 end
             end
-            @test BAYSOL.GCPause._DEPTH[] == d0
+            @test BAYSOL.Runtime._DEPTH[] == d0
         end
-        n3 = n_collections(); GC.gc(); @test n_collections() > n3
+        n3 = n_collections()
+        GC.gc()
+        @test n_collections() > n3
     end
 
     # -----------------------------------------------------------------------
@@ -273,10 +316,12 @@ n_collections() = Base.gc_num().pause
         @test identical_across_workers(() -> BAYSOL.Scattering._gaussian_dummy(v, q))
     end
 
-    @testset "compute_B_lm: bit-identical, repeatable, and exception-free under 24 workers" begin
+    # …and exception-free under 24 workers
+    @testset "compute_B_lm: bit-identical, repeatable" begin
         inp = conc_blm_inputs(1)
         @test identical_across_workers(() -> blm(inp); reps = 2)
-        # the same threaded call, repeated: always the same bits (a lost update would show up here)
+        # the same threaded call, repeated: always the
+        # same bits (a lost update would show up here)
         ref = fpr(with_workers(() -> blm(inp), 1))
         got = with_workers(6) do
             with_chaos(0.002) do
@@ -288,11 +333,15 @@ n_collections() = Base.gc_num().pause
 
     @testset "the whole static build (species_multipoles) is bit-identical" begin
         q = collect(range(0.01, 0.3; length = 210))
-        @test identical_across_workers(() -> species_multipoles(conc_mol(), q, 8, 9000.0); workers = (2, 5, 24))
+        @test identical_across_workers(
+            () -> species_multipoles(conc_mol(), q, 8, 9000.0);
+            workers = (2, 5, 24),
+        )
     end
 
     # -----------------------------------------------------------------------
-    @testset "concurrent callers: each gets its own serial result (no hidden shared state)" begin
+    # …(no hidden shared state)
+    @testset "concurrent callers: each gets its own serial result" begin
         inputs = [conc_blm_inputs(s) for s in 1:4]
         refs = with_workers(() -> [fpr(blm(i)) for i in inputs], 1)
         for chaos in (0.0, 0.003)
@@ -319,7 +368,8 @@ n_collections() = Base.gc_num().pause
     @testset "repeated threaded builds leave nothing behind" begin
         inp = conc_blm_inputs(2)
         with_workers(() -> blm(inp), 6)                           # warm up (compile, pools)
-        GC.gc(); GC.gc()
+        GC.gc()
+        GC.gc()
         live0 = Base.gc_live_bytes()
         with_workers(6) do
             for _ in 1:6
@@ -327,7 +377,9 @@ n_collections() = Base.gc_num().pause
                 vols(conc_mol())
             end
         end
-        GC.gc(); GC.gc()
-        @test Base.gc_live_bytes() - live0 < 150 * 2^20             # no growth that survives a full collection
+        GC.gc()
+        GC.gc()
+        # no growth that survives a full collection
+        @test Base.gc_live_bytes() - live0 < 150 * 2^20
     end
 end

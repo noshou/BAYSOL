@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Exercises src/Inference/Chains.jl: `convergence` (a thin layer over MCMCDiagnosticTools.jl, whose own tests cover the
-# statistics; here the shapes, the short-chain guard and the behaviour the sampler relies on) and `select_chains`.
+# Exercises src/Inference/Infer.jl (the chains part): `convergence` (a thin layer
+# over MCMCDiagnosticTools.jl, whose own tests cover the statistics; here the shapes,
+# the short-chain guard and the behaviour the sampler relies on) and `select_chains`.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using Random
@@ -26,10 +27,20 @@ end
         @test all(e -> 2500 < e, c.ess) && all(e -> 1000 < e, c.ess_tail)
     end
 
-    @testset "chains in different places, of different scale, or drifting: R̂ above 1.01" begin
-        @test only(convergence(randn(rng, 500, 4, 1) .+ reshape([0.0, 0.0, 5.0, 5.0], 1, 4, 1)).rhat) > 1.5
-        @test only(convergence(randn(rng, 1000, 4, 1) .* reshape([1.0, 1.0, 6.0, 6.0], 1, 4, 1)).rhat) > 1.1
-        @test only(convergence(randn(rng, 600, 2, 1) .+ range(0, 6; length = 600)).rhat) > 1.2
+    # …R̂ above 1.01
+    @testset "chains in different places, of different scale, or drifting" begin
+        @test only(
+            convergence(
+                randn(rng, 500, 4, 1) .+ reshape([0.0, 0.0, 5.0, 5.0], 1, 4, 1),
+            ).rhat,
+        ) > 1.5
+        @test only(
+            convergence(
+                randn(rng, 1000, 4, 1) .* reshape([1.0, 1.0, 6.0, 6.0], 1, 4, 1),
+            ).rhat,
+        ) > 1.1
+        @test only(convergence(randn(rng, 600, 2, 1) .+ range(0, 6; length = 600)).rhat) >
+              1.2
     end
 
     @testset "autocorrelation lowers the ESS" begin
@@ -44,8 +55,10 @@ end
         @test all(isnan, c.rhat) && all(isnan, c.ess) && all(isnan, c.ess_tail)
     end
 
-    @testset "select_chains: errors and mostly divergent chains are not pooled, a chain in a poorer mode is" begin
-        pooled, reason = select_chains([0.0, 0.0, 0.0, 0.9], [nothing, nothing, nothing, nothing])
+    # …a chain in a poorer mode is
+    @testset "select_chains: errors and mostly divergent chains are not pooled" begin
+        pooled, reason =
+            select_chains([0.0, 0.0, 0.0, 0.9], [nothing, nothing, nothing, nothing])
         @test pooled == [true, true, true, false]
         @test reason[1:3] == ["ok", "ok", "ok"] && occursin("diverged", reason[4])
         pooled, reason = select_chains([0.0, 0.0], [nothing, "boom"])

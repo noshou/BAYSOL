@@ -9,7 +9,7 @@ The entry points that run the tests.
 | `unittests.jl` | the unit and integration suite: everything in`../unit_tests/units/`, in name order with `test_quality.jl` last                                                  |
 | `fittings.tcl` | the end-to-end fitting tests in`../fitting_tests/`: the ones you name, or all of them; optionally the benchmark, the report and the sampler diagnostics on them |
 | `vis.tcl`      | the visual checks in`../visualize/`: the ones you name, or all of them                                                                                          |
-| `diagnose.tcl` | the sampler diagnostics (`../utils/diagnose.tcl`, one part per call) on fitting tests, without rerunning their fits: all five parts by default, or the ones named with `--report`, `--ablate`, `--residuals`, `--warmup`, `--tolerance` |
+| `diagnose.tcl` | the sampler diagnostics (`../utils/diagnose.jl`, one Julia process per part) on fitting tests, without rerunning their fits: all five parts by default, or the ones named with `--report`, `--ablate`, `--residuals`, `--warmup`, `--tolerance` |
 | `profile.tcl` | where the static build of a fitting test spends its time, by function (`../utils/profile_seed.jl`; development tooling, not a benchmark) |
 | `validate.tcl` | the validations in `../validation/`: slow, suite-wide checks of one change against criteria fixed before the run (`--list`; needs `--approved` to run) |
 | `tcltests.tcl` | the tests of the Tcl tools in `../utils/` (`../utils/tests/*.test`, tcltest; ~1 s)                                                                               |

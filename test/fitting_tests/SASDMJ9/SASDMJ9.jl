@@ -3,7 +3,8 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.Inference: Solute, Protein, NonBiological, PROFILE
+using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
+using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDMJ9")
@@ -14,9 +15,9 @@ const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDMJ9_fit1.fit")
 raw = readdlm(_DATA_PATH; skipstart = 5)
 
 # has 5 lines of headers, and some beam info at the end; need to skip.
-qvals   = Float64.(raw[1:2048, 1])
-I_exp   = Float64.(raw[1:2048, 2])
-σ_exp   = Float64.(raw[1:2048, 3])
+qvals = Float64.(raw[1:2048, 1])
+I_exp = Float64.(raw[1:2048, 2])
+σ_exp = Float64.(raw[1:2048, 3])
 
 # qvals are in nm⁻¹; must convert to Å⁻¹.
 qvals = qvals ./ NM_INV_PER_ANGSTROM_INV
@@ -47,8 +48,8 @@ qvals = qvals ./ NM_INV_PER_ANGSTROM_INV
 
 const PH, σ_PH = 7.5, PH_METER_SIGMA
 
-const ENERGY_EV      = HC_EV_ANGSTROM / 1.54   # ≈ 8051 eV, from X33's stated 1.54 Å wavelength
-const TEMPERATURE_C   = 20.0             # 20°C, stated in the paper
+const ENERGY_EV = HC_EV_ANGSTROM / 1.54   # ≈ 8051 eV, from X33's stated 1.54 Å wavelength
+const TEMPERATURE_C = 20.0             # 20°C, stated in the paper
 const IONIC_STRENGTH_M = 0.200           # 200 mM NaCl, matches the SEC/SAXS buffer above
 
 # Nsp7 sequence, read directly off SASDMJ9_fit1_model1.pdb chain B (residues
@@ -57,60 +58,62 @@ const IONIC_STRENGTH_M = 0.200           # 200 mM NaCl, matches the SEC/SAXS buf
 # in chain B; the tag-free chain B sequence is used here as the dominant,
 # biologically relevant species (the paper itself describes the mature
 # protein, not the tag, as "Nsp7").
-const NSP7_SEQ = 
+const NSP7_SEQ =
     "KLTEMKCTNVVLLGLLSKMHVESNSKEWNYCVGLHNEINLCDDPDAVLEKLLALIAFFLS" *
     "KHNTCDLSDLIESYFENTTILQ"
 
 # Average mass from NSP7_SEQ (ExPASy average residue masses + one water for
 # the terminal H/OH).
-const NSP7_MW = 9331.77   # g/mol
+const NSP7_MW         = 9331.77   # g/mol
 const NSP7_CONC_MG_ML = 4.70
 const NSP7_MOLARITY   = NSP7_CONC_MG_ML / NSP7_MW   # ≈ 0.504 mM
 const NSP7_MOLARITY_σ = MOLARITY_REL_SIGMA * NSP7_MOLARITY
 
-# Buffer components
-# Counter-ions (added 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
-# not list. Assumed: 10 mM Tris titrated with HCl -> Cl⁻ = C·0.859 (pK(22 °C) = 8.156). The pH is taken as
-# set at room temperature (22 ± 3 °C), which fixes the counter-ion amount whatever the measurement
-# temperature. pK(T) from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
-# 10.1063/1.1416902) pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.209 M. σ combines σ_PH, ±3 °C,
-# ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is modelled; the volume change of
-# the buffer's own (de)protonation is not. Titrant: not stated; HCl for amine bases (Tris, imidazole,
-# histidine), NaOH for Good's buffers.
+# Buffer components Counter-ions (added 2026-10-01). Setting the pH adds titrant
+# counter-ions that the deposited recipe does not list. Assumed: 10 mM Tris titrated with
+# HCl -> Cl⁻ = C·0.859 (pK(22 °C) = 8.156). The pH is taken as set at room temperature (22
+# ± 3 °C), which fixes the counter-ion amount whatever the measurement temperature. pK(T)
+# from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
+# 10.1063/1.1416902) pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.209 M. σ combines
+# σ_PH, ±3 °C, ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is
+# modelled; the volume change of the buffer's own (de)protonation is not. Titrant: not
+# stated; HCl for amine bases (Tris, imidazole, histidine), NaOH for Good's buffers.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
-    # electron density (see Inference.Solute).
-    NonBiological(0.200, 0.002,   "sodium chloride"),   # 200 mM NaCl, ±1%
-    NonBiological(0.010, 0.0002,  "tris"),              # 10 mM Tris-HCl, ±2%
-    NonBiological(0.005, 0.0001,  "dtt"),               # 5 mM DTT, ±2%
-    NonBiological(0.008588, 0.000422, "chloride"),   # Cl⁻ counter-ion from HCl titration of Tris (see note above)
+    # electron density (see BulkElectronDensity.Solute).
+    NonBiological(0.200, 0.002, "sodium chloride"),   # 200 mM NaCl, ±1%
+    NonBiological(0.010, 0.0002, "tris"),              # 10 mM Tris-HCl, ±2%
+    NonBiological(0.005, 0.0001, "dtt"),               # 5 mM DTT, ±2%
+    # Cl⁻ counter-ion from HCl titration of Tris (see note above)
+    NonBiological(0.008588, 0.000422, "chloride"),
 ]
 
 # ---------------------------------------------------------------------------
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-const Q_MAX_FIT    = 0.5
+const Q_MAX_FIT = 0.5
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from the diameter of the
-# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to the Shannon channels
-# that diameter allows (see `rebin` there).
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
     fit_subset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT`. (`seed_model` bins the curve and drops the
-bins with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT`. (`seed_model`
+bins the curve and drops the bins with non-positive intensity.)
 """
 function fit_subset()
     keep = findall(≤(Q_MAX_FIT), qvals)
     return qvals[keep], I_exp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdmj9` samples. It is separate only because the developer tools in test/utils/ build
-# a fit's Seed without running the fit; if you are reading this script as an example you can skip it:
+# Builds the Seed that `run_sasdmj9` samples. It is separate only because
+# the developer tools in test/utils/ build a fit's Seed without running
+# the fit; if you are reading this script as an example you can skip it:
 # `run_sasdmj9` below is the whole story (build the seed, then sample it).
 function seed_sasdmj9(; seed::Integer = SAMPLER_SEED)
     q_fit, I_fit, σ_fit = fit_subset()
@@ -123,7 +126,11 @@ function seed_sasdmj9(; seed::Integer = SAMPLER_SEED)
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdmj9(; n_samples::Int = N_SAMPLES, n_adapt::Int = N_ADAPT, seed::Integer = SAMPLER_SEED)
+function run_sasdmj9(;
+    n_samples::Int = N_SAMPLES,
+    n_adapt::Int = N_ADAPT,
+    seed::Integer = SAMPLER_SEED,
+)
     s, data = seed_sasdmj9(; seed)
     res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
@@ -138,7 +145,8 @@ open(joinpath(@__DIR__, "res.txt"), "w") do io
     BAYSOL.write_report(io, result; form_factor_log = form_factor_log, n_atoms = n_atoms)
 end
 
-# Plotting is loaded after the fit: loading GLMakie first invalidates compiled BAYSOL methods, which the fit then recompiles.
+# Plotting is loaded after the fit: loading GLMakie first invalidates
+# compiled BAYSOL methods, which the fit then recompiles.
 using GLMakie
 
 """
@@ -151,8 +159,8 @@ all draws diverged) the quantile-curve envelope.
 function sasdmj9_figure(result, data)
     _, divergence_rate, map_result, quantile_result = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
@@ -161,7 +169,6 @@ function sasdmj9_figure(result, data)
         fig[1, 1],
         xlabel = "q (Å⁻¹)",
         ylabel = "I(q)",
-
         xscale = log10,
         yscale = log10,
     )
@@ -179,7 +186,8 @@ function sasdmj9_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
@@ -207,7 +215,14 @@ function sasdmj9_figure(result, data)
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)
@@ -247,7 +262,8 @@ function sasdmj9_residuals_figure(result, data)
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID, label = "quantiles",
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID,
+            label = "quantiles",
         )
         lines!(
             ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
@@ -257,8 +273,22 @@ function sasdmj9_residuals_figure(result, data)
 
     if map_curve !== nothing
         resid = I_fit .- map_curve[:, 2]
-        errorbars!(ax, q_fit, resid, σ_fit; whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR)
-        scatter!(ax, q_fit, resid; markersize = MARKERSIZE, color = COLOR_DATA, label = "data - MAP")
+        errorbars!(
+            ax,
+            q_fit,
+            resid,
+            σ_fit;
+            whiskerwidth = WHISKERWIDTH,
+            color = COLOR_ERRORBAR,
+        )
+        scatter!(
+            ax,
+            q_fit,
+            resid;
+            markersize = MARKERSIZE,
+            color = COLOR_DATA,
+            label = "data - MAP",
+        )
         hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
         lo, hi = extrema(resid)
         pad = YLIM_LIN_PAD_FRAC * (hi - lo)
@@ -317,15 +347,15 @@ Overlays our MAP curve against the reference CRYSOL fit.
 function sasdmj9_comparison_figure(result, data)
     _, _, map_result, _ = result
     q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero) are left out of the plot only; the fit
-    # itself uses every point.
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
     pos = I_fit .> 0
     q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
 
     crysol   = readdlm(_FIT_PATH; skipstart = 1)
     q_crysol = Float64.(crysol[:, 1])
     I_crysol = Float64.(crysol[:, 4])
-    keep   = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT) .& (I_crysol .> 0)
+    keep     = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT) .& (I_crysol .> 0)
 
     fig = Figure(size = FIG_SIZE_CURVE)
     ax = Axis(
@@ -348,12 +378,20 @@ function sasdmj9_comparison_figure(result, data)
 
     lines!(
         ax, q_crysol[keep], I_crysol[keep];
-        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = "CRYSOL fit1",
+        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash,
+        label = "CRYSOL fit1",
     )
 
     if map_result !== nothing
         _, map_curve = map_result
-        lines!(ax, map_curve[:, 1], map(v -> v > 0 ? v : NaN, map_curve[:, 2]); color = COLOR_MAP, linewidth = LW_MAP, label = "BAYSOL MAP")
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "BAYSOL MAP",
+        )
     end
 
     axislegend(ax; position = :lb, framevisible = false)

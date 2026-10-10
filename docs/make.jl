@@ -14,32 +14,37 @@ using BAYSOL
 const DOC_MODULES = [
     "Utils"               => BAYSOL.Utils,
     "Runtime"             => BAYSOL.Runtime,
-    "PartialMolarVolumes" => BAYSOL.PartialMolarVolumes,
+    "Geometry"            => BAYSOL.Geometry,
+    "BulkElectronDensity" => BAYSOL.BulkElectronDensity,
     "MolecularStructure"  => BAYSOL.MolecularStructure,
     "Scattering"          => BAYSOL.Scattering,
-    "SASA"                => BAYSOL.SASA,
     "Inference"           => BAYSOL.Inference,
     "Pipeline"            => BAYSOL.Pipeline,
 ]
 
-# Documented modules that have no page of their own: they are covered by their parent's page.
-const DOC_SUBMODULES = [BAYSOL.Scattering.SphFuncs, BAYSOL.PhysicalConstants, BAYSOL.Cache, BAYSOL.Timing,
-                        BAYSOL.GCPause, BAYSOL.Parallel, BAYSOL.PlasticSequence, BAYSOL.Shannon]
+# Documented modules that have no page of their own: Utils
+# is the only module with submodules, covered by its page.
+const DOC_SUBMODULES = [BAYSOL.PhysicalConstants, BAYSOL.Shannon]
 
-# A module whose API reference spans several pages lists them here (title => page); every other
-# module has the single page `api/<lowercase name>.md`.
+# A module whose API reference spans several pages lists them here (title =>
+# page); every other module has the single page `api/<lowercase name>.md`.
 const API_PAGE_OVERRIDES = Dict(
-    "Inference" => ["Model and priors" => "api/inference.md", "Sampler" => "api/inference_sampler.md"],
+    "Inference" => [
+        "Model and priors" => "api/inference.md",
+        "Sampler" => "api/inference_sampler.md",
+    ],
 )
 
 api_pages(name) = get(API_PAGE_OVERRIDES, name, "api/" * lowercase(name) * ".md")
 
-# The tests are documented by their READMEs only (the test files themselves are far too large for a
-# site): one "Testing" page per README under test/, in the order they appear in the navigation.
-# title => README path relative to the repository root.
+# The tests are documented by their READMEs only (the test files themselves are far too
+# large for a site): one "Testing" page per README under test/, in the order they appear
+# in the navigation. title => README path relative to the repository root. The development
+# commands (dev/README.md): their own section of the site, copied the same way.
+const DEV_GUIDES = ["Commands" => "dev/README.md"]
+
 const TEST_GUIDES = [
     "Overview"        => "test/README.md",
-    "Running"         => "test/run/README.md",
     "Unit tests"      => "test/unit_tests/README.md",
     "Utilities"       => "test/utils/README.md",
     "Baselines"       => "test/baselines/README.md",
@@ -52,9 +57,13 @@ const TEST_GUIDES = [
     "Visualizations"  => "test/visualize/README.md",
 ]
 
-# The page file a test README is copied to: docs/src/testing/<its directory name>.md ("tests" for test/README.md).
+# The page file a test README is copied to: docs/src/testing/<its
+# directory name>.md ("tests" for test/README.md).
 const REPO_ROOT = normpath(joinpath(@__DIR__, ".."))
-test_page(path) = (d = basename(dirname(normpath(joinpath(REPO_ROOT, path)))); (d == "test" ? "tests" : d) * ".md")
+test_page(path) = (
+    d = basename(dirname(normpath(joinpath(REPO_ROOT, path))));
+    (d == "test" ? "tests" : d) * ".md"
+)
 
 # ---------------------------------------------------------------------------
 # Pull each module's own README.md into the generated site as a "Guides"
@@ -66,40 +75,58 @@ const GUIDES_DIR = joinpath(@__DIR__, "src", "guides")
 mkpath(GUIDES_DIR)
 
 for (name, _) in DOC_MODULES
-    cp(joinpath(@__DIR__, "..", "src", name, "README.md"), joinpath(GUIDES_DIR, lowercase(name) * ".md"); force = true)
+    cp(
+        joinpath(@__DIR__, "..", "src", name, "README.md"),
+        joinpath(GUIDES_DIR, lowercase(name) * ".md");
+        force = true,
+    )
 end
 
-# The test READMEs, with their relative links to each other pointed at the copied pages (the READMEs link
-# to one another as files, which would be dead links on the site).
+# The test READMEs, with their relative links to each other pointed at the copied pages
+# (the READMEs link to one another as files, which would be dead links on the site).
 const TESTING_DIR = joinpath(@__DIR__, "src", "testing")
 mkpath(TESTING_DIR)
 
-page_of = Dict(normpath(joinpath(REPO_ROOT, path)) => test_page(path) for (_, path) in TEST_GUIDES)
+page_of = Dict(
+    normpath(joinpath(REPO_ROOT, path)) => test_page(path)
+    for (_, path) in vcat(DEV_GUIDES, TEST_GUIDES)
+)
 
-for (_, path) in TEST_GUIDES
+for (_, path) in vcat(DEV_GUIDES, TEST_GUIDES)
     readme = normpath(joinpath(REPO_ROOT, path))
-    # Documenter's Markdown parser does not know HTML comments: left in, they print as text and swallow the
-    # table that follows (the Results-table markers of the fitting-tests README), so they are dropped here.
+    # Documenter's Markdown parser does not know HTML comments: left in, they
+    # print as text and swallow the table that follows (the Results-table
+    # markers of the fitting-tests README), so they are dropped here.
     text = replace(read(readme, String), r"<!--.*?-->[ \t]*\n?"s => "")
-    text = replace(text, r"\]\(([^)\s#]+\.md)(#[^)\s]*)?\)" => function (m)
-        target, anchor = match(r"\]\(([^)\s#]+\.md)(#[^)\s]*)?\)", m).captures
-        page = get(page_of, normpath(joinpath(dirname(readme), target)), nothing)
-        page === nothing ? m : "](" * page * something(anchor, "") * ")"
-    end)
+    text = replace(
+        text,
+        r"\]\(([^)\s#]+\.md)(#[^)\s]*)?\)" => function (m)
+            target, anchor = match(r"\]\(([^)\s#]+\.md)(#[^)\s]*)?\)", m).captures
+            page = get(page_of, normpath(joinpath(dirname(readme), target)), nothing)
+            page === nothing ? m : "](" * page * something(anchor, "") * ")"
+        end,
+    )
     write(joinpath(TESTING_DIR, test_page(path)), text)
 end
 
 makedocs(
     sitename = "BAYSOL.jl",
-    # No `format` override needed: the "academic" theme (academic.scss)
-    # compiles directly to docs/src/assets/themes/documenter-light.css,
+    # The default HTML format, except for the size warning (see below): the "academic" theme
+    # (academic.scss) compiles directly to docs/src/assets/themes/documenter-light.css,
     # overwriting Documenter's own built-in light theme file in place.
-    modules  = [BAYSOL; last.(DOC_MODULES); DOC_SUBMODULES],
-    pages    = [
-        "Home" => "index.md",
-        "Guides" => [name => joinpath("guides", lowercase(name) * ".md") for (name, _) in DOC_MODULES],
-        "Testing" => [title => joinpath("testing", test_page(path)) for (title, path) in TEST_GUIDES],
-        "API Reference" => [name => api_pages(name) for (name, _) in DOC_MODULES],
+    modules = [BAYSOL; last.(DOC_MODULES); DOC_SUBMODULES],
+    pages   = [
+    "Home" => "index.md",
+    "Guides" => [
+    name => joinpath("guides", lowercase(name) * ".md") for (name, _) in DOC_MODULES
+    ],
+    "Development" => [
+    title => joinpath("testing", test_page(path)) for (title, path) in DEV_GUIDES
+    ],
+    "Testing" => [
+    title => joinpath("testing", test_page(path)) for (title, path) in TEST_GUIDES
+    ],
+    "API Reference" => [name => api_pages(name) for (name, _) in DOC_MODULES]
     ],
     # :exports would require every exported docstring across every submodule
     # to be referenced in a docs page -- most of this package's functions are
@@ -109,6 +136,13 @@ makedocs(
     # Left un-strict (`:none`) until there's a reason to enforce an explicit
     # public API surface.
     checkdocs = :none,
+    # The Scattering API page is a bit over Documenter's default 100 KiB warning size and
+    # the search index over 500 KiB. The Scattering page is one coherent module, so the
+    # warning levels are raised (the error levels stay).
+    format = Documenter.HTML(;
+        size_threshold_warn = 150 * 1024,
+        search_size_threshold_warn = 750 * 1024,
+    ),
     # Strict: every `@ref` resolves as of 2026-10-01, so a broken
     # cross-reference now fails the build (and the deploy) instead of
     # shipping a dead link.

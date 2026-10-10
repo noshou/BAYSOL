@@ -3,7 +3,7 @@
 Do eight NUTS chains (two at the MAP (independent random streams) and three mirrored pairs at distances 4, 10 and 20 posterior standard deviations from the MAP along a random direction each) converge to one posterior, does a better basin that the MAP search missed get found, and does pooling change the answer the single chain started at the MAP gives? It also checks that the jitter scales are neither too small to test anything nor so large that chains are dropped.
 
 ```bash
-tclsh test/run/validate.tcl chains --approved        # prints its plan without --approved
+tclsh dev/validate.tcl chains --approved        # prints its plan without --approved
 ```
 
 The script (`validate.jl`) runs `infer` with the defaults (8 chains, the `run_model` warm-up and draws) on each fit and each RNG seed, and a second time with `n_chains = 1` (the single chain started at the MAP, as in earlier versions); it compares the pooled post-warm-up draws with that single chain.

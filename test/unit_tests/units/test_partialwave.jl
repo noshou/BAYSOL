@@ -8,7 +8,8 @@
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using Random
-using BAYSOL.Scattering: SharedAmplitude, compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
+using BAYSOL.Scattering:
+    SharedAmplitude, compute_B_lm, partial_wave_weights, self_scatter, cross_scatter
 using BAYSOL.Scattering: BESS_CUT
 using SpecialFunctions: sphericalbesselj
 using BAYSOL.MolecularStructure: create, coords_spherical, to_spherical
@@ -29,7 +30,9 @@ function pw_naive_B(coords_sph, qvals, f_atoms, lMax)
         for l in 0:lMax, m in 0:l
             k = pw_idx(l, m)
             for qi in 1:Q
-                B[k, qi] += f_atoms[i, qi] * sphericalbesselj(l, qvals[qi] * coords_sph[1, i]) * conj(Y[k, 1])
+                B[k, qi] +=
+                    f_atoms[i, qi] * sphericalbesselj(l, qvals[qi] * coords_sph[1, i]) *
+                    conj(Y[k, 1])
             end
         end
     end
@@ -37,9 +40,9 @@ function pw_naive_B(coords_sph, qvals, f_atoms, lMax)
 end
 
 # A fixed 5-atom geometry plus a fixed q-grid and amplitude matrix.
-pw_cart = [ 0.0  1.3 -2.1  0.4  1.7;
-            0.0 -0.7  1.1  2.2 -1.9;
-            1.5  0.9  0.3 -1.4  0.6]
+pw_cart = [0.0 1.3 -2.1 0.4 1.7;
+    0.0 -0.7 1.1 2.2 -1.9;
+    1.5 0.9 0.3 -1.4 0.6]
 pw_sph = to_spherical(pw_cart)
 pw_q = [0.0, 0.15, 0.4, 0.9]
 # amplitudes decaying with q, distinct per atom, all real
@@ -100,23 +103,39 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         B = compute_B_lm(pw_sph, pw_q, pw_f, lMax, UInt64(2))
         ref = pw_naive_B(pw_sph, pw_q, pw_f, lMax)
         # each skipped term is ≤ BESS_CUT·|f|·|Y_lm|, and |Y_lm| ≤ √((2l+1)/4π)
-        bound = size(pw_sph, 2) * BESS_CUT * maximum(abs, pw_f) * sqrt((2lMax + 1) / 4π) + DEFAULT_ATOL
+        bound =
+            size(pw_sph, 2) * BESS_CUT * maximum(abs, pw_f) * sqrt((2lMax + 1) / 4π) +
+            DEFAULT_ATOL
         for k in 1:pw_nrows(lMax), qi in eachindex(pw_q)
             @test abs(B[1, k, qi] - ref[k, qi]) ≤ bound
         end
         # unsorted q takes the uncut path: the same result within that bound
         perm = [3, 1, 4, 2]
         Bu = compute_B_lm(pw_sph, pw_q[perm], pw_f[:, perm], lMax, UInt64(2))
-        @test all(abs(Bu[1, k, j] - B[1, k, perm[j]]) ≤ bound for k in 1:pw_nrows(lMax), j in 1:4)
-        @test all(check_complex(Bu[1, k, j], ref[k, perm[j]]) for k in 1:pw_nrows(lMax), j in 1:4)
+        @test all(
+            abs(Bu[1, k, j] - B[1, k, perm[j]]) ≤ bound for k in 1:pw_nrows(lMax), j in 1:4
+        )
+        @test all(
+            check_complex(Bu[1, k, j], ref[k, perm[j]]) for k in 1:pw_nrows(lMax), j in 1:4
+        )
     end
 
-    @testset "SharedAmplitude: the multipoles of an explicit matrix of equal rows, without building it" begin
+    # …without building it
+    @testset "SharedAmplitude: the multipoles of an explicit matrix of equal rows" begin
         n = size(pw_sph, 2)
-        for fvec in ([exp(-0.3 * q^2) for q in pw_q], [(1.0 + 0.5im) * exp(-0.3 * q^2) for q in pw_q])
+        for fvec in (
+            [exp(-0.3 * q^2) for q in pw_q],
+            [(1.0 + 0.5im) * exp(-0.3 * q^2) for q in pw_q],
+        )
             for lMax in (0, 2, 4)
                 Bs = compute_B_lm(pw_sph, pw_q, SharedAmplitude(fvec, n), lMax, UInt64(2))
-                Bm = compute_B_lm(pw_sph, pw_q, repeat(reshape(fvec, 1, :), n, 1), lMax, UInt64(2))
+                Bm = compute_B_lm(
+                    pw_sph,
+                    pw_q,
+                    repeat(reshape(fvec, 1, :), n, 1),
+                    lMax,
+                    UInt64(2),
+                )
                 @test size(Bs) == size(Bm)
                 @test isapprox(Bs, Bm; rtol = 1e-12, atol = 1e-14)
             end
@@ -125,7 +144,8 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         @test SharedAmplitude([1.0, 2.0, 3.0], 5)[4, 2] == 2.0
     end
 
-    @testset "compute_B_lm does not depend on the order of the atoms (they are processed by radius)" begin
+    # …(they are processed by radius)
+    @testset "compute_B_lm does not depend on the order of the atoms" begin
         rng = MersenneTwister(4)
         cart = 6 .* randn(rng, 3, 60)
         sph = to_spherical(cart)
@@ -136,8 +156,14 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
             perm = randperm(rng, 60)
             Bp = compute_B_lm(sph[:, perm], q, f[perm, :], lMax, UInt64(7))
             @test isapprox(Bp, B; rtol = 1e-11, atol = 1e-13 * maximum(abs, B))
-            # another chunk size regroups the atoms into tiles, hence other negligible-Bessel cuts: equal up to that cut (1e-9)
-            @test isapprox(compute_B_lm(sph, q, f, lMax, UInt64(60)), B; rtol = 0, atol = 1e-8 * maximum(abs, B))
+            # another chunk size regroups the atoms into tiles, hence
+            # other negligible-Bessel cuts: equal up to that cut (1e-9)
+            @test isapprox(
+                compute_B_lm(sph, q, f, lMax, UInt64(60)),
+                B;
+                rtol = 0,
+                atol = 1e-8 * maximum(abs, B),
+            )
         end
     end
 
@@ -156,7 +182,9 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         B = compute_B_lm(pw_sph, pw_q, pw_f, 0, UInt64(5))
         j0(x) = x == 0.0 ? 1.0 : sin(x) / x
         for (qi, q) in enumerate(pw_q)
-            ref = sum(pw_f[i, qi] * j0(q * pw_sph[1, i]) for i in 1:size(pw_sph, 2)) / sqrt(4π)
+            ref =
+                sum(pw_f[i, qi] * j0(q * pw_sph[1, i]) for i in 1:size(pw_sph, 2)) /
+                sqrt(4π)
             @test check_complex(B[1, 1, qi], complex(ref))
         end
     end
@@ -172,7 +200,8 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         # a numerically zero imaginary part still collapses to one channel
         @test size(compute_B_lm(pw_sph, pw_q, f_zeroimag, 2, UInt64(2)), 1) == 1
         # a single nonzero imaginary entry anywhere flips it to two channels
-        f_one = ComplexF64.(f_real); f_one[3, 2] += 1e-8im
+        f_one = ComplexF64.(f_real)
+        f_one[3, 2] += 1e-8im
         @test size(compute_B_lm(pw_sph, pw_q, f_one, 2, UInt64(2)), 1) == 2
     end
 
@@ -186,8 +215,14 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         Bre = compute_B_lm(pw_sph, pw_q, real.(f_cplx), lMax, UInt64(2))
         Bim = compute_B_lm(pw_sph, pw_q, imag.(f_cplx), lMax, UInt64(2))
         @test size(B, 1) == 2
-        @test all(check_complex(B[1, k, q], Bre[1, k, q]) for k in 1:pw_nrows(lMax), q in eachindex(pw_q))
-        @test all(check_complex(B[2, k, q], Bim[1, k, q]) for k in 1:pw_nrows(lMax), q in eachindex(pw_q))
+        @test all(
+            check_complex(B[1, k, q], Bre[1, k, q]) for
+            k in 1:pw_nrows(lMax), q in eachindex(pw_q)
+        )
+        @test all(
+            check_complex(B[2, k, q], Bim[1, k, q]) for
+            k in 1:pw_nrows(lMax), q in eachindex(pw_q)
+        )
     end
 
     @testset "compute_B_lm is invariant to _CHUNK" begin
@@ -222,7 +257,9 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         a, b = 2.5, -0.75
         lMax = 2
         lhs = compute_B_lm(pw_sph, pw_q, a .* f1 .+ b .* f2, lMax, UInt64(2))
-        rhs = a .* compute_B_lm(pw_sph, pw_q, f1, lMax, UInt64(2)) .+ b .* compute_B_lm(pw_sph, pw_q, f2, lMax, UInt64(2))
+        rhs =
+            a .* compute_B_lm(pw_sph, pw_q, f1, lMax, UInt64(2)) .+
+            b .* compute_B_lm(pw_sph, pw_q, f2, lMax, UInt64(2))
         @test size(lhs) == size(rhs)
         @test all(check_complex(lhs[i], rhs[i]) for i in eachindex(lhs))
     end
@@ -244,7 +281,10 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         # so truncating at a lower lMax must give the shared prefix back
         Bbig = compute_B_lm(pw_sph, pw_q, pw_f, 5, UInt64(2))
         Bsmall = compute_B_lm(pw_sph, pw_q, pw_f, 2, UInt64(2))
-        @test all(check_complex(Bbig[1, k, q], Bsmall[1, k, q]) for k in 1:pw_nrows(2), q in eachindex(pw_q))
+        @test all(
+            check_complex(Bbig[1, k, q], Bsmall[1, k, q]) for
+            k in 1:pw_nrows(2), q in eachindex(pw_q)
+        )
     end
 
     @testset "compute_B_lm: atoms on the z axis populate only the m = 0 rows" begin
@@ -286,13 +326,20 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
     @testset "compute_B_lm accepts a Molecule's own spherical coordinates" begin
         # the documented input layout is exactly what MolecularStructure.coords_spherical
         # returns so it must go straight through
-        mol = create("tri", ["C", "O", "N"], [(0.0, 0.0, 1.0), (1.2, -0.3, 0.5), (-0.8, 0.9, -1.1)])
+        mol = create(
+            "tri",
+            ["C", "O", "N"],
+            [(0.0, 0.0, 1.0), (1.2, -0.3, 0.5), (-0.8, 0.9, -1.1)],
+        )
         sph = coords_spherical(mol)
         @test size(sph) == (3, 3)
         f = [1.0 + 0.1i for i in 1:3, _ in eachindex(pw_q)]
         B = compute_B_lm(sph, pw_q, f, 2, UInt64(2))
         ref = pw_naive_B(sph, pw_q, f, 2)
-        @test all(check_complex(B[1, k, q], ref[k, q]) for k in 1:pw_nrows(2), q in eachindex(pw_q))
+        @test all(
+            check_complex(B[1, k, q], ref[k, q]) for
+            k in 1:pw_nrows(2), q in eachindex(pw_q)
+        )
     end
 
     @testset "compute_B_lm exception contract" begin
@@ -303,12 +350,30 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         # coords must be the (3, N) spherical layout, not (N, 3) or cartesian-ish
         @test_throws ArgumentError compute_B_lm(zeros(2, 5), pw_q, pw_f, 2, UInt64(2))
         @test_throws ArgumentError compute_B_lm(zeros(4, 5), pw_q, pw_f, 2, UInt64(2))
-        @test_throws ArgumentError compute_B_lm(permutedims(pw_sph), pw_q, pw_f, 2, UInt64(2))
+        @test_throws ArgumentError compute_B_lm(
+            permutedims(pw_sph),
+            pw_q,
+            pw_f,
+            2,
+            UInt64(2),
+        )
         # f_atoms is (N, Q): one row per atom, one column per q
         @test_throws ArgumentError compute_B_lm(pw_sph, pw_q, pw_f[1:4, :], 2, UInt64(2))
-        @test_throws ArgumentError compute_B_lm(pw_sph, pw_q, vcat(pw_f, pw_f), 2, UInt64(2))
+        @test_throws ArgumentError compute_B_lm(
+            pw_sph,
+            pw_q,
+            vcat(pw_f, pw_f),
+            2,
+            UInt64(2),
+        )
         @test_throws ArgumentError compute_B_lm(pw_sph, pw_q, pw_f[:, 1:2], 2, UInt64(2))
-        @test_throws ArgumentError compute_B_lm(pw_sph, pw_q, hcat(pw_f, pw_f), 2, UInt64(2))
+        @test_throws ArgumentError compute_B_lm(
+            pw_sph,
+            pw_q,
+            hcat(pw_f, pw_f),
+            2,
+            UInt64(2),
+        )
         # lMax = 0 and a single q are on the allowed side of every boundary
         @test size(compute_B_lm(pw_sph, [0.3], pw_f[:, 1:1], 0, UInt64(1))) == (1, 1, 1)
     end
@@ -319,15 +384,16 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         f_cplx = pw_f .+ [(0.15i + 0.02q) * im for i in 1:5, q in eachindex(pw_q)]
         for B in (
             compute_B_lm(pw_sph, pw_q, real.(pw_f), lMax, UInt64(2)),
-            compute_B_lm(pw_sph, pw_q, f_cplx, lMax, UInt64(2))
+            compute_B_lm(pw_sph, pw_q, f_cplx, lMax, UInt64(2)),
         )
             S = self_scatter(B, w)
             @test length(S) == length(pw_q)
             @test eltype(S) <: Real
             for qi in eachindex(pw_q)
-                ref = 4π * sum(
-                    w[k] * abs2(B[c, k, qi])
-                    for c in 1:size(B, 1), k in 1:length(w)
+                ref =
+                    4π * sum(
+                        w[k] * abs2(B[c, k, qi])
+                        for c in 1:size(B, 1), k in 1:length(w)
                     )
                 @test check_float(S[qi], ref)
             end
@@ -367,7 +433,7 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         f_cplx = pw_f .+ [(0.2i + 0.01q) * im for i in 1:5, q in eachindex(pw_q)]
         for B in (
             compute_B_lm(pw_sph, pw_q, real.(pw_f), lMax, UInt64(2)),
-            compute_B_lm(pw_sph, pw_q, f_cplx, lMax, UInt64(2))
+            compute_B_lm(pw_sph, pw_q, f_cplx, lMax, UInt64(2)),
         )
             X = cross_scatter(B, B, w)
             S = self_scatter(B, w)
@@ -388,11 +454,14 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         # Re(a conj(b)) = Re(b conj(a)), so the order of the operands is free
         @test all(check_float(X[q], cross_scatter(Bb, A, w)[q]) for q in eachindex(X))
         for qi in eachindex(pw_q)
-            ref = 4π * sum(w[k] * real(A[1, k, qi] * conj(Bb[1, k, qi])) for k in 1:length(w))
+            ref =
+                4π * sum(w[k] * real(A[1, k, qi] * conj(Bb[1, k, qi])) for k in 1:length(w))
             @test check_float(X[qi], ref)
         end
         # unlike self_scatter it is signed: negating one operand negates it
-        @test all(check_float(cross_scatter(A, -1.0 .* Bb, w)[q], -X[q]) for q in eachindex(X))
+        @test all(
+            check_float(cross_scatter(A, -1.0 .* Bb, w)[q], -X[q]) for q in eachindex(X)
+        )
     end
 
     @testset "cross_scatter is bilinear" begin
@@ -401,11 +470,11 @@ pw_f = [(1.0 + 0.5i) * exp(-0.3 * q^2) for i in 1:5, q in pw_q]
         A = compute_B_lm(pw_sph, pw_q, real.(pw_f), lMax, UInt64(2))
         B1 = compute_B_lm(
             pw_sph, pw_q, [cos(0.5i + q) for i in 1:5, q in eachindex(pw_q)],
-            lMax, UInt64(2)
+            lMax, UInt64(2),
         )
         B2 = compute_B_lm(
             pw_sph, pw_q, [0.3i - 0.2q for i in 1:5, q in eachindex(pw_q)],
-            lMax, UInt64(2)
+            lMax, UInt64(2),
         )
         a, b = 1.75, -0.5
         lhs = cross_scatter(A, a .* B1 .+ b .* B2, w)
