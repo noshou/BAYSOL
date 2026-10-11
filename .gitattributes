@@ -8,6 +8,9 @@ Manifest.toml  linguist-generated=false
 # Hand-written -- override Linguist's documentation heuristic, which
 # otherwise excludes anything under docs/ from language stats.
 docs/src/assets/themes/academic.scss linguist-documentation=false
-# documenter-light.css is compiled output of academic.scss (see docs/make.jl),
-# not hand-authored -- stays excluded from language stats.
+docs/src/assets/themes/academic-dark.scss linguist-documentation=false
+# documenter-light.css and documenter-dark.css are compiled output of academic.scss and
+# academic-dark.scss (see docs/make.jl), not hand-authored -- they stay excluded from
+# language stats.
 docs/src/assets/themes/documenter-light.css linguist-generated=true
+docs/src/assets/themes/documenter-dark.css linguist-generated=true
