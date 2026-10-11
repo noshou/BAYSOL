@@ -22,6 +22,14 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      # actions/checkout leaves the pushed tag lightweight (it fetches the commit only),
+      # which loses the tag's message: the release name docs/make.jl shows under the
+      # sidebar title. Fetch the annotated tag itself.
+      - name: Fetch the annotated tag
+        if: github.ref_type == 'tag'
+        run: |
+          tag="refs/tags/${GITHUB_REF_NAME}"
+          git fetch --force origin "${tag}:${tag}"
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
