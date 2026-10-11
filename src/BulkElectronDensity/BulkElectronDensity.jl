@@ -34,8 +34,8 @@ Fractional partial-molar-volume expansibility, K⁻¹: an upper bound on
 (∂ϕ°/∂T)/ϕ° used to widen a solute's 25 °C ϕ° uncertainty when the sample is at
 another temperature
 
-    `σ_T` = `PMV_FRACTIONAL_EXPANSIBILITY` · ϕ°
-          · |t − [`PMV_REFERENCE_TEMPERATURE_C`](@ref)|.
+    `σ_T`   = `PMV_FRACTIONAL_EXPANSIBILITY` · ϕ°
+            · |t − [`PMV_REFERENCE_TEMPERATURE_C`](@ref)|.
 
 Derived from the multi-temperature series bundled with the tables
 (15-35 °C: sugars, ureas and glycolurils in `sources/extracted_pmv_candidates.tsv`;
@@ -212,16 +212,16 @@ const _ϕ°_r_cache = KeyedCache{Tuple{String,Float64,Float64},Tuple{Int64,Float
 
 "Maps IUPAC nucleotide ambiguity codes to the bases they average over."
 const _wildcards_nuc = Dict(
-    "R" => Dict("DNA" => ["A", "G"], "RNA" => ["A", "G"]),          # puRine
-    "Y" => Dict("DNA" => ["C", "T"], "RNA" => ["C", "U"]),          # pYrimidine
-    "S" => Dict("DNA" => ["G", "C"], "RNA" => ["G", "C"]),          # Strong (3 H-bonds)
-    "W" => Dict("DNA" => ["A", "T"], "RNA" => ["A", "U"]),          # Weak (2 H-bonds)
-    "K" => Dict("DNA" => ["G", "T"], "RNA" => ["G", "U"]),          # Keto
-    "M" => Dict("DNA" => ["A", "C"], "RNA" => ["A", "C"]),          # aMino
-    "B" => Dict("DNA" => ["C", "G", "T"], "RNA" => ["C", "G", "U"]),     # not A
-    "D" => Dict("DNA" => ["A", "G", "T"], "RNA" => ["A", "G", "U"]),     # not C
-    "H" => Dict("DNA" => ["A", "C", "T"], "RNA" => ["A", "C", "U"]),     # not G
-    "V" => Dict("DNA" => ["A", "C", "G"], "RNA" => ["A", "C", "G"]),     # not T/U
+    "R" => Dict("DNA" => ["A", "G"], "RNA" => ["A", "G"]), # puRine
+    "Y" => Dict("DNA" => ["C", "T"], "RNA" => ["C", "U"]), # pYrimidine
+    "S" => Dict("DNA" => ["G", "C"], "RNA" => ["G", "C"]), # Strong (3 H-bonds)
+    "W" => Dict("DNA" => ["A", "T"], "RNA" => ["A", "U"]), # Weak (2 H-bonds)
+    "K" => Dict("DNA" => ["G", "T"], "RNA" => ["G", "U"]), # Keto
+    "M" => Dict("DNA" => ["A", "C"], "RNA" => ["A", "C"]), # aMino
+    "B" => Dict("DNA" => ["C", "G", "T"], "RNA" => ["C", "G", "U"]),          # not A
+    "D" => Dict("DNA" => ["A", "G", "T"], "RNA" => ["A", "G", "U"]),          # not C
+    "H" => Dict("DNA" => ["A", "C", "T"], "RNA" => ["A", "C", "U"]),          # not G
+    "V" => Dict("DNA" => ["A", "C", "G"], "RNA" => ["A", "C", "G"]),          # not T/U
     "N" => Dict("DNA" => ["A", "C", "G", "T"], "RNA" => ["A", "C", "G", "U"]), # aNy
 )
 

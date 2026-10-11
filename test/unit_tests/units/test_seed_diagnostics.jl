@@ -226,6 +226,20 @@ end
     end
 
     # …draw statistics
+    @testset "chain_report: one line per chain, divergent draws listed" begin
+        io = IOBuffer()
+        rows = chain_report(io, seed; label = "toy", n_samples = 60, n_adapt = 30,
+            rng_seed = 3)
+        txt = String(take!(io))
+        @test length(rows) ≥ BAYSOL.Inference.DEFAULT_N_CHAINS
+        @test occursin("toy", txt) && occursin("pooled kept draws", txt)
+        @test all(r -> r.pooled == false || r.n_post ≥ 0, rows)
+        # the same seed gives the same report
+        io2 = IOBuffer()
+        chain_report(io2, seed; label = "toy", n_samples = 60, n_adapt = 30, rng_seed = 3)
+        @test String(take!(io2)) == txt
+    end
+
     @testset "warmup_study: step-size trace, one row per (adaptation length, seed)" begin
         io = IOBuffer()
         r = warmup_study(

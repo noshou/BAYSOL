@@ -1,0 +1,85 @@
+=== Run ===
+n_atoms         = 38692
+lMax            = 53
+n_q_raw         = 1287
+n_q             = 192
+n_samples       = 1000
+n_adapt         = 300
+rng_seed        = 6252506411145483830
+Dₘₐₓ            = 175.1 Å (atoms and hydration-shell beads)
+channels        = 16.3 (q range × D / π)
+rebin           = 12 per channel: 1287 measured → 192 fitted points (5 non-positive dropped)
+iterations      = 5166
+mean_accept     = 0.9578
+tree_depth      = 3.36 (max 5)
+mean_n_steps    = 12.30
+EBFMI           = 0.7654
+cavity_frac     = 0.0628
+excl_vol_sat    = false
+divergence_rate = 0.0002
+chains          = 8 pooled of 8
+modes           = 2 (mass shares by bridge sampling; the pooled draws carry them)
+mode_1          = chains 1,2,3,4,6,8, share 0.813 (log mass +900.73 ± 0.01)
+mode_2          = chains 5,7, share 0.187 (log mass +899.26 ± 0.03)
+optima          = 2 with mass (share of at least 0.01)
+optimum_1       = share 0.813, 6 chains at it
+optimum_2       = share 0.187, 2 chains at it
+rhat_max        = 1.0049
+ess_min         = 746
+ess_tail_min    = 773
+
+=== MAP ===
+log_density    = +896.303
+ρₑ             = +0.336572
+δρ₁            = -0.710062
+δρ₂            = -0.190471
+δρ₃            = +0.320128
+scale          = +7.49619e-11
+bkgrnd_corr    = +4.86834e-05
+excl_vol_corr  = +1.10911
+χ²             = +1.66478
+
+=== Quantiles (16-84) ===
+param                 quantile_lo      quantile_hi         bound_lo         bound_hi
+log_density_Q            +892.657           +895.3         +892.657           +895.3
+ρₑ_Q                    +0.336465        +0.336647        +0.336465        +0.336647
+δρ₁_Q                    -1.66073        +0.506114         -1.66042        +0.505853
+δρ₂_Q                   -0.483998        +0.226132        -0.483854        +0.225863
+δρ₃_Q                    -2.78821         +1.98001         -2.78349         +1.97959
+scale_Q              +1.22687e-11     +6.03943e-11     +1.22768e-11     +6.03942e-11
+bkgrnd_corr_Q         +4.9268e-05     +7.40804e-05      +4.9269e-05     +7.40561e-05
+excl_vol_corr_Q         +0.919607         +1.29659        +0.919643         +1.29658
+χ²_Q                     +1.66473         +1.66863         +1.66473         +1.66863
+
+=== Standard deviations from prior (θ-space z-score) ===
+param                       z_MAP    z_quantile_lo    z_quantile_hi
+ρₑ_Z                    +0.137245         -1.02269        +0.945263
+δρ₁_Z                    -1.02695         -1.53042        -0.141574
+δρ₂_Z                   -0.697646        -0.890009        -0.386496
+δρ₃_Z                   +0.652317        -0.176735         +1.56389
+
+=== Timing ===                                           seconds    % wall    (JIT)
+wall clock  (seed_model → end of report)                    4.40     100.0    (3.5)
+  static build                                              1.51      34.4    (0.2)
+    resolve_structure                                    6.3e-05
+    propka                [cache hit]                    1.0e-03
+    pdb2pqr               [cache hit]                    1.1e-05
+    load_molecule                                           0.04
+    SASA                                                    0.25
+    shannon (diameter, binning)                             0.03
+    forward_cache                                           1.18
+      vacuum + excluded volume (vols + B_lm)                0.80
+      hydration (B_lm)                                      0.37
+      Gram + r_m                                         3.1e-03
+    seed_sampler (priors, WLS)                           2.9e-04
+  sampling                                                  1.78      40.5    (2.3)
+    MAP search + whitening (76/76 starts, 2 modes)          0.06
+    NUTS setup (starts, Hamiltonian)                     1.7e-04
+    optima from the draws, 0 extra chains                   0.24
+    NUTS  (8k iters, 107.37k leapfrog, 0.031 ms/step)       1.14
+    2 posterior modes: mass by bridge sampling              0.09
+    per-draw c1 re-profile + curves (7566 draws)            0.05
+    MAP + quantiles                                         0.20
+  report write                                              0.15
+  unaccounted                                               0.95    (0.9)
+GC: 0.15 s

@@ -1,0 +1,78 @@
+=== Run ===
+n_atoms         = 21580
+lMax            = 60
+n_q_raw         = 570
+n_q             = 219
+n_samples       = 1000
+n_adapt         = 300
+rng_seed        = 6252506411145483830
+Dₘₐₓ            = 198.2 Å (atoms and hydration-shell beads)
+channels        = 18.2 (q range × D / π)
+rebin           = 12 per channel: 570 measured → 219 fitted points (0 non-positive dropped)
+iterations      = 5600
+mean_accept     = 0.9564
+tree_depth      = 2.87 (max 5)
+mean_n_steps    = 7.51
+EBFMI           = 0.8804
+cavity_frac     = 0.0262
+excl_vol_sat    = false
+divergence_rate = 0.0000
+chains          = 8 pooled of 8
+rhat_max        = 1.0021
+ess_min         = 2253
+ess_tail_min    = 2807
+
+=== MAP ===
+log_density    = -72.3354
+ρₑ             = +0.336435
+δρ₁            = +0.000625699
+δρ₂            = +0.693134
+δρ₃            = -2.54775
+scale          = +2.77243e-06
+bkgrnd_corr    = -0.173073
+excl_vol_corr  = +1.17634
+χ²             = +2.43646
+
+=== Quantiles (16-84) ===
+param                 quantile_lo      quantile_hi         bound_lo         bound_hi
+log_density_Q            -75.8893         -73.0808         -75.8891         -73.0808
+ρₑ_Q                    +0.336341        +0.336522        +0.336341        +0.336522
+δρ₁_Q                   -0.022068       +0.0140406       -0.0220645       +0.0140365
+δρ₂_Q                   +0.631024        +0.815303        +0.631047        +0.815294
+δρ₃_Q                    -2.81553         -2.16481         -2.81551          -2.1649
+scale_Q              +2.24494e-06     +3.06881e-06     +2.24496e-06     +3.06876e-06
+bkgrnd_corr_Q           -0.186876        -0.147591        -0.186875        -0.147591
+excl_vol_corr_Q          +1.17249         +1.17811         +1.17249         +1.17811
+χ²_Q                       +2.438         +2.44653           +2.438         +2.44653
+
+=== Standard deviations from prior (θ-space z-score) ===
+param                       z_MAP    z_quantile_lo    z_quantile_hi
+ρₑ_Z                   +0.0339971         -1.00543          +0.9915
+δρ₁_Z                   -0.561412        -0.578116        -0.551466
+δρ₂_Z                  +0.0449498       -0.0194321        +0.179865
+δρ₃_Z                   -0.123851        -0.182949        -0.037292
+
+=== Timing ===                                         seconds    % wall    (JIT)
+wall clock  (seed_model → end of report)                  4.10     100.0    (3.7)
+  static build                                            1.41      34.4    (0.5)
+    resolve_structure                                  6.5e-05
+    propka                [cache hit]                  5.1e-04
+    pdb2pqr               [cache hit]                  9.8e-06
+    load_molecule                                         0.02
+    SASA                                                  0.24
+    shannon (diameter, binning)                           0.03
+    forward_cache                                         1.11
+      vacuum + excluded volume (vols + B_lm)              0.70
+      hydration (B_lm)                                    0.40
+      Gram + r_m                                       4.4e-03
+    seed_sampler (priors, WLS)                         1.9e-04
+  sampling                                                1.79      43.6    (2.4)
+    MAP search + whitening (70/64 starts, 2 modes)        0.13
+    NUTS setup (starts, Hamiltonian)                   1.8e-04
+    optima from the draws, 0 extra chains                 0.26
+    NUTS  (8k iters, 63.9k leapfrog, 0.043 ms/step)       1.01
+    per-draw c1 re-profile + curves (8000 draws)          0.02
+    MAP + quantiles                                       0.36
+  report write                                            0.15
+  unaccounted                                             0.75    (0.7)
+GC: 0.09 s

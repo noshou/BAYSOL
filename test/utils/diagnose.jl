@@ -21,6 +21,9 @@
 #   --warmup     how short can the warm-up be and how many draws are enough
 #   --tolerance  NUTS at several c1 profiling tolerances and
 #                RNG seeds (is the tolerance tight enough?)
+#   --chains     every chain of `infer`: start, mode, divergences, step size, and each
+#                divergent draw (which chains the divergences come from); --retry 1
+#                looks at the rerun `infer` does when R̂ is above the limit
 #
 # `ID` is a folder under test/fitting_tests/ (SASDBS6); `tag` picks one run of a script that
 # has several (fit2_model3); scripts with a single run take no tag. SASDMZ9 and SASDJ72 take
@@ -84,18 +87,19 @@ function main(args)
     if isempty(args)
         println("usage: julia --project=test/fitting_tests test/utils/diagnose.jl ",
             (
-                "--report|--ablate|--residuals|--warmup|--tolerance [--out FILE] [--tols " *
-                "1e-5,1e-8] [--seeds 1,2,3] [--samples N] [--adapt N] ID[:tag] ..."
+                "--report|--ablate|--residuals|--warmup|--tolerance|--chains " *
+                "[--out FILE] [--tols 1e-5,1e-8] [--seeds 1,2,3] [--retry 1] " *
+                "[--samples N] [--adapt N] ID[:tag] ..."
             ),
         )
         return
     end
     cmd, rest = args[1], args[2:end]
-    cmd in ("--report", "--ablate", "--residuals", "--warmup", "--tolerance") ||
+    cmd in ("--report", "--ablate", "--residuals", "--warmup", "--tolerance", "--chains") ||
         error(
             (
             "unknown part $cmd (--report | --ablate " *
-            "| --residuals | --warmup | --tolerance)"
+            "| --residuals | --warmup | --tolerance | --chains)"
         ),
         )
     cmd = cmd[3:end]
@@ -105,13 +109,15 @@ function main(args)
     n_adapt = parse(Int, get(opts, "adapt", string(BAYSOL.Pipeline.DEFAULT_N_ADAPT)))
     tols = Tuple(parse.(Float64, split(get(opts, "tols", "1e-5,1e-8"), ",")))
     rngs = Tuple(parse.(Int, split(get(opts, "seeds", "7"), ",")))
+    # (the seeds of --chains are 64-bit: a report's `rng_seed` is a UInt64)
+    chain_seeds = parse.(Int128, split(get(opts, "seeds", "7"), ","))
     out = haskey(opts, "out") ? open(opts["out"], "w") : stdout
     try
         for spec in specs
             id, tag =
                 occursin(':', spec) ? String.(split(spec, ":"; limit = 2)) : (spec, "")
             seed, reference, label =
-                load_fit_seed(id, tag; makie = !(cmd in ("residuals", "warmup")))
+                load_fit_seed(id, tag; makie = !(cmd in ("residuals", "warmup", "chains")))
             if cmd == "report"
                 diagnose(out, seed; label, reference, n_samples, n_adapt)
             elseif cmd == "tolerance"
@@ -126,6 +132,11 @@ function main(args)
                 )
             elseif cmd == "warmup"
                 warmup_study(out, seed; label, rng_seeds = rngs)
+            elseif cmd == "chains"
+                for s in chain_seeds
+                    chain_report(out, seed; label, n_samples, n_adapt, rng_seed = s,
+                        rerun = get(opts, "retry", "0") == "1")
+                end
             elseif cmd == "residuals"
                 residual_report(out, seed; label)
             else

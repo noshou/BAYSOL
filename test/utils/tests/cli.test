@@ -45,19 +45,20 @@ test diagnose-list {list names every fitting test with its tags} -body {
 } -result {0 27 1 1}
 
 test diagnose-parts-default-all \
-    {no part flag runs all five parts, in order, each with only its own options} -body {
+    {no part flag runs all six parts, in order, each with only its own options} -body {
     lassign [status_and [file join $RUN diagnose.tcl] --seeds \
         1,2 --samples 50 --out /nowhere --dry-run SASDMJ9] s out
     list $s [regexp -all {=== diagnose: } $out] \
          [regexp {=== diagnose: report.*=== diagnose: ablate.*=== diagnose:\
-                 residuals.*=== diagnose: warmup.*=== diagnose: tolerance} \
+                 residuals.*=== diagnose: warmup.*=== diagnose: tolerance.*\
+                 === diagnose: chains} \
              [string map [list \n { }] $out]] \
          [string match \
              "*diagnose.jl --warmup --seeds 1,2 --out /nowhere/warmup.txt SASDMJ9*" \
              $out] \
          [string match \
              "*diagnose.jl --report --samples 50 --out /nowhere/report.txt SASDMJ9*" $out]
-} -result {0 5 1 1 1}
+} -result {0 6 1 1 1}
 
 test diagnose-default-all-fits {with no ID, every run of every fitting test} -body {
     lassign [status_and [file join $RUN diagnose.tcl] --warmup --dry-run] s out

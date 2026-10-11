@@ -61,17 +61,36 @@ function _write_chains(io::IO, d::Inference.ChainDiagnostics)
     npool = count(d.pooled)
     @printf(io, "%-15s = %d pooled of %d\n", "chains", npool, d.n_chains)
     if length(d.mode_weight) > 1
+        # a mode whose share is below MODE_NEGLIGIBLE keeps no draws (see `infer`)
+        keeps = d.mode_weight .≥ Inference.MODE_NEGLIGIBLE
+        n_live = count(keeps)
         note =
             d.weights_uncertain ?
             "mass shares by bridge sampling are uncertain: the chains of the modes " *
             "that can matter are pooled as they came" :
-            "mass shares by bridge sampling; the pooled draws carry them"
+            n_live == length(d.mode_weight) ?
+            "mass shares by bridge sampling; the pooled draws carry them" :
+            "$n_live kept"
         @printf(io, "%-15s = %d (%s)\n", "modes", length(d.mode_weight), note)
         for m in eachindex(d.mode_weight)
-            @printf(io, "%-15s = chains %s, share %.3f (log mass %+.2f ± %.2f)\n",
+            share = d.mode_weight[m]
+            @printf(io, "%-15s = chains %s, share %s (log mass %+.2f ± %.2f)%s\n",
                 "mode_$m",
-                join(findall(==(m), d.mode), ","), d.mode_weight[m], d.mode_logmass[m],
-                d.mode_err[m])
+                join(findall(==(m), d.mode), ","),
+                share ≥ 1e-3 ? @sprintf("%.3f", share) : @sprintf("%.1e", share),
+                d.mode_logmass[m], d.mode_err[m],
+                keeps[m] ? "" : ", no draws (< $(Inference.MODE_NEGLIGIBLE))")
+        end
+    end
+    # the optima that carry mass, when there is more than one or chains were added at one
+    if length(d.optima) > 1 || d.n_extra > 0
+        @printf(io, "%-15s = %d with mass (share of at least %g)\n", "optima",
+            length(d.optima), Inference.OPTIMUM_MIN_SHARE)
+        for (i, o) in enumerate(d.optima)
+            @printf(io, "%-15s = share %s, %d chain%s at it%s\n", "optimum_$i",
+                o.share ≥ 1e-3 ? @sprintf("%.3f", o.share) : @sprintf("%.1e", o.share),
+                o.chains, o.chains == 1 ? "" : "s",
+                o.started > 0 ? " ($(o.started) started there)" : "")
         end
     end
     for k in 1:d.n_chains
@@ -97,6 +116,12 @@ function _write_chains(io::IO, d::Inference.ChainDiagnostics)
         @printf(io, "%-15s = %.0f\n", "ess_min", minimum(filter(!isnan, d.ess)))
         @printf(io, "%-15s = %.0f\n", "ess_tail_min", minimum(filter(!isnan, d.ess_tail)))
     end
+    isnan(d.first_rhat) || @printf(
+        io,
+        "%-15s = first run R̂ %.4f; reran with %d warm-up and %d draws per chain, %s\n",
+        "retry", d.first_rhat, Inference.RETRY_N_ADAPT, Inference.RETRY_N_DRAWS,
+        d.retry_kept ? "rerun kept" : "first run kept (rerun no better)"
+    )
     return nothing
 end
 

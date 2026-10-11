@@ -8,7 +8,6 @@
 # it was derived for (MAP start `i`, chain `k`), not to the thread that happens to run it.
 
 using LinearAlgebra: BLAS
-using OhMyThreads: tforeach, DynamicScheduler
 using Random: Xoshiro
 
 export worker_count,
@@ -131,39 +130,69 @@ An exception raised by `f` is rethrown as itself (not wrapped in a
 # Exceptions
 - Whatever `f` throws.
 """
-function tmap_items(f, xs)
+function tmap_items(f::F, xs) where {F}
     (worker_count() == 1 || length(xs) ≤ 1) && return map(f, xs)
+    # A captured variable that is reassigned after the closure is made lives in a box that
+    # the tasks would share: a data race waiting to happen, refused here.
+    any(==(Core.Box), fieldtypes(F)) && throw(
+        ArgumentError(
+            "tmap_items: the function captures a variable that is reassigned " *
+            "(a boxed capture); bind it once, or pass it as an argument",
+        ),
+    )
     # The results go into a pre-typed vector (not the task map's own result,
     # whose type inference cannot see), so callers stay type-stable.
     R = Base.promote_op(f, eltype(xs))
     out = Vector{R}(undef, length(xs))
-    try
-        chaos = _CHAOS[]
-        # The map runs as a task; this thread, which may be the one that paused
-        # the garbage collector, polls for its end and runs the collector's
-        # checkpoint meanwhile (workers cannot, see gc_checkpoint).
-        job = Threads.@spawn tforeach(
-            eachindex(xs);
-            scheduler = DynamicScheduler(; chunking = false),
-        ) do i
-            chaos > 0 && sleep(rand() * chaos)
-            out[i] = f(xs[i])
-        end
-        # a short job ends within a few yields (this thread runs queued
-        # tasks while it yields); a long one is waited for in 1 ms sleeps
-        spins = 0
-        while !istaskdone(job)
-            gc_checkpoint()
-            (spins += 1) ≤ 50 ? yield() : sleep(0.001)
-        end
-        wait(job)
-        return out
-    catch e
-        while e isa TaskFailedException
-            e = e.task.result
-        end
-        throw(e)
+    _run_items!(out, f, xs)
+    return out
+end
+
+"""
+One work item of [`tmap_items`](@ref): `f`, the items and the output vector are fields
+of type `Any` on purpose, so the task code below compiles once per result type and not
+once per closure (the work in each item is heavy; one dynamic call is nothing).
+"""
+struct _ItemJob{R}
+    out::Vector{R}
+    f::Any
+    xs::Any
+    chaos::Float64
+end
+
+function _run_item(job::_ItemJob{R}, i::Int) where {R}
+    job.chaos > 0 && sleep(rand() * job.chaos)
+    job.out[i] = job.f(job.xs[i])
+    return nothing
+end
+
+"""
+Runs `f(xs[i])` into `out[i]` for every `i`, one task per item on the default thread
+pool, and waits for them; the first failing item's exception (by position) is rethrown as
+itself, not wrapped in `TaskFailedException`. Not specialized on `f` or `xs`.
+"""
+function _run_items!(out::Vector{R}, @nospecialize(f), @nospecialize(xs)) where {R}
+    job = _ItemJob{R}(out, f, xs, _CHAOS[])
+    tasks = Task[Threads.@spawn(_run_item(job, i)) for i in eachindex(out)]
+    # This thread, which may be the one that paused the garbage collector, polls for the
+    # end of the tasks and runs the collector's checkpoint meanwhile (workers cannot, see
+    # gc_checkpoint). A short job ends within a few yields (this thread runs queued
+    # tasks while it yields); a long one is waited for in 1 ms sleeps.
+    spins = 0
+    while !all(istaskdone, tasks)
+        gc_checkpoint()
+        (spins += 1) ≤ 50 ? yield() : sleep(0.001)
     end
+    for t in tasks
+        if istaskfailed(t)
+            e = t.result
+            while e isa TaskFailedException
+                e = e.task.result
+            end
+            throw(e)
+        end
+    end
+    return out
 end
 
 """

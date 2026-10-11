@@ -82,13 +82,15 @@ using Base.CoreLogging: with_logger, NullLogger   # (the Logging stdlib is not a
                             seed_model(MolecularStructure.LocalPathSource(path), 9000.0, q,
                                 I, σ, 7.0, 0.1, solutes;
                                 add_hydrogens = false)
-                        result = run_model(seed, 40, 20)
+                        # (no rerun for R̂: 40 iterations never reach 1.01 and the rerun is
+                        # 2000 warm-up and 2000 draws per chain)
+                        result = run_model(seed, 40, 20; retry = false)
                         # the chains run as tasks only when more than one worker is
                         # available, which the one-thread precompilation process is
                         # not: run them once as tasks too, so that first fits with
                         # several threads find the task machinery compiled
                         Runtime.with_workers(4) do
-                            run_model(seed, 40, 20)
+                            run_model(seed, 40, 20; retry = false)
                         end
                         write_report(IOBuffer(), result)
                         # the static build of a structure above

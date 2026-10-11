@@ -89,6 +89,7 @@ namespace eval report {
         ess_min           {^ess_min\s+= @FLP@}
         ess_tail_min      {^ess_tail_min\s+= @FLP@}
         modes             {^modes\s+= (\d+)}
+        optima            {^optima\s+= (\d+) with mass}
 
         lgdn_MAP          {^log_density\s+= @FLP@}
         rho_e_MAP         {^ρₑ\s+= @FLP@}
@@ -203,7 +204,7 @@ namespace eval report {
         # has a `mode_<k>` line); 1 for a single mode
         set shares {}
         foreach {m share} [regexp -all -line -inline -- \
-            {^mode_\d+\s+= chains [\d,]+, share ([\d.]+)} $text] {
+            {^mode_\d+\s+= chains [\d,]+, share ([\d.]+(?:e[-+]?\d+)?)} $text] {
             lappend shares $share
         }
         dict set d mode_share_max \

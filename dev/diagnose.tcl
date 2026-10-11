@@ -5,7 +5,7 @@
 # rerunning their fits or reports: every part by default.
 #
 #     tclsh dev/diagnose.tcl [--report] [--ablate] [--residuals] [--warmup]
-#         [--tolerance] [options] [ID[:tag] ...]
+#         [--tolerance] [--chains] [options] [ID[:tag] ...]
 #     tclsh dev/diagnose.tcl --list
 #
 # Parts (each is one Julia process, test/utils/diagnose.jl,
@@ -21,13 +21,19 @@
 #                iterations against it, ESS vs draws
 #   --tolerance  NUTS at several c1 profiling tolerances and RNG seeds (is the
 #                tolerance tight enough?)
-# With none of the part flags, all five run, in
+#   --chains     every chain of infer (the 8 chains run_model uses): start distance,
+#                posterior mode, divergences, step size, steps, acceptance, and each
+#                divergent draw, to see which chains a fit's divergences come from.
+#                --seeds is the run's rng_seed (default 7; pass the one in a report's
+#                === Run === section to look at that run); --retry 1: the rerun infer does
+#                when R̂ is above the limit (2000 + 2000, derived seeds), kept or not
+# With none of the part flags, all six run, in
 # this order. Name one or more to run only those.
 #
 # Options (each is passed to the parts that accept it):
-#   --samples N --adapt N   NUTS iterations (report, tolerance; default: those of run_model)
+#   --samples N --adapt N   NUTS iterations (report, tolerance, chains; default: run_model)
 #   --tols 1e-5,1e-8        c1 tolerances (tolerance)
-#   --seeds 1,2,3           RNG seeds (warmup, tolerance; default 7)
+#   --seeds 1,2,3           RNG seeds (warmup, tolerance, chains; default 7)
 #   --out DIR               write DIR/<part>.txt for each part instead of stdout
 #   --threads N  run the Julia processes with N threads (as `julia -t N`: 4, auto,
 #                4,1); default one
@@ -53,6 +59,7 @@ namespace eval diagnose {
         residuals {--out}
         warmup    {--out --seeds}
         tolerance {--out --samples --adapt --tols --seeds}
+        chains    {--out --samples --adapt --seeds --retry}
     }
 
     # Checks the values of the options in the dict
@@ -71,6 +78,11 @@ namespace eval diagnose {
                             fail $who "--seeds needs integers separated by commas,\
                                 got '$value'"
                         }
+                    }
+                }
+                --retry {
+                    if {$value ni {0 1}} {
+                        fail $who "--retry needs 0 or 1, got '$value'"
                     }
                 }
                 --tols {

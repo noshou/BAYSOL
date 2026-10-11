@@ -57,6 +57,26 @@ function _chisq_measured(sh::Shannon.ShannonInfo, y::AbstractVector{<:Real})::Fl
 end
 
 """
+[`_chisq_measured`](@ref) of every column of `curves` (models on the fitted grid), in
+one matrix product with [`Shannon.raw_interpolation`](@ref) instead of a spline per
+column, in blocks of columns so that the measured-grid residuals stay small.
+
+# Returns
+- `Vector{Float64}`, one reduced χ² per column.
+"""
+function _chisq_measured_all(sh::Shannon.ShannonInfo, curves::AbstractMatrix{<:Real})
+    M = Shannon.raw_interpolation(sh)
+    n_raw = length(sh.I_raw)
+    out = Vector{Float64}(undef, size(curves, 2))
+    block = max(1, 1_000_000 ÷ max(n_raw, 1))
+    for cols in Iterators.partition(axes(curves, 2), block)
+        R = (sh.I_raw .- M * curves[:, cols]) ./ sh.σ_raw
+        out[cols] = vec(sum(abs2, R; dims = 1)) ./ (n_raw - 3)
+    end
+    return out
+end
+
+"""
 Run NUTS on [`Inference._logπ`](@ref) starting from seed, returning posterior
 draws of the physical parameters ξ = (ρₑ, δρ₁, δρ₂, δρ₃), one
 (scale, `bkgrnd_corr`) pair and predicted curve per draw, and
@@ -124,7 +144,7 @@ trajectory's sample covariance, starting from the identity in the whitened coord
     [`Inference._logπ`](@ref)/[`Inference._ll`](@ref).
 - `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
     (0, 100) exclusive (validated below); the default, `DEFAULT_TARGET_ACCEPT`,
-    is Stan's usual 80%, used here too absent a specific reason to retarget it.
+    is 95%.
 - `rng_seed::Union{Nothing,Integer}=nothing`: the run's random seed (see
     [`Inference.infer`](@ref)). To reproduce a fit exactly, pass the
     `rng_seed` printed in its report's `=== Run ===` section; `nothing` picks
@@ -134,6 +154,8 @@ trajectory's sample covariance, starting from the identity in the whitened coord
     1 at the MAP, the others at deterministic distances from it, in mirrored
     pairs); see [`Inference.infer`](@ref). The draws of the chains that did not
     fail are pooled, and the report gives the split R̂ and ESS of the pool.
+- `retry::Bool=true`: rerun the sampler once, longer and from derived seeds, when R̂
+    is above [`Inference.RETRY_RHAT`](@ref); see [`Inference.infer`](@ref).
 - `jitter_seed::Integer=Inference.DEFAULT_JITTER_SEED`: seed
     of the jittered chain starts, separate from `rng_seed`.
 
@@ -156,6 +178,7 @@ function run_model(
     rng_seed::Union{Nothing,Integer} = nothing,
     n_chains::Int = Inference.DEFAULT_N_CHAINS,
     jitter_seed::Integer = Inference.DEFAULT_JITTER_SEED,
+    retry::Bool = true,
 )::Union{
     Tuple{Inference.Inferred,Float64,MAPResult,QuantileResult},
     Tuple{Inference.Inferred,Float64,Nothing,Nothing},
@@ -196,11 +219,12 @@ function run_model(
     # calculate unfiltered fit
     fit_unfiltered =
         Inference.infer(seed, n_samples, n_adapt; l = l, δ = δ, rng_seed = rng_seed,
-            n_chains = n_chains, jitter_seed = jitter_seed)
+            n_chains = n_chains, jitter_seed = jitter_seed, retry = retry)
     t_post = tick()
 
     # filter-out the warm-up draws of every chain
-    keep = findall(>(n_adapt), fit_unfiltered.iteration)
+    # (a rerun for R̂ has its own warm-up length)
+    keep = findall(>(fit_unfiltered.diagnostics.n_adapt), fit_unfiltered.iteration)
     fit = Inference.Inferred(
         fit_unfiltered.samples[keep],
         fit_unfiltered.stats[keep],
@@ -223,7 +247,7 @@ function run_model(
     binned = seed.shannon !== nothing && seed.shannon.rebin > 0
     chisq_meas = if binned
         sh_ = seed.shannon
-        [_chisq_measured(sh_, view(fit.curves, :, j)) for j in axes(fit.curves, 2)]
+        _chisq_measured_all(sh_, fit.curves)
     else
         fit.chisq_red
     end

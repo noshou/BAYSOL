@@ -86,6 +86,15 @@ test parse-modes {the modes line and the shares of the modes} -body {
     fields res_chains.txt {modes mode_share_max mode_share_min}
 } -result {2 0.81 0.19}
 
+test parse-modes-negligible \
+    {a mode with a tiny share is printed in scientific notation and still parsed} -body {
+    fields res_chains_negligible.txt {modes mode_share_max mode_share_min}
+} -result {2 1.0 7.1e-10}
+
+test parse-optima {the count of optima that carry mass} -body {
+    fields res_optima.txt {optima}
+} -result 2
+
 test parse-chains-absent {a report from before the chains has none of them} -body {
     fields res_current.txt {chains_pooled chains_total rhat_max\
         ess_min ess_tail_min chains_dropped modes mode_share_max}
