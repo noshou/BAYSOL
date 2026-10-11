@@ -2,7 +2,7 @@ name: Documentation
 
 on:
   # master -> the "dev" docs; a version tag (v0.2.0, ...) -> that version's
-  # docs plus the "stable" alias. workflow_dispatch still allows a manual
+  # docs (plain vX.Y.Z tags only). workflow_dispatch still allows a manual
   # rebuild of either (pick the branch or the tag in the Actions UI).
   push:
     branches:
