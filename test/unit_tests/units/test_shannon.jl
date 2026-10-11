@@ -13,7 +13,7 @@ using Random
 using Statistics
 using LinearAlgebra
 using BAYSOL.Shannon: ShannonInfo, SHANNON_REBIN, BIN_BIAS_MAX, cloud_diameter, auto_lmax,
-    shannon_data, model_on_raw,
+    shannon_data, model_on_raw, raw_interpolation,
     residual_structure, bin_bias_ratio
 using BAYSOL.BulkElectronDensity: NonBiological, Solute
 using BAYSOL.Scattering: forward_cache, hydration
@@ -196,6 +196,32 @@ brute_diameter(P) = maximum(
         end
     end
 
+    @testset "raw_interpolation: one matrix for every curve" begin
+        q = collect(0.0:0.01:0.2)
+        I = 1 .+ q
+        σ = fill(0.1, length(q))
+        info = shannon_data(q, I, σ; D = 50.0, rebin = 3, max_bin_bias = Inf)
+        M = raw_interpolation(info)
+        @test size(M) == (length(info.q_raw), length(info.q))
+        rng = Xoshiro(4)
+        for _ in 1:5
+            y = 5 .+ rand(rng, length(info.q))
+            @test M * y ≈ model_on_raw(info, y) rtol = 1e-10
+        end
+        # reduced χ² of many curves at once = the per-curve function
+        Y = 5 .+ rand(rng, length(info.q), 40)
+        all_at_once = BAYSOL.Pipeline._chisq_measured_all(info, Y)
+        one_by_one = [BAYSOL.Pipeline._chisq_measured(info, Y[:, j]) for j in 1:40]
+        @test all_at_once ≈ one_by_one rtol = 1e-10
+        # more columns than one block: the blocks join up
+        wide = repeat(Y, 1, 60)
+        wide_chi2 = BAYSOL.Pipeline._chisq_measured_all(info, wide)
+        @test wide_chi2 ≈ repeat(one_by_one, 60) rtol = 1e-10
+        two = shannon_data([0.1, 0.2, 0.3], [1.0, 2.0, 3.0], [0.1, 0.1, 0.1];
+            D = 5.0, rebin = nothing)
+        @test raw_interpolation(two) * [1.0, 2.0, 3.0] ≈ [1.0, 2.0, 3.0]
+    end
+
     @testset "model_on_raw" begin
         q = collect(0.0:0.01:0.2)
         I = 1 .+ q
@@ -338,7 +364,7 @@ brute_diameter(P) = maximum(
               (300, 700, 1000)
         # n_samples / n_adapt default to the constants
         @test hasmethod(BAYSOL.run_model, Tuple{typeof(s)})
-        res = BAYSOL.run_model(s, 120, 60)
+        res = BAYSOL.run_model(s, 120, 60; retry = false)
         map_params = res[3][1]
         # the reported χ² is the one on the measured points
         # (not the binned fit's own), n − 3 degrees of freedom

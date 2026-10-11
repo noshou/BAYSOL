@@ -17,7 +17,7 @@ using HypothesisTests: WaldWolfowitzTest
 using Dierckx: Spline1D
 
 export ShannonInfo, SHANNON_REBIN, BIN_BIAS_MAX, cloud_diameter, auto_lmax,
-    shannon_data, bin_bias_ratio, model_on_raw, residual_structure
+    shannon_data, bin_bias_ratio, model_on_raw, raw_interpolation, residual_structure
 
 """
 Default number of bins per Shannon channel (`k`): the bin width is `π/(k·D)`. Binning
@@ -364,6 +364,36 @@ function model_on_raw(info::ShannonInfo, y::AbstractVector{<:Real})::Vector{Floa
     )
     k = min(3, length(info.q) - 1) # cubic where the grid allows it
     return Spline1D(info.q, Float64.(y); k = k, bc = "extrapolate")(info.q_raw)
+end
+
+"""
+    raw_interpolation(info) -> Matrix{Float64}
+
+The matrix `M` with `M * y == model_on_raw(info, y)` for every model `y` on the fitted
+grid: an interpolating spline is linear in the values it interpolates, so the map from
+the fitted grid to the measured one is one matrix, built here from the unit vectors. The
+product of `M` with a matrix of curves evaluates them all at once, where `model_on_raw`
+builds a spline per curve.
+
+# Arguments
+- `info::ShannonInfo`.
+
+# Returns
+- `Matrix{Float64}`, `length(info.q_raw) × length(info.q)`.
+
+# Exceptions
+- `ArgumentError`: the fitted grid has fewer than two points.
+"""
+function raw_interpolation(info::ShannonInfo)::Matrix{Float64}
+    n = length(info.q)
+    M = Matrix{Float64}(undef, length(info.q_raw), n)
+    e = zeros(n)
+    for j in 1:n
+        e[j] = 1.0
+        M[:, j] = model_on_raw(info, e)
+        e[j] = 0.0
+    end
+    return M
 end
 
 """

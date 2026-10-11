@@ -11,6 +11,9 @@
 #         rewrite the table in test/fitting_tests/README.md
 #     tclsh test/utils/results_table.tcl --check
 #         exit 1 if the table in that README is not up to date
+#     tclsh test/utils/results_table.tcl --tsv FILE
+#         write every quantity read from every report (not only the table's
+#         columns) to FILE, one tab-separated row per res*.txt
 #
 # One row per `test/fitting_tests/*/res*.txt`: the MAP χ² (the report's `χ²` line,
 # on the measured q grid whatever the binning of the fit, so it is comparable with
@@ -177,6 +180,35 @@ namespace eval results_table {
         return $lines
     }
 
+    # Every parsed quantity of every report as tab-separated text: a header
+    # line (run, then the union of the keys in first-seen order), then one row
+    # per res*.txt in path order; a key a report lacks is an empty cell.
+    proc tsv {} {
+        global ROOT FIT_DIR
+        set keys {}
+        set rows {}
+        foreach path [lsort [glob -directory [file join $ROOT $FIT_DIR] */res*.txt]] {
+            set r [parse [slurp $path]]
+            dict for {k _} $r {
+                if {$k ni $keys} {
+                    lappend keys $k
+                }
+            }
+            lappend rows [list [label $path] $r]
+        }
+        set lines [list [join [linsert $keys 0 run] \t]]
+        foreach row $rows {
+            lassign $row name r
+            set cells [list $name]
+            foreach k $keys {
+                set v [expr {[dict exists $r $k] ? [dict get $r $k] : ""}]
+                lappend cells [string map [list \t " " \n " "] $v]
+            }
+            lappend lines [join $cells \t]
+        }
+        return [join $lines \n]
+    }
+
     # The cells of the rows of a markdown table: a list of rows, each a list
     # of trimmed cells with runs of white space collapsed to one space. The
     # separator row (|---|---|) is skipped, so column padding does not matter.
@@ -250,6 +282,16 @@ namespace eval results_table {
             ::usage $::SCRIPT
             return
         }
+        set tsv_file ""
+        set at [lsearch -exact $argv --tsv]
+        if {$at >= 0} {
+            if {$at + 1 >= [llength $argv]} {
+                puts stderr "results_table.tcl: --tsv needs a file name"
+                exit 2
+            }
+            set tsv_file [lindex $argv [expr {$at + 1}]]
+            set argv [lreplace $argv $at [expr {$at + 1}]]
+        }
         set update [expr {"--update" in $argv}]
         set check [expr {"--check" in $argv}]
         set only [lsearch -all -inline -not -exact $argv --update]
@@ -268,6 +310,18 @@ namespace eval results_table {
             puts stderr "results_table.tcl: --update and\
                 --check cover the whole table; give no ID"
             exit 2
+        }
+        if {$tsv_file ne ""} {
+            if {$update || $check || [llength $only]} {
+                puts stderr "results_table.tcl: --tsv stands alone"
+                exit 2
+            }
+            set ch [open $tsv_file w]
+            fconfigure $ch -encoding utf-8
+            puts $ch [tsv]
+            close $ch
+            puts "wrote $tsv_file"
+            return
         }
         set table [join [table $only] "\n"]
         if {$check} {

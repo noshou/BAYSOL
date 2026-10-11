@@ -114,4 +114,65 @@ using BAYSOL.Inference: chain_modes, bridge_logmass, mode_weights, draws_per_cha
               last(idx) ≤ 700
         @test diff(idx) ⊆ [3, 4, 5]
     end
+    @testset "chain_modes: one chain far from nine others is its own mode" begin
+        # (the rank-normalized R̂ of all ten chains together is then only about the
+        # limit, so "R̂ below the limit" must not stand for "one mode")
+        cube = randn(rng, 700, 10, 5)
+        cube[:, 7, :] .+= 24
+        @test chain_modes(cube) == [1, 1, 1, 1, 1, 1, 2, 1, 1, 1]
+        @test chain_modes(randn(rng, 700, 10, 5)) == ones(Int, 10)
+    end
+
+    @testset "report: the optima that carry mass" begin
+        OR = BAYSOL.Inference.OptimumReport
+        function optima_text(optima, n_extra)
+            M = 1
+            d = BAYSOL.Inference.ChainDiagnostics(10, zeros(10), fill(true, 10),
+                fill("ok", 10), [1.001], [1000.0], [800.0], 0.0, ones(Int, 10), [1.0],
+                [850.0], [0.02], false, 300, NaN, false, n_extra, optima)
+            io = IOBuffer()
+            BAYSOL.Pipeline._write_chains(io, d)
+            return String(take!(io))
+        end
+        # one optimum and no extra chains: nothing is said
+        @test !occursin("optima", optima_text([OR([0.3, 0, 0, 0], 850.0, 1.0, 9, 0)], 0))
+        txt = optima_text(
+            [
+                OR([0.3, 0, 0, 0], 850.0, 0.958, 9, 0),
+                OR([0.3, 0, -4, -5], 847.0, 0.042, 0, 2),
+            ],
+            2,
+        )
+        @test occursin("optima          = 2 with mass (share of at least 0.01)", txt)
+        @test occursin("optimum_1       = share 0.958, 9 chains at it\n", txt)
+        @test occursin(
+            "optimum_2       = share 0.042, 0 chains at it (2 started there)",
+            txt,
+        )
+    end
+
+    @testset "report: a mode that keeps no draws says so" begin
+        ChainDiagnostics = BAYSOL.Inference.ChainDiagnostics
+        function chains_text(weights)
+            M = length(weights)
+            d = ChainDiagnostics(M, zeros(M), fill(true, M), fill("ok", M), [1.001],
+                [1000.0], [800.0], 0.0, collect(1:M), weights, fill(850.0, M),
+                fill(0.02, M), false, 300, NaN, false, 0,
+                BAYSOL.Inference.OptimumReport[])
+            io = IOBuffer()
+            BAYSOL.Pipeline._write_chains(io, d)
+            return String(take!(io))
+        end
+        # one mode carries the posterior, the other has a share far below the limit
+        txt = chains_text([1.0, 7.1e-10])
+        @test occursin("modes           = 2 (1 kept)", txt)
+        @test occursin("share 1.000 ", txt) && occursin("share 7.1e-10 ", txt)
+        @test occursin(", no draws (< 0.0001)", txt)
+        @test count("no draws", txt) == 1
+        # both carry mass: the plain wording, and no mode keeps nothing
+        txt = chains_text([0.8, 0.2])
+        @test occursin("the pooled draws carry them", txt) && !occursin("no draws", txt)
+        # three modes, two carry mass: "2 carry"
+        @test occursin("modes           = 3 (2 kept)", chains_text([0.7, 0.3, 1e-9]))
+    end
 end

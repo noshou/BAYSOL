@@ -63,12 +63,37 @@ function convergence(x::AbstractArray{<:Real,3})
 end
 
 """
+    OptimumReport
+
+An optimum of the posterior that carries mass (a Laplace share of at least
+[`OPTIMUM_MIN_SHARE`](@ref)), as [`infer`](@ref) found it: by the MAP search, by its
+jittered starts, or by L-BFGS from the draws of the first round of chains.
+
+# Fields
+- `ξ::Vector{Float64}`: the optimum, in the sampled parameters (ρₑ, δρ₁, δρ₂, δρ₃).
+- `logmass::Float64`, `share::Float64`: its Laplace log-mass and its share of the
+    total over the optima with a mass.
+- `chains::Int`: chains at it at the end (chains with at least
+    [`OPTIMUM_CHAIN_FRACTION`](@ref) of their draws within [`OPTIMUM_CHAIN_RADIUS`](@ref)
+    of it under its own Hessian).
+- `started::Int`: of those, how many `infer` started there because fewer than
+    [`OPTIMUM_MIN_CHAINS`](@ref) chains were.
+"""
+struct OptimumReport
+    ξ::Vector{Float64}
+    logmass::Float64
+    share::Float64
+    chains::Int
+    started::Int
+end
+
+"""
     ChainDiagnostics
 
 What the chains of one [`infer`](@ref) call looked like.
 
 # Fields
-- `n_chains::Int`: chains run.
+- `n_chains::Int`: chains run, those started at optima included (the last `n_extra`).
 - `start_scale::Vector{Float64}`: per chain, the signed distance of its start
     from the MAP in posterior standard deviations (negative: the mirrored chain
     of a pair; 0: the MAP): the distance actually used, after any halving, see
@@ -96,6 +121,16 @@ What the chains of one [`infer`](@ref) call looked like.
     the weights ([`weights_uncertain`](@ref)): the chains of the modes that can matter
     were then pooled as they came, and `mode_weight` is each mode's share of those
     chains (0 for a mode that is negligible even at its most optimistic estimate).
+- `n_adapt::Int`: warm-up iterations per chain of the run these draws come from (the
+    caller's `n_adapt`, or [`RETRY_N_ADAPT`](@ref) when the rerun was kept).
+- `first_rhat::Float64`: the worst R̂ of the first run when [`infer`](@ref) reran
+    (see [`RETRY_RHAT`](@ref)); NaN when it did not.
+- `retry_kept::Bool`: whether the rerun's draws are the ones returned (false if there
+    was no rerun, or the first run's R̂ was no worse).
+- `n_extra::Int`: chains started at an optimum that carries mass but had fewer than
+    [`OPTIMUM_MIN_CHAINS`](@ref) chains at it after the first round (they are the last
+    `n_extra` chains; `start_scale` is the distance of the optimum from the MAP).
+- `optima::Vector{OptimumReport}`: the optima that carry mass, the best first.
 """
 struct ChainDiagnostics
     n_chains::Int
@@ -111,6 +146,20 @@ struct ChainDiagnostics
     mode_logmass::Vector{Float64}
     mode_err::Vector{Float64}
     weights_uncertain::Bool
+    n_adapt::Int
+    first_rhat::Float64
+    retry_kept::Bool
+    n_extra::Int
+    optima::Vector{OptimumReport}
+end
+
+"""
+The largest R̂ of `d` (NaN entries ignored); `Inf` if there is none, so that a run
+that could not be judged never beats one that could.
+"""
+function _worst_rhat(d::ChainDiagnostics)
+    r = filter(!isnan, d.rhat)
+    return isempty(r) ? Inf : maximum(r)
 end
 
 """
@@ -305,7 +354,7 @@ the forward model) from the trajectory's sample covariance.
                                 [`_logπ`](@ref)/[`_ll`](@ref).
 - `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
                                 (0, 100) exclusive; the default,
-                                [`DEFAULT_TARGET_ACCEPT`](@ref), is Stan's usual 80%.
+                                [`DEFAULT_TARGET_ACCEPT`](@ref), is 95%.
 - `n_chains::Int=DEFAULT_N_CHAINS`: number of NUTS chains
                                 ([`DEFAULT_N_CHAINS`](@ref) = 8, whatever the number of
                                 Julia threads; the threads only decide how many run at
@@ -319,6 +368,15 @@ the forward model) from the trajectory's sample covariance.
                                 of the jittered starts, separate from `rng_seed`:
                                 the same `jitter_seed` gives the same starts
                                 whatever the `rng_seed` or the thread count.
+- `retry::Bool=true`: when the worst R̂ of the run is above [`RETRY_RHAT`](@ref), sample
+                                once more with [`RETRY_N_ADAPT`](@ref) warm-up and
+                                [`RETRY_N_DRAWS`](@ref) post-warm-up iterations per chain,
+                                from `rng_seed` and `jitter_seed` offset deterministically
+                                ([`RETRY_SEED_OFFSET`](@ref)), and keep the run with the
+                                smaller worst R̂. The same seeds always give the same
+                                result, retried or not. `diagnostics.first_rhat` and
+                                `retry_kept` record what happened. Not done when the
+                                caller already asked for that many iterations.
 - `rng_seed::Union{Nothing,Integer}=nothing`: the run's
                                 random seed. Every random draw of the run (the extra MAP
                                 starts, the NUTS chain) comes from a stream derived from
@@ -346,13 +404,63 @@ function infer(
     rng_seed::Union{Nothing,Integer} = nothing,
     n_chains::Int = DEFAULT_N_CHAINS,
     jitter_seed::Integer = DEFAULT_JITTER_SEED,
+    retry::Bool = true,
 )::Inferred
     n_chains ≥ 1 || throw(DomainError(n_chains, "n_chains must be ≥ 1"))
     base = rng_seed === nothing ? draw_base() : (rng_seed % UInt64)
-    return with_gc_paused(
-        () -> _infer(seed, n_samples, n_adapt; l = l, δ = δ, base = base,
-            n_chains = n_chains, jitter_base = jitter_seed % UInt64),
-    )
+    jitter_base = jitter_seed % UInt64
+    go =
+        (ns, na, b, j) -> with_gc_paused(
+            () -> _infer(seed, ns, na; l = l, δ = δ, base = b,
+                n_chains = n_chains, jitter_base = j),
+        )
+    r1 = go(n_samples, n_adapt, base, jitter_base)
+    worst = _worst_rhat(r1.diagnostics)
+    _retry_needed(worst, n_samples, n_adapt, retry) || return r1
+
+    # R̂ above the limit: once more, longer, from streams and jitter directions derived
+    # from the seeds (a different draw of the starts too, since a bad R̂ can be seed luck)
+    info = seed.timing === nothing ? nothing : copy(seed.timing.info)
+    r2 = go(RETRY_N_ADAPT + RETRY_N_DRAWS, RETRY_N_ADAPT,
+        _retry_seeds(base, jitter_base)...)
+    kept = _worst_rhat(r2.diagnostics) ≤ worst
+    best = kept ? r2 : r1
+    if seed.timing !== nothing
+        # what the report says about the run is that of the kept attempt, with the
+        # caller's seed (the rerun's is derived from it)
+        kept || merge!(seed.timing.info, info)
+        seed.timing.info["rng_seed"] = base
+        seed.timing.info["n_adapt"] = best.diagnostics.n_adapt
+        seed.timing.info["n_samples"] =
+            best.diagnostics.n_adapt + (kept ? RETRY_N_DRAWS : n_samples - n_adapt)
+    end
+    d = best.diagnostics
+    return Inferred(best.samples, best.stats, best.scale, best.bkgrnd_corr, best.c1,
+        best.chisq_red, best.curves, best.chain, best.iteration,
+        ChainDiagnostics(d.n_chains, d.start_scale, d.pooled, d.reason, d.rhat, d.ess,
+            d.ess_tail, d.rewhitened, d.mode, d.mode_weight, d.mode_logmass, d.mode_err,
+            d.weights_uncertain, d.n_adapt, worst, kept, d.n_extra, d.optima),
+        best.likelihood, best.timing)
+end
+
+"""
+The `(base, jitter_base)` of the rerun [`infer`](@ref) does when R̂ is above
+[`RETRY_RHAT`](@ref), derived from the run's own by [`RETRY_SEED_OFFSET`](@ref).
+"""
+function _retry_seeds(base::UInt64, jitter_base::UInt64)
+    return (base + RETRY_SEED_OFFSET) * 0x9e3779b97f4a7c15,
+    (jitter_base + RETRY_SEED_OFFSET) * 0xbf58476d1ce4e5b9
+end
+
+"""
+Whether [`infer`](@ref) reruns: `retry` is on, the worst R̂ `worst` is above
+[`RETRY_RHAT`](@ref), and the rerun would be longer than the run itself (a caller that
+already asked for [`RETRY_N_ADAPT`](@ref) warm-up and [`RETRY_N_DRAWS`](@ref) draws
+gets none).
+"""
+function _retry_needed(worst::Real, n_samples::Integer, n_adapt::Integer, retry::Bool)
+    longer = n_adapt < RETRY_N_ADAPT || n_samples - n_adapt < RETRY_N_DRAWS
+    return retry && longer && worst > RETRY_RHAT
 end
 
 """
@@ -390,7 +498,7 @@ function _infer(
     if seed.timing !== nothing
         seed.timing.info["map_modes"] = sp.n_modes
         tock!(seed.timing, :sampling, 1,
-            "MAP search + whitening ($(sp.n_ok)/$(MAP_N_STARTS) starts, $(sp.n_modes) " *
+            "MAP search + whitening ($(sp.n_ok)/$(sp.n_starts) starts, $(sp.n_modes) " *
             "mode$(sp.n_modes == 1 ? "" : "s")$(sp.whitened ? "" : ", not whitened"))",
             t_map)
     end
@@ -418,15 +526,31 @@ function _infer(
                 _run_chains(seed, l, sp, n_samples, n_adapt, δ, base, jitter_base, n_chains)
         end
     end
-    runs, starts, t_nuts = chains.runs, chains.starts, chains.t_nuts
+    t_nuts = chains.t_nuts
+
+    # optima the chains visited that the search did not report, and chains for the ones that
+    # carry mass but have too few chains at them (their draws could not get their weight)
+    t_h = tick()
+    ext = _with_optima_chains(
+        seed, l, sp, chains.runs, chains.starts, post, n_samples, n_adapt, δ, base,
+        n_chains,
+    )
+    runs, starts, n_extra = ext.runs, ext.starts, ext.n_extra
+    n_total = length(runs)
+    optima_report = ext.optima_report
+    if seed.timing !== nothing
+        seed.timing.info["optima"] = count(o -> o.share ≥ OPTIMUM_MIN_SHARE, optima_report)
+        tock!(seed.timing, :sampling, 1,
+            "optima from the draws, $n_extra extra chain$(n_extra == 1 ? "" : "s")", t_h)
+    end
     n_lf = sum(r -> r.stats === nothing ? 0 : sum(getproperty.(r.stats, :n_steps)), runs)
 
     # which chains are pooled (every chain that ran and did not mostly diverge)
     ran = [r.error === nothing for r in runs]
     # no chain ran: the error is the caller's to see
     any(ran) || throw(first(r.error for r in runs))
-    ld = zeros(length(post), n_chains)
-    div_rate = zeros(n_chains)
+    ld = zeros(length(post), n_total)
+    div_rate = zeros(n_total)
     for r in runs
         r.error === nothing || continue
         ld[:, r.k] = getproperty.(r.stats[post], :log_density)
@@ -447,7 +571,7 @@ function _infer(
     pk = findall(pooled)
 
     if seed.timing !== nothing
-        seed.timing.info["n_chains"]        = n_chains
+        seed.timing.info["n_chains"]        = n_total
         seed.timing.info["n_chains_pooled"] = length(pk)
         seed.timing.info["leapfrog"]        = n_lf
         # chain-seconds per leapfrog step
@@ -455,7 +579,7 @@ function _infer(
         tock!(seed.timing, :sampling, 1,
             @sprintf(
                 "NUTS  (%s iters, %s leapfrog, %.3f ms/step)",
-                fmt_count(n_chains * n_samples),
+                fmt_count(n_total * n_samples),
                 fmt_count(n_lf),
                 ms
             ),
@@ -546,10 +670,10 @@ function _infer(
             isempty(v) ? NaN : f(v)
         ) for q in 1:(N+1)
     ]
-    diag = ChainDiagnostics(n_chains, [starts[k][2] for k in 1:n_chains], pooled, reason,
+    diag = ChainDiagnostics(n_total, [starts[k][2] for k in 1:n_total], pooled, reason,
         worst(maximum, :rhat), worst(minimum, :ess), worst(minimum, :ess_tail),
-        rewhitened, [k in pk ? mode_of[findfirst(==(k), pk)] : 0 for k in 1:n_chains],
-        weights, logZ, err, uncertain)
+        rewhitened, [k in pk ? mode_of[findfirst(==(k), pk)] : 0 for k in 1:n_total],
+        weights, logZ, err, uncertain, n_adapt, NaN, false, n_extra, optima_report)
 
     return Inferred(
         reduce(vcat, (runs[pk[c]].ξ[rows[c]] for c in eachindex(pk))),
@@ -565,6 +689,139 @@ function _infer(
         l.type,
         seed.timing,
     )
+end
+
+# ---------------------------------------------------------------------------
+#   Optima beyond the MAP search: shares, chains at them, chains started at them
+# ---------------------------------------------------------------------------
+
+"""
+The Laplace share of every optimum: `exp(logmass)` over the sum over those that have
+one; 0 for an optimum with none (`NaN`).
+"""
+function _optimum_shares(optima)
+    lm = [o.logmass for o in optima]
+    ok = filter(!isnan, lm)
+    isempty(ok) && return zeros(length(optima))
+    top = maximum(ok)
+    tot = sum(exp(x - top) for x in ok)
+    return [isnan(x) ? 0.0 : exp(x - top) / tot for x in lm]
+end
+
+"""
+How many of the chains, whose post-warm-up draws are the rows of `Ws` (whitened
+coordinates of `sp`), are at the optimum `o`: at least [`OPTIMUM_CHAIN_FRACTION`](@ref) of
+a chain's draws lie within [`OPTIMUM_CHAIN_RADIUS`](@ref) of it in the Mahalanobis distance
+of the Hessian there. 0 for an optimum without a positive definite Hessian.
+"""
+function _chains_at(o, sp, Ws)
+    all(>(0), o.λ) || return 0
+    H = o.V * (o.λ .* o.V')
+    return count(Ws) do W
+        size(W, 1) == 0 && return false
+        inside = count(axes(W, 1)) do i
+            d = sp.ẑ + sp.S * typeof(sp.ẑ)(@view W[i, :]) - o.z
+            d' * H * d ≤ OPTIMUM_CHAIN_RADIUS^2
+        end
+        inside ≥ OPTIMUM_CHAIN_FRACTION * size(W, 1)
+    end
+end
+
+"""
+The first round of chains `runs` (with their `starts`), extended: L-BFGS from their draws
+for optima the MAP search did not report ([`_optima_and_extra_chains`](@ref)), then the
+chains that optima carrying mass are missing, run and appended (none for `n_chains == 1`,
+which is a single chain). Also the [`OptimumReport`](@ref)s of the optima that carry mass.
+
+# Returns
+- `NamedTuple` `(runs, starts, n_extra, optima_report)`.
+"""
+function _with_optima_chains(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, runs, starts, post,
+    n_samples, n_adapt, δ, base, n_chains) where {N}
+    opt = _optima_and_extra_chains(seed, l, sp, runs, post)
+    if n_chains > 1 && !isempty(opt.extra_w)
+        ex = _run_extra_chains(
+            seed, l, sp, n_samples, n_adapt, δ, base, opt.extra_w, length(runs),
+        )
+        all_runs = vcat(runs, ex.runs)
+        Ws = vcat(
+            opt.Ws,
+            [_draws_w(seed, sp, r.ξ[post]) for r in ex.runs if r.error === nothing],
+        )
+        report = _optimum_reports(seed, sp, opt.optima, Ws, opt.owner[ex.keep])
+        return (runs = all_runs, starts = vcat(starts, ex.starts),
+            n_extra = length(ex.runs),
+            optima_report = report)
+    end
+    report = _optimum_reports(seed, sp, opt.optima, opt.Ws, Int[])
+    return (runs = runs, starts = starts, n_extra = 0, optima_report = report)
+end
+
+"""
+After the first round of chains: the optima known (the MAP search's and those found by
+L-BFGS from the chains' draws, [`_harvest_optima`](@ref)), and the whitened starts of the
+chains that optima carrying mass ([`OPTIMUM_MIN_SHARE`](@ref)) are missing: up to
+[`OPTIMUM_MIN_CHAINS`](@ref) chains at each, [`OPTIMUM_MAX_EXTRA_CHAINS`](@ref) in all,
+the heaviest optimum first.
+
+# Returns
+- `(optima, extra_w, owner, Ws)`: the optima, the starts and, for each start, the index in
+    `optima` of the optimum it is at, and the whitened post-warm-up draws of each chain
+    (one matrix per chain that ran).
+"""
+function _optima_and_extra_chains(
+    seed::Seed{<:Real,N},
+    l::LIKELIHOOD,
+    sp,
+    runs,
+    post,
+) where {N}
+    ran = [r for r in runs if r.error === nothing]
+    isempty(ran) && return (
+        optima = sp.optima, extra_w = Vector{Float64}[], owner = Int[],
+        Ws = Matrix{Float64}[],
+    )
+    Ws = [_draws_w(seed, sp, r.ξ[post]) for r in ran]
+    ld = reduce(vcat, [getproperty.(r.stats[post], :log_density) for r in ran])
+    dv = reduce(vcat, [getproperty.(r.stats[post], :numerical_error) for r in ran])
+    optima, _ = _harvest_optima(seed, l, sp, reduce(vcat, Ws), ld, Vector{Bool}(dv))
+    shares = _optimum_shares(optima)
+    extra_w = Vector{Float64}[]
+    owner = Int[]
+    for i in sortperm(shares; rev = true)
+        shares[i] ≥ OPTIMUM_MIN_SHARE || break
+        need = OPTIMUM_MIN_CHAINS - _chains_at(optima[i], sp, Ws)
+        need > 0 || continue
+        w = Vector(sp.S \ (optima[i].z - sp.ẑ))
+        for _ in 1:need
+            length(extra_w) < OPTIMUM_MAX_EXTRA_CHAINS || break
+            push!(extra_w, w)
+            push!(owner, i)
+        end
+    end
+    return (optima = optima, extra_w = extra_w, owner = owner, Ws = Ws)
+end
+
+"""
+The [`OptimumReport`](@ref)s of the optima that carry mass, the best first, with the
+chains at each after all the chains have run (`Ws`: the whitened post-warm-up draws of each
+chain that ran); `owners` lists, for each chain started at an optimum, the index in
+`optima` of that optimum.
+"""
+function _optimum_reports(seed::Seed{<:Real,N}, sp, optima, Ws, owners) where {N}
+    shares = _optimum_shares(optima)
+    out = OptimumReport[]
+    for i in sortperm(shares; rev = true)
+        shares[i] ≥ OPTIMUM_MIN_SHARE || break
+        push!(
+            out,
+            OptimumReport(
+                Vector(Ξ(sp.μ .+ sp.σ .* optima[i].z, seed.pr)), optima[i].logmass,
+                shares[i], _chains_at(optima[i], sp, Ws), count(==(i), owners),
+            ),
+        )
+    end
+    return out
 end
 
 # ---------------------------------------------------------------------------
@@ -604,20 +861,17 @@ function _value_target(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp) where {N}
 end
 
 """
-Runs the `n_chains` NUTS chains on the whitened target of `sp`, one task each, from their
-starts ([`_chain_start`](@ref)). `δ` is the target acceptance as a fraction. Every chain
-has its own metric, Hamiltonian, adaptor and random stream (the stream belongs to the
-chain index, not to the thread that happens to run it) and shares only the read-only seed.
+The pieces shared by every NUTS chain on the whitened target of `sp`: ℓπ (value),
+∂ℓπ∂w (value and gradient, one ForwardDiff pass) and `run_chain(k, w₀)`, which runs chain
+`k` from the whitened start `w₀` with its own metric, Hamiltonian, adaptor and random
+stream (the stream belongs to the chain index, not to the thread that happens to run it)
+and shares only the read-only seed.
 
 # Returns
--   `NamedTuple` `(runs, starts, t_nuts)`: the [`_ChainRun`](@ref)s in
-    chain order, the starts and the timer started when the chains began.
+- `(ℓπ, ∂ℓπ∂w, run_chain)`; `run_chain` returns a [`_ChainRun`](@ref).
 """
-function _run_chains(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, n_samples::Int64,
-    n_adapt::Int64, δ::Real,
-    base::UInt64, jitter_base::UInt64, n_chains::Int) where {N}
-    t_setup = tick()
-
+function _chain_runner(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, n_samples::Int64,
+    n_adapt::Int64, δ::Real, base::UInt64, show_progress::Bool) where {N}
     # ℓπ: w ↦ log π(θ(w)), the value-only log-posterior in NUTS's coordinates w.
     ℓπ = @closure w -> _logπ(
         _θ_of_w(SVector{N,eltype(w)}(w...), sp),
@@ -635,18 +889,11 @@ function _run_chains(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, n_samples::Int64,
         (DiffResults.value(result), DiffResults.gradient(result))
     end
 
-    # The starts: mirrored jittered pairs, or the MAP for a single chain
-    # (deterministically, see `_chain_start`). Chosen serially and up front,
-    # so neither the starts nor which chain gets which depend on the threads.
-    starts = [_chain_start(k, n_chains, N, ℓπ, ∂ℓπ∂w, jitter_base) for k in 1:n_chains]
-    show_progress = n_chains == 1   # concurrent progress bars would overwrite each other
-
     # One NUTS chain. Every chain has its own metric, Hamiltonian, adaptor
     # and random stream (the stream belongs to the chain index, not to the
     # thread that happens to run it), and shares only the read-only seed.
     run_chain =
-        k -> begin
-            w₀, _ = starts[k]
+        (k, w₀) -> begin
             t0 = time_ns()
             try
                 # DenseEuclideanMetric allows the adaptation to learn
@@ -707,10 +954,62 @@ function _run_chains(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, n_samples::Int64,
             end
         end
 
+    return ℓπ, ∂ℓπ∂w, run_chain
+end
+
+"""
+Runs the `n_chains` NUTS chains on the whitened target of `sp`, one task each, from their
+starts ([`_chain_start`](@ref)). `δ` is the target acceptance as a fraction. Every chain
+has its own metric, Hamiltonian, adaptor and random stream (the stream belongs to the
+chain index, not to the thread that happens to run it) and shares only the read-only seed.
+
+# Returns
+-   `NamedTuple` `(runs, starts, t_nuts)`: the [`_ChainRun`](@ref)s in
+    chain order, the starts and the timer started when the chains began.
+"""
+function _run_chains(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, n_samples::Int64,
+    n_adapt::Int64, δ::Real,
+    base::UInt64, jitter_base::UInt64, n_chains::Int) where {N}
+    t_setup = tick()
+    # (concurrent progress bars would overwrite each other)
+    ℓπ, ∂ℓπ∂w, run_chain =
+        _chain_runner(seed, l, sp, n_samples, n_adapt, δ, base, n_chains == 1)
+
+    # The starts: mirrored jittered pairs, or the MAP for a single chain
+    # (deterministically, see `_chain_start`). Chosen serially and up front,
+    # so neither the starts nor which chain gets which depend on the threads.
+    starts = [_chain_start(k, n_chains, N, ℓπ, ∂ℓπ∂w, jitter_base) for k in 1:n_chains]
+
     tock!(seed.timing, :sampling, 1, "NUTS setup (starts, Hamiltonian)", t_setup)
     t_nuts = tick()
-    runs = tmap_items(run_chain, 1:n_chains)
+    runs = tmap_items(k -> run_chain(k, starts[k][1]), 1:n_chains)
     return (runs = runs, starts = starts, t_nuts = t_nuts)
+end
+
+"""
+Runs one NUTS chain at each of the whitened starts `w_starts`, as chains `k0 + 1`,
+`k0 + 2`, … (their streams belong to those indices). A start where log π or its gradient
+is not finite is dropped.
+
+# Returns
+-   `NamedTuple` `(runs, starts, keep)`: the [`_ChainRun`](@ref)s, their `(w₀, distance
+    from the MAP)` and the positions in `w_starts` that were run.
+"""
+function _run_extra_chains(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, n_samples::Int64,
+    n_adapt::Int64, δ::Real, base::UInt64, w_starts::AbstractVector, k0::Int) where {N}
+    ℓπ, ∂ℓπ∂w, run_chain = _chain_runner(seed, l, sp, n_samples, n_adapt, δ, base, false)
+    keep = filter(eachindex(w_starts)) do i
+        try
+            v, g = ∂ℓπ∂w(w_starts[i])
+            isfinite(v) && all(isfinite, g)
+        catch e
+            e isa InterruptException && rethrow()
+            false
+        end
+    end
+    runs = tmap_items(i -> run_chain(k0 + findfirst(==(i), keep), w_starts[i]), keep)
+    starts = [(w_starts[i], sqrt(sum(abs2, w_starts[i]))) for i in keep]
+    return (runs = runs, starts = starts, keep = keep)
 end
 
 """

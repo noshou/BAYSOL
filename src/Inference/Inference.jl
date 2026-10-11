@@ -293,24 +293,30 @@ end
 """
 Default NUTS target acceptance rate, as a percentage in (0, 100), for
 [`run_model`](@ref BAYSOL.Pipeline.run_model) /
-[`Inference.infer`](@ref BAYSOL.Inference.infer): Stan's usual default of 80 %.
+[`Inference.infer`](@ref BAYSOL.Inference.infer): 95 %, above Stan's usual 80 %. The
+posteriors here are strongly curved and often multimodal; on the 53 fits of
+`test/validation/rhat_retry/` 95 % removed the divergences (the three fits above 1 %
+went to 0.04 % or less) for 1.3× the leapfrog steps.
 """
-const DEFAULT_TARGET_ACCEPT = 80
+const DEFAULT_TARGET_ACCEPT = 95
 
 """
 Number of L-BFGS starts of the pre-NUTS MAP search
 ([`Inference.infer`](@ref BAYSOL.Inference.infer)): the seed's own initial
-point plus `MAP_N_STARTS - 1` further prior draws (32: the search takes
-tens of milliseconds, and a narrow basin can attract only a few starts).
+point plus `MAP_N_STARTS - 1` further prior draws (64: the search takes
+tens of milliseconds, and a basin that attracts a few percent of the starts is missed by
+32 of them with probability `(1 − p)^32`, 8.5 % for `p` = 7.4 %, a hit rate measured on
+SASDLP4 in `test/validation/optima_recall/`).
 """
-const MAP_N_STARTS = 32
+const MAP_N_STARTS = 64
 
 """
 How many of the distinct basins the MAP search finds (lowest optimum
 first) are compared by their Laplace mass (`−f − ½ log det H`, one
-Hessian each) to choose the one the sampler is whitened at.
+Hessian each) to choose the one the sampler is whitened at; they are also the
+optima [`infer`](@ref) knows about (see [`OPTIMUM_MIN_SHARE`](@ref)).
 """
-const MAP_MAX_BASINS = 4
+const MAP_MAX_BASINS = 8
 
 "Iteration cap of each L-BFGS start of the MAP search."
 const MAP_MAX_ITER = 500
@@ -359,6 +365,65 @@ Mahalanobis distance (under the MAP Hessian) beyond which two L-BFGS optima coun
 distinct modes in the MAP search's multimodality count.
 """
 const MAP_MODE_SEP = 3.0
+
+# More optima: jitter, harvest, chains started at optima without chains
+
+"""
+Radii, in posterior standard deviations under an optimum's own Hessian, of the
+jittered L-BFGS starts the MAP search makes around the optima it has found
+([`MAP_JITTER_DIRECTIONS`](@ref) random directions at each radius).
+"""
+const MAP_JITTER_RADII = (3.0, 6.0, 12.0)
+
+"Random directions per radius of the jittered starts ([`MAP_JITTER_RADII`](@ref))."
+const MAP_JITTER_DIRECTIONS = 2
+
+"""
+The jittered starts go around at most this many distinct optima, the lowest first, and
+only those within [`MAP_JITTER_WITHIN_NATS`](@ref) of the lowest.
+"""
+const MAP_JITTER_MAX_OPTIMA = 4
+
+"Nats above the lowest optimum within which an optimum is jittered around."
+const MAP_JITTER_WITHIN_NATS = 15.0
+
+"""
+After the first round of chains, [`infer`](@ref) runs L-BFGS from this many draws chosen
+by farthest-point cover (the draw of highest log π first, then repeatedly the draw
+farthest, in the whitened coordinates, from those taken), to find optima the chains
+visit and the random starts did not reach.
+"""
+const HARVEST_COVER = 16
+
+"As [`HARVEST_COVER`](@ref), for the divergent draws: at most this many, also by cover."
+const HARVEST_DIVERGENT = 8
+
+"""
+An optimum carries mass when its Laplace share (its mass over the total of the optima
+found) is at least this much.
+"""
+const OPTIMUM_MIN_SHARE = 0.01
+
+"""
+Mahalanobis radius, under an optimum's own Hessian, within which a draw counts as
+being at that optimum; a chain is at the optimum when at least
+[`OPTIMUM_CHAIN_FRACTION`](@ref) of its draws are (4 contains 99 % of a Gaussian
+in four dimensions).
+"""
+const OPTIMUM_CHAIN_RADIUS = 4.0
+
+"The share of a chain's draws that must lie at an optimum for the chain to be at it."
+const OPTIMUM_CHAIN_FRACTION = 0.5
+
+"""
+An optimum that carries mass ([`OPTIMUM_MIN_SHARE`](@ref)) should have at least this many
+chains at it; if fewer are, [`infer`](@ref) starts the missing ones there
+(chains that did not mix into it cannot give its draws their weight).
+"""
+const OPTIMUM_MIN_CHAINS = 2
+
+"The most chains [`infer`](@ref) starts at optima in all."
+const OPTIMUM_MAX_EXTRA_CHAINS = 6
 
 # Chains: starts, pooling
 
@@ -414,6 +479,34 @@ chains are reported as converged (Stan's recommendation).
 """
 const RHAT_OK = 1.01
 
+"""
+[`infer`](@ref) with `retry = true` samples once more when the worst R̂ of its run
+is above this (it is [`RHAT_OK`](@ref)): the rerun has [`RETRY_N_ADAPT`](@ref)
+warm-up and [`RETRY_N_DRAWS`](@ref) post-warm-up iterations per chain, and new
+random streams and jitter directions derived from the run's seeds (so the same
+seeds still give the same result). The run with the smaller worst R̂ is kept.
+"""
+const RETRY_RHAT = RHAT_OK
+
+"""
+Warm-up iterations per chain of the rerun [`infer`](@ref) does when R̂ is above
+[`RETRY_RHAT`](@ref). Not run when the caller already asked for at least this
+many warm-up and [`RETRY_N_DRAWS`](@ref) post-warm-up iterations.
+"""
+const RETRY_N_ADAPT = 2000
+
+"""
+Post-warm-up iterations per chain of the rerun, see [`RETRY_N_ADAPT`](@ref).
+"""
+const RETRY_N_DRAWS = 2000
+
+"""
+Offsets that derive the rerun's `rng_seed` and `jitter_seed` from the original ones
+(wrapping multiplication by a 64-bit odd constant after adding the offset), so a
+retry is a deterministic function of the seeds and the data.
+"""
+const RETRY_SEED_OFFSET = UInt64(0x72657472795f7264)   # "retry_rd"
+
 # Several modes: grouping and bridge sampling
 
 """
@@ -454,9 +547,10 @@ Purpose tags of [`stream`](@ref BAYSOL.Runtime.stream):
 which use of randomness a stream is for.
 """
 const _RNG_MAP_STARTS = 1
-const _RNG_NUTS   = 2
+const _RNG_NUTS = 2
 const _RNG_JITTER = 3
 const _RNG_BRIDGE = 4
+const _RNG_MAP_JITTER = 5
 
 # The data a run starts from
 
@@ -503,7 +597,8 @@ include("Infer.jl")
 include("MAP.jl")
 
 export Seed, Inferred,
-    seed_sampler, infer, PROFILE, MARGINAL, ChainDiagnostics, DEFAULT_N_CHAINS,
+    seed_sampler, infer, PROFILE, MARGINAL, ChainDiagnostics, OptimumReport,
+    DEFAULT_N_CHAINS,
     ρₑ_prior, δρ_prior, prior_z_scores,
     ξ_priors, θ_prior_moments, profiled_corrs, excl_vol_saturation,
     WLSData, wls_fit

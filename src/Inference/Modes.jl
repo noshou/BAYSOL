@@ -27,9 +27,9 @@ when their pairwise R̂ ([`convergence`](@ref)) is at most
 """
 function chain_modes(cube::AbstractArray{<:Real,3})::Vector{Int}
     m = size(cube, 2)
-    # all chains agree (the usual case): one mode, one call
-    m == 1 || any(isnan, convergence(cube).rhat) ||
-        all(≤(MODE_RHAT), convergence(cube).rhat) && return ones(Int, m)
+    # (no shortcut for "the R̂ of all chains is below the limit": one chain far from nine
+    # others only raises the rank-normalized R̂ to about the limit, so it would be pooled)
+    m == 1 && return ones(Int, m)
     mode = zeros(Int, m)
     nmodes = 0
     for start in 1:m

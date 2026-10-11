@@ -198,7 +198,9 @@ end
         n_samples, n_adapt = 20, 10
         local fit
         t_nuts = @elapsed begin
-            fit = infer(seed, n_samples, n_adapt; l = PROFILE(), n_chains = 1)
+            fit = infer(
+                seed, n_samples, n_adapt; l = PROFILE(), n_chains = 1, retry = false,
+            )
         end
         samples, stats = fit.samples, fit.stats
         @info (

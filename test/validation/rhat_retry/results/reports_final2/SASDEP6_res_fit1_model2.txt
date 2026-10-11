@@ -1,0 +1,84 @@
+=== Run ===
+n_atoms         = 6150
+lMax            = 27
+n_q_raw         = 620
+n_q             = 178
+n_samples       = 4000
+n_adapt         = 2000
+rng_seed        = 6252506411145483830
+Dₘₐₓ            = 86.9 Å (atoms and hydration-shell beads)
+channels        = 8.0 (q range × D / π)
+rebin           = 22 per channel: 620 measured → 178 fitted points (0 non-positive dropped)
+iterations      = 16000
+mean_accept     = 0.9652
+tree_depth      = 3.81 (max 6)
+mean_n_steps    = 19.12
+EBFMI           = 0.8134
+cavity_frac     = 0.0297
+excl_vol_sat    = false
+divergence_rate = 0.0000
+chains          = 8 pooled of 8
+rhat_max        = 1.0019
+ess_min         = 3260
+ess_tail_min    = 2010
+retry           = first run R̂ 1.0127; reran with 2000 warm-up and 2000 draws per chain, rerun kept
+
+=== MAP ===
+log_density    = +111.493
+ρₑ             = +0.339244
+δρ₁            = -0.44232
+δρ₂            = +1.89292
+δρ₃            = -6.40716
+scale          = +2.8959e-05
+bkgrnd_corr    = -0.621729
+excl_vol_corr  = +1.22107
+χ²             = +2.88387
+
+=== Quantiles (16-84) ===
+param                 quantile_lo      quantile_hi         bound_lo         bound_hi
+log_density_Q            +107.998          +110.74         +107.998          +110.74
+ρₑ_Q                     +0.33889        +0.339708         +0.33889        +0.339708
+δρ₁_Q                   -0.466296        -0.430682        -0.466296        -0.430683
+δρ₂_Q                    +1.86837         +1.94203         +1.86837         +1.94203
+δρ₃_Q                    -6.77318         -6.23743         -6.77318         -6.23743
+scale_Q               +2.6917e-05     +3.00856e-05      +2.6917e-05     +3.00856e-05
+bkgrnd_corr_Q           -0.639573        -0.600113        -0.639573        -0.600115
+excl_vol_corr_Q          +1.22052         +1.22154         +1.22052         +1.22154
+χ²_Q                     +2.88405         +2.89121         +2.88405         +2.89121
+
+=== Standard deviations from prior (θ-space z-score) ===
+param                       z_MAP    z_quantile_lo    z_quantile_hi
+ρₑ_Z                    -0.274491         -1.15667        +0.880999
+δρ₁_Z                   -0.863778        -0.878908        -0.856393
+δρ₂_Z                    +3.25831         +3.00143         +4.01947
+δρ₃_Z                   -0.945307         -1.03109        -0.906576
+
+=== Timing ===                                            seconds    % wall    (JIT)
+wall clock  (seed_model → end of report)                     4.77     100.0    (0.0)
+  static build                                               0.58      12.1    (0.0)
+    resolve_structure                                     3.3e-05
+    propka                [cache hit]                     1.9e-04
+    pdb2pqr               [cache hit]                     9.7e-06
+    load_molecule                                         6.3e-03
+    SASA                                                     0.03
+    shannon (diameter, binning)                           1.3e-03
+    forward_cache                                            0.54
+      vacuum + excluded volume (vols + B_lm)                 0.17
+      hydration (B_lm)                                       0.37
+      Gram + r_m                                          7.2e-04
+    seed_sampler (priors, WLS)                            6.7e-05
+  sampling                                                   4.14      86.8    (0.1)
+    MAP search + whitening (70/64 starts, 2 modes)           0.07
+    NUTS setup (starts, Hamiltonian)                      8.4e-05
+    optima from the draws, 0 extra chains                    0.13
+    NUTS  (8k iters, 112.28k leapfrog, 0.013 ms/step)        0.58
+    per-draw c1 re-profile + curves (8000 draws)             0.02
+    MAP search + whitening (70/64 starts, 2 modes)           0.07
+    NUTS setup (starts, Hamiltonian)                      8.1e-05
+    optima from the draws, 0 extra chains                    0.10
+    NUTS  (32k iters, 529.73k leapfrog, 0.014 ms/step)       2.47
+    per-draw c1 re-profile + curves (32000 draws)            0.07
+    MAP + quantiles                                          0.63
+  report write                                            3.8e-03
+  unaccounted                                                0.05    (0.0)
+GC: 0.38 s

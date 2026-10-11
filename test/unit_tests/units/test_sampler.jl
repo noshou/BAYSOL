@@ -191,7 +191,7 @@ end
         θ = SVector(-1.1, 0.2, 0.9, 0.4)
         ẑ = SVector(0.3, -0.2, 0.1, 0.5)
         S = @SMatrix [2.0 0.1 0.0 0.0; 0.0 0.5 0.2 0.0; 0.0 0.0 1.5 0.3; 0.1 0.0 0.0 0.7]
-        sp = FIT._SamplingSpace(μ, σ, ẑ, S, 1, 1, true, 0, 0.0)
+        sp = FIT._SamplingSpace(μ, σ, ẑ, S, 1, 1, 1, true, 0, 0.0, FIT._Optimum{4,16}[])
         w = S \ (FIT._standardize(θ, pr) - ẑ)
         @test all(isapprox.(FIT._θ_of_w(w, sp), θ; rtol = 1e-12))
     end
@@ -322,16 +322,16 @@ end
         sp1 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x1234))
         sp2 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x1234))
         @test sp1.ẑ == sp2.ẑ && sp1.S == sp2.S && sp1.n_evals == sp2.n_evals
-        r1 = FIT.infer(seed, 40, 20; rng_seed = 7)
-        r2 = FIT.infer(seed, 40, 20; rng_seed = 7)
-        r3 = FIT.infer(seed, 40, 20; rng_seed = 8)
+        r1 = FIT.infer(seed, 40, 20; rng_seed = 7, retry = false)
+        r2 = FIT.infer(seed, 40, 20; rng_seed = 7, retry = false)
+        r3 = FIT.infer(seed, 40, 20; rng_seed = 8, retry = false)
         @test r1.samples == r2.samples
         @test r1.samples != r3.samples
         # Random.seed! before the call fixes the run when no rng_seed is given
         Random.seed!(3)
-        q1 = FIT.infer(seed, 40, 20)
+        q1 = FIT.infer(seed, 40, 20; retry = false)
         Random.seed!(3)
-        q2 = FIT.infer(seed, 40, 20)
+        q2 = FIT.infer(seed, 40, 20; retry = false)
         @test q1.samples == q2.samples
     end
 
@@ -339,7 +339,7 @@ end
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         for δ in (0, 100, -10, 150)
-            @test_throws DomainError FIT.infer(seed, 5, 2; δ = δ)
+            @test_throws DomainError FIT.infer(seed, 5, 2; δ = δ, retry = false)
         end
     end
 
@@ -377,7 +377,7 @@ end
                 FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
             Random.seed!(rng)
             n_samples, n_adapt = 60, 30
-            fit = FIT.infer(seed, n_samples, n_adapt; l = l, n_chains = 1)
+            fit = FIT.infer(seed, n_samples, n_adapt; l = l, n_chains = 1, retry = false)
             @test length(fit.samples) == n_samples
             @test length(fit.stats) == n_samples
             @test length(fit.c1) == n_samples
@@ -390,9 +390,9 @@ end
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         Random.seed!(42)
-        fit1 = FIT.infer(seed, 20, 10; l = FIT.PROFILE())
+        fit1 = FIT.infer(seed, 20, 10; l = FIT.PROFILE(), retry = false)
         Random.seed!(42)
-        fit2 = FIT.infer(seed, 20, 10; l = FIT.PROFILE())
+        fit2 = FIT.infer(seed, 20, 10; l = FIT.PROFILE(), retry = false)
         for i in eachindex(fit1.samples)
             @test all(fit1.samples[i] .== fit2.samples[i])
             @test fit1.stats[i].log_density == fit2.stats[i].log_density
@@ -403,7 +403,7 @@ end
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         n_samples, n_adapt = 60, 30
-        r = FIT.infer(seed, n_samples, n_adapt; rng_seed = 5)
+        r = FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, retry = false)
         d = r.diagnostics
         @test d.n_chains == FIT.DEFAULT_N_CHAINS == 8
         # chains 1 and 2 at the MAP, then mirrored pairs at the CHAIN_START_RADII
@@ -419,13 +419,25 @@ end
               FIT.chain_radius(9, 10) == 20
         # chains 1 and 2 start at the same point but are different chains
         @test r.samples[r.chain .== 1] != r.samples[r.chain .== 2]
-        # pooled chains are kept whole, chain after chain
+        # pooled chains come chain after chain, each with all its warm-up rows; with one
+        # posterior mode they are whole, with several the post-warm-up rows are thinned
+        # to the modes' shares (a chain never gains rows)
         pk = findall(d.pooled)
         @test !isempty(pk)
-        @test length(r.samples) == length(pk) * n_samples == length(r.stats) ==
-              length(r.c1) == size(r.curves, 2)
-        @test r.chain == vcat((fill(k, n_samples) for k in pk)...)
-        @test r.iteration == repeat(1:n_samples, length(pk))
+        @test length(r.samples) == length(r.stats) == length(r.c1) == size(r.curves, 2) ==
+              length(r.chain) == length(r.iteration)
+        @test issorted(r.chain) && unique(r.chain) == pk
+        for k in pk
+            it = r.iteration[r.chain .== k]
+            @test it[1:n_adapt] == 1:n_adapt && issorted(it) && allunique(it) &&
+                  maximum(it) ≤ n_samples
+        end
+        if length(d.mode_weight) == 1 && !d.weights_uncertain
+            @test r.chain == vcat((fill(k, n_samples) for k in pk)...)
+            @test r.iteration == repeat(1:n_samples, length(pk))
+        else
+            @test length(r.samples) ≤ length(pk) * n_samples
+        end
         @test length(d.rhat) == length(d.ess) == length(d.ess_tail) == 5
         @test d.rewhitened ≥ 0
         # every pooled chain is in a mode; the modes' shares
@@ -438,30 +450,152 @@ end
         @test d.weights_uncertain isa Bool &&
               (length(d.mode_weight) > 1 || !d.weights_uncertain)
         # one chain starts at the MAP
-        one = FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, n_chains = 1)
+        one = FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, n_chains = 1, retry = false)
         @test length(one.samples) == n_samples && one.diagnostics.start_scale == [0.0] &&
               one.diagnostics.mode == [1] && one.diagnostics.mode_weight == [1.0]
         # same seeds, same run, at one worker and at several
         # (a chain belongs to its index, not to a thread)
         again = BAYSOL.Runtime.with_workers(
-            () -> FIT.infer(seed, n_samples, n_adapt; rng_seed = 5),
+            () -> FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, retry = false),
             1,
         )
         @test again.samples == r.samples && again.chain == r.chain
         # the jitter seed is separate from the rng seed:
         # it changes the starts, the rng seed does not
-        @test FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, jitter_seed = 99).samples !=
+        @test FIT.infer(
+            seed,
+            n_samples,
+            n_adapt;
+            rng_seed = 5,
+            jitter_seed = 99,
+            retry = false,
+        ).samples !=
               r.samples
-        @test FIT.infer(seed, n_samples, n_adapt; rng_seed = 6).diagnostics.start_scale ==
-              d.start_scale
-        @test_throws DomainError FIT.infer(seed, n_samples, n_adapt; n_chains = 0)
+        other_seed = FIT.infer(seed, n_samples, n_adapt; rng_seed = 6, retry = false)
+        @test other_seed.diagnostics.start_scale == d.start_scale
+        @test_throws DomainError FIT.infer(
+            seed,
+            n_samples,
+            n_adapt;
+            n_chains = 0,
+            retry = false,
+        )
+    end
+
+    @testset "retry: a run with R̂ above the limit is rerun once, deterministically" begin
+        fw = smpl_fw()
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        # 60 iterations per chain are too few for R̂ ≤ 1.01 on this toy posterior
+        plain = FIT.infer(seed, 60, 30; rng_seed = 5, retry = false, n_chains = 2)
+        @test isnan(plain.diagnostics.first_rhat) && !plain.diagnostics.retry_kept &&
+              plain.diagnostics.n_adapt == 30
+        @test FIT._worst_rhat(plain.diagnostics) > FIT.RETRY_RHAT
+        r = FIT.infer(seed, 60, 30; rng_seed = 5, n_chains = 2)
+        d = r.diagnostics
+        @test d.first_rhat == FIT._worst_rhat(plain.diagnostics)
+        if d.retry_kept
+            @test d.n_adapt == FIT.RETRY_N_ADAPT
+            @test maximum(r.iteration) == FIT.RETRY_N_ADAPT + FIT.RETRY_N_DRAWS
+        else
+            @test d.n_adapt == 30 && r.samples == plain.samples
+        end
+        # same seeds, same result, retried or not
+        again = FIT.infer(seed, 60, 30; rng_seed = 5, n_chains = 2)
+        @test again.samples == r.samples && again.diagnostics.retry_kept == d.retry_kept
+        # the decision: only above the limit, only when on, only if the rerun is longer
+        big = (FIT.RETRY_N_ADAPT + FIT.RETRY_N_DRAWS, FIT.RETRY_N_ADAPT)
+        @test FIT._retry_needed(1.02, 1000, 300, true)
+        @test !FIT._retry_needed(1.005, 1000, 300, true)
+        @test !FIT._retry_needed(1.02, 1000, 300, false)
+        @test !FIT._retry_needed(1.02, big..., true)
+        @test FIT._retry_needed(Inf, 1000, 300, true)      # a run that could not be judged
+        @test !FIT._retry_needed(NaN, 1000, 300, true)
+    end
+
+    @testset "optima: farthest-point cover, shares and chains at an optimum" begin
+        rng = Xoshiro(1)
+        W = [0.0 0; 1 0; 10 0; 0 10; 10 10]
+        c = FIT._farthest_cover(W, 3, 1)
+        @test c[1] == 1 && allunique(c) && length(c) == 3 && 5 in c
+        @test length(FIT._farthest_cover(W, 10, 1)) == 5
+        # identical rows: nothing is farther than what is taken
+        @test FIT._farthest_cover(W[[1, 1], :], 2, 1) == [1]
+
+        I4 = @SMatrix [1.0 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1]
+        opt(lm; z = zeros(SVector{4}), λ = ones(SVector{4})) =
+            FIT._Optimum(z, 0.0, λ, I4, lm)
+        @test FIT._optimum_shares([opt(0.0), opt(log(0.25)), opt(NaN)]) ≈ [0.8, 0.2, 0.0]
+        @test FIT._optimum_shares([opt(NaN)]) == [0.0]
+        @test sum(FIT._optimum_shares([opt(3.0), opt(2.0), opt(-40.0)])) ≈ 1
+
+        # an optimum at z = (10,0,0,0) with unit curvature, whitened coordinates = z
+        sp = (ẑ = zeros(SVector{4}), S = I4)
+        o = opt(0.0; z = SVector(10.0, 0, 0, 0))
+        near = 0.3 .* randn(rng, 200, 4) .+ [10.0 0 0 0]
+        far = 0.3 .* randn(rng, 200, 4)
+        @test FIT._chains_at(o, sp, [near, far, near]) == 2
+        # 40 % of a chain's draws at the optimum is not at it (the limit is half)
+        @test FIT._chains_at(o, sp, [vcat(near[1:80, :], far[1:120, :])]) == 0
+        @test FIT._chains_at(o, sp, [vcat(near[1:120, :], far[1:80, :])]) == 1
+        # without a positive definite Hessian there is nothing to measure against
+        @test FIT._chains_at(opt(NaN; λ = SVector(NaN, 1, 1, 1)), sp, [near]) == 0
+    end
+
+    @testset "MAP search: the optima it found, and the harvest from draws" begin
+        fw = smpl_fw()
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        sp = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(5))
+        @test 1 ≤ length(sp.optima) ≤ FIT.MAP_MAX_BASINS
+        @test issorted([o.f for o in sp.optima])
+        # the MAP is one of them, and a Hessian with a finite mass exists for it
+        @test any(o -> o.z == sp.ẑ, sp.optima)
+        @test all(o -> isnan(o.logmass) || all(>(0), o.λ), sp.optima)
+        # a pure function of the seeds
+        sp2 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(5))
+        @test [o.z for o in sp2.optima] == [o.z for o in sp.optima] && sp2.ẑ == sp.ẑ
+
+        # draws around the MAP: the known optima come back, none is lost, and L-BFGS ran
+        rng = Xoshiro(2)
+        W = randn(rng, 300, 4)
+        opts, n_evals = FIT._harvest_optima(
+            seed, FIT.PROFILE(), sp, W, randn(rng, 300), falses(300),
+        )
+        @test n_evals > 0 && length(opts) ≥ length(sp.optima)
+        @test issorted([o.f for o in opts])
+        @test all(o -> any(p -> p.z == o.z, opts), sp.optima)
+        # nothing to harvest from
+        @test FIT._harvest_optima(
+            seed, FIT.PROFILE(), sp, zeros(0, 4), Float64[], Bool[],
+        ) == (sp.optima, 0)
+    end
+
+    @testset "infer: the optima of the run and the chains started at them" begin
+        fw = smpl_fw()
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        r = FIT.infer(seed, 60, 30; rng_seed = 5, retry = false)
+        d = r.diagnostics
+        @test d.n_chains == FIT.DEFAULT_N_CHAINS + d.n_extra
+        @test 0 ≤ d.n_extra ≤ FIT.OPTIMUM_MAX_EXTRA_CHAINS
+        @test length(d.pooled) == length(d.start_scale) == length(d.mode) == d.n_chains
+        @test !isempty(d.optima)
+        @test all(o -> o.share ≥ FIT.OPTIMUM_MIN_SHARE, d.optima)
+        @test issorted([o.share for o in d.optima]; rev = true)
+        @test sum(o.started for o in d.optima) == d.n_extra
+        # the chains started at an optimum come last, with their own streams
+        @test maximum(r.chain) ≤ d.n_chains
+        # a single chain is a single chain
+        one = FIT.infer(seed, 60, 30; rng_seed = 5, n_chains = 1, retry = false)
+        @test one.diagnostics.n_extra == 0 && one.diagnostics.n_chains == 1
+        # same seeds, same run
+        again = FIT.infer(seed, 60, 30; rng_seed = 5, retry = false)
+        @test again.samples == r.samples && again.diagnostics.n_extra == d.n_extra
     end
 
     @testset "MAP search: log π at the MAP, more starts, a start added by the caller" begin
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         sp = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x77))
-        @test FIT.MAP_N_STARTS == 32 && sp.n_ok ≥ 1
+        @test FIT.MAP_N_STARTS == 64 && sp.n_ok ≥ 1
         μ, σ = FIT.θ_prior_moments(seed.pr)
         @test sp.logπ ≈
               -FIT._neglogπ(sp.ẑ, μ, σ, seed, FIT.PROFILE(), FIT.EXCL_VOL_CORR_TOL)

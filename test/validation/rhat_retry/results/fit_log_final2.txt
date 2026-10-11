@@ -1,0 +1,92 @@
+
+=== fit: SASDA52
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDA52/SASDA52_fit1.jl
+Precompiling packages...
+  35912.2 ms  ✓ BAYSOL
+  1 dependency successfully precompiled in 36 seconds. 207 already precompiled.
+  2 dependencies precompiled but different versions are currently loaded (Mmap and Statistics). Restart julia to access the new versions. Otherwise, 19 dependents of these packages may trigger further precompilation to work with the unexpected versions.
+
+=== fit: SASDBS6
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDBS6/SASDBS6.jl
+
+=== fit: SASDCQ2
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDCQ2/SASDCQ2.jl
+
+=== fit: SASDD88
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDD88/SASDD88.jl
+
+=== fit: SASDEP6
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDEP6/SASDEP6.jl
+
+=== fit: SASDF42
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDF42/SASDF42.jl
+
+=== fit: SASDJ62
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDJ62/SASDJ62_model1.jl
+
+=== fit: SASDJ72
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDJ72/SASDJ72.jl
+
+=== fit: SASDJY2
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDJY2/SASDJY2.jl
+
+=== fit: SASDKQ8
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDKQ8/SASDKQ8.jl
+
+=== fit: SASDLP4
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDLP4/SASDLP4.jl
+
+=== fit: SASDMJ9
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDMJ9/SASDMJ9.jl
+
+=== fit: SASDMZ9
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDMZ9/SASDMZ9.jl
+
+=== fit: SASDN32
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDN32/SASDN32.jl
+
+=== fit: SASDP48
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDP48/SASDP48.jl
+
+=== fit: SASDR99
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDR99/SASDR99.jl
+
+=== fit: SASDRN5
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDRN5/SASDRN5.jl
+
+=== fit: SASDRW2
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDRW2/SASDRW2.jl
+┌ Warning: excluded-volume correction c1 saturated at the lower profiling bound
+│   c1 = 0.780000017393558
+└ @ BAYSOL.Pipeline ~/BAYSOL/src/Pipeline/RunModel.jl:285
+
+=== fit: SASDTK5
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDTK5/SASDTK5.jl
+
+=== fit: SASDUN5
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDUN5/SASDUN5.jl
+
+=== fit: SASDV94
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDV94/SASDV94_fit1.jl
+
+=== fit: SASDVG2
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDVG2/SASDVG2.jl
+
+=== fit: SASDWZ9
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDWZ9/SASDWZ9.jl
+
+=== fit: SASDX52
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDX52/SASDX52.jl
+
+=== fit: SASDYW6
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDYW6/SASDYW6_fit2.jl
+
+=== fit: SASDZC6
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDZC6/SASDZC6.jl
+
+=== fit: SASDZZ9
+$ julia --startup-file=no --project=/home/noso/BAYSOL/test/fitting_tests /home/noso/BAYSOL/test/fitting_tests/SASDZZ9/SASDZZ9_fit1.jl
+
+=== table
+$ /usr/bin/tclsh /home/noso/BAYSOL/test/utils/results_table.tcl --update
+updated the Results table in /home/noso/BAYSOL/test/fitting_tests/README.md

@@ -33,7 +33,7 @@ export nuts_replica, gradient_w, gradient_noise, local_curvature, lbfgs_starts,
     hessian_sensitivity,
     axis_scan, mode_table, shell_contrast_ablation, curve_chi2, ess, diagnose,
     tolerance_sweep,
-    warmup_study
+    warmup_study, chain_report
 
 # ---------------------------------------------------------------------------
 #                                   helpers
@@ -123,7 +123,8 @@ from the global RNG (the MAP starts, the step-size search and the sampler), whic
 # Keywords
 - `l = F.PROFILE()`, `n_samples = Pipeline.DEFAULT_N_SAMPLES`,
     `n_adapt = Pipeline.DEFAULT_N_ADAPT` (the `run_model`
-    defaults), `δ = 0.8` (target acceptance).
+    defaults), `δ = Inference.DEFAULT_TARGET_ACCEPT / 100` (target acceptance as a fraction,
+    the same constant `run_model` uses, so this tool cannot drift from the pipeline).
 - `c1_tol = F.EXCL_VOL_CORR_TOL`: tolerance for the NUTS log density
     and gradient (the MAP search always uses the package default).
 - `rng_seed = nothing`: `Random.seed!` this before NUTS.
@@ -138,7 +139,8 @@ from the global RNG (the MAP starts, the step-size search and the sampler), whic
 """
 function nuts_replica(seed::F.Seed; l = F.PROFILE(), c1_tol = F.EXCL_VOL_CORR_TOL,
     n_samples = R.DEFAULT_N_SAMPLES,
-    n_adapt = R.DEFAULT_N_ADAPT, δ = 0.8, rng_seed = nothing, sp = nothing)
+    n_adapt = R.DEFAULT_N_ADAPT, δ = F.DEFAULT_TARGET_ACCEPT / 100, rng_seed = nothing,
+    sp = nothing)
     n_adapt < n_samples || throw(ArgumentError("n_adapt must be < n_samples"))
     # seed first: the MAP starts (when `sp` is not given), the
     # step-size search and the sampler all draw from this RNG
@@ -933,6 +935,113 @@ function warmup_study(io::IO, seed::F.Seed; label = "",
         n_ess400 === nothing ? "none within $(size(R, 2))" : n_ess400,
     )
     return (; trace, adapt, draws, n_ess400)
+end
+
+# ---------------------------------------------------------------------------
+#                                 chain_report
+# ---------------------------------------------------------------------------
+
+"""
+    chain_report(io, seed; label, l, n_samples, n_adapt, rng_seed, rerun, max_listed)
+
+Runs [`Inference.infer`](@ref BAYSOL.Inference.infer) (all its chains, as `run_model`
+does) and prints, per chain: its start (signed distance from the MAP in posterior
+standard deviations), the posterior mode it settled in, whether it was pooled, and over
+its post-warm-up draws that were kept: the number of divergent transitions, the
+final step size, the mean leapfrog steps, the mean acceptance and the mean log π; then
+each divergent draw (ξ, log π against its chain's median, leapfrog steps, tree depth),
+at most `max_listed`. Shows which chains the divergences of a fit come from.
+
+Only the draws the pool keeps are seen: a chain in a mode that keeps no draws, or a
+chain that was not pooled, has none to report (its line says so). `rng_seed` is the run's
+(pass the `rng_seed` of a report's `=== Run ===` section to look at that very run). With
+`rerun = true` it is the run `infer` does when R̂ is above the limit instead (the
+`RETRY_N_ADAPT` / `RETRY_N_DRAWS` size, seeds from `Inference._retry_seeds`), whether or
+not that run was kept.
+
+# Returns
+- A vector of `(; k, start, mode, pooled, n_post, div, div_warm, ε, steps, accept,
+    logπ)`, one per chain; `div` and the other post-warm-up fields are `missing`
+    for a chain with no kept post-warm-up draws.
+
+# Exceptions
+- None beyond those of [`Inference.infer`](@ref BAYSOL.Inference.infer).
+"""
+function chain_report(io::IO, seed::F.Seed; label = "", l = F.PROFILE(),
+    n_samples = R.DEFAULT_N_SAMPLES, n_adapt = R.DEFAULT_N_ADAPT, rng_seed = 7,
+    rerun = false, max_listed = 12)
+    if rerun
+        base, jitter = F._retry_seeds(rng_seed % UInt64, F.DEFAULT_JITTER_SEED)
+        n_samples, n_adapt = F.RETRY_N_ADAPT + F.RETRY_N_DRAWS, F.RETRY_N_ADAPT
+        fit = F.infer(seed, n_samples, n_adapt; l, rng_seed = base, jitter_seed = jitter,
+            retry = false)
+    else
+        fit = F.infer(seed, n_samples, n_adapt; l, rng_seed, retry = false)
+    end
+    d = fit.diagnostics
+    na = d.n_adapt
+    println(io, label, ": ", d.n_chains, " chains, ", na, " warm-up + ",
+        n_samples - n_adapt,
+        " draws, rng_seed ", rng_seed, ", δ ", F.DEFAULT_TARGET_ACCEPT,
+        rerun ? "  (the rerun)" : "")
+    println(io, "chain  start σ   mode  pooled  kept  div  div%  warm-up div       ε",
+        "  steps  accept   mean log π")
+    out = NamedTuple[]
+    listed = String[]
+    for k in 1:d.n_chains
+        idx = findall(==(k), fit.chain)
+        post = filter(i -> fit.iteration[i] > na, idx)
+        warm = setdiff(idx, post)
+        st = fit.stats
+        wdiv = count(i -> st[i].numerical_error, warm)
+        if isempty(post)
+            @printf(io, "%5d  %+7.2f  %5d  %-6s  %4d  %s\n", k, d.start_scale[k],
+                d.mode[k], d.pooled[k] ? "yes" : "no", 0,
+                d.pooled[k] ? "no post-warm-up draws kept (negligible mode)" :
+                "not pooled: " * d.reason[k])
+            push!(
+                out,
+                (; k, start = d.start_scale[k], mode = d.mode[k],
+                    pooled = d.pooled[k], n_post = 0, div = missing, div_warm = wdiv,
+                    ε = missing, steps = missing, accept = missing, logπ = missing),
+            )
+            continue
+        end
+        nd = count(i -> st[i].numerical_error, post)
+        ld = [st[i].log_density for i in post]
+        row = (; k, start = d.start_scale[k], mode = d.mode[k], pooled = d.pooled[k],
+            n_post = length(post), div = nd, div_warm = wdiv,
+            ε = mean(st[i].step_size for i in post),
+            steps = mean(st[i].n_steps for i in post),
+            accept = mean(st[i].acceptance_rate for i in post), logπ = mean(ld))
+        push!(out, row)
+        @printf(io,
+            "%5d  %+7.2f  %5d  %-6s  %4d  %3d  %4.1f  %11d  %6.4f  %5.1f  %6.3f  %11.2f\n",
+            k, row.start, row.mode, "yes", row.n_post, nd, 100nd / row.n_post, wdiv,
+            row.ε, row.steps, row.accept, row.logπ)
+        med = median(ld)
+        for i in post
+            st[i].numerical_error || continue
+            push!(
+                listed,
+                @sprintf("  chain %d iteration %d  ξ = [%s]  log π %+.2f vs chain median \
+                %+.2f  steps %d  depth %d", k, fit.iteration[i],
+                    join((@sprintf("%.5g", x) for x in fit.samples[i]), ", "),
+                    st[i].log_density, med, st[i].n_steps, st[i].tree_depth)
+            )
+        end
+    end
+    tot = sum(r.n_post for r in out)
+    nd = sum(r -> ismissing(r.div) ? 0 : r.div, out)
+    @printf(io, "pooled kept draws: %d, divergent: %d (%.2f %%)\n", tot, nd,
+        tot == 0 ? 0.0 : 100nd / tot)
+    if !isempty(listed)
+        println(io, "divergent draws",
+            length(listed) > max_listed ?
+            " (first $max_listed of $(length(listed)))" : "", ":")
+        foreach(s -> println(io, s), first(listed, max_listed))
+    end
+    return out
 end
 
 end # module SeedDiagnostics
