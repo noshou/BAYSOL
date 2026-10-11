@@ -623,7 +623,7 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
             "MAP search: %.1fs  n_ok=%d/%d  n_modes=%d  whitened=%s",
             t_map,
             sp.n_ok,
-            F.MAP_N_STARTS,
+            sp.n_starts,
             sp.n_modes,
             sp.whitened
         )

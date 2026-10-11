@@ -1,12 +1,12 @@
 # Validation
 
-Slow, suite-wide checks that a change does what it should, run once per change against criteria written down before the run. They are not unit tests (those take seconds and run on every commit, `../unit_tests/`), not fitting tests (worked examples, `../fitting_tests/`) and not benchmarks (timings on a quiet machine, `../utils/bench.tcl`): a validation runs part of the fitting pipeline (the MAP search, the Hessian) on every fitting test, takes minutes of one core, and its verdict is a statement about distributions over the 53 fits, not about one fit.
+Slow, suite-wide checks that a change does what it should, run once per change against criteria written down before the run. They are not unit tests (those take seconds and run on every commit, `../unit_tests/`), not fitting tests (worked examples, `../fitting_tests/`) and not benchmarks (timings on a quiet machine, `../utils/bench.clj`): a validation runs part of the fitting pipeline (the MAP search, the Hessian) on every fitting test, takes minutes of one core, and its verdict is a statement about distributions over the 53 fits, not about one fit.
 
 ```bash
-tclsh dev/validate.tcl --list                       # the validations and the question each answers
-tclsh dev/validate.tcl map_fstop                    # prints the plan; runs nothing
-tclsh dev/validate.tcl map_fstop --approved         # runs it on every fitting test
-tclsh dev/validate.tcl map_fstop SASDMJ9 SASDBS6 --approved   # or on some
+bb validate --list                       # the validations and the question each answers
+bb validate map_fstop                    # prints the plan; runs nothing
+bb validate map_fstop --approved         # runs it on every fitting test
+bb validate map_fstop SASDMJ9 SASDBS6 --approved   # or on some
 ```
 
 Like the benchmark, a validation only runs with `--approved`, after the repository owner has approved that run.
@@ -24,5 +24,9 @@ Each validation is a folder with:
 | [`shannon_binning/`](shannon_binning.md) | Does fitting the curve binned to Shannon channels give the same answer as fitting every point? |
 | [`map_fstop/`](map_fstop.md) | Does stopping each MAP start on f (not only on the gradient) change what the MAP search finds? |
 | [`threading/`](threading.md) | Does threading a stage change what it computes (bit for bit) and is it faster? |
+| [`chains/`](chains.md) | Do eight chains converge to one posterior, is a better basin the MAP search missed found, and does pooling change the answer the single chain gives? |
+| [`optima_recall/`](optima_recall.md) | Does the MAP search find every optimum that carries probability mass, and which general rule for choosing the starts finds the ones it misses, at what cost? |
+| [`rhat_retry/`](rhat_retry.md) | Does a target acceptance of 95 % plus one longer rerun when R̂ is above 1.01 bring the 53 fits to converged, divergence-free posteriors without changing what they say? (Evidence is a full run of the fitting tests, no `validate.jl`.) |
+| [`c1_rootfind/`](c1_rootfind.md) | Does polishing c1 as the root of the analytic derivative locate the same minimum as `Brent()` with fewer passes? (Rejected and reverted; the criteria and the rows of the deciding run are kept, the script is not.) |
 
 The feature-level correctness of what a validation covers is a unit test (for example `test_shannon.jl`, and the f-stop test in `test_sampler.jl`); the validation answers whether the change is safe on real data.

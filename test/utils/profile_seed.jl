@@ -7,7 +7,7 @@
 # for frames in BAYSOL's own source. With `--nuts` it then does the same for the
 # sampling: one short run to warm the compiler, then a profiled `infer` of the
 # `run_model` default iterations (`Pipeline.DEFAULT_N_SAMPLES`, `DEFAULT_N_ADAPT`).
-# Started through `tclsh dev/profile.tcl ID[:tag] [--delay 0.0005] [--nuts]`;
+# Started through `bb profile ID[:tag] [--delay 0.0005] [--nuts]`;
 # development tooling, not a test.
 
 using Printf

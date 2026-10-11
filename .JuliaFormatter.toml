@@ -1,4 +1,4 @@
-# JuliaFormatter.jl settings (applied by `tclsh dev/format.tcl`). The aim is the 92-character line limit
+# JuliaFormatter.jl settings (applied by `bb dev/format.clj`). The aim is the 92-character line limit
 # with the least restyling: line breaks the author chose are kept wherever they fit.
 margin = 92
 indent = 4

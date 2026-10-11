@@ -2,11 +2,11 @@
 
 Does `infer` with the target acceptance raised from 80 % to 95 % and a single longer rerun when R̂ is above 1.01 (2000 warm-up and 2000 draws per chain, from seeds and jitter directions derived deterministically from the run's own) bring the 53 fits to converged, divergence-free posteriors without changing what they say?
 
-This is not run through `validate.tcl` (there is no `validate.jl`): the evidence is a full top-to-bottom run of the fitting tests, whose reports are tabulated by `test/utils/results_table.tcl --tsv`.
+This is not run through `validate.clj` (there is no `validate.jl`): the evidence is a full top-to-bottom run of the fitting tests, whose reports are tabulated by `test/utils/results_table.clj --tsv`.
 
 ```bash
-tclsh dev/fittings.tcl --table --threads 4,1                                  # all 53 fits at the defaults
-tclsh test/utils/results_table.tcl --tsv test/validation/rhat_retry/results/results_final.tsv
+bb fittings --table --threads 4,1                                  # all 53 fits at the defaults
+bb results-table --tsv test/validation/rhat_retry/results/results_final.tsv
 ```
 
 ## Evidence already in `results/` (the study that led to the design, 2026-10-10)

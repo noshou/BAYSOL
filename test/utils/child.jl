@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # The measured process of the cold/steady benchmark (see the Benchmarks
-# section of README.md). Do not run by hand: bench.tcl starts it in a fresh
+# section of README.md). Do not run by hand: bench.clj starts it in a fresh
 # process, in the right environment, and collects the JSON it prints.
 #
 #   julia --project=<repo> child.jl <repo> <ID[:tag]> [n_samples n_adapt]

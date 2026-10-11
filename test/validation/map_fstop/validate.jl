@@ -5,7 +5,7 @@
 # runs twice from the same starting points: with the f-stop (the default) and
 # with the gradient test alone (`f_abstol = 0`, as before). No sampling.
 #
-#   tclsh dev/validate.tcl map_fstop [ID ...] --approved
+#   bb validate map_fstop [ID ...] --approved
 #       (the entry point: prints its plan without --approved)
 #
 # which runs

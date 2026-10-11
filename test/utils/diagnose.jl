@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Sampler diagnostics on any SASBDB fitting test, without rerunning its fit or report.
-# Normally started through the Tcl front end, which checks the arguments first:
+# Normally started through the Babashka front end, which checks the arguments first:
 #
-#   tclsh dev/diagnose.tcl --<part> [options] ID[:tag] ...
+#   bb diagnose --<part> [options] ID[:tag] ...
 #
 # or directly:
 #
@@ -11,7 +11,7 @@
 #       --<part> [options] ID[:tag] ...
 #
 # Parts (the work is done by test/utils/seed_diagnostics.jl;
-# the options are listed in dev/diagnose.tcl):
+# the options are listed in dev/diagnose.clj):
 #   --report     MAP starts, Hessian, NUTS step size and depth,
 #                Laplace agreement, modes, gradient error
 #   --ablate     χ² with one shared shell contrast / δρ₁=δρ₂ + δρ₃ / the full model

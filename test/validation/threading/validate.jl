@@ -13,9 +13,9 @@
 #           warm wall time. (Not threaded any more: it was measured slower at 4 threads, see
 #           README.md; kept to show that the results do not depend on the thread count.)
 #
-#   tclsh dev/validate.tcl threading [ID ...] --threads 1 --approved
+#   bb validate threading [ID ...] --threads 1 --approved
 #       (the entry point: prints its plan without --approved)
-#   tclsh dev/validate.tcl threading [ID ...] --threads 4 --approved
+#   bb validate threading [ID ...] --threads 4 --approved
 #
 # which runs
 #

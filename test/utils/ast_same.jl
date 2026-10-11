@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Compares Julia files before and after a pure
-# re-flowing of lines (dev/linelen.tcl --verify):
+# re-flowing of lines (dev/linelen.clj --verify):
 #
 #   julia test/utils/ast_same.jl OLD_ROOT NEW_ROOT file.jl ...
 #
