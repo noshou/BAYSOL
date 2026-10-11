@@ -228,6 +228,15 @@ h1, h2, h3, h4, h5, h6 {
 #documenter .docs-sidebar ul.docs-menu {
     border-top: none;
 }
+// Documenter styles the sidebar scrollbars with `::-webkit-scrollbar` only, which Firefox
+// ignores: it drew the menu's scrollbar with its default light track, a white bar down the
+// sidebar's right edge. The standard properties give the scrollbar the sidebar's colours.
+#documenter .docs-sidebar,
+#documenter .docs-sidebar ul.docs-menu {
+    scrollbar-color: $documenter-sidebar-menu-hover-background
+        $documenter-sidebar-background;
+    scrollbar-width: thin;
+}
 
 nav.breadcrumb {
     font-family: $family-sans-serif;

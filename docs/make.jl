@@ -153,10 +153,23 @@ makedocs(
 )
 
 # Deploys only from CI (.github/workflows/docs.yml): a push to master builds
-# the "dev" docs, a pushed version tag builds that version and "stable".
+# the "dev" docs, a pushed version tag builds that version's folder.
 # Locally this prints "could not auto-detect the building environment" and
 # skips, which is expected.
+#
+# `versions` is what the version selector lists and where the site root goes. The root
+# redirects to the FIRST entry, and older releases get a "newer version available" banner
+# pointing at it, so the releases come first (`v#.#.#`: every release by its full number,
+# newest first: v0.3.0, v0.2.0, ...) and `dev` is last. There is deliberately no `stable`
+# and no per-minor alias (`v0.3`): Documenter's default,
+# `["stable" => "v^", "v#.#", "dev" => "dev"]`, would list `stable` and `v0.3` (symlinks to
+# the same build) and hide `v0.3.0`. Documenter still writes `v0.3`-style symlinks on
+# gh-pages (old links keep working); they are not in the selector.
+#
+# A release tag must be a plain `vX.Y.Z` (the release's name goes in the tag's message):
+# a suffix such as `v0.3.0-name` is a pre-release to Documenter and is never listed.
 deploydocs(
     repo = "github.com/noshou/BAYSOL.git",
     devbranch = "master",
+    versions = ["v#.#.#", "dev" => "dev"],
 )

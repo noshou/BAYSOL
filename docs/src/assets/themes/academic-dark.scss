@@ -286,6 +286,13 @@ html.theme--#{$themename} {
     #documenter .docs-sidebar ul.docs-menu {
         border-top: none;
     }
+    // Firefox ignores Documenter's `::-webkit-scrollbar` rules (see academic.scss).
+    #documenter .docs-sidebar,
+    #documenter .docs-sidebar ul.docs-menu {
+        scrollbar-color: $documenter-sidebar-menu-hover-background
+            $documenter-sidebar-background;
+        scrollbar-width: thin;
+    }
 
     nav.breadcrumb {
         font-family: $family-sans-serif;
