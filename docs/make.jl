@@ -152,6 +152,12 @@ makedocs(
     # shipping a dead link.
 )
 
+# The release under the sidebar title on every page: `v0.3.0-wʋsg_n_yɩɩda` on a tag build
+# (the tag and its message; .github/workflows/docs.yml fetches the annotated tag), `dev`
+# otherwise. See release_label.jl.
+include(joinpath(@__DIR__, "release_label.jl"))
+stamp_release_label(joinpath(@__DIR__, "build"), release_label(REPO_ROOT))
+
 # Deploys only from CI (.github/workflows/docs.yml): a push to master builds
 # the "dev" docs, a pushed version tag builds that version's folder.
 # Locally this prints "could not auto-detect the building environment" and
