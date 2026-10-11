@@ -1,0 +1,54 @@
+;; Task shortcuts for the dev tools: `bb tasks` lists them and `bb <task> args...` runs one,
+;; passing the arguments on (`bb fittings SASDMJ9 --report` is
+;; `bb dev/fittings.clj SASDMJ9 --report`). The scripts do not need this file; they also
+;; run directly, from any directory, as `bb dev/precommit.clj --quick`.
+{:tasks
+    {:init
+        (defn script
+            "Runs the Babashka script at `path` with the arguments given to the task."
+            [path]
+            (apply shell "bb" path *command-line-args*)),
+        ;; run the fitting tests and what hangs off them
+        fittings {:doc "Run fitting tests: [ID ...] --report --table --fixme --bench",
+            :task (script "dev/fittings.clj")},
+        diagnose {:doc "Sampler diagnostics on fits: --report --ablate --chains ...",
+            :task (script "dev/diagnose.clj")},
+        validate {:doc "Slow suite-wide validations (--approved runs them)",
+            :task (script "dev/validate.clj")},
+        profile {:doc "Profile the static build of fitting tests",
+            :task (script "dev/profile.clj")},
+        vis {:doc "The visual checks of the geometry code", :task (script "dev/vis.clj")},
+        ;; tests, checks and the build
+        unit {:doc "The Julia unit suite (names pick the files: bb unit shannon wls)",
+            :task (apply shell
+                (or (System/getenv "JULIA") "julia")
+                "--startup-file=no" "--project=test"
+                "dev/unittests.jl" *command-line-args*)},
+        test {:doc "The tests of the dev tools (names pick the files: bb test compare)",
+            :task (script "dev/tests.clj")},
+        precommit {:doc "Every check before a commit (--quick: only the fast ones)",
+            :task (script "dev/precommit.clj")},
+        docs {:doc "Build the documentation site (strict, ~20 s) into docs/build",
+            :task (shell (or (System/getenv "JULIA") "julia")
+                "--startup-file=no"
+                "--project=docs"
+                "docs/make.jl")},
+        ;; format, lint, layout
+        fmt {:doc "Format the Julia and Clojure code (Clojure: zprint, 4-space layout)",
+            :task (apply shell "bb" "dev/format.clj" "--apply" *command-line-args*)},
+        fmt-check {:doc "List the files that are not formatted; exit 1 if any",
+            :task
+            (apply shell "bb" "dev/format.clj" "--check" *command-line-args*)},
+        lint {:doc "Lint the Clojure code (clj-kondo, settings in .clj-kondo/config.edn)",
+            :task (shell "clj-kondo" "--lint" "dev" "test/utils")},
+        linelen {:doc "Lines over 92 characters: --check, --reflow, --snapshot, --verify",
+            :task (script "dev/linelen.clj")},
+        ;; results and benchmarks
+        results-table {:doc "The Results table: --update, --check, --tsv FILE, or IDs",
+            :task (script "test/utils/results_table.clj")},
+        compare {:doc "Compare fitting-test results between git revisions",
+            :task (script "test/utils/compare.clj")},
+        bench {:doc "The cold/steady benchmark (prints its plan without --approved)",
+            :task (script "test/utils/bench.clj")},
+        extract-formfactor {:doc "Rebuild the form-factor table from xraydb.sqlite",
+            :task (script "test/utils/extract_formfactor.clj")}}}

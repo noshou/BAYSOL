@@ -3,7 +3,7 @@
 # Does the MAP search find every optimum of the posterior that carries probability
 # mass, and which general rule finds the ones it misses, at what cost?
 #
-#   tclsh dev/validate.tcl optima_recall [ID ...] --approved
+#   bb validate optima_recall [ID ...] --approved
 #       (the entry point: prints its plan without --approved)
 #
 # which runs

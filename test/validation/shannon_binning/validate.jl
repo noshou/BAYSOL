@@ -6,7 +6,7 @@
 # with those found on the curve binned to k bins per Shannon channel, at the
 # same band limit lMax. No sampling: only the MAP search and its Hessian.
 #
-#   tclsh dev/validate.tcl shannon_binning [ID ...] --approved
+#   bb validate shannon_binning [ID ...] --approved
 #       (the entry point: prints its plan without --approved)
 #
 # which runs
@@ -24,7 +24,7 @@
 # the binned fit has the *better* χ² (the unbinned reference MAP search missed the best
 # basin). Those criteria were therefore replaced, after the data was seen, by
 # distribution-level ones on a fresh full rerun of the 53 fits compared with the
-# committed unbinned results (`test/utils/compare.tcl`): fit quality (χ² on the measured
+# committed unbinned results (`test/utils/compare.clj`): fit quality (χ² on the measured
 # grid), the distribution of the fitted parameters, and the health of the regression
 # (see the Shannon section of src/Inference/README.md). The rows below stay as evidence.
 #

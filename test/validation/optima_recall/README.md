@@ -3,8 +3,8 @@
 Does the MAP search find every optimum of the posterior that carries probability mass, and if it misses some, which general rule for choosing the L-BFGS starts finds them, at what cost?
 
 ```bash
-tclsh dev/validate.tcl optima_recall --approved --threads 4,1        # all 53 fits
-tclsh dev/validate.tcl optima_recall SASDX52 --approved --threads 4,1   # or some
+bb validate optima_recall --approved --threads 4,1        # all 53 fits
+bb validate optima_recall SASDX52 --approved --threads 4,1   # or some
 ```
 
 The script (`validate.jl`) writes `results/optima_recall-<stamp>.tsv` (one row per fit, rule and seed) and `results/optima_recall-<stamp>_optima.tsv` (one row per reference optimum), and prints its verdict against the criteria below. It runs the fit's `Seed` only (no plots, no report) and the sampler a few times for the harvest rule.

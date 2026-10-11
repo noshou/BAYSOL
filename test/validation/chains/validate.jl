@@ -6,7 +6,7 @@
 # each RNG seed, `infer` runs with the defaults (8 chains) and with `n_chains = 1`,
 # and the pooled post-warm-up draws are compared with the single chain's.
 #
-#   tclsh dev/validate.tcl chains [ID ...] --approved
+#   bb validate chains [ID ...] --approved
 #       (the entry point: prints its plan without --approved)
 #
 # which runs

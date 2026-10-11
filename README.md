@@ -9,15 +9,4 @@ BAYSOL builds the five-species (vacuum, excluded volume, convex/concave/cavity h
 - Several threads: start Julia with `julia -t auto` (or `-t 6,1`) to use them; results are bit-identical at any thread count. What is threaded and what it buys: the Parallel section of the [Runtime guide](src/Runtime/README.md)
 - Test runners and developer tools (fitting tests, result comparison, sampler diagnostics, benchmarks): [dev](dev/README.md), [test/utils](test/utils/README.md)
 
-```
-# unit tests
-julia --project=test dev/unittests.jl
-
-# example of an end-to-end fit
-julia --project=test/fitting_tests test/fitting_tests/SASDMJ9/SASDMJ9.jl
-
-# build the docs (copies src/*/README.md into docs/src/guides/ and the test READMEs into docs/src/testing/)
-julia --project=docs docs/make.jl
-```
-
  BAYSOL’s reported parameters and uncertainties are conditional on the gaussian scattering model, measurement errors, and priors. Validation across 53 fits and three synthetic cases found no general justification for global error inflation, while an experimental correlated-discrepancy model risked absorbing systematic misfit and shifting estimates.

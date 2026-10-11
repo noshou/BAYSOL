@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Tests for test/utils/seed_diagnostics.jl, the sampler diagnostics
-# used on the SASBDB fitting tests (through dev/diagnose.tcl). They run
+# used on the SASBDB fitting tests (through dev/diagnose.clj). They run
 # on a small toy seed so that the diagnostics cannot rot unnoticed; the
 # numbers they produce on real fits are not asserted here.
 

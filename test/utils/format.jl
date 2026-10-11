@@ -2,7 +2,7 @@
 
 # Formats Julia files with JuliaFormatter.jl to the settings of the
 # repository's .JuliaFormatter.toml (92 characters per line, the author's
-# line breaks kept wherever they fit). Started by dev/format.tcl:
+# line breaks kept wherever they fit). Started by dev/format.clj:
 #
 #   julia --project=test/format test/utils/format.jl (--apply|--check) FILE_OR_DIR ...
 #

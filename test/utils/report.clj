@@ -1,0 +1,227 @@
+;; SPDX-License-Identifier: LGPL-3.0-or-later
+
+;; Parsing one fitting-test report (`res*.txt`) into a map of numbers. A value a report
+;; format lacks is the empty string, so "defined" means `(seq v)`. The map carries its
+;; keys in first-seen order as metadata (`(:order (meta r))`), since the TSV columns
+;; follow that order.
+;;
+;; Every pattern below finds the last number on its line: after a greedy `.*` comes
+;; `\s`, then the number.
+
+(ns report
+    (:require [clojure.string :as str]
+        [common :refer [as-number num-re]]))
+
+;; In a pattern, @N@ and @FLP@ are a number (one capture group), @NUM@ the same without
+;; a capture group (to skip a column), @QTY@ a number with an optional k (x1000) or
+;; M (x1000000) suffix (one capture group).
+(def ^:private tokens
+    {"@N@" num-re,
+        "@FLP@" num-re,
+        "@NUM@" "[-+]?\\d+\\.?\\d*(?:[eE][-+]?\\d+)?",
+        "@QTY@" "([-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][-+]?\\d+)?[kM]?)"})
+
+;; The compiled pattern with its tokens replaced. Line mode by default (`(?m)`: ^ and $
+;; match at line ends; `(?d)`: only \n ends a line; `.` stops at a newline), the mode
+;; of a line-oriented tool. Memoized: a report is read with ~150 patterns.
+(def ^:private rx
+    (memoize (fn [pat & [flags]]
+            (re-pattern (str (or flags "(?md)")
+                    (reduce-kv str/replace (str pat) tokens))))))
+
+(defn- grab
+    "First capture group of `pat` in `text`, \"\" if absent."
+    [text pat]
+    (or (second (re-find (rx pat) text)) ""))
+
+(defn- qty
+    "'496.68k' -> 496680.0, '1.2M' -> 1.2e6, rounded to 6 decimals (so 8.03k is exactly
+    8030.0, not 8029.999999999999)."
+    [tok]
+    (let [scale (case (last tok)
+                \k 1e3
+                \M 1e6
+                1.0)
+            x (parse-double (str/replace tok #"[kM]+$" ""))]
+        (/ (double (Math/round (* x scale 1e6))) 1e6)))
+
+(defn- whole
+    "x as an integer when it is a whole number."
+    [x]
+    (if (== x (Math/floor x)) (long x) x))
+
+;; The one-line quantities of a report as [key pattern ...]. A line a report lacks
+;; gives "".
+(def ^:private entries
+    [:n_atoms #"^n_atoms\s+= (\d+)" :lMax #"^lMax\s+= (\d+)" :n_q_raw
+        #"^n_q_raw\s+= (\d+)" :n_q #"^n_q\s+= (\d+)" :n_samples #"^n_samples\s+= (\d+)"
+        :n_adapt #"^n_adapt\s+= (\d+)" :rng_seed #"^rng_seed\s+= (\d+)" :dmax
+        #"^Dₘₐₓ\s+= @FLP@ Å" :channels #"^channels\s+= @FLP@" :rebin_per_channel
+        #"^rebin\s+= (\d+) per channel" :rebin_measured
+        #"^rebin\s+= \d+ per channel: (\d+) measured" :rebin_fitted
+        #"^rebin\s+= \d+ per channel: \d+ measured → (\d+) fitted points"
+        :rebin_dropped
+        (str #"^rebin\s+= \d+ per channel: \d+ measured → "
+            #"\d+ fitted points \((\d+) non-positive dropped\)") :iterations
+        #"^iterations\s+= (\d+)" :accept #"^mean_accept\s+= @FLP@" :depth
+        #"^tree_depth\s+= @FLP@" :depth_max #"^tree_depth\s+=[^\n]*\(max (\d+)\)"
+        :steps #"^mean_n_steps\s+= @FLP@" :ebfmi #"^EBFMI\s+= @FLP@" :cavity_frac
+        #"^cavity_frac\s+= @FLP@" :sat #"^excl_vol_sat\s+= (\w+)" :div
+        #"^divergence_rate\s+= @FLP@" :chains_pooled #"^chains\s+= (\d+) pooled of \d+"
+        :chains_total #"^chains\s+= \d+ pooled of (\d+)" :rhat_max
+        #"^rhat_max\s+= @FLP@" :ess_min #"^ess_min\s+= @FLP@" :ess_tail_min
+        #"^ess_tail_min\s+= @FLP@" :modes #"^modes\s+= (\d+)" :optima
+        #"^optima\s+= (\d+) with mass" :lgdn_MAP #"^log_density\s+= @FLP@" :rho_e_MAP
+        #"^ρₑ\s+= @FLP@" :dro1_MAP #"^δρ₁\s+= @FLP@" :dro2_MAP #"^δρ₂\s+= @FLP@"
+        :dro3_MAP #"^δρ₃\s+= @FLP@" :scale_MAP #"^scale\s+= @FLP@" :bkgrnd_MAP
+        #"^bkgrnd_corr\s+= @FLP@" :excl_MAP #"^excl_vol_corr\s+= @FLP@" :chi2_MAP
+        #"^χ²\s+= @FLP@" :quantile_lo #"^=== Quantiles \((\d+)-\d+\) ===" :quantile_hi
+        #"^=== Quantiles \(\d+-(\d+)\) ==="
+        ;; the `=== Timing ===` section
+        :wall #"^wall clock.*\s@FLP@\s+100\.0" :static_build
+        #"^\s+static build\s+@FLP@" :resolve_structure #"^\s+resolve_structure\s+@FLP@"
+        :propka #"^\s+propka.*\s@FLP@\s*$" :pdb2pqr #"^\s+pdb2pqr.*\s@FLP@\s*$"
+        :load_molecule #"^\s+load_molecule\s+@FLP@" :sasa #"^\s+SASA\s+@FLP@" :shannon
+        #"^\s+shannon \(diameter, binning\)\s+@FLP@" :fwd #"^\s+forward_cache\s+@FLP@"
+        :vacuum_excluded #"^\s+vacuum \+ excluded volume \(vols \+ B_lm\)\s+@FLP@"
+        :hydration #"^\s+hydration \(B_lm\)\s+@FLP@" :gram_rm
+        #"^\s+Gram \+ r_m\s+@FLP@" :seed_fitting
+        #"^\s+seed_(?:fitting|sampler) \(priors, WLS\)\s+@FLP@" :sampling
+        #"^\s+sampling\s+@FLP@" :map_s #"^\s+MAP search \+ whitening .*\)\s+@FLP@\s*$"
+        :nuts_setup #"^\s+NUTS setup \(.*\)\s+@FLP@\s*$" :nuts
+        #"^\s+NUTS\s+\(.*\)\s+@FLP@\s*$" :reprofile
+        #"^\s+per-draw c1 re-profile.*\)\s+@FLP@\s*$" :map_quantiles
+        #"^\s+MAP \+ quantiles\s+@FLP@" :report_write #"^\s+report write\s+@FLP@"
+        :unaccounted #"^\s+unaccounted\s+@FLP@" :gc #"^GC: @FLP@" :map_starts_ok
+        #"^\s+MAP search \+ whitening \((\d+)/\d+ starts" :map_starts_total
+        #"^\s+MAP search \+ whitening \(\d+/(\d+) starts" :map_modes
+        #"^\s+MAP search \+ whitening \(\d+/\d+ starts, (\d+) modes?"
+        ;; counts with a k or M suffix, stored as plain numbers
+        :nuts_iters #"^\s+NUTS\s+\(@QTY@ iters" :leapfrog
+        #"^\s+NUTS\s+\(\S+ iters, @QTY@ leapfrog" :ms_per_step
+        #"^\s+NUTS\s+\(\S+ iters, \S+ leapfrog, @QTY@ ms/step\)" :draws
+        #"^\s+per-draw c1 re-profile.*\((\d+) draws\)"])
+
+;; The parameter rows: [prefix label]. Each has the quantile and bound columns of the
+;; `=== Quantiles ===` table; the four with a prior also the z-score columns.
+(def ^:private params
+    [[:lgdn "log_density"] [:rho_e "ρₑ"] [:dro1 "δρ₁"] [:dro2 "δρ₂"] [:dro3 "δρ₃"]
+        [:scale "scale"] [:bkgrnd "bkgrnd_corr"] [:excl "excl_vol_corr"] [:chi2 "χ²"]])
+
+(defn- columns
+    "[key pattern] pairs for the columns `cols` of the table rows labelled `<label>_<tag>`
+    of the parameters `ps`: column i is the (i+1)-th number after the label."
+    [ps tag cols]
+    (for [[p label] ps
+            [i col] (map-indexed vector cols)]
+        [(keyword (str (name p) "_" col))
+            (str "^" label "_" tag "\\s+" (str/join (repeat i "@NUM@\\s+")) "@FLP@")]))
+
+(def ^:private table-entries
+    (concat (columns params "Q" ["QUANT_LO" "QUANT_HI" "BOUND_LO" "BOUND_HI"])
+        (columns (subvec params 1 5) "Z" ["Z_MAP" "Z_QUANT_LO" "Z_QUANT_HI"])))
+
+;; Later passes re-read lines the ones above already took, so a key set twice keeps its
+;; first position and takes the last value (see `put`). Patterns here use @N@: the
+;; values are the ones the tools compare.
+(def ^:private sampler-quality
+    [:div #"^divergence_rate = @N@" :steps #"^mean_n_steps\s+= @N@" :depth
+        #"^tree_depth\s+= @N@" :accept #"^mean_accept\s+= @N@" :ebfmi
+        #"^EBFMI\s+= @N@"])
+
+(def ^:private fit-quality
+    [:chi2 #"^χ²\s+= @N@" :c1 #"^excl_vol_corr\s+= @N@" :sat
+        #"^excl_vol_sat\s+= (\w+)" :rho_e #"^ρₑ\s+= @N@" :d1 #"^δρ₁\s+= @N@" :d2
+        #"^δρ₂\s+= @N@" :d3 #"^δρ₃\s+= @N@"])
+
+(def ^:private timing
+    [:wall #"^wall clock.*\s@N@\s+100\.0" :fwd #"^\s+forward_cache\s+@N@" :propka
+        #"^\s+propka.*\s@N@\s*$" :pdb2pqr #"^\s+pdb2pqr.*\s@N@\s*$" :map_s
+        #"^\s+MAP search \+ whitening .*\)\s+@N@\s*$" :reprofile
+        #"^\s+per-draw c1 re-profile.*\)\s+@N@\s*$" :gc #"^GC: @N@"])
+
+(def ^:private n-modes-re #"MAP search \+ whitening \(\d+/\d+ starts, (\d+) modes?")
+
+(def ^:private share-re
+    #"^mode_\d+\s+= chains [\d,]+, share ([\d.]+(?:e[-+]?\d+)?)")
+
+;; "NUTS  (2k iters, 496.68k leapfrog, 0.2 ms/step)   <seconds>"
+(def ^:private nuts-re
+    #"NUTS  \(([\d.]+k?) iters, ([\d.]+[kM]?) leapfrog, ([\d.]+) ms/step\)\s+@N@")
+
+;; The map being built, with its keys in first-seen order: {:ks [k ...] :m {k v ...}}.
+(defn- put
+    [st k v]
+    (-> st
+        (update :ks #(if (contains? (:m st) k) % (conj % k)))
+        (assoc-in [:m k] v)))
+
+(defn- puts [st kvs] (reduce (fn [s [k v]] (put s k v)) st kvs))
+
+(defn- grabs
+    "[key value] pairs from the flat [key pattern ...] list."
+    [text kv-flat]
+    (for [[k pat] (partition 2 kv-flat)] [k (grab text pat)]))
+
+(defn- by-value
+    "The largest (`max-key`) or smallest value among the strings `shares`, as a number,
+    \"\" if there are none."
+    [pick shares]
+    (if (seq shares) (as-number (apply pick parse-double shares)) ""))
+
+(defn parse
+    "The numbers of one report as a map; a key is \"\" where a revision's format lacks it."
+    [text]
+    (let [g (partial grab text)
+            ;; a quantity with a k or M suffix is stored as the plain number
+            quantity (fn [[k pat]]
+                (let [v (g pat)]
+                    [k
+                        (if (and (str/includes? (str pat) "@QTY@") (seq v))
+                            (whole (qty v))
+                            v)]))
+            ;; the mass shares of the posterior modes (each has a `mode_<k>` line)
+            shares (map second (re-seq (rx share-re) text))
+            ;; the NUTS line: groups are iterations, leapfrog steps, ms/step, seconds
+            [_ _ leap ms secs] (re-find (rx nuts-re) text)
+            ;; the z-score of the MAP δρ₃ from the prior: the number after its row
+            ;; label. The label is found first (lazily, across lines), then the number
+            ;; after it; a later δρ₃ label is not tried if the first has no number.
+            z3 (let [m (re-matcher #"(?ms)=== Standard deviations from prior.*?^δρ₃"
+                        text)]
+                (if (.find m) (grab (subs text (.end m)) #"\A\s*@N@") ""))
+            st (puts {:ks [], :m {}}
+                (concat (map quantity (partition 2 entries))
+                    (map quantity table-entries)
+                    [[:mode_share_max (by-value max-key shares)]
+                        [:mode_share_min (by-value min-key shares)]
+                        ;; chains that were not pooled (a `chain_dropped` line
+                        ;; each)
+                        [:chains_dropped
+                            (count (re-seq (rx #"^chain_dropped\s+=") text))]]
+                    (grabs text sampler-quality)
+                    (grabs text fit-quality)))
+            ;; the Shannon-binned fit's χ² on the measured grid (reports since Shannon
+            ;; binning only), and the χ² every comparison uses: that one when there is
+            ;; one, else the (unbinned) fit's own
+            raw (g #"^measured grid\s+lag-1.*χ²_red\s+@N@")
+            st (puts st
+                (concat [[:chi2_raw raw]
+                        [:chi2_cmp (if (seq raw) raw (get-in st [:m :chi2]))]]
+                    (grabs text timing)
+                    [[:leapfrog (if leap (qty leap) "")]
+                        [:ms_step (or ms "")] [:nuts (or secs "")]
+                        ;; reports since the `_Z` row labels have it in its own key
+                        [:z3 (if (seq z3) z3 (get-in st [:m :dro3_Z_MAP]))]
+                        ;; number of distinct local optima the MAP search found
+                        [:n_modes (g n-modes-re)]]))
+            {:keys [wall propka pdb2pqr]} (:m st)
+            or-zero #(if (seq %) (as-number %) 0)
+            ;; wall clock without the PROPKA / pdb2pqr subprocesses, the convention for
+            ;; every comparison
+            st (put st
+                :wall_ex
+                (if (seq wall)
+                    (- (as-number wall) (or-zero propka) (or-zero pdb2pqr))
+                    ""))]
+        (with-meta (:m st) {:order (:ks st)})))

@@ -1,4 +1,4 @@
-# Depositor's fit quality for each run in the Results table of README.md (read by test/utils/results_table.tcl).
+# Depositor's fit quality for each run in the Results table of README.md (read by test/utils/results_table.clj).
 # One line per run, tab-separated: the run label as the table shows it, then the depositor's χ² and the method
 # that produced it. The members of one deposited multi-model fit repeat the same text; the table prints a
 # repeat as ″. This is the only column of the table that is not computed from the reports.
