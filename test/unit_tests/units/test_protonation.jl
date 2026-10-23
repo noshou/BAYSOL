@@ -1,18 +1,18 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Exercises the Henderson-Hasselbalch protonation helpers in
-# src/MolecularStructure/Pdb2pqr.jl (used to choose pdb2pqr's
+# src/Hydrogenator/Propka.jl (used to choose pdb2pqr's
 # --neutraln/--neutralc terminus flags).
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.MolecularStructure: MolecularStructure
+using BAYSOL.Hydrogenator: Hydrogenator
 
 include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
 
-const _fraction_protonated   = MolecularStructure._fraction_protonated
-const _fraction_deprotonated = MolecularStructure._fraction_deprotonated
-const _group_protonated      = MolecularStructure._group_protonated
+const _fraction_protonated   = Hydrogenator._fraction_protonated
+const _fraction_deprotonated = Hydrogenator._fraction_deprotonated
+const _group_protonated      = Hydrogenator._group_protonated
 
 # Independent re-derivation of the HH fraction formulas, not a call into the
 # functions under test wearing a different hat.

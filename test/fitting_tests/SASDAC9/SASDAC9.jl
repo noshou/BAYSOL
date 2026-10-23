@@ -1,0 +1,453 @@
+using Statistics
+using Random
+using BAYSOL
+using BAYSOL.MolecularStructure: LocalPathSource
+using BAYSOL.BulkElectronDensity: Solute, NonBiological, DEFAULT_TEMPERATURE_C
+include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
+
+const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDAC9")
+const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDAC9.dat")
+
+# ---------------------------------------------------------------------------
+#                                 Source
+# ---------------------------------------------------------------------------
+#
+# SASBDB SASDAC9: Crystal structure of the Varkud satellite ribozyme (the catalytically
+# inactive G638A construct, a dimer of 186 nt chains, 120.3 kDa).
+#
+# Paper: Suslov NB, DasGupta S, Huang H, et al., Nat Chem Biol (2015), DOI
+# 10.1038/nchembio.1929. SASBDB entry: https://www.sasbdb.org/data/SASDAC9/ (the buffer,
+# pH and instrument below are the SASBDB entry metadata; the paper was not consulted for
+# them).
+#
+# Sample: 1.5-4.5 mg/ml series, extrapolated to infinite dilution. Instrument: Advanced
+# Light Source 12.3.1 (SIBYLS) (X-ray synchrotron), Pilatus3 X 2M, wavelength 0.103 nm =
+# 1.03 Å => energy = hc/λ ≈ 12038 eV (hc = 12398.42 eV·Å). SASBDB gives no temperature
+# for this entry, so the package default (`DEFAULT_TEMPERATURE_C`, 25 °C) is used.
+#
+# Buffer as deposited: "10 mM Tris 25 mM KCl 5 mM MgCl2", pH 7.5. The measured
+# macromolecule is deliberately NOT a solute (see BulkElectronDensity.Solute).
+#
+# Curve units: the SASBDB .dat is in nm⁻¹ (q 0.21-3.24 nm⁻¹, 2 header lines, 4 trailer
+# lines) and is converted to Å⁻¹ (÷10). The model is the 12092-atom crystal-structure
+# dimer (chains A and B; 4026 hydrogens, a GDP ligand, 22 waters, 10 Mg²⁺, 10 K⁺ and 68
+# MO6 atoms as HETATM). The depositor's fit is a FoXS profile with χ² = 680 (Chi = 26.08;
+# the model describes the data poorly); the entry is kept on purpose as a stress test.
+# ---------------------------------------------------------------------------
+
+qvals, I_exp, σ_exp = _read_curve(_DATA_PATH)
+
+# qvals are in nm⁻¹; must convert to Å⁻¹.
+qvals = qvals ./ NM_INV_PER_ANGSTROM_INV
+check_q_angstrom(qvals)
+
+# ---------------------------------------------------------------------------
+#                            Solution conditions
+# ---------------------------------------------------------------------------
+
+const PH, σ_PH      = 7.5, PH_METER_SIGMA
+const ENERGY_EV     = HC_EV_ANGSTROM / 1.03   # ≈ 12038 eV, from the stated 0.103 nm
+const TEMPERATURE_C = DEFAULT_TEMPERATURE_C   # none recorded in SASBDB
+
+# Buffer components (the measured macromolecule is deliberately NOT listed: ρₑ is the
+# buffer's electron density). Counter-ions. Setting the pH adds titrant
+# counter-ions that the deposited recipe does not list. Assumed: 10 mM Tris titrated with
+# HCl -> Cl⁻ = C·0.846 (pK(22 °C) = 8.156). The pH is taken as set at room temperature (22
+# ± 3 °C), which fixes the counter-ion amount whatever the measurement temperature. pK(T)
+# from Goldberg, Kishore & Lennen 2002 (J. Phys. Chem. Ref. Data 31, 231, DOI
+# 10.1063/1.1416902) pK/ΔH/ΔCp; the fraction is Davies-corrected at I ≈ 0.048 M. σ combines
+# σ_PH, ±3 °C, ±0.02 pK, 30 % of the Davies shift, and ±2 % on C. Only the counter-ion is
+# modelled; the volume change of the buffer's own (de)protonation is not. Titrant: not
+# stated; HCl for amine bases (Tris, imidazole, histidine), NaOH for Good's buffers.
+const SOLUTES = Solute[
+    NonBiological(0.025, 0.00025, "potassium chloride"),   # 25 mM, ±1%
+    NonBiological(0.01, 0.0002, "tris"),   # 10 mM, ±2%
+    NonBiological(0.005, 0.0001, "magnesium chloride"),   # 5 mM, ±2%
+    # Cl⁻ counter-ion from HCl titration of Tris (see note above)
+    NonBiological(0.008462, 0.000441, "chloride"),
+]
+
+# ---------------------------------------------------------------------------
+#                       Forward-model / sampler wiring
+# ---------------------------------------------------------------------------
+
+const Q_MAX_FIT = 0.3
+
+# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# bins the curve to the Shannon channels that diameter allows (see `rebin` there).
+
+# ADD_HYDROGENS = true: the deposited model already carries 4026 hydrogens; as for
+# SASDWZ9 pdb2pqr is left to place its own. The model has two RNA chains that both carry
+# the chain id A (the ions, water and MO6 are chain B): see the hand-off notes.
+const ADD_HYDROGENS = true
+
+# One run per atomic model with a deposited fit; `fit` is that model's
+# reference curve (q scaled to Å⁻¹ by `fit_scale`; the fitted intensity is
+# column `fit_col`; `rescale` = the file is normalized, scale it to the data).
+const RUNS = [
+    (
+    tag = "fit2_model1",
+    pdb = "SASDAC9_fit2_model1.pdb",
+    fit = "SASDAC9_fit2.dat",
+    fit_scale = 1.0,
+    fit_col = 3,
+    rescale = false,
+    software = "FoXS",
+),   # VS ribozyme dimer with 4026 H and a GDP; deposited χ² = 680.3 (Chi = 26.08)
+]
+
+"""
+    fit_subset() -> (q, I, σ)
+
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
+(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+"""
+function fit_subset()
+    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
+    return qvals[keep], I_exp[keep], σ_exp[keep]
+end
+
+# Builds the Seed that `run_sasdac9` samples. It is separate only because
+# the developer tools in test/utils/ build a fit's Seed without running
+# the fit; if you are reading this script as an example you can skip it:
+# `run_sasdac9` below is the whole story (build the seed, then sample it).
+function seed_sasdac9(run; seed::Integer = SAMPLER_SEED)
+    q_fit, I_fit, σ_fit = fit_subset()
+
+    Random.seed!(seed)
+    s = BAYSOL.seed_model(
+        LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, q_fit, I_fit,
+        σ_fit, PH, σ_PH, SOLUTES;
+        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    )
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
+end
+
+function run_sasdac9(
+    run;
+    n_samples::Int = N_SAMPLES,
+    n_adapt::Int = N_ADAPT,
+    seed::Integer = SAMPLER_SEED,
+)
+    s, data = seed_sasdac9(run; seed)
+    res = BAYSOL.run_model(s, n_samples, n_adapt)
+    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+end
+
+"""
+    sasdac9_figure(result, data) -> Figure
+
+Plots the SASDAC9 fit: the experimental data (`data = (q_fit, I_fit, σ_fit)`)
+with its per-point standard errors, the MAP predicted curve, and (when not
+all draws diverged) the quantile-curve envelope.
+"""
+function sasdac9_figure(result, data)
+    _, divergence_rate, map_result, quantile_result = result
+    q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
+
+    fig = Figure(size = FIG_SIZE_CURVE)
+    ax = Axis(
+        fig[1, 1],
+        xlabel = "q (Å⁻¹)",
+        ylabel = "I(q)",
+        xscale = log10,
+        yscale = log10,
+    )
+
+    y_floor = log_axis_floor(I_fit)   # see log_axis_floor in common.jl
+
+    if quantile_result !== nothing
+        _, curves = quantile_result
+        bounds    = curves["bounds"]
+        quantiles = curves["quantiles"]
+
+        band!(
+            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
+            color = COLOR_BAND, label = "bounds",
+        )
+        lines!(
+            ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
+            label = "quantiles",
+        )
+        lines!(
+            ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
+        )
+    end
+
+    # A linear/additive I(q) ± σ(q) interval isn't symmetric on a log10
+    # axis; the lower whisker compresses toward 0 while the upper one
+    # looks comparatively short, so the point visually rides near the top
+    # of its own errorbar instead of centred (and I - σ can go
+    # non-positive outright once σ > I, near the noise floor). Standard
+    # SAXS log-I plotting convention (PRIMUS/SASBDB-style) instead
+    # propagates σ into log-space via the delta method
+    # (d/dx log10(x) = 1/(x·ln10)) and plots a log-symmetric interval, which
+    # stays well-defined and visually centred no matter how large σ gets
+    # relative to I.
+    log_I = log10.(I_fit)
+    log_σ = σ_fit ./ (I_fit .* log(10))
+    rangebars!(
+        ax, q_fit, exp10.(log_I .- log_σ), exp10.(log_I .+ log_σ);
+        whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR,
+    )
+    scatter!(ax, q_fit, I_fit; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
+
+    if map_result !== nothing
+        _, map_curve = map_result
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "MAP",
+        )
+    end
+
+    axislegend(ax; position = :lb, framevisible = false)
+
+    # Centre the view on the actual data (I_fit), not on however far the
+    # errorbar whiskers/bounds band happen to extend
+    lo, hi = extrema(I_fit)
+    ylims!(ax, lo * YLIM_LOG_LO, hi * YLIM_LOG_HI)
+
+    return fig
+end
+
+"""
+    sasdac9_residuals_figure(result, data) -> Figure
+
+Data-minus-MAP residuals against q, with the quantile-curve envelope
+(`"bounds"`/`"quantiles"`) similarly re-centred on the MAP curve.
+"""
+function sasdac9_residuals_figure(result, data)
+    _, _, map_result, quantile_result = result
+    q_fit, I_fit, σ_fit = data
+
+    fig = Figure(size = FIG_SIZE_RESIDUALS)
+    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
+
+    map_curve = map_result === nothing ? nothing : map_result[2]
+
+    if quantile_result !== nothing && map_curve !== nothing
+        _, curves = quantile_result
+        bounds    = curves["bounds"]
+        quantiles = curves["quantiles"]
+        I_map     = map_curve[:, 2]
+
+        band!(
+            ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
+            color = COLOR_BAND_RESID, label = "bounds",
+        )
+        lines!(
+            ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID,
+            label = "quantiles",
+        )
+        lines!(
+            ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
+            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID,
+        )
+    end
+
+    if map_curve !== nothing
+        resid = I_fit .- map_curve[:, 2]
+        errorbars!(
+            ax,
+            q_fit,
+            resid,
+            σ_fit;
+            whiskerwidth = WHISKERWIDTH,
+            color = COLOR_ERRORBAR,
+        )
+        scatter!(
+            ax,
+            q_fit,
+            resid;
+            markersize = MARKERSIZE,
+            color = COLOR_DATA,
+            label = "data - MAP",
+        )
+        hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
+        lo, hi = extrema(resid)
+        pad = YLIM_LIN_PAD_FRAC * (hi - lo)
+        ylims!(ax, lo - pad, hi + pad)
+    end
+
+    axislegend(ax; position = :rt, framevisible = false)
+
+    return fig
+end
+
+"""
+    sasdac9_hist(result) -> Figure
+
+Histograms of the non-divergent posterior draws for each physical parameter
+"""
+function sasdac9_hist(result)
+    fit, _, map_result, _ = result
+    ok = .!getproperty.(fit.stats, :numerical_error)
+    samples = fit.samples[ok]
+    c1_draws = fit.c1[ok]
+    scale_draws = fit.scale[ok]
+    bkgrnd_draws = fit.bkgrnd_corr[ok]
+    map_params = map_result === nothing ? nothing : map_result[1]
+
+    fig = Figure(size = FIG_SIZE_HIST)
+    for (i, (label, map_key)) in enumerate(HIST_PARAMS)
+        row, col = fldmod1(i, 3)
+        ax = Axis(
+            fig[row, col], xlabel = label, ylabel = "count",
+            xticklabelrotation = π/2,
+        )
+        draws = if label == "c1"
+            c1_draws
+        elseif label == "scale"
+            scale_draws
+        elseif label == "bkgrnd_corr"
+            bkgrnd_draws
+        else
+            getindex.(samples, i)
+        end
+        hist!(ax, draws; bins = HIST_BINS, color = COLOR_HIST)
+        if map_params !== nothing
+            vlines!(ax, [map_params[map_key]]; color = COLOR_MAP, linewidth = LW_MAP)
+        end
+    end
+
+    return fig
+end
+
+"""
+    sasdac9_comparison_figure(result, data) -> Figure
+
+Overlays our MAP curve against the depositor's reference fit (`fit_curve = (q, I)`, or
+`nothing` if the fit file could not be parsed, in which case no figure is made).
+"""
+function sasdac9_comparison_figure(result, data, fit_curve, label)
+    _, _, map_result, _ = result
+    q_fit, I_fit, σ_fit = data
+    # Log axes: non-positive intensities (high-q noise around zero)
+    # are left out of the plot only; the fit itself uses every point.
+    pos = I_fit .> 0
+    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
+
+    fit_curve === nothing && return nothing
+    q_crysol, I_crysol = fit_curve
+    keep = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT) .& (I_crysol .> 0)
+
+    fig = Figure(size = FIG_SIZE_CURVE)
+    ax = Axis(
+        fig[1, 1],
+        xlabel = "q (Å⁻¹)",
+        ylabel = "I(q)",
+        xscale = log10,
+        yscale = log10,
+    )
+
+    # Same log-symmetric errorbar treatment as `sasdac9_figure` -- see its
+    # comment for why a raw additive I ± σ interval isn't used here.
+    log_I = log10.(I_fit)
+    log_σ = σ_fit ./ (I_fit .* log(10))
+    rangebars!(
+        ax, q_fit, exp10.(log_I .- log_σ), exp10.(log_I .+ log_σ);
+        whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR,
+    )
+    scatter!(ax, q_fit, I_fit; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
+
+    lines!(
+        ax, q_crysol[keep], I_crysol[keep];
+        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = label,
+    )
+
+    if map_result !== nothing
+        _, map_curve = map_result
+        lines!(
+            ax,
+            map_curve[:, 1],
+            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
+            color = COLOR_MAP,
+            linewidth = LW_MAP,
+            label = "BAYSOL MAP",
+        )
+    end
+
+    axislegend(ax; position = :lb, framevisible = false)
+
+    lo, hi = extrema(I_fit)
+    ylims!(ax, lo * YLIM_LOG_LO, hi * YLIM_LOG_HI)
+
+    return fig
+end
+
+
+# the results of every run, kept for the figures below
+fits = Dict{String,Any}()
+
+for run in RUNS
+    # one set of outputs per run; a single-run entry keeps the plain `res*` names
+    suffix = length(RUNS) == 1 ? "" : "_" * run.tag
+
+    result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdac9(run)
+
+    # `@__DIR__` (this SASDAC9/ folder), not the caller's cwd.
+    open(joinpath(@__DIR__, "res$(suffix).txt"), "w") do io
+        BAYSOL.write_report(
+            io,
+            result;
+            form_factor_log = form_factor_log,
+            n_atoms = n_atoms,
+        )
+    end
+
+    fits[run.tag] = (result, (q_fit, I_fit, σ_fit))
+end
+
+# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL
+# methods, which every fit would then recompile (about 40 % of a fit's wall clock).
+using GLMakie
+
+for run in RUNS
+    suffix = length(RUNS) == 1 ? "" : "_" * run.tag
+    result, data = fits[run.tag]
+    q_fit, I_fit, σ_fit = data
+
+    fig = sasdac9_figure(result, data)
+    save(joinpath(@__DIR__, "res$(suffix).png"), fig; px_per_unit = PX_PER_UNIT)
+
+    fig_residuals = sasdac9_residuals_figure(result, data)
+    save(
+        joinpath(@__DIR__, "res$(suffix)_residuals.png"),
+        fig_residuals;
+        px_per_unit = PX_PER_UNIT,
+    )
+
+    fig_hist = sasdac9_hist(result)
+    save(joinpath(@__DIR__, "res$(suffix)_hist.png"), fig_hist; px_per_unit = PX_PER_UNIT)
+
+    fit_curve = try
+        fc = _read_fit(joinpath(_FIXTURE_DIR, run.fit), run.fit_scale, run.fit_col)
+        fc !== nothing && run.rescale ? _rescale_fit(fc, q_fit, I_fit) : fc
+    catch e
+        @warn "could not read the reference fit" run.fit exception = e
+        nothing
+    end
+    fig_cmp = sasdac9_comparison_figure(
+        result,
+        data,
+        fit_curve,
+        run.software * " " * run.tag * (run.rescale ? " (rescaled)" : ""),
+    )
+    fig_cmp === nothing || save(
+        joinpath(@__DIR__, "res$(suffix)_comparison.png"),
+        fig_cmp;
+        px_per_unit = PX_PER_UNIT,
+    )
+end

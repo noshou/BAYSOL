@@ -294,6 +294,30 @@ a few milliseconds is not shown as a block of zeros. Exactly 0 prints as `0`.
 _fmt_seconds(x::Real) =
     x == 0 ? "0" : abs(x) < 0.01 ? @sprintf("%.1e", x) : @sprintf("%.2f", x)
 
+"The width the lines of the timing table's notes are wrapped to."
+const NOTE_WIDTH = 80
+
+"""
+The words of `note` ("" gives none) filled into lines of at most `width` characters; a word
+longer than `width` stays whole on a line of its own.
+"""
+function _wrap_note(note::AbstractString, width::Integer)::Vector{String}
+    lines = String[]
+    cur = ""
+    for word in split(note)
+        if isempty(cur)
+            cur = String(word)
+        elseif length(cur) + 1 + length(word) <= width
+            cur *= " " * word
+        else
+            push!(lines, cur)
+            cur = String(word)
+        end
+    end
+    isempty(cur) || push!(lines, cur)
+    return lines
+end
+
 """
 The report's `=== Timing ===` section, written last. The wall clock runs from the
 creation of `log` (the start of [`seed_model`](@ref)) to now, i.e. to the end of
@@ -303,7 +327,9 @@ every section before this one. Nothing is written when `log` is `nothing`.
 
 Stages print in the order they were recorded, indented two spaces per depth, with
 the group lines (static build, sampling) summing their depth-1 stages. The label
-column is as wide as the longest label so the seconds column always lines up.
+column is as wide as the longest stage name so the seconds column always lines up; a
+stage's note (`[cache hit]`) is wrapped to [`NOTE_WIDTH`](@ref) columns on lines of its own
+under it, so no line is wider than the table.
 """
 function _write_timing(io::IO, log::Union{Nothing,StageLog}, t_report)
     log === nothing && return nothing
@@ -318,26 +344,35 @@ function _write_timing(io::IO, log::Union{Nothing,StageLog}, t_report)
     # write_report compiles before their bodies (and so their stages) begin
     unacc_c = total_c - st_c - sp_c - report_c
 
-    # (label, seconds, % of wall, JIT seconds); the
-    # last two are nothing on plain stage lines
-    rows = Tuple{String,Float64,Union{Nothing,Float64},Union{Nothing,Float64}}[]
+    # (label, seconds, % of wall, JIT seconds); the last two are nothing on plain stage
+    # lines, and a stage's note is a row of its own with no seconds (`nothing`)
+    rows = Tuple{String,Union{Nothing,Float64},Union{Nothing,Float64},
+        Union{Nothing,Float64}}[]
     push!(rows, ("wall clock  (seed_model → end of report)", wall, 100.0, total_c))
     for (group, label, tot, comp) in
         ((:static, "static build", st, st_c), (:sampling, "sampling", sp, sp_c))
         push!(rows, ("  " * label, tot, 100 * tot / wall, comp))
         for stage in log.stages
             stage.group === group || continue
-            name = stage.note == "" ? stage.name : rpad(stage.name, 22) * stage.note
-            push!(rows, ("  "^(stage.depth + 1) * name, stage.seconds, nothing, nothing))
+            indent = "  "^(stage.depth + 1)
+            push!(rows, (indent * stage.name, stage.seconds, nothing, nothing))
+            for l in _wrap_note(stage.note, NOTE_WIDTH - length(indent) - 2)
+                push!(rows, (indent * "  " * l, nothing, nothing, nothing))
+            end
         end
     end
     push!(rows, ("  report write", report_s, nothing, nothing))
     push!(rows, ("  unaccounted", unacc, nothing, max(unacc_c, 0.0)))
 
-    w = maximum(length(r[1]) for r in rows)
+    # the label column fits the stage names; a note is wrapped lines of its own
+    w = maximum(length(r[1]) for r in rows if r[2] !== nothing)
     println(io)
     @printf(io, "%-*s %10s %9s %8s\n", w, "=== Timing ===", "seconds", "% wall", "(JIT)")
     for (label, secs, pct, jit) in rows
+        if secs === nothing
+            println(io, label)
+            continue
+        end
         @printf(io, "%-*s %10s", w, label, _fmt_seconds(secs))
         pct === nothing || @printf(io, " %9.1f", pct)
         jit === nothing || @printf(io, " %8s", @sprintf("(%.1f)", jit))

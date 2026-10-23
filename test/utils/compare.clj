@@ -37,8 +37,9 @@
 ;;         ... against the latest release's baseline
 ;;
 ;; Conventions (CLAUDE.md): speedups are cumulative against the reference and not additive;
-;; the wall clock excludes PROPKA/pdb2pqr; fit comparisons are judged on distributions, not
-;; 1:1. Needs Babashka; shared helpers are in common.clj, the report parser in report.clj.
+;; the wall clock excludes PROPKA, every pdb2pqr stage and a component download; fit
+;; comparisons are judged on distributions, not 1:1. Needs Babashka; shared helpers
+;; are in common.clj, the report parser in report.clj.
 
 (ns compare
     (:require [babashka.classpath :refer [add-classpath]]
@@ -165,17 +166,23 @@
 
 (def ^:private timing-rows
     "The stages of the report's timing table: [label key]. A revision whose report
-    lacks one shows -."
-    [["static build" :static_build] ["  propka" :propka] ["  pdb2pqr" :pdb2pqr]
-        ["  load_molecule" :load_molecule] ["  SASA" :sasa] ["  shannon" :shannon]
-        ["  forward_cache" :fwd] ["    vacuum + excluded volume" :vacuum_excluded]
-        ["    hydration" :hydration] ["    Gram + r_m" :gram_rm]
-        ["  seed_fitting" :seed_fitting] ["sampling" :sampling]
-        ["  MAP search + whitening" :map_s] ["  NUTS setup" :nuts_setup]
-        ["  NUTS" :nuts] ["  per-draw c1 re-profile" :reprofile]
-        ["  MAP + quantiles" :map_quantiles] ["report write" :report_write]
-        ["unaccounted" :unaccounted] ["GC" :gc]
-        ["wall clock excl. PROPKA/pdb2pqr" :wall_ex]
+    lacks one (an old format, or a protein-only run for the nucleotide stages) shows -,
+    not 0."
+    [["static build" :static_build] ["  resolve_structure" :resolve_structure]
+        ["  components" :components] ["  structure checks" :structure_checks]
+        ["  classify" :classify] ["  propka" :propka]
+        ["  pdb2pqr (any variant)" :pdb2pqr]
+        ["  modified nucleotide hydrogens" :modified_hydrogens]
+        ["  modified amino acid hydrogens" :modified_amino_hydrogens]
+        ["  heavy atoms" :heavy_atoms] ["  load_molecule" :load_molecule]
+        ["  SASA" :sasa] ["  shannon" :shannon] ["  forward_cache" :fwd]
+        ["    vacuum + excluded volume" :vacuum_excluded] ["    hydration" :hydration]
+        ["    Gram + r_m" :gram_rm] ["  seed_fitting" :seed_fitting]
+        ["sampling" :sampling] ["  MAP search + whitening" :map_s]
+        ["  NUTS setup" :nuts_setup] ["  NUTS" :nuts]
+        ["  per-draw c1 re-profile" :reprofile] ["  MAP + quantiles" :map_quantiles]
+        ["report write" :report_write] ["unaccounted" :unaccounted] ["GC" :gc]
+        ["wall clock excl. PROPKA/pdb2pqr/downloads" :wall_ex]
         ["leapfrog steps (x1e6)" :leapfrog]])
 
 (defn- timing-table
@@ -439,20 +446,25 @@
 
 (def ^:private stages
     "Stage rows of the benchmark tables: [label prefix of the stage names summed into
-    that row]."
+    that row]. `pdb2pqr` takes its three variants (`pdb2pqr (nucleic, none)`, ...); the
+    first four rows are the ones the steady-state table repeats."
     [["forward_cache" "forward_cache"] ["MAP search" "MAP search"]
         ["NUTS" "NUTS  ("] ["c1 re-profile" "per-draw c1 re-profile"]
-        ["propka" "propka"] ["pdb2pqr" "pdb2pqr"]])
+        ["propka" "propka"] ["pdb2pqr" "pdb2pqr"] ["components" "components"]
+        ["classify" "classify"] ["structure checks" "structure checks"]
+        ["heavy atoms" "heavy atoms"]
+        ["modified nucleotide hydrogens" "modified nucleotide hydrogens"]
+        ["modified amino acid hydrogens" "modified amino acid hydrogens"]])
 
 (defn- stage-total
     "Seconds of `field` (:stage_seconds, :stage_compile or :stage_gc) summed over the
-    stages named `prefix`*."
+    stages named `prefix`*, nil when the fit has no such stage (an older run, or a
+    stage that did not apply to that structure)."
     [fit field prefix]
-    (reduce +
-        0.0
-        (for [[stage v] (map vector (:stage_name fit) (field fit))
-                :when (str/starts-with? stage prefix)]
-            v)))
+    (when-let [vs (seq (for [[stage v] (map vector (:stage_name fit) (field fit))
+                        :when (str/starts-with? stage prefix)]
+                    v))]
+        (reduce + 0.0 vs)))
 
 (defn- compile-in-stages
     "Seconds of compile time inside the timed stages (those at depth 1) of a fit."
@@ -560,6 +572,46 @@
         (println (str
                 "\n(ratio > 1: the last file is faster; first fit includes JIT, "
                 "steady fit does not; compare cold with cold only)"))))
+
+;; --- the stage notes
+
+(def ^:private note-stages
+    "The stages whose notes the notes table shows, in the order of the report."
+    ["components" "classify" "propka" "pdb2pqr" "modified nucleotide hydrogens"
+        "modified amino acid hydrogens" "heavy atoms"])
+
+(defn- stage-note
+    "The note of the stage `nm` in `report` (a variant such as `pdb2pqr (mixed, propka)`
+    counts as `pdb2pqr`), or \"\"."
+    [report nm]
+    (or (some (fn [[k v]] (when (str/starts-with? k nm) v)) (:stage_notes report))
+        ""))
+
+(defn- notable?
+    "Is a fit worth a line of the notes table: not protein-only, or a cache missed, or
+    a component downloaded."
+    [report]
+    (let [notes (vals (:stage_notes report))]
+        (boolean (or (some #(str/starts-with? % "[nucleic") notes)
+                (some #(str/starts-with? % "[mixed") notes)
+                (some #(str/includes? % "cache miss") notes)
+                (pos? (or-zero (:components_download report)))))))
+
+(defn- notes-table
+    "The notes of the judged column's fits that are not plain protein runs with every
+    cache hit: what the nucleotide stages found, and which lookups missed. Reports
+    without notes (older formats) give no line."
+    [reports cur]
+    (heading (str "Stage notes of " cur))
+    (let [rows (for [[path r] reports
+                    :when (notable? r)]
+                (cons (str/replace path (str c/fit-dir "/") "")
+                    (map #(stage-note r %) note-stages)))]
+        (if (seq rows)
+            (do (head (cons "fit" note-stages))
+                (doseq [cells rows] (apply row cells)))
+            (println
+                "(every fit is protein-only with all caches hit, or has no notes)"))))
 
 ;; --- the CSV files
 
@@ -704,6 +756,7 @@
                                 " fits that have a " "report in every column.\n"))
                         ;; --- the report
                         (timing-table agg names)
+                        (notes-table (agg cur) cur)
                         (println (str "\n| | fits | median χ² | χ² Q1 / Q3 "
                                 "| >1 % divergent | c1 pinned"
                                 " | MAP >3σ from δρ₃ prior | median δρ₃ "

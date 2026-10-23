@@ -66,17 +66,21 @@
 (defn- strip-lines
     "Strips the trailing blanks (spaces and tabs) from the lines of file `path` listed
     in `only` (a set of 1-based line numbers, or :all), leaving everything else, line
-    endings included, untouched. Returns how many lines changed."
+    endings included, untouched. Returns how many lines changed. A .tsv file is left
+    alone: a trailing tab there is an empty last field, not whitespace."
     [path only]
-    (let [lines (str/split (c/slurp8 path) #"\n" -1)
-            stripped (map-indexed (fn [i line]
-                    (if (or (= only :all) (contains? only (inc i)))
-                        (str/replace line #"[ \t]+(\r?)$" "$1")
-                        line))
-                lines)
-            n (count (filter true? (map not= lines stripped)))]
-        (when (pos? n) (c/spit8 path (str/join "\n" stripped)))
-        n))
+    (if (= "tsv" (fs/extension path))
+        0
+        (let [lines (str/split (c/slurp8 path) #"\n" -1)
+                stripped (map-indexed (fn [i line]
+                        (if (or (= only :all)
+                                (contains? only (inc i)))
+                            (str/replace line #"[ \t]+(\r?)$" "$1")
+                            line))
+                    lines)
+                n (count (filter true? (map not= lines stripped)))]
+            (when (pos? n) (c/spit8 path (str/join "\n" stripped)))
+            n)))
 
 (defn- git-check-output
     "The output of `git diff --check HEAD`: the lines of tracked files with trailing

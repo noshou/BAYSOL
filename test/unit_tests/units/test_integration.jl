@@ -17,10 +17,10 @@
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,
-    propka_pKas, PropkaError,
-    resolve_hydrogens, Pdb2pqrError, _store_dir,
-    Molecule, n_atoms, elms, coords_cartesian
-using BAYSOL.Inference: seed_sampler, infer, PROFILE, Ξ
+    _store_dir, Molecule, n_atoms, elms, coords_cartesian
+using BAYSOL.Hydrogenator: propka_pKas, PropkaError, resolve_hydrogens, Pdb2pqrError,
+    Propka
+using BAYSOL.Inference: seed_sampler, infer, Ξ
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 using ForwardDiff
 using BAYSOL.Inference: φ_max, BOUNDS_δρ₁₂
@@ -146,11 +146,15 @@ end
     #------------------------------------------------------------------
     @testset "resolve_hydrogens + load_molecule compose" begin
         hyd_ph = 7.0
-        hyd_out_path = joinpath(_store_dir(), "1CRN-TEST_pH$(hyd_ph).pdb")
+        hyd_out_path = joinpath(_store_dir(), "1CRN-TEST_pH$(hyd_ph)_parse_propka.pdb")
         rm(hyd_out_path; force = true)   # force a fresh pdb2pqr run too
 
         t_pdb2pqr = @elapsed begin
-            hyd_path = resolve_hydrogens(resolved_path, pKa_records, hyd_ph)
+            hyd_path = resolve_hydrogens(
+                resolved_path,
+                hyd_ph;
+                titration = Propka(pKa_records),
+            )
         end
         @info "pdb2pqr (fresh) on 1CRN-TEST.pdb took $(round(t_pdb2pqr; digits = 2))s"
         @test isfile(hyd_path)
@@ -187,7 +191,7 @@ end
         solutes = Solute[NonBiological(0.15, 0.001, "sodium chloride")]
         pH, σ_pH = 7.0, 0.1
 
-        Random.seed!(0)   # reproducibility, not survival -- see infer's z-space docstring
+        Random.seed!(0)   # reproducibility, not survival
         seed = seed_sampler(fw, I_exp, σ_exp, pH, σ_pH, solutes)
         @test seed isa BAYSOL.Inference.Seed
         @test seed.fw === fw
@@ -199,7 +203,7 @@ end
         local fit
         t_nuts = @elapsed begin
             fit = infer(
-                seed, n_samples, n_adapt; l = PROFILE(), n_chains = 1, retry = false,
+                seed, n_samples, n_adapt; n_chains = 1, retry = false,
             )
         end
         samples, stats = fit.samples, fit.stats
@@ -227,12 +231,11 @@ end
             Solute[NonBiological(0.15, 0.001, "sodium chloride")],
         )
         Random.seed!(3)
-        sp_f = BAYSOL.Inference._sampling_space(seed, PROFILE())
+        sp_f = BAYSOL.Inference._sampling_space(seed)
         # the same starting points
         Random.seed!(3)
         sp_g = BAYSOL.Inference._sampling_space(
-            seed,
-            PROFILE();
+            seed;
             f_abstol = 0.0,
             successive_f_tol = 1,
         )
@@ -241,7 +244,6 @@ end
             sp.μ,
             sp.σ,
             seed,
-            PROFILE(),
             BAYSOL.Inference.EXCL_VOL_CORR_TOL,
         )
         # same optimum, to 1e-4 nats
@@ -254,7 +256,7 @@ end
     #   Test 5: the analytic profile-likelihood gradient on a real structure
     #------------------------------------------------------------------
     # …data that constrain ξ)
-    @testset "analytic ∂ℓ/∂ξ equals ForwardDiff through profiled_corrs (crambin" begin
+    @testset "analytic ∂ℓ/∂ξ equals ForwardDiff through profiled_corrs (  " begin
         FITM = BAYSOL.Inference
         q = collect(range(0.02, 0.30; length = 80))
         fw = forward_cache(mol, q, 8, INTEG_E; chunk = INTEG_CHUNK)
@@ -286,9 +288,15 @@ end
             f_fix(z) = FITM.wls_prof_ll(
                 FITM.wls_fit(
                     BAYSOL.Scattering.model_intensity(
-                        BAYSOL.Scattering.intensity_terms(fw, z[1], (z[2], z[3], z[4]))...,
+                        BAYSOL.Scattering.intensity_terms(
+                            fw,
+                            z[1],
+                            (z[2], z[3], z[4]),
+                        )...,
                         BAYSOL.Scattering.excluded_volume_factor(
-                            tab.qvals, tab.r_m, c1,
+                            tab.qvals,
+                            tab.r_m,
+                            c1,
                         ),
                     ),
                     wls,
@@ -320,6 +328,6 @@ end
     # would make the freshness checks above silently pass on a stale cache
     # next time.
     rm(pka_path; force = true)
-    rm(joinpath(_store_dir(), "1CRN-TEST_pH7.0.pdb"); force = true)
+    rm(joinpath(_store_dir(), "1CRN-TEST_pH7.0_parse_propka.pdb"); force = true)
 
 end

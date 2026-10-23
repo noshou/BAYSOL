@@ -16,6 +16,7 @@ using StaticArrays: SVector
 using ..PhysicalConstants: NS_PER_S
 using ..Runtime: StageLog, tick, tock!, timed!, stage_seconds, with_gc_paused, tmap_blocks
 using ..MolecularStructure: MolecularStructure
+using ..Hydrogenator: Hydrogenator, Propka
 using ..Geometry: sasa, PROBE_RADIUS, SHELL_N_TARGET
 using ..Shannon: Shannon, SHANNON_REBIN
 using ..Scattering: Scattering, B_LM_CHUNK, SHELL_THICKNESS

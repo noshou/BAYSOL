@@ -140,8 +140,6 @@ trajectory's sample covariance, starting from the identity in the whitened coord
     [`QuantileResult`](@ref)'s "quantiles"/"bounds" entries, e.g. the
     default ("16-84") is a ±1σ-equivalent interval for a Normal. The special
     case "0-0" means *no* filtering.
-- `l::LIKELIHOOD=PROFILE()`: PROFILE() or MARGINAL(), forwarded to
-    [`Inference._logπ`](@ref)/[`Inference._ll`](@ref).
 - `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
     (0, 100) exclusive (validated below); the default, `DEFAULT_TARGET_ACCEPT`,
     is 95%.
@@ -173,7 +171,6 @@ function run_model(
     n_samples::Int64 = DEFAULT_N_SAMPLES,
     n_adapt::Int64 = DEFAULT_N_ADAPT;
     quantiles::AbstractString = DEFAULT_QUANTILES,
-    l::Inference.LIKELIHOOD = Inference.PROFILE(),
     δ::Real = DEFAULT_TARGET_ACCEPT,
     rng_seed::Union{Nothing,Integer} = nothing,
     n_chains::Int = Inference.DEFAULT_N_CHAINS,
@@ -218,7 +215,7 @@ function run_model(
 
     # calculate unfiltered fit
     fit_unfiltered =
-        Inference.infer(seed, n_samples, n_adapt; l = l, δ = δ, rng_seed = rng_seed,
+        Inference.infer(seed, n_samples, n_adapt; δ = δ, rng_seed = rng_seed,
             n_chains = n_chains, jitter_seed = jitter_seed, retry = retry)
     t_post = tick()
 
@@ -236,7 +233,6 @@ function run_model(
         fit_unfiltered.chain[keep],
         fit_unfiltered.iteration[keep],
         fit_unfiltered.diagnostics,
-        fit_unfiltered.likelihood,
         fit_unfiltered.timing,
     )
 

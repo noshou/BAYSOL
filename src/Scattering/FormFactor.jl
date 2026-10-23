@@ -196,11 +196,13 @@ function f1f2(element::AbstractString, energy::Real)::Tuple{Float64,Float64}
     ch === nothing && throw(
         FormFactorError("no Chantler data for element \"$element\""),
     )
-    E       = Float64(energy)
-    errmsg1 = "energy $E eV outside the Chantler range"
-    errmsg2 = " [$(ch.e[1]), $(ch.e[end])] for \"$element\""
-    errmsg  = errmsg1 * errmsg2
-    (ch.e[1] ≤ E ≤ ch.e[end]) || throw(FormFactorError(errmsg))
+    E = Float64(energy)
+    (ch.e[1] ≤ E ≤ ch.e[end]) || throw(
+        FormFactorError(
+            "energy $E eV outside the Chantler range " *
+            "[$(ch.e[1]), $(ch.e[end])] for \"$element\"",
+        ),
+    )
     n = length(ch.e)
     w = _window(n, searchsortedlast(ch.e, E))
     x = view(ch.e, w)

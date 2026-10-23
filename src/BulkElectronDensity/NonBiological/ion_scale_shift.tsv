@@ -1,0 +1,80 @@
+name	iupac_name	charge	doi	v0_old_absolute	v0_new_conventional	shift	scale_evidence	confidence
+methylammonium	methanaminium	1	10.1007/BF00972756	30.7	36.11	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+butylammonium	butan-1-aminium	1	10.1007/BF00972756	80.05	85.46	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+isobutylammonium	2-methylpropan-1-aminium	1	10.1007/BF00972756	80.18	85.59	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+tert-butylammonium	2-methylpropan-2-aminium	1	10.1007/BF00972756	82.3	87.71	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+anilinium	anilinium	1	10.1007/BF00972756	79.54	84.95	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+phenethylammonium	2-phenylethan-1-aminium	1	10.1007/BF00972756	110.08	115.49	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+dimethylammonium	N-methylmethanaminium	1	10.1007/BF00972756	49.27	54.68	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+diethylammonium	N-ethylethanaminium	1	10.1007/BF00972756	83.53	88.94	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+trimethylammonium	N,N-dimethylmethanaminium	1	10.1007/BF00972756	67.39	72.8	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+triethylammonium	N,N-diethylethanaminium	1	10.1007/BF00972756	116.07	121.48	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+tripropylammonium	N,N-dipropylpropan-1-aminium	1	10.1007/BF00972756	163.55	168.96	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+tributylammonium	N,N-dibutylbutan-1-aminium	1	10.1007/BF00972756	215.5	220.91	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+tetramethylammonium	tetramethylazanium	1	10.1007/BF00972756	84.25	89.66	5.41	salt-fit conv V=89.68(+-0.23); row-fit=-5.43; scale index=+1.00 (0=conv,1=abs); after fix row-fit=-0.02; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+tetraethylammonium	tetraethylazanium	1	10.1007/BF00972756	143.55	148.96	5.41	salt-fit conv V=149.42(+-0.24); row-fit=-5.87; scale index=+1.08 (0=conv,1=abs); after fix row-fit=-0.46; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+tetrapropylammonium	tetrapropylazanium	1	10.1007/BF00972756	209.22	214.63	5.41	salt-fit conv V=215.25(+-0.24); row-fit=-6.03; scale index=+1.11 (0=conv,1=abs); after fix row-fit=-0.62; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+tetrabutylammonium	tetrabutylazanium	1	10.1007/BF00972756	270.3	275.71	5.41	salt-fit conv V=275.94(+-0.23); row-fit=-5.64; scale index=+1.04 (0=conv,1=abs); after fix row-fit=-0.23; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+tetrapentylammonium	tetrapentylazanium	1	10.1007/BF00972756	333.3	338.71	5.41	salt-fit conv V=340.09(+-0.29); row-fit=-6.79; scale index=+1.26 (0=conv,1=abs); after fix row-fit=-1.38; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+pyrrolidinium	pyrrolidin-1-ium	1	10.1007/BF00972756	68.5	73.91	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+piperidinium	piperidin-1-ium	1	10.1007/BF00972756	83.6	89.01	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+pyridinium	pyridin-1-ium	1	10.1007/BF00972756	67.52	72.93	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+1-methylpyridinium	1-methylpyridin-1-ium	1	10.1007/BF00972756	85	90.41	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+morpholinium	morpholin-4-ium	1	10.1007/BF00972756	69.79	75.2	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+imidazolium	1H-imidazol-3-ium	1	10.1007/BF00972756	54.2	59.61	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+piperazine-1,4-diium	piperazine-1,4-diium	2	10.1007/BF00972756	52.86	63.68	10.82	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+piperazin-1-ium	piperazin-1-ium	1	10.1007/BF00972756	71.92	77.33	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+formate	formate	-1	10.1007/BF00972756	31.75	26.34	-5.41	salt-fit conv V=26.30(+-0.29); row-fit=+5.45; scale index=+1.01 (0=conv,1=abs); after fix row-fit=+0.04; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+acetate	acetate	-1	10.1007/BF00972756	45.91	40.5	-5.41	salt-fit conv V=40.76(+-0.20); row-fit=+5.15; scale index=+0.95 (0=conv,1=abs); after fix row-fit=-0.26; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+propanoate	propanoate	-1	10.1007/BF00972756	60.31	54.9	-5.41	salt-fit conv V=55.08(+-0.27); row-fit=+5.23; scale index=+0.97 (0=conv,1=abs); after fix row-fit=-0.18; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+butanoate	butanoate	-1	10.1007/BF00972756	75.92	70.51	-5.41	salt-fit conv V=70.14(+-0.29); row-fit=+5.78; scale index=+1.07 (0=conv,1=abs); after fix row-fit=+0.37; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+hexanoate	hexanoate	-1	10.1007/BF00972756	107.96	102.55	-5.41	salt-fit conv V=101.84(+-0.36); row-fit=+6.12; scale index=+1.13 (0=conv,1=abs); after fix row-fit=+0.71; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+heptanoate	heptanoate	-1	10.1007/BF00972756	123.65	118.24	-5.41	salt-fit conv V=117.17(+-0.36); row-fit=+6.48; scale index=+1.20 (0=conv,1=abs); after fix row-fit=+1.07; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+octanoate	octanoate	-1	10.1007/BF00972756	139.6	134.19	-5.41	salt-fit conv V=132.69(+-0.36); row-fit=+6.91; scale index=+1.28 (0=conv,1=abs); after fix row-fit=+1.50; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+nonanoate	nonanoate	-1	10.1007/BF00972756	155.33	149.92	-5.41	salt-fit conv V=148.28(+-0.36); row-fit=+7.05; scale index=+1.30 (0=conv,1=abs); after fix row-fit=+1.64; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+decanoate	decanoate	-1	10.1007/BF00972756	170.68	165.27	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+tridecanoate	tridecanoate	-1	10.1007/BF00972756	202.39	196.98	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+benzoate	benzoate	-1	10.1007/BF00972756	92.52	87.11	-5.41	salt-fit conv V=89.94(+-0.31); row-fit=+2.58; scale index=+0.48 (0=conv,1=abs); after fix row-fit=-2.83; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high (scale) / value suspect
+phenylacetate	phenylacetate	-1	10.1007/BF00972756	107.21	101.8	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+salicylate	2-hydroxybenzoate	-1	10.1007/BF00972756	100	94.59	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+methanesulfonate	methanesulfonate	-1	10.1007/BF00972756	60.48	55.07	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+ethanesulfonate	ethanesulfonate	-1	10.1007/BF00972756	78.16	72.75	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+propane-1-sulfonate	propane-1-sulfonate	-1	10.1007/BF00972756	91.68	86.27	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+butane-1-sulfonate	butane-1-sulfonate	-1	10.1007/BF00972756	107.68	102.27	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+pentane-1-sulfonate	pentane-1-sulfonate	-1	10.1007/BF00972756	123.62	118.21	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+hexane-1-sulfonate	hexane-1-sulfonate	-1	10.1007/BF00972756	139.58	134.17	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+dodecane-1-sulfonate	dodecane-1-sulfonate	-1	10.1007/BF00972756	233.1	227.69	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+tetradecane-1-sulfonate	tetradecane-1-sulfonate	-1	10.1007/BF00972756	266.6	261.19	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+benzenesulfonate	benzenesulfonate	-1	10.1007/BF00972756	109.13	103.72	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+butyl sulfate	butyl sulfate	-1	10.1007/BF00972756	116.6	111.19	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+hexyl sulfate	hexyl sulfate	-1	10.1007/BF00972756	147.9	142.49	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+octyl sulfate	octyl sulfate	-1	10.1007/BF00972756	179.2	173.79	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+phenolate	phenolate	-1	10.1007/BF00972756	72.9	67.49	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+tetraphenylphosphonium	tetraphenylphosphonium	1	10.1007/BF00972756	286.54	291.95	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+tetraphenylarsonium	tetraphenylarsanium	1	10.1007/BF00972756	295.2	300.61	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+tetraphenylborate	tetraphenylborate	-1	10.1007/BF00972756	283.01	277.6	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+guanidinium	guanidinium	1	10.1007/BF00972756	44.6	50.01	5.41	salt-fit conv V=48.27(+-0.25); row-fit=-3.67; scale index=+0.68 (0=conv,1=abs); after fix row-fit=+1.74; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium
+oxalate	oxalate	-2	10.1007/BF00972756	41.28	30.46	-10.82	salt-fit conv V=24.42(+-0.41); row-fit=+16.86; scale index=+1.56 (0=conv,1=abs); after fix row-fit=+6.04; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high (scale) / value suspect
+succinate	butanedioate	-2	10.1007/BF00972756	67.3	56.48	-10.82	salt-fit conv V=55.25(+-0.44); row-fit=+12.05; scale index=+1.11 (0=conv,1=abs); after fix row-fit=+1.23; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+adipate	hexanedioate	-2	10.1007/BF00972756	99.44	88.62	-10.82	salt-fit conv V=88.04(+-0.49); row-fit=+11.40; scale index=+1.05 (0=conv,1=abs); after fix row-fit=+0.58; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+suberate	octanedioate	-2	10.1007/BF00972756	130.81	119.99	-10.82	salt-fit conv V=119.05(+-0.49); row-fit=+11.76; scale index=+1.09 (0=conv,1=abs); after fix row-fit=+0.94; Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	high
+sebacate	decanedioate	-2	10.1007/BF00972756	162.11	151.29	-10.82	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+cholate	cholate	-1	10.1007/BF00972756	324	318.59	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+deoxycholate	deoxycholate	-1	10.1007/BF00972756	322.4	316.99	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+chenodeoxycholate	chenodeoxycholate	-1	10.1007/BF00972756	326.6	321.19	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+ascorbate	2-(1,2-dihydroxyethyl)-4-hydroxy-5-oxo-2,5-dihydrofuran-3-olate	-1	10.1007/BF00972756	93.9	88.49	-5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+propylammonium	propan-1-aminium	1	10.1007/BF00972756	64.01	69.42	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+pentylammonium	pentan-1-aminium	1	10.1007/BF00972756	96.03	101.44	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+hexylammonium	hexan-1-aminium	1	10.1007/BF00972756	111.95	117.36	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+octylammonium	octan-1-aminium	1	10.1007/BF00972756	143.69	149.1	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+benzylammonium	phenylmethanaminium	1	10.1007/BF00972756	93.87	99.28	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+dipropylammonium	N-propylpropan-1-aminium	1	10.1007/BF00972756	115.46	120.87	5.41	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+propane-1,3-diamine dication	propane-1,3-diaminium	2	10.1007/BF00972756	52.48	63.3	10.82	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+butane-1,4-diamine dication	butane-1,4-diaminium	2	10.1007/BF00972756	69.9	80.72	10.82	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+pentane-1,5-diamine dication	pentane-1,5-diaminium	2	10.1007/BF00972756	87.17	97.99	10.82	Gianni-Lepori additivity table: all salt-testable members show index 0.5-1.6, none ~0	medium-high
+hydrogen ion	hydron	1	10.1021/cr030047d	-5.5	0	5.5	Marcus-Hefter 2004 Chem Rev (TATB / V(H+)=-5.4 absolute scale); hydron -5.5 is the absolute proton itself	high
+tetrahexylammonium	tetrahexylazanium	1	10.1021/cr030047d	395.9	401.31	5.41	Marcus-Hefter 2004 Chem Rev (TATB / V(H+)=-5.4 absolute scale); hydron -5.5 is the absolute proton itself	medium-high
+tetraheptylammonium	tetraheptylazanium	1	10.1021/cr030047d	458.6	464.01	5.41	Marcus-Hefter 2004 Chem Rev (TATB / V(H+)=-5.4 absolute scale); hydron -5.5 is the absolute proton itself	medium-high
+triflate	trifluoromethanesulfonate	-1	10.1021/cr030047d	80.2	74.79	-5.41	salt-fit conv V=75.46(+-0.37); row-fit=+4.74; scale index=+0.88 (0=conv,1=abs); after fix row-fit=-0.67; Marcus-Hefter 2004 Chem Rev (TATB / V(H+)=-5.4 absolute scale); hydron -5.5 is the absolute proton itself	high
+spermidine(3+)	N-(3-azaniumylpropyl)butane-1,4-diaminium	3	10.1002/jcc.23608	137.5	137.5	0	probably absolute (neutral V + z*5.4 by construction), unverified; left unchanged	medium-low
+spermine(4+)	N,N'-bis(3-azaniumylpropyl)butane-1,4-diaminium	4	10.1002/jcc.23608	191.4	191.4	0	probably absolute (neutral V + z*5.4 by construction), unverified; left unchanged	medium-low

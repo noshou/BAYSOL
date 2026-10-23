@@ -51,4 +51,6 @@
         bench {:doc "The cold/steady benchmark (prints its plan without --approved)",
             :task (script "test/utils/bench.clj")},
         extract-formfactor {:doc "Rebuild the form-factor table from xraydb.sqlite",
-            :task (script "test/utils/extract_formfactor.clj")}}}
+            :task (script "test/utils/extract_formfactor.clj")},
+        extract-components {:doc "Regenerate the component table: --check, --update",
+            :task (script "dev/extract_components.clj")}}}

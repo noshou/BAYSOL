@@ -60,3 +60,11 @@
                         (with-out-str (is (precommit/whitespace))))
                     (is (= before (c/slurp8 (str dir "/a.jl")))))
                 (finally (fs/delete-tree dir))))))
+
+(deftest whitespace-leaves-tsv-alone
+    (testing "a trailing tab in a .tsv is an empty last field, not whitespace"
+        (let [dir (scratch-repo)
+                tsv "a\tb\tc\nx\ty\t\n"]
+            (h/write-file (str dir "/t.tsv") tsv)
+            (is (zero? (#'precommit/strip-lines (str dir "/t.tsv") :all)))
+            (is (= tsv (c/slurp8 (str dir "/t.tsv")))))))

@@ -79,7 +79,6 @@ end
     end
 
     seed = sdg_seed()
-    l = SDF.PROFILE()
     rep = nuts_replica(seed; n_samples = 160, n_adapt = 80, rng_seed = 11)
     sp = rep.sp
 
@@ -107,8 +106,7 @@ end
             SDF._θ_of_w(SVector{4}(x...), sp),
             seed.pr,
             seed.wls,
-            seed.fw,
-            l;
+            seed.fw;
             tab = seed.c1tab,
             c1_tol = 1e-11,
         )

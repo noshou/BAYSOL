@@ -8,7 +8,8 @@
     (:require [clojure.string :as str]
         [clojure.test :refer [deftest is testing]]
         [common :as c]
-        [format :as fmt]))
+        [format :as fmt]
+        [helpers :as h]))
 
 (defn- lines
     "The lines of the strings `ls` joined by newlines."
@@ -84,3 +85,10 @@
                 :let [text (c/slurp8 (c/in-root f))]]
             (is (= text (fmt/reindent text))
                 (str f " is not a fixed point of reindent")))))
+
+(deftest an-unknown-option-is-refused-before-any-formatter-runs
+    (let [{:keys [status out]}
+            (h/run-tool (str h/dev-dir "/format.clj") "--apply" "--check")]
+        (is (= 2 status))
+        (is (h/contains-text? out "unknown option --check"))
+        (is (h/contains-text? out "bb fmt-check"))))

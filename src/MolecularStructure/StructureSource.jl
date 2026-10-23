@@ -8,7 +8,7 @@ pass the resulting path to [`load_molecule`](@ref) themselves.
 """
 
 using BioStructures: BioStructures, MMCIFFormat, PDBFormat, writepdb,
-    standardselector, heavyatomselector, retrievepdb, collectmodels
+    hydrogenselector, retrievepdb, collectmodels
 using Downloads: Downloads
 
 """
@@ -77,11 +77,22 @@ struct URLSource <: StructureSource
 end
 
 """
+The selector of the canonical .pdb for `model`: [`_model_selector`](@ref) without hydrogens.
+Which atoms the canonical .pdb keeps: heavy atoms of standard residues and of nucleotides,
+including modified ones that are HETATM records (BioStructures' `heavyatomselector` would
+drop those); waters, ions, ligands and hydrogens are dropped.
+"""
+function _canonical_selector(model)
+    keep = _model_selector(model)
+    return at -> keep(at) && !hydrogenselector(at)
+end
+
+"""
 Shared "produce candidate .pdb, then compare-or-write-or-throw" step used by
 [`LocalPathSource`](@ref) and [`URLSource`](@ref) (not [`PDBIDSource`](@ref),
 which has its own simpler fetch-if-missing path). Takes model 1 of the
 already-parsed BioStructures structure struc, writes it (filtered through
-standardselector and heavyatomselector, dropping HETATM/waters and
+`_canonical_selector`: standard and nucleotide heavy atoms, no waters, ions, ligands or
 hydrogens) to a temp file, then:
 
 - if nothing is stored under key yet, moves the temp file into place;
@@ -104,7 +115,7 @@ function _resolve_canonical_pdb(struc, key::AbstractString)::String
     tmp_path = joinpath(tmpdir, key * ".pdb")
     model = first(collectmodels(struc))   # first model whatever its number
     try
-        writepdb(tmp_path, model, standardselector, heavyatomselector)
+        writepdb(tmp_path, model, _canonical_selector(model))
     catch e
         rm(tmpdir; recursive = true, force = true)
         throw(
@@ -136,8 +147,8 @@ end
     resolve_structure(source::StructureSource) -> String
 
 Resolve source to an absolute path to a canonical .pdb file in
-[`_store_dir`](@ref) (model 1 only, no HETATM/waters, no hydrogens). See
-[`StructureSource`](@ref) and its subtypes for per-variant behaviour.
+[`_store_dir`](@ref) (model 1 only; modified nucleotides kept; no waters, ions, ligands
+or hydrogens). See [`StructureSource`](@ref) and its subtypes for per-variant behaviour.
 """
 function resolve_structure end
 
@@ -188,7 +199,7 @@ function resolve_structure(source::PDBIDSource)::String
     end
     model = first(collectmodels(struc))   # first model whatever its number
     try
-        writepdb(existing, model, standardselector, heavyatomselector)
+        writepdb(existing, model, _canonical_selector(model))
     catch e
         rm(tmpdir; recursive = true, force = true)
         throw(

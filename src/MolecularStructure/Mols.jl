@@ -5,8 +5,8 @@ A molecule.
 """
 
 using ..Runtime: Lazy, force
-using BioStructures: BioStructures, PDBFormat, standardselector,
-    collectatoms, collectmodels, atomname, element, coords, ishetero
+using BioStructures: BioStructures, PDBFormat,
+    collectatoms, collectmodels, atomname, element, coords, ishetero, resname
 using NearestNeighbors: KDTree
 using FastClosures: @closure
 
@@ -228,6 +228,33 @@ elms(m::Molecule)::Vector{String} = m._elms
 name(m::Molecule)::String = m._name
 
 """
+Log (`@info`, once per structure) the modified amino acids the loader kept from the HETATM
+records of `atoms`, with the number of residues per residue name: `MSE`, `SEP`, ... are part
+of the polymer and stay in the molecule ([`polymer_selector`](@ref)).
+"""
+function _log_modified_amino_acids(pdb_path::AbstractString, atoms)::Nothing
+    kept = Dict{String,Set{Tuple{String,String}}}()
+    for at in atoms
+        ishetero(at) || continue
+        name = uppercase(resname(at))
+        name in STANDARD_AMINO_ACIDS && continue
+        is_amino_acid(name) || continue
+        push!(get!(kept, name, Set{Tuple{String,String}}()), _residue_key(at))
+    end
+    isempty(kept) && return nothing
+    stem = replace(splitext(basename(pdb_path))[1], r"_pH[0-9.]+_.*$" => "")
+    _warn_once("aminos", joinpath(dirname(pdb_path), stem); level = :info) do
+        counts = join(
+            ("$k: $(length(v)) residue(s)" for (k, v) in sort!(collect(kept); by = first)),
+            ", ",
+        )
+        "\"$stem\": kept modified amino acids from the HETATM records ($counts); " *
+        "they are hydrogenated through their standard parent where they have one"
+    end
+    return nothing
+end
+
+"""
 Parse whatever .pdb is at `pdb_path` into a Molecule.
 Works identically whether `pdb_path` is heavy-atom-only or hydrogenated:
 atoms are collected via standardselector alone (no heavyatomselector), so
@@ -236,7 +263,7 @@ file keeps its hydrogens too.
 
 # Arguments
 - `pdb_path`: path to any parseable .pdb, e.g. from [`resolve_structure`](@ref) or
-    [`resolve_hydrogens`](@ref).
+    [`resolve_hydrogens`](@ref BAYSOL.Hydrogenator.resolve_hydrogens).
 
 # Returns
 - `Molecule` built from each atom's element and coordinates.
@@ -246,14 +273,31 @@ function load_molecule(pdb_path::AbstractString)::Molecule
 
     key = splitext(basename(pdb_path))[1]
     local struc
+    # chains that reuse an id and their residue numbers are relabelled and true duplicate
+    # atoms dropped in a temporary copy (BioStructures refuses both; chain ids never
+    # reach the scattering model)
+    tmpdir = mktempdir()
     try
-        struc = BioStructures.read(pdb_path, PDBFormat)
-    catch e
-        throw(MoleculeError("failed parsing .pdb \"$pdb_path\": $(sprint(showerror, e))"))
+        copy = joinpath(tmpdir, basename(pdb_path))
+        read_path = sanitized_copy(pdb_path, copy) === nothing ? pdb_path : copy
+        try
+            struc = BioStructures.read(read_path, PDBFormat)
+        catch e
+            throw(
+                MoleculeError("failed parsing .pdb \"$pdb_path\": $(sprint(showerror, e))"),
+            )
+        end
+    finally
+        rm(tmpdir; recursive = true, force = true)
     end
     # first model whatever its number (an ensemble member
     # extracted to its own file keeps e.g. MODEL 63)
-    atoms = collectatoms(first(collectmodels(struc)), standardselector)
+    models = collectmodels(struc)
+    isempty(models) && throw(MoleculeError("no atom records in \"$pdb_path\""))
+    model = first(models)
+    atoms = collectatoms(model, _model_selector(model))
+
+    _log_modified_amino_acids(pdb_path, atoms)
 
     n        = length(atoms)
     elms_v   = Vector{String}(undef, n)

@@ -1,0 +1,22 @@
+=== Timing ===                                                                                                                                                      seconds    % wall    (JIT)
+wall clock  (seed_model → end of report)                                                                                                                               0.39     100.0    (0.3)
+  static build                                                                                                                                                         0.20      50.2    (0.1)
+    resolve_structure                                                                                                                                               7.0e-05
+    components            [17 residue names: 17 builtin, 0 cache, 0 download]                                                                                       6.4e-04
+    structure checks      [0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings]                                                                      0.01
+    classify              [nucleic: AMBER, titration none]                                                                                                          2.7e-03
+    pdb2pqr (nucleic, none)[cache hit]                                                                                                                                 0.01
+    modified nucleotide hydrogens[14 residues: 14 hydrogenated through their base, 0 without a base; 149 hydrogens placed, 232 in the free components' formulas]       0.02
+    heavy atoms           [1821 in, 1821 out; 1 restored, 0 added by pdb2pqr]                                                                                          0.03
+    load_molecule                                                                                                                                                      0.02
+    SASA                                                                                                                                                               0.04
+    shannon (diameter, binning)                                                                                                                                     4.4e-03
+    forward_cache                                                                                                                                                      0.05
+      vacuum + excluded volume (vols + B_lm)                                                                                                                           0.03
+      hydration (B_lm)                                                                                                                                                 0.01
+      Gram + r_m                                                                                                                                                    1.8e-04
+    seed_sampler (priors, WLS)                                                                                                                                      7.6e-05
+  sampling                                                                                                                                                                0       0.0    (0.0)
+  report write                                                                                                                                                         0.15
+  unaccounted                                                                                                                                                          0.04    (0.0)
+GC: 0 s

@@ -37,8 +37,8 @@ include(joinpath(@__DIR__, "..", "..", "utils", "fit_seed.jl"))
 # c1), −log π, reduced χ², evaluations, modes, starts, whitened.
 function run_search(seed, rng_seed; kw...)
     Random.seed!(rng_seed)
-    sp = Fit._sampling_space(seed, Fit.PROFILE(); kw...)
-    f = Fit._neglogπ(sp.ẑ, sp.μ, sp.σ, seed, Fit.PROFILE(), Fit.EXCL_VOL_CORR_TOL)
+    sp = Fit._sampling_space(seed; kw...)
+    f = Fit._neglogπ(sp.ẑ, sp.μ, sp.σ, seed, Fit.EXCL_VOL_CORR_TOL)
     ξ = Fit.Ξ(sp.μ .+ sp.σ .* sp.ẑ, seed.pr)
     ŷ, wfit, c1 = Fit.profiled_corrs(seed.wls, ξ, seed.fw; tables = seed.c1tab, tol = 1e-8)
     return (; p = [ξ[1], ξ[2], ξ[3], ξ[4], c1], f, χ² = Fit.reduced_chi2(wfit),

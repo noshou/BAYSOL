@@ -1,0 +1,23 @@
+=== Timing ===                                                                                                                seconds    % wall    (JIT)
+wall clock  (seed_model → end of report)                                                                                         3.39     100.0    (1.6)
+  static build                                                                                                                   3.00      88.7    (1.4)
+    resolve_structure                                                                                                         1.2e-04
+    components            [21 residue names: 21 builtin, 0 cache, 0 download]                                                 1.1e-03
+    structure checks      [0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings]                                0.02
+    classify              [protein: PARSE, titration propka]                                                                  3.2e-03
+    propka                [cache hit]                                                                                         8.6e-04
+    pdb2pqr               [cache miss]                                                                                           2.59
+    modified amino acid hydrogens[1 residues: 1 hydrogenated through their parent, 0 without a parent; 9 hydrogens placed]       0.02
+    heavy atoms           [1144 in, 1144 out; 0 restored, 0 added by pdb2pqr]                                                    0.03
+    load_molecule                                                                                                                0.28
+    SASA                                                                                                                         0.02
+    shannon (diameter, binning)                                                                                               4.2e-03
+    forward_cache                                                                                                                0.03
+      vacuum + excluded volume (vols + B_lm)                                                                                     0.03
+      hydration (B_lm)                                                                                                        5.4e-03
+      Gram + r_m                                                                                                              8.1e-05
+    seed_sampler (priors, WLS)                                                                                                8.1e-05
+  sampling                                                                                                                          0       0.0    (0.0)
+  report write                                                                                                                   0.16
+  unaccounted                                                                                                                    0.22    (0.0)
+GC: 0 s

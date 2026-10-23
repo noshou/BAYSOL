@@ -203,17 +203,6 @@ const θ_CASES = (
         end
     end
 
-    @testset "5-parameter (nucleotide) variant: round trip and log-Jacobian" begin
-        ξ5 = SVector(CRYSOL_SOLVENT_DENSITY, 1.05, -0.2, -2.0, 0.4)
-        θ5, corr5 = Θ(ξ5, PR)
-        @test all(isapprox.(Ξ(θ5, PR), ξ5; rtol = 1e-12))
-        @test isapprox(
-            corr5,
-            logjac(SVector(θ5[1], θ5[2], θ5[3], θ5[4]), PR) + θ5[5];
-            atol = 1e-3 * DEFAULT_ATOL,
-        )
-    end
-
     # …(250_000 draws)
     @testset "priors -> θ/ξ: full-prior draws round-trip and never throw" begin
         Random.seed!(20_260_920)

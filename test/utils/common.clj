@@ -129,9 +129,14 @@
 (def ^:private skip-dirs
     #{".git" "build" "_cache" "sources" "manuscript" ".CondaPkg" "node_modules"})
 
+;; Paths (relative to the root) that hold code of others: the hook files clj-kondo
+;; copies into .clj-kondo/imports. They are gitignored and not ours to format.
+(def ^:private skip-paths #{".clj-kondo/imports"})
+
 (defn code-files
     "Every code file under `path` (a file or a directory) as a path relative to the
-    root, sorted by path. Folders like .git and _cache are skipped."
+    root, sorted by path. Folders like .git and _cache, and the hook files clj-kondo
+    copies into .clj-kondo/imports, are skipped."
     [path]
     (let [root (str (fs/normalize *root*))
             rel #(str (fs/relativize root (fs/normalize %)))
@@ -143,8 +148,9 @@
             (->> (fs/list-dir path)
                 (sort-by str)
                 (mapcat (fn [e]
-                        (cond (fs/directory? e) (if (skip-dirs
-                                    (str (fs/file-name e)))
+                        (cond (fs/directory? e)
+                            (if (or (skip-dirs (str (fs/file-name e)))
+                                    (skip-paths (rel e)))
                                 []
                                 (code-files e))
                             (code? e) [(rel e)]

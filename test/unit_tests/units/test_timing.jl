@@ -99,7 +99,12 @@ using BAYSOL.Pipeline: _write_timing, _write_run_info
               occursin("(JIT)", lines[1])
         @test any(startswith("wall clock  (seed_model → end of report)"), lines)
         @test any(l -> startswith(l, "  static build"), lines)
-        @test any(l -> startswith(l, "    pdb2pqr") && occursin("[cache miss]", l), lines)
+        # a stage's note is a line of its own under it
+        i = findfirst(l -> startswith(l, "    pdb2pqr"), lines)
+        @test i !== nothing && occursin(r"21\.30\s*$", lines[i]) &&
+              strip(lines[i+1]) == "[cache miss]"
+        # no line of the table is wider than the label column plus the numbers
+        @test maximum(length, lines) <= 90
         # depth 2 → 6 spaces
         @test any(l -> startswith(l, "      hydration (SASA + B_lm)"), lines)
         @test any(l -> startswith(l, "  report write"), lines) &&
@@ -112,6 +117,12 @@ using BAYSOL.Pipeline: _write_timing, _write_run_info
             lines,
         )
         @test any(l -> startswith(l, "    seed_sampler") && occursin(r"\s0\s*$", l), lines)
+        # a long note is wrapped to NOTE_WIDTH and loses no word
+        long = join(("word$i" for i in 1:40), " ")
+        wrapped = BAYSOL.Pipeline._wrap_note(long, 30)
+        @test length(wrapped) > 1 && all(l -> length(l) <= 30, wrapped) &&
+              join(wrapped, " ") == long
+        @test BAYSOL.Pipeline._wrap_note("", 30) == String[]
         @test BAYSOL.Pipeline._fmt_seconds(25.9) == "25.90" &&
               BAYSOL.Pipeline._fmt_seconds(0.01) == "0.01" &&
               BAYSOL.Pipeline._fmt_seconds(0.0099) == "9.9e-03" &&

@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Exercises src/BulkElectronDensity/ (CalcDensity.jl, PMV.jl): bulk water electron
-# density (Kell-equation density -> e/A^-3, `_ρₑ_w`) and protein/non-protein
-# partial molar volumes at infinite dilution (`ϕ°`), including the
-# pH-dependent titration formula, ambiguity-code (B/J/Z) averaging, the
-# uncertainty backfill for solutes with no reported error, and the
-# `BulkElectronDensity` internal dispatch surface (`_common2iupac`, backend markers).
+# Exercises src/BulkElectronDensity/ (CalcDensity.jl, Titration.jl, Protein/,
+# NonBiological/, Nucleotide/, Polymers/): bulk water electron density (Kell-equation
+# density -> e/A^-3, `_ρₑ_w`) and protein/non-protein partial molar volumes at infinite
+# dilution (`ϕ°`), including the pH-dependent titration formula, ambiguity-code (B/J/Z)
+# averaging, the uncertainty backfill for solutes with no reported error, and the
+# `BulkElectronDensity` internal dispatch surface (`_common2target`, backend markers).
 #
 # Data provenance for every hardcoded number below: `_ρₑ_w` reference values
 # are a re-derivation of the published Kell (1975) density equation plus the same
@@ -365,16 +365,228 @@ end
     #                 ϕ° -- non-protein solute partial molar volume
     #------------------------------------------------------------------
 
+    #------------------------------------------------------------------
+    #                 Polymer solute (Polymers/)
+    #------------------------------------------------------------------
+
+    @testset "Polymer: PEG, PPG, Pluronic, glucan, cyclodextrin, Triton and Brij" begin
+        P = IFACE._polymer_ϕ°
+        # Ayranci & Sahin 2008 (10.1016/j.jct.2008.04.007), measured at 25 °C, nominal Mn
+        for (name, Mn, v) in (("PEG 200", 200, 171.9), ("PEG-400", 400, 339.0),
+            ("poly(ethylene glycol) 1000", 1000, 838.1), ("PEG3350", 3350, 2789.0),
+            ("PEG 10000", 10000, 8381.0))
+            Z, V, σ = P(name)
+            @test abs(V - v) < 2σ
+            @test Z == round(Int, 24 * (Mn - 18.015268) / 44.0526 + 10)
+        end
+        # the measured di- to pentaethylene glycols are covered by the same line
+        for (n, v) in ((2, 92.2), (3, 129.3), (4, 166.3), (5, 203.85))
+            @test abs(P("PEG n=$n")[2] - v) < 2P("PEG n=$n")[3]
+        end
+        @test P("PEG n=22") == P("peg-n=22")
+        @test P("PEG n=22")[2] ≈ 19.24 + 36.73 * 22
+        @test P("PEG n=22")[1] == 24 * 22 + 10
+        @test_throws ArgumentError P("PEG n=1")
+        # Senkow et al. 2002 (10.1039/b204404h): L64 2560, F68 7121, L35 1678 at 25 °C
+        for (nEO, nPO, v) in ((26, 30, 2560.0), (150, 30, 7121.0), (22, 16, 1678.0))
+            Z, V, σ = P("Pluronic nEO=$nEO nPO=$nPO")
+            @test abs(V - v) < 2σ
+            @test Z == 24nEO + 32nPO + 10
+        end
+        @test P("poloxamer nPO=30, nEO=150") == P("Pluronic nEO=150 nPO=30")
+        @test_throws ArgumentError P("Pluronic nEO=10 nPO=0")
+        # propylene glycol oligomers (n = 2 to 5) and maltooligosaccharides of the tables
+        for (name, v) in (("PPG n=3", 177.61), ("PPG n=5", 283.75), ("glucan n=7", 694.8))
+            _, V, σ = P(name)
+            @test abs(V - v) < 2σ
+        end
+        @test P("PPG-2000") == P("polypropylene glycol 2000")
+        @test P("dextran 40") == P("dextran 40000")
+        # measured dextran slope (0.630 mL/g), not the
+        # maltooligosaccharide line used for glucan/pullulan
+        let m = (40000 - 18.015268) / 162.1406
+            @test P("dextran 40000")[2] ≈ 16.6 + 102.2m
+            @test P("pullulan 40000")[2] ≈ 16.6 + 96.7m
+            @test P("dextran n=250")[2] ≈ 16.6 + 102.2 * 250
+        end
+        # UCON 50-HB: butanol plus EO and PO increments, equal masses of EO and PO
+        let (Z, V, σ) = P("UCON Mn=3930")
+            n_EO = 0.5 * (3930 - 74.1216) / 44.0526
+            n_PO = 0.5 * (3930 - 74.1216) / 58.0791
+            @test V ≈ 86.6 + 36.92n_EO + 53.13n_PO
+            @test Z == round(Int, 42 + 24n_EO + 32n_PO) && σ > 3
+            @test P("ucon 3930") == (Z, V, σ)
+        end
+        # a viscosity grade, not a molar mass
+        @test_throws ArgumentError P("UCON 50-HB-5100")
+        # fewer than one EO and one PO
+        @test_throws ArgumentError P("UCON 80")
+        @test P("pullulan 100000")[1] ==
+              round(Int, 86 * (100000 - 18.015268) / 162.1406 + 10)
+        # cyclodextrins: α, β, γ = 6, 7, 8 units (601.5, 710.0, 803.0)
+        for (n, v) in ((6, 601.5), (7, 710.0), (8, 803.0))
+            @test abs(P("cyclodextrin n=$n")[2] - v) < 2P("cyclodextrin n=$n")[3]
+        end
+        # Szymczyk & Taraba 2016: Triton X-114 (7.5 EO) micelle 516.6
+        _, V, σ = P("Triton nEO=7.5")
+        @test abs(V - 516.6) < 1e-9 && σ > 0
+        @test P("Triton nEO=9.5")[1] == 342
+        # alkyl ethoxylates are calibrated on
+        # 2-methoxy/ethoxy/butoxyethanol (C1E1, C2E1, C4E1)
+        for (name, v) in (("C1E1", 75.2), ("C2E1", 91.2), ("C4E1", 123.0))
+            @test abs(P(name)[2] - v) < 2P(name)[3]
+        end
+        @test P("Brij nC=12 nEO=23") == P("C12E23")
+        @test P("C12E23")[1] == 658                   # C58H118O24
+        @test_throws ArgumentError P("not a polymer")
+    end
+
+    @testset "Polymer: maltoside and LMNG families, and their fixed monomer grades" begin
+        P = IFACE._polymer_ϕ°
+        # decyl maltoside C22H42O11 and LMNG C47H88O22:
+        # the 3D-RISM estimates they are anchored on
+        @test P("maltoside nC=10") == (262, 373.3, 3.9)
+        @test P("LMNG nC=10")[[1, 3]] == (546, 5.6) && P("LMNG nC=10")[2] ≈ 782.9
+        # one CH₂ is the alkyl increment (two per
+        # carbon of an LMNG chain pair), Z of C24H46O11
+        @test P("alkyl maltoside nC=12")[1] == 278
+        @test P("maltoside nC=12")[2] ≈ 373.3 + 2 * IFACE.ALKYL_ETHOXYLATE_V0_PER_CH2
+        @test P("MNG nC=12")[2] ≈ 782.9 + 4 * IFACE.ALKYL_ETHOXYLATE_V0_PER_CH2
+        # the uncertainty grows with the distance from the calculated chain length
+        @test P("maltoside nC=14")[3] > P("maltoside nC=10")[3]
+        @test P("maltoside nC=8")[3] ≈ P("maltoside nC=12")[3]
+        @test_throws ArgumentError P("maltoside nC=0")
+        @test_throws ArgumentError P("LMNG nC=0")
+        # the fixed monomer grades are the same numbers, and the family reproduces them
+        @test P("decyl maltoside") == P("maltoside nC=10")
+        @test P("n-decyl-beta-d-maltopyranoside") == P("decyl maltoside")
+        @test P("lmng")[[1, 3]] == P("LMNG nC=10")[[1, 3]] &&
+              P("lmng")[2] ≈ P("LMNG nC=10")[2]
+        @test P("DDM")[1] == 278 && abs(P("DDM")[2] - P("maltoside nC=12")[2]) < 0.1
+        @test P("digitonin") == (660, 860.1, 8.0)
+        # they live in Polymers/ now, not in NonBiological
+        @test_throws ArgumentError IFACE.ϕ°("digitonin")
+    end
+
+    @testset "Polymer: fixed grades of Polymers/polymers.json through POLYMER_LOOKUP" begin
+        P = IFACE._polymer_ϕ°
+        @test P("tween 80") == (716, 1137.2, 3.0)
+        @test P("Tween 20")[2] ≈ 1037.0
+        @test P("amphipol A8-35")[2] ≈ 100.3
+        @test P("dextran")[2] ≈ 102.2
+        # Miklos 2010 (PVP), Ochiai 1981 (PVA) and Acosta
+        # 2017 (Ficoll 400), per monomer or per kDa
+        @test P("PVP") == (60, 89.4, 0.6) && P("polyvinylpyrrolidone K30") == P("pvp-40")
+        @test P("PVA") == (24, 33.2, 0.5) && P("polyvinyl alcohol") == P("pva")
+        @test P("Ficoll 400") == P("ficoll") && P("ficoll")[2] == 680.0
+        @test P("Ficoll 70")[2] == 650.0
+        @test P("brij 35")[2] ≈ 1062.7
+        @test abs(P("brij 35")[2] - P("C12E23")[2]) < 0.1
+        @test P("alpha-cyclodextrin")[1] == 516
+        # the charged glycylglycine forms are fixed predictions (no family: a charge marker)
+        @test P("glycylglycine(1+)")[2] ≈ 84.7
+    end
+
+    @testset "Polymer: peptides follow the protein scheme plus terminus titration" begin
+        P = IFACE._polymer_ϕ°
+        # measured zwitterion volumes of the tables
+        # (Hoiland): within the +-2 short-peptide uncertainty
+        for (seq, v) in (("GG", 76.3), ("GGG", 112.2), ("GGGG", 149.7), ("GGGGG", 187.1),
+            ("AA", 110.6), ("AAA", 163.8), ("AAAA", 220.1), ("GAG", 132.4), ("GSG", 133.1),
+            ("GV", 121.99), ("GL", 139.7), ("SS", 111.8))
+            _, V, σ = P("peptide $seq", 6.0)
+            @test abs(V - v) < 2.5σ
+        end
+        # naming routes agree
+        @test P("tetraalanine", 6.0) == P("peptide AAAA", 6.0)
+        @test P("glycylleucylglycine", 6.0) == P("peptide GLG", 6.0)
+        @test P("glycyl-α-aspartylglycine", 6.0) == P("peptide GDG", 6.0)
+        @test P("pentaglycine", 6.0) == P("peptide GGGGG", 6.0)
+        # termini titrate: cation at low pH is +10.5,
+        # anion at high pH is +4.8 over the zwitterion
+        v_zw = P("peptide GG", 6.0)[2]
+        @test P("peptide GG", 0.0)[2] - v_zw ≈ 10.5 atol = 0.15
+        @test P("peptide GG", 14.0)[2] - v_zw ≈ 4.8 atol = 0.15
+        # carboxyl half protonated
+        @test P("peptide GG", 3.3)[2] - v_zw ≈ 5.25 atol = 0.1
+        # compare with the fixed OBIGT predictions of the charged forms (within 3)
+        @test abs(P("peptide GG", 0.0)[2] - 84.7) < 3
+        @test abs(P("peptide GG", 14.0)[2] - 80.4) < 3
+        # pH uncertainty propagates only where the termini titrate
+        @test P("peptide GG", 3.3, 0.2)[3] > P("peptide GG", 3.3, 0.0)[3]
+        @test P("peptide GG", 6.0, 0.2)[3] ≈ P("peptide GG", 6.0, 0.0)[3] atol = 5e-3
+        @test_throws ArgumentError P("peptide G")
+    end
+
+    @testset "Polymer solute enters ρₑ and replaces a NonBiological entry's role" begin
+        ρ_peg, σ_peg =
+            IFACE.ρₑ(7.0, 0.0, IFACE.Solute[IFACE.Polymer(0.001, 1e-5, "PEG-3350")])
+        ρ_w, _ = IFACE.ρₑ(7.0, 0.0, IFACE.Solute[])
+        # 1 mM of a 3350 Da chain adds electrons
+        @test ρ_peg > ρ_w && σ_peg > 0
+        @test_throws ArgumentError IFACE.ρₑ(
+            7.0,
+            0.0,
+            IFACE.Solute[IFACE.Polymer(0.001, 1e-5, "not a polymer")],
+        )
+        # polymers are not NonBiological solutes
+        @test_throws ArgumentError IFACE.ϕ°("PEG-3350")
+    end
+
+    @testset "Polymers/polymers.{tsv,json,lookup}: JSON values are rule winners" begin
+        dir = joinpath(dirname(pathof(BAYSOL)), "BulkElectronDensity", "Polymers")
+        lines = readlines(joinpath(dir, "polymers.tsv"))
+        rank = Dict("measured" => 0, "derived" => 1, "predicted" => 2)
+        best = Dict{String,Tuple{Tuple{Int,Float64},Float64}}()
+        targets = Set(lowercase(t) for t in values(IFACE.POLYMER_LOOKUP))
+        names = String[]
+        for l in lines[2:end]
+            f = split(l, '\t'; keepempty = true)
+            push!(names, lowercase(f[2]))
+            f[7] == "rejected" && continue
+            k = lowercase(f[2])
+            r = (get(rank, f[7], 3), f[6] == "" ? Inf : parse(Float64, f[6]))
+            haskey(best, k) && best[k][1] <= r && continue
+            best[k] = (r, parse(Float64, f[5]))
+        end
+        @test sort(collect(keys(best))) == sort(collect(keys(IFACE._polymers)))
+        @test all(k -> IFACE._polymers[k][2] == best[k][2], keys(best))
+        @test all(n -> n in targets, names)            # every row's name is a lookup target
+        @test all(a -> a == lowercase(a), keys(IFACE.POLYMER_LOOKUP))
+        # no species lives in both lookups
+        @test isempty(intersect(keys(IFACE.POLYMER_LOOKUP), keys(IFACE.NONBIO_LOOKUP)))
+    end
+
     @testset "ϕ°(name): known solutes with an explicitly reported uncertainty" begin
         @test IFACE.ϕ°("sodium chloride") == (28, 16.61, 0.01)
         @test IFACE.ϕ°("potassium chloride") == (36, 26.81, 0.01)
         @test IFACE.ϕ°("tris") == (66, 90.63, 0.05)
         @test IFACE.ϕ°("hepes") == (128, 152.8, 3.1)
         @test IFACE.ϕ°("mops") == (112, 145.71, 0.4)
-        @test IFACE.ϕ°("guanidinium chloride") == (50, 69.92, 0.4)
+        # Polak 2021 (10.1016/j.jct.2021.106450) replaced Kumar 2001 (69.92 ± 0.4)
+        @test IFACE.ϕ°("guanidinium chloride") == (50, 67.53, 0.13)
         @test IFACE.ϕ°("calcium chloride") == (54, 17.839, 0.03)
         # DTT, IUPAC name direct
         @test IFACE.ϕ°("1,4-disulfanylbutane-2,3-diol") == (82, 103.6, 6.4)
+        # Kaczkowska 2019 (10.1016/j.molliq.2018.10.155):
+        # taurine is new, the smaller uncertainties win
+        @test IFACE.ϕ°("taurine") == (66, 71.13, 0.08)
+        @test IFACE.ϕ°("glycine") == (40, 43.11, 0.01)
+        @test IFACE.ϕ°("TMAO")[2] == 73.32
+        # Held 2010 densities (ectoines) and the 3D-RISM difference estimate of NEP
+        @test IFACE.ϕ°("ectoine") == (76, 102.8, 1.0)
+        @test IFACE.ϕ°("hydroxyectoine")[1] == 84 && IFACE.ϕ°("homoectoine")[1] == 84
+        @test IFACE.ϕ°("N-ethyl-2-pyrrolidone") == (62, 107.2, 1.5)
+        # Malevich 2006 NTA salts (measured) and ions (derived on the conventional scale)
+        @test IFACE.ϕ°("Na3NTA") == (130, 98.5, 0.5)
+        @test IFACE.ϕ°("NTA3-")[2] == 102.1 && IFACE.ϕ°("NiNTA-")[2] == 95.4
+        # Xie 1999 DTPA species: ion = salt − n·V(Na⁺), V(Na⁺) = −1.21
+        @test IFACE.ϕ°("Na5DTPA")[2] ≈ 196.47
+        @test IFACE.ϕ°("DTPA5-")[2] ≈ IFACE.ϕ°("Na5DTPA")[2] + 5 * 1.21 atol = 1e-9
+        # De Lisi 1990: the measured micellar volume outranks the additivity-derived monomer
+        @test IFACE.ϕ°("CTAB")[2] == 360.4 && IFACE.ϕ°("TTAB")[2] == 327.8
+        # Wang 2008 sodium cholate (measured) does not displace the measured cholate anion
+        @test IFACE.ϕ°("sodium cholate")[2] == 326.3 && IFACE.ϕ°("cholate")[2] == 318.59
     end
 
     # …when unreported
@@ -414,15 +626,125 @@ end
     # …for a mis-cased IUPAC name
     @testset "ϕ°(name): resolves through the common-name fallback even" begin
         # "Urea" is not itself a `_solutes` key (keys are lowercase IUPAC), so
-        # resolution falls through to `_common2iupac`, which lowercases before
-        # looking the name up in `COMMON_TO_IUPAC`.
+        # resolution falls through to `_common2target`, which lowercases before
+        # looking the name up in `NONBIO_LOOKUP`.
         @test IFACE.ϕ°("Urea") == IFACE.ϕ°("urea")
         @test IFACE.ϕ°("UREA") == IFACE.ϕ°("urea")
     end
 
+    @testset "ϕ°(name): 3D-RISM additions resolve from trivial, older, CAS names" begin
+        V(name) = IFACE.ϕ°(name)[2]
+        # bare and trivial names, the buffer's older
+        # IUPAC and CAS spellings, enantiomer descriptors
+        for (names, v) in (
+            (
+                ("tes", "TES buffer",
+                    "N-Tris(hydroxymethyl)methyl-2-aminoethanesulfonic acid",
+                    "Ethanesulfonic acid, 2-[[2-hydroxy-1,1-bis(hydroxymethyl)" *
+                    "ethyl]amino]-",
+                    "2-[tris(hydroxymethyl)methylamino]ethanesulphonic acid"), 137.8),
+            (
+                ("capso", "CAPSO", "3-(Cyclohexylamino)-2-hydroxy-1-propanesulfonic acid",
+                    "1-Propanesulfonic acid, 3-(cyclohexylamino)-2-hydroxy-", "(S)-CAPSO",
+                    "dl-capso",
+                    "(2R)-3-(cyclohexylamino)-2-hydroxypropane-1-sulfonic acid"), 172.4),
+            (
+                ("ampso", "AMPSO",
+                    "N-(1,1-Dimethyl-2-hydroxyethyl)-3-amino-2-hydroxypropanesulfonic acid",
+                    "(R)-AMPSO"), 157.0),
+            (
+                ("bis-tris propane", "BTP", "Bis Tris Propane",
+                    "1,3-Bis[tris(hydroxymethyl)methylamino]propane",
+                    "2,2'-(propane-1,3-diyldiimino)bis" *
+                    "[2-(hydroxymethyl)propane-1,3-diol]"), 211.3),
+            (
+                ("tcep", "tris(2-carboxyethyl)phosphine",
+                    "3,3',3''-phosphanetriyltripropionic acid",
+                    "Propanoic acid, 3,3',3''-phosphinidynetris-"), 182.8),
+            (("egta", "EGTA tetraanion", "egta(4-)"), 210.2),
+            (("hegta3-", "EGTA(3-)"), 227.9),
+            (("H2EGTA2-", "egta2-"), 234.9),
+            (
+                ("chapso",
+                    "3-[(3-Cholamidopropyl)dimethylammonio]-2-hydroxy-1-propanesulfonate",
+                    "(R)-CHAPSO"), 495.9))
+            for n in names
+                @test V(n) ≈ v
+            end
+        end
+        # a PubChem typo that OPSIN rejected (1-hydroxy instead of 2-hydroxy) was not added
+        @test_throws ArgumentError IFACE.ϕ°(
+            "3-(cyclohexylamino)-1-hydroxypropane-1-sulfonic acid",
+        )
+        # detergents live in Polymers: trivial, anomeric and
+        # older spellings reach the fixed monomer grades
+        P = IFACE._polymer_ϕ°
+        for n in ("DDM", "n-Dodecyl-β-D-maltoside", "Lauryl maltoside",
+            "dodecyl-beta-d-maltoside",
+            "n-dodecyl-alpha-d-maltoside",
+            "dodecyl 4-O-α-D-glucopyranosyl-β-D-glucopyranoside")
+            @test P(n)[2] ≈ 405.2
+        end
+        for n in ("MNG-3", "LMNG", "2,2-didecylpropane-1,3-bis-β-D-maltopyranoside")
+            @test P(n)[2] ≈ 782.9
+        end
+        @test P("Digitonine")[2] ≈ 860.1
+        # two aliases that named other compounds were removed: DMG
+        # is dimethylglycine, and digitoxigenin is not digitogenin
+        @test_throws ArgumentError P("dmg")
+        @test_throws ArgumentError P("digitoxigenin glycoside")
+    end
+
+    @testset "ϕ°(name): formula and abbreviation aliases reach the intended species" begin
+        # citrate, not isocitrate (the formula aliases once pointed at the isomer)
+        @test IFACE.ϕ°("c6h5o7-3") == IFACE.ϕ°("citrate")
+        @test IFACE.ϕ°("c6h6o7-2") == IFACE.ϕ°("hydrogen citrate")
+        @test IFACE.ϕ°("c6h8o7") == IFACE.ϕ°("citric acid")
+        @test IFACE.ϕ°("c6h5o7-3") != IFACE.ϕ°("isocitrate(3-)")
+        @test IFACE.ϕ°("gdnhcl") == IFACE.ϕ°("guanidinium chloride")
+        @test IFACE.ϕ°("glycerin") == IFACE.ϕ°("glycerol")
+        @test IFACE.ϕ°("naoh") == IFACE.ϕ°("sodium hydroxide")
+        @test IFACE.ϕ°("sodium sulfate decahydrate") == IFACE.ϕ°("sodium sulfate")
+        @test IFACE.ϕ°("spermidine")[1] == 82            # the 3+ form, as at pH 7
+        @test IFACE.ϕ°("spermine")[1] == 114
+    end
+
+    @testset "ϕ°(name): the 2026-10-22 gap-filling batch is internally consistent" begin
+        V(n) = IFACE.ϕ°(n)[2]
+        # additivity rows equal the sum of their ion rows
+        @test V("mncl2") ≈ V("manganese(2+)") + 2 * V("chloride")
+        @test V("koh") ≈ V("potassium(1+)") + V("hydroxide")
+        @test V("hbr") ≈ V("bromide")                       # strong acid, V(H+) = 0
+        @test V("tris-hcl") > V("tris")
+        # buffer salts are the anion plus the counter-ion
+        @test V("sodium hepes") ≈ V("hepes anion") + V("sodium(1+)")
+        @test V("hepes anion") > V("hepes")                  # anion above the zwitterion
+        # fatty acid series grows by about 15.5 per CH2
+        @test 14.5 < (V("palmitate") - V("myristate")) / 2 < 16.5
+        @test 14.5 < (V("stearic acid") - V("palmitic acid")) / 2 < 16.5
+        # ATP chain
+        @test V("atp(4-)") < V("atp disodium salt")
+        @test V("atpγs(4-)") > V("atp(4-)")
+        @test V("camp") < V("amp")
+        # hydrates share the anhydrous value; borate and lipids exist
+        @test V("trehalose dihydrate") ≈ V("trehalose")
+        @test V("sodium carbonate decahydrate") ≈ V("sodium carbonate")
+        @test V("borate") > 0
+        @test V("dmpc") > 600
+        Z(n) = IFACE.ϕ°(n)[1]
+        @test Z("copper chloride") == Z("copper(2+)") + 2 * Z("chloride")
+        # cationic guanidinium/amidinium RISM rows were left out on purpose
+        @test_throws ArgumentError IFACE.ϕ°("benzamidinium")
+        # the Gianni-Lepori tridecanoate row was rejected
+        @test_throws ArgumentError IFACE.ϕ°("tridecanoate")
+        # detergent monomer and poly(A) residue are Polymers
+        @test IFACE._polymer_ϕ°("dpc")[2] > 300
+        @test IFACE._polymer_ϕ°("poly(a)")[2] ≈ 189.13 atol = 0.5
+    end
+
     @testset "ϕ°(name): unknown solute throws ArgumentError" begin
         # a real, just-unmapped reagent
-        @test_throws ArgumentError IFACE.ϕ°("taurine")
+        @test_throws ArgumentError IFACE.ϕ°("iodoacetamide")
         @test_throws ArgumentError IFACE.ϕ°("not a real solute at all")
     end
 
@@ -447,18 +769,18 @@ end
     end
 
     #------------------------------------------------------------------
-    #                _common2iupac (private -- reached only via ϕ°(name))
+    #                _common2target (private -- reached only via ϕ°(name))
     #------------------------------------------------------------------
 
-    @testset "_common2iupac: hits, case-insensitivity, and misses" begin
+    @testset "_common2target: hits, case-insensitivity, and misses" begin
         # Not part of the public dispatch surface.
-        @test PMVMOD._common2iupac("urea") == ("urea", true)
-        @test PMVMOD._common2iupac("Urea") == ("urea", true)
-        @test PMVMOD._common2iupac("UREA") == ("urea", true)
-        @test PMVMOD._common2iupac("sodium chloride") == ("sodium chloride", true)
-        @test PMVMOD._common2iupac("calcium chloride") == ("calcium dichloride", true)
-        @test PMVMOD._common2iupac("taurine") == ("", false)
-        @test PMVMOD._common2iupac("") == ("", false)
+        @test PMVMOD._common2target("urea") == ("urea", true)
+        @test PMVMOD._common2target("Urea") == ("urea", true)
+        @test PMVMOD._common2target("UREA") == ("urea", true)
+        @test PMVMOD._common2target("sodium chloride") == ("sodium chloride", true)
+        @test PMVMOD._common2target("calcium chloride") == ("calcium dichloride", true)
+        @test PMVMOD._common2target("iodoacetamide") == ("", false)
+        @test PMVMOD._common2target("") == ("", false)
     end
 
     #------------------------------------------------------------------

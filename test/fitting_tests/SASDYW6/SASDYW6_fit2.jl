@@ -4,7 +4,6 @@ using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
-using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDYW6")
@@ -105,7 +104,7 @@ const FBA1_MOLARITY   = FBA1_CONC_MG_ML / FBA1_MW    # ≈ 2.548e-5 M ≈ 25.5 �
 const FBA1_MOLARITY_σ = MOLARITY_REL_SIGMA * FBA1_MOLARITY
 
 # Buffer components. Cross-checked against
-# src/BulkElectronDensity/NonBiological/common_to_iupac.json (case-insensitive
+# src/BulkElectronDensity/NonBiological/nonbio_lookup.json (case-insensitive
 # grep) and the sibling nonbiological.tsv.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
@@ -181,7 +180,7 @@ function run_sasdyw6_fit2(;
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seed_sasdyw6_fit2(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
+    res = BAYSOL.run_model(s, n_samples, n_adapt)
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
 end
 

@@ -5,8 +5,10 @@
 ;; without running anything.
 
 (ns cli-test
-    (:require [clojure.string :as str]
+    (:require [babashka.fs :as fs]
+        [clojure.string :as str]
         [clojure.test :refer [deftest is]]
+        [common :as c]
         [helpers :as h]))
 
 (defn- tool
@@ -41,7 +43,11 @@
 (deftest diagnose-list
     (let [r (tool "diagnose" "--list")]
         (is (= 0 (:status r)))
-        (is (= 27 (count (str/split-lines (str/trim (:out r))))))
+        ;; one line per fitting-test folder (derived: the folders are the source)
+        (is (= (count (filter #(and (fs/directory? %)
+                            (str/starts-with? (fs/file-name %) "SASD"))
+                        (fs/list-dir (c/in-root c/fit-dir))))
+                (count (str/split-lines (str/trim (:out r))))))
         (is (says? r
                 "SASDBS6  fit2_model1 fit2_model2"
                 "SASDMJ9  (single run, no tag)"))))
@@ -72,7 +78,8 @@
 (deftest diagnose-default-all-fits
     (let [r (tool "diagnose" "--warmup" "--dry-run")]
         (is (= 0 (:status r)))
-        (is (= 53
+        ;; one ID or ID:tag per run of every fitting test (the scripts' RUNS tables)
+        (is (= (count (c/specs-of (c/ids)))
                 (count (re-seq #"SASD\w+(?::\w+)?"
                         (last (str/split-lines (:out r)))))))))
 

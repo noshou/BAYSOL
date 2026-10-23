@@ -34,8 +34,8 @@ bits(x::AbstractArray{Float64}) = reinterpret(UInt64, collect(vec(x)))
 
 # One MAP search with base `b`: its fingerprint and the wall time of a second, warm call.
 function map_run(seed, b::UInt64)
-    sp = Fit._sampling_space(seed, Fit.PROFILE(); base = b)          # compile + the result
-    t = @elapsed Fit._sampling_space(seed, Fit.PROFILE(); base = b)  # warm timing
+    sp = Fit._sampling_space(seed; base = b)          # compile + the result
+    t = @elapsed Fit._sampling_space(seed; base = b)  # warm timing
     fp = hash((
         bits(Vector(sp.ẑ)),
         bits(Matrix(sp.S)),

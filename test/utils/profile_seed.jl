@@ -112,7 +112,7 @@ function main(args)
         )
         for st in seed.timing.stages
             st.group === :static || continue
-            @printf("  %s%-48s %7.3f s\n", "  "^st.depth, st.name, st.seconds)
+            @printf("  %s%-48s %7.3f s  %s\n", "  "^st.depth, st.name, st.seconds, st.note)
         end
         print_profile()
         nuts && profile_nuts(seed, delay, spec)

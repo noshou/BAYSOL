@@ -1,0 +1,130 @@
+common_name	iupac_name	formula	charge	v0_cm3_per_mol	uncertainty_cm3_per_mol	basis	doi
+PEG 200	poly(ethylene glycol) (Mn about 200)	C8H18O5	0	171.9	0.3	measured	10.1016/j.jct.2008.04.007
+PEG 300	poly(ethylene glycol) (Mn about 300)	C12H26O7	0	255.2	0.3	measured	10.1016/j.jct.2008.04.007
+PEG 400	poly(ethylene glycol) (Mn about 400)	C18H38O10	0	339	0.3	measured	10.1016/j.jct.2008.04.007
+PEG 550	poly(ethylene glycol) (Mn about 550)	C24H50O13	0	463.4	0.8	measured	10.1016/j.jct.2008.04.007
+PEG 600	poly(ethylene glycol) (Mn about 600)	C26H54O14	0	500.7	1.2	measured	10.1016/j.jct.2008.04.007
+PEG 1000	poly(ethylene glycol) (Mn about 1000)	C44H90O23	0	838.1	0.3	measured	10.1016/j.jct.2008.04.007
+PEG 1450	poly(ethylene glycol) (Mn about 1450)	C66H134O34	0	1201	0.6	measured	10.1016/j.jct.2008.04.007
+PEG 3350	poly(ethylene glycol) (Mn about 3350)	C152H306O77	0	2789	3	measured	10.1016/j.jct.2008.04.007
+PEG 8000	poly(ethylene glycol) (Mn about 8000)	C364H730O183	0	6702	4	measured	10.1016/j.jct.2008.04.007
+PEG 10000	poly(ethylene glycol) (Mn about 10000)	C454H910O228	0	8381	7	measured	10.1016/j.jct.2008.04.007
+PEG 200	poly(ethylene glycol) (Mn about 200)	C8H18O5	0	170.9	0.5	derived	10.1016/j.jct.2018.02.022
+PEG 300	poly(ethylene glycol) (Mn about 300)	C12H26O7	0	251.8	0.7	derived	10.1016/j.jct.2018.02.022
+PEG 400	poly(ethylene glycol) (Mn about 400)	C18H38O10	0	337.3	1.4	derived	10.1016/j.jct.2018.02.022
+PEG 600	poly(ethylene glycol) (Mn about 600)	C26H54O14	0	503.7	1.5	derived	10.1016/j.jct.2018.02.022
+PEG 200	poly(ethylene glycol) (Mn about 200)	C8H18O5	0	173.39	1.7	measured	10.1016/j.jct.2019.105916
+PEG 600	poly(ethylene glycol) (Mn about 600)	C26H54O14	0	515.51	5.2	measured	10.1016/j.jct.2019.105916
+PEG 400	poly(ethylene glycol) (Mn about 400)	C18H38O10	0	329.98	3.3	measured	10.1016/j.jct.2018.07.015
+PEG 4000	poly(ethylene glycol) (Mn about 4000)	C182H366O92	0	3132.58	31.3	rejected	10.1016/j.jct.2018.07.015
+PEG 4000	poly(ethylene glycol) (Mn about 4000)	C182H366O92	0	3341.42	33.4	measured	10.1021/acs.jced.0c01091
+PEG 6000	poly(ethylene glycol) (Mn about 6000)	C272H546O137	0	5040.37	50.4	measured	10.1021/acs.jced.2c00260
+PEG 600	poly(ethylene glycol) (Mn about 600)	C26H54O14	0	431.98	4.3	rejected	10.1021/acs.jced.2c00260
+PEG 400	poly(ethylene glycol) (Mn about 400)	C18H38O10	0	333.96	3.3	measured	10.1021/acs.jced.4c00470
+PEG 200	poly(ethylene glycol) (Mn about 200)	C8H18O5	0	170.2	1.7	measured	10.1021/acs.jced.4c00470
+Triton X-114	polyethylene glycol tert-octylphenyl ether (average 7.5 EO)	C30H54O9	0	516.6	2	measured	10.1007/s10973-016-5631-3 [micellar, 10 mM, apparent]
+Triton X-100	polyethylene glycol tert-octylphenyl ether	C34H62O11	0	590.4	8	derived	10.1007/s10973-016-5631-3 [TX-114 + 2.0 EO increment 36.9]
+Tween 80	polyoxyethylene (20) sorbitan monooleate	C64H124O26	0	1137.2	3	measured	10.1007/s10973-016-5631-3 [micellar, 10 mM, apparent]
+Tween 20	polyoxyethylene (20) sorbitan monolaurate	C58H114O26	0	1037	35	derived	10.1007/s10973-016-5631-3 [Tween 80 - 6 CH2 + saturation]
+Pluronic L31	poloxamer L31	C55H112O20	0	985.2	4	measured	10.1039/b204404h
+Pluronic L35	poloxamer L35	C92H186O39	0	1678	7	measured	10.1039/b204404h
+Pluronic 10R5	poloxamer 10R5	C100H202O42	0	1816	7	measured	10.1039/b204404h
+Pluronic L64	poloxamer L64	C142H286O57	0	2560	10	measured	10.1039/b204404h
+Pluronic F68	poloxamer F68	C390H782O181	0	7121	28	measured	10.1039/b204404h
+Pluronic P123	poloxamer P123	C287H576O110	0	5231	21	measured	10.1039/b204404h
+Pluronic F127	poloxamer 407	C595H1192O266	0	10846	40	derived	10.1039/b204404h [group additivity: 200 EO x 36.92 + 65 PO x 53.13 + 9]
+amphipol A8-35	poly(acrylic acid) amphipol A8-35 (35% COONa, 25% octylamide, 40% isopropylamide)	C6.2H10.7N0.65O1.35Na0.35	0	100.3	0.5	measured	10.1016/j.ab.2004.07.033
+dextran	dextran	C6H10O5	0	102.2	1.5	measured	arXiv:2604.09373
+polyoxyethylene (23) lauryl ether	polyoxyethylene (23) lauryl ether	C58H118O24	0	1062.7	21.3	derived	10.1007/978-3-642-71114-5_2
+polyoxyethylene (20) cetyl ether	polyoxyethylene (20) cetyl ether	C76H154O21	0	1015.6	20.3	derived	10.1007/978-3-642-71114-5_2
+nonylphenyl polyethylene glycol ether	nonylphenyl polyethylene glycol ether	C33H60O10	0	587.9	17.6	derived	10.1016/j.jct.2008.04.007
+diethylene glycol	2,2'-oxydi(ethan-1-ol)	C4H10O3	0	91.67	0.15	derived	10.1016/j.jct.2018.02.022
+diethylene glycol	2,2'-oxydi(ethan-1-ol)	C4H10O3	0	91.81	0.5	measured	10.1016/j.ctta.2024.100129
+triethylene glycol	2,2'-[ethane-1,2-diylbis(oxy)]di(ethan-1-ol)	C6H14O4	0	129.6	0.5	derived	10.1016/j.jct.2018.02.022
+triethylene glycol	2,2'-[ethane-1,2-diylbis(oxy)]di(ethan-1-ol)	C6H14O4	0	128.55	0.8	measured	10.1016/j.ctta.2024.100129
+alpha-cyclodextrin	alpha-cyclodextrin	C36H60O30	0	604.91	3	measured	10.1016/j.jct.2017.12.017
+beta-cyclodextrin	beta-cyclodextrin	C42H70O35	0	716.85	6	measured	10.1016/j.jct.2017.12.017
+diethylene glycol	2,2'-oxydi(ethan-1-ol)	C4H10O3	0	92.2		measured	10.1007/978-3-642-71114-5_2
+triethylene glycol	2,2'-[ethane-1,2-diylbis(oxy)]di(ethan-1-ol)	C6H14O4	0	129.3		measured	10.1007/978-3-642-71114-5_2
+tetraethylene glycol	2-{2-[2-(2-hydroxyethoxy)ethoxy]ethoxy}ethan-1-ol	C8H18O5	0	166.3		measured	10.1007/978-3-642-71114-5_2
+glycylglycine	glycylglycine	C4H8N2O3	0	76.3		measured	10.1007/978-3-642-71114-5_2
+triglycine	glycylglycylglycine	C6H11N3O4	0	112.2		measured	10.1007/978-3-642-71114-5_2
+tetraglycine	glycylglycylglycylglycine	C8H14N4O5	0	149.7		measured	10.1007/978-3-642-71114-5_2
+pentaglycine	glycylglycylglycylglycylglycine	C10H17N5O6	0	187.1		measured	10.1007/978-3-642-71114-5_2
+dialanine	alanylalanine	C6H12N2O3	0	110.6		measured	10.1007/978-3-642-71114-5_2
+trialanine	alanylalanylalanine	C9H17N3O4	0	163.8		measured	10.1007/978-3-642-71114-5_2
+tetraalanine	alanylalanylalanylalanine	C12H22N4O5	0	220.1		measured	10.1007/978-3-642-71114-5_2
+diserine	serylserine	C6H12N2O5	0	111.8		measured	10.1007/978-3-642-71114-5_2
+triserine	serylserylserine	C9H17N3O7	0	166.0		measured	10.1007/978-3-642-71114-5_2
+glycylalanine	glycylalanine	C5H10N2O3	0	92.7		measured	10.1007/978-3-642-71114-5_2
+alanylglycine	alanylglycine	C5H10N2O3	0	95.0		measured	10.1007/978-3-642-71114-5_2
+glycylalanylglycine	glycylalanylglycine	C7H13N3O4	0	132.4		measured	10.1002/bip.360301102
+glycylserylglycine	glycylserylglycine	C7H13N3O5	0	133.1		measured	10.1002/bip.360301102
+Diethylene glycol	2,2'-oxydi(ethan-1-ol)	C4H10O3	0	92.17		measured	10.1007/BF00646936
+Tetraethylene glycol	2-{2-[2-(2-hydroxyethoxy)ethoxy]ethoxy}ethan-1-ol	C8H18O5	0	166.25		measured	10.1007/BF00646936
+Pentaethylene glycol	pentaethylene glycol	C10H22O6	0	203.85		measured	10.1007/BF00646936
+Dipropylene glycol	dipropylene glycol	C12H28O6	0	124.64		measured	10.1007/BF00646936
+Pentapropylene glycol	pentapropylene glycol	C15H32O6	0	283.75		measured	10.1007/BF00646936
+Maltotriose	maltotriose	C18H32O16	0	304.8		rejected	10.1007/BF00646936
+alpha-Cyclodextrin	alpha-cyclodextrin	C36H60O30	0	602.0		measured	10.1007/BF00646936
+beta-Cyclodextrin	beta-cyclodextrin	C42H70O35	0	710.8		measured	10.1007/BF00646936
+Diethylene glycol	2,2'-oxydi(ethan-1-ol)	C4H10O3	0	92.22	0.05	measured	10.1007/978-3-642-71114-5_2
+Tetraethylene glycol	2-{2-[2-(2-hydroxyethoxy)ethoxy]ethoxy}ethan-1-ol	C8H18O5	0	166.31	0.08	measured	10.1007/978-3-642-71114-5_2
+Maltotriose	maltotriose	C18H32O16	0	307.0	2	measured	10.1007/978-3-642-71114-5_2
+alpha-Cyclodextrin	alpha-cyclodextrin	C36H60O30	0	601.5	1.0	measured	10.1007/978-3-642-71114-5_2
+beta-Cyclodextrin	beta-cyclodextrin	C42H70O35	0	710.0	1.0	measured	10.1007/978-3-642-71114-5_2
+gamma-Cyclodextrin	gamma-cyclodextrin	C48H80O40	0	803.0		measured	10.1007/978-3-642-71114-5_2
+Diglycine	glycylglycine	C4H8N2O3	0	76.3	0.1	measured	10.1007/978-3-642-71114-5_2
+Pentaglycine	glycylglycylglycylglycylglycine	C10H17N5O6	0	187.1	0.1	measured	10.1007/978-3-642-71114-5_2
+Glycyl-L-alanine	glycylalanine	C5H10N2O3	0	92.66	0.06	measured	10.1007/978-3-642-71114-5_2
+Glycyl-DL-alanine	glycylalanine	C5H10N2O3	0	92.37	0.02	measured	10.1007/978-3-642-71114-5_2
+Glycyl-L-valine	glycylvaline	C7H14N2O3	0	121.99	0.02	measured	10.1007/978-3-642-71114-5_2
+Glycyl-L-leucine	glycylleucine	C8H16N2O3	0	139.7	0.07	measured	10.1007/978-3-642-71114-5_2
+Triethylene glycol	2,2'-[ethane-1,2-diylbis(oxy)]di(ethan-1-ol)	C6H14O4	0	129.27		measured	10.1007/BF00646936
+Tetrapropylene glycol	tetrapropylene glycol	C12H26O5	0	231.36		measured	10.1007/BF00646936
+Triethylene glycol	2,2'-[ethane-1,2-diylbis(oxy)]di(ethan-1-ol)	C6H14O4	0	129.27	0.04	measured	10.1007/978-3-642-71114-5_2
+Triglycine	glycylglycylglycine	C6H11N3O4	0	112.2	0.3	measured	10.1007/978-3-642-71114-5_2
+Tetraglycine	glycylglycylglycylglycine	C8H14N4O5	0	149.7	0.1	measured	10.1007/978-3-642-71114-5_2
+Tripropylene glycol	tripropylene glycol	C9H20O4	0	177.61		measured	10.1007/BF00646936
+maltotetraose	maltotetraose	C24H42O21	0	400.6	3.3	measured	Hourston, D. J. (1967). Physicochemical studies on starches and other polymers in solution (PhD thesis).
+maltopentaose	maltopentaose	C30H52O26	0	500.6	3.3	measured	Hourston, D. J. (1967). Physicochemical studies on starches and other polymers in solution (PhD thesis).
+maltohexaose	maltohexaose	C36H62O31	0	596.5	5	measured	Hourston, D. J. (1967). Physicochemical studies on starches and other polymers in solution (PhD thesis).
+maltoheptaose	maltoheptaose	C42H72O36	0	694.8	5.8	measured	Hourston, D. J. (1967). Physicochemical studies on starches and other polymers in solution (PhD thesis).
+maltooctaose	maltooctaose	C48H82O41	0	814.7	24.4	derived	10.1111/j.1365-2621.1965.tb00297.x
+maltononaose	maltononaose	C54H92O46	0	889.9	26.7	derived	10.1111/j.1365-2621.1965.tb00297.x
+maltodecaose	maltodecaose	C60H102O51	0	997.8	29.9	derived	10.1111/j.1365-2621.1965.tb00297.x
+Gly-Arg+-Gly	glycyl-arginylglycine(1+)	C10H21N6O4	1	184.9		predicted	10.5194/bg-3-311-2006
+Gly-Asn-Gly	glycyl-asparaginylglycine	C8H14N4O5	0	150.1		predicted	10.5194/bg-3-311-2006
+Gly-Cys-Gly	glycyl-cysteinylglycine	C7H13N3O4S	0	143.7		predicted	10.5194/bg-3-311-2006
+Gly-Gln-Gly	glycyl-glutaminylglycine	C9H16N4O5	0	162.5		predicted	10.5194/bg-3-311-2006
+Gly-His-Gly	glycyl-histidylglycine	C10H15N5O4	0	172		predicted	10.5194/bg-3-311-2006
+Gly-Ile-Gly	glycyl-isoleucylglycine	C10H19N3O4	0	176.9		predicted	10.5194/bg-3-311-2006
+Gly-Leu-Gly	glycyl-leucylglycine	C10H19N3O4	0	176.4		predicted	10.5194/bg-3-311-2006
+Gly-Lys+-Gly	glycyl-lysylglycine(1+)	C10H21N4O4	1	177		predicted	10.5194/bg-3-311-2006
+Gly-Met-Gly	glycyl-methionylglycine	C9H17N3O4S	0	177		predicted	10.5194/bg-3-311-2006
+Gly-Phe-Gly	glycyl-phenylalanylglycine	C13H17N3O4	0	193.1		predicted	10.5194/bg-3-311-2006
+Gly-Pro-Gly	glycyl-prolylglycine	C9H15N3O4	0	145.2		predicted	10.5194/bg-3-311-2006
+Gly-Thr-Gly	glycyl-threonylglycine	C8H15N3O5	0	145.8		predicted	10.5194/bg-3-311-2006
+Gly-Tyr-Gly	glycyl-tyrosylglycine	C13H17N3O5	0	194.9		predicted	10.5194/bg-3-311-2006
+Gly-Val-Gly	glycyl-valylglycine	C9H17N3O4	0	160.3		predicted	10.5194/bg-3-311-2006
+Gly-Asp-Gly	glycyl-α-aspartylglycine	C8H13N3O6	0	143.6		predicted	10.5194/bg-3-311-2006
+Gly-Glu-Gly	glycyl-α-glutamylglycine	C9H15N3O6	0	159.9		predicted	10.5194/bg-3-311-2006
+diglycine-	glycylglycinate	C4H7N2O3	-1	80.4		predicted	10.1007/s00239-014-9616-1
+diglycine+	glycylglycine(1+)	C4H9N2O3	1	84.7		predicted	10.1007/s00239-014-9616-1
+triglycine-	glycylglycylglycinate	C6H10N3O4	-1	115.1		predicted	10.1007/s00239-014-9616-1
+triglycine+	glycylglycylglycine(1+)	C6H12N3O4	1	119.4		predicted	10.1007/s00239-014-9616-1
+glutathione	γ-glutamylcysteinylglycine	C10H17N3O6S	0	193.6		obigt-unverified	OBIGT/CHNOSZ commit 7780ddc key Dic07
+decyl maltoside	decyl maltoside	C22H42O11	0	373.3	3.9	estimated	3D-RISM of decyl beta-D-maltoside, 367.7 (SD 1.8 over 10 conformers), plus a group-wise correction (+5.6) fitted to 72 solutes of the NonBiological table with measured volumes (leave-one-out RMS 3.5); AmberTools 3D-RISM, cSPC/E, KH, GAFF2/AM1-BCC; method ~/dimethylarsinic-acid/partial_molar_volume_method.md; ~/pmv_work/rism2/ [monomer, infinite dilution, not micellar]
+dodecyl maltoside	dodecyl maltoside	C24H46O11	0	405.2	4.0	estimated	decyl maltoside 373.3 plus 2 CH2 at 15.93 (the alkyl ethoxylate increment, which agrees with the measured sulfonate series 15.6 to 16.2); not calculated directly [monomer, infinite dilution, not micellar]
+LMNG	lauryl maltose neopentyl glycol	C47H88O22	0	782.9	5.6	estimated	3D-RISM of LMNG, 768.8 (SD 2.3 over 6 conformers), plus a group-wise correction (+14.1) fitted to 72 solutes of the NonBiological table with measured volumes (leave-one-out RMS 3.5); AmberTools 3D-RISM, cSPC/E, KH, GAFF2/AM1-BCC; ~/pmv_work/rism2/ [monomer, infinite dilution, not micellar]
+digitonin	digitonin	C56H92O29	0	860.1	8.0	estimated	3D-RISM of digitonin, 840.2 (SD 3.6 over 10 conformers), plus a group-wise correction (+19.9) fitted to 72 solutes of the NonBiological table with measured volumes (leave-one-out RMS 3.5); the spiroketal aglycone has no measured analogue, so +-5 is added for it; AmberTools 3D-RISM, cSPC/E, KH, GAFF2/AM1-BCC; ~/pmv_work/rism2/ [monomer, infinite dilution, not micellar]
+PVP	poly(1-vinylpyrrolidin-2-one)	C6H9NO	0	89.4	0.6	measured	10.1021/bi100727y [per monomer unit; Table 1 partial specific volumes 0.807, 0.806 and 0.798 mL/g for PVP-10, -29 and -55, mean 0.804 x 111.14; dried PVP in water, DMA 5000, temperature not stated; Acosta 2017 10.1002/pro.3316 uses 0.80]
+PVA	poly(vinyl alcohol)	C2H4O	0	33.2	0.5	measured	10.1295/polymj.13.351 [per monomer unit; 0.754 mL/g x 44.053, 25 C in water, 99.9 mol % saponified, Mw 94 500; the 80 % hydrolysed grades differ (Crowther and Eagland)]
+Ficoll 400	Ficoll	Ficoll (per 1000 Da)	0	680	10	measured	10.1002/pro.3316 [per 1000 Da of polymer; 0.68 mL/g, DMA 5000 densities, linear in mass fraction; no uncertainty printed, 10 is ours; the electron count 540 per 1000 Da is our estimate from the sucrose plus glyceryl-ether composition]
+Ficoll 70	Ficoll 70	Ficoll (per 1000 Da)	0	650	30	cited-unverified	10.1002/pro.3316 [per 1000 Da; 0.65 mL/g cited by the paper from Christiansen 2010 (its ref 79), which was not read; 30 is ours]
+dextran	dextran	C6H10O5	0	106.7	3	cited-unverified	10.1002/pro.3316 [per residue; 0.6579 mL/g x 162.14 cited by the paper from Durchschlag (its ref 78), not read; the measured 102.2 (Migliorini 2026) wins]
+dodecylphosphocholine	dodecylphosphocholine	C17H38NO4P	0	312.41	9.05	estimated	direct 3D-RISM of the zwitterionic monomer (4 seeds) with the group-wise correction fitted to 72 solutes of the NonBiological table (P diester and quaternary N are outside the fitted groups: extra 8); AmberTools 3D-RISM, cSPC/E, KH, GAFF2/AM1-BCC; ~/pmv_work/rism4/; monomer value, not micellar
+poly(A)	poly(adenylic acid)	C10H11N5O6P	-1	189.13	3	predicted	per nucleotide residue (a monomer unit of the polymer, sodium counter-ion separate): measured nucleoside 171.43 plus the phosphate group increment 17.7 used by the RNA backend (Nucleotide/); the residue of the table equals AMP sodium salt 189.1 for A
+poly(G)	poly(guanylic acid)	C10H11N5O7P	-1	193.1	3	predicted	per nucleotide residue (a monomer unit of the polymer, sodium counter-ion separate): measured nucleoside 175.4 plus the phosphate group increment 17.7 used by the RNA backend (Nucleotide/); the residue of the table equals AMP sodium salt 189.1 for A
+poly(C)	poly(cytidylic acid)	C9H11N3O7P	-1	171.89	3	predicted	per nucleotide residue (a monomer unit of the polymer, sodium counter-ion separate): measured nucleoside 154.19 plus the phosphate group increment 17.7 used by the RNA backend (Nucleotide/); the residue of the table equals AMP sodium salt 189.1 for A
+poly(U)	poly(uridylic acid)	C9H10N2O8P	-1	170.02	3	predicted	per nucleotide residue (a monomer unit of the polymer, sodium counter-ion separate): measured nucleoside 152.32 plus the phosphate group increment 17.7 used by the RNA backend (Nucleotide/); the residue of the table equals AMP sodium salt 189.1 for A

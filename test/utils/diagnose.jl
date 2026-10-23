@@ -59,7 +59,7 @@ end
 # and FoXS evaluate). Nothing is sampled: the MAP search of the fit is enough.
 function residual_report(out, seed; label)
     Fit = BAYSOL.Inference
-    sp = Fit._sampling_space(seed, Fit.PROFILE())
+    sp = Fit._sampling_space(seed)
     ξ = Fit.Ξ(sp.μ .+ sp.σ .* sp.ẑ, seed.pr)
     ŷ, wfit, _ = Fit.profiled_corrs(seed.wls, ξ, seed.fw; tables = seed.c1tab)
     pred = Fit.wls_predict(wfit, ŷ)

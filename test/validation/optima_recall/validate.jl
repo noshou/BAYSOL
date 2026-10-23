@@ -135,9 +135,8 @@ struct Problem{S}
 end
 
 function Problem(seed)
-    l = F.PROFILE()
     μ, σ = F.θ_prior_moments(seed.pr)
-    f = z -> F._neglogπ(SV{4}(z...), μ, σ, seed, l, F.EXCL_VOL_CORR_TOL)
+    f = z -> F._neglogπ(SV{4}(z...), μ, σ, seed, F.EXCL_VOL_CORR_TOL)
     function fg!(G, z)
         dr = DiffResults.GradientResult(z)
         ForwardDiff.gradient!(dr, f, z)
@@ -186,8 +185,7 @@ end
 # ---------------------------------------------------------------------------------
 
 function hessian_at(P::Problem, z)
-    H = F._fd_hessian(SV{4}(z...), 1e-3 .* ones(SV{4,Float64}), P.μ, P.σ, P.seed,
-        F.PROFILE())
+    H = F._fd_hessian(SV{4}(z...), 1e-3 .* ones(SV{4,Float64}), P.μ, P.σ, P.seed)
     return all(isfinite, H) ? Symmetric(Matrix(H)) : nothing
 end
 

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Exercises src/MolecularStructure/Pdb2pqr.jl: the pdb2pqr subprocess wrapper
+# Exercises src/Hydrogenator/Pdb2pqr.jl: the pdb2pqr subprocess wrapper
 # that adds explicit hydrogens (`resolve_hydrogens`), its pKa-record-driven,
 # per-chain N-/C-terminus override (`_terminus_groups`), and the generalized
 # Molecule loader (`load_molecule`). Needs real network/subprocess
@@ -8,9 +8,10 @@
 # the live propka3 test in test_propka.jl.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.MolecularStructure: resolve_hydrogens, load_molecule, Pdb2pqrError,
-    MoleculeError,
-    _terminus_groups, propka_pKas, _store_dir,
+using BAYSOL.Hydrogenator: resolve_hydrogens, Pdb2pqrError, Propka, NoTitration,
+    FORCE_FIELDS, _terminus_groups, propka_pKas, _hydrogens_path
+using BAYSOL.MolecularStructure: load_molecule, MoleculeError, _store_dir,
+    LocalPathSource, resolve_structure,
     Molecule, n_atoms, elms, coords_cartesian
 
 # A 7-"residue" fragment (not a real contiguous chain -- each residue's real
@@ -169,7 +170,7 @@ END
     # Clean any stale cache entries from a prior run so caching assertions
     # below are meaningful.
     for pH in (1.0, 7.0, 10.0)
-        rm(joinpath(_store_dir(), "pdb2pqr-TEST_pH$(pH).pdb"); force = true)
+        rm(joinpath(_store_dir(), "pdb2pqr-TEST_pH$(pH)_parse_propka.pdb"); force = true)
     end
 
     local recs
@@ -186,7 +187,11 @@ END
     @test 0 < cterm.pKa < 14
 
     @testset "nonexistent input raises Pdb2pqrError" begin
-        @test_throws Pdb2pqrError resolve_hydrogens("/no/such/file/nope.pdb", recs, 7.0)
+        @test_throws Pdb2pqrError resolve_hydrogens(
+            "/no/such/file/nope.pdb",
+            7.0;
+            titration = Propka(recs),
+        )
     end
 
     @testset "termini flags computed per chain from pKa records" begin
@@ -241,7 +246,7 @@ END
 
     # …confirmed atom names
     @testset "resolve_hydrogens at pH 1: neutral (protonated) C-terminus" begin
-        out = resolve_hydrogens(pdb_path, recs, 1.0)
+        out = resolve_hydrogens(pdb_path, 1.0; titration = Propka(recs))
         @test isfile(out)
         @test dirname(out) == _store_dir()
         lines = readlines(out)
@@ -266,7 +271,7 @@ END
     end
 
     @testset "resolve_hydrogens at pH 10: neutral (deprotonated) N-terminus" begin
-        out = resolve_hydrogens(pdb_path, recs, 10.0)
+        out = resolve_hydrogens(pdb_path, 10.0; titration = Propka(recs))
         @test isfile(out)
         lines = readlines(out)
 
@@ -282,18 +287,18 @@ END
     end
 
     @testset "caching: repeat call for the same (stem, pH) does not re-run pdb2pqr" begin
-        out1 = resolve_hydrogens(pdb_path, recs, 7.0)
+        out1 = resolve_hydrogens(pdb_path, 7.0; titration = Propka(recs))
         @test isfile(out1)
         mtime1 = mtime(out1)
 
         sleep(1.1)   # coarse mtime resolution on some filesystems
-        out2 = resolve_hydrogens(pdb_path, recs, 7.0)
+        out2 = resolve_hydrogens(pdb_path, 7.0; titration = Propka(recs))
         @test out2 == out1
         @test mtime(out2) == mtime1   # untouched: cache hit, no re-run
     end
 
     @testset "load_molecule: more atoms than heavy-only, no non-finite coords" begin
-        out = resolve_hydrogens(pdb_path, recs, 7.0)
+        out = resolve_hydrogens(pdb_path, 7.0; titration = Propka(recs))
         mol = load_molecule(out)
         @test mol isa Molecule
 
@@ -313,7 +318,7 @@ END
 
     rm(dir; force = true, recursive = true)
     for pH in (1.0, 7.0, 10.0)
-        rm(joinpath(_store_dir(), "pdb2pqr-TEST_pH$(pH).pdb"); force = true)
+        rm(joinpath(_store_dir(), "pdb2pqr-TEST_pH$(pH)_parse_propka.pdb"); force = true)
     end
     rm(joinpath(_store_dir(), "pdb2pqr-TEST.pka"); force = true)
 
@@ -334,7 +339,7 @@ END
     dir2 = mktempdir()
     pdb_path2 = joinpath(dir2, "pdb2pqr-TWOCHAIN.pdb")
     write(pdb_path2, _TWO_CHAIN_PDB)
-    rm(joinpath(_store_dir(), "pdb2pqr-TWOCHAIN_pH3.1.pdb"); force = true)
+    rm(joinpath(_store_dir(), "pdb2pqr-TWOCHAIN_pH3.1_parse_propka.pdb"); force = true)
 
     local recs2
     try
@@ -356,7 +361,7 @@ END
         groups = _terminus_groups(recs2, 3.1, ["A", "B"])
         @test length(groups) == 2   # genuine per-chain conflict, not collapsed to one run
 
-        out = resolve_hydrogens(pdb_path2, recs2, 3.1)
+        out = resolve_hydrogens(pdb_path2, 3.1; titration = Propka(recs2))
         @test isfile(out)
         lines = readlines(out)
 
@@ -375,7 +380,50 @@ END
     end
 
     rm(dir2; force = true, recursive = true)
-    rm(joinpath(_store_dir(), "pdb2pqr-TWOCHAIN_pH3.1.pdb"); force = true)
+    rm(joinpath(_store_dir(), "pdb2pqr-TWOCHAIN_pH3.1_parse_propka.pdb"); force = true)
     rm(joinpath(_store_dir(), "pdb2pqr-TWOCHAIN.pka"); force = true)
 
+end
+
+@testset "Hydrogenator: force field and titration method are choices" begin
+
+    @testset "an unknown force field raises Pdb2pqrError before any run" begin
+        f = joinpath(mktempdir(), "ff-TEST.pdb")
+        write(f, _TEST_PDB)
+        @test_throws Pdb2pqrError resolve_hydrogens(f, 7.0; ff = :gromos)
+    end
+
+    @testset "the cache key separates force field and titration method" begin
+        paths = [
+            _hydrogens_path("x.pdb", 7.0, ff, t)
+            for ff in (:parse, :amber), t in (Propka(), NoTitration())
+        ]
+        @test allunique(paths)
+        @test all(p -> dirname(p) == _store_dir(), paths)
+        @test endswith(
+            _hydrogens_path("x.pdb", 7.0, :amber, NoTitration()),
+            "x_pH7.0_amber_notitration.pdb",
+        )
+        # the knob PROPKA is not implied: pKas are optional, the default needs none
+        @test Propka().pKas === nothing
+        @test :amber in FORCE_FIELDS && :parse in FORCE_FIELDS
+    end
+
+    @testset "AMBER without titration hydrogenates a B-DNA duplex (no PROPKA)" begin
+        fix = joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1BNA-TEST.pdb")
+        path = resolve_structure(LocalPathSource(fix))
+        out = _hydrogens_path(path, 7.0, :amber, NoTitration())
+        rm(out; force = true)
+        try
+            hpath = resolve_hydrogens(path, 7.0; ff = :amber)
+            @test hpath == out
+            @test isfile(hpath)
+            heavy = n_atoms(load_molecule(path))
+            @test n_atoms(load_molecule(hpath)) > heavy
+            # no PROPKA run happened for this structure
+            @test !isfile(joinpath(_store_dir(), "1BNA-TEST.pka"))
+        finally
+            rm(out; force = true)
+        end
+    end
 end

@@ -17,8 +17,8 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using BAYSOL.MolecularStructure: Molecule, create, coords_cartesian, coords_spherical,
     radii, vols, r_max, elms, name,
     MoleculeError, _to_tuples,
-    LocalPathSource, resolve_structure, propka_pKas, resolve_hydrogens,
-    load_molecule, _store_dir
+    LocalPathSource, resolve_structure, load_molecule, _store_dir
+using BAYSOL.Hydrogenator: propka_pKas, resolve_hydrogens, Propka
 using BAYSOL.Geometry: sphere_volume
 using BAYSOL.Scattering: mean_atomic_radius
 using BAYSOL: Geometry
@@ -363,12 +363,12 @@ _forced_rmax(m)  = getfield(getfield(m, :_r_max), :done)
         # Clear any stale cache entries so PROPKA/Pdb2pqr genuinely run fresh.
         stem = "SASDMJ9_fit1_model1"
         rm(joinpath(_store_dir(), "$(stem).pka"); force = true)
-        rm(joinpath(_store_dir(), "$(stem)_pH7.5.pdb"); force = true)
+        rm(joinpath(_store_dir(), "$(stem)_pH7.5_parse_propka.pdb"); force = true)
 
         pH          = 7.5   # matches test/fitting_tests/SASDMJ9/SASDMJ9.jl's PH
         path        = resolve_structure(LocalPathSource(pdb_path))
         pKa_records = propka_pKas(path)
-        hpath       = resolve_hydrogens(path, pKa_records, pH)
+        hpath       = resolve_hydrogens(path, pH; titration = Propka(pKa_records))
         mol         = load_molecule(hpath)
 
         @test any(e -> e == "h", elms(mol))   # explicit hydrogens really were added
