@@ -20,7 +20,6 @@ using Random: Random, AbstractRNG
 # Priors
 #----------------
 
-
 """
 CRYSOL3's fitting limits `(lo, hi)` on the convex/concave shell contrasts
 δρ₁, δρ₂, in units of [`UNIT_OF_δρ`](@ref): "The limits during the fitting are
@@ -166,15 +165,14 @@ end
     WLSFit{T}
 
 Result of [`wls_fit`](@ref): the fitted `I_calc(q)` = scale·`y_model(q)` +
-`bkgrnd_corr` plus everything needed to use the fit as a (profiled or
-marginalised) Gaussian log-likelihood term.
+`bkgrnd_corr` plus everything needed to use the fit as a profiled Gaussian
+log-likelihood term.
 """
 struct WLSFit{T}
     scale::T
     bkgrnd_corr::T
     chi2::T
     dof::Int
-    det_XtWX::T
     sum_log_var::T
 end
 
@@ -222,69 +220,6 @@ const ENVELOPE_TAYLOR_LIMIT = 0.05
 
 # 1/0!, 1/1!, …, 1/8!: the Taylor polynomial of eˣ, degree 8
 const _EXP_TAYLOR = ntuple(n -> 1 / factorial(n - 1), 9)
-
-#----------------
-# Likelihood
-#----------------
-
-"Dispatch tag selecting profile vs. marginal log-likelihood in [`_ll`](@ref)."
-abstract type LIKELIHOOD end
-
-"""
-Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The forward
-model produces a predicted curve `y_model(q)`, but the data `I_exp(q)` sits at
-some unknown overall scale scale and background offset `bkgrnd_corr`, i.e.
-`I_calc` = scale·`y_model` + `bkgrnd_corr`. `wls_fit` (ProfiledCorrs.jl) fits
-(scale, `bkgrnd_corr`) in closed form (2-parameter weighted linear regression),
-and reports the resulting Gaussian log-likelihood two ways, selected by l:
-
-- `l = PROFILE()`: treat (scale, `bkgrnd_corr`) as pinned at their best-fit
-    values (a point estimate) [`wls_prof_ll`](@ref):
-
-        -½χ² - ½ Σln(σᵢ²) - ½n·ln(2π)
-
-- `l = MARGINAL()`: instead of pinning (scale, `bkgrnd_corr`), integrate
-    them out analytically under a flat prior (Gaussian integral in closed
-    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref).
-    This adds a correction term:
-
-        -½ln(det(XᵀWX))
-
-    which lets uncertainty in scale/background flow into the posterior on the
-    physical parameters, instead of freezing it out.
-"""
-struct PROFILE<:LIKELIHOOD
-    type::AbstractString
-    PROFILE() = new("profile_log_likelihood")
-end
-
-"""
-Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The forward
-model produces a predicted curve `y_model(q)`, but the data `I_exp(q)` sits at
-some unknown overall scale scale and background offset `bkgrnd_corr`, i.e.
-`I_calc` = scale·`y_model` + `bkgrnd_corr`. `wls_fit` (ProfiledCorrs.jl) fits
-(scale, `bkgrnd_corr`) in closed form (2-parameter weighted linear regression),
-and reports the resulting Gaussian log-likelihood two ways, selected by l:
-
-- `l = PROFILE()`: treat (scale, `bkgrnd_corr`) as pinned at their best-fit
-    values (a point estimate) [`wls_prof_ll`](@ref):
-
-        -½χ² - ½ Σln(σᵢ²) - ½n·ln(2π)
-
-- `l = MARGINAL()`: instead of pinning (scale, `bkgrnd_corr`), integrate
-    them out analytically under a flat prior (Gaussian integral in closed
-    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref).
-    This adds a correction term:
-
-        -½ln(det(XᵀWX))
-
-    which lets uncertainty in scale/background flow into the posterior on the
-    physical parameters, instead of freezing it out.
-"""
-struct MARGINAL<:LIKELIHOOD
-    type::AbstractString
-    MARGINAL() = new("marginal_log_likelihood")
-end
 
 #----------------
 # Sampler
@@ -338,7 +273,7 @@ fourth digit; the f test ends such a start. 1e-5 stopped some starts too early
 const MAP_F_ABSTOL = 1e-6
 
 """
-Successive iterations with a decrease below [`MAP_F_ABSTOL`](@ref) that end an L-BFGS start.
+Successive iterations w/ a decrease below [`MAP_F_ABSTOL`](@ref) that end an L-BFGS start.
 """
 const MAP_F_SUCCESSIVE = 3
 
@@ -417,8 +352,8 @@ const OPTIMUM_CHAIN_FRACTION = 0.5
 
 """
 An optimum that carries mass ([`OPTIMUM_MIN_SHARE`](@ref)) should have at least this many
-chains at it; if fewer are, [`infer`](@ref) starts the missing ones there
-(chains that did not mix into it cannot give its draws their weight).
+chains at it; if fewer are, [`infer`](@ref) starts the missing ones there (chains that did
+not mix into it cannot give its draws their weight).
 """
 const OPTIMUM_MIN_CHAINS = 2
 
@@ -469,7 +404,8 @@ evidence): the sampler re-whitens at that draw's basin and runs the chains once 
 const BASIN_RESTART_NATS = 2.0
 
 """
-A chain is not pooled when more than this fraction of its post-warm-up transitions diverged.
+A chain is not pooled when more than this fraction
+of its post-warm-up transitions diverged.
 """
 const CHAIN_MAX_DIVERGENT = 0.5
 
@@ -597,7 +533,7 @@ include("Infer.jl")
 include("MAP.jl")
 
 export Seed, Inferred,
-    seed_sampler, infer, PROFILE, MARGINAL, ChainDiagnostics, OptimumReport,
+    seed_sampler, infer, ChainDiagnostics, OptimumReport,
     DEFAULT_N_CHAINS,
     ρₑ_prior, δρ_prior, prior_z_scores,
     ξ_priors, θ_prior_moments, profiled_corrs, excl_vol_saturation,

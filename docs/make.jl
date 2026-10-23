@@ -17,6 +17,7 @@ const DOC_MODULES = [
     "Geometry"            => BAYSOL.Geometry,
     "BulkElectronDensity" => BAYSOL.BulkElectronDensity,
     "MolecularStructure"  => BAYSOL.MolecularStructure,
+    "Hydrogenator"        => BAYSOL.Hydrogenator,
     "Scattering"          => BAYSOL.Scattering,
     "Inference"           => BAYSOL.Inference,
     "Pipeline"            => BAYSOL.Pipeline,

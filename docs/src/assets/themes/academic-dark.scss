@@ -336,9 +336,30 @@ html.theme--#{$themename} {
     .docstring pre {
         font-family: $family-monospace;
         font-feature-settings: "calt" 1, "liga" 1;
+    }
+
+    // Blocks are boxed; inline code is only tinted (no border, no pill), and the code
+    // inside a block takes the block's own box instead of drawing a second one.
+    pre,
+    .documenter-example-output,
+    .docstring pre {
         background: #172d47;
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 8px;
+    }
+
+    code {
+        background: rgba(255, 255, 255, 0.08);
+        border: 0;
+        border-radius: 4px;
+    }
+
+    pre code,
+    pre code.hljs,
+    .documenter-example-output code {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
     }
 
     // Four-colour syntax highlighting: the light theme's hues, lifted to read on

@@ -1,0 +1,17 @@
+
+=== Timing ===                                       seconds   % wall   (JIT)
+wall clock  (seed_model → end of report)                 4.89    100.0   (2.1)
+  static build                                           0.45      9.2   (0.1)
+    resolve_structure                                 7.1e-05
+    components                                        2.7e-03
+      [21 residue names: 21 builtin, 0 cache, 2 download]
+    classify                                          4.0e-03
+      [protein: PARSE, titration propka]
+    pdb2pqr (nucleic, none)                              0.04
+      [cache hit]
+    SASA                                                 0.10
+  sampling                                               4.78     97.8   (1.0)
+    NUTS  (10k iters, 207.94k leapfrog, 0.011 ms/step)   2.65
+  report write                                           0.15
+  unaccounted                                           -0.49            (0.8)
+GC: 0.22 s

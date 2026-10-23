@@ -103,11 +103,10 @@ function _neglogπ(
     μ,
     σ,
     seed::Seed,
-    l::LIKELIHOOD,
     tol::Float64,
 )::T where {N,T<:Real}
     v = try
-        -_logπ(μ .+ σ .* z, seed.pr, seed.wls, seed.fw, l; tab = seed.c1tab, c1_tol = tol)
+        -_logπ(μ .+ σ .* z, seed.pr, seed.wls, seed.fw; tab = seed.c1tab, c1_tol = tol)
     catch e
         e isa WLSError || rethrow()
         return T(Inf)
@@ -126,10 +125,9 @@ function _neglogπ_grad(
     μ,
     σ,
     seed::Seed,
-    l::LIKELIHOOD,
     tol::Float64,
 ) where {N}
-    return ForwardDiff.gradient(x -> _neglogπ(x, μ, σ, seed, l, tol), z)
+    return ForwardDiff.gradient(x -> _neglogπ(x, μ, σ, seed, tol), z)
 end
 
 """
@@ -141,13 +139,13 @@ coordinate i, from its envelope-theorem gradient, with c1 profiled to
 - `SMatrix{N,N,Float64}`: may contain non-finite entries if a probe hit a flat model.
 """
 function _fd_hessian(
-    z::SVector{N,Float64}, h::SVector{N,Float64}, μ, σ, seed::Seed, l::LIKELIHOOD,
+    z::SVector{N,Float64}, h::SVector{N,Float64}, μ, σ, seed::Seed,
 ) where {N}
     cols = ntuple(Val(N)) do i
         e = SVector(ntuple(j -> j == i ? h[i] : 0.0, Val(N)))
         (
-            _neglogπ_grad(z + e, μ, σ, seed, l, EXCL_VOL_CORR_TOL) -
-            _neglogπ_grad(z - e, μ, σ, seed, l, EXCL_VOL_CORR_TOL)
+            _neglogπ_grad(z + e, μ, σ, seed, EXCL_VOL_CORR_TOL) -
+            _neglogπ_grad(z - e, μ, σ, seed, EXCL_VOL_CORR_TOL)
         ) / (2h[i])
     end
     H = hcat(cols...)
@@ -167,19 +165,18 @@ function _floored_eigen(H::SMatrix{N,N,Float64}) where {N}
 end
 
 """
-The L-BFGS machinery of the MAP search, as a closure: `run(z)` minimizes −log π (c1 profiled
-to `EXCL_VOL_CORR_TOL`, the density NUTS samples) from `z`, and returns `(z, f, evals)`
-of the optimum, or `nothing` if the start is infeasible or ends non-finite. `f` is
-the objective itself.
+The L-BFGS machinery of the MAP search, as a closure: `run(z)` minimizes −log π (c1
+profiled to `EXCL_VOL_CORR_TOL`, the density NUTS samples) from `z`, and returns
+`(z, f, evals)` of the optimum, or `nothing` if the start is infeasible or ends
+non-finite. `f` is the objective itself.
 """
 function _lbfgs_runner(
-    seed::Seed{<:Real,N},
-    l::LIKELIHOOD;
+    seed::Seed{<:Real,N};
     f_abstol::Real = MAP_F_ABSTOL,
     successive_f_tol::Int = MAP_F_SUCCESSIVE,
 ) where {N}
     μ, σ = θ_prior_moments(seed.pr)
-    f = z -> _neglogπ(SVector{N}(z...), μ, σ, seed, l, EXCL_VOL_CORR_TOL)
+    f = z -> _neglogπ(SVector{N}(z...), μ, σ, seed, EXCL_VOL_CORR_TOL)
     fg! = (G, z) -> begin
         gc_checkpoint()
         dr = DiffResults.GradientResult(z)
@@ -222,9 +219,8 @@ function _optimum(
     μ,
     σ,
     seed::Seed,
-    l::LIKELIHOOD,
 ) where {N}
-    H = _fd_hessian(z, MAP_HESS_STEP .* ones(SVector{N,Float64}), μ, σ, seed, l)
+    H = _fd_hessian(z, MAP_HESS_STEP .* ones(SVector{N,Float64}), μ, σ, seed)
     I_N = one(SMatrix{N,N,Float64})
     if !all(isfinite, H)
         return _Optimum(z, f, SVector{N}(ntuple(_ -> NaN, Val(N))), I_N, NaN)
@@ -263,21 +259,20 @@ Pre-NUTS MAP search and Laplace whitening (see the note at the top of `MAP.jl`).
 
 L-BFGS runs from the seed's θ₀ and `MAP_N_STARTS - 1` further prior draws (and any
 `extra_starts`), on −log π in prior-standardized z-space with c1 profiled to
-`EXCL_VOL_CORR_TOL` (the same objective NUTS then samples). A second round of L-BFGS runs
-then starts around the optima found: from [`MAP_JITTER_RADII`](@ref) ×
+`EXCL_VOL_CORR_TOL` (the same objective NUTS then samples). A second round of L-BFGS
+runs then starts around the optima found: from [`MAP_JITTER_RADII`](@ref) ×
 [`MAP_JITTER_DIRECTIONS`](@ref) points at distances from each optimum measured in
 its own Hessian (at most [`MAP_JITTER_MAX_OPTIMA`](@ref) optima, those within
 [`MAP_JITTER_WITHIN_NATS`](@ref) of the lowest), which reaches basins next to the ones
 already found that random starts rarely hit. The distinct basins among all the optima
 (Mahalanobis distance under the Hessian at the lowest one) are compared by their Laplace
-mass, `−f − ½ log det H`, for the best `MAP_MAX_BASINS` of them: a narrow basin can have the
-lowest f and still carry less mass than a wide one. The heaviest basin's optimum is the
+mass, `−f − ½ log det H`, for the best `MAP_MAX_BASINS` of them: a narrow basin can have
+the lowest f and still carry less mass than a wide one. The heaviest basin's optimum is the
 MAP ẑ. Its Hessian is taken in two central-difference passes: step `MAP_HESS_STEP`, then
 `MAP_HESS_REL_STEP` × each coordinate's Laplace σ from the first pass.
 
 # Arguments
 - `seed::Seed`: priors, data, forward cache and c1 tables; `seed.θ₀` is the first start.
-- `l::LIKELIHOOD`: `PROFILE()` or `MARGINAL()`, as [`_logπ`](@ref).
 
 # Keywords
 - `f_abstol`, `successive_f_tol`: the f-based stopping rule of each L-BFGS start.
@@ -294,15 +289,14 @@ MAP ẑ. Its Hessian is taken in two central-difference passes: step `MAP_HESS_S
     Hessian is non-finite, ẑ is kept and S is the identity.
 """
 function _sampling_space(
-    seed::Seed{<:Real,N},
-    l::LIKELIHOOD;
+    seed::Seed{<:Real,N};
     f_abstol::Real = MAP_F_ABSTOL,
     successive_f_tol::Int = MAP_F_SUCCESSIVE,
     base::UInt64 = draw_base(),
     extra_starts::AbstractVector = SVector{N,Float64}[],
 )::_SamplingSpace where {N}
     μ, σ = θ_prior_moments(seed.pr)
-    run = _lbfgs_runner(seed, l; f_abstol, successive_f_tol)
+    run = _lbfgs_runner(seed; f_abstol, successive_f_tol)
     L = N * N
     no_optima = _Optimum{N,L}[]
 
@@ -342,7 +336,7 @@ function _sampling_space(
     ẑ, f_mode = optima[1]
     h₀ = MAP_HESS_STEP .* ones(SVector{N,Float64})
     memo = Dict{SVector{N,Float64},_Optimum{N,L}}()
-    mk(z, f) = get!(() -> _optimum(z, f, μ, σ, seed, l), memo, z)
+    mk(z, f) = get!(() -> _optimum(z, f, μ, σ, seed), memo, z)
 
     # distinct basins: the lowest optimum of each (Mahalanobis distance under `Hm`)
     function basins(Hm)
@@ -373,7 +367,7 @@ function _sampling_space(
         fᵢ ≤ f_mode + MAP_JITTER_WITHIN_NATS || continue
         oᵢ = mk(zᵢ, fᵢ)
         all(isfinite, oᵢ.λ) || continue
-        half = oᵢ.V .* (1 ./ sqrt.(max.(oᵢ.λ, MAP_HESS_EIG_FLOOR)))'   # z = zᵢ + half·u
+        half = oᵢ.V .* (1 ./ sqrt.(max.(oᵢ.λ, MAP_HESS_EIG_FLOOR)))' # z = zᵢ + half·u
         for r in MAP_JITTER_RADII, _ in 1:MAP_JITTER_DIRECTIONS
             ctr += 1
             u = randn(stream(base, _RNG_MAP_JITTER, ctr), N)
@@ -407,7 +401,7 @@ function _sampling_space(
         end
     end
     σ_lap = sqrt.(diag(V₁ * ((1 ./ λ₁) .* V₁')))   # Laplace σ per coordinate
-    H = _fd_hessian(ẑ, MAP_HESS_REL_STEP .* σ_lap, μ, σ, seed, l)
+    H = _fd_hessian(ẑ, MAP_HESS_REL_STEP .* σ_lap, μ, σ, seed)
     all(isfinite, H) || (H = SMatrix{N,N}(V₁ * (λ₁ .* V₁')))
     λ, V = _floored_eigen(H)
 
@@ -426,18 +420,17 @@ end
 """
 Optima the chains visit that the MAP search did not report. L-BFGS runs from a
 farthest-point cover ([`_farthest_cover`](@ref)) of `HARVEST_COVER` of the draws `W`
-(rows, in the whitened coordinates of `sp`; the one of highest log density `ld` first) and
-of up to `HARVEST_DIVERGENT` of the divergent ones (`diverged`). Each optimum that is not
-within `MAP_MODE_SEP` (Mahalanobis, under the Hessian of `sp`) of one already known
-is added with its Laplace mass.
+(rows, in the whitened coordinates of `sp`; the one of highest log density `ld` first)
+and of up to `HARVEST_DIVERGENT` of the divergent ones (`diverged`). Each optimum that
+is not within `MAP_MODE_SEP` (Mahalanobis, under the Hessian of `sp`) of one already
+known is added with its Laplace mass.
 
 # Returns
-- `(optima::Vector{_Optimum}, n_evals::Int)`: `sp.optima` and the new ones, lowest −log π
-    first, and the evaluations of the L-BFGS runs.
+- `(optima::Vector{_Optimum}, n_evals::Int)`: `sp.optima` and the new
+    ones, lowest −log π first, and the evaluations of the L-BFGS runs.
 """
 function _harvest_optima(
     seed::Seed{<:Real,N},
-    l::LIKELIHOOD,
     sp::_SamplingSpace{N,L},
     W::AbstractMatrix{<:Real},
     ld::AbstractVector{<:Real},
@@ -447,7 +440,7 @@ function _harvest_optima(
 ) where {N,L}
     n = size(W, 1)
     n == 0 && return sp.optima, 0
-    run = _lbfgs_runner(seed, l; f_abstol, successive_f_tol)
+    run = _lbfgs_runner(seed; f_abstol, successive_f_tol)
     rows = _farthest_cover(W, HARVEST_COVER, argmax(ld))
     dv = findall(diverged)
     if !isempty(dv)
@@ -461,7 +454,7 @@ function _harvest_optima(
         r === nothing && continue
         n_evals += r.evals
         any(o -> sqrt((r.z - o.z)' * Hf * (r.z - o.z)) ≤ MAP_MODE_SEP, known) && continue
-        push!(known, _optimum(r.z, r.f, sp.μ, sp.σ, seed, l))
+        push!(known, _optimum(r.z, r.f, sp.μ, sp.σ, seed))
     end
     sort!(known; by = o -> o.f)
     return known, n_evals

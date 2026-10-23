@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Tests for src/Inference/ProfiledCorrs.jl: the 2-parameter weighted least squares fit
-# of I_calc(q) = scale*y_model(q) + bkgrnd_corr, plus the profile/marginal
+# of I_calc(q) = scale*y_model(q) + bkgrnd_corr, plus the profile
 # log-likelihoods and the χ²/dof diagnostic built on top of it.
 #
 # `ref_wls` below is an independent re-derivation via explicit normal-equation
@@ -15,11 +15,11 @@ using LinearAlgebra
 using Random
 using ForwardDiff
 using BAYSOL.Inference:
-    WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll, wls_marg_ll,
+    WLSError, WLSFit, wls_fit, wls_predict, wls_prof_ll,
     reduced_chi2
 
 """
-Reference (scale, bkgrnd_corr, chi2, det_XtWX) via explicit normal equations
+Reference (scale, bkgrnd_corr, chi2, det(XᵀWX)) via explicit normal equations
 `(XᵀWX) β = XᵀWy`, independent of `wls_fit`'s accumulator formulas.
 """
 function ref_wls(y_model::AbstractVector, I_obs::AbstractVector, σ::AbstractVector)
@@ -80,12 +80,11 @@ end
             I_obs = scale_true .* y_model .+ bkgrnd_corr_true .+ σ .* randn(rng, n)
 
             f = wls_fit(y_model, I_obs, σ)
-            scale_r, bkgrnd_corr_r, chi2_r, det_r = ref_wls(y_model, I_obs, σ)
+            scale_r, bkgrnd_corr_r, chi2_r, _ = ref_wls(y_model, I_obs, σ)
 
             @test check_float(f.scale, scale_r; atol = 1e3 * DEFAULT_ATOL)
             @test check_float(f.bkgrnd_corr, bkgrnd_corr_r; atol = 1e3 * DEFAULT_ATOL)
             @test check_float(f.chi2, chi2_r; atol = 1e3 * DEFAULT_ATOL)
-            @test check_float(f.det_XtWX, det_r; atol = 1e6 * DEFAULT_ATOL)
             @test f.dof == n - 2
         end
     end
@@ -149,7 +148,7 @@ end
     end
 
     #------------------------------------------------------------------
-    #                 wls_prof_ll / wls_marg_ll
+    #                 wls_prof_ll
     #------------------------------------------------------------------
 
     @testset "wls_prof_ll: matches its closed form directly from WLSFit fields" begin
@@ -164,18 +163,6 @@ end
         @test check_float(wls_prof_ll(f), expected)
     end
 
-    @testset "wls_marg_ll: matches its closed form directly from WLSFit fields" begin
-        y_model = collect(range(0.1, 5.0; length = 12))
-        I_obs =
-            1.3 .* y_model .+ 0.4 .+
-            [0.1, -0.1, 0.2, -0.2, 0.05, -0.05, 0.1, -0.1, 0.0, 0.15, -0.15, 0.05]
-        σ = fill(0.3, length(y_model))
-        f = wls_fit(y_model, I_obs, σ)
-
-        expected = wls_prof_ll(f) - log(f.det_XtWX) / 2 + log(2π)
-        @test check_float(wls_marg_ll(f), expected)
-    end
-
     # …constant
     @testset "wls_prof_ll: a perfect (chi2 == 0) fit is just the data-normalisation" begin
         y_model = collect(range(0.0, 4.0; length = 6))
@@ -187,8 +174,8 @@ end
         @test check_float(wls_prof_ll(f), expected)
     end
 
-    @testset "wls_prof_ll / wls_marg_ll: exact sign flip of the old NLL formulas" begin
-        # Direct cross-check against the pre-refactor NLL closed forms, kept
+    @testset "wls_prof_ll: exact sign flip of the old NLL formula" begin
+        # Direct cross-check against the pre-refactor NLL closed form, kept
         # here independent of the source so a sign error in the rename would
         # be caught even if both sides of the wls_prof_ll test above shared
         # the same (wrong) sign by copy-paste.
@@ -200,9 +187,7 @@ end
         f = wls_fit(y_model, I_obs, σ)
 
         nll_prof = (f.chi2 + f.sum_log_var) / 2 + (f.dof + 2) * log(2π) / 2
-        nll_marg = nll_prof + log(f.det_XtWX) / 2 - log(2π)
         @test check_float(wls_prof_ll(f), -nll_prof)
-        @test check_float(wls_marg_ll(f), -nll_marg)
     end
 
     #------------------------------------------------------------------
@@ -251,10 +236,10 @@ end
     #                 AD-differentiability (stage-1 HMC needs this)
     #------------------------------------------------------------------
 
-    @testset "wls_fit -> wls_marg_ll is AD-differentiable through y_model" begin
+    @testset "wls_fit -> wls_prof_ll is AD-differentiable through y_model" begin
         # y_model stands in for a forward-model curve parameterised by θ, as
         # it will be when this feeds stage-1 HMC; the gradient must survive
-        # with no Float64 cast anywhere in wls_fit/wls_prof_ll/wls_marg_ll.
+        # with no Float64 cast anywhere in wls_fit/wls_prof_ll.
         q = collect(range(0.1, 2.0; length = 10))
         I_obs =
             3.0 .* exp.(-q) .+ 0.5 .+
@@ -262,7 +247,7 @@ end
         σ = fill(0.2, length(q))
 
         model(θ) = θ[1] .* exp.(-θ[2] .* q)   # θ = (amplitude, decay rate)
-        loss(θ) = wls_marg_ll(wls_fit(model(θ), I_obs, σ))
+        loss(θ) = wls_prof_ll(wls_fit(model(θ), I_obs, σ))
 
         θ₀ = [2.5, 1.1]
         g = ForwardDiff.gradient(loss, θ₀)
@@ -274,7 +259,9 @@ end
             θp[i] += h
             θm = copy(θ₀)
             θm[i] -= h
-            @test g[i] ≈ (loss(θp) - loss(θm)) / (2h) rtol = 1e-4
+            # the amplitude direction is exactly flat under the profile (the scale
+            # absorbs it), so its gradient is ~0 and needs an absolute tolerance
+            @test g[i] ≈ (loss(θp) - loss(θm)) / (2h) rtol = 1e-4 atol = 1e-6
         end
     end
 

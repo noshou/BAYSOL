@@ -18,7 +18,7 @@ Four Julia environments are involved: `test/` (the unit suite), `test/fitting_te
 `test/visualize/` (GLMakie for the visual checks), and the root package.
 
 ```bash
-julia --project=test dev/unittests.jl                 # the whole unit suite (~5 min)
+julia --project=test dev/unittests.jl                 # the whole unit suite
 bb fittings SASDMJ9                        # one fitting test (all of them if none is named)
 bb vis --list                              # the visual checks
 julia --project=test test/unit_tests/units/test_sampler.jl # one unit-test file

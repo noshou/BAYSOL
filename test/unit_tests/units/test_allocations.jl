@@ -89,7 +89,7 @@ end
 
     @testset "allocation budgets, bytes per q point (ratchet down, never up)" begin
         g(x) = ForwardDiff.gradient(
-            z -> ALC._logπ(SVector{4}(z...), pr, wls, fw, ALC.PROFILE(); tab = tab),
+            z -> ALC._logπ(SVector{4}(z...), pr, wls, fw; tab = tab),
             x,
         )
         x0 = collect(ALC.Θ(ξ, pr)[1])

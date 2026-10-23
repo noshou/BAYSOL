@@ -4,7 +4,6 @@ using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
-using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 # =============================================================================
@@ -111,7 +110,7 @@ const FADD5_MOLARITY   = FADD5_CONC_MG_ML / FADD5_MW # ≈ 6.68e-5 M
 const FADD5_MOLARITY_σ = MOLARITY_REL_SIGMA * FADD5_MOLARITY   # σ not stated by SASBDB
 
 # Buffer components. All four species below were cross-checked against
-# src/BulkElectronDensity/NonBiological/common_to_iupac.json and found
+# src/BulkElectronDensity/NonBiological/nonbio_lookup.json and found
 # present (no MISSING FROM PMV LOOKUP entries for this case):
 #   "sodium chloride"    -> "sodium chloride"
 #   "magnesium chloride" -> "magnesium dichloride"
@@ -187,7 +186,7 @@ function run_sasdx52(;
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seed_sasdx52(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
+    res = BAYSOL.run_model(s, n_samples, n_adapt)
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
 end
 

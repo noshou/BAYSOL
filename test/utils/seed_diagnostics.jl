@@ -45,9 +45,9 @@ function _space(seed::F.Seed)
     return μ, σ, z -> F.Ξ(μ .+ σ .* SVector{4}(z...), seed.pr)
 end
 
-_fz(seed, z, tol, l) = begin
+_fz(seed, z, tol) = begin
     μ, σ, _ = _space(seed)
-    F._neglogπ(SVector{4}(z...), μ, σ, seed, l, tol)
+    F._neglogπ(SVector{4}(z...), μ, σ, seed, tol)
 end
 
 _vs(v) = "[" * join((@sprintf("%.4g", x) for x in v), ", ") * "]"
@@ -85,7 +85,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    gradient_w(seed, sp, w; l = F.PROFILE(), tol = F.EXCL_VOL_CORR_TOL) -> Vector{Float64}
+    gradient_w(seed, sp, w; tol = F.EXCL_VOL_CORR_TOL) -> Vector{Float64}
 
 ∇_w log π(θ(w)) as NUTS computes it, with c1 profiled to `tol`.
 
@@ -99,16 +99,15 @@ end
 # Exceptions
 - `WLSError` if the model curve is flat at `w`.
 """
-gradient_w(seed, sp, w; l = F.PROFILE(), tol = F.EXCL_VOL_CORR_TOL) =
+gradient_w(seed, sp, w; tol = F.EXCL_VOL_CORR_TOL) =
     ForwardDiff.gradient(
         x ->
             F._logπ(F._θ_of_w(SVector{4,eltype(x)}(x...), sp), seed.pr, seed.wls, seed.fw,
-                l;
                 tab = seed.c1tab, c1_tol = tol),
         collect(Float64, w))
 
 """
-    nuts_replica(seed; l, c1_tol, n_samples, n_adapt, δ, rng_seed, sp) -> NamedTuple
+    nuts_replica(seed; c1_tol, n_samples, n_adapt, δ, rng_seed, sp) -> NamedTuple
 
 `infer` re-implemented step for step (MAP search and whitening, then NUTS with the
 same adaptor), but with the c1 profiling tolerance `c1_tol` chosen by the caller
@@ -121,14 +120,14 @@ from the global RNG (the MAP starts, the step-size search and the sampler), whic
 - `seed::Inference.Seed`.
 
 # Keywords
-- `l = F.PROFILE()`, `n_samples = Pipeline.DEFAULT_N_SAMPLES`,
+- `n_samples = Pipeline.DEFAULT_N_SAMPLES`,
     `n_adapt = Pipeline.DEFAULT_N_ADAPT` (the `run_model`
     defaults), `δ = Inference.DEFAULT_TARGET_ACCEPT / 100` (target acceptance as a fraction,
     the same constant `run_model` uses, so this tool cannot drift from the pipeline).
 - `c1_tol = F.EXCL_VOL_CORR_TOL`: tolerance for the NUTS log density
     and gradient (the MAP search always uses the package default).
 - `rng_seed = nothing`: `Random.seed!` this before NUTS.
-- `sp = F._sampling_space(seed, l)`: reuse a whitening already computed.
+- `sp = F._sampling_space(seed)`: reuse a whitening already computed.
 
 # Returns
 - `(; sp, ε0, ε, W, post, stats, seconds, n_leapfrog)`: `W` all draws (4 × n_samples) in w,
@@ -137,7 +136,7 @@ from the global RNG (the MAP starts, the step-size search and the sampler), whic
 # Exceptions
 - `ArgumentError` if `n_adapt ≥ n_samples`.
 """
-function nuts_replica(seed::F.Seed; l = F.PROFILE(), c1_tol = F.EXCL_VOL_CORR_TOL,
+function nuts_replica(seed::F.Seed; c1_tol = F.EXCL_VOL_CORR_TOL,
     n_samples = R.DEFAULT_N_SAMPLES,
     n_adapt = R.DEFAULT_N_ADAPT, δ = F.DEFAULT_TARGET_ACCEPT / 100, rng_seed = nothing,
     sp = nothing)
@@ -145,12 +144,11 @@ function nuts_replica(seed::F.Seed; l = F.PROFILE(), c1_tol = F.EXCL_VOL_CORR_TO
     # seed first: the MAP starts (when `sp` is not given), the
     # step-size search and the sampler all draw from this RNG
     rng_seed === nothing || Random.seed!(rng_seed)
-    sp === nothing && (sp = F._sampling_space(seed, l))
+    sp === nothing && (sp = F._sampling_space(seed))
     # again: computing `sp` consumed draws, a given `sp` did not
     rng_seed === nothing || Random.seed!(rng_seed)
     ℓπ =
         w -> F._logπ(F._θ_of_w(SVector{4,eltype(w)}(w...), sp), seed.pr, seed.wls, seed.fw,
-            l;
             tab = seed.c1tab, c1_tol = c1_tol)
     ∂ = w -> begin
         r = DiffResults.GradientResult(w)
@@ -180,7 +178,7 @@ function nuts_replica(seed::F.Seed; l = F.PROFILE(), c1_tol = F.EXCL_VOL_CORR_TO
 end
 
 """
-    gradient_noise(seed, sp, W; l, tol, ref_tol, n) -> NamedTuple
+    gradient_noise(seed, sp, W; tol, ref_tol, n) -> NamedTuple
 
 How wrong NUTS's gradient is because c1 is only profiled to `tol`: at `n`
 evenly spaced columns of `W`, ‖∇ℓπ(tol) − ∇ℓπ(ref_tol)‖₂ in w coordinates,
@@ -191,7 +189,7 @@ gradient error comparable to 1 is as large as the force NUTS is integrating.
 - `seed`, `sp`, `W`: the seed, its whitening, and draws (columns) in w.
 
 # Keywords
-- `l = F.PROFILE()`, `tol = F.EXCL_VOL_CORR_TOL`, `ref_tol = 1e-11`, `n = 40`.
+- `tol = F.EXCL_VOL_CORR_TOL`, `ref_tol = 1e-11`, `n = 40`.
 
 # Returns
 - `(; noise, grad_norm)`: vectors of length `n`.
@@ -203,19 +201,18 @@ function gradient_noise(
     seed,
     sp,
     W;
-    l = F.PROFILE(),
     tol = F.EXCL_VOL_CORR_TOL,
     ref_tol = 1e-11,
     n = 40,
 )
     idx = unique(round.(Int, range(1, size(W, 2), length = n)))
-    ref = [gradient_w(seed, sp, W[:, k]; l, tol = ref_tol) for k in idx]
-    noise = [norm(gradient_w(seed, sp, W[:, k]; l, tol) .- r) for (k, r) in zip(idx, ref)]
+    ref = [gradient_w(seed, sp, W[:, k]; tol = ref_tol) for k in idx]
+    noise = [norm(gradient_w(seed, sp, W[:, k]; tol) .- r) for (k, r) in zip(idx, ref)]
     return (; noise, grad_norm = norm.(ref))
 end
 
 """
-    local_curvature(seed, sp, W; l, tol, n, step) -> NamedTuple
+    local_curvature(seed, sp, W; tol, n, step) -> NamedTuple
 
 Extreme eigenvalues of the Hessian of −ℓπ in w at `n` evenly spaced columns of
 `W`, by central differences of the gradient (use a tight `tol`: the Hessian
@@ -228,7 +225,7 @@ these bound the step size the geometry allows independently of any gradient erro
 # Exceptions
 - `WLSError` if a probe point has a flat model curve.
 """
-function local_curvature(seed, sp, W; l = F.PROFILE(), tol = 1e-11, n = 40, step = 0.05)
+function local_curvature(seed, sp, W; tol = 1e-11, n = 40, step = 0.05)
     idx = unique(round.(Int, range(1, size(W, 2), length = n)))
     λmax = Float64[]
     λmin = Float64[]
@@ -238,8 +235,8 @@ function local_curvature(seed, sp, W; l = F.PROFILE(), tol = 1e-11, n = 40, step
             e = zeros(4)
             e[i] = step
             (
-                -gradient_w(seed, sp, w .+ e; l, tol) .+
-                gradient_w(seed, sp, w .- e; l, tol)
+                -gradient_w(seed, sp, w .+ e; tol) .+
+                gradient_w(seed, sp, w .- e; tol)
             ) ./ (2step)
         end
         H = hcat(cols...)
@@ -255,7 +252,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    lbfgs_starts(seed; l, n_starts, rng_seed, ref_tol) -> Vector{NamedTuple}
+    lbfgs_starts(seed; n_starts, rng_seed, ref_tol) -> Vector{NamedTuple}
 
 The MAP search's L-BFGS starts replayed one by one (the seed's θ₀, then prior
 draws), recording how each stopped. `grad_gap` is ‖∇f(tol) − ∇f(ref_tol)‖∞ at
@@ -263,7 +260,7 @@ the stopping point (z space): when it is larger than `F.MAP_G_TOL` the
 optimizer cannot be told apart from converged by its gradient.
 
 # Keywords
-- `l = F.PROFILE()`, `n_starts = F.MAP_N_STARTS`, `rng_seed = nothing`, `ref_tol = 1e-11`.
+- `n_starts = F.MAP_N_STARTS`, `rng_seed = nothing`, `ref_tol = 1e-11`.
 
 # Returns
 - One `(; start, z, f, iters, g_converged, f_converged, iteration_limit, grad_gap, c1, ξ)`
@@ -274,13 +271,12 @@ optimizer cannot be told apart from converged by its gradient.
 """
 function lbfgs_starts(
     seed::F.Seed;
-    l = F.PROFILE(),
     n_starts = F.MAP_N_STARTS,
     rng_seed = nothing,
     ref_tol = 1e-11,
 )
     μ, σ, ξ_of = _space(seed)
-    f0 = z -> F._neglogπ(SVector{4}(z...), μ, σ, seed, l, F.EXCL_VOL_CORR_TOL)
+    f0 = z -> F._neglogπ(SVector{4}(z...), μ, σ, seed, F.EXCL_VOL_CORR_TOL)
     function fg!(G, z)
         dr = DiffResults.GradientResult(z)
         ForwardDiff.gradient!(dr, f0, z)
@@ -307,8 +303,8 @@ function lbfgs_starts(
         ẑ = SVector{4}(F.Optim.minimizer(res)...)
         gap = maximum(
             abs,
-            F._neglogπ_grad(ẑ, μ, σ, seed, l, F.EXCL_VOL_CORR_TOL) .-
-            F._neglogπ_grad(ẑ, μ, σ, seed, l, ref_tol),
+            F._neglogπ_grad(ẑ, μ, σ, seed, F.EXCL_VOL_CORR_TOL) .-
+            F._neglogπ_grad(ẑ, μ, σ, seed, ref_tol),
         )
         c1 = F.profiled_corrs(
             seed.wls,
@@ -330,7 +326,7 @@ function lbfgs_starts(
 end
 
 """
-    hessian_sensitivity(seed, ẑ; l, rels) -> NamedTuple
+    hessian_sensitivity(seed, ẑ; rels) -> NamedTuple
 
 Eigenvalues of the MAP Hessian of −log π (z space) from the first pass (absolute step
 `F.MAP_HESS_STEP`) and from second passes at each `rels` × the Laplace σ. Eigenvalues that
@@ -346,7 +342,6 @@ move with the step size mean the finite differences are measuring noise, not cur
 function hessian_sensitivity(
     seed::F.Seed,
     ẑ;
-    l = F.PROFILE(),
     rels = (0.3, 0.1, 0.03, 0.01),
 )
     μ, σ, _ = _space(seed)
@@ -356,19 +351,18 @@ function hessian_sensitivity(
         μ,
         σ,
         seed,
-        l,
     )
     ev(H) = all(isfinite, H) ? eigvals(Symmetric(Matrix(H))) : fill(NaN, 4)
     λ1, V1 = F._floored_eigen(H1)
     σ_lap = sqrt.(diag(V1 * ((1 ./ λ1) .* V1')))
     pass2 = Dict(
-        r => ev(F._fd_hessian(SVector{4}(ẑ...), r .* σ_lap, μ, σ, seed, l)) for r in rels
+        r => ev(F._fd_hessian(SVector{4}(ẑ...), r .* σ_lap, μ, σ, seed)) for r in rels
     )
     return (; pass1 = ev(H1), pass2, σ_lap)
 end
 
 """
-    mode_table(seed, optima, sp; l) -> Vector{NamedTuple}
+    mode_table(seed, optima, sp) -> Vector{NamedTuple}
 
 Distinct optima (Mahalanobis distance > `F.MAP_MODE_SEP` under the MAP
 Hessian) with the Laplace log-mass −f − ½ log det H of each, so a mode that
@@ -384,7 +378,7 @@ merely exists can be told from one that carries posterior probability.
 # Exceptions
 - None.
 """
-function mode_table(seed::F.Seed, optima, sp; l = F.PROFILE())
+function mode_table(seed::F.Seed, optima, sp)
     μ, σ, _ = _space(seed)
     Hf = Symmetric(Matrix(inv(sp.S * sp.S')))
     modes = NamedTuple[]
@@ -393,14 +387,14 @@ function mode_table(seed::F.Seed, optima, sp; l = F.PROFILE())
             push!(modes, (; z = o.z, f = o.f))
     end
     return map(modes) do m
-        H = F._fd_hessian(m.z, 1e-3 .* ones(SVector{4,Float64}), μ, σ, seed, l)
+        H = F._fd_hessian(m.z, 1e-3 .* ones(SVector{4,Float64}), μ, σ, seed)
         λ = all(isfinite, H) ? eigvals(Symmetric(Matrix(H))) : fill(NaN, 4)
         (; m.z, m.f, λ, log_mass = all(>(0), λ) ? -m.f - 0.5 * sum(log, λ) : NaN)
     end
 end
 
 """
-    axis_scan(seed, sp; l, svals, grid, h) -> Vector{NamedTuple}
+    axis_scan(seed, sp; svals, grid, h) -> Vector{NamedTuple}
 
 Shape of −log π along each whitened axis of the MAP: `ratio[s] = Δf / (s²/2)` at each
 of `svals` (1 for a Gaussian; < 1 or > 1 means a flatter or steeper wall), and over
@@ -415,11 +409,11 @@ median), and how far c1* moves (`c1_jumps` counts steps above 5e-3, a regime swi
 # Exceptions
 - None.
 """
-function axis_scan(seed::F.Seed, sp; l = F.PROFILE(),
+function axis_scan(seed::F.Seed, sp;
     svals = (-10, -5, -3, -2, -1, -0.5, 0.5, 1, 2, 3, 5, 10),
     grid = 241, h = 6 / (grid - 1), ref_tol = 1e-11)
     _, _, ξ_of = _space(seed)
-    f(z, tol) = _fz(seed, z, tol, l)
+    f(z, tol) = _fz(seed, z, tol)
     fmin = f(sp.ẑ, ref_tol)
     ss = range(-3, 3, length = grid)
     map(1:4) do i
@@ -463,7 +457,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    shell_contrast_ablation(seed; l, tol) -> NamedTuple
+    shell_contrast_ablation(seed; tol) -> NamedTuple
 
 Nested models on the same structure, buffer and
 data, with c1, scale and background profiled:
@@ -483,7 +477,7 @@ barely moves it). M1 and M2 are grid searches (481 points; 121 × 121), so M3
 # Exceptions
 - None; probe points with a flat model curve count as infinite χ².
 """
-function shell_contrast_ablation(seed::F.Seed; l = F.PROFILE(), tol = F.EXCL_VOL_CORR_TOL)
+function shell_contrast_ablation(seed::F.Seed; tol = F.EXCL_VOL_CORR_TOL)
     μ, σ, ξ_of = _space(seed)
     pr = seed.pr
     ρ0 = exp(μ[1])
@@ -513,7 +507,7 @@ function shell_contrast_ablation(seed::F.Seed; l = F.PROFILE(), tol = F.EXCL_VOL
         c, c1 = χ((ρ0, d12, d12, d3))
         c < m2.chi2 && (m2 = (chi2 = c, d12, d3, c1))
     end
-    sp = F._sampling_space(seed, l)
+    sp = F._sampling_space(seed)
     ξ3 = ξ_of(sp.ẑ)
     c3, c13 = χ(ξ3)
     return (; M1 = m1, M2 = m2, M3 = (chi2 = c3, ξ = ξ3, c1 = c13))
@@ -559,7 +553,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    diagnose(io, seed; label, reference, l, n_samples, n_adapt)
+    diagnose(io, seed; label, reference, n_samples, n_adapt)
 
 Full sampler diagnosis of one seed, written to `io`: MAP starts and how they
 stopped, Hessian sensitivity, the NUTS replica (step size, tree depth, posterior
@@ -571,7 +565,7 @@ found, gradient error from the c1 tolerance, and local curvature along the chain
 - `io`, `seed`.
 
 # Keywords
-- `label = ""`, `l = F.PROFILE()`, `n_samples`, `n_adapt` (default: the
+- `label = ""`, `n_samples`, `n_adapt` (default: the
     `run_model` defaults, `Pipeline.DEFAULT_N_SAMPLES`, `DEFAULT_N_ADAPT`).
 - `reference = nothing`: `(; q, I, σ, q_ref, I_ref)`
     to add the reference curve's χ² on the same points.
@@ -582,7 +576,7 @@ found, gradient error from the c1 tolerance, and local curvature along the chain
 # Exceptions
 - None beyond those of the functions it calls.
 """
-function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.PROFILE(),
+function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing,
     n_samples = R.DEFAULT_N_SAMPLES, n_adapt = R.DEFAULT_N_ADAPT)
     p(args...) = (println(io, args...); flush(io))
     pr = seed.pr
@@ -617,7 +611,7 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
         )
     end
 
-    t_map = @elapsed sp = F._sampling_space(seed, l)
+    t_map = @elapsed sp = F._sampling_space(seed)
     p(
         @sprintf(
             "MAP search: %.1fs  n_ok=%d/%d  n_modes=%d  whitened=%s",
@@ -628,7 +622,7 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
             sp.whitened
         )
     )
-    r = nuts_replica(seed; l, n_samples, n_adapt, sp)
+    r = nuts_replica(seed; n_samples, n_adapt, sp)
     st = r.stats[(n_adapt+1):end]
     ns = getproperty.(r.stats, :n_steps)
     dp = getproperty.(r.stats, :tree_depth)
@@ -676,7 +670,6 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
         pr,
         seed.wls,
         seed.fw,
-        l;
         tab = seed.c1tab,
     )
     ℓs = getproperty.(st, :log_density)
@@ -710,7 +703,7 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
         )
     end
 
-    starts = lbfgs_starts(seed; l, rng_seed = 12345)
+    starts = lbfgs_starts(seed; rng_seed = 12345)
     p("L-BFGS starts (z space):")
     for o in starts
         p(
@@ -720,7 +713,7 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
                 o.start, o.f, o.iters, o.g_converged, o.iteration_limit, o.grad_gap, o.c1)
         )
     end
-    hs = hessian_sensitivity(seed, sp.ẑ; l)
+    hs = hessian_sensitivity(seed, sp.ẑ)
     p(
         "MAP Hessian eigenvalues (floor ",
         F.MAP_HESS_EIG_FLOOR,
@@ -739,7 +732,7 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
         "Δf/(s²/2) along whitened axes (1 = Gaussian), s = ",
         join(("$s" for s in (-10, -5, -3, -2, -1, -0.5, 0.5, 1, 2, 3, 5, 10)), ","),
     )
-    scans = axis_scan(seed, sp; l)
+    scans = axis_scan(seed, sp)
     for a in scans
         p("  w$(a.axis): ", join((@sprintf("%8.3g", x) for x in a.ratio), " "))
     end
@@ -751,7 +744,7 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
                 a.axis, a.noise, a.f2_median, a.f2_max, a.f2_at, a.c1_range..., a.c1_jumps)
         )
     end
-    modes = mode_table(seed, starts, sp; l)
+    modes = mode_table(seed, starts, sp)
     p("distinct optima: ", length(modes))
     for (k, m) in enumerate(modes)
         p(
@@ -767,12 +760,12 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
             )
         )
     end
-    gn = gradient_noise(seed, sp, post; l)
+    gn = gradient_noise(seed, sp, post)
     p("gradient error from the c1 tolerance in w: min/median/max = ",
         _vs([minimum(gn.noise), median(gn.noise), maximum(gn.noise)]),
         "  vs |∇ℓπ| median = ", @sprintf("%.3g", median(gn.grad_norm)),
         "   (posterior-scale gradient ≈ 1)")
-    lc = local_curvature(seed, sp, post; l)
+    lc = local_curvature(seed, sp, post)
     p("local λ_max(−∇²ℓπ) min/median/max = ",
         _vs([minimum(lc.λmax), median(lc.λmax), maximum(lc.λmax)]),
         "  → stable ε < ", _vs(2 ./ sqrt.([maximum(lc.λmax), median(lc.λmax)])),
@@ -781,7 +774,7 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing, l = F.P
 end
 
 """
-    tolerance_sweep(io, seed; label, tols, rng_seeds, l, n_samples, n_adapt)
+    tolerance_sweep(io, seed; label, tols, rng_seeds, n_samples, n_adapt)
 
 NUTS replica at each c1 profiling tolerance in `tols` and each RNG seed in
 `rng_seeds` (same MAP and whitening throughout), one line each: wall time, final
@@ -797,11 +790,11 @@ in w. Shows whether a tolerance is tight enough for the gradient it feeds NUTS.
 """
 function tolerance_sweep(io::IO, seed::F.Seed; label = "", tols = (1e-5, 1e-8),
     rng_seeds = (7,),
-    l = F.PROFILE(), n_samples = R.DEFAULT_N_SAMPLES, n_adapt = R.DEFAULT_N_ADAPT)
-    sp = F._sampling_space(seed, l)
+    n_samples = R.DEFAULT_N_SAMPLES, n_adapt = R.DEFAULT_N_ADAPT)
+    sp = F._sampling_space(seed)
     out = NamedTuple[]
     for tol in tols, rs in rng_seeds
-        r = nuts_replica(seed; l, c1_tol = tol, n_samples, n_adapt, rng_seed = rs, sp)
+        r = nuts_replica(seed; c1_tol = tol, n_samples, n_adapt, rng_seed = rs, sp)
         st = r.stats[(n_adapt+1):end]
         steps = mean(getproperty.(st, :n_steps))
         mins = minimum(ess(r.post[i, :]) for i in 1:4)
@@ -840,7 +833,7 @@ function _vs_reference(P, μr, σr)
 end
 
 """
-    warmup_study(io, seed; label, adapts, n_post, n_ref, n_adapt_ref, rng_seeds, l)
+    warmup_study(io, seed; label, adapts, n_post, n_ref, n_adapt_ref, rng_seeds)
         -> NamedTuple
 
 How short can the warm-up be, and how many draws are enough? One long reference run
@@ -862,11 +855,10 @@ the first `n` in steps of 100 with smallest ESS ≥ 400.
 """
 function warmup_study(io::IO, seed::F.Seed; label = "",
     adapts = (50, 100, 200, 300, 500, 1000), n_post = 1000,
-    n_ref = 4000, n_adapt_ref = 1000, rng_seeds = (7,), l = F.PROFILE())
-    sp = F._sampling_space(seed, l)
+    n_ref = 4000, n_adapt_ref = 1000, rng_seeds = (7,))
+    sp = F._sampling_space(seed)
     ref = nuts_replica(
         seed;
-        l,
         n_samples = n_adapt_ref + n_ref,
         n_adapt = n_adapt_ref,
         rng_seed = 101,
@@ -886,7 +878,7 @@ function warmup_study(io::IO, seed::F.Seed; label = "",
         ))
     adapt = NamedTuple[]
     for a in adapts, rs in rng_seeds
-        r = nuts_replica(seed; l, n_samples = a + n_post, n_adapt = a, rng_seed = rs, sp)
+        r = nuts_replica(seed; n_samples = a + n_post, n_adapt = a, rng_seed = rs, sp)
         st = r.stats[(a+1):end]
         steps = mean(getproperty.(st, :n_steps))
         v = _vs_reference(r.post, μr, σr)
@@ -942,7 +934,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    chain_report(io, seed; label, l, n_samples, n_adapt, rng_seed, rerun, max_listed)
+    chain_report(io, seed; label, n_samples, n_adapt, rng_seed, rerun, max_listed)
 
 Runs [`Inference.infer`](@ref BAYSOL.Inference.infer) (all its chains, as `run_model`
 does) and prints, per chain: its start (signed distance from the MAP in posterior
@@ -967,16 +959,16 @@ not that run was kept.
 # Exceptions
 - None beyond those of [`Inference.infer`](@ref BAYSOL.Inference.infer).
 """
-function chain_report(io::IO, seed::F.Seed; label = "", l = F.PROFILE(),
+function chain_report(io::IO, seed::F.Seed; label = "",
     n_samples = R.DEFAULT_N_SAMPLES, n_adapt = R.DEFAULT_N_ADAPT, rng_seed = 7,
     rerun = false, max_listed = 12)
     if rerun
         base, jitter = F._retry_seeds(rng_seed % UInt64, F.DEFAULT_JITTER_SEED)
         n_samples, n_adapt = F.RETRY_N_ADAPT + F.RETRY_N_DRAWS, F.RETRY_N_ADAPT
-        fit = F.infer(seed, n_samples, n_adapt; l, rng_seed = base, jitter_seed = jitter,
+        fit = F.infer(seed, n_samples, n_adapt; rng_seed = base, jitter_seed = jitter,
             retry = false)
     else
-        fit = F.infer(seed, n_samples, n_adapt; l, rng_seed, retry = false)
+        fit = F.infer(seed, n_samples, n_adapt; rng_seed, retry = false)
     end
     d = fit.diagnostics
     na = d.n_adapt

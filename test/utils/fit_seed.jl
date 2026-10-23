@@ -111,7 +111,10 @@ function load_fit_seed(
         r = only(filter(r -> r.tag == tag, runs))
         (r.fit, r.fit_scale, r.fit_col)
     else
-        ("$(id)_fit1.fit", 1.0, 4)   # CRYSOL .fit layout: q, I_exp, σ, I_fit
+        # SASDWJ4_fit2.jl -> SASDWJ4_fit2.fit; a script without a fit suffix is fit1
+        stem = splitext(script)[1]
+        fit_name = occursin("_fit", stem) ? stem : id * "_fit1"
+        ("$fit_name.fit", 1.0, 4)   # CRYSOL .fit layout: q, I_exp, σ, I_fit
     end
     fit_path = joinpath(fit_dir, "..", "fixtures", "experiments", id, fit_file)
     if id != "SASDMZ9" && isfile(fit_path) && isdefined(mod, :fit_subset)

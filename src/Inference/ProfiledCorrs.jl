@@ -107,10 +107,12 @@ function wls_fit(
     y_model::AbstractVector,
     data::WLSData,
 )::WLSFit
+
     n = length(y_model)
     n == length(data.I_obs) || throw(
         WLSError(
-            "y_model and WLSData must have equal length; got $n and $(length(data.I_obs))",
+            "y_model and WLSData must have equal length; " *
+            "got $n and $(length(data.I_obs))",
         ),
     )
 
@@ -182,7 +184,6 @@ function _wls_from_sums(SwI, SwII, SwIy, n::Int, data::WLSData)::WLSFit
         bkgrnd_corr,
         chi2,
         n - 2,
-        det_XtWX,
         data.sum_log_var,
     )
 end
@@ -224,20 +225,12 @@ wls_prof_ll(f::WLSFit) =
     (f.dof + 2) * log(2π) / 2
 
 
-"""
-Log marginal-likelihood with scale and background integrated out under
-a flat prior.
-"""
-wls_marg_ll(f::WLSFit) = wls_prof_ll(f) - log(f.det_XtWX) / 2 + log(2π)
-
 # ---------------------------------------------------------------------------
 # c1 only enters through the excluded-volume envelope g(q; c1), so for a fixed ξ the
 # model curve is ŷ(q; c1) = A(q) + g·B(q) + g²·C(q) with A, B, C from
 # `Scattering.intensity_terms` (the contrast contraction lives in Scattering; see its
 # docstring). A, B, C are built once per ξ; the scan reads g from a static table and
 # each Brent step costs one exp per q, instead of a full forward pass per trial c1.
-# What is fitting, and so lives here: the weighted χ² of ŷ against the data, the c1
-# scan and Brent polish, and the saturation test.
 # ---------------------------------------------------------------------------
 
 
@@ -506,7 +499,16 @@ function _c1_search(
     χ²_at_c1 = @closure c1 -> reduced_chi2(
         _wls_from_sums(_sums_at(A, B, C, tab, wls, c1)..., n, wls),
     )
-    return minimizer(optimize(χ²_at_c1, lo_b, hi_b, Brent(); abs_tol = tol, rel_tol = 0.0))
+    return minimizer(
+        optimize(
+            χ²_at_c1,
+            lo_b,
+            hi_b,
+            Brent();
+            abs_tol = tol,
+            rel_tol = 0.0,
+        ),
+    )
 end
 
 """
@@ -602,7 +604,10 @@ without the dual-number vectors. All temporaries are Bumper-allocated.
 - `WLSError`: as [`wls_fit`](@ref), if the model is flat.
 """
 function _profile_ll_grad(
-    wls::WLSData, ξ::SVector{N,Float64}, fw::ForwardCache, tab::_C1Tables, tol::Float64;
+    wls::WLSData,
+    ξ::SVector{N,Float64},
+    fw::ForwardCache,
+    tab::_C1Tables, tol::Float64;
     c1::Union{Nothing,Float64} = nothing,
 ) where {N}
     c1_fixed = c1

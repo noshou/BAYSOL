@@ -73,7 +73,11 @@
 (deftest fitting-test-lookups
     (testing
         "the real fitting tests: ids, a RUNS table, a single-run script, the specials"
-        (is (= 27 (count (c/ids))))
+        ;; every SASD folder, counted by a plain directory listing
+        (is (= (count (filter #(and (fs/directory? %)
+                            (str/starts-with? (fs/file-name %) "SASD"))
+                        (fs/list-dir (c/in-root c/fit-dir))))
+                (count (c/ids))))
         (is (= ["fit2_model1" "fit2_model2" "fit2_model3" "fit2_model4"
                     "fit2_model5"]
                 (c/tags-of "SASDBS6")))
@@ -158,5 +162,12 @@
     (let [{:keys [status out]} (h/run-tool (str h/dev-dir "/diagnose.clj")
                 "--list")]
         (is (= 0 status))
-        (is (= 27 (count (str/split-lines out))))
+        (is (= (count (c/ids)) (count (str/split-lines out))))
         (is (h/contains-text? out "SASDMJ9  (single run, no tag)"))))
+
+(deftest code-files-skip-the-hooks-clj-kondo-copies-in
+    (let [files (set (c/code-files c/*root*))]
+        (testing "our own clj-kondo config is code of ours"
+            (is (contains? files ".clj-kondo/config.edn")))
+        (testing "the copied hook files are not"
+            (is (not-any? #(str/starts-with? % ".clj-kondo/imports/") files)))))

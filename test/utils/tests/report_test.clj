@@ -4,7 +4,8 @@
 ;; format (which lacks the MAP-search lines), with every parsed field checked.
 
 (ns report-test
-    (:require [clojure.test :refer [deftest is testing]]
+    (:require [clojure.string :as str]
+        [clojure.test :refer [deftest is testing]]
         [common :as c]
         [helpers :as h]
         [report]))
@@ -125,3 +126,181 @@
         (let [r (report/parse (c/slurp8 (str h/data-dir "/res_current.txt")))]
             (is (= [:n_atoms :lMax :n_q_raw] (take 3 (:order (meta r)))))
             (is (apply distinct? (:order (meta r)))))))
+
+;; --- the stages of the nucleotide work. The timing sections in data/timing_*.txt are the
+;; ones `Pipeline._write_timing` printed for a seed build (no sampling) of the fixtures
+;; 1EHZ (nucleic acid with modified nucleotides), 3HDD (protein + DNA) and 1CRN (protein
+;; only); note how a name longer than the label column touches its note.
+
+(defn- report-with
+    "The text of res_current.txt before its timing section, then the timing section in
+    the file `timing` of the test data."
+    [timing]
+    (str (first (str/split (c/slurp8 (str h/data-dir "/res_current.txt"))
+                #"(?m)^=== Timing ==="
+                2))
+        (c/slurp8 (str h/data-dir "/" timing))))
+
+(defn- near? [a b] (< (Math/abs (- (double a) (double b))) 1e-9))
+
+(def ^:private new-stages
+    [:components :components_download :structure_checks :classify
+        :modified_hydrogens :heavy_atoms])
+
+(deftest nucleotide-stages-nucleic
+    (testing
+        "a nucleic-acid run: no PROPKA, the AMBER hydrogenation, modified residues"
+        (let [r (report/parse (report-with "timing_nucleic.txt"))]
+            (is (= ["6.4e-04" "0" "0.01" "2.7e-03" "0.02" "0.03"]
+                    (mapv r new-stages)))
+            (is (= ["" "0.01" "0.02" "0.20" "0.39"]
+                    (mapv r [:propka :pdb2pqr :load_molecule :static_build :wall])))
+            (testing
+                "pdb2pqr (nucleic, none) is the pdb2pqr key; wall_ex drops only it"
+                (is (near? 0.38 (r :wall_ex)))))))
+
+(deftest nucleotide-stages-mixed
+    (testing
+        "a protein + nucleic run: PROPKA and pdb2pqr (mixed, propka), no modified"
+        (let [r (report/parse (report-with "timing_mixed.txt"))]
+            (is (= ["6.5e-04" "0" "4.3e-03" "1.5e-03" "" "9.7e-03"]
+                    (mapv r new-stages)))
+            (is (= ["1.0e-03" "0.04"] (mapv r [:propka :pdb2pqr])))
+            (is (near? (- 0.32 0.001 0.04) (r :wall_ex))))))
+
+(deftest nucleotide-stages-protein
+    (testing
+        "a protein-only run: PROPKA and pdb2pqr as before, the new stages present"
+        (let [r (report/parse (report-with "timing_protein.txt"))]
+            (is (= ["2.3e-04" "0" "8.0e-04" "3.0e-04" "" "1.9e-03"]
+                    (mapv r new-stages)))
+            (is (near? (- 0.91 0.89 0.000017) (r :wall_ex))))))
+
+(deftest wall-ex-download
+    (testing
+        "a component download counts as external time, a lookup without one does not"
+        (let [text (report-with "timing_nucleic.txt")
+                downloaded (-> text
+                    (str/replace "0 cache, 0 download]"
+                        "0 cache, 1 download]")
+                    (str/replace "6.4e-04" "0.25"))
+                r (report/parse downloaded)]
+            (is (= ["0.25" "1"] (mapv r [:components :components_download])))
+            (is (near? (- 0.39 0.01 0.25) (r :wall_ex)))
+            (is (near? 0.38 (:wall_ex (report/parse text)))
+                "0 downloads: the table load stays in the wall clock"))))
+
+(deftest wall-ex-without-the-new-stages
+    (testing
+        "a report without them gives the numbers it always gave; the keys are empty"
+        (let [r (report/parse (c/slurp8 (str h/data-dir "/res_current.txt")))]
+            (is (= (repeat 6 "") (map r new-stages)))
+            (is (= 15.37 (r :wall_ex)))))
+    (testing
+        "the same report, a nucleic run's stages added: only its pdb2pqr time goes"
+        (let [r (report/parse (report-with "timing_nucleic.txt"))]
+            (is (near? (- (c/as-number (r :wall)) (c/as-number (r :pdb2pqr)))
+                    (r :wall_ex))))))
+
+(deftest stage-notes-parse
+    (testing "the notes of a nucleic run, the glued ones included"
+        (is (= {"components" "[17 residue names: 17 builtin, 0 cache, 0 download]",
+                    "structure checks"
+                    (str "[0 chains relabelled, 0 duplicate atoms dropped, "
+                        "0 dummy-like findings]"),
+                    "classify" "[nucleic: AMBER, titration none]",
+                    "pdb2pqr (nucleic, none)" "[cache hit]",
+                    "modified nucleotide hydrogens"
+                    (str
+                        "[14 residues: 14 hydrogenated through their base, 0 without a "
+                        "base; 149 hydrogens placed, 232 in the free "
+                        "components' formulas]"),
+                    "heavy atoms" "[1821 in, 1821 out; 1 restored, 0 added by pdb2pqr]"}
+                (report/stage-notes (c/slurp8 (str h/data-dir
+                            "/timing_nucleic.txt"))))))
+    (testing "mixed and protein runs"
+        (is (= {"classify" "[mixed: PARSE, titration propka]",
+                    "propka" "[cache hit]",
+                    "pdb2pqr (mixed, propka)" "[cache hit]"}
+                (select-keys (report/stage-notes
+                        (c/slurp8 (str h/data-dir "/timing_mixed.txt")))
+                    ["classify" "propka" "pdb2pqr (mixed, propka)"])))
+        (is (= {"classify" "[protein: PARSE, titration propka]",
+                    "propka" "[cache miss]",
+                    "pdb2pqr" "[cache hit]"}
+                (select-keys (report/stage-notes
+                        (c/slurp8 (str h/data-dir "/timing_protein.txt")))
+                    ["classify" "propka" "pdb2pqr"]))))
+    (testing
+        "an older report has only the propka and pdb2pqr notes; no section: none"
+        (is (= {"propka" "[cache hit]", "pdb2pqr" "[cache hit]"}
+                (report/stage-notes (c/slurp8 (str h/data-dir "/res_current.txt")))))
+        (is (= {} (report/stage-notes "n_atoms = 3\n"))))
+    (testing "parse carries them without making them a TSV column"
+        (let [r (report/parse (report-with "timing_nucleic.txt"))]
+            (is (= "[nucleic: AMBER, titration none]"
+                    (get-in r [:stage_notes "classify"])))
+            (is (not (some #{:stage_notes} (:order (meta r))))))))
+
+;; --- modified amino acids: data/timing_protein_mse.txt is a protein with one MSE
+;; (HETATM, synthetic), data/timing_mixed_mse.txt SASDH39 (protein + DNA, 20 MSE); both
+;; are the unedited output of `Pipeline._write_timing`. `modified amino acid hydrogens`
+;; is longer than the label column, so its note touches the name.
+
+(deftest modified-amino-stage
+    (testing "a protein-only run with modified amino acids"
+        (let [r (report/parse (report-with "timing_protein_mse.txt"))]
+            (is (= ["0.02" ""]
+                    (mapv r [:modified_amino_hydrogens :modified_hydrogens])))
+            (is (= ["0.03" "2.59" "8.6e-04"]
+                    (mapv r [:heavy_atoms :pdb2pqr :propka])))
+            (is (near? (- 3.39 0.00086 2.59) (r :wall_ex)))))
+    (testing "a mixed run; pdb2pqr (mixed, propka) is the pdb2pqr key"
+        (let [r (report/parse (report-with "timing_mixed_mse.txt"))]
+            (is (= ["0.01" "7.56"] (mapv r [:modified_amino_hydrogens :pdb2pqr])))
+            (is (near? (- 8.86 0.003 7.56) (r :wall_ex)))))
+    (testing
+        "the two modified stages are separate keys; a run without either has both empty"
+        (let [r (report/parse (report-with "timing_nucleic.txt"))]
+            (is (= ["0.02" ""]
+                    (mapv r [:modified_hydrogens :modified_amino_hydrogens]))))
+        (let [r (report/parse (report-with "timing_protein.txt"))]
+            (is (= ["" ""]
+                    (mapv r [:modified_hydrogens :modified_amino_hydrogens])))))
+    (testing "the glued note"
+        (is (= (str "[1 residues: 1 hydrogenated through their parent, "
+                    "0 without a parent; 9 hydrogens placed]")
+                (get (report/stage-notes (c/slurp8 (str h/data-dir
+                                "/timing_protein_mse.txt")))
+                    "modified amino acid hydrogens")))
+        (is (= (str "[20 residues: 20 hydrogenated through their parent, "
+                    "0 without a parent; 183 hydrogens placed]")
+                (get (report/stage-notes (c/slurp8 (str h/data-dir
+                                "/timing_mixed_mse.txt")))
+                    "modified amino acid hydrogens")))))
+
+;; --- the notes on a line of their own (today's layout), data/timing_notes_own_line.txt
+(deftest stage-notes-own-line
+    (testing "the note under its stage; a stage without one has none"
+        (is (= {"components" "[21 residue names: 21 builtin, 0 cache, 2 download]",
+                    "classify" "[protein: PARSE, titration propka]",
+                    "pdb2pqr (nucleic, none)" "[cache hit]"}
+                (report/stage-notes (c/slurp8 (str h/data-dir
+                            "/timing_notes_own_line.txt"))))))
+    (testing
+        "the download count and the stage seconds are read across the two lines"
+        (let [r (report/parse (report-with "timing_notes_own_line.txt"))]
+            (is (= ["2" "2.7e-03" "0.04"]
+                    (mapv r [:components_download :components :pdb2pqr])))
+            (is (= "0.10" (r :sasa))))))
+
+(deftest stage-notes-wrapped
+    (testing "a note wrapped over lines is joined; the next stage is not swallowed"
+        (let [text (str "=== Timing ===     seconds\n"
+                    "    heavy atoms        0.04\n"
+                    "      [1821 in, 1821 out; 1 restored,\n"
+                    "      0 added by pdb2pqr]\n"
+                    "    SASA               0.10\n")]
+            (is (= {"heavy atoms"
+                        "[1821 in, 1821 out; 1 restored, 0 added by pdb2pqr]"}
+                    (report/stage-notes text))))))

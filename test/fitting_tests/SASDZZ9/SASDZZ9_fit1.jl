@@ -4,7 +4,6 @@ using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
-using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDZZ9")
@@ -72,7 +71,7 @@ const NODB_MOLARITY   = NODB_CONC_MG_ML / NODB_MW   # ≈ 9.02e-5 M
 const NODB_MOLARITY_σ = MOLARITY_REL_SIGMA * NODB_MOLARITY
 
 # Buffer components. "sodium chloride" / "tris" both present verbatim in
-# src/BulkElectronDensity/NonBiological/common_to_iupac.json. Counter-ions (added
+# src/BulkElectronDensity/NonBiological/nonbio_lookup.json. Counter-ions (added
 # 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
 # not list. Assumed: 20 mM Tris titrated with HCl -> Cl⁻ = C·0.854 (pK(22 °C) =
 # 8.156). The pH is taken as set at room temperature (22 ± 3 °C), which fixes the
@@ -137,7 +136,7 @@ function run_sasdzz9_fit1(;
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seed_sasdzz9_fit1(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
+    res = BAYSOL.run_model(s, n_samples, n_adapt)
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
 end
 

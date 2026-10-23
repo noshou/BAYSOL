@@ -14,7 +14,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 const FIT = BAYSOL.Inference
 
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
-using BAYSOL.Inference: WLSData, wls_fit, wls_prof_ll, wls_marg_ll,
+using BAYSOL.Inference: WLSData, wls_fit, wls_prof_ll,
     profiled_corrs, Θ, Ξ
 using BAYSOL.Inference: BOUNDS_δρ₁₂, κ_δρ₁₂, κ_δρ₃
 using BAYSOL.Scattering: forward_cache, ForwardCache
@@ -84,25 +84,25 @@ ref_lp(ξ, pr) =
 Log-likelihood at ξ with c1 profiled: the c1 is taken from `profiled_corrs`,
 everything else (contrasts, WLS, likelihood) is recomputed directly.
 """
-function ref_ll(ξ, wls, fw, l::FIT.LIKELIHOOD)
+function ref_ll(ξ, wls, fw)
     _, _, c1 = profiled_corrs(wls, SVector{4,Float64}(ξ), fw)
     ŷ = reference_intensity(fw, 1.0, 0.0, ξ[1], (ξ[2], ξ[3], ξ[4]), c1)
     fit = wls_fit(ŷ, wls)
-    return l isa FIT.PROFILE ? wls_prof_ll(fit) : wls_marg_ll(fit)
+    return wls_prof_ll(fit)
 end
 
 """
 Independent re-derivation of `_logπ`: decode θ by hand, add the log-Jacobian
 a + Σₖ [ln Wₖ + ln uₖ + ln(1 - uₖ)], uₖ = σ(tₖ), W = (12, 12, W₃).
 """
-function ref_logπ(θ::NTuple{4,<:Real}, pr, wls, fw, l::FIT.LIKELIHOOD)
+function ref_logπ(θ::NTuple{4,<:Real}, pr, wls, fw)
     lo, hi = BOUNDS_δρ₁₂
     u = map(t -> 1 / (1 + exp(-t)), θ[2:4])
     L₃, W₃ = pr.δρ₃Prior.μ, pr.δρ₃Prior.σ
     W = (hi - lo, hi - lo, W₃)
     ξ = (exp(θ[1]), lo + W[1] * u[1], lo + W[2] * u[2], L₃ + W₃ * u[3])
     corr = θ[1] + sum(log(W[k]) + log(u[k]) + log(1 - u[k]) for k in 1:3)
-    return ref_lp(ξ, pr) + ref_ll(ξ, wls, fw, l) + corr
+    return ref_lp(ξ, pr) + ref_ll(ξ, wls, fw) + corr
 end
 
 θ_of(ξt, pr) = Tuple(Θ(SVector{4,Float64}(ξt), pr)[1])
@@ -196,16 +196,12 @@ end
         @test all(isapprox.(FIT._θ_of_w(w, sp), θ; rtol = 1e-12))
     end
 
-    @testset "_ll: PROFILE/MARGINAL match the independent reference" begin
+    @testset "_ll: matches the independent reference" begin
         fw = smpl_fw()
         wls = WLSData(synth_data(fw)...)
         for ξt in (ξ_TRUE, (0.30, 0.95, 0.10, -6.0), (0.40, 1.15, -0.20, 2.5))
             ξ = SVector{4,Float64}(ξt)
-            for l in (FIT.PROFILE(), FIT.MARGINAL())
-                @test close_(FIT._ll(wls, ξ, fw, l), ref_ll(ξt, wls, fw, l))
-            end
-            @test !close_(FIT._ll(wls, ξ, fw, FIT.PROFILE()),
-                FIT._ll(wls, ξ, fw, FIT.MARGINAL()); atol = 1e3 * DEFAULT_ATOL)
+            @test close_(FIT._ll(wls, ξ, fw), ref_ll(ξt, wls, fw))
         end
     end
 
@@ -225,7 +221,7 @@ end
         end
     end
 
-    @testset "_logπ: pure, and matches the independent reference for both LIKELIHOODs" begin
+    @testset "_logπ: pure, and matches the independent reference" begin
         pr = smpl_priors()
         fw = smpl_fw()
         wls = WLSData(synth_data(fw)...)
@@ -233,11 +229,9 @@ end
             θt = θ_of(ξt, pr)
             θ = SVector{4,Float64}(θt)
             θ_before = Tuple(θ)
-            for l in (FIT.PROFILE(), FIT.MARGINAL())
-                val = FIT._logπ(θ, pr, wls, fw, l)
-                @test Tuple(θ) == θ_before
-                @test close_(val, ref_logπ(θt, pr, wls, fw, l); atol = 1e1 * DEFAULT_ATOL)
-            end
+            val = FIT._logπ(θ, pr, wls, fw)
+            @test Tuple(θ) == θ_before
+            @test close_(val, ref_logπ(θt, pr, wls, fw); atol = 1e1 * DEFAULT_ATOL)
         end
     end
 
@@ -247,7 +241,7 @@ end
         fw = smpl_fw()
         wls = WLSData(synth_data(fw)...)
         θ₀ = collect(θ_of(ξ_TRUE, pr))
-        f(x) = FIT._logπ(SVector{4,eltype(x)}(x...), pr, wls, fw, FIT.PROFILE())
+        f(x) = FIT._logπ(SVector{4,eltype(x)}(x...), pr, wls, fw)
         g = ForwardDiff.gradient(f, θ₀)
         @test all(isfinite, g)
         h = 1.0e-5
@@ -290,13 +284,12 @@ end
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         Random.seed!(11)
-        sp = FIT._sampling_space(seed, FIT.PROFILE())
+        sp = FIT._sampling_space(seed)
         f(z) = FIT._neglogπ(
             SVector{4}(z...),
             sp.μ,
             sp.σ,
             seed,
-            FIT.PROFILE(),
             FIT.EXCL_VOL_CORR_TOL,
         )
         g!(G, z) = (G .= ForwardDiff.gradient(f, z); G)
@@ -310,7 +303,7 @@ end
         # and it costs fewer evaluations than the gradient test alone, for the same optimum
         Random.seed!(11)
         sp_g =
-            FIT._sampling_space(seed, FIT.PROFILE(); f_abstol = 0.0, successive_f_tol = 1)
+            FIT._sampling_space(seed; f_abstol = 0.0, successive_f_tol = 1)
         @test sp.n_evals < sp_g.n_evals
         @test abs(f(sp.ẑ) - f(sp_g.ẑ)) < 1e-4
     end
@@ -319,8 +312,8 @@ end
     @testset "rng_seed: the MAP search and the whole run are reproducible" begin
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
-        sp1 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x1234))
-        sp2 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x1234))
+        sp1 = FIT._sampling_space(seed; base = UInt64(0x1234))
+        sp2 = FIT._sampling_space(seed; base = UInt64(0x1234))
         @test sp1.ẑ == sp2.ẑ && sp1.S == sp2.S && sp1.n_evals == sp2.n_evals
         r1 = FIT.infer(seed, 40, 20; rng_seed = 7, retry = false)
         r2 = FIT.infer(seed, 40, 20; rng_seed = 7, retry = false)
@@ -358,10 +351,10 @@ end
     Re-evaluating `_logπ` at Θ(sample) must land on the log_density
     AdvancedHMC.jl reported for that iteration.
     """
-    function check_log_density_self_consistency(samples, stats, seed, l)
+    function check_log_density_self_consistency(samples, stats, seed)
         for i in eachindex(samples)
             θ_check, _ = Θ(samples[i], seed.pr)
-            recomputed = FIT._logπ(θ_check, seed.pr, seed.wls, seed.fw, l)
+            recomputed = FIT._logπ(θ_check, seed.pr, seed.wls, seed.fw)
             # Θ(Ξ(θ)) differs from θ by rounding, and the profiled c1
             # is located by a value-only minimizer, which is only as
             # accurate as √eps relative to the curvature (up to ~1e-6
@@ -370,29 +363,26 @@ end
         end
     end
 
-    for (name, l, rng) in (("PROFILE", FIT.PROFILE(), 1), ("MARGINAL", FIT.MARGINAL(), 2))
-        @testset "run: $name -- output shapes, physical domain, self-consistency" begin
-            fw = smpl_fw()
-            seed =
-                FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
-            Random.seed!(rng)
-            n_samples, n_adapt = 60, 30
-            fit = FIT.infer(seed, n_samples, n_adapt; l = l, n_chains = 1, retry = false)
-            @test length(fit.samples) == n_samples
-            @test length(fit.stats) == n_samples
-            @test length(fit.c1) == n_samples
-            check_physical_domain(fit.samples, seed.pr)
-            check_log_density_self_consistency(fit.samples, fit.stats, seed, l)
-        end
+    @testset "run: output shapes, physical domain, self-consistency" begin
+        fw = smpl_fw()
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        Random.seed!(1)
+        n_samples, n_adapt = 60, 30
+        fit = FIT.infer(seed, n_samples, n_adapt; n_chains = 1, retry = false)
+        @test length(fit.samples) == n_samples
+        @test length(fit.stats) == n_samples
+        @test length(fit.c1) == n_samples
+        check_physical_domain(fit.samples, seed.pr)
+        check_log_density_self_consistency(fit.samples, fit.stats, seed)
     end
 
     @testset "run: deterministic under a fixed global RNG seed" begin
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         Random.seed!(42)
-        fit1 = FIT.infer(seed, 20, 10; l = FIT.PROFILE(), retry = false)
+        fit1 = FIT.infer(seed, 20, 10; retry = false)
         Random.seed!(42)
-        fit2 = FIT.infer(seed, 20, 10; l = FIT.PROFILE(), retry = false)
+        fit2 = FIT.infer(seed, 20, 10; retry = false)
         for i in eachindex(fit1.samples)
             @test all(fit1.samples[i] .== fit2.samples[i])
             @test fit1.stats[i].log_density == fit2.stats[i].log_density
@@ -544,28 +534,28 @@ end
     @testset "MAP search: the optima it found, and the harvest from draws" begin
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
-        sp = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(5))
+        sp = FIT._sampling_space(seed; base = UInt64(5))
         @test 1 ≤ length(sp.optima) ≤ FIT.MAP_MAX_BASINS
         @test issorted([o.f for o in sp.optima])
         # the MAP is one of them, and a Hessian with a finite mass exists for it
         @test any(o -> o.z == sp.ẑ, sp.optima)
         @test all(o -> isnan(o.logmass) || all(>(0), o.λ), sp.optima)
         # a pure function of the seeds
-        sp2 = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(5))
+        sp2 = FIT._sampling_space(seed; base = UInt64(5))
         @test [o.z for o in sp2.optima] == [o.z for o in sp.optima] && sp2.ẑ == sp.ẑ
 
         # draws around the MAP: the known optima come back, none is lost, and L-BFGS ran
         rng = Xoshiro(2)
         W = randn(rng, 300, 4)
         opts, n_evals = FIT._harvest_optima(
-            seed, FIT.PROFILE(), sp, W, randn(rng, 300), falses(300),
+            seed, sp, W, randn(rng, 300), falses(300),
         )
         @test n_evals > 0 && length(opts) ≥ length(sp.optima)
         @test issorted([o.f for o in opts])
         @test all(o -> any(p -> p.z == o.z, opts), sp.optima)
         # nothing to harvest from
         @test FIT._harvest_optima(
-            seed, FIT.PROFILE(), sp, zeros(0, 4), Float64[], Bool[],
+            seed, sp, zeros(0, 4), Float64[], Bool[],
         ) == (sp.optima, 0)
     end
 
@@ -594,16 +584,15 @@ end
     @testset "MAP search: log π at the MAP, more starts, a start added by the caller" begin
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
-        sp = FIT._sampling_space(seed, FIT.PROFILE(); base = UInt64(0x77))
+        sp = FIT._sampling_space(seed; base = UInt64(0x77))
         @test FIT.MAP_N_STARTS == 64 && sp.n_ok ≥ 1
         μ, σ = FIT.θ_prior_moments(seed.pr)
         @test sp.logπ ≈
-              -FIT._neglogπ(sp.ẑ, μ, σ, seed, FIT.PROFILE(), FIT.EXCL_VOL_CORR_TOL)
+              -FIT._neglogπ(sp.ẑ, μ, σ, seed, FIT.EXCL_VOL_CORR_TOL)
         # a start handed in (here the MAP itself) can only
         # add to the optima, never lower log π at the MAP
         sp2 = FIT._sampling_space(
-            seed,
-            FIT.PROFILE();
+            seed;
             base = UInt64(0x77),
             extra_starts = [sp.ẑ],
         )

@@ -127,10 +127,12 @@ columns in `_GRAM_PAIRS` order.
 - `ArgumentError`: G is not five-species.
 """
 function _pack_gram(G::Array{Float64,3})::Matrix{Float64}
-    err1 = "_pack_gram: needs the five-species Gram matrix;"
-    err2 = " got $(size(G, 1))×$(size(G, 2))"
-    err  = err1 * err2
-    (size(G, 1) == 5 && size(G, 2) == 5) || throw(ArgumentError(err))
+    (size(G, 1) == 5 && size(G, 2) == 5) || throw(
+        ArgumentError(
+            "_pack_gram: needs the five-species Gram matrix; " *
+            "got $(size(G, 1))×$(size(G, 2))",
+        ),
+    )
     Q = size(G, 3)
     Gc = Matrix{Float64}(undef, Q, length(_GRAM_PAIRS))
     @inbounds for (j, (a, b)) in enumerate(_GRAM_PAIRS)

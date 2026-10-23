@@ -35,5 +35,10 @@ test/baselines/results/
 docs/src/guides/
 docs/src/testing/
 
-# clj-kondo cache
+# clj-kondo: analysis cache, and the library configs an editor's clojure-lsp copies in
+# (the one tracked file is .clj-kondo/config.edn)
 .clj-kondo/.cache
+.clj-kondo/imports/
+
+# clojure-lsp cache (the editor creates it on opening the project)
+.lsp/.cache/

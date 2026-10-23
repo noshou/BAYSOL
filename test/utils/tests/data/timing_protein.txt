@@ -1,0 +1,22 @@
+=== Timing ===                                                                                       seconds    % wall    (JIT)
+wall clock  (seed_model → end of report)                                                                0.91     100.0    (0.8)
+  static build                                                                                          0.91     100.0    (0.8)
+    resolve_structure                                                                                2.3e-05
+    components            [15 residue names: 15 builtin, 0 cache, 0 download]                        2.3e-04
+    structure checks      [0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings]    8.0e-04
+    classify              [protein: PARSE, titration propka]                                         3.0e-04
+    propka                [cache miss]                                                                  0.89
+    pdb2pqr               [cache hit]                                                                1.7e-05
+    heavy atoms           [327 in, 327 out; 0 restored, 0 added by pdb2pqr]                          1.9e-03
+    load_molecule                                                                                    1.4e-03
+    SASA                                                                                             6.0e-03
+    shannon (diameter, binning)                                                                      4.2e-04
+    forward_cache                                                                                    9.2e-03
+      vacuum + excluded volume (vols + B_lm)                                                         7.5e-03
+      hydration (B_lm)                                                                               1.7e-03
+      Gram + r_m                                                                                     3.3e-05
+    seed_sampler (priors, WLS)                                                                       3.4e-05
+  sampling                                                                                                 0       0.0    (0.0)
+  report write                                                                                       3.3e-07
+  unaccounted                                                                                        8.2e-05    (0.0)
+GC: 0 s

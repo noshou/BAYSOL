@@ -212,6 +212,24 @@
                     (count e)))]
         [(count npts) (reduce + npts)]))
 
+(defn- add-deuterium!
+    "Adds deuterium `d` as a copy of hydrogen `h` in both tables. X-ray scattering
+    depends on the electron cloud only, and 2H has the same one as 1H, so f0, f' and
+    f'' are identical (the nucleus differs, which matters for neutrons, not here)."
+    [dst]
+    (execute! dst
+        [(str
+                "INSERT INTO waasmaier SELECT 'd', 'd', z, c, a1, a2, a3, a4, a5, "
+                "b1, b2, b3, b4, b5 FROM waasmaier WHERE ion = 'h'")])
+    (execute!
+        dst
+        [(str "INSERT INTO chantler SELECT 'd', z, npts, emin, emax, energy, f1, f2 "
+                "FROM chantler WHERE element = 'h'")])
+    (execute!
+        dst
+        ["INSERT INTO provenance VALUES (?, ?)" "deuterium"
+            "d is a copy of h: same electron cloud, hence the same f0, f1, f2 for X-rays"]))
+
 (defn build
     "Reads the source database `src` and writes the compact database `dst` (which must
     not exist)."
@@ -221,6 +239,7 @@
             [n-c tot] (add-chantler! src dst)]
         (doseq [[k v] provenance]
             (execute! dst ["INSERT INTO provenance VALUES (?, ?)" k v]))
+        (add-deuterium! dst)
         ;; VACUUM packs the file
         (execute! dst ["VACUUM"])
         (println (format

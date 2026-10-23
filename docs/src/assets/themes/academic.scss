@@ -295,9 +295,30 @@ pre,
 .docstring pre {
     font-family: $family-monospace;
     font-feature-settings: "calt" 1, "liga" 1;
+}
+
+// Blocks are boxed; inline code is only tinted (no border, no pill), and the code
+// inside a block takes the block's own box instead of drawing a second one.
+pre,
+.documenter-example-output,
+.docstring pre {
     background: #ffffff;
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 8px;
+}
+
+code {
+    background: rgba(0, 0, 0, 0.05);
+    border: 0;
+    border-radius: 4px;
+}
+
+pre code,
+pre code.hljs,
+.documenter-example-output code {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
 }
 
 // four-color syntax highlighting (highlight.js token classes). Per

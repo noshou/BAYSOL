@@ -30,6 +30,7 @@ using .Runtime: Runtime
 include("Geometry/Geometry.jl")
 include("BulkElectronDensity/BulkElectronDensity.jl")
 include("MolecularStructure/MolecularStructure.jl")
+include("Hydrogenator/Hydrogenator.jl")
 include("Scattering/Scattering.jl")
 include("Inference/Inference.jl")
 include("Pipeline/Pipeline.jl")
@@ -37,6 +38,7 @@ include("Pipeline/Pipeline.jl")
 using .Geometry: Geometry
 using .BulkElectronDensity: BulkElectronDensity
 using .MolecularStructure: MolecularStructure
+using .Hydrogenator: Hydrogenator
 using .Scattering: Scattering
 using .Inference: Inference
 using .Pipeline: Pipeline, seed_model, run_model, write_report

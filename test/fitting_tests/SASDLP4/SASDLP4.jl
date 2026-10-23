@@ -3,7 +3,6 @@ using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
-using BAYSOL.Inference: PROFILE
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDLP4")
@@ -151,7 +150,7 @@ function run_sasdlp4(
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seed_sasdlp4(run; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
+    res = BAYSOL.run_model(s, n_samples, n_adapt)
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
 end
 

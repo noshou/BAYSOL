@@ -40,7 +40,7 @@ Convergence statistics of the pooled chains' post-warm-up draws, from MCMCDiagno
 the value on the rank-normalized draws, which asks whether the chains agree in location, and
 on the rank-normalized draws folded around the median, which asks whether they agree in
 scale and tails), the bulk effective sample size (how many independent draws the centre of
-the distribution is worth) and the tail effective sample size (the same for the 5 % and 95 %
+the distribution is worth) and the tail effective sample size (the same for the 5% and 95%
 quantiles, which the report's intervals and curve bands are made of). Every chain is split
 in halves first, so a chain that drifts shows up as two that disagree.
 
@@ -48,8 +48,8 @@ in halves first, so a chain that drifts shows up as two that disagree.
 - `x::AbstractArray{<:Real,3}`: the draws, `draws × chains × quantities`.
 
 # Returns
-- `NamedTuple` `(rhat, ess, ess_tail)` of vectors with one entry per quantity; all
-  `NaN` when a chain has fewer than 8 draws (the statistics need at least 4 per half).
+    -   `NamedTuple` `(rhat, ess, ess_tail)` of vectors with one entry per quantity; all
+        `NaN` when a chain has fewer than 8 draws (the stats need at least 4 per half).
 
 # Exceptions
 - None.
@@ -269,7 +269,6 @@ curve per draw, and AdvancedHMC.jl's own per-iteration diagnostics.
     chain, 1 to `n_samples` (the first `n_adapt` are warm-up).
 - `diagnostics::ChainDiagnostics`: which chains were pooled and why not, the
     start scale of each, and the split R̂ and ESS of the pooled post-warm-up draws.
-- `likelihood::AbstractString`: the likelihood type
 - `timing::Union{Nothing,StageLog}`: the run's stage log (from the `Seed`), if timing is on.
 """
 struct Inferred{S,N}
@@ -283,7 +282,6 @@ struct Inferred{S,N}
     chain::Vector{Int}
     iteration::Vector{Int}
     diagnostics::ChainDiagnostics
-    likelihood::AbstractString
     timing::Union{Nothing,StageLog}
 end
 
@@ -350,8 +348,6 @@ the forward model) from the trajectory's sample covariance.
                         size and mass matrix before sampling proper.
 
 # Keywords
-- `l::LIKELIHOOD=PROFILE()`: PROFILE() or MARGINAL(), forwarded to
-                                [`_logπ`](@ref)/[`_ll`](@ref).
 - `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
                                 (0, 100) exclusive; the default,
                                 [`DEFAULT_TARGET_ACCEPT`](@ref), is 95%.
@@ -399,7 +395,6 @@ function infer(
     seed::Seed,
     n_samples::Int64,
     n_adapt::Int64;
-    l::LIKELIHOOD = PROFILE(),
     δ::Real = DEFAULT_TARGET_ACCEPT,
     rng_seed::Union{Nothing,Integer} = nothing,
     n_chains::Int = DEFAULT_N_CHAINS,
@@ -411,7 +406,7 @@ function infer(
     jitter_base = jitter_seed % UInt64
     go =
         (ns, na, b, j) -> with_gc_paused(
-            () -> _infer(seed, ns, na; l = l, δ = δ, base = b,
+            () -> _infer(seed, ns, na; δ = δ, base = b,
                 n_chains = n_chains, jitter_base = j),
         )
     r1 = go(n_samples, n_adapt, base, jitter_base)
@@ -440,7 +435,7 @@ function infer(
         ChainDiagnostics(d.n_chains, d.start_scale, d.pooled, d.reason, d.rhat, d.ess,
             d.ess_tail, d.rewhitened, d.mode, d.mode_weight, d.mode_logmass, d.mode_err,
             d.weights_uncertain, d.n_adapt, worst, kept, d.n_extra, d.optima),
-        best.likelihood, best.timing)
+        best.timing)
 end
 
 """
@@ -474,7 +469,6 @@ function _infer(
     seed::Seed{<:Real,N},
     n_samples::Int64,
     n_adapt::Int64;
-    l::LIKELIHOOD = PROFILE(),
     δ::Real = DEFAULT_TARGET_ACCEPT,
     base::UInt64 = draw_base(),
     n_chains::Int = DEFAULT_N_CHAINS,
@@ -494,7 +488,7 @@ function _infer(
     # in which the posterior is ≈ N(0, I) and the chain starts at the MAP.
     t_map = tick()
     seed.timing === nothing || (seed.timing.info["rng_seed"] = base)
-    sp = _sampling_space(seed, l; base = base)
+    sp = _sampling_space(seed; base = base)
     if seed.timing !== nothing
         seed.timing.info["map_modes"] = sp.n_modes
         tock!(seed.timing, :sampling, 1,
@@ -507,13 +501,13 @@ function _infer(
     # at, the MAP search missed a better basin: re-whiten there (L-BFGS
     # from that draw, the heaviest basin wins) and run the chains once more
     post = (n_adapt+1):n_samples
-    chains = _run_chains(seed, l, sp, n_samples, n_adapt, δ, base, jitter_base, n_chains)
+    chains = _run_chains(seed, sp, n_samples, n_adapt, δ, base, jitter_base, n_chains)
     rewhitened = 0.0
     best = _best_draw(chains.runs, post)
     if best.ld > sp.logπ + BASIN_RESTART_NATS
         t_re = tick()
         z_best = _standardize(Θ(best.ξ, seed.pr)[1], seed.pr)
-        sp2 = _sampling_space(seed, l; base = base, extra_starts = [z_best])
+        sp2 = _sampling_space(seed; base = base, extra_starts = [z_best])
         tock!(seed.timing, :sampling, 1,
             @sprintf(
                 "re-whitening: a chain found a basin %.1f nats above the MAP",
@@ -523,7 +517,7 @@ function _infer(
             rewhitened = sp2.logπ - sp.logπ
             sp = sp2
             chains =
-                _run_chains(seed, l, sp, n_samples, n_adapt, δ, base, jitter_base, n_chains)
+                _run_chains(seed, sp, n_samples, n_adapt, δ, base, jitter_base, n_chains)
         end
     end
     t_nuts = chains.t_nuts
@@ -532,7 +526,7 @@ function _infer(
     # carry mass but have too few chains at them (their draws could not get their weight)
     t_h = tick()
     ext = _with_optima_chains(
-        seed, l, sp, chains.runs, chains.starts, post, n_samples, n_adapt, δ, base,
+        seed, sp, chains.runs, chains.starts, post, n_samples, n_adapt, δ, base,
         n_chains,
     )
     runs, starts, n_extra = ext.runs, ext.starts, ext.n_extra
@@ -605,7 +599,7 @@ function _infer(
     logZ = zeros(M)
     err = zeros(M)
     if M > 1
-        ℓπ = _value_target(seed, l, sp)
+        ℓπ = _value_target(seed, sp)
         for m in 1:M
             cs = findall(==(m), mode_of)
             W = reduce(vcat, (_draws_w(seed, sp, runs[pk[c]].ξ[post]) for c in cs))
@@ -686,7 +680,6 @@ function _infer(
         reduce(vcat, (fill(pk[c], length(rows[c])) for c in eachindex(pk))),
         reduce(vcat, (rows[c] for c in eachindex(pk))),
         diag,
-        l.type,
         seed.timing,
     )
 end
@@ -736,12 +729,12 @@ which is a single chain). Also the [`OptimumReport`](@ref)s of the optima that c
 # Returns
 - `NamedTuple` `(runs, starts, n_extra, optima_report)`.
 """
-function _with_optima_chains(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, runs, starts, post,
+function _with_optima_chains(seed::Seed{<:Real,N}, sp, runs, starts, post,
     n_samples, n_adapt, δ, base, n_chains) where {N}
-    opt = _optima_and_extra_chains(seed, l, sp, runs, post)
+    opt = _optima_and_extra_chains(seed, sp, runs, post)
     if n_chains > 1 && !isempty(opt.extra_w)
         ex = _run_extra_chains(
-            seed, l, sp, n_samples, n_adapt, δ, base, opt.extra_w, length(runs),
+            seed, sp, n_samples, n_adapt, δ, base, opt.extra_w, length(runs),
         )
         all_runs = vcat(runs, ex.runs)
         Ws = vcat(
@@ -771,7 +764,6 @@ the heaviest optimum first.
 """
 function _optima_and_extra_chains(
     seed::Seed{<:Real,N},
-    l::LIKELIHOOD,
     sp,
     runs,
     post,
@@ -784,7 +776,7 @@ function _optima_and_extra_chains(
     Ws = [_draws_w(seed, sp, r.ξ[post]) for r in ran]
     ld = reduce(vcat, [getproperty.(r.stats[post], :log_density) for r in ran])
     dv = reduce(vcat, [getproperty.(r.stats[post], :numerical_error) for r in ran])
-    optima, _ = _harvest_optima(seed, l, sp, reduce(vcat, Ws), ld, Vector{Bool}(dv))
+    optima, _ = _harvest_optima(seed, sp, reduce(vcat, Ws), ld, Vector{Bool}(dv))
     shares = _optimum_shares(optima)
     extra_w = Vector{Float64}[]
     owner = Int[]
@@ -849,13 +841,12 @@ end
 ℓπ: w ↦ log π(θ(w)), the value-only log-posterior in NUTS's coordinates
 w (the target the chains sample and bridge sampling integrates).
 """
-function _value_target(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp) where {N}
+function _value_target(seed::Seed{<:Real,N}, sp) where {N}
     return w -> _logπ(
         _θ_of_w(SVector{N,eltype(w)}(w...), sp),
         seed.pr,
         seed.wls,
-        seed.fw,
-        l;
+        seed.fw;
         tab = seed.c1tab,
     )
 end
@@ -870,14 +861,14 @@ and shares only the read-only seed.
 # Returns
 - `(ℓπ, ∂ℓπ∂w, run_chain)`; `run_chain` returns a [`_ChainRun`](@ref).
 """
-function _chain_runner(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, n_samples::Int64,
+function _chain_runner(seed::Seed{<:Real,N}, sp, n_samples::Int64,
     n_adapt::Int64, δ::Real, base::UInt64, show_progress::Bool) where {N}
     # ℓπ: w ↦ log π(θ(w)), the value-only log-posterior in NUTS's coordinates w.
     ℓπ = @closure w -> _logπ(
         _θ_of_w(SVector{N,eltype(w)}(w...), sp),
         seed.pr,
         seed.wls,
-        seed.fw, l;
+        seed.fw;
         tab = seed.c1tab,
     )
 
@@ -967,13 +958,13 @@ chain index, not to the thread that happens to run it) and shares only the read-
 -   `NamedTuple` `(runs, starts, t_nuts)`: the [`_ChainRun`](@ref)s in
     chain order, the starts and the timer started when the chains began.
 """
-function _run_chains(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, n_samples::Int64,
+function _run_chains(seed::Seed{<:Real,N}, sp, n_samples::Int64,
     n_adapt::Int64, δ::Real,
     base::UInt64, jitter_base::UInt64, n_chains::Int) where {N}
     t_setup = tick()
     # (concurrent progress bars would overwrite each other)
     ℓπ, ∂ℓπ∂w, run_chain =
-        _chain_runner(seed, l, sp, n_samples, n_adapt, δ, base, n_chains == 1)
+        _chain_runner(seed, sp, n_samples, n_adapt, δ, base, n_chains == 1)
 
     # The starts: mirrored jittered pairs, or the MAP for a single chain
     # (deterministically, see `_chain_start`). Chosen serially and up front,
@@ -995,9 +986,9 @@ is not finite is dropped.
 -   `NamedTuple` `(runs, starts, keep)`: the [`_ChainRun`](@ref)s, their `(w₀, distance
     from the MAP)` and the positions in `w_starts` that were run.
 """
-function _run_extra_chains(seed::Seed{<:Real,N}, l::LIKELIHOOD, sp, n_samples::Int64,
+function _run_extra_chains(seed::Seed{<:Real,N}, sp, n_samples::Int64,
     n_adapt::Int64, δ::Real, base::UInt64, w_starts::AbstractVector, k0::Int) where {N}
-    ℓπ, ∂ℓπ∂w, run_chain = _chain_runner(seed, l, sp, n_samples, n_adapt, δ, base, false)
+    ℓπ, ∂ℓπ∂w, run_chain = _chain_runner(seed, sp, n_samples, n_adapt, δ, base, false)
     keep = filter(eachindex(w_starts)) do i
         try
             v, g = ∂ℓπ∂w(w_starts[i])

@@ -48,7 +48,7 @@ const PASS_FRACTION = 0.95
 # profiled c1 and the reduced χ² on the measured grid.
 function map_summary(seed)
     Random.seed!(1)
-    sp = Fit._sampling_space(seed, Fit.PROFILE())
+    sp = Fit._sampling_space(seed)
     μ, σ = Fit.θ_prior_moments(seed.pr)
     ξ = Fit.Ξ(μ .+ σ .* sp.ẑ, seed.pr)
     ŷ, fit, c1 = Fit.profiled_corrs(seed.wls, ξ, seed.fw; tables = seed.c1tab, tol = 1e-8)

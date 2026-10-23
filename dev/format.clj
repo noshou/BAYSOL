@@ -170,8 +170,9 @@
         (apply str (map #(format "%02x" (bit-and % 0xff)) bytes*))))
 
 (defn- format-clj
-    "Formats (`apply?`) or checks the .clj files under `paths`; true when none needed
-    changing. Lists the files that were (or would be) changed. zprint is slow under
+    "Formats (`apply?`) or checks the .clj files under `paths`; true on success: when
+    formatting always, when checking if none would change. Lists the files that were (or
+    would be) changed. zprint is slow under
     Babashka (about half a second a file), so a text it has once left unchanged is
     remembered in `_cache/format-clj/` and skipped the next time."
     [apply? paths]
@@ -193,7 +194,7 @@
                     :when (if (= old fresh) (do (remember! old) false) true)]
                 (do (when apply? (c/spit8 path fresh) (remember! fresh)) f))]
         (doseq [f changed] (println (if apply? "formatted" "not formatted:") f))
-        (empty? changed)))
+        (or apply? (empty? changed))))
 
 (defn- format-julia
     "Formats (`apply?`) or checks the Julia files under `paths` with JuliaFormatter, in
@@ -214,6 +215,15 @@
                     (c/fail
                         who
                         (str "unknown option " mode " (one of: --apply, --check)")))
+                ;; a typo such as `bb fmt --check` (the task passes --apply) must not reach
+                ;; the formatters as a path
+                _ (when-let [bad (first (filter #(and (str/starts-with? % "--")
+                                    (not (#{"--julia" "--clj"} %)))
+                                rest-args))]
+                    (c/fail who
+                        (str "unknown option " bad
+                            " (use `bb fmt-check` to only check, "
+                            "`bb fmt` to rewrite; options: --julia, --clj)")))
                 apply? (= mode "--apply")
                 languages (set (filter #{"--julia" "--clj"} rest-args))
                 ;; no language flag: both

@@ -18,7 +18,7 @@ using ..Runtime: KeyedCache
 using JSON3: JSON3
 using FastClosures: @closure
 
-export Solute, Protein, NonBiological, DNA, RNA, DEFAULT_TEMPERATURE_C, ρₑ
+export Solute, Protein, NonBiological, Polymer, DNA, RNA, DEFAULT_TEMPERATURE_C, ρₑ
 
 
 """
@@ -101,6 +101,20 @@ struct NonBiological <: Solute
     arg::String
 end
 
+"""
+A polymer, polydisperse surfactant or short oligomer buffer component: PEG,
+Pluronics, dextran, detergents such as Tween, Triton and Brij, peptides,
+cyclodextrins ... `arg` is a grade name (`"PEG-3350"`, `"tween 80"`), a chain
+description (`"Pluronic nEO=150 nPO=30"`, `"C12E23"`) or a peptide (`"peptide GAG"`,
+`"tetraalanine"`). Molarity is per mole of chains (per average monomer unit for
+dextran, amphipol, PVP and PVA; per 1000 Da for Ficoll). See the README, `Polymers/`.
+"""
+struct Polymer <: Solute
+    molarity::Float64
+    molarity_uncertainty::Float64
+    arg::String
+end
+
 "A DNA buffer component (not the measured species; see [`Solute`](@ref))."
 struct DNA <: Solute
     molarity::Float64
@@ -116,114 +130,19 @@ struct RNA <: Solute
 end
 
 # ---------------------------------------------------------------------------
-#   Constants, caches and data tables (used by CalcDensity.jl and PMV.jl)
+#   Constants and caches shared by the backends
+#   (each class keeps its tables beside its code: Protein/, NonBiological/, Nucleotide/,
+#   Polymers/)
 # ---------------------------------------------------------------------------
 
 "Memoized water electron bulk density"
 const _ρₑ_w_cache = KeyedCache{Int64,Tuple{Float64,Float64}}()
 
-"""key => ((pH condition, `ionized_key`), `neutral_key`)"""
-const _protein_ionization::Dict{String,Tuple{Tuple{Float64,String},String}} = JSON3.read(
-    read(joinpath(@__DIR__, "Protein", "ionization.json"), String),
-    Dict{String,Tuple{Tuple{Float64,String},String}},
-)
-
-""" key => (`electron_count`, `partial_molar_volume`, uncertainty). `electron_count` is a
-side-chain-only increment relative to glycine (see [`BACKBONE_ELECTRONS`](@ref)), and is
-identical between a group's "-neutral" and "-acidic"/"-basic" forms since deprotonation
-only removes a bare proton (no electron). """
-const _Protein::Dict{String,Tuple{Int64,Float64,Float64}} = JSON3.read(
-    read(joinpath(@__DIR__, "Protein", "protein.json"), String),
-    Dict{String,Tuple{Int64,Float64,Float64}},
-)
-
-""" maps ambiguity codes to the two amino acids. Average must be taken. """
-const _wildcards = Dict("B" => ("D", "N"), "J" => ("L", "I"), "Z" => ("E", "Q"))
-
-"""
-Memoized protein partial molar volume, keyed by
-`(sequence, pH, σ_pH)`: the result depends on all three
-"""
-const _ϕ°_p_cache = KeyedCache{Tuple{String,Float64,Float64},Tuple{Int64,Float64,Float64}}()
-
-# The two JSON tables below are read into `const`s at precompile time; declare
-# them as dependencies so editing them invalidates the precompile cache
-# (otherwise stale values/keys keep being served after a table edit).
-include_dependency(joinpath(@__DIR__, "NonBiological", "nonbiological.json"))
-include_dependency(joinpath(@__DIR__, "NonBiological", "common_to_iupac.json"))
-
-""" iupac name => (electron count, pmv, uncertainty) """
-const _solutes::Dict{String,Tuple{Int64,Float64,Union{Float64,Nothing}}} =
-    JSON3.read(
-        read(joinpath(@__DIR__, "NonBiological", "nonbiological.json"), String),
-        Dict{String,Tuple{Int64,Float64,Union{Float64,Nothing}}},
-    )
-
-""" common name => iupac name """
-const COMMON_TO_IUPAC::Dict{String,String} = JSON3.read(
-    read(joinpath(@__DIR__, "NonBiological", "common_to_iupac.json"), String),
-    Dict{String,String},
-)
-
-"Memoized non-biological solute partial molar volume, keyed by iupac name"
-const _ϕ°_s_cache = KeyedCache{String,Tuple{Int64,Float64,Float64}}()
-
-""" key => (`electron_count`, V0, uncertainty). Strict Float64 uncertainty
-(not Union{Float64,Nothing} like `_solutes`, since no RNA/DNA entry has
-a missing uncertainty) — matches `_Protein`'s type, required by `_titrated`. """
-const _DNA::Dict{String,Tuple{Int64,Float64,Float64}} =
-    JSON3.read(
-        read(joinpath(@__DIR__, "DNA", "dna.json"), String),
-        Dict{String,Tuple{Int64,Float64,Float64}},
-    )
-
-""" key => (`electron_count`, V0, uncertainty). Strict Float64 uncertainty
-(not Union{Float64,Nothing} like `_solutes`, since no RNA/DNA entry has
-a missing uncertainty) — matches `_Protein`'s type, required by `_titrated`. """
-const _RNA::Dict{String,Tuple{Int64,Float64,Float64}} =
-    JSON3.read(
-        read(joinpath(@__DIR__, "RNA", "rna.json"), String),
-        Dict{String,Tuple{Int64,Float64,Float64}},
-    )
-
-""" key => ((pKa, `ionized_key`), `neutral_key`), same shape as `_protein_ionization`. """
-const _DNA_ionization::Dict{String,Tuple{Tuple{Float64,String},String}} = JSON3.read(
-    read(joinpath(@__DIR__, "DNA", "ionization.json"), String),
-    Dict{String,Tuple{Tuple{Float64,String},String}},
-)
-
-""" key => ((pKa, `ionized_key`), `neutral_key`), same shape as `_protein_ionization`. """
-const _RNA_ionization::Dict{String,Tuple{Tuple{Float64,String},String}} = JSON3.read(
-    read(joinpath(@__DIR__, "RNA", "ionization.json"), String),
-    Dict{String,Tuple{Tuple{Float64,String},String}},
-)
-
-"""
-Memoized DNA partial molar volume, keyed by
-`(sequence, pH, σ_pH)`: the result depends on all three
-"""
-const _ϕ°_d_cache = KeyedCache{Tuple{String,Float64,Float64},Tuple{Int64,Float64,Float64}}()
-
-"""
-Memoized RNA partial molar volume, keyed by
-`(sequence, pH, σ_pH)`: the result depends on all three
-"""
-const _ϕ°_r_cache = KeyedCache{Tuple{String,Float64,Float64},Tuple{Int64,Float64,Float64}}()
-
-"Maps IUPAC nucleotide ambiguity codes to the bases they average over."
-const _wildcards_nuc = Dict(
-    "R" => Dict("DNA" => ["A", "G"], "RNA" => ["A", "G"]), # puRine
-    "Y" => Dict("DNA" => ["C", "T"], "RNA" => ["C", "U"]), # pYrimidine
-    "S" => Dict("DNA" => ["G", "C"], "RNA" => ["G", "C"]), # Strong (3 H-bonds)
-    "W" => Dict("DNA" => ["A", "T"], "RNA" => ["A", "U"]), # Weak (2 H-bonds)
-    "K" => Dict("DNA" => ["G", "T"], "RNA" => ["G", "U"]), # Keto
-    "M" => Dict("DNA" => ["A", "C"], "RNA" => ["A", "C"]), # aMino
-    "B" => Dict("DNA" => ["C", "G", "T"], "RNA" => ["C", "G", "U"]),          # not A
-    "D" => Dict("DNA" => ["A", "G", "T"], "RNA" => ["A", "G", "U"]),          # not C
-    "H" => Dict("DNA" => ["A", "C", "T"], "RNA" => ["A", "C", "U"]),          # not G
-    "V" => Dict("DNA" => ["A", "C", "G"], "RNA" => ["A", "C", "G"]),          # not T/U
-    "N" => Dict("DNA" => ["A", "C", "G", "T"], "RNA" => ["A", "C", "G", "U"]), # aNy
-)
+# The polymer JSON tables are read into `const`s at precompile time; declare them as
+# dependencies so editing them invalidates the precompile cache (otherwise stale values/keys
+# keep being served after a table edit). Same for NonBiological/NonBiological.jl.
+include_dependency(joinpath(@__DIR__, "Polymers", "polymers.json"))
+include_dependency(joinpath(@__DIR__, "Polymers", "polymers_lookup.json"))
 
 include("CalcDensity.jl")   # water first: `_H2O_V0_25C` below needs its density
 
@@ -233,6 +152,230 @@ from the same Kell equation as `_ρₑ_w` (≈ 18.0686)."
 const _H2O_V0_25C =
     WATER_MOLAR_MASS / _kell_density(PMV_REFERENCE_TEMPERATURE_C) * CM3_PER_LITER
 
-include("PMV.jl")
+# Group-additive polymer volumes (Polymers/Polymers.jl); sources and fits in the README.
+"Molar mass of one oxyethylene unit, –OCH₂CH₂–, g/mol."
+const EO_MOLAR_MASS = 44.0526
+
+"Intercept, cm³/mol, of the PEG ϕ° line `PEG_V0_INTERCEPT + PEG_V0_PER_UNIT·m` (`m` =
+oxyethylene
+units, H(OCH₂CH₂)ₘOH): weighted fit to the ten PEGs 200–10 000 of Ayranci & Sahin 2008 and
+to the
+measured di- to pentaethylene glycols at 25 °C (worst residual 1.0 %, diethylene glycol)."
+const PEG_V0_INTERCEPT = 19.24
+
+"Slope, cm³/mol per oxyethylene unit, of the PEG ϕ° line (see [`PEG_V0_INTERCEPT`](@ref))."
+const PEG_V0_PER_UNIT = 36.73
+
+"Fractional uncertainty of the PEG line (largest residual of the ten fitted grades, 0.9 %)."
+const PEG_V0_REL_UNC = 0.01
+
+"""
+ϕ° contribution, cm³/mol, of one ethylene oxide
+unit of a Pluronic at 25 °C (Senkow et al. 2002).
+"""
+const PLURONIC_EO_V0 = 36.92
+
+"""
+ϕ° contribution, cm³/mol, of one propylene oxide
+unit of a Pluronic at 25 °C (Senkow et al. 2002).
+"""
+const PLURONIC_PO_V0 = 53.13
+
+"""
+End-group term, cm³/mol, of the Pluronic additivity scheme (L35, L64, F68, 10R5 give 8–13).
+"""
+const PLURONIC_END_V0 = 9.0
+
+"Uncertainty, cm³/mol, of [`PLURONIC_END_V0`](@ref)."
+const PLURONIC_END_UNC = 8.0
+
+"Fractional uncertainty of the Pluronic scheme: 0.2 % on L35/L64/F68/10R5, but micellar
+grades
+(P123 at 25 °C) deviate by 2 %, so 1 % is a compromise."
+const PLURONIC_REL_UNC = 0.01
+
+"Molar mass of one oxypropylene unit, –OCH(CH₃)CH₂–, g/mol."
+const PO_MOLAR_MASS = 58.0791
+
+"Molar mass of 1-butanol, g/mol, the starter of the UCON 50-HB random EO/PO copolymers."
+const UCON_STARTER_MOLAR_MASS = 74.1216
+
+"Electrons of the UCON starter, 1-butanol (C₄H₁₀O)."
+const UCON_STARTER_Z = 42
+
+"ϕ°, cm³/mol, of the UCON starter, 1-butanol, measured (the tables): the chain is the butyl
+ether
+C₄H₉(OR)ₙOH, and the same step on 2-butoxyethanol (123.0 = 86.6 + 36.4) reproduces the EO
+increment."
+const UCON_STARTER_V0 = 86.6
+
+"Uncertainty, cm³/mol, of the UCON starter term: the 1-butanol value is measured, the
+end-group
+change of a copolymer is not."
+const UCON_STARTER_UNC = 3.0
+
+"Mass fraction of oxyethylene units in UCON 50-HB copolymers (equal weights of EO and PO)."
+const UCON_EO_MASS_FRACTION = 0.5
+
+"Intercept, cm³/mol, of the poly(propylene glycol) line
+`PPG_V0_INTERCEPT + PPG_V0_PER_UNIT·m`,
+H(OC₃H₆)ₘOH: weighted fit to the measured propylene to pentapropylene glycols of the tables
+(m = 1–5, residuals ≤ 0.2 %); its slope agrees with the Pluronic PO increment."
+const PPG_V0_INTERCEPT = 18.10
+
+"Slope, cm³/mol per oxypropylene unit, of the PPG line (see [`PPG_V0_INTERCEPT`](@ref))."
+const PPG_V0_PER_UNIT = 53.20
+
+"Fractional uncertainty of the PPG line; only m ≤ 5 is anchored, longer chains extrapolate."
+const PPG_V0_REL_UNC = 0.01
+
+"Molar mass of one anhydroglucose unit, C₆H₁₀O₅, g/mol (dextran, pullulan, maltodextrin)."
+const GLUCOSE_UNIT_MOLAR_MASS = 162.1406
+
+"Intercept, cm³/mol, of the α-glucan line `GLUCAN_V0_INTERCEPT + GLUCAN_V0_PER_UNIT·m` (`m`
+=
+anhydroglucose units): weighted fit to glucose and maltose to maltoheptaose of the tables."
+const GLUCAN_V0_INTERCEPT = 16.6
+
+"Slope, cm³/mol per anhydroglucose unit (0.60 mL/g) of the α-glucan line; the dextran
+measured in
+10× PBS at 2.5–25 % (Migliorini 2026) is 5 % higher (102.2), inside
+[`GLUCAN_V0_REL_UNC`](@ref)."
+const GLUCAN_V0_PER_UNIT = 96.7
+
+"Fractional uncertainty of the α-glucan line."
+const GLUCAN_V0_REL_UNC = 0.04
+
+"Slope, cm³/mol per anhydroglucose unit, of the dextran line
+`GLUCAN_V0_INTERCEPT + DEXTRAN_V0_PER_UNIT·m`:
+the measured partial specific volume of dextran 10, 40 and 450 kDa, 0.630 mL/g (Migliorini
+2026)
+× 162.14. Measured dextran takes priority over the α-glucan line, which is fitted to
+maltooligosaccharides."
+const DEXTRAN_V0_PER_UNIT = 102.2
+
+"""
+Fractional uncertainty of the dextran line: the
+three measured molar masses agree within 2 %.
+"""
+const DEXTRAN_V0_REL_UNC = 0.02
+
+"Octylphenol ethoxylate (Triton X) ϕ°, cm³/mol, at zero ethylene oxide units, micellar
+state:
+`V(Triton X-114, 7.5 EO) − 7.5·`[`PLURONIC_EO_V0`](@ref) (Szymczyk & Taraba 2016)."
+const TRITON_V0_BASE = 239.7
+
+"Fractional uncertainty of the Triton scheme: one measured grade, micellar state."
+const TRITON_V0_REL_UNC = 0.02
+
+"Intercept, cm³/mol, of the alkyl ethoxylate scheme CₙEₘ = H(CH₂)ₙ(OCH₂CH₂)ₘOH,
+`ϕ° = ALKYL_ETHOXYLATE_V0_BASE +
+ALKYL_ETHOXYLATE_V0_PER_CH2·n + `[`PLURONIC_EO_V0`](@ref)`·m`:
+fit to the measured 2-methoxy-, 2-ethoxy- and 2-butoxyethanol of the tables (C₁E₁, C₂E₁,
+C₄E₁, residuals ≤ 0.05); the EO increment agrees with diglyme − 1,2-dimethoxyethane (36.8)
+and the PEG slope."
+const ALKYL_ETHOXYLATE_V0_BASE = 22.38
+
+"""
+Slope, cm³/mol per CH₂, of the alkyl ethoxylate
+scheme (see [`ALKYL_ETHOXYLATE_V0_BASE`](@ref)).
+"""
+const ALKYL_ETHOXYLATE_V0_PER_CH2 = 15.93
+
+"Fractional uncertainty of the alkyl ethoxylate scheme: calibrated on C₁–C₄ monoethers,
+applied to
+C₈–C₁₈ chains that are micellar above the CMC, so 2 %."
+const ALKYL_ETHOXYLATE_V0_REL_UNC = 0.02
+
+"Intercept, cm³/mol, of the alkyl maltoside scheme (n-alkyl β-D-maltoside with an `n`-carbon
+chain),
+`ϕ° = MALTOSIDE_V0_BASE + `[`ALKYL_ETHOXYLATE_V0_PER_CH2`](@ref)`·n`, monomer (infinite
+dilution): the
+3D-RISM estimate for decyl maltoside, 373.3 (3D-RISM 367.7 plus a group correction fitted to
+72
+measured solutes of the tables), minus 10 CH₂ of 15.93 each."
+const MALTOSIDE_V0_BASE = 214.0
+
+"Chain length at which the maltoside and LMNG schemes were calculated (decyl maltoside, and
+each of
+the two chains of LMNG as drawn in its structure)."
+const MALTOSIDE_REFERENCE_CARBONS = 10
+
+"Uncertainty, cm³/mol, of the alkyl maltoside scheme at
+[`MALTOSIDE_REFERENCE_CARBONS`](@ref): the
+estimate of decyl maltoside (conformer spread, anchor class and fitted corrections in
+quadrature)."
+const MALTOSIDE_V0_UNC = 3.9
+
+"Uncertainty, cm³/mol, added per CH₂ away from [`MALTOSIDE_REFERENCE_CARBONS`](@ref) (in
+quadrature
+with [`MALTOSIDE_V0_UNC`](@ref)): the scatter of the measured per-CH₂ increments, 15.6 to
+16.2."
+const MALTOSIDE_V0_PER_CH2_UNC = 0.4
+
+"Intercept, cm³/mol, of the LMNG scheme (lauryl maltose neopentyl glycol: two maltosides on
+a
+neopentyl glycol core with two `n`-carbon chains),
+`ϕ° = LMNG_V0_BASE + 2·`[`ALKYL_ETHOXYLATE_V0_PER_CH2`](@ref)`·n`,
+monomer: the 3D-RISM estimate for LMNG, 782.9 (n = 10), minus 20 CH₂."
+const LMNG_V0_BASE = 464.3
+
+"""
+Uncertainty, cm³/mol, of the LMNG scheme at
+[`MALTOSIDE_REFERENCE_CARBONS`](@ref) carbons per chain.
+"""
+const LMNG_V0_UNC = 5.6
+
+"ϕ° per anhydroglucose unit, cm³/mol, of a cyclodextrin (`n` units, no end groups): mean of
+α, β
+and γ (6, 7, 8 units: 601.5, 710.0, 803.0)."
+const CYCLODEXTRIN_V0_PER_UNIT = 100.7
+
+"""
+Fractional uncertainty of the cyclodextrin scheme (residuals ≤ 0.8 % on the three measured).
+"""
+const CYCLODEXTRIN_V0_REL_UNC = 0.01
+
+"""
+pKa of the peptide carboxyl terminus, Lee et al. 2008
+(10.1016/j.bpc.2008.02.009, `Protein/ionization.tsv`, 25 °C).
+"""
+const PEPTIDE_COOH_PKA = 3.3
+
+"""
+Volume gain, cm³/mol, of protonating the carboxyl
+terminus (zwitterion → cation), and its uncertainty.
+"""
+const PEPTIDE_COOH_DV = 10.5
+const PEPTIDE_COOH_DV_UNC = 0.4
+
+"pKa of the peptide amino terminus (same source)."
+const PEPTIDE_NH2_PKA = 8.0
+
+"""
+Volume change, cm³/mol, of protonating the amino terminus
+(−4.8: deprotonating it gains 4.8), and its uncertainty.
+"""
+const PEPTIDE_NH2_DV = -4.8
+const PEPTIDE_NH2_DV_UNC = 0.5
+
+"Extra uncertainty, cm³/mol, of the residue-additive scheme on short peptides: the protein
+residue values
+reproduce Gly₃–Gly₅ to 0.1 but Ala/Ser peptides 1–4 low (mean −1.7, worst −3.8; measured di-
+to pentapeptides)."
+const PEPTIDE_SHORT_UNC = 2.0
+
+"Peptides of at most this many residues get [`PEPTIDE_SHORT_UNC`](@ref)."
+const PEPTIDE_SHORT_MAX_RESIDUES = 8
+
+include("Polymers/Polymers.jl")
+""" Returns the partial molar volume at infinite dilution of a solute. """
+function ϕ° end
+
+# helpers shared by the sequence backends
+include("Titration.jl")
+include("Protein/Protein.jl")               # ϕ°(pH, seq)
+include("NonBiological/NonBiological.jl")   # ϕ°(name)
+include("Nucleotide/Nucleotide.jl")         # ϕ°(isDNA, seq, pH)
 
 end # module BulkElectronDensity

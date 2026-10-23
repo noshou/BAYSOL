@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Exercises src/MolecularStructure/Pdb2pqr.jl: the propka3 subprocess wrapper
+# Exercises src/Hydrogenator/Propka.jl: the propka3 subprocess wrapper
 # and its .pka summary-table parser.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.MolecularStructure: propka_pKas, PropkaError, _parse_pka, _store_dir
+using BAYSOL.Hydrogenator: propka_pKas, PropkaError, _parse_pka
+using BAYSOL.MolecularStructure: _store_dir
 
 # Real backbone/sidechain coordinates lifted from 1UBQ (residues ASP 21 and
 # LYS 6, renumbered 1/2), so bond lengths/angles are physically valid and

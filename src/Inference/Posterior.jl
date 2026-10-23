@@ -1,11 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # The log-posterior in the sampled coordinates: the
-# likelihood types, the prior and the Jacobian.
-
-""" Returns the log-likelihood of a WLS fit under the given likelihood type. """
-__ll(fit::WLSFit, ::PROFILE) = wls_prof_ll(fit)
-__ll(fit::WLSFit, ::MARGINAL) = wls_marg_ll(fit)
+# likelihood, the prior and the Jacobian.
 
 """
 Log-likelihood of the data at a given ξ = (ρₑ, δρ₁, δρ₂, δρ₃). The forward
@@ -13,22 +9,10 @@ model produces a predicted curve `y_model(q)`, but the data `I_exp(q)` sits at
 some unknown overall scale scale and background offset `bkgrnd_corr`, i.e.
 `I_calc` = scale·`y_model` + `bkgrnd_corr`. `wls_fit` (ProfiledCorrs.jl) fits
 (scale, `bkgrnd_corr`) in closed form (2-parameter weighted linear regression),
-and reports the resulting Gaussian log-likelihood two ways, selected by l:
+and the likelihood is the profile log-likelihood: (scale, `bkgrnd_corr`) are
+pinned at their best-fit values (a point estimate), [`wls_prof_ll`](@ref):
 
-- `l = PROFILE()`: treat (scale, `bkgrnd_corr`) as pinned at their best-fit
-    values (a point estimate) [`wls_prof_ll`](@ref):
-
-        -½χ² - ½ Σln(σᵢ²) - ½n·ln(2π)
-
-- `l = MARGINAL()`: instead of pinning (scale, `bkgrnd_corr`), integrate
-    them out analytically under a flat prior (Gaussian integral in closed
-    form since the problem is linear in scale, `bkgrnd_corr`) [`wls_marg_ll`](@ref).
-    This adds a correction term:
-
-        -½ln(det(XᵀWX))
-
-    which lets uncertainty in scale/background flow into the posterior on the
-    physical parameters, instead of freezing it out.
+    -½χ² - ½ Σln(σᵢ²) - ½n·ln(2π)
 
 # Arguments
 -   `wls::WLSData`: precomputed data-only weighted sums over (`I_exp`, `σ_exp`),
@@ -36,8 +20,6 @@ and reports the resulting Gaussian log-likelihood two ways, selected by l:
 -   `ξ::SVector{N,<:Real}`: the physical fit parameters, (ρₑ, δρ₁, δρ₂, δρ₃) for `N = 4`.
 -   `fw::ForwardCache`: the structure's static cache, from
     [`BAYSOL.Scattering.forward_cache`](@ref).
--   `l::LIKELIHOOD`: `PROFILE()` or `MARGINAL()`, selecting which log-likelihood
-    variant to return.
 
 # Keywords
 - `tab::Union{Nothing,_C1Tables} = nothing`, `c1_tol = EXCL_VOL_CORR_TOL`: forwarded to
@@ -49,28 +31,25 @@ and reports the resulting Gaussian log-likelihood two ways, selected by l:
 function _ll(
     wls::WLSData,
     ξ::SVector{N,<:Real},
-    fw::ForwardCache,
-    l::LIKELIHOOD;
+    fw::ForwardCache;
     tab::Union{Nothing,_C1Tables} = nothing,
     c1_tol::Float64 = EXCL_VOL_CORR_TOL,
 ) where {N}
     _, fit, _ = profiled_corrs(wls, ξ, fw; tables = tab, tol = c1_tol)
-    return __ll(fit, l)
+    return wls_prof_ll(fit)
 end
 
 """
-[`_ll`](@ref) for the profile likelihood at a ForwardDiff dual ξ: the
+[`_ll`](@ref) at a ForwardDiff dual ξ: the
 value and the gradient with respect to ξ come from [`_profile_ll_grad`](@ref)
 (analytic, no dual-number vectors through the forward model), and are
 composed with the partials of ξ, so `ForwardDiff.gradient` of any
-function of θ sees the exact chain rule. The marginal likelihood keeps
-the generic path above.
+function of θ sees the exact chain rule.
 """
 function _ll(
     wls::WLSData,
     ξ::SVector{N,D},
-    fw::ForwardCache,
-    ::PROFILE;
+    fw::ForwardCache;
     tab::Union{Nothing,_C1Tables} = nothing,
     c1_tol::Float64 = EXCL_VOL_CORR_TOL,
 ) where {N,D<:ForwardDiff.Dual{<:Any,Float64}}
@@ -117,18 +96,17 @@ with W₁ = W₂ = 12 and (L₃, W₃) the δρ₃ prior's location and scale.
 
 log p(ξ(θ)) is the sum of the log-prior and log-likelihood:
 
-    log p(ξ | data) = log p(ξ) + log p(data | ξ) = _lp(ξ, p) + _ll(wls, ξ, fw, l)
+    log p(ξ | data) = log p(ξ) + log p(data | ξ) = _lp(ξ, p) + _ll(wls, ξ, fw)
 
 giving:
 
-    log π(θ) = _lp(ξ(θ), p) + _ll(wls, ξ(θ), fw, l) + logjac(θ)
+    log π(θ) = _lp(ξ(θ), p) + _ll(wls, ξ(θ), fw) + logjac(θ)
 
 # Arguments
 - `θ::SVector{N,<:Real}`: the current NUTS position, (a, t₁, t₂, t₃) for `N = 4`.
 - `p::ξ_priors`: the physical priors, forwarded to [`_lp`](@ref).
 - `wls::WLSData`: the precomputed data, forwarded to [`_ll`](@ref).
 - `fw::ForwardCache`: the structure's geometry-only cache, forwarded to [`_ll`](@ref).
-- `l::LIKELIHOOD`: PROFILE() or MARGINAL(), forwarded to [`_ll`](@ref).
 
 # Keywords
 - `tab`, `c1_tol`: forwarded to [`_ll`](@ref).
@@ -140,11 +118,10 @@ function _logπ(
     θ::SVector{N,<:Real},
     p::ξ_priors,
     wls::WLSData,
-    fw::ForwardCache,
-    l::LIKELIHOOD;
+    fw::ForwardCache;
     tab::Union{Nothing,_C1Tables} = nothing,
     c1_tol::Float64 = EXCL_VOL_CORR_TOL,
 ) where {N}
     ξ = Ξ(θ, p)  # unconstrained θ-space -> physical ξ-space
-    return _lp(ξ, p) + _ll(wls, ξ, fw, l; tab = tab, c1_tol = c1_tol) + logjac(θ, p)
+    return _lp(ξ, p) + _ll(wls, ξ, fw; tab = tab, c1_tol = c1_tol) + logjac(θ, p)
 end

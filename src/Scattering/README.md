@@ -16,7 +16,7 @@ Solution-scattering molecules tumble freely, so the measured intensity is the or
 exp(i q·r) = 4π Σ_l Σ_m i^l j_l(q r) Y_lm(q̂) conj(Y_lm(r̂))
 ```
 
-substitute into A(q), and swaps the atom-sum and (l,m)-sum, giving
+substitute into A(q) and swap the atom-sum and (l,m)-sum, giving
 
 ```
 A(q) = 4π Σ_l Σ_m i^l Y_lm(q̂) B_lm(q)
@@ -35,7 +35,7 @@ Atomic form factors are complex (f = f0 + f' + i f''); the module splits `f_i` i
 
 ### Gram-matrix factorization
 
-A real molecule in solution scatters as several superposed **species**; vac (real atoms in vacuo), ex (one Gaussian excluded-volume dummy per atom, the bulk solvent it displaces), and `sh_convex`/`sh_concave`/`sh_cavity`(hydration-shell dummies on the solvent-accessible surface, split by local geometry into CRYSOL 3's three border-layer populations). Species combine coherently at the amplitude level, `A_total` = `Σ_a` `c_a` `A_a`, so after the applying the orientational average we get:
+A real molecule in solution scatters as several superposed **species**; vac (real atoms in vacuo), ex (one Gaussian excluded-volume dummy per atom, the bulk solvent it displaces), and `sh_convex`/`sh_concave`/`sh_cavity`(hydration-shell dummies on the solvent-accessible surface, split by local geometry into CRYSOL 3's three border-layer populations). Species combine coherently at the amplitude level, `A_total` = `Σ_a` `c_a` `A_a`, so after the orientational average:
 
 ```
 I(q) = Σ_a Σ_b c_a c_b S_ab(q),   S_ab(q) = 4π Σ_lm w_lm Re(B^a_lm(q) conj(B^b_lm(q)))
@@ -45,7 +45,7 @@ I(q) = Σ_a Σ_b c_a c_b S_ab(q),   S_ab(q) = 4π Σ_lm w_lm Re(B^a_lm(q) conj(B
 positive semidefinite) and reused across every parameter draw: I(q) = vᵀ G(q) v with contrast vector v = [1, -dns, `dro_1`, `dro_2`, `dro_3`]. Classic single-shell CRYSOL is the n = 3 reduction with the three shell classes merged. The module docstring in Scattering.jl derives this in full, including CRYSOL's excluded-volume correction factor `c_1` (an
 expansion of every dummy's radius by `r_0`/`r_m`) and the detector-scale model `I_calc(q)` = m·I(q) + c.
 
-ForwardCache.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defines it: the mean of each atom's own excluded-volume-dummy equivalent-sphere radius, `r_m` = N⁻¹ Σᵢ cbrt(3 Vᵢ / 4π), where Vᵢ is MolecularStructure.vols(mol)[i] (the displaced-solvent volume, see MolecularStructure's README) -- **not** the mean van der Waals radius (radii(mol)). vols is computed geometrically: each atom's vdW sphere is clipped by its neighbours' power-diagram planes, so Vᵢ < (4/3)π·rᵢ³ for any atom with overlapping neighbours, and the two radii differ for essentially every atom in a packed structure.
+ForwardCache.jl's `mean_atomic_radius(mol)` computes `r_m` as CRYSOL itself defines it: the mean of each atom's own excluded-volume-dummy equivalent-sphere radius, `r_m` = N⁻¹ Σᵢ cbrt(3 Vᵢ / 4π), where Vᵢ is MolecularStructure.vols(mol)[i] (the displaced-solvent volume, see MolecularStructure's README) -- **not** the mean van der Waals radius (radii(mol)): each atom's vdW sphere is clipped by its neighbours' power-diagram planes, so Vᵢ < (4/3)π·rᵢ³ for any atom with overlapping neighbours.
 
 `c_1` is not fitted here: the cache stores `r_m`, and during fitting `Inference.profiled_corrs` profiles `c_1` per likelihood evaluation, from the cached G(q) and `excluded_volume_factor`, within the hard bounds `EXCL_VOL_CORR_BOUNDS = (0.8, 1.3)`, with no prior (see the Inference README).
 
@@ -114,7 +114,7 @@ Bs = species_multipoles(mol, qvals, lMax, energy)  # (vac, ex, sh_convex, sh_con
 G  = gram(collect(Bs), w)                           # (5, 5, Q) Gram matrix
 ```
 
-`compute_B_lm` works in real arithmetic. Per degree l, `[Re B_l; Im B_l] = [Re Y_l; −Im Y_l] · W_l`, with `W_l[i, q] = f(i, q)·j_l(q·r_i)` for each real amplitude column (Re f, plus Im f when f is anomalous). That is one OpenBLAS product per degree and column, accumulated in place. W is filled directly by the spherical Bessel sweep (`sphBessRatios!`, then `sphBessStep` upward), so no j array is ever stored. It is built for `B_LM_TILE` atoms and a q-tile sized to fit `B_LM_W_BYTES`; all buffers are allocated once per call. Negligible terms are skipped: since |jₗ(x)| ≤ xˡ/(2l+1)!!, jₗ ≤ `BESS_CUT` (1e-9) for x below `x_cut(l)` (`xcut` in `compute_B_lm`) = (`BESS_CUT`·(2l+1)!!)^(1/l), so for each tile (largest radius `r_max`) and degree l the columns q < `x_cut(l)/r_max` are left out of both the W writes and the product. That needs q in ascending order (the full range is used otherwise); each skipped term is below `BESS_CUT`·|f|, changing G by ~1e-12 relative or less. `species_multipoles` computes the vacuum and excluded-volume multipoles in one shared pass (`_compute_B_lm` with both amplitude sets), timed as the single stage `"vacuum + excluded volume (vols + B_lm)"`. With several Julia threads the tiles are dealt round-robin to `B_LM_GROUPS` (24) groups, fixed by the input and never by the thread count; each group sums its tiles in order into an accumulator, the groups run in waves of one per worker with a pool of one accumulator per worker, and the accumulators are added to the result in group order (in parallel by column blocks). The result is therefore bit-identical at any thread count. Each worker owns its work buffers (`A`, `Ft`, `W`, the Bessel and harmonic caches), allocated once per call by the calling thread, and OpenBLAS is limited to one thread inside the groups (`with_blas_single`); with one Julia thread, or below `B_LM_PARALLEL_MIN` tiles × q points, the same groups run in order on one thread and OpenBLAS keeps its own threads. `B_LM_ACC_BYTES` caps the number of workers by accumulator memory, never the grouping.
+`compute_B_lm` works in real arithmetic. Per degree l, `[Re B_l; Im B_l] = [Re Y_l; −Im Y_l] · W_l`, with `W_l[i, q] = f(i, q)·j_l(q·r_i)` for each real amplitude column (Re f, plus Im f when f is anomalous). That is one OpenBLAS product per degree and column, accumulated in place. W is filled directly by the spherical Bessel sweep (`sphBessRatios!`, then `sphBessStep` upward), so no j array is ever stored. It is built for `B_LM_TILE` atoms and a q-tile sized to fit `B_LM_W_BYTES`. Negligible terms are skipped: since |jₗ(x)| ≤ xˡ/(2l+1)!!, jₗ ≤ `BESS_CUT` (1e-9) for x below `x_cut(l)` (`xcut` in `compute_B_lm`) = (`BESS_CUT`·(2l+1)!!)^(1/l), so for each tile (largest radius `r_max`) and degree l the columns q < `x_cut(l)/r_max` are left out of both the W writes and the product. That needs q in ascending order (the full range is used otherwise); each skipped term is below `BESS_CUT`·|f|, changing G by ~1e-12 relative or less. `species_multipoles` computes the vacuum and excluded-volume multipoles in one shared pass (`_compute_B_lm` with both amplitude sets), timed as the single stage `"vacuum + excluded volume (vols + B_lm)"`. With several Julia threads the tiles are dealt round-robin to `B_LM_GROUPS` (24) groups, fixed by the input and never by the thread count; each group sums its tiles in order into an accumulator, and the accumulators are added to the result in group order, so the result is bit-identical at any thread count. Each worker owns its work buffers, and OpenBLAS is limited to one thread inside the groups (`with_blas_single`); with one Julia thread, or below `B_LM_PARALLEL_MIN` tiles × q points, the same groups run in order on one thread. `B_LM_ACC_BYTES` caps the number of workers by accumulator memory, never the grouping.
 
 ## FormFactor.jl
 
@@ -124,7 +124,7 @@ The data and interpolation scheme follow the Python package XrayDB, but nothing 
 
 Data:
 
-- **waasmaier**: Waasmaier & Kirfel (1995) Gaussian coefficients for the non-resonant term f0. 211 species.
+- **waasmaier**: Waasmaier & Kirfel (1995) Gaussian coefficients for the non-resonant term f0. 212 species (`d`, deuterium, is a copy of `h`: X-ray scattering depends on the electron cloud only).
 - **chantler**: Chantler FFAST (NIST) anomalous corrections f1/f2, spanning roughly 1.01 eV to 966 keV.
 
 
@@ -142,7 +142,7 @@ Data:
 f0(s) = c + Σ_{i=1..5} a_i · exp(-b_i·s²),   s = q/(4π)  [Å⁻¹]
 ```
 
-211 (c, a1..a5, b1..b5) rows, keyed by lowercase ion string ("fe3+", "o2-") or bare element ("fe"). Valid for 0 ≤ s ≤ `WK_S_MAX` = 6.0 Å⁻¹; the fits go non-physical (some ionic c terms are large and negative, e.g.
+212 (c, a1..a5, b1..b5) rows, keyed by lowercase ion string ("fe3+", "o2-") or bare element ("fe"). Valid for 0 ≤ s ≤ `WK_S_MAX` = 6.0 Å⁻¹; the fits go non-physical (some ionic c terms are large and negative, e.g.
 fe3+'s c = -61.93) if extrapolated past that range, so f0 throws rather than extrapolating (f0("fe3+", `WK_S_MAX` + eps) raises FormFactorError).
 
 At q → 0, f0 recovers the electron count: Z - charge for an ion, Z for a neutral atom (checked in tests to atol = 5e-3, the Cromer-Mann parameterization's own residual at s = 0).
@@ -166,14 +166,10 @@ Ions are deduplicated on build, preserving first-seen order, so a batch like ["f
 
 ### Constants
 
-Defined at module level in `Scattering.jl`, the module's main file (used by `FormFactor.jl`).
-
-
 `WK_S_MAX = 6.0` (upper bound of the Waasmaier–Kirfel f0 parameterisation's s range), `F2_LOG_FLOOR = 1e-99` (floor applied to Chantler f2 before log-log interpolation)
 
 ## Constants
 
-Defined at module level in `Scattering.jl`.
-
+Defined at module level in `Scattering.jl` (the form-factor ones above are used by `FormFactor.jl`).
 
 `SHELL_THICKNESS` (3.0 Å, CRYSOL's border-layer default), `B_LM_CHUNK` (`UInt64(2048)`, atoms/dummies per pass in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm)), `B_LM_TILE` (256 atoms per inner tile, the inner dimension of each per-degree BLAS product), `B_LM_W_BYTES` (8 MiB budget for one worker's W buffer, which sets the q-tile length), `B_LM_GROUPS` (24 tile groups, fixed by the input; divides evenly over 1, 2, 3, 4, 6, 8 and 12 workers), `B_LM_ACC_BYTES` (1 GiB for the workers' accumulators together; limits the number of workers only), `B_LM_PARALLEL_MIN` (4096 tiles × q points: below it the groups run on one thread), `B_LM_REDUCE_COLS` (accumulator columns per task in the parallel sum), `EV_EXP_COEFF` ((4π/3)^(2/3)/4π, converting CRYSOL's radius parameterisation of the excluded-volume correction c1 into the volume parameterisation of the dummy amplitudes; also used by c1 profiling), `GAUTSCHI_MARGIN` (`(12, 5.0)`: the continued-fraction start order in [`Scattering.sphBessRatios!`](@ref BAYSOL.Scattering.sphBessRatios!) is max(lMax, ⌈x⌉) + 12 + ⌈5·x^(1/3)⌉) and `BESS_CUT` (1e-9: below it jₗ(q·r) is treated as zero in `compute_B_lm`; see the Scattering README)

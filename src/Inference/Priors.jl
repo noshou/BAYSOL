@@ -353,36 +353,6 @@ function δρ_prior(
     (δρ₁_prior, δρ₂_prior, _δρ₃_prior(κ_δρ₃, ρ̄ₑ))
 end
 
-# TODO: after validating w/ CRYSOL on proteins, move on to fitting w/ nucleotides.
-
-# """
-#     δρprior(z, I, σI, ξ, σξ) -> (δρ₁, δρ₂, δρ₃, δρ4)
-
-# Nucleotide variant: δρ₁, δρ₂, δρ₃ as in the protein variant, plus δρ4 for
-# cation condensation around the phosphate backbone (Manning theory).
-
-# # Arguments
-# - z:   total counterion valence.
-# - I:   total ionic strength.
-# - σI: uncertainty in ionic strength.
-# - ξ:   Manning linear charge density parameter.
-# - σξ: uncertainty in ξ.
-
-# # Returns
-# - δρ₁::LogNormal: convex-bead contrast (fixed prior).
-# - δρ₂::Normal: concave-bead contrast (fixed prior).
-# - δρ₃::Beta: cavity-bead contrast (fixed prior).
-# - δρ4::LogNormal: condensed-cation-layer contrast, derived from z, I, σI, ξ, σξ.
-# """
-# function δρ_prior(
-#     z::Real,
-#     I::Real,
-#     σ_I::Real,
-#     ξ::Real,
-#     σ_ξ::Real
-# )::Tuple{LogNormal, Normal, Beta, LogNormal}
-# end
-
 # ---------------------------------------------------------------------------
 #   Parameter transform and Jacobian
 # ---------------------------------------------------------------------------
@@ -503,55 +473,6 @@ adds; identical to the `corr` [`Θ`](@ref) returns for ξ = Ξ(θ):
 logjac(θ::SVector{4,<:Real}, p::ξ_priors) =
     θ[1] + _t_logjac(θ[2], WIDTH_δρ₁₂) + _t_logjac(θ[3], WIDTH_δρ₁₂) +
     _t_logjac(θ[4], p.δρ₃Prior.σ)
-
-
-"""
-    ξ ∈ (0,∞) × (-10,2) × (-10,2) × (L₃,L₃+W₃) × (0,∞)
-    │
-    │ Θ: ξ ⤇ (θ, corr)
-    │
-    ▼
-    θ ∈ ℝ⁵
-
-Nucleotide variant (not wired into the sampler yet): as the 4-parameter
-[`Θ`](@ref), plus δρ4 ∈ (0,∞), the condensed-counterion contrast, mapped
-by δρ4 = eᶜ:
-
-    θ = ⟨a, t₁, t₂, t₃, c⟩ ∈ ℝ⁵
-    ln|det(∂ξ/∂θ)| = logjac(θ[1:4]) + c
-
-# Arguments
-- `ξ::SVector{5,<:Real} = (ρₑ, δρ₁, δρ₂, δρ₃, δρ4)`.
-
-# Returns
-- `θ::SVector{5,<:Real} = (a, t₁, t₂, t₃, c)`.
-- `corr::Real = ln|det(∂ξ/∂θ)|`.
-"""
-function Θ(ξ::SVector{5,<:Real}, p::ξ_priors)
-    θ₄, corr₄ = Θ(SVector{4}(ξ[1], ξ[2], ξ[3], ξ[4]), p)
-    c = log(ξ[5])
-    return SVector{5}(θ₄..., c), corr₄ + c
-end
-
-"""
-    θ ∈ ℝ⁵
-    │
-    │ Ξ: θ ⤇ ξ
-    │
-    ▼
-    ξ ∈ (0,∞) × (-10,2) × (-10,2) × (L₃,L₃+W₃) × (0,∞)
-
-Inverse of the 5-parameter [`Θ`](@ref).
-
-# Arguments
-- `θ::SVector{5,<:Real} = (a, t₁, t₂, t₃, c)`.
-
-# Returns
-- `ξ::SVector{5,<:Real} = (ρₑ, δρ₁, δρ₂, δρ₃, δρ4)`
-"""
-function Ξ(θ::SVector{5,<:Real}, p::ξ_priors)
-    return SVector{5}(Ξ(SVector{4}(θ[1], θ[2], θ[3], θ[4]), p)..., exp(θ[5]))
-end
 
 # ---------------------------------------------------------------------------
 #   The priors of ξ, their moments and z-scores

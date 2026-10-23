@@ -9,9 +9,9 @@
 # network access, since the fixture used here is a local .pdb.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, propka_pKas,
-    resolve_hydrogens, load_molecule,
+using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,
     _store_dir, Molecule, n_atoms, elms, coords_cartesian
+using BAYSOL.Hydrogenator: propka_pKas, resolve_hydrogens, Propka
 
 const _PIPELINE_FIXTURE =
     joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1CRN-TEST.pdb")
@@ -26,7 +26,7 @@ const _PIPELINE_FIXTURE =
     stem = "1CRN-TEST"
     rm(joinpath(_store_dir(), "$(stem).pka"); force = true)
     for pH in (7.0,)
-        rm(joinpath(_store_dir(), "$(stem)_pH$(pH).pdb"); force = true)
+        rm(joinpath(_store_dir(), "$(stem)_pH$(pH)_parse_propka.pdb"); force = true)
     end
 
     source = LocalPathSource(_PIPELINE_FIXTURE)
@@ -35,7 +35,7 @@ const _PIPELINE_FIXTURE =
     path = resolve_structure(source)
     mol_heavy = load_molecule(path)
     pKa_records = propka_pKas(path)
-    hpath = resolve_hydrogens(path, pKa_records, pH)
+    hpath = resolve_hydrogens(path, pH; titration = Propka(pKa_records))
     mol_h = load_molecule(hpath)
 
     @testset "return types" begin
@@ -71,7 +71,7 @@ const _PIPELINE_FIXTURE =
     # Leave the shared _cache/ scratch dir clean for repeat runs.
     rm(joinpath(_store_dir(), "$(stem).pka"); force = true)
     for pH in (7.0,)
-        rm(joinpath(_store_dir(), "$(stem)_pH$(pH).pdb"); force = true)
+        rm(joinpath(_store_dir(), "$(stem)_pH$(pH)_parse_propka.pdb"); force = true)
     end
 
 end

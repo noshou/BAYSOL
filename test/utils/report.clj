@@ -5,6 +5,10 @@
 ;; keys in first-seen order as metadata (`(:order (meta r))`), since the TSV columns
 ;; follow that order.
 ;;
+;; The stages of the timing table are read by name; the three stage variants of the
+;; hydrogenation (`pdb2pqr`, `pdb2pqr (nucleic, none)`, `pdb2pqr (mixed, propka)`) are
+;; one key, since a run records exactly one of them. A stage a report lacks is "".
+;;
 ;; Every pattern below finds the last number on its line: after a greedy `.*` comes
 ;; `\s`, then the number.
 
@@ -80,8 +84,14 @@
         ;; the `=== Timing ===` section
         :wall #"^wall clock.*\s@FLP@\s+100\.0" :static_build
         #"^\s+static build\s+@FLP@" :resolve_structure #"^\s+resolve_structure\s+@FLP@"
+        :components #"^\s+components.*\s@FLP@\s*$" :components_download
+        #"^\s+components(?:[^\n]*\n\s*)?[^\n]*, (\d+) download\]" :structure_checks
+        #"^\s+structure checks.*\s@FLP@\s*$" :classify #"^\s+classify.*\s@FLP@\s*$"
         :propka #"^\s+propka.*\s@FLP@\s*$" :pdb2pqr #"^\s+pdb2pqr.*\s@FLP@\s*$"
-        :load_molecule #"^\s+load_molecule\s+@FLP@" :sasa #"^\s+SASA\s+@FLP@" :shannon
+        :modified_hydrogens #"^\s+modified nucleotide hydrogens.*\s@FLP@\s*$"
+        :modified_amino_hydrogens #"^\s+modified amino acid hydrogens.*\s@FLP@\s*$"
+        :heavy_atoms #"^\s+heavy atoms.*\s@FLP@\s*$" :load_molecule
+        #"^\s+load_molecule\s+@FLP@" :sasa #"^\s+SASA\s+@FLP@" :shannon
         #"^\s+shannon \(diameter, binning\)\s+@FLP@" :fwd #"^\s+forward_cache\s+@FLP@"
         :vacuum_excluded #"^\s+vacuum \+ excluded volume \(vols \+ B_lm\)\s+@FLP@"
         :hydration #"^\s+hydration \(B_lm\)\s+@FLP@" :gram_rm
@@ -169,8 +179,64 @@
     [pick shares]
     (if (seq shares) (as-number (apply pick parse-double shares)) ""))
 
+;; The notes of the timing table. Today a stage prints its note on a line of its own under
+;; it (`    classify   <seconds>` then `      [nucleic: AMBER, titration none]`); older
+;; reports print `<name>  [note]  <seconds>` on one line, where the name and the note can
+;; touch (`pdb2pqr (mixed, propka)[cache hit]`, a name longer than the label column), so
+;; the note is cut at its first `[` and last `]`.
+(def ^:private note-re #"^\s+([^\[\n]*?)\s*(\[.*\])\s")
+
+(def ^:private note-line-re #"^\s+(\[.*\])\s*$")
+
+(def ^:private stage-numbers-re
+    #"(\s+[-+]?\d[\d.]*(?:e[-+]?\d+)?){1,2}(\s+\([\d.]+\))?\s*$")
+
+(defn stage-notes
+    "The notes of the stages in the `=== Timing ===` section of `text`, as a map from
+    stage name to note (`{\"classify\" \"[nucleic: AMBER, titration none]\"}`), in either
+    layout; a note wrapped over several lines is joined with single spaces. A stage
+    without a note (and a report without the section) is absent from the map."
+    [text]
+    (let [section (second (re-find #"(?ms)^=== Timing ===[^\n]*\n(.*)" text))]
+        (loop [lines (str/split-lines (or section ""))
+                prev nil
+                open nil
+                notes {}]
+            (if-let [line (first lines)]
+                (let [[_ own] (re-find note-line-re line)
+                        [_ nm note] (re-find note-re (str line " "))]
+                    (cond
+                        ;; the lines of a wrapped note up to the one that closes it
+                        open (let [joined (str (:text open) " " (str/trim line))]
+                            (if (str/ends-with? (str/trim line) "]")
+                                (recur (rest lines)
+                                    nil
+                                    nil
+                                    (assoc notes (:name open) joined))
+                                (recur (rest lines)
+                                    prev
+                                    (assoc open :text joined)
+                                    notes)))
+                        (and prev (re-find #"^\s+\[" line) (not own))
+                        (recur (rest lines)
+                            prev
+                            {:name prev, :text (str/trim line)}
+                            notes)
+                        (and own prev)
+                        (recur (rest lines) nil nil (assoc notes prev own))
+                        (and note (not own))
+                        (recur (rest lines) nil nil (assoc notes nm note))
+                        :else (recur (rest lines)
+                            (str/trim
+                                (str/replace line stage-numbers-re ""))
+                            nil
+                            notes)))
+                notes))))
+
 (defn parse
-    "The numbers of one report as a map; a key is \"\" where a revision's format lacks it."
+    "The numbers of one report as a map; a key is \"\" where a revision's format lacks it.
+    The map also carries `:stage_notes` (see `stage-notes`), which is not one of the
+    ordered keys, so the TSV and CSV outputs leave it out."
     [text]
     (let [g (partial grab text)
             ;; a quantity with a k or M suffix is stored as the plain number
@@ -215,13 +281,23 @@
                         [:z3 (if (seq z3) z3 (get-in st [:m :dro3_Z_MAP]))]
                         ;; number of distinct local optima the MAP search found
                         [:n_modes (g n-modes-re)]]))
-            {:keys [wall propka pdb2pqr]} (:m st)
+            {:keys [wall propka pdb2pqr components components_download]} (:m st)
             or-zero #(if (seq %) (as-number %) 0)
-            ;; wall clock without the PROPKA / pdb2pqr subprocesses, the convention for
-            ;; every comparison
-            st (put st
+            ;; the seconds of the `components` stage when it downloaded a component (its
+            ;; note says `N download`, N > 0): network time, not computing, and the
+            ;; stage cannot split it from the table load. A lookup that downloaded
+            ;; nothing is computing and stays in the wall clock.
+            download-s
+            (if (pos? (or-zero components_download)) (or-zero components) 0)
+            ;; wall clock without the external-tool time (PROPKA and every `pdb2pqr*`
+            ;; stage, which depend on the cache, and a component download), the
+            ;; convention for every comparison. A stage a report lacks (an older
+            ;; format) contributes nothing.
+            st (put
+                st
                 :wall_ex
                 (if (seq wall)
-                    (- (as-number wall) (or-zero propka) (or-zero pdb2pqr))
+                    (- (as-number wall) (or-zero propka) (or-zero pdb2pqr) download-s)
                     ""))]
-        (with-meta (:m st) {:order (:ks st)})))
+        (with-meta (assoc (:m st) :stage_notes (stage-notes text))
+            {:order (:ks st)})))

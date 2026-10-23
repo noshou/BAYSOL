@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# The calculation: the electron density of water at the sample
+# The electron density of water at the sample
 # temperature, and the bulk electron density of the buffer with its
 # propagated uncertainty (`ρₑ`, the module's one public function).
 
@@ -58,6 +58,12 @@ end
 """ `(Z, ϕ°, σ_ϕ°)` of a non-biological solute. """
 function _ρₑ_i(s::NonBiological, ::Real, ::Real)::Tuple{Float64,Float64,Float64}
     Z_j, ϕ°_j, σ_ϕ°_j = ϕ°(s.arg)
+    return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
+end
+
+""" `(Z, ϕ°, σ_ϕ°)` of a polymer, detergent or oligomer (at this pH for peptides). """
+function _ρₑ_i(p::Polymer, pH::Real, σ_pH::Real)::Tuple{Float64,Float64,Float64}
+    Z_j, ϕ°_j, σ_ϕ°_j = _polymer_ϕ°(p.arg, pH, σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 

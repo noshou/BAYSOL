@@ -3,8 +3,7 @@ using Statistics
 using Random
 using BAYSOL
 using BAYSOL.MolecularStructure: LocalPathSource
-using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
-using BAYSOL.Inference: PROFILE
+using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological, Polymer
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDN32")
@@ -81,7 +80,7 @@ const SAS20D2_MOLARITY_σ = MOLARITY_REL_SIGMA * SAS20D2_MOLARITY
 #
 # maltoheptaose: V0 = 694.8 ± 5.8 cm³/mol (Hourston 1967 PhD thesis,
 # Table 6.1, 25 °C, measured from the partial specific volume 0.600 ±
-# 0.005 mL/g); it now resolves in src/BulkElectronDensity/NonBiological.
+# 0.005 mL/g); an oligomer, so it is a `Polymer` solute (BulkElectronDensity/Polymers).
 # 5 mM is not negligible next to the 137 mM NaCl / 10 mM phosphate buffer
 # components, so it is included (previously omitted because no entry existed).
 const SOLUTES = Solute[
@@ -97,7 +96,7 @@ const SOLUTES = Solute[
     NonBiological(0.006986, 0.000993, "disodium hydrogen phosphate"),
     NonBiological(0.001, 0.00002, "tcep"),                          # 1 mM TCEP, ±2%
     # 5 mM maltoheptaose ligand, ±2%
-    NonBiological(0.005, 0.0001, "maltoheptaose"),
+    Polymer(0.005, 0.0001, "maltoheptaose"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -144,7 +143,7 @@ function run_sasdn32(;
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seed_sasdn32(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt; l = PROFILE())
+    res = BAYSOL.run_model(s, n_samples, n_adapt)
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
 end
 

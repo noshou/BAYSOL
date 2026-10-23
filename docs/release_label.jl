@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # The small line under the sidebar's "BAYSOL.jl": the release a page documents
-# (`v0.3.0-wʋsg_n_yɩɩda`: the tag, then its name, which is the tag's message) or `dev`.
+# (ex: `v0.3.0-wʋsg_n_yɩɩda`: the tag, then its name, which is the tag's message) or `dev`.
 # docs/make.jl stamps it into the built pages; the same function patched the pages of
 # releases deployed before it existed (run on a gh-pages checkout). Its style is
 # `.docs-release` in docs/src/assets/themes/academic.scss and academic-dark.scss.

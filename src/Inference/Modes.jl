@@ -167,6 +167,7 @@ function _bridge_half(Wa::AbstractMatrix{Float64}, Wb::AbstractMatrix{Float64},
     n2 = n1
     q = Vector{Float64}(undef, max(n1, n2))
     t = similar(q)
+
     # the log ratios l = log p − log g at the draws
     l1 = Vector{Float64}(undef, n1)
     _quadform!(view(q, 1:n1), view(t, 1:n1), Wb, μ, Linv)
@@ -226,15 +227,15 @@ Bridge-sampling estimate of the log mass of one mode from its draws:
 for the other, averaged. The difference of the two halves gives the error.
 
 # Arguments
-- `W::AbstractMatrix`: the mode's draws in the sampler's whitened coordinates, one draw per
-  row, in sampling order (the halves are the first and the second half of the sequence).
-- `logp_draws::AbstractVector`: log π at the rows of `W`.
-- `logp`: `w -> log π(w)`.
-- `rng::AbstractRNG`: the source of the proposal points.
+-  `W::AbstractMatrix`: the mode's draws in the sampler's whitened coordinates, one draw per
+    row, in sampling order (the halves are the first and the second half of the sequence).
+-  `logp_draws::AbstractVector`: log π at the rows of `W`.
+-  `logp`: `w -> log π(w)`.
+-  `rng::AbstractRNG`: the source of the proposal points.
 
 # Returns
-- `NamedTuple` `(logZ, err)`: the estimate of log Z and half the difference between
-  the two halves' estimates (an approximate standard error of the mean, in nats).
+-   `NamedTuple` `(logZ, err)`: the estimate of log Z and half the difference between
+    the two halves' estimates (an approximate standard error of the mean, in nats).
 
 # Exceptions
 - None.
