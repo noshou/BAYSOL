@@ -26,7 +26,7 @@
 ;; test/validation/NAME/results/NAME-<stamp>.tsv, which is the evidence
 ;; the validation's README refers to; it prints its verdict against the
 ;; criteria in its README. Needs Babashka and `julia` on the PATH (or
-;; JULIA=/path/to/julia); shared helpers are in test/utils/common.clj.
+;; JULIA=/path/to/julia); shared helpers are in dev/common.clj.
 
 (ns validate
     (:require [babashka.classpath :refer [add-classpath]]
@@ -35,8 +35,7 @@
     (:import (java.time LocalDateTime)
         (java.time.format DateTimeFormatter)))
 
-(add-classpath (str
-        (fs/path (fs/parent (fs/absolutize *file*)) ".." "test" "utils")))
+(add-classpath (str (fs/parent (fs/absolutize *file*))))
 
 (require '[common :as c])
 

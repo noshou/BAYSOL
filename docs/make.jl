@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 using Documenter
+# Loaded for its effect: it makes the HTML pages render ```mermaid fences as diagrams.
+using DocumenterMermaid
 using BAYSOL
 
 # ---------------------------------------------------------------------------
@@ -47,7 +49,6 @@ const DEV_GUIDES = ["Commands" => "dev/README.md"]
 const TEST_GUIDES = [
     "Overview"        => "test/README.md",
     "Unit tests"      => "test/unit_tests/README.md",
-    "Utilities"       => "test/utils/README.md",
     "Baselines"       => "test/baselines/README.md",
     "Fixtures"        => "test/fixtures/README.md",
     "Validation"      => "test/validation/README.md",

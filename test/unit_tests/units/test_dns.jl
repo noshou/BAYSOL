@@ -16,7 +16,7 @@ using BAYSOL.PhysicalConstants: AVOGADRO, ANGSTROM3_PER_LITER, CM3_PER_LITER
 using BAYSOL.BulkElectronDensity: PMV_REFERENCE_TEMPERATURE_C
 using Distributions: mean, var, LogNormal
 
-include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "floatcompare.jl"))   # close_
 # LYSOZYME, ...
 include(joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "sequences.jl"))
 

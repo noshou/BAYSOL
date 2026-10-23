@@ -29,7 +29,7 @@ using StaticArrays: SVector
 using BAYSOL.Scattering: forward_cache, ForwardCache
 using Random
 
-include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "floatcompare.jl"))   # close_
 
 # ---------------------------------------------------------------------------
 #                    fixture: the smallest real -TEST structure

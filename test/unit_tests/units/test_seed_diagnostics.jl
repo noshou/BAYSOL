@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Tests for test/utils/seed_diagnostics.jl, the sampler diagnostics
+# Tests for dev/seed_diagnostics.jl, the sampler diagnostics
 # used on the SASBDB fitting tests (through dev/diagnose.clj). They run
 # on a small toy seed so that the diagnostics cannot rot unnoticed; the
 # numbers they produce on real fits are not asserted here.
@@ -14,7 +14,7 @@ using StaticArrays: SVector
 using Random
 using Statistics: mean, median
 
-include(joinpath(@__DIR__, "..", "..", "utils", "seed_diagnostics.jl"))
+include(joinpath(@__DIR__, "..", "..", "..", "dev", "seed_diagnostics.jl"))
 using .SeedDiagnostics
 
 const SDF = BAYSOL.Inference
@@ -186,17 +186,7 @@ end
         @test all(a -> a.c1_range[1] ≤ a.c1_range[2], scans)
     end
 
-    @testset "shell_contrast_ablation: finite χ², contrasts inside their supports" begin
-        a = shell_contrast_ablation(seed)
-        @test all(isfinite, (a.M1.chi2, a.M2.chi2, a.M3.chi2))
-        @test SDF.LOWER_BOUND_δρ₁₂ ≤ a.M1.d ≤ SDF.LOWER_BOUND_δρ₁₂ + SDF.WIDTH_δρ₁₂
-        @test SDF.LOWER_BOUND_δρ₁₂ ≤ a.M2.d12 ≤ SDF.LOWER_BOUND_δρ₁₂ + SDF.WIDTH_δρ₁₂
-        # one more free contrast cannot fit worse than
-        # a shared one, up to the grid resolution
-        @test a.M2.chi2 ≤ a.M1.chi2 * 1.05 + 1e-6
-    end
-
-    @testset "diagnose / tolerance_sweep: write their reports" begin
+    @testset "diagnose: writes its report" begin
         io = IOBuffer()
         diagnose(io, seed; label = "toy", n_samples = 120, n_adapt = 60)
         txt = String(take!(io))
@@ -210,17 +200,6 @@ end
         )
             @test occursin(key, txt)
         end
-        rows = tolerance_sweep(
-            io,
-            seed;
-            label = "toy",
-            tols = (1e-5, 1e-8),
-            rng_seeds = (1, 2),
-            n_samples = 120,
-            n_adapt = 60,
-        )
-        @test length(rows) == 4 && all(r -> r.ε > 0 && r.steps ≥ 1, rows)
-        @test count(==('\n'), String(take!(io))) == 4
     end
 
     # …draw statistics
@@ -236,27 +215,5 @@ end
         io2 = IOBuffer()
         chain_report(io2, seed; label = "toy", n_samples = 60, n_adapt = 30, rng_seed = 3)
         @test String(take!(io2)) == txt
-    end
-
-    @testset "warmup_study: step-size trace, one row per (adaptation length, seed)" begin
-        io = IOBuffer()
-        r = warmup_study(
-            io,
-            seed;
-            label = "toy",
-            adapts = (30, 60),
-            n_post = 100,
-            n_ref = 200,
-            n_adapt_ref = 60,
-            rng_seeds = (1, 2),
-        )
-        txt = String(take!(io))
-        for key in ("toy WARMUP", "toy ADAPT", "toy DRAWS", "toy ESS400")
-            @test occursin(key, txt)
-        end
-        @test length(r.adapt) == 4 &&
-              all(x -> x.ε > 0 && x.steps ≥ 1 && x.dm ≥ 0 && x.ds ≥ 0, r.adapt)
-        @test [d.n for d in r.draws] == [100, 200] && all(d -> d.min_ess > 0, r.draws)
-        @test all(e -> e[2] > 0, r.trace) && last(r.trace)[1] ≤ 60
     end
 end

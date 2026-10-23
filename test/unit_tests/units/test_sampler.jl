@@ -24,7 +24,7 @@ using StaticArrays: SVector, @SMatrix
 using ForwardDiff
 using Random
 
-include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "floatcompare.jl"))   # close_
 
 # ---------------------------------------------------------------------------
 #                 fixtures: a non-trivial structure + synthetic data

@@ -51,8 +51,7 @@
         [babashka.process :as p]
         [clojure.string :as str]))
 
-(add-classpath (str
-        (fs/path (fs/parent (fs/absolutize *file*)) ".." "test" "utils")))
+(add-classpath (str (fs/parent (fs/absolutize *file*))))
 
 (require '[common :as c])
 
@@ -169,15 +168,13 @@
             :cmd ["bb" (c/in-root "dev" "format.clj") "--check" "--clj"]}
         {:name "julia-format",
             :cmd ["bb" (c/in-root "dev" "format.clj") "--check" "--julia"]}
-        {:name "clj-lint",
-            :quick? true,
-            :cmd ["clj-kondo" "--lint" (c/in-root "dev") (c/in-root "test" "utils")]}
+        {:name "clj-lint", :quick? true, :cmd ["clj-kondo" "--lint" (c/in-root "dev")]}
         {:name "line-length",
             :quick? true,
             :cmd ["bb" (c/in-root "dev" "linelen.clj") "--check"]}
         {:name "results-table",
             :quick? true,
-            :cmd ["bb" (c/in-root "test" "utils" "results_table.clj") "--check"]}
+            :cmd ["bb" (c/in-root "dev" "results_table.clj") "--check"]}
         {:name "docs-build",
             :cmd [:julia "--startup-file=no" (str "--project=" (c/in-root "docs"))
                 (c/in-root "docs" "make.jl")]}])

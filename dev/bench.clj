@@ -248,10 +248,10 @@
     "One fresh process for the fit `spec`: the child's JSON with the process wall time
     added, as text."
     [julia {:keys [repo env]} spec iterations]
-    (let [[t-proc out]
-            (timed env
+    (let [[t-proc out] (timed env
                 (concat [julia (str "--project=" repo)
-                        (str (fs/path repo "test" "utils" "child.jl")) repo spec]
+                        (str (fs/path repo "dev" "child.jl")) repo
+                        spec]
                     iterations))
             raw (json-line out)]
         (when (or (nil? raw) (= raw "{}"))

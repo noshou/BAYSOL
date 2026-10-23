@@ -24,7 +24,7 @@
 # the binned fit has the *better* χ² (the unbinned reference MAP search missed the best
 # basin). Those criteria were therefore replaced, after the data was seen, by
 # distribution-level ones on a fresh full rerun of the 53 fits compared with the
-# committed unbinned results (`test/utils/compare.clj`): fit quality (χ² on the measured
+# committed unbinned results (`dev/compare.clj`): fit quality (χ² on the measured
 # grid), the distribution of the fitted parameters, and the health of the regression
 # (see the Shannon section of src/Inference/README.md). The rows below stay as evidence.
 #
@@ -37,7 +37,7 @@
 using Printf, Random, LinearAlgebra, Statistics
 using BAYSOL
 const Fit = BAYSOL.Inference
-include(joinpath(@__DIR__, "..", "..", "utils", "fit_seed.jl"))
+include(joinpath(@__DIR__, "..", "..", "..", "dev", "fit_seed.jl"))
 
 const MAP_SHIFT_MAX = 0.5
 const SIGMA_RATIO   = (0.95, 1.05)

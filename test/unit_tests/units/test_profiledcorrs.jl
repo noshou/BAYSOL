@@ -15,7 +15,7 @@ using StaticArrays: SVector
 using ForwardDiff
 using Random
 
-include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "floatcompare.jl"))   # close_
 
 const CMIN, CMAX = EXCL_VOL_CORR_BOUNDS
 const EPS        = EXCL_VOL_CORR_EPS

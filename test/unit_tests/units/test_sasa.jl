@@ -17,9 +17,9 @@ using BAYSOL.MolecularStructure: MolecularStructure
 # `MolecularStructure._build` takes the radii thunk directly.
 # ---------------------------------------------------------------------------
 
-# element letter -> radius (Å): `SASA_RADII`, in test/utils/geometry.jl.
+# element letter -> radius (Å): `SASA_RADII`, in test/unit_tests/geometry.jl.
 # SASA_RADII, sph, lattices
-include(joinpath(@__DIR__, "..", "..", "utils", "geometry.jl"))
+include(joinpath(@__DIR__, "..", "geometry.jl"))
 
 function sasa_mol(elms, crds)
     es = String[lowercase(e) for e in elms]
@@ -252,7 +252,7 @@ const SASA_WITNESS_LOSS_MAX = 0.0092
         # a sealed void inside a dense shell is CAVITY throughout, while the
         # same construction with no void has none; detection holds while the
         # void fits inside the ray range and degrades to open surface past it.
-        # (`sph` comes from test/utils/geometry.jl, included at the top.)
+        # (`sph` comes from test/unit_tests/geometry.jl, included at the top.)
         for R in (4.0, 5.0, 6.0)
             hp, _, hc = Geometry.sasa(
                 sasa_mol(fill("q", 300), sph(R, 300)); probe = probe)
@@ -330,7 +330,7 @@ const SASA_WITNESS_LOSS_MAX = 0.0092
         # regime where an exposed atom can have no open point among its first
         # SASA_N_OCC directions and bail. Compares every case against the pass turned
         # off (n_occ = n_pts) and logs the lost area. (`surface_atom_cases`,
-        # `jittered_lattice` come from test/utils/geometry.jl.)
+        # `jittered_lattice` come from test/unit_tests/geometry.jl.)
         probe = 1.4
         pmap = BAYSOL.Geometry.plastic_points(SHELL_SAMPLE)
         # large atom's area, pass off / on

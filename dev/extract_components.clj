@@ -39,7 +39,7 @@
 ;; With --source-date and --fetched set to the checked-in header's values, a regeneration
 ;; from the same dictionary file is byte-identical to the checked-in table.
 ;;
-;; The shared helpers (`common`) live in test/utils/; this file puts that folder on its
+;; The shared helpers (`common`) live beside this file; it puts its folder on its
 ;; classpath.
 
 (ns extract-components
@@ -57,8 +57,7 @@
         (java.time.format DateTimeFormatter)
         (java.util.zip GZIPInputStream)))
 
-(add-classpath (str
-        (fs/path (fs/parent (fs/absolutize *file*)) ".." "test" "utils")))
+(add-classpath (str (fs/parent (fs/absolutize *file*))))
 
 (require '[common :as c])
 

@@ -16,19 +16,18 @@
 ;;   --dry-run  print the command, run nothing
 ;;
 ;; Each is built twice in one process (the first call warms the compiler) and the
-;; second build is profiled (test/utils/profile_seed.jl): the stage timings of that
+;; second build is profiled (dev/profile_seed.jl): the stage timings of that
 ;; build, and the samples by function, exclusive and inclusive, for frames in
 ;; BAYSOL's own source. This is development tooling for performance work, not a
 ;; benchmark: use it to find what to optimize, and `bb fittings --bench --approved`
 ;; or the fitting-test reports to measure it. Needs Babashka and `julia` on the PATH
-;; (or JULIA=/path/to/julia); shared helpers are in test/utils/common.clj.
+;; (or JULIA=/path/to/julia); shared helpers are in dev/common.clj.
 
 (ns profile
     (:require [babashka.classpath :refer [add-classpath]]
         [babashka.fs :as fs]))
 
-(add-classpath (str
-        (fs/path (fs/parent (fs/absolutize *file*)) ".." "test" "utils")))
+(add-classpath (str (fs/parent (fs/absolutize *file*))))
 
 (require '[common :as c])
 
@@ -47,7 +46,7 @@
             ;; one Julia process profiles every spec, so the compiler warms up once
             (let [cmd (concat [(c/find-julia) "--startup-file=no"
                             (str "--project=" (c/in-root c/fit-dir))
-                            (c/in-root "test" "utils" "profile_seed.jl")]
+                            (c/in-root "dev" "profile_seed.jl")]
                         (when interval ["--delay" interval])
                         (when (some #{"--nuts"} flags) ["--nuts"])
                         specs)]

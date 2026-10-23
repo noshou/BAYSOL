@@ -18,7 +18,7 @@ using BAYSOL.Inference: BOUNDS_δρ₁₂, κ_δρ₁₂, κ_δρ₃
 
 const logjac = BAYSOL.Inference.logjac
 
-include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))
+include(joinpath(@__DIR__, "..", "floatcompare.jl"))
 
 const LO, HI = BOUNDS_δρ₁₂
 

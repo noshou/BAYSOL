@@ -12,10 +12,8 @@
 
 (deftest guard-prints-plan-only
     (testing "without --approved the script refuses and says what it would run"
-        (let [{:keys [status out]} (h/run-tool (str h/utils-dir "/bench.clj")
-                    "--state"
-                    "cold"
-                    "SASDMJ9")]
+        (let [{:keys [status out]}
+                (h/run-tool (str h/dev-dir "/bench.clj") "--state" "cold" "SASDMJ9")]
             (is (= 0 status))
             (is (h/contains-text? out "not running"))
             (is (h/contains-text? out "Planned: --state cold SASDMJ9"))
@@ -23,7 +21,7 @@
 
 (deftest guard-also-for-warm
     (testing "the warm state needs approval too"
-        (let [{:keys [status out]} (h/run-tool (str h/utils-dir "/bench.clj")
+        (let [{:keys [status out]} (h/run-tool (str h/dev-dir "/bench.clj")
                     "--state" "warm"
                     "SASDMJ9" "SASDBS6:fit2_model3")]
             (is (= 0 status))
@@ -36,7 +34,7 @@
                 (bench/parse-args ["--state" "cold" "--keep" "--samples" "5"
                         "SASDMJ9" "SASDBS6:fit2_model3"]))))
     (testing "an option without its value stops with status 2"
-        (let [{:keys [status out]} (h/run-tool (str h/utils-dir "/bench.clj")
+        (let [{:keys [status out]} (h/run-tool (str h/dev-dir "/bench.clj")
                     "--approved"
                     "SASDMJ9"
                     "--out")]
@@ -53,7 +51,7 @@
                         "test/fitting_tests/SASDMJ9/res_hist.png"
                         "test/fitting_tests/SASDMJ9/SASDMJ9.jl"
                         "src/Inference/Inference.jl" "test/baselines/README.md"
-                        "test/utils/bench.clj"])))))
+                        "dev/bench.clj"])))))
 
 (deftest make-depot-links-only-sources
     (testing "the cold depot links source dirs and has no compiled/ cache"

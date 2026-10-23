@@ -21,7 +21,7 @@
 #   julia --project=test -t 6,1 dev/unittests.jl concurrency
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
-include(joinpath(@__DIR__, "..", "..", "utils", "geometry.jl"))   # jittered_lattice
+include(joinpath(@__DIR__, "..", "geometry.jl"))   # jittered_lattice
 
 using BAYSOL.Runtime: worker_count, stream, tmap_items, tmap_blocks, with_blas_single,
     with_workers, with_chaos
