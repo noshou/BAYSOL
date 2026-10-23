@@ -5,9 +5,12 @@ BAYSOL = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 # that list it as a direct dependency, not a transitive one.
 CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+# Renders ```mermaid fences in the HTML site (GitHub renders them natively).
+DocumenterMermaid = "a078cd44-4d9c-4618-b545-3ab9d77f9177"
 
 [compat]
 CondaPkg = "0.2"
+DocumenterMermaid = "0.2"
 
 # Shared conda environment across every BAYSOL-dependent project in this
 # repo -- see ../Project.toml for the full rationale.

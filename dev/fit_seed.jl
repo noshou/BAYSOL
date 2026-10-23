@@ -54,7 +54,7 @@ function load_fit_seed(
     seed_options::NamedTuple = (;),
     makie::Bool = true,
 )
-    fit_dir = joinpath(@__DIR__, "..", "fitting_tests")
+    fit_dir = joinpath(@__DIR__, "..", "test", "fitting_tests")
     dir = joinpath(fit_dir, id)
     isdir(dir) || error("no fitting test folder $dir")
     scripts = filter(f -> endswith(f, ".jl"), readdir(dir))

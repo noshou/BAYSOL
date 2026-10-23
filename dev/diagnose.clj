@@ -4,37 +4,28 @@
 ;; Sampler diagnostics on SASBDB fitting tests, without
 ;; rerunning their fits or reports: every part by default.
 ;;
-;;     bb diagnose [--report] [--ablate] [--residuals] [--warmup]
-;;         [--tolerance] [--chains] [options] [ID[:tag] ...]
+;;     bb diagnose [--report] [--residuals] [--chains] [options] [ID[:tag] ...]
 ;;     bb diagnose --list
 ;;
-;; Parts (each is one Julia process, test/utils/diagnose.jl,
+;; Parts (each is one Julia process, dev/diagnose.jl,
 ;; which loads the fit's Seed and runs the part):
 ;;   --report     MAP starts, Hessian, NUTS step size and depth, Laplace agreement,
 ;;                modes, gradient error
-;;   --ablate     chi-squared with one shared shell contrast / drho1=drho2 + drho3 /
-;;                the full model
 ;;   --residuals  are the residuals at the MAP white (lag-1, runs z), reduced
 ;;                chi-squared on the fitted and measured grid
-;;   --warmup     how short can the warm-up be and how many draws are enough: step
-;;                size along a long reference warm-up, runs with 50..1000 adaptation
-;;                iterations against it, ESS vs draws
-;;   --tolerance  NUTS at several c1 profiling tolerances and RNG seeds (is the
-;;                tolerance tight enough?)
 ;;   --chains     every chain of infer (the 8 chains run_model uses): start distance,
 ;;                posterior mode, divergences, step size, steps, acceptance, and each
 ;;                divergent draw, to see which chains a fit's divergences come from.
 ;;                --seeds is the run's rng_seed (default 7; pass the one in a report's
 ;;                === Run === section to look at that run); --retry 1: the rerun infer does
 ;;                when R̂ is above the limit (2000 + 2000, derived seeds), kept or not
-;; With none of the part flags, all six run, in
+;; With none of the part flags, all three run, in
 ;; this order. Name one or more to run only those.
 ;;
 ;; Options (each is passed to the parts that accept it):
-;;   --samples N --adapt N   NUTS iterations (report, tolerance, chains; default:
+;;   --samples N --adapt N   NUTS iterations (report, chains; default:
 ;;   run_model)
-;;   --tols 1e-5,1e-8        c1 tolerances (tolerance)
-;;   --seeds 1,2,3           RNG seeds (warmup, tolerance, chains; default 7)
+;;   --seeds 1,2,3           RNG seeds (chains; default 7)
 ;;   --out DIR               write DIR/<part>.txt for each part instead of stdout
 ;;   --threads N  run the Julia processes with N threads (as `julia -t N`: 4, auto,
 ;;                4,1); default one
@@ -51,8 +42,7 @@
         [babashka.fs :as fs]
         [clojure.string :as str]))
 
-(add-classpath (str
-        (fs/path (fs/parent (fs/absolutize *file*)) ".." "test" "utils")))
+(add-classpath (str (fs/parent (fs/absolutize *file*))))
 
 (require '[common :as c])
 
@@ -61,9 +51,7 @@
 ;; The parts, in the order they run (the slow ones last), each with the options it
 ;; accepts.
 (def ^:private parts
-    [["report" ["--out" "--samples" "--adapt"]] ["ablate" ["--out"]]
-        ["residuals" ["--out"]] ["warmup" ["--out" "--seeds"]]
-        ["tolerance" ["--out" "--samples" "--adapt" "--tols" "--seeds"]]
+    [["report" ["--out" "--samples" "--adapt"]] ["residuals" ["--out"]]
         ["chains" ["--out" "--samples" "--adapt" "--seeds" "--retry"]]])
 
 (defn- integer-text? [s] (boolean (re-matches #"[-+]?\d+" s)))
@@ -83,15 +71,6 @@
                     (str "--seeds needs integers separated by commas, got '" v "'")))
             "--retry" (when-not (#{"0" "1"} v)
                 (c/fail who (str "--retry needs 0 or 1, got '" v "'")))
-            "--tols"
-            (when-not (every? #(some-> (parse-double %)
-                        pos?)
-                    (csv))
-                (c/fail who
-                    (str
-                        "--tols needs positive numbers separated by commas, got '"
-                        v
-                        "'")))
             nil)))
 
 (defn- command
@@ -99,7 +78,7 @@
     in the fitting-test project."
     [julia part opts specs]
     (concat [julia "--startup-file=no" (str "--project=" (c/in-root c/fit-dir))
-            (c/in-root "test" "utils" "diagnose.jl") (str "--" part)]
+            (c/in-root "dev" "diagnose.jl") (str "--" part)]
         (mapcat identity opts)
         specs))
 

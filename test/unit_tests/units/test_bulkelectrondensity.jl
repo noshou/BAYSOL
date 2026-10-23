@@ -23,7 +23,7 @@ using BAYSOL.PhysicalConstants:
 "Fully-qualified handle onto the submodule, for the private caches/tables below."
 const PMVMOD = BAYSOL.BulkElectronDensity
 
-include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "floatcompare.jl"))   # close_
 # LYSOZYME, ...
 include(joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "sequences.jl"))
 

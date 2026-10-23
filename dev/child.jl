@@ -21,7 +21,7 @@ const REPO, SPEC = ARGS[1], ARGS[2]
 const ITERATIONS = length(ARGS) ≥ 4 ? (parse(Int, ARGS[3]), parse(Int, ARGS[4])) : nothing
 
 t_using = @elapsed using BAYSOL
-t_tool  = @elapsed include(joinpath(REPO, "test", "utils", "fit_seed.jl"))
+t_tool  = @elapsed include(joinpath(REPO, "dev", "fit_seed.jl"))
 id, tag = occursin(':', SPEC) ? String.(split(SPEC, ":"; limit = 2)) : (String(SPEC), "")
 
 function one_fit()

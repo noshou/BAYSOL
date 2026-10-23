@@ -56,7 +56,7 @@
 
 (defn- extract
     [src dst]
-    (h/run-tool (str h/utils-dir "/extract_formfactor.clj") src dst))
+    (h/run-tool (str h/dev-dir "/extract_formfactor.clj") src dst))
 
 (deftest builds-rows
     (when sqlite?
@@ -144,7 +144,7 @@
     (when sqlite?
         (testing "no arguments: usage and status 2"
             (is (= 2
-                    (:status (h/run-tool (str h/utils-dir
+                    (:status (h/run-tool (str h/dev-dir
                                 "/extract_formfactor.clj"))))))))
 
 (deftest numbers-are-checked

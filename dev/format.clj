@@ -9,14 +9,16 @@
 ;; indentation is a multiple of 4 and inherits from its parent line (zprint alone aligns
 ;; arguments under the first one, which depends on where the bracket sits). A string or a
 ;; symbol longer than the limit cannot be wrapped: `bb linelen --check` finds those.
+;; After the formatters, the prose of both languages is re-wrapped (dev/reflow.clj): the
+;; comment blocks and docstring paragraphs that contain a line over the limit, balanced.
 ;;
 ;;     bb fmt [--julia|--clj] [PATH ...]
 ;;     bb fmt-check [--julia|--clj] [PATH ...]
 ;;
 ;;   bb fmt        rewrites the Julia and Babashka files under PATH (default: the whole
-;;                 repository)
-;;   bb fmt-check  changes nothing; lists the files that are not formatted and exits 1
-;;                 if there are any
+;;                 repository), then re-wraps their long comments and docstrings
+;;   bb fmt-check  changes nothing; lists the files that are not formatted or whose
+;;                 prose would be re-wrapped, and exits 1 if there are any
 ;;   --julia, --clj   only that language (the precommit runs the two checks as
 ;;                 separate steps)
 ;;
@@ -32,10 +34,9 @@
         [babashka.fs :as fs]
         [clojure.string :as str]))
 
-(add-classpath (str
-        (fs/path (fs/parent (fs/absolutize *file*)) ".." "test" "utils")))
+(add-classpath (str (fs/parent (fs/absolutize *file*))))
 
-(require '[common :as c])
+(require '[common :as c] '[reflow])
 
 (def ^:private who "bb fmt")
 
@@ -202,8 +203,16 @@
     [apply? paths]
     (c/run-cmd [(c/find-julia) "--startup-file=no"
             (str "--project=" (c/in-root "test" "format"))
-            (c/in-root "test" "utils" "format.jl")
-            (if apply? "--apply" "--check") paths]))
+            (c/in-root "dev" "format.jl") (if apply? "--apply" "--check")
+            paths]))
+
+(defn- reflow-prose
+    "Re-wraps (`apply?`) or checks the prose of the `language` files under `paths`;
+    true on success."
+    [apply? language paths]
+    (let [changed (reflow/reflow-files apply? language paths)]
+        (doseq [f changed] (println (if apply? "re-wrapped" "prose to re-wrap:") f))
+        (or apply? (empty? changed))))
 
 (defn run
     "The tool's main program for the argument list `argv`; returns the exit status."
@@ -230,10 +239,15 @@
                 both? (empty? languages)
                 paths (or (seq (remove #{"--julia" "--clj"} rest-args)) [c/*root*])
                 ;; each language is run even if the other failed
+                ;; the formatter first, then the prose; both run even if one fails
+                both-ok (fn [language format-fn]
+                    (let [formatted (format-fn apply? paths)
+                            prose (reflow-prose apply? language paths)]
+                        (and formatted prose)))
                 julia-ok (or (not (or both? (languages "--julia")))
-                    (format-julia apply? paths))
+                    (both-ok :julia format-julia))
                 clj-ok (or (not (or both? (languages "--clj")))
-                    (format-clj apply? paths))]
+                    (both-ok :clj format-clj))]
             (when-not (and julia-ok clj-ok) 1))))
 
 ;; Run only when executed as a script, so the functions can be loaded for testing.

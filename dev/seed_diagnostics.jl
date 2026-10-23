@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Diagnostics for the MAP-whitened NUTS pipeline, generic over any `Inference.Seed`
-# (a unit-test toy, a SASBDB fit, ...). A developer tool: test/utils/diagnose.jl is
+# (a unit-test toy, a SASBDB fit, ...). A developer tool: dev/diagnose.jl is
 # its command line, and test/unit_tests/units/test_seed_diagnostics.jl keeps it
 # from rotting. Functions only: nothing runs on include. Plain data comes back from
-# the measuring functions and `diagnose` / `tolerance_sweep` print it, so a test
+# the measuring functions and `diagnose` prints it, so a test
 # can assert on the numbers and a script can print them.
 #
 # Needs only `BAYSOL` and the standard library, and borrows StaticArrays /
 # ForwardDiff / DiffResults from `BAYSOL.Inference`'s own bindings, so it loads in
-# any environment that has BAYSOL (test/, test/fitting_tests/ and test/utils/
+# any environment that has BAYSOL (test/ and test/fitting_tests/
 # alike). It reaches into `Inference` internals (`_logπ`, `_sampling_space`,
 # `_fd_hessian`, ...) on purpose, as the unit tests do; keep it in step with them.
 #
@@ -30,10 +30,7 @@ const ForwardDiff = F.ForwardDiff
 const DiffResults = F.DiffResults
 
 export nuts_replica, gradient_w, gradient_noise, local_curvature, lbfgs_starts,
-    hessian_sensitivity,
-    axis_scan, mode_table, shell_contrast_ablation, curve_chi2, ess, diagnose,
-    tolerance_sweep,
-    warmup_study, chain_report
+    hessian_sensitivity, axis_scan, mode_table, curve_chi2, ess, diagnose, chain_report
 
 # ---------------------------------------------------------------------------
 #                                   helpers
@@ -453,65 +450,8 @@ function axis_scan(seed::F.Seed, sp;
 end
 
 # ---------------------------------------------------------------------------
-#                       what the shell contrasts buy
+#                              reference curves
 # ---------------------------------------------------------------------------
-
-"""
-    shell_contrast_ablation(seed; tol) -> NamedTuple
-
-Nested models on the same structure, buffer and
-data, with c1, scale and background profiled:
-
-- `M1`: one shared contrast δρ₁ = δρ₂ = δρ₃ = d
-    (the single hydration-shell contrast of CRYSOL);
-- `M2`: δρ₁ = δρ₂ = d₁₂ and a free δρ₃;
-- `M3`: the full model at the pipeline's MAP.
-
-ρₑ is held at its prior median in M1 and M2 (its prior σ is 0.01–0.1 %, so M3
-barely moves it). M1 and M2 are grid searches (481 points; 121 × 121), so M3
-≤ M2 ≤ M1 holds up to grid resolution and L-BFGS convergence, not exactly.
-
-# Returns
-- `(; M1, M2, M3)`, each `(; chi2, ...)` with the reduced χ² and the optimum found.
-
-# Exceptions
-- None; probe points with a flat model curve count as infinite χ².
-"""
-function shell_contrast_ablation(seed::F.Seed; tol = F.EXCL_VOL_CORR_TOL)
-    μ, σ, ξ_of = _space(seed)
-    pr = seed.pr
-    ρ0 = exp(μ[1])
-    χ(ξ) =
-        try
-            _, fit, c1 = F.profiled_corrs(
-                seed.wls,
-                SVector{4}(ξ...),
-                seed.fw;
-                tables = seed.c1tab,
-                tol,
-            )
-            (F.reduced_chi2(fit), c1)
-        catch
-            (Inf, NaN)
-        end
-    lo3, hi3 = pr.δρ₃Prior.μ, pr.δρ₃Prior.μ + pr.δρ₃Prior.σ
-    m1 = (chi2 = Inf, d = NaN, c1 = NaN)
-    for d in range(F.LOWER_BOUND_δρ₁₂, F.LOWER_BOUND_δρ₁₂ + F.WIDTH_δρ₁₂, length = 481)
-        c, c1 = χ((ρ0, d, d, d))
-        c < m1.chi2 && (m1 = (chi2 = c, d, c1))
-    end
-    m2 = (chi2 = Inf, d12 = NaN, d3 = NaN, c1 = NaN)
-    for d12 in range(F.LOWER_BOUND_δρ₁₂, F.LOWER_BOUND_δρ₁₂ + F.WIDTH_δρ₁₂, length = 121),
-        d3 in range(lo3, hi3, length = 121)
-
-        c, c1 = χ((ρ0, d12, d12, d3))
-        c < m2.chi2 && (m2 = (chi2 = c, d12, d3, c1))
-    end
-    sp = F._sampling_space(seed)
-    ξ3 = ξ_of(sp.ẑ)
-    c3, c13 = χ(ξ3)
-    return (; M1 = m1, M2 = m2, M3 = (chi2 = c3, ξ = ξ3, c1 = c13))
-end
 
 """
     curve_chi2(q, I, σ, q_ref, I_ref) -> NamedTuple
@@ -771,162 +711,6 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing,
         "  → stable ε < ", _vs(2 ./ sqrt.([maximum(lc.λmax), median(lc.λmax)])),
         " (worst, median);  adapted ε = ", @sprintf("%.4g", r.ε))
     return nothing
-end
-
-"""
-    tolerance_sweep(io, seed; label, tols, rng_seeds, n_samples, n_adapt)
-
-NUTS replica at each c1 profiling tolerance in `tols` and each RNG seed in
-`rng_seeds` (same MAP and whitening throughout), one line each: wall time, final
-ε, steps per iteration, ms per step, ESS, divergent transitions and posterior sd
-in w. Shows whether a tolerance is tight enough for the gradient it feeds NUTS.
-
-# Returns
-- A vector of `(; tol, rng_seed, seconds, ε, steps, ms_step, min_ess, div)`
-    (`div`: divergent post-warmup transitions).
-
-# Exceptions
-- None beyond those of [`nuts_replica`](@ref).
-"""
-function tolerance_sweep(io::IO, seed::F.Seed; label = "", tols = (1e-5, 1e-8),
-    rng_seeds = (7,),
-    n_samples = R.DEFAULT_N_SAMPLES, n_adapt = R.DEFAULT_N_ADAPT)
-    sp = F._sampling_space(seed)
-    out = NamedTuple[]
-    for tol in tols, rs in rng_seeds
-        r = nuts_replica(seed; c1_tol = tol, n_samples, n_adapt, rng_seed = rs, sp)
-        st = r.stats[(n_adapt+1):end]
-        steps = mean(getproperty.(st, :n_steps))
-        mins = minimum(ess(r.post[i, :]) for i in 1:4)
-        div = count(getproperty.(st, :numerical_error))
-        row = (;
-            tol,
-            rng_seed = rs,
-            seconds = r.seconds,
-            ε = r.ε,
-            steps,
-            ms_step = 1000r.seconds / r.n_leapfrog,
-            min_ess = mins,
-            div,
-        )
-        push!(out, row)
-        println(
-            io,
-            @sprintf(
-                "%s tol=%.0e seed=%s  NUTS=%6.1fs  ε=%.4f  n_steps=%7.1f \
-                     ms/step=%.3f  minESS=%6.1f  div=%d  sd(w)=%s  |ΔH|=%.3f",
-                label, tol, rs, r.seconds, r.ε, steps, row.ms_step, mins, div,
-                _vs(std(r.post, dims = 2)),
-                mean(abs.(getproperty.(st, :hamiltonian_energy_error))))
-        )
-        flush(io)
-    end
-    return out
-end
-
-# Posterior summary of a block of draws (rows: parameters) against a reference block: the
-# largest mean shift in reference sd units, the largest |log sd ratio|, the smallest ESS.
-function _vs_reference(P, μr, σr)
-    dm = maximum(abs.(vec(mean(P, dims = 2)) .- μr) ./ σr)
-    ds = maximum(abs.(log.(vec(std(P, dims = 2)) ./ σr)))
-    return (; dm, ds, min_ess = minimum(ess(P[i, :]) for i in 1:size(P, 1)))
-end
-
-"""
-    warmup_study(io, seed; label, adapts, n_post, n_ref, n_adapt_ref, rng_seeds)
-        -> NamedTuple
-
-How short can the warm-up be, and how many draws are enough? One long reference run
-(`n_adapt_ref` = 1000 adaptation iterations, then `n_ref` draws) fixes the posterior
-in w. Then (1) `WARMUP` lines: its step size ε at chosen warm-up iterations (Stan's
-windowed schedule resets the step-size averaging at each window end); (2) `ADAPT`
-lines: runs with `a` adaptation iterations in `adapts` and `n_post` draws each, per
-RNG seed: final ε, steps per iteration, divergent fraction, smallest ESS, ESS per
-gradient evaluation, and the largest mean shift (reference sd units) and |log sd
-ratio| against the reference; (3) `DRAWS` lines: the same statistics on the first
-`n` draws of the reference (biased low, those draws are part of the reference), and
-the first `n` in steps of 100 with smallest ESS ≥ 400.
-
-# Returns
-- `(; trace, adapt, draws, n_ess400)`.
-
-# Exceptions
-- None beyond those of [`nuts_replica`](@ref).
-"""
-function warmup_study(io::IO, seed::F.Seed; label = "",
-    adapts = (50, 100, 200, 300, 500, 1000), n_post = 1000,
-    n_ref = 4000, n_adapt_ref = 1000, rng_seeds = (7,))
-    sp = F._sampling_space(seed)
-    ref = nuts_replica(
-        seed;
-        n_samples = n_adapt_ref + n_ref,
-        n_adapt = n_adapt_ref,
-        rng_seed = 101,
-        sp,
-    )
-    R = ref.post
-    μr = vec(mean(R, dims = 2))
-    σr = vec(std(R, dims = 2))
-    marks = filter(≤(n_adapt_ref), (10, 25, 50, 75, 100, 150, 250, 450, 950, 1000))
-    trace = [(i, ref.stats[i].step_size) for i in marks]
-    println(io, label, " WARMUP  ",
-        join((@sprintf("%d:%.4f", i, e) for (i, e) in trace), "  "),
-        @sprintf(
-            "  final=%.4f  steps/it=%.1f",
-            ref.ε,
-            mean(getproperty.(ref.stats[(n_adapt_ref+1):end], :n_steps))
-        ))
-    adapt = NamedTuple[]
-    for a in adapts, rs in rng_seeds
-        r = nuts_replica(seed; n_samples = a + n_post, n_adapt = a, rng_seed = rs, sp)
-        st = r.stats[(a+1):end]
-        steps = mean(getproperty.(st, :n_steps))
-        v = _vs_reference(r.post, μr, σr)
-        row = (; a, rng_seed = rs, ε = r.ε, steps,
-            div = mean(getproperty.(st, :numerical_error)),
-            v.min_ess, ess_per_grad = v.min_ess / sum(getproperty.(st, :n_steps)), v.dm,
-            v.ds, seconds = r.seconds)
-        push!(adapt, row)
-        println(
-            io,
-            @sprintf(
-                "%s ADAPT  a=%4d seed=%s  ε=%.4f  steps=%6.1f  div=%.4f  \
-                    minESS=%7.1f  ess/grad=%.5f  dm=%.3f  dsd=%.3f  t=%.2fs",
-                label, a, rs, row.ε, steps, row.div, row.min_ess, row.ess_per_grad, row.dm,
-                row.ds, row.seconds)
-        )
-    end
-    draws = NamedTuple[]
-    for n in (100, 250, 500, 1000, 2000, n_ref)
-        n ≤ size(R, 2) || continue
-        v = _vs_reference(R[:, 1:n], μr, σr)
-        push!(draws, (; n, v...))
-        println(
-            io,
-            @sprintf(
-                "%s DRAWS  n=%5d  minESS=%7.1f  dm=%.3f  dsd=%.3f",
-                label,
-                n,
-                v.min_ess,
-                v.dm,
-                v.ds
-            )
-        )
-    end
-    n_ess400 = nothing
-    for n in 100:100:size(R, 2)
-        if minimum(ess(R[i, 1:n]) for i in 1:size(R, 1)) ≥ 400
-            n_ess400 = n
-            break
-        end
-    end
-    println(
-        io,
-        label,
-        " ESS400  first n with min ESS ≥ 400: ",
-        n_ess400 === nothing ? "none within $(size(R, 2))" : n_ess400,
-    )
-    return (; trace, adapt, draws, n_ess400)
 end
 
 # ---------------------------------------------------------------------------

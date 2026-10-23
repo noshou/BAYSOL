@@ -8,7 +8,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.Hydrogenator: Hydrogenator
 
-include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "floatcompare.jl"))   # close_
 
 const _fraction_protonated   = Hydrogenator._fraction_protonated
 const _fraction_deprotonated = Hydrogenator._fraction_deprotonated

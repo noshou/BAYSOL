@@ -51,7 +51,7 @@
         (testing
             "the per-fit CSV for three fixed revisions equals the verified golden file"
             (let [out (str (h/scratch-dir) "/cmp.csv")
-                    {:keys [status]} (h/run-tool (str h/utils-dir "/compare.clj")
+                    {:keys [status]} (h/run-tool (str h/dev-dir "/compare.clj")
                         "30f55ea" "81cf301"
                         "24af397" "--no-tree"
                         "--csv" out)]
@@ -62,7 +62,7 @@
 
 (deftest unknown-revision
     (testing "an unknown revision stops with status 1 and names the tags"
-        (let [{:keys [status out]} (h/run-tool (str h/utils-dir "/compare.clj")
+        (let [{:keys [status out]} (h/run-tool (str h/dev-dir "/compare.clj")
                     "no-such-rev")]
             (is (= 1 status))
             (is (h/contains-text? out "unknown git revision 'no-such-rev'")))))
@@ -70,8 +70,7 @@
 (deftest default-is-latest-release
     (when (h/git-history?)
         (testing "with no revision the baseline is the latest release tag"
-            (let [{:keys [status out]} (h/run-tool (str h/utils-dir
-                            "/compare.clj"))]
+            (let [{:keys [status out]} (h/run-tool (str h/dev-dir "/compare.clj"))]
                 (is (= 0 status))
                 (is (h/contains-text? out
                         (str "baseline: "

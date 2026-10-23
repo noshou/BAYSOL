@@ -12,7 +12,7 @@ using Distributions:
     LocationScale, Continuous, Beta, mode, var, cdf, params, minimum, maximum
 using StaticArrays: SVector
 
-include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "floatcompare.jl"))   # close_
 
 const ρ̄ = 0.3346
 const BB = LocationScale{Float64,Continuous,Beta{Float64}}

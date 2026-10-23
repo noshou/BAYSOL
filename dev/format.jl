@@ -4,7 +4,7 @@
 # repository's .JuliaFormatter.toml (92 characters per line, the author's
 # line breaks kept wherever they fit). Started by dev/format.clj:
 #
-#   julia --project=test/format test/utils/format.jl (--apply|--check) FILE_OR_DIR ...
+#   julia --project=test/format dev/format.jl (--apply|--check) FILE_OR_DIR ...
 #
 # `--apply` rewrites the files and lists the ones that changed; `--check` changes nothing
 # and lists the files that are not formatted. Exit status 1 if `--check` finds one.

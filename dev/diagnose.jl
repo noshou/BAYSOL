@@ -7,27 +7,23 @@
 #
 # or directly:
 #
-#   julia --project=test/fitting_tests test/utils/diagnose.jl \
+#   julia --project=test/fitting_tests dev/diagnose.jl \
 #       --<part> [options] ID[:tag] ...
 #
-# Parts (the work is done by test/utils/seed_diagnostics.jl;
+# Parts (the work is done by dev/seed_diagnostics.jl;
 # the options are listed in dev/diagnose.clj):
 #   --report     MAP starts, Hessian, NUTS step size and depth,
 #                Laplace agreement, modes, gradient error
-#   --ablate     χ² with one shared shell contrast / δρ₁=δρ₂ + δρ₃ / the full model
 #   --residuals  are the residuals at the MAP white (lag-1 and runs
 #                z) and the reduced χ², on the fitted grid and on the
 #                measured grid (the MAP search only; no sampling)
-#   --warmup     how short can the warm-up be and how many draws are enough
-#   --tolerance  NUTS at several c1 profiling tolerances and
-#                RNG seeds (is the tolerance tight enough?)
 #   --chains     every chain of `infer`: start, mode, divergences, step size, and each
 #                divergent draw (which chains the divergences come from); --retry 1
 #                looks at the rerun `infer` does when R̂ is above the limit
 #
 # `ID` is a folder under test/fitting_tests/ (SASDBS6); `tag` picks one run of a script that
 # has several (fit2_model3); scripts with a single run take no tag. SASDMZ9 and SASDJ72 take
-# model1|model2(|model3). How the Seed is obtained is in test/utils/fit_seed.jl.
+# model1|model2(|model3). How the Seed is obtained is in dev/fit_seed.jl.
 
 using Printf
 using BAYSOL
@@ -85,21 +81,20 @@ end
 
 function main(args)
     if isempty(args)
-        println("usage: julia --project=test/fitting_tests test/utils/diagnose.jl ",
+        println("usage: julia --project=test/fitting_tests dev/diagnose.jl ",
             (
-                "--report|--ablate|--residuals|--warmup|--tolerance|--chains " *
-                "[--out FILE] [--tols 1e-5,1e-8] [--seeds 1,2,3] [--retry 1] " *
+                "--report|--residuals|--chains " *
+                "[--out FILE] [--seeds 1,2,3] [--retry 1] " *
                 "[--samples N] [--adapt N] ID[:tag] ..."
             ),
         )
         return
     end
     cmd, rest = args[1], args[2:end]
-    cmd in ("--report", "--ablate", "--residuals", "--warmup", "--tolerance", "--chains") ||
+    cmd in ("--report", "--residuals", "--chains") ||
         error(
             (
-            "unknown part $cmd (--report | --ablate " *
-            "| --residuals | --warmup | --tolerance | --chains)"
+            "unknown part $cmd (--report | --residuals | --chains)"
         ),
         )
     cmd = cmd[3:end]
@@ -107,8 +102,6 @@ function main(args)
     isempty(specs) && error("give at least one ID[:tag]")
     n_samples = parse(Int, get(opts, "samples", string(BAYSOL.Pipeline.DEFAULT_N_SAMPLES)))
     n_adapt = parse(Int, get(opts, "adapt", string(BAYSOL.Pipeline.DEFAULT_N_ADAPT)))
-    tols = Tuple(parse.(Float64, split(get(opts, "tols", "1e-5,1e-8"), ",")))
-    rngs = Tuple(parse.(Int, split(get(opts, "seeds", "7"), ",")))
     # (the seeds of --chains are 64-bit: a report's `rng_seed` is a UInt64)
     chain_seeds = parse.(Int128, split(get(opts, "seeds", "7"), ","))
     out = haskey(opts, "out") ? open(opts["out"], "w") : stdout
@@ -117,39 +110,16 @@ function main(args)
             id, tag =
                 occursin(':', spec) ? String.(split(spec, ":"; limit = 2)) : (spec, "")
             seed, reference, label =
-                load_fit_seed(id, tag; makie = !(cmd in ("residuals", "warmup", "chains")))
+                load_fit_seed(id, tag; makie = !(cmd in ("residuals", "chains")))
             if cmd == "report"
                 diagnose(out, seed; label, reference, n_samples, n_adapt)
-            elseif cmd == "tolerance"
-                tolerance_sweep(
-                    out,
-                    seed;
-                    label,
-                    tols,
-                    rng_seeds = rngs,
-                    n_samples,
-                    n_adapt,
-                )
-            elseif cmd == "warmup"
-                warmup_study(out, seed; label, rng_seeds = rngs)
             elseif cmd == "chains"
                 for s in chain_seeds
                     chain_report(out, seed; label, n_samples, n_adapt, rng_seed = s,
                         rerun = get(opts, "retry", "0") == "1")
                 end
-            elseif cmd == "residuals"
-                residual_report(out, seed; label)
             else
-                a = shell_contrast_ablation(seed)
-                println(
-                    out,
-                    @sprintf(
-                        "%s  M1(shared d)=%.3f [d=%.2f c1=%.3f]   \
-                            M2(δρ₁=δρ₂, δρ₃)=%.3f \
-                            [d12=%.2f d3=%.2f c1=%.3f]   M3(full MAP)=%.3f [c1=%.3f]",
-                        label, a.M1.chi2, a.M1.d, a.M1.c1, a.M2.chi2, a.M2.d12, a.M2.d3,
-                        a.M2.c1, a.M3.chi2, a.M3.c1)
-                )
+                residual_report(out, seed; label)
             end
             flush(out)
         end

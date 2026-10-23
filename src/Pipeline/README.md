@@ -1,20 +1,33 @@
 # Pipeline
 
-
-|                      | contents                                                                                                                                      |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Pipeline.jl`         | the module: imports, the module-level constants `DEFAULT_QUANTILES` (`"16-84"`, the default `quantiles` of `run_model` and the label `write_report` prints) and `DEFAULT_N_ADAPT` / `DEFAULT_N_DRAWS` / `DEFAULT_N_SAMPLES` (300 / 700 / 1000, the default NUTS iterations of `run_model`), the result types `MAPParams`, `MAPResult`, `QuantileBounds`, `QuantileParams`, `QuantileCurves`, `QuantileResult`, includes, exports |
-| `SeedModel.jl`      | `seed_model`: resolve the structure, look its residue names up (`components`), choose the hydrogenation from them (`classify`), `structure checks` (chains reusing an id, duplicate atoms, dummy-like models), PROPKA + Pdb2pqr (always PARSE; PROPKA unless the structure is a nucleic acid alone; modified nucleotides are hydrogenated through their base), SASA and the diameter of the scatterer cloud, `Inference.shannon_data` (binning and `lMax`), `Scattering.forward_cache`, `Inference.seed_sampler`; starts the run's `Runtime.StageLog` |
-| `RunModel.jl`       | `run_model`: `Inference.infer` (8 chains by default), drop the warm-up of every chain, pick the MAP draw (highest non-divergent log density), compute parameter and curve quantiles |
-| `Report.jl`         | `write_report`, the parameter order/labels it prints, and the `=== Run ===` and `=== Timing ===` sections (`_write_run_info`, `_write_timing`) |
-
-The package root re-binds `seed_model`, `run_model` and `write_report`, so they are reachable as `BAYSOL.seed_model` etc.; the result types are `BAYSOL.Pipeline.MAPParams` etc.:
+The three entry points, re-bound by the package root as `BAYSOL.seed_model`, `BAYSOL.run_model` and `BAYSOL.write_report`:
 
 ```julia
 using BAYSOL
-seed = BAYSOL.seed_model(src, energy, q, I, σ, pH, σ_pH, solutes)   # rebin = 12 per Shannon channel, lMax from the structure
-res  = BAYSOL.run_model(seed)                                        # 300 warm-up + 700 draws; run_model(seed, n_samples, n_adapt) to change
+seed = BAYSOL.seed_model(src, energy, q, I, σ, pH, σ_pH, solutes) # rebin = 12 per Shannon channel, lMax from the structure
+res  = BAYSOL.run_model(seed) # 300 warm-up + 700 draws; run_model(seed, n_samples, n_adapt) to change
 BAYSOL.write_report(res)
 ```
 
-The report's sections, in order: `=== Run ===` (the structure and model sizes, the sampler settings, and how the measured curve was binned to the fitted one, followed without a break by the sampler's statistics, the cavity fraction, whether c1 hit its bound, and the divergence rate), `=== MAP ===`, `=== Quantiles (lo-hi) ===`, `=== Standard deviations from prior (θ-space z-score) ===`, an optional `=== Form-Factor Parsing Log ===`, and `=== Timing ===` (see the Timing README). The `χ²` of the MAP section is the reduced χ² on the measured points, with the number of points less 3 (scale, background and c1) as its degrees of freedom, so it is on the grid CRYSOL and FoXS evaluate whatever binning the fit used. The residual statistics (lag-1, runs z) are not in the report; `bb diagnose --residuals ID` prints them.
+
+| File           | Contents                                                                                                                                                                                                                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Pipeline.jl`  | the module: constants `DEFAULT_QUANTILES` (`"16-84"`), `DEFAULT_N_ADAPT` / `DEFAULT_N_DRAWS` / `DEFAULT_N_SAMPLES` (300 / 700 / 1000), the result types `MAPParams`, `MAPResult`, `QuantileBounds`, `QuantileParams`, `QuantileCurves`, `QuantileResult` (as `BAYSOL.Pipeline.MAPParams` etc.) |
+| `SeedModel.jl` | `seed_model`                                                                                                                                                                                                                                                                                   |
+| `RunModel.jl`  | `run_model`                                                                                                                                                                                                                                                                                    |
+| `Report.jl`    | `write_report` and the `=== Run ===` and `=== Timing ===` sections                                                                                                                                                                                                                             |
+
+## The stages
+
+`seed_model` (every step is a named stage of the `Runtime.StageLog`, cache hits marked):
+
+1. resolve the structure (`MolecularStructure`), look its residue names up (`components`), run the `structure checks` (reused chain ids, duplicate atoms, dummy-like models) and choose the hydrogenation from the content (`classify`);
+2. `Hydrogenator`: PROPKA unless the structure is a nucleic acid alone, then pdb2pqr (PARSE, or AMBER for a nucleic acid alone), with modified residues hydrogenated through their parent;
+3. the solvent-accessible surface and the diameter `D` of the scatterer cloud (atoms **and** beads), `Utils.Shannon` binning of the curve to `rebin` bins per channel `π/D`, and `lMax = ⌈q_max D⌉`;
+4. `Scattering.forward_cache` (the Gram matrix), the priors from the buffer `solutes` (`BulkElectronDensity.ρₑ`), and `Inference.seed_sampler`.
+
+`run_model` calls `Inference.infer` (8 chains, MAP search, harvest, mode pooling, one R̂ retry), drops each chain's warm-up, picks the MAP draw (highest non-divergent `log π`) and computes the quantile intervals and bands. `write_report` prints only statistics meaningful to a user; developer diagnostics live in the dev tools (`bb diagnose`).
+
+## The report
+
+Sections, in order: `=== Run ===` (structure and model sizes, sampler settings, the Shannon binning, then the sampler's statistics, cavity fraction, whether `c1` hit its bound, divergence rate), `=== Data (Shannon) ===`, `=== MAP ===`, `=== Quantiles (lo-hi) ===`, `=== Standard deviations from prior (θ-space z-score) ===`, an optional `=== Form-Factor Parsing Log ===` and `=== Timing ===`. The χ² of the MAP section is the reduced χ² **on the measured points** with `n_raw − 3` degrees of freedom (scale, background, `c1`), the grid CRYSOL and FoXS evaluate, whatever the binning. Each timing stage's note is wrapped on lines of its own under it (80 columns); older reports have name, note and seconds on one line and the parsers in `dev/` read both. Residual statistics (lag-1, runs z) are not in the report; `bb diagnose --residuals ID` prints them. The fitting-test scripts under `test/fitting_tests/` are deliberately self-contained examples of these three calls.

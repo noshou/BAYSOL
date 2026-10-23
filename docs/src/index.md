@@ -1,6 +1,6 @@
 # BAYSOL.jl
 
-Bayesian CRYSOL fitting for proteins (and, in future, nucleotides).
+Bayesian CRYSOL fitting for proteins and nucleic acids.
 
 ```@autodocs
 Modules = [BAYSOL]

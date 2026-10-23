@@ -13,7 +13,7 @@ using BAYSOL.MolecularStructure: StructureSource, LocalPathSource, PDBIDSource, 
 using BioStructures:
     BioStructures, MMCIFFormat, writepdb, standardselector, heavyatomselector
 
-include(joinpath(@__DIR__, "..", "..", "utils", "floatcompare.jl"))   # close_
+include(joinpath(@__DIR__, "..", "floatcompare.jl"))   # close_
 
 # Real, curated PDB structures checked into test/fixtures/molecules/, spanning
 # a genuine size range and mixing .pdb/.cif so both LocalPathSource branches

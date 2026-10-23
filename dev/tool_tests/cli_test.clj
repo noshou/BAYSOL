@@ -36,8 +36,8 @@
 (deftest diagnose-bad-numbers
     (is (= [2 2 2]
             (map :status
-                [(tool "diagnose" "--tolerance" "--tols" "1e-5,abc" "SASDMJ9")
-                    (tool "diagnose" "--tolerance" "--seeds" "1,x" "SASDMJ9")
+                [(tool "diagnose" "--chains" "--retry" "2" "SASDMJ9")
+                    (tool "diagnose" "--chains" "--seeds" "1,x" "SASDMJ9")
                     (tool "diagnose" "--report" "--samples" "0" "SASDMJ9")]))))
 
 (deftest diagnose-list
@@ -59,24 +59,24 @@
                 "--out" "/nowhere"
                 "--dry-run" "SASDMJ9")]
         (is (= 0 (:status r)))
-        (is (= 6 (count (re-seq #"=== diagnose: " (:out r)))))
+        (is (= 3 (count (re-seq #"=== diagnose: " (:out r)))))
         ;; in this order
         (is (re-find (re-pattern (str "(?s)"
                         (str/join ".*"
                             (map #(str "=== diagnose: " %)
-                                ["report" "ablate" "residuals"
-                                    "warmup" "tolerance"
+                                ["report" "residuals"
                                     "chains"]))))
                 (:out r)))
         ;; each part gets only its own options
         (is
             (says?
                 r
-                "diagnose.jl --warmup --seeds 1,2 --out /nowhere/warmup.txt SASDMJ9"
+                (str "diagnose.jl --chains --seeds 1,2 --samples 50 "
+                    "--out /nowhere/chains.txt SASDMJ9")
                 "diagnose.jl --report --samples 50 --out /nowhere/report.txt SASDMJ9"))))
 
 (deftest diagnose-default-all-fits
-    (let [r (tool "diagnose" "--warmup" "--dry-run")]
+    (let [r (tool "diagnose" "--residuals" "--dry-run")]
         (is (= 0 (:status r)))
         ;; one ID or ID:tag per run of every fitting test (the scripts' RUNS tables)
         (is (= (count (c/specs-of (c/ids)))
@@ -84,7 +84,7 @@
                         (last (str/split-lines (:out r)))))))))
 
 (deftest diagnose-parts-select
-    (let [r (tool "diagnose" "--warmup" "--residuals" "--dry-run" "SASDMJ9")]
+    (let [r (tool "diagnose" "--chains" "--residuals" "--dry-run" "SASDMJ9")]
         (is (= 0 (:status r)))
         (is (= 2 (count (re-seq #"=== diagnose: " (:out r)))))
         (is (not (h/contains-text? (:out r) "diagnose.jl --report")))))

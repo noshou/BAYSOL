@@ -136,7 +136,7 @@
             (h/write-file
                 script
                 (str "(require '[babashka.classpath :as cp]) (cp/add-classpath \""
-                    h/utils-dir
+                    h/dev-dir
                     "\") (require '[common :as c])\n"
                     "(c/split-args \"t.clj\" [\"--out\"] [] *command-line-args*)"))
             (doseq [args [["--bad"] ["--out"]]]

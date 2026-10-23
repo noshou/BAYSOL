@@ -36,15 +36,14 @@
 ;; table, the diagnostics. A failing fit does not stop the others; the
 ;; exit status is 1 if any step failed. The fits rewrite the res*.txt
 ;; and figures in their folders. Needs Babashka and `julia` on the PATH (or
-;; JULIA=/path/to/julia); shared helpers are in test/utils/common.clj.
+;; JULIA=/path/to/julia); shared helpers are in dev/common.clj.
 
 (ns fittings
     (:require [babashka.classpath :refer [add-classpath]]
         [babashka.fs :as fs]
         [clojure.string :as str]))
 
-(add-classpath (str
-        (fs/path (fs/parent (fs/absolutize *file*)) ".." "test" "utils")))
+(add-classpath (str (fs/parent (fs/absolutize *file*))))
 
 (require '[common :as c])
 

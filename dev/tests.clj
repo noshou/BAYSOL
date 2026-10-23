@@ -1,7 +1,7 @@
 #!/usr/bin/env bb
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
-;; Runs the tests of the dev tools (test/utils/tests/*_test.clj, Clojure's own
+;; Runs the tests of the dev tools (dev/tool_tests/*_test.clj, Clojure's own
 ;; clojure.test). No fit and no benchmark runs, and Julia is not needed.
 ;;
 ;;     bb test [NAME ...]
@@ -12,12 +12,10 @@
 
 (require '[babashka.classpath :refer [add-classpath]] '[babashka.fs :as fs])
 
-;; The tools under test (dev/, test/utils/) and the tests themselves are all on the
-;; classpath.
+;; The tools under test (dev/) and the tests themselves are all on the classpath.
 (let [here (fs/parent (fs/absolutize *file*))]
     (add-classpath (str here))
-    (add-classpath (str (fs/path here ".." "test" "utils")))
-    (add-classpath (str (fs/path here ".." "test" "utils" "tests"))))
+    (add-classpath (str (fs/path here "tool_tests"))))
 
 (ns tests
     (:require [babashka.fs :as fs]
@@ -29,7 +27,7 @@
     "The namespaces of the test files that match `names` (all when empty), sorted:
     common_test.clj holds the namespace common-test."
     [names]
-    (->> (fs/glob (c/in-root "test" "utils" "tests") "*_test.clj")
+    (->> (fs/glob (c/in-root "dev" "tool_tests") "*_test.clj")
         (map #(str (fs/strip-ext (fs/file-name %))))
         sort
         (filter (fn [f] (or (empty? names) (some #(str/includes? f %) names))))

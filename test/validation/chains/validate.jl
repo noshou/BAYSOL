@@ -32,7 +32,7 @@
 using Printf, Random, Statistics
 using BAYSOL
 const Fit = BAYSOL.Inference
-include(joinpath(@__DIR__, "..", "..", "utils", "fit_seed.jl"))
+include(joinpath(@__DIR__, "..", "..", "..", "dev", "fit_seed.jl"))
 
 const N_SAMPLES, N_ADAPT =
     BAYSOL.Pipeline.DEFAULT_N_SAMPLES, BAYSOL.Pipeline.DEFAULT_N_ADAPT

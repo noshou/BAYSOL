@@ -1,49 +1,57 @@
 # Utils
 
-`BAYSOL.Utils` groups the small scientific helpers every other module builds on. Each stays a named submodule, re-bound at the package root, so `BAYSOL.PhysicalConstants` and `BAYSOL.Shannon` are the names to import from (`using BAYSOL.PhysicalConstants: AVOGADRO`). `Utils` is loaded first, in dependency order: `PhysicalConstants`, `Shannon`. The process machinery (caching, timing, GC pausing, threading) lives in [`Runtime`](@ref BAYSOL.Runtime) and the point sets, excluded volumes and SASA in [`Geometry`](@ref BAYSOL.Geometry);
+`BAYSOL.Utils` groups the small scientific helpers every other module builds on. Each stays a named submodule, re-bound at the package root (`using BAYSOL.PhysicalConstants: AVOGADRO`). Load order: `PhysicalConstants`, `Shannon`. Caching, timing, GC pausing and threading live in [`Runtime`](@ref BAYSOL.Runtime); point sets, excluded volumes and SASA in [`Geometry`](@ref BAYSOL.Geometry).
 
 ## PhysicalConstants
 
-Physical constants and units shared across the package, defined once (`PhysicalConstants.jl`)
-so they cannot drift between modules. It is the first module loaded; every other module
-imports what it needs by name:
+Every physical constant and unit conversion, defined once so it cannot drift between modules; other modules import by name (`using ..PhysicalConstants: AVOGADRO, WATER_MOLAR_MASS`).
 
-```julia
-# src/BulkElectronDensity/BulkElectronDensity.jl
-using ..PhysicalConstants: AVOGADRO, WATER_MOLAR_MASS
-```
 
-or, from outside the package, `using BAYSOL.PhysicalConstants: AVOGADRO`.
+| constant                                                                        | value                                                                              | used by                                     |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------- |
+| `AVOGADRO`                                                                      | 6.02214076 × 10²³ mol⁻¹ (exact, 2019 SI)                                      | BulkElectronDensity, Inference              |
+| `PLANCK_CONSTANT`, `SPEED_OF_LIGHT`, `ELEMENTARY_CHARGE`                        | exact 2019 SI values of h, c, e                                                    | `HC_EV_ANGSTROM`                            |
+| `HC_EV_ANGSTROM`                                                                | h·c ≈ 12398.42 eV·Å; <br />`E = HC_EV_ANGSTROM / λ`                          | fitting scripts                             |
+| `WATER_MOLAR_MASS`                                                              | 18.015268 g·mol⁻¹ (IAPWS-95)                                                    | BulkElectronDensity                         |
+| `WATER_ELECTRONS`                                                               | 10                                                                                 | BulkElectronDensity                         |
+| `WATER_DENSITY_UNCERTAINTY`                                                     | 0.02 kg·m⁻³ on the Kell density                                                 | BulkElectronDensity                         |
+| `KELL_DENSITY_NUM`, `KELL_DENSITY_DEN`                                          | Kell (1975) coefficients, kg·m⁻³, 0–150 °C                                    | BulkElectronDensity                         |
+| `ANGSTROM3_PER_LITER`, `CM3_PER_LITER`, `ANGSTROM_PER_METER`, `PM_PER_ANGSTROM` | 10²⁷, 10³, 10¹⁰, 100                                                          | BulkElectronDensity, Inference, AtomicRadii |
+| `NM_INV_PER_ANGSTROM_INV`                                                       | 10 (an integer, so `q ./ NM_INV_PER_ANGSTROM_INV` is bit-identical to `q ./ 10`)   | fitting scripts                             |
+| `UNIT_OF_δρ`                                                                  | 0.03 e·Å⁻³, CRYSOL's `--dro` unit                                              | Scattering, Inference                       |
+| `NS_PER_S`, `MS_PER_S`                                                          | 10⁹, 10³                                                                         | Timing, Inference, Pipeline                 |
+| `STANDARD_TEMPERATURE_C`                                                        | 25 °C (298.15 K); backs `PMV_REFERENCE_TEMPERATURE_C` and `DEFAULT_TEMPERATURE_C` | BulkElectronDensity, Inference              |
 
-| constant | value | used by |
-|---|---|---|
-| `AVOGADRO` | 6.02214076 × 10²³ mol⁻¹ (exact, 2019 SI) | BulkElectronDensity, Inference |
-| `PLANCK_CONSTANT`, `SPEED_OF_LIGHT`, `ELEMENTARY_CHARGE` | exact 2019 SI values of h, c, e | `HC_EV_ANGSTROM` |
-| `HC_EV_ANGSTROM` | h·c ≈ 12398.42 eV·Å; E (eV) = `HC_EV_ANGSTROM` / λ (Å) | fitting scripts |
-| `WATER_MOLAR_MASS` | 18.015268 g·mol⁻¹ (IAPWS-95) | BulkElectronDensity |
-| `WATER_ELECTRONS` | 10 | BulkElectronDensity |
-| `WATER_DENSITY_UNCERTAINTY` | 0.02 kg·m⁻³, absolute uncertainty on the Kell water density | BulkElectronDensity |
-| `KELL_DENSITY_NUM`, `KELL_DENSITY_DEN` | Kell (1975) coefficients: `ρ_w(t)` = Σ aₖtᵏ / (1 + b·t), kg·m⁻³, 0–150 °C | BulkElectronDensity |
-| `ANGSTROM3_PER_LITER`, `CM3_PER_LITER`, `ANGSTROM_PER_METER`, `PM_PER_ANGSTROM` | 10²⁷, 10³, 10¹⁰, 100 | BulkElectronDensity, Inference, AtomicRadii |
-| `NM_INV_PER_ANGSTROM_INV` | 10 (an integer, so `q ./ NM_INV_PER_ANGSTROM_INV` is bit-identical to `q ./ 10`) | fitting scripts |
-| `UNIT_OF_δρ` | 0.03 e·Å⁻³, CRYSOL's --dro shell-contrast unit | Scattering, Inference |
-| `NS_PER_S`, `MS_PER_S` | 10⁹, 10³ | Timing, Inference, Pipeline |
-| `STANDARD_TEMPERATURE_C` | 25 °C (298.15 K), the standard reference temperature; backs `PMV_REFERENCE_TEMPERATURE_C` and `DEFAULT_TEMPERATURE_C` so they cannot drift apart | BulkElectronDensity, Inference |
-
-Every other tunable is a module-level constant in its owning module (see that module's README).
+Every other tunable is a module-level constant in its owning module.
 
 ## Shannon
 
-A particle of diameter D scatters a curve that carries no information at a q spacing finer than π/D (one *Shannon channel*), so a curve of thousands of points holds only `N_s` = (`q_max` − `q_min`)·D/π independent values: the median fitting test had 62 points per channel. Fitting all of them makes the Gaussian likelihood claim far more independent data than exist. `Shannon` is the data reduction that precedes the fit:
+The data reduction that precedes the fit. For a particle whose scatterers lie in a set of diameter `D`,
 
-- `cloud_diameter(points)`: the exact diameter of a `(3, n)` point cloud. The farthest pair of a set always lies on its convex hull, so the hull is built with [Quickhull.jl](https://github.com/augustt198/Quickhull.jl) and only its vertices (~100 of thousands of points) are compared pairwise; fewer than four points or a degenerate (collinear, coplanar, repeated) cloud is compared directly. `seed_model` applies it to the atoms **and** the hydration-shell beads (the actual scatterer cloud, 5-6 Å wider than the atoms alone).
-- `shannon_data(q, I, σ; D, rebin, max_bin_bias, lMax, drop_nonpositive)`: inverse-variance binning of the curve to `rebin` bins per channel (bin width π/(rebin·D); each bin carries the weighted-mean q and I and σ = 1/√Σw, which keeps Σw·I and Σw, the sufficient statistics of the linear fit, unchanged), the drop of bins with non-positive mean intensity, and the band limit `auto_lmax(D, q_max) = ceil(q_max·D)`. It returns a `ShannonInfo` (also stored as `Inference.Seed.shannon`) with both the fitted and the raw curve. `SHANNON_REBIN = 12` is the default and a minimum: a bin is the mean of the curve over its width, not its value at the mean q, which shifts a bin by at most π²/(96·`rebin`²) of its value whatever the particle (`bin_bias_ratio` divides that bound by the curve's smallest relative error), so a precise curve needs finer bins. `shannon_data` therefore raises `rebin` until that ratio is at most `BIN_BIAS_MAX` = 0.3 (`max_bin_bias = Inf` keeps `rebin` as given), and fits the curve as measured once the bins are as fine as its points. The `rebin` the report prints is the one used.
-- `model_on_raw(info, y)`: the model curve on the measured grid (an interpolating cubic spline from Dierckx.jl/FITPACK, error 0.001 σ for 1 % data at the default `rebin`), which gives the reduced χ² on the measured points that a depositor's χ² refers to.
-- `residual_structure(r)`: lag-1 autocorrelation (StatsBase.jl) and Wald–Wolfowitz runs-test z-score (HypothesisTests.jl) of the normalized residuals. White residuals have both ≈ 0; the fits are often far from that (lag-1 up to 0.89 on the unbinned curves), a smooth misfit of the conventional model. The statistics are not in the report; `bb diagnose --residuals ID` prints them for a fit (fitted and measured grid).
+```math
+I(q)=\int_0^D p(r)\,\frac{\sin qr}{qr}\,dr
+```
 
-Dropping non-positive points is not neutral: it removes the negative half of the noise at high q, so what remains is biased upwards. It is the default (`drop_nonpositive = true`, as the fitting scripts always did, but after binning rather than before, where it removes far fewer points). `test/validation/shannon_binning/` is a per-fit screen of the effect of the binning and of the filter on the MAP and the Laplace width (run by `bb validate shannon_binning`). Per-fit shifts measured in the unbinned σ are a poor judge (that σ is overconfident), so the default `rebin = 12` is judged by distributions over the 53 fitting tests against the committed unbinned results, with criteria fixed before that rerun:
+with `p(r)` the distance distribution, zero beyond `D` because the autocorrelation of a function supported on a set of diameter `D` vanishes beyond `D`. Hence `F(q) = qI(q) = ∫₀^D (p(r)/r) sin(qr) dr` is the Fourier transform of a function supported on `[−D, D]` (odd extension), and the Whittaker–Shannon theorem (expand it in a Fourier series on `[−D, D]`) gives
 
-1. **Fit quality:** the median χ² on the measured grid within ±2 % and the quartiles within ±5 %; at most 3 fits worse by more than 5 % (better fits are not penalized).
-2. **Parameter distribution** (MAP δρ₁, δρ₂, δρ₃, ρₑ, c1 across fits): each median moves by less than 0.25 of its interquartile range; the counts of fits at a prior bound, with c1 saturated, or beyond 3σ from the δρ₃ prior change by at most 3.
-3. **Health of the regression:** fits with more than 1 % divergent transitions increase by at most 2; the median steps per iteration and the median tree depth are not more than 25 % worse; E-BFMI stays above 0.3 where it was; no chain fails outright; the MAP search finds the same number of modes (±1) in at least 90 % of the fits.
+```math
+F(q)=\sum_{n\in\mathbb Z}F\!\Big(\frac{n\pi}{D}\Big)\,\mathrm{sinc}\!\Big(\frac{Dq}{\pi}-n\Big)
+```
 
+The curve is fully determined by its values on the grid `Δq = π/D` (one *Shannon channel*), so a range `[q_min, q_max]` holds only `N_s = (q_max − q_min)·D/π` independent values (the median fitting test had 62 points per channel). Fitting every point makes the Gaussian likelihood claim far more independent data than exist, and it is an upper bound on how many parameters the curve can constrain. `N_s` is `n_channels` of `ShannonInfo`, printed in the report.
+
+- `cloud_diameter(points)`: the exact diameter of a `(3, n)` cloud. A convex function's maximum over the hull is at a vertex, so the farthest pair lies on the convex hull; it is built with [Quickhull.jl](https://github.com/augustt198/Quickhull.jl) and only its vertices (~100 of thousands) are compared pairwise (fewer than four points or a degenerate cloud is compared directly). `seed_model` applies it to the atoms **and** the hydration beads (the actual scatterer cloud, 5–6 Å wider than the atoms alone).
+-
+- `shannon_data(q, I, σ; D, rebin, max_bin_bias, lMax, drop_nonpositive)`: **inverse-variance binning** to `rebin` bins per channel (width `π/(rebin·D)`), each bin carrying
+
+  ```math
+  \bar q=\frac{\sum w_jq_j}{\sum w_j},\quad \bar I=\frac{\sum w_jI_j}{\sum w_j},\quad \bar\sigma=\Big(\sum w_j\Big)^{-1/2},\quad w_j=\sigma_j^{-2}
+  ```
+
+  This is the minimum-variance unbiased linear estimator (Gauss–Markov; Lagrange multiplier on `Σλ_j = 1` gives `λ_j ∝ w_j`) and keeps `Σw·I` and `Σw`, the sufficient statistics of the linear fit, unchanged: by the weighted analysis-of-variance identity binning is lossless exactly when the model is constant over the bin. It assumes independent errors; correlated errors make `σ̄` too small (the variance of an equicorrelated mean tends to `ρ_cσ²`, not 0), which is why the binned χ² of a smooth misfit exceeds the raw one by about the number of points per bin and the report quotes χ² on the measured grid. Bins with non-positive mean are dropped (`drop_nonpositive = true`); this removes the negative half of the noise at high q, biasing the survivors upward by ≈ 0.8σ̄ at a true value 0, 0.06σ̄ at 2σ̄ and < 0.005σ̄ above 3σ̄.
+- **Bin bias and `rebin`.** A bin is the mean of the curve over its width, not its value at the mean q: `E[Ī] − I(q̄) ≈ ½ I″ Var_w(q) = (Δ²/24) I″` (relative: `Δ²/24 · |I″/I|`). Taking `|I″/I| ≤ (D/2)²` gives the worst-case relative bias `π²/(96·rebin²)` (7.1·10⁻⁴ at 12); this is a design heuristic (it holds for the monotone decay of compact particles, not as a theorem). `bin_bias_ratio` divides it by the smallest binned relative error; `shannon_data` raises `rebin` (`k ← max(k+1, ⌈k√(ℛ_k/0.3)⌉)`, at most 64 times, using `β_k ∝ k⁻²`) until the ratio is at most `BIN_BIAS_MAX = 0.3` (`max_bin_bias = Inf` keeps `rebin` as given), and fits the curve unbinned once the binned one holds at least 90 % as many points. `SHANNON_REBIN = 12` is the default and a minimum; the report prints the `rebin` used and the achieved `bin bias` (warn above 0.3).
+- **Band limit.** `auto_lmax(D, q_max) = max(1, ⌈q_max·D⌉)`: the degree-`l` moment of a scatterer at `r ≤ D` is ∝ `j_l(qr)`, negligible once `l` exceeds `q_max D` by a few `x^{1/3}` (Scattering); conservative by up to 2 for a centred cloud, safe for any origin. The moment count grows as `(lMax+1)²`, a further reason to bin before building the forward model. For `D = 100 Å`, `q ∈ [0.01, 0.3]`: `N_s ≈ 9.2`, ~110 binned points, `lMax = 30`.
+- `model_on_raw(info, y)`: the model on the measured grid by an interpolating cubic spline (Dierckx.jl/FITPACK; error 0.001σ for 1 % data at the default `rebin`), giving the reduced χ² on the measured points that a depositor's χ² refers to.
+- `residual_structure(r)`: lag-1 autocorrelation (StatsBase.jl) and Wald–Wolfowitz runs-test z (HypothesisTests.jl) of the normalised residuals. White residuals have both ≈ 0; the fits are often far from that (lag-1 up to 0.89 on unbinned curves), a smooth misfit of the conventional model. Not in the report; `bb diagnose --residuals ID` prints them.
+
+**Validation.** `test/validation/shannon_binning/` screens the effect of binning and of the filter (`bb validate shannon_binning`). Per-fit shifts in the unbinned σ are a poor judge (that σ is overconfident), so `rebin = 12` was judged by distributions over the 53 fits against the unbinned results, with criteria fixed beforehand: median χ² on the measured grid within ±2 % (quartiles ±5 %, at most 3 fits worse by > 5 %); parameter medians moving < 0.25 of their interquartile range; no more than +2 fits above 1 % divergences, median steps per iteration and tree depth not > 25 % worse, E-BFMI above 0.3, the number of modes ±1 in ≥ 90 % of fits. The one failed clause (5 fits > 5 % worse, limit 3) is a definitional gap: the new χ² includes non-positive raw points, as FoXS does.

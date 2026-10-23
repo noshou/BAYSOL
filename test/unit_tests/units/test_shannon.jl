@@ -383,7 +383,7 @@ brute_diameter(P) = maximum(
         end
         @test !occursin("Residuals at the MAP", txt) &&
               !occursin("=== Data (Shannon) ===", txt)
-        # the line the dev tools' report parser (test/utils/report.clj) reads is unchanged
+        # the line the dev tools' report parser (dev/report.clj) reads is unchanged
         @test occursin(r"^χ²\s+= "m, txt)
         # merged into the Run section
         @test !occursin("=== Diagnostics ===", txt)

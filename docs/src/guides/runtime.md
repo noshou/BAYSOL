@@ -1,98 +1,45 @@
 # Runtime
 
-The process machinery the other modules run on, in one module (`BAYSOL.Runtime`, four files): `Cache.jl`, `Timing.jl`, `GCPause.jl` and `Parallel.jl`. Every name is imported from `Runtime` (`using ..Runtime: Lazy, tmap_items`).
+The process machinery the other modules run on (`BAYSOL.Runtime`): `Cache.jl`, `Timing.jl`, `GCPause.jl`, `Parallel.jl`. Names are imported from `Runtime` (`using ..Runtime: Lazy, tmap_items`).
 
 ## Cache
 
-Thread-safe memoization primitives, guarded by a ReentrantLock so concurrent callers racing on the same computation never double-compute or observe a torn store.
+Thread-safe memoisation, guarded by a `ReentrantLock` so concurrent callers on one computation never double-compute or see a half-written store (the lock is held while the thunk runs, acceptable because thunks are short or run once).
 
-### Lazy {T} / force
-
-A single deferred, memoized value of type T:
-
-```julia
-mutable struct Lazy{T}
-    const f::Any            # zero-arg thunk
-    const lock::ReentrantLock
-    done::Bool
-    value::T
-end
-```
-
-- Lazy{T}(f) builds an unforced cache wrapping the zero-arg thunk f.
-- force(c::Lazy{T})::T runs f once, under c's lock, the first time it's called; every subsequent call (concurrent or not) returns the already-computed value without re-running f.
+- `Lazy{T}(f)`: a deferred, memoised value; `force(c)` runs the zero-argument thunk `f` once, under the lock, and returns the stored value to every later caller. `Molecule` uses it for its radii, volumes, `r_max` and k-d tree, so each is computed on first use by exactly one thread.
+- `KeyedCache{K,V}`: a lock-guarded `Dict` with `get!(f, cache, key)` (compute on a miss) and `haskey`. It memoises the water density by temperature and the partial molar volume of a protein or nucleic-acid sequence by `(sequence, pH, σ_pH)`, and (as `KeyedCache{String,ReentrantLock}`) serialises one `propka3` run per structure in Hydrogenator.
 
 ```julia
-using ..Runtime: Lazy, force
-
-struct Molecule
-    ...
-    _radii  :: Lazy{Vector{Float64}}
-    _vols   :: Lazy{Vector{Float64}}
-    _r_max  :: Lazy{Float64}
-end
+using ..Runtime: Lazy, force, KeyedCache
 
 rad  = Lazy{Vector{Float64}}(() -> _compute_radii(es))
 rmax = Lazy{Float64}(() -> maximum(force(rad)))
-tree = Lazy{KDTree}(() -> KDTree(cart))
-vol  = Lazy{Vector{Float64}}(() -> excluded_volume(cart, force(rad), force(tree), force(rmax)))
-
-radii(m::Molecule)::Vector{Float64} = force(m._radii)
-vols(m::Molecule)::Vector{Float64}  = force(m._vols)
-r_max(m::Molecule)::Float64         = force(m._r_max)
-```
-
-### KeyedCache {K,V}
-
-```julia
-struct KeyedCache{K,V}
-    store::Dict{K,V}
-    lock::ReentrantLock
-end
-```
-
-- Base.get!(f::Union{Function,Type}, c::KeyedCache{K,V}, key::K)::V: returns the cached value for key, computing it via the zero-arg thunk f and storing it on a cache miss.
-- Base.haskey(c::KeyedCache{K,V}, key::K)::Bool: whether key has already been memoized, also taken under the lock.
-
-```julia
-using ..Runtime: KeyedCache
+radii(m::Molecule) = force(m._radii)
 
 const _ρₑ_w_cache = KeyedCache{Int64, Tuple{Float64, Float64}}()
-const _ϕ°_p_cache  = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, Float64, Float64}}()   # (sequence, pH, σ_pH)
-const _ϕ°_s_cache  = KeyedCache{String, Tuple{Int64, Float64, Float64}}()
-const _ϕ°_d_cache  = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, Float64, Float64}}()   # (sequence, pH, σ_pH)
-const _ϕ°_r_cache  = KeyedCache{Tuple{String, Float64, Float64}, Tuple{Int64, Float64, Float64}}()   # (sequence, pH, σ_pH)
 ```
 
 ## Timing
 
-`StageLog` records wall-clock, JIT-compile and GC seconds per named stage of a run. `seed_model` creates one (so the wall clock starts at the top of `seed_model`), hands it to `forward_cache(...; stage_log=)` and `seed_sampler(...; timing=)`, and it rides in `Seed.timing` → `Inferred.timing`. `write_report` ends with a `=== Timing ===` section (static build vs sampling, per-stage, plus `report write` and `unaccounted`) and starts with `=== Run ===` (`n_atoms`, lMax, `n_q`, `n_samples`, `n_adapt`). Everything is a no-op when the log is `nothing`. `unaccounted` on a cold session is first-call JIT of `run_model`/`infer`/`write_report`, which compiles before their own stages begin; the `(JIT)` column on that line shows it.
+`StageLog` records wall-clock, JIT-compile and GC seconds per named stage. `seed_model` creates one (the wall clock starts at its top), hands it to `forward_cache(...; stage_log=)` and `seed_sampler(...; timing=)`, and it rides in `Seed.timing` → `Inferred.timing`. `write_report` starts with `=== Run ===` (`n_atoms`, `lMax`, `n_q`, `n_samples`, `n_adapt`) and ends with `=== Timing ===` (static build vs sampling, per stage, `report write`, `unaccounted`). Everything is a no-op when the log is `nothing`. `unaccounted` in a cold session is the first-call JIT of `run_model`/`infer`/`write_report`, compiled before their own stages begin (the `(JIT)` column shows it).
 
 ## GCPause
 
-Julia collects whenever the heap has grown by an adaptive amount; with a small live heap and large temporary arrays that is often, and GC was a fifth of the wall clock of the fitting tests (it sits in the static build). `with_gc_paused(f; budget)` runs `f` with automatic collection off (re-entrant: pauses nest, the collector comes back when the outermost ends, also on an exception, and only if it was on before) and `gc_checkpoint()`, called in the loops that allocate, runs one young collection (`GC.gc(false)`) once the live heap has grown by more than `budget` (default 1 GiB, `GC_PAUSE_BUDGET`) since the last one. `seed_model` and `infer` run inside a pause; checkpoints sit in the `B_lm` chunk loop, the MAP objective, the NUTS gradient and the re-profile loop. Garbage is thus bounded by the budget and cleared in a few large young collections.
+With a small live heap and large temporary arrays Julia collects often; GC was a fifth of the wall clock of the fitting tests. `with_gc_paused(f; budget)` runs `f` with automatic collection off (re-entrant: pauses nest, the collector returns when the outermost ends, also on an exception, and only if it was on before), and `gc_checkpoint()` in the allocating loops runs one young collection (`GC.gc(false)`) once more than `budget` bytes (default 1 GiB, `GC_PAUSE_BUDGET`) have been allocated since the last. `seed_model` and `infer` run inside a pause, with checkpoints in the `B_lm` chunk loop, the MAP objective, the NUTS gradient and the re-profile loop, so garbage is bounded by the budget and cleared in a few large collections.
 
-With several Julia threads the pause has one rule: **only the thread that began it collects.** `GC.enable` is a per-thread switch (the collector is off while any thread has switched it off), so a worker thread's `GC.enable(true)` does nothing and its `GC.enable(false)` would leave the collector off for the rest of the process. `gc_checkpoint()` therefore returns at once on any other thread, and `tmap_items` has the pausing thread call it while it waits for its tasks. The byte budget counts what all threads allocated (`Base.gc_bytes()`, not the live-heap counter, which does not see worker allocations until a collection).
+With several threads there is one rule: **only the thread that began the pause collects.** `GC.enable` is a per-thread switch (the collector is off while any thread has switched it off): a worker's `GC.enable(true)` does nothing and its `GC.enable(false)` would leave the collector off for the process. `gc_checkpoint()` returns at once on any other thread, `tmap_items` has the pausing thread call it while it waits, and the budget counts what all threads allocated (`Base.gc_bytes()`).
 
 ## Parallel
 
-The threaded stages are built on a few small tools, so that **a result never depends on the number of Julia threads**.
+**A result never depends on the number of Julia threads.** A floating-point sum depends on the order of its additions, so every threaded reduction is grouped by the input, never by the thread count, and every random stream is a function of its label.
 
-- `draw_base()` draws one `UInt64` for a run from the default RNG (so `Random.seed!` before a run fixes it); the run's `rng_seed` keyword replaces it, and it is printed in the report's `=== Run ===` section.
-- `stream(base, purpose, index)` is the random stream of one *work item* (MAP start `i`, chain `k`): a `Xoshiro` seeded by SplitMix64 mixing of the base, a fixed integer naming the use, and the item's index. A stream belongs to the item, not to the thread that runs it. SplitMix64 is written out here (not `hash`) so a published seed gives the same streams on every Julia version.
-- `tmap_items(f, xs)` is an ordered map with one `Threads.@spawn` task per element (no chunking, since each item is heavy); serial with one thread or at most one item. The task code is not specialized on `f` (the function and the items are `Any` fields of a job struct), so it is compiled once and not once per closure. A closure that captures a variable which is reassigned (a boxed capture) is refused with an `ArgumentError`, since the tasks would share the box. An exception in a task is rethrown as itself, not wrapped. While it waits, the calling thread runs the garbage-collector checkpoint (see GCPause).
-- `tmap_blocks(f, n, block; threaded)` applies `f` to the blocks `lo:hi` of `1:n` in block order, on the threads when `threaded` (the caller's size rule: below some input size the tasks cost more than they save), else in a plain loop.
-- `with_blas_single(f)` runs `f` with OpenBLAS limited to one thread when Julia has several (concurrent tasks calling a threaded BLAS oversubscribe the cores) and restores it when the outermost scope ends; with one Julia thread it changes nothing, so BLAS keeps its own threads. `worker_count()` is the number of default-pool threads.
-- Test hooks: `with_workers(f, n)` makes the stages split their work for `n` workers (1 forces the serial paths) and `with_chaos(f, d)` delays every task by a random time up to `d` seconds. They let `test_concurrency.jl` compare worker counts and scheduling orders in one process.
+- `draw_base()`: one `UInt64` for a run from the default RNG (so `Random.seed!` before a run fixes it); the `rng_seed` keyword replaces it and the report prints it.
+- `stream(base, purpose, index)`: the random stream of one work item (MAP start `i`, chain `k`, bridge proposal for mode `m`): a `Xoshiro` seeded by SplitMix64 mixing of the base, a fixed integer naming the use, and the index. SplitMix64 (`z = xor(z, z >> 30) * 0xbf58476d1ce4e5b9`, `z = xor(z, z >> 27) * 0x94d049bb133111eb`, `xor(z, z >> 31)`, a bijection on `UInt64`) is written out rather than using `hash`, so a published seed gives the same streams on every Julia version. Reproducibility rests on each stream being a deterministic function of its `(seed, purpose, index)` label, not on the independence of the streams.
+- `tmap_items(f, xs)`: ordered map with one `Threads.@spawn` task per element (no chunking: each item is heavy); serial with one thread or at most one item. The job struct stores `f` and the items as `Any`, so the task code is compiled once and not per closure. A closure capturing a reassigned variable (a boxed capture) raises `ArgumentError`; a task's exception is rethrown as itself. While waiting, the calling thread runs the GC checkpoint.
+- `tmap_blocks(f, n, block; threaded)`: applies `f` to the blocks `lo:hi` of `1:n` in block order, on the threads when `threaded` (the caller's size rule), else in a plain loop.
+- `with_blas_single(f)`: OpenBLAS limited to one thread while several Julia threads run (a threaded BLAS in concurrent tasks oversubscribes the cores); with one Julia thread it changes nothing. `worker_count()` is the number of default-pool threads.
+- Test hooks: `with_workers(f, n)` (1 forces the serial paths) and `with_chaos(f, d)` (delays every task by up to `d` s) let `test_concurrency.jl` compare worker counts and scheduling orders.
 
 ### Using several threads
 
-Julia starts with one thread. To use more, start it with `julia -t auto` (all logical CPUs) or `julia -t 6,1` (six workers and one interactive thread, which keeps a REPL or plot window responsive); the developer tools take `--threads N` and pass it on. Nothing else changes: a fit gives **bit-identical results at any thread count**, memory stays bounded, and small inputs (under 4,096 atoms or hydration beads) run exactly as before, because the tasks would cost more than they save.
-
-What runs on the threads:
-
-- the multipole expansion of the forward cache (`compute_B_lm`: the atoms are cut into tiles, dealt to 24 groups fixed by the input, summed per group and added in group order), the excluded volumes, the SASA surface and the bead classification, and the amplitude fills (`_gaussian_dummy`, `form_factors`);
-- `forward_cache` plus SASA scale with the thread count; the gain flattens above four threads because the efficiency cores are slower than the performance cores and every wave of groups waits for its slowest worker;
-- not threaded: the MAP search and its Hessian (threading it measured slower), each NUTS chain (sequential by nature; the chains run side by side, one task each, see `Inference.infer`), and PROPKA and pdb2pqr (external processes).
-
-The details and the criteria these numbers were judged against are in the threading validation (`test/validation/threading/`).
+Start Julia with `julia -t auto` or `julia -t 6,1` (six workers and one interactive thread, which keeps a REPL or plot window responsive); the dev tools take `--threads N`. A fit gives bit-identical results at any thread count, memory stays bounded, and inputs under 4,096 atoms or beads run as before. On the threads: the multipole expansion (`compute_B_lm`: tiles dealt to 24 groups fixed by the input, summed per group, added in group order), the excluded volumes, SASA, bead classification and the amplitude fills (`_gaussian_dummy`, `form_factors`). The gain flattens above four threads (efficiency cores are slower and every wave waits for its slowest worker). Not threaded: the MAP search and its Hessian (measured slower, 0.71× at four threads), each NUTS chain (sequential by nature; the chains run side by side, one task each) and PROPKA/pdb2pqr (external processes). Criteria and numbers: `test/validation/threading/`.

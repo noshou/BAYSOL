@@ -10,7 +10,7 @@
 #   julia --project=test test/unit_tests/units/test_atomicradii.jl
 #
 # Layout: the tests are in ../test/unit_tests/units/, with the setup they share
-# (testsetup.jl) beside them; the shared helpers are in ../test/utils/
+# (testsetup.jl) beside them; the shared helpers are beside them in ../test/unit_tests/
 # (floatcompare.jl, geometry.jl); the data the tests read is in ../test/fixtures/
 # (sequences.jl, the protein/DNA/RNA sequences, sits with the molecules there).
 

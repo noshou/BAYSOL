@@ -12,7 +12,7 @@ The script (`validate.jl`) finds the MAP and the Laplace posterior width on the 
 
 **First criteria** (fixed before the first run), per fit: in at least 95 % of the fits every MAP coordinate moves by at most 0.5σ of the unbinned fit, every Laplace σ is within [0.95, 1.05] of the unbinned one, and the reduced χ² on the measured grid is within 2 %. **Every k failed them** (k = 12: 94.3 / 94.3 / 96.2 %; k = 8: 79.2 / 90.6 / 96.2 %; k = 16: 98.1 / 92.5 / 98.1 %). They judge the binned fit in the unbinned fit's own σ, which is unrealistically small (the unbinned curve has ~60 points per channel and is overfit), and two of the four failures at k = 12 are fits where the binned fit has the *better* χ² (the unbinned reference MAP search missed the best basin).
 
-**Replacement criteria**, set after that data was seen, judged over distributions on a fresh full rerun of the 53 fits against the previous results (`test/utils/compare.clj`):
+**Replacement criteria**, set after that data was seen, judged over distributions on a fresh full rerun of the 53 fits against the previous results (`dev/compare.clj`):
 
 1. Fit quality: the median χ² on the measured grid within ±2 %, the quartiles within ±5 %, at most 3 fits worse by more than 5 %.
 2. Parameter distribution: each median of ρₑ, δρ₁, δρ₂, δρ₃, c1 moves by less than 0.25 of its interquartile range; the counts of fits at a prior bound, with c1 saturated, or beyond 3σ from the δρ₃ prior change by at most 3.

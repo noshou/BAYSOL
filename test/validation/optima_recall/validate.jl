@@ -102,7 +102,7 @@ const F = BAYSOL.Inference
 const SV = F.SVector
 const ForwardDiff = F.ForwardDiff
 const DiffResults = F.DiffResults
-include(joinpath(@__DIR__, "..", "..", "utils", "fit_seed.jl"))
+include(joinpath(@__DIR__, "..", "..", "..", "dev", "fit_seed.jl"))
 
 const ORACLE_STARTS = 500
 const ORACLE_CHAIN_ITER = (4000, 1000)       # n_samples, n_adapt of the long run

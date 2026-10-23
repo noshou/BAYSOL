@@ -12,9 +12,8 @@
         [common :as c]))
 
 (def repo-dir c/*root*)
-(def utils-dir (c/in-root "test" "utils"))
 (def dev-dir (c/in-root "dev"))
-(def data-dir (c/in-root "test" "utils" "tests" "data"))
+(def data-dir (c/in-root "dev" "tool_tests" "data"))
 
 (defn run-tool
     "Runs `bb script args...` and returns {:status n :out combined-stdout-and-stderr}."

@@ -1,8 +1,8 @@
 # baselines
 
 Reference benchmark runs: one per release, kept so that a later change can be compared with the release it follows.
-A baseline is the JSON result of `test/utils/bench.clj` (see the Benchmarks section of
-[`../utils/README.md`](../utils/README.md)), saved here when a release is made.
+A baseline is the JSON result of `dev/bench.clj` (see the Benchmarks section of
+[`../../dev/README.md`](../../dev/README.md)), saved here when a release is made.
 
 | file | what it is |
 |---|---|

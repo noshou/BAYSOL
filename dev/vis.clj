@@ -15,17 +15,16 @@
 ;;
 ;; Each check is one call in a fresh Julia process in test/visualize/'s
 ;; own environment. Needs Babashka and `julia` on the PATH (or
-;; JULIA=/path/to/julia); shared helpers are in test/utils/common.clj.
+;; JULIA=/path/to/julia); shared helpers are in dev/common.clj.
 
-;; The shared helpers live in test/utils/, next to the other tools; put that folder on
-;; the classpath so the script runs from any working directory.
+;; The shared helpers live next to this script; put its folder on the classpath so
+;; the script runs from any working directory.
 (ns vis
     (:require [babashka.fs :as fs]
         [babashka.classpath :refer [add-classpath]]
         [clojure.string :as str]))
 
-(add-classpath (str
-        (fs/path (fs/parent (fs/absolutize *file*)) ".." "test" "utils")))
+(add-classpath (str (fs/parent (fs/absolutize *file*))))
 
 (require '[common :as c])
 

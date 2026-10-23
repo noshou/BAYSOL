@@ -1,6 +1,6 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
-;; Shared helpers of the dev tools (dev/*.clj and test/utils/*.clj): the repository root,
+;; Shared helpers of the dev tools (dev/*.clj): the repository root,
 ;; running programs, git, the fitting-test lookups, command lines, and the number
 ;; formatting the tools' output depends on.
 
@@ -13,14 +13,22 @@
 
 ;; --- the repository
 
-;; Repository root: two levels above this file, test/utils/ (BAYSOL_ROOT overrides it,
+;; Repository root: one level above this file, dev/ (BAYSOL_ROOT overrides it,
 ;; for testing elsewhere). Dynamic, so a test can point the helpers at a scratch tree.
 (def ^:dynamic *root*
     (or (System/getenv "BAYSOL_ROOT")
-        (str (fs/normalize
-                (fs/path (fs/parent (fs/absolutize *file*)) ".." "..")))))
+        (str (fs/normalize (fs/path (fs/parent (fs/absolutize *file*)) "..")))))
 
 (def fit-dir "test/fitting_tests")
+
+(def line-limit
+    "The longest line the code may have, in characters (`bb linelen --check`)."
+    92)
+
+(defn char-count
+    "Characters of `s`, not UTF-16 units: a code point outside the BMP counts once."
+    [s]
+    (.codePointCount ^String s 0 (count s)))
 
 (defn in-root [& parts] (str (apply fs/path *root* parts)))
 

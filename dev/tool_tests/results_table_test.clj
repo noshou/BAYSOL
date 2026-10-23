@@ -73,12 +73,12 @@
 
 (deftest check-readme
     (testing "the Results table of fitting_tests/README.md is up to date"
-        (let [{:keys [status out]}
-                (h/run-tool (str h/utils-dir "/results_table.clj") "--check")]
+        (let [{:keys [status out]} (h/run-tool (str h/dev-dir "/results_table.clj")
+                    "--check")]
             (is (= 0 status))
             (is (h/contains-text? out "is up to date"))))
     (testing "--check covers the whole table"
         (is (= 2
-                (:status (h/run-tool (str h/utils-dir "/results_table.clj")
+                (:status (h/run-tool (str h/dev-dir "/results_table.clj")
                         "--check"
                         "SASDMJ9"))))))

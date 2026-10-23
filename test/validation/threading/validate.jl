@@ -28,7 +28,7 @@
 using Printf, Statistics
 using BAYSOL
 const Fit = BAYSOL.Inference
-include(joinpath(@__DIR__, "..", "..", "utils", "fit_seed.jl"))
+include(joinpath(@__DIR__, "..", "..", "..", "dev", "fit_seed.jl"))
 
 bits(x::AbstractArray{Float64}) = reinterpret(UInt64, collect(vec(x)))
 
