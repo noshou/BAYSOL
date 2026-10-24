@@ -496,12 +496,6 @@
                         (infer-base b))
                     ["-" "-"])))))
 
-(defn read-rows
-    "The unsorted table rows of a component dictionary read from `rdr` (see
-    `read-blocks` and `rows-of`)."
-    [rdr]
-    (rows-of (read-blocks rdr)))
-
 ;; --- validating the inference
 
 (defn validate

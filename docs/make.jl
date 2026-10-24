@@ -47,20 +47,12 @@ api_pages(name) = get(API_PAGE_OVERRIDES, name, "api/" * lowercase(name) * ".md"
 const DEV_GUIDES = ["Commands" => "dev/README.md"]
 
 const TEST_GUIDES = [
-    "Overview"        => "test/README.md",
-    "Unit tests"      => "test/unit_tests/README.md",
-    "Baselines"       => "test/baselines/README.md",
-    "Fixtures"        => "test/fixtures/README.md",
-    "Validation"      => "test/validation/README.md",
-    "Shannon binning" => "test/validation/shannon_binning/README.md",
-    "MAP f-stop"      => "test/validation/map_fstop/README.md",
-    "Threading"       => "test/validation/threading/README.md",
-    "Chains"          => "test/validation/chains/README.md",
-    "Optima recall"   => "test/validation/optima_recall/README.md",
-    "R̂ retry"         => "test/validation/rhat_retry/README.md",
-    "c1 root-find"    => "test/validation/c1_rootfind/README.md",
-    "Fitting tests"   => "test/fitting_tests/README.md",
-    "Visualizations"  => "test/visualize/README.md",
+    "Overview"       => "test/README.md",
+    "Unit tests"     => "test/unit_tests/README.md",
+    "Baselines"      => "test/baselines/README.md",
+    "Fixtures"       => "test/fixtures/README.md",
+    "Fitting tests"  => "test/fitting_tests/README.md",
+    "Visualizations" => "test/visualize/README.md",
 ]
 
 # The page file a test README is copied to: docs/src/testing/<its

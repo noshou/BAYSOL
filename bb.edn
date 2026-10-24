@@ -1,4 +1,4 @@
-;; Task shortcuts for the dev tools: `bb tasks` lists them and `bb <task> args...` runs one,
+;; Task shortcuts for the dev tools: `bb help` lists them and `bb <task> args...` runs one,
 ;; passing the arguments on (`bb fittings SASDMJ9 --report` is
 ;; `bb dev/fittings.clj SASDMJ9 --report`). The scripts do not need this file; they also
 ;; run directly, from any directory, as `bb dev/precommit.clj --quick`.
@@ -8,13 +8,23 @@
             "Runs the Babashka script at `path` with the arguments given to the task."
             [path]
             (apply shell "bb" path *command-line-args*)),
+        ;; list every task with its :doc, in the order of this file
+        help {:doc "List the dev tools with their descriptions",
+            :override-builtin true,
+            :task (doseq [[_ name doc]
+                    (re-seq (re-pattern
+                            "(?m)^        ([\\w-]+) \\{:doc\\s+\"([^\"]*)\"")
+                        (slurp "bb.edn"))
+                    :when (not= name "help")]
+                (println (format "%-20s %s" name doc)))},
+        ;; print this file
+        tasks
+        {:doc "Print bb.edn", :override-builtin true, :task (print (slurp "bb.edn"))},
         ;; run the fitting tests and what hangs off them
         fittings {:doc "Run fitting tests: [ID ...] --report --table --fixme --bench",
             :task (script "dev/fittings.clj")},
         diagnose {:doc "Sampler diagnostics on fits: --report --residuals --chains ...",
             :task (script "dev/diagnose.clj")},
-        validate {:doc "Slow suite-wide validations (--approved runs them)",
-            :task (script "dev/validate.clj")},
         profile {:doc "Profile the static build of fitting tests",
             :task (script "dev/profile.clj")},
         vis {:doc "The visual checks of the geometry code", :task (script "dev/vis.clj")},

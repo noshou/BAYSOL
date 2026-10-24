@@ -16,7 +16,6 @@
 ;;              need a quiet machine, and AI agents tend to start a benchmark
 ;;              without checking for one, so the owner's per-run approval (their
 ;;              confirmation that nothing else is running) is a small safeguard.
-;;              (The slow validations are run by `bb validate`.)
 ;;   --no-fit   skip the fits themselves (the later steps do not need them rerun)
 ;;   --report   afterwards, print the Results-table rows of the selected fits
 ;;              (bb results-table)

@@ -12,16 +12,6 @@ using ..PhysicalConstants: UNIT_OF_δρ
 
 
 """
-The number of sampled physical parameters ξ of `p`'s parameterization: 4 for
-[`ξ_priors`](@ref) (ρₑ, δρ₁, δρ₂, δρ₃). The sampler, the MAP search, the
-likelihood and the report are written for any `N`; only the prior-specific
-pieces (the transform [`Θ`](@ref)/[`Ξ`](@ref), [`θ_prior_moments`](@ref),
-the log-prior) know the parameterization, and a parameterization with more
-parameters adds methods of this function and of those.
-"""
-nparams(::ξ_priors) = 4
-
-"""
 The report key of each coordinate of ξ for `p`, in ξ
 order (the keys of `run_model`'s parameter dictionaries).
 """

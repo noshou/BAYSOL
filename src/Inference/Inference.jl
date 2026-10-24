@@ -229,19 +229,19 @@ const _EXP_TAYLOR = ntuple(n -> 1 / factorial(n - 1), 9)
 Default NUTS target acceptance rate, as a percentage in (0, 100), for
 [`run_model`](@ref BAYSOL.Pipeline.run_model) /
 [`Inference.infer`](@ref BAYSOL.Inference.infer): 95 %, above Stan's usual 80 %. The
-posteriors here are strongly curved and often multimodal; on the 53 fits of
-`test/validation/rhat_retry/` 95 % removed the divergences (the three fits above 1 %
-went to 0.04 % or less) for 1.3× the leapfrog steps.
+posteriors here are strongly curved and often multimodal; on the 53 fits of a validation
+run (since removed, in git history under `test/validation/rhat_retry/`) 95 % removed the
+divergences (the three fits above 1 % went to 0.04 % or less) for 1.3× the leapfrog steps.
 """
 const DEFAULT_TARGET_ACCEPT = 95
 
 """
 Number of L-BFGS starts of the pre-NUTS MAP search
-([`Inference.infer`](@ref BAYSOL.Inference.infer)): the seed's own initial
-point plus `MAP_N_STARTS - 1` further prior draws (64: the search takes
-tens of milliseconds, and a basin that attracts a few percent of the starts is missed by
-32 of them with probability `(1 − p)^32`, 8.5 % for `p` = 7.4 %, a hit rate measured on
-SASDLP4 in `test/validation/optima_recall/`).
+([`Inference.infer`](@ref BAYSOL.Inference.infer)): the seed's own initial point plus
+`MAP_N_STARTS - 1` further prior draws (64: the search takes tens of milliseconds, and
+a basin that attracts a few percent of the starts is missed by 32 of them with
+probability `(1 − p)^32`, 8.5 % for `p` = 7.4 %, a hit rate measured on SASDLP4 in a
+validation run, since removed, in git history under `test/validation/optima_recall/`).
 """
 const MAP_N_STARTS = 64
 

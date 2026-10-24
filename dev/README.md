@@ -2,7 +2,7 @@
 
 Developer tools. Every one is a [Babashka](https://babashka.org) script in this folder, with its Julia
 helper beside it where it needs one, and has a short **`bb <task>`** name defined in `bb.edn` at the
-repository root; `bb tasks` lists them with a line each.
+repository root; `bb help` lists them with a line each.
 
 ```bash
 bb unit                                               # the whole Julia unit suite
@@ -14,10 +14,6 @@ bb fittings --no-fit --table                          # rewrite the Results tabl
 bb fittings SASDMJ9 --fixme                           # run it, then the sampler diagnostics
 bb fittings SASDMJ9 --bench                           # prints the benchmark plan; runs no benchmark
 bb fittings SASDMJ9 --bench --approved                # runs the benchmark (see below)
-bb validate --list                                    # the validations and their questions
-bb validate map_fstop                                 # prints the validation's plan; runs nothing
-bb validate map_fstop --approved                      # runs it on every fit (see below)
-bb validate threading --threads 4 --approved          # any entry point takes --threads N (JULIA_NUM_THREADS: 4, auto, 4,1)
 bb diagnose --residuals                               # no fit named: every run of every fitting test (53)
 bb diagnose SASDMJ9                                   # every diagnostic part on this fit
 bb diagnose --chains --seeds 1,2,3 SASDMJ9            # only the chains, three RNG seeds
@@ -40,24 +36,28 @@ commands, run nothing). They stop before running anything if a name you give doe
 
 ## Tasks and files
 
-`bb.edn` (repository root) gives each tool a `bb <task>` name and a one-line description (`bb tasks`). Run
+`bb.edn` (repository root) gives each tool a `bb <task>` name and a one-line description (`bb help`). Run
 `bb <task>` from the repository root; the scripts themselves work from anywhere (`bb dev/fittings.clj ...` is
 the same as `bb fittings ...`). To add a tool, give it a task in `bb.edn` with the `script` helper
 (`mytool {:doc "..." :task (script "dev/mytool.clj")}`) and a section below if it needs one.
+`bb tasks` prints `bb.edn` itself (it overrides Babashka's built-in `tasks`). `bb.edn` is formatted by
+`bb fmt` (zprint, 4-space indent), which also decides the order of the keys inside a task. The
+repository's `.editorconfig` sets 4-space indentation and no trailing whitespace for `.clj`, `.edn`
+and `.jl`, so Tab inserts spaces; literal tabs are flagged by `bb linelen`.
 
 The files of this folder that are not tasks:
 
 
-| File                                                      | What it is                                                                                                                                                      |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `common.clj`                                              | helpers shared by the scripts: the repository root, running programs, git, the fitting-test lookups, command lines, number formatting                           |
-| `report.clj`                                              | parses one fitting-test report (`res*.txt`) into a map of numbers; used by `compare.clj` and `results_table.clj`                                                |
-| `reflow.clj`                                              | re-wraps long comments and docstrings; `bb fmt` runs it after the formatters                                                                                    |
-| `child.jl`, `diagnose.jl`, `profile_seed.jl`, `format.jl` | the Julia side of `bench.clj`, `diagnose.clj`, `profile.clj` and `format.clj`                                                                                   |
-| `fit_seed.jl`, `seed_diagnostics.jl`                      | the `Seed` a fitting test would sample, built without fitting, and the sampler diagnostics that run on any `Seed`; the validations and a unit test include them |
-| `tool_tests/`                                             | the `clojure.test` files for the scripts (`*_test.clj`), `helpers.clj` and `data/`; run by `bb test`                                                            |
+| File                                                      | What it is                                                                                                                                   |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `common.clj`                                              | helpers shared by the scripts: the repository root, running programs, git, the fitting-test lookups, command lines, number formatting        |
+| `report.clj`                                              | parses one fitting-test report (`res*.txt`) into a map of numbers; used by `compare.clj` and `results_table.clj`                             |
+| `reflow.clj`                                              | re-wraps long comments and docstrings; `bb fmt` runs it after the formatters                                                                 |
+| `child.jl`, `diagnose.jl`, `profile_seed.jl`, `format.jl` | the Julia side of `bench.clj`, `diagnose.clj`, `profile.clj` and `format.clj`                                                                |
+| `fit_seed.jl`, `seed_diagnostics.jl`                      | the `Seed` a fitting test would sample, built without fitting, and the sampler diagnostics that run on any `Seed`; a unit test includes them |
+| `tool_tests/`                                             | the `clojure.test` files for the scripts (`*_test.clj`), `helpers.clj` and `data/`; run by `bb test`                                         |
 
-## bb compare | bb results-table | bb bench | bb extract-formfactor
+## bb compare results-table | bench | extract-formfactor
 
 ```bash
 bb compare v0.2.0-soukouratou HEAD          # any revisions; the working tree is added last
@@ -97,15 +97,6 @@ bb profile ID[:tag] [ID[:tag] ...] [--delay SECONDS] [--dry-run]
 ```
 
 Builds the `Seed` of each fitting test twice in one process (the first call warms the compiler) and profiles the second with Julia's sampling profiler: the stage timings of that build (each static stage with its note, e.g. `[cache hit]` or the residue counts of the nucleotide stages; see "Reports" below) and the samples by function, charged to the innermost BAYSOL function (its own code plus the libraries it calls) and inclusive. The profiler slows the code by a factor of several, so read the proportions, not the seconds. It is how the time in `forward_cache` was found; use `bb fittings --bench --approved` or the reports to measure a change.
-
-## bb validate
-
-```
-bb validate --list
-bb validate NAME [ID[:tag] ...] [--approved] [--dry-run]
-```
-
-Runs a **validation** (`../test/validation/NAME/`): a slow, suite-wide check of one change against criteria fixed before the run; see `../test/validation/README.md`. **Without `--approved` it only prints its plan.** With it, the script writes its per-fit rows to `../test/validation/NAME/results/NAME-<stamp>.tsv` and prints its verdict. A bare ID stands for every run of its script.
 
 ## bb vis
 
@@ -385,7 +376,7 @@ SASDX52: the longer run is worse, not better. The divergences go from 5 to 970 (
 ### What SASDX52 shows
 
 * The divergences are not the c1 tolerance (block 9: gradient error three to four orders below the gradient) and not a discontinuity of the profiled c1 (block 7: `jumps=0` on all four axes).
-* The posterior has a **third optimum** that the MAP search does not report (block 8 lists two). It carries about 4 % of the posterior mass by the Laplace estimate. No random start reaches it: 500 random L-BFGS starts gave 0 hits (`test/validation/optima_recall/`), and the 64 starts of block 5 end in the two known optima.
+* The posterior has a **third optimum** that the MAP search does not report (block 8 lists two). It carries about 4 % of the posterior mass by the Laplace estimate. No random start reaches it: 500 random L-BFGS starts gave 0 hits (a validation run, removed, in git history under `test/validation/optima_recall/`), and the 64 starts of block 5 end in the two known optima.
 * The sampler finds it from the draws instead: the harvest of optima from the first chains' draws finds it, and `infer` starts more chains there (block 10). Those chains tend to leave it again, so it holds far fewer of the pooled draws than its Laplace share.
 * The long retry (block 11) is where the divergences concentrate (chain 2: smaller ε, lowest acceptance), but this output does not show what puts it there.
 

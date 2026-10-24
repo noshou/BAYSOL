@@ -12,7 +12,7 @@ Given a measured curve `I_exp(q) ± σ_exp(q)` and the geometry-only `ForwardCac
 
 `c1` is not part of `ξ`: it is a mean-field bookkeeping factor (one population-mean radius `r_m` over per-atom volumes), not an identifiable physical unknown, so no defensible prior width exists. Scale `m` and background `b` (`I_calc = m·ĥ + b`) are linear and solved in closed form.
 
-The sampler, MAP search, likelihood and report are generic in the number `N` of sampled parameters (`Seed{T,N}`, `Inferred{S,N}`); only the transform `Θ`/`Ξ`, `θ_prior_moments` and the log-prior are specific to the four-parameter priors (`nparams`, `param_keys`). The Gram matrix stays five-species.
+The sampler, MAP search, likelihood and report are generic in the number `N` of sampled parameters (`Seed{T,N}`, `Inferred{S,N}`); only the transform `Θ`/`Ξ`, `θ_prior_moments` and the log-prior are specific to the four-parameter priors (and `param_keys`, which names the report keys). The Gram matrix stays five-species.
 
 ## Likelihood
 
@@ -170,7 +170,7 @@ NUTS samples `w` with `θ = μ_θ + σ_θ ⊙ (ẑ + S w)` (`_θ_of_w`), in whic
 
 ## NUTS
 
-`infer(...; rng_seed)` is reproducible at any thread count: the `UInt64` seed is mixed (SplitMix64) with each draw's purpose and index into that item's own `Xoshiro` stream (MAP start `i`, chain `k`; bridge proposals; the chain-start directions from the separate `jitter_seed`). The seed is printed in the report's `=== Run ===` section. The MAP search stays serial (threading measured slower, `test/validation/threading/`).
+`infer(...; rng_seed)` is reproducible at any thread count: the `UInt64` seed is mixed (SplitMix64) with each draw's purpose and index into that item's own `Xoshiro` stream (MAP start `i`, chain `k`; bridge proposals; the chain-start directions from the separate `jitter_seed`). The seed is printed in the report's `=== Run ===` section. The MAP search stays serial (threading measured slower, in a validation run now in git history under `test/validation/threading/`).
 
 Each chain uses multinomial NUTS with the generalised U-turn criterion (as in Stan; max tree depth 10, divergence threshold Δ_max = 1000), a `DenseEuclideanMetric(N)` (full covariance: the parameters multiply each other in `Î`, and a diagonal metric would cost ~√((1+r)/(1−r)) more steps for a pair with correlation `r`), `Leapfrog`, and `StanHMCAdaptor`:
 
@@ -204,7 +204,7 @@ Within each mode (modes differ by construction), on the unthinned post-warm-up d
 - **Split R̂** on `2M` half-chains: `W` the mean within-sequence variance, `B` the between-sequence variance of means, `var⁺ = (n−1)/n W + B/n`, `R̂ = √(var⁺/W)`, so `R̂² − 1 ≈ τ_μ²/W` is the between-mean variance as a fraction of the within variance (1.01 ⇔ means within ≈ 0.14 within-sd). Rank normalisation (Blom scores) makes it location-robust; the folded version (about the median) catches differences of scale and tails; the larger is kept.
 - **ESS** `= S/τ̂`, `τ = 1 + 2Σρ_t`, the autocorrelation from the variogram (`ρ̂_t = 1 − (W − γ̄_t)/var⁺`) truncated by Geyer's initial positive/monotone pair sequence (max lag 250). A Monte Carlo standard error of a mean is `σ/√ESS`, of a 16/84 % interval end `1.52σ/√ESS` (a few percent of σ at the default 5600 draws). The **tail ESS** is the one the intervals stand on; the rule of thumb is R̂ < 1.01 and ESS ≥ 100 per chain.
 
-The worst values over the diagnosed modes are reported (`rhat_max` flagged above `RHAT_OK = 1.01`, `ess_min`, `ess_tail_min`). **Retry:** if the worst R̂ exceeds `RETRY_RHAT = 1.01` and the run was shorter than the retry, the whole procedure is run once more with `RETRY_N_ADAPT = RETRY_N_DRAWS = 2000` and seeds derived by an odd-constant multiplication of `rng_seed` and `jitter_seed` (`RETRY_SEED_OFFSET`: a different search, streams and directions, still deterministic), and the run with the smaller worst R̂ is kept (`retry = false` disables it; the report's `retry` line and `diagnostics.first_rhat`, `retry_kept` say what happened). It cannot repair a structural failure (a second mode explored by a single chain keeps R̂ ≈ 1.7). Outcomes: `test/validation/rhat_retry/` (53/53 at R̂ ≤ 1.01 on the latest run, 8 retries). Convergence statistics detect chains that disagree, not chains that agree on a wrong region.
+The worst values over the diagnosed modes are reported (`rhat_max` flagged above `RHAT_OK = 1.01`, `ess_min`, `ess_tail_min`). **Retry:** if the worst R̂ exceeds `RETRY_RHAT = 1.01` and the run was shorter than the retry, the whole procedure is run once more with `RETRY_N_ADAPT = RETRY_N_DRAWS = 2000` and seeds derived by an odd-constant multiplication of `rng_seed` and `jitter_seed` (`RETRY_SEED_OFFSET`: a different search, streams and directions, still deterministic), and the run with the smaller worst R̂ is kept (`retry = false` disables it; the report's `retry` line and `diagnostics.first_rhat`, `retry_kept` say what happened). It cannot repair a structural failure (a second mode explored by a single chain keeps R̂ ≈ 1.7). Outcomes: 53/53 at R̂ ≤ 1.01 on the latest run, 8 retries (the validation records were removed; git history under `test/validation/rhat_retry/`). Convergence statistics detect chains that disagree, not chains that agree on a wrong region.
 
 ## Draws and summaries
 

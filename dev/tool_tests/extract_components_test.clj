@@ -289,7 +289,8 @@
 
 (deftest rows-of-a-dictionary
     (testing "quotes, ? parents, classes, tabs, missing fields, the base columns"
-        (is (= expected-rows (sort-by first (ec/read-rows (reader cif)))))))
+        (is (= expected-rows
+                (sort-by first (ec/rows-of (ec/read-blocks (reader cif))))))))
 
 (deftest table-text-sorted-with-header
     (testing "sorted by id, header counts the rows, duplicates are an error"
