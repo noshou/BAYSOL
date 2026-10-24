@@ -314,8 +314,9 @@ function _sampling_space(
         ],
         [SVector{N,Float64}(z) for z in extra_starts],
     )
-    # serial on purpose: the whole search is ~8 ms warm (a start is ~1 ms), so
-    # threading it was measured slower (0.71× at 4 threads, test/validation/threading/)
+    # serial on purpose: the whole search is ~8 ms warm (a start is ~1
+    # ms), so threading it was measured slower (0.71× at 4 threads, a
+    # validation run since removed from `test/validation/threading/`)
     optima = Tuple{SVector{N,Float64},Float64}[]
     n_evals = 0
     n_try = 0

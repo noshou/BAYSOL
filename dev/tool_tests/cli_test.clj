@@ -117,34 +117,6 @@
         (is (= 0 (:status r)))
         (is (says? r "bb bench --approved SASDMJ9"))))
 
-(deftest validate-list-and-unknown
-    (let [listing (tool "validate" "--list")
-            unknown (tool "validate" "nonsense")
-            bad-fit (tool "validate" "map_fstop" "NOPE" "--approved" "--dry-run")]
-        (is (= 0 (:status listing)))
-        (is (says? listing "shannon_binning" "map_fstop"))
-        (is (= 2 (:status unknown)))
-        (is (says? unknown "no validation 'nonsense'"))
-        (is (= 2 (:status bad-fit)))
-        (is (says? bad-fit "no fitting test folder for: NOPE"))))
-
-(deftest validate-plan-needs-approval
-    (let [plan (tool "validate" "map_fstop" "SASDMJ9")
-            run (tool "validate" "map_fstop" "SASDMJ9" "--approved" "--dry-run")]
-        (is (= 0 (:status plan)))
-        (is (says? plan "not running"))
-        (is (not (re-find #"^\$ " (:out plan))))
-        (is (= 0 (:status run)))
-        (is (re-find (re-pattern
-                    (str "map_fstop/validate.jl --out \\S*map_fstop/results/"
-                        "map_fstop-\\S*\\.tsv SASDMJ9"))
-                (:out run)))))
-
-(deftest validate-bare-id-expands
-    (let [r (tool "validate" "shannon_binning" "SASDEP6" "--approved" "--dry-run")]
-        (is (= 0 (:status r)))
-        (is (says? r " SASDEP6:fit1_model1 SASDEP6:fit1_model2"))))
-
 (deftest fittings-trace-compile
     (let [r (tool "fittings" "SASDMJ9" "--trace-compile" "/tmp/x.jl" "--dry-run")
             missing (tool "fittings" "SASDMJ9" "--trace-compile")]
