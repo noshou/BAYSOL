@@ -86,7 +86,7 @@
         (re-find #"\brna\b" typ) "rna"
         :else "other"))
 
-(defn- nucleic?
+(defn ^:private nucleic?
     "Is the data block `block` (a map as `read-blocks` makes it) a nucleic acid component?"
     [block]
     (not= "other" (component-class (str/lower-case (get block "type" "?")))))
@@ -107,7 +107,7 @@
 
 (def ^:private bond-cols ["_chem_comp_bond.atom_id_1" "_chem_comp_bond.atom_id_2"])
 
-(defn- loop-row
+(defn ^:private loop-row
     "Adds one data row of a loop with the column names `cols` to the nucleic block `cur`:
     an atom `[name element]` (hydrogens and deuterium are dropped) or a bond `[a b]`."
     [cur cols line]
@@ -227,7 +227,7 @@
         "DT" "T",
         "DU" "U"})
 
-(defn- parent-ids
+(defn ^:private parent-ids
     "The ids of a `parent` column text (\"DT, DT\", \"C\", \"-\"), as a vector."
     [parent]
     (if (#{"-" "?" ""} parent) [] (mapv str/trim (str/split parent #","))))
@@ -272,7 +272,7 @@
             found (for [[b re] name-keywords :when (re-find re up)] b)]
         (when (= 1 (count found)) (first found))))
 
-(defn- adjacency
+(defn ^:private adjacency
     "The bond graph of a block: atom name to the set of bonded heavy atoms. Bonds to
     unknown (hydrogen) atoms are dropped."
     [{:keys [atoms bonds]}]
@@ -286,7 +286,7 @@
             (zipmap known (repeat #{}))
             bonds)))
 
-(defn- cycles-of-length
+(defn ^:private cycles-of-length
     "Every simple cycle of `n` atoms of the graph `g`, as a set of atom-name sets."
     [g n]
     (set (for [start (keys g)
@@ -301,7 +301,7 @@
                     (extend-path [start]))]
             (set path))))
 
-(defn- glycosidic
+(defn ^:private glycosidic
     "The `[c1 n furanose]` of the nucleoside in graph `g` (elements in `el`): a five-ring
     of one O and four C whose carbon next to the ring O carries a nitrogen outside the
     ring; nil unless there is exactly one such pair (abasic sugars, C-nucleosides and
@@ -318,7 +318,7 @@
                     [c1 n ring]))]
         (when (= 1 (count hits)) (first hits))))
 
-(defn- base-core
+(defn ^:private base-core
     "The atoms of the base ring system hanging on the glycosidic nitrogen `n`: everything
     reachable from `n` without passing through the sugar (`c1` and the furanose ring
     atoms `sugar`), pruned of its dead ends until only rings and the bonds between them
@@ -334,12 +334,12 @@
             (let [dead (filter #(<= (count (filter core (g %))) 1) core)]
                 (if (seq dead) (recur (reduce disj core dead)) core)))))
 
-(defn- subs-of
+(defn ^:private subs-of
     "The heavy atoms bonded to `a` that are not in `core`."
     [g core a]
     (remove core (g a)))
 
-(defn- ring-pyrimidine
+(defn ^:private ring-pyrimidine
     "The base of a pyrimidine base ring: the ring `core` (6 atoms, glycosidic nitrogen `n1`)
     in graph `g` with elements `el`, numbered from N1. \"C\" for a C4 amine with a C2
     oxygen (a C5 substituent does not matter: an amine only at C5 is not a C), `:ut` for
@@ -369,7 +369,7 @@
                         ["O"] :ut
                         nil))))))
 
-(defn- ring-purine
+(defn ^:private ring-purine
     "The base (A or G) of a purine base ring system: `core` (9 atoms) with glycosidic
     nitrogen `n9` in graph `g` with elements `el`, numbered from N9, or nil. Inosine-like
     bases (C6 oxygen, no C2 amine) and bases with other substituents give nil."
@@ -619,9 +619,9 @@
 
 (def ^:private http-date DateTimeFormatter/RFC_1123_DATE_TIME)
 
-(defn- url? [s] (boolean (re-find #"^https?://" s)))
+(defn ^:private url? [s] (boolean (re-find #"^https?://" s)))
 
-(defn- download!
+(defn ^:private download!
     "Downloads `url` to the file `dest` (streamed, redirects followed); returns the
     Last-Modified header text, or nil if the server sent none. A status other than 200 is
     an error."
@@ -639,14 +639,14 @@
                     {})))
         (.orElse (.firstValue (.headers response) "Last-Modified") nil)))
 
-(defn- mtime-text
+(defn ^:private mtime-text
     "The modification time of the local file `path` in the HTTP date form."
     [path]
     (.format http-date
         (ZonedDateTime/ofInstant (.toInstant (fs/last-modified-time path))
             ZoneOffset/UTC)))
 
-(defn- read-gz
+(defn ^:private read-gz
     "The data blocks of the gzip file `path` (see `read-blocks`)."
     [path]
     (with-open [rdr (io/reader (GZIPInputStream. (io/input-stream (str path)) 65536)
@@ -654,7 +654,7 @@
                 "UTF-8")]
         (read-blocks rdr)))
 
-(defn- with-source
+(defn ^:private with-source
     "Calls `(f blocks last-modified)` with the data blocks of `source` (a gzip path or an
     http(s) URL, downloaded to a temporary file that is deleted afterwards) and the
     text of its Last-Modified header or modification time."
@@ -689,7 +689,7 @@
 
 ;; --- check and update
 
-(defn- check
+(defn ^:private check
     "Compares `text` with the table file `out`: prints the first differing lines to
     stderr and returns 1, or reports the table up to date and returns 0."
     [text out]

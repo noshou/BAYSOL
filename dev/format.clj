@@ -45,9 +45,22 @@
 (def ^:private zprint-options
     {:style :community, :width 84, :list {:indent 4}, :comment {:wrap? false}})
 
+(def ^:private edn-options
+    "What an .edn file adds to `zprint-options`: a map keeps its line breaks, so the blank
+    lines the author puts before a comment (bb.edn) survive. zprint removes every blank
+    line inside a form otherwise."
+    {:map {:respect-nl? true}})
+
+(defn options-for
+    "zprint's options for the file at `path`."
+    [path]
+    (if (str/ends-with? path ".edn")
+        (merge zprint-options edn-options)
+        zprint-options))
+
 (def ^:private zprint-version "1.3.0")
 
-(defn- zprint-file-str
+(defn ^:private zprint-file-str
     "zprint's whole-file formatter. The library is loaded on first use, so a Julia-only
     run never waits for it. Once downloaded (into the local Maven repository) its jar goes
     straight on the classpath, which takes a fraction of a second; resolving it through
@@ -153,24 +166,36 @@
                             :else (recur (dec i) next-indent (cons line acc))))))]
         (str/join "\n" result)))
 
+(defn private-defns
+    "`text` with every top-level `(defn- name` written as `(defn ^:private name`, the way
+    a private `def` is written. Only a form that starts a line at column 0 is touched, so
+    prose and docstrings that mention `defn-` indented stay as they are. Done before zprint,
+    which then wraps the longer line, so formatting twice changes nothing."
+    [text]
+    (str/replace text #"(?m)^\(defn- " "(defn ^:private "))
+
 (defn format-text
     "`text` of a .clj file as zprint (`zprint-fn`, from `zprint-file-str`) and `reindent`
     leave it."
     [zprint-fn text path]
-    (reindent (zprint-fn text path zprint-options)))
+    (reindent (zprint-fn (private-defns text) path (options-for path))))
 
-(defn- formatted-key
+(defn ^:private formatted-key
     "The name of the cache entry for a text that zprint leaves unchanged: a hash of the
     text, the options and the zprint version, so any of them changing invalidates it."
     [text]
     (let [digest (java.security.MessageDigest/getInstance "SHA-1")
             bytes* (.digest digest
-                (.getBytes
-                    (pr-str zprint-version zprint-options :reindent-1 text)
+                (.getBytes (pr-str zprint-version
+                        zprint-options
+                        edn-options
+                        :reindent-1
+                        :private-defn
+                        text)
                     "UTF-8"))]
         (apply str (map #(format "%02x" (bit-and % 0xff)) bytes*))))
 
-(defn- format-clj
+(defn ^:private format-clj
     "Formats (`apply?`) or checks the .clj files under `paths`; true on success: when
     formatting always, when checking if none would change. Lists the files that were (or
     would be) changed. zprint is slow under
@@ -197,7 +222,7 @@
         (doseq [f changed] (println (if apply? "formatted" "not formatted:") f))
         (or apply? (empty? changed))))
 
-(defn- format-julia
+(defn ^:private format-julia
     "Formats (`apply?`) or checks the Julia files under `paths` with JuliaFormatter, in
     its own environment; true on success."
     [apply? paths]
@@ -206,7 +231,7 @@
             (c/in-root "dev" "format.jl") (if apply? "--apply" "--check")
             paths]))
 
-(defn- reflow-prose
+(defn ^:private reflow-prose
     "Re-wraps (`apply?`) or checks the prose of the `language` files under `paths`;
     true on success."
     [apply? language paths]

@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Exercises src/Runtime/Timing.jl (`StageLog`, `timed!`, `tick`/`tock!`,
-# `fmt_count`) and the report's `=== Run ===` / `=== Timing ===` sections.
+# `fmt_count`) and the timing table.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.Runtime: StageLog, Stage, timed!, tick, tock!, stage_seconds, fmt_count
-using BAYSOL.Pipeline: _write_timing, _write_run_info
+using BAYSOL.Pipeline: _write_timing
 
 @testset "Timing" begin
     @testset "fmt_count: plain below 1000, else thousands with trimmed decimals" begin
@@ -47,23 +47,14 @@ using BAYSOL.Pipeline: _write_timing, _write_run_info
         @test stage_seconds(log, :sampling) == (3.0, 0.0, 0.2)
     end
 
-    @testset "_write_run_info / _write_timing write nothing without a log" begin
+    @testset "_write_timing writes nothing without a log" begin
         io = IOBuffer()
-        @test _write_run_info(io, nothing) === nothing
-        # a bare n_atoms still gets a Run section
-        _write_run_info(io, nothing; n_atoms = 327)
-        @test occursin(r"=== Run ===\nn_atoms\s+= 327", String(take!(io)))
         @test _write_timing(io, nothing, tick()) === nothing
         @test isempty(take!(io))
     end
 
     @testset "_write_timing: sections, nesting, and an aligned seconds column" begin
         log = StageLog()
-        log.info["n_atoms"] = 602
-        log.info["lMax"] = 12
-        log.info["n_q"] = 60
-        log.info["n_samples"] = 2000
-        log.info["n_adapt"] = 1000
         push!(log.stages, Stage(:static, 1, "pdb2pqr", 21.3, 0.0, 0.0, "[cache miss]"))
         push!(log.stages, Stage(:static, 1, "forward_cache", 25.9, 0.0, 0.0, ""))
         push!(log.stages, Stage(:static, 1, "resolve_structure", 0.0023, 0.0, 0.0, ""))
@@ -85,19 +76,12 @@ using BAYSOL.Pipeline: _write_timing, _write_run_info
             ),
         )
         io = IOBuffer()
-        _write_run_info(io, log)
-        run_txt = String(take!(io))
-        @test occursin("=== Run ===", run_txt)
-        @test occursin(r"n_atoms\s+= 602", run_txt) && occursin(r"lMax\s+= 12", run_txt)
-        @test findfirst("n_atoms", run_txt).start < findfirst("lMax", run_txt).start
-        @test occursin(r"n_samples\s+= 2000", run_txt)
-
         _write_timing(io, log, tick())
         lines = split(String(take!(io)), '\n'; keepempty = false)
-        @test startswith(lines[1], "=== Timing ===")
+        @test startswith(lines[1], "stage") && !any(contains("=== Timing ==="), lines)
         @test occursin("seconds", lines[1]) && occursin("% wall", lines[1]) &&
               occursin("(JIT)", lines[1])
-        @test any(startswith("wall clock  (seed_model → end of report)"), lines)
+        @test any(startswith("wall clock  (seed_model → end of timings)"), lines)
         @test any(l -> startswith(l, "  static build"), lines)
         # a stage's note is a line of its own under it
         i = findfirst(l -> startswith(l, "    pdb2pqr"), lines)
@@ -109,7 +93,10 @@ using BAYSOL.Pipeline: _write_timing, _write_run_info
         @test any(l -> startswith(l, "      hydration (SASA + B_lm)"), lines)
         @test any(l -> startswith(l, "  report write"), lines) &&
               any(l -> startswith(l, "  unaccounted"), lines)
-        @test startswith(lines[end], "GC: ")
+        # the GC line, then the two halves of the wall clock as the last two lines
+        @test startswith(lines[end-2], "GC: ")
+        @test startswith(lines[end-1], "fit timing  = ") &&
+              startswith(lines[end], "plot timing = ")
         # a stage of a few milliseconds is not rounded
         # to 0.00: it prints in scientific notation
         @test any(

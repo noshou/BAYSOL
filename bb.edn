@@ -1,13 +1,14 @@
-;; Task shortcuts for the dev tools: `bb help` lists them and `bb <task> args...` runs one,
-;; passing the arguments on (`bb fittings SASDMJ9 --report` is
-;; `bb dev/fittings.clj SASDMJ9 --report`). The scripts do not need this file; they also
-;; run directly, from any directory, as `bb dev/precommit.clj --quick`.
+;; Task shortcuts for the dev tools: `bb help` lists them and `bb <task> args...`
+;; runs one, passing the arguments on (`bb fitting-tests SASDMJ9 --report` is
+;; `bb dev/fitting_tests.clj SASDMJ9 --report`). The scripts do not need this file;
+;; they also run directly, from any directory, as `bb dev/precommit.clj --quick`.
 {:tasks
     {:init
         (defn script
             "Runs the Babashka script at `path` with the arguments given to the task."
             [path]
             (apply shell "bb" path *command-line-args*)),
+
         ;; list every task with its :doc, in the order of this file
         help {:doc "List the dev tools with their descriptions",
             :override-builtin true,
@@ -17,17 +18,25 @@
                         (slurp "bb.edn"))
                     :when (not= name "help")]
                 (println (format "%-20s %s" name doc)))},
+
         ;; print this file
         tasks
         {:doc "Print bb.edn", :override-builtin true, :task (print (slurp "bb.edn"))},
+
         ;; run the fitting tests and what hangs off them
-        fittings {:doc "Run fitting tests: [ID ...] --report --table --fixme --bench",
-            :task (script "dev/fittings.clj")},
+        fitting-tests {:doc
+            "Run fitting tests: --list, [ID ...] --report --table --fixme",
+            :task (script "dev/fitting_tests.clj")},
+        render-plots {:doc "Render a folder's .tex figures: DIR --recursive --type pdf",
+            :task (script "dev/render_tex.clj")},
+        fonts {:doc "Is a font available to LaTeX? NAME ... | --list",
+            :task (script "dev/fonts.clj")},
         diagnose {:doc "Sampler diagnostics on fits: --report --residuals --chains ...",
             :task (script "dev/diagnose.clj")},
         profile {:doc "Profile the static build of fitting tests",
             :task (script "dev/profile.clj")},
         vis {:doc "The visual checks of the geometry code", :task (script "dev/vis.clj")},
+
         ;; tests, checks and the build
         unit {:doc "The Julia unit suite (names pick the files: bb unit shannon wls)",
             :task (apply shell
@@ -43,6 +52,7 @@
                 "--startup-file=no"
                 "--project=docs"
                 "docs/make.jl")},
+
         ;; format, lint, layout
         fmt {:doc
             "Format the Julia and Clojure code and re-wrap long comments and docstrings",
@@ -54,6 +64,7 @@
             :task (shell "clj-kondo" "--lint" "dev")},
         linelen {:doc "Report lines over 92 characters and tabs (--check)",
             :task (script "dev/linelen.clj")},
+
         ;; results and benchmarks
         results-table {:doc "The Results table: --update, --check, --tsv FILE, or IDs",
             :task (script "dev/results_table.clj")},

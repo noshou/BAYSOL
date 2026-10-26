@@ -128,303 +128,14 @@ function run_sasdq69(
     return res, s.fw.form_factor_log, s.fw.n_atoms, data
 end
 
-"""
-    sasdq69_figure(result, data) -> Figure
-
-Plots the SASDQ69 fit: the experimental data (`data = (q_fit, I_fit, σ_fit)`)
-with its per-point standard errors, the MAP predicted curve, and (when not
-all draws diverged) the quantile-curve envelope.
-"""
-function sasdq69_figure(result, data)
-    _, divergence_rate, map_result, quantile_result = result
-    q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero)
-    # are left out of the plot only; the fit itself uses every point.
-    pos = I_fit .> 0
-    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
-
-    fig = Figure(size = FIG_SIZE_CURVE)
-    ax = Axis(
-        fig[1, 1],
-        xlabel = "q (Å⁻¹)",
-        ylabel = "I(q)",
-        xscale = log10,
-        yscale = log10,
-    )
-
-    y_floor = log_axis_floor(I_fit)   # see log_axis_floor in common.jl
-
-    if quantile_result !== nothing
-        _, curves = quantile_result
-        bounds    = curves["bounds"]
-        quantiles = curves["quantiles"]
-
-        band!(
-            ax, bounds[:, 1], max.(bounds[:, 2], y_floor), max.(bounds[:, 3], y_floor);
-            color = COLOR_BAND, label = "bounds",
-        )
-        lines!(
-            ax, quantiles[:, 1], max.(quantiles[:, 2], y_floor);
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
-            label = "quantiles",
-        )
-        lines!(
-            ax, quantiles[:, 1], max.(quantiles[:, 3], y_floor);
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE,
-        )
-    end
-
-    # A linear/additive I(q) ± σ(q) interval isn't symmetric on a log10
-    # axis; the lower whisker compresses toward 0 while the upper one
-    # looks comparatively short, so the point visually rides near the top
-    # of its own errorbar instead of centred (and I - σ can go
-    # non-positive outright once σ > I, near the noise floor). Standard
-    # SAXS log-I plotting convention (PRIMUS/SASBDB-style) instead
-    # propagates σ into log-space via the delta method
-    # (d/dx log10(x) = 1/(x·ln10)) and plots a log-symmetric interval, which
-    # stays well-defined and visually centred no matter how large σ gets
-    # relative to I.
-    log_I = log10.(I_fit)
-    log_σ = σ_fit ./ (I_fit .* log(10))
-    rangebars!(
-        ax, q_fit, exp10.(log_I .- log_σ), exp10.(log_I .+ log_σ);
-        whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR,
-    )
-    scatter!(ax, q_fit, I_fit; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
-
-    if map_result !== nothing
-        _, map_curve = map_result
-        lines!(
-            ax,
-            map_curve[:, 1],
-            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
-            color = COLOR_MAP,
-            linewidth = LW_MAP,
-            label = "MAP",
-        )
-    end
-
-    axislegend(ax; position = :lb, framevisible = false)
-
-    # Centre the view on the actual data (I_fit), not on however far the
-    # errorbar whiskers/bounds band happen to extend
-    lo, hi = extrema(I_fit)
-    ylims!(ax, lo * YLIM_LOG_LO, hi * YLIM_LOG_HI)
-
-    return fig
-end
-
-"""
-    sasdq69_residuals_figure(result, data) -> Figure
-
-Data-minus-MAP residuals against q, with the quantile-curve envelope
-(`"bounds"`/`"quantiles"`) similarly re-centred on the MAP curve.
-"""
-function sasdq69_residuals_figure(result, data)
-    _, _, map_result, quantile_result = result
-    q_fit, I_fit, σ_fit = data
-
-    fig = Figure(size = FIG_SIZE_RESIDUALS)
-    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
-
-    map_curve = map_result === nothing ? nothing : map_result[2]
-
-    if quantile_result !== nothing && map_curve !== nothing
-        _, curves = quantile_result
-        bounds    = curves["bounds"]
-        quantiles = curves["quantiles"]
-        I_map     = map_curve[:, 2]
-
-        band!(
-            ax, bounds[:, 1], bounds[:, 2] .- I_map, bounds[:, 3] .- I_map;
-            color = COLOR_BAND_RESID, label = "bounds",
-        )
-        lines!(
-            ax, quantiles[:, 1], quantiles[:, 2] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID,
-            label = "quantiles",
-        )
-        lines!(
-            ax, quantiles[:, 1], quantiles[:, 3] .- I_map;
-            linestyle = :dot, color = COLOR_POSTERIOR, linewidth = LW_QUANTILE_RESID,
-        )
-    end
-
-    if map_curve !== nothing
-        resid = I_fit .- map_curve[:, 2]
-        errorbars!(
-            ax,
-            q_fit,
-            resid,
-            σ_fit;
-            whiskerwidth = WHISKERWIDTH,
-            color = COLOR_ERRORBAR,
-        )
-        scatter!(
-            ax,
-            q_fit,
-            resid;
-            markersize = MARKERSIZE,
-            color = COLOR_DATA,
-            label = "data - MAP",
-        )
-        hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
-        lo, hi = extrema(resid)
-        pad = YLIM_LIN_PAD_FRAC * (hi - lo)
-        ylims!(ax, lo - pad, hi + pad)
-    end
-
-    axislegend(ax; position = :rt, framevisible = false)
-
-    return fig
-end
-
-"""
-    sasdq69_hist(result) -> Figure
-
-Histograms of the non-divergent posterior draws for each physical parameter
-"""
-function sasdq69_hist(result)
-    fit, _, map_result, _ = result
-    ok = .!getproperty.(fit.stats, :numerical_error)
-    samples = fit.samples[ok]
-    c1_draws = fit.c1[ok]
-    scale_draws = fit.scale[ok]
-    bkgrnd_draws = fit.bkgrnd_corr[ok]
-    map_params = map_result === nothing ? nothing : map_result[1]
-
-    fig = Figure(size = FIG_SIZE_HIST)
-    for (i, (label, map_key)) in enumerate(HIST_PARAMS)
-        row, col = fldmod1(i, 3)
-        ax = Axis(
-            fig[row, col], xlabel = label, ylabel = "count",
-            xticklabelrotation = π/2,
-        )
-        draws = if label == "c1"
-            c1_draws
-        elseif label == "scale"
-            scale_draws
-        elseif label == "bkgrnd_corr"
-            bkgrnd_draws
-        else
-            getindex.(samples, i)
-        end
-        hist!(ax, draws; bins = HIST_BINS, color = COLOR_HIST)
-        if map_params !== nothing
-            vlines!(ax, [map_params[map_key]]; color = COLOR_MAP, linewidth = LW_MAP)
-        end
-    end
-
-    return fig
-end
-
-"""
-    sasdq69_comparison_figure(result, data) -> Figure
-
-Overlays our MAP curve against the depositor's reference fit (`fit_curve = (q, I)`, or
-`nothing` if the fit file could not be parsed, in which case no figure is made).
-"""
-function sasdq69_comparison_figure(result, data, fit_curve, label)
-    _, _, map_result, _ = result
-    q_fit, I_fit, σ_fit = data
-    # Log axes: non-positive intensities (high-q noise around zero)
-    # are left out of the plot only; the fit itself uses every point.
-    pos = I_fit .> 0
-    q_fit, I_fit, σ_fit = q_fit[pos], I_fit[pos], σ_fit[pos]
-
-    fit_curve === nothing && return nothing
-    q_crysol, I_crysol = fit_curve
-    keep = (q_crysol .> 0) .& (q_crysol .≤ Q_MAX_FIT) .& (I_crysol .> 0)
-
-    fig = Figure(size = FIG_SIZE_CURVE)
-    ax = Axis(
-        fig[1, 1],
-        xlabel = "q (Å⁻¹)",
-        ylabel = "I(q)",
-        xscale = log10,
-        yscale = log10,
-    )
-
-    # Same log-symmetric errorbar treatment as `sasdq69_figure` -- see its
-    # comment for why a raw additive I ± σ interval isn't used here.
-    log_I = log10.(I_fit)
-    log_σ = σ_fit ./ (I_fit .* log(10))
-    rangebars!(
-        ax, q_fit, exp10.(log_I .- log_σ), exp10.(log_I .+ log_σ);
-        whiskerwidth = WHISKERWIDTH, color = COLOR_ERRORBAR,
-    )
-    scatter!(ax, q_fit, I_fit; markersize = MARKERSIZE, color = COLOR_DATA, label = "data")
-
-    lines!(
-        ax, q_crysol[keep], I_crysol[keep];
-        color = COLOR_REFERENCE, linewidth = LW_REFERENCE, linestyle = :dash, label = label,
-    )
-
-    if map_result !== nothing
-        _, map_curve = map_result
-        lines!(
-            ax,
-            map_curve[:, 1],
-            map(v -> v > 0 ? v : NaN, map_curve[:, 2]);
-            color = COLOR_MAP,
-            linewidth = LW_MAP,
-            label = "BAYSOL MAP",
-        )
-    end
-
-    axislegend(ax; position = :lb, framevisible = false)
-
-    lo, hi = extrema(I_fit)
-    ylims!(ax, lo * YLIM_LOG_LO, hi * YLIM_LOG_HI)
-
-    return fig
-end
-
-
-# the results of every run, kept for the figures below
-fits = Dict{String,Any}()
-
 for run in RUNS
     # one set of outputs per run; a single-run entry keeps the plain `res*` names
     suffix = length(RUNS) == 1 ? "" : "_" * run.tag
 
     result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdq69(run)
 
-    # `@__DIR__` (this SASDQ69/ folder), not the caller's cwd.
-    open(joinpath(@__DIR__, "res$(suffix).txt"), "w") do io
-        BAYSOL.write_report(
-            io,
-            result;
-            form_factor_log = form_factor_log,
-            n_atoms = n_atoms,
-        )
-    end
-
-    fits[run.tag] = (result, (q_fit, I_fit, σ_fit))
-end
-
-# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL
-# methods, which every fit would then recompile (about 40 % of a fit's wall clock).
-using GLMakie
-
-for run in RUNS
-    suffix = length(RUNS) == 1 ? "" : "_" * run.tag
-    result, data = fits[run.tag]
-    q_fit, I_fit, σ_fit = data
-
-    fig = sasdq69_figure(result, data)
-    save(joinpath(@__DIR__, "res$(suffix).png"), fig; px_per_unit = PX_PER_UNIT)
-
-    fig_residuals = sasdq69_residuals_figure(result, data)
-    save(
-        joinpath(@__DIR__, "res$(suffix)_residuals.png"),
-        fig_residuals;
-        px_per_unit = PX_PER_UNIT,
-    )
-
-    fig_hist = sasdq69_hist(result)
-    save(joinpath(@__DIR__, "res$(suffix)_hist.png"), fig_hist; px_per_unit = PX_PER_UNIT)
-
+    # The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
+    # that their time is in its timing section.
     fit_curve = try
         fc = _read_fit(joinpath(_FIXTURE_DIR, run.fit), run.fit_scale, run.fit_col)
         fc !== nothing && run.rescale ? _rescale_fit(fc, q_fit, I_fit) : fc
@@ -432,15 +143,22 @@ for run in RUNS
         @warn "could not read the reference fit" run.fit exception = e
         nothing
     end
-    fig_cmp = sasdq69_comparison_figure(
-        result,
-        data,
-        fit_curve,
-        run.software * " " * run.tag * (run.rescale ? " (rescaled)" : ""),
+    references = BAYSOL.Reference[]
+    if fit_curve !== nothing
+        push!(
+            references,
+            BAYSOL.Reference(
+                run.software * " " * run.tag * (run.rescale ? " (rescaled)" : ""),
+                fit_curve...; q_max = Q_MAX_FIT,
+            ),
+        )
+    end
+    BAYSOL.results(
+        result, (q_fit, I_fit, σ_fit);
+        dir = @__DIR__, name = "res$(suffix)", references,
+        form_factor_log = form_factor_log, n_atoms = n_atoms,
     )
-    fig_cmp === nothing || save(
-        joinpath(@__DIR__, "res$(suffix)_comparison.png"),
-        fig_cmp;
-        px_per_unit = PX_PER_UNIT,
-    )
+
+    # `@__DIR__` (this SASDQ69/ folder), not the caller's cwd.
+    BAYSOL.print_summary(result)
 end

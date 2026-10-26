@@ -21,7 +21,7 @@ const _ρₑ_w_cache = KeyedCache{Int64, Tuple{Float64, Float64}}()
 
 ## Timing
 
-`StageLog` records wall-clock, JIT-compile and GC seconds per named stage. `seed_model` creates one (the wall clock starts at its top), hands it to `forward_cache(...; stage_log=)` and `seed_sampler(...; timing=)`, and it rides in `Seed.timing` → `Inferred.timing`. `write_report` starts with `=== Run ===` (`n_atoms`, `lMax`, `n_q`, `n_samples`, `n_adapt`) and ends with `=== Timing ===` (static build vs sampling, per stage, `report write`, `unaccounted`). Everything is a no-op when the log is `nothing`. `unaccounted` in a cold session is the first-call JIT of `run_model`/`infer`/`write_report`, compiled before their own stages begin (the `(JIT)` column shows it).
+`StageLog` records wall-clock, JIT-compile and GC seconds per named stage. `seed_model` creates one (the wall clock starts at its top), hands it to `forward_cache(...; stage_log=)` and `seed_sampler(...; timing=)`, and it rides in `Seed.timing` → `Inferred.timing`. `write_timings` prints the timing table (static build vs sampling, the `plotting` stages that `results` records, per stage, `report write`, `unaccounted`), whose last two lines are `fit timing` (everything but the plotting) and `plot timing`; the run's settings (`n_atoms`, `lMax`, `n_q`, `n_samples`, `n_adapt`) are in the `run` sheet of the workbook. Everything is a no-op when the log is `nothing`. `unaccounted` in a cold session is the first-call JIT of `run_model`/`infer`/`write_timings`, compiled before their own stages begin (the `(JIT)` column shows it).
 
 ## GCPause
 
@@ -33,7 +33,7 @@ With several threads there is one rule: **only the thread that began the pause c
 
 **A result never depends on the number of Julia threads.** A floating-point sum depends on the order of its additions, so every threaded reduction is grouped by the input, never by the thread count, and every random stream is a function of its label.
 
-- `draw_base()`: one `UInt64` for a run from the default RNG (so `Random.seed!` before a run fixes it); the `rng_seed` keyword replaces it and the report prints it.
+- `draw_base()`: one `UInt64` for a run from the default RNG (so `Random.seed!` before a run fixes it); the `rng_seed` keyword replaces it and the `run` sheet of the workbook records it.
 - `stream(base, purpose, index)`: the random stream of one work item (MAP start `i`, chain `k`, bridge proposal for mode `m`): a `Xoshiro` seeded by SplitMix64 mixing of the base, a fixed integer naming the use, and the index. SplitMix64 (`z = xor(z, z >> 30) * 0xbf58476d1ce4e5b9`, `z = xor(z, z >> 27) * 0x94d049bb133111eb`, `xor(z, z >> 31)`, a bijection on `UInt64`) is written out rather than using `hash`, so a published seed gives the same streams on every Julia version. Reproducibility rests on each stream being a deterministic function of its `(seed, purpose, index)` label, not on the independence of the streams.
 - `tmap_items(f, xs)`: ordered map with one `Threads.@spawn` task per element (no chunking: each item is heavy); serial with one thread or at most one item. The job struct stores `f` and the items as `Any`, so the task code is compiled once and not per closure. A closure capturing a reassigned variable (a boxed capture) raises `ArgumentError`; a task's exception is rethrown as itself. While waiting, the calling thread runs the GC checkpoint.
 - `tmap_blocks(f, n, block; threaded)`: applies `f` to the blocks `lo:hi` of `1:n` in block order, on the threads when `threaded` (the caller's size rule), else in a plain loop.

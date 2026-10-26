@@ -54,9 +54,9 @@
     [["report" ["--out" "--samples" "--adapt"]] ["residuals" ["--out"]]
         ["chains" ["--out" "--samples" "--adapt" "--seeds" "--retry"]]])
 
-(defn- integer-text? [s] (boolean (re-matches #"[-+]?\d+" s)))
+(defn ^:private integer-text? [s] (boolean (re-matches #"[-+]?\d+" s)))
 
-(defn- check-option
+(defn ^:private check-option
     "Stops with a message if the value of option `k` is bad."
     [[k v]]
     (let [csv #(str/split v #"," -1)]
@@ -73,7 +73,7 @@
                 (c/fail who (str "--retry needs 0 or 1, got '" v "'")))
             nil)))
 
-(defn- command
+(defn ^:private command
     "The command that runs `part` on `specs` with the options `opts` (pairs): diagnose.jl
     in the fitting-test project."
     [julia part opts specs]
@@ -82,7 +82,7 @@
         (mapcat identity opts)
         specs))
 
-(defn- part-options
+(defn ^:private part-options
     "The options that go to `part`: those it accepts, in command-line order, and its
     own output file under `outdir` when one was asked for."
     [part opts outdir]
@@ -90,7 +90,7 @@
         (cond-> (filterv #(accepted (first %)) opts)
             outdir (conj ["--out" (str (fs/path outdir (str part ".txt")))]))))
 
-(defn- run-part
+(defn ^:private run-part
     "Runs one part (or, with `dry`, prints its command); true if it succeeded."
     [julia part opts outdir specs dry]
     (let [cmd (command julia part (part-options part opts outdir) specs)]

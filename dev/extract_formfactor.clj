@@ -38,13 +38,13 @@
 ;; helpers) starts nothing.
 (defonce ^:private pod (delay (pods/load-pod 'org.babashka/go-sqlite3 "0.3.13")))
 
-(defn- query
+(defn ^:private query
     "The rows of a SELECT, as maps."
     [db sql-params]
     @pod
     ((requiring-resolve 'pod.babashka.go-sqlite3/query) db sql-params))
 
-(defn- execute!
+(defn ^:private execute!
     "Runs one statement with its parameters."
     [db sql-params]
     @pod
@@ -121,7 +121,7 @@
 
 ;; --- the two tables
 
-(defn- add-waasmaier!
+(defn ^:private add-waasmaier!
     "Copies the Waasmaier-Kirfel f0 coefficients: one row per ion, the offset c, five
     Gaussian amplitudes a1..a5 and five exponents b1..b5 (the source keeps the two
     five-element lists as JSON text). Returns the number of rows."
@@ -149,7 +149,7 @@
                     (concat a b))))
         (count rows)))
 
-(defn- dedupe-grid
+(defn ^:private dedupe-grid
     "The indices of the grid points to keep: the first, then each point above the last
     one kept. Cs has duplicate grid energies upstream, which makes the s=0 spline throw;
     dropping them (keeping the first) makes the grid strictly increasing for every
@@ -162,7 +162,7 @@
             (> (energies i) last-e) (recur (inc i) (energies i) (conj kept i))
             :else (recur (inc i) last-e kept))))
 
-(defn- add-chantler!
+(defn ^:private add-chantler!
     "Copies the Chantler FFAST anomalous terms: one row per element, the energy grid and
     f1, f2 on it, packed as Float64 blobs. A missing atomic number is an error (LEFT
     JOIN, then checked) rather than a silently dropped element. Returns [elements
@@ -212,7 +212,7 @@
                     (count e)))]
         [(count npts) (reduce + npts)]))
 
-(defn- add-deuterium!
+(defn ^:private add-deuterium!
     "Adds deuterium `d` as a copy of hydrogen `h` in both tables. X-ray scattering
     depends on the electron cloud only, and 2H has the same one as 1H, so f0, f' and
     f'' are identical (the nucleus differs, which matters for neutrons, not here)."

@@ -19,12 +19,12 @@
 
 ;; --- building a dictionary
 
-(defn- q
+(defn ^:private q
     "A CIF token: quoted when it holds a quote or a space."
     [s]
     (if (re-find #"['\s]" s) (str "\"" s "\"") s))
 
-(defn- block-text
+(defn ^:private block-text
     "The CIF text of one component. Keys: `:id`, `:type` (default RNA LINKING), `:name`
     (a quoted value; with `:name-block` a `;` text block, with `:name-next` the quoted
     value on the line after an empty one), `:formula`, `:parent`, `:letter`, `:atoms`
@@ -57,7 +57,7 @@
                 (for [[a b] bonds] (str id " " (q a) " " (q b) " SING"))
                 ["# "]))))
 
-(defn- ring-bonds
+(defn ^:private ring-bonds
     "The bonds closing the ring `names` into a cycle."
     [names]
     (map vector names (concat (rest names) [(first names)])))
@@ -70,7 +70,7 @@
     (concat (ring-bonds ["C1'" "C2'" "C3'" "C4'" "O4'"])
         [["C4'" "C5'"] ["C3'" "O3'"]]))
 
-(defn- pyrimidine
+(defn ^:private pyrimidine
     "The atoms and bonds of a nucleoside with a pyrimidine: the oxygen on C2, the atom
     `c4` ([name element]) on C4 and, if given, `c5` on C5."
     [c4 c5]
@@ -84,7 +84,7 @@
             [["C2" "O2"] ["C4" (first c4)]]
             (when c5 [["C5" (first c5)]]))})
 
-(defn- purine
+(defn ^:private purine
     "The atoms and bonds of a nucleoside with a purine: `c6` ([name element]) on C6 and,
     if given, `c2` on C2."
     [c6 c2]
@@ -118,9 +118,9 @@
         "abasic" [{:atoms (conj (vec sugar-atoms) ["O1'" "O"]),
                 :bonds (conj (vec sugar-bonds) ["C1'" "O1'"])} nil]})
 
-(defn- reader [text] (BufferedReader. (StringReader. text)))
+(defn ^:private reader [text] (BufferedReader. (StringReader. text)))
 
-(defn- blocks-of
+(defn ^:private blocks-of
     [& blocks]
     (ec/read-blocks (reader (str/join "\n" (map block-text blocks)))))
 
@@ -315,7 +315,7 @@
 
 ;; --- the command line
 
-(defn- write-gz
+(defn ^:private write-gz
     "Writes `text` gzip-compressed to `path`."
     [path text]
     (with-open [out (GZIPOutputStream. (io/output-stream (str path)))]
@@ -324,7 +324,9 @@
 (def ^:private opts
     ["--source-date" "Sat, 10 Oct 2026 05:56:05 GMT" "--fetched" "2026-10-14"])
 
-(defn- tool [& args] (h/run-tool (str h/dev-dir "/extract_components.clj") args))
+(defn ^:private tool
+    [& args]
+    (h/run-tool (str h/dev-dir "/extract_components.clj") args))
 
 (deftest command-line
     (testing "stdout, --update, --check (stale and fresh) and --validate-inference"

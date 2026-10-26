@@ -98,12 +98,12 @@ function main(args)
     isempty(specs) && error("give an ID[:tag]")
     for spec in specs
         id, tag = occursin(':', spec) ? split(spec, ":") : (spec, "")
-        load_fit_seed(String(id), String(tag); makie = false)             # warm-up
+        load_fit_seed(String(id), String(tag))             # warm-up
         Profile.clear()
         Profile.init(n = 10^7, delay = delay)
         local seed
         t = @elapsed (Profile.@profile (seed, _, _) =
-            load_fit_seed(String(id), String(tag); makie = false))
+            load_fit_seed(String(id), String(tag)))
         println(
             (
             "\n=== $spec: second seed build (script load " *

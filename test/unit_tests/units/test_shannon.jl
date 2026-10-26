@@ -307,7 +307,7 @@ brute_diameter(P) = maximum(
         @test_throws ArgumentError residual_structure([1.0, 2.0])
     end
 
-    @testset "seed_model → run_model → write_report on crambin" begin
+    @testset "seed_model → run_model → write_timings on crambin" begin
         path = joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1CRN-TEST.pdb")
         solutes = Solute[NonBiological(0.15, 0.001, "sodium chloride")]
         # synthetic data on a dense grid; the model that
@@ -375,30 +375,20 @@ brute_diameter(P) = maximum(
         @test map_params["chisq_red"] ≈ sum(abs2, r_map) / (length(r_map) - 3)
         # residual statistics are a dev tool
         @test !haskey(map_params, "resid_lag1") && !haskey(map_params, "chisq_red_raw")
-        buf = IOBuffer()
-        BAYSOL.write_report(buf, res; n_atoms = s.fw.n_atoms)
-        txt = String(take!(buf))
-        for needle in ("=== Run ===", "n_q_raw", "rebin", "channels", "divergence_rate")
-            @test occursin(needle, txt)
+        # the run sheet carries the binning and the sampler's statistics
+        sheets = BAYSOL.Pipeline._summary_sheets(res; n_atoms = s.fw.n_atoms)
+        run = Dict(zip(sheets[1].cols[1], sheets[1].cols[2]))
+        for key in ("n_atoms", "n_q_raw", "rebin_channels", "channels", "divergence_rate")
+            @test haskey(run, key)
         end
-        @test !occursin("Residuals at the MAP", txt) &&
-              !occursin("=== Data (Shannon) ===", txt)
-        # the line the dev tools' report parser (dev/report.clj) reads is unchanged
-        @test occursin(r"^χ²\s+= "m, txt)
-        # merged into the Run section
-        @test !occursin("=== Diagnostics ===", txt)
-        # section order: Run (with the diagnostics), MAP, Quantiles, z-scores, Timing
-        order = [
-            first(findfirst(h, txt)) for h in (
-                "=== Run ===",
-                "divergence_rate",
-                "=== MAP ===",
-                "=== Quantiles",
-                "=== Standard deviations",
-                "=== Timing ===",
-            )
-        ]
-        @test issorted(order)
+        @test run["n_q_raw"] == length(sh.q_raw) && run["rebin_fitted"] == length(sh.q)
+        @test [x.name for x in sheets][2:3] == ["map", "quantiles_16-84"]
+        # write_timings is the timing table only
+        buf = IOBuffer()
+        BAYSOL.write_timings(buf, res)
+        txt = String(take!(buf))
+        @test startswith(txt, "stage") && occursin("fit timing", txt)
+        @test !occursin("=== ", txt)
     end
     # …acceptable
     @testset "shannon_data raises the rebin until the binning's worst-case bias is" begin

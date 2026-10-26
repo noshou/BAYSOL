@@ -12,7 +12,7 @@
 (def ^:private run-label @#'results-table/run-label)
 (def ^:private table-cells @#'results-table/table-cells)
 
-(defn- report-dict
+(defn ^:private report-dict
     "A parsed-report map with sensible defaults, overridden by the key/value pairs."
     [& kvs]
     (merge {:chi2 "+21.485",
@@ -66,10 +66,10 @@
         (is (not= (table-cells "| a | 1 |") (table-cells "| a | 2 |")))))
 
 (deftest labels
-    (testing "run labels from report paths"
+    (testing "run labels from workbook paths"
         (is (= ["SASDMJ9 —" "SASDBS6 fit2_model1"]
-                [(run-label "x/SASDMJ9/res.txt")
-                    (run-label "x/SASDBS6/res_fit2_model1.txt")]))))
+                [(run-label "x/SASDMJ9/res.xlsx")
+                    (run-label "x/SASDBS6/res_fit2_model1.xlsx")]))))
 
 (deftest check-readme
     (testing "the Results table of fitting_tests/README.md is up to date"

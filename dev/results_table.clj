@@ -12,18 +12,17 @@
 ;;     bb results-table --check
 ;;         exit 1 if the table in that README is not up to date
 ;;     bb results-table --tsv FILE
-;;         write every quantity read from every report (not only the table's
-;;         columns) to FILE, one tab-separated row per res*.txt
+;;         write every quantity read from every run (not only the table's
+;;         columns) to FILE, one tab-separated row per res*.xlsx
 ;;
-;; One row per `test/fitting_tests/*/res*.txt`: the MAP χ² (the report's `χ²` line,
-;; on the measured q grid whatever the binning of the fit, so it is comparable with
-;; the depositor's; reports from before 2026-10-09 print the binned fit's own there
-;; and the measured-grid value in their `measured grid` residual line, which is
-;; read when present), the MAP δρ₁, δρ₂, δρ₃, the profiled c1 and the share of
-;; divergent transitions, all read from the report. The depositor's χ² column
-;; cannot be computed; it comes from test/fitting_tests/depositor_chi2.tsv (one
-;; line per run). A run whose depositor text is the same as the row above it (same
-;; entry) prints ″, as the members of one deposited multi-model fit do.
+;; One row per `test/fitting_tests/*/res*.xlsx` (the workbook `results` writes,
+;; with the `res*_timings.txt` beside it for the timings): the MAP χ² (the `chi2` row
+;; of the `map` sheet, on the measured q grid whatever the binning of the fit, so it
+;; is comparable with the depositor's), the MAP δρ₁, δρ₂, δρ₃, the profiled c1 and
+;; the share of divergent transitions, all read from the workbook. The depositor's χ²
+;; column cannot be computed; it comes from test/fitting_tests/depositor_chi2.tsv
+;; (one line per run). A run whose depositor text is the same as the row above it
+;; (same entry) prints ″, as the members of one deposited multi-model fit do.
 ;;
 ;; Bold marks a parameter at a hard prior bound, c1 profiling saturation, or a chain
 ;; with more than 5 % divergent transitions. "At a bound" means within 0.05 of the
@@ -47,7 +46,7 @@
 
 (add-classpath (str (fs/parent (fs/absolutize *file*))))
 
-(require '[common :as c] '[report])
+(require '[common :as c] '[report] '[workbook])
 
 ;; Bounds of the sampled contrasts, as in
 ;; src/Inference/Inference.jl (BOUNDS_δρ₁₂, UNIT_OF_δρ, φ_max).
@@ -72,25 +71,32 @@
 
 (def ^:private who "bb results-table")
 
-(defn- report-paths
-    "Every report, in path order (the order of the table's rows)."
+(defn ^:private report-paths
+    "Every run's workbook, in path order (the order of the table's rows)."
     []
-    (->> (fs/glob (c/in-root c/fit-dir) "*/res*.txt")
+    (->> (fs/glob (c/in-root c/fit-dir) "*/res*.xlsx")
         (map str)
         sort))
 
-(defn- run-label
+(defn ^:private run-label
     "The run label as the table shows it: \"SASDBS6 fit2_model1\", or \"SASDZC6 —\"
     for a report without a tag."
     [path]
-    ;; res.txt -> "", res_fit1.txt -> "fit1"
+    ;; res.xlsx -> "", res_fit1.xlsx -> "fit1"
     (let [tag (-> (fs/file-name path)
                 fs/strip-ext
                 (subs 3)
                 (str/replace #"^_+" ""))]
         (str (fs/file-name (fs/parent path)) " " (if (seq tag) tag "—"))))
 
-(defn- depositors
+(defn ^:private read-run
+    "The parsed numbers of the run whose workbook is at `path` (with its timing file)."
+    [path]
+    (report/parse-run (workbook/read-file path)
+        (let [t (report/timings-path path)]
+            (if (fs/exists? t) (c/slurp8 t) ""))))
+
+(defn ^:private depositors
     "Depositor text for every run, from the side file: map of label -> text."
     []
     (into {}
@@ -103,22 +109,22 @@
                 :let [[run text] (str/split line #"\t" -1)]]
             [run (or text "")])))
 
-(defn- minus
+(defn ^:private minus
     "A number with a true minus sign, as the README prints them."
     [s]
     (str/replace s "-" "−"))
 
-(defn- bold
+(defn ^:private bold
     "`**text**` when `flag` is true."
     [text flag]
     (if flag (str "**" text "**") text))
 
-(defn- at-bound?
+(defn ^:private at-bound?
     "Is the contrast value `v` within `tol` of either end of [lo, hi]?"
     [v lo hi tol]
     (or (>= v (- hi tol)) (<= v (+ lo tol))))
 
-(defn- row
+(defn ^:private row
     "The cells of one table row from a parsed report."
     [run r depositor]
     (let [[rho d1 d2 d3 c1 div chi2] (map #(parse-double (r %))
@@ -137,7 +143,7 @@
             (bold (if (zero? div) "0" (str (c/fmt "%.1f" (* div 100)) " %"))
                 (> div divergent-flag))]))
 
-(defn- table-lines
+(defn ^:private table-lines
     "The table as markdown lines (header, separator, one row per report in path order),
     for the fitting tests in `only` (all of them when empty). The \"″\" repeat marker
     follows the rows actually shown."
@@ -161,18 +167,18 @@
             ;; each row next to the one shown before it, for the repeat marker
             (map (fn [prev {:keys [path label id dep]}]
                     (let [same? (and prev (= id (:id prev)) (= dep (:dep prev)))
-                            r (report/parse (c/slurp8 path))
+                            r (read-run path)
                             cells (row label r (if same? "″" dep))]
                         (str "| " (str/join " | " cells) " |")))
                 (cons nil runs)
                 runs))))
 
-(defn- tsv-text
+(defn ^:private tsv-text
     "Every parsed quantity of every report as tab-separated text: a header line (run,
-    then the union of the keys in first-seen order), then one row per res*.txt in path
+    then the union of the keys in first-seen order), then one row per res*.xlsx in path
     order; a key a report lacks is an empty cell."
     []
-    (let [runs (for [p (report-paths)] [(run-label p) (report/parse (c/slurp8 p))])
+    (let [runs (for [p (report-paths)] [(run-label p) (read-run p)])
             ks (distinct (mapcat (comp :order meta second) runs))
             ;; a number in its canonical form ("3.20" -> 3.2); no tab or newline
             cell
@@ -183,7 +189,7 @@
                 (for [[label r] runs]
                     (str/join "\t" (cons label (map #(cell r %) ks))))))))
 
-(defn- table-cells
+(defn ^:private table-cells
     "The cells of the rows of a markdown table, trimmed with runs of white space
     collapsed to one space. The separator row (|---|---|) is skipped, so column
     padding does not matter."
@@ -194,7 +200,7 @@
         (mapv #(str/replace (str/trim %) #"\s+" " ")
             (str/split (subs line 1 (dec (count line))) #"\|" -1))))
 
-(defn- readme-region
+(defn ^:private readme-region
     "The README, its text and the span between the two marker comments
     ({:readme :text :from :to}); an error, exit status 1, if a marker is missing."
     []
@@ -210,7 +216,7 @@
                     {})))
         {:readme readme, :text text, :from (+ b (count begin-mark)), :to e}))
 
-(defn- check-table
+(defn ^:private check-table
     "Is the README table the generated one? Prints the differing rows and returns 1 if
     not, else 0."
     [table]
@@ -239,7 +245,7 @@
                             " generated    : " (show (get want i)))))
                 1))))
 
-(defn- update-readme
+(defn ^:private update-readme
     "Replaces what lies between the marker comments of the README by `table`."
     [table]
     (let [{:keys [readme text from to]} (readme-region)

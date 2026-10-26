@@ -62,7 +62,7 @@
 
 ;; --- the whitespace step
 
-(defn- strip-lines
+(defn ^:private strip-lines
     "Strips the trailing blanks (spaces and tabs) from the lines of file `path` listed
     in `only` (a set of 1-based line numbers, or :all), leaving everything else, line
     endings included, untouched. Returns how many lines changed. A .tsv file is left
@@ -81,7 +81,7 @@
             (when (pos? n) (c/spit8 path (str/join "\n" stripped)))
             n)))
 
-(defn- git-check-output
+(defn ^:private git-check-output
     "The output of `git diff --check HEAD`: the lines of tracked files with trailing
     whitespace, and other problems such as leftover conflict markers. The command
     exits non-zero when it finds any, which is not an error here."
@@ -92,7 +92,7 @@
                 "--check" "HEAD")]
         (slurp (:out git-proc) :encoding "UTF-8")))
 
-(defn- summary-lines
+(defn ^:private summary-lines
     "The report of what was stripped (at most 12 files) and of the problems (at most
     12), as printed lines."
     [stripped problems]
@@ -149,7 +149,7 @@
 
 ;; --- the steps
 
-(defn- steps
+(defn ^:private steps
     "The checks, in order: {:name :quick? :cmd}. `:cmd` is a command vector, whose
     first element :julia stands for the Julia executable, or :whitespace for the
     step done in this process."
@@ -179,7 +179,7 @@
             :cmd [:julia "--startup-file=no" (str "--project=" (c/in-root "docs"))
                 (c/in-root "docs" "make.jl")]}])
 
-(defn- run-step
+(defn ^:private run-step
     "Runs one step; [state seconds] with state \"ok\" or \"FAILED\"."
     [{:keys [cmd]} julia]
     (let [t0 (System/currentTimeMillis)

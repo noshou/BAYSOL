@@ -12,7 +12,7 @@
         [common :as c]
         [helpers :as h]))
 
-(defn- make-repo
+(defn ^:private make-repo
     "A throwaway git repository with commits of increasing dates, `tags-at` being
     [date [tag ...]] pairs, one commit each, with the tags on them."
     [dir tags-at]

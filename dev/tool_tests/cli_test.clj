@@ -7,16 +7,18 @@
 (ns cli-test
     (:require [babashka.fs :as fs]
         [clojure.string :as str]
-        [clojure.test :refer [deftest is]]
+        [clojure.test :refer [deftest is testing]]
         [common :as c]
         [helpers :as h]))
 
-(defn- tool
+(defn ^:private tool
     "Runs the front end `name` (dev/<name>.clj) with `args`; {:status :out}."
     [tool-name & args]
     (apply h/run-tool (str h/dev-dir "/" tool-name ".clj") args))
 
-(defn- says? [{:keys [out]} & parts] (every? #(h/contains-text? out %) parts))
+(defn ^:private says?
+    [{:keys [out]} & parts]
+    (every? #(h/contains-text? out %) parts))
 
 (deftest diagnose-unknown-id
     (let [r (tool "diagnose" "--report" "NOPE")]
@@ -89,17 +91,46 @@
         (is (= 2 (count (re-seq #"=== diagnose: " (:out r)))))
         (is (not (h/contains-text? (:out r) "diagnose.jl --report")))))
 
-(deftest fittings-unknown-id
-    (let [r (tool "fittings" "NOPE" "SASDMJ9" "--dry-run")]
+(deftest fitting_tests-unknown-id
+    (let [r (tool "fitting_tests" "NOPE" "SASDMJ9" "--dry-run")]
         (is (= 2 (:status r)))
         (is (says? r "no fitting test folder for: NOPE"))
         (is (not (h/contains-text? (:out r) "=== fit")))))
 
-(deftest fittings-approved-needs-a-step
-    (is (= 2 (:status (tool "fittings" "SASDMJ9" "--approved" "--dry-run")))))
+(deftest fitting_tests-list
+    (let [r (tool "fitting_tests" "--list")
+            lines (str/split-lines (str/trim (:out r)))]
+        (is (= 0 (:status r)))
+        (is (= lines (sort lines)) "sorted")
+        (is (every? #(re-matches #"SASD\w+" %) lines)
+            "one ID per line, nothing else")
+        (is (some #{"SASDMJ9" "SASDEP6"} lines))
+        (is (not (h/contains-text? (:out r) "=== fit")) "nothing runs")))
 
-(deftest fittings-dry-run
-    (let [r (tool "fittings"
+(deftest fonts-check-names-against-tex-live
+    (testing "with TeX Live: true for an installed font, false for one that is not"
+        (when (fs/which "luaotfload-tool")
+            (let [ok (tool "fonts" "Latin Modern Roman")
+                    no (tool "fonts" "No Such Font Zzz")
+                    both (tool "fonts" "Latin Modern Roman" "No Such Font Zzz")]
+                (is (= 0 (:status ok)))
+                (is (h/contains-text? (:out ok) "Latin Modern Roman: true"))
+                (is (= 1 (:status no)))
+                (is (h/contains-text? (:out no) "No Such Font Zzz: false"))
+                (is (= 1 (:status both)) "one false is enough to fail")
+                (is (every? #(h/contains-text? (:out both) %)
+                        ["Latin Modern Roman: true"
+                            "No Such Font Zzz: false"])))))
+    (testing "the command line"
+        (is (= 2 (:status (tool "fonts"))) "a name or --list is needed")
+        (is (= 2 (:status (tool "fonts" "--list" "Some Font"))) "not both")
+        (is (= 2 (:status (tool "fonts" "--bogus"))))))
+
+(deftest fitting_tests-approved-needs-a-step
+    (is (= 2 (:status (tool "fitting_tests" "SASDMJ9" "--approved" "--dry-run")))))
+
+(deftest fitting_tests-dry-run
+    (let [r (tool "fitting_tests"
                 "SASDMJ9" "SASDEP6"
                 "--bench" "--report"
                 "--fixme" "--dry-run")]
@@ -112,22 +143,23 @@
         ;; the benchmark is not approved
         (is (not (h/contains-text? (:out r) "--approved")))))
 
-(deftest fittings-dry-run-approved
-    (let [r (tool "fittings" "SASDMJ9" "--bench" "--approved" "--dry-run")]
+(deftest fitting_tests-dry-run-approved
+    (let [r (tool "fitting_tests" "SASDMJ9" "--bench" "--approved" "--dry-run")]
         (is (= 0 (:status r)))
         (is (says? r "bb bench --approved SASDMJ9"))))
 
-(deftest fittings-trace-compile
-    (let [r (tool "fittings" "SASDMJ9" "--trace-compile" "/tmp/x.jl" "--dry-run")
-            missing (tool "fittings" "SASDMJ9" "--trace-compile")]
+(deftest fitting_tests-trace-compile
+    (let [r
+            (tool "fitting_tests" "SASDMJ9" "--trace-compile" "/tmp/x.jl" "--dry-run")
+            missing (tool "fitting_tests" "SASDMJ9" "--trace-compile")]
         (is (= 0 (:status r)))
         (is (re-find #"--trace-compile=/tmp/x.jl.*SASDMJ9.jl"
                 (str/replace (:out r) "\n" " ")))
         (is (= 2 (:status missing)))
         (is (says? missing "needs a value"))))
 
-(deftest fittings-table
-    (let [r (tool "fittings" "SASDMJ9" "--no-fit" "--table" "--dry-run")]
+(deftest fitting_tests-table
+    (let [r (tool "fitting_tests" "SASDMJ9" "--no-fit" "--table" "--dry-run")]
         (is (= 0 (:status r)))
         (is (says? r "bb results-table --update"))))
 

@@ -26,7 +26,7 @@ const SEED_ENTRY_OVERRIDES = Dict{String,Function}(
 )
 
 """
-    load_fit_seed(id, tag = ""; seed_options = (;), makie = true)
+    load_fit_seed(id, tag = ""; seed_options = (;))
         -> (seed, reference, label)
 
 The `Seed` that `test/fitting_tests/<id>/<id>.jl` builds for run `tag`,
@@ -34,9 +34,6 @@ plus the depositor's reference curve for it (`nothing` if the script
 has none) as the `reference` argument of `SeedDiagnostics.diagnose`.
 
 # Keywords
-- `makie = true`: set `false` to skip the script's `using GLMakie`
-    (the figure functions then can't be called); the benchmark
-    driver uses this to stay in the package's own environment.
 - `seed_options = (;)`: keywords added to the script's
     `BAYSOL.seed_model` call, e.g. `(; rebin = 8)` or `(; rebin = nothing)`
     to try another binning without editing the script.
@@ -52,7 +49,6 @@ function load_fit_seed(
     id::AbstractString,
     tag::AbstractString = "";
     seed_options::NamedTuple = (;),
-    makie::Bool = true,
 )
     fit_dir = joinpath(@__DIR__, "..", "test", "fitting_tests")
     dir = joinpath(fit_dir, id)
@@ -74,8 +70,6 @@ function load_fit_seed(
     )
     m === nothing && error("$path: found no top-level run statement to stop before")
     src = src[1:(m.offset-1)]
-    # plotting is not needed to build a seed
-    makie || (src = replace(src, r"^using GLMakie[^\n]*\n"m => ""))
 
     # the script's `BAYSOL.seed_model(...)` call gets
     # `seed_options` appended (a no-op when there are none)

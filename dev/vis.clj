@@ -50,7 +50,7 @@
             :call "sasa_hydro_report()",
             :doc "the same, numbers only, no window (works headless)"}])
 
-(defn- command
+(defn ^:private command
     "The Julia command line of one check: include its script, then call it."
     [julia {:keys [script call]}]
     [julia "--startup-file=no" (str "--project=" (c/in-root "test" "visualize"))

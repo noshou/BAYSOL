@@ -97,7 +97,7 @@
 ;; name binds it to the root, because Babashka finds `bb.edn` in the current directory.
 (def ^:dynamic *dir* nil)
 
-(defn- spawn
+(defn ^:private spawn
     "Starts a program: `opts` (babashka.process options) and the command, a nested
     collection of strings and numbers that is flattened. The process is not waited for."
     [opts cmd]
@@ -172,6 +172,16 @@
     [& args]
     (let [git-proc (spawn {:out :stream, :err :inherit, :dir *root*} ["git" args])
             out (slurp (:out git-proc) :encoding "UTF-8")]
+        (when-not (zero? (:exit @git-proc))
+            (throw (ex-info (str "git " (str/join " " args) " failed") {})))
+        out))
+
+(defn git-bytes
+    "Output of `git -C <root> args` as bytes (a binary file at a revision). A failing git
+    raises an error."
+    [& args]
+    (let [git-proc (spawn {:out :stream, :err :inherit, :dir *root*} ["git" args])
+            out (.readAllBytes ^java.io.InputStream (:out git-proc))]
         (when-not (zero? (:exit @git-proc))
             (throw (ex-info (str "git " (str/join " " args) " failed") {})))
         out))
@@ -357,7 +367,7 @@
             v)
         :else v))
 
-(defn- fmt-f
+(defn ^:private fmt-f
     "`%.<n>f` of x. A negative value that rounds to zero keeps its sign (\"-0.00\")."
     [x n]
     (let [s (-> (BigDecimal. (Math/abs (double x)))
@@ -365,7 +375,7 @@
                 .toPlainString)]
         (if (neg? (Math/copySign 1.0 (double x))) (str "-" s) s)))
 
-(defn- fmt-g
+(defn ^:private fmt-g
     "`%.<p>g` of x: p significant digits, trailing zeros dropped, the exponent form
     (\"1.23e+05\") below 1e-4 and from 10^p up."
     [x p]

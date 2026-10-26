@@ -23,7 +23,7 @@
         [clojure.test :as t]
         [common :as c]))
 
-(defn- test-namespaces
+(defn ^:private test-namespaces
     "The namespaces of the test files that match `names` (all when empty), sorted:
     common_test.clj holds the namespace common-test."
     [names]

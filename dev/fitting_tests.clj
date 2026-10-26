@@ -4,9 +4,11 @@
 ;; Runs the end-to-end fitting tests (test/fitting_tests/<ID>/): each is a script
 ;; that fits one SASBDB entry and writes its report and figures next to it.
 ;;
-;;     bb fittings [ID ...] [--no-fit] [--bench] [--approved] [--report]
+;;     bb fitting-tests --list
+;;     bb fitting-tests [ID ...] [--no-fit] [--bench] [--approved] [--report]
 ;;         [--table] [--fixme] [--trace-compile FILE] [--dry-run]
 ;;
+;;   --list     print the ID of every fitting test, one per line, and run nothing
 ;;   ID         the fitting-test folders to run (SASDMJ9, SASDBS6, ...). Every one
 ;;              must exist, or nothing runs. With none given, every fitting test runs.
 ;;   --bench    also run the cold / steady-state benchmark on the selected fits
@@ -37,7 +39,7 @@
 ;; and figures in their folders. Needs Babashka and `julia` on the PATH (or
 ;; JULIA=/path/to/julia); shared helpers are in dev/common.clj.
 
-(ns fittings
+(ns fitting-tests
     (:require [babashka.classpath :refer [add-classpath]]
         [babashka.fs :as fs]
         [clojure.string :as str]))
@@ -46,21 +48,22 @@
 
 (require '[common :as c])
 
-(def ^:private who "bb fittings")
+(def ^:private who "bb fitting-tests")
 
 (def ^:private flag-names
-    ["--bench" "--approved" "--no-fit" "--report" "--table" "--fixme" "--dry-run"])
+    ["--list" "--bench" "--approved" "--no-fit" "--report" "--table" "--fixme"
+        "--dry-run"])
 
 ;; The options that take a value.
 (def ^:private valued ["--trace-compile"])
 
-(defn- tool
+(defn ^:private tool
     "The command that runs another Babashka tool of the repository by its task name:
     `bb <task> args`."
     [task & args]
     (into ["bb" task] args))
 
-(defn- steps
+(defn ^:private steps
     "The steps to run, in order, as [label failure-name command-or-fn]. Each has a
     command (a vector, run with `sh`) and runs only if its flag was given (the fits
     unless --no-fit)."
@@ -105,27 +108,29 @@
                 (c/fail who "--approved only applies together with --bench"))
             ;; every folder asked for must exist; none asked for means all of them
             (c/check-folders who specs false)
-            (let [selected (or (seq specs) (c/ids))
-                    julia (c/find-julia)
-                    dry (boolean (flag? "--dry-run"))
-                    ;; a failing step does not stop the others
-                    failed (doall
-                        (for [[label failure cmd] (steps {:flag? flag?,
-                                        :selected selected,
-                                        :requested specs,
-                                        :julia julia,
-                                        :trace trace})
-                                :let [_ (println (str "\n=== " label))]
-                                :when (not (binding [c/*dir* (when (= "bb"
-                                                    (first cmd))
-                                                c/*root*)]
-                                        (c/sh dry cmd)))]
-                            failure))]
-                (when (seq failed)
-                    (binding [*out* *err*]
-                        (println (str "\n" who
-                                ": failed: " (str/join ", " failed))))
-                    1)))))
+            (if (flag? "--list")
+                (run! println (c/ids))
+                (let [selected (or (seq specs) (c/ids))
+                        julia (c/find-julia)
+                        dry (boolean (flag? "--dry-run"))
+                        ;; a failing step does not stop the others
+                        failed (doall
+                            (for [[label failure cmd] (steps {:flag? flag?,
+                                            :selected selected,
+                                            :requested specs,
+                                            :julia julia,
+                                            :trace trace})
+                                    :let [_ (println (str "\n=== " label))]
+                                    :when (not (binding [c/*dir*
+                                                (when (= "bb" (first cmd))
+                                                    c/*root*)]
+                                            (c/sh dry cmd)))]
+                                failure))]
+                    (when (seq failed)
+                        (binding [*out* *err*]
+                            (println (str "\n" who
+                                    ": failed: " (str/join ", " failed))))
+                        1))))))
 
 ;; Run only when executed as a script, so the functions can be loaded for testing.
 (when (= *file* (System/getProperty "babashka.file"))

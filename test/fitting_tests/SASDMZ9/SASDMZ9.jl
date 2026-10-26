@@ -157,38 +157,6 @@ end
 #                         Shared plotting helpers
 # ---------------------------------------------------------------------------
 
-"""
-    _positive_log_floor(values)
-
-Return a strictly positive plotting floor based on the smallest finite,
-positive value in `values`.
-
-This is used only for visualization on logarithmic axes.
-"""
-function _positive_log_floor(values)
-    positive = values[
-        isfinite.(values) .& (values .> 0)
-    ]
-    if isempty(positive)
-        return eps(Float64)
-    end
-    return max(minimum(positive) / 2, eps(Float64))
-end
-
-"""
-    _valid_log_xy(x, y)
-
-Return a mask selecting finite, strictly positive x/y values.
-"""
-function _valid_log_xy(x, y)
-    return (
-        isfinite.(x) .&
-        isfinite.(y) .&
-        (x .> 0) .&
-        (y .> 0)
-    )
-end
-
 # ---------------------------------------------------------------------------
 #                         Generic run model function
 # ---------------------------------------------------------------------------
@@ -223,331 +191,13 @@ end
 #                         Generic fit figure
 # ---------------------------------------------------------------------------
 
-function sasdmz9_figure(result, data)
-    _, _, map_result, quantile_result = result
-    q_fit, I_fit, σ_fit = data
-
-    valid_data =
-        isfinite.(q_fit) .&
-        isfinite.(I_fit) .&
-        isfinite.(σ_fit) .&
-        (q_fit .> 0) .&
-        (I_fit .> 0) .&
-        (σ_fit .>= 0)
-
-    q_plot = q_fit[valid_data]
-    I_plot = I_fit[valid_data]
-    σ_plot = σ_fit[valid_data]
-
-    if isempty(I_plot)
-        error("No positive finite experimental intensities available for log plot.")
-    end
-
-    y_floor = _positive_log_floor(I_plot)
-
-    fig = Figure(size = FIG_SIZE_CURVE)
-    ax = Axis(
-        fig[1, 1],
-        xlabel = "q (Å⁻¹)",
-        ylabel = "I(q)",
-        xscale = log10,
-        yscale = log10,
-    )
-
-    # Quantile/bounds envelope
-    if quantile_result !== nothing
-        _, curves = quantile_result
-        bounds = curves["bounds"]
-        quantiles = curves["quantiles"]
-
-        q_bounds = bounds[:, 1]
-        lo_bounds = bounds[:, 2]
-        hi_bounds = bounds[:, 3]
-        lo_bounds = max.(lo_bounds, y_floor)
-        hi_bounds = max.(hi_bounds, y_floor)
-
-        valid_bounds =
-            isfinite.(q_bounds) .&
-            isfinite.(lo_bounds) .&
-            isfinite.(hi_bounds) .&
-            (q_bounds .> 0)
-
-        if any(valid_bounds)
-            band!(
-                ax,
-                q_bounds[valid_bounds],
-                lo_bounds[valid_bounds],
-                hi_bounds[valid_bounds];
-                color = COLOR_BAND,
-                label = "bounds",
-            )
-        end
-
-        q_quant = quantiles[:, 1]
-        lo_quant = quantiles[:, 2]
-        hi_quant = quantiles[:, 3]
-        lo_quant = max.(lo_quant, y_floor)
-        hi_quant = max.(hi_quant, y_floor)
-
-        valid_quant =
-            isfinite.(q_quant) .&
-            isfinite.(lo_quant) .&
-            isfinite.(hi_quant) .&
-            (q_quant .> 0)
-
-        if any(valid_quant)
-            lines!(
-                ax,
-                q_quant[valid_quant],
-                lo_quant[valid_quant];
-                linestyle = :dot,
-                color = COLOR_POSTERIOR,
-                linewidth = LW_QUANTILE,
-                label = "quantiles",
-            )
-            lines!(
-                ax,
-                q_quant[valid_quant],
-                hi_quant[valid_quant];
-                linestyle = :dot,
-                color = COLOR_POSTERIOR,
-                linewidth = LW_QUANTILE,
-            )
-        end
-    end
-
-    # Experimental error bars (delta method in log10 space)
-    log_I = log10.(I_plot)
-    log_σ = σ_plot ./ (I_plot .* log(10))
-    err_lo = exp10.(log_I .- log_σ)
-    err_hi = exp10.(log_I .+ log_σ)
-    err_lo = max.(err_lo, y_floor)
-    err_hi = max.(err_hi, y_floor)
-
-    valid_errors =
-        isfinite.(q_plot) .&
-        isfinite.(err_lo) .&
-        isfinite.(err_hi) .&
-        (q_plot .> 0) .&
-        (err_lo .> 0) .&
-        (err_hi .> 0)
-
-    if any(valid_errors)
-        rangebars!(
-            ax,
-            q_plot[valid_errors],
-            err_lo[valid_errors],
-            err_hi[valid_errors];
-            whiskerwidth = WHISKERWIDTH,
-            color = COLOR_ERRORBAR,
-        )
-    end
-
-    scatter!(
-        ax,
-        q_plot,
-        I_plot;
-        markersize = MARKERSIZE,
-        color = COLOR_DATA,
-        label = "data",
-    )
-
-    # MAP curve
-    if map_result !== nothing
-        _, map_curve = map_result
-        q_map = map_curve[:, 1]
-        I_map = map_curve[:, 2]
-
-        valid_map =
-            isfinite.(q_map) .&
-            isfinite.(I_map) .&
-            (q_map .> 0) .&
-            (I_map .> 0)
-
-        if any(valid_map)
-            lines!(
-                ax,
-                q_map[valid_map],
-                max.(I_map[valid_map], y_floor);
-                color = COLOR_MAP,
-                linewidth = LW_MAP,
-                label = "MAP",
-            )
-        end
-    end
-
-    axislegend(ax; position = :lb, framevisible = false)
-
-    lo, hi = extrema(I_plot)
-    lo = max(lo, y_floor)
-    hi = max(hi, lo * 1.3)
-    ymin = max(lo * YLIM_LOG_LO, eps(Float64))
-    ymax = max(hi * YLIM_LOG_HI, ymin * 1.01)
-    ylims!(ax, ymin, ymax)
-
-    return fig
-end
-
 # ---------------------------------------------------------------------------
 #                         Generic residual figure
 # ---------------------------------------------------------------------------
 
-function sasdmz9_residuals_figure(result, data)
-    _, _, map_result, quantile_result = result
-    q_fit, I_fit, σ_fit = data
-
-    fig = Figure(size = FIG_SIZE_RESIDUALS)
-    ax = Axis(fig[1, 1], xlabel = "q (Å⁻¹)", ylabel = "I(q) - I_MAP(q)")
-
-    map_curve = map_result === nothing ? nothing : map_result[2]
-
-    if map_curve !== nothing
-        I_map = map_curve[:, 2]
-
-        if quantile_result !== nothing
-            _, curves = quantile_result
-            bounds = curves["bounds"]
-            quantiles = curves["quantiles"]
-
-            q_bounds = bounds[:, 1]
-            lo_bounds = bounds[:, 2]
-            hi_bounds = bounds[:, 3]
-
-            valid_bounds =
-                isfinite.(q_bounds) .&
-                isfinite.(lo_bounds) .&
-                isfinite.(hi_bounds) .&
-                isfinite.(I_map)
-
-            if any(valid_bounds)
-                band!(
-                    ax,
-                    q_bounds[valid_bounds],
-                    lo_bounds[valid_bounds] .- I_map[valid_bounds],
-                    hi_bounds[valid_bounds] .- I_map[valid_bounds];
-                    color = COLOR_BAND_RESID,
-                    label = "bounds",
-                )
-            end
-
-            q_quant = quantiles[:, 1]
-            lo_quant = quantiles[:, 2]
-            hi_quant = quantiles[:, 3]
-
-            valid_quant =
-                isfinite.(q_quant) .&
-                isfinite.(lo_quant) .&
-                isfinite.(hi_quant) .&
-                isfinite.(I_map)
-
-            if any(valid_quant)
-                lines!(
-                    ax,
-                    q_quant[valid_quant],
-                    lo_quant[valid_quant] .- I_map[valid_quant];
-                    linestyle = :dot,
-                    color = COLOR_POSTERIOR,
-                    linewidth = LW_QUANTILE_RESID,
-                    label = "quantiles",
-                )
-                lines!(
-                    ax,
-                    q_quant[valid_quant],
-                    hi_quant[valid_quant] .- I_map[valid_quant];
-                    linestyle = :dot,
-                    color = COLOR_POSTERIOR,
-                    linewidth = LW_QUANTILE_RESID,
-                )
-            end
-        end
-
-        resid = I_fit .- I_map
-        valid_resid =
-            isfinite.(q_fit) .&
-            isfinite.(I_fit) .&
-            isfinite.(σ_fit) .&
-            isfinite.(resid) .&
-            (q_fit .> 0) .&
-            (σ_fit .>= 0)
-
-        if any(valid_resid)
-            errorbars!(
-                ax,
-                q_fit[valid_resid],
-                resid[valid_resid],
-                σ_fit[valid_resid];
-                whiskerwidth = WHISKERWIDTH,
-                color = COLOR_ERRORBAR,
-            )
-            scatter!(
-                ax,
-                q_fit[valid_resid],
-                resid[valid_resid];
-                markersize = MARKERSIZE,
-                color = COLOR_DATA,
-                label = "data - MAP",
-            )
-            hlines!(ax, [0.0]; color = COLOR_MAP, linewidth = LW_ZERO_LINE)
-
-            lo, hi = extrema(resid[valid_resid])
-            if lo == hi
-                pad = max(abs(lo) * 0.3, 1.0)
-            else
-                pad = YLIM_LIN_PAD_FRAC * (hi - lo)
-            end
-            ylims!(ax, lo - pad, hi + pad)
-        end
-    end
-
-    axislegend(ax; position = :rt, framevisible = false)
-    return fig
-end
-
 # ---------------------------------------------------------------------------
 #                         Generic histogram figure
 # ---------------------------------------------------------------------------
-
-function sasdmz9_hist(result)
-    fit, _, map_result, _ = result
-    ok = .!getproperty.(fit.stats, :numerical_error)
-    samples = fit.samples[ok]
-    c1_draws = fit.c1[ok]
-    scale_draws = fit.scale[ok]
-    bkgrnd_draws = fit.bkgrnd_corr[ok]
-    map_params = map_result === nothing ? nothing : map_result[1]
-
-    fig = Figure(size = FIG_SIZE_HIST)
-    for (i, (label, map_key)) in enumerate(HIST_PARAMS)
-        row, col = fldmod1(i, 3)
-        ax = Axis(
-            fig[row, col],
-            xlabel = label,
-            ylabel = "count",
-            xticklabelrotation = π / 2,
-        )
-        values = if label == "c1"
-            c1_draws
-        elseif label == "scale"
-            scale_draws
-        elseif label == "bkgrnd_corr"
-            bkgrnd_draws
-        else
-            getindex.(samples, i)
-        end
-        valid = isfinite.(values)
-        values = values[valid]
-        if !isempty(values)
-            hist!(ax, values; bins = HIST_BINS, color = COLOR_HIST)
-        end
-        if map_params !== nothing
-            map_value = map_params[map_key]
-            if isfinite(map_value)
-                vlines!(ax, [map_value]; color = COLOR_MAP, linewidth = LW_MAP)
-            end
-        end
-    end
-    return fig
-end
 
 # ---------------------------------------------------------------------------
 #                               Model 1
@@ -566,9 +216,16 @@ const _PDB_PATH1 = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1_model1.pdb")
 result1, form_factor_log1, n_atoms1, (q_fit1, I_fit1, σ_fit1) =
     run_sasdmz9_model(_PDB_PATH1)
 
-open(joinpath(@__DIR__, "res_model1.txt"), "w") do io
-    BAYSOL.write_report(io, result1; form_factor_log = form_factor_log1, n_atoms = n_atoms1)
-end
+# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
+# that their time is in its timing section.
+BAYSOL.results(
+    result1, (q_fit1, I_fit1, σ_fit1);
+    dir = @__DIR__, name = "res_model1",
+    form_factor_log = form_factor_log1, n_atoms = n_atoms1,
+)
+
+BAYSOL.write_timings(joinpath(@__DIR__, "res_model1_timings.txt"), result1)
+BAYSOL.print_summary(result1)
 
 # ---------------------------------------------------------------------------
 #                               Model 2
@@ -581,9 +238,16 @@ const _PDB_PATH2 = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1_model2.pdb")
 result2, form_factor_log2, n_atoms2, (q_fit2, I_fit2, σ_fit2) =
     run_sasdmz9_model(_PDB_PATH2)
 
-open(joinpath(@__DIR__, "res_model2.txt"), "w") do io
-    BAYSOL.write_report(io, result2; form_factor_log = form_factor_log2, n_atoms = n_atoms2)
-end
+# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
+# that their time is in its timing section.
+BAYSOL.results(
+    result2, (q_fit2, I_fit2, σ_fit2);
+    dir = @__DIR__, name = "res_model2",
+    form_factor_log = form_factor_log2, n_atoms = n_atoms2,
+)
+
+BAYSOL.write_timings(joinpath(@__DIR__, "res_model2_timings.txt"), result2)
+BAYSOL.print_summary(result2)
 
 # ---------------------------------------------------------------------------
 #                               Model 3
@@ -596,49 +260,13 @@ const _PDB_PATH3 = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1_model3.pdb")
 result3, form_factor_log3, n_atoms3, (q_fit3, I_fit3, σ_fit3) =
     run_sasdmz9_model(_PDB_PATH3)
 
-open(joinpath(@__DIR__, "res_model3.txt"), "w") do io
-    BAYSOL.write_report(io, result3; form_factor_log = form_factor_log3, n_atoms = n_atoms3)
-end
-
-# Plotting is loaded after the fits: loading GLMakie first invalidates compiled BAYSOL
-# methods, which every fit would then recompile (about 40 % of a fit's wall clock).
-using GLMakie
-
-fig1 = sasdmz9_figure(result1, (q_fit1, I_fit1, σ_fit1))
-save(joinpath(@__DIR__, "res_model1.png"), fig1; px_per_unit = PX_PER_UNIT)
-
-fig_residuals1 = sasdmz9_residuals_figure(result1, (q_fit1, I_fit1, σ_fit1))
-save(
-    joinpath(@__DIR__, "res_model1_residuals.png"),
-    fig_residuals1;
-    px_per_unit = PX_PER_UNIT,
+# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
+# that their time is in its timing section.
+BAYSOL.results(
+    result3, (q_fit3, I_fit3, σ_fit3);
+    dir = @__DIR__, name = "res_model3",
+    form_factor_log = form_factor_log3, n_atoms = n_atoms3,
 )
 
-fig_hist1 = sasdmz9_hist(result1)
-save(joinpath(@__DIR__, "res_model1_hist.png"), fig_hist1; px_per_unit = PX_PER_UNIT)
-
-fig2 = sasdmz9_figure(result2, (q_fit2, I_fit2, σ_fit2))
-save(joinpath(@__DIR__, "res_model2.png"), fig2; px_per_unit = PX_PER_UNIT)
-
-fig_residuals2 = sasdmz9_residuals_figure(result2, (q_fit2, I_fit2, σ_fit2))
-save(
-    joinpath(@__DIR__, "res_model2_residuals.png"),
-    fig_residuals2;
-    px_per_unit = PX_PER_UNIT,
-)
-
-fig_hist2 = sasdmz9_hist(result2)
-save(joinpath(@__DIR__, "res_model2_hist.png"), fig_hist2; px_per_unit = PX_PER_UNIT)
-
-fig3 = sasdmz9_figure(result3, (q_fit3, I_fit3, σ_fit3))
-save(joinpath(@__DIR__, "res_model3.png"), fig3; px_per_unit = PX_PER_UNIT)
-
-fig_residuals3 = sasdmz9_residuals_figure(result3, (q_fit3, I_fit3, σ_fit3))
-save(
-    joinpath(@__DIR__, "res_model3_residuals.png"),
-    fig_residuals3;
-    px_per_unit = PX_PER_UNIT,
-)
-
-fig_hist3 = sasdmz9_hist(result3)
-save(joinpath(@__DIR__, "res_model3_hist.png"), fig_hist3; px_per_unit = PX_PER_UNIT)
+BAYSOL.write_timings(joinpath(@__DIR__, "res_model3_timings.txt"), result3)
+BAYSOL.print_summary(result3)

@@ -7,13 +7,16 @@ repository root; `bb help` lists them with a line each.
 ```bash
 bb unit                                               # the whole Julia unit suite
 bb unit shannon wls                                   # only the test files whose name contains one of these words
-bb fittings                                           # every fitting test
-bb fittings SASDMJ9 SASDBS6                           # just these
-bb fittings SASDMJ9 --report                          # run it, then print its Results-table row
-bb fittings --no-fit --table                          # rewrite the Results table in fitting_tests/README.md from the reports
-bb fittings SASDMJ9 --fixme                           # run it, then the sampler diagnostics
-bb fittings SASDMJ9 --bench                           # prints the benchmark plan; runs no benchmark
-bb fittings SASDMJ9 --bench --approved                # runs the benchmark (see below)
+bb fitting-tests                                           # every fitting test
+bb fitting-tests SASDMJ9 SASDBS6                           # just these
+bb fitting-tests SASDMJ9 --report                          # run it, then print its Results-table row
+bb fitting-tests --no-fit --table                          # rewrite the Results table in fitting_tests/README.md from the workbooks
+bb fitting-tests SASDMJ9 --fixme                           # run it, then the sampler diagnostics
+bb fitting-tests SASDMJ9 --bench                           # prints the benchmark plan; runs no benchmark
+bb fitting-tests SASDMJ9 --bench --approved                # runs the benchmark (see below)
+bb fitting-tests --list                                    # the IDs of the fitting tests, one per line
+bb render-plots test/fitting_tests --recursive        # render the figures' .tex files to PDF (--type svg|png|jpeg)
+bb fonts "TeX Gyre Pagella"                           # is a font available to LaTeX? prints true or false (--list: every font)
 bb diagnose --residuals                               # no fit named: every run of every fitting test (53)
 bb diagnose SASDMJ9                                   # every diagnostic part on this fit
 bb diagnose --chains --seeds 1,2,3 SASDMJ9            # only the chains, three RNG seeds
@@ -31,14 +34,14 @@ bb precommit                                          # all pre-commit checks
 bb precommit --quick                                  # only the checks that take a second
 ```
 
-Every script prints its usage with `--help`, and the ones that start work accept `--dry-run` (print the
-commands, run nothing). They stop before running anything if a name you give does not exist.
+Every script prints its usage with `--help`, and the ones that start long jobs (`fitting-tests`, `bench`,
+`diagnose`, `precommit`) accept `--dry-run` (print the commands, run nothing). They stop before running anything if a name you give does not exist.
 
 ## Tasks and files
 
 `bb.edn` (repository root) gives each tool a `bb <task>` name and a one-line description (`bb help`). Run
-`bb <task>` from the repository root; the scripts themselves work from anywhere (`bb dev/fittings.clj ...` is
-the same as `bb fittings ...`). To add a tool, give it a task in `bb.edn` with the `script` helper
+`bb <task>` from the repository root; the scripts themselves work from anywhere (`bb dev/fitting_tests.clj ...` is
+the same as `bb fitting-tests ...`). To add a tool, give it a task in `bb.edn` with the `script` helper
 (`mytool {:doc "..." :task (script "dev/mytool.clj")}`) and a section below if it needs one.
 `bb tasks` prints `bb.edn` itself (it overrides Babashka's built-in `tasks`). `bb.edn` is formatted by
 `bb fmt` (zprint, 4-space indent), which also decides the order of the keys inside a task. The
@@ -51,7 +54,8 @@ The files of this folder that are not tasks:
 | File                                                      | What it is                                                                                                                                   |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `common.clj`                                              | helpers shared by the scripts: the repository root, running programs, git, the fitting-test lookups, command lines, number formatting        |
-| `report.clj`                                              | parses one fitting-test report (`res*.txt`) into a map of numbers; used by `compare.clj` and `results_table.clj`                             |
+| `report.clj`                                              | `parse-run`: one fitting-test run (its `res*.xlsx` workbook and `res*_timings.txt`) into a map of numbers; used by `compare.clj` and `results_table.clj` |
+| `workbook.clj`                                            | reads the sheets of an `.xlsx` (a zip of XML, JDK only); used by `report.clj`                                                                |
 | `reflow.clj`                                              | re-wraps long comments and docstrings; `bb fmt` runs it after the formatters                                                                 |
 | `child.jl`, `diagnose.jl`, `profile_seed.jl`, `format.jl` | the Julia side of `bench.clj`, `diagnose.clj`, `profile.clj` and `format.clj`                                                                |
 | `fit_seed.jl`, `seed_diagnostics.jl`                      | the `Seed` a fitting test would sample, built without fitting, and the sampler diagnostics that run on any `Seed`; a unit test includes them |
@@ -70,23 +74,25 @@ bb bench --approved --state cold --out test/baselines/<name>.json SASDMJ9 SASDBS
 bb extract-formfactor xraydb.sqlite src/Scattering/form_factors.sqlite3
 ```
 
-- **`compare.clj`** compares fitting-test results (`test/fitting_tests/*/res*.txt`) between git revisions and the working tree: timing totals, χ² and parameter distributions, the fits with the deepest NUTS trees.
-- **`results_table.clj`** generates the Results table of `test/fitting_tests/README.md` from the reports (`--update` rewrites it in place, `--check` exits 1 if it is stale, `--tsv FILE` writes every quantity read from the reports).
+- **`compare.clj`** compares fitting-test results (`test/fitting_tests/*/res*.xlsx` and `res*_timings.txt`) between git revisions and the working tree: timing totals, χ² and parameter distributions, the fits with the deepest NUTS trees.
+- **`results_table.clj`** generates the Results table of `test/fitting_tests/README.md` from the workbooks (`--update` rewrites it in place, `--check` exits 1 if it is stale, `--tsv FILE` writes every quantity read from the reports).
 - **`bench.clj`** is the cold / steady-state benchmark driver (protocol below): a throwaway depot and repository copy, one `child.jl` process per fit, one JSON result.
 - **`extract_formfactor.clj`** rebuilds `src/Scattering/form_factors.sqlite3` from xraydb's `xraydb.sqlite` (Waasmaier-Kirfel f0, Chantler f1/f2, and deuterium as a copy of hydrogen). Offline; the result is checked in.
 
-## bb fittings
+## bb fitting-tests
 
 ```
-bb fittings [ID ...] [--no-fit] [--bench] [--approved] [--report] [--table] [--fixme] [--trace-compile FILE] [--dry-run]
+bb fitting-tests --list
+bb fitting-tests [ID ...] [--no-fit] [--bench] [--approved] [--report] [--table] [--fixme] [--trace-compile FILE] [--dry-run]
 ```
 
+- **`--list`** prints the ID of every fitting test, one per line, and runs nothing.
 - **`ID ...`** are folders of `test/fitting_tests/` (`SASDMJ9`, `SASDBS6`, ...). If none exist, nothing runs and the available folders are listed. With none given, every fitting test runs. Each fit is its script run with the `test/fitting_tests` environment; it rewrites its `res*.txt` and figures.
 - **`--no-fit`** skips the fits themselves, for when only a later step is wanted.
 - The steps run in a fixed order: the fits, then `--bench`, then `--report`, then `--table`, then `--fixme`. A failing step does not stop the later ones; the exit status is 1 if any failed.
 - **`--bench`** also runs the cold / steady-state benchmark (`bench.clj`) on the selected fits, one `ID[:tag]` per run of each script. **Without `--approved` this only prints the benchmark's plan and runs nothing.** **`--approved`** is passed to the benchmark. Benchmark timings are only meaningful on a quiet machine, so a benchmark runs only after the repository owner has approved that run. `--approved` without `--bench` is an error.
-- **`--report`** prints the Results-table rows of the selected fits (`results_table.clj`), from the reports the fits just wrote. To rewrite the table in `fitting_tests/README.md`, use `bb results-table --update`.
-- **`--table`** rewrites the Results table in `fitting_tests/README.md` from every report (`results_table.clj --update`), whatever IDs are named.
+- **`--report`** prints the Results-table rows of the selected fits (`results_table.clj`), from the workbooks the fits just wrote. To rewrite the table in `fitting_tests/README.md`, use `bb results-table --update`.
+- **`--table`** rewrites the Results table in `fitting_tests/README.md` from every workbook (`results_table.clj --update`), whatever IDs are named.
 - **`--trace-compile FILE`** runs the fits with Julia's `--trace-compile=FILE`: the file lists the methods each fit's process had to compile at run time, i.e. what a precompile workload has not covered.
 - **`--fixme`** runs the sampler diagnostics (`diagnose.clj --report`) on every run of the selected fits: MAP starts, Hessian, step size and tree depth, gradient error, modes. Use it when a fit looks wrong.
 
@@ -96,7 +102,7 @@ bb fittings [ID ...] [--no-fit] [--bench] [--approved] [--report] [--table] [--f
 bb profile ID[:tag] [ID[:tag] ...] [--delay SECONDS] [--dry-run]
 ```
 
-Builds the `Seed` of each fitting test twice in one process (the first call warms the compiler) and profiles the second with Julia's sampling profiler: the stage timings of that build (each static stage with its note, e.g. `[cache hit]` or the residue counts of the nucleotide stages; see "Reports" below) and the samples by function, charged to the innermost BAYSOL function (its own code plus the libraries it calls) and inclusive. The profiler slows the code by a factor of several, so read the proportions, not the seconds. It is how the time in `forward_cache` was found; use `bb fittings --bench --approved` or the reports to measure a change.
+Builds the `Seed` of each fitting test twice in one process (the first call warms the compiler) and profiles the second with Julia's sampling profiler: the stage timings of that build (each static stage with its note, e.g. `[cache hit]` or the residue counts of the nucleotide stages; see "Reports" below) and the samples by function, charged to the innermost BAYSOL function (its own code plus the libraries it calls) and inclusive. The profiler slows the code by a factor of several, so read the proportions, not the seconds. It is how the time in `forward_cache` was found; use `bb fitting-tests --bench --approved` or the reports to measure a change.
 
 ## bb vis
 
@@ -113,7 +119,7 @@ Runs every `../test/unit_tests/units/test_*.jl` (or, given words, the files whos
 
 ## bb test
 
-Runs the [clojure.test](https://clojure.github.io/clojure/clojure.test-api.html) files `tool_tests/*_test.clj`, which cover the dev tools (`common.clj`, `report.clj`, `results_table.clj`, `compare.clj`, `bench.clj`, `extract_formfactor.clj`, `extract_components.clj` and the command-line front ends). They run no Julia, no fit and no benchmark (`bench.clj` is tested only without `--approved`, on a sandbox). Given words, only the test files whose name contains one of them run (`bb test compare bench`); the exit status is 1 if a test fails.
+Runs the [clojure.test](https://clojure.github.io/clojure/clojure.test-api.html) files `tool_tests/*_test.clj`, which cover the dev tools (`common.clj`, `report.clj`, `workbook.clj`, `results_table.clj`, `compare.clj`, `bench.clj`, `extract_formfactor.clj`, `extract_components.clj` and the command-line front ends). They run no Julia, no fit and no benchmark (`bench.clj` is tested only without `--approved`, on a sandbox). Given words, only the test files whose name contains one of them run (`bb test compare bench`); the exit status is 1 if a test fails.
 
 ## bb extract-components
 
@@ -154,6 +160,25 @@ The code rule of the repository is **at most 92 characters per line** in code fi
 `.scss`, `.yml`; not Markdown or data). `format.clj` formats the Julia files with
 [JuliaFormatter.jl](https://github.com/domluna/JuliaFormatter.jl) (settings in `.JuliaFormatter.toml`, environment `test/format`) and the Clojure and EDN files with [zprint](https://github.com/kkinnear/zprint) (needs `java`) followed by a re-indentation in multiples of 4. Neither wraps comments or docstring text, so `format.clj` then runs `reflow.clj`: every comment block and docstring paragraph that contains a line over the limit is re-wrapped, balanced; a block that fits is left alone, so a second `bb fmt` changes nothing. `bb fmt-check` lists the files that the formatters or the re-wrapping would change. Long string literals and symbols are split by hand: `bb linelen --check` reports every line still over the limit, and the precommit refuses the commit while there is one.
 
+**Private functions** are written `(defn ^:private name ...)`, as a private `def` is (`def ^:private`), never `defn-`. `bb fmt` rewrites a top-level `(defn- ` into it before zprint runs, and `bb fmt-check` (so `bb precommit`) fails on one.
+
+## bb render-plots
+
+```
+bb render-plots DIR [--recursive] [--type pdf|svg|png|jpeg]
+```
+
+Renders the `.tex` figures that `results` writes. `DIR` is the folder with the files; `--recursive` also takes its subfolders. Each file is compiled with `lualatex` (or `xelatex`) in its own folder, with `-interaction=nonstopmode -halt-on-error`, and its `.aux` and `.log` are removed afterwards; a file that fails keeps its `.log` and the others still run. The default `--type pdf` needs only the engine; `svg`, `png` and `jpeg` convert the PDF with poppler's `pdftocairo` and remove it. Output files sit next to their `.tex`. The exit status is 1 if any file failed or no engine is installed. SVG is about four to five times the size of the PDF and its text is outlines, not text, so it is for web pages and slides.
+
+## bb fonts
+
+```
+bb fonts NAME [NAME ...]
+bb fonts --list
+```
+
+Asks the TeX Live installation whether a font can be used for the figures. For each `NAME` (a `fontspec` name such as `TeX Gyre Pagella` or `Latin Modern Math`; case and spaces do not matter) it prints `NAME: true` or `NAME: false`, and the exit status is 1 if any is `false`. Any font that says `true` is a valid `font` of `results`, as the text font, or as the second entry of a `("Text font", "Math font")` pair. `--list` prints every installed font family (from `fc-list`, or from LuaLaTeX's index where there is none), the math fonts first. The check is `luaotfload-tool --find`, which comes with TeX Live, and it does not rebuild the font database: a font installed since the database was last built needs `luaotfload-tool --update` first. Without `luaotfload-tool` the tool stops with a message, since nothing can be said about a font. `BAYSOL.font_available("NAME")` is the same question from Julia.
+
 ## bb docs
 
 ```
@@ -182,7 +207,7 @@ settings in `.clj-kondo/config.edn`), **line-length** (a line over 92 characters
 
 ## Reports
 
-The `=== Timing ===` section of a report lists the stages of the static build in the order the pipeline recorded them (`Pipeline._write_timing`); a stage with a note prints it in square brackets on the lines under it, wrapped to 80 columns (the parsers join a wrapped note). Reports from before 2026-10-22 print the note on the stage's own line before its seconds, where a long name touches it (`pdb2pqr (mixed, propka)[cache hit]`); the parsers read both layouts.
+The timing table (`res*_timings.txt`) lists the stages of the static build in the order the pipeline recorded them (`Pipeline._write_timing`); a stage with a note prints it in square brackets on the lines under it, wrapped to 80 columns (the parsers join a wrapped note). Reports from before 2026-10-22 print the note on the stage's own line before its seconds, where a long name touches it (`pdb2pqr (mixed, propka)[cache hit]`); the parsers read both layouts.
 
 
 | Stage (depth 1 of the static build)                             | When                                                                                   | Note                                                                                                                                                                                                                         |
@@ -198,7 +223,7 @@ The `=== Timing ===` section of a report lists the stages of the static build in
 | `heavy atoms`                                                   | with hydrogens                                                                         | `[N in, N out; R restored, A added by pdb2pqr]`                                                                                                                                                                              |
 | `load_molecule`, `SASA`, ...                                    | always                                                                                 |                                                                                                                                                                                                                              |
 
-How the tools read them (`report.clj`, patterns by stage name; a report that lacks a stage, an older format or a run to which it did not apply, has `""` for it):
+How the tools read them (`report.clj`, patterns by stage name over the timing file; a run that lacks a stage, or to which it did not apply, has `""` for it):
 
 - **Keys.** Seconds: `:components`, `:structure_checks`, `:classify`, `:propka`, `:pdb2pqr`, `:modified_hydrogens` (nucleotides), `:modified_amino_hydrogens`, `:heavy_atoms` (and the existing `:resolve_structure`, `:load_molecule`, ...). `:pdb2pqr` is the `pdb2pqr*` stage of the run, whichever of the three variants it was (the patterns match on the prefix, like `propka*`); a run records exactly one. `:components_download` is the `N` of the components note. The notes themselves are in `(:stage_notes report)`, a map from stage name to note (`report/stage-notes`), not among the ordered keys, so the TSV (`results_table.clj --tsv`) and `--csv-all` outputs (numbers only) do not change shape.
 - **Wall clock without external tools (`:wall_ex`, the convention of every comparison).** wall clock minus `:propka` minus `:pdb2pqr` (every `pdb2pqr*` stage) minus, only when `:components_download` is above 0, the seconds of `components` (a download is network time, and the stage cannot separate it from the table load; a lookup that downloaded nothing is computing and stays in). Everything else (`classify`, `modified amino acid hydrogens`, `structure checks`, `heavy atoms`, `modified nucleotide hydrogens`, `resolve_structure`) is in-process work and stays in the wall clock. A stage a report lacks contributes nothing, so the 53 reports of the original suite give exactly the numbers they always gave.
@@ -322,7 +347,7 @@ SASDX52: the gradient error (median 6.7e-5, at most 1.4e-3) is four orders of ma
 
 ### Part 2: --chains
 
-One line per chain of `infer`, the chains `run_model` pools, for the run with the report's own `rng_seed`. The first eight chains are fixed: two at the MAP and three mirrored pairs further out. Chains after the eighth are started at optima that the harvest of the first chains' draws found to carry mass (see below), and their `start σ` is the optimum's distance from the MAP. Columns: `start σ`, the distance of the chain's start from the MAP in posterior sd (negative is the mirrored chain of a pair); `mode`, the posterior mode it settled in; `pooled`; `kept`, its post-warm-up draws that the pool keeps (a chain in a mode with no mass keeps none); `div` and `div%`, divergent transitions among them; `warm-up div`, divergences during warm-up (not part of the posterior); `ε`, `steps` and `accept`, its mean step size, leapfrog steps and acceptance; `mean log π`. After the table, every divergent draw: chain, iteration, ξ = (ρₑ, δρ₁, δρ₂, δρ₃), log π against the chain's median, leapfrog steps and tree depth.
+One line per chain of `infer`, the chains `run_model` pools, for the run with the run's own `rng_seed` (the `run` sheet). The first eight chains are fixed: two at the MAP and three mirrored pairs further out. Chains after the eighth are started at optima that the harvest of the first chains' draws found to carry mass (see below), and their `start σ` is the optimum's distance from the MAP. Columns: `start σ`, the distance of the chain's start from the MAP in posterior sd (negative is the mirrored chain of a pair); `mode`, the posterior mode it settled in; `pooled`; `kept`, its post-warm-up draws that the pool keeps (a chain in a mode with no mass keeps none); `div` and `div%`, divergent transitions among them; `warm-up div`, divergences during warm-up (not part of the posterior); `ε`, `steps` and `accept`, its mean step size, leapfrog steps and acceptance; `mean log π`. After the table, every divergent draw: chain, iteration, ξ = (ρₑ, δρ₁, δρ₂, δρ₃), log π against the chain's median, leapfrog steps and tree depth.
 
 **10. The run `run_model` does** (300 warm-up, 700 draws):
 
@@ -400,7 +425,7 @@ The cold state's temporary directory is deleted when the run ends (also on failu
 | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | the Julia compiled caches (`compiled/`), so BAYSOL and its dependencies are precompiled for real | package sources, artifacts, registries (`packages/`, `artifacts/`, `registries/`, `clones/`)                         |
 | `_cache/` (downloaded PDBs, `.pka` and protonated-PDB outputs): propka and pdb2pqr run for real  | the provisioned conda environment (`conda_environments/`): provisioning is a one-off network cost, not measured here |
-| result files (`res*.txt`, figures), `docs/`, `sources/`, `manuscript/`, any local sysimage       | tracked and untracked-unignored files of the working tree                                                            |
+| result files (`res*.xlsx`, `res*_timings.txt`, figures), `docs/`, `sources/`, `manuscript/`, any local sysimage       | tracked and untracked-unignored files of the working tree                                                            |
 
 ### What is reported
 
@@ -418,5 +443,5 @@ Keep the two apart: first-fit minus steady-fit is compilation, and PrecompileToo
 
 - **Benchmarks are only run with the repository owner's explicit approval, per run, because they need a quiet machine.** `bench.clj` prints its plan unless `--approved` is passed, and `--approved` is added only after the owner has said yes to this run (a safeguard against careless runs, not a security measure).
 - One process at a time, a quiet machine (for example: check for `DisplayLinkManager` and `baloo` CPU use first), no parallel runs.
-- Compare like with like: a cold run against a cold run of an earlier commit (use `git worktree`/`git stash` to build the earlier tree), never against warm numbers or the committed `res*.txt` timings, which are warm-cache.
+- Compare like with like: a cold run against a cold run of an earlier commit (use `git worktree`/`git stash` to build the earlier tree), never against warm numbers or the committed `res*_timings.txt` timings, which are warm-cache.
 - [`../test/baselines/`](../test/baselines/README.md) holds the machine-specific reference run of each release (the default for `compare.clj --bench` is the latest release's; host and CPU are recorded in `meta`); compare only within a host.

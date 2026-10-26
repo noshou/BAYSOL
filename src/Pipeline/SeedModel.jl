@@ -107,7 +107,7 @@ function seed_model(
     # the static build allocates large temporaries; collect
     # once per byte budget instead of whenever the heap grows
     return with_gc_paused() do
-        # the run's clock starts here; write_report reads the wall clock off it
+        # the run's clock starts here; write_timings reads the wall clock off it
         log = StageLog()
 
         if !(length(qvals) == length(I_exp) == length(σ_exp))

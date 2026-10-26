@@ -14,13 +14,13 @@
 ;; the one being judged: every speedup and every χ² comparison is "last column against each
 ;; of the others". `--no-tree` drops the working tree, so the last REV is judged instead.
 ;;
-;; Reads every `test/fitting_tests/*/res*.txt` at each REV via `git show` (no
-;; checkout, nothing rerun) and prints, over the fits present in every column: the
-;; time of every stage, fit quality (the χ² spread and the parameter distributions),
-;; sampler health (acceptance, tree depth, steps, E-BFMI, divergences, chains, R-hat,
-;; ESS), the MAP search, the problem sizes, the posterior widths and the worst fits.
-;; `--csv` writes a fixed set of per-fit numbers, `--csv-all` every parsed key.
-;; `--bench` instead compares the JSON results of `bb bench` (cold/steady
+;; Reads every `test/fitting_tests/*/res*.xlsx` (and its timing file) at each REV via
+;; `git show` (no checkout, nothing rerun) and prints, over the fits present in every
+;; column: the time of every stage, fit quality (the χ² spread and the parameter
+;; distributions), sampler health (acceptance, tree depth, steps, E-BFMI, divergences,
+;; chains, R-hat, ESS), the MAP search, the problem sizes, the posterior widths and
+;; the worst fits. `--csv` writes a fixed set of per-fit numbers, `--csv-all` every
+;; parsed key. `--bench` instead compares the JSON results of `bb bench` (cold/steady
 ;; benchmarks): the last file is the one judged, and with a single file it is compared
 ;; with the newest baseline of the latest release in test/baselines/ (README there).
 ;;
@@ -49,7 +49,7 @@
 
 (add-classpath (str (fs/parent (fs/absolutize *file*))))
 
-(require '[common :as c] '[report])
+(require '[common :as c] '[report] '[workbook])
 
 (def ^:private who "bb compare")
 
@@ -58,41 +58,65 @@
 ;; A result set is a sorted map of path -> parsed report (see report.clj). Sorted, so
 ;; that sums run over the fits in the same order whatever the source.
 
-(defn- git-reports
-    "The parsed reports of every res*.txt under the fitting tests at `rev`."
-    [rev]
-    (into
-        (sorted-map)
-        (for
-            [p (str/split-lines (c/git "ls-tree" "-r" "--name-only" rev c/fit-dir))
-                :when (re-matches (re-pattern (str c/fit-dir "/[^/]+/res[^/]*\\.txt")) p)]
-            [p (report/parse (c/git "show" (str rev ":" p)))])))
+(defn ^:private run-key
+    "The key of a run in a result set: its path without the extension, so the same fit
+    has the same key at every revision."
+    [path]
+    (str/replace path #"\.(xlsx|txt)$" ""))
 
-(defn- tree-reports
+(defn ^:private git-reports
+    "The parsed runs of every fitting test at `rev`: the workbooks (with their timing
+    files), or, in a revision from before the workbook, its `res*.txt` text reports."
+    [rev]
+    (let [paths (str/split-lines (c/git "ls-tree" "-r" "--name-only" rev c/fit-dir))
+            matching
+            (fn [ext]
+                (filter
+                    #(re-matches (re-pattern (str c/fit-dir "/[^/]+/res[^/]*\\." ext)) %)
+                    paths))
+            workbooks (matching "xlsx")
+            texts (remove #(str/ends-with? % "_timings.txt") (matching "txt"))]
+        (into (sorted-map)
+            (concat
+                (for [p texts
+                        :when (not-any? #(= (run-key p) (run-key %)) workbooks)]
+                    [(run-key p) (report/parse (c/git "show" (str rev ":" p)))])
+                (for [p workbooks
+                        :let [t (report/timings-path p)]]
+                    [(run-key p)
+                        (report/parse-run
+                            (workbook/read-sheets (c/git-bytes "show" (str rev ":" p)))
+                            (if (some #{t} paths) (c/git "show" (str rev ":" t)) ""))])))))
+
+(defn ^:private tree-reports
     "The same for the files in the working tree."
     []
     (into (sorted-map)
-        (for [f (fs/glob c/*root* (str c/fit-dir "/*/res*.txt"))]
-            [(str (fs/relativize c/*root* f)) (report/parse (c/slurp8 f))])))
+        (for [f (fs/glob c/*root* (str c/fit-dir "/*/res*.xlsx"))
+                :let [p (str (fs/relativize c/*root* f))
+                    t (report/timings-path f)]]
+            [(run-key p)
+                (report/parse-run (workbook/read-file f)
+                    (if (fs/exists? t) (c/slurp8 t) ""))])))
 
 ;; --- small numeric and formatting helpers
 
-(defn- column
+(defn ^:private column
     "The non-empty values of `k` over a map of reports, as numbers."
     [reports k]
     (->> (vals reports)
         (map #(c/as-number (% k)))
         (remove #{""})))
 
-(defn- total
+(defn ^:private total
     "Sum of `k` over the reports, or nil if no report has it (older formats lack some
     fields)."
     [reports k]
     (when-let [xs (seq (column reports k))] (reduce + 0.0 xs)))
 
-(defn- or-zero [v] (if (or (nil? v) (= v "")) 0 (c/as-number v)))
+(defn ^:private or-zero [v] (if (or (nil? v) (= v "")) 0 (c/as-number v)))
 
-(defn- mean [xs] (/ (reduce + xs) (double (count xs))))
+(defn ^:private mean [xs] (/ (reduce + xs) (double (count xs))))
 
 (defn median
     "Median of the numbers `xs`."
@@ -133,34 +157,34 @@
         "n/a"
         (str (c/fmt "%.2f" (/ (double numer) denom)) "x")))
 
-(defn- med
+(defn ^:private med
     "The median of `xs` by `spec`, or \"-\" when there are none."
     [xs spec]
     (if (seq xs) (c/fmt spec (median xs)) "-"))
 
-(defn- stat
+(defn ^:private stat
     "`(f xs)` of the known values of `k`, by `spec`, or \"-\" when no report has it."
     [reports k f spec]
     (if-let [xs (seq (column reports k))]
         (c/fmt spec (f xs))
         "-"))
 
-(defn- p90 [xs] (pct xs 0.9))
+(defn ^:private p90 [xs] (pct xs 0.9))
 
-(defn- n-where [pred xs] (count (filter pred xs)))
+(defn ^:private n-where [pred xs] (count (filter pred xs)))
 
-(defn- row
+(defn ^:private row
     "Prints a markdown table row."
     [& cells]
     (println (str "| " (str/join " | " cells) " |")))
 
-(defn- head
+(defn ^:private head
     "Prints the header and rule lines of a markdown table."
     [cells]
     (row (str/join " | " cells))
     (println (str "|" (apply str (repeat (count cells) "---|")))))
 
-(defn- heading [text] (println (str "\n### " text "\n")))
+(defn ^:private heading [text] (println (str "\n### " text "\n")))
 
 ;; --- the tables of the revision comparison
 
@@ -185,7 +209,7 @@
         ["wall clock excl. PROPKA/pdb2pqr/downloads" :wall_ex]
         ["leapfrog steps (x1e6)" :leapfrog]])
 
-(defn- timing-table
+(defn ^:private timing-table
     "Timing totals over all common fits, one column per revision plus \"last vs each
     other\" ratios. `agg` is name -> reports."
     [agg names]
@@ -217,7 +241,7 @@
         (println (str "\n(ratio > 1: the last column is faster "
                 "/ does less work than that revision)"))))
 
-(defn- quality
+(defn ^:private quality
     "How many common fits got better / worse / stayed within 1 % in `latest` against
     `old`."
     [latest old label cur]
@@ -243,7 +267,7 @@
                 (- (count pairs) lower higher)
                 " unchanged"))))
 
-(defn- distribution
+(defn ^:private distribution
     "One row of the distribution table: fit quality and parameter distributions of a
     set of reports."
     [reports label]
@@ -270,7 +294,7 @@
 ;; --- the expanded tables: fit quality spread, sampler health, MAP search, sizes,
 ;; posterior widths
 
-(defn- chi2-row
+(defn ^:private chi2-row
     "The χ² distribution of a column: spread, geometric mean and how many fits are
     above a few thresholds."
     [reports label]
@@ -289,7 +313,7 @@
             (n-where #(> % 5) x)
             (n-where #(> % 10) x))))
 
-(defn- sampler-row
+(defn ^:private sampler-row
     "Sampler health of a column: acceptance, tree depth and steps, E-BFMI, divergences,
     and (reports with chains) the worst R-hat and the smallest ESS."
     [reports label]
@@ -321,7 +345,7 @@
             (n-where #(> % 1) (col :modes))
             (stat reports :mode_share_max #(apply min %) "%.3f"))))
 
-(defn- map-row
+(defn ^:private map-row
     "The MAP search of a column: modes, starts that converged, its time and its share of
     the wall clock."
     [reports label]
@@ -335,7 +359,7 @@
             (med (column reports :map_s) "%.3f")
             (if (and m w) (str (c/fmt "%.1f" (/ (* 100 m) w)) " %") "-"))))
 
-(defn- size-row
+(defn ^:private size-row
     "What the fits were (a rebinned or re-sized problem is not comparable 1:1): medians
     of the problem sizes."
     [reports label]
@@ -346,7 +370,7 @@
                     [:n_adapt "%.0f"]]]
             (med (column reports k) spec))))
 
-(defn- width-row
+(defn ^:private width-row
     "One parameter's posterior: the median MAP z-score, how many fits have it beyond 3
     sigma of the prior, and the width of the quantile interval in prior standard
     deviations (z_hi - z_lo): median, p10, p90."
@@ -365,7 +389,7 @@
             (if (seq w) (c/fmt "%.3f" (pct w 0.1)) "-")
             (if (seq w) (c/fmt "%.3f" (pct w 0.9)) "-"))))
 
-(defn- worst
+(defn ^:private worst
     "The eight worst fits of the judged column by `k`, with every column's cell (made by
     `cell` from a report)."
     [title sets names k cell]
@@ -383,21 +407,21 @@
                                     (cell r)
                                     "-")))))))))
 
-(defn- cell-nuts
+(defn ^:private cell-nuts
     [r]
     (str (dash "%.1f" (r :steps)) " / " (dash "%.1f" (r :nuts)) "s"))
 
-(defn- cell-chi2
+(defn ^:private cell-chi2
     [r]
     (str (c/fmt "%.3g" (or-zero (r :chi2_cmp))) " / " (dash "%.4f" (r :div))))
 
-(defn- cell-rhat
+(defn ^:private cell-rhat
     [r]
     (str (dash "%.3f" (r :rhat_max))
         " / " (dash "%.0f" (r :ess_min))
         " / " (dash "%.0f" (r :ess_tail_min))))
 
-(defn- detail-tables
+(defn ^:private detail-tables
     "Every expanded table, over the common fits (`agg`: name -> reports) and the judged
     column's full sets."
     [agg sets names]
@@ -456,7 +480,7 @@
         ["modified nucleotide hydrogens" "modified nucleotide hydrogens"]
         ["modified amino acid hydrogens" "modified amino acid hydrogens"]])
 
-(defn- stage-total
+(defn ^:private stage-total
     "Seconds of `field` (:stage_seconds, :stage_compile or :stage_gc) summed over the
     stages named `prefix`*, nil when the fit has no such stage (an older run, or a
     stage that did not apply to that structure)."
@@ -466,7 +490,7 @@
                     v))]
         (reduce + 0.0 vs)))
 
-(defn- compile-in-stages
+(defn ^:private compile-in-stages
     "Seconds of compile time inside the timed stages (those at depth 1) of a fit."
     [fit]
     (reduce +
@@ -475,7 +499,7 @@
                 :when (== depth 1)]
             cmp)))
 
-(defn- bench-row
+(defn ^:private bench-row
     "Prints one table row of the benchmark report: `getter` is given the fit of a run
     and returns a number; a run lacking the fit shows \"-\"."
     [runs names spec label getter]
@@ -486,7 +510,7 @@
             (str/join " | " (map #(dash "%.2f" %) cells))
             (str/join " | " (map #(ratio % (last cells)) (butlast cells))))))
 
-(defn- bench-main
+(defn ^:private bench-main
     "Side-by-side report of benchmark JSON files from `bb bench` (the last file is the
     one judged)."
     [files]
@@ -580,14 +604,14 @@
     ["components" "classify" "propka" "pdb2pqr" "modified nucleotide hydrogens"
         "modified amino acid hydrogens" "heavy atoms"])
 
-(defn- stage-note
+(defn ^:private stage-note
     "The note of the stage `nm` in `report` (a variant such as `pdb2pqr (mixed, propka)`
     counts as `pdb2pqr`), or \"\"."
     [report nm]
     (or (some (fn [[k v]] (when (str/starts-with? k nm) v)) (:stage_notes report))
         ""))
 
-(defn- notable?
+(defn ^:private notable?
     "Is a fit worth a line of the notes table: not protein-only, or a cache missed, or
     a component downloaded."
     [report]
@@ -597,7 +621,7 @@
                 (some #(str/includes? % "cache miss") notes)
                 (pos? (or-zero (:components_download report)))))))
 
-(defn- notes-table
+(defn ^:private notes-table
     "The notes of the judged column's fits that are not plain protein runs with every
     cache hit: what the nucleotide stages found, and which lookups missed. Reports
     without notes (older formats) give no line."
@@ -615,9 +639,9 @@
 
 ;; --- the CSV files
 
-(defn- shown [path] (str/replace path (str c/fit-dir "/") ""))
+(defn ^:private shown [path] (str/replace path (str c/fit-dir "/") ""))
 
-(defn- write-csv
+(defn ^:private write-csv
     "Writes `file`: a header `fit,<name>:<key>,...`, then one line per fit of the judged
     column, with `cell` giving the text of a report value (nil: blank)."
     [file sets names keys* header-key cell]
@@ -641,7 +665,7 @@
 
 ;; --- the main program
 
-(defn- parse-args
+(defn ^:private parse-args
     "The command line: {:revs :no-tree :bench :csv :csv-all}. A bad option stops with
     the usage line."
     [argv]
@@ -661,7 +685,7 @@
                 (c/exit 2))
             :else (recur more (update acc :revs conj a)))))
 
-(defn- load-sets
+(defn ^:private load-sets
     "The result sets to compare: [names sets], one per revision then the working tree.
     Stops with a message on an unknown revision."
     [revs no-tree]

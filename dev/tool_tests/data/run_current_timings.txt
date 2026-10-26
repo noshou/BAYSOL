@@ -1,0 +1,67 @@
+stage                                                     seconds    % wall    (JIT)
+wall clock  (seed_model → end of report)                     3.00     100.0    (2.3)
+  static build                                               0.24       7.9    (0.1)
+    resolve_structure                                     4.1e-05
+    components                                            1.6e-03
+      [19 residue names: 19 builtin, 0 cache, 0 download]
+    structure checks                                         0.01
+      [0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings]
+    classify                                              2.3e-03
+      [protein: PARSE, titration propka]
+    propka                                                3.0e-04
+      [cache hit]
+    pdb2pqr                                                  0.04
+      [cache hit]
+    heavy atoms                                              0.03
+      [1295 in, 1297 out; 0 restored, 2 added by pdb2pqr]
+    load_molecule                                            0.02
+    SASA                                                     0.03
+    shannon (diameter, binning)                           4.8e-03
+    forward_cache                                            0.10
+      vacuum + excluded volume (vols + B_lm)                 0.07
+      hydration (B_lm)                                       0.02
+      Gram + r_m                                          6.7e-04
+    seed_sampler (priors, WLS)                            2.1e-04
+  sampling                                                   1.15      38.2    (0.9)
+    MAP search + whitening (70/70 starts, 3 modes)           0.09
+    NUTS setup (starts, Hamiltonian)                      1.5e-04
+    optima from the draws, 0 extra chains                    0.17
+    NUTS  (2.4k iters, 22.02k leapfrog, 0.030 ms/step)       0.84
+    per-draw c1 re-profile + curves (2400 draws)             0.01
+    MAP + quantiles                                          0.03
+  plotting                                                   0.40      13.3    (0.3)
+    summary data                                          4.2e-03
+    fit                                                   7.3e-03
+      data                                                1.1e-05
+      tex                                                 7.2e-03
+    residuals                                             7.2e-04
+      data                                                4.2e-08
+      tex                                                 7.1e-04
+    histogram data                                           0.02
+    histogram rho_e                                       4.5e-03
+      data                                                3.8e-07
+      tex                                                 4.5e-03
+    histogram delta_rho_1                                 1.1e-04
+      data                                                4.1e-08
+      tex                                                 1.1e-04
+    histogram delta_rho_2                                 8.3e-05
+      data                                                      0
+      tex                                                 8.2e-05
+    histogram delta_rho_3                                 7.5e-05
+      data                                                4.1e-08
+      tex                                                 7.4e-05
+    histogram scale                                       7.9e-05
+      data                                                4.2e-08
+      tex                                                 7.8e-05
+    histogram bkgrnd_corr                                 7.2e-05
+      data                                                      0
+      tex                                                 7.2e-05
+    histogram c1                                          7.4e-05
+      data                                                      0
+      tex                                                 7.4e-05
+    data files                                               0.37
+  report write                                            8.7e-07
+  unaccounted                                                1.22    (1.0)
+GC: 0.01 s
+fit timing  = 2.60 s
+plot timing = 0.40 s

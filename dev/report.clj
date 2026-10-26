@@ -1,7 +1,10 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
-;; Parsing one fitting-test report (`res*.txt`) into a map of numbers. A value a report
-;; format lacks is the empty string, so "defined" means `(seq v)`. The map carries its
+;; Parsing one fitting-test run into a map of numbers: `parse-run` reads the run's
+;; workbook (`res*.xlsx`, see workbook.clj) and its timing file (`res*_timings.txt`);
+;; `parse` reads a text report (`res*.txt`), which the revisions before the workbook keep
+;; their results in, so `compare` can read them. A value a source lacks is the empty
+;; string, so "defined" means `(seq v)`. The map carries its
 ;; keys in first-seen order as metadata (`(:order (meta r))`), since the TSV columns
 ;; follow that order.
 ;;
@@ -14,7 +17,14 @@
 
 (ns report
     (:require [clojure.string :as str]
-        [common :refer [as-number num-re]]))
+        [common :refer [as-number num-re]]
+        [workbook]))
+
+(defn timings-path
+    "The timing file that goes with the workbook at `xlsx-path`: `res_x.xlsx` ->
+    `res_x_timings.txt`."
+    [xlsx-path]
+    (str/replace (str xlsx-path) #"\.xlsx$" "_timings.txt"))
 
 ;; In a pattern, @N@ and @FLP@ are a number (one capture group), @NUM@ the same without
 ;; a capture group (to skip a column), @QTY@ a number with an optional k (x1000) or
@@ -33,12 +43,12 @@
             (re-pattern (str (or flags "(?md)")
                     (reduce-kv str/replace (str pat) tokens))))))
 
-(defn- grab
+(defn ^:private grab
     "First capture group of `pat` in `text`, \"\" if absent."
     [text pat]
     (or (second (re-find (rx pat) text)) ""))
 
-(defn- qty
+(defn ^:private qty
     "'496.68k' -> 496680.0, '1.2M' -> 1.2e6, rounded to 6 decimals (so 8.03k is exactly
     8030.0, not 8029.999999999999)."
     [tok]
@@ -49,7 +59,7 @@
             x (parse-double (str/replace tok #"[kM]+$" ""))]
         (/ (double (Math/round (* x scale 1e6))) 1e6)))
 
-(defn- whole
+(defn ^:private whole
     "x as an integer when it is a whole number."
     [x]
     (if (== x (Math/floor x)) (long x) x))
@@ -102,7 +112,8 @@
         #"^\s+NUTS\s+\(.*\)\s+@FLP@\s*$" :reprofile
         #"^\s+per-draw c1 re-profile.*\)\s+@FLP@\s*$" :map_quantiles
         #"^\s+MAP \+ quantiles\s+@FLP@" :report_write #"^\s+report write\s+@FLP@"
-        :unaccounted #"^\s+unaccounted\s+@FLP@" :gc #"^GC: @FLP@" :map_starts_ok
+        :unaccounted #"^\s+unaccounted\s+@FLP@" :gc #"^GC: @FLP@" :fit_timing
+        #"^fit timing\s+= @FLP@" :plot_timing #"^plot timing\s+= @FLP@" :map_starts_ok
         #"^\s+MAP search \+ whitening \((\d+)/\d+ starts" :map_starts_total
         #"^\s+MAP search \+ whitening \(\d+/(\d+) starts" :map_modes
         #"^\s+MAP search \+ whitening \(\d+/\d+ starts, (\d+) modes?"
@@ -118,7 +129,7 @@
     [[:lgdn "log_density"] [:rho_e "ρₑ"] [:dro1 "δρ₁"] [:dro2 "δρ₂"] [:dro3 "δρ₃"]
         [:scale "scale"] [:bkgrnd "bkgrnd_corr"] [:excl "excl_vol_corr"] [:chi2 "χ²"]])
 
-(defn- columns
+(defn ^:private columns
     "[key pattern] pairs for the columns `cols` of the table rows labelled `<label>_<tag>`
     of the parameters `ps`: column i is the (i+1)-th number after the label."
     [ps tag cols]
@@ -160,20 +171,20 @@
     #"NUTS  \(([\d.]+k?) iters, ([\d.]+[kM]?) leapfrog, ([\d.]+) ms/step\)\s+@N@")
 
 ;; The map being built, with its keys in first-seen order: {:ks [k ...] :m {k v ...}}.
-(defn- put
+(defn ^:private put
     [st k v]
     (-> st
         (update :ks #(if (contains? (:m st) k) % (conj % k)))
         (assoc-in [:m k] v)))
 
-(defn- puts [st kvs] (reduce (fn [s [k v]] (put s k v)) st kvs))
+(defn ^:private puts [st kvs] (reduce (fn [s [k v]] (put s k v)) st kvs))
 
-(defn- grabs
+(defn ^:private grabs
     "[key value] pairs from the flat [key pattern ...] list."
     [text kv-flat]
     (for [[k pat] (partition 2 kv-flat)] [k (grab text pat)]))
 
-(defn- by-value
+(defn ^:private by-value
     "The largest (`max-key`) or smallest value among the strings `shares`, as a number,
     \"\" if there are none."
     [pick shares]
@@ -197,7 +208,10 @@
     layout; a note wrapped over several lines is joined with single spaces. A stage
     without a note (and a report without the section) is absent from the map."
     [text]
-    (let [section (second (re-find #"(?ms)^=== Timing ===[^\n]*\n(.*)" text))]
+    (let [section (or (second (re-find #"(?ms)^=== Timing ===[^\n]*\n(.*)" text))
+                ;; a timing file is the table alone, below its column-label line
+                (when-not (str/includes? text "=== ")
+                    (second (re-find #"(?s)\A[^\n]*\n(.*)" text))))]
         (loop [lines (str/split-lines (or section ""))
                 prev nil
                 open nil
@@ -281,7 +295,8 @@
                         [:z3 (if (seq z3) z3 (get-in st [:m :dro3_Z_MAP]))]
                         ;; number of distinct local optima the MAP search found
                         [:n_modes (g n-modes-re)]]))
-            {:keys [wall propka pdb2pqr components components_download]} (:m st)
+            {:keys [wall propka pdb2pqr components components_download plot_timing]}
+            (:m st)
             or-zero #(if (seq %) (as-number %) 0)
             ;; the seconds of the `components` stage when it downloaded a component (its
             ;; note says `N download`, N > 0): network time, not computing, and the
@@ -290,14 +305,130 @@
             download-s
             (if (pos? (or-zero components_download)) (or-zero components) 0)
             ;; wall clock without the external-tool time (PROPKA and every `pdb2pqr*`
-            ;; stage, which depend on the cache, and a component download), the
-            ;; convention for every comparison. A stage a report lacks (an older
-            ;; format) contributes nothing.
-            st (put
-                st
+            ;; stage, which depend on the cache, and a component download) and
+            ;; without the plotting (`plot timing`, which older reports lack: the
+            ;; fit is what is compared), the convention for every comparison. A
+            ;; stage a report lacks (an older format) contributes nothing.
+            st (put st
                 :wall_ex
                 (if (seq wall)
-                    (- (as-number wall) (or-zero propka) (or-zero pdb2pqr) download-s)
+                    (- (as-number wall)
+                        (or-zero propka)
+                        (or-zero pdb2pqr)
+                        download-s
+                        (or-zero plot_timing))
                     ""))]
         (with-meta (assoc (:m st) :stage_notes (stage-notes text))
             {:order (:ks st)})))
+
+;; The workbook's names for the parameters, and the prefix of their keys in the map.
+(def ^:private param-prefix
+    {"log_density" :lgdn,
+        "rho_e" :rho_e,
+        "delta_rho_1" :dro1,
+        "delta_rho_2" :dro2,
+        "delta_rho_3" :dro3,
+        "scale" :scale,
+        "bkgrnd_corr" :bkgrnd,
+        "excl_vol_corr" :excl,
+        "chi2" :chi2})
+
+;; Keys of the `run` sheet: key of the map <- row of the sheet.
+(def ^:private run-rows
+    {:n_atoms "n_atoms",
+        :lMax "lmax",
+        :n_q_raw "n_q_raw",
+        :n_q "n_q",
+        :n_samples "n_samples",
+        :n_adapt "n_adapt",
+        :rng_seed "rng_seed",
+        :dmax "dmax",
+        :channels "channels",
+        :rebin_per_channel "rebin_channels",
+        :rebin_measured "rebin_measured",
+        :rebin_fitted "rebin_fitted",
+        :rebin_dropped "rebin_non_positive_dropped",
+        :iterations "iterations",
+        :accept "mean_accept",
+        :depth "tree_depth_avg",
+        :depth_max "tree_depth_max",
+        :steps "mean_n_steps",
+        :ebfmi "ebfmi",
+        :cavity_frac "cavity_frac",
+        :div "divergence_rate",
+        :chains_pooled "chains_pooled",
+        :chains_total "chains_run",
+        :rhat_max "rhat_max",
+        :ess_min "ess_min",
+        :ess_tail_min "ess_tail_min",
+        :modes "modes",
+        :optima "optima"})
+
+(defn ^:private table
+    "The rows of a sheet below its header as maps of column name -> cell text."
+    [rows]
+    (let [header (first rows)] (for [r (rest rows)] (zipmap header r))))
+
+(defn ^:private sheet-values
+    "The workbook's numbers as [key value] pairs for the map `parse-run` builds."
+    [sheets]
+    (let [run (into {}
+                (map (juxt #(get % "key") #(get % "value")))
+                (table (get sheets "run")))
+            qname (first (filter #(str/starts-with? % "quantiles_") (keys sheets)))
+            [q-lo q-hi] (some-> qname
+                (subs (count "quantiles_"))
+                (str/split #"-"))
+            by-param (fn [sheet]
+                (for [r (table (get sheets sheet))
+                        :let [p (param-prefix (get r "parameter"))]
+                        :when p]
+                    [p r]))
+            shares (map #(get % "share") (table (get sheets "modes")))
+            share-of
+            (fn [pick]
+                (if (seq shares) (as-number (apply pick parse-double shares)) ""))]
+        (concat (for [[k row] run-rows] [k (get run row "")])
+            [[:sat
+                    (if-let [v (get run "excl_vol_sat")]
+                        (if (zero? (parse-double v)) "false" "true")
+                        "")]
+                [:chains_dropped
+                    (if (and (get run "chains_run") (get run "chains_pooled"))
+                        (- (parse-long (get run "chains_run"))
+                            (parse-long (get run "chains_pooled")))
+                        0)] [:quantile_lo (or q-lo "")] [:quantile_hi (or q-hi "")]
+                [:mode_share_max (share-of max-key)]
+                [:mode_share_min (share-of min-key)]]
+            (for [[p r] (by-param "map")
+                    :let [v (get r "value")]
+                    kv (concat [[(keyword (str (name p) "_MAP")) v]]
+                        (case p
+                            :chi2 [[:chi2 v]]
+                            :excl [[:c1 v]]
+                            :rho_e [[:rho_e v]]
+                            :dro1 [[:d1 v]]
+                            :dro2 [[:d2 v]]
+                            :dro3 [[:d3 v]]
+                            []))]
+                kv)
+            (for [[p r] (by-param qname)
+                    [k col] [["QUANT_LO" "quantile_lo"] ["QUANT_HI" "quantile_hi"]
+                        ["BOUND_LO" "bound_lo"] ["BOUND_HI" "bound_hi"]]]
+                [(keyword (str (name p) "_" k)) (get r col)])
+            (for [[p r] (by-param "stdev_from_prior")
+                    [k col] [["Z_MAP" "z_map"] ["Z_QUANT_LO" "z_quantile_lo"]
+                        ["Z_QUANT_HI" "z_quantile_hi"]]]
+                [(keyword (str (name p) "_" k)) (get r col)]))))
+
+(defn parse-run
+    "The numbers of one run as a map like `parse`'s: `sheets` are the run's workbook
+    (`workbook/read-sheets`) and `timings` the text of its timing file. A quantity the
+    workbook lacks is \"\". The measured-grid χ² is the MAP's χ² in the workbook, so
+    `:chi2_cmp` is that."
+    [sheets timings]
+    (let [base (parse timings)
+            kvs (sheet-values sheets)
+            m (reduce (fn [m [k v]] (assoc m k v)) base kvs)
+            m (assoc m :z3 (get m :dro3_Z_MAP "") :chi2_cmp (get m :chi2 ""))]
+        (with-meta m (meta base))))

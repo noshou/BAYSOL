@@ -21,12 +21,14 @@
 (use-fixtures :once
     (fn [run-tests] (run-tests) (when pod-id (pods/unload-pod pod-id))))
 
-(defn- query [db sql] ((requiring-resolve 'pod.babashka.go-sqlite3/query) db [sql]))
-(defn- execute!
+(defn ^:private query
+    [db sql]
+    ((requiring-resolve 'pod.babashka.go-sqlite3/query) db [sql]))
+(defn ^:private execute!
     [db sql]
     ((requiring-resolve 'pod.babashka.go-sqlite3/execute!) db [sql]))
 
-(defn- make-source
+(defn ^:private make-source
     "A source database at `path`; `waasmaier-scale` is the JSON text of the amplitudes
     (wrong length: the tool must fail)."
     [path waasmaier-scale]
@@ -47,14 +49,14 @@
         "INSERT INTO Chantler VALUES ('C', '[1.0, 2.0, 2.0, 3.0]',
                     '[0.1, 0.2, 0.3, 0.4]', '[1.1, 1.2, 1.3, 1.4]')"))
 
-(defn- doubles-of
+(defn ^:private doubles-of
     "The doubles of a little-endian Float64 blob given as a vector of bytes."
     [bytes*]
     (let [buf (-> (ByteBuffer/wrap (byte-array (map unchecked-byte bytes*)))
                 (.order ByteOrder/LITTLE_ENDIAN))]
         (vec (repeatedly (/ (count bytes*) 8) #(.getDouble buf)))))
 
-(defn- extract
+(defn ^:private extract
     [src dst]
     (h/run-tool (str h/dev-dir "/extract_formfactor.clj") src dst))
 

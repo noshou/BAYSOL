@@ -109,8 +109,7 @@ function main(args)
         for spec in specs
             id, tag =
                 occursin(':', spec) ? String.(split(spec, ":"; limit = 2)) : (spec, "")
-            seed, reference, label =
-                load_fit_seed(id, tag; makie = !(cmd in ("residuals", "chains")))
+            seed, reference, label = load_fit_seed(id, tag)
             if cmd == "report"
                 diagnose(out, seed; label, reference, n_samples, n_adapt)
             elseif cmd == "chains"

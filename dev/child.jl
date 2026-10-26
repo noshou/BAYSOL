@@ -12,7 +12,6 @@
 #
 # It does the same fit twice in one process. The first is the "first fit"
 # (JIT included); the second is "steady state" (everything compiled).
-# Plotting is skipped (`makie = false`), so GLMakie is never loaded.
 
 using JSON3
 const T_PROC = time()
@@ -26,7 +25,7 @@ id, tag = occursin(':', SPEC) ? String.(split(SPEC, ":"; limit = 2)) : (String(S
 
 function one_fit()
     local seed
-    seed_s = @elapsed (seed, _, _) = load_fit_seed(id, tag; makie = false)
+    seed_s = @elapsed (seed, _, _) = load_fit_seed(id, tag)
     run_s = @elapsed redirect_stderr(devnull) do
         ITERATIONS === nothing ? BAYSOL.run_model(seed) :
         BAYSOL.run_model(seed, ITERATIONS...)

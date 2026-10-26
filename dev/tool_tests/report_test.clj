@@ -10,7 +10,7 @@
         [helpers :as h]
         [report]))
 
-(defn- fields
+(defn ^:private fields
     "The values of `ks` in the report `file` of the test data, as printed."
     [file ks]
     (let [r (report/parse (c/slurp8 (str h/data-dir "/" file)))]
@@ -132,7 +132,7 @@
 ;; 1EHZ (nucleic acid with modified nucleotides), 3HDD (protein + DNA) and 1CRN (protein
 ;; only); note how a name longer than the label column touches its note.
 
-(defn- report-with
+(defn ^:private report-with
     "The text of res_current.txt before its timing section, then the timing section in
     the file `timing` of the test data."
     [timing]
@@ -141,7 +141,7 @@
                 2))
         (c/slurp8 (str h/data-dir "/" timing))))
 
-(defn- near? [a b] (< (Math/abs (- (double a) (double b))) 1e-9))
+(defn ^:private near? [a b] (< (Math/abs (- (double a) (double b))) 1e-9))
 
 (def ^:private new-stages
     [:components :components_download :structure_checks :classify
@@ -304,3 +304,15 @@
             (is (= {"heavy atoms"
                         "[1821 in, 1821 out; 1 restored, 0 added by pdb2pqr]"}
                     (report/stage-notes text))))))
+
+(deftest plot-timing
+    (testing
+        "the last two lines of the timing table, and the plotting left out of wall_ex"
+        (let [text (str (report-with "timing_protein.txt")
+                    "fit timing  = 0.8 s\nplot timing = 0.1 s\n")
+                r (report/parse text)
+                old (report/parse (report-with "timing_protein.txt"))]
+            (is (= ["0.8" "0.1"] (mapv r [:fit_timing :plot_timing])))
+            (is (= ["" ""] (mapv old [:fit_timing :plot_timing]))
+                "a report from before plotting has neither, and is read as it was")
+            (is (near? (- (old :wall_ex) 0.1) (r :wall_ex))))))

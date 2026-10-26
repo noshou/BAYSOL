@@ -31,13 +31,13 @@
 
 (def ^:private len c/char-count)
 
-(defn- lines-of
+(defn ^:private lines-of
     "The lines of the file `rel` (relative to the root), split on newlines only: a
     carriage return stays at the end of its line."
     [rel]
     (str/split (c/slurp8 (c/in-root rel)) #"\n" -1))
 
-(defn- long-lines
+(defn ^:private long-lines
     "[file line-number length] of every line over the limit in `files`."
     [files]
     (for [f files
@@ -46,7 +46,7 @@
             :when (> n limit)]
         [f (inc i) n]))
 
-(defn- tab-lines
+(defn ^:private tab-lines
     "[file line-number] of every line holding a tab character (indent with 4 spaces)."
     [files]
     (for [f files
@@ -54,7 +54,7 @@
             :when (str/includes? line "\t")]
         [f (inc i)]))
 
-(defn- check
+(defn ^:private check
     "Lists the lines over the limit and the tabs; true when there are none."
     [paths]
     (let [files (mapcat c/code-files (or (seq paths) [c/*root*]))

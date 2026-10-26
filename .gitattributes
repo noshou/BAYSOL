@@ -3,7 +3,7 @@
 
 # bb.edn and .clj-kondo/config.edn are Clojure data; count and highlight them as Clojure
 # (Linguist otherwise files .edn under its own data-only "edn" language).
-*.edn   linguist-language=Clojure
+*.edn linguist-language=Clojure
 
 # Hand-written; override Linguist's documentation heuristic, which
 # otherwise excludes anything under docs/ from language stats.
@@ -12,3 +12,6 @@ docs/src/assets/themes/*.scss linguist-documentation=false
 # documenter-light.css / documenter-dark.css are compiled output of academic.scss /
 # academic-dark.scss, not hand-authored; they stay excluded from language stats.
 docs/src/assets/themes/documenter-*.css linguist-generated=true
+
+# Ignore generated .tex files.
+*.tex linguist-generated=true

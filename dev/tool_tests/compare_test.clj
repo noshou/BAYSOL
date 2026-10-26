@@ -80,7 +80,7 @@
 ;; --- the stages of the nucleotide work (timing sections: data/timing_*.txt, see
 ;; report_test.clj)
 
-(defn- report-with
+(defn ^:private report-with
     "res_current.txt before its timing section, then the section in the test-data file
     `timing` (nil: res_current.txt as it is, a report without the new stages)."
     [timing]
@@ -90,14 +90,14 @@
                     (c/slurp8 (str h/data-dir "/" timing)))
                 text))))
 
-(defn- timing-text
+(defn ^:private timing-text
     "The timing table `compare` prints for the revisions `names` (name -> one fit)."
     [names reports]
     (with-out-str (@#'compare/timing-table
             (into {} (for [[n r] (map vector names reports)] [n {"fit" r}]))
             names)))
 
-(defn- cells-of
+(defn ^:private cells-of
     "The cells of the table row labelled `label` in `text`."
     [text label]
     (some (fn [line]

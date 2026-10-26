@@ -238,7 +238,7 @@ fw    = forward_cache(mol, q_fit, lMax, energy_eV)
 seed  = seed_sampler(fw, I_fit, σ_fit, PH, σ_PH, SOLUTES; t = T_C)
 
 result = BAYSOL.run_model(seed)
-BAYSOL.write_report(result)
+BAYSOL.write_timings(result)
 ```
 
 ## Constants

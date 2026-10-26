@@ -80,7 +80,7 @@
             (str/starts-with? f "test/baselines/results/")
             (re-find #"^test/fitting_tests/.*/res[^/]*\.(txt|png)$" f))))
 
-(defn- copy-repo
+(defn ^:private copy-repo
     "Copies the repository's tracked and untracked-but-not-ignored files (minus the
     excluded ones) to `dest`. Returns the number of files copied."
     [dest]
@@ -101,7 +101,7 @@
             :when (fs/directory? (fs/path real d))]
         (fs/create-sym-link (fs/path dest d) (fs/path real d))))
 
-(defn- julia-facts
+(defn ^:private julia-facts
     "Julia's version, CPU name, hardware threads and first depot, from one short call."
     [julia]
     (let [out (:out @(p/process
@@ -114,7 +114,9 @@
             [version cpu cores depot] (str/split-lines out)]
         {:version version, :cpu cpu, :cores cores, :depot depot}))
 
-(defn- hostname [] (str/trim (:out @(p/process {:out :string} "hostname"))))
+(defn ^:private hostname
+    []
+    (str/trim (:out @(p/process {:out :string} "hostname"))))
 
 (defn json-line
     "The JSON object a child process printed: the last line that is a whole object
@@ -127,7 +129,7 @@
         (filter #(and (str/starts-with? % "{") (str/ends-with? % "}")))
         last))
 
-(defn- timed
+(defn ^:private timed
     "Runs a command and returns [wall-seconds stdout]. The command's stderr goes to
     ours, and the variables of the map `env` are set for its duration only."
     [env cmd]
@@ -148,9 +150,9 @@
 ;; Written by hand, not by a JSON library: the keys keep their order, and the child's
 ;; own JSON text is kept as it printed (no digit is rewritten).
 
-(defn- jstr [s] (json/generate-string (str s)))
+(defn ^:private jstr [s] (json/generate-string (str s)))
 
-(defn- pretty-object
+(defn ^:private pretty-object
     "A JSON object from [key already-encoded-value] pairs, one key per line at
     `indent` spaces, the colons aligned."
     [pairs indent]
@@ -169,7 +171,7 @@
             ind
             "}")))
 
-(defn- meta-object
+(defn ^:private meta-object
     [facts state repo]
     (let [rev (str (str/trim (c/git "rev-parse" "--short" "HEAD"))
                 (when (seq (str/trim (c/git "status" "--porcelain"))) "+dirty"))
@@ -190,7 +192,7 @@
 
 ;; --- the run
 
-(defn- plan
+(defn ^:private plan
     "What an unapproved run prints instead of running."
     [argv]
     (str/join
@@ -206,7 +208,7 @@
                 "and repository untouched.")
             "Re-run with --approved once the run has been approved."]))
 
-(defn- install!
+(defn ^:private install!
     "Instantiates and precompiles the project at `repo` (timed): [json-text-of-install
     env]. The cold state builds its own repo copy and depot first."
     [julia state facts tmp]
@@ -244,7 +246,7 @@
                         ["precompile_s" t-pre]]
                     4)})))
 
-(defn- fit!
+(defn ^:private fit!
     "One fresh process for the fit `spec`: the child's JSON with the process wall time
     added, as text."
     [julia {:keys [repo env]} spec iterations]

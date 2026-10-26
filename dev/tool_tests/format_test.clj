@@ -11,7 +11,7 @@
         [format :as fmt]
         [helpers :as h]))
 
-(defn- lines
+(defn ^:private lines
     "The lines of the strings `ls` joined by newlines."
     [& ls]
     (str/join "\n" ls))
@@ -92,3 +92,27 @@
         (is (= 2 status))
         (is (h/contains-text? out "unknown option --check"))
         (is (h/contains-text? out "bb fmt-check"))))
+
+(deftest edn-files-keep-their-line-breaks
+    (testing
+        "an .edn map respects the author's newlines (blank lines before a comment)"
+        (is (true? (get-in (fmt/options-for "bb.edn") [:map :respect-nl?])))
+        (is (true? (get-in (fmt/options-for "dev/x/y.edn") [:map :respect-nl?]))))
+    (testing "Clojure code is formatted as before"
+        (is (nil? (get-in (fmt/options-for "dev/report.clj") [:map :respect-nl?])))
+        (is (= 4 (get-in (fmt/options-for "dev/report.clj") [:list :indent])))))
+
+(deftest private-functions-are-defn-private
+    (testing "a top-level defn- becomes defn ^:private"
+        (is (= "(defn ^:private f [x] x)" (fmt/private-defns "(defn- f [x] x)")))
+        (is (= (lines "(defn ^:private a [] 1)" "(defn ^:private b [] 2)")
+                (fmt/private-defns (lines "(defn- a [] 1)" "(defn- b [] 2)")))))
+    (testing "a public defn, an indented mention and a docstring are left alone"
+        (is (= "(defn f [] 1)" (fmt/private-defns "(defn f [] 1)")))
+        (is (= (lines "(def x" "    \"use (defn- for a private fn\")")
+                (fmt/private-defns (lines "(def x"
+                        "    \"use (defn- for a private fn\")"))))
+        (is (= "(def ^:private x 1)" (fmt/private-defns "(def ^:private x 1)"))))
+    (testing "it is idempotent"
+        (let [once (fmt/private-defns "(defn- f [x] x)")]
+            (is (= once (fmt/private-defns once))))))

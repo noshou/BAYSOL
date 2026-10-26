@@ -12,7 +12,7 @@
         [linelen]
         [reflow]))
 
-(defn- words-of [lines] (re-seq #"\S+" (str/join " " lines)))
+(defn ^:private words-of [lines] (re-seq #"\S+" (str/join " " lines)))
 
 (deftest balanced-no-orphan
     (testing

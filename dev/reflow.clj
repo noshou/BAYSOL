@@ -17,7 +17,7 @@
 
 (def ^:private len c/char-count)
 
-(defn- clojure-ext?
+(defn ^:private clojure-ext?
     "Is `ext` the extension of a Clojure source or EDN file (`;` comments)?"
     [ext]
     (contains? #{"clj" "edn"} ext))
@@ -53,7 +53,7 @@
                     text)]
             (if (seq cur) (conj out cur) out))))
 
-(defn- greedy
+(defn ^:private greedy
     "Greedy wrap of `ws` to lines of at most `w` characters."
     [ws w]
     (let [[lines cur] (reduce (fn [[lines cur] word]
@@ -87,30 +87,30 @@
                         first)
                     (greedy ws width))))))
 
-(defn- structured?
+(defn ^:private structured?
     "Is this comment text the start of a list item, a table row, an aligned column or
     other structure?"
     [text]
     (boolean (re-find #"^(?:[-*+]\s|\d+[.)]\s|\||```|[A-Za-z_0-9`]+\s*(?:=|:)\s*$)"
             text)))
 
-(defn- banner?
+(defn ^:private banner?
     "Is this comment text a section banner (`--- name` or `=== name`)?"
     [ext text]
     (boolean (re-find (if (clojure-ext? ext) #"^[-=─]{3}" #"^#+\s*[-=─]{3}") text)))
 
 ;; The comment prefix of a file type: `#` for Julia, one or more `;` for Clojure.
-(defn- comment-re
+(defn ^:private comment-re
     [ext]
     (if (clojure-ext? ext) #"^(\s*;+) (\S.*)$" #"^(\s*#) (\S.*)$"))
 
-(defn- docstring-fence
+(defn ^:private docstring-fence
     "A line that is exactly three quotes opens or closes a Julia docstring."
     [{:keys [ext lines]} i]
     (when (and (= ext "jl") (= (str/trim (lines i)) "\"\"\""))
         {:out [(lines i)], :next (inc i), :toggle true}))
 
-(defn- one-line-docstring
+(defn ^:private one-line-docstring
     "A one-line Julia docstring that is too long becomes a block docstring."
     [{:keys [ext lines in-doc]} i]
     (let [line (lines i)]
@@ -124,7 +124,7 @@
                     ["\"\"\""]),
                 :next (inc i)})))
 
-(defn- continuation
+(defn ^:private continuation
     "The indented lines after index `i` that continue a docstring list item: [hang
     parts next-index], `hang` being the indent of the first one."
     [lines i]
@@ -141,7 +141,7 @@
                 "") (map (fn [[_ l]] (nth (re-matches #"(\s+)(\S.*)" l) 2)) cont)
             (+ i 1 (count cont))]))
 
-(defn- docstring-list-item
+(defn ^:private docstring-list-item
     "A too long list item of a Julia docstring (`- text` with its indented continuation
     lines) is re-wrapped under its marker, with a hanging indent."
     [{:keys [ext lines in-doc]} i]
@@ -167,7 +167,7 @@
                     (subvec lines i j)),
                 :next j})))
 
-(defn- trailing-comment
+(defn ^:private trailing-comment
     "A trailing comment that makes a Julia code line too long moves above the line."
     [{:keys [ext lines in-doc]} i]
     (let [line (lines i)]
@@ -183,7 +183,7 @@
                         [(str ind code)]),
                     :next (inc i)}))))
 
-(defn- paragraph-lines
+(defn ^:private paragraph-lines
     "The consecutive lines from `i` that form one paragraph, and the prefix they share:
     [prefix texts], or nil when line `i` starts none. A paragraph is a block of
     comment lines with one prefix, or (Julia) plain lines of a docstring."
@@ -211,7 +211,7 @@
                             (not (structured? %))
                             (not (re-find #"^[@#!\"]" %)))))])))
 
-(defn- paragraph
+(defn ^:private paragraph
     "A paragraph with a line over the limit is re-wrapped balanced under its prefix; one
     that fits is kept."
     [ctx i]

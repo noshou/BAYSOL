@@ -13,7 +13,7 @@
         [helpers :as h]
         [precommit]))
 
-(defn- scratch-repo
+(defn ^:private scratch-repo
     "A scratch repository with one committed file (a.jl: three lines, the second already
     ends in blanks); its path."
     []
@@ -27,7 +27,7 @@
         (git "-c" "user.name=t" "-c" "user.email=t@t" "commit" "-q" "-m" "init")
         dir))
 
-(defn- visible [s] (str/replace s "\n" "|"))
+(defn ^:private visible [s] (str/replace s "\n" "|"))
 
 (deftest whitespace-strips-only-changed-lines
     (testing
