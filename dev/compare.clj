@@ -14,7 +14,8 @@
 ;; the one being judged: every speedup and every χ² comparison is "last column against each
 ;; of the others". `--no-tree` drops the working tree, so the last REV is judged instead.
 ;;
-;; Reads every `test/fitting_tests/*/res*.xlsx` (and its timing file) at each REV via
+;; Reads every run log `test/fitting_tests/*/<ID>.LOG` (a revision from before the logs: its
+;; `res*.txt` text reports) at each REV via
 ;; `git show` (no checkout, nothing rerun) and prints, over the fits present in every
 ;; column: the time of every stage, fit quality (the χ² spread and the parameter
 ;; distributions), sampler health (acceptance, tree depth, steps, E-BFMI, divergences,
@@ -49,7 +50,7 @@
 
 (add-classpath (str (fs/parent (fs/absolutize *file*))))
 
-(require '[common :as c] '[report] '[workbook])
+(require '[common :as c] '[report])
 
 (def ^:private who "bb compare")
 
@@ -59,45 +60,49 @@
 ;; that sums run over the fits in the same order whatever the source.
 
 (defn ^:private run-key
-    "The key of a run in a result set: its path without the extension, so the same fit
-    has the same key at every revision."
-    [path]
-    (str/replace path #"\.(xlsx|txt)$" ""))
+    "The key of a run in a result set: its folder and its name, the section title of a log
+    (`test/fitting_tests/SASDBS6/fit2_model1`; the folder alone for a run named after it)
+    or the path of a text report without its extension, so the same fit has the same key
+    at every revision."
+    [path title]
+    (let [dir (str (fs/parent path))]
+        (if title
+            (if (= title (fs/file-name dir)) dir (str dir "/" title))
+            (str/replace (str path) #"\.txt$" ""))))
+
+(defn ^:private log-runs
+    "The runs of the log at `path` with the text `text`, as [key run-map] pairs."
+    [path text]
+    (for [[title r] (report/parse-log text)] [(run-key path title) r]))
 
 (defn ^:private git-reports
-    "The parsed runs of every fitting test at `rev`: the workbooks (with their timing
-    files), or, in a revision from before the workbook, its `res*.txt` text reports."
+    "The parsed runs of every fitting test at `rev`: the runs of its logs
+    (`<ID>.LOG`), or, in a revision from before the logs, its `res*.txt` text reports."
     [rev]
     (let [paths (str/split-lines (c/git "ls-tree" "-r" "--name-only" rev c/fit-dir))
-            matching
-            (fn [ext]
-                (filter
-                    #(re-matches (re-pattern (str c/fit-dir "/[^/]+/res[^/]*\\." ext)) %)
-                    paths))
-            workbooks (matching "xlsx")
-            texts (remove #(str/ends-with? % "_timings.txt") (matching "txt"))]
+            logs (filter
+                #(re-matches (re-pattern (str c/fit-dir "/[^/]+/[^/]+\\.LOG")) %)
+                paths)
+            texts (when (empty? logs)
+                (filter #(re-matches (re-pattern (str c/fit-dir
+                                "/[^/]+/res[^/]*\\.txt"))
+                        %)
+                    paths))]
         (into (sorted-map)
             (concat
-                (for [p texts
-                        :when (not-any? #(= (run-key p) (run-key %)) workbooks)]
-                    [(run-key p) (report/parse (c/git "show" (str rev ":" p)))])
-                (for [p workbooks
-                        :let [t (report/timings-path p)]]
-                    [(run-key p)
-                        (report/parse-run
-                            (workbook/read-sheets (c/git-bytes "show" (str rev ":" p)))
-                            (if (some #{t} paths) (c/git "show" (str rev ":" t)) ""))])))))
+                (for [p logs kv (log-runs p (c/git "show" (str rev ":" p)))] kv)
+                (for [p texts]
+                    [(run-key p nil)
+                        (report/parse (c/git "show" (str rev ":" p)))])))))
 
 (defn ^:private tree-reports
     "The same for the files in the working tree."
     []
     (into (sorted-map)
-        (for [f (fs/glob c/*root* (str c/fit-dir "/*/res*.xlsx"))
-                :let [p (str (fs/relativize c/*root* f))
-                    t (report/timings-path f)]]
-            [(run-key p)
-                (report/parse-run (workbook/read-file f)
-                    (if (fs/exists? t) (c/slurp8 t) ""))])))
+        (for [f (fs/glob c/*root* (str c/fit-dir "/*/*.LOG"))
+                :let [p (str (fs/relativize c/*root* f))]
+                kv (log-runs p (c/slurp8 f))]
+            kv)))
 
 ;; --- small numeric and formatting helpers
 

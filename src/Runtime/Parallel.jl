@@ -82,15 +82,16 @@ end
 
 """
 One fresh base value for a run, drawn from the default
-RNG, so that `Random.seed!` before a run fixes it.
+RNG, so that `Random.seed!` before a run fixes it. It has 53 bits (below 2^53), so that
+it is written exactly as a number in the workbook (a spreadsheet number is a `Float64`).
 
 # Returns
-- `UInt64`.
+- `UInt64`, below 2^53.
 
 # Exceptions
 - None.
 """
-draw_base()::UInt64 = rand(UInt64)
+draw_base()::UInt64 = rand(UInt64) >> 11
 
 """
 The random stream of one work item, derived from the run's `base` value.

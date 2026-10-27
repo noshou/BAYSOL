@@ -66,10 +66,10 @@
         (is (not= (table-cells "| a | 1 |") (table-cells "| a | 2 |")))))
 
 (deftest labels
-    (testing "run labels from workbook paths"
+    (testing "run labels from a folder and a section title"
         (is (= ["SASDMJ9 —" "SASDBS6 fit2_model1"]
-                [(run-label "x/SASDMJ9/res.xlsx")
-                    (run-label "x/SASDBS6/res_fit2_model1.xlsx")]))))
+                [(run-label "SASDMJ9" "SASDMJ9")
+                    (run-label "SASDBS6" "fit2_model1")]))))
 
 (deftest check-readme
     (testing "the Results table of fitting_tests/README.md is up to date"

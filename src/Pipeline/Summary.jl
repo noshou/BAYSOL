@@ -4,30 +4,127 @@
 #          The summary sheets of the workbook (written by `results`)
 # ---------------------------------------------------------------------------
 
-"""
-The `run` sheet: one `key | value` row for each setting and statistic of the run, all
-numbers (a flag is 0 or 1; `excl_vol_sat` is 0, +1 when `c1` sat on its upper bound and -1
-on its lower one). `map_params` is `nothing` when every draw diverged (the rows that
-depend on the MAP are then left out). A row whose source the run did not record is left
-out.
+# section, unit and meaning of each row of the `run` sheet
+const _RUN_SECTIONS = ["model", "data", "sampler", "convergence", "output"]
+const _RUN_INFO = Dict(
+    "n_atoms" => ("model", "atoms",
+        "Atoms of the structure in the model, hydrogens included."),
+    "lmax" => ("model", "",
+        "Highest spherical-harmonic degree of the forward model."),
+    "dmax" => ("model", "Å",
+        "Diameter of the scatterer cloud (atoms and hydration beads), which " *
+        "sets the Shannon channel width π/dmax."),
+    "cavity_frac" => ("model", "",
+        "Share of the hydration shell classified as cavity at the MAP, 0 to " *
+        "1."),
+    "excl_vol_sat" => ("model", "",
+        "Where the profiled excluded-volume correction c1 sits at the MAP: 0 " *
+        "inside its bounds, 1 on the upper bound, -1 on the lower. A bound is " *
+        "a warning."),
+    "n_q_raw" => ("data", "points",
+        "Measured points before binning."),
+    "n_q" => ("data", "points",
+        "Points fitted, after Shannon binning and dropping non-positive bins."),
+    "channels" => ("data", "",
+        "Shannon channels in the measured q range, q_max·dmax/π."),
+    "rebin_channels" => ("data", "bins",
+        "Bins per Shannon channel."),
+    "rebin_measured" => ("data", "points",
+        "Measured points that went into the binning."),
+    "rebin_fitted" => ("data", "points",
+        "Binned points that were fitted."),
+    "rebin_non_positive_dropped" => ("data", "bins",
+        "Bins dropped because their intensity was not positive."),
+    "n_samples" => ("sampler", "iterations",
+        "NUTS iterations of each chain, warm-up included."),
+    "n_adapt" => ("sampler", "iterations",
+        "Warm-up iterations of each chain."),
+    "rng_seed" => ("sampler", "",
+        "Random seed that reproduces the run."),
+    "iterations" => ("sampler", "draws",
+        "Posterior draws pooled from the chains that were used."),
+    "mean_accept" => ("sampler", "",
+        "Mean NUTS acceptance rate, which the step size is tuned to match its " *
+        "target."),
+    "tree_depth_avg" => ("sampler", "",
+        "Mean depth of the NUTS trees."),
+    "tree_depth_max" => ("sampler", "",
+        "Deepest NUTS tree. A depth at the limit means a poorly scaled " *
+        "posterior."),
+    "mean_n_steps" => ("sampler", "steps",
+        "Mean leapfrog steps per iteration."),
+    "ebfmi" => ("sampler", "",
+        "Energy fraction of missing information of the worst chain. Below " *
+        "about 0.3 the momentum resampling explores poorly."),
+    "divergence_rate" => ("sampler", "",
+        "Share of draws with a numerical divergence, 0 to 1. Above 0.01 treat " *
+        "the quantiles with care."),
+    "chains_pooled" => ("convergence", "chains",
+        "Chains whose draws were pooled."),
+    "chains_run" => ("convergence", "chains",
+        "Chains that were run."),
+    "rhat_max" => ("convergence", "",
+        "Worst split R-hat within a mode. Above 1.01 the chains have not " *
+        "converged."),
+    "ess_min" => ("convergence", "draws",
+        "Smallest bulk effective sample size over the parameters."),
+    "ess_tail_min" => ("convergence", "draws",
+        "Smallest tail effective sample size over the parameters."),
+    "modes" => ("convergence", "",
+        "Posterior modes the chains settled in (present only when more than " *
+        "one)."),
+    "optima" => ("convergence", "",
+        "Local optima that carry posterior mass (present only when more than " *
+        "one)."),
+    "rewhitened_nats" => ("convergence", "nats",
+        "By how much the first chains found a better basin than the MAP " *
+        "search, after which the sampler was re-whitened there and the chains " *
+        "rerun."),
+    "retry_first_rhat" => ("convergence", "",
+        "Worst R-hat of the first run, when the run was repeated because it " *
+        "was above its limit."),
+    "retry_kept" => ("convergence", "",
+        "1 if the draws of the repeated run were kept, 0 if the first run's."),
+    "quantile_lo_pct" => ("output", "%",
+        "Lower percentile of the interval in the quantiles sheet."),
+    "quantile_hi_pct" => ("output", "%",
+        "Upper percentile of the interval in the quantiles sheet."),
+)
 
-The rows, in order: the structure and model sizes (`n_atoms`, `lmax`, `n_q_raw`, `n_q`),
-the sampler settings (`n_samples`, `n_adapt`, `rng_seed`), the Shannon binning (`dmax`,
-`channels`, `rebin_channels`, `rebin_measured`, `rebin_fitted`,
-`rebin_non_positive_dropped`), the sampler's statistics (`iterations`, `mean_accept`,
-`tree_depth_avg`, `tree_depth_max`, `mean_n_steps`, `ebfmi`), the cavity fraction of the
-hydration shell, `excl_vol_sat`, `divergence_rate`, and the chains (`chains_pooled`,
-`chains_run`, `rhat_max`, `ess_min`, `ess_tail_min`, then `modes`, `optima`,
-`rewhitened_nats`, `retry_first_rhat` and `retry_kept` when they apply).
+"""
+The `run` sheet: one row for each setting and statistic of the run, with the columns
+`section | name | value | unit | meaning`. The `section` is `model`, `data`, `sampler`,
+`convergence` or `output`, the rows are grouped by it, `value` is always a number (a flag is
+0 or 1; `excl_vol_sat` is 0, +1 when `c1` sat on its upper bound and -1 on its lower one),
+`unit` is empty for a pure number, and `meaning` says in words what the row is and, for a
+check, what a worrying value is. `map_params` is `nothing` when every draw diverged (the
+rows that depend on the MAP are then left out). A row whose source the run did not record
+is left out. The rows are those of `_RUN_INFO`.
 """
 function _run_sheet(fit, divergence_rate::Real, map_params, info::AbstractDict)
+    keys_, vals = _run_rows(fit, divergence_rate, map_params, info)
+    # grouped by section, in the order of the rows within it
+    order = sortperm(
+        keys_; by = k -> findfirst(==(_RUN_INFO[k][1]), _RUN_SECTIONS), alg = MergeSort)
+    meta = [_RUN_INFO[keys_[i]] for i in order]
+    return _sheet("run", ["section", "name", "value", "unit", "meaning"],
+        first.(meta), keys_[order], vals[order],
+        [isempty(m[2]) ? missing : m[2] for m in meta], last.(meta))
+end
+
+"""
+The `(names, values)` of the rows of the run (see `_run_sheet`), in the order they are
+found.
+"""
+function _run_rows(fit, divergence_rate::Real, map_params, info::AbstractDict)
     keys_ = String[]
     vals = Any[]
     add!(k, v) = (push!(keys_, k); push!(vals, v))
     for (k, source) in (
         ("n_atoms", "n_atoms"), ("lmax", "lMax"), ("n_q_raw", "n_q_raw"),
         ("n_q", "n_q"), ("n_samples", "n_samples"), ("n_adapt", "n_adapt"),
-        ("rng_seed", "rng_seed"),
+        ("rng_seed", "rng_seed"), ("quantile_lo_pct", "quantile_lo_pct"),
+        ("quantile_hi_pct", "quantile_hi_pct"),
     )
         haskey(info, source) && add!(k, info[source])
     end
@@ -84,7 +181,7 @@ function _run_sheet(fit, divergence_rate::Real, map_params, info::AbstractDict)
         add!("retry_first_rhat", d.first_rhat)
         add!("retry_kept", d.retry_kept ? 1 : 0)
     end
-    return _sheet("run", ["key", "value"], keys_, vals)
+    return keys_, vals
 end
 
 """
@@ -115,11 +212,11 @@ function _optima_sheet(d::Inference.ChainDiagnostics)
 end
 
 """
-The `map`, `quantiles_<lo>-<hi>` and `stdev_from_prior` sheets (`[]` when every draw
+The `map`, `quantiles_<interval>` and `stdev_from_prior` sheets (`[]` when every draw
 diverged and there is no MAP):
 
 - `map`: `parameter | value`, the MAP value of every reported quantity;
-- `quantiles_<lo>-<hi>`: `parameter | quantile_lo | quantile_hi | bound_lo | bound_hi`, the
+- `quantiles_<interval>`: `parameter | quantile_lo | quantile_hi | bound_lo | bound_hi`, the
     empirical quantile pair of each quantity and the extreme draws inside it;
 - `stdev_from_prior`: `parameter | z_map | z_quantile_lo | z_quantile_hi`, for the four
     parameters with a prior, how many prior standard deviations (θ-space) the MAP value and
@@ -151,15 +248,16 @@ function _result_sheets(result, quantile_label::AbstractString)
 end
 
 """
-The summary sheets of a run, in workbook order: `run`, `map`, `quantiles_<lo>-<hi>`,
+The summary sheets of a run, in workbook order: `run`, `map`, `quantiles_<interval>`,
 `stdev_from_prior`, then `modes` and `optima` when the run has them and
-`form_factor_log` (one line of text to a row) when there is a log. `quantile_label` is the
-`quantiles` given to [`run_model`](@ref); `n_atoms`, if given, overrides the logged atom
+`form_factor_log` (one line of text to a row) when there is a log. `quantile_label`
+names the quantiles sheet (`nothing`: the label [`run_model`](@ref) logged, else the
+default's); `n_atoms`, if given, overrides the logged atom
 count.
 """
 function _summary_sheets(
     result;
-    quantile_label::AbstractString = DEFAULT_QUANTILES,
+    quantile_label::Union{Nothing,AbstractString} = nothing,
     form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}} = nothing,
     n_atoms::Union{Nothing,Integer} = nothing,
 )
@@ -168,7 +266,12 @@ function _summary_sheets(
     n_atoms === nothing || (info["n_atoms"] = n_atoms)
     map_params = map_result === nothing ? nothing : first(map_result)
     sheets = Any[_run_sheet(fit, divergence_rate, map_params, info)]
-    append!(sheets, _result_sheets(result, quantile_label))
+    label = something(
+        quantile_label,
+        get(info, "quantile_label", nothing),
+        _sigma_label(DEFAULT_SIGMA),
+    )
+    append!(sheets, _result_sheets(result, label))
     for sh in (_modes_sheet(fit.diagnostics), _optima_sheet(fit.diagnostics))
         sh === nothing || push!(sheets, sh)
     end
@@ -272,7 +375,8 @@ function _summary_lines(result)
     end
 
     files = String[]
-    for (key, label, tail) in (("workbook", "Results", ""), ("plots", "Figures", "/"))
+    for (key, label, tail) in
+        (("workbook", "Results", ""), ("plots", "Figures", "/"), ("log", "Log", ""))
         haskey(info, key) && push!(files, "$label: $(_shown(info[key]))$tail")
     end
     isempty(files) || push!(lines, "  " * join(files, "    "))
@@ -289,16 +393,16 @@ thing a run says:
 Fit finished: reduced χ² = 0.87 on the measured points
 ρₑ = 0.3362 (0.3361–0.3362)    δρ₁ = −1.06 (−1.15 – −1.03)    δρ₂ = …    δρ₃ = …
 Checks: converged (R̂ 1.002), no divergent transitions, 8 of 8 chains used
-Results: out/res.xlsx    Figures: out/plots/
+Results: out/res.xlsx    Figures: out/plots/    Log: out/out.LOG
 Wall clock: 141.3 s
 ```
 
-The χ² is the reduced χ² of the MAP on the measured points. Each of `ρₑ`, `δρ₁`, `δρ₂` and
-`δρ₃` is shown as its MAP value with the quantile pair of the run (the `quantiles` of
-[`run_model`](@ref)) in brackets. A check that fails adds a `Note:` line in words (chains
-not converged, more than 1 % divergent transitions, `c1` on its bound, several posterior
-modes). The paths are the ones [`results`](@ref) wrote, so
-call this last; the line for a file that was not written is left out.
+The χ² is the reduced χ² of the MAP on the measured points. Each of `ρₑ`, `δρ₁`,
+`δρ₂` and `δρ₃` is shown as its MAP value with the quantile pair of the run (the
+`sigma` or `quantiles` of [`run_model`](@ref)) in brackets. A check that fails adds a
+`Note:` line in words (chains not converged, more than 1 % divergent transitions,
+`c1` on its bound, several posterior modes). The paths are the ones [`results`](@ref)
+wrote, so call this last; the line for a file that was not written is left out.
 
 # Returns
 - `nothing`.

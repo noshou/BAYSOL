@@ -144,13 +144,16 @@ result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdzz9_fit1()
 
 fit, divergence_rate, map_result, quantile_result = result
 
-# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-# that their time is in its timing section.
+# `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
 reference = BAYSOL.Reference("CRYSOL fit1", qvals_all, I_crysol_all; q_max = Q_MAX_FIT)
 BAYSOL.results(
     result, (q_fit, I_fit, σ_fit);
     dir = @__DIR__, name = "res_fit1", references = reference,
     form_factor_log = form_factor_log, n_atoms = n_atoms,
+    ref_chi2 = "CRYSOL ≈ 34.5",
+    run_log = true,
 )
 
 # `@__DIR__` (this SASDZZ9/ folder), not the caller's cwd.

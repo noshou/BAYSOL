@@ -7,7 +7,7 @@ hydration-shell contrasts) with the excluded-volume correction profiled out.
 The package root only assembles the modules, one folder per module under `src/`,
 in dependency order, and re-binds the pipeline entry points of
 [`Pipeline`](@ref BAYSOL.Pipeline) so they are reachable as `BAYSOL.seed_model`,
-`BAYSOL.run_model` and `BAYSOL.write_timings`, and its plotting entry point as
+`BAYSOL.run_model` and `BAYSOL.write_log`, and its plotting entry point as
 `BAYSOL.results` (with `BAYSOL.PlotStyle` and `BAYSOL.Reference`).
 """
 module BAYSOL
@@ -43,14 +43,14 @@ using .Hydrogenator: Hydrogenator
 using .Scattering: Scattering
 using .Inference: Inference
 using .Pipeline:
-    Pipeline, seed_model, run_model, write_timings, print_summary, results,
+    Pipeline, seed_model, run_model, write_log, print_summary, results,
     PlotStyle, Reference, font_available
 
 # The pipeline entry points, reached qualified
 # (`BAYSOL.seed_model`), not exported. Their
 # result types live in Pipeline (`BAYSOL.Pipeline.MAPParams`, …).
 public seed_model,
-    run_model, write_timings, print_summary, results, PlotStyle, Reference,
+    run_model, write_log, print_summary, results, PlotStyle, Reference,
     font_available
 
 include("Precompile.jl")

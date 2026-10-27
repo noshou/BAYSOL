@@ -4,8 +4,8 @@
 # `fmt_count`) and the timing table.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Runtime: StageLog, Stage, timed!, tick, tock!, stage_seconds, fmt_count
-using BAYSOL.Pipeline: _write_timing
+using BAYSOL.Runtime:
+    StageLog, Stage, timed!, tick, tock!, stage_seconds, fmt_count, process_age_s
 
 @testset "Timing" begin
     @testset "fmt_count: plain below 1000, else thousands with trimmed decimals" begin
@@ -16,6 +16,20 @@ using BAYSOL.Pipeline: _write_timing
         @test fmt_count(2000) == "2k"
         @test fmt_count(14210) == "14.21k"
         @test fmt_count(100000) == "100k"
+    end
+
+    @testset "the startup: the age of the process when the log starts" begin
+        @test process_age_s() ≥ 0
+        log = StageLog()
+        @test log.startup ≥ 0
+        if isfile("/proc/self/stat")
+            # counted from the start of the process: longer than the time since this log
+            @test log.startup > 0.1
+            @test process_age_s() ≥ log.startup
+        end
+        # the compile and GC counters at the start are those of the process
+        @test log.compile0 ≤ Base.cumulative_compile_time_ns()[1]
+        @test log.gc0 ≤ Base.gc_time_ns()
     end
 
     @testset "timed!: returns f's value; a parent is recorded before its children" begin
@@ -47,82 +61,85 @@ using BAYSOL.Pipeline: _write_timing
         @test stage_seconds(log, :sampling) == (3.0, 0.0, 0.2)
     end
 
-    @testset "_write_timing writes nothing without a log" begin
-        io = IOBuffer()
-        @test _write_timing(io, nothing, tick()) === nothing
-        @test isempty(take!(io))
-    end
-
-    @testset "_write_timing: sections, nesting, and an aligned seconds column" begin
+    @testset "_timing_table: wall clock, startup, groups, nesting, the halves" begin
         log = StageLog()
-        push!(log.stages, Stage(:static, 1, "pdb2pqr", 21.3, 0.0, 0.0, "[cache miss]"))
+        push!(log.stages, Stage(:static, 1, "pdb2pqr", 21.3, 0.1, 0.2, "[cache miss]"))
         push!(log.stages, Stage(:static, 1, "forward_cache", 25.9, 0.0, 0.0, ""))
-        push!(log.stages, Stage(:static, 1, "resolve_structure", 0.0023, 0.0, 0.0, ""))
-        push!(
-            log.stages,
-            Stage(:static, 1, "seed_sampler (priors, WLS)", 0.0, 0.0, 0.0, ""),
-        )
         push!(log.stages, Stage(:static, 2, "hydration (SASA + B_lm)", 19.8, 0.0, 0.0, ""))
         push!(
             log.stages,
-            Stage(
-                :sampling,
-                1,
-                "NUTS  (2k iters, 14.21k leapfrog, 4.8 ms/step)",
-                68.0,
-                0.0,
-                0.0,
-                "",
-            ),
+            Stage(:sampling, 1, "NUTS  (2k iters, 14.21k leapfrog, 4.8 ms/step)", 68.0,
+                0.0, 0.0, ""),
         )
-        io = IOBuffer()
-        _write_timing(io, log, tick())
-        lines = split(String(take!(io)), '\n'; keepempty = false)
-        @test startswith(lines[1], "stage") && !any(contains("=== Timing ==="), lines)
-        @test occursin("seconds", lines[1]) && occursin("% wall", lines[1]) &&
-              occursin("(JIT)", lines[1])
-        @test any(startswith("wall clock  (seed_model → end of timings)"), lines)
-        @test any(l -> startswith(l, "  static build"), lines)
-        # a stage's note is a line of its own under it
+        push!(log.stages, Stage(:plot, 1, "fit", 0.5, 0.2, 0.0, ""))
+        t = BAYSOL.Pipeline._timing_table(log, tick())
+        names = [r.name for r in t.rows]
+        @test startswith(names[1], "wall clock") && t.rows[1].depth == 0
+        @test t.rows[1].pct == 100.0
+        @test names[2] == "startup" && t.rows[2].secs == log.startup
+        # a group sums its depth-1 stages; a stage is a level below its group
+        static = only(filter(r -> r.name == "static build", t.rows))
+        @test static.secs ≈ 21.3 + 25.9 && static.depth == 1
+        @test only(filter(r -> startswith(r.name, "hydration"), t.rows)).depth == 3
+        # the stages are in the order they were recorded, then report write and unaccounted
+        @test names[(end-1):end] == ["report write", "unaccounted"]
+        # every row has its JIT and GC seconds; the halves of the wall clock add up
+        pdb = only(filter(r -> r.name == "pdb2pqr", t.rows))
+        @test pdb.jit == 0.1 && pdb.gc == 0.2 && pdb.note == "[cache miss]"
+        @test t.fit + t.plot ≈ t.rows[1].secs
+        @test t.plot ≈ 0.5
+        # without a plot stage there is no plotting group, and the plot timing is 0
+        t2 = BAYSOL.Pipeline._timing_table(StageLog(), tick())
+        @test !any(r -> r.name == "plotting", t2.rows) && t2.plot == 0
+    end
+
+    @testset "_timing_text: the table as a person reads it" begin
+        P = BAYSOL.Pipeline
+        log = StageLog()
+        push!(log.stages, Stage(:static, 1, "pdb2pqr", 21.3, 0.1, 0.2, "[cache miss]"))
+        push!(log.stages, Stage(:static, 1, "resolve_structure", 0.0023, 0.0, 0.0, ""))
+        push!(log.stages, Stage(:static, 2, "hydration (SASA + B_lm)", 19.8, 0.0, 0.0, ""))
+        push!(
+            log.stages,
+            Stage(:sampling, 1, "NUTS  (2k iters, 14.21k leapfrog, 4.8 ms/step)", 68.0,
+                0.0, 0.0, ""),
+        )
+        lines = P._timing_text(P._timing_table(log, tick()))
+        @test startswith(lines[1], "stage") && occursin("% wall", lines[1])
+        @test occursin("(JIT)", lines[1]) && occursin("(GC)", lines[1])
+        @test endswith(lines[1], "notes")
+        @test startswith(lines[2], "wall clock") &&
+              endswith(lines[2], "process start to end")
+        @test any(startswith("  static build"), lines)
+        # a stage's note is in a column of its own, on the stage's line, without brackets
         i = findfirst(l -> startswith(l, "    pdb2pqr"), lines)
-        @test i !== nothing && occursin(r"21\.30\s*$", lines[i]) &&
-              strip(lines[i+1]) == "[cache miss]"
-        # no line of the table is wider than the label column plus the numbers
-        @test maximum(length, lines) <= 90
-        # depth 2 → 6 spaces
-        @test any(l -> startswith(l, "      hydration (SASA + B_lm)"), lines)
-        @test any(l -> startswith(l, "  report write"), lines) &&
-              any(l -> startswith(l, "  unaccounted"), lines)
-        # the GC line, then the two halves of the wall clock as the last two lines
-        @test startswith(lines[end-2], "GC: ")
-        @test startswith(lines[end-1], "fit timing  = ") &&
-              startswith(lines[end], "plot timing = ")
-        # a stage of a few milliseconds is not rounded
-        # to 0.00: it prints in scientific notation
+        @test i !== nothing && occursin(r"21\.30\s", lines[i]) &&
+              endswith(lines[i], "(0.2)  cache miss")
+        # what a name carries in parentheses is a note too, and the name is clean
+        @test only(filter(l -> startswith(l, "    NUTS"), lines)) |>
+              l ->
+            endswith(l, "2k iters, 14.21k leapfrog, 4.8 ms/step")
+        @test !any(contains("["), lines[2:(end-3)])
+        # a level is two more spaces; a stage of a few milliseconds is not rounded to 0.00
         @test any(
-            l -> startswith(l, "    resolve_structure") && occursin(r"2\.3e-03\s*$", l),
+            l -> startswith(l, "      hydration") && endswith(l, "SASA + B_lm"),
             lines,
         )
-        @test any(l -> startswith(l, "    seed_sampler") && occursin(r"\s0\s*$", l), lines)
-        # a long note is wrapped to NOTE_WIDTH and loses no word
-        long = join(("word$i" for i in 1:40), " ")
-        wrapped = BAYSOL.Pipeline._wrap_note(long, 30)
-        @test length(wrapped) > 1 && all(l -> length(l) <= 30, wrapped) &&
-              join(wrapped, " ") == long
-        @test BAYSOL.Pipeline._wrap_note("", 30) == String[]
-        @test BAYSOL.Pipeline._fmt_seconds(25.9) == "25.90" &&
-              BAYSOL.Pipeline._fmt_seconds(0.01) == "0.01" &&
-              BAYSOL.Pipeline._fmt_seconds(0.0099) == "9.9e-03" &&
-              BAYSOL.Pipeline._fmt_seconds(0) == "0"
-        # the seconds column ends at the same character on every stage line
-        # (character positions, not byte offsets: the wall-clock label contains "→")
-        charend(l, r) = length(l[1:something(findfirst(r, l)).stop])
-        ends = [
-            charend(l, r"\d+\.\d\d(?=( |$))") for l in lines[2:(end-1)]
-            if occursin(r"^\s*\S.*\d+\.\d\d", l)
-        ]
-        @test length(ends) ≥ 6
-        header_end = charend(lines[1], r"seconds")
-        @test all(==(header_end), ends)
+        @test any(l -> startswith(l, "    resolve_structure") && occursin("2.3e-03", l),
+            lines)
+        # every row has its share of the wall clock, its JIT and its GC
+        row = only(filter(l -> startswith(l, "    pdb2pqr"), lines))
+        @test occursin(r"\d+\.\d\s+\(0\.1\)\s+\(0\.2\)", row)
+        # the GC line, then the two halves of the wall clock, are the last three lines
+        @test startswith(lines[end-2], "GC: ") && startswith(lines[end-1], "fit timing  = ")
+        @test startswith(lines[end], "plot timing = ")
+        # the seconds column ends at the same character on every stage row (character
+        # positions, not byte offsets)
+        tail = r"\S+(?=\s+-?[\d.]+\s+\([\d.]+\)\s+\([\d.]+\))"
+        charend(l) = length(l[1:something(findfirst(tail, l)).stop])
+        rows = filter(l -> occursin(r"\(\d+\.\d\)\s+\(\d+\.\d\)", l), lines)
+        @test length(rows) ≥ 6 && length(unique(charend.(rows))) == 1
+        @test P._fmt_seconds(25.9) == "25.90" && P._fmt_seconds(0.01) == "0.01" &&
+              P._fmt_seconds(0.0099) == "9.9e-03" && P._fmt_seconds(0) == "0"
     end
 end

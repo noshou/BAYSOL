@@ -94,6 +94,7 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 const RUNS = [
     (
         tag = "fit1_model1",
+        ref_chi2 = "OLIGOMER 2-state 8.31 (w 0.59)",
         pdb = "SASDEP6_fit1_model1.pdb",
         fit = "SASDEP6_fit1.fit",
         fit_scale = 1.0,
@@ -103,6 +104,7 @@ const RUNS = [
     ),   # D_max ≈ 84 Å; deposited χ² = 8.31
     (
         tag = "fit1_model2",
+        ref_chi2 = "OLIGOMER 2-state 8.31 (w 0.41)",
         pdb = "SASDEP6_fit1_model2.pdb",
         fit = "SASDEP6_fit1.fit",
         fit_scale = 1.0,
@@ -156,8 +158,9 @@ for run in RUNS
 
     result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdep6(run)
 
-    # The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-    # that their time is in its timing section.
+    # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+    # run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
     fit_curve = try
         fc = _read_fit(joinpath(_FIXTURE_DIR, run.fit), run.fit_scale, run.fit_col)
         fc !== nothing && run.rescale ? _rescale_fit(fc, q_fit, I_fit) : fc
@@ -179,6 +182,8 @@ for run in RUNS
         result, (q_fit, I_fit, σ_fit);
         dir = @__DIR__, name = "res$(suffix)", references,
         form_factor_log = form_factor_log, n_atoms = n_atoms,
+        ref_chi2 = run.ref_chi2,
+        run_log = true,
     )
 
     # `@__DIR__` (this SASDEP6/ folder), not the caller's cwd.

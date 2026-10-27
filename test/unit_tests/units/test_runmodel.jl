@@ -6,7 +6,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using Random
 using Statistics: quantile
-using BAYSOL.Pipeline: _curve_bands
+using BAYSOL.Pipeline: _curve_bands, _quantile_spec, _sigma_label, DEFAULT_SIGMA, MAX_SIGMA
 
 # the straightforward version: per q, copy the row,
 # take the quantiles, filter the draws between them
@@ -46,4 +46,35 @@ end
         _curve_bands(1:5, c, 0.16, 0.84)
         @test c == c0
     end
+end
+
+@testset "run_model: the interval from sigma or quantiles" begin
+    # the default is 2σ: the percentiles a Normal has at ±2σ
+    @test DEFAULT_SIGMA == 2.0
+    lo, hi, label = _quantile_spec(nothing, nothing)
+    @test lo ≈ 0.02275 atol = 1e-5
+    @test hi ≈ 0.97725 atol = 1e-5
+    @test label == "2sigma"
+    lo, hi, label = _quantile_spec(nothing, 1)
+    @test lo ≈ 0.15866 atol = 1e-5
+    @test hi ≈ 0.84134 atol = 1e-5
+    @test label == "1sigma"
+    lo, hi, label = _quantile_spec(nothing, 0.5)
+    @test lo ≈ 0.30854 atol = 1e-5
+    @test hi ≈ 0.69146 atol = 1e-5
+    @test label == "0.5sigma"
+    @test lo + hi ≈ 1                                  # symmetric tails
+    @test _sigma_label(3.0) == "3sigma" && _sigma_label(1.5) == "1.5sigma"
+    # a "<lo>-<hi>" range, as before, and the extremes
+    @test _quantile_spec("5-95", nothing) == (0.05, 0.95, "5-95")
+    @test _quantile_spec("0-0", nothing) == (0.0, 1.0, "0-0")
+    # both, or nonsense, is an error
+    @test_throws ArgumentError _quantile_spec("5-95", 2)
+    @test_throws DomainError _quantile_spec(nothing, 0)
+    @test_throws DomainError _quantile_spec(nothing, -1)
+    @test_throws DomainError _quantile_spec(nothing, MAX_SIGMA + 0.1)
+    @test _quantile_spec(nothing, MAX_SIGMA)[3] == "3sigma"
+    @test_throws DomainError _quantile_spec("95-5", nothing)
+    @test_throws DomainError _quantile_spec("5-101", nothing)
+    @test_throws DomainError _quantile_spec("5to95", nothing)
 end

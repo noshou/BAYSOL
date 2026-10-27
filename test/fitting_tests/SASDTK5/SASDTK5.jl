@@ -78,6 +78,7 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 const RUNS = [
     (
         tag = "fit2_model1",
+        ref_chi2 = "CRYSOL 1.14",
         pdb = "SASDTK5_fit2_model1.pdb",
         fit = "SASDTK5_fit2.fit",
         fit_scale = 1.0,
@@ -87,6 +88,7 @@ const RUNS = [
     ),   # D_max ≈ 93 Å; deposited χ² = 1.138
     (
         tag = "fit3_model1",
+        ref_chi2 = "CRYSOL 1.17",
         pdb = "SASDTK5_fit3_model1.pdb",
         fit = "SASDTK5_fit3.fit",
         fit_scale = 1.0,
@@ -96,6 +98,7 @@ const RUNS = [
     ),   # D_max ≈ 81 Å; deposited χ² = 1.167
     (
         tag = "fit4_model1",
+        ref_chi2 = "CRYSOL 5.22",
         pdb = "SASDTK5_fit4_model1.pdb",
         fit = "SASDTK5_fit4.fit",
         fit_scale = 1.0,
@@ -105,6 +108,7 @@ const RUNS = [
     ),   # D_max ≈ 110 Å; deposited χ² = 5.221
     (
         tag = "fit5_model1",
+        ref_chi2 = "CRYSOL 1.81",
         pdb = "SASDTK5_fit5_model1.pdb",
         fit = "SASDTK5_fit5.fit",
         fit_scale = 1.0,
@@ -114,6 +118,7 @@ const RUNS = [
     ),   # D_max ≈ 91 Å; deposited χ² = 1.805
     (
         tag = "fit6_model1",
+        ref_chi2 = "CRYSOL 1.03",
         pdb = "SASDTK5_fit6_model1.pdb",
         fit = "SASDTK5_fit6.fit",
         fit_scale = 1.0,
@@ -123,6 +128,7 @@ const RUNS = [
     ),   # D_max ≈ 94 Å; deposited χ² = 1.026
     (
         tag = "fit7_model1",
+        ref_chi2 = "CRYSOL 6.09",
         pdb = "SASDTK5_fit7_model1.pdb",
         fit = "SASDTK5_fit7.fit",
         fit_scale = 1.0,
@@ -176,8 +182,9 @@ for run in RUNS
 
     result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdtk5(run)
 
-    # The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-    # that their time is in its timing section.
+    # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+    # run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
     fit_curve = try
         fc = _read_fit(joinpath(_FIXTURE_DIR, run.fit), run.fit_scale, run.fit_col)
         fc !== nothing && run.rescale ? _rescale_fit(fc, q_fit, I_fit) : fc
@@ -199,6 +206,8 @@ for run in RUNS
         result, (q_fit, I_fit, σ_fit);
         dir = @__DIR__, name = "res$(suffix)", references,
         form_factor_log = form_factor_log, n_atoms = n_atoms,
+        ref_chi2 = run.ref_chi2,
+        run_log = true,
     )
 
     # `@__DIR__` (this SASDTK5/ folder), not the caller's cwd.

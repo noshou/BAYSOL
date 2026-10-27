@@ -180,8 +180,9 @@ for model in (:model1, :model2)
 
     fit, divergence_rate, map_result, quantile_result = result
 
-    # The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-    # that their time is in its timing section.
+    # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+    # run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
     crysol = readdlm(_FIT_PATH; skipstart = 3)
     reference = BAYSOL.Reference(
         "MultiFoXS 2-state",
@@ -193,6 +194,8 @@ for model in (:model1, :model2)
         result, (q_fit, I_fit, σ_fit);
         dir = @__DIR__, name = "res_$(model)", references = reference,
         form_factor_log = form_factor_log, n_atoms = n_atoms,
+        ref_chi2 = "MultiFoXS 2-state 2.91",
+        run_log = true,
     )
 
     # `@__DIR__` (this SASDJ72/ folder), not the caller's cwd.

@@ -86,6 +86,7 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 const RUNS = [
     (
         tag = "fit2_model1",
+        ref_chi2 = "EOM ensemble 11.3",
         pdb = "SASDBS6_fit2_model1.pdb",
         fit = "SASDBS6_fit2.fit",
         fit_scale = 1.0,
@@ -95,6 +96,7 @@ const RUNS = [
     ),   # D_max ≈ 141 Å; deposited χ² = 11.4
     (
         tag = "fit2_model2",
+        ref_chi2 = "EOM ensemble 11.3",
         pdb = "SASDBS6_fit2_model2.pdb",
         fit = "SASDBS6_fit2.fit",
         fit_scale = 1.0,
@@ -104,6 +106,7 @@ const RUNS = [
     ),   # D_max ≈ 160 Å; deposited χ² = 11.4
     (
         tag = "fit2_model3",
+        ref_chi2 = "EOM ensemble 11.3",
         pdb = "SASDBS6_fit2_model3.pdb",
         fit = "SASDBS6_fit2.fit",
         fit_scale = 1.0,
@@ -113,6 +116,7 @@ const RUNS = [
     ),   # D_max ≈ 151 Å; deposited χ² = 11.4
     (
         tag = "fit2_model4",
+        ref_chi2 = "EOM ensemble 11.3",
         pdb = "SASDBS6_fit2_model4.pdb",
         fit = "SASDBS6_fit2.fit",
         fit_scale = 1.0,
@@ -122,6 +126,7 @@ const RUNS = [
     ),   # D_max ≈ 141 Å; deposited χ² = 11.4
     (
         tag = "fit2_model5",
+        ref_chi2 = "EOM ensemble 11.3",
         pdb = "SASDBS6_fit2_model5.pdb",
         fit = "SASDBS6_fit2.fit",
         fit_scale = 1.0,
@@ -175,8 +180,9 @@ for run in RUNS
 
     result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdbs6(run)
 
-    # The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-    # that their time is in its timing section.
+    # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+    # run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
     fit_curve = try
         fc = _read_fit(joinpath(_FIXTURE_DIR, run.fit), run.fit_scale, run.fit_col)
         fc !== nothing && run.rescale ? _rescale_fit(fc, q_fit, I_fit) : fc
@@ -198,6 +204,8 @@ for run in RUNS
         result, (q_fit, I_fit, σ_fit);
         dir = @__DIR__, name = "res$(suffix)", references,
         form_factor_log = form_factor_log, n_atoms = n_atoms,
+        ref_chi2 = run.ref_chi2,
+        run_log = true,
     )
 
     # `@__DIR__` (this SASDBS6/ folder), not the caller's cwd.

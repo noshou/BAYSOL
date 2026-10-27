@@ -4,14 +4,14 @@
 The pipeline entry points: [`seed_model`](@ref) builds a [`Inference.Seed`](@ref) from a
 structure, a measured curve and a buffer, [`run_model`](@ref) samples it and summarizes the
 posterior, [`results`](@ref) draws the figures and writes the workbook of numbers, and
-[`write_timings`](@ref) writes the timing table. `BAYSOL.seed_model`, `BAYSOL.run_model`,
-`BAYSOL.results` and `BAYSOL.write_timings` are these functions, re-exported by the
+[`write_log`](@ref) writes the run log. `BAYSOL.seed_model`, `BAYSOL.run_model`,
+`BAYSOL.results` and `BAYSOL.write_log` are these functions, re-exported by the
 package root.
 """
 module Pipeline
 
 using Statistics: quantile, mean, var
-using Printf: @printf, @sprintf
+using Printf: @sprintf
 using StaticArrays: SVector
 using ..PhysicalConstants: NS_PER_S
 using ..Runtime: StageLog, tick, tock!, timed!, stage_seconds, with_gc_paused, tmap_blocks
@@ -22,13 +22,22 @@ using ..Shannon: Shannon, SHANNON_REBIN
 using ..Scattering: Scattering, B_LM_CHUNK, SHELL_THICKNESS
 using ..BulkElectronDensity: Solute, DEFAULT_TEMPERATURE_C
 using ..Inference: Inference, κ_δρ₁₂, κ_δρ₃, DEFAULT_TARGET_ACCEPT
+using Distributions: Normal, cdf
 
 """
-"lo-hi" empirical quantile range (integer percentages, 0 ≤ lo < hi ≤ 100)
-used to build "quantiles"/"bounds" entries. The default "16-84" is a ±1σ-equivalent
-interval for a Normal. The special case "0-0" means *no* filtering.
+Half-width, in σ, of the default posterior interval of [`run_model`](@ref): the
+"quantiles"/"bounds" entries are built from the empirical quantiles that bound the central
+interval a Normal distribution would have at ±`DEFAULT_SIGMA` σ (2σ: the 2.28th and 97.72nd
+percentiles). The quantiles are those of the draws, so the interval is no assumption of
+a Normal posterior; the σ only says which percentiles. The run sheet records them.
 """
-const DEFAULT_QUANTILES = "16-84"
+const DEFAULT_SIGMA = 2.0
+
+"""
+The largest `sigma` [`run_model`](@ref) accepts. Beyond 3σ (the 0.13th percentile) the
+quantiles of a run's few thousand draws rest on a handful of draws.
+"""
+const MAX_SIGMA = 3.0
 
 """
 Default warm-up of [`run_model`](@ref): NUTS iterations of step-size and mass-matrix
@@ -136,21 +145,73 @@ const PLOT_FONT = ("TeX Gyre PagellaX", "TeX Gyre Pagella Math")
 
 """
 The subfolders of the output folder of [`results`](@ref): the `.tex` figures, and what
-is compiled from them, go into `PLOT_SUBDIR`, the TSV files into `DATA_SUBDIR`. The report
-(`res.txt`) stays in the output folder itself.
+is compiled from them, go into `PLOT_SUBDIR`. The workbook stays in the output folder
+itself.
 """
 const PLOT_SUBDIR = "plots"
 
-"The subfolder of the TSV files of [`results`](@ref); see `PLOT_SUBDIR`."
-const DATA_SUBDIR = "data"
-
 """
-Significant figures of every number in the tables of [`results`](@ref): a TSV file
-prints this many, and a workbook cell is rounded to this many. The default, 17, is every
+Significant figures of every number in the tables of [`results`](@ref): a workbook
+cell is rounded to this many. The default, 17, is every
 bit of a `Float64` (the number reads back exactly); lower it for shorter files or to drop
 the noise in the last digits (15 is the most a `Float64` is guaranteed to carry).
 """
 const TABLE_SIGFIGS = 17
+
+"""
+The angle (degrees, counter-clockwise) the x tick labels of every figure are turned by,
+so that long labels (`0.3405`, `6×10⁻⁶`) do not run into each other: they end at their tick
+and slope up to the left. `0` leaves them horizontal.
+"""
+const PLOT_XTICK_ANGLE = 45.0
+
+"""
+The line width (pt) of the axis ticks, major and minor, which are black so that they show
+against the plot.
+"""
+const PLOT_LW_TICK = 0.8
+
+"""
+The line width (pt) of the axis lines (the box round each figure), black.
+"""
+const PLOT_LW_AXIS = 1.2
+
+"""
+The length (cm) of a major tick; a minor tick is half as long. The ticks point inward and
+are drawn on all four sides of the axis.
+"""
+const PLOT_TICK_LENGTH_CM = 0.22
+
+"""
+The number of minor ticks between two major ones of a linear axis (a log axis has its own).
+"""
+const PLOT_MINOR_TICKS = 4
+
+"""
+The gap (pt) between the y axis and its tick labels.
+"""
+const PLOT_TICK_LABEL_PAD_PT = 4.0
+
+"""
+The length (pt) of the straight stub that carries an x tick out of the axis, and of the
+elbow (pt) that then bends towards the slanted label; see `PLOT_XTICK_ANGLE`.
+"""
+const PLOT_TICK_STUB_PT = 4.0
+const PLOT_TICK_ELBOW_PT = 6.0
+
+# The release name is the `release_name` key of Project.toml, next to `version` (which must
+# stay plain semver: `0.3.0-name` would be a pre-release, and a name may have non-ASCII
+# letters). It is read when the package is precompiled; a change of Project.toml
+# precompiles it again.
+const _PROJECT_TOML = normpath(joinpath(@__DIR__, "..", "..", "Project.toml"))
+include_dependency(_PROJECT_TOML)
+
+"""
+The name of the release the version in `Project.toml` belongs to (the message of its git
+tag, `wʋsg_n_yɩɩda` for v0.3.0): the `release_name` key of `Project.toml`, `""` if it has
+none. Change it together with `version`: the run log prints both, as `v0.3.0-wʋsg_n_yɩɩda`.
+"""
+const RELEASE_NAME = String(get(Base.parsed_toml(_PROJECT_TOML), "release_name", ""))
 
 """
 The padding (pt) the PDF page keeps round a figure. Without it the page is cropped to the
@@ -270,10 +331,11 @@ const _REPORT_LABELS = Dict{String,String}(
 include("SeedModel.jl")
 include("RunModel.jl")
 include("Tables.jl")
+include("Log.jl")
 include("Results.jl")
 include("Summary.jl")
 
-export seed_model, run_model, print_summary, write_timings
+export seed_model, run_model, print_summary, write_log
 results, PlotStyle, Reference, font_available
 public MAPParams, MAPResult, QuantileBounds, QuantileParams, QuantileCurves, QuantileResult
 

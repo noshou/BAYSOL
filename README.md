@@ -9,11 +9,11 @@ using BAYSOL
 seed = BAYSOL.seed_model(structure, energy, q, I, σ, pH, σ_pH, solutes)
 res  = BAYSOL.run_model(seed)                 # NUTS: 300 warm-up + 700 draws, 8 chains
 BAYSOL.results(res, seed; dir = "out")   # terminal plots, pgfplots .tex files, the workbook out/res.xlsx
-BAYSOL.write_timings("out/res_timings.txt", res)  # the timing table, a text file
+BAYSOL.write_log(res)  # the run log out/out.LOG: timings and what is worth tracking (or results(...; run_log = true))
 BAYSOL.print_summary(res)                      # the verdict: χ², the parameters, the checks, where the files are
 ```
 
-`results` prints the fit, the residuals and the posterior histograms in the terminal, and writes each figure as a standalone pgfplots `.tex` file (set `compile = true`, or run `bb render-plots`, to turn them into PDF, SVG or PNG; that needs `lualatex` or `xelatex`) and one workbook, `res.xlsx`, with the results as numbers: the run's settings and sampler statistics, the MAP, the posterior quantiles, the curves, the histogram counts and every draw, one sheet each (the [Pipeline guide](src/Pipeline/README.md) explains every sheet). Every posterior histogram is a figure of its own. The font is an option: any font LuaLaTeX can find (TeX Gyre PagellaX with TeX Gyre Pagella Math by default; `BAYSOL.font_available("Name")` or `bb fonts "Name"` checks one, `bb fonts --list` lists them). See the [Pipeline guide](src/Pipeline/README.md).
+`results` prints the fit, the residuals and the posterior histograms in the terminal, and writes each figure as a standalone pgfplots `.tex` file (set `compile = true`, or run `bb render-plots`, to turn them into PDF, SVG or PNG; that needs `lualatex` or `xelatex`) and one workbook, `res.xlsx`, with the results as numbers (and, with `run_log = true`, the run's section of a small tracked run log, `<folder>.LOG`, that benchmarks read): the run's settings and sampler statistics, the MAP, the posterior quantiles, the curves, the histogram counts and every draw, one sheet each (the [Pipeline guide](src/Pipeline/README.md) explains every sheet). Every posterior histogram is a figure of its own. The font is an option: any font LuaLaTeX can find (TeX Gyre PagellaX with TeX Gyre Pagella Math by default; `BAYSOL.font_available("Name")` or `bb fonts "Name"` checks one, `bb fonts --list` lists them). See the [Pipeline guide](src/Pipeline/README.md).
 
 - Documentation: [BAYSOL](https://noshou.github.io/BAYSOL/). Each module's README under `src/` is also a Guides page there.
 - Worked analyses of 27 protein SASBDB entries and 30 DNA/RNA entries: [fitting tests](test/fitting_tests/)

@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
 ;; Runs the end-to-end fitting tests (test/fitting_tests/<ID>/): each is a script
-;; that fits one SASBDB entry and writes its report and figures next to it.
+;; that fits one SASBDB entry and writes its workbook, figures and run log next to it.
 ;;
 ;;     bb fitting-tests --list
 ;;     bb fitting-tests [ID ...] [--no-fit] [--bench] [--approved] [--report]
@@ -18,11 +18,11 @@
 ;;              need a quiet machine, and AI agents tend to start a benchmark
 ;;              without checking for one, so the owner's per-run approval (their
 ;;              confirmation that nothing else is running) is a small safeguard.
-;;   --no-fit   skip the fits themselves (the later steps do not need them rerun)
+;;   --no-fit   skip the fits themselves (the later steps read the logs earlier fits left)
 ;;   --report   afterwards, print the Results-table rows of the selected fits
 ;;              (bb results-table)
 ;;   --table    afterwards, rewrite the Results table in test/fitting_tests/README.md
-;;              from all the reports (bb results-table --update); covers
+;;              from all the run logs (bb results-table --update); covers
 ;;              every fit, whatever IDs are named
 ;;   --fixme    afterwards, run the sampler diagnostics on the selected fits
 ;;              (bb diagnose --report)
@@ -35,8 +35,8 @@
 ;;
 ;; The steps run in that order: the fits, the benchmark, the report, the
 ;; table, the diagnostics. A failing fit does not stop the others; the
-;; exit status is 1 if any step failed. The fits rewrite the res*.txt
-;; and figures in their folders. Needs Babashka and `julia` on the PATH (or
+;; exit status is 1 if any step failed. The fits rewrite the workbook, the figures and the
+;; run log in their folders. Needs Babashka and `julia` on the PATH (or
 ;; JULIA=/path/to/julia); shared helpers are in dev/common.clj.
 
 (ns fitting-tests

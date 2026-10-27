@@ -82,6 +82,7 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 const RUNS = [
     (
         tag = "fit2_model1",
+        ref_chi2 = "MultiFoXS 1-state 0.85",
         pdb = "SASDCQ2_fit2_model1.pdb",
         fit = "SASDCQ2_fit2.dat",
         fit_scale = 1.0,
@@ -91,6 +92,7 @@ const RUNS = [
     ),   # D_max ≈ 69 Å; deposited χ² = 0.85
     (
         tag = "fit3_model1",
+        ref_chi2 = "MultiFoXS 2-state 0.79",
         pdb = "SASDCQ2_fit3_model1.pdb",
         fit = "SASDCQ2_fit3.dat",
         fit_scale = 1.0,
@@ -100,6 +102,7 @@ const RUNS = [
     ),   # D_max ≈ 71 Å; deposited χ² = 0.79
     (
         tag = "fit3_model2",
+        ref_chi2 = "MultiFoXS 2-state 0.79",
         pdb = "SASDCQ2_fit3_model2.pdb",
         fit = "SASDCQ2_fit3.dat",
         fit_scale = 1.0,
@@ -153,8 +156,9 @@ for run in RUNS
 
     result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdcq2(run)
 
-    # The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-    # that their time is in its timing section.
+    # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+    # run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
     fit_curve = try
         fc = _read_fit(joinpath(_FIXTURE_DIR, run.fit), run.fit_scale, run.fit_col)
         fc !== nothing && run.rescale ? _rescale_fit(fc, q_fit, I_fit) : fc
@@ -176,6 +180,8 @@ for run in RUNS
         result, (q_fit, I_fit, σ_fit);
         dir = @__DIR__, name = "res$(suffix)", references,
         form_factor_log = form_factor_log, n_atoms = n_atoms,
+        ref_chi2 = run.ref_chi2,
+        run_log = true,
     )
 
     # `@__DIR__` (this SASDCQ2/ folder), not the caller's cwd.

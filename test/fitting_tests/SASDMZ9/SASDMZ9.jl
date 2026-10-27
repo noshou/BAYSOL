@@ -216,15 +216,17 @@ const _PDB_PATH1 = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1_model1.pdb")
 result1, form_factor_log1, n_atoms1, (q_fit1, I_fit1, σ_fit1) =
     run_sasdmz9_model(_PDB_PATH1)
 
-# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-# that their time is in its timing section.
+# `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
 BAYSOL.results(
     result1, (q_fit1, I_fit1, σ_fit1);
     dir = @__DIR__, name = "res_model1",
     form_factor_log = form_factor_log1, n_atoms = n_atoms1,
+    ref_chi2 = "MultiFoXS 3-state 2.65",
+    run_log = true,
 )
 
-BAYSOL.write_timings(joinpath(@__DIR__, "res_model1_timings.txt"), result1)
 BAYSOL.print_summary(result1)
 
 # ---------------------------------------------------------------------------
@@ -238,15 +240,17 @@ const _PDB_PATH2 = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1_model2.pdb")
 result2, form_factor_log2, n_atoms2, (q_fit2, I_fit2, σ_fit2) =
     run_sasdmz9_model(_PDB_PATH2)
 
-# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-# that their time is in its timing section.
+# `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
 BAYSOL.results(
     result2, (q_fit2, I_fit2, σ_fit2);
     dir = @__DIR__, name = "res_model2",
     form_factor_log = form_factor_log2, n_atoms = n_atoms2,
+    ref_chi2 = "MultiFoXS 3-state 2.65",
+    run_log = true,
 )
 
-BAYSOL.write_timings(joinpath(@__DIR__, "res_model2_timings.txt"), result2)
 BAYSOL.print_summary(result2)
 
 # ---------------------------------------------------------------------------
@@ -260,13 +264,15 @@ const _PDB_PATH3 = joinpath(_FIXTURE_DIR, "SASDMZ9_fit1_model3.pdb")
 result3, form_factor_log3, n_atoms3, (q_fit3, I_fit3, σ_fit3) =
     run_sasdmz9_model(_PDB_PATH3)
 
-# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-# that their time is in its timing section.
+# `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
 BAYSOL.results(
     result3, (q_fit3, I_fit3, σ_fit3);
     dir = @__DIR__, name = "res_model3",
     form_factor_log = form_factor_log3, n_atoms = n_atoms3,
+    ref_chi2 = "MultiFoXS 3-state 2.65",
+    run_log = true,
 )
 
-BAYSOL.write_timings(joinpath(@__DIR__, "res_model3_timings.txt"), result3)
 BAYSOL.print_summary(result3)

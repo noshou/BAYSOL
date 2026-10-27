@@ -170,7 +170,7 @@ NUTS samples `w` with `θ = μ_θ + σ_θ ⊙ (ẑ + S w)` (`_θ_of_w`), in whic
 
 ## NUTS
 
-`infer(...; rng_seed)` is reproducible at any thread count: the `UInt64` seed is mixed (SplitMix64) with each draw's purpose and index into that item's own `Xoshiro` stream (MAP start `i`, chain `k`; bridge proposals; the chain-start directions from the separate `jitter_seed`). The seed is printed in the report's `=== Run ===` section. The MAP search stays serial (threading measured slower, in a validation run now in git history under `test/validation/threading/`).
+`infer(...; rng_seed)` is reproducible at any thread count: the `UInt64` seed is mixed (SplitMix64) with each draw's purpose and index into that item's own `Xoshiro` stream (MAP start `i`, chain `k`; bridge proposals; the chain-start directions from the separate `jitter_seed`). The seed is the `rng_seed` row of the run log and of the `run` sheet (a fresh seed has 53 bits, so a spreadsheet holds it exactly). The MAP search stays serial (threading measured slower, in a validation run now in git history under `test/validation/threading/`).
 
 Each chain uses multinomial NUTS with the generalised U-turn criterion (as in Stan; max tree depth 10, divergence threshold Δ_max = 1000), a `DenseEuclideanMetric(N)` (full covariance: the parameters multiply each other in `Î`, and a diagonal metric would cost ~√((1+r)/(1−r)) more steps for a pair with correlation `r`), `Leapfrog`, and `StanHMCAdaptor`:
 
@@ -202,7 +202,7 @@ r_{t+1}=\frac{\frac1{N_2}\sum_j \dfrac{\ell_{2j}}{s_1\ell_{2j}+s_2r_t}}{\frac1{N
 Within each mode (modes differ by construction), on the unthinned post-warm-up draws, `convergence` computes (MCMCDiagnosticTools.jl, Vehtari et al. 2021):
 
 - **Split R̂** on `2M` half-chains: `W` the mean within-sequence variance, `B` the between-sequence variance of means, `var⁺ = (n−1)/n W + B/n`, `R̂ = √(var⁺/W)`, so `R̂² − 1 ≈ τ_μ²/W` is the between-mean variance as a fraction of the within variance (1.01 ⇔ means within ≈ 0.14 within-sd). Rank normalisation (Blom scores) makes it location-robust; the folded version (about the median) catches differences of scale and tails; the larger is kept.
-- **ESS** `= S/τ̂`, `τ = 1 + 2Σρ_t`, the autocorrelation from the variogram (`ρ̂_t = 1 − (W − γ̄_t)/var⁺`) truncated by Geyer's initial positive/monotone pair sequence (max lag 250). A Monte Carlo standard error of a mean is `σ/√ESS`, of a 16/84 % interval end `1.52σ/√ESS` (a few percent of σ at the default 5600 draws). The **tail ESS** is the one the intervals stand on; the rule of thumb is R̂ < 1.01 and ESS ≥ 100 per chain.
+- **ESS** `= S/τ̂`, `τ = 1 + 2Σρ_t`, the autocorrelation from the variogram (`ρ̂_t = 1 − (W − γ̄_t)/var⁺`) truncated by Geyer's initial positive/monotone pair sequence (max lag 250). A Monte Carlo standard error of a mean is `σ/√ESS`, of a 16/84 % interval end `1.52σ/√ESS` (more in the tails, where the default 2σ interval ends) (a few percent of σ at the default 5600 draws). The **tail ESS** is the one the intervals stand on; the rule of thumb is R̂ < 1.01 and ESS ≥ 100 per chain.
 
 The worst values over the diagnosed modes are reported (`rhat_max` flagged above `RHAT_OK = 1.01`, `ess_min`, `ess_tail_min`). **Retry:** if the worst R̂ exceeds `RETRY_RHAT = 1.01` and the run was shorter than the retry, the whole procedure is run once more with `RETRY_N_ADAPT = RETRY_N_DRAWS = 2000` and seeds derived by an odd-constant multiplication of `rng_seed` and `jitter_seed` (`RETRY_SEED_OFFSET`: a different search, streams and directions, still deterministic), and the run with the smaller worst R̂ is kept (`retry = false` disables it; the report's `retry` line and `diagnostics.first_rhat`, `retry_kept` say what happened). It cannot repair a structural failure (a second mode explored by a single chain keeps R̂ ≈ 1.7). Outcomes: 53/53 at R̂ ≤ 1.01 on the latest run, 8 retries (the validation records were removed; git history under `test/validation/rhat_retry/`). Convergence statistics detect chains that disagree, not chains that agree on a wrong region.
 
@@ -211,7 +211,7 @@ The worst values over the diagnosed modes are reported (`rhat_max` flagged above
 `infer` returns an `Inferred{S,N}`: the draws of `ξ` of the pooled chains, chain after chain (warm-up included; `chain`, `iteration`), AdvancedHMC's per-iteration statistics, and for every draw its **re-profiled** scale, `bkgrnd_corr`, `c1`, reduced χ² and predicted curve `m ĥ(q; ξ, c1) + b` on the fitted grid (scale and background are discarded at every density evaluation, so they are recomputed to match). `BAYSOL.run_model` hands back the same type with the first `n_adapt` draws dropped.
 
 - **MAP.** The reported "MAP" is the non-divergent draw of highest `log π` (a draw of the sampled density in `θ`, not the L-BFGS end point and not the mode of the physical-space density). In the Gaussian case the best of `S` draws has `χ²_min` median `√(8 ln 2/S)`: ≈ 0.18 posterior sd and 0.016 nats from the mode at `S = 5600`.
-- **Intervals.** `"16-84"` quantiles (default; `"0-0"` is the extremes) with Julia's linear-interpolation definition, and `"bounds"`, the smallest and largest actual draws inside them. Curve bands apply the same operation at each `q`: they are **pointwise** (the whole curve lies inside with probability at most 68 %) bands of the *fitted function*, not a posterior predictive (which would add `σᵢ²` and the variance of the nuisance parameters), and should not be compared with the scatter of the data. Divergent draws are removed, which biases the bands slightly narrow.
+- **Intervals.** Quantiles at the percentiles of ±`sigma` σ of a Normal (default 2σ: 2.28 – 97.72; or `quantiles = "<lo>-<hi>"`, `"0-0"` being the extremes) with Julia's linear-interpolation definition, and `"bounds"`, the smallest and largest actual draws inside them. Curve bands apply the same operation at each `q`: they are **pointwise** (the whole curve lies inside with probability at most 68 %) bands of the *fitted function*, not a posterior predictive (which would add `σᵢ²` and the variance of the nuisance parameters), and should not be compared with the scatter of the data. Divergent draws are removed, which biases the bands slightly narrow.
 - **χ² on the measured grid.** `model_on_raw` interpolates the binned model onto the raw `q` by a cubic spline (`n_raw − 3` degrees of freedom). For a systematic misfit of `εσ` per raw point and `n` raw points per bin, the raw χ²_red ≈ `1 + ε²` and the binned ≈ `1 + nε²`: the binned statistic matches the independent-channel likelihood that is sampled, the measured-grid one is comparable with other programs.
 
 ## Usage
@@ -238,7 +238,7 @@ fw    = forward_cache(mol, q_fit, lMax, energy_eV)
 seed  = seed_sampler(fw, I_fit, σ_fit, PH, σ_PH, SOLUTES; t = T_C)
 
 result = BAYSOL.run_model(seed)
-BAYSOL.write_timings(result)
+BAYSOL.write_log(result)
 ```
 
 ## Constants

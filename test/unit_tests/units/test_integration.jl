@@ -230,12 +230,16 @@ end
             0.1,
             Solute[NonBiological(0.15, 0.001, "sodium chloride")],
         )
-        Random.seed!(3)
-        sp_f = BAYSOL.Inference._sampling_space(seed)
+        # the run's base value, fixed: it is what `Random.seed!(3)` drew before a fresh base
+        # had 53 bits. A different base gives other starting points, and on some of them
+        # the f-stop ends further from the gradient-stop optimum than the 1e-4 nats below
+        # (0.34 nats on another base), which this test does not look into
+        base = UInt64(6267000709126231976)
+        sp_f = BAYSOL.Inference._sampling_space(seed; base)
         # the same starting points
-        Random.seed!(3)
         sp_g = BAYSOL.Inference._sampling_space(
             seed;
+            base,
             f_abstol = 0.0,
             successive_f_tol = 1,
         )

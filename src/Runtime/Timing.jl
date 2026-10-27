@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Named stage of a run, for the report's `=== Timing ===` section.
+# Named stage of a run, for the timing table of the run log (`BAYSOL.write_log`).
 # A [`StageLog`](@ref) is created when a run starts and is handed down
 # to whatever should be timed; everything is a no-op when the log is `nothing`.
 
 using ..PhysicalConstants: NS_PER_S
 
-export Stage, StageLog, tick, tock!, timed!, stage_seconds, fmt_count
+export Stage, StageLog, tick, tock!, timed!, stage_seconds, fmt_count, process_age_s
 
 """
 One timed stage. `group` is `:static`, `:sampling` or `:report`; `depth` 1 is a
@@ -24,14 +24,43 @@ struct Stage
     note::String
 end
 
+# the time `Runtime` was loaded, the start of a process on a system without /proc
+const _LOADED_NS = Ref{UInt64}(0)
+__init__() = (_LOADED_NS[] = time_ns())
+
+"""
+Seconds since this process started (Linux: from `/proc`, so it counts Julia's own startup,
+`using BAYSOL` and everything compiled before the run); on another system the seconds
+since BAYSOL was loaded, which leaves Julia's own startup out.
+
+# Returns
+- The age in seconds, 0 if it cannot be found.
+"""
+function process_age_s()::Float64
+    try
+        stat = read("/proc/self/stat", String)
+        # the fields after the command name `(...)`: the 20th of them is `starttime`
+        # (field 22 of the file), in clock ticks since boot
+        fields = split(stat[(findlast(')', stat)+2):end])
+        ticks = ccall(:sysconf, Clong, (Cint,), 2)           # _SC_CLK_TCK
+        up = parse(Float64, first(split(read("/proc/uptime", String))))
+        return max(up - parse(Int, fields[20]) / ticks, 0.0)
+    catch
+        return _LOADED_NS[] == 0 ? 0.0 : (time_ns() - _LOADED_NS[]) / NS_PER_S
+    end
+end
+
 """
 Stages in execution order (a parent precedes its children), the start time of the
-run (`t0`, `time_ns()`; `compile0`, the compile counter then), and free-form run
-facts (`info`, e.g. lMax, `n_samples`).
+run (`t0`, `time_ns()`; `compile0` and `gc0`, the compile and GC counters then, which
+count from the start of the process) and the `startup` (seconds from the start of the
+process to `t0`), and free-form run facts (`info`, e.g. lMax, `n_samples`).
 """
 mutable struct StageLog
     const t0::UInt64
     const compile0::UInt64
+    const gc0::UInt64
+    const startup::Float64
     const stages::Vector{Stage}
     const info::Dict{String,Any}
     const lock::ReentrantLock
@@ -40,8 +69,14 @@ mutable struct StageLog
         return new(
             time_ns(),
             Base.cumulative_compile_time_ns()[1],
+            Base.gc_time_ns(),
+            process_age_s(),
             Stage[],
-            Dict{String,Any}(),
+            # the machine at the start of the run, for the log
+            Dict{String,Any}(
+                "load_start" => first(Sys.loadavg()),
+                "free_memory_start" => Sys.free_memory(),
+            ),
             ReentrantLock(),
         )
     end

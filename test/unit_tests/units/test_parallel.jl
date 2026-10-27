@@ -45,6 +45,8 @@ using Random
         b = draw_base()
         @test a == b && a isa UInt64
         @test draw_base() != a
+        # below 2^53, so that a workbook holds it exactly
+        @test all(_ -> draw_base() < UInt64(2)^53, 1:1000)
     end
 
     @testset "tmap_items: results in input order, whatever order the tasks finish in" begin

@@ -92,11 +92,10 @@ using Base.CoreLogging: with_logger, NullLogger   # (the Logging stdlib is not a
                         Runtime.with_workers(4) do
                             run_model(seed, 40, 20; retry = false)
                         end
-                        # the figures (terminal, .tex, TSV; no LaTeX is run) and the report
-                        # with their timings, as a fit's script does
+                        # the figures (terminal, .tex) and the workbook, with their
+                        # timings; no LaTeX is run, as in a fit's script
                         results(result, seed; dir = pdb, io = IOBuffer(),
-                            references = Reference("reference", q, I))
-                        write_timings(result)
+                            references = Reference("reference", q, I), run_log = true)
                         # the static build of a structure above
                         # the thread thresholds, as tasks
                         Runtime.with_workers(4) do

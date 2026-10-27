@@ -77,6 +77,7 @@ const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 const RUNS = [
     (
     tag = "fit1_model1",
+    ref_chi2 = "CRYSOL 3.03",
     pdb = "SASDRW2_fit1_model1.pdb",
     fit = "SASDRW2_fit1.fit",
     fit_scale = 1.0,
@@ -130,8 +131,9 @@ for run in RUNS
 
     result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdrw2(run)
 
-    # The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-    # that their time is in its timing section.
+    # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+    # run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
     fit_curve = try
         fc = _read_fit(joinpath(_FIXTURE_DIR, run.fit), run.fit_scale, run.fit_col)
         fc !== nothing && run.rescale ? _rescale_fit(fc, q_fit, I_fit) : fc
@@ -153,6 +155,8 @@ for run in RUNS
         result, (q_fit, I_fit, σ_fit);
         dir = @__DIR__, name = "res$(suffix)", references,
         form_factor_log = form_factor_log, n_atoms = n_atoms,
+        ref_chi2 = run.ref_chi2,
+        run_log = true,
     )
 
     # `@__DIR__` (this SASDRW2/ folder), not the caller's cwd.

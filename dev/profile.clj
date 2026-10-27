@@ -20,7 +20,7 @@
 ;; build, and the samples by function, exclusive and inclusive, for frames in
 ;; BAYSOL's own source. This is development tooling for performance work, not a
 ;; benchmark: use it to find what to optimize, and `bb fitting-tests --bench --approved`
-;; or the fitting-test reports to measure it. Needs Babashka and `julia` on the PATH
+;; or the fitting-test run logs to measure it. Needs Babashka and `julia` on the PATH
 ;; (or JULIA=/path/to/julia); shared helpers are in dev/common.clj.
 
 (ns profile

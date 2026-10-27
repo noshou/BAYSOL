@@ -307,7 +307,7 @@ brute_diameter(P) = maximum(
         @test_throws ArgumentError residual_structure([1.0, 2.0])
     end
 
-    @testset "seed_model → run_model → write_timings on crambin" begin
+    @testset "seed_model → run_model → the run sheet on crambin" begin
         path = joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1CRN-TEST.pdb")
         solutes = Solute[NonBiological(0.15, 0.001, "sodium chloride")]
         # synthetic data on a dense grid; the model that
@@ -377,18 +377,16 @@ brute_diameter(P) = maximum(
         @test !haskey(map_params, "resid_lag1") && !haskey(map_params, "chisq_red_raw")
         # the run sheet carries the binning and the sampler's statistics
         sheets = BAYSOL.Pipeline._summary_sheets(res; n_atoms = s.fw.n_atoms)
-        run = Dict(zip(sheets[1].cols[1], sheets[1].cols[2]))
+        run = Dict(zip(sheets[1].cols[2], sheets[1].cols[3]))   # name | value
         for key in ("n_atoms", "n_q_raw", "rebin_channels", "channels", "divergence_rate")
             @test haskey(run, key)
         end
         @test run["n_q_raw"] == length(sh.q_raw) && run["rebin_fitted"] == length(sh.q)
-        @test [x.name for x in sheets][2:3] == ["map", "quantiles_16-84"]
-        # write_timings is the timing table only
-        buf = IOBuffer()
-        BAYSOL.write_timings(buf, res)
-        txt = String(take!(buf))
-        @test startswith(txt, "stage") && occursin("fit timing", txt)
-        @test !occursin("=== ", txt)
+        @test [x.name for x in sheets][2:3] == ["map", "quantiles_2sigma"]
+        # the timing table: the wall clock first, the fit and plot timings add up to it
+        tbl = BAYSOL.Pipeline._timing_table(res[1].timing, BAYSOL.Runtime.tick())
+        @test startswith(tbl.rows[1].name, "wall clock")
+        @test tbl.fit + tbl.plot ≈ tbl.rows[1].secs
     end
     # …acceptable
     @testset "shannon_data raises the rebin until the binning's worst-case bias is" begin

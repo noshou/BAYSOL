@@ -138,8 +138,9 @@ result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdwj4_fit2()
 
 fit, divergence_rate, map_result, quantile_result = result
 
-# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-# that their time is in its timing section.
+# `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
 pos = I_fit .> 0   # the points with a positive intensity, as the plots show
 ref = readdlm(_FIT_PATH; skipstart = 1)
 q_ref, I_ref = _rescale_fit(
@@ -150,8 +151,9 @@ BAYSOL.results(
     result, (q_fit, I_fit, σ_fit);
     dir = @__DIR__, name = "res_fit2", references = reference,
     form_factor_log = form_factor_log, n_atoms = n_atoms,
+    ref_chi2 = "Pepsi-SAXS 10.774",
+    run_log = true,
 )
 
 # `@__DIR__` (this SASDWJ4/ folder), not the caller's cwd.
-BAYSOL.write_timings(joinpath(@__DIR__, "res_fit2_timings.txt"), result)
 BAYSOL.print_summary(result)

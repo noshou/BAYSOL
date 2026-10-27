@@ -4,7 +4,7 @@
 # plotting library (`_curve_data`, `_residual_data`, `_histogram_data`, `_comparison_data`),
 # and three outputs are drawn from it: a terminal preview (UnicodePlots), a pgfplots `.tex`
 # file per figure (PGFPlotsX; a LaTeX run turns it into a PDF/PNG/SVG, only on request) and
-# the figures' tables, which Tables.jl writes (a workbook, or TSV files).
+# the figures' tables, which Tables.jl writes (a workbook).
 
 using PGFPlotsX: PGFPlotsX, @pgf
 using UnicodePlots: UnicodePlots
@@ -38,6 +38,13 @@ same name (`PlotStyle().color_map` is `PLOT_COLOR_MAP`).
 - `ylim_log`, `ylim_lin_pad_frac`: the y-ranges of the I(q) and the residuals plots.
 - `preview_size`: `(width, height)` of a terminal plot (characters, rows).
 - `border_pt`: the padding the PDF page keeps round a figure (pt).
+- `lw_axis`: the line width of the axis box (pt).
+- `lw_tick`, `tick_length_cm`, `minor_ticks`, `tick_label_pad_pt`: the black axis
+    ticks (line width in pt, major length in cm, the minor ticks between two major
+    ones of a linear axis) and the gap between the y axis and its tick labels (pt).
+- `xtick_angle`: the angle the x tick labels are turned by (degrees; 0 leaves them level).
+- `tick_stub_pt`, `tick_elbow_pt`: each x tick leaves the axis straight for `tick_stub_pt`
+    and then bends for `tick_elbow_pt` towards its slanted label (pt).
 - `font`: the font of the LaTeX output: the name of any font LuaLaTeX can find (the text
     font; the math font stays Latin Modern Math), a `(text font, math font)` pair of
     `fontspec` names (the default is `PLOT_FONT`, TeX Gyre PagellaX with TeX Gyre Pagella
@@ -67,6 +74,14 @@ Base.@kwdef struct PlotStyle
     ylim_lin_pad_frac::Float64 = PLOT_YLIM_LIN_PAD_FRAC
     preview_size::NamedTuple = PLOT_PREVIEW_SIZE
     border_pt::Float64 = PLOT_BORDER_PT
+    xtick_angle::Float64 = PLOT_XTICK_ANGLE
+    lw_axis::Float64 = PLOT_LW_AXIS
+    lw_tick::Float64 = PLOT_LW_TICK
+    tick_length_cm::Float64 = PLOT_TICK_LENGTH_CM
+    minor_ticks::Int = PLOT_MINOR_TICKS
+    tick_label_pad_pt::Float64 = PLOT_TICK_LABEL_PAD_PT
+    tick_stub_pt::Float64 = PLOT_TICK_STUB_PT
+    tick_elbow_pt::Float64 = PLOT_TICK_ELBOW_PT
     font::Union{Nothing,String,Tuple{String,String}} = PLOT_FONT
 end
 
@@ -390,8 +405,7 @@ function _fitting_ticks(lo::Real, hi::Real, width_cm::Real)
         ticks, labels = _linear_ticks(lo, hi, n)
         # a label takes about 0.18 cm a printed character (TeX markup does not print) and
         # needs a gap of about 0.3 cm
-        printed(l) = count(c -> !(c in "\$\\{}^"), replace(l, "\\times" => "×"))
-        sum(0.18 * printed(l) + 0.3 for l in labels) ≤ 0.9 * width_cm && break
+        sum(0.18 * _printed_length(l) + 0.3 for l in labels) ≤ 0.9 * width_cm && break
     end
     return ticks, labels
 end
@@ -442,6 +456,94 @@ function _tick_labels(ticks, step::Real)
     ]
 end
 
+"""
+The look of the axis lines and ticks of an axis, in its options `opts`: a bold
+black box and black ticks of `style.lw_tick` on all four sides, pointing
+inward, major and minor (`style.minor_ticks` between two major ones of a linear
+axis; a log axis keeps its own) and the y tick labels `style.tick_label_pad_pt`
+away from the axis. The x tick labels are drawn by `_xtick_leaders!`.
+"""
+function _style_ticks!(opts, style::PlotStyle; log::Bool = false)
+    opts["axis line style"] = "{black, line width=$(style.lw_axis)pt}"
+    opts["tick align"] = "inside"
+    opts["xtick pos"] = "both"
+    opts["ytick pos"] = "both"
+    opts["tick style"] = "{black, line width=$(style.lw_tick)pt}"
+    opts["major tick length"] = "$(style.tick_length_cm)cm"
+    opts["minor tick length"] = "$(style.tick_length_cm / 2)cm"
+    if !log
+        opts["minor x tick num"] = style.minor_ticks
+        opts["minor y tick num"] = style.minor_ticks
+    end
+    opts["yticklabel style"] = "xshift=-$(style.tick_label_pad_pt)pt"
+    return opts
+end
+
+"""
+How many characters a tick label prints: the TeX markup (`\\times`, `^`, `{}`, `\$`) does
+not print.
+"""
+_printed_length(l) = count(c -> !(c in "\$\\{}^"), replace(l, "\\times" => "×"))
+
+"""
+The labels of the ticks of a log axis (`0.02`, `0.5`, `1`): rounded, so that `3 * 0.1` does
+not print as `0.30000000000000004`.
+"""
+function _log_labels(ticks)
+    return [
+        "\$" * replace(string(round(t; sigdigits = 3)), r"\.0$" => "") * "\$" for
+        t in ticks
+    ]
+end
+
+"""
+The x tick labels of an axis whose options are `opts`, drawn as TikZ so that each can hang
+on a bent tick: the tick leaves the axis straight (`style.tick_stub_pt`), bends for
+`style.tick_elbow_pt` in the direction of the slanted label (`style.xtick_angle`) and ends
+in the label, which reads up to the right. pgfplots' own labels are switched off, and the
+axis title is moved down below the longest label. With an angle of 0 the tick stays
+straight and the label sits level below it.
+
+# Returns
+- The TikZ commands to put in the axis, as strings; none if the axis has no x ticks or no
+    `ymin` to start them from.
+"""
+function _xtick_leaders!(opts, style::PlotStyle)
+    (haskey(opts, "xtick") && haskey(opts, "ymin")) || return String[]
+    ticks = split(string(opts["xtick"]), ',')
+    labels = if haskey(opts, "xticklabels")
+        split(string(opts["xticklabels"]), ',')
+    else
+        _log_labels(parse.(Float64, ticks))
+    end
+    opts["xticklabels"] = "{}"
+    # the commands lie outside the axis box: clip each plot on its own, not everything
+    opts["clip mode"] = "individual"
+    a, ymin = style.xtick_angle, opts["ymin"]
+    stub, elbow = style.tick_stub_pt, style.tick_elbow_pt
+    leg = iszero(a) ? "" : " -- ++(-$(elbow * cosd(a))pt,-$(elbow * sind(a))pt)"
+    node = iszero(a) ? "anchor=north" : "anchor=east, rotate=$a"
+    cmds = [
+        "\\draw[black, line width=$(style.lw_tick)pt] (axis cs:$x,$ymin) -- " *
+        "++(0pt,-$(stub)pt)$leg node[$node, inner sep=2pt, text=black] {$l};" for
+        (x, l) in zip(ticks, labels)
+    ]
+    # the title goes below the longest label: its stub, elbow and slope, and its height
+    width_cm = 0.18 * maximum(_printed_length, labels)
+    drop_cm = (stub + elbow * sind(a)) / 28.45 + width_cm * sind(a) + 0.45
+    opts["xlabel style"] = "yshift=-$(round(drop_cm; digits = 2))cm"
+    return cmds
+end
+
+"""
+A pgfplots axis with `opts` and `plots`, and the x tick labels drawn by
+`_xtick_leaders!` after them.
+"""
+function _axis(opts, plots, style::PlotStyle)
+    leaders = _xtick_leaders!(opts, style)
+    return PGF.Axis(opts, plots..., leaders...)
+end
+
 "Puts `ticks` and their `labels` into the options of an axis, on its `ax` (\"x\") axis."
 function _set_ticks!(opts, ax::AbstractString, ticks, labels)
     length(ticks) < 2 && return opts
@@ -460,7 +562,7 @@ function _axis_options(style::PlotStyle; ylabel, height, log::Bool, ylim = nothi
         width = "$(style.size_cm.width)cm",
         height = "$(height)cm",
         legend_pos = legend_pos,
-        legend_style = "draw=none, fill=none, font=\\small",
+        legend_style = "draw=none, fill=none, font=\\footnotesize",
         legend_cell_align = "left",
     }
     if log
@@ -479,11 +581,11 @@ function _axis_options(style::PlotStyle; ylabel, height, log::Bool, ylim = nothi
         opts["ymin"] = ylim[1]
         opts["ymax"] = ylim[2]
     end
-    return opts
+    return _style_ticks!(opts, style; log)
 end
 
-"The x-range of a log axis: the data's, with a margin of 8 % either side."
-_xlim(q) = (minimum(q) / 1.08, maximum(q) * 1.08)
+"The x-range of a log axis: exactly the data's, with no margin either side."
+_xlim(q) = (minimum(q), maximum(q))
 
 "A `\\addlegendentry` for the plot just before it."
 _legend(text) = PGF.LegendEntry(_tex_escape(text))
@@ -584,10 +686,10 @@ function _fit_axis(c, style::PlotStyle)
         _data_plots(c, style),
         _map_plot(c, style, "MAP"),
     )
-    return PGF.Axis(
+    return _axis(
         _axis_options(style; ylabel = raw"$I(q)$", height = style.size_cm.curve,
             log = true, ylim = c.ylim, xlim = _xlim(c.q)),
-        plots...)
+        plots, style)
 end
 
 "The residuals figure."
@@ -614,27 +716,77 @@ function _residual_axis(r, style::PlotStyle)
     opts = _axis_options(style; ylabel = raw"$I(q) - I_{\mathrm{MAP}}(q)$",
         height = style.size_cm.residuals, log = false, ylim = r.ylim,
         xlim = extrema(r.q), legend_pos = "north east")
-    return PGF.Axis(opts, plots...)
+    return _axis(opts, plots, style)
 end
 
-"One posterior histogram, a figure of its own, with the MAP value marked."
+"""
+`v` as TeX math to `sigfigs` significant figures: `-5.49`, and
+`6.2\\times10^{-6}` for a value far from 1 (below 10⁻³ or from 10⁵).
+"""
+function _tex_number(v::Real; sigfigs::Integer = 4)
+    v == 0 && return "0"
+    e = floor(Int, log10(abs(v)))
+    -3 ≤ e ≤ 4 && return string(round(v; sigdigits = sigfigs))
+    return string(round(v / 10.0^e; sigdigits = sigfigs)) * "\\times10^{" * string(e) * "}"
+end
+
+"""
+The middle of the tallest bin of the histogram `h`: where the draws are most often found,
+the mode of the sampled values to within a bin.
+"""
+function _hist_mode(h)
+    k = argmax(h.counts)
+    return (h.edges[k] + h.edges[k+1]) / 2
+end
+
+"""
+The skewness of the histogram `h` (the third standardized moment of its bin middles,
+weighted by the counts): positive for a long right tail, negative for a long left one.
+"""
+function _hist_skew(h)
+    mid = (h.edges[1:(end-1)] .+ h.edges[2:end]) ./ 2
+    w = h.counts ./ sum(h.counts)
+    m = sum(w .* mid)
+    s2 = sum(w .* (mid .- m) .^ 2)
+    return s2 > 0 ? sum(w .* (mid .- m) .^ 3) / s2^1.5 : 0.0
+end
+
+"""
+One posterior histogram, a figure of its own, with
+its MAP value and its mode μ marked and in a legend.
+"""
 function _histogram_axis(h, style::PlotStyle)
     pw, ph = style.size_cm.hist
     ymax = 1.08 * maximum(h.counts)
+    # the legend (MAP and μ) goes in the top corner over the long tail, where the bars are
+    # low: the right for a right tail (or none), the left for a left tail
+    corner = _hist_skew(h) ≥ 0 ? "north east" : "north west"
     opts = @pgf {
         xlabel = h.tex, ylabel = "count", ymin = 0, ymax = ymax,
         width = "$(pw)cm", height = "$(ph)cm",
+        legend_pos = corner,
+        legend_style = "draw=black, fill=white, font=\\footnotesize, inner sep=3pt",
+        legend_cell_align = "left",
     }
     _set_ticks!(opts, "x", _fitting_ticks(first(h.edges), last(h.edges), pw)...)
+    _style_ticks!(opts, style)
     plots = Any[
         @pgf(
         PGF.Plot(
             {ybar_interval, fill = _TEX_COLORS.hist,
                 fill_opacity = _opacity(style.color_hist), draw = _TEX_COLORS.hist,
-                draw_opacity = 1},
+                draw_opacity = 1, forget_plot},
             _coords(h.edges, vcat(h.counts, h.counts[end])))
     ),
     ]
+    mode = _hist_mode(h)
+    # digits enough to tell a bin from its neighbour: a narrow posterior (ρₑ) needs more
+    # than 4 significant figures to show MAP and μ apart
+    bw = h.edges[2] - h.edges[1]
+    top = max(abs(mode), abs(something(h.map_value, 0.0)))
+    sig = max(4, ceil(Int, log10(top / bw)) + 1)
+    # the legend: the MAP value (the solid line) and μ, the most sampled part of the
+    # histogram (the middle of its tallest bin; the dotted line), each with its value
     if h.map_value !== nothing
         push!(plots,
             @pgf(
@@ -645,9 +797,24 @@ function _histogram_axis(h, style::PlotStyle)
                         mark = "none",
                     },
                     _coords([h.map_value, h.map_value], [0, ymax]))
+            ),
+            PGF.LegendEntry(
+                "\$\\mathrm{MAP} = " * _tex_number(h.map_value; sigfigs = sig) * "\$",
             ))
     end
-    return PGF.Axis(opts, plots...)
+    push!(plots,
+        @pgf(
+            PGF.Plot(
+                {
+                    color = _TEX_COLORS.data,
+                    line_width = "$(style.lw_map)pt",
+                    dotted,
+                    mark = "none",
+                },
+                _coords([mode, mode], [0, ymax]))
+        ),
+        PGF.LegendEntry("\$\\mu = " * _tex_number(mode; sigfigs = sig) * "\$"))
+    return _axis(opts, plots, style)
 end
 
 "The comparison figure: data, reference curve, MAP curve."
@@ -666,10 +833,10 @@ function _comparison_axis(c, style::PlotStyle)
         ],
         _map_plot(c, style, "BAYSOL MAP"),
     )
-    return PGF.Axis(
+    return _axis(
         _axis_options(style; ylabel = raw"$I(q)$", height = style.size_cm.curve,
             log = true, ylim = c.ylim, xlim = _xlim(c.q)),
-        plots...)
+        plots, style)
 end
 
 """
@@ -819,11 +986,10 @@ and one **comparison** figure per entry of `references` (data, reference curve, 
 `<name>_comparison`, or `<name>_comparison_<reference name>` when there are several).
 
 The files are laid out under `dir`: the `.tex` figures (and what is compiled from them) in
-`dir/plots/`, the numbers as one workbook `dir/<name>.xlsx` (or, with ``, as
-TSV files in `dir/data/`), and the timing table, which [`write_timings`](@ref) writes (as
-`<name>_timings.txt` in the fitting scripts) next to it. `name` is the first
-part of every file name, so several runs can share a folder. Three kinds of output come out
-of each figure:
+`dir/plots/`, and the numbers as one workbook `dir/<name>.xlsx`; the run's log (timings
+and what is worth tracking), which [`write_log`](@ref) writes when `run_log = true`, is
+the section of `name` in `dir/<folder name>.LOG`. `name` is the first part of every file
+name, so several runs can share a folder. Three kinds of output come out of each figure:
 
 - a **terminal preview** printed to `io` (`preview = true`), made with UnicodePlots, which
     needs nothing installed;
@@ -832,15 +998,15 @@ of each figure:
     `compile = true` each document is also compiled to the `formats` (`:pdf`, `:png`,
     `:svg`; this needs a LaTeX engine, and poppler's `pdftocairo`/`pdftoppm` for
     `:png`/`:svg`). A failed run is a warning and the `.tex` stays;
-- the **numbers**, by `tables`: `:xlsx` (the default) writes one workbook, `:tsv` one TSV
-    file for each sheet (`<name>_<sheet>.tsv`), `:both` both, `:none` neither. Sheet and
-    column names are plain ASCII, and every value is a number except the labels in the first
-    column and the text of `form_factor_log`. The sheets:
-    - `run`: `key | value`, the run's settings and statistics:
+- the **numbers**, always written, as one workbook. Sheet and
+    column names are plain ASCII, and every value is a number (a statistic that could not be
+    computed is an empty cell) except the labels in the first column and the text of
+    `form_factor_log`. The sheets:
+    - `run`: `section | name | value | unit | meaning`, the run's settings and statistics:
         model sizes, sampler settings, the Shannon binning, the
         sampler's diagnostics and the chains' convergence;
     - `map`: `parameter | value`, the MAP value of each parameter;
-    - `quantiles_<lo>-<hi>`: `parameter | quantile_lo | quantile_hi | bound_lo | bound_hi`,
+    - `quantiles_<interval>`: `parameter | quantile_lo | quantile_hi | bound_lo | bound_hi`,
         the posterior quantile pair of each parameter and the extreme draws inside it;
     - `stdev_from_prior`: `parameter | z_map | z_quantile_lo | z_quantile_hi`, how far the
         MAP value and the quantile pair of the four prior-carrying parameters lie from the
@@ -856,15 +1022,15 @@ of each figure:
     The README of `src/Pipeline/` explains every row of `run`.
 
 The time of each figure (its data, preview, `.tex` and LaTeX run), of the summary tables
-and of writing the data files is recorded in the run's timing log as stages of the
-`plot` group, so the timing table lists them: call this before [`write_timings`](@ref).
+and of writing the workbook is recorded in the run's timing log as stages of the `plot`
+group, so the log's timings list them; with `run_log` it calls [`write_log`](@ref) last.
 
 # Arguments
 - `result`: what `run_model` returned.
 - `data`: the curve the fit saw, `(q, I, σ)`, which is `seed.shannon.q`, `.I`, `.σ`; or the
     `seed` itself.
-- `dir`, `name`: the output folder (created if missing, with its `plots/` and `data/`
-    subfolders as they are needed) and the first part of the file names.
+- `dir`, `name`: the output folder (created if missing, with its `plots/`
+    subfolder as it is needed) and the first part of the file names.
 - `references`: [`Reference`](@ref)s, a vector or a single one.
 - `style`: a [`PlotStyle`](@ref).
 - `font`: the font of the LaTeX figures, `style.font` unless given: the name of any font
@@ -873,8 +1039,13 @@ and of writing the data files is recorded in the run's timing log as stages of t
     TeX Gyre Pagella Math, and [`font_available`](@ref) checks a name. A font needs
     `lualatex` or `xelatex` to compile; the terminal plots and the data do not depend on it.
 - `preview`, `io`: whether to print the terminal plots, and where.
-- `tex`, `tables`, `compile`, `formats`: as above.
-- `quantile_label`: the `quantiles` given to `run_model`, which names the quantiles sheet.
+- `tex`, `compile`, `formats`: as above.
+- `quantile_label`: the name of the quantiles sheet's interval (`quantiles_<label>`);
+    `nothing` takes the one `run_model` used (`2sigma`, `5-95`, …).
+- `run_log`: also write the run's section of the folder's run log ([`write_log`](@ref)),
+    `false` by default; the fitting tests set it. The log is then in the files returned.
+- `ref_chi2`: the reference χ², the depositor's with its method (`"CRYSOL 1.37"`), which
+    the log prints in the run's section as the `ref_chi2` row (only with `run_log`).
 - `form_factor_log`, `n_atoms`: the seed's `seed.fw.form_factor_log` and `seed.fw.n_atoms`
     for the `form_factor_log` and `run` sheets; given by themselves when `data` is a
     `Seed`.
@@ -884,8 +1055,7 @@ and of writing the data files is recorded in the run's timing log as stages of t
 
 # Exceptions
 - `ArgumentError` if `data` has no positive intensity, its three vectors differ in length,
-    `font` is not `nothing`, a font name or a pair of names, or `tables` is not one of
-    `:xlsx`, `:tsv`, `:both`, `:none`.
+    or `font` is not `nothing`, a font name or a pair of names.
 """
 function results(
     result, data::Tuple;
@@ -899,7 +1069,9 @@ function results(
     tex::Bool = true,
     compile::Bool = false,
     formats = (:pdf,),
-    quantile_label::AbstractString = DEFAULT_QUANTILES,
+    quantile_label::Union{Nothing,AbstractString} = nothing,
+    run_log::Bool = false,
+    ref_chi2::Union{Nothing,AbstractString} = nothing,
     form_factor_log = nothing,
     n_atoms = nothing,
 )::Vector{String}
@@ -1058,7 +1230,10 @@ function results(
     any(endswith(".tex"), written) &&
         (log.info["plots"] = abspath(joinpath(dir, PLOT_SUBDIR))) # print_summary names it  
 
-    write_timings(result)
+    if run_log
+        logfile = write_log(result; ref_chi2)
+        logfile === nothing || push!(written, logfile)
+    end
 
     return written
 end

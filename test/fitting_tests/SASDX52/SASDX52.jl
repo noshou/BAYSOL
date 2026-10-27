@@ -194,8 +194,9 @@ result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdx52()
 
 fit, divergence_rate, map_result, quantile_result = result
 
-# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-# that their time is in its timing section.
+# `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
 ref = readdlm(_FIT_PATH; skipstart = 3)
 reference = BAYSOL.Reference(
     "SASBDB fit1",
@@ -207,6 +208,8 @@ BAYSOL.results(
     result, (q_fit, I_fit, σ_fit);
     dir = @__DIR__, name = "res", references = reference,
     form_factor_log = form_factor_log, n_atoms = n_atoms,
+    ref_chi2 = "0.70 (method unconfirmed)",
+    run_log = true,
 )
 
 # `@__DIR__` (this SASDX52/ folder), not the caller's cwd.

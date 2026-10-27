@@ -3,6 +3,42 @@
 # run_model: NUTS on a Seed, then the MAP draw and the posterior quantiles.
 
 """
+The quantile levels of a run's interval and the label that names its sheet, from the
+`quantiles` ("<lo>-<hi>") or the `sigma` given to [`run_model`](@ref); neither means
+`DEFAULT_SIGMA`.
+
+# Returns
+- `(p_lo, p_hi, label)`: the levels in [0, 1] and the label, `"<lo>-<hi>"` or
+    `"<k>sigma"`.
+
+# Exceptions
+- `ArgumentError` if both are given.
+- `DomainError` if `sigma` is not in `(0, MAX_SIGMA]` or `quantiles` is not a valid range.
+"""
+function _quantile_spec(quantiles, sigma)
+    quantiles !== nothing && sigma !== nothing &&
+        throw(ArgumentError("give `sigma` or `quantiles`, not both"))
+    if quantiles === nothing
+        k = sigma === nothing ? DEFAULT_SIGMA : Float64(sigma)
+        0 < k ≤ MAX_SIGMA || throw(DomainError(k, "sigma must be in (0, $MAX_SIGMA]"))
+        return cdf(Normal(), -k), cdf(Normal(), k), _sigma_label(k)
+    end
+    m = match(r"^(\d+)-(\d+)$", quantiles)
+    m === nothing && throw(DomainError(quantiles, "quantiles must be '<#>-<#>'"))
+    q_1, q_2 = parse(Int64, m.captures[1]), parse(Int64, m.captures[2])
+    if q_1 ≥ q_2 || q_2 > 100
+        # "0-0" means no quantile filtering: the full 0th-100th percentile range spans
+        # (and so filters out nothing from) the data
+        q_1 == 0 && q_2 == 0 && return 0.0, 1.0, String(quantiles)
+        throw(DomainError((q_1, q_2), "invalid quantile range"))
+    end
+    return q_1 / 100, q_2 / 100, String(quantiles)
+end
+
+"The sheet label of a `sigma` interval: `2sigma`, `0.5sigma` (ASCII, as sheet names are)."
+_sigma_label(k::Real) = (isinteger(k) ? string(Int(k)) : string(k)) * "sigma"
+
+"""
 The posterior band of the predicted curve at every q: for the draws `curves[q, :]`
 of each q, the `p_lo` and `p_hi` empirical quantiles and the smallest and largest
 draw inside them. Each q's draws are sorted once (on a contiguous copy, q's in
@@ -135,17 +171,22 @@ trajectory's sample covariance, starting from the identity in the whitened coord
     `DEFAULT_N_DRAWS` = 700 posterior draws.
 
 # Keywords
-- `quantiles::AbstractString=DEFAULT_QUANTILES`: the "<lo>-<hi>" empirical quantile
-    range (integer percentages, 0 ≤ lo < hi ≤ 100) used to build
-    [`QuantileResult`](@ref)'s "quantiles"/"bounds" entries, e.g. the
-    default ("16-84") is a ±1σ-equivalent interval for a Normal. The special
-    case "0-0" means *no* filtering.
+- `sigma::Union{Nothing,Real}=nothing`: the half-width, in σ, of the interval of
+    [`QuantileResult`](@ref)'s "quantiles"/"bounds" entries: the empirical quantiles of
+    the draws at the percentiles a Normal has at ±`sigma` σ (`2` gives 2.28 – 97.72, `1`
+    gives 15.87 – 84.13, `0.5` gives 30.85 – 69.15), `0 < sigma ≤ MAX_SIGMA` (3). The
+    interval is that of the draws, not a Normal fitted to them, and the percentiles used
+    are in the `run` sheet. Neither `sigma` nor `quantiles` given means
+    `DEFAULT_SIGMA` (2).
+- `quantiles::Union{Nothing,AbstractString}=nothing`: the same interval as a
+    "<lo>-<hi>" range of percentages (integers, 0 ≤ lo < hi ≤ 100), e.g. `"5-95"`, instead
+    of `sigma`; giving both is an error. The special case "0-0" means *no* filtering.
 - `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
     (0, 100) exclusive (validated below); the default, `DEFAULT_TARGET_ACCEPT`,
     is 95%.
 - `rng_seed::Union{Nothing,Integer}=nothing`: the run's random seed (see
     [`Inference.infer`](@ref)). To reproduce a fit exactly, pass the
-    `rng_seed` printed in its report's `=== Run ===` section; `nothing` picks
+    `rng_seed` row of its run log (or the `run` sheet); `nothing` picks
     a fresh one (so `Random.seed!` before the call also fixes the run).
 
 - `n_chains::Int=Inference.DEFAULT_N_CHAINS`: number of NUTS chains (8; chain
@@ -170,7 +211,8 @@ function run_model(
     seed::Inference.Seed,
     n_samples::Int64 = DEFAULT_N_SAMPLES,
     n_adapt::Int64 = DEFAULT_N_ADAPT;
-    quantiles::AbstractString = DEFAULT_QUANTILES,
+    sigma::Union{Nothing,Real} = nothing,
+    quantiles::Union{Nothing,AbstractString} = nothing,
     δ::Real = DEFAULT_TARGET_ACCEPT,
     rng_seed::Union{Nothing,Integer} = nothing,
     n_chains::Int = Inference.DEFAULT_N_CHAINS,
@@ -181,22 +223,7 @@ function run_model(
     Tuple{Inference.Inferred,Float64,Nothing,Nothing},
 }
 
-    # parse quantiles
-    q_regex = r"^(\d+)-(\d+)$"
-    if !occursin(q_regex, quantiles)
-        throw(DomainError(quantiles, "quantiles must be '<#>-<#>'"))
-    else
-        q_match = match(q_regex, quantiles)
-        q_1 = parse(Int64, q_match.captures[1])
-        q_2 = parse(Int64, q_match.captures[2])
-        if ((q_1 ≥ q_2) || q_1 < 0 || q_1 > 100 || q_2 < 0 || q_2 > 100)
-            # special case: "0-0" means no quantile filtering
-            if !(q_1 == 0 && q_2 == 0)
-                throw(DomainError((q_1, q_2), "invalid quantile range"))
-            end
-        end
-    end
-    q_1, q_2 = q_1 / 100, q_2 / 100
+    q_1, q_2, quantile_label = _quantile_spec(quantiles, sigma)
 
     # "0-0" means no quantile filtering: reuse the same quantile/map_bounds
     # machinery below with the full 0th-100th percentile range, which by
@@ -206,11 +233,14 @@ function run_model(
     end
 
     if seed.timing !== nothing
-        seed.timing.info["n_atoms"]   = seed.fw.n_atoms
-        seed.timing.info["lMax"]      = seed.fw.lMax
-        seed.timing.info["n_q"]       = length(seed.fw.qvals)
-        seed.timing.info["n_samples"] = n_samples
-        seed.timing.info["n_adapt"]   = n_adapt
+        seed.timing.info["n_atoms"]         = seed.fw.n_atoms
+        seed.timing.info["lMax"]            = seed.fw.lMax
+        seed.timing.info["n_q"]             = length(seed.fw.qvals)
+        seed.timing.info["n_samples"]       = n_samples
+        seed.timing.info["n_adapt"]         = n_adapt
+        seed.timing.info["quantile_label"]  = quantile_label
+        seed.timing.info["quantile_lo_pct"] = 100 * q_1
+        seed.timing.info["quantile_hi_pct"] = 100 * q_2
     end
 
     # calculate unfiltered fit

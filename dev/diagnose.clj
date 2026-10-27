@@ -16,8 +16,8 @@
 ;;   --chains     every chain of infer (the 8 chains run_model uses): start distance,
 ;;                posterior mode, divergences, step size, steps, acceptance, and each
 ;;                divergent draw, to see which chains a fit's divergences come from.
-;;                --seeds is the run's rng_seed (default 7; pass the one in a report's
-;;                === Run === section to look at that run); --retry 1: the rerun infer does
+;;                --seeds is the run's rng_seed (default 7; pass the `rng_seed` of the run's
+;;                `run` sheet to look at that run); --retry 1: the rerun infer does
 ;;                when R̂ is above the limit (2000 + 2000, derived seeds), kept or not
 ;; With none of the part flags, all three run, in
 ;; this order. Name one or more to run only those.

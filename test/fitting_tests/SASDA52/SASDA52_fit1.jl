@@ -157,8 +157,9 @@ resf1, fflogf1, natmsf1, (qf1, If1, σf1) = run_sasda52_fit1()
 
 fit_fit1, divergence_rate_fit1, map_resf1, quantile_resf1 = resf1
 
-# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-# that their time is in its timing section.
+# `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
 crysol = readdlm(_FIT_PATH_FIT1; skipstart = 1)
 reference = BAYSOL.Reference(
     "CRYSOL fit1",
@@ -173,6 +174,8 @@ BAYSOL.results(
     references = reference,
     form_factor_log = fflogf1,
     n_atoms = natmsf1,
+    ref_chi2 = "CRYSOL χ² 2.48 (χ² ≈ 6.2)",
+    run_log = true,
 )
 
 # `@__DIR__` (this SASDA52/ folder), not the caller's cwd.

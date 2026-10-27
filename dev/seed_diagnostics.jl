@@ -730,7 +730,7 @@ at most `max_listed`. Shows which chains the divergences of a fit come from.
 
 Only the draws the pool keeps are seen: a chain in a mode that keeps no draws, or a
 chain that was not pooled, has none to report (its line says so). `rng_seed` is the run's
-(pass the `rng_seed` of a report's `=== Run ===` section to look at that very run). With
+(pass the `rng_seed` row of a run log to look at that very run). With
 `rerun = true` it is the run `infer` does when R̂ is above the limit instead (the
 `RETRY_N_ADAPT` / `RETRY_N_DRAWS` size, seeds from `Inference._retry_seeds`), whether or
 not that run was kept.

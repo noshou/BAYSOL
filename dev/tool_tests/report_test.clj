@@ -316,3 +316,82 @@
             (is (= ["" ""] (mapv old [:fit_timing :plot_timing]))
                 "a report from before plotting has neither, and is read as it was")
             (is (near? (- (old :wall_ex) 0.1) (r :wall_ex))))))
+
+;; a run log as `BAYSOL.write_log` writes it: the stamp, then a section for each run: flat
+;; rows (cells padded with spaces, then a tab), the timing table as a person reads it (the
+;; notes in a column of their own), the machine last
+(def ^:private log-lines
+    ["datetime\t27-10-2026 14:09:33 -0400" "" "=== fit1 ==="
+        "revision        \t2d144a8" "ref_chi2        \tCRYSOL 1.5"
+        "structure       \tnucleic" "pdb2pqr_cache   \tmiss" "components_download\t2"
+        "n_atoms         \t2592" "chi2            \t0.874" "rho_e           \t0.3362"
+        "delta_rho_1     \t-1.079" "delta_rho_3     \t-5.49" "z_delta_rho_3   \t0.4"
+        "c1              \t1.2483" "c1_sat          \t1" "divergence_rate \t0.002"
+        "leapfrog        \t69910" "map_starts_ok   \t70" "map_modes       \t3" ""
+        "--- timing ---" "stage  seconds  % wall  (JIT)  (GC)  notes"
+        "wall clock  12.00  100.0  (4.0)  (0.7)  process start to end"
+        "  startup  2.00  16.7  (1.0)  (0.1)  process start to seed_model"
+        "  static build  4.00  33.3  (1.0)  (0.1)"
+        "    components  0.50  4.2  (0.0)  (0.0)  19 residue names, 2 download"
+        "    propka  1.00  8.3  (0.0)  (0.0)  cache hit"
+        "    pdb2pqr  0.40  3.3  (0.0)  (0.0)  nucleic, none; cache miss"
+        "  sampling  5.00  41.7  (2.0)  (0.2)"
+        "    MAP search + whitening  0.50  4.2  (0.0)  (0.0)  70/70 starts, 3 modes"
+        "    NUTS  3.00  25.0  (0.0)  (0.0)  8k iters, 69.91k leapfrog, 0.016 ms/step"
+        "    optima from the draws  0.18  1.5  (0.2)  (0.0)  0 extra chains"
+        "    per-draw c1 re-profile + curves  0.20  1.7  (0.0)  (0.0)  8000 draws"
+        "  plotting  1.00  8.3  (0.5)  (0.1)" "  report write  0.01  0.1  (0.0)  (0.0)"
+        "  unaccounted  0.66  5.5  (0.4)  (0.2)" "GC: 0.60 s" "fit timing  = 11.00 s"
+        "plot timing = 1.00 s" "" "--- machine ---" "machine.cpus    \t8" ""
+        "=== fit2 ===" "chi2            \t2.5" "divergence_rate \t0"])
+
+(def ^:private log-text (str (clojure.string/join "\n" log-lines) "\n"))
+
+(deftest parse-log
+    (let [runs (report/parse-log log-text)
+            [[t1 r1] [t2 r2]] runs]
+        (testing "a section for each run, in file order, named by its title"
+            (is (= ["fit1" "fit2"] [t1 t2])))
+        (testing "the keys the tools read, with the numbers as the log has them"
+            (is (= ["0.874" "0.3362" "-1.079" "-5.49" "1.2483" "0.002" "2592"]
+                    (mapv r1 [:chi2_cmp :rho_e :d1 :d3 :c1 :div :n_atoms])))
+            (is (= "CRYSOL 1.5" (:ref_chi2 r1)))
+            (is (= "-5.49" (:dro3_MAP r1)))
+            (is (= "0.4" (:z3 r1))))
+        (testing "a flag and a count from the notes"
+            (is (= "true" (:sat r1)))
+            (is (= "false"
+                    (:sat (second (first (report/parse-log
+                                    "=== x ===\nc1_sat\t0\n"))))))
+            (is (= ["70" "3" "3"] (mapv r1 [:map_starts_ok :map_modes :n_modes])))
+            (is (= "69910" (:leapfrog r1))))
+        (testing "the timings are read from the table, as a person sees it"
+            (is (= ["12.00" "2.00" "1.00" "0.40" "3.00" "1.00" "0.60" "11.00"]
+                    (mapv r1
+                        [:wall :startup :propka :pdb2pqr :nuts :plot_timing :gc
+                            :fit_timing])))
+            ;; what a label carries: the NUTS iterations are not in the stats rows
+            (is (= ["0.016" "8000"] [(:ms_step r1) (:draws r1)]))
+            ;; 12 - 2 (startup) - 1 (propka) - 0.4 (pdb2pqr) - 0.5 (components, 2 of them
+            ;; downloaded) - 1 (plot)
+            (is (< (Math/abs (- 7.1 (:wall_ex r1))) 1e-9)))
+        (testing "the stage notes, in square brackets"
+            (is (= {"wall clock" "[process start to end]",
+                        "startup" "[process start to seed_model]",
+                        "components" "[19 residue names, 2 download]",
+                        "propka" "[cache hit]",
+                        "pdb2pqr" "[nucleic, none; cache miss]",
+                        "MAP search + whitening" "[70/70 starts, 3 modes]",
+                        "NUTS" "[8k iters, 69.91k leapfrog, 0.016 ms/step]",
+                        "optima from the draws" "[0 extra chains]",
+                        "per-draw c1 re-profile + curves" "[8000 draws]"}
+                    (:stage_notes r1))))
+        (testing "a value the log lacks is empty; a run with no ref_chi2 has none"
+            (is (= ["" "" ""] (mapv r2 [:d1 :wall :ref_chi2])))
+            (is (= "2.5" (:chi2 r2))))
+        (testing "the lines before the first section, and blank lines, are skipped"
+            (is (= 2 (count runs)))
+            (is (= [] (report/parse-log "datetime\t1\n\n"))))
+        (testing "the map lists its keys in a fixed order for the TSV"
+            (is (= :n_atoms (first (:order (meta r1))))))))
+

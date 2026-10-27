@@ -127,8 +127,9 @@ result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdpn6_fit1()
 
 fit, divergence_rate, map_result, quantile_result = result
 
-# The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-# that their time is in its timing section.
+# `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
 crysol = readdlm(_FIT_PATH; skipstart = 1)
 reference = BAYSOL.Reference(
     "Pepsi-SAXS fit1",
@@ -140,6 +141,8 @@ BAYSOL.results(
     result, (q_fit, I_fit, σ_fit);
     dir = @__DIR__, name = "res_fit1", references = reference,
     form_factor_log = form_factor_log, n_atoms = n_atoms,
+    ref_chi2 = "Pepsi-SAXS 1.224",
+    run_log = true,
 )
 
 # `@__DIR__` (this SASDPN6/ folder), not the caller's cwd.

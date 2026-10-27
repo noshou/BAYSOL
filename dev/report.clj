@@ -1,9 +1,9 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
-;; Parsing one fitting-test run into a map of numbers: `parse-run` reads the run's
-;; workbook (`res*.xlsx`, see workbook.clj) and its timing file (`res*_timings.txt`);
-;; `parse` reads a text report (`res*.txt`), which the revisions before the workbook keep
-;; their results in, so `compare` can read them. A value a source lacks is the empty
+;; Parsing fitting-test runs into maps of numbers: `parse-log` reads a run log
+;; (`<ID>.LOG`, see BAYSOL.write_log), the one file every tool looks at; `parse` reads a
+;; text report (`res*.txt`), which the revisions before the logs keep their results in, so
+;; `compare` can read them. A value a source lacks is the empty
 ;; string, so "defined" means `(seq v)`. The map carries its
 ;; keys in first-seen order as metadata (`(:order (meta r))`), since the TSV columns
 ;; follow that order.
@@ -17,14 +17,7 @@
 
 (ns report
     (:require [clojure.string :as str]
-        [common :refer [as-number num-re]]
-        [workbook]))
-
-(defn timings-path
-    "The timing file that goes with the workbook at `xlsx-path`: `res_x.xlsx` ->
-    `res_x_timings.txt`."
-    [xlsx-path]
-    (str/replace (str xlsx-path) #"\.xlsx$" "_timings.txt"))
+        [common :refer [as-number num-re]]))
 
 ;; In a pattern, @N@ and @FLP@ are a number (one capture group), @NUM@ the same without
 ;; a capture group (to skip a column), @QTY@ a number with an optional k (x1000) or
@@ -247,6 +240,30 @@
                             notes)))
                 notes))))
 
+(def ^:private or-zero
+    "A number from the string `v`, 0 if it is empty."
+    #(if (seq %) (as-number %) 0))
+
+(defn ^:private wall-ex
+    "The wall clock of the run map `m` without the startup (before `seed_model`), the
+    external-tool time (PROPKA and every `pdb2pqr*` stage, which depend on the cache, and a
+    component download) and without
+    the plotting (`plot timing`, which older reports lack: the fit is what is compared),
+    the convention for every comparison; \"\" without a wall clock. A stage a report
+    lacks (an older format) contributes nothing. The seconds of the `components` stage
+    count as download time when its note says `N download`, N > 0: network time, not
+    computing, and the stage cannot split it from the table load."
+    [{:keys [wall startup propka pdb2pqr components components_download
+                plot_timing]}]
+    (if (seq wall)
+        (- (as-number wall)
+            (or-zero startup)
+            (or-zero propka)
+            (or-zero pdb2pqr)
+            (if (pos? (or-zero components_download)) (or-zero components) 0)
+            (or-zero plot_timing))
+        ""))
+
 (defn parse
     "The numbers of one report as a map; a key is \"\" where a revision's format lacks it.
     The map also carries `:stage_notes` (see `stage-notes`), which is not one of the
@@ -295,140 +312,200 @@
                         [:z3 (if (seq z3) z3 (get-in st [:m :dro3_Z_MAP]))]
                         ;; number of distinct local optima the MAP search found
                         [:n_modes (g n-modes-re)]]))
-            {:keys [wall propka pdb2pqr components components_download plot_timing]}
-            (:m st)
-            or-zero #(if (seq %) (as-number %) 0)
-            ;; the seconds of the `components` stage when it downloaded a component (its
-            ;; note says `N download`, N > 0): network time, not computing, and the
-            ;; stage cannot split it from the table load. A lookup that downloaded
-            ;; nothing is computing and stays in the wall clock.
-            download-s
-            (if (pos? (or-zero components_download)) (or-zero components) 0)
-            ;; wall clock without the external-tool time (PROPKA and every `pdb2pqr*`
-            ;; stage, which depend on the cache, and a component download) and
-            ;; without the plotting (`plot timing`, which older reports lack: the
-            ;; fit is what is compared), the convention for every comparison. A
-            ;; stage a report lacks (an older format) contributes nothing.
-            st (put st
-                :wall_ex
-                (if (seq wall)
-                    (- (as-number wall)
-                        (or-zero propka)
-                        (or-zero pdb2pqr)
-                        download-s
-                        (or-zero plot_timing))
-                    ""))]
+            st (put st :wall_ex (wall-ex (:m st)))]
         (with-meta (assoc (:m st) :stage_notes (stage-notes text))
             {:order (:ks st)})))
 
-;; The workbook's names for the parameters, and the prefix of their keys in the map.
-(def ^:private param-prefix
-    {"log_density" :lgdn,
-        "rho_e" :rho_e,
-        "delta_rho_1" :dro1,
-        "delta_rho_2" :dro2,
-        "delta_rho_3" :dro3,
-        "scale" :scale,
-        "bkgrnd_corr" :bkgrnd,
-        "excl_vol_corr" :excl,
-        "chi2" :chi2})
+;; --- the run log
 
-;; Keys of the `run` sheet: key of the map <- row of the sheet.
-(def ^:private run-rows
-    {:n_atoms "n_atoms",
-        :lMax "lmax",
-        :n_q_raw "n_q_raw",
-        :n_q "n_q",
-        :n_samples "n_samples",
-        :n_adapt "n_adapt",
-        :rng_seed "rng_seed",
-        :dmax "dmax",
-        :channels "channels",
-        :rebin_per_channel "rebin_channels",
-        :rebin_measured "rebin_measured",
-        :rebin_fitted "rebin_fitted",
-        :rebin_dropped "rebin_non_positive_dropped",
-        :iterations "iterations",
-        :accept "mean_accept",
-        :depth "tree_depth_avg",
-        :depth_max "tree_depth_max",
-        :steps "mean_n_steps",
-        :ebfmi "ebfmi",
-        :cavity_frac "cavity_frac",
-        :div "divergence_rate",
-        :chains_pooled "chains_pooled",
-        :chains_total "chains_run",
-        :rhat_max "rhat_max",
-        :ess_min "ess_min",
-        :ess_tail_min "ess_tail_min",
-        :modes "modes",
-        :optima "optima"})
+(def ^:private log-keys
+    "The key of the run map <- the row of a log section (its first value), in the order the
+    map lists them. The map has the keys `parse` makes, so the tools read either source."
+    [[:n_atoms "n_atoms"] [:lMax "lmax"] [:dmax "dmax"] [:n_q_raw "n_q_raw"]
+        [:n_q "n_q"] [:n_samples "n_samples"] [:n_adapt "n_adapt"]
+        [:rng_seed "rng_seed"] [:baysol "baysol"] [:structure "structure"]
+        [:ref_chi2 "ref_chi2"] [:chi2 "chi2"] [:chi2_MAP "chi2"] [:chi2_cmp "chi2"]
+        [:rho_e "rho_e"] [:rho_e_MAP "rho_e"] [:d1 "delta_rho_1"]
+        [:dro1_MAP "delta_rho_1"] [:d2 "delta_rho_2"] [:dro2_MAP "delta_rho_2"]
+        [:d3 "delta_rho_3"] [:dro3_MAP "delta_rho_3"] [:scale_MAP "scale"]
+        [:bkgrnd_MAP "bkgrnd_corr"] [:c1 "c1"] [:excl_MAP "c1"] [:z3 "z_delta_rho_3"]
+        [:dro3_Z_MAP "z_delta_rho_3"] [:cavity_frac "cavity_frac"]
+        [:div "divergence_rate"] [:n_divergent "n_divergent"] [:rhat_max "rhat_max"]
+        [:ess_min "ess_min"] [:ess_tail_min "ess_tail_min"] [:ebfmi "ebfmi"]
+        [:accept "mean_accept"] [:depth "tree_depth_avg"] [:depth_max "tree_depth_max"]
+        [:steps "mean_n_steps"] [:iterations "iterations"] [:leapfrog "leapfrog"]
+        [:ms_step "ms_step"] [:ms_per_step "ms_step"] [:chains_pooled "chains_pooled"]
+        [:chains_total "chains_run"] [:modes "modes"] [:optima "optima"]
+        [:mode_share_max "mode_share_max"] [:mode_share_min "mode_share_min"]
+        [:map_starts_ok "map_starts_ok"] [:map_starts_total "map_starts_total"]
+        [:map_modes "map_modes"] [:n_modes "map_modes"]
+        [:components_download "components_download"]])
 
-(defn ^:private table
-    "The rows of a sheet below its header as maps of column name -> cell text."
-    [rows]
-    (let [header (first rows)] (for [r (rest rows)] (zipmap header r))))
+(def ^:private log-stages
+    "The key of the run map <- the stage of the timing table of a log section (the stage's
+    name without what it carries in parentheses or after a comma; the seconds)."
+    {"wall clock" :wall,
+        "startup" :startup,
+        "static build" :static_build,
+        "resolve_structure" :resolve_structure,
+        "components" :components,
+        "structure checks" :structure_checks,
+        "classify" :classify,
+        "propka" :propka,
+        "pdb2pqr" :pdb2pqr,
+        "modified nucleotide hydrogens" :modified_hydrogens,
+        "modified amino acid hydrogens" :modified_amino_hydrogens,
+        "heavy atoms" :heavy_atoms,
+        "load_molecule" :load_molecule,
+        "SASA" :sasa,
+        "shannon" :shannon,
+        "forward_cache" :fwd,
+        "vacuum + excluded volume" :vacuum_excluded,
+        "hydration" :hydration,
+        "Gram + r_m" :gram_rm,
+        "seed_sampler" :seed_fitting,
+        "sampling" :sampling,
+        "MAP search + whitening" :map_s,
+        "NUTS setup" :nuts_setup,
+        "NUTS" :nuts,
+        "optima from the draws" :optima_s,
+        "per-draw c1 re-profile + curves" :reprofile,
+        "MAP + quantiles" :map_quantiles,
+        "plotting" :plotting,
+        "report write" :report_write,
+        "unaccounted" :unaccounted})
 
-(defn ^:private sheet-values
-    "The workbook's numbers as [key value] pairs for the map `parse-run` builds."
-    [sheets]
-    (let [run (into {}
-                (map (juxt #(get % "key") #(get % "value")))
-                (table (get sheets "run")))
-            qname (first (filter #(str/starts-with? % "quantiles_") (keys sheets)))
-            [q-lo q-hi] (some-> qname
-                (subs (count "quantiles_"))
-                (str/split #"-"))
-            by-param (fn [sheet]
-                (for [r (table (get sheets sheet))
-                        :let [p (param-prefix (get r "parameter"))]
-                        :when p]
-                    [p r]))
-            shares (map #(get % "share") (table (get sheets "modes")))
-            share-of
-            (fn [pick]
-                (if (seq shares) (as-number (apply pick parse-double shares)) ""))]
-        (concat (for [[k row] run-rows] [k (get run row "")])
-            [[:sat
-                    (if-let [v (get run "excl_vol_sat")]
-                        (if (zero? (parse-double v)) "false" "true")
-                        "")]
-                [:chains_dropped
-                    (if (and (get run "chains_run") (get run "chains_pooled"))
-                        (- (parse-long (get run "chains_run"))
-                            (parse-long (get run "chains_pooled")))
-                        0)] [:quantile_lo (or q-lo "")] [:quantile_hi (or q-hi "")]
-                [:mode_share_max (share-of max-key)]
-                [:mode_share_min (share-of min-key)]]
-            (for [[p r] (by-param "map")
-                    :let [v (get r "value")]
-                    kv (concat [[(keyword (str (name p) "_MAP")) v]]
-                        (case p
-                            :chi2 [[:chi2 v]]
-                            :excl [[:c1 v]]
-                            :rho_e [[:rho_e v]]
-                            :dro1 [[:d1 v]]
-                            :dro2 [[:d2 v]]
-                            :dro3 [[:d3 v]]
-                            []))]
-                kv)
-            (for [[p r] (by-param qname)
-                    [k col] [["QUANT_LO" "quantile_lo"] ["QUANT_HI" "quantile_hi"]
-                        ["BOUND_LO" "bound_lo"] ["BOUND_HI" "bound_hi"]]]
-                [(keyword (str (name p) "_" k)) (get r col)])
-            (for [[p r] (by-param "stdev_from_prior")
-                    [k col] [["Z_MAP" "z_map"] ["Z_QUANT_LO" "z_quantile_lo"]
-                        ["Z_QUANT_HI" "z_quantile_hi"]]]
-                [(keyword (str (name p) "_" k)) (get r col)]))))
+;; a row of the timing table: indent, stage, seconds, % wall, (JIT), (GC), then the notes,
+;; if there are any, after two spaces
+(def ^:private timing-row-re
+    #"^( *)(\S.*?)\s+(-?\d\S*)\s+(-?\d\S*)\s+\((\S+)\)\s+\((\S+)\)(?:\s{2}(.*?))?\s*$")
 
-(defn parse-run
-    "The numbers of one run as a map like `parse`'s: `sheets` are the run's workbook
-    (`workbook/read-sheets`) and `timings` the text of its timing file. A quantity the
-    workbook lacks is \"\". The measured-grid χ² is the MAP's χ² in the workbook, so
-    `:chi2_cmp` is that."
-    [sheets timings]
-    (let [base (parse timings)
-            kvs (sheet-values sheets)
-            m (reduce (fn [m [k v]] (assoc m k v)) base kvs)
-            m (assoc m :z3 (get m :dro3_Z_MAP "") :chi2_cmp (get m :chi2 ""))]
-        (with-meta m (meta base))))
+(defn ^:private timing-values
+    "What a log section's timing table (its lines) says: {:kvs {key value ...} :notes
+    {stage \"[note]\" ...}}. The `kvs` are the seconds of each stage, the process's `GC`,
+    the `fit timing` and the `plot timing`, and what the notes carry (the MAP search's
+    starts
+    and modes, the NUTS iterations, leapfrog steps and ms/step, the draws re-profiled); the
+    first row of a stage name wins. A stage's note comes back in square brackets, the shape
+    the text reports had."
+    [lines]
+    (let [rows (keep #(re-matches timing-row-re %) lines)
+            by-stage (reduce (fn [m [_ _ stage secs _ _ _ note]]
+                    (if (contains? m stage)
+                        m
+                        (assoc m stage {:secs secs, :note note})))
+                {}
+                rows)
+            note (fn [stage] (get-in by-stage [stage :note] ""))
+            [_ _ leap ms]
+            (re-find #"([\d.]+[kM]?) iters, ([\d.]+[kM]?) leapfrog, ([\d.]+) ms/step"
+                (note "NUTS"))
+            [_ ok total modes] (re-find #"(\d+)/(\d+) starts, (\d+) modes?"
+                (note "MAP search + whitening"))
+            line (fn [re] (first (filter #(re-find re %) lines)))]
+        {:kvs (merge (into {}
+                    (for [[stage k] log-stages
+                            :when (contains? by-stage stage)]
+                        [k (get-in by-stage [stage :secs])]))
+                {:gc (if-let [l (line #"^GC: ")]
+                        (grab l #"^GC: @N@")
+                        ""),
+                    :fit_timing (if-let [l (line #"^fit timing")]
+                        (grab l #"^fit timing\s+= @N@")
+                        ""),
+                    :plot_timing (if-let [l (line #"^plot timing")]
+                        (grab l #"^plot timing\s+= @N@")
+                        ""),
+                    :leapfrog_label (if leap (whole (qty leap)) ""),
+                    :ms_step_label (or ms ""),
+                    :map_starts_ok_label (or ok ""),
+                    :map_starts_total_label (or total ""),
+                    :map_modes_label (or modes ""),
+                    :draws (or (second (re-find
+                                #"(\d+) draws"
+                                (note "per-draw c1 re-profile + curves")))
+                        "")}),
+            :notes (into {}
+                (for [[stage {:keys [note]}] by-stage
+                        :when (seq note)]
+                    [stage (str "[" note "]")]))}))
+
+(defn ^:private log-sections
+    "The sections of a log's text, in file order: [title lines], the lines of the section
+    (the stamp before the first section is in none)."
+    [text]
+    (reduce
+        (fn [out line]
+            (if-let [[_ title] (re-matches #"=== (.*) ===" line)]
+                (conj out [title []])
+                (if (empty? out) out (update-in out [(dec (count out)) 1] conj line))))
+        []
+        (str/split-lines text)))
+
+(defn ^:private split-blocks
+    "The lines of a section split at its `--- name ---` markers: {:stats [...] :timing
+    [...] :machine [...]}; the lines before the first marker are the stats."
+    [lines]
+    (loop [ls lines
+            cur :stats
+            out {}]
+        (if-let [line (first ls)]
+            (if-let [[_ nm] (re-matches #"--- (\w+) ---" line)]
+                (recur (rest ls) (keyword nm) out)
+                (recur (rest ls) cur (update out cur (fnil conj []) line)))
+            out)))
+
+(defn ^:private rows-of
+    "The rows `name<tab>value` of lines, as {name [value ...]} (the cells trimmed; blank
+    lines skipped)."
+    [lines]
+    (into {}
+        (for [l lines
+                :when (not (str/blank? l))
+                :let [[k & vs] (map str/trim (str/split l #"\t"))]]
+            [k (vec vs)])))
+
+(defn ^:private log-run
+    "The run map of one section's lines."
+    [lines]
+    (let [{:keys [stats machine], timing-lines :timing} (split-blocks lines)
+            m (merge (rows-of stats) (rows-of machine))
+            v (fn [k] (or (first (get m k)) ""))
+            {:keys [kvs notes]} (timing-values timing-lines)
+            base (into {} (for [[k lk] log-keys] [k (v lk)]))
+            base (merge base
+                (into {} (for [k (vals log-stages)] [k (get kvs k "")]))
+                (select-keys kvs [:gc :fit_timing :plot_timing :draws])
+                ;; the leapfrog steps, ms/step and MAP search of the notes, where the
+                ;; stats rows do not have them
+                (into {}
+                    (for [[k lab] [[:leapfrog :leapfrog_label]
+                                [:ms_step :ms_step_label]
+                                [:ms_per_step :ms_step_label]
+                                [:map_starts_ok :map_starts_ok_label]
+                                [:map_starts_total
+                                    :map_starts_total_label]
+                                [:map_modes :map_modes_label]
+                                [:n_modes :map_modes_label]]
+                            :when (empty? (get base k ""))]
+                        [k (get kvs lab "")])))
+            ;; the flag of c1 on its bound, as the text reports wrote it
+            base (assoc base
+                :sat
+                (case (v "c1_sat")
+                    "" ""
+                    "0" "false"
+                    "true"))
+            ks (concat (map first log-keys)
+                (vals log-stages)
+                [:gc :fit_timing :plot_timing :draws :sat :wall_ex])]
+        (with-meta (assoc base :stage_notes notes :wall_ex (wall-ex base))
+            {:order (vec ks)})))
+
+(defn parse-log
+    "The runs of the text of a run log: a vector of [title run-map], in file order. A run
+    map has the keys `parse` makes (`:chi2`, `:d1`, `:div`, `:wall`, ...), and `:ref_chi2`
+    (the reference χ² text, the depositor's, \"\" if the log has none); a value the log
+    lacks is \"\"."
+    [text]
+    (vec (for [[title lines] (log-sections text)] [title (log-run lines)])))

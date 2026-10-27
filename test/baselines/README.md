@@ -28,4 +28,4 @@ bb compare --bench test/baselines/results/<new run>.json
 - A baseline is only ever captured with the repository owner's approval of that run (`bench.clj` refuses to start without
   `--approved`), because a benchmark needs a quiet machine.
 - There is no baseline for `v0.2.0-soukouratou`: it predates the benchmark tooling. Its timings exist only as the committed
-  `res*.txt` reports, which are warm-cache and are compared with `compare.clj` (no `--bench`).
+  run logs (`<ID>.LOG`, or `res*.txt` reports before them), which are warm-cache and are compared with `compare.clj` (no `--bench`).

@@ -1,9 +1,6 @@
 (require '[babashka.pods :as pods])
 
-(pods/load-pod
-    ["java" "-jar"
-        "tui/lib/pod-babashka-lanterna/pod-babashka-lanterna-0.0.1-standalone.jar"]
-    {:transport :socket})
+(pods/load-pod ["java" "-jar" "tui/lib/lanterna/lanterna.jar"] {:transport :socket})
 
 (require '[pod.babashka.lanterna.terminal :as terminal])
 

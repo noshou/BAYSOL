@@ -81,6 +81,7 @@ const RUNS = [
 # coordinates with chain A = PLPA, chain B = PLPB.
     (
     tag = "fit2_model1",
+    ref_chi2 = "29.6 (MDFF model)",
     pdb = "SASDR99_fit2_model1_chainAB.pdb",
     fit = "SASDR99_fit2.fit",
     fit_scale = 1.0,
@@ -140,8 +141,9 @@ for run in RUNS
 
     result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdr99(run)
 
-    # The figures (terminal plots, pgfplots .tex, TSV) go before the report, so
-    # that their time is in its timing section.
+    # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+
+    # run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
     fit_curve = try
         fc = _read_fit(joinpath(_FIXTURE_DIR, run.fit), run.fit_scale, run.fit_col)
         fc !== nothing && run.rescale ? _rescale_fit(fc, q_fit, I_fit) : fc
@@ -163,6 +165,8 @@ for run in RUNS
         result, (q_fit, I_fit, σ_fit);
         dir = @__DIR__, name = "res$(suffix)", references,
         form_factor_log = form_factor_log, n_atoms = n_atoms,
+        ref_chi2 = run.ref_chi2,
+        run_log = true,
     )
 
     # `@__DIR__` (this SASDR99/ folder), not the caller's cwd.

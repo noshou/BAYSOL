@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Exercises how the nucleotide stages are wired into the timing log of `seed_model`
-# (src/Pipeline/SeedModel.jl) and the report (`Pipeline._write_timing`): the names and
+# (src/Pipeline/SeedModel.jl) and the timing table (`Pipeline._timing_table`): the names and
 # notes of the stages, their order, which ones appear for which content. Only the structure
 # of the log is asserted, never a time. Small fragments of the fixtures (a few residues of
 # 1EHZ, 1CRN, 1BNA) are seeded with synthetic data, so a seed is quick; the hydrogenation
@@ -26,7 +26,6 @@ using BAYSOL.MolecularStructure: LocalPathSource, _store_dir, _component_path,
     _COMPONENT_DOWNLOAD, _COMPONENT_MEMO, _COMPONENT_TABLE, AMBER_NUCLEIC_NAMES
 using BAYSOL.Hydrogenator: _hydrogens_path, _pka_path, Propka, NoTitration
 using BAYSOL.Runtime: force
-using BAYSOL.Pipeline: _write_timing
 using BAYSOL.Runtime: tick
 
 const _FIXTURES = joinpath(@__DIR__, "..", "..", "fixtures")
@@ -221,7 +220,12 @@ wiring(log) = [n for n in names_of(log) if n in _WIRING]
         end
 
         # ---- the report prints the stages and notes ----------------------------------
-        @testset "the timing report" begin
+        @testset "the timing table lists the stages and their notes" begin
+            # a row of the table is a stage's name, as recorded, and its note
+            rows_of(log) = [
+                "  "^r.depth * r.name * "  " * r.note for
+                r in BAYSOL.Pipeline._timing_table(log, tick()).rows
+            ]
             for (key, notes) in (
                 "mod" => ["resolve_structure", "components", "classify",
                     "pdb2pqr (nucleic, none)", "modified nucleotide hydrogens",
@@ -234,16 +238,12 @@ wiring(log) = [n for n in names_of(log) if n in _WIRING]
                     ["components", "classify", "propka", "pdb2pqr", "[protein: PARSE"],
                 "mixed" => ["pdb2pqr (mixed, propka)", "[mixed: PARSE, titration propka]"],
             )
-                io = IOBuffer()
-                _write_timing(io, seeds[key], tick())
-                text = String(take!(io))
-                @test occursin("=== Timing ===", text)
-                flat = replace(text, r"\s*\n\s*" => " ")   # notes are wrapped
+                lines = rows_of(seeds[key])
+                flat = join(lines, "\n")
                 for n in notes
                     @test occursin(n, flat)
                 end
-                # the stages print in the order they were recorded
-                lines = split(text, '\n')
+                # the stages are in the order they were recorded
                 at(n) = findfirst(l -> occursin(n, l), lines)
                 present = [
                     n for n in _WIRING if n in names_of(seeds[key]) &&
@@ -252,13 +252,8 @@ wiring(log) = [n for n in names_of(log) if n in _WIRING]
                 pos = [at(n) for n in present]
                 @test all(!isnothing, pos) && issorted(pos)
             end
-            # a modified-nucleotide line is absent where there are none
-            io = IOBuffer()
-            _write_timing(io, seeds["std"], tick())
-            @test !occursin("modified nucleotide hydrogens", String(take!(io)))
-            # no log: nothing is written
-            io = IOBuffer()
-            @test _write_timing(io, nothing, tick()) === nothing && isempty(take!(io))
+            # a modified-nucleotide stage is absent where there are none
+            @test !occursin("modified nucleotide hydrogens", join(rows_of(seeds["std"])))
         end
     finally
         _COMPONENT_DOWNLOAD[] = saved_hook

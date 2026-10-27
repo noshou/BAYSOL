@@ -376,11 +376,11 @@ the forward model) from the trajectory's sample covariance.
 - `rng_seed::Union{Nothing,Integer}=nothing`: the run's
                                 random seed. Every random draw of the run (the extra MAP
                                 starts, the NUTS chain) comes from a stream derived from
-                                it by the draw's index, so the same `rng_seed`
-                                reproduces the run exactly, whatever the number of Julia
-                                threads. `nothing` draws a fresh one from the default
-                                RNG (so `Random.seed!` before the call also fixes it);
-                                it is printed in the report's `=== Run ===` section.
+                                it by the draw's index, so the same `rng_seed` reproduces
+                                the run exactly, whatever the number of Julia threads.
+                                `nothing` draws a fresh one from the default RNG (so
+                                `Random.seed!` before the call also fixes it); it is the
+                                `rng_seed` row of the run log and of the `run` sheet.
 
 # Returns
 An [`Inferred`](@ref) of the pooled chains, chain after chain. Includes the
