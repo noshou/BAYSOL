@@ -361,3 +361,38 @@ pre code.hljs,
         display: none;
     }
 }
+
+// The navbar keeps the GitHub link, the light/dark button and (on older releases) the
+// link to the latest release: the settings gear, the "Edit source on GitHub" link and the
+// "collapse all docstrings" chevron are hidden (`display: none` also takes them out of the
+// tab order). The light/dark button takes the gear's place, and its choice is the one the
+// settings menu would have stored.
+#documenter .docs-navbar .docs-settings-button,
+#documenter .docs-navbar .docs-article-toggle-button,
+#documenter .docs-navbar a[title="Edit source on GitHub"] {
+    display: none;
+}
+
+// Documenter's "This documentation is for an older version ..." pop-up is hidden: older
+// releases carry a short "Latest: vX.Y.Z" link in the navbar instead
+// (docs/version_notice.jl).
+.warning-overlay-base {
+    display: none;
+}
+#documenter .docs-navbar .docs-version-notice {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    @media (max-width: 768px) {
+        .docs-version-label {
+            display: none;
+        }
+    }
+}
+
+// Documenter holds the page to a 52rem column (`.docs-main`, and the article inside it)
+// beside the sidebar, which leaves the right of a wide screen empty. The page here uses
+// the whole width between the sidebar and the window's edge.
+#documenter .docs-main,
+#documenter .docs-main > article {
+    max-width: none;
+}
