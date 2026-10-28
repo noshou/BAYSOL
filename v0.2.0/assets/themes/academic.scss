@@ -391,8 +391,20 @@ pre code.hljs,
 
 // Documenter holds the page to a 52rem column (`.docs-main`, and the article inside it)
 // beside the sidebar, which leaves the right of a wide screen empty. The page here uses
-// the whole width between the sidebar and the window's edge.
-#documenter .docs-main,
+// the whole width between the sidebar and the window's edge, with the same padding on
+// both sides (1rem on a phone, up to 2.5rem) so the text sits centred in it.
+#documenter .docs-main {
+    max-width: none;
+    padding-right: 0;
+}
 #documenter .docs-main > article {
     max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0 clamp(1rem, 3vw, 2.5rem);
+}
+// The navbar gets the same side padding, so its edges line up with the text's.
+#documenter .docs-main > header.docs-navbar {
+    padding-left: clamp(1rem, 3vw, 2.5rem);
+    padding-right: clamp(1rem, 3vw, 2.5rem);
 }

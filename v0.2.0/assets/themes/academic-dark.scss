@@ -386,53 +386,78 @@ html.theme--#{$themename} {
     }
 }
 
-// The light/dark button in the navbar (docs/theme_toggle.jl): transparent, sized and
-// centred like the navbar's other icon links. It holds a sun and a moon; this theme
-// hides the one that is not its own.
-#documenter .docs-navbar .docs-theme-toggle {
-    display: inline-flex;
-    align-items: center;
-    background: none;
-    cursor: pointer;
-    svg {
-        display: block;
+// The rules below belong to this theme too, so they sit inside its block like the rest
+// (an unscoped rule here would lose to Documenter's own `html.theme--documenter-dark ...`).
+html.theme--documenter-dark {
+    // Firefox draws a code block's scrollbar light by default, which shows as a white strip
+    // along its bottom edge on the dark page.
+    pre,
+    .documenter-example-output,
+    .docstring pre {
+        scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+        scrollbar-width: thin;
     }
-    .docs-sun {
-        display: none;
-    }
-}
 
-// The navbar keeps the GitHub link, the light/dark button and (on older releases) the
-// link to the latest release: the settings gear, the "Edit source on GitHub" link and the
-// "collapse all docstrings" chevron are hidden (`display: none` also takes them out of the
-// tab order). The light/dark button takes the gear's place, and its choice is the one the
-// settings menu would have stored.
-#documenter .docs-navbar .docs-settings-button,
-#documenter .docs-navbar .docs-article-toggle-button,
-#documenter .docs-navbar a[title="Edit source on GitHub"] {
-    display: none;
-}
-
-// Documenter's "This documentation is for an older version ..." pop-up is hidden: older
-// releases carry a short "Latest: vX.Y.Z" link in the navbar instead
-// (docs/version_notice.jl).
-.warning-overlay-base {
-    display: none;
-}
-#documenter .docs-navbar .docs-version-notice {
-    white-space: nowrap;
-    font-size: 0.85rem;
-    @media (max-width: 768px) {
-        .docs-version-label {
+    // The light/dark button in the navbar (docs/theme_toggle.jl): transparent, sized and
+    // centred like the navbar's other icon links. It holds a sun and a moon; this theme
+    // hides the one that is not its own.
+    #documenter .docs-navbar .docs-theme-toggle {
+        display: inline-flex;
+        align-items: center;
+        background: none;
+        cursor: pointer;
+        svg {
+            display: block;
+        }
+        .docs-sun {
             display: none;
         }
     }
-}
 
-// Documenter holds the page to a 52rem column (`.docs-main`, and the article inside it)
-// beside the sidebar, which leaves the right of a wide screen empty. The page here uses
-// the whole width between the sidebar and the window's edge.
-#documenter .docs-main,
-#documenter .docs-main > article {
-    max-width: none;
+    // The navbar keeps the GitHub link, the light/dark button and (on older releases)
+    // the link to the latest release: the settings gear, the "Edit source on GitHub"
+    // link and the "collapse all docstrings" chevron are hidden (`display: none` also
+    // takes them out of the tab order). The light/dark button takes the gear's place,
+    // and its choice is the one the settings menu would have stored.
+    #documenter .docs-navbar .docs-settings-button,
+    #documenter .docs-navbar .docs-article-toggle-button,
+    #documenter .docs-navbar a[title="Edit source on GitHub"] {
+        display: none;
+    }
+
+    // Documenter's "This documentation is for an older version ..." pop-up is hidden: older
+    // releases carry a short "Latest: vX.Y.Z" link in the navbar instead
+    // (docs/version_notice.jl).
+    .warning-overlay-base {
+        display: none;
+    }
+    #documenter .docs-navbar .docs-version-notice {
+        white-space: nowrap;
+        font-size: 0.85rem;
+        @media (max-width: 768px) {
+            .docs-version-label {
+                display: none;
+            }
+        }
+    }
+
+    // Documenter holds the page to a 52rem column (`.docs-main`, and the article inside it)
+    // beside the sidebar, which leaves the right of a wide screen empty. The page here uses
+    // the whole width between the sidebar and the window's edge, with the same padding on
+    // both sides (1rem on a phone, up to 2.5rem) so the text sits centred in it.
+    #documenter .docs-main {
+        max-width: none;
+        padding-right: 0;
+    }
+    #documenter .docs-main > article {
+        max-width: none;
+        margin-left: 0;
+        margin-right: 0;
+        padding: 0 clamp(1rem, 3vw, 2.5rem);
+    }
+    // The navbar gets the same side padding, so its edges line up with the text's.
+    #documenter .docs-main > header.docs-navbar {
+        padding-left: clamp(1rem, 3vw, 2.5rem);
+        padding-right: clamp(1rem, 3vw, 2.5rem);
+    }
 }
