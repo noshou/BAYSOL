@@ -107,6 +107,28 @@ for (_, path) in vcat(DEV_GUIDES, TEST_GUIDES)
     write(joinpath(TESTING_DIR, test_page(path)), text)
 end
 
+# ---------------------------------------------------------------------------
+# The home page is the repository README (so the guide for running an experiment is on the
+# site too), copied like the guides, with its links to other READMEs pointed at the site's
+# pages, followed by the root module's docstring. `docs/src/index.md` is generated and
+# gitignored: edit the README, not the copy.
+# ---------------------------------------------------------------------------
+readme = read(joinpath(REPO_ROOT, "README.md"), String)
+readme = replace(readme, r"<!--.*?-->[ \t]*\n?"s => "")
+readme = replace(
+    readme,
+    r"\]\(src/([A-Za-z]+)/README\.md\)" =>
+        m -> "](guides/" * lowercase(match(r"src/([A-Za-z]+)/", m).captures[1]) * ".md)",
+)
+for (_, path) in vcat(DEV_GUIDES, TEST_GUIDES)
+    page = "](testing/" * test_page(path) * ")"
+    global readme = replace(readme, "](" * path * ")" => page)
+end
+write(
+    joinpath(@__DIR__, "src", "index.md"),
+    readme * "\n\n```@autodocs\nModules = [BAYSOL]\n```\n",
+)
+
 makedocs(
     sitename = "BAYSOL.jl",
     # The default HTML format, except for the size warning (see below): the "academic" theme
@@ -151,6 +173,19 @@ makedocs(
 # otherwise. See release_label.jl.
 include(joinpath(@__DIR__, "release_label.jl"))
 stamp_release_label(joinpath(@__DIR__, "build"), release_label(REPO_ROOT))
+
+# Only the light and dark themes stay in the settings menu (see prune_themes.jl).
+include(joinpath(@__DIR__, "prune_themes.jl"))
+prune_themes(joinpath(@__DIR__, "build"))
+
+# The sun/moon button that toggles light and dark (see theme_toggle.jl).
+include(joinpath(@__DIR__, "theme_toggle.jl"))
+add_theme_toggle(joinpath(@__DIR__, "build"))
+
+# A short link to the latest release in the navbar of older ones, instead of Documenter's
+# pop-up (see version_notice.jl).
+include(joinpath(@__DIR__, "version_notice.jl"))
+add_version_notice(joinpath(@__DIR__, "build"))
 
 # Deploys only from CI (.github/workflows/docs.yml): a push to master builds
 # the "dev" docs, a pushed version tag builds that version's folder.

@@ -131,12 +131,15 @@
 
 (defn ^:private timed
     "Runs a command and returns [wall-seconds stdout]. The command's stderr goes to
-    ours, and the variables of the map `env` are set for its duration only."
+    ours, and the variables of the map `env` are set for its duration only, with those
+    of `--threads` (`JULIA_NUM_THREADS`, see `common/take-threads`)."
     [env cmd]
     (let [t0 (System/nanoTime)
-            result @(apply
-                p/process
-                {:out :string, :err :inherit, :continue true, :extra-env env}
+            result @(apply p/process
+                {:out :string,
+                    :err :inherit,
+                    :continue true,
+                    :extra-env (merge c/*env* env)}
                 (map str cmd))
             seconds (/ (- (System/nanoTime) t0) 1e9)]
         (when-not (zero? (:exit result))

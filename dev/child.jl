@@ -19,6 +19,13 @@ const REPO, SPEC = ARGS[1], ARGS[2]
 # (n_samples, n_adapt), or the defaults
 const ITERATIONS = length(ARGS) ≥ 4 ? (parse(Int, ARGS[3]), parse(Int, ARGS[4])) : nothing
 
+# Every fit runs with this `rng_seed` (and the default `jitter_seed`), in the first and the
+# steady fit alike: the MAP search, the extra chains it may start and every chain depend on
+# the seed, so a fresh seed each time measures a different amount of work from one run to
+# the next (about one run in six of SASDBS6:fit2_model3 finds a second mode and starts two
+# more chains, which costs 60 to 90 %). The same seed in two revisions is the same work.
+const RNG_SEED = 1
+
 t_using = @elapsed using BAYSOL
 t_tool  = @elapsed include(joinpath(REPO, "dev", "fit_seed.jl"))
 id, tag = occursin(':', SPEC) ? String.(split(SPEC, ":"; limit = 2)) : (String(SPEC), "")
@@ -27,8 +34,8 @@ function one_fit()
     local seed
     seed_s = @elapsed (seed, _, _) = load_fit_seed(id, tag)
     run_s = @elapsed redirect_stderr(devnull) do
-        ITERATIONS === nothing ? BAYSOL.run_model(seed) :
-        BAYSOL.run_model(seed, ITERATIONS...)
+        ITERATIONS === nothing ? BAYSOL.run_model(seed; rng_seed = RNG_SEED) :
+        BAYSOL.run_model(seed, ITERATIONS...; rng_seed = RNG_SEED)
     end
     st = seed.timing.stages
     return Dict{String,Any}(
@@ -39,7 +46,7 @@ function one_fit()
         "stage_gc" => [s.gc for s in st],
         "n_samples" => seed.timing.info["n_samples"],
         "n_adapt" => seed.timing.info["n_adapt"],
-        "n_chains" => get(seed.timing.info, "n_chains", 1),
+        "n_chains" => get(seed.timing.info, "n_chains", 1), "rng_seed" => RNG_SEED,
         "n_atoms" => seed.fw.n_atoms, "n_q" => length(seed.fw.qvals),
         "lMax" => seed.fw.lMax,
         "n_q_raw" => length(seed.shannon.q_raw), "rebin" => seed.shannon.rebin,

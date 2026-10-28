@@ -437,6 +437,8 @@ For each fit, in a fresh process (`child.jl` does the fit **twice** in one proce
   seconds, compile seconds and GC seconds from the pipeline's own `Timing` log;
 - **steady fit**: the second fit, with everything already compiled.
 
+Both fits run with the same pinned `rng_seed = 1` (`RNG_SEED` in `child.jl`; the JSON records it, and the number of chains), so a benchmark repeats the same work. A fresh seed each time does not: the MAP search can find a second optimum, which starts two extra chains and costs 60 to 90 % of `run_model` (on SASDBS6:fit2_model3 about one seed in six). The same seed in two revisions is the same work only while the model inputs are the same: a change of the buffer table changes a prior, and so the starting points. Check `n_chains` in both results before reading a difference as speed. `--threads N` sets `JULIA_NUM_THREADS` for the measured process (the v0.3.0 baseline was 4).
+
 Keep the two apart: first-fit minus steady-fit is compilation, and PrecompileTools-style work trades first-fit time for install time, so both rows must be compared. Never quote a warm-state number as what a user gets. The report convention of the fitting tests (wall clock excluding propka, every pdb2pqr stage and a component download; see the stage section above) is unchanged; in the cold state those stages run for real and appear as their own rows.
 
 ### Rules

@@ -2,8 +2,15 @@
 *.scss  linguist-detectable=true
 *.css   linguist-detectable=false
 
+# docs/ is untracked by default
+docs/src/assets/theme_toggle.jl linguist-documentation=false
+docs/src/assets/make.jl linguist-documentation=false
+docs/src/assets/prune_themes.jl linguist-documentation=false
+docs/src/assets/release_label.jl linguist-documentation=false
+
 # Hand-written; override Linguist's documentation heuristic, which
 # otherwise excludes anything under docs/ from language stats.
+docs/src/assets/themes/*.scss linguist-documentation=false
 docs/src/assets/themes/*.scss linguist-documentation=false
 
 # documenter-light.css / documenter-dark.css are compiled output of academic.scss /
