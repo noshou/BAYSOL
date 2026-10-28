@@ -370,3 +370,19 @@ pre code.hljs,
 #documenter .docs-navbar a[title="Edit source on GitHub"] {
     display: none;
 }
+
+// Documenter's "This documentation is for an older version ..." pop-up is hidden: older
+// releases carry a short "Latest: vX.Y.Z" link in the navbar instead
+// (docs/version_notice.jl).
+.warning-overlay-base {
+    display: none;
+}
+#documenter .docs-navbar .docs-version-notice {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    @media (max-width: 768px) {
+        .docs-version-label {
+            display: none;
+        }
+    }
+}
