@@ -455,8 +455,10 @@ html.theme--documenter-dark {
         margin-right: 0;
         padding: 0 clamp(1rem, 3vw, 2.5rem);
     }
-    // The navbar gets the same side padding, so its edges line up with the text's.
-    #documenter .docs-main > header.docs-navbar {
+    // The navbar and the footer (the previous and next page links) get the same side
+    // padding, so their edges line up with the text's.
+    #documenter .docs-main > header.docs-navbar,
+    #documenter .docs-main .docs-footer {
         padding-left: clamp(1rem, 3vw, 2.5rem);
         padding-right: clamp(1rem, 3vw, 2.5rem);
     }
