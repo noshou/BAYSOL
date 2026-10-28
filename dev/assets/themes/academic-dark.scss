@@ -428,3 +428,11 @@ html.theme--#{$themename} {
         }
     }
 }
+
+// Documenter holds the page to a 52rem column (`.docs-main`, and the article inside it)
+// beside the sidebar, which leaves the right of a wide screen empty. The page here uses
+// the whole width between the sidebar and the window's edge.
+#documenter .docs-main,
+#documenter .docs-main > article {
+    max-width: none;
+}
