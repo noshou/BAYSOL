@@ -52,6 +52,12 @@
     font-style: normal;
 }
 @font-face {
+    font-family: "Iosevka Charon Mono";
+    src: url("fonts/IosevkaCharonMono-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
     font-family: "Fira Code";
     src: url("fonts/FiraCode-Regular.woff2") format("woff2");
     font-weight: 400;
@@ -286,6 +292,25 @@ html.theme--#{$themename} {
     #documenter .docs-sidebar ul.docs-menu {
         border-top: none;
     }
+    // The release under the sidebar title (`v0.3.0-wʋsg_n_yɩɩda`, `dev`), stamped into
+    // each page by docs/release_label.jl. Iosevka Charon Mono, which has the Latin-extended
+    // and IPA letters of the release names (ʋ, ɩ) that Montserrat lacks.
+    #documenter .docs-sidebar .docs-package-name .docs-release {
+        display: block;
+        font-family: "Iosevka Charon Mono", $family-code;
+        font-size: 0.7rem;
+        font-weight: 400;
+        letter-spacing: 0.02em;
+        opacity: 0.7;
+        margin-top: 0.1rem;
+    }
+    // Firefox ignores Documenter's `::-webkit-scrollbar` rules (see academic.scss).
+    #documenter .docs-sidebar,
+    #documenter .docs-sidebar ul.docs-menu {
+        scrollbar-color: $documenter-sidebar-menu-hover-background
+            $documenter-sidebar-background;
+        scrollbar-width: thin;
+    }
 
     nav.breadcrumb {
         font-family: $family-sans-serif;
@@ -311,9 +336,30 @@ html.theme--#{$themename} {
     .docstring pre {
         font-family: $family-monospace;
         font-feature-settings: "calt" 1, "liga" 1;
+    }
+
+    // Blocks are boxed; inline code is only tinted (no border, no pill), and the code
+    // inside a block takes the block's own box instead of drawing a second one.
+    pre,
+    .documenter-example-output,
+    .docstring pre {
         background: #172d47;
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 8px;
+    }
+
+    code {
+        background: rgba(255, 255, 255, 0.08);
+        border: 0;
+        border-radius: 4px;
+    }
+
+    pre code,
+    pre code.hljs,
+    .documenter-example-output code {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
     }
 
     // Four-colour syntax highlighting: the light theme's hues, lifted to read on
@@ -337,5 +383,21 @@ html.theme--#{$themename} {
     .hljs-string,
     .hljs-symbol {
         color: #cf8bae;
+    }
+}
+
+// The light/dark button in the navbar (docs/theme_toggle.jl): transparent, sized and
+// centred like the navbar's other icon links. It holds a sun and a moon; this theme
+// hides the one that is not its own.
+#documenter .docs-navbar .docs-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    background: none;
+    cursor: pointer;
+    svg {
+        display: block;
+    }
+    .docs-sun {
+        display: none;
     }
 }

@@ -336,9 +336,30 @@ html.theme--#{$themename} {
     .docstring pre {
         font-family: $family-monospace;
         font-feature-settings: "calt" 1, "liga" 1;
+    }
+
+    // Blocks are boxed; inline code is only tinted (no border, no pill), and the code
+    // inside a block takes the block's own box instead of drawing a second one.
+    pre,
+    .documenter-example-output,
+    .docstring pre {
         background: #172d47;
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 8px;
+    }
+
+    code {
+        background: rgba(255, 255, 255, 0.08);
+        border: 0;
+        border-radius: 4px;
+    }
+
+    pre code,
+    pre code.hljs,
+    .documenter-example-output code {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
     }
 
     // Four-colour syntax highlighting: the light theme's hues, lifted to read on
@@ -362,5 +383,21 @@ html.theme--#{$themename} {
     .hljs-string,
     .hljs-symbol {
         color: #cf8bae;
+    }
+}
+
+// The light/dark button in the navbar (docs/theme_toggle.jl): transparent, sized and
+// centred like the navbar's other icon links. It holds a sun and a moon; this theme
+// hides the one that is not its own.
+#documenter .docs-navbar .docs-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    background: none;
+    cursor: pointer;
+    svg {
+        display: block;
+    }
+    .docs-sun {
+        display: none;
     }
 }

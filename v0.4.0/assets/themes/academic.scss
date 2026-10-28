@@ -345,3 +345,19 @@ pre code.hljs,
 .hljs-symbol {
     color: #be185d;
 }
+
+// The light/dark button in the navbar (docs/theme_toggle.jl): transparent, sized and
+// centred like the navbar's other icon links. It holds a sun and a moon; this theme
+// hides the one that is not its own.
+#documenter .docs-navbar .docs-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    background: none;
+    cursor: pointer;
+    svg {
+        display: block;
+    }
+    .docs-moon {
+        display: none;
+    }
+}
