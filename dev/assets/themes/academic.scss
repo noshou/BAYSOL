@@ -362,11 +362,13 @@ pre code.hljs,
     }
 }
 
-// The navbar keeps the GitHub link, the light/dark button and the docstring chevron: the
-// settings gear and the "Edit source on GitHub" link are hidden (`display: none` also
-// takes them out of the tab order). The light/dark button takes the gear's place, and its
-// choice is the one the settings menu would have stored.
+// The navbar keeps the GitHub link, the light/dark button and (on older releases) the
+// link to the latest release: the settings gear, the "Edit source on GitHub" link and the
+// "collapse all docstrings" chevron are hidden (`display: none` also takes them out of the
+// tab order). The light/dark button takes the gear's place, and its choice is the one the
+// settings menu would have stored.
 #documenter .docs-navbar .docs-settings-button,
+#documenter .docs-navbar .docs-article-toggle-button,
 #documenter .docs-navbar a[title="Edit source on GitHub"] {
     display: none;
 }
