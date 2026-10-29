@@ -40,9 +40,9 @@
 ;; JULIA=/path/to/julia); shared helpers are in dev/common.clj.
 
 (ns fitting-tests
-    (:require [babashka.classpath :refer [add-classpath]]
-        [babashka.fs :as fs]
-        [clojure.string :as str]))
+ (:require [babashka.classpath :refer [add-classpath]]
+  [babashka.fs :as fs]
+  [clojure.string :as str]))
 
 (add-classpath (str (fs/parent (fs/absolutize *file*))))
 
@@ -51,87 +51,84 @@
 (def ^:private who "bb fitting-tests")
 
 (def ^:private flag-names
-    ["--list" "--bench" "--approved" "--no-fit" "--report" "--table" "--fixme"
-        "--dry-run"])
+ ["--list" "--bench" "--approved" "--no-fit" "--report" "--table" "--fixme"
+  "--dry-run"])
 
 ;; The options that take a value.
 (def ^:private valued ["--trace-compile"])
 
 (defn ^:private tool
-    "The command that runs another Babashka tool of the repository by its task name:
-    `bb <task> args`."
-    [task & args]
-    (into ["bb" task] args))
+ "The command that runs another Babashka tool of the repository by its task name:
+ `bb <task> args`."
+ [task & args]
+ (into ["bb" task] args))
 
 (defn ^:private steps
-    "The steps to run, in order, as [label failure-name command-or-fn]. Each has a
-    command (a vector, run with `sh`) and runs only if its flag was given (the fits
-    unless --no-fit)."
-    [{:keys [flag? selected requested julia trace]}]
-    (concat
-        ;; 1. the fits: one Julia process per fitting test, in the fitting-test project
-        (when-not (flag? "--no-fit")
-            (for [id selected]
-                [(str "fit: " id) (str "fit " id)
-                    (concat [julia "--startup-file=no"]
-                        (when trace [(str "--trace-compile=" trace)])
-                        [(str "--project=" (c/in-root c/fit-dir))
-                            (c/script-of id)])]))
-        ;; 2. the benchmark (a no-op that prints its plan unless --approved is given)
-        (when (flag? "--bench")
-            [["benchmark" "benchmark"
-                    (concat (tool "bench")
-                        (when (flag? "--approved") ["--approved"])
-                        (c/specs-of selected))]])
-        ;; 3. the report: the Results-table rows of the selected fits
-        (when (flag? "--report")
-            [["report" "report" (apply tool "results-table" requested)]])
-        ;; 3b. the Results table of the fitting tests' README
-        (when (flag? "--table") [["table" "table" (tool "results-table" "--update")]])
-        ;; 4. the diagnostics
-        (when (flag? "--fixme")
-            [["diagnostics" "diagnostics"
-                    (apply tool "diagnose" "--report" (c/specs-of selected))]])))
+ "The steps to run, in order, as [label failure-name command-or-fn]. Each has a
+ command (a vector, run with `sh`) and runs only if its flag was given (the fits
+ unless --no-fit)."
+ [{:keys [flag? selected requested julia trace]}]
+ (concat
+  ;; 1. the fits: one Julia process per fitting test, in the fitting-test project
+  (when-not (flag? "--no-fit")
+   (for [id selected]
+    [(str "fit: " id) (str "fit " id)
+     (concat [julia "--startup-file=no"]
+      (when trace [(str "--trace-compile=" trace)])
+      [(str "--project=" (c/in-root c/fit-dir)) (c/script-of id)])]))
+  ;; 2. the benchmark (a no-op that prints its plan unless --approved is given)
+  (when (flag? "--bench")
+   [["benchmark" "benchmark"
+     (concat (tool "bench")
+      (when (flag? "--approved") ["--approved"])
+      (c/specs-of selected))]])
+  ;; 3. the report: the Results-table rows of the selected fits
+  (when (flag? "--report")
+   [["report" "report" (apply tool "results-table" requested)]])
+  ;; 3b. the Results table of the fitting tests' README
+  (when (flag? "--table") [["table" "table" (tool "results-table" "--update")]])
+  ;; 4. the diagnostics
+  (when (flag? "--fixme")
+   [["diagnostics" "diagnostics"
+     (apply tool "diagnose" "--report" (c/specs-of selected))]])))
 
 (defn run
-    "The tool's main program for the argument list `argv`; returns the exit status."
-    [argv]
-    (if (some #{"--help" "-h"} argv)
-        (c/usage)
-        (let [{:keys [opts flags specs]}
-                (c/split-args who valued flag-names argv "one of")
-                flag? (set flags)
-                trace (some-> (get (into {} opts) "--trace-compile")
-                    fs/absolutize
-                    str)]
-            (when (and (flag? "--approved") (not (flag? "--bench")))
-                (c/fail who "--approved only applies together with --bench"))
-            ;; every folder asked for must exist; none asked for means all of them
-            (c/check-folders who specs false)
-            (if (flag? "--list")
-                (run! println (c/ids))
-                (let [selected (or (seq specs) (c/ids))
-                        julia (c/find-julia)
-                        dry (boolean (flag? "--dry-run"))
-                        ;; a failing step does not stop the others
-                        failed (doall
-                            (for [[label failure cmd] (steps {:flag? flag?,
-                                            :selected selected,
-                                            :requested specs,
-                                            :julia julia,
-                                            :trace trace})
-                                    :let [_ (println (str "\n=== " label))]
-                                    :when (not (binding [c/*dir*
-                                                (when (= "bb" (first cmd))
-                                                    c/*root*)]
-                                            (c/sh dry cmd)))]
-                                failure))]
-                    (when (seq failed)
-                        (binding [*out* *err*]
-                            (println (str "\n" who
-                                    ": failed: " (str/join ", " failed))))
-                        1))))))
+ "The tool's main program for the argument list `argv`; returns the exit status."
+ [argv]
+ (if (some #{"--help" "-h"} argv)
+  (c/usage)
+  (let [{:keys [opts flags specs]}
+    (c/split-args who valued flag-names argv "one of")
+    flag? (set flags)
+    trace (some-> (get (into {} opts) "--trace-compile")
+     fs/absolutize
+     str)]
+   (when (and (flag? "--approved") (not (flag? "--bench")))
+    (c/fail who "--approved only applies together with --bench"))
+   ;; every folder asked for must exist; none asked for means all of them
+   (c/check-folders who specs false)
+   (if (flag? "--list")
+    (run! println (c/ids))
+    (let [selected (or (seq specs) (c/ids))
+      julia (c/find-julia)
+      dry (boolean (flag? "--dry-run"))
+      ;; a failing step does not stop the others
+      failed (doall (for [[label failure cmd] (steps {:flag? flag?,
+           :selected selected,
+           :requested specs,
+           :julia julia,
+           :trace trace})
+         :let [_ (println (str "\n=== " label))]
+         :when (not (binding [c/*dir* (when (= "bb"
+              (first cmd))
+             c/*root*)]
+           (c/sh dry cmd)))]
+        failure))]
+     (when (seq failed)
+      (binding [*out* *err*]
+       (println (str "\n" who ": failed: " (str/join ", " failed))))
+      1))))))
 
 ;; Run only when executed as a script, so the functions can be loaded for testing.
 (when (= *file* (System/getProperty "babashka.file"))
-    (c/main run *command-line-args*))
+ (c/main run *command-line-args*))

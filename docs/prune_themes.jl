@@ -29,8 +29,8 @@ function prune_themes(dir; keep = ["documenter-light", "documenter-dark"])
     changed = 0
     for (root, _, files) in walkdir(dir), file in files
         path = joinpath(root, file)
-        if  endswith(file, ".css") && basename(root) == "themes" &&
-            splitext(file)[1] in others
+        if endswith(file, ".css") && basename(root) == "themes" &&
+           splitext(file)[1] in others
             rm(path)
         elseif endswith(file, ".html")
             html = read(path, String)

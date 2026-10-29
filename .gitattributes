@@ -28,3 +28,7 @@ Manifest.toml linguist-generated=true
 
 # Ignore generated .tex files.
 *.tex linguist-generated=true
+
+# The TUI's ASCII art: trailing spaces are part of the picture, so `git diff --check` (and
+# `bb precommit`'s whitespace step, which strips what it reports) must leave them alone.
+*.ascii whitespace=-trailing-space

@@ -38,9 +38,9 @@
 ;; Julia starts. Needs Babashka, and `julia` on the PATH (or JULIA=/path/to/julia).
 
 (ns diagnose
-    (:require [babashka.classpath :refer [add-classpath]]
-        [babashka.fs :as fs]
-        [clojure.string :as str]))
+ (:require [babashka.classpath :refer [add-classpath]]
+  [babashka.fs :as fs]
+  [clojure.string :as str]))
 
 (add-classpath (str (fs/parent (fs/absolutize *file*))))
 
@@ -51,93 +51,85 @@
 ;; The parts, in the order they run (the slow ones last), each with the options it
 ;; accepts.
 (def ^:private parts
-    [["report" ["--out" "--samples" "--adapt"]] ["residuals" ["--out"]]
-        ["chains" ["--out" "--samples" "--adapt" "--seeds" "--retry"]]])
+ [["report" ["--out" "--samples" "--adapt"]] ["residuals" ["--out"]]
+  ["chains" ["--out" "--samples" "--adapt" "--seeds" "--retry"]]])
 
 (defn ^:private integer-text? [s] (boolean (re-matches #"[-+]?\d+" s)))
 
 (defn ^:private check-option
-    "Stops with a message if the value of option `k` is bad."
-    [[k v]]
-    (let [csv #(str/split v #"," -1)]
-        (case k
-            ("--samples" "--adapt")
-            (when-not (and (integer-text? v) (>= (parse-long v) 1))
-                (c/fail who (str k " needs a positive integer, got '" v "'")))
-            "--seeds"
-            (when-not (every? integer-text? (csv))
-                (c/fail
-                    who
-                    (str "--seeds needs integers separated by commas, got '" v "'")))
-            "--retry" (when-not (#{"0" "1"} v)
-                (c/fail who (str "--retry needs 0 or 1, got '" v "'")))
-            nil)))
+ "Stops with a message if the value of option `k` is bad."
+ [[k v]]
+ (let [csv #(str/split v #"," -1)]
+  (case k
+   ("--samples" "--adapt")
+   (when-not (and (integer-text? v) (>= (parse-long v) 1))
+    (c/fail who (str k " needs a positive integer, got '" v "'")))
+   "--seeds"
+   (when-not (every? integer-text? (csv))
+    (c/fail who (str "--seeds needs integers separated by commas, got '" v "'")))
+   "--retry" (when-not (#{"0" "1"} v)
+    (c/fail who (str "--retry needs 0 or 1, got '" v "'")))
+   nil)))
 
 (defn ^:private command
-    "The command that runs `part` on `specs` with the options `opts` (pairs): diagnose.jl
-    in the fitting-test project."
-    [julia part opts specs]
-    (concat [julia "--startup-file=no" (str "--project=" (c/in-root c/fit-dir))
-            (c/in-root "dev" "diagnose.jl") (str "--" part)]
-        (mapcat identity opts)
-        specs))
+ "The command that runs `part` on `specs` with the options `opts` (pairs): diagnose.jl
+ in the fitting-test project."
+ [julia part opts specs]
+ (concat [julia "--startup-file=no" (str "--project=" (c/in-root c/fit-dir))
+   (c/in-root "dev" "diagnose.jl") (str "--" part)]
+  (mapcat identity opts)
+  specs))
 
 (defn ^:private part-options
-    "The options that go to `part`: those it accepts, in command-line order, and its
-    own output file under `outdir` when one was asked for."
-    [part opts outdir]
-    (let [accepted (set (second (some #(when (= part (first %)) %) parts)))]
-        (cond-> (filterv #(accepted (first %)) opts)
-            outdir (conj ["--out" (str (fs/path outdir (str part ".txt")))]))))
+ "The options that go to `part`: those it accepts, in command-line order, and its
+ own output file under `outdir` when one was asked for."
+ [part opts outdir]
+ (let [accepted (set (second (some #(when (= part (first %)) %) parts)))]
+  (cond-> (filterv #(accepted (first %)) opts)
+   outdir (conj ["--out" (str (fs/path outdir (str part ".txt")))]))))
 
 (defn ^:private run-part
-    "Runs one part (or, with `dry`, prints its command); true if it succeeded."
-    [julia part opts outdir specs dry]
-    (let [cmd (command julia part (part-options part opts outdir) specs)]
-        (println (str "\n=== diagnose: " part))
-        (if dry (do (println (str/join " " cmd)) true) (c/run-cmd cmd))))
+ "Runs one part (or, with `dry`, prints its command); true if it succeeded."
+ [julia part opts outdir specs dry]
+ (let [cmd (command julia part (part-options part opts outdir) specs)]
+  (println (str "\n=== diagnose: " part))
+  (if dry (do (println (str/join " " cmd)) true) (c/run-cmd cmd))))
 
 (defn run
-    "The tool's main program for the argument list `argv`; returns the exit status."
-    [argv]
-    (if (or (empty? argv) (some #{"--help" "-h"} argv))
-        (c/usage)
-        (let [part-flags (map #(str "--" (first %)) parts)
-                {:keys [opts flags specs]} (c/split-args
-                    who
-                    (distinct (mapcat second parts))
-                    (concat part-flags ["--list" "--dry-run"])
-                    argv)]
-            (if (some #{"--list"} flags)
-                (c/list-fits)
-                (let [outdir (get (into {} opts) "--out")
-                        ;; --out is per part, set by `part-options`
-                        opts (remove #(= "--out" (first %)) opts)
-                        specs (or (seq specs) (c/specs-of (c/ids)))
-                        ;; the parts asked for, in the order given; none: all, in order
-                        chosen (or (seq (keep #(when (some #{%} part-flags)
-                                        (subs % 2))
-                                    flags))
-                            (map first parts))
-                        dry (boolean (some #{"--dry-run"} flags))]
-                    ;; the command line is checked before Julia is looked for or
-                    ;; started
-                    (run! check-option opts)
-                    (c/check-specs who specs)
-                    (let [julia (c/find-julia)]
-                        (when (and outdir (not dry)) (fs/create-dirs outdir))
-                        ;; every part runs even if one fails; the failures are named
-                        (let [failed (doall
-                                    (remove
-                                        #(run-part julia % opts outdir specs dry)
-                                        chosen))]
-                            (when (seq failed)
-                                (binding [*out* *err*]
-                                    (println (str "\n" who
-                                            ": failed: " (str/join ", "
-                                                failed))))
-                                1))))))))
+ "The tool's main program for the argument list `argv`; returns the exit status."
+ [argv]
+ (if (or (empty? argv) (some #{"--help" "-h"} argv))
+  (c/usage)
+  (let [part-flags (map #(str "--" (first %)) parts)
+    {:keys [opts flags specs]} (c/split-args who
+     (distinct (mapcat second parts))
+     (concat part-flags
+      ["--list" "--dry-run"])
+     argv)]
+   (if (some #{"--list"} flags)
+    (c/list-fits)
+    (let [outdir (get (into {} opts) "--out")
+      ;; --out is per part, set by `part-options`
+      opts (remove #(= "--out" (first %)) opts)
+      specs (or (seq specs) (c/specs-of (c/ids)))
+      ;; the parts asked for, in the order given; none: all, in order
+      chosen (or (seq (keep #(when (some #{%} part-flags) (subs % 2)) flags))
+       (map first parts))
+      dry (boolean (some #{"--dry-run"} flags))]
+     ;; the command line is checked before Julia is looked for or
+     ;; started
+     (run! check-option opts)
+     (c/check-specs who specs)
+     (let [julia (c/find-julia)]
+      (when (and outdir (not dry)) (fs/create-dirs outdir))
+      ;; every part runs even if one fails; the failures are named
+      (let [failed (doall (remove #(run-part julia % opts outdir specs dry)
+          chosen))]
+       (when (seq failed)
+        (binding [*out* *err*]
+         (println (str "\n" who ": failed: " (str/join ", " failed))))
+        1))))))))
 
 ;; Run only when executed as a script, so the functions can be loaded for testing.
 (when (= *file* (System/getProperty "babashka.file"))
-    (c/main run *command-line-args*))
+ (c/main run *command-line-args*))

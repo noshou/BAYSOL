@@ -118,7 +118,8 @@ readme = replace(readme, r"<!--.*?-->[ \t]*\n?"s => "")
 readme = replace(
     readme,
     r"\]\(src/([A-Za-z]+)/README\.md\)" =>
-        m -> "](guides/" * lowercase(match(r"src/([A-Za-z]+)/", m).captures[1]) * ".md)",
+        m ->
+            "](guides/" * lowercase(match(r"src/([A-Za-z]+)/", m).captures[1]) * ".md)",
 )
 for (_, path) in vcat(DEV_GUIDES, TEST_GUIDES)
     page = "](testing/" * test_page(path) * ")"

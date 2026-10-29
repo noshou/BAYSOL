@@ -44,9 +44,9 @@ Every script prints its usage with `--help`, and the ones that start long jobs (
 the same as `bb fitting-tests ...`). To add a tool, give it a task in `bb.edn` with the `script` helper
 (`mytool {:doc "..." :task (script "dev/mytool.clj")}`) and a section below if it needs one.
 `bb tasks` prints `bb.edn` itself (it overrides Babashka's built-in `tasks`). `bb.edn` is formatted by
-`bb fmt` (zprint, 4-space indent), which also decides the order of the keys inside a task. The
-repository's `.editorconfig` sets 4-space indentation and no trailing whitespace for `.clj`, `.edn`
-and `.jl`, so Tab inserts spaces; literal tabs are flagged by `bb linelen`.
+`bb fmt` (zprint, 1-space indent), which also decides the order of the keys inside a task. The
+repository's `.editorconfig` sets 1-space indentation for `.clj` and `.edn`, 4 for `.jl`, and no
+trailing whitespace, so Tab inserts spaces; literal tabs are flagged by `bb linelen`.
 
 The files of this folder that are not tasks:
 
@@ -158,7 +158,7 @@ bb linelen --check [PATH ...]              # report lines over 92 characters and
 
 The code rule of the repository is **at most 92 characters per line** in code files (`.jl`, `.clj`, `.edn`,
 `.scss`, `.yml`; not Markdown or data). `format.clj` formats the Julia files with
-[JuliaFormatter.jl](https://github.com/domluna/JuliaFormatter.jl) (settings in `.JuliaFormatter.toml`, environment `test/format`) and the Clojure and EDN files with [zprint](https://github.com/kkinnear/zprint) (needs `java`) followed by a re-indentation in multiples of 4. Neither wraps comments or docstring text, so `format.clj` then runs `reflow.clj`: every comment block and docstring paragraph that contains a line over the limit is re-wrapped, balanced; a block that fits is left alone, so a second `bb fmt` changes nothing. `bb fmt-check` lists the files that the formatters or the re-wrapping would change. Long string literals and symbols are split by hand: `bb linelen --check` reports every line still over the limit, and the precommit refuses the commit while there is one.
+[JuliaFormatter.jl](https://github.com/domluna/JuliaFormatter.jl) (settings in `.JuliaFormatter.toml`, environment `test/format`) and the Clojure and EDN files with [zprint](https://github.com/kkinnear/zprint) (needs `java`) followed by a re-indentation of one space per level of nesting. zprint keeps the author's line breaks and blank lines (only the blank lines before the end of a file go), and `bb fmt` ends by running clj-kondo over the `.clj` files of the whole repository (`dev/` and `tui/` included), so it exits 1 on a lint warning. Neither wraps comments or docstring text, so `format.clj` then runs `reflow.clj`: every comment block and docstring paragraph that contains a line over the limit is re-wrapped, balanced; a block that fits is left alone, so a second `bb fmt` changes nothing. `bb fmt-check` lists the files that the formatters or the re-wrapping would change. Long string literals and symbols are split by hand: `bb linelen --check` reports every line still over the limit, and the precommit refuses the commit while there is one.
 
 **Private functions** are written `(defn ^:private name ...)`, as a private `def` is (`def ^:private`), never `defn-`. `bb fmt` rewrites a top-level `(defn- ` into it before zprint runs, and `bb fmt-check` (so `bb precommit`) fails on one.
 

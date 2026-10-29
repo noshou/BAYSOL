@@ -24,8 +24,8 @@
 ;; (or JULIA=/path/to/julia); shared helpers are in dev/common.clj.
 
 (ns profile
-    (:require [babashka.classpath :refer [add-classpath]]
-        [babashka.fs :as fs]))
+ (:require [babashka.classpath :refer [add-classpath]]
+  [babashka.fs :as fs]))
 
 (add-classpath (str (fs/parent (fs/absolutize *file*))))
 
@@ -34,25 +34,25 @@
 (def ^:private who "bb profile")
 
 (defn run
-    "The tool's main program for the argument list `argv`; returns the exit status."
-    [argv]
-    (if (some #{"--help" "-h"} argv)
-        (c/usage)
-        (let [{:keys [opts flags specs]}
-                (c/split-args who ["--delay"] ["--nuts" "--dry-run"] argv)
-                interval (get (into {} opts) "--delay")]
-            (when (empty? specs) (c/fail who "give at least one ID[:tag]"))
-            (c/check-folders who specs)
-            ;; one Julia process profiles every spec, so the compiler warms up once
-            (let [cmd (concat [(c/find-julia) "--startup-file=no"
-                            (str "--project=" (c/in-root c/fit-dir))
-                            (c/in-root "dev" "profile_seed.jl")]
-                        (when interval ["--delay" interval])
-                        (when (some #{"--nuts"} flags) ["--nuts"])
-                        specs)]
-                ;; a failed run is the tool's failure: status 1
-                (when-not (c/sh (boolean (some #{"--dry-run"} flags)) cmd) 1)))))
+ "The tool's main program for the argument list `argv`; returns the exit status."
+ [argv]
+ (if (some #{"--help" "-h"} argv)
+  (c/usage)
+  (let [{:keys [opts flags specs]}
+    (c/split-args who ["--delay"] ["--nuts" "--dry-run"] argv)
+    interval (get (into {} opts) "--delay")]
+   (when (empty? specs) (c/fail who "give at least one ID[:tag]"))
+   (c/check-folders who specs)
+   ;; one Julia process profiles every spec, so the compiler warms up once
+   (let [cmd (concat [(c/find-julia) "--startup-file=no"
+       (str "--project=" (c/in-root c/fit-dir))
+       (c/in-root "dev" "profile_seed.jl")]
+      (when interval ["--delay" interval])
+      (when (some #{"--nuts"} flags) ["--nuts"])
+      specs)]
+    ;; a failed run is the tool's failure: status 1
+    (when-not (c/sh (boolean (some #{"--dry-run"} flags)) cmd) 1)))))
 
 ;; Run only when executed as a script, so the functions can be loaded for testing.
 (when (= *file* (System/getProperty "babashka.file"))
-    (c/main run *command-line-args*))
+ (c/main run *command-line-args*))

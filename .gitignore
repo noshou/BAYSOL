@@ -119,3 +119,6 @@ latex.out/
 # ...but fixtures keep their data files (SASDA52's pddf/*.out is a tracked fixture, a
 # program output and no LaTeX file)
 !test/fixtures/**/*.out
+
+# the Clojure CLI classpath cache of the TUI project
+tui/.cpcache/
