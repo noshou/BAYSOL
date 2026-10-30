@@ -1,7 +1,8 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
 (ns baysol.tui.screens.main-menu
- (:require [baysol.tui.screens.state :as state]
+ (:require [baysol.tui.screens.open-projects :as open-projects]
+  [baysol.tui.screens.state :as state]
   [baysol.tui.screens.page-load :as pgld]
   [baysol.tui.version :as version])
  (:import (com.googlecode.lanterna TextColor$ANSI)
@@ -53,7 +54,7 @@
    :actions {KeyType/ArrowUp :page1,
     KeyType/ArrowDown :page5,
     KeyType/ArrowRight :page4,
-    KeyType/Enter :page3 ; future -> :goto-project
+    KeyType/Enter :goto-projects
    }},
   :page4 ; settings
   {:asset (page-asset "page4"),
@@ -105,9 +106,10 @@
   (state/handle pages target KeyType/Enter)
   (state/handle pages page input)))
 
-(defn -main
- "Draws main menu with event handling"
- [& _]
+(defn ^:private run-menu
+ "Draws the main menu and handles the keys until an action ends it; returns that action
+ (:quit or :goto-projects). The screen is stopped when it returns."
+ []
  (let [factory (DefaultTerminalFactory.)
    ^TerminalScreen screen (.createScreen factory)]
   (.startScreen screen)
@@ -129,10 +131,21 @@
        (state/draw-page screen (pages target) background)
        (Thread/sleep (long hotkey-delay-ms)))
       next-page (page-after page input)]
-     (cond (= next-page :quit) nil ; quit means exit program
+     (cond (not (contains? pages next-page)) next-page ; an action: end and return it
       (= next-page page) (recur page) ; got back same page, no-op
 
       ; a new page: draw it on the screen
       :else (do (state/draw-page screen (pages next-page) background)
        (recur next-page)))))
-   (finally (.stopScreen screen)))))
+   (finally
+    ; leave the alternate screen, then close the terminal itself: that gives back the
+    ; settings (echo, line editing) a shell started afterwards needs
+    (.stopScreen screen)
+    (.close (.getTerminal screen))))))
+
+(defn -main
+ "Runs the main menu, then hands the terminal over if the menu ended on an action that
+ needs it."
+ [& _]
+ (when (= (run-menu) :goto-projects)
+  (when-not (open-projects/open!) (System/exit 1))))
