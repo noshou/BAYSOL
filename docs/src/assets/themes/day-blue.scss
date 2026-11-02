@@ -1,0 +1,482 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
+// day-blue.scss
+// Daylight Blue — warm ivory, powder blue and butter yellow
+
+@charset "UTF-8";
+
+@font-face {
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-italic.woff2") format("woff2");
+    font-weight: 400;
+    font-style: italic;
+}
+@font-face {
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
+}
+@font-face {
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-bolditalic.woff2") format("woff2");
+    font-weight: 700;
+    font-style: italic;
+}
+@font-face {
+    font-family: "Montserrat";
+    src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"),
+        url("fonts/Montserrat[wght].woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+}
+@font-face {
+    font-family: "Iosevka Charon Mono";
+    src: url("fonts/IosevkaCharonMono-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: "Fira Code";
+    src: url("fonts/FiraCode-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: "Fira Code";
+    src: url("fonts/FiraCode-Bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
+}
+
+$themename: "day-blue"; // the stylesheet is day-blue.css (docs/compile_themes.jl)
+
+// Do not import the default Lato font.
+$bulmaswatch-import-font: false;
+
+@import "flatly/variables";
+
+$body-size: 16px;
+$size-6: 1rem;
+$size-7: 0.75rem;
+
+$documenter-is-dark-theme: false;
+
+// Typography
+$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Helvetica Neue", sans-serif;
+$family-serif: "TeX Gyre Pagella", Palatino, Georgia, serif;
+$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas",
+    "Liberation Mono", monospace;
+
+// ---- Palette ---------------------------------------------------------------
+
+// Admonitions
+$red: #bd493e;
+$orange: #c46b28;
+$yellow: #d8a900;
+$green: #38834d;
+$turquoise: #328d91;
+$cyan: #438dbb;
+$blue: #4a83b5;
+$purple: #8564a5;
+
+$info: $blue;
+$success: $green;
+$warning: $yellow;
+$danger: $red;
+$compat: $cyan;
+$todo: $purple;
+
+// Core palette
+$body-background-color: #f8f6ec;
+
+$text: #42566b;
+$text-strong: #243b53;
+
+$link: #3879a6;
+$link-hover: #a27a00;
+
+$border: #d6e1e8;
+$background: #e5eff4;
+
+$admonition-default: $text;
+
+$admonition-background: (
+    'default': #eef3f4,
+    'info': #e5eff4,
+    'success': #e8f1e6,
+    'warning': #fbf3d9,
+    'danger': #f8e9e5,
+    'compat': #e4f1f3
+);
+
+$admonition-header-background: ();
+$admonition-header-color: ();
+$admonition-body-color: ();
+$admonition-border-color: ();
+
+$shadow: #a8b9c4;
+
+// Sidebar
+$documenter-sidebar-background: #e3eff5;
+$documenter-sidebar-color: #344e63;
+
+$documenter-sidebar-menu-hover-background: #cbdfea;
+$documenter-sidebar-menu-hover-color: #243b53;
+
+$documenter-sidebar-menu-active-background: #e3eff5;
+$documenter-sidebar-menu-active-color: #243b53;
+
+$documenter-sidebar-menu-active-hover-background: #cbdfea;
+$documenter-sidebar-menu-active-hover-color: #243b53;
+
+$border-width: 1px;
+$lightness-unit: 8%;
+
+@import "documenter/utilities";
+@import "documenter/variables";
+
+// Code
+$code: #356d91;
+$code-background: #edf3f5;
+
+$documenter-docstring-shadow: none;
+
+@import "bulma/utilities/all";
+@import "bulma/base/minireset.sass";
+@import "bulma/helpers/all";
+
+// Inputs
+$input-color: #344e63;
+$input-background-color: #fffdf6;
+$input-border-color: #c6dce8;
+$input-placeholder-color: #93a5b2;
+
+$search-result-link-border-color: #c6dce8;
+$search-result-link-text-color: #344e63;
+$search-result-link-text-background-color: #f8f6ec;
+$search-result-title-text-color: #3879a6;
+$search-modal-kbd-color: #8395a3;
+
+$button-static-color: $text;
+$button-static-background-color: $background;
+$button-static-border-color: $border;
+
+html.theme--#{$themename} {
+    @import "bulma/base/generic.sass";
+
+    @import "documenter/overrides";
+
+    @import "bulma/elements/all";
+    @import "bulma/form/all";
+    @import "bulma/components/all";
+    @import "bulma/grid/all";
+    @import "bulma/layout/all";
+
+    @import "flatly/overrides";
+
+    @import "documenter/elements";
+    @import "documenter/components/all";
+    @import "documenter/patches";
+    @import "documenter/layout/all";
+
+    @import "documenter/theme_overrides";
+
+    @import "documenter/ansicolors";
+
+    code.language-julia-repl > span.hljs-meta {
+        color: #38834d;
+        font-weight: bolder;
+    }
+
+    // Light syntax highlighting.
+    @import "highlightjs/github";
+
+    .search-result-link {
+        border-radius: 0.7em;
+        transition: all 300ms;
+    }
+
+    .search-result-link:hover,
+    .search-result-link:focus {
+        background-color: rgba(198, 227, 242, 0.45);
+    }
+
+    .search-result-link .property-search-result-badge {
+        transition: all 300ms;
+    }
+
+    .search-result-link:hover .property-search-result-badge,
+    .search-result-link:focus .property-search-result-badge {
+        color: #344e63 !important;
+        background-color: #f5d76e !important;
+    }
+
+    .search-result-title {
+        color: #243b53;
+    }
+
+    .search-result-highlight {
+        background-color: #f5d76e;
+        color: #243b53;
+    }
+
+    .search-divider {
+        border-bottom: 1px solid #d6e1e8;
+    }
+
+    .w-100 {
+        width: 100%;
+    }
+
+    .gap-2 {
+        gap: 0.5rem;
+    }
+
+    .gap-4 {
+        gap: 1rem;
+    }
+
+    // ---- Academic reskin ----------------------------------------------------
+
+    body {
+        color: $text;
+    }
+
+    body,
+    p,
+    .content,
+    .docstring > section > div {
+        font-family: $family-serif;
+        line-height: 1.6;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        font-family: $family-sans-serif;
+        font-weight: 700;
+        color: $text-strong;
+    }
+
+    .docstring-binding,
+    .docstring > header {
+        font-family: $family-sans-serif;
+        font-weight: 700;
+    }
+
+    #documenter .docs-sidebar,
+    #documenter .docs-sidebar * {
+        font-family: $family-sans-serif;
+    }
+
+    #documenter .docs-sidebar .docs-package-name a,
+    #documenter .docs-sidebar .docs-package-name {
+        color: #243b53;
+    }
+
+    #documenter .docs-sidebar .tocitem {
+        color: $documenter-sidebar-color;
+    }
+
+    #documenter .docs-sidebar .tocitem.is-active,
+    #documenter .docs-sidebar li.is-active > .tocitem {
+        font-weight: 700;
+    }
+
+    // No box or divider around the active entry.
+    #documenter .docs-sidebar ul.docs-menu li.is-active {
+        border: none !important;
+    }
+
+    #documenter .docs-sidebar ul.docs-menu {
+        border-top: none;
+    }
+
+    // Release label
+    #documenter .docs-sidebar .docs-package-name .docs-release {
+        display: block;
+        font-family: "Iosevka Charon Mono", $family-code;
+        font-size: 0.7rem;
+        font-weight: 400;
+        letter-spacing: 0.02em;
+        opacity: 0.7;
+        margin-top: 0.1rem;
+    }
+
+    // Sidebar scrollbar
+    #documenter .docs-sidebar,
+    #documenter .docs-sidebar ul.docs-menu {
+        scrollbar-color: #b8d2e0 #e3eff5;
+        scrollbar-width: thin;
+    }
+
+    nav.breadcrumb {
+        font-family: $family-sans-serif;
+        font-weight: 600;
+        color: $text;
+    }
+
+    // Search
+    #documenter-search-query {
+        background-color: #fffdf6;
+        color: #344e63;
+        border: 1px solid #c6dce8;
+        border-radius: 6px;
+    }
+
+    #documenter-search-query:focus {
+        border-color: #e1bd45;
+        box-shadow: 0 0 0 0.125em rgba(245, 215, 110, 0.3);
+    }
+
+    // Navbar
+    #documenter .docs-main header.docs-navbar.headroom--not-top {
+        box-shadow: none;
+    }
+
+    // Code typography
+    code,
+    pre,
+    .documenter-example-output,
+    .docstring pre {
+        font-family: $family-monospace;
+        font-feature-settings: "calt" 1, "liga" 1;
+    }
+
+    // Code blocks
+    pre,
+    .documenter-example-output,
+    .docstring pre {
+        background: #edf3f5;
+        color: #344e63;
+        border: 1px solid #d6e1e8;
+        border-radius: 8px;
+    }
+
+    // Inline code
+    code {
+        background: rgba(198, 227, 242, 0.4);
+        color: #356d91;
+        border: 0;
+        border-radius: 4px;
+    }
+
+    pre code,
+    pre code.hljs,
+    .documenter-example-output code {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+    }
+
+    // Syntax highlighting
+    .hljs-keyword,
+    .hljs-function .hljs-keyword,
+    .hljs-literal {
+        color: #7952a3;
+    }
+
+    .hljs-title,
+    .hljs-title.function_,
+    .hljs-name {
+        color: #356d91;
+    }
+
+    .hljs-type,
+    .hljs-built_in,
+    .hljs-class .hljs-title {
+        color: #287d6d;
+    }
+
+    .hljs-number,
+    .hljs-string,
+    .hljs-symbol {
+        color: #a45b70;
+    }
+
+    .hljs-comment {
+        color: #8798a2;
+        font-style: italic;
+    }
+
+    .hljs-subst {
+        color: #344e63;
+    }
+}
+
+// Theme-specific rules
+html.theme--#{$themename} {
+
+    // Scrollbars
+    pre,
+    .documenter-example-output,
+    .docstring pre {
+        scrollbar-color: #b8cbd6 transparent;
+        scrollbar-width: thin;
+    }
+
+    // Theme toggle
+    #documenter .docs-navbar .docs-theme-toggle {
+        display: inline-flex;
+        align-items: center;
+        background: none;
+        cursor: pointer;
+
+        svg {
+            display: block;
+        }
+
+        .docs-moon {
+            display: none;
+        }
+    }
+
+    // Navbar controls
+    #documenter .docs-navbar .docs-settings-button,
+    #documenter .docs-navbar .docs-article-toggle-button,
+    #documenter .docs-navbar a[title="Edit source on GitHub"] {
+        display: none;
+    }
+
+    // Version notice
+    .warning-overlay-base {
+        display: none;
+    }
+
+    #documenter .docs-navbar .docs-version-notice {
+        white-space: nowrap;
+        font-size: 0.85rem;
+
+        @media (max-width: 768px) {
+            .docs-version-label {
+                display: none;
+            }
+        }
+    }
+
+    // Full-width article layout
+    #documenter .docs-main {
+        max-width: none;
+        padding-right: 0;
+    }
+
+    #documenter .docs-main > article {
+        max-width: none;
+        margin-left: 0;
+        margin-right: 0;
+        padding: 0 clamp(1rem, 3vw, 2.5rem);
+    }
+
+    // Navbar and footer alignment
+    #documenter .docs-main > header.docs-navbar,
+    #documenter .docs-main .docs-footer {
+        padding-left: clamp(1rem, 3vw, 2.5rem);
+        padding-right: clamp(1rem, 3vw, 2.5rem);
+    }
+}

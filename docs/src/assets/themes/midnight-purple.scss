@@ -1,0 +1,571 @@
+
+ // SPDX-License-Identifier: LGPL-3.0-or-later
+
+// midnight-purple.scss
+// midnight navy, ultraviolet purple,
+// electric cyan, neon pink and luminous mint.
+
+@charset "UTF-8";
+
+@font-face {
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-italic.woff2") format("woff2");
+    font-weight: 400;
+    font-style: italic;
+}
+@font-face {
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
+}
+@font-face {
+    font-family: "TeX Gyre Pagella";
+    src: url("fonts/texgyrepagella-bolditalic.woff2") format("woff2");
+    font-weight: 700;
+    font-style: italic;
+}
+@font-face {
+    font-family: "Montserrat";
+    src: url("fonts/Montserrat[wght].woff2") format("woff2-variations"),
+        url("fonts/Montserrat[wght].woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+}
+@font-face {
+    font-family: "Iosevka Charon Mono";
+    src: url("fonts/IosevkaCharonMono-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: "Fira Code";
+    src: url("fonts/FiraCode-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: "Fira Code";
+    src: url("fonts/FiraCode-Bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
+}
+
+$themename: "midnight-purple"; // the stylesheet is midnight-purple.css (docs/compile_themes.jl)
+
+$bulmaswatch-import-font: false;
+
+@import "darkly/variables";
+
+$body-size: 16px;
+$size-6: 1rem;
+$size-7: 0.75rem;
+
+$documenter-is-dark-theme: true;
+
+// ---- Typography -----------------------------------------------------------
+
+$family-sans-serif: "Montserrat", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Helvetica Neue", sans-serif;
+
+$family-serif: "TeX Gyre Pagella", Palatino, Georgia, serif;
+
+$family-monospace: "Fira Code", "SFMono-Regular", "Menlo", "Consolas",
+    "Liberation Mono", monospace;
+
+// ---- Neon palette ---------------------------------------------------------
+
+$red: #FF477E;
+$orange: #FF9D4D;
+$yellow: #FFE66D;
+$green: #39FFB6;
+$turquoise: #00F5FF;
+$cyan: #00E5FF;
+$blue: #4D8DFF;
+$purple: #B026FF;
+
+$info: $cyan;
+$success: $green;
+$warning: $yellow;
+$danger: $red;
+$compat: $blue;
+$todo: $purple;
+
+// ---- Core palette ---------------------------------------------------------
+
+// Keep the main page genuinely dark.
+$body-background-color: #090817;
+
+$text: #CEC5E8;
+$text-strong: #F4EEFF;
+
+$link: #00E5FF;
+$link-hover: #D946FF;
+
+$border: #38245C;
+$background: #17112D;
+
+$admonition-default: $text;
+
+$admonition-background: (
+    'default': #17152A,
+    'info': #14263D,
+    'success': #122C29,
+    'warning': #302516,
+    'danger': #301529,
+    'compat': #17243D
+);
+
+$admonition-header-background: ();
+$admonition-header-color: ();
+$admonition-body-color: ();
+$admonition-border-color: ();
+
+$shadow: #05030D;
+
+// ---- Sidebar ---------------------------------------------------------------
+
+// More saturated purple than the original navy sidebar.
+$documenter-sidebar-background: #180D30;
+$documenter-sidebar-color: #D8CCFF;
+
+$documenter-sidebar-menu-hover-background: #321653;
+$documenter-sidebar-menu-hover-color: #00F5FF;
+
+$documenter-sidebar-menu-active-background: #180D30;
+$documenter-sidebar-menu-active-color: #D946FF;
+
+$documenter-sidebar-menu-active-hover-background: #321653;
+$documenter-sidebar-menu-active-hover-color: #00F5FF;
+
+$border-width: 1px;
+$lightness-unit: -8%;
+
+@import "documenter/utilities";
+@import "documenter/variables";
+
+// ---- Code -----------------------------------------------------------------
+
+$code: #D8A5FF;
+$code-background: #151026;
+
+$documenter-docstring-shadow: none;
+
+@import "bulma/utilities/all";
+@import "bulma/base/minireset.sass";
+@import "bulma/helpers/all";
+
+// ---- Inputs ----------------------------------------------------------------
+
+$input-color: #E7DEFF;
+$input-background-color: #100C20;
+$input-border-color: #7843B8;
+$input-placeholder-color: rgba(206, 197, 232, 0.55);
+
+$search-result-link-border-color: #B026FF;
+$search-result-link-text-color: #E7DEFF;
+$search-result-link-text-background-color: #17112D;
+$search-result-title-text-color: #00E5FF;
+$search-modal-kbd-color: rgba(216, 204, 255, 0.65);
+
+$button-static-color: $text;
+$button-static-background-color: $background;
+$button-static-border-color: $border;
+
+// ---- Theme -----------------------------------------------------------------
+
+html.theme--#{$themename} {
+    @import "bulma/base/generic.sass";
+
+    @import "documenter/overrides";
+
+    @import "bulma/elements/all";
+    @import "bulma/form/all";
+    @import "bulma/components/all";
+    @import "bulma/grid/all";
+    @import "bulma/layout/all";
+
+    @import "darkly/overrides";
+
+    @import "documenter/elements";
+    @import "documenter/components/all";
+    @import "documenter/patches";
+    @import "documenter/layout/all";
+
+    @import "documenter/theme_overrides";
+
+    @import "documenter/ansicolors";
+
+    // Julia REPL
+    code.language-julia-repl > span.hljs-meta {
+        color: #39FFB6;
+        font-weight: bolder;
+        text-shadow: 0 0 8px rgba(57, 255, 182, 0.3);
+    }
+
+    // Base syntax highlighting
+    @import "highlightjs/a11y-dark";
+
+    .hljs-subst {
+        color: #F4EEFF;
+    }
+
+    // ---- Search ------------------------------------------------------------
+
+    .search-result-link {
+        border-radius: 0.7em;
+        transition: all 300ms;
+    }
+
+    .search-result-link:hover,
+    .search-result-link:focus {
+        background-color: rgba(176, 38, 255, 0.13);
+        box-shadow: inset 0 0 0 1px rgba(176, 38, 255, 0.25);
+    }
+
+    .search-result-link .property-search-result-badge {
+        transition: all 300ms;
+    }
+
+    .search-result-link:hover .property-search-result-badge,
+    .search-result-link:focus .property-search-result-badge {
+        color: #090817 !important;
+        background-color: #00E5FF !important;
+    }
+
+    .search-result-title {
+        color: #E7DEFF;
+    }
+
+    .search-result-highlight {
+        background-color: #D946FF;
+        color: #090817;
+        border-radius: 2px;
+    }
+
+    .search-divider {
+        border-bottom: 1px solid #38245C;
+    }
+
+    .w-100 {
+        width: 100%;
+    }
+
+    .gap-2 {
+        gap: 0.5rem;
+    }
+
+    .gap-4 {
+        gap: 1rem;
+    }
+
+    // ---- Academic reskin ---------------------------------------------------
+
+    body {
+        color: $text;
+    }
+
+    body,
+    p,
+    .content,
+    .docstring > section > div {
+        font-family: $family-serif;
+        line-height: 1.6;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        font-family: $family-sans-serif;
+        font-weight: 700;
+        color: $text-strong;
+    }
+
+    h1 {
+        text-shadow: 0 0 24px rgba(176, 38, 255, 0.22);
+    }
+
+    h2 {
+        text-shadow: 0 0 16px rgba(176, 38, 255, 0.12);
+    }
+
+    .docstring-binding,
+    .docstring > header {
+        font-family: $family-sans-serif;
+        font-weight: 700;
+    }
+
+    // ---- Sidebar -----------------------------------------------------------
+
+    #documenter .docs-sidebar,
+    #documenter .docs-sidebar * {
+        font-family: $family-sans-serif;
+    }
+
+    #documenter .docs-sidebar .docs-package-name a,
+    #documenter .docs-sidebar .docs-package-name {
+        color: #F0E5FF;
+    }
+
+    #documenter .docs-sidebar .tocitem {
+        color: $documenter-sidebar-color;
+        transition: color 200ms, background-color 200ms;
+    }
+
+    #documenter .docs-sidebar .tocitem:hover {
+        color: #00F5FF;
+        text-shadow: 0 0 10px rgba(0, 245, 255, 0.35);
+    }
+
+    #documenter .docs-sidebar .tocitem.is-active,
+    #documenter .docs-sidebar li.is-active > .tocitem {
+        font-weight: 700;
+        color: #D946FF;
+        text-shadow: 0 0 12px rgba(217, 70, 255, 0.55);
+    }
+
+    // No box or divider around active entry.
+    #documenter .docs-sidebar ul.docs-menu li.is-active {
+        border: none !important;
+    }
+
+    #documenter .docs-sidebar ul.docs-menu {
+        border-top: none;
+    }
+
+    // Release label
+    #documenter .docs-sidebar .docs-package-name .docs-release {
+        display: block;
+        font-family: "Iosevka Charon Mono", $family-code;
+        font-size: 0.7rem;
+        font-weight: 400;
+        letter-spacing: 0.02em;
+        opacity: 0.8;
+        margin-top: 0.1rem;
+        color: #B99AE8;
+    }
+
+    // Sidebar scrollbar
+    #documenter .docs-sidebar,
+    #documenter .docs-sidebar ul.docs-menu {
+        scrollbar-color: #7843B8 #180D30;
+        scrollbar-width: thin;
+    }
+
+    // ---- Breadcrumbs -------------------------------------------------------
+
+    nav.breadcrumb {
+        font-family: $family-sans-serif;
+        font-weight: 600;
+        color: $text;
+    }
+
+    // ---- Search ------------------------------------------------------------
+
+    #documenter-search-query {
+        background-color: #100C20;
+        color: #E7DEFF;
+        border: 1px solid #7843B8;
+        border-radius: 6px;
+        transition: border-color 200ms, box-shadow 200ms;
+    }
+
+    #documenter-search-query:focus {
+        border-color: #D946FF;
+        box-shadow: 0 0 0 0.125em rgba(217, 70, 255, 0.22),
+            0 0 15px rgba(176, 38, 255, 0.16);
+    }
+
+    // ---- Navbar ------------------------------------------------------------
+
+    #documenter .docs-main header.docs-navbar.headroom--not-top {
+        box-shadow: none;
+    }
+
+    // ---- Code typography ---------------------------------------------------
+
+    code,
+    pre,
+    .documenter-example-output,
+    .docstring pre {
+        font-family: $family-monospace;
+        font-feature-settings: "calt" 1, "liga" 1;
+    }
+
+    // Code blocks
+    pre,
+    .documenter-example-output,
+    .docstring pre {
+        background: #151026;
+        color: #E7DEFF;
+        border: 1px solid #38245C;
+        border-radius: 8px;
+    }
+
+    // Inline code
+    code {
+        background: rgba(176, 38, 255, 0.13);
+        color: #D8A5FF;
+        border: 0;
+        border-radius: 4px;
+    }
+
+    pre code,
+    pre code.hljs,
+    .documenter-example-output code {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+    }
+
+    // ---- Neon syntax highlighting -----------------------------------------
+
+    .hljs-keyword,
+    .hljs-function .hljs-keyword,
+    .hljs-literal {
+        color: #D946FF;
+    }
+
+    .hljs-title,
+    .hljs-title.function_,
+    .hljs-name {
+        color: #00E5FF;
+    }
+
+    .hljs-type,
+    .hljs-built_in,
+    .hljs-class .hljs-title {
+        color: #39FFB6;
+    }
+
+    .hljs-number,
+    .hljs-string,
+    .hljs-symbol {
+        color: #FF6BCB;
+    }
+
+    .hljs-comment {
+        color: #8979AA;
+        font-style: italic;
+    }
+
+    .hljs-attr,
+    .hljs-attribute {
+        color: #FFE66D;
+    }
+
+    .hljs-variable,
+    .hljs-template-variable {
+        color: #8FAEFF;
+    }
+
+    // ---- Links -------------------------------------------------------------
+
+    a {
+        transition: color 180ms;
+    }
+
+    a:hover {
+        text-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+    }
+
+    // ---- Admonitions -------------------------------------------------------
+
+    .admonition {
+        border-radius: 8px;
+    }
+
+    .admonition.is-info {
+        border-color: #00E5FF;
+        box-shadow: 0 0 12px rgba(0, 229, 255, 0.07);
+    }
+
+    .admonition.is-success {
+        border-color: #39FFB6;
+        box-shadow: 0 0 12px rgba(57, 255, 182, 0.07);
+    }
+
+    .admonition.is-warning {
+        border-color: #FFE66D;
+    }
+
+    .admonition.is-danger {
+        border-color: #FF477E;
+    }
+}
+
+// ---- Theme-specific layout and controls -----------------------------------
+
+html.theme--#{$themename} {
+
+    // Code scrollbar
+    pre,
+    .documenter-example-output,
+    .docstring pre {
+        scrollbar-color: rgba(176, 38, 255, 0.55) transparent;
+        scrollbar-width: thin;
+    }
+
+    // Theme toggle
+    #documenter .docs-navbar .docs-theme-toggle {
+        display: inline-flex;
+        align-items: center;
+        background: none;
+        cursor: pointer;
+
+        svg {
+            display: block;
+        }
+
+        .docs-sun {
+            display: none;
+        }
+    }
+
+    // Navbar controls
+    #documenter .docs-navbar .docs-settings-button,
+    #documenter .docs-navbar .docs-article-toggle-button,
+    #documenter .docs-navbar a[title="Edit source on GitHub"] {
+        display: none;
+    }
+
+    // Version notice
+    .warning-overlay-base {
+        display: none;
+    }
+
+    #documenter .docs-navbar .docs-version-notice {
+        white-space: nowrap;
+        font-size: 0.85rem;
+
+        @media (max-width: 768px) {
+            .docs-version-label {
+                display: none;
+            }
+        }
+    }
+
+    // Full-width article layout
+    #documenter .docs-main {
+        max-width: none;
+        padding-right: 0;
+    }
+
+    #documenter .docs-main > article {
+        max-width: none;
+        margin-left: 0;
+        margin-right: 0;
+        padding: 0 clamp(1rem, 3vw, 2.5rem);
+    }
+
+    // Navbar and footer alignment
+    #documenter .docs-main > header.docs-navbar,
+    #documenter .docs-main .docs-footer {
+        padding-left: clamp(1rem, 3vw, 2.5rem);
+        padding-right: clamp(1rem, 3vw, 2.5rem);
+    }
+}

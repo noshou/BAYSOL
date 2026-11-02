@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "d2764dc0b8cabe230b38af249ff8bb56e0376f3a"
+project_hash = "d8b64cd414f337bab5ef842acaecca127a9f4ac5"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -1231,6 +1231,12 @@ git-tree-sha1 = "1ccd7f7235fe700bfb57dd6dd9984cce08f517d2"
 uuid = "76ed43ae-9a5d-5a62-8c75-30186b810ce8"
 version = "3.53.4+0"
 
+[[deps.Sass]]
+deps = ["libsass_jll"]
+git-tree-sha1 = "aa841c3738cec78b5dbccd56dda332710f35f6a5"
+uuid = "322a6be2-4ae8-5d68-aaf1-3e960788d1d9"
+version = "0.2.0"
+
 [[deps.ScientificTypesBase]]
 deps = ["InteractiveUtils"]
 git-tree-sha1 = "e785eaa35a0f5518a388f9010e66fda64ea95ede"
@@ -1535,6 +1541,12 @@ version = "1.4.2+0"
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
 version = "5.15.0+0"
+
+[[deps.libsass_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "6044ffe7e7bf0602e2039dc747c3332a097ac74b"
+uuid = "47bcb7c8-5119-555a-9eeb-0afcc36cd728"
+version = "3.6.6+0"
 
 [[deps.micromamba_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]

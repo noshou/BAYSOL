@@ -2,7 +2,7 @@
 
 # A short "Latest: v0.4.0 →" link in the navbar of every older release, in place of
 # Documenter's "This documentation is for an older version ..." pop-up (hidden by
-# `.warning-overlay-base` in docs/src/assets/themes/academic.scss and academic-dark.scss;
+# `.warning-overlay-base` in each docs/src/assets/themes/<theme>.scss;
 # Documenter's own warner.js still runs and still adds the `noindex` tag that keeps search
 # engines off old releases). docs/make.jl writes the script into the built pages, like
 # theme_toggle.jl does the light/dark button.

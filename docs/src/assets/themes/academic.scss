@@ -6,23 +6,6 @@
 //   - Montserrat        -> titles, sidebar/nav, breadcrumb
 //   - TeX Gyre Pagella   -> body prose (docstring descriptions)
 //   - Fira Code          -> code, with ligatures enabled
-//
-// This overrides Documenter's built-in "documenter-light" theme *in place*
-// (Documenter: "Documenter copies all files under the source directory...
-// unless the user already had a file with the same name, in which case the
-//
-// IMPORTANT: unlike Documenter's own "custom theme" tutorial (which nests
-// everything in `html.theme--$(name) { ... }`, expecting the picker to add
-// that class to <html>), this file must NOT be scoped that way. The real
-// documenter-light.scss it replaces is entirely unscoped;  Documenter's
-// themeswap.js applies *no* class to <html> when the light/primary theme is
-// active (only non-primary themes get a `theme--<name>` class). A scoped
-// version of this file would never match anything and (as happened in an
-// earlier version of this file) silently fail to apply almost everywhere.
-//
-// Compile with:
-//   using DocumenterTools: Themes
-//   Themes.compile("academic.scss", "docs/src/assets/themes/documenter-light.css")
 
 @font-face {
     font-family: "TeX Gyre Pagella";
@@ -73,6 +56,21 @@
     font-weight: 700;
     font-style: normal;
 }
+
+// The same base as day-blue.scss: bulmaswatch's flatly variables first (docs/scss/flatly,
+// vendored because Documenter does not ship it), then this file's own values on top of
+// them. This theme stays unscoped, unlike the others: it is the primary light theme, and
+// Documenter puts no `theme--` class on <html> for that one.
+// Do not import the default Lato font.
+$bulmaswatch-import-font: false;
+
+@import "flatly/variables";
+
+$body-size: 16px;
+$size-6: 1rem;
+$size-7: 0.75rem;
+
+$documenter-is-dark-theme: false;
 
 // Base palette + admonition colors, unchanged from Documenter's own
 // documenter-light.scss (documenter/variables.scss requires these to exist
@@ -153,6 +151,8 @@ $link-hover: #14263e;
 @import "bulma/grid/all";
 @import "bulma/layout/all";
 
+@import "flatly/overrides";
+
 @import "documenter/elements";
 @import "documenter/components/all";
 @import "documenter/patches";
@@ -167,7 +167,7 @@ code.language-julia-repl > span.hljs-meta {
     font-weight: bolder;
 }
 
-@import "highlightjs/default";
+@import "highlightjs/github";
 
 .gap-4 {
     gap: 1rem;

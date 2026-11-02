@@ -4,7 +4,7 @@
 # (ex: `v0.3.0-wʋsg_n_yɩɩda`: the tag, then its name, which is the tag's message) or `dev`.
 # docs/make.jl stamps it into the built pages; the same function patched the pages of
 # releases deployed before it existed (run on a gh-pages checkout). Its style is
-# `.docs-release` in docs/src/assets/themes/academic.scss and academic-dark.scss.
+# `.docs-release` in each docs/src/assets/themes/<theme>.scss.
 
 """
     release_label(repo; env = ENV) -> String

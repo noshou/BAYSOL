@@ -125,3 +125,6 @@ tui/.cpcache/
 
 # local brief detail moved out of CLAUDE.md
 notes/
+
+# sass (Ruby) cache
+.sass-cache/

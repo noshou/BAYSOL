@@ -5,18 +5,6 @@
 // Same typography (Montserrat titles/nav, TeX Gyre Pagella prose, Fira Code
 // with ligatures) and the same structure as the light theme; only the palette
 // is inverted: ink-navy page, deeper navy sidebar, ivory text.
-//
-// This overrides Documenter's built-in "documenter-dark" theme *in place*.
-//
-// Unlike academic.scss (the primary theme, which must be unscoped), a
-// secondary theme MUST be nested in `html.theme--documenter-dark { ... }`:
-// themeswap.js puts that class on <html> when the dark theme is picked and
-// disables the primary stylesheet. This mirrors Documenter's own
-// documenter-dark.scss.
-//
-// Compile with:
-//   using DocumenterTools: Themes
-//   Themes.compile("academic-dark.scss", "docs/src/assets/themes/documenter-dark.css")
 
 @charset "UTF-8";
 
@@ -70,7 +58,7 @@
     font-style: normal;
 }
 
-$themename: "documenter-dark"; // CSS file must be called `$(themename).css`
+$themename: "academic-dark"; // the stylesheet is academic-dark.css (docs/compile_themes.jl)
 
 // Darkly wants to @import the Lato font by default, but we don't need it.
 $bulmaswatch-import-font: false;
@@ -388,7 +376,7 @@ html.theme--#{$themename} {
 
 // The rules below belong to this theme too, so they sit inside its block like the rest
 // (an unscoped rule here would lose to Documenter's own `html.theme--documenter-dark ...`).
-html.theme--documenter-dark {
+html.theme--#{$themename} {
     // Firefox draws a code block's scrollbar light by default, which shows as a white strip
     // along its bottom edge on the dark page.
     pre,

@@ -141,9 +141,9 @@ write(
 
 makedocs(
     sitename = "BAYSOL.jl",
-    # The default HTML format, except for the size warning (see below): the "academic" theme
-    # (academic.scss) compiles directly to docs/src/assets/themes/documenter-light.css,
-    # overwriting Documenter's own built-in light theme file in place.
+    # The default HTML format, except for the size warning (see below). The themes are ours:
+    # docs/src/assets/themes/<name>.scss, compiled to <name>.css by compile_themes.jl and
+    # linked in place of Documenter's own by register_themes.jl after the build.
     modules = [BAYSOL; last.(DOC_MODULES); DOC_SUBMODULES],
     pages   = [
     "Home" => "index.md",
@@ -168,11 +168,11 @@ makedocs(
     # public API surface.
     checkdocs = :none,
     # The Scattering API page is a bit over Documenter's default 100 KiB warning size and
-    # the search index over 500 KiB. The Scattering page is one coherent module, so the
+    # the search index (now about 760 KiB, as the READMEs grew) over the default 500 KiB. The Scattering page is one coherent module, so the
     # warning levels are raised (the error levels stay).
     format = Documenter.HTML(;
         size_threshold_warn = 150 * 1024,
-        search_size_threshold_warn = 750 * 1024,
+        search_size_threshold_warn = 1024 * 1024,
     ),
     # Strict: every `@ref` resolves as of 2026-10-01, so a broken
     # cross-reference now fails the build (and the deploy) instead of
@@ -185,11 +185,11 @@ makedocs(
 include(joinpath(@__DIR__, "release_label.jl"))
 stamp_release_label(joinpath(@__DIR__, "build"), release_label(REPO_ROOT))
 
-# Only the light and dark themes stay in the settings menu (see prune_themes.jl).
-include(joinpath(@__DIR__, "prune_themes.jl"))
-prune_themes(joinpath(@__DIR__, "build"))
+# The four themes replace Documenter's own six (see register_themes.jl).
+include(joinpath(@__DIR__, "register_themes.jl"))
+register_themes(joinpath(@__DIR__, "build"))
 
-# The sun/moon button that toggles light and dark (see theme_toggle.jl).
+# The sun/moon button that cycles through the themes (see theme_toggle.jl).
 include(joinpath(@__DIR__, "theme_toggle.jl"))
 add_theme_toggle(joinpath(@__DIR__, "build"))
 

@@ -2,20 +2,27 @@
 *.scss  linguist-detectable=true
 *.css   linguist-detectable=false
 
-# docs/ is untracked by default
-docs/src/assets/theme_toggle.jl linguist-documentation=false
-docs/src/assets/make.jl linguist-documentation=false
-docs/src/assets/prune_themes.jl linguist-documentation=false
-docs/src/assets/release_label.jl linguist-documentation=false
-
-# Hand-written; override Linguist's documentation heuristic, which
+# Hand-written files under docs/ (the site's build scripts, theme sources and the vendored
+# Sass/CSS they compile against): override Linguist's documentation heuristic, which
 # otherwise excludes anything under docs/ from language stats.
-docs/src/assets/themes/*.scss linguist-documentation=false
+docs/*.jl linguist-documentation=false
 docs/src/assets/themes/*.scss linguist-documentation=false
 
-# documenter-light.css / documenter-dark.css are compiled output of academic.scss /
-# academic-dark.scss, not hand-authored; they stay excluded from language stats.
-docs/src/assets/themes/documenter-*.css linguist-generated=true
+# docs/src/assets/themes/<name>.css is the compiled output of <name>.scss (written by
+# docs/compile_themes.jl, never edited by hand); docs/scss/highlightjs/github.css is vendored.
+# docs/scss/flatly (bulmaswatch, MIT) is vendored too. All three stay out of the language stats.
+docs/src/assets/themes/*.css linguist-generated=true
+docs/scss/highlightjs/*.css linguist-vendored=true
+docs/scss/flatly/* linguist-vendored=true
+
+# Everything under test/ is hand-written code and counts in the language stats (Julia,
+# Clojure/EDN, TOML), including each test environment's Project.toml; only the Manifest.toml
+# files, which are generated, stay out. Overrides Linguist's documentation heuristic.
+test/** linguist-documentation=false
+test/**/*.jl linguist-detectable=true
+test/**/*.clj linguist-detectable=true
+test/**/*.edn linguist-detectable=true
+test/**/Project.toml linguist-detectable=true linguist-generated=false
 
 # bb.edn and .clj-kondo/config.edn are Clojure data; count and highlight them as Clojure
 # (Linguist otherwise files .edn under its own data-only "edn" language).
@@ -25,6 +32,7 @@ docs/src/assets/themes/documenter-*.css linguist-generated=true
 # TOMLs
 *.toml linguist-detectable=true
 Manifest.toml linguist-generated=true
+docs/Project.toml linguist-documentation=false
 
 # Ignore generated .tex files.
 *.tex linguist-generated=true
@@ -33,3 +41,11 @@ Manifest.toml linguist-generated=true
 # the picture, so `git diff --check` (and `bb precommit`'s whitespace step, which strips
 # what it reports) must leave them alone.
 tui/resources/**/*.txt whitespace=-trailing-space
+
+# (after the TOML rules above, which would otherwise win) test/ Manifests stay out of the stats.
+test/**/Manifest.toml linguist-generated=true linguist-detectable=false
+
+# Linguist treats everything under test/fixtures/ as vendored (default rule
+# `(^|/)[Tt]ests?/fixtures/`), which also hides these two hand-written code fixtures.
+test/fixtures/molecules/sequences.jl linguist-vendored=false linguist-detectable=true
+test/fixtures/settings/cases.edn linguist-vendored=false linguist-detectable=true linguist-language=Clojure
