@@ -5,7 +5,8 @@ Geometry of clouds of spheres, in one module (`BAYSOL.Geometry`): the low-discre
 
 | File                 | Provides                                                                                         |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| `Geometry.jl`        | the module: [`SphereCloud`](@ref BAYSOL.Geometry.SphereCloud) and every tunable constant (below) |
+| `Geometry.jl`        | the module: [`SphereCloud`](@ref BAYSOL.Geometry.SphereCloud) and the types the files share      |
+| `Params.jl`          | the settings of the module (below): probe, shell, surface sampling           |
 | `PlasticSequence.jl` | `plastic_points`, `Vec2`, `Vec3`: even point sets on the plane, the sphere surface and the ball  |
 | `ExcludedVolumes.jl` | `excluded_volume`, `sphere_volume`: the per-atom displaced-solvent volume                        |
 | `SasaMetrics.jl`     | the exact occlusion tests (`_caps!`, `blocked`)                                                  |
@@ -83,4 +84,4 @@ The loops over atoms (excluded volumes, SASA) and beads (classification) are cut
 
 ## Constants
 
-Module level in `Geometry.jl`: `N_VOL_SHELL` (2145), `ATOM_BLOCK`, `ATOM_PARALLEL_MIN`, `CLASS_BLOCK` (neither affects the result), `PROBE_RADIUS` (1.4 Å), `SHELL_N_TARGET` (`nothing`: size the shell from the area), `SHELL_AREA_PER_POINT` (4.0), `SHELL_MIN_POINTS` (55), `SHELL_SAMPLE` (256), `BEAD_RAY_RANGE`, `BEAD_RAY_DIRS`, `BEAD_CONVEX_ESCAPE`, `SASA_N_OCC` (104). `PROBE_RADIUS` and `SHELL_N_TARGET` are also the hydration-shell defaults that Scattering and `seed_model` forward.
+In `Geometry.jl`, fixed (not settings): `N_VOL_SHELL` (2145), `ATOM_BLOCK`, `ATOM_PARALLEL_MIN`, `CLASS_BLOCK` (none affects the result), `BEAD_CONVEX_ESCAPE`. In `Params.jl`: `PROBE_RADIUS` (1.4 Å), `SHELL_AREA_PER_POINT` (4.0), `SHELL_MIN_POINTS` (55), `SHELL_SAMPLE` (256), `BEAD_RAY_RANGE`, `BEAD_RAY_DIRS`, `SASA_N_OCC` (104). `PROBE_RADIUS` is also the hydration-shell default that Scattering and `seed_model` forward; the shell size `n_target` is a keyword of `sasa`, `hydration` and `seed_model` (`nothing`: size the shell from the accessible area), not a constant.

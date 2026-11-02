@@ -48,7 +48,7 @@
 (require '[common :as c] '[report])
 
 ;; Bounds of the sampled contrasts, as in
-;; src/Inference/Inference.jl (BOUNDS_δρ₁₂, UNIT_OF_δρ, φ_max).
+;; src/Inference/Params.jl (BOUNDS_δρ₁₂, φ_max) and UNIT_OF_δρ of PhysicalConstants.jl.
 (def ^:private lower-bound-δρ₁₂ -10.0)
 (def ^:private dro-upper 2.0)
 (def ^:private unit-of-δρ 0.03)

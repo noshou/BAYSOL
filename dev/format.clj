@@ -28,8 +28,17 @@
 ;;                 (line breaks and blank lines are kept, except the blank lines
 ;;                 before the end of a file)
 ;;                 Both commands also check the release name `v<version>-<release_name>`
-;;                 of the root Project.toml: at most 22 characters, the room the TUI's
-;;                 main menu has for it
+;;                 of the root Project.toml: at most 35 characters, the room the TUI's
+;;                 main menu has for it, and the names of the settings, the constants
+;;                 of every src/*/Params.jl (not the fixed constants of the module
+;;                 files): at most 23 characters, the width of the name column of the
+;;                 settings sheets of the TUI, and the pages of those sheets
+;;                 (tui/resources/*-settings/pages/page*.txt): every row of the table
+;;                 well formed at the right widths, and the cursor marker
+;;                 `>` once.
+;;                 `bb fmt` trims the trailing spaces and tabs of every .txt file in
+;;                 those folders (the pages and the blocs they are made from), and
+;;                 `bb fmt-check` lists the files that have any
 ;;   bb fmt-check  changes nothing; lists the files that are not formatted, whose
 ;;                 prose would be re-wrapped or whose license header is missing or
 ;;                 wrong, and exits 1 if there are any
@@ -445,8 +454,8 @@
   (or apply? (empty? changed))))
 
 ;; The release name `v<version>-<release_name>` is shown on the main menu of the TUI, which
-;; has room for this many characters.
-(def max-version-name-length 22)
+;; has room for this many characters: from the left edge of the box, under it.
+(def max-version-name-length 35)
 
 (defn version-name
  "The release name `v<version>-<release_name>` of the Project.toml text `toml`, or nil
@@ -471,6 +480,164 @@
      max-version-name-length
      " (the main menu of the TUI has room for that many)")))
   "there is no `version` or no `release_name`"))
+
+(def max-parameter-name-length
+ "The most characters the name of a setting may have: the width of the name column of the
+ TUI's settings sheets."
+ 23)
+
+(defn parameter-names
+ "The names of the constants declared in the text `text` of a Julia `Params.jl` file
+ (`const NAME = ...`, with or without a type annotation `const NAME::T = ...`)."
+ [text]
+ (map second (re-seq #"(?m)^const\s+([^\s:=]+)" text)))
+
+(defn parameter-problems
+ "What is wrong with the names in the `Params.jl` text `text`: one sentence for each name
+ of more than `max-parameter-name-length` characters; empty if all fit."
+ [text]
+ (for [n (parameter-names text)
+   :let [len (.codePointCount ^String n 0 (count n))]
+   :when (> len max-parameter-name-length)]
+  (str n
+   " has "
+   len
+   " characters, the limit is "
+   max-parameter-name-length
+   " (the name column of the settings sheets)")))
+
+(defn ^:private check-parameter-names
+ "Checks the names of the settings in every `src/<Module>/Params.jl` (the fixed constants
+ of the module files are not settings and are not checked): prints each problem and
+ returns false, or returns true."
+ []
+ (let [files (sort (map str (fs/glob (c/in-root "src") "*/Params.jl")))
+   problems (for [f files
+     p (parameter-problems (c/slurp8 f))]
+    (str f ": " p))]
+  (doseq [p problems] (println (str who ": " p)))
+  (empty? problems)))
+
+;; The pages of the TUI's settings sheets (tui/resources/<category>-settings/pages/*.txt):
+;; a table of three fields, `name | description | value`, of these widths (the first
+;; character of a field is a space, so a name has room for width - 1 characters).
+(def ^:private page-field-widths [24 29 19])
+
+(defn ^:private page-rule
+ "A horizontal rule of the page table: `left`, then a run of `═` for each field with
+ `between` after each field but the last, then `right`."
+ [left between right]
+ (str "   "
+  left
+  (str/join between (map #(str/join (repeat % "═")) page-field-widths))
+  right))
+
+(def ^:private page-header
+ "   ║        name            ║        description          ║      value        ║")
+
+(defn ^:private page-field-re
+ "The regex of a field of `w` characters."
+ [w]
+ (str ".{" w "}"))
+
+(defn ^:private page-row-re
+ "The regex of a row of the table (3 spaces of indent) whose edges are `left`, `mid` and
+ `right`."
+ [left mid right]
+ (let [[a b c] (map page-field-re page-field-widths)]
+  (re-pattern (str "   " left a mid b mid c right))))
+
+(def ^:private page-name-row (page-row-re "╠" "╬" "╣"))
+(def ^:private page-more-row (page-row-re "║" "║" "║"))
+
+(defn page-problems
+ "What is wrong with the text `text` of a settings page, as sentences that start with the
+ line number; empty if the page is fine. A page is the table header, the rule under it,
+ rows, the bottom rule and the footer. A row is either the first line of a setting (`╠
+ name ╬ description ╬ value ╣`) or a further line of its description or value (`║ ║ ║
+ ║`), exactly as wide as the header: 3 spaces or the marker ` > ` in front, then the
+ fields. The marker `>` is the cursor: it appears once on the page, in front of the first
+ line of a setting."
+ [text]
+ (let [lines (vec (str/split text #"\n" -1))
+   rule-under (page-rule "╠" "╬" "╣")
+   ;; the footer box hangs under the value field, so its junction is `╬`, not `╩`
+   bottom (let [[a b c] (map #(str/join (repeat % "═")) page-field-widths)]
+    (str "   ╚" a "╩" b "╬" c "╣"))
+   bottom-at (first (keep-indexed #(when (= %2 bottom) %1) lines))
+   problems (atom [])
+   problem! (fn [i msg] (swap! problems conj (str "line " (inc i) ": " msg)))]
+  (when-not (= (first lines) page-header)
+   (problem! 0 "the table header is not the standard one"))
+  (when-not (= (get lines 1) rule-under)
+   (problem! 1 "the rule under the header is not the standard one"))
+  (if (nil? bottom-at)
+   (problem! (dec (count lines)) "no standard bottom rule of the table")
+   (doseq [i (range 2 bottom-at)]
+    (let [l (nth lines i)
+      marked? (str/starts-with? l " > ")
+      body (if marked? (str "   " (subs l 3)) l)]
+     (cond
+      (re-matches page-name-row body) nil
+      (re-matches page-more-row body)
+      (when marked?
+       (problem! i "the marker `>` is on a continuation line, not on a setting"))
+      :else
+      (problem!
+       i
+       (str
+        "not a row of the table: "
+        (.codePointCount ^String l 0 (count l))
+        " characters; a row is `╠ name ╬ description ╬ value ╣` or a continuation "
+        "`║ ║ ║ ║`, "
+        (+ 7 (reduce + page-field-widths))
+        " characters in all (3 of indent), without trailing spaces"))))))
+  (let [n (count (filter #(str/starts-with? % " > ") lines))]
+   (when-not (= n 1)
+    (swap! problems conj
+     (str "the marker `>` appears " n " times, it must appear exactly once"))))
+  @problems))
+
+(defn trim-trailing-space
+ "`text` with the spaces and tabs at the end of each line removed."
+ [text]
+ (str/replace text #"(?m)[ \t]+$" ""))
+
+(defn ^:private settings-page-files
+ "The text files of the TUI's settings sheets, tui/resources/*-settings/pages/*.txt (the
+ pages and the blocs they are made from; not the art pages of the settings menu, whose
+ trailing spaces are part of the picture), as a sorted list of paths; `glob` is the name
+ pattern inside the folders."
+ [glob]
+ (sort (map str
+   (fs/glob (c/in-root "tui" "resources")
+    (str "*-settings/pages/" glob)))))
+
+(defn ^:private format-settings-pages
+ "Trims (`apply?`) or checks the trailing spaces and tabs of every text file of the TUI's
+ settings sheets (pages and blocs); true on success: when trimming always, when checking
+ if no file has any. Lists the files that were (or would be) changed."
+ [apply?]
+ (let [changed (doall (for [f (settings-page-files "*.txt")
+      :let [old (c/slurp8 f)
+       fresh (trim-trailing-space old)]
+      :when (not= old fresh)]
+     (do (when apply? (c/spit8 f fresh)) f)))]
+  (doseq [f changed]
+   (println (if apply? "trailing spaces trimmed:" "trailing spaces:") f))
+  (or apply? (empty? changed))))
+
+(defn ^:private check-settings-pages
+ "Checks every page of the TUI's settings sheets, tui/resources/*-settings/pages/page*.txt
+ (the blocs they are made from are not pages): prints each problem with its file and
+ returns false, or returns true. Trailing spaces are not a problem here: `bb fmt` trims
+ them."
+ []
+ (let [problems (for [f (settings-page-files "page*.txt")
+     p (page-problems (trim-trailing-space (c/slurp8 f)))]
+    (str f ": " p))]
+  (doseq [p problems] (println (str who ": " p)))
+  (empty? problems)))
 
 (defn ^:private check-version-name
  "Checks the release name in the Project.toml at the root of the repository: prints the
@@ -545,8 +712,22 @@
     lint-ok
     (or (not apply?) (not (or both? (languages "--clj"))) (lint-clj paths))
     ;; whatever the mode and the language: the release name must fit the main menu
-    version-ok (check-version-name)]
-   (when-not (and header-ok julia-ok clj-ok scss-ok lint-ok version-ok) 1))))
+    version-ok (check-version-name)
+    ;; and the names of the settings must fit the name column of the TUI's sheets
+    names-ok (check-parameter-names)
+    ;; the pages of those sheets: trailing spaces trimmed, then well formed
+    trim-ok (format-settings-pages apply?)
+    pages-ok (check-settings-pages)]
+   (when-not (and header-ok
+     julia-ok
+     clj-ok
+     scss-ok
+     lint-ok
+     version-ok
+     names-ok
+     trim-ok
+     pages-ok)
+    1))))
 
 ;; Run only when executed as a script, so the functions can be loaded for testing.
 (when (= *file* (System/getProperty "babashka.file"))

@@ -348,11 +348,111 @@
      release
      "\"\n"))]
   (is (= "v0.4.0-yals-n-gɛsga" (fmt/version-name (toml "0.4.0" "yals-n-gɛsga"))))
-  (testing "22 characters fit, 23 do not"
+  (testing "35 characters fit, 36 do not"
    (is (nil? (fmt/version-problem (toml "0.4.0" "yals-n-gɛsga"))))
-   (is (nil? (fmt/version-problem (toml "0.4.0" (apply str (repeat 15 "a"))))))
-   (is (some? (fmt/version-problem (toml "0.4.0" (apply str (repeat 16 "a")))))))
+   (is (nil? (fmt/version-problem (toml "0.4.0" (apply str (repeat 28 "a"))))))
+   (is (some? (fmt/version-problem (toml "0.4.0" (apply str (repeat 29 "a")))))))
   (testing "a missing key is a problem"
    (is (some? (fmt/version-problem "name = \"BAYSOL\"\nversion = \"0.4.0\"\n"))))
   (testing "the Project.toml of the repository fits"
    (is (nil? (fmt/version-problem (c/slurp8 (c/in-root "Project.toml"))))))))
+
+(deftest setting-names-fit-the-sheets
+ (testing "the names of the constants of a Params.jl text, typed or not"
+  (is (= ["A_B" "C"]
+    (fmt/parameter-names (lines "# comment" "const A_B = 1"
+      "const C::Int = 2" "x = 3")))))
+ (testing "a name of 23 characters fits, 24 does not"
+  (let [ok (apply str (repeat fmt/max-parameter-name-length "A"))
+    too-long (str ok "B")]
+   (is (empty? (fmt/parameter-problems (str "const " ok " = 1"))))
+   (is (= 1 (count (fmt/parameter-problems (str "const " too-long " = 1")))))
+   (is (str/includes? (first (fmt/parameter-problems
+       (str "const " too-long " = 1")))
+     too-long))))
+ (testing "the settings of the repository all fit"
+  (is (empty? (mapcat (comp fmt/parameter-problems c/slurp8)
+     (map str (fs/glob (c/in-root "src") "*/Params.jl")))))))
+
+(def ^:private page-header
+ "   ║        name            ║        description          ║      value        ║")
+
+(def ^:private page-rule-under
+ "   ╠════════════════════════╬═════════════════════════════╬═══════════════════╣")
+
+(def ^:private page-bottom
+ "   ╚════════════════════════╩═════════════════════════════╬═══════════════════╣")
+
+(defn ^:private name-row
+ "A first line of a setting: the marker or 3 spaces, then the three fields."
+ [marked? setting desc]
+ (str (if marked? " > " "   ")
+  "╠"
+  (format "%-24s" (str " " setting))
+  "╬"
+  (format "%-29s" (str " " desc))
+  "╬"
+  (apply str (repeat 19 " "))
+  "╣"))
+
+(defn ^:private more-row
+ "A continuation line: the three fields with a description."
+ [desc]
+ (str "   ║"
+  (apply str (repeat 24 " "))
+  "║"
+  (format "%-29s" (str " " desc))
+  "║"
+  (apply str (repeat 19 " "))
+  "║"))
+
+(defn ^:private page
+ "A page text of the standard header and bottom rule around the body lines `body`."
+ [& body]
+ (apply lines page-header page-rule-under (concat body [page-bottom "   footer"])))
+
+(deftest settings-pages-are-well-formed
+ (testing "a page with one marker on the first line of a setting is fine"
+  (is (empty? (fmt/page-problems
+     (page (name-row true "PLOT_HIST_BINS" "Bins in the histogram.")
+      (more-row "More of it.")
+      (name-row false "PLOT_FONT" "A font."))))))
+ (testing "no marker, or two, is a problem"
+  (is (some #(str/includes? % "0 times")
+    (fmt/page-problems (page (name-row false "A" "a")
+      (name-row false "B" "b")))))
+  (is (some #(str/includes? % "2 times")
+    (fmt/page-problems (page (name-row true "A" "a")
+      (name-row true "B" "b"))))))
+ (testing "the marker on a continuation line is a problem"
+  (is (some #(str/includes? % "continuation")
+    (fmt/page-problems
+     (page (name-row true "A" "a") (str " > " (subs (more-row "x") 3)))))))
+ (testing "a ║ where a ╬ belongs is a problem, with the line number"
+  (let [bad (str/replace (name-row true "A" "a") "╬" "║")]
+   (is (some #(str/starts-with? % "line 3:") (fmt/page-problems (page bad))))))
+ (testing "a trailing space, or a short or long row, is a problem"
+  (is (seq (fmt/page-problems (page (name-row true "A" "a")
+      (str (more-row "x") " ")))))
+  (is (seq (fmt/page-problems (page (name-row true "A" "a")
+      (subs (more-row "x") 1)))))
+  (is (seq (fmt/page-problems (page (name-row true "A" "a")
+      (str (more-row "x") "║"))))))
+ (testing "a wrong header or bottom rule is a problem"
+  (is (seq (fmt/page-problems
+     (str/replace (page (name-row true "A" "a")) "name" "NAME"))))
+  (is (seq (fmt/page-problems
+     (str/replace (page (name-row true "A" "a")) page-bottom "   ╚")))))
+ (testing "the repository's own header and rules are the ones tested here"
+  (let [real (c/slurp8
+     (c/in-root "tui" "resources" "plots-settings" "pages" "page1.txt"))
+    real-lines (str/split real #"\n")]
+   (is (= page-header (first real-lines)))
+   (is (= page-rule-under (second real-lines))))))
+
+(deftest trailing-spaces-are-trimmed
+ (testing "spaces and tabs at the end of each line go, nothing else"
+  (is (= "a\n b\n\nc" (fmt/trim-trailing-space "a  \n b\t\n  \nc")))
+  (is (= "║ x ║\n" (fmt/trim-trailing-space "║ x ║   \n"))))
+ (testing "a text without any is unchanged"
+  (is (= "a\n b" (fmt/trim-trailing-space "a\n b")))))

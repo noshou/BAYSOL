@@ -1,0 +1,225 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+# Harvests the default of every setting the terminal interface shows into one EDN file,
+# `tui/resources/default_settings.edn`: screen -> setting name -> `{:page :default :type
+# :limits}`. The settings are read from the pages (`tui/resources/<screen>-settings/pages`,
+# one setting per page, the cursor `>` on its first row), the values from the `const`s of
+# the `Params.jl` files, the limits from each module's `SETTING_LIMITS`. A name on a page
+# that no module defines, or a limit that names no setting, is an error, so the pages, the
+# constants and the limits cannot drift apart.
+#
+#   julia --project=. dev/harvest_defaults.jl [OUT]
+#
+# OUT defaults to tui/resources/default_settings.edn. The file comes out unformatted;
+# `bb harvest-defaults` (dev/harvest_defaults.clj) runs this and then the formatter.
+
+using BAYSOL
+using Colors: color_names
+
+const ROOT = normpath(joinpath(@__DIR__, ".."))
+const DEFAULT_OUT = joinpath(ROOT, "tui", "resources", "default_settings.edn")
+const SCREENS = ("sampler", "model", "output", "plots")
+const MODULES = (BAYSOL.Inference, BAYSOL.Geometry, BAYSOL.Scattering, BAYSOL.Pipeline)
+const LIMIT_KEYS = (:above, :below, :at_least, :at_most)
+const RELATION_RULES =
+    (:inside, :within_width, :ordered, :all_above, :at_most_setting, :opacity)
+
+"The setting each page of `screen` is about, in page order: `[name, ...]`."
+function page_settings(screen::AbstractString)
+    dir = joinpath(ROOT, "tui", "resources", "$screen-settings", "pages")
+    n = count(f -> occursin(r"^page\d+\.txt$", f), readdir(dir))
+    names = String[]
+    for i in 1:n
+        rows = split(read(joinpath(dir, "page$i.txt"), String), "\n")
+        row = findfirst(l -> startswith(l, " > ╠"), rows)
+        row === nothing && error("$screen page$i has no cursor row")
+        push!(names, strip(split(split(rows[row], "╠")[2], "╬")[1]))
+    end
+    allunique(names) || error("$screen: a setting is on two pages")
+    return names
+end
+
+"The module whose `Params.jl` defines the setting `s`."
+function owner(s::Symbol)
+    owners = [m for m in MODULES if isdefined(m, s) && Base.binding_module(m, s) === m]
+    length(owners) == 1 || error("setting $s is defined in $(length(owners)) modules")
+    return only(owners)
+end
+
+"EDN text of the value `v`."
+edn(v::Bool) = v ? "true" : "false"
+edn(v::Integer) = string(v)
+edn(v::AbstractFloat) = isfinite(v) ? string(v) : error("a non-finite default: $v")
+edn(v::Symbol) = ":" * string(v)
+edn(v::AbstractString) = repr(v)
+edn(v::Tuple) = "[" * join(edn.(v), " ") * "]"
+edn(v::NamedTuple) = "{" * join((":$k $(edn(x))" for (k, x) in pairs(v)), " ") * "}"
+
+"The choices of `name` (`SETTING_CHOICES` of its module), or `nothing`."
+function choices_of(name::AbstractString)
+    m = owner(Symbol(name))
+    isdefined(m, :SETTING_CHOICES) || return nothing
+    return get(getfield(m, :SETTING_CHOICES), Symbol(name), nothing)
+end
+
+"""
+The shape of a tuple default as EDN: the kind of each part (`:int`, `:float` or
+`:colour`), in a vector, or in a map for a named tuple. The terminal interface compares
+the shape of a default it reads with this, which only the Julia constant can say.
+"""
+function shape_edn(v)
+    kind(x) =
+        x isa Integer ? ":int" :
+        x isa Real ? ":float" :
+        x isa Symbol ? ":colour" :
+        error("a tuple default has a part of type $(typeof(x))")
+    v isa NamedTuple &&
+        return "{" * join((":$k $(kind(x))" for (k, x) in pairs(v)), " ") * "}"
+    return "[" * join(kind.(v), " ") * "]"
+end
+
+"""
+The part names of the tuple setting `name` as EDN, a vector of strings (`SETTING_PARTS` of
+its module). Every tuple setting needs one name for each of its parts.
+"""
+function parts_edn(name::AbstractString, v)
+    m = owner(Symbol(name))
+    table = isdefined(m, :SETTING_PARTS) ? getfield(m, :SETTING_PARTS) : (;)
+    haskey(table, Symbol(name)) || error("tuple setting $name has no SETTING_PARTS")
+    parts = table[Symbol(name)]
+    length(parts) == length(v) ||
+        error("setting $name has $(length(v)) parts but $(length(parts)) names")
+    return "[" * join(repr.(collect(parts)), " ") * "]"
+end
+
+"The limits of `name` as EDN, `{}` when it has none."
+function limits_edn(name::AbstractString)
+    m = owner(Symbol(name))
+    table = getfield(m, :SETTING_LIMITS)
+    haskey(table, Symbol(name)) || return "{}"
+    lim = table[Symbol(name)]
+    for k in keys(lim)
+        k in LIMIT_KEYS || error("setting $name: unknown limit $k")
+    end
+    pairs_edn = (
+        ":" * replace(string(k), "_" => "-") * " " * edn(x) for (k, x) in pairs(lim)
+    )
+    return "{" * join(pairs_edn, " ") * "}"
+end
+
+"""
+EDN text of the rules that tie settings together: a vector of maps, the `SETTING_RELATIONS`
+of every module. A setting a rule names must be on a page.
+"""
+function relations_edn(named::Set{Symbol})
+    io = IOBuffer()
+    println(io, ";; SPDX-License-Identifier: LGPL-3.0-or-later")
+    println(io)
+    println(io, ";; Generated by `bb harvest-defaults` from the SETTING_RELATIONS of the")
+    println(
+        io,
+        ";; Params.jl files. Do not edit: change the constant and run `bb precommit`.",
+    )
+    println(io)
+    println(io, "[")
+    for m in MODULES
+        isdefined(m, :SETTING_RELATIONS) || continue
+        for r in getfield(m, :SETTING_RELATIONS)
+            r.rule in RELATION_RULES || error("unknown relation rule $(r.rule)")
+            fields = String[]
+            for (k, v) in pairs(r)
+                v === nothing && continue
+                if v isa Symbol && k !== :rule
+                    v in named || error("relation $(r.rule): $v is on no page")
+                    push!(fields, ":$k $(repr(String(v)))")
+                else
+                    push!(fields, ":$k $(edn(v))")
+                end
+            end
+            println(io, " {", join(fields, " "), "}")
+        end
+    end
+    println(io, "]")
+    return String(take!(io))
+end
+
+"The whole file."
+function harvest()
+    io = IOBuffer()
+    println(io, ";; SPDX-License-Identifier: LGPL-3.0-or-later")
+    println(io)
+    println(io, ";; Generated by `bb harvest-defaults` from the Params.jl files and the")
+    println(io, ";; pages of the settings screens. Do not edit: change the constant and")
+    println(io, ";; run `bb precommit`.")
+    println(io, ";; screen -> setting -> {:page (its page number) :default :type :limits}.")
+    println(io)
+    named = Set{Symbol}()
+    println(io, "{")
+    for (si, screen) in enumerate(SCREENS)
+        println(io, " :$screen")
+        println(io, " {")
+        for (i, name) in enumerate(page_settings(screen))
+            sym = Symbol(name)
+            push!(named, sym)
+            v = getfield(owner(sym), sym)
+            println(io, "  ", repr(name))
+            choices = choices_of(name)
+            if choices !== nothing
+                all(c -> c in choices, v) || error("setting $name: a default is no choice")
+            end
+            println(
+                io,
+                "  {:page ", i, " :default ", edn(v), " :type :",
+                BAYSOL.Pipeline.setting_kind(Symbol(name), v),
+                " :limits ", limits_edn(name),
+                choices === nothing ? "" : " :choices " * edn(choices),
+                BAYSOL.Pipeline.setting_kind(Symbol(name), v) === :tuple ?
+                " :shape " * shape_edn(v) * " :parts " * parts_edn(name, v) : "", "}",
+            )
+        end
+        println(io, " }", si < length(SCREENS) ? "\n" : "")
+    end
+    println(io, "}")
+    listed = Set(BAYSOL.Pipeline._setting_names())
+    for n in setdiff(named, listed)
+        error("setting $n is on a page but in no SETTING_NAMES")
+    end
+    for n in setdiff(listed, named)
+        error("setting $n is in SETTING_NAMES but on no page")
+    end
+    for m in MODULES, table in (:SETTING_LIMITS, :SETTING_CHOICES, :SETTING_PARTS)
+        isdefined(m, table) || continue
+        for k in keys(getfield(m, table))
+            k in named || error("$table of $(nameof(m)) names $k, which no page shows")
+        end
+    end
+    return String(take!(io)), named
+end
+
+"""
+The colours a setting may hold, one per line, `name #rrggbb`: the names `Colors.parse`
+knows and their colour, which the terminal interface shows as a swatch.
+"""
+function colour_names()
+    hex(c) = "#" * join(string.(c; base = 16, pad = 2))
+    rows = ["$name $(hex(c))" for (name, c) in sort!(collect(color_names); by = first)]
+    return join(rows, "\n") * "\n"
+end
+
+function main(args)
+    out = isempty(args) ? DEFAULT_OUT : abspath(only(args))
+    text, named = harvest()
+    write(out, text)
+    beside(from, to) = joinpath(
+        dirname(out),
+        replace(basename(out), "default_settings" => from, ".edn" => to),
+    )
+    colours = beside("colours", ".txt")
+    relations = beside("setting_relations", ".edn")
+    write(colours, colour_names())
+    write(relations, relations_edn(named))
+    println("harvest-defaults: wrote $out, $colours and $relations")
+    return 0
+end
+
+exit(main(ARGS))

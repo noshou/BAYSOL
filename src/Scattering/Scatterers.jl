@@ -10,9 +10,10 @@ using ..Geometry: sasa, CONVEX, CONCAVE, CAVITY
 using ..MolecularStructure: Molecule, elms, coords_spherical, vols, to_spherical
 using ..Runtime: StageLog, timed!
 
-# SHELL_THICKNESS is a Scattering module constant (Scattering.jl);
-# PROBE_RADIUS and SHELL_N_TARGET are Geometry's (imported in Scattering.jl);
-# this file only reads them as call defaults.
+# SHELL_THICKNESS is a Scattering module constant (Scattering/Params.jl);
+# PROBE_RADIUS is Geometry's (Geometry/Params.jl, imported in Scattering.jl);
+# this file only reads it as a call default. `n_target = nothing` sizes the shell from the
+# accessible area.
 
 """
 Per-dummy amplitude f[i,k] = `v_i` * exp(-`q_k²` * `v_i`^(2/3) / 4π), the
@@ -116,7 +117,7 @@ contrast `dro_k` downstream (CRYSOL's δρ = (1, 1, 0) defaults).
 # Keywords
     - `thickness::Float64 = SHELL_THICKNESS`: shell thickness in Å; > 0.
     - `probe::Float64 = PROBE_RADIUS`: solvent probe radius, forwarded to sasa.
-    - `n_target::Union{Nothing,Int} = SHELL_N_TARGET`: total shell dummies before the class
+    - `n_target::Union{Nothing,Int} = nothing`: total shell dummies before the class
     split, the analogue of CRYSOL's --fb. nothing lets sasa
     size the cloud from the accessible area (≈ area / `SHELL_AREA_PER_POINT`,
     floored at `SHELL_MIN_POINTS`); pass an Int to pin it. Runtime is
@@ -138,7 +139,7 @@ function hydration(
     _CHUNK::UInt64;
     thickness::Float64           = SHELL_THICKNESS,
     probe::Float64               = PROBE_RADIUS,
-    n_target::Union{Nothing,Int} = SHELL_N_TARGET,
+    n_target::Union{Nothing,Int} = nothing,
     shell::Union{Nothing,Tuple}  = nothing,
 )::@NamedTuple{
     convex::Array{ComplexF64,3},
@@ -192,7 +193,7 @@ sweep per atom, shared by the form-factor and dummy amplitudes.
 # Keywords
 - `chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size (results invariant).
 - thickness::Real = `SHELL_THICKNESS`, probe::Real = `PROBE_RADIUS`,
-    `n_target` = `SHELL_N_TARGET`, `shell` = nothing: forwarded to [`hydration`](@ref).
+    `n_target` = `nothing`, `shell` = nothing: forwarded to [`hydration`](@ref).
 - `form_factor_log::Union{Nothing,Vector{String}} = nothing`: when not nothing,
     the form-factor table's construction diagnostics are appended to it.
 - `stage_log::Union{Nothing,StageLog} = nothing`: if given, records the
@@ -206,7 +207,7 @@ function species_multipoles(
     chunk::Unsigned = B_LM_CHUNK,
     thickness::Real = SHELL_THICKNESS,
     probe::Real = PROBE_RADIUS,
-    n_target::Union{Nothing,Integer} = SHELL_N_TARGET,
+    n_target::Union{Nothing,Integer} = nothing,
     shell::Union{Nothing,Tuple} = nothing,
     form_factor_log::Union{Nothing,Vector{String}} = nothing,
     stage_log::Union{Nothing,StageLog} = nothing,

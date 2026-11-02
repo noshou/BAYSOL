@@ -21,6 +21,12 @@
 ;;                  line of an untracked, unignored text file is stripped) and
 ;;                  reported, never a failure; a leftover conflict marker cannot be
 ;;                  fixed by a tool and is a failure
+;;   default-settings  `tui/resources/default_settings.edn` is regenerated from the
+;;                  Params.jl files and the pages of the settings screens
+;;                  (`bb harvest-defaults`: dev/harvest_defaults.jl, then the formatter;
+;;                  about 5 s once BAYSOL is compiled); a page whose setting no
+;;                  constant has fails the step, and the changed file belongs in the
+;;                  commit
 ;;   clj-format     every .clj file is formatted by zprint (`bb fmt-check --clj`)
 ;;   julia-format   every .jl file is formatted by JuliaFormatter.jl
 ;;                  (`bb fmt-check --julia`, settings in .JuliaFormatter.toml);
@@ -35,8 +41,8 @@
 ;;                  docs/make.jl`, ~1 min); it also regenerates the (gitignored)
 ;;                  copies of the READMEs under docs/src/guides and docs/src/testing
 ;;
-;;   --quick     skip the Julia steps (unit-tests, concurrency-tests, julia-format,
-;;               docs-build): the checks that take a second
+;;   --quick     skip the Julia steps (unit-tests, concurrency-tests, default-settings,
+;;               julia-format, docs-build): the checks that take a second
 ;;   --threads N  run the Julia processes with N threads (as `julia -t N`: 4, auto,
 ;;               4,1); default one
 ;;   --dry-run   print what would run, run nothing
@@ -160,6 +166,8 @@
    :cmd [:julia "--startup-file=no" "-t" "6,1" (str "--project=" (c/in-root "test"))
     (c/in-root "dev" "unittests.jl") "concurrency" "parallel" "gcpause"
     "cache"]} {:name "whitespace", :quick? true, :cmd :whitespace}
+  {:name "default-settings",
+   :cmd ["bb" (c/in-root "dev" "harvest_defaults.clj")]}
   {:name "clj-format",
    :quick? true,
    :cmd ["bb" (c/in-root "dev" "format.clj") "--check" "--clj"]}

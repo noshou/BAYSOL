@@ -320,12 +320,16 @@ end
         r3 = FIT.infer(seed, 40, 20; rng_seed = 8, retry = false)
         @test r1.samples == r2.samples
         @test r1.samples != r3.samples
-        # Random.seed! before the call fixes the run when no rng_seed is given
+        # `rng_seed = nothing` draws a fresh seed: Random.seed! before the call fixes it
         Random.seed!(3)
-        q1 = FIT.infer(seed, 40, 20; retry = false)
+        q1 = FIT.infer(seed, 40, 20; rng_seed = nothing, retry = false)
         Random.seed!(3)
-        q2 = FIT.infer(seed, 40, 20; retry = false)
+        q2 = FIT.infer(seed, 40, 20; rng_seed = nothing, retry = false)
         @test q1.samples == q2.samples
+        # and the default is the fixed seed RNG_SEED (0): reproducible without any seeding
+        d1 = FIT.infer(seed, 40, 20; retry = false)
+        d2 = FIT.infer(seed, 40, 20; rng_seed = FIT.RNG_SEED, retry = false)
+        @test FIT.RNG_SEED == 0 && d1.samples == d2.samples
     end
 
     @testset "run: δ must be a percentage strictly inside (0, 100)" begin
@@ -395,7 +399,7 @@ end
         n_samples, n_adapt = 60, 30
         r = FIT.infer(seed, n_samples, n_adapt; rng_seed = 5, retry = false)
         d = r.diagnostics
-        @test d.n_chains == FIT.DEFAULT_N_CHAINS == 8
+        @test d.n_chains == FIT.N_CHAINS == 8
         # chains 1 and 2 at the MAP, then mirrored pairs at the CHAIN_START_RADII
         # (never farther than nominal, nearer only if a start had to be pulled back)
         @test d.start_scale[1] == 0 && d.start_scale[2] == 0
@@ -450,19 +454,9 @@ end
             1,
         )
         @test again.samples == r.samples && again.chain == r.chain
-        # the jitter seed is separate from the rng seed:
-        # it changes the starts, the rng seed does not
-        @test FIT.infer(
-            seed,
-            n_samples,
-            n_adapt;
-            rng_seed = 5,
-            jitter_seed = 99,
-            retry = false,
-        ).samples !=
-              r.samples
+        # one seed drives everything, the chain starts included: another seed, other draws
         other_seed = FIT.infer(seed, n_samples, n_adapt; rng_seed = 6, retry = false)
-        @test other_seed.diagnostics.start_scale == d.start_scale
+        @test other_seed.samples != r.samples
         @test_throws DomainError FIT.infer(
             seed,
             n_samples,
@@ -479,7 +473,7 @@ end
         plain = FIT.infer(seed, 60, 30; rng_seed = 5, retry = false, n_chains = 2)
         @test isnan(plain.diagnostics.first_rhat) && !plain.diagnostics.retry_kept &&
               plain.diagnostics.n_adapt == 30
-        @test FIT._worst_rhat(plain.diagnostics) > FIT.RETRY_RHAT
+        @test FIT._worst_rhat(plain.diagnostics) > FIT.RHAT_OK
         r = FIT.infer(seed, 60, 30; rng_seed = 5, n_chains = 2)
         d = r.diagnostics
         @test d.first_rhat == FIT._worst_rhat(plain.diagnostics)
@@ -492,14 +486,23 @@ end
         # same seeds, same result, retried or not
         again = FIT.infer(seed, 60, 30; rng_seed = 5, n_chains = 2)
         @test again.samples == r.samples && again.diagnostics.retry_kept == d.retry_kept
-        # the decision: only above the limit, only when on, only if the rerun is longer
-        big = (FIT.RETRY_N_ADAPT + FIT.RETRY_N_DRAWS, FIT.RETRY_N_ADAPT)
-        @test FIT._retry_needed(1.02, 1000, 300, true)
-        @test !FIT._retry_needed(1.005, 1000, 300, true)
-        @test !FIT._retry_needed(1.02, 1000, 300, false)
-        @test !FIT._retry_needed(1.02, big..., true)
-        @test FIT._retry_needed(Inf, 1000, 300, true)      # a run that could not be judged
-        @test !FIT._retry_needed(NaN, 1000, 300, true)
+        # what counts as converged: R̂ at most RHAT_OK and both ESS at least ESS_MIN, with a
+        # NaN (could not be computed) never read as fine
+        ok = FIT.ESS_MIN
+        @test isempty(FIT._convergence_problems(1.005, ok, ok))
+        @test length(FIT._convergence_problems(1.02, ok, ok)) == 1
+        @test length(FIT._convergence_problems(1.005, ok - 1, ok)) == 1
+        @test length(FIT._convergence_problems(1.005, ok, ok - 1)) == 1
+        @test length(FIT._convergence_problems(Inf, ok, ok)) == 1
+        @test length(FIT._convergence_problems(NaN, ok, ok)) == 1
+        @test length(FIT._convergence_problems(1.005, NaN, NaN)) == 2
+        # the retry follows it, however long the run was, and only when on
+        @test FIT._retry_needed(plain.diagnostics, true)
+        @test !FIT._retry_needed(plain.diagnostics, false)
+        # the error says why
+        err = FIT.NotConvergedError(FIT._convergence_problems(1.5, ok, ok))
+        @test occursin("nothing to report", sprint(showerror, err))
+        @test occursin("1.5", sprint(showerror, err))
     end
 
     @testset "optima: farthest-point cover, shares and chains at an optimum" begin
@@ -535,7 +538,7 @@ end
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         sp = FIT._sampling_space(seed; base = UInt64(5))
-        @test 1 ≤ length(sp.optima) ≤ FIT.MAP_MAX_BASINS
+        @test 1 ≤ length(sp.optima) ≤ FIT.MAP_OPTIMA_KEPT
         @test issorted([o.f for o in sp.optima])
         # the MAP is one of them, and a Hessian with a finite mass exists for it
         @test any(o -> o.z == sp.ẑ, sp.optima)
@@ -564,8 +567,8 @@ end
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
         r = FIT.infer(seed, 60, 30; rng_seed = 5, retry = false)
         d = r.diagnostics
-        @test d.n_chains == FIT.DEFAULT_N_CHAINS + d.n_extra
-        @test 0 ≤ d.n_extra ≤ FIT.OPTIMUM_MAX_EXTRA_CHAINS
+        @test d.n_chains == FIT.N_CHAINS + d.n_extra
+        @test 0 ≤ d.n_extra ≤ FIT.OPTIMUM_CHAIN_CAP
         @test length(d.pooled) == length(d.start_scale) == length(d.mode) == d.n_chains
         @test !isempty(d.optima)
         @test all(o -> o.share ≥ FIT.OPTIMUM_MIN_SHARE, d.optima)

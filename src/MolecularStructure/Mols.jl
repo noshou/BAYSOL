@@ -46,7 +46,7 @@ Stack coordinates into a (3, n) matrix translated to the centroid.
 """
 function _center(cs::Vector{NTuple{3,Float64}})::Matrix{Float64}
     n = length(cs)
-    n == 0 && throw(MoleculeError("Empty coordinates"))
+    n == 0 && throw(MoleculeError("the molecule has no coordinates"))
     sx = 0.0
     sy = 0.0
     sz = 0.0
@@ -115,7 +115,7 @@ coordination-number trends, not as physical sizes.
 - `es`: element/ion strings, one per atom.
 """
 function _compute_radii(es::Vector{String})::Vector{Float64}
-    isempty(es) && throw(MoleculeError("Empty elements"))
+    isempty(es) && throw(MoleculeError("the molecule has no elements"))
     pairs = lookup_radii(es)
     out = Vector{Float64}(undef, length(pairs))
     @inbounds for i in eachindex(pairs)
@@ -171,7 +171,9 @@ Unexported; [`create`](@ref) is the only production caller, and the unit tests a
 function _build(name::AbstractString, es::Vector{String}, coords, radii)
     cs = _to_tuples(coords)
     n  = length(cs)
-    n == length(es) || throw(MoleculeError("coords and elms length mismatch"))
+    n == length(es) || throw(
+        MoleculeError("$n coordinates but $(length(es)) elements: they must match"),
+    )
     cart = _center(cs)
     sph  = to_spherical(cart)
     rad  = Lazy{Vector{Float64}}(radii)

@@ -40,7 +40,7 @@ function sdg_seed(; rel_noise = 0.01)
     σ = max.(abs.(y) .* rel_noise, 1.0e-6)
     Random.seed!(0x5D6)
     I_exp = y .+ randn(length(y)) .* σ
-    Random.seed!(0x5D7)   # θ₀ and the MAP starts are drawn from the global RNG
+    Random.seed!(0x5D7)
     return SDF.seed_sampler(
         fw,
         I_exp,
@@ -208,7 +208,7 @@ end
         rows = chain_report(io, seed; label = "toy", n_samples = 60, n_adapt = 30,
             rng_seed = 3)
         txt = String(take!(io))
-        @test length(rows) ≥ BAYSOL.Inference.DEFAULT_N_CHAINS
+        @test length(rows) ≥ BAYSOL.Inference.N_CHAINS
         @test occursin("toy", txt) && occursin("pooled kept draws", txt)
         @test all(r -> r.pooled == false || r.n_post ≥ 0, rows)
         # the same seed gives the same report

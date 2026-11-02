@@ -20,98 +20,10 @@ using Random: Random, AbstractRNG
 # Priors
 #----------------
 
-"""
-CRYSOL3's fitting limits `(lo, hi)` on the convex/concave shell contrasts
-δρ₁, δρ₂, in units of [`UNIT_OF_δρ`](@ref): "The limits during the fitting are
--10 to 2". They are the support of the δρ₁/δρ₂ priors
-([`Inference.δρ_prior`](@ref BAYSOL.Inference.δρ_prior)) and of the scaled-logit
-maps [`Inference.Θ`](@ref BAYSOL.Inference.Θ)/[`Inference.Ξ`](@ref BAYSOL.Inference.Ξ)
-put on them.
-"""
-const BOUNDS_δρ₁₂ = (-10.0, 2.0)
+include("Params.jl")
 
-"Lower end L of the δρ₁/δρ₂ support [L, L + W] = [`BOUNDS_δρ₁₂`](@ref)."
-const LOWER_BOUND_δρ₁₂ = BOUNDS_δρ₁₂[1]
-
-"Width W of the δρ₁/δρ₂ support [L, L + W] = [`BOUNDS_δρ₁₂`](@ref)."
-const WIDTH_δρ₁₂ = BOUNDS_δρ₁₂[2] - BOUNDS_δρ₁₂[1]
-
-"""
-CRYSOL3's default convex/concave shell contrast δρ₁ = δρ₂, in units of
-[`UNIT_OF_δρ`](@ref): "The default parameters of the contrasts for the three types
-of water beads are 1, 1, 0". The mode of the δρ₁/δρ₂ priors
-([`Inference.δρ_prior`](@ref BAYSOL.Inference.δρ_prior)); must lie inside
-[`BOUNDS_δρ₁₂`](@ref).
-"""
-const MODE_δρ₁₂ = 1.0
-
-"""
-Default concentration κ = α + β − 2 of the δρ₁/δρ₂ Beta priors
-([`Inference.δρ_prior`](@ref BAYSOL.Inference.δρ_prior)). κ = 14 gives
-Beta(83/6, 13/6) on [`BOUNDS_δρ₁₂`](@ref), with its mode at δρ = 1 and
-SD(δρ) ≈ 1.00. That is the same spread as the Normal(1, 1) δρ₂ prior it
-replaces.
-"""
-const κ_δρ₁₂ = 14.0
-
-"""
-Default concentration κ = α + β − 2 of the cavity-contrast (δρ₃) Beta prior
-([`Inference.δρ_prior`](@ref BAYSOL.Inference.δρ_prior)), stretched onto
-[−ρ̄ₑ/`UNIT_OF_δρ`, (`φ_max` − 1)·ρ̄ₑ/`UNIT_OF_δρ`]. κ = 1.25 gives Beta(2, 1.25) on
-u = (δρ₃ − X)/W, with its mode at δρ₃ = 0 (bulk-density cavity water).
-"""
-const κ_δρ₃ = 1.25
-
-"""
-Upper bound on the cavity occupancy φ = `ρ_cavity/ρ₀`. Water in a cavity can
-be at most modestly denser than bulk: the densest well-attested hydration
-water is Merzel & Smith's first layer at 1.15·ρ₀, so `φ_max` = 1.25 leaves
-margin above it while excluding unphysical over-dense "water" (e.g. the
-δρ3 = 4, φ ≈ 1.36, seen when δρ3 was unconstrained).
-"""
-const φ_max = 1.25
-
-@assert(
-    BOUNDS_δρ₁₂[1] < MODE_δρ₁₂ < BOUNDS_δρ₁₂[2],
-    "MODE_δρ₁₂ must lie inside BOUNDS_δρ₁₂"
-)
-
-"A Beta prior stretched onto a bounded interval, as [`δρ_prior`](@ref) returns."
-const BoundedBeta = LocationScale{Float64,Continuous,Beta{Float64}}
-
-"""
-Physical prior distributions over ξ = (ρₑ, δρ₁, δρ₂, δρ₃). δρ₃'s bounds are fixed
-at the mean of `ρₑPrior` (see [`_δρ₃_prior`](@ref)).
-"""
-struct ξ_priors
-    ρₑPrior::LogNormal{Float64}
-    δρ₁Prior::BoundedBeta
-    δρ₂Prior::BoundedBeta
-    δρ₃Prior::BoundedBeta
-end
-
-#----------------
-# Profiled c1
-#----------------
-
-"""
-Hard bounds `(cmin, cmax)` on CRYSOL's excluded-volume correction c1
-([`Inference.profiled_corrs`](@ref BAYSOL.Inference.profiled_corrs)), CRYSOL's
-`r₀/r_m`. c1 is profiled, not sampled, so these bounds -- not a prior -- are
-what stops it from absorbing model misspecification that belongs on the
-physically meaningful parameters (dns/δρ1-3) instead.
-"""
-const EXCL_VOL_CORR_BOUNDS = (0.8, 1.3)
-
-"""
-Padding/grid-resolution unit for [`Inference.profiled_corrs`](@ref
-`BAYSOL.Inference.profiled_corrs`)'s c1 search: the search actually runs on
-`(cmin - EXCL_VOL_CORR_EPS, cmax + EXCL_VOL_CORR_EPS)` so that landing
-exactly on `cmin`/`cmax` can be distinguished from genuinely wanting to go
-further (real "saturation"), and the same value is the coarse pre-scan
-grid's step size.
-"""
-const EXCL_VOL_CORR_EPS = 0.02
+# Fixed internals: not settings (changing them could break a run), so they are not in
+# Params.jl.
 
 """
 Absolute tolerance on c1 of [`Inference.profiled_corrs`](@ref
@@ -135,10 +47,154 @@ RNG seed (SASDMZ9 model 3 at 1e-5: 13 to 820 steps per iteration over four seeds
 """
 const EXCL_VOL_CORR_TOL = 1e-8
 
-@assert(
-    0 < EXCL_VOL_CORR_EPS <= (EXCL_VOL_CORR_BOUNDS[2] - EXCL_VOL_CORR_BOUNDS[1]),
-    "EXCL_VOL_CORR_EPS must be in (0, cmax-cmin]"
-)
+"""
+The rank-normalized split R̂ below which the pooled
+chains are reported as converged (Stan's recommendation).
+"""
+const RHAT_OK = 1.01
+
+"""
+The smallest bulk and tail effective sample size a run may have to count as converged:
+400 (Vehtari et al. 2021, the companion of the R̂ limit). Below it, or when an ESS cannot
+be computed, the run is retried and, if it is still below, [`NotConvergedError`](@ref) is
+thrown.
+"""
+const ESS_MIN = 400.0
+
+"""
+Default `retry` of [`infer`](@ref) and [`run_model`](@ref BAYSOL.Pipeline.run_model):
+whether a run whose worst R̂ is above [`RHAT_OK`](@ref) is sampled once more, longer
+([`RETRY_N_ADAPT`](@ref), [`RETRY_N_DRAWS`](@ref)).
+"""
+const RETRY = true
+
+"""
+Gradient tolerance (max-norm of ∇ log π in prior-standardized z-space) at which an
+L-BFGS start of the MAP search counts as converged.
+"""
+const MAP_G_TOL = 1e-6
+
+"""
+Absolute decrease of −log π (nats) below which an L-BFGS start of the MAP search
+counts as stalled, once it has stayed below it for `MAP_F_SUCCESSIVE` successive
+iterations. The problem is conditioned ~1e6 in z-space, so the gradient test alone
+([`MAP_G_TOL`](@ref)) keeps iterating long after f has stopped changing in the
+fourth digit; the f test ends such a start. 1e-5 stopped some starts too early
+(SASDMZ9 model 2 missed its best mode); 1e-6 lost none on 51 of the fitting tests.
+"""
+const MAP_F_ABSTOL = 1e-6
+
+"""
+Mahalanobis distance (under the MAP Hessian) beyond which two L-BFGS optima count as
+distinct modes in the MAP search's multimodality count.
+"""
+const MAP_MODE_SEP = 3.0
+
+"""
+Floor on the eigenvalues of the MAP Hessian (prior-standardized z-space) before
+whitening. z-space is scaled to unit prior spread, so a direction whose curvature is
+below 1 (wider than the prior itself, or negative: a ridge or saddle) keeps the prior
+scaling NUTS would have used without the whitening.
+"""
+const MAP_HESS_EIG_FLOOR = 1.0
+
+"""
+An optimum carries mass when its Laplace share (its mass over the total of the optima
+found) is at least this much.
+"""
+const OPTIMUM_MIN_SHARE = 0.01
+
+"""
+Two chains are in the same mode when the larger of their rank-normalized split R̂ over
+the parameters and log π is at most this. Chains of one mode agree (R̂ near 1, a few
+hundredths above it for slow ones); chains of two separate modes disagree and R̂
+saturates near 1.7, so any value between is a clean cut; 1.25 is the middle of the gap.
+"""
+const MODE_RHAT = 1.25
+
+"""
+A mode whose mass share is below this fraction keeps no draws in the
+pooled posterior (its chains are still reported, with their weight).
+"""
+const MODE_NEGLIGIBLE = 1e-4
+
+"""
+Largest `q²·|k(c1) − k(cⱼ)|` for which the anchored envelope's Taylor
+polynomial is used; its truncation error there is below 6e-18 relative. Beyond
+it (a very large q or mean radius) the passes use the library exponential.
+"""
+const ENVELOPE_TAYLOR_LIMIT = 0.05
+
+"""
+Central-difference step, in prior-standardized z-space, of the first Hessian pass at
+the MAP. The second pass rescales it per coordinate to `MAP_HESS_REL_STEP` times that
+coordinate's Laplace standard deviation from the first pass.
+"""
+const MAP_HESS_STEP = 1e-4
+
+"Second-pass Hessian step as a fraction of each coordinate's first-pass Laplace σ."
+const MAP_HESS_REL_STEP = 0.1
+
+"""
+A jittered start whose log π is not finite (or whose gradient is not)
+is pulled halfway back toward the MAP at most this many times; if it
+never becomes usable the chain starts at the MAP and is marked as such.
+"""
+const CHAIN_JITTER_MAX_HALVINGS = 8
+
+"""
+A chain is not pooled when more than this fraction
+of its post-warm-up transitions diverged.
+"""
+const CHAIN_MAX_DIVERGENT = 0.5
+
+"""
+Offset that derives the rerun's `rng_seed` from the original one
+(wrapping multiplication by a 64-bit odd constant after adding the offset), so a
+retry is a deterministic function of the seeds and the data.
+"""
+const RETRY_SEED_OFFSET = UInt64(0x72657472795f7264)   # "retry_rd"
+
+"Iteration cap of the bridge-sampling fixed point."
+const BRIDGE_MAX_ITER = 1000
+
+"Convergence tolerance of the bridge-sampling fixed point, on log Z."
+const BRIDGE_TOL = 1e-10
+
+"""
+The largest bridge-sampling error (in nats) of a mode's log mass at which the mode
+weights are still applied. A larger error means the estimate does not determine the
+mode's share (an error of 6 nats is a factor of 400), so thinning the draws to it
+could discard a whole mode on the strength of noise; see [`weights_uncertain`](@ref).
+"""
+const BRIDGE_MAX_ERR = 1.0
+
+"Largest exponent (in nats) allowed in the bridge-sampling weights: `exp(230) ≈ 1e100`."
+const BRIDGE_CLAMP = 230.0
+
+"Lower end L of the δρ₁/δρ₂ support [L, L + W] = [`BOUNDS_δρ₁₂`](@ref)."
+const LOWER_BOUND_δρ₁₂ = BOUNDS_δρ₁₂[1]
+
+"Width W of the δρ₁/δρ₂ support [L, L + W] = [`BOUNDS_δρ₁₂`](@ref)."
+const WIDTH_δρ₁₂ = BOUNDS_δρ₁₂[2] - BOUNDS_δρ₁₂[1]
+
+"A Beta prior stretched onto a bounded interval, as [`δρ_prior`](@ref) returns."
+const BoundedBeta = LocationScale{Float64,Continuous,Beta{Float64}}
+
+"""
+Physical prior distributions over ξ = (ρₑ, δρ₁, δρ₂, δρ₃). δρ₃'s bounds are fixed
+at the mean of `ρₑPrior` (see [`_δρ₃_prior`](@ref)).
+"""
+struct ξ_priors
+    ρₑPrior::LogNormal{Float64}
+    δρ₁Prior::BoundedBeta
+    δρ₂Prior::BoundedBeta
+    δρ₃Prior::BoundedBeta
+end
+
+#----------------
+# Profiled c1
+#----------------
 
 # The weighted-least-squares data and fit the profiled
 # likelihood is built from, and the static c1 tables
@@ -211,270 +267,12 @@ end
 
 # The anchored envelope of the c1 search
 
-"""
-Largest `q²·|k(c1) − k(cⱼ)|` for which the anchored envelope's Taylor
-polynomial is used; its truncation error there is below 6e-18 relative. Beyond
-it (a very large q or mean radius) the passes use the library exponential.
-"""
-const ENVELOPE_TAYLOR_LIMIT = 0.05
-
 # 1/0!, 1/1!, …, 1/8!: the Taylor polynomial of eˣ, degree 8
 const _EXP_TAYLOR = ntuple(n -> 1 / factorial(n - 1), 9)
 
 #----------------
 # Sampler
 #----------------
-
-"""
-Default NUTS target acceptance rate, as a percentage in (0, 100), for
-[`run_model`](@ref BAYSOL.Pipeline.run_model) /
-[`Inference.infer`](@ref BAYSOL.Inference.infer): 95 %, above Stan's usual 80 %. The
-posteriors here are strongly curved and often multimodal; on the 53 fits of a validation
-run (since removed, in git history under `test/validation/rhat_retry/`) 95 % removed the
-divergences (the three fits above 1 % went to 0.04 % or less) for 1.3× the leapfrog steps.
-"""
-const DEFAULT_TARGET_ACCEPT = 95
-
-"""
-Number of L-BFGS starts of the pre-NUTS MAP search
-([`Inference.infer`](@ref BAYSOL.Inference.infer)): the seed's own initial point plus
-`MAP_N_STARTS - 1` further prior draws (64: the search takes tens of milliseconds, and
-a basin that attracts a few percent of the starts is missed by 32 of them with
-probability `(1 − p)^32`, 8.5 % for `p` = 7.4 %, a hit rate measured on SASDLP4 in a
-validation run, since removed, in git history under `test/validation/optima_recall/`).
-"""
-const MAP_N_STARTS = 64
-
-"""
-How many of the distinct basins the MAP search finds (lowest optimum
-first) are compared by their Laplace mass (`−f − ½ log det H`, one
-Hessian each) to choose the one the sampler is whitened at; they are also the
-optima [`infer`](@ref) knows about (see [`OPTIMUM_MIN_SHARE`](@ref)).
-"""
-const MAP_MAX_BASINS = 8
-
-"Iteration cap of each L-BFGS start of the MAP search."
-const MAP_MAX_ITER = 500
-
-"""
-Gradient tolerance (max-norm of ∇ log π in prior-standardized z-space) at which an
-L-BFGS start of the MAP search counts as converged.
-"""
-const MAP_G_TOL = 1e-6
-
-"""
-Absolute decrease of −log π (nats) below which an L-BFGS start of the MAP search
-counts as stalled, once it has stayed below it for `MAP_F_SUCCESSIVE` successive
-iterations. The problem is conditioned ~1e6 in z-space, so the gradient test alone
-([`MAP_G_TOL`](@ref)) keeps iterating long after f has stopped changing in the
-fourth digit; the f test ends such a start. 1e-5 stopped some starts too early
-(SASDMZ9 model 2 missed its best mode); 1e-6 lost none on 51 of the fitting tests.
-"""
-const MAP_F_ABSTOL = 1e-6
-
-"""
-Successive iterations w/ a decrease below [`MAP_F_ABSTOL`](@ref) that end an L-BFGS start.
-"""
-const MAP_F_SUCCESSIVE = 3
-
-"""
-Central-difference step, in prior-standardized z-space, of the first Hessian pass at
-the MAP. The second pass rescales it per coordinate to `MAP_HESS_REL_STEP` times that
-coordinate's Laplace standard deviation from the first pass.
-"""
-const MAP_HESS_STEP = 1e-4
-
-"Second-pass Hessian step as a fraction of each coordinate's first-pass Laplace σ."
-const MAP_HESS_REL_STEP = 0.1
-
-"""
-Floor on the eigenvalues of the MAP Hessian (prior-standardized z-space) before
-whitening. z-space is scaled to unit prior spread, so a direction whose curvature is
-below 1 (wider than the prior itself, or negative: a ridge or saddle) keeps the prior
-scaling NUTS would have used without the whitening.
-"""
-const MAP_HESS_EIG_FLOOR = 1.0
-
-"""
-Mahalanobis distance (under the MAP Hessian) beyond which two L-BFGS optima count as
-distinct modes in the MAP search's multimodality count.
-"""
-const MAP_MODE_SEP = 3.0
-
-# More optima: jitter, harvest, chains started at optima without chains
-
-"""
-Radii, in posterior standard deviations under an optimum's own Hessian, of the
-jittered L-BFGS starts the MAP search makes around the optima it has found
-([`MAP_JITTER_DIRECTIONS`](@ref) random directions at each radius).
-"""
-const MAP_JITTER_RADII = (3.0, 6.0, 12.0)
-
-"Random directions per radius of the jittered starts ([`MAP_JITTER_RADII`](@ref))."
-const MAP_JITTER_DIRECTIONS = 2
-
-"""
-The jittered starts go around at most this many distinct optima, the lowest first, and
-only those within [`MAP_JITTER_WITHIN_NATS`](@ref) of the lowest.
-"""
-const MAP_JITTER_MAX_OPTIMA = 4
-
-"Nats above the lowest optimum within which an optimum is jittered around."
-const MAP_JITTER_WITHIN_NATS = 15.0
-
-"""
-After the first round of chains, [`infer`](@ref) runs L-BFGS from this many draws chosen
-by farthest-point cover (the draw of highest log π first, then repeatedly the draw
-farthest, in the whitened coordinates, from those taken), to find optima the chains
-visit and the random starts did not reach.
-"""
-const HARVEST_COVER = 16
-
-"As [`HARVEST_COVER`](@ref), for the divergent draws: at most this many, also by cover."
-const HARVEST_DIVERGENT = 8
-
-"""
-An optimum carries mass when its Laplace share (its mass over the total of the optima
-found) is at least this much.
-"""
-const OPTIMUM_MIN_SHARE = 0.01
-
-"""
-Mahalanobis radius, under an optimum's own Hessian, within which a draw counts as
-being at that optimum; a chain is at the optimum when at least
-[`OPTIMUM_CHAIN_FRACTION`](@ref) of its draws are (4 contains 99 % of a Gaussian
-in four dimensions).
-"""
-const OPTIMUM_CHAIN_RADIUS = 4.0
-
-"The share of a chain's draws that must lie at an optimum for the chain to be at it."
-const OPTIMUM_CHAIN_FRACTION = 0.5
-
-"""
-An optimum that carries mass ([`OPTIMUM_MIN_SHARE`](@ref)) should have at least this many
-chains at it; if fewer are, [`infer`](@ref) starts the missing ones there (chains that did
-not mix into it cannot give its draws their weight).
-"""
-const OPTIMUM_MIN_CHAINS = 2
-
-"The most chains [`infer`](@ref) starts at optima in all."
-const OPTIMUM_MAX_EXTRA_CHAINS = 6
-
-# Chains: starts, pooling
-
-"""
-Number of NUTS chains [`infer`](@ref) runs by default: 8. Fixed, not the
-number of Julia threads: the number of threads only decides how many chains
-run at the same time (two rounds on four cores), so the posterior never
-depends on the machine. Where the chains start: [`chain_radius`](@ref).
-"""
-const DEFAULT_N_CHAINS = 8
-
-"""
-Distances from the MAP, in posterior standard deviations (the sampler's whitened
-coordinates, where the posterior is ≈ N(0, I)), at which the mirrored pairs of chains
-start: pair `p` (two chains) starts at `+r_p·u_p` and `-r_p·u_p` for a random direction
-`u_p` on the sphere, so that along each direction both sides of the MAP are started from
-(the posteriors are skewed against hard bounds, and the two sides differ). The typical
-distance of a draw from the MAP in four dimensions is 2; the far starts are what finds
-second modes. Pairs beyond `length(CHAIN_START_RADII)` reuse the last radius.
-"""
-const CHAIN_START_RADII = (4.0, 10.0, 20.0)
-
-"""
-Default `jitter_seed` of [`infer`](@ref): the jittered starts
-come from streams of this value (never of the run's `rng_seed`),
-so they are the same in every run unless the caller changes it.
-"""
-const DEFAULT_JITTER_SEED = UInt64(0x6a697474657273)   # "jitters"
-
-"""
-A jittered start whose log π is not finite (or whose gradient is not)
-is pulled halfway back toward the MAP at most this many times; if it
-never becomes usable the chain starts at the MAP and is marked as such.
-"""
-const CHAIN_JITTER_MAX_HALVINGS = 8
-
-"""
-If the best post-warm-up draw of the first round of chains beats log π at the MAP the
-sampler was whitened at by more than this many nats, the MAP search missed a better basin
-(a draw of a four-parameter posterior sits about 1.7 nats below its mode, so this is clear
-evidence): the sampler re-whitens at that draw's basin and runs the chains once more.
-"""
-const BASIN_RESTART_NATS = 2.0
-
-"""
-A chain is not pooled when more than this fraction
-of its post-warm-up transitions diverged.
-"""
-const CHAIN_MAX_DIVERGENT = 0.5
-
-"""
-The rank-normalized split R̂ below which the pooled
-chains are reported as converged (Stan's recommendation).
-"""
-const RHAT_OK = 1.01
-
-"""
-[`infer`](@ref) with `retry = true` samples once more when the worst R̂ of its run
-is above this (it is [`RHAT_OK`](@ref)): the rerun has [`RETRY_N_ADAPT`](@ref)
-warm-up and [`RETRY_N_DRAWS`](@ref) post-warm-up iterations per chain, and new
-random streams and jitter directions derived from the run's seeds (so the same
-seeds still give the same result). The run with the smaller worst R̂ is kept.
-"""
-const RETRY_RHAT = RHAT_OK
-
-"""
-Warm-up iterations per chain of the rerun [`infer`](@ref) does when R̂ is above
-[`RETRY_RHAT`](@ref). Not run when the caller already asked for at least this
-many warm-up and [`RETRY_N_DRAWS`](@ref) post-warm-up iterations.
-"""
-const RETRY_N_ADAPT = 2000
-
-"""
-Post-warm-up iterations per chain of the rerun, see [`RETRY_N_ADAPT`](@ref).
-"""
-const RETRY_N_DRAWS = 2000
-
-"""
-Offsets that derive the rerun's `rng_seed` and `jitter_seed` from the original ones
-(wrapping multiplication by a 64-bit odd constant after adding the offset), so a
-retry is a deterministic function of the seeds and the data.
-"""
-const RETRY_SEED_OFFSET = UInt64(0x72657472795f7264)   # "retry_rd"
-
-# Several modes: grouping and bridge sampling
-
-"""
-Two chains are in the same mode when the larger of their rank-normalized split R̂ over
-the parameters and log π is at most this. Chains of one mode agree (R̂ near 1, a few
-hundredths above it for slow ones); chains of two separate modes disagree and R̂
-saturates near 1.7, so any value between is a clean cut; 1.25 is the middle of the gap.
-"""
-const MODE_RHAT = 1.25
-
-"Iteration cap of the bridge-sampling fixed point."
-const BRIDGE_MAX_ITER = 1000
-
-"Convergence tolerance of the bridge-sampling fixed point, on log Z."
-const BRIDGE_TOL = 1e-10
-
-"""
-A mode whose mass share is below this fraction keeps no draws in the
-pooled posterior (its chains are still reported, with their weight).
-"""
-const MODE_NEGLIGIBLE = 1e-4
-
-"""
-The largest bridge-sampling error (in nats) of a mode's log mass at which the mode
-weights are still applied. A larger error means the estimate does not determine the
-mode's share (an error of 6 nats is a factor of 400), so thinning the draws to it
-could discard a whole mode on the strength of noise; see [`weights_uncertain`](@ref).
-"""
-const BRIDGE_MAX_ERR = 1.0
-
-"Largest exponent (in nats) allowed in the bridge-sampling weights: `exp(230) ≈ 1e100`."
-const BRIDGE_CLAMP = 230.0
 
 # Purpose tags of the random streams
 
@@ -487,6 +285,7 @@ const _RNG_NUTS = 2
 const _RNG_JITTER = 3
 const _RNG_BRIDGE = 4
 const _RNG_MAP_JITTER = 5
+const _RNG_INITIAL_POINT = 6
 
 # The data a run starts from
 
@@ -497,7 +296,8 @@ Everything [`infer`](@ref) needs to start a NUTS chain.
 
 # Fields
 -   `pr::ξ_priors`: the physical priors over ξ, from [`_calc_ξ_priors`](@ref).
--   `θ₀::SVector{N,T}`: one draw from pr ([`_ξ₀`](@ref)), reparameterized into
+-   `θ₀::SVector{N,T}`: one draw from pr ([`_ξ₀`](@ref)) from a stream of
+    [`RNG_SEED`](@ref), so it is the same in every run, reparameterized into
     unconstrained θ-space via [`Θ`](@ref); the first start of the MAP search.
 -   `fw::ForwardCache`: the structure's geometry-only cache (the Gram matrix
     G(q), q-grid, and mean atomic radius), from `forward_cache`.
@@ -533,8 +333,8 @@ include("Infer.jl")
 include("MAP.jl")
 
 export Seed, Inferred,
-    seed_sampler, infer, ChainDiagnostics, OptimumReport,
-    DEFAULT_N_CHAINS,
+    seed_sampler, infer, ChainDiagnostics, OptimumReport, NotConvergedError,
+    N_CHAINS,
     ρₑ_prior, δρ_prior, prior_z_scores,
     ξ_priors, θ_prior_moments, profiled_corrs, excl_vol_saturation,
     WLSData, wls_fit

@@ -19,6 +19,8 @@ using Dierckx: Spline1D
 export ShannonInfo, SHANNON_REBIN, BIN_BIAS_MAX, cloud_diameter, auto_lmax,
     shannon_data, bin_bias_ratio, model_on_raw, raw_interpolation, residual_structure
 
+# Fixed internals: not settings (changing them could break a run).
+
 """
 Default number of bins per Shannon channel (`k`): the bin width is `π/(k·D)`. Binning
 at `k ≥ 8` preserved the Laplace posterior width and moved the MAP by less than the

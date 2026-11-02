@@ -81,8 +81,9 @@ function with_chaos(f, max_delay::Real)
 end
 
 """
-One fresh base value for a run, drawn from the default
-RNG, so that `Random.seed!` before a run fixes it. It has 53 bits (below 2^53), so that
+One fresh base value, drawn from the default RNG, so that `Random.seed!` before the call
+fixes it. A run uses it only when `rng_seed = nothing`; by default its base is
+`RNG_SEED`. It has 53 bits (below 2^53), so that
 it is written exactly as a number in the workbook (a spreadsheet number is a `Float64`).
 
 # Returns

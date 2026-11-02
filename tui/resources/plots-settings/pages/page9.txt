@@ -1,0 +1,24 @@
+   ║        name            ║        description          ║      value        ║
+   ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
+   ╠ PLOT_COLOUR_BAND       ╬ Colour and opacity of the   ╬                   ╣
+   ║                        ║ posterior bounds band of    ║                   ║
+   ║                        ║ the intensity plot.         ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_COLOUR_BAND_RESID ╬ Colour and opacity of the   ╬                   ╣
+   ║                        ║ posterior bounds band of    ║                   ║
+   ║                        ║ the residuals plot.         ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_COLOUR_HIST       ╬ Colour and opacity of the   ╬                   ╣
+   ║                        ║ histogram bars.             ║                   ║
+   ║                        ║                             ║                   ║
+ > ╠ PLOT_COLOUR_AXIS       ╬ Colour of the axes.         ╬                   ╣
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:       ↑║   plots [2 / 8]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)

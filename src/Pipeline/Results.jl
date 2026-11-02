@@ -23,43 +23,48 @@ const ColorSpec = Union{AbstractString,Symbol,Tuple{Union{AbstractString,Symbol}
 
 The look of the figures of [`results`](@ref). Every field is a keyword argument, and
 each defaults to the `PLOT_`-prefixed constant of [`Pipeline`](@ref BAYSOL.Pipeline) of the
-same name (`PlotStyle().color_map` is `PLOT_COLOR_MAP`).
+same name (`PlotStyle().color_map` is `PLOT_COLOUR_MAP`).
 
 # Fields
 - `color_map`, `color_posterior`, `color_data`, `color_errorbar`,
-    `color_band`, `color_band_resid`, `color_hist`, `color_reference`:
+    `color_band`, `color_band_resid`, `color_hist`, `color_reference`, `color_axis`,
+    `color_tick`:
     [`ColorSpec`](@ref BAYSOL.Pipeline.ColorSpec)s.
 - `lw_map`, `lw_reference`, `lw_quantile`,
     `lw_quantile_resid`, `lw_zero_line`, `lw_errorbar`: line widths (pt).
 - `markersize`, `whiskerwidth`: the data markers' radius and the error bars' whisker (pt).
 - `hist_bins`: bins of each posterior histogram.
-- `size_cm`: `(width, curve, residuals, hist)` of the figures (cm); `hist` is the
-    `(width, height)` of one histogram figure.
+- `size_cm`: `(width, height)` of every figure (cm), the same for all of them.
 - `ylim_log`, `ylim_lin_pad_frac`: the y-ranges of the I(q) and the residuals plots.
 - `preview_size`: `(width, height)` of a terminal plot (characters, rows).
 - `border_pt`: the padding the PDF page keeps round a figure (pt).
-- `lw_axis`: the line width of the axis box (pt).
-- `lw_tick`, `tick_length_cm`, `minor_ticks`, `tick_label_pad_pt`: the black axis
-    ticks (line width in pt, major length in cm, the minor ticks between two major
-    ones of a linear axis) and the gap between the y axis and its tick labels (pt).
+- `lw_axis`: the line width of the axis box (pt); its colour is `color_axis`.
+- `lw_tick`, `lw_minor_tick`, `tick_length_cm`, `minor_ticks`, `tick_label_pad_pt`: the
+    axis ticks, in `color_tick` (line widths of the major and the minor ticks in pt, major
+    length in cm, the minor ticks between two major ones of a linear axis) and the gap
+    between the y axis and its tick labels (pt).
 - `xtick_angle`: the angle the x tick labels are turned by (degrees; 0 leaves them level).
+- `xtick_label_pad_pt`: the gap between the end of an x tick and its label (pt).
 - `tick_stub_pt`, `tick_elbow_pt`: each x tick leaves the axis straight for `tick_stub_pt`
     and then bends for `tick_elbow_pt` towards its slanted label (pt).
 - `font`: the font of the LaTeX output: the name of any font LuaLaTeX can find (the text
     font; the math font stays Latin Modern Math), a `(text font, math font)` pair of
-    `fontspec` names (the default is `PLOT_FONT`, TeX Gyre PagellaX with TeX Gyre Pagella
-    Math), or `nothing` for the LaTeX default. [`font_available`](@ref) says whether a name
-    is usable. A font needs `lualatex` or `xelatex`.
+    `fontspec` names (the default is `PLOT_FONT`, that is `PLOT_TEXT_FONT`, TeX Gyre
+    PagellaX, with `PLOT_MATH_FONT`, TeX Gyre Pagella Math), or `nothing` for the LaTeX
+    default. [`font_available`](@ref) says whether a name is usable. A font needs
+    `lualatex` or `xelatex`.
 """
 Base.@kwdef struct PlotStyle
-    color_map::ColorSpec = PLOT_COLOR_MAP
-    color_posterior::ColorSpec = PLOT_COLOR_POSTERIOR
-    color_data::ColorSpec = PLOT_COLOR_DATA
-    color_errorbar::ColorSpec = PLOT_COLOR_ERRORBAR
-    color_band::ColorSpec = PLOT_COLOR_BAND
-    color_band_resid::ColorSpec = PLOT_COLOR_BAND_RESID
-    color_hist::ColorSpec = PLOT_COLOR_HIST
-    color_reference::ColorSpec = PLOT_COLOR_REFERENCE
+    color_map::ColorSpec = PLOT_COLOUR_MAP
+    color_posterior::ColorSpec = PLOT_COLOUR_POSTERIOR
+    color_data::ColorSpec = PLOT_COLOUR_DATA
+    color_errorbar::ColorSpec = PLOT_COLOUR_ERRORBAR
+    color_band::ColorSpec = PLOT_COLOUR_BAND
+    color_band_resid::ColorSpec = PLOT_COLOUR_BAND_RESID
+    color_hist::ColorSpec = PLOT_COLOUR_HIST
+    color_reference::ColorSpec = PLOT_COLOUR_REFERENCE
+    color_axis::ColorSpec = PLOT_COLOUR_AXIS
+    color_tick::ColorSpec = PLOT_TICK_COLOUR
     lw_map::Float64 = PLOT_LW_MAP
     lw_reference::Float64 = PLOT_LW_REFERENCE
     lw_quantile::Float64 = PLOT_LW_QUANTILE
@@ -69,20 +74,51 @@ Base.@kwdef struct PlotStyle
     markersize::Float64 = PLOT_MARKERSIZE
     whiskerwidth::Float64 = PLOT_WHISKERWIDTH
     hist_bins::Int = PLOT_HIST_BINS
-    size_cm::NamedTuple = PLOT_SIZE_CM
+    size_cm::Tuple{Float64,Float64} = PLOT_WIDTH_HEIGHT_CM
     ylim_log::Tuple{Float64,Float64} = PLOT_YLIM_LOG
     ylim_lin_pad_frac::Float64 = PLOT_YLIM_LIN_PAD_FRAC
     preview_size::NamedTuple = PLOT_PREVIEW_SIZE
     border_pt::Float64 = PLOT_BORDER_PT
     xtick_angle::Float64 = PLOT_XTICK_ANGLE
-    lw_axis::Float64 = PLOT_LW_AXIS
-    lw_tick::Float64 = PLOT_LW_TICK
+    lw_axis::Float64 = PLOT_AXIS_LW
+    lw_tick::Float64 = PLOT_LW_MAJOR_TICK
+    lw_minor_tick::Float64 = PLOT_LW_MINOR_TICK
     tick_length_cm::Float64 = PLOT_TICK_LENGTH_CM
-    minor_ticks::Int = PLOT_MINOR_TICKS
-    tick_label_pad_pt::Float64 = PLOT_TICK_LABEL_PAD_PT
-    tick_stub_pt::Float64 = PLOT_TICK_STUB_PT
-    tick_elbow_pt::Float64 = PLOT_TICK_ELBOW_PT
+    minor_ticks::Int = PLOT_LINMIN_TICKS
+    tick_label_pad_pt::Float64 = PLOT_YTICK_LABEL_PAD_PT
+    xtick_label_pad_pt::Float64 = PLOT_XTICK_LABEL_PAD_PT
+    tick_stub_pt::Float64 = PLOT_XTICK_STUB_PT
+    tick_elbow_pt::Float64 = PLOT_XTICK_ELBOW_PT
     font::Union{Nothing,String,Tuple{String,String}} = PLOT_FONT
+end
+
+"""
+Throws an `ArgumentError` for a [`PlotStyle`](@ref) value that cannot be drawn: a
+non-positive size, bin count or preview size, or a negative width, length or padding. A
+poor but drawable choice is left to the user.
+"""
+function _check_style(s::PlotStyle)
+    _need(all(>(0), s.size_cm), "style.size_cm must be positive")
+    _need(s.hist_bins ≥ 1, "style.hist_bins must be at least 1")
+    _need(s.minor_ticks ≥ 0, "style.minor_ticks must not be negative")
+    _need(0 < s.ylim_log[1] < s.ylim_log[2], "style.ylim_log must be (lo, hi), 0 < lo < hi")
+    _need(s.ylim_lin_pad_frac ≥ 0, "style.ylim_lin_pad_frac must not be negative")
+    _need(
+        get(s.preview_size, :width, 0) > 0 && get(s.preview_size, :height, 0) > 0,
+        "style.preview_size must have a positive width and height",
+    )
+    _need(isfinite(s.xtick_angle), "style.xtick_angle must be finite")
+    widths = (
+        s.lw_map, s.lw_reference, s.lw_quantile, s.lw_quantile_resid, s.lw_zero_line,
+        s.lw_errorbar, s.markersize, s.whiskerwidth, s.border_pt, s.lw_axis, s.lw_tick,
+        s.lw_minor_tick, s.tick_length_cm, s.tick_label_pad_pt, s.xtick_label_pad_pt,
+        s.tick_stub_pt, s.tick_elbow_pt,
+    )
+    _need(
+        all(w -> isfinite(w) && w ≥ 0, widths),
+        "style: widths, sizes and paddings must be finite and not negative",
+    )
+    return nothing
 end
 
 """
@@ -284,10 +320,10 @@ _rgb(spec::ColorSpec) = _rgba(spec)[1:3]
 # ---------------------------------------------------------------------------
 
 # The names of the colours defined in the preamble of every document.
-const _TEX_COLORS = (
+const _TEX_COLOURS = (
     map = "bsmap", posterior = "bsposterior", data = "bsdata", errorbar = "bserrorbar",
     band = "bsband", band_resid = "bsbandresid", hist = "bshist",
-    reference = "bsreference",
+    reference = "bsreference", axis = "bsaxis", tick = "bstick",
 )
 
 """
@@ -359,7 +395,7 @@ function _tex_document(axis, style::PlotStyle)
     filter!(o -> !startswith(o, "border="), PGF.CLASS_OPTIONS)
     push!(PGF.CLASS_OPTIONS, "border=$(style.border_pt)pt")
     PGF.push_preamble!(td, raw"\usepgfplotslibrary{fillbetween}")
-    for (k, name) in pairs(_TEX_COLORS)
+    for (k, name) in pairs(_TEX_COLOURS)
         r, g, b, _ = _rgba(getfield(style, Symbol(:color_, k)))
         PGF.push_preamble!(td, "\\definecolor{$name}{RGB}{$r,$g,$b}")
     end
@@ -458,17 +494,19 @@ end
 
 """
 The look of the axis lines and ticks of an axis, in its options `opts`: a bold
-black box and black ticks of `style.lw_tick` on all four sides, pointing
+box in `style.color_axis` and ticks in `style.color_tick` (`style.lw_tick` wide, the minor
+ones `style.lw_minor_tick`) on all four sides, pointing
 inward, major and minor (`style.minor_ticks` between two major ones of a linear
 axis; a log axis keeps its own) and the y tick labels `style.tick_label_pad_pt`
 away from the axis. The x tick labels are drawn by `_xtick_leaders!`.
 """
 function _style_ticks!(opts, style::PlotStyle; log::Bool = false)
-    opts["axis line style"] = "{black, line width=$(style.lw_axis)pt}"
+    opts["axis line style"] = "{$(_TEX_COLOURS.axis), line width=$(style.lw_axis)pt}"
     opts["tick align"] = "inside"
     opts["xtick pos"] = "both"
     opts["ytick pos"] = "both"
-    opts["tick style"] = "{black, line width=$(style.lw_tick)pt}"
+    opts["tick style"] = "{$(_TEX_COLOURS.tick), line width=$(style.lw_tick)pt}"
+    opts["minor tick style"] = "{$(_TEX_COLOURS.tick), line width=$(style.lw_minor_tick)pt}"
     opts["major tick length"] = "$(style.tick_length_cm)cm"
     opts["minor tick length"] = "$(style.tick_length_cm / 2)cm"
     if !log
@@ -524,8 +562,9 @@ function _xtick_leaders!(opts, style::PlotStyle)
     leg = iszero(a) ? "" : " -- ++(-$(elbow * cosd(a))pt,-$(elbow * sind(a))pt)"
     node = iszero(a) ? "anchor=north" : "anchor=east, rotate=$a"
     cmds = [
-        "\\draw[black, line width=$(style.lw_tick)pt] (axis cs:$x,$ymin) -- " *
-        "++(0pt,-$(stub)pt)$leg node[$node, inner sep=2pt, text=black] {$l};" for
+        "\\draw[$(_TEX_COLOURS.tick), line width=$(style.lw_tick)pt] " *
+        "(axis cs:$x,$ymin) -- ++(0pt,-$(stub)pt)$leg " *
+        "node[$node, inner sep=$(style.xtick_label_pad_pt)pt, text=black] {$l};" for
         (x, l) in zip(ticks, labels)
     ]
     # the title goes below the longest label: its stub, elbow and slope, and its height
@@ -559,7 +598,7 @@ function _axis_options(style::PlotStyle; ylabel, height, log::Bool, ylim = nothi
     opts = @pgf {
         xlabel = _TEX_X,
         ylabel = ylabel,
-        width = "$(style.size_cm.width)cm",
+        width = "$(style.size_cm[1])cm",
         height = "$(height)cm",
         legend_pos = legend_pos,
         legend_style = "draw=none, fill=none, font=\\footnotesize",
@@ -605,7 +644,7 @@ function _band_plots(band, quant, style::PlotStyle; lw, band_color, band_opacity
             ),
             @pgf(
                 PGF.Plot(
-                    {fill = _TEX_COLORS[band_color], fill_opacity = band_opacity,
+                    {fill = _TEX_COLOURS[band_color], fill_opacity = band_opacity,
                         draw = "none"}, raw"fill between [of=bslo and bshi]")
             ),
             _legend("bounds"))
@@ -614,13 +653,13 @@ function _band_plots(band, quant, style::PlotStyle; lw, band_color, band_opacity
         push!(plots,
             @pgf(
                 PGF.Plot(
-                    {color = _TEX_COLORS.posterior, densely_dotted,
+                    {color = _TEX_COLOURS.posterior, densely_dotted,
                         line_width = "$(lw)pt", mark = "none"}, _coords(quant.q, quant.lo))
             ),
             _legend("quantiles"),
             @pgf(
                 PGF.Plot(
-                    {color = _TEX_COLORS.posterior, densely_dotted,
+                    {color = _TEX_COLOURS.posterior, densely_dotted,
                         line_width = "$(lw)pt", mark = "none", forget_plot},
                     _coords(quant.q, quant.hi))
             ))
@@ -643,7 +682,7 @@ function _errorbar_options(style::PlotStyle)
         "error bars/y dir" => "both", "error bars/y explicit",
         "error bars/error mark" => "-",
         "error bars/error bar style" => string(
-            "color=", _TEX_COLORS.errorbar, ", draw opacity=",
+            "color=", _TEX_COLOURS.errorbar, ", draw opacity=",
             _opacity(style.color_errorbar),
             ", line width=", style.lw_errorbar, "pt"),
         "error bars/error mark options" => _whisker(style),
@@ -659,7 +698,7 @@ function _data_plots(c, style::PlotStyle)
         @pgf(
             PGF.Plot(
                 {only_marks, mark = "*", mark_size = "$(style.markersize)pt",
-                    color = _TEX_COLORS.data}, _coords(c.q, c.I))
+                    color = _TEX_COLOURS.data}, _coords(c.q, c.I))
         ),
         _legend("data"),
     ]
@@ -671,7 +710,7 @@ function _map_plot(c, style::PlotStyle, label)
     return Any[
         @pgf(
             PGF.Plot(
-                {color = _TEX_COLORS.map, line_width = "$(style.lw_map)pt",
+                {color = _TEX_COLOURS.map, line_width = "$(style.lw_map)pt",
                     mark = "none"}, _coords(c.map.q, c.map.I))
         ),
         _legend(label),
@@ -687,7 +726,7 @@ function _fit_axis(c, style::PlotStyle)
         _map_plot(c, style, "MAP"),
     )
     return _axis(
-        _axis_options(style; ylabel = raw"$I(q)$", height = style.size_cm.curve,
+        _axis_options(style; ylabel = raw"$I(q)$", height = style.size_cm[2],
             log = true, ylim = c.ylim, xlim = _xlim(c.q)),
         plots, style)
 end
@@ -702,19 +741,19 @@ function _residual_axis(r, style::PlotStyle)
             @pgf(
                 PGF.Plot(
                     {only_marks, mark = "*", mark_size = "$(style.markersize)pt",
-                        color = _TEX_COLORS.data}, _coords(r.q, r.resid))
+                        color = _TEX_COLOURS.data}, _coords(r.q, r.resid))
             ),
             _legend("data - MAP"),
             @pgf(
                 PGF.Plot(
-                    {color = _TEX_COLORS.map, line_width = "$(style.lw_zero_line)pt",
+                    {color = _TEX_COLOURS.map, line_width = "$(style.lw_zero_line)pt",
                         mark = "none", forget_plot},
                     _coords([minimum(r.q), maximum(r.q)], [0.0, 0.0]))
             ),
         ],
     )
     opts = _axis_options(style; ylabel = raw"$I(q) - I_{\mathrm{MAP}}(q)$",
-        height = style.size_cm.residuals, log = false, ylim = r.ylim,
+        height = style.size_cm[2], log = false, ylim = r.ylim,
         xlim = extrema(r.q), legend_pos = "north east")
     return _axis(opts, plots, style)
 end
@@ -756,7 +795,7 @@ One posterior histogram, a figure of its own, with
 its MAP value and its mode μ marked and in a legend.
 """
 function _histogram_axis(h, style::PlotStyle)
-    pw, ph = style.size_cm.hist
+    pw, ph = style.size_cm
     ymax = 1.08 * maximum(h.counts)
     # the legend (MAP and μ) goes in the top corner over the long tail, where the bars are
     # low: the right for a right tail (or none), the left for a left tail
@@ -773,8 +812,8 @@ function _histogram_axis(h, style::PlotStyle)
     plots = Any[
         @pgf(
         PGF.Plot(
-            {ybar_interval, fill = _TEX_COLORS.hist,
-                fill_opacity = _opacity(style.color_hist), draw = _TEX_COLORS.hist,
+            {ybar_interval, fill = _TEX_COLOURS.hist,
+                fill_opacity = _opacity(style.color_hist), draw = _TEX_COLOURS.hist,
                 draw_opacity = 1, forget_plot},
             _coords(h.edges, vcat(h.counts, h.counts[end])))
     ),
@@ -792,7 +831,7 @@ function _histogram_axis(h, style::PlotStyle)
             @pgf(
                 PGF.Plot(
                     {
-                        color = _TEX_COLORS.map,
+                        color = _TEX_COLOURS.map,
                         line_width = "$(style.lw_map)pt",
                         mark = "none",
                     },
@@ -806,7 +845,7 @@ function _histogram_axis(h, style::PlotStyle)
         @pgf(
             PGF.Plot(
                 {
-                    color = _TEX_COLORS.data,
+                    color = _TEX_COLOURS.data,
                     line_width = "$(style.lw_map)pt",
                     dotted,
                     mark = "none",
@@ -825,7 +864,7 @@ function _comparison_axis(c, style::PlotStyle)
         Any[
             @pgf(
                 PGF.Plot(
-                    {color = _TEX_COLORS.reference, dashed,
+                    {color = _TEX_COLOURS.reference, dashed,
                         line_width = "$(style.lw_reference)pt", mark = "none"},
                     _coords(ref.q, ref.I))
             ),
@@ -834,7 +873,7 @@ function _comparison_axis(c, style::PlotStyle)
         _map_plot(c, style, "BAYSOL MAP"),
     )
     return _axis(
-        _axis_options(style; ylabel = raw"$I(q)$", height = style.size_cm.curve,
+        _axis_options(style; ylabel = raw"$I(q)$", height = style.size_cm[2],
             log = true, ylim = c.ylim, xlim = _xlim(c.q)),
         plots, style)
 end
@@ -1040,8 +1079,6 @@ group, so the log's timings list them; with `run_log` it calls [`write_log`](@re
     `lualatex` or `xelatex` to compile; the terminal plots and the data do not depend on it.
 - `preview`, `io`: whether to print the terminal plots, and where.
 - `tex`, `compile`, `formats`: as above.
-- `quantile_label`: the name of the quantiles sheet's interval (`quantiles_<label>`);
-    `nothing` takes the one `run_model` used (`2sigma`, `5-95`, …).
 - `run_log`: also write the run's section of the folder's run log ([`write_log`](@ref)),
     `false` by default; the fitting tests set it. The log is then in the files returned.
 - `ref_chi2`: the reference χ², the depositor's with its method (`"CRYSOL 1.37"`), which
@@ -1054,7 +1091,9 @@ group, so the log's timings list them; with `run_log` it calls [`write_log`](@re
 - The paths of the files written.
 
 # Exceptions
-- `ArgumentError` if `data` has no positive intensity, its three vectors differ in length,
+- `ArgumentError` if the `style` holds a value that cannot be drawn (a non-positive size
+    or bin count, a negative width), `formats` holds anything but `:pdf`, `:png` and `:svg`,
+    or `data` has no positive intensity, its three vectors differ in length,
     or `font` is not `nothing`, a font name or a pair of names.
 """
 function results(
@@ -1066,16 +1105,20 @@ function results(
     font = style.font,
     preview::Bool = true,
     io::IO = stdout,
-    tex::Bool = true,
-    compile::Bool = false,
-    formats = (:pdf,),
-    quantile_label::Union{Nothing,AbstractString} = nothing,
+    tex::Bool = FIGURES_TEX,
+    compile::Bool = FIGURES_COMPILE,
+    formats = FIGURES_FORMATS,
     run_log::Bool = false,
     ref_chi2::Union{Nothing,AbstractString} = nothing,
     form_factor_log = nothing,
     n_atoms = nothing,
 )::Vector{String}
     q, I, σ = data
+    _check_style(style)
+    _need(
+        all(f -> f in (:pdf, :png, :svg), formats),
+        "formats may hold :pdf, :png and :svg",
+    )
     length(q) == length(I) == length(σ) ||
         throw(ArgumentError("data: q, I and σ must have the same length"))
     refs = references isa Reference ? [references] : collect(references)
@@ -1124,7 +1167,6 @@ function results(
             sheets,
             _summary_sheets(
                 result;
-                quantile_label,
                 form_factor_log,
                 n_atoms,
             ),

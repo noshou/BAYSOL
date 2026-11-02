@@ -19,7 +19,7 @@ const REPO, SPEC = ARGS[1], ARGS[2]
 # (n_samples, n_adapt), or the defaults
 const ITERATIONS = length(ARGS) ≥ 4 ? (parse(Int, ARGS[3]), parse(Int, ARGS[4])) : nothing
 
-# Every fit runs with this `rng_seed` (and the default `jitter_seed`), in the first and the
+# Every fit runs with this `rng_seed`, in the first and the
 # steady fit alike: the MAP search, the extra chains it may start and every chain depend on
 # the seed, so a fresh seed each time measures a different amount of work from one run to
 # the next (about one run in six of SASDBS6:fit2_model3 finds a second mode and starts two

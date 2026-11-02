@@ -6,7 +6,7 @@
 # function: exclusive (the function was running) and inclusive (it was on the stack),
 # for frames in BAYSOL's own source. With `--nuts` it then does the same for the
 # sampling: one short run to warm the compiler, then a profiled `infer` of the
-# `run_model` default iterations (`Pipeline.DEFAULT_N_SAMPLES`, `DEFAULT_N_ADAPT`).
+# `run_model` default iterations (`Pipeline.N_ADAPT + N_DRAWS`, `N_ADAPT`).
 # Started through `bb profile ID[:tag] [--delay 0.0005] [--nuts]`;
 # development tooling, not a test.
 
@@ -66,13 +66,13 @@ function profile_nuts(seed, delay, spec)
     Profile.init(n = 10^7, delay = delay)
     t = @elapsed (Profile.@profile BAYSOL.Inference.infer(
         seed,
-        BAYSOL.Pipeline.DEFAULT_N_SAMPLES,
-        BAYSOL.Pipeline.DEFAULT_N_ADAPT,
+        BAYSOL.Pipeline.N_ADAPT + BAYSOL.Pipeline.N_DRAWS,
+        BAYSOL.Pipeline.N_ADAPT,
     ))
     println(
         (
-        "\n=== $spec: infer of $(BAYSOL.Pipeline.DEFAULT_N_SAMPLES) iterations " *
-        "($(BAYSOL.Pipeline.DEFAULT_N_ADAPT) adaptation) took $(round(t; digits = 2)) s"
+        "\n=== $spec: infer of $(BAYSOL.Pipeline.N_ADAPT + BAYSOL.Pipeline.N_DRAWS) " *
+        "iterations ($(BAYSOL.Pipeline.N_ADAPT) adaptation) took $(round(t; digits = 2)) s"
     ),
     )
     print_profile()

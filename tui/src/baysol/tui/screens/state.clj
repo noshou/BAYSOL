@@ -1,7 +1,9 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
 (ns baysol.tui.screens.state
- (:import (com.googlecode.lanterna TextColor)
+ (:require [baysol.tui.screens.theme :as theme])
+ (:import (com.googlecode.lanterna TextColor TextColor$RGB)
+  (com.googlecode.lanterna.input KeyStroke KeyType)
   (com.googlecode.lanterna.screen Screen$RefreshType TerminalScreen)
   (com.googlecode.lanterna.graphics TextGraphics)))
 
@@ -13,18 +15,107 @@
  [pages page input]
  (or (get-in pages [page :actions input]) page))
 
+;; The size of every page, in cells: the page is drawn in the middle of a larger terminal.
+(def page-columns 80)
+(def page-rows 24)
+
+;; What was drawn last, `{:screen :page :background}`, so that a resize can draw it again.
+(def ^:private last-drawn (atom nil))
+
+(defn page-offset
+ "Where the top left cell of a page goes on a terminal of `columns` by `rows` cells,
+ `[column row]`: the page is centred, and sits at the corner if the terminal is not larger
+ than the page."
+ [columns rows]
+ [(max 0 (quot (- columns page-columns) 2)) (max 0 (quot (- rows page-rows) 2))])
+
 (defn draw-page
  "Draws a page on the terminal, on a screen filled with the solid colour `background`
- (a Lanterna `TextColor`)."
+ (a Lanterna `TextColor`) with the theme's text colour. The page's `:marks`,
+ `[[row column [r g b]] ...]`, are blank cells of those colours drawn over the text, as
+ swatches, on the page's `:panel`, `[[row column width] ...]`, cells in white."
  [^TerminalScreen screen page ^TextColor background]
  (let [lines (:asset page)
-   ^TextGraphics graphics (.newTextGraphics screen)]
+   ^TextGraphics graphics (.newTextGraphics screen)
+   size (.getTerminalSize screen)
+   [dx dy] (page-offset (.getColumns size) (.getRows size))]
+  (reset! last-drawn {:screen screen, :page page, :background background})
   (.clear screen)
+  (.setForegroundColor graphics theme/foreground)
   (.setBackgroundColor graphics background)
   (.fill graphics \space)
   (doseq [[row line] (map-indexed vector lines)]
-   (.putString graphics 0 (int row) ^String line))
+   (.putString graphics (int dx) (int (+ dy row)) ^String line))
+  ; the white panel behind swatches: `[[row column width] ...]`, the text drawn again on it
+  (.setBackgroundColor graphics theme/panel)
+  (doseq [[row column width] (:panel page)
+    :let [line (get lines row "")
+     text (subs (str line (apply str (repeat (+ column width) \space)))
+      column
+      (+ column width))]]
+   (.putString graphics (int (+ dx column)) (int (+ dy row)) ^String text))
+  (doseq [[row column [r g b]] (:marks page)]
+   (.setBackgroundColor graphics (TextColor$RGB. (int r) (int g) (int b)))
+   (.putString graphics (int (+ dx column)) (int (+ dy row)) " "))
 
   ; repaint every cell, not only the ones that changed: a cell the terminal drew wider
   ; than one column (or a glyph that overflows its cell) cannot be left half-erased
   (.refresh screen Screen$RefreshType/COMPLETE)))
+
+(defn key->input
+ "The input of `stroke`, the thing a page table maps: the lower-case letter for a
+ character key, `:ctrl-<letter>` (`:ctrl-s`, `:ctrl-u`, ...) for Ctrl and a letter, else the
+ `KeyType` (arrows, Enter, Escape). A terminal sends Ctrl-M as Enter, so `:ctrl-m` never
+ arrives."
+ [^KeyStroke stroke]
+ (let [key-type (.getKeyType stroke)]
+  (if (= key-type KeyType/Character)
+   (let [letter (Character/toLowerCase (char (.getCharacter stroke)))]
+    (if (.isCtrlDown stroke) (keyword (str "ctrl-" letter)) letter))
+   key-type)))
+
+(def ^:private poll-ms
+ "How long to sleep between looks for a key, in milliseconds."
+ 25)
+
+(defn ^:private next-stroke
+ "Waits for a key on `screen` and returns its `KeyStroke`. While it waits it looks for a
+ change of the size of the terminal, and draws the page that was drawn last again, in the
+ middle of the new size."
+ ^KeyStroke [^TerminalScreen screen]
+ (loop []
+  (if-let [stroke (.pollInput screen)]
+   stroke
+   (do (when (.doResizeIfNecessary screen)
+     (when-let [{:keys [page background]} @last-drawn]
+      (draw-page screen page background)))
+    (Thread/sleep (long poll-ms))
+    (recur)))))
+
+(defn discard-pending!
+ "Throws away the keys already waiting on `screen`, after a short wait for ones still on
+ their way, and returns how many there were. The program takes a second or so to start, and
+ a key typed meanwhile (the Enter that ran it, a double press) must not act on the first
+ page."
+ [^TerminalScreen screen]
+ (Thread/sleep (long poll-ms))
+ (loop [n 0]
+  (if (.pollInput screen) (recur (inc n)) n)))
+
+(defn read-input
+ "Waits for a key on `screen` and returns its input (see `key->input`)."
+ [^TerminalScreen screen]
+ (key->input (next-stroke screen)))
+
+(defn key->raw
+ "The input of `stroke` for typing text: a character key without Ctrl gives the character
+ as typed (capitals kept), anything else what `key->input` gives."
+ [^KeyStroke stroke]
+ (if (and (= (.getKeyType stroke) KeyType/Character) (not (.isCtrlDown stroke)))
+  (.getCharacter stroke)
+  (key->input stroke)))
+
+(defn read-raw
+ "Waits for a key on `screen` and returns its raw input (see `key->raw`)."
+ [^TerminalScreen screen]
+ (key->raw (next-stroke screen)))

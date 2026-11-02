@@ -116,7 +116,7 @@ then carries an equal sum(area)/M, so sum(areas) is the solvent-accessible area.
 -   `probe`: solvent probe radius in Å; probe ≥ 0.
     Default [`PROBE_RADIUS`](@ref) (water, 1.4).
 -   `n_target`: total points to keep; > 0. Default
-    [`SHELL_N_TARGET`](@ref) (nothing), deriving it from
+    `nothing`, which derives it from
     the accessible area via [`SHELL_AREA_PER_POINT`](@ref)
     so spacing stays fixed as the molecule grows. A cloud
     already smaller than the budget is kept whole.
@@ -134,7 +134,7 @@ M is 0 for a molecule with no accessible surface; pts is then (3, 0).
 function sasa(
     mol::SphereCloud;
     probe::Float64               = PROBE_RADIUS,
-    n_target::Union{Nothing,Int} = SHELL_N_TARGET,
+    n_target::Union{Nothing,Int} = nothing,
 )::Tuple{Matrix{Float64},Vector{Float64},Vector{BeadClass}}
     n_target === nothing || n_target > 0 ||
         throw(DomainError(n_target, "n_target must be > 0"))

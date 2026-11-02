@@ -28,6 +28,18 @@ using ..MolecularStructure:
 #   Constants and shared types
 # ---------------------------------------------------------------------------
 
+"Force field of [`resolve_hydrogens`](@ref) when none is given."
+const DEFAULT_FORCE_FIELD = :parse
+
+"""
+Force field [`hydrogenation_choice`](@ref) picks for a structure with nucleic acids and no
+protein. PARSE and AMBER place the same hydrogens (pdb2pqr's `--pdb-output` does not
+depend on the force field), but PARSE is not one-to-one on chimeras such as 246D (an RNA
+with one deoxy-C, where it aborts on its charge check). Proteins keep PARSE because the
+terminus flags `--neutraln`/`--neutralc` work only with it, and a mixed structure has them.
+"""
+const NUCLEIC_FORCE_FIELD = :amber
+
 """
 One lock per output path, so concurrent callers
 for the same structure run the external tool once.
@@ -43,18 +55,6 @@ partial charges. PARSE has parameters for amino acids only; AMBER and CHARMM als
 nucleotides.
 """
 const FORCE_FIELDS = (:amber, :charmm, :parse, :peoepb, :swanson, :tyl06)
-
-"Force field of [`resolve_hydrogens`](@ref) when none is given."
-const DEFAULT_FORCE_FIELD = :parse
-
-"""
-Force field [`hydrogenation_choice`](@ref) picks for a structure with nucleic acids and no
-protein. PARSE and AMBER place the same hydrogens (pdb2pqr's `--pdb-output` does not
-depend on the force field), but PARSE is not one-to-one on chimeras such as 246D (an RNA
-with one deoxy-C, where it aborts on its charge check). Proteins keep PARSE because the
-terminus flags `--neutraln`/`--neutralc` work only with it, and a mixed structure has them.
-"""
-const NUCLEIC_FORCE_FIELD = :amber
 
 """
 Residue names that are in the dictionary as something else but are also Amber nucleotide

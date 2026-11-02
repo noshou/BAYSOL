@@ -100,8 +100,9 @@ function main(args)
     cmd = cmd[3:end]
     opts, specs = parse_cli(rest)
     isempty(specs) && error("give at least one ID[:tag]")
-    n_samples = parse(Int, get(opts, "samples", string(BAYSOL.Pipeline.DEFAULT_N_SAMPLES)))
-    n_adapt = parse(Int, get(opts, "adapt", string(BAYSOL.Pipeline.DEFAULT_N_ADAPT)))
+    n_default = BAYSOL.Pipeline.N_ADAPT + BAYSOL.Pipeline.N_DRAWS
+    n_samples = parse(Int, get(opts, "samples", string(n_default)))
+    n_adapt = parse(Int, get(opts, "adapt", string(BAYSOL.Pipeline.N_ADAPT)))
     # (the seeds of --chains are 64-bit: a report's `rng_seed` is a UInt64)
     chain_seeds = parse.(Int128, split(get(opts, "seeds", "7"), ","))
     out = haskey(opts, "out") ? open(opts["out"], "w") : stdout

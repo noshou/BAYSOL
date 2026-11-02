@@ -1,3 +1,4 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
-{:linters {:shadowed-var {:level :warning}}}
+{:linters {:shadowed-var {:level :warning}},
+ :lint-as {baysol.tui.support/with-data-folder clojure.core/let}}

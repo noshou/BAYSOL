@@ -47,6 +47,10 @@
     "dev/unittests.jl" *command-line-args*)},
   test {:doc "The tests of the dev tools (names pick the files: bb test compare)",
    :task (script "dev/tests.clj")},
+  harvest-defaults
+  {:doc
+   "Write tui/resources/default_settings.edn from Params.jl (--check: only compare)",
+   :task (script "dev/harvest_defaults.clj")},
   precommit {:doc "Every check before a commit (--quick: only the fast ones)",
    :task (script "dev/precommit.clj")},
   docs {:doc "Build the documentation site (strict, ~20 s) into docs/build",

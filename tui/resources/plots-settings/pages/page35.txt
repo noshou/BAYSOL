@@ -1,0 +1,24 @@
+   ║        name            ║        description          ║      value        ║
+   ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
+   ╠ PLOT_XTICK_ANGLE       ╬ Counter-clockwise angle, in ╬                   ╣
+   ║                        ║ degrees, of the x-tick      ║                   ║
+   ║                        ║ elbows.                     ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_XTICK_STUB_PT     ╬ Length, in points, of the   ╬                   ╣
+   ║                        ║ x-tick stubs.               ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_XTICK_ELBOW_PT    ╬ Length, in points, of the   ╬                   ╣
+   ║                        ║ x-tick elbows.              ║                   ║
+   ║                        ║                             ║                   ║
+ > ╠ PLOT_XTICK_LABEL_PAD_PT╬ Gap, in points, between the ╬                   ╣
+   ║                        ║ axis and the x-tick labels. ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_YTICK_LABEL_PAD_PT╬ Gap, in points, between the ╬                   ╣
+   ║                        ║ axis and the y-tick labels. ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓↑║   plots [8 / 8]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃              ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)

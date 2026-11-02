@@ -1,0 +1,488 @@
+;; SPDX-License-Identifier: LGPL-3.0-or-later
+
+;; Cases of saved settings values that the two checks of the settings,
+;; `BAYSOL.load_settings` (Julia) and `baysol.tui.validate` (the terminal interface), must
+;; judge alike. Each case is one setting with a saved `:value`: `:valid` says whether it
+;; is kept; `:expect` is the value kept (numbers compare equal whether whole or not);
+;; `:mention` is a part of the reason it is refused; `:with` gives other settings a value
+;; too (the rules that tie settings together need them). Both test suites read this file,
+;; so a rule that one side learns and the other does not is a failing test.
+
+[
+ ;; ---- valid values
+ {:setting "N_ADAPT", :value 450, :valid true, :expect 450}
+ {:setting "N_ADAPT", :value 1, :valid true, :expect 1}
+ {:setting "N_DRAWS", :value 1000, :valid true, :expect 1000}
+ {:setting "RNG_SEED", :value -12, :valid true, :expect -12}
+ {:setting "RNG_SEED", :value 0, :valid true, :expect 0}
+ {:setting "TARGET_ACCEPT", :value 50, :valid true, :expect 50}
+ {:setting "TARGET_ACCEPT", :value 99, :valid true, :expect 99}
+ {:setting "TARGET_ACCEPT", :value 1, :valid true, :expect 1}
+ {:setting "TABLE_SIGFIGS", :value 1, :valid true, :expect 1}
+ {:setting "TABLE_SIGFIGS", :value 17, :valid true, :expect 17}
+ {:setting "HARVEST_COVER", :value 0, :valid true, :expect 0}
+ {:setting "OPTIMUM_CHAIN_CAP", :value 0, :valid true, :expect 0}
+ {:setting "N_CHAINS", :value 1, :valid true, :expect 1}
+ {:setting "MAP_N_STARTS", :value 10, :valid true, :expect 10}
+ {:setting "VAL_SIGMA", :value 3, :valid true, :expect 3.0}
+ {:setting "VAL_SIGMA", :value 2.5, :valid true, :expect 2.5}
+ {:setting "VAL_SIGMA", :value 1e-3, :valid true, :expect 0.001}
+ {:setting "PLOT_LW_MAP", :value 0, :valid true, :expect 0.0}
+ {:setting "PROBE_RADIUS", :value 0, :valid true, :expect 0.0}
+ {:setting "OPTIMUM_CHAIN_FRACTION", :value 1, :valid true, :expect 1.0}
+ {:setting "OPTIMUM_CHAIN_FRACTION", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_XTICK_ANGLE", :value -30, :valid true, :expect -30.0}
+ {:setting "PLOT_XTICK_ANGLE", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_LINMIN_TICKS", :value 0, :valid true, :expect 0}
+ {:setting "PLOT_HIST_BINS", :value 200, :valid true, :expect 200}
+ {:setting "κ_δρ₁₂", :value 14, :valid true, :expect 14.0}
+ {:setting "φ_max", :value 2.5, :valid true, :expect 2.5}
+ {:setting "SHELL_THICKNESS", :value 2, :valid true, :expect 2.0}
+ {:setting "FIGURES_TEX", :value false, :valid true, :expect false}
+ {:setting "FIGURES_COMPILE", :value true, :valid true, :expect true}
+ {:setting "PLOT_COLOUR_MAP", :value :crimson, :valid true, :expect :crimson}
+ {:setting "PLOT_COLOUR_MAP",
+  :value :antiquewhite4,
+  :valid true,
+  :expect :antiquewhite4}
+ {:setting "PLOT_COLOUR_DATA", :value "#ff0000", :valid true, :expect "#ff0000"}
+ {:setting "PLOT_COLOUR_DATA", :value "#A0b1C2", :valid true, :expect "#A0b1C2"}
+ {:setting "PLOT_TICK_COLOUR", :value :gray20, :valid true, :expect :gray20}
+ {:setting "PLOT_COLOUR_AXIS", :value :black, :valid true, :expect :black}
+ {:setting "PLOT_TEXT_FONT",
+  :value "Latin Modern Roman",
+  :valid true,
+  :expect "Latin Modern Roman"}
+ {:setting "PLOT_MATH_FONT",
+  :value "Garamond-Math",
+  :valid true,
+  :expect "Garamond-Math"}
+ {:setting "PLOT_TEXT_FONT", :value "κ Font δ", :valid true, :expect "κ Font δ"}
+ {:setting "FIGURES_FORMATS", :value [:svg], :valid true, :expect [:svg]}
+ {:setting "FIGURES_FORMATS", :value [:svg :pdf], :valid true, :expect [:pdf :svg]}
+ {:setting "FIGURES_FORMATS",
+  :value [:svg :png :pdf],
+  :valid true,
+  :expect [:pdf :png :svg]}
+ {:setting "FIGURES_FORMATS", :value (:png), :valid true, :expect [:png]}
+ {:setting "FIGURES_FORMATS",
+  :value [:pdf :png :svg],
+  :valid true,
+  :expect [:pdf :png :svg]}
+ {:setting "CHAIN_START_RADII",
+  :value [1.0 2.0 3.0],
+  :valid true,
+  :expect [1.0 2.0 3.0]}
+ {:setting "CHAIN_START_RADII", :value [1 2 3], :valid true, :expect [1.0 2.0 3.0]}
+ {:setting "MAP_JITTER_RADII",
+  :value [0.5 1 1e1],
+  :valid true,
+  :expect [0.5 1.0 10.0]}
+ {:setting "PLOT_WIDTH_HEIGHT_CM", :value [10 7], :valid true, :expect [10.0 7.0]}
+ {:setting "PLOT_YLIM_LOG", :value [0.5 2], :valid true, :expect [0.5 2.0]}
+ {:setting "PLOT_PREVIEW_SIZE",
+  :value {:width 80, :height 24},
+  :valid true,
+  :expect {:width 80, :height 24}}
+ {:setting "PLOT_PREVIEW_SIZE",
+  :value {:height 24, :width 80},
+  :valid true,
+  :expect {:width 80, :height 24}}
+ {:setting "PLOT_COLOUR_BAND", :value [:red 0.5], :valid true, :expect [:red 0.5]}
+ {:setting "PLOT_COLOUR_BAND", :value [:red 0], :valid true, :expect [:red 0.0]}
+ {:setting "PLOT_COLOUR_BAND", :value [:red 1], :valid true, :expect [:red 1.0]}
+ {:setting "PLOT_COLOUR_HIST",
+  :value [:antiquewhite4 0.6],
+  :valid true,
+  :expect [:antiquewhite4 0.6]}
+ {:setting "PLOT_COLOUR_ERRORBAR",
+  :value [:gray40 0.6],
+  :valid true,
+  :expect [:gray40 0.6]}
+ {:setting "BOUNDS_δρ₁₂", :value [-5.0 3.0], :valid true, :expect [-5.0 3.0]}
+ {:setting "EXCL_VOL_CORR_BOUNDS", :value [0.9 1.2], :valid true, :expect [0.9 1.2]}
+ {:setting "EXCL_VOL_CORR_EPS", :value 0.1, :valid true, :expect 0.1}
+ {:setting "MODE_δρ₁₂", :value 0.5, :valid true, :expect 0.5}
+ {:setting "SASA_N_OCC", :value 256, :valid true, :expect 256}
+ {:setting "SASA_N_OCC", :value 1, :valid true, :expect 1}
+ {:setting "SHELL_SAMPLE", :value 104, :valid true, :expect 104}
+ {:setting "SHELL_SAMPLE", :value 1000, :valid true, :expect 1000}
+ ;; ---- valid values that need another setting to be so
+ {:setting "SASA_N_OCC",
+  :value 300,
+  :valid true,
+  :expect 300,
+  :with {"SHELL_SAMPLE" 400}}
+ {:setting "SASA_N_OCC",
+  :value 300,
+  :valid true,
+  :expect 300,
+  :with {"SHELL_SAMPLE" 300}}
+ {:setting "SHELL_SAMPLE",
+  :value 300,
+  :valid true,
+  :expect 300,
+  :with {"SASA_N_OCC" 200}}
+ {:setting "MODE_δρ₁₂",
+  :value 3.5,
+  :valid true,
+  :expect 3.5,
+  :with {"BOUNDS_δρ₁₂" [-4.0 4.0]}}
+ {:setting "EXCL_VOL_CORR_EPS",
+  :value 1.5,
+  :valid true,
+  :expect 1.5,
+  :with {"EXCL_VOL_CORR_BOUNDS" [0.5 2.0]}}
+ {:setting "EXCL_VOL_CORR_EPS",
+  :value 1.5,
+  :valid true,
+  :expect 1.5,
+  :with {"EXCL_VOL_CORR_BOUNDS" [0.5 2.0]}}
+ {:setting "BOUNDS_δρ₁₂", :value [-10.0 5.0], :valid true, :expect [-10.0 5.0]}
+ ;; ---- values that are refused
+ {:setting "N_ADAPT", :value "300", :valid false, :mention "whole number"}
+ {:setting "N_ADAPT", :value 300.5, :valid false, :mention "whole number"}
+ {:setting "N_ADAPT", :value 300.0, :valid false, :mention "whole number"}
+ {:setting "N_ADAPT", :value true, :valid false, :mention "whole number"}
+ {:setting "N_ADAPT", :value nil, :valid false, :mention "whole number"}
+ {:setting "N_ADAPT", :value [1], :valid false, :mention "whole number"}
+ {:setting "N_ADAPT", :value :a, :valid false, :mention "whole number"}
+ {:setting "N_ADAPT", :value {}, :valid false, :mention "whole number"}
+ {:setting "N_ADAPT", :value 0, :valid false, :mention "at least 1"}
+ {:setting "N_ADAPT", :value -5, :valid false, :mention "at least 1"}
+ {:setting "N_DRAWS", :value 0, :valid false, :mention "at least 1"}
+ {:setting "N_CHAINS", :value 0, :valid false, :mention "at least 1"}
+ {:setting "RETRY_N_ADAPT", :value 0, :valid false, :mention "at least 1"}
+ {:setting "RETRY_N_DRAWS", :value -1, :valid false, :mention "at least 1"}
+ {:setting "MAP_MAX_ITER", :value 0, :valid false, :mention "at least 1"}
+ {:setting "MAP_N_STARTS", :value 0, :valid false, :mention "at least 1"}
+ {:setting "MAP_OPTIMA_KEPT", :value 0, :valid false, :mention "at least 1"}
+ {:setting "MAP_F_SUCCESSIVE", :value 0, :valid false, :mention "at least 1"}
+ {:setting "MAP_JITTER_DIRECTIONS", :value 0, :valid false, :mention "at least 1"}
+ {:setting "MAP_JITTER_MAX_OPTIMA", :value 0, :valid false, :mention "at least 1"}
+ {:setting "OPTIMUM_MIN_CHAINS", :value 0, :valid false, :mention "at least 1"}
+ {:setting "SHELL_MIN_POINTS", :value 0, :valid false, :mention "at least 1"}
+ {:setting "SHELL_SAMPLE", :value 0, :valid false, :mention "at least 1"}
+ {:setting "BEAD_RAY_DIRS", :value 0, :valid false, :mention "at least 1"}
+ {:setting "HARVEST_COVER", :value -1, :valid false, :mention "at least 0"}
+ {:setting "HARVEST_DIVERGENT", :value -1, :valid false, :mention "at least 0"}
+ {:setting "OPTIMUM_CHAIN_CAP", :value -1, :valid false, :mention "at least 0"}
+ {:setting "RNG_SEED", :value 1.5, :valid false, :mention "whole number"}
+ {:setting "RNG_SEED", :value "0", :valid false, :mention "whole number"}
+ {:setting "TARGET_ACCEPT", :value 0, :valid false, :mention "above 0"}
+ {:setting "TARGET_ACCEPT", :value 100, :valid false, :mention "below 100"}
+ {:setting "TARGET_ACCEPT", :value 101, :valid false, :mention "below 100"}
+ {:setting "TARGET_ACCEPT", :value -3, :valid false, :mention "above 0"}
+ {:setting "TARGET_ACCEPT", :value 95.5, :valid false, :mention "whole number"}
+ {:setting "TABLE_SIGFIGS", :value 0, :valid false, :mention "at least 1"}
+ {:setting "TABLE_SIGFIGS", :value 18, :valid false, :mention "at most 17"}
+ {:setting "VAL_SIGMA", :value 0, :valid false, :mention "above 0"}
+ {:setting "VAL_SIGMA", :value -1, :valid false, :mention "above 0"}
+ {:setting "VAL_SIGMA", :value "2", :valid false, :mention "number"}
+ {:setting "VAL_SIGMA", :value true, :valid false, :mention "number"}
+ {:setting "VAL_SIGMA", :value nil, :valid false, :mention "number"}
+ {:setting "VAL_SIGMA", :value [2.0], :valid false, :mention "number"}
+ {:setting "OPTIMUM_CHAIN_FRACTION", :value 0, :valid false, :mention "above 0"}
+ {:setting "OPTIMUM_CHAIN_FRACTION", :value 1.5, :valid false, :mention "at most 1"}
+ {:setting "OPTIMUM_CHAIN_RADIUS", :value 0, :valid false, :mention "above 0"}
+ {:setting "BASIN_RESTART_NATS", :value -2, :valid false, :mention "above 0"}
+ {:setting "MAP_JITTER_WITHIN_NATS", :value 0, :valid false, :mention "above 0"}
+ {:setting "κ_δρ₁₂", :value 0, :valid false, :mention "above 0"}
+ {:setting "κ_δρ₃", :value -1, :valid false, :mention "above 0"}
+ {:setting "φ_max", :value 0, :valid false, :mention "above 0"}
+ {:setting "EXCL_VOL_CORR_EPS", :value 0, :valid false, :mention "above 0"}
+ {:setting "SHELL_THICKNESS", :value 0, :valid false, :mention "above 0"}
+ {:setting "SHELL_AREA_PER_POINT", :value 0, :valid false, :mention "above 0"}
+ {:setting "BEAD_RAY_RANGE", :value 0, :valid false, :mention "above 0"}
+ {:setting "SASA_N_OCC", :value 0, :valid false, :mention "above 0"}
+ {:setting "PROBE_RADIUS", :value -0.1, :valid false, :mention "at least 0"}
+ {:setting "PLOT_LW_MAP", :value -0.1, :valid false, :mention "at least 0"}
+ {:setting "PLOT_MARKERSIZE", :value -1, :valid false, :mention "at least 0"}
+ {:setting "PLOT_BORDER_PT", :value -8, :valid false, :mention "at least 0"}
+ {:setting "PLOT_YLIM_LIN_PAD_FRAC",
+  :value -0.3,
+  :valid false,
+  :mention "at least 0"}
+ {:setting "PLOT_XTICK_ANGLE", :value "45", :valid false, :mention "number"}
+ {:setting "PLOT_HIST_BINS", :value 0, :valid false, :mention "at least 1"}
+ {:setting "PLOT_HIST_BINS", :value 40.5, :valid false, :mention "whole number"}
+ {:setting "PLOT_LINMIN_TICKS", :value -1, :valid false, :mention "at least 0"}
+ {:setting "FIGURES_TEX", :value "true", :valid false, :mention "true or false"}
+ {:setting "FIGURES_TEX", :value 1, :valid false, :mention "true or false"}
+ {:setting "FIGURES_COMPILE", :value nil, :valid false, :mention "true or false"}
+ {:setting "FIGURES_COMPILE", :value [true], :valid false, :mention "true or false"}
+ {:setting "PLOT_COLOUR_MAP", :value :notacolour, :valid false, :mention "colour"}
+ {:setting "PLOT_COLOUR_MAP", :value "red", :valid false, :mention "colour"}
+ {:setting "PLOT_COLOUR_MAP", :value 5, :valid false, :mention "colour"}
+ {:setting "PLOT_COLOUR_MAP", :value "#GGGGGG", :valid false, :mention "colour"}
+ {:setting "PLOT_COLOUR_MAP", :value "#fff", :valid false, :mention "colour"}
+ {:setting "PLOT_COLOUR_MAP", :value "#ff00000", :valid false, :mention "colour"}
+ {:setting "PLOT_COLOUR_MAP", :value nil, :valid false, :mention "colour"}
+ {:setting "PLOT_COLOUR_AXIS", :value [:red], :valid false, :mention "colour"}
+ {:setting "PLOT_TEXT_FONT", :value "", :valid false, :mention "font"}
+ {:setting "PLOT_TEXT_FONT", :value "   ", :valid false, :mention "font"}
+ {:setting "PLOT_TEXT_FONT", :value 5, :valid false, :mention "font"}
+ {:setting "PLOT_TEXT_FONT", :value :font, :valid false, :mention "font"}
+ {:setting "PLOT_TEXT_FONT", :value nil, :valid false, :mention "font"}
+ {:setting "PLOT_TEXT_FONT", :value "a\u0001b", :valid false, :mention "font"}
+ {:setting "PLOT_TEXT_FONT", :value "a\nb", :valid false, :mention "font"}
+ {:setting "FIGURES_FORMATS", :value [], :valid false, :mention "at least one"}
+ {:setting "FIGURES_FORMATS", :value [:gif], :valid false, :mention "some of"}
+ {:setting "FIGURES_FORMATS", :value [:pdf :pdf], :valid false, :mention "some of"}
+ {:setting "FIGURES_FORMATS", :value "pdf", :valid false, :mention "some of"}
+ {:setting "FIGURES_FORMATS", :value [:pdf "png"], :valid false, :mention "some of"}
+ {:setting "FIGURES_FORMATS", :value :pdf, :valid false, :mention "some of"}
+ {:setting "FIGURES_FORMATS", :value nil, :valid false, :mention "some of"}
+ {:setting "FIGURES_FORMATS", :value {:pdf true}, :valid false, :mention "some of"}
+ {:setting "CHAIN_START_RADII", :value [1.0 2.0], :valid false, :mention "3 parts"}
+ {:setting "CHAIN_START_RADII", :value [1 2 3 4], :valid false, :mention "3 parts"}
+ {:setting "CHAIN_START_RADII", :value ["a" 1 2], :valid false, :mention "number"}
+ {:setting "CHAIN_START_RADII", :value [0 1 2], :valid false, :mention "above 0"}
+ {:setting "CHAIN_START_RADII",
+  :value [-1.0 2.0 3.0],
+  :valid false,
+  :mention "above 0"}
+ {:setting "CHAIN_START_RADII", :value 5, :valid false, :mention "3 parts"}
+ {:setting "CHAIN_START_RADII", :value {:a 1}, :valid false, :mention "3 parts"}
+ {:setting "CHAIN_START_RADII", :value [1 2 nil], :valid false, :mention "number"}
+ {:setting "MAP_JITTER_RADII",
+  :value [1.0 2.0 0.0],
+  :valid false,
+  :mention "above 0"}
+ {:setting "MAP_JITTER_RADII", :value [], :valid false, :mention "3 parts"}
+ {:setting "BOUNDS_δρ₁₂",
+  :value [2.0 1.0],
+  :valid false,
+  :mention "first part below"}
+ {:setting "BOUNDS_δρ₁₂",
+  :value [1.0 1.0],
+  :valid false,
+  :mention "first part below"}
+ {:setting "BOUNDS_δρ₁₂", :value [1 2 3], :valid false, :mention "2 parts"}
+ {:setting "BOUNDS_δρ₁₂", :value [:a :b], :valid false, :mention "number"}
+ {:setting "BOUNDS_δρ₁₂", :value [0.0 0.5], :valid false, :mention "inside"}
+ {:setting "BOUNDS_δρ₁₂", :value [1.5 3.0], :valid false, :mention "inside"}
+ {:setting "MODE_δρ₁₂", :value 5.0, :valid false, :mention "inside"}
+ {:setting "MODE_δρ₁₂", :value -10.0, :valid false, :mention "inside"}
+ {:setting "MODE_δρ₁₂", :value 2.0, :valid false, :mention "inside"}
+ {:setting "MODE_δρ₁₂", :value "1", :valid false, :mention "number"}
+ {:setting "EXCL_VOL_CORR_BOUNDS", :value [0 1.3], :valid false, :mention "above 0"}
+ {:setting "EXCL_VOL_CORR_BOUNDS",
+  :value [1.3 0.8],
+  :valid false,
+  :mention "first part below"}
+ {:setting "EXCL_VOL_CORR_BOUNDS",
+  :value [-0.5 1.3],
+  :valid false,
+  :mention "above 0"}
+ {:setting "EXCL_VOL_CORR_BOUNDS", :value [0.8], :valid false, :mention "2 parts"}
+ {:setting "EXCL_VOL_CORR_EPS", :value 1.0, :valid false, :mention "width"}
+ {:setting "EXCL_VOL_CORR_EPS", :value 0.6, :valid false, :mention "width"}
+ {:setting "PLOT_WIDTH_HEIGHT_CM", :value [0 5], :valid false, :mention "above 0"}
+ {:setting "PLOT_WIDTH_HEIGHT_CM",
+  :value [16.0 "x"],
+  :valid false,
+  :mention "number"}
+ {:setting "PLOT_WIDTH_HEIGHT_CM", :value [16.0], :valid false, :mention "2 parts"}
+ {:setting "PLOT_WIDTH_HEIGHT_CM", :value [-1 5], :valid false, :mention "above 0"}
+ {:setting "PLOT_PREVIEW_SIZE",
+  :value {:width 0, :height 5},
+  :valid false,
+  :mention "above 0"}
+ {:setting "PLOT_PREVIEW_SIZE",
+  :value {:width 70},
+  :valid false,
+  :mention "exactly"}
+ {:setting "PLOT_PREVIEW_SIZE",
+  :value {:width 70, :height 18, :depth 1},
+  :valid false,
+  :mention "exactly"}
+ {:setting "PLOT_PREVIEW_SIZE",
+  :value {:width 7.5, :height 3},
+  :valid false,
+  :mention "whole number"}
+ {:setting "PLOT_PREVIEW_SIZE", :value [70 18], :valid false, :mention "exactly"}
+ {:setting "PLOT_PREVIEW_SIZE",
+  :value {:w 70, :h 18},
+  :valid false,
+  :mention "exactly"}
+ {:setting "PLOT_PREVIEW_SIZE",
+  :value {:width -3, :height 18},
+  :valid false,
+  :mention "above 0"}
+ {:setting "PLOT_YLIM_LOG",
+  :value [1.3 0.7],
+  :valid false,
+  :mention "first part below"}
+ {:setting "PLOT_YLIM_LOG", :value [0 1], :valid false, :mention "above 0"}
+ {:setting "PLOT_YLIM_LOG", :value [-1 1], :valid false, :mention "above 0"}
+ {:setting "PLOT_YLIM_LOG", :value [0.7], :valid false, :mention "2 parts"}
+ {:setting "PLOT_COLOUR_BAND", :value [:red 1.5], :valid false, :mention "opacity"}
+ {:setting "PLOT_COLOUR_BAND", :value [:red -0.1], :valid false, :mention "opacity"}
+ {:setting "PLOT_COLOUR_BAND",
+  :value [:notacolour 0.5],
+  :valid false,
+  :mention "colour"}
+ {:setting "PLOT_COLOUR_BAND", :value [:red], :valid false, :mention "2 parts"}
+ {:setting "PLOT_COLOUR_BAND", :value :red, :valid false, :mention "2 parts"}
+ {:setting "PLOT_COLOUR_BAND", :value [:red "x"], :valid false, :mention "number"}
+ {:setting "PLOT_COLOUR_BAND", :value [0.5 :red], :valid false, :mention "colour"}
+ {:setting "PLOT_COLOUR_BAND",
+  :value [:red 0.5 0.1],
+  :valid false,
+  :mention "2 parts"}
+ {:setting "PLOT_COLOUR_ERRORBAR",
+  :value [:red 2],
+  :valid false,
+  :mention "opacity"}
+ {:setting "PLOT_COLOUR_BAND_RESID",
+  :value [:red 1.0001],
+  :valid false,
+  :mention "opacity"}
+ {:setting "PLOT_COLOUR_HIST", :value [:red -1], :valid false, :mention "opacity"}
+ {:setting "SASA_N_OCC", :value 500, :valid false, :mention "at most SHELL_SAMPLE"}
+ {:setting "SHELL_SAMPLE", :value 50, :valid false, :mention "at most SHELL_SAMPLE"}
+ ;; ---- refused because of another setting
+ {:setting "SASA_N_OCC",
+  :value 300,
+  :valid false,
+  :mention "at most SHELL_SAMPLE",
+  :with {"SHELL_SAMPLE" 200}}
+ {:setting "SHELL_SAMPLE",
+  :value 100,
+  :valid false,
+  :mention "SHELL_SAMPLE",
+  :with {"SASA_N_OCC" 200}}
+ {:setting "MODE_δρ₁₂",
+  :value 3.5,
+  :valid false,
+  :mention "inside",
+  :with {"BOUNDS_δρ₁₂" [-4.0 3.0]}}
+ {:setting "BOUNDS_δρ₁₂",
+  :value [-3.0 0.5],
+  :valid false,
+  :mention "inside",
+  :with {"MODE_δρ₁₂" 1.0}}
+ {:setting "EXCL_VOL_CORR_EPS",
+  :value 0.3,
+  :valid false,
+  :mention "width",
+  :with {"EXCL_VOL_CORR_BOUNDS" [1.0 1.2]}}
+ {:setting "EXCL_VOL_CORR_BOUNDS",
+  :value [1.0 1.01],
+  :valid false,
+  :mention "width",
+  :with {"EXCL_VOL_CORR_EPS" 0.5}}
+ ;; ---- the remaining settings, one valid and refused values each
+ {:setting "PLOT_COLOUR_POSTERIOR", :value :orange, :valid true, :expect :orange}
+ {:setting "PLOT_COLOUR_POSTERIOR",
+  :value :notacolour,
+  :valid false,
+  :mention "colour"}
+ {:setting "PLOT_COLOUR_POSTERIOR", :value 3, :valid false, :mention "colour"}
+ {:setting "PLOT_COLOUR_REFERENCE", :value :orange, :valid true, :expect :orange}
+ {:setting "PLOT_COLOUR_REFERENCE",
+  :value :notacolour,
+  :valid false,
+  :mention "colour"}
+ {:setting "PLOT_COLOUR_REFERENCE", :value 3, :valid false, :mention "colour"}
+ {:setting "PLOT_LW_REFERENCE", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_LW_REFERENCE", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_LW_REFERENCE", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_LW_REFERENCE", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_LW_REFERENCE", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_LW_REFERENCE", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_LW_QUANTILE", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_LW_QUANTILE", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_LW_QUANTILE", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_LW_QUANTILE", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_LW_QUANTILE", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_LW_QUANTILE", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_LW_QUANTILE_RESID", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_LW_QUANTILE_RESID", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_LW_QUANTILE_RESID", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_LW_QUANTILE_RESID",
+  :value -0.5,
+  :valid false,
+  :mention "at least 0"}
+ {:setting "PLOT_LW_QUANTILE_RESID", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_LW_QUANTILE_RESID", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_LW_ZERO_LINE", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_LW_ZERO_LINE", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_LW_ZERO_LINE", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_LW_ZERO_LINE", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_LW_ZERO_LINE", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_LW_ZERO_LINE", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_LW_ERRORBAR", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_LW_ERRORBAR", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_LW_ERRORBAR", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_LW_ERRORBAR", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_LW_ERRORBAR", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_LW_ERRORBAR", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_WHISKERWIDTH", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_WHISKERWIDTH", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_WHISKERWIDTH", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_WHISKERWIDTH", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_WHISKERWIDTH", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_WHISKERWIDTH", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_AXIS_LW", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_AXIS_LW", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_AXIS_LW", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_AXIS_LW", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_AXIS_LW", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_AXIS_LW", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_TICK_LENGTH_CM", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_TICK_LENGTH_CM", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_TICK_LENGTH_CM", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_TICK_LENGTH_CM", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_TICK_LENGTH_CM", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_TICK_LENGTH_CM", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_LW_MAJOR_TICK", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_LW_MAJOR_TICK", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_LW_MAJOR_TICK", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_LW_MAJOR_TICK", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_LW_MAJOR_TICK", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_LW_MAJOR_TICK", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_LW_MINOR_TICK", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_LW_MINOR_TICK", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_LW_MINOR_TICK", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_LW_MINOR_TICK", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_LW_MINOR_TICK", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_LW_MINOR_TICK", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_XTICK_STUB_PT", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_XTICK_STUB_PT", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_XTICK_STUB_PT", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_XTICK_STUB_PT", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_XTICK_STUB_PT", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_XTICK_STUB_PT", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_XTICK_ELBOW_PT", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_XTICK_ELBOW_PT", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_XTICK_ELBOW_PT", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_XTICK_ELBOW_PT", :value -0.5, :valid false, :mention "at least 0"}
+ {:setting "PLOT_XTICK_ELBOW_PT", :value "wide", :valid false, :mention "number"}
+ {:setting "PLOT_XTICK_ELBOW_PT", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_XTICK_LABEL_PAD_PT", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_XTICK_LABEL_PAD_PT", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_XTICK_LABEL_PAD_PT", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_XTICK_LABEL_PAD_PT",
+  :value -0.5,
+  :valid false,
+  :mention "at least 0"}
+ {:setting "PLOT_XTICK_LABEL_PAD_PT",
+  :value "wide",
+  :valid false,
+  :mention "number"}
+ {:setting "PLOT_XTICK_LABEL_PAD_PT", :value nil, :valid false, :mention "number"}
+ {:setting "PLOT_YTICK_LABEL_PAD_PT", :value 2, :valid true, :expect 2.0}
+ {:setting "PLOT_YTICK_LABEL_PAD_PT", :value 0.25, :valid true, :expect 0.25}
+ {:setting "PLOT_YTICK_LABEL_PAD_PT", :value 0, :valid true, :expect 0.0}
+ {:setting "PLOT_YTICK_LABEL_PAD_PT",
+  :value -0.5,
+  :valid false,
+  :mention "at least 0"}
+ {:setting "PLOT_YTICK_LABEL_PAD_PT",
+  :value "wide",
+  :valid false,
+  :mention "number"}
+ {:setting "PLOT_YTICK_LABEL_PAD_PT", :value nil, :valid false, :mention "number"}
+]

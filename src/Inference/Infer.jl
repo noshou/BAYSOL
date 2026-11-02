@@ -124,7 +124,7 @@ What the chains of one [`infer`](@ref) call looked like.
 - `n_adapt::Int`: warm-up iterations per chain of the run these draws come from (the
     caller's `n_adapt`, or [`RETRY_N_ADAPT`](@ref) when the rerun was kept).
 - `first_rhat::Float64`: the worst R̂ of the first run when [`infer`](@ref) reran
-    (see [`RETRY_RHAT`](@ref)); NaN when it did not.
+    (see [`RHAT_OK`](@ref)); NaN when it did not.
 - `retry_kept::Bool`: whether the rerun's draws are the ones returned (false if there
     was no rerun, or the first run's R̂ was no worse).
 - `n_extra::Int`: chains started at an optimum that carries mass but had fewer than
@@ -154,12 +154,66 @@ struct ChainDiagnostics
 end
 
 """
-The largest R̂ of `d` (NaN entries ignored); `Inf` if there is none, so that a run
-that could not be judged never beats one that could.
+The largest R̂ of `d`; `Inf` if there is none or any is NaN (an R̂ that could not be
+computed counts as not converged), so that a run that could not be judged never beats one
+that could.
 """
 function _worst_rhat(d::ChainDiagnostics)
-    r = filter(!isnan, d.rhat)
-    return isempty(r) ? Inf : maximum(r)
+    (isempty(d.rhat) || any(isnan, d.rhat)) && return Inf
+    return maximum(d.rhat)
+end
+
+"""
+The smallest of the effective sample sizes `v`; NaN if there are none or any is NaN (an ESS
+that could not be computed counts as not converged).
+"""
+_worst_ess(v::AbstractVector) = (isempty(v) || any(isnan, v)) ? NaN : minimum(v)
+
+"""
+Why a run does not count as converged, from its worst R̂, smallest bulk ESS and smallest
+tail ESS: R̂ above [`RHAT_OK`](@ref) or not computable, or an ESS below [`ESS_MIN`](@ref) or
+not computable. NaN means "could not be computed" and is never read as fine.
+
+# Returns
+- `Vector{String}`: one sentence per problem, empty for a converged run.
+"""
+function _convergence_problems(rhat::Real, ess::Real, ess_tail::Real)
+    out = String[]
+    if !isfinite(rhat)
+        push!(out, "R̂ could not be computed (too few draws, or a constant quantity)")
+    elseif rhat > RHAT_OK
+        push!(out, "the worst R̂, $(round(rhat; digits = 3)), is above $RHAT_OK")
+    end
+    for (name, v) in (("bulk", ess), ("tail", ess_tail))
+        if isnan(v)
+            push!(out, "the $name effective sample size could not be computed")
+        elseif v < ESS_MIN
+            ess_text = round(v; digits = 1)
+            push!(out, "the smallest $name ESS, $ess_text, is below $ESS_MIN")
+        end
+    end
+    return out
+end
+
+function _convergence_problems(d::ChainDiagnostics)
+    return _convergence_problems(_worst_rhat(d), _worst_ess(d.ess), _worst_ess(d.ess_tail))
+end
+
+"""
+Thrown by [`run_model`](@ref BAYSOL.Pipeline.run_model) when a run is still not converged
+after its retry: a fit that did not converge has nothing worth reporting, so no result is
+returned and no report is written.
+
+# Fields
+- `problems::Vector{String}`: why the run does not count as converged.
+"""
+struct NotConvergedError <: Exception
+    problems::Vector{String}
+end
+
+function Base.showerror(io::IO, e::NotConvergedError)
+    print(io, "NotConvergedError: the run did not converge, even after a longer retry, ",
+        "so there is nothing to report: ", join(e.problems, "; "), ".")
 end
 
 """
@@ -218,7 +272,8 @@ Runs initial seeding for the sampler.
 - `shannon::Union{Nothing,ShannonInfo} = nothing`: stored in the returned `Seed`.
 
 # Returns
-- `Seed`: priors, initial point, forward cache, and data.
+- `Seed`: priors, initial point, forward cache, and data. The initial point is drawn from a
+    stream of [`RNG_SEED`](@ref), not the global RNG, so a seed is the same every time.
 """
 function seed_sampler(
     fw::ForwardCache,
@@ -234,7 +289,7 @@ function seed_sampler(
     shannon::Union{Nothing,ShannonInfo} = nothing,
 )::Seed
     pr = _calc_ξ_priors(pH, σ_pH, solutes; t = t, κ_δρ₁₂ = κ_δρ₁₂, κ_δρ₃ = κ_δρ₃)
-    ξ₀ = _ξ₀(pr)
+    ξ₀ = _ξ₀(pr, stream(RNG_SEED % UInt64, _RNG_INITIAL_POINT, 0))
     θ₀, _ = Θ(ξ₀, pr)
     wls = WLSData(I_exp, σ_exp)
     return Seed(pr, θ₀, fw, wls, timing, _C1Tables(fw), shannon)
@@ -348,11 +403,11 @@ the forward model) from the trajectory's sample covariance.
                         size and mass matrix before sampling proper.
 
 # Keywords
-- `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
+- `δ::Real=TARGET_ACCEPT`: target acceptance rate as a percentage,
                                 (0, 100) exclusive; the default,
-                                [`DEFAULT_TARGET_ACCEPT`](@ref), is 95%.
-- `n_chains::Int=DEFAULT_N_CHAINS`: number of NUTS chains
-                                ([`DEFAULT_N_CHAINS`](@ref) = 8, whatever the number of
+                                [`TARGET_ACCEPT`](@ref), is 95%.
+- `n_chains::Int=N_CHAINS`: number of NUTS chains
+                                ([`N_CHAINS`](@ref) = 8, whatever the number of
                                 Julia threads; the threads only decide how many run at
                                 once). Chain 1 starts at the MAP, the others at
                                 deterministic distances from it ([`chain_radius`](@ref)).
@@ -360,27 +415,24 @@ the forward model) from the trajectory's sample covariance.
                                 are pooled, the modes they settled in weighted by their
                                 mass (see [`bridge_logmass`](@ref)). With `n_chains = 1`
                                 the run is the single-chain run of earlier versions.
-- `jitter_seed::Integer=DEFAULT_JITTER_SEED`: seed
-                                of the jittered starts, separate from `rng_seed`:
-                                the same `jitter_seed` gives the same starts
-                                whatever the `rng_seed` or the thread count.
-- `retry::Bool=true`: when the worst R̂ of the run is above [`RETRY_RHAT`](@ref), sample
+- `retry::Bool=RETRY` (true): when the run does not count as converged (worst R̂ above
+    [`RHAT_OK`](@ref), an ESS below [`ESS_MIN`](@ref), or either not computable), sample
                                 once more with [`RETRY_N_ADAPT`](@ref) warm-up and
                                 [`RETRY_N_DRAWS`](@ref) post-warm-up iterations per chain,
-                                from `rng_seed` and `jitter_seed` offset deterministically
+                                from `rng_seed` offset deterministically
                                 ([`RETRY_SEED_OFFSET`](@ref)), and keep the run with the
                                 smaller worst R̂. The same seeds always give the same
                                 result, retried or not. `diagnostics.first_rhat` and
-                                `retry_kept` record what happened. Not done when the
-                                caller already asked for that many iterations.
-- `rng_seed::Union{Nothing,Integer}=nothing`: the run's
+                                `retry_kept` record what happened. The rerun always
+                                adapts again, however long the first run was.
+- `rng_seed::Union{Nothing,Integer}=RNG_SEED` (0): the run's
                                 random seed. Every random draw of the run (the extra MAP
                                 starts, the NUTS chain) comes from a stream derived from
                                 it by the draw's index, so the same `rng_seed` reproduces
                                 the run exactly, whatever the number of Julia threads.
                                 `nothing` draws a fresh one from the default RNG (so
-                                `Random.seed!` before the call also fixes it); it is the
-                                `rng_seed` row of the run log and of the `run` sheet.
+                                `Random.seed!` before the call also fixes it). It is
+                                the `rng_seed` row of the run log and the `run` sheet.
 
 # Returns
 An [`Inferred`](@ref) of the pooled chains, chain after chain. Includes the
@@ -395,30 +447,28 @@ function infer(
     seed::Seed,
     n_samples::Int64,
     n_adapt::Int64;
-    δ::Real = DEFAULT_TARGET_ACCEPT,
-    rng_seed::Union{Nothing,Integer} = nothing,
-    n_chains::Int = DEFAULT_N_CHAINS,
-    jitter_seed::Integer = DEFAULT_JITTER_SEED,
-    retry::Bool = true,
+    δ::Real = TARGET_ACCEPT,
+    rng_seed::Union{Nothing,Integer} = RNG_SEED,
+    n_chains::Int = N_CHAINS,
+    retry::Bool = RETRY,
 )::Inferred
     n_chains ≥ 1 || throw(DomainError(n_chains, "n_chains must be ≥ 1"))
     base = rng_seed === nothing ? draw_base() : (rng_seed % UInt64)
-    jitter_base = jitter_seed % UInt64
     go =
-        (ns, na, b, j) -> with_gc_paused(
-            () -> _infer(seed, ns, na; δ = δ, base = b,
-                n_chains = n_chains, jitter_base = j),
+        (ns, na, b) -> with_gc_paused(
+            () -> _infer(seed, ns, na; δ = δ, base = b, n_chains = n_chains),
         )
-    r1 = go(n_samples, n_adapt, base, jitter_base)
+    r1 = go(n_samples, n_adapt, base)
     worst = _worst_rhat(r1.diagnostics)
-    _retry_needed(worst, n_samples, n_adapt, retry) || return r1
+    _retry_needed(r1.diagnostics, retry) || return r1
 
     # R̂ above the limit: once more, longer, from streams and jitter directions derived
     # from the seeds (a different draw of the starts too, since a bad R̂ can be seed luck)
     info = seed.timing === nothing ? nothing : copy(seed.timing.info)
-    r2 = go(RETRY_N_ADAPT + RETRY_N_DRAWS, RETRY_N_ADAPT,
-        _retry_seeds(base, jitter_base)...)
-    kept = _worst_rhat(r2.diagnostics) ≤ worst
+    r2 = go(RETRY_N_ADAPT + RETRY_N_DRAWS, RETRY_N_ADAPT, _retry_seed(base))
+    kept =
+        isempty(_convergence_problems(r2.diagnostics)) ||
+        _worst_rhat(r2.diagnostics) ≤ worst
     best = kept ? r2 : r1
     if seed.timing !== nothing
         # what the report says about the run is that of the kept attempt, with the
@@ -439,23 +489,18 @@ function infer(
 end
 
 """
-The `(base, jitter_base)` of the rerun [`infer`](@ref) does when R̂ is above
-[`RETRY_RHAT`](@ref), derived from the run's own by [`RETRY_SEED_OFFSET`](@ref).
+The `base` of the rerun [`infer`](@ref) does when the run is not converged,
+derived from the run's own by [`RETRY_SEED_OFFSET`](@ref).
 """
-function _retry_seeds(base::UInt64, jitter_base::UInt64)
-    return (base + RETRY_SEED_OFFSET) * 0x9e3779b97f4a7c15,
-    (jitter_base + RETRY_SEED_OFFSET) * 0xbf58476d1ce4e5b9
-end
+_retry_seed(base::UInt64) = (base + RETRY_SEED_OFFSET) * 0x9e3779b97f4a7c15
 
 """
-Whether [`infer`](@ref) reruns: `retry` is on, the worst R̂ `worst` is above
-[`RETRY_RHAT`](@ref), and the rerun would be longer than the run itself (a caller that
-already asked for [`RETRY_N_ADAPT`](@ref) warm-up and [`RETRY_N_DRAWS`](@ref) draws
-gets none).
+Whether [`infer`](@ref) reruns: `retry` is on and the run does not count as converged
+(R̂ above [`RHAT_OK`](@ref) or not computable, or an ESS below [`ESS_MIN`](@ref) or not
+computable). The rerun always adapts again, whatever the length of the run.
 """
-function _retry_needed(worst::Real, n_samples::Integer, n_adapt::Integer, retry::Bool)
-    longer = n_adapt < RETRY_N_ADAPT || n_samples - n_adapt < RETRY_N_DRAWS
-    return retry && longer && worst > RETRY_RHAT
+function _retry_needed(d::ChainDiagnostics, retry::Bool)
+    return retry && !isempty(_convergence_problems(d))
 end
 
 """
@@ -469,10 +514,9 @@ function _infer(
     seed::Seed{<:Real,N},
     n_samples::Int64,
     n_adapt::Int64;
-    δ::Real = DEFAULT_TARGET_ACCEPT,
+    δ::Real = TARGET_ACCEPT,
     base::UInt64 = draw_base(),
-    n_chains::Int = DEFAULT_N_CHAINS,
-    jitter_base::UInt64 = DEFAULT_JITTER_SEED,
+    n_chains::Int = N_CHAINS,
 )::Inferred where {N}
 
     if δ ≤ 0 || δ ≥ 100
@@ -501,7 +545,7 @@ function _infer(
     # at, the MAP search missed a better basin: re-whiten there (L-BFGS
     # from that draw, the heaviest basin wins) and run the chains once more
     post = (n_adapt+1):n_samples
-    chains = _run_chains(seed, sp, n_samples, n_adapt, δ, base, jitter_base, n_chains)
+    chains = _run_chains(seed, sp, n_samples, n_adapt, δ, base, n_chains)
     rewhitened = 0.0
     best = _best_draw(chains.runs, post)
     if best.ld > sp.logπ + BASIN_RESTART_NATS
@@ -517,7 +561,7 @@ function _infer(
             rewhitened = sp2.logπ - sp.logπ
             sp = sp2
             chains =
-                _run_chains(seed, sp, n_samples, n_adapt, δ, base, jitter_base, n_chains)
+                _run_chains(seed, sp, n_samples, n_adapt, δ, base, n_chains)
         end
     end
     t_nuts = chains.t_nuts
@@ -754,7 +798,7 @@ end
 After the first round of chains: the optima known (the MAP search's and those found by
 L-BFGS from the chains' draws, [`_harvest_optima`](@ref)), and the whitened starts of the
 chains that optima carrying mass ([`OPTIMUM_MIN_SHARE`](@ref)) are missing: up to
-[`OPTIMUM_MIN_CHAINS`](@ref) chains at each, [`OPTIMUM_MAX_EXTRA_CHAINS`](@ref) in all,
+[`OPTIMUM_MIN_CHAINS`](@ref) chains at each, [`OPTIMUM_CHAIN_CAP`](@ref) in all,
 the heaviest optimum first.
 
 # Returns
@@ -786,7 +830,7 @@ function _optima_and_extra_chains(
         need > 0 || continue
         w = Vector(sp.S \ (optima[i].z - sp.ẑ))
         for _ in 1:need
-            length(extra_w) < OPTIMUM_MAX_EXTRA_CHAINS || break
+            length(extra_w) < OPTIMUM_CHAIN_CAP || break
             push!(extra_w, w)
             push!(owner, i)
         end
@@ -960,7 +1004,7 @@ chain index, not to the thread that happens to run it) and shares only the read-
 """
 function _run_chains(seed::Seed{<:Real,N}, sp, n_samples::Int64,
     n_adapt::Int64, δ::Real,
-    base::UInt64, jitter_base::UInt64, n_chains::Int) where {N}
+    base::UInt64, n_chains::Int) where {N}
     t_setup = tick()
     # (concurrent progress bars would overwrite each other)
     ℓπ, ∂ℓπ∂w, run_chain =
@@ -969,7 +1013,7 @@ function _run_chains(seed::Seed{<:Real,N}, sp, n_samples::Int64,
     # The starts: mirrored jittered pairs, or the MAP for a single chain
     # (deterministically, see `_chain_start`). Chosen serially and up front,
     # so neither the starts nor which chain gets which depend on the threads.
-    starts = [_chain_start(k, n_chains, N, ℓπ, ∂ℓπ∂w, jitter_base) for k in 1:n_chains]
+    starts = [_chain_start(k, n_chains, N, ℓπ, ∂ℓπ∂w, base) for k in 1:n_chains]
 
     tock!(seed.timing, :sampling, 1, "NUTS setup (starts, Hamiltonian)", t_setup)
     t_nuts = tick()
@@ -1041,19 +1085,19 @@ from the MAP in posterior standard deviations ([`chain_radius`](@ref)). The star
 `r·u` for a direction `u` on the unit sphere: a single chain, and chain 1, at the MAP
 (`w = 0`); chain 2 also at the MAP (its own random stream makes it an independent
 chain); chains 3 and up in mirrored pairs, chains `2p+1` and `2p+2` at `+r_p·u_p` and
-`-r_p·u_p`. The directions come from streams of `jitter_base`
-([`DEFAULT_JITTER_SEED`](@ref) unless the caller gave a `jitter_seed`; never the run's
-`rng_seed`). A start where log π or its gradient is not finite is pulled halfway back
-toward the MAP, up to [`CHAIN_JITTER_MAX_HALVINGS`](@ref) times, and the distance
-returned is the one used; a start that never becomes usable is the MAP itself (0).
+`-r_p·u_p`. The directions come from streams of the run's `base` (its
+`rng_seed`), under their own purpose tag. A start where log π or its gradient is not
+finite is pulled halfway back toward the MAP, up to [`CHAIN_JITTER_MAX_HALVINGS`](@ref)
+times, and the distance returned is the one used; a start that never becomes usable is the
+MAP itself (0).
 
 # Returns
 - `(w₀::Vector{Float64}, r::Float64)`.
 """
-function _chain_start(k::Int, n::Int, N::Int, ℓπ, ∂ℓπ∂w, jitter_base::UInt64)
+function _chain_start(k::Int, n::Int, N::Int, ℓπ, ∂ℓπ∂w, base::UInt64)
     r = chain_radius(k, n)
     r == 0 && return zeros(N), 0.0
-    z = randn(stream(jitter_base, _RNG_JITTER, (k - 1) ÷ 2), N)
+    z = randn(stream(base, _RNG_JITTER, (k - 1) ÷ 2), N)
     u = z ./ sqrt(sum(abs2, z))
     for _ in 0:CHAIN_JITTER_MAX_HALVINGS
         w = r .* u

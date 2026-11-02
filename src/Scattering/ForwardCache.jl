@@ -186,7 +186,7 @@ multipoles ([`species_multipoles`](@ref)), reduced to the Gram matrix G(q), plus
 # Keywords
 -   `chunk::Unsigned = B_LM_CHUNK`: `compute_B_lm` batch size (results invariant).
 -   `thickness::Real = SHELL_THICKNESS`, `probe::Real = PROBE_RADIUS`,
-    `n_target = SHELL_N_TARGET`: hydration-shell geometry, forwarded to hydration.
+    `n_target = nothing`: hydration-shell geometry, forwarded to hydration.
 -   `shell::Union{Nothing,Tuple} = nothing`: a precomputed `sasa`
     result, see [`hydration`](@ref).
 -   `stage_log::Union{Nothing,StageLog} = nothing`: if given, the vacuum,
@@ -203,7 +203,7 @@ forward_cache(
     chunk::Unsigned                    = B_LM_CHUNK,
     thickness::Real                    = SHELL_THICKNESS,
     probe::Real                        = PROBE_RADIUS,
-    n_target::Union{Nothing,Integer}   = SHELL_N_TARGET,
+    n_target::Union{Nothing,Integer}   = nothing,
     shell::Union{Nothing,Tuple}        = nothing,
     stage_log::Union{Nothing,StageLog} = nothing,
 )::ForwardCache = begin

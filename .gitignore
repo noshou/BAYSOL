@@ -122,3 +122,6 @@ latex.out/
 
 # the Clojure CLI classpath cache of the TUI project
 tui/.cpcache/
+
+# local brief detail moved out of CLAUDE.md
+notes/

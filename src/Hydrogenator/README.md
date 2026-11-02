@@ -34,7 +34,7 @@ flowchart TD
     cached"]
 ```
 
-Files: `Hydrogenator.jl` (module, `TitrationMethod`, `Propka`, `NoTitration`, `FORCE_FIELDS`, CondaPkg tool paths), `Propka.jl` (propka3, its `.pka` parser, the terminus rule), `Pdb2pqr.jl` (`resolve_hydrogens`, the run, per-chain partition, cache), `Content.jl` (`hydrogenation_choice`, the dropped-nucleotide guard, `modified_hydrogen_deficit`), `Modified.jl` (`relabel_modified`/`restore_modified!`), `ChainEnds.jl` (`isolate_chain_ends`/`restore_chain_ends!`), `Balance.jl` (heavy-atom balance).
+Files: `Hydrogenator.jl` (module, the fixed `DEFAULT_FORCE_FIELD` and `NUCLEIC_FORCE_FIELD`, `TitrationMethod`, `Propka`, `NoTitration`, `FORCE_FIELDS`, CondaPkg tool paths), `Propka.jl` (propka3, its `.pka` parser, the terminus rule), `Pdb2pqr.jl` (`resolve_hydrogens`, the run, per-chain partition, cache), `Content.jl` (`hydrogenation_choice`, the dropped-nucleotide guard, `modified_hydrogen_deficit`), `Modified.jl` (`relabel_modified`/`restore_modified!`), `ChainEnds.jl` (`isolate_chain_ends`/`restore_chain_ends!`), `Balance.jl` (heavy-atom balance).
 
 ## Usage
 

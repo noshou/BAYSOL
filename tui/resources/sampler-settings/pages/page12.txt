@@ -1,0 +1,24 @@
+   ║        name            ║        description          ║      value        ║
+   ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
+   ╠ MAP_N_STARTS           ╬ Number of L-BFGS starts of  ╬                   ╣
+   ║                        ║ the search for the          ║                   ║
+   ║                        ║ posterior mode. More        ║                   ║
+   ║                        ║ starts miss fewer basins    ║                   ║
+   ║                        ║ but run slower. Not         ║                   ║
+   ║                        ║ recommended to change.      ║                   ║
+   ║                        ║                             ║                   ║
+ > ╠ MAP_F_SUCCESSIVE       ╬ Stop a start when −log π    ╬                   ╣
+   ║                        ║ (the negative log           ║                   ║
+   ║                        ║ posterior) improves by      ║                   ║
+   ║                        ║ less than 1e-6 nats for     ║                   ║
+   ║                        ║ this many iterations in a   ║                   ║
+   ║                        ║ row. Not recommended to     ║                   ║
+   ║                        ║ change.                     ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:       ↑║  sampler [4 / 8]  ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)

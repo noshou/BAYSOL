@@ -22,7 +22,7 @@ Every physical constant and unit conversion, defined once so it cannot drift bet
 | `NS_PER_S`, `MS_PER_S`                                                          | 10⁹, 10³                                                                         | Timing, Inference, Pipeline                 |
 | `STANDARD_TEMPERATURE_C`                                                        | 25 °C (298.15 K); backs `PMV_REFERENCE_TEMPERATURE_C` and `DEFAULT_TEMPERATURE_C` | BulkElectronDensity, Inference              |
 
-Every other tunable is a module-level constant in its owning module.
+`SHANNON_REBIN` and `BIN_BIAS_MAX` are fixed constants of the `Shannon` submodule (not settings); `Utils` has no `Params.jl`.
 
 ## Shannon
 

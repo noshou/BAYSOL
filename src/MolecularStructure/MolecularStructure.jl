@@ -13,10 +13,14 @@ import ..Geometry: coords_cartesian, radii, r_max, neighbour_tree
 using ..Geometry: SphereCloud, excluded_volume
 
 """
-Package-root-relative  local store (`_cache`/). Created on first use.
+The local store (downloaded structures, component files, hydrogenated copies). It is the
+folder the environment variable `BAYSOL_CACHE` names when that is an absolute path (the
+terminal interface sets it to the operating system's cache folder), otherwise `_cache/`
+in the package root. Created on first use.
 """
 function _store_dir()::String
-    dir = joinpath(pkgdir(@__MODULE__), "_cache")
+    env = get(ENV, "BAYSOL_CACHE", "")
+    dir = isabspath(env) ? env : joinpath(pkgdir(@__MODULE__), "_cache")
     mkpath(dir)
     return dir
 end
@@ -24,6 +28,39 @@ end
 # ---------------------------------------------------------------------------
 #   Constants and shared types
 # ---------------------------------------------------------------------------
+
+"Subdirectory of [`_store_dir`](@ref) holding the cached component files `<ID>.cif`."
+const COMPONENT_CACHE_DIR = "components"
+
+"""
+Where a component missing from the bundled table is downloaded from; `{ID}` stands for the
+upper-case residue id. Small mmCIF files, one per component.
+"""
+const COMPONENT_URL = "https://files.rcsb.org/ligands/download/{ID}.cif"
+
+"Seconds before a component download is given up (the lookup then raises `ComponentError`)."
+const COMPONENT_TIMEOUT_S = 30
+
+"""
+An ATOM-record residue (not an ion, a water or a small ligand) with at most this many heavy
+atoms is dummy-like: a C-alpha-only linker residue, a bead.
+"""
+const DUMMY_MAX_HEAVY_ATOMS = 2
+
+"""
+A structure in which more than this fraction of the atoms have a B-factor of exactly 0.00
+**and** an occupancy of 0 is flagged as dummy-like (placeholder atoms).
+"""
+const DUMMY_ZERO_FRACTION = 0.05
+
+"""
+Above this fraction the zero-B, zero-occupancy rule does not fire: a file whose atoms all
+have occupancy 0 and B 0 (SASDR99) carries no information about which atoms are dummies.
+"""
+const DUMMY_ZERO_MAX_FRACTION = 0.95
+
+"How many [`BACKBONE_ATOMS`](@ref) make an unknown or legacy-named residue a nucleotide."
+const BACKBONE_MIN = 4
 
 # Ion string -> (element, signed charge): element = 1-2 lowercase; magnitude has a non-zero
 # leading digit (no charge 0); a bare sign means +/-1.
@@ -39,18 +76,6 @@ const _TWO_LETTER_ELEMENTS = Set([
     "BR", "SE", "AL", "SI", "AS", "LI", "BE", "NE", "AR", "KR", "SR", "MO",
     "AG", "SN", "SB", "TE", "XE", "CS", "BA", "PT", "AU", "PB",
 ])
-
-"Subdirectory of [`_store_dir`](@ref) holding the cached component files `<ID>.cif`."
-const COMPONENT_CACHE_DIR = "components"
-
-"""
-Where a component missing from the bundled table is downloaded from; `{ID}` stands for the
-upper-case residue id. Small mmCIF files, one per component.
-"""
-const COMPONENT_URL = "https://files.rcsb.org/ligands/download/{ID}.cif"
-
-"Seconds before a component download is given up (the lookup then raises `ComponentError`)."
-const COMPONENT_TIMEOUT_S = 30
 
 """
 The bundled component table: one row per wwPDB component, `id`, `class`, `type`, `parent`,
@@ -84,24 +109,6 @@ Residue names that mark a dummy residue (CORAL/EOM linkers, bead models, unknown
 placeholders): `UNK DUM DUMMY UNL`. See [`dummy_like_residues`](@ref).
 """
 const DUMMY_RESIDUE_NAMES = ("UNK", "DUM", "DUMMY", "UNL")
-
-"""
-An ATOM-record residue (not an ion, a water or a small ligand) with at most this many heavy
-atoms is dummy-like: a C-alpha-only linker residue, a bead.
-"""
-const DUMMY_MAX_HEAVY_ATOMS = 2
-
-"""
-A structure in which more than this fraction of the atoms have a B-factor of exactly 0.00
-**and** an occupancy of 0 is flagged as dummy-like (placeholder atoms).
-"""
-const DUMMY_ZERO_FRACTION = 0.05
-
-"""
-Above this fraction the zero-B, zero-occupancy rule does not fire: a file whose atoms all
-have occupancy 0 and B 0 (SASDR99) carries no information about which atoms are dummies.
-"""
-const DUMMY_ZERO_MAX_FRACTION = 0.95
 
 "The backbone atoms a protein residue must have to be a real residue: `N`, `CA`, `C`."
 const PROTEIN_BACKBONE_ATOMS = ("N", "CA", "C")
@@ -169,9 +176,6 @@ The sugar-phosphate backbone atoms of a nucleotide residue (primes spelled `'`; 
 legacy: a residue with at least [`BACKBONE_MIN`](@ref) of them is a nucleotide.
 """
 const BACKBONE_ATOMS = ("P", "O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'")
-
-"How many [`BACKBONE_ATOMS`](@ref) make an unknown or legacy-named residue a nucleotide."
-const BACKBONE_MIN = 4
 
 """
 # Fields

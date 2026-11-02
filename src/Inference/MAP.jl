@@ -63,7 +63,7 @@ the MAP search found. Immutable, built once per [`infer`](@ref) call.
 - `logπ::Float64`: log π at the MAP (`NaN` if every start failed):
     the value NUTS's chains are measured against (a draw that beats it
     by [`BASIN_RESTART_NATS`](@ref) shows that a better basin exists).
-- `optima::Vector{_Optimum}`: the distinct optima found (the best [`MAP_MAX_BASINS`](@ref)
+- `optima::Vector{_Optimum}`: the distinct optima found (the best [`MAP_OPTIMA_KEPT`](@ref)
     of them, lowest −log π first), each with its Laplace mass.
 """
 struct _SamplingSpace{N,L}
@@ -266,7 +266,7 @@ its own Hessian (at most [`MAP_JITTER_MAX_OPTIMA`](@ref) optima, those within
 [`MAP_JITTER_WITHIN_NATS`](@ref) of the lowest), which reaches basins next to the ones
 already found that random starts rarely hit. The distinct basins among all the optima
 (Mahalanobis distance under the Hessian at the lowest one) are compared by their Laplace
-mass, `−f − ½ log det H`, for the best `MAP_MAX_BASINS` of them: a narrow basin can have
+mass, `−f − ½ log det H`, for the best `MAP_OPTIMA_KEPT` of them: a narrow basin can have
 the lowest f and still carry less mass than a wide one. The heaviest basin's optimum is the
 MAP ẑ. Its Hessian is taken in two central-difference passes: step `MAP_HESS_STEP`, then
 `MAP_HESS_REL_STEP` × each coordinate's Laplace σ from the first pass.
@@ -279,7 +279,7 @@ MAP ẑ. Its Hessian is taken in two central-difference passes: step `MAP_HESS_S
 - `base::UInt64`: the run's random base value; start `i ≥ 2` draws its
     prior sample from the stream `stream(base, _RNG_MAP_STARTS, i)`, and the jittered
     start `j` its direction from `stream(base, _RNG_MAP_JITTER, j)`.
-    Default: a fresh draw from the default RNG.
+    Default: a fresh draw from the default RNG (`infer` always passes its own).
 - `extra_starts`: further L-BFGS starts in z-space (the sampler passes the
     best draw of a first round of chains here, to re-whiten at a better basin).
 
@@ -388,10 +388,10 @@ function _sampling_space(
 
     # The heaviest basin, not just the lowest optimum: representatives of the
     # distinct basins (the lowest optimum of each, Mahalanobis distance under H₁),
-    # the best MAP_MAX_BASINS of them compared by Laplace mass −f − ½ log det H
+    # the best MAP_OPTIMA_KEPT of them compared by Laplace mass −f − ½ log det H
     # (eigenvalues floored, as for the whitening).
     reps = basins(H₁f)
-    found = [mk(optima[i]...) for i in reps[1:min(end, MAP_MAX_BASINS)]]
+    found = [mk(optima[i]...) for i in reps[1:min(end, MAP_OPTIMA_KEPT)]]
     mass₁ = -f_mode - sum(log, λ₁) / 2
     for o in found[2:end]
         all(isfinite, o.λ) || continue

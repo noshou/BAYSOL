@@ -172,17 +172,15 @@ using SQLite: SQLite
 using DBInterface: DBInterface
 using FastClosures: @closure
 using LinearAlgebra: LinearAlgebra
-using ..Geometry: PROBE_RADIUS, SHELL_N_TARGET, ATOM_BLOCK, ATOM_PARALLEL_MIN
+using ..Geometry: PROBE_RADIUS, ATOM_BLOCK, ATOM_PARALLEL_MIN
 using ..PhysicalConstants: UNIT_OF_δρ
 using ..Runtime: gc_checkpoint, Lazy, force, tmap_blocks
 using LinearAlgebra: mul!
 
-"""
-Hydration-shell thickness in Å: how far the perturbed-density water layer
-extends beyond the solvent-accessible surface. 3.0 is CRYSOL's border-layer
-default.
-"""
-const SHELL_THICKNESS = 3.0
+include("Params.jl")
+
+# Fixed internals: not settings (changing them could break a run), so they are not in
+# Params.jl.
 
 """
 Atoms/dummies per pass in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm).
@@ -242,18 +240,6 @@ parallel in [`Scattering.compute_B_lm`](@ref BAYSOL.Scattering.compute_B_lm).
 const B_LM_REDUCE_COLS = 16
 
 """
-Coefficients of
-[`excluded_volume_factor`](@ref BAYSOL.Scattering.excluded_volume_factor):
-(4π/3)^(2/3) / 4π.
-
-Converts CRYSOL's *radius* parameterisation into the *volume* parameterisation
-[`_gaussian_dummy`](@ref BAYSOL.Scattering._gaussian_dummy) is written in,
-via V = (4π/3) r³ (which is exactly `Geometry.sphere_volume`,
-so `r_m` and the dummy volumes stay consistent).
-"""
-const EV_EXP_COEFF = (4π / 3)^(2 / 3) / (4π)
-
-"""
 Start order of the continued-fraction sweep in
 [`sphBessRatios!`](@ref BAYSOL.Scattering.sphBessRatios!): N = max(lMax,
 ⌈x⌉) + `GAUTSCHI_MARGIN[1]` + ⌈`GAUTSCHI_MARGIN[2]`·x^(1/3)⌉. Deep enough
@@ -284,6 +270,18 @@ Floor applied to Chantler f2 table values before the log-log interpolation
 where the table stores an exact zero.
 """
 const F2_LOG_FLOOR = 1e-99
+
+"""
+Coefficients of
+[`excluded_volume_factor`](@ref BAYSOL.Scattering.excluded_volume_factor):
+(4π/3)^(2/3) / 4π.
+
+Converts CRYSOL's *radius* parameterisation into the *volume* parameterisation
+[`_gaussian_dummy`](@ref BAYSOL.Scattering._gaussian_dummy) is written in,
+via V = (4π/3) r³ (which is exactly `Geometry.sphere_volume`,
+so `r_m` and the dummy volumes stay consistent).
+"""
+const EV_EXP_COEFF = (4π / 3)^(2 / 3) / (4π)
 
 """
 Species pairs (a, b), a ≤ b, in [`ForwardCache`](@ref)'s `Gc`

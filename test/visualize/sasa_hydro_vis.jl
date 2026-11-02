@@ -99,12 +99,12 @@ end
 # pure geometry: plastic sample points, no plotting
 # --------------------------------------------------------------------------
 
-const EXPOSED_COLOR  = RGBf(1.00, 0.62, 0.13)   # warm/bright
-const OCCLUDED_COLOR = RGBf(0.24, 0.26, 0.32)   # dark/desaturated
-const DUMMY_COLOR    = RGBf(0.90, 0.15, 0.55)   # distinct from atoms and points
-const CONCAVE_COLOR  = RGBf(0.20, 0.55, 0.90)
-const CAVITY_COLOR   = RGBf(0.35, 0.80, 0.35)
-const ATOM_COLOR     = RGBf(0.55, 0.62, 0.75)
+const EXPOSED_COLOUR  = RGBf(1.00, 0.62, 0.13)   # warm/bright
+const OCCLUDED_COLOUR = RGBf(0.24, 0.26, 0.32)   # dark/desaturated
+const DUMMY_COLOUR    = RGBf(0.90, 0.15, 0.55)   # distinct from atoms and points
+const CONCAVE_COLOUR  = RGBf(0.20, 0.55, 0.90)
+const CAVITY_COLOUR   = RGBf(0.35, 0.80, 0.35)
+const ATOM_COLOUR     = RGBf(0.55, 0.62, 0.75)
 
 """
     atom_sample_points(mol, i, n, probe) -> NamedTuple
@@ -248,15 +248,15 @@ function sasa_hydro_figure(;
     for i in 1:natoms
         ρ = Float32(rads[i] + probe)
         c = Point3f(crds[1, i], crds[2, i], crds[3, i])
-        mesh!(ax, Sphere(c, ρ); color = (ATOM_COLOR, i in highlight ? 0.35 : 0.10),
+        mesh!(ax, Sphere(c, ρ); color = (ATOM_COLOUR, i in highlight ? 0.35 : 0.10),
             transparency = true, shading = NoShading)
     end
 
     # the shell itself: one marker per accessible point, i.e. one per dummy
     # `Scattering.hydration` will place. Every point of a given atom carries the
     # same area, so a uniform marker size is the honest rendering.
-    bead_colour = Dict(Geometry.CONVEX => DUMMY_COLOR, Geometry.CONCAVE => CONCAVE_COLOR,
-        Geometry.CAVITY => CAVITY_COLOR)
+    bead_colour = Dict(Geometry.CONVEX => DUMMY_COLOUR, Geometry.CONCAVE => CONCAVE_COLOUR,
+        Geometry.CAVITY => CAVITY_COLOUR)
     scatter!(ax, [Point3f(shell[1, k], shell[2, k], shell[3, k]) for k in axes(shell, 2)];
         color = [bead_colour[c] for c in shell_cls], markersize = 5)
 
@@ -265,16 +265,16 @@ function sasa_hydro_figure(;
         st = atom_sample_points(sc.mol, i, n_show, probe)
         ex = [Point3f(p...) for (p, e) in zip(st.pts, st.exposed) if e]
         oc = [Point3f(p...) for (p, e) in zip(st.pts, st.exposed) if !e]
-        isempty(oc) || scatter!(ax, oc; color = OCCLUDED_COLOR, markersize = 5)
-        isempty(ex) || scatter!(ax, ex; color = EXPOSED_COLOR, markersize = 5)
+        isempty(oc) || scatter!(ax, oc; color = OCCLUDED_COLOUR, markersize = 5)
+        isempty(ex) || scatter!(ax, ex; color = EXPOSED_COLOUR, markersize = 5)
     end
 
-    els = [MarkerElement(color = ATOM_COLOR, marker = :circle, markersize = 14),
-        MarkerElement(color = DUMMY_COLOR, marker = :circle, markersize = 10),
-        MarkerElement(color = CONCAVE_COLOR, marker = :circle, markersize = 10),
-        MarkerElement(color = CAVITY_COLOR, marker = :circle, markersize = 10),
-        MarkerElement(color = EXPOSED_COLOR, marker = :circle, markersize = 10),
-        MarkerElement(color = OCCLUDED_COLOR, marker = :circle, markersize = 10)]
+    els = [MarkerElement(color = ATOM_COLOUR, marker = :circle, markersize = 14),
+        MarkerElement(color = DUMMY_COLOUR, marker = :circle, markersize = 10),
+        MarkerElement(color = CONCAVE_COLOUR, marker = :circle, markersize = 10),
+        MarkerElement(color = CAVITY_COLOUR, marker = :circle, markersize = 10),
+        MarkerElement(color = EXPOSED_COLOUR, marker = :circle, markersize = 10),
+        MarkerElement(color = OCCLUDED_COLOUR, marker = :circle, markersize = 10)]
     Legend(fig[2, 1], els,
         ["atom (expanded radius)",
             @sprintf("bead: convex (%.3f A^2 each)",

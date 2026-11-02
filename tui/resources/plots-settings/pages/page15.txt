@@ -1,0 +1,24 @@
+   ║        name            ║        description          ║      value        ║
+   ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
+ > ╠ PLOT_MARKERSIZE        ╬ Radius, in points, of the   ╬                   ╣
+   ║                        ║ data markers.               ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_LW_ERRORBAR       ╬ Width, in points, of the    ╬                   ╣
+   ║                        ║ error bars.                 ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_WHISKERWIDTH      ╬ Length, in points, of the   ╬                   ╣
+   ║                        ║ end caps (whiskers) of the  ║                   ║
+   ║                        ║ error bars.                 ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_AXIS_LW           ╬ Line width, in points, of   ╬                   ╣
+   ║                        ║ the axes.                   ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓ ║   plots [4 / 8]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)

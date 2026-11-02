@@ -1,0 +1,24 @@
+   ║        name            ║        description          ║      value        ║
+   ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
+   ╠ N_CHAINS               ╬ Number of independent       ╬                   ╣
+   ║                        ║ chains. Chains 1 and 2      ║                   ║
+   ║                        ║ start at the maximum a      ║                   ║
+   ║                        ║ posteriori (MAP) point;     ║                   ║
+   ║                        ║ the others start in         ║                   ║
+   ║                        ║ mirrored pairs.             ║                   ║
+   ║                        ║                             ║                   ║
+ > ╠ CHAIN_START_RADII      ╬ Start distances, in         ╬                   ╣
+   ║                        ║ standard deviations, from   ║                   ║
+   ║                        ║ the MAP point of mirrored   ║                   ║
+   ║                        ║ chain pairs (±r). Far       ║                   ║
+   ║                        ║ starts find second modes.   ║                   ║
+   ║                        ║ Not recommended to change.  ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ OPTIMUM_CHAIN_CAP      ╬ Cap on the number of extra  ╬                   ╣
+   ║                        ║ chains started at optima.   ║                   ║
+   ║                        ║ Not recommended to change.  ║                   ║
+   ║                        ║                             ║                   ║
+   ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓↑║  sampler [2 / 8]  ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)

@@ -1,0 +1,24 @@
+   ║        name            ║        description          ║      value        ║
+   ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
+   ╠ PLOT_TICK_LENGTH_CM    ╬ Length, in centimetres, of  ╬                   ╣
+   ║                        ║ the major ticks; minor      ║                   ║
+   ║                        ║ ticks are half as long.     ║                   ║
+   ║                        ║                             ║                   ║
+ > ╠ PLOT_LINMIN_TICKS      ╬ Number of minor ticks       ╬                   ╣
+   ║                        ║ between major ticks on      ║                   ║
+   ║                        ║ linear axes.                ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_LW_MAJOR_TICK     ╬ Width, in points, of the    ╬                   ╣
+   ║                        ║ major ticks.                ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_LW_MINOR_TICK     ╬ Width, in points, of the    ╬                   ╣
+   ║                        ║ minor ticks.                ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ PLOT_TICK_COLOUR       ╬ Colour of the ticks.        ╬                   ╣
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓↑║   plots [7 / 8]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)

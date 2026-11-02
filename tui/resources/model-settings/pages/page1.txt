@@ -1,0 +1,24 @@
+   ║        name            ║        description          ║      value        ║
+   ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
+ > ╠ BOUNDS_δρ₁₂            ╬ Hard limits (low, high) on  ╬                   ╣
+   ║                        ║ the hydration-shell         ║                   ║
+   ║                        ║ contrasts δρ₁ and δρ₂, in   ║                   ║
+   ║                        ║ CRYSOL's units.             ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ MODE_δρ₁₂              ╬ Most likely value of δρ₁    ╬                   ╣
+   ║                        ║ and δρ₂ (CRYSOL's default   ║                   ║
+   ║                        ║ is 1). Must lie inside the  ║                   ║
+   ║                        ║ bounds.                     ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ κ_δρ₁₂                 ╬ Concentration of the δρ₁    ╬                   ╣
+   ║                        ║ and δρ₂ Beta priors.        ║                   ║
+   ║                        ║ Higher is tighter; 14 gives ║                   ║
+   ║                        ║ a standard deviation of     ║                   ║
+   ║                        ║ about 1.                    ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ║                        ║                             ║                   ║
+   ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓ ║   model [1 / 5]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃              ┃ reset all: ^r     (^ is ctrl key)

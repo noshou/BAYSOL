@@ -1,0 +1,24 @@
+   ║        name            ║        description          ║      value        ║
+   ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
+   ╠ κ_δρ₃                  ╬ Concentration of the Beta   ╬                   ╣
+   ║                        ║ prior of the cavity         ║                   ║
+   ║                        ║ contrast δρ₃, whose mode    ║                   ║
+   ║                        ║ is bulk-density water.      ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ φ_max                  ╬ Maximum cavity water        ╬                   ╣
+   ║                        ║ density relative to bulk;   ║                   ║
+   ║                        ║ it bounds δρ₃. 1.25 is      ║                   ║
+   ║                        ║ above the densest           ║                   ║
+   ║                        ║ hydration water.            ║                   ║
+   ║                        ║                             ║                   ║
+ > ╠ EXCL_VOL_CORR_BOUNDS   ╬ Hard limits (low, high) on  ╬                   ╣
+   ║                        ║ the excluded-volume         ║                   ║
+   ║                        ║ correction c1. Hitting a    ║                   ║
+   ║                        ║ bound is intended: c1       ║                   ║
+   ║                        ║ cannot absorb model         ║                   ║
+   ║                        ║ misspecification.           ║                   ║
+   ║                        ║                             ║                   ║
+   ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:       ↑║   model [2 / 5]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)

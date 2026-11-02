@@ -63,7 +63,7 @@ Computes a NUTS seed from given data input:
     batch size, forwarded to [`Scattering.forward_cache`](@ref) (results
     invariant, cost/memory tradeoff only).
 -   `thickness::Real = SHELL_THICKNESS`, `probe::Float64 = PROBE_RADIUS`,
-    `n_target::Union{Nothing,Int} = SHELL_N_TARGET`: hydration-shell geometry,
+    `n_target::Union{Nothing,Int} = nothing`: hydration-shell geometry,
     forwarded to [`Scattering.forward_cache`](@ref).
 -   `t::Real = DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to
     [`Inference.seed_sampler`](@ref).
@@ -77,9 +77,12 @@ Computes a NUTS seed from given data input:
 # Exceptions
 - `MolecularStructure.ComponentError`: a residue name is neither in the bundled component
     table nor in the cache and cannot be downloaded (offline).
-- `DomainError`: qvals, `I_exp`, and `σ_exp` have mismatched lengths, or hold non-finite
-    values, or `σ_exp` is not positive, or `rebin < 1`.
-- `ArgumentError`: `qvals/I_exp/σ_exp` are empty, or
+- `DomainError`: qvals, `I_exp`, and `σ_exp` have mismatched lengths.
+- `ArgumentError`: an input is outside its limits (a non-finite or non-positive q, σ_exp,
+    `energy`,
+    `thickness` or κ; a negative `σ_pH` or `probe`; `rebin`, `lMax`, `n_target` or
+    `blm_chunk` below 1; a temperature at or below absolute zero), or `qvals/I_exp/σ_exp`
+    are empty, or
     no point has a positive intensity after binning.
 """
 function seed_model(
@@ -100,7 +103,7 @@ function seed_model(
     thickness::Real = SHELL_THICKNESS,
     t::Real = DEFAULT_TEMPERATURE_C,
     probe::Float64 = PROBE_RADIUS,
-    n_target::Union{Nothing,Int} = SHELL_N_TARGET,
+    n_target::Union{Nothing,Int} = nothing,
     κ_δρ₁₂::Real = κ_δρ₁₂,
     κ_δρ₃::Real = κ_δρ₃,
 )::Inference.Seed
@@ -124,6 +127,25 @@ function seed_model(
         elseif (length(qvals) == 0)
             throw(ArgumentError("qvals, I_exp, and σ_exp cannot be empty"))
         end
+
+        # inputs that must be positive or inside a range (and never a zero divisor)
+        _need(all(isfinite, qvals) && all(>(0), qvals), "q must be finite and positive")
+        _need(all(isfinite, I_exp), "I_exp must be finite")
+        _need(all(x -> isfinite(x) && x > 0, σ_exp), "σ_exp must be finite and positive")
+        _need(isfinite(energy) && energy > 0, "energy must be a positive number of eV")
+        _need(
+            isfinite(pH) && isfinite(σ_pH) && σ_pH ≥ 0,
+            "pH must be finite and σ_pH must not be negative",
+        )
+        _need(isfinite(t) && t > -273.15, "t must be above absolute zero (°C)")
+        _need(rebin === nothing || rebin ≥ 1, "rebin must be at least 1 (or nothing)")
+        _need(max_bin_bias > 0, "max_bin_bias must be positive")
+        _need(lMax === nothing || lMax ≥ 1, "lMax must be at least 1 (or nothing)")
+        _need(blm_chunk ≥ 1, "blm_chunk must be at least 1")
+        _need(isfinite(thickness) && thickness > 0, "thickness must be positive")
+        _need(isfinite(probe) && probe ≥ 0, "probe must be finite and not negative")
+        _need(n_target === nothing || n_target ≥ 1, "n_target must be ≥ 1 or nothing")
+        _need(κ_δρ₁₂ > 0 && κ_δρ₃ > 0, "κ_δρ₁₂ and κ_δρ₃ must be positive")
 
         # load pdb into cache, then add hydrogens if requested. What the residues are
         # (components) decides how: PARSE with PROPKA, except AMBER without PROPKA for a

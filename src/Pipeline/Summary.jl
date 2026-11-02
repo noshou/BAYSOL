@@ -250,14 +250,12 @@ end
 """
 The summary sheets of a run, in workbook order: `run`, `map`, `quantiles_<interval>`,
 `stdev_from_prior`, then `modes` and `optima` when the run has them and
-`form_factor_log` (one line of text to a row) when there is a log. `quantile_label`
-names the quantiles sheet (`nothing`: the label [`run_model`](@ref) logged, else the
-default's); `n_atoms`, if given, overrides the logged atom
-count.
+`form_factor_log` (one line of text to a row) when there is a log. The quantiles sheet
+is named after the interval [`run_model`](@ref) logged (`2sigma`, else the default's);
+`n_atoms`, if given, overrides the logged atom count.
 """
 function _summary_sheets(
     result;
-    quantile_label::Union{Nothing,AbstractString} = nothing,
     form_factor_log::Union{Nothing,AbstractVector{<:AbstractString}} = nothing,
     n_atoms::Union{Nothing,Integer} = nothing,
 )
@@ -266,11 +264,7 @@ function _summary_sheets(
     n_atoms === nothing || (info["n_atoms"] = n_atoms)
     map_params = map_result === nothing ? nothing : first(map_result)
     sheets = Any[_run_sheet(fit, divergence_rate, map_params, info)]
-    label = something(
-        quantile_label,
-        get(info, "quantile_label", nothing),
-        _sigma_label(DEFAULT_SIGMA),
-    )
+    label = something(get(info, "quantile_label", nothing), _sigma_label(VAL_SIGMA))
     append!(sheets, _result_sheets(result, label))
     for sh in (_modes_sheet(fit.diagnostics), _optima_sheet(fit.diagnostics))
         sh === nothing || push!(sheets, sh)
@@ -348,18 +342,15 @@ function _summary_lines(result)
 
     d = fit.diagnostics
     checks = String[]
-    rhat = filter(!isnan, d.rhat)
-    if !isempty(rhat)
-        r = maximum(rhat)
-        if r > Inference.RHAT_OK
-            push!(checks, @sprintf("NOT converged (R̂ %.3f > %g)", r, Inference.RHAT_OK))
-            push!(
-                notes,
-                "the chains did not converge; run longer before trusting the quantiles",
-            )
-        else
-            push!(checks, @sprintf("converged (R̂ %.3f)", r))
-        end
+    problems = Inference._convergence_problems(d)
+    if isempty(problems)
+        push!(checks, @sprintf("converged (R̂ %.3f)", Inference._worst_rhat(d)))
+    else
+        push!(checks, "NOT converged (" * join(problems, "; ") * ")")
+        push!(
+            notes,
+            "the chains did not converge; run longer before trusting the quantiles",
+        )
     end
     push!(checks,
         divergence_rate == 0 ? "no divergent transitions" :
@@ -399,7 +390,7 @@ Wall clock: 141.3 s
 
 The χ² is the reduced χ² of the MAP on the measured points. Each of `ρₑ`, `δρ₁`,
 `δρ₂` and `δρ₃` is shown as its MAP value with the quantile pair of the run (the
-`sigma` or `quantiles` of [`run_model`](@ref)) in brackets. A check that fails adds a
+`sigma` of [`run_model`](@ref)) in brackets. A check that fails adds a
 `Note:` line in words (chains not converged, more than 1 % divergent transitions,
 `c1` on its bound, several posterior modes). The paths are the ones [`results`](@ref)
 wrote, so call this last; the line for a file that was not written is left out.

@@ -4,35 +4,19 @@
 
 """
 The quantile levels of a run's interval and the label that names its sheet, from the
-`quantiles` ("<lo>-<hi>") or the `sigma` given to [`run_model`](@ref); neither means
-`DEFAULT_SIGMA`.
+`sigma` given to [`run_model`](@ref); `nothing` means `VAL_SIGMA`. The levels are those a
+Normal has at ±`sigma` σ.
 
 # Returns
-- `(p_lo, p_hi, label)`: the levels in [0, 1] and the label, `"<lo>-<hi>"` or
-    `"<k>sigma"`.
+- `(p_lo, p_hi, label)`: the levels in [0, 1] and the label, `"<k>sigma"`.
 
 # Exceptions
-- `ArgumentError` if both are given.
-- `DomainError` if `sigma` is not in `(0, MAX_SIGMA]` or `quantiles` is not a valid range.
+- `DomainError` if `sigma` is not a finite number above 0.
 """
-function _quantile_spec(quantiles, sigma)
-    quantiles !== nothing && sigma !== nothing &&
-        throw(ArgumentError("give `sigma` or `quantiles`, not both"))
-    if quantiles === nothing
-        k = sigma === nothing ? DEFAULT_SIGMA : Float64(sigma)
-        0 < k ≤ MAX_SIGMA || throw(DomainError(k, "sigma must be in (0, $MAX_SIGMA]"))
-        return cdf(Normal(), -k), cdf(Normal(), k), _sigma_label(k)
-    end
-    m = match(r"^(\d+)-(\d+)$", quantiles)
-    m === nothing && throw(DomainError(quantiles, "quantiles must be '<#>-<#>'"))
-    q_1, q_2 = parse(Int64, m.captures[1]), parse(Int64, m.captures[2])
-    if q_1 ≥ q_2 || q_2 > 100
-        # "0-0" means no quantile filtering: the full 0th-100th percentile range spans
-        # (and so filters out nothing from) the data
-        q_1 == 0 && q_2 == 0 && return 0.0, 1.0, String(quantiles)
-        throw(DomainError((q_1, q_2), "invalid quantile range"))
-    end
-    return q_1 / 100, q_2 / 100, String(quantiles)
+function _sigma_spec(sigma)
+    k = sigma === nothing ? VAL_SIGMA : Float64(sigma)
+    (isfinite(k) && k > 0) || throw(DomainError(k, "sigma must be a finite number above 0"))
+    return cdf(Normal(), -k), cdf(Normal(), k), _sigma_label(k)
 end
 
 "The sheet label of a `sigma` interval: `2sigma`, `0.5sigma` (ASCII, as sheet names are)."
@@ -69,7 +53,10 @@ function _curve_bands(qvals::AbstractVector, curves::AbstractMatrix, p_lo::Real,
             sort!(col)
             lo, hi = quantile(col, (p_lo, p_hi); sorted = true)
             first_in, last_in = searchsortedfirst(col, lo), searchsortedlast(col, hi)
-            first_in ≤ last_in || error("Illegal state: filtered cannot be empty!")
+            first_in ≤ last_in || error(
+                "no posterior draw lies between the quantile bounds at q index $q ",
+                "(are the draws non-finite?)",
+            )
             quantiles[q, :] .= (qvals[q], lo, hi)
             bounds[q, :] .= (qvals[q], col[first_in], col[last_in])
         end
@@ -164,39 +151,40 @@ trajectory's sample covariance, starting from the identity in the whitened coord
 
 # Arguments
 - `seed::Seed`: priors, initial point, forward cache, and data.
-- `n_samples::Int64=DEFAULT_N_SAMPLES`: total number of NUTS iterations (including the
+- `n_samples::Int64=N_ADAPT + N_DRAWS`: total number of NUTS iterations (including the
     `n_adapt` warm-up steps); the default is 1000.
-- `n_adapt::Int64=DEFAULT_N_ADAPT`: number of warm-up iterations spent adapting the step
+- `n_adapt::Int64=N_ADAPT`: number of warm-up iterations spent adapting the step
     size and mass matrix before sampling proper; the default is 300, leaving
-    `DEFAULT_N_DRAWS` = 700 posterior draws.
+    `N_DRAWS` = 700 posterior draws.
 
 # Keywords
 - `sigma::Union{Nothing,Real}=nothing`: the half-width, in σ, of the interval of
     [`QuantileResult`](@ref)'s "quantiles"/"bounds" entries: the empirical quantiles of
     the draws at the percentiles a Normal has at ±`sigma` σ (`2` gives 2.28 – 97.72, `1`
-    gives 15.87 – 84.13, `0.5` gives 30.85 – 69.15), `0 < sigma ≤ MAX_SIGMA` (3). The
-    interval is that of the draws, not a Normal fitted to them, and the percentiles used
-    are in the `run` sheet. Neither `sigma` nor `quantiles` given means
-    `DEFAULT_SIGMA` (2).
-- `quantiles::Union{Nothing,AbstractString}=nothing`: the same interval as a
-    "<lo>-<hi>" range of percentages (integers, 0 ≤ lo < hi ≤ 100), e.g. `"5-95"`, instead
-    of `sigma`; giving both is an error. The special case "0-0" means *no* filtering.
-- `δ::Real=DEFAULT_TARGET_ACCEPT`: target acceptance rate as a percentage,
-    (0, 100) exclusive (validated below); the default, `DEFAULT_TARGET_ACCEPT`,
+    gives 15.87 – 84.13, `0.5` gives 30.85 – 69.15), any finite `sigma > 0` (there is no
+    upper limit: beyond about 3σ the quantiles of a few thousand draws rest on a handful
+    of draws). The interval is that of the draws, not a Normal fitted to them, and the
+    percentiles used are in the `run` sheet. `nothing` means `VAL_SIGMA` (2).
+- `δ::Real=TARGET_ACCEPT`: target acceptance rate as a percentage,
+    (0, 100) exclusive (validated below); the default, `TARGET_ACCEPT`,
     is 95%.
-- `rng_seed::Union{Nothing,Integer}=nothing`: the run's random seed (see
-    [`Inference.infer`](@ref)). To reproduce a fit exactly, pass the
-    `rng_seed` row of its run log (or the `run` sheet); `nothing` picks
-    a fresh one (so `Random.seed!` before the call also fixes the run).
+- `rng_seed::Union{Nothing,Integer}=Inference.RNG_SEED` (0):
+    the run's random seed (see [`Inference.infer`](@ref)). To reproduce a fit exactly,
+    pass the `rng_seed` row of its run log (or the `run` sheet); `nothing` picks
+    a fresh one (so `Random.seed!` before the call also fixes the run). The default, 0,
+    makes every run reproducible.
 
-- `n_chains::Int=Inference.DEFAULT_N_CHAINS`: number of NUTS chains (8; chain
+- `n_chains::Int=Inference.N_CHAINS`: number of NUTS chains (8; chain
     1 at the MAP, the others at deterministic distances from it, in mirrored
     pairs); see [`Inference.infer`](@ref). The draws of the chains that did not
     fail are pooled, and the report gives the split R̂ and ESS of the pool.
-- `retry::Bool=true`: rerun the sampler once, longer and from derived seeds, when R̂
-    is above [`Inference.RETRY_RHAT`](@ref); see [`Inference.infer`](@ref).
-- `jitter_seed::Integer=Inference.DEFAULT_JITTER_SEED`: seed
-    of the jittered chain starts, separate from `rng_seed`.
+- `retry::Bool=Inference.RETRY` (true; a CLI and developer switch, not a setting):
+    rerun the sampler once, longer, always adapting again and from derived seeds, when the
+    run does not count as converged (R̂ above [`Inference.RHAT_OK`](@ref), an ESS below
+    [`Inference.ESS_MIN`](@ref), or either not computable); see
+    [`Inference.infer`](@ref). If the run is still not converged, `run_model` throws
+    [`Inference.NotConvergedError`](@ref) and nothing is reported. `retry = false` skips
+    both the rerun and the error: the run is only flagged in its summary.
 
 # Returns
 A 4-tuple (fit, divergencerate, map, curve):
@@ -206,31 +194,31 @@ A 4-tuple (fit, divergencerate, map, curve):
 -   `divergence_rate::Float64`: fraction of fit's draws AdvancedHMC.jl
     flagged as numerically divergent, [0, 1].
 -   `map/curve`: either both nothing or a [`MAPResult`](@ref)/[`QuantileResult`](@ref) pair.
+
+# Exceptions
+- [`Inference.NotConvergedError`](@ref) if the run is not converged after its retry
+    (`retry = true`): nothing is returned, so nothing can be reported.
+- `DomainError` if `n_adapt < 1`, `n_samples ≤ n_adapt`, `sigma` is not a finite number
+    above 0, or `δ` is not strictly inside (0, 100); `n_chains < 1`.
 """
 function run_model(
     seed::Inference.Seed,
-    n_samples::Int64 = DEFAULT_N_SAMPLES,
-    n_adapt::Int64 = DEFAULT_N_ADAPT;
+    n_samples::Int64 = N_ADAPT + N_DRAWS,
+    n_adapt::Int64 = N_ADAPT;
     sigma::Union{Nothing,Real} = nothing,
-    quantiles::Union{Nothing,AbstractString} = nothing,
-    δ::Real = DEFAULT_TARGET_ACCEPT,
-    rng_seed::Union{Nothing,Integer} = nothing,
-    n_chains::Int = Inference.DEFAULT_N_CHAINS,
-    jitter_seed::Integer = Inference.DEFAULT_JITTER_SEED,
-    retry::Bool = true,
+    δ::Real = TARGET_ACCEPT,
+    rng_seed::Union{Nothing,Integer} = Inference.RNG_SEED,
+    n_chains::Int = Inference.N_CHAINS,
+    retry::Bool = Inference.RETRY,
 )::Union{
     Tuple{Inference.Inferred,Float64,MAPResult,QuantileResult},
     Tuple{Inference.Inferred,Float64,Nothing,Nothing},
 }
 
-    q_1, q_2, quantile_label = _quantile_spec(quantiles, sigma)
-
-    # "0-0" means no quantile filtering: reuse the same quantile/map_bounds
-    # machinery below with the full 0th-100th percentile range, which by
-    # construction spans (and therefore filters out nothing from) the data.
-    if q_1 == 0 && q_2 == 0
-        q_1, q_2 = 0.0, 1.0
-    end
+    n_adapt ≥ 1 || throw(DomainError(n_adapt, "n_adapt must be at least 1"))
+    n_samples > n_adapt ||
+        throw(DomainError(n_samples, "n_samples must exceed n_adapt, to leave draws"))
+    q_1, q_2, quantile_label = _sigma_spec(sigma)
 
     if seed.timing !== nothing
         seed.timing.info["n_atoms"]         = seed.fw.n_atoms
@@ -246,7 +234,11 @@ function run_model(
     # calculate unfiltered fit
     fit_unfiltered =
         Inference.infer(seed, n_samples, n_adapt; δ = δ, rng_seed = rng_seed,
-            n_chains = n_chains, jitter_seed = jitter_seed, retry = retry)
+            n_chains = n_chains, retry = retry)
+    if retry
+        problems = Inference._convergence_problems(fit_unfiltered.diagnostics)
+        isempty(problems) || throw(Inference.NotConvergedError(problems))
+    end
     t_post = tick()
 
     # filter-out the warm-up draws of every chain
@@ -363,7 +355,11 @@ function run_model(
         function map_bounds(lo, hi, x)
             filtered = (item for item in x if lo ≤ item ≤ hi)
             if (isempty(filtered))
-                error("Illegal state: filtered cannot be empty!")
+                error(
+                    "no value lies between the bounds $lo and $hi, so the interval ",
+                    "is empty ",
+                    "(are the draws non-finite?)",
+                )
             end
             return extrema(filtered)
         end

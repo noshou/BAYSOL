@@ -20,7 +20,7 @@ using BAYSOL.Scattering: species_multipoles, forward_cache, ForwardCache,
     excluded_volume_factor, gram, partial_wave_weights, self_scatter, cross_scatter,
     hydration,
     intensity_terms, model_intensity, cavity_shell_fraction,
-    SHELL_THICKNESS, PROBE_RADIUS, SHELL_N_TARGET, B_LM_CHUNK
+    SHELL_THICKNESS, PROBE_RADIUS, B_LM_CHUNK
 using BAYSOL.MolecularStructure: create, radii, vols
 using BAYSOL.PhysicalConstants: UNIT_OF_δρ
 using LinearAlgebra: Symmetric, issymmetric, eigvals
@@ -58,13 +58,12 @@ iy_w    = partial_wave_weights(iy_lMax)
     @testset "module-level config constants" begin
         @test SHELL_THICKNESS === 3.0
         @test PROBE_RADIUS === 1.4
-        @test SHELL_N_TARGET === nothing
         @test B_LM_CHUNK isa Unsigned
         # the primitives really do read these as their defaults
         m = fwd_mol()
         @test hydration(m, fwd_q, 2, fwd_chunk) ==
               hydration(m, fwd_q, 2, fwd_chunk; thickness = SHELL_THICKNESS,
-            probe = PROBE_RADIUS, n_target = SHELL_N_TARGET)
+            probe = PROBE_RADIUS, n_target = nothing)
     end
 
     @testset "species_multipoles: 5 species in canonical order" begin

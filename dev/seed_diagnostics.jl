@@ -117,9 +117,9 @@ from the global RNG (the MAP starts, the step-size search and the sampler), whic
 - `seed::Inference.Seed`.
 
 # Keywords
-- `n_samples = Pipeline.DEFAULT_N_SAMPLES`,
-    `n_adapt = Pipeline.DEFAULT_N_ADAPT` (the `run_model`
-    defaults), `δ = Inference.DEFAULT_TARGET_ACCEPT / 100` (target acceptance as a fraction,
+- `n_samples = Pipeline.N_ADAPT + Pipeline.N_DRAWS`,
+    `n_adapt = Pipeline.N_ADAPT` (the `run_model`
+    defaults), `δ = Inference.TARGET_ACCEPT / 100` (target acceptance as a fraction,
     the same constant `run_model` uses, so this tool cannot drift from the pipeline).
 - `c1_tol = F.EXCL_VOL_CORR_TOL`: tolerance for the NUTS log density
     and gradient (the MAP search always uses the package default).
@@ -134,8 +134,8 @@ from the global RNG (the MAP starts, the step-size search and the sampler), whic
 - `ArgumentError` if `n_adapt ≥ n_samples`.
 """
 function nuts_replica(seed::F.Seed; c1_tol = F.EXCL_VOL_CORR_TOL,
-    n_samples = R.DEFAULT_N_SAMPLES,
-    n_adapt = R.DEFAULT_N_ADAPT, δ = F.DEFAULT_TARGET_ACCEPT / 100, rng_seed = nothing,
+    n_samples = R.N_ADAPT + R.N_DRAWS,
+    n_adapt = R.N_ADAPT, δ = F.TARGET_ACCEPT / 100, rng_seed = nothing,
     sp = nothing)
     n_adapt < n_samples || throw(ArgumentError("n_adapt must be < n_samples"))
     # seed first: the MAP starts (when `sp` is not given), the
@@ -506,7 +506,7 @@ found, gradient error from the c1 tolerance, and local curvature along the chain
 
 # Keywords
 - `label = ""`, `n_samples`, `n_adapt` (default: the
-    `run_model` defaults, `Pipeline.DEFAULT_N_SAMPLES`, `DEFAULT_N_ADAPT`).
+    `run_model` defaults, `Pipeline.N_ADAPT + N_DRAWS`, `N_ADAPT`).
 - `reference = nothing`: `(; q, I, σ, q_ref, I_ref)`
     to add the reference curve's χ² on the same points.
 
@@ -517,7 +517,7 @@ found, gradient error from the c1 tolerance, and local curvature along the chain
 - None beyond those of the functions it calls.
 """
 function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing,
-    n_samples = R.DEFAULT_N_SAMPLES, n_adapt = R.DEFAULT_N_ADAPT)
+    n_samples = R.N_ADAPT + R.N_DRAWS, n_adapt = R.N_ADAPT)
     p(args...) = (println(io, args...); flush(io))
     pr = seed.pr
     μ, σ, ξ_of = _space(seed)
@@ -732,7 +732,7 @@ Only the draws the pool keeps are seen: a chain in a mode that keeps no draws, o
 chain that was not pooled, has none to report (its line says so). `rng_seed` is the run's
 (pass the `rng_seed` row of a run log to look at that very run). With
 `rerun = true` it is the run `infer` does when R̂ is above the limit instead (the
-`RETRY_N_ADAPT` / `RETRY_N_DRAWS` size, seeds from `Inference._retry_seeds`), whether or
+`RETRY_N_ADAPT` / `RETRY_N_DRAWS` size, seed from `Inference._retry_seed`), whether or
 not that run was kept.
 
 # Returns
@@ -744,13 +744,12 @@ not that run was kept.
 - None beyond those of [`Inference.infer`](@ref BAYSOL.Inference.infer).
 """
 function chain_report(io::IO, seed::F.Seed; label = "",
-    n_samples = R.DEFAULT_N_SAMPLES, n_adapt = R.DEFAULT_N_ADAPT, rng_seed = 7,
+    n_samples = R.N_ADAPT + R.N_DRAWS, n_adapt = R.N_ADAPT, rng_seed = 7,
     rerun = false, max_listed = 12)
     if rerun
-        base, jitter = F._retry_seeds(rng_seed % UInt64, F.DEFAULT_JITTER_SEED)
+        base = F._retry_seed(rng_seed % UInt64)
         n_samples, n_adapt = F.RETRY_N_ADAPT + F.RETRY_N_DRAWS, F.RETRY_N_ADAPT
-        fit = F.infer(seed, n_samples, n_adapt; rng_seed = base, jitter_seed = jitter,
-            retry = false)
+        fit = F.infer(seed, n_samples, n_adapt; rng_seed = base, retry = false)
     else
         fit = F.infer(seed, n_samples, n_adapt; rng_seed, retry = false)
     end
@@ -758,7 +757,7 @@ function chain_report(io::IO, seed::F.Seed; label = "",
     na = d.n_adapt
     println(io, label, ": ", d.n_chains, " chains, ", na, " warm-up + ",
         n_samples - n_adapt,
-        " draws, rng_seed ", rng_seed, ", δ ", F.DEFAULT_TARGET_ACCEPT,
+        " draws, rng_seed ", rng_seed, ", δ ", F.TARGET_ACCEPT,
         rerun ? "  (the rerun)" : "")
     println(io, "chain  start σ   mode  pooled  kept  div  div%  warm-up div       ε",
         "  steps  accept   mean log π")

@@ -7,5 +7,5 @@ and the MAP search and whitening before it, are on [Inference: sampler](@ref).
 
 ```@autodocs
 Modules = [BAYSOL.Inference]
-Pages   = ["Inference.jl", "Priors.jl", "ProfiledCorrs.jl"]
+Pages   = ["Inference.jl", "Params.jl", "Priors.jl", "ProfiledCorrs.jl"]
 ```

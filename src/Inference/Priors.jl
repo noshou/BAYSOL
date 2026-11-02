@@ -164,7 +164,7 @@ so the mode stays at [`MODE_δρ₁₂`](@ref) if [`BOUNDS_δρ₁₂`](@ref) ev
 """
 function _δρ₁₂_priors(κ::Real)::Tuple{BoundedBeta,BoundedBeta}
     if (κ <= 0)
-        throw(DomainError(κ, "failed assertion: κ > 0"))
+        throw(DomainError(κ, "the prior concentration κ must be positive"))
     end
 
     X = BOUNDS_δρ₁₂[1]
@@ -295,9 +295,9 @@ checked. φ is not a parameter; it is only the derivation of the bounds and the 
 """
 function _δρ₃_prior(κ::Real, ρ̄ₑ::Real)::BoundedBeta
     if (κ <= 0)
-        throw(DomainError(κ, "failed assertion: κ > 0"))
+        throw(DomainError(κ, "the prior concentration κ must be positive"))
     elseif (ρ̄ₑ <= 0)
-        throw(DomainError(ρ̄ₑ, "failed assertion: ρ̄ₑ > 0"))
+        throw(DomainError(ρ̄ₑ, "the mean electron density ρ̄ₑ must be positive"))
     end
 
     X = -ρ̄ₑ / UNIT_OF_δρ

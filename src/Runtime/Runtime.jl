@@ -11,6 +11,8 @@ module Runtime
 
 # --- constants and shared state (the included files use them) ---
 
+# Fixed internals, not settings: changing them could break a run.
+
 "Default byte budget of [`with_gc_paused`](@ref): garbage allowed to
 pile up before a checkpoint collects it (1 GiB)."
 const GC_PAUSE_BUDGET = 1 << 30

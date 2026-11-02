@@ -360,8 +360,7 @@ brute_diameter(P) = maximum(
         @test h1.convex ≈ h2.convex && h1.concave ≈ h2.concave && h1.cavity ≈ h2.cavity
 
         R = BAYSOL.Pipeline
-        @test (R.DEFAULT_N_ADAPT, R.DEFAULT_N_DRAWS, R.DEFAULT_N_SAMPLES) ==
-              (300, 700, 1000)
+        @test (R.N_ADAPT, R.N_DRAWS) == (300, 700)
         # n_samples / n_adapt default to the constants
         @test hasmethod(BAYSOL.run_model, Tuple{typeof(s)})
         res = BAYSOL.run_model(s, 120, 60; retry = false)

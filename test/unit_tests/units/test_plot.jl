@@ -12,7 +12,7 @@ using BAYSOL.Runtime: StageLog, tick, stage_seconds
 using BAYSOL.Pipeline: results, PlotStyle, Reference, _curve_data, _residual_data,
     _histogram_data, _rgba, _log_ticks, _linear_ticks, _tick_labels,
     _fitting_ticks, _sheet_names,
-    PLOT_COLOR_MAP,
+    PLOT_COLOUR_MAP,
     PLOT_HIST_BINS,
     PLOT_HIST_PARAMS
 
@@ -97,12 +97,14 @@ end
 
 @testset "Plot" begin
     @testset "PlotStyle: defaults are the module constants, every one overridable" begin
-        @test PlotStyle().color_map == PLOT_COLOR_MAP
+        @test PlotStyle().color_map == PLOT_COLOUR_MAP
         @test PlotStyle().hist_bins == PLOT_HIST_BINS
         s = PlotStyle(; color_map = "blue", hist_bins = 10, lw_map = 3)
         @test s.color_map == "blue" && s.hist_bins == 10 && s.lw_map == 3.0
         @test PlotStyle().font == BAYSOL.Pipeline.PLOT_FONT
         @test PlotStyle().font == ("TeX Gyre PagellaX", "TeX Gyre Pagella Math")
+        @test PlotStyle().font == (BAYSOL.Pipeline.PLOT_TEXT_FONT,
+            BAYSOL.Pipeline.PLOT_MATH_FONT)
     end
 
     @testset "colours: names, hex strings and (colour, opacity) tuples" begin
@@ -597,8 +599,13 @@ end
     @testset "ticks: black, inward, four sides, major and minor; slanted, padded" begin
         P = BAYSOL.Pipeline
         @test PlotStyle().xtick_angle == P.PLOT_XTICK_ANGLE == 45.0
-        @test PlotStyle().lw_tick == P.PLOT_LW_TICK
-        @test PlotStyle().minor_ticks == P.PLOT_MINOR_TICKS
+        @test PlotStyle().lw_tick == P.PLOT_LW_MAJOR_TICK
+        @test PlotStyle().minor_ticks == P.PLOT_LINMIN_TICKS
+        @test PlotStyle().lw_minor_tick == P.PLOT_LW_MINOR_TICK
+        @test PlotStyle().color_tick == P.PLOT_TICK_COLOUR
+        @test PlotStyle().color_axis == P.PLOT_COLOUR_AXIS
+        @test PlotStyle().xtick_label_pad_pt == P.PLOT_XTICK_LABEL_PAD_PT
+        @test PlotStyle().size_cm == P.PLOT_WIDTH_HEIGHT_CM == (16.0, 11.0)
         result, data, I_true = synthetic_result()
         mktempdir() do dir
             files = results(result, data; dir, preview = false,
@@ -609,15 +616,18 @@ end
             for f in tex
                 src = read(f, String)
                 @test occursin("xtick pos={both}", src) && occursin("ytick pos={both}", src)
-                @test occursin("tick style={{black, line width=0.8pt}}", src)
-                @test occursin("axis line style={{black, line width=1.2pt}}", src)
+                @test occursin("tick style={{bstick, line width=0.8pt}}", src)
+                @test occursin("minor tick style={{bstick, line width=0.8pt}}", src)
+                @test occursin("axis line style={{bsaxis, line width=1.2pt}}", src)
+                @test occursin("\\definecolor{bsaxis}{RGB}{0,0,0}", src)
+                @test occursin("\\definecolor{bstick}{RGB}{0,0,0}", src)
                 @test occursin("yticklabel style={xshift=-4.0pt}", src)
                 # the x labels are drawn: a stub (4 pt) and an elbow (6 pt at 45°) to a
                 # label slanted by 45°; pgfplots prints none, and clips each plot only
                 @test occursin("xticklabels={{}}", src) &&
                       occursin("clip mode={individual}", src)
                 @test occursin("++(0pt,-4.0pt) -- ++(-4.24", src)
-                @test occursin("node[anchor=east, rotate=45.0, inner sep=2pt", src)
+                @test occursin("node[anchor=east, rotate=45.0, inner sep=2.0pt", src)
             end
             # minor ticks: a linear axis (a histogram, the residuals) counts them,
             # a log axis (the fit) has its own

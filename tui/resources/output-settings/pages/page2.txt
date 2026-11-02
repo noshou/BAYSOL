@@ -1,0 +1,24 @@
+   ║        name            ║        description          ║      value        ║
+   ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
+   ╠ TABLE_SIGFIGS          ╬ Significant figures of each ╬                   ╣
+   ║                        ║ workbook number. 17 keeps   ║                   ║
+   ║                        ║ every bit of a 64-bit       ║                   ║
+   ║                        ║ float; 15 is the most that  ║                   ║
+   ║                        ║ is guaranteed.              ║                   ║
+   ║                        ║                             ║                   ║
+ > ╠ VAL_SIGMA              ╬ Half-width, in standard     ╬                   ╣
+   ║                        ║ deviations, of the          ║                   ║
+   ║                        ║ reported interval (2 gives  ║                   ║
+   ║                        ║ 2.28 % to 97.72 %). Not     ║                   ║
+   ║                        ║ advised above 3: too few    ║                   ║
+   ║                        ║ draws.                      ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ FIGURES_TEX            ╬ Write each figure as a      ╬                   ╣
+   ║                        ║ pgfplots .tex file in the   ║                   ║
+   ║                        ║ plots folder. No LaTeX      ║                   ║
+   ║                        ║ installation is needed.     ║                   ║
+   ║                        ║                             ║                   ║
+   ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓↑║   output [1 / 2]  ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃              ┃ reset all: ^r     (^ is ctrl key)

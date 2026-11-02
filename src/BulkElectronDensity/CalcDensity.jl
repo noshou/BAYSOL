@@ -29,7 +29,7 @@ function _ρₑ_w(t::Real)::Tuple{Float64,Float64}
 
     # temperature must be between 0 and 150
     if (t < 0 || t > 150)
-        throw(DomainError(t, "temperature must be between 0°C and 150 °C"))
+        throw(DomainError(t, "temperature must be between 0 and 150 °C"))
     end
 
     # look up in cache if memoized
@@ -148,11 +148,16 @@ function ρₑ(
 
     for s in solutes
         if s.molarity_uncertainty < 0
-            throw(DomainError(s.molarity_uncertainty, "Uncertainty must be ≥ 0"))
+            throw(
+                DomainError(
+                    s.molarity_uncertainty,
+                    "a solute's molarity uncertainty must not be negative",
+                ),
+            )
         elseif s.molarity ≤ 0
-            throw(DomainError(s.molarity, "Molarity must be > 0"))
+            throw(DomainError(s.molarity, "a solute's molarity must be above 0"))
         elseif s.arg == ""
-            throw(ArgumentError("Name or sequence cannot be empty"))
+            throw(ArgumentError("a solute's name or sequence cannot be empty"))
         end
 
         Z_j, ϕ°_j, σ_ϕ°_j = _ρₑ_i(s, pH, σ_pH)

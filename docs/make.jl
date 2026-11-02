@@ -36,6 +36,12 @@ const API_PAGE_OVERRIDES = Dict(
         "Model and priors" => "api/inference.md",
         "Sampler" => "api/inference_sampler.md",
     ],
+    "Pipeline" => [
+        "Entry points" => "api/pipeline.md",
+        "Results and figures" => "api/pipeline_results.md",
+        "Run log and tables" => "api/pipeline_outputs.md",
+        "Settings" => "api/pipeline_settings.md",
+    ],
 )
 
 api_pages(name) = get(API_PAGE_OVERRIDES, name, "api/" * lowercase(name) * ".md")
@@ -79,6 +85,9 @@ for (name, _) in DOC_MODULES
         force = true,
     )
 end
+
+# The terminal interface's README (tui/README.md), copied the same way, as its own page.
+cp(joinpath(REPO_ROOT, "tui", "README.md"), joinpath(GUIDES_DIR, "tui.md"); force = true)
 
 # The test READMEs, with their relative links to each other pointed at the copied pages
 # (the READMEs link to one another as files, which would be dead links on the site).
@@ -138,6 +147,7 @@ makedocs(
     modules = [BAYSOL; last.(DOC_MODULES); DOC_SUBMODULES],
     pages   = [
     "Home" => "index.md",
+    "Terminal UI" => "guides/tui.md",
     "Guides" => [
     name => joinpath("guides", lowercase(name) * ".md") for (name, _) in DOC_MODULES
     ],
