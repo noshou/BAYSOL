@@ -13,7 +13,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 # Everything below lives in a module of its own, so that the helpers and constants of this
 # file cannot clash with those of another file when the aggregator includes them all into
 # Main.
-module NtTest_structure_checks
+module NtTest_struct_chk
 
 using Test
 using BAYSOL

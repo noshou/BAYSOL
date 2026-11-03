@@ -23,7 +23,7 @@ Base.showerror(io::IO, e::StructureSourceError) = print(io, "StructureSourceErro
 
 """
 Where to obtain a protein structure from. One concrete subtype per input
-shape; [`resolve_structure`](@ref) dispatches on it to produce a canonical,
+shape; [`reslove_struct`](@ref) dispatches on it to produce a canonical,
 cached local .pdb path.
 """
 abstract type StructureSource end
@@ -144,15 +144,15 @@ function _resolve_canonical_pdb(struc, key::AbstractString)::String
 end
 
 """
-    resolve_structure(source::StructureSource) -> String
+    reslove_struct(source::StructureSource) -> String
 
 Resolve source to an absolute path to a canonical .pdb file in
 [`_store_dir`](@ref) (model 1 only; modified nucleotides kept; no waters, ions, ligands
 or hydrogens). See [`StructureSource`](@ref) and its subtypes for per-variant behaviour.
 """
-function resolve_structure end
+function reslove_struct end
 
-function resolve_structure(source::LocalPathSource)::String
+function reslove_struct(source::LocalPathSource)::String
     path = source.path
     isfile(path) || throw(StructureSourceError("no such file: $path"))
     ext = lowercase(splitext(path)[2])
@@ -182,7 +182,7 @@ function resolve_structure(source::LocalPathSource)::String
     end
 end
 
-function resolve_structure(source::PDBIDSource)::String
+function reslove_struct(source::PDBIDSource)::String
     id = uppercase(source.id)
     existing = joinpath(_store_dir(), id * ".pdb")
     isfile(existing) && return existing   # presence trusted outright, no re-fetch
@@ -223,7 +223,7 @@ function _sniff_format(path::AbstractString)
     return PDBFormat
 end
 
-function resolve_structure(source::URLSource)::String
+function reslove_struct(source::URLSource)::String
     url = source.url
     key = source.id
 

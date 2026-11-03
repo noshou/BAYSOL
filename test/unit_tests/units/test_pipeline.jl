@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Exercises the structure-loading pipeline's primitives composing correctly
-# end to end: resolve_structure -> propka_pKas -> resolve_hydrogens ->
+# end to end: reslove_struct -> propka_pKas -> resolve_hydrogens ->
 # load_molecule, written out explicitly the way real calling code composes
 # them (there is no bundled orchestration function in the library -- callers
 # do this composition themselves). Needs real subprocess access for
@@ -9,7 +9,7 @@
 # network access, since the fixture used here is a local .pdb.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule,
+using BAYSOL.MolecularStructure: LocalPathSource, reslove_struct, load_molecule,
     _store_dir, Molecule, n_atoms, elms, coords_cartesian
 using BAYSOL.Hydrogenator: propka_pKas, resolve_hydrogens, Propka
 
@@ -17,7 +17,7 @@ const _PIPELINE_FIXTURE =
     joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1CRN-TEST.pdb")
 
 # …load_molecule
-@testset "pipeline: resolve_structure -> propka_pKas -> resolve_hydrogens ->" begin
+@testset "pipeline: reslove_struct -> propka_pKas -> resolve_hydrogens ->" begin
 
     @test isfile(_PIPELINE_FIXTURE)
 
@@ -32,7 +32,7 @@ const _PIPELINE_FIXTURE =
     source = LocalPathSource(_PIPELINE_FIXTURE)
     pH = 7.0
 
-    path = resolve_structure(source)
+    path = reslove_struct(source)
     mol_heavy = load_molecule(path)
     pKa_records = propka_pKas(path)
     hpath = resolve_hydrogens(path, pH; titration = Propka(pKa_records))

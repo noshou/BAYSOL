@@ -17,7 +17,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using BAYSOL.MolecularStructure: Molecule, create, coords_cartesian, coords_spherical,
     radii, vols, r_max, elms, name,
     MoleculeError, _to_tuples,
-    LocalPathSource, resolve_structure, load_molecule, _store_dir
+    LocalPathSource, reslove_struct, load_molecule, _store_dir
 using BAYSOL.Hydrogenator: propka_pKas, resolve_hydrogens, Propka
 using BAYSOL.Geometry: sphere_volume
 using BAYSOL.Scattering: mean_atomic_radius
@@ -344,7 +344,7 @@ _forced_rmax(m)  = getfield(getfield(m, :_r_max), :done)
     # Needs real subprocess access for PROPKA/Pdb2pqr (same assumption as
     # test_pipeline.jl/test_pdb2pqr.jl); no network access, since the PDB is a
     # local fixture. Composes the pipeline primitives exactly as
-    # `BAYSOL.run_model` does (`src/BAYSOL.jl`): resolve_structure ->
+    # `BAYSOL.run_model` does (`src/BAYSOL.jl`): reslove_struct ->
     # propka_pKas -> resolve_hydrogens -> load_molecule.
 
     @testset "total excluded volume on SASDMJ9 is close to CRYSOL's own reported Vol" begin
@@ -366,7 +366,7 @@ _forced_rmax(m)  = getfield(getfield(m, :_r_max), :done)
         rm(joinpath(_store_dir(), "$(stem)_pH7.5_parse_propka.pdb"); force = true)
 
         pH          = 7.5   # matches test/fitting_tests/SASDMJ9/SASDMJ9.jl's PH
-        path        = resolve_structure(LocalPathSource(pdb_path))
+        path        = reslove_struct(LocalPathSource(pdb_path))
         pKa_records = propka_pKas(path)
         hpath       = resolve_hydrogens(path, pH; titration = Propka(pKa_records))
         mol         = load_molecule(hpath)

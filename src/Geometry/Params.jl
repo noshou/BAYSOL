@@ -79,10 +79,10 @@ const SASA_N_OCC = 104
 @assert(BEAD_RAY_RANGE > 0 && BEAD_RAY_DIRS ≥ 1, "BEAD_RAY_RANGE > 0 and BEAD_RAY_DIRS ≥ 1")
 
 """
-The limits of each setting above that has one, read by the terminal interface when a
-user edits a value (`dev/harvest_defaults.jl` copies them to `default_settings.edn`). Each
-limit is `above` or `below` (strict) or `at_least` or `at_most` (inclusive). Limits that
-tie two settings together (`SASA_N_OCC` ≤ `SHELL_SAMPLE`) stay in the checks above.
+The limits of each setting above that has one, read by the terminal interface when a user
+edits a value (`dev/scripts/harvest_defaults.jl` copies them to `default_settings.edn`).
+Each limit is `above` or `below` (strict) or `at_least` or `at_most` (inclusive). Limits
+that tie two settings together (`SASA_N_OCC` ≤ `SHELL_SAMPLE`) stay in the checks above.
 """
 const SETTING_LIMITS = (
     PROBE_RADIUS = (at_least = 0,),

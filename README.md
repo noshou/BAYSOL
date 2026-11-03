@@ -486,75 +486,58 @@ BAYSOL.print_summary(res)                        # χ², the parameters, the che
 
 `results` also takes `compile = true` (PDF, SVG or PNG; needs `lualatex` or `xelatex`), a `PlotStyle`, a `font`, and `run_log = true` for the run log. Every option is explained in the [Pipeline guide](src/Pipeline/README.md). Start Julia with `julia -t auto` to use several threads; results are the same at any thread count ([Runtime guide](src/Runtime/README.md)).
 
-## For developers: the scripting tools and the tests
+## For developers: the tools and the tests
 
-BAYSOL itself is Julia. Everything around it (running the tests, comparing results between versions, formatting, benchmarks, rendering figures, building the docs) is a small script written in **Clojure** and run by **[Babashka](https://babashka.org)** (`bb`), a Clojure interpreter that starts in milliseconds, so there is nothing to build. You do not need to know Clojure to *use* the tools; you do to change them. The dev tools were written on Linux (ARM); on Windows, use WSL.
+BAYSOL is Julia, and so are the tools around it (tests, result comparison, formatting, benchmarks, figures, the docs build). They are the package `Dev` in [`dev/`](dev/README.md), started with one script, `dev/bysl.jl`, on Linux, macOS and Windows.
 
 ### What to install
 
 | Tool | Used for | Needed? |
 |------|----------|---------|
-| **Julia 1.12** | the package, the unit suite, the docs build | yes (install as in "Step 2" above; set `JULIA=/path/to/julia` to use another) |
-| **Babashka** (`bb`) | runs every dev tool and the tasks in [`bb.edn`](https://github.com/noshou/BAYSOL/blob/master/bb.edn) | yes |
-| **Java** (any recent JDK or JRE) | zprint, the Clojure formatter that `bb fmt` downloads and runs | for `bb fmt` and `bb precommit` |
-| **clj-kondo** | lints the Clojure code | for `bb lint` and `bb precommit` |
-| **git** | `bb compare` reads other revisions | for `bb compare` |
-| **LuaLaTeX or XeLaTeX** (TeX Live), plus poppler for PNG/SVG | `bb render-plots` and `bb fonts` | optional |
-
-Install lines (see [babashka.org](https://babashka.org) and [clj-kondo](https://github.com/clj-kondo/clj-kondo) for other routes):
-
-```
-# macOS (Homebrew)
-brew install borkdude/brew/babashka borkdude/brew/clj-kondo
-brew install --cask temurin                    # a JDK, for zprint
-
-# Linux (and WSL on Windows); Java from your package manager, e.g.  sudo apt install default-jre
-curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install && chmod +x install && sudo ./install
-curl -sLO https://raw.githubusercontent.com/clj-kondo/clj-kondo/master/script/install-clj-kondo && chmod +x install-clj-kondo && sudo ./install-clj-kondo
-```
+| **Julia 1.12** | the package, the tools, the unit suite, the docs build | yes (as in "Step 2" above; `JULIA=/path/to/julia` picks another) |
+| **git** | `bysl results compare` reads other revisions | for that |
+| **LuaLaTeX or XeLaTeX** (TeX Live), plus poppler for PNG/SVG | `bysl plots` | optional |
 
 ### One-time setup
 
-Four Julia environments exist (the root package, the unit suite, the fitting tests, and the docs), plus one for the formatter. Instantiate the ones you will use, from the repository root:
+Instantiate the Julia environments you will use, from the repository root:
 
 ```
+julia --project=dev -e 'using Pkg; Pkg.instantiate()'                   # the tools
+julia --project=dev/test -e 'using Pkg; Pkg.instantiate()'              # the tools' tests
 julia --project=test -e 'using Pkg; Pkg.instantiate()'                  # the unit suite
 julia --project=test/fitting_tests -e 'using Pkg; Pkg.instantiate()'    # the fitting tests
-julia --project=test/format -e 'using Pkg; Pkg.instantiate()'           # JuliaFormatter, for bb fmt
+julia --project=test/format -e 'using Pkg; Pkg.instantiate()'           # JuliaFormatter, for bysl fmt
 julia --project=docs -e 'using Pkg; Pkg.instantiate()'                  # the docs build
 ```
 
-### `bb.edn`: the task list
-
-[`bb.edn`](https://github.com/noshou/BAYSOL/blob/master/bb.edn) is Babashka's task file in the repository root. It gives each tool a short `bb <task>` name and a one-line description. Run tasks from the repository root:
+### Running the tools
 
 ```
-bb help                      # every task with its description
-bb tasks                     # print bb.edn itself
-bb <task> --help             # the usage of one tool
+alias bysl='julia --startup-file=no -O0 --compile=min /path/to/BAYSOL/dev/bysl.jl'
+bysl help                    # every tool with a line each
+bysl <tool> --help           # the usage of one tool
 ```
 
-| Task | What it does |
-|------|--------------|
-| `bb unit [names]` | the Julia unit suite (names pick the files: `bb unit shannon wls`) |
-| `bb test [names]` | the tests of the dev tools themselves |
-| `bb fitting-tests --list` | the IDs of the fitting tests; `bb fitting-tests SASDMJ9` runs one |
-| `bb precommit` | every check before a commit (`--quick`: only the fast ones) |
-| `bb fmt` / `bb lint` / `bb linelen --check` | format the Julia and Clojure code, lint it, find lines over 92 characters |
-| `bb docs` | build this documentation site (strict) |
-| `bb render-plots DIR` | turn the figures' `.tex` files into PDF, SVG or PNG |
-| `bb compare REV1 REV2` | compare fitting-test results between git revisions |
-| `bb results-table --update` | regenerate the Results table in the fitting-test README |
-| `bb bench` | the cold/steady benchmark (prints its plan unless `--approved`) |
-
-The scripts do not need `bb.edn`: each also runs directly from any directory, for example `bb dev/precommit.clj --quick`. To add a tool, put a script in `dev/` and give it a task in `bb.edn` (`mytool {:doc "..." :task (script "dev/mytool.clj")}`).
+| Command | What it does |
+|---------|--------------|
+| `bysl unit [names]` | the Julia unit suite (names pick the files: `bysl unit shannon wls`) |
+| `bysl test [names]` | the tests of the tools themselves |
+| `bysl fits list`, `bysl fits run SASDMJ9` | the fitting tests, and running one (all if none is named) |
+| `bysl precommit` | every check before a commit (`--quick`: only the fast ones) |
+| `bysl fmt`, `bysl fmt --lines` | format the code, find lines over 92 characters |
+| `bysl docs` | build this documentation site (strict) |
+| `bysl plots render DIR` | turn the figures' `.tex` files into PDF, SVG or PNG |
+| `bysl results compare REV` | compare fitting-test results with a git revision |
+| `bysl results table --update` | regenerate the Results table in the fitting-test README |
+| `bysl fits bench` | the cold/steady benchmark (prints its plan unless `--approved`) |
 
 ### Where things are
 
 - [dev/README.md](dev/README.md): every tool, its options, the benchmark protocol and the diagnostics.
 - [test/README.md](test/README.md): the test tree. [Unit tests](test/unit_tests/README.md), [fitting tests](test/fitting_tests/README.md) (worked examples, with the Results table), [baselines](test/baselines/README.md) (the reference benchmark of each release), [fixtures](test/fixtures/README.md) (the data the tests read) and [visualizations](test/visualize/README.md).
-- [`dev/tool_tests/`](https://github.com/noshou/BAYSOL/tree/master/dev/tool_tests): the `clojure.test` files for the dev tools (run by `bb test`).
-- Before a commit, run `bb precommit`. It runs the tool tests, the unit suite, formatting, lint, the line-length check, the Results-table check and a strict docs build.
+- `dev/test/`: the tests of the tools (run by `bysl test`).
+- Before a commit, run `bysl precommit`: the tool tests, the unit suite, formatting, the line-length check, the Results-table check and a strict docs build.
 
 ## What the numbers mean
 

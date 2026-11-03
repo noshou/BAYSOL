@@ -22,11 +22,11 @@ using BAYSOL.BulkElectronDensity: NonBiological, Solute
 using Printf: @sprintf
 using BAYSOL.MolecularStructure: component, is_amino_acid, amino_parent, is_nucleotide,
     polymer_selector, nucleotide_selector, load_molecule, n_atoms, elms, coords_cartesian,
-    radii, resolve_structure, LocalPathSource, residue_names, _store_dir, _WARNED,
+    radii, reslove_struct, LocalPathSource, residue_names, _store_dir, _WARNED,
     STANDARD_AMINO_ACIDS, _resolve_parent, _AMINO_PARENTS, _is_amino_type,
     _COMPONENT_DOWNLOAD, _COMPONENT_MEMO, _ComponentNotFound
 using BAYSOL.Hydrogenator: relabel_modified, restore_modified!, resolve_hydrogens, Propka,
-    has_modified_amino, modified_amino_hydrogens, AMINO_ATOM_ALIASES, STANDARD_AMINO_ATOMS,
+    has_modified_amino, moded_aa_hyd, AMINO_ATOM_ALIASES, STANDARD_AMINO_ATOMS,
     _runs_as_parent, _amino_run_as, hydrogenation_choice, heavy_atom_count
 using BAYSOL.Runtime: force
 using BioStructures:
@@ -209,8 +209,8 @@ end
             ref = load_molecule(wr(dir, "ref.pdb", LINES))
             @test n_atoms(mol) == n_atoms(ref)           # MSE kept, six extras dropped
             @test count(e -> lowercase(e) == "se", elms(mol)) == 1
-            # the same through resolve_structure for a .pdb (used in place) and a .cif
-            @test n_atoms(load_molecule(resolve_structure(LocalPathSource(path)))) ==
+            # the same through reslove_struct for a .pdb (used in place) and a .cif
+            @test n_atoms(load_molecule(reslove_struct(LocalPathSource(path)))) ==
                   n_atoms(ref)
             # all residues written as HETATM: all kept
             @test n_atoms(load_molecule(wr(dir, "het.pdb", allhet()))) == n_atoms(ref)
@@ -375,7 +375,7 @@ end
             @test count(e -> lowercase(e) == "s", elms(mol)) ==
                   count(e -> lowercase(e) == "s", elms(load_molecule(ref.hp))) - 1
             # the diagnostic of the timing log
-            d = modified_amino_hydrogens(r.hp, r.infos)
+            d = moded_aa_hyd(r.hp, r.infos)
             @test d.residues == 1 && d.with_parent == 1 && d.no_parent == 0
             @test d.placed == count(is_h, res) > 0
         end
@@ -401,7 +401,7 @@ end
             @test count(is_h, res) == in_h > 0
             @test r.h ==
                   ref.h - count(is_h, [l for l in ref.out if res_of(l) == ALA1]) + in_h
-            d = modified_amino_hydrogens(r.hp, r.infos)
+            d = moded_aa_hyd(r.hp, r.infos)
             @test (d.residues, d.with_parent, d.no_parent, d.placed) == (1, 0, 1, in_h)
         end
 
@@ -416,7 +416,7 @@ end
             @test unique(name_of.(res)) == ["MSE"]
             @test sort([atom_of(l) for l in res if !is_h(l)]) ==
                   sort([atom_of(l) for l in lines if res_of(l) == MET1 && !is_h(l)])
-            d = modified_amino_hydrogens(r.hp, r.infos)
+            d = moded_aa_hyd(r.hp, r.infos)
             @test (d.residues, d.with_parent, d.no_parent) == (1, 0, 1)
         end
 
@@ -438,17 +438,17 @@ end
             end
             names(log) = [s.name for s in log.stages]
             note(log, n) = only(s.note for s in log.stages if s.name == n)
-            wiring = ("resolve_structure", "components", "structure checks", "classify",
+            wiring = ("reslove_struct", "components", "structure checks", "classify",
                 "propka", "pdb2pqr", "modified amino acid hydrogens", "heavy atoms",
                 "load_molecule")
             log = seeded("nt-amino-seed", mse("HETATM"))
-            @test filter(in(wiring), names(log)) == ["resolve_structure", "components",
+            @test filter(in(wiring), names(log)) == ["reslove_struct", "components",
                 "structure checks", "classify", "propka", "pdb2pqr",
                 "modified amino acid hydrogens", "heavy atoms", "load_molecule"]
             # the protein-only route: no force-field suffix on the stage, PARSE in the note
             @test note(log, "classify") == "[protein: PARSE, titration propka]"
             r = hydrogenated("nt-amino-seed", mse("HETATM"))
-            d = modified_amino_hydrogens(r.hp, r.infos)
+            d = moded_aa_hyd(r.hp, r.infos)
             @test note(log, "modified amino acid hydrogens") ==
                   "[1 residues: 1 hydrogenated through their parent, 0 without a parent; " *
                   "$(d.placed) hydrogens placed]"
@@ -461,7 +461,7 @@ end
             # none of them: no such stage
             log = seeded("nt-amino-seed-ref", LINES)
             @test !("modified amino acid hydrogens" in names(log))
-            @test filter(in(wiring), names(log)) == ["resolve_structure", "components",
+            @test filter(in(wiring), names(log)) == ["reslove_struct", "components",
                 "structure checks", "classify", "propka", "pdb2pqr", "heavy atoms",
                 "load_molecule"]
         end
@@ -483,7 +483,7 @@ end
             hp = resolve_hydrogens(path, 7.4; ff = :parse, titration = Propka())
             infos = component.(residue_names(path))
             @test n_atoms(load_molecule(hp)) == 14270
-            d = modified_amino_hydrogens(hp, infos)
+            d = moded_aa_hyd(hp, infos)
             @test (d.residues, d.with_parent, d.no_parent) == (20, 20, 0)
             @test d.placed == 183
             # SASDB48: the twenty standard names written as HETATM, no amino-acid stage

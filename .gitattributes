@@ -24,23 +24,37 @@ test/**/*.clj linguist-detectable=true
 test/**/*.edn linguist-detectable=true
 test/**/Project.toml linguist-detectable=true linguist-generated=false
 
-# bb.edn and .clj-kondo/config.edn are Clojure data; count and highlight them as Clojure
+# .clj-kondo/config.edn and the TUI's .edn files are Clojure data; count and highlight them as Clojure
 # (Linguist otherwise files .edn under its own data-only "edn" language).
 *.edn linguist-language=Clojure
 *.edn linguist-detectable=true
 
-# TOMLs
+# TOMLs: every Project.toml (root, docs/, test/ and its environments, dev/ and dev/test/) and
+# CondaPkg.toml is hand-written and counts; every Manifest.toml is generated and stays out.
 *.toml linguist-detectable=true
-Manifest.toml linguist-generated=true
+Project.toml linguist-detectable=true linguist-generated=false
+CondaPkg.toml linguist-detectable=true linguist-generated=false
+Manifest.toml linguist-generated=true linguist-detectable=false
 docs/Project.toml linguist-documentation=false
 
 # Ignore generated .tex files.
 *.tex linguist-generated=true
 
 # The TUI's ASCII art (the page files under tui/resources): trailing spaces are part of
-# the picture, so `git diff --check` (and `bb precommit`'s whitespace step, which strips
+# the picture, so `git diff --check` (and `bysl precommit`'s whitespace step, which strips
 # what it reports) must leave them alone.
 tui/resources/**/*.txt whitespace=-trailing-space
+
+# The dev tools (the Julia package in dev/ with its tests, the launcher and the scripts beside
+# them) and the TypeScript code are hand-written and count in the language stats, each
+# environment's Project.toml included; only the Manifest.toml files, which are generated, stay
+# out. Overrides Linguist's documentation heuristic.
+dev/** linguist-documentation=false
+dev/**/*.jl linguist-detectable=true
+dev/**/Project.toml linguist-detectable=true linguist-generated=false
+*.ts linguist-detectable=true
+*.tsx linguist-detectable=true
+*.d.ts linguist-detectable=true linguist-generated=false
 
 # (after the TOML rules above, which would otherwise win) test/ Manifests stay out of the stats.
 test/**/Manifest.toml linguist-generated=true linguist-detectable=false
@@ -49,3 +63,6 @@ test/**/Manifest.toml linguist-generated=true linguist-detectable=false
 # `(^|/)[Tt]ests?/fixtures/`), which also hides these two hand-written code fixtures.
 test/fixtures/molecules/sequences.jl linguist-vendored=false linguist-detectable=true
 test/fixtures/settings/cases.edn linguist-vendored=false linguist-detectable=true linguist-language=Clojure
+
+# (after the TOML rules above) the Manifests of dev/ stay out of the stats too.
+dev/**/Manifest.toml linguist-generated=true linguist-detectable=false

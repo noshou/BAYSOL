@@ -907,8 +907,9 @@ function _engine_kwargs(font)
             for n in names
                 n === nothing || font_available(n) ||
                     error(
-                        "the font \"$n\" is not available to LuaLaTeX (`bb fonts \"$n\"` " *
-                        "checks a name, `bb fonts --list` lists them; " *
+                        "the font \"$n\" is not available to LuaLaTeX " *
+                        "(`bysl plots fonts \"$n\"` checks a name, " *
+                        "`bysl plots fonts --list` lists them; " *
                         "font = nothing uses the LaTeX default)",
                     )
             end

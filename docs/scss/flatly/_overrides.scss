@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // Overrides
+$lato-font-url: "https://fonts.googleapis.com/css?family=Lato:400,700,400italic" +
+    "&display=swap";
+
 @if $bulmaswatch-import-font {
-    @import url("https://fonts.googleapis.com/css?family=Lato:400,700,400italic&display=swap");
+    @import url($lato-font-url);
 }
 
 hr {

@@ -97,7 +97,7 @@ using BAYSOL.Runtime:
         P = BAYSOL.Pipeline
         log = StageLog()
         push!(log.stages, Stage(:static, 1, "pdb2pqr", 21.3, 0.1, 0.2, "[cache miss]"))
-        push!(log.stages, Stage(:static, 1, "resolve_structure", 0.0023, 0.0, 0.0, ""))
+        push!(log.stages, Stage(:static, 1, "reslove_struct", 0.0023, 0.0, 0.0, ""))
         push!(log.stages, Stage(:static, 2, "hydration (SASA + B_lm)", 19.8, 0.0, 0.0, ""))
         push!(
             log.stages,
@@ -125,7 +125,7 @@ using BAYSOL.Runtime:
             l -> startswith(l, "      hydration") && endswith(l, "SASA + B_lm"),
             lines,
         )
-        @test any(l -> startswith(l, "    resolve_structure") && occursin("2.3e-03", l),
+        @test any(l -> startswith(l, "    reslove_struct") && occursin("2.3e-03", l),
             lines)
         # every row has its share of the wall clock, its JIT and its GC
         row = only(filter(l -> startswith(l, "    pdb2pqr"), lines))

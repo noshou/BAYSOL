@@ -26,6 +26,9 @@ sources/
 # cache
 _cache/
 
+# npm packages (Biome, see package.json)
+node_modules/
+
 # manuscript
 manuscript/
 

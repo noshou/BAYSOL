@@ -150,7 +150,7 @@
          (str "the defaults break a rule: " setting " " reason))))))))))
 
 (defn regenerate-defaults!
- "Runs the harvest again (`dev/harvest_defaults.jl` of the BAYSOL package the TUI runs
+ "Runs the harvest again (`dev/scripts/harvest_defaults.jl` of the BAYSOL package the TUI runs
  from), which rewrites `default_settings.edn` and its companions from the Params.jl files.
  True if it ran and succeeded; false when there is no package to run it from, no Julia, or
  it failed."

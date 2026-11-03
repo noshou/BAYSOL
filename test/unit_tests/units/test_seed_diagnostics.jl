@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Tests for dev/seed_diagnostics.jl, the sampler diagnostics
-# used on the SASBDB fitting tests (through dev/diagnose.clj). They run
+# Tests for dev/src/seed_diagnostics.jl, the sampler diagnostics
+# used on the SASBDB fitting tests (through `bysl fits diagnose`). They run
 # on a small toy seed so that the diagnostics cannot rot unnoticed; the
 # numbers they produce on real fits are not asserted here.
 
@@ -14,7 +14,7 @@ using StaticArrays: SVector
 using Random
 using Statistics: mean, median
 
-include(joinpath(@__DIR__, "..", "..", "..", "dev", "seed_diagnostics.jl"))
+include(joinpath(@__DIR__, "..", "..", "..", "dev", "src", "seed_diagnostics.jl"))
 using .SeedDiagnostics
 
 const SDF = BAYSOL.Inference

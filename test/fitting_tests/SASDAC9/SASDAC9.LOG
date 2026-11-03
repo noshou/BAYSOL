@@ -7,7 +7,7 @@ baysol                  	v0.4.0-yals-n-gɛsga
 ref_chi2                	FoXS 680.3
 structure               	nucleic
 pdb2pqr_cache           	miss
-components_download     	0
+comp_dwnld     	0
 n_atoms                 	11996
 lmax                    	52
 dmax                    	171.505
@@ -45,7 +45,7 @@ chains_pooled           	8
 chains_run              	8
 modes                   	1
 map_starts_ok           	70
-map_starts_total        	70
+map_starts_tot        	70
 map_modes               	1
 
 --- timing ---
@@ -53,7 +53,7 @@ stage                                  seconds    % wall    (JIT)     (GC)  note
 wall clock                               11.37     100.0    (2.7)    (0.9)  process start to end
   startup                                 4.84      42.6    (0.0)    (0.6)  process start to seed_model
   static build                            3.05      26.8    (1.1)    (0.0)
-    resolve_structure                  2.3e-05       0.0    (0.0)    (0.0)
+    reslove_struct                  2.3e-05       0.0    (0.0)    (0.0)
     components                         5.8e-03       0.1    (0.0)    (0.0)  8 residue names: 8 builtin, 0 cache, 0 download
     structure checks                      0.04       0.3    (0.0)    (0.0)  2 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings
     classify                              0.01       0.1    (0.0)    (0.0)  nucleic: AMBER, titration none; 2 chains relabelled

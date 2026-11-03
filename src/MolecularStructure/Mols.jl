@@ -264,7 +264,7 @@ a heavy-only file naturally yields just its heavy atoms, and a hydrogenated
 file keeps its hydrogens too.
 
 # Arguments
-- `pdb_path`: path to any parseable .pdb, e.g. from [`resolve_structure`](@ref) or
+- `pdb_path`: path to any parseable .pdb, e.g. from [`reslove_struct`](@ref) or
     [`resolve_hydrogens`](@ref BAYSOL.Hydrogenator.resolve_hydrogens).
 
 # Returns

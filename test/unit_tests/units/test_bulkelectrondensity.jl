@@ -593,7 +593,7 @@ end
     @testset "ϕ°(name): uncertainty is backfilled with the fixed mean" begin
         # nonbiological.json stores `nothing` uncertainty for a solute when no source
         # reports one; ϕ° backfills with `NONBIO_MEAN_UNCERTAINTY`, the mean of every
-        # stated uncertainty (harvested by `bb harvest-pmv-mean`, a constant at run time).
+        # stated uncertainty (harvested by `bysl harvest pmv-mean`, a constant at run time).
         reported = [u for (_, _, u) in values(PMVMOD._solutes) if u !== nothing]
         avg_u = PMVMOD.NONBIO_MEAN_UNCERTAINTY
         @test length(reported) > 0

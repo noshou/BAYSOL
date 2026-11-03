@@ -29,7 +29,7 @@ include("Params.jl")
 """
 The subfolder of the output folder of [`results`](@ref) that the `.tex` figures, and what
 is compiled from them, go into. The workbook and the run log stay in the output folder
-itself. Not a setting: `bb render-plots` and the TUI look for the figures here.
+itself. Not a setting: `bysl plots render` and the TUI look for the figures here.
 """
 const PLOT_SUBDIR = "plots"
 

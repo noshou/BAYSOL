@@ -17,8 +17,8 @@
 # forces the serial paths) and `Parallel.with_chaos(d)` delays every task by a random
 # time up to d seconds, so the matrix of worker counts is exercised in one process
 # whatever `-t` it was started with. The suite is most meaningful with several Julia
-# threads: `precommit.clj` also runs it with `-t 6,1`; run by hand with
-#   julia --project=test -t 6,1 dev/unittests.jl concurrency
+# threads: `bysl precommit` also runs it with `-t 6,1`; run by hand with
+#   julia --project=test -t 6,1 dev/scripts/unittests.jl concurrency
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 include(joinpath(@__DIR__, "..", "geometry.jl"))   # jittered_lattice

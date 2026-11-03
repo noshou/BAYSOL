@@ -1,7 +1,7 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
 ;; resources/default_settings.edn is harvested from the Params.jl files by `bb precommit`
-;; (`dev/harvest_defaults.jl`). These tests check it against the pages of the settings
+;; (`dev/scripts/harvest_defaults.jl`). These tests check it against the pages of the settings
 ;; sheets, so a page added, renamed or reordered without a harvest is noticed here: every
 ;; page has an entry on its own page number, and every entry has a page.
 

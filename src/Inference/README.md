@@ -218,7 +218,7 @@ The worst values over the diagnosed modes are reported (`rhat_max` flagged above
 
 ```julia
 using BAYSOL
-using BAYSOL.MolecularStructure: LocalPathSource, resolve_structure, load_molecule
+using BAYSOL.MolecularStructure: LocalPathSource, reslove_struct, load_molecule
 using BAYSOL.Hydrogenator: propka_pKas, resolve_hydrogens, Propka
 using BAYSOL.Scattering: forward_cache
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
@@ -231,7 +231,7 @@ SOLUTES = Solute[                       # buffer only: the measured protein is n
     NonBiological(0.005, 0.0001, "dtt"),
 ]
 
-path  = resolve_structure(LocalPathSource(pdb_path))
+path  = reslove_struct(LocalPathSource(pdb_path))
 hpath = resolve_hydrogens(path, PH; titration = Propka(propka_pKas(path)))
 mol   = load_molecule(hpath)
 fw    = forward_cache(mol, q_fit, lMax, energy_eV)

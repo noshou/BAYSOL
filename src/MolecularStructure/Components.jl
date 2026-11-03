@@ -77,10 +77,10 @@ component's name; `:none` when `base` is `nothing`).
 
 `parent` is what the dictionary **declares**, `base` the base the component stands for,
 declared or **inferred**, `base_source` says which. The inference is offline, in
-`dev/extract_components.clj`, validated there against the declared parents, and only the
-bundled table has it: a component read from a cached or downloaded file has the base of its
-declared parent, else `nothing`. Nothing in loading, the force-field choice or the
-classification depends on `parent` or `base`.
+`bysl extract components` (`dev/src/Extract.jl`), validated there against the declared
+parents, and only the bundled table has it: a component read from a cached or downloaded
+file has the base of its declared parent, else `nothing`. Nothing in loading, the
+force-field choice or the classification depends on `parent` or `base`.
 
 `parent === nothing` means "no declared (or resolvable) parent" and is never an error: the
 dictionary's list is split and deduplicated (`DT, DT` is `DT`), a non-standard parent

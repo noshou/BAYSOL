@@ -8,7 +8,7 @@
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: StructureSource, LocalPathSource, PDBIDSource, URLSource,
-    StructureSourceError, resolve_structure, load_molecule,
+    StructureSourceError, reslove_struct, load_molecule,
     Molecule, n_atoms, elms, coords_cartesian, _store_dir
 using BioStructures:
     BioStructures, MMCIFFormat, writepdb, standardselector, heavyatomselector
@@ -151,7 +151,7 @@ END
 """,
         )
         before = isfile(joinpath(_store_dir(), "passthrough-TEST.pdb"))
-        resolved = resolve_structure(LocalPathSource(pdb_path))
+        resolved = reslove_struct(LocalPathSource(pdb_path))
         @test resolved == abspath(pdb_path)
         @test !isfile(joinpath(_store_dir(), "passthrough-TEST.pdb"))  # nothing cached
         @test before == false
@@ -165,7 +165,7 @@ END
         cache_path = joinpath(_store_dir(), "fixture-TEST.pdb")
         rm(cache_path; force = true)
 
-        resolved = resolve_structure(LocalPathSource(cif_path))
+        resolved = reslove_struct(LocalPathSource(cif_path))
         @test isfile(resolved)
         @test dirname(resolved) == _store_dir()
         # Keyed by the file's own basename stem, not a content hash.
@@ -197,12 +197,12 @@ END
         cache_path = joinpath(_store_dir(), "repeat-TEST.pdb")
         rm(cache_path; force = true)
 
-        resolved1 = resolve_structure(LocalPathSource(cif_path))
+        resolved1 = reslove_struct(LocalPathSource(cif_path))
         @test resolved1 == cache_path
         mtime1 = mtime(cache_path)
 
         sleep(1.1)   # coarse mtime resolution on some filesystems
-        resolved2 = resolve_structure(LocalPathSource(cif_path))
+        resolved2 = reslove_struct(LocalPathSource(cif_path))
         @test resolved2 == cache_path
         @test mtime(cache_path) == mtime1   # untouched: identical content, no rewrite
 
@@ -218,12 +218,12 @@ END
         rm(cache_path; force = true)
 
         write(cif_path, _TEST_CIF)
-        resolve_structure(LocalPathSource(cif_path))   # seed the cache
+        reslove_struct(LocalPathSource(cif_path))   # seed the cache
         @test isfile(cache_path)
 
         write(cif_path, _TEST_CIF_COLLIDING)
         err = try
-            resolve_structure(LocalPathSource(cif_path))
+            reslove_struct(LocalPathSource(cif_path))
             nothing
         catch e
             e
@@ -236,13 +236,13 @@ END
     end
 
     @testset "bad local inputs raise StructureSourceError" begin
-        @test_throws StructureSourceError resolve_structure(
+        @test_throws StructureSourceError reslove_struct(
             LocalPathSource("/no/such/path/does-not-exist.pdb"))
 
         dir = mktempdir()
         bad_ext = joinpath(dir, "structure.xyz")
         write(bad_ext, "not a real structure file")
-        @test_throws StructureSourceError resolve_structure(LocalPathSource(bad_ext))
+        @test_throws StructureSourceError reslove_struct(LocalPathSource(bad_ext))
         rm(dir; recursive = true, force = true)
     end
 
@@ -252,7 +252,7 @@ END
         write(cif_path, _TEST_MULTICHAIN_CIF)
 
         err = try
-            resolve_structure(LocalPathSource(cif_path))
+            reslove_struct(LocalPathSource(cif_path))
             nothing
         catch e
             e
@@ -266,7 +266,7 @@ END
     end
 
     @testset "bad PDB ID raises StructureSourceError" begin
-        @test_throws StructureSourceError resolve_structure(PDBIDSource("ZZZZ"))
+        @test_throws StructureSourceError reslove_struct(PDBIDSource("ZZZZ"))
     end
 
     @testset "URLSource constructor requires a non-empty id" begin
@@ -274,7 +274,7 @@ END
     end
 
     @testset "bad URL raises StructureSourceError" begin
-        @test_throws StructureSourceError resolve_structure(
+        @test_throws StructureSourceError reslove_struct(
             URLSource(
                 "https://this-host-should-not-resolve.invalid/nope.pdb",
                 "bad-url-TEST",
@@ -285,13 +285,13 @@ END
         cache_path = joinpath(_store_dir(), _TEST_PDB_ID * ".pdb")
         rm(cache_path; force = true)   # start clean regardless of prior runs
 
-        resolved1 = resolve_structure(PDBIDSource(_TEST_PDB_ID))
+        resolved1 = reslove_struct(PDBIDSource(_TEST_PDB_ID))
         @test resolved1 == cache_path
         @test isfile(cache_path)
         mtime1 = mtime(cache_path)
 
         sleep(1.1)   # coarse mtime resolution on some filesystems
-        resolved2 = resolve_structure(PDBIDSource(lowercase(_TEST_PDB_ID)))
+        resolved2 = reslove_struct(PDBIDSource(lowercase(_TEST_PDB_ID)))
         @test resolved2 == cache_path
         @test mtime(cache_path) == mtime1   # untouched: no re-fetch/re-write
 
@@ -302,7 +302,7 @@ END
     end
 
     @testset "load_molecule end-to-end on the fetched PDB ID" begin
-        path = resolve_structure(PDBIDSource(_TEST_PDB_ID))
+        path = reslove_struct(PDBIDSource(_TEST_PDB_ID))
         mol = load_molecule(path)
         @test mol isa Molecule
 
@@ -319,7 +319,7 @@ END
         cache_path = joinpath(_store_dir(), id * ".pdb")
         rm(cache_path; force = true)
 
-        resolved1 = resolve_structure(URLSource(url, id))
+        resolved1 = reslove_struct(URLSource(url, id))
         @test resolved1 == cache_path
         @test isfile(cache_path)
 
@@ -330,7 +330,7 @@ END
         # A second call always re-fetches (no fetch-avoidance fast path
         # anymore), but identical downloaded content must resolve to the
         # same file rather than erroring or duplicating it.
-        resolved2 = resolve_structure(URLSource(url, id))
+        resolved2 = reslove_struct(URLSource(url, id))
         @test resolved2 == cache_path
         @test read(resolved2) == read(resolved1)
 
@@ -345,11 +345,11 @@ END
         cache_path = joinpath(_store_dir(), id * ".pdb")
         rm(cache_path; force = true)
 
-        resolve_structure(URLSource(real_url, id))   # seed the cache
+        reslove_struct(URLSource(real_url, id))   # seed the cache
         @test isfile(cache_path)
 
         err = try
-            resolve_structure(URLSource(other_url, id))
+            reslove_struct(URLSource(other_url, id))
             nothing
         catch e
             e
@@ -368,7 +368,7 @@ END
         @test isfile(path)
 
         is_cif = lowercase(splitext(fname)[2]) in (".cif", ".mmcif")
-        resolved = resolve_structure(LocalPathSource(path))
+        resolved = reslove_struct(LocalPathSource(path))
         try
             if is_cif
                 # .cif branch converts into the shared cache.
@@ -406,7 +406,7 @@ END
             # .cif-sourced fixture is always heavy-only after canonicalization
             # (so the two counts coincide), but a raw .pdb-passthrough fixture
             # may already carry its own embedded hydrogens on disk (true of
-            # e.g. 7RSA-TEST.pdb, 1IGT-TEST.pdb), which resolve_structure's
+            # e.g. 7RSA-TEST.pdb, 1IGT-TEST.pdb), which reslove_struct's
             # pure-passthrough branch never strips.
             standard_only_n = length(BioStructures.collectatoms(struc[1], standardselector))
             mol = load_molecule(resolved)
@@ -436,13 +436,13 @@ END
         # "1UBQ-TEST.cif") -- distinct from PDBIDSource's uppercase-ID cache
         # key ("1UBQ.pdb"), so the two paths below resolve to genuinely
         # different cache files even though both concern the same protein.
-        local_resolved = resolve_structure(LocalPathSource(fixture_path))
+        local_resolved = reslove_struct(LocalPathSource(fixture_path))
         mol_local = load_molecule(local_resolved)
 
         # Force a genuine fresh network fetch for the PDB-ID path.
         net_cache = joinpath(_store_dir(), uppercase(id) * ".pdb")
         rm(net_cache; force = true)
-        net_resolved = resolve_structure(PDBIDSource(id))
+        net_resolved = reslove_struct(PDBIDSource(id))
         mol_net = load_molecule(net_resolved)
 
         is_cif = lowercase(splitext(fname)[2]) in (".cif", ".mmcif")

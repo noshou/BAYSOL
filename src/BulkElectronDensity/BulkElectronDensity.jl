@@ -207,8 +207,8 @@ include_dependency(joinpath(@__DIR__, "Polymers", "polymers_lookup.json"))
 Uncertainty, cm³·mol⁻¹, given to a non-biological solute whose row of `nonbiological.json`
 states none: the mean of every stated uncertainty of that table (a missing error bar is
 not zero), rounded to six decimals. A fixed number, not computed at run time, so adding
-rows to the table cannot shift a result between runs; the harvest `bb harvest-pmv-mean`
-rewrites the literal between the two marker comments below (`bb precommit` runs it) and
+rows to the table cannot shift a result between runs; the harvest `bysl harvest pmv-mean`
+rewrites the literal between the two marker comments below (`bysl precommit` runs it) and
 the unit suite fails if it is stale. The terminal interface reads the same literal for the
 default `±` of a custom solute, so keep the markers and the one-line form.
 """

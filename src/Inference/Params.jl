@@ -44,7 +44,7 @@ const κ_δρ₃ = 1.25
 """
 Uncertainty, cm³ mol⁻¹, that a non-biological buffer solute gets when its row of the
 partial-molar-volume table states none: the harvested mean of the table's stated
-uncertainties (`NONBIO_MEAN_UNCERTAINTY` of `BulkElectronDensity`, which `bb precommit`
+uncertainties (`NONBIO_MEAN_UNCERTAINTY` of `BulkElectronDensity`, which `bysl precommit`
 keeps current). It widens the prior on ρₑ for such a solute and nothing else. **Not
 recommended to change**: a smaller value claims a precision the table does not have. Must
 be above 0.
@@ -270,10 +270,10 @@ const RETRY_N_DRAWS = 2000
 )
 
 """
-The limits of each setting above that has one, read by the terminal interface when a
-user edits a value (`dev/harvest_defaults.jl` copies them to `default_settings.edn`). Each
-limit is `above` or `below` (strict) or `at_least` or `at_most` (inclusive). Limits that
-tie settings together (`MODE_δρ₁₂` inside `BOUNDS_δρ₁₂`, `EXCL_VOL_CORR_EPS` within the
+The limits of each setting above that has one, read by the terminal interface when a user
+edits a value (`dev/scripts/harvest_defaults.jl` copies them to `default_settings.edn`).
+Each limit is `above` or `below` (strict) or `at_least` or `at_most` (inclusive). Limits
+that tie settings together (`MODE_δρ₁₂` inside `BOUNDS_δρ₁₂`, `EXCL_VOL_CORR_EPS` within the
 width of `EXCL_VOL_CORR_BOUNDS`) and those of the tuple settings stay in the checks above.
 """
 const SETTING_LIMITS = (

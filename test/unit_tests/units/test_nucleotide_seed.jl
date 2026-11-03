@@ -82,7 +82,7 @@ names_of(log) = [s.name for s in log.stages]
 stage(log, name) = only(s for s in log.stages if s.name == name)
 # the stages of the nucleotide wiring, in the order they were recorded
 const _WIRING =
-    ("resolve_structure", "components", "structure checks", "classify", "propka", "pdb2pqr",
+    ("reslove_struct", "components", "structure checks", "classify", "propka", "pdb2pqr",
         "pdb2pqr (nucleic, none)", "pdb2pqr (mixed, propka)",
         "modified nucleotide hydrogens", "heavy atoms", "load_molecule")
 wiring(log) = [n for n in names_of(log) if n in _WIRING]
@@ -115,7 +115,7 @@ wiring(log) = [n for n in names_of(log) if n in _WIRING]
         seeds["mod"] = log
 
         @testset "nucleic acid with modified nucleotides" begin
-            @test wiring(log) == ["resolve_structure", "components", "structure checks",
+            @test wiring(log) == ["reslove_struct", "components", "structure checks",
                 "classify", "pdb2pqr (nucleic, none)", "modified nucleotide hydrogens",
                 "heavy atoms", "load_molecule"]
             @test !("propka" in names_of(log))                     # PROPKA never runs
@@ -164,7 +164,7 @@ wiring(log) = [n for n in names_of(log) if n in _WIRING]
         log, path = seeded(dir, "nt-seed-std", std)
         seeds["std"] = log
         @testset "nucleic acid without modified nucleotides" begin
-            @test wiring(log) == ["resolve_structure", "components", "structure checks",
+            @test wiring(log) == ["reslove_struct", "components", "structure checks",
                 "classify", "pdb2pqr (nucleic, none)", "heavy atoms", "load_molecule"]
             @test !("modified nucleotide hydrogens" in names_of(log))
             @test stage(log, "components").note ==
@@ -179,7 +179,7 @@ wiring(log) = [n for n in names_of(log) if n in _WIRING]
         @testset "without hydrogens: the residues are still looked up" begin
             log, _ = seeded(dir, "nt-seed-std", std; add_hydrogens = false)
             @test wiring(log) ==
-                  ["resolve_structure", "components", "structure checks", "load_molecule"]
+                  ["reslove_struct", "components", "structure checks", "load_molecule"]
             @test stage(log, "components").note ==
                   "[3 residue names: 3 builtin, 0 cache, 0 download]"
         end
@@ -189,7 +189,7 @@ wiring(log) = [n for n in names_of(log) if n in _WIRING]
         log, path = seeded(dir, "nt-seed-prot", prot)
         seeds["prot"] = log
         @testset "protein only" begin
-            @test wiring(log) == ["resolve_structure", "components", "structure checks",
+            @test wiring(log) == ["reslove_struct", "components", "structure checks",
                 "classify", "propka", "pdb2pqr", "heavy atoms", "load_molecule"]
             @test stage(log, "classify").note == "[protein: PARSE, titration propka]"
             @test stage(log, "structure checks").note ==
@@ -207,7 +207,7 @@ wiring(log) = [n for n in names_of(log) if n in _WIRING]
         log, path = seeded(dir, "nt-seed-mixed", mixed)
         seeds["mixed"] = log
         @testset "protein and DNA" begin
-            @test wiring(log) == ["resolve_structure", "components", "structure checks",
+            @test wiring(log) == ["reslove_struct", "components", "structure checks",
                 "classify", "propka", "pdb2pqr (mixed, propka)", "heavy atoms",
                 "load_molecule"]
             @test stage(log, "classify").note == "[mixed: PARSE, titration propka]"
@@ -227,7 +227,7 @@ wiring(log) = [n for n in names_of(log) if n in _WIRING]
                 r in BAYSOL.Pipeline._timing_table(log, tick()).rows
             ]
             for (key, notes) in (
-                "mod" => ["resolve_structure", "components", "classify",
+                "mod" => ["reslove_struct", "components", "classify",
                     "pdb2pqr (nucleic, none)", "modified nucleotide hydrogens",
                     "load_molecule",
                     "[4 residue names: 2 builtin, 1 cache, 1 download]",

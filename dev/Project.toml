@@ -1,0 +1,23 @@
+name = "Dev"
+uuid = "7d1c5e2a-3b0f-4c58-9a41-6e2f8b9d0c11"
+version = "0.1.0"
+
+[deps]
+CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
+
+[compat]
+CodecZlib = "0.7.9"
+Dates = "1.11.0"
+Downloads = "1.7.0"
+JSON3 = "1.14.4"
+OrderedCollections = "2.0.3"
+PrecompileTools = "1.3.4"
+Printf = "1.11.0"
+Sockets = "1.11.0"

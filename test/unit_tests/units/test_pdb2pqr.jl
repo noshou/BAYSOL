@@ -11,7 +11,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using BAYSOL.Hydrogenator: resolve_hydrogens, Pdb2pqrError, Propka, NoTitration,
     FORCE_FIELDS, _terminus_groups, propka_pKas, _hydrogens_path
 using BAYSOL.MolecularStructure: load_molecule, MoleculeError, _store_dir,
-    LocalPathSource, resolve_structure,
+    LocalPathSource, reslove_struct,
     Molecule, n_atoms, elms, coords_cartesian
 
 # A 7-"residue" fragment (not a real contiguous chain -- each residue's real
@@ -411,7 +411,7 @@ end
 
     @testset "AMBER without titration hydrogenates a B-DNA duplex (no PROPKA)" begin
         fix = joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1BNA-TEST.pdb")
-        path = resolve_structure(LocalPathSource(fix))
+        path = reslove_struct(LocalPathSource(fix))
         out = _hydrogens_path(path, 7.0, :amber, NoTitration())
         rm(out; force = true)
         try

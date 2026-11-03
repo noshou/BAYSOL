@@ -203,7 +203,7 @@ function _log_stats(result)
         add!("pdb2pqr_cache", occursin("cache miss", pq.note) ? "miss" : "hit")
     cmp = _log_stage(log, "components")
     dl = cmp === nothing ? nothing : match(r"(\d+) download", cmp.note)
-    dl === nothing || add!("components_download", dl.captures[1])
+    dl === nothing || add!("comp_dwnld", dl.captures[1])
 
     for k in
         (
@@ -252,7 +252,7 @@ function _log_stats(result)
     m = mp === nothing ? nothing : match(r"(\d+)/(\d+) starts, (\d+) modes?", mp.name)
     if m !== nothing
         add!("map_starts_ok", m.captures[1])
-        add!("map_starts_total", m.captures[2])
+        add!("map_starts_tot", m.captures[2])
         add!("map_modes", m.captures[3])
     end
     return rows

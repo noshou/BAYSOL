@@ -2,7 +2,7 @@
 
 # Shared baseline so every units/test_*.jl can run standalone
 # (`julia --project=test test/unit_tests/units/test_X.jl`) or aggregated via
-# dev/unittests.jl. Include-guarded so re-including it (as happens when the
+# dev/scripts/unittests.jl. Include-guarded so re-including it (as happens when the
 # aggregator includes every file in one process) is a no-op past the first hit.
 if !@isdefined(check_float)
     using Test

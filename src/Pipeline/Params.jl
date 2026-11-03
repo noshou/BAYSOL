@@ -134,7 +134,7 @@ const PLOT_PREVIEW_SIZE = (width = 70, height = 18)
 """
 The text font of the figures: a `fontspec` name, TeX Gyre PagellaX (the TeX Live package
 `newpx`). Any font that LuaLaTeX can find does; [`font_available`](@ref) says whether it
-can find one, and `bb fonts` does the same from the shell.
+can find one, and `bysl plots fonts` does the same from the shell.
 """
 const PLOT_TEXT_FONT = "TeX Gyre PagellaX"
 
@@ -224,11 +224,11 @@ const PLOT_BORDER_PT = 8.0
 )
 
 """
-The limits of each setting above that has one, read by the terminal interface when a
-user edits a value (`dev/harvest_defaults.jl` copies them to `default_settings.edn`). Each
-limit is `above` or `below` (strict) or `at_least` or `at_most` (inclusive). They follow
-`results`' check of a `PlotStyle`: widths, sizes and paddings are not negative. The
-settings that are tuples are left out.
+The limits of each setting above that has one, read by the terminal interface
+when a user edits a value (`dev/scripts/harvest_defaults.jl` copies them to
+`default_settings.edn`). Each limit is `above` or `below` (strict) or `at_least`
+or `at_most` (inclusive). They follow `results`' check of a `PlotStyle`: widths,
+sizes and paddings are not negative. The settings that are tuples are left out.
 """
 const SETTING_LIMITS = (
     N_ADAPT = (at_least = 1,),
@@ -260,7 +260,7 @@ const SETTING_LIMITS = (
 """
 The settings above that hold some of a few fixed choices (any subset, in this order),
 read by the terminal interface, which shows them as tabs to switch on and off
-(`dev/harvest_defaults.jl` copies them to `default_settings.edn`).
+(`dev/scripts/harvest_defaults.jl` copies them to `default_settings.edn`).
 """
 const SETTING_CHOICES = (FIGURES_FORMATS = (:pdf, :png, :svg),)
 

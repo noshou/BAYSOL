@@ -49,8 +49,12 @@ document.addEventListener("click", function (ev) {
 
 # The click script of an earlier release of this file (the light/dark one): the only
 # `<script>` that handles `.docs-theme-toggle` and lacks the `theme-cycle` marker.
-const OLD_THEME_TOGGLE_SCRIPT =
-    r"<script>\ndocument\.addEventListener\(\"click\", function \(ev\) \{\n  if \(!ev\.target\.closest \|\| !ev\.target\.closest\(\"\.docs-theme-toggle\"\)\) return;.*?</script>"s
+const OLD_THEME_TOGGLE_SCRIPT = Regex(
+    raw"<script>\ndocument\.addEventListener\(\"click\", function \(ev\) \{\n  " *
+    raw"if \(!ev\.target\.closest \|\| !ev\.target\.closest\(\"\.docs-theme-toggle\"\)\) " *
+    raw"return;.*?</script>",
+    "s",
+)
 
 """
     add_theme_toggle(dir) -> Int

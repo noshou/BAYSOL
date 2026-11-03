@@ -136,7 +136,7 @@ Add explicit hydrogens: runs pdb2pqr on the heavy-atom .pdb at `pdb_path` and
 returns the path to a hydrogen-included .pdb stored in the `MolecularStructure` store.
 
 # Arguments
-- `pdb_path`: path to a heavy-atom .pdb (e.g. from `resolve_structure`).
+- `pdb_path`: path to a heavy-atom .pdb (e.g. from `reslove_struct`).
 - `pH`: solution pH, passed to pdb2pqr and used to resolve the termini flags when
     `titration` is pH-driven.
 

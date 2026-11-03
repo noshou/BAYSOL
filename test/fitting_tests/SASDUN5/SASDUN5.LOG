@@ -7,7 +7,7 @@ baysol                  	v0.4.0-yals-n-gɛsga
 ref_chi2                	OLIGOMER 2-state 2.21
 structure               	protein
 pdb2pqr_cache           	miss
-components_download     	0
+comp_dwnld     	0
 n_atoms                 	30152
 lmax                    	50
 dmax                    	165.667
@@ -45,7 +45,7 @@ chains_pooled           	8
 chains_run              	8
 modes                   	1
 map_starts_ok           	70
-map_starts_total        	70
+map_starts_tot        	70
 map_modes               	2
 
 --- timing ---
@@ -53,7 +53,7 @@ stage                                          seconds    % wall    (JIT)     (G
 wall clock                                       28.93     100.0    (2.5)    (0.9)  process start to end
   startup                                         4.90      16.9    (0.0)    (0.6)  process start to seed_model
   static build                                   20.91      72.3    (0.9)    (0.0)
-    resolve_structure                          2.4e-05       0.0    (0.0)    (0.0)
+    reslove_struct                          2.4e-05       0.0    (0.0)    (0.0)
     components                                    0.01       0.0    (0.0)    (0.0)  20 residue names: 20 builtin, 0 cache, 0 download
     structure checks                              0.08       0.3    (0.0)    (0.0)  0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings
     classify                                      0.03       0.1    (0.0)    (0.0)  protein: PARSE, titration propka
@@ -141,7 +141,7 @@ baysol                  	v0.4.0-yals-n-gɛsga
 ref_chi2                	OLIGOMER 2-state 2.21
 structure               	protein
 pdb2pqr_cache           	miss
-components_download     	0
+comp_dwnld     	0
 n_atoms                 	60302
 lmax                    	52
 dmax                    	171.743
@@ -179,7 +179,7 @@ chains_pooled           	8
 chains_run              	8
 modes                   	1
 map_starts_ok           	70
-map_starts_total        	70
+map_starts_tot        	70
 map_modes               	3
 
 --- timing ---
@@ -187,7 +187,7 @@ stage                                          seconds    % wall    (JIT)     (G
 wall clock                                      107.63     100.0    (2.7)    (1.5)  process start to end
   startup                                        29.06      27.0    (2.7)    (0.9)  process start to seed_model
   static build                                   76.71      71.3    (0.0)    (0.0)
-    resolve_structure                          1.5e-05       0.0    (0.0)    (0.0)
+    reslove_struct                          1.5e-05       0.0    (0.0)    (0.0)
     components                                    0.03       0.0    (0.0)    (0.0)  20 residue names: 20 builtin, 0 cache, 0 download
     structure checks                              0.15       0.1    (0.0)    (0.0)  0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings
     classify                                      0.05       0.1    (0.0)    (0.0)  protein: PARSE, titration propka

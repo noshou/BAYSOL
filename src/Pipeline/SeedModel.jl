@@ -157,8 +157,8 @@ function seed_model(
         # load pdb into cache, then add hydrogens if requested. What the residues are
         # (components) decides how: PARSE with PROPKA, except AMBER without PROPKA for a
         # nucleic acid alone.
-        path = timed!(log, :static, 1, "resolve_structure") do
-            MolecularStructure.resolve_structure(mol_src)
+        path = timed!(log, :static, 1, "reslove_struct") do
+            MolecularStructure.reslove_struct(mol_src)
         end
 
         # the residue names of the structure, looked up in the component table (loaded
@@ -244,7 +244,7 @@ function seed_model(
             # modified amino acids likewise, through their standard parent
             if Hydrogenator.has_modified_amino(infos)
                 t_stage = tick()
-                a = Hydrogenator.modified_amino_hydrogens(hpath, infos)
+                a = Hydrogenator.moded_aa_hyd(hpath, infos)
                 tock!(
                     log, :static, 1, "modified amino acid hydrogens", t_stage;
                     note = "[$(a.residues) residues: $(a.with_parent) hydrogenated " *
