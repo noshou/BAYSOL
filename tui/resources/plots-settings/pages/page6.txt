@@ -20,5 +20,5 @@
    ║                        ║                             ║                   ║
    ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
    ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓ ║   plots [2 / 8]   ║
-   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
-   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)
+   ╠╩╗├┤└┬┘└┐│││  menu: ^x  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^w  ┃ prev bloc: ← ┃ reset all: ^r  (^ is ctrl key)

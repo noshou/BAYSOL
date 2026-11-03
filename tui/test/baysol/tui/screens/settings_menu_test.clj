@@ -34,17 +34,17 @@
 
 (deftest a-hotkey-opens-its-own-sheet-from-any-page
  (doseq [page (keys links)]
-  (is (= :output (settings-menu/page-after page \o)))
-  (is (= :sampler (settings-menu/page-after page \s)))
+  (is (= :output (settings-menu/page-after page \u)))
+  (is (= :sampler (settings-menu/page-after page \a)))
   (is (= :plots (settings-menu/page-after page \p)))
   (is (= :model (settings-menu/page-after page \m)))))
 
-(deftest ctrl-b-goes-back-escape-quits-and-other-keys-do-nothing
+(deftest ctrl-x-goes-back-escape-quits-and-other-keys-do-nothing
  (doseq [page (keys links)]
-  (is (= :back (settings-menu/page-after page :ctrl-b)))
+  (is (= :back (settings-menu/page-after page :ctrl-x)))
   (is (= :quit (settings-menu/page-after page KeyType/Escape)))
   (is (= :quit (settings-menu/page-after page KeyType/EOF)))
-  (is (every? #(= page (settings-menu/page-after page %)) [:ctrl-s :ctrl-m \x]))))
+  (is (every? #(= page (settings-menu/page-after page %)) [:ctrl-w :ctrl-m \x]))))
 
 (deftest every-kind-opens-a-sheet
  (is (= (set (keep :enter (vals links))) (set (keys settings-menu/sheet-dirs))))

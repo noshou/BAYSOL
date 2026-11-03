@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# The theme button in the navbar, a sun on a light theme and a crescent moon on a dark one.
-# Each click goes to the next of the four themes (`SITE_THEMES` in register_themes.jl) and
-# wraps around: sun on academic -> academic-dark (moon) -> day-blue (sun) -> midnight-purple
-# (moon) -> academic. docs/make.jl writes it into the built pages (like release_label.jl does
-# the release name): the button's HTML below, and the only browser code it needs, the click
-# handler, as an inline script. Everything else is Julia or style: which icon shows is
-# decided by `.docs-theme-toggle` in each docs/src/assets/themes/<theme>.scss. The click
-# stores the choice the way Documenter's settings menu does (`documenter-theme` in
-# localStorage) and calls Documenter's own `set_theme_from_local_storage` (themeswap.js) to
-# swap the stylesheets.
+# The theme button in the navbar, a sun on a light theme and a crescent moon on a dark
+# one. Each click goes to the next of the four themes (`SITE_THEMES` in
+# register_themes.jl) and wraps around: sun on academic -> academic-dark (moon) ->
+# day-blue (sun) -> midnight-purple (moon) -> academic. docs/make.jl writes it into the
+# built pages (like release_label.jl does the release name): the button's HTML below,
+# and the only browser code it needs, the click handler, as an inline script. Everything
+# else is Julia or style: which icon shows is decided by `.docs-theme-toggle` in each
+# docs/src/assets/themes/<theme>.scss. The click stores the choice the way Documenter's
+# settings menu does (`documenter-theme` in localStorage) and calls Documenter's own
+# `set_theme_from_local_storage` (themeswap.js) to swap the stylesheets.
 
 "SVG for sun and moon (light / dark mode)"
 const THEME_TOGGLE_BUTTON = """
@@ -56,10 +56,10 @@ const OLD_THEME_TOGGLE_SCRIPT =
     add_theme_toggle(dir) -> Int
 
 Adds the theme button before the settings gear, and its click handler at the end of
-`<head>`, on every HTML page under `dir`. A page that has the light/dark button of an earlier
-release gets the new title and the cycling handler in its place (this is how the pages of
-releases already deployed are brought up to date, see patch_versions.jl). A page that already
-has the current button is left as it is, so a second run changes nothing.
+`<head>`, on every HTML page under `dir`. A page that has the light/dark button of an
+earlier release gets the new title and the cycling handler in its place (this is how the
+pages of releases already deployed are brought up to date, see patch_versions.jl). A page
+that already has the current button is left as it is, so a second run changes nothing.
 
 # Returns
 - `Int`: the number of pages changed.

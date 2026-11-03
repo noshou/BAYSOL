@@ -590,12 +590,17 @@ end
     end
 
     # …when unreported
-    @testset "ϕ°(name): uncertainty is backfilled with the live average" begin
+    @testset "ϕ°(name): uncertainty is backfilled with the fixed mean" begin
         # nonbiological.json stores `nothing` uncertainty for a solute when no source
-        # reports one; ϕ° backfills with the mean of every other solute's uncertainty.
+        # reports one; ϕ° backfills with `NONBIO_MEAN_UNCERTAINTY`, the mean of every
+        # stated uncertainty (harvested by `bb harvest-pmv-mean`, a constant at run time).
         reported = [u for (_, _, u) in values(PMVMOD._solutes) if u !== nothing]
-        avg_u = sum(reported) / length(reported)
+        avg_u = PMVMOD.NONBIO_MEAN_UNCERTAINTY
         @test length(reported) > 0
+        # a stale constant (table edited, harvest not run) fails here: it is the mean
+        # rounded to six decimals
+        @test close_(avg_u, sum(reported) / length(reported); atol = 1e-6)
+        @test avg_u == round(avg_u; digits = 6)
         for name in
             ("lithium chloride", "sodium bromide", "propane-1,2,3-triol", "sodium iodide",
             "trisodium 2-hydroxypropane-1,2,3-tricarboxylate",
@@ -609,6 +614,40 @@ end
         for name in
             ("lithium chloride", "sodium bromide", "propane-1,2,3-triol", "sodium iodide")
             @test PMVMOD._solutes[name][3] === nothing
+        end
+    end
+
+    @testset "pmv_fallback_uncert: reaches ϕ° and ρₑ, is never cached" begin
+        no_unc = "lithium chloride"            # a row that states no uncertainty
+        stated = "sodium chloride"             # one that states its own
+        @test PMVMOD._solutes[no_unc][3] === nothing
+        @test PMVMOD._solutes[PMVMOD._resolve_solute_name(stated)][3] !== nothing
+        mean_u = PMVMOD.NONBIO_MEAN_UNCERTAINTY
+
+        # two calls with different overrides, in either order: each gets its own value
+        # (a value cached under the name alone would be served to the second call)
+        @test IFACE.ϕ°(no_unc; fallback_σ = 7.0)[3] == 7.0
+        @test IFACE.ϕ°(no_unc; fallback_σ = 0.5)[3] == 0.5
+        @test IFACE.ϕ°(no_unc)[3] == mean_u
+        @test IFACE.ϕ°(no_unc; fallback_σ = 7.0)[3] == 7.0
+        # a stated uncertainty is never replaced
+        @test IFACE.ϕ°(stated; fallback_σ = 7.0)[3] == IFACE.ϕ°(stated)[3]
+
+        sol(name) = IFACE.Solute[IFACE.NonBiological(0.2, 0.002, name)]
+        ρ0, σ0 = IFACE.ρₑ(7.4, 0.05, sol(no_unc))
+        @test (ρ0, σ0) == IFACE.ρₑ(7.4, 0.05, sol(no_unc); pmv_fallback_uncert = mean_u)
+        ρ1, σ1 = IFACE.ρₑ(7.4, 0.05, sol(no_unc); pmv_fallback_uncert = 10.0)
+        @test ρ1 == ρ0                  # the mean is untouched, only the spread moves
+        @test σ1 > σ0
+        # a solute with a stated uncertainty does not care
+        @test IFACE.ρₑ(7.4, 0.05, sol(stated)) ==
+              IFACE.ρₑ(7.4, 0.05, sol(stated); pmv_fallback_uncert = 10.0)
+
+        # the guard: finite and above 0
+        for bad in (0.0, -1.0, NaN, Inf, -Inf)
+            @test_throws DomainError IFACE.ρₑ(
+                7.4, 0.05, sol(no_unc); pmv_fallback_uncert = bad,
+            )
         end
     end
 

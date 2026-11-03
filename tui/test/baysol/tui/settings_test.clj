@@ -6,18 +6,11 @@
 (ns baysol.tui.settings-test
  (:require [baysol.tui.screens.sheets :as sheets]
   [baysol.tui.settings :as settings]
+  [baysol.tui.support :refer [temp-root]]
   [clojure.edn :as edn]
   [clojure.java.io :as io]
   [clojure.string :as str]
-  [clojure.test :refer [deftest is testing]])
- (:import (java.nio.file Files)
-  (java.nio.file.attribute FileAttribute)))
-
-(defn ^:private temp-root
- "A new empty folder (a File) for a test."
- []
- (.toFile (Files/createTempDirectory "baysol-settings"
-   (make-array FileAttribute 0))))
+  [clojure.test :refer [deftest is testing]]))
 
 (deftest the-file-is-a-copy-of-the-defaults
  (let [root (temp-root)

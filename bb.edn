@@ -51,6 +51,14 @@
   {:doc
    "Write tui/resources/default_settings.edn from Params.jl (--check: only compare)",
    :task (script "dev/harvest_defaults.clj")},
+  harvest-pmv-mean
+  {:doc
+   "Write the mean PMV uncertainty into its Julia constant (--check: only compare)",
+   :task (script "dev/harvest_pmv_mean.clj")},
+  harvest-solutes
+  {:doc
+   "Write tui/resources/solute_index.edn from the solute tables (--check: only compare)",
+   :task (script "dev/harvest_solutes.clj")},
   precommit {:doc "Every check before a commit (--quick: only the fast ones)",
    :task (script "dev/precommit.clj")},
   docs {:doc "Build the documentation site (strict, ~20 s) into docs/build",

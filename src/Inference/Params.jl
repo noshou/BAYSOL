@@ -42,6 +42,16 @@ u = (δρ₃ − X)/W, with its mode at δρ₃ = 0 (bulk-density cavity water).
 const κ_δρ₃ = 1.25
 
 """
+Uncertainty, cm³ mol⁻¹, that a non-biological buffer solute gets when its row of the
+partial-molar-volume table states none: the harvested mean of the table's stated
+uncertainties (`NONBIO_MEAN_UNCERTAINTY` of `BulkElectronDensity`, which `bb precommit`
+keeps current). It widens the prior on ρₑ for such a solute and nothing else. **Not
+recommended to change**: a smaller value claims a precision the table does not have. Must
+be above 0.
+"""
+const PMV_FALLBACK_UNCERT = BulkElectronDensity.NONBIO_MEAN_UNCERTAINTY
+
+"""
 Upper bound on the cavity occupancy φ = `ρ_cavity/ρ₀`. Water in a cavity can
 be at most modestly denser than bulk: the densest well-attested hydration
 water is Merzel & Smith's first layer at 1.15·ρ₀, so `φ_max` = 1.25 leaves
@@ -288,6 +298,7 @@ const SETTING_LIMITS = (
     κ_δρ₁₂ = (above = 0,),
     κ_δρ₃ = (above = 0,),
     φ_max = (above = 0,),
+    PMV_FALLBACK_UNCERT = (above = 0,),
     EXCL_VOL_CORR_EPS = (above = 0,),
 )
 
@@ -321,7 +332,7 @@ const SETTING_NAMES = (
     :MAP_JITTER_DIRECTIONS, :MAP_JITTER_MAX_OPTIMA, :MAP_JITTER_WITHIN_NATS,
     :BASIN_RESTART_NATS, :HARVEST_COVER, :HARVEST_DIVERGENT, :OPTIMUM_CHAIN_RADIUS,
     :OPTIMUM_CHAIN_FRACTION, :BOUNDS_δρ₁₂, :MODE_δρ₁₂, :κ_δρ₁₂, :κ_δρ₃, :φ_max,
-    :EXCL_VOL_CORR_BOUNDS, :EXCL_VOL_CORR_EPS,
+    :EXCL_VOL_CORR_BOUNDS, :EXCL_VOL_CORR_EPS, :PMV_FALLBACK_UNCERT,
 )
 
 """

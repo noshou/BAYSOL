@@ -280,6 +280,29 @@ end
         )
     end
 
+    @testset "pmv_fallback_uncert: seed_sampler and ρₑ_prior forward it" begin
+        fw = smpl_fw()
+        I_exp, σ_exp = synth_data(fw)
+        li = Solute[NonBiological(0.2, 0.002, "lithium chloride")]   # states no uncertainty
+        p0 = FIT.ρₑ_prior(smpl_pH, smpl_σ_pH, li)
+        p1 = FIT.ρₑ_prior(smpl_pH, smpl_σ_pH, li; pmv_fallback_uncert = 10.0)
+        @test mean(p1) ≈ mean(p0) rtol = 1.0e-12
+        @test std(p1) > std(p0)
+        seed = FIT.seed_sampler(
+            fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, li; pmv_fallback_uncert = 10.0,
+        )
+        @test std(seed.pr.ρₑPrior) ≈ std(p1) rtol = 1.0e-12
+        @test std(FIT._calc_ξ_priors(smpl_pH, smpl_σ_pH, li).ρₑPrior) ≈ std(p0)
+        for bad in (0.0, NaN)
+            @test_throws DomainError FIT.ρₑ_prior(
+                smpl_pH, smpl_σ_pH, li; pmv_fallback_uncert = bad,
+            )
+            @test_throws DomainError FIT.seed_sampler(
+                fw, I_exp, σ_exp, smpl_pH, smpl_σ_pH, li; pmv_fallback_uncert = bad,
+            )
+        end
+    end
+
     @testset "MAP search: the f-stop does not stop short of the optimum" begin
         fw = smpl_fw()
         seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())

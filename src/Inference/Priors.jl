@@ -41,23 +41,28 @@ Given μ = ρₑ, σ = √σ², the LogNormal(μln, σln) parameters are:
 # Keywords
 - `t::Real=DEFAULT_TEMPERATURE_C`: sample temperature
     in °C, forwarded to `BulkElectronDensity.ρₑ`.
+- `pmv_fallback_uncert::Real=PMV_FALLBACK_UNCERT`: uncertainty, cm³ mol⁻¹, of a
+    non-biological solute whose table row states none; forwarded to
+    `BulkElectronDensity.ρₑ`.
 
 # Returns
 - `LogNormal{Float64}`: prior distribution over ρₑ.
 
 # Exceptions
-- `DomainError`: thrown if `σ_pH` < 0.
+- `DomainError`: thrown if `σ_pH` < 0, or if `pmv_fallback_uncert` is not finite and
+    above 0.
 """
 function ρₑ_prior(
     pH::Real,
     σ_pH::Real,
     solutes::Vector{Solute};
     t::Real = DEFAULT_TEMPERATURE_C,
+    pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT,
 )::LogNormal{Float64}
 
     σ_pH < 0 && throw(DomainError(σ_pH, "σ_pH must be ≥ 0"))
 
-    μ, σ = BulkElectronDensity.ρₑ(pH, σ_pH, solutes; t = t)
+    μ, σ = BulkElectronDensity.ρₑ(pH, σ_pH, solutes; t = t, pmv_fallback_uncert)
 
     σ_ln = sqrt(log(1 + (σ / μ)^2))
     μ_ln = log(μ) - σ_ln^2 / 2
@@ -485,6 +490,7 @@ Generates physical prior distributions of ξ.
     forwarded to [`δρ_prior`](@ref).
 - `κ_δρ₃::Real = κ_δρ₃`: concentration of the δρ₃ prior,
     forwarded to [`δρ_prior`](@ref).
+- `pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT`: forwarded to [`ρₑ_prior`](@ref).
 
 # Returns
 - `ξ_priors`: the priors. δρ₃'s bounds are fixed at the mean of the ρₑ prior.
@@ -496,8 +502,9 @@ function _calc_ξ_priors(
     t::Real = DEFAULT_TEMPERATURE_C,
     κ_δρ₁₂::Real = κ_δρ₁₂,
     κ_δρ₃::Real = κ_δρ₃,
+    pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT,
 )::ξ_priors
-    ρₑ = ρₑ_prior(pH, σ_pH, solutes; t = t)
+    ρₑ = ρₑ_prior(pH, σ_pH, solutes; t = t, pmv_fallback_uncert = pmv_fallback_uncert)
     δρ₁, δρ₂, δρ₃ = δρ_prior(κ_δρ₁₂, κ_δρ₃, mean(ρₑ))
     return ξ_priors(ρₑ, δρ₁, δρ₂, δρ₃)
 end

@@ -1,10 +1,10 @@
    ║        name            ║        description          ║      value        ║
    ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
-   ╠ SHELL_THICKNESS        ╬ Hydration-shell thickness   ╬                   ╣
+ > ╠ SHELL_THICKNESS        ╬ Hydration-shell thickness   ╬                   ╣
    ║                        ║ beyond the accessible       ║                   ║
    ║                        ║ surface (CRYSOL's default). ║                   ║
    ║                        ║                             ║                   ║
- > ╠ PROBE_RADIUS           ╬ Solvent probe radius used   ╬                   ╣
+   ╠ PROBE_RADIUS           ╬ Solvent probe radius used   ╬                   ╣
    ║                        ║ for the accessible surface  ║                   ║
    ║                        ║ (water).                    ║                   ║
    ║                        ║                             ║                   ║
@@ -19,6 +19,6 @@
    ║                        ║ smallest grid, F(10)). Not  ║                   ║
    ║                        ║ recommended to change.      ║                   ║
    ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
-   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓↑║   model [3 / 5]   ║
-   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
-   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓ ║   model [3 / 5]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^x  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^w  ┃ prev bloc: ← ┃ reset all: ^r  (^ is ctrl key)

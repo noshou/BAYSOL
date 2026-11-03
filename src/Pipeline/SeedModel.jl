@@ -70,6 +70,11 @@ Computes a NUTS seed from given data input:
 -   `κ_δρ₁₂::Real = κ_δρ₁₂`, `κ_δρ₃::Real = κ_δρ₃`:
     concentrations of the δρ₁/δρ₂ and δρ₃ priors, forwarded to
     [`Inference.seed_sampler`](@ref).
+-   `pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT`: uncertainty, cm³ mol⁻¹, of a
+    non-biological solute whose row of the partial-molar-volume table states none
+    (default: the harvested mean of the table's stated ones, `NONBIO_MEAN_UNCERTAINTY`).
+    Not recommended to change; it is recorded in the run log. Forwarded to
+    [`Inference.seed_sampler`](@ref).
 
 # Returns
 -   `seed::Inference.Seed`, ready to pass to [`run_model`](@ref)/[`Inference.infer`](@ref).
@@ -77,7 +82,8 @@ Computes a NUTS seed from given data input:
 # Exceptions
 - `MolecularStructure.ComponentError`: a residue name is neither in the bundled component
     table nor in the cache and cannot be downloaded (offline).
-- `DomainError`: qvals, `I_exp`, and `σ_exp` have mismatched lengths.
+- `DomainError`: qvals, `I_exp`, and `σ_exp` have mismatched lengths, or
+    `pmv_fallback_uncert` is not finite and above 0.
 - `ArgumentError`: an input is outside its limits (a non-finite or non-positive q, σ_exp,
     `energy`,
     `thickness` or κ; a negative `σ_pH` or `probe`; `rebin`, `lMax`, `n_target` or
@@ -106,6 +112,7 @@ function seed_model(
     n_target::Union{Nothing,Int} = nothing,
     κ_δρ₁₂::Real = κ_δρ₁₂,
     κ_δρ₃::Real = κ_δρ₃,
+    pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT,
 )::Inference.Seed
     # the static build allocates large temporaries; collect
     # once per byte budget instead of whenever the heap grows
@@ -267,10 +274,10 @@ function seed_model(
         # the data the forward model is built for: the accessible
         # surface is needed first, since the diameter of the whole
         # scatterer cloud fixes the Shannon width and the band limit
-        shell                     = timed!(log, :static, 1, "SASA") do
+        shell                           = timed!(log, :static, 1, "SASA") do
             sasa(mol; probe = probe, n_target = n_target)
         end
-        info                      = timed!(
+        info                            = timed!(
         log, :static, 1, "shannon (diameter, binning)"
 ) do
             D = Shannon.cloud_diameter(
@@ -287,12 +294,13 @@ function seed_model(
             drop_nonpositive = drop_nonpositive
 )
         end
-        log.info["lMax"]          = info.lMax
-        log.info["n_q_raw"]       = length(info.q_raw)
-        log.info["rebin"]         = info.rebin
-        log.info["D"]             = info.D
-        log.info["n_channels"]    = info.n_channels
-        log.info["n_nonpositive"] = info.n_nonpositive
+        log.info["lMax"]                = info.lMax
+        log.info["n_q_raw"]             = length(info.q_raw)
+        log.info["rebin"]               = info.rebin
+        log.info["D"]                   = info.D
+        log.info["n_channels"]          = info.n_channels
+        log.info["n_nonpositive"]       = info.n_nonpositive
+        log.info["pmv_fallback_uncert"] = Float64(pmv_fallback_uncert)
 
         # calculate forward model
         fw = timed!(log, :static, 1, "forward_cache") do
@@ -321,6 +329,7 @@ function seed_model(
                 t = t,
                 κ_δρ₁₂ = κ_δρ₁₂,
                 κ_δρ₃ = κ_δρ₃,
+                pmv_fallback_uncert = pmv_fallback_uncert,
                 timing = log,
                 shannon = info,
             )

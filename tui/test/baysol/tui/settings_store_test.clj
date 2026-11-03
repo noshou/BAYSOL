@@ -8,20 +8,14 @@
 (ns baysol.tui.settings-store-test
  (:require [baysol.tui.screens.open-projects :as open-projects]
   [baysol.tui.settings :as settings]
+  [baysol.tui.support :refer [temp-root]]
   [clojure.edn :as edn]
   [clojure.java.io :as io]
   [clojure.string :as str]
-  [clojure.test :refer [deftest is testing use-fixtures]])
- (:import (java.nio.file Files)
-  (java.nio.file.attribute FileAttribute)))
+  [clojure.test :refer [deftest is testing use-fixtures]]))
 
 (use-fixtures :each
  (fn [f] (settings/reset-notices!) (f) (settings/reset-notices!)))
-
-(defn ^:private temp-root
- "A new empty folder (a File) for a test."
- []
- (.toFile (Files/createTempDirectory "baysol-store" (make-array FileAttribute 0))))
 
 (defn ^:private write-settings!
  "Makes the settings file of `root` hold the text `text`."

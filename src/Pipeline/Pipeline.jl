@@ -21,7 +21,7 @@ using ..Geometry: Geometry, sasa, PROBE_RADIUS
 using ..Shannon: Shannon, SHANNON_REBIN
 using ..Scattering: Scattering, B_LM_CHUNK, SHELL_THICKNESS
 using ..BulkElectronDensity: Solute, DEFAULT_TEMPERATURE_C
-using ..Inference: Inference, κ_δρ₁₂, κ_δρ₃, TARGET_ACCEPT
+using ..Inference: Inference, κ_δρ₁₂, κ_δρ₃, PMV_FALLBACK_UNCERT, TARGET_ACCEPT
 using Distributions: Normal, cdf
 
 include("Params.jl")
@@ -163,6 +163,7 @@ const _REPORT_LABELS = Dict{String,String}(
 )
 
 include("Settings.jl")
+include("Buffer.jl")
 include("SeedModel.jl")
 include("RunModel.jl")
 include("Tables.jl")
@@ -173,7 +174,7 @@ include("Summary.jl")
 export seed_model,
     run_model, print_summary, write_log,
     results, PlotStyle, Reference, font_available, load_settings, settings_file,
-    InvalidSettingsError
+    InvalidSettingsError, load_buffer, InvalidBufferError, seed_keywords
 public MAPParams, MAPResult, QuantileBounds, QuantileParams, QuantileCurves, QuantileResult
 
 end # module

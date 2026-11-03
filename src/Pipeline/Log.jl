@@ -206,7 +206,10 @@ function _log_stats(result)
     dl === nothing || add!("components_download", dl.captures[1])
 
     for k in
-        ("n_atoms", "lmax", "dmax", "n_q_raw", "n_q", "n_samples", "n_adapt", "rng_seed")
+        (
+        "n_atoms", "lmax", "dmax", "n_q_raw", "n_q", "n_samples", "n_adapt", "rng_seed",
+        "pmv_fallback_uncert",
+    )
         adopt!(k)
     end
     if map_params !== nothing

@@ -1,24 +1,24 @@
    ║        name            ║        description          ║      value        ║
    ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
- > ╠ κ_δρ₃                  ╬ Concentration of the Beta   ╬                   ╣
-   ║                        ║ prior of the cavity         ║                   ║
-   ║                        ║ contrast δρ₃, whose mode    ║                   ║
-   ║                        ║ is bulk-density water.      ║                   ║
+   ╠ BOUNDS_δρ₁₂            ╬ Hard limits (low, high) on  ╬                   ╣
+   ║                        ║ the hydration-shell         ║                   ║
+   ║                        ║ contrasts δρ₁ and δρ₂, in   ║                   ║
+   ║                        ║ CRYSOL's units.             ║                   ║
    ║                        ║                             ║                   ║
-   ╠ φ_max                  ╬ Maximum cavity water        ╬                   ╣
-   ║                        ║ density relative to bulk;   ║                   ║
-   ║                        ║ it bounds δρ₃. 1.25 is      ║                   ║
-   ║                        ║ above the densest           ║                   ║
-   ║                        ║ hydration water.            ║                   ║
+   ╠ MODE_δρ₁₂              ╬ Most likely value of δρ₁    ╬                   ╣
+   ║                        ║ and δρ₂ (CRYSOL's default   ║                   ║
+   ║                        ║ is 1). Must lie inside the  ║                   ║
+   ║                        ║ bounds.                     ║                   ║
    ║                        ║                             ║                   ║
-   ╠ EXCL_VOL_CORR_BOUNDS   ╬ Hard limits (low, high) on  ╬                   ╣
-   ║                        ║ the excluded-volume         ║                   ║
-   ║                        ║ correction c1. Hitting a    ║                   ║
-   ║                        ║ bound is intended: c1       ║                   ║
-   ║                        ║ cannot absorb model         ║                   ║
-   ║                        ║ misspecification.           ║                   ║
+   ╠ κ_δρ₁₂                 ╬ Concentration of the δρ₁    ╬                   ╣
+   ║                        ║ and δρ₂ Beta priors.        ║                   ║
+   ║                        ║ Higher is tighter; 14 gives ║                   ║
+   ║                        ║ a standard deviation of     ║                   ║
+   ║                        ║ about 1.                    ║                   ║
    ║                        ║                             ║                   ║
+ > ╠ PMV_FALLBACK_UNCERT    ╬ Fallback PMV uncertainty.   ╬                   ╣
+   ║                        ║ Not recommended to change.  ║                   ║
    ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
-   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓ ║   model [2 / 5]   ║
-   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
-   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:       ↑║   model [1 / 5]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^x  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^w  ┃              ┃ reset all: ^r  (^ is ctrl key)

@@ -94,6 +94,15 @@
       (support/feed! vs again KeyType/Enter KeyType/Escape)
       (is (nil? (ask-name! (:screen vs))))
       (is (= "that project already exists!" (error-row vs))))))
+   (testing "a name held by a broken project folder says so, in full"
+    (let [broken (io/file (app/projects-root root) "Held")]
+     (io/make-parents (io/file broken "project.edn"))
+     (spit (io/file broken "project.edn") "not edn (")
+     (let [vs (support/virtual-screen)]
+      (support/feed! vs "held" KeyType/Enter KeyType/Escape)
+      (is (nil? (ask-name! (:screen vs))))
+      (is (str/includes? (str/join "\n" (support/screen-lines vs))
+        "that name is taken by a broken project folder!")))))
    (testing "the message goes when the next key is typed, and a second try can work"
     (let [vs (support/virtual-screen)]
      (support/feed! vs
@@ -237,13 +246,13 @@
        (swap! seen assoc :prompt (wait-for vs "name: _"))
        (support/feed! vs "demo1" KeyType/Enter)
        (swap! seen assoc :menu (wait-for vs "project menu"))
-       (support/feed! vs :ctrl-b)
+       (support/feed! vs :ctrl-x)
        (swap! seen assoc :back (wait-for vs release))
        (support/feed! vs KeyType/Escape)))]
     (is (= :quit r))
     (is (str/includes? (:prompt @seen) "name: _"))
     (is (str/includes? (:menu @seen) "project menu") "the project menu opened")
-    (is (str/includes? (:back @seen) release) "ctrl-b came back to the main menu")
+    (is (str/includes? (:back @seen) release) "ctrl-x came back to the main menu")
     (let [dir (io/file (app/projects-root root) "demo1")]
      (is (some? (projects/read-project dir)))
      (is (= (slurp (settings/settings-file root))
@@ -287,7 +296,7 @@
        (swap! seen assoc :list (wait-for vs "1 of 2 matches"))
        (support/feed! vs KeyType/ArrowDown KeyType/Enter)
        (swap! seen assoc :menu (wait-for vs "project menu"))
-       (support/feed! vs :ctrl-b)
+       (support/feed! vs :ctrl-x)
        (wait-for vs release)
        (support/feed! vs KeyType/Escape)))]
     (is (= :quit r))
@@ -382,9 +391,9 @@
   (support/with-data-folder
    [root (support/temp-root)]
    (let [dir (projects/create! root "p")]
-    (testing "its menu runs, and ctrl-b or escape end it"
+    (testing "its menu runs, and ctrl-x or escape end it"
      (let [vs (support/virtual-screen)]
-      (support/feed! vs :ctrl-b)
+      (support/feed! vs :ctrl-x)
       (is (= :back (open-project! (:screen vs) dir))))
      (let [vs (support/virtual-screen)]
       (support/feed! vs KeyType/Escape)
@@ -394,7 +403,7 @@
      (settings/save! root :sampler "N_ADAPT" 450)
      (spit (settings/settings-file dir) (pr-str {:sampler {"N_ADAPT" {:value 0}}}))
      (let [vs (support/virtual-screen)]
-      (support/feed! vs :ctrl-b)
+      (support/feed! vs :ctrl-x)
       (is (= :back (open-project! (:screen vs) dir)))
       (is (= 450
         (settings/value (get-in (settings/load-project! dir root)
@@ -495,7 +504,7 @@
   (is (= \a (state/key->raw (KeyStroke. \a false false))))
   (is (= \_ (state/key->raw (KeyStroke. \_ false false))))
   (is (= \space (state/key->raw (KeyStroke. \space false false))))
-  (is (= :ctrl-b (state/key->raw (KeyStroke. \b true false))))
+  (is (= :ctrl-x (state/key->raw (KeyStroke. \x true false))))
   (is (= KeyType/Enter (state/key->raw (KeyStroke. KeyType/Enter))))
   (is (= KeyType/ArrowUp (state/key->raw (KeyStroke. KeyType/ArrowUp))))
   (testing "while a key for the menus is lower case"

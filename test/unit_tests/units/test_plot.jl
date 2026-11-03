@@ -387,7 +387,7 @@ end
             for k in ("n_atoms", "lmax", "dmax", "rebin_channels", "rebin_measured",
                 "rebin_fitted", "rebin_non_positive_dropped", "tree_depth_avg",
                 "tree_depth_max", "ebfmi", "excl_vol_sat", "chains_pooled", "chains_run",
-                "rhat_max", "ess_min", "ess_tail_min")
+                "rhat_max", "ess_min", "ess_tail_min", "pmv_fallback_uncert")
                 @test k in keys_
             end
             # numbers all, the seed too (a fresh one has 53 bits, exact as a number); a

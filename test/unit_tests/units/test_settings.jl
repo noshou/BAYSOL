@@ -106,7 +106,7 @@ end
     defaults = load_settings(joinpath(tempdir(), "no", "such", "settings.edn"))
     @test defaults isa Dict{Symbol,Any}
     @test Set(keys(defaults)) == Set(_setting_names())
-    @test length(defaults) == 79
+    @test length(defaults) == 80
     for n in _setting_names()
         @test defaults[n] == _setting_default(n)
     end
@@ -252,6 +252,7 @@ const INVALID_VALUES = [
     ("OPTIMUM_CHAIN_RADIUS", "0", "above 0"), ("BASIN_RESTART_NATS", "-2", "above 0"),
     ("MAP_JITTER_WITHIN_NATS", "0", "above 0"), ("κ_δρ₁₂", "0", "above 0"),
     ("κ_δρ₃", "-1", "above 0"), ("φ_max", "0", "above 0"),
+    ("PMV_FALLBACK_UNCERT", "0", "above 0"), ("PMV_FALLBACK_UNCERT", "-3.0", "above 0"),
     ("EXCL_VOL_CORR_EPS", "0", "above 0"), ("SHELL_THICKNESS", "0", "above 0"),
     ("SHELL_AREA_PER_POINT", "0", "above 0"), ("BEAD_RAY_RANGE", "0", "above 0"),
     ("SASA_N_OCC", "0", "above 0"), ("PROBE_RADIUS", "-0.1", "at least 0"),
@@ -480,7 +481,7 @@ const JUNK = ["nil", "true", "false", "0", "1", "-1", "2.5", "1e999", "\"\"", "\
 
 @testset "fuzzing the saved value of every setting" begin
     names = _setting_names()
-    @test length(names) == 79
+    @test length(names) == 80
     for n in names
         default = _setting_default(n)
         kind = setting_kind(n, default)
@@ -566,7 +567,7 @@ end
         @test (r isa Dict{Symbol,Any}) || (r isa InvalidSettingsError)
         if r isa Dict
             accepted += 1
-            @test length(r) == 79
+            @test length(r) == 80
             @test r[:N_ADAPT] isa Int && r[:N_ADAPT] >= 1
             @test r[:RNG_SEED] isa Int
             @test r[:FIGURES_TEX] isa Bool
@@ -608,7 +609,7 @@ _plain(x) = x
     @test length(cases) > 200
     @test count(c -> c[:valid], cases) > 60
     @test count(c -> !c[:valid], cases) > 140
-    @test length(unique(c[:setting] for c in cases)) >= 79
+    @test length(unique(c[:setting] for c in cases)) >= 80
     for c in cases
         name = c[:setting]
         entries = Dict{Any,Any}(name => Dict{Any,Any}(:value => c[:value]))

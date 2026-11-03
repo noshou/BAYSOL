@@ -492,3 +492,36 @@ _merged_relations() =
         r for m in _SETTING_MODULES if isdefined(m, :SETTING_RELATIONS)
         for r in getfield(m, :SETTING_RELATIONS)
     ]
+
+# ---------------------------------------------------------------------------
+#             the settings that `seed_model` takes as keywords
+# ---------------------------------------------------------------------------
+
+# The settings whose name is a keyword of `seed_model`: (setting, keyword).
+const _SEED_SETTINGS = (
+    (:SHELL_THICKNESS, :thickness),
+    (:PROBE_RADIUS, :probe),
+    (:κ_δρ₁₂, :κ_δρ₁₂),
+    (:κ_δρ₃, :κ_δρ₃),
+    (:PMV_FALLBACK_UNCERT, :pmv_fallback_uncert),
+)
+
+"""
+    seed_keywords(settings = load_settings()) -> NamedTuple
+
+The keywords of [`seed_model`](@ref) that a setting stands for, from `settings` (what
+[`load_settings`](@ref) returns): `thickness` (`SHELL_THICKNESS`), `probe`
+(`PROBE_RADIUS`), `κ_δρ₁₂`, `κ_δρ₃` and `pmv_fallback_uncert` (`PMV_FALLBACK_UNCERT`).
+Pass it on with `seed_model(...; seed_keywords(settings)...)`. The sampler, output and
+plot settings feed other functions and are not here.
+
+# Returns
+- A `NamedTuple` of the five keywords.
+
+# Exceptions
+- `KeyError` if `settings` lacks one of the settings (a `Dict` from `load_settings` has
+  them all).
+"""
+seed_keywords(settings::AbstractDict = load_settings()) =
+    NamedTuple{Tuple(last.(_SEED_SETTINGS))}(
+        Tuple(settings[first(p)] for p in _SEED_SETTINGS))

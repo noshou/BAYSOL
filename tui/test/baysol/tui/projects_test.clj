@@ -212,3 +212,29 @@
       (is (some? problem) n))
      (when problem
       (is (<= (count problem) 29) "a message that fits the main menu")))))))
+
+(deftest a-broken-project-folder-keeps-its-name
+ (let [root (support/temp-root)
+   projects-dir (app/projects-root root)
+   broken (io/file projects-dir "Demo")]
+  (io/make-parents (io/file broken "project.edn"))
+  (spit (io/file broken "project.edn") "{:id \"other\"}")
+  (app/ensure-dir! (io/file projects-dir "plain"))
+  (testing "it is not listed, but listed as broken; a plain folder is not"
+   (is (= [] (projects/list-projects projects-dir)))
+   (is (= ["Demo"] (projects/broken-names projects-dir))))
+  (testing "the name says what holds it, whatever the case"
+   (let [existing (projects/entry-names projects-dir)
+     broken-names (projects/broken-names projects-dir)]
+    (is (= "that name is taken by a broken project folder!"
+      (projects/name-problem "demo" existing broken-names)))
+    (is (= "that project already exists!"
+      (projects/name-problem "plain" existing broken-names)))
+    (is (= "that project already exists!"
+      (projects/name-problem "demo" existing)))))
+  (testing "create! says it too, and leaves the folder alone"
+   (let [e (try (projects/create! root "demo")
+      nil
+      (catch clojure.lang.ExceptionInfo e e))]
+    (is (= "that name is taken by a broken project folder!" (:reason (ex-data e)))))
+   (is (= "{:id \"other\"}" (slurp (io/file broken "project.edn")))))))

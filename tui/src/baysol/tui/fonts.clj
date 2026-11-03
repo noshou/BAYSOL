@@ -29,7 +29,7 @@
 
 (ns baysol.tui.fonts
  (:require [baysol.tui.core :as core]
-  [clojure.edn :as edn]
+  [baysol.tui.edn-store :as store]
   [clojure.java.io :as io]
   [clojure.java.shell :as shell]
   [clojure.string :as str])
@@ -316,7 +316,7 @@
  "The cache file `cache` (a File) as a map, or nil if there is none or it is not one."
  [^File cache]
  (try (when (.isFile cache)
-   (let [m (edn/read-string (slurp cache :encoding "UTF-8"))]
+   (let [m (store/read-edn cache nil)]
     (when (and (map? m)
       (contains? m :fingerprint)
       (vector? (:math m))

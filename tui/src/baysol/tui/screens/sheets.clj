@@ -12,7 +12,7 @@
 ;;   down, up    the next and the previous setting of the bloc (no wrapping)
 ;;   right, left the first page (first setting) of the next and of the previous bloc, where
 ;;               there is one; the footer shows `next bloc: →` and `prev bloc: ←` only then
-;;   ctrl-b      back to the settings menu (the footer's `menu: ^b`)
+;;   ctrl-x      back to the settings menu (the footer's `menu: ^x`)
 ;;   escape      quit the program (the footer's `quit: esc`)
 ;;   enter       edit the value of the setting under the cursor:
 ;;                 a number: type it, Enter checks it against its limits, Escape cancels;
@@ -27,16 +27,19 @@
 ;;                   must be on); the row below says `⏎ toggle  esc done`.
 ;;               The new value is a draft, marked `*`, until it is saved. Tuples cannot be
 ;;               edited yet
-;;   ctrl-s      save every draft of the sheet, in any bloc, into settings.edn
+;;   ctrl-w      save every draft of the sheet, in any bloc, into settings.edn
 ;;   ctrl-u      undo: the draft of the setting under the cursor goes back to what
 ;;               was saved
 ;;   ctrl-r      reset: every setting of the bloc becomes a draft of its default
 ;;   Drafts survive every move inside the sheet, down, up, left and right, and show their
-;;   `*` when their page comes back; only ctrl-s keeps them: leaving the sheet (ctrl-b,
-;;   escape) drops the ones not saved.
+;;   `*` when their page comes back; only ctrl-w keeps them: leaving the sheet (ctrl-x,
+;;   escape) drops the ones not saved, after asking `discard N changes?` (enter leaves,
+;;   escape keeps editing).
 
 (ns baysol.tui.screens.sheets
- (:require [baysol.tui.screens.page-load :as pgld]
+ (:require [baysol.tui.text :as txt]
+  [baysol.tui.screens.loop :as lp]
+  [baysol.tui.screens.page-load :as pgld]
   [baysol.tui.screens.picker :as picker]
   [baysol.tui.screens.state :as state]
   [baysol.tui.settings :as settings]
@@ -93,7 +96,7 @@
    KeyType/ArrowUp (if (same-bloc? (dec i)) (dec i) i)
    KeyType/ArrowRight (or (first-page-of blocs (inc bloc)) i)
    KeyType/ArrowLeft (or (first-page-of blocs (dec bloc)) i)
-   :ctrl-b :back
+   :ctrl-x :back
    KeyType/Escape :quit
    KeyType/EOF :quit ; the terminal went away: leave rather than spin
    i)))
@@ -114,6 +117,16 @@
  the cursor shown while typing."
  16)
 
+(def ^:private cap-note
+ "What the value cell says when a character past `max-buffer` is refused (at most 18
+ characters, the width of the cell's error)."
+ (str max-buffer " digits at most"))
+
+(def ^:private max-int-digits
+ "The most digits of a whole number setting that is accepted: no integer setting has an
+ upper limit of its own, so a value is held to what 64 bits and the cell can say plainly."
+ 15)
+
 (def ^:private max-text
  "The longest name typed to pick a colour or a font."
  40)
@@ -121,7 +134,7 @@
 (defn ^:private put-cell
  "The line `line` with `text`, padded or cut to `width`, written at column `from`."
  [^String line from width text]
- (let [cell (subs (str text (apply str (repeat width \space))) 0 width)]
+ (let [cell (subs (str text (txt/spaces width)) 0 width)]
   (str (subs line 0 from) cell (subs line (+ from width)))))
 
 (defn with-values
@@ -134,7 +147,7 @@
    (if-let [[_ setting] (re-find #"^(?: > |   )╠([^╬]*)╬" line)]
     (if-let [{:keys [value text draft?]} (get shown (str/trim setting))]
      (let [text (or text (settings/format-value value))
-       cell (subs (str " " text (apply str (repeat value-width \space)))
+       cell (subs (str " " text (txt/spaces value-width))
         0
         value-width)
        cell (if draft? (str (subs cell 0 (dec value-width)) "*") cell)]
@@ -229,6 +242,19 @@
    lines
    (range top (inc bottom)))))
 
+(defn with-discard
+ "The lines of a page with the question that leaves a sheet with `n` drafts not saved
+ written in the description column of the table, which is made blank first: `discard 3
+ changes?`, then the keys that answer it, one to a row."
+ [lines n]
+ (let [[top bottom] (column-rows lines)
+   texts [(lp/discard-title n) "enter: discard" "esc: keep editing"]]
+  (reduce
+   (fn [ls [row text]]
+    (update ls row put-cell description-column description-width (str " " text)))
+   (blank-description lines)
+   (map vector (range top (inc bottom)) texts))))
+
 (defn ^:private dropdown-layout
  "What the dropdown of the edit `edit` writes in the description column of the page
  `lines`: `{:top first row :from first name shown :items how many :texts [cell ...]
@@ -302,7 +328,11 @@
        :when (and (some? bound) (bad? parsed bound))]
       (let [full (str "must be " words " " bound)]
        (if (<= (count full) 18) full (str words " " bound))))))]
-  (cond (nil? parsed) {:error
+  (cond (and (= kind :int)
+    (re-matches #"[+-]?\d+" t)
+    (> (count (str/replace t #"^[+-]?0*" "")) max-int-digits))
+   {:error (str max-int-digits " digits at most")}
+   (nil? parsed) {:error
     (if (= kind :int) "not a whole number" "not a number")}
    (and (= kind :float) (not (Double/isFinite (double parsed))))
    {:error "not a number"}
@@ -365,11 +395,6 @@
   (update state :drafts dissoc setting)
   (assoc-in state [:drafts setting] v)))
 
-(defn ^:private printable?
- "Whether `input` is a key that types a character."
- [input]
- (and (char? input) (>= (int input) 32) (not= (int input) 127)))
-
 (defn ^:private effective-values
  "Every setting's value on the sheet, `{setting value}`, with the draft of each."
  [{:keys [entries], :as state}]
@@ -412,15 +437,15 @@
 
    (cancel-key? input) {:state (assoc state :edit nil)}
 
-   (= input KeyType/Backspace)
-   {:state (update state
+   (and (not= input \space) (txt/edits? input buffer max-buffer))
+   {:state (update
+     state
      :edit
-     #(assoc %
-      :buffer (subs buffer 0 (max 0 (dec (count buffer))))
-      :error nil))}
+     #(assoc % :buffer (txt/typed buffer input max-buffer) :error nil))}
 
-   (and (printable? input) (< (count buffer) max-buffer) (not= input \space))
-   {:state (update state :edit #(assoc % :buffer (str buffer input) :error nil))}
+   ;; a character past the cap is refused, and the cell says so
+   (and (not= input \space) (txt/at-cap? input buffer max-buffer))
+   {:state (assoc-in state [:edit :error] cap-note)}
 
    :else {:state state})))
 
@@ -461,17 +486,15 @@
    (and (#{KeyType/ArrowDown KeyType/ArrowUp} input) (seq matches))
    (edit! (assoc edit
      :error nil
-     :index (mod ((if (= input KeyType/ArrowDown) inc dec) index)
-      (count matches))))
+     :index (txt/cycle-index index
+      (count matches)
+      (= input KeyType/ArrowDown))))
 
    (and (= input KeyType/Tab) (seq matches))
    (edit! (refilter edit (nth matches index)))
 
-   (= input KeyType/Backspace)
-   (edit! (refilter edit (subs buffer 0 (max 0 (dec (count buffer))))))
-
-   (and (printable? input) (< (count buffer) max-text))
-   (edit! (refilter edit (str buffer input)))
+   (txt/edits? input buffer max-text)
+   (edit! (refilter edit (txt/typed buffer input max-text)))
 
    :else {:state state})))
 
@@ -632,15 +655,12 @@
      :edit
      (assoc edit
       :error nil
-      :index (mod ((if (= input KeyType/ArrowRight) inc dec)
-        index)
-       (count matches))))}
-   (= input KeyType/Backspace) (set-buffer
-    (subs buffer 0 (max 0 (dec (count buffer)))))
-   (and (printable? input)
-    (not= input \space)
-    (< (count buffer) (if colour? max-text max-buffer)))
-   (set-buffer (str buffer input))
+      :index (txt/cycle-index index
+       (count matches)
+       (= input KeyType/ArrowRight))))}
+   (and (not= input \space)
+    (txt/edits? input buffer (if colour? max-text max-buffer)))
+   (set-buffer (txt/typed buffer input (if colour? max-text max-buffer)))
    :else {:state state})))
 
 (defn ^:private tuple-layout
@@ -713,7 +733,7 @@
     {:state (assoc state
       :edit
       {:setting setting,
-       :buffer (subs t 0 (min (count t) max-buffer))})})
+       :buffer t})})
    (:colour :font)
    (let [names (catalog setting kind)]
     {:state (assoc state
@@ -748,7 +768,7 @@
 
    (= input KeyType/Enter) (start-edit state setting)
 
-   (= input :ctrl-s)
+   (= input :ctrl-w)
    {:state (-> state
      (assoc :drafts {})
      (update :entries
@@ -772,15 +792,19 @@
 
 (defn step
  "What `input` does in `state` on `sheet`: `:back` or `:quit`, or `{:state new-state}`,
- with `:save [[setting value] ...]` when drafts were saved (the caller writes them)."
+ with `:save [[setting value] ...]` when drafts were saved (the caller writes them).
+ Ctrl-X is `:back` in every mode, an edit being open (a number, a dropdown, a tuple, a
+ set of choices) or not: the edit and the unsaved drafts are dropped with the sheet."
  [sheet state input]
  (if-let [{:keys [setting]} (:edit state)]
   (let [kind (get-in state [:entries setting :type])]
-   (case kind
-    (:int :float) (number-step state setting input)
-    (:colour :font) (text-step state setting kind input)
-    :set (set-step state setting input)
-    :tuple (tuple-step state setting input)))
+   (if (state/back-key? input)
+    :back
+    (case kind
+     (:int :float) (number-step state setting input)
+     (:colour :font) (text-step state setting kind input)
+     :set (set-step state setting input)
+     :tuple (tuple-step state setting input))))
   (normal-step sheet state input)))
 
 (defn page-lines
@@ -829,7 +853,7 @@
  `:entries` (a setting name to `{:saved v :default d :type t :limits l :choices c :notice
  n}`), `:catalog` (the names to pick from for a setting and a kind), `:swatch` (the colour
  of a colour name), `:relations` (the rules that tie settings together) and `:save!`, a
- function of a setting name and a value, called for each draft a ctrl-s saves."
+ function of a setting name and a value, called for each draft a ctrl-w saves."
  [^TerminalScreen screen sheet ^TextColor background
   {:keys [entries catalog swatch relations save!]}]
  (loop [st (initial-state entries catalog swatch relations)]
@@ -838,8 +862,28 @@
     :marks (page-marks sheet st),
     :panel (page-panel sheet st)}
    background)
-  (let [result (step sheet st (state/read-input screen))]
-   (if (keyword? result)
-    result
-    (do (run! (fn [[setting v]] (save! setting v)) (:save result))
+  (let [input (state/read-input screen)
+    result (step sheet st input)
+    n (count (:drafts st))]
+   (cond
+    ;; leaving with drafts that were not saved asks first (not when the terminal is gone)
+    (and (#{:back :quit} result) (not= input KeyType/EOF) (pos? n))
+    (let [answer (lp/confirm-discard!
+       screen
+       n
+       (fn [_]
+        (state/draw-page screen
+         {:asset (with-discard
+           (page-lines sheet (assoc st :edit nil))
+           n),
+          :marks [],
+          :panel nil}
+         background)))]
+     (cond (true? answer) result
+      (= answer :quit) :quit
+      :else (recur (assoc st :edit nil))))
+
+    (keyword? result) result
+
+    :else (do (run! (fn [[setting v]] (save! setting v)) (:save result))
      (recur (:state result)))))))

@@ -14,6 +14,10 @@ const _RUN_INFO = Dict(
     "dmax" => ("model", "Å",
         "Diameter of the scatterer cloud (atoms and hydration beads), which " *
         "sets the Shannon channel width π/dmax."),
+    "pmv_fallback_uncert" => ("model", "cm³/mol",
+        "Uncertainty given to a non-biological buffer solute whose row of the " *
+        "partial-molar-volume table states none (the table's mean by default; " *
+        "not recommended to change)."),
     "cavity_frac" => ("model", "",
         "Share of the hydration shell classified as cavity at the MAP, 0 to " *
         "1."),
@@ -125,6 +129,7 @@ function _run_rows(fit, divergence_rate::Real, map_params, info::AbstractDict)
         ("n_q", "n_q"), ("n_samples", "n_samples"), ("n_adapt", "n_adapt"),
         ("rng_seed", "rng_seed"), ("quantile_lo_pct", "quantile_lo_pct"),
         ("quantile_hi_pct", "quantile_hi_pct"),
+        ("pmv_fallback_uncert", "pmv_fallback_uncert"),
     )
         haskey(info, source) && add!(k, info[source])
     end

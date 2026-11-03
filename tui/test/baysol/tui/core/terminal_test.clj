@@ -2,19 +2,17 @@
 
 (ns baysol.tui.core.terminal-test
  (:require [baysol.tui.core.terminal :as terminal]
+  [baysol.tui.support :refer [temp-root]]
   [clojure.java.io :as io]
   [clojure.string :as str]
-  [clojure.test :refer [deftest is testing]])
- (:import (java.nio.file Files)
-  (java.nio.file.attribute FileAttribute)))
+  [clojure.test :refer [deftest is testing]]))
 
 (defn ^:private system [os env] {:os os, :env env, :home "/home/u", :cwd "/work"})
 
 (defn ^:private bin-with
  "A new folder (a File) holding an executable file for each of `names`."
  [& names]
- (let [dir (.toFile (Files/createTempDirectory "baysol-test"
-     (make-array FileAttribute 0)))]
+ (let [dir (temp-root)]
   (doseq [n names]
    (let [file (io/file dir n)]
     (spit file "#!/bin/sh\n")

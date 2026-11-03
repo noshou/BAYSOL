@@ -16,12 +16,12 @@
 
 (ns baysol.tui.projects
  (:require [baysol.tui.core.app :as app]
+  [baysol.tui.edn-store :as store]
   [baysol.tui.settings :as settings]
-  [clojure.edn :as edn]
+  [baysol.tui.text :as txt]
   [clojure.java.io :as io]
   [clojure.string :as str])
- (:import (java.nio.file Files StandardCopyOption)
-  (java.time Instant)))
+ (:import (java.time Instant)))
 
 (def max-name
  "The most characters a project name may have."
@@ -34,21 +34,27 @@
    (map #(str "lpt" %) (range 1 10)))))
 
 (defn name-problem
- "What is wrong with `id` as the name of a new project, as a short message (29 characters
- at most, which is what the main menu has room for), or nil if it is fine. `existing` is
+ "What is wrong with `id` as the name of a new project, as a short message (the main
+ menu has room for 29 characters; the one for a broken folder is longer and the menu
+ makes room), or nil if it is fine. `existing` is
  every name already in the projects folder. The checks run in this order: empty, too long,
- characters, a trailing dot, a reserved name, a name taken."
- [id existing]
- (let [lower (str/lower-case id)]
-  (cond (str/blank? id) "type a name first!"
-   (> (count id) max-name) (str "name too long (" max-name " at most)")
-   (not (re-matches #"[A-Za-z0-9._-]+" id)) "use only a-z 0-9 . _ -"
-   (not (re-matches #"[A-Za-z0-9].*" id)) "start with a letter or digit"
-   (str/ends-with? id ".") "must not end with a dot"
-   (contains? reserved (first (str/split lower #"\.")))
-   "reserved name, pick another"
-   (some #(= lower (str/lower-case %)) existing) "that project already exists!"
-   :else nil)))
+ characters, a trailing dot, a reserved name, a name taken. `broken` (optional, see
+ [[broken-names]]) are the names of folders that have a `project.edn` that cannot be used:
+ a name among them says so, as it is neither listed nor free."
+ ([id existing] (name-problem id existing []))
+ ([id existing broken]
+  (let [lower (str/lower-case id)
+    same? (fn [names] (some #(= lower (str/lower-case %)) names))]
+   (cond (str/blank? id) "type a name first!"
+    (> (count id) max-name) (txt/too-long "name" max-name)
+    (not (re-matches #"[A-Za-z0-9._-]+" id)) "use only a-z 0-9 . _ -"
+    (not (re-matches #"[A-Za-z0-9].*" id)) "start with a letter or digit"
+    (str/ends-with? id ".") "must not end with a dot"
+    (contains? reserved (first (str/split lower #"\.")))
+    "reserved name, pick another"
+    (same? broken) "that name is taken by a broken project folder!"
+    (same? existing) "that project already exists!"
+    :else nil))))
 
 (defn project-dir
  "The folder (a File) of the project `id` in the projects folder `projects-root`."
@@ -61,8 +67,7 @@
  [^java.io.File dir]
  (let [file (io/file dir "project.edn")]
   (when (.isFile file)
-   (let [project (try (edn/read-string (slurp file :encoding "UTF-8"))
-      (catch Exception _ nil))]
+   (let [project (store/read-edn file nil)]
     (when (and (map? project) (= (:id project) (.getName dir))) project)))))
 
 (defn entry-names
@@ -70,6 +75,23 @@
  is no such folder), projects or not."
  [projects-root]
  (vec (some->> (.listFiles (io/file projects-root))
+   (map #(.getName ^java.io.File %)))))
+
+(defn broken-names
+ "The names of the folders of the projects folder `projects-root` that have a `project.edn`
+ that cannot be used (see [[read-project]]): [[list-projects]] hides them, but their names
+ are taken.
+
+ # Returns
+ A vector of names.
+
+ # Exceptions
+ None."
+ [projects-root]
+ (vec (some->> (.listFiles (io/file projects-root))
+   (filter #(.isDirectory ^java.io.File %))
+   (filter #(.isFile (io/file ^java.io.File % "project.edn")))
+   (remove read-project)
    (map #(.getName ^java.io.File %)))))
 
 (defn list-projects
@@ -99,7 +121,7 @@
  [app-root id]
  (let [projects (app/projects-root app-root)
    _ (app/ensure-dir! projects)
-   problem (name-problem id (entry-names projects))
+   problem (name-problem id (entry-names projects) (broken-names projects))
    _ (when problem
     (throw (ex-info problem {:type ::invalid-name, :reason problem, :id id})))
    dir (project-dir projects id)]
@@ -108,13 +130,13 @@
    (throw (ex-info
      "that project already exists!"
      {:type ::invalid-name, :reason "that project already exists!", :id id})))
+
+  ; copy over the project
   (try (spit (io/file dir "project.edn")
     (pr-str {:id id, :created (str (Instant/now))})
     :encoding
     "UTF-8")
-   (Files/copy (.toPath (settings/settings-file app-root))
-    (.toPath (settings/settings-file dir))
-    (into-array StandardCopyOption
-     [StandardCopyOption/REPLACE_EXISTING]))
+   (store/copy-over! (settings/settings-file app-root)
+    (settings/settings-file dir))
    dir
    (catch Exception e (delete-tree! dir) (throw e)))))

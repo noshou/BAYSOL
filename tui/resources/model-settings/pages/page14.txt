@@ -1,24 +1,24 @@
    ║        name            ║        description          ║      value        ║
    ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
- > ╠ BEAD_RAY_RANGE         ╬ Range of the rays that      ╬                   ╣
-   ║                        ║ classify a bead as cavity   ║                   ║
-   ║                        ║ or bulk; a farther wall     ║                   ║
-   ║                        ║ counts as bulk. Not         ║                   ║
+   ╠ EXCL_VOL_CORR_EPS      ╬ Padding of the search       ╬                   ╣
+   ║                        ║ range of the                ║                   ║
+   ║                        ║ excluded-volume correction  ║                   ║
+   ║                        ║ c1, and step of the coarse  ║                   ║
+   ║                        ║ scan. Not recommended to    ║                   ║
+   ║                        ║ change.                     ║                   ║
+   ║                        ║                             ║                   ║
+   ╠ SHELL_SAMPLE           ╬ Sample directions per atom  ╬                   ╣
+   ║                        ║ for the surface. More is    ║                   ║
+   ║                        ║ slower and more accurate.   ║                   ║
+   ║                        ║ Not recommended to change.  ║                   ║
+   ║                        ║                             ║                   ║
+ > ╠ SASA_N_OCC             ╬ Early-exit prefix of the    ╬                   ╣
+   ║                        ║ surface directions; smaller ║                   ║
+   ║                        ║ is faster but loses         ║                   ║
+   ║                        ║ solvent-accessible area     ║                   ║
+   ║                        ║ (0.3 to 0.6 % at 104). Not  ║                   ║
    ║                        ║ recommended to change.      ║                   ║
-   ║                        ║                             ║                   ║
-   ╠ BEAD_RAY_DIRS          ╬ Number of ray directions    ╬                   ╣
-   ║                        ║ per bead for that test. Not ║                   ║
-   ║                        ║ recommended to change.      ║                   ║
-   ║                        ║                             ║                   ║
-   ║                        ║                             ║                   ║
-   ║                        ║                             ║                   ║
-   ║                        ║                             ║                   ║
-   ║                        ║                             ║                   ║
-   ║                        ║                             ║                   ║
-   ║                        ║                             ║                   ║
-   ║                        ║                             ║                   ║
-   ║                        ║                             ║                   ║
    ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
-   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓ ║   model [5 / 5]   ║
-   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃              ┃ undo:      ^u╚═══════════════════╝
-   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:       ↑║   model [4 / 5]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^x  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^w  ┃ prev bloc: ← ┃ reset all: ^r  (^ is ctrl key)

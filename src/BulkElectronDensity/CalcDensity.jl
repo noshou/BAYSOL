@@ -56,33 +56,163 @@ end
 # ---------------------------------------------------------------------------
 
 """ `(Z, ϕ°, σ_ϕ°)` of a non-biological solute. """
-function _ρₑ_i(s::NonBiological, ::Real, ::Real)::Tuple{Float64,Float64,Float64}
-    Z_j, ϕ°_j, σ_ϕ°_j = ϕ°(s.arg)
+function _ρₑ_i(
+    s::NonBiological,
+    ::Real,
+    ::Real,
+    fallback_σ::Real,
+)::Tuple{Float64,Float64,Float64}
+    Z_j, ϕ°_j, σ_ϕ°_j = ϕ°(s.arg; fallback_σ)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
 """ `(Z, ϕ°, σ_ϕ°)` of a polymer, detergent or oligomer (at this pH for peptides). """
-function _ρₑ_i(p::Polymer, pH::Real, σ_pH::Real)::Tuple{Float64,Float64,Float64}
+function _ρₑ_i(
+    p::Polymer,
+    pH::Real,
+    σ_pH::Real,
+    ::Real,
+)::Tuple{Float64,Float64,Float64}
     Z_j, ϕ°_j, σ_ϕ°_j = _polymer_ϕ°(p.arg, pH, σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
 """ `(Z, ϕ°, σ_ϕ°)` of a protein sequence. """
-function _ρₑ_i(p::Protein, pH::Real, σ_pH::Real)::Tuple{Float64,Float64,Float64}
+function _ρₑ_i(
+    p::Protein,
+    pH::Real,
+    σ_pH::Real,
+    ::Real,
+)::Tuple{Float64,Float64,Float64}
     Z_j, ϕ°_j, σ_ϕ°_j = ϕ°(pH, p.arg; σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
 """ `(Z, ϕ°, σ_ϕ°)` of a DNA sequence. """
-function _ρₑ_i(d::DNA, pH::Real, σ_pH::Real)::Tuple{Float64,Float64,Float64}
+function _ρₑ_i(
+    d::DNA,
+    pH::Real,
+    σ_pH::Real,
+    ::Real,
+)::Tuple{Float64,Float64,Float64}
     Z_j, ϕ°_j, σ_ϕ°_j = ϕ°(true, pH, d.arg; σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
 end
 
 """ `(Z, ϕ°, σ_ϕ°)` of an RNA sequence. """
-function _ρₑ_i(r::RNA, pH::Real, σ_pH::Real)::Tuple{Float64,Float64,Float64}
+function _ρₑ_i(
+    r::RNA,
+    pH::Real,
+    σ_pH::Real,
+    ::Real,
+)::Tuple{Float64,Float64,Float64}
     Z_j, ϕ°_j, σ_ϕ°_j = ϕ°(false, pH, r.arg; σ_pH)
     return (Float64(Z_j), ϕ°_j, σ_ϕ°_j)
+end
+
+""" `(Z, ϕ°, σ_ϕ°)` of a custom non-biological solute; no `σ_ϕ°` gets the fallback. """
+function _ρₑ_i(
+    s::CustomNonBio,
+    ::Real,
+    ::Real,
+    fallback_σ::Real,
+)::Tuple{Float64,Float64,Float64}
+    return (Float64(s.Z), s.ϕ°, s.σ_ϕ° === nothing ? Float64(fallback_σ) : s.σ_ϕ°)
+end
+
+"""
+`(Z, ϕ°, σ_ϕ°)` of a custom polymer (the model of the built-in chain families, see
+[`CustomPolymer`](@ref)).
+
+# Exceptions
+`ArgumentError` when the chain has fewer than 2 units in all.
+"""
+function _ρₑ_i(
+    s::CustomPolymer,
+    ::Real,
+    ::Real,
+    ::Real,
+)::Tuple{Float64,Float64,Float64}
+    total = sum(s.n)
+    total >= 2 || throw(
+        ArgumentError(
+            "$(s.arg) with $total units: too short, use CustomNonBio for a single solute",
+        ),
+    )
+    ϕ°_j = s.v0 + sum(s.slope .* s.n)
+    Z_j = round(Int64, s.Z_ends + sum(s.Z_unit .* s.n))
+    # a chain whose uncertainties are all unstated gets the polymer-grade rule
+    if s.σ_ends === nothing && all(isnothing, s.σ_unit)
+        σ = POLYMER_UNKNOWN_REL_UNC * abs(ϕ°_j)
+    else
+        terms = [
+            u === nothing ? POLYMER_UNKNOWN_REL_UNC * abs(m * k) : u * k for
+            (u, m, k) in zip(s.σ_unit, s.slope, s.n)
+        ]
+        σ = sqrt(sum(abs2, terms) + (s.σ_ends === nothing ? 0.0 : s.σ_ends)^2)
+    end
+    return (Float64(Z_j), ϕ°_j, σ)
+end
+
+"""
+Check the numbers of a custom solute (nothing to check for the other types).
+
+# Returns
+- `nothing`.
+
+# Exceptions
+- `DomainError`: `Z`/`Z_unit` not above 0, `ϕ°`, `v0` or `slope` not finite, `n` not
+    finite or below 0, `Z_ends` below 0, or a given `σ_ϕ°`/`σ_unit`/`σ_ends` not finite and
+    at least 0.
+- `ArgumentError`: a `CustomPolymer` with no kind of unit, more than
+    `CUSTOM_POLYMER_MAX_UNITS` or vectors of different lengths.
+"""
+_check_custom(::Solute) = nothing
+
+function _check_custom(s::CustomNonBio)
+    s.Z > 0 || throw(DomainError(s.Z, "a custom solute's electron count must be above 0"))
+    isfinite(s.ϕ°) || throw(DomainError(s.ϕ°, "a custom solute's ϕ° must be finite"))
+    _check_σ(s.σ_ϕ°, "σ_ϕ°")
+end
+
+function _check_custom(s::CustomPolymer)
+    k = length(s.n)
+    (1 <= k <= CUSTOM_POLYMER_MAX_UNITS) || throw(
+        ArgumentError(
+            "a custom polymer has 1 to $CUSTOM_POLYMER_MAX_UNITS kinds of unit, got $k",
+        ),
+    )
+    (length(s.Z_unit) == k && length(s.slope) == k && length(s.σ_unit) == k) || throw(
+        ArgumentError(
+            "a custom polymer's n, Z_unit, slope and σ_unit must be the same length",
+        ),
+    )
+    for (i, Z) in enumerate(s.Z_unit)
+        Z > 0 || throw(DomainError(Z, "a custom polymer's Z_unit[$i] must be above 0"))
+    end
+    for (i, v) in enumerate(s.n)
+        (isfinite(v) && v >= 0) ||
+            throw(DomainError(v, "a custom polymer's n[$i] must be finite and at least 0"))
+    end
+    for (v, nm) in ((s.v0, "v0"),)
+        isfinite(v) || throw(DomainError(v, "a custom polymer's $nm must be finite"))
+    end
+    for (i, v) in enumerate(s.slope)
+        isfinite(v) || throw(DomainError(v, "a custom polymer's slope[$i] must be finite"))
+    end
+    s.Z_ends >= 0 ||
+        throw(DomainError(s.Z_ends, "a custom polymer's Z_ends must be at least 0"))
+    for (i, u) in enumerate(s.σ_unit)
+        _check_σ(u, "σ_unit[$i]")
+    end
+    _check_σ(s.σ_ends, "σ_ends")
+end
+
+_check_σ(::Nothing, ::String) = nothing
+function _check_σ(σ::Float64, name::String)
+    isfinite(σ) && σ >= 0 ||
+        throw(DomainError(σ, "a custom solute's $name must be finite and at least 0"))
+    return nothing
 end
 
 
@@ -112,11 +242,15 @@ where `k_j` = `N_A`·`Z_j/1e27` − `ρ_w`·`ϕ°_j/1e3`.
 # Arguments
 - `pH::Real`: pH of the solution; forwarded to ϕ° for Protein/DNA/RNA solutes.
 - `σ_pH::Real`: standard uncertainty on pH, propagated through each titration term.
-- `solutes::Vector{Solute}`: the buffer's components, **excluding the measured
+- `solutes::Vector{Solute}`: the buffer's components (`Protein`, `NonBiological`,
+    `Polymer`, `DNA`, `RNA`, `CustomNonBio`, `CustomPolymer`), **excluding the measured
     macromolecule** (see [`Solute`](@ref)). Empty means pure water.
 
 # Keywords
 - `t::Real=DEFAULT_TEMPERATURE_C`: sample temperature in °C, forwarded to `_ρₑ_w`.
+- `pmv_fallback_uncert::Real=NONBIO_MEAN_UNCERTAINTY`: the uncertainty, cm³·mol⁻¹, of a
+    non-biological solute (a table row or a `CustomNonBio`) that states none.
+    Must be finite and above 0.
 
 # Returns
 - `Tuple{Float64, Float64}`: (ρₑ, σρₑ), the bulk electron density and its
@@ -124,15 +258,25 @@ where `k_j` = `N_A`·`Z_j/1e27` − `ρ_w`·`ϕ°_j/1e3`.
 
 # Exceptions
 - `DomainError`: thrown if any solute's `molarity_uncertainty` < 0 or
-    molarity ≤ 0.
-- `ArgumentError`: thrown if a solute's sequence/name is empty.
+    molarity ≤ 0, if `pmv_fallback_uncert` is not finite and above 0, or if a
+    `CustomNonBio`/`CustomPolymer` has a number outside its range (see its docstring).
+- `ArgumentError`: thrown if a solute's sequence/name is empty, or a `CustomPolymer` has
+    fewer than 2 units in all or an unusable list of unit kinds.
 """
 function ρₑ(
     pH::Real,
     σ_pH::Real,
     solutes::Vector{Solute};
     t::Real = DEFAULT_TEMPERATURE_C,
+    pmv_fallback_uncert::Real = NONBIO_MEAN_UNCERTAINTY,
 )::Tuple{Float64,Float64}
+
+    isfinite(pmv_fallback_uncert) && pmv_fallback_uncert > 0 || throw(
+        DomainError(
+            pmv_fallback_uncert,
+            "the fallback PMV uncertainty must be finite and above 0",
+        ),
+    )
 
     ρₑ_w, σ_w = _ρₑ_w(t)
     ρw_k = ρₑ_w / CM3_PER_LITER   # ρ_w per cm³·mol⁻¹ of ϕ° at 1 mol·L⁻¹
@@ -160,7 +304,8 @@ function ρₑ(
             throw(ArgumentError("a solute's name or sequence cannot be empty"))
         end
 
-        Z_j, ϕ°_j, σ_ϕ°_j = _ρₑ_i(s, pH, σ_pH)
+        _check_custom(s)
+        Z_j, ϕ°_j, σ_ϕ°_j = _ρₑ_i(s, pH, σ_pH, pmv_fallback_uncert)
         C_j = s.molarity
         σ_C_j = s.molarity_uncertainty
         σ_T_j = PMV_FRACTIONAL_EXPANSIBILITY * abs(ϕ°_j) * ΔT

@@ -6,19 +6,53 @@
 
 (ns baysol.tui.support
  (:require [baysol.tui.core.app :as app]
+  [baysol.tui.projects :as projects]
   [clojure.java.io :as io]
   [clojure.string :as str])
- (:import (com.googlecode.lanterna TerminalSize)
+ (:import (com.googlecode.lanterna TerminalSize TextColor$ANSI)
   (com.googlecode.lanterna.input KeyStroke KeyType)
   (com.googlecode.lanterna.screen TerminalScreen)
   (com.googlecode.lanterna.terminal.virtual DefaultVirtualTerminal)
   (java.nio.file Files)
   (java.nio.file.attribute FileAttribute)))
 
+;; The keys and the background colour nearly every screen test uses.
+(def background TextColor$ANSI/DEFAULT)
+(def enter KeyType/Enter)
+(def esc KeyType/Escape)
+(def down KeyType/ArrowDown)
+(def up KeyType/ArrowUp)
+(def eof KeyType/EOF)
+
+(defn has?
+ "Whether the text `text` contains `s`."
+ [text s]
+ (str/includes? text s))
+
+(defn keys-of
+ "The keys of `inputs`: a string is each of its characters, anything else one key."
+ [inputs]
+ (mapcat #(if (string? %) (seq %) [%]) inputs))
+
+(def ^:private temp-roots (atom []))
+
+(defn ^:private delete-tree!
+ "Deletes the folder or file `f` and everything under it."
+ [^java.io.File f]
+ (doseq [c (reverse (file-seq f))]
+  (.delete ^java.io.File c)))
+
+;; The folders `temp-root` made go when the JVM does, so a test run leaves none behind.
+(.addShutdownHook (Runtime/getRuntime)
+ (Thread. ^Runnable (fn [] (run! delete-tree! @temp-roots))))
+
 (defn temp-root
- "A new empty folder (a File)."
+ "A new empty folder (a File), deleted with its contents when the test JVM exits."
  []
- (.toFile (Files/createTempDirectory "baysol-test" (make-array FileAttribute 0))))
+ (let [dir (.toFile (Files/createTempDirectory "baysol-test"
+     (make-array FileAttribute 0)))]
+  (swap! temp-roots conj dir)
+  dir))
 
 (defmacro with-data-folder
  "Runs `body` with the BAYSOL folder and its projects folder in a new temporary folder,
@@ -69,3 +103,24 @@
  "What is drawn on the screen of `vs` as one text of its rows."
  [vs]
  (str/join "\n" (screen-lines vs)))
+
+(defn in-project
+ "Calls `f` with a temporary BAYSOL folder (a File) and a new project `demo` in it
+ (its folder), `(in-project (fn [root dir] ...))`."
+ [f]
+ (with-data-folder [root (temp-root)] (f root (projects/create! root "demo"))))
+
+(defn run-keys!
+ "Runs `(show! screen)` in a future on a new virtual screen with `inputs` fed (a
+ sequential input is its keys); returns what it returned and the text the screen ended
+ on. A screen still waiting after 20 seconds is given escapes and the result is
+ `:timeout`."
+ [show! & inputs]
+ (let [vs (virtual-screen)
+   f (future (show! (:screen vs)))]
+  (apply feed! vs (mapcat #(if (sequential? %) % [%]) inputs))
+  (let [r (deref f 20000 :timeout)]
+   (when (= r :timeout)
+    (feed! vs esc esc esc esc eof)
+    (deref f 3000 nil))
+   [r (screen-text vs)])))

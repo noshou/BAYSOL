@@ -18,7 +18,8 @@ using ..Runtime: KeyedCache
 using JSON3: JSON3
 using FastClosures: @closure
 
-export Solute, Protein, NonBiological, Polymer, DNA, RNA, DEFAULT_TEMPERATURE_C, ρₑ
+export Solute, Protein, NonBiological, Polymer, DNA, RNA, CustomNonBio, CustomPolymer,
+    CUSTOM_POLYMER_MAX_UNITS, DEFAULT_TEMPERATURE_C, ρₑ
 
 
 """
@@ -129,6 +130,64 @@ struct RNA <: Solute
     arg::String
 end
 
+"""
+A custom non-biological buffer component whose electron count and partial molar
+volume the user supplies (a compound the table does not have). `arg` is its name (never
+empty), `Z` its electrons (above 0), `ϕ°` its partial molar volume at 25 °C in
+cm³ mol⁻¹ (any finite value: ions can be negative) and `σ_ϕ°` the absolute uncertainty
+of `ϕ°` in cm³ mol⁻¹ (at least 0); `nothing` gets the `pmv_fallback_uncert` of
+[`ρₑ`](@ref), like a table row that states none. The pH arguments are ignored.
+"""
+struct CustomNonBio <: Solute
+    molarity::Float64
+    molarity_uncertainty::Float64
+    arg::String
+    Z::Int
+    ϕ°::Float64
+    σ_ϕ°::Union{Nothing,Float64}
+end
+
+"""
+The most kinds of repeat unit a [`CustomPolymer`](@ref) may have (the user states each
+one; the terminal interface has room for four). A guardrail of the type, not a setting.
+"""
+const CUSTOM_POLYMER_MAX_UNITS = 4
+
+"""
+A custom polymer made of one to four kinds of repeat unit (`CUSTOM_POLYMER_MAX_UNITS`),
+the model of the built-in chain families (PEG, Pluronic, UCON, Brij, ...) with the user's
+numbers: with `n[i]` units of kind `i` in the chain (real numbers, means; at least 2
+units in all)
+
+    ϕ° = v0 + Σᵢ slope[i]·n[i]          Z = round(Z_ends + Σᵢ Z_unit[i]·n[i])
+
+in cm³ mol⁻¹ and electrons. `Z_unit[i]` is the electrons per unit of kind `i` (above 0),
+`Z_ends` the electrons of the end groups and `v0` their contribution to `ϕ°`: neither has a
+default, the user states them (a chain ended by H and OH has `Z_ends = 10`). Molarity is per
+mole of chains; `arg` is the name (never empty). The four vectors have one entry per kind
+(the same length, 1 to 4).
+
+The uncertainty of `ϕ°` has one term for each kind, `σ_unit[i]·n[i]` (`σ_unit[i]` absolute
+per unit, cm³ mol⁻¹, at least 0), and the end groups' `σ_ends` (absolute, at least 0), added
+in quadrature as the built-in Pluronic and UCON families add theirs; a kind whose
+`σ_unit[i]` is `nothing` contributes `2 %` of `|slope[i]·n[i]|` (the rule of a polymer
+grade that states no uncertainty), and `σ_ends = nothing` contributes nothing. When every
+entry of `σ_unit` and `σ_ends` is `nothing` the uncertainty is `2 %` of `|ϕ°|`, exactly
+that rule.
+"""
+struct CustomPolymer <: Solute
+    molarity::Float64
+    molarity_uncertainty::Float64
+    arg::String
+    n::Vector{Float64}
+    Z_unit::Vector{Int}
+    slope::Vector{Float64}
+    σ_unit::Vector{Union{Nothing,Float64}}
+    Z_ends::Int
+    v0::Float64
+    σ_ends::Union{Nothing,Float64}
+end
+
 # ---------------------------------------------------------------------------
 #   Constants and caches shared by the backends
 #   (each class keeps its tables beside its code: Protein/, NonBiological/, Nucleotide/,
@@ -143,6 +202,19 @@ const _ρₑ_w_cache = KeyedCache{Int64,Tuple{Float64,Float64}}()
 # keep being served after a table edit). Same for NonBiological/NonBiological.jl.
 include_dependency(joinpath(@__DIR__, "Polymers", "polymers.json"))
 include_dependency(joinpath(@__DIR__, "Polymers", "polymers_lookup.json"))
+
+"""
+Uncertainty, cm³·mol⁻¹, given to a non-biological solute whose row of `nonbiological.json`
+states none: the mean of every stated uncertainty of that table (a missing error bar is
+not zero), rounded to six decimals. A fixed number, not computed at run time, so adding
+rows to the table cannot shift a result between runs; the harvest `bb harvest-pmv-mean`
+rewrites the literal between the two marker comments below (`bb precommit` runs it) and
+the unit suite fails if it is stale. The terminal interface reads the same literal for the
+default `±` of a custom solute, so keep the markers and the one-line form.
+"""
+# BEGIN harvested: nonbio-mean-uncertainty
+const NONBIO_MEAN_UNCERTAINTY = 3.044643
+# END harvested: nonbio-mean-uncertainty
 
 include("CalcDensity.jl")   # water first: `_H2O_V0_25C` below needs its density
 

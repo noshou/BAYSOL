@@ -167,9 +167,10 @@ makedocs(
     # Left un-strict (`:none`) until there's a reason to enforce an explicit
     # public API surface.
     checkdocs = :none,
-    # The Scattering API page is a bit over Documenter's default 100 KiB warning size and
-    # the search index (now about 760 KiB, as the READMEs grew) over the default 500 KiB. The Scattering page is one coherent module, so the
-    # warning levels are raised (the error levels stay).
+    # The Scattering API page is a bit over Documenter's default 100 KiB
+    # warning size and the search index (now about 760 KiB, as the READMEs
+    # grew) over the default 500 KiB. The Scattering page is one coherent
+    # module, so the warning levels are raised (the error levels stay).
     format = Documenter.HTML(;
         size_threshold_warn = 150 * 1024,
         search_size_threshold_warn = 1024 * 1024,

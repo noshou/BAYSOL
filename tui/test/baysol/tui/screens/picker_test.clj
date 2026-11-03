@@ -135,7 +135,7 @@
     (is (= :cancel (keys! st \a KeyType/Escape)))
     (is (= :cancel (keys! st KeyType/EOF))))
    (testing "other keys change nothing"
-    (is (= st (keys! st :ctrl-s KeyType/ArrowLeft KeyType/ArrowRight KeyType/F1))))
+    (is (= st (keys! st :ctrl-w KeyType/ArrowLeft KeyType/ArrowRight KeyType/F1))))
    (testing "the text has a limit"
     (is (= 40 (count (:buffer (apply keys! st (repeat 100 \a)))))))
    (testing "a control character is not typed"

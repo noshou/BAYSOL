@@ -37,6 +37,8 @@
  {:setting "PLOT_HIST_BINS", :value 200, :valid true, :expect 200}
  {:setting "κ_δρ₁₂", :value 14, :valid true, :expect 14.0}
  {:setting "φ_max", :value 2.5, :valid true, :expect 2.5}
+ {:setting "PMV_FALLBACK_UNCERT", :value 3, :valid true, :expect 3.0}
+ {:setting "PMV_FALLBACK_UNCERT", :value 0.5, :valid true, :expect 0.5}
  {:setting "SHELL_THICKNESS", :value 2, :valid true, :expect 2.0}
  {:setting "FIGURES_TEX", :value false, :valid true, :expect false}
  {:setting "FIGURES_COMPILE", :value true, :valid true, :expect true}
@@ -190,6 +192,8 @@
  {:setting "κ_δρ₁₂", :value 0, :valid false, :mention "above 0"}
  {:setting "κ_δρ₃", :value -1, :valid false, :mention "above 0"}
  {:setting "φ_max", :value 0, :valid false, :mention "above 0"}
+ {:setting "PMV_FALLBACK_UNCERT", :value 0, :valid false, :mention "above 0"}
+ {:setting "PMV_FALLBACK_UNCERT", :value -3, :valid false, :mention "above 0"}
  {:setting "EXCL_VOL_CORR_EPS", :value 0, :valid false, :mention "above 0"}
  {:setting "SHELL_THICKNESS", :value 0, :valid false, :mention "above 0"}
  {:setting "SHELL_AREA_PER_POINT", :value 0, :valid false, :mention "above 0"}

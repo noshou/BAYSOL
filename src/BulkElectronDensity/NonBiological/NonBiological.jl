@@ -25,7 +25,8 @@ const NONBIO_LOOKUP::Dict{String,String} = JSON3.read(
     Dict{String,String},
 )
 
-"Memoized non-biological solute partial molar volume, keyed by iupac name"
+"Memoized non-biological solute partial molar volume, keyed by iupac name (the table's own
+values: `NaN` for a missing uncertainty)"
 const _ϕ°_s_cache = KeyedCache{String,Tuple{Int64,Float64,Float64}}()
 
 """
@@ -64,43 +65,42 @@ Takes the IUPAC name of a solute and returns (electron count, pmv, uncertainty).
 Private: name must already be an exact nonbiological.json key (see
 [`ϕ°(::AbstractString)`](@ref), the public entry point, which resolves a
 common name to its IUPAC form via [`_resolve_solute_name`](@ref) first).
+
+The cache holds the table's own triple, `NaN` for an uncertainty the table does not
+state; the uncertainty to use in its place, `fallback_σ`, is put in after the lookup. It
+must not be in the cache: a value cached under the name alone would be served to every
+later call, whatever `fallback_σ` it passed.
 """
-function _ϕ°_by_iupac_name(name::AbstractString)::Tuple{Int64,Float64,Float64}
+function _ϕ°_by_iupac_name(
+    name::AbstractString,
+    fallback_σ::Real = NONBIO_MEAN_UNCERTAINTY,
+)::Tuple{Int64,Float64,Float64}
 
     key = String(name)
 
-    return @closure get!(_ϕ°_s_cache, key) do
+    Z, v0, σ = @closure get!(_ϕ°_s_cache, key) do
         res = get(_solutes, name, nothing)
 
         # name is not mapped, throw error
         if res === nothing
             throw(ArgumentError("unknown solute: $name"))
         else
-            # if uncertainty is unknown, assign average uncertainty
-            if res[3] === nothing
-                i = 0
-                s = 0.0
-                for k in keys(_solutes)
-                    u = _solutes[k][3]
-                    if u !== nothing
-                        i += 1
-                        s += u
-                    end
-                end
-                s /= i
-                (res[1], res[2], s)
-
-            else
-                (res[1], res[2], res[3])
-            end
+            # a row that states no uncertainty is kept as NaN; see above
+            (res[1], res[2], res[3] === nothing ? NaN : res[3])
         end
     end
+
+    return (Z, v0, isnan(σ) ? Float64(fallback_σ) : σ)
 end
 
 """
 Takes the common or IUPAC name of a solute (resolved via
 [`_resolve_solute_name`](@ref), which is case-insensitive) and returns
-(electron count, pmv, uncertainty).
+(electron count, pmv, uncertainty). A row of the table that states no uncertainty gets
+`fallback_σ` (cm³·mol⁻¹), by default `NONBIO_MEAN_UNCERTAINTY`.
 """
-ϕ°(name::AbstractString)::Tuple{Int64,Float64,Float64} =
-    _ϕ°_by_iupac_name(_resolve_solute_name(name))
+ϕ°(
+    name::AbstractString;
+    fallback_σ::Real = NONBIO_MEAN_UNCERTAINTY,
+)::Tuple{Int64,Float64,Float64} =
+    _ϕ°_by_iupac_name(_resolve_solute_name(name), fallback_σ)

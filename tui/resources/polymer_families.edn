@@ -1,0 +1,71 @@
+;; SPDX-License-Identifier: LGPL-3.0-or-later
+
+;; The polymer families of BAYSOL that take arguments, as the buffer page asks for them.
+;; Each family has the names a user may type (`:names`, lower-case, matched like the solute
+;; names) and one or more ways to give it (`:forms`): the arguments to ask for, and the
+;; `:template` that makes the `arg` string `Polymer` takes, `{key}` being replaced by the
+;; number typed for `key`. The strings are the ones `_polymer_family_ϕ°` parses
+;; (src/BulkElectronDensity/Polymers/Polymers.jl); test_polymerfamilies.jl checks that every
+;; template of this file resolves, so the two cannot drift apart. A number is a positive
+;; real; `:min` is the least a chain may have (the Julia code refuses shorter chains).
+;; Fixed grades (Tween 80, Brij 35, Triton X-100, Ficoll 400 ...) take no argument and are
+;; found by name in the solute index, not here.
+
+[{:id "peg",
+  :label "PEG",
+  :names ["peg" "polyethylene glycol" "poly(ethylene glycol)" "polyethylene oxide"
+   "peo"],
+  :forms [{:args [{:key "n", :prompt "units n", :min 2}], :template "PEG n={n}"}
+   {:args [{:key "Mn", :prompt "Mn (g/mol)"}], :template "PEG {Mn}"}]}
+ {:id "ppg",
+  :label "PPG",
+  :names ["ppg" "polypropylene glycol" "poly(propylene glycol)"],
+  :forms [{:args [{:key "n", :prompt "units n", :min 2}], :template "PPG n={n}"}
+   {:args [{:key "Mn", :prompt "Mn (g/mol)"}], :template "PPG {Mn}"}]}
+ {:id "dextran",
+  :label "dextran",
+  :names ["dextran"],
+  :forms [{:args [{:key "n", :prompt "units n", :min 2}], :template "dextran n={n}"}
+   {:args [{:key "Mn", :prompt "Mn (kDa, or g/mol)"}],
+    :template "dextran {Mn}"}]}
+ {:id "glucan",
+  :label "pullulan / glucan",
+  :names ["pullulan" "glucan"],
+  :forms
+  [{:args [{:key "n", :prompt "units n", :min 2}], :template "pullulan n={n}"}
+   {:args [{:key "Mn", :prompt "Mn (kDa, or g/mol)"}], :template "pullulan {Mn}"}]}
+ {:id "ucon",
+  :label "UCON",
+  :names ["ucon"],
+  :forms [{:args [{:key "Mn", :prompt "Mn (g/mol)"}], :template "UCON {Mn}"}]}
+ {:id "cyclodextrin",
+  :label "cyclodextrin",
+  :names ["cyclodextrin"],
+  :forms [{:args [{:key "n", :prompt "glucose units n (6, 7 or 8)", :min 1}],
+    :template "cyclodextrin n={n}"}]}
+ {:id "triton",
+  :label "Triton",
+  :names ["triton" "octylphenol ethoxylate"],
+  :forms [{:args [{:key "nEO", :prompt "ethylene oxide units nEO"}],
+    :template "Triton nEO={nEO}"}]}
+ {:id "alkyl-ethoxylate",
+  :label "Brij / alkyl ethoxylate",
+  :names ["brij" "alkyl ethoxylate"],
+  :forms [{:args [{:key "nC", :prompt "carbons nC"}
+     {:key "nEO", :prompt "ethylene oxide units nEO"}],
+    :template "Brij nC={nC} nEO={nEO}"}]}
+ {:id "maltoside",
+  :label "alkyl maltoside",
+  :names ["maltoside" "alkyl maltoside"],
+  :forms [{:args [{:key "nC", :prompt "carbons nC"}],
+    :template "maltoside nC={nC}"}]}
+ {:id "lmng",
+  :label "LMNG / MNG",
+  :names ["lmng" "mng"],
+  :forms [{:args [{:key "nC", :prompt "carbons nC"}], :template "LMNG nC={nC}"}]}
+ {:id "pluronic",
+  :label "Pluronic / poloxamer",
+  :names ["pluronic" "poloxamer"],
+  :forms [{:args [{:key "nEO", :prompt "ethylene oxide units nEO"}
+     {:key "nPO", :prompt "propylene oxide units nPO"}],
+    :template "Pluronic nEO={nEO} nPO={nPO}"}]}]

@@ -10,7 +10,9 @@
 ;; `overlay` writes the dropdown onto the lines of a page, so none of it needs a terminal.
 
 (ns baysol.tui.screens.picker
- (:require [baysol.tui.screens.page-load :as pgld]
+ (:require [baysol.tui.text :as txt]
+  [baysol.tui.screens.page-load :as pgld]
+  [baysol.tui.screens.state :as kb]
   [clojure.string :as str])
  (:import (com.googlecode.lanterna.input KeyType)))
 
@@ -57,11 +59,13 @@
 
 (defn step
  "What `input` does in the picker `state`: `{:state new-state}`, `{:chosen name}` for
- Enter on a highlighted name, or `:cancel` for Escape (or the terminal going away). Enter
+ Enter on a highlighted name, `:cancel` for Escape (or the terminal going away) or `:back`
+ for Ctrl-X (back from anywhere: the caller's screen returns `:back`). Enter
  with no name to pick leaves the picker open with an error."
  [{:keys [buffer matches index], :as state} input]
  (cond
   (or (= input KeyType/Escape) (= input KeyType/EOF)) :cancel
+  (kb/back-key? input) :back
 
   (= input KeyType/Enter)
   (if (seq matches)
@@ -71,20 +75,15 @@
   (and (#{KeyType/ArrowDown KeyType/ArrowUp} input) (seq matches))
   {:state (assoc state
     :error nil
-    :index (mod ((if (= input KeyType/ArrowDown) inc dec) index)
-     (count matches)))}
+    :index (txt/cycle-index index
+     (count matches)
+     (= input KeyType/ArrowDown)))}
 
   (and (= input KeyType/Tab) (seq matches)) {:state (refilter state
     (nth matches index))}
 
-  (= input KeyType/Backspace)
-  {:state (refilter state (subs buffer 0 (max 0 (dec (count buffer)))))}
-
-  (and (char? input)
-   (>= (int input) 32)
-   (not= (int input) 127)
-   (< (count buffer) max-text))
-  {:state (refilter state (str buffer input))}
+  (txt/edits? input buffer max-text)
+  {:state (refilter state (txt/typed buffer input max-text))}
 
   :else {:state state}))
 
@@ -98,10 +97,10 @@
  both (a space between them at least)."
  [status width]
  (let [left (str " " status)
-   room (- width (count left) 1 (count exit-hint))]
+   room (- width (txt/display-width left) 1 (count exit-hint))]
   (if (pos? room)
-   (str left (apply str (repeat room \space)) " " exit-hint)
-   (subs left 0 (min (count left) width)))))
+   (str left (txt/spaces room) " " exit-hint)
+   (txt/take-width left width))))
 
 (defn count-status
  "What the status row says of the matches: \"no match\", or `index` + 1 of `n` with the
@@ -110,7 +109,7 @@
  [index n width]
  (let [full (str (inc index) " of " n " matches")]
   (cond (zero? n) "no match"
-   (>= (- width (count full) 1 1 (count exit-hint)) 0) full
+   (>= (- width (txt/display-width full) 1 1 (count exit-hint)) 0) full
    :else (str (inc index) " of " n))))
 
 (defn layout
@@ -122,7 +121,7 @@
    items (min (dec rows) n)
    from (max 0 (min (- index (quot items 2)) (- n items)))
    status (or error (count-status index n width))
-   cut (fn [s] (subs s 0 (min (count s) width)))]
+   cut (fn [s] (txt/take-width s width))]
   {:from from,
    :items items,
    :texts (concat (for [k (range items)
@@ -143,7 +142,7 @@
  "What the picker shows of what was typed: the end of the text, with a cursor, in at most
  `width` characters."
  [{:keys [buffer]} width]
- (str (if (>= (count buffer) width)
-   (str "…" (subs buffer (- (count buffer) (- width 2))))
+ (str (if (>= (txt/display-width buffer) width)
+   (str "…" (txt/take-last-width buffer (- width 2)))
    buffer)
   "_"))

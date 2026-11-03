@@ -1,24 +1,24 @@
    ║        name            ║        description          ║      value        ║
    ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
- > ╠ EXCL_VOL_CORR_EPS      ╬ Padding of the search       ╬                   ╣
-   ║                        ║ range of the                ║                   ║
-   ║                        ║ excluded-volume correction  ║                   ║
-   ║                        ║ c1, and step of the coarse  ║                   ║
-   ║                        ║ scan. Not recommended to    ║                   ║
-   ║                        ║ change.                     ║                   ║
+   ╠ SHELL_THICKNESS        ╬ Hydration-shell thickness   ╬                   ╣
+   ║                        ║ beyond the accessible       ║                   ║
+   ║                        ║ surface (CRYSOL's default). ║                   ║
    ║                        ║                             ║                   ║
-   ╠ SHELL_SAMPLE           ╬ Sample directions per atom  ╬                   ╣
-   ║                        ║ for the surface. More is    ║                   ║
-   ║                        ║ slower and more accurate.   ║                   ║
-   ║                        ║ Not recommended to change.  ║                   ║
+   ╠ PROBE_RADIUS           ╬ Solvent probe radius used   ╬                   ╣
+   ║                        ║ for the accessible surface  ║                   ║
+   ║                        ║ (water).                    ║                   ║
    ║                        ║                             ║                   ║
-   ╠ SASA_N_OCC             ╬ Early-exit prefix of the    ╬                   ╣
-   ║                        ║ surface directions; smaller ║                   ║
-   ║                        ║ is faster but loses         ║                   ║
-   ║                        ║ solvent-accessible area     ║                   ║
-   ║                        ║ (0.3 to 0.6 % at 104). Not  ║                   ║
+   ╠ SHELL_AREA_PER_POINT   ╬ Square ångströms of         ╬                   ╣
+   ║                        ║ surface per shell point;    ║                   ║
+   ║                        ║ sets the point spacing,     ║                   ║
+   ║                        ║ calibrated to CRYSOL. Not   ║                   ║
+   ║                        ║ recommended to change.      ║                   ║
+   ║                        ║                             ║                   ║
+ > ╠ SHELL_MIN_POINTS       ╬ Floor on the number of      ╬                   ╣
+   ║                        ║ shell points (CRYSOL's      ║                   ║
+   ║                        ║ smallest grid, F(10)). Not  ║                   ║
    ║                        ║ recommended to change.      ║                   ║
    ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
-   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓ ║   model [4 / 5]   ║
-   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
-   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:       ↑║   model [3 / 5]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^x  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^w  ┃ prev bloc: ← ┃ reset all: ^r  (^ is ctrl key)

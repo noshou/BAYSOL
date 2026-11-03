@@ -1,7 +1,8 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
 (ns baysol.tui.screens.page-load
- (:require [clojure.java.io :as io]
+ (:require [baysol.tui.text :as txt]
+  [clojure.java.io :as io]
   [clojure.string :as str]))
 
 ;; The width of a tab in the art pages: the owner's editor shows a tab as 4 columns, so a
@@ -35,20 +36,14 @@
  spaces, and a text wider than the span is cut."
  [lines row from to text]
  (let [width (- to from)
-   text (subs text 0 (min (count text) width))
-   left (+ from (quot (- width (count text)) 2))
-   line (str (nth lines row))
-   padded (str line (apply str (repeat (max 0 (- to (count line))) \space)))]
-  (assoc lines
-   row
-   (str (subs padded 0 left) text (subs padded (+ left (count text)))))))
+   text (txt/take-width text width)
+   w (txt/display-width text)
+   left (+ from (quot (- width w) 2))
+   line (str (nth lines row))]
+  (assoc lines row (txt/splice-width line left (+ left w) text))))
 
 (defn put-text
- "The line `line` with `text`, padded or cut to `width` characters, written from column
- `from`. A line shorter than that is padded with spaces first."
+ "The line `line` with `text`, padded or cut to `width` cells (a wide character takes
+ two), written from column `from`. A line shorter than that is padded with spaces first."
  [^String line from width text]
- (let [padded (str line
-    (apply str
-     (repeat (max 0 (- (+ from width) (count line))) \space)))
-   cell (subs (str text (apply str (repeat width \space))) 0 width)]
-  (str (subs padded 0 from) cell (subs padded (+ from width)))))
+ (txt/splice-width line from (+ from width) (txt/pad-width text width)))

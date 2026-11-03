@@ -8,6 +8,15 @@
 ;; The steps, in order (all of them run even if
 ;; one fails; the exit status is 1 if any failed):
 ;;   tool-tests     the tests of the dev tools (`bb test`)
+;;   pmv-mean       `NONBIO_MEAN_UNCERTAINTY` of BulkElectronDensity.jl is rewritten to
+;;                  the mean of the stated uncertainties of nonbiological.json
+;;                  (`bb harvest-pmv-mean`, no Julia); the changed file belongs in the
+;;                  commit
+;;   solute-index   `tui/resources/solute_index.edn`, the names of the buffer page's
+;;                  autocomplete, is regenerated from the solute tables and the polymer
+;;                  families (`bb harvest-solutes`, no Julia; the formatting takes
+;;                  minutes the first time and is remembered after that); the changed
+;;                  file belongs in the commit
 ;;   unit-tests     the unit and integration suite
 ;;                  (`julia --project=test dev/unittests.jl`, ~5 min)
 ;;   concurrency-tests  the concurrency and race tests again with six Julia threads
@@ -159,6 +168,12 @@
  step done in this process."
  []
  [{:name "tool-tests", :quick? true, :cmd ["bb" (c/in-root "dev" "tests.clj")]}
+  {:name "pmv-mean",
+   :quick? true,
+   :cmd ["bb" (c/in-root "dev" "harvest_pmv_mean.clj")]}
+  {:name "solute-index",
+   :quick? true,
+   :cmd ["bb" (c/in-root "dev" "harvest_solutes.clj")]}
   {:name "unit-tests",
    :cmd [:julia "--startup-file=no" (str "--project=" (c/in-root "test"))
     (c/in-root "dev" "unittests.jl")]}

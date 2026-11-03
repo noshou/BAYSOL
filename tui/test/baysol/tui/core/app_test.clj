@@ -71,8 +71,7 @@
    (path-of (app/projects-root (io/file "/srv/baysol"))))))
 
 (deftest ensure-dir-makes-folders-and-names-the-one-it-cannot
- (let [root (.toFile (Files/createTempDirectory "baysol-test"
-     (make-array FileAttribute 0)))]
+ (let [root (support/temp-root)]
   (testing "a folder and the parents it lacks"
    (let [dir (io/file root "x" "y" "z")]
     (is (= dir (app/ensure-dir! dir)))

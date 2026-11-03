@@ -1,7 +1,8 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
 (ns baysol.tui.screens.main-menu
- (:require [baysol.tui.core.app :as app]
+ (:require [baysol.tui.text :as txt]
+  [baysol.tui.core.app :as app]
   [baysol.tui.projects :as projects]
   [baysol.tui.screens.open-projects :as open-projects]
   [baysol.tui.screens.page-load :as pgld]
@@ -81,10 +82,6 @@
    :actions
    {KeyType/ArrowUp :page4, KeyType/ArrowLeft :page5, KeyType/Enter :quit}}})
 
-;; How long a hotkey shows its page selected before it presses Enter there, in
-;; milliseconds, so that the selection can be seen.
-(def ^:private hotkey-delay-ms 50)
-
 ;; hotkeys: a letter (either case), or Esc, jumps to a page and then presses Enter on it
 ;; (Esc, and the terminal closing, go to the quit page, which is shown selected before the
 ;; program ends)
@@ -139,8 +136,15 @@
       (if (> i text-row) (pgld/put-text line 0 right-column "") line))
      lines))
    (update text-row pgld/put-text prompt-col prompt-width text)
+   ;; an error longer than the prompt's room ends just before the right column
    (cond-> error
-    (update (inc text-row) pgld/put-text prompt-col prompt-width error))
+    (update (inc text-row)
+     pgld/put-text
+     (if (> (count error) prompt-width)
+      (max 0 (- right-column 1 (count error)))
+      prompt-col)
+     (max prompt-width (count error))
+     error))
    (update (if error (+ 2 text-row) (inc text-row))
     pgld/put-text
     prompt-col
@@ -170,14 +174,15 @@
  [buffer]
  (let [room (- prompt-width (count "name: ") 1)]
   (str "name: "
-   (if (> (count buffer) room)
-    (str "…" (subs buffer (- (count buffer) (dec room))))
+   (if (> (txt/display-width buffer) room)
+    (str "…" (txt/take-last-width buffer (dec room)))
     buffer)
    "_")))
 
 (defn ^:private ask-name!
  "Asks for the name of a new project under `new` on page 1 until it makes one, then returns
- its folder; nil if the user gives up with Escape. A name that is not valid, or is taken,
+ its folder; nil if the user gives up with Escape; `:quit` when the terminal goes away
+ (end of the input). A name that is not valid, or is taken,
  is told on the right and the prompt stays; so is a problem making the project."
  [screen]
  (loop [buffer ""
@@ -185,11 +190,15 @@
   (draw! screen :page1 (typed-name buffer) error)
   (let [input (state/read-raw screen)]
    (cond
-    (or (= input KeyType/Escape) (= input KeyType/EOF)) nil
+    (= input KeyType/EOF) :quit
+
+    ;; Ctrl-X has no parent to go back to here: it cancels the prompt, as Escape does
+    (or (= input KeyType/Escape) (state/back-key? input)) nil
 
     (= input KeyType/Enter)
     (let [problem (projects/name-problem buffer
-       (projects/entry-names @app/projects-dir))]
+       (projects/entry-names @app/projects-dir)
+       (projects/broken-names @app/projects-dir))]
      (if problem
       (recur buffer problem)
       (let [made (try (projects/create! @app/app-dir buffer)
@@ -200,14 +209,11 @@
          (catch Exception _ "could not create the project!"))]
        (if (string? made) (recur buffer made) made))))
 
-    (= input KeyType/Backspace) (recur (subs buffer 0 (max 0 (dec (count buffer))))
+    (txt/edits? input buffer max-typed) (recur (txt/typed buffer input max-typed)
      nil)
 
-    (and (char? input)
-     (>= (int input) 32)
-     (not= (int input) 127)
-     (< (count buffer) max-typed))
-    (recur (str buffer input) nil)
+    (txt/at-cap? input buffer max-typed) (recur buffer
+     (txt/too-long "name" max-typed))
 
     :else (recur buffer error)))))
 
@@ -227,20 +233,26 @@
  column on below `load` is blank while it is open. Returns the folder of the project; nil
  if the user gives up with Escape."
  [screen ids]
- (loop [st (picker/initial ids nil)]
-  (let [lines (-> (:asset (pages :page2))
-     blank-below-load
-     (with-message (str "find: " (picker/typed-text st 22)))
-     (picker/overlay st
-      {:row (inc text-row),
-       :col message-col,
-       :width message-width,
-       :rows 7}))]
-   (state/draw-page screen {:asset lines} background)
-   (let [result (picker/step st (state/read-raw screen))]
-    (cond (= result :cancel) nil
-     (:chosen result) (projects/project-dir @app/projects-dir (:chosen result))
-     :else (recur (:state result)))))))
+ (let [picked (state/run-prompt!
+    screen
+    (picker/initial ids nil)
+    (fn [st]
+     (state/draw-lines! screen
+      background
+      (-> (:asset (pages :page2))
+       blank-below-load
+       (with-message
+        (str "find: " (picker/typed-text st 22)))
+       (picker/overlay st
+        {:row (inc text-row),
+         :col message-col,
+         :width message-width,
+         :rows 7}))))
+    picker/step
+    true)]
+  ;; Ctrl-X (`:back`) has no parent to go back to here: it cancels, as Escape does
+  (cond (string? picked) (projects/project-dir @app/projects-dir picked)
+   (= picked :quit) :quit)))
 
 (defn ^:private open-project!
  "Opens the project in `dir` on `screen`: its settings are checked first (the file is made
@@ -278,19 +290,17 @@
     target (hotkeys input)
 
     ; a hotkey first shows its page selected, waits, and only then presses Enter
-    _ (when (and target (not= target page))
-     (draw! screen target nil nil)
-     (Thread/sleep (long hotkey-delay-ms)))
+    _ (state/show-hotkey! #(draw! screen % nil nil) target page)
     next-page (page-after page input)
     ;; what a project that was made or picked ends on: `:quit` for the program, else
     ;; `[page message]`, back to this menu with the page it was opened from selected
     ;; and the message to tell, if there is one
     after-project (fn [from dir]
-     (let [r (when (and dir (not (map? dir)))
+     (let [r (when (and dir (not (map? dir)) (not= dir :quit))
         (open-project! screen dir))
        message (cond (string? r) r
         (map? dir) (:message dir))]
-      (if (= r :quit)
+      (if (or (= r :quit) (= dir :quit))
        :quit
        (do (draw! screen from nil message) [from message]))))]
    (cond

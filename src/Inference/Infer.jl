@@ -268,6 +268,8 @@ Runs initial seeding for the sampler.
     [`ρₑ_prior`](@ref).
 - `κ_δρ₁₂::Real = κ_δρ₁₂`, `κ_δρ₃::Real = κ_δρ₃`:
     prior concentrations, forwarded to [`δρ_prior`](@ref).
+- `pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT`: uncertainty, cm³ mol⁻¹, of a
+    non-biological solute whose table row states none, forwarded to [`ρₑ_prior`](@ref).
 - `timing::Union{Nothing,StageLog} = nothing`: stored in the returned `Seed`.
 - `shannon::Union{Nothing,ShannonInfo} = nothing`: stored in the returned `Seed`.
 
@@ -285,10 +287,14 @@ function seed_sampler(
     t::Real = DEFAULT_TEMPERATURE_C,
     κ_δρ₁₂::Real = κ_δρ₁₂,
     κ_δρ₃::Real = κ_δρ₃,
+    pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT,
     timing::Union{Nothing,StageLog} = nothing,
     shannon::Union{Nothing,ShannonInfo} = nothing,
 )::Seed
-    pr = _calc_ξ_priors(pH, σ_pH, solutes; t = t, κ_δρ₁₂ = κ_δρ₁₂, κ_δρ₃ = κ_δρ₃)
+    pr = _calc_ξ_priors(
+        pH, σ_pH, solutes;
+        t = t, κ_δρ₁₂ = κ_δρ₁₂, κ_δρ₃ = κ_δρ₃, pmv_fallback_uncert = pmv_fallback_uncert,
+    )
     ξ₀ = _ξ₀(pr, stream(RNG_SEED % UInt64, _RNG_INITIAL_POINT, 0))
     θ₀, _ = Θ(ξ₀, pr)
     wls = WLSData(I_exp, σ_exp)

@@ -45,14 +45,15 @@ using .Inference: Inference
 using .Pipeline:
     Pipeline, seed_model, run_model, write_log, print_summary, results,
     PlotStyle, Reference, font_available, load_settings, settings_file,
-    InvalidSettingsError
+    InvalidSettingsError, load_buffer, InvalidBufferError, seed_keywords
 
 # The pipeline entry points, reached qualified
 # (`BAYSOL.seed_model`), not exported. Their
 # result types live in Pipeline (`BAYSOL.Pipeline.MAPParams`, …).
 public seed_model,
     run_model, write_log, print_summary, results, PlotStyle, Reference,
-    font_available, load_settings, settings_file, InvalidSettingsError
+    font_available, load_settings, settings_file, InvalidSettingsError, load_buffer,
+    InvalidBufferError, seed_keywords
 
 include("Precompile.jl")
 

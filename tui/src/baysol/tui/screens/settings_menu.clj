@@ -12,14 +12,18 @@
 ;;   arrows     move the cursor to the neighbour in that direction, where there is one (the
 ;;              arrows beside `move:` on each page say which)
 ;;   enter      open the sheet of the kind under the cursor (`baysol.tui.screens.sheets`)
-;;   o s p m    jump to output, sampler, plots or model and open it (the letter in the
+;;   u a p m    jump to output, sampler, plots or model and open it (the letter in the
 ;;              brackets next to each name); the page shows the choice for a moment first
-;;   ctrl-b     back to the main menu (`main-menu: ctrl+b`)
+;;   ctrl-e     the landing of the custom solutes and recipes (the global menu only:
+;;              `solutes: ctrl+e`), over the page the cursor is on; ctrl-x there comes back
+;;              to this page
+;;   ctrl-x     back to the main menu (`main-menu: ctrl+x`)
 ;;   escape     quit the program (`quit: esc`)
 
 (ns baysol.tui.screens.settings-menu
  (:require [baysol.tui.catalog :as catalog]
   [baysol.tui.core.app :as app]
+  [baysol.tui.screens.custom-landing :as custom-landing]
   [baysol.tui.screens.page-load :as pgld]
   [baysol.tui.screens.sheets :as sheets]
   [baysol.tui.screens.state :as state]
@@ -71,10 +75,7 @@
 (def project-pages (make-pages project-screen-name))
 
 ;; hotkeys: a letter jumps to a page and then presses Enter on it
-(def hotkeys {\o :page1, \s :page2, \p :page3, \m :page4})
-
-;; How long a hotkey shows its page selected before the sheet opens, in milliseconds.
-(def ^:private hotkey-delay-ms 50)
+(def hotkeys {\u :page1, \a :page2, \p :page3, \m :page4})
 
 (defn page-after
  "What `input` leads to from `page` of the table `table` (`pages`, the default, or
@@ -84,15 +85,13 @@
  what Enter does there."
  ([page input] (page-after pages page input))
  ([table page input]
-  (cond (= input :ctrl-b) :back
-   (or (= input KeyType/Escape) (= input KeyType/EOF)) :quit
-   (hotkeys input) (state/handle table (hotkeys input) KeyType/Enter)
-   :else (state/handle table page input))))
+  (state/menu-after table hotkeys page input)))
 
 (defn ^:private global-opts
  "The options of the menu of the global settings, in the BAYSOL folder."
  []
  {:pages pages,
+  :custom-solutes? true,
   :load! (fn [] (settings/load! @app/app-dir)),
   :save! (fn [kind setting v] (settings/save! @app/app-dir kind setting v))})
 
@@ -108,27 +107,33 @@
 (defn show!
  "Shows the settings menu on `screen`, with the solid colour `background`, and handles the
  keys until one leaves it; returns :back or :quit. A sheet opens from the page the cursor
- is on, and the menu is back on that page when the sheet is left with ctrl-b.
+ is on, and the menu is back on that page when the sheet is left with ctrl-x.
 
  `opts` says which settings it is the menu of; it has `:pages` (the table of pages),
- `:load!` (a function that gives the checked settings) and `:save!` (a function of a
- kind, a setting name and a value). The default is the global settings; `project-opts`
+ `:custom-solutes?` (true for the global menu: ctrl-e opens the custom landing), `:load!`
+ (a function that gives the checked settings) and `:save!` (a function of a kind, a
+ setting name and a value). The default is the global settings; `project-opts`
  gives those of a project."
  ([^TerminalScreen screen ^TextColor background]
   (show! screen background (global-opts)))
- ([^TerminalScreen screen ^TextColor background {table :pages, :keys [load! save!]}]
-  (let [draw! #(state/draw-page screen (table %) background)]
+ ([^TerminalScreen screen
+   ^TextColor background
+   {table :pages, :keys [load! save! custom-solutes?]}]
+  (let [draw! (state/page-drawer screen table background)]
    (draw! :page1)
    (loop [page :page1]
     (let [input (state/read-input screen)
       target (hotkeys input)
 
       ; a hotkey first shows its page selected, waits, and only then presses Enter
-      _ (when (and target (not= target page))
-       (draw! target)
-       (Thread/sleep (long hotkey-delay-ms)))
+      _ (state/show-hotkey! draw! target page)
       next-page (page-after table page input)]
-     (cond (contains? table next-page)
+     (cond (and custom-solutes? (= input :ctrl-e))
+      (if (= :quit (custom-landing/show! screen background))
+       :quit
+       (do (draw! page) (recur page)))
+
+      (contains? table next-page)
       (if (= next-page page)
        (recur page)
        (do (draw! next-page) (recur next-page)))

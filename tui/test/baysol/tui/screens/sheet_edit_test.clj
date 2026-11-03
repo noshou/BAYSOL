@@ -1,6 +1,6 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
-;; Editing on the settings sheets: what Enter, typing, ctrl-s, ctrl-u and ctrl-r do, how a
+;; Editing on the settings sheets: what Enter, typing, ctrl-w, ctrl-u and ctrl-r do, how a
 ;; value is checked against its limits, and what a page shows of a draft or of an error.
 ;; The editing is a pure function of a state and a key, so no terminal is needed.
 
@@ -20,7 +20,7 @@
 
 (defn ^:private press
  "The state after the keys `inputs`, starting from `state`; the last result of `step`
- when it is not a state (:back, :quit) and the saves of the last ctrl-s as `:saved`."
+ when it is not a state (:back, :quit) and the saves of the last ctrl-w as `:saved`."
  [sheet state & inputs]
  (reduce (fn [st input]
    (let [r (sheets/step sheet (:state st st) input)]
@@ -156,19 +156,19 @@
     (is (= {"N_ADAPT" 450} (:drafts back)))
     (is (= (sheets/page-lines sheet with-draft) (sheets/page-lines sheet back)))
     (is (re-find #"450 +\*" (str/join "\n" (sheets/page-lines sheet back))))))
-  (testing "a draft of another bloc is saved by ctrl-s, with the ones of this bloc"
+  (testing "a draft of another bloc is saved by ctrl-w, with the ones of this bloc"
    (let [away (:state (press sheet with-draft KeyType/ArrowRight))
-     saved (press sheet away :ctrl-s)]
+     saved (press sheet away :ctrl-w)]
     (is (= {"N_ADAPT" 450} (into {} (:save saved))))
     (is (= 450 (get-in saved [:state :entries "N_ADAPT" :saved])))
     (is (= {} (get-in saved [:state :drafts])))))
-  (testing "ctrl-b and escape leave"
-   (is (= :back (press sheet with-draft :ctrl-b)))
+  (testing "ctrl-x and escape leave"
+   (is (= :back (press sheet with-draft :ctrl-x)))
    (is (= :quit (press sheet with-draft KeyType/Escape))))
   (testing "ctrl-u takes the draft of the page's setting back"
    (is (= {} (get-in (press sheet with-draft :ctrl-u) [:state :drafts]))))
   (testing
-   "ctrl-s saves every draft of the bloc and the state stands on the new values"
+   "ctrl-w saves every draft of the bloc and the state stands on the new values"
    (let [two (:state (apply press
        sheet
        with-draft
@@ -177,7 +177,7 @@
          KeyType/Backspace]
         (typed "900")
         [KeyType/Enter])))
-     saved (press sheet two :ctrl-s)]
+     saved (press sheet two :ctrl-w)]
     (is (= {"N_ADAPT" 450, "N_DRAWS" 900} (into {} (:save saved))))
     (is (= {} (get-in saved [:state :drafts])))
     (is (= 450 (get-in saved [:state :entries "N_ADAPT" :saved])))
@@ -551,7 +551,7 @@
       (sheets/page-lines sheet (:state done))))))
   (testing "saving takes it away too"
    (let [drafted (:state (press sheet st KeyType/Enter \9 KeyType/Enter))
-     saved (press sheet drafted :ctrl-s)]
+     saved (press sheet drafted :ctrl-w)]
     (is (nil? (get-in saved [:state :entries "N_ADAPT" :notice])))))
   (testing "while a value is being typed the page shows the typing, not the notice"
    (let [typing (:state (press sheet st KeyType/Enter))]
@@ -661,8 +661,8 @@
         (sheets/page-lines sheet (:state r))))]
      (is (str/includes? row "(4.0, 12.0, 20.0)"))
      (is (str/includes? row "*╣"))))
-   (testing "^s saves it"
-    (let [saved (press sheet (:state r) :ctrl-s)]
+   (testing "^w saves it"
+    (let [saved (press sheet (:state r) :ctrl-w)]
      (is (= [["CHAIN_START_RADII" [4.0 12.0 20.0]]] (:save saved)))))))
  (testing
   "a whole number and an exponent are fine for a float part; a named tuple keeps its keys"

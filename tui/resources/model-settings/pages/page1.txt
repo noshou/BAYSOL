@@ -16,9 +16,9 @@
    ║                        ║ a standard deviation of     ║                   ║
    ║                        ║ about 1.                    ║                   ║
    ║                        ║                             ║                   ║
-   ║                        ║                             ║                   ║
-   ║                        ║                             ║                   ║
+   ╠ PMV_FALLBACK_UNCERT    ╬ Fallback PMV uncertainty.   ╬                   ╣
+   ║                        ║ Not recommended to change.  ║                   ║
    ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
    ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓ ║   model [1 / 5]   ║
-   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
-   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃              ┃ reset all: ^r     (^ is ctrl key)
+   ╠╩╗├┤└┬┘└┐│││  menu: ^x  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^w  ┃              ┃ reset all: ^r  (^ is ctrl key)

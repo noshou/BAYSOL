@@ -2,16 +2,10 @@
 
 (ns baysol.tui.core-test
  (:require [baysol.tui.core :as core]
+  [baysol.tui.support :refer [temp-root]]
   [clojure.java.io :as io]
   [clojure.string :as str]
-  [clojure.test :refer [deftest is testing]])
- (:import (java.nio.file Files)
-  (java.nio.file.attribute FileAttribute)))
-
-(defn ^:private temp-dir
- "A new empty folder (a File) that no test shares."
- []
- (.toFile (Files/createTempDirectory "baysol-test" (make-array FileAttribute 0))))
+  [clojure.test :refer [deftest is testing]]))
 
 (defn ^:private executable!
  "Makes the file `file-name` in `dir`; executable if `executable?`."
@@ -46,7 +40,7 @@
   (is (not (core/linux? {:os "Mac OS X"})))))
 
 (deftest find-executable-looks-on-the-path
- (let [dir (temp-dir)
+ (let [dir (temp-root)
    _ (executable! dir "konsole" true)
    _ (executable! dir "notexec" false)
    _ (executable! dir "wt.exe" true)

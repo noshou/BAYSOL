@@ -20,5 +20,5 @@
    ║                        ║ the warm-up of the rerun.   ║                   ║
    ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
    ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:       ↑║  sampler [1 / 8]  ║
-   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
-   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃              ┃ reset all: ^r     (^ is ctrl key)
+   ╠╩╗├┤└┬┘└┐│││  menu: ^x  ┃ next bloc: → ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^w  ┃              ┃ reset all: ^r  (^ is ctrl key)

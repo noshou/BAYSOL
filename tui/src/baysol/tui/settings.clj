@@ -25,13 +25,13 @@
 
 (ns baysol.tui.settings
  (:require [baysol.tui.core.app :as app]
+  [baysol.tui.edn-store :as store]
   [baysol.tui.validate :as validate]
   [clojure.edn :as edn]
   [clojure.java.io :as io]
   [clojure.java.shell :as shell]
   [clojure.string :as str])
- (:import (java.nio.file Files StandardCopyOption)
-  (java.time Instant)))
+ (:import (java.time Instant)))
 
 (def ^:private screens [:sampler :model :output :plots])
 
@@ -353,15 +353,7 @@
  "Writes `settings` as the settings file of the BAYSOL folder `root`, through a temporary
  file that replaces it in one step."
  [root settings]
- (let [file (settings-file root)
-   tmp (io/file (.getParentFile file) "settings.edn.tmp")]
-  (io/make-parents file)
-  (spit tmp (settings-text settings) :encoding "UTF-8")
-  (Files/move (.toPath tmp)
-   (.toPath file)
-   (into-array StandardCopyOption
-    [StandardCopyOption/REPLACE_EXISTING
-     StandardCopyOption/ATOMIC_MOVE]))))
+ (store/write-atomic! (settings-file root) (settings-text settings)))
 
 (defn ^:private log!
  "Adds the lines `lines` to `settings.log` in the BAYSOL folder `root`, each with the time."
@@ -391,8 +383,7 @@
  [root]
  (let [file (settings-file root)]
   (when (.isFile file)
-   (let [stored (try (edn/read-string (slurp file :encoding "UTF-8"))
-      (catch Exception _ ::unreadable))]
+   (let [stored (store/read-edn file ::unreadable)]
     (if (map? stored) stored ::unreadable)))))
 
 (defn load!
@@ -422,10 +413,7 @@
 
    (= stored ::unreadable)
    (do
-    (Files/copy (.toPath (settings-file root))
-     (.toPath (io/file root "settings.edn.corrupt"))
-     (into-array StandardCopyOption
-      [StandardCopyOption/REPLACE_EXISTING]))
+    (store/copy-over! (settings-file root) (io/file root "settings.edn.corrupt"))
     (write! root (merge-defaults defaults nil))
     (log!
      root
@@ -484,19 +472,14 @@
    baseline (baseline-of global)
    scope (str project-root)
    copy-global! #(do (io/make-parents (settings-file project-root))
-    (Files/copy (.toPath (settings-file global-root))
-     (.toPath (settings-file project-root))
-     (into-array
-      StandardCopyOption
-      [StandardCopyOption/REPLACE_EXISTING])))
+    (store/copy-over! (settings-file global-root)
+     (settings-file project-root)))
    stored (read-stored project-root)
    reset? (= stored ::unreadable)]
   (when (nil? stored) (copy-global!))
   (when reset?
-   (Files/copy (.toPath (settings-file project-root))
-    (.toPath (io/file project-root "settings.edn.corrupt"))
-    (into-array StandardCopyOption
-     [StandardCopyOption/REPLACE_EXISTING]))
+   (store/copy-over! (settings-file project-root)
+    (io/file project-root "settings.edn.corrupt"))
    (copy-global!)
    (log! project-root
     ["settings.edn could not be read; kept as settings.edn.corrupt,"

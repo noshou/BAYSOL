@@ -25,7 +25,7 @@
 (deftest the-blocs-are-read-from-the-footers
  (testing "the pages of each sheet and the bloc each belongs to"
   (is (= (sizes 4 3 3 2 2 4 3 2) (blocs-of "sampler-settings")))
-  (is (= (sizes 3 3 4 3 2) (blocs-of "model-settings")))
+  (is (= (sizes 4 3 4 3 2) (blocs-of "model-settings")))
   (is (= (sizes 3 2) (blocs-of "output-settings")))
   (is (= (sizes 5 4 5 4 5 3 5 5) (blocs-of "plots-settings")))))
 
@@ -57,13 +57,13 @@
 (deftest the-other-keys
  (let [sampler (sheets/load-sheet "sampler-settings")]
   (testing
-   "ctrl-b (`menu: ^b`) goes back to the settings menu from any page; escape quits"
-   (is (every? #(= :back (sheets/move sampler % :ctrl-b)) (range 23)))
+   "ctrl-x (`menu: ^x`) goes back to the settings menu from any page; escape quits"
+   (is (every? #(= :back (sheets/move sampler % :ctrl-x)) (range 23)))
    (is (every? #(= :quit (sheets/move sampler % KeyType/Escape)) (range 23)))
    (is (= :quit (sheets/move sampler 3 KeyType/EOF))))
   (testing "the commands that do nothing yet, and any other key, stay on the page"
    (is (every? #(= 3 (sheets/move sampler 3 %))
-     [KeyType/Enter :ctrl-s :ctrl-u :ctrl-r :ctrl-m \m \x
+     [KeyType/Enter :ctrl-w :ctrl-u :ctrl-r :ctrl-m \m \x
       KeyType/Backspace])))))
 
 (defn ^:private footer
@@ -97,8 +97,8 @@
    :let [[hints next-line prev-line] (footer (nth (:pages sheet) i))
     moves? #(not= i (sheets/move sheet i %))]]
   (testing (str dir " page" (inc i))
-   (is (str/includes? next-line "menu: ^b")
-    "the footer names ctrl-b as the menu key")
+   (is (str/includes? next-line "menu: ^x")
+    "the footer names ctrl-x as the menu key")
    (is (not (str/includes? next-line "^m"))
     "ctrl-m is Enter in a terminal: not offered")
    (is (= (str/includes? next-line "next bloc: →") (moves? KeyType/ArrowRight))

@@ -1,12 +1,12 @@
    ║        name            ║        description          ║      value        ║
    ╠════════════════════════╬═════════════════════════════╬═══════════════════╣
-   ╠ BEAD_RAY_RANGE         ╬ Range of the rays that      ╬                   ╣
+ > ╠ BEAD_RAY_RANGE         ╬ Range of the rays that      ╬                   ╣
    ║                        ║ classify a bead as cavity   ║                   ║
    ║                        ║ or bulk; a farther wall     ║                   ║
    ║                        ║ counts as bulk. Not         ║                   ║
    ║                        ║ recommended to change.      ║                   ║
    ║                        ║                             ║                   ║
- > ╠ BEAD_RAY_DIRS          ╬ Number of ray directions    ╬                   ╣
+   ╠ BEAD_RAY_DIRS          ╬ Number of ray directions    ╬                   ╣
    ║                        ║ per bead for that test. Not ║                   ║
    ║                        ║ recommended to change.      ║                   ║
    ║                        ║                             ║                   ║
@@ -19,6 +19,6 @@
    ║                        ║                             ║                   ║
    ║                        ║                             ║                   ║
    ╚════════════════════════╩═════════════════════════════╬═══════════════════╣
-   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:       ↑║   model [5 / 5]   ║
-   ╠╩╗├┤└┬┘└┐│││  menu: ^b  ┃              ┃ undo:      ^u╚═══════════════════╝
-   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^s  ┃ prev bloc: ← ┃ reset all: ^r     (^ is ctrl key)
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬  quit: esc ┃ edit:      ⏎ ┃ move:      ↓ ║   model [5 / 5]   ║
+   ╠╩╗├┤└┬┘└┐│││  menu: ^x  ┃              ┃ undo:      ^u╚═══════════════════╝
+   ╚═╝┴└ ┴ └┘└┘┴┘ save: ^w  ┃ prev bloc: ← ┃ reset all: ^r  (^ is ctrl key)

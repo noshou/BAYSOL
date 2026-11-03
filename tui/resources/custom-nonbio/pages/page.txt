@@ -1,0 +1,24 @@
+   ╔═ add a non-biological solute ════════════════════════════════════════════╗
+   ║    field    ║            value             ║           meaning           ║
+   ╠═════════════╬══════════════════════════════╬═════════════════════════════╣
+   ║ name        ║                              ║ preferred name              ║
+   ║             ║                              ║                             ║
+   ║ formula     ║                              ║ charge as NH4+ or SO42-     ║
+   ║             ║                              ║                             ║
+   ║ Z           ║                              ║ electrons, from formula     ║
+   ║             ║                              ║                             ║
+   ║ PMV @ 25C   ║                              ║ cm³/mol at 25 °C            ║
+   ║             ║                              ║                             ║
+   ║ ±           ║                              ║ cm³/mol absolute;           ║
+   ║             ║                              ║ blank = PMV_FALLBACK_UNCERT ║
+   ╠═════════════╩══════════════════════════════╩═════════════════════════════╣
+   ║ BAYSOL will use                                                          ║
+   ║                                                                          ║
+   ║                                                                          ║
+   ║                                                                          ║
+   ║                                                                          ║
+   ║                                                                          ║
+   ╚══════════════════════════════════════════════════════════════════════════╝
+   ╔╗ ┌┐┬ ┬┌┐┌┐┬   cancel: esc     ┃ edit:     ⏎  ┃ move:      ↓↑
+   ╠╩╗├┤└┬┘└┐│││   menu: ^x        ┃              ┃
+   ╚═╝┴└ ┴ └┘└┘┴┘  (^ is ctrl key) ┃ undo:    ^u  ┃ add to table: ^w
