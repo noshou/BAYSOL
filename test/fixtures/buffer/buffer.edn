@@ -1,7 +1,7 @@
 ;; SPDX-License-Identifier: LGPL-3.0-or-later
 
 ;; A buffer.edn with a row of every kind, the one schema both sides are tested against: the
-;; TUI (tui/src/baysol/tui/buffer.clj and its tests) writes and validates it, the Julia
+;; TUI (the Clojure version, in git history; see tui/SPEC.md) writes and validates it, the Julia
 ;; loader (BAYSOL.Pipeline.load_buffer, test_loadbuffer.jl) reads it. Concentrations are in
 ;; mM as typed; the loader divides by 1000 (BAYSOL takes mol/L). Row keys:
 ;;   :kind          :nonbiological :polymer :dna :rna :protein :custom-nonbio

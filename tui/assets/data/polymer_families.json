@@ -1,0 +1,61 @@
+[
+ {"id": "peg", "label": "PEG",
+  "names": ["peg","polyethylene glycol","poly(ethylene glycol)","polyethylene oxide","peo"],
+  "forms": [
+   {"template":"PEG n={n}","args":[{"key":"n","min":2,"prompt":"units n"}]},
+   {"template":"PEG {Mn}","args":[{"key":"Mn","prompt":"Mn (g/mol)"}]}
+  ]},
+ {"id": "ppg", "label": "PPG",
+  "names": ["ppg","polypropylene glycol","poly(propylene glycol)"],
+  "forms": [
+   {"template":"PPG n={n}","args":[{"key":"n","min":2,"prompt":"units n"}]},
+   {"template":"PPG {Mn}","args":[{"key":"Mn","prompt":"Mn (g/mol)"}]}
+  ]},
+ {"id": "dextran", "label": "dextran",
+  "names": ["dextran"],
+  "forms": [
+   {"template":"dextran n={n}","args":[{"key":"n","min":2,"prompt":"units n"}]},
+   {"template":"dextran {Mn}","args":[{"key":"Mn","prompt":"Mn (kDa, or g/mol)"}]}
+  ]},
+ {"id": "glucan", "label": "pullulan / glucan",
+  "names": ["pullulan","glucan"],
+  "forms": [
+   {"template":"pullulan n={n}","args":[{"key":"n","min":2,"prompt":"units n"}]},
+   {"template":"pullulan {Mn}","args":[{"key":"Mn","prompt":"Mn (kDa, or g/mol)"}]}
+  ]},
+ {"id": "ucon", "label": "UCON",
+  "names": ["ucon"],
+  "forms": [
+   {"template":"UCON {Mn}","args":[{"key":"Mn","prompt":"Mn (g/mol)"}]}
+  ]},
+ {"id": "cyclodextrin", "label": "cyclodextrin",
+  "names": ["cyclodextrin"],
+  "forms": [
+   {"template":"cyclodextrin n={n}","args":[{"key":"n","min":1,"prompt":"glucose units n (6, 7 or 8)"}]}
+  ]},
+ {"id": "triton", "label": "Triton",
+  "names": ["triton","octylphenol ethoxylate"],
+  "forms": [
+   {"template":"Triton nEO={nEO}","args":[{"key":"nEO","prompt":"ethylene oxide units nEO"}]}
+  ]},
+ {"id": "alkyl-ethoxylate", "label": "Brij / alkyl ethoxylate",
+  "names": ["brij","alkyl ethoxylate"],
+  "forms": [
+   {"template":"Brij nC={nC} nEO={nEO}","args":[{"key":"nC","prompt":"carbons nC"},{"key":"nEO","prompt":"ethylene oxide units nEO"}]}
+  ]},
+ {"id": "maltoside", "label": "alkyl maltoside",
+  "names": ["maltoside","alkyl maltoside"],
+  "forms": [
+   {"template":"maltoside nC={nC}","args":[{"key":"nC","prompt":"carbons nC"}]}
+  ]},
+ {"id": "lmng", "label": "LMNG / MNG",
+  "names": ["lmng","mng"],
+  "forms": [
+   {"template":"LMNG nC={nC}","args":[{"key":"nC","prompt":"carbons nC"}]}
+  ]},
+ {"id": "pluronic", "label": "Pluronic / poloxamer",
+  "names": ["pluronic","poloxamer"],
+  "forms": [
+   {"template":"Pluronic nEO={nEO} nPO={nPO}","args":[{"key":"nEO","prompt":"ethylene oxide units nEO"},{"key":"nPO","prompt":"propylene oxide units nPO"}]}
+  ]}
+]

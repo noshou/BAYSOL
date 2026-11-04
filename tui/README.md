@@ -1,27 +1,15 @@
 # BAYSOL terminal interface
 
 A terminal front end for BAYSOL: pick a project, edit its settings, and (soon) run fits and
-read the results, all from the keyboard. It is plain Clojure on the JVM
-([Lanterna](https://github.com/mabe02/lanterna)), and it runs in any terminal that is at
+read the results, all from the keyboard. It was plain Clojure on the JVM
+([Lanterna](https://github.com/mabe02/lanterna)), and ran in any terminal that was at
 least 80 columns by 24 rows. It looks best with 24-bit colour (most current terminals);
 without it the screens are black on white.
 
-> **Status.** The main menu, the settings screens and projects work. The project's
-> buffer, run, logs, models and data pages and the help page are not built yet, and the
-> fits themselves are still run from Julia. This page will become the landing page, with
-> installation and a full walk-through, once those exist.
-
-## Starting it
-
-You need a Java runtime (tested with Java 25) and the Clojure command line tools. From the
-`tui/` folder of the repository:
-
-```
-clojure -M:run        # the program
-clojure -M:test       # its tests
-```
-
-If you start it without a terminal (from a desktop icon, say), it opens one for itself.
+> **Status.** The Clojure/Lanterna implementation was removed once its behaviour was written
+> down in `tui/SPEC.md`; it stays in the git history (commit `33b726b` and earlier) and
+> is to be replaced by a TypeScript (Ink) version. This folder keeps the pre-rendered art and
+> data in `resources/`, the specification, and this description of the screens as they were.
 
 ## The main menu
 

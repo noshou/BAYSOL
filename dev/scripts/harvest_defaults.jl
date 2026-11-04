@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Harvests the default of every setting into one JSON file,
-# `tui/resources/default_settings.json`: setting name -> `{default, type, limits}` and,
+# `tui/assets/data/default_settings.json`: setting name -> `{default, type, limits}` and,
 # where they apply, `choices` (a setting with a fixed set of values) and `shape` and
 # `parts` (a tuple: what each part is, and its name).
 
@@ -10,7 +10,7 @@ using Colors: color_names
 using JSON3
 
 const ROOT = normpath(joinpath(@__DIR__, "..", ".."))
-const DEFAULT_OUT = joinpath(ROOT, "tui", "resources", "default_settings.json")
+const DEFAULT_OUT = joinpath(ROOT, "tui", "assets", "data", "default_settings.json")
 const MODULES = (BAYSOL.Inference, BAYSOL.Geometry, BAYSOL.Scattering, BAYSOL.Pipeline)
 const LIMIT_KEYS = (:above, :below, :at_least, :at_most)
 const RELATION_RULES =
@@ -138,23 +138,26 @@ function relations_json(named::Set{Symbol})
 end
 
 """
-The colours a setting may hold, one per line, `name #rrggbb`: the names `Colors.parse`
-knows and their colour, which the terminal interface shows as a swatch.
+The colours a setting may hold as one JSON object, `"name": "#rrggbb"`: the names
+`Colors.parse` knows and their colour, which the terminal interface shows as a swatch.
 """
 function colour_names()
     hex(c) = "#" * join(string.(c; base = 16, pad = 2))
-    rows = ["$name $(hex(c))" for (name, c) in sort!(collect(color_names); by = first)]
-    return join(rows, "\n") * "\n"
+    rows = [
+        " $(JSON3.write(name)): $(JSON3.write(hex(c)))"
+        for (name, c) in sort!(collect(color_names); by = first)
+    ]
+    return "{\n" * join(rows, ",\n") * "\n}\n"
 end
 
 function main(args)
     out = isempty(args) ? DEFAULT_OUT : abspath(only(args))
     text, named = harvest()
+    mkpath(dirname(out))
     write(out, text)
     colours = joinpath(
         dirname(out),
-        replace(basename(out), "default_settings" => "colours",
-            ".json" => ".txt"),
+        replace(basename(out), "default_settings" => "colours"),
     )
     relations = joinpath(
         dirname(out),

@@ -17,8 +17,8 @@ Writes the settings defaults to JSON.
 
     bysl harvest defaults [--check]
 
-    (none)      write tui/resources/default_settings.json, setting_relations.json
-                and colours.txt from the Params.jl files (dev/scripts/harvest_defaults.jl)
+    (none)      write tui/assets/data/default_settings.json, setting_relations.json
+                and colours.json from the Params.jl files (dev/scripts/harvest_defaults.jl)
     --check     change nothing; exit 1 if one of the three is out of date
 """
 # Runs the script that harvests the defaults into the file `out` (and the colours and the
@@ -35,13 +35,13 @@ function run(argv::Vector{String})::Int
     unknown = findfirst(!=("--check"), argv)
     unknown === nothing ||
         fail(WHO, "unknown option $(argv[unknown]) (the only one is --check)")
-    resources = in_root("tui", "resources")
+    resources = in_root("tui", "assets", "data")
     defaults_file = joinpath(resources, "default_settings.json")
-    colours_file = joinpath(resources, "colours.txt")
+    colours_file = joinpath(resources, "colours.json")
     relations_file = joinpath(resources, "setting_relations.json")
     if "--check" in argv
         scratch = joinpath(resources, "default_settings.check.json")
-        scratch_colours = joinpath(resources, "colours.check.txt")
+        scratch_colours = joinpath(resources, "colours.check.json")
         scratch_rules = joinpath(resources, "setting_relations.check.json")
         same(fresh, old) = slurp8(fresh) == (isfile(old) ? slurp8(old) : nothing)
         try
@@ -51,7 +51,7 @@ function run(argv::Vector{String})::Int
                 println(WHO, ": the defaults, the colours and the rules are up to date")
                 return 0
             end
-            println(WHO, ": default_settings.json, colours.txt or setting_relations.json ",
+            println(WHO, ": default_settings.json, colours.json or setting_relations.json ",
                 "is out of date")
             return 1
         finally
@@ -78,7 +78,7 @@ Writes the index of typeable solute names to JSON.
 
     bysl harvest solutes [--check]
 
-    (none)      write tui/resources/solute_index.json from the alias and value
+    (none)      write tui/assets/data/solute_index.json from the alias and value
                 tables of src/BulkElectronDensity and polymer_families.json
     --check     change nothing; exit 1 if the file is out of date
 """
@@ -191,7 +191,7 @@ function build_text()::String
         read_json("NonBiological", "nonbiological.json"),
         read_json("Polymers", "polymers_lookup.json"),
         read_json("Polymers", "polymers.json"),
-        JSON3.read(slurp8(in_root("tui", "resources", "polymer_families.json"))))
+        JSON3.read(slurp8(in_root("tui", "assets", "data", "polymer_families.json"))))
     idx.dropped > 0 && println(WHO, ": ", idx.dropped,
         " alias(es) left out: target not in the table")
     return render(idx)
@@ -206,7 +206,7 @@ function run(argv::Vector{String})::Int
     unknown = findfirst(!=("--check"), argv)
     unknown === nothing ||
         fail(WHO, "unknown option $(argv[unknown]) (the only one is --check)")
-    out_file = in_root("tui", "resources", "solute_index.json")
+    out_file = in_root("tui", "assets", "data", "solute_index.json")
     text = build_text()
     if "--check" in argv
         if text == (isfile(out_file) ? slurp8(out_file) : nothing)
@@ -216,6 +216,7 @@ function run(argv::Vector{String})::Int
         println(WHO, ": solute_index.json is out of date")
         return 1
     end
+    mkpath(dirname(out_file))
     spit8(out_file, text)
     println(WHO, ": wrote ", out_file)
     return 0
@@ -321,8 +322,8 @@ end
 
 const SUBS = [
     "defaults" =>
-        (Defaults, "tui/resources/default_settings.json from the Params.jl files"),
-    "solutes" => (Solutes, "tui/resources/solute_index.json from the solute tables"),
+        (Defaults, "tui/assets/data/default_settings.json from the Params.jl files"),
+    "solutes" => (Solutes, "tui/assets/data/solute_index.json from the solute tables"),
     "pmv-mean" => (PmvMean, "the mean PMV uncertainty, as a Julia constant"),
 ]
 

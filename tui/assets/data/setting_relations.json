@@ -1,0 +1,16 @@
+[
+ {"rule": "ordered", "setting": "BOUNDS_δρ₁₂"},
+ {"rule": "inside", "setting": "MODE_δρ₁₂", "of": "BOUNDS_δρ₁₂"},
+ {"rule": "ordered", "setting": "EXCL_VOL_CORR_BOUNDS", "above": 0},
+ {"rule": "within_width", "setting": "EXCL_VOL_CORR_EPS", "of": "EXCL_VOL_CORR_BOUNDS"},
+ {"rule": "all_above", "setting": "CHAIN_START_RADII", "bound": 0},
+ {"rule": "all_above", "setting": "MAP_JITTER_RADII", "bound": 0},
+ {"rule": "at_most_setting", "setting": "SASA_N_OCC", "of": "SHELL_SAMPLE"},
+ {"rule": "all_above", "setting": "PLOT_WIDTH_HEIGHT_CM", "bound": 0},
+ {"rule": "all_above", "setting": "PLOT_PREVIEW_SIZE", "bound": 0},
+ {"rule": "ordered", "setting": "PLOT_YLIM_LOG", "above": 0},
+ {"rule": "opacity", "setting": "PLOT_COLOUR_ERRORBAR"},
+ {"rule": "opacity", "setting": "PLOT_COLOUR_BAND"},
+ {"rule": "opacity", "setting": "PLOT_COLOUR_BAND_RESID"},
+ {"rule": "opacity", "setting": "PLOT_COLOUR_HIST"}
+]

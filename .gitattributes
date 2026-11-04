@@ -16,18 +16,11 @@ docs/scss/highlightjs/*.css linguist-vendored=true
 docs/scss/flatly/* linguist-vendored=true
 
 # Everything under test/ is hand-written code and counts in the language stats (Julia,
-# Clojure/EDN, TOML), including each test environment's Project.toml; only the Manifest.toml
+# TOML), including each test environment's Project.toml; only the Manifest.toml
 # files, which are generated, stay out. Overrides Linguist's documentation heuristic.
 test/** linguist-documentation=false
 test/**/*.jl linguist-detectable=true
-test/**/*.clj linguist-detectable=true
-test/**/*.edn linguist-detectable=true
 test/**/Project.toml linguist-detectable=true linguist-generated=false
-
-# .clj-kondo/config.edn and the TUI's .edn files are Clojure data; count and highlight them as Clojure
-# (Linguist otherwise files .edn under its own data-only "edn" language).
-*.edn linguist-language=Clojure
-*.edn linguist-detectable=true
 
 # TOMLs: every Project.toml (root, docs/, test/ and its environments, dev/ and dev/test/) and
 # CondaPkg.toml is hand-written and counts; every Manifest.toml is generated and stays out.
@@ -62,7 +55,6 @@ test/**/Manifest.toml linguist-generated=true linguist-detectable=false
 # Linguist treats everything under test/fixtures/ as vendored (default rule
 # `(^|/)[Tt]ests?/fixtures/`), which also hides these two hand-written code fixtures.
 test/fixtures/molecules/sequences.jl linguist-vendored=false linguist-detectable=true
-test/fixtures/settings/cases.edn linguist-vendored=false linguist-detectable=true linguist-language=Clojure
 
 # (after the TOML rules above) the Manifests of dev/ stay out of the stats too.
 dev/**/Manifest.toml linguist-generated=true linguist-detectable=false
