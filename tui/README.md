@@ -36,9 +36,9 @@ The settings are in four groups (output, model, sampler, plots), each a table of
 | :-- | :-- |
 | up, down | the previous and next setting |
 | left, right | the previous and next group of settings |
-| Enter | edit the setting under the cursor |
+| Enter | edit the setting under the menuCursor |
 | ctrl-w | save every change (a changed value is marked `*` until it is saved) |
-| ctrl-u | undo the change of the setting under the cursor |
+| ctrl-u | undo the change of the setting under the menuCursor |
 | ctrl-r | reset the settings of this group to their defaults |
 | ctrl-x | back to the menu; with changes not saved it first asks `discard N changes?` (Enter drops them, Esc keeps editing; the same for Esc when it would quit) |
 | Esc | quit the program |
@@ -79,7 +79,7 @@ Back/menu is `^x` (Ctrl-X, 2026-11-02): `^b` was dropped because it is tmux's pr
 
 - **Leaving with unsaved changes asks.** The tables (solutes, recipes, custom solutes) show `discard N changes?  enter: discard  esc: keep` in the border row; the settings sheets show it in the description column. Nothing unsaved: no question. An open prompt, flow or edit is dropped first and does not count.
 - **A recipe loaded over a buffer that has solutes asks** at the first `^w`: `replace N solutes with recipe "NAME"?` (Enter replaces, Esc keeps editing). An empty buffer is replaced without a question.
-- **A `buffer.edn`, `recipes.edn` or `custom-solutes.edn` that cannot be used** is never written over. The landing (buffer; custom solutes and recipes, for the option under the cursor) shows the file's path and `r: reset`; `r` asks, Enter renames the file to `<name>.corrupt` (replacing an older one) and starts empty. The tables of such a file do not invite adding (no `no solutes: ^n ...`, the add legends are blank).
+- **A `buffer.edn`, `recipes.edn` or `custom-solutes.edn` that cannot be used** is never written over. The landing (buffer; custom solutes and recipes, for the option under the menuCursor) shows the file's path and `r: reset`; `r` asks, Enter renames the file to `<name>.corrupt` (replacing an older one) and starts empty. The tables of such a file do not invite adding (no `no solutes: ^n ...`, the add legends are blank).
 - A solutes table with no row hides the `edit` and `undo` legends.
 - A project folder whose `project.edn` is broken is not listed by `load`; the name stays taken: `that name is taken by a broken project folder!`.
 - A project whose `settings.edn` was unreadable opens with a box (`settings.edn was unreadable: global settings used, old file kept as settings.edn.corrupt`), once.
@@ -98,4 +98,4 @@ Back/menu is `^x` (Ctrl-X, 2026-11-02): `^b` was dropped because it is tmux's pr
 - End of input (the terminal going away) in the main menu's name prompt or project list
   ends the program, as everywhere else.
 
-- In the models list `^r` removes the model under the cursor (after a warning; the Delete key works too), as `^r` removes a row in the tables. The custom-solute forms show `menu: ^x` in their footers. A note on a table's bottom border never covers a junction of the rule.
+- In the models list `^r` removes the model under the menuCursor (after a warning; the Delete key works too), as `^r` removes a row in the tables. The custom-solute forms show `menu: ^x` in their footers. A note on a table's bottom border never covers a junction of the rule.

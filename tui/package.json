@@ -3,17 +3,18 @@
   "type": "module",
   "version": "1.0.0",
   "description": "A terminal front end for BAYSOL: pick a project, edit its settings, and (soon) run fits and read the results, all from the keyboard. It was plain Clojure on the JVM ([Lanterna](https://github.com/mabe02/lanterna)), and ran in any terminal that was at least 80 columns by 24 rows. It looks best with 24-bit colour (most current terminals); without it the screens are black on white.",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "tsx src/main.tsx",
+    "check": "tsc"
   },
   "keywords": [],
   "author": "",
   "license": "LGPL-3.0-or-later",
-  "private": "true",
+  "private": true,
   "dependencies": {
     "ink": "^8.0.0",
-    "react": "^19.3.1"
+    "react": "^19.3.1",
+    "smol-toml": "^1.9.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
