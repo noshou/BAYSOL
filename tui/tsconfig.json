@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+		"jsx": "react-jsx",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"target": "es2025",
+		"strict": true,
+		"noEmit": true,
+		"types": ["node"],
+		"lib": ["ESNext"],
+		"skipLibCheck": true
+	},
+	"include": ["src"]
+}
