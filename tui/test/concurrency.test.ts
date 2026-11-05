@@ -1,0 +1,302 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
+import assert from "node:assert/strict"
+import { spawn } from "node:child_process"
+import {
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readFileSync,
+    utimesSync,
+    writeFileSync,
+} from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { test } from "node:test"
+import { fileURLToPath } from "node:url"
+import {
+    ChangedOnDiskError,
+    FileInUseError,
+    noteRead,
+    withFileLock,
+    writeAtomic,
+    writeJson,
+} from "../src/core/files.js"
+import {
+    type BufferRow,
+    bufferFile,
+    readSolutes,
+    writeSolutes,
+} from "../src/store/buffer.js"
+import {
+    readSolutes as readCustom,
+    writeSolutes as writeCustom,
+} from "../src/store/custom-store.js"
+import { addModel, listModels } from "../src/store/models.js"
+import {
+    deleteRecipe,
+    readRecipes,
+    recipesFile,
+    renameRecipe,
+    saveRecipe,
+    writeRecipes,
+} from "../src/store/recipe-store.js"
+import { recordRun, runIds } from "../src/store/runs.js"
+import { defaultCatalog } from "../src/store/settings-defs.js"
+import { loadGlobal, loadProject, settingsFile } from "../src/store/settings-store.js"
+import { fixture } from "./support/fixtures.js"
+
+const tmp = (): string => mkdtempSync(join(tmpdir(), "baysol-test-"))
+const worker = fileURLToPath(new URL("./support/lock-worker.ts", import.meta.url))
+
+/** Runs the worker as a child process; resolves with its exit code. */
+function runWorker(file: string, cycles: number): Promise<number | null> {
+    return new Promise((resolve, reject) => {
+        const args = ["--import", "tsx", worker, file, String(cycles)]
+        const child = spawn(process.execPath, args, { stdio: "inherit" })
+        child.on("error", reject)
+        child.on("exit", resolve)
+    })
+}
+
+// ---- the lock ----------------------------------------------------------------------
+
+test("four real processes counting under the lock lose no update", async () => {
+    const file = join(tmp(), "counter.txt")
+    writeFileSync(file, "0")
+    const codes = await Promise.all([1, 2, 3, 4].map(() => runWorker(file, 25)))
+    assert.deepEqual(codes, [0, 0, 0, 0])
+    assert.equal(readFileSync(file, "utf-8"), "100")
+    assert.equal(existsSync(`${file}.lock`), false, "every lock was released")
+})
+
+test("the lock is released when the work throws, and the result is returned", () => {
+    const file = join(tmp(), "x.json")
+    assert.throws(
+        () =>
+            withFileLock(file, () => {
+                throw new Error("boom")
+            }),
+        /boom/,
+    )
+    assert.equal(
+        withFileLock(file, () => 7),
+        7,
+    )
+})
+
+test("a stale lock is broken", () => {
+    const file = join(tmp(), "x.json")
+    mkdirSync(`${file}.lock`)
+    const old = new Date(Date.now() - 60_000)
+    utimesSync(`${file}.lock`, old, old)
+    assert.equal(
+        withFileLock(file, () => "got it"),
+        "got it",
+    )
+})
+
+test("a lock held by another copy times out with a clear error", () => {
+    const file = join(tmp(), "settings.json")
+    mkdirSync(`${file}.lock`) // fresh: its owner is alive
+    const t0 = Date.now()
+    assert.throws(
+        () => withFileLock(file, () => undefined),
+        (e) =>
+            e instanceof FileInUseError &&
+            e.message === "settings.json is in use by another copy",
+    )
+    assert.ok(Date.now() - t0 >= 2900, "it waited about 3 s")
+})
+
+// ---- settings of two copies --------------------------------------------------------
+
+const saved = (dir: string): Record<string, unknown> => {
+    const out: Record<string, unknown> = {}
+    const file = JSON.parse(readFileSync(settingsFile(dir), "utf-8")) as Record<
+        string,
+        Record<string, { value: unknown }>
+    >
+    for (const sheet of Object.values(file))
+        for (const [name, entry] of Object.entries(sheet)) out[name] = entry.value
+    return out
+}
+
+test("two copies changing different settings both survive", () => {
+    const dir = tmp()
+    const a = loadGlobal(dir).settings
+    const b = loadGlobal(dir).settings
+    assert.equal(a.set({ N_ADAPT: 450 }).ok, true)
+    assert.equal(b.set({ N_DRAWS: 900 }).ok, true)
+    a.save()
+    b.save()
+    assert.deepEqual(saved(dir), { N_ADAPT: 450, N_DRAWS: 900 })
+    assert.equal(b.get("N_ADAPT"), 450, "the saving copy takes over what was written")
+    assert.equal(loadGlobal(dir).settings.get("N_DRAWS"), 900)
+})
+
+test("for the same setting the last save wins, and a reset is a change too", () => {
+    const dir = tmp()
+    const a = loadGlobal(dir).settings
+    const b = loadGlobal(dir).settings
+    a.set({ N_ADAPT: 450, N_DRAWS: 900 })
+    b.set({ N_ADAPT: 500 })
+    a.save()
+    b.save()
+    assert.deepEqual(saved(dir), { N_ADAPT: 500, N_DRAWS: 900 })
+    const c = loadGlobal(dir).settings
+    c.reset(["N_DRAWS"])
+    c.save()
+    assert.deepEqual(saved(dir), { N_ADAPT: 500 })
+})
+
+test("project settings of two copies merge the same way", () => {
+    const root = tmp()
+    const p = join(root, "projects", "p")
+    mkdirSync(p, { recursive: true })
+    const a = loadProject(p, root).settings
+    const b = loadProject(p, root).settings
+    a.set({ N_ADAPT: 450 })
+    b.set({ N_CHAINS: 3 })
+    a.save()
+    b.save()
+    assert.deepEqual(saved(p), { N_ADAPT: 450, N_CHAINS: 3 })
+})
+
+test("a garbled file is kept aside, never silently written over", () => {
+    const dir = tmp()
+    const a = loadGlobal(dir).settings
+    a.set({ N_ADAPT: 450 })
+    writeFileSync(settingsFile(dir), "{ garbled")
+    a.save()
+    assert.equal(readFileSync(`${settingsFile(dir)}.corrupt`, "utf-8"), "{ garbled")
+    assert.deepEqual(saved(dir), { N_ADAPT: 450 })
+    assert.match(readFileSync(join(dir, "settings.log"), "utf-8"), /could not be read/)
+})
+
+test("the first load does not clobber a file that appeared meanwhile", () => {
+    const dir = tmp()
+    // The other copy made its file first; a load under the lock finds it.
+    writeFileSync(settingsFile(dir), writeJson({ sampler: { N_ADAPT: { value: 450 } } }))
+    const r = loadGlobal(dir)
+    assert.equal(r.settings.get("N_ADAPT"), 450)
+    assert.deepEqual(saved(dir), { N_ADAPT: 450 })
+})
+
+test("a save wipes a conflicting value from the other copy as a load does", () => {
+    const dir = tmp()
+    const a = loadGlobal(dir).settings
+    a.set({ N_ADAPT: 450 })
+    writeFileSync(
+        settingsFile(dir),
+        writeJson({ sampler: { N_ADAPT: { value: 450 }, N_DRAWS: { value: -5 } } }),
+    )
+    a.save()
+    assert.deepEqual(saved(dir), { N_ADAPT: 450 })
+    assert.equal(defaultCatalog().require("N_DRAWS").default, a.get("N_DRAWS"))
+})
+
+// ---- list files --------------------------------------------------------------------
+
+const row = (fixture("buffer/buffer.json").solutes as BufferRow[])[0] as BufferRow
+
+test("a second writer is refused when another copy saved after it read", () => {
+    const dir = tmp()
+    writeSolutes(dir, [row]) // this copy wrote and so knows the file
+    // The other copy saves a different buffer, as a separate process would.
+    const theirs = writeJson({ solutes: [row, row] })
+    writeAtomic(bufferFile(dir), theirs)
+    assert.throws(
+        () => writeSolutes(dir, []),
+        (e) =>
+            e instanceof ChangedOnDiskError &&
+            e.message ===
+                "buffer.json changed on disk: another copy of BAYSOL saved it; reopen it",
+    )
+    assert.equal(readFileSync(bufferFile(dir), "utf-8"), theirs, "their file is intact")
+    // After the reopen (a read) the write goes through.
+    assert.equal(readSolutes(dir).length, 2)
+    writeSolutes(dir, [row])
+    assert.equal(readSolutes(dir).length, 1)
+})
+
+test("same content saved again is no change; a copy that never read may write", () => {
+    const dir = tmp()
+    writeSolutes(dir, [row])
+    writeAtomic(bufferFile(dir), readFileSync(bufferFile(dir), "utf-8"))
+    writeSolutes(dir, [row, row])
+    const other = tmp()
+    writeAtomic(bufferFile(other), writeJson({ solutes: [row] }))
+    writeSolutes(other, []) // never read this folder in this process
+    assert.deepEqual(readSolutes(other), [])
+})
+
+test("a file that appeared after this copy found none is a change", () => {
+    const root = tmp()
+    assert.deepEqual(readCustom(root), [])
+    writeAtomic(join(root, "custom-solutes.json"), writeJson({ solutes: [] }))
+    assert.throws(() => writeCustom(root, []), ChangedOnDiskError)
+})
+
+test("recipe operations that read and write in one step never conflict", () => {
+    const root = tmp()
+    saveRecipe(root, "A", [row])
+    readRecipes(root)
+    // another copy adds a recipe
+    writeAtomic(
+        recipesFile(root),
+        writeJson({ recipes: [...readRecipes(root), { name: "B", solutes: [row] }] }),
+    )
+    saveRecipe(root, "C", [row]) // reads again under the lock: B is kept
+    assert.deepEqual(
+        readRecipes(root).map((r) => r.name),
+        ["A", "B", "C"],
+    )
+    writeAtomic(
+        recipesFile(root),
+        writeJson({ recipes: [...readRecipes(root), { name: "D", solutes: [] }] }),
+    )
+    assert.equal(renameRecipe(root, "A", "AA"), undefined)
+    writeAtomic(
+        recipesFile(root),
+        writeJson({ recipes: [...readRecipes(root), { name: "E", solutes: [] }] }),
+    )
+    assert.equal(deleteRecipe(root, "B"), true)
+    assert.deepEqual(
+        readRecipes(root).map((r) => r.name),
+        ["AA", "C", "D", "E"],
+    )
+    // but a plain write after a stale read is refused
+    writeAtomic(recipesFile(root), writeJson({ recipes: [] }))
+    assert.throws(() => writeRecipes(root, []), ChangedOnDiskError)
+})
+
+test("noteRead of a missing file is a version too", () => {
+    const dir = tmp()
+    noteRead(bufferFile(dir))
+    writeAtomic(bufferFile(dir), writeJson({ solutes: [] }))
+    assert.throws(() => writeSolutes(dir, []), ChangedOnDiskError)
+})
+
+// ---- creating things that must be new -------------------------------------------------
+
+test("a model name taken meanwhile is refused by the copy itself", () => {
+    const project = tmp()
+    const src = tmp()
+    mkdirSync(join(src, "a"))
+    mkdirSync(join(src, "b"))
+    writeFileSync(join(src, "a", "m.pdb"), "first")
+    writeFileSync(join(src, "b", "m.pdb"), "second")
+    addModel(project, join(src, "a", "m.pdb"))
+    assert.throws(() => addModel(project, join(src, "b", "m.pdb")), /EEXIST/)
+    assert.equal(readFileSync(join(project, "models", "m.pdb"), "utf-8"), "first")
+    assert.deepEqual(listModels(project), ["m.pdb"])
+})
+
+test("runs recorded at once get folders of their own, and nothing is overwritten", () => {
+    const project = tmp()
+    writeFileSync(join(project, "settings.json"), "{}\n")
+    const ids = Array.from({ length: 6 }, () => recordRun(project, { models: ["m"] }).id)
+    assert.equal(new Set(ids).size, 6)
+    assert.deepEqual(runIds(project, "logs"), [...ids].sort())
+})

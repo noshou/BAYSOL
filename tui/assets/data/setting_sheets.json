@@ -1,0 +1,438 @@
+{
+ "sheets": [
+  {
+   "id": "sampler",
+   "title": "Sampler",
+   "groups": [
+    {
+     "title": "Draws",
+     "settings": [
+      {
+       "name": "N_ADAPT",
+       "description": "Number of warm-up iterations per chain, used to tune the sampler before draws are kept."
+      },
+      {
+       "name": "N_DRAWS",
+       "description": "Posterior draws kept per chain after warm-up. More draws give smoother intervals but longer runs."
+      },
+      {
+       "name": "RETRY_N_ADAPT",
+       "description": "Warm-up iterations per chain of the rerun that follows a failed convergence check; it adapts again from scratch."
+      },
+      {
+       "name": "RETRY_N_DRAWS",
+       "description": "Draws kept per chain after the warm-up of the rerun."
+      }
+     ]
+    },
+    {
+     "title": "Chains",
+     "settings": [
+      {
+       "name": "N_CHAINS",
+       "description": "Number of independent chains. Chains 1 and 2 start at the maximum a posteriori (MAP) point; the others start in mirrored pairs."
+      },
+      {
+       "name": "CHAIN_START_RADII",
+       "description": "Start distances, in standard deviations, from the MAP point of mirrored chain pairs (±r). Far starts find second modes. Not recommended to change."
+      },
+      {
+       "name": "OPTIMUM_CHAIN_CAP",
+       "description": "Cap on the number of extra chains started at optima. Not recommended to change."
+      },
+      {
+       "name": "OPTIMUM_MIN_CHAINS",
+       "description": "Minimum number of chains each massive optimum (at least 1 % Laplace mass) should have; missing chains are started there."
+      },
+      {
+       "name": "OPTIMUM_CHAIN_RADIUS",
+       "description": "Mahalanobis radius around an optimum within which a draw counts as being at it. Not recommended to change."
+      },
+      {
+       "name": "OPTIMUM_CHAIN_FRACTION",
+       "description": "Share of a chain's draws that must lie within the radius for the chain to count as at the optimum. Not recommended to change."
+      }
+     ]
+    },
+    {
+     "title": "Reproducibility and NUTS",
+     "settings": [
+      {
+       "name": "RNG_SEED",
+       "description": "Seed of every random draw. The same seed reproduces a run exactly."
+      },
+      {
+       "name": "TARGET_ACCEPT",
+       "description": "Target acceptance rate of the No-U-Turn Sampler (NUTS), in percent. Higher means smaller steps, fewer divergent transitions and more leapfrog steps. Not recommended to change."
+      }
+     ]
+    },
+    {
+     "title": "MAP search",
+     "settings": [
+      {
+       "name": "MAP_MAX_ITER",
+       "description": "Maximum number of L-BFGS optimizer steps per start. Not recommended to change."
+      },
+      {
+       "name": "MAP_N_STARTS",
+       "description": "Number of L-BFGS starts of the search for the posterior mode. More starts miss fewer basins but run slower. Not recommended to change."
+      },
+      {
+       "name": "MAP_F_SUCCESSIVE",
+       "description": "Stop a start when −log π (the negative log posterior) improves by less than 1e-6 nats for this many iterations in a row. Not recommended to change."
+      },
+      {
+       "name": "MAP_OPTIMA_KEPT",
+       "description": "Of the optima found, keep the best N (lowest −log π) and compare them by Laplace mass to choose the whitening point. Not recommended to change."
+      }
+     ]
+    },
+    {
+     "title": "MAP jitter",
+     "settings": [
+      {
+       "name": "MAP_JITTER_RADII",
+       "description": "Distances, in standard deviations, from an optimum at which its extra L-BFGS restarts begin. Not recommended to change."
+      },
+      {
+       "name": "MAP_JITTER_DIRECTIONS",
+       "description": "Random directions tried at each jitter radius. Not recommended to change."
+      },
+      {
+       "name": "MAP_JITTER_MAX_OPTIMA",
+       "description": "Jitter only the best N optima (lowest −log π). Not recommended to change."
+      },
+      {
+       "name": "MAP_JITTER_WITHIN_NATS",
+       "description": "Only optima within this many nats of the lowest are jittered. Not recommended to change."
+      }
+     ]
+    },
+    {
+     "title": "Basins and harvest",
+     "settings": [
+      {
+       "name": "BASIN_RESTART_NATS",
+       "description": "If a draw beats the maximum a posteriori (MAP) point by more than this many nats, a better basin was missed: re-whiten there and rerun the chain. Not recommended to change."
+      },
+      {
+       "name": "HARVEST_COVER",
+       "description": "After the first round, run L-BFGS from this many draws to find missed optima. Not recommended to change."
+      },
+      {
+       "name": "HARVEST_DIVERGENT",
+       "description": "Also run L-BFGS from at most this many divergent draws. Not recommended to change."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "model",
+   "title": "Model",
+   "groups": [
+    {
+     "title": "Contrast priors",
+     "settings": [
+      {
+       "name": "BOUNDS_δρ₁₂",
+       "description": "Hard limits (low, high) on the hydration-shell contrasts δρ₁ and δρ₂, in CRYSOL's units."
+      },
+      {
+       "name": "MODE_δρ₁₂",
+       "description": "Most likely value of δρ₁ and δρ₂ (CRYSOL's default is 1). Must lie inside the bounds."
+      },
+      {
+       "name": "κ_δρ₁₂",
+       "description": "Concentration of the δρ₁ and δρ₂ Beta priors. Higher is tighter; 14 gives a standard deviation of about 1."
+      },
+      {
+       "name": "κ_δρ₃",
+       "description": "Concentration of the Beta prior of the cavity contrast δρ₃, whose mode is bulk-density water."
+      },
+      {
+       "name": "φ_max",
+       "description": "Maximum cavity water density relative to bulk; it bounds δρ₃. 1.25 is above the densest hydration water."
+      }
+     ]
+    },
+    {
+     "title": "Excluded volume",
+     "settings": [
+      {
+       "name": "EXCL_VOL_CORR_BOUNDS",
+       "description": "Hard limits (low, high) on the excluded-volume correction c1. Hitting a bound is intended: c1 cannot absorb model misspecification."
+      },
+      {
+       "name": "EXCL_VOL_CORR_EPS",
+       "description": "Padding of the search range of the excluded-volume correction c1, and step of the coarse scan. Not recommended to change."
+      },
+      {
+       "name": "PMV_FALLBACK_UNCERT",
+       "description": "Fallback PMV uncertainty. Not recommended to change."
+      }
+     ]
+    },
+    {
+     "title": "Hydration shell",
+     "settings": [
+      {
+       "name": "SHELL_THICKNESS",
+       "description": "Hydration-shell thickness beyond the accessible surface (CRYSOL's default)."
+      },
+      {
+       "name": "PROBE_RADIUS",
+       "description": "Solvent probe radius used for the accessible surface (water)."
+      },
+      {
+       "name": "SHELL_AREA_PER_POINT",
+       "description": "Square ångströms of surface per shell point; sets the point spacing, calibrated to CRYSOL. Not recommended to change."
+      },
+      {
+       "name": "SHELL_MIN_POINTS",
+       "description": "Floor on the number of shell points (CRYSOL's smallest grid, F(10)). Not recommended to change."
+      },
+      {
+       "name": "SHELL_SAMPLE",
+       "description": "Sample directions per atom for the surface. More is slower and more accurate. Not recommended to change."
+      },
+      {
+       "name": "SASA_N_OCC",
+       "description": "Early-exit prefix of the surface directions; smaller is faster but loses solvent-accessible area (0.3 to 0.6 % at 104). Not recommended to change."
+      }
+     ]
+    },
+    {
+     "title": "Bead model",
+     "settings": [
+      {
+       "name": "BEAD_RAY_RANGE",
+       "description": "Range of the rays that classify a bead as cavity or bulk; a farther wall counts as bulk. Not recommended to change."
+      },
+      {
+       "name": "BEAD_RAY_DIRS",
+       "description": "Number of ray directions per bead for that test. Not recommended to change."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "output",
+   "title": "Output",
+   "groups": [
+    {
+     "title": "Tables",
+     "settings": [
+      {
+       "name": "TABLE_SIGFIGS",
+       "description": "Significant figures of each workbook number. 17 keeps every bit of a 64-bit float; 15 is the most that is guaranteed."
+      },
+      {
+       "name": "VAL_SIGMA",
+       "description": "Half-width, in standard deviations, of the reported interval (2 gives 2.28 % to 97.72 %). Not advised above 3: too few draws."
+      }
+     ]
+    },
+    {
+     "title": "Figures",
+     "settings": [
+      {
+       "name": "FIGURES_TEX",
+       "description": "Write each figure as a pgfplots .tex file in the plots folder. No LaTeX installation is needed."
+      },
+      {
+       "name": "FIGURES_COMPILE",
+       "description": "Run LaTeX on the .tex figures (about 1 second each; needs lualatex, xelatex or pdflatex). A failure only produces a warning."
+      },
+      {
+       "name": "FIGURES_FORMATS",
+       "description": "File types made from each .tex file when compiling: :pdf, :png or :svg (PNG and SVG also need poppler)."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "plots",
+   "title": "Plots",
+   "groups": [
+    {
+     "title": "Colours",
+     "settings": [
+      {
+       "name": "PLOT_COLOUR_MAP",
+       "description": "Colour of the maximum a posteriori (MAP) curve and of its markers in the histograms."
+      },
+      {
+       "name": "PLOT_COLOUR_POSTERIOR",
+       "description": "Colour of the posterior quantile curves."
+      },
+      {
+       "name": "PLOT_COLOUR_DATA",
+       "description": "Colour of the measured points."
+      },
+      {
+       "name": "PLOT_COLOUR_ERRORBAR",
+       "description": "Colour and opacity of the error bars of the measured points."
+      },
+      {
+       "name": "PLOT_COLOUR_REFERENCE",
+       "description": "Colour of the reference curve on a comparison plot."
+      },
+      {
+       "name": "PLOT_COLOUR_BAND",
+       "description": "Colour and opacity of the posterior bounds band of the intensity plot."
+      },
+      {
+       "name": "PLOT_COLOUR_BAND_RESID",
+       "description": "Colour and opacity of the posterior bounds band of the residuals plot."
+      },
+      {
+       "name": "PLOT_COLOUR_HIST",
+       "description": "Colour and opacity of the histogram bars."
+      },
+      {
+       "name": "PLOT_COLOUR_AXIS",
+       "description": "Colour of the axes."
+      },
+      {
+       "name": "PLOT_TICK_COLOUR",
+       "description": "Colour of the ticks."
+      }
+     ]
+    },
+    {
+     "title": "Line widths",
+     "settings": [
+      {
+       "name": "PLOT_LW_MAP",
+       "description": "Line width, in points, of the MAP curve and of its histogram marker."
+      },
+      {
+       "name": "PLOT_LW_REFERENCE",
+       "description": "Line width, in points, of the reference curve."
+      },
+      {
+       "name": "PLOT_LW_QUANTILE",
+       "description": "Line width, in points, of the quantile curves of the intensity plot."
+      },
+      {
+       "name": "PLOT_LW_QUANTILE_RESID",
+       "description": "Line width, in points, of the quantile curves of the residuals plot."
+      },
+      {
+       "name": "PLOT_LW_ZERO_LINE",
+       "description": "Line width, in points, of the zero line of the residuals plot."
+      },
+      {
+       "name": "PLOT_LW_ERRORBAR",
+       "description": "Width, in points, of the error bars."
+      },
+      {
+       "name": "PLOT_AXIS_LW",
+       "description": "Line width, in points, of the axes."
+      },
+      {
+       "name": "PLOT_LW_MAJOR_TICK",
+       "description": "Width, in points, of the major ticks."
+      },
+      {
+       "name": "PLOT_LW_MINOR_TICK",
+       "description": "Width, in points, of the minor ticks."
+      }
+     ]
+    },
+    {
+     "title": "Markers",
+     "settings": [
+      {
+       "name": "PLOT_MARKERSIZE",
+       "description": "Radius, in points, of the data markers."
+      },
+      {
+       "name": "PLOT_WHISKERWIDTH",
+       "description": "Length, in points, of the end caps (whiskers) of the error bars."
+      }
+     ]
+    },
+    {
+     "title": "Size and text",
+     "settings": [
+      {
+       "name": "PLOT_WIDTH_HEIGHT_CM",
+       "description": "Width and height of the figures, in centimetres."
+      },
+      {
+       "name": "PLOT_PREVIEW_SIZE",
+       "description": "Width (in characters) and height (in rows) of a plot previewed in the terminal."
+      },
+      {
+       "name": "PLOT_BORDER_PT",
+       "description": "Padding added around the plot when exporting. Without it the page is cropped to the bounding box, which can cut off labels or tick marks."
+      },
+      {
+       "name": "PLOT_TEXT_FONT",
+       "description": "Text font of the figures."
+      },
+      {
+       "name": "PLOT_MATH_FONT",
+       "description": "Math font of the figures."
+      }
+     ]
+    },
+    {
+     "title": "Histogram and ranges",
+     "settings": [
+      {
+       "name": "PLOT_HIST_BINS",
+       "description": "Number of bins of each posterior histogram."
+      },
+      {
+       "name": "PLOT_YLIM_LOG",
+       "description": "The y-range of the intensity plots is the data's range scaled by these two factors (lower, upper)."
+      },
+      {
+       "name": "PLOT_YLIM_LIN_PAD_FRAC",
+       "description": "Padding of the y-range of the residuals plot, as a fraction of the residuals' range."
+      }
+     ]
+    },
+    {
+     "title": "Ticks",
+     "settings": [
+      {
+       "name": "PLOT_TICK_LENGTH_CM",
+       "description": "Length, in centimetres, of the major ticks; minor ticks are half as long."
+      },
+      {
+       "name": "PLOT_LINMIN_TICKS",
+       "description": "Number of minor ticks between major ticks on linear axes."
+      },
+      {
+       "name": "PLOT_XTICK_ANGLE",
+       "description": "Counter-clockwise angle, in degrees, of the x-tick elbows."
+      },
+      {
+       "name": "PLOT_XTICK_STUB_PT",
+       "description": "Length, in points, of the x-tick stubs."
+      },
+      {
+       "name": "PLOT_XTICK_ELBOW_PT",
+       "description": "Length, in points, of the x-tick elbows."
+      },
+      {
+       "name": "PLOT_XTICK_LABEL_PAD_PT",
+       "description": "Gap, in points, between the axis and the x-tick labels."
+      },
+      {
+       "name": "PLOT_YTICK_LABEL_PAD_PT",
+       "description": "Gap, in points, between the axis and the y-tick labels."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

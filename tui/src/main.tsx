@@ -1,44 +1,28 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import { Box, render, Text, useInput, useWindowSize } from "ink"
-import { useState } from "react"
-import { KeyInput, keyPress } from "./keys.js"
-import { MainMenu } from "./main-menu.js"
-import { darkTheme, lightTheme, ThemeContext } from "./theme.js"
+import { render } from "ink"
+import { App } from "./app.js"
+import { readSystem } from "./core/system.js"
+import { hasTerminal, programCommand, relaunchInTerminal, startAction } from "./system/terminal.js"
 
-const toggleKey = new KeyInput("t", true)
+/**
+ * The entry point. In a terminal the program runs here; with no terminal (started
+ * from a launcher) it opens a terminal emulator that runs the program again; the copy
+ * that was already opened for that never opens a second one.
+ */
+const system = readSystem()
+const action = startAction(hasTerminal(), system)
 
-function App() {
-    const [mode, setMode] = useState<"light"|"dark">()
-    const theme = mode === "light" ? lightTheme : darkTheme
-    const { columns, rows } = useWindowSize()
-
-    // toggle between light and dark theme
-    useInput((input, key) => {
-        const press = keyPress(input, key)
-        if (press.is(toggleKey))
-            { setMode(mode === "light" ? "dark" : "light")  }
-    })
-
-    return (
-        <ThemeContext.Provider value={theme}>
-            <Box
-                width = {columns}
-                height={rows}
-                backgroundColor={theme.bg}
-                flexDirection="column"
-            >
-                <Box flexGrow={1}>
-                    <MainMenu/>
-                </Box>
-
-                <Box justifyContent="flex-end">
-                    <Text color={theme.mt}>
-                        {mode === "light" ? "theme (^t): ☀️" : "theme (^t): 🌕"}
-                    </Text>
-                </Box>
-            </Box>
-        </ThemeContext.Provider>
-    )
+if (action === "run") {
+    render(<App />)
+} else if (action === "relaunch") {
+    const command = programCommand(process.execPath, process.execArgv, process.argv)
+    const problem = await relaunchInTerminal(system, command)
+    if (problem !== undefined) {
+        console.error(`BAYSOL: ${problem}`)
+        process.exitCode = 1
+    }
+} else {
+    console.error("BAYSOL: this program needs a terminal")
+    process.exitCode = 1
 }
-render (<App/>)

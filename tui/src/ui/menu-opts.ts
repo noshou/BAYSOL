@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import { readFileSync }  from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
-import { KeyInput }      from "./keys.js"
-
-/** The `assets/` folder, found relative to this source file. */
-const assets: string = join(dirname(fileURLToPath(import.meta.url)), "..", "assets")
+import { readFileSync } from "node:fs"
+import { assetPath }    from "../core/assets.js"
+import { KeyInput }     from "./keys.js"
 
 /**
  * Every menu option and its hotkey. Its keys are the allowed option names
@@ -61,7 +57,7 @@ export type MenuOption = Art & {
  * @throws if the file does not exist or cannot be read.
  */
 function loadArt(...path: string[]): Art {
-    const text = readFileSync(join(assets, ...path), "utf-8")
+    const text = readFileSync(assetPath(...path), "utf-8")
     const lines = text.split("\n")
     return {
         text,
@@ -139,3 +135,19 @@ export function menuCursor(): Art { return loadArt("menu-options", "cursor.txt")
  * @throws if `assets/logo/logo-large.txt` cannot be read.
  */
 export function menuLogo(): Art { return loadArt("logo", "logo-large.txt") }
+
+/**
+ * The small BAYSOL logos that sit at the bottom left of the screens below the menus:
+ * `blocky` (square corners) on the screens drawn with double lines, the tables, forms
+ * and settings sheets; `smooth` (rounded corners) on the rounded landing pages.
+ */
+export type SmallLogo = "blocky" | "smooth"
+
+/**
+ * Loads a small logo.
+ *
+ * @param kind - `"blocky"` or `"smooth"`.
+ * @returns the logo art with its size in terminal cells.
+ * @throws if `assets/logo/logo-<kind>.txt` cannot be read.
+ */
+export function smallLogo(kind: SmallLogo): Art { return loadArt("logo", `logo-${kind}.txt`) }
