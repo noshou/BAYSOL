@@ -5,9 +5,14 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { KeyInput }      from "./keys.js"
 
+/** The `assets/` folder, found relative to this source file. */
 const assets: string = join(dirname(fileURLToPath(import.meta.url)), "..", "assets")
 
-// define menuOptions to be the strict constants below
+/**
+ * Every menu option and its hotkey. Its keys are the allowed option names
+ * ([[MenuOptions]]), and each name must have a `<name>.txt` in
+ * `assets/menu-options/`.
+ */
 const menuOptions = {
     buffer:   { hotkey: new KeyInput("b") },
     data:     { hotkey: new KeyInput("d") },
@@ -25,49 +30,112 @@ const menuOptions = {
     settings: { hotkey: new KeyInput("s") },
 } as const satisfies Record<string, { hotkey: KeyInput }>
 
-// define allowed names as the keys of menu_options
-export type MenuOptionNames = keyof typeof menuOptions
+/** The name of a menu option: one of the keys of `menuOptions`. */
+export type MenuOptions = keyof typeof menuOptions
 
-export type MenuOption = {
-    name:   MenuOptionNames
-    hotkey: KeyInput
+/** An art piece: its text and its size in terminal cells. */
+export type Art = {
     text:   string
     width:  number
     height: number
 }
 
 /**
- * Loads one menu option, the art piece of an item of a menu, from
- * `assets/menu-options/<name>-<type>.txt`.
+ * One loaded menu option: its art piece (`text`, `width`, `height`) and the
+ * hotkey that selects it. The selected state is drawn with the theme's colours,
+ * not with a second piece of art.
  *
- * @param type - `"reg"` for the regular piece, `"bold"` for the selected one.
- * @param name - the option, one of the keys of `menu_options`.
- * @returns the option with its hotkey, its text, and its size in terminal cells
- *     (`width` is the longest line, `height` the number of lines).
- * @throws if the file `<name>-<type>.txt` does not exist or cannot be read.
+ * @property hotkey - the key that selects the option.
  */
-export function loadOpts(type: "reg" | "bold", name: MenuOptionNames): MenuOption {
-    // load the text of the option
-    const file = `${name}-${type}.txt`
-    const text = readFileSync(join(assets, "menu-options", file), "utf-8")
+export type MenuOption = Art & {
+    hotkey: KeyInput
+}
 
-    // the size of the piece in terminal cells
+/**
+ * Reads an art piece from a file below `assets/` and measures it.
+ *
+ * @param path - the folders and the file name below `assets/`, one string each,
+ *     e.g. `"logo", "logo-large.txt"`.
+ * @returns the text, and its size in terminal cells (`width` is the longest line,
+ *     `height` the number of lines).
+ * @throws if the file does not exist or cannot be read.
+ */
+function loadArt(...path: string[]): Art {
+    const text = readFileSync(join(assets, ...path), "utf-8")
     const lines = text.split("\n")
     return {
-        name,
-        hotkey: menuOptions[name].hotkey,
         text,
         width: Math.max(...lines.map((line) => line.length)),
         height: lines.length,
     }
 }
 
-/** returns the menuCursor (width=3, height=3) */
-export function menuCursor(): string {
-    return readFileSync(join(assets, "menu-options", "cursor.txt"), "utf-8")
+/**
+ * Loads menu options, each with its art piece, from
+ * `assets/menu-options/<name>.txt`.
+ *
+ * Call it once, at module level: it reads the files from disk each time.
+ *
+ * @param names - the options to load.
+ * @returns a record with exactly the given names as keys, each mapping to its
+ *     [[MenuOption]]: its art with its size, and its hotkey. A name that was not
+ *     passed is a type error to look up, and a passed one is never `undefined`.
+ * @throws if a file cannot be read.
+ */
+export function loadOpts<N extends MenuOptions>(
+    names: readonly N[]
+): Record<N, MenuOption> {
+    // starts empty and is filled below, so the cast says "complete by the return"
+    const result = {} as Record<N, MenuOption>
+    for (const name of names) {
+        result[name] = {
+            ...loadArt("menu-options", `${name}.txt`),
+            hotkey: menuOptions[name].hotkey,
+        }
+    }
+    return result
 }
 
-/** returns the menu logo (width=47, height=3)*/
-export function menuLogo(): string {
-    return readFileSync(join(assets, "logo", "logo-large.txt"), "utf-8")
+/**
+ * The grid shapes that have move hints, and how many positions each has.
+ * Each shape needs `assets/menu-arrows/(<shape>)-pos1.txt` to `-pos<n>.txt`.
+ */
+const arrowLayouts = { "2x2": 4, "2x3": 6 } as const
+
+/** A grid shape with move hints: `"2x2"` or `"2x3"`. */
+export type ArrowLayout = keyof typeof arrowLayouts
+
+/**
+ * Loads the move hints of a grid shape, one art piece per position of the grid.
+ *
+ * The pieces show which arrows are possible from a position, e.g. the first
+ * position of a 2x3 grid has a right and a down arrow. Positions count from the
+ * top-left, one row at a time, so `pos1` is the first element of the array.
+ *
+ * Call it once, at module level: it reads the files from disk each time.
+ *
+ * @param layout - the grid shape, `"2x2"` or `"2x3"`.
+ * @returns the pieces in order, `pos1` first: 4 for `"2x2"`, 6 for `"2x3"`.
+ * @throws if a file `assets/menu-arrows/(<layout>)-pos<n>.txt` cannot be read.
+ */
+export function menuArrows(layout: ArrowLayout): Art[] {
+    return Array.from({ length: arrowLayouts[layout] }, (_, i) =>
+        loadArt("menu-arrows", `(${layout})-pos${i + 1}.txt`)
+    )
 }
+
+/**
+ * Loads the cursor drawn beside the selected menu item.
+ *
+ * @returns the cursor art with its size in terminal cells.
+ * @throws if `assets/menu-options/cursor.txt` cannot be read.
+ */
+export function menuCursor(): Art { return loadArt("menu-options", "cursor.txt") }
+
+/**
+ * Loads the logo shown at the top of the menu.
+ *
+ * @returns the logo art with its size in terminal cells.
+ * @throws if `assets/logo/logo-large.txt` cannot be read.
+ */
+export function menuLogo(): Art { return loadArt("logo", "logo-large.txt") }
