@@ -2,36 +2,32 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import { parseNumber } from "../src/core/text.js"
 import {
+    blocksFitting,
     capNote,
     descriptionLines,
     type EditEnd,
-    firstOfGroup,
-    groupJump,
-    groupSettings,
-    hexOf,
-    indexOfName,
+    type EditStep,
+    indexOfPick,
     maxNumberText,
     narrow,
-    nextSetting,
+    noteLines,
+    numberRules,
     openNumber,
-    openPicker,
     openTabs,
     openTuple,
-    parseNumberText,
-    pickerMatches,
     pickOneNote,
-    type Step,
+    pickValue,
+    scrollTop,
     settingFacts,
-    sheetRows,
     stepNumber,
-    stepPicker,
     stepTabs,
     stepTuple,
     swatchColour,
+    tableWidths,
     tupleMatches,
     valueText,
-    windowStart,
     withDraft,
 } from "../src/screens/setting-edit.js"
 import { defaultCatalog } from "../src/store/settings-defs.js"
@@ -42,11 +38,12 @@ const catalog = defaultCatalog()
 const def = (name: string) => catalog.require(name)
 
 /** A typed character. */
-const typed = (text: string): KeyInput => new KeyInput(text.toLowerCase(), false, text)
+const typed = (text: string): KeyInput =>
+    new KeyInput(text.toLowerCase(), false, text, text !== text.toLowerCase())
 
 /** Feeds keys to an editor; returns the last state and how it ended, if it did. */
 function drive<S, V>(
-    step: (s: S, p: KeyInput) => Step<S, V>,
+    step: (s: S, p: KeyInput) => EditStep<S, V>,
     start: S,
     presses: KeyInput[],
 ): { state: S; end?: EditEnd<V> } {
@@ -63,25 +60,28 @@ function drive<S, V>(
 /** The keys that type a text. */
 const text = (s: string): KeyInput[] => [...s].map(typed)
 
-test("parseNumberText: whole numbers and decimals", () => {
-    assert.deepEqual(parseNumberText("int", "12"), { value: 12 })
-    assert.deepEqual(parseNumberText("int", "-3"), { value: -3 })
-    assert.deepEqual(parseNumberText("int", "2.5"), { error: "a whole number, please" })
-    assert.deepEqual(parseNumberText("int", ""), { error: "a whole number, please" })
-    assert.deepEqual(parseNumberText("float", "1e-3"), { value: 0.001 })
-    assert.deepEqual(parseNumberText("float", "5"), { value: 5 })
-    assert.deepEqual(parseNumberText("float", ".5"), { value: 0.5 })
-    assert.deepEqual(parseNumberText("float", "x"), { error: "a number, please" })
-    assert.deepEqual(parseNumberText("float", ""), { error: "a number, please" })
-    assert.deepEqual(parseNumberText("float", "1e999"), { error: "a number, please" })
+test("number rules: whole numbers and decimals", () => {
+    assert.deepEqual(parseNumber("12", numberRules.int), { value: 12 })
+    assert.deepEqual(parseNumber("-3", numberRules.int), { value: -3 })
+    const whole = { error: "a whole number, please" }
+    assert.deepEqual(parseNumber("2.5", numberRules.int), whole)
+    assert.deepEqual(parseNumber("", numberRules.int), { error: "a whole number, please" })
+    assert.deepEqual(parseNumber("1e-3", numberRules.float), { value: 0.001 })
+    assert.deepEqual(parseNumber("5", numberRules.float), { value: 5 })
+    assert.deepEqual(parseNumber(".5", numberRules.float), { value: 0.5 })
+    assert.deepEqual(parseNumber("x", numberRules.float), { error: "a number, please" })
+    assert.deepEqual(parseNumber("", numberRules.float), { error: "a number, please" })
+    assert.deepEqual(parseNumber("1e999", numberRules.float), { error: "a number, please" })
 })
 
-test("parseNumberText: ints refuse more than 15 digits, leading zeros do not count", () => {
-    assert.deepEqual(parseNumberText("int", "123456789012345"), { value: 123456789012345 })
-    assert.deepEqual(parseNumberText("int", "1234567890123456"), {
+test("number rules: ints refuse more than 15 digits, leading zeros do not count", () => {
+    assert.deepEqual(parseNumber("123456789012345", numberRules.int), {
+        value: 123456789012345,
+    })
+    assert.deepEqual(parseNumber("1234567890123456", numberRules.int), {
         error: "15 digits at most",
     })
-    assert.deepEqual(parseNumberText("int", "-0000000000000000005"), { value: -5 })
+    assert.deepEqual(parseNumber("-0000000000000000005", numberRules.int), { value: -5 })
 })
 
 test("number editor: Enter takes, limits are the setting's, Esc drops", () => {
@@ -131,52 +131,31 @@ test("narrow: prefix first, then inside, case-insensitive", () => {
     assert.deepEqual(narrow(names, "dark"), ["darkgray"])
     assert.deepEqual(narrow(names, "ray"), ["gray", "gray20", "darkgray"])
     assert.deepEqual(narrow(names, "zzz"), [])
-    assert.equal(indexOfName(names, "RED"), 3)
-    assert.equal(indexOfName(names, "nothing"), 0)
+    assert.equal(indexOfPick(names, "RED"), 3)
+    assert.equal(indexOfPick(names, "nothing"), 0)
 })
 
 const colours = ["black", "crimson", "gray", "gray20", "red"]
 
-test("picker: type to narrow, up and down go round, Enter picks, Tab completes", () => {
-    const start = openPicker("colour", colours, "gray")
-    assert.equal(start.index, 2)
-    const typedGr = drive(stepPicker, start, text("gr"))
-    assert.deepEqual(pickerMatches(typedGr.state), ["gray", "gray20"])
-    assert.equal(typedGr.state.index, 0)
-    const down = drive(stepPicker, typedGr.state, [keys.down, keys.enter])
-    assert.deepEqual(down.end, { kind: "done", value: "gray20" })
-    // wraps upward from the first
-    const up = drive(stepPicker, typedGr.state, [keys.up, keys.enter])
-    assert.deepEqual(up.end, { kind: "done", value: "gray20" })
-    // Tab takes the highlighted name into the text
-    const tab = drive(stepPicker, typedGr.state, [keys.down, keys.tab])
-    assert.equal(tab.state.buffer.text, "gray20")
-    assert.deepEqual(pickerMatches(tab.state), ["gray20"])
-})
-
-test("picker: unknown names, hex colours, fonts with no list", () => {
-    const none = drive(stepPicker, openPicker("colour", colours, "red"), [
-        ...text("zzz"),
-        keys.enter,
-    ])
-    assert.equal(none.state.error, "not a known colour")
-    assert.equal(none.end, undefined)
-    const hex = drive(stepPicker, openPicker("colour", colours, "red"), [
-        ...text("#AB12cd"),
-        keys.enter,
-    ])
-    assert.deepEqual(hex.end, { kind: "done", value: "#ab12cd" })
-    const font = drive(stepPicker, openPicker("font", ["Alpha"], "Alpha"), [
-        ...text("zz"),
-        keys.enter,
-    ])
-    assert.equal(font.state.error, "not a known font")
-    const noList = openPicker("font", [], "x")
-    const offline = drive(stepPicker, noList, [...text("My Font"), keys.enter])
-    assert.deepEqual(offline.end, { kind: "done", value: "My Font" })
-    assert.equal(drive(stepPicker, noList, [keys.enter]).state.error, "not a known font")
-    const red = openPicker("colour", colours, "red")
-    assert.equal(drive(stepPicker, red, [keys.escape]).end?.kind, "cancel")
+test("picker: the highlighted name, a hex colour, fonts with no list", () => {
+    assert.deepEqual(pickValue("colour", colours, "gr", "gray"), { value: "gray" })
+    // a typed #rrggbb wins over the highlighted name, and is lower-cased
+    assert.deepEqual(pickValue("colour", colours, " #AB12cd ", "red"), {
+        value: "#ab12cd",
+    })
+    assert.deepEqual(pickValue("colour", colours, "zzz", undefined), {
+        error: "not a known colour",
+    })
+    assert.deepEqual(pickValue("font", ["Alpha"], "zz", undefined), {
+        error: "not a known font",
+    })
+    // a hex text is no font
+    assert.deepEqual(pickValue("font", ["Alpha"], "#ab12cd", undefined), {
+        error: "not a known font",
+    })
+    // no list of fonts on this machine: the text as typed
+    assert.deepEqual(pickValue("font", [], "My Font", undefined), { value: "My Font" })
+    assert.deepEqual(pickValue("font", [], "", undefined), { error: "not a known font" })
 })
 
 test("tabs: Enter toggles, arrows stop, Tab goes round, Esc needs one on", () => {
@@ -293,7 +272,7 @@ test("tuple with a colour: the list opens on the colour, a first key replaces it
     assert.deepEqual(tupleMatches(opacity.state), [])
 })
 
-test("valueText, swatchColour, hexOf, settingFacts", () => {
+test("valueText, swatchColour, settingFacts", () => {
     assert.equal(valueText(def("FIGURES_FORMATS"), ["pdf", "png"]), "pdf png")
     assert.equal(valueText(def("PLOT_PREVIEW_SIZE"), { width: 70, height: 18 }), "(70, 18)")
     const band = def("PLOT_COLOUR_BAND")
@@ -301,8 +280,7 @@ test("valueText, swatchColour, hexOf, settingFacts", () => {
     assert.equal(valueText(def("N_ADAPT"), 1000), "1000")
     assert.equal(swatchColour(def("PLOT_COLOUR_BAND"), ["darkorange", 0.15]), "darkorange")
     assert.equal(swatchColour(def("N_ADAPT"), 1000), undefined)
-    assert.equal(hexOf([255, 0, 16]), "#ff0010")
-    assert.match(settingFacts(def("N_ADAPT")), /^whole number, at least \d+ · default \d+$/)
+    assert.match(settingFacts(def("N_ADAPT")), /^integer, at least \d+ · default \d+$/)
 })
 
 test("valueText says yes or no for a yes/no setting", () => {
@@ -322,50 +300,51 @@ test("descriptionLines wrap to the width at any width", () => {
     }
 })
 
-test("sheet rows: headings, then settings; moves skip headings", () => {
-    const sheet = catalog.sheet("sampler")
-    assert.ok(sheet !== undefined)
-    const rows = sheetRows(sheet)
-    assert.equal(rows[0]?.kind, "group")
-    const count = sheet.groups.flatMap((g) => g.settings).length
-    assert.equal(rows.filter((r) => r.kind === "setting").length, count)
-    const first = firstOfGroup(rows, 0)
-    assert.equal(first, 1)
-    // down from the last setting of group 0 lands on the first of group 1, over the heading
-    const lastOfZero = firstOfGroup(rows, 1) - 2
-    assert.equal(rows[lastOfZero]?.kind, "setting")
-    assert.equal(nextSetting(rows, lastOfZero, 1), firstOfGroup(rows, 1))
-    assert.equal(nextSetting(rows, firstOfGroup(rows, 1), -1), lastOfZero)
-    // no move past the ends
-    assert.equal(nextSetting(rows, first, -1), first)
-    assert.equal(nextSetting(rows, rows.length - 1, 1), rows.length - 1)
+test("tableWidths: the columns and their borders fill the width exactly", () => {
+    for (const columns of [78, 98, 108, 140]) {
+        const w = tableWidths(columns, 23)
+        assert.equal(3 + 4 + w.name + w.desc + w.value, columns)
+        assert.equal(w.name, 24)
+        assert.equal(w.value, columns >= 100 ? 25 : 19)
+    }
+    // a short name makes a narrow name column
+    assert.equal(tableWidths(78, 6).name, 8)
 })
 
-test("sheet rows: left and right jump to the previous and next group", () => {
-    const sheet = catalog.sheet("plots")
-    assert.ok(sheet !== undefined)
-    const rows = sheetRows(sheet)
-    const g1 = firstOfGroup(rows, 1)
-    assert.equal(groupJump(rows, firstOfGroup(rows, 0) + 1, 1), g1)
-    assert.equal(groupJump(rows, g1 + 1, -1), firstOfGroup(rows, 0))
-    assert.equal(groupJump(rows, firstOfGroup(rows, 0), -1), firstOfGroup(rows, 0))
-    const lastGroup = sheet.groups.length - 1
-    const last = firstOfGroup(rows, lastGroup)
-    assert.equal(groupJump(rows, last, 1), last)
-    assert.deepEqual(
-        groupSettings(rows, 0).map((d) => d.name),
-        sheet.groups[0]?.settings.map((d) => d.name),
-    )
+test("every setting fits a block at 80 columns, its description wrapped whole", () => {
+    const w = tableWidths(78, 23)
+    for (const d of catalog.defs()) {
+        const lines = descriptionLines(d, w.desc - 2)
+        assert.ok(lines.every((l) => l.length <= w.desc - 2), d.name)
+        const one = (t: string): string => t.replace(/\s+/g, " ")
+        assert.equal(one(lines.join(" ")), one(d.description))
+    }
 })
 
-test("windowStart keeps the heading in view above a group's first setting", () => {
-    const sheet = catalog.sheet("model")
-    assert.ok(sheet !== undefined)
-    const rows = sheetRows(sheet)
-    const g1 = firstOfGroup(rows, 1)
-    assert.equal(windowStart(rows, g1, g1), g1 - 1)
-    assert.equal(windowStart(rows, g1, g1 - 3), g1 - 3)
-    assert.equal(windowStart(rows, g1 + 1, g1 + 1), g1 + 1)
+test("noteLines: at most two lines", () => {
+    assert.deepEqual(noteLines("must be at least 1", 18), ["must be at least 1"])
+    assert.equal(noteLines("a very long message that goes on and on and on", 10).length, 2)
+})
+
+test("blocksFitting counts the rules between blocks", () => {
+    // blocks of 3 lines: 3, then 3+1+3 = 7, then 11
+    assert.equal(blocksFitting([3, 3, 3], 0, 7), 2)
+    assert.equal(blocksFitting([3, 3, 3], 0, 6), 1)
+    assert.equal(blocksFitting([3, 3, 3], 0, 11), 3)
+    // a block taller than the room is still shown, alone
+    assert.equal(blocksFitting([9, 3], 0, 4), 1)
+    assert.equal(blocksFitting([3, 3, 3], 1, 7), 2)
+})
+
+test("scrollTop keeps the selected block wholly in view and moves little", () => {
+    const heights = [3, 3, 3, 3, 3]
+    assert.equal(scrollTop(heights, 0, 1, 7), 0)
+    assert.equal(scrollTop(heights, 0, 2, 7), 1)
+    assert.equal(scrollTop(heights, 1, 4, 7), 3)
+    // up again: the top follows the selection
+    assert.equal(scrollTop(heights, 3, 1, 7), 1)
+    // tall block taller than the room: it is the top
+    assert.equal(scrollTop([2, 9, 2], 0, 1, 5), 1)
 })
 
 test("withDraft: no draft when the value is the saved one", () => {

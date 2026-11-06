@@ -5,10 +5,12 @@ import { test } from "node:test"
 import { readAssetJson } from "../src/core/assets.js"
 import {
     buildCatalog,
+    colourHex,
     defaultCatalog,
     formatValue,
     type Relation,
     SettingsCatalogError,
+    settingNames,
 } from "../src/store/settings-defs.js"
 import { catalogProblems } from "../src/store/settings-validate.js"
 
@@ -122,4 +124,26 @@ test("a value reads in the value cell, at most 17 cells", () => {
     assert.equal(formatValue(["gray40", 0.6]), "(gray40, 0.6)")
     assert.equal(formatValue({ width: 70, height: 18 }), "(70, 18)")
     assert.equal(formatValue("TeX Gyre Pagella Math"), "TeX Gyre Pagella…")
+})
+
+test("the colours have names and colours", () => {
+    const list = settingNames("PLOT_COLOUR_MAP", "colour")
+    assert.ok(list.length > 600)
+    for (const n of ["crimson", "darkorange", "gray20", "black", "antiquewhite4"]) {
+        assert.ok(list.includes(n), n)
+    }
+    assert.deepEqual(colourHex("crimson"), "#dc143c")
+    assert.deepEqual(colourHex("antiquewhite4"), "#8b8378")
+    assert.deepEqual(colourHex("#ff0000"), "#ff0000")
+    assert.equal(colourHex("nope"), undefined)
+    assert.equal(colourHex("#ff00"), undefined)
+})
+
+test("fonts are the math fonts or the text fonts", () => {
+    const math = ["Neo Euler", "TeX Gyre Pagella Math"]
+    const fonts = { math, text: ["Pagella", "Times"] }
+    assert.deepEqual(settingNames("PLOT_MATH_FONT", "font", fonts), fonts.math)
+    assert.deepEqual(settingNames("PLOT_TEXT_FONT", "font", fonts), fonts.text)
+    assert.deepEqual(settingNames("X", "other", fonts), [])
+    assert.deepEqual(settingNames("PLOT_TEXT_FONT", "font"), [])
 })

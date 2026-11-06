@@ -16,7 +16,7 @@ import {
     terminalCandidates,
     terminalCommand,
     windowsTerminalCommand,
-} from "../src/system/terminal.js"
+} from "../src/core/terminal.js"
 
 const system = (os: NodeJS.Platform, env: Record<string, string>): System => ({
     os,

@@ -9,14 +9,15 @@ import {
     accepted,
     addModel,
     addModels,
-    complete,
     deleteModel,
-    hints,
-    hintsFor,
     listModels,
+    modelPathProblem,
     modelsDir,
-    pathProblem,
 } from "../src/store/models.js"
+import { complete, hintsFor } from "../src/store/path-input.js"
+
+/** The hints of a typed path for structure files. */
+const hints = (text: string) => hintsFor(text, accepted)
 
 const tempRoot = () => mkdtempSync(join(tmpdir(), "baysol-test-"))
 
@@ -36,13 +37,13 @@ test("accepted files", () => {
 test("paths", () => {
     const src = tempRoot()
     const pdb = file(src, "one.pdb", "ATOM")
-    assert.equal(pathProblem(pdb, []), undefined)
-    assert.equal(pathProblem("  ", []), "type a path first!")
-    assert.equal(pathProblem("one.pdb", []), "use a full absolute path")
-    assert.equal(pathProblem(join(src, "none.pdb"), []), "no such file")
-    assert.equal(pathProblem(src, []), "that is a folder, not a file")
-    assert.equal(pathProblem(file(src, "n.txt", "x"), []), "only .cif and .pdb files")
-    assert.equal(pathProblem(pdb, ["ONE.pdb"]), "a model with that name exists")
+    assert.equal(modelPathProblem(pdb, []), undefined)
+    assert.equal(modelPathProblem("  ", []), "type the full path of a model file first!")
+    assert.equal(modelPathProblem("one.pdb", []), "use a full absolute path")
+    assert.equal(modelPathProblem(join(src, "none.pdb"), []), "no such file")
+    assert.equal(modelPathProblem(src, []), "that is a folder, not a file")
+    assert.equal(modelPathProblem(file(src, "n.txt", "x"), []), "only .cif and .pdb files")
+    assert.equal(modelPathProblem(pdb, ["ONE.pdb"]), "a model with that name exists")
     for (const m of [
         "use a full absolute path",
         "that is a folder, not a file",

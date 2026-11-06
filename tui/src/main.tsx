@@ -3,7 +3,12 @@
 import { render } from "ink"
 import { App } from "./app.js"
 import { readSystem } from "./core/system.js"
-import { hasTerminal, programCommand, relaunchInTerminal, startAction } from "./system/terminal.js"
+import {
+    hasTerminal,
+    programCommand,
+    relaunchInTerminal,
+    startAction,
+} from "./core/terminal.js"
 
 /**
  * The entry point. In a terminal the program runs here; with no terminal (started
@@ -14,7 +19,11 @@ const system = readSystem()
 const action = startAction(hasTerminal(), system)
 
 if (action === "run") {
-    render(<App />)
+    // the alternate screen (like vim): a frame as tall as the terminal would otherwise
+    // make it scroll a line on every redraw, and the shell is restored on exit
+    // Ctrl-C is a key like any other for Ink (`App` handles it with Ctrl-D), so the
+    // run screen can take the abort over later
+    render(<App />, { alternateScreen: true, exitOnCtrlC: false })
 } else if (action === "relaunch") {
     const command = programCommand(process.execPath, process.execArgv, process.argv)
     const problem = await relaunchInTerminal(system, command)

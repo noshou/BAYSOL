@@ -7,6 +7,7 @@ import {
     mkdirSync,
     mkdtempSync,
     readFileSync,
+    rmSync,
     utimesSync,
     writeFileSync,
 } from "node:fs"
@@ -29,19 +30,19 @@ import {
     writeSolutes,
 } from "../src/store/buffer.js"
 import {
-    readSolutes as readCustom,
-    writeSolutes as writeCustom,
+    readCustomSolutes,
+    writeCustomSolutes,
 } from "../src/store/custom-store.js"
 import { addModel, listModels } from "../src/store/models.js"
+import { ProjectGoneError } from "../src/store/projects.js"
 import {
-    deleteRecipe,
     readRecipes,
     recipesFile,
+    removeRecipe,
     renameRecipe,
     saveRecipe,
     writeRecipes,
 } from "../src/store/recipe-store.js"
-import { recordRun, runIds } from "../src/store/runs.js"
 import { defaultCatalog } from "../src/store/settings-defs.js"
 import { loadGlobal, loadProject, settingsFile } from "../src/store/settings-store.js"
 import { fixture } from "./support/fixtures.js"
@@ -215,7 +216,7 @@ test("a second writer is refused when another copy saved after it read", () => {
     )
     assert.equal(readFileSync(bufferFile(dir), "utf-8"), theirs, "their file is intact")
     // After the reopen (a read) the write goes through.
-    assert.equal(readSolutes(dir).length, 2)
+    assert.equal(readSolutes(dir, { track: true }).length, 2)
     writeSolutes(dir, [row])
     assert.equal(readSolutes(dir).length, 1)
 })
@@ -233,9 +234,9 @@ test("same content saved again is no change; a copy that never read may write", 
 
 test("a file that appeared after this copy found none is a change", () => {
     const root = tmp()
-    assert.deepEqual(readCustom(root), [])
+    assert.deepEqual(readCustomSolutes(root, { track: true }), [])
     writeAtomic(join(root, "custom-solutes.json"), writeJson({ solutes: [] }))
-    assert.throws(() => writeCustom(root, []), ChangedOnDiskError)
+    assert.throws(() => writeCustomSolutes(root, []), ChangedOnDiskError)
 })
 
 test("recipe operations that read and write in one step never conflict", () => {
@@ -261,7 +262,7 @@ test("recipe operations that read and write in one step never conflict", () => {
         recipesFile(root),
         writeJson({ recipes: [...readRecipes(root), { name: "E", solutes: [] }] }),
     )
-    assert.equal(deleteRecipe(root, "B"), true)
+    assert.equal(removeRecipe(root, "B"), true)
     assert.deepEqual(
         readRecipes(root).map((r) => r.name),
         ["AA", "C", "D", "E"],
@@ -271,11 +272,80 @@ test("recipe operations that read and write in one step never conflict", () => {
     assert.throws(() => writeRecipes(root, []), ChangedOnDiskError)
 })
 
+test("a plain read never moves the base, a tracked read does", () => {
+    const dir = tmp()
+    writeSolutes(dir, [row]) // baseline: one row
+    readSolutes(dir, { track: true })
+    const theirs = writeJson({ solutes: [row, row] })
+    writeAtomic(bufferFile(dir), theirs) // the other copy saves
+    readSolutes(dir) // an unrelated plain read must not accept their save as current
+    assert.throws(() => writeSolutes(dir, [row, row, row]), ChangedOnDiskError)
+    assert.equal(readFileSync(bufferFile(dir), "utf-8"), theirs, "their file is intact")
+    readSolutes(dir, { track: true }) // reopened: the base moves
+    writeSolutes(dir, [row, row, row])
+    assert.equal(readSolutes(dir).length, 3)
+})
+
+test("a plain read alone never makes a later save throw", () => {
+    const dir = tmp()
+    writeAtomic(bufferFile(dir), writeJson({ solutes: [row] }))
+    readSolutes(dir) // never tracked
+    writeAtomic(bufferFile(dir), writeJson({ solutes: [row, row] }))
+    readSolutes(dir)
+    writeSolutes(dir, [])
+    assert.deepEqual(readSolutes(dir), [])
+})
+
+test("the same holds for recipes and custom solutes", () => {
+    const root = tmp()
+    saveRecipe(root, "A", [row])
+    readRecipes(root, { track: true })
+    writeAtomic(recipesFile(root), writeJson({ recipes: [] }))
+    readRecipes(root)
+    assert.throws(() => writeRecipes(root, readRecipes(root)), ChangedOnDiskError)
+    readRecipes(root, { track: true })
+    writeRecipes(root, [])
+    writeCustomSolutes(root, [])
+    readCustomSolutes(root, { track: true })
+    writeAtomic(join(root, "custom-solutes.json"), writeJson({ solutes: [], by: "b" }))
+    readCustomSolutes(root)
+    assert.throws(() => writeCustomSolutes(root, []), ChangedOnDiskError)
+})
+
 test("noteRead of a missing file is a version too", () => {
     const dir = tmp()
     noteRead(bufferFile(dir))
     writeAtomic(bufferFile(dir), writeJson({ solutes: [] }))
     assert.throws(() => writeSolutes(dir, []), ChangedOnDiskError)
+})
+
+// ---- a deleted project is not made again -----------------------------------------------
+
+test("writes into a project that was deleted are refused and make nothing", () => {
+    const root = tmp()
+    const p = join(root, "projects", "gone")
+    mkdirSync(p, { recursive: true })
+    const settings = loadProject(p, root).settings
+    settings.set({ N_ADAPT: 450 })
+    const src = join(tmp(), "m.pdb")
+    writeFileSync(src, "x")
+    readSolutes(p, { track: true })
+    rmSync(p, { recursive: true })
+    const gone = (e: unknown): boolean =>
+        e instanceof ProjectGoneError && e.message === "project gone no longer exists"
+    assert.throws(() => writeSolutes(p, [row]), gone)
+    assert.throws(() => settings.save(), gone)
+    assert.throws(() => addModel(p, src), gone)
+    assert.throws(() => loadProject(p, root), gone)
+    assert.equal(existsSync(p), false, "the folder was not made again")
+})
+
+test("the global files still make the data folder", () => {
+    const dir = join(tmp(), "baysol-data")
+    loadGlobal(dir).settings.set({ N_ADAPT: 450 })
+    assert.equal(existsSync(settingsFile(dir)), true)
+    writeCustomSolutes(join(dir, "sub"), [])
+    assert.equal(existsSync(join(dir, "sub", "custom-solutes.json")), true)
 })
 
 // ---- creating things that must be new -------------------------------------------------
@@ -291,12 +361,4 @@ test("a model name taken meanwhile is refused by the copy itself", () => {
     assert.throws(() => addModel(project, join(src, "b", "m.pdb")), /EEXIST/)
     assert.equal(readFileSync(join(project, "models", "m.pdb"), "utf-8"), "first")
     assert.deepEqual(listModels(project), ["m.pdb"])
-})
-
-test("runs recorded at once get folders of their own, and nothing is overwritten", () => {
-    const project = tmp()
-    writeFileSync(join(project, "settings.json"), "{}\n")
-    const ids = Array.from({ length: 6 }, () => recordRun(project, { models: ["m"] }).id)
-    assert.equal(new Set(ids).size, 6)
-    assert.deepEqual(runIds(project, "logs"), [...ids].sort())
 })

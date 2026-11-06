@@ -2,9 +2,9 @@
 
 import { Box, Text } from "ink"
 import { type ReactNode, useMemo, useState } from "react"
+import { formatNumber } from "../core/text.js"
 import {
     entryProblem,
-    formatNumber,
     formatRounded,
     getField,
     type NonbioEntry,
@@ -18,10 +18,10 @@ import { isBuiltinName } from "../store/solute-index.js"
 import { FieldForm, type FormRow } from "../ui/field-form.js"
 import { placeAt } from "../ui/form-layout.js"
 import { Frame } from "../ui/frame.js"
-import type { LegendItem } from "../ui/legend.js"
 import { useNav } from "../ui/nav.js"
 import { useTheme } from "../ui/theme.js"
 import { useFormScreen } from "../ui/use-form-screen.js"
+import { formLegend } from "./table-legend.js"
 
 /** The fields of the form, in the order of its rows, with the label of each. */
 const FIELDS = [
@@ -38,15 +38,6 @@ type FieldKey = (typeof FIELDS)[number]["key"]
 /** Each row has one cell, in column 0. */
 const VALID = FIELDS.map(() => [0])
 
-/** The keys of the form page. */
-const LEGEND: LegendItem[] = [
-    { label: "move", keys: "↑↓" },
-    { label: "edit", keys: "⏎" },
-    { label: "restore", keys: "^u" },
-    { label: "accept", keys: "^w" },
-    { label: "cancel", keys: "esc" },
-]
-
 /**
  * What the form page of a custom non-biological solute is told.
  *
@@ -56,7 +47,7 @@ const LEGEND: LegendItem[] = [
  * @property onAccept - called with the entry when the form is accepted; the form then
  *     closes. A form left with Esc calls nothing.
  */
-export type CustomNonbioFormProps = {
+type CustomNonbioFormProps = {
     entry:    NonbioEntry
     others:   readonly string[]
     fallback: number
@@ -115,6 +106,14 @@ export function CustomNonbioForm(props: CustomNonbioFormProps): ReactNode {
             const back = withField(entry, key, getField(orig, key)) as NonbioEntry
             setEntry(key === "formula" ? { ...back, z: orig.z } : back)
         },
+        // a cell can be put back when it (or, for the formula, its Z) was changed
+        canRestore: (pos) => {
+            const key = (FIELDS[pos.row] as (typeof FIELDS)[number]).key
+            return (
+                getField(entry, key) !== getField(orig, key) ||
+                (key === "formula" && entry.z !== orig.z)
+            )
+        },
         check: () => {
             const found = entryProblem(entry, isBuiltinName, others)
             if (!found) return undefined
@@ -139,10 +138,16 @@ export function CustomNonbioForm(props: CustomNonbioFormProps): ReactNode {
         [entry, fallback],
     )
     return (
-        <Frame logo="blocky"
+        <Frame
             title={orig.name === "" ? "new custom solute" : "custom solute"}
             subtitle={orig.name === "" ? "non-biological" : `${orig.name} · non-biological`}
-            legend={LEGEND}
+            legend={formLegend({
+                editing: form.edit !== undefined,
+                moves: form.moves,
+                canRestore: form.canRestore,
+                complete: form.complete,
+                acceptLabel: orig.name === "" ? "add to table" : "accept",
+            })}
             note={form.note}
             noteIsError={form.noteIsError}
         >

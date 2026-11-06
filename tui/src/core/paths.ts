@@ -45,7 +45,7 @@ const cacheTagText =
  * @returns the folder, or `undefined` if the variable is missing, blank or not an
  *     absolute path (the XDG specification says to ignore a relative one).
  */
-export function envDir(system: System, name: string): string | undefined {
+function envDir(system: System, name: string): string | undefined {
     const value = (system.env[name] ?? "").trim()
     return value !== "" && isAbsolute(value) ? value : undefined
 }
@@ -58,7 +58,7 @@ export function envDir(system: System, name: string): string | undefined {
  * @param system - the machine.
  * @returns the folder; it need not exist.
  */
-export function dataHome(system: System): string {
+function dataHome(system: System): string {
     if (isWindows(system))
         return envDir(system, "LOCALAPPDATA") ?? join(system.home, "AppData", "Local")
     if (isMac(system)) return join(system.home, "Library", "Application Support")
@@ -73,7 +73,7 @@ export function dataHome(system: System): string {
  * @param system - the machine.
  * @returns the folder; it need not exist.
  */
-export function cacheHome(system: System): string {
+function cacheHome(system: System): string {
     if (isWindows(system))
         return envDir(system, "LOCALAPPDATA") ?? join(system.home, "AppData", "Local")
     if (isMac(system)) return join(system.home, "Library", "Caches")
@@ -87,7 +87,7 @@ export function cacheHome(system: System): string {
  * @param system - the machine.
  * @returns the folder; it need not exist.
  */
-export function appRoot(system: System): string {
+function appRoot(system: System): string {
     return envDir(system, homeVar) ?? join(dataHome(system), "baysol")
 }
 
@@ -98,7 +98,7 @@ export function appRoot(system: System): string {
  * @param system - the machine.
  * @returns the folder; it need not exist.
  */
-export function cacheRoot(system: System): string {
+function cacheRoot(system: System): string {
     return envDir(system, cacheVar) ?? join(cacheHome(system), "baysol", "_cache")
 }
 
@@ -175,7 +175,7 @@ function isDefaultCache(system: System, dir: string): boolean {
  * @param dir - the cache folder, which must exist.
  * @returns `dir`.
  */
-export function tagCache(system: System, dir: string): string {
+function tagCache(system: System, dir: string): string {
     const tag = join(dir, cacheTag)
     const empty = readdirSync(dir).length === 0
     if (!existsSync(tag) && (isDefaultCache(system, dir) || empty))
@@ -196,7 +196,7 @@ export const cacheDir: () => string = lazy(() => {
  * @param dir - the folder.
  * @returns the size in bytes; 0 if the folder does not exist.
  */
-export function cacheSize(dir: string): number {
+function cacheSize(dir: string): number {
     if (!existsSync(dir)) return 0
     let total = 0
     let entries: Dirent[]
@@ -240,8 +240,12 @@ function refusal(system: System, dir: string): string | undefined {
  * @param dir - the cache folder, [[cacheDir]] when left out.
  * @returns the bytes freed (the marker is not counted); 0 for a missing folder.
  * @throws if the folder is refused, with the reason in the message.
+ * @public Kept for a future "clear cache" action (notes/tui.md); no screen calls it yet.
  */
-export function clearCache(system: System = readSystem(), dir: string = cacheDir()): number {
+export function clearCache(
+    system: System = readSystem(),
+    dir: string = cacheDir(),
+): number {
     if (!existsSync(dir)) return 0
     const why = refusal(system, dir)
     if (why !== undefined) throw new Error(`refusing to clear the cache folder: ${why}`)

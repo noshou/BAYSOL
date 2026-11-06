@@ -10,8 +10,8 @@ import { fileURLToPath } from "node:url"
  * can say "not found", and nothing may depend on it being found.
  */
 
-/** The environment variable that names the BAYSOL package folder, for a layout we did not foresee. */
-export const repoVar = "BAYSOL_ROOT"
+/** The environment variable that names the BAYSOL package folder (unforeseen layouts). */
+const repoVar = "BAYSOL_ROOT"
 
 /**
  * Whether a folder holds the `Project.toml` of the package BAYSOL.
@@ -34,7 +34,10 @@ function isRepo(dir: string): boolean {
  * @param cwd - the working directory.
  * @returns the candidates, without repeats.
  */
-export function repoCandidates(env: Record<string, string | undefined>, cwd: string): string[] {
+function repoCandidates(
+    env: Record<string, string | undefined>,
+    cwd: string,
+): string[] {
     const found: string[] = []
     const add = (dir: string | undefined) => {
         if (dir && !found.includes(dir)) found.push(dir)

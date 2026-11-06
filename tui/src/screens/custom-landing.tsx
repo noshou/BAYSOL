@@ -6,26 +6,32 @@ import { type ReactNode, useMemo, useState } from "react"
 import { quarantine } from "../core/files.js"
 import { appDir } from "../core/paths.js"
 import { truncateStart } from "../core/text.js"
-import { customFile, readSolutes } from "../store/custom-store.js"
+import { customFile, readCustomSolutes } from "../store/custom-store.js"
 import { readRecipes, recipesFile } from "../store/recipe-store.js"
+import { CursorList, ListText } from "../ui/cursor-list.js"
 import { Frame } from "../ui/frame.js"
 import { keys } from "../ui/keys.js"
 import { useBodyColumns } from "../ui/layout.js"
-import { legendBack, legendEnter, legendMove, legendQuit } from "../ui/legend.js"
+import {
+    legendBack,
+    legendEnter,
+    legendFor,
+    legendOf,
+    moveLegend,
+} from "../ui/legend.js"
 import { useNav } from "../ui/nav.js"
 import { useTheme } from "../ui/theme.js"
-import { useConfirm } from "../ui/use-confirm.js"
+import { questionLegend, useConfirm } from "../ui/use-confirm.js"
 import { useKeys } from "../ui/use-keys.js"
 import { useListCursor } from "../ui/use-list-cursor.js"
 import { CustomSolutesTable } from "./custom-solutes-table.js"
-import { type FileCount, fileStatus, landingOptions } from "./custom-text.js"
+import { customLandingOptions, type FileCount, fileStatus } from "./custom-text.js"
 import { RecipesTable } from "./recipes-table.js"
 
 /** The two options, in order: which file each one is about. */
 const OPTIONS = ["recipes", "solutes"] as const
 
 /** The key that offers to reset a file that cannot be used. */
-const RESET_KEY = "r"
 
 /**
  * How many rows a file holds.
@@ -49,7 +55,7 @@ function count(read: () => readonly unknown[]): FileCount {
  * nothing), and `r` on it offers to reset it to empty, the old file kept beside it as
  * `<name>.corrupt`.
  *
- * Keys: up and down move, Enter opens, Ctrl-X goes back, Esc quits.
+ * Keys: up and down move, Enter opens, Ctrl-X goes back.
  *
  * @returns the screen.
  */
@@ -70,16 +76,17 @@ export function CustomLanding(): ReactNode {
     const counts = useMemo(
         () => [
             count(() => readRecipes(root)),
-            count(() => readSolutes(root)),
+            count(() => readCustomSolutes(root)),
         ],
         [root, nav.depth, resets],
     )
     const [recipes, solutes] = counts as [FileCount, FileCount]
-    const labels = landingOptions(recipes, solutes)
+    const labels = customLandingOptions(recipes, solutes)
+    // one line for each, under the plain names (not the file names)
     const status = [
-        fileStatus(names[0] as string, recipes, "recipe"),
-        fileStatus(names[1] as string, solutes, "solute"),
-    ].join("  ")
+        fileStatus("recipes", recipes, "recipe"),
+        fileStatus("custom solutes", solutes, "solute"),
+    ].join("\n")
 
     const on = cursor.index
     const unusable = counts[on] === "unusable"
@@ -92,13 +99,16 @@ export function CustomLanding(): ReactNode {
         if (press.is(keys.up)) cursor.move(-1)
         else if (press.is(keys.down)) cursor.move(1)
         else if (press.is(keys.back)) nav.pop()
-        else if (press.is(keys.escape)) nav.quit()
         else if (press.is(keys.enter)) {
             nav.push(on === 0 ? <RecipesTable /> : <CustomSolutesTable />)
-        } else if (unusable && press.key_ === RESET_KEY && !press.ctrl) {
+        } else if (unusable && press.is(keys.reset)) {
             confirm.ask(
-                `reset ${fileName} to empty?  the old file is kept as ${fileName}.corrupt` +
-                    "  enter: reset  esc: keep",
+                {
+                    text: `reset ${fileName} to empty?  ` +
+                        `the old file is kept as ${fileName}.corrupt`,
+                    yes: "reset",
+                    no: "keep",
+                },
                 () => {
                     try {
                         quarantine(file)
@@ -114,25 +124,29 @@ export function CustomLanding(): ReactNode {
 
     // for a file that cannot be used: where it is and what can be done
     const hint = unusable
-        ? `${truncateStart(file, Math.max(10, columns - 24))}  ${RESET_KEY}: reset`
+        ? `${truncateStart(file, Math.max(10, columns - 24))}  ${keys.reset.label}: reset`
         : undefined
+    const listLegend = legendOf([
+        legendBack,
+        legendEnter,
+        moveLegend({ up: on > 0, down: on < OPTIONS.length - 1 }),
+        unusable && legendFor("reset file", keys.reset),
+    ])
     return (
         <Frame
             title="custom solutes and recipes"
-            legend={[legendMove, legendEnter, legendBack, legendQuit]}
-            note={confirm.question ?? message}
+            legend={
+                confirm.question ? questionLegend(confirm.question) : listLegend
+            }
+            note={confirm.note ?? message}
         >
-            <Box flexDirection="column">
-                {labels.map((label, i) => (
-                    <Text
-                        key={label}
-                        color={i === on ? theme.fg : theme.mt}
-                        bold={i === on}
-                    >
-                        {`${i === on ? ">" : " "} ${label}`}
-                    </Text>
-                ))}
-            </Box>
+            <CursorList
+                items={labels}
+                index={on}
+                offset={cursor.offset}
+                lines={labels.length}
+                row={(label, isOn) => <ListText on={isOn}>{label}</ListText>}
+            />
             <Box flexDirection="column" marginTop={1}>
                 <Text color={theme.mt}>{status}</Text>
                 {hint ? <Text color={theme.er}>{hint}</Text> : null}

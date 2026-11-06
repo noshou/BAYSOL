@@ -5,7 +5,6 @@ import { mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from 
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { test } from "node:test"
-import type { System } from "../src/core/system.js"
 import {
     defaultFontDirs,
     fingerprint,
@@ -16,7 +15,8 @@ import {
     readFaces,
     scanFonts,
     texInstalled,
-} from "../src/system/fonts.js"
+} from "../src/core/fonts.js"
+import type { System } from "../src/core/system.js"
 
 const tmp = (): string => mkdtempSync(join(tmpdir(), "baysol-test-"))
 

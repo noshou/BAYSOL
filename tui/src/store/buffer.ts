@@ -1,17 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { join } from "node:path"
-import {
-    assertUnchanged,
-    isDict,
-    noteWritten,
-    quarantine,
-    readMap,
-    withFileLock,
-    writeAtomic,
-    writeJson,
-} from "../core/files.js"
-import { MAX_ROWS } from "./limits.js"
+import { isDict, type ReadOptions } from "../core/files.js"
+import { ListFile } from "./list-file.js"
+import { inProject } from "./projects.js"
 
 /**
  * The buffer of a project: `buffer.json` in the project's folder, a JSON object whose
@@ -36,7 +28,7 @@ import { MAX_ROWS } from "./limits.js"
  */
 
 /** The most units a custom polymer row has (the loader's `CUSTOM_POLYMER_MAX_UNITS`). */
-export const maxUnits = 4
+const maxUnits = 4
 
 /** The name of the file in a project's folder. */
 export const bufferFileName = "buffer.json"
@@ -52,9 +44,6 @@ export const kinds = [
     "custom-polymer",
 ] as const
 
-/** A kind of row. */
-export type RowKind = (typeof kinds)[number]
-
 /**
  * What every row has.
  *
@@ -69,7 +58,7 @@ export type RowBase = {
 }
 
 /** A row whose `arg` is a name BAYSOL looks up: a table name or a grade or family. */
-export type NamedRow = RowBase & {
+type NamedRow = RowBase & {
     kind: "nonbiological" | "polymer"
     arg: string
 }
@@ -78,7 +67,7 @@ export type NamedRow = RowBase & {
  * A row of a sequence: `arg` is the clean sequence; `source` (a file name, no folder)
  * and `record` (the record's id) are provenance only.
  */
-export type SequenceRow = RowBase & {
+type SequenceRow = RowBase & {
     kind: "dna" | "rna" | "protein"
     arg: string
     source?: string
@@ -110,7 +99,7 @@ export type CustomNonbioRow = RowBase & {
  * @property slope - its volume per unit.
  * @property sigma - its absolute uncertainty, `null` for none.
  */
-export type CustomUnit = {
+type CustomUnit = {
     label?: string
     formula?: string
     z: number
@@ -153,8 +142,14 @@ export function bufferFile(projectDir: string): string {
 
 type Dict = Record<string, unknown>
 
-/** Whether a value is a number (not `NaN`; a boolean is none). */
-function isNum(x: unknown): x is number {
+/**
+ * Whether a value is a number (not `NaN`; a boolean is none). The one test of "is a
+ * number" that the loader's rules ([[rowProblem]]) and the custom entries share.
+ *
+ * @param x - any value.
+ * @returns the answer.
+ */
+export function isNumber(x: unknown): x is number {
     return typeof x === "number" && !Number.isNaN(x)
 }
 
@@ -170,7 +165,7 @@ function isName(x: unknown): x is string {
 
 /** Whether a map has a key that holds a number or `null`: the key must be there. */
 function isOptNum(m: Dict, key: string): boolean {
-    return key in m && (m[key] === null || isNum(m[key]))
+    return key in m && (m[key] === null || isNumber(m[key]))
 }
 
 /**
@@ -182,7 +177,7 @@ function isOptNum(m: Dict, key: string): boolean {
 function unitProblem(u: unknown): string | undefined {
     if (!isDict(u)) return "a unit is not a map"
     if (!isInt(u.z)) return "unit z must be an integer"
-    if (!isNum(u.slope)) return "unit slope must be a number"
+    if (!isNumber(u.slope)) return "unit slope must be a number"
     if (!isOptNum(u, "sigma")) return "unit sigma must be a number or null"
     return undefined
 }
@@ -197,7 +192,7 @@ function customProblem(row: Dict): string | undefined {
     if (row.kind === "custom-nonbio") {
         if (!isName(row.custom)) return "custom must be a name"
         if (!isInt(row.z)) return "z must be an integer"
-        if (!isNum(row.pmv)) return "pmv must be a number"
+        if (!isNumber(row.pmv)) return "pmv must be a number"
         if (!isOptNum(row, "sigma-pmv")) return "sigma-pmv must be a number or null"
         return undefined
     }
@@ -209,10 +204,10 @@ function customProblem(row: Dict): string | undefined {
         const problem = unitProblem(u)
         if (problem !== undefined) return problem
     }
-    if (!Array.isArray(counts) || !counts.every(isNum)) return "counts must be numbers"
+    if (!Array.isArray(counts) || !counts.every(isNumber)) return "counts must be numbers"
     if (counts.length !== units.length) return "counts needs one per unit"
     if (!isInt(row["z-ends"])) return "z-ends must be an integer"
-    if (!isNum(row["pmv-ends"])) return "pmv-ends must be a number"
+    if (!isNumber(row["pmv-ends"])) return "pmv-ends must be a number"
     if (!isOptNum(row, "sigma-ends")) return "sigma-ends must be a number or null"
     return undefined
 }
@@ -228,8 +223,8 @@ function customProblem(row: Dict): string | undefined {
 export function rowProblem(row: unknown): string | undefined {
     if (!isDict(row)) return "a row is not a map"
     if (!(kinds as readonly unknown[]).includes(row.kind)) return "unknown kind"
-    if (!(isNum(row.mM) && Number(row.mM) > 0)) return "mM must be above 0"
-    if (!(isNum(row["sigma-mM"]) && Number(row["sigma-mM"]) >= 0))
+    if (!(isNumber(row.mM) && Number(row.mM) > 0)) return "mM must be above 0"
+    if (!(isNumber(row["sigma-mM"]) && Number(row["sigma-mM"]) >= 0))
         return "sigma-mM must be 0 or more"
     if (row.kind === "custom-nonbio" || row.kind === "custom-polymer")
         return customProblem(row)
@@ -240,39 +235,32 @@ export function rowProblem(row: unknown): string | undefined {
 // --- the file
 
 /**
- * Reads the map in the buffer file of a project.
- *
- * @param projectDir - the project's folder.
- * @returns the map; `{}` for no file or no content.
- * @throws UnusableFileError (kind `buffer`) if the file is not readable as one JSON object
- *     with at most [[MAX_ROWS]] valid solutes.
+ * The list file of the buffer: the mechanics (tracked read, locked write, unusable files,
+ * the cap, the other keys kept) are [[ListFile]]'s. A project's folder that is gone is
+ * not made again.
  */
-function readBufferMap(projectDir: string): Dict {
-    return readMap(bufferFile(projectDir), {
-        kind: "buffer",
-        name: bufferFileName,
-        expected: "a map with a vector of valid solutes",
-        valid: (map) => {
-            const solutes = "solutes" in map ? map.solutes : []
-            return (
-                Array.isArray(solutes) &&
-                solutes.length <= MAX_ROWS &&
-                solutes.every((row) => isDict(row) && rowProblem(row) === undefined)
-            )
-        },
-    })
-}
+const list = new ListFile<BufferRow>({
+    fileName: bufferFileName,
+    key: "solutes",
+    kind: "buffer",
+    plural: "solutes",
+    noun: "buffer row",
+    problem: rowProblem,
+    createParents: false,
+})
 
 /**
  * The solutes of the buffer of a project.
  *
  * @param projectDir - the project's folder.
+ * @param options - `track: true` when the rows are read to be edited and saved: the
+ *     version read is then the one [[writeSolutes]] checks against, so a save after
+ *     another copy saved the file is refused. A plain read changes nothing about that.
  * @returns the rows (empty for none).
  * @throws UnusableFileError if the file cannot be used.
  */
-export function readSolutes(projectDir: string): BufferRow[] {
-    const solutes = readBufferMap(projectDir).solutes
-    return Array.isArray(solutes) ? (solutes as BufferRow[]) : []
+export function readSolutes(projectDir: string, options: ReadOptions = {}): BufferRow[] {
+    return list.read(projectDir, options)
 }
 
 /**
@@ -284,26 +272,13 @@ export function readSolutes(projectDir: string): BufferRow[] {
  * @param solutes - the rows, at most [[MAX_ROWS]].
  * @returns the file.
  * @throws ChangedOnDiskError if another copy of the program saved the file after this
- *     one read it (nothing is written); Error (`not a valid buffer row: ...`, nothing
- *     written) for a row that
- *     [[rowProblem]] refuses, or more than [[MAX_ROWS]] rows; UnusableFileError if the
- *     file there cannot be used.
+ *     one read it (nothing is written); UnusableFileError (`not a valid buffer row: ...`,
+ *     `too many solutes ...`, nothing written) for a row that [[rowProblem]] refuses or
+ *     more than [[MAX_ROWS]] rows, or a file that cannot be used; ProjectGoneError when
+ *     the project's folder is gone.
  */
 export function writeSolutes(projectDir: string, solutes: readonly BufferRow[]): string {
-    for (const row of solutes) {
-        const problem = rowProblem(row)
-        if (problem !== undefined) throw new Error(`not a valid buffer row: ${problem}`)
-    }
-    if (solutes.length > MAX_ROWS) throw new Error(`too many solutes (${MAX_ROWS} at most)`)
-    const file = bufferFile(projectDir)
-    return withFileLock(file, () => {
-        assertUnchanged(file)
-        const others = readBufferMap(projectDir)
-        delete others.solutes // replaced by the new rows below
-        writeAtomic(file, writeJson({ solutes, ...others }))
-        noteWritten(file)
-        return file
-    })
+    return inProject(projectDir, () => list.write(projectDir, solutes))
 }
 
 /**
@@ -316,5 +291,5 @@ export function writeSolutes(projectDir: string, solutes: readonly BufferRow[]):
  * @throws if it cannot be renamed.
  */
 export function resetBuffer(projectDir: string): string | undefined {
-    return quarantine(bufferFile(projectDir))
+    return list.reset(projectDir)
 }

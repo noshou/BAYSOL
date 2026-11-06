@@ -10,15 +10,20 @@ import {
     type CustomEntry,
     problems,
 } from "../store/custom.js"
-import { customFile, readSolutes, writeSolutes } from "../store/custom-store.js"
+import {
+    customFile,
+    readCustomSolutes,
+    removeCustomSolute,
+    writeCustomSolutes,
+} from "../store/custom-store.js"
 import { type Row, rowValue } from "../store/draft.js"
 import { globalScope, loadScope } from "../store/scope.js"
 import { soundCatalog } from "../store/settings-store.js"
 import { isBuiltinName } from "../store/solute-index.js"
 import { type Column, DataTable } from "../ui/data-table.js"
 import { Frame } from "../ui/frame.js"
-import { keys } from "../ui/keys.js"
-import { type LegendItem, legendBack, legendMove, legendQuit } from "../ui/legend.js"
+import { keyLabels, keys } from "../ui/keys.js"
+import { legendFor } from "../ui/legend.js"
 import { useNav } from "../ui/nav.js"
 import { useKeys } from "../ui/use-keys.js"
 import { CustomNonbioForm } from "./custom-nonbio-form.js"
@@ -34,7 +39,7 @@ const PMV_WIDTH = 14
 const SIGMA_WIDTH = 10
 
 /** What the empty table says. */
-const EMPTY_HINT = "none: ^n ^p add"
+const EMPTY_HINT = `none: ${keyLabels(keys.addNonbio, keys.addPolymer)} add`
 
 /**
  * The global setting `PMV_FALLBACK_UNCERT`, which a blank ± stands for; the forms and
@@ -60,7 +65,7 @@ function fallbackUncertainty(): number {
  */
 function load(root: string): { items: CustomEntry[]; locked?: string } {
     try {
-        return { items: readSolutes(root) }
+        return { items: readCustomSolutes(root, { track: true }) }
     } catch {
         return { items: [], locked: `${basename(customFile(root))} unusable!` }
     }
@@ -86,15 +91,16 @@ function otherNames(
  * The custom solutes of the user: one row for each entry of the custom solutes file, with
  * the columns name, formula, Z, PMV at 25 °C and ± (cm³/mol). A polymer shows its units
  * by their labels (`A:C2H4O B:C3H6O`, Z `24A+32B+10`, PMV `36.9A+53.1B+9`). A new or
- * edited row shows `*`, one marked to be removed `-`; nothing is written before `^w`.
+ * edited row shows `*`; nothing of that is written before `^w`.
  *
  * Keys: up and down move; Enter edits the row in its form page; `^n` and `^p` add a
  * non-biological solute and a polymer (their form pages), neither past 999 rows; `^r`
- * marks the row to be removed; `^u` undoes the last change of the row; `^w` saves (a row
- * that is not complete is told and nothing is saved); `^x` goes back and Esc quits, both
- * asking first when something is unsaved. A file that cannot be used is told and left
- * alone: the table is empty and nothing can be changed. The mechanics are
- * `useTableScreen`.
+ * on a saved row asks `delete solute NAME? ...` and Enter deletes that entry from the
+ * file at once (a row never saved just goes); `^u` undoes the last edit of the row; `^w`
+ * saves (a row that is not complete is told and nothing is saved); `^x` goes back,
+ * asking first when something is unsaved. A file that cannot be used
+ * is told and left alone: the table is empty and nothing can be changed. The mechanics
+ * are `useTableScreen`.
  *
  * @returns the screen.
  */
@@ -106,7 +112,12 @@ export function CustomSolutesTable(): ReactNode {
     const t = useTableScreen<CustomEntry>({
         items: loaded.items,
         locked: loaded.locked,
-        save: (items) => void writeSolutes(root, items),
+        erase: {
+            what: "solute",
+            name: (entry) => entry.name,
+            remove: (entry) => void removeCustomSolute(root, entry.name),
+        },
+        save: (items) => void writeCustomSolutes(root, items),
         check: (drafts) => problems(drafts, isBuiltinName),
     })
 
@@ -158,28 +169,15 @@ export function CustomSolutesTable(): ReactNode {
         },
     ]
 
-    // what does nothing is not offered: a locked file edits nothing, a full table
-    // adds nothing
-    const legend: LegendItem[] = [legendMove]
-    if (t.canEdit) legend.push({ label: "edit", keys: "⏎" })
-    if (t.canAdd) {
-        legend.push(
-            { label: "add nonbio", keys: "^n" },
-            { label: "add polymer", keys: "^p" },
-        )
-    }
-    if (!t.locked) {
-        legend.push(
-            { label: "remove", keys: "^r" },
-            { label: "undo", keys: "^u" },
-            { label: "save", keys: "^w" },
-        )
-    }
-    legend.push(legendBack, legendQuit)
+    // only the keys that work now: where the cursor is, what the rows and the file allow
+    const legend = t.legend([
+        legendFor("add nonbio", keys.addNonbio),
+        legendFor("add polymer", keys.addPolymer),
+    ])
 
     const changes = t.drafts.count
     return (
-        <Frame logo="blocky"
+        <Frame
             title="custom solutes"
             subtitle={changes > 0 ? `${changes} unsaved` : basename(customFile(root))}
             legend={legend}

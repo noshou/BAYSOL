@@ -10,23 +10,24 @@ import {
     type Recipe,
     readRecipes,
     recipesFile,
+    removeRecipe,
     renameProblem,
     writeRecipes,
 } from "../store/recipe-store.js"
 import { type Column, DataTable } from "../ui/data-table.js"
 import { Frame } from "../ui/frame.js"
 import { keys } from "../ui/keys.js"
-import { type LegendItem, legendBack, legendMove, legendQuit } from "../ui/legend.js"
+import { type LegendItem, legendFor } from "../ui/legend.js"
 import { useNav } from "../ui/nav.js"
 import { Prompt } from "../ui/prompt.js"
+import { scrollWindow } from "../ui/scroll-window.js"
 import { useKeys } from "../ui/use-keys.js"
 import { unusable } from "./buffer-text.js"
-import { windowOffset } from "./solute-rows.js"
 import { SolutesTable } from "./solutes-table.js"
 import { useTableScreen } from "./use-table-screen.js"
 
 /** What the empty table says. */
-const EMPTY_HINT = "none: ^n adds"
+const EMPTY_HINT = `none: ${keys.addNonbio.label} adds`
 
 /** The rows the name prompt takes under the table: the field and its error. */
 const PROMPT_ROWS = 3
@@ -42,7 +43,7 @@ const RECIPE_SUBTITLE = "recipe"
  */
 function load(root: string): { items: Recipe[]; locked?: string } {
     try {
-        return { items: readRecipes(root) }
+        return { items: readRecipes(root, { track: true }) }
     } catch {
         return { items: [], locked: unusable(basename(recipesFile(root))) }
     }
@@ -73,14 +74,14 @@ type Naming = { index: number | undefined; initial: string }
 /**
  * The saved recipes of the user: one row for each recipe of the recipes file, with the
  * columns name, solutes (how many) and kinds (`3 solute 1 polymer 2 custom 4 seq`). A
- * row that is new or changed shows `*`, one marked to be removed `-`; nothing is written
- * before `^w`.
+ * row that is new or changed shows `*`; nothing of that is written before `^w`.
  *
  * Keys: up and down move; Enter asks the recipe's name (prefilled) and then opens its
  * solutes in a [[SolutesTable]]; `^n` does the same for a new, empty recipe (never past
- * 999); `^r` marks the row to be removed (the projects that loaded it keep their own
- * buffer); `^u` undoes its last change; `^w` saves the list; `^x` goes back and Esc quits,
- * both asking first when something is unsaved. A name is not blank, at most 40
+ * 999); `^r` on a saved row asks `delete recipe NAME? ...` and Enter deletes it from the
+ * file at once (the projects that loaded it keep their own buffer; a row never saved just
+ * goes); `^u` undoes its last edit; `^w` saves the list; `^x` goes back,
+ * asking first when something is unsaved. A name is not blank, at most 40
  * characters, without control characters and unique among the other recipes (case does
  * not matter, a recipe may change only its case); a clash says `name in use`. A file that
  * cannot be used is told and left alone. The mechanics are `useTableScreen`.
@@ -98,12 +99,19 @@ export function RecipesTable(): ReactNode {
     const t = useTableScreen<Recipe>({
         items: loaded.items,
         locked: loaded.locked,
+        erase: {
+            what: "recipe",
+            name: (recipe) => recipe.name,
+            remove: (recipe) => void removeRecipe(root, recipe.name, { guarded: true }),
+        },
         save: (recipes) => void writeRecipes(root, recipes),
         // names are checked when they are typed, the solutes when they are saved
         check: () => undefined,
     })
     const [naming, setNaming] = useState<Naming | undefined>(undefined)
     const [problem, setProblem] = useState<string | undefined>(undefined)
+    // the keys of the open name prompt
+    const [nameKeys, setNameKeys] = useState<LegendItem[]>([])
     // stable: a prompt reports its text again whenever this handler changes
     const clearProblem = useCallback(() => setProblem(undefined), [])
 
@@ -155,34 +163,20 @@ export function RecipesTable(): ReactNode {
         }
     }, naming === undefined)
 
-    const legend: LegendItem[] = [legendMove]
-    if (t.canEdit) legend.push({ label: "edit", keys: "⏎" })
-    if (t.canAdd) legend.push({ label: "new recipe", keys: "^n" })
-    if (!t.locked) {
-        legend.push(
-            { label: "remove", keys: "^r" },
-            { label: "undo", keys: "^u" },
-            { label: "save", keys: "^w" },
-        )
-    }
-    legend.push(legendBack, legendQuit)
+    // only the keys that work now; the name prompt has its own keys while it is open
+    const legend = naming
+        ? nameKeys
+        : t.legend([legendFor("new recipe", keys.addNonbio)])
 
     // the prompt takes the rows under the table, so the window shrinks to keep the cursor
     const pageSize = naming ? Math.max(3, t.pageSize - PROMPT_ROWS) : t.pageSize
-    const offset = windowOffset(t.cursor.index, t.cursor.offset, pageSize, t.rows.length)
+    const offset = scrollWindow(t.cursor.index, t.cursor.offset, pageSize, t.rows.length)
     const changes = t.drafts.count
     return (
-        <Frame logo="blocky"
+        <Frame
             title="recipes"
             subtitle={changes > 0 ? `${changes} unsaved` : basename(recipesFile(root))}
-            legend={
-                naming
-                    ? [
-                          { label: "take", keys: "⏎" },
-                          { label: "cancel", keys: "esc" },
-                      ]
-                    : legend
-            }
+            legend={legend}
             note={naming ? undefined : t.frameNote}
             noteIsError={t.frameNoteIsError}
         >
@@ -203,6 +197,7 @@ export function RecipesTable(): ReactNode {
                     maxLength={MAX_NAME}
                     error={problem}
                     onChange={clearProblem}
+                    onLegend={setNameKeys}
                     onSubmit={(text) => submit(text, naming)}
                     onCancel={() => setNaming(undefined)}
                 />

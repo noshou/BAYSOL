@@ -2,8 +2,8 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import { fileManagerCommands, subshellCommand } from "../src/core/open-folder.js"
 import type { System } from "../src/core/system.js"
-import { fileManagerCommands, subshellCommand } from "../src/system/open-folder.js"
 
 const system = (os: NodeJS.Platform, env: Record<string, string> = {}): System => ({
     os,

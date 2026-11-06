@@ -12,9 +12,6 @@ import { readAssetJson } from "../core/assets.js"
 import { fold, numberText, plainNumber } from "../core/text.js"
 import type { CustomEntry } from "./custom.js"
 
-// Re-exported: the path the screens and the other stores have always imported them by.
-export { fold, plainNumber }
-
 /** How many results `search` gives at most. */
 export const DEFAULT_LIMIT = 200
 
@@ -27,7 +24,7 @@ export type EntryKind =
     | "custom-polymer"
 
 /** The badge a result carries in the dropdown. */
-export type EntryTag = "solute" | "polymer" | "custom"
+type EntryTag = "solute" | "polymer" | "custom"
 
 /**
  * One result of `search`.
@@ -65,14 +62,14 @@ interface IndexFile {
 }
 
 /** One argument of a family form: `{key}` in the template, with a lower bound. */
-export interface FamilyArgument {
+interface FamilyArgument {
     key: string
     min?: number
     prompt: string
 }
 
 /** One way to write a family: a template with `{key}` placeholders and its arguments. */
-export interface FamilyForm {
+interface FamilyForm {
     template: string
     args: FamilyArgument[]
 }

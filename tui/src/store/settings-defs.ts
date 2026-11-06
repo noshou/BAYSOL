@@ -42,7 +42,7 @@ export type SettingValue =
     | Record<string, number>
 
 /** The rules that tie settings together, as `setting_relations.json` names them. */
-export type RuleName =
+type RuleName =
     | "inside"
     | "within_width"
     | "ordered"
@@ -69,7 +69,7 @@ export type Relation = {
 }
 
 /** The rule names a [[Relation]] may have. */
-export const relationRules: readonly RuleName[] = [
+const relationRules: readonly RuleName[] = [
     "inside",
     "within_width",
     "ordered",
@@ -79,7 +79,7 @@ export const relationRules: readonly RuleName[] = [
 ]
 
 /** The kinds a setting may have, in the order of [[SettingKind]]. */
-export const settingKinds: readonly SettingKind[] = [
+const settingKinds: readonly SettingKind[] = [
     "int",
     "float",
     "bool",
@@ -158,7 +158,7 @@ export class SettingDef {
  * @property title - the group's title.
  * @property settings - its settings, in the order the sheet shows them.
  */
-export type GroupDef = { title: string; settings: SettingDef[] }
+type GroupDef = { title: string; settings: SettingDef[] }
 
 /**
  * One settings sheet.
@@ -376,7 +376,7 @@ export function defaultCatalog(): SettingsCatalog {
 
 /** The characters of a value that fit the value cell of a sheet (a space, the value, and
  * a column kept for the mark of an unsaved value make 19). */
-export const valueCellWidth = 17
+const valueCellWidth = 17
 
 /**
  * The text of a value for the value cell of a sheet, at most 17 cells: a colour name as
@@ -390,7 +390,64 @@ export function formatValue(value: SettingValue): string {
     const text = Array.isArray(value)
         ? `(${value.join(", ")})`
         : typeof value === "object"
-          ? `(${Object.values(value).join(", ")})`
-          : String(value)
+            ? `(${Object.values(value).join(", ")})`
+            : String(value)
     return truncate(text, valueCellWidth)
+}
+
+// ---- the names a colour or font setting may take, and how a colour looks --------------
+//
+// The editor offers them as a list to pick from: the colours (`assets/data/colours.json`,
+// harvested from the names `Colors.parse` knows) and the fonts installed on this
+// machine, which the caller finds (the font scan is a module of its own) and passes in.
+
+/** The colours of `colours.json` (`name -> "#rrggbb"`), read once. */
+let cachedColours: Map<string, string> | undefined
+
+/** The colours, name to `#rrggbb`, in the order of the file (which is sorted). */
+function colours(): Map<string, string> {
+    cachedColours ??= new Map(
+        Object.entries(readAssetJson<Record<string, string>>("data", "colours.json")),
+    )
+    return cachedColours
+}
+
+/**
+ * The colour of a name as the `#rrggbb` text a terminal colour takes, for a `Swatch`.
+ *
+ * @param colour - a name of the list, or a `#rrggbb` text (its own colour).
+ * @returns `#rrggbb`, or `undefined` for a name that is no colour.
+ */
+export function colourHex(colour: string): string | undefined {
+    if (/^#[0-9a-f]{6}$/.test(colour)) return colour
+    return colours().get(colour)
+}
+
+/** The fonts of a machine: math fonts (with an OpenType MATH table) and text fonts. */
+export interface FontLists {
+    math: readonly string[]
+    text: readonly string[]
+}
+
+/** The kinds of text setting that take a list of names. */
+export type ListKind = "colour" | "font"
+
+/**
+ * The names a text setting may take. The font of a setting whose name has `MATH` in it is
+ * chosen from the math fonts, any other font setting from the text fonts, which leave the
+ * math fonts out.
+ *
+ * @param setting - the setting's name, `PLOT_MATH_FONT`.
+ * @param kind - `colour` or `font`; any other kind has no list.
+ * @param fonts - the fonts installed here; a machine with none has no list.
+ * @returns the names, sorted (colours in the order of the harvest, which is sorted).
+ */
+export function settingNames(
+    setting: string,
+    kind: ListKind | string,
+    fonts: FontLists = { math: [], text: [] },
+): readonly string[] {
+    if (kind === "colour") return [...colours().keys()]
+    if (kind === "font") return setting.includes("MATH") ? fonts.math : fonts.text
+    return []
 }

@@ -1,203 +1,86 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import { constants, copyFileSync, mkdirSync } from "node:fs"
-import { basename, join } from "node:path"
-import {
-    entryNames,
-    isFile,
-    isFolder,
-    sleepSync,
-    writeAtomic,
-    writeJson,
-} from "../core/files.js"
-import { settingsFileName } from "./settings-store.js"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { entryNames, isFile, isFolder } from "../core/files.js"
 
 /**
- * The record of the runs of a project. Nothing here is ever deleted or overwritten: a
- * run adds a folder named by its exact time (UTC) to `logs/` and, if it succeeded, one
- * to `data/`, and the two have the same name, so a log and its data belong together.
+ * The runs of a project, as the program that makes them leaves them. A run is a folder
+ * named by its start time (UTC); Julia creates it, the TUI only reads:
  *
- *     <project>/logs/<time>/models.json   the names of the models of the run
- *                           settings.json the project's settings as they were (to
- *                                         restore by hand)
- *                           <name>.LOG    the run's log
- *     <project>/data/<time>/...           everything the run wrote: the workbook of each
- *                                         model, its plots (rendered or not) and its
- *                                         unicode plots
+ *     <project>/runs/<stamp>/run.json   {"status": "running" | "done" | "failed" |
+ *                                        "aborted", ...}
+ *                            logs/ or logs.7z, one folder per model, ...
  *
- * `logs/` and `data/` are not made by the user or by a new project: a run makes them, a
- * failed one only `logs/`. Until then the project has no runs, which is [[hasRuns]].
+ * `runs/` is not made by the user or by a new project: a run makes it. Until then the
+ * project has no runs, which is [[hasRuns]]. Nothing here deletes or overwrites a run.
  */
 
-/** The two folders a run is recorded in. */
-export type RunKind = "logs" | "data"
+/** The folder of a project that holds its runs. */
+const runsFolder = "runs"
 
-/** The name of the file that lists the models of a run. */
-export const modelsFileName = "models.json"
+/** The file of a run folder that says how the run ended. */
+const runFileName = "run.json"
 
-/** The time a run waits when the name it wanted is taken (two runs in one millisecond). */
-const retryMs = 1
+/** How a run stands, as `run.json` says. */
+export type RunStatus = "running" | "done" | "failed" | "aborted"
 
-/**
- * The name of a run started at a time, one that sorts as text and that every file
- * system accepts (no colon).
- *
- * @param instant - the time.
- * @returns e.g. `20261102T153045123Z` (UTC, milliseconds).
- */
-export function stamp(instant: Date): string {
-    return instant.toISOString().replace(/[-:.]/g, "")
-}
+/** The statuses a `run.json` may hold; anything else reads as unknown. */
+const statuses: readonly string[] = ["running", "done", "failed", "aborted"]
 
 /**
- * The names of the runs in one of the folders of a project.
+ * The names of the runs of a project.
  *
  * @param projectDir - the project's folder.
- * @param kind - `logs` or `data`.
- * @returns the names, oldest first; empty if the folder is not there.
+ * @returns the folder names under `runs/`, oldest first (a stamp sorts as text); empty
+ *     if the folder is not there.
  */
-export function runIds(projectDir: string, kind: RunKind): string[] {
-    const dir = join(projectDir, kind)
+export function runIds(projectDir: string): string[] {
+    const dir = join(projectDir, runsFolder)
     return entryNames(dir)
         .filter((name) => isFolder(join(dir, name)))
         .sort()
 }
 
 /**
- * Whether a project has a run to show in one of its folders.
+ * Whether a project has at least one run folder.
  *
  * @param projectDir - the project's folder.
- * @param kind - `logs` or `data`.
  * @returns the answer.
  */
-export function hasRuns(projectDir: string, kind: RunKind): boolean {
-    return runIds(projectDir, kind).length > 0
+export function hasRuns(projectDir: string): boolean {
+    return runIds(projectDir).length > 0
 }
 
 /**
- * A run just recorded.
- *
- * @property id - the run's name, a [[stamp]].
- * @property logs - its folder in `logs/`.
- * @property data - its folder in `data/`; `undefined` for a failed run.
- */
-export type RunRecord = {
-    id: string
-    logs: string
-    data: string | undefined
-}
-
-/**
- * What a run gives to [[recordRun]].
- *
- * @property models - the names of its models.
- * @property logFile - its log, if it has one.
- * @property outputDir - the folder the run wrote its results to; `undefined` if the
- *     run failed: a failed run leaves its record in `logs/` only.
- */
-export type RunInput = {
-    models: readonly string[]
-    logFile?: string
-    outputDir?: string
-}
-
-/**
- * Makes a folder that must be new.
- *
- * @param dir - the folder; its parent is made if need be.
- * @returns `true` if it was made, `false` if the name was taken.
- * @throws for any other failure.
- */
-function makeNew(dir: string): boolean {
-    mkdirSync(join(dir, ".."), { recursive: true })
-    try {
-        mkdirSync(dir)
-        return true
-    } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "EEXIST") return false
-        throw error
-    }
-}
-
-/**
- * Makes the folder of a new run under `logs` and, with `withData`, under `data`, both
- * named by the current time. A name already taken is never reused: it waits for the
- * next one.
+ * How one run ended, from its `run.json`.
  *
  * @param projectDir - the project's folder.
- * @param withData - whether the run has a folder in `data/` too.
- * @returns the new run's folders.
+ * @param id - the run's name.
+ * @returns the status, or `undefined` when the file is missing, unreadable or says
+ *     something else.
  */
-function newRunDirs(projectDir: string, withData: boolean): RunRecord {
-    for (;;) {
-        const id = stamp(new Date())
-        const logs = join(projectDir, "logs", id)
-        const data = join(projectDir, "data", id)
-        if (makeNew(logs) && (!withData || makeNew(data)))
-            return { id, logs, data: withData ? data : undefined }
-        sleepSync(retryMs)
-    }
-}
-
-/**
- * Copies a file, never over a file that is there.
- *
- * @param from - the file.
- * @param to - where the copy goes.
- * @throws if it cannot be copied or `to` exists.
- */
-function copyNew(from: string, to: string): void {
-    copyFileSync(from, to, constants.COPYFILE_EXCL)
-}
-
-/**
- * Copies a file that may vanish meanwhile (the run's own output folder is being
- * cleaned by something else): a file that is gone is skipped, never an error.
- *
- * @param from - the file.
- * @param to - where the copy goes.
- * @throws if it cannot be copied for any other reason, or `to` exists.
- */
-function copyIfThere(from: string, to: string): void {
+export function runStatus(projectDir: string, id: string): RunStatus | undefined {
+    const file = join(projectDir, runsFolder, id, runFileName)
+    if (!isFile(file)) return undefined
     try {
-        copyNew(from, to)
-    } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+        const status = (JSON.parse(readFileSync(file, "utf-8")) as { status?: unknown })
+            .status
+        return typeof status === "string" && statuses.includes(status)
+            ? (status as RunStatus)
+            : undefined
+    } catch {
+        return undefined
     }
 }
 
 /**
- * Copies every file under a folder into another folder, keeping the layout.
- *
- * @param from - the folder to copy.
- * @param to - the folder the copy goes in; it is made if need be.
- */
-function copyTree(from: string, to: string): void {
-    mkdirSync(to, { recursive: true })
-    for (const entry of entryNames(from)) {
-        const source = join(from, entry)
-        if (isFolder(source)) copyTree(source, join(to, entry))
-        else if (isFile(source)) copyIfThere(source, join(to, entry))
-    }
-}
-
-/**
- * Records a run of a project: its models, the project's settings as they are now, its
- * log and, for a run that succeeded, its output.
+ * Whether a run finished properly, which is what the `results` item of the project
+ * menu needs.
  *
  * @param projectDir - the project's folder.
- * @param run - what the run has to record.
- * @returns the run's name and folders.
- * @throws if something cannot be written; nothing is deleted then, what was written
- *     stays.
+ * @returns `true` when some run has the status `done`.
  */
-export function recordRun(projectDir: string, run: RunInput): RunRecord {
-    const record = newRunDirs(projectDir, run.outputDir !== undefined)
-    writeAtomic(join(record.logs, modelsFileName), writeJson([...run.models]))
-    copyNew(join(projectDir, settingsFileName), join(record.logs, settingsFileName))
-    if (run.logFile !== undefined)
-        copyNew(run.logFile, join(record.logs, basename(run.logFile)))
-    if (run.outputDir !== undefined && record.data !== undefined)
-        copyTree(run.outputDir, record.data)
-    return record
+export function hasFinishedRun(projectDir: string): boolean {
+    return runIds(projectDir).some((id) => runStatus(projectDir, id) === "done")
 }

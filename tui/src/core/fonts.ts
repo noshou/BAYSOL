@@ -13,8 +13,8 @@ import {
     statSync,
 } from "node:fs"
 import { join } from "node:path"
-import { writeAtomic } from "../core/files.js"
-import { findExecutable, isMac, isWindows, type System } from "../core/system.js"
+import { writeAtomic } from "./files.js"
+import { findExecutable, isMac, isWindows, type System } from "./system.js"
 
 /**
  * The fonts installed on this machine, sorted into math fonts and text fonts by what
@@ -195,7 +195,7 @@ function nameRank(platform: number, language: number): number {
  * @param table - the bytes of the `name` table.
  * @returns the family, or `undefined` if there is none or the table is damaged.
  */
-export function familyFromNameTable(table: Buffer): string | undefined {
+function familyFromNameTable(table: Buffer): string | undefined {
     if (table.length < nameHeaderSize) return undefined
     const count = table.readUInt16BE(2)
     const strings = table.readUInt16BE(4)
@@ -524,12 +524,9 @@ function registryFonts(system: System): string[] {
 export function fontFiles(system: System): string[] {
     const tex = texInstalled(system)
     const fromFontconfig = programLines(system, "fc-list", ["--format", "%{file}\\n"]) ?? []
+    const luaotfloadArgs = ["--no-reload", "--list=*", "--fields=fullpath"]
     const fromLuaotfload = tex
-        ? (programLines(system, "luaotfload-tool", [
-              "--no-reload",
-              "--list=*",
-              "--fields=fullpath",
-          ]) ?? [])
+        ? (programLines(system, "luaotfload-tool", luaotfloadArgs) ?? [])
         : []
     const fromTexmf =
         tex && !fromLuaotfload.some(isFontFile) ? walkFonts(texFontDirs(system)) : []

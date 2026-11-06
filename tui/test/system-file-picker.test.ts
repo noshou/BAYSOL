@@ -2,12 +2,12 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import type { System } from "../src/core/system.js"
 import {
     parsePickerOutput,
     pickerCommands,
     pickerSpecs,
-} from "../src/system/file-picker.js"
+} from "../src/core/file-picker.js"
+import type { System } from "../src/core/system.js"
 
 const system = (os: NodeJS.Platform, env: Record<string, string> = {}): System => ({
     os,
@@ -27,6 +27,16 @@ test("Linux: zenity first, kdialog first on KDE, both multiple choice", () => {
 
 test("the start folder is in the command", () => {
     assert.ok(pickerCommands(linux, "/home/me")[0]?.includes("--filename=/home/me/"))
+})
+
+test("the data picker is for one delimited text file or workbook", () => {
+    const spec = pickerSpecs.data
+    assert.equal(spec.multiple, false)
+    for (const c of pickerCommands(linux, "/h", spec)) {
+        assert.ok(!c.includes("--multiple"))
+        for (const pattern of ["*.dat", "*.CSV", "*.xlsx"])
+            assert.ok(c.some((a) => a.includes(pattern)), pattern)
+    }
 })
 
 test("the sequence picker is for one FASTA or FASTQ file", () => {

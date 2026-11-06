@@ -2,7 +2,7 @@
   "name": "baysol-tui",
   "type": "module",
   "version": "1.0.0",
-  "description": "A terminal front end for BAYSOL: pick a project, edit its settings, and (soon) run fits and read the results, all from the keyboard. It was plain Clojure on the JVM ([Lanterna](https://github.com/mabe02/lanterna)), and ran in any terminal that was at least 80 columns by 24 rows. It looks best with 24-bit colour (most current terminals); without it the screens are black on white.",
+  "description": "The terminal interface of BAYSOL (TypeScript, Ink): make projects, add models and a buffer, edit settings, all from the keyboard. Runs in any terminal of at least 80 x 24; looks best with 24-bit colour.",
   "scripts": {
     "start": "tsx src/main.tsx",
     "check": "tsc",
@@ -13,17 +13,17 @@
   "license": "LGPL-3.0-or-later",
   "private": true,
   "dependencies": {
-    "@types/proper-lockfile": "^4.1.4",
-    "edn-data": "^1.2.2",
     "ink": "^8.0.0",
     "proper-lockfile": "^4.1.2",
     "react": "^19.3.1",
     "smol-toml": "^1.9.1",
     "string-width": "^8.3.0",
-    "wrap-ansi": "^10.0.2"
+    "wrap-ansi": "^10.0.2",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/proper-lockfile": "^4.1.4",
     "@types/react": "^19.3.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"

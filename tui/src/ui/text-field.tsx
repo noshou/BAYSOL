@@ -3,8 +3,8 @@
 import { Text } from "ink"
 import type { ReactNode } from "react"
 import { displayWidth, truncateStart } from "../core/text.js"
-import { useTheme } from "./theme.js"
 import type { TextBuffer } from "./text-buffer.js"
+import { useTheme } from "./theme.js"
 
 /**
  * The line of an input: the typed text with the cursor drawn as an inverted cell.
@@ -16,7 +16,8 @@ import type { TextBuffer } from "./text-buffer.js"
  * @returns the field.
  */
 export function TextField(
-    { buffer, width, placeholder }: { buffer: TextBuffer; width: number; placeholder?: string }
+    { buffer, width, placeholder }:
+        { buffer: TextBuffer; width: number; placeholder?: string }
 ): ReactNode {
     const theme = useTheme()
     const [first] = [...new Intl.Segmenter().segment(buffer.text.slice(buffer.cursor))]

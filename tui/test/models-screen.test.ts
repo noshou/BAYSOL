@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import assert from "node:assert/strict"
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
 import { test } from "node:test"
-import { deleteQuestion, pathSuggestions, pickNote } from "../src/screens/models-screen.js"
+import { pickNote } from "../src/screens/models-screen.js"
+import { destructiveQuestion, questionNote } from "../src/ui/use-confirm.js"
 
 test("pickNote tells copied and skipped files", () => {
     assert.equal(pickNote({ copied: [], skipped: [] }), "nothing was picked")
@@ -24,27 +22,14 @@ test("pickNote tells copied and skipped files", () => {
     )
 })
 
-test("pathSuggestions show the name and complete to the whole path", () => {
-    const dir = mkdtempSync(join(tmpdir(), "baysol-test-"))
-    mkdirSync(join(dir, "sub"))
-    writeFileSync(join(dir, "m1.pdb"), "")
-    writeFileSync(join(dir, "notes.txt"), "")
-    assert.deepEqual(pathSuggestions(`${dir}/`), [
-        { label: "sub/", completion: `${dir}/sub/` },
-        { label: "m1.pdb", completion: `${dir}/m1.pdb` },
-    ])
-    assert.deepEqual(
-        pathSuggestions(`${dir}/m`).map((s) => s.completion),
-        [`${dir}/m1.pdb`],
-    )
-    assert.deepEqual(pathSuggestions("relative"), [])
-    assert.deepEqual(pathSuggestions(`${dir}/nope/x`), [])
-})
-
 test("the deletion question names the model and warns", () => {
-    const q = deleteQuestion("a.pdb")
-    assert.match(q, /^remove a\.pdb\?/)
-    assert.match(q, /destructive/)
-    assert.ok(q.endsWith("enter: delete  esc: keep"))
-    assert.ok(deleteQuestion("x".repeat(80)).endsWith("enter: delete  esc: keep"))
+    const q = questionNote(destructiveQuestion("model a.pdb"))
+    assert.match(q, /^delete model a\.pdb\?/)
+    assert.match(q, /cannot be undone/)
+    assert.equal(q, "delete model a.pdb? this cannot be undone!")
+    // a long name is cut, never the warning behind it
+    const long = questionNote(destructiveQuestion(`model ${"x".repeat(80)}`))
+    assert.ok(long.endsWith("? this cannot be undone!"))
+    assert.ok(long.includes("…"))
+    assert.ok(long.length <= 7 + 24 + 24)
 })

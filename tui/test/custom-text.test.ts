@@ -3,9 +3,9 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import {
+    customLandingOptions,
     fileStatus,
     formulaCell,
-    landingOptions,
     pmvCell,
     sigmaCell,
     zCell,
@@ -77,10 +77,10 @@ test("the ± of a polymer is the units' when they agree, … when not, (2%) blan
 })
 
 test("the landing counts and says what the files hold", () => {
-    assert.deepEqual(landingOptions(3, 12), ["recipes (3)", "solutes (12)"])
-    assert.deepEqual(landingOptions("unusable", 0), ["recipes (?)", "solutes (0)"])
-    assert.equal(fileStatus("recipes.json", 3, "recipe"), "recipes.json: 3 recipes")
+    assert.deepEqual(customLandingOptions(3, 12), ["recipes (3)", "solutes (12)"])
+    assert.deepEqual(customLandingOptions("unusable", 0), ["recipes (?)", "solutes (0)"])
+    assert.equal(fileStatus("recipes", 3, "recipe"), "recipes: 3 recipes")
     assert.equal(fileStatus("a", 1, "solute"), "a: 1 solute")
-    assert.equal(fileStatus("a", 0, "solute"), "a: none yet")
-    assert.equal(fileStatus("a", "unusable", "solute"), "a unusable!")
+    assert.equal(fileStatus("custom solutes", 0, "solute"), "custom solutes: none yet")
+    assert.equal(fileStatus("a", "unusable", "solute"), "a: unusable!")
 })

@@ -18,7 +18,7 @@ export const minRows = 24
  * The rows that every screen keeps for itself: its title, the box of keys at the
  * bottom (the logo's three lines, a note line, the border)  and the theme line.
  */
-export const frameRows = 10
+const frameRows = 10
 
 /**
  * The rows a list or table body may use on the current terminal.
@@ -41,3 +41,6 @@ export function useBodyColumns(): number {
     const { columns } = useWindowSize()
     return Math.max(minColumns, columns) - 2
 }
+
+/** The rows the app keeps under every screen for the theme line (`theme (^t): ...`). */
+export const themeLineRows = 1

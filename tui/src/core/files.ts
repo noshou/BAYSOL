@@ -173,7 +173,8 @@ export type MapSpec = {
 }
 
 /**
- * Reads the map in a file, and notes the version read ([[noteRead]]).
+ * Reads the map in a file. It does not note the version ([[noteRead]]): the store
+ * decides whether the read starts an editing session.
  *
  * @param file - the file; none (or no content) is `{}`.
  * @param spec - what the map must be.
@@ -181,7 +182,6 @@ export type MapSpec = {
  * @throws [[UnusableFileError]] for a file that is not JSON or not such a map.
  */
 export function readMap(file: string, spec: MapSpec): Record<string, unknown> {
-    noteRead(file)
     if (!isFile(file)) return {}
     const bad = Symbol("bad")
     const value = readJson<symbol>(file, bad)
@@ -194,20 +194,28 @@ export function readMap(file: string, spec: MapSpec): Record<string, unknown> {
 /**
  * Writes text to a file through a temporary file next to it that replaces it in one
  * step, so a reader (this program, Julia) never sees half a file; the folders are made
- * if there are none. The temporary file has a name of its own (`<name>.<pid>.<random>.tmp`),
+ * if there are none. The temporary file has a name of its own
+ * (`<name>.<pid>.<random>.tmp`),
  * so two copies of the program saving at once never write into the same one: each rename
  * puts a whole file in place and the last one wins. A temporary file is never left
  * behind, even when the write fails.
  *
  * @param file - the file.
  * @param text - the text, UTF-8.
+ * @param options - `createParents: false` makes no folder: the file's folder must
+ *     exist (a project's files, which must not bring back a deleted project).
  * @returns `file`.
- * @throws if it cannot be written.
+ * @throws [[ParentMissingError]] with `createParents: false` and no folder; otherwise
+ *     if it cannot be written.
  */
-export function writeAtomic(file: string, text: string): string {
+export function writeAtomic(
+    file: string,
+    text: string,
+    options: FolderOptions = {},
+): string {
     const unique = `${process.pid}.${randomBytes(4).toString("hex")}`
     const tmp = join(dirname(file), `${basename(file)}.${unique}.tmp`)
-    mkdirSync(dirname(file), { recursive: true })
+    prepareFolder(file, options)
     try {
         writeFileSync(tmp, text, "utf-8")
         renameSync(tmp, file)
@@ -216,6 +224,40 @@ export function writeAtomic(file: string, text: string): string {
         throw error
     }
     return file
+}
+
+/**
+ * Whether the folders of a file are made when they are missing.
+ *
+ * @property createParents - `true` (the default) makes them; `false` requires the
+ *     folder to exist already.
+ */
+export type FolderOptions = { createParents?: boolean }
+
+/**
+ * The error of a write into a folder that is not there although it must be (a project
+ * folder another copy of the program has deleted).
+ *
+ * @param dir - the folder.
+ */
+export class ParentMissingError extends Error {
+    constructor(readonly dir: string) {
+        super(`${basename(dir)} no longer exists`)
+        this.name = "ParentMissingError"
+    }
+}
+
+/**
+ * Makes the folder of a file, or checks that it is there.
+ *
+ * @param file - the file about to be written or locked.
+ * @param options - see [[FolderOptions]].
+ * @throws [[ParentMissingError]] with `createParents: false` and no folder.
+ */
+function prepareFolder(file: string, options: FolderOptions): void {
+    const dir = dirname(file)
+    if (options.createParents ?? true) mkdirSync(dir, { recursive: true })
+    else if (!isFolder(dir)) throw new ParentMissingError(dir)
 }
 
 /**
@@ -285,12 +327,18 @@ export class FileInUseError extends Error {
  *
  * @param file - the file to protect.
  * @param fn - the work; keep it short.
+ * @param options - as for [[writeAtomic]]: `createParents: false` for a project's files.
  * @returns what `fn` returns.
- * @throws [[FileInUseError]] if the lock stays taken for 3 s; whatever `fn` throws (the
+ * @throws [[ParentMissingError]] as for [[writeAtomic]]; [[FileInUseError]] if the lock
+ *     stays taken for 3 s; whatever `fn` throws (the
  *     lock is always released).
  */
-export function withFileLock<T>(file: string, fn: () => T): T {
-    mkdirSync(dirname(file), { recursive: true })
+export function withFileLock<T>(
+    file: string,
+    fn: () => T,
+    options: FolderOptions = {},
+): T {
+    prepareFolder(file, options)
     const deadline = Date.now() + LOCK_WAIT_MS
     let release: () => void
     for (;;) {
@@ -340,6 +388,16 @@ function versionOf(file: string): Version {
 }
 
 /**
+ * What the read function of a list file takes besides what to read.
+ *
+ * @property track - `true` when the read opens an editing session on the file (a table
+ *     loads its rows to change them): the version read becomes the base that the next
+ *     write checks ([[assertUnchanged]]). Left out, the read is plain and the base
+ *     stays as it was.
+ */
+export type ReadOptions = { track?: boolean }
+
+/**
  * The error of a list file that another copy of the program saved after this one read
  * it: saving now would lose that copy's changes.
  *
@@ -356,8 +414,12 @@ export class ChangedOnDiskError extends Error {
 }
 
 /**
- * Records that this process has read a file (or found none): the base for
- * [[assertUnchanged]].
+ * Records the version of a file as this process now takes it to be (it read it, or
+ * found none): the base for [[assertUnchanged]]. Only a read that opens an editing
+ * session on the file calls this, and it calls it BEFORE reading, so a save by another
+ * copy between the two can only make a later save refuse, never lose an update. A
+ * plain read (a count, a list for display) must not call it, or it would accept another
+ * copy's save as "current".
  *
  * @param file - the file.
  */
@@ -406,4 +468,22 @@ export function quarantine(file: string): string | undefined {
     const kept = join(dirname(file), `${basename(file)}.corrupt`)
     renameSync(file, kept)
     return kept
+}
+
+/**
+ * The words for a failed save, for a screen's note: what another copy of the program
+ * did (`ChangedOnDiskError`, `FileInUseError`, `ParentMissingError` and its
+ * `ProjectGoneError` say it themselves), else `could not save!`.
+ *
+ * @param error - what the save threw.
+ * @returns the note to show.
+ */
+export function saveErrorNote(error: unknown): string {
+    if (
+        error instanceof ChangedOnDiskError ||
+        error instanceof FileInUseError ||
+        error instanceof ParentMissingError
+    )
+        return error.message
+    return "could not save!"
 }

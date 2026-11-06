@@ -2,7 +2,8 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { Drafts, MAX_ROWS } from "../src/store/draft.js"
+import { Drafts } from "../src/store/draft.js"
+import { MAX_ROWS } from "../src/store/limits.js"
 
 const marks = (s: Drafts<string>) => s.rows.map((_, i) => s.mark(i))
 const values = (s: Drafts<string>) => s.rows.map((_, i) => s.value(i))

@@ -8,9 +8,15 @@ import { useTheme } from "./theme.js"
 /** The logo, loaded once: it is read from disk. */
 const logo = menuLogo()
 
+/** The rows a [[MenuHeader]] takes: the logo and the line under it. */
+export const menuHeaderRows = logo.height + 1
+
 /**
  * What the top of a menu shows: the BAYSOL logo, centred, with one line under it (the
  * version on the main menu, the project's name on the project menu, ...).
+ *
+ * It has no margin of its own: the `GridMenu` that shows it puts one above it when
+ * the terminal has room for it.
  *
  * @param caption - the line under the logo.
  * @returns the header, to pass to a `GridMenu`.
@@ -19,7 +25,7 @@ export function MenuHeader({ caption }: { caption: string }): ReactNode {
     const theme = useTheme()
     return (
         <Box flexDirection="column" alignItems="center">
-            <Box width={logo.width} height={logo.height} flexShrink={0} marginTop={1}>
+            <Box width={logo.width} height={logo.height} flexShrink={0}>
                 <Text color={theme.fg}>{logo.text}</Text>
             </Box>
             <Text color={theme.mt}> {caption} </Text>

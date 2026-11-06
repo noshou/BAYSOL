@@ -15,9 +15,6 @@
 
 import { isDeepStrictEqual } from "node:util"
 
-// Re-exported: the screens know the cap by this path.
-export { MAX_ROWS } from "./limits.js"
-
 import { MAX_ROWS } from "./limits.js"
 
 /** The mark of a row: `-` to be removed, `*` new or edited. */

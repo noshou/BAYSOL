@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react"
 import { Entry } from "./entry.js"
+import type { LegendItem } from "./legend.js"
 import type { Suggestion } from "./suggestion-list.js"
 
 /**
@@ -27,8 +28,13 @@ export type Choice<T> = Suggestion & { value: T }
  * @property active - whether the dropdown listens to keys, `true` when left out.
  * @property onHighlight - called with the value of the highlighted choice whenever it
  *     changes (`undefined` when none).
+ * @property take - what Enter is called in the legend (`null` when picking does nothing).
+ * @property extras - keys of this dropdown that work only while it lists something
+ *     (`delete ^r`), for the legend.
+ * @property cancel - what Esc is called in the legend.
+ * @property onLegend - called with the keys that work now whenever they change.
  */
-export type DropdownProps<T> = {
+type DropdownProps<T> = {
     label:      string
     search:     (text: string) => Choice<T>[]
     noMatch?:   string
@@ -38,6 +44,10 @@ export type DropdownProps<T> = {
     onBack?:    () => void
     active?:    boolean
     onHighlight?: (value: T | undefined) => void
+    take?:      string | null
+    extras?:    LegendItem[]
+    cancel?:    string | null
+    onLegend?:  (items: LegendItem[]) => void
 }
 
 /**
@@ -48,7 +58,21 @@ export type DropdownProps<T> = {
  * @returns the dropdown.
  */
 export function Dropdown<T>(props: DropdownProps<T>): ReactNode {
-    const { label, search, noMatch, initial, onPick, onCancel, onBack, onHighlight, active } = props
+    const {
+        label,
+        search,
+        noMatch,
+        initial,
+        onPick,
+        onCancel,
+        onBack,
+        onHighlight,
+        take,
+        extras,
+        cancel,
+        onLegend,
+        active,
+    } = props
     return (
         <Entry<Choice<T>>
             label={label}
@@ -60,6 +84,10 @@ export function Dropdown<T>(props: DropdownProps<T>): ReactNode {
             onCancel={onCancel}
             onBack={onBack}
             active={active}
+            take={take}
+            listedExtras={extras}
+            cancel={cancel}
+            onLegend={onLegend}
             onHighlight={onHighlight && ((choice) => onHighlight(choice?.value))}
         />
     )

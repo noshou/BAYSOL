@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { spawn } from "node:child_process"
-import { findExecutable, isLinux, isMac, isWindows, type System } from "../core/system.js"
+import { findExecutable, isLinux, isMac, isWindows, type System } from "./system.js"
 
 /**
  * The desktop's own file picker, to choose structure files (`.cif`, `.pdb`), several at
@@ -30,8 +30,9 @@ export type PickerSpec = {
     multiple: boolean
 }
 
-/** The pickers by kind: the models (several `.cif` and `.pdb` files) and the buffer's
- * DNA, RNA and protein sequence file (ONE file, FASTA or FASTQ). */
+/** The pickers by kind: the models (several `.cif` and `.pdb` files), the buffer's
+ * DNA, RNA and protein sequence file (ONE file, FASTA or FASTQ) and the measured curve
+ * of a project (ONE delimited text file or `.xlsx` workbook). */
 export const pickerSpecs = {
     structure: {
         title: "Choose models",
@@ -43,6 +44,12 @@ export const pickerSpecs = {
         title: "Choose a sequence file",
         label: "Sequence files",
         exts: ["fasta", "fa", "fna", "faa", "fastq", "fq"],
+        multiple: false,
+    },
+    data: {
+        title: "Choose a data file",
+        label: "Data files",
+        exts: ["dat", "txt", "csv", "tsv", "tab", "xlsx"],
         multiple: false,
     },
 } satisfies Record<string, PickerSpec>

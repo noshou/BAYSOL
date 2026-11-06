@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { spawn, spawnSync } from "node:child_process"
-import { findExecutable, isLinux, isMac, isWindows, type System } from "../core/system.js"
+import { findExecutable, isLinux, isMac, isWindows, type System } from "./system.js"
 
 /**
  * "Open" for the projects folder: the desktop's file manager is tried, and a shell is
@@ -87,7 +87,7 @@ export function openFileManager(system: System, dir: string): Promise<string | u
  * @param dir - the folder the shell starts in.
  * @returns a problem text if the shell could not be started, else `undefined`.
  */
-export function runShellIn(system: System, dir: string): string | undefined {
+function runShellIn(system: System, dir: string): string | undefined {
     const [program, ...args] = subshellCommand(system) as [string, ...string[]]
     console.log(`BAYSOL: shell in ${dir} (type exit to return)`)
     const result = spawnSync(program, args, { cwd: dir, stdio: "inherit" })

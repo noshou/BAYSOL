@@ -241,12 +241,13 @@ function check(def: SettingDef, raw: unknown): Checked {
                 names.length > 0 &&
                 names.every((x) => typeof x === "string" && def.choices.includes(x)) &&
                 new Set(names).size === names.length
-            return ok
-                ? { ok: true, value: def.choices.filter((c) => names.includes(c)) }
-                : {
-                      ok: false,
-                      error: `must be some of ${def.choices.join(", ")}, at least one`,
-                  }
+            if (!ok) {
+                return {
+                    ok: false,
+                    error: `must be some of ${def.choices.join(", ")}, at least one`,
+                }
+            }
+            return { ok: true, value: def.choices.filter((c) => names.includes(c)) }
         }
         case "tuple":
             return checkTuple(def, raw)

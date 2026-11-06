@@ -6,6 +6,7 @@ import { truncate } from "../core/text.js"
 import { useBodyColumns } from "./layout.js"
 import { Legend, type LegendItem } from "./legend.js"
 import { type SmallLogo, smallLogo } from "./menu-opts.js"
+import { Panel } from "./panel.js"
 import { useTheme } from "./theme.js"
 
 /** Both small logos, loaded once: they are read from disk. */
@@ -27,7 +28,7 @@ const logos = { blocky: smallLogo("blocky"), smooth: smallLogo("smooth") }
  *     error, or a hint. It is cut to the width of the terminal.
  * @property noteIsError - draw the note in the error colour.
  */
-export type FrameProps = {
+type FrameProps = {
     title:        string
     subtitle?:    string
     legend:       LegendItem[]
@@ -48,23 +49,45 @@ export type FrameProps = {
  * @returns the screen.
  */
 export function Frame(props: FrameProps): ReactNode {
-    const { title, subtitle, legend, logo = "smooth", counter, note, noteIsError, children } = props
+    const {
+        title,
+        subtitle,
+        legend,
+        logo = "smooth",
+        counter,
+        note,
+        noteIsError,
+        children,
+    } = props
     const theme = useTheme()
     const columns = useBodyColumns()
     const art = logos[logo]
 
-    const noteLine = note ? (
-        <Text color={noteIsError ? theme.er : theme.fg}>{truncate(note, columns - 6 - art.width)}</Text>
-    ) : null
+    // the note has a row of its own whether there is one or not, so a note appearing
+    // never makes the footer taller (which would push the body, and the logo, up a row)
+    const noteLine = (
+        <Box height={1} flexShrink={0}>
+            {note ? (
+                <Text color={noteIsError ? theme.er : theme.fg}>
+                    {truncate(note, columns - 6 - art.width)}
+                </Text>
+            ) : null}
+        </Box>
+    )
     const logoBox = (
-        <Box width={art.width} height={art.height} backgroundColor={theme.bg} flexShrink={0}>
-            <Text color={theme.mt}>{art.text}</Text>
+        <Box
+            width={art.width}
+            height={art.height}
+            backgroundColor={theme.bg}
+            flexShrink={0}
+        >
+            <Text color={theme.fg}>{art.text}</Text>
         </Box>
     )
     const counterBox = counter ? (
-        <Box borderStyle={logo === "blocky" ? "double" : "round"} borderColor={theme.mt} paddingX={1}>
+        <Panel style={logo === "blocky" ? "double" : "round"} paddingX={1}>
             <Text color={theme.fg}>{counter}</Text>
-        </Box>
+        </Panel>
     ) : null
 
     return (
@@ -80,17 +103,17 @@ export function Frame(props: FrameProps): ReactNode {
 
             {logo === "blocky" ? (
                 // the tables, forms and sheets: one box with double lines holds it all
-                <Box borderStyle="double" borderColor={theme.mt} paddingX={1} columnGap={2}>
+                <Panel style="double" paddingX={1} columnGap={2} alignItems="flex-end">
                     {logoBox}
                     <Box flexDirection="column" flexGrow={1}>
                         {noteLine}
                         <Legend items={legend} style="columns" />
                     </Box>
                     {counterBox}
-                </Box>
+                </Panel>
             ) : (
                 // the landing pages: the logo, then each key in a rounded box of its own
-                <Box columnGap={2}>
+                <Box columnGap={2} alignItems="flex-end">
                     {logoBox}
                     <Box flexDirection="column" flexGrow={1}>
                         {noteLine}

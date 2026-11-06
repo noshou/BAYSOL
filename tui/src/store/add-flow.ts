@@ -32,16 +32,15 @@
 // The row keys follow `Solute` of ./solutes.ts (`sigmaMM`); `bufferRow` renames it to the
 // `sigma-mM` of the file (see ./solutes.ts), which `rowProblem` of ./buffer.ts checks.
 
-import { accessSync, constants, statSync } from "node:fs"
-import { basename, isAbsolute } from "node:path"
+import { basename } from "node:path"
 import {
-    displayWidth,
     formatNumber,
-    numberText,
+    type NumberRules,
     type Parsed,
-    takeWidth,
+    parseNumber,
     tooLong,
 } from "../core/text.js"
+import { keys } from "../ui/keys.js"
 import { rowProblem } from "./buffer.js"
 import {
     type CustomEntry,
@@ -51,7 +50,7 @@ import {
 } from "./custom.js"
 import type { Drafts } from "./draft.js"
 import { MAX_ROWS } from "./limits.js"
-import { complete, hintsFor } from "./models.js"
+import { checkPath, complete, hintsFor, MAX_PATH_TYPED } from "./path-input.js"
 import { isFastaFile, parseFile, type SequenceKind, summary } from "./sequences.js"
 import {
     allFamilies,
@@ -64,34 +63,22 @@ import {
     type SoluteEntry,
     search,
 } from "./solute-index.js"
-import { bufferRow, type Solute, setField } from "./solutes.js"
-
-// Re-exported: the add flow API the screens use.
-export { bufferRow, formatNumber, numberText, type Parsed, tooLong }
+import { bufferRow, type Solute, setSoluteField } from "./solutes.js"
 
 // ---- limits and wording ---------------------------------------------------------------
 
 /** The most characters of a name typed in the dropdown. */
-export const MAX_NAME_TYPED = 60
-
-/** The most characters of a path typed. */
-export const MAX_PATH_TYPED = 300
+const MAX_NAME_TYPED = 60
 
 /** The most characters a cell takes. */
-export const MAX_CELL_TYPED = 60
-
-/** The most rows a dropdown has, its status row included. */
-export const DROPDOWN_ROWS = 8
-
-/** The room a dropdown line keeps at the right for the tag, a space included. */
-const TAG_ROOM = 7
+const MAX_CELL_TYPED = 60
 
 /**
  * What the status row says when a typed name finds nothing. `^e` is a key of the GLOBAL
  * settings (main menu > settings), not of a project's own settings, so the way there is
  * spelled out; 40 characters is what the row holds.
  */
-export const NO_MATCH = "no match (custom: main menu>settings>^e)"
+export const NO_MATCH = `no match (custom: main menu>settings>${keys.addNucleotide.label})`
 
 /**
  * The columns of the table, by the field typed into each: the order of the art, which is
@@ -119,7 +106,7 @@ const SEQUENCE_KINDS: ReadonlySet<string> = new Set(["dna", "rna", "protein"])
 /**
  * The choice `^e` asks first: the label shown and the sequence kind it stands for.
  */
-export const NUCLEOTIDE_KINDS: readonly (readonly [string, SequenceKind])[] = [
+const NUCLEOTIDE_KINDS: readonly (readonly [string, SequenceKind])[] = [
     ["DNA", "dna"],
     ["RNA", "rna"],
 ]
@@ -135,23 +122,24 @@ export const NUCLEOTIDE_KINDS: readonly (readonly [string, SequenceKind])[] = [
  * @returns the trimmed name or the number, or an error: `name needed`,
  *   `a number, please`, `mM must be > 0`, `not below 0`.
  */
-export function parseField(field: EditField, text: string): Parsed<string | number> {
-    const t = text.trim()
-    if (field === "name") return t === "" ? { error: "name needed" } : { value: t }
-    const x = numberText(t)
-    if (x === undefined) return { error: "a number, please" }
-    if (field === "mM" && !(x > 0)) return { error: "mM must be > 0" }
-    if (x < 0) return { error: "not below 0" }
-    return { value: x }
+export function parseAddField(field: EditField, text: string): Parsed<string | number> {
+    if (field === "name") {
+        const t = text.trim()
+        return t === "" ? { error: "name needed" } : { value: t }
+    }
+    return parseNumber(text, field === "mM" ? CONCENTRATION_RULES : UNCERTAINTY_RULES)
 }
 
-/** The count of units typed: a number above 0. */
-function parseCount(text: string): Parsed<number> {
-    const x = numberText(text.trim())
-    if (x === undefined) return { error: "a number, please" }
-    if (!(x > 0)) return { error: "must be > 0" }
-    return { value: x }
+/** A concentration is a number above 0. */
+const CONCENTRATION_RULES: NumberRules = {
+    above: { limit: 0, message: "mM must be > 0" },
 }
+
+/** An uncertainty is a number, 0 or more. */
+const UNCERTAINTY_RULES: NumberRules = { atLeast: { limit: 0, message: "not below 0" } }
+
+/** The count of units typed: a number above 0. */
+const COUNT_RULES: NumberRules = { above: { limit: 0, message: "must be > 0" } }
 
 /** Keeps `index` on a list of `n` entries after one step forward or back, wrapping. */
 function cycle(index: number, n: number, delta: 1 | -1): number {
@@ -204,26 +192,6 @@ export function entries(
 }
 
 /**
- * The text of an entry as a dropdown line `room` characters wide: its name (with an
- * ellipsis when it does not fit) and its tag at the right.
- *
- * @param e - the entry.
- * @param room - the width of the line.
- * @returns a line of exactly `room` cells.
- */
-export function itemText(
-    e: { name: string; kind?: string; tag: string },
-    room: number,
-): string {
-    const n = Math.max(1, room - TAG_ROOM - 1)
-    const name = String(e.name)
-    const shown = displayWidth(name) > n ? `${takeWidth(name, n - 1)}…` : name
-    const pad = " ".repeat(Math.max(0, n - displayWidth(shown)))
-    const tag = e.kind === "polymer-family" ? "family" : e.tag
-    return `${shown}${pad} ${" ".repeat(Math.max(0, TAG_ROOM - tag.length))}${tag}`
-}
-
-/**
  * The note for a polymer whose molarity has a basis.
  *
  * @param basis - `per monomer unit`, `per 1000 Da`, or none.
@@ -231,31 +199,6 @@ export function itemText(
  */
 export function basisNote(basis: string | null | undefined): string | undefined {
     return basis ? `mM ${basis}` : undefined
-}
-
-/**
- * Whether a dropdown opens below the cell on a row: when at least `DROPDOWN_ROWS` rows of
- * the window remain below it.
- *
- * @param row - the row of the cell in the window (0-based).
- * @param window - how many body rows the table shows.
- * @returns true for below, false for above.
- */
-export function opensBelow(row: number, window: number): boolean {
-    return window - 1 - row >= DROPDOWN_ROWS
-}
-
-/**
- * The line of the page (0-based) where a dropdown starts: under the cell, else above it.
- *
- * @param row - the row of the cell in the window.
- * @param window - how many body rows the table shows.
- * @param height - the lines of the dropdown.
- * @param top - the line where the body starts.
- * @returns the first line of the dropdown.
- */
-export function boxTop(row: number, window: number, height: number, top: number): number {
-    return opensBelow(row, window) ? top + row + 1 : top + row - height
 }
 
 /**
@@ -344,7 +287,7 @@ export function familyMatch(arg: string | null | undefined): FamilyMatch | undef
  * @param values - from an argument key to its text; an argument it lacks shows as `key=`.
  * @returns the text.
  */
-export function valuesText(
+function valuesText(
     form: { args: { key: string }[] },
     values: Readonly<Record<string, string | undefined>>,
 ): string {
@@ -521,7 +464,7 @@ interface Common {
 }
 
 /** The dropdown of names of `^n` and `^p` is open. */
-export interface NameState extends Common {
+interface NameState extends Common {
     kind: "name"
     nameKind: NameKind
     customs: readonly CustomEntry[]
@@ -533,7 +476,7 @@ export interface NameState extends Common {
 }
 
 /** A polymer family with several forms asks which one. */
-export interface FormState extends Common {
+interface FormState extends Common {
     kind: "form"
     fam: PolymerFamily
     labels: string[]
@@ -541,13 +484,13 @@ export interface FormState extends Common {
 }
 
 /** `^e` asks DNA or RNA. */
-export interface NucleotideState extends Common {
+interface NucleotideState extends Common {
     kind: "nuc"
     index: number
 }
 
 /** The path of a sequence file is typed. */
-export interface PathState extends Common {
+interface PathState extends Common {
     kind: "path"
     seqKind: SequenceKind
     buffer: string
@@ -556,7 +499,7 @@ export interface PathState extends Common {
 }
 
 /** One cell is typed into. */
-export interface EditState extends Common {
+interface EditState extends Common {
     kind: "edit"
     /** The row typed into. */
     i: number
@@ -576,7 +519,7 @@ export interface EditState extends Common {
 }
 
 /** The flow is over: `table` and `cursor` are its result. */
-export interface DoneState extends Common {
+interface DoneState extends Common {
     kind: "done"
     /** Whether it was cancelled (the rows of the add are dropped) or stopped or ended. */
     cancelled: boolean
@@ -609,7 +552,7 @@ export type AddEvent =
     | { type: "files"; result: { files: readonly string[] } | { problem: string } }
 
 /** Where a prompt or a dropdown is drawn. */
-export interface Cell {
+interface Cell {
     /** The row of the table. */
     row: number
     /** The column, an index of `COLUMNS`. */
@@ -617,7 +560,7 @@ export interface Cell {
 }
 
 /** One line of a dropdown. */
-export interface DropdownItem {
+interface DropdownItem {
     text: string
     /** `solute`, `polymer`, `family` or `custom`; none for a form or a hint. */
     tag?: string
@@ -673,7 +616,7 @@ export interface DoneStep {
 }
 
 /** What a screen draws. */
-export type Step = DropdownStep | PromptStep | DoneStep
+export type FlowStep = DropdownStep | PromptStep | DoneStep
 
 // ---- building states ------------------------------------------------------------------
 
@@ -875,7 +818,7 @@ export interface StartOptions {
  * @returns the first state; done at once, with the table as it is, when it holds
  *   `MAX_ROWS` rows.
  */
-export function startAdd(
+function startAdd(
     table: Drafts<Solute>,
     kind: AddKind,
     options: StartOptions = {},
@@ -921,7 +864,7 @@ export function startAdd(
  * @param cursor - the row.
  * @returns the first state; done at once for no row or a row marked for removal.
  */
-export function startEdit(table: Drafts<Solute>, cursor: number): AddState {
+function startEdit(table: Drafts<Solute>, cursor: number): AddState {
     const row = table.rows[cursor]
     const base: Common = { table, cursor, added: [], fromCursor: cursor }
     if (!row || row.removed) return finish(base, true)
@@ -994,39 +937,15 @@ function picked(state: NameState, e: SoluteEntry): AddState {
  * @returns a message of 22 characters at most: `type a path first!`, `use a full path`,
  *   `no such file`, `that is a folder`, `cannot read the file`; `undefined` when fine.
  */
-export function pathProblem(path: string): string | undefined {
-    if (path.trim() === "") return "type a path first!"
-    if (!isAbsolute(path)) return "use a full path"
-    let isFolder: boolean
-    try {
-        isFolder = statSync(path).isDirectory()
-    } catch {
-        return "no such file"
-    }
-    if (isFolder) return "that is a folder"
-    try {
-        accessSync(path, constants.R_OK)
-    } catch {
-        return "cannot read the file"
-    }
-    return undefined
-}
-
-/**
- * The names a typed path can go on with: folders, then the FASTA and FASTQ files.
- *
- * @param buffer - the path typed.
- * @returns the hints (see `hintsFor` of ./models.ts).
- */
-export function pathHints(buffer: string): string[] {
-    return hintsFor(buffer, isFastaFile)
+export function sequencePathProblem(path: string): string | undefined {
+    return checkPath(path, 22)
 }
 
 /** The state after Enter on the path typed: the file is read and its rows added. */
 function pathEnter(state: PathState): AddState {
     // a typed or pasted path may end in blanks or a newline
     const path = state.buffer.trim()
-    const problem = pathProblem(path)
+    const problem = sequencePathProblem(path)
     if (problem) return { ...state, problem }
     const parsed = parseFile(path, state.seqKind)
     if ("error" in parsed) return { ...state, problem: parsed.error }
@@ -1064,7 +983,10 @@ function setBatchField(
     field: string,
     value: unknown,
 ): Drafts<Solute> {
-    return (state.batch ?? [state.i]).reduce((t, j) => setField(t, j, field, value), table)
+    return (state.batch ?? [state.i]).reduce(
+        (t, j) => setSoluteField(t, j, field, value),
+        table,
+    )
 }
 
 /** The state after Enter in the params cell: the argument is taken and the next asked. */
@@ -1086,10 +1008,10 @@ function paramsEnter(state: EditState): AddState {
         if (k + 1 < args.length) return asNext({ ...ctx, values, k: k + 1 })
         const result = familyArg(ctx.fam, ctx.formIndex, values)
         if ("error" in result) return { ...state, problem: result.error }
-        const table = setField(state.table, state.i, "arg", result.arg)
+        const table = setSoluteField(state.table, state.i, "arg", result.arg)
         return nextField(state, table, { hint: result.note })
     }
-    const parsed = parseCount(state.text)
+    const parsed = parseNumber(state.text, COUNT_RULES)
     if ("error" in parsed) return { ...state, problem: parsed.error }
     const counts = [...ctx.counts, parsed.value]
     if (k + 1 < ctx.labels.length) return asNext({ ...ctx, counts, k: k + 1 })
@@ -1103,7 +1025,7 @@ function paramsEnter(state: EditState): AddState {
 /** The state after Enter in the cell being typed into. */
 function editEnter(state: EditState): AddState {
     if (state.field === "params") return paramsEnter(state)
-    const parsed = parseField(state.field, state.text)
+    const parsed = parseAddField(state.field, state.text)
     if ("error" in parsed) return { ...state, problem: parsed.error }
     const table = setBatchField(state.table, state, state.field, parsed.value)
     return nextField(state, table, {
@@ -1183,7 +1105,7 @@ function advanceChoice(
 
 /** The path prompt after an event. */
 function advancePath(state: PathState, event: AddEvent): AddState {
-    const hints = pathHints(state.buffer)
+    const hints = hintsFor(state.buffer, isFastaFile)
     const at = Math.min(state.index, Math.max(0, hints.length - 1))
     switch (event.type) {
         case "cancel":
@@ -1240,7 +1162,7 @@ function advanceEdit(state: EditState, event: AddEvent): AddState {
  * @param event - what the user did.
  * @returns the next state (the same object when the event means nothing here).
  */
-export function advance(state: AddState, event: AddEvent): AddState {
+function advance(state: AddState, event: AddEvent): AddState {
     const clean = state.problem === undefined ? state : { ...state, problem: undefined }
     switch (clean.kind) {
         case "name":
@@ -1296,7 +1218,7 @@ function pathStatus(state: PathState, hints: readonly string[]): string | undefi
  * @param state - the state.
  * @returns a dropdown, a prompt, or done.
  */
-export function view(state: AddState): Step {
+function view(state: AddState): FlowStep {
     const { problem } = state
     const paramsColumn = COLUMNS.indexOf("params")
     switch (state.kind) {
@@ -1334,7 +1256,7 @@ export function view(state: AddState): Step {
                 problem,
             }
         case "path": {
-            const hints = pathHints(state.buffer)
+            const hints = hintsFor(state.buffer, isFastaFile)
             return {
                 type: "dropdown",
                 label: "path",
@@ -1414,7 +1336,7 @@ export class AddFlow {
     }
 
     /** What to draw now. */
-    get step(): Step {
+    get step(): FlowStep {
         return view(this.current)
     }
 
@@ -1439,7 +1361,7 @@ export class AddFlow {
      * @param event - the event.
      * @returns the step to draw next.
      */
-    send(event: AddEvent): Step {
+    send(event: AddEvent): FlowStep {
         this.current = advance(this.current, event)
         return this.step
     }

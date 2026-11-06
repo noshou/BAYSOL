@@ -7,10 +7,12 @@
 
 import { truncate } from "../core/text.js"
 import { MAX_ROWS } from "../store/limits.js"
+import { keyLabels, keys } from "../ui/keys.js"
+import { type Question, questionNote } from "../ui/use-confirm.js"
 import { type FileCount, fileStatus } from "./custom-text.js"
 
 /** What the landing can do: edit the buffer, load a recipe, start new, save globally. */
-export type LandingId = "edit" | "load" | "new" | "save"
+type LandingId = "edit" | "load" | "new" | "save"
 
 /**
  * One option of the landing.
@@ -21,19 +23,18 @@ export type LandingId = "edit" | "load" | "new" | "save"
 export type LandingOption = { id: LandingId; label: string }
 
 /** What the empty solutes table says. */
-export const EMPTY_HINT = "no solutes: ^n ^p ^f ^e"
+export const EMPTY_HINT = `no solutes: ${keyLabels(
+    keys.addNonbio, keys.addPolymer, keys.addProtein, keys.addNucleotide
+)}`
 
 /** The note of a recipe that was loaded over a buffer that has solutes. */
-export const REPLACES_HINT = "replaces the current recipe at ^w"
+export const REPLACES_HINT = `replaces the current recipe at ${keys.save.label}`
 
 /** The note of a new recipe over a buffer that has solutes. */
-export const NOTHING_REPLACED_HINT = "nothing is replaced until ^w"
+export const NOTHING_REPLACED_HINT = `nothing is replaced until ${keys.save.label}`
 
 /** The message when there is no recipe to load. */
 export const NO_RECIPES = "no saved recipes!"
-
-/** The message of a save that failed for a reason that is not an unusable file. */
-export const COULD_NOT_SAVE = "could not save!"
 
 /** The message when a name prompt of the landing is left with a question unanswered. */
 export const NOT_SAVED = "not saved"
@@ -62,7 +63,7 @@ export function plural(n: number, word: string): string {
  * @param count - the solutes of the buffer, `"unusable"` for a file that cannot be used.
  * @returns the options.
  */
-export function landingOptions(count: FileCount): LandingOption[] {
+export function bufferLandingOptions(count: FileCount): LandingOption[] {
     const has = typeof count === "number" && count > 0
     const options: (LandingOption | undefined)[] = [
         has
@@ -76,14 +77,13 @@ export function landingOptions(count: FileCount): LandingOption[] {
 }
 
 /**
- * What the landing says of the buffer file.
+ * What the landing says of the buffer file, under the plain label `buffer`.
  *
- * @param file - the file's name.
  * @param count - what it holds.
- * @returns `buffer.json: 12 solutes`, `none yet` or `unusable!` after the name.
+ * @returns `buffer: 12 solutes`, `buffer: none yet` or `buffer: unusable!`.
  */
-export function bufferStatus(file: string, count: FileCount): string {
-    return fileStatus(file, count, "solute")
+export function bufferStatus(count: FileCount): string {
+    return fileStatus("buffer", count, "solute")
 }
 
 /**
@@ -109,8 +109,21 @@ export function fitName(name: string, room: number, fixed: number): string {
     return truncate(name, Math.max(MIN_NAME, room - fixed))
 }
 
-/** The keys that answer a question of the landing and the table. */
-const REPLACE_KEYS = "enter: replace  esc: keep"
+/**
+ * A question of the landing and the table that asks to replace something and shortens
+ * the name in it so that the whole note, with the keys that answer it, fits.
+ *
+ * @param lead - the text before the name.
+ * @param name - the name to fit.
+ * @param room - the cells the note line has.
+ * @returns `lead` + name + `"?`, answered by `replace` and `keep`.
+ */
+function replaceQuestion(lead: string, name: string, room: number): Question {
+    const answers = { yes: "replace", no: "keep" }
+    const end = '"?'
+    const fixed = questionNote({ text: end, ...answers }).length + lead.length
+    return { text: `${lead}${fitName(name, room, fixed)}${end}`, ...answers }
+}
 
 /**
  * The question asked at the first `^w` of a recipe loaded over a buffer.
@@ -118,12 +131,10 @@ const REPLACE_KEYS = "enter: replace  esc: keep"
  * @param n - how many solutes the buffer has.
  * @param recipe - the recipe's name.
  * @param room - the cells the note line has.
- * @returns `replace 3 solutes with recipe "NAME"?  enter: replace  esc: keep`.
+ * @returns `replace 3 solutes with recipe "NAME"?`, answered by `replace` and `keep`.
  */
-export function replaceBufferQuestion(n: number, recipe: string, room: number): string {
-    const lead = `replace ${plural(n, "solute")} with recipe "`
-    const tail = `"?  ${REPLACE_KEYS}`
-    return `${lead}${fitName(recipe, room, lead.length + tail.length)}${tail}`
+export function replaceBufferQuestion(n: number, recipe: string, room: number): Question {
+    return replaceQuestion(`replace ${plural(n, "solute")} with recipe "`, recipe, room)
 }
 
 /**
@@ -131,12 +142,10 @@ export function replaceBufferQuestion(n: number, recipe: string, room: number): 
  *
  * @param name - the name typed.
  * @param room - the cells the note line has.
- * @returns `replace "NAME"?  enter: replace  esc: keep`.
+ * @returns `replace "NAME"?`, answered by `replace` and `keep`.
  */
-export function replaceRecipeQuestion(name: string, room: number): string {
-    const lead = 'replace "'
-    const tail = `"?  ${REPLACE_KEYS}`
-    return `${lead}${fitName(name, room, lead.length + tail.length)}${tail}`
+export function replaceRecipeQuestion(name: string, room: number): Question {
+    return replaceQuestion('replace "', name, room)
 }
 
 /**

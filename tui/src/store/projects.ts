@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import { mkdirSync, rmSync } from "node:fs"
+import { lstatSync, mkdirSync, rmSync } from "node:fs"
 import { basename, join } from "node:path"
 import {
     entryNames,
     isDict,
     isFile,
     isFolder,
+    ParentMissingError,
     readJson,
     sortNoCase,
     writeAtomic,
@@ -14,9 +15,6 @@ import {
 } from "../core/files.js"
 import { ensureDir, projectsRoot } from "../core/paths.js"
 import { tooLong } from "../core/text.js"
-
-// Re-exported: the path the screens import the folder helpers by.
-export { entryNames, isFile, isFolder, sortNoCase, tooLong }
 
 /**
  * The projects: one folder for each in the `projects` folder of the BAYSOL folder, named
@@ -37,10 +35,10 @@ export { entryNames, isFile, isFolder, sortNoCase, tooLong }
  */
 
 /** The most characters a project name may have. */
-export const maxName = 40
+const maxName = 40
 
 /** The name of the file that makes a folder a project. */
-export const projectFileName = "project.json"
+const projectFileName = "project.json"
 
 /** Names a Windows file system keeps for devices, whatever the extension. */
 const reserved: ReadonlySet<string> = new Set([
@@ -76,7 +74,7 @@ const brokenMessage = "that name is taken by a broken project folder!"
  *     used ([[brokenNames]]): they are neither listed nor free.
  * @returns the message, or `undefined` if the name is fine.
  */
-export function nameProblem(
+export function projectNameProblem(
     id: string,
     existing: readonly string[],
     broken: readonly string[] = [],
@@ -151,9 +149,47 @@ export function listProjects(root: string): string[] {
 }
 
 /**
+ * The error of a write into a project whose folder is gone (another copy of the program
+ * deleted the project). Nothing is made then: a write must not bring a deleted project
+ * back as a broken folder that blocks its name.
+ *
+ * @param projectDir - the project's folder.
+ */
+export class ProjectGoneError extends ParentMissingError {
+    constructor(readonly projectDir: string) {
+        super(projectDir)
+        this.message = `project ${basename(projectDir)} no longer exists`
+        this.name = "ProjectGoneError"
+    }
+}
+
+/**
+ * Runs a write inside a project's folder, which must exist already. Use
+ * `createParents: false` ([[FolderOptions]]) for the folders the work makes itself.
+ *
+ * @param projectDir - the project's folder.
+ * @param fn - the work.
+ * @returns what `fn` returns.
+ * @throws [[ProjectGoneError]] if the folder is not there before the work or goes
+ *     missing during it; whatever `fn` throws.
+ */
+export function inProject<T>(projectDir: string, fn: () => T): T {
+    if (!isFolder(projectDir)) throw new ProjectGoneError(projectDir)
+    try {
+        return fn()
+    } catch (error) {
+        const gone =
+            error instanceof ParentMissingError ||
+            (error as NodeJS.ErrnoException).code === "ENOENT"
+        if (gone && !isFolder(projectDir)) throw new ProjectGoneError(projectDir)
+        throw error
+    }
+}
+
+/**
  * The error of a name that is not valid or is taken.
  *
- * @param reason - what [[nameProblem]] says, short enough for the main menu.
+ * @param reason - what [[projectNameProblem]] says, short enough for the main menu.
  * @param id - the name.
  */
 export class InvalidNameError extends Error {
@@ -199,7 +235,7 @@ export function createProject(
     now: Date = new Date(),
 ): string {
     const root = ensureDir(projectsRoot(appRoot))
-    const problem = nameProblem(id, entryNames(root), brokenNames(root))
+    const problem = projectNameProblem(id, entryNames(root), brokenNames(root))
     if (problem !== undefined) throw new InvalidNameError(problem, id)
     const dir = join(root, id)
     hooks.prepareGlobal()
@@ -219,4 +255,34 @@ export function createProject(
         rmSync(dir, { recursive: true, force: true })
         throw error
     }
+}
+
+/**
+ * Deletes a project: its folder and everything in it, for good. Because this removes
+ * what the user made, it checks first and deletes nothing unless every check passes:
+ * the id is a valid project name (so it cannot be a path: no `/`, no `..`, no empty
+ * name), the folder is a real directory (not a symbolic link, which could lead
+ * anywhere) directly below `<root>/projects`, and it is a project (a readable
+ * `project.json` with the same id).
+ *
+ * @param appRoot - the BAYSOL folder.
+ * @param id - the project's name.
+ * @throws Error with a clear message when a check fails; nothing is deleted then. A
+ *     folder that is already gone is not an error (it was deleted meanwhile).
+ */
+export function deleteProject(appRoot: string, id: string): void {
+    if (id === "" || !nameCharacters.test(id) || !nameStart.test(id))
+        throw new Error(`not a project name: "${id}"`)
+    const dir = join(projectsRoot(appRoot), id)
+    let stat: ReturnType<typeof lstatSync>
+    try {
+        stat = lstatSync(dir)
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return
+        throw error
+    }
+    if (stat.isSymbolicLink()) throw new Error(`${id} is a link, not a project folder`)
+    if (!stat.isDirectory()) throw new Error(`${id} is not a folder`)
+    if (readProject(dir)?.id !== id) throw new Error(`${id} is not a valid project`)
+    rmSync(dir, { recursive: true, force: true })
 }

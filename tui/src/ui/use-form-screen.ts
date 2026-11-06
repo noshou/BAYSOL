@@ -4,6 +4,7 @@ import { useCallback, useState } from "react"
 import type { FieldFormEdit } from "./field-form.js"
 import { type CellPos, moveCell, placeAt } from "./form-layout.js"
 import { keys } from "./keys.js"
+import type { Moves } from "./legend.js"
 import { useKeys } from "./use-keys.js"
 
 /**
@@ -20,6 +21,8 @@ import { useKeys } from "./use-keys.js"
  * @property restore - puts a cell back to what it was when the form opened.
  * @property check - the first thing wrong with the form: where and what; `undefined`
  *     when it can be accepted.
+ * @property canRestore - whether `^u` has anything to put back on a cell (the cell differs
+ *     from what it was when the form opened); `true` for every cell when left out.
  * @property accept - the form is complete: hand it back and leave.
  * @property cancel - leave and change nothing.
  */
@@ -29,6 +32,7 @@ export type FormScreenSpec = {
     editText:  (pos: CellPos) => string
     take:      (pos: CellPos, text: string) => { error?: string; note?: string }
     restore:   (pos: CellPos) => void
+    canRestore?: (pos: CellPos) => boolean
     check:     () => { pos: CellPos; message: string } | undefined
     accept:    () => void
     cancel:    () => void
@@ -42,6 +46,10 @@ export type FormScreenSpec = {
  * @property problem - the row to flag after `^w` found a problem (for `FieldForm`).
  * @property note - the line for the `Frame`: what `^w` found, or what taking a cell said.
  * @property noteIsError - draw the note in the error colour (always true now).
+ * @property moves - which arrows move the cursor from `pos` (a neighbouring cell exists
+ *     in that direction), for the legend.
+ * @property canRestore - `^u` has something to put back on the cell under the cursor.
+ * @property complete - `spec.check` finds nothing: `^w` would accept the form.
  */
 export type FormScreen = {
     pos:         CellPos
@@ -49,6 +57,9 @@ export type FormScreen = {
     problem:     { row: number; message: string } | undefined
     note:        string | undefined
     noteIsError: boolean
+    moves:       Moves
+    canRestore:  boolean
+    complete:    boolean
 }
 
 /**
@@ -99,20 +110,34 @@ export function useFormScreen(spec: FormScreenSpec): FormScreen {
         } else if (press.is(keys.escape) || press.is(keys.back)) spec.cancel()
     }, !editing)
 
-    const edit: FieldFormEdit | undefined = editing
-        ? {
-              label: spec.editLabel(pos),
-              initial: spec.editText(pos),
-              error: editError,
-              onChange,
-              onCancel: closePrompt,
-              onSubmit: (text) => {
-                  const result = spec.take(pos, text)
-                  if (result.error) return setEditError(result.error)
-                  closePrompt()
-                  setNote(result.note)
-              },
-          }
-        : undefined
-    return { pos, edit, problem, note, noteIsError: true }
+    const editOf = (): FieldFormEdit => ({
+        label: spec.editLabel(pos),
+        initial: spec.editText(pos),
+        error: editError,
+        onChange,
+        onCancel: closePrompt,
+        onSubmit: (text) => {
+            const result = spec.take(pos, text)
+            if (result.error) return setEditError(result.error)
+            closePrompt()
+            setNote(result.note)
+        },
+    })
+    const edit: FieldFormEdit | undefined = editing ? editOf() : undefined
+    const moves: Moves = {
+        up: moveCell(spec.valid, pos, -1, 0).row !== pos.row,
+        down: moveCell(spec.valid, pos, 1, 0).row !== pos.row,
+        left: moveCell(spec.valid, pos, 0, -1).col !== pos.col,
+        right: moveCell(spec.valid, pos, 0, 1).col !== pos.col,
+    }
+    return {
+        pos,
+        edit,
+        problem,
+        note,
+        noteIsError: true,
+        moves,
+        canRestore: spec.canRestore?.(pos) ?? true,
+        complete: spec.check() === undefined,
+    }
 }

@@ -53,8 +53,8 @@ const kindNames: Readonly<Record<SequenceKind, string>> = {
     protein: "protein",
 }
 
-/** The file extensions (lower case, with the dot) of the sequence files. */
-export const extensions: readonly string[] = [
+/** The file sequenceExtensions (lower case, with the dot) of the sequence files. */
+const sequenceExtensions: readonly string[] = [
     ".fasta",
     ".fa",
     ".fna",
@@ -72,7 +72,7 @@ const anyPlaceholder: ReadonlySet<string> = new Set("*X")
  * @param id - the header up to the first white space (`seqN` if it is empty).
  * @param letters - the sequence, cleaned and upper-cased, placeholders kept.
  */
-export class Sequence {
+class Sequence {
     constructor(
         readonly id: string,
         readonly letters: string,
@@ -107,14 +107,14 @@ export class Sequence {
 export type SequenceResult = { records: Sequence[] } | { error: string }
 
 /**
- * Whether a file name (or path) has one of the [[extensions]].
+ * Whether a file name (or path) has one of the [[sequenceExtensions]].
  *
  * @param fileName - the name or path.
  * @returns the answer (case does not matter).
  */
 export function isFastaFile(fileName: string): boolean {
     const low = fileName.toLowerCase()
-    return extensions.some((e) => low.endsWith(e))
+    return sequenceExtensions.some((e) => low.endsWith(e))
 }
 
 /** A failed result. */

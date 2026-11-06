@@ -13,6 +13,7 @@
 
 import { basename } from "node:path"
 import { type ReactNode, useCallback, useReducer, useRef, useState } from "react"
+import { pick } from "../core/file-picker.js"
 import { appDir } from "../core/paths.js"
 import { readSystem } from "../core/system.js"
 import {
@@ -23,37 +24,34 @@ import {
     COLUMNS,
     type DoneStep,
     type EditField,
+    type FlowStep,
     NO_MATCH,
-    pathHints,
-    type Step,
 } from "../store/add-flow.js"
 import type { CustomEntry } from "../store/custom.js"
-import { customFile, readSolutes as readCustoms } from "../store/custom-store.js"
+import { customFile, readCustomSolutes } from "../store/custom-store.js"
 import type { Row } from "../store/draft.js"
-import { complete } from "../store/models.js"
+import { pathSuggestions } from "../store/path-input.js"
+import { isFastaFile } from "../store/sequences.js"
 import type { Solute } from "../store/solutes.js"
-import { pick } from "../system/file-picker.js"
 import { Dropdown, filterChoices } from "../ui/dropdown.js"
 import { Entry, suggestionLines } from "../ui/entry.js"
-import { KeyInput } from "../ui/keys.js"
-import type { LegendItem } from "../ui/legend.js"
+import { keys } from "../ui/keys.js"
+import { type LegendItem, legendFor } from "../ui/legend.js"
 import { Prompt } from "../ui/prompt.js"
+import { scrollWindow } from "../ui/scroll-window.js"
 import type { Suggestion } from "../ui/suggestion-list.js"
 import { useKeys } from "../ui/use-keys.js"
-import { flowChanges, windowOffset } from "./solute-rows.js"
+import { flowChanges } from "./solute-rows.js"
 import type { TableScreen } from "./use-table-screen.js"
 
 /**
  * The rows an open flow takes under the table: its label, the messages, the suggestions
  * (`suggestionLines`) and the status line.
  */
-export const FLOW_ROWS = suggestionLines + 4
+const FLOW_ROWS = suggestionLines + 4
 
 /** The fewest table rows left in view while a flow is open. */
 const MIN_TABLE_ROWS = 3
-
-/** The key of an empty path field that opens the desktop's file picker. */
-const hotkeyPick = new KeyInput("o")
 
 /** The message when the custom solutes cannot be read: only built-in ones are offered. */
 const customUnusable = (file: string) => `${file} unusable!`
@@ -61,50 +59,29 @@ const customUnusable = (file: string) => `${file} unusable!`
 /** What the path field says while nothing is typed. */
 const PATH_PLACEHOLDER = "full path of a FASTA or FASTQ file"
 
+/** The suggestions of the path prompt of a sequence file: folders and FASTA/FASTQ files. */
+const suggestSequencePaths = (text: string) => pathSuggestions(text, isFastaFile)
+
 /** The note while the picker window is open. */
 const PICKING_NOTE = "choose a file in the picker window..."
 
-/**
- * The suggestions of the path prompt of a sequence file: the folders and sequence files
- * that fit what is typed, each shown by its name; Tab puts the whole path into the field.
- *
- * @param text - the path typed.
- * @returns the suggestions, none for a folder that cannot be listed.
- */
-export function pathSuggestions(text: string): Suggestion[] {
-    try {
-        return pathHints(text).map((hint) => ({
-            label: hint,
-            completion: complete(text, hint),
-        }))
-    } catch {
-        return []
-    }
-}
+/** The legend item of the file picker, offered on an empty path field. */
+const pickerLegend: LegendItem = legendFor("file picker", keys.pickFiles)
 
 /**
- * The keys a step takes, for the legend while it is open.
+ * The keys of an open step: what its entry reports (`move` only when the list has
+ * several entries, `complete` only when one is highlighted, the file picker only on an
+ * empty path field), except that a dropdown step that has nothing typed completes
+ * nothing, so `tab` is dropped.
  *
  * @param step - what is drawn.
- * @param canPick - the path field is empty and `o` opens the picker.
+ * @param items - the legend its entry reported.
  * @returns the legend items.
  */
-export function flowLegend(step: Step, canPick: boolean): LegendItem[] {
-    const take: LegendItem = { label: "take", keys: "⏎" }
-    const cancel: LegendItem = { label: "cancel", keys: "esc" }
-    if (step.type === "prompt") return [take, cancel]
-    if (step.type === "done") return []
-    if (step.label === "path") {
-        return [
-            take,
-            { label: "complete", keys: "tab" },
-            ...(canPick ? [{ label: "file picker", keys: "o" }] : []),
-            cancel,
-        ]
-    }
-    const move: LegendItem = { label: "move", keys: "↑↓" }
-    if (step.typed === undefined) return [take, move, cancel]
-    return [take, move, { label: "complete", keys: "tab" }, cancel]
+export function flowLegend(step: FlowStep, items: LegendItem[]): LegendItem[] {
+    const completes = step.type === "dropdown" && step.label !== "path"
+    if (!completes || step.typed !== undefined) return items
+    return items.filter((i) => i.keys !== keys.tab.label)
 }
 
 /** A flow that is open and the table it was started on. */
@@ -158,6 +135,8 @@ export function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): 
     const [picking, setPicking] = useState(false)
     // the basis of the highlighted solute's molarity (`mM per monomer unit`)
     const [basis, setBasis] = useState<string | undefined>(undefined)
+    // the keys the open step's entry reports
+    const [stepKeys, setStepKeys] = useState<LegendItem[]>([])
 
     const finish = useCallback((done: DoneStep) => {
         const current = run.current
@@ -200,7 +179,7 @@ export function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): 
             let problem: string | undefined
             if (kind === "nonbio" || kind === "polymer") {
                 try {
-                    customs = readCustoms(root)
+                    customs = readCustomSolutes(root)
                 } catch {
                     problem = customUnusable(basename(customFile(root)))
                 }
@@ -236,7 +215,7 @@ export function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): 
     // `o` on an empty path field asks the desktop for a file; the field has the `o` by
     // then, so it is emptied and the picked path put in
     useKeys((press) => {
-        if (!press.is(hotkeyPick) || !current) return
+        if (!press.is(keys.pickFiles) || !current) return
         void (async () => {
             setPicking(true)
             const system = readSystem()
@@ -289,6 +268,7 @@ export function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): 
                 onChange={onText}
                 onSubmit={onSubmit}
                 onCancel={onCancel}
+                onLegend={setStepKeys}
             />
         )
     } else if (step.label === "name") {
@@ -314,6 +294,7 @@ export function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): 
                 onSubmit={(_text, s) => s && send({ type: "pick", index: s.value })}
                 onCancel={onCancel}
                 onHighlight={onHighlight}
+                onLegend={setStepKeys}
             />
         )
     } else if (step.label === "path") {
@@ -325,9 +306,11 @@ export function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): 
                 initial={step.typed}
                 maxLength={step.maxLength}
                 placeholder={PATH_PLACEHOLDER}
-                suggest={pathSuggestions}
+                suggest={suggestSequencePaths}
                 error={step.problem}
                 active={!picking}
+                extras={canPick ? [pickerLegend] : []}
+                onLegend={setStepKeys}
                 onChange={onText}
                 onSubmit={onSubmit}
                 onCancel={onCancel}
@@ -342,6 +325,7 @@ export function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): 
                 search={filterChoices(choices)}
                 onPick={(index) => send({ type: "pick", index })}
                 onCancel={onCancel}
+                onLegend={setStepKeys}
             />
         )
     }
@@ -350,11 +334,11 @@ export function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): 
         open: true,
         rows,
         cursor,
-        offset: windowOffset(cursor, t.cursor.offset, pageSize, rows.length),
+        offset: scrollWindow(cursor, t.cursor.offset, pageSize, rows.length),
         pageSize,
         cell,
         note,
-        legend: picking ? [] : flowLegend(step, canPick),
+        legend: picking ? [] : flowLegend(step, stepKeys),
         entry,
         add,
         edit,

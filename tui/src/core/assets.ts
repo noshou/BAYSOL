@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url"
  */
 
 /** The environment variable that names the `assets/` folder, for a layout not foreseen. */
-export const assetsVar = "BAYSOL_ASSETS"
+const assetsVar = "BAYSOL_ASSETS"
 
 /**
  * A file every `assets/` folder has; the folder is only accepted when it is there, so
@@ -31,7 +31,7 @@ const marker = join("data", "default_settings.json")
  * @param cwd - the working directory.
  * @returns the candidates, in order, without repeats.
  */
-export function assetCandidates(
+function assetCandidates(
     env: Record<string, string | undefined>,
     execPath: string,
     cwd: string
@@ -57,7 +57,7 @@ let found: string | undefined
  * @throws if no candidate holds the assets; the message lists where it looked and names
  *     `BAYSOL_ASSETS` as the way out.
  */
-export function assetsRoot(): string {
+function assetsRoot(): string {
     if (found !== undefined) return found
     const tried = assetCandidates(process.env, process.execPath, process.cwd())
     const hit = tried.find((dir) => existsSync(join(dir, marker)))

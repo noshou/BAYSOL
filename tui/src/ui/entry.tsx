@@ -3,10 +3,12 @@
 import { Box, Text } from "ink"
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { keys } from "./keys.js"
-import { useTheme } from "./theme.js"
 import { useBodyColumns } from "./layout.js"
-import { SuggestionList, type Suggestion } from "./suggestion-list.js"
+import { entryLegend, type LegendItem } from "./legend.js"
+import { stepIndex } from "./scroll-window.js"
+import { positionStatus, type Suggestion, SuggestionList } from "./suggestion-list.js"
 import { TextField } from "./text-field.js"
+import { useTheme } from "./theme.js"
 import { useKeys } from "./use-keys.js"
 import { useTextBuffer } from "./use-text-buffer.js"
 
@@ -24,7 +26,13 @@ export const suggestionLines = 7
  *     change, so it must be fast. None given means a plain text input.
  * @property pick - `true` for a dropdown: Enter takes the highlighted suggestion, and
  *     nothing if there is none. `false`: Enter takes the typed text.
- * @property noMatch - the status line when a dropdown has no suggestion for the text.
+ * @property noMatch - the status line when there is no suggestion for the typed text
+ *     (also for blank text when `counter` is set).
+ * @property initialIndex - the suggestion highlighted at first, the best one when left out.
+ * @property wrap - whether up and down go round at the ends of the list, `false` when
+ *     left out (they stop).
+ * @property lines - the most suggestions shown, [[suggestionLines]] when left out.
+ * @property counter - show the place of the highlight (`3 of 12`) as the status line.
  * @property error - a message about the last attempt, shown under the field in the
  *     error colour; the screen clears it by changing it.
  * @property onSubmit - called with the typed text and the highlighted suggestion.
@@ -32,6 +40,18 @@ export const suggestionLines = 7
  * @property onBack - called for Ctrl-X (back one screen), when it differs from Esc.
  * @property onHighlight - called with the highlighted suggestion whenever it changes
  *     (a screen that acts on the highlighted item, e.g. to remove it).
+ * @property take - what Enter is called in the legend (`"take"` when left out; `null`
+ *     for an entry whose Enter does nothing).
+ * @property canTake - a prompt's Enter has something to take, `true` when left out.
+ * @property extras - keys of this entry that work always (`file picker o`), for the legend.
+ * @property listedExtras - keys that work only while the list holds something
+ *     (`delete ^r`), for the legend.
+ * @property cancel - what Esc is called in the legend, `"cancel"` when left out; `null`
+ *     for an entry that is the screen itself, where Esc does nothing and is not shown.
+ * @property onLegend - called with the keys that work now (`entryLegend` of what the
+ *     entry knows: how many suggestions it lists, whether it picks, whether it has an
+ *     `onBack`, plus the five props above) whenever they change, so the screen shows
+ *     them without keeping any of that itself.
  * @property active - whether the entry listens to keys, `true` when left out; a screen
  *     passes `false` while a question of its own (a confirm) is open over the entry, so
  *     the entry keeps its text and comes back as it was.
@@ -46,12 +66,22 @@ export type EntryProps<S extends Suggestion> = {
     suggest?:     (text: string) => S[]
     pick?:        boolean
     noMatch?:     string
+    initialIndex?: number
+    wrap?:        boolean
+    lines?:       number
+    counter?:     boolean
     error?:       string
     onSubmit:     (text: string, suggestion: S | undefined) => void
     onCancel:     () => void
     onBack?:      () => void
     active?:      boolean
     onHighlight?: (suggestion: S | undefined) => void
+    take?:        string | null
+    canTake?:     boolean
+    extras?:      LegendItem[]
+    listedExtras?: LegendItem[]
+    cancel?:      string | null
+    onLegend?:    (items: LegendItem[]) => void
     onChange?:    (text: string) => void
 }
 
@@ -67,11 +97,13 @@ export type EntryProps<S extends Suggestion> = {
  */
 export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
     const { label, initial, maxLength, placeholder, suggest, pick, noMatch, error } = props
-    const { onSubmit, onCancel, onBack, onHighlight, onChange, active = true } = props
+    const { onSubmit, onCancel, onBack, onHighlight, onChange, onLegend } = props
+    const { active = true } = props
     const theme = useTheme()
     const columns = useBodyColumns()
     const input = useTextBuffer(initial ?? "", maxLength, active)
-    const [highlight, setHighlight] = useState(0)
+    const { wrap = false, lines = suggestionLines, counter = false } = props
+    const [highlight, setHighlight] = useState(props.initialIndex ?? 0)
 
     const text = input.buffer.text
     const items = useMemo(() => (suggest ? suggest(text) : []), [suggest, text])
@@ -85,11 +117,15 @@ export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
             if (pick && items.length === 0) return
             return onSubmit(text, items[marked])
         }
-        if (press.is(keys.down)) return setHighlight(Math.min(marked + 1, items.length - 1))
-        if (press.is(keys.up)) return setHighlight(Math.max(marked - 1, 0))
+        if (press.is(keys.down) || press.is(keys.up))
+            return setHighlight(stepIndex(marked, items.length, press.is(keys.down), wrap))
         if (press.is(keys.tab)) {
             if (items[marked]) {
-                input.set(input.buffer.replace(items[marked].completion ?? items[marked].label))
+                input.set(
+                    input.buffer.replace(items[marked].completion ?? items[marked].label),
+                )
+                // the completed text narrows the list again: its best match first
+                setHighlight(0)
             }
             return
         }
@@ -107,7 +143,28 @@ export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
     const current = items[marked]
     useEffect(() => onHighlight?.(current), [current, onHighlight])
 
-    const status = pick && items.length === 0 && text !== "" ? noMatch : undefined
+    // and the keys that work now, whenever they change (compared by value: the screen's
+    // extras are new arrays on every render)
+    const legend = entryLegend({
+        count: items.length,
+        pick,
+        canTake: props.canTake,
+        take: props.take,
+        extras: props.extras,
+        listedExtras: props.listedExtras,
+        cancel: props.cancel,
+        back: onBack !== undefined,
+    })
+    const legendKey = JSON.stringify(legend)
+    // biome-ignore lint/correctness/useExhaustiveDependencies: legendKey = value of legend
+    useEffect(() => onLegend?.(legend), [legendKey, onLegend])
+
+    const none = items.length === 0 && (text !== "" || counter)
+    const status = none
+        ? noMatch
+        : counter && items.length > 0
+            ? positionStatus(marked, items.length)
+            : undefined
     return (
         <Box flexDirection="column">
             <Box columnGap={1}>
@@ -126,7 +183,7 @@ export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
                 <SuggestionList
                     items={items}
                     highlight={marked}
-                    lines={suggestionLines}
+                    lines={lines}
                     width={columns}
                     status={status}
                 />

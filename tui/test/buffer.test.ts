@@ -59,24 +59,23 @@ test("a custom-solutes entry is no buffer row, but its snapshot is", () => {
         assert.notEqual(rowProblem({ ...entry, mM: 1, "sigma-mM": 0 }), undefined)
     for (const e of entries) {
         const base = { name: e.name, custom: e.name, mM: 1, "sigma-mM": 0 }
-        const snapshot =
-            e.kind === "nonbiological"
-                ? {
-                      kind: "custom-nonbio",
-                      ...base,
-                      z: e.z,
-                      pmv: e.pmv,
-                      "sigma-pmv": e.sigma,
-                  }
-                : {
-                      kind: "custom-polymer",
-                      ...base,
-                      units: e.units,
-                      counts: e.units.map(() => 3),
-                      "z-ends": e["z-ends"],
-                      "pmv-ends": e["pmv-ends"],
-                      "sigma-ends": e["sigma-ends"],
-                  }
+        const nonbio = () => ({
+            kind: "custom-nonbio",
+            ...base,
+            z: e.z,
+            pmv: e.pmv,
+            "sigma-pmv": e.sigma,
+        })
+        const polymer = () => ({
+            kind: "custom-polymer",
+            ...base,
+            units: e.units,
+            counts: e.units.map(() => 3),
+            "z-ends": e["z-ends"],
+            "pmv-ends": e["pmv-ends"],
+            "sigma-ends": e["sigma-ends"],
+        })
+        const snapshot = e.kind === "nonbiological" ? nonbio() : polymer()
         assert.equal(rowProblem(snapshot), undefined, e.name)
     }
 })

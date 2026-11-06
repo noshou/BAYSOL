@@ -1,19 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { join } from "node:path"
-import {
-    assertUnchanged,
-    isDict,
-    noteWritten,
-    readMap,
-    UnusableFileError,
-    withFileLock,
-    writeAtomic,
-    writeJson,
-} from "../core/files.js"
-import { fold } from "../core/text.js"
+import { isDict, type ReadOptions } from "../core/files.js"
 import { type CustomEntry, MAX_UNITS } from "./custom.js"
-import { MAX_ROWS } from "./limits.js"
+import { ListFile } from "./list-file.js"
 
 /**
  * The custom solutes of the user: `custom-solutes.json` in the BAYSOL data folder, next
@@ -38,13 +28,8 @@ import { MAX_ROWS } from "./limits.js"
  * single-unit shape older than this one has none) is unusable, and is never written over.
  */
 
-/** The kind carried by the errors of this file. */
-const KIND = "custom-solutes"
-
 /** The name of the file in the BAYSOL folder. */
 export const customSolutesFileName = "custom-solutes.json"
-
-type Dict = Record<string, unknown>
 
 /**
  * The custom solutes file of the BAYSOL folder.
@@ -57,53 +42,57 @@ export function customFile(root: string): string {
 }
 
 /**
- * Whether a value is a map and, if it is a polymer, has an array of 1 to [[MAX_UNITS]]
- * unit maps.
+ * What is wrong with an entry: not a map or, if it is a polymer, without an array of
+ * 1 to [[MAX_UNITS]] unit maps.
  *
  * @param e - a value of the file or of a save.
- * @returns true if it can be kept.
+ * @returns the message, or `undefined` when it can be kept.
  */
-function usableEntry(e: unknown): boolean {
-    if (!isDict(e)) return false
-    if (e.kind !== "polymer") return true
+function entryProblem(e: unknown): string | undefined {
+    if (!isDict(e)) return "an entry is not a map"
+    if (e.kind !== "polymer") return undefined
     const u = e.units
-    return Array.isArray(u) && u.length >= 1 && u.length <= MAX_UNITS && u.every(isDict)
+    const ok = Array.isArray(u) && u.length >= 1 && u.length <= MAX_UNITS && u.every(isDict)
+    return ok ? undefined : `a polymer needs 1-${MAX_UNITS} units`
 }
 
-/**
- * Reads the map in the file.
- *
- * @param root - the BAYSOL data folder.
- * @returns the map; `{}` for no file or no content.
- * @throws UnusableFileError (kind `custom-solutes`) if the file is not one JSON object of
- *     the kind described above.
- */
-function readFileMap(root: string): Dict {
-    return readMap(customFile(root), {
-        kind: KIND,
-        name: customSolutesFileName,
-        expected: `a map of up to ${MAX_ROWS} solutes`,
-        valid: (map) => {
-            const solutes = "solutes" in map ? map.solutes : []
-            return (
-                Array.isArray(solutes) &&
-                solutes.length <= MAX_ROWS &&
-                solutes.every(usableEntry)
-            )
-        },
-    })
-}
+/** The list file of the custom solutes; names differ without regard to case. */
+const list = new ListFile<CustomEntry>({
+    fileName: customSolutesFileName,
+    key: "solutes",
+    kind: "custom-solutes",
+    plural: "solutes",
+    noun: "custom solute",
+    problem: entryProblem,
+    nameOf: (e) => e.name,
+})
 
 /**
  * The custom solutes of the folder.
  *
  * @param root - the BAYSOL data folder.
+ * @param options - `track: true` when the entries are read to be edited and saved (see
+ *     `readSolutes` of ./buffer.ts); a plain read leaves the base of the check alone.
  * @returns the entries (empty for none).
  * @throws UnusableFileError (kind `custom-solutes`) if the file cannot be used.
  */
-export function readSolutes(root: string): CustomEntry[] {
-    const solutes = readFileMap(root).solutes
-    return Array.isArray(solutes) ? (solutes as CustomEntry[]) : []
+export function readCustomSolutes(root: string, options: ReadOptions = {}): CustomEntry[] {
+    return list.read(root, options)
+}
+
+/**
+ * Removes ONE saved entry from the file at once, leaving every other entry (and key) as
+ * the file has it: the delete of the custom solutes table, which writes nothing else.
+ * It takes the lock and refuses when another copy saved the file after this one read it.
+ *
+ * @param root - the BAYSOL data folder.
+ * @param name - the name of the saved entry, without regard to case.
+ * @returns whether there was such an entry (nothing is written when there was not).
+ * @throws ChangedOnDiskError if the file changed since this process read it;
+ *     UnusableFileError (kind `custom-solutes`) for a file that cannot be used.
+ */
+export function removeCustomSolute(root: string, name: string): boolean {
+    return list.remove(root, name, { guarded: true })
 }
 
 /**
@@ -117,22 +106,9 @@ export function readSolutes(root: string): CustomEntry[] {
  * @returns the file.
  * @throws ChangedOnDiskError if another copy of the program saved the file after this
  *     one read it (nothing is written); UnusableFileError (kind `custom-solutes`) for too
- *     many entries, a polymer
- *     without 1 to [[MAX_UNITS]] units, a name used twice, or a file that cannot be used.
+ *     many entries, a polymer without 1 to [[MAX_UNITS]] units, a name used twice, or a
+ *     file that cannot be used.
  */
-export function writeSolutes(root: string, solutes: readonly CustomEntry[]): string {
-    if (solutes.length > MAX_ROWS) throw new UnusableFileError("too many solutes", KIND)
-    if (!solutes.every(usableEntry))
-        throw new UnusableFileError("a polymer needs 1-4 units", KIND)
-    const names = solutes.map((e) => fold(e.name))
-    if (new Set(names).size !== names.length)
-        throw new UnusableFileError("name in use", KIND)
-    const file = customFile(root)
-    return withFileLock(file, () => {
-        assertUnchanged(file)
-        const { solutes: _old, ...others } = readFileMap(root)
-        writeAtomic(file, writeJson({ solutes, ...others }))
-        noteWritten(file)
-        return file
-    })
+export function writeCustomSolutes(root: string, solutes: readonly CustomEntry[]): string {
+    return list.write(root, solutes)
 }

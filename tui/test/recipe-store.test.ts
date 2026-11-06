@@ -5,17 +5,17 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
-import { UnusableFileError } from "../src/core/files.js"
+import { ChangedOnDiskError, UnusableFileError } from "../src/core/files.js"
 import type { BufferRow } from "../src/store/buffer.js"
 import {
-    deleteRecipe,
-    indexOfName,
+    indexOfRecipe,
     kindsSummary,
     listRecipes,
-    nameProblem,
     readRecipes,
+    recipeNameProblem,
     recipeSolutes,
     recipesFile,
+    removeRecipe,
     renameProblem,
     renameRecipe,
     saveRecipe,
@@ -147,17 +147,17 @@ test("the caps", () => {
 })
 
 test("names", () => {
-    assert.equal(nameProblem("SEC buffer"), undefined)
-    assert.equal(nameProblem("x".repeat(40)), undefined)
-    assert.equal(nameProblem("x".repeat(41)), "40 characters at most")
-    assert.equal(nameProblem("   "), "type a name first!")
-    assert.equal(nameProblem(""), "type a name first!")
-    assert.equal(nameProblem("a\tb"), "no control characters")
-    assert.equal(nameProblem("ångström ± 😀"), undefined)
+    assert.equal(recipeNameProblem("SEC buffer"), undefined)
+    assert.equal(recipeNameProblem("x".repeat(40)), undefined)
+    assert.equal(recipeNameProblem("x".repeat(41)), "40 characters at most")
+    assert.equal(recipeNameProblem("   "), "type a name first!")
+    assert.equal(recipeNameProblem(""), "type a name first!")
+    assert.equal(recipeNameProblem("a\tb"), "no control characters")
+    assert.equal(recipeNameProblem("ångström ± 😀"), undefined)
     const recipes = [{ name: "Alpha" }, { name: "beta" }]
-    assert.equal(indexOfName(recipes, " ALPHA "), 0)
-    assert.equal(indexOfName(recipes, "Beta"), 1)
-    assert.equal(indexOfName(recipes, "gamma"), undefined)
+    assert.equal(indexOfRecipe(recipes, " ALPHA "), 0)
+    assert.equal(indexOfRecipe(recipes, "Beta"), 1)
+    assert.equal(indexOfRecipe(recipes, "gamma"), undefined)
 })
 
 test("a rename is unique among the others, a case-only change is allowed", () => {
@@ -183,8 +183,8 @@ test("list, rename and delete", () => {
     assert.equal(renameRecipe(root, "SEC BUFFER", "customs"), "name in use")
     assert.equal(renameRecipe(root, "nope", "x"), "no such recipe")
     assert.equal(renameRecipe(root, "empty", "none"), undefined)
-    assert.equal(deleteRecipe(root, "NONE"), true)
-    assert.equal(deleteRecipe(root, "none"), false)
+    assert.equal(removeRecipe(root, "NONE"), true)
+    assert.equal(removeRecipe(root, "none"), false)
     assert.deepEqual(
         readRecipes(root).map((r) => r.name),
         ["SEC BUFFER", "Everything", "Customs"],
@@ -214,4 +214,22 @@ test("kinds", () => {
         "the fixture's rows",
     )
     assert.ok(kindsSummary(rows).includes("seq"))
+})
+
+test("removing one recipe keeps the others and refuses after another copy saved", () => {
+    const root = tempRoot()
+    writeFileSync(recipesFile(root), fixtureText("buffer/recipes.json"))
+    const names = () => readRecipes(root).map((r) => r.name)
+    const all = names()
+    readRecipes(root, { track: true })
+    assert.equal(removeRecipe(root, all[1] as string, { guarded: true }), true)
+    assert.deepEqual(names(), all.filter((_, i) => i !== 1))
+    assert.equal(removeRecipe(root, "nope"), false)
+    assert.deepEqual(readRecipes(root), readRecipes(root), "still a valid file")
+    // another copy saves: this one's view is stale and the removal refuses
+    const rest = names()
+    writeFileSync(recipesFile(root), fixtureText("buffer/recipes.json"))
+    const stale = () => removeRecipe(root, rest[0] as string, { guarded: true })
+    assert.throws(stale, ChangedOnDiskError)
+    assert.equal(names().length, all.length, "nothing was written")
 })

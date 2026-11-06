@@ -2,13 +2,13 @@
 
 import { Box, Text } from "ink"
 import { type ReactNode, useMemo, useState } from "react"
+import { formatNumber } from "../core/text.js"
 import {
     blankUnit,
     compactUnits,
     defaultLabel,
     type EntryUnit,
     entryProblem,
-    formatNumber,
     getField,
     labelShown,
     MAX_UNITS,
@@ -27,10 +27,10 @@ import { isBuiltinName } from "../store/solute-index.js"
 import { FieldForm, type FormCell, type FormRow } from "../ui/field-form.js"
 import { type CellPos, placeAt } from "../ui/form-layout.js"
 import { Frame } from "../ui/frame.js"
-import type { LegendItem } from "../ui/legend.js"
 import { useNav } from "../ui/nav.js"
 import { useTheme } from "../ui/theme.js"
 import { useFormScreen } from "../ui/use-form-screen.js"
+import { formLegend } from "./table-legend.js"
 
 /** The cells of a unit row, in column order: the field of each. */
 const UNIT_KEYS: readonly UnitKey[] = ["label", "formula", "z", "slope", "sigma"]
@@ -55,15 +55,6 @@ const VALID: number[][] = [
     [1, 2, 3, 4],
 ]
 
-/** The keys of the form page. */
-const LEGEND: LegendItem[] = [
-    { label: "move", keys: "↑↓←→" },
-    { label: "edit", keys: "⏎" },
-    { label: "restore", keys: "^u" },
-    { label: "accept", keys: "^w" },
-    { label: "cancel", keys: "esc" },
-]
-
 /**
  * What the form page of a custom polymer is told.
  *
@@ -72,7 +63,7 @@ const LEGEND: LegendItem[] = [
  * @property onAccept - called with the polymer (its used unit rows only) when the form is
  *     accepted; the form then closes. A form left with Esc calls nothing.
  */
-export type CustomPolymerFormProps = {
+type CustomPolymerFormProps = {
     entry:    PolymerEntry
     others:   readonly string[]
     onAccept: (entry: PolymerEntry) => void
@@ -222,6 +213,17 @@ export function CustomPolymerForm(props: CustomPolymerFormProps): ReactNode {
             }
             setEntry(withValue(t, originalOf(t)))
         },
+        // a cell can be put back when it (or, for a formula, the Z it gave) was changed
+        canRestore: (pos) => {
+            const t = targetAt(pos)
+            if (t.kind === "ends" && t.key === "formula") return endsFormula !== ""
+            if (t.kind === "unit" && t.key === "formula") {
+                const u = entry.units[t.unit] as EntryUnit
+                const o = orig.units[t.unit] as EntryUnit
+                return u.formula !== o.formula || u.z !== o.z
+            }
+            return cellValue(t) !== originalOf(t)
+        },
         check: () => {
             const found = entryProblem(compact, isBuiltinName, others)
             if (!found) return undefined
@@ -277,10 +279,16 @@ export function CustomPolymerForm(props: CustomPolymerFormProps): ReactNode {
     const preview = useMemo(() => polymerPreview(entry), [entry])
 
     return (
-        <Frame logo="blocky"
+        <Frame
             title={orig.name === "" ? "new custom polymer" : "custom polymer"}
             subtitle={orig.name === "" ? undefined : orig.name}
-            legend={LEGEND}
+            legend={formLegend({
+                editing: form.edit !== undefined,
+                moves: form.moves,
+                canRestore: form.canRestore,
+                complete: form.complete,
+                acceptLabel: orig.name === "" ? "add to table" : "accept",
+            })}
             note={form.note}
             noteIsError={form.noteIsError}
         >

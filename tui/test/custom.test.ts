@@ -2,6 +2,7 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import { formatNumber } from "../src/core/text.js"
 import {
     addEntry,
     addUnit,
@@ -13,8 +14,8 @@ import {
     defaultLabel,
     type EntryUnit,
     entryProblem,
+    fieldMessage,
     fieldProblem,
-    formatNumber,
     formatRounded,
     getField,
     labelShown,
@@ -25,7 +26,6 @@ import {
     parseCell,
     parseField,
     polymerPreview,
-    problem,
     problems,
     removeUnit,
     setField,
@@ -265,7 +265,7 @@ test("field problems tell their field", () => {
     assert.equal(fieldProblem({ ...polymer(), "pmv-ends": null })?.field, "pmv-ends")
     assert.equal(fieldProblem({ ...polymer(), "sigma-ends": -1 })?.field, "sigma-ends")
     for (const e of [nonbio(), polymer(), two, { ...nonbio(), pmv: null }])
-        assert.equal(problem(e), fieldProblem(e)?.message)
+        assert.equal(fieldMessage(e), fieldProblem(e)?.message)
     // one entry among the others: built-in and used names, case-insensitively
     assert.equal(entryProblem(nonbio(), undefined, ["x", "y"]), undefined)
     assert.deepEqual(entryProblem(nonbio(), undefined, ["x", " nace "]), {

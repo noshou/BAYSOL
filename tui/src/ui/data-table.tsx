@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { Box, Text } from "ink"
-import type { ReactNode } from "react"
-import { padWidth, truncate } from "../core/text.js"
+import { Fragment, type ReactNode } from "react"
+import { displayWidth, padWidth, truncate } from "../core/text.js"
+import { Bar, Rule } from "./table-segments.js"
 import { useTheme } from "./theme.js"
 
 /**
@@ -37,7 +38,7 @@ export type Column<R> = {
  * @property empty - what to say when there are no rows.
  * @property width - the cells the table may use (the body width of the terminal).
  */
-export type DataTableProps<R> = {
+type DataTableProps<R> = {
     columns:  Column<R>[]
     rows:     R[]
     cursor:   number
@@ -63,10 +64,14 @@ export function columnWidths<R>(columns: Column<R>[], width: number): number[] {
     // each cell has one space of padding on both sides and the columns share one rule
     const room = width - gutter - columns.length * 3
     const fixed = columns.reduce((sum, c) => sum + (c.width ?? 0), 0)
-    const grows = columns.reduce((sum, c) => sum + (c.width === undefined ? (c.grow ?? 1) : 0), 0)
+    const grows = columns.reduce(
+        (sum, c) => sum + (c.width === undefined ? (c.grow ?? 1) : 0),
+        0,
+    )
     const left = Math.max(0, room - fixed)
     return columns.map((c) =>
-        c.width ?? Math.max(c.title.length, Math.floor((left * (c.grow ?? 1)) / grows))
+        c.width ??
+            Math.max(displayWidth(c.title), Math.floor((left * (c.grow ?? 1)) / grows))
     )
 }
 
@@ -83,29 +88,54 @@ export function DataTable<R>(props: DataTableProps<R>): ReactNode {
     const theme = useTheme()
     const widths = columnWidths(columns, width)
 
-    const line = (cells: string[], lead: string): string =>
-        lead + cells.map((c, i) => {
-            const col = columns[i]
-            const cut = truncate(c, widths[i])
-            const pad = " ".repeat(Math.max(0, widths[i] - cut.length))
-            return ` ${col.align === "right" ? pad + cut : padWidth(cut, widths[i])} `
-        }).join("│")
+    // a row of text segments in the colour of the row, the separators in the border colour
+    const line = (
+        cells: string[],
+        lead: string,
+        ink: string,
+        bold: boolean,
+    ): ReactNode => (
+        <Text>
+            <Text color={ink} bold={bold}>{lead}</Text>
+            {cells.map((c, i) => {
+                const col = columns[i] as Column<R>
+                const w = widths[i] as number
+                const cut = truncate(c, w)
+                const pad = " ".repeat(Math.max(0, w - displayWidth(cut)))
+                const body = col.align === "right" ? pad + cut : padWidth(cut, w)
+                return (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a column is its place
+                    <Fragment key={i}>
+                        {i > 0 ? <Bar style="single" /> : null}
+                        <Text color={ink} bold={bold}>{` ${body} `}</Text>
+                    </Fragment>
+                )
+            })}
+        </Text>
+    )
 
     const shown = rows.slice(offset, offset + pageSize)
     return (
         <Box flexDirection="column">
-            <Text bold color={theme.fg}>{line(columns.map((c) => c.title), "   ")}</Text>
-            <Text color={theme.mt}>
-                {"───" + widths.map((w) => "─".repeat(w + 2)).join("┼")}
-            </Text>
-            {rows.length === 0 ? <Text color={theme.mt}>{empty ?? "nothing here yet"}</Text> : null}
+            {line(columns.map((c) => c.title), "   ", theme.fg, true)}
+            <Rule
+                style="single"
+                part="mid"
+                widths={widths.map((w) => w + 2)}
+                options={{ frame: false, lead: 3 }}
+            />
+            {rows.length === 0 ? (
+                <Text color={theme.mt}>{empty ?? "nothing here yet"}</Text>
+            ) : null}
             {shown.map((row, i) => {
                 const on = offset + i === cursor
+                const ink = on ? theme.fg : theme.mt
                 const lead = `${on ? ">" : " "}${mark ? mark(row) : " "} `
                 return (
-                    <Text key={offset + i} color={on ? theme.fg : theme.mt} bold={on}>
-                        {line(columns.map((c) => c.text(row)), lead)}
-                    </Text>
+                    // biome-ignore lint/suspicious/noArrayIndexKey: position is the id
+                    <Fragment key={offset + i}>
+                        {line(columns.map((c) => c.text(row)), lead, ink, on)}
+                    </Fragment>
                 )
             })}
             {rows.length > pageSize ? (

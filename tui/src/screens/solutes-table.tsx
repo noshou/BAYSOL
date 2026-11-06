@@ -5,15 +5,15 @@ import { formatNumber } from "../core/text.js"
 import { paramsCell, rowNote } from "../store/add-flow.js"
 import type { BufferRow } from "../store/buffer.js"
 import { type Row, rowValue } from "../store/draft.js"
-import { firstProblem, type Solute } from "../store/solutes.js"
+import { firstProblem, rowOf, type Solute, soluteOf } from "../store/solutes.js"
 import { type Column, columnWidths, DataTable } from "../ui/data-table.js"
 import { Frame } from "../ui/frame.js"
 import { keys } from "../ui/keys.js"
-import { type LegendItem, legendBack, legendMove, legendQuit } from "../ui/legend.js"
-import { useConfirm } from "../ui/use-confirm.js"
+import { legendFor } from "../ui/legend.js"
+import { questionLegend, useConfirm } from "../ui/use-confirm.js"
 import { useKeys } from "../ui/use-keys.js"
 import { EMPTY_HINT, replaceBufferQuestion } from "./buffer-text.js"
-import { rowOf, soluteOf, soluteProblem } from "./solute-rows.js"
+import { soluteProblem } from "./solute-rows.js"
 import { useSoluteFlow } from "./use-solute-flow.js"
 import { useTableScreen } from "./use-table-screen.js"
 
@@ -23,7 +23,7 @@ import { useTableScreen } from "./use-table-screen.js"
  * @property count - how many solutes the target has now (above 0).
  * @property recipe - the name of the recipe the rows come from.
  */
-export type ReplaceInfo = { count: number; recipe: string }
+type ReplaceInfo = { count: number; recipe: string }
 
 /**
  * What a table of solutes edits and where it saves.
@@ -44,7 +44,7 @@ export type ReplaceInfo = { count: number; recipe: string }
  * @property replace - when set, the first `^w` asks `replace N solutes with recipe
  *     "NAME"?` and saves only on Enter.
  */
-export type SolutesTableProps = {
+type SolutesTableProps = {
     title: string
     subtitle?: string
     items: readonly BufferRow[]
@@ -107,8 +107,8 @@ function columnsOf(
  * prompt under the table); `^n`, `^p`, `^f`, `^e` add a non-biological solute, a polymer,
  * a protein and DNA or RNA from a file (a dropdown or a prompt under the table), none
  * past 999 rows; `^r` marks the row to be removed; `^u` undoes its last change; `^w`
- * saves (a row that is not complete is told and nothing is saved); `^x` goes back and Esc
- * quits, both asking first when something is unsaved. While a flow is open Esc and `^x`
+ * saves (a row that is not complete is told and nothing is saved); `^x` goes back, asking
+ * first when something is unsaved. While a flow is open Esc and `^x`
  * cancel it. The mechanics are `useTableScreen`, the flows `useSoluteFlow`.
  *
  * @param props - see [[SolutesTableProps]].
@@ -181,39 +181,29 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
     const paramsWidth = widths[PARAMS_COLUMN] as number
     const view: View[] = flow.rows.map((row, i) => ({ row, i }))
 
-    // what does nothing is not offered: a locked table edits nothing, a full one adds
-    // nothing
-    const legend: LegendItem[] = [legendMove]
-    if (t.canEdit) legend.push({ label: "edit", keys: "⏎" })
-    if (t.canAdd) {
-        legend.push(
-            { label: "add solute", keys: "^n" },
-            { label: "add polymer", keys: "^p" },
-            { label: "add protein", keys: "^f" },
-            { label: "add DNA/RNA", keys: "^e" },
-        )
-    }
-    if (!t.locked) {
-        legend.push(
-            { label: "remove", keys: "^r" },
-            { label: "undo", keys: "^u" },
-            { label: "save", keys: "^w" },
-        )
-    }
-    legend.push(legendBack, legendQuit)
+    // only the keys that work now (`useTableScreen` knows where the cursor is and what the
+    // rows allow); a question of the screen's own (the recipe replace) shows its answers
+    const legend = confirm.question
+        ? questionLegend(confirm.question)
+        : t.legend([
+            legendFor("add solute", keys.addNonbio),
+            legendFor("add polymer", keys.addPolymer),
+            legendFor("add protein", keys.addProtein),
+            legendFor("add DNA/RNA", keys.addNucleotide),
+        ])
 
     // the questions first, then what an open flow says, the table's own note, the basis
     // of the polymer under the cursor, and what the caller asked to say
     const quiet = t.frameNote === undefined
-    const note = confirm.question ?? (flow.open
-        ? flow.note
-        : (t.frameNote ??
-          (t.current ? rowNote(t.current) : undefined) ??
-          hint ??
-          idleNote))
+    const note = confirm.note ?? (flow.open
+        ?   flow.note
+        :   (t.frameNote ??
+            (t.current ? rowNote(t.current) : undefined) ??
+            hint ??
+            idleNote))
     const changes = t.drafts.count
     return (
-        <Frame logo="blocky"
+        <Frame
             title={title}
             subtitle={changes > 0 ? `${changes} unsaved` : subtitle}
             legend={flow.open ? flow.legend : legend}

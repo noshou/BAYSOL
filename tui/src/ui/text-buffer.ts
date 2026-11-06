@@ -74,7 +74,8 @@ export class TextBuffer {
     delete(): TextBuffer {
         const after = this.text.slice(this.cursor)
         const first = [...new Intl.Segmenter().segment(after)][0]?.segment ?? ""
-        return this.with(this.text.slice(0, this.cursor) + after.slice(first.length), this.cursor)
+        const text = this.text.slice(0, this.cursor) + after.slice(first.length)
+        return this.with(text, this.cursor)
     }
 
     /** Moves the cursor one character left. */

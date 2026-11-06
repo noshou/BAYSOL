@@ -2,7 +2,7 @@
 
 import { readFileSync } from "node:fs"
 import { assetPath }    from "../core/assets.js"
-import { KeyInput }     from "./keys.js"
+import { type KeyInput, plainKey } from "./keys.js"
 
 /**
  * Every menu option and its hotkey. Its keys are the allowed option names
@@ -10,20 +10,19 @@ import { KeyInput }     from "./keys.js"
  * `assets/menu-options/`.
  */
 const menuOptions = {
-    buffer:   { hotkey: new KeyInput("b") },
-    data:     { hotkey: new KeyInput("d") },
-    help:     { hotkey: new KeyInput("h") },
-    load:     { hotkey: new KeyInput("l") },
-    logs:     { hotkey: new KeyInput("g") },
-    models:   { hotkey: new KeyInput("m") },
-    new:      { hotkey: new KeyInput("n") },
-    open:     { hotkey: new KeyInput("o") },
-    output:   { hotkey: new KeyInput("u") },
-    plots:    { hotkey: new KeyInput("p") },
-    quit:     { hotkey: new KeyInput("q") },
-    run:      { hotkey: new KeyInput("r") },
-    sampler:  { hotkey: new KeyInput("a") },
-    settings: { hotkey: new KeyInput("s") },
+    buffer:   { hotkey: plainKey("b") },
+    data:     { hotkey: plainKey("d") },
+    help:     { hotkey: plainKey("h") },
+    load:     { hotkey: plainKey("l") },
+    logs:     { hotkey: plainKey("g") },
+    models:   { hotkey: plainKey("m") },
+    new:      { hotkey: plainKey("n") },
+    open:     { hotkey: plainKey("o") },
+    output:   { hotkey: plainKey("u") },
+    plots:    { hotkey: plainKey("p") },
+    quit:     { hotkey: plainKey("q") },
+    sampler:  { hotkey: plainKey("a") },
+    settings: { hotkey: plainKey("s") },
 } as const satisfies Record<string, { hotkey: KeyInput }>
 
 /** The name of a menu option: one of the keys of `menuOptions`. */
@@ -93,34 +92,6 @@ export function loadOpts<N extends MenuOptions>(
 }
 
 /**
- * The grid shapes that have move hints, and how many positions each has.
- * Each shape needs `assets/menu-arrows/(<shape>)-pos1.txt` to `-pos<n>.txt`.
- */
-const arrowLayouts = { "2x2": 4, "2x3": 6 } as const
-
-/** A grid shape with move hints: `"2x2"` or `"2x3"`. */
-export type ArrowLayout = keyof typeof arrowLayouts
-
-/**
- * Loads the move hints of a grid shape, one art piece per position of the grid.
- *
- * The pieces show which arrows are possible from a position, e.g. the first
- * position of a 2x3 grid has a right and a down arrow. Positions count from the
- * top-left, one row at a time, so `pos1` is the first element of the array.
- *
- * Call it once, at module level: it reads the files from disk each time.
- *
- * @param layout - the grid shape, `"2x2"` or `"2x3"`.
- * @returns the pieces in order, `pos1` first: 4 for `"2x2"`, 6 for `"2x3"`.
- * @throws if a file `assets/menu-arrows/(<layout>)-pos<n>.txt` cannot be read.
- */
-export function menuArrows(layout: ArrowLayout): Art[] {
-    return Array.from({ length: arrowLayouts[layout] }, (_, i) =>
-        loadArt("menu-arrows", `(${layout})-pos${i + 1}.txt`)
-    )
-}
-
-/**
  * Loads the cursor drawn beside the selected menu item.
  *
  * @returns the cursor art with its size in terminal cells.
@@ -150,4 +121,6 @@ export type SmallLogo = "blocky" | "smooth"
  * @returns the logo art with its size in terminal cells.
  * @throws if `assets/logo/logo-<kind>.txt` cannot be read.
  */
-export function smallLogo(kind: SmallLogo): Art { return loadArt("logo", `logo-${kind}.txt`) }
+export function smallLogo(kind: SmallLogo): Art {
+    return loadArt("logo", `logo-${kind}.txt`)
+}

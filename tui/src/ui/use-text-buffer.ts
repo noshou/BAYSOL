@@ -3,8 +3,8 @@
 import { usePaste } from "ink"
 import { useCallback, useState } from "react"
 import { type KeyInput, keys } from "./keys.js"
-import { TextBuffer } from "./text-buffer.js"
 import { useScreenActive } from "./nav.js"
+import { TextBuffer } from "./text-buffer.js"
 
 /**
  * The state of a one-line text input and the one function that feeds it key presses.
@@ -49,8 +49,8 @@ export function useTextBuffer(
         else if (press.is(keys.delete)) set((b) => b.delete())
         else if (press.is(keys.left)) set((b) => b.left())
         else if (press.is(keys.right)) set((b) => b.right())
-        else if (press.key_ === "home") set((b) => b.home())
-        else if (press.key_ === "end") set((b) => b.end())
+        else if (press.is(keys.home)) set((b) => b.home())
+        else if (press.is(keys.end)) set((b) => b.end())
         else return false
         return true
     }, [])

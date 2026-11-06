@@ -5,37 +5,33 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
-import { displayWidth } from "../src/core/text.js"
+import { formatNumber } from "../src/core/text.js"
 import {
     type AddEvent,
     AddFlow,
     type AddKind,
     basisNote,
-    boxTop,
-    bufferRow,
     countsText,
-    DROPDOWN_ROWS,
     type DropdownStep,
     entries,
     entryTag,
     familyMatch,
-    formatNumber,
-    itemText,
     NO_MATCH,
-    opensBelow,
     type PromptStep,
     paramsCell,
-    parseField,
-    pathHints,
-    pathProblem,
+    parseAddField,
     rowNote,
+    sequencePathProblem,
 } from "../src/store/add-flow.js"
 import { rowProblem } from "../src/store/buffer.js"
 import type { CustomEntry } from "../src/store/custom.js"
 import { Drafts } from "../src/store/draft.js"
 import { MAX_ROWS } from "../src/store/limits.js"
+import { hintsFor } from "../src/store/path-input.js"
+import { isFastaFile } from "../src/store/sequences.js"
 import { resolveBuiltin } from "../src/store/solute-index.js"
 import type { Solute } from "../src/store/solutes.js"
+import { bufferRow } from "../src/store/solutes.js"
 import { fixture as sharedFixture } from "./support/fixtures.js"
 
 // ---- fixtures -------------------------------------------------------------------------
@@ -147,14 +143,14 @@ test("numbers", () => {
     assert.equal(formatNumber(200.0), "200")
     assert.equal(formatNumber(1.0e-5), "0.00001")
     assert.equal(formatNumber(null), "")
-    assert.deepEqual(parseField("sigmaMM", " 0.5 "), { value: 0.5 })
-    assert.ok("error" in parseField("mM", "0"))
-    assert.deepEqual(parseField("mM", "-1"), { error: "mM must be > 0" })
-    assert.deepEqual(parseField("sigmaMM", "-1"), { error: "not below 0" })
-    assert.deepEqual(parseField("sigmaMM", ""), { error: "a number, please" })
-    assert.deepEqual(parseField("sigmaMM", "1e999"), { error: "a number, please" })
-    assert.deepEqual(parseField("name", " x "), { value: "x" })
-    assert.deepEqual(parseField("name", " "), { error: "name needed" })
+    assert.deepEqual(parseAddField("sigmaMM", " 0.5 "), { value: 0.5 })
+    assert.ok("error" in parseAddField("mM", "0"))
+    assert.deepEqual(parseAddField("mM", "-1"), { error: "mM must be > 0" })
+    assert.deepEqual(parseAddField("sigmaMM", "-1"), { error: "not below 0" })
+    assert.deepEqual(parseAddField("sigmaMM", ""), { error: "a number, please" })
+    assert.deepEqual(parseAddField("sigmaMM", "1e999"), { error: "a number, please" })
+    assert.deepEqual(parseAddField("name", " x "), { value: "x" })
+    assert.deepEqual(parseAddField("name", " "), { error: "name needed" })
 })
 
 // ---- the dropdown ---------------------------------------------------------------------
@@ -229,29 +225,7 @@ test("the name dropdown keys", () => {
     assert.equal(dropdown(long).problem, "name too long (60 at most)")
 })
 
-test("a dropdown line and the status row", () => {
-    const e = {
-        name: "a-rather-long-solute-name-that-will-not-fit-in-the-dropdown-at-all",
-        tag: "solute",
-        kind: "nonbiological",
-    }
-    const others = [
-        e,
-        { name: "ficoll 70", kind: "polymer", tag: "polymer" },
-        { name: "x", tag: "custom" },
-        { name: "peg", kind: "polymer-family", tag: "polymer" },
-    ]
-    for (const room of [20, 45, 60]) {
-        for (const entry of others) {
-            assert.equal(displayWidth(itemText(entry, room)), room, `${room} ${entry.name}`)
-        }
-    }
-    assert.ok(itemText(e, 45).endsWith("…  solute"))
-    assert.ok(
-        itemText({ name: "peg", kind: "polymer-family", tag: "polymer" }, 30).endsWith(
-            "family",
-        ),
-    )
+test("the status row of the dropdown", () => {
     assert.equal(dropdown(add("nonbio")).status, "type a solute name")
     assert.equal(dropdown(add("polymer")).status, "type a polymer name")
     assert.equal(dropdown(feed(add("polymer"), "qqqqzzzz")).status, NO_MATCH)
@@ -269,19 +243,6 @@ test("the basis", () => {
     assert.equal(rowNote({ kind: "polymer", arg: "ficoll 70" } as Solute), "mM per 1000 Da")
     assert.equal(rowNote({ kind: "polymer", arg: "PEG n=22" } as Solute), undefined)
     assert.equal(rowNote({ kind: "nonbiological", arg: "nacl" } as Solute), undefined)
-})
-
-test("placement", () => {
-    // the body of the real tables starts on line 3 and is 15 rows tall
-    assert.equal(DROPDOWN_ROWS, 8)
-    assert.ok(opensBelow(0, 15))
-    assert.ok(opensBelow(6, 15))
-    assert.ok(!opensBelow(7, 15))
-    assert.equal(boxTop(0, 15, 8, 3), 4)
-    assert.equal(boxTop(6, 15, 8, 3), 10)
-    assert.equal(boxTop(7, 15, 8, 3), 2)
-    assert.equal(boxTop(14, 15, 3, 3), 3 + 14 - 3)
-    assert.equal(boxTop(0, 18, 8, 2), 3)
 })
 
 // ---- the params of a row --------------------------------------------------------------
@@ -325,11 +286,11 @@ test("the family of an arg", () => {
 test("paths", () => {
     const root = tempRoot()
     writeFileSync(join(root, "a.fasta"), ">a\nACGT\n")
-    assert.equal(pathProblem(""), "type a path first!")
-    assert.equal(pathProblem("a.fasta"), "use a full path")
-    assert.equal(pathProblem(join(root, "none.fa")), "no such file")
-    assert.equal(pathProblem(root), "that is a folder")
-    assert.equal(pathProblem(join(root, "a.fasta")), undefined)
+    assert.equal(sequencePathProblem(""), "type a path first!")
+    assert.equal(sequencePathProblem("a.fasta"), "use a full path")
+    assert.equal(sequencePathProblem(join(root, "none.fa")), "no such file")
+    assert.equal(sequencePathProblem(root), "that is a folder")
+    assert.equal(sequencePathProblem(join(root, "a.fasta")), undefined)
     for (const m of [
         "type a path first!",
         "use a full path",
@@ -341,8 +302,8 @@ test("paths", () => {
     writeFileSync(join(root, "b.txt"), "x")
     writeFileSync(join(root, "c.FQ"), "@a\nA\n+\nI\n")
     mkdirSync(join(root, "dir"))
-    assert.deepEqual(pathHints(`${root}/`), ["dir/", "a.fasta", "c.FQ"])
-    assert.deepEqual(pathHints(`${root}/a`), ["a.fasta"])
+    assert.deepEqual(hintsFor(`${root}/`, isFastaFile), ["dir/", "a.fasta", "c.FQ"])
+    assert.deepEqual(hintsFor(`${root}/a`, isFastaFile), ["a.fasta"])
 })
 
 // ---- the steps of the flow, row by row against the fixture ----------------------------

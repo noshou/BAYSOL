@@ -1,30 +1,35 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { Box, Text } from "ink"
-import type { ReactNode } from "react"
-import { padWidth, truncate } from "../core/text.js"
-import type { SettingDef, SettingValue } from "../store/settings-defs.js"
-import { swatch } from "../store/solutes.js"
+import { type ReactNode, useCallback, useState } from "react"
+import { truncate } from "../core/text.js"
+import {
+    colourHex,
+    type ListKind,
+    type SettingDef,
+    type SettingValue,
+} from "../store/settings-defs.js"
 import { ChoiceTabs } from "../ui/choice-tabs.js"
+import { Entry } from "../ui/entry.js"
+import { keys } from "../ui/keys.js"
 import { useBodyColumns } from "../ui/layout.js"
-import type { LegendItem } from "../ui/legend.js"
-import { listWindowStart } from "../ui/suggestion-list.js"
+import { type LegendItem, legendFor } from "../ui/legend.js"
+import { positionStatus, type Suggestion, SuggestionList } from "../ui/suggestion-list.js"
 import { TextBuffer } from "../ui/text-buffer.js"
 import { TextField } from "../ui/text-field.js"
 import { useTheme } from "../ui/theme.js"
 import {
     type EditEnd,
-    hexOf,
+    indexOfPick,
+    maxNameText,
+    narrow,
+    noteLines,
     openNumber,
-    openPicker,
     openTabs,
     openTuple,
-    type PickerKind,
     pasteNumber,
-    pastePicker,
-    pickerMatches,
+    pickValue,
     stepNumber,
-    stepPicker,
     stepTabs,
     stepTuple,
     tupleMatches,
@@ -40,13 +45,10 @@ import { useEditor } from "./use-editor.js"
  */
 
 /** The most names a list of colours or fonts shows at once. */
-export const pickerLines = 6
-
-/** The cells a swatch takes: two blocks and a gap. */
-const swatchCells = 3
+const pickerLines = 6
 
 /** What an editor is told. */
-export type SettingEditorProps = {
+type SettingEditorProps = {
     /** The setting being edited (not a yes/no one). */
     def: SettingDef
     /** Its value now (draft or saved). */
@@ -98,28 +100,28 @@ export function editorRows(def: SettingDef): number {
  * @returns the legend items.
  */
 export function editorLegend(def: SettingDef): LegendItem[] {
-    const cancel = { label: "cancel", keys: "esc" }
-    const take = { label: "take", keys: "⏎" }
+    const cancel = legendFor("cancel", keys.escape)
+    const take = legendFor("take", keys.enter)
     switch (def.kind) {
         case "colour":
         case "font":
             return [
-                { label: "pick", keys: "↑↓" },
-                { label: "complete", keys: "tab" },
+                legendFor("pick", [keys.up, keys.down]),
+                legendFor("complete", keys.tab),
                 take,
                 cancel,
             ]
         case "set":
             return [
-                { label: "move", keys: "←→ tab" },
-                { label: "toggle", keys: "⏎" },
-                { label: "done", keys: "esc" },
+                legendFor("move", [keys.left, keys.right], keys.tab),
+                legendFor("toggle", keys.enter),
+                legendFor("done", keys.escape),
             ]
         case "tuple":
             return [
-                { label: "part", keys: "←→" },
+                legendFor("part", [keys.left, keys.right]),
                 ...(def.partKinds.includes("colour")
-                    ? [{ label: "pick colour", keys: "↑↓ tab" }]
+                    ? [legendFor("pick colour", [keys.up, keys.down], keys.tab)]
                     : []),
                 take,
                 cancel,
@@ -198,6 +200,36 @@ function NumberEditor(props: Omit<SettingEditorProps, "names">): ReactNode {
     )
 }
 
+/**
+ * A number typed into the value cell of the sheet's table: the field, and under it the
+ * error, wrapped to two lines at most. The cell's own box paints the background.
+ *
+ * @param props.def - the setting (an `int` or a `float`).
+ * @param props.current - its value now.
+ * @param props.width - the cells the field and the error may use.
+ * @param props.onEnd - called once, when the edit is over.
+ * @returns the cell's content: a space, the field, the error lines.
+ */
+export function InlineNumber(props: Omit<SettingEditorProps, "names"> & {
+    width: number
+}): ReactNode {
+    const { def, current, width, onEnd } = props
+    const theme = useTheme()
+    const edit = useEditor(openNumber(def, current), stepNumber, onEnd, pasteNumber)
+    const error = edit.error === undefined ? [] : noteLines(edit.error, width)
+    return (
+        <Box flexDirection="column">
+            <Box>
+                <Text> </Text>
+                <TextField buffer={edit.buffer} width={width} />
+            </Box>
+            {error.map((line) => (
+                <Text key={line} color={theme.er}>{` ${line}`}</Text>
+            ))}
+        </Box>
+    )
+}
+
 /** Some of a few choices, as tabs. */
 function TabsEditor(props: Omit<SettingEditorProps, "names" | "current"> & {
     current: string[]
@@ -218,72 +250,64 @@ function TabsEditor(props: Omit<SettingEditorProps, "names" | "current"> & {
 }
 
 /**
- * A list of names with the highlighted one marked, each colour with its swatch.
+ * The names as suggestions, each colour with its swatch.
  *
- * @param props.matches - the names to list.
- * @param props.index - the highlighted one.
- * @param props.colours - whether the names are colours, to draw their swatches.
- * @returns the list, `pickerLines` long at most, with a status line under it.
+ * @param names - the names to list.
+ * @param colours - whether the names are colours, to give them swatches.
+ * @returns the suggestions, in the order of `names`.
  */
-function NameList(props: {
-    matches: readonly string[]
-    index: number
-    colours: boolean
-}): ReactNode {
-    const { matches, index, colours } = props
-    const theme = useTheme()
-    const columns = useBodyColumns()
-    const start = listWindowStart(matches.length, index, pickerLines)
-    const room = Math.max(1, columns - 2 - (colours ? swatchCells : 0))
-    const status = matches.length === 0 ? "no match" : `${index + 1} of ${matches.length}`
-    return (
-        <Box flexDirection="column">
-            {matches.slice(start, start + pickerLines).map((name, i) => {
-                const on = start + i === index
-                const rgb = colours ? swatch(name) : undefined
-                return (
-                    <Text key={name} bold={on} color={on ? theme.fg : theme.mt}>
-                        {on ? "> " : "  "}
-                        {colours ? (
-                            rgb === undefined ? (
-                                "   "
-                            ) : (
-                                <Text color={hexOf(rgb)}>{"██ "}</Text>
-                            )
-                        ) : null}
-                        {padWidth(name, room)}
-                    </Text>
-                )
-            })}
-            <Text color={theme.mt}>{status}</Text>
-        </Box>
-    )
+function nameSuggestions(names: readonly string[], colours: boolean): Suggestion[] {
+    return names.map((label) => ({
+        label,
+        swatch: colours ? colourHex(label) : undefined,
+    }))
 }
 
-/** A colour or a font picked from a list. */
+/**
+ * The status line under the colours of a tuple's colour part.
+ *
+ * @param index - the highlighted colour.
+ * @param count - how many colours match.
+ * @returns `no match` or the place of the highlight.
+ */
+function tupleStatus(index: number, count: number): string {
+    return count === 0 ? "no match" : positionStatus(index, count)
+}
+
+/** A colour or a font picked from a list: the shared [[Entry]], narrowing as one types. */
 function PickerEditor(
-    props: Omit<SettingEditorProps, "current"> & { kind: PickerKind; current: string },
+    props: Omit<SettingEditorProps, "current"> & { kind: ListKind; current: string },
 ): ReactNode {
     const { def, kind, current, names, onEnd } = props
-    const theme = useTheme()
-    const columns = useBodyColumns()
-    const edit = useEditor(openPicker(kind, names, current), stepPicker, onEnd, pastePicker)
+    const [error, setError] = useState<string | undefined>(undefined)
+    const suggest = useCallback(
+        (text: string) => nameSuggestions(narrow(names, text), kind === "colour"),
+        [names, kind],
+    )
+    // stable: the entry calls it again whenever it changes
+    const clearError = useCallback(() => setError(undefined), [])
     return (
         <Box flexDirection="column">
             <Heading def={def} />
-            <Box columnGap={1}>
-                <Text color={theme.mt}>{kind}:</Text>
-                <TextField
-                    buffer={edit.buffer}
-                    width={columns - 10}
-                    placeholder="type to narrow"
-                />
-            </Box>
-            <ErrorLine error={edit.error} />
-            <NameList
-                matches={pickerMatches(edit)}
-                index={edit.index}
-                colours={kind === "colour"}
+            <Entry
+                label={`${kind}:`}
+                maxLength={maxNameText}
+                placeholder="type to narrow"
+                suggest={suggest}
+                initialIndex={indexOfPick(names, current)}
+                wrap
+                counter
+                noMatch="no match"
+                lines={pickerLines}
+                error={error}
+                onChange={clearError}
+                onSubmit={(text, chosen) => {
+                    const picked = pickValue(kind, names, text, chosen?.label)
+                    if ("error" in picked) setError(picked.error)
+                    else onEnd({ kind: "done", value: picked.value })
+                }}
+                onCancel={() => onEnd({ kind: "cancel" })}
+                onBack={() => onEnd({ kind: "back" })}
             />
         </Box>
     )
@@ -297,6 +321,7 @@ function TupleEditor(props: SettingEditorProps): ReactNode {
     const edit = useEditor(openTuple(def, current, names), stepTuple, onEnd)
     const label = Math.max(...def.partNames.map((n) => n.length))
     const colour = def.partKinds[edit.focus] === "colour"
+    const matches = tupleMatches(edit)
     return (
         <Box flexDirection="column">
             <Heading def={def} />
@@ -322,7 +347,13 @@ function TupleEditor(props: SettingEditorProps): ReactNode {
             <ErrorLine error={edit.error} />
             {edit.names.length > 0 ? (
                 colour ? (
-                    <NameList matches={tupleMatches(edit)} index={edit.index} colours />
+                    <SuggestionList
+                        items={nameSuggestions(matches, true)}
+                        highlight={edit.index}
+                        lines={pickerLines}
+                        width={columns}
+                        status={tupleStatus(edit.index, matches.length)}
+                    />
                 ) : (
                     <Box height={pickerLines + 1} />
                 )

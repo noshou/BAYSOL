@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import { constants, copyFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs"
-import { basename, isAbsolute, join, sep } from "node:path"
-import {
-    entryNames,
-    isFile,
-    isFolder,
-    isReadable,
-    sortNoCase,
-} from "../core/files.js"
-import { compareNoCase } from "../core/text.js"
+import { constants, copyFileSync, mkdirSync, unlinkSync } from "node:fs"
+import { basename, join } from "node:path"
+import { entryNames, isFile, sortNoCase } from "../core/files.js"
+import { checkPath } from "./path-input.js"
+import { inProject } from "./projects.js"
 
 /**
  * The models of a project: the structure files (`.cif` or `.pdb`) in its `models/`
@@ -19,15 +14,10 @@ import { compareNoCase } from "../core/text.js"
  * or an empty one, or one whose files were all deleted, has no models: nothing here
  * tells these apart ([[listModels]] is empty for all three, and the folder is never
  * removed).
- *
- * [[hints]] and [[complete]] are the autocompletion of a typed path.
  */
 
-/** The file extensions a model may have, lower case, without the dot. */
-export const extensions: ReadonlySet<string> = new Set(["cif", "pdb"])
-
-/** The most hints [[hintsFor]] gives. */
-const maxHints = 50
+/** The file modelExtensions a model may have, lower case, without the dot. */
+const modelExtensions: ReadonlySet<string> = new Set(["cif", "pdb"])
 
 /** The message for a copy that failed for a reason the checks could not see. */
 export const copyFailed = "could not copy the file!"
@@ -50,7 +40,7 @@ export function modelsDir(projectDir: string): string {
  */
 export function accepted(fileName: string): boolean {
     const dot = fileName.lastIndexOf(".")
-    return dot >= 0 && extensions.has(fileName.slice(dot + 1).toLowerCase())
+    return dot >= 0 && modelExtensions.has(fileName.slice(dot + 1).toLowerCase())
 }
 
 /**
@@ -69,6 +59,9 @@ export function listModels(projectDir: string): string[] {
     return sortNoCase(files)
 }
 
+/** The model prompt takes only structure files. */
+const ONLY_STRUCTURES = { accept: accepted, message: "only .cif and .pdb files" }
+
 /**
  * What is wrong with a path as the file to add as a model.
  *
@@ -79,18 +72,16 @@ export function listModels(projectDir: string): string[] {
  * @param existing - the names of the models there are.
  * @returns a short message (42 characters at most), or `undefined` if it is fine.
  */
-export function pathProblem(path: string, existing: readonly string[]): string | undefined {
-    const name = basename(path)
-    const lower = name.toLowerCase()
-    if (path.trim() === "") return "type a path first!"
-    if (!isAbsolute(path)) return "use a full absolute path"
-    if (!existsSync(path)) return "no such file"
-    if (isFolder(path)) return "that is a folder, not a file"
-    if (!accepted(name)) return "only .cif and .pdb files"
-    if (!isReadable(path)) return "cannot read that file"
-    if (existing.some((n) => n.toLowerCase() === lower))
-        return "a model with that name exists"
-    return undefined
+export function modelPathProblem(
+    path: string,
+    existing: readonly string[],
+): string | undefined {
+    const problem = checkPath(path, 42, ONLY_STRUCTURES)
+    if (problem !== undefined) return problem
+    const lower = basename(path).toLowerCase()
+    return existing.some((n) => n.toLowerCase() === lower)
+        ? "a model with that name exists"
+        : undefined
 }
 
 /**
@@ -100,15 +91,22 @@ export function pathProblem(path: string, existing: readonly string[]): string |
  * @param projectDir - the project's folder.
  * @param path - the file to copy.
  * @returns the copy.
- * @throws if the copy cannot be made, a model of that name being there included;
+ * @throws ProjectGoneError if the project's folder does not exist (it is not made);
+ *     an error if the copy cannot be made, a model of that name being there included;
  *     nothing is deleted then.
  */
 export function addModel(projectDir: string, path: string): string {
     const dir = modelsDir(projectDir)
     const target = join(dir, basename(path))
-    mkdirSync(dir, { recursive: true })
-    copyFileSync(path, target, constants.COPYFILE_EXCL)
-    return target
+    return inProject(projectDir, () => {
+        try {
+            mkdirSync(dir) // not recursive: the project's folder must be there
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
+        }
+        copyFileSync(path, target, constants.COPYFILE_EXCL)
+        return target
+    })
 }
 
 /**
@@ -123,7 +121,7 @@ export type AddResult = {
 }
 
 /**
- * Adds each of the files as [[addModel]] does; the ones that fail [[pathProblem]] (or
+ * Adds each of the files as [[addModel]] does; the ones that fail [[modelPathProblem]] (or
  * whose copy fails) are left out. A name that comes twice is added once (the first
  * wins). Nothing here throws.
  *
@@ -135,7 +133,7 @@ export function addModels(projectDir: string, paths: readonly string[]): AddResu
     const result: AddResult = { copied: [], skipped: [] }
     for (const path of paths) {
         const existing = [...listModels(projectDir), ...result.copied]
-        let reason = pathProblem(path, existing)
+        let reason = modelPathProblem(path, existing)
         if (reason === undefined) {
             try {
                 addModel(projectDir, path)
@@ -166,66 +164,4 @@ export function deleteModel(projectDir: string, modelName: string): boolean {
     } catch {
         return false
     }
-}
-
-// --- autocompletion of a typed path
-
-/**
- * The part of a typed path up to and with its last separator.
- *
- * @param text - the path typed.
- * @returns the part up to `/` (or the system's own separator); `""` when there is none.
- */
-export function dirPart(text: string): string {
-    const cut = Math.max(text.lastIndexOf("/"), text.lastIndexOf(sep))
-    return cut < 0 ? "" : text.slice(0, cut + 1)
-}
-
-/**
- * The names a typed path can go on with, for the folder it is in: folders (with a `/`
- * at the end) first, then the files whose name `accept` takes, those that start with
- * what is typed after the last separator (case does not matter). A name that starts
- * with a dot is given only when a dot is typed.
- *
- * @param text - the path typed.
- * @param accept - says whether a file name is wanted.
- * @returns at most 50 names; empty when `text` is not an absolute path in a folder
- *     that exists.
- */
-export function hintsFor(text: string, accept: (fileName: string) => boolean): string[] {
-    const dir = dirPart(text)
-    const prefix = text.slice(dir.length).toLowerCase()
-    if (dir.trim() === "" || !isAbsolute(dir) || !isFolder(dir)) return []
-    const found: { folder: boolean; name: string }[] = []
-    for (const name of entryNames(dir)) {
-        const folder = isFolder(join(dir, name))
-        const typed = name.toLowerCase().startsWith(prefix)
-        const shown = prefix.startsWith(".") || !name.startsWith(".")
-        if (typed && shown && (folder || accept(name))) found.push({ folder, name })
-    }
-    found.sort((a, b) =>
-        a.folder !== b.folder ? (a.folder ? -1 : 1) : compareNoCase(a.name, b.name),
-    )
-    return found.slice(0, maxHints).map((f) => (f.folder ? `${f.name}/` : f.name))
-}
-
-/**
- * The hints of [[hintsFor]] for `.cif` and `.pdb` files.
- *
- * @param text - the path typed.
- * @returns the hints.
- */
-export function hints(text: string): string[] {
-    return hintsFor(text, accepted)
-}
-
-/**
- * A typed path with its last part replaced by a hint.
- *
- * @param text - the path typed.
- * @param hint - one of [[hints]].
- * @returns the completed path.
- */
-export function complete(text: string, hint: string): string {
-    return dirPart(text) + hint
 }

@@ -2,7 +2,7 @@
 
 import { spawn } from "node:child_process"
 import { basename } from "node:path"
-import { findExecutable, isLinux, isMac, isWindows, type System } from "../core/system.js"
+import { findExecutable, isLinux, isMac, isWindows, type System } from "./system.js"
 
 /**
  * Opening a terminal emulator that runs a command, for a program started without a
@@ -15,7 +15,7 @@ import { findExecutable, isLinux, isMac, isWindows, type System } from "../core/
 
 /** The environment variable set in a terminal this program opened, so that the copy
  * running there never opens another one if it still finds no terminal. */
-export const inTerminalVar = "BAYSOL_IN_TERMINAL"
+const inTerminalVar = "BAYSOL_IN_TERMINAL"
 
 /** The terminal emulators tried when nothing says which to use, in this order. */
 const genericTerminals = [
@@ -228,14 +228,10 @@ export function openTerminalCommand(system: System, command: string[]): Terminal
         const terminal = terminalCandidates(system)
             .map((name) => findExecutable(system, name))
             .find((path) => path !== undefined)
-        return terminal
-            ? {
-                  command: terminalCommand(
-                      terminal,
-                      inDirectoryCommand(system.cwd, command),
-                  ),
-              }
-            : { problem: "No supported Linux terminal emulator found" }
+        if (!terminal) return { problem: "No supported Linux terminal emulator found" }
+        return {
+            command: terminalCommand(terminal, inDirectoryCommand(system.cwd, command)),
+        }
     }
     if (isMac(system)) return { command: macTerminalCommand(system.cwd, command) }
     if (isWindows(system)) {
@@ -288,7 +284,7 @@ export function startAction(hasTerminal: boolean, system: System): StartAction {
  * @param extraEnv - variables added to it.
  * @returns a problem text if it could not be started, else `undefined`.
  */
-export async function launchDetached(
+async function launchDetached(
     command: string[],
     system: System,
     extraEnv: Record<string, string> = {},

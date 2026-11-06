@@ -58,9 +58,14 @@ export function useScreenActive(): boolean {
  * Lower screens keep their state because they are hidden, not unmounted.
  *
  * @param root - the first screen.
+ * @param suspended - `true` while nothing may take keys (the terminal is too small to
+ *     show a screen): the screens stay mounted, so the user comes back to the one
+ *     they were on, with its state, when the terminal is big enough again.
  * @returns the provider; put it around the whole program.
  */
-export function NavProvider({ root }: { root: ReactElement }): ReactNode {
+export function NavProvider(
+    { root, suspended = false }: { root: ReactElement; suspended?: boolean }
+): ReactNode {
     const { exit } = useApp()
     const [stack, setStack] = useState<ReactElement[]>([root])
 
@@ -78,7 +83,11 @@ export function NavProvider({ root }: { root: ReactElement }): ReactNode {
     return (
         <NavContext.Provider value={nav}>
             {stack.map((screen, i) => (
-                <ActiveContext.Provider key={i} value={i === stack.length - 1}>
+                <ActiveContext.Provider
+                    // biome-ignore lint/suspicious/noArrayIndexKey: position is the id
+                    key={i}
+                    value={!suspended && i === stack.length - 1}
+                >
                     <Box
                         display={i === stack.length - 1 ? "flex" : "none"}
                         flexGrow={1}

@@ -1,19 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { join } from "node:path"
-import {
-    assertUnchanged,
-    isDict,
-    noteWritten,
-    readMap,
-    UnusableFileError,
-    withFileLock,
-    writeAtomic,
-    writeJson,
-} from "../core/files.js"
+import { isDict, type ReadOptions } from "../core/files.js"
 import { fold } from "../core/text.js"
 import { type BufferRow, rowProblem } from "./buffer.js"
 import { MAX_ROWS } from "./limits.js"
+import { ListFile } from "./list-file.js"
 
 /**
  * The saved recipes of the user: `recipes.json` in the BAYSOL data folder, next to
@@ -42,9 +34,6 @@ import { MAX_ROWS } from "./limits.js"
 
 /** The most characters a recipe name typed in the TUI may have. */
 export const MAX_NAME = 40
-
-/** The kind carried by the errors of this file. */
-const KIND = "recipes"
 
 /** The name of the file in the BAYSOL folder. */
 export const recipesFileName = "recipes.json"
@@ -77,8 +66,6 @@ export interface RecipeSummary {
     kinds: string
 }
 
-type Dict = Record<string, unknown>
-
 /**
  * The recipes file of the BAYSOL folder.
  *
@@ -91,13 +78,13 @@ export function recipesFile(root: string): string {
 
 /**
  * What is wrong with a text as the name of a recipe: blank, longer than [[MAX_NAME]], or
- * with a control character in it. Whether it is taken is for [[indexOfName]] and
+ * with a control character in it. Whether it is taken is for [[indexOfRecipe]] and
  * [[renameProblem]].
  *
  * @param n - the text typed.
  * @returns a short message, or `undefined`.
  */
-export function nameProblem(n: string): string | undefined {
+export function recipeNameProblem(n: string): string | undefined {
     if (n.trim() === "") return "type a name first!"
     if (n.trim().length > MAX_NAME) return `${MAX_NAME} characters at most`
     if (/\p{Cc}/u.test(n)) return "no control characters"
@@ -111,7 +98,7 @@ export function nameProblem(n: string): string | undefined {
  * @param n - the name, compared without regard to case and to the spaces at the ends.
  * @returns the index, or `undefined`.
  */
-export function indexOfName(
+export function indexOfRecipe(
     recipes: readonly { name: string }[],
     n: string,
 ): number | undefined {
@@ -122,7 +109,7 @@ export function indexOfName(
 
 /**
  * What is wrong with a name for the recipe at a place in a list: the rules of
- * [[nameProblem]], and a name that another recipe has already. The recipe itself may
+ * [[recipeNameProblem]], and a name that another recipe has already. The recipe itself may
  * keep its name, or change only its case (that is a rename, not a clash).
  *
  * @param recipes - the recipes (or table rows holding a `name`).
@@ -135,63 +122,62 @@ export function renameProblem(
     n: string,
     except?: number,
 ): string | undefined {
-    const problem = nameProblem(n)
+    const problem = recipeNameProblem(n)
     if (problem) return problem
     const others = recipes.filter((_, i) => i !== except)
-    return indexOfName(others, n) === undefined ? undefined : IN_USE_MESSAGE
+    return indexOfRecipe(others, n) === undefined ? undefined : IN_USE_MESSAGE
 }
 
 /**
- * Whether a value is a map with a name and at most [[MAX_ROWS]] valid buffer rows.
+ * What is wrong with a recipe: no name, or not an array of at most [[MAX_ROWS]] valid
+ * buffer rows.
  *
  * @param r - a value of the file or of a save.
- * @returns true if so.
+ * @returns the message, or `undefined`.
  */
-function usableRecipe(r: unknown): r is Recipe {
-    return (
-        isDict(r) &&
-        typeof r.name === "string" &&
-        r.name.trim() !== "" &&
-        Array.isArray(r.solutes) &&
-        r.solutes.length <= MAX_ROWS &&
-        r.solutes.every((row) => isDict(row) && rowProblem(row) === undefined)
-    )
+function recipeProblem(r: unknown): string | undefined {
+    if (!isDict(r) || typeof r.name !== "string" || r.name.trim() === "")
+        return "a recipe needs a name"
+    if (!Array.isArray(r.solutes)) return "a recipe needs solutes"
+    if (r.solutes.length > MAX_ROWS) return `too many solutes (${MAX_ROWS} at most)`
+    for (const row of r.solutes) {
+        const why = isDict(row) ? rowProblem(row) : "a row is not a map"
+        if (why !== undefined) return why
+    }
+    return undefined
 }
 
-/** Whether a value is at most [[MAX_ROWS]] usable recipes with names that differ. */
-function usableRecipes(recipes: unknown): recipes is Recipe[] {
-    if (!Array.isArray(recipes) || recipes.length > MAX_ROWS) return false
-    if (!recipes.every(usableRecipe)) return false
-    return new Set(recipes.map((r) => fold(r.name))).size === recipes.length
-}
+/** The list file of the recipes; names differ without regard to case. */
+const list = new ListFile<Recipe>({
+    fileName: recipesFileName,
+    key: "recipes",
+    kind: "recipes",
+    plural: "recipes",
+    noun: "recipe",
+    problem: recipeProblem,
+    nameOf: (r) => r.name,
+})
 
 /**
- * Reads the map in the file.
- *
- * @param root - the BAYSOL data folder.
- * @returns the map; `{}` for no file or no content.
- * @throws UnusableFileError (kind `recipes`) if the file is not one JSON object of the kind
- *     described above.
+ * The recipes in the order the file keeps their keys: the name first and the solutes
+ * second, then whatever else the recipe has.
  */
-function readFileMap(root: string): Dict {
-    return readMap(recipesFile(root), {
-        kind: KIND,
-        name: recipesFileName,
-        expected: "a map of valid recipes",
-        valid: (map) => usableRecipes("recipes" in map ? map.recipes : []),
-    })
+function ordered(recipes: readonly Recipe[]): Recipe[] {
+    return recipes.map(({ name, solutes, ...rest }) => ({ name, solutes, ...rest }))
 }
 
 /**
  * The recipes of the folder.
  *
  * @param root - the BAYSOL data folder.
+ * @param options - `track: true` when the recipes are read to be edited and saved with
+ *     [[writeRecipes]] (see `readSolutes` of ./buffer.ts); a plain read leaves the base
+ *     of the check alone.
  * @returns the recipes, in file order (empty for none).
  * @throws UnusableFileError (kind `recipes`) if the file cannot be used.
  */
-export function readRecipes(root: string): Recipe[] {
-    const recipes = readFileMap(root).recipes
-    return Array.isArray(recipes) ? (recipes as Recipe[]) : []
+export function readRecipes(root: string, options: ReadOptions = {}): Recipe[] {
+    return list.read(root, options)
 }
 
 /**
@@ -204,28 +190,8 @@ export function readRecipes(root: string): Recipe[] {
  */
 export function recipeSolutes(root: string, n: string): BufferRow[] | undefined {
     const recipes = readRecipes(root)
-    const i = indexOfName(recipes, n)
+    const i = indexOfRecipe(recipes, n)
     return i === undefined ? undefined : (recipes[i] as Recipe).solutes
-}
-
-/**
- * The write of [[writeRecipes]], for a caller that holds the lock on the file and has
- * made sure of what is on disk.
- *
- * @param root - the BAYSOL data folder.
- * @param recipes - the recipes.
- * @returns the file.
- * @throws UnusableFileError like [[writeRecipes]].
- */
-function writeRecipesLocked(root: string, recipes: readonly Recipe[]): string {
-    if (!usableRecipes(recipes)) throw new UnusableFileError("not valid recipes", KIND)
-    const file = recipesFile(root)
-    const { recipes: _old, ...others } = readFileMap(root)
-    // The name comes first and the solutes second, then whatever else the recipe has.
-    const out = recipes.map(({ name, solutes, ...rest }) => ({ name, solutes, ...rest }))
-    writeAtomic(file, writeJson({ recipes: out, ...others }))
-    noteWritten(file)
-    return file
 }
 
 /**
@@ -233,8 +199,9 @@ function writeRecipesLocked(root: string, recipes: readonly Recipe[]): string {
  * temporary file that replaces it in one step. The file is made if there is none; one
  * that cannot be used is not touched. It takes the lock on the file and refuses to
  * write when another copy of the program saved the file after this one read it (the
- * operations that read and write in one step, [[saveRecipe]], [[renameRecipe]] and
- * [[deleteRecipe]], read again under the lock and so never conflict).
+ * operations that read and write in one step, [[saveRecipe]] and [[renameRecipe]],
+ * read again under the lock and so never conflict; [[removeRecipe]] does too unless
+ * it is `guarded`, for a table that shows an older file).
  *
  * @param root - the BAYSOL data folder.
  * @param recipes - the recipes; they must keep the rules above.
@@ -244,12 +211,7 @@ function writeRecipesLocked(root: string, recipes: readonly Recipe[]): string {
  *     (nothing is written) or a file that cannot be used.
  */
 export function writeRecipes(root: string, recipes: readonly Recipe[]): string {
-    if (!usableRecipes(recipes)) throw new UnusableFileError("not valid recipes", KIND)
-    const file = recipesFile(root)
-    return withFileLock(file, () => {
-        assertUnchanged(file)
-        return writeRecipesLocked(root, recipes)
-    })
+    return list.write(root, ordered(recipes))
 }
 
 /**
@@ -262,13 +224,13 @@ export function writeRecipes(root: string, recipes: readonly Recipe[]): string {
  * @param solutes - the rows.
  * @returns the new list.
  */
-export function withRecipe(
+function withRecipe(
     recipes: readonly Recipe[],
     n: string,
     solutes: readonly BufferRow[],
 ): Recipe[] {
     const recipe = { name: n.trim(), solutes: [...solutes] }
-    const i = indexOfName(recipes, n)
+    const i = indexOfRecipe(recipes, n)
     if (i === undefined) return [...recipes, recipe]
     return recipes.map((r, j) => (j === i ? { ...r, ...recipe } : r))
 }
@@ -285,9 +247,8 @@ export function withRecipe(
  *     invalid row, a blank name, an unusable file).
  */
 export function saveRecipe(root: string, n: string, solutes: readonly BufferRow[]): string {
-    return withFileLock(recipesFile(root), () =>
-        writeRecipesLocked(root, withRecipe(readRecipes(root), n, solutes)),
-    )
+    list.update(root, (recipes) => ordered(withRecipe(recipes, n, solutes)))
+    return recipesFile(root)
 }
 
 /**
@@ -301,39 +262,39 @@ export function saveRecipe(root: string, n: string, solutes: readonly BufferRow[
  * @throws UnusableFileError like [[readRecipes]].
  */
 export function renameRecipe(root: string, from: string, to: string): string | undefined {
-    return withFileLock(recipesFile(root), () => {
-        const recipes = readRecipes(root)
-        const i = indexOfName(recipes, from)
-        if (i === undefined) return "no such recipe"
-        const problem = renameProblem(recipes, to, i)
-        if (problem) return problem
-        writeRecipesLocked(
-            root,
-            recipes.map((r, j) => (j === i ? { ...r, name: to.trim() } : r)),
-        )
-        return undefined
+    let message: string | undefined
+    list.update(root, (recipes) => {
+        const i = indexOfRecipe(recipes, from)
+        if (i === undefined) {
+            message = "no such recipe"
+            return undefined
+        }
+        message = renameProblem(recipes, to, i)
+        if (message) return undefined
+        return ordered(recipes.map((r, j) => (j === i ? { ...r, name: to.trim() } : r)))
     })
+    return message
 }
 
 /**
- * Deletes a recipe of the folder.
+ * Removes ONE saved recipe, at once: it re-reads the file under the lock and drops that
+ * recipe only, so it never loses another copy's changes to the other recipes.
  *
  * @param root - the BAYSOL data folder.
  * @param n - the recipe's name, without regard to case.
+ * @param options - `guarded: true` for a table that shows the file as it read it for
+ *     editing: the removal then refuses when another copy saved the file since. A list
+ *     that picks a recipe by name (the buffer landing) leaves it out.
  * @returns whether there was such a recipe (nothing is written when there was not).
- * @throws UnusableFileError like [[writeRecipes]].
+ * @throws ChangedOnDiskError when `guarded` and the file changed since this process read
+ *     it; UnusableFileError like [[writeRecipes]].
  */
-export function deleteRecipe(root: string, n: string): boolean {
-    return withFileLock(recipesFile(root), () => {
-        const recipes = readRecipes(root)
-        const i = indexOfName(recipes, n)
-        if (i === undefined) return false
-        writeRecipesLocked(
-            root,
-            recipes.filter((_, j) => j !== i),
-        )
-        return true
-    })
+export function removeRecipe(
+    root: string,
+    n: string,
+    options: { guarded?: boolean } = {},
+): boolean {
+    return list.remove(root, n, options)
 }
 
 /** The groups [[kindsSummary]] counts, in the order it tells them. */
@@ -378,7 +339,7 @@ export function kindsSummary(solutes: readonly { kind: string }[]): string {
  * @param recipes - the recipes.
  * @returns the name, the solute count and the kinds of each.
  */
-export function summaries(recipes: readonly Recipe[]): RecipeSummary[] {
+function summaries(recipes: readonly Recipe[]): RecipeSummary[] {
     return recipes.map((r) => ({
         name: r.name,
         solutes: r.solutes.length,

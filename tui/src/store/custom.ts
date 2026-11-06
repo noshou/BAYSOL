@@ -20,13 +20,21 @@
 // A number the user has not given is `null` (a `sigma` of `null` is a blank: the
 // defaults apply, where the Julia side resolves them).
 
-import { fold, formatNumber, numberText, type Parsed } from "../core/text.js"
-import type { CustomNonbioRow, CustomPolymerRow, RowBase } from "./buffer.js"
+import {
+    fold,
+    formatNumber,
+    type NumberRules,
+    type Parsed,
+    parseNumber,
+} from "../core/text.js"
+import {
+    type CustomNonbioRow,
+    type CustomPolymerRow,
+    isNumber,
+    type RowBase,
+} from "./buffer.js"
 import type { Drafts } from "./draft.js"
 import { isProblem, parseFormula, parseUnit, stripUnit } from "./formula.js"
-
-// Re-exported: the path the screens import them by.
-export { formatNumber, type Parsed }
 /**
  * The relative uncertainty of the PMV of a polymer unit whose `sigma` is blank: 2 % of
  * the PMV. This is `POLYMER_UNKNOWN_REL_UNC` of `Polymers.jl` (BulkElectronDensity),
@@ -38,16 +46,16 @@ export const POLYMER_UNKNOWN_REL_UNC = 0.02
 export const MAX_UNITS = 4
 
 /** The labels offered for the units, in order. */
-export const DEFAULT_LABELS: readonly string[] = ["A", "B", "C", "D"]
+const DEFAULT_LABELS: readonly string[] = ["A", "B", "C", "D"]
 
 /** The most characters a unit label has. */
-export const MAX_LABEL = 8
+const MAX_LABEL = 8
 
 /** The most digits of a whole number typed for Z (it must fit a Julia `Int`). */
 const MAX_Z_DIGITS = 9
 
 /** The numbers of repeat units the polymer preview shows the chain's values for. */
-export const PREVIEW_COUNTS: readonly number[] = [10, 100]
+const PREVIEW_COUNTS: readonly number[] = [10, 100]
 
 /** What the preview says after a σ that is the fallback setting's. */
 const FALLBACK_NOTE = "(fallback)"
@@ -120,13 +128,13 @@ export type CustomKind = CustomEntry["kind"]
 export type UnitKey = keyof EntryUnit
 
 /** A cell of a unit of a polymer: the unit's index (0-based) and the cell. */
-export interface UnitField {
+interface UnitField {
     unit: number
     key: UnitKey
 }
 
 /** The fields an entry has that are not in a unit. */
-export type TopField =
+type TopField =
     | "name"
     | "formula"
     | "z"
@@ -300,11 +308,6 @@ function isNegative(x: unknown): boolean {
     return typeof x === "number" && x < 0
 }
 
-/** Whether a value is a number. */
-function isNumber(x: unknown): x is number {
-    return typeof x === "number" && !Number.isNaN(x)
-}
-
 /**
  * What is wrong with the Z of an entry or a unit: a Z above 0, or else a formula that is
  * understood (and so would give one), is needed.
@@ -400,7 +403,7 @@ export function fieldProblem(e: CustomEntry): FieldProblem | undefined {
  * @param e - the entry.
  * @returns the message of [[fieldProblem]], or `undefined`.
  */
-export function problem(e: CustomEntry): string | undefined {
+export function fieldMessage(e: CustomEntry): string | undefined {
     return fieldProblem(e)?.message
 }
 
@@ -446,7 +449,7 @@ export function problems(
         const e = state.value(i) as CustomEntry
         const key = fold(e.name)
         const message =
-            problem(e) ??
+            fieldMessage(e) ??
             (builtin?.(e.name) ? BUILTIN_MESSAGE : undefined) ??
             (seen.has(key) ? IN_USE_MESSAGE : undefined)
         if (message) return [i, message]
@@ -511,8 +514,20 @@ export function snapshot(
 
 // --- the typed fields (shared by the table and the form pages)
 
-/** A whole number as typed for Z. */
-const WHOLE = new RegExp(`^\\d{1,${MAX_Z_DIGITS}}$`)
+/** A whole number as typed for Z: digits only, at most [[MAX_Z_DIGITS]] (zeros count). */
+const WHOLE_RULES: NumberRules = { whole: true, maxDigits: MAX_Z_DIGITS, countZeros: true }
+
+/** The Z of a unit or a non-biological solute: whole and above 0. */
+const Z_RULES: NumberRules = {
+    ...WHOLE_RULES,
+    above: { limit: 0, message: "Z must be > 0" },
+}
+
+/** A ± is blank (the defaults apply) or a number, 0 or more. */
+const SIGMA_RULES: NumberRules & { blank: true } = {
+    blank:   true,
+    atLeast: { limit: 0, message: "not below 0" },
+}
 
 /**
  * A number rounded to 2 decimals, as [[formatNumber]] shows it.
@@ -553,7 +568,6 @@ export function parseField(
     text: string,
 ): Parsed<string | number | null> {
     const t = text.trim()
-    const number = numberText(t)
     switch (field) {
         case "name":
             return t === "" ? { error: "name needed" } : { value: t }
@@ -566,18 +580,14 @@ export function parseField(
         case "formula":
             return { value: t }
         case "z-ends":
-            if (!WHOLE.test(t)) return { error: "a whole number, please" }
-            return { value: Number(t) }
+            return parseNumber(t, WHOLE_RULES)
         case "z":
-            if (!WHOLE.test(t)) return { error: "a whole number, please" }
-            return Number(t) === 0 ? { error: "Z must be > 0" } : { value: Number(t) }
+            return parseNumber(t, Z_RULES)
         case "sigma":
         case "sigma-ends":
-            if (t === "") return { value: null }
-            if (number === undefined) return { error: "a number, please" }
-            return number < 0 ? { error: "not below 0" } : { value: number }
+            return parseNumber(t, SIGMA_RULES)
         default:
-            return number === undefined ? { error: "a number, please" } : { value: number }
+            return parseNumber(t)
     }
 }
 
@@ -712,7 +722,7 @@ export function labelShown(label: string, i: number, used: boolean): string {
  * @param u - the unit.
  * @returns true if so.
  */
-export function unitBlank(u: EntryUnit): boolean {
+function unitBlank(u: EntryUnit): boolean {
     return (
         u.label.trim() === "" &&
         u.formula.trim() === "" &&
@@ -765,7 +775,7 @@ export interface CompletePolymer extends PolymerEntry {
  * @param e - the polymer (its units compacted).
  * @returns true if so.
  */
-export function isComplete(e: PolymerEntry): e is CompletePolymer {
+function isComplete(e: PolymerEntry): e is CompletePolymer {
     return (
         isNumber(e["z-ends"]) &&
         isNumber(e["pmv-ends"]) &&

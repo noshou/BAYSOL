@@ -5,7 +5,7 @@ import { useRef, useState } from "react"
 import type { KeyInput } from "../ui/keys.js"
 import { useScreenActive } from "../ui/nav.js"
 import { useKeys } from "../ui/use-keys.js"
-import type { EditEnd, Step } from "./setting-edit.js"
+import type { EditEnd, EditStep } from "./setting-edit.js"
 
 /**
  * Holds the state of a pure editor (see `setting-edit.ts`) and feeds it the keys of the
@@ -22,7 +22,7 @@ import type { EditEnd, Step } from "./setting-edit.js"
  */
 export function useEditor<S, V>(
     initial: S,
-    step: (state: S, press: KeyInput) => Step<S, V>,
+    step: (state: S, press: KeyInput) => EditStep<S, V>,
     onEnd: (end: EditEnd<V>) => void,
     paste?: (state: S, text: string) => S,
 ): S {

@@ -10,7 +10,7 @@ import wrapAnsi from "wrap-ansi"
  */
 
 /** What marks text that was cut. */
-export const ellipsis = "…"
+const ellipsis = "…"
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" })
 
@@ -188,3 +188,84 @@ export function formatNumber(x: number | null | undefined): string {
  * What typed text comes to: the value, or a short message for the cell.
  */
 export type Parsed<T> = { value: T } | { error: string }
+
+/** What [[parseNumber]] says of text that is no number. */
+const NOT_A_NUMBER = "a number, please"
+
+/** What [[parseNumber]] says of text that is no whole number. */
+const NOT_A_WHOLE_NUMBER = "a whole number, please"
+
+/** A whole number as typed: digits, a sign only when [[NumberRules.signed]]. */
+const WHOLE_UNSIGNED = /^\d+$/
+const WHOLE_SIGNED = /^[+-]?\d+$/
+
+/**
+ * What a number cell accepts. Every field is optional; with none, any finite number
+ * (negative too) is taken. The checks run in the order of the fields below, after the
+ * text is known to be a number.
+ *
+ * @property whole - only whole numbers (`a whole number, please` otherwise).
+ * @property signed - with `whole`: a leading `+` or `-` is allowed (a decimal always
+ *     allows one).
+ * @property maxDigits - with `whole`: the most digits; more is refused with
+ *     `digitsMessage`, or with the not-whole message when that is left out. Leading
+ *     zeros are not counted unless `countZeros` is set.
+ * @property countZeros - with `maxDigits`: count every digit typed, leading zeros too
+ *     (the custom Z cells, as before).
+ * @property digitsMessage - what is said of too many digits.
+ * @property blank - blank text is the value `null` (the cell is optional), not an error.
+ * @property above - the number must be above `limit`, else `message`.
+ * @property atLeast - the number must be `limit` or more, else `message`.
+ */
+export type NumberRules = {
+    whole?:         boolean
+    signed?:        boolean
+    maxDigits?:     number
+    countZeros?:    boolean
+    digitsMessage?: string
+    blank?:         boolean
+    above?:         { limit: number; message: string }
+    atLeast?:       { limit: number; message: string }
+}
+
+/**
+ * What the text typed in a number cell comes to. The one parser of every number the user
+ * types (a concentration, a Z, a setting): the three families differ only in `rules`.
+ * The text is trimmed first; a number with an exponent or past the range of a double
+ * (`1e999`) is no number.
+ *
+ * @param text - what was typed.
+ * @param rules - what the cell accepts.
+ * @returns `{ value }` (`null` for blank text when `rules.blank`), or `{ error }`: `a
+ *     number, please`, `a whole number, please`, the digits message, or the message of
+ *     the limit that failed.
+ */
+export function parseNumber(
+    text: string,
+    rules: NumberRules & { blank: true },
+): Parsed<number | null>
+export function parseNumber(text: string, rules?: NumberRules): Parsed<number>
+export function parseNumber(text: string, rules: NumberRules = {}): Parsed<number | null> {
+    const t = text.trim()
+    if (t === "" && rules.blank) return { value: null }
+    let x: number
+    if (rules.whole) {
+        if (!(rules.signed ? WHOLE_SIGNED : WHOLE_UNSIGNED).test(t)) {
+            return { error: NOT_A_WHOLE_NUMBER }
+        }
+        const leading = rules.countZeros ? /^[+-]/ : /^[+-]?0*/
+        const stripped = t.replace(leading, "")
+        const digits = stripped.length
+        if (rules.maxDigits !== undefined && digits > rules.maxDigits) {
+            return { error: rules.digitsMessage ?? NOT_A_WHOLE_NUMBER }
+        }
+        x = Number(t)
+    } else {
+        const n = numberText(t)
+        if (n === undefined) return { error: NOT_A_NUMBER }
+        x = n
+    }
+    if (rules.above && !(x > rules.above.limit)) return { error: rules.above.message }
+    if (rules.atLeast && x < rules.atLeast.limit) return { error: rules.atLeast.message }
+    return { value: x }
+}

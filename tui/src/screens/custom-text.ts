@@ -3,9 +3,9 @@
 // The text of the custom solutes screens that needs no terminal: what the cells of a row
 // of the custom solutes table show, and what the landing says of its two files.
 
+import { formatNumber } from "../core/text.js"
 import {
     type CustomEntry,
-    formatNumber,
     formatRounded,
     POLYMER_UNKNOWN_REL_UNC,
     type PolymerEntry,
@@ -114,22 +114,25 @@ export function sigmaCell(e: CustomEntry, fallback: number): string {
  * @param solutes - what the custom solutes file holds.
  * @returns `["recipes (3)", "solutes (12)"]`, `?` for a file that cannot be used.
  */
-export function landingOptions(recipes: FileCount, solutes: FileCount): [string, string] {
+export function customLandingOptions(
+    recipes: FileCount,
+    solutes: FileCount,
+): [string, string] {
     const shown = (n: FileCount) => (n === "unusable" ? "?" : String(n))
     return [`recipes (${shown(recipes)})`, `solutes (${shown(solutes)})`]
 }
 
 /**
- * What the landing says of what a file holds: `recipes.json: 3 recipes`, `none yet`, or
- * `unusable!`.
+ * What the landing says of what a file holds, under a plain label and not the file's name:
+ * `recipes: 3 recipes`, `recipes: none yet`, or `recipes: unusable!`.
  *
- * @param file - the name of the file.
+ * @param label - what the file holds, as a person says it (`recipes`, `custom solutes`).
  * @param count - what it holds.
  * @param word - what one row is called (`recipe`); an `s` is added unless there is one.
  * @returns the text.
  */
-export function fileStatus(file: string, count: FileCount, word: string): string {
-    if (count === "unusable") return `${file} unusable!`
-    if (count === 0) return `${file}: none yet`
-    return `${file}: ${count} ${word}${count === 1 ? "" : "s"}`
+export function fileStatus(label: string, count: FileCount, word: string): string {
+    if (count === "unusable") return `${label}: unusable!`
+    if (count === 0) return `${label}: none yet`
+    return `${label}: ${count} ${word}${count === 1 ? "" : "s"}`
 }

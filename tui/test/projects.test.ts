@@ -7,19 +7,21 @@ import {
     mkdirSync,
     mkdtempSync,
     readFileSync,
+    symlinkSync,
     writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
+import { entryNames } from "../src/core/files.js"
 import { projectsRoot } from "../src/core/paths.js"
 import {
     brokenNames,
     createProject,
-    entryNames,
+    deleteProject,
     InvalidNameError,
     listProjects,
-    nameProblem,
+    projectNameProblem,
     readProject,
 } from "../src/store/projects.js"
 
@@ -131,7 +133,7 @@ test("a project that fails half way is removed, and a refused global makes nothi
     assert.throws(() => createProject(appRoot, "broken", failing), /cannot write/)
     assert.equal(existsSync(join(projectsRoot(appRoot), "broken")), false)
     // and the name is free again
-    assert.equal(nameProblem("broken", entryNames(projectsRoot(appRoot))), undefined)
+    assert.equal(projectNameProblem("broken", entryNames(projectsRoot(appRoot))), undefined)
     const refused = {
         ...hooks,
         prepareGlobal: () => {
@@ -165,7 +167,7 @@ test("good names", () => {
         "lpt10",
         "com10",
     ]
-    for (const n of good) assert.equal(nameProblem(n, []), undefined, n)
+    for (const n of good) assert.equal(projectNameProblem(n, []), undefined, n)
 })
 
 test("bad names, in the order of the checks", () => {
@@ -207,21 +209,21 @@ test("bad names, in the order of the checks", () => {
         ["nul.x.y", reserved],
     ]
     for (const [name, message] of cases) {
-        assert.equal(nameProblem(name, []), message, JSON.stringify(name))
+        assert.equal(projectNameProblem(name, []), message, JSON.stringify(name))
         assert.ok(message.length <= 29, "the message fits the main menu")
     }
 })
 
 test("a name that is taken is refused whatever its case", () => {
     const taken = "that project already exists!"
-    assert.equal(nameProblem("run", ["run"]), taken)
-    assert.equal(nameProblem("Run", ["run"]), taken)
-    assert.equal(nameProblem("RUN", ["Run", "other"]), taken)
-    assert.equal(nameProblem("run2", ["run", "other"]), undefined)
+    assert.equal(projectNameProblem("run", ["run"]), taken)
+    assert.equal(projectNameProblem("Run", ["run"]), taken)
+    assert.equal(projectNameProblem("RUN", ["Run", "other"]), taken)
+    assert.equal(projectNameProblem("run2", ["run", "other"]), undefined)
     // a loose file takes its name
-    assert.equal(nameProblem("notes.txt", ["notes.txt"]), taken)
+    assert.equal(projectNameProblem("notes.txt", ["notes.txt"]), taken)
     // a bad name is told before it is told to be taken
-    assert.equal(nameProblem("run.", ["run."]), "must not end with a dot")
+    assert.equal(projectNameProblem("run.", ["run."]), "must not end with a dot")
 })
 
 test("a thousand made-up names are judged", () => {
@@ -237,7 +239,7 @@ test("a thousand made-up names are judged", () => {
             { length: 1 + next(12) },
             () => alphabet[next(alphabet.length)],
         ).join("")
-        const problem = nameProblem(name, [])
+        const problem = projectNameProblem(name, [])
         if (/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(name)) {
             assert.ok(
                 problem === undefined ||
@@ -262,11 +264,12 @@ test("a broken project folder keeps its name", () => {
     const existing = entryNames(root)
     const broken = brokenNames(root)
     assert.equal(
-        nameProblem("demo", existing, broken),
+        projectNameProblem("demo", existing, broken),
         "that name is taken by a broken project folder!",
     )
-    assert.equal(nameProblem("plain", existing, broken), "that project already exists!")
-    assert.equal(nameProblem("demo", existing), "that project already exists!")
+    const exists = "that project already exists!"
+    assert.equal(projectNameProblem("plain", existing, broken), exists)
+    assert.equal(projectNameProblem("demo", existing), "that project already exists!")
     // createProject says it too, and leaves the folder alone
     assert.throws(
         () => createProject(appRoot, "demo", hooksFor(appRoot)),
@@ -276,4 +279,36 @@ test("a broken project folder keeps its name", () => {
     )
     const file = join(root, "Demo", "project.json")
     assert.equal(readFileSync(file, "utf-8"), '{"id": "other"}')
+})
+
+test("deleteProject removes only a real project folder", () => {
+    const app = tempRoot()
+    const root = projectsRoot(app)
+    mkdirSync(root, { recursive: true })
+    const make = (name: string, info?: string) => {
+        mkdirSync(join(root, name))
+        writeFileSync(join(root, name, "keep.txt"), "x")
+        if (info !== undefined) writeFileSync(join(root, name, "project.json"), info)
+    }
+    make("good", JSON.stringify({ id: "good" }))
+    make("plain")
+    make("broken", "{not json")
+    make("wrong", JSON.stringify({ id: "other" }))
+    // a link to a valid project outside the projects folder
+    const outside = join(app, "outside")
+    mkdirSync(outside)
+    writeFileSync(join(outside, "project.json"), JSON.stringify({ id: "link" }))
+    symlinkSync(outside, join(root, "link"))
+
+    const bads = ["../outside", "a/b", "", "..", ".", "link", "plain", "broken", "wrong"]
+    for (const bad of bads)
+        assert.throws(() => deleteProject(app, bad), Error, bad)
+    assert.ok(existsSync(join(outside, "project.json")))
+    for (const kept of ["plain", "broken", "wrong", "good"])
+        assert.ok(existsSync(join(root, kept, "keep.txt")), kept)
+
+    deleteProject(app, "good")
+    assert.ok(!existsSync(join(root, "good")))
+    deleteProject(app, "good") // already gone: no error
+    assert.ok(existsSync(join(root, "plain", "keep.txt")))
 })

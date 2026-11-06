@@ -3,47 +3,34 @@
 import { basename } from "node:path"
 import { Text } from "ink"
 import { type ReactNode, useCallback, useMemo, useState } from "react"
+import { pick } from "../core/file-picker.js"
 import { readSystem } from "../core/system.js"
-import { truncate } from "../core/text.js"
 import {
     type AddResult,
+    accepted,
     addModel,
     addModels,
-    complete,
     copyFailed,
     deleteModel,
-    hints,
     listModels,
-    pathProblem,
+    modelPathProblem,
 } from "../store/models.js"
+import { MAX_PATH_TYPED, pathSuggestions } from "../store/path-input.js"
 import type { ProjectRef } from "../store/scope.js"
-import { pick } from "../system/file-picker.js"
-import { Dropdown, filterChoices } from "../ui/dropdown.js"
+import type { Choice } from "../ui/dropdown.js"
 import { Frame } from "../ui/frame.js"
-import { KeyInput, keys } from "../ui/keys.js"
-import { type LegendItem, legendBack, legendQuit } from "../ui/legend.js"
+import { type KeyInput, keys } from "../ui/keys.js"
+import { type LegendItem, legendFor, legendOf } from "../ui/legend.js"
 import { useNav } from "../ui/nav.js"
+import { usePickList } from "../ui/pick-list.js"
 import { Prompt } from "../ui/prompt.js"
-import { useConfirm } from "../ui/use-confirm.js"
+import { destructiveQuestion } from "../ui/use-confirm.js"
 import { useKeys } from "../ui/use-keys.js"
 
+/** What Esc does at the path prompt: nothing (the prompt is the screen; `^x` goes back). */
+const nothing = (): void => {}
+
 /** The most characters a path may be typed with. */
-export const maxTypedPath = 300
-
-/** The longest model name the deletion question shows whole, so its keys stay in view. */
-const questionNameWidth = 24
-
-/**
- * The question asked before a model is deleted, short so that the keys at its end are
- * never cut off by the note line.
- *
- * @param modelName - the model.
- * @returns the text for the note line.
- */
-export function deleteQuestion(modelName: string): string {
-    const name = truncate(modelName, questionNameWidth)
-    return `remove ${name}? destructive, keep a backup!  enter: delete  esc: keep`
-}
 
 /**
  * The note to tell about the result of adding picked files: how many were copied and,
@@ -63,37 +50,15 @@ export function pickNote(result: AddResult): string {
     return `${lead}skipped ${skipped.length}: ${first}`
 }
 
-/**
- * The suggestions of the path prompt: the folder's names that fit what is typed. Each
- * is shown by its name; Tab puts the whole completed path into the field. A folder
- * that cannot be listed gives none.
- *
- * @param text - the path typed.
- * @returns the suggestions, folders first.
- */
-export function pathSuggestions(text: string): { label: string; completion: string }[] {
-    try {
-        return hints(text).map((hint) => ({
-            label: hint,
-            completion: complete(text, hint),
-        }))
-    } catch {
-        return []
-    }
-}
-
-/** The hotkeys of the empty field: pick files with the desktop picker, open the list. */
-const hotkeyPick = new KeyInput("o")
-const hotkeyModels = new KeyInput("m")
+/** The suggestions of the path prompt: folders and structure files. */
+const suggestModelPaths = (text: string) => pathSuggestions(text, accepted)
 
 /** The note while the picker window is open. */
 const pickingNote = "choose files in the picker window..."
 
 /** The legend entry that opens the list, with how many models there are. */
-const modelsLegend = (count: number): LegendItem => ({
-    label: `models (${count})`,
-    keys: "m",
-})
+const modelsLegend = (count: number): LegendItem =>
+    legendFor(`models (${count})`, keys.openList)
 
 /** What the screen does: asks for a path, lists the models, or waits for the picker. */
 type Mode = "prompt" | "list" | "picking"
@@ -103,20 +68,20 @@ type Mode = "prompt" | "list" | "picking"
  * file, which is COPIED into the project's `models/` folder (the original is never
  * touched) and the prompt stays for the next one. With nothing typed `o` opens the
  * desktop's file picker and `m` the list of the models, where `^r` asks and then
- * deletes one.
+ * deletes the highlighted one at once; `^r` on the empty field opens the list with that
+ * question already asked about the first model.
  *
  * @param project - the project whose models these are.
  * @returns the screen.
  */
 export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
     const nav = useNav()
-    const confirm = useConfirm()
     const [mode, setMode] = useState<Mode>("prompt")
     const [typed, setTyped] = useState("")
     const [problem, setProblem] = useState<string | undefined>()
     const [note, setNote] = useState<string | undefined>()
-    // the model the list highlights, which ^r asks about
-    const [highlighted, setHighlighted] = useState<string | undefined>()
+    // the keys of the open path prompt, which knows how many names it hints
+    const [promptKeys, setPromptKeys] = useState<LegendItem[]>([])
     // the prompt is remounted (a new key) to empty its field: the keys `o` and `m` are
     // typed into it by the time the screen has seen them, and a copied path is cleared
     const [fieldKey, setFieldKey] = useState(0)
@@ -149,33 +114,46 @@ export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
     // slash, so they cannot be part of one); the prompt's own handler does the rest
     useKeys((press: KeyInput) => {
         if (typed !== "") return
-        if (press.is(hotkeyPick)) void pickFiles()
-        else if (press.is(hotkeyModels) && names.length > 0) {
+        if (press.is(keys.pickFiles)) void pickFiles()
+        else if (
+            (press.is(keys.openList) || press.is(keys.remove)) &&
+            names.length > 0
+        ) {
+            // `^r` opens the list too (to choose what to delete there), like `m`
             resetField()
             setNote(undefined)
             setMode("list")
         }
     }, mode === "prompt")
 
-    const remove = useCallback((name: string) => {
-        confirm.ask(deleteQuestion(name), () => {
+    // every model matching the typed text, all of them for a blank text; ^r asks about
+    // the highlighted one and Enter deletes it, the last one closes the list
+    const entries = useMemo<Choice<string>[]>(
+        () => names.map((name) => ({ label: name, value: name })),
+        [names],
+    )
+    const closeList = useCallback(() => setMode("prompt"), [])
+    const pickList = usePickList<string>({
+        open: mode === "list",
+        label: "find:",
+        entries,
+        take: null, // a model that is picked is not used for anything
+        cancel: "close",
+        onPick: () => {},
+        onCancel: closeList,
+        onBack: nav.pop,
+        question: (name) => destructiveQuestion(`model ${name}`),
+        onDelete: (name) => {
             deleteModel(project.dir, name)
-            const left = listModels(project.dir)
             setVersion((v) => v + 1)
-            if (left.length === 0) setMode("prompt") // the last one closes the list
-        })
-    }, [confirm.ask, project.dir])
-
-    // the list is not drawn while a deletion is asked (it would take Esc as well), so
-    // the question is answered here; ^r in the list opens it
-    useKeys((press) => {
-        if (confirm.handleKey(press)) return
-        if (press.is(keys.remove) && highlighted !== undefined) remove(highlighted)
-    }, mode === "list")
+        },
+        onFail: (e) => setNote((e as Error).message),
+        onEmpty: closeList,
+    })
 
     const submit = useCallback((text: string) => {
         const path = text.trim() // a typed or pasted path may end in blanks or a newline
-        const bad = pathProblem(path, names)
+        const bad = modelPathProblem(path, names)
         if (bad !== undefined) return setProblem(bad)
         try {
             addModel(project.dir, path)
@@ -187,41 +165,21 @@ export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
         resetField()
     }, [names, project.dir, resetField])
 
-    // every model matching the typed text, all of them for a blank text
-    const search = useMemo(
-        () => filterChoices(names.map((name) => ({ label: name, value: name }))),
-        [names],
-    )
-
+    // only the keys that work now. The list shows its own (remove only with a model
+    // highlighted, move only for several, tab only with one highlighted) or the answers
+    // to the delete question; the prompt shows tab only while it hints a name, copy only
+    // once something is typed, and the hotkeys only while the field is empty.
+    const editLegend = legendOf([
+        typed === "" && legendFor("pick files", keys.pickFiles),
+        typed === "" && names.length > 0 && modelsLegend(names.length),
+        typed === "" && names.length > 0 && legendFor("delete", keys.remove),
+        ...promptKeys,
+    ])
     const legend: LegendItem[] =
-        mode === "list" && confirm.question !== undefined
-            ? [{ label: "delete", keys: "⏎" }, { label: "keep it", keys: "esc" }]
-            : mode === "list"
-              ? [
-                    { label: "remove", keys: "^r" },
-                    { label: "move", keys: "↑↓" },
-                    { label: "close", keys: "esc" },
-                    legendBack,
-                ]
-            : mode === "picking"
-              ? []
-              : typed === ""
-                ? [
-                      { label: "pick files", keys: "o" },
-                      ...(names.length > 0 ? [modelsLegend(names.length)] : []),
-                      { label: "copy", keys: "⏎" },
-                      legendQuit,
-                      legendBack,
-                  ]
-                : [
-                      { label: "complete", keys: "tab" },
-                      { label: "copy", keys: "⏎" },
-                      legendQuit,
-                      legendBack,
-                  ]
+        mode === "list" ? pickList.legend : mode === "picking" ? [] : editLegend
 
     const frameNote =
-        mode === "list" ? confirm.question : mode === "picking" ? pickingNote : note
+        mode === "list" ? pickList.note : mode === "picking" ? pickingNote : note
     return (
         <Frame
             title="models"
@@ -235,33 +193,23 @@ export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
                     <Prompt
                         key={fieldKey}
                         label="path:"
-                        maxLength={maxTypedPath}
+                        maxLength={MAX_PATH_TYPED}
                         placeholder="full absolute path of a .cif or .pdb file"
-                        suggest={pathSuggestions}
+                        suggest={suggestModelPaths}
                         error={problem}
                         onSubmit={submit}
-                        onCancel={nav.quit}
+                        onCancel={nothing}
                         onBack={nav.pop}
                         onChange={onChange}
+                        take="copy"
+                        canTake={typed !== ""}
+                        cancel={null}
+                        onLegend={setPromptKeys}
                     />
                     {names.length === 0 ? <Text dimColor>no models yet!</Text> : null}
                 </>
             ) : null}
-            {mode === "list" && confirm.question === undefined ? (
-                <Dropdown<string>
-                    label="find:"
-                    search={search}
-                    noMatch="no match"
-                    onPick={() => {}} // a model that is picked is not used for anything
-                    onCancel={() => setMode("prompt")}
-                    onBack={nav.pop}
-                    onHighlight={setHighlighted}
-                />
-            ) : null}
-            {mode === "list" && confirm.question !== undefined ? (
-                <Text>{highlighted}</Text>
-            ) : null}
+            {mode === "list" ? pickList.list : null}
         </Frame>
     )
 }
-

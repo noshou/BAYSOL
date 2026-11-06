@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import { wrapText } from "../core/text.js"
+import { type NumberRules, parseNumber, wrapText } from "../core/text.js"
 import type {
     Limits,
+    ListKind,
     PartKind,
     SettingDef,
     SettingValue,
-    SheetDef,
 } from "../store/settings-defs.js"
 import { sameValue } from "../store/settings-store.js"
 import { validateValue } from "../store/settings-validate.js"
 import { type KeyInput, keys } from "../ui/keys.js"
+import { scrollTo, stepIndex } from "../ui/scroll-window.js"
 import { TextBuffer } from "../ui/text-buffer.js"
 
 /**
@@ -37,13 +38,13 @@ export type EditEnd<V> = { kind: "done"; value: V } | { kind: "cancel" } | { kin
  * @property state - the state after the key.
  * @property end - set when the key ended the edit.
  */
-export type Step<S, V> = { state: S; end?: EditEnd<V> }
+export type EditStep<S, V> = { state: S; end?: EditEnd<V> }
 
 /** The edit was abandoned. */
-const cancelled = <S, V>(state: S): Step<S, V> => ({ state, end: { kind: "cancel" } })
+const cancelled = <S, V>(state: S): EditStep<S, V> => ({ state, end: { kind: "cancel" } })
 
 /** Ctrl-X was pressed. */
-const wentBack = <S, V>(state: S): Step<S, V> => ({ state, end: { kind: "back" } })
+const wentBack = <S, V>(state: S): EditStep<S, V> => ({ state, end: { kind: "back" } })
 
 // --- the text editing keys
 
@@ -55,14 +56,14 @@ const wentBack = <S, V>(state: S): Step<S, V> => ({ state, end: { kind: "back" }
  * @param press - the key.
  * @returns the new buffer, or `undefined` if the key is not an editing key.
  */
-export function editBuffer(buffer: TextBuffer, press: KeyInput): TextBuffer | undefined {
+function editBuffer(buffer: TextBuffer, press: KeyInput): TextBuffer | undefined {
     if (press.typed) return buffer.insert(press.text)
     if (press.is(keys.backspace)) return buffer.backspace()
     if (press.is(keys.delete)) return buffer.delete()
     if (press.is(keys.left)) return buffer.left()
     if (press.is(keys.right)) return buffer.right()
-    if (press.key_ === "home") return buffer.home()
-    if (press.key_ === "end") return buffer.end()
+    if (press.is(keys.home)) return buffer.home()
+    if (press.is(keys.end)) return buffer.end()
     return undefined
 }
 
@@ -78,38 +79,24 @@ export const maxNumberText = 16
  * The most digits of a whole number that are taken: no integer setting has an upper
  * limit of its own, so a value is held to what a 64 bit number says exactly.
  */
-export const maxIntDigits = 15
+const maxIntDigits = 15
 
 /** What the editor says when a character past [[maxNumberText]] is refused. */
 export const capNote = `${maxNumberText} digits at most`
 
-/** What a whole number looks like as typed. */
-const wholeText = /^[+-]?\d+$/
-
-/** What a decimal number looks like as typed (`5`, `.5`, `1e-3`, `2.`). */
-const decimalText = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/
-
 /**
- * What text means as a number of a kind. Limits are not looked at here: a setting is
- * checked by `validateValue`, a part of a tuple by the rules over the whole tuple.
- *
- * @param kind - `"int"` or `"float"`.
- * @param text - what was typed.
- * @returns `{ value }`, or `{ error }` such as `a number, please`.
+ * What a setting of each number kind accepts as text, for `parseNumber`. Limits are not
+ * looked at here: a setting is checked by `validateValue`, a part of a tuple by the
+ * rules over the whole tuple.
  */
-export function parseNumberText(
-    kind: "int" | "float",
-    text: string,
-): { value: number } | { error: string } {
-    const t = text.trim()
-    if (kind === "int") {
-        if (!wholeText.test(t)) return { error: "a whole number, please" }
-        if (t.replace(/^[+-]?0*/, "").length > maxIntDigits)
-            return { error: `${maxIntDigits} digits at most` }
-        return { value: Number(t) }
-    }
-    const x = decimalText.test(t) ? Number(t) : Number.NaN
-    return Number.isFinite(x) ? { value: x } : { error: "a number, please" }
+export const numberRules: Record<"int" | "float", NumberRules> = {
+    int: {
+        whole:         true,
+        signed:        true,
+        maxDigits:     maxIntDigits,
+        digitsMessage: `${maxIntDigits} digits at most`,
+    },
+    float: {},
 }
 
 /**
@@ -141,12 +128,15 @@ export function openNumber(def: SettingDef, current: SettingValue): NumberEdit {
  * @param press - the key.
  * @returns the next state, and the number when Enter took it.
  */
-export function stepNumber(edit: NumberEdit, press: KeyInput): Step<NumberEdit, number> {
+export function stepNumber(
+    edit: NumberEdit,
+    press: KeyInput,
+): EditStep<NumberEdit, number> {
     if (press.is(keys.escape)) return cancelled(edit)
     if (press.is(keys.back)) return wentBack(edit)
     if (press.is(keys.enter)) {
         const kind = edit.def.kind === "int" ? "int" : "float"
-        const parsed = parseNumberText(kind, edit.buffer.text)
+        const parsed = parseNumber(edit.buffer.text, numberRules[kind])
         if ("error" in parsed) return { state: { ...edit, error: parsed.error } }
         const checked = validateValue(edit.def, parsed.value)
         if (!checked.ok) return { state: { ...edit, error: checked.error } }
@@ -200,142 +190,33 @@ export function narrow(names: readonly string[], typed: string): string[] {
  * @param name - the name (case does not matter).
  * @returns its index, or 0 if it is not there.
  */
-export function indexOfName(names: readonly string[], name: string): number {
+export function indexOfPick(names: readonly string[], name: string): number {
     const t = name.toLowerCase()
     const at = names.findIndex((n) => n.toLowerCase() === t)
     return Math.max(at, 0)
 }
 
-/** The next index in a ring of `count` items, up or down. */
-function cycle(index: number, count: number, down: boolean): number {
-    return (index + (down ? 1 : count - 1)) % count
-}
-
-/** The kinds of setting that are picked from a list of names. */
-export type PickerKind = "colour" | "font"
-
 /**
- * The state of a colour or a font being picked.
+ * What Enter takes in a colour or font picker: the highlighted name, else a colour typed
+ * as `#rrggbb`, else (on a machine with no list of fonts) the text as it is.
  *
- * @property kind - what is picked.
- * @property names - every name there is (empty for fonts on a machine with no list).
- * @property buffer - what was typed to narrow the list.
- * @property index - the highlighted name, among the names that match.
- * @property error - what was wrong with the last attempt.
+ * @param kind - what is picked.
+ * @param names - every name there is (empty for fonts on a machine with no list).
+ * @param typed - the text in the field.
+ * @param highlighted - the name highlighted in the narrowed list, if any.
+ * @returns the value, or what is wrong.
  */
-export type PickerEdit = {
-    kind: PickerKind
-    names: readonly string[]
-    buffer: TextBuffer
-    index: number
-    error?: string
-}
-
-/**
- * Opens a list of names with the current one highlighted.
- *
- * @param kind - `"colour"` or `"font"`.
- * @param names - the names to pick from.
- * @param current - the value now (a name, or `#rrggbb`).
- * @returns the edit with nothing typed.
- */
-export function openPicker(
-    kind: PickerKind,
+export function pickValue(
+    kind: ListKind,
     names: readonly string[],
-    current: string,
-): PickerEdit {
-    return {
-        kind,
-        names,
-        buffer: new TextBuffer("", undefined, maxNameText),
-        index: indexOfName(names, current),
-    }
-}
-
-/**
- * @param edit - the state.
- * @returns the names the typed text narrows the list to.
- */
-export function pickerMatches(edit: PickerEdit): string[] {
-    return narrow(edit.names, edit.buffer.text)
-}
-
-/**
- * What Enter takes: the highlighted name, else a colour typed as `#rrggbb`, else (on a
- * machine with no list of fonts) the text as it is.
- */
-function pickValue(edit: PickerEdit): { value: string } | { error: string } {
-    const typed = edit.buffer.text.trim()
-    if (edit.kind === "colour" && hexText.test(typed)) return { value: typed.toLowerCase() }
-    const chosen = pickerMatches(edit)[edit.index]
-    if (chosen !== undefined) return { value: chosen }
-    if (edit.kind === "font" && edit.names.length === 0 && typed !== "")
-        return { value: typed }
-    return { error: edit.kind === "colour" ? "not a known colour" : "not a known font" }
-}
-
-/**
- * One key while a name is picked: typing narrows the list, up and down move in it
- * (round), Tab takes the highlighted name into the text, Enter picks, Esc drops.
- *
- * @param edit - the state.
- * @param press - the key.
- * @returns the next state, and the name when Enter picked one.
- */
-export function stepPicker(edit: PickerEdit, press: KeyInput): Step<PickerEdit, string> {
-    if (press.is(keys.escape)) return cancelled(edit)
-    if (press.is(keys.back)) return wentBack(edit)
-    if (press.is(keys.enter)) {
-        const picked = pickValue(edit)
-        if ("error" in picked) return { state: { ...edit, error: picked.error } }
-        return { state: edit, end: { kind: "done", value: picked.value } }
-    }
-    const matches = pickerMatches(edit)
-    const vertical = press.is(keys.down) || press.is(keys.up)
-    if (vertical && matches.length > 0)
-        return {
-            state: {
-                ...edit,
-                error: undefined,
-                index: cycle(edit.index, matches.length, press.is(keys.down)),
-            },
-        }
-    if (press.is(keys.tab) && matches.length > 0) {
-        const buffer = edit.buffer.replace(matches[edit.index] as string)
-        const now = narrow(edit.names, buffer.text)
-        return {
-            state: {
-                ...edit,
-                buffer,
-                error: undefined,
-                index: indexOfName(now, buffer.text),
-            },
-        }
-    }
-    // up, down and Tab with no name to move to do nothing
-    if (vertical || press.is(keys.tab)) return { state: edit }
-    const buffer = editBuffer(edit.buffer, press)
-    if (buffer === undefined) return { state: edit }
-    const changed = buffer.text !== edit.buffer.text
-    return {
-        state: {
-            ...edit,
-            buffer,
-            error: undefined,
-            index: changed ? 0 : edit.index,
-        },
-    }
-}
-
-/**
- * Pasted text into the field of a picker.
- *
- * @param edit - the state.
- * @param text - what was pasted.
- * @returns the next state, the first match highlighted.
- */
-export function pastePicker(edit: PickerEdit, text: string): PickerEdit {
-    return { ...edit, buffer: edit.buffer.insert(text.trim()), error: undefined, index: 0 }
+    typed: string,
+    highlighted: string | undefined,
+): { value: string } | { error: string } {
+    const text = typed.trim()
+    if (kind === "colour" && hexText.test(text)) return { value: text.toLowerCase() }
+    if (highlighted !== undefined) return { value: highlighted }
+    if (kind === "font" && names.length === 0 && text !== "") return { value: text }
+    return { error: kind === "colour" ? "not a known colour" : "not a known font" }
 }
 
 // --- a choice of a few options: tabs
@@ -377,9 +258,9 @@ export const pickOneNote = "pick one or more"
  * @param press - the key.
  * @returns the next state, and the choices that are on, in order, when Esc ended it.
  */
-export function stepTabs(edit: TabsEdit, press: KeyInput): Step<TabsEdit, string[]> {
+export function stepTabs(edit: TabsEdit, press: KeyInput): EditStep<TabsEdit, string[]> {
     const n = edit.options.length
-    const moved = (focus: number): Step<TabsEdit, string[]> => ({
+    const moved = (focus: number): EditStep<TabsEdit, string[]> => ({
         state: { ...edit, focus, error: undefined },
     })
     if (press.is(keys.back)) return wentBack(edit)
@@ -433,7 +314,7 @@ const partText = (part: number | string): string => String(part)
  * @param value - its value (an array, or an object keyed by the names of the parts).
  * @returns the parts.
  */
-export function tupleParts(def: SettingDef, value: SettingValue): (number | string)[] {
+function tupleParts(def: SettingDef, value: SettingValue): (number | string)[] {
     return def.isRecord
         ? def.partNames.map((n) => (value as Record<string, number>)[n] as number)
         : [...(value as (number | string)[])]
@@ -460,7 +341,7 @@ function refocused(edit: TupleEdit): TupleEdit {
     const colour = edit.def.partKinds[edit.focus] === "colour"
     const index =
         colour && edit.fresh.has(edit.focus)
-            ? indexOfName(edit.names, edit.buffers[edit.focus] as string)
+            ? indexOfPick(edit.names, edit.buffers[edit.focus] as string)
             : 0
     return { ...edit, index }
 }
@@ -496,7 +377,7 @@ function partValue(
     names: readonly string[],
     highlight: string | undefined,
 ): { value: number | string } | { error: string } {
-    if (kind !== "colour") return parseNumberText(kind, text)
+    if (kind !== "colour") return parseNumber(text, numberRules[kind])
     const t = text.trim()
     if (hexText.test(t)) return { value: t.toLowerCase() }
     const exact = names.find((n) => n.toLowerCase() === t.toLowerCase())
@@ -509,7 +390,7 @@ function partValue(
  * Enter on a tuple: every part is read, then the tuple is checked as a whole; the
  * edit stays open, with the part at fault in focus, when something is wrong.
  */
-function commitTuple(edit: TupleEdit): Step<TupleEdit, SettingValue> {
+function commitTuple(edit: TupleEdit): EditStep<TupleEdit, SettingValue> {
     const { def } = edit
     const matches = tupleMatches(edit)
     const parsed = def.partKinds.map((kind, i) =>
@@ -551,18 +432,21 @@ function commitTuple(edit: TupleEdit): Step<TupleEdit, SettingValue> {
  * @param press - the key.
  * @returns the next state, and the tuple when Enter took it.
  */
-export function stepTuple(edit: TupleEdit, press: KeyInput): Step<TupleEdit, SettingValue> {
+export function stepTuple(
+    edit: TupleEdit,
+    press: KeyInput,
+): EditStep<TupleEdit, SettingValue> {
     const n = edit.def.partNames.length
     const colour = edit.def.partKinds[edit.focus] === "colour"
     const matches = tupleMatches(edit)
-    const focusOn = (to: number): Step<TupleEdit, SettingValue> => ({
+    const focusOn = (to: number): EditStep<TupleEdit, SettingValue> => ({
         state: refocused({
             ...edit,
             focus: Math.max(0, Math.min(n - 1, to)),
             error: undefined,
         }),
     })
-    const setText = (text: string): Step<TupleEdit, SettingValue> => {
+    const setText = (text: string): EditStep<TupleEdit, SettingValue> => {
         const fresh = new Set(edit.fresh)
         fresh.delete(edit.focus)
         const buffers = edit.buffers.map((b, i) => (i === edit.focus ? text : b))
@@ -579,7 +463,7 @@ export function stepTuple(edit: TupleEdit, press: KeyInput): Step<TupleEdit, Set
             state: {
                 ...edit,
                 error: undefined,
-                index: cycle(edit.index, matches.length, press.is(keys.down)),
+                index: stepIndex(edit.index, matches.length, press.is(keys.down), true),
             },
         }
     if (press.is(keys.down)) return focusOn(edit.focus + 1)
@@ -633,16 +517,6 @@ export function swatchColour(def: SettingDef, value: SettingValue): string | und
     return undefined
 }
 
-/**
- * `#rrggbb` for red, green and blue given as 0 to 255 each.
- *
- * @param rgb - the three.
- * @returns the text.
- */
-export function hexOf(rgb: readonly [number, number, number]): string {
-    return `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}`
-}
-
 /** The limit keys in the order they are told, with the words for each. */
 const limitWords: [keyof Limits, string][] = [
     ["above", "above"],
@@ -659,7 +533,7 @@ const limitWords: [keyof Limits, string][] = [
  */
 export function settingFacts(def: SettingDef): string {
     const kind: Record<SettingDef["kind"], string> = {
-        int: "whole number",
+        int: "integer",
         float: "number",
         bool: "yes or no",
         colour: "colour",
@@ -685,101 +559,104 @@ export function descriptionLines(def: SettingDef, cells: number): string[] {
     return wrapText(def.description, cells)
 }
 
-// --- the rows of a sheet and its drafts
+// --- the table of a sheet: widths, rules, blocks that scroll
+
+/** The cells left of the table: the margin where the cursor `>` stands. */
+const marginCells = 3
+
+/** The cells of the four vertical lines of the table. */
+const borderCells = 4
+
+/** The cells of the value column on a narrow terminal (a space, 17 cells, a mark). */
+const valueColumnNarrow = 19
+
+/** The cells of the value column from [[wideColumns]] on, room for a swatch and a tuple. */
+const valueColumnWide = 25
+
+/** The width of a terminal from which the value column is the wide one. */
+const wideColumns = 100
+
+/** The most cells of the name column (a space, a name of up to 22 cells, a space). */
+const nameColumnMax = 24
+
+/** The most lines of a message under a value (an error or a notice). */
+const noteLinesMax = 2
 
 /**
- * One row of a sheet's list: the heading of a group or one setting.
+ * The widths of the columns of the table.
  *
- * @property group - the index of the group the row belongs to.
+ * @property name - the name column, borders not counted.
+ * @property desc - the description column, which takes all that is left.
+ * @property value - the value column.
  */
-export type SheetRow =
-    | { kind: "group"; title: string; group: number }
-    | { kind: "setting"; def: SettingDef; group: number }
+export type TableWidths = { name: number; desc: number; value: number }
 
 /**
- * The rows of a sheet: each group's heading, then its settings.
+ * Works out the columns of the table for a width: the name column as wide as the
+ * longest name, the value column a fixed width, the description all the rest.
  *
- * @param sheet - the sheet.
- * @returns the rows, top to bottom.
+ * @param columns - the cells the table (with its margin) may use.
+ * @param longestName - the cells of the longest setting name of the sheet.
+ * @returns the widths.
  */
-export function sheetRows(sheet: SheetDef): SheetRow[] {
-    return sheet.groups.flatMap((g, group) => [
-        { kind: "group" as const, title: g.title, group },
-        ...g.settings.map((def) => ({ kind: "setting" as const, def, group })),
-    ])
+export function tableWidths(columns: number, longestName: number): TableWidths {
+    const name = Math.min(nameColumnMax, longestName + 2)
+    const value = columns >= wideColumns ? valueColumnWide : valueColumnNarrow
+    const desc = Math.max(8, columns - marginCells - borderCells - name - value)
+    return { name, value, desc }
 }
 
 /**
- * The next setting row from a row, up or down, skipping headings.
+ * The lines of a message under a value: wrapped to the column, at most two lines.
  *
- * @param rows - the rows.
- * @param from - the index the cursor is on.
- * @param delta - 1 for down, -1 for up.
- * @returns the index of the next setting, or `from` if there is none that way.
+ * @param text - the message.
+ * @param cells - the room.
+ * @returns the lines.
  */
-export function nextSetting(
-    rows: readonly SheetRow[],
-    from: number,
-    delta: 1 | -1,
+export function noteLines(text: string, cells: number): string[] {
+    return wrapText(text, cells).slice(0, noteLinesMax)
+}
+
+/**
+ * How many lines of a table the first blocks take from `top`, rules between them.
+ *
+ * @param heights - the lines of every block.
+ * @param top - the first block.
+ * @param budget - the lines available.
+ * @returns the number of blocks that fit whole, at least one.
+ */
+export function blocksFitting(
+    heights: readonly number[],
+    top: number,
+    budget: number,
 ): number {
-    for (let i = from + delta; i >= 0 && i < rows.length; i += delta)
-        if (rows[i]?.kind === "setting") return i
-    return from
+    let used = 0
+    let n = 0
+    for (let i = top; i < heights.length; i++) {
+        used += (heights[i] as number) + (n > 0 ? 1 : 0)
+        if (used > budget && n > 0) break
+        n++
+    }
+    return n
 }
 
 /**
- * The first setting row of a group.
+ * The first block to draw so that the selected one is wholly in view: the old top if
+ * that already shows it, else the smallest top that does.
  *
- * @param rows - the rows.
- * @param group - the group's index.
- * @returns the row's index, or -1 if the group has no setting.
+ * @param heights - the lines of every block.
+ * @param top - the first block drawn so far.
+ * @param selected - the selected block.
+ * @param budget - the lines available.
+ * @returns the new first block.
  */
-export function firstOfGroup(rows: readonly SheetRow[], group: number): number {
-    return rows.findIndex((r) => r.kind === "setting" && r.group === group)
-}
-
-/**
- * Where the left and right keys go: the first setting of the previous or of the next
- * group.
- *
- * @param rows - the rows.
- * @param from - the index the cursor is on.
- * @param delta - 1 for the next group, -1 for the previous one.
- * @returns the row's index, or `from` if there is no such group.
- */
-export function groupJump(rows: readonly SheetRow[], from: number, delta: 1 | -1): number {
-    const here = rows[from]?.group ?? 0
-    const to = firstOfGroup(rows, here + delta)
-    return to < 0 ? from : to
-}
-
-/**
- * The settings of a group.
- *
- * @param rows - the rows.
- * @param group - the group's index.
- * @returns their definitions, in order.
- */
-export function groupSettings(rows: readonly SheetRow[], group: number): SettingDef[] {
-    return rows.flatMap((r) => (r.kind === "setting" && r.group === group ? [r.def] : []))
-}
-
-/**
- * The first row to draw, so that the heading of the group stays in view when the cursor
- * is on the group's first setting at the top of the window.
- *
- * @param rows - the rows.
- * @param cursor - the index the cursor is on.
- * @param offset - the first row the cursor's window starts at (keeps `cursor` in view).
- * @returns the index to start drawing from.
- */
-export function windowStart(
-    rows: readonly SheetRow[],
-    cursor: number,
-    offset: number,
+export function scrollTop(
+    heights: readonly number[],
+    top: number,
+    selected: number,
+    budget: number,
 ): number {
-    const above = rows[cursor - 1]
-    return offset === cursor && above?.kind === "group" ? cursor - 1 : offset
+    return scrollTo(top, selected, (first) => blocksFitting(heights, first, budget))
 }
 
 /**

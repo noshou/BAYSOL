@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { Box, Text } from "ink"
-import type { ReactNode } from "react"
+import { Fragment, type ReactNode } from "react"
 import { displayWidth, padWidth, truncate } from "../core/text.js"
 import { type CellPos, fitWidths, MIN_CELL } from "./form-layout.js"
 import { useBodyColumns } from "./layout.js"
 import { Prompt } from "./prompt.js"
+import { Bar, Rule } from "./table-segments.js"
 import { useTheme } from "./theme.js"
 
 /** The blank cells between two columns of cells. */
@@ -35,8 +36,9 @@ export type FormCell = {
  *
  * @property label - what the row is, drawn muted before the cells.
  * @property cells - the cells, one per column.
- * @property heading - titles for the columns, drawn as a muted line above this row
- *     (for the first row of a small table).
+ * @property heading - titles for the columns of a small table: this row starts the
+ *     table, and it and the rows after it are drawn as a grid (the titles, a rule, the
+ *     rows, `│` between the columns, all lines in the border colour).
  */
 export type FormRow = {
     label:     string
@@ -71,7 +73,7 @@ export type FieldFormEdit = {
  * @property problem - a row to flag with a message at its end, in the error colour.
  * @property edit - the cell being typed into, if one is.
  */
-export type FieldFormProps = {
+type FieldFormProps = {
     rows:     readonly FormRow[]
     pos:      CellPos
     problem?: { row: number; message: string }
@@ -98,11 +100,20 @@ type Metrics = {
     columns:    number
     labelWidth: number
     widths:     number[]
+    gridFrom:   number
 }
 
 /** The cells before the first cell of a row: the cursor mark, the label and a gap. */
 function leadWidth(m: Metrics): number {
-    return LEAD + m.labelWidth + CELL_GAP
+    // in a grid the label is a column of its own, padded, then the separator and a pad
+    return m.gridFrom < Infinity
+        ? LEAD + m.labelWidth + 2 + 2
+        : LEAD + m.labelWidth + CELL_GAP
+}
+
+/** The cells of every column of a grid, padding included: the label column first. */
+function gridWidths(m: Metrics): number[] {
+    return [m.labelWidth + 2, ...m.widths.map((w) => w + 2)]
 }
 
 /** A text cut and padded to the width of a column. */
@@ -119,15 +130,19 @@ function RowLine(props: {
     on:       boolean
     col:      number
     message?: string
+    grid:     boolean
     m:        Metrics
 }): ReactNode {
-    const { row, on, col, message, m } = props
+    const { row, on, col, message, grid, m } = props
     const theme = useTheme()
     // a wide cell takes the rest of the row but leaves room for the message
     const flag = message ? displayWidth(message) + CELL_GAP : 0
     const wideRoom = Math.max(MIN_CELL, m.columns - leadWidth(m) - flag)
     const gap = " ".repeat(CELL_GAP)
-    const lead = `${on ? ">" : " "} ${padWidth(row.label, m.labelWidth)}${gap}`
+    const mark = `${on ? ">" : " "} `
+    const lead = grid
+        ? `${mark} ${padWidth(row.label, m.labelWidth)} `
+        : `${mark}${padWidth(row.label, m.labelWidth)}${gap}`
     return (
         <Text color={theme.mt} wrap="truncate-end">
             {lead}
@@ -136,16 +151,18 @@ function RowLine(props: {
                 const text = !cell
                     ? " ".repeat(m.widths[c] as number)
                     : cell.wide
-                      ? truncate(cell.text, wideRoom)
-                      : inColumn(cell.text, c, m)
+                        ? truncate(cell.text, wideRoom)
+                        : inColumn(cell.text, c, m)
                 const color = !cell || cell.muted ? theme.mt : theme.fg
                 return (
                     // biome-ignore lint/suspicious/noArrayIndexKey: a column is its place
                     <Text key={c}>
+                        {grid ? <Bar style="single" /> : null}
+                        {grid ? " " : null}
                         <Text inverse={here} bold={here} color={color}>
                             {text || " "}
                         </Text>
-                        {c < row.cells.length - 1 ? gap : ""}
+                        {grid ? " " : c < row.cells.length - 1 ? gap : ""}
                     </Text>
                 )
             })}
@@ -171,29 +188,49 @@ export function FieldForm(props: FieldFormProps): ReactNode {
 
     const count = Math.max(...rows.map((r) => r.cells.length))
     const labelWidth = Math.max(...rows.map((r) => displayWidth(r.label)))
-    const room = columns - LEAD - labelWidth - CELL_GAP - (count - 1) * CELL_GAP
+    const gridFrom = rows.findIndex((r) => r.heading !== undefined)
+    const grid = gridFrom >= 0
+    // a grid pays 2 cells of padding and a separator per column, the label column too
+    const room = grid
+        ? columns - LEAD - (labelWidth + 2) - count * 3
+        : columns - LEAD - labelWidth - CELL_GAP - (count - 1) * CELL_GAP
     const m: Metrics = {
         columns,
         labelWidth,
         widths: fitWidths(naturalWidths(rows, count), room),
+        gridFrom: grid ? gridFrom : Infinity,
     }
-    const gap = " ".repeat(CELL_GAP)
 
     return (
         <Box flexDirection="column">
             {rows.map((row, r) => (
                 <Box key={row.label} flexDirection="column">
                     {row.heading ? (
-                        <Text color={theme.mt} wrap="truncate-end">
-                            {" ".repeat(leadWidth(m)) +
-                                row.heading.map((h, c) => inColumn(h, c, m)).join(gap)}
-                        </Text>
+                        <>
+                            <Text color={theme.mt} wrap="truncate-end">
+                                {" ".repeat(LEAD + 1 + m.labelWidth + 1)}
+                                {row.heading.map((h, c) => (
+                                    // biome-ignore lint/suspicious/noArrayIndexKey: column
+                                    <Fragment key={c}>
+                                        <Bar style="single" />
+                                        {` ${inColumn(h, c, m)} `}
+                                    </Fragment>
+                                ))}
+                            </Text>
+                            <Rule
+                                style="single"
+                                part="mid"
+                                widths={gridWidths(m)}
+                                options={{ frame: false, lead: LEAD }}
+                            />
+                        </>
                     ) : null}
                     <RowLine
                         row={row}
                         on={r === pos.row}
                         col={pos.col}
                         message={problem?.row === r ? problem.message : undefined}
+                        grid={r >= gridFrom && grid}
                         m={m}
                     />
                 </Box>

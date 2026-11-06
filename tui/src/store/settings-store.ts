@@ -13,6 +13,7 @@ import {
     writeJson,
 } from "../core/files.js"
 import { ensureDir } from "../core/paths.js"
+import { inProject } from "./projects.js"
 import {
     defaultCatalog,
     type SettingDef,
@@ -50,16 +51,16 @@ import {
  */
 
 /** The name of the settings file in a folder (Julia looks for the same name). */
-export const settingsFileName = "settings.json"
+const settingsFileName = "settings.json"
 
 /** The name of the log of wiped values, next to the settings file. */
-export const settingsLogName = "settings.log"
+const settingsLogName = "settings.log"
 
 /** The notice of a setting wiped back to its default. */
-export const noticeDefault = "reset to default"
+const noticeDefault = "reset to default"
 
 /** The notice of a project setting wiped back to the global value. */
-export const noticeGlobal = "reset to global"
+const noticeGlobal = "reset to global"
 
 /**
  * The wipes a rule can cause one after another: wiping a value to its baseline may break
@@ -249,11 +250,20 @@ export class Settings {
      * and replaced by all the settings this copy knows.
      *
      * @returns the path of the file.
-     * @throws FileInUseError if another copy holds the lock for 3 s, or an error if the
+     * @throws FileInUseError if another copy holds the lock for 3 s; ProjectGoneError for
+     *     a project whose folder was deleted meanwhile (nothing is made); an error if the
      *     file cannot be written.
      */
     save(): string {
-        return withFileLock(settingsFile(this.dir), () => this.saveLocked())
+        const run = (): string =>
+            withFileLock(settingsFile(this.dir), () => this.saveLocked(), this.folder)
+        // A project's folder must exist: a deleted project is not made again.
+        return this.baseline === undefined ? run() : inProject(this.dir, run)
+    }
+
+    /** Whether a write may make the folder: the global one, not a project's. */
+    private get folder(): { createParents: boolean } {
+        return { createParents: this.baseline === undefined }
     }
 
     /**
@@ -293,7 +303,7 @@ export class Settings {
             this.baseline,
         )
         wiped.push(...final.wiped)
-        writeAtomic(file, writeJson(sheetsOf(this.catalog, final.saved)))
+        writeAtomic(file, writeJson(sheetsOf(this.catalog, final.saved)), this.folder)
         this.saved.clear()
         for (const [name, value] of final.saved) this.saved.set(name, value)
         this.changed.clear()
@@ -342,7 +352,7 @@ export function settingsFile(dir: string): string {
  * @property value - what the file had for it (raw, as read).
  * @property reason - why it was not kept, e.g. `must be at least 1`.
  */
-export type Wipe = { screen: string; setting: string; value: unknown; reason: string }
+type Wipe = { screen: string; setting: string; value: unknown; reason: string }
 
 /**
  * What [[wipeInvalid]] makes of a file.
@@ -595,7 +605,9 @@ function loadChecked(
     const notices = wiped.map((w) => ({ setting: w.setting, message }))
     for (const n of notices) settings.notices.set(n.setting, n.message)
     if (wiped.length > 0) {
-        writeAtomic(settingsFile(dir), settings.toText())
+        writeAtomic(settingsFile(dir), settings.toText(), {
+            createParents: baseline === undefined,
+        })
         logWipes(settings, wiped, target)
     }
     logLines(
@@ -687,7 +699,8 @@ export function loadGlobal(
  * @param catalog - what the settings are (the bundled data by default).
  * @returns the project's settings and what was wiped; `reset` says the file was
  *     unreadable.
- * @throws [[SettingsCatalogError]] if the bundled data is corrupt, or an error if a file
+ * @throws [[SettingsCatalogError]] if the bundled data is corrupt; [[ProjectGoneError]]
+ *     if the project's folder does not exist (nothing is made); an error if a file
  *     cannot be written.
  */
 export function loadProject(
@@ -697,35 +710,41 @@ export function loadProject(
 ): LoadResult {
     const global = loadGlobal(globalDir, catalog).settings
     const baseline = new Map(Object.entries(global.values()))
-    ensureDir(projectDir)
     const file = settingsFile(projectDir)
-    const clean = loadClean(catalog, projectDir, baseline)
-    if (clean) return clean
-    return withFileLock(file, () => {
-        const copyGlobal = (): string => copyOver(settingsFile(globalDir), file)
-        let read = readSettingsFile(file)
-        const reset = read.state === "unreadable"
-        if (read.state === "missing") copyGlobal()
-        if (read.state === "unreadable") {
-            quarantine(file)
-            copyGlobal()
-            logLines(projectDir, [
-                `${settingsFileName} could not be read; kept as ` +
-                    `${settingsFileName}.corrupt, ` +
-                    "replaced by a copy of the global settings",
-            ])
-        }
-        read = readSettingsFile(file)
-        if (read.state !== "ok")
-            throw new Error(`${file} cannot be used after it was copied`)
-        const loaded = loadChecked(
-            catalog,
-            projectDir,
-            read.stored,
-            baseline,
-            "global value",
-            noticeGlobal,
+    // The project's folder must exist: opening a deleted project makes nothing.
+    return inProject(projectDir, () => {
+        const clean = loadClean(catalog, projectDir, baseline)
+        if (clean) return clean
+        return withFileLock(
+            file,
+            () => {
+                const copyGlobal = (): string => copyOver(settingsFile(globalDir), file)
+                let read = readSettingsFile(file)
+                const reset = read.state === "unreadable"
+                if (read.state === "missing") copyGlobal()
+                if (read.state === "unreadable") {
+                    quarantine(file)
+                    copyGlobal()
+                    logLines(projectDir, [
+                        `${settingsFileName} could not be read; kept as ` +
+                            `${settingsFileName}.corrupt, ` +
+                            "replaced by a copy of the global settings",
+                    ])
+                }
+                read = readSettingsFile(file)
+                if (read.state !== "ok")
+                    throw new Error(`${file} cannot be used after it was copied`)
+                const loaded = loadChecked(
+                    catalog,
+                    projectDir,
+                    read.stored,
+                    baseline,
+                    "global value",
+                    noticeGlobal,
+                )
+                return { ...loaded, reset }
+            },
+            { createParents: false },
         )
-        return { ...loaded, reset }
     })
 }
