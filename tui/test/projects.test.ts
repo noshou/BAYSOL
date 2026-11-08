@@ -1,31 +1,182 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+// Tests of store/projects.ts: the run folder, the projects and the models.
+//
+// Contents:
+//   1. Run folder
+//   2. Projects
+//   3. Models
+
 import assert from "node:assert/strict"
 import {
     copyFileSync,
     existsSync,
     mkdirSync,
-    mkdtempSync,
     readFileSync,
     symlinkSync,
     writeFileSync,
 } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { hostname } from "node:os"
+import { dirname, join } from "node:path"
 import { test } from "node:test"
-import { entryNames } from "../src/core/files.js"
-import { projectsRoot } from "../src/core/paths.js"
+import { projectsRoot } from "../src/core/environment.js"
+import { entryNames, writeJson } from "../src/core/file-system.js"
+import { pickNote } from "../src/screens/menus.js"
+import { checkPath, complete, hintsFor, pathSuggestions } from "../src/store/lists.js"
 import {
+    accepted,
+    addModel,
+    addModels,
     brokenNames,
     createProject,
+    defaultTemperature,
+    deleteModel,
     deleteProject,
+    hasRuns,
     InvalidNameError,
+    isoStamp,
+    listModels,
     listProjects,
+    livePid,
+    modelPathProblem,
+    modelsDir,
     projectNameProblem,
     readProject,
+    runIds,
+    runStatus,
+    settleRun,
 } from "../src/store/projects.js"
+import { destructiveQuestion } from "../src/ui/input.js"
+import { tempDir as tempRoot } from "./support/fixtures.js"
 
-const tempRoot = () => mkdtempSync(join(tmpdir(), "baysol-test-"))
+// ========================================================================================
+// 1. Run folder
+// ========================================================================================
+
+/** Makes `runs/<id>/` with a `run.json` holding `json` (none when `undefined`). */
+function makeRun(project: string, id: string, json?: string): void {
+    const dir = join(project, "runs", id)
+    mkdirSync(dir, { recursive: true })
+    if (json !== undefined) writeFileSync(join(dir, "run.json"), json)
+}
+
+test("a project with no runs/ folder has no runs", () => {
+    const project = tempRoot()
+    assert.deepEqual(runIds(project), [])
+    assert.equal(hasRuns(project), false)
+})
+
+test("runs are the folders of runs/, oldest first, files are not runs", () => {
+    const project = tempRoot()
+    makeRun(project, "20261102T153045Z")
+    makeRun(project, "20261101T000000Z")
+    // the new name sorts by its instant (23:00 at -05:00 on the 1st is 04:00Z on the 2nd)
+    makeRun(project, "23-00-00-000_EST_-0500_2026-11-01")
+    makeRun(project, "09-00-00-000_UTC_+0000_2026-11-02")
+    makeRun(project, "unreadable")
+    writeFileSync(join(project, "runs", "notes.txt"), "x")
+    // the old layout is not read: logs/ and data/ hold no runs
+    mkdirSync(join(project, "logs", "20250101T000000Z"), { recursive: true })
+    mkdirSync(join(project, "data", "20250101T000000Z"), { recursive: true })
+    assert.deepEqual(runIds(project), [
+        "unreadable",
+        "20261101T000000Z",
+        "23-00-00-000_EST_-0500_2026-11-01",
+        "09-00-00-000_UTC_+0000_2026-11-02",
+        "20261102T153045Z",
+    ])
+    assert.equal(hasRuns(project), true)
+})
+
+test("run.json says how a run ended; a bad file says nothing", () => {
+    const project = tempRoot()
+    makeRun(project, "a", '{"status": "running"}')
+    makeRun(project, "b", '{"status": "failed"}')
+    makeRun(project, "c", '{"status": "bogus"}')
+    makeRun(project, "d", "{ not json")
+    makeRun(project, "e")
+    assert.equal(runStatus(project, "a"), "running")
+    assert.equal(runStatus(project, "b"), "failed")
+    for (const id of ["c", "d", "e", "missing"])
+        assert.equal(runStatus(project, id), undefined, id)
+    assert.equal(hasRuns(project), true)
+    makeRun(project, "f", '{"status": "done", "models": []}')
+    assert.equal(runStatus(project, "f"), "done")
+})
+
+// ---- the run flow's reading side: liveness, the default temperature -------------------
+
+/** Makes a finished run with a plain `logs/run.LOG` holding `log`. */
+function finishedRun(project: string, id: string, status: string, log?: string): string {
+    const dir = join(project, "runs", id)
+    mkdirSync(join(dir, "logs"), { recursive: true })
+    writeFileSync(join(dir, "run.json"), writeJson({ status }))
+    if (log !== undefined) writeFileSync(join(dir, "logs", "run.LOG"), log)
+    return dir
+}
+
+const header = (t: string) =>
+    `datetime\tnow\ntemperature_c       \t${t}\nph\t7\n\n--- output ---\n`
+
+test("the default temperature is the newest FINISHED run's, else nothing", () => {
+    const project = tempRoot()
+    assert.equal(defaultTemperature(project), undefined)
+    finishedRun(project, "20260101T000000Z", "done", header("20"))
+    finishedRun(project, "20260102T000000Z", "failed", header("37.5"))
+    // a run still writing its log, and one that was aborted, are never read
+    finishedRun(project, "20260103T000000Z", "running", header("99"))
+    finishedRun(project, "20260104T000000Z", "aborted", header("98"))
+    assert.equal(defaultTemperature(project), 37.5)
+    // a newer finished run without the row (or with a row after the header) is skipped
+    finishedRun(project, "20260105T000000Z", "done", "datetime\tnow\n")
+    finishedRun(project, "20260106T000000Z", "done", "--- output ---\ntemperature_c\t30\n")
+    finishedRun(project, "20260107T000000Z", "done")
+    assert.equal(defaultTemperature(project), 37.5)
+})
+
+test("a live run, the pid rule and the heartbeat age", () => {
+    const dir = finishedRun(tempRoot(), "20260101T000000Z", "running")
+    const beat = (pid: number, host: string, ms: number) =>
+        writeFileSync(
+            join(dir, "run.json"),
+            writeJson({ status: "running", pid, host, heartbeat: isoStamp(ms) }),
+        )
+    beat(process.pid, hostname(), Date.now())
+    assert.equal(livePid(dir), process.pid)
+    beat(2 ** 22 + 5, hostname(), Date.now())
+    assert.equal(livePid(dir), undefined, "no such process on this host")
+    // another host: the pid cannot be checked, the heartbeat decides
+    beat(2 ** 22 + 5, "some-other-host", Date.now())
+    assert.equal(livePid(dir), 2 ** 22 + 5)
+    beat(2 ** 22 + 5, "some-other-host", Date.now() - 61_000)
+    assert.equal(livePid(dir), undefined)
+    writeFileSync(join(dir, "run.json"), "{ not json")
+    assert.equal(livePid(dir), undefined, "a file that cannot be read is no run")
+})
+
+test("settle changes only a running run, and leaves a live one", () => {
+    const project = tempRoot()
+    const done = finishedRun(project, "20260101T000000Z", "done", "temperature_c\t20\n")
+    assert.equal(settleRun(done, "aborted"), false)
+    assert.equal(runStatus(project, "20260101T000000Z"), "done")
+    const live = finishedRun(project, "20260102T000000Z", "running", "temperature_c\t20\n")
+    writeFileSync(
+        join(live, "run.json"),
+        writeJson({
+            status: "running",
+            pid: process.pid,
+            host: hostname(),
+            heartbeat: isoStamp(Date.now()),
+        }),
+    )
+    assert.equal(settleRun(live, "interrupted", { ifStale: true }), false, "live: kept")
+    assert.equal(settleRun(live, "aborted"), true, "the caller knows it is over")
+    assert.equal(runStatus(project, "20260102T000000Z"), "aborted")
+})
+
+// ========================================================================================
+// 2. Projects
+// ========================================================================================
 
 /** Hooks that stand in for the settings module: the "global settings" is a text file. */
 function hooksFor(appRoot: string, text = "global settings\n") {
@@ -311,4 +462,220 @@ test("deleteProject removes only a real project folder", () => {
     assert.ok(!existsSync(join(root, "good")))
     deleteProject(app, "good") // already gone: no error
     assert.ok(existsSync(join(root, "plain", "keep.txt")))
+})
+
+// ========================================================================================
+// 3. Models
+// ========================================================================================
+
+/** The hints of a typed path for structure files. */
+const hints = (text: string) => hintsFor(text, accepted)
+
+
+/** Writes a file (its folders made) and returns its path. */
+function file(dir: string, name: string, text: string): string {
+    const path = join(dir, name)
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, text)
+    return path
+}
+
+test("accepted files", () => {
+    for (const n of ["a.cif", "a.pdb", "A.PDB", "x.y.Cif"]) assert.ok(accepted(n), n)
+    for (const n of ["a.txt", "pdb", "a.pdbx", "a.", ""]) assert.ok(!accepted(n), n)
+})
+
+test("paths", () => {
+    const src = tempRoot()
+    const pdb = file(src, "one.pdb", "ATOM")
+    assert.equal(modelPathProblem(pdb, []), undefined)
+    assert.equal(modelPathProblem("  ", []), "type the full path of a model file first!")
+    assert.equal(modelPathProblem("one.pdb", []), "use a full absolute path")
+    assert.equal(modelPathProblem(join(src, "none.pdb"), []), "no such file")
+    assert.equal(modelPathProblem(src, []), "that is a folder, not a file")
+    assert.equal(modelPathProblem(file(src, "n.txt", "x"), []), "only .cif and .pdb files")
+    assert.equal(modelPathProblem(pdb, ["ONE.pdb"]), "a model with that name exists")
+    for (const m of [
+        "use a full absolute path",
+        "that is a folder, not a file",
+        "a model with that name exists",
+        "could not copy the file!",
+    ])
+        assert.ok(m.length <= 42, m)
+})
+
+test("add copies and never moves", () => {
+    const src = tempRoot()
+    const project = tempRoot()
+    const pdb = file(src, "one.pdb", "ATOM")
+    assert.deepEqual(listModels(project), []) // no models/ folder: no models
+    const copy = addModel(project, pdb)
+    assert.equal(readFileSync(copy, "utf-8"), "ATOM")
+    assert.equal(copy, join(project, "models", "one.pdb"))
+    assert.ok(existsSync(pdb), "the original is still there")
+    assert.deepEqual(listModels(project), ["one.pdb"])
+    // a model is never overwritten
+    writeFileSync(pdb, "CHANGED")
+    assert.throws(() => addModel(project, pdb))
+    assert.equal(readFileSync(join(project, "models", "one.pdb"), "utf-8"), "ATOM")
+})
+
+test("adding several", () => {
+    const src = tempRoot()
+    const project = tempRoot()
+    const a = file(src, "a.pdb", "A")
+    const b = file(src, "sub/b.cif", "B")
+    const dup = file(src, "sub/a.pdb", "other")
+    const txt = file(src, "c.txt", "C")
+    const none = join(src, "none.pdb")
+    const { copied, skipped } = addModels(project, [a, b, dup, txt, none])
+    assert.deepEqual(copied, ["a.pdb", "b.cif"])
+    assert.deepEqual(
+        skipped.map((s) => s[0]),
+        [dup, txt, none],
+    )
+    assert.deepEqual(
+        skipped.map((s) => s[1]),
+        ["a model with that name exists", "only .cif and .pdb files", "no such file"],
+    )
+    assert.equal(readFileSync(join(project, "models", "a.pdb"), "utf-8"), "A") // first wins
+    for (const f of [a, b, dup, txt]) assert.ok(existsSync(f), "nothing was moved")
+    assert.deepEqual(addModels(project, []), { copied: [], skipped: [] })
+})
+
+test("only models are listed", () => {
+    const project = tempRoot()
+    file(modelsDir(project), "b.CIF", "x")
+    file(modelsDir(project), "A.pdb", "x")
+    file(modelsDir(project), "notes.txt", "x")
+    mkdirSync(join(project, "models", "dir.pdb"))
+    assert.deepEqual(listModels(project), ["A.pdb", "b.CIF"])
+})
+
+test("deleting is limited to the models", () => {
+    const project = tempRoot()
+    const outside = file(tempRoot(), "keep.pdb", "x")
+    file(modelsDir(project), "a.pdb", "x")
+    file(modelsDir(project), "b.cif", "x")
+    assert.equal(deleteModel(project, "../../nothing.pdb"), false)
+    assert.equal(deleteModel(project, `../${outside}`), false)
+    assert.equal(deleteModel(project, "missing.pdb"), false)
+    assert.ok(existsSync(outside))
+    assert.equal(deleteModel(project, "a.pdb"), true)
+    assert.deepEqual(listModels(project), ["b.cif"])
+    // deleting them all is the same as having had none
+    assert.equal(deleteModel(project, "b.cif"), true)
+    assert.deepEqual(listModels(project), [])
+    assert.deepEqual(listModels(tempRoot()), [])
+})
+
+test("hints and completion", () => {
+    const dir = tempRoot()
+    mkdirSync(join(dir, "Sub"))
+    mkdirSync(join(dir, ".hidden"))
+    file(dir, "alpha.pdb", "x")
+    file(dir, "Beta.cif", "x")
+    file(dir, "notes.txt", "x")
+    const d = `${dir}/`
+    // folders first, then models, no other files, no dot names
+    assert.deepEqual(hints(d), ["Sub/", "alpha.pdb", "Beta.cif"])
+    // narrowed by what is typed, case does not matter
+    assert.deepEqual(hints(`${d}AL`), ["alpha.pdb"])
+    assert.deepEqual(hints(`${d}su`), ["Sub/"])
+    assert.deepEqual(hints(`${d}.`), [".hidden/"])
+    assert.deepEqual(hints(`${d}zzz`), [])
+    // no hints without an absolute path in a folder that exists
+    assert.deepEqual(hints(""), [])
+    assert.deepEqual(hints("alpha"), [])
+    assert.deepEqual(hints("/no/such/folder/x"), [])
+    // hintsFor takes any predicate on the file name
+    assert.deepEqual(
+        hintsFor(d, (n) => n.endsWith(".txt")),
+        ["Sub/", "notes.txt"],
+    )
+    assert.deepEqual(
+        hintsFor(d, () => false),
+        ["Sub/"],
+    )
+    assert.deepEqual(hintsFor(d, accepted), hints(d))
+    // completion replaces the last part
+    assert.equal(complete(`${d}al`, "alpha.pdb"), `${d}alpha.pdb`)
+    assert.equal(complete(d, "Sub/"), `${d}Sub/`)
+})
+
+// ---- the path prompt (store/lists.ts)
+
+test("pathSuggestions show the name and complete to the whole path", () => {
+    const dir = tempRoot()
+    mkdirSync(join(dir, "sub"))
+    writeFileSync(join(dir, "m1.pdb"), "")
+    writeFileSync(join(dir, "notes.txt"), "")
+    assert.deepEqual(pathSuggestions(`${dir}/`, accepted), [
+        { label: "sub/", completion: `${dir}/sub/` },
+        { label: "m1.pdb", completion: `${dir}/m1.pdb` },
+    ])
+    assert.deepEqual(
+        pathSuggestions(`${dir}/m`, accepted).map((s) => s.completion),
+        [`${dir}/m1.pdb`],
+    )
+    assert.deepEqual(pathSuggestions("relative", accepted), [])
+    assert.deepEqual(pathSuggestions(`${dir}/nope/x`, accepted), [])
+})
+
+test("checkPath answers with the wording of its budget, in a fixed order", () => {
+    const dir = tempRoot()
+    const kind = { accept: (n: string) => n.endsWith(".ok"), message: "K" }
+    writeFileSync(join(dir, "a.ok"), "")
+    writeFileSync(join(dir, "a.no"), "")
+    for (const budget of [22, 42] as const) {
+        const empty =
+            budget === 42
+                ? "type the full path of a model file first!"
+                : "type a path first!"
+        assert.equal(checkPath(" ", budget), empty)
+        assert.equal(checkPath(join(dir, "none.ok"), budget), "no such file")
+        assert.equal(checkPath(join(dir, "a.no"), budget, kind), "K")
+        assert.equal(checkPath(join(dir, "a.no"), budget), undefined)
+        assert.equal(checkPath(join(dir, "a.ok"), budget, kind), undefined)
+    }
+    assert.equal(checkPath("a.ok", 22), "use a full path")
+    assert.equal(checkPath("a.ok", 42), "use a full absolute path")
+    assert.equal(checkPath(dir, 22), "that is a folder")
+    assert.equal(checkPath(dir, 42), "that is a folder, not a file")
+})
+
+test("a path that is not absolute or not in a folder has no suggestions", () => {
+    assert.deepEqual(pathSuggestions("relative/path", () => true), [])
+    assert.deepEqual(pathSuggestions("/no/such/folder/ab", () => true), [])
+})
+
+// ---- the notes of the models screen
+
+test("pickNote tells copied and skipped files", () => {
+    assert.equal(pickNote({ copied: [], skipped: [] }), "nothing was picked")
+    assert.equal(pickNote({ copied: ["a.pdb"], skipped: [] }), "copied a.pdb")
+    assert.equal(pickNote({ copied: ["a.pdb", "b.cif"], skipped: [] }), "copied 2 files")
+    assert.equal(
+        pickNote({
+            copied: ["a.pdb"],
+            skipped: [["/x/b.txt", "only .cif and .pdb files"]],
+        }),
+        "copied a.pdb, skipped 1: only .cif and .pdb files",
+    )
+    assert.equal(
+        pickNote({ copied: [], skipped: [["/x/b.txt", "no such file"], ["/y", "z"]] }),
+        "skipped 2: no such file",
+    )
+})
+
+test("the deletion question names the model and warns", () => {
+    const q = destructiveQuestion("model a.pdb").text
+    assert.match(q, /^delete model a\.pdb\?/)
+    assert.match(q, /cannot be undone/)
+    assert.equal(q, "delete model a.pdb? this cannot be undone!")
+    // a long name is cut, never the warning behind it
+    const long = destructiveQuestion(`model ${"x".repeat(80)}`).text
+    assert.ok(long.endsWith("? this cannot be undone!"))
+    assert.ok(long.includes("…"))
+    assert.ok(long.length <= 7 + 24 + 24)
 })

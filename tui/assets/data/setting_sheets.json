@@ -128,6 +128,44 @@
    "title": "model",
    "groups": [
     {
+     "title": "data selection",
+     "settings": [
+      {
+       "name": "Q_MIN",
+       "description": "Lowest q fitted, in Å⁻¹; points below it are left out. none uses every point."
+      },
+      {
+       "name": "Q_MAX",
+       "description": "Highest q fitted, in Å⁻¹; points above it are left out. none uses every point. Must lie above Q_MIN."
+      },
+      {
+       "name": "SIGMA_SCALE",
+       "description": "Factor the measured standard errors are multiplied by: above 1 says they were under-estimated, below 1 over-estimated."
+      },
+      {
+       "name": "EXCLUDE_Q",
+       "description": "Ranges of q, in Å⁻¹, whose points are left out, typed as lo-hi pairs such as 0.1-0.2, 0.5-0.6. none leaves none out."
+      }
+     ]
+    },
+    {
+     "title": "structure",
+     "settings": [
+      {
+       "name": "CHAINS",
+       "description": "The chains of the structure that are kept, one character each, as in the file (case counts), such as A B. all keeps every chain."
+      },
+      {
+       "name": "MODEL",
+       "description": "Which model of a multi-model structure (an NMR ensemble) is used, counting from 1."
+      },
+      {
+       "name": "ADD_HYDROGENS",
+       "description": "Whether hydrogens are added (PROPKA and pdb2pqr); no fits the structure as it is, with the hydrogens it carries."
+      }
+     ]
+    },
+    {
      "title": "contrast priors",
      "settings": [
       {
@@ -208,6 +246,10 @@
       {
        "name": "BEAD_RAY_DIRS",
        "description": "Number of ray directions per bead for that test. Not recommended to change."
+      },
+      {
+       "name": "LMAX",
+       "description": "Spherical-harmonic band limit of the forward model. auto takes q_max times the diameter of the scatterer cloud; lower is coarser and faster."
       }
      ]
     }
@@ -353,6 +395,27 @@
      ]
     },
     {
+     "title": "comparison",
+     "settings": [
+      {
+       "name": "PLOT_COMPARE",
+       "description": "Whether a run makes the comparison figure and workbook: the measured curve, every model and the reference curves on one plot."
+      },
+      {
+       "name": "PLOT_COMPARE_COLOURS",
+       "description": "Colours of the fitted curves of the comparison figure, in order, one per model, repeating when there are more models."
+      },
+      {
+       "name": "PLOT_COMPARE_MARKERS",
+       "description": "Markers of the reference curves of the comparison figure, in order, repeating when there are more references."
+      },
+      {
+       "name": "PLOT_LW_COMPARE",
+       "description": "Line width, in points, of the fitted curves of the comparison figure."
+      }
+     ]
+    },
+    {
      "title": "size and text",
      "settings": [
       {
@@ -362,6 +425,10 @@
       {
        "name": "PLOT_PREVIEW_SIZE",
        "description": "Width (in characters) and height (in rows) of a plot previewed in the terminal."
+      },
+      {
+       "name": "PLOT_TUI_SIZES",
+       "description": "Sizes, width x height in characters, of the terminal plots a run writes, growing in both; the viewer shows the largest that fits its window."
       },
       {
        "name": "PLOT_BORDER_PT",

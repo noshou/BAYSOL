@@ -1,38 +1,21 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import assert from "node:assert/strict"
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
-import { formatNumber } from "../src/core/text.js"
-import {
-    type AddEvent,
-    AddFlow,
-    type AddKind,
-    basisNote,
-    countsText,
-    type DropdownStep,
-    entries,
-    entryTag,
-    familyMatch,
-    NO_MATCH,
-    type PromptStep,
-    paramsCell,
-    parseAddField,
-    rowNote,
-    sequencePathProblem,
-} from "../src/store/add-flow.js"
+import { formatNumber } from "../src/core/terminal.js"
+import { AddFlow, sequencePathProblem } from "../src/store/add-flow.js"
+import { type AddEvent, type AddKind, basisNote, countsText, type DropdownStep, entries, entryTag, familyMatch, type PromptStep, paramsCell, rowNote } from "../src/store/add-state.js"
 import { rowProblem } from "../src/store/buffer.js"
 import type { CustomEntry } from "../src/store/custom.js"
-import { Drafts } from "../src/store/draft.js"
-import { MAX_ROWS } from "../src/store/limits.js"
-import { hintsFor } from "../src/store/path-input.js"
-import { isFastaFile } from "../src/store/sequences.js"
-import { resolveBuiltin } from "../src/store/solute-index.js"
-import type { Solute } from "../src/store/solutes.js"
-import { bufferRow } from "../src/store/solutes.js"
-import { fixture as sharedFixture } from "./support/fixtures.js"
+import { Drafts, hintsFor, isFastaFile, MAX_ROWS } from "../src/store/lists.js"
+import { bufferRow, CONC_UNITS, type ConcUnit, concUnit, draftProblem, fieldLabel, formatConc, fromShown, NO_MATCH, nextConcUnit, parseAddField, resolveBuiltin, type Solute, setConcUnit, toShown } from "../src/store/solutes.js"
+import {
+    seqresLetters,
+    fixture as sharedFixture,
+    tempDir as tempRoot,
+} from "./support/fixtures.js"
 
 // ---- fixtures -------------------------------------------------------------------------
 
@@ -87,7 +70,6 @@ const chain4: CustomEntry = {
 const customs = [nacet, ammonium, chain1, chain4]
 
 /** A folder to write files in. */
-const tempRoot = () => mkdtempSync(join(tmpdir(), "baysol-test-"))
 
 const empty = () => new Drafts<Solute>()
 
@@ -137,6 +119,94 @@ function field(flow: AddFlow): string | undefined {
     return s.kind === "edit" ? s.field : undefined
 }
 
+// ---- the concentration unit -----------------------------------------------------------
+
+/** Runs `body` with a unit shown, then puts mM back. */
+function inUnit(unit: ConcUnit, body: () => void) {
+    setConcUnit(unit)
+    try {
+        body()
+    } finally {
+        setConcUnit("mM")
+    }
+}
+
+test("^k turns mM, M, µM, mM", () => {
+    assert.equal(concUnit(), "mM")
+    assert.deepEqual([nextConcUnit(), nextConcUnit(), nextConcUnit()], ["M", "µM", "mM"])
+    assert.deepEqual([...CONC_UNITS], ["mM", "M", "µM"])
+})
+
+test("conversion between the stored mM and the unit shown round-trips", () => {
+    assert.equal(toShown(137, "µM"), 137000)
+    assert.equal(toShown(137, "M"), 0.137)
+    assert.equal(toShown(0.0003, "µM"), 0.3)
+    assert.equal(toShown(0.0003, "M"), 3e-7)
+    for (const x of [137, 6.85, 0.0003, 2.7, 1e-7, 123456.789, 0.1, 5e-324 * 1e300]) {
+        for (const u of CONC_UNITS) {
+            assert.equal(fromShown(toShown(x, u), u), x, `${x} ${u}`)
+        }
+    }
+})
+
+test("formatConc: plain when it fits, scientific with the digits that fit", () => {
+    assert.equal(formatConc(137), "137")
+    assert.equal(formatConc(137, "µM"), "137000")
+    assert.equal(formatConc(137, "µM", 4), "1e5")
+    assert.equal(formatConc(137, "µM", 5), "1.4e5")
+    assert.equal(formatConc(137, "µM", 6), "137000")
+    assert.equal(formatConc(137, "M", 5), "0.137")
+    assert.equal(formatConc(0.137, "M", 6), "1.4e-4")
+    assert.equal(formatConc(0.137, "M", 5), "1e-4")
+    assert.equal(formatConc(0.0003, "M", 7), "3e-7")
+    assert.equal(formatConc(6.85, "µM", 4), "6850")
+    assert.equal(formatConc(6.85, "µM", 3), "7e3")
+    assert.equal(formatConc(6.85, "µM", 1), "7e3")
+    assert.equal(formatConc(0, "M", 3), "0")
+    assert.equal(formatConc(null), "")
+    // what is shown is a number the entry's parser takes
+    for (const u of CONC_UNITS) {
+        const text = formatConc(0.0003, u, 4)
+        assert.ok("value" in parseAddField("sigmaMM", text), text)
+    }
+    // exact text round-trips through the entry's parser (an edit starts from it)
+    inUnit("M", () => {
+        assert.deepEqual(parseAddField("mM", formatConc(0.0003)), { value: 0.0003 })
+    })
+})
+
+test("entry in the unit shown: stored in mM, messages and labels name the unit", () => {
+    inUnit("µM", () => {
+        assert.deepEqual(parseAddField("mM", "137000"), { value: 137 })
+        assert.deepEqual(parseAddField("mM", "1.37e5"), { value: 137 })
+        assert.deepEqual(parseAddField("sigmaMM", "300"), { value: 0.3 })
+        assert.deepEqual(parseAddField("mM", "0"), { error: "µM must be > 0" })
+        assert.equal(fieldLabel("mM"), "µM")
+        assert.equal(fieldLabel("sigmaMM"), "±µM")
+        assert.equal(basisNote("per 1000 Da"), "µM per 1000 Da")
+        const s = { name: "x", mM: 0, sigmaMM: 0 } as Solute
+        assert.equal(draftProblem(s, () => undefined), "µM must be > 0")
+    })
+    inUnit("M", () => {
+        assert.deepEqual(parseAddField("mM", "0.137"), { value: 137 })
+    })
+})
+
+test("a flow edits a cell in the unit shown and keeps the stored mM", () => {
+    inUnit("M", () => {
+        const flow = AddFlow.edit(Drafts.of([fixtureRow("NaCl")]), 0)
+        let step = flow.step
+        // name, then the concentration starts from its value in M
+        step = flow.send({ type: "submit" })
+        assert.equal((step as PromptStep).label, "M")
+        assert.equal((step as PromptStep).typed, formatConc(200, "M"))
+        flow.send({ type: "text", text: "0.3" })
+        flow.send({ type: "submit" })
+        flow.send({ type: "submit" })
+        assert.equal(flow.table.value(0)?.mM, 300)
+    })
+})
+
 // ---- numbers --------------------------------------------------------------------------
 
 test("numbers", () => {
@@ -179,35 +249,37 @@ test("the entries of each add key", () => {
     assert.equal(entryTag(entries("nonbio", "nacl", [])[0]), "solute")
     assert.equal(entryTag(entries("polymer", "peg", [])[0]), "family")
     assert.equal(entryTag(entries("polymer", "ficoll 70", [])[0]), "polymer")
-    assert.equal(entryTag(entries("polymer", "chain-4", customs)[0]), "custom")
     assert.equal(entryTag(entries("nonbio", "amm-nitrate-x", customs)[0]), "custom")
+    assert.equal(entryTag(entries("polymer", "chain-4", customs)[0]), "custom")
     // the custom entries carry their entry
     const e = entries("nonbio", "n-acetylcysteine ethyl ester", customs)[0]
     assert.equal(e.kind, "custom-nonbio")
     assert.deepEqual(e.entry, nacet)
     assert.equal(entries("polymer", "chain-1", customs)[0].kind, "custom-polymer")
     assert.deepEqual(entries("nonbio", "chain-1", customs), [])
+    assert.deepEqual(entries("polymer", "amm-nitrate-x", customs), [])
 })
 
 test("the name dropdown keys", () => {
-    const f = () => add("polymer")
+    const f = () => add("nonbio")
     // typing narrows, the first entry is highlighted
-    let d = dropdown(feed(f(), "chain"))
-    assert.equal(d.typed, "chain")
+    let d = dropdown(feed(f(), "amm-n"))
+    assert.equal(d.typed, "amm-n")
     assert.equal(d.index, 0)
-    assert.equal(d.items[0].text, "chain-1")
+    assert.equal(d.items[0].text, "amm-nitrate-x")
     // up and down wrap
-    const n = d.items.length
-    const flow = feed(f(), "chain")
+    const flow = feed(f(), "n-acet")
+    const n = dropdown(flow).items.length
+    assert.ok(n > 1)
     d = dropdown(feed(flow, { type: "move", delta: -1 }))
     assert.equal(d.index, n - 1)
     for (let k = 0; k < n; k++) feed(flow, down)
     assert.equal(dropdown(flow).index, n - 1)
     // Tab completes to the highlighted name; with no entry it is idle
-    assert.equal(dropdown(feed(f(), "chai", { type: "complete" })).typed, "chain-1")
+    assert.equal(dropdown(feed(f(), "amm-n", { type: "complete" })).typed, "amm-nitrate-x")
     assert.equal(dropdown(feed(f(), { type: "complete" })).typed, "")
     // a shorter text narrows again
-    assert.equal(dropdown(feed(f(), "chai", "cha")).typed, "cha")
+    assert.equal(dropdown(feed(f(), "amm-n", "amm")).typed, "amm")
     // Escape drops the row
     const out = feed(f(), esc)
     assert.ok(out.done)
@@ -223,6 +295,22 @@ test("the name dropdown keys", () => {
     const long = feed(f(), "a".repeat(60), "a".repeat(61))
     assert.equal(dropdown(long).typed, "a".repeat(60))
     assert.equal(dropdown(long).problem, "name too long (60 at most)")
+})
+
+test("the name dropdown keys of the polymer key (custom polymers)", () => {
+    const f = () => add("polymer")
+    let d = dropdown(feed(f(), "chain"))
+    assert.equal(d.typed, "chain")
+    assert.equal(d.index, 0)
+    assert.equal(d.items[0].text, "chain-1")
+    const n = d.items.length
+    const flow = feed(f(), "chain")
+    d = dropdown(feed(flow, { type: "move", delta: -1 }))
+    assert.equal(d.index, n - 1)
+    for (let k = 0; k < n; k++) feed(flow, down)
+    assert.equal(dropdown(flow).index, n - 1)
+    assert.equal(dropdown(feed(f(), "chai", { type: "complete" })).typed, "chain-1")
+    assert.equal(dropdown(feed(f(), "chai", "cha")).typed, "cha")
 })
 
 test("the status row of the dropdown", () => {
@@ -461,6 +549,69 @@ function toPath(kind: "dna" | "rna" | "protein", table = empty()): AddFlow {
     return feed(add("nucleotide", table), ...(kind === "rna" ? [down] : []), submit)
 }
 
+test("sequences typed or pasted as text, linted like a file", () => {
+    const crn = seqresLetters("1CRN-TEST.pdb", "A")
+    const dnaChain = seqresLetters("1BNA-TEST.pdb", "A")
+    const paste = (text: string): AddEvent => ({ type: "paste", text })
+    // typed text: no path character, so it is a sequence; mM and +- follow
+    let flow = feed(toPath("protein"), crn.toLowerCase(), submit)
+    assert.equal(field(flow), "mM")
+    flow = feed(flow, "0.02", submit, "0.002", submit)
+    const typed = onlyRow(flow)
+    assert.equal(typed.arg, crn)
+    assert.equal(typed.name, "seq1")
+    assert.equal(typed.source, "text")
+    assert.ok(rowProblem(bufferRow(typed)) === undefined)
+    // a multi-line paste (FASTA) is taken whole: counted first, Enter takes it
+    const fasta = `>1BNA chain A\n${dnaChain.slice(0, 6)}\n${dnaChain.slice(6)}\n`
+    const pasted = feed(toPath("dna"), paste(fasta))
+    assert.equal(pasted.state.kind, "path")
+    assert.equal(dropdown(pasted).typed, "", "the field is left alone")
+    assert.equal(dropdown(pasted).status, "pasted 12 residues: enter takes them")
+    const taken = onlyRow(feed(pasted, submit, "1", submit, "0.1", submit))
+    assert.equal(taken.arg, dnaChain)
+    assert.equal(taken.name, "1BNA")
+    // several records say so
+    const two = feed(toPath("dna"), paste(">a\nACGT\n>b\nGGCC\n"))
+    assert.equal(dropdown(two).status, "pasted 8 residues in 2 records: enter takes them")
+    assert.equal(rows(feed(two, submit, "1", submit, "0.1", submit)).length, 2)
+    // typing after a paste forgets it
+    const forgot = feed(toPath("dna"), paste(fasta), "A")
+    assert.equal(dropdown(forgot).status, "no hint")
+    // a bad pasted text is an error that stays until the next input, nothing is held
+    const bad = feed(toPath("dna"), paste(`>x\n${dnaChain.replace("T", "U")}\n`))
+    assert.equal(dropdown(bad).problem, "U is RNA, not DNA (at 7)")
+    assert.equal(dropdown(feed(bad, "A")).problem, undefined)
+    assert.equal(
+        dropdown(feed(toPath("dna"), paste("ACGT\nAC-T\n"))).problem,
+        "invalid residue '-' at 7",
+    )
+    // Enter on nothing says what to type
+    assert.equal(
+        dropdown(feed(toPath("dna"), submit)).problem,
+        "type a path or a sequence first!",
+    )
+    // typed text with a bad letter is the same error as the pasted one
+    assert.equal(
+        dropdown(feed(toPath("rna"), "ACGT", submit)).problem,
+        "T is DNA, not RNA (at 4)",
+    )
+    // an existing file wins; text that looks like a path is a path, with the path messages
+    const root = tempRoot()
+    const file = seqFile(root, "p.fa", `>p\n${dnaChain}\n`)
+    assert.equal(
+        onlyRow(feed(toPath("dna"), file, submit, "1", submit, "0.1", submit)).source,
+        "p.fa",
+    )
+    assert.equal(
+        dropdown(feed(toPath("dna"), join(root, "gone.fa"), submit)).problem,
+        "no such file",
+    )
+    assert.equal(dropdown(feed(toPath("dna"), "seq.fa", submit)).problem, "use a full path")
+    // a single-line paste that fits the field is typed text, as before
+    assert.equal(dropdown(feed(toPath("dna"), { type: "text", text: file })).typed, file)
+})
+
 test("sequences from files", () => {
     const root = tempRoot()
     const dna = seqFile(root, "primer.fasta", ">p1\nACGTTGCA\n")
@@ -523,21 +674,21 @@ test("sequences from files", () => {
             ["q2", "TTGA"],
         ],
     )
-    // errors keep the prompt open, with a note of at most 22 characters
+    // errors keep the prompt open, with a note that fits the footer
     const cases: [string, string][] = [
-        ["", "type a path first!"],
+        ["", "type a path or a sequence first!"],
         ["rel.fa", "use a full path"],
         [join(root, "none.fa"), "no such file"],
         [root, "that is a folder"],
-        [seqFile(root, "bad.fa", ">x\nAC9\n"), "bad letter 9 (DNA)"],
-        [seqFile(root, "none.txt", "hello"), "wrong format"],
+        [seqFile(root, "bad.fa", ">x\nAC-T\n"), "invalid residue '-' at 3"],
+        [seqFile(root, "none.txt", "hello"), "invalid residue 'E' at 2"],
         [seqFile(root, "empty.fa", ""), "no records"],
     ]
     for (const [typed, note] of cases) {
         const f = feed(toPath("dna"), ...(typed ? [typed] : []), submit)
         assert.equal(f.state.kind, "path", typed)
         assert.equal(dropdown(f).problem, note, typed)
-        assert.ok(note.length <= 22)
+        assert.ok(note.length <= 40)
         assert.equal(rows(f).length, 1, "only the draft row so far")
     }
     // a pasted path with a newline is trimmed
@@ -562,8 +713,14 @@ test("sequences from files", () => {
     // a DNA file with a U is refused as DNA, an RNA file with a T as RNA
     const u = seqFile(root, "u.fa", ">x\nACGU\n")
     const t = seqFile(root, "t.fa", ">x\nACGT\n")
-    assert.equal(dropdown(feed(toPath("dna"), u, submit)).problem, "bad letter U (DNA)")
-    assert.equal(dropdown(feed(toPath("rna"), t, submit)).problem, "bad letter T (RNA)")
+    assert.equal(
+        dropdown(feed(toPath("dna"), u, submit)).problem,
+        "U is RNA, not DNA (at 4)",
+    )
+    assert.equal(
+        dropdown(feed(toPath("rna"), t, submit)).problem,
+        "T is DNA, not RNA (at 4)",
+    )
     assert.equal(field(feed(toPath("dna"), t, submit)), "mM")
     assert.equal(field(feed(toPath("rna"), u, submit)), "mM")
     // the desktop's file picker: the first file is taken, a problem is a note

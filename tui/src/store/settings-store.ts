@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+// Settings store: the settings files of the user, their scopes, and the theme preference.
+//
+// Contents:
+//   1. Store: `Settings`, loading and saving the global and project files under locks
+//   2. Model settings: the overrides of one model (`model-settings.json`)
+//   3. Scope: whose settings a screen shows (global, one project or one model)
+//   4. Theme preference: the one theme name kept in `theme.json`
+//
+// The definitions and the validation of the settings are in `settings.ts`.
+
 import { appendFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
+import { appDir, ensureDir } from "../core/environment.js"
 import {
     copyOver,
     isDict,
@@ -11,22 +22,22 @@ import {
     withFileLock,
     writeAtomic,
     writeJson,
-} from "../core/files.js"
-import { ensureDir } from "../core/paths.js"
-import { inProject } from "./projects.js"
+} from "../core/file-system.js"
+import { inProject, lockedIn, type ProjectRef } from "./projects.js"
 import {
+    checkRelations,
     defaultCatalog,
+    isRunLevel,
+    reasonFor,
     type SettingDef,
     type SettingsCatalog,
-    SettingsCatalogError,
     type SettingValue,
-} from "./settings-defs.js"
-import {
-    catalogProblems,
-    checkRelations,
-    shortReason,
     validateValue,
-} from "./settings-validate.js"
+} from "./settings.js"
+
+// ========================================================================================
+// 1. Store
+// ========================================================================================
 
 /**
  * The settings of the user: the application-wide `settings.json` in the BAYSOL folder and
@@ -41,8 +52,8 @@ import {
  * Nothing invalid is kept:
  * - Every load checks every saved value and the rules over all of them. A value that is
  *   not valid is wiped: the setting goes back to its default (a project's: to the global
- *   value), the file is rewritten without it, a line in `settings.log` says so, and the
- *   load reports a notice for it.
+ *   value), the file is rewritten without it, a line in `settings.log` beside it says
+ *   what was wiped and why, and the load reports a notice for it.
  * - A file that cannot be read at all is kept as `settings.json.corrupt` and replaced
  *   (by an empty one, or by a copy of the global file for a project).
  * - A change is checked before it is made ([[Settings.evaluate]]).
@@ -53,7 +64,7 @@ import {
 /** The name of the settings file in a folder (Julia looks for the same name). */
 const settingsFileName = "settings.json"
 
-/** The name of the log of wiped values, next to the settings file. */
+/** The log beside a settings file that says which saved values a load wiped. */
 const settingsLogName = "settings.log"
 
 /** The notice of a setting wiped back to its default. */
@@ -66,7 +77,7 @@ const noticeGlobal = "reset to global"
  * The wipes a rule can cause one after another: wiping a value to its baseline may break
  * the same rule again, and then the next round sends it to the default. After this many
  * rounds the loop stops (it can only go on if the defaults themselves break a rule,
- * which `catalogProblems` rules out).
+ * which the unit tests rule out).
  */
 const maxWipeRounds = 4
 
@@ -77,14 +88,13 @@ const maxWipeRounds = 4
  *
  * @property ok - whether every one of them is valid and no rule breaks.
  * @property values - the valid ones, in the type of the setting.
- * @property errors - for each setting that cannot take its value: `message`, a
- *     sentence for a report, and `short`, the same for a narrow cell (at most 18
- *     characters for a rule about a number, 29 about a tuple).
+ * @property errors - for each setting that cannot take its value, a sentence that says
+ *     why (`must be at least 1`).
  */
-export type Evaluation = {
+type Evaluation = {
     ok: boolean
     values: Map<string, SettingValue>
-    errors: Map<string, { message: string; short: string }>
+    errors: Map<string, string>
 }
 
 /**
@@ -92,13 +102,11 @@ export type Evaluation = {
  * drafts; a sheet holds what the user is typing and asks [[Settings.evaluate]] whether
  * it may become a value.
  *
- * @param catalog - what the settings are.
  * @param dir - the folder of the settings file; [[Settings.save]] writes there.
- * @param saved - the values that are saved (they must be valid).
  * @param baseline - what a reset goes back to, setting name to value: the global values
  *     for a project's settings. `undefined` means the defaults.
  */
-export class Settings {
+class Settings {
     /** Why a setting was wiped at the load, setting name to message, until it is set. */
     readonly notices = new Map<string, string>()
 
@@ -107,13 +115,13 @@ export class Settings {
      * these over the file as it is then, so a copy of the program in another terminal
      * that changed other settings does not lose its work.
      */
-    private readonly changed = new Set<string>()
+    protected readonly changed = new Set<string>()
 
     constructor(
         readonly catalog: SettingsCatalog,
         readonly dir: string,
-        private readonly saved: Map<string, SettingValue> = new Map(),
-        private readonly baseline?: ReadonlyMap<string, SettingValue>,
+        protected readonly saved: Map<string, SettingValue> = new Map(),
+        protected readonly baseline?: ReadonlyMap<string, SettingValue>,
     ) {}
 
     /**
@@ -122,7 +130,8 @@ export class Settings {
      * @throws if there is no such setting.
      */
     get(name: string): SettingValue {
-        return this.saved.get(name) ?? this.catalog.require(name).default
+        const saved = this.saved.get(name)
+        return saved !== undefined ? saved : this.catalog.require(name).default
     }
 
     /**
@@ -158,30 +167,23 @@ export class Settings {
      *
      * @param changes - setting name to the raw value (a number, a boolean, a string, a
      *     colour name, an array or an object for a tuple).
-     * @returns the evaluation.
      */
     evaluate(changes: Record<string, unknown>): Evaluation {
         const values = new Map<string, SettingValue>()
-        const errors = new Map<string, { message: string; short: string }>()
+        const errors = new Map<string, string>()
         for (const [name, raw] of Object.entries(changes)) {
             const def = this.catalog.get(name)
             const r = def === undefined ? undefined : validateValue(def, raw)
             if (r === undefined)
-                errors.set(name, { message: "is not a setting", short: "not a setting" })
+                errors.set(name, "is not a setting")
             else if (r.ok) values.set(name, r.value)
-            else errors.set(name, { message: r.error, short: r.error })
+            else errors.set(name, r.error)
         }
         const candidate = { ...this.values(), ...Object.fromEntries(values) }
-        for (const { reason, relation } of checkRelations(
-            this.catalog.relations,
-            candidate,
-        )) {
-            for (const name of [relation.setting, relation.of]) {
+        for (const broken of checkRelations(this.catalog.relations, candidate)) {
+            for (const name of [broken.relation.setting, broken.relation.of]) {
                 if (name !== undefined && values.has(name) && !errors.has(name))
-                    errors.set(name, {
-                        message: reason,
-                        short: shortReason(relation, name),
-                    })
+                    errors.set(name, reasonFor(broken, name))
             }
         }
         for (const name of errors.keys()) values.delete(name)
@@ -191,9 +193,6 @@ export class Settings {
     /**
      * Gives values to settings, in memory, if all of them may be given ([[evaluate]]);
      * otherwise nothing changes. The notices of the settings changed go.
-     *
-     * @param changes - as for [[evaluate]].
-     * @returns the evaluation; the values are in place when `ok`.
      */
     set(changes: Record<string, unknown>): Evaluation {
         const ev = this.evaluate(changes)
@@ -211,7 +210,6 @@ export class Settings {
      * for a project's settings becomes the global value. Nothing changes if that would
      * break a rule with a setting that is not reset.
      *
-     * @param names - the settings.
      * @returns the evaluation of the reset values; they are in place when `ok`.
      */
     reset(names: readonly string[]): Evaluation {
@@ -231,8 +229,6 @@ export class Settings {
     /**
      * The text of the settings file for the saved values: the sheets in order, the
      * settings of each in the order of the sheet, shaped as Julia reads them.
-     *
-     * @returns the text (JSON; `{}` when nothing is saved).
      */
     toText(): string {
         return writeJson(sheetsOf(this.catalog, this.saved))
@@ -249,7 +245,6 @@ export class Settings {
      * file that cannot be read is kept as `settings.json.corrupt`, never written over,
      * and replaced by all the settings this copy knows.
      *
-     * @returns the path of the file.
      * @throws FileInUseError if another copy holds the lock for 3 s; ProjectGoneError for
      *     a project whose folder was deleted meanwhile (nothing is made); an error if the
      *     file cannot be written.
@@ -269,45 +264,32 @@ export class Settings {
     /**
      * The work of [[save]], for a caller that holds the lock on the file already.
      *
-     * @returns the path of the file.
      * @throws an error if the file cannot be written.
      */
     saveLocked(): string {
         const file = settingsFile(this.dir)
         const read = readSettingsFile(file)
-        const wiped: Wipe[] = []
-        let base: Map<string, SettingValue>
+        if (read.state === "unreadable") quarantine(file)
+        // the file as it is with this copy's changes over it (every saved value when
+        // there is no readable file), checked once
+        let stored: Record<string, unknown>
         if (read.state === "ok") {
-            const disk = wipeInvalid(this.catalog, read.stored, this.baseline)
-            wiped.push(...disk.wiped)
-            base = disk.saved
+            stored = structuredClone(read.stored)
             for (const name of this.changed) {
+                const def = this.catalog.require(name)
+                for (const group of Object.values(stored))
+                    if (isDict(group)) delete group[name]
                 const value = this.saved.get(name)
-                if (value === undefined) base.delete(name)
-                else base.set(name, value)
+                if (value === undefined) continue
+                if (!isDict(stored[def.sheet])) stored[def.sheet] = {}
+                ;(stored[def.sheet] as Record<string, unknown>)[name] = { value }
             }
-        } else {
-            if (read.state === "unreadable") {
-                quarantine(file)
-                logLines(this.dir, [
-                    `${settingsFileName} could not be read; kept as ` +
-                        `${settingsFileName}.corrupt, ` +
-                        "replaced by the settings of this copy",
-                ])
-            }
-            base = new Map(this.saved)
-        }
-        const final = wipeInvalid(
-            this.catalog,
-            sheetsOf(this.catalog, base),
-            this.baseline,
-        )
-        wiped.push(...final.wiped)
+        } else stored = sheetsOf(this.catalog, this.saved)
+        const final = wipeInvalid(this.catalog, stored, this.baseline)
         writeAtomic(file, writeJson(sheetsOf(this.catalog, final.saved)), this.folder)
         this.saved.clear()
         for (const [name, value] of final.saved) this.saved.set(name, value)
         this.changed.clear()
-        logWipes(this, wiped, this.baseline === undefined ? "default" : "global value")
         return file
     }
 }
@@ -315,10 +297,6 @@ export class Settings {
 /**
  * The saved values as the sheets of the file: the sheets in order, the settings of each
  * in the order of the sheet.
- *
- * @param catalog - what the settings are.
- * @param saved - setting name to value.
- * @returns sheet id to setting name to `{ value }`.
  */
 function sheetsOf(
     catalog: SettingsCatalog,
@@ -360,22 +338,13 @@ type Wipe = { screen: string; setting: string; value: unknown; reason: string }
  * @property saved - the values kept (and, with a baseline, the values wiped values went
  *     back to), setting name to value.
  * @property wiped - what was not kept.
- * @property dropped - sentences about parts of the file that are no setting and were
- *     left out (a screen that is no map).
  */
 export type Sanitized = {
     saved: Map<string, SettingValue>
     wiped: Wipe[]
-    dropped: string[]
 }
 
-/**
- * Whether two values are the same: numbers as numbers, arrays and objects by content.
- *
- * @param a - a value.
- * @param b - a value.
- * @returns true if equal.
- */
+/** Whether two values are the same: numbers as numbers, arrays and objects by content. */
 export function sameValue(a: unknown, b: unknown): boolean {
     if (Array.isArray(a) && Array.isArray(b))
         return a.length === b.length && a.every((x, i) => sameValue(x, b[i]))
@@ -390,6 +359,18 @@ export function sameValue(a: unknown, b: unknown): boolean {
 }
 
 /**
+ * How the table of one model is checked (see [[wipeInvalid]]).
+ *
+ * @property inherited - the project's value of every setting: what the model has without
+ *     an override, which the rules between settings are checked over.
+ * @property refuse - why a setting may not be in the table (`undefined`: it may).
+ */
+export type ModelRules = {
+    inherited: ReadonlyMap<string, SettingValue>
+    refuse: (name: string) => string | undefined
+}
+
+/**
  * Checks everything a settings file holds and keeps what is valid. Every saved value is
  * checked ([[validateValue]]); then the rules over all the values are checked, and the
  * saved values of the settings of a broken rule are wiped too. A setting that is no
@@ -399,18 +380,16 @@ export function sameValue(a: unknown, b: unknown): boolean {
  * there (the settings of a project go back to the global settings); a rule still broken
  * after that sends it to its default after all.
  *
- * @param catalog - what the settings are.
  * @param stored - the file's content as `readJson` gave it (a map of screens).
  * @param baseline - the values wiped settings go back to, or `undefined` for defaults.
- * @returns the values kept, the wipes and the parts left out.
  */
 export function wipeInvalid(
     catalog: SettingsCatalog,
     stored: Record<string, unknown>,
     baseline?: ReadonlyMap<string, SettingValue>,
+    model?: ModelRules,
 ): Sanitized {
     const wiped: Wipe[] = []
-    const dropped: string[] = []
     const saved = new Map<string, SettingValue>()
     const wipe = (def: SettingDef, value: unknown, reason: string): void => {
         wiped.push({ screen: def.sheet, setting: def.name, value, reason })
@@ -425,16 +404,18 @@ export function wipeInvalid(
 
     // The entries of the file by setting name, whatever screen they are on.
     const entries = new Map<string, unknown>()
-    for (const [screen, group] of Object.entries(stored)) {
-        if (typeof group !== "object" || group === null || Array.isArray(group)) {
-            dropped.push(`screen ${screen} is not a map of settings`)
-            continue
-        }
-        for (const [name, entry] of Object.entries(group)) entries.set(name, entry)
+    for (const group of Object.values(stored)) {
+        if (isDict(group))
+            for (const [name, entry] of Object.entries(group)) entries.set(name, entry)
     }
     for (const def of catalog.defs()) {
         if (!entries.has(def.name)) continue
         const entry = entries.get(def.name)
+        const refused = model?.refuse(def.name)
+        if (refused !== undefined) {
+            wipe(def, isDict(entry) && "value" in entry ? entry.value : entry, refused)
+            continue
+        }
         if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
             wipe(def, entry, "its entry is not a map")
             sendBack(def, 0)
@@ -453,14 +434,19 @@ export function wipeInvalid(
     // rule.
     const effective = (): Record<string, SettingValue> =>
         Object.fromEntries(
-            catalog.defs().map((d) => [d.name, saved.get(d.name) ?? d.default]),
+            catalog
+                .defs()
+                .map((d) => [
+                    d.name,
+                    saved.get(d.name) ?? model?.inherited.get(d.name) ?? d.default,
+                ]),
         )
     for (let round = 0; round < maxWipeRounds; round++) {
         const reasons = new Map<string, string>()
-        for (const { relation, reason } of checkRelations(catalog.relations, effective())) {
-            for (const name of [relation.setting, relation.of]) {
+        for (const broken of checkRelations(catalog.relations, effective())) {
+            for (const name of [broken.relation.setting, broken.relation.of]) {
                 if (name !== undefined && saved.has(name) && !reasons.has(name))
-                    reasons.set(name, reason)
+                    reasons.set(name, reasonFor(broken, name))
             }
         }
         if (reasons.size === 0) break
@@ -470,10 +456,26 @@ export function wipeInvalid(
             sendBack(def, round)
         }
     }
-    return { saved, wiped, dropped }
+    return { saved, wiped }
 }
 
 // --- loading and saving the files
+
+/**
+ * Adds one line to `settings.log` beside the settings file for each wiped value: time,
+ * setting, the bad value as JSON and why, tab-separated. A log that cannot be written
+ * never stops the load.
+ */
+function logWipes(dir: string, wiped: readonly Wipe[]): void {
+    const stamp = new Date().toISOString()
+    const line = (w: Wipe): string =>
+        [stamp, w.setting, JSON.stringify(w.value) ?? String(w.value), w.reason].join("\t")
+    try {
+        appendFileSync(join(dir, settingsLogName), `${wiped.map(line).join("\n")}\n`)
+    } catch {
+        // the notices still tell the user
+    }
+}
 
 /**
  * What a load of a settings file gives.
@@ -501,9 +503,6 @@ type FileState =
 /**
  * Reads a settings file. A file that is empty, is not JSON, or holds anything but a map
  * is unreadable (Julia refuses it too).
- *
- * @param file - the path.
- * @returns what is there.
  */
 function readSettingsFile(file: string): FileState {
     if (!existsSync(file)) return { state: "missing" }
@@ -514,175 +513,63 @@ function readSettingsFile(file: string): FileState {
 }
 
 /**
- * Adds lines to `settings.log` in a folder, each with the time.
+ * Loads a folder's settings under the lock on its file: a missing file is made by `seed`,
+ * an unreadable one is kept as `settings.json.corrupt` and made again; an invalid saved
+ * value is wiped and the file rewritten.
  *
- * @param dir - the folder.
- * @param lines - the lines.
- * @throws if the log cannot be written.
+ * @param baseline - as for [[wipeInvalid]]; a project's (its folder must exist).
  */
-function logLines(dir: string, lines: string[]): void {
-    if (lines.length === 0) return
-    const stamp = new Date().toISOString()
-    appendFileSync(
-        join(dir, settingsLogName),
-        lines.map((l) => `${stamp} ${l}\n`).join(""),
-        "utf-8",
-    )
-}
-
-/**
- * The text of a value for the log, as JSON.
- *
- * @param value - a raw value or a setting value.
- * @returns the text, one line.
- */
-function showValue(value: unknown): string {
-    return JSON.stringify(value) ?? String(value)
-}
-
-/**
- * The bundled catalog, once its defaults are known to be sound.
- *
- * @returns the catalog.
- * @throws [[SettingsCatalogError]] if the bundled data is corrupt; the program cannot
- *     go on.
- */
-export function soundCatalog(): SettingsCatalog {
-    const catalog = defaultCatalog()
-    if (!soundChecked.has(catalog)) {
-        const problems = catalogProblems(catalog)
-        if (problems.length > 0) throw new SettingsCatalogError(problems)
-        soundChecked.add(catalog)
-    }
-    return catalog
-}
-
-/** The catalogs whose defaults have been checked. */
-const soundChecked = new WeakSet<SettingsCatalog>()
-
-/**
- * Adds a line to `settings.log` for each wiped value.
- *
- * @param settings - the settings after the wipe (where the values went back to).
- * @param wiped - what was wiped.
- * @param target - what a wiped value went back to (`default`, `global value`).
- */
-function logWipes(settings: Settings, wiped: readonly Wipe[], target: string): void {
-    logLines(
-        settings.dir,
-        wiped.map(
-            (w) =>
-                `${w.setting}: ${showValue(w.value)} is not valid (${w.reason}); ` +
-                `reset to its ${target} ${showValue(settings.get(w.setting))}`,
-        ),
-    )
-}
-
-/**
- * Checks a folder's settings file and builds the settings from it: the common part of
- * a global and a project load. The file must exist and be readable. If anything is
- * wiped the file is rewritten and the wipes logged, so the caller must hold the lock on
- * the file then ([[withFileLock]]).
- *
- * @param catalog - what the settings are.
- * @param dir - the folder.
- * @param stored - the file's map.
- * @param baseline - as for [[wipeInvalid]].
- * @param target - what a wiped value went back to, for the log (`default`, `global value`).
- * @param message - the notice of a wiped setting.
- * @returns the load result, with the file rewritten and logged if anything was wiped.
- */
-function loadChecked(
+function load(
     catalog: SettingsCatalog,
     dir: string,
-    stored: Record<string, unknown>,
     baseline: ReadonlyMap<string, SettingValue> | undefined,
-    target: string,
-    message: string,
+    seed: () => void,
+    notice: string,
 ): LoadResult {
-    const { saved, wiped, dropped } = wipeInvalid(catalog, stored, baseline)
-    const settings = new Settings(catalog, dir, saved, baseline)
-    const notices = wiped.map((w) => ({ setting: w.setting, message }))
-    for (const n of notices) settings.notices.set(n.setting, n.message)
-    if (wiped.length > 0) {
-        writeAtomic(settingsFile(dir), settings.toText(), {
-            createParents: baseline === undefined,
-        })
-        logWipes(settings, wiped, target)
+    const file = settingsFile(dir)
+    const body = (): LoadResult => {
+        let read = readSettingsFile(file)
+        const reset = read.state === "unreadable"
+        if (reset) quarantine(file)
+        if (read.state !== "ok") {
+            seed()
+            read = readSettingsFile(file)
+            if (read.state !== "ok")
+                throw new Error(`${file} cannot be used after it was made`)
+        }
+        const { saved, wiped } = wipeInvalid(catalog, read.stored, baseline)
+        const settings = new Settings(catalog, dir, saved, baseline)
+        const notices = wiped.map((w) => ({ setting: w.setting, message: notice }))
+        for (const n of notices) settings.notices.set(n.setting, n.message)
+        if (wiped.length > 0) {
+            writeAtomic(file, settings.toText(), { createParents: baseline === undefined })
+            logWipes(dir, wiped)
+        }
+        return { settings, wiped, reset, notices }
     }
-    logLines(
-        dir,
-        dropped.map((d) => `${d}; left out`),
-    )
-    return { settings, wiped, reset: false, notices }
-}
-
-/**
- * The load of a file that needs no change: it reads and everything in it is valid. No
- * lock is needed to read (a file is only ever replaced whole).
- *
- * @param catalog - what the settings are.
- * @param dir - the folder.
- * @param baseline - as for [[wipeInvalid]].
- * @returns the load result, or `undefined` if the file is missing, unreadable or holds
- *     anything to wipe (the caller then redoes the load under the lock).
- */
-function loadClean(
-    catalog: SettingsCatalog,
-    dir: string,
-    baseline: ReadonlyMap<string, SettingValue> | undefined,
-): LoadResult | undefined {
-    const read = readSettingsFile(settingsFile(dir))
-    if (read.state !== "ok") return undefined
-    const { saved, wiped, dropped } = wipeInvalid(catalog, read.stored, baseline)
-    if (wiped.length > 0 || dropped.length > 0) return undefined
-    const settings = new Settings(catalog, dir, saved, baseline)
-    return { settings, wiped: [], reset: false, notices: [] }
+    return baseline === undefined ? withFileLock(file, body) : lockedIn(dir, file, body)
 }
 
 /**
  * Loads the global settings from the BAYSOL folder: the file is made first (empty: every
  * setting at its default) if it is missing; an invalid saved value is wiped to its
  * default and the file rewritten; a file that cannot be read is kept as
- * `settings.json.corrupt` and replaced. All of it is in `settings.log`.
+ * `settings.json.corrupt` and replaced.
  *
- * @param dir - the BAYSOL folder (made if there is none).
- * @param catalog - what the settings are (the bundled data by default).
- * @returns the settings and what was wiped.
- * @throws [[SettingsCatalogError]] if the bundled data is corrupt, or an error if a file
- *     cannot be written.
+ * @throws if a file cannot be written.
  */
 export function loadGlobal(
     dir: string,
-    catalog: SettingsCatalog = soundCatalog(),
+    catalog: SettingsCatalog = defaultCatalog(),
 ): LoadResult {
     ensureDir(dir)
-    const clean = loadClean(catalog, dir, undefined)
-    if (clean) return clean
-    // Something has to be written: make, rewrite or replace the file under the lock,
-    // looking at the file again there (another copy may have done it meanwhile).
-    return withFileLock(settingsFile(dir), () => {
-        const read = readSettingsFile(settingsFile(dir))
-        if (read.state === "ok")
-            return loadChecked(
-                catalog,
-                dir,
-                read.stored,
-                undefined,
-                "default",
-                noticeDefault,
-            )
-        const settings = new Settings(catalog, dir)
-        if (read.state === "unreadable") {
-            quarantine(settingsFile(dir))
-            logLines(dir, [
-                `${settingsFileName} could not be read; kept as ` +
-                    `${settingsFileName}.corrupt, replaced by the defaults`,
-            ])
-        }
-        settings.saveLocked()
-        return { settings, wiped: [], reset: read.state === "unreadable", notices: [] }
-    })
+    return load(
+        catalog,
+        dir,
+        undefined,
+        () => writeAtomic(settingsFile(dir), writeJson({})),
+        noticeDefault,
+    )
 }
 
 /**
@@ -694,57 +581,376 @@ export function loadGlobal(
  * project file is kept as `settings.json.corrupt` and replaced by a copy of the global
  * file.
  *
- * @param projectDir - the project's folder.
- * @param globalDir - the BAYSOL folder.
- * @param catalog - what the settings are (the bundled data by default).
  * @returns the project's settings and what was wiped; `reset` says the file was
  *     unreadable.
- * @throws [[SettingsCatalogError]] if the bundled data is corrupt; [[ProjectGoneError]]
- *     if the project's folder does not exist (nothing is made); an error if a file
- *     cannot be written.
+ * @throws [[ProjectGoneError]] if the project's folder does not exist (nothing is made);
+ *     an error if a file cannot be written.
  */
 export function loadProject(
     projectDir: string,
     globalDir: string,
-    catalog: SettingsCatalog = soundCatalog(),
+    catalog: SettingsCatalog = defaultCatalog(),
 ): LoadResult {
     const global = loadGlobal(globalDir, catalog).settings
-    const baseline = new Map(Object.entries(global.values()))
-    const file = settingsFile(projectDir)
-    // The project's folder must exist: opening a deleted project makes nothing.
-    return inProject(projectDir, () => {
-        const clean = loadClean(catalog, projectDir, baseline)
-        if (clean) return clean
-        return withFileLock(
-            file,
-            () => {
-                const copyGlobal = (): string => copyOver(settingsFile(globalDir), file)
-                let read = readSettingsFile(file)
-                const reset = read.state === "unreadable"
-                if (read.state === "missing") copyGlobal()
-                if (read.state === "unreadable") {
-                    quarantine(file)
-                    copyGlobal()
-                    logLines(projectDir, [
-                        `${settingsFileName} could not be read; kept as ` +
-                            `${settingsFileName}.corrupt, ` +
-                            "replaced by a copy of the global settings",
-                    ])
-                }
-                read = readSettingsFile(file)
-                if (read.state !== "ok")
-                    throw new Error(`${file} cannot be used after it was copied`)
-                const loaded = loadChecked(
-                    catalog,
-                    projectDir,
-                    read.stored,
-                    baseline,
-                    "global value",
-                    noticeGlobal,
-                )
-                return { ...loaded, reset }
-            },
-            { createParents: false },
+    return load(
+        catalog,
+        projectDir,
+        new Map(Object.entries(global.values())),
+        () => copyOver(settingsFile(globalDir), settingsFile(projectDir)),
+        noticeGlobal,
+    )
+}
+
+// ========================================================================================
+// 2. The settings of one model
+// ========================================================================================
+
+/**
+ * The settings of single models: `<project>/model-settings.json`, which Julia reads
+ * (`{"<model file stem>": {"<sheet>": {"<NAME>": {"value": v}}}}`, the shape of a
+ * `settings.json` for each model). It is SPARSE: a model has only the settings that differ
+ * from the project's, and a model or a setting that is not in it is the project's. A
+ * setting of the whole run ([[isRunLevel]]) is refused by Julia with an error that fails
+ * the run, so it is never written and is wiped when found. The table of a model that is
+ * no longer in the project stays in the file (Julia ignores it with a note).
+ */
+const modelFileName = "model-settings.json"
+
+/** The notice of a model's setting wiped: it is the project's again. */
+const noticeModel = "reset to project"
+
+/** Why a setting of the whole run is wiped from a model's table. */
+const reasonRunLevel = "is a setting of the whole run"
+
+/** @returns the path of a project's `model-settings.json`. */
+export const modelSettingsFile = (projectDir: string): string =>
+    join(projectDir, modelFileName)
+
+/**
+ * @param file - a model's file name (`crambin.pdb`).
+ * @returns its stem, the model's name in `model-settings.json`: the name without the last
+ *     extension, as Julia takes it.
+ */
+export function modelStem(file: string): string {
+    const dot = file.lastIndexOf(".")
+    return dot > 0 ? file.slice(0, dot) : file
+}
+
+/** The rules of the table of a model whose project's values are `inherited`. */
+const modelRules = (inherited: ReadonlyMap<string, SettingValue>): ModelRules => ({
+    inherited,
+    refuse: (name) => (isRunLevel(name) ? reasonRunLevel : undefined),
+})
+
+/** The `settings.log` lines of a model's wiped values (the setting: `model <stem>: X`). */
+const modelWipes = (stem: string, wiped: readonly Wipe[]): Wipe[] =>
+    wiped.map((w) => ({ ...w, setting: `model ${stem}: ${w.setting}` }))
+
+/**
+ * Writes the table of one model into `model-settings.json`, keeping every other model's
+ * table as it is (the stored file, read under the lock). An empty table removes the
+ * model's key (the file stays sparse); nothing is made when there is no file and nothing
+ * to put in it.
+ */
+function writeModelTable(
+    catalog: SettingsCatalog,
+    projectDir: string,
+    stored: Record<string, unknown> | undefined,
+    stem: string,
+    saved: ReadonlyMap<string, SettingValue>,
+): void {
+    const sheets = sheetsOf(catalog, saved)
+    const out = { ...stored }
+    if (Object.keys(sheets).length === 0) {
+        if (stored === undefined) return
+        delete out[stem]
+    } else out[stem] = sheets
+    writeAtomic(modelSettingsFile(projectDir), writeJson(out), { createParents: false })
+}
+
+/**
+ * The settings of ONE model: its overrides (the table in `model-settings.json`) over the
+ * project's values. [[get]] is the override, else the project's value; an edit to a value
+ * equal to the project's removes the override instead of making one (so the file the
+ * program writes stays sparse), a reset gives the project's value back (removes it); an
+ * override already in the file is kept even when it equals the project's value now.
+ * [[save]] changes only this model's table, under the lock of the file, over the file as
+ * it is then, so another copy's work on other settings or models survives.
+ *
+ * @param inherited - the project's value of every setting.
+ */
+export class ModelSettings extends Settings {
+    constructor(
+        catalog: SettingsCatalog,
+        readonly projectDir: string,
+        readonly stem: string,
+        saved: Map<string, SettingValue>,
+        readonly inherited: ReadonlyMap<string, SettingValue>,
+    ) {
+        super(catalog, projectDir, saved)
+    }
+
+    /** @returns the override, else the project's value. */
+    override get(name: string): SettingValue {
+        return this.saved.get(name) ?? this.resetValue(name)
+    }
+
+    /** @returns the project's value: what the model has without an override. */
+    override resetValue(name: string): SettingValue {
+        return this.inherited.get(name) ?? this.catalog.require(name).default
+    }
+
+    /** As [[Settings.evaluate]], and a setting of the whole run is never accepted. */
+    override evaluate(changes: Record<string, unknown>): ReturnType<Settings["evaluate"]> {
+        const own = Object.entries(changes).filter(([name]) => !isRunLevel(name))
+        const ev = super.evaluate(Object.fromEntries(own))
+        for (const name of Object.keys(changes))
+            if (isRunLevel(name)) ev.errors.set(name, reasonRunLevel)
+        return { ...ev, ok: ev.errors.size === 0 }
+    }
+
+    /** @returns the names of the settings this model overrides, in the sheets' order. */
+    overrides(): string[] {
+        return this.catalog.defs().flatMap((d) => (this.saved.has(d.name) ? [d.name] : []))
+    }
+
+    /**
+     * Gives values to settings in memory as [[Settings.set]] does, but a value equal to
+     * the project's removes the override instead of making one.
+     */
+    override set(changes: Record<string, unknown>): ReturnType<Settings["evaluate"]> {
+        const ev = this.evaluate(changes)
+        if (!ev.ok) return ev
+        for (const [name, value] of ev.values) {
+            if (sameValue(value, this.resetValue(name))) this.saved.delete(name)
+            else this.saved.set(name, value)
+            this.changed.add(name)
+            this.notices.delete(name)
+        }
+        return ev
+    }
+
+    /** Saves under the lock of `model-settings.json`, inside the project. */
+    override save(): string {
+        return lockedIn(this.projectDir, modelSettingsFile(this.projectDir), () =>
+            this.saveLocked(),
         )
+    }
+
+    /**
+     * The work of [[save]]: the file is read again, only the settings this copy changed
+     * are applied to this model's table there, the table is checked as a load checks it
+     * (a value that is not valid is wiped and logged) and written with the other models'
+     * tables untouched; this copy takes over what was written. A file that cannot be read
+     * is kept as `model-settings.json.corrupt` and replaced by the overrides this copy
+     * has.
+     */
+    override saveLocked(): string {
+        const file = modelSettingsFile(this.projectDir)
+        const read = readSettingsFile(file)
+        if (read.state === "unreadable") quarantine(file)
+        const stored = read.state === "ok" ? structuredClone(read.stored) : undefined
+        let table: Record<string, unknown>
+        if (stored !== undefined) {
+            const own = stored[this.stem]
+            table = isDict(own) ? own : {}
+            for (const name of this.changed) {
+                const def = this.catalog.require(name)
+                for (const group of Object.values(table))
+                    if (isDict(group)) delete group[name]
+                const value = this.saved.get(name)
+                if (value === undefined) continue
+                if (!isDict(table[def.sheet])) table[def.sheet] = {}
+                ;(table[def.sheet] as Record<string, unknown>)[name] = { value }
+            }
+        } else table = sheetsOf(this.catalog, this.saved)
+        const rules = modelRules(this.inherited)
+        const final = wipeInvalid(this.catalog, table, undefined, rules)
+        writeModelTable(this.catalog, this.projectDir, stored, this.stem, final.saved)
+        if (final.wiped.length > 0)
+            logWipes(this.projectDir, modelWipes(this.stem, final.wiped))
+        this.saved.clear()
+        for (const [name, value] of final.saved) this.saved.set(name, value)
+        this.changed.clear()
+        return file
+    }
+}
+
+/**
+ * Loads one model's settings over its project's (the project's own load comes first, so
+ * its values are checked and its file made), under the lock of `model-settings.json`:
+ * an invalid value, a setting of the whole run, or a value that a rule between settings
+ * breaks (over the project's values) is wiped from the model's table, the file rewritten
+ * without it and a line added to `settings.log`; a file that cannot be read is kept as
+ * `model-settings.json.corrupt`; the other models' tables are never touched. A model that
+ * has no table reads as empty and nothing is made.
+ *
+ * @param stem - the model's name (see [[modelStem]]).
+ * @returns the settings, and what was wiped, as [[LoadResult]] says (`reset`: the file or
+ *     the model's table could not be read).
+ * @throws [[ProjectGoneError]] if the project's folder does not exist; an error if a
+ *     file cannot be written.
+ */
+export function loadModel(
+    projectDir: string,
+    stem: string,
+    globalDir: string,
+    catalog: SettingsCatalog = defaultCatalog(),
+): Omit<LoadResult, "settings"> & { settings: ModelSettings } {
+    const project = loadProject(projectDir, globalDir, catalog).settings
+    const inherited = new Map(Object.entries(project.values()))
+    const file = modelSettingsFile(projectDir)
+    return lockedIn(projectDir, file, () => {
+        const read = readSettingsFile(file)
+        let reset = read.state === "unreadable"
+        if (reset) quarantine(file)
+        const stored = read.state === "ok" ? structuredClone(read.stored) : undefined
+        const own = stored?.[stem]
+        if (own !== undefined && !isDict(own)) reset = true // Julia refuses it too
+        const table = isDict(own) ? own : {}
+        const rules = modelRules(inherited)
+        const { saved, wiped } = wipeInvalid(catalog, table, undefined, rules)
+        const settings = new ModelSettings(catalog, projectDir, stem, saved, inherited)
+        const notices = wiped
+            .filter((w) => !isRunLevel(w.setting))
+            .map((w) => ({ setting: w.setting, message: noticeModel }))
+        for (const n of notices) settings.notices.set(n.setting, n.message)
+        if (wiped.length > 0 || (own !== undefined && !isDict(own))) {
+            writeModelTable(catalog, projectDir, stored, stem, saved)
+            if (wiped.length > 0) logWipes(projectDir, modelWipes(stem, wiped))
+        }
+        return { settings, wiped, reset, notices }
     })
+}
+
+/**
+ * The settings each model of a project overrides, read without a lock or a change: model
+ * stem to the names of its overrides in the sheets' order, for the models that have any.
+ * An unreadable file, a table that is no object and the settings of the whole run (which
+ * a model cannot have) count for nothing.
+ */
+export function modelOverrides(
+    projectDir: string,
+    catalog: SettingsCatalog = defaultCatalog(),
+): Map<string, string[]> {
+    const out = new Map<string, string[]>()
+    const read = readSettingsFile(modelSettingsFile(projectDir))
+    if (read.state !== "ok") return out
+    for (const [stem, table] of Object.entries(read.stored)) {
+        if (!isDict(table)) continue
+        const given = new Set<string>()
+        for (const group of Object.values(table))
+            if (isDict(group))
+                for (const [name, entry] of Object.entries(group))
+                    if (isDict(entry) && "value" in entry) given.add(name)
+        const names = catalog
+            .defs()
+            .filter((d) => given.has(d.name) && !isRunLevel(d.name))
+            .map((d) => d.name)
+        if (names.length > 0) out.set(stem, names)
+    }
+    return out
+}
+
+// ========================================================================================
+// 3. Scope
+// ========================================================================================
+
+/**
+ * Whose settings a screen shows: the global ones that every new project starts from,
+ * those of one project, or the overrides of one model of a project. The same sheets serve
+ * all three; only where the file is and what "reset" returns to differ.
+ */
+export type Scope =
+    | { kind: "global" }
+    | { kind: "project"; project: ProjectRef }
+    | { kind: "model"; project: ProjectRef; model: string }
+
+/** The global scope. */
+export const globalScope: Scope = { kind: "global" }
+
+/** The scope of a project. */
+export function projectScope(project: ProjectRef): Scope {
+    return { kind: "project", project }
+}
+
+/** The scope of one model of a project (`model` is its stem, see [[modelStem]]). */
+export function modelScope(project: ProjectRef, model: string): Scope {
+    return { kind: "model", project, model }
+}
+
+/** The words that name a scope on a screen's title. */
+export function scopeTitle(scope: Scope): string {
+    if (scope.kind === "model") return "model settings"
+    return scope.kind === "global" ? "global settings" : "project settings"
+}
+
+/**
+ * Loads (and checks, and if need be repairs) the settings of a scope.
+ *
+ * @returns the settings and what was wiped on the way, see [[LoadResult]].
+ * @throws if the bundled data is corrupt or a file cannot be written.
+ */
+export function loadScope(scope: Scope): LoadResult {
+    if (scope.kind === "model") return loadModel(scope.project.dir, scope.model, appDir())
+    return scope.kind === "global"
+        ? loadGlobal(appDir())
+        : loadProject(scope.project.dir, appDir())
+}
+
+// ========================================================================================
+// 4. Theme preference
+// ========================================================================================
+
+/**
+ * The theme the user last left the program in, kept as one global preference so the
+ * next start opens in it. The file is `theme.json` in the BAYSOL folder:
+ * `{ "theme": "graphite" }`, the name of the theme. The store knows no themes (the app
+ * passes the names that exist), and it is only a preference: a missing or unusable
+ * file means the default, and nothing about it may ever stop the program.
+ */
+
+/** The name of the file, defined here once. */
+const themeFileName = "theme.json"
+
+/** The path of the theme file. */
+export function themeFile(dir: string): string {
+    return join(dir, themeFileName)
+}
+
+/**
+ * Reads the saved theme name.
+ *
+ * @param fallback - the name to give when nothing usable is saved (the default theme).
+ * @returns the saved name; `fallback` when there is no file, it cannot be read, or it
+ *     names a theme that is not in `known` (one removed since).
+ */
+export function readThemeName(
+    dir: string,
+    known: readonly string[],
+    fallback: string,
+): string {
+    const file = themeFile(dir)
+    if (!isFile(file)) return fallback
+    const saved = readJson<undefined>(file, undefined)
+    const name = isDict(saved) ? saved.theme : undefined
+    return typeof name === "string" && known.includes(name) ? name : fallback
+}
+
+/**
+ * Saves the theme name. A file that exists but cannot be used is kept as
+ * `theme.json.corrupt` first, so it is never written over.
+ *
+ * @returns `true` if it was saved; `false` if the folder cannot be written (a
+ *     preference that cannot be kept is not an error worth stopping for).
+ */
+export function writeThemeName(dir: string, name: string): boolean {
+    const file = themeFile(dir)
+    try {
+        if (isFile(file) && !isDict(readJson<undefined>(file, undefined))) quarantine(file)
+        writeAtomic(file, writeJson({ theme: name }))
+        return true
+    } catch {
+        return false
+    }
 }

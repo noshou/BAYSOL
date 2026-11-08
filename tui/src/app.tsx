@@ -2,22 +2,20 @@
 
 import { Box, Text, useApp, useWindowSize } from "ink"
 import { type ReactNode, useState } from "react"
-import { appDir } from "./core/paths.js"
-import { MainMenu } from "./screens/main-menu.js"
-import { readThemeName, writeThemeName } from "./store/theme-store.js"
-import { keys } from "./ui/keys.js"
-import { minColumns, minRows } from "./ui/layout.js"
-import { Logo } from "./ui/logo.js"
-import { NavProvider } from "./ui/nav.js"
+import { appDir } from "./core/environment.js"
+import { MainMenu } from "./screens/menus.js"
+import { quitAll } from "./store/run.js"
+import { readThemeName, writeThemeName } from "./store/settings-store.js"
+import { ThemePicker } from "./ui/input.js"
+import { keys, minColumns, minRows, NavProvider, useKeys } from "./ui/interaction.js"
 import {
     defaultTheme,
+    Logo,
     type Theme,
     ThemeContext,
     themeByName,
     themes,
 } from "./ui/theme.js"
-import { ThemePicker } from "./ui/theme-picker.js"
-import { useKeys } from "./ui/use-keys.js"
 
 /**
  * The theme the user left the program in last time: the saved name looked up in the
@@ -54,10 +52,14 @@ export function App(): ReactNode {
     }, !picking)
 
     // Ctrl-C and Ctrl-D end the program from anywhere (with `q` in the main menu they are
-    // the only exits; Esc never quits). One handler, always on: the run screen will take
-    // this over, to stop the fit it started before it leaves.
+    // the only exits; Esc never quits). One handler, always on: a run that is going is
+    // aborted first (its Julia stopped, its status written, its logs packed), then the
+    // program leaves; a second press while that happens asks for the same thing again.
     useKeys((press) => {
-        if (press.is(keys.interrupt) || press.is(keys.eof)) exit()
+        if (press.is(keys.interrupt) || press.is(keys.eof))
+            void quitAll(press.label)
+                .catch(() => {})
+                .finally(exit)
     })
 
     /** Uses a theme from now on, and remembers it. */
@@ -82,7 +84,10 @@ export function App(): ReactNode {
                     </Text>
                 ) : null}
                 <Box flexGrow={1} display={tooSmall ? "none" : "flex"}>
-                    <NavProvider root={<MainMenu />} suspended={tooSmall || picking} />
+                    <NavProvider
+                        root={<MainMenu />}
+                        suspended={tooSmall || picking}
+                    />
                 </Box>
                 <Box
                     justifyContent="flex-end"

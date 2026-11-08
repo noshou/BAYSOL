@@ -9,6 +9,7 @@
  {"rule": "all_above", "setting": "PLOT_WIDTH_HEIGHT_CM", "bound": 0},
  {"rule": "all_above", "setting": "PLOT_PREVIEW_SIZE", "bound": 0},
  {"rule": "ordered", "setting": "PLOT_YLIM_LOG", "above": 0},
+ {"rule": "below_setting", "setting": "Q_MIN", "of": "Q_MAX"},
  {"rule": "opacity", "setting": "PLOT_COLOUR_ERRORBAR"},
  {"rule": "opacity", "setting": "PLOT_COLOUR_BAND"},
  {"rule": "opacity", "setting": "PLOT_COLOUR_BAND_RESID"},

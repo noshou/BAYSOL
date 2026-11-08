@@ -350,3 +350,41 @@ export function parseUnit(text: string): { unit: string; z: number } | FormulaPr
     if (parsed.charge !== 0) return { error: "no charge allowed" }
     return { unit, z: parsed.z }
 }
+
+/** The things a formula can be taken into: an entry or a unit. */
+export interface WithFormula {
+    formula: string
+    z: number | null
+    label?: string
+}
+
+/**
+ * The formula text taken into an entry or a unit of a polymer. The formula is set and,
+ * when it is not the one the target had, Z is what it comes to, or `null` when the
+ * formula is not understood (the reason is the note, unless the formula is blank); a
+ * formula that did not change keeps its Z, so a Z typed by hand stays. A polymer unit
+ * with no label gets `offered`, when that is given.
+ *
+ * @param m - the entry (non-biological) or unit.
+ * @param text - the formula as typed.
+ * @param unit - true for a polymer unit: a surrounding `( )n` is dropped and no charge
+ *     is allowed.
+ * @param offered - the label to give a unit that has none.
+ * @returns the new target, and the reason the formula was not understood, if any.
+ */
+export function takeFormula<T extends WithFormula>(
+    m: T,
+    text: string,
+    unit: boolean,
+    offered?: string,
+): { value: T; note: string | undefined } {
+    const parsed = unit ? parseUnit(text) : parseFormula(text)
+    const shown = unit ? stripUnit(text) : text.trim()
+    const same = shown === m.formula
+    const failed = isProblem(parsed)
+    const z = same ? m.z : failed ? null : parsed.z
+    let value: T = { ...m, formula: shown, z }
+    if (unit && offered && shown !== "" && (m.label ?? "").trim() === "")
+        value = { ...value, label: offered }
+    return { value, note: !same && failed && shown !== "" ? parsed.error : undefined }
+}

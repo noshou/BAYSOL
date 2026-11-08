@@ -1,30 +1,32 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+// Tests of store/settings-store.ts: the store, the theme and the project settings.
+
 import assert from "node:assert/strict"
-import {
-    existsSync,
-    mkdtempSync,
-    readdirSync,
-    readFileSync,
-    writeFileSync,
-} from "node:fs"
-import { tmpdir } from "node:os"
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
-import { writeJson } from "../src/core/files.js"
-import { defaultCatalog } from "../src/store/settings-defs.js"
+import { writeJson } from "../src/core/file-system.js"
+import { checkRelations, defaultCatalog } from "../src/store/settings.js"
 import {
     type LoadResult,
     loadGlobal,
+    loadProject,
+    readThemeName,
     settingsFile,
-    soundCatalog,
+    themeFile,
+    writeThemeName,
 } from "../src/store/settings-store.js"
-import { checkRelations } from "../src/store/settings-validate.js"
+import { defaultTheme, type ThemeName, themeByName, themes } from "../src/ui/theme.js"
+import { tempDir as tmp } from "./support/fixtures.js"
+
+// ========================================================================================
+// 1. Store
+// ========================================================================================
 
 const catalog = defaultCatalog()
 
 /** A new empty folder below the temporary folder. */
-const tmp = (): string => mkdtempSync(join(tmpdir(), "baysol-test-"))
 
 const read = (dir: string, name: string): string | undefined => {
     const file = join(dir, name)
@@ -56,13 +58,12 @@ function savedValues(dir: string): Record<string, unknown> {
 
 const wipedSettings = (r: LoadResult): string[] => r.wiped.map((w) => w.setting).sort()
 
-test("the first load makes an empty file that Julia reads, and logs nothing", () => {
+test("the first load makes an empty file that Julia reads, ", () => {
     const dir = tmp()
     const r = loadGlobal(dir)
     assert.deepEqual(JSON.parse(read(dir, "settings.json") as string), {})
     assert.deepEqual(r.wiped, [])
     assert.equal(r.reset, false)
-    assert.equal(read(dir, "settings.log"), undefined)
     for (const d of catalog.defs()) assert.deepEqual(r.settings.get(d.name), d.default)
 })
 
@@ -132,10 +133,25 @@ test("a load of a good file changes nothing", () => {
     assert.equal(r.settings.get("N_ADAPT"), 450)
     assert.deepEqual(r.settings.get("FIGURES_FORMATS"), ["pdf", "svg"])
     assert.deepEqual(r.wiped, [])
-    assert.equal(read(dir, "settings.log"), undefined)
 })
 
-test("a value that is not valid is wiped, logged and noticed, once", () => {
+test("a wiped value is a line of settings.log: time, setting, bad value, reason", () => {
+    const dir = tmp()
+    writeFileSync(settingsFile(dir), fileWith(["N_ADAPT", 0], ["N_DRAWS", 900]))
+    assert.equal(read(dir, "settings.log"), undefined, "nothing loaded, nothing logged")
+    loadGlobal(dir)
+    const lines = (read(dir, "settings.log") as string).trim().split("\n")
+    assert.equal(lines.length, 1)
+    const [stamp, setting, value, reason] = (lines[0] as string).split("\t")
+    assert.ok(!Number.isNaN(Date.parse(stamp as string)))
+    assert.deepEqual([setting, value], ["N_ADAPT", "0"])
+    assert.match(reason as string, /at least 1/)
+    // a clean load adds nothing
+    loadGlobal(dir)
+    assert.equal((read(dir, "settings.log") as string).trim().split("\n").length, 1)
+})
+
+test("a value that is not valid is wiped and noticed, once", () => {
     const dir = tmp()
     writeFileSync(
         settingsFile(dir),
@@ -150,11 +166,6 @@ test("a value that is not valid is wiped, logged and noticed, once", () => {
     assert.equal(adapt?.value, 0)
     assert.match(adapt?.reason ?? "", /at least 1/)
     assert.deepEqual(savedValues(dir), { N_DRAWS: 900 })
-    const log = (read(dir, "settings.log") as string).trim().split("\n")
-    assert.equal(log.length, 2)
-    assert.match(log.join("\n"), /N_ADAPT: 0 is not valid/)
-    assert.match(log.join("\n"), /reset to its default 300/)
-    assert.match(log.join("\n"), /PLOT_COLOUR_MAP: "nope" is not valid/)
     assert.deepEqual(
         r.notices.map((n) => n.message),
         ["reset to default", "reset to default"],
@@ -163,7 +174,6 @@ test("a value that is not valid is wiped, logged and noticed, once", () => {
     assert.equal(r.settings.notices.has("N_DRAWS"), false)
     const again = loadGlobal(dir)
     assert.deepEqual(again.wiped, [])
-    assert.equal((read(dir, "settings.log") as string).trim().split("\n").length, 2)
     again.settings.notices.set("N_ADAPT", "x")
     assert.equal(again.settings.set({ N_ADAPT: 400 }).ok, true)
     assert.equal(
@@ -219,7 +229,6 @@ test("a file that cannot be read is kept aside and replaced", () => {
         assert.equal(r.reset, true, JSON.stringify(text))
         assert.equal(read(dir, "settings.json.corrupt"), text, "the old file is kept")
         assert.deepEqual(JSON.parse(read(dir, "settings.json") as string), {})
-        assert.match(read(dir, "settings.log") as string, /could not be read/)
         const again = loadGlobal(dir)
         assert.equal(again.reset, false, "the replacement reads")
         assert.deepEqual(again.wiped, [])
@@ -262,7 +271,6 @@ test("a file of many bad values is cleaned in one load", () => {
     assert.equal(r.wiped.length, 12)
     assert.deepEqual(savedValues(dir), {})
     for (const d of catalog.defs()) assert.deepEqual(r.settings.get(d.name), d.default)
-    assert.equal((read(dir, "settings.log") as string).trim().split("\n").length, 12)
 })
 
 test("unknown names and screens are dropped quietly", () => {
@@ -298,11 +306,7 @@ test("a change is checked before it is made", () => {
         const ev = settings.set(changes)
         assert.equal(ev.ok, false, JSON.stringify(changes))
         assert.equal(ev.values.size, 0)
-        assert.ok(
-            [...ev.errors.values()].every(
-                (e) => e.message.length > 0 && e.short.length > 0,
-            ),
-        )
+        assert.ok([...ev.errors.values()].every((e) => e.length > 0))
     }
     for (const d of catalog.defs()) assert.deepEqual(settings.get(d.name), d.default)
     assert.equal(settings.isSaved("N_ADAPT"), false)
@@ -314,17 +318,55 @@ test("rules that tie settings together hold across a change, also among several"
     assert.equal(settings.set({ SASA_N_OCC: 250 }).ok, true)
     const low = settings.set({ SHELL_SAMPLE: 200 })
     assert.equal(low.ok, false)
-    assert.match(low.errors.get("SHELL_SAMPLE")?.message ?? "", /SASA_N_OCC|SHELL_SAMPLE/)
-    assert.equal(low.errors.get("SHELL_SAMPLE")?.short, "below SASA_N_OCC")
+    assert.match(low.errors.get("SHELL_SAMPLE") ?? "", /SASA_N_OCC|SHELL_SAMPLE/)
     assert.equal(settings.get("SHELL_SAMPLE"), 300)
-    assert.equal(
-        settings.set({ SASA_N_OCC: 301 }).errors.get("SASA_N_OCC")?.short,
-        "above SHELL_SAMPLE",
-    )
+    assert.ok(settings.set({ SASA_N_OCC: 301 }).errors.has("SASA_N_OCC"))
     assert.equal(settings.set({ SASA_N_OCC: 300 }).ok, true, "at the edge is fine")
     const both = settings.set({ SHELL_SAMPLE: 100, SASA_N_OCC: 90 })
     assert.equal(both.ok, true, "two settings of a rule can change together")
     assert.deepEqual(checkRelations(catalog.relations, settings.values()), [])
+})
+
+test("q limits: Q_MIN below Q_MAX when both are given; null is saved as null", () => {
+    const dir = tmp()
+    const { settings } = loadGlobal(dir)
+    const bad = settings.evaluate({ Q_MIN: 0.05, Q_MAX: 0.02 })
+    assert.equal(bad.ok, false)
+    assert.equal(bad.errors.get("Q_MIN"), "must be below Q_MAX")
+    assert.equal(bad.errors.get("Q_MAX"), "must be above Q_MIN")
+    assert.equal(settings.set({ Q_MAX: 0.3 }).ok, true)
+    assert.equal(settings.evaluate({ Q_MIN: 0.4 }).ok, false, "against the saved Q_MAX")
+    assert.equal(settings.set({ Q_MIN: 0.05, Q_MAX: null }).ok, true)
+    assert.equal(settings.get("Q_MAX"), null)
+    assert.equal(settings.set({ Q_MIN: null }).ok, true)
+    settings.set({
+        EXCLUDE_Q: [[0.1, 0.2]],
+        CHAINS: ["A", "B"],
+        LMAX: null,
+        MODEL: 2,
+        ADD_HYDROGENS: false,
+    })
+    settings.save()
+    const saved = savedValues(dir)
+    assert.deepEqual(saved.Q_MIN, null)
+    assert.deepEqual(saved.Q_MAX, null)
+    assert.deepEqual(saved.EXCLUDE_Q, [[0.1, 0.2]])
+    assert.deepEqual(saved.CHAINS, ["A", "B"])
+    assert.deepEqual(saved.LMAX, null)
+    assert.equal(saved.ADD_HYDROGENS, false)
+    const again = loadGlobal(dir)
+    assert.deepEqual(again.wiped, [])
+    assert.equal(again.settings.get("Q_MAX"), null)
+    assert.deepEqual(again.settings.get("CHAINS"), ["A", "B"])
+    const crossed = loadGlobal(
+        (() => {
+            const d = tmp()
+            const text = fileWith(["Q_MIN", 0.5], ["Q_MAX", 0.1])
+            writeFileSync(join(d, "settings.json"), text)
+            return d
+        })(),
+    )
+    assert.deepEqual(wipedSettings(crossed), ["Q_MAX", "Q_MIN"])
 })
 
 test("reset goes back to the default, and the file follows", () => {
@@ -347,6 +389,249 @@ test("reset goes back to the default, and the file follows", () => {
     assert.equal(settings.reset(["SHELL_SAMPLE", "SASA_N_OCC"]).ok, true)
 })
 
-test("the bundled data is sound", () => {
-    assert.equal(soundCatalog(), catalog)
+// ========================================================================================
+// 2. Theme preference
+// ========================================================================================
+
+const known = themes.map((theme) => theme.nm)
+const readTheme = (dir: string) => readThemeName(dir, known, defaultTheme.nm)
+
+test("the default theme is one of the themes", () => {
+    assert.ok(themes.includes(defaultTheme))
+})
+
+test("no file means the default", () => {
+    assert.equal(readTheme(tmp()), defaultTheme.nm)
+})
+
+test("what is saved is what is read, for every theme there is", () => {
+    const dir = tmp()
+    for (const name of known) {
+        assert.ok(writeThemeName(dir, name))
+        assert.equal(readTheme(dir), name)
+    }
+})
+
+test("a name no theme has, or a garbled file, means the default", () => {
+    const dir = tmp()
+    writeFileSync(themeFile(dir), '{"theme":"no such theme"}')
+    assert.equal(readTheme(dir), defaultTheme.nm)
+    writeFileSync(themeFile(dir), "{ not json")
+    assert.equal(readTheme(dir), defaultTheme.nm)
+    // the file of the first version said `mode`, which no theme is called
+    writeFileSync(themeFile(dir), '{"mode":"light"}')
+    assert.equal(readTheme(dir), defaultTheme.nm)
+})
+
+test("a garbled file is kept as .corrupt when the theme is saved", () => {
+    const dir = tmp()
+    writeFileSync(themeFile(dir), "{ not json")
+    assert.ok(writeThemeName(dir, "rose"))
+    assert.equal(readFileSync(`${themeFile(dir)}.corrupt`, "utf-8"), "{ not json")
+    assert.equal(readTheme(dir), "rose")
+    assert.ok(existsSync(themeFile(dir)))
+})
+
+test("an unwritable folder is not an error", () => {
+    // a folder below a regular file can never be made
+    const dir = tmp()
+    writeFileSync(join(dir, "a-file"), "x")
+    assert.equal(writeThemeName(join(dir, "a-file", "sub"), "rose"), false)
+})
+
+test("the registry: unique names, a logo each, findable by name", () => {
+    assert.equal(new Set(known).size, themes.length)
+    for (const theme of themes) {
+        assert.ok(theme.lg !== "" && theme.nm !== "")
+        assert.equal(themeByName(theme.nm), theme)
+    }
+    assert.equal(themeByName("nope"), undefined)
+})
+
+test("a theme name is checked by the compiler against the theme arrays", () => {
+    const real: ThemeName = "graphite"
+    // @ts-expect-error a name that is in neither array does not compile
+    const missing: ThemeName = "no such theme"
+    // `tsc` fails here if the line above ever stops being an error
+    assert.ok(themeByName(real))
+    assert.equal(themeByName(missing), undefined)
+})
+
+// ========================================================================================
+// 3. Project settings
+// ========================================================================================
+
+/** A project folder in a BAYSOL folder. */
+function projectIn(root: string, id: string): string {
+    const dir = join(root, "projects", id)
+    mkdirSync(dir, { recursive: true })
+    return dir
+}
+
+/** A global folder whose settings hold `values`, saved. */
+function globalWith(values: Record<string, unknown>): string {
+    const g = tmp()
+    const { settings } = loadGlobal(g)
+    assert.equal(settings.set(values).ok, true)
+    settings.save()
+    return g
+}
+
+test("the first load makes an exact copy of the global settings", () => {
+    const g = globalWith({ N_ADAPT: 450 })
+    const p = projectIn(g, "p")
+    const r = loadProject(p, g)
+    assert.equal(read(p, "settings.json"), read(g, "settings.json"))
+    assert.equal(r.settings.get("N_ADAPT"), 450)
+    assert.deepEqual(r.wiped, [])
+    assert.equal(r.reset, false)
+    const g2 = tmp()
+    const p2 = projectIn(g2, "q")
+    loadProject(p2, g2)
+    assert.ok(read(g2, "settings.json") !== undefined, "the global settings are made first")
+    assert.equal(read(p2, "settings.json"), read(g2, "settings.json"))
+})
+
+test("a project does not follow later changes; a reset goes to the global value", () => {
+    const g = tmp()
+    const p = projectIn(g, "p")
+    loadProject(p, g)
+    const global = loadGlobal(g).settings
+    global.set({ N_ADAPT: 900 })
+    global.save()
+    const r = loadProject(p, g)
+    assert.equal(r.settings.get("N_ADAPT"), 300, "its own value is what it was")
+    assert.equal(r.settings.resetValue("N_ADAPT"), 900)
+    assert.equal(
+        r.settings.resetValue("N_DRAWS"),
+        700,
+        "a setting the global ones did not change",
+    )
+    assert.equal(
+        loadGlobal(g).settings.resetValue("N_ADAPT"),
+        300,
+        "the global ones reset to the defaults",
+    )
+    assert.equal(r.settings.reset(["N_ADAPT"]).ok, true)
+    assert.equal(r.settings.get("N_ADAPT"), 900)
+    r.settings.save()
+    assert.deepEqual(savedValues(p).N_ADAPT, 900)
+})
+
+test("an invalid value goes back to the global value", () => {
+    const g = globalWith({ N_ADAPT: 450, PLOT_COLOUR_MAP: "darkorange" })
+    const p = projectIn(g, "p")
+    writeFileSync(
+        settingsFile(p),
+        fileWith(
+            ["N_ADAPT", 0],
+            ["N_DRAWS", 900],
+            ["PLOT_COLOUR_MAP", "nope"],
+            ["RNG_SEED", 7],
+        ),
+    )
+    const r = loadProject(p, g)
+    assert.equal(r.settings.get("N_ADAPT"), 450, "the global value, not the default 300")
+    assert.equal(r.settings.get("PLOT_COLOUR_MAP"), "darkorange")
+    assert.equal(r.settings.get("N_DRAWS"), 900)
+    assert.equal(r.settings.get("RNG_SEED"), 7)
+    assert.deepEqual(r.wiped.map((w) => w.setting).sort(), ["N_ADAPT", "PLOT_COLOUR_MAP"])
+    assert.deepEqual(savedValues(p), {
+        N_ADAPT: 450,
+        N_DRAWS: 900,
+        PLOT_COLOUR_MAP: "darkorange",
+        RNG_SEED: 7,
+    })
+    assert.deepEqual(
+        r.notices.map((n) => n.message),
+        ["reset to global", "reset to global"],
+    )
+    assert.equal(r.settings.notices.get("N_ADAPT"), "reset to global")
+    assert.equal(r.settings.notices.has("N_DRAWS"), false)
+})
+
+test("a wiped value at the global default goes to that default", () => {
+    const g = tmp()
+    loadGlobal(g)
+    const p = projectIn(g, "p")
+    writeFileSync(settingsFile(p), fileWith(["N_ADAPT", "x"]))
+    const r = loadProject(p, g)
+    assert.equal(r.settings.get("N_ADAPT"), 300)
+    assert.deepEqual(
+        r.wiped.map((w) => w.setting),
+        ["N_ADAPT"],
+    )
+})
+
+test("values that break a rule together go back to the global ones", () => {
+    const g = globalWith({ SHELL_SAMPLE: 300 })
+    const p = projectIn(g, "p")
+    writeFileSync(settingsFile(p), fileWith(["SASA_N_OCC", 250], ["SHELL_SAMPLE", 100]))
+    const r = loadProject(p, g)
+    assert.equal(r.settings.get("SHELL_SAMPLE"), 300)
+    assert.equal(r.settings.get("SASA_N_OCC"), 104)
+    assert.deepEqual(r.wiped.map((w) => w.setting).sort(), ["SASA_N_OCC", "SHELL_SAMPLE"])
+})
+
+test("a project file that cannot be read is replaced by the global settings", () => {
+    const g = globalWith({ N_ADAPT: 450 })
+    const p = projectIn(g, "p")
+    for (const bad of ["{ not json", "", "[1, 2]", "null", "42"]) {
+        writeFileSync(settingsFile(p), bad)
+        const r = loadProject(p, g)
+        assert.equal(r.reset, true, JSON.stringify(bad))
+        assert.equal(read(p, "settings.json.corrupt"), bad)
+        assert.equal(r.settings.get("N_ADAPT"), 450)
+        assert.equal(read(p, "settings.json"), read(g, "settings.json"))
+        assert.equal(loadProject(p, g).reset, false, "and it reads again")
+    }
+})
+
+test("a save in a project stays in the project", () => {
+    const g = tmp()
+    loadGlobal(g)
+    const before = read(g, "settings.json")
+    const p = projectIn(g, "p")
+    const { settings } = loadProject(p, g)
+    assert.equal(settings.set({ N_ADAPT: 500 }).ok, true)
+    settings.save()
+    assert.deepEqual(savedValues(p), { N_ADAPT: 500 })
+    assert.equal(read(g, "settings.json"), before, "the global file did not change")
+    assert.equal(loadProject(p, g).settings.get("N_ADAPT"), 500)
+    const file = read(p, "settings.json")
+    for (const changes of [
+        { N_ADAPT: 0 },
+        { PLOT_COLOUR_MAP: "nope" },
+        { SASA_N_OCC: 9999 },
+        { "MODE_δρ₁₂": 50 },
+    ])
+        assert.equal(settings.set(changes).ok, false)
+    settings.save()
+    assert.equal(read(p, "settings.json"), file)
+})
+
+test("projects are independent", () => {
+    const g = tmp()
+    loadGlobal(g)
+    const a = projectIn(g, "a")
+    const b = projectIn(g, "b")
+    const sa = loadProject(a, g).settings
+    const sb = loadProject(b, g).settings
+    sa.set({ N_ADAPT: 111 })
+    sa.save()
+    sb.set({ N_ADAPT: 222 })
+    sb.save()
+    assert.equal(loadProject(a, g).settings.get("N_ADAPT"), 111)
+    assert.equal(loadProject(b, g).settings.get("N_ADAPT"), 222)
+    assert.equal(loadGlobal(g).settings.get("N_ADAPT"), 300)
+})
+
+test("a bad global file is mended by a project load too", () => {
+    const g = tmp()
+    const p = projectIn(g, "p")
+    writeFileSync(settingsFile(g), fileWith(["N_ADAPT", -4]))
+    const r = loadProject(p, g)
+    assert.equal(r.settings.get("N_ADAPT"), 300)
+    assert.deepEqual(savedValues(g), {})
+    assert.equal(read(p, "settings.json"), read(g, "settings.json"))
 })

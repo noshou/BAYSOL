@@ -1,32 +1,40 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+// The data screen of a project: the files of its measured curve and the way to its
+// reference curves. The import screen it opens is in `data-import.tsx`.
+
+import { existsSync } from "node:fs"
 import { basename } from "node:path"
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useMemo, useState } from "react"
-import { pick } from "../core/file-picker.js"
-import { readSystem } from "../core/system.js"
-import { parseNumber, plainNumber } from "../core/text.js"
+import { readSystem } from "../core/environment.js"
+import { pick } from "../core/file-system.js"
 import {
+    parseNumber,
+    plainNumber,
+    shortNumber,
+    truncateStart,
+} from "../core/terminal.js"
+import {
+    type DataMapping,
     type DataStatus,
-    DEFAULT_UNITS,
     dataErrorNote,
     ENERGY_PROBLEM,
-    parseDataFile,
+    loadSource,
     readDataInfo,
     resetData,
+    roleLabel,
+    roles,
     setEnergy,
     setUnits,
     type Units,
     unitLabel,
     unitsList,
-    writeData,
 } from "../store/data.js"
-import { checkPath, MAX_PATH_TYPED, pathSuggestions } from "../store/path-input.js"
-import type { ProjectRef } from "../store/scope.js"
-import { ChoiceTabs } from "../ui/choice-tabs.js"
-import { CursorList, ListText } from "../ui/cursor-list.js"
+import { checkPath, MAX_PATH_TYPED, pathSuggestions } from "../store/lists.js"
+import type { ProjectRef } from "../store/projects.js"
+import { listReferences } from "../store/references.js"
 import { Frame } from "../ui/frame.js"
-import { type KeyInput, keys } from "../ui/keys.js"
 import {
     type LegendItem,
     legendBack,
@@ -34,27 +42,46 @@ import {
     legendFor,
     legendOf,
     moveLegend,
-} from "../ui/legend.js"
-import { useNav, useScreenActive } from "../ui/nav.js"
-import { Panel } from "../ui/panel.js"
-import { Prompt } from "../ui/prompt.js"
-import { useTheme } from "../ui/theme.js"
-import { questionLegend, useConfirm } from "../ui/use-confirm.js"
-import { useKeys } from "../ui/use-keys.js"
-import { useListCursor } from "../ui/use-list-cursor.js"
+} from "../ui/grid.js"
+import { Prompt, questionLegend, useConfirm } from "../ui/input.js"
+import {
+    CursorList,
+    type KeyInput,
+    keys,
+    ListText,
+    useBodyColumns,
+    useKeys,
+    useListCursor,
+    useNav,
+    useScreenActive,
+} from "../ui/interaction.js"
+import { Panel, useTheme } from "../ui/theme.js"
+import { DataImportScreen } from "./data-import.js"
+import { ReferencesScreen, referenceSummary } from "./references-screen.js"
 
-/** What the screen is doing: the options, a path prompt, the picker window, a choice of
- * units or a number prompt for the energy. */
-type Mode = "menu" | "path" | "picking" | "units" | "energy"
+/** What the screen is doing: the options, a path prompt, the picker window or a number
+ * prompt for the energy (the import itself is its own screen). */
+type Mode = "menu" | "path" | "picking" | "energy"
 
 /** The options of the screen, in order. */
 const options = [
     { id: "load", label: "load a file" },
+    { id: "mapping", label: "change the columns" },
     { id: "units", label: "units" },
     { id: "energy", label: "energy" },
+    { id: "references", label: "references" },
 ] as const
 
-/** What is said when `units` or `energy` is chosen before a file is loaded. */
+/** What is said when the columns are to be changed and none were recorded. */
+const NO_SOURCE = "no source recorded: load a file"
+
+/** The options that work without data. */
+const alwaysOn: ReadonlySet<string> = new Set(["load", "references"])
+
+/** The width of the name column of the summary (`references` is the longest). */
+const LINE_NAME_WIDTH = 11
+
+/** What is said when `units`, `energy` or the columns come before a file. */
 const LOAD_FIRST = "load a file first"
 
 /** What is said when a file is to be loaded over data files that cannot be used. */
@@ -75,49 +102,67 @@ const suggestDataPaths = (text: string) => pathSuggestions(text, acceptedHint)
 /** The note while the picker window is open. */
 const pickingNote = "choose a file in the picker window..."
 
-/**
- * A number for the summary: five significant digits, no exponent for ordinary sizes.
- *
- * @param x - the number.
- * @returns the text.
- */
-const short = (x: number): string => plainNumber(Number(x.toPrecision(5)))
 
 /**
  * The lines that describe the data of a project.
  *
  * @param status - what [[readDataInfo]] found.
- * @returns `name  value` pairs: the points, the q range in the units, the source, the
- *     units and the energy; empty when there is no usable data.
+ * @param width - the cells a value may use.
+ * @returns `name  value` pairs: the points, the q range in the units, the source, how it
+ *     was read (when `data.json` remembers), the units and the energy; empty when there
+ *     is no usable data.
  */
-function describe(status: DataStatus | undefined): [string, string][] {
+function describe(status: DataStatus | undefined, width: number): [string, string][] {
     if (status?.kind !== "ok") return []
     const { info } = status
     const unit = unitLabel(info.units)
-    return [
+    const { mapping } = info
+    const rows: [string, string][] = [
         ["points", String(info.points)],
-        ["q range", `${short(status.qMin)} to ${short(status.qMax)} ${unit}`],
-        ["source", info.source],
-        ["units", unit],
-        ["energy", info.energy === null ? "not set" : `${short(info.energy)} eV`],
+        ["q range", `${shortNumber(status.qMin)} to ${shortNumber(status.qMax)} ${unit}`],
+        ["source", truncateStart(mapping?.path ?? info.source, width)],
     ]
+    if (mapping)
+        rows.push(
+            [
+                "columns",
+                roles.map((r) => `${roleLabel[r]}=${mapping.columns[r].spec}`).join(", "),
+            ],
+            [
+                "read as",
+                [
+                    mapping.sheet === "" ? mapping.separator : `sheet ${mapping.sheet}`,
+                    `skip ${mapping.skipRows}`,
+                    `comments ${mapping.comments ? "on" : "off"}`,
+                    `header ${mapping.header}`,
+                ].join(", "),
+            ],
+        )
+    rows.push(
+        ["units", unit],
+        ["energy", info.energy === null ? "not set" : `${shortNumber(info.energy)} eV`],
+    )
+    return rows
 }
 
 /**
  * The data of a project: the measured curve. A path prompt takes any delimited text file
- * or `.xlsx` workbook (the first sheet), checks it and COPIES it as a clean `data.tsv`
- * into the project at once (the file itself is never touched; a bad file shows its
- * message under the field and changes nothing). Two more options work once a file is
- * loaded: the units of q (`nm⁻¹` or `Å⁻¹`, tabs) and the X-ray energy in eV (a number
- * above 0; there is no default and the project is not ready for a run without it). Both
- * are saved at once, to `data.json` only.
+ * or `.xlsx` workbook (the first sheet) and opens the import screen on it (options of
+ * how the file is read, the three columns, a live preview), which writes a clean
+ * `data.tsv` into the project (the file itself is never touched). `change the columns`
+ * opens the import again on the stored source with the stored choices (`data.json`
+ * remembers them; an old file without them says so, a source that is gone is one line).
+ * Two more options work once a file is loaded: the units of q (Enter turns them
+ * between `nm⁻¹` and `Å⁻¹`)
+ * and the X-ray energy in eV (a number above 0; there is no default and the project is
+ * not ready for a run without it). Both are saved at once, to `data.json` only.
  *
  * Data files that cannot be used are told and never written over; `r` puts them aside
  * as `.corrupt`. The screen reads the files again at every key and when it regains the
  * focus, so another copy's change shows, and every failure of a save (project gone,
  * file in use) is a line of text.
  *
- * Keys: up and down move, Enter does it, Esc closes a prompt or the units, `^x` goes
+ * Keys: up and down move, Enter does it, Esc closes a prompt, `^x` goes
  * back.
  *
  * @param props - the project.
@@ -135,16 +180,19 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
     const [promptKeys, setPromptKeys] = useState<LegendItem[]>([])
     // the path prompt is remounted to empty its field (see the models screen)
     const [fieldKey, setFieldKey] = useState(0)
-    const [unitsFocus, setUnitsFocus] = useState(0)
     // bumped to read the files again: after a save and at every key of the menu
     const [version, setVersion] = useState(0)
     const dir = project.dir
     // biome-ignore lint/correctness/useExhaustiveDependencies: these only re-read
     const status = useMemo(() => readDataInfo(dir), [dir, nav.depth, active, version])
     const cursor = useListCursor(options.length, options.length)
-    const lines = describe(status)
+    const columns = useBodyColumns()
+    const lines = describe(status, columns - 20)
+    // biome-ignore lint/correctness/useExhaustiveDependencies: these only re-read
+    const references = useMemo(() => listReferences(dir), [dir, nav.depth, active, version])
+    const usable = references.filter((e) => e.unusable === undefined).length
+    const referencesText = referenceSummary(references, columns - 20)
     const loaded = status?.kind === "ok"
-    const currentUnits = status?.kind === "ok" ? status.info.units : DEFAULT_UNITS
     const unusable = status?.kind === "unusable"
 
     const say = useCallback((text: string, error = false) => setNote({ text, error }), [])
@@ -159,7 +207,8 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
     }, [])
 
     /**
-     * Reads a file and, if it is a curve, writes it into the project.
+     * Reads a file and opens the import screen on it (the options, the columns, the
+     * preview); the project's data changes only when that screen imports.
      *
      * @returns what is wrong with the file (nothing was changed), `undefined` on success.
      */
@@ -167,17 +216,36 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         const bad = checkPath(path, 42)
         if (bad !== undefined) return bad
         try {
-            const current = readDataInfo(dir)
-            if (current?.kind === "unusable") return RESET_FIRST
-            const keep = current?.kind === "ok" ? current.info : undefined
-            const data = parseDataFile(path)
-            const units = keep?.units ?? DEFAULT_UNITS
-            writeData(dir, data, path, units, keep?.energy ?? undefined)
-            say(`loaded ${data.q.length} points from ${basename(path)}`)
-            refresh()
+            if (readDataInfo(dir)?.kind === "unusable") return RESET_FIRST
+            nav.push(<DataImportScreen {...importProps(path)} />)
             return undefined
         } catch (error) {
             return dataErrorNote(error)
+        }
+    }
+
+    /** What the import screen is given: the file read now, and what to say afterwards. */
+    const importProps = (path: string, initial?: DataMapping) => ({
+        project,
+        path,
+        source: loadSource(path),
+        initial,
+        onDone: (points: number, dropped: number) => {
+            const note = dropped > 0 ? `, dropped ${dropped} rows with q or sigma <= 0` : ""
+            say(`loaded ${points} points from ${basename(path)}${note}`)
+            refresh()
+        },
+    })
+
+    /** Opens the import again on the stored source with the stored choices. */
+    const reopen = (mapping: DataMapping | undefined) => {
+        if (mapping === undefined) return say(NO_SOURCE, true)
+        if (!existsSync(mapping.path))
+            return say(`source is gone: ${basename(mapping.path)}`, true)
+        try {
+            nav.push(<DataImportScreen {...importProps(mapping.path, mapping)} />)
+        } catch (error) {
+            say(dataErrorNote(error), true)
         }
     }
 
@@ -195,6 +263,10 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         else if (result.files[0] !== undefined) {
             const bad = load(result.files[0])
             if (bad !== undefined) say(bad, true)
+            else {
+                resetField()
+                return toMenu()
+            }
         } else say("nothing was picked")
         resetField()
         setMode("path")
@@ -205,7 +277,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         if ("error" in parsed) return setProblem(parsed.error)
         try {
             setEnergy(dir, parsed.value)
-            say(`energy ${short(parsed.value)} eV saved`)
+            say(`energy ${shortNumber(parsed.value)} eV saved`)
             refresh()
             toMenu()
         } catch (error) {
@@ -213,16 +285,18 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         }
     }
 
-    const chooseUnits = () => {
-        const units: Units = unitsList[unitsFocus] ?? DEFAULT_UNITS
+    /** Enter on `units` turns q between the two units and saves at once. */
+    const flipUnits = (current: Units) => {
+        const next = unitsList[(unitsList.indexOf(current) + 1) % unitsList.length] as Units
         try {
-            setUnits(dir, units)
-            say(`units ${unitLabel(units)} saved`)
+            setUnits(dir, next)
+            // a reference has no units of its own: it is read in the data's
+            const also = listReferences(dir).length > 0 ? ", references too" : ""
+            say(`units ${unitLabel(next)} saved${also}`)
         } catch (error) {
             say(dataErrorNote(error), true)
         }
         refresh()
-        setMode("menu")
     }
 
     const choose = (id: (typeof options)[number]["id"]) => {
@@ -232,12 +306,13 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
             resetField()
             return setMode("path")
         }
+        // the references list opens without data (only adding one needs it)
+        if (id === "references") return nav.push(<ReferencesScreen project={project} />)
         if (status?.kind !== "ok") return say(unusable ? RESET_FIRST : LOAD_FIRST, true)
         setProblem(undefined)
-        if (id === "units") {
-            setUnitsFocus(Math.max(0, unitsList.indexOf(status.info.units)))
-            setMode("units")
-        } else setMode("energy")
+        if (id === "mapping") return reopen(status.info.mapping)
+        if (id === "units") flipUnits(status.info.units)
+        else setMode("energy")
     }
 
     // the menu: move, do, back, and reset for files that cannot be used
@@ -277,17 +352,6 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         if (typed === "" && press.is(keys.pickFiles)) void pickFile()
     }, mode === "path")
 
-    // the units tabs: left, right and tab move, Enter saves, Esc closes
-    useKeys((press: KeyInput) => {
-        const last = unitsList.length - 1
-        if (press.is(keys.left)) setUnitsFocus((f) => Math.max(0, f - 1))
-        else if (press.is(keys.right)) setUnitsFocus((f) => Math.min(last, f + 1))
-        else if (press.is(keys.tab)) setUnitsFocus((f) => (f >= last ? 0 : f + 1))
-        else if (press.is(keys.enter)) chooseUnits()
-        else if (press.is(keys.escape)) toMenu()
-        else if (press.is(keys.back)) nav.pop()
-    }, mode === "units")
-
     const onChange = useCallback((text: string) => {
         setTyped(text)
         setProblem(undefined)
@@ -312,68 +376,72 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                 typed === "" && legendFor("pick file", keys.pickFiles),
                 ...promptKeys,
             ])
-        if (mode === "units")
-            return [
-                legendFor("choose", keys.enter),
-                legendFor("move", [keys.left, keys.right]),
-                legendFor("next", keys.tab),
-                legendFor("close", keys.escape),
-                legendBack,
-            ]
         return mode === "energy" ? promptKeys : []
     }
     const legend = legendNow()
 
-    /** The line above the keys: a question, the picker's wait, or the last result. */
-    const noteNow = (): { text: string; error: boolean } | undefined => {
-        if (confirm.note) return { text: confirm.note, error: false }
-        if (mode === "picking") return { text: pickingNote, error: false }
-        return note
-    }
-    const shownNote = noteNow()
+    // the line above the keys: a question, the picker's wait, or the last result
+    const shownNote = confirm.note ?? (mode === "picking" ? pickingNote : note?.text)
+    const noteIsError = !confirm.note && mode !== "picking" && note?.error
     return (
         <Frame
             title="data"
             subtitle={project.id}
             legend={legend}
-            note={shownNote?.text}
-            noteIsError={shownNote?.error}
+            note={shownNote}
+            noteIsError={noteIsError}
         >
-            <Panel paddingX={1} flexDirection="column">
-                {loaded ? (
-                    lines.map(([name, value]) => (
-                        <Box key={name} columnGap={1}>
-                            <Text color={theme.mt}>{name.padEnd(8)}</Text>
-                            <Text color={theme.fg}>{value}</Text>
-                        </Box>
-                    ))
-                ) : unusable ? (
-                    <Text color={theme.er}>{status.message}</Text>
-                ) : (
-                    <Text color={theme.mt}>no data yet</Text>
-                )}
-            </Panel>
-            <Box marginTop={1}>
-                <CursorList
-                    items={options}
-                    index={cursor.index}
-                    offset={cursor.offset}
-                    lines={options.length}
-                    active={mode === "menu"}
-                    row={(o, on) => (
-                        <ListText on={on && (o.id === "load" || loaded)}>
-                            {o.label}
-                        </ListText>
-                    )}
-                />
-            </Box>
+            {mode === "path" ? null : (
+                <>
+                    <Panel paddingX={1} flexDirection="column">
+                        {loaded ? (
+                            lines.map(([name, value]) => (
+                                <Box key={name} columnGap={1}>
+                                    <Text color={theme.mt}>
+                                        {name.padEnd(LINE_NAME_WIDTH)}
+                                    </Text>
+                                    <Text color={theme.fg}>{value}</Text>
+                                </Box>
+                            ))
+                        ) : unusable ? (
+                            <Text color={theme.er}>{status.message}</Text>
+                        ) : (
+                            <Text color={theme.mt}>no data yet</Text>
+                        )}
+                        {referencesText === undefined ? null : (
+                            <Box columnGap={1}>
+                                <Text color={theme.mt}>
+                                    {"references".padEnd(LINE_NAME_WIDTH)}
+                                </Text>
+                                <Text color={theme.fg}>{referencesText}</Text>
+                            </Box>
+                        )}
+                    </Panel>
+                    <Box marginTop={1}>
+                        <CursorList
+                            items={options}
+                            index={cursor.index}
+                            offset={cursor.offset}
+                            lines={options.length}
+                            active={mode === "menu"}
+                            row={(o, on) => (
+                                <ListText on={on && (loaded || alwaysOn.has(o.id))}>
+                                    {o.id === "references" && usable > 0
+                                        ? `${o.label} (${usable})`
+                                        : o.label}
+                                </ListText>
+                            )}
+                        />
+                    </Box>
+                </>
+            )}
             {mode === "path" ? (
                 <Box marginTop={1}>
                     <Prompt
                         key={fieldKey}
                         label="path:"
                         maxLength={MAX_PATH_TYPED}
-                        placeholder="q | I(q) | σ (.csv, .xlsx, .dat, .tsv, ...)"
+                        placeholder="any table: .dat, .csv, .tsv, .txt, .xlsx, ..."
                         suggest={suggestDataPaths}
                         error={problem}
                         onSubmit={submitPath}
@@ -387,16 +455,6 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                         canTake={typed !== ""}
                         cancel="close"
                         onLegend={setPromptKeys}
-                    />
-                </Box>
-            ) : null}
-            {mode === "units" ? (
-                <Box marginTop={1} columnGap={1}>
-                    <Text color={theme.fg}>units:</Text>
-                    <ChoiceTabs
-                        options={unitsList.map(unitLabel)}
-                        selected={new Set([unitLabel(currentUnits)])}
-                        focus={unitsFocus}
                     />
                 </Box>
             ) : null}

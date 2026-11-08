@@ -1,0 +1,4 @@
+{
+    "pH": { "min": 0, "max": 14 },
+    "sigmaPh": { "min": 0, "max": 14, "default": 0.1 }
+}

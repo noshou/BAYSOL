@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { readFileSync, writeFileSync } from "node:fs"
-import { withFileLock } from "../../src/core/files.js"
+import { withFileLock } from "../../src/core/file-system.js"
 
 /**
  * A child process of test/concurrency.test.ts: adds 1 to the number in a counter file,

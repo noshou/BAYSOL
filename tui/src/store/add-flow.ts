@@ -5,22 +5,22 @@
 // RNA file) and the edit of an existing row each start a flow; a flow asks one thing at a
 // time:
 //
-//   name   a dropdown of every solute BAYSOL knows (`search` of ./solute-index.ts, plus
+//   name   a dropdown of every solute BAYSOL knows (`search` of ./solutes.ts, plus
 //          the custom solutes), narrowed by what is typed, for `^n` and `^p`;
 //   form   a polymer family with several forms (PEG by n or by Mn) asks which one;
 //   nuc    `^e` asks DNA or RNA first;
-//   path   the path of a sequence file, hinted as the models' paths are; the file is read
+//   path   the path of a sequence file (hinted as the models' paths are) or the sequence
+//          text itself, typed or pasted; a file is read and its text linted the same way;
 //          and every record of it becomes a row;
-//   edit   one cell is typed into: the name (free text), the params of a family or of a
-//          custom polymer (one argument at a time), mM, then +-;
+//   edit   one cell is typed into: the name (free text), the params of a family (one
+//          argument at a time), mM, then +-;
 //   done   nothing is asked any more: `table` holds the result.
 //
 // After the pick, by kind of the entry: a non-biological solute or a built-in polymer
 // grade goes on to mM and +-; a polymer family asks its numbers in the params cell
 // (`units n`, `Mn (g/mol)`, ...); a custom non-biological solute stores a snapshot of the
-// entry (the project never reads the global file); a custom polymer asks the count of each
-// unit kind (`nA`, `nB`, ...); DNA, RNA and protein ask a path and make one row for each
-// record of the file, with the same mM and +-. The rows are those of
+// entry (the project never reads the global file); DNA, RNA and protein ask a path and
+// make one row for each record of the file, with the same mM and +-. The rows are those of
 // `test/fixtures/buffer/buffer.json`. The flow never saves: the rows are drafts of a
 // `Drafts<Solute>` until the screen's `^w`.
 //
@@ -31,594 +31,43 @@
 //
 // The row keys follow `Solute` of ./solutes.ts (`sigmaMM`); `bufferRow` renames it to the
 // `sigma-mM` of the file (see ./solutes.ts), which `rowProblem` of ./buffer.ts checks.
+//
+// The vocabulary of the flow (fields, entries, params cell, states, events, steps) is in
+// `solutes.ts`.
+//
+// Contents:
+//   1. Building states: the state of a flow started, of a pick, of a field opened
+//   2. The steps of the pick, 3. the path or text of a sequence, 4. editing a cell
+//   5. The transitions: `advance`
+//   6. What to draw: `view`
+//   7. The class: `AddFlow`
 
 import { basename } from "node:path"
-import {
-    formatNumber,
-    type NumberRules,
-    type Parsed,
-    parseNumber,
-    tooLong,
-} from "../core/text.js"
-import { keys } from "../ui/keys.js"
+import { parseNumber, tooLong } from "../core/terminal.js"
+import { type AddEvent, type AddKind, type AddState, argProblem, basisNote, COUNT_RULES, type Common, type CountsContext, contextArgs, ctxInitialText, ctxPrompt, ctxShown, type DoneState, type EditState, editableParams, entries, entryTag, type FamilyContext, type FlowStep, type FormState, type NameKind, type NameState, type NucleotideState, type ParamsContext, type PathState } from "./add-state.js"
 import { rowProblem } from "./buffer.js"
+import { type CustomEntry, type NonbioEntry, snapshot } from "./custom.js"
 import {
-    type CustomEntry,
-    type NonbioEntry,
-    type PolymerEntry,
-    snapshot,
-} from "./custom.js"
-import type { Drafts } from "./draft.js"
-import { MAX_ROWS } from "./limits.js"
-import { checkPath, complete, hintsFor, MAX_PATH_TYPED } from "./path-input.js"
-import { isFastaFile, parseFile, type SequenceKind, summary } from "./sequences.js"
-import {
-    allFamilies,
-    DEFAULT_LIMIT,
-    type EntryKind,
-    family,
-    familyArg,
-    type PolymerFamily,
-    polymerBasis,
-    type SoluteEntry,
-    search,
-} from "./solute-index.js"
-import { bufferRow, type Solute, setSoluteField } from "./solutes.js"
-
-// ---- limits and wording ---------------------------------------------------------------
-
-/** The most characters of a name typed in the dropdown. */
-const MAX_NAME_TYPED = 60
-
-/** The most characters a cell takes. */
-const MAX_CELL_TYPED = 60
-
-/**
- * What the status row says when a typed name finds nothing. `^e` is a key of the GLOBAL
- * settings (main menu > settings), not of a project's own settings, so the way there is
- * spelled out; 40 characters is what the row holds.
- */
-export const NO_MATCH = `no match (custom: main menu>settings>${keys.addNucleotide.label})`
-
-/**
- * The columns of the table, by the field typed into each: the order of the art, which is
- * what `Cell.column` indexes.
- */
-export const COLUMNS = ["name", "mM", "sigmaMM", "params"] as const
-
-/** A field of a row that the flow types into. */
-export type EditField = (typeof COLUMNS)[number]
-
-/** How a field is called to the user in a prompt. */
-const FIELD_LABELS: Readonly<Record<EditField, string>> = {
-    name: "name",
-    mM: "mM",
-    sigmaMM: "±",
-    params: "params",
-}
-
-/** The note of a sequence row being edited: the sequence is not edited, it is re-added. */
-const RE_ADD_NOTE = "re-add to change the sequence"
-
-/** The kinds of sequence a row can be, whose `arg` is a sequence. */
-const SEQUENCE_KINDS: ReadonlySet<string> = new Set(["dna", "rna", "protein"])
-
-/**
- * The choice `^e` asks first: the label shown and the sequence kind it stands for.
- */
-const NUCLEOTIDE_KINDS: readonly (readonly [string, SequenceKind])[] = [
-    ["DNA", "dna"],
-    ["RNA", "rna"],
-]
-
-// ---- numbers --------------------------------------------------------------------------
-
-/**
- * What the text typed for a field comes to. A concentration must be above 0, an
- * uncertainty 0 or more.
- *
- * @param field - the field typed into.
- * @param text - the text typed.
- * @returns the trimmed name or the number, or an error: `name needed`,
- *   `a number, please`, `mM must be > 0`, `not below 0`.
- */
-export function parseAddField(field: EditField, text: string): Parsed<string | number> {
-    if (field === "name") {
-        const t = text.trim()
-        return t === "" ? { error: "name needed" } : { value: t }
-    }
-    return parseNumber(text, field === "mM" ? CONCENTRATION_RULES : UNCERTAINTY_RULES)
-}
-
-/** A concentration is a number above 0. */
-const CONCENTRATION_RULES: NumberRules = {
-    above: { limit: 0, message: "mM must be > 0" },
-}
-
-/** An uncertainty is a number, 0 or more. */
-const UNCERTAINTY_RULES: NumberRules = { atLeast: { limit: 0, message: "not below 0" } }
-
-/** The count of units typed: a number above 0. */
-const COUNT_RULES: NumberRules = { above: { limit: 0, message: "must be > 0" } }
-
-/** Keeps `index` on a list of `n` entries after one step forward or back, wrapping. */
-function cycle(index: number, n: number, delta: 1 | -1): number {
-    return (((index + delta) % n) + n) % n
-}
-
-// ---- the dropdown of names ------------------------------------------------------------
-
-/** The add keys that open the dropdown of names. */
-export type NameKind = "nonbio" | "polymer"
-
-/** Every add key. */
-export type AddKind = NameKind | "protein" | "nucleotide"
-
-/**
- * The kinds of index entry each dropdown lists: `^n` the non-biological solutes and the
- * custom non-biological ones, `^p` the polymer grades, the families and the custom
- * polymers.
- */
-const NAME_KINDS: Readonly<Record<NameKind, ReadonlySet<EntryKind>>> = {
-    nonbio: new Set<EntryKind>(["nonbiological", "custom-nonbio"]),
-    polymer: new Set<EntryKind>(["polymer", "polymer-family", "custom-polymer"]),
-}
-
-/**
- * The short tag at the right of an entry.
- *
- * @param e - an entry of the search.
- * @returns `solute`, `polymer`, `family` or `custom`.
- */
-export function entryTag(e: SoluteEntry): string {
-    return e.kind === "polymer-family" ? "family" : e.tag
-}
-
-/**
- * The entries of the dropdown of an add key for a typed query: what `search` finds of the
- * kind of the key and nothing else.
- *
- * @param kind - `nonbio` (`^n`) or `polymer` (`^p`).
- * @param query - what is typed; a blank one finds nothing.
- * @param customs - the custom solutes to search too.
- * @returns the entries, best first, at most `DEFAULT_LIMIT`.
- */
-export function entries(
-    kind: NameKind,
-    query: string,
-    customs: readonly CustomEntry[] = [],
-): SoluteEntry[] {
-    return search(query, customs, DEFAULT_LIMIT, NAME_KINDS[kind])
-}
-
-/**
- * The note for a polymer whose molarity has a basis.
- *
- * @param basis - `per monomer unit`, `per 1000 Da`, or none.
- * @returns `mM per monomer unit`, or `undefined` for no basis.
- */
-export function basisNote(basis: string | null | undefined): string | undefined {
-    return basis ? `mM ${basis}` : undefined
-}
-
-/**
- * The note for the row under the cursor when nothing is open: the basis of a polymer's
- * molarity.
- *
- * @param s - the solute of the row.
- * @returns `mM per monomer unit` / `mM per 1000 Da`, or `undefined`.
- */
-export function rowNote(s: Solute): string | undefined {
-    return s.kind === "polymer" ? basisNote(polymerBasis(s.arg)) : undefined
-}
-
-// ---- the params of a row --------------------------------------------------------------
-
-/** A number as the form templates write it: the characters a number is made of. */
-const NUMBER_GROUP = "([-+0-9.eE]+)"
-
-/** Escapes the characters of a text that mean something in a regular expression. */
-function escapeRegex(text: string): string {
-    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
-/** The pattern of the `arg` strings a form's template makes, a number for each `{key}`. */
-function templateRegex(template: string): RegExp {
-    const parts = template.split(/\{\w+\}/).map(escapeRegex)
-    return new RegExp(`^${parts.join(NUMBER_GROUP)}$`, "i")
-}
-
-/** One form of one family with the pattern its `arg` strings have. */
-interface FormPattern {
-    fam: PolymerFamily
-    formIndex: number
-    keys: string[]
-    regex: RegExp
-}
-
-/** The patterns of every form of every family; made when first needed. */
-let cachedPatterns: FormPattern[] | undefined
-
-/** The patterns of every form of every family. */
-function formPatterns(): FormPattern[] {
-    cachedPatterns ??= allFamilies().flatMap((fam) =>
-        fam.forms.map((form, formIndex) => ({
-            fam,
-            formIndex,
-            keys: form.args.map((a) => a.key),
-            regex: templateRegex(form.template),
-        })),
-    )
-    return cachedPatterns
-}
-
-/** The family and form a polymer row's `arg` was made from, with its values as written. */
-export interface FamilyMatch {
-    fam: PolymerFamily
-    formIndex: number
-    /** From an argument key to the text written in the `arg` (`PEG n=22`: n is "22"). */
-    values: Record<string, string>
-}
-
-/**
- * The family and form a polymer row's `arg` was made from.
- *
- * @param arg - the `arg` of a row, or none.
- * @returns the match, or `undefined` for a grade or any other text.
- */
-export function familyMatch(arg: string | null | undefined): FamilyMatch | undefined {
-    const text = String(arg ?? "").trim()
-    for (const { fam, formIndex, keys, regex } of formPatterns()) {
-        const m = regex.exec(text)
-        if (m)
-            return {
-                fam,
-                formIndex,
-                values: Object.fromEntries(keys.map((k, j) => [k, m[j + 1]])),
-            }
-    }
-    return undefined
-}
-
-/**
- * The key=value text of the numbers of a family form: `n=22`, `nEO=100 nPO=65`.
- *
- * @param form - a form of a family.
- * @param values - from an argument key to its text; an argument it lacks shows as `key=`.
- * @returns the text.
- */
-function valuesText(
-    form: { args: { key: string }[] },
-    values: Readonly<Record<string, string | undefined>>,
-): string {
-    return form.args.map((a) => `${a.key}=${values[a.key] ?? ""}`).join(" ")
-}
-
-/**
- * The text of the counts of a custom polymer's units: `nA=100 nB=65` (a unit without a
- * count yet is left out).
- *
- * @param units - the units, with their labels.
- * @param counts - the counts, in the order of the units.
- * @returns the text.
- */
-export function countsText(
-    units: readonly { label?: string }[],
-    counts: readonly number[],
-): string {
-    const n = Math.min(units.length, counts.length)
-    const parts: string[] = []
-    for (let k = 0; k < n; k++) parts.push(`n${units[k].label}=${formatNumber(counts[k])}`)
-    return parts.join(" ")
-}
-
-/** What the params cell says of a solute and how it is aligned. */
-export interface ParamsCell {
-    text: string
-    align: "left" | "center"
-}
-
-/**
- * What the params cell says of a solute: `n/a` centred for a non-biological solute, a
- * grade and a custom non-biological one; the key=value text, left, for a polymer family
- * and a custom polymer; the summary of the sequence for DNA, RNA and protein.
- *
- * @param s - the solute (not necessarily complete).
- * @param width - the room for text.
- * @returns the text and its alignment.
- */
-export function paramsCell(
-    s: Partial<Solute> & { kind: string },
-    width: number,
-): ParamsCell {
-    const na: ParamsCell = { text: "n/a", align: "center" }
-    if (s.kind === "polymer") {
-        const m = familyMatch(s.arg)
-        if (!m) return na
-        return { text: valuesText(m.fam.forms[m.formIndex], m.values), align: "left" }
-    }
-    if (s.kind === "custom-polymer") {
-        const units = (s.units ?? []) as { label?: string }[]
-        const counts = (s.counts ?? []) as number[]
-        return { text: countsText(units, counts), align: "left" }
-    }
-    if (SEQUENCE_KINDS.has(s.kind)) {
-        return {
-            text: summary(s.kind as SequenceKind, String(s.arg ?? ""), width),
-            align: "left",
-        }
-    }
-    return na
-}
-
-// ---- the arguments of the params cell -------------------------------------------------
-
-/** The numbers of a polymer family's form, asked one at a time. */
-interface FamilyContext {
-    type: "family"
-    fam: PolymerFamily
-    formIndex: number
-    /** The argument being typed. */
-    k: number
-    /** The arguments taken, by key. */
-    values: Record<string, string>
-    /** The old values of a row being edited, by key. */
-    prefill: Record<string, string>
-}
-
-/** The count of each unit of a custom polymer, asked one at a time. */
-interface CountsContext {
-    type: "counts"
-    /** The stored entry (an added row); none when an existing row's counts are re-typed. */
-    entry?: PolymerEntry
-    labels: string[]
-    k: number
-    counts: number[]
-    prefill: string[]
-}
-
-/** What the params cell asks, and how far it is. */
-type ParamsContext = FamilyContext | CountsContext
-
-/** The context to type the params of a solute in; none when the row has none to type. */
-function editableParams(s: Solute): ParamsContext | undefined {
-    if (s.kind === "polymer") {
-        const m = familyMatch(s.arg)
-        if (!m) return undefined
-        return {
-            type: "family",
-            fam: m.fam,
-            formIndex: m.formIndex,
-            k: 0,
-            values: {},
-            prefill: m.values,
-        }
-    }
-    if (s.kind === "custom-polymer") {
-        const units = (s.units ?? []) as { label?: string }[]
-        const counts = (s.counts ?? []) as number[]
-        return {
-            type: "counts",
-            labels: units.map((u) => String(u.label)),
-            k: 0,
-            counts: [],
-            prefill: counts.map(formatNumber),
-        }
-    }
-    return undefined
-}
-
-/** The arguments of the form a family context asks. */
-function contextArgs(ctx: FamilyContext) {
-    return ctx.fam.forms[ctx.formIndex].args
-}
-
-/** The prompt of the argument being typed: `units n`, `Mn (g/mol)`, `nA`. */
-function ctxPrompt(ctx: ParamsContext): string {
-    return ctx.type === "family" ? contextArgs(ctx)[ctx.k].prompt : `n${ctx.labels[ctx.k]}`
-}
-
-/** The text the argument being typed starts as: the old value when a row is edited. */
-function ctxInitialText(ctx: ParamsContext): string {
-    if (ctx.type === "family") return ctx.prefill[contextArgs(ctx)[ctx.k].key] ?? ""
-    return ctx.prefill[ctx.k] ?? ""
-}
-
-/** What the params cell shows while `typed` is typed: the arguments taken, then it. */
-function ctxShown(ctx: ParamsContext, typed: string): string {
-    if (ctx.type === "family") {
-        const args = contextArgs(ctx)
-        const done = args.slice(0, ctx.k).map((a) => `${a.key}=${ctx.values[a.key]}`)
-        return [...done, `${args[ctx.k].key}=${typed}`].join(" ")
-    }
-    const done = ctx.labels
-        .slice(0, ctx.k)
-        .map((l, j) => `n${l}=${formatNumber(ctx.counts[j])}`)
-    return [...done, `n${ctx.labels[ctx.k]}=${typed}`].join(" ")
-}
-
-/**
- * What is wrong with a text as one argument of a family form. The other arguments stand
- * at a value that is always fine.
- */
-function argProblem(ctx: FamilyContext, key: string, text: string): string | undefined {
-    const dummy = Object.fromEntries(contextArgs(ctx).map((a) => [a.key, "1000"]))
-    const r = familyArg(ctx.fam, ctx.formIndex, { ...dummy, [key]: text })
-    return "error" in r ? r.error : undefined
-}
-
-// ---- the state ------------------------------------------------------------------------
-
-/** What every state of the flow carries. */
-interface Common {
-    /** The table with the rows as the flow has made them. */
-    table: Drafts<Solute>
-    /** The row the flow is at (the table's cursor). */
-    cursor: number
-    /** The rows this add made: Escape drops them. Empty when an existing row is edited. */
-    added: readonly number[]
-    /** The cursor before the add, which Escape goes back to. */
-    fromCursor: number
-    /** What went wrong with the last event, as a short message. */
-    problem?: string
-}
-
-/** The dropdown of names of `^n` and `^p` is open. */
-interface NameState extends Common {
-    kind: "name"
-    nameKind: NameKind
-    customs: readonly CustomEntry[]
-    /** What is typed. */
-    query: string
-    matches: SoluteEntry[]
-    /** The highlighted entry. */
-    index: number
-}
-
-/** A polymer family with several forms asks which one. */
-interface FormState extends Common {
-    kind: "form"
-    fam: PolymerFamily
-    labels: string[]
-    index: number
-}
-
-/** `^e` asks DNA or RNA. */
-interface NucleotideState extends Common {
-    kind: "nuc"
-    index: number
-}
-
-/** The path of a sequence file is typed. */
-interface PathState extends Common {
-    kind: "path"
-    seqKind: SequenceKind
-    buffer: string
-    /** The highlighted hint. */
-    index: number
-}
-
-/** One cell is typed into. */
-interface EditState extends Common {
-    kind: "edit"
-    /** The row typed into. */
-    i: number
-    field: EditField
-    /** What is typed (for a params cell, the argument being typed). */
-    text: string
-    /** The fields still to do after this one. */
-    queue: readonly EditField[]
-    /** The arguments of the params cell being typed. */
-    ctx?: ParamsContext
-    /** The context of the params field that comes next in the queue. */
-    nextCtx?: ParamsContext
-    /** The rows of a file, which get the same mM and +-. */
-    batch?: readonly number[]
-    /** A note to keep while mM is typed (`below 1000 counts as kDa`). */
-    hint?: string
-}
-
-/** The flow is over: `table` and `cursor` are its result. */
-interface DoneState extends Common {
-    kind: "done"
-    /** Whether it was cancelled (the rows of the add are dropped) or stopped or ended. */
-    cancelled: boolean
-}
-
-/** A state of the flow. */
-export type AddState =
-    | NameState
-    | FormState
-    | NucleotideState
-    | PathState
-    | EditState
-    | DoneState
-
-/** What the user does, as the screen forwards it. */
-export type AddEvent =
-    /** Enter: take the highlighted entry, the path, or the cell. */
-    | { type: "submit" }
-    /** Choose entry `index` of the dropdown (a click); the highlighted one when absent. */
-    | { type: "pick"; index?: number }
-    /** The typed text is now `text` (the whole text, as the screen's field holds it). */
-    | { type: "text"; text: string }
-    /** Up or down in a dropdown. */
-    | { type: "move"; delta: 1 | -1 }
-    /** Tab: complete the typed text to the highlighted entry or hint. */
-    | { type: "complete" }
-    /** Escape: drop the rows of the add; an edit stops and keeps what was taken. */
-    | { type: "cancel" }
-    /** What the desktop's file picker gave (`o` on an empty path). */
-    | { type: "files"; result: { files: readonly string[] } | { problem: string } }
-
-/** Where a prompt or a dropdown is drawn. */
-interface Cell {
-    /** The row of the table. */
-    row: number
-    /** The column, an index of `COLUMNS`. */
-    column: number
-}
-
-/** One line of a dropdown. */
-interface DropdownItem {
-    text: string
-    /** `solute`, `polymer`, `family` or `custom`; none for a form or a hint. */
-    tag?: string
-}
-
-/** A dropdown is open under a cell. */
-export interface DropdownStep {
-    type: "dropdown"
-    /** What is asked: `name`, `form`, `DNA or RNA`, `path`. */
-    label: string
-    cell: Cell
-    /** What is typed; `undefined` when the dropdown is a choice with no typing. */
-    typed?: string
-    maxLength?: number
-    items: DropdownItem[]
-    /** The highlighted item. */
-    index: number
-    /** The text of the status row, when it is not the count of the items. */
-    status?: string
-    /** The border note: the basis of the highlighted entry's molarity. */
-    note?: string
-    /** Whether `o` on an empty text asks for the desktop's file picker. */
-    filePicker?: boolean
-    /** The message of the last event. */
-    problem?: string
-}
-
-/** A cell is typed into. */
-export interface PromptStep {
-    type: "prompt"
-    /** What is asked: `name`, `mM`, `±`, or the prompt of an argument (`units n`). */
-    label: string
-    cell: Cell
-    /** The text being edited: the whole cell, or the argument of a params cell. */
-    typed: string
-    /** What the cell shows: `typed`, or every argument of a params cell. */
-    shown: string
-    maxLength: number
-    /** The border note: an argument's prompt, the hint kept for mM, a reminder. */
-    note?: string
-    problem?: string
-}
-
-/** The flow is over. */
-export interface DoneStep {
-    type: "done"
-    cancelled: boolean
-    table: Drafts<Solute>
-    cursor: number
-    /** The rows this add made (empty after a cancel and for an edit). */
-    added: readonly number[]
-    problem?: string
-}
-
-/** What a screen draws. */
-export type FlowStep = DropdownStep | PromptStep | DoneStep
-
-// ---- building states ------------------------------------------------------------------
+    checkPath,
+    complete,
+    type Drafts,
+    hintsFor,
+    isFastaFile,
+    MAX_PATH_TYPED,
+    MAX_ROWS,
+    parseFile,
+    parseText,
+    residuesOf,
+    type SequenceKind,
+    type SequenceRecords,
+} from "./lists.js"
+import type { PolymerEntry } from "./polymers.js"
+import { bufferRow, COLUMNS, cycle, type EditField, family, familyArg, fieldLabel, formatConc, MAX_CELL_TYPED, MAX_NAME_TYPED, NO_MATCH, NUCLEOTIDE_KINDS, type PolymerFamily, parseAddField, RE_ADD_NOTE, SEQUENCE_KINDS, type Solute, type SoluteEntry, setSoluteField } from "./solutes.js"
+
+
+// ========================================================================================
+// 1. Building states
+// ========================================================================================
 
 /** The solute of row `i`. */
 function rowSolute(table: Drafts<Solute>, i: number): Solute {
@@ -668,9 +117,9 @@ function fieldText(table: Drafts<Solute>, i: number, field: EditField): string {
         case "name":
             return s.name
         case "mM":
-            return formatNumber(s.mM)
+            return formatConc(s.mM)
         case "sigmaMM":
-            return formatNumber(s.sigmaMM)
+            return formatConc(s.sigmaMM)
         default:
             return ""
     }
@@ -792,6 +241,9 @@ function nameState(
     }
 }
 
+/** The `source` of rows made from typed or pasted text (a file's rows carry its name). */
+const PASTED_SOURCE = "text"
+
 /** The state of the path prompt of a sequence file. */
 function pathState(from: Common, seqKind: SequenceKind): PathState {
     return { ...carry(from), kind: "path", seqKind, buffer: "", index: 0 }
@@ -858,7 +310,7 @@ function startAdd(
 
 /**
  * The flow of an edit of the row under the cursor: its name (a free label), the params of
- * a polymer family or a custom polymer, mM, then +-.
+ * a polymer family, mM, then +-.
  *
  * @param table - the table.
  * @param cursor - the row.
@@ -875,7 +327,9 @@ function startEdit(table: Drafts<Solute>, cursor: number): AddState {
     })
 }
 
-// ---- the steps of the pick ------------------------------------------------------------
+// ========================================================================================
+// 2. The steps of the pick
+// ========================================================================================
 
 /** The state after an entry was picked in the name dropdown. */
 function picked(state: NameState, e: SoluteEntry): AddState {
@@ -911,9 +365,8 @@ function picked(state: NameState, e: SoluteEntry): AddState {
             const labels = entry.units.map((u) => u.label)
             const ones = labels.map(() => 1)
             const probe = { ...snapshot(entry, ones), mM: 1, sigmaMM: 0 }
-            if (rowProblem(bufferRow(probe as unknown as Solute))) {
+            if (rowProblem(bufferRow(probe as unknown as Solute)))
                 return { ...state, problem: "custom entry invalid" }
-            }
             const table = set({ ...solute, kind: "custom-polymer" } as Solute)
             const ctx: CountsContext = {
                 type: "counts",
@@ -928,7 +381,9 @@ function picked(state: NameState, e: SoluteEntry): AddState {
     }
 }
 
-// ---- the path of a sequence file ------------------------------------------------------
+// ========================================================================================
+// 3. The path or text of a sequence
+// ========================================================================================
 
 /**
  * What is wrong with a path as the sequence file to read.
@@ -941,25 +396,27 @@ export function sequencePathProblem(path: string): string | undefined {
     return checkPath(path, 22)
 }
 
-/** The state after Enter on the path typed: the file is read and its rows added. */
-function pathEnter(state: PathState): AddState {
-    // a typed or pasted path may end in blanks or a newline
-    const path = state.buffer.trim()
-    const problem = sequencePathProblem(path)
-    if (problem) return { ...state, problem }
-    const parsed = parseFile(path, state.seqKind)
-    if ("error" in parsed) return { ...state, problem: parsed.error }
+/** Whether typed text names a path (it has a separator, a dot, `~` or a drive colon). */
+function looksLikePath(text: string): boolean {
+    return /[/\\.~:]/.test(text)
+}
+
+/** The rows of the records taken, each asked its mM and ± next. */
+function takeRecords(
+    state: PathState,
+    records: SequenceRecords,
+    source: string,
+): AddState {
     const existing = state.table.length - state.added.length
-    if (existing + parsed.records.length > MAX_ROWS) {
+    if (existing + records.length > MAX_ROWS) {
         return { ...state, problem: `over ${MAX_ROWS} rows` }
     }
-    const file = basename(path)
-    const [first, ...rest] = parsed.records.map(
+    const [first, ...rest] = records.map(
         (r): Solute => ({
             kind: state.seqKind,
             name: r.id,
             arg: r.letters,
-            source: file,
+            source,
             record: r.id,
             mM: null,
             sigmaMM: null,
@@ -967,14 +424,41 @@ function pathEnter(state: PathState): AddState {
     )
     const i = state.added[0]
     const table = state.table.set(i, first).add(...rest)
-    const idx = [...Array(parsed.records.length).keys()].map((k) => i + k)
+    const idx = [...Array(records.length).keys()].map((k) => i + k)
     return openField({ ...state, added: idx }, table, i, "mM", {
         queue: ["sigmaMM"],
         batch: idx,
     })
 }
 
-// ---- editing a cell -------------------------------------------------------------------
+/**
+ * The state after Enter: the pasted text waiting, else what is typed. Text that names a
+ * path is a file (every path message of [[checkPath]] applies); anything else is linted
+ * as sequence text ([[parseText]]).
+ */
+function pathEnter(state: PathState): AddState {
+    // a typed or pasted path may end in blanks or a newline
+    const text = state.buffer.trim()
+    if (text === "") {
+        return state.pasted
+            ? takeRecords(state, state.pasted, PASTED_SOURCE)
+            : { ...state, problem: "type a path or a sequence first!" }
+    }
+    if (!looksLikePath(text)) {
+        const parsed = parseText(text, state.seqKind)
+        if ("error" in parsed) return { ...state, problem: parsed.error }
+        return takeRecords(state, parsed.records, PASTED_SOURCE)
+    }
+    const problem = sequencePathProblem(text)
+    if (problem) return { ...state, problem }
+    const parsed = parseFile(text, state.seqKind)
+    if ("error" in parsed) return { ...state, problem: parsed.error }
+    return takeRecords(state, parsed.records, basename(text))
+}
+
+// ========================================================================================
+// 4. Editing a cell
+// ========================================================================================
 
 /** The table with a field of every row of a batch (or of row `i`) set. */
 function setBatchField(
@@ -1034,7 +518,9 @@ function editEnter(state: EditState): AddState {
     })
 }
 
-// ---- the transitions ------------------------------------------------------------------
+// ========================================================================================
+// 5. The transitions
+// ========================================================================================
 
 /** The state with the typed text replaced, or the message that it is too long. */
 function withText<S extends { problem?: string }>(
@@ -1125,7 +611,14 @@ function advancePath(state: PathState, event: AddEvent): AddState {
                 ...s,
                 buffer,
                 index: 0,
+                pasted: undefined,
             }))
+        case "paste": {
+            const parsed = parseText(event.text, state.seqKind)
+            return "error" in parsed
+                ? { ...state, pasted: undefined, problem: parsed.error }
+                : { ...state, pasted: parsed.records }
+        }
         case "files": {
             if ("problem" in event.result)
                 return { ...state, problem: event.result.problem }
@@ -1185,7 +678,9 @@ function advance(state: AddState, event: AddEvent): AddState {
     }
 }
 
-// ---- what to draw ---------------------------------------------------------------------
+// ========================================================================================
+// 6. What to draw
+// ========================================================================================
 
 /** The status row of the name dropdown when nothing went wrong: what to type, no match. */
 function nameStatus(state: NameState): string | undefined {
@@ -1208,7 +703,12 @@ function editNote(state: EditState): string | undefined {
 /** The status row of the path prompt. */
 function pathStatus(state: PathState, hints: readonly string[]): string | undefined {
     if (state.problem) return state.problem
-    if (state.buffer === "") return "type a path, o: file picker"
+    if (state.pasted) {
+        const n = residuesOf(state.pasted)
+        const k = state.pasted.length
+        return `pasted ${n} residues${k > 1 ? ` in ${k} records` : ""}`
+    }
+    if (state.buffer === "") return "type a path or a sequence, o: file picker"
     return hints.length === 0 ? "no hint" : undefined
 }
 
@@ -1275,7 +775,7 @@ function view(state: AddState): FlowStep {
             const params = state.field === "params" && ctx
             return {
                 type: "prompt",
-                label: params ? ctxPrompt(ctx) : FIELD_LABELS[state.field],
+                label: params ? ctxPrompt(ctx) : fieldLabel(state.field),
                 cell: { row: state.i, column: COLUMNS.indexOf(state.field) },
                 typed: state.text,
                 shown: params ? ctxShown(ctx, state.text) : state.text,
@@ -1295,6 +795,10 @@ function view(state: AddState): FlowStep {
             }
     }
 }
+
+// ========================================================================================
+// 7. The class
+// ========================================================================================
 
 /**
  * One add or edit flow for a screen: draw `step`, forward what the user does to `send`

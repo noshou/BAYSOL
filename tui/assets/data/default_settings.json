@@ -78,5 +78,18 @@
  "PLOT_XTICK_STUB_PT": {"default": 4.0, "type": "float", "limits": {"at_least": 0}},
  "PLOT_XTICK_ELBOW_PT": {"default": 6.0, "type": "float", "limits": {"at_least": 0}},
  "PLOT_XTICK_LABEL_PAD_PT": {"default": 2.0, "type": "float", "limits": {"at_least": 0}},
- "PLOT_YTICK_LABEL_PAD_PT": {"default": 4.0, "type": "float", "limits": {"at_least": 0}}
+ "PLOT_YTICK_LABEL_PAD_PT": {"default": 4.0, "type": "float", "limits": {"at_least": 0}},
+ "Q_MIN": {"default": null, "type": "optional_float", "limits": {"above": 0}},
+ "Q_MAX": {"default": null, "type": "optional_float", "limits": {"above": 0}},
+ "SIGMA_SCALE": {"default": 1.0, "type": "float", "limits": {"above": 0}},
+ "EXCLUDE_Q": {"default": [], "type": "ranges", "limits": {}},
+ "LMAX": {"default": null, "type": "optional_int", "limits": {"at_least": 1}},
+ "CHAINS": {"default": [], "type": "strings", "limits": {}},
+ "MODEL": {"default": 1, "type": "int", "limits": {"at_least": 1}},
+ "ADD_HYDROGENS": {"default": true, "type": "bool", "limits": {}},
+ "PLOT_COMPARE": {"default": true, "type": "bool", "limits": {}},
+ "PLOT_COMPARE_COLOURS": {"default": ["#D55E00", "#0072B2", "#E69F00", "#CC79A7", "#009E73", "#56B4E9", "#F0E442", "#999999"], "type": "colours", "limits": {}},
+ "PLOT_COMPARE_MARKERS": {"default": ["o", "square", "triangle", "diamond", "x", "+", "star", "pentagon"], "type": "markers", "limits": {}, "choices": ["o", "*", "square", "square*", "triangle", "triangle*", "diamond", "diamond*", "pentagon", "pentagon*", "star", "x", "+", "asterisk", "oplus", "otimes"]},
+ "PLOT_LW_COMPARE": {"default": 1.2, "type": "float", "limits": {"at_least": 0}},
+ "PLOT_TUI_SIZES": {"default": [[76, 5], [100, 9], [130, 13], [170, 18]], "type": "sizes", "limits": {}}
 }
