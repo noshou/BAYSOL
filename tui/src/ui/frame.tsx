@@ -13,7 +13,7 @@ import { Box, Text } from "ink"
 import { Fragment, type ReactNode, useCallback, useState } from "react"
 import { LOGS_FLOW } from "../core/environment.js"
 import { displayWidth, padWidth, truncate } from "../core/terminal.js"
-import { runDisplay } from "../store/projects.js"
+import { runBrief, runDisplay } from "../store/projects.js"
 import {
     type Design,
     Legend,
@@ -54,18 +54,39 @@ export function cornerLabel(project: string, run?: string): string {
 }
 
 /**
- * The corner as far as it fits: cut with an ellipsis before it can push the title, and
- * left out altogether when what is left is less than `corner.minCells` (a few cells of
- * `pro…` say nothing).
+ * The corner texts of a page, longest first (`fitCorner` takes the first that fits whole):
+ * the full form of [[cornerLabel]], then the run as `runBrief` (`15:00:00 2026-11-09`),
+ * then without the word `project`, then the run alone.
  *
- * @param label - the corner text.
+ * @param project - the project's name.
+ * @param run - the run's name, `undefined` on the run list.
+ * @returns the forms; a page without a run has `project: demo` and `demo`.
+ */
+export function cornerLabels(project: string, run?: string): string[] {
+    if (run === undefined) return [cornerLabel(project), project]
+    const { separator } = LOGS_FLOW.corner
+    const brief = runBrief(run)
+    return [
+        cornerLabel(project, run),
+        `project: ${project}${separator}run: ${brief}`,
+        `${project}${separator}${brief}`,
+        brief,
+    ]
+}
+
+/**
+ * The corner as far as it fits: the first form that fits whole, else the last one cut
+ * with an ellipsis before it can push the title, and left out altogether when what is
+ * left is less than `corner.minCells` (a few cells of `pro…` say nothing).
+ *
+ * @param label - the corner text, or its forms from the longest.
  * @param columns - the width of the title row.
  * @param title - the title of the page.
  * @param subtitle - its subtitle, if any (drawn as `· subtitle`, a space between).
  * @returns the text to draw, or `undefined` for none.
  */
 export function fitCorner(
-    label: string,
+    label: string | readonly string[],
     columns: number,
     title: string,
     subtitle?: string,
@@ -74,7 +95,8 @@ export function fitCorner(
         displayWidth(title) + (subtitle ? 1 + displayWidth(`· ${subtitle}`) : 0) + GAP
     const room = columns - used
     if (room < LOGS_FLOW.corner.minCells) return undefined
-    return truncate(label, room)
+    const forms = typeof label === "string" ? [label] : label
+    return forms.find((f) => displayWidth(f) <= room) ?? truncate(forms.at(-1) ?? "", room)
 }
 
 /** Both small logos, loaded once: they are read from disk. */
@@ -100,7 +122,7 @@ const COUNTER_CELLS = 4
  * @param counter - the counter text, if any.
  * @returns the room, at least 1.
  */
-function legendRoom(design: Design, columns: number, counter?: string): number {
+export function legendRoom(design: Design, columns: number, counter?: string): number {
     const box = design === "blocky" ? BLOCKY_BOX_CELLS : 0
     const count = counter ? displayWidth(counter) + COUNTER_CELLS + FOOTER_GAP : 0
     return Math.max(1, columns - box - logos[design].width - FOOTER_GAP - count)
@@ -179,7 +201,7 @@ type FrameProps = {
     counter?:     string
     note?:        string
     noteIsError?: boolean
-    corner?:      string
+    corner?:      string | readonly string[]
     children?:    ReactNode
 }
 

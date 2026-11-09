@@ -6,6 +6,7 @@
 //   1. Sheets: a workbook or delimited file read into sheets and cells
 //   2. Plots: the terminal plots of a run (`plots.txt`) cut into tabs and windows
 //   3. Pager: the arithmetic of the text pager and how a text becomes its lines
+//   4. Search, jump, copy: finding cells, `B7` jumps, TSV for the clipboard, formulas
 
 import { readFileSync, statSync } from "node:fs"
 import { stripVTControlCharacters } from "node:util"
@@ -58,6 +59,8 @@ export class ViewerFileError extends Error {}
  * @property fullColumns - the columns the sheet has.
  * @property header - the first row is text over data, so the viewer keeps it in view.
  * @property widths - the width of each column, from its text.
+ * @property formulas - the text of the formula (`=SUM(A1:A2)`) of each cell that has one,
+ *     empty for the others; `undefined` when the sheet has none (a delimited file).
  */
 export type Sheet = {
     name: string
@@ -68,6 +71,7 @@ export type Sheet = {
     fullColumns: number
     header: boolean
     widths: number[]
+    formulas?: string[][]
 }
 
 /** A file opened for viewing: its sheet names now, its sheets when asked for. */
@@ -77,7 +81,7 @@ export type Workbook = {
 }
 
 /** What SheetJS gives for a cell, the parts used here. */
-type RawCell = { t?: string; v?: unknown; w?: string }
+type RawCell = { t?: string; v?: unknown; w?: string; f?: string }
 
 /**
  * A cell's text as it is shown: the formatted text SheetJS made, else the value.
@@ -85,7 +89,13 @@ type RawCell = { t?: string; v?: unknown; w?: string }
  * line that cannot move the cursor of the terminal or break a TSV row.
  */
 export function cellDisplay(cell: RawCell): string {
-    const text = cell.w ?? (cell.v === undefined || cell.v === null ? "" : String(cell.v))
+    return cleanText(
+        cell.w ?? (cell.v === undefined || cell.v === null ? "" : String(cell.v)),
+    )
+}
+
+/** A text with every run of control characters replaced by one space. */
+function cleanText(text: string): string {
     // biome-ignore lint/suspicious/noControlCharactersInRegex: that is what is matched
     return text.replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ")
 }
@@ -96,7 +106,7 @@ export function cellDisplay(cell: RawCell): string {
  *
  * @param max - the widest and narrowest allowed, and how many rows are sampled.
  */
-function fitWidths(
+export function fitWidths(
     cells: string[][],
     columns: number,
     max: Pick<ViewerLimits, "minColumnWidth" | "maxColumnWidth" | "widthSampleRows">,
@@ -138,6 +148,7 @@ export function buildSheet(name: string, ws: XLSX.WorkSheet, max: ViewerLimits):
     const cells = Array.from({ length: rows }, () => Array<string>(columns).fill(""))
     let firstRowText = true
     let firstRowCells = 0
+    let formulas: string[][] | undefined
     for (const key of Object.keys(ws)) {
         if (key.startsWith("!")) continue
         const { r, c } = XLSX.utils.decode_cell(key)
@@ -145,6 +156,10 @@ export function buildSheet(name: string, ws: XLSX.WorkSheet, max: ViewerLimits):
         const cell = ws[key] as RawCell
         const text = cellDisplay(cell)
         ;(cells[r] as string[])[c] = text
+        if (typeof cell.f === "string" && cell.f !== "") {
+            formulas ??= Array.from({ length: rows }, () => Array<string>(columns).fill(""))
+            ;(formulas[r] as string[])[c] = cleanText(`=${cell.f}`)
+        }
         if (r === 0 && text !== "") {
             firstRowCells++
             if (cell.t !== "s") firstRowText = false
@@ -159,6 +174,7 @@ export function buildSheet(name: string, ws: XLSX.WorkSheet, max: ViewerLimits):
         fullColumns: Math.max(full.e.c + 1, columns),
         header: rows > 1 && firstRowCells > 0 && firstRowText,
         widths: fitWidths(cells, columns, max),
+        ...(formulas ? { formulas } : {}),
     }
 }
 
@@ -196,6 +212,7 @@ export function openWorkbook(path: string, fallbackName: string): Workbook {
     const options: XLSX.ParsingOptions = {
         type: binary ? "buffer" : "string",
         sheetRows: max.maxRows,
+        cellFormula: true,
     }
     const source: string | Buffer = binary ? bytes : text
     try {
@@ -462,3 +479,176 @@ export function pagerLines(text: string, tabWidth: number): string[] {
         expandTabs(line, tabWidth).replace(/[\u0000-\u001f\u007f-\u009f]/g, " "),
     )
 }
+
+// ========================================================================================
+// 4. Search, jump, copy
+// ========================================================================================
+
+/** The text each cell shows: the formulas where `formulas` is on and a cell has one. */
+export function shownCells(sheet: Sheet, formulas: boolean): string[][] {
+    const f = sheet.formulas
+    if (!formulas || f === undefined) return sheet.cells
+    return sheet.cells.map((line, r) => line.map((t, c) => f[r]?.[c] || t))
+}
+
+/** A cell, 0-based. */
+export type CellAt = { row: number; column: number }
+
+/**
+ * The cells whose text contains `text`, case-insensitively, row by row.
+ *
+ * @param cells - the text of the sheet.
+ * @param text - what is searched (empty: no match).
+ * @returns the cells in row-major order.
+ */
+export function findCells(cells: readonly string[][], text: string): CellAt[] {
+    const wanted = text.toLowerCase()
+    if (wanted === "") return []
+    const out: CellAt[] = []
+    cells.forEach((line, row) => {
+        line.forEach((t, column) => {
+            if (t.toLowerCase().includes(wanted)) out.push({ row, column })
+        })
+    })
+    return out
+}
+
+/**
+ * The match a search lands on from a cursor: the first at or after it, else (wrapping)
+ * the first.
+ *
+ * @returns the index in `matches`, `undefined` with none.
+ */
+export function matchFrom(matches: readonly CellAt[], row: number, column: number) {
+    if (matches.length === 0) return undefined
+    const from = (m: CellAt) => m.row > row || (m.row === row && m.column >= column)
+    const at = matches.findIndex(from)
+    return Math.max(at, 0)
+}
+
+/**
+ * The next (`dir` 1) or previous (-1) match of a cursor, wrapping at both ends: from a cell
+ * that is no match, the next is the first after it and the previous the last before it.
+ *
+ * @returns the index in `matches`, `undefined` with none.
+ */
+export function matchStep(
+    matches: readonly CellAt[],
+    row: number,
+    column: number,
+    dir: 1 | -1,
+): number | undefined {
+    const n = matches.length
+    if (n === 0) return undefined
+    const after = (m: CellAt) => m.row > row || (m.row === row && m.column > column)
+    if (dir === 1) {
+        const at = matches.findIndex(after)
+        return Math.max(at, 0)
+    }
+    const before = matches.findLastIndex(
+        (m) => m.row < row || (m.row === row && m.column < column),
+    )
+    return before < 0 ? n - 1 : before
+}
+
+/** The index of a cell among the matches, `undefined` when it is none. */
+export const matchIndex = (matches: readonly CellAt[], row: number, column: number) => {
+    const at = matches.findIndex((m) => m.row === row && m.column === column)
+    return at < 0 ? undefined : at
+}
+
+/**
+ * Reads what `g` takes: a cell (`B7`), a row (`7`) or a column (`B`). A part left out
+ * keeps the cursor's. A place outside the sheet is refused, not clamped: the user typed it.
+ *
+ * @param text - what was typed.
+ * @param at - the cursor.
+ * @param rows - the rows of the sheet.
+ * @param columns - the columns of the sheet.
+ * @returns the cell, or the note.
+ */
+export function parseJump(
+    text: string,
+    at: CellAt,
+    rows: number,
+    columns: number,
+): CellAt | { error: string } {
+    const typed = text.trim()
+    const match = /^([A-Za-z]{1,3})?(\d{1,7})?$/.exec(typed)
+    if (typed === "" || match === null)
+        return { error: "a cell like B7, a row or a column" }
+    const [, letters, digits] = match
+    const column =
+        letters === undefined ? at.column : XLSX.utils.decode_col(letters.toUpperCase())
+    const row = digits === undefined ? at.row : Number(digits) - 1
+    if (row < 0 || row >= rows || column >= columns)
+        return { error: `outside the sheet (A1:${cellRef(rows - 1, columns - 1)})` }
+    return { row, column }
+}
+
+/** The most bytes a copy may send through the terminal (OSC 52 has limits). */
+export const COPY_LIMIT = 70 * 1024
+
+/** What a copy takes: a rectangle, or a whole row or column. */
+export type CopyWhat =
+    | { kind: "range"; from: CellAt; to: CellAt }
+    | { kind: "row"; row: number }
+    | { kind: "column"; column: number }
+
+/**
+ * The text of a copy: the cells TAB-separated, a line break between rows, and what the
+ * note says. Control characters of a cell are already a space (and are cleaned again).
+ *
+ * @param cells - the text of the sheet.
+ * @param what - what to copy.
+ * @returns the text, the note (`copied A1:B2 (4 cells)`) or the refusal.
+ */
+export function copyText(
+    cells: readonly string[][],
+    what: CopyWhat,
+): { text: string; note: string } | { error: string } {
+    const rows = cells.length
+    const columns = cells[0]?.length ?? 0
+    const [r0, r1, c0, c1, label] =
+        what.kind === "row"
+            ? [what.row, what.row, 0, columns - 1, `row ${what.row + 1}`]
+            : what.kind === "column"
+                ? [
+                    0,
+                    rows - 1,
+                    what.column,
+                    what.column,
+                    `column ${columnLabel(what.column)}`,
+                ]
+                : [
+                    Math.min(what.from.row, what.to.row),
+                    Math.max(what.from.row, what.to.row),
+                    Math.min(what.from.column, what.to.column),
+                    Math.max(what.from.column, what.to.column),
+                    "",
+                ]
+    const lines: string[] = []
+    for (let r = r0; r <= r1; r++) {
+        const line: string[] = []
+        for (let c = c0; c <= c1; c++) line.push(cleanText(cells[r]?.[c] ?? ""))
+        lines.push(line.join("\t"))
+    }
+    const text = lines.join("\n")
+    if (Buffer.byteLength(text) > COPY_LIMIT)
+        return { error: `too much to copy (${COPY_LIMIT / 1024} KB at most)` }
+    const count = (r1 - r0 + 1) * (c1 - c0 + 1)
+    const name =
+        label ||
+        (count === 1 ? cellRef(r0, c0) : `${cellRef(r0, c0)}:${cellRef(r1, c1)}`)
+    return { text, note: `copied ${name} (${count} ${count === 1 ? "cell" : "cells"})` }
+}
+
+/**
+ * The terminal sequence that puts a text on the clipboard (OSC 52, which also works
+ * over SSH).
+ *
+ * @param text - the text.
+ * @returns the sequence.
+ */
+export const clipboardSequence = (text: string): string =>
+    `\x1b]52;c;${Buffer.from(text, "utf-8").toString("base64")}\x07`

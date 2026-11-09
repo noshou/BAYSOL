@@ -37,6 +37,7 @@ import {
     deleteReference,
     freeStem,
     listReferences,
+    migrateReferences,
     readReferenceFile,
     referencesDir,
     referenceText,
@@ -285,6 +286,34 @@ test("references: copies adding the same stem both succeed, with different names
     const [entry] = listReferences(dir)
     assert.equal(deleteReference(dir, (entry as { file: string }).file), true)
     assert.equal(deleteReference(dir, (entry as { file: string }).file), false)
+})
+
+test("references: an old references/ folder is moved to reference-fit/", () => {
+    const dir = project()
+    const old = join(dir, "references")
+    mkdirSync(old)
+    writeFileSync(join(old, "CRYSOL.tsv"), "0.1\t2\n0.2\t1\n0.3\t1\n")
+    writeFileSync(join(old, "notes.md"), "kept")
+    assert.deepEqual(
+        listReferences(dir).map((e) => e.name),
+        ["CRYSOL"],
+    )
+    assert.ok(!existsSync(old), "the old folder is gone (renamed)")
+    assert.ok(existsSync(join(referencesDir(dir), "notes.md")), "every file came along")
+    assert.equal(migrateReferences(dir), false, "nothing more to move")
+    // adding to a project that still has the old folder moves it first
+    const second = project()
+    mkdirSync(join(second, "references"))
+    writeFileSync(join(second, "references", "a.tsv"), "0.1\t2\n0.2\t1\n0.3\t1\n")
+    assert.equal(addReference(second, curve(4), "b.dat"), "b")
+    assert.deepEqual(readdirSync(referencesDir(second)).sort(), ["a.tsv", "b.tsv"])
+    assert.ok(!existsSync(join(second, "references")))
+    // both folders present: the new one wins and the old one is left alone
+    const both = project()
+    mkdirSync(join(both, "references"))
+    mkdirSync(referencesDir(both))
+    assert.equal(migrateReferences(both), false)
+    assert.ok(existsSync(join(both, "references")))
 })
 
 // ========================================================================================

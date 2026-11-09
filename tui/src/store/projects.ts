@@ -8,13 +8,10 @@
 //   3. Models
 
 import {
-    closeSync,
     constants,
     copyFileSync,
     lstatSync,
     mkdirSync,
-    openSync,
-    readSync,
     rmSync,
     unlinkSync,
 } from "node:fs"
@@ -37,6 +34,7 @@ import {
 } from "../core/file-system.js"
 import { tooLong } from "../core/terminal.js"
 import { checkPath } from "./lists.js"
+import { readRunText } from "./run-archive.js"
 
 // ========================================================================================
 // 1. Run folder: status, liveness, settle
@@ -350,6 +348,25 @@ export function runDisplay(raw: string): string {
     return raw
 }
 
+/**
+ * The name of a run in as few cells as tell two runs apart, `14:19:18 2026-11-09` (the
+ * clock to the second and the date, no milliseconds or zone), for a question or a note
+ * that has little room. A name that is not of either format is returned as it is.
+ *
+ * @param raw - the run folder's name.
+ * @returns the text, 19 cells for a real run.
+ */
+export function runBrief(raw: string): string {
+    const name = raw.normalize("NFC")
+    const m = runNameFormat.exec(name)
+    if (m !== null && parseRunStamp(name) !== undefined)
+        return `${m[1]}:${m[2]}:${m[3]} ${m[8]}-${m[9]}-${m[10]}`
+    const old = oldRunNameFormat.exec(name)
+    if (old !== null && parseRunStamp(name) !== undefined)
+        return `${old[4]}:${old[5]}:${old[6]} ${old[1]}-${old[2]}-${old[3]}`
+    return raw
+}
+
 /** The ms of a UTC date and time, `undefined` when that day or time does not exist. */
 function utcInstant(
     y: number,
@@ -493,9 +510,6 @@ export function newestRuns(projectDir: string): RunEntry[] {
     return entries
 }
 
-/** The bytes of a run.LOG read to find its header (the setup rows come first). */
-const logHeadBytes = 8192
-
 /**
  * The default of the temperature prompt: the `temperature_c` row (`name<spaces><TAB>value`,
  * in the header that ends at the first `---`) of the newest FINISHED run's
@@ -509,11 +523,9 @@ export function defaultTemperature(projectDir: string): number | undefined {
     for (const { dir, json } of newestRuns(projectDir)) {
         if (json?.status !== "done" && json?.status !== "failed") continue
         try {
-            const fd = openSync(join(dir, "logs", "run.LOG"), "r")
-            const head = Buffer.alloc(logHeadBytes)
-            const n = readSync(fd, head, 0, logHeadBytes, 0)
-            closeSync(fd)
-            const header = head.toString("utf-8", 0, n).split(/^---/m)[0] ?? ""
+            // the log of a packed run is read from its archive, a plain one from its folder
+            const log = readRunText(dir, "logs/run.LOG", RUN_FLOW.log.maxBytes)
+            const header = log.split(/^---/m)[0] ?? ""
             const t = Number(/^temperature_c[ \t]*\t[ \t]*(\S+)/m.exec(header)?.[1])
             if (Number.isFinite(t)) return t
         } catch {

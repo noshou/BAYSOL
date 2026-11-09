@@ -673,9 +673,14 @@ test("the deletion question names the model and warns", () => {
     assert.match(q, /^delete model a\.pdb\?/)
     assert.match(q, /cannot be undone/)
     assert.equal(q, "delete model a.pdb? this cannot be undone!")
-    // a long name is cut, never the warning behind it
+    // a long name is cut (from its start), never the kind or the warning behind it
+    assert.equal(
+        destructiveQuestion("model SASDCQ2_fit3_model1").text,
+        "delete model SASDCQ2_fit3_model1? this cannot be undone!",
+    )
     const long = destructiveQuestion(`model ${"x".repeat(80)}`).text
     assert.ok(long.endsWith("? this cannot be undone!"))
     assert.ok(long.includes("…"))
-    assert.ok(long.length <= 7 + 24 + 24)
+    assert.ok(long.startsWith("delete model …x"))
+    assert.ok(long.length <= 58)
 })

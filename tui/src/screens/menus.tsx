@@ -124,7 +124,7 @@ import { useTheme } from "../ui/theme.js"
 import { CustomSolutesTable } from "./custom-solutes.js"
 import { DataScreen } from "./data-screen.js"
 import { LogsRuns } from "./logs-menu.js"
-import { OpenRuns } from "./logs-viewer.js"
+import { OpenRuns } from "./open-runs.js"
 import { RunScreen } from "./run-screens.js"
 import {
     bufferLandingOptions,
@@ -200,7 +200,7 @@ type ModelsMode = "prompt" | "list" | "picking"
  * @param project - the project whose models these are.
  * @returns the screen.
  */
-function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
+export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
     const nav = useNav()
     const theme = useTheme()
     const active = useScreenActive()
@@ -287,7 +287,7 @@ function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
         onPick: () => {},
         onCancel: closeList,
         onBack: nav.pop,
-        question: (name) => destructiveQuestion(`model ${name}`),
+        question: (name) => destructiveQuestion(`model ${modelStem(name)}`),
         action: { label: "settings", key: keys.modelSettings, run: openSettings },
         onDelete: (name) => {
             deleteModel(project.dir, name)
@@ -400,7 +400,7 @@ type LandingMode = "menu" | "load" | "save"
  *
  * Keys: up and down move, Enter opens, `^x` goes back.
  */
-function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
+export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
     const nav = useNav()
     const theme = useTheme()
     const columns = useBodyColumns()
@@ -701,7 +701,7 @@ function settingsNotice(project: ProjectRef): string | undefined {
     }
     if (!reset) return undefined
     const file = basename(settingsFile(project.dir))
-    return `${file} was unreadable: global settings used, old file kept as ${file}.corrupt`
+    return `${file} unreadable: global used, old in .corrupt`
 }
 
 /**
@@ -714,7 +714,7 @@ function settingsNotice(project: ProjectRef): string | undefined {
  * @param project - the project.
  * @returns the screen.
  */
-function ProjectMenu({ project }: { project: ProjectRef }): ReactNode {
+export function ProjectMenu({ project }: { project: ProjectRef }): ReactNode {
     const nav = useNav()
     const [notice, setNotice] = useState<string | undefined>(() => settingsNotice(project))
     // the temperature prompt of a run: the text it starts with, its error, its keys

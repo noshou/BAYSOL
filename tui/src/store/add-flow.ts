@@ -44,7 +44,33 @@
 
 import { basename } from "node:path"
 import { parseNumber, tooLong } from "../core/terminal.js"
-import { type AddEvent, type AddKind, type AddState, argProblem, basisNote, COUNT_RULES, type Common, type CountsContext, contextArgs, ctxInitialText, ctxPrompt, ctxShown, type DoneState, type EditState, editableParams, entries, entryTag, type FamilyContext, type FlowStep, type FormState, type NameKind, type NameState, type NucleotideState, type ParamsContext, type PathState } from "./add-state.js"
+import {
+    type AddEvent,
+    type AddKind,
+    type AddState,
+    argProblem,
+    basisNote,
+    COUNT_RULES,
+    type Common,
+    type CountsContext,
+    contextArgs,
+    ctxInitialText,
+    ctxPrompt,
+    ctxShown,
+    type DoneState,
+    type EditState,
+    editableParams,
+    entries,
+    entryTag,
+    type FamilyContext,
+    type FlowStep,
+    type FormState,
+    type NameKind,
+    type NameState,
+    type NucleotideState,
+    type ParamsContext,
+    type PathState,
+} from "./add-state.js"
 import { rowProblem } from "./buffer.js"
 import { type CustomEntry, type NonbioEntry, snapshot } from "./custom.js"
 import {
@@ -62,7 +88,27 @@ import {
     type SequenceRecords,
 } from "./lists.js"
 import type { PolymerEntry } from "./polymers.js"
-import { bufferRow, COLUMNS, cycle, type EditField, family, familyArg, fieldLabel, formatConc, MAX_CELL_TYPED, MAX_NAME_TYPED, NO_MATCH, NUCLEOTIDE_KINDS, type PolymerFamily, parseAddField, RE_ADD_NOTE, SEQUENCE_KINDS, type Solute, type SoluteEntry, setSoluteField } from "./solutes.js"
+import {
+    bufferRow,
+    COLUMNS,
+    cycle,
+    type EditField,
+    family,
+    familyArg,
+    fieldLabel,
+    formatConc,
+    MAX_CELL_TYPED,
+    MAX_NAME_TYPED,
+    NO_MATCH,
+    NUCLEOTIDE_KINDS,
+    type PolymerFamily,
+    parseAddField,
+    RE_ADD_NOTE,
+    SEQUENCE_KINDS,
+    type Solute,
+    type SoluteEntry,
+    setSoluteField,
+} from "./solutes.js"
 
 
 // ========================================================================================
@@ -706,7 +752,7 @@ function pathStatus(state: PathState, hints: readonly string[]): string | undefi
     if (state.pasted) {
         const n = residuesOf(state.pasted)
         const k = state.pasted.length
-        return `pasted ${n} residues${k > 1 ? ` in ${k} records` : ""}`
+        return `pasted ${n} residues${k > 1 ? ` in ${k} records` : ""}: enter takes them`
     }
     if (state.buffer === "") return "type a path or a sequence, o: file picker"
     return hints.length === 0 ? "no hint" : undefined

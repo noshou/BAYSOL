@@ -15,6 +15,7 @@ import {
     reasonFor,
     type SettingDef,
     type SettingValue,
+    settingNames,
     validateValue,
 } from "../src/store/settings.js"
 import { wipeInvalid } from "../src/store/settings-store.js"
@@ -39,8 +40,15 @@ test("every default is known and sits in one group of a sheet", () => {
     assert.equal(names.length, Object.keys(defaults).length)
     assert.deepEqual([...names].sort(), Object.keys(defaults).sort())
     assert.equal(new Set(names).size, names.length)
-    // every setting is on a sheet, in one of its groups
-    for (const def of catalog.defs())
+    // every setting is on a sheet, in one of its groups, but those the owner took off
+    // the sheets (`FIGURES_COMPILE`: `open runs` compiles plots with a key; the setting
+    // stays a keyword of Julia's `results` for the command line)
+    const offSheet = catalog.defs().filter((d) => catalog.sheet(d.sheet) === undefined)
+    assert.deepEqual(
+        offSheet.map((d) => d.name),
+        ["FIGURES_COMPILE"],
+    )
+    for (const def of catalog.defs().filter((d) => !offSheet.includes(d)))
         assert.ok(
             catalog.sheet(def.sheet)?.groups.some((g) => g.title === def.group),
             def.name,
@@ -206,6 +214,15 @@ test("yes/no", () => {
     assert.equal(kept("FIGURES_TEX", false), false)
     for (const bad of [null, 0, 1, "true", [true], {}])
         assert.equal(kept("FIGURES_TEX", bad), "must be true or false")
+})
+
+test("fonts are the math fonts or the text fonts", () => {
+    const fonts = { math: ["Pagella Math"], text: ["Pagella", "Times"] }
+    assert.deepEqual(settingNames("PLOT_MATH_FONT", "font", fonts), fonts.math)
+    assert.deepEqual(settingNames("PLOT_TEXT_FONT", "font", fonts), fonts.text)
+    assert.deepEqual(settingNames("X", "other", fonts), [])
+    assert.deepEqual(settingNames("PLOT_TEXT_FONT", "font"), [])
+    assert.deepEqual(settingNames("X", "colour"), colourNames())
 })
 
 test("colours: a name of the list or #rrggbb", () => {

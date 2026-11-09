@@ -331,6 +331,29 @@ export const RUN_FLOW = {
     screen: { tailLines: 500 },
     julia: { threads: "auto,1" },
     log: { maxBytes: 4194304 },
+    // the 7z archive of a finished run (`core/archive.ts`, `store/run-archive.ts`): its
+    // file name, the compression level, the largest single entry read into memory and the
+    // most bytes one extraction may write
+    archive: {
+        name: "run.7z",
+        level: 9,
+        maxEntryBytes: 33554432,
+        maxExtractBytes: 536870912,
+    },
+}
+
+/**
+ * The tunables of the plots actions of `open runs` (`store/plots.ts`): how long one LaTeX
+ * run may take, the arguments every engine gets, the compilers looked for on the `PATH`
+ * (in this order; a path that is set may also name `pdflatex`) and the name of the
+ * plot folder inside the BAYSOL data folder.
+ */
+export const PLOTS_FLOW = {
+    compileSeconds: 180,
+    engineArguments: ["-interaction=nonstopmode", "-halt-on-error"],
+    searched: ["lualatex", "xelatex"],
+    accepted: ["lualatex", "xelatex", "pdflatex"],
+    folder: "plots",
 }
 
 /** The tunables of the logs menu and `open runs`: pager steps, columns, refresh, corner. */

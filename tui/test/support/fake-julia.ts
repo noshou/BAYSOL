@@ -3,7 +3,7 @@
 import { spawn } from "node:child_process"
 import { appendFileSync, mkdirSync, renameSync, writeFileSync } from "node:fs"
 import { hostname } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 /**
  * A stand-in for Julia in the tests of the run flow: it takes the three arguments the
@@ -11,6 +11,9 @@ import { join } from "node:path"
  * `logs/run.LOG` the way `BAYSOL.run_project` does, then behaves as `FAKE_MODE` says:
  *
  * - `done`: prints a few lines (one with a carriage-return progress bar), finishes `done`.
+ * - `plots`: like `done`, and the run has the files a real one leaves: a model `m` with its
+ *   `m.LOG`, `output/` (`m.xlsx`, `plots.txt`, the plots at two sizes, two `.tex`
+ *   figures in `output/plots/`) and a comparison in `compare/`, all named in `run.json`.
  * - `failed`: finishes `failed` with an ERRORS section.
  * - `hang`: starts a grandchild (`sleep`) in the same process group, then waits; on SIGTERM
  *   it finishes `aborted` and exits 130, as Julia does.
@@ -26,8 +29,74 @@ const mode = process.env.FAKE_MODE ?? "done"
 const iso = (): string => `${new Date().toISOString().slice(0, 19)}Z`
 const started = iso()
 
+/** The sizes of the terminal plots the fake model writes, `[width, rows]`. */
+const PLOT_SIZES: [number, number][] = [
+    [76, 10],
+    [100, 14],
+]
+
+/** The standalone figure the fake model writes (a real pgfplots document). */
+const figure = (title: string): string =>
+    [
+        "\\documentclass[border=8pt]{standalone}",
+        "\\usepackage{pgfplots}",
+        "\\begin{document}",
+        "\\begin{tikzpicture}",
+        `\\begin{axis}[title={${title}}]`,
+        "\\addplot coordinates {(0.02, 3.1) (0.10, 2.4) (0.20, 1.2)};",
+        "\\end{axis}",
+        "\\end{tikzpicture}",
+        "\\end{document}",
+        "",
+    ].join("\n")
+
+/** One boxed terminal plot: a title line, then a box (UnicodePlots' `:corners`). */
+const boxed = (title: string, w: number, h: number): string =>
+    [
+        `${title}   ${w}x${h}`,
+        `┌${"─".repeat(w - 2)}┐`,
+        ...Array.from({ length: h }, () => `│${" ".repeat(w - 2)}│`),
+        `└${"─".repeat(w - 2)}┘`,
+    ].join("\n")
+
+/** The terminal plots at one size: two plots, a blank line between them. */
+const terminalPlots = (w: number, h: number): string =>
+    `${boxed("fit", w, h)}\n\n${boxed("residuals", w, h)}\n`
+
+/** The files of a finished model and of the comparison (`plots` mode). */
+function writeOutputs(): void {
+    const dir = runDir as string
+    const files: Record<string, string> = {
+        "m/m.LOG": "datetime\tnow\n",
+        "m/output/m.xlsx": "PK workbook",
+        "m/output/plots.txt": terminalPlots(70, 18),
+        "m/output/plots/m.tex": figure("fit"),
+        "m/output/plots/m_residuals.tex": figure("residuals"),
+        "compare/plots.txt": terminalPlots(70, 18),
+        "compare/plots/res_compare.tex": figure("comparison"),
+        "compare/res_compare.xlsx": "PK workbook",
+    }
+    for (const [w, h] of PLOT_SIZES) {
+        files[`m/output/plots_${w}x${h}.txt`] = terminalPlots(w, h)
+        files[`compare/plots_${w}x${h}.txt`] = terminalPlots(w, h)
+    }
+    for (const [rel, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(dir, rel)), { recursive: true })
+        writeFileSync(join(dir, rel), text)
+    }
+}
+
 /** Writes `run.json` atomically. */
 function runJson(status: string): void {
+    const sizes = (folder: string): unknown[] =>
+        mode !== "plots"
+            ? []
+            : PLOT_SIZES.map(([w, h]) => ({
+                file: `${folder}/plots_${w}x${h}.txt`,
+                width: w,
+                rows: h,
+            }))
+    const plots = mode === "plots" && status !== "running"
     const file = join(runDir as string, "run.json")
     const body = {
         schema: 1,
@@ -39,7 +108,16 @@ function runJson(status: string): void {
         started,
         heartbeat: iso(),
         ended: status === "running" ? null : iso(),
-        models: [],
+        models: plots ? [{ name: "m", status: "done", plot_sizes: sizes("m/output") }] : [],
+        ...(plots
+            ? {
+                compare: {
+                    status: "done",
+                    files: ["compare/res_compare.xlsx"],
+                    plot_sizes: sizes("compare"),
+                },
+            }
+            : {}),
     }
     writeFileSync(`${file}.tmp`, JSON.stringify(body, null, 2))
     renameSync(`${file}.tmp`, file)
@@ -67,10 +145,11 @@ writeFileSync(
 )
 process.stdout.write("fake julia started\n")
 
-if (mode === "done" || mode === "failed") {
+if (mode === "done" || mode === "failed" || mode === "plots") {
+    if (mode === "plots") writeOutputs()
     process.stdout.write("progress 10%\rprogress 50%\rprogress 100%\n")
     process.stderr.write("\x1b[32mcolour on stderr\x1b[0m\n")
-    setTimeout(() => finish(mode, 0), 200)
+    setTimeout(() => finish(mode === "plots" ? "done" : mode, 0), 200)
 } else if (mode === "crash") {
     process.stdout.write("about to crash\n")
     setTimeout(() => process.exit(3), 100)

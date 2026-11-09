@@ -41,6 +41,7 @@ export type SettingKind =
     | "colours"
     | "markers"
     | "sizes"
+    | "path"
 
 /** The kinds a part of a tuple can have. */
 export type PartKind = "int" | "float" | "colour"
@@ -63,7 +64,7 @@ export type Limits = {
  * `null` is an optional number that is not given (no limit, automatic), a list of
  * `[lo, hi]` pairs is a `ranges` setting (a list of `[width, height]` pairs `sizes`), a
  * list of single-character strings `strings` (of colours `colours`, of marker names
- * `markers`).
+ * `markers`); a `path` is a string, empty for "not set".
  */
 export type SettingValue =
     | null
@@ -170,6 +171,8 @@ export const runLevelSettings: readonly string[] = [
     "FIGURES_TEX",
     "FIGURES_COMPILE",
     "FIGURES_FORMATS",
+    "FIGURES_DIR",
+    "FIGURES_COMPILER",
 ]
 
 /** The prefix of the settings of the figures' look: all of them are run-level. */
@@ -338,6 +341,28 @@ export function colourHex(colour: string): string | undefined {
 /** @returns every colour name, sorted. */
 export const colourNames = (): readonly string[] => [...colours().keys()]
 
+/** The fonts of a machine: math fonts (with an OpenType MATH table) and text fonts. */
+export type FontLists = { math: readonly string[]; text: readonly string[] }
+
+/**
+ * The names a setting is picked from. The font of a setting whose name has `MATH` in it
+ * is chosen from the math fonts, any other font setting from the text fonts.
+ *
+ * @param setting - the setting's name, `PLOT_MATH_FONT`.
+ * @param kind - `colour` or `font`; any other kind has no list.
+ * @param fonts - the fonts installed here; a machine with none has no list.
+ * @returns the names, sorted.
+ */
+export function settingNames(
+    setting: string,
+    kind: string,
+    fonts: FontLists = { math: [], text: [] },
+): readonly string[] {
+    if (kind === "colour") return colourNames()
+    if (kind === "font") return setting.includes("MATH") ? fonts.math : fonts.text
+    return []
+}
+
 // ========================================================================================
 // 2. Validation
 // ========================================================================================
@@ -374,7 +399,13 @@ const maxFontName = 100
 /** `#rrggbb`, the one spelling of a colour that is not a name of the list. */
 const hexColour = /^#[0-9a-fA-F]{6}$/
 
-/** A control character (ISO control, category Cc): no font name has one. */
+/** The most characters (code points) a `path` setting has, as on the Julia side. */
+const maxPathText = 4096
+
+/** What is said of a value that is no path (the words of the Julia side). */
+const pathError = "must be a path (text without control characters, or empty)"
+
+/** A control character (ISO control, category Cc): no font name or path has one. */
 const controlCharacter = /\p{Cc}/u
 
 /**
@@ -614,6 +645,14 @@ export function validateValue(def: SettingDef, raw: unknown): Checked {
             return ok
                 ? { ok: true, value: raw }
                 : { ok: false, error: "must be a font name" }
+        }
+        case "path": {
+            const ok =
+                typeof raw === "string" &&
+                [...raw].length <= maxPathText &&
+                !controlCharacter.test(raw)
+            if (!ok) return { ok: false, error: pathError }
+            return { ok: true, value: raw.trim() }
         }
         case "set": {
             const names: unknown[] = Array.isArray(raw) ? raw : []

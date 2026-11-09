@@ -368,8 +368,7 @@ export type ReadOptions = { track?: boolean }
 export class ChangedOnDiskError extends Error {
     constructor(readonly file: string) {
         super(
-            `${basename(file)} changed on disk: ` +
-                "another copy of BAYSOL saved it; reopen it",
+            `${basename(file)} changed on disk: reopen it`,
         )
     }
 }

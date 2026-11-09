@@ -43,6 +43,8 @@
  "FIGURES_TEX": {"default": true, "type": "bool", "limits": {}},
  "FIGURES_COMPILE": {"default": false, "type": "bool", "limits": {}},
  "FIGURES_FORMATS": {"default": ["pdf"], "type": "set", "limits": {}, "choices": ["pdf", "png", "svg"]},
+ "FIGURES_DIR": {"default": "", "type": "path", "limits": {}},
+ "FIGURES_COMPILER": {"default": "", "type": "path", "limits": {}},
  "PLOT_COLOUR_MAP": {"default": "crimson", "type": "colour", "limits": {}},
  "PLOT_COLOUR_POSTERIOR": {"default": "darkorange", "type": "colour", "limits": {}},
  "PLOT_COLOUR_DATA": {"default": "gray20", "type": "colour", "limits": {}},

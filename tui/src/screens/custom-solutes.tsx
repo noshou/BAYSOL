@@ -335,7 +335,8 @@ function otherNames(
  * edited row shows `*`; nothing of that is written before `^w`.
  *
  * Keys: up and down move; Enter edits the row in its form page; `^n` and `^p` add a
- * non-biological solute and a polymer (their form pages), neither past 999 rows; `^r` on a saved row asks `delete solute NAME? ...` and Enter deletes
+ * non-biological solute and a polymer (their form pages), neither past 999 rows; `^r` on
+ * a saved row asks `delete solute NAME? ...` and Enter deletes
  * that entry from the file at once (a row never saved just goes); `^u` undoes the last
  * edit of the row; `^w` saves (a row that is not complete is told and nothing is saved);
  * `^x` goes back, asking first when something is unsaved. A file that cannot be used is

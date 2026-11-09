@@ -3,7 +3,7 @@
 // The logs menu (`logs` of the project menu): the runs of a project, the options of one
 // run (views of the files of its plain `logs/` folder and the restores that put its inputs
 // back into the project). `open... > open runs` (results, plots, `run.LOG`) is
-// `logs-viewer.tsx`, whose pager these pages reuse.
+// `open-runs.tsx`, whose pager these pages reuse.
 //
 // Contents:
 //   1. Layout: the rows the pages give their tables
@@ -32,7 +32,7 @@ import {
     sizeText,
     watchBuffer,
 } from "../store/run-logs.js"
-import { cornerLabel, Frame, footerExtraLines } from "../ui/frame.js"
+import { cornerLabels, Frame, footerExtraLines } from "../ui/frame.js"
 import { type LegendItem, legendBack, legendFor, legendOf, moveLegend } from "../ui/grid.js"
 import {
     type Question,
@@ -49,11 +49,22 @@ import {
     useScreenActive,
 } from "../ui/interaction.js"
 import { type Column, columnWidths, DataTable } from "../ui/theme.js"
-import { TextPager, useRunWatch } from "./logs-viewer.js"
+import { TextPager, useRunWatch } from "./open-runs.js"
 
 // ========================================================================================
 // 1. Layout
 // ========================================================================================
+
+/**
+ * The `models` cell of the run list: how many models the run had (the names would be cut
+ * by the column; `open runs` and `view models` list them).
+ *
+ * @param models - the names of a run's models.
+ * @returns `-` for none, else the count.
+ */
+export function modelsCell(models: readonly string[]): string {
+    return models.length === 0 ? "-" : String(models.length)
+}
 
 /** The rows a `DataTable` takes besides its rows: header, rule and the `n / total` line. */
 const TABLE_CHROME_ROWS = 3
@@ -203,7 +214,7 @@ function LogsRun({ project, run }: { project: ProjectRef; run: RunRow }): ReactN
                 design="blocky"
                 title="logs"
                 subtitle={it.action === "conditions" ? "conditions" : it.file}
-                corner={cornerLabel(project.id, run.id)}
+                corner={cornerLabels(project.id, run.id)}
                 runDir={run.dir}
                 load={load}
             />,
@@ -271,7 +282,7 @@ function LogsRun({ project, run }: { project: ProjectRef; run: RunRow }): ReactN
             design="blocky"
             title="logs"
             subtitle="options"
-            corner={cornerLabel(project.id, run.id)}
+            corner={cornerLabels(project.id, run.id)}
             counter={
                 confirm.question ? undefined : `options [${index + 1} / ${runItems.length}]`
             }
@@ -357,7 +368,7 @@ export function LogsRuns({ project }: { project: ProjectRef }): ReactNode {
     const tableFor = (stampWidth: number): Column<RunRow>[] => [
         { title: "run", width: stampWidth, text: (r) => runDisplay(r.id) },
         { title: "status", width: flow.statusWidth, text: (r) => r.state },
-        { title: "models", text: (r) => (r.models.length > 0 ? r.models.join(", ") : "-") },
+        { title: "models", text: (r) => modelsCell(r.models) },
         {
             title: "size",
             width: flow.sizeWidth,
@@ -398,7 +409,7 @@ export function LogsRuns({ project }: { project: ProjectRef }): ReactNode {
             design="blocky"
             title="logs"
             subtitle="runs"
-            corner={cornerLabel(project.id)}
+            corner={cornerLabels(project.id)}
             counter={
                 runs.length > 0 && !confirm.question
                     ? `runs [${index + 1} / ${runs.length}]`

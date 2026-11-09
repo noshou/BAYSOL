@@ -6,11 +6,39 @@ import { join } from "node:path"
 import { test } from "node:test"
 import { formatNumber } from "../src/core/terminal.js"
 import { AddFlow, sequencePathProblem } from "../src/store/add-flow.js"
-import { type AddEvent, type AddKind, basisNote, countsText, type DropdownStep, entries, entryTag, familyMatch, type PromptStep, paramsCell, rowNote } from "../src/store/add-state.js"
+import {
+    type AddEvent,
+    type AddKind,
+    basisNote,
+    countsText,
+    type DropdownStep,
+    entries,
+    entryTag,
+    familyMatch,
+    type PromptStep,
+    paramsCell,
+    rowNote,
+} from "../src/store/add-state.js"
 import { rowProblem } from "../src/store/buffer.js"
 import type { CustomEntry } from "../src/store/custom.js"
 import { Drafts, hintsFor, isFastaFile, MAX_ROWS } from "../src/store/lists.js"
-import { bufferRow, CONC_UNITS, type ConcUnit, concUnit, draftProblem, fieldLabel, formatConc, fromShown, NO_MATCH, nextConcUnit, parseAddField, resolveBuiltin, type Solute, setConcUnit, toShown } from "../src/store/solutes.js"
+import {
+    bufferRow,
+    CONC_UNITS,
+    type ConcUnit,
+    concUnit,
+    draftProblem,
+    fieldLabel,
+    formatConc,
+    fromShown,
+    NO_MATCH,
+    nextConcUnit,
+    parseAddField,
+    resolveBuiltin,
+    type Solute,
+    setConcUnit,
+    toShown,
+} from "../src/store/solutes.js"
 import {
     seqresLetters,
     fixture as sharedFixture,

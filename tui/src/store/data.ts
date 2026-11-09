@@ -66,7 +66,8 @@ export class DataFileError extends Error {}
  * @property q - the scattering vector, strictly increasing and above 0.
  * @property i - the intensity.
  * @property sigma - its uncertainty, above 0; empty for a curve without one (a reference).
- * @property dropped - the rows left out because their q was not above 0 (0 if none).
+ * @property dropped - the rows left out (q or sigma not above 0, or a row repeated
+ *     exactly; 0 if none).
  */
 export type DataPoints = { q: number[]; i: number[]; sigma: number[]; dropped: number }
 
@@ -593,8 +594,9 @@ export type CurveColumns = { q: number; i: number; sigma?: number }
 /**
  * Takes the chosen columns of a table as the curve and checks it. A row with q or sigma
  * not above 0 is dropped and counted (`dropped`), as the fitting scripts do with real
- * SASBDB files. Without a `sigma` column (a reference curve) only q is checked and
- * `sigma` of the result is empty.
+ * SASBDB files, and so is a row repeated exactly (merged data sets have them); a q that
+ * goes back otherwise is an error. Without a `sigma` column (a reference curve) only q
+ * is checked and `sigma` of the result is empty.
  *
  * @param columns - the columns, counting from 1 (see [[resolveColumns]]).
  * @throws [[DataFileError]] for the FIRST problem: a cell that is empty or no number
@@ -623,8 +625,18 @@ export function extractCurve(table: Table, columns: CurveColumns): DataPoints {
             continue
         }
         const before = data.q[data.q.length - 1]
-        if (before !== undefined && value.q <= before)
-            throw new DataFileError(`${where} ${line}: q must increase`)
+        if (before !== undefined && value.q <= before) {
+            // a row repeated exactly (merged data sets do it) is dropped; any other
+            // order is an error
+            const last = data.q.length - 1
+            const same =
+                value.q === before &&
+                value.i === data.i[last] &&
+                (columns.sigma === undefined || value.sigma === data.sigma[last])
+            if (!same) throw new DataFileError(`${where} ${line}: q must increase`)
+            data.dropped++
+            continue
+        }
         data.q.push(value.q)
         data.i.push(value.i)
         if (columns.sigma !== undefined) data.sigma.push(value.sigma)

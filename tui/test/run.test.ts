@@ -20,6 +20,7 @@ import { getTimeZones } from "@vvo/tzdb"
 import moment from "moment-timezone"
 import { RUN_FLOW } from "../src/core/environment.js"
 import { writeJson } from "../src/core/file-system.js"
+import { wrapLine } from "../src/core/terminal.js"
 import { runNote, visibleTail } from "../src/screens/run-screens.js"
 import { type BufferRow, bufferFile, writeSolutes } from "../src/store/buffer.js"
 import { setEnergy, writeData } from "../src/store/data.js"
@@ -32,6 +33,7 @@ import {
     markStaleRuns,
     parseRunStamp,
     RunInProgressError,
+    runBrief,
     runDirOf,
     runDisplay,
     runIds,
@@ -57,6 +59,13 @@ import {
     snapshotInputs,
     temperatureStart,
 } from "../src/store/run.js"
+import {
+    isPacked,
+    RUN_ARCHIVE,
+    readRunText,
+    runFolderFiles,
+} from "../src/store/run-archive.js"
+import { destructiveQuestion } from "../src/ui/input.js"
 import { fixture, tempDir, tempDir as tmp } from "./support/fixtures.js"
 
 // ========================================================================================
@@ -428,27 +437,39 @@ test("the snapshot also copies model-settings.json and the reference files", () 
     snapshotInputs(p, run.dir)
     const logs = join(run.dir, "logs")
     assert.equal(existsSync(join(logs, "model-settings.json")), false)
-    assert.equal(existsSync(join(logs, "references")), false, "none made without any")
+    assert.equal(existsSync(join(logs, "reference-fit")), false, "none made without any")
     // a project with both: only the files Julia reads, whole
     const q = project()
     const models = '{"crambin":{"model":{"Q_MAX":{"value":0.3}}}}\n'
     writeFileSync(join(q, "model-settings.json"), models)
-    mkdirSync(join(q, "references", "folder.dat"), { recursive: true })
-    writeFileSync(join(q, "references", "CRYSOL.tsv"), "0.1\t2\n0.2\t1\n0.3\t1\n")
-    writeFileSync(join(q, "references", "foxs.DAT"), "0.1 2\n")
-    writeFileSync(join(q, "references", "notes.md"), "not a curve")
+    mkdirSync(join(q, "reference-fit", "folder.dat"), { recursive: true })
+    writeFileSync(join(q, "reference-fit", "CRYSOL.tsv"), "0.1\t2\n0.2\t1\n0.3\t1\n")
+    writeFileSync(join(q, "reference-fit", "foxs.DAT"), "0.1 2\n")
+    writeFileSync(join(q, "reference-fit", "notes.md"), "not a curve")
     const run2 = claimRun(q)
     snapshotInputs(q, run2.dir)
     const out = join(run2.dir, "logs")
     assert.equal(readFileSync(join(out, "model-settings.json"), "utf-8"), models)
     assert.deepEqual(
-        readdirSync(join(out, "references")).sort(),
+        readdirSync(join(out, "reference-fit")).sort(),
         ["CRYSOL.tsv", "foxs.DAT"],
     )
     assert.equal(
-        readFileSync(join(out, "references", "CRYSOL.tsv"), "utf-8"),
-        readFileSync(join(q, "references", "CRYSOL.tsv"), "utf-8"),
+        readFileSync(join(out, "reference-fit", "CRYSOL.tsv"), "utf-8"),
+        readFileSync(join(q, "reference-fit", "CRYSOL.tsv"), "utf-8"),
     )
+})
+
+test("the snapshot of a project with the old references/ folder moves it", () => {
+    const q = project()
+    mkdirSync(join(q, "references"))
+    writeFileSync(join(q, "references", "CRYSOL.tsv"), "0.1\t2\n0.2\t1\n0.3\t1\n")
+    const run = claimRun(q)
+    snapshotInputs(q, run.dir)
+    assert.equal(existsSync(join(q, "references")), false, "moved")
+    assert.deepEqual(readdirSync(join(q, "reference-fit")), ["CRYSOL.tsv"])
+    assert.deepEqual(readdirSync(join(run.dir, "logs", "reference-fit")), ["CRYSOL.tsv"])
+    assert.equal(existsSync(join(run.dir, "logs", "references")), false)
 })
 
 test("the startup sweep marks a dead run interrupted, and leaves a live one alone", () => {
@@ -526,16 +547,22 @@ test("the oldest lines go beyond the maximum; each stream has its own open line"
     assert.deepEqual(t.lines, ["c", "d", "e", "out", "err"])
 })
 
-test("the screen shows the newest lines that fit, each cut to the panel", () => {
+test("the screen shows the newest lines that fit, each wrapped to the panel", () => {
     const lines = ["1", "2", "3", "4", "a very long line indeed"]
     assert.deepEqual(visibleTail(lines, 3, 80), ["3", "4", "a very long line indeed"])
-    assert.deepEqual(visibleTail(lines, 2, 8), ["4", "a very …"])
+    assert.deepEqual(visibleTail(lines, 2, 8), ["  line", "  indeed"])
+    assert.deepEqual(wrapLine("  Checks: a b c d e f", 12), [
+        "  Checks:",
+        "    a b c d",
+        "    e f",
+    ])
     assert.deepEqual(visibleTail([], 5, 80), [])
 })
 
 test("the note under the output: what the run is doing, else what it has to tell", () => {
     assert.equal(runNote("running", undefined), undefined)
     assert.equal(runNote("aborting", "x"), "stopping the run...")
+    assert.equal(runNote("packing", "x"), "packing the run...")
     assert.equal(
         runNote("failed", "could not start julia: ENOENT"),
         "could not start julia: ENOENT",
@@ -589,14 +616,19 @@ function alive(pid: number): boolean {
     }
 }
 
-/** The text of an entry of the run's plain `logs/` folder. */
-const logText = (dir: string, name: string): string =>
-    readFileSync(join(dir, "logs", name), "utf-8")
+/** The text of a file of the run's `logs/`, from its archive or its plain folder. */
+const logText = (dir: string, name: string): string => readRunText(dir, `logs/${name}`)
 
-test("a normal run: tail, done, plain logs stay, conditions in the LOG", async () => {
+test("a normal run: tail, packing, done, logs in the archive, conditions", async () => {
     const p = project()
     const session = RunSession.begin(p, 21.5, fakeLauncher("done"))
+    const phases: string[] = []
+    session.subscribe(() => {
+        if (phases.at(-1) !== session.view.phase) phases.push(session.view.phase)
+    })
     const phase = await session.done
+    assert.ok(phases.includes("packing"), phases.join(","))
+    assert.equal(phases.at(-1), "done")
     assert.equal(phase, "done")
     const view = session.view
     assert.ok(isEnd(view.phase) && view.endedMs !== undefined)
@@ -607,11 +639,31 @@ test("a normal run: tail, done, plain logs stay, conditions in the LOG", async (
     assert.ok(view.lines.includes("colour on stderr"))
     const dir = runDirOf(p, view.id)
     assert.equal(runStatus(p, view.id), "done")
-    assert.equal(existsSync(join(dir, "logs.7z")), false, "nothing is packed")
-    const names = readdirSync(join(dir, "logs"))
+    // packed: the archive holds the logs, run.json stays outside, no staging is left
+    assert.ok(isPacked(dir) && !existsSync(join(dir, "logs")))
+    assert.ok(existsSync(join(dir, "run.json")))
+    assert.deepEqual(
+        readdirSync(dir).filter((n) => n !== "run.json" && n !== RUN_ARCHIVE),
+        [CLAIM_FILE],
+        "only the claim marker is left beside run.json and the archive",
+    )
+    const names = [...runFolderFiles(dir, "logs").keys()]
     for (const n of ["run.LOG", "settings.json", "buffer.json", "data.tsv", "data.json"])
         assert.ok(names.includes(n), n)
     assert.match(logText(dir, "run.LOG"), /temperature_c\t21\.5/)
+    assert.equal(session.view.note, undefined)
+})
+
+test("a pack that fails leaves the run folder as it was and says why", async () => {
+    const p = project()
+    const session = RunSession.begin(p, 21.5, fakeLauncher("done"), async () => {
+        throw new Error("7-Zip failed: disk full")
+    })
+    assert.equal(await session.done, "done")
+    const dir = runDirOf(p, session.view.id)
+    assert.match(session.view.note ?? "", /not packed: disk full/)
+    assert.equal(isPacked(dir), false)
+    assert.match(readFileSync(join(dir, "logs", "run.LOG"), "utf-8"), /temperature_c/)
 })
 
 test("a run that failed ends failed with its error line as the note", async () => {
@@ -646,7 +698,7 @@ test("abort stops the child and its grandchild and finishes the log", async () =
         "no process left",
     )
     assert.equal(runStatus(p, session.view.id), "aborted")
-    assert.ok(existsSync(join(runDirOf(p, session.view.id), "logs", "run.LOG")))
+    assert.ok(logText(runDirOf(p, session.view.id), "run.LOG").length > 0)
     // the project can start a new run again
     const again = RunSession.begin(p, 20, fakeLauncher("done"))
     assert.equal(await again.done, "done")
@@ -764,4 +816,15 @@ test("the Julia command and arguments: values travel in ARGS, not in the code", 
     assert.match(args[5] ?? "", /ui = :tui/)
     assert.deepEqual(args.slice(6), ["/p q/it's", "22.5", "/p q/it's/runs/x"])
     assert.ok(!juliaArgs(spec, undefined, "1").some((a) => a.startsWith("--project")))
+})
+
+test("runBrief: a run in as few cells as tell runs apart", () => {
+    assert.equal(runBrief("14-19-18-912_EST_-0500_2026-11-09"), "14:19:18 2026-11-09")
+    assert.equal(runBrief("20260101T120000Z"), "12:00:00 2026-01-01")
+    assert.equal(runBrief("not-a-run"), "not-a-run")
+    const brief = runBrief("14-19-18-912_EST_-0500_2026-11-09")
+    assert.equal(
+        destructiveQuestion(`run ${brief}`).text,
+        "delete run 14:19:18 2026-11-09? this cannot be undone!",
+    )
 })

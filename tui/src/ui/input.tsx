@@ -14,7 +14,7 @@
 
 import { Box, Text, useWindowSize } from "ink"
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { padWidth, truncate } from "../core/terminal.js"
+import { padWidth, truncate, truncateStart } from "../core/terminal.js"
 import { entryLegend, type LegendItem, legendFor } from "./grid.js"
 import {
     CursorList,
@@ -409,8 +409,12 @@ export function filterChoices<T>(choices: Choice<T>[]): (text: string) => Choice
 // 5. Confirmation
 // ========================================================================================
 
-/** The most cells of the name of what is deleted that the question shows. */
-const maxWhatCells = 24
+/**
+ * The most cells of what is deleted that the question shows: with `delete ` and the
+ * warning the whole question is 58 cells, which fits the note row of every footer at
+ * 80 columns.
+ */
+const maxWhatCells = 27
 
 /**
  * A question: what is asked and what its two answers do. The note line shows only the
@@ -517,13 +521,18 @@ export function useDiscardGuard(
  * custom solute, a model). Every such removal asks exactly this, and
  * nothing is removed without it, so the wording is in one place.
  *
- * @param what - what is about to go, e.g. `project demo`; cut at 24 cells (with `…`) so
- *     the warning behind it is never the part that does not fit.
+ * @param what - what is about to go, `<kind> <name>` (e.g. `project demo`); only the
+ *     name (user data) is cut, from its start (`…ram1`), when the two do not fit
+ *     [[maxWhatCells]], so the warning behind it is never the part that does not fit.
  * @returns the question, for [[Confirm.ask]]; the note is just its text, the keys that
  *     answer it are in the legend.
  */
 export function destructiveQuestion(what: string): Question {
-    const text = `delete ${truncate(what, maxWhatCells)}? this cannot be undone!`
+    const at = what.indexOf(" ")
+    const kind = at < 0 ? "" : what.slice(0, at + 1)
+    const name = at < 0 ? what : what.slice(at + 1)
+    const shown = `${kind}${truncateStart(name, Math.max(4, maxWhatCells - kind.length))}`
+    const text = `delete ${shown}? this cannot be undone!`
     return { text, yes: "delete", no: "keep" }
 }
 

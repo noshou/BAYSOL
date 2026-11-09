@@ -18,7 +18,6 @@ import {
     sigmaCell,
     zCell,
 } from "../src/screens/custom-solutes.js"
-import { viewerLegend } from "../src/screens/logs-viewer.js"
 import {
     bufferLandingOptions,
     customLandingOptions,
@@ -29,7 +28,7 @@ import {
     narrow,
     numberRules,
     parseSetting,
-    pickColour,
+    pickValue,
     plural,
     recipeChoice,
     replaceBufferQuestion,
@@ -45,6 +44,7 @@ import {
 } from "../src/screens/screen-rules.js"
 import { fileStatus } from "../src/screens/settings-screens.js"
 import { draftOf, soluteProblem } from "../src/screens/solutes.js"
+import { legendExtraRows, viewerFullLegend, viewerLegend } from "../src/screens/viewer.js"
 import { type BufferRow, rowProblem } from "../src/store/buffer.js"
 import { blankNonbio, type NonbioEntry } from "../src/store/custom.js"
 import { blankPolymer, type PolymerEntry } from "../src/store/polymers.js"
@@ -129,9 +129,23 @@ test("narrow: prefix first, then inside, case-insensitive", () => {
 })
 
 test("picker: the highlighted name, or a typed hex colour that wins", () => {
-    assert.deepEqual(pickColour("gr", "gray"), { value: "gray" })
-    assert.deepEqual(pickColour(" #AB12cd ", "red"), { value: "#ab12cd" })
-    assert.deepEqual(pickColour("zzz", undefined), { error: "not a known colour" })
+    const names = ["gray", "red"]
+    assert.deepEqual(pickValue("colour", names, "gr", "gray"), { value: "gray" })
+    assert.deepEqual(pickValue("colour", names, " #AB12cd ", "red"), { value: "#ab12cd" })
+    assert.deepEqual(pickValue("colour", names, "zzz", undefined), {
+        error: "not a known colour",
+    })
+    // fonts: the highlighted name only, a hex text is no font
+    assert.deepEqual(pickValue("font", ["Alpha"], "al", "Alpha"), { value: "Alpha" })
+    assert.deepEqual(pickValue("font", ["Alpha"], "zz", undefined), {
+        error: "not a known font",
+    })
+    assert.deepEqual(pickValue("font", ["Alpha"], "#ab12cd", undefined), {
+        error: "not a known font",
+    })
+    // no list of fonts on this machine: the text as typed
+    assert.deepEqual(pickValue("font", [], "My Font", undefined), { value: "My Font" })
+    assert.deepEqual(pickValue("font", [], "", undefined), { error: "not a known font" })
 })
 
 test("a font is the text as typed; empty is the default font", () => {
@@ -352,6 +366,10 @@ const facts = {
     hasPlots: true,
     move: all,
     zoom: { in: true, out: true },
+    cells: false,
+    marked: false,
+    hasFormulas: false,
+    matches: false,
 }
 const labels = (f = facts) => viewerLegend(f).map((i) => i.label)
 
@@ -359,6 +377,11 @@ test("the legend lists only keys that work now", () => {
     const one = { ...facts, sheets: 1, active: 0, hasPlots: false }
     assert.deepEqual(labels(one), ["move", "back"])
     assert.deepEqual(labels(), ["next sheet", "prev sheet", "move", "plots", "back"])
+    // the keys are written the way they are pressed
+    const keysOf = (f = facts) => viewerLegend(f).map((i) => `${i.label}=${i.keys}`)
+    assert.ok(keysOf().includes("next sheet=tab"))
+    assert.ok(keysOf().includes("prev sheet=shift+tab"))
+    assert.ok(keysOf({ ...facts, plots: true }).includes("zoom in=shift++"))
     // the first tab has no previous one, the last has no next one
     assert.ok(!labels({ ...facts, active: 0 }).includes("prev sheet"))
     assert.ok(!labels({ ...facts, active: 2 }).includes("next sheet"))
@@ -373,6 +396,39 @@ test("the legend lists only keys that work now", () => {
     assert.ok(!labels({ ...facts, plots: true, zoom: { in: false, out: true } })
         .includes("zoom in"))
     assert.ok(!labels({ ...facts, plots: true, hasPlots: false }).includes("sheets"))
+})
+
+test("sheet keys: find, go to, mark, copy; formulas and matches when they work", () => {
+    const sheets = { ...facts, cells: true }
+    assert.deepEqual(labels(sheets), [
+        "next sheet", "prev sheet", "move", "find", "go to", "mark", "copy",
+        "plots", "back",
+    ])
+    const pressed = (f = sheets) => viewerLegend(f).map((i) => `${i.label}=${i.keys}`)
+    assert.ok(pressed().includes("find=/"))
+    assert.ok(pressed().includes("go to=g"))
+    assert.ok(pressed().includes("mark=␣"))
+    assert.ok(pressed().includes("copy=c"))
+    const more = { ...sheets, hasFormulas: true, matches: true, marked: true }
+    assert.ok(pressed(more).includes("formulas=f"))
+    assert.ok(pressed(more).includes("next match=n"))
+    assert.ok(pressed(more).includes("prev match=N"))
+    assert.ok(pressed(more).includes("unmark=␣"))
+    assert.ok(!labels(more).includes("mark"))
+    // the plots mode has none of them
+    assert.ok(!labels({ ...more, plots: true }).includes("find"))
+    // the fullest legend holds them all
+    const full = viewerFullLegend({ hasPlots: true }).map((i) => i.label)
+    const wanted = ["find", "go to", "unmark", "copy", "formulas", "next match"]
+    for (const l of [...wanted, "prev match"]) assert.ok(full.includes(l), l)
+})
+
+test("the fullest viewer legend leaves the grid room at 80x24", () => {
+    // frame 7 + tabs/status 4 + letters 2 + header 2 = 15 rows besides the extra bands;
+    // 78 is the body width of an 80-column terminal: the 12 keys stay in one band
+    const extra = legendExtraRows(viewerFullLegend({ hasPlots: true }), 78, "smooth")
+    assert.equal(extra, 0)
+    assert.ok(24 - 15 - extra >= 8)
 })
 
 // ========================================================================================

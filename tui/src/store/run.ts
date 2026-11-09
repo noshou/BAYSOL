@@ -45,8 +45,9 @@ import {
     settleRun,
     startLockName,
 } from "./projects.js"
-import { referenceFiles, referencesDir } from "./references.js"
-import { firstErrorLine, readLogText } from "./run-logs.js"
+import { migrateReferences, referenceFiles, referencesDir } from "./references.js"
+import { packRun } from "./run-archive.js"
+import { briefError, firstErrorLine, readLogText } from "./run-logs.js"
 import { modelSettingsFile, settingsFile } from "./settings-store.js"
 
 // ========================================================================================
@@ -221,7 +222,7 @@ function snapshotFiles(projectDir: string): [string, string][] {
  * (`settings.json`, `buffer.json`, then `data.tsv` outside `data.json`, the order the data
  * writer locks them in), so a save in progress in another copy is waited for and a copy is
  * never half a file. A project without `settings.json` gets `{}` (the defaults, as Julia
- * does). `model-settings.json` and the files of `references/` are copied too when the
+ * does). `model-settings.json` and the files of `reference-fit/` are copied too when the
  * project has them (Julia copies them itself otherwise, without our locks). The models
  * are not copied: Julia lists them (name, full path, size, sha256) in `models.json` when
  * the run starts.
@@ -252,18 +253,19 @@ export function snapshotInputs(projectDir: string, runDir: string): void {
     })
     // the optional inputs, under their own locks: the per-model settings and the
     // reference curves (the files only; Julia reads them from `logs/` and uses a
-    // `logs/references/` that is there as it is)
+    // `logs/reference-fit/` that is there as it is)
     const models = modelSettingsFile(projectDir)
     lockedIn(projectDir, models, () => {
         if (isFile(models)) copyOver(models, join(logs, "model-settings.json"))
     })
+    migrateReferences(projectDir) // an old `references/` folder gets its new name first
     const references = referencesDir(projectDir)
     lockedIn(projectDir, references, () => {
         const files = referenceFiles(projectDir)
         if (files.length === 0) return
-        mkdirSync(join(logs, "references"), { recursive: true })
+        mkdirSync(join(logs, "reference-fit"), { recursive: true })
         for (const file of files)
-            copyOver(join(references, file), join(logs, "references", file))
+            copyOver(join(references, file), join(logs, "reference-fit", file))
     })
 }
 
@@ -378,8 +380,11 @@ export class OutputTail {
  * The screen only watches a [[RunSession]].
  */
 
-/** What the run is doing: runs, is being stopped, or is over. */
-export type RunPhase = "running" | "aborting" | "done" | "failed" | "aborted"
+/**
+ * What the run is doing: runs, is being stopped, is being packed into its archive (the
+ * process is over; see `run-archive.ts`), or is over.
+ */
+export type RunPhase = "running" | "aborting" | "packing" | "done" | "failed" | "aborted"
 
 /** Whether a phase is an end: the run is over. */
 export const isEnd = (phase: RunPhase): boolean =>
@@ -531,14 +536,16 @@ function appendToLog(runDir: string, text: string): void {
 }
 
 /**
- * The first line of the ERRORS section of a run's `run.LOG`, for the note row of a failed
- * run.
+ * The first error of the ERRORS section of a run's `run.LOG` in a few words, for the note
+ * row of a failed run (`not converged`; this program's own `tui: ...` lines are short
+ * and stay as they are). The whole text stays in `run.LOG`.
  *
  * @returns the line, or `undefined` when the log cannot be read or has no error.
  */
 function failureNote(runDir: string): string | undefined {
     try {
-        return firstErrorLine(readLogText(runDir))
+        const line = firstErrorLine(readLogText(runDir))
+        return line === undefined || line.startsWith("tui: ") ? line : briefError(line)
     } catch {
         return undefined
     }
@@ -587,6 +594,7 @@ export class RunSession {
         private readonly child: ChildProcess,
         id: string,
         project: string,
+        private readonly pack: (runDir: string) => Promise<number>,
     ) {
         this.done = new Promise((resolve) => {
             this.resolveDone = resolve
@@ -612,6 +620,7 @@ export class RunSession {
      * exists; if one fails the folder is marked `failed` and the error is thrown.
      *
      * @param launcher - what starts the child, [[juliaLauncher]] when left out.
+     * @param pack - what packs the run once it is over, [[packRun]] when left out.
      * @throws [[RunInProgressError]] (`a run is in progress (pid N)`), `ProjectGoneError`,
      *     [[FileInUseError]], or the error of a missing input file.
      */
@@ -619,6 +628,7 @@ export class RunSession {
         projectDir: string,
         temperature: number,
         launcher: Launcher = juliaLauncher,
+        pack: (runDir: string) => Promise<number> = packRun,
     ): RunSession {
         const claimed = claimRun(projectDir)
         let child: ChildProcess
@@ -637,7 +647,14 @@ export class RunSession {
             throw error
         }
         const name = projectDir.split(/[\\/]/).filter(Boolean).pop() ?? projectDir
-        const session = new RunSession(projectDir, claimed.dir, child, claimed.id, name)
+        const session = new RunSession(
+            projectDir,
+            claimed.dir,
+            child,
+            claimed.id,
+            name,
+            pack,
+        )
         active.add(session)
         return session
     }
@@ -734,6 +751,15 @@ export class RunSession {
             // stays in run.LOG)
             if (phase === "failed" && note === undefined)
                 note = failureNote(this.runDir)
+            // the packing phase is shown; a pack that fails leaves the folder as it was and
+            // the note says why (the run's own outcome is unchanged)
+            this.update({ phase: "packing", note })
+            try {
+                await this.pack(this.runDir)
+            } catch (error) {
+                const why = error instanceof Error ? error.message : "unknown error"
+                note = `not packed: ${why}`
+            }
             this.update({ phase, note })
         } catch (error) {
             this.update({ phase: "failed", note: (error as Error).message })
@@ -791,6 +817,11 @@ export class RunSession {
         const pid = this.child.pid
         if (pid !== undefined) signalGroup(pid, "SIGKILL")
     }
+}
+
+/** @returns whether a run is going (it has not ended yet). */
+export function hasActiveRuns(): boolean {
+    return active.size > 0
 }
 
 /**

@@ -586,6 +586,7 @@ export function parseSetting(
         raw = sizes.value
     } else if (def.kind === "set") raw = text.split(/\s+/).filter((w) => w !== "")
     else if (def.kind === "font") raw = text.trim() === "" ? def.default : text.trim()
+    else if (def.kind === "path") raw = text.trim()
     else if (def.kind === "tuple") {
         const words = text.split(",").map((w) => w.trim())
         if (words.length !== def.partNames.length)
@@ -616,9 +617,9 @@ export function parseSetting(
     return checked.ok ? { value: checked.value } : { error: checked.error }
 }
 
-// --- colours: a name picked from a list
+// --- colours and fonts: a name picked from a list
 
-/** The longest name typed to narrow a list of colours. */
+/** The longest name typed to narrow a list of colours or fonts. */
 export const maxNameText = 40
 
 /**
@@ -649,22 +650,30 @@ export function indexOfPick(names: readonly string[], name: string): number {
     return Math.max(at, 0)
 }
 
+/** The kinds of setting picked from a list of names. */
+export type ListKind = "colour" | "font"
+
 /**
- * What Enter takes in the colour picker: a colour typed as `#rrggbb`, else the
- * highlighted name.
+ * What Enter takes in a colour or font picker: a colour typed as `#rrggbb`, else the
+ * highlighted name, else (a machine with no list of fonts) the font text as it is.
  *
+ * @param kind - what is picked.
+ * @param names - every name there is (empty for fonts on a machine with no list).
  * @param typed - the text in the field.
  * @param highlighted - the name highlighted in the narrowed list, if any.
  * @returns the value, or what is wrong.
  */
-export function pickColour(
+export function pickValue(
+    kind: ListKind,
+    names: readonly string[],
     typed: string,
     highlighted: string | undefined,
 ): { value: string } | { error: string } {
     const text = typed.trim()
-    if (hexText.test(text)) return { value: text.toLowerCase() }
+    if (kind === "colour" && hexText.test(text)) return { value: text.toLowerCase() }
     if (highlighted !== undefined) return { value: highlighted }
-    return { error: "not a known colour" }
+    if (kind === "font" && names.length === 0 && text !== "") return { value: text }
+    return { error: kind === "colour" ? "not a known colour" : "not a known font" }
 }
 
 // --- what a sheet shows
@@ -709,6 +718,7 @@ export function valueText(def: SettingDef, value: SettingValue): string {
     if (def.kind === "sizes")
         return (value as number[][]).map(([w, h]) => `${w}x${h}`).join(", ")
     if (def.kind === "tuple") return tupleParts(def, value).join(", ")
+    if (def.kind === "path" && value === "") return "(default)"
     return String(value)
 }
 

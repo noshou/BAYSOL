@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { Box, Text, useApp, useWindowSize } from "ink"
-import { type ReactNode, useState } from "react"
+import { type ReactNode, useRef, useState } from "react"
 import { appDir } from "./core/environment.js"
 import { MainMenu } from "./screens/menus.js"
-import { quitAll } from "./store/run.js"
+import { hasActiveRuns, quitAll } from "./store/run.js"
 import { readThemeName, writeThemeName } from "./store/settings-store.js"
 import { ThemePicker } from "./ui/input.js"
 import { keys, minColumns, minRows, NavProvider, useKeys } from "./ui/interaction.js"
@@ -51,15 +51,25 @@ export function App(): ReactNode {
         if (press.is(keys.theme)) setPicking(true)
     }, !picking)
 
-    // Ctrl-C and Ctrl-D end the program from anywhere (with `q` in the main menu they are
-    // the only exits; Esc never quits). One handler, always on: a run that is going is
-    // aborted first (its Julia stopped, its status written, its logs packed), then the
-    // program leaves; a second press while that happens asks for the same thing again.
+    // Ctrl-C and Ctrl-D (with `q` in the main menu the only exits; Esc never quits). While
+    // a run is going the first press only stops the run (its Julia stopped, its status
+    // written, its logs packed) and the screen stays; the next press, while that happens
+    // or once the run is over, ends the program.
+    const stopping = useRef(false)
     useKeys((press) => {
-        if (press.is(keys.interrupt) || press.is(keys.eof))
+        if (!(press.is(keys.interrupt) || press.is(keys.eof))) return
+        if (hasActiveRuns() && !stopping.current) {
+            stopping.current = true
             void quitAll(press.label)
                 .catch(() => {})
-                .finally(exit)
+                .finally(() => {
+                    stopping.current = false
+                })
+            return
+        }
+        void quitAll(press.label)
+            .catch(() => {})
+            .finally(exit)
     })
 
     /** Uses a theme from now on, and remembers it. */

@@ -23,7 +23,15 @@ import { appDir, readSystem } from "../core/environment.js"
 import { pick } from "../core/file-system.js"
 import { formatNumber, parseNumber } from "../core/terminal.js"
 import { AddFlow } from "../store/add-flow.js"
-import { type AddEvent, type AddKind, basisNote, type DoneStep, type FlowStep, paramsCell, rowNote } from "../store/add-state.js"
+import {
+    type AddEvent,
+    type AddKind,
+    basisNote,
+    type DoneStep,
+    type FlowStep,
+    paramsCell,
+    rowNote,
+} from "../store/add-state.js"
 import {
     type BufferRow,
     type Conditions,
@@ -38,7 +46,21 @@ import {
     type Row,
     rowValue,
 } from "../store/lists.js"
-import { bufferRow, COLUMNS, type ConcUnit, concUnit, type EditField, firstProblem, formatConc, NO_MATCH, nextConcUnit, type RowProblem, rowOf, type Solute, soluteOf } from "../store/solutes.js"
+import {
+    bufferRow,
+    COLUMNS,
+    type ConcUnit,
+    concUnit,
+    type EditField,
+    firstProblem,
+    formatConc,
+    NO_MATCH,
+    nextConcUnit,
+    type RowProblem,
+    rowOf,
+    type Solute,
+    soluteOf,
+} from "../store/solutes.js"
 import { Frame } from "../ui/frame.js"
 import { type LegendItem, legendFor } from "../ui/grid.js"
 import {

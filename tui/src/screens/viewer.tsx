@@ -1,56 +1,49 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// The file viewer of the logs (a workbook or a delimited file, with its plots text behind
-// `^p`), its legends, and `open runs`, the screen of the project menu that leads to it
-// (with the pager of a run's `run.LOG`).
+// The read-only file viewer (a workbook or a delimited file, with its plots text behind
+// `^p`) and its legends. `open-runs.tsx` is the screen that leads to it.
 //
 // Contents:
 //   1. The viewer legend: the sheet legend and the rows its fullest legend needs
 //   2. `SheetViewerScreen`: the read-only viewer of a workbook, a table file or plots
-//   3. `OpenRuns`: the runs of a project and the viewer on a done model
 
 import { readFileSync, statSync } from "node:fs"
-import { basename } from "node:path"
+import { basename, relative, sep } from "node:path"
 import { Box, Text, useWindowSize } from "ink"
-import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useState } from "react"
-import { LOGS_FLOW } from "../core/environment.js"
-import { isFolder } from "../core/file-system.js"
-import { displayWidth, padWidth, truncate } from "../core/terminal.js"
-import { liveRun, type ProjectRef, runDisplay } from "../store/projects.js"
+import { Fragment, type ReactNode, useMemo, useState } from "react"
+import { isFile } from "../core/file-system.js"
+import { displayWidth, padWidth, truncate, writeTerminal } from "../core/terminal.js"
+import { readRunText } from "../store/run-archive.js"
+import type { PlotFile } from "../store/run-logs.js"
 import {
-    deleteRun,
-    listOpenRuns,
-    type OpenModel,
-    type OpenRow,
-    type OpenRun,
-    openRows,
-    type PlotFile,
-    RUN_GONE,
-    readLogText,
-} from "../store/run-logs.js"
-import {
+    type CellAt,
+    type CopyWhat,
     cellRef,
-    clampTop,
+    clipboardSequence,
     columnLabel,
+    copyText,
+    findCells,
     firstShown,
     fitCount,
-    lastTop,
+    fitWidths,
     looksNumeric,
+    matchFrom,
+    matchIndex,
+    matchStep,
     openWorkbook,
     type Plot,
-    pagerLines,
-    pagerStatus,
-    pageTop,
+    parseJump,
     pickPlotFile,
     plotWidth,
     type Sheet,
+    shownCells,
     sliceCells,
     splitPlots,
     VIEWER_LIMITS,
     ViewerFileError,
     type Workbook,
 } from "../store/view.js"
-import { cornerLabel, Frame, footerExtraLines } from "../ui/frame.js"
+import { Frame, footerExtraLines } from "../ui/frame.js"
 import {
     type Design,
     type LegendItem,
@@ -59,19 +52,15 @@ import {
     legendOf,
     moveLegend,
 } from "../ui/grid.js"
-import { destructiveQuestion, questionLegend, useConfirm } from "../ui/input.js"
+import { Prompt } from "../ui/input.js"
 import {
-    CursorList,
     clampWindow,
     type KeyInput,
     keys,
-    ListText,
     scrollWindow,
     useBodyColumns,
-    useBodyRows,
     useKeys,
     useNav,
-    useScreenActive,
 } from "../ui/interaction.js"
 import { Bar, linesOf, Panel, Rule, useTheme } from "../ui/theme.js"
 
@@ -89,15 +78,19 @@ const BASE_LEGEND_LINES = 3
  * @param base - what the workbook has: how many tabs, a plots file.
  * @returns the items.
  */
-function viewerFullLegend(base: { hasPlots: boolean }): LegendItem[] {
+export function viewerFullLegend(base: { hasPlots: boolean }): LegendItem[] {
     const all = { up: true, down: true, left: true, right: true }
     return viewerLegend({
         ...base,
-        plots: true,
+        plots: false,
         sheets: 3,
         active: 1,
         move: all,
         zoom: { in: true, out: true },
+        cells: true,
+        marked: true,
+        hasFormulas: true,
+        matches: true,
     })
 }
 
@@ -111,7 +104,7 @@ function viewerFullLegend(base: { hasPlots: boolean }): LegendItem[] {
  * @param design - the page's design: a blocky footer's box adds its two rows.
  * @returns the rows, 0 when the keys fit one band (smooth).
  */
-function legendExtraRows(
+export function legendExtraRows(
     items: readonly LegendItem[],
     columns: number,
     design: Design,
@@ -129,6 +122,10 @@ function legendExtraRows(
  * @property hasPlots - a plots file is there (the `^p` key works).
  * @property move - which arrows can move now (an edge has none past it).
  * @property zoom - whether a larger (`in`) or smaller (`out`) plot size exists.
+ * @property cells - a sheet is shown (sheets mode): find, go to, mark and copy work.
+ * @property marked - a range is marked (`mark` becomes `unmark`).
+ * @property hasFormulas - the sheet has formulas (`f` works).
+ * @property matches - a search found cells (`n` and shift+`n` work).
  */
 export type ViewerFacts = {
     plots: boolean
@@ -137,6 +134,10 @@ export type ViewerFacts = {
     hasPlots: boolean
     move: { up: boolean; down: boolean; left: boolean; right: boolean }
     zoom: { in: boolean; out: boolean }
+    cells: boolean
+    marked: boolean
+    hasFormulas: boolean
+    matches: boolean
 }
 
 /**
@@ -156,11 +157,20 @@ export function viewerLegend(facts: ViewerFacts): LegendItem[] {
             facts.zoom.out && legendFor("zoom out", keys.zoomOut),
         ]
         : []
+    const on = facts.cells && !facts.plots
+    // the order puts the keys in columns of three that fit one band at 80 columns
     return legendOf([
         next,
         prev,
         move,
         ...zoom,
+        on && legendFor("find", keys.find),
+        on && legendFor("go to", keys.jump),
+        on && legendFor(facts.marked ? "unmark" : "mark", keys.space),
+        on && facts.matches && legendFor("next match", keys.nextMatch),
+        on && facts.matches && legendFor("prev match", keys.prevMatch),
+        on && facts.hasFormulas && legendFor("formulas", keys.formulas),
+        on && legendFor("copy", keys.copy),
         facts.hasPlots && legendFor(facts.plots ? "sheets" : "plots", keys.plots),
         legendBack,
     ])
@@ -198,10 +208,18 @@ type Pos = { row: number; column: number; top: number; left: number }
 /** Where a plot is scrolled to. */
 type PlotPos = { top: number; left: number }
 
-/** The plots file read: its plots, or none (missing, unreadable, empty, no plot in it). */
-function readPlots(path: string | undefined): Plot[] {
+/**
+ * The plots file read: its plots, or none (missing, unreadable, empty, no plot in it). The
+ * file is read from its plain place or, for a packed run, from the run's archive (`runDir`
+ * is the run folder the path is in); nothing is extracted to disk.
+ */
+export function readPlots(path: string | undefined, runDir: string | undefined): Plot[] {
     if (path === undefined || path === "") return []
     try {
+        if (runDir !== undefined && !isFile(path)) {
+            const rel = relative(runDir, path).split(sep).join("/")
+            return splitPlots(readRunText(runDir, rel, VIEWER_LIMITS.maxBytes))
+        }
         if (statSync(path).size > VIEWER_LIMITS.maxBytes) return []
         return splitPlots(readFileSync(path, "utf-8"))
     } catch {
@@ -266,21 +284,25 @@ function TabBar(props: {
  *     tallest plot): the largest that fits the panel is shown and picked again when the
  *     window changes, the plot tab kept; `plotsPath` is the fallback (and for a caller
  *     with no sizes the only file).
+ * @param props.runDir - the run folder the plots files are in: a plots file that is not on
+ *     disk is read from its archive (`run.7z`).
  * @param props.title - the title of the screen, `view` when left out.
  * @param props.design - `"blocky"` (the logs pages) or `"smooth"` (`open runs`, default).
  * @param props.corner - the text at the top right of the title row; none when left out.
  * @returns the screen.
  */
-function SheetViewerScreen(props: {
+export function SheetViewerScreen(props: {
     workbookPath: string
     plotsPath?: string
     plotFiles?: PlotFile[]
+    runDir?: string
     title?: string
     subtitle?: string
-    corner?: string
+    corner?: string | readonly string[]
     design?: Design
 }): ReactNode {
     const { workbookPath, plotsPath, plotFiles = [], title = "view", corner } = props
+    const { runDir } = props
     const { subtitle: subtitleProp } = props
     const { design = "smooth" } = props
     const border = linesOf(design)
@@ -344,9 +366,11 @@ function SheetViewerScreen(props: {
     const picked = pickedAt === undefined ? undefined : plotFiles[pickedAt]
     const pickedPath = picked?.path
     const plots = useMemo(() => {
-        const sized = readPlots(pickedPath)
-        return sized.length > 0 || pickedPath === undefined ? sized : readPlots(plotsPath)
-    }, [pickedPath, plotsPath])
+        const sized = readPlots(pickedPath, runDir)
+        return sized.length > 0 || pickedPath === undefined
+            ? sized
+            : readPlots(plotsPath, runDir)
+    }, [pickedPath, plotsPath, runDir])
 
     // ---- state
     const [mode, setMode] = useState<"sheets" | "plots">("sheets")
@@ -357,6 +381,13 @@ function SheetViewerScreen(props: {
     const [plotPositions, setPlotPositions] = useState<Record<number, PlotPos>>({})
     const [note, setNote] = useState<{ text: string; error: boolean } | undefined>()
     const say = (text: string, error = false) => setNote({ text, error })
+    // find, jump, mark, copy and formulas (sheets mode)
+    const [asking, setAsking] = useState<"find" | "jump" | undefined>()
+    const [askKeys, setAskKeys] = useState<LegendItem[]>([])
+    const [search, setSearch] = useState("")
+    const [mark, setMark] = useState<{ tab: number; at: CellAt } | undefined>()
+    const [copying, setCopying] = useState(false)
+    const [showFormulas, setShowFormulas] = useState(false)
 
     const book = "book" in opened ? opened.book : undefined
     const names = mode === "plots" ? plots.map((p) => p.title) : (book?.names ?? [])
@@ -375,6 +406,29 @@ function SheetViewerScreen(props: {
 
     const cursor: Pos = positions[tab] ?? { row: 0, column: 0, top: 0, left: 0 }
 
+    // what the cells show (a formula's text with `f`) and what the search finds in it
+    const hasFormulas = sheet?.formulas !== undefined
+    const formulasOn = showFormulas && hasFormulas
+    const texts = useMemo(
+        () => (sheet ? shownCells(sheet, formulasOn) : []),
+        [sheet, formulasOn],
+    )
+    const found = useMemo(() => findCells(texts, search), [texts, search])
+    const foundKeys = useMemo(
+        () => new Set(found.map((m) => `${m.row}:${m.column}`)),
+        [found],
+    )
+    const foundAt = matchIndex(found, cursor.row, cursor.column)
+    const range =
+        mark !== undefined && mark.tab === tab
+            ? {
+                r0: Math.min(mark.at.row, cursor.row),
+                r1: Math.max(mark.at.row, cursor.row),
+                c0: Math.min(mark.at.column, cursor.column),
+                c1: Math.max(mark.at.column, cursor.column),
+            }
+            : undefined
+
     // ---- the legend: the keys that work now, in as many bands as the width needs; the
     // footer reserves the height of the fullest one (`legendFull`), so it never moves
     const fullLegend = viewerFullLegend({ hasPlots: plots.length > 0 })
@@ -392,7 +446,14 @@ function SheetViewerScreen(props: {
     )
     const rowWidth = String(sheet?.rows ?? 1).length
     const gutter = rowWidth + 2
-    const widths = sheet?.widths ?? []
+    const formulaWidths = useMemo(
+        () =>
+            sheet && formulasOn
+                ? fitWidths(texts, sheet.columns, VIEWER_LIMITS)
+                : undefined,
+        [sheet, formulasOn, texts],
+    )
+    const widths = formulaWidths ?? sheet?.widths ?? []
     const sizes = widths.map((w) => w + COLUMN_EXTRA)
     const room = innerWidth - gutter
     const firstBody = sheet?.header ? 1 : 0
@@ -451,7 +512,17 @@ function SheetViewerScreen(props: {
                     right: sheet !== undefined && cursor.column < sheet.columns - 1,
                 },
         zoom: { in: sizeAt >= 0 && sizeAt < bySize.length - 1, out: sizeAt > 0 },
+        cells: sheet !== undefined && sheet.rows > 0,
+        marked: range !== undefined,
+        hasFormulas,
+        matches: found.length > 0,
     })
+    const copyLegend = legendOf([
+        legendFor("cell", keys.copy),
+        legendFor("row", keys.copyRow),
+        legendFor("column", keys.copyColumn),
+        legendFor("cancel", keys.escape),
+    ])
 
     // ---- moves in the sheet
     /** Puts the cursor on a cell, keeping it in view, and forgets nothing else. */
@@ -474,12 +545,57 @@ function SheetViewerScreen(props: {
         const next = Math.min(Math.max(to, 0), names.length - 1)
         if (mode === "plots") setPlotTab(next)
         else setTab(next)
+        setMark(undefined)
         setTabFirst(0)
+    }
+
+    /** Copies what was asked through the terminal and says what went. */
+    const copy = (what: CopyWhat) => {
+        const out = copyText(texts, what)
+        if ("error" in out) return say(out.error, true)
+        if (!writeTerminal(clipboardSequence(out.text))) return say("no terminal", true)
+        setMark(undefined)
+        say(out.note)
+    }
+
+    /** Puts the cursor on a match (the search found some) and says where it is. */
+    const goToMatch = (at: number | undefined, list: readonly CellAt[] = found) => {
+        const m = at === undefined ? undefined : list[at]
+        if (m === undefined) return say("no match")
+        place(m.row, m.column)
+    }
+
+    /** `/` took a text: an empty one ends the search. */
+    const submitFind = (text: string) => {
+        setAsking(undefined)
+        setSearch(text)
+        if (text === "") return
+        const list = findCells(texts, text)
+        goToMatch(matchFrom(list, cursor.row, cursor.column), list)
+    }
+
+    /** `g` took a cell, a row or a column. */
+    const submitJump = (text: string) => {
+        setAsking(undefined)
+        if (sheet === undefined) return
+        const to = parseJump(text, cursor, sheet.rows, sheet.columns)
+        if ("error" in to) return say(to.error, true)
+        place(to.row, to.column)
     }
 
     // ---- keys
     useKeys((press: KeyInput) => {
         setNote(undefined)
+        if (copying) {
+            setCopying(false)
+            if (sheet === undefined) return
+            const here = { row: cursor.row, column: cursor.column }
+            if (press.is(keys.copy)) copy({ kind: "range", from: here, to: here })
+            else if (press.is(keys.copyRow)) copy({ kind: "row", row: cursor.row })
+            else if (press.is(keys.copyColumn))
+                copy({ kind: "column", column: cursor.column })
+            return
+        }
         if (press.is(keys.back)) return nav.depth > 1 ? nav.pop() : nav.quit()
         if (press.is(keys.plots)) {
             if (plots.length === 0) return say("no plots")
@@ -491,7 +607,8 @@ function SheetViewerScreen(props: {
             return switchTab(active - 1)
         if (active < names.length - 1 && (press.is(keys.tab) || press.is(keys.nextSheet)))
             return switchTab(active + 1)
-        if (mode === "plots" && press.is(keys.zoomIn) && zoomTo(+1)) return
+        const zoomIn = press.is(keys.zoomIn) || press.is(keys.zoomInAlt)
+        if (mode === "plots" && zoomIn && zoomTo(+1)) return
         if (mode === "plots" && press.is(keys.zoomOut) && zoomTo(-1)) return
         if (mode === "plots") {
             if (press.is(keys.up)) scrollPlot(-1, 0)
@@ -506,6 +623,31 @@ function SheetViewerScreen(props: {
         }
         if (sheet === undefined) return
         const { row, column } = cursor
+        if (press.is(keys.escape) && range !== undefined) return setMark(undefined)
+        if (sheet.rows > 0) {
+            if (press.is(keys.find)) return setAsking("find")
+            if (press.is(keys.jump)) return setAsking("jump")
+            if (press.is(keys.space))
+                return setMark(range ? undefined : { tab, at: { row, column } })
+            if (press.is(keys.copy)) {
+                if (range === undefined) return setCopying(true)
+                return copy({
+                    kind: "range",
+                    from: { row: range.r0, column: range.c0 },
+                    to: { row: range.r1, column: range.c1 },
+                })
+            }
+            if (press.is(keys.formulas)) {
+                if (!hasFormulas) return say("no formulas here")
+                return setShowFormulas((v) => !v)
+            }
+            // shift+n is tested first: a plain `n` matches either press
+            if (press.is(keys.prevMatch) || press.is(keys.nextMatch)) {
+                if (search === "") return say("nothing searched: press /")
+                const dir = press.is(keys.prevMatch) ? -1 : 1
+                return goToMatch(matchStep(found, row, column, dir))
+            }
+        }
         if (press.is(keys.up)) place(row - 1, column)
         else if (press.is(keys.down)) place(row + 1, column)
         else if (press.is(keys.left)) place(row, column - 1)
@@ -514,7 +656,7 @@ function SheetViewerScreen(props: {
         else if (press.is(keys.pageDown)) place(row + pageRows, column)
         else if (press.is(keys.home)) place(row, 0)
         else if (press.is(keys.end)) place(row, sheet.columns - 1)
-    })
+    }, asking === undefined)
 
     // ---- drawing
     const subtitle = [subtitleProp, mode === "plots" ? "plots" : undefined]
@@ -524,16 +666,23 @@ function SheetViewerScreen(props: {
     /** One cell: the text cut to its column, in the colour its state gives. */
     const cellView = (r: number, c: number, bold: boolean): ReactNode => {
         const w = widths[c] as number
-        const raw = (sheet as Sheet).cells[r]?.[c] ?? ""
+        const raw = texts[r]?.[c] ?? ""
         const cut = truncate(raw, w)
         const pad = " ".repeat(Math.max(0, w - displayWidth(cut)))
         const text = looksNumeric(raw) ? pad + cut : padWidth(cut, w)
         const here = r === cursor.row && c === cursor.column
+        const marked =
+            range !== undefined &&
+            r >= range.r0 &&
+            r <= range.r1 &&
+            c >= range.c0 &&
+            c <= range.c1
         return (
             <Text
                 bold={bold || here}
-                color={here ? theme.bg : theme.fg}
-                backgroundColor={here ? theme.fg : undefined}
+                underline={foundKeys.has(`${r}:${c}`)}
+                color={here || marked ? theme.bg : theme.fg}
+                backgroundColor={here ? theme.fg : marked ? theme.mt : undefined}
             >
                 {` ${text} `}
             </Text>
@@ -573,6 +722,17 @@ function SheetViewerScreen(props: {
             `${cellRef(cursor.row, cursor.column)} · ` +
                 `row ${cursor.row + 1} / ${sheet.fullRows}`,
         ]
+        if (search !== "" && sheet.rows > 0)
+            parts.push(
+                foundAt === undefined
+                    ? `${found.length} matches`
+                    : `match ${foundAt + 1} / ${found.length}`,
+            )
+        if (range !== undefined)
+            parts.push(
+                `range ${cellRef(range.r0, range.c0)}:${cellRef(range.r1, range.c1)}`,
+            )
+        if (formulasOn) parts.push("formulas")
         if (sheet.fullRows > sheet.rows || sheet.fullColumns > sheet.columns)
             parts.push(
                 `cut: ${sheet.rows} of ${sheet.fullRows} rows, ` +
@@ -587,7 +747,9 @@ function SheetViewerScreen(props: {
             : loaded !== undefined && "error" in loaded
                 ? loaded.error
                 : undefined
-    const shownNote = note ?? (failure ? { text: failure, error: true } : undefined)
+    const shownNote = copying
+        ? { text: "copy: cell (c), row (r), column (l)?", error: false }
+        : (note ?? (failure ? { text: failure, error: true } : undefined))
 
     return (
         <Frame
@@ -595,7 +757,7 @@ function SheetViewerScreen(props: {
             title={title}
             subtitle={subtitle}
             corner={corner}
-            legend={legend}
+            legend={asking ? askKeys : copying ? copyLegend : legend}
             legendFull={fullLegend}
             note={shownNote?.text}
             noteIsError={shownNote?.error}
@@ -660,428 +822,22 @@ function SheetViewerScreen(props: {
                     </>
                 )}
                 <Box flexGrow={1} />
-                <Text color={theme.mt} wrap="truncate-end">{status}</Text>
-            </Panel>
-        </Frame>
-    )
-}
-
-// ========================================================================================
-// 3. Open runs
-// ========================================================================================
-
-// `open... > open runs` of the project menu: the runs and their models, the viewer above on
-// a model's results, `^r` to delete a run and `l` to read its `run.LOG`.
-
-/** The keys `OpenRuns` can ever show: the frame reserves their height. */
-const OPEN_FULL: LegendItem[] = [
-    legendFor("move", [keys.up, keys.down]),
-    legendFor("open", keys.enter),
-    legendFor("run.LOG", keys.showLog),
-    legendFor("delete run", keys.remove),
-    legendBack,
-]
-
-/** The key of a selectable row: a model or the comparison of a run, or a run with none. */
-const rowKey = (row: OpenRow): string =>
-    row.kind === "run"
-        ? row.run.id
-        : `${row.run.id}/${row.kind === "compare" ? "\0" : ""}${row.model.name}`
-
-/**
- * What Enter on a model that has no workbook says: why there is nothing to open.
- *
- * @param model - the model.
- * @returns the note, short.
- */
-export function noWorkbookNote(model: OpenModel): string {
-    if (model.state === "running" || model.state === "pending")
-        return `${model.name} is still running`
-    if (model.state === "failed")
-        return model.error ? `${model.name} failed: ${model.error}` : `${model.name} failed`
-    if (model.state === "done") return `${model.name} has no workbook`
-    return `${model.name} was ${model.state}: no workbook`
-}
-
-/**
- * The text of a row of the open-runs list. A heading is the run (`stamp  status`); a
- * model row is `model  status`, indented under its run, or with its run in front when it
- * is the run's only model.
- *
- * @param row - the row.
- * @param stampWidth - the width of the run column (a long zone label widens it).
- * @returns the text before the status, and the status.
- */
-export function openRowText(
-    row: OpenRow,
-    stampWidth: number = LOGS_FLOW.list.stampWidth,
-): { text: string; status: string } {
-    if (row.kind === "run") return { text: runDisplay(row.run.id), status: row.run.state }
-    // a model that has settings of its own is marked
-    const label = row.model.name + (row.model.overrides.length > 0 ? " *" : "")
-    const name = row.nested
-        ? `  ${label}`
-        : `${(row.kind === "compare" ? "" : runDisplay(row.run.id)).padEnd(stampWidth)} ` +
-            label
-    return { text: name, status: row.model.state }
-}
-
-/** The keys of the pager, fullest first (the frame reserves their height). */
-const pageNext = legendFor("next page", keys.enter, keys.space, keys.pageDown)
-const pagePrev = legendFor("previous page", keys.pageBack, keys.pageUp)
-const PAGER_FULL: LegendItem[] = [
-    pageNext,
-    pagePrev,
-    legendFor("move", [keys.up, keys.down, keys.left, keys.right]),
-    legendFor("close", keys.escape, keys.back),
-]
-
-/** The rows of the pager's panel that are not text: its borders and the status line. */
-const PAGER_CHROME_ROWS = 3
-
-/** The columns the pager's panel gives up: its two border columns and the padding. */
-const PAGER_CHROME_COLUMNS = 4
-
-/**
- * Watches the folder of a run for a page that shows it: another copy of the program may
- * delete the run while the page is open. Only the page on top looks (every
- * `watch.pollSeconds`, and at once when a page comes back to the top). When the folder is
- * gone the hook reports it; the page shows `this run was deleted` and the hook closes it
- * after `watch.closeSeconds` (or at any key), so nothing crashes and nothing stays on
- * screen.
- *
- * @param runDir - the run folder.
- * @returns `true` once the folder was found gone.
- */
-export function useRunWatch(runDir: string): boolean {
-    const nav = useNav()
-    const active = useScreenActive()
-    const [gone, setGone] = useState(false)
-
-    useEffect(() => {
-        if (!active) return
-        const look = (): void => {
-            if (!isFolder(runDir)) setGone(true)
-        }
-        look()
-        const timer = setInterval(look, LOGS_FLOW.watch.pollSeconds * 1000)
-        return () => clearInterval(timer)
-    }, [active, runDir])
-
-    useEffect(() => {
-        if (!gone || !active) return
-        const timer = setTimeout(nav.pop, LOGS_FLOW.watch.closeSeconds * 1000)
-        return () => clearTimeout(timer)
-    }, [gone, active, nav.pop])
-
-    // any key closes it sooner; the keys of the page itself are off while it is gone
-    useKeys(() => nav.pop(), gone)
-    return gone
-}
-
-/**
- * The read-only pager of the program, ONE for every text of a run: its `run.LOG` (`l` in
- * `open runs`) and every view of the logs menu. Enter, Space and PgDn page down, `b` and
- * PgUp page up, the arrows move a line (or sideways, for the wide lines of a plot), Home
- * and End jump, Esc closes. The text is read once; a refusal (no file, too large, deleted)
- * is the note, and a run deleted while the page is open closes it with
- * `this run was deleted`.
- *
- * @param props.title - the title of the screen (`open`, `logs`).
- * @param props.subtitle - what is shown (`run.LOG`, `settings.json`).
- * @param props.corner - the corner text (`cornerLabel`).
- * @param props.runDir - the run folder, watched for its deletion.
- * @param props.design - `"blocky"` on the logs pages, `"smooth"` (default) in `open runs`.
- * @param props.load - reads the text (it may throw: the message is the note).
- * @returns the screen.
- */
-export function TextPager(props: {
-    title: string
-    subtitle: string
-    corner: string
-    runDir: string
-    load: () => string
-    design?: Design
-}): ReactNode {
-    const { title, subtitle, corner, runDir, load, design = "smooth" } = props
-    const nav = useNav()
-    const theme = useTheme()
-    const columns = useBodyColumns()
-    const gone = useRunWatch(runDir)
-    const panel = design === "blocky" ? "double" : "round"
-    const [top, setTop] = useState(0)
-    const [left, setLeft] = useState(0)
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `load` is read once per page
-    const loaded = useMemo((): { lines: string[] } | { error: string } => {
-        try {
-            return { lines: pagerLines(load(), LOGS_FLOW.pager.tabWidth) }
-        } catch (error) {
-            const why = error instanceof Error ? error.message : "cannot read the file"
-            return { error: why }
-        }
-    }, [runDir])
-    const lines = "lines" in loaded ? loaded.lines : []
-    const pageRows = Math.max(
-        1,
-        useBodyRows(legendExtraRows(PAGER_FULL, columns, design)) - PAGER_CHROME_ROWS,
-    )
-    const width = Math.max(1, columns - PAGER_CHROME_COLUMNS)
-    const widest = useMemo(
-        () => lines.reduce((m, l) => Math.max(m, displayWidth(l)), 0),
-        [lines],
-    )
-    const maxLeft = Math.max(0, widest - width)
-    const shownTop = clampTop(top, lines.length, pageRows)
-    const shownLeft = Math.min(left, maxLeft)
-    const canDown = shownTop < lastTop(lines.length, pageRows)
-    const canUp = shownTop > 0
-
-    useKeys((press) => {
-        if (gone) return
-        const page = (down: boolean): void =>
-            setTop(pageTop(shownTop, lines.length, pageRows, LOGS_FLOW.pager.overlap, down))
-        if (press.is(keys.escape) || press.is(keys.back)) nav.pop()
-        else if (press.is(keys.enter) || press.is(keys.space) || press.is(keys.pageDown))
-            page(true)
-        else if (press.is(keys.pageBack) || press.is(keys.pageUp)) page(false)
-        else if (press.is(keys.down)) setTop(clampTop(shownTop + 1, lines.length, pageRows))
-        else if (press.is(keys.up)) setTop(clampTop(shownTop - 1, lines.length, pageRows))
-        else if (press.is(keys.home)) setTop(0)
-        else if (press.is(keys.end)) setTop(lastTop(lines.length, pageRows))
-        else if (press.is(keys.right))
-            setLeft(Math.min(shownLeft + LOGS_FLOW.pager.sideStep, maxLeft))
-        else if (press.is(keys.left))
-            setLeft(Math.max(shownLeft - LOGS_FLOW.pager.sideStep, 0))
-    })
-
-    const error = gone ? RUN_GONE : "error" in loaded ? loaded.error : undefined
-    return (
-        <Frame
-            design={design}
-            title={title}
-            subtitle={subtitle}
-            corner={corner}
-            legend={legendOf([
-                canDown && pageNext,
-                canUp && pagePrev,
-                moveLegend({
-                    up: canUp,
-                    down: canDown,
-                    left: shownLeft > 0,
-                    right: shownLeft < maxLeft,
-                }),
-                legendFor("close", keys.escape, keys.back),
-            ])}
-            legendFull={PAGER_FULL}
-            note={error}
-            noteIsError={error !== undefined}
-        >
-            <Panel style={panel} paddingX={1} flexDirection="column" flexGrow={1}>
-                {lines.slice(shownTop, shownTop + pageRows).map((line, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: a line is its place
-                    <Text key={shownTop + i} color={theme.fg} wrap="truncate">
-                        {sliceCells(line, shownLeft, width) || " "}
+                {asking ? (
+                    <Prompt
+                        label={asking === "find" ? "find:" : "go to:"}
+                        initial={asking === "find" ? search : ""}
+                        maxLength={VIEWER_LIMITS.maxColumnWidth * 2}
+                        take={asking === "find" ? "find" : "go"}
+                        onLegend={setAskKeys}
+                        onSubmit={asking === "find" ? submitFind : submitJump}
+                        onCancel={() => setAsking(undefined)}
+                    />
+                ) : (
+                    <Text color={theme.mt} wrap="truncate-end">
+                        {status}
                     </Text>
-                ))}
-                <Box flexGrow={1} />
-                <Text color={theme.mt} wrap="truncate-end">
-                    {pagerStatus(shownTop, lines.length, pageRows)}
-                </Text>
+                )}
             </Panel>
         </Frame>
     )
-}
-
-/**
- * The display of `open... > open runs`: the runs of the project, newest first, and their
- * models. A run with several models is a heading with its models under it; a run with one
- * model is that one row; a run with none is a row of its own. Enter on a model that is done
- * opens the read-only viewer on its results workbook (with the model's `plots.txt` behind
- * `^p`); on any other model the note says why there is nothing to open. `l` shows the
- * run's `run.LOG`; `^r` deletes the whole run folder after the usual question (refused
- * while a run of the project is live). The list is read again every few seconds and when
- * the screen comes back to the top.
- *
- * @param props.project - the project.
- * @returns the screen.
- */
-export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
-    const nav = useNav()
-    const active = useScreenActive()
-    const theme = useTheme()
-    const confirm = useConfirm()
-    const [runs, setRuns] = useState<OpenRun[]>(() => listOpenRuns(project.dir))
-    // the highlighted row is kept by NAME, so a list that changes under it keeps the cursor
-    const [selected, setSelected] = useState<string | undefined>()
-    const [offset, setOffset] = useState(0)
-    const [note, setNote] = useState<{ text: string; error: boolean } | undefined>()
-
-    const refresh = useCallback(() => setRuns(listOpenRuns(project.dir)), [project.dir])
-    useEffect(() => {
-        if (!active) return
-        refresh()
-        const timer = setInterval(refresh, LOGS_FLOW.watch.pollSeconds * 1000)
-        return () => clearInterval(timer)
-    }, [active, refresh])
-
-    const rows = useMemo(() => openRows(runs), [runs])
-    // the cursor lives on the model rows and on runs without a model (not on a heading)
-    const stops = rows.flatMap((r, i) =>
-        r.kind !== "run" || r.run.models.length === 0 ? [i] : [],
-    )
-    const stop = Math.max(
-        stops.findIndex((i) => rowKey(rows[i] as OpenRow) === selected),
-        0,
-    )
-    const at = stops[stop] ?? 0
-    const current = rows[at]
-    const pageSize = useBodyRows()
-    const columns = useBodyColumns()
-    const top = scrollWindow(at, offset, pageSize, rows.length)
-    // the status words line up: the names are padded to the longest
-    const stampWidth = Math.max(
-        LOGS_FLOW.list.stampWidth,
-        ...rows.map((r) => displayWidth(runDisplay(r.run.id))),
-    )
-    const nameWidth = Math.max(
-        ...rows.map((r) => displayWidth(openRowText(r, stampWidth).text)),
-    )
-
-    const step = (to: number): void => {
-        const i = stops[Math.min(Math.max(to, 0), stops.length - 1)]
-        if (i !== undefined) setSelected(rowKey(rows[i] as OpenRow))
-        setOffset(top)
-    }
-
-    /** `^r`: refuse a live run, else ask and, on Enter, delete the whole run folder. */
-    const askDelete = (run: OpenRun): void => {
-        const live = liveRun(project.dir)
-        if (live !== undefined) {
-            setNote({ text: `a run is in progress (pid ${live.pid})`, error: true })
-            return
-        }
-        confirm.ask(destructiveQuestion(`run ${runDisplay(run.id)}`), () => {
-            try {
-                deleteRun(project.dir, run.id)
-                setNote({ text: "run deleted", error: false })
-            } catch (error) {
-                const text = error instanceof Error ? error.message : "could not delete"
-                setNote({ text, error: true })
-            }
-            refresh()
-        })
-    }
-
-    useKeys((press) => {
-        if (confirm.handleKey(press)) return
-        setNote(undefined)
-        if (press.is(keys.back) || press.is(keys.escape)) nav.pop()
-        else if (press.is(keys.up)) step(stop - 1)
-        else if (press.is(keys.down)) step(stop + 1)
-        else if (current === undefined) return
-        else if (press.is(keys.remove)) askDelete(current.run)
-        else if (press.is(keys.showLog))
-            nav.push(
-                <TextPager
-                    title="open"
-                    subtitle="run.LOG"
-                    corner={cornerLabel(project.id, current.run.id)}
-                    runDir={current.run.dir}
-                    load={() => readLogText(current.run.dir)}
-                />,
-            )
-        else if (press.is(keys.enter)) {
-            if (current.kind === "run")
-                return setNote({
-                    text: `${runDisplay(current.run.id)} has no models`,
-                    error: false,
-                })
-            const { run, model } = current
-            if (model.workbook === undefined)
-                return setNote({ text: noWorkbookNote(model), error: false })
-            nav.push(
-                <SheetViewerScreen
-                    workbookPath={model.workbook}
-                    plotsPath={model.plots}
-                    plotFiles={model.plotSizes}
-                    title={current.kind === "compare" ? "comparison" : "results"}
-                    subtitle={current.kind === "compare" ? undefined : model.name}
-                    corner={cornerLabel(project.id, run.id)}
-                />,
-            )
-        }
-    })
-
-    const legend = confirm.question
-        ? questionLegend(confirm.question)
-        : legendOf([
-            moveLegend({ up: stop > 0, down: stop < stops.length - 1 }),
-            current !== undefined && legendFor("open", keys.enter),
-            current !== undefined && legendFor("run.LOG", keys.showLog),
-            current !== undefined && legendFor("delete run", keys.remove),
-            legendBack,
-        ])
-    // a model with settings of its own says which, when nothing else is to be said
-    const own = current?.kind === "model" ? current.model.overrides : []
-    const hint =
-        own.length > 0
-            ? { text: truncate(`overrides: ${own.join(", ")}`, columns - 4), error: false }
-            : undefined
-    const shown =
-        confirm.note !== undefined ? { text: confirm.note, error: false } : (note ?? hint)
-    return (
-        <Frame
-            title="open"
-            subtitle="runs"
-            corner={cornerLabel(project.id)}
-            legend={legend}
-            legendFull={OPEN_FULL}
-            note={shown?.text}
-            noteIsError={shown?.error}
-        >
-            {rows.length === 0 ? (
-                <Text color={theme.mt}>no runs yet</Text>
-            ) : (
-                <CursorList
-                    items={rows}
-                    index={at}
-                    offset={top}
-                    lines={pageSize}
-                    heading={(r) =>
-                        r.kind === "run" && r.run.models.length > 0
-                            ? headingText(r.run)
-                            : undefined
-                    }
-                    row={(r, on) => {
-                        const { text, status } = openRowText(r, stampWidth)
-                        const bad =
-                            r.kind === "run"
-                                ? r.run.state === "failed"
-                                : r.model.state === "failed"
-                        return (
-                            <Box columnGap={2}>
-                                <ListText on={on}>{padWidth(text, nameWidth)}</ListText>
-                                {bad ? (
-                                    <Text color={theme.er}>{status}</Text>
-                                ) : (
-                                    <ListText on={on}>{status}</ListText>
-                                )}
-                            </Box>
-                        )
-                    }}
-                />
-            )}
-        </Frame>
-    )
-}
-
-/**
- * The text of a run's heading row: its stamp and how it stands.
- *
- * @param run - the run.
- * @returns the text.
- */
-function headingText(run: OpenRun): string {
-    const { text, status } = openRowText({ kind: "run", run })
-    return `${text}  ${status}`
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// References: the reference curves of a project (`<project>/references/`).
+// Reference fits: the reference curves of a project (`<project>/reference-fit/`; the
+// folder was `references/` until 2026-11-09 and an old one is moved to the new name).
 //
 // Julia reads every `.tsv`, `.dat` or `.txt` file there with two or three numeric columns
 // (q, I and an optional sigma that it reads and ignores; q in the units of `data.json`,
@@ -10,15 +11,24 @@
 // header, named by the stem of the source made safe, never over a file that is there.
 // Nothing here deletes anything by itself; a delete is asked for with the stem's name.
 
-import { mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs"
+import { mkdirSync, readFileSync, renameSync, statSync, unlinkSync } from "node:fs"
 import { basename, extname, join } from "node:path"
-import { entryNames, isFile, sortNoCase, writeAtomic } from "../core/file-system.js"
+import {
+    entryNames,
+    isFile,
+    isFolder,
+    sortNoCase,
+    writeAtomic,
+} from "../core/file-system.js"
 import { numberText } from "../core/terminal.js"
 import { DataFileError, type DataPoints, readDataInfo, type Units } from "./data.js"
 import { lockedIn } from "./projects.js"
 
 /** The folder of a project that holds the reference curves. */
-const REFERENCES_FOLDER = "references"
+const REFERENCES_FOLDER = "reference-fit"
+
+/** The name the folder had before 2026-11-09 (moved to [[REFERENCES_FOLDER]] on sight). */
+const LEGACY_REFERENCES_FOLDER = "references"
 
 /** The extensions Julia reads (compared in lower case). */
 const REFERENCE_EXTENSIONS: readonly string[] = [".tsv", ".dat", ".txt"]
@@ -32,12 +42,47 @@ const MAX_REFERENCE_BYTES = 20 * 1024 * 1024
 /** The longest a stem made safe is (cells). */
 const MAX_STEM = 60
 
-/** @returns the `references/` folder of a project (it may not exist). */
+/** @returns the `reference-fit/` folder of a project (it may not exist). */
 export const referencesDir = (projectDir: string): string =>
     join(projectDir, REFERENCES_FOLDER)
 
 /**
- * One file of the `references/` folder.
+ * Moves an old `reference-fit/` folder to `reference-fit/` (a plain rename: nothing is
+ * lost) when the new one is not there. The caller holds the lock of `reference-fit`.
+ * A failed rename leaves both folders as they are.
+ *
+ * @returns whether the folder was moved.
+ */
+function moveLegacyFolder(projectDir: string): boolean {
+    const old = join(projectDir, LEGACY_REFERENCES_FOLDER)
+    const dir = referencesDir(projectDir)
+    if (isFolder(dir) || !isFolder(old)) return false
+    try {
+        renameSync(old, dir)
+        return true
+    } catch {
+        return false
+    }
+}
+
+/**
+ * [[moveLegacyFolder]] under the project's lock of the folder, for a caller that does not
+ * hold it. Never throws (a locked or vanished project is left as it is).
+ *
+ * @returns whether the folder was moved.
+ */
+export function migrateReferences(projectDir: string): boolean {
+    const dir = referencesDir(projectDir)
+    if (isFolder(dir) || !isFolder(join(projectDir, LEGACY_REFERENCES_FOLDER))) return false
+    try {
+        return lockedIn(projectDir, dir, () => moveLegacyFolder(projectDir))
+    } catch {
+        return false
+    }
+}
+
+/**
+ * One file of the `reference-fit/` folder.
  *
  * @property file - the file name (with its extension).
  * @property name - the curve's name: the file's stem.
@@ -121,7 +166,7 @@ const isReferenceFile = (file: string): boolean =>
     REFERENCE_EXTENSIONS.includes(extname(file).toLowerCase())
 
 /**
- * The names of the files of a project's `references/` folder that Julia would try to
+ * The names of the files of a project's `reference-fit/` folder that Julia would try to
  * read (a reference extension in any case, a file), in name order without regard to case.
  */
 export function referenceFiles(projectDir: string): string[] {
@@ -132,11 +177,12 @@ export function referenceFiles(projectDir: string): string[] {
 }
 
 /**
- * The files of a project's `references/` folder that Julia would try to read, in name
+ * The files of a project's `reference-fit/` folder that Julia would try to read, in name
  * order (without regard to case), each as a curve or as unusable with the reason. A
  * missing folder holds none. Nothing is changed, whatever the files are.
  */
 export function listReferences(projectDir: string): ReferenceEntry[] {
+    migrateReferences(projectDir)
     const dir = referencesDir(projectDir)
     return referenceFiles(projectDir).map((file) => {
         const name = stemOf(file)
@@ -198,7 +244,7 @@ export function referenceUnits(projectDir: string): Units {
 }
 
 /**
- * Adds a curve to the project's `references/` as a clean `<stem>.tsv`, under the lock of
+ * Adds a curve to the project's `reference-fit/` as a clean `<stem>.tsv`, under the lock of
  * the folder, inside the project (a deleted project is not brought back). The stem comes
  * from `source` made safe, and a taken one gets `-2`, `-3`, ...: nothing is overwritten.
  *
@@ -212,6 +258,7 @@ export function addReference(projectDir: string, data: DataPoints, source: strin
     const dir = referencesDir(projectDir)
     return lockedIn(projectDir, dir, () => {
         referenceUnits(projectDir)
+        moveLegacyFolder(projectDir)
         try {
             mkdirSync(dir) // not recursive: the project's folder must be there
         } catch (error) {
@@ -237,6 +284,7 @@ export function addReference(projectDir: string, data: DataPoints, source: strin
 export function deleteReference(projectDir: string, file: string): boolean {
     const dir = referencesDir(projectDir)
     return lockedIn(projectDir, dir, () => {
+        moveLegacyFolder(projectDir)
         if (file !== basename(file) || !isReferenceFile(file) || !isFile(join(dir, file)))
             return false
         try {

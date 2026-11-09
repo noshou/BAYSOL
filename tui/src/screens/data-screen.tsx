@@ -69,17 +69,17 @@ const options = [
     { id: "mapping", label: "change the columns" },
     { id: "units", label: "units" },
     { id: "energy", label: "energy" },
-    { id: "references", label: "references" },
+    { id: "reference fit", label: "reference fit" },
 ] as const
 
 /** What is said when the columns are to be changed and none were recorded. */
 const NO_SOURCE = "no source recorded: load a file"
 
 /** The options that work without data. */
-const alwaysOn: ReadonlySet<string> = new Set(["load", "references"])
+const alwaysOn: ReadonlySet<string> = new Set(["load", "reference fit"])
 
-/** The width of the name column of the summary (`references` is the longest). */
-const LINE_NAME_WIDTH = 11
+/** The width of the name column of the summary (`reference fit` is the longest). */
+const LINE_NAME_WIDTH = 13
 
 /** What is said when `units`, `energy` or the columns come before a file. */
 const LOAD_FIRST = "load a file first"
@@ -120,7 +120,7 @@ function describe(status: DataStatus | undefined, width: number): [string, strin
     const rows: [string, string][] = [
         ["points", String(info.points)],
         ["q range", `${shortNumber(status.qMin)} to ${shortNumber(status.qMax)} ${unit}`],
-        ["source", truncateStart(mapping?.path ?? info.source, width)],
+        ["source", truncateStart(basename(mapping?.path ?? info.source), width)],
     ]
     if (mapping)
         rows.push(
@@ -140,7 +140,7 @@ function describe(status: DataStatus | undefined, width: number): [string, strin
         )
     rows.push(
         ["units", unit],
-        ["energy", info.energy === null ? "not set" : `${shortNumber(info.energy)} eV`],
+        ["energy", info.energy === null ? "not set" : `${plainNumber(info.energy)} eV`],
     )
     return rows
 }
@@ -187,11 +187,11 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
     const status = useMemo(() => readDataInfo(dir), [dir, nav.depth, active, version])
     const cursor = useListCursor(options.length, options.length)
     const columns = useBodyColumns()
-    const lines = describe(status, columns - 20)
+    const lines = describe(status, columns - 22)
     // biome-ignore lint/correctness/useExhaustiveDependencies: these only re-read
     const references = useMemo(() => listReferences(dir), [dir, nav.depth, active, version])
     const usable = references.filter((e) => e.unusable === undefined).length
-    const referencesText = referenceSummary(references, columns - 20)
+    const referencesText = referenceSummary(references, columns - 22)
     const loaded = status?.kind === "ok"
     const unusable = status?.kind === "unusable"
 
@@ -231,8 +231,12 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         source: loadSource(path),
         initial,
         onDone: (points: number, dropped: number) => {
-            const note = dropped > 0 ? `, dropped ${dropped} rows with q or sigma <= 0` : ""
-            say(`loaded ${points} points from ${basename(path)}${note}`)
+            // the source is on the summary rows; with rows dropped the note says how many
+            say(
+                dropped > 0
+                    ? `loaded ${points} points, dropped ${dropped} rows (bad q or sigma)`
+                    : `loaded ${points} points from ${truncateStart(basename(path), 30)}`,
+            )
             refresh()
         },
     })
@@ -277,7 +281,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         if ("error" in parsed) return setProblem(parsed.error)
         try {
             setEnergy(dir, parsed.value)
-            say(`energy ${shortNumber(parsed.value)} eV saved`)
+            say(`energy ${plainNumber(parsed.value)} eV saved`)
             refresh()
             toMenu()
         } catch (error) {
@@ -291,7 +295,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         try {
             setUnits(dir, next)
             // a reference has no units of its own: it is read in the data's
-            const also = listReferences(dir).length > 0 ? ", references too" : ""
+            const also = listReferences(dir).length > 0 ? ", reference fit too" : ""
             say(`units ${unitLabel(next)} saved${also}`)
         } catch (error) {
             say(dataErrorNote(error), true)
@@ -307,7 +311,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
             return setMode("path")
         }
         // the references list opens without data (only adding one needs it)
-        if (id === "references") return nav.push(<ReferencesScreen project={project} />)
+        if (id === "reference fit") return nav.push(<ReferencesScreen project={project} />)
         if (status?.kind !== "ok") return say(unusable ? RESET_FIRST : LOAD_FIRST, true)
         setProblem(undefined)
         if (id === "mapping") return reopen(status.info.mapping)
@@ -329,7 +333,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         } else if (unusable && press.is(keys.reset)) {
             confirm.ask(
                 {
-                    text: "reset the data files? the old ones are kept as .corrupt",
+                    text: "reset the data files? old ones kept as .corrupt",
                     yes: "reset",
                     no: "keep",
                 },
@@ -411,7 +415,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                         {referencesText === undefined ? null : (
                             <Box columnGap={1}>
                                 <Text color={theme.mt}>
-                                    {"references".padEnd(LINE_NAME_WIDTH)}
+                                    {"reference fit".padEnd(LINE_NAME_WIDTH)}
                                 </Text>
                                 <Text color={theme.fg}>{referencesText}</Text>
                             </Box>
@@ -426,7 +430,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                             active={mode === "menu"}
                             row={(o, on) => (
                                 <ListText on={on && (loaded || alwaysOn.has(o.id))}>
-                                    {o.id === "references" && usable > 0
+                                    {o.id === "reference fit" && usable > 0
                                         ? `${o.label} (${usable})`
                                         : o.label}
                                 </ListText>

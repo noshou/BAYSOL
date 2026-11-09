@@ -3,7 +3,7 @@
 // The settings screens: the sheet and its editors, the menu, and what the landings share.
 //
 // Contents:
-//   1. The editors: one text line, or a colour picked from a list
+//   1. The editors: one text line, or a colour or font picked from a list
 //   2. `SettingsSheet`: one group of settings
 //   3. `SettingsMenu`: the groups
 //   4. Shared
@@ -12,17 +12,19 @@
 import { basename } from "node:path"
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useMemo, useReducer, useState } from "react"
-import { appDir } from "../core/environment.js"
+import { appDir, cacheDir, readSystem } from "../core/environment.js"
 import { quarantine } from "../core/file-system.js"
+import { listFonts } from "../core/fonts.js"
 import { truncateStart, wrapText } from "../core/terminal.js"
 import { readRecipes, recipesFile } from "../store/buffer.js"
 import { customFile, readCustomSolutes } from "../store/custom.js"
 import {
     colourHex,
-    colourNames,
+    type FontLists,
     modelSheets,
     type SettingDef,
     type SettingValue,
+    settingNames,
 } from "../store/settings.js"
 import {
     loadScope,
@@ -69,11 +71,12 @@ import {
     customLandingOptions,
     type EditEnd,
     indexOfPick,
+    type ListKind,
     maxNameText,
     maxSettingText,
     narrow,
     parseSetting,
-    pickColour,
+    pickValue,
     swatchColour,
     valueText,
     withDraft,
@@ -84,12 +87,14 @@ import {
 // 1. The editors
 // ========================================================================================
 
-/** The most colours the picker shows at once. */
+/** The most colours or fonts the picker shows at once. */
 const pickerLines = 5
 
-/** The rows an editor takes under the table: its label, an error, and the colour list. */
-const editorRows = (def: SettingDef): number =>
-    def.kind === "colour" ? pickerLines + 3 : 3
+/** Whether a setting is picked from a list (a colour or a font). */
+const isPicked = (def: SettingDef): boolean => def.kind === "colour" || def.kind === "font"
+
+/** The rows an editor takes under the table: its label, an error, and the list. */
+const editorRows = (def: SettingDef): number => (isPicked(def) ? pickerLines + 3 : 3)
 
 /** The kinds typed as a list, which need a longer line (the default colours are 70). */
 const listKinds: ReadonlySet<string> = new Set(["colours", "markers", "sizes"])
@@ -97,10 +102,15 @@ const listKinds: ReadonlySet<string> = new Set(["colours", "markers", "sizes"])
 /** The most characters a list line takes. */
 const maxListText = 200
 
+/** The most characters a path line takes. */
+const maxPathText = 1000
+
 /** What an editor is told: the setting, its value now and what to call when it is over. */
 type EditorProps = {
     def: SettingDef
     current: SettingValue
+    /** The installed fonts, for a font setting (listed when its editor is opened). */
+    fonts?: FontLists
     onEnd: (end: EditEnd<SettingValue>) => void
     onLegend: (keys: LegendItem[]) => void
 }
@@ -110,8 +120,6 @@ function textHint(def: SettingDef): { label: string; placeholder?: string } {
     switch (def.kind) {
         case "set":
             return { label: "some of:", placeholder: def.choices.join(" ") }
-        case "font":
-            return { label: "font:", placeholder: "empty: the default font" }
         case "tuple":
             return { label: `${def.partNames.join(", ")}:` }
         case "ranges":
@@ -124,6 +132,8 @@ function textHint(def: SettingDef): { label: string; placeholder?: string } {
             return { label: "markers:", placeholder: "o, square, triangle" }
         case "sizes":
             return { label: "sizes:", placeholder: "76x5, 100x9 (growing)" }
+        case "path":
+            return { label: "path:", placeholder: "empty: the default" }
         case "optional_int":
         case "optional_float":
             return { label: "number:", placeholder: `empty: ${valueText(def, null)}` }
@@ -144,8 +154,14 @@ function TextEditor({ def, current, onEnd, onLegend }: EditorProps): ReactNode {
     return (
         <Prompt
             label={label}
-            initial={valueText(def, current)}
-            maxLength={listKinds.has(def.kind) ? maxListText : maxSettingText}
+            initial={def.kind === "path" ? (current as string) : valueText(def, current)}
+            maxLength={
+                def.kind === "path"
+                    ? maxPathText
+                    : listKinds.has(def.kind)
+                        ? maxListText
+                        : maxSettingText
+            }
             placeholder={placeholder}
             error={error}
             onChange={clearError}
@@ -161,19 +177,31 @@ function TextEditor({ def, current, onEnd, onLegend }: EditorProps): ReactNode {
     )
 }
 
-/** A colour picked from the list of names, narrowing as one types; `#rrggbb` is typed. */
-function ColourEditor({ current, onEnd, onLegend }: EditorProps): ReactNode {
-    const names = colourNames()
+/**
+ * A colour or a font picked from the list of names, narrowing as one types; `#rrggbb`
+ * is typed. The math font setting lists the fonts with a MATH table, the text font
+ * setting the other fonts; a name not in the list is refused (on a machine with no
+ * fonts found the text is taken as typed).
+ */
+function PickerEditor({ def, current, fonts, onEnd, onLegend }: EditorProps): ReactNode {
+    const kind: ListKind = def.kind === "font" ? "font" : "colour"
+    const names = useMemo(
+        () => settingNames(def.name, kind, fonts),
+        [def.name, kind, fonts],
+    )
     const [error, setError] = useState<string>()
     const suggest = useCallback(
         (text: string): Suggestion[] =>
-            narrow(names, text).map((label) => ({ label, swatch: colourHex(label) })),
-        [names],
+            narrow(names, text).map((label) => ({
+                label,
+                swatch: kind === "colour" ? colourHex(label) : undefined,
+            })),
+        [names, kind],
     )
     const clearError = useCallback(() => setError(undefined), [])
     return (
         <Entry
-            label="colour:"
+            label={`${kind}:`}
             maxLength={maxNameText}
             placeholder="type to narrow"
             suggest={suggest}
@@ -185,7 +213,7 @@ function ColourEditor({ current, onEnd, onLegend }: EditorProps): ReactNode {
             error={error}
             onChange={clearError}
             onSubmit={(text, chosen) => {
-                const picked = pickColour(text, chosen?.label)
+                const picked = pickValue(kind, names, text, chosen?.label)
                 if ("error" in picked) setError(picked.error)
                 else onEnd({ kind: "done", value: picked.value })
             }}
@@ -273,6 +301,8 @@ function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode {
     // notices of wiped settings that an edit has dealt with
     const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set())
     const [editing, setEditing] = useState<string>()
+    // the installed fonts, listed (and cached on disk) the first time a font is edited
+    const [fonts, setFonts] = useState<FontLists>()
     const [promptKeys, setPromptKeys] = useState<LegendItem[]>([])
     const [status, setStatus] = useState<{ text: string; error: boolean } | undefined>(
         () =>
@@ -363,7 +393,11 @@ function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode {
     }
     const edit = (d: SettingDef): void => {
         if (d.kind === "bool") draft(d, !(valueFor(d) as boolean))
-        else setEditing(d.name)
+        else {
+            if (d.kind === "font")
+                setFonts((was) => was ?? listFonts(readSystem(), cacheDir()))
+            setEditing(d.name)
+        }
     }
     const endEdit = (end: EditEnd<SettingValue>): void => {
         setEditing(undefined)
@@ -471,11 +505,12 @@ function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode {
             <Box flexDirection="column" marginTop={1}>
                 {editedDef ? (
                     <Box flexDirection="column" height={editorRows(editedDef)}>
-                        {editedDef.kind === "colour" ? (
-                            <ColourEditor
+                        {isPicked(editedDef) ? (
+                            <PickerEditor
                                 key={editedDef.name}
                                 def={editedDef}
                                 current={valueFor(editedDef)}
+                                fonts={fonts}
                                 onEnd={endEdit}
                                 onLegend={setPromptKeys}
                             />
@@ -618,7 +653,7 @@ export function useResetFile(
     return (name, reset) =>
         confirm.ask(
             {
-                text: `reset ${name} to empty?  the old file is kept as ${name}.corrupt`,
+                text: `reset ${name}? the old one is kept as .corrupt`,
                 yes: "reset",
                 no: "keep",
             },
@@ -626,7 +661,7 @@ export function useResetFile(
                 try {
                     reset()
                     reread()
-                    setMessage(`${name} reset, kept as ${name}.corrupt`)
+                    setMessage(`${name} reset; old one kept as .corrupt`)
                 } catch {
                     setMessage("could not reset!")
                 }

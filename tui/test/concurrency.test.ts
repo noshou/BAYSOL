@@ -214,8 +214,7 @@ test("a second writer is refused when another copy saved after it read", () => {
         () => writeSolutes(dir, []),
         (e) =>
             e instanceof ChangedOnDiskError &&
-            e.message ===
-                "buffer.json changed on disk: another copy of BAYSOL saved it; reopen it",
+            e.message === "buffer.json changed on disk: reopen it",
     )
     assert.equal(readFileSync(bufferFile(dir), "utf-8"), theirs, "their file is intact")
     // After the reopen (a read) the write goes through.

@@ -3,8 +3,9 @@
 /**
  * The store side of the runs of a project: the run list and the one deletion of a run, the
  * options of the logs menu and the restores that put a run's inputs back into the project,
- * and the runs and models of `open... > open runs`. The run's `logs/` folder is plain
- * files (nothing is packed), read here and never written. Tolerant: a run or model folder
+ * and the runs and models of `open... > open runs`. A run's files are read from its
+ * archive or from its plain folders alike (`run-archive.ts`), read here and never
+ * written. Tolerant: a run or model folder
  * that vanishes is skipped or has no workbook, and nothing here throws for a run that is
  * odd.
  *
@@ -14,8 +15,9 @@
  * models (`listOpenRuns`, `openRows`, `findWorkbook`, `firstErrorLine`).
  */
 
-import { lstatSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
+import { lstatSync, readdirSync, rmSync } from "node:fs"
 import { basename, isAbsolute, join } from "node:path"
+import { PACK_LOCK } from "../core/archive.js"
 import { RUN_FLOW } from "../core/environment.js"
 import {
     ChangedOnDiskError,
@@ -27,6 +29,7 @@ import {
     UnusableFileError,
     withFileLock,
 } from "../core/file-system.js"
+import { displayWidth, takeWidth, truncateStart } from "../core/terminal.js"
 import {
     type BufferRow,
     type Conditions,
@@ -52,6 +55,12 @@ import {
     runDirOf,
     startLockName,
 } from "./projects.js"
+import {
+    RunFileMissing,
+    RunFileTooLarge,
+    readRunText,
+    runFolderFiles,
+} from "./run-archive.js"
 import { defaultCatalog } from "./settings.js"
 import { loadProject, wipeInvalid } from "./settings-store.js"
 
@@ -174,7 +183,16 @@ export function deleteRun(projectDir: string, id: string): void {
         join(runs, startLockName),
         () => {
             assertNoLiveRun(projectDir)
-            if (isFolder(dir)) rmSync(dir, { recursive: true, force: true })
+            if (!isFolder(dir)) return
+            // a run that is being packed is not deleted under the pack
+            try {
+                withFileLock(join(dir, PACK_LOCK), () => {}, { createParents: false })
+            } catch (error) {
+                if (error instanceof FileInUseError)
+                    throw new Error("this run is being packed: try again in a moment")
+                throw error
+            }
+            rmSync(dir, { recursive: true, force: true })
         },
         { createParents: false },
     )
@@ -186,27 +204,23 @@ export function deleteRun(projectDir: string, id: string): void {
 export const RUN_GONE = "this run was deleted"
 
 /**
- * The text of a file of a run's `logs/` (read whole, read only).
+ * The text of a file of a run's `logs/` (read whole, read only), from the run's archive
+ * or from its plain `logs/` folder.
  *
  * @param name - a file of the folder (`run.LOG`, `settings.json`, ...), never a path.
- * @throws Error `this run was deleted`, `this run has no <name>` or `<name> is too large
- *     to show` (over `RUN_FLOW.log.maxBytes`).
+ * @throws Error `this run was deleted`, `this run has no <name>`, `<name> is too large
+ *     to show` (over `RUN_FLOW.log.maxBytes`) or `the run's archive cannot be read: ...`.
  */
 export function readRunFile(runDir: string, name: string): string {
-    const file = join(runDir, "logs", name)
-    const missing = (): Error =>
-        new Error(isFolder(runDir) ? `this run has no ${name}` : RUN_GONE)
-    let size: number
     try {
-        size = statSync(file).size
-    } catch {
-        throw missing()
-    }
-    if (size > RUN_FLOW.log.maxBytes) throw new Error(`${name} is too large to show`)
-    try {
-        return readFileSync(file, "utf-8")
-    } catch {
-        throw missing()
+        return readRunText(runDir, `logs/${name}`, RUN_FLOW.log.maxBytes)
+    } catch (error) {
+        if (error instanceof RunFileTooLarge)
+            throw new Error(`${name} is too large to show`)
+        if (error instanceof RunFileMissing)
+            throw new Error(isFolder(runDir) ? `this run has no ${name}` : RUN_GONE)
+        if (!isFolder(runDir)) throw new Error(RUN_GONE)
+        throw new Error(`the run's archive cannot be read: ${(error as Error).message}`)
     }
 }
 
@@ -216,28 +230,13 @@ export function readLogText(runDir: string): string {
 }
 
 /**
- * The files of a run's `logs/` and their sizes (empty for a run without the folder).
+ * The files of a run's `logs/` and their sizes, in the archive and in the plain folder
+ * (empty for a run without either).
  *
  * @returns file name to bytes.
  */
 export function runFileSizes(runDir: string): Map<string, number> {
-    const sizes = new Map<string, number>()
-    const dir = join(runDir, "logs")
-    let names: string[]
-    try {
-        names = readdirSync(dir)
-    } catch {
-        return sizes
-    }
-    for (const name of names) {
-        try {
-            const stat = statSync(join(dir, name))
-            if (stat.isFile()) sizes.set(name, stat.size)
-        } catch {
-            // gone since the listing
-        }
-    }
-    return sizes
+    return runFolderFiles(runDir, "logs")
 }
 
 // ---- 3. the options of a run -----------------------------------------------------------
@@ -547,6 +546,8 @@ type ModelState =
  * @property plotSizes - the same plots at more sizes (`plot_sizes` of `run.json`), the
  *     viewer shows the largest that fits; empty for a run that has none.
  * @property overrides - the names of the settings the model has of its own.
+ * @property tex - the `.tex` figures it has, in the archive or in its folder: paths
+ *     relative to the run folder (`<model>/output/plots/<name>.tex`), sorted.
  */
 export type OpenModel = {
     name: string
@@ -556,6 +557,7 @@ export type OpenModel = {
     plots: string
     plotSizes: PlotFile[]
     overrides: string[]
+    tex: string[]
 }
 
 /**
@@ -594,6 +596,17 @@ const COMPARE_FOLDER = "compare"
 
 /** The folder of a model that holds what `results` wrote. */
 const OUTPUT_FOLDER = "output"
+
+/** The folder of the `.tex` figures, in a model's output folder and in the comparison's. */
+const TEX_FOLDER = "plots"
+
+/** The `.tex` figures in a folder of a run, as paths relative to the run folder. */
+function texFiles(dir: string, folder: string): string[] {
+    return [...runFolderFiles(dir, folder).keys()]
+        .filter((n) => n.endsWith(".tex"))
+        .sort()
+        .map((n) => `${folder}/${n}`)
+}
 
 /** The name of a model's plain-text unicode plots in its output folder. */
 const PLOTS_FILE = "plots.txt"
@@ -700,6 +713,7 @@ function openModels(
             plots: join(output, PLOTS_FILE),
             plotSizes: plotFilesOf(dir, m.plot_sizes),
             overrides: overridesOf(m.overrides),
+            tex: texFiles(dir, `${name}/${OUTPUT_FOLDER}/${TEX_FOLDER}`),
         })
     }
     return out
@@ -736,6 +750,7 @@ function openCompare(
         plots: join(folder, PLOTS_FILE),
         plotSizes: plotFilesOf(dir, c.plot_sizes),
         overrides: [],
+        tex: texFiles(dir, `${COMPARE_FOLDER}/${TEX_FOLDER}`),
     }
 }
 
@@ -789,6 +804,56 @@ export function openRows(runs: readonly OpenRun[]): OpenRow[] {
             rows.push({ kind: "compare", run, model: run.compare, nested: !single })
     }
     return rows
+}
+
+/** The widest a brief reason may be (`briefError`): it has to share a note row. */
+export const BRIEF_ERROR_WIDTH = 30
+
+/**
+ * The short phrases of the errors a run knows, tried in this order on the first line of an
+ * error (`NotConvergedError: the run did not converge: ...`).
+ */
+const KNOWN_ERRORS: readonly (readonly [RegExp, string])[] = [
+    [/^NotConvergedError\b/, "not converged"],
+    [/^InterruptException\b/, "interrupted"],
+    [/^OutOfMemoryError\b/, "out of memory"],
+]
+
+/**
+ * A failed model's `error` (the first line Julia put in `run.json`) in a few words, for a
+ * row or a note: the model prefix and the error's type are left off, a known error gets
+ * its phrase (`NotConvergedError` is `not converged`), anything else its first sentence,
+ * cut at a word when it is longer than [[BRIEF_ERROR_WIDTH]]. The whole text stays in
+ * `run.LOG` (`^l` in the run list).
+ *
+ * @param error - the error text; only its first line is read.
+ * @returns the reason, never ending in `…` and never longer than the width.
+ */
+export function briefError(error: string): string {
+    const first = (error.split(/\r?\n/)[0] ?? "").trim().replace(/^model .+?: /, "")
+    for (const [pattern, phrase] of KNOWN_ERRORS) if (pattern.test(first)) return phrase
+    const plain = first.replace(/^[A-Z]\w*(?:Error|Exception): /, "")
+    const sentence = (plain.split(/(?<=[.!?])\s/)[0] ?? plain).replace(/[.:;,]$/, "")
+    if (displayWidth(sentence) <= BRIEF_ERROR_WIDTH) return sentence
+    // cut at the last word that fits
+    const cut = takeWidth(sentence, BRIEF_ERROR_WIDTH + 1)
+    const at = cut.lastIndexOf(" ")
+    return (at > 0 ? cut.slice(0, at) : takeWidth(cut, BRIEF_ERROR_WIDTH)).trim()
+}
+
+/**
+ * `<name> failed: <reason>` for a note row: only the name (data of the user) is cut, from
+ * its start (the end tells models apart), when the line would not fit; the sentence never
+ * is.
+ *
+ * @param name - the model's name.
+ * @param error - its error (`briefError` shortens it); none gives `<name> failed`.
+ * @param room - the cells of the note row.
+ * @returns the line.
+ */
+export function failedNote(name: string, error: string | undefined, room: number): string {
+    const tail = error ? ` failed: ${briefError(error)}` : " failed"
+    return `${truncateStart(name, Math.max(8, room - displayWidth(tail)))}${tail}`
 }
 
 /**

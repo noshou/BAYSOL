@@ -202,7 +202,7 @@ break a rule (a model's `Q_MIN` above the project's `Q_MAX`): that override is w
 
 ### Data
 
-The `data` screen has five options: `load a file`, `change the columns`, `units`, `energy`, `references`. Before a
+The `data` screen has five options: `load a file`, `change the columns`, `units`, `energy`, `reference fit`. Before a
 file is loaded it says `no data yet`.
 
 **`load a file`** asks for a path (names hinted, Tab completes, `o` on an empty field opens the file chooser).
@@ -257,12 +257,11 @@ line numbers, and the three chosen columns come first. The columns start as a gu
 | :-- | :-- |
 | `line 7, column err: "abc" is no number` (`row` for a workbook) | a cell of a chosen column is not a number |
 | `no value` | an empty cell |
-| `q must increase` | a repeated or decreasing q |
+| `q must increase` | a q that goes back (an exactly repeated row is dropped, not an error) |
 | `only N points: need 3` | fewer than 3 points |
-| a sigma of 0 | refused, at the first such row |
 
-A row whose q is not above 0 is the one thing dropped; the note says `loaded 4 points from f.dat, dropped 2 rows
-with q <= 0`. The import writes a **clean `data.tsv`** in the project (three tab-separated columns q, I, sigma,
+Rows whose q or sigma is not above 0, and rows repeated exactly (real files have them: SASDCQ2 repeats one), are
+dropped and counted; the note says `loaded 4 points, dropped 2 rows (bad q or sigma)`. The import writes a **clean `data.tsv`** in the project (three tab-separated columns q, I, sigma,
 one measurement per row, no header, no comments, no unit text); your file is never touched. Afterwards:
 
 ```
@@ -298,9 +297,9 @@ one measurement per row, no header, no comments, no unit text); your file is nev
   is gone it says `source is gone: <name>`; an old `data.json` without a mapping says `no source recorded:
   load a file`.
 
-- **`references`** opens the list of the project's **reference curves** (the depositor's CRYSOL or FoXS fit, ...)
-  that a run draws in its comparison figure. They are the files of `<project>/references/`. The summary of the data
-  screen says `references  2 (name1, name2)` when there are some. The list opens at any time, but adding needs data
+- **`reference fit`** opens the list of the project's **reference curves** (the depositor's CRYSOL or FoXS fit, ...)
+  that a run draws in its comparison figure. They are the files of `<project>/reference-fit/` (the folder was `references/` before 2026-11-09: when the list or an add finds only the old one it is renamed, nothing is lost, and a run snapshot with only `logs/references/` is still read by Julia). The summary of the data
+  screen says `reference fit  2 (name1, name2)` when there are some. The list opens at any time, but adding needs data
   (`import the data first`), because a reference is in the **same units as the data** (`units` turns them for
   both). The list shows each curve's name,
   its points (those with q and I above 0, the ones a run draws) and its q range. `^n` adds one: a path prompt as for
@@ -483,17 +482,26 @@ the highlighted setting under it:
 | :-- | :-- |
 | sampler | sampling: `N_ADAPT`, `N_DRAWS`, `RETRY_N_ADAPT`, `RETRY_N_DRAWS`, `RNG_SEED`, `TARGET_ACCEPT`; chains: `N_CHAINS`, `CHAIN_START_RADII`, `OPTIMUM_CHAIN_CAP`, `OPTIMUM_MIN_CHAINS`, `OPTIMUM_CHAIN_RADIUS`, `OPTIMUM_CHAIN_FRACTION`; MAP search: `MAP_MAX_ITER`, `MAP_N_STARTS`, `MAP_F_SUCCESSIVE`, `MAP_OPTIMA_KEPT`; MAP jitter: `MAP_JITTER_RADII`, `MAP_JITTER_DIRECTIONS`, `MAP_JITTER_MAX_OPTIMA`, `MAP_JITTER_WITHIN_NATS`; basins and harvest: `BASIN_RESTART_NATS`, `HARVEST_COVER`, `HARVEST_DIVERGENT` |
 | model | data selection: `Q_MIN`, `Q_MAX`, `SIGMA_SCALE`, `EXCLUDE_Q`; structure: `CHAINS`, `MODEL`, `ADD_HYDROGENS`; contrast priors: `BOUNDS_δρ₁₂`, `MODE_δρ₁₂`, `κ_δρ₁₂`, `κ_δρ₃`, `φ_max`; excluded volume: `EXCL_VOL_CORR_BOUNDS`, `EXCL_VOL_CORR_EPS`, `PMV_FALLBACK_UNCERT`; hydration shell: `SHELL_THICKNESS`, `PROBE_RADIUS`, `SHELL_AREA_PER_POINT`, `SHELL_MIN_POINTS`, `SHELL_SAMPLE`, `SASA_N_OCC`; bead model: `BEAD_RAY_RANGE`, `BEAD_RAY_DIRS`, `LMAX` |
-| output | tables: `VAL_SIGMA` (2); figures: `FIGURES_TEX`, `FIGURES_COMPILE`, `FIGURES_FORMATS` |
+| output | tables: `VAL_SIGMA` (2); figures: `FIGURES_TEX`, `FIGURES_FORMATS`, `FIGURES_DIR` (the plot dir; empty: `<BAYSOL data folder>/plots`), `FIGURES_COMPILER` (the LaTeX compiler path; empty: `lualatex`, then `xelatex`, on the `PATH`). Both are typed as one line of text and are settings of the whole run |
 | plots | colours, line widths, markers, comparison (`PLOT_COMPARE`, `PLOT_COMPARE_COLOURS`, `PLOT_COMPARE_MARKERS`, `PLOT_LW_COMPARE`), size and text (fonts, `PLOT_PREVIEW_SIZE`, `PLOT_TUI_SIZES`), histogram and ranges, ticks: the `PLOT_*` settings |
 
 Every setting is on a sheet. A run that does not converge at the first pass is rerun once with `RETRY_N_ADAPT` and `RETRY_N_DRAWS` (2000 each by default), so a small `N_ADAPT`/`N_DRAWS` can end as a longer run; extra chains are also started at other optima (`OPTIMUM_MIN_CHAINS`), so a run can have more chains than `N_CHAINS`. `RNG_SEED` makes a run reproducible; `VAL_SIGMA` is the
-half-width of the reported interval in standard deviations; `FIGURES_COMPILE` (needs LaTeX) and
-`FIGURES_FORMATS` (`pdf png svg`) render the `.tex` figures.
+half-width of the reported interval in standard deviations; `FIGURES_FORMATS` (`pdf png svg`) sets the file types of compiled figures (`shift+c` in `open runs`; the
+setting `FIGURES_COMPILE` is off the sheets, it stays a keyword of `results` for the command line).
 
 - **Enter** edits: a yes/no turns over; a colour is picked from a list (type to narrow, Tab completes, or type
-  `#rrggbb`); anything else is typed on one line (Esc gives up): a number, the figure formats separated by
-  blanks (`pdf png`), a font name as it is (empty is the default font; a font LaTeX cannot find is a warning of
-  the run), a pair such as a colour and its opacity as `darkorange, 0.15`.
+  `#rrggbb`); a font is picked from the fonts installed on this machine (`PLOT_TEXT_FONT`: text fonts;
+  `PLOT_MATH_FONT`: only fonts with an OpenType `MATH` table), narrowed and completed the same way, a name not in
+  the list is refused (on a machine where no font is found the name is taken as typed); anything else is typed
+  on one line (Esc gives up): a number, the figure formats separated by blanks (`pdf png`), a pair such as a
+  colour and its opacity as `darkorange, 0.15`.
+- **The font list** is read from the font files themselves (family from the `name` table, math fonts by the
+  `MATH` table; nothing is guessed from a name): the system font folders (Linux `/usr/share/fonts`,
+  `~/.local/share/fonts`, plus `fc-list`; macOS `/System/Library/Fonts`, `/Library/Fonts`, `~/Library/Fonts`;
+  Windows `C:\Windows\Fonts`, the user's font folder and the registry) and, with TeX installed, the LuaLaTeX font
+  database or the `texmf` trees. The result is cached in `fonts.json` of the cache folder with a fingerprint of
+  the files (paths, sizes, times), so an installed or removed font makes the scan run again. The macOS and
+  Windows parts are untested.
 - **Three list settings** are typed as one line and shown the same way. `PLOT_COMPARE_COLOURS`: colour names or
   `#rrggbb` separated by commas or blanks, `#D55E00, #0072B2, red` (the names of the colour list, lower case; at
   least one; repeats allowed; the first model has the first colour, and so on, starting again). `PLOT_COMPARE_MARKERS`:
@@ -544,7 +552,7 @@ run of this project is already going the start is refused with `a run is in prog
 
 The **run screen** is a live view of the last lines of Julia's output (the full text is also written to the
 run's `run.LOG`); the plots are not shown here, they are in the results. The counter reads `running 0:42`,
-`aborting`, `done`, `failed` or `aborted`. Keys are locked except `^t` and:
+`aborting`, `packing` (the run is over and its files are being put into the run's archive, see "The run archive" below), `done`, `failed` or `aborted`. Keys are locked except `^t` and:
 
 - **Ctrl-C or Ctrl-D**: abort and **quit the whole program**. Julia is asked to stop (SIGTERM) and given a few
   seconds to finish its log, then killed. Julia prints a stack trace for the signal; it is not an error of the
@@ -581,6 +589,31 @@ the same checks as editing the file yourself; it is refused while a run is live
 question. Nothing is ever written into a run, and there is no way to delete a single log file. A page open on a run
 that another copy deletes says `this run was deleted` and closes.
 
+### The run archive
+
+When Julia has finished (a run that is done, failed or aborted) the program **packs the run folder**: the screen
+says `packing`, then `done`. Everything of `<run>/` goes into ONE 7z archive, `<run>/run.7z`, specific to that
+run, with paths relative to the run folder (`logs/run.LOG`, `<model>/<model>.LOG`, `<model>/output/plots.txt`,
+`<model>/output/plots_76x10.txt`, `<model>/output/plots/<name>.tex`, `compare/plots.txt`, ...), at the best
+compression (`-mx=9`). **Left outside the archive, in place:** `run.json` (the small metadata file that the run
+lists, the state of a run and the viewers' plot sizes come from), the `.xlsx` workbooks (`<model>/output/*.xlsx`,
+`compare/*.xlsx`: the viewer opens them directly and they do not compress) and the dot files of the run folder (the
+`.claim` marker, a `.pack` lock while a pack runs).
+
+The pack is **atomic**: the archive is made as `run.7z.tmp.<pid>`, tested with `7z t` and compared with the list of
+what was packed, and only then renamed to `run.7z`; the packed originals are removed after that and never before.
+If anything fails (a full disk, a failed test) the run folder stays exactly as it was, the staged file is
+removed, and the note row on the run screen says why (`not packed: ...`); the run's
+own outcome is unchanged. While a pack runs, deleting that run is refused with `this run is being packed`.
+
+**Reading is the same for packed and older runs.** The viewer's plots (`^p`), `run.LOG` (`^l` and `view run.LOG`),
+the logs menu (every view, `conditions`, the restores) and the temperature the next run starts at read the archive
+or, for a run that was never packed, the plain folder; the plots are read straight out of the archive (nothing is
+extracted to disk), always read-only, with a check of every entry name (no `..`, no absolute path) and a size cap
+per entry. Extracting (move and compile plots) uses a temporary folder that is always removed. The archive is made
+by 7-Zip (the `7zip-bin` binary, run through `node-7z`; a `7z`, `7zz` or `7za` on the `PATH` is the fallback when
+the bundled one cannot run).
+
 ### Results (`open...`)
 
 With a run in the project, `open...` offers `open project folder` and `open runs`. **`open runs`** lists the runs,
@@ -609,6 +642,16 @@ none is a row of its own. The state of a model is `done`, `failed`, `aborted`, `
 - A run that made the **comparison** (one figure of the measured curve, every model and the references) has one
   more row, `comparison`, after its models: Enter opens `compare/<run>_compare.xlsx` in the same viewer (its
   `compare` and `legend` sheets, `^p` for the plot); a failed one says why in the note row.
+- **`shift+m` and `shift+c`** act on the highlighted model (or the `comparison` row): **move plots** copies its `.tex` figures
+  (from the run's archive, or from its folder in an older run) into the plot folder, **compile plots** extracts
+  them to a temporary folder, runs the LaTeX compiler on each and puts the PDFs in the plot folder. The legend
+  shows them where there are figures. Where they go: `<plot dir>/<project>/<run stamp>/<model>/` (`comparison/` for the comparison),
+  one folder for all projects: the setting `plot dir` (output sheet), by default `<BAYSOL data folder>/plots`. The
+  compiler is the setting `latex compiler path`; empty means `lualatex`, then `xelatex`, found on the `PATH`
+  (`pdflatex` cannot load the fonts of the figures, so it is only used when you set its path). A compiler that
+  cannot be found is told in the note row, with where to set the path (a path that is set is never replaced by a
+  different compiler); a figure that LaTeX rejects is named with the first line of its error, and the others are still
+  made. A note, an error too, stays until the next key.
 - **`^l`** on a run opens `logs/run.LOG` in a pager: Enter, Space and PgDn page down, `b` and PgUp page up, arrows,
   Home and End move, Esc or `^x` closes. A live run can be read.
 - **`^r`** deletes the whole run folder after a question (`... this cannot be undone!`); a live run is refused
@@ -646,6 +689,23 @@ largest that fits is chosen at first; the keys appear only while a larger or sma
 sheet is cut at a limit, and the status line says so. The first row is frozen when it is text. The viewer never
 writes, locks or changes a file.
 
+In the sheets mode the viewer also has these keys (each shows in the legend only while it works):
+
+| Key | What it does |
+| :-- | :-- |
+| `/` | **find**: a prompt (Enter searches, Esc cancels) for text; the cells that contain it, in any case, are underlined and the cursor jumps to the first one at or after it. The status line shows `match 3 / 12`; the text is kept while the viewer is open, for every sheet |
+| `n`, `N` | the next and the previous match, wrapping round (shown while a search has matches; `no match` is a note when there is none) |
+| `g` | **go to**: a prompt for a cell (`B7`), a row (`7`, the column stays) or a column (`B`, the row stays); text that is none of these, or a place outside the sheet (`outside the sheet (A1:H60)`), is a note that stays until the next key |
+| `Space` | **mark** the cursor cell as one corner of a range; moving the cursor extends the range (drawn highlighted, `range A1:B2` in the status line); `Space` again or `Esc` clears it |
+| `c` | **copy**: with a range marked it copies the range; without one the note asks `copy: cell (c), row (r), column (l)?` and the next key picks (`Esc` cancels) |
+| `f` | **formulas**: shows the formula text of the cells that have one (`=SUM(A1:A2)`) instead of their values, and back; on a sheet without formulas it says `no formulas here` (the key is in the legend only when the sheet has formulas) |
+
+A copy is TAB-separated text, one line per row, sent to the clipboard through the terminal (the OSC 52 sequence,
+which also works over SSH; a terminal that does not accept it ignores it). The note says what went:
+`copied A1:B2 (4 cells)`, `copied row 7 (12 cells)`, `copied column C (61 cells)`. More than 70 KB is refused
+(`too much to copy (70 KB at most)`). Control characters in a cell become a space, so a cell can never send an escape
+sequence to the terminal.
+
 The plots exist at several sizes (`PLOT_TUI_SIZES`, written by a run started from the terminal interface). The
 plots mode shows the **largest that fits the panel** (width and rows), the smallest if none does (then it
 scrolls), and picks again when the window is resized; the plot tab stays. The status line says which, `plot 1 / 9 ·
@@ -673,7 +733,10 @@ scrolls), and picks again when the window is resized; the plot tab stays. The st
 | `Tab`, `Shift+Tab` (also `]` `[`) | viewer: next and previous sheet or plot |
 | `+` `-` | viewer, plots mode: zoom in and out (a larger or smaller saved size) |
 | `^p` | viewer: switch between sheets and plots (in the buffer it adds a polymer) |
+| `/`, `n`, `N`, `g` | viewer: find, next and previous match, go to a cell |
+| `Space`, `c`, `f` | viewer: mark a range, copy (OSC 52), show formulas |
 | `l` | `open runs`: read the run's `run.LOG` |
+| `shift+m`, `shift+c` | `open runs`: move plots, compile plots of the highlighted model |
 | `b`, `Space`, PgUp, PgDn | pager: page up and down |
 | menu hotkeys | main: `n` `l` `o` `s` `h` `q`; project: `m` `d` `b` `g` `s` `o`; settings: `u` `m` `a` `p` |
 
@@ -699,12 +762,14 @@ renamed, so a reader never sees half a file.
         model-settings.json  per-model overrides {"<model>": {sheet: {NAME: {"value": ...}}}}, sparse
         models/              copies of your .cif and .pdb files
         runs/<HH-MM-SS-mmm_TZ_±HHMM_YYYY-MM-DD>/   e.g. 23-35-29-123_EST_-0500_2026-11-07
-            run.json         status, versions, models, timings (written by Julia)
+            run.json         status, versions, models, timings (written by Julia; never packed)
+            run.7z           the run's archive: everything below except the workbooks (see "The run archive")
             logs/            settings.json buffer.json solutes.json data.tsv data.json
-                             models.json run.LOG plots.txt  (what the run read, and its log)
+                             models.json run.LOG plots.txt  (what the run read, and its log; in run.7z)
             <model>/
-                <model>.LOG
-                output/      <model>.xlsx, plots.txt, the .tex figures (in output/plots/)
+                <model>.LOG  (in run.7z)
+                output/      <model>.xlsx (stays in place), plots.txt, plots_<W>x<H>.txt, the .tex figures
+                             (in output/plots/) (these in run.7z)
 ```
 
 `settings.json` (global or project; the keys are the sheet, then the setting):
@@ -819,16 +884,15 @@ import; `units` is `"nm-1"` or `"A-1"`):
 
 `logs/run.LOG` has flat `name<TAB>value` rows: the setup (with `temperature_c`, `ph`, `sigma_ph`,
 `energy_ev`), then the output, a `--- result ---` block and, if anything failed, an `=== ERRORS ===` section with
-each message and its stack. Nothing in a run folder is ever overwritten; the only deletion is the explicit
-`delete run`. A file that cannot be used is never written over: it is told, and `r` resets it, keeping the old
+each message and its stack. Nothing in a run folder is ever overwritten; the deletions are the explicit
+`delete run` and, once its archive has passed `7z t`, the files that were packed into it. A file that cannot be used is never written over: it is told, and `r` resets it, keeping the old
 one as `<name>.corrupt`.
 
 ## Two copies at once
 
 Two copies of the program, or the program and a Julia script, can use the same data folder safely. Saving takes
 a short lock on the file. Settings changed in two copies are merged (the same setting: the last save wins). A
-buffer or custom-solute list that another copy saved meanwhile is not overwritten (`changed on disk: another copy
-of BAYSOL saved it; reopen it`). A project deleted in one copy is not brought back by the other. Starting a run
+buffer or custom-solute list that another copy saved meanwhile is not overwritten (`changed on disk: reopen it`). A project deleted in one copy is not brought back by the other. Starting a run
 takes a lock too, so two copies starting at the same instant cannot both win; a refused start says
 `a run is in progress (pid N)`, and `delete run` and `delete project` refuse a live run.
 
@@ -839,10 +903,12 @@ takes a lock too, so two copies starting at the same instant cannot both win; a 
 | `BAYSOL: this program needs a terminal` | run it from a terminal window, not a pipe |
 | a message instead of the screen | the terminal is under 80 x 24: enlarge it |
 | `<file> unusable!` and `r: reset` | the file was edited by hand or damaged; `r` then Enter resets it to empty and keeps the old one as `<name>.corrupt` |
-| `changed on disk: another copy of BAYSOL saved it; reopen it` | leave the screen and open it again |
+| `changed on disk: reopen it` | another copy of BAYSOL saved the file meanwhile: leave the screen and open it again |
 | no `run: shift+r` | a model, a buffer with a solute and a pH, or data with its energy is missing |
 | `a run is in progress (pid N)` | a run of this project is live (maybe in another window); wait or stop it |
 | `could not start julia: ...` | `julia` is not on the PATH: install it or set `JULIA` to its full path |
+| `not packed: ...` | the run finished but its archive could not be made or did not test; read the reason; the run reads fine unpacked |
+| `no LaTeX compiler found ...` | `compile plots` found no `lualatex` or `xelatex` on the `PATH`: set `latex compiler path` (output sheet) |
 | `julia ended unexpectedly (...)` | Julia died; read `logs/run.LOG` (`l` in `open runs`) |
 | a model is `failed`, with its first error line on the run screen | the whole message and stack are in the `ERRORS` section of `logs/run.LOG`; the other models still ran |
 | `WLSError` in `run.LOG` | too few points (fewer than 3) or the model curve is flat across the q window; check the curve, `units` and `energy` |
@@ -862,8 +928,8 @@ repository root are shared by both sides, so a change to a file format changes b
 
 | Folder | What lives there |
 | :-- | :-- |
-| `core/` | no UI: `environment.ts` (folders, the cache, asset lookup, the `RUN_FLOW` and `LOGS_FLOW` constants, the Julia command), `terminal.ts` (text width, wrapping, number parsing, `hasTerminal`), `file-system.ts` (JSON files, atomic writes, locks) |
-| `store/` | the data layer, no React: settings, projects and the run folder, buffer and solutes, the add flow, custom solutes, data import, the run session and its logs, the viewer's data |
+| `core/` | no UI: `environment.ts` (folders, the cache, asset lookup, the `RUN_FLOW` and `LOGS_FLOW` constants, the Julia command), `terminal.ts` (text width, wrapping, number parsing, `hasTerminal`), `file-system.ts` (JSON files, atomic writes, locks), `archive.ts` (7-Zip: atomic packing, read-only listing and reading of entries, extraction into a temporary folder), `fonts.ts` |
+| `store/` | the data layer, no React: settings, projects and the run folder, buffer and solutes, the add flow, custom solutes, data import, the run session and its logs, the run archive (`run-archive.ts`), the plots actions (`plots.ts`), the viewer's data |
 | `ui/` | the kit every screen is built from: `interaction.tsx` (the navigation stack, **all key definitions**, text input, cursor lists), `theme.tsx`, `grid.tsx` (menus and legends), `input.tsx` (prompts, dropdowns, questions, the theme picker), `frame.tsx` (the screen frame and forms) |
 | `screens/` | the screens: menus, data, solutes, custom solutes, settings, the run screen, the viewer and `open runs` |
 

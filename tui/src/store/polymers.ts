@@ -156,7 +156,10 @@ export function isNegative(x: unknown): boolean {
  * @param e - the entry or unit.
  * @returns `formula` with `formula unknown`, `z` with `Z must be > 0`, or `undefined`.
  */
-export function zProblem(e: { formula: string; z: number | null }): FieldProblem | undefined {
+export function zProblem(e: {
+    formula: string
+    z: number | null
+}): FieldProblem | undefined {
     const hasZ = e.z !== null && e.z > 0
     const formulaOk = e.formula.trim() === "" || !isProblem(parseFormula(e.formula))
     if (!hasZ && !formulaOk) return { field: "formula", message: "formula unknown" }

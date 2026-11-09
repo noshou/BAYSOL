@@ -4,7 +4,11 @@ import assert from "node:assert/strict"
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
-import { ChangedOnDiskError, UnusableFileError, writeJson } from "../src/core/file-system.js"
+import {
+    ChangedOnDiskError,
+    UnusableFileError,
+    writeJson,
+} from "../src/core/file-system.js"
 import { formatNumber } from "../src/core/terminal.js"
 import {
     addEntry,
@@ -573,7 +577,10 @@ const storePolymer = (units: unknown[] = [storeUnit]): PolymerEntry =>
     }) as PolymerEntry
 
 const unusable = (f: () => unknown) =>
-    assert.throws(f, (e: unknown) => e instanceof UnusableFileError && e.kind === "custom-solutes")
+    assert.throws(
+        f,
+        (e: unknown) => e instanceof UnusableFileError && e.kind === "custom-solutes",
+    )
 
 test("the fixture round trips", () => {
     const root = tempRoot()

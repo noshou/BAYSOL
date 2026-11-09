@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// Tests of store/view.ts: the sheets, the plots and the pager.
+// Tests of store/view.ts: the sheets, the plots, the pager, search, jump and copy.
 
 import assert from "node:assert/strict"
 import { readFileSync, statSync, writeFileSync } from "node:fs"
@@ -9,21 +9,30 @@ import { test } from "node:test"
 import * as XLSX from "xlsx"
 import {
     buildSheet,
+    COPY_LIMIT,
     cellDisplay,
     cellRef,
     clampTop,
+    clipboardSequence,
     columnLabel,
+    copyText,
     expandTabs,
+    findCells,
     firstShown,
     fitCount,
     lastTop,
     looksNumeric,
+    matchFrom,
+    matchIndex,
+    matchStep,
     openWorkbook,
     pagerLines,
     pagerStatus,
     pageTop,
+    parseJump,
     pickPlotFile,
     plotWidth,
+    shownCells,
     sliceCells,
     splitPlots,
     stripAnsi,
@@ -295,4 +304,119 @@ test("the plot size shown is the largest that fits, else the smallest", () => {
     assert.equal(pickPlotFile(files, 400, 100), 3)
     assert.equal(pickPlotFile(files, 40, 5), 0, "none fits: the smallest")
     assert.equal(pickPlotFile([...files].reverse(), 40, 5), 3, "whatever the order")
+})
+
+// ========================================================================================
+// 4. Search, jump, copy, formulas
+// ========================================================================================
+
+const grid = [
+    ["Name", "Value", "note"],
+    ["alpha", "1", "a NAME here"],
+    ["beta", "2", ""],
+    ["name2", "3", "x"],
+]
+
+test("search is case-insensitive, row by row, and wraps with n and shift+n", () => {
+    const hits = findCells(grid, "name")
+    assert.deepEqual(hits, [
+        { row: 0, column: 0 },
+        { row: 1, column: 2 },
+        { row: 3, column: 0 },
+    ])
+    assert.deepEqual(findCells(grid, ""), [])
+    assert.deepEqual(findCells(grid, "zzz"), [])
+    // the first match at or after the cursor, wrapping to the first
+    assert.equal(matchFrom(hits, 0, 0), 0)
+    assert.equal(matchFrom(hits, 0, 1), 1)
+    assert.equal(matchFrom(hits, 1, 2), 1)
+    assert.equal(matchFrom(hits, 3, 1), 0)
+    assert.equal(matchFrom([], 0, 0), undefined)
+    // next and previous, from a match and from a cell that is none
+    assert.equal(matchStep(hits, 0, 0, 1), 1)
+    assert.equal(matchStep(hits, 3, 0, 1), 0, "next wraps")
+    assert.equal(matchStep(hits, 0, 0, -1), 2, "previous wraps")
+    assert.equal(matchStep(hits, 2, 1, 1), 2)
+    assert.equal(matchStep(hits, 2, 1, -1), 1)
+    assert.equal(matchStep([], 0, 0, 1), undefined)
+    assert.equal(matchIndex(hits, 1, 2), 1)
+    assert.equal(matchIndex(hits, 2, 2), undefined)
+})
+
+test("jump reads a cell, a row or a column and refuses what is outside", () => {
+    const at = { row: 4, column: 2 }
+    assert.deepEqual(parseJump("B7", at, 60, 8), { row: 6, column: 1 })
+    assert.deepEqual(parseJump(" b7 ", at, 60, 8), { row: 6, column: 1 })
+    assert.deepEqual(parseJump("7", at, 60, 8), { row: 6, column: 2 })
+    assert.deepEqual(parseJump("B", at, 60, 8), { row: 4, column: 1 })
+    assert.deepEqual(parseJump("AA1", at, 60, 30), { row: 0, column: 26 })
+    for (const bad of ["", "7B", "B 7", "$B$7", "B-7", "1.5", "ABCD1"])
+        assert.ok("error" in parseJump(bad, at, 60, 8), bad)
+    const outside = parseJump("B61", at, 60, 8)
+    assert.deepEqual(outside, { error: "outside the sheet (A1:H60)" })
+    assert.ok("error" in parseJump("I1", at, 60, 8))
+    assert.ok("error" in parseJump("0", at, 60, 8))
+})
+
+test("a copy is TSV by range, row or column, with the note that says what", () => {
+    const out = (what: Parameters<typeof copyText>[1]) => copyText(grid, what)
+    assert.deepEqual(
+        out({ kind: "range", from: { row: 1, column: 1 }, to: { row: 0, column: 0 } }),
+        { text: "Name\tValue\nalpha\t1", note: "copied A1:B2 (4 cells)" },
+    )
+    const beta = { row: 2, column: 0 }
+    assert.deepEqual(out({ kind: "range", from: beta, to: beta }), {
+        text: "beta",
+        note: "copied A3 (1 cell)",
+    })
+    assert.deepEqual(out({ kind: "row", row: 1 }), {
+        text: "alpha\t1\ta NAME here",
+        note: "copied row 2 (3 cells)",
+    })
+    assert.deepEqual(out({ kind: "column", column: 2 }), {
+        text: "note\na NAME here\n\nx",
+        note: "copied column C (4 cells)",
+    })
+})
+
+test("a copy cleans control characters and refuses over 70 KB", () => {
+    const dirty = [["a\tb\x1b]52;c;x\x07", "ok\nline"]]
+    const out = copyText(dirty, { kind: "row", row: 0 })
+    assert.ok("text" in out)
+    assert.equal(out.text, "a b ]52;c;x \tok line")
+    assert.ok([...out.text].every((ch) => ch === "\t" || ch >= " "))
+    const big = [["x".repeat(COPY_LIMIT)], ["y"]]
+    assert.deepEqual(copyText(big, { kind: "column", column: 0 }), {
+        error: "too much to copy (70 KB at most)",
+    })
+    const fits = [["x".repeat(COPY_LIMIT)]]
+    assert.ok("text" in copyText(fits, { kind: "row", row: 0 }))
+})
+
+test("the clipboard sequence is OSC 52 with the text in base64", () => {
+    assert.equal(clipboardSequence("a\tb\nc"), "\x1b]52;c;YQliCmM=\x07")
+    const base64 = Buffer.from("日本").toString("base64")
+    assert.equal(clipboardSequence("日本"), `\x1b]52;c;${base64}\x07`)
+})
+
+test("formulas are read from a workbook and shown instead of the values", () => {
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([[1], [2], [0]])
+    ws.A3 = { t: "n", v: 3, f: "SUM(A1:A2)" }
+    XLSX.utils.book_append_sheet(wb, ws, "f")
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[1, 2]]), "plain")
+    const path = join(temp(), "formulas.xlsx")
+    writeFileSync(path, XLSX.write(wb, { type: "buffer", bookType: "xlsx" }))
+    const book = openWorkbook(path, "x")
+    const sheet = book.sheet(0)
+    assert.equal(sheet.cells[2]?.[0], "3")
+    assert.equal(sheet.formulas?.[2]?.[0], "=SUM(A1:A2)")
+    assert.deepEqual(shownCells(sheet, true)[2], ["=SUM(A1:A2)"])
+    const plainValue = shownCells(sheet, true)[0]
+    assert.deepEqual(plainValue, ["1"], "a cell without a formula shows its value")
+    assert.equal(shownCells(sheet, false), sheet.cells)
+    assert.equal(book.sheet(1).formulas, undefined, "no formulas, no toggle")
+    const csv = join(temp(), "t.csv")
+    writeFileSync(csv, "a,b\n1,2\n")
+    assert.equal(openWorkbook(csv, "t").sheet(0).formulas, undefined)
 })

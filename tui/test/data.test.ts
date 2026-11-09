@@ -438,14 +438,6 @@ const FIT_FILES: Record<string, [file: string, sigma: number]> = {
 }
 
 /**
- * The files the importer refuses, and its message: a repeated q row, as deposited. Rows
- * with q or sigma not above 0 are dropped, as the scripts' own filters do.
- */
-const REFUSED: Record<string, string> = {
-    SASDCQ2: "line 395: q must increase",
-}
-
-/**
  * The scripts' own reading (`_read_curve` in test/fitting_tests/common.jl): every line
  * with numbers in columns 1, 2 and `sigma` (commas read as blanks), and the line of the
  * first one.
@@ -486,20 +478,17 @@ test("real curves: every deposited file is detected, auto, as the scripts read i
         assert.deepEqual(end, last.cells.map(Number), at)
         // q increasing and above 0, sigma above 0, at least 3 points: the importer's checks
         const columns = { q: 1, i: 2, sigma }
-        const refused = REFUSED[id]
-        if (refused !== undefined)
-            assert.equal(
-                failure(() => extractCurve(table, columns)),
-                refused,
-            )
-        else {
-            const curve = extractCurve(table, columns)
-            const bad = (r: { cells: string[] }) =>
-                Number(r.cells[0]) <= 0 || Number(r.cells[2]) <= 0
-            const zero = want.filter(bad).length
-            assert.equal(curve.dropped, zero, at)
-            assert.equal(curve.q.length, want.length - zero, at)
-        }
+        // every real file imports: rows with q or sigma not above 0 and rows repeated
+        // exactly (SASDCQ2 has one) are dropped and counted
+        const curve = extractCurve(table, columns)
+        const kept = want.filter((r) => Number(r.cells[0]) > 0 && Number(r.cells[2]) > 0)
+        let repeated = 0
+        for (const [k, r] of kept.entries())
+            if (k > 0 && r.cells.join(" ") === kept[k - 1]?.cells.join(" ")) repeated++
+        const dropped = want.length - kept.length + repeated
+        assert.equal(curve.dropped, dropped, at)
+        assert.equal(curve.q.length, want.length - dropped, at)
+        if (id === "SASDCQ2") assert.ok(repeated >= 1, "the repeated row of SASDCQ2")
         separators.add(table.separator)
     }
     assert.deepEqual([...separators].sort(), ["tab", "whitespace"])

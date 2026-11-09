@@ -280,12 +280,16 @@
        "description": "Write each figure as a pgfplots .tex file in the plots folder. No LaTeX installation is needed."
       },
       {
-       "name": "FIGURES_COMPILE",
-       "description": "Run LaTeX on the .tex figures (about 1 second each; needs lualatex, xelatex or pdflatex). A failure only produces a warning."
-      },
-      {
        "name": "FIGURES_FORMATS",
        "description": "File types made from each .tex file when compiling: :pdf, :png or :svg (PNG and SVG also need poppler)."
+      },
+      {
+       "name": "FIGURES_DIR",
+       "description": "Plot dir: where plots are moved and compiled to, one folder for all projects (<plot dir>/<project>/<run>/<model>/). Empty: the plots folder of the BAYSOL data folder. A run also copies its .tex figures there when this is set."
+      },
+      {
+       "name": "FIGURES_COMPILER",
+       "description": "Path of the LaTeX compiler that compiles plots (lualatex, xelatex or pdflatex, named by its file). Empty: lualatex, then xelatex, found on the PATH. A path that is set is never replaced by another compiler."
       }
      ]
     }

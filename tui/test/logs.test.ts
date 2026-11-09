@@ -16,7 +16,7 @@ import { test } from "node:test"
 import { RUN_FLOW } from "../src/core/environment.js"
 import { ChangedOnDiskError, isFolder, writeJson } from "../src/core/file-system.js"
 import { LogsRuns } from "../src/screens/logs-menu.js"
-import { noWorkbookNote, openRowText, TextPager } from "../src/screens/logs-viewer.js"
+import { noWorkbookNote, openRowText, TextPager } from "../src/screens/open-runs.js"
 import {
     type BufferRow,
     readConditions,
@@ -163,7 +163,7 @@ test("a vanishing project folder gives no runs, a live model stays running", () 
 test("rows: several models are listed under a heading, one model goes straight on", () => {
     const model = (name: string) => ({
         name, state: "done" as const, error: undefined, workbook: undefined, plots: "",
-        plotSizes: [], overrides: [] as string[],
+        plotSizes: [], overrides: [] as string[], tex: [] as string[],
     })
     const run = (id: string, names: string[]): OpenRun => ({
         id, dir: "", state: "done", models: names.map(model), compare: undefined,

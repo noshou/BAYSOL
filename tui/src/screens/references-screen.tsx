@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// The references screen of a project: the reference curves in its `references/` folder
+// The references screen of a project: the reference curves in its `reference-fit/` folder
 // (the depositor's CRYSOL or FoXS fit, ...), which the comparison of a run draws with the
 // measured curve and the fits. `^n` adds one from any table (a path prompt, then the
 // import screen of the data screen in its reference mode), `^r` deletes the highlighted
@@ -106,7 +106,7 @@ export function referenceNote(entry: ReferenceEntry | undefined): string | undef
 }
 
 /**
- * The references of a project: a table of the curves in `references/` (name, points, q
+ * The references of a project: a table of the curves in `reference-fit/` (name, points, q
  * range in the project's units), an unusable file listed as `unusable` with its reason as
  * the note (the program never deletes or changes it). Keys: up and down move, `^n` adds
  * (a path or, with an empty field, `o` for the file picker; the import screen then reads
@@ -312,7 +312,7 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
     ]
     return (
         <Frame
-            title="references"
+            title="reference fit"
             subtitle={project.id}
             legend={legend}
             note={shown?.text}
@@ -344,7 +344,7 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
                 <Panel paddingX={1} flexDirection="column">
                     {entries.length === 0 ? (
                         <Text color={theme.mt}>
-                            {`no references yet (add: ${keys.addReference.label})`}
+                            {`no reference fit yet (add: ${keys.addReference.label})`}
                         </Text>
                     ) : (
                         <DataTable

@@ -5,7 +5,8 @@
 
 import { Box, Text } from "ink"
 import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react"
-import { displayWidth, truncate } from "../core/terminal.js"
+import { displayWidth, wrapLine } from "../core/terminal.js"
+import { runDisplay } from "../store/projects.js"
 import { elapsedText, isEnd, type RunPhase, type RunSession } from "../store/run.js"
 import { Frame } from "../ui/frame.js"
 import { type LegendItem, legendFor } from "../ui/grid.js"
@@ -42,23 +43,24 @@ const WAITING = "waiting for julia..."
  */
 export function runNote(phase: RunPhase, note: string | undefined): string | undefined {
     if (phase === "aborting") return "stopping the run..."
+    if (phase === "packing") return "packing the run..."
     return note
 }
 
 /**
- * The last of the output lines that fit a panel, each cut to its width.
+ * The last of the output lines that fit a panel, each wrapped to its width.
  *
  * @param lines - all the lines kept.
  * @param rows - the rows of the panel's inside.
  * @param columns - the cells of a line.
- * @returns at most `rows` lines, the newest last.
+ * @returns at most `rows` rows, the newest last.
  */
 export function visibleTail(
     lines: readonly string[],
     rows: number,
     columns: number,
 ): string[] {
-    return lines.slice(-rows).map((line) => truncate(line, columns))
+    return lines.flatMap((line) => wrapLine(line, columns)).slice(-rows)
 }
 
 /**
@@ -103,7 +105,7 @@ export function RunScreen({ session }: { session: RunSession }): ReactNode {
     return (
         <Frame
             title="run"
-            subtitle={`${view.project} · ${view.id}`}
+            subtitle={`${view.project} · ${runDisplay(view.id)}`}
             legend={legend}
             legendFull={[ABORT_LEGEND, BACK_LEGEND]}
             counter={`${view.phase} ${elapsed}`}

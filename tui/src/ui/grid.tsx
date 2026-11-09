@@ -18,8 +18,10 @@ import {
     type KeyInput,
     keyLabels,
     keys,
+    NarrowWidth,
     plainKey,
     themeLineRows,
+    useBodyColumns,
     useKeys,
     useNav,
 } from "./interaction.js"
@@ -444,6 +446,9 @@ const hintArtHeight = 3
 /** The border rows of the `Panel` around the hint art, top and bottom. */
 const hintBorderRows = 2
 
+/** The most cells an open prompt or list takes: it is a dropdown, not half the screen. */
+const overlayMaxWidth = 44
+
 /** The rows the hint box (or the legend of an open overlay) takes at the bottom. */
 const hintRows = hintArtHeight + hintBorderRows
 
@@ -697,6 +702,8 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
     // when the terminal is too short to fit them with everything else, so the notice
     // never lands on the art
     const { rows: terminalRows, columns: terminalColumns } = useWindowSize()
+    const bodyColumns = useBodyColumns()
+    const overlayWidth = Math.min(Math.floor(bodyColumns / 2), overlayMaxWidth)
     const fixedRows = menuHeaderRows + noticeRows + hintRows + themeLineRows
     const needed = fixedRows + spec.gridHeight + marginRows
     const margin = terminalRows >= needed ? 1 : 0
@@ -734,9 +741,25 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
                     (the right half, as high as the grid) and nothing else, so the left
                     column stays in view and opening it never moves the grid */}
                 {overlay !== undefined ? (
-                    <Box position="absolute" top={0} right={0} bottom={0} width="50%">
-                        <Panel flexDirection="column" flexGrow={1} paddingX={1}>
-                            {overlay}
+                    <Box
+                        position="absolute"
+                        top={0}
+                        right={0}
+                        bottom={0}
+                        width={Math.floor(bodyColumns / 2)}
+                        backgroundColor={theme.bg}
+                        justifyContent="center"
+                    >
+                        <Panel
+                            flexDirection="column"
+                            alignSelf="flex-start"
+                            width={overlayWidth}
+                            paddingX={1}
+                        >
+                            {/* the panel's width, less the border and the padding */}
+                            <NarrowWidth.Provider value={overlayWidth - 4}>
+                                {overlay}
+                            </NarrowWidth.Provider>
                         </Panel>
                     </Box>
                 ) : null}

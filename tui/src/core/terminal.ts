@@ -85,6 +85,23 @@ export function wrapText(text: string, cells: number): string[] {
 }
 
 /**
+ * One output line as the rows of a panel: a line that is too wide is wrapped at spaces
+ * (never cut with an ellipsis), the continuation rows indented two cells further than
+ * the line itself, so nothing of what Julia printed is lost off the right edge.
+ *
+ * @param line - the line.
+ * @param columns - the cells of a row.
+ * @returns the rows, at least one.
+ */
+export function wrapLine(line: string, columns: number): string[] {
+    if (displayWidth(line) <= columns) return [line]
+    const lead = line.length - line.trimStart().length
+    const room = Math.max(4, columns - lead - 2)
+    const pieces = wrapText(line.trimStart(), room)
+    return pieces.map((piece, i) => " ".repeat(lead + (i === 0 ? 0 : 2)) + piece)
+}
+
+/**
  * The note that tells a cap was reached while typing a `what` (`name`, `text`). The one
  * place the wording lives.
  */
@@ -237,4 +254,17 @@ export function parseNumber(text: string, rules: NumberRules = {}): Parsed<numbe
  */
 export function hasTerminal(): boolean {
     return Boolean(process.stdin.isTTY && process.stdout.isTTY)
+}
+
+/**
+ * Writes a raw sequence to the terminal (the clipboard's OSC 52), beside what Ink draws;
+ * nothing without a terminal.
+ *
+ * @param sequence - what to write.
+ * @returns `true` when it was written.
+ */
+export function writeTerminal(sequence: string): boolean {
+    if (!process.stdout.isTTY) return false
+    process.stdout.write(sequence)
+    return true
 }

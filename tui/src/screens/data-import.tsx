@@ -159,8 +159,8 @@ function visibleColumns(count: number, chosen: number[], room: number): number[]
  * @param props.initial - the stored mapping, to start from the choices of an earlier
  *     import.
  * @param props.reference - the reference mode: the curve is added to the project's
- *     `references/` instead of replacing its data; sigma may be `none`, the units are the
- *     project's (shown in the subtitle), and the stored mapping is not used.
+ *     `reference-fit/` instead of replacing its data; sigma may be `none`, the units are
+ *     the project's (shown in the subtitle), and the stored mapping is not used.
  * @param props.onDone - called with the number of points, of rows dropped for a q (or
  *     sigma) not above 0 and, for a reference, the name it got, after a successful import.
  * @returns the screen.

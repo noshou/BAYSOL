@@ -151,6 +151,7 @@ const namedLabels: Record<string, string> = {
     home:      "home",
     end:       "end",
     " ":       "␣",
+    "+":       "shift++",
 }
 
 /**
@@ -200,7 +201,8 @@ export class KeyInput {
      * letter for a Ctrl key, `shift+` and the letter for a Shift key.
      */
     get label(): string {
-        if (this.key_ in namedLabels) return namedLabels[this.key_]
+        if (this.key_ in namedLabels)
+            return `${this.shift ? "shift+" : ""}${namedLabels[this.key_]}`
         if (this.ctrl) return `^${this.key_}`
         return this.shift ? `shift+${this.key_}` : this.key_
     }
@@ -243,6 +245,23 @@ export const plainKey = (letter: string): KeyInput => new KeyInput(letter)
  */
 export const shiftKey = (letter: string): KeyInput =>
     new KeyInput(letter, false, "", true)
+
+/** A key only the capital letter matches; a legend shows the capital (`N`). */
+class CapitalKey extends KeyInput {
+    override get label(): string {
+        return this.key_.toUpperCase()
+    }
+}
+
+/**
+ * A capital-letter hotkey: only the capital matches it, and the legend shows `N`, not
+ * `shift+n` (shorter, so a legend with many keys keeps its width).
+ *
+ * @param letter - the letter, lower case.
+ * @returns the key.
+ */
+const capitalKey = (letter: string): KeyInput =>
+    new CapitalKey(letter, false, "", true)
 
 /**
  * What a legend shows for one or more keys, so a legend never spells a key itself.
@@ -338,7 +357,7 @@ export const keys = {
     /** Reset an unusable file (a landing page). */
     reset:     plainKey("r"),
 
-    // The file viewer (`screens/logs-viewer.tsx`).
+    // The file viewer (`screens/viewer.tsx`).
 
     /** The pager's page down (with Enter and PgDn). */
     space:      new KeyInput(" "),
@@ -350,12 +369,31 @@ export const keys = {
     /** The previous and the next sheet (tab). */
     shiftTab:   shiftKey("tab"),
     zoomIn:     plainKey("+"),
+    zoomInAlt:  plainKey("="),
     zoomOut:    plainKey("-"),
     prevSheet:  plainKey("["),
     nextSheet:  plainKey("]"),
 
+    /** Search (`/`), the next and previous match, jump to a cell, copy, formulas. */
+    find:       plainKey("/"),
+    nextMatch:  plainKey("n"),
+    prevMatch:  capitalKey("n"),
+    jump:       plainKey("g"),
+    copy:       plainKey("c"),
+    copyRow:    plainKey("r"),
+    copyColumn: plainKey("l"),
+    formulas:   plainKey("f"),
+
     /** Read the `run.LOG` of a run (`open runs`). */
     showLog:    ctrlKey("l"),
+
+    /** Move (copy) the `.tex` plots of the highlighted model or comparison to the plot
+     * folder (`open runs`). */
+    movePlots:       shiftKey("m"),
+
+    /** Compile the plots of the highlighted model or comparison with LaTeX into the
+     * plot folder. */
+    compilePlots:    shiftKey("c"),
 
     // The `run.LOG` pager also takes `enter`, `space`, `pageDown`, `pageUp`, the arrows
     // and `home`/`end`.
@@ -471,8 +509,16 @@ export function useBodyRows(extra: number = 0): number {
  */
 export function useBodyColumns(): number {
     const { columns } = useWindowSize()
-    return Math.max(minColumns, columns) - 2
+    const narrowed = useContext(NarrowWidth)
+    return narrowed ?? Math.max(minColumns, columns) - 2
 }
+
+/**
+ * The width a box inside the body really has, when it is narrower than the body (the
+ * panel of an open dropdown is half as wide): [[useBodyColumns]] answers with it, so a
+ * list pads and truncates its rows to the panel and never wraps them.
+ */
+export const NarrowWidth = createContext<number | undefined>(undefined)
 
 /** The rows the app keeps under every screen for the theme line (`theme (^t): ...`). */
 export const themeLineRows = 1

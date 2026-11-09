@@ -14,8 +14,10 @@
   "private": true,
   "dependencies": {
     "@vvo/tzdb": "^6.204.0",
+    "7zip-bin": "^5.2.0",
     "ink": "^8.0.0",
     "moment-timezone": "^0.6.6",
+    "node-7z": "^3.0.0",
     "proper-lockfile": "^4.1.2",
     "react": "^19.3.1",
     "string-width": "^8.3.0",
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/node-7z": "^2.1.11",
     "@types/proper-lockfile": "^4.1.4",
     "@types/react": "^19.3.0",
     "tsx": "^4.23.15",
