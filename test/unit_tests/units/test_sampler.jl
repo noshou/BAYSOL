@@ -625,4 +625,183 @@ end
         @test sp2.logπ ≥ sp.logπ - 1e-6
     end
 
+    @testset "SamplerOptions: the settings of the search, the chains and the rerun" begin
+        SO = FIT.SamplerOptions
+        o = SO()
+        @test o.retry_n_adapt == FIT.RETRY_N_ADAPT && o.retry_n_draws == FIT.RETRY_N_DRAWS
+        @test o.chain_start_radii == collect(FIT.CHAIN_START_RADII)
+        @test o.optimum_chain_cap == FIT.OPTIMUM_CHAIN_CAP &&
+              o.optimum_min_chains == FIT.OPTIMUM_MIN_CHAINS
+        @test o.optimum_chain_radius == FIT.OPTIMUM_CHAIN_RADIUS &&
+              o.optimum_chain_fraction == FIT.OPTIMUM_CHAIN_FRACTION
+        @test o.map_max_iter == FIT.MAP_MAX_ITER && o.map_n_starts == FIT.MAP_N_STARTS &&
+              o.map_f_successive == FIT.MAP_F_SUCCESSIVE &&
+              o.map_optima_kept == FIT.MAP_OPTIMA_KEPT
+        @test o.map_jitter_radii == collect(FIT.MAP_JITTER_RADII) &&
+              o.map_jitter_directions == FIT.MAP_JITTER_DIRECTIONS &&
+              o.map_jitter_max_optima == FIT.MAP_JITTER_MAX_OPTIMA &&
+              o.map_jitter_within_nats == FIT.MAP_JITTER_WITHIN_NATS
+        @test o.basin_restart_nats == FIT.BASIN_RESTART_NATS &&
+              o.harvest_cover == FIT.HARVEST_COVER &&
+              o.harvest_divergent == FIT.HARVEST_DIVERGENT
+        # every value is converted to the type of its field (so the code stays type-stable)
+        c = SO(; map_n_starts = 0x05, chain_start_radii = [1, 2], optimum_chain_radius = 3)
+        @test c.map_n_starts === 5 && c.chain_start_radii == [1.0, 2.0] &&
+              c.optimum_chain_radius === 3.0
+
+        # the chain radii: a vector replaces the constant, a short one repeats its last
+        @test FIT.chain_radius(5, 8, [1.0, 2.0]) == 2.0 &&
+              FIT.chain_radius(6, 8, [1.0, 2.0]) == -2.0
+        @test FIT.chain_radius(3, 8, (7.0,)) == 7.0 &&
+              FIT.chain_radius(8, 8, (7.0,)) == -7.0
+        @test FIT.chain_radius(8, 8) == FIT.chain_radius(8, 8, FIT.CHAIN_START_RADII)
+        # what counts as a chain at an optimum
+        I4 = @SMatrix [1.0 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1]
+        sp = (ẑ = zeros(SVector{4}), S = I4)
+        o₁ = FIT._Optimum(SVector(10.0, 0, 0, 0), 0.0, ones(SVector{4}), I4, 0.0)
+        rng = Xoshiro(3)
+        near = 0.3 .* randn(rng, 100, 4) .+ [10.0 0 0 0]
+        mixed = vcat(near[1:40, :], 0.3 .* randn(rng, 60, 4))        # 40 % at the optimum
+        @test FIT._chains_at(o₁, sp, [mixed]) == 0
+        @test FIT._chains_at(o₁, sp, [mixed]; fraction = 0.3) == 1
+        @test FIT._chains_at(o₁, sp, [near]; radius = 0.1) == 0
+        @test FIT._chains_at(o₁, sp, [near]) == FIT._chains_at(
+            o₁, sp, [near]; radius = FIT.OPTIMUM_CHAIN_RADIUS,
+            fraction = FIT.OPTIMUM_CHAIN_FRACTION,
+        )
+    end
+
+    @testset "SamplerOptions act: MAP search, harvest, rerun, extra chains" begin
+        fw = smpl_fw()
+        seed = FIT.seed_sampler(fw, synth_data(fw)..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        SO = FIT.SamplerOptions
+        base = UInt64(0x51)
+        # the default options are the search as it always ran
+        sp0 = FIT._sampling_space(seed; base = base)
+        spd = FIT._sampling_space(seed; base = base, options = SO())
+        @test spd.ẑ == sp0.ẑ && spd.n_evals == sp0.n_evals && spd.n_starts == sp0.n_starts
+        # fewer starts and no jitter: fewer L-BFGS runs
+        few = SO(; map_n_starts = 3, map_jitter_directions = 1, map_jitter_max_optima = 1)
+        spf = FIT._sampling_space(seed; base = base, options = few)
+        @test spf.n_starts < sp0.n_starts && spf.n_evals < sp0.n_evals
+        # starts + one direction at each radius
+        @test spf.n_starts ≤ 3 + 3
+        # an iteration cap of 1 gives up early
+        capped = FIT._sampling_space(seed; base = base, options = SO(; map_max_iter = 1))
+        @test capped.n_evals < sp0.n_evals
+        # the successive-decrease count is a keyword of the options too
+        @test FIT._sampling_space(
+            seed; base = base, options = SO(; map_f_successive = 1),
+        ).n_evals ≤ sp0.n_evals
+        # harvest: one draw to start from instead of the cover
+        rng = Xoshiro(2)
+        W = randn(rng, 300, 4)
+        ld = randn(rng, 300)
+        _, n_all = FIT._harvest_optima(seed, sp0, W, ld, falses(300))
+        _, n_one = FIT._harvest_optima(
+            seed, sp0, W, ld, falses(300); options = SO(; harvest_cover = 1),
+        )
+        @test 0 < n_one < n_all
+        # the rerun has the length the options give it
+        short = SO(; retry_n_adapt = 20, retry_n_draws = 25)
+        r = FIT.infer(seed, 60, 30; rng_seed = 5, n_chains = 2, options = short)
+        d = r.diagnostics
+        @test d.first_rhat == FIT._worst_rhat(
+            FIT.infer(seed, 60, 30; rng_seed = 5, retry = false, n_chains = 2).diagnostics,
+        )
+        if d.retry_kept
+            @test d.n_adapt == 20 && maximum(r.iteration) == 45
+        else
+            @test d.n_adapt == 30
+        end
+        # the extra chains at optima: none allowed, none started
+        none = FIT.infer(
+            seed, 60, 30; rng_seed = 5, retry = false,
+            options = SO(; optimum_chain_cap = 0),
+        )
+        @test none.diagnostics.n_extra == 0 && none.diagnostics.n_chains == FIT.N_CHAINS
+        # the default options are the default run
+        a = FIT.infer(seed, 40, 20; rng_seed = 7, retry = false, n_chains = 2)
+        b = FIT.infer(
+            seed,
+            40,
+            20;
+            rng_seed = 7,
+            retry = false,
+            n_chains = 2,
+            options = SO(),
+        )
+        @test a.samples == b.samples
+        # start radii of the chains: pair 1 starts at ±2, not ±4
+        rr = FIT.infer(
+            seed, 40, 20; rng_seed = 7, retry = false, n_chains = 4,
+            options = SO(; chain_start_radii = [2.0]),
+        )
+        @test all(x -> abs(x) ≤ 2, rr.diagnostics.start_scale[1:4])
+    end
+
+    @testset "seed_sampler: bounds, mode, φ_max and the c1 window are keywords" begin
+        fw = smpl_fw()
+        data = synth_data(fw)
+        args = (fw, data..., smpl_pH, smpl_σ_pH, smpl_solutes())
+        s0 = FIT.seed_sampler(args...)
+        # at their constants: the seed of always
+        sd = FIT.seed_sampler(
+            args...; bounds_δρ₁₂ = FIT.BOUNDS_δρ₁₂, mode_δρ₁₂ = FIT.MODE_δρ₁₂,
+            φ_max = FIT.φ_max, excl_vol_corr_bounds = FIT.EXCL_VOL_CORR_BOUNDS,
+            excl_vol_corr_eps = FIT.EXCL_VOL_CORR_EPS,
+        )
+        @test sd.θ₀ == s0.θ₀ && sd.pr == s0.pr && sd.c1tab.cs == s0.c1tab.cs
+        @test (s0.pr.δρ₁Prior.μ, s0.pr.δρ₁Prior.σ) == (-10.0, 12.0)
+
+        # changed: the supports, the mode, φ_max and the c1 window
+        s1 = FIT.seed_sampler(
+            args...; bounds_δρ₁₂ = (-6.0, 3.0), mode_δρ₁₂ = 0.5, φ_max = 1.1,
+            excl_vol_corr_bounds = (0.9, 1.2), excl_vol_corr_eps = 0.025,
+        )
+        pr = s1.pr
+        @test (pr.δρ₁Prior.μ, pr.δρ₁Prior.σ) == (-6.0, 9.0) &&
+              (pr.δρ₂Prior.μ, pr.δρ₂Prior.σ) == (-6.0, 9.0)
+        # the mode of the prior sits where it was asked to
+        α, β = params(pr.δρ₁Prior.ρ)
+        @test pr.δρ₁Prior.μ + pr.δρ₁Prior.σ * (α - 1) / (α + β - 2) ≈ 0.5
+        # φ_max is the support of δρ₃: its upper end is (φ_max - 1)·ρ̄ₑ/UNIT_OF_δρ
+        ρ̄ = mean(pr.ρₑPrior)
+        top3(p) = p.δρ₃Prior.μ + p.δρ₃Prior.σ
+        @test top3(pr) ≈ (1.1 - 1) * ρ̄ / FIT.UNIT_OF_δρ
+        @test top3(s0.pr) ≈ (FIT.φ_max - 1) * mean(s0.pr.ρₑPrior) / FIT.UNIT_OF_δρ
+        c = s1.c1tab
+        @test (c.cmin, c.cmax, c.eps) == (0.9, 1.2, 0.025) && c.cs[1] ≈ 0.9 - 0.025
+        # the transform follows the support in the prior (and round-trips)
+        ξ = SVector(0.33, -2.0, 2.5, top3(pr) / 2)
+        θ, corr = Θ(ξ, pr)
+        @test Ξ(θ, pr) ≈ ξ
+        @test corr ≈ FIT.logjac(θ, pr)
+        # a point of (-10, 2) but outside (-6, 3) is not in the support
+        @test_throws DomainError Θ(SVector(0.33, -8.0, 0.0, 0.0), pr)
+        # type stability of the hot-path functions with a non-default support
+        θv = SVector{4,Float64}(θ)
+        @inferred Θ(ξ, pr)
+        @inferred Ξ(θv, pr)
+        @inferred FIT.logjac(θv, pr)
+        # the c1 search uses the tables' window; the sampler sees no error
+        wls = WLSData(data...)
+        _, _, c1 = profiled_corrs(wls, SVector{4,Float64}(ξ), fw; tables = c)
+        @test 0.9 - 0.025 ≤ c1 ≤ 1.2 + 0.025
+        @test FIT.excl_vol_saturation(1.25; cmin = c.cmin, cmax = c.cmax) == 1
+        @test FIT.excl_vol_saturation(1.25) == 0
+        # a table is not used for a window it was not built for (given explicitly)
+        @test_throws ArgumentError profiled_corrs(
+            wls, SVector{4,Float64}(ξ), fw; tables = c, cmin = 0.8,
+        )
+        @test isfinite(
+            FIT._neglogπ(zeros(SVector{4}), s1.pr |> FIT.θ_prior_moments |> first,
+                s1.pr |> FIT.θ_prior_moments |> last, s1, FIT.EXCL_VOL_CORR_TOL),
+        )
+        # a bad value is a DomainError here (the pipeline checks first, with its own error)
+        @test_throws DomainError FIT.seed_sampler(args...; mode_δρ₁₂ = 5.0)
+        @test_throws DomainError FIT.seed_sampler(args...; φ_max = 0.0)
+        @test_throws DomainError FIT.seed_sampler(args...; bounds_δρ₁₂ = (2.0, -10.0))
+    end
+
 end

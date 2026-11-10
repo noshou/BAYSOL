@@ -111,8 +111,10 @@ into a small error can show up here as a gross one.
 const SCAT_CUBE_E = fill("c", 8)
 const SCAT_CUBE_X = reduce(
     hcat,
-    [Float64[1.5x, 1.5y, 1.5z]
-     for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)],
+    [
+        Float64[1.5x, 1.5y, 1.5z]
+        for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)
+    ],
 )
 
 """

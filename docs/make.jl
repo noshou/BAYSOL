@@ -86,7 +86,7 @@ for (name, _) in DOC_MODULES
     )
 end
 
-# The terminal interface's README (tui/README.md), copied the same way, as its own page.
+# The terminal interface's README (tui/README.md), copied the same way, as the first guide.
 cp(joinpath(REPO_ROOT, "tui", "README.md"), joinpath(GUIDES_DIR, "tui.md"); force = true)
 
 # The test READMEs, with their relative links to each other pointed at the copied pages
@@ -130,6 +130,8 @@ readme = replace(
         m ->
             "](guides/" * lowercase(match(r"src/([A-Za-z]+)/", m).captures[1]) * ".md)",
 )
+# The terminal interface guide (tui/README.md) is the page guides/tui.md.
+readme = replace(readme, "](tui/README.md)" => "](guides/tui.md)")
 for (_, path) in vcat(DEV_GUIDES, TEST_GUIDES)
     page = "](testing/" * test_page(path) * ")"
     global readme = replace(readme, "](" * path * ")" => page)
@@ -147,10 +149,11 @@ makedocs(
     modules = [BAYSOL; last.(DOC_MODULES); DOC_SUBMODULES],
     pages   = [
     "Home" => "index.md",
-    "Terminal UI" => "guides/tui.md",
-    "Guides" => [
-    name => joinpath("guides", lowercase(name) * ".md") for (name, _) in DOC_MODULES
-    ],
+    # The terminal interface guide comes first among the guides, then one per module.
+    "Guides" => vcat(
+    ["Terminal UI" => "guides/tui.md"],
+    [name => joinpath("guides", lowercase(name) * ".md") for (name, _) in DOC_MODULES]
+    ),
     "Development" => [
     title => joinpath("testing", test_page(path)) for (title, path) in DEV_GUIDES
     ],

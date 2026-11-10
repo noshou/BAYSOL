@@ -43,17 +43,19 @@ using .Hydrogenator: Hydrogenator
 using .Scattering: Scattering
 using .Inference: Inference
 using .Pipeline:
-    Pipeline, seed_model, run_model, write_log, print_summary, results,
+    Pipeline, seed_model, run_model, write_log, print_summary, results, compare_results,
     PlotStyle, Reference, font_available, load_settings, settings_file,
-    InvalidSettingsError, load_buffer, InvalidBufferError, seed_keywords
+    InvalidSettingsError, load_buffer, load_buffer_ph, InvalidBufferError, seed_keywords,
+    run_keywords, run_arguments, results_keywords, run_project
 
 # The pipeline entry points, reached qualified
 # (`BAYSOL.seed_model`), not exported. Their
 # result types live in Pipeline (`BAYSOL.Pipeline.MAPParams`, …).
 public seed_model,
-    run_model, write_log, print_summary, results, PlotStyle, Reference,
+    run_model, write_log, print_summary, results, compare_results, PlotStyle, Reference,
     font_available, load_settings, settings_file, InvalidSettingsError, load_buffer,
-    InvalidBufferError, seed_keywords
+    load_buffer_ph, InvalidBufferError, seed_keywords, run_keywords, run_arguments,
+    results_keywords, run_project
 
 include("Precompile.jl")
 

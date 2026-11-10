@@ -1,0 +1,279 @@
+{
+  "recipes": [
+    {
+      "name": "SEC buffer",
+      "solutes": [
+        {
+          "kind": "nonbiological",
+          "name": "NaCl",
+          "arg": "sodium chloride",
+          "mM": 200,
+          "sigma-mM": 10
+        },
+        {
+          "kind": "polymer",
+          "name": "PEG 3350",
+          "arg": "PEG 3350",
+          "mM": 0.05,
+          "sigma-mM": 0.003
+        },
+        {
+          "kind": "polymer",
+          "name": "PEG 22",
+          "arg": "PEG n=22",
+          "mM": 0.1,
+          "sigma-mM": 0.01
+        }
+      ],
+      "pH": 6.8,
+      "sigma-pH": 0.05
+    },
+    {
+      "name": "Everything",
+      "solutes": [
+        {
+          "kind": "nonbiological",
+          "name": "NaCl",
+          "arg": "sodium chloride",
+          "mM": 200,
+          "sigma-mM": 10
+        },
+        {
+          "kind": "polymer",
+          "name": "PEG 3350",
+          "arg": "PEG 3350",
+          "mM": 0.05,
+          "sigma-mM": 0.003
+        },
+        {
+          "kind": "polymer",
+          "name": "PEG 22",
+          "arg": "PEG n=22",
+          "mM": 0.1,
+          "sigma-mM": 0.01
+        },
+        {
+          "kind": "polymer",
+          "name": "Pluronic",
+          "arg": "Pluronic nEO=100 nPO=65",
+          "mM": 0.01,
+          "sigma-mM": 0.001
+        },
+        {
+          "kind": "dna",
+          "name": "primer-A",
+          "arg": "ACGTTGCA",
+          "source": "primer.fasta",
+          "record": "p1",
+          "mM": 0.01,
+          "sigma-mM": 0.001
+        },
+        {
+          "kind": "rna",
+          "name": "guide",
+          "arg": "ACGUUGCA",
+          "source": "guide.fa",
+          "record": "g1",
+          "mM": 0.02,
+          "sigma-mM": 0.002
+        },
+        {
+          "kind": "protein",
+          "name": "carrier",
+          "arg": "MKTAYIAKQR",
+          "source": "carrier.fa",
+          "record": "sp|P1",
+          "mM": 0.02,
+          "sigma-mM": 0.002
+        },
+        {
+          "kind": "custom-nonbio",
+          "name": "NACET",
+          "custom": "N-acetylcysteine ethyl ester",
+          "z": 102,
+          "pmv": 118.4,
+          "sigma-pmv": 4,
+          "mM": 5,
+          "sigma-mM": 0.1
+        },
+        {
+          "kind": "custom-nonbio",
+          "name": "ammonium nitrate",
+          "custom": "ammonium nitrate",
+          "z": 32,
+          "pmv": 46.7,
+          "sigma-pmv": null,
+          "mM": 10,
+          "sigma-mM": 0.2
+        },
+        {
+          "z-ends": 10,
+          "counts": [
+            22
+          ],
+          "name": "one-unit chain",
+          "custom": "chain-1",
+          "sigma-ends": null,
+          "pmv-ends": 19.24,
+          "kind": "custom-polymer",
+          "sigma-mM": 0.0001,
+          "units": [
+            {
+              "label": "A",
+              "formula": "C2H4O",
+              "z": 24,
+              "slope": 36.73,
+              "sigma": null
+            }
+          ],
+          "mM": 0.01
+        },
+        {
+          "z-ends": 5,
+          "counts": [
+            3,
+            4,
+            5,
+            6
+          ],
+          "name": "four-unit chain",
+          "custom": "chain-4",
+          "sigma-ends": 0.5,
+          "pmv-ends": 7,
+          "kind": "custom-polymer",
+          "sigma-mM": 0.0001,
+          "units": [
+            {
+              "label": "A",
+              "formula": "C2H4O",
+              "z": 10,
+              "slope": 1,
+              "sigma": null
+            },
+            {
+              "label": "B",
+              "formula": "C3H6O",
+              "z": 20,
+              "slope": 2,
+              "sigma": 0.1
+            },
+            {
+              "label": "C",
+              "formula": "C4H8O",
+              "z": 30,
+              "slope": 3,
+              "sigma": null
+            },
+            {
+              "label": "D",
+              "formula": "C5H10O",
+              "z": 40,
+              "slope": 4,
+              "sigma": 0.2
+            }
+          ],
+          "mM": 0.01
+        }
+      ],
+      "pH": 7.4,
+      "sigma-pH": 0.0
+    },
+    {
+      "name": "Customs",
+      "solutes": [
+        {
+          "kind": "custom-nonbio",
+          "name": "NACET",
+          "custom": "N-acetylcysteine ethyl ester",
+          "z": 102,
+          "pmv": 118.4,
+          "sigma-pmv": 4,
+          "mM": 5,
+          "sigma-mM": 0.1
+        },
+        {
+          "kind": "custom-nonbio",
+          "name": "ammonium nitrate",
+          "custom": "ammonium nitrate",
+          "z": 32,
+          "pmv": 46.7,
+          "sigma-pmv": null,
+          "mM": 10,
+          "sigma-mM": 0.2
+        },
+        {
+          "z-ends": 10,
+          "counts": [
+            22
+          ],
+          "name": "one-unit chain",
+          "custom": "chain-1",
+          "sigma-ends": null,
+          "pmv-ends": 19.24,
+          "kind": "custom-polymer",
+          "sigma-mM": 0.0001,
+          "units": [
+            {
+              "label": "A",
+              "formula": "C2H4O",
+              "z": 24,
+              "slope": 36.73,
+              "sigma": null
+            }
+          ],
+          "mM": 0.01
+        },
+        {
+          "z-ends": 5,
+          "counts": [
+            3,
+            4,
+            5,
+            6
+          ],
+          "name": "four-unit chain",
+          "custom": "chain-4",
+          "sigma-ends": 0.5,
+          "pmv-ends": 7,
+          "kind": "custom-polymer",
+          "sigma-mM": 0.0001,
+          "units": [
+            {
+              "label": "A",
+              "formula": "C2H4O",
+              "z": 10,
+              "slope": 1,
+              "sigma": null
+            },
+            {
+              "label": "B",
+              "formula": "C3H6O",
+              "z": 20,
+              "slope": 2,
+              "sigma": 0.1
+            },
+            {
+              "label": "C",
+              "formula": "C4H8O",
+              "z": 30,
+              "slope": 3,
+              "sigma": null
+            },
+            {
+              "label": "D",
+              "formula": "C5H10O",
+              "z": 40,
+              "slope": 4,
+              "sigma": 0.2
+            }
+          ],
+          "mM": 0.01
+        }
+      ]
+    },
+    {
+      "name": "empty",
+      "solutes": []
+    }
+  ]
+}

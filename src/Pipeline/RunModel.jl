@@ -185,6 +185,42 @@ trajectory's sample covariance, starting from the identity in the whitened coord
     [`Inference.infer`](@ref). If the run is still not converged, `run_model` throws
     [`Inference.NotConvergedError`](@ref) and nothing is reported. `retry = false` skips
     both the rerun and the error: the run is only flagged in its summary.
+- `retry_n_adapt::Integer=Inference.RETRY_N_ADAPT`, `retry_n_draws::Integer=
+    Inference.RETRY_N_DRAWS` (2000, 2000): warm-up and post-warm-up iterations per chain of
+    the rerun.
+- `chain_start_radii=Inference.CHAIN_START_RADII` ((4, 10, 20)): the distances from the
+    MAP, in posterior standard deviations, at which the mirrored pairs of chains start;
+    pairs beyond the list reuse the last radius.
+- `optimum_chain_cap::Integer=Inference.OPTIMUM_CHAIN_CAP` (6),
+    `optimum_min_chains::Integer=Inference.OPTIMUM_MIN_CHAINS` (2),
+    `optimum_chain_radius::Real=Inference.OPTIMUM_CHAIN_RADIUS` (4),
+    `optimum_chain_fraction::Real=Inference.OPTIMUM_CHAIN_FRACTION` (0.5): how many chains
+    an optimum that carries mass should have, how many extra chains are started in all,
+    and what counts as a chain being at an optimum (the share of its draws within the
+    Mahalanobis radius).
+- `map_max_iter::Integer=Inference.MAP_MAX_ITER` (500), `map_n_starts::Integer=
+    Inference.MAP_N_STARTS` (64), `map_f_successive::Integer=Inference.MAP_F_SUCCESSIVE`
+    (3), `map_optima_kept::Integer=Inference.MAP_OPTIMA_KEPT` (8): the MAP search's
+    iteration cap and number of L-BFGS starts, the successive small decreases that end a
+    start, and the optima kept for comparison by Laplace mass.
+- `map_jitter_radii=Inference.MAP_JITTER_RADII` ((3, 6, 12)),
+    `map_jitter_directions::Integer=Inference.MAP_JITTER_DIRECTIONS` (2),
+    `map_jitter_max_optima::Integer=Inference.MAP_JITTER_MAX_OPTIMA` (4),
+    `map_jitter_within_nats::Real=Inference.MAP_JITTER_WITHIN_NATS` (15): the jittered
+    starts around the optima found.
+- `basin_restart_nats::Real=Inference.BASIN_RESTART_NATS` (2): how far above the MAP a
+    draw must be for the sampler to re-whiten at its basin.
+- `harvest_cover::Integer=Inference.HARVEST_COVER` (16),
+    `harvest_divergent::Integer=Inference.HARVEST_DIVERGENT` (8): the draws, and divergent
+    draws, from which L-BFGS looks for optima the search missed.
+
+Every setting of [`load_settings`](@ref) that the sampler depends on is a keyword here
+(`n_samples` and `n_adapt` are the positional arguments): [`run_keywords`](@ref) and
+[`run_arguments`](@ref) turn the settings into them. The keywords from `retry_n_adapt` on
+are those of [`Inference.SamplerOptions`](@ref); they are checked as `load_settings`
+checks the setting of the same name (the keyword is the setting's name in lower case,
+`MAP_N_STARTS` → `map_n_starts`) and a bad value throws the same
+[`InvalidSettingsError`](@ref) lines.
 
 # Returns
 A 4-tuple (fit, divergencerate, map, curve):
@@ -200,6 +236,9 @@ A 4-tuple (fit, divergencerate, map, curve):
     (`retry = true`): nothing is returned, so nothing can be reported.
 - `DomainError` if `n_adapt < 1`, `n_samples ≤ n_adapt`, `sigma` is not a finite number
     above 0, or `δ` is not strictly inside (0, 100); `n_chains < 1`.
+- [`InvalidSettingsError`](@ref) if one of the keywords from `retry_n_adapt` on is outside
+    its limits (a count below its least, a radius at or below 0, a fraction outside (0, 1],
+    a `chain_start_radii` or `map_jitter_radii` that is not three positive numbers).
 """
 function run_model(
     seed::Inference.Seed,
@@ -210,6 +249,24 @@ function run_model(
     rng_seed::Union{Nothing,Integer} = Inference.RNG_SEED,
     n_chains::Int = Inference.N_CHAINS,
     retry::Bool = Inference.RETRY,
+    retry_n_adapt = Inference.RETRY_N_ADAPT,
+    retry_n_draws = Inference.RETRY_N_DRAWS,
+    chain_start_radii = Inference.CHAIN_START_RADII,
+    optimum_chain_cap = Inference.OPTIMUM_CHAIN_CAP,
+    optimum_min_chains = Inference.OPTIMUM_MIN_CHAINS,
+    optimum_chain_radius = Inference.OPTIMUM_CHAIN_RADIUS,
+    optimum_chain_fraction = Inference.OPTIMUM_CHAIN_FRACTION,
+    map_max_iter = Inference.MAP_MAX_ITER,
+    map_n_starts = Inference.MAP_N_STARTS,
+    map_f_successive = Inference.MAP_F_SUCCESSIVE,
+    map_optima_kept = Inference.MAP_OPTIMA_KEPT,
+    map_jitter_radii = Inference.MAP_JITTER_RADII,
+    map_jitter_directions = Inference.MAP_JITTER_DIRECTIONS,
+    map_jitter_max_optima = Inference.MAP_JITTER_MAX_OPTIMA,
+    map_jitter_within_nats = Inference.MAP_JITTER_WITHIN_NATS,
+    basin_restart_nats = Inference.BASIN_RESTART_NATS,
+    harvest_cover = Inference.HARVEST_COVER,
+    harvest_divergent = Inference.HARVEST_DIVERGENT,
 )::Union{
     Tuple{Inference.Inferred,Float64,MAPResult,QuantileResult},
     Tuple{Inference.Inferred,Float64,Nothing,Nothing},
@@ -219,6 +276,17 @@ function run_model(
     n_samples > n_adapt ||
         throw(DomainError(n_samples, "n_samples must exceed n_adapt, to leave draws"))
     q_1, q_2, quantile_label = _sigma_spec(sigma)
+    # the checks of load_settings on the keywords that are settings of the sampler
+    ck = _checked_keywords(
+        :run_model,
+        (; retry_n_adapt, retry_n_draws, chain_start_radii, optimum_chain_cap,
+            optimum_min_chains, optimum_chain_radius, optimum_chain_fraction,
+            map_max_iter, map_n_starts, map_f_successive, map_optima_kept,
+            map_jitter_radii, map_jitter_directions, map_jitter_max_optima,
+            map_jitter_within_nats, basin_restart_nats, harvest_cover,
+            harvest_divergent),
+    )
+    options = Inference.SamplerOptions(; ck...)
 
     if seed.timing !== nothing
         seed.timing.info["n_atoms"]         = seed.fw.n_atoms
@@ -234,7 +302,7 @@ function run_model(
     # calculate unfiltered fit
     fit_unfiltered =
         Inference.infer(seed, n_samples, n_adapt; δ = δ, rng_seed = rng_seed,
-            n_chains = n_chains, retry = retry)
+            n_chains = n_chains, retry = retry, options = options)
     if retry
         problems = Inference._convergence_problems(fit_unfiltered.diagnostics)
         isempty(problems) || throw(Inference.NotConvergedError(problems))
@@ -316,7 +384,9 @@ function run_model(
         # posterior draw, since transient saturation during warmup is
         # expected (see EXCL_VOL_CORR_BOUNDS) and
         # not itself diagnostic.
-        excl_vol_sat = Inference.excl_vol_saturation(fit.c1[max_idx])
+        excl_vol_sat = Inference.excl_vol_saturation(
+            fit.c1[max_idx]; cmin = seed.c1tab.cmin, cmax = seed.c1tab.cmax,
+        )
         MAP_params["excl_vol_sat"] = Float64(excl_vol_sat)
         if excl_vol_sat != 0
             side = excl_vol_sat > 0 ? "upper" : "lower"

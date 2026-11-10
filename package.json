@@ -1,9 +1,13 @@
 {
     "name": "baysol-dev",
     "private": true,
-    "description": "Formatter and linter of the TypeScript code (run by `bysl fmt --ts`)",
+    "description": "The JavaScript side of the repository: the terminal interface (the `tui` workspace) and the formatter/linter of its TypeScript (run by `bysl fmt --ts`). One `node_modules`, here.",
     "license": "LGPL-3.0-or-later",
     "devDependencies": {
-        "@biomejs/biome": "2.6.4"
-    }
+        "@biomejs/biome": "2.6.4",
+        "knip": "6.44.1"
+    },
+    "workspaces": [
+        "tui"
+    ]
 }

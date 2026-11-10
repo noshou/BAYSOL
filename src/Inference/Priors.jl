@@ -160,23 +160,34 @@ so the mode stays at [`MODE_δρ₁₂`](@ref) if [`BOUNDS_δρ₁₂`](@ref) ev
 - `κ::Real`: the concentration κ = α + β − 2 > 0 shared by both priors
     (default in the sampler: [`κ_δρ₁₂`](@ref)).
 
+# Keywords
+- `bounds::NTuple{2,<:Real} = BOUNDS_δρ₁₂`: the support `(X, Y)` of both priors.
+- `mode::Real = MODE_δρ₁₂`: their mode, strictly inside `bounds`.
+
 # Returns
 - `(δρ₁, δρ₂)::NTuple{2,BoundedBeta}`: two identical
-    `LocationScale(-10, 12, Beta(1 + 11κ/12, 1 + κ/12))` priors on [-10, 2].
+    `LocationScale(-10, 12, Beta(1 + 11κ/12, 1 + κ/12))` priors on [-10, 2] (with the
+    default keywords).
 
 # Exceptions
-- `DomainError`: κ ≤ 0.
+- `DomainError`: κ ≤ 0, `bounds` not ordered or `mode` not strictly inside them.
 """
-function _δρ₁₂_priors(κ::Real)::Tuple{BoundedBeta,BoundedBeta}
+function _δρ₁₂_priors(
+    κ::Real;
+    bounds::NTuple{2,<:Real} = BOUNDS_δρ₁₂,
+    mode::Real = MODE_δρ₁₂,
+)::Tuple{BoundedBeta,BoundedBeta}
     if (κ <= 0)
         throw(DomainError(κ, "the prior concentration κ must be positive"))
+    elseif !(bounds[1] < mode < bounds[2])
+        throw(DomainError((bounds, mode), "mode must lie strictly inside the bounds"))
     end
 
-    X = BOUNDS_δρ₁₂[1]
-    W = BOUNDS_δρ₁₂[2] - BOUNDS_δρ₁₂[1]
+    X = Float64(bounds[1])
+    W = Float64(bounds[2] - bounds[1])
 
-    # mode of u that puts δρ's mode at MODE_δρ₁₂ (= 11/12 for CRYSOL's 1 on [-10, 2])
-    m = (MODE_δρ₁₂ - X) / W
+    # mode of u that puts δρ's mode at the mode (= 11/12 for CRYSOL's 1 on [-10, 2])
+    m = (mode - X) / W
     α = 1 + m * κ
     β = 1 + (1 - m) * κ
     u = Beta(α, β)
@@ -296,13 +307,15 @@ checked. φ is not a parameter; it is only the derivation of the bounds and the 
     Beta(1 + κ/φ_max, 1 + (1 − 1/φ_max)·κ))`.
 
 # Exceptions
-- `DomainError`: κ ≤ 0 or ρ̄ₑ ≤ 0.
+- `DomainError`: κ ≤ 0, ρ̄ₑ ≤ 0 or `φ_max` ≤ 0.
 """
-function _δρ₃_prior(κ::Real, ρ̄ₑ::Real)::BoundedBeta
+function _δρ₃_prior(κ::Real, ρ̄ₑ::Real; φ_max::Real = φ_max)::BoundedBeta
     if (κ <= 0)
         throw(DomainError(κ, "the prior concentration κ must be positive"))
     elseif (ρ̄ₑ <= 0)
         throw(DomainError(ρ̄ₑ, "the mean electron density ρ̄ₑ must be positive"))
+    elseif !(φ_max > 0)
+        throw(DomainError(φ_max, "φ_max must be positive"))
     end
 
     X = -ρ̄ₑ / UNIT_OF_δρ
@@ -326,6 +339,11 @@ interval with its mode at CRYSOL3's default (1, 1, 0). See [`_δρ₁₂_priors`
 - `κ_δρ₃::Real`: concentration κ > 0 of the cavity (δρ₃) prior.
 - `ρ̄ₑ::Real`: bulk solvent electron density fixing δρ₃'s bounds, e·Å⁻³.
 
+# Keywords
+- `bounds_δρ₁₂::NTuple{2,<:Real} = BOUNDS_δρ₁₂`, `mode_δρ₁₂::Real = MODE_δρ₁₂`:
+    the support and mode of the δρ₁/δρ₂ priors, see [`_δρ₁₂_priors`](@ref).
+- `φ_max::Real = φ_max`: the upper bound of the cavity occupancy, which sets δρ₃'s support.
+
 # Returns
 - `δρ₁::BoundedBeta`: convex-bead contrast prior on [-10, 2].
 - `δρ₂::BoundedBeta`: concave-bead contrast prior on [-10, 2].
@@ -333,19 +351,23 @@ interval with its mode at CRYSOL3's default (1, 1, 0). See [`_δρ₁₂_priors`
     [−`ρ̄ₑ/UNIT_OF_δρ`, (`φ_max` − 1)·`ρ̄ₑ/UNIT_OF_δρ`].
 
 # Exceptions
-- `DomainError`: `κ_δρ₁₂` ≤ 0, `κ_δρ₃` ≤ 0 or ρ̄ₑ ≤ 0.
+- `DomainError`: `κ_δρ₁₂` ≤ 0, `κ_δρ₃` ≤ 0, ρ̄ₑ ≤ 0, `φ_max` ≤ 0, or `mode_δρ₁₂` not
+    strictly inside `bounds_δρ₁₂`.
 """
 function δρ_prior(
     κ_δρ₁₂::Real,
     κ_δρ₃::Real,
-    ρ̄ₑ::Real,
+    ρ̄ₑ::Real;
+    bounds_δρ₁₂::NTuple{2,<:Real} = BOUNDS_δρ₁₂,
+    mode_δρ₁₂::Real = MODE_δρ₁₂,
+    φ_max::Real = φ_max,
 )::Tuple{
     BoundedBeta,
     BoundedBeta,
     BoundedBeta,
 }
-    δρ₁_prior, δρ₂_prior = _δρ₁₂_priors(κ_δρ₁₂)
-    (δρ₁_prior, δρ₂_prior, _δρ₃_prior(κ_δρ₃, ρ̄ₑ))
+    δρ₁_prior, δρ₂_prior = _δρ₁₂_priors(κ_δρ₁₂; bounds = bounds_δρ₁₂, mode = mode_δρ₁₂)
+    (δρ₁_prior, δρ₂_prior, _δρ₃_prior(κ_δρ₃, ρ̄ₑ; φ_max = φ_max))
 end
 
 # ---------------------------------------------------------------------------
@@ -408,7 +430,8 @@ result is log-concave in tₖ.
 # Arguments
 - `ξ::SVector{4,<:Real} = (ρₑ, δρ₁, δρ₂, δρ₃)`: the physical fit
     parameters, in ξ-space. ρₑ > 0; δρ₁, δρ₂ ∈ (-10, 2); δρ₃ ∈ (L₃, L₃ + W₃).
-- `p::ξ_priors`: supplies (L₃, W₃) = (`p.δρ₃Prior.μ`, `p.δρ₃Prior.σ`).
+- `p::ξ_priors`: supplies (L, W) = (`p.δρ₁Prior.μ`, `p.δρ₁Prior.σ`) (and δρ₂'s) and
+    (L₃, W₃) = (`p.δρ₃Prior.μ`, `p.δρ₃Prior.σ`).
 
 # Returns
 - `θ::SVector{4,<:Real} = (a, t₁, t₂, t₃)`: the unconstrained ℝ⁴ vector.
@@ -419,8 +442,8 @@ result is log-concave in tₖ.
 """
 function Θ(ξ::SVector{4,<:Real}, p::ξ_priors)
     a  = log(ξ[1])
-    t₁ = logit((ξ[2] - LOWER_BOUND_δρ₁₂) / WIDTH_δρ₁₂)
-    t₂ = logit((ξ[3] - LOWER_BOUND_δρ₁₂) / WIDTH_δρ₁₂)
+    t₁ = logit((ξ[2] - p.δρ₁Prior.μ) / p.δρ₁Prior.σ)
+    t₂ = logit((ξ[3] - p.δρ₂Prior.μ) / p.δρ₂Prior.σ)
     t₃ = logit((ξ[4] - p.δρ₃Prior.μ) / p.δρ₃Prior.σ)
     θ  = SVector{4}(a, t₁, t₂, t₃)
     return θ, logjac(θ, p)
@@ -438,7 +461,7 @@ Inverse of [`Θ`](@ref): θ-space (unconstrained ℝ⁴) back to ξ-space.
 
 # Arguments
 - `θ::SVector{4,<:Real} = (a, t₁, t₂, t₃)`: unconstrained ℝ⁴.
-- `p::ξ_priors`: supplies (L₃, W₃), as in [`Θ`](@ref).
+- `p::ξ_priors`: supplies (L, W) and (L₃, W₃), as in [`Θ`](@ref).
 
 # Returns
 - `ξ::SVector{4,<:Real} = (ρₑ, δρ₁, δρ₂, δρ₃)`
@@ -446,8 +469,8 @@ Inverse of [`Θ`](@ref): θ-space (unconstrained ℝ⁴) back to ξ-space.
 function Ξ(θ::SVector{4,<:Real}, p::ξ_priors)
     return SVector{4}(
         exp(θ[1]),
-        LOWER_BOUND_δρ₁₂ + WIDTH_δρ₁₂ * logistic(θ[2]),
-        LOWER_BOUND_δρ₁₂ + WIDTH_δρ₁₂ * logistic(θ[3]),
+        p.δρ₁Prior.μ + p.δρ₁Prior.σ * logistic(θ[2]),
+        p.δρ₂Prior.μ + p.δρ₂Prior.σ * logistic(θ[3]),
         p.δρ₃Prior.μ + p.δρ₃Prior.σ * logistic(θ[4]),
     )
 end
@@ -460,13 +483,13 @@ adds; identical to the `corr` [`Θ`](@ref) returns for ξ = Ξ(θ):
 
 # Arguments
 - `θ::SVector{4,<:Real} = (a, t₁, t₂, t₃)`.
-- `p::ξ_priors`: supplies W₃ = `p.δρ₃Prior.σ`.
+- `p::ξ_priors`: supplies W = `p.δρ₁Prior.σ`, `p.δρ₂Prior.σ` and W₃ = `p.δρ₃Prior.σ`.
 
 # Returns
 - `Real`: the log-Jacobian.
 """
 logjac(θ::SVector{4,<:Real}, p::ξ_priors) =
-    θ[1] + _t_logjac(θ[2], WIDTH_δρ₁₂) + _t_logjac(θ[3], WIDTH_δρ₁₂) +
+    θ[1] + _t_logjac(θ[2], p.δρ₁Prior.σ) + _t_logjac(θ[3], p.δρ₂Prior.σ) +
     _t_logjac(θ[4], p.δρ₃Prior.σ)
 
 # ---------------------------------------------------------------------------
@@ -491,6 +514,9 @@ Generates physical prior distributions of ξ.
 - `κ_δρ₃::Real = κ_δρ₃`: concentration of the δρ₃ prior,
     forwarded to [`δρ_prior`](@ref).
 - `pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT`: forwarded to [`ρₑ_prior`](@ref).
+- `bounds_δρ₁₂`, `mode_δρ₁₂`, `φ_max`: the δρ priors' support, mode and the cavity
+    occupancy bound (defaults `BOUNDS_δρ₁₂`, `MODE_δρ₁₂`, `φ_max`), forwarded to
+    [`δρ_prior`](@ref).
 
 # Returns
 - `ξ_priors`: the priors. δρ₃'s bounds are fixed at the mean of the ρₑ prior.
@@ -503,9 +529,15 @@ function _calc_ξ_priors(
     κ_δρ₁₂::Real = κ_δρ₁₂,
     κ_δρ₃::Real = κ_δρ₃,
     pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT,
+    bounds_δρ₁₂::NTuple{2,<:Real} = BOUNDS_δρ₁₂,
+    mode_δρ₁₂::Real = MODE_δρ₁₂,
+    φ_max::Real = φ_max,
 )::ξ_priors
     ρₑ = ρₑ_prior(pH, σ_pH, solutes; t = t, pmv_fallback_uncert = pmv_fallback_uncert)
-    δρ₁, δρ₂, δρ₃ = δρ_prior(κ_δρ₁₂, κ_δρ₃, mean(ρₑ))
+    δρ₁, δρ₂, δρ₃ = δρ_prior(
+        κ_δρ₁₂, κ_δρ₃, mean(ρₑ); bounds_δρ₁₂ = bounds_δρ₁₂, mode_δρ₁₂ = mode_δρ₁₂,
+        φ_max = φ_max,
+    )
     return ξ_priors(ρₑ, δρ₁, δρ₂, δρ₃)
 end
 

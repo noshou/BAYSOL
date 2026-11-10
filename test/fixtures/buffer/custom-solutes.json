@@ -1,0 +1,73 @@
+{
+  "solutes": [
+    {
+      "kind": "nonbiological",
+      "name": "N-acetylcysteine ethyl ester",
+      "formula": "C7H13NO3S",
+      "z": 102,
+      "pmv": 118.4,
+      "sigma": 4
+    },
+    {
+      "kind": "nonbiological",
+      "name": "ammonium nitrate",
+      "formula": "NH4+ NO3-",
+      "z": 32,
+      "pmv": 46.7,
+      "sigma": null
+    },
+    {
+      "kind": "polymer",
+      "name": "chain-1",
+      "units": [
+        {
+          "label": "A",
+          "formula": "C2H4O",
+          "z": 24,
+          "slope": 36.73,
+          "sigma": null
+        }
+      ],
+      "z-ends": 10,
+      "pmv-ends": 19.24,
+      "sigma-ends": null
+    },
+    {
+      "kind": "polymer",
+      "name": "chain-4",
+      "units": [
+        {
+          "label": "A",
+          "formula": "C2H4O",
+          "z": 10,
+          "slope": 1,
+          "sigma": null
+        },
+        {
+          "label": "B",
+          "formula": "C3H6O",
+          "z": 20,
+          "slope": 2,
+          "sigma": 0.1
+        },
+        {
+          "label": "C",
+          "formula": "C4H8O",
+          "z": 30,
+          "slope": 3,
+          "sigma": null
+        },
+        {
+          "label": "D",
+          "formula": "C5H10O",
+          "z": 40,
+          "slope": 4,
+          "sigma": 0.2
+        }
+      ],
+      "z-ends": 5,
+      "pmv-ends": 7,
+      "sigma-ends": 0.5
+    }
+  ]
+}

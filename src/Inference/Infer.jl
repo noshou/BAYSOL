@@ -12,6 +12,96 @@
 using MCMCDiagnosticTools: MCMCDiagnosticTools
 using Statistics: mean
 
+# ---------------------------------------------------------------------------
+#   SamplerOptions: the settings of the chains, the MAP search and the harvest
+# ---------------------------------------------------------------------------
+
+"""
+    SamplerOptions(; retry_n_adapt, retry_n_draws, chain_start_radii, ...)
+
+The tunable settings of [`infer`](@ref) that are not its own arguments, gathered in one
+immutable value that is passed down to where they are read, so every field has the type
+of its setting and the sampler's code stays type-stable. Every keyword is named after its
+constant and defaults to it, so `SamplerOptions()` is the sampler as it has always run.
+[`run_model`](@ref BAYSOL.Pipeline.run_model) builds one from its keywords of the same
+names, after the checks of [`load_settings`](@ref BAYSOL.Pipeline.load_settings); the
+constructor itself checks nothing.
+
+# Fields
+- `retry_n_adapt::Int`, `retry_n_draws::Int`: warm-up and post-warm-up iterations per chain
+    of the rerun ([`RETRY_N_ADAPT`](@ref), [`RETRY_N_DRAWS`](@ref)).
+- `chain_start_radii::Vector{Float64}`: [`CHAIN_START_RADII`](@ref).
+- `optimum_chain_cap::Int`, `optimum_min_chains::Int`, `optimum_chain_radius::Float64`,
+    `optimum_chain_fraction::Float64`: [`OPTIMUM_CHAIN_CAP`](@ref),
+    [`OPTIMUM_MIN_CHAINS`](@ref), [`OPTIMUM_CHAIN_RADIUS`](@ref),
+    [`OPTIMUM_CHAIN_FRACTION`](@ref).
+- `map_max_iter::Int`, `map_n_starts::Int`, `map_f_successive::Int`,
+    `map_optima_kept::Int`: [`MAP_MAX_ITER`](@ref), [`MAP_N_STARTS`](@ref),
+    [`MAP_F_SUCCESSIVE`](@ref), [`MAP_OPTIMA_KEPT`](@ref).
+- `map_jitter_radii::Vector{Float64}`, `map_jitter_directions::Int`,
+    `map_jitter_max_optima::Int`, `map_jitter_within_nats::Float64`:
+    [`MAP_JITTER_RADII`](@ref), [`MAP_JITTER_DIRECTIONS`](@ref),
+    [`MAP_JITTER_MAX_OPTIMA`](@ref), [`MAP_JITTER_WITHIN_NATS`](@ref).
+- `basin_restart_nats::Float64`: [`BASIN_RESTART_NATS`](@ref).
+- `harvest_cover::Int`, `harvest_divergent::Int`: [`HARVEST_COVER`](@ref),
+    [`HARVEST_DIVERGENT`](@ref).
+
+# Returns
+- A `SamplerOptions` (the constructor converts each value to its field's type).
+
+# Exceptions
+- `MethodError`/`InexactError` if a value cannot be converted to its field's type.
+"""
+struct SamplerOptions
+    retry_n_adapt::Int
+    retry_n_draws::Int
+    chain_start_radii::Vector{Float64}
+    optimum_chain_cap::Int
+    optimum_min_chains::Int
+    optimum_chain_radius::Float64
+    optimum_chain_fraction::Float64
+    map_max_iter::Int
+    map_n_starts::Int
+    map_f_successive::Int
+    map_optima_kept::Int
+    map_jitter_radii::Vector{Float64}
+    map_jitter_directions::Int
+    map_jitter_max_optima::Int
+    map_jitter_within_nats::Float64
+    basin_restart_nats::Float64
+    harvest_cover::Int
+    harvest_divergent::Int
+end
+
+function SamplerOptions(;
+    retry_n_adapt::Integer = RETRY_N_ADAPT,
+    retry_n_draws::Integer = RETRY_N_DRAWS,
+    chain_start_radii = CHAIN_START_RADII,
+    optimum_chain_cap::Integer = OPTIMUM_CHAIN_CAP,
+    optimum_min_chains::Integer = OPTIMUM_MIN_CHAINS,
+    optimum_chain_radius::Real = OPTIMUM_CHAIN_RADIUS,
+    optimum_chain_fraction::Real = OPTIMUM_CHAIN_FRACTION,
+    map_max_iter::Integer = MAP_MAX_ITER,
+    map_n_starts::Integer = MAP_N_STARTS,
+    map_f_successive::Integer = MAP_F_SUCCESSIVE,
+    map_optima_kept::Integer = MAP_OPTIMA_KEPT,
+    map_jitter_radii = MAP_JITTER_RADII,
+    map_jitter_directions::Integer = MAP_JITTER_DIRECTIONS,
+    map_jitter_max_optima::Integer = MAP_JITTER_MAX_OPTIMA,
+    map_jitter_within_nats::Real = MAP_JITTER_WITHIN_NATS,
+    basin_restart_nats::Real = BASIN_RESTART_NATS,
+    harvest_cover::Integer = HARVEST_COVER,
+    harvest_divergent::Integer = HARVEST_DIVERGENT,
+)
+    return SamplerOptions(
+        retry_n_adapt, retry_n_draws, collect(Float64, chain_start_radii),
+        optimum_chain_cap, optimum_min_chains, optimum_chain_radius,
+        optimum_chain_fraction, map_max_iter, map_n_starts, map_f_successive,
+        map_optima_kept, collect(Float64, map_jitter_radii), map_jitter_directions,
+        map_jitter_max_optima, map_jitter_within_nats, basin_restart_nats,
+        harvest_cover, harvest_divergent,
+    )
+end
 
 """
 The nominal signed distance from the MAP, in posterior standard deviations, at which
@@ -20,6 +110,7 @@ both at the MAP (two independent chains of their own random streams from the sam
 independent effective sample size within the main mode and a baseline for R̂ there), and
 chains 3 and up in mirrored pairs at the radii of [`CHAIN_START_RADII`](@ref) (the first
 of a pair positive, the second negative: the same random direction, opposite sides).
+`radii` replaces [`CHAIN_START_RADII`](@ref) (a non-empty vector or tuple).
 
 # Returns
 - `Float64`.
@@ -27,9 +118,11 @@ of a pair positive, the second negative: the same random direction, opposite sid
 # Exceptions
 - None.
 """
-function chain_radius(k::Int, n::Int)::Float64
+function chain_radius(
+    k::Int, n::Int, radii::Union{AbstractVector{<:Real},Tuple} = CHAIN_START_RADII,
+)::Float64
     (n == 1 || k ≤ 2) && return 0.0
-    r = CHAIN_START_RADII[min((k - 1) ÷ 2, length(CHAIN_START_RADII))]
+    r = radii[min((k - 1) ÷ 2, length(radii))]
     return isodd(k) ? r : -r
 end
 
@@ -212,8 +305,7 @@ struct NotConvergedError <: Exception
 end
 
 function Base.showerror(io::IO, e::NotConvergedError)
-    print(io, "NotConvergedError: the run did not converge, even after a longer retry, ",
-        "so there is nothing to report: ", join(e.problems, "; "), ".")
+    print(io, "NotConvergedError: the run did not converge: ", join(e.problems, "; "), ".")
 end
 
 """
@@ -270,6 +362,12 @@ Runs initial seeding for the sampler.
     prior concentrations, forwarded to [`δρ_prior`](@ref).
 - `pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT`: uncertainty, cm³ mol⁻¹, of a
     non-biological solute whose table row states none, forwarded to [`ρₑ_prior`](@ref).
+- `bounds_δρ₁₂::NTuple{2,<:Real} = BOUNDS_δρ₁₂`, `mode_δρ₁₂::Real = MODE_δρ₁₂`,
+    `φ_max::Real = φ_max`: the δρ₁/δρ₂ support and mode and the cavity-occupancy bound,
+    forwarded to [`δρ_prior`](@ref).
+- `excl_vol_corr_bounds::NTuple{2,<:Real} = EXCL_VOL_CORR_BOUNDS`,
+    `excl_vol_corr_eps::Real = EXCL_VOL_CORR_EPS`: the c1 bounds and the search's padding
+    and grid step, for the `c1tab` of the `Seed`.
 - `timing::Union{Nothing,StageLog} = nothing`: stored in the returned `Seed`.
 - `shannon::Union{Nothing,ShannonInfo} = nothing`: stored in the returned `Seed`.
 
@@ -288,17 +386,29 @@ function seed_sampler(
     κ_δρ₁₂::Real = κ_δρ₁₂,
     κ_δρ₃::Real = κ_δρ₃,
     pmv_fallback_uncert::Real = PMV_FALLBACK_UNCERT,
+    bounds_δρ₁₂::NTuple{2,<:Real} = BOUNDS_δρ₁₂,
+    mode_δρ₁₂::Real = MODE_δρ₁₂,
+    φ_max::Real = φ_max,
+    excl_vol_corr_bounds::NTuple{2,<:Real} = EXCL_VOL_CORR_BOUNDS,
+    excl_vol_corr_eps::Real = EXCL_VOL_CORR_EPS,
     timing::Union{Nothing,StageLog} = nothing,
     shannon::Union{Nothing,ShannonInfo} = nothing,
 )::Seed
     pr = _calc_ξ_priors(
         pH, σ_pH, solutes;
-        t = t, κ_δρ₁₂ = κ_δρ₁₂, κ_δρ₃ = κ_δρ₃, pmv_fallback_uncert = pmv_fallback_uncert,
+        t = t, κ_δρ₁₂ = κ_δρ₁₂, κ_δρ₃ = κ_δρ₃,
+        pmv_fallback_uncert = pmv_fallback_uncert,
+        bounds_δρ₁₂ = bounds_δρ₁₂, mode_δρ₁₂ = mode_δρ₁₂, φ_max = φ_max,
     )
     ξ₀ = _ξ₀(pr, stream(RNG_SEED % UInt64, _RNG_INITIAL_POINT, 0))
     θ₀, _ = Θ(ξ₀, pr)
     wls = WLSData(I_exp, σ_exp)
-    return Seed(pr, θ₀, fw, wls, timing, _C1Tables(fw), shannon)
+    c1tab = _C1Tables(
+        fw; cmin = Float64(excl_vol_corr_bounds[1]),
+        cmax = Float64(excl_vol_corr_bounds[2]),
+        eps = Float64(excl_vol_corr_eps),
+    )
+    return Seed(pr, θ₀, fw, wls, timing, c1tab, shannon)
 end
 
 """
@@ -439,6 +549,10 @@ the forward model) from the trajectory's sample covariance.
                                 `nothing` draws a fresh one from the default RNG (so
                                 `Random.seed!` before the call also fixes it). It is
                                 the `rng_seed` row of the run log and the `run` sheet.
+- `options::SamplerOptions = SamplerOptions()`: the rerun's length, the chain starts, the
+                                MAP search, its jitter, the harvest and the basin
+                                restart (see [`SamplerOptions`](@ref)); the defaults are
+                                the constants of `Params.jl`.
 
 # Returns
 An [`Inferred`](@ref) of the pooled chains, chain after chain. Includes the
@@ -457,12 +571,16 @@ function infer(
     rng_seed::Union{Nothing,Integer} = RNG_SEED,
     n_chains::Int = N_CHAINS,
     retry::Bool = RETRY,
+    options::SamplerOptions = SamplerOptions(),
 )::Inferred
     n_chains ≥ 1 || throw(DomainError(n_chains, "n_chains must be ≥ 1"))
     base = rng_seed === nothing ? draw_base() : (rng_seed % UInt64)
     go =
         (ns, na, b) -> with_gc_paused(
-            () -> _infer(seed, ns, na; δ = δ, base = b, n_chains = n_chains),
+            () -> _infer(
+                seed, ns, na; δ = δ, base = b, n_chains = n_chains,
+                options = options,
+            ),
         )
     r1 = go(n_samples, n_adapt, base)
     worst = _worst_rhat(r1.diagnostics)
@@ -471,7 +589,10 @@ function infer(
     # R̂ above the limit: once more, longer, from streams and jitter directions derived
     # from the seeds (a different draw of the starts too, since a bad R̂ can be seed luck)
     info = seed.timing === nothing ? nothing : copy(seed.timing.info)
-    r2 = go(RETRY_N_ADAPT + RETRY_N_DRAWS, RETRY_N_ADAPT, _retry_seed(base))
+    r2 = go(
+        options.retry_n_adapt + options.retry_n_draws, options.retry_n_adapt,
+        _retry_seed(base),
+    )
     kept =
         isempty(_convergence_problems(r2.diagnostics)) ||
         _worst_rhat(r2.diagnostics) ≤ worst
@@ -483,7 +604,7 @@ function infer(
         seed.timing.info["rng_seed"] = base
         seed.timing.info["n_adapt"] = best.diagnostics.n_adapt
         seed.timing.info["n_samples"] =
-            best.diagnostics.n_adapt + (kept ? RETRY_N_DRAWS : n_samples - n_adapt)
+            best.diagnostics.n_adapt + (kept ? options.retry_n_draws : n_samples - n_adapt)
     end
     d = best.diagnostics
     return Inferred(best.samples, best.stats, best.scale, best.bkgrnd_corr, best.c1,
@@ -523,6 +644,7 @@ function _infer(
     δ::Real = TARGET_ACCEPT,
     base::UInt64 = draw_base(),
     n_chains::Int = N_CHAINS,
+    options::SamplerOptions = SamplerOptions(),
 )::Inferred where {N}
 
     if δ ≤ 0 || δ ≥ 100
@@ -538,7 +660,7 @@ function _infer(
     # in which the posterior is ≈ N(0, I) and the chain starts at the MAP.
     t_map = tick()
     seed.timing === nothing || (seed.timing.info["rng_seed"] = base)
-    sp = _sampling_space(seed; base = base)
+    sp = _sampling_space(seed; base = base, options = options)
     if seed.timing !== nothing
         seed.timing.info["map_modes"] = sp.n_modes
         tock!(seed.timing, :sampling, 1,
@@ -551,13 +673,17 @@ function _infer(
     # at, the MAP search missed a better basin: re-whiten there (L-BFGS
     # from that draw, the heaviest basin wins) and run the chains once more
     post = (n_adapt+1):n_samples
-    chains = _run_chains(seed, sp, n_samples, n_adapt, δ, base, n_chains)
+    chains = _run_chains(
+        seed, sp, n_samples, n_adapt, δ, base, n_chains; options = options,
+    )
     rewhitened = 0.0
     best = _best_draw(chains.runs, post)
-    if best.ld > sp.logπ + BASIN_RESTART_NATS
+    if best.ld > sp.logπ + options.basin_restart_nats
         t_re = tick()
         z_best = _standardize(Θ(best.ξ, seed.pr)[1], seed.pr)
-        sp2 = _sampling_space(seed; base = base, extra_starts = [z_best])
+        sp2 = _sampling_space(
+            seed; base = base, extra_starts = [z_best], options = options,
+        )
         tock!(seed.timing, :sampling, 1,
             @sprintf(
                 "re-whitening: a chain found a basin %.1f nats above the MAP",
@@ -566,8 +692,9 @@ function _infer(
         if sp2.logπ > sp.logπ
             rewhitened = sp2.logπ - sp.logπ
             sp = sp2
-            chains =
-                _run_chains(seed, sp, n_samples, n_adapt, δ, base, n_chains)
+            chains = _run_chains(
+                seed, sp, n_samples, n_adapt, δ, base, n_chains; options = options,
+            )
         end
     end
     t_nuts = chains.t_nuts
@@ -577,7 +704,7 @@ function _infer(
     t_h = tick()
     ext = _with_optima_chains(
         seed, sp, chains.runs, chains.starts, post, n_samples, n_adapt, δ, base,
-        n_chains,
+        n_chains; options = options,
     )
     runs, starts, n_extra = ext.runs, ext.starts, ext.n_extra
     n_total = length(runs)
@@ -755,18 +882,22 @@ end
 How many of the chains, whose post-warm-up draws are the rows of `Ws` (whitened
 coordinates of `sp`), are at the optimum `o`: at least [`OPTIMUM_CHAIN_FRACTION`](@ref) of
 a chain's draws lie within [`OPTIMUM_CHAIN_RADIUS`](@ref) of it in the Mahalanobis distance
-of the Hessian there. 0 for an optimum without a positive definite Hessian.
+of the Hessian there. 0 for an optimum without a positive definite Hessian. `radius` and
+`fraction` replace the two constants.
 """
-function _chains_at(o, sp, Ws)
+function _chains_at(
+    o, sp, Ws;
+    radius::Real = OPTIMUM_CHAIN_RADIUS, fraction::Real = OPTIMUM_CHAIN_FRACTION,
+)
     all(>(0), o.λ) || return 0
     H = o.V * (o.λ .* o.V')
     return count(Ws) do W
         size(W, 1) == 0 && return false
         inside = count(axes(W, 1)) do i
             d = sp.ẑ + sp.S * typeof(sp.ẑ)(@view W[i, :]) - o.z
-            d' * H * d ≤ OPTIMUM_CHAIN_RADIUS^2
+            d' * H * d ≤ radius^2
         end
-        inside ≥ OPTIMUM_CHAIN_FRACTION * size(W, 1)
+        inside ≥ fraction * size(W, 1)
     end
 end
 
@@ -780,8 +911,9 @@ which is a single chain). Also the [`OptimumReport`](@ref)s of the optima that c
 - `NamedTuple` `(runs, starts, n_extra, optima_report)`.
 """
 function _with_optima_chains(seed::Seed{<:Real,N}, sp, runs, starts, post,
-    n_samples, n_adapt, δ, base, n_chains) where {N}
-    opt = _optima_and_extra_chains(seed, sp, runs, post)
+    n_samples, n_adapt, δ, base, n_chains;
+    options::SamplerOptions = SamplerOptions()) where {N}
+    opt = _optima_and_extra_chains(seed, sp, runs, post; options = options)
     if n_chains > 1 && !isempty(opt.extra_w)
         ex = _run_extra_chains(
             seed, sp, n_samples, n_adapt, δ, base, opt.extra_w, length(runs),
@@ -791,12 +923,14 @@ function _with_optima_chains(seed::Seed{<:Real,N}, sp, runs, starts, post,
             opt.Ws,
             [_draws_w(seed, sp, r.ξ[post]) for r in ex.runs if r.error === nothing],
         )
-        report = _optimum_reports(seed, sp, opt.optima, Ws, opt.owner[ex.keep])
+        report = _optimum_reports(
+            seed, sp, opt.optima, Ws, opt.owner[ex.keep]; options = options,
+        )
         return (runs = all_runs, starts = vcat(starts, ex.starts),
             n_extra = length(ex.runs),
             optima_report = report)
     end
-    report = _optimum_reports(seed, sp, opt.optima, opt.Ws, Int[])
+    report = _optimum_reports(seed, sp, opt.optima, opt.Ws, Int[]; options = options)
     return (runs = runs, starts = starts, n_extra = 0, optima_report = report)
 end
 
@@ -816,7 +950,8 @@ function _optima_and_extra_chains(
     seed::Seed{<:Real,N},
     sp,
     runs,
-    post,
+    post;
+    options::SamplerOptions = SamplerOptions(),
 ) where {N}
     ran = [r for r in runs if r.error === nothing]
     isempty(ran) && return (
@@ -826,17 +961,24 @@ function _optima_and_extra_chains(
     Ws = [_draws_w(seed, sp, r.ξ[post]) for r in ran]
     ld = reduce(vcat, [getproperty.(r.stats[post], :log_density) for r in ran])
     dv = reduce(vcat, [getproperty.(r.stats[post], :numerical_error) for r in ran])
-    optima, _ = _harvest_optima(seed, sp, reduce(vcat, Ws), ld, Vector{Bool}(dv))
+    optima, _ = _harvest_optima(
+        seed, sp, reduce(vcat, Ws), ld, Vector{Bool}(dv); options = options,
+    )
     shares = _optimum_shares(optima)
     extra_w = Vector{Float64}[]
     owner = Int[]
     for i in sortperm(shares; rev = true)
         shares[i] ≥ OPTIMUM_MIN_SHARE || break
-        need = OPTIMUM_MIN_CHAINS - _chains_at(optima[i], sp, Ws)
+        need =
+            options.optimum_min_chains - _chains_at(
+                optima[i], sp, Ws;
+                radius = options.optimum_chain_radius,
+                fraction = options.optimum_chain_fraction,
+            )
         need > 0 || continue
         w = Vector(sp.S \ (optima[i].z - sp.ẑ))
         for _ in 1:need
-            length(extra_w) < OPTIMUM_CHAIN_CAP || break
+            length(extra_w) < options.optimum_chain_cap || break
             push!(extra_w, w)
             push!(owner, i)
         end
@@ -850,7 +992,10 @@ chains at each after all the chains have run (`Ws`: the whitened post-warm-up dr
 chain that ran); `owners` lists, for each chain started at an optimum, the index in
 `optima` of that optimum.
 """
-function _optimum_reports(seed::Seed{<:Real,N}, sp, optima, Ws, owners) where {N}
+function _optimum_reports(
+    seed::Seed{<:Real,N}, sp, optima, Ws, owners;
+    options::SamplerOptions = SamplerOptions(),
+) where {N}
     shares = _optimum_shares(optima)
     out = OptimumReport[]
     for i in sortperm(shares; rev = true)
@@ -859,7 +1004,13 @@ function _optimum_reports(seed::Seed{<:Real,N}, sp, optima, Ws, owners) where {N
             out,
             OptimumReport(
                 Vector(Ξ(sp.μ .+ sp.σ .* optima[i].z, seed.pr)), optima[i].logmass,
-                shares[i], _chains_at(optima[i], sp, Ws), count(==(i), owners),
+                shares[i],
+                _chains_at(
+                    optima[i], sp, Ws;
+                    radius = options.optimum_chain_radius,
+                    fraction = options.optimum_chain_fraction,
+                ),
+                count(==(i), owners),
             ),
         )
     end
@@ -1010,7 +1161,7 @@ chain index, not to the thread that happens to run it) and shares only the read-
 """
 function _run_chains(seed::Seed{<:Real,N}, sp, n_samples::Int64,
     n_adapt::Int64, δ::Real,
-    base::UInt64, n_chains::Int) where {N}
+    base::UInt64, n_chains::Int; options::SamplerOptions = SamplerOptions()) where {N}
     t_setup = tick()
     # (concurrent progress bars would overwrite each other)
     ℓπ, ∂ℓπ∂w, run_chain =
@@ -1019,7 +1170,10 @@ function _run_chains(seed::Seed{<:Real,N}, sp, n_samples::Int64,
     # The starts: mirrored jittered pairs, or the MAP for a single chain
     # (deterministically, see `_chain_start`). Chosen serially and up front,
     # so neither the starts nor which chain gets which depend on the threads.
-    starts = [_chain_start(k, n_chains, N, ℓπ, ∂ℓπ∂w, base) for k in 1:n_chains]
+    starts = [
+        _chain_start(k, n_chains, N, ℓπ, ∂ℓπ∂w, base, options.chain_start_radii)
+        for k in 1:n_chains
+    ]
 
     tock!(seed.timing, :sampling, 1, "NUTS setup (starts, Hamiltonian)", t_setup)
     t_nuts = tick()
@@ -1100,8 +1254,11 @@ MAP itself (0).
 # Returns
 - `(w₀::Vector{Float64}, r::Float64)`.
 """
-function _chain_start(k::Int, n::Int, N::Int, ℓπ, ∂ℓπ∂w, base::UInt64)
-    r = chain_radius(k, n)
+function _chain_start(
+    k::Int, n::Int, N::Int, ℓπ, ∂ℓπ∂w, base::UInt64,
+    radii::Union{AbstractVector{<:Real},Tuple} = CHAIN_START_RADII,
+)
+    r = chain_radius(k, n, radii)
     r == 0 && return zeros(N), 0.0
     z = randn(stream(base, _RNG_JITTER, (k - 1) ÷ 2), N)
     u = z ./ sqrt(sum(abs2, z))

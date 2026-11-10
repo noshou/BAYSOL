@@ -172,12 +172,6 @@ const BRIDGE_MAX_ERR = 1.0
 "Largest exponent (in nats) allowed in the bridge-sampling weights: `exp(230) ≈ 1e100`."
 const BRIDGE_CLAMP = 230.0
 
-"Lower end L of the δρ₁/δρ₂ support [L, L + W] = [`BOUNDS_δρ₁₂`](@ref)."
-const LOWER_BOUND_δρ₁₂ = BOUNDS_δρ₁₂[1]
-
-"Width W of the δρ₁/δρ₂ support [L, L + W] = [`BOUNDS_δρ₁₂`](@ref)."
-const WIDTH_δρ₁₂ = BOUNDS_δρ₁₂[2] - BOUNDS_δρ₁₂[1]
-
 "A Beta prior stretched onto a bounded interval, as [`δρ_prior`](@ref) returns."
 const BoundedBeta = LocationScale{Float64,Continuous,Beta{Float64}}
 
@@ -332,7 +326,7 @@ include("Modes.jl")
 include("Infer.jl")
 include("MAP.jl")
 
-export Seed, Inferred,
+export Seed, Inferred, SamplerOptions,
     seed_sampler, infer, ChainDiagnostics, OptimumReport, NotConvergedError,
     N_CHAINS,
     ρₑ_prior, δρ_prior, prior_z_scores,

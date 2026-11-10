@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# The polymer families the terminal interface offers (tui/resources/polymer_families.edn)
+# The polymer families the terminal interface offers (tui/assets/data/polymer_families.json)
 # against the code that parses their `arg` strings (`_polymer_ϕ°`): every template, filled
 # with sample numbers, must resolve to a finite positive Z and ϕ°, so the file and
 # src/BulkElectronDensity/Polymers cannot drift apart.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.Pipeline: _parse_edn
+using BAYSOL.BulkElectronDensity: JSON3
 using BAYSOL.BulkElectronDensity: _polymer_ϕ°
 
 const FAMILIES =
-    joinpath(@__DIR__, "..", "..", "..", "tui", "resources", "polymer_families.edn")
+    joinpath(@__DIR__, "..", "..", "..", "tui", "assets", "data", "polymer_families.json")
 
 # Sample numbers by key; a family that needs another value for a key says so by id.
 const SAMPLE = Dict("n" => 10, "Mn" => 3350, "nEO" => 100, "nPO" => 65, "nC" => 12)
@@ -26,8 +26,8 @@ fill_template(id, form, values = Dict()) = replace(form[:template],
 tokens(template) = String[m.captures[1] for m in eachmatch(r"\{([^}]+)\}", template)]
 
 @testset "polymer families of the interface resolve" begin
-    families = _parse_edn(read(FAMILIES, String))
-    @test families isa Vector && !isempty(families)
+    families = JSON3.read(read(FAMILIES, String))
+    @test families isa AbstractVector && !isempty(families)
     ids = [f[:id] for f in families]
     @test allunique(ids)
     for f in families

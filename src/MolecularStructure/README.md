@@ -59,7 +59,7 @@ is_nucleotide("5MC")    # true
 
 ## Structure Source
 
-`reslove_struct(source)` → absolute path to a canonical `.pdb` in `_store_dir()` (first model, heavy atoms of the standard residues and of every nucleotide and amino acid, modified ones such as `PSU`, `5MC`, `MSE`, `SEP` included; no waters, ions, ligands, saccharides or hydrogens).
+`reslove_struct(source; model = 1)` → absolute path to a canonical `.pdb` in `_store_dir()` (the first model, or the `model`-th counted from 1: a later model of a `.pdb` is written to `<stem>_model<k>_<hash>.pdb`, of an mmCIF or download to `<id>_model<k>.pdb`; one beyond the last is a `StructureSourceError`; heavy atoms of the standard residues and of every nucleotide and amino acid, modified ones such as `PSU`, `5MC`, `MSE`, `SEP` included; no waters, ions, ligands, saccharides or hydrogens).
 
 - `LocalPathSource(path)`: a file on disk; if one already exists under that name the converted result is byte-compared, identical content is reused and different content raises `StructureSourceError`.
 - `PDBIDSource(id)`: a 4-character RCSB ID, fetched with `BioStructures.retrievepdb`, stored under the uppercased ID; a repeat request trusts an existing file.
@@ -77,3 +77,5 @@ is_nucleotide("5MC")    # true
 | `element_charges(element, charge, ion → ionic_radii)`     | 212 rows, one per ionic radius: which charge states have data, nearest to a target with one query; rebuild it if `ionic_radii` is regenerated                                                                                                                                                                                 |
 
 `MolecularStructure.jl` (which also holds the fixed component-download and structure-check constants) includes these files in dependency order and provides `_store_dir()`. The geometry constants (`N_VOL_SHELL`, `ATOM_BLOCK`, `ATOM_PARALLEL_MIN`) are fixed constants in `Geometry.jl`.
+
+`keep_chains(path, chains)` → `path` itself for no chains, else the path of a copy in `_store_dir()` (`<stem>_chains<ids>_<hash>.pdb`) holding the ATOM, HETATM, ANISOU and TER records of those chains (one-character ids, case counts; read as text, so it works on files BioStructures refuses, and before reused ids are relabelled); a chain the file lacks is a `StructureSourceError` that lists the ones it has. `seed_model` calls it after `reslove_struct`, from its `model` and `chains` keywords; without them nothing is written and the caches keep their keys.

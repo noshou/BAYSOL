@@ -37,7 +37,7 @@ bysl harvest solutes --check                           # only compare the solute
 bysl extract components --check                        # is the bundled component table current?
 bysl fmt                                               # format Julia, TypeScript and SCSS, re-wrap prose
 bysl fmt --check --julia                               # only list the Julia files that are not formatted
-bysl fmt --lines                                       # lines over 92 characters and tabs, if any
+bysl fmt --lines                                       # lines over 92 characters, tabs, TypeScript not indented in 4s
 bysl test                                              # the dev tools' tests
 bysl test fmt results                                  # only the test files with these words in their name
 bysl docs                                              # build the documentation site (strict)
@@ -80,18 +80,18 @@ To add a tool, write a module with a `run(argv::Vector{String})::Int` and a `USA
 ```
 bysl fmt [--julia|--ts|--scss] [PATH ...]          # format and re-wrap (rewrite the files)
 bysl fmt --check [--julia|--ts|--scss] [PATH ...]  # only list what is not formatted
-bysl fmt --lines [PATH ...]                        # report lines over 92 characters and tabs
+bysl fmt --lines [PATH ...]                        # report lines over 92 characters, tabs, skewed TypeScript indentation
 ```
 
 The code rule of the repository is **at most 92 characters per line** in code files (`.jl`, `.ts`, `.tsx`, `.mts`, `.cts`, `.scss`, `.yml`; not Markdown or data). `bysl fmt`:
 
 - formats the Julia files with [JuliaFormatter.jl](https://github.com/domluna/JuliaFormatter.jl) (settings in `.JuliaFormatter.toml`, environment `test/format`) and the SCSS files with its own indentation rules (4 spaces a level);
-- trims the trailing white space of TypeScript files and gives them one final newline, then runs [Biome](https://biomejs.dev) on them (`biome check`, with `--write` when rewriting; settings in `biome.json` at the repository root): layout and lint in one tool. Biome comes from `BIOME`, `node_modules/.bin/biome` in the root or a folder below it, or the `PATH`; TypeScript files without one are a failure (`npm install --save-dev @biomejs/biome`). With no TypeScript file Biome is not called;
+- trims the trailing white space of TypeScript files and gives them one final newline, then runs [Biome](https://biomejs.dev) on them for the lint only (`biome check`, with `--write` for its safe fixes; settings in `biome.json` at the repository root, where Biome's formatter is off so the author's own layout and alignment stay). The 92-column limit is `bysl fmt --lines`. Biome comes from `BIOME`, `node_modules/.bin/biome` in the root or a folder below it, or the `PATH`; TypeScript files without one are a failure (`npm install --save-dev @biomejs/biome`). With no TypeScript file Biome is not called;
 - re-wraps comments and docstrings: every comment block and docstring paragraph that contains a line over the limit is filled again, balanced; a block that fits is left alone, so a second run changes nothing. Plain triple-quoted strings (such as the usage texts) are not docstrings and are left alone;
 - gives every code file its license header, `SPDX-License-Identifier: LGPL-3.0-or-later` in the file's comment syntax (the second line after a shebang);
-- checks the release name in `Project.toml` (at most 35 characters, the room of the terminal interface's main menu), the names of the constants of every `src/*/Params.jl` (at most 23 characters, the name column of the settings sheets) and the pages of those sheets (`tui/resources/*-settings/pages/page*.txt`: a well-formed table, the cursor marker once), and trims the trailing spaces of the files in those folders.
+- checks the release name in `Project.toml` (at most 35 characters) and the names of the constants of every `src/*/Params.jl` (at most 23 characters); both are hard caps, since a longer name is hard to read.
 
-`--check` lists the files that the formatters or the re-wrapping would change, without touching anything. Long string literals and symbols are split by hand: `bysl fmt --lines` reports every line still over the limit and every tab character, and the precommit refuses the commit while there is one.
+`--check` lists the files that the formatters or the re-wrapping would change, without touching anything. Long string literals and symbols are split by hand: `bysl fmt --lines` also fails on TypeScript indented by anything but a multiple of 4 spaces (a continuation line, such as a ternary arm or a wrapped argument, goes one whole level deeper, never half a level; doc-comment lines and template literals are exempt). It reports every line still over the limit and every tab character, and the precommit refuses the commit while there is one.
 
 ## bysl harvest
 
@@ -215,7 +215,7 @@ Builds the site with Documenter.jl in `../docs/` (`julia --project=docs docs/mak
 bysl precommit [--quick] [--dry-run] [--threads N]
 ```
 
-The single entry point to run before a commit; a failing step does not stop the later ones and the exit status is 1 if any failed. Steps, in order: **tool-tests**, **pmv-mean** and **solute-index** (the harvesters rewrite what is stale; the changed files belong in the commit), **unit-tests**, **concurrency-tests**, **whitespace** (trailing whitespace on the lines you changed, untracked files included, is stripped and reported, never a failure; only a leftover conflict marker fails), **default-settings** (the harvest of the defaults), **ts-format**, **julia-format**, **line-length** (a line over 92 characters refuses the commit), **results-table** and **docs-build** (the strict documentation build). `--quick` skips the Julia steps (unit-tests, concurrency-tests, default-settings, julia-format, docs-build). It never runs a fitting test or a benchmark.
+The single entry point to run before a commit; a failing step does not stop the later ones and the exit status is 1 if any failed. Steps, in order: **tool-tests**, **pmv-mean** and **solute-index** (the harvesters rewrite what is stale; the changed files belong in the commit), **unit-tests**, **concurrency-tests**, **whitespace** (trailing whitespace on the lines you changed, untracked files included, is stripped and reported, never a failure; only a leftover conflict marker fails), **default-settings** (the harvest of the defaults), **ts-format**, **ts-unused** ([Knip](https://knip.dev), config `knip.jsonc`: an unused dependency, file, export or type of `tui/` refuses the commit), **julia-format**, **line-length** (a line over 92 characters, a tab, or TypeScript, Julia or SCSS indented by anything but a multiple of 4 spaces refuses the commit; Julia lines that continue an expression after a trailing operator are exempt, JuliaFormatter aligns those), **results-table** and **docs-build** (the strict documentation build). `--quick` skips the Julia steps (unit-tests, concurrency-tests, default-settings, julia-format, docs-build). It never runs a fitting test or a benchmark.
 
 ## Requirements
 

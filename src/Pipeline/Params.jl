@@ -52,6 +52,24 @@ each `.tex`, any of `:pdf`, `:png`, `:svg`.
 """
 const FIGURES_FORMATS = (:pdf,)
 
+"""
+Default `plot_dir` of [`results`](@ref): the folder the `.tex` figures are also copied to,
+a path; `""` (the default) copies nothing. The terminal interface shows it as the "plot
+dir": when it is empty it moves and compiles plots into the `plots` folder of its own data
+folder, one folder for all projects, as `<plot dir>/<project>/<run>/<model>/`. A run made
+by [`run_project`](@ref) copies the figures of each model into that layout.
+"""
+const FIGURES_DIR = ""
+
+"""
+Default `latex_compiler` of [`results`](@ref): the path of the LaTeX compiler that
+`compile = true` runs (`lualatex`, `xelatex` or `pdflatex`, named by its file name), a
+path; `""` (the default) looks for `lualatex`, then `xelatex`, on the `PATH`. The terminal
+interface's "compile plots" uses the same setting; a path that is set is never replaced by
+another compiler.
+"""
+const FIGURES_COMPILER = ""
+
 # ---------------------------------------------------------------------------
 #                       Plot defaults (used by Results.jl)
 # ---------------------------------------------------------------------------
@@ -89,6 +107,51 @@ const PLOT_LW_MAP = 1.2
 
 "Line width (pt) of the reference curve."
 const PLOT_LW_REFERENCE = 1.2
+
+"""
+Whether [`run_project`](@ref) also makes the combined comparison figure of a run
+([`compare_results`](@ref): the measured curve, the fitted curve of every model and the
+reference curves of the project's `reference-fit/` folder, on one plot, and the `compare`
+workbook with the same curves). It is made after the last model, in the run's `compare/`
+folder, when at least one model was fitted.
+"""
+const PLOT_COMPARE = true
+
+"""
+The colours of the fitted curves of the comparison figure, in order: the first model has
+the first colour, the second the second, and so on, starting again from the first when
+there are more models than colours. Each is a name `Colors.parse` reads or a `"#rrggbb"`
+string; the default is the Okabe-Ito set, which stays distinguishable with the common
+forms of colour blindness. At least one colour.
+"""
+const PLOT_COMPARE_COLOURS = (
+    Symbol("#D55E00"), Symbol("#0072B2"), Symbol("#E69F00"), Symbol("#CC79A7"),
+    Symbol("#009E73"), Symbol("#56B4E9"), Symbol("#F0E442"), Symbol("#999999"),
+)
+
+"""
+The markers of the reference curves of the comparison figure, in order: the first
+reference has the first marker, and so on, starting again when there are more references
+than markers (all references share the colour [`PLOT_COLOUR_REFERENCE`](@ref), so the
+marker tells them apart). Each is one of [`PLOT_MARKER_NAMES`](@ref). At least one marker.
+"""
+const PLOT_COMPARE_MARKERS =
+    (:o, :square, :triangle, :diamond, :x, Symbol("+"), :star, :pentagon)
+
+"Line width (pt) of the fitted curves of the comparison figure."
+const PLOT_LW_COMPARE = 1.2
+
+"""
+The marker names a [`PLOT_COMPARE_MARKERS`](@ref) may hold: the names of the pgfplots
+marks (a name ending in `*` is the filled mark). The terminal plot draws the closest
+mark UnicodePlots has.
+"""
+const PLOT_MARKER_NAMES = (
+    :o, Symbol("*"), :square, Symbol("square*"), :triangle, Symbol("triangle*"),
+    :diamond, Symbol("diamond*"), :pentagon, Symbol("pentagon*"), :star, :x,
+    Symbol("+"),
+    :asterisk, :oplus, :otimes,
+)
 
 "Line width (pt) of the quantile curves of the I(q) plot."
 const PLOT_LW_QUANTILE = 0.9
@@ -130,6 +193,20 @@ const PLOT_YLIM_LIN_PAD_FRAC = 0.3
 
 "Width (characters) and height (rows) of a terminal plot."
 const PLOT_PREVIEW_SIZE = (width = 70, height = 18)
+
+"""
+The sizes of the terminal plots a `:tui` run writes besides `plots.txt` (which keeps
+[`PLOT_PREVIEW_SIZE`](@ref)): an ordered list of `(width, height)` pairs, the width in
+terminal columns of the WHOLE plot (the axis labels, ticks and legend included, so the
+widest line of the text is at most that wide) and the height in rows of the plot area
+(the title, the axis and the legend come on top, about 5 rows more; a histogram has that
+many bins). A text plot cannot be resized afterwards, so a viewer picks the largest one
+that fits its window. Each size is written for every model and for the comparison as
+`plots_<width>x<height>.txt` next to `plots.txt`. At least one size; each at least
+`(24, 3)` and at most `(400, 100)`, and each larger than the one before in both
+width and height.
+"""
+const PLOT_TUI_SIZES = ((76, 5), (100, 9), (130, 13), (170, 18))
 
 """
 The text font of the figures: a `fontspec` name, TeX Gyre PagellaX (the TeX Live package
@@ -209,6 +286,72 @@ figure's bounding box and the edge of a label or a tick at the right or the top 
 """
 const PLOT_BORDER_PT = 8.0
 
+# ---------------------------------------------------------------------------
+#         The data and the structure of a fit (the keywords of `seed_model`)
+# ---------------------------------------------------------------------------
+#
+# A value that "is not given" is `nothing` (no limit, automatic)
+# or an empty tuple (none). The kind of such a setting cannot be
+# read off its default, so `SETTING_KINDS` below says it.
+
+"""
+The lowest q, in Å⁻¹, of the curve that [`seed_model`](@ref) fits: points below it are left
+out (before the Shannon binning, so the channels and `lMax` follow the range that is
+fitted). `nothing`, the default, is no lower limit: every point is used. Points at `Q_MIN`
+are kept.
+"""
+const Q_MIN = nothing
+
+"""
+The highest q, in Å⁻¹, of the curve that [`seed_model`](@ref) fits (see [`Q_MIN`](@ref)).
+`nothing`, the default, is no upper limit. Must lie above `Q_MIN` when both are given.
+Points at `Q_MAX` are kept.
+"""
+const Q_MAX = nothing
+
+"""
+The factor [`seed_model`](@ref) multiplies the measured standard errors by, before anything
+else is done with the curve (binning included). 1, the default, leaves them as they are; a
+value above 1 says the errors were under-estimated, below 1 over-estimated. Must be above 0.
+A run records it.
+"""
+const SIGMA_SCALE = 1.0
+
+"""
+Ranges of q, in Å⁻¹, `((q_lo, q_hi), ...)`, whose points [`seed_model`](@ref) leaves out
+(both ends included), for instance a few points a detector artefact spoiled. The default,
+`()`, leaves none out. Each range needs `0 ≤ q_lo < q_hi`; they may overlap.
+"""
+const EXCLUDE_Q = ()
+
+"""
+The spherical-harmonic band limit of the forward model that [`seed_model`](@ref) pins
+(`lMax`). `nothing`, the default, is automatic: `⌈q_max·D⌉` for the largest fitted q and the
+diameter `D` of the scatterer cloud. A value at least 1 is used as it is (a low one is a
+coarser, faster model; a high one costs time).
+"""
+const LMAX = nothing
+
+"""
+The chains of the structure that [`seed_model`](@ref) keeps, `("A", "B")`: one character
+each, as written in the file (case counts); every other chain is removed before the
+hydrogens are added. The default, `()`, keeps every chain.
+"""
+const CHAINS = ()
+
+"""
+Which model of a multi-model structure (an NMR ensemble) [`seed_model`](@ref) uses: the
+`MODEL`-th in the file, counting from 1. The default, 1, is the first model whatever its
+number, which is what was always read.
+"""
+const MODEL = 1
+
+"""
+Whether [`seed_model`](@ref) adds hydrogens (PROPKA and pdb2pqr). `false` fits the structure
+as it is, with the hydrogens it carries. Which tool and force field do it is not a setting.
+"""
+const ADD_HYDROGENS = true
+
 # Sanity limits: positive, inside their range, and never a zero where the code divides.
 @assert(isfinite(VAL_SIGMA) && VAL_SIGMA > 0, "VAL_SIGMA must be a finite number above 0")
 @assert(N_ADAPT ≥ 1 && N_DRAWS ≥ 1, "N_ADAPT and N_DRAWS must be at least 1")
@@ -216,6 +359,12 @@ const PLOT_BORDER_PT = 8.0
 @assert(
     all(f -> f in (:pdf, :png, :svg), FIGURES_FORMATS),
     "FIGURES_FORMATS may hold :pdf, :png and :svg"
+)
+@assert(
+    !isempty(PLOT_COMPARE_COLOURS) && !isempty(PLOT_COMPARE_MARKERS) &&
+    all(in(PLOT_MARKER_NAMES), PLOT_COMPARE_MARKERS),
+    "PLOT_COMPARE_COLOURS and PLOT_COMPARE_MARKERS need at least one entry, and the " *
+    "markers must be in PLOT_MARKER_NAMES"
 )
 @assert(
     all(>(0), PLOT_WIDTH_HEIGHT_CM) && PLOT_HIST_BINS ≥ 1 && PLOT_LINMIN_TICKS ≥ 1 &&
@@ -226,7 +375,7 @@ const PLOT_BORDER_PT = 8.0
 """
 The limits of each setting above that has one, read by the terminal interface
 when a user edits a value (`dev/scripts/harvest_defaults.jl` copies them to
-`default_settings.edn`). Each limit is `above` or `below` (strict) or `at_least`
+`default_settings.json`). Each limit is `above` or `below` (strict) or `at_least`
 or `at_most` (inclusive). They follow `results`' check of a `PlotStyle`: widths,
 sizes and paddings are not negative. The settings that are tuples are left out.
 """
@@ -235,11 +384,17 @@ const SETTING_LIMITS = (
     N_DRAWS = (at_least = 1,),
     TABLE_SIGFIGS = (at_least = 1, at_most = 17),
     VAL_SIGMA = (above = 0,),
+    Q_MIN = (above = 0,),
+    Q_MAX = (above = 0,),
+    SIGMA_SCALE = (above = 0,),
+    LMAX = (at_least = 1,),
+    MODEL = (at_least = 1,),
     PLOT_HIST_BINS = (at_least = 1,),
     PLOT_LINMIN_TICKS = (at_least = 0,),
     PLOT_YLIM_LIN_PAD_FRAC = (at_least = 0,),
     PLOT_LW_MAP = (at_least = 0,),
     PLOT_LW_REFERENCE = (at_least = 0,),
+    PLOT_LW_COMPARE = (at_least = 0,),
     PLOT_LW_QUANTILE = (at_least = 0,),
     PLOT_LW_QUANTILE_RESID = (at_least = 0,),
     PLOT_LW_ZERO_LINE = (at_least = 0,),
@@ -260,14 +415,19 @@ const SETTING_LIMITS = (
 """
 The settings above that hold some of a few fixed choices (any subset, in this order),
 read by the terminal interface, which shows them as tabs to switch on and off
-(`dev/scripts/harvest_defaults.jl` copies them to `default_settings.edn`).
+(`dev/scripts/harvest_defaults.jl` copies them to `default_settings.json`). A setting of
+kind `:markers` (`PLOT_COMPARE_MARKERS`) is the exception: its choices are the names a
+marker may have, and it is an ordered list, not a subset (see `SETTING_KINDS`).
 """
-const SETTING_CHOICES = (FIGURES_FORMATS = (:pdf, :png, :svg),)
+const SETTING_CHOICES = (
+    FIGURES_FORMATS = (:pdf, :png, :svg), PLOT_COMPARE_MARKERS = PLOT_MARKER_NAMES,
+)
 
 """
 The rules that tie settings above together, or that a tuple setting must obey, which a set
 of values must obey as a whole; each is a `(rule, setting, ...)` and is read by the
 terminal interface and by [`load_settings`](@ref BAYSOL.Pipeline.load_settings).
+`:below_setting`: `setting` is below the setting `of` (skipped when either is `nothing`);
 `:all_above`: every number of `setting` is above `bound`; `:ordered`: the pair `setting`
 has its first number below its second, and above `above` if there is one; `:opacity`:
 `setting` is a `(colour, opacity)` pair whose opacity is in 0 to 1.
@@ -276,6 +436,7 @@ const SETTING_RELATIONS = (
     (rule = :all_above, setting = :PLOT_WIDTH_HEIGHT_CM, bound = 0),
     (rule = :all_above, setting = :PLOT_PREVIEW_SIZE, bound = 0),
     (rule = :ordered, setting = :PLOT_YLIM_LOG, above = 0),
+    (rule = :below_setting, setting = :Q_MIN, of = :Q_MAX),
     (rule = :opacity, setting = :PLOT_COLOUR_ERRORBAR),
     (rule = :opacity, setting = :PLOT_COLOUR_BAND),
     (rule = :opacity, setting = :PLOT_COLOUR_BAND_RESID),
@@ -289,7 +450,8 @@ accepts a saved value for these and for no other name.
 """
 const SETTING_NAMES = (
     :N_ADAPT, :N_DRAWS, :TABLE_SIGFIGS, :VAL_SIGMA, :FIGURES_TEX, :FIGURES_COMPILE,
-    :FIGURES_FORMATS, :PLOT_COLOUR_MAP, :PLOT_COLOUR_POSTERIOR, :PLOT_COLOUR_DATA,
+    :FIGURES_FORMATS, :FIGURES_DIR, :FIGURES_COMPILER, :PLOT_COLOUR_MAP,
+    :PLOT_COLOUR_POSTERIOR, :PLOT_COLOUR_DATA,
     :PLOT_COLOUR_ERRORBAR, :PLOT_COLOUR_REFERENCE, :PLOT_COLOUR_BAND,
     :PLOT_COLOUR_BAND_RESID, :PLOT_COLOUR_HIST, :PLOT_COLOUR_AXIS, :PLOT_LW_MAP,
     :PLOT_LW_REFERENCE, :PLOT_LW_QUANTILE, :PLOT_LW_QUANTILE_RESID,
@@ -299,6 +461,28 @@ const SETTING_NAMES = (
     :PLOT_BORDER_PT, :PLOT_TICK_LENGTH_CM, :PLOT_LINMIN_TICKS, :PLOT_LW_MAJOR_TICK,
     :PLOT_LW_MINOR_TICK, :PLOT_TICK_COLOUR, :PLOT_XTICK_ANGLE, :PLOT_XTICK_STUB_PT,
     :PLOT_XTICK_ELBOW_PT, :PLOT_XTICK_LABEL_PAD_PT, :PLOT_YTICK_LABEL_PAD_PT,
+    :Q_MIN, :Q_MAX, :SIGMA_SCALE, :EXCLUDE_Q, :LMAX, :CHAINS, :MODEL, :ADD_HYDROGENS,
+    :PLOT_COMPARE, :PLOT_COMPARE_COLOURS, :PLOT_COMPARE_MARKERS, :PLOT_LW_COMPARE,
+    :PLOT_TUI_SIZES,
+)
+
+"""
+The kind of the settings whose kind cannot be read off the default: `:optional_float`
+and `:optional_int` (a number, or `nothing` for "not given"; `nothing` has no type of
+its own), `:ranges` (a list of `(low, high)` pairs of q), `:strings` (a list of texts),
+`:colours` (an ordered, non-empty list of colours, a colour name or `#rrggbb` each; a
+colour may be repeated) and `:markers` (an ordered, non-empty list of marker names from
+the setting's `SETTING_CHOICES`; a name may be repeated) and `:sizes` (an ordered,
+non-empty list of `[width, height]` pairs of whole numbers, each larger than the one
+before in both) and `:path` (a text for a file or folder path, which may be empty for
+"not set"; no control characters, at most 4096 characters). Every other setting has the
+kind of its default (`setting_kind`).
+"""
+const SETTING_KINDS = (
+    Q_MIN = :optional_float, Q_MAX = :optional_float, LMAX = :optional_int,
+    EXCLUDE_Q = :ranges, CHAINS = :strings, PLOT_COMPARE_COLOURS = :colours,
+    PLOT_COMPARE_MARKERS = :markers, PLOT_TUI_SIZES = :sizes, FIGURES_DIR = :path,
+    FIGURES_COMPILER = :path,
 )
 
 """

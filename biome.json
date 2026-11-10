@@ -3,18 +3,9 @@
     "files": {
         "includes": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts", "!**/node_modules", "!docs/build"]
     },
-    "formatter": {
-        "enabled": true,
-        "indentStyle": "space",
-        "indentWidth": 4,
-        "lineWidth": 92,
-        "lineEnding": "lf"
-    },
+    "formatter": { "enabled": false },
     "linter": {
         "enabled": true,
         "rules": { "preset": "recommended" }
-    },
-    "javascript": {
-        "formatter": { "quoteStyle": "double", "semicolons": "always" }
     }
 }

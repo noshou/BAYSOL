@@ -1,27 +1,29 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Exercises src/Pipeline/Buffer.jl: `load_buffer` reads the buffer.edn of a project (mM as
+# Exercises src/Pipeline/Buffer.jl: `load_buffer` reads the buffer.json of a project (mM as
 # typed) into the `Vector{Solute}` of `seed_model` (mol/L), against the fixture shared with
-# the terminal interface (test/fixtures/buffer/buffer.edn), the shape errors, the missing
-# file and the empty buffer; and `seed_keywords` (src/Pipeline/Settings.jl).
+# the terminal interface (test/fixtures/buffer/buffer.json), the shape errors, the missing
+# file, the empty buffer, the pH and sigma-pH (`load_buffer_ph`); and `seed_keywords`
+# (src/Pipeline/Settings.jl).
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using Logging
 using BAYSOL.Pipeline:
-    load_buffer, InvalidBufferError, seed_keywords, load_settings,
-    seed_model
+    load_buffer, load_buffer_ph, InvalidBufferError, seed_keywords, load_settings,
+    seed_model, BUFFER_PH_MIN, BUFFER_PH_MAX, BUFFER_SIGMA_PH_MIN, BUFFER_SIGMA_PH_MAX,
+    _read_json
 using BAYSOL.BulkElectronDensity: Solute, NonBiological, Polymer, Protein, DNA, RNA,
     CustomNonBio, CustomPolymer, ρₑ, _ρₑ_i
 using BAYSOL.Inference: κ_δρ₁₂, κ_δρ₃, PMV_FALLBACK_UNCERT
 using BAYSOL.Scattering: SHELL_THICKNESS
 using BAYSOL.Geometry: PROBE_RADIUS
 
-const FIXTURE = joinpath(@__DIR__, "..", "..", "fixtures", "buffer", "buffer.edn")
+const FIXTURE = joinpath(@__DIR__, "..", "..", "fixtures", "buffer", "buffer.json")
 
 "`load_buffer` on a file holding `text`: the solutes or the error, warnings silenced."
 function try_buffer(text)
     mktempdir() do dir
-        path = joinpath(dir, "buffer.edn")
+        path = joinpath(dir, "buffer.json")
         write(path, text)
         with_logger(NullLogger()) do
             try
@@ -33,10 +35,14 @@ function try_buffer(text)
     end
 end
 
-"A buffer file with the one row `row` (EDN text)."
-one_row(row) = "{:solutes [$row]}"
+"A buffer file with the one row `row` (JSON text)."
+one_row(row) = "{\"solutes\": [$row]}"
 
-const NB = "{:kind :nonbiological :arg \"sodium chloride\" :mM 200.0 :sigma-mM 10.0}"
+# A JSON row from its keys (`k => json text of the value`, in order).
+row(pairs...) = "{" * join(("\"$k\": $v" for (k, v) in pairs), ", ") * "}"
+const NB = row("kind" => "\"nonbiological\"", "arg" => "\"sodium chloride\"",
+    "mM" => "200.0", "sigma-mM" => "10.0")
+
 
 problems(text) = (r = try_buffer(text); r isa InvalidBufferError ? r.problems : nothing)
 function has(text, needle)
@@ -97,7 +103,7 @@ end
 
 @testset "load_buffer: missing file and empty buffer" begin
     mktempdir() do dir
-        path = joinpath(dir, "nope.edn")
+        path = joinpath(dir, "nope.json")
         e = with_logger(NullLogger()) do
             try
                 load_buffer(path)
@@ -110,114 +116,196 @@ end
         @test_logs (:warn, r"invalid buffer") (
             @test_throws InvalidBufferError load_buffer(path)
         )
-        write(path, "{:solutes []}")
+        write(path, "{\"solutes\": []}")
         @test_logs (:warn, "the buffer has no solutes: pure water") (
             @test load_buffer(path) == Solute[]
         )
     end
-    @test try_buffer("{:solutes []}") == Solute[]
+    @test try_buffer("{\"solutes\": []}") == Solute[]
 end
 
 @testset "load_buffer: invalid files" begin
-    @test has("not edn {", "cannot be read")
-    @test has("[1 2]", ":solutes")
-    @test has("{:other []}", ":solutes")
-    @test has("{:solutes 3}", ":solutes")
-    @test has(one_row("3"), "solute 1: is not a map")
-    @test has(one_row("{:kind :metal :arg \"x\" :mM 1 :sigma-mM 0}"), "unknown `:kind`")
-    @test has(one_row("{:arg \"x\" :mM 1 :sigma-mM 0}"), "unknown `:kind`")
-    @test has(one_row("{:kind :dna :mM 1 :sigma-mM 0}"), "`arg` is missing")
-    @test has(one_row("{:kind :dna :arg 5 :mM 1 :sigma-mM 0}"), "`arg` is 5")
-    @test has(one_row("{:kind :dna :arg \"\" :mM 1 :sigma-mM 0}"), "`arg`")
-    @test has(one_row("{:kind :dna :arg \"AC\" :sigma-mM 0}"), "`mM` is missing")
-    @test has(one_row("{:kind :dna :arg \"AC\" :mM \"1\" :sigma-mM 0}"), "`mM`")
-    @test has(one_row("{:kind :dna :arg \"AC\" :mM 0 :sigma-mM 0}"), "above 0")
-    @test has(one_row("{:kind :dna :arg \"AC\" :mM -1 :sigma-mM 0}"), "above 0")
-    @test has(one_row("{:kind :dna :arg \"AC\" :mM 1}"), "`sigma-mM` is missing")
-    @test has(one_row("{:kind :dna :arg \"AC\" :mM 1 :sigma-mM nil}"), "`sigma-mM`")
-    @test has(one_row("{:kind :dna :arg \"AC\" :mM 1 :sigma-mM -0.1}"), "negative")
+    dna(; kind = "\"dna\"", arg = "\"AC\"", mM = "1", sm = "0") =
+        row("kind" => kind, "arg" => arg, "mM" => mM, "sigma-mM" => sm)
+    @test has("not json {", "cannot be read")
+    @test has("[1, 2]", "`solutes`")
+    @test has("{\"other\": []}", "`solutes`")
+    @test has("{\"solutes\": 3}", "`solutes`")
+    @test has(one_row("3"), "solute 1: is not an object")
+    @test has(one_row(dna(kind = "\"metal\"")), "unknown `kind`")
+    @test has(one_row(row("arg" => "\"x\"", "mM" => "1", "sigma-mM" => "0")),
+        "unknown `kind`")
+    @test has(one_row(row("kind" => "\"dna\"", "mM" => "1", "sigma-mM" => "0")),
+        "`arg` is missing")
+    @test has(one_row(dna(arg = "5")), "`arg` is 5")
+    @test has(one_row(dna(arg = "\"\"")), "`arg`")
+    @test has(one_row(row("kind" => "\"dna\"", "arg" => "\"AC\"", "sigma-mM" => "0")),
+        "`mM` is missing")
+    @test has(one_row(dna(mM = "\"1\"")), "`mM`")
+    @test has(one_row(dna(mM = "0")), "above 0")
+    @test has(one_row(dna(mM = "-1")), "above 0")
+    @test has(one_row(row("kind" => "\"dna\"", "arg" => "\"AC\"", "mM" => "1")),
+        "`sigma-mM` is missing")
+    @test has(one_row(dna(sm = "null")), "`sigma-mM`")
+    @test has(one_row(dna(sm = "-0.1")), "negative")
     # the row number is 1-based and the later rows are still checked
-    p = problems("{:solutes [$NB {:kind :dna :mM 1 :sigma-mM 0} 7]}")
+    p = problems("{\"solutes\": [$NB, $(row("kind" => "\"dna\"", "mM" => "1",
+        "sigma-mM" => "0")), 7]}")
     @test length(p) == 2 && occursin("solute 2", p[1]) && occursin("solute 3", p[2])
     # integers are numbers
-    @test try_buffer(one_row("{:kind :dna :arg \"AC\" :mM 1 :sigma-mM 0}")) ==
-          Solute[DNA(0.001, 0.0, "AC")]
+    @test try_buffer(one_row(dna())) == Solute[DNA(0.001, 0.0, "AC")]
 
-    cn =
-        "{:kind :custom-nonbio :custom \"x\" :z 5 :pmv 10.0 :sigma-pmv nil " *
-        ":mM 1 :sigma-mM 0}"
-    @test try_buffer(one_row(cn)) ==
+    cn(; custom = "\"x\"", z = "5", pmv = "10.0", sp = "null") =
+        row("kind" => "\"custom-nonbio\"", "custom" => custom, "z" => z, "pmv" => pmv,
+            "sigma-pmv" => sp, "mM" => "1", "sigma-mM" => "0")
+    @test try_buffer(one_row(cn())) ==
           Solute[CustomNonBio(0.001, 0.0, "x", 5, 10.0, nothing)]
-    @test has(one_row(replace(cn, ":custom \"x\"" => ":custom \"\"")), "`custom`")
-    @test has(one_row(replace(cn, ":z 5" => "")), "`z` is missing")
-    @test has(one_row(replace(cn, ":z 5" => ":z 5.5")), "`z` is 5.5")
-    @test has(one_row(replace(cn, ":pmv 10.0" => ":pmv nil")), "`pmv`")
-    @test has(one_row(replace(cn, ":sigma-pmv nil" => "")), "`sigma-pmv` is missing")
-    @test has(one_row(replace(cn, ":sigma-pmv nil" => ":sigma-pmv \"a\"")),
-        "`sigma-pmv`")
+    @test has(one_row(cn(custom = "\"\"")), "`custom`")
+    @test has(one_row(replace(cn(), "\"z\": 5, " => "")), "`z` is missing")
+    @test has(one_row(cn(z = "5.5")), "`z` is 5.5")
+    @test has(one_row(cn(pmv = "null")), "`pmv`")
+    @test has(one_row(replace(cn(), "\"sigma-pmv\": null, " => "")),
+        "`sigma-pmv` is missing")
+    @test has(one_row(cn(sp = "\"a\"")), "`sigma-pmv`")
 
-    u(z = 24) = "{:label \"A\" :formula \"C\" :z $z :slope 1.0 :sigma nil}"
-    cp(; units = "[$(u())]", counts = "[22.0]", extra = "") =
-        "{:kind :custom-polymer :custom \"c\" :units $units :z-ends 10 :pmv-ends 1.0 " *
-        ":sigma-ends nil :counts $counts :mM 1 :sigma-mM 0 $extra}"
+    u(z = 24) =
+        "{\"label\": \"A\", \"formula\": \"C\", \"z\": $z, \"slope\": 1.0, " *
+        "\"sigma\": null}"
+    cp(; units = "[$(u())]", counts = "[22.0]", ze = "10", pe = "1.0", se = "null") =
+        row("kind" => "\"custom-polymer\"", "custom" => "\"c\"", "units" => units,
+            "z-ends" => ze, "pmv-ends" => pe, "sigma-ends" => se, "counts" => counts,
+            "mM" => "1", "sigma-mM" => "0")
     @test try_buffer(one_row(cp())) isa Vector{Solute}
     @test has(one_row(cp(units = "[]", counts = "[]")), "1 to 4")
     @test has(
-        one_row(cp(units = "[$(u()) $(u()) $(u()) $(u()) $(u())]",
-            counts = "[1 1 1 1 1]")), "1 to 4")
-    @test has(one_row(cp(counts = "[1.0 2.0]")), "`:counts` has 2 entries")
+        one_row(
+            cp(units = "[$(u()), $(u()), $(u()), $(u()), $(u())]",
+                counts = "[1, 1, 1, 1, 1]"),
+        ), "1 to 4")
+    @test has(one_row(cp(counts = "[1.0, 2.0]")), "`counts` has 2 entries")
     @test has(one_row(cp(counts = "[\"a\"]")), "`counts`")
     @test has(one_row(cp(units = "3", counts = "[1]")), "`units`")
-    @test has(one_row(cp(units = "[3]")), "unit 1: is not a map")
-    @test has(one_row(cp(units = "[{:label \"A\" :slope 1.0 :sigma nil}]")),
+    @test has(one_row(cp(units = "[3]")), "unit 1: is not an object")
+    @test has(
+        one_row(cp(units = "[{\"label\": \"A\", \"slope\": 1.0, \"sigma\": null}]")),
         "`z` is missing")
-    @test has(one_row(cp(units = "[{:z 1 :slope nil :sigma nil}]")), "`slope`")
-    @test has(one_row(replace(cp(), ":z-ends 10" => "")), "`z-ends` is missing")
-    @test has(one_row(replace(cp(), ":pmv-ends 1.0" => ":pmv-ends nil")), "`pmv-ends`")
-    @test has(one_row(replace(cp(), ":sigma-ends nil" => "")), "`sigma-ends` is missing")
+    @test has(one_row(cp(units = "[{\"z\": 1, \"slope\": null, \"sigma\": null}]")),
+        "`slope`")
+    @test has(one_row(replace(cp(), "\"z-ends\": 10, " => "")), "`z-ends` is missing")
+    @test has(one_row(cp(pe = "null")), "`pmv-ends`")
+    @test has(one_row(replace(cp(), "\"sigma-ends\": null, " => "")),
+        "`sigma-ends` is missing")
     # the range of a number is ρₑ's business, not the loader's
     @test try_buffer(one_row(cp(units = "[$(u(-3))]"))) isa Vector{Solute}
     @test try_buffer(one_row(cp(counts = "[0.5]"))) isa Vector{Solute}
 end
 
-@testset "the EDN reader on the shapes the buffer needs" begin
+@testset "the JSON reader on the shapes the buffer needs" begin
     text = """
-        ;; a comment, with "quotes" and {braces}
-        {:solutes
-         [{:kind :dna, :arg "ACGT",
-           ;; a comment in the middle of a row
-           :name "ünï — 核", :mM 1.5e-1, :sigma-mM .01}
-          {:kind :custom-polymer, :custom "c", :units [{:z 1 :slope -2.5 :sigma nil}],
-           :z-ends 0, :pmv-ends 0.0, :sigma-ends nil, :counts [1 2.0],
-           :mM 1 :sigma-mM 0}]}
+        {"solutes":
+         [{"kind": "dna", "arg": "ACGT",
+           "name": "ünï — 核", "mM": 1.5e-1, "sigma-mM": 0.01},
+          {"kind": "custom-polymer", "custom": "c",
+           "units": [{"z": 1, "slope": -2.5, "sigma": null}],
+           "z-ends": 0, "pmv-ends": 0.0, "sigma-ends": null, "counts": [1, 2.0],
+           "mM": 1, "sigma-mM": 0}]}
         """
     p = problems(text)
-    # two units are not allowed by the counts: only the length rule fires
-    @test p !== nothing && length(p) == 1 && occursin("`:counts` has 2", p[1])
-    ok = replace(text, "[1 2.0]" => "[3]")
+    # two counts for one unit: only the length rule fires
+    @test p !== nothing && length(p) == 1 && occursin("`counts` has 2", p[1])
+    ok = replace(text, "[1, 2.0]" => "[3]")
     s = try_buffer(ok)
     @test s[1] == DNA(0.00015, 1e-5, "ACGT")
     @test s[2].slope == [-2.5] && s[2].n == [3.0]
 end
 
 @testset "seed_keywords" begin
-    defaults = load_settings(joinpath(tempdir(), "no", "such", "settings.edn"))
+    defaults = load_settings(joinpath(tempdir(), "no", "such", "settings.json"))
     k = seed_keywords(defaults)
-    @test k == (thickness = SHELL_THICKNESS, probe = PROBE_RADIUS, κ_δρ₁₂ = κ_δρ₁₂,
-        κ_δρ₃ = κ_δρ₃, pmv_fallback_uncert = PMV_FALLBACK_UNCERT)
+    @test k.thickness == SHELL_THICKNESS && k.probe == PROBE_RADIUS
+    @test k.κ_δρ₁₂ == κ_δρ₁₂ && k.κ_δρ₃ == κ_δρ₃
+    @test k.pmv_fallback_uncert == PMV_FALLBACK_UNCERT
+    # the geometry, prior and c1 settings that are keywords of seed_model too
+    @test length(k) == 24 && k.shell_sample == 256 && k.sasa_n_occ == 104
     # every keyword is one `seed_model` takes
     kw = Base.kwarg_decl(first(methods(seed_model)))
     @test all(n -> n in kw, keys(k))
     mktempdir() do dir
-        path = joinpath(dir, "settings.edn")
+        path = joinpath(dir, "settings.json")
         write(
             path,
-            "{:inference {\"PMV_FALLBACK_UNCERT\" {:value 7.5} " *
-            "\"κ_δρ₃\" {:value 2.0}}}",
+            "{\"inference\": {\"PMV_FALLBACK_UNCERT\": {\"value\": 7.5}, " *
+            "\"κ_δρ₃\": {\"value\": 2.0}}}",
         )
         s = load_settings(path)
         k2 = seed_keywords(s)
         @test k2.pmv_fallback_uncert == 7.5 && k2.κ_δρ₃ == 2.0
         @test k2.thickness == SHELL_THICKNESS && k2.κ_δρ₁₂ == κ_δρ₁₂
     end
+end
+
+@testset "load_buffer_ph: the shared fixture and the limits" begin
+    c = load_buffer_ph(FIXTURE)
+    @test c == (pH = 7.4, σ_pH = 0.1)
+    @test c.pH isa Float64 && c.σ_pH isa Float64
+    @test load_buffer(FIXTURE) isa Vector{Solute}
+    # the limits are the ones of the interface's asset file
+    asset = _read_json(
+        read(
+            joinpath(@__DIR__, "..", "..", "..", "tui", "assets", "data",
+                "buffer_conditions.json"), String))
+    @test (asset[:pH][:min], asset[:pH][:max]) == (BUFFER_PH_MIN, BUFFER_PH_MAX)
+    @test (asset[:sigmaPh][:min], asset[:sigmaPh][:max]) ==
+          (BUFFER_SIGMA_PH_MIN, BUFFER_SIGMA_PH_MAX)
+end
+
+"`load_buffer_ph` (or `load_buffer`) on a file holding `text`: the result or the error."
+function try_ph(text; f = load_buffer_ph)
+    mktempdir() do dir
+        path = joinpath(dir, "buffer.json")
+        write(path, text)
+        with_logger(NullLogger()) do
+            try
+                f(path)
+            catch e
+                e isa InvalidBufferError ? e : rethrow()
+            end
+        end
+    end
+end
+
+@testset "load_buffer_ph: what is refused" begin
+    ok = "{\"solutes\": [], \"pH\": 6.5, \"sigma-pH\": 0}"
+    @test try_ph(ok) == (pH = 6.5, σ_pH = 0.0)
+    @test try_ph("{\"solutes\": [], \"pH\": 0, \"sigma-pH\": 14}") ==
+          (pH = 0.0, σ_pH = 14.0)
+    # no conditions: load_buffer is fine, load_buffer_ph insists
+    none = "{\"solutes\": []}"
+    @test try_ph(none; f = load_buffer) == Solute[]
+    e = try_ph(none)
+    @test e isa InvalidBufferError && occursin("no `pH`", e.problems[1])
+    for extra in ("\"pH\": 7", "\"sigma-pH\": 0.1", "\"pH\": -0.5, \"sigma-pH\": 0.1",
+        "\"pH\": 14.5, \"sigma-pH\": 0.1", "\"pH\": 7, \"sigma-pH\": -1",
+        "\"pH\": 7, \"sigma-pH\": 15", "\"pH\": \"7\", \"sigma-pH\": 0.1",
+        "\"pH\": 7, \"sigma-pH\": null", "\"pH\": true, \"sigma-pH\": 0.1")
+        text = "{\"solutes\": [], $extra}"
+        @test try_ph(text) isa InvalidBufferError
+        # a bad pH also makes the whole buffer invalid, as it does for the interface
+        @test try_ph(text; f = load_buffer) isa InvalidBufferError
+    end
+    e = try_ph("{\"solutes\": [], \"pH\": 7}")
+    @test any(occursin("sigma-pH", p) for p in e.problems)
+    # a missing file and a file that is no buffer
+    mktempdir() do dir
+        path = joinpath(dir, "nope.json")
+        e = with_logger(NullLogger()) do
+            try
+                load_buffer_ph(path)
+            catch e
+                e
+            end
+        end
+        @test e isa InvalidBufferError && occursin("does not exist", e.problems[1])
+    end
+    @test try_ph("[1]") isa InvalidBufferError
 end

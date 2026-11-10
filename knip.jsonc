@@ -1,0 +1,19 @@
+{
+    // Unused dependencies, files and exports of the TypeScript side (`bysl precommit`, step
+    // `ts-unused`). The terminal interface is the `tui` workspace; the root only carries the
+    // linter that `bysl fmt` runs.
+    "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+    "workspaces": {
+        ".": {
+            // Biome is run by the dev tools (`bysl fmt`), not imported by any file, so it
+            // looks unused to a scan of the code.
+            "ignoreDependencies": ["@biomejs/biome"]
+        },
+        "tui": {
+            "entry": ["test/*.test.ts", "test/support/*.ts"],
+            "project": ["src/**/*.{ts,tsx}", "test/**/*.ts"],
+            // `reg` is the Windows registry tool that `core/fonts.ts` runs on Windows
+            "ignoreBinaries": ["reg"]
+        }
+    }
+}

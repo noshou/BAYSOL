@@ -530,8 +530,8 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing,
     )
     p("δρ₃ support = [", @sprintf("%.4g", pr.δρ₃Prior.μ), ", ",
         @sprintf("%.4g", pr.δρ₃Prior.μ + pr.δρ₃Prior.σ),
-        "]   δρ₁,₂ support = [", F.LOWER_BOUND_δρ₁₂, ", ",
-        F.LOWER_BOUND_δρ₁₂ + F.WIDTH_δρ₁₂, "]")
+        "]   δρ₁,₂ support = [", pr.δρ₁Prior.μ, ", ",
+        pr.δρ₁Prior.μ + pr.δρ₁Prior.σ, "]")
     if reference !== nothing
         c = curve_chi2(
             reference.q,
@@ -625,8 +625,8 @@ function diagnose(io::IO, seed::F.Seed; label = "", reference = nothing,
 
     # distance to the support bounds
     ξs = [F.Ξ(F._θ_of_w(SVector{4}(post[:, k]...), sp), pr) for k in 1:size(post, 2)]
-    bnd = ((0.0, Inf), (F.LOWER_BOUND_δρ₁₂, F.LOWER_BOUND_δρ₁₂ + F.WIDTH_δρ₁₂),
-        (F.LOWER_BOUND_δρ₁₂, F.LOWER_BOUND_δρ₁₂ + F.WIDTH_δρ₁₂),
+    bnd = ((0.0, Inf), (pr.δρ₁Prior.μ, pr.δρ₁Prior.μ + pr.δρ₁Prior.σ),
+        (pr.δρ₂Prior.μ, pr.δρ₂Prior.μ + pr.δρ₂Prior.σ),
         (pr.δρ₃Prior.μ, pr.δρ₃Prior.μ + pr.δρ₃Prior.σ))
     p("coordinate   median ξ       sd ξ     distance to nearest support bound / sd")
     for (k, nm) in enumerate(("ρₑ", "δρ₁", "δρ₂", "δρ₃"))

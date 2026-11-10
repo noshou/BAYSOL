@@ -2,7 +2,7 @@
 
 # Formats the code: Julia with JuliaFormatter.jl, SCSS with its own indentation rules, the
 # prose of all languages re-wrapped, the license headers, the line-length rule, and the
-# checks of the terminal interface's settings pages, setting names and release name.
+# checks of the setting names and the release name.
 module Fmt
 
 using ..Common
@@ -24,7 +24,7 @@ Formats the code and checks its layout.
     --julia     only Julia files (likewise --ts, --scss)
 
 Also checked: the release name in Project.toml (35 characters at most), the names in
-src/*/Params.jl (23 at most) and the settings pages of the terminal interface.
+src/*/Params.jl (23 at most).
 """
 
 const LICENSE_ID = "LGPL-3.0-or-later"
@@ -134,8 +134,8 @@ function biome_command()
 end
 
 # Formats (`apply`) or checks the TypeScript files under `paths`: trailing white
-# space and the final newline here, then Biome (`biome.json`) for the layout and
-# the lint. A missing Biome with TypeScript files present is a failure.
+# space and the final newline here, then Biome (`biome.json`, formatter off) for the
+# lint. A missing Biome with TypeScript files present is a failure.
 function format_ts(apply::Bool, paths)
     files = [
         f for f in unique(reduce(vcat, code_files.(paths); init = String[]))
@@ -328,10 +328,10 @@ function reflow_prose(apply::Bool, language::Symbol, paths)
     return apply || isempty(changed)
 end
 
-# --- the release name, the setting names and the settings pages of the TUI
+# --- the release name and the setting names
 
-# The release name `v<version>-<release_name>` is shown on the main menu of the TUI, which
-# has room for this many characters: from the left edge of the box, under it.
+# A hard cap on the release name `v<version>-<release_name>`: a longer one is hard to read
+# where it is shown.
 const MAX_VERSION_NAME_LENGTH = 35
 
 """
@@ -355,12 +355,12 @@ function version_problem(toml::AbstractString)
     n = char_count(release)
     n > MAX_VERSION_NAME_LENGTH || return nothing
     return "the release name $release has $n characters, the limit is " *
-           "$MAX_VERSION_NAME_LENGTH (the main menu of the TUI has room for that many)"
+           "$MAX_VERSION_NAME_LENGTH (a longer name is hard to read)"
 end
 
 """
-The most characters the name of a setting may have: the width of the name column of the
-TUI's settings sheets.
+The most characters the name of a setting may have, a hard cap: a longer name is hard to
+read.
 """
 const MAX_PARAMETER_NAME_LENGTH = 23
 
@@ -378,7 +378,7 @@ more than `MAX_PARAMETER_NAME_LENGTH` characters; empty if all fit.
 function parameter_problems(text::AbstractString)
     return String[
         "$n has $(char_count(n)) characters, the limit is " *
-        "$MAX_PARAMETER_NAME_LENGTH (the name column of the settings sheets)"
+        "$MAX_PARAMETER_NAME_LENGTH (a longer name is hard to read)"
         for n in parameter_names(text) if char_count(n) > MAX_PARAMETER_NAME_LENGTH
     ]
 end
@@ -393,125 +393,6 @@ function check_parameter_names()
     ])
     problems = String[]
     for f in files, p in parameter_problems(slurp8(f))
-        push!(problems, "$f: $p")
-    end
-    foreach(p -> println(WHO, ": ", p), problems)
-    return isempty(problems)
-end
-
-# The pages of the TUI's settings sheets (tui/resources/<category>-settings/pages/*.txt):
-# a table of three fields, `name | description | value`, of these widths (the first
-# character of a field is a space, so a name has room for width - 1 characters).
-const PAGE_FIELD_WIDTHS = (24, 29, 19)
-
-# A horizontal rule of the page table: `left`, then a run of `═` for each field with
-# `between` after each field but the last, then `right`.
-page_rule(left, between, right) =
-    "   " * left * join(("═"^w for w in PAGE_FIELD_WIDTHS), between) * right
-
-const PAGE_HEADER =
-    "   ║        name            ║" * "        description          ║" *
-    "      value        ║"
-
-# The regex of a row of the table (3 spaces of indent) whose edges are `left`, `mid` and
-# `right`.
-function page_row_re(left, mid, right)
-    a, b, c = (".{$w}" for w in PAGE_FIELD_WIDTHS)
-    return Regex("^   $left$a$mid$b$mid$c$right\$")
-end
-
-const PAGE_NAME_ROW = page_row_re("╠", "╬", "╣")
-const PAGE_MORE_ROW = page_row_re("║", "║", "║")
-
-"""
-What is wrong with the text `text` of a settings page, as sentences that start with the
-line number; empty if the page is fine.
-"""
-function page_problems(text::AbstractString)::Vector{String}
-    lines = String.(split(text, '\n'; keepempty = true))
-    rule_under = page_rule("╠", "╬", "╣")
-    # the footer box hangs under the value field, so its junction is `╬`, not `╩`
-    a, b, c = ("═"^w for w in PAGE_FIELD_WIDTHS)
-    bottom = "   ╚" * a * "╩" * b * "╬" * c * "╣"
-    bottom_at = findfirst(==(bottom), lines)
-    problems = String[]
-    problem!(i, msg) = push!(problems, "line $i: $msg")
-    first(lines) == PAGE_HEADER || problem!(1, "the table header is not the standard one")
-    (length(lines) >= 2 && lines[2] == rule_under) ||
-        problem!(2, "the rule under the header is not the standard one")
-    if bottom_at === nothing
-        problem!(length(lines), "no standard bottom rule of the table")
-    else
-        for i in 3:(bottom_at-1)
-            l = lines[i]
-            marked = startswith(l, " > ")
-            body = marked ? "   " * l[nextind(l, 3):end] : l
-            if occursin(PAGE_NAME_ROW, body)
-                continue
-            elseif occursin(PAGE_MORE_ROW, body)
-                marked && problem!(i,
-                    "the marker `>` is on a continuation line, not on a setting")
-            else
-                problem!(
-                    i,
-                    "not a row of the table: $(char_count(l)) characters; a row " *
-                    "is `╠ name ╬ description ╬ value ╣` or a continuation " *
-                    "`║ ║ ║ ║`, $(7 + sum(PAGE_FIELD_WIDTHS)) characters in all " *
-                    "(3 of indent), without trailing spaces",
-                )
-            end
-        end
-    end
-    n = count(startswith(" > "), lines)
-    n == 1 || push!(problems,
-        "the marker `>` appears $n times, it must appear exactly once")
-    return problems
-end
-
-# The text files of the TUI's settings sheets, tui/resources/*-settings/pages/*.txt (the
-# pages and the blocs they are made from; not the art pages of the settings menu, whose
-# trailing spaces are part of the picture), as a sorted list of paths; `pattern` is a
-# regex for the file name inside the folders.
-function settings_page_files(pattern::Regex)
-    base = in_root("tui", "resources")
-    isdir(base) || return String[]
-    found = String[]
-    for d in readdir(base)
-        endswith(d, "-settings") || continue
-        pages = joinpath(base, d, "pages")
-        isdir(pages) || continue
-        for f in readdir(pages)
-            occursin(pattern, f) && push!(found, joinpath(pages, f))
-        end
-    end
-    return sort(found)
-end
-
-# Trims (`apply`) or checks the trailing spaces and tabs of every text file of the TUI's
-# settings sheets (pages and blocs); true on success.
-function format_settings_pages(apply::Bool)
-    changed = String[]
-    for f in settings_page_files(r"^.*\.txt$")
-        old = slurp8(f)
-        fresh = trim_trailing_space(old)
-        old == fresh && continue
-        apply && spit8(f, fresh)
-        push!(changed, f)
-    end
-    for f in changed
-        println(apply ? "trailing spaces trimmed:" : "trailing spaces:", " ", f)
-    end
-    return apply || isempty(changed)
-end
-
-# Checks every page of the TUI's settings sheets (the blocs they are made from are not
-# pages): prints each problem with its file and returns false, or returns true.
-function check_settings_pages()
-    problems = String[]
-    for f in settings_page_files(r"^page.*\.txt$"),
-        p in
-        page_problems(trim_trailing_space(slurp8(f)))
-
         push!(problems, "$f: $p")
     end
     foreach(p -> println(WHO, ": ", p), problems)
@@ -837,7 +718,8 @@ end
 
 # --- the line-length rule
 #
-# Every line of the code at most 92 characters, no tab character (`bysl fmt --lines`).
+# Every line of the code at most 92 characters, no tab character, and in TypeScript, Julia
+# and SCSS every indentation a multiple of 4 spaces (`bysl fmt --lines`).
 
 const LINES_WHO = "bysl fmt --lines"
 
@@ -864,26 +746,121 @@ function tab_lines(files)
     return found
 end
 
-"Lists the lines over the limit and the tabs; true when there are none."
+"""
+    skewed_indent(lines, lang = :ts) -> Vector{Tuple{Int,Int}}
+
+`(line number, leading spaces)` of every line of code whose indentation is not a multiple
+of 4 spaces, for `lang` one of `:ts`, `:julia` or `:scss`. Every level of nesting is
+exactly 4 spaces, a continuation line included (a ternary arm, a wrapped argument): write
+it one level deeper, never half a level.
+
+Not counted, because their offset is part of the text and not a level of nesting: blank
+lines; comments and the lines of a block or doc comment (TypeScript and SCSS: ` *` lines
+and `/* ... */`; Julia: `#` lines); the lines of a multi-line string (TypeScript template
+literals, Julia `\"\"\"` strings and docstrings). In Julia also a line that continues an
+expression after a trailing operator (`a ==`, `x *`, `&&`, `=`, `?`, `,` is not one),
+because JuliaFormatter aligns it under the operand it continues and the check must not
+fight the formatter.
+"""
+function skewed_indent(lines, lang::Symbol = :ts)::Vector{Tuple{Int,Int}}
+    found = Tuple{Int,Int}[]
+    in_comment = false
+    in_string = false
+    depth = 0                       # open brackets, Julia only
+    floor = nothing                 # the depth where a continued expression began
+    for (i, raw) in enumerate(lines)
+        line = chopsuffix(raw, "\r")
+        body = lstrip(line, ' ')
+        lead = length(line) - length(body)
+        comment_line =
+            lang === :julia ? startswith(body, "#") :
+            (startswith(body, "*") || startswith(body, "//"))
+        counted =
+            !isempty(body) && !in_comment && !in_string && !comment_line &&
+            floor === nothing
+        counted && lead % 4 != 0 && push!(found, (i, lead))
+        # what this line opens or closes, for the lines after it
+        if lang !== :julia
+            if in_comment
+                occursin("*/", body) && (in_comment = false)
+            elseif startswith(body, "/*") && !occursin("*/", body)
+                in_comment = true
+            end
+        end
+        if lang === :ts
+            # an odd number of unescaped backticks toggles a multi-line template literal
+            ticks = count(==('`'), replace(body, "\\`" => ""))
+            isodd(ticks) && (in_string = !in_string)
+        elseif lang === :julia
+            # an odd number of triple quotes toggles a multi-line string or docstring
+            isodd(length(collect(eachmatch(r"\"\"\"", body)))) && (in_string = !in_string)
+            if !(isempty(body) || comment_line || in_string)
+                code = julia_code(body)
+                ends_open = occursin(JULIA_CONTINUES, code)
+                # a line that ends in an operator starts (or goes on with) an expression
+                # continued on the next lines: JuliaFormatter aligns those under the
+                # operand, so they are exempt until the brackets are back where they were
+                ends_open && floor === nothing && (floor = depth)
+                depth += count(c -> c in "([{", code) - count(c -> c in ")]}", code)
+                !ends_open && floor !== nothing && depth <= floor && (floor = nothing)
+            end
+        end
+    end
+    return found
+end
+
+# A Julia code line that ends in an operator: the next line continues the expression.
+const JULIA_CONTINUES = Regex(
+    "(==|!=|<=|>=|&&|\\|\\||\\+|-|\\*|/|=|\\?|:|->|\\|>|<|>|\\^|%|\\\\" *
+    "|\\bisa|\\bin|\\bfor|[≈≤≥≠∈∉∪∩⊆⊂])\\s*\$",
+)
+
+# The code of a Julia line for counting brackets and operators: strings and the comment
+# at the end are cut out.
+julia_code(body) = replace(replace(body, r"\"([^\"\\]|\\.)*\"" => "\"\""), r"\s#.*$" => "")
+
+"(file, line number, leading spaces) of every skewed line in `files`."
+function skewed_lines(files)
+    found = Tuple{String,Int,Int}[]
+    for f in files
+        lang =
+            endswith(f, ".ts") || endswith(f, ".tsx") ? :ts :
+            endswith(f, ".jl") ? :julia : endswith(f, ".scss") ? :scss : nothing
+        lang === nothing && continue
+        for (i, lead) in skewed_indent(lines_of(f), lang)
+            push!(found, (f, i, lead))
+        end
+    end
+    return found
+end
+
+"Lists the lines over the limit, the tabs and the skewed indentation; true when none."
 function check_lines(paths)::Bool
     files = reduce(vcat, code_files.(isempty(paths) ? [root()] : paths))
     too_long = long_lines(files)
     tabs = tab_lines(files)
+    skewed = skewed_lines(files)
     for (f, i, n) in too_long
         println(f, ":", i, ": ", n, " characters")
     end
     for (f, i) in tabs
         println(f, ":", i, ": tab character (indent with 4 spaces)")
     end
+    for (f, i, n) in skewed
+        println(f, ":", i, ": indented by ", n, " spaces (a multiple of 4 is required)")
+    end
+    isempty(skewed) ||
+        println(stderr, LINES_WHO, ": ", length(skewed), " line(s) whose indentation is ",
+            "not a multiple of 4 spaces in ", length(unique(first.(skewed))), " file(s)")
     isempty(tabs) ||
         println(stderr, LINES_WHO, ": ", length(tabs), " line(s) with a tab character")
     isempty(too_long) ||
         println(stderr, LINES_WHO, ": ", length(too_long), " line(s) over ",
             LINE_LIMIT, " characters in ", length(unique(first.(too_long))),
             " file(s)")
-    ok = isempty(too_long) && isempty(tabs)
+    ok = isempty(too_long) && isempty(tabs) && isempty(skewed)
     ok && println("layout: ", length(files), " code files, no line over ",
-        LINE_LIMIT, " characters, no tab character")
+        LINE_LIMIT, " characters, no tab character, indented in 4s")
     return ok
 end
 
@@ -897,7 +874,7 @@ const LANGUAGE_FLAGS = Dict("--julia" => :julia, "--ts" => :ts, "--scss" => :scs
 The tool's main program: the options and the paths.
 """
 function run(argv::Vector{String})::Int
-    if isempty(argv) || any(a -> a in ("--help", "-h"), argv)
+    if any(a -> a in ("--help", "-h"), argv)
         usage(USAGE)
         return 0
     end
@@ -931,15 +908,11 @@ function run(argv::Vector{String})::Int
     julia_ok = !wanted(:julia) || both_ok(:julia, format_julia)
     ts_ok = !wanted(:ts) || both_ok(:ts, format_ts)
     scss_ok = !wanted(:scss) || both_ok(:scss, format_scss)
-    # whatever the mode and the language: the release name must fit the main menu, the
-    # names of the settings the name column of the TUI's sheets, and the pages of those
-    # sheets must be well formed (trailing spaces trimmed first)
+    # whatever the mode and the language: the release name and the names of the settings
+    # stay within their length caps
     version_ok = check_version_name()
     names_ok = check_parameter_names()
-    trim_ok = format_settings_pages(apply)
-    pages_ok = check_settings_pages()
-    return all((header_ok, julia_ok, ts_ok, scss_ok, version_ok, names_ok,
-        trim_ok, pages_ok)) ? 0 : 1
+    return all((header_ok, julia_ok, ts_ok, scss_ok, version_ok, names_ok)) ? 0 : 1
 end
 
 end

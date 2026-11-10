@@ -2,18 +2,422 @@
 
 Bayesian CRYSOL-style fitting of SAXS curves for proteins and DNA/RNA. Give it a measured curve, a 3D structure and the buffer recipe, and it returns the fit parameters with their uncertainties, not just one best guess.
 
+Two ways to use it, both without writing code:
+
+1. **The terminal interface** (the first guide below, full reference in the [terminal interface guide](tui/README.md)): menus and forms in a terminal window; you make a project, add a model, your curve and your buffer, press one key to run, and read the results there.
+2. **A script** (the second guide below, "Second way: run it from a script"): you edit one short text file and run it. This is the way to script and to run batches; Julia users can also call the package directly ("For Julia users", at the end).
+
 - Documentation: [BAYSOL](https://noshou.github.io/BAYSOL/). Each module's README under `src/` is also a page there.
 - Worked analyses of 27 protein and 30 DNA/RNA SASBDB entries: [fitting tests](test/fitting_tests/README.md)
 - Developer tools (test runners, comparison, benchmarks, figure rendering): [dev](dev/README.md)
 
-## Run an RNA/DNA experiment (macOS, Linux, Windows; no coding)
+## Use BAYSOL from the terminal interface (no coding)
+
+The terminal interface (TUI) is the first way to use BAYSOL: a full-screen program that runs in
+a terminal window, with menus, forms and tables, and no code to write. You make a *project*, put
+a 3D model, your curve and your buffer into it, press one key to fit, and read the results in the
+same window. It runs on **Linux, macOS and Windows**. The second way, for scripting and for
+batches, is the script guide ("Second way: run it from a script") further down. The full
+reference of every screen, key and file is the [terminal interface guide](tui/README.md).
+
+> **Status, said plainly.** The developers have run the interface on **Linux (ARM)**. The
+> macOS and Windows parts (opening a folder or a file chooser from the interface, stopping a
+> run) are written from the documentation of those systems and **have not been tested**; on
+> Windows, WSL is the safest route (see Step 1 of the script guide). Everything you do inside
+> the interface (menus, forms, tables, viewers) works the same on every system.
+
+### What you need
+
+| What | Version | Check it with |
+|------|---------|---------------|
+| **Julia** | 1.12 | `julia --version` |
+| **Node.js** (runs the interface) | 22 or newer | `node --version` |
+| **BAYSOL** itself | a folder with `tui/` in it | |
+| A terminal at least **80 columns by 24 rows**, ideally with 24-bit colour | | |
+
+- *Julia*: install it as in Step 2 of the script guide below (`juliaup`, `winget`).
+- *Node.js*: from <https://nodejs.org> (the LTS download), or `winget install OpenJS.NodeJS` on
+  Windows, or your package manager, or `nvm`. `npm` comes with it.
+- *BAYSOL*: download and unzip it as in Step 3 of the script guide, or `git clone` it, **from a
+  version that contains the `tui/` folder**. In the commands below the folder is `BAYSOL`.
+- *Your data*: a 3D model of your molecule (a `.cif` or `.pdb` file), your curve as a text file or
+  a spreadsheet (`.xlsx`) with the columns q, I(q) and its error, and your buffer recipe (what is
+  in the buffer, in mM, and its pH). You also need the X-ray energy in eV and the buffer
+  temperature in °C. Your measured molecule is **never** listed in the buffer; only what is in
+  the blank is.
+
+### Install and start (once, then every time)
+
+In a terminal, in the BAYSOL folder:
+
+```
+cd BAYSOL
+npm install                                                 # once: the interface's libraries
+julia --project=. -e 'using Pkg; Pkg.instantiate(); using BAYSOL'   # once: the fitting code
+cd tui
+npm start                                                   # every time: starts the interface
+```
+
+`npm install` is run **once, at the BAYSOL folder** (not in `tui/`): the repository has one
+`node_modules`, shared by the `tui` folder. The `julia` line downloads and compiles BAYSOL and
+takes several minutes; it is only so that your first fit is not the one that waits. The first
+fit still downloads the helper programs PROPKA and pdb2pqr (they add hydrogen atoms) and needs
+internet.
+
+The interface needs a real terminal: started with its output redirected it prints `BAYSOL: this
+program needs a terminal` and stops. If the terminal is smaller than 80 x 24 it shows a message;
+make the window bigger and the screen comes back as it was.
+
+**Where BAYSOL keeps your work** (the *data folder*, made on first start):
+
+| System | Data folder | Downloaded structures (a cache you may delete) |
+|--------|-------------|---------------------------------|
+| Linux | `$XDG_DATA_HOME/baysol`, else `~/.local/share/baysol` | `$XDG_CACHE_HOME/baysol/_cache`, else `~/.cache/baysol/_cache` |
+| macOS | `~/Library/Application Support/baysol` | `~/Library/Caches/baysol/_cache` |
+| Windows | `%LOCALAPPDATA%\baysol` | `%LOCALAPPDATA%\baysol\_cache` |
+
+Set the environment variable `BAYSOL_HOME` (an absolute path) to use another folder, and
+`BAYSOL_CACHE` for the cache; a relative path is ignored. To try the interface without touching
+your real work: `BAYSOL_HOME=/tmp/baysol-try npm start`.
+
+### The main menu
+
+The first screen is the main menu with the logo, the release name and six options: **new
+project**, **load project**, **open** (the data folder in your file manager, with a shell in it
+until you leave it), **settings** (the global ones), **help** (a placeholder: it says it is not
+built yet) and **quit**.
+
+- Move with the arrow keys and press **Enter**, or press the option's letter: `n`, `l`, `o`, `s`,
+  `h`, `q`. The box at the bottom lists the keys that work from where the cursor is, and nothing else.
+- **`q`** in the main menu quits. **Ctrl-C** and **Ctrl-D** quit from anywhere (they also stop a
+  run that is going). **Esc never quits**: it only closes what is open (a prompt, a list, a
+  viewer). **Ctrl-X** goes back one screen.
+- **Ctrl-T** opens the theme list, on any screen: 20 themes (10 light, 10 dark), each with an
+  emoji and its colours. Arrows move, Enter picks, Esc leaves. The theme you leave in is the one the
+  next start uses.
+
+### Make a project
+
+A project is a folder that holds one analysis: models, data, buffer, settings and the runs.
+
+1. Press `n` (**new project**), type a name and press Enter. A name has letters, digits, `.`,
+   `_` and `-`, starts with a letter or digit, has at most 40 characters, and is unique
+   (capital letters do not count).
+2. The **project menu** opens: `models`, `data`, `buffer`, `logs`, `settings`, `open...` (hotkeys
+   `m`, `d`, `b`, `g`, `s`, `o`). `^x` goes back to the main menu; later, `l` (**load project**) in the main menu
+   lists your projects (`^r` there deletes one, after a question).
+
+A new project gets a copy of the global settings; its own can then differ.
+
+### 1. Add the 3D model
+
+Open **models** (`m`). Type or paste the **full path** of a `.cif` or `.pdb` file and press Enter
+(Tab completes a name; on an empty field, `o` opens your system's file chooser, and `m` lists the
+models already in the project). The file is **copied** into the project's `models/` folder; your
+original is never touched. You can add several models: each is fitted in turn, in one run.
+`^r` on the model list deletes a model from the project (after a question). `^o` on the list opens the
+**settings of that model**: the project's sheets, showing which settings the model overrides (`overridden`)
+and which it takes from the project (`inherited`, muted); `^r` there gives a group the project's values
+again. They are saved in `model-settings.json` of the project, only what differs. Settings of the whole run
+(the figures' look, `TABLE_SIGFIGS`, `FIGURES_*`) are not offered for a model.
+
+If you only have a sequence, make a 3D model with another program first: BAYSOL fits a
+structure, not a sequence.
+
+### 2. Import the curve
+
+Open **data** (`d`) and choose **load a file**. Give the full path of your curve: any delimited
+text file (`.dat`, `.csv`, `.tsv`, `.txt`, anything; tabs, commas, semicolons, `|` or aligned
+columns) or an `.xlsx` workbook (its first sheet). The **import screen** opens: on the left the
+options, on the right a live preview of how the file is read, with the file's own line numbers.
+
+```
+ data · demo · SASDMJ9.dat
+
+ ╭────────────────────────────────╮ ╭─────────────────────────────────────────╮
+ │ > separator auto (whitespace)  │ │     line │ col:1  │ col:2  │ col:3      │
+ │   comments  on                 │ │ ─────────┼────────┼────────┼────────    │
+ │   skip rows 0                  │ │        6 │ 0.671… │ 0.226… │ 0.174…     │
+ │   header    auto (no)          │ │        7 │ 0.698… │ 0.222… │ 0.142…     │
+ │   I(q)      col:2              │ │        8 │ 0.725… │ 0.180… │ 0.121…     │
+ │   q         col:1              │ │        9 │ 0.753… │ 0.226… │ 0.103…     │
+ │   sigma     col:3              │ │       10 │ 0.780… │ 0.174… │ 0.908…     │
+ ╰────────────────────────────────╯ ╰─────────────────────────────────────────╯
+```
+
+- **Header text is found for you.** The data start at the first line that splits into at least two
+  numbers, and end at the first line that is not data (a footer); the text above it (such as the
+  five header lines of a SASBDB `.dat` file, shown above as "line 6" onward) is skipped.
+  Use `skip rows` only if a header has numbers in it.
+- `separator` (auto, tab, comma, semicolon, whitespace), `comments` (lines starting with `#`,
+  `;`, `%` or `!`) and `header` (auto, yes, no: is there a row of column names?) turn with
+  **Enter** or the left and right arrows. `skip rows` takes a number. Up and down, or **Tab** and
+  **Shift+Tab**, move between the options.
+- **The three columns** `I(q)`, `q` and `sigma` start as a guess. Enter on one opens a prompt:
+  type a **column number** (`2` or `col:2`) or a **header name** (any capitals; Tab completes).
+  Sigma, the error of each point, is required.
+- Press **`^w`** to import. The first problem stops the import, names the line and column
+  (`line 7, column err: "abc" is no number`) and writes nothing. A row whose q or sigma is not above 0, and a row
+  repeated exactly, is dropped and counted (`dropped 2 rows (q or sigma <= 0, or repeated)`). At least 3
+  points are needed, and q must increase otherwise.
+
+The import writes a clean `data.tsv` in the project (q, I, sigma; no header); your file is never
+changed. Back on the data screen, two more things are required:
+
+```
+ data · demo
+
+ ╭────────────────────────────────────────────────────────────────────────────╮
+ │ points   2048                                                              │
+ │ q range  0.067102 to 5.6685 nm⁻¹                                           │
+ │ source   …/files/SASDMJ9.dat                                               │
+ │ columns  I(q)=col:2, q=col:1, sigma=col:3                                  │
+ │ read as  auto, skip 0, comments on, header auto                            │
+ │ units    nm⁻¹                                                              │
+ │ energy   12000 eV                                                          │
+ ╰────────────────────────────────────────────────────────────────────────────╯
+
+   load a file
+   change the columns
+   units
+ > energy
+```
+
+- **`units`**: Enter switches the unit of q between `Å⁻¹` and `nm⁻¹` and saves it at once. A new
+  curve starts as `Å⁻¹`, so **set it right**: a curve in nm⁻¹ read as Å⁻¹ gives absurd fits.
+- **`energy`**: the X-ray energy in eV (above 0). There is no default.
+- **`change the columns`** reopens the import with the choices you made, so you can correct them.
+- **`reference fit`** lists the **reference curves** of the project (the depositor's CRYSOL or FoXS fit, for
+  the comparison figure of a run). `^n` adds one from any table, through the same import screen with
+  only `q` and `I(q)` (and an optional `sigma`, `none` by default); the curve must be in the same units as
+  the data. It is saved as a clean `<name>.tsv` in the project's `reference-fit/` folder (called `references/` before 2026-11-09; an old folder is renamed when you open the list) (a taken name gets
+  `-2`, `-3`; nothing is overwritten) and `^r` deletes the highlighted one, after a question. Adding needs the
+  data first. On macOS and Windows the file chooser of this option is untested like the others.
+
+### 3. Set up the buffer
+
+Open **buffer** (`b`). It has the rows `buffer (N solutes)`, `custom solutes (N)`, `load a recipe`,
+`new recipe` and, once the buffer has solutes, `save current recipe globally`. Open the first for the table of
+solutes. A **recipe** is a named buffer saved for every project (with its pH and σ): save the current buffer as
+one, or load one into this project's table (nothing changes on disk until `^w`; a buffer that has solutes asks
+`replace N solutes with recipe "NAME"?`). `^e` in the global settings menu opens the recipes and the custom
+solutes.
+
+```
+ buffer · demo
+
+     pH         │ σ
+ ───────────────┼────────────
+     7.4        │ 0.1
+
+     solute                │ params                       │    [mM] │   ±[mM]
+ ──────────────────────────┼──────────────────────────────┼─────────┼─────────
+ >   nacl                  │ n/a                          │     200 │      10
+```
+
+- **`^g`** sets the **pH and its uncertainty σ** in one prompt (`7.4 0.1`; σ is optional and
+  defaults to 0.1). The pH has no default: without it the buffer is not ready.
+- **`^n`** adds a small molecule (salt, buffer, sugar, ...): type a name, pick a suggestion with
+  Enter (Tab completes), then the concentration (**in mM**, until you turn the unit) and its **uncertainty ±**.
+  **`^p`** adds a polymer by grade or family (for example `PEG n=22`), **`^f`** a protein, and
+  **`^e`** DNA or RNA, from a FASTA or FASTQ file (the full path; every record of the file becomes a
+  row, all with the same concentration and uncertainty, which you can then edit) or from the sequence
+  itself, typed or pasted (a whole FASTA is fine). Spaces, line breaks, the `>` line and the numbers of a
+  GenBank-style listing are dropped and letters made upper-case; any other wrong character is an error
+  that names it and its place (`invalid residue '-' at 12`), and nothing is repaired silently. These are things *in the buffer*, not your measured molecule.
+- **`^k`** turns the unit of the concentrations and their ± (mM, then M, then µM, then mM again). It
+  changes only what is shown and typed: the file keeps mM. Small or large numbers show as `3e-7`. The unit
+  is kept per buffer (`conc-unit` in its `buffer.json`, saved at once) and the table opens in it again.
+- **`⏎`** edits the row under the cursor, **`^r`** marks it for removal, **`^u`** undoes, and
+  **`^w`** saves every change (a `*` marks what is not saved yet).
+- A name BAYSOL does not know shows `no match (custom: buffer>custom solutes)`. Open
+  **custom solutes** on the buffer page, press `^n`, and type its name, its **formula** (it gives the
+  **Z**, the number of electrons, and a preview shows how it adds up; an unknown element is told), its
+  partial molar volume (PMV, cm³/mol) and optionally its uncertainty; press `^w` to add it to the table and
+  `^w` again to save. It is then offered by `^n` in every project. For a polymer of your own, press `^p`
+  instead: a name, up to four kinds of repeat unit (label, formula, Z, PMV per unit, ±), the end groups,
+  and a preview of the chain's Z and PMV; it is offered by `^p` in the buffer, which then asks how many
+  of each unit there are.
+
+### 4. Settings (usually leave them)
+
+`settings` in the project menu opens four sheets: `output`, `model`, `sampler` and `plots`
+(hotkeys `u`, `m`, `a`, `p`). Each is a list of settings in groups (left and right arrows switch
+group), with a description of the highlighted one under it. The defaults are sound: 300 warm-up
+and 700 kept draws on each of 8 chains is the sampler default.
+
+- **Enter** edits: yes/no turns over, a colour is picked from a list (or typed as `#rrggbb`),
+  a font from the fonts installed on this machine (the math font only from fonts with a `MATH` table),
+  anything else is typed on one line. Every value is checked as you type it.
+- `*` marks a change not saved yet, `!` a setting that cannot be saved (its message stays until
+  the next key). **`^w`** saves, **`^u`** undoes the one under the cursor, **`^r`** resets the
+  group to its default (in a project: to the global value).
+- Every setting is on a sheet. A run that does not converge at the first pass is rerun once longer
+  (`RETRY_N_ADAPT`, `RETRY_N_DRAWS`), so a small sampler can end as a longer run. The ones you may want: `N_ADAPT` and `N_DRAWS` (the
+  sampler's length), `RNG_SEED` (the same seed gives the same result), `N_CHAINS`,
+  `VAL_SIGMA` (the half-width of the reported interval in standard deviations; 2 is about 95 %),
+  `FIGURES_FORMATS` (PDF/PNG/SVG figures; needs LaTeX), `FIGURES_DIR` (the plot folder)
+  and `FIGURES_COMPILER` (the LaTeX compiler) and the colours,
+  line widths and fonts of the `plots` sheet.
+- The comparison figure's colours, markers and sizes of the terminal plots are lists typed on one line:
+  `#D55E00, #0072B2, red`, `o, square, triangle` and `76x5, 100x9` (a wrong line is refused and stays).
+- The `model` sheet also selects data and structure: `Q_MIN`/`Q_MAX` (q limits in Å⁻¹, `none` for no limit),
+  `SIGMA_SCALE`, `EXCLUDE_Q` (ranges typed `0.1-0.2, 0.5-0.6`), `CHAINS` (`A B`, empty for all chains),
+  `MODEL` and `ADD_HYDROGENS`.
+- The main menu's `settings` edits the **global** settings, which new projects copy.
+
+### 5. Run
+
+When the project has a model, a buffer (with at least one solute and a pH) and data (with its
+energy), the project menu shows **`run: shift+r`** at the bottom. Press **Shift+R**.
+
+1. A prompt asks **`temperature °C:`** (0 to 100; the default is the temperature of your last
+   finished run, else 25). Enter starts the run.
+2. The **run screen** shows Julia's output live. The keys are locked; the footer says `abort
+   and quit: ^c`. A fit takes from minutes to much longer, and the first one is slower because
+   of the compile.
+3. At the end the counter says `done`, `failed` or `aborted` and **Enter** goes back to the project
+   menu. A failed run shows the first line of its error.
+
+**Ctrl-C (or Ctrl-D) stops the run and quits the program**: Julia is asked to finish its log, then
+stopped. Only one run per project can be live at once: another start says `a run is in progress
+(pid N)`. While it runs you can edit nothing that it uses: it works on a copy of your project
+files made at the start.
+
+### 6. Read the results
+
+`open...` (`o`) in the project menu. With no run yet it opens the project folder in your file
+manager. Once a run exists it offers `open project folder` and **`open runs`**.
+
+```
+ open · runs                                                      project: demo
+
+ > 10:15:00:000 EST -05:00 · 2026-11-07 lyz  done
+
+
+ ╭╮ ╭╮╷ ╷╭╮╭╮╷
+ ├┴╮├┤╰┬╯╰╮│││    open: ⏎    ┃ delete run: ^r
+ ╰─╯╵╵ ╵ ╰╯╰╯╰─   run.LOG: ^l ┃ back: ^x
+```
+
+- The list shows each run (named by its UTC start time, newest first) and, under it, one row per
+  model with its state: `done`, `failed`, `aborted`, `interrupted`. A model that did not finish
+  says why in the note row.
+- **Enter** on a `done` model opens the **results workbook** (`<model>.xlsx`) in a viewer, one
+  tab per sheet: **`[`** and **`]`** change sheet, the arrows move the cursor.
+  **`^p`** switches to the **plots** of that model (the same text plots a script prints; one tab per
+  plot), and back.
+  The plots are written at several sizes; the viewer shows the largest that fits its window and picks
+  again when you resize it.
+- A run that made the **comparison** (the measured curve, every model and the references on one plot) has one
+  more row, `comparison`, after its models: Enter opens its workbook and plots. A model that has settings of
+  its own is marked `*`, and the note row says which.
+- **`^l`** on a run reads its `logs/run.LOG` (the full log, including the sampler's output and the
+  errors) in a pager: Enter, Space and PgDn page down, `b` and PgUp page up. Esc closes it.
+- **`shift+m`** and **`shift+c`** (with a model or the `comparison` highlighted)
+  **move** the model's LaTeX figures (`.tex`) to your plot folder, or **compile** them with LaTeX into PDFs there:
+  `<plot dir>/<project>/<run>/<model>/`. The plot folder is the setting `plot dir` (`output` settings), by
+  default the `plots` folder of the BAYSOL data folder, one folder for all projects. Compiling needs a LaTeX
+  compiler: with `latex compiler path` empty it looks for `lualatex`, then `xelatex`, on the `PATH`, and if
+  there is none it says so (set the path in the output settings; a path you set is never replaced by another
+  compiler).
+- **`^r`** deletes the whole run, after a question (never one that is still running).
+
+When a run ends, the program **packs** it (the run screen says `packing`): everything in the run folder except
+`run.json` and the `.xlsx` workbooks goes into one archive, `run.7z`, which is tested before the packed files are
+removed; if packing fails the folder stays as it was and the note says why. Runs, logs and plots read the archive
+and older, unpacked runs alike.
+
+### Logs: read and restore what a run used
+
+`logs` (`g`) in the project menu lists the runs of the project, newest first, with how each ended
+(`*` live, `!` interrupted), its models and its size. **Enter** opens a run's options: view its
+`run.LOG`, settings, buffer, units and energy, the conditions (temperature, pH, σ, energy as the
+log records them), solutes and models; and **restore** its settings, buffer (with pH and σ) or units and
+energy into the project. A restore asks one short question (`replace buffer (pH 7.4, σ 0.1)?`) and is
+refused while a run is live. Nothing is ever written into a run, and nothing is deleted from here.
+(`open...` > `open runs` is for the results workbook and plots, and is where a run is deleted.)
+
+The same files are on disk, for your spreadsheet program, your LaTeX and your records: see below.
+
+### Where everything is on disk
+
+```
+<data folder>/
+    settings.json            the global settings (only what you changed)
+    theme.json               your theme
+    custom-solutes.json      your custom solutes
+    recipes.json             your saved recipes
+    projects/<name>/
+        project.json   settings.json   buffer.json
+        data.tsv       data.json
+        models/                  your .cif / .pdb copies
+        runs/<local time, zone, offset, date>/  (23-35-29-123_EST_-0500_2026-11-07; the zone is its
+                                         abbreviation or, without one, its city: SãoPaulo)
+            run.json             status, versions, models, timings
+            logs/                the inputs the run used, run.LOG, plots.txt
+            <model>/
+                <model>.LOG
+                output/          <model>.xlsx, plots.txt, the .tex figures
+```
+
+Open the project's folder with `open...` > `open project folder` (the main menu's `open` opens
+the data folder). Everything is plain JSON, TSV or text, and the interface writes every file
+through a temporary file, so a crash never leaves half a file.
+
+### The keys at a glance
+
+| Key | Does |
+|-----|------|
+| arrows, `⏎` | move, select, edit (a letter on a menu picks its option) |
+| `Esc` | closes the open prompt, list, question or viewer; never quits |
+| `^x` | back one screen; never quits |
+| `q` (main menu), `^c`, `^d` | quit (`^c`/`^d` also stop a run) |
+| `^t` | theme list |
+| `^w` | save every change on the screen |
+| `^u` | undo |
+| `^r` | remove or delete the highlighted item (asks first); reset a group of settings |
+| `^n`, `^p`, `^f`, `^e` | buffer: add a small molecule, a polymer, a protein, DNA/RNA |
+| `^g` | buffer: edit pH and σ |
+| `^k` | buffer: turn the unit of the concentrations (mM, M, µM) |
+| `o`, `m` (empty path field) | open the file chooser; list the models |
+| `r` (on an unusable file) | reset it |
+| `Shift+R` | run (project menu, when ready) |
+| `Tab`, `Shift+Tab`, `^p`, `+` `-` | viewer: next/previous sheet or plot; sheets or plots; plots zoom |
+| `/`, `n`, `N`, `g` | viewer: find, next/previous match, go to a cell (`B7`, `7`, `B`) |
+| `Space`, `c`, `f` | viewer: mark a range, copy it as TSV to the clipboard, show formulas |
+| `^l`, `b`, `Space` | `open runs`: read `run.LOG`; pager: page back, forward |
+| `shift+m`, `shift+c` | `open runs`: move or compile the plots of the highlighted model |
+
+### If something goes wrong in the terminal interface
+
+| What you see | What to do |
+|---|---|
+| `BAYSOL: this program needs a terminal` | Run it from a terminal window, not from a pipe or a launcher. |
+| A message instead of the screen | The window is under 80 x 24. Enlarge it. |
+| `buffer.json unusable!` (or `data`, `settings`, ...) with `r: reset` | The file was changed outside the interface or is damaged. `r` and Enter **reset** it to empty and keep the old one beside it as `<name>.corrupt`, so nothing is lost. |
+| `changed on disk: another copy of BAYSOL saved it; reopen it` | A second copy of the program saved this file meanwhile. Leave the screen and reopen it. |
+| No `run: shift+r` at the bottom of the project menu | One of the four is missing: a model, a buffer with a solute, a pH, valid data with its energy. |
+| `a run is in progress (pid N)` | The project already has a live run (maybe in another window). Wait for it, or stop it. A crashed run is marked `interrupted` after a minute and stops blocking. |
+| `could not start julia: ...` | `julia` is not on the PATH. Install it, or set the environment variable `JULIA` to its full path. |
+| A model is `failed`; its first error line is on the run screen | Read the `ERRORS` section at the end of `logs/run.LOG` (`l` in `open runs`). Other models in the run are still fitted. |
+| `WLSError` in the log | The fit had too few points (fewer than 3) or the model curve is flat across your q range. Check the curve, the q units and the energy. |
+| `a number, please` / `from 0 to 100 °C` | The temperature prompt wants a number in that range. |
+| An unknown residue or element error | The model has a residue BAYSOL does not know. It looks names up online: reconnect and retry. |
+| Anything else | Send the developers `logs/run.LOG` of the run and the error text. |
+
+---
+
+## Second way: run it from a script, an RNA/DNA experiment (macOS, Linux, Windows; no coding)
+
+*This is the second way to use BAYSOL. The first, the terminal interface above, needs no script.*
 
 This guide takes you from a computer with nothing installed to a finished fit of your RNA or
 DNA scattering curve, on **macOS, Linux or Windows**. You will copy and paste commands into a
 terminal and edit one small text file. You do not need to write any code.
 
-> **Status, said plainly.** BAYSOL does not have an app or a "Run" button yet. You run one
-> short text file (a "script") from a terminal. The developers have run BAYSOL on **Linux
+> **Status, said plainly.** Here you run one short text file (a "script") from a terminal; for
+> menus and a run key, use the terminal interface above. The developers have run BAYSOL on **Linux
 > (ARM)**. **macOS, Windows and Intel/AMD machines have not been tested yet.** The steps below
 > use only standard tools, so they should work, but if one fails, copy the error message from
 > the terminal and send it to the developers. **On Windows, the safest route is to use WSL**

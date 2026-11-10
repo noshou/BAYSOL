@@ -756,9 +756,11 @@ toward and would have no way to tell you it missed the other one.
     mean radius `r_m` are all the c1 search reads.
 
 # Keywords
-- `cmin, cmax = EXCL_VOL_CORR_BOUNDS`: the physical c1 bounds.
-- `eps = EXCL_VOL_CORR_EPS`: both the amount the search window is padded
-    past `(cmin, cmax)` and the coarse pre-scan's grid step.
+- `cmin, cmax = nothing`: the physical c1 bounds; `nothing` takes
+    `EXCL_VOL_CORR_BOUNDS` (or, with `tables`, the bounds the tables were built for).
+- `eps = nothing`: both the amount the search window is padded
+    past `(cmin, cmax)` and the coarse pre-scan's grid step; `nothing` takes
+    `EXCL_VOL_CORR_EPS` (or the tables').
 - `tol = EXCL_VOL_CORR_TOL`: absolute tolerance on c1 of the `Brent()`
     polish. It sets the accuracy of the *gradient* taken through this
     function to first order, not just of c1 (the envelope-theorem gradient
@@ -776,7 +778,8 @@ Brent step one fused pass with one exp per q, instead of a full forward pass + `
 per trial c1. The search itself (scan points, bracket, `Brent()`) is unchanged.
 
 # Exceptions
-- `ArgumentError`: `tables` were built for a different q grid, `r_m` or scan settings.
+- `ArgumentError`: `tables` were built for a different q grid, `r_m` or a given scan
+    setting.
 - `WLSError`: as [`wls_fit`](@ref).
 
 # Returns
@@ -791,15 +794,24 @@ function profiled_corrs(
     wls::WLSData,
     ξ::SVector{N,<:Real},
     fw::ForwardCache;
-    cmin::Float64 = EXCL_VOL_CORR_BOUNDS[1],
-    cmax::Float64 = EXCL_VOL_CORR_BOUNDS[2],
-    eps::Float64 = EXCL_VOL_CORR_EPS,
+    cmin::Union{Nothing,Float64} = nothing,
+    cmax::Union{Nothing,Float64} = nothing,
+    eps::Union{Nothing,Float64} = nothing,
     tol::Float64 = EXCL_VOL_CORR_TOL,
     tables::Union{Nothing,_C1Tables} = nothing,
 ) where {N}
-    tab = tables === nothing ? _C1Tables(fw; cmin = cmin, cmax = cmax, eps = eps) : tables
+    # tables carry the scan settings they were built for; a given setting must match
+    tab =
+        tables === nothing ?
+        _C1Tables(
+            fw;
+            cmin = something(cmin, EXCL_VOL_CORR_BOUNDS[1]),
+            cmax = something(cmax, EXCL_VOL_CORR_BOUNDS[2]),
+            eps = something(eps, EXCL_VOL_CORR_EPS),
+        ) : tables
     (
-        tab.cmin == cmin && tab.cmax == cmax && tab.eps == eps &&
+        (cmin === nothing || tab.cmin == cmin) && (cmax === nothing || tab.cmax == cmax) &&
+        (eps === nothing || tab.eps == eps) &&
         tab.r_m == fw.r_m && tab.qvals == fw.qvals
     ) ||
         throw(

@@ -3,7 +3,12 @@
 # Harvests the default of every setting into one JSON file,
 # `tui/assets/data/default_settings.json`: setting name -> `{default, type, limits}` and,
 # where they apply, `choices` (a setting with a fixed set of values) and `shape` and
-# `parts` (a tuple: what each part is, and its name).
+# `parts` (a tuple: what each part is, and its name). `type` is the kind of the setting
+# (`BAYSOL.Pipeline.setting_kind`): `bool`, `int`, `float`, `colour`, `font`, `set`,
+# `tuple` and, for a setting that may be `null` or is a list, `optional_float`,
+# `optional_int` (a number or `null`), `ranges` (a list of `[low, high]` pairs),
+# `strings` (a list of texts), `colours` (an ordered list of colour names or `#rrggbb`) and
+# `markers` (an ordered list of marker names, `choices` being the names allowed).
 
 using BAYSOL
 using Colors: color_names
@@ -13,8 +18,10 @@ const ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 const DEFAULT_OUT = joinpath(ROOT, "tui", "assets", "data", "default_settings.json")
 const MODULES = (BAYSOL.Inference, BAYSOL.Geometry, BAYSOL.Scattering, BAYSOL.Pipeline)
 const LIMIT_KEYS = (:above, :below, :at_least, :at_most)
-const RELATION_RULES =
-    (:inside, :within_width, :ordered, :all_above, :at_most_setting, :opacity)
+const RELATION_RULES = (
+    :inside, :within_width, :ordered, :all_above, :at_most_setting, :below_setting,
+    :opacity,
+)
 
 "The module whose `Params.jl` defines the setting `s`."
 function owner(s::Symbol)

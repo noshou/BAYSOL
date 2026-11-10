@@ -31,7 +31,11 @@ same name (`PlotStyle().color_map` is `PLOT_COLOUR_MAP`).
     `color_tick`:
     [`ColorSpec`](@ref BAYSOL.Pipeline.ColorSpec)s.
 - `lw_map`, `lw_reference`, `lw_quantile`,
-    `lw_quantile_resid`, `lw_zero_line`, `lw_errorbar`: line widths (pt).
+    `lw_quantile_resid`, `lw_zero_line`, `lw_errorbar`, `lw_compare`: line widths (pt).
+- `colors_compare`, `markers_compare`: for [`compare_results`](@ref), the colours of the
+    fitted curves of the models and the markers of the reference curves, each a tuple of
+    `Symbol`s (a colour name or `Symbol("#rrggbb")`; a marker of `PLOT_MARKER_NAMES`),
+    assigned in order and cycled when there are more curves than entries.
 - `markersize`, `whiskerwidth`: the data markers' radius and the error bars' whisker (pt).
 - `hist_bins`: bins of each posterior histogram.
 - `size_cm`: `(width, height)` of every figure (cm), the same for all of them.
@@ -71,6 +75,9 @@ Base.@kwdef struct PlotStyle
     lw_quantile_resid::Float64 = PLOT_LW_QUANTILE_RESID
     lw_zero_line::Float64 = PLOT_LW_ZERO_LINE
     lw_errorbar::Float64 = PLOT_LW_ERRORBAR
+    lw_compare::Float64 = PLOT_LW_COMPARE
+    colors_compare::Tuple{Vararg{Symbol}} = PLOT_COMPARE_COLOURS
+    markers_compare::Tuple{Vararg{Symbol}} = PLOT_COMPARE_MARKERS
     markersize::Float64 = PLOT_MARKERSIZE
     whiskerwidth::Float64 = PLOT_WHISKERWIDTH
     hist_bins::Int = PLOT_HIST_BINS
@@ -108,10 +115,20 @@ function _check_style(s::PlotStyle)
         "style.preview_size must have a positive width and height",
     )
     _need(isfinite(s.xtick_angle), "style.xtick_angle must be finite")
+    _need(
+        !isempty(s.colors_compare) && all(_is_colour, s.colors_compare),
+        "style.colors_compare must be a non-empty tuple of colours",
+    )
+    _need(
+        !isempty(s.markers_compare) && all(in(PLOT_MARKER_NAMES), s.markers_compare),
+        "style.markers_compare must be a non-empty tuple of markers of PLOT_MARKER_NAMES",
+    )
     widths = (
         s.lw_map, s.lw_reference, s.lw_quantile, s.lw_quantile_resid, s.lw_zero_line,
-        s.lw_errorbar, s.markersize, s.whiskerwidth, s.border_pt, s.lw_axis, s.lw_tick,
-        s.lw_minor_tick, s.tick_length_cm, s.tick_label_pad_pt, s.xtick_label_pad_pt,
+        s.lw_errorbar, s.lw_compare, s.markersize, s.whiskerwidth, s.border_pt,
+        s.lw_axis,
+        s.lw_tick, s.lw_minor_tick, s.tick_length_cm, s.tick_label_pad_pt,
+        s.xtick_label_pad_pt,
         s.tick_stub_pt, s.tick_elbow_pt,
     )
     _need(
@@ -891,16 +908,36 @@ function _write_tex(td, stem::AbstractString)
 end
 
 """
-The `PGFPlotsX.save` keywords that pick the LaTeX engine: with a font, `lualatex` or else
-`xelatex` (the fonts are `fontspec` fonts, which `pdflatex` cannot load); without one,
-nothing, and PGFPlotsX uses the first engine it finds.
+The `PGFPlotsX` engine of each LaTeX compiler a `latex_compiler` path may name (by its file
+name without the extension).
+"""
+const _LATEX_ENGINES = (
+    lualatex = PGF.LUALATEX, xelatex = PGF.XELATEX, pdflatex = PGF.PDFLATEX,
+)
+
+"""
+The `PGFPlotsX.save` keywords that pick the LaTeX engine. With a `compiler` (the path of
+`lualatex`, `xelatex` or `pdflatex`) that one, and nothing else (a path that is set is
+never replaced by another compiler); without one, as for a font: with a font, `lualatex`
+or else `xelatex` (the fonts are `fontspec` fonts, which `pdflatex` cannot load); without
+a font, nothing, and PGFPlotsX uses the first engine it finds.
 
 # Exceptions
-- `ErrorException` if there is a font and neither engine is installed, or LuaLaTeX cannot
-    find the font.
+- `ErrorException` if `compiler` is not a file or not named for one of the three engines,
+    or a font is given and the compiler is `pdflatex`; if there is a font and no compiler
+    and neither `lualatex` nor `xelatex` is installed, or LuaLaTeX cannot find the font.
 """
-function _engine_kwargs(font)
+function _engine_kwargs(font, compiler::AbstractString = "")
     names = _font_names(font)
+    if !isempty(compiler)
+        isfile(compiler) || error("the LaTeX compiler $compiler is not a file")
+        key = Symbol(lowercase(first(splitext(basename(compiler)))))
+        haskey(_LATEX_ENGINES, key) ||
+            error("the LaTeX compiler must be lualatex, xelatex or pdflatex, got $compiler")
+        names !== nothing && key === :pdflatex &&
+            error("a font needs lualatex or xelatex, not $compiler")
+        return (; latex_engine = _LATEX_ENGINES[key])
+    end
     names === nothing && return (;)
     if Sys.which("lualatex") !== nothing
         if Sys.which("luaotfload-tool") !== nothing
@@ -925,20 +962,26 @@ end
 
 """
 Run LaTeX on `td` for each of `formats` (`:pdf`, `:png`, `:svg`), writing `<stem>.<format>`
-(with `font`, as the engine of [`_engine_kwargs`](@ref) that can load it).
+(with `font` and `compiler`, as the engine of [`_engine_kwargs`](@ref) that can load it).
 A failed run (no engine installed, a LaTeX error) is a warning, not an error: the other
 outputs stay and the run goes on.
 
 # Returns
 - The paths written.
 """
-function _compile_tex(td, stem::AbstractString, formats, font = nothing)
+function _compile_tex(td, stem::AbstractString, formats, font = nothing, compiler = "")
     mkpath(dirname(stem))
     written = String[]
+    # the compiler's own folder first on the PATH, so PGFPlotsX runs that one
+    path_env =
+        isempty(compiler) ? ENV["PATH"] :
+        string(dirname(abspath(compiler)), Sys.iswindows() ? ';' : ':', ENV["PATH"])
     for fmt in formats
         path = string(stem, ".", fmt)
         try
-            PGF.save(path, td; _engine_kwargs(font)...)
+            withenv("PATH" => path_env) do
+                PGF.save(path, td; _engine_kwargs(font, compiler)...)
+            end
             push!(written, path)
         catch e
             @warn "LaTeX did not produce $path" exception = e
@@ -1006,6 +1049,98 @@ function _preview_histogram(h, style::PlotStyle)
 end
 
 # ---------------------------------------------------------------------------
+#               the terminal plots at several sizes (`PLOT_TUI_SIZES`)
+# ---------------------------------------------------------------------------
+
+"""
+`style` for a terminal plot with the plot area `w` wide and `h` rows tall, and `bins`
+bins when it is a histogram (which has no height of its own: its height is its bin count).
+
+# Returns
+- A [`PlotStyle`](@ref) like `style` with the preview size and the bin count changed.
+
+# Exceptions
+- None.
+"""
+function _terminal_style(style::PlotStyle, w::Integer, h::Integer, bins::Integer = h)
+    fields = (k => getfield(style, k) for k in fieldnames(PlotStyle))
+    return PlotStyle(;
+        fields..., preview_size = (width = w, height = h),
+        hist_bins = min(style.hist_bins, bins),
+    )
+end
+
+"The width, in terminal cells, of the widest line of `text` (U+2800 and boxes are 1)."
+_text_width(text::AbstractString) = maximum(textwidth, split(text, '\n'); init = 0)
+
+# The rows a terminal plot has above and below its plot area (the title, the two borders,
+# the tick labels and the label of the x axis); a size's plots are at most this and its
+# `height` tall.
+const _TERMINAL_EXTRA_ROWS = 5
+
+"""
+The text of a terminal plot that is `width` columns wide as a whole (labels, ticks and
+legend included) and has a plot area of `height` rows. `render(w, h, bins)` draws the plot
+with the area `w` wide, `h` rows tall and, for a histogram, `bins` bins. The labels and the
+legend add a width of their own, so the area's width is corrected until the widest line is
+`width` (a title or a legend wider than that cannot be cut: then the narrowest drawing
+found is the result, which a caller can read off the text). A histogram's bin count is only
+a suggestion (the edges are rounded to nice numbers, so a bimodal sample gets more bins), so
+it is lowered until the plot is at most `height` plus the rows round the area. The colour
+codes are taken out.
+
+# Returns
+- The plain text of the plot, lines joined by a newline.
+
+# Exceptions
+- None.
+"""
+function _text_of_size(render, width::Integer, height::Integer)
+    text = ""
+    for bins in height:-1:2
+        w = width
+        best, best_width = "", typemax(Int)
+        for _ in 1:4
+            text = _plain_text(render(max(w, 10), height, bins))
+            m = _text_width(text)
+            if (m <= width && (best_width > width || m > best_width)) ||
+               (best_width > width && m < best_width)
+                best, best_width = text, m
+            end
+            m == width && break
+            w = max(w + width - m, 10)
+        end
+        text = best
+        count('\n', strip(text)) + 1 <= height + _TERMINAL_EXTRA_ROWS && break
+    end
+    return text
+end
+
+"""
+Writes the texts `texts` (one `IOBuffer` per size of `sizes`) as `plots_<W>x<H>.txt` into
+`dir` (made if missing), and returns the paths. A size whose text is empty (no terminal
+plot was drawn) is not written.
+
+# Returns
+- The paths of the files written.
+
+# Exceptions
+- `SystemError` if a file cannot be written.
+"""
+function _write_tui_texts(dir::AbstractString, sizes, texts)
+    mkpath(dir)
+    paths = String[]
+    for ((W, H), buf) in zip(sizes, texts)
+        text = String(take!(buf))
+        isempty(text) && continue
+        path = joinpath(dir, "plots_$(W)x$(H).txt")
+        write(path, text)
+        push!(paths, path)
+    end
+    return paths
+end
+
+# ---------------------------------------------------------------------------
 #                                 results
 # ---------------------------------------------------------------------------
 
@@ -1023,7 +1158,8 @@ are made, each from the same prepared data:
     `<name>_hist_delta_rho_1`, …, `<name>_hist_c1`);
 
 and one **comparison** figure per entry of `references` (data, reference curve, MAP curve;
-`<name>_comparison`, or `<name>_comparison_<reference name>` when there are several).
+`<name>_comparison`, or `<name>_comparison_<reference name>` when there are several). The
+models of one run, with all the references, on ONE figure are [`compare_results`](@ref).
 
 The files are laid out under `dir`: the `.tex` figures (and what is compiled from them) in
 `dir/plots/`, and the numbers as one workbook `dir/<name>.xlsx`; the run's log (timings
@@ -1056,8 +1192,11 @@ name, so several runs can share a folder. Three kinds of output come out of each
     - `data` (`q | I | sigma`, the fitted curve), `model` (`q | I_map | quantile_lo |
         quantile_hi | bound_lo | bound_hi`), `residuals` (`q | I | sigma | I_map |
         residual`), one `hist_<parameter>` (`bin_lo | bin_hi | count`) for each histogram,
-        `draws` (every draw with its `chain`, `iteration`, `divergent` flag, the four
-        sampled parameters, `scale`, `bkgrnd_corr`, `c1` and `chisq_red`) and one
+        `draws` (one tidy table, a row for each draw, header frozen and units in the
+        header text: `chain`, `draw` within the chain, the four sampled parameters,
+        `scale`, `bkgrnd_corr`, `excl_vol_corr`, `chi2_fit_grid`, and the sampler's flags
+        `log_density`, `divergent`, `tree_depth`, `n_steps`, `step_size` and
+        `acceptance_rate`, each only if the statistics carry it) and one
         `ref_<name>` (`q | I`) for each reference curve.
     The README of `src/Pipeline/` explains every row of `run`.
 
@@ -1087,15 +1226,36 @@ group, so the log's timings list them; with `run_log` it calls [`write_log`](@re
 - `form_factor_log`, `n_atoms`: the seed's `seed.fw.form_factor_log` and `seed.fw.n_atoms`
     for the `form_factor_log` and `run` sheets; given by themselves when `data` is a
     `Seed`.
+- `table_sigfigs::Integer = TABLE_SIGFIGS`: significant figures of every number of the
+    workbook (17 writes every bit of a `Float64`; at least 1).
+- `plot_tui_sizes = PLOT_TUI_SIZES`, `tui_dir = nothing`: with a `tui_dir` the terminal
+    plots are also drawn at each of the sizes `plot_tui_sizes` (the setting
+    `PLOT_TUI_SIZES`: `(width, height)` pairs, the width of the whole plot in columns and
+    the height of its area in rows) and written into that folder as
+    `plots_<width>x<height>.txt`, in the layout of `io` (so a viewer can pick the largest
+    that fits its window); `run_project` does it in `:tui` mode. Without `tui_dir` the
+    sizes are checked and nothing is written.
+- `plot_dir::AbstractString = FIGURES_DIR`: with a path (not `""`), the `.tex` figures are
+    also copied into that folder (made if missing; a file of the same name is
+    replaced). `run_project` gives each model its own
+    `<plot folder>/<project>/<run>/<model>`.
+- `latex_compiler::AbstractString = FIGURES_COMPILER`: the path of the compiler `compile`
+    runs, `lualatex`, `xelatex` or `pdflatex`, named by its file; `""` looks for
+    `lualatex`, then `xelatex`, on the `PATH`. A compiler that is set is the only one tried.
 
 # Returns
-- The paths of the files written.
+- The paths of the files written (the copies in `plot_dir` are not listed).
 
 # Exceptions
 - `ArgumentError` if the `style` holds a value that cannot be drawn (a non-positive size
     or bin count, a negative width), `formats` holds anything but `:pdf`, `:png` and `:svg`,
     or `data` has no positive intensity, its three vectors differ in length,
     or `font` is not `nothing`, a font name or a pair of names.
+- [`InvalidSettingsError`](@ref) if `table_sigfigs` is not a whole number of at least 1
+    (the check of [`load_settings`](@ref) for `TABLE_SIGFIGS`), `plot_tui_sizes` is not
+    a valid `PLOT_TUI_SIZES`, or `plot_dir` or `latex_compiler` is not a path (text
+    without control characters).
+- `SystemError` if the plot folder cannot be made or written.
 """
 function results(
     result, data::Tuple;
@@ -1113,9 +1273,19 @@ function results(
     ref_chi2::Union{Nothing,AbstractString} = nothing,
     form_factor_log = nothing,
     n_atoms = nothing,
+    table_sigfigs::Integer = TABLE_SIGFIGS,
+    plot_tui_sizes = PLOT_TUI_SIZES,
+    tui_dir::Union{Nothing,AbstractString} = nothing,
+    plot_dir::AbstractString = FIGURES_DIR,
+    latex_compiler::AbstractString = FIGURES_COMPILER,
 )::Vector{String}
     q, I, σ = data
     _check_style(style)
+    checked = _checked_keywords(
+        :results, (; table_sigfigs, plot_tui_sizes, plot_dir, latex_compiler),
+    )
+    table_sigfigs, plot_tui_sizes = checked.table_sigfigs, checked.plot_tui_sizes
+    plot_dir, latex_compiler = checked.plot_dir, checked.latex_compiler
     _need(
         all(f -> f in (:pdf, :png, :svg), formats),
         "formats may hold :pdf, :png and :svg",
@@ -1130,6 +1300,8 @@ function results(
     log = result[1].timing
     written = String[]
     sheets = Any[]                                  # the tables, as the workbook's sheets
+    # the terminal plots at the other sizes, one text for each (`tui_dir` only)
+    tui_texts = [IOBuffer() for _ in plot_tui_sizes]
 
     # a figure's stage: its data, then each output as a child stage. `axis_of(d)` is the
     # figure's pgfplots axis, which the `.tex` and the LaTeX run share; `preview_of(d)` is
@@ -1139,8 +1311,22 @@ function results(
             d = timed!(build, log, :plot, 2, "data")
             if preview && preview_of !== nothing
                 timed!(log, :plot, 2, "preview") do
-                    println(io, preview_of(d))
+                    println(io, preview_of(d, style))
                     println(io)
+                end
+            end
+            if tui_dir !== nothing && preview_of !== nothing
+                timed!(log, :plot, 2, "terminal sizes") do
+                    for (buf, (W, H)) in zip(tui_texts, plot_tui_sizes)
+                        text = _text_of_size(W, H) do w, h, bins
+                            sprint(
+                                print,
+                                preview_of(d, _terminal_style(style, w, h, bins)),
+                            )
+                        end
+                        println(buf, text)
+                        println(buf)
+                    end
                 end
             end
             td = nothing
@@ -1154,7 +1340,9 @@ function results(
                 timed!(log, :plot, 2, "latex") do
                     append!(
                         written,
-                        _compile_tex(td, tex_base * suffix, formats, style.font),
+                        _compile_tex(
+                            td, tex_base * suffix, formats, style.font, latex_compiler,
+                        ),
                     )
                 end
             end
@@ -1178,7 +1366,7 @@ function results(
         () -> _curve_data(result, data, style),
         "",
         c -> _fit_axis(c, style),
-        c -> _preview_fit(c, style),
+        (c, st) -> _preview_fit(c, st),
         c -> begin
             out = [_sheet("data", ["q", "I", "sigma"], q, I, σ)]
             c.map === nothing || push!(
@@ -1203,7 +1391,7 @@ function results(
             () -> r,
             "_residuals",
             r -> _residual_axis(r, style),
-            r -> _preview_residuals(r, style),
+            (r, st) -> _preview_residuals(r, st),
             r -> [
                 _sheet(
                     "residuals",
@@ -1243,7 +1431,7 @@ function results(
             () -> h,
             "_hist_" * h.file,
             h -> _histogram_axis(h, style),
-            h -> _preview_histogram(h, style),
+            (h, st) -> _preview_histogram(h, st),
             nothing,
         )
     end
@@ -1267,7 +1455,17 @@ function results(
     end
 
     timed!(log, :plot, 1, "data files") do
-        append!(written, _write_tables(dir, name, sheets, log))
+        append!(written, _write_tables(dir, name, sheets, log; sigfigs = table_sigfigs))
+        tui_dir === nothing || append!(
+            written, _write_tui_texts(tui_dir, plot_tui_sizes, tui_texts),
+        )
+    end
+
+    if !isempty(plot_dir)       # the `.tex` figures are also put in the plot folder
+        mkpath(plot_dir)
+        for f in written
+            endswith(f, ".tex") && cp(f, joinpath(plot_dir, basename(f)); force = true)
+        end
     end
 
     any(endswith(".tex"), written) &&

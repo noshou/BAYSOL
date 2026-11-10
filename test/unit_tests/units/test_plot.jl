@@ -263,10 +263,24 @@ end
             n_ok = count(s -> !s.numerical_error, result[1].stats)
             @test sum(h[2:end, 3]) == n_ok
             dr = xf["draws"][:]
-            @test size(dr, 1) == 301 &&
-                  string.(dr[1, 1:4]) == ["chain", "iteration", "divergent", "rho_e"]
+            # one tidy table: chain, draw, the parameters, the derived quantities, the
+            # sampler's flags (those this stand-in's statistics carry), units in the header
+            hdr = string.(dr[1, :])
+            @test size(dr, 1) == 301
+            @test hdr == ["chain", "draw", "rho_e (e-/A^3)", "delta_rho_1 (0.03 e-/A^3)",
+                "delta_rho_2 (0.03 e-/A^3)", "delta_rho_3 (0.03 e-/A^3)", "scale",
+                "bkgrnd_corr (a.u.)", "excl_vol_corr (c1)", "chi2_fit_grid", "divergent",
+                "tree_depth", "n_steps", "acceptance_rate"]
+            # three chains of 100: `draw` counts from 1 within each
+            @test dr[2:end, 1] == repeat(1:3, inner = 100) &&
+                  dr[2:end, 2] == repeat(1:100, 3)
             # every 50th diverged
-            @test count(==(1), dr[2:end, 3]) == 6
+            @test count(==(1), dr[2:end, findfirst(==("divergent"), hdr)]) == 6
+            # nothing is recomputed: the columns are the fit's own, to the table's digits
+            fit = result[1]
+            @test dr[2:end, 3] == getindex.(fit.samples, 1) &&
+                  dr[2:end, 7] == fit.scale && dr[2:end, 10] == fit.chisq_red
+            @test dr[2:end, findfirst(==("tree_depth"), hdr)] == fill(3, 300)
         end
     end
 
@@ -379,6 +393,13 @@ end
             # sheet and column names are plain ASCII
             @test all(isascii, sheets)
             @test all(isascii, string.(xf["draws"][:][1, :]))
+            # the real sampler's statistics carry the rest of the flags
+            hdr = string.(xf["draws"][:][1, :])
+            @test all(
+                in(hdr),
+                ["log_density", "divergent", "tree_depth", "n_steps",
+                    "step_size", "acceptance_rate"],
+            )
             # run: section | name | value | unit | meaning; a number on every row, the
             # binning and the chains among them, the rows grouped by section, each explained
             run = xf["run"][:]
@@ -387,7 +408,7 @@ end
             for k in ("n_atoms", "lmax", "dmax", "rebin_channels", "rebin_measured",
                 "rebin_fitted", "rebin_non_positive_dropped", "tree_depth_avg",
                 "tree_depth_max", "ebfmi", "excl_vol_sat", "chains_pooled", "chains_run",
-                "rhat_max", "ess_min", "ess_tail_min", "pmv_fallback_uncert")
+                "rhat_max", "ess_min", "ess_tail_min", "pmv_fallback_uncert", "draws_rows")
                 @test k in keys_
             end
             # numbers all, the seed too (a fresh one has 53 bits, exact as a number); a
@@ -565,17 +586,22 @@ end
         result, data, _ = synthetic_result()
         lines = BAYSOL.Pipeline._summary_lines(result)
         @test lines[1] == "Fit finished: reduced χ² = 1.10 on the measured points"
-        @test startswith(lines[2], "  ρₑ = 0.335 (0.235–0.435)    δρ₁ = 1 (0.9–1.1)")
-        @test occursin("δρ₃ = −1 (−1.1 – −0.9)", lines[2])
-        @test lines[3] ==
-              "  Checks: converged (R̂ 1.001), no divergent transitions, 3 of 3 chains used"
+        # one parameter per row
+        @test lines[2] == "  ρₑ   0.335  (0.235–0.435)"
+        @test startswith(lines[3], "  δρ₁  1  (0.9–1.1)")
+        @test lines[5] == "  δρ₃  −1  (−1.1 – −0.9)"
+        @test lines[6] == "  Checks:  converged (R̂ 1.001)"
+        @test lines[7] == "           no divergent transitions"
+        @test lines[8] == "           3 of 3 chains used"
         @test startswith(lines[end], "Wall clock: ") && endswith(lines[end], " s")
-        @test length(lines) == 4                      # no file written yet, no notes
+        @test length(lines) == 9                      # no file written yet, no notes
+        # the terminal summary fits the smallest terminal (80 columns) without files
+        @test all(l -> textwidth(l) <= 76, lines)
         # a failed check adds a note in words
         bad = (result[1], 0.05, result[3], result[4])
         blines = BAYSOL.Pipeline._summary_lines(bad)
-        @test occursin("5.0 % divergent transitions", blines[3])
-        @test any(startswith("  Note: more than 1 % of the transitions diverged"), blines)
+        @test any(contains("5.0 % divergent transitions"), blines)
+        @test any(startswith("  Note: over 1 % of transitions diverged"), blines)
         # no MAP: the verdict says so
         nomap = BAYSOL.Pipeline._summary_lines(synthetic_result(; with_map = false)[1])
         @test occursin("every draw diverged", nomap[1])
@@ -583,9 +609,9 @@ end
         mktempdir() do dir
             results(result, data; dir, preview = false, run_log = true)
             lines = BAYSOL.Pipeline._summary_lines(result)
-            files = only(filter(contains("Results:"), lines))
-            @test occursin("res.xlsx", files) && occursin("Figures: ", files) &&
-                  occursin("plots/", files) && occursin(".LOG", files)
+            @test occursin("res.xlsx", only(filter(contains("Results:"), lines)))
+            @test occursin("plots/", only(filter(contains("Figures:"), lines)))
+            @test occursin(".LOG", only(filter(contains("Log:"), lines)))
             @test startswith(lines[end], "Wall clock: ")
             io = IOBuffer()
             BAYSOL.print_summary(io, result)
@@ -792,5 +818,275 @@ end
         # without any plot stage there is no plotting group, and the plot timing is 0
         t2 = BAYSOL.Pipeline._timing_table(StageLog(), tick())
         @test !any(r -> r.name == "plotting", t2.rows) && t2.plot == 0
+    end
+end
+
+# ---------------------------------------------------------------------------
+# compare_results: the combined figure of a run (src/Pipeline/Compare.jl)
+# ---------------------------------------------------------------------------
+
+# a result like `synthetic_result`'s with its MAP curve (and bands) rescaled by `k` and,
+# with `q2`, on a grid of its own (what models of different Shannon binning have)
+function scaled_result(; k = 1.0, q2 = nothing, seed = 1)
+    result, data, I_true = synthetic_result(; seed)
+    fit, rate, (mapp, mc), (qp, curves) = result
+    if q2 !== nothing
+        I2 = 1000 .* exp.(-(q2 .* 25) .^ 2 ./ 3) .+ 5
+        mc = hcat(q2, I2 .* k)
+    else
+        mc = hcat(mc[:, 1], mc[:, 2] .* k)
+    end
+    return (fit, rate, (mapp, mc), (qp, curves)), data, I_true
+end
+
+@testset "compare_results" begin
+    P = BAYSOL.Pipeline
+    XLSX = P.XLSX
+    result1, data, I_true = scaled_result()
+    q = data[1]
+
+    @testset "one model, one reference: the three outputs" begin
+        ref = Reference("CRYSOL fit1", q[1:2:end], I_true[1:2:end])
+        mktempdir() do dir
+            io = IOBuffer()
+            files = BAYSOL.compare_results([result1], data; names = ["m1"],
+                references = ref, dir, name = "run", io)
+            @test basename.(files) == ["run_compare.tex", "run_compare.xlsx"]
+            @test files[1] == joinpath(dir, "plots", "run_compare.tex")
+            @test files[2] == joinpath(dir, "run_compare.xlsx")
+            @test sort(readdir(dir)) == ["plots", "run_compare.xlsx"]    # no .part left
+            tex = read(files[1], String)
+            # the model's colour is defined, the band of a single model is drawn, the
+            # reference is dashed in the reference colour with its marker, in the legend
+            @test occursin("\\definecolor{bscompare1}{RGB}{213,94,0}", tex)
+            @test occursin("fill between", tex) && occursin("bounds", tex)
+            @test occursin("m1 (MAP)", tex) && occursin("CRYSOL fit1", tex)
+            @test occursin("mark={o}", tex) && occursin("dashed", tex)
+            @test occursin("mark repeat={", tex) && occursin("error bars/y dir", tex)
+            # the terminal plot: the data, the reference and the model with its chi2
+            text = String(take!(io))
+            @test occursin("comparison", text) && occursin("data", text)
+            @test occursin("CRYSOL fit1", text) && occursin("m1   χ² = 1.1", text)
+            # the workbook: the measured curve and one column per curve
+            xf = XLSX.readxlsx(files[2])
+            @test XLSX.sheetnames(xf) == ["compare", "legend"]
+            cmp = xf["compare"][:]
+            @test string.(cmp[1, :]) == ["q (A^-1)", "I_measured (a.u.)", "sigma (a.u.)",
+                "fit_m1 (a.u.)", "ref_CRYSOL fit1 (a.u.)"]
+            @test size(cmp, 1) == length(q) + 1
+            @test cmp[2:end, 1] == q && cmp[2:end, 2] == data[2] && cmp[2:end, 3] == data[3]
+            @test cmp[2:end, 4] == result1[3][2][:, 2]
+            # the reference is on every second q: a point on the grid is exact, the others
+            # lie between their neighbours (linear), and nothing lies beyond its range
+            @test cmp[2, 5] == I_true[1] && cmp[4, 5] == I_true[3]
+            @test cmp[3, 5] ≈ (I_true[1] + I_true[3]) / 2 atol = DEFAULT_ATOL
+            @test ismissing(cmp[end, 5]) == (q[end] > q[end-1] && length(q) % 2 == 0)
+            lg = xf["legend"][:]
+            @test string.(lg[1, :]) == ["column", "kind", "name", "colour", "hex",
+                "marker", "line", "chi2", "note"]
+            @test string.(lg[2:end, 2]) == ["data", "fit", "reference"]
+            @test string.(lg[2:end, 3]) == ["measured", "m1", "CRYSOL fit1"]
+            @test string.(lg[2:end, 1]) == string.(cmp[1, [2, 4, 5]])
+            @test string.(lg[2:end, 4]) == ["gray20", "#D55E00", "mediumturquoise"]
+            @test string.(lg[2:end, 5]) == ["#333333", "#D55E00", "#48D1CC"]
+            @test check_float(lg[3, 8], 1.1) && ismissing(lg[2, 8])
+            @test string(lg[4, 6]) == "o" && string(lg[4, 7]) == "dashed"
+            @test occursin("on the measured q", string(lg[3, 9]))
+            @test occursin("interpolated", string(lg[4, 9]))
+        end
+    end
+
+    @testset "several models: colours and markers are assigned in order and cycle" begin
+        results3 = [scaled_result(; k)[1] for k in (0.9, 1.0, 1.1)]
+        refs = [Reference("r$k", q, I_true .* (1 + k / 10)) for k in 1:3]
+        style = PlotStyle(; colors_compare = (:red, Symbol("#00ff00")),
+            markers_compare = (:o, :x),
+            lw_compare = 2.5)
+        mktempdir() do dir
+            files = BAYSOL.compare_results(results3, data; names = ["a", "b", "c"],
+                references = refs, dir, style, preview = false)
+            tex = read(files[1], String)
+            # the third model has the first colour again, the third reference the first
+            # marker; the bands of several models are left out
+            @test occursin("\\definecolor{bscompare1}{RGB}{255,0,0}", tex)
+            @test occursin("\\definecolor{bscompare2}{RGB}{0,255,0}", tex)
+            @test occursin("\\definecolor{bscompare3}{RGB}{255,0,0}", tex)
+            @test !occursin("fill between", tex) && !occursin("bounds", tex)
+            @test occursin("line width={2.5pt}", tex)
+            @test count("mark={o}", tex) == 2 && count("mark={x}", tex) == 1
+            lg = XLSX.readxlsx(files[2])["legend"][:]
+            @test string.(lg[2:end, 2]) == ["data", "fit", "fit", "fit", "reference",
+                "reference", "reference"]
+            @test string.(lg[2:end, 5]) == ["#333333", "#FF0000", "#00FF00", "#FF0000",
+                "#48D1CC", "#48D1CC", "#48D1CC"]
+            @test string.(lg[6:end, 6]) == ["o", "x", "o"]
+            @test P._assigned((:a, :b), 1) == :a && P._assigned((:a, :b), 5) == :a
+            @test P._assigned((:a, :b), 4) == :b
+        end
+    end
+
+    @testset "models of different q grids go onto the measured q of the sheet" begin
+        q2 = collect(range(0.05, 0.3; length = 11))                  # inside the data's
+        r2, _, _ = scaled_result(; q2)
+        mktempdir() do dir
+            files = BAYSOL.compare_results([result1, r2], data; dir, preview = false)
+            cmp = XLSX.readxlsx(files[2])["compare"][:]
+            @test string.(cmp[1, 4:5]) == ["fit_model1 (a.u.)", "fit_model2 (a.u.)"]
+            col = cmp[2:end, 5]
+            inside = (q .>= q2[1]) .& (q .<= q2[end])
+            @test all(ismissing, col[.!inside]) && !any(ismissing, col[inside])
+            @test all(≥(0), col[inside])
+        end
+    end
+
+    @testset "no MAP: the model is left out with a warning, none left is an error" begin
+        none, d, _ = synthetic_result(with_map = false)
+        mktempdir() do dir
+            files =
+                @test_logs (:warn, r"model dead has no MAP curve") BAYSOL.compare_results(
+                    [result1, none], data; names = ["live", "dead"], dir, preview = false)
+            cmp = XLSX.readxlsx(files[2])["compare"][:]
+            @test size(cmp, 2) == 4 && string(cmp[1, 4]) == "fit_live (a.u.)"
+            @test_throws ArgumentError BAYSOL.compare_results(
+                [none], data; dir, preview = false)
+        end
+    end
+
+    @testset "switches and bad input" begin
+        mktempdir() do dir
+            files = BAYSOL.compare_results([result1], data; dir, preview = false,
+                tex = false)
+            @test basename.(files) == ["res_compare.xlsx"] && !isdir(joinpath(dir, "plots"))
+        end
+        mktempdir() do dir
+            io = IOBuffer()
+            BAYSOL.compare_results([result1], data; dir, io, preview = false)
+            @test isempty(take!(io))
+        end
+        @test_throws ArgumentError BAYSOL.compare_results([], data; preview = false)
+        @test_throws ArgumentError BAYSOL.compare_results(
+            [result1], data; names = ["a", "b"], preview = false)
+        @test_throws ArgumentError BAYSOL.compare_results(
+            [result1, result1], data; names = ["a", "a"], preview = false)
+        @test_throws ArgumentError BAYSOL.compare_results(
+            [result1], (q, data[2][1:3], data[3]); preview = false)
+        @test_throws ArgumentError BAYSOL.compare_results(
+            [result1], data; formats = (:gif,), preview = false)
+        @test_throws ArgumentError BAYSOL.compare_results(
+            [result1], data; font = 3, preview = false)
+        @test_throws BAYSOL.InvalidSettingsError BAYSOL.compare_results(
+            [result1], data; table_sigfigs = 0, preview = false)
+        @test_throws ArgumentError BAYSOL.compare_results(
+            [result1], data; style = PlotStyle(; markers_compare = (:circle,)),
+            preview = false)
+    end
+
+    @testset "every marker name has a terminal marker and draws in the figure" begin
+        for m in P.PLOT_MARKER_NAMES
+            @test haskey(P._TERMINAL_MARKERS, m)
+            @test P._TERMINAL_MARKERS[m] in keys(P.UnicodePlots.MARKERS)
+        end
+        @test sort(collect(keys(P._TERMINAL_MARKERS))) == sort(collect(P.PLOT_MARKER_NAMES))
+        mktempdir() do dir
+            # every marker draws in the terminal and the .tex
+            refs = [Reference("r$i", q, I_true) for i in eachindex(P.PLOT_MARKER_NAMES)]
+            style = PlotStyle(; markers_compare = P.PLOT_MARKER_NAMES)
+            io = IOBuffer()
+            files = BAYSOL.compare_results([result1], data; references = refs, dir, style,
+                io)
+            tex = read(files[1], String)
+            for m in P.PLOT_MARKER_NAMES
+                @test occursin("mark={$m}", tex)
+            end
+            @test occursin("r16", String(take!(io)))
+        end
+    end
+
+    @testset "interpolation onto the measured q" begin
+        f = P._interp_onto
+        @test isequal(f([1.0, 2.0, 3.5], [1.0, 3.0], [10.0, 30.0]), [10.0, 20.0, missing])
+        @test all(ismissing, f([0.5, 4.0], [1.0, 3.0], [10.0, 30.0]))
+        @test f([3.0], [1.0, 3.0], [10.0, 30.0]) == [30.0]
+        @test all(ismissing, f([1.0], [1.0], [10.0]))                   # one point: none
+        # unsorted, NaN skipped
+        @test f([2.0], [3.0, 1.0, NaN], [30.0, 10.0, 5.0]) == [20.0]
+    end
+
+    @testset "the new settings change only the comparison, never the single figures" begin
+        r, d, _ = synthetic_result()
+        mktempdir() do a
+            mktempdir() do b
+                results(r, d; dir = a, preview = false)
+                results(r, d; dir = b, preview = false,
+                    style = PlotStyle(; colors_compare = (:red,), markers_compare = (:x,),
+                        lw_compare = 9.0))
+                for f in readdir(joinpath(a, "plots"))
+                    @test read(joinpath(a, "plots", f), String) ==
+                          read(joinpath(b, "plots", f), String)
+                end
+                @test isfile(joinpath(a, "res.xlsx"))
+                @test !any(contains("compare"), readdir(a)) &&
+                      !any(contains("compare"), readdir(joinpath(a, "plots")))
+            end
+        end
+    end
+end
+
+@testset "reference curves: the reader of a project's reference-fit/ folder" begin
+    P = BAYSOL.Pipeline
+    mktempdir() do dir
+        write(joinpath(dir, "good.tsv"),
+            "# CRYSOL fit\nq\tI\tsigma\n\n0.1\t10\t0.5  # a point\n" *
+            "0.2\t8\t0.4\n0.3\t6\t0.3\n",
+        )
+        r = P._read_reference(joinpath(dir, "good.tsv"))
+        @test r isa Reference && r.name == "good"
+        @test r.q == [0.1, 0.2, 0.3] && r.I == [10.0, 8.0, 6.0]
+        # two columns, comma and semicolon separators, and q in nm⁻¹ turned into Å⁻¹
+        write(joinpath(dir, "two.dat"), "1,10\n2;8\n3 6\n")
+        r2 = P._read_reference(joinpath(dir, "two.dat"); q_scale = 0.1)
+        @test r2.q ≈ [0.1, 0.2, 0.3] && r2.I == [10.0, 8.0, 6.0]
+        # errors name the file and the line
+        write(joinpath(dir, "text.txt"), "0.1 10\n0.2 abc\n")
+        e = try
+            P._read_reference(joinpath(dir, "text.txt"))
+        catch err
+            err
+        end
+        @test e isa ArgumentError && occursin("text.txt line 2", e.msg)
+        write(joinpath(dir, "four.txt"), "0.1 10 1 5\n")
+        e = try
+            P._read_reference(joinpath(dir, "four.txt"))
+        catch err
+            err
+        end
+        @test e isa ArgumentError && occursin("four.txt line 1: expected 2 or 3", e.msg)
+        write(joinpath(dir, "empty.txt"), "# nothing\n\n")
+        @test_throws ArgumentError P._read_reference(joinpath(dir, "empty.txt"))
+        write(joinpath(dir, "neg.txt"), "0.1 -5\n0.2 -6\n")
+        e = try
+            P._read_reference(joinpath(dir, "neg.txt"))
+        catch err
+            err
+        end
+        @test e isa ArgumentError && occursin("neg.txt", e.msg)
+        @test_throws SystemError P._read_reference(joinpath(dir, "absent.txt"))
+
+        # the folder: good files in name order, the bad ones skipped with a line each,
+        # other extensions ignored, a name that is taken gets a number
+        refs = joinpath(dir, "reference-fit")
+        mkpath(refs)
+        for (f, src) in
+            (("a.tsv", "good.tsv"), ("a.dat", "two.dat"), ("bad.txt", "text.txt"),
+            ("B.TXT", "two.dat"), ("note.md", "two.dat"), ("empty.tsv", "empty.txt"))
+            cp(joinpath(dir, src), joinpath(refs, f))
+        end
+        mkpath(joinpath(refs, "sub.tsv"))                       # a folder is not a curve
+        got, problems = P._read_references(refs)
+        @test [x.name for x in got] == ["B", "a", "a-2"]
+        @test length(problems) == 2 &&
+              any(p -> occursin("bad.txt was skipped", p) && occursin("line 2", p),
+                  problems) && any(contains("empty.tsv was skipped"), problems)
+        @test P._read_references(joinpath(dir, "nowhere")) == (Reference[], String[])
     end
 end

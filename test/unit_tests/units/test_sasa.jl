@@ -397,4 +397,46 @@ const SASA_WITNESS_LOSS_MAX = 0.0092
         # and functional from here.
         @test length(BAYSOL.Geometry.plastic_points(8)) == 8
     end
+    @testset "sasa: the shell settings are keywords (defaults unchanged, changes act)" begin
+        # a 3×3×3 block of atoms
+        m = sasa_mol(
+            fill("c", 27),
+            [(2.4i, 2.4j, 2.4k) for i in 0:2 for j in 0:2 for k in 0:2],
+        )
+        base = Geometry.sasa(m)
+        count_of(r) = size(r[1], 2)
+        # every keyword at its constant is the default
+        same = Geometry.sasa(
+            m; shell_area_per_point = Geometry.SHELL_AREA_PER_POINT,
+            shell_min_points = SHELL_MIN_POINTS, shell_sample = SHELL_SAMPLE,
+            sasa_n_occ = SASA_N_OCC, bead_ray_range = Geometry.BEAD_RAY_RANGE,
+            bead_ray_dirs = Geometry.BEAD_RAY_DIRS,
+        )
+        @test same == base
+        # the budget is the area's, not the floor
+        @test count_of(base) > SHELL_MIN_POINTS
+        # the budget: each bead stands for more area, so there are fewer of them; the floor
+        # holds a small budget up
+        @test count_of(Geometry.sasa(m; shell_area_per_point = 8.0)) < count_of(base)
+        @test count_of(
+            Geometry.sasa(m; shell_area_per_point = 1e6, shell_min_points = 70),
+        ) ==
+              70
+        # the directions per atom, and the witness pass (off at sasa_n_occ == shell_sample:
+        # it can only add area)
+        @test Geometry.sasa(m; shell_sample = 128)[1] != base[1]
+        full = Geometry.sasa(m; sasa_n_occ = SHELL_SAMPLE)
+        @test sum(full[2]) ≥ sum(base[2]) - 1e-9
+        # no bead has a neighbour within a vanishing range: all are open surface
+        @test all(==(Geometry.CONVEX), Geometry.sasa(m; bead_ray_range = 1e-3)[3])
+        @test Geometry.sasa(m; bead_ray_dirs = 1)[3] isa Vector{Geometry.BeadClass}
+        # the limits of the settings
+        for bad in (
+            (; shell_area_per_point = 0.0), (; shell_min_points = 0),
+            (; shell_sample = 0), (; sasa_n_occ = SHELL_SAMPLE + 1), (; sasa_n_occ = 0),
+            (; bead_ray_range = 0.0), (; bead_ray_dirs = 0),
+        )
+            @test_throws DomainError Geometry.sasa(m; bad...)
+        end
+    end
 end

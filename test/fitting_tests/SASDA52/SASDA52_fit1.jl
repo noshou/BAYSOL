@@ -10,9 +10,9 @@ include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR_FIT1 =
 joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDA52")
-const _DATA_PATH_FIT1   = joinpath(_FIXTURE_DIR_FIT1, "experimental_data", "SASDA52.dat")
-const _PDB_PATH_FIT1    = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1_model1.pdb")
-const _FIT_PATH_FIT1    = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1.fit")
+const _DATA_PATH_FIT1 = joinpath(_FIXTURE_DIR_FIT1, "experimental_data", "SASDA52.dat")
+const _PDB_PATH_FIT1  = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1_model1.pdb")
+const _FIT_PATH_FIT1  = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1.fit")
 
 raw_fit1 = readdlm(_DATA_PATH_FIT1; skipstart = 4)
 
@@ -108,10 +108,6 @@ const SOLUTES_FIT1 = Solute[
 # ---------------------------------------------------------------------------
 
 const Q_MAX_FIT_FIT1 = 0.5   # matches SASDA52_fit1.fit's q-range (0 to 0.5 Å⁻¹)
-
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
-# bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS_FIT1 = true   # runs Pdb2pqr at PH_FIT1
 

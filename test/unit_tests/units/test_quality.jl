@@ -126,7 +126,7 @@ end
     @test isempty(
         _reports(Geometry._class_loop,
             (TT, Matrix{Float64}, Matrix{Float64}, Matrix{Float64},
-                Vector{Float64}, Float64, Vector{Vec3})),
+                Vector{Float64}, Float64, Vector{Vec3}, Float64)),
     )
 
     # two barriers here, not one: the sampling loop and the classification loop

@@ -13,22 +13,11 @@ docs/src/assets/themes/*.scss linguist-documentation=false
 # docs/scss/flatly (bulmaswatch, MIT) is vendored too. All three stay out of the language stats.
 docs/src/assets/themes/*.css linguist-generated=true
 docs/scss/highlightjs/*.css linguist-vendored=true
-docs/scss/flatly/* linguist-vendored=true
+docs/scss/flatly/** linguist-vendored=true
 
-# Everything under test/ is hand-written code and counts in the language stats (Julia,
-# TOML), including each test environment's Project.toml; only the Manifest.toml
-# files, which are generated, stay out. Overrides Linguist's documentation heuristic.
 test/** linguist-documentation=false
 test/**/*.jl linguist-detectable=true
-test/**/Project.toml linguist-detectable=true linguist-generated=false
-
-# TOMLs: every Project.toml (root, docs/, test/ and its environments, dev/ and dev/test/) and
-# CondaPkg.toml is hand-written and counts; every Manifest.toml is generated and stays out.
-*.toml linguist-detectable=true
-Project.toml linguist-detectable=true linguist-generated=false
-CondaPkg.toml linguist-detectable=true linguist-generated=false
-Manifest.toml linguist-generated=true linguist-detectable=false
-docs/Project.toml linguist-documentation=false
+tui/test/**/*.ts linguist-documentation=false
 
 # Ignore generated .tex files.
 *.tex linguist-generated=true
@@ -38,23 +27,26 @@ docs/Project.toml linguist-documentation=false
 # what it reports) must leave them alone.
 tui/resources/**/*.txt whitespace=-trailing-space
 
-# The dev tools (the Julia package in dev/ with its tests, the launcher and the scripts beside
-# them) and the TypeScript code are hand-written and count in the language stats, each
-# environment's Project.toml included; only the Manifest.toml files, which are generated, stay
-# out. Overrides Linguist's documentation heuristic.
+# ev tools
 dev/** linguist-documentation=false
 dev/**/*.jl linguist-detectable=true
-dev/**/Project.toml linguist-detectable=true linguist-generated=false
 *.ts linguist-detectable=true
 *.tsx linguist-detectable=true
 *.d.ts linguist-detectable=true linguist-generated=false
-
-# (after the TOML rules above, which would otherwise win) test/ Manifests stay out of the stats.
-test/**/Manifest.toml linguist-generated=true linguist-detectable=false
+*.test.ts linguist-detectable=true linguist-generated=false
 
 # Linguist treats everything under test/fixtures/ as vendored (default rule
 # `(^|/)[Tt]ests?/fixtures/`), which also hides these two hand-written code fixtures.
 test/fixtures/molecules/sequences.jl linguist-vendored=false linguist-detectable=true
 
-# (after the TOML rules above) the Manifests of dev/ stay out of the stats too.
-dev/**/Manifest.toml linguist-generated=true linguist-detectable=false
+# TOMLS
+test/Project.toml linguist-detectable=true
+Project.toml linguist-detectable=true
+test/visualize/Project.toml linguist-detectable=true
+test/format/Project.toml linguist-detectable=true
+test/fitting_tests/Project.toml linguist-detectable=true
+docs/Project.toml linguist-documentation=false linguist-detectable=true
+dev/test/Project.toml linguist-detectable=true
+dev/Project.toml linguist-detectable=true
+.JuliaFormatter.toml linguist-detectable=true
+CondaPkg.toml linguist-detectable=true

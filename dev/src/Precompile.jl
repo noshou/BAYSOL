@@ -33,7 +33,6 @@ using PrecompileTools: @compile_workload, @setup_workload
             Fmt.reindent_scss("a {\ncolor: red;\n}\n")
             Fmt.reflow_lines(["# " * join(fill("word", 40), " ")], "jl")
             Fmt.trim_trailing_space("a  \nb\t\n")
-            Fmt.page_problems("not a page")
             Fmt.version_problem("version = \"1\"\nrelease_name = \"x\"\n")
             # the readers of the run logs and the tools built on them
             Report.parse_log(log_text)

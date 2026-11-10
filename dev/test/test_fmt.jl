@@ -193,7 +193,7 @@ end
     @test run_tool("fmt", "--check", "--scss", dir)[1] == 0
 end
 
-@testset "the release name must fit the main menu" begin
+@testset "the release name has a length cap" begin
     toml(
         version,
         release,
@@ -206,7 +206,7 @@ end
     @test Fmt.version_problem(slurp8(in_root("Project.toml"))) === nothing
 end
 
-@testset "setting names fit the sheets" begin
+@testset "setting names have a length cap" begin
     @test Fmt.parameter_names(
         lines("# comment", "const A_B = 1", "const C::Int = 2", "x = 3"),
     ) ==
@@ -220,64 +220,6 @@ end
         f = in_root("src", d, "Params.jl")
         isfile(f) && @test isempty(Fmt.parameter_problems(slurp8(f)))
     end
-end
-
-const PAGE_HEADER =
-    "   ║        name            ║" * "        description          ║" *
-    "      value        ║"
-const PAGE_RULE_UNDER =
-    "   ╠════════════════════════╬" * "═════════════════════════════╬" *
-    "═══════════════════╣"
-const PAGE_BOTTOM =
-    "   ╚════════════════════════╩" * "═════════════════════════════╬" *
-    "═══════════════════╣"
-
-# A first line of a setting: the marker or 3 spaces, then the three fields.
-name_row(marked, setting, desc) =
-    (marked ? " > " : "   ") * "╠" * rpad(" $setting", 24) *
-    "╬" * rpad(" $desc", 29) * "╬" * " "^19 * "╣"
-# A continuation line: the three fields with a description.
-more_row(desc) = "   ║" * " "^24 * "║" * rpad(" $desc", 29) * "║" * " "^19 * "║"
-page(body...) = lines(PAGE_HEADER, PAGE_RULE_UNDER, body..., PAGE_BOTTOM, "   footer")
-
-@testset "settings pages are well formed" begin
-    @test isempty(
-        Fmt.page_problems(
-            page(
-                name_row(true, "PLOT_HIST_BINS", "Bins in the histogram."),
-                more_row("More of it."),
-                name_row(false, "PLOT_FONT", "A font."),
-            ),
-        ),
-    )
-    @test any(
-        occursin("0 times", p) for p in
-        Fmt.page_problems(page(name_row(false, "A", "a"), name_row(false, "B", "b")))
-    )
-    @test any(
-        occursin("2 times", p) for p in
-        Fmt.page_problems(page(name_row(true, "A", "a"), name_row(true, "B", "b")))
-    )
-    @test any(
-        occursin("continuation", p) for p in Fmt.page_problems(page(
-            name_row(true, "A", "a"), " > " * more_row("x")[4:end]))
-    )
-    bad = replace(name_row(true, "A", "a"), "╬" => "║")
-    @test any(startswith(p, "line 3:") for p in Fmt.page_problems(page(bad)))
-    @test !isempty(Fmt.page_problems(page(name_row(true, "A", "a"), more_row("x") * " ")))
-    @test !isempty(Fmt.page_problems(page(name_row(true, "A", "a"), more_row("x")[2:end])))
-    @test !isempty(Fmt.page_problems(page(name_row(true, "A", "a"), more_row("x") * "║")))
-    @test !isempty(
-        Fmt.page_problems(replace(page(name_row(true, "A", "a")), "name" => "NAME")),
-    )
-    @test !isempty(
-        Fmt.page_problems(replace(page(name_row(true, "A", "a")), PAGE_BOTTOM => "   ╚")),
-    )
-    real = split(
-        slurp8(in_root("tui", "resources", "plots-settings", "pages", "page1.txt")),
-        "\n",
-    )
-    @test real[1] == PAGE_HEADER && real[2] == PAGE_RULE_UNDER
 end
 
 @testset "trailing spaces are trimmed" begin
@@ -459,6 +401,22 @@ end
     @test all(l -> startswith(l, "// "), out)
     @test all(l -> length(l) <= Common.LINE_LIMIT, out)
     @test Fmt.reflow_lines(["// short"], "scss") == ["// short"]
+end
+
+@testset "TypeScript indentation is a multiple of 4 spaces" begin
+    ok = ["const a = 1", "if (a) {", "    b()", "        c()", "}"]
+    @test isempty(Fmt.skewed_indent(ok))
+    # one, two and three spaces off, and a ternary arm half a level in
+    @test Fmt.skewed_indent(["a(", "  b,", "     c,", "       d", ")"]) ==
+          [(2, 2), (3, 5), (4, 7)]
+    @test Fmt.skewed_indent(["x", "  ? y", "  : z"]) == [(2, 2), (3, 2)]
+    # not counted: blank lines, doc comments, // comments, block comments, templates
+    text = ["/**", " * doc", "   * odd", " */", "   // note", "", "const s = `", "  in",
+        "   side", "`", "ok()"]
+    @test isempty(Fmt.skewed_indent(text))
+    @test Fmt.skewed_indent(["/* a", "   b */", "  c"]) == [(3, 2)]
+    # a carriage return at the end of a line does not count as indentation
+    @test isempty(Fmt.skewed_indent(["a()\r", "    b()\r"]))
 end
 
 end

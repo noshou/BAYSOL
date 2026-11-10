@@ -237,7 +237,8 @@ export lookup_radii, Ion, tryparse_ion, ion_key, ion_radius, element_radius, nea
     to_spherical, radii, vols, r_max, neighbour_tree, elms, name, n_atoms,
     ComponentError, component, is_nucleotide, nucleotide_selector,
     StructureSource, LocalPathSource,
-    PDBIDSource, URLSource, StructureSourceError, reslove_struct, load_molecule,
+    PDBIDSource, URLSource, StructureSourceError, reslove_struct, keep_chains,
+    load_molecule,
     excluded_volume
 
 end # module

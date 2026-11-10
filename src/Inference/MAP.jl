@@ -168,12 +168,13 @@ end
 The L-BFGS machinery of the MAP search, as a closure: `run(z)` minimizes −log π (c1
 profiled to `EXCL_VOL_CORR_TOL`, the density NUTS samples) from `z`, and returns
 `(z, f, evals)` of the optimum, or `nothing` if the start is infeasible or ends
-non-finite. `f` is the objective itself.
+non-finite. `f` is the objective itself. `max_iter` caps the iterations of each start.
 """
 function _lbfgs_runner(
     seed::Seed{<:Real,N};
     f_abstol::Real = MAP_F_ABSTOL,
     successive_f_tol::Int = MAP_F_SUCCESSIVE,
+    max_iter::Int = MAP_MAX_ITER,
 ) where {N}
     μ, σ = θ_prior_moments(seed.pr)
     f = z -> _neglogπ(SVector{N}(z...), μ, σ, seed, EXCL_VOL_CORR_TOL)
@@ -189,7 +190,7 @@ function _lbfgs_runner(
         g_abstol = MAP_G_TOL,
         f_abstol = f_abstol,
         successive_f_tol = successive_f_tol,
-        iterations = MAP_MAX_ITER,
+        iterations = max_iter,
     )
     run =
         zs -> begin
@@ -275,6 +276,8 @@ MAP ẑ. Its Hessian is taken in two central-difference passes: step `MAP_HESS_S
 - `seed::Seed`: priors, data, forward cache and c1 tables; `seed.θ₀` is the first start.
 
 # Keywords
+- `options::SamplerOptions`: the counts, radii and caps named above (`MAP_*` settings of
+    [`SamplerOptions`](@ref)); the defaults are the constants.
 - `f_abstol`, `successive_f_tol`: the f-based stopping rule of each L-BFGS start.
 - `base::UInt64`: the run's random base value; start `i ≥ 2` draws its
     prior sample from the stream `stream(base, _RNG_MAP_STARTS, i)`, and the jittered
@@ -290,13 +293,16 @@ MAP ẑ. Its Hessian is taken in two central-difference passes: step `MAP_HESS_S
 """
 function _sampling_space(
     seed::Seed{<:Real,N};
+    options::SamplerOptions = SamplerOptions(),
     f_abstol::Real = MAP_F_ABSTOL,
-    successive_f_tol::Int = MAP_F_SUCCESSIVE,
+    successive_f_tol::Int = options.map_f_successive,
     base::UInt64 = draw_base(),
     extra_starts::AbstractVector = SVector{N,Float64}[],
 )::_SamplingSpace where {N}
     μ, σ = θ_prior_moments(seed.pr)
-    run = _lbfgs_runner(seed; f_abstol, successive_f_tol)
+    run = _lbfgs_runner(
+        seed; f_abstol, successive_f_tol, max_iter = options.map_max_iter,
+    )
     L = N * N
     no_optima = _Optimum{N,L}[]
 
@@ -310,7 +316,7 @@ function _sampling_space(
                 Θ(_ξ₀(seed.pr, stream(base, _RNG_MAP_STARTS, i)), seed.pr)[1],
                 seed.pr,
             )
-            for i in 2:MAP_N_STARTS
+            for i in 2:options.map_n_starts
         ],
         [SVector{N,Float64}(z) for z in extra_starts],
     )
@@ -363,13 +369,13 @@ function _sampling_space(
 
     # the second round: jittered starts around the distinct optima of the first
     ctr = 0
-    for i in basins(metric(o₁))[1:min(end, MAP_JITTER_MAX_OPTIMA)]
+    for i in basins(metric(o₁))[1:min(end, options.map_jitter_max_optima)]
         zᵢ, fᵢ = optima[i]
-        fᵢ ≤ f_mode + MAP_JITTER_WITHIN_NATS || continue
+        fᵢ ≤ f_mode + options.map_jitter_within_nats || continue
         oᵢ = mk(zᵢ, fᵢ)
         all(isfinite, oᵢ.λ) || continue
         half = oᵢ.V .* (1 ./ sqrt.(max.(oᵢ.λ, MAP_HESS_EIG_FLOOR)))' # z = zᵢ + half·u
-        for r in MAP_JITTER_RADII, _ in 1:MAP_JITTER_DIRECTIONS
+        for r in options.map_jitter_radii, _ in 1:options.map_jitter_directions
             ctr += 1
             u = randn(stream(base, _RNG_MAP_JITTER, ctr), N)
             search!(zᵢ + r .* (half * SVector{N}(u ./ sqrt(sum(abs2, u)))))
@@ -391,7 +397,7 @@ function _sampling_space(
     # the best MAP_OPTIMA_KEPT of them compared by Laplace mass −f − ½ log det H
     # (eigenvalues floored, as for the whitening).
     reps = basins(H₁f)
-    found = [mk(optima[i]...) for i in reps[1:min(end, MAP_OPTIMA_KEPT)]]
+    found = [mk(optima[i]...) for i in reps[1:min(end, options.map_optima_kept)]]
     mass₁ = -f_mode - sum(log, λ₁) / 2
     for o in found[2:end]
         all(isfinite, o.λ) || continue
@@ -424,7 +430,8 @@ farthest-point cover ([`_farthest_cover`](@ref)) of `HARVEST_COVER` of the draws
 (rows, in the whitened coordinates of `sp`; the one of highest log density `ld` first)
 and of up to `HARVEST_DIVERGENT` of the divergent ones (`diverged`). Each optimum that
 is not within `MAP_MODE_SEP` (Mahalanobis, under the Hessian of `sp`) of one already
-known is added with its Laplace mass.
+known is added with its Laplace mass. `options` (`harvest_cover`, `harvest_divergent`,
+`map_max_iter`, `map_f_successive` of [`SamplerOptions`](@ref)) replace those constants.
 
 # Returns
 - `(optima::Vector{_Optimum}, n_evals::Int)`: `sp.optima` and the new
@@ -436,16 +443,19 @@ function _harvest_optima(
     W::AbstractMatrix{<:Real},
     ld::AbstractVector{<:Real},
     diverged::AbstractVector{Bool};
+    options::SamplerOptions = SamplerOptions(),
     f_abstol::Real = MAP_F_ABSTOL,
-    successive_f_tol::Int = MAP_F_SUCCESSIVE,
+    successive_f_tol::Int = options.map_f_successive,
 ) where {N,L}
     n = size(W, 1)
     n == 0 && return sp.optima, 0
-    run = _lbfgs_runner(seed; f_abstol, successive_f_tol)
-    rows = _farthest_cover(W, HARVEST_COVER, argmax(ld))
+    run = _lbfgs_runner(
+        seed; f_abstol, successive_f_tol, max_iter = options.map_max_iter,
+    )
+    rows = _farthest_cover(W, options.harvest_cover, argmax(ld))
     dv = findall(diverged)
     if !isempty(dv)
-        append!(rows, dv[_farthest_cover(W[dv, :], HARVEST_DIVERGENT, 1)])
+        append!(rows, dv[_farthest_cover(W[dv, :], options.harvest_divergent, 1)])
     end
     Hf = inv(sp.S * sp.S')
     known = copy(sp.optima)

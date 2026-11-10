@@ -305,8 +305,10 @@ function _peptide_ϕ°(
     v += PEPTIDE_COOH_DV * f_c - PEPTIDE_NH2_DV * f_n
     dv_dpH = (
         log(10)
-        * (-PEPTIDE_COOH_DV * f_c * (1 - f_c)
-         - PEPTIDE_NH2_DV * f_n * (1 - f_n))
+        * (
+            -PEPTIDE_COOH_DV * f_c * (1 - f_c)
+            - PEPTIDE_NH2_DV * f_n * (1 - f_n)
+        )
     )
     var = (
         σ^2

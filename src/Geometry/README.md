@@ -73,6 +73,8 @@ A geometric proxy for exposure: convex points of a globular surface see almost t
 using BAYSOL.Geometry: sasa, CONVEX, CONCAVE, CAVITY, PROBE_RADIUS
 
 pts, areas, class = sasa(mol; probe = PROBE_RADIUS, n_target = nothing)
+# every setting of Params.jl is a keyword too, named in lower case: shell_area_per_point, shell_min_points,
+# shell_sample, sasa_n_occ, bead_ray_range, bead_ray_dirs (defaults: the constants)
 # pts: (3, M) accessible points in mol's centred frame; areas: (M,) Å², equal; class: (M,) BeadClass
 ```
 
@@ -84,4 +86,4 @@ The loops over atoms (excluded volumes, SASA) and beads (classification) are cut
 
 ## Constants
 
-In `Geometry.jl`, fixed (not settings): `N_VOL_SHELL` (2145), `ATOM_BLOCK`, `ATOM_PARALLEL_MIN`, `CLASS_BLOCK` (none affects the result), `BEAD_CONVEX_ESCAPE`. In `Params.jl`: `PROBE_RADIUS` (1.4 Å), `SHELL_AREA_PER_POINT` (4.0), `SHELL_MIN_POINTS` (55), `SHELL_SAMPLE` (256), `BEAD_RAY_RANGE`, `BEAD_RAY_DIRS`, `SASA_N_OCC` (104). `PROBE_RADIUS` is also the hydration-shell default that Scattering and `seed_model` forward; the shell size `n_target` is a keyword of `sasa`, `hydration` and `seed_model` (`nothing`: size the shell from the accessible area), not a constant.
+In `Geometry.jl`, fixed (not settings): `N_VOL_SHELL` (2145), `ATOM_BLOCK`, `ATOM_PARALLEL_MIN`, `CLASS_BLOCK` (none affects the result), `BEAD_CONVEX_ESCAPE`. In `Params.jl`: `PROBE_RADIUS` (1.4 Å), `SHELL_AREA_PER_POINT` (4.0), `SHELL_MIN_POINTS` (55), `SHELL_SAMPLE` (256), `BEAD_RAY_RANGE`, `BEAD_RAY_DIRS`, `SASA_N_OCC` (104). `PROBE_RADIUS` is also the hydration-shell default that Scattering and `seed_model` forward; the shell size `n_target` is a keyword of `sasa`, `hydration` and `seed_model` (`nothing`: size the shell from the accessible area), not a constant. Every other constant of `Params.jl` is a keyword of `sasa` as well (`shell_area_per_point`, `shell_min_points`, `shell_sample`, `sasa_n_occ` with `0 < sasa_n_occ ≤ shell_sample`, `bead_ray_range`, `bead_ray_dirs`), which `seed_model` takes and forwards, checked there as `load_settings` checks the settings.

@@ -12,10 +12,11 @@ using Printf: Printf
 """
 A table of the numbers behind the figures: `name` (a sheet of the workbook),
 the column names `header` and the columns `cols` (vectors of numbers,
-strings or `missing`; a shorter one is padded with empty cells).
+strings or `missing`; a shorter one is padded with empty cells). With `frozen = true` the
+header row stays in view when the sheet is scrolled.
 """
-_sheet(name, header, cols...) =
-    (; name = String(name), header = String.(header), cols = collect(Any, cols))
+_sheet(name, header, cols...; frozen::Bool = false) =
+    (; name = String(name), header = String.(header), cols = collect(Any, cols), frozen)
 
 """
 `names` as sheet names of a workbook: at most 31 characters (Excel's limit), none repeated
@@ -37,25 +38,27 @@ function _sheet_names(names)
 end
 
 """
-A cell of the workbook: a finite number rounded to `TABLE_SIGFIGS` significant figures
-(nothing is rounded at 17 or more, which a `Float64` cannot carry); a number that is
-not finite (a statistic that could not be computed, `NaN`) is an empty cell, since a
-spreadsheet has no `NaN` and would hold it as text. Anything else is as it is, but an
-integer a `Float64` cannot hold exactly (2^53 or more: a seed a user gave) is text.
+A cell of the workbook: a finite number rounded to `sigfigs` significant
+figures (`TABLE_SIGFIGS` by default; nothing is rounded at 17 or more, which
+a `Float64` cannot carry); a number that is not finite (a statistic that
+could not be computed, `NaN`) is an empty cell, since a spreadsheet has no
+`NaN` and would hold it as text. Anything else is as it is, but an integer a
+`Float64` cannot hold exactly (2^53 or more: a seed a user gave) is text.
 """
 function _cell end
-_cell(x::AbstractFloat) =
-    !isfinite(x) ? missing : TABLE_SIGFIGS < 17 ? round(x; sigdigits = TABLE_SIGFIGS) : x
-_cell(x::UInt64) = x > UInt64(2)^53 ? string(x) : x
-_cell(x) = x
+_cell(x::AbstractFloat, sigfigs::Integer = TABLE_SIGFIGS) =
+    !isfinite(x) ? missing : sigfigs < 17 ? round(x; sigdigits = sigfigs) : x
+_cell(x::UInt64, ::Integer = TABLE_SIGFIGS) = x > UInt64(2)^53 ? string(x) : x
+_cell(x, ::Integer = TABLE_SIGFIGS) = x
 
 """
 Writes the table `sh` (made by `_sheet`) into the workbook sheet `sheet`, the header row
 first; a column shorter than the longest is padded with empty cells.
 """
-function _fill_sheet!(sheet, sh)
+function _fill_sheet!(sheet, sh, sigfigs::Integer = TABLE_SIGFIGS)
     n = maximum(length, sh.cols)
-    cols = [Any[i ≤ length(c) ? _cell(c[i]) : missing for i in 1:n] for c in sh.cols]
+    cols =
+        [Any[i ≤ length(c) ? _cell(c[i], sigfigs) : missing for i in 1:n] for c in sh.cols]
     XLSX.writetable!(sheet, cols, sh.header)
     return nothing
 end
@@ -94,7 +97,7 @@ cannot leave half a workbook.
 # Returns
 - `path`.
 """
-function _write_xlsx(path::AbstractString, sheets)
+function _write_xlsx(path::AbstractString, sheets; sigfigs::Integer = TABLE_SIGFIGS)
     mkpath(dirname(path))
     tmp = path * ".part"
     names = _sheet_names([sh.name for sh in sheets])
@@ -103,10 +106,13 @@ function _write_xlsx(path::AbstractString, sheets)
             sheet = k == 1 ? xf[1] : XLSX.addsheet!(xf)
             XLSX.rename!(sheet, names[k])
             n = maximum(length, sh.cols)
-            cols =
-                [Any[i ≤ length(c) ? _cell(c[i]) : missing for i in 1:n] for c in sh.cols]
+            cols = [
+                Any[i ≤ length(c) ? _cell(c[i], sigfigs) : missing for i in 1:n]
+                for c in sh.cols
+            ]
             XLSX.writetable!(sheet, cols, sh.header)
             _fit_columns!(sheet, sh.header, cols)
+            get(sh, :frozen, false) && XLSX.freezePanes(sheet)
         end
     end
     mv(tmp, path; force = true)
@@ -119,26 +125,55 @@ The workbook path is recorded in `log.info` so that `print_summary` can name it.
 
 Returns the path written.
 """
-function _write_tables(dir, name, sheets, log)
-    path = _write_xlsx(joinpath(dir, name * ".xlsx"), sheets)
+function _write_tables(dir, name, sheets, log; sigfigs::Integer = TABLE_SIGFIGS)
+    path = _write_xlsx(joinpath(dir, name * ".xlsx"), sheets; sigfigs = sigfigs)
     log === nothing || (log.info["workbook"] = abspath(path))
     return [path]
 end
 
 """
-The `draws` sheet: every draw of `fit` (divergent ones flagged), with its chain,
-iteration, ξ, scale, background, c1 and reduced χ².
+The `draws` sheet: one tidy table, a row for each posterior draw of `fit`, in the order the
+chains are stored, with a frozen header row. The columns, with units in the header text:
+`chain` and `draw` (1-based, within the chain); the sampled parameters `rho_e` (e⁻/Å³) and
+`delta_rho_1..3` (units of `UNIT_OF_δρ` e⁻/Å³); the quantities derived from each draw
+that the result already holds, `scale`, `bkgrnd_corr`, `excl_vol_corr` (the profiled c1)
+and `chi2_fit_grid` (the reduced χ² on the fitted grid); and the sampler's flags of the
+draw: `log_density`, `divergent` (1 for a divergent transition), `tree_depth`, `n_steps`,
+`step_size` and `acceptance_rate`. A flag the sampler's statistics do not carry has no
+column. Nothing is recomputed: every column is read off `fit`.
 """
 function _draws_sheet(fit)
-    cols = Any[Float64.(fit.chain), Float64.(fit.iteration),
-        Float64.(getproperty.(fit.stats, :numerical_error))]
-    names = ["chain", "iteration", "divergent"]
+    n = length(fit.samples)
+    # the position of each draw within its chain (the chains are stored one after another)
+    seen = Dict{Int,Int}()
+    draw = [seen[c] = get(seen, c, 0) + 1 for c in fit.chain]
+    cols = Any[fit.chain, draw]
+    names = ["chain", "draw"]
     for (i, (_, _, _, file)) in enumerate(PLOT_HIST_PARAMS)
         i ≤ 4 || break
         push!(cols, getindex.(fit.samples, i))
-        push!(names, file)
+        push!(names, i == 1 ? "rho_e (e-/A^3)" : "$file ($(UNIT_OF_δρ) e-/A^3)")
     end
     append!(cols, (fit.scale, fit.bkgrnd_corr, fit.c1, fit.chisq_red))
-    append!(names, ["scale", "bkgrnd_corr", "c1", "chisq_red"])
-    return _sheet("draws", names, cols...)
+    append!(
+        names,
+        ["scale", "bkgrnd_corr (a.u.)", "excl_vol_corr (c1)", "chi2_fit_grid"],
+    )
+    # the sampler's flags, each only if the statistics carry it
+    function stat(key)
+        all(s -> hasproperty(s, key), fit.stats) || return nothing
+        return getproperty.(fit.stats, key)
+    end
+    for (key, label) in (
+        (:log_density, "log_density"), (:numerical_error, "divergent"),
+        (:tree_depth, "tree_depth"), (:n_steps, "n_steps"),
+        (:step_size, "step_size"), (:acceptance_rate, "acceptance_rate"),
+    )
+        v = stat(key)
+        v === nothing && continue
+        push!(cols, key === :numerical_error ? Int.(v) : v)
+        push!(names, label)
+    end
+    all(c -> length(c) == n, cols) || error("the draws of the fit differ in length")
+    return _sheet("draws", names, cols...; frozen = true)
 end

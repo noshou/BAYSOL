@@ -271,7 +271,7 @@ const RETRY_N_DRAWS = 2000
 
 """
 The limits of each setting above that has one, read by the terminal interface when a user
-edits a value (`dev/scripts/harvest_defaults.jl` copies them to `default_settings.edn`).
+edits a value (`dev/scripts/harvest_defaults.jl` copies them to `default_settings.json`).
 Each limit is `above` or `below` (strict) or `at_least` or `at_most` (inclusive). Limits
 that tie settings together (`MODE_δρ₁₂` inside `BOUNDS_δρ₁₂`, `EXCL_VOL_CORR_EPS` within the
 width of `EXCL_VOL_CORR_BOUNDS`) and those of the tuple settings stay in the checks above.

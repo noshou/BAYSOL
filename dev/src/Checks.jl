@@ -71,7 +71,8 @@ Every check before a commit.
 
 Steps, in order; all run, and the exit status is 1 if any failed:
     tool-tests, pmv-mean, solute-index, unit-tests, concurrency-tests, whitespace,
-    default-settings, ts-format, julia-format, line-length, results-table, docs-build
+    default-settings, ts-format, ts-unused, julia-format, line-length, results-table,
+    docs-build
 
     --quick     skip the Julia steps (unit-tests, concurrency-tests,
                 default-settings, julia-format, docs-build)
@@ -189,6 +190,8 @@ function steps(julia)
         ("whitespace", true, :whitespace),
         ("default-settings", false, ["bysl", "harvest", "defaults"]),
         ("ts-format", true, ["bysl", "fmt", "--check", "--ts"]),
+        # Knip (config: knip.jsonc): unused dependencies, files, exports and types of tui/
+        ("ts-unused", true, [in_root("node_modules", ".bin", "knip"), "--no-progress"]),
         ("julia-format", false, ["bysl", "fmt", "--check", "--julia"]),
         ("line-length", true, ["bysl", "fmt", "--lines"]),
         ("results-table", true, ["bysl", "results", "table", "--check"]),

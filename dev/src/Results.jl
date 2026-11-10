@@ -760,12 +760,8 @@ function bench_main(files)::Int
                 n in names
             ], ", "),
     )
-    specs = sort(
-        unique(
-            reduce(vcat, [String[string(k) for k in keys(runs[n][:fit])]
-                 for n in names]),
-        ),
-    )
+    fit_keys(n) = String[string(k) for k in keys(runs[n][:fit])]
+    specs = sort(unique(reduce(vcat, [fit_keys(n) for n in names])))
     for spec in specs
         r(label, getter) = bench_row(runs, names, spec, label, getter)
         top(k) = f -> as_number(f[k])

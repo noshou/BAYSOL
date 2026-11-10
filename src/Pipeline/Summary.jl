@@ -18,6 +18,27 @@ const _RUN_INFO = Dict(
         "Uncertainty given to a non-biological buffer solute whose row of the " *
         "partial-molar-volume table states none (the table's mean by default; " *
         "not recommended to change)."),
+    "lmax_pinned" => ("model", "",
+        "1 if the band limit lmax was pinned by the user instead of chosen from the " *
+        "q range (present only then)."),
+    "add_hydrogens" => ("model", "",
+        "0 if the hydrogens were not added by the pipeline (present only then)."),
+    "structure_model" => ("model", "",
+        "Which model of a multi-model structure was used (present when not the " *
+        "first)."),
+    "q_min" => ("data", "Å⁻¹",
+        "Lowest q of the fitted range (present only when set)."),
+    "q_max" => ("data", "Å⁻¹",
+        "Highest q of the fitted range (present only when set)."),
+    "sigma_scale" => ("data", "",
+        "Factor the measured errors were multiplied by (present when not 1)."),
+    "n_q_input" => ("data", "points",
+        "Measured points given, before q_min, q_max and the excluded ranges " *
+        "(present only when some were left out)."),
+    "n_q_cropped" => ("data", "points",
+        "Points left out for lying outside q_min to q_max."),
+    "n_q_excluded" => ("data", "points",
+        "Points left out for lying in an excluded range of q."),
     "cavity_frac" => ("model", "",
         "Share of the hydration shell classified as cavity at the MAP, 0 to " *
         "1."),
@@ -26,7 +47,8 @@ const _RUN_INFO = Dict(
         "inside its bounds, 1 on the upper bound, -1 on the lower. A bound is " *
         "a warning."),
     "n_q_raw" => ("data", "points",
-        "Measured points before binning."),
+        "Measured points before binning, after q_min, q_max and the excluded ranges.",
+    ),
     "n_q" => ("data", "points",
         "Points fitted, after Shannon binning and dropping non-positive bins."),
     "channels" => ("data", "",
@@ -89,6 +111,12 @@ const _RUN_INFO = Dict(
         "was above its limit."),
     "retry_kept" => ("convergence", "",
         "1 if the draws of the repeated run were kept, 0 if the first run's."),
+    "draws_rows" => ("output", "rows",
+        "Rows of the draws sheet, one per posterior draw (chain, draw within the " *
+        "chain, the parameters, the derived quantities and the sampler's flags of " *
+        "the draw; units are in the column headers; `chi2_fit_grid` is the reduced " *
+        "chi2 on the fitted grid, the map sheet's chi2 is on the measured points).",
+    ),
     "quantile_lo_pct" => ("output", "%",
         "Lower percentile of the interval in the quantiles sheet."),
     "quantile_hi_pct" => ("output", "%",
@@ -103,7 +131,9 @@ The `run` sheet: one row for each setting and statistic of the run, with the col
 `unit` is empty for a pure number, and `meaning` says in words what the row is and, for a
 check, what a worrying value is. `map_params` is `nothing` when every draw diverged (the
 rows that depend on the MAP are then left out). A row whose source the run did not record
-is left out. The rows are those of `_RUN_INFO`.
+is left out. The rows are those of `_RUN_INFO`. The data and structure choices (`q_min`,
+`q_max`, `sigma_scale`, the points left out, `structure_model`, `add_hydrogens`,
+`lmax_pinned`) are rows only when they differ from the defaults.
 """
 function _run_sheet(fit, divergence_rate::Real, map_params, info::AbstractDict)
     keys_, vals = _run_rows(fit, divergence_rate, map_params, info)
@@ -129,7 +159,11 @@ function _run_rows(fit, divergence_rate::Real, map_params, info::AbstractDict)
         ("n_q", "n_q"), ("n_samples", "n_samples"), ("n_adapt", "n_adapt"),
         ("rng_seed", "rng_seed"), ("quantile_lo_pct", "quantile_lo_pct"),
         ("quantile_hi_pct", "quantile_hi_pct"),
-        ("pmv_fallback_uncert", "pmv_fallback_uncert"),
+        ("pmv_fallback_uncert", "pmv_fallback_uncert"), ("q_min", "q_min"),
+        ("q_max", "q_max"), ("sigma_scale", "sigma_scale"), ("n_q_input", "n_q_input"),
+        ("n_q_cropped", "n_q_cropped"), ("n_q_excluded", "n_q_excluded"),
+        ("structure_model", "structure_model"), ("add_hydrogens", "add_hydrogens"),
+        ("lmax_pinned", "lmax_pinned"),
     )
         haskey(info, source) && add!(k, info[source])
     end
@@ -155,6 +189,7 @@ function _run_rows(fit, divergence_rate::Real, map_params, info::AbstractDict)
         (h = H[fit.chain .== c]; mean(diff(h) .^ 2) / var(h)) for c in unique(fit.chain)
     )
     add!("iterations", length(stats))
+    add!("draws_rows", length(fit.samples))
     add!("mean_accept", mean(getproperty.(stats, :acceptance_rate)))
     add!("tree_depth_avg", mean(depth))
     add!("tree_depth_max", maximum(depth))
@@ -314,9 +349,9 @@ end
 """
 The lines of the terminal summary of a [`run_model`](@ref) result (see
 [`print_summary`](@ref)): the verdict (reduced χ², the four sampled parameters with their
-quantile pair), the checks in words with a note for each that failed, where the results,
-figures went (what [`results`](@ref) recorded
-in the run's timing log), and the wall clock as the last line.
+quantile pair, one per row), the checks in words with a note for each that failed, where
+the results and figures went (what [`results`](@ref) recorded in the run's timing log),
+and the wall clock as the last line.
 """
 function _summary_lines(result)
     fit, divergence_rate, map_result, quantile_result = result
@@ -334,15 +369,14 @@ function _summary_lines(result)
         push!(lines,
             @sprintf("Fit finished: reduced χ² = %.2f on the measured points",
                 mp["chisq_red"]))
-        push!(lines,
-            "  " * join(
-                [
-                    "$(_SUMMARY_LABELS[k]) = $(_signed(mp[k])) " *
-                    _interval(qp[k]["quantiles"]...) for k in _PRIOR_KEYS
-                ],
-                "    "))
+        # one parameter per row, so a line never outgrows an 80-column terminal
+        for k in _PRIOR_KEYS
+            push!(lines,
+                "  $(rpad(_SUMMARY_LABELS[k], 3))  $(_signed(mp[k]))  " *
+                _interval(qp[k]["quantiles"]...))
+        end
         get(mp, "excl_vol_sat", 0.0) == 0.0 || push!(notes,
-            "the excluded-volume correction c1 sits on its bound")
+            "c1 (excluded volume) sits on its bound")
     end
 
     d = fit.diagnostics
@@ -351,31 +385,32 @@ function _summary_lines(result)
     if isempty(problems)
         push!(checks, @sprintf("converged (R̂ %.3f)", Inference._worst_rhat(d)))
     else
-        push!(checks, "NOT converged (" * join(problems, "; ") * ")")
-        push!(
-            notes,
-            "the chains did not converge; run longer before trusting the quantiles",
-        )
+        push!(checks, "NOT converged:")
+        append!(checks, "  " .* problems)
+        push!(notes, "chains not converged: run longer first")
     end
     push!(checks,
         divergence_rate == 0 ? "no divergent transitions" :
         @sprintf("%.1f %% divergent transitions", 100 * divergence_rate))
     divergence_rate > _SUMMARY_MAX_DIVERGENT && push!(notes,
-        "more than 1 % of the transitions diverged; treat the quantiles with care")
+        "over 1 % of transitions diverged: take care")
     push!(checks, "$(count(d.pooled)) of $(d.n_chains) chains used")
     length(d.mode_weight) > 1 && push!(notes,
-        "the posterior has $(length(d.mode_weight)) modes (see the modes sheet)")
-    push!(lines, "  Checks: " * join(checks, ", "))
+        "$(length(d.mode_weight)) posterior modes (see the modes sheet)")
+    # the first check follows `Checks:`, the others line up under it
+    push!(lines, "  Checks:  " * first(checks))
+    for c in checks[2:end]
+        push!(lines, "           " * c)
+    end
     for n in notes
         push!(lines, "  Note: " * n)
     end
 
-    files = String[]
     for (key, label, tail) in
         (("workbook", "Results", ""), ("plots", "Figures", "/"), ("log", "Log", ""))
-        haskey(info, key) && push!(files, "$label: $(_shown(info[key]))$tail")
+        haskey(info, key) &&
+            push!(lines, "  $(rpad(label * ":", 8)) $(_shown(info[key]))$tail")
     end
-    isempty(files) || push!(lines, "  " * join(files, "    "))
     log === nothing ||
         push!(lines, @sprintf("Wall clock: %.1f s", (time_ns() - log.t0) / NS_PER_S))
     return lines
@@ -387,18 +422,26 @@ thing a run says:
 
 ```
 Fit finished: reduced χ² = 0.87 on the measured points
-ρₑ = 0.3362 (0.3361–0.3362)    δρ₁ = −1.06 (−1.15 – −1.03)    δρ₂ = …    δρ₃ = …
-Checks: converged (R̂ 1.002), no divergent transitions, 8 of 8 chains used
-Results: out/res.xlsx    Figures: out/plots/    Log: out/out.LOG
+  ρₑ   0.3362  (0.3361–0.3362)
+  δρ₁  −1.06  (−1.15 – −1.03)
+  δρ₂  …
+  δρ₃  …
+  Checks:  converged (R̂ 1.002)
+           no divergent transitions
+           8 of 8 chains used
+  Results: out/res.xlsx
+  Figures: out/plots/
+  Log:     out/out.LOG
 Wall clock: 141.3 s
 ```
 
 The χ² is the reduced χ² of the MAP on the measured points. Each of `ρₑ`, `δρ₁`,
 `δρ₂` and `δρ₃` is shown as its MAP value with the quantile pair of the run (the
-`sigma` of [`run_model`](@ref)) in brackets. A check that fails adds a
-`Note:` line in words (chains not converged, more than 1 % divergent transitions,
-`c1` on its bound, several posterior modes). The paths are the ones [`results`](@ref)
-wrote, so call this last; the line for a file that was not written is left out.
+`sigma` of [`run_model`](@ref)) in brackets. Every line is short (a parameter, a check
+or a file per row) so it fits an 80-column terminal. A check that fails adds a `Note:`
+line in words (chains not converged, over 1 % divergent transitions, `c1` on its bound,
+several posterior modes). The paths are the ones [`results`](@ref) wrote, so call this
+last; the line for a file that was not written is left out.
 
 # Returns
 - `nothing`.

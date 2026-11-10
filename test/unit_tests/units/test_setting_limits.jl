@@ -26,7 +26,12 @@ end
                 @test isdefined(m, name)
                 @test all(k -> k in KINDS, keys(limits))
                 v = getfield(m, name)
-                @test v isa Real && !(v isa Bool)
+                # a setting that may be "not given" (`nothing`) has its limits on the
+                # numbers it can hold
+                optional = Pipeline.setting_kind(name, v) in
+                (:optional_float, :optional_int)
+                @test (v isa Real && !(v isa Bool)) || (optional && v === nothing)
+                v === nothing && continue
                 for (kind, bound) in pairs(limits)
                     @test satisfies(v, kind, bound)
                 end

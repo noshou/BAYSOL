@@ -3,17 +3,19 @@
 """
 The pipeline entry points: [`seed_model`](@ref) builds a [`Inference.Seed`](@ref) from a
 structure, a measured curve and a buffer, [`run_model`](@ref) samples it and summarizes the
-posterior, [`results`](@ref) draws the figures and writes the workbook of numbers, and
-[`write_log`](@ref) writes the run log. `BAYSOL.seed_model`, `BAYSOL.run_model`,
-`BAYSOL.results` and `BAYSOL.write_log` are these functions, re-exported by the
-package root.
+posterior, [`results`](@ref) draws the figures and writes the workbook of numbers,
+[`compare_results`](@ref) draws the models of one measured curve and the reference curves
+on one figure, and [`write_log`](@ref) writes the run log, and [`run_project`](@ref) does
+all of it for every model of a project folder and leaves a run folder. `BAYSOL.seed_model`,
+`BAYSOL.run_model`, `BAYSOL.results`, `BAYSOL.compare_results`, `BAYSOL.write_log` and
+`BAYSOL.run_project` are these functions, re-exported by the package root.
 """
 module Pipeline
 
 using Statistics: quantile, mean, var
 using Printf: @sprintf
 using StaticArrays: SVector
-using ..PhysicalConstants: NS_PER_S
+using ..PhysicalConstants: NS_PER_S, UNIT_OF_δρ
 using ..Runtime: StageLog, tick, tock!, timed!, stage_seconds, with_gc_paused, tmap_blocks
 using ..MolecularStructure: MolecularStructure
 using ..Hydrogenator: Hydrogenator, Propka
@@ -32,6 +34,13 @@ is compiled from them, go into. The workbook and the run log stay in the output 
 itself. Not a setting: `bysl plots render` and the TUI look for the figures here.
 """
 const PLOT_SUBDIR = "plots"
+
+"""
+The smallest and the largest size, `(width, height)`, a pair of
+[`PLOT_TUI_SIZES`](@ref) may have: below the smallest a text plot has no room for its
+axes, above the largest it is a wall of text. A guardrail of the setting, not a setting.
+"""
+const PLOT_TUI_SIZE_LIMITS = (min = (24, 3), max = (400, 100))
 
 """
 Throws an `ArgumentError` with `message` unless `condition` holds: the check behind the
@@ -169,12 +178,15 @@ include("RunModel.jl")
 include("Tables.jl")
 include("Log.jl")
 include("Results.jl")
+include("Compare.jl")
 include("Summary.jl")
+include("RunProject.jl")
 
 export seed_model,
     run_model, print_summary, write_log,
-    results, PlotStyle, Reference, font_available, load_settings, settings_file,
-    InvalidSettingsError, load_buffer, InvalidBufferError, seed_keywords
+    results, compare_results, PlotStyle, Reference, font_available, load_settings,
+    settings_file, InvalidSettingsError, load_buffer, load_buffer_ph, InvalidBufferError,
+    seed_keywords, run_keywords, run_arguments, results_keywords, run_project
 public MAPParams, MAPResult, QuantileBounds, QuantileParams, QuantileCurves, QuantileResult
 
 end # module

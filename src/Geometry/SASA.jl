@@ -77,7 +77,7 @@ otherwise dispatch dynamically on the non-concrete tree type, once per bead.
 """
 function _class_loop(
     tree::T, pts::Matrix{Float64}, nrm::Matrix{Float64}, crds::Matrix{Float64},
-    rads::Vector{Float64}, probe::Float64, dirs::Vector{Vec3},
+    rads::Vector{Float64}, probe::Float64, dirs::Vector{Vec3}, ray_range::Float64,
 )::Vector{BeadClass} where {T}
     out = Vector{BeadClass}(undef, size(pts, 2))
     m = size(pts, 2)
@@ -85,7 +85,7 @@ function _class_loop(
     # the blocks run on the Julia threads (large inputs)
     tmap_blocks(m, CLASS_BLOCK; threaded = m ≥ ATOM_PARALLEL_MIN) do blk
         @inbounds for k in blk
-            nb = inrange(tree, view(pts, :, k), BEAD_RAY_RANGE)
+            nb = inrange(tree, view(pts, :, k), ray_range)
             out[k] = _bead_class(
                 (pts[1, k], pts[2, k], pts[3, k]),
                 (nrm[1, k], nrm[2, k], nrm[3, k]),
@@ -120,6 +120,13 @@ then carries an equal sum(area)/M, so sum(areas) is the solvent-accessible area.
     the accessible area via [`SHELL_AREA_PER_POINT`](@ref)
     so spacing stays fixed as the molecule grows. A cloud
     already smaller than the budget is kept whole.
+-   `shell_area_per_point::Real = SHELL_AREA_PER_POINT`, `shell_min_points::Integer =
+    SHELL_MIN_POINTS`: the derived point budget is `max(shell_min_points,
+    round(area / shell_area_per_point))`.
+-   `shell_sample::Integer = SHELL_SAMPLE`, `sasa_n_occ::Integer = SASA_N_OCC`: directions
+    per atom and the witness-pass prefix, `0 < sasa_n_occ ≤ shell_sample`.
+-   `bead_ray_range::Real = BEAD_RAY_RANGE`, `bead_ray_dirs::Integer = BEAD_RAY_DIRS`: the
+    escape-ray range (Å) and the number of directions of the cavity classification.
 
 # Returns
 -   `pts`::Matrix{Float64}, (3, M): accessible points in mol's centred
@@ -130,29 +137,51 @@ then carries an equal sum(area)/M, so sum(areas) is the solvent-accessible area.
     anything larger classifies as open surface.
 
 M is 0 for a molecule with no accessible surface; pts is then (3, 0).
+
+# Exceptions
+- `DomainError` if `n_target` is not above 0, `probe` is negative, a shell setting is
+    outside its limit (positive, counts at least 1) or `sasa_n_occ` exceeds
+    `shell_sample`.
 """
 function sasa(
     mol::SphereCloud;
     probe::Float64               = PROBE_RADIUS,
     n_target::Union{Nothing,Int} = nothing,
+    shell_area_per_point::Real   = SHELL_AREA_PER_POINT,
+    shell_min_points::Integer    = SHELL_MIN_POINTS,
+    shell_sample::Integer        = SHELL_SAMPLE,
+    sasa_n_occ::Integer          = SASA_N_OCC,
+    bead_ray_range::Real         = BEAD_RAY_RANGE,
+    bead_ray_dirs::Integer       = BEAD_RAY_DIRS,
 )::Tuple{Matrix{Float64},Vector{Float64},Vector{BeadClass}}
     n_target === nothing || n_target > 0 ||
         throw(DomainError(n_target, "n_target must be > 0"))
     probe ≥ 0.0 || throw(DomainError(probe, "probe must be ≥ 0"))
+    shell_area_per_point > 0 ||
+        throw(DomainError(shell_area_per_point, "shell_area_per_point must be > 0"))
+    shell_min_points ≥ 1 ||
+        throw(DomainError(shell_min_points, "shell_min_points must be ≥ 1"))
+    shell_sample ≥ 1 || throw(DomainError(shell_sample, "shell_sample must be ≥ 1"))
+    0 < sasa_n_occ ≤ shell_sample ||
+        throw(DomainError(sasa_n_occ, "sasa_n_occ must be in (0, shell_sample]"))
+    bead_ray_range > 0 || throw(DomainError(bead_ray_range, "bead_ray_range must be > 0"))
+    bead_ray_dirs ≥ 1 || throw(DomainError(bead_ray_dirs, "bead_ray_dirs must be ≥ 1"))
 
-    pmap = plastic_points(SHELL_SAMPLE)
+    pmap = plastic_points(Int(shell_sample))
     rads = radii(mol)
     rmax = r_max(mol)
     crds = coords_cartesian(mol)
     tree = neighbour_tree(mol)
     pts, areas, nrm, counts =
-        _sasa_loop(tree, crds, rads, rmax, pmap, probe, SHELL_SAMPLE, SASA_N_OCC)
+        _sasa_loop(
+            tree, crds, rads, rmax, pmap, probe, Int(shell_sample), Int(sasa_n_occ),
+        )
 
     total = sum(areas)
     m = length(areas)
     budget =
         n_target === nothing ?
-        max(SHELL_MIN_POINTS, round(Int, total / SHELL_AREA_PER_POINT)) : n_target
+        max(Int(shell_min_points), round(Int, total / shell_area_per_point)) : n_target
 
     if m > budget
         idx = _prefix_thin(counts, m, budget)
@@ -161,7 +190,7 @@ function sasa(
     end
 
     class = _class_loop(tree, pts, nrm, crds, rads, probe,
-        plastic_points(BEAD_RAY_DIRS))
+        plastic_points(Int(bead_ray_dirs)), Float64(bead_ray_range))
     return pts, areas, class
 end
 

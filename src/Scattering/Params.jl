@@ -14,7 +14,7 @@ const SHELL_THICKNESS = 3.0
 
 """
 The limits of each setting above that has one, read by the terminal interface when a user
-edits a value (`dev/scripts/harvest_defaults.jl` copies them to `default_settings.edn`).
+edits a value (`dev/scripts/harvest_defaults.jl` copies them to `default_settings.json`).
 Each limit is `above` or `below` (strict) or `at_least` or `at_most` (inclusive).
 """
 const SETTING_LIMITS = (SHELL_THICKNESS = (above = 0,),)

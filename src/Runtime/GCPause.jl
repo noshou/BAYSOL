@@ -53,8 +53,8 @@ function with_gc_paused(f; budget::Integer = GC_PAUSE_BUDGET)
                 # GC.enable is per thread: only the thread that
                 # disabled the collector can enable it again
                 Threads.threadid() == _OWNER[] ||
-                    @warn "with_gc_paused ended on another thread than it began on: " *
-                          "the collector stays off"
+                    @warn   "with_gc_paused ended on another thread than it began on: " *
+                            "the collector stays off"
                 _WAS_ENABLED[] && GC.enable(true)
             end
         end

@@ -205,6 +205,27 @@ function _log_stats(result)
     dl = cmp === nothing ? nothing : match(r"(\d+) download", cmp.note)
     dl === nothing || add!("comp_dwnld", dl.captures[1])
 
+    # the conditions the run was given, next to the atoms and the model
+    for (k, from) in (
+        ("temperature_c", "temperature_c"), ("ph", "ph"), ("sigma_ph", "sigma_ph"),
+        ("energy_ev", "energy_ev"),
+    )
+        haskey(info, from) && add!(k, info[from])
+    end
+    # the data and structure choices that differ from the defaults (see `seed_model`)
+    for k in (
+        "q_min", "q_max", "sigma_scale", "exclude_q", "n_q_input", "n_q_cropped",
+        "n_q_excluded", "structure_model", "structure_chains", "add_hydrogens",
+        "lmax_pinned",
+    )
+        haskey(info, k) && add!(k, info[k])
+    end
+    # the settings this model was given that differ from the project's (`run_project`
+    # with a `model-settings.json`): one row each, `override_<setting>`
+    for k in sort!([k for k in keys(info) if startswith(k, "override_")])
+        add!(k, info[k])
+    end
+
     for k in
         (
         "n_atoms", "lmax", "dmax", "n_q_raw", "n_q", "n_samples", "n_adapt", "rng_seed",
@@ -356,7 +377,11 @@ each, and a second call replaces the run's own section). The lines are flat, tab
 - the run: the BAYSOL revision (`-dirty` if tracked files have uncommitted changes),
   the Julia version, the BAYSOL version with its release name (`v0.3.0-wʋsg_n_yɩɩda`), the
   reference χ² (`ref_chi2`) if known, the kind of structure and its
-  caches, the atoms, the model and the data, the sampler's settings and the seed;
+  caches, the conditions (`temperature_c`, `ph`, `sigma_ph`, `energy_ev`: what `seed_model`
+  was given), the data and structure choices that differ from the defaults (`q_min`,
+  `q_max`, `sigma_scale`, `exclude_q`, the points before and after, `structure_model`,
+  `structure_chains`, `add_hydrogens`, `lmax_pinned`), the atoms, the model and the data,
+  the sampler's settings and the seed;
 - the fit: the reduced χ² on the measured points, the MAP of the parameters and their
   z-scores from the prior, the cavity fraction;
 - the sampler's health: divergences, R̂, effective sample sizes, E-BFMI, acceptance, tree
