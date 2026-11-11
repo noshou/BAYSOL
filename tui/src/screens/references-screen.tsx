@@ -12,12 +12,8 @@ import { type ReactNode, useCallback, useMemo, useState } from "react"
 import { readSystem } from "../core/environment.js"
 import { pick } from "../core/file-system.js"
 import { shortNumber, truncate } from "../core/terminal.js"
-import {
-    dataErrorNote,
-    loadSource,
-    readDataInfo,
-    unitLabel,
-} from "../store/data.js"
+import { dataErrorNote, readDataInfo, unitLabel } from "../store/data.js"
+import { loadSource } from "../store/data-table.js"
 import { checkPath, MAX_PATH_TYPED, pathSuggestions } from "../store/lists.js"
 import type { ProjectRef } from "../store/projects.js"
 import {
@@ -28,7 +24,7 @@ import {
 } from "../store/references.js"
 import { Frame } from "../ui/frame.js"
 import { type LegendItem, legendBack, legendFor, legendOf, moveLegend } from "../ui/grid.js"
-import { destructiveQuestion, Prompt, questionLegend, useConfirm } from "../ui/input.js"
+import { destructiveQuestion, PathPrompt, questionLegend, useConfirm } from "../ui/input.js"
 import {
     type KeyInput,
     keys,
@@ -182,7 +178,7 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
                     path={path}
                     source={loadSource(path)}
                     reference
-                    onDone={(points, dropped, name) => {
+                    onDone={(points, dropped, name, warning) => {
                         // the table counts the points a run draws (I above 0)
                         const found = listReferences(dir).find((e) => e.name === name)
                         const drawn = found?.points
@@ -191,7 +187,12 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
                                 ? `${points} points`
                                 : `${points} rows, ${drawn} drawn`
                         const extra = dropped > 0 ? `, dropped ${dropped}` : ""
-                        say(`added ${name}: ${count}${extra}`)
+                        // a warning (it may be the wrong file) is the one thing said
+                        say(
+                            warning === undefined
+                                ? `added ${name}: ${count}${extra}`
+                                : `added ${truncate(String(name), 16)}: ${warning}`,
+                        )
                         if (name !== undefined) setSelected(`${name}.tsv`)
                         refresh()
                     }}
@@ -320,9 +321,8 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
         >
             {mode === "path" ? (
                 <Box marginTop={1}>
-                    <Prompt
+                    <PathPrompt
                         key={fieldKey}
-                        label="path:"
                         maxLength={MAX_PATH_TYPED}
                         placeholder="any table: .dat, .csv, .tsv, .txt, .xlsx, ..."
                         suggest={suggestPaths}

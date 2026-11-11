@@ -11,6 +11,7 @@
 
 import { lazy, readAssetJson } from "../core/environment.js"
 import { isDict } from "../core/file-system.js"
+import { colourNames, colourOf } from "./colours.js"
 
 // ========================================================================================
 // 1. Definitions
@@ -173,6 +174,7 @@ export const runLevelSettings: readonly string[] = [
     "FIGURES_FORMATS",
     "FIGURES_DIR",
     "FIGURES_COMPILER",
+    "TABLE_DIR",
 ]
 
 /** The prefix of the settings of the figures' look: all of them are run-level. */
@@ -317,29 +319,8 @@ export const defaultCatalog: () => SettingsCatalog = lazy(() => {
     return new SettingsCatalog(sheets, relations, hidden)
 })
 
-// ---- colours: the names a colour setting may take, and how a colour looks -------------
-//
-// The editor offers them as a list to pick from: `assets/data/colours.json`, harvested from
-// the names `Colors.parse` knows. A font is plain text (Julia checks it, not the TUI).
-
-/** The colours of `colours.json`, name to `#rrggbb`, in the order of the (sorted) file. */
-const colours: () => Map<string, string> = lazy(() => {
-    const file = readAssetJson<Record<string, string>>("data", "colours.json")
-    return new Map(Object.entries(file))
-})
-
-/**
- * The colour of a name as the `#rrggbb` text a terminal colour takes, for a `Swatch`.
- *
- * @param colour - a name of the list, or a `#rrggbb` text (its own colour).
- */
-export function colourHex(colour: string): string | undefined {
-    if (/^#[0-9a-f]{6}$/.test(colour)) return colour
-    return colours().get(colour)
-}
-
-/** @returns every colour name, sorted. */
-export const colourNames = (): readonly string[] => [...colours().keys()]
+// ---- colours: see `colours.ts` (names, codes, swatches); a font is plain text (Julia
+// checks it, not the TUI) -----------------------------------------------------------------
 
 /** The fonts of a machine: math fonts (with an OpenType MATH table) and text fonts. */
 export type FontLists = { math: readonly string[]; text: readonly string[] }
@@ -396,9 +377,6 @@ export type Checked = { ok: true; value: SettingValue } | { ok: false; error: st
 /** The most characters (code points) a font name has, as on the Julia side. */
 const maxFontName = 100
 
-/** `#rrggbb`, the one spelling of a colour that is not a name of the list. */
-const hexColour = /^#[0-9a-fA-F]{6}$/
-
 /** The most characters (code points) a `path` setting has, as on the Julia side. */
 const maxPathText = 4096
 
@@ -407,17 +385,6 @@ const pathError = "must be a path (text without control characters, or empty)"
 
 /** A control character (ISO control, category Cc): no font name or path has one. */
 const controlCharacter = /\p{Cc}/u
-
-/**
- * Whether a raw value is a colour a figure can use: a string named like a colour of the
- * list, or `#rrggbb`.
- *
- * @returns the colour (name or hex) it stands for, or `undefined` if it is none.
- */
-function colourOf(raw: unknown): string | undefined {
-    if (typeof raw !== "string") return undefined
-    return hexColour.test(raw) || colours().has(raw) ? raw : undefined
-}
 
 /**
  * The whole number a raw value is, if it is one (a plain JavaScript integer that keeps
@@ -504,12 +471,13 @@ function checkChains(raw: unknown): Checked {
 /** The names of a list setting must be strings, as JSON holds them. */
 const isList = (raw: unknown): raw is unknown[] => Array.isArray(raw) && raw.length > 0
 
-/** A non-empty list of colours: names of the list or `#rrggbb` (as `:colours` of Julia). */
+/** A non-empty list of colours: names or colour codes (as `:colours` of Julia). */
 function checkColours(raw: unknown): Checked {
     if (!isList(raw)) return { ok: false, error: "must be a non-empty list of colours" }
-    if (!raw.every((x) => colourOf(x) !== undefined))
-        return { ok: false, error: "must hold only colours: name or #rrggbb" }
-    return { ok: true, value: raw as string[] }
+    const kept = raw.map(colourOf)
+    if (!kept.every((x): x is string => x !== undefined))
+        return { ok: false, error: "must hold only colours" }
+    return { ok: true, value: kept }
 }
 
 /** A non-empty list of marker names of the choices (as `:markers` of Julia). */

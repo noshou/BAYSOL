@@ -5,11 +5,10 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { readAssetJson } from "../src/core/environment.js"
+import { colourNames } from "../src/store/colours.js"
 import {
     type BrokenRelation,
     checkRelations,
-    colourHex,
-    colourNames,
     defaultCatalog,
     type Relation,
     reasonFor,
@@ -97,19 +96,6 @@ test("every entry is complete and the data is sound", () => {
         values[def.name] = r.value
     }
     assert.deepEqual(checkRelations(catalog.relations, values), [])
-})
-
-test("the colours have names and colours", () => {
-    const list = colourNames()
-    assert.ok(list.length > 600)
-    for (const n of ["crimson", "darkorange", "gray20", "black", "antiquewhite4"]) {
-        assert.ok(list.includes(n), n)
-    }
-    assert.deepEqual(colourHex("crimson"), "#dc143c")
-    assert.deepEqual(colourHex("antiquewhite4"), "#8b8378")
-    assert.deepEqual(colourHex("#ff0000"), "#ff0000")
-    assert.equal(colourHex("nope"), undefined)
-    assert.equal(colourHex("#ff00"), undefined)
 })
 
 // ========================================================================================
@@ -225,23 +211,30 @@ test("fonts are the math fonts or the text fonts", () => {
     assert.deepEqual(settingNames("X", "colour"), colourNames())
 })
 
-test("colours: a name of the list or #rrggbb", () => {
+test("colours: a name of the list or a colour code", () => {
     for (const good of [
         "crimson",
         "antiquewhite4",
         "gray20",
         "#ff0000",
         "#A0b1C2",
+        "#fff",
+        "rgb(1, 2, 3)",
     ])
         assert.deepEqual(validateValue(def("PLOT_COLOUR_MAP"), good), {
             ok: true,
             value: good,
         })
+    // any spelling of a listed name is kept as the listed name; a name Julia does not
+    // read is kept as its #rrggbb
+    assert.deepEqual(validateValue(def("PLOT_COLOUR_MAP"), "Sky Blue"), {
+        ok: true,
+        value: "skyblue",
+    })
     for (const bad of [
         "notacolour",
         5,
         null,
-        "#fff",
         "#ff00000",
         "#GGGGGG",
         "",
@@ -436,19 +429,22 @@ test("rules: inside, width, ordered, all above, at most, opacity", () => {
 
 const accepts = (name: string, raw: unknown) => validateValue(def(name), raw)
 
-test("colours: a non-empty list of names of the list or #rrggbb, repeats allowed", () => {
+test("colours: a non-empty list of names or colour codes, repeats allowed", () => {
     const n = "PLOT_COMPARE_COLOURS"
-    for (const good of [["red"], ["#D55E00", "#0072b2", "crimson"], ["red", "red"]])
+    const goods = [["red"], ["#D55E00", "#0072b2", "crimson"], ["red", "red"]]
+    for (const good of [...goods, ["#fff"], ["rgb(1, 2, 3)"]])
         assert.deepEqual(accepts(n, good), { ok: true, value: good })
+    // a name is kept in its listed spelling (lower case), as Julia reads it
+    assert.deepEqual(accepts(n, ["Red"]), { ok: true, value: ["red"] })
     for (const bad of [[], "red", null, {}])
         assert.deepEqual(accepts(n, bad), {
             ok: false,
             error: "must be a non-empty list of colours",
         })
-    for (const bad of [["nope"], ["#fff"], ["red", 5], ["Red"], [["red"]]])
+    for (const bad of [["nope"], ["rgb(1,2)"], ["red", 5], [["red"]]])
         assert.deepEqual(accepts(n, bad), {
             ok: false,
-            error: "must hold only colours: name or #rrggbb",
+            error: "must hold only colours",
         })
 })
 

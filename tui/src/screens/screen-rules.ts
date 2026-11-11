@@ -8,9 +8,16 @@
 //   3. Setting edit: the rules of the settings editors
 //   4. Landing words: the options and questions of the recipes and the landings
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { saveErrorNote } from "../core/file-system.js"
 import { type NumberRules, parseNumber, truncate } from "../core/terminal.js"
+import {
+    colourWords,
+    listedName,
+    looksLikeCode,
+    parseColourCode,
+    splitTopLevel,
+} from "../store/colours.js"
 import { Drafts, MAX_ROWS, type Row, rowMark } from "../store/lists.js"
 import {
     type PartKind,
@@ -45,6 +52,7 @@ import {
     useListCursor,
     useNav,
 } from "../ui/interaction.js"
+import { FIND_ROWS, type TableFind, useTableFind } from "./table-find.js"
 
 // ========================================================================================
 // 1. Tables and forms
@@ -100,12 +108,14 @@ export type TableFacts = {
  * @param adds - the add keys of this table (`add solute ^n`, ...); shown only when
  *     `facts.canAdd`.
  * @param editLabel - what Enter does on a row, `"edit"` when left out.
+ * @param more - items that go last: the find and sort keys of a table of named rows.
  * @returns the items, in order.
  */
 export function tableLegend(
     facts: TableFacts,
     adds: LegendItem[],
     editLabel = "edit",
+    more: LegendItem[] = [],
 ): LegendItem[] {
     const { rows, cursor, locked } = facts
     return legendOf([
@@ -117,6 +127,7 @@ export function tableLegend(
         facts.canRemove &&
             !locked && legendFor(facts.removeLabel ?? "remove", keys.remove),
         facts.canUndo && !locked && legendFor("undo", keys.undo),
+        ...more,
     ])
 }
 
@@ -224,6 +235,11 @@ const FRAME_LEGEND_LINES = 3
  *     is then `saveErrorNote`); the row leaves the table and every other row keeps its
  *     drafts, still unsaved. A row never saved is dropped without a question. Left out,
  *     `^r` only marks the row (and `^w` removes it: a buffer's solutes).
+ * @property label - the name of an item. With it the table finds a row by name (`/`) and
+ *     puts the rows in alphabetical order (`s`); both show in the legend only while they
+ *     can do something.
+ * @property sorted - the rows are put in alphabetical order when the table opens (the
+ *     recipes, the custom solutes); needs `label`.
  */
 export type TableScreenOptions<V> = {
     items:      readonly V[]
@@ -239,6 +255,8 @@ export type TableScreenOptions<V> = {
         name:   (saved: V) => string
         remove: (saved: V) => void
     }
+    label?:     (item: V) => string
+    sorted?:    boolean
 }
 
 /**
@@ -273,6 +291,8 @@ export type TableScreenOptions<V> = {
  *     keys of the screen and what Enter does (`"edit"`).
  * @property handleKey - routes a key press; returns `true` when it was handled, so the
  *     screen stops there.
+ * @property finder - the open finder to draw under the table, `null` while closed (a
+ *     table with `label`); the table's page is shorter while it is open.
  */
 export type TableScreen<V> = {
     drafts:           Drafts<V>
@@ -294,6 +314,7 @@ export type TableScreen<V> = {
     legendFull:       LegendItem[]
     legend:           (adds: LegendItem[], editLabel?: string) => LegendItem[]
     handleKey:        (press: KeyInput) => boolean
+    finder:           TableFind["element"]
 }
 
 /**
@@ -315,7 +336,10 @@ export type TableScreen<V> = {
  */
 export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V> {
     const { items, save, check, extraRows = 0, extraChanges = 0, locked, erase } = options
-    const { added = [] } = options
+    const { added = [], label, sorted } = options
+    const findKeys = label
+        ? [legendFor("find", keys.find), legendFor("sort", keys.sort)]
+        : []
     const width = useBodyColumns()
     // the fullest legend: both arrows, every key that acts on a row, and the adds
     const legendFull = tableLegend(
@@ -330,21 +354,30 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
             removeLabel: erase ? "delete" : undefined,
             dirty: true,
         },
-        options.adds ?? [],
+        [...(options.adds ?? []), ...findKeys],
     )
     // rows the footer takes beyond the three lines the frame's own count allows for (the
     // table screens are blocky: their footer's box takes two more)
     const footerExtra = footerExtraLines(legendFull, width, FRAME_LEGEND_LINES, "blocky")
     const nav = useNav()
-    const [drafts, setDrafts] = useState<Drafts<V>>(() =>
-        added.reduce((d, item) => d.add(item), Drafts.of(items)),
-    )
+    const [drafts, setDrafts] = useState<Drafts<V>>(() => {
+        const start = Drafts.of(items)
+        const first = label && sorted ? start.sorted(label) : start
+        return added.reduce((d, item) => d.add(item), first)
+    })
     const [note, setNoteState] = useState<{ text: string; isError: boolean } | undefined>(
         locked ? { text: locked, isError: true } : undefined,
     )
     const [focusLast, setFocusLast] = useState(false)
-    const pageSize = useBodyRows(TABLE_CHROME_ROWS + extraRows + footerExtra)
+    const bodyRows = useBodyRows(TABLE_CHROME_ROWS + extraRows + footerExtra)
+    // the finder (`/`) takes rows under the table while it is open; it moves the cursor
+    // through a ref, because the cursor is made from the page size that depends on it
+    const goRef = useRef<(i: number) => void>(() => undefined)
+    const goTo = useCallback((i: number) => goRef.current(i), [])
+    const find = useTableFind(drafts.rows, label, goTo)
+    const pageSize = find.open ? Math.max(3, bodyRows - FIND_ROWS) : bodyRows
     const cursor = useListCursor(drafts.length, pageSize)
+    goRef.current = cursor.set
     const guard = useDiscardGuard(drafts.count + extraChanges)
     const removal = useConfirm()
 
@@ -408,10 +441,22 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
         })
     }
 
+    /** `s`: the rows in alphabetical order, the cursor staying on its row. */
+    const sortRows = (by: (item: V) => string) => {
+        const row = drafts.rows[cursor.index]
+        const next = drafts.sorted(by)
+        setDrafts(next)
+        if (row) cursor.set(next.rows.indexOf(row))
+    }
+
     const handleKey = (press: KeyInput): boolean => {
         if (guard.handleKey(press) || removal.handleKey(press)) return true
+        // an open finder takes every key itself
+        if (find.open) return true
         setNote(undefined)
-        if (press.is(keys.up)) cursor.move(-1)
+        if (label && drafts.length > 1 && press.is(keys.find)) find.start()
+        else if (label && drafts.length > 1 && press.is(keys.sort)) sortRows(label)
+        else if (press.is(keys.up)) cursor.move(-1)
         else if (press.is(keys.down)) cursor.move(1)
         else if (press.is(keys.back)) guard.leave(nav.pop)
         else if (press.is(keys.remove) || press.is(keys.undo) || press.is(keys.save)) {
@@ -450,7 +495,13 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
         legend: (adds, editLabel) => {
             const asked = guard.question ?? removal.question
             if (asked !== undefined) return questionLegend(asked)
+            if (find.open) return find.legend
             const row = drafts.rows[cursor.index]
+            const several = label !== undefined && drafts.length > 1
+            const more = legendOf([
+                several && legendFor("find", keys.find),
+                several && !drafts.isSorted(label) && legendFor("sort", keys.sort),
+            ])
             return tableLegend(
                 {
                     rows: drafts.length,
@@ -463,8 +514,9 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
                     canUndo: row !== undefined && rowMark(row) !== undefined,
                     dirty: drafts.dirty || extraChanges > 0,
                 },
-                adds,
+                [...adds],
                 editLabel,
+                more,
             )
         },
         mark: (row) => rowMark(row) ?? " ",
@@ -472,6 +524,7 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
         append,
         adopt,
         handleKey,
+        finder: find.element,
     }
 }
 
@@ -499,16 +552,13 @@ export const numberRules: Record<"int" | "float", NumberRules> = {
     float: {},
 }
 
-/** What a `#rrggbb` colour looks like as typed. */
-const hexText = /^#[0-9a-fA-F]{6}$/
-
-/** One part of a tuple as typed: a number, or a colour (name or `#rrggbb`, any case). */
-function parsePart(
+/** One part of a tuple as typed: a number, or a colour (a name or a code, as typed). */
+export function parsePart(
     kind: PartKind,
     text: string,
 ): { value: number | string } | { error: string } {
     if (kind !== "colour") return parseNumber(text, numberRules[kind])
-    return { value: text.toLowerCase() }
+    return { value: text.trim() }
 }
 
 /** The words that stand for "not given" in an optional number: blank, these. */
@@ -558,6 +608,33 @@ function parseSizes(text: string): { value: number[][] } | { error: string } {
     return { value: sizes }
 }
 
+/** A tuple value from its parts: an array, or an object keyed by the names of the parts. */
+export function tupleOf(def: SettingDef, parts: (number | string)[]): SettingValue {
+    return def.isRecord
+        ? Object.fromEntries(def.partNames.map((n, i) => [n, parts[i] as number]))
+        : parts
+}
+
+/** Whether a setting is a tuple with a colour part (`colour, opacity`). */
+export const hasColourPart = (def: SettingDef): boolean =>
+    def.kind === "tuple" && def.partKinds.includes("colour")
+
+/**
+ * The tuple the parts make, checked as a whole (what `parseSetting` does at the end of a
+ * typed line).
+ *
+ * @param def - the tuple setting.
+ * @param parts - one value for each part, in order.
+ * @returns the value `validateValue` accepts, or what is wrong.
+ */
+export function finishTuple(
+    def: SettingDef,
+    parts: (number | string)[],
+): { value: SettingValue } | { error: string } {
+    const checked = validateValue(def, tupleOf(def, parts))
+    return checked.ok ? { value: checked.value } : { error: checked.error }
+}
+
 /**
  * What typed text means for a setting that is typed (a number, an optional number, a
  * `set` of blank-separated choices, a font, a tuple as comma-separated parts, ranges as
@@ -578,7 +655,7 @@ export function parseSetting(
         const t = text.trim()
         raw = /^(all)?$/i.test(t) ? [] : [...t.replace(/[\s,]+/g, "")]
     } else if (def.kind === "colours") {
-        raw = listWords(text).map((w) => (hexText.test(w) ? w : w.toLowerCase()))
+        raw = colourWords(text)
     } else if (def.kind === "markers") raw = listWords(text)
     else if (def.kind === "sizes") {
         const sizes = parseSizes(text)
@@ -588,7 +665,7 @@ export function parseSetting(
     else if (def.kind === "font") raw = text.trim() === "" ? def.default : text.trim()
     else if (def.kind === "path") raw = text.trim()
     else if (def.kind === "tuple") {
-        const words = text.split(",").map((w) => w.trim())
+        const words = splitTopLevel(text)
         if (words.length !== def.partNames.length)
             return {
                 error: `needs ${def.partNames.length} values: ${def.partNames.join(", ")}`,
@@ -599,9 +676,7 @@ export function parseSetting(
             if ("error" in part) return { error: `${def.partNames[i]}: ${part.error}` }
             parts.push(part.value)
         }
-        raw = def.isRecord
-            ? Object.fromEntries(def.partNames.map((n, i) => [n, parts[i]]))
-            : parts
+        raw = tupleOf(def, parts)
     } else if (
         def.kind.startsWith("optional") &&
         (text.trim() === "" || nullWords.includes(text.trim().toLowerCase()))
@@ -654,7 +729,7 @@ export function indexOfPick(names: readonly string[], name: string): number {
 export type ListKind = "colour" | "font"
 
 /**
- * What Enter takes in a colour or font picker: a colour typed as `#rrggbb`, else the
+ * What Enter takes in a colour or font picker: a colour code typed out, else the
  * highlighted name, else (a machine with no list of fonts) the font text as it is.
  *
  * @param kind - what is picked.
@@ -670,8 +745,10 @@ export function pickValue(
     highlighted: string | undefined,
 ): { value: string } | { error: string } {
     const text = typed.trim()
-    if (kind === "colour" && hexText.test(text)) return { value: text.toLowerCase() }
+    if (kind === "colour" && parseColourCode(text) !== undefined) return { value: text }
+    if (kind === "colour" && looksLikeCode(text)) return { error: "not a colour code" }
     if (highlighted !== undefined) return { value: highlighted }
+    if (kind === "colour" && listedName(text) !== undefined) return { value: text }
     if (kind === "font" && names.length === 0 && text !== "") return { value: text }
     return { error: kind === "colour" ? "not a known colour" : "not a known font" }
 }
@@ -688,7 +765,7 @@ const yesNo = { true: "yes", false: "no" } as const
  * @param value - its value (an array, or an object keyed by the names of the parts).
  * @returns the parts.
  */
-function tupleParts(def: SettingDef, value: SettingValue): (number | string)[] {
+export function tupleParts(def: SettingDef, value: SettingValue): (number | string)[] {
     return def.isRecord
         ? def.partNames.map((n) => (value as Record<string, number>)[n] as number)
         : [...(value as (number | string)[])]
@@ -840,19 +917,6 @@ export function bufferLandingOptions(
     if (typeof buffer === "number" && buffer > 0)
         options.push({ id: "save", label: "save current recipe globally" })
     return options
-}
-
-/**
- * The labels of the two options of the custom landing.
- *
- * @returns `["recipes (3)", "solutes (12)"]`, `?` for a file that cannot be used.
- */
-export function customLandingOptions(
-    recipes: number | "unusable",
-    solutes: number | "unusable",
-): [string, string] {
-    const shown = (n: number | "unusable") => (n === "unusable" ? "?" : String(n))
-    return [`recipes (${shown(recipes)})`, `solutes (${shown(solutes)})`]
 }
 
 /**

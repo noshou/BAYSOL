@@ -21,7 +21,7 @@ import { dirname, join } from "node:path"
 import { test } from "node:test"
 import { projectsRoot } from "../src/core/environment.js"
 import { entryNames, writeJson } from "../src/core/file-system.js"
-import { pickNote } from "../src/screens/menus.js"
+import { pickNote } from "../src/screens/models.js"
 import { checkPath, complete, hintsFor, pathSuggestions } from "../src/store/lists.js"
 import {
     accepted,

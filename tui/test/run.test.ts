@@ -27,21 +27,13 @@ import { setEnergy, writeData } from "../src/store/data.js"
 import {
     addModel,
     CLAIM_FILE,
-    compareRunNames,
     isoStamp,
     liveRun,
     markStaleRuns,
-    parseRunStamp,
     RunInProgressError,
-    runBrief,
     runDirOf,
-    runDisplay,
     runIds,
-    runStamp,
     runStatus,
-    ZONE_OVERRIDES,
-    zoneLabel,
-    zoneLabelWithSource,
 } from "../src/store/projects.js"
 import {
     claimRun,
@@ -60,11 +52,21 @@ import {
     temperatureStart,
 } from "../src/store/run.js"
 import {
+    archivePath,
     isPacked,
-    RUN_ARCHIVE,
     readRunText,
     runFolderFiles,
 } from "../src/store/run-archive.js"
+import {
+    compareRunNames,
+    parseRunStamp,
+    runBrief,
+    runDisplay,
+    runStamp,
+    ZONE_OVERRIDES,
+    zoneLabel,
+    zoneLabelWithSource,
+} from "../src/store/run-stamp.js"
 import { destructiveQuestion } from "../src/ui/input.js"
 import { fixture, tempDir, tempDir as tmp } from "./support/fixtures.js"
 
@@ -413,11 +415,11 @@ test("a project that is gone is not made again by a claim", () => {
     assert.equal(existsSync(gone), false)
 })
 
-test("the snapshot copies the inputs into logs/; a missing settings.json is {}", () => {
+test("the snapshot copies the inputs into the run folder; no settings.json: {}", () => {
     const p = project()
     const run = claimRun(p)
     snapshotInputs(p, run.dir)
-    const logs = join(run.dir, "logs")
+    const logs = run.dir
     assert.equal(readFileSync(join(logs, "settings.json"), "utf-8"), "{}\n")
     for (const name of ["buffer.json", "data.tsv", "data.json"])
         assert.equal(
@@ -435,9 +437,13 @@ test("the snapshot also copies model-settings.json and the reference files", () 
     const p = project()
     const run = claimRun(p)
     snapshotInputs(p, run.dir)
-    const logs = join(run.dir, "logs")
+    const logs = run.dir
     assert.equal(existsSync(join(logs, "model-settings.json")), false)
-    assert.equal(existsSync(join(logs, "reference-fit")), false, "none made without any")
+    assert.deepEqual(
+        readdirSync(logs).filter((n) => n.startsWith("reference-fit")),
+        [],
+        "none made without any",
+    )
     // a project with both: only the files Julia reads, whole
     const q = project()
     const models = '{"crambin":{"model":{"Q_MAX":{"value":0.3}}}}\n'
@@ -448,14 +454,14 @@ test("the snapshot also copies model-settings.json and the reference files", () 
     writeFileSync(join(q, "reference-fit", "notes.md"), "not a curve")
     const run2 = claimRun(q)
     snapshotInputs(q, run2.dir)
-    const out = join(run2.dir, "logs")
+    const out = run2.dir
     assert.equal(readFileSync(join(out, "model-settings.json"), "utf-8"), models)
     assert.deepEqual(
-        readdirSync(join(out, "reference-fit")).sort(),
-        ["CRYSOL.tsv", "foxs.DAT"],
+        readdirSync(out).filter((n) => n.startsWith("reference-fit-")).sort(),
+        ["reference-fit-CRYSOL.tsv", "reference-fit-foxs.DAT"],
     )
     assert.equal(
-        readFileSync(join(out, "reference-fit", "CRYSOL.tsv"), "utf-8"),
+        readFileSync(join(out, "reference-fit-CRYSOL.tsv"), "utf-8"),
         readFileSync(join(q, "reference-fit", "CRYSOL.tsv"), "utf-8"),
     )
 })
@@ -468,8 +474,8 @@ test("the snapshot of a project with the old references/ folder moves it", () =>
     snapshotInputs(q, run.dir)
     assert.equal(existsSync(join(q, "references")), false, "moved")
     assert.deepEqual(readdirSync(join(q, "reference-fit")), ["CRYSOL.tsv"])
-    assert.deepEqual(readdirSync(join(run.dir, "logs", "reference-fit")), ["CRYSOL.tsv"])
-    assert.equal(existsSync(join(run.dir, "logs", "references")), false)
+    assert.ok(existsSync(join(run.dir, "reference-fit-CRYSOL.tsv")))
+    assert.equal(existsSync(join(run.dir, "references")), false)
 })
 
 test("the startup sweep marks a dead run interrupted, and leaves a live one alone", () => {
@@ -616,8 +622,8 @@ function alive(pid: number): boolean {
     }
 }
 
-/** The text of a file of the run's `logs/`, from its archive or its plain folder. */
-const logText = (dir: string, name: string): string => readRunText(dir, `logs/${name}`)
+/** The text of a file of the run, from its archive or its plain folder. */
+const logText = (dir: string, name: string): string => readRunText(dir, name)
 
 test("a normal run: tail, packing, done, logs in the archive, conditions", async () => {
     const p = project()
@@ -639,16 +645,14 @@ test("a normal run: tail, packing, done, logs in the archive, conditions", async
     assert.ok(view.lines.includes("colour on stderr"))
     const dir = runDirOf(p, view.id)
     assert.equal(runStatus(p, view.id), "done")
-    // packed: the archive holds the logs, run.json stays outside, no staging is left
-    assert.ok(isPacked(dir) && !existsSync(join(dir, "logs")))
-    assert.ok(existsSync(join(dir, "run.json")))
-    assert.deepEqual(
-        readdirSync(dir).filter((n) => n !== "run.json" && n !== RUN_ARCHIVE),
-        [CLAIM_FILE],
-        "only the claim marker is left beside run.json and the archive",
-    )
-    const names = [...runFolderFiles(dir, "logs").keys()]
-    for (const n of ["run.LOG", "settings.json", "buffer.json", "data.tsv", "data.json"])
+    // packed: ONE archive beside where the folder was, with everything (run.json too)
+    assert.ok(isPacked(dir) && !existsSync(dir), "the folder is gone")
+    assert.ok(existsSync(archivePath(dir)))
+    assert.deepEqual(readdirSync(join(dir, "..")).filter((n) => !n.startsWith(".")), [
+        `${view.id}.7z`,
+    ])
+    const names = [...runFolderFiles(dir, "").keys()]
+    for (const n of ["run.json", "run.LOG", "settings.json", "buffer.json", "data.tsv"])
         assert.ok(names.includes(n), n)
     assert.match(logText(dir, "run.LOG"), /temperature_c\t21\.5/)
     assert.equal(session.view.note, undefined)
@@ -661,9 +665,9 @@ test("a pack that fails leaves the run folder as it was and says why", async () 
     })
     assert.equal(await session.done, "done")
     const dir = runDirOf(p, session.view.id)
-    assert.match(session.view.note ?? "", /not packed: disk full/)
+    assert.match(session.view.note ?? "", /not packed: .*disk full/)
     assert.equal(isPacked(dir), false)
-    assert.match(readFileSync(join(dir, "logs", "run.LOG"), "utf-8"), /temperature_c/)
+    assert.match(readFileSync(join(dir, "run.LOG"), "utf-8"), /temperature_c/)
 })
 
 test("a run that failed ends failed with its error line as the note", async () => {

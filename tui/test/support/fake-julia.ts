@@ -8,12 +8,14 @@ import { dirname, join } from "node:path"
 /**
  * A stand-in for Julia in the tests of the run flow: it takes the three arguments the
  * real child takes (project, temperature, run folder) and writes a `run.json` and a
- * `logs/run.LOG` the way `BAYSOL.run_project` does, then behaves as `FAKE_MODE` says:
+ * `run.LOG` the way `BAYSOL.run_project` does (the run folder is flat), then behaves as
+ * `FAKE_MODE` says:
  *
  * - `done`: prints a few lines (one with a carriage-return progress bar), finishes `done`.
  * - `plots`: like `done`, and the run has the files a real one leaves: a model `m` with its
- *   `m.LOG`, `output/` (`m.xlsx`, `plots.txt`, the plots at two sizes, two `.tex`
- *   figures in `output/plots/`) and a comparison in `compare/`, all named in `run.json`.
+ *   `m.LOG`, `m.xlsx`, `m-plots.txt`, the plots at two sizes (`m-76x10.txt`), two `.tex`
+ *   figures (`m.tex`, `m_residuals.tex`) and a comparison (`compare.tsv`, `compare.tex`,
+ *   `compare-plots.txt`, `compare-<W>x<H>.txt`), all named in `run.json`.
  * - `failed`: finishes `failed` with an ERRORS section.
  * - `hang`: starts a grandchild (`sleep`) in the same process group, then waits; on SIGTERM
  *   it finishes `aborted` and exits 130, as Julia does.
@@ -67,18 +69,18 @@ const terminalPlots = (w: number, h: number): string =>
 function writeOutputs(): void {
     const dir = runDir as string
     const files: Record<string, string> = {
-        "m/m.LOG": "datetime\tnow\n",
-        "m/output/m.xlsx": "PK workbook",
-        "m/output/plots.txt": terminalPlots(70, 18),
-        "m/output/plots/m.tex": figure("fit"),
-        "m/output/plots/m_residuals.tex": figure("residuals"),
-        "compare/plots.txt": terminalPlots(70, 18),
-        "compare/plots/res_compare.tex": figure("comparison"),
-        "compare/res_compare.xlsx": "PK workbook",
+        "m.LOG": "datetime\tnow\n",
+        "m.xlsx": "PK workbook",
+        "m-plots.txt": terminalPlots(70, 18),
+        "m.tex": figure("fit"),
+        "m_residuals.tex": figure("residuals"),
+        "compare-plots.txt": terminalPlots(70, 18),
+        "compare.tex": figure("comparison"),
+        "compare.tsv": "q\tI\n0.1\t2\n",
     }
     for (const [w, h] of PLOT_SIZES) {
-        files[`m/output/plots_${w}x${h}.txt`] = terminalPlots(w, h)
-        files[`compare/plots_${w}x${h}.txt`] = terminalPlots(w, h)
+        files[`m-${w}x${h}.txt`] = terminalPlots(w, h)
+        files[`compare-${w}x${h}.txt`] = terminalPlots(w, h)
     }
     for (const [rel, text] of Object.entries(files)) {
         mkdirSync(dirname(join(dir, rel)), { recursive: true })
@@ -88,11 +90,11 @@ function writeOutputs(): void {
 
 /** Writes `run.json` atomically. */
 function runJson(status: string): void {
-    const sizes = (folder: string): unknown[] =>
+    const sizes = (stem: string): unknown[] =>
         mode !== "plots"
             ? []
             : PLOT_SIZES.map(([w, h]) => ({
-                file: `${folder}/plots_${w}x${h}.txt`,
+                file: `${stem}-${w}x${h}.txt`,
                 width: w,
                 rows: h,
             }))
@@ -108,12 +110,21 @@ function runJson(status: string): void {
         started,
         heartbeat: iso(),
         ended: status === "running" ? null : iso(),
-        models: plots ? [{ name: "m", status: "done", plot_sizes: sizes("m/output") }] : [],
+        models: plots
+            ? [
+                {
+                    name: "m",
+                    status: "done",
+                    files: ["m.xlsx", "m.tex", "m_residuals.tex", "m-plots.txt"],
+                    plot_sizes: sizes("m"),
+                },
+            ]
+            : [],
         ...(plots
             ? {
                 compare: {
                     status: "done",
-                    files: ["compare/res_compare.xlsx"],
+                    files: ["compare.tex", "compare.tsv", "compare-plots.txt"],
                     plot_sizes: sizes("compare"),
                 },
             }
@@ -125,7 +136,7 @@ function runJson(status: string): void {
 
 /** Appends to the LOG. */
 const log = (text: string): void =>
-    appendFileSync(join(runDir as string, "logs", "run.LOG"), text)
+    appendFileSync(join(runDir as string, "run.LOG"), text)
 
 /** Finishes the run the way Julia does and exits. */
 function finish(status: string, code: number): never {
@@ -137,10 +148,10 @@ function finish(status: string, code: number): never {
 
 if (mode === "silent") process.exit(1)
 
-mkdirSync(join(runDir as string, "logs"), { recursive: true })
+mkdirSync(runDir as string, { recursive: true })
 runJson("running")
 writeFileSync(
-    join(runDir as string, "logs", "run.LOG"),
+    join(runDir as string, "run.LOG"),
     `datetime\tnow\nproject\t${project}\ntemperature_c\t${temperature}\n\n--- output ---\n`,
 )
 process.stdout.write("fake julia started\n")

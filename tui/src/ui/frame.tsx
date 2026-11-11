@@ -13,7 +13,7 @@ import { Box, Text } from "ink"
 import { Fragment, type ReactNode, useCallback, useState } from "react"
 import { LOGS_FLOW } from "../core/environment.js"
 import { displayWidth, padWidth, truncate } from "../core/terminal.js"
-import { runBrief, runDisplay } from "../store/projects.js"
+import { runBrief, runDisplay } from "../store/run-stamp.js"
 import {
     type Design,
     Legend,

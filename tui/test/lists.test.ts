@@ -470,3 +470,17 @@ test("room for another row", () => {
     assert.equal(Drafts.of(Array(MAX_ROWS).fill(0)).hasRoom, false)
     assert.equal(new Drafts().hasRoom, true)
 })
+
+test("drafts: sorted puts the rows in alphabetical order and keeps their marks", () => {
+    const base = Drafts.of(["Zeta", "alpha", "Mango", "beta"]).set(0, "Zeta2")
+    const label = (s: string) => s
+    assert.equal(base.isSorted(label), false)
+    const sorted = base.sorted(label)
+    assert.deepEqual(values(sorted), ["alpha", "beta", "Mango", "Zeta2"])
+    // the edited row keeps its mark where it went
+    assert.deepEqual(marks(sorted), [undefined, undefined, undefined, "*"])
+    assert.equal(sorted.isSorted(label), true)
+    // equal names keep their order
+    const same = Drafts.of(["b", "B", "a"]).sorted(label)
+    assert.deepEqual(values(same), ["a", "b", "B"])
+})

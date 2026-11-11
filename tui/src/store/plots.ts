@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// The plots actions of `open runs`: "move plots" (the `.tex` figures of a model or of the
-// comparison, out of the run's archive or folder, into the plot folder) and "compile
-// plots" (LaTeX on them, the PDFs into the plot folder).
+// The files actions of `open runs`: "move tex" (the `.tex` figures of a model or of the
+// comparison, out of the run's archive or folder, into the plot folder), "move data" (the
+// workbooks and the comparison table, into the data folder) and "compile plots" (LaTeX on
+// the figures, the PDFs into the plot folder). They act on the whole run or on one row of
+// it; the destination folders are flat, named for the model, and never take the place of
+// a file that is there.
 //
 // Contents:
-//   1. Where plots go: the plot folder and its layout
-//   2. Getting the figures out of a run
+//   1. Where files go: the folders and the names
+//   2. Getting the files out of a run
 //   3. Move and compile
 
 import { spawn } from "node:child_process"
@@ -14,12 +17,13 @@ import {
     accessSync,
     constants,
     copyFileSync,
+    existsSync,
     readFileSync,
-    renameSync,
+    rmSync,
     statSync,
 } from "node:fs"
-import { basename, isAbsolute, join } from "node:path"
-import { extractEntries, isSafeEntryName, withTempFolder } from "../core/archive.js"
+import { basename, extname, isAbsolute, join, relative, sep } from "node:path"
+import { extractEntries, withTempFolder } from "../core/archive.js"
 import {
     appDir,
     ensureDir,
@@ -30,20 +34,25 @@ import {
 } from "../core/environment.js"
 import { isFile } from "../core/file-system.js"
 import { displayWidth, truncate, truncateStart } from "../core/terminal.js"
-import { archivePath } from "./run-archive.js"
+import { archiveHolding } from "./run-archive.js"
 
 // ========================================================================================
-// 1. Where plots go
+// 1. Where files go
 // ========================================================================================
+
+/** The name the comparison goes by in a unit (as in the run list). */
+const COMPARISON = "comparison"
 
 /**
- * One model of a run (or its comparison) whose figures an action takes.
+ * One model of a run (or its comparison) whose files an action takes.
  *
  * @property project - the project's folder name.
  * @property run - the run's name (its stamp).
- * @property runDir - the run folder.
+ * @property runDir - the run's path (its folder, which may be packed away).
  * @property name - the model's name, or `comparison`.
  * @property tex - its `.tex` figures, paths relative to the run folder.
+ * @property data - its data files (the workbook, or the comparison table), paths relative
+ *     to the run folder.
  */
 export type PlotUnit = {
     project: string
@@ -51,19 +60,24 @@ export type PlotUnit = {
     runDir: string
     name: string
     tex: readonly string[]
+    data: readonly string[]
 }
 
 /** The [[PlotUnit]] of a model (or the comparison) of a run of a project. */
 export const plotUnit = (
     projectDir: string,
     run: { id: string; dir: string },
-    model: { name: string; tex: readonly string[] },
+    model: { name: string; tex: readonly string[]; workbook?: string | undefined },
 ): PlotUnit => ({
     project: basename(projectDir),
     run: run.id,
     runDir: run.dir,
     name: model.name,
     tex: model.tex,
+    data:
+        model.workbook === undefined
+            ? []
+            : [relative(run.dir, model.workbook).split(sep).join("/")],
 })
 
 /**
@@ -81,70 +95,129 @@ export function plotRoot(setting: unknown, dataFolder: () => string = appDir): s
 }
 
 /**
- * The folder one model's plots go to: `<plot dir>/<project>/<run stamp>/<model>/`
- * (`comparison` for the comparison), the layout `run_project` uses when it copies
- * the figures itself.
+ * The data folder: the setting "data dir" (`TABLE_DIR`), or, when it is empty, the `data`
+ * folder of the BAYSOL data folder. ONE folder for all the projects.
  *
- * @throws Error when a part is not a plain folder name (nothing is built from it).
+ * @param setting - the value of the setting.
+ * @param dataFolder - the BAYSOL data folder, the program's own when left out.
+ * @returns the folder's path (it is not made here).
  */
-export function unitFolder(root: string, unit: PlotUnit): string {
-    for (const part of [unit.project, unit.run, unit.name])
-        if (!isSafeEntryName(part) || part.includes("/"))
-            throw new Error(`not a folder name: ${part}`)
-    return join(root, unit.project, unit.run, unit.name)
+export function dataRoot(setting: unknown, dataFolder: () => string = appDir): string {
+    return typeof setting === "string" && setting.trim() !== ""
+        ? setting.trim()
+        : join(dataFolder(), PLOTS_FLOW.dataFolder)
+}
+
+/**
+ * The name a unit's file has in the destination folder, keyed off the model: the file's
+ * own name (`<model>.tex`, `<model>_hist_c1.tex`, `<model>.xlsx`); the comparison's
+ * (`compare.tsv`, or `<run>_compare.xlsx` in an older run) becomes `<project>-compare.*`.
+ */
+export function destinationName(unit: PlotUnit, rel: string): string {
+    const base = basename(rel)
+    if (unit.name !== COMPARISON) return base
+    return `${unit.project}-compare${base.replace(/^(?:.*_)?compare/, "")}`
+}
+
+/** A name with `-<k>` before its extension (`a.tex` is `a-2.tex`). */
+const numbered = (name: string, k: number): string => {
+    const ext = extname(name)
+    return `${name.slice(0, name.length - ext.length)}-${k}${ext}`
+}
+
+/**
+ * The names the files of one unit are put under in a folder without taking the place of a
+ * file there: their own, or, when one of them is taken, all of them with `-2`, `-3`, ...
+ * before the extension (the first number that frees every name), so the files of one unit
+ * stay together.
+ *
+ * @param folder - the destination.
+ * @param names - the names the files would have.
+ * @returns the names to use, in the order of `names`.
+ */
+export function freeNames(folder: string, names: readonly string[]): string[] {
+    for (let k = 1; ; k++) {
+        const out = names.map((n) => (k === 1 ? n : numbered(n, k)))
+        if (!out.some((n) => existsSync(join(folder, n)))) return out
+    }
 }
 
 // ========================================================================================
-// 2. Getting the figures out of a run
+// 2. Getting the files out of a run
 // ========================================================================================
 
 /**
- * Puts a unit's figures into `folder`, flat (`<name>.tex`), from the plain files of its run
- * where they are and from the run's archive otherwise (extracted to a temporary folder
- * that is always removed).
+ * Puts files of a unit into the temporary folder `tmp`, flat, under their own names: from
+ * the plain files of its run where they are and from the run's archive otherwise.
  *
- * @param folder - the folder to fill (made if missing).
- * @param pick - which figures (`undefined`: all of the unit's).
- * @returns the file names put there.
- * @throws [[ArchiveError]] when the archive cannot be read, Error when a file cannot be
- *     written.
+ * @param rels - the files, paths relative to the run folder.
+ * @returns each file's name in `tmp`, in the order of `rels`.
+ * @throws [[ArchiveError]] when the archive cannot be read, Error when a file is not
+ *     there.
  */
 async function bring(
     unit: PlotUnit,
-    folder: string,
-    pick?: (name: string) => boolean,
+    rels: readonly string[],
+    tmp: string,
 ): Promise<string[]> {
-    const wanted = unit.tex.filter((rel) => pick === undefined || pick(basename(rel)))
-    ensureDir(folder)
-    const archived = wanted.filter((rel) => !isFile(join(unit.runDir, ...rel.split("/"))))
-    const put = (from: string, rel: string): string => {
-        const name = basename(rel)
-        const staged = join(folder, `${name}.tmp.${process.pid}`)
-        copyFileSync(from, staged)
-        renameSync(staged, join(folder, name))
-        return name
+    const byArchive = new Map<string, string[]>()
+    for (const rel of rels) {
+        const plain = join(unit.runDir, ...rel.split("/"))
+        if (isFile(plain)) {
+            copyFileSync(plain, join(tmp, basename(rel)))
+            continue
+        }
+        const archive = archiveHolding(unit.runDir, rel)
+        if (archive === undefined) throw new Error(`no ${basename(rel)} in the run`)
+        byArchive.set(archive, [...(byArchive.get(archive) ?? []), rel])
     }
-    const names = wanted
-        .filter((rel) => !archived.includes(rel))
-        .map((rel) => put(join(unit.runDir, ...rel.split("/")), rel))
-    if (archived.length > 0)
-        await withTempFolder("baysol-plots", async (tmp) => {
-            await extractEntries(archivePath(unit.runDir), archived, tmp)
-            for (const rel of archived) names.push(put(join(tmp, ...rel.split("/")), rel))
+    for (const [archive, names] of byArchive) {
+        await withTempFolder("baysol-extract", async (from) => {
+            await extractEntries(archive, names, from)
+            for (const rel of names)
+                copyFileSync(join(from, ...rel.split("/")), join(tmp, basename(rel)))
         })
-    return names.sort()
+    }
+    return rels.map((rel) => basename(rel))
+}
+
+/**
+ * Copies files from `tmp` into `folder` under names that are free, never replacing a file.
+ * A name taken between the check and the copy (another copy of the program) makes the
+ * whole set go again under the next number; what this call copied before is removed then.
+ *
+ * @param copies - `[name in tmp, name wanted in folder]` for each file.
+ * @returns how many files were put.
+ */
+function putFiles(
+    tmp: string,
+    folder: string,
+    copies: readonly (readonly [string, string])[],
+): number {
+    ensureDir(folder)
+    for (;;) {
+        const names = freeNames(
+            folder,
+            copies.map(([, wanted]) => wanted),
+        )
+        const made: string[] = []
+        try {
+            copies.forEach(([from], i) => {
+                const to = join(folder, names[i] as string)
+                copyFileSync(join(tmp, from), to, constants.COPYFILE_EXCL)
+                made.push(to)
+            })
+            return made.length
+        } catch (error) {
+            for (const file of made) rmSync(file, { force: true })
+            if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
+        }
+    }
 }
 
 // ========================================================================================
 // 3. Move and compile
 // ========================================================================================
-
-/** Where a note says plots went: the unit's folder, or the project's for several. */
-function placeOf(units: readonly PlotUnit[], root: string): string {
-    const [first] = units
-    if (first === undefined) return root
-    return units.length === 1 ? unitFolder(root, first) : join(root, first.project)
-}
 
 /** The cells left in a note row of `room` cells after `head` (at least 12). */
 const restOf = (room: number, head: string): number =>
@@ -153,31 +226,50 @@ const restOf = (room: number, head: string): number =>
 /** The text of a count: `1 plot`, `3 plots`. */
 const plots = (n: number): string => `${n} plot${n === 1 ? "" : "s"}`
 
+/** What a move takes: the `.tex` figures or the data files. */
+export type MoveKind = "tex" | "data"
+
 /**
- * Move plots: copies the `.tex` figures of the units into the plot folder
- * (`<plot dir>/<project>/<run stamp>/<model>/`). The originals stay (they are in the run's
- * archive); a file of the same name there is replaced.
+ * Move tex / move data: copies the `.tex` figures (to the plot folder) or the data files,
+ * the workbooks and the comparison table (to the data folder), of the units into the
+ * folder, flat. The originals stay (they are in the run's archive); a file of the same
+ * name there is never replaced: the unit's files take `-2`, `-3`, ... ([[freeNames]]).
  *
+ * @param kind - which files.
  * @param units - the models (and comparison) to take.
- * @param root - the plot folder ([[plotRoot]]).
+ * @param root - the destination folder ([[plotRoot]] or [[dataRoot]]).
  * @param room - the cells of the note row; only the folder in the note is cut to fit it.
  * @returns what to tell the user.
- * @throws Error naming what is wrong: nothing to move, an unreadable archive, a folder that
- *     cannot be written.
+ * @throws Error naming what is wrong: nothing to move, an unreadable archive, a folder
+ *     that cannot be written.
  */
-export async function movePlots(
+export async function moveFiles(
+    kind: MoveKind,
     units: readonly PlotUnit[],
     root: string,
     room = Number.POSITIVE_INFINITY,
 ): Promise<string> {
-    const withPlots = units.filter((u) => u.tex.length > 0)
-    if (withPlots.length === 0) throw new Error("no plots (.tex) to move")
+    const filesOf = (u: PlotUnit): readonly string[] => (kind === "tex" ? u.tex : u.data)
+    const taking = units.filter((u) => filesOf(u).length > 0)
+    if (taking.length === 0)
+        throw new Error(kind === "tex" ? "no plots (.tex) to move" : "no data to move")
     let count = 0
-    for (const unit of withPlots)
-        count += (await bring(unit, unitFolder(root, unit))).length
-    const head = `moved ${plots(count)} to `
-    // only the folder (data) is cut, from its start: the end names the model
-    return head + truncateStart(placeOf(withPlots, root), restOf(room, head))
+    for (const unit of taking) {
+        const rels = filesOf(unit)
+        await withTempFolder("baysol-move", async (tmp) => {
+            const names = await bring(unit, rels, tmp)
+            count += putFiles(
+                tmp,
+                root,
+                names.map((n, i) => [n, destinationName(unit, rels[i] as string)]),
+            )
+        })
+    }
+    const files = `${count} data file${count === 1 ? "" : "s"}`
+    const what = kind === "tex" ? plots(count) : files
+    const head = `moved ${what} to `
+    // only the folder (data) is cut, from its start: the end names it
+    return head + truncateStart(root, restOf(room, head))
 }
 
 /**
@@ -268,9 +360,9 @@ function compileOne(
 
 /**
  * Compile plots: extracts (or copies) the units' `.tex` figures into a temporary folder
- * (always removed), runs the compiler on each there, and puts the PDFs into the plot folder
- * (`<plot dir>/<project>/<run stamp>/<model>/`). Figures that fail are named in the result;
- * the others are still made.
+ * (always removed), runs the compiler on each there, and puts the PDFs into the plot
+ * folder, flat, named for the model, never replacing a file ([[freeNames]]). Figures that
+ * fail are named in the result; the others are still made.
  *
  * @param units - the models (and comparison) to take.
  * @param root - the plot folder ([[plotRoot]]).
@@ -294,21 +386,22 @@ export async function compilePlots(
     let made = 0
     const failed: string[] = []
     for (const unit of withPlots) {
-        const dest = unitFolder(root, unit)
         await withTempFolder("baysol-compile", async (tmp) => {
-            for (const name of await bring(unit, tmp)) {
+            const names = await bring(unit, unit.tex, tmp)
+            const done: [string, string][] = []
+            for (const [i, name] of names.entries()) {
                 const why = await compileOne(compiler.path, tmp, name)
                 if (why !== undefined) {
                     failed.push(`${unit.name}/${name}: ${why}`)
                     continue
                 }
-                ensureDir(dest)
-                const pdf = `${basename(name, ".tex")}.pdf`
-                const staged = join(dest, `${pdf}.tmp.${process.pid}`)
-                copyFileSync(join(tmp, pdf), staged)
-                renameSync(staged, join(dest, pdf))
-                made++
+                const wanted = destinationName(unit, unit.tex[i] as string)
+                done.push([
+                    `${basename(name, ".tex")}.pdf`,
+                    `${basename(wanted, ".tex")}.pdf`,
+                ])
             }
+            made += putFiles(tmp, root, done)
         })
     }
     if (made === 0) {
@@ -321,5 +414,5 @@ export async function compilePlots(
         return head + truncate(failed[0] ?? "", restOf(room, head))
     }
     const head = `compiled ${plots(made)} to `
-    return head + truncateStart(placeOf(withPlots, root), restOf(room, head))
+    return head + truncateStart(root, restOf(room, head))
 }

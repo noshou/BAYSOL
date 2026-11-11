@@ -366,6 +366,23 @@ export function Logo({ theme }: { theme: Theme }): ReactNode {
     )
 }
 
+/**
+ * Draws its children with the muted text colour as the foreground colour, so a box of a
+ * picker shows all its text (names, values, counter, hints) in the one foreground colour.
+ * The background is the theme's own; only the muted text changes.
+ *
+ * @param props.children - what is drawn.
+ * @returns the children under the changed theme.
+ */
+export function Bright({ children }: PropsWithChildren): ReactNode {
+    const theme = useTheme()
+    return (
+        <ThemeContext.Provider value={{ ...theme, mt: theme.fg }}>
+            {children}
+        </ThemeContext.Provider>
+    )
+}
+
 // ========================================================================================
 // 2. `Panel`: a bordered box in the colours of the theme
 // ========================================================================================

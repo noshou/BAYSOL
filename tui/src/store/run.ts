@@ -28,6 +28,7 @@ import {
 import { formatNumber, type Parsed, parseNumber } from "../core/terminal.js"
 import { bufferFile, readConditions, readSolutes } from "./buffer.js"
 import { dataIsReady, dataJsonFile, dataTsvFile } from "./data.js"
+import { modelReferencesFile } from "./model-references.js"
 import type { ProjectRef } from "./projects.js"
 import {
     CLAIM_FILE,
@@ -40,7 +41,6 @@ import {
     markStaleRuns,
     RunInProgressError,
     runDirOf,
-    runStamp,
     runStatus,
     settleRun,
     startLockName,
@@ -48,6 +48,7 @@ import {
 import { migrateReferences, referenceFiles, referencesDir } from "./references.js"
 import { packRun } from "./run-archive.js"
 import { briefError, firstErrorLine, readLogText } from "./run-logs.js"
+import { runStamp } from "./run-stamp.js"
 import { modelSettingsFile, settingsFile } from "./settings-store.js"
 
 // ========================================================================================
@@ -140,7 +141,7 @@ export const temperatureStart = (last?: number): string =>
  * Starting a run, the part before any process exists: the NAME of the run folder, the
  * claim of it (one locked step that scans for a live run and makes the folder, so two
  * copies of the program starting at the same instant cannot both win) and the SNAPSHOT of
- * the inputs into its `logs/` folder (Julia reads only that copy, so editing the project
+ * the inputs into its run folder (Julia reads only that copy, so editing the project
  * during a run changes nothing). The rules are those of notes/run-design.md, "Concurrency".
  */
 
@@ -218,20 +219,21 @@ function snapshotFiles(projectDir: string): [string, string][] {
 }
 
 /**
- * Copies the inputs of a run into its `logs/` folder, each under the lock of its own file
+ * Copies the inputs of a run into its folder (flat: the run folder has no subfolders, the
+ * reference fits are `reference-fit-<file>`), each under the lock of its own file
  * (`settings.json`, `buffer.json`, then `data.tsv` outside `data.json`, the order the data
  * writer locks them in), so a save in progress in another copy is waited for and a copy is
  * never half a file. A project without `settings.json` gets `{}` (the defaults, as Julia
- * does). `model-settings.json` and the files of `reference-fit/` are copied too when the
- * project has them (Julia copies them itself otherwise, without our locks). The models
- * are not copied: Julia lists them (name, full path, size, sha256) in `models.json` when
- * the run starts.
+ * does). `model-settings.json`, `model-references.json` and the files of `reference-fit/`
+ * are copied too when the project has them (Julia copies them itself otherwise, without
+ * our locks). The models are not copied: Julia lists them (name, full path, size, sha256)
+ * in `models.json` when the run starts.
  *
  * @throws if a file the run needs (`buffer.json`, `data.tsv`, `data.json`) is missing,
  *     [[FileInUseError]], `ProjectGoneError`.
  */
 export function snapshotInputs(projectDir: string, runDir: string): void {
-    const logs = join(runDir, "logs")
+    const logs = runDir
     mkdirSync(logs, { recursive: true })
     for (const [from, name] of snapshotFiles(projectDir)) {
         lockedIn(projectDir, from, () => {
@@ -252,20 +254,24 @@ export function snapshotInputs(projectDir: string, runDir: string): void {
         }
     })
     // the optional inputs, under their own locks: the per-model settings and the
-    // reference curves (the files only; Julia reads them from `logs/` and uses a
-    // `logs/reference-fit/` that is there as it is)
+    // reference curves (the files only; Julia reads them from the run folder and uses
+    // `reference-fit-*` files that are there as they are)
     const models = modelSettingsFile(projectDir)
     lockedIn(projectDir, models, () => {
         if (isFile(models)) copyOver(models, join(logs, "model-settings.json"))
+    })
+    const modelReferences = modelReferencesFile(projectDir)
+    lockedIn(projectDir, modelReferences, () => {
+        if (isFile(modelReferences))
+            copyOver(modelReferences, join(logs, "model-references.json"))
     })
     migrateReferences(projectDir) // an old `references/` folder gets its new name first
     const references = referencesDir(projectDir)
     lockedIn(projectDir, references, () => {
         const files = referenceFiles(projectDir)
         if (files.length === 0) return
-        mkdirSync(join(logs, "reference-fit"), { recursive: true })
         for (const file of files)
-            copyOver(join(references, file), join(logs, "reference-fit", file))
+            copyOver(join(references, file), join(logs, `reference-fit-${file}`))
     })
 }
 
@@ -290,7 +296,7 @@ export function markAllStaleRuns(projectsRoot: string): string[] {
 /**
  * Gives up a claimed run whose start failed before Julia was running: the folder stays (a
  * run is never deleted by the program) and is marked `failed`, with the reason written
- * into its `logs/run.LOG` by the caller.
+ * into its `run.LOG` by the caller.
  */
 function abandonClaim(runDir: string): boolean {
     try {
@@ -516,15 +522,14 @@ function groupAlive(pid: number): boolean {
 }
 
 /**
- * Appends text to the run's `logs/run.LOG` (made if Julia never got to), under the rule
+ * Appends text to the run's `run.LOG` (made if Julia never got to), under the rule
  * that the file has one writer: this is only called once Julia is gone.
  *
  * @param text - what to add; an `=== ERRORS ===` heading goes first when the log has none.
  */
 function appendToLog(runDir: string, text: string): void {
-    const logs = join(runDir, "logs")
-    mkdirSync(logs, { recursive: true })
-    const file = join(logs, "run.LOG")
+    mkdirSync(runDir, { recursive: true })
+    const file = join(runDir, "run.LOG")
     let before = ""
     try {
         before = readFileSync(file, "utf-8")

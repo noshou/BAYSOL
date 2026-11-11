@@ -7,7 +7,7 @@
 //   1. Names and the tool
 //   2. Packing: round trip, atomic failures, the lock, removing the packed files
 //   3. Reading: entry names, the size cap, the listing kept, extraction, the temp folder
-//   4. A run folder: what is packed and what stays, readers for packed and plain runs
+//   4. A run: what is packed, readers for packed, plain and older runs
 
 import assert from "node:assert/strict"
 import {
@@ -20,7 +20,7 @@ import {
     writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import { test } from "node:test"
 import {
     ArchiveError,
@@ -35,16 +35,18 @@ import {
     withTempFolder,
 } from "../src/core/archive.js"
 import { RUN_FLOW } from "../src/core/environment.js"
+import { readRunObject } from "../src/store/projects.js"
 import {
+    archivePath,
     isPacked,
+    legacyNames,
+    materializeRunFile,
     packableFiles,
     packRun,
-    RUN_ARCHIVE,
     RunFileMissing,
     RunFileTooLarge,
     readRunBytes,
     readRunText,
-    runFolderFiles,
 } from "../src/store/run-archive.js"
 import { listOpenRuns, readRunFile, runFileSizes } from "../src/store/run-logs.js"
 import { makeRun } from "./support/fake-run.js"
@@ -334,73 +336,81 @@ test("the temporary folder is removed after success and after a failure", async 
 })
 
 // ========================================================================================
-// 4. A run folder
+// 4. A run: what is packed, the readers for packed, plain and older runs
 // ========================================================================================
 
-test("a run packs everything but run.json, the workbooks and the dot files", async () => {
+/** The names of the entries of a run's archive. */
+const entriesOf = (dir: string): string[] =>
+    listEntries(archivePath(dir)).map((e) => e.name)
+
+test("a packed run is ONE archive beside its folder, with everything in it", async () => {
     const p = project()
     const { dir } = await makeRun(p)
     assert.equal(isPacked(dir), true)
-    // what stays: run.json, the workbooks (in place), the claim marker
-    assert.deepEqual(
-        snapshot(dir).filter((x) => !x.startsWith(`${RUN_ARCHIVE}:`)),
-        [
-            `.claim:${statSync(join(dir, ".claim")).size}`,
-            "compare/",
-            "compare/res_compare.xlsx:11",
-            "m/",
-            "m/output/",
-            "m/output/m.xlsx:11",
-            `run.json:${statSync(join(dir, "run.json")).size}`,
-        ],
-    )
-    // what is inside: paths relative to the run folder
-    const inside = listEntries(join(dir, RUN_ARCHIVE)).map((e) => e.name)
+    assert.equal(existsSync(dir), false, "the folder is gone")
+    assert.deepEqual(readdirSync(join(p, "runs")), [`${basename(dir)}${".7z"}`])
+    const inside = entriesOf(dir)
     for (const name of [
-        "logs/run.LOG",
-        "logs/settings.json",
-        "logs/buffer.json",
-        "logs/data.tsv",
-        "logs/data.json",
-        "m/m.LOG",
-        "m/output/plots.txt",
-        "m/output/plots_76x10.txt",
-        "m/output/plots_100x14.txt",
-        "m/output/plots/m.tex",
-        "m/output/plots/m_residuals.tex",
-        "compare/plots.txt",
-        "compare/plots_76x10.txt",
-        "compare/plots/res_compare.tex",
+        "run.json",
+        "run.LOG",
+        "settings.json",
+        "buffer.json",
+        "data.tsv",
+        "data.json",
+        "m.LOG",
+        "m.xlsx",
+        "m-plots.txt",
+        "m-76x10.txt",
+        "m-100x14.txt",
+        "m.tex",
+        "m_residuals.tex",
+        "compare.tsv",
+        "compare.tex",
+        "compare-plots.txt",
+        "compare-76x10.txt",
     ])
         assert.ok(inside.includes(name), name)
-    assert.equal(inside.some((n) => /xlsx$|run\.json$/.test(n) || n.startsWith(".")), false)
-    // a second pack of the same run finds nothing left to pack, and changes nothing
-    const before = snapshot(dir)
-    assert.equal(await packRun(dir), 0, "nothing left to pack")
-    assert.deepEqual(snapshot(dir), before)
+    assert.equal(
+        inside.some((n) => n.includes("/") || n.startsWith(".")),
+        false,
+        "flat, no dot files",
+    )
+    // a second pack finds nothing: there is no folder any more
+    assert.equal(await packRun(dir), 0)
 })
 
-test("packableFiles on a plain run: the rules, and odd names left alone", async () => {
+test("packableFiles: the rules, and odd names left alone", async () => {
     const p = project()
     const { dir } = await makeRun(p, async () => 0)
     assert.equal(isPacked(dir), false)
-    write(dir, { "m/output/m.XLSX": "x", "m/output/~$m.xlsx": "x", ".hidden": "x" })
-    write(dir, { "run.7z.tmp.123": "x", "m/out\\put.txt": "x" })
+    write(dir, { "m.XLSX": "x", "~$m.xlsx": "x", ".hidden": "x", ".stage-m/a.tex": "x" })
+    write(dir, { "run.7z.tmp.123": "x", "out\\put.txt": "x" })
     const files = packableFiles(dir)
-    assert.ok(files.includes("logs/run.LOG") && files.includes("m/output/plots/m.tex"))
+    assert.ok(files.includes("run.LOG") && files.includes("m.tex"))
+    assert.ok(files.includes("run.json") && files.includes("m.xlsx"), "everything")
+    assert.ok(files.includes("m.XLSX") && files.includes("compare.tsv"))
     for (const left of [
-        "run.json",
         ".claim",
         ".hidden",
-        "m/output/m.xlsx",
-        "m/output/m.XLSX",
-        "m/output/~$m.xlsx",
-        "compare/res_compare.xlsx",
+        ".stage-m/a.tex",
+        "~$m.xlsx",
         "run.7z.tmp.123",
-        "m/out\\put.txt",
+        "out\\put.txt",
     ])
         assert.equal(files.includes(left), false, left)
     assert.deepEqual(files, [...files].sort())
+})
+
+test("a pack that fails leaves the run folder as it was", async () => {
+    const p = project()
+    const { dir } = await makeRun(p, async () => 0)
+    const before = snapshot(dir)
+    await withTool(failingTool("a"), async () => {
+        await assert.rejects(packRun(dir), ArchiveError)
+    })
+    assert.deepEqual(snapshot(dir), before)
+    assert.equal(isPacked(dir), false)
+    assert.equal(existsSync(`${dir}.7z`), false)
 })
 
 test("readers give the same files from a packed run and from a plain one", async () => {
@@ -408,13 +418,7 @@ test("readers give the same files from a packed run and from a plain one", async
     const plain = await makeRun(project(), async () => 0)
     assert.equal(isPacked(packed.dir), true)
     assert.equal(isPacked(plain.dir), false)
-    for (const rel of [
-        "logs/settings.json",
-        "logs/data.tsv",
-        "m/output/plots_76x10.txt",
-        "m/output/plots/m.tex",
-        "compare/plots/res_compare.tex",
-    ])
+    for (const rel of ["settings.json", "data.tsv", "m-76x10.txt", "m.tex", "compare.tex"])
         assert.equal(readRunText(packed.dir, rel), readRunText(plain.dir, rel), rel)
     // the run.LOG differs only in its start time; the conditions row is the same
     for (const run of [packed, plain])
@@ -424,21 +428,18 @@ test("readers give the same files from a packed run and from a plain one", async
         [...runFileSizes(plain.dir).keys()].sort(),
     )
     assert.ok(runFileSizes(packed.dir).has("run.LOG"))
-    assert.deepEqual(
-        [...runFolderFiles(packed.dir, "m/output/plots").keys()].sort(),
-        ["m.tex", "m_residuals.tex"],
-    )
+    // run.json is read from the archive too, and the run list shows both
+    assert.equal(readRunObject(packed.dir)?.status, "done")
     // a plain file wins when both exist (a pack that died after the rename)
-    mkdirSync(join(packed.dir, "logs"))
-    writeFileSync(join(packed.dir, "logs", "settings.json"), "plain wins")
-    assert.equal(readRunText(packed.dir, "logs/settings.json"), "plain wins")
+    writeFileSync(join(plain.dir, "settings.json"), "plain wins")
+    assert.equal(readRunText(plain.dir, "settings.json"), "plain wins")
 })
 
 test("readers refuse what is missing, too large, unsafe, or a broken archive", async () => {
     const run = await makeRun(project())
-    assert.throws(() => readRunBytes(run.dir, "logs/nope.txt"), RunFileMissing)
+    assert.throws(() => readRunBytes(run.dir, "nope.txt"), RunFileMissing)
     assert.throws(() => readRunBytes(run.dir, "nope/nope.txt"), RunFileMissing)
-    assert.throws(() => readRunBytes(run.dir, "logs/data.tsv", 3), RunFileTooLarge)
+    assert.throws(() => readRunBytes(run.dir, "data.tsv", 3), RunFileTooLarge)
     assert.throws(() => readRunBytes(run.dir, "../x"), /not a safe name/)
     assert.throws(() => readRunFile(run.dir, "nope.txt"), /this run has no nope\.txt/)
     assert.throws(
@@ -446,18 +447,18 @@ test("readers refuse what is missing, too large, unsafe, or a broken archive", a
         /this run was deleted/,
     )
     const plain = await makeRun(project(), async () => 0)
-    assert.throws(() => readRunBytes(plain.dir, "logs/nope.txt"), RunFileMissing)
-    assert.throws(() => readRunBytes(plain.dir, "logs/data.tsv", 3), RunFileTooLarge)
+    assert.throws(() => readRunBytes(plain.dir, "nope.txt"), RunFileMissing)
+    assert.throws(() => readRunBytes(plain.dir, "data.tsv", 3), RunFileTooLarge)
     // an archive that is damaged is told, by name, and does not crash the page
     const broken = await makeRun(project())
-    writeFileSync(join(broken.dir, RUN_ARCHIVE), "not an archive")
+    writeFileSync(archivePath(broken.dir), "not an archive")
     assert.throws(
         () => readRunFile(broken.dir, "run.LOG"),
-        /the run's archive cannot be read/,
+        /this run has no run\.LOG|the run's archive cannot be read/,
     )
 })
 
-test("open runs lists a packed run's figures and sizes like a plain run's", async () => {
+test("open runs lists a packed run's files like a plain run's", async () => {
     const p = project()
     const packed = await makeRun(p)
     const plain = await makeRun(p, async () => 0)
@@ -465,12 +466,10 @@ test("open runs lists a packed run's figures and sizes like a plain run's", asyn
     assert.equal(runs.length, 2)
     for (const run of runs) {
         const [m] = run.models
-        assert.deepEqual(m?.tex, [
-            "m/output/plots/m.tex",
-            "m/output/plots/m_residuals.tex",
-        ])
-        assert.deepEqual(run.compare?.tex, ["compare/plots/res_compare.tex"])
-        assert.equal(m?.workbook, join(run.dir, "m", "output", "m.xlsx"))
+        assert.deepEqual(m?.tex, ["m.tex", "m_residuals.tex"])
+        assert.deepEqual(run.compare?.tex, ["compare.tex"])
+        assert.equal(m?.workbook, join(run.dir, "m.xlsx"))
+        assert.equal(run.compare?.workbook, join(run.dir, "compare.tsv"))
         assert.deepEqual(
             m?.plotSizes.map((s) => [s.width, s.rows]),
             [
@@ -480,7 +479,53 @@ test("open runs lists a packed run's figures and sizes like a plain run's", asyn
         )
         // the sized plot files are not on disk in the packed run, but they read
         const file = m?.plotSizes[0]?.path.split("/").pop() ?? ""
-        assert.match(readRunText(run.dir, `m/output/${file}`), /fit/)
+        assert.match(readRunText(run.dir, file), /fit/)
     }
     assert.ok([packed.dir, plain.dir].every((d) => runs.some((r) => r.dir === d)))
+})
+
+test("a workbook that is only in the archive is opened from a copy on disk", async () => {
+    const { dir } = await makeRun(project())
+    const path = materializeRunFile(dir, join(dir, "m.xlsx"))
+    assert.equal(readFileSync(path, "utf-8"), "PK workbook")
+    assert.ok(!path.startsWith(dir))
+    // a plain file is its own copy
+    const plain = await makeRun(project(), async () => 0)
+    const there = join(plain.dir, "m.xlsx")
+    assert.equal(materializeRunFile(plain.dir, there), there)
+    assert.throws(() => materializeRunFile(dir, join(dir, "nope.xlsx")), RunFileMissing)
+})
+
+test("a run of the older layouts still reads: logs/, output/, inner run.7z", async () => {
+    const dir = join(tempDir(), "runs", "20261102T000000Z")
+    write(dir, {
+        "run.json": '{"status":"done","models":[{"name":"m","status":"done"}]}',
+        "m/output/m.xlsx": "PK workbook",
+        "logs/run.LOG": "temperature_c\t30\n",
+        "logs/buffer.json": "{}",
+        "logs/reference-fit/CRYSOL.tsv": "1\t2\n",
+        "m/output/plots/m.tex": "tex",
+    })
+    await packFiles(dir, "run.7z", [
+        "logs/run.LOG",
+        "logs/buffer.json",
+        "logs/reference-fit/CRYSOL.tsv",
+        "m/output/plots/m.tex",
+    ])
+    removePacked(dir, [
+        "logs/run.LOG",
+        "logs/buffer.json",
+        "logs/reference-fit/CRYSOL.tsv",
+        "m/output/plots/m.tex",
+    ])
+    assert.equal(isPacked(dir), true)
+    assert.equal(readRunFile(dir, "run.LOG"), "temperature_c\t30\n")
+    assert.equal(readRunText(dir, "buffer.json"), "{}")
+    assert.equal(readRunText(dir, "reference-fit-CRYSOL.tsv"), "1\t2\n")
+    assert.equal(readRunText(dir, "m/output/plots/m.tex"), "tex")
+    assert.deepEqual(legacyNames("run.LOG"), ["logs/run.LOG"])
+    assert.deepEqual(legacyNames("m.tex"), [])
+    // it is never packed again
+    assert.equal(await packRun(dir), 0)
+    assert.equal(readRunObject(dir)?.status, "done")
 })

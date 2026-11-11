@@ -944,6 +944,20 @@ export class Drafts<V> {
         return this.replace(i, { ...row, draft: undefined })
     }
 
+    /**
+     * The state with the rows in alphabetical order of `label` (case ignored, a stable
+     * order for equal names). Marks and drafts stay with their rows.
+     */
+    sorted(label: (item: V) => string): Drafts<V> {
+        const name = (row: Row<V>) => label(rowValue(row) as V)
+        return new Drafts([...this.rows].sort((a, b) => compareNoCase(name(a), name(b))))
+    }
+
+    /** Whether the rows already stand in the order [[sorted]] gives. */
+    isSorted(label: (item: V) => string): boolean {
+        return this.sorted(label).rows.every((row, i) => row === this.rows[i])
+    }
+
     /** The items the file gets at the next save: the rows not marked to go. */
     toSave(): V[] {
         return this.rows.filter((row) => !row.removed).map((row) => rowValue(row) as V)

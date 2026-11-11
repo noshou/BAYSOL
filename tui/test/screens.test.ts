@@ -20,13 +20,15 @@ import {
 } from "../src/screens/custom-solutes.js"
 import {
     bufferLandingOptions,
-    customLandingOptions,
+    finishTuple,
     fitName,
     formLegend,
+    hasColourPart,
     indexOfPick,
     NO_RECIPES,
     narrow,
     numberRules,
+    parsePart,
     parseSetting,
     pickValue,
     plural,
@@ -37,6 +39,8 @@ import {
     swatchColour,
     type TableFacts,
     tableLegend,
+    tupleOf,
+    tupleParts,
     unusable,
     valueText,
     withDraft,
@@ -131,7 +135,7 @@ test("narrow: prefix first, then inside, case-insensitive", () => {
 test("picker: the highlighted name, or a typed hex colour that wins", () => {
     const names = ["gray", "red"]
     assert.deepEqual(pickValue("colour", names, "gr", "gray"), { value: "gray" })
-    assert.deepEqual(pickValue("colour", names, " #AB12cd ", "red"), { value: "#ab12cd" })
+    assert.deepEqual(pickValue("colour", names, " #AB12cd ", "red"), { value: "#AB12cd" })
     assert.deepEqual(pickValue("colour", names, "zzz", undefined), {
         error: "not a known colour",
     })
@@ -169,7 +173,7 @@ test("a tuple is one line of comma-separated parts, checked as a whole", () => {
     })
     const band = def("PLOT_COLOUR_BAND")
     assert.deepEqual(parseSetting(band, "Red, 0.5"), { value: ["red", 0.5] })
-    assert.deepEqual(parseSetting(band, "#00FF00, 0.5"), { value: ["#00ff00", 0.5] })
+    assert.deepEqual(parseSetting(band, "#00FF00, 0.5"), { value: ["#00FF00", 0.5] })
     // the colour must exist (the opacity rule is checked at the save)
     assert.ok("error" in parseSetting(band, "nocolour, 0.5"))
 })
@@ -224,6 +228,36 @@ test("chains are letters or digits, split by commas, spaces or nothing", () => {
     assert.equal(valueText(c, []), "all")
     assert.equal(valueText(c, ["A", "b"]), "A, b")
     assert.deepEqual(parseSetting(c, valueText(c, ["A", "b"])), { value: ["A", "b"] })
+})
+
+test("a tuple with a colour part is edited part by part and checked as a whole", () => {
+    for (const name of [
+        "PLOT_COLOUR_ERRORBAR",
+        "PLOT_COLOUR_BAND",
+        "PLOT_COLOUR_BAND_RESID",
+        "PLOT_COLOUR_HIST",
+    ])
+        assert.ok(hasColourPart(def(name)), name)
+    for (const name of ["PLOT_WIDTH_HEIGHT_CM", "PLOT_PREVIEW_SIZE", "N_ADAPT"])
+        assert.ok(!hasColourPart(def(name)), name)
+    const band = def("PLOT_COLOUR_BAND")
+    assert.deepEqual(tupleParts(band, ["darkorange", 0.15]), ["darkorange", 0.15])
+    // the colour part is a name, a code or a notation; the other part a number
+    assert.deepEqual(finishTuple(band, ["Sky Blue", 0.5]), { value: ["skyblue", 0.5] })
+    assert.deepEqual(finishTuple(band, ["#0AF", 1]), { value: ["#0AF", 1] })
+    assert.deepEqual(finishTuple(band, ["nocolour", 0.5]), {
+        error: "a part must be a colour",
+    })
+    // a colour Julia does not read by name is kept as #rrggbb
+    assert.deepEqual(finishTuple(band, ["nunavut yellow", 0.5]), {
+        value: ["#e7a615", 0.5],
+    })
+    assert.deepEqual(parsePart("float", "0.25"), { value: 0.25 })
+    assert.ok("error" in parsePart("float", "x"))
+    assert.ok("error" in parsePart("int", "0.5"))
+    // the stored shape is unchanged: an array of [colour, number]
+    assert.ok(Array.isArray(tupleOf(band, ["red", 0.3])))
+    assert.deepEqual(tupleOf(def("PLOT_PREVIEW_SIZE"), [70, 18]), { width: 70, height: 18 })
 })
 
 test("valueText and swatchColour", () => {
@@ -563,9 +597,7 @@ test("the buffer landing offers what applies", () => {
     )
 })
 
-test("the custom landing counts and says what the files hold", () => {
-    assert.deepEqual(customLandingOptions(3, 12), ["recipes (3)", "solutes (12)"])
-    assert.deepEqual(customLandingOptions("unusable", 0), ["recipes (?)", "solutes (0)"])
+test("the landings say what their files hold", () => {
     assert.equal(fileStatus("recipes", 0, "recipe"), "recipes: none yet")
     assert.equal(fileStatus("recipes", 1, "recipe"), "recipes: 1 recipe")
     assert.equal(fileStatus("recipes", 3, "recipe"), "recipes: 3 recipes")
@@ -607,4 +639,11 @@ test("a loaded recipe's pH and σ are an unsaved draft of the buffer", () => {
     assert.equal(draftOf(undefined, own), undefined, "a recipe without leaves the own")
     assert.equal(draftOf(undefined, undefined), undefined)
     assert.equal(draftOf({ ...own }, own), undefined, "the same is no change")
+})
+
+test("table legend: the keys that come last (find, sort) follow the rows", () => {
+    const more = [legendFor("find", keys.find)]
+    const withMore = tableLegend(base, adds, "edit", more)
+    assert.equal(withMore.at(-1)?.label, "find")
+    assert.equal(tableLegend(base, adds).some((i) => i.label === "find"), false)
 })

@@ -24,8 +24,8 @@ import {
     scrollWindow,
     shiftKey,
     stepIndex,
-    TextBuffer,
 } from "../src/ui/interaction.js"
+import { TextBuffer } from "../src/ui/text-input.js"
 
 // ========================================================================================
 // 1. Keys: names, matching and labels
@@ -112,6 +112,8 @@ const menuModules = {
         import("../src/screens/menus.js").then((m) => m.projectMenuSpec),
     settingsMenuSpec: () =>
         import("../src/screens/settings-screens.js").then((m) => m.settingsMenuSpec),
+    globalMenuSpec: () =>
+        import("../src/screens/settings-screens.js").then((m) => m.globalMenuSpec),
 }
 
 test("every option of a menu has a hotkey of its own", async () => {

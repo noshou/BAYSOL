@@ -10,7 +10,7 @@
 //   4. `GridMenu`: the grid component with its taskbar
 
 import { readFileSync } from "node:fs"
-import { Box, Text, useWindowSize } from "ink"
+import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useEffect, useState } from "react"
 import { assetPath } from "../core/environment.js"
 import { displayWidth, padWidth } from "../core/terminal.js"
@@ -24,6 +24,7 @@ import {
     useBodyColumns,
     useKeys,
     useNav,
+    useTerminalSize,
 } from "./interaction.js"
 import { Panel, useTheme } from "./theme.js"
 
@@ -298,8 +299,10 @@ const menuOptions = {
     output:   { hotkey: plainKey("u") },
     plots:    { hotkey: plainKey("p") },
     quit:     { hotkey: plainKey("q") },
+    recipes:  { hotkey: plainKey("y") },
     sampler:  { hotkey: plainKey("a") },
     settings: { hotkey: plainKey("s") },
+    solutes:  { hotkey: plainKey("t") },
 } as const satisfies Record<string, { hotkey: KeyInput }>
 
 /** The name of a menu option: one of the keys of `menuOptions`. */
@@ -614,9 +617,13 @@ export type TaskbarItem = { label: string; key: KeyInput; onPress: () => void }
  *     it applies; the room for the keys is always reserved, so the grid never moves
  *     when items come and go. Esc does nothing at menu level: the only way out of the
  *     program is `q` in the main menu (and Ctrl-C / Ctrl-D, handled by the app).
- * @property onKey - called for every other key press, for the keys a menu adds (the
- *     settings menu's Ctrl-E); not called while a hotkey is waiting.
- * @property legend - extra text for the hint box, e.g. `"custom solutes: ^e"`.
+ * @property onKey - called, with the option the cursor is on, for every other key press,
+ *     for the keys a menu adds (the settings menu's reset of an unusable file); not
+ *     called while a hotkey is waiting.
+ * @property intercept - called first with every key press; returns `true` when it took
+ *     the press (an open question), and the menu then does nothing with it.
+ * @property legend - extra text for the hint box, e.g. `"reset file: r"`; a function
+ *     gets the option the cursor is on, so the text can follow the cursor.
  * @property notice - a line shown under the grid (an error, e.g. `no projects to load!`);
  *     the menu keeps taking keys.
  * @property overlayLegend - the keys of the open overlay, shown in place of the move
@@ -629,8 +636,9 @@ type GridMenuProps<N extends MenuOptions> = {
     header?:   ReactNode
     onChoose:  (name: N) => void
     taskbar?:  TaskbarItem[]
-    onKey?:    (press: KeyInput) => void
-    legend?:   string
+    onKey?:    (press: KeyInput, selected: N) => void
+    intercept?: (press: KeyInput) => boolean
+    legend?:   string | ((selected: N) => string | undefined)
     notice?:   string
     overlay?:  ReactNode
     overlayLegend?: LegendItem[]
@@ -654,6 +662,7 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
         onChoose,
         taskbar,
         onKey,
+        intercept,
         legend,
         overlay,
         overlayLegend,
@@ -663,6 +672,7 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
     const nav = useNav()
     const [selected, setSelected] = useState<N>(spec.names[0])
     const [pending, setPending] = useState<N | null>(null)
+    const legendText = typeof legend === "function" ? legend(selected) : legend
 
     // a hotkey chooses its option after `hotkeyDelay`; the cleanup cancels the timer
     useEffect(() => {
@@ -681,6 +691,7 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
     }, [])
 
     useKeys((press) => {
+        if (intercept?.(press)) return
         const action = taskbar?.find((item) => press.is(item.key))
         // while a hotkey waits to choose its option, ignore every key
         if (pending !== null) return
@@ -694,14 +705,14 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
             const hot  = spec.byHotkey(press)
             if (next) setSelected(next)
             else if (hot) jumpTo(hot)
-            else onKey?.(press)
+            else onKey?.(press, selected)
         }
     }, overlay === undefined)
 
     // the two blank rows (above the header, above the grid) are decoration: they go
     // when the terminal is too short to fit them with everything else, so the notice
     // never lands on the art
-    const { rows: terminalRows, columns: terminalColumns } = useWindowSize()
+    const { rows: terminalRows, columns: terminalColumns } = useTerminalSize()
     const bodyColumns = useBodyColumns()
     const overlayWidth = Math.min(Math.floor(bodyColumns / 2), overlayMaxWidth)
     const fixedRows = menuHeaderRows + noticeRows + hintRows + themeLineRows
@@ -797,7 +808,7 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
                             <Text color={theme.mt}>
                                 {`    select: ${keys.enter.label}` +
                                     (nav.depth > 1 ? `    back: ${keys.back.label}` : "")}
-                                {legend ? `    ${legend}` : ""}
+                                {legendText ? `    ${legendText}` : ""}
                             </Text>
                         </Panel>
 

@@ -14,32 +14,34 @@ import { fileURLToPath } from "node:url"
 import * as XLSX from "xlsx"
 import { numberText } from "../src/core/terminal.js"
 import {
-    DataFileError,
-    type DataPoints,
-    DEFAULT_PARSE_OPTIONS,
     dataIsReady,
     dataJsonFile,
     dataTsvFile,
-    extractCurve,
-    guessColumns,
-    loadSource,
     makeMapping,
-    type ParseOptions,
     parseDataText,
-    parseTable,
     readDataInfo,
     resetData,
-    resolveColumn,
-    resolveColumns,
-    rowsOf,
     setEnergy,
     setUnits,
-    sheetNames,
-    suggestColumns,
-    textSource,
     unitLabel,
     writeData,
 } from "../src/store/data.js"
+import {
+    DataFileError,
+    type DataPoints,
+    DEFAULT_PARSE_OPTIONS,
+    extractCurve,
+    guessColumns,
+    loadSource,
+    type ParseOptions,
+    parseTable,
+    resolveColumn,
+    resolveColumns,
+    rowsOf,
+    sheetNames,
+    suggestColumns,
+    textSource,
+} from "../src/store/data-table.js"
 import { ProjectGoneError } from "../src/store/projects.js"
 import { tempDir as temp } from "./support/fixtures.js"
 

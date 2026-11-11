@@ -1,20 +1,17 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // Interaction: how a screen listens and keeps its place: the navigation stack, the keys,
-// the layout rules, the one-line text input and the lists with a cursor.
+// the layout rules and the lists with a cursor.
 //
 // Contents:
 //   1. Navigation: the screen stack and which screen listens
 //   2. Key values: `KeyInput`, `keys`, `ctrlKey`/`plainKey`/`shiftKey`, matching, labels
 //   3. `useKeys`: the one handler hook, gated by the nav stack
 //   4. Layout: the terminal size and the room the screens get
-//   5. `TextBuffer`: the text and cursor of an input as an immutable value
-//   6. `useTextBuffer`: the buffer as state, with paste and key handling
-//   7. `TextField`: draws a buffer with its cursor
-//   8. Scroll window: which rows of a long list are drawn (pure)
-//   9. `useListCursor`: the cursor and offset of a list as state
-//   10. `CursorList` and `ListText`: a list drawn with a `>` cursor
-//   11. `Swatch`: the colour cell pair of a list row
+//   5. Scroll window: which rows of a long list are drawn (pure)
+//   6. `useListCursor`: the cursor and offset of a list as state
+//   7. `CursorList` and `ListText`: a list drawn with a `>` cursor
+//   8. `Swatch`: the colour cell pair of a list row
 
 import {
     Box,
@@ -22,7 +19,6 @@ import {
     Text,
     useApp,
     useInput,
-    usePaste,
     useWindowSize,
 } from "ink"
 import {
@@ -34,7 +30,6 @@ import {
     useMemo,
     useState,
 } from "react"
-import { displayWidth, truncateStart } from "../core/terminal.js"
 import { useTheme } from "./theme.js"
 
 // ========================================================================================
@@ -58,6 +53,7 @@ export type Nav = {
 }
 
 const NavContext = createContext<Nav | null>(null)
+
 
 /**
  * Whether the screen that reads this is the one on top. Every screen stays mounted
@@ -97,6 +93,10 @@ export function NavProvider(
     { root, suspended = false }: { root: ReactElement; suspended?: boolean }
 ): ReactNode {
     const { exit } = useApp()
+    // ONE resize listener for every screen: each `useWindowSize` of Ink adds its own, and
+    // the screens of the stack stay mounted (more than ten hit Node's leak warning)
+    const { columns, rows } = useWindowSize()
+    const size = useMemo(() => ({ columns, rows }), [columns, rows])
     const [stack, setStack] = useState<ReactElement[]>([root])
 
     const push = useCallback((screen: ReactElement) => setStack((s) => [...s, screen]), [])
@@ -111,6 +111,7 @@ export function NavProvider(
     )
 
     return (
+        <SizeContext.Provider value={size}>
         <NavContext.Provider value={nav}>
             {stack.map((screen, i) => (
                 <ActiveContext.Provider
@@ -128,6 +129,7 @@ export function NavProvider(
                 </ActiveContext.Provider>
             ))}
         </NavContext.Provider>
+        </SizeContext.Provider>
     )
 }
 
@@ -339,6 +341,9 @@ export const keys = {
     /** Edit the pH of a buffer (and its σ) on the solutes table. */
     editPh:        ctrlKey("g"),
 
+    /** Change the family the colour picker narrows to (all, red, orange, ...). */
+    family:        ctrlKey("g"),
+
     /** Turn the unit of the concentrations of the buffer table (mM, M, µM). */
     units:         ctrlKey("k"),
 
@@ -347,6 +352,9 @@ export const keys = {
 
     /** Open the settings of the highlighted model (the models list). */
     modelSettings: ctrlKey("o"),
+
+    /** Open the reference fit of the highlighted model (the models list). */
+    modelReference: ctrlKey("f"),
 
     /** Pick files with the desktop file picker (an empty field). */
     pickFiles: plainKey("o"),
@@ -374,8 +382,10 @@ export const keys = {
     prevSheet:  plainKey("["),
     nextSheet:  plainKey("]"),
 
-    /** Search (`/`), the next and previous match, jump to a cell, copy, formulas. */
+    /** Search (`/`), the next and previous match, jump to a cell, copy, formulas. In a
+     * table of named rows `/` finds a row and `s` puts the rows in alphabetical order. */
     find:       plainKey("/"),
+    sort:       plainKey("s"),
     nextMatch:  plainKey("n"),
     prevMatch:  capitalKey("n"),
     jump:       plainKey("g"),
@@ -387,9 +397,19 @@ export const keys = {
     /** Read the `run.LOG` of a run (`open runs`). */
     showLog:    ctrlKey("l"),
 
-    /** Move (copy) the `.tex` plots of the highlighted model or comparison to the plot
-     * folder (`open runs`). */
-    movePlots:       shiftKey("m"),
+    /** Move (copy) the `.tex` plots of the whole run, every model and the comparison, to
+     * the plot folder (`open runs`). */
+    moveTex:         shiftKey("t"),
+
+    /** The same for the highlighted model or comparison alone. */
+    moveTexHere:     plainKey("t"),
+
+    /** Move (copy) the data of the whole run, the workbooks and the comparison table, to
+     * the data folder. */
+    moveData:        shiftKey("d"),
+
+    /** The same for the highlighted model or comparison alone. */
+    moveDataHere:    plainKey("d"),
 
     /** Compile the plots of the highlighted model or comparison with LaTeX into the
      * plot folder. */
@@ -484,6 +504,21 @@ export const minColumns = 80
 /** The shortest terminal the screens are laid out for, in rows. */
 export const minRows = 24
 
+/** The terminal's size, read once by [[NavProvider]] and shared by every screen. */
+const SizeContext = createContext<{ columns: number; rows: number }>({
+    columns: minColumns,
+    rows: minRows,
+})
+
+/**
+ * The terminal's columns and rows (one shared listener, see [[NavProvider]]).
+ *
+ * @returns the size; the smallest supported one outside a provider.
+ */
+export function useTerminalSize(): { columns: number; rows: number } {
+    return useContext(SizeContext)
+}
+
 /**
  * The rows that every screen keeps for itself: its title, the keys at the bottom
  * (the logo's three lines and a note line) and the theme line, with a little to spare.
@@ -497,7 +532,7 @@ const frameRows = 10
  * @returns the rows left, at least 3 so a list never vanishes.
  */
 export function useBodyRows(extra: number = 0): number {
-    const { rows } = useWindowSize()
+    const { rows } = useTerminalSize()
     return Math.max(3, rows - frameRows - extra)
 }
 
@@ -508,7 +543,7 @@ export function useBodyRows(extra: number = 0): number {
  *     `minColumns - 2`.
  */
 export function useBodyColumns(): number {
-    const { columns } = useWindowSize()
+    const { columns } = useTerminalSize()
     const narrowed = useContext(NarrowWidth)
     return narrowed ?? Math.max(minColumns, columns) - 2
 }
@@ -524,228 +559,7 @@ export const NarrowWidth = createContext<number | undefined>(undefined)
 export const themeLineRows = 1
 
 // ========================================================================================
-// 5. TextBuffer
-// ========================================================================================
-
-/**
- * The text of a one-line input and the place of its cursor, as a value: every edit
- * gives a new buffer, so the state of a component is just "a `TextBuffer`" and the
- * editing rules can be tested without a terminal.
- *
- * The cursor counts UTF-16 code units; it only ever stands between characters that
- * the user sees as one, because every edit moves it by whole graphemes.
- *
- * @param text - what is typed so far.
- * @param cursor - where the next character goes, `text.length` when left out.
- * @param maxLength - the most characters (graphemes) the input takes; `Infinity`
- *     when left out. Typing more is cut, and [[TextBuffer.full]] says it happened so
- *     the screen can tell the user (a limit that caps typing is never silent).
- */
-export class TextBuffer {
-    readonly cursor: number
-
-    constructor(
-        readonly text: string = "",
-        cursor?: number,
-        readonly maxLength: number = Number.POSITIVE_INFINITY
-    ) {
-        this.cursor = Math.min(Math.max(cursor ?? text.length, 0), text.length)
-    }
-
-    /** The characters (graphemes) the user sees. */
-    private get units(): string[] {
-        return [...new Intl.Segmenter().segment(this.text)].map((s) => s.segment)
-    }
-
-    /** The number of characters the user sees. */
-    get length(): number {
-        return this.units.length
-    }
-
-    /** `true` when the buffer holds `maxLength` characters, so typing is refused. */
-    get full(): boolean {
-        return this.length >= this.maxLength
-    }
-
-    /** A copy with another text and cursor, same limit. */
-    private with(text: string, cursor?: number): TextBuffer {
-        return new TextBuffer(text, cursor, this.maxLength)
-    }
-
-    /**
-     * Types text at the cursor (a pasted text may be many characters, newlines
-     * become nothing).
-     *
-     * @param typed - the text to insert.
-     * @returns the new buffer; characters beyond `maxLength` are dropped.
-     */
-    insert(typed: string): TextBuffer {
-        const clean = typed.replace(/[\r\n]+/g, "")
-        const room = this.maxLength - this.length
-        const take = [...new Intl.Segmenter().segment(clean)].slice(0, Math.max(0, room))
-        const add = take.map((s) => s.segment).join("")
-        const text = this.text.slice(0, this.cursor) + add + this.text.slice(this.cursor)
-        return this.with(text, this.cursor + add.length)
-    }
-
-    /** Deletes the character before the cursor. */
-    backspace(): TextBuffer {
-        if (this.cursor === 0) return this
-        const before = this.text.slice(0, this.cursor)
-        const last = [...new Intl.Segmenter().segment(before)].pop()?.segment ?? ""
-        const start = this.cursor - last.length
-        return this.with(this.text.slice(0, start) + this.text.slice(this.cursor), start)
-    }
-
-    /** Deletes the character at the cursor. */
-    delete(): TextBuffer {
-        const after = this.text.slice(this.cursor)
-        const first = [...new Intl.Segmenter().segment(after)][0]?.segment ?? ""
-        const text = this.text.slice(0, this.cursor) + after.slice(first.length)
-        return this.with(text, this.cursor)
-    }
-
-    /** Moves the cursor one character left. */
-    left(): TextBuffer {
-        if (this.cursor === 0) return this
-        const before = this.text.slice(0, this.cursor)
-        const last = [...new Intl.Segmenter().segment(before)].pop()?.segment ?? ""
-        return this.with(this.text, this.cursor - last.length)
-    }
-
-    /** Moves the cursor one character right. */
-    right(): TextBuffer {
-        const after = this.text.slice(this.cursor)
-        const first = [...new Intl.Segmenter().segment(after)][0]?.segment ?? ""
-        return this.with(this.text, this.cursor + first.length)
-    }
-
-    /** Moves the cursor to the start. */
-    home(): TextBuffer {
-        return this.with(this.text, 0)
-    }
-
-    /** Moves the cursor to the end. */
-    end(): TextBuffer {
-        return this.with(this.text, this.text.length)
-    }
-
-    /** Replaces the whole text (a completion), the cursor goes to its end. */
-    replace(text: string): TextBuffer {
-        return this.with(text).end()
-    }
-}
-
-// ========================================================================================
-// 6. useTextBuffer
-// ========================================================================================
-
-/**
- * The state of a one-line text input and the one function that feeds it key presses.
- *
- * @property buffer - the text and the cursor.
- * @property edit - applies a key press to the buffer if it is an editing key (a typed
- *     character, backspace, delete, left, right, home, end); returns `true` if the
- *     key was one, so the caller can go on with its own keys otherwise.
- * @property set - replaces the whole buffer (a completion, a reset).
- */
-export type TextInput = {
-    buffer: TextBuffer
-    edit:   (press: KeyInput) => boolean
-    set:    (buffer: TextBuffer) => void
-}
-
-/**
- * Keeps the text of an input. The caller still owns the keys that end the input
- * (Enter, Esc, Tab, arrows of a list): it calls `edit` first and handles the press
- * itself when `edit` says it is not an editing key.
- *
- * Pasted text (the terminal's bracketed paste) is inserted whole, newlines dropped,
- * unless `onPaste` takes it.
- *
- * @param initial - the starting text, empty when left out.
- * @param maxLength - the most characters taken, unlimited when left out.
- * @param active - whether this input listens to pastes, `true` when left out.
- * @param onPaste - sees the pasted text first (line breaks kept); `true` means it took
- *     it and nothing is inserted (a sequence prompt takes a multi-line paste whole).
- * @returns the [[TextInput]].
- */
-export function useTextBuffer(
-    initial: string = "",
-    maxLength: number = Number.POSITIVE_INFINITY,
-    active: boolean = true,
-    onPaste?: (text: string, room: number) => boolean,
-): TextInput {
-    const onTop = useScreenActive()
-    const [buffer, set] = useState(() => new TextBuffer(initial, undefined, maxLength))
-
-    usePaste(
-        (pasted) => {
-            if (onPaste?.(pasted, maxLength - buffer.length)) return
-            set((b) => b.insert(pasted.trim()))
-        },
-        { isActive: active && onTop },
-    )
-
-    const edit = useCallback((press: KeyInput): boolean => {
-        if (press.typed) set((b) => b.insert(press.text))
-        else if (press.is(keys.backspace)) set((b) => b.backspace())
-        else if (press.is(keys.delete)) set((b) => b.delete())
-        else if (press.is(keys.left)) set((b) => b.left())
-        else if (press.is(keys.right)) set((b) => b.right())
-        else if (press.is(keys.home)) set((b) => b.home())
-        else if (press.is(keys.end)) set((b) => b.end())
-        else return false
-        return true
-    }, [])
-
-    return { buffer, edit, set }
-}
-
-// ========================================================================================
-// 7. TextField
-// ========================================================================================
-
-/**
- * The line of an input: the typed text with the cursor drawn as an inverted cell.
- * Text longer than the room scrolls so the cursor stays in view.
- *
- * @param buffer - the text and the cursor.
- * @param width - the cells the field may use.
- * @param placeholder - muted text shown while nothing is typed.
- * @returns the field.
- */
-export function TextField(
-    { buffer, width, placeholder }:
-        { buffer: TextBuffer; width: number; placeholder?: string }
-): ReactNode {
-    const theme = useTheme()
-    const [first] = [...new Intl.Segmenter().segment(buffer.text.slice(buffer.cursor))]
-    const at     = first?.segment ?? " "
-    const after  = buffer.text.slice(buffer.cursor + (first?.segment.length ?? 0))
-
-    // keep the end of the text before the cursor, which is what the user is editing
-    const room   = width - displayWidth(at) - displayWidth(after)
-    const before = truncateStart(buffer.text.slice(0, buffer.cursor), Math.max(1, room))
-
-    if (buffer.text === "" && placeholder)
-        return (
-            <Text>
-                <Text color={theme.bg} backgroundColor={theme.fg}>{" "}</Text>
-                <Text color={theme.mt}>{placeholder}</Text>
-            </Text>
-        )
-    return (
-        <Text color={theme.fg}>
-            {before}
-            <Text color={theme.bg} backgroundColor={theme.fg}>{at}</Text>
-            {after}
-        </Text>
-    )
-}
-
-// ========================================================================================
-// 8. Scroll window
+// 5. Scroll window
 // ========================================================================================
 
 // The one place that decides which rows of a long list are drawn: the cursor of a table,
@@ -838,7 +652,7 @@ export function stepIndex(
 }
 
 // ========================================================================================
-// 9. useListCursor
+// 6. useListCursor
 // ========================================================================================
 
 /**
@@ -888,7 +702,7 @@ export function useListCursor(
 }
 
 // ========================================================================================
-// 10. CursorList
+// 7. CursorList
 // ========================================================================================
 
 /**
@@ -967,7 +781,7 @@ export function CursorList<T>(props: {
 }
 
 // ========================================================================================
-// 11. Swatch
+// 8. Swatch
 // ========================================================================================
 
 /** The cells a [[Swatch]] takes; a caller that wants a gap after it adds its own. */

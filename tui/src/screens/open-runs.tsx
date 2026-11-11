@@ -11,16 +11,18 @@
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react"
 import { LOGS_FLOW } from "../core/environment.js"
-import { isFolder } from "../core/file-system.js"
 import { displayWidth, padWidth, truncate, wrapLine } from "../core/terminal.js"
 import {
     compilePlots,
-    movePlots,
+    dataRoot,
+    type MoveKind,
+    moveFiles,
     type PlotUnit,
     plotRoot,
     plotUnit,
 } from "../store/plots.js"
-import { liveRun, type ProjectRef, runBrief, runDisplay } from "../store/projects.js"
+import { liveRun, type ProjectRef } from "../store/projects.js"
+import { runExists } from "../store/run-archive.js"
 import {
     deleteRun,
     failedNote,
@@ -31,7 +33,9 @@ import {
     openRows,
     RUN_GONE,
     readLogText,
+    runModels,
 } from "../store/run-logs.js"
+import { runBrief, runDisplay } from "../store/run-stamp.js"
 import { loadScope, projectScope } from "../store/settings-store.js"
 import {
     clampTop,
@@ -77,7 +81,10 @@ const OPEN_FULL: LegendItem[] = [
     legendFor("move", [keys.up, keys.down]),
     legendFor("open", keys.enter),
     legendFor("run.LOG", keys.showLog),
-    legendFor("move plots", keys.movePlots),
+    legendFor("move data", keys.moveData),
+    legendFor("move tex", keys.moveTex),
+    legendFor("data here", keys.moveDataHere),
+    legendFor("tex here", keys.moveTexHere),
     legendFor("compile plots", keys.compilePlots),
     legendFor("delete run", keys.remove),
     legendBack,
@@ -166,7 +173,7 @@ export function useRunWatch(runDir: string): boolean {
     useEffect(() => {
         if (!active) return
         const look = (): void => {
-            if (!isFolder(runDir)) setGone(true)
+            if (!runExists(runDir)) setGone(true)
         }
         look()
         const timer = setInterval(look, LOGS_FLOW.watch.pollSeconds * 1000)
@@ -388,25 +395,50 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
     }
 
     /**
-     * `shift+m` / `shift+c`: move or compile the plots of the highlighted
-     * model or comparison, into the plot folder. A failure is the note, which stays until
-     * the next key.
+     * `shift+d` / `shift+t` move the data or the tex plots of the whole run (every model
+     * and the comparison), `d` / `t` those of the highlighted row alone, `shift+c`
+     * compiles the plots of the highlighted row: all into the folder of the setting. A
+     * failure is the note, which stays until the next key.
+     *
+     * @param what - `data`, `tex` or `compile`.
+     * @param whole - the whole run instead of the highlighted row.
      */
-    const plotsAction = (what: "move" | "compile"): void => {
+    const filesAction = (what: MoveKind | "compile", whole: boolean): void => {
         if (current === undefined) return
         const { run } = current
-        const here = current.kind === "run" ? [] : [current.model]
-        const units: PlotUnit[] = here.map((m) => plotUnit(project.dir, run, m))
-        setBusy(what === "move" ? "moving plots..." : "compiling plots...")
+        const rows = whole
+            ? runModels(run)
+            : current.kind === "run"
+                ? []
+                : [current.model]
+        const units: PlotUnit[] = rows.map((m) => plotUnit(project.dir, run, m))
+        setBusy(
+            what === "data"
+                ? "moving data..."
+                : what === "tex"
+                    ? "moving plots..."
+                    : "compiling plots...",
+        )
         void (async () => {
             try {
                 const { settings } = loadScope(projectScope(project))
-                const root = plotRoot(settings.get("FIGURES_DIR"))
                 const compiler = settings.get("FIGURES_COMPILER")
                 const text =
-                    what === "move"
-                        ? await movePlots(units, root, noteRoom)
-                        : await compilePlots(units, root, compiler, noteRoom)
+                    what === "compile"
+                        ? await compilePlots(
+                            units,
+                            plotRoot(settings.get("FIGURES_DIR")),
+                            compiler,
+                            noteRoom,
+                        )
+                        : await moveFiles(
+                            what,
+                            units,
+                            what === "data"
+                                ? dataRoot(settings.get("TABLE_DIR"))
+                                : plotRoot(settings.get("FIGURES_DIR")),
+                            noteRoom,
+                        )
                 setNote({ text, error: false })
             } catch (error) {
                 const text = error instanceof Error ? error.message : "the plots failed"
@@ -430,8 +462,12 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
         else if (press.is(keys.down)) step(stop + 1)
         else if (current === undefined) return
         else if (press.is(keys.remove)) askDelete(current.run)
-        else if (press.is(keys.movePlots)) plotsAction("move")
-        else if (press.is(keys.compilePlots)) plotsAction("compile")
+        // a capital press matches the plain key too, so the capitals are tested first
+        else if (press.is(keys.moveData)) filesAction("data", true)
+        else if (press.is(keys.moveTex)) filesAction("tex", true)
+        else if (press.is(keys.compilePlots)) filesAction("compile", false)
+        else if (press.is(keys.moveDataHere)) filesAction("data", false)
+        else if (press.is(keys.moveTexHere)) filesAction("tex", false)
         else if (press.is(keys.showLog))
             nav.push(
                 <TextPager
@@ -465,9 +501,13 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
         }
     })
 
-    // the plots actions are offered where there are figures to take
-    const hasTex =
-        current !== undefined && current.kind !== "run" && current.model.tex.length > 0
+    // the file actions are offered where there is something to take: the `here` ones for
+    // the highlighted row, the whole-run ones when the run has any
+    const here = current !== undefined && current.kind !== "run" ? current.model : undefined
+    const hasTex = here !== undefined && here.tex.length > 0
+    const hasData = here !== undefined && here.workbook !== undefined
+    const wholeRun = current === undefined ? [] : runModels(current.run)
+    const hasTexRun = wholeRun.some((m) => m.tex.length > 0)
     const legend = confirm.question
         ? questionLegend(confirm.question)
         : legendOf([
@@ -475,7 +515,10 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
             current !== undefined && legendFor("open", keys.enter),
             current !== undefined && legendFor("run.LOG", keys.showLog),
             current !== undefined && legendFor("delete run", keys.remove),
-            hasTex && legendFor("move plots", keys.movePlots),
+            hasData && legendFor("move data", keys.moveData),
+            hasTexRun && legendFor("move tex", keys.moveTex),
+            hasData && legendFor("data here", keys.moveDataHere),
+            hasTex && legendFor("tex here", keys.moveTexHere),
             hasTex && legendFor("compile plots", keys.compilePlots),
             legendBack,
         ])

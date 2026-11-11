@@ -181,6 +181,19 @@ test("rows: several models are listed under a heading, one model goes straight o
     assert.equal(nested && openRowText(nested).text, "  a")
 })
 
+test("rows: the comparison is a row only for a run of several models", () => {
+    const model = (name: string) => ({
+        name, state: "done" as const, error: undefined, workbook: undefined, plots: "",
+        plotSizes: [], overrides: [] as string[], tex: [] as string[],
+    })
+    const run = (id: string, names: string[]): OpenRun => ({
+        id, dir: "", state: "done", models: names.map(model), compare: model("comparison"),
+    })
+    const kinds = (r: OpenRun) => openRows([r]).map((row) => row.kind)
+    assert.deepEqual(kinds(run("r1", ["a"])), ["model"])
+    assert.deepEqual(kinds(run("r2", ["a", "b"])), ["run", "model", "model", "compare"])
+})
+
 test("the comparison and the overrides of a run, and its plot sizes", () => {
     const p = tmp()
     const sizes = [
@@ -232,18 +245,17 @@ test("the comparison and the overrides of a run, and its plot sizes", () => {
     assert.match(c?.workbook ?? "", /compare\/x_compare\.xlsx$/)
     assert.match(c?.plots ?? "", /compare\/plots\.txt$/)
     assert.equal(c?.plotSizes.length, 1)
-    // the row comes after the models: nested under a heading, or aligned with a lone model
+    // the row comes after the models, nested under a heading; a lone model has none
     const rows = openRows([run as OpenRun, failed as OpenRun])
     assert.deepEqual(
         rows.map((r) => (r.kind === "run" ? "run" : `${r.kind}:${r.model.name}`)),
         [
             "run", "model:one", "model:two", "compare:comparison",
-            "model:one", "compare:comparison",
+            "model:one",
         ],
     )
     assert.equal(rows[3] && openRowText(rows[3]).text, "  comparison")
-    assert.match(rows[5] ? openRowText(rows[5]).text : "", /^ +comparison$/)
-    assert.equal(rows[5] && openRowText(rows[5]).status, "failed")
+    assert.equal(rows.length, 5)
     assert.equal(rows[1] && openRowText(rows[1]).text, "  one *")
     assert.equal(rows[2] && openRowText(rows[2]).text, "  two")
     assert.equal(
@@ -263,7 +275,7 @@ test("notes for a model with nothing to open say why", () => {
     const m = (state: string, error?: string) =>
         ({ name: "m", state, error, workbook: undefined, plots: "" }) as never
     assert.equal(noWorkbookNote(m("running")), "m is still running")
-    assert.equal(noWorkbookNote(m("failed", "WLSError: x")), "m failed: WLSError: x")
+    assert.equal(noWorkbookNote(m("failed", "WLSError: x")), "m failed: x")
     assert.equal(noWorkbookNote(m("failed")), "m failed")
     assert.equal(noWorkbookNote(m("aborted")), "m was aborted: no workbook")
     assert.equal(noWorkbookNote(m("done")), "m has no workbook")
@@ -365,7 +377,11 @@ test("a run's files are read plain: any name, a cap, and why one cannot be", () 
     const run = makeRun(dir, "20261101T000000Z", { status: "done" }, { "plots.txt": "p\n" })
     assert.equal(readRunFile(run, "plots.txt"), "p\n")
     assert.throws(() => readRunFile(run, "buffer.json"), /this run has no buffer\.json/)
-    assert.deepEqual([...runFileSizes(run)], [["plots.txt", 2]])
+    assert.deepEqual(
+        [...runFileSizes(run).keys()].sort(),
+        ["plots.txt", "run.json"],
+        "the files of logs/ and the run's own",
+    )
     assert.equal(runFileSizes(join(dir, "nope")).size, 0)
     writeFileSync(join(run, "logs", "settings.json"), "x".repeat(RUN_FLOW.log.maxBytes + 1))
     assert.throws(() => readRunFile(run, "settings.json"), /settings\.json is too large/)
@@ -596,6 +612,6 @@ test("a restore reads the plain logs/ of a run and never writes into the run", (
     assert.equal(folderSize(run), before)
     assert.deepEqual(
         [...runFileSizes(run).keys()].sort(),
-        ["buffer.json", "data.json", "data.tsv"],
+        ["buffer.json", "data.json", "data.tsv", "run.json"],
     )
 })

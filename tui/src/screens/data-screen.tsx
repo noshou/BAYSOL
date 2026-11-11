@@ -20,17 +20,15 @@ import {
     type DataStatus,
     dataErrorNote,
     ENERGY_PROBLEM,
-    loadSource,
     readDataInfo,
     resetData,
-    roleLabel,
-    roles,
     setEnergy,
     setUnits,
     type Units,
     unitLabel,
     unitsList,
 } from "../store/data.js"
+import { loadSource, roleLabel, roles } from "../store/data-table.js"
 import { checkPath, MAX_PATH_TYPED, pathSuggestions } from "../store/lists.js"
 import type { ProjectRef } from "../store/projects.js"
 import { listReferences } from "../store/references.js"
@@ -43,7 +41,7 @@ import {
     legendOf,
     moveLegend,
 } from "../ui/grid.js"
-import { Prompt, questionLegend, useConfirm } from "../ui/input.js"
+import { PathPrompt, Prompt, questionLegend, useConfirm } from "../ui/input.js"
 import {
     CursorList,
     type KeyInput,
@@ -230,13 +228,13 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         path,
         source: loadSource(path),
         initial,
-        onDone: (points: number, dropped: number) => {
-            // the source is on the summary rows; with rows dropped the note says how many
-            say(
-                dropped > 0
-                    ? `loaded ${points} points, dropped ${dropped} rows (bad q or sigma)`
-                    : `loaded ${points} points from ${truncateStart(basename(path), 30)}`,
-            )
+        onDone: (points: number, dropped: number, _name?: string, warning?: string) => {
+            // the source is on the summary rows; with rows dropped the note says how many;
+            // a warning (it may be the wrong file) is the one thing said
+            const loaded = `loaded ${points} points`
+            if (warning !== undefined) say(`${loaded}. ${warning}`)
+            else if (dropped > 0) say(`${loaded}, dropped ${dropped} rows (bad q or sigma)`)
+            else say(`${loaded} from ${truncateStart(basename(path), 30)}`)
             refresh()
         },
     })
@@ -441,9 +439,8 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
             )}
             {mode === "path" ? (
                 <Box marginTop={1}>
-                    <Prompt
+                    <PathPrompt
                         key={fieldKey}
-                        label="path:"
                         maxLength={MAX_PATH_TYPED}
                         placeholder="any table: .dat, .csv, .tsv, .txt, .xlsx, ..."
                         suggest={suggestDataPaths}

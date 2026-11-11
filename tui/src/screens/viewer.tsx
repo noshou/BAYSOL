@@ -9,11 +9,11 @@
 
 import { readFileSync, statSync } from "node:fs"
 import { basename, relative, sep } from "node:path"
-import { Box, Text, useWindowSize } from "ink"
+import { Box, Text } from "ink"
 import { Fragment, type ReactNode, useMemo, useState } from "react"
 import { isFile } from "../core/file-system.js"
 import { displayWidth, padWidth, truncate, writeTerminal } from "../core/terminal.js"
-import { readRunText } from "../store/run-archive.js"
+import { materializeRunFile, readRunText } from "../store/run-archive.js"
 import type { PlotFile } from "../store/run-logs.js"
 import {
     type CellAt,
@@ -61,6 +61,7 @@ import {
     useBodyColumns,
     useKeys,
     useNav,
+    useTerminalSize,
 } from "../ui/interaction.js"
 import { Bar, linesOf, Panel, Rule, useTheme } from "../ui/theme.js"
 
@@ -315,7 +316,12 @@ export function SheetViewerScreen(props: {
     // ---- what is read (once)
     const opened = useMemo((): { book: Workbook } | { error: string } => {
         try {
-            return { book: openWorkbook(workbookPath, basename(workbookPath)) }
+            // a file that is only in the run's archive is opened from a copy on disk
+            const file =
+                runDir === undefined
+                    ? workbookPath
+                    : materializeRunFile(runDir, workbookPath)
+            return { book: openWorkbook(file, basename(workbookPath)) }
         } catch (error) {
             return {
                 error:
@@ -324,10 +330,10 @@ export function SheetViewerScreen(props: {
                         : "cannot read that file",
             }
         }
-    }, [workbookPath])
+    }, [workbookPath, runDir])
     // the plots come at several sizes: the largest file that fits the panel is read, and
     // another one when the window changes (the tabs are the same in every size)
-    const { rows: terminalRows } = useWindowSize()
+    const { rows: terminalRows } = useTerminalSize()
     const innerWidth = columnsAvailable - 4
     // a plot is drawn right up to the panel's border (no padding), so a plot as wide as
     // the 80-column window less its margins and borders fits

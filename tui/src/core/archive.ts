@@ -22,7 +22,7 @@ import {
     statSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { dirname, isAbsolute, join } from "node:path"
 import { path7za } from "7zip-bin"
 import sevenZip, { type SevenZipOptions, type ZipStream } from "node-7z"
 import { lock } from "proper-lockfile"
@@ -34,7 +34,7 @@ import { findExecutable, RUN_FLOW, readSystem } from "./environment.js"
 
 /**
  * Why an archive could not be made or read: said to the user as it is, in a sentence
- * (`7-Zip failed: ...`, `run.7z holds no logs/run.LOG`).
+ * (`7-Zip failed: ...`, `run.7z holds no run.LOG`).
  */
 export class ArchiveError extends Error {}
 
@@ -256,8 +256,10 @@ const common = (): SevenZipOptions => ({
  * else is touched: the files packed stay where they are (the caller removes them once
  * this returns).
  *
- * @param folder - the folder the paths are relative to (and the archive is written in).
- * @param archiveName - the archive's file name, in `folder`.
+ * @param folder - the folder the paths are relative to (and the archive is written in,
+ *     unless `archiveName` is a path).
+ * @param archiveName - the archive's file name, in `folder`, or an absolute path (a run's
+ *     archive is written beside its folder).
  * @param files - the files to pack, `/`-separated paths relative to `folder`, at least
  *     one.
  * @throws [[ArchiveError]] when the archive exists already, there is nothing to pack, a
@@ -269,7 +271,7 @@ export async function packFiles(
     archiveName: string,
     files: readonly string[],
 ): Promise<void> {
-    const archive = join(folder, archiveName)
+    const archive = isAbsolute(archiveName) ? archiveName : join(folder, archiveName)
     const staging = `${archive}.tmp.${process.pid}`
     if (files.length === 0) throw new ArchiveError("nothing to pack")
     const bad = files.find((f) => !isSafeEntryName(f))
@@ -282,7 +284,7 @@ export async function packFiles(
     })
     try {
         if (stampOf(archive) !== undefined)
-            throw new ArchiveError(`${archiveName} exists already`)
+            throw new ArchiveError(`${basenameOf(archive)} exists already`)
         const options: SevenZipOptions = {
             ...common(),
             method: [`x=${RUN_FLOW.archive.level}`],

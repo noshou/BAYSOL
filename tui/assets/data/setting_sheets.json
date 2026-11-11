@@ -267,6 +267,10 @@
        "description": "Significant figures of each workbook number. 17 keeps every bit of a 64-bit float; 15 is the most that is guaranteed."
       },
       {
+       "name": "TABLE_DIR",
+       "description": "Data dir: where data is moved to (the workbooks and the comparison table), one folder for all projects. Empty: the data folder of the BAYSOL data folder. A run also copies its data there when this is set. A taken name gets -2, -3 and is never replaced."
+      },
+      {
        "name": "VAL_SIGMA",
        "description": "Half-width, in standard deviations, of the reported interval (2 gives 2.28 % to 97.72 %). Not advised above 3: too few draws."
       }
@@ -285,7 +289,7 @@
       },
       {
        "name": "FIGURES_DIR",
-       "description": "Plot dir: where plots are moved and compiled to, one folder for all projects (<plot dir>/<project>/<run>/<model>/). Empty: the plots folder of the BAYSOL data folder. A run also copies its .tex figures there when this is set."
+       "description": "Plot dir: where plots are moved and compiled to, one folder for all projects (named for the model, a taken name gets -2, -3). Empty: the plots folder of the BAYSOL data folder. A run also copies its .tex figures there when this is set."
       },
       {
        "name": "FIGURES_COMPILER",

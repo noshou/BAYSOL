@@ -21,7 +21,8 @@ import {
     writeAtomic,
 } from "../core/file-system.js"
 import { numberText } from "../core/terminal.js"
-import { DataFileError, type DataPoints, readDataInfo, type Units } from "./data.js"
+import { readDataInfo, type Units } from "./data.js"
+import { DataFileError, type DataPoints } from "./data-table.js"
 import { lockedIn } from "./projects.js"
 
 /** The folder of a project that holds the reference curves. */
@@ -47,7 +48,7 @@ export const referencesDir = (projectDir: string): string =>
     join(projectDir, REFERENCES_FOLDER)
 
 /**
- * Moves an old `reference-fit/` folder to `reference-fit/` (a plain rename: nothing is
+ * Moves an old `references/` folder to `reference-fit/` (a plain rename: nothing is
  * lost) when the new one is not there. The caller holds the lock of `reference-fit`.
  * A failed rename leaves both folders as they are.
  *

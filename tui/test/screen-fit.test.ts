@@ -22,13 +22,14 @@ import { displayWidth, wrapLine } from "../src/core/terminal.js"
 import { CustomSolutesTable, RecipesTable } from "../src/screens/custom-solutes.js"
 import { DataScreen } from "../src/screens/data-screen.js"
 import { LogsRuns, modelsCell } from "../src/screens/logs-menu.js"
-import { BufferLanding, MainMenu, ModelsScreen, ProjectMenu } from "../src/screens/menus.js"
+import { BufferLanding, MainMenu, ProjectMenu } from "../src/screens/menus.js"
+import { ModelReferenceScreen } from "../src/screens/model-reference.js"
+import { ModelsScreen } from "../src/screens/models.js"
 import { noWorkbookNote, OpenRuns } from "../src/screens/open-runs.js"
 import { ReferencesScreen } from "../src/screens/references-screen.js"
 import { RunScreen } from "../src/screens/run-screens.js"
-import { SettingsMenu } from "../src/screens/settings-screens.js"
+import { SettingsMenu, SettingsSheet } from "../src/screens/settings-screens.js"
 import { writeData } from "../src/store/data.js"
-import { runBrief } from "../src/store/projects.js"
 import type { RunView } from "../src/store/run.js"
 import {
     BRIEF_ERROR_WIDTH,
@@ -37,6 +38,7 @@ import {
     type OpenModel,
     restoreErrorNote,
 } from "../src/store/run-logs.js"
+import { runBrief } from "../src/store/run-stamp.js"
 import { globalScope, projectScope } from "../src/store/settings-store.js"
 import { cornerLabels, fitCorner, legendRoom } from "../src/ui/frame.js"
 import { destructiveQuestion } from "../src/ui/input.js"
@@ -103,6 +105,36 @@ function scratchProject(): { id: string; dir: string } {
         join(run, "logs", "run.LOG"),
         `datetime\tnow\n\n=== ERRORS ===\nmodel ${MODEL}: ${LONG_ERROR}\n`,
     )
+    // a newer run in the flat layout that is done and has everything: the open-runs
+    // legend then shows every key it can
+    const flat = join(dir, "runs", "10-00-00-000_EST_-0500_2026-11-10")
+    mkdirSync(flat, { recursive: true })
+    writeFileSync(
+        join(flat, "run.json"),
+        JSON.stringify({
+            schema: 1,
+            status: "done",
+            pid: 1,
+            host: "nowhere",
+            started: "2026-11-10T15:00:00Z",
+            heartbeat: "2026-11-10T15:00:20Z",
+            ended: "2026-11-10T15:00:20Z",
+            models: [
+                {
+                    name: MODEL,
+                    status: "done",
+                    files: [`${MODEL}.xlsx`, `${MODEL}.tex`, `${MODEL}-plots.txt`],
+                },
+            ],
+            compare: {
+                status: "done",
+                files: ["compare.tsv", "compare.tex", "compare-plots.txt"],
+            },
+        }),
+    )
+    for (const name of [`${MODEL}.xlsx`, `${MODEL}.tex`, "compare.tsv", "compare.tex"])
+        writeFileSync(join(flat, name), "x")
+    writeFileSync(join(flat, "run.LOG"), "datetime\tnow\n")
     return { id: "SASDCQ2", dir }
 }
 
@@ -143,6 +175,11 @@ test("every screen fits 80 x 24 and a wider terminal, and shows no cut message",
         "main menu": createElement(MainMenu),
         "project menu": createElement(ProjectMenu, { project }),
         models: createElement(ModelsScreen, { project }),
+        "model reference": createElement(ModelReferenceScreen, {
+            project,
+            file: `${MODEL}.pdb`,
+            stem: MODEL,
+        }),
         data: createElement(DataScreen, { project }),
         "reference fit": createElement(ReferencesScreen, { project }),
         "buffer landing": createElement(BufferLanding, { project }),
@@ -156,6 +193,13 @@ test("every screen fits 80 x 24 and a wider terminal, and shows no cut message",
             session: { subscribe: () => () => {}, snapshot: () => failedView } as never,
         }),
     }
+    // every settings sheet, of the project and of the program (their rows carry long names)
+    for (const sheetId of ["output", "model", "sampler", "plots"] as const)
+        for (const scope of [projectScope(project), globalScope])
+            screens[`${scope.kind} sheet ${sheetId}`] = createElement(SettingsSheet, {
+                scope,
+                sheetId,
+            })
     for (const [name, screen] of Object.entries(screens)) {
         for (const columns of [80, 100]) {
             const lines = draw(screen, columns)
@@ -169,6 +213,16 @@ test("every screen fits 80 x 24 and a wider terminal, and shows no cut message",
             }
         }
     }
+})
+
+test("the open-runs legend with every file key fits 80 columns, nothing cut", () => {
+    const project = scratchProject()
+    const lines = draw(createElement(OpenRuns, { project }), 80)
+    const text = lines.join("\n")
+    for (const label of ["move data", "move tex", "data here", "tex here", "compile plots"])
+        assert.ok(text.includes(label), `${label} is in the legend:\n${text}`)
+    assert.ok(lines.length <= 24)
+    for (const line of lines) assert.ok(displayWidth(line) <= 80, line)
 })
 
 test("the models of a run are counted in the run list, never cut", () => {

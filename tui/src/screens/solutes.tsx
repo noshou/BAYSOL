@@ -617,6 +617,7 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
             setHint(undefined)
         },
         check: (drafts) => firstProblem(drafts, soluteProblem),
+        label: (solute) => solute.name,
     })
     const flow = useSoluteFlow(t)
 
@@ -723,6 +724,7 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
                 width={t.width}
             />
             {flow.entry}
+            {t.finder}
             {asking ? (
                 <Prompt
                     label="pH σ:"

@@ -9,8 +9,9 @@
  * that vanishes is skipped or has no workbook, and nothing here throws for a run that is
  * odd.
  *
- * Contents: 1. the state of a run, the run list and the deletion; 2. the files of a run's
- * `logs/`; 3. the options of the logs menu (`runItems`, `conditionsText`); 4. the restores
+ * Contents: 1. the state of a run, the run list and the deletion; 2. the files of a run
+ * (its own, flat, or under `logs/` in an older run); 3. the options of the logs menu
+ * (`runItems`, `conditionsText`); 4. the restores
  * (`restoreSettings`, `restoreBuffer`, `restoreUnits`); 5. the runs and
  * models (`listOpenRuns`, `openRows`, `findWorkbook`, `firstErrorLine`).
  */
@@ -38,14 +39,8 @@ import {
     rowProblem,
     writeSolutes,
 } from "./buffer.js"
-import {
-    DataFileError,
-    type DataMapping,
-    readMapping,
-    setEnergy,
-    setUnits,
-    type Units,
-} from "./data.js"
+import { type DataMapping, readMapping, setEnergy, setUnits, type Units } from "./data.js"
+import { DataFileError } from "./data-table.js"
 import {
     assertNoLiveRun,
     livePid,
@@ -56,9 +51,11 @@ import {
     startLockName,
 } from "./projects.js"
 import {
+    archivePath,
     RunFileMissing,
     RunFileTooLarge,
     readRunText,
+    runExists,
     runFolderFiles,
 } from "./run-archive.js"
 import { defaultCatalog } from "./settings.js"
@@ -98,13 +95,13 @@ function modelNames(json: Record<string, unknown> | undefined): string[] {
  * One run of the logs menu's list.
  *
  * @property id - the run's name, its stamp (`23-35-29-123_EST_-0500_2026-11-07`).
- * @property dir - the run folder.
+ * @property dir - the run's path: its folder, or where it was (the archive is `<dir>.7z`).
  * @property state - `live` for a run whose process is alive, `interrupted` for one that
  *     says `running` but nobody runs, else the status of `run.json`, or `unknown` when
  *     there is no readable file.
  * @property live - whether the run is live (`state === "live"`).
  * @property models - the names of its models, as `run.json` lists them.
- * @property size - the bytes of the whole run folder.
+ * @property size - the bytes of the whole run: its folder and its archive.
  */
 export type RunRow = {
     id: string
@@ -138,12 +135,23 @@ export function folderSize(dir: string): number {
     return total
 }
 
+/** The bytes of a run: its folder (when it has one) and its archive. */
+function runSize(dir: string): number {
+    let archived = 0
+    try {
+        archived = lstatSync(archivePath(dir)).size
+    } catch {
+        // no archive of the new layout
+    }
+    return folderSize(dir) + archived
+}
+
 /** The runs of a project, newest first, tolerant of a folder that goes meanwhile. */
 export function listRuns(projectDir: string): RunRow[] {
     const rows: RunRow[] = []
     for (const { id, dir, json } of newestRuns(projectDir)) {
-        const size = folderSize(dir)
-        if (!isFolder(dir)) continue // gone while it was measured
+        const size = runSize(dir)
+        if (!runExists(dir)) continue // gone while it was measured
         const state = stateOf(dir, json)
         const models = modelNames(json)
         rows.push({ id, dir, state, live: state === "live", models, size })
@@ -164,7 +172,8 @@ export function sizeText(bytes: number): string {
 }
 
 /**
- * Deletes a whole run folder: the one deletion of a run (there is no delete-a-log action).
+ * Deletes a whole run, its folder and its archive: the one deletion of a run (there is no
+ * delete-a-log action).
  * Under the project's `.start` lock (so no run starts between the check and the removal),
  * after checking that no run of the project is live. A folder that is already gone is no
  * error.
@@ -183,15 +192,18 @@ export function deleteRun(projectDir: string, id: string): void {
         join(runs, startLockName),
         () => {
             assertNoLiveRun(projectDir)
-            if (!isFolder(dir)) return
+            if (!runExists(dir)) return
             // a run that is being packed is not deleted under the pack
-            try {
-                withFileLock(join(dir, PACK_LOCK), () => {}, { createParents: false })
-            } catch (error) {
-                if (error instanceof FileInUseError)
-                    throw new Error("this run is being packed: try again in a moment")
-                throw error
+            if (isFolder(dir)) {
+                try {
+                    withFileLock(join(dir, PACK_LOCK), () => {}, { createParents: false })
+                } catch (error) {
+                    if (error instanceof FileInUseError)
+                        throw new Error("this run is being packed: try again in a moment")
+                    throw error
+                }
             }
+            rmSync(archivePath(dir), { force: true })
             rmSync(dir, { recursive: true, force: true })
         },
         { createParents: false },
@@ -204,39 +216,39 @@ export function deleteRun(projectDir: string, id: string): void {
 export const RUN_GONE = "this run was deleted"
 
 /**
- * The text of a file of a run's `logs/` (read whole, read only), from the run's archive
- * or from its plain `logs/` folder.
+ * The text of one of a run's own files (read whole, read only), from the run's archive or
+ * from its plain folder; an older run keeps them under `logs/`, which is looked in too.
  *
- * @param name - a file of the folder (`run.LOG`, `settings.json`, ...), never a path.
+ * @param name - a file of the run (`run.LOG`, `settings.json`, ...), never a path.
  * @throws Error `this run was deleted`, `this run has no <name>`, `<name> is too large
  *     to show` (over `RUN_FLOW.log.maxBytes`) or `the run's archive cannot be read: ...`.
  */
 export function readRunFile(runDir: string, name: string): string {
     try {
-        return readRunText(runDir, `logs/${name}`, RUN_FLOW.log.maxBytes)
+        return readRunText(runDir, name, RUN_FLOW.log.maxBytes)
     } catch (error) {
         if (error instanceof RunFileTooLarge)
             throw new Error(`${name} is too large to show`)
         if (error instanceof RunFileMissing)
-            throw new Error(isFolder(runDir) ? `this run has no ${name}` : RUN_GONE)
-        if (!isFolder(runDir)) throw new Error(RUN_GONE)
+            throw new Error(runExists(runDir) ? `this run has no ${name}` : RUN_GONE)
+        if (!runExists(runDir)) throw new Error(RUN_GONE)
         throw new Error(`the run's archive cannot be read: ${(error as Error).message}`)
     }
 }
 
-/** The text of a run's `logs/run.LOG`: [[readRunFile]]. */
+/** The text of a run's `run.LOG`: [[readRunFile]]. */
 export function readLogText(runDir: string): string {
     return readRunFile(runDir, "run.LOG")
 }
 
 /**
- * The files of a run's `logs/` and their sizes, in the archive and in the plain folder
- * (empty for a run without either).
+ * The files of a run and their sizes, in the archive and in the plain folder (an older
+ * run's `logs/` files too, under their own names; empty for a run without either).
  *
  * @returns file name to bytes.
  */
 export function runFileSizes(runDir: string): Map<string, number> {
-    return runFolderFiles(runDir, "logs")
+    return new Map([...runFolderFiles(runDir, "logs"), ...runFolderFiles(runDir, "")])
 }
 
 // ---- 3. the options of a run -----------------------------------------------------------
@@ -258,7 +270,7 @@ type RestoreKind = "settings" | "buffer" | "units"
  * One option of the run page.
  *
  * @property label - what the list says, e.g. `view settings`.
- * @property file - the file of the run's `logs/` it reads.
+ * @property file - the file of the run it reads.
  * @property action - see [[RunAction]].
  * @property restore - what a `restore` option puts back.
  * @property json - the file is JSON and is shown pretty-printed.
@@ -540,14 +552,17 @@ type ModelState =
  * @property state - how it stands. A `running` or `pending` model of a run that nobody
  *     runs any more is `interrupted`.
  * @property error - the first line of why a failed model failed (`run.json`), if known.
- * @property workbook - the results workbook of a finished model, `undefined` for a model
- *     that is not done or whose workbook is not there ([[findWorkbook]]).
- * @property plots - the model's `output/plots.txt` (it may not exist; the viewer says so).
+ * @property workbook - the results workbook of a finished model (a path in the run's
+ *     folder, which may exist only in the archive: [[materializeRunFile]] gives a file),
+ *     `undefined` for a model that is not done or has none.
+ * @property plots - the model's plots text, `<model>-plots.txt` (`output/plots.txt` in an
+ *     older run; it may not exist, the viewer says so).
  * @property plotSizes - the same plots at more sizes (`plot_sizes` of `run.json`), the
  *     viewer shows the largest that fits; empty for a run that has none.
  * @property overrides - the names of the settings the model has of its own.
- * @property tex - the `.tex` figures it has, in the archive or in its folder: paths
- *     relative to the run folder (`<model>/output/plots/<name>.tex`), sorted.
+ * @property tex - the `.tex` figures it has, in the archive or in its folder: names
+ *     relative to the run folder (`<model>.tex`; `<model>/output/plots/<name>.tex` in an
+ *     older run), sorted.
  */
 export type OpenModel = {
     name: string
@@ -668,6 +683,21 @@ function overridesOf(list: unknown): string[] {
 }
 
 /**
+ * The names a `files` list of `run.json` holds (flat names of the run folder), or
+ * `undefined` for an entry that has no such list (a run of an older layout).
+ */
+function listedFiles(list: unknown): string[] | undefined {
+    if (!Array.isArray(list)) return undefined
+    return list.filter(
+        (f): f is string => typeof f === "string" && f !== "" && !f.includes("/"),
+    )
+}
+
+/** The names of a list that end in `.tex`, sorted. */
+const texOf = (files: readonly string[]): string[] =>
+    files.filter((f) => f.endsWith(".tex")).sort()
+
+/**
  * The state of one model entry of `run.json`.
  *
  * @returns the model state: a model still `running` or `pending` in a run that is not
@@ -705,6 +735,25 @@ function openModels(
         if (name === "" || name.startsWith(".") || basename(name) !== name) continue
         const output = join(dir, name, OUTPUT_FOLDER)
         const state = modelState(m.status, run)
+        const files = listedFiles(m.files)
+        if (files !== undefined) {
+            // the flat layout: the files are named in `run.json`
+            const book = files.includes(`${name}.xlsx`)
+                ? `${name}.xlsx`
+                : files.filter((f) => f.endsWith(".xlsx")).sort()[0]
+            out.push({
+                name,
+                state,
+                error: typeof m.error === "string" && m.error !== "" ? m.error : undefined,
+                workbook:
+                    state === "done" && book !== undefined ? join(dir, book) : undefined,
+                plots: join(dir, `${name}-plots.txt`),
+                plotSizes: plotFilesOf(dir, m.plot_sizes),
+                overrides: overridesOf(m.overrides),
+                tex: texOf(files),
+            })
+            continue
+        }
         out.push({
             name,
             state,
@@ -734,6 +783,22 @@ function openCompare(
     const c = json?.compare
     if (!isDict(c)) return undefined
     const state = modelState(c.status, run)
+    const files = listedFiles(c.files)
+    if (files !== undefined && files.length > 0) {
+        // the flat layout: `compare.tsv`, `compare.tex`, `compare-plots.txt`
+        const table = files.find((f) => f.endsWith(".tsv"))
+        return {
+            name: COMPARE_NAME,
+            state,
+            error: typeof c.error === "string" && c.error !== "" ? c.error : undefined,
+            workbook:
+                state === "done" && table !== undefined ? join(dir, table) : undefined,
+            plots: join(dir, "compare-plots.txt"),
+            plotSizes: plotFilesOf(dir, c.plot_sizes),
+            overrides: [],
+            tex: texOf(files),
+        }
+    }
     const folder = join(dir, COMPARE_FOLDER)
     const listed = (Array.isArray(c.files) ? c.files : [])
         .filter((f) => typeof f === "string" && /\.xlsx$/i.test(f))
@@ -770,6 +835,11 @@ export function listOpenRuns(projectDir: string): OpenRun[] {
     return runs
 }
 
+/** The models of a run and its comparison, as the units a whole-run action takes. */
+export function runModels(run: OpenRun): OpenModel[] {
+    return run.compare === undefined ? run.models : [...run.models, run.compare]
+}
+
 /**
  * One row of the `open runs` list: a run that is only a heading (it has several models,
  * or none), or a model (a run with exactly one model is just that one row, with its run).
@@ -787,7 +857,8 @@ export type OpenRow =
 /**
  * The flat rows of the list: for each run (as given, newest first) its heading and its
  * models under it when it has several (or none: a heading alone), and one single row
- * when it has one model, which goes straight on.
+ * when it has one model, which goes straight on. The comparison is a row of its own only
+ * for a run of several models: one model has nothing to compare it with.
  */
 export function openRows(runs: readonly OpenRun[]): OpenRow[] {
     const rows: OpenRow[] = []
@@ -800,7 +871,7 @@ export function openRows(runs: readonly OpenRun[]): OpenRow[] {
             for (const model of run.models)
                 rows.push({ kind: "model", run, model, nested: true })
         }
-        if (run.compare !== undefined)
+        if (run.compare !== undefined && run.models.length > 1)
             rows.push({ kind: "compare", run, model: run.compare, nested: !single })
     }
     return rows

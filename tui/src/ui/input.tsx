@@ -12,7 +12,7 @@
 //   6. `usePickList`: dropdown + delete + question wiring
 //   7. `ThemePicker`: the list of themes, opened with Ctrl-T
 
-import { Box, Text, useWindowSize } from "ink"
+import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { padWidth, truncate, truncateStart } from "../core/terminal.js"
 import { entryLegend, type LegendItem, legendFor } from "./grid.js"
@@ -22,16 +22,17 @@ import {
     type KeyInput,
     keys,
     ListText,
+    NarrowWidth,
     Swatch,
     stepIndex,
     swatchCells,
-    TextField,
     useBodyColumns,
     useKeys,
     useListCursor,
-    useTextBuffer,
+    useTerminalSize,
 } from "./interaction.js"
-import { Logo, logoCells, Panel, type Theme, themes, useTheme } from "./theme.js"
+import { TextField, useTextBuffer } from "./text-input.js"
+import { Bright, Logo, logoCells, Panel, type Theme, themes, useTheme } from "./theme.js"
 
 // ========================================================================================
 // 1. Suggestions
@@ -108,7 +109,9 @@ function SuggestionList(props: {
                     )
                 }}
             />
-            {status ? <Text color={theme.mt}>{truncate(status, width)}</Text> : null}
+            {status ? (
+                <Text color={theme.mt}>{padWidth(truncate(status, width), width)}</Text>
+            ) : null}
         </Box>
     )
 }
@@ -191,6 +194,25 @@ export type EntryProps<S extends Suggestion> = {
     cancel?:      string | null
     onLegend?:    (items: LegendItem[]) => void
     onChange?:    (text: string) => void
+    side?:        EntrySide<S>
+}
+
+/**
+ * Something drawn beside an entry's list, right after its widest visible name: the entry
+ * is as wide as that name, its marker and swatch, and `gap` cells (at least `min`, at most
+ * what leaves `width` cells for the side), so the side moves with the list and costs no
+ * extra render.
+ *
+ * @property width - the cells the side takes.
+ * @property gap - the cells between the widest name shown and the side.
+ * @property min - the least cells the entry takes.
+ * @property render - the side, told the highlighted suggestion.
+ */
+type EntrySide<S extends Suggestion> = {
+    width:  number
+    gap:    number
+    min:    number
+    render: (current: S | undefined) => ReactNode
 }
 
 /**
@@ -271,19 +293,33 @@ export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
     // biome-ignore lint/correctness/useExhaustiveDependencies: legendKey = value of legend
     useEffect(() => onLegend?.(legend), [legendKey, onLegend])
 
+    // beside the list: as wide as the widest name shown, its marker, swatch and a gap
+    const swatched = items.some((item) => item.swatch !== undefined)
+    const offset = centredWindow(items.length, marked, lines)
+    const shownItems = items.slice(offset, offset + lines)
+    const widest = Math.max(0, ...shownItems.map((i) => i.label.length))
+    const width = props.side
+        ? Math.min(
+            columns - props.side.width,
+            Math.max(
+                props.side.min,
+                2 + (swatched ? swatchCells + 1 : 0) + widest + props.side.gap,
+            ),
+        )
+        : columns
     const none = items.length === 0 && (text !== "" || counter)
     const status = none
         ? noMatch
         : counter && items.length > 0
             ? positionStatus(marked, items.length)
             : undefined
-    return (
-        <Box flexDirection="column">
+    const list = (
+        <Box flexDirection="column" width={props.side ? width : undefined}>
             <Box columnGap={1}>
                 <Text color={theme.fg}>{label}</Text>
                 <TextField
                     buffer={input.buffer}
-                    width={Math.max(10, columns - label.length - 2)}
+                    width={Math.max(10, width - label.length - 2)}
                     placeholder={placeholder}
                 />
             </Box>
@@ -296,10 +332,17 @@ export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
                     items={items}
                     highlight={marked}
                     lines={lines}
-                    width={columns}
+                    width={width}
                     status={status}
                 />
             ) : null}
+        </Box>
+    )
+    if (!props.side) return list
+    return (
+        <Box>
+            {list}
+            {props.side.render(current)}
         </Box>
     )
 }
@@ -318,6 +361,28 @@ export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
  */
 export function Prompt(props: Omit<EntryProps<Suggestion>, "pick" | "noMatch">): ReactNode {
     return <Entry {...props} pick={false} />
+}
+
+/**
+ * A path prompt: a [[Prompt]] in a [[Panel]] as wide as the body, like the box of the
+ * other dropdowns, so the field and the folder's names under it sit inside one frame.
+ * The panel takes four cells (border and padding), and the entry is told so.
+ *
+ * @param props - the props of a [[Prompt]]; `label` is `path:` when left out.
+ * @returns the boxed prompt.
+ */
+export function PathPrompt(
+    props: Omit<EntryProps<Suggestion>, "pick" | "noMatch" | "label"> & { label?: string },
+): ReactNode {
+    const columns = useBodyColumns()
+    const { label = "path:", ...rest } = props
+    return (
+        <Panel paddingX={1} flexDirection="column" width={columns}>
+            <NarrowWidth.Provider value={columns - 4}>
+                <Prompt label={label} {...rest} />
+            </NarrowWidth.Provider>
+        </Panel>
+    )
 }
 
 // ========================================================================================
@@ -352,6 +417,7 @@ export type Choice<T> = Suggestion & { value: T }
  *     (`delete ^r`), for the legend.
  * @property cancel - what Esc is called in the legend.
  * @property onLegend - called with the keys that work now whenever they change.
+ * @property lines - the most choices listed, [[suggestionLines]] when left out.
  */
 type DropdownProps<T> = {
     label:      string
@@ -367,6 +433,7 @@ type DropdownProps<T> = {
     extras?:    LegendItem[]
     cancel?:    string | null
     onLegend?:  (items: LegendItem[]) => void
+    lines?:     number
 }
 
 /**
@@ -561,8 +628,9 @@ const deleteLegend: LegendItem = legendFor("delete", keys.remove)
  * @property onFail - called with what `onDelete` threw.
  * @property onEmpty - called when the last entry is gone, so the screen closes the list.
  * @property question - the question asked before `onDelete`, from the highlighted value.
- * @property action - one more key on the highlighted entry (`settings ^o`): its legend
- *     label, the key and what it does with the value; it works while no question is open.
+ * @property action - more keys on the highlighted entry (`settings ^o`): each has its
+ *     legend label, the key and what it does with the value; they work while no question
+ *     is open. One action, or a list of them.
  */
 type PickListProps<T> = {
     open: boolean
@@ -577,8 +645,11 @@ type PickListProps<T> = {
     onFail: (error: unknown) => void
     onEmpty: () => void
     question: (value: T) => Question
-    action?: { label: string; key: KeyInput; run: (value: T) => void }
+    action?: PickAction<T> | PickAction<T>[]
 }
+
+/** One more key of a pick list: its legend label, the key and what it does. */
+type PickAction<T> = { label: string; key: KeyInput; run: (value: T) => void }
 
 /**
  * What [[usePickList]] gives the screen.
@@ -608,7 +679,11 @@ type PickList = {
  */
 export function usePickList<T>(props: PickListProps<T>): PickList {
     const { open, label, entries, onPick, onCancel, onBack, take, cancel } = props
-    const { onDelete, onFail, onEmpty, question, action } = props
+    const { onDelete, onFail, onEmpty, question } = props
+    const actions = useMemo(
+        () => (props.action === undefined ? [] : [props.action].flat()),
+        [props.action],
+    )
     const confirm = useConfirm()
     const [highlighted, setHighlighted] = useState<T>()
     const [shown, setShown] = useState<LegendItem[]>([])
@@ -616,7 +691,8 @@ export function usePickList<T>(props: PickListProps<T>): PickList {
 
     useKeys((press) => {
         if (confirm.handleKey(press)) return
-        if (action !== undefined && press.is(action.key)) {
+        const action = actions.find((a) => press.is(a.key))
+        if (action !== undefined) {
             if (highlighted !== undefined) action.run(highlighted)
             return
         }
@@ -648,11 +724,7 @@ export function usePickList<T>(props: PickListProps<T>): PickList {
             onBack={onBack}
             take={take}
             cancel={cancel}
-            extras={
-                action === undefined
-                    ? [deleteLegend]
-                    : [legendFor(action.label, action.key), deleteLegend]
-            }
+            extras={[...actions.map((a) => legendFor(a.label, a.key)), deleteLegend]}
             onHighlight={setHighlighted}
             onLegend={setShown}
         />
@@ -709,12 +781,25 @@ function swatchesOf(theme: Theme): string[] {
  * @param onClose - called when the popup is left without picking.
  * @returns the popup box, to be placed over the screen.
  */
-export function ThemePicker(
+export function ThemePicker(props: {
+    current: Theme
+    onPick: (theme: Theme) => void
+    onClose: () => void
+}): ReactNode {
+    return (
+        <Bright>
+            <ThemePopup {...props} />
+        </Bright>
+    )
+}
+
+/** The popup itself, read under [[Bright]]: all its text in the foreground colour. */
+function ThemePopup(
     { current, onPick, onClose }:
         { current: Theme; onPick: (theme: Theme) => void; onClose: () => void }
 ): ReactNode {
     const theme = useTheme()
-    const { rows } = useWindowSize()
+    const { rows } = useTerminalSize()
     const pageSize = Math.max(3, Math.min(entries.length, rows - popupChrome))
     const start = entries.indexOf(current)
     const cursor = useListCursor(entries.length, pageSize, Math.max(0, start))

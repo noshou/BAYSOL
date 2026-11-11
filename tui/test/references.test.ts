@@ -19,6 +19,7 @@ import {
     referenceNote,
     referenceSummary,
 } from "../src/screens/references-screen.js"
+import { setUnits, writeData } from "../src/store/data.js"
 import {
     DataFileError,
     type DataPoints,
@@ -27,10 +28,8 @@ import {
     isNoSigma,
     parseTable,
     resolveReferenceColumns,
-    setUnits,
     textSource,
-    writeData,
-} from "../src/store/data.js"
+} from "../src/store/data-table.js"
 import { ProjectGoneError } from "../src/store/projects.js"
 import {
     addReference,

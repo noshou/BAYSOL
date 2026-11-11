@@ -7,24 +7,30 @@
 import { basename } from "node:path"
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useMemo, useState } from "react"
-import { parseNumber, truncate } from "../core/terminal.js"
+import { numberText, parseNumber, shortNumber, truncate } from "../core/terminal.js"
 import {
-    DataFileError,
     type DataMapping,
-    DEFAULT_PARSE_OPTIONS,
     DEFAULT_UNITS,
     dataErrorNote,
+    makeMapping,
+    readDataInfo,
+    unitLabel,
+    writeData,
+} from "../store/data.js"
+import { measuredPoints, referenceWarning, sigmaWarning } from "../store/data-checks.js"
+import {
+    DataFileError,
+    type DataPoints,
+    DEFAULT_PARSE_OPTIONS,
     extractCurve,
     guessColumns,
     headerModes,
     IMPORT_TUNABLES,
     isNoSigma,
-    makeMapping,
     NO_SIGMA,
     type ParseOptions,
     parseTable,
     type Role,
-    readDataInfo,
     resolveColumn,
     resolveColumns,
     resolveReferenceColumns,
@@ -36,10 +42,9 @@ import {
     separatorProblem,
     sheetNames,
     suggestColumns,
+    type Table,
     type TableRow,
-    unitLabel,
-    writeData,
-} from "../store/data.js"
+} from "../store/data-table.js"
 import type { ProjectRef } from "../store/projects.js"
 import { addReference, referenceUnits } from "../store/references.js"
 import { Frame } from "../ui/frame.js"
@@ -77,6 +82,15 @@ const fieldLabel: Record<Field, string> = {
     q: roleLabel.q,
     i: roleLabel.i,
     sigma: roleLabel.sigma,
+}
+
+/** The column of the model's intensity in a depositor's fit file (q, I, model, error). */
+const REFERENCE_MODEL_COLUMN = 3
+
+/** @returns a preview cell with a number rounded to five digits, a text cell as it is. */
+function roundedCell(text: string): string {
+    const x = numberText(text.trim())
+    return x === undefined ? text : shortNumber(x)
 }
 
 /** The width of the label column of the options panel. */
@@ -121,6 +135,41 @@ function cycle<T>(list: readonly T[], current: T, step: number): T {
 }
 
 /**
+ * The warning for the curve the chosen columns of a table give, `undefined` for none (or
+ * for columns that give no curve: the import says why when it is tried).
+ *
+ * @param table - the whole table.
+ * @param specs - the columns as typed or guessed.
+ * @param reference - whether it is a reference fit (checked against `measured`) or the
+ *     measured curve (its sigma is checked).
+ * @param measured - the project's measured curve, for a reference.
+ */
+function curveWarning(
+    table: Table,
+    specs: Record<Role, string>,
+    reference: boolean,
+    measured: DataPoints | undefined,
+): string | undefined {
+    try {
+        if (reference)
+            return referenceWarning(
+                extractCurve(table, resolveReferenceColumns(specs, table.names)),
+                measured,
+            )
+        const columns = resolveColumns(specs, table.names)
+        return sigmaWarning(
+            extractCurve(table, {
+                q: columns.q.column,
+                i: columns.i.column,
+                sigma: columns.sigma.column,
+            }),
+        )
+    } catch {
+        return undefined
+    }
+}
+
+/**
  * The columns of the preview to draw: those the three roles are on first, then the
  * first others, in the order of the file.
  *
@@ -162,7 +211,9 @@ function visibleColumns(count: number, chosen: number[], room: number): number[]
  *     `reference-fit/` instead of replacing its data; sigma may be `none`, the units are
  *     the project's (shown in the subtitle), and the stored mapping is not used.
  * @param props.onDone - called with the number of points, of rows dropped for a q (or
- *     sigma) not above 0 and, for a reference, the name it got, after a successful import.
+ *     sigma) not above 0, for a reference the name it got, and a warning about the curve
+ *     (a wrong file or columns, see `store/data-checks.ts`) or `undefined`, after a
+ *     successful import (a warning never stops it).
  * @returns the screen.
  */
 export function DataImportScreen(props: {
@@ -171,7 +222,7 @@ export function DataImportScreen(props: {
     source: Source
     initial?: DataMapping
     reference?: boolean
-    onDone: (points: number, dropped: number, name?: string) => void
+    onDone: (points: number, dropped: number, name?: string, warning?: string) => void
 }): ReactNode {
     const { project, path, source, initial, reference = false, onDone } = props
     const nav = useNav()
@@ -220,10 +271,21 @@ export function DataImportScreen(props: {
     )
     const rowCount = rowsOf(source, options.sheet).length
     const guess = useMemo(() => guessColumns(table.names, table.header), [table])
+    // a reference fit starts as the files of the fits come: q first, the model's
+    // intensity in column 3 (a table of two columns has it in column 2) and no sigma
+    const referenceGuess: Record<Role, string> = {
+        q: "col:1",
+        i:
+            table.names.length >= REFERENCE_MODEL_COLUMN
+                ? `col:${REFERENCE_MODEL_COLUMN}`
+                : "col:2",
+        sigma: NO_SIGMA,
+    }
+    const start = reference ? referenceGuess : guess
     const specs: Record<Role, string> = {
-        q: typed.q ?? guess.q,
-        i: typed.i ?? guess.i,
-        sigma: typed.sigma ?? (reference && guess.sigma === "" ? NO_SIGMA : guess.sigma),
+        q: typed.q ?? start.q,
+        i: typed.i ?? start.i,
+        sigma: typed.sigma ?? start.sigma,
     }
     // a reference has the units of the project's data (read once, when the screen opens)
     const units = useMemo(() => {
@@ -233,6 +295,25 @@ export function DataImportScreen(props: {
             return undefined
         }
     }, [reference, project.dir])
+
+    // the measured curve a reference is held against, read once
+    const measured = useMemo(
+        () => (reference ? measuredPoints(project.dir) : undefined),
+        [reference, project.dir],
+    )
+    // what is wrong with the curve the columns give now (the whole file is read again
+    // only when the options or the columns change)
+    const { q: specQ, i: specI, sigma: specSigma } = specs
+    const warning = useMemo(
+        () =>
+            curveWarning(
+                parseTable(source, options),
+                { q: specQ, i: specI, sigma: specSigma },
+                reference,
+                measured,
+            ),
+        [source, options, specQ, specI, specSigma, reference, measured],
+    )
 
     const say = (text: string, error = false) => setNote({ text, error })
 
@@ -262,7 +343,7 @@ export function DataImportScreen(props: {
                 const full = parseTable(source, options)
                 const data = extractCurve(full, resolveReferenceColumns(specs, full.names))
                 const name = addReference(project.dir, data, path)
-                onDone(data.q.length, data.dropped, name)
+                onDone(data.q.length, data.dropped, name, warning)
                 nav.pop()
                 return
             }
@@ -285,7 +366,7 @@ export function DataImportScreen(props: {
                 keep?.energy ?? undefined,
                 makeMapping(path, options, columns),
             )
-            onDone(data.q.length, data.dropped)
+            onDone(data.q.length, data.dropped, undefined, warning)
             nav.pop()
         } catch (error) {
             say(dataErrorNote(error), true)
@@ -395,7 +476,8 @@ export function DataImportScreen(props: {
         { title: "line", width: lineWidth, align: "right", text: (r) => String(r.line) },
         ...visible.map((k) => ({
             title: table.names[k] as string,
-            text: (r: TableRow) => r.cells[k] ?? "",
+            text: (r: TableRow) =>
+                reference ? roundedCell(r.cells[k] ?? "") : (r.cells[k] ?? ""),
         })),
     ]
     const bodyRows = useBodyRows(PROMPT_ROWS + PREVIEW_FRAME_ROWS)
@@ -421,12 +503,12 @@ export function DataImportScreen(props: {
 
     return (
         <Frame
-            title={reference ? "reference" : "data"}
+            title={reference ? "reference fit" : "data"}
             subtitle={`${project.id} · ${truncate(basename(path), 30)}${
                 units === undefined ? "" : ` · ${units}`
             }`}
             legend={legend}
-            note={note?.text}
+            note={note?.text ?? warning}
             noteIsError={note?.error}
         >
             <Box columnGap={1}>

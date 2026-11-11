@@ -6,8 +6,8 @@
 import { Box, Text } from "ink"
 import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react"
 import { displayWidth, wrapLine } from "../core/terminal.js"
-import { runDisplay } from "../store/projects.js"
 import { elapsedText, isEnd, type RunPhase, type RunSession } from "../store/run.js"
+import { runDisplay } from "../store/run-stamp.js"
 import { Frame } from "../ui/frame.js"
 import { type LegendItem, legendFor } from "../ui/grid.js"
 import {

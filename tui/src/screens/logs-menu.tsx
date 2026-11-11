@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // The logs menu (`logs` of the project menu): the runs of a project, the options of one
-// run (views of the files of its plain `logs/` folder and the restores that put its inputs
-// back into the project). `open... > open runs` (results, plots, `run.LOG`) is
+// run (views of the run's own files, from its archive or folder, and the restores that put
+// its inputs back into the project). `open... > open runs` (results, plots, `run.LOG`) is
 // `open-runs.tsx`, whose pager these pages reuse.
 //
 // Contents:
@@ -13,7 +13,7 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react"
 import { appDir, LOGS_FLOW } from "../core/environment.js"
 import { displayWidth } from "../core/terminal.js"
-import { liveRun, type ProjectRef, runDisplay } from "../store/projects.js"
+import { liveRun, type ProjectRef } from "../store/projects.js"
 import {
     bufferFacts,
     conditionsText,
@@ -32,6 +32,7 @@ import {
     sizeText,
     watchBuffer,
 } from "../store/run-logs.js"
+import { runDisplay } from "../store/run-stamp.js"
 import { cornerLabels, Frame, footerExtraLines } from "../ui/frame.js"
 import { type LegendItem, legendBack, legendFor, legendOf, moveLegend } from "../ui/grid.js"
 import {

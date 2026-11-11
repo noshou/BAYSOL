@@ -366,6 +366,8 @@ export function CustomSolutesTable(): ReactNode {
         },
         save: (items) => void writeCustomSolutes(root, items),
         check: (drafts) => problems(drafts, isBuiltinName),
+        label: (entry) => entry.name,
+        sorted: true,
     })
 
     const form = (entry: CustomEntry, row: number | undefined) => {
@@ -439,6 +441,7 @@ export function CustomSolutesTable(): ReactNode {
                 empty={t.locked ? "" : CUSTOM_EMPTY_HINT}
                 width={t.width}
             />
+            {t.finder}
         </Frame>
     )
 }
@@ -518,6 +521,8 @@ export function RecipesTable(): ReactNode {
         save: (recipes) => void writeRecipes(root, recipes),
         // names are checked when they are typed, the solutes when they are saved
         check: () => undefined,
+        label: (recipe) => recipe.name,
+        sorted: true,
     })
     const [naming, setNaming] = useState<Naming>()
     const [problem, setProblem] = useState<string>()
@@ -634,6 +639,7 @@ export function RecipesTable(): ReactNode {
                 empty={t.locked ? "" : RECIPES_EMPTY_HINT}
                 width={t.width}
             />
+            {t.finder}
             {naming ? (
                 <Prompt
                     label="recipe name:"
