@@ -33,12 +33,13 @@ import {
     rowProblem,
     saveRecipe,
     withConditions,
+    writeBufferNotes,
     writeConcUnit,
     writeRecipes,
     writeSolutes,
 } from "../src/store/buffer.js"
 import { MAX_ROWS } from "../src/store/lists.js"
-import { fixture, tempDir as tempRoot } from "./support/fixtures.js"
+import { fixture, tempDir } from "./support/fixtures.js"
 
 /** The fixture the Julia loader is tested against too, `custom-polymer` rows included. */
 const fixtureMap = fixture("buffer/buffer.json")
@@ -54,7 +55,7 @@ const row = (kind: string, n = 0): Record<string, unknown> =>
 
 /** A project folder whose buffer.json holds `text`. */
 function projectWith(text: string): string {
-    const dir = tempRoot()
+    const dir = tempDir()
     writeFileSync(bufferFile(dir), text)
     return dir
 }
@@ -193,7 +194,7 @@ test("custom polymer rows", () => {
 })
 
 test("a missing or empty file is a buffer with no solutes", () => {
-    const dir = tempRoot()
+    const dir = tempDir()
     assert.deepEqual(readSolutes(dir), [])
     for (const text of ["", "  \n", "{}", '{"solutes": []}'])
         assert.deepEqual(readSolutes(projectWith(text)), [], JSON.stringify(text))
@@ -219,13 +220,13 @@ test("a file that cannot be used is told and never written over", () => {
     }
     // more than 999 solutes
     const rows = Array.from({ length: MAX_ROWS + 1 }, () => fixtureRows[0] as BufferRow)
-    assert.throws(() => writeSolutes(tempRoot(), rows), /too many/)
+    assert.throws(() => writeSolutes(tempDir(), rows), /too many/)
     const one =
         '{"kind": "polymer", "name": "p", "arg": "PEG 3350", "mM": 1, "sigma-mM": 0}'
     const text = `{"solutes": [${rows.map(() => one).join(",")}]}`
     assert.throws(() => readSolutes(projectWith(text)), UnusableFileError)
     const full = rows.slice(1).map(() => fixtureRows[0] as BufferRow)
-    const dir = tempRoot()
+    const dir = tempDir()
     writeSolutes(dir, full)
     assert.equal(readSolutes(dir).length, MAX_ROWS)
 })
@@ -234,7 +235,7 @@ test("the fixture is read, and what is written reads back the same", () => {
     const dir = projectWith(fixtureText)
     const solutes = readSolutes(dir)
     assert.deepEqual(solutes, fixtureRows)
-    const other = tempRoot()
+    const other = tempDir()
     writeSolutes(other, solutes)
     assert.deepEqual(readSolutes(other), solutes)
     // the kind goes out as a plain string, two-space indented, ending in a newline
@@ -301,7 +302,7 @@ test("conditions: both or neither, numbers within the limits", () => {
 })
 
 test("conditions are written with the solutes, read back, and kept otherwise", () => {
-    const dir = tempRoot()
+    const dir = tempDir()
     assert.equal(readConditions(dir), undefined)
     writeSolutes(dir, fixtureRows, { pH: 6.5, "sigma-pH": 0.2 })
     assert.deepEqual(readConditions(dir), { pH: 6.5, "sigma-pH": 0.2 })
@@ -351,7 +352,7 @@ test("the concentration unit is kept in the file, per buffer", () => {
 test("a bad unit opens in mM; a switch after a foreign save writes nothing", () => {
     for (const bad of ['"L"', "3", "null"])
         assert.equal(readConcUnit(projectWith(`{"conc-unit": ${bad}}`)), "mM")
-    const none = tempRoot()
+    const none = tempDir()
     writeConcUnit(none, "M")
     assert.equal(existsSync(bufferFile(none)), false)
     const dir = projectWith('{"solutes": []}')
@@ -385,7 +386,7 @@ test("every row of the shared recipes is valid", () => {
 })
 
 test("the recipes fixture round trips, its pH and σ with it", () => {
-    const root = tempRoot()
+    const root = tempDir()
     writeFileSync(recipesFile(root), recipesText)
     const recipes = readRecipes(root)
     assert.deepEqual(
@@ -412,7 +413,7 @@ test("the recipes fixture round trips, its pH and σ with it", () => {
 })
 
 test("no file, no recipes", () => {
-    const root = tempRoot()
+    const root = tempDir()
     assert.deepEqual(readRecipes(root), [])
     assert.equal(recipeSolutes(root, "x"), undefined)
     writeFileSync(recipesFile(root), "")
@@ -420,7 +421,7 @@ test("no file, no recipes", () => {
 })
 
 test("save adds, replaces and keeps", () => {
-    const root = tempRoot()
+    const root = tempDir()
     writeFileSync(
         recipesFile(root),
         '{"recipes": [{"name": "A", "solutes": [], "note": 1}], "other": [1, 2]}',
@@ -446,7 +447,7 @@ test("save adds, replaces and keeps", () => {
 })
 
 test("a save stores the buffer's pH and σ; a buffer without leaves none", () => {
-    const root = tempRoot()
+    const root = tempDir()
     saveRecipe(root, "SEC", [recipeRow], sec)
     assert.deepEqual(recipeConditions(readRecipes(root)[0] as Recipe), sec)
     assert.deepEqual(readRecipes(root)[0]?.pH, 6.8)
@@ -477,15 +478,15 @@ test("a recipe's conditions are both or neither, within the limits", () => {
         { pH: 7, "sigma-pH": sigmaPh.max + 1 },
         { pH: "7", "sigma-pH": 0.1 },
     ]) {
-        const root = tempRoot()
+        const root = tempDir()
         const text = JSON.stringify({ recipes: [{ ...base, ...bad }] })
         writeFileSync(recipesFile(root), text)
         unusableRecipes(() => readRecipes(root))
         unusableRecipes(() => saveRecipe(root, "B", [recipeRow]))
         assert.equal(readFileSync(recipesFile(root), "utf-8"), text, "never overwritten")
-        unusableRecipes(() => writeRecipes(tempRoot(), [{ ...base, ...bad } as Recipe]))
+        unusableRecipes(() => writeRecipes(tempDir(), [{ ...base, ...bad } as Recipe]))
     }
-    const root = tempRoot()
+    const root = tempDir()
     writeRecipes(root, [{ ...base, pH: 7, "sigma-pH": 0 }])
     assert.deepEqual(recipeConditions(readRecipes(root)[0] as Recipe), {
         pH: 7,
@@ -518,7 +519,7 @@ test("unusable recipe files are told and never overwritten", () => {
         '{"recipes": [{"name": "A", "solutes": {}}]}',
         "; a comment",
     ]) {
-        const root = tempRoot()
+        const root = tempDir()
         writeFileSync(recipesFile(root), text)
         unusableRecipes(() => readRecipes(root))
         unusableRecipes(() => saveRecipe(root, "B", [recipeRow]))
@@ -528,7 +529,7 @@ test("unusable recipe files are told and never overwritten", () => {
 })
 
 test("invalid recipe writes are refused", () => {
-    const root = tempRoot()
+    const root = tempDir()
     unusableRecipes(() =>
         writeRecipes(root, [{ name: "A", solutes: [{ kind: "x" } as never] }]),
     )
@@ -543,7 +544,7 @@ test("invalid recipe writes are refused", () => {
 })
 
 test("the recipe caps", () => {
-    const root = tempRoot()
+    const root = tempDir()
     const many = Array.from({ length: MAX_ROWS }, (_, i) => ({
         name: `r${i}`,
         solutes: [],
@@ -591,7 +592,7 @@ test("a rename is unique among the others, a case-only change is allowed", () =>
 })
 
 test("list, rename and delete recipes", () => {
-    const root = tempRoot()
+    const root = tempDir()
     writeFileSync(recipesFile(root), recipesText)
     assert.deepEqual(listRecipes(root)[0], {
         name: "SEC buffer",
@@ -639,7 +640,7 @@ test("kinds of a recipe's rows", () => {
 })
 
 test("removing one recipe keeps the others and refuses after another copy saved", () => {
-    const root = tempRoot()
+    const root = tempDir()
     writeFileSync(recipesFile(root), recipesText)
     const names = () => readRecipes(root).map((r) => r.name)
     const all = names()
@@ -656,4 +657,84 @@ test("removing one recipe keeps the others and refuses after another copy saved"
     const stale = () => removeRecipe(root, rest[0] as string, { guarded: true })
     assert.throws(stale, ChangedOnDiskError)
     assert.equal(names().length, all.length, "nothing was written")
+})
+
+// ----------------------------------------------------------------------------------------
+// The temperature of the buffer (`"temperature"` next to `pH`, `sigma-pH`)
+// ----------------------------------------------------------------------------------------
+
+test("the temperature is written with the conditions, read back, and kept", () => {
+    const dir = tempDir()
+    writeSolutes(dir, fixtureRows, { pH: 7.5, "sigma-pH": 0.1, temperature: 4 })
+    assert.deepEqual(readConditions(dir), { pH: 7.5, "sigma-pH": 0.1, temperature: 4 })
+    const keys = () => Object.keys(JSON.parse(readFileSync(bufferFile(dir), "utf-8")))
+    assert.deepEqual(keys(), ["solutes", "pH", "sigma-pH", "temperature"])
+    // the other writers keep it: rows only, the unit, the notes
+    writeSolutes(dir, fixtureRows.slice(0, 2))
+    readSolutes(dir, { track: true })
+    writeConcUnit(dir, "M")
+    writeBufferNotes(dir, [{ title: "t", text: "x" }])
+    assert.equal(readConditions(dir)?.temperature, 4)
+    // conditions without a temperature take the key off
+    writeSolutes(dir, fixtureRows.slice(0, 2), { pH: 7.5, "sigma-pH": 0.1 })
+    assert.deepEqual(readConditions(dir), { pH: 7.5, "sigma-pH": 0.1 })
+    assert.ok(!keys().includes("temperature"))
+    // the limits are the asset's: 0 and 100 are in, nothing outside
+    for (const t of [0, 100, 22.5])
+        assert.doesNotThrow(() =>
+            writeSolutes(dir, [], { pH: 7, "sigma-pH": 0, temperature: t }),
+        )
+    for (const t of [150, -1, 100.5, Number.NaN])
+        assert.throws(
+            () => writeSolutes(dir, [], { pH: 7, "sigma-pH": 0, temperature: t }),
+            UnusableFileError,
+            String(t),
+        )
+    assert.deepEqual(conditionLimits().temperature, { min: 0, max: 100 })
+})
+
+test("a bad temperature in a file makes it unusable and it is never written over", () => {
+    for (const bad of ["150", "-1", '"4"', "null", "true"]) {
+        const text = `{"solutes": [], "pH": 7, "sigma-pH": 0.1, "temperature": ${bad}}`
+        const dir = projectWith(text)
+        assert.throws(() => readSolutes(dir), UnusableFileError, text)
+        assert.throws(() => readConditions(dir), UnusableFileError, text)
+        assert.throws(() => writeSolutes(dir, []), UnusableFileError, text)
+        assert.equal(readFileSync(bufferFile(dir), "utf-8"), text)
+    }
+    assert.match(conditionsProblem({ temperature: 150 }) ?? "", /^temperature must be/)
+    assert.equal(conditionsProblem({ temperature: 4 }), undefined)
+    // an old file: pH and σ, no temperature
+    assert.deepEqual(conditionsOf({ pH: 7, "sigma-pH": 0.1 }), { pH: 7, "sigma-pH": 0.1 })
+})
+
+test("a recipe keeps its temperature; one without has none", () => {
+    const root = tempDir()
+    saveRecipe(root, "cold", fixtureRows, { pH: 7.5, "sigma-pH": 0.1, temperature: 4 })
+    saveRecipe(root, "old", fixtureRows, { pH: 7, "sigma-pH": 0.2 })
+    const [cold, old] = readRecipes(root) as [Recipe, Recipe]
+    assert.deepEqual(recipeConditions(cold), { pH: 7.5, "sigma-pH": 0.1, temperature: 4 })
+    assert.deepEqual(recipeConditions(old), { pH: 7, "sigma-pH": 0.2 })
+    const saved = JSON.parse(readFileSync(recipesFile(root), "utf-8")).recipes[0]
+    const order = ["name", "solutes", "pH", "sigma-pH", "temperature"]
+    assert.deepEqual(Object.keys(saved), order)
+    assert.equal(listRecipes(root)[0]?.conditions?.temperature, 4)
+    // the other writers keep it (rename, notes), and a replace takes it off with the pH
+    renameRecipe(root, "cold", "colder")
+    assert.equal(recipeConditions(readRecipes(root)[0] as Recipe)?.temperature, 4)
+    assert.equal(withConditions(cold, { pH: 7, "sigma-pH": 0 }).temperature, undefined)
+    saveRecipe(root, "colder", fixtureRows, { pH: 7, "sigma-pH": 0.2 })
+    assert.equal(recipeConditions(readRecipes(root)[0] as Recipe)?.temperature, undefined)
+    // a temperature outside the limits is refused, in a save and in a file
+    assert.throws(
+        () => saveRecipe(root, "hot", [], { pH: 7, "sigma-pH": 0, temperature: 150 }),
+        UnusableFileError,
+    )
+    const bad = tempDir()
+    writeFileSync(
+        recipesFile(bad),
+        '{"recipes": [{"name": "x", "solutes": [], "pH": 7, "sigma-pH": 0,' +
+            ' "temperature": 150}]}',
+    )
+    assert.throws(() => readRecipes(bad), UnusableFileError)
 })

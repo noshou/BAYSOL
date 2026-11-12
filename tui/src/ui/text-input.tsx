@@ -198,6 +198,20 @@ export function useTextBuffer(
 // ========================================================================================
 
 /**
+ * The cells [[TextField]] draws for a buffer (the text, plus one for the cursor cell
+ * after its end), never more than its room: a caller that puts a field into a table cell
+ * pads the rest with spaces.
+ *
+ * @param buffer - the text and the cursor.
+ * @param width - the cells the field may use.
+ * @returns the cells drawn.
+ */
+export function fieldCells(buffer: TextBuffer, width: number): number {
+    const atEnd = buffer.cursor >= buffer.text.length
+    return Math.min(width, displayWidth(buffer.text) + (atEnd ? 1 : 0))
+}
+
+/**
  * The line of an input: the typed text with the cursor drawn as an inverted cell.
  * Text longer than the room scrolls so the cursor stays in view.
  *

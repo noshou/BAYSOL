@@ -1,0 +1,36 @@
+{
+    "temperature": {
+        "default": 25,
+        "min": 0,
+        "max": 100,
+        "maxLength": 8
+    },
+    "liveness": {
+        "staleSeconds": 60,
+        "claimRefreshSeconds": 10
+    },
+    "claim": {
+        "maxStampTries": 600
+    },
+    "abort": {
+        "graceSeconds": 5,
+        "killWaitSeconds": 5
+    },
+    "screen": {
+        "tailLines": 500
+    },
+    "julia": {
+        "threads": "auto,1"
+    },
+    "log": {
+        "maxBytes": 4194304
+    },
+    "archive": {
+        "extension": ".7z",
+        "level": 9,
+        "wordSize": 273,
+        "solid": true,
+        "maxEntryBytes": 33554432,
+        "maxExtractBytes": 536870912
+    }
+}

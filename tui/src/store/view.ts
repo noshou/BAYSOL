@@ -8,9 +8,10 @@
 //   3. Pager: the arithmetic of the text pager and how a text becomes its lines
 //   4. Search, jump, copy: finding cells, `B7` jumps, TSV for the clipboard, formulas
 
-import { readFileSync, statSync } from "node:fs"
 import { stripVTControlCharacters } from "node:util"
 import * as XLSX from "xlsx"
+import { readAssetJson } from "../core/environment.js"
+import { readBounded } from "../core/file-system.js"
 import { displayWidth } from "../core/terminal.js"
 import { scrollTo } from "../ui/interaction.js"
 
@@ -28,21 +29,24 @@ import { scrollTo } from "../ui/interaction.js"
 /**
  * The limits of the viewer: the largest file opened, the most rows, columns and cells
  * held of a sheet (rows are cut to fit), the narrowest and widest column drawn, the rows
- * that decide a column's width and the longest tab name.
+ * that decide a column's width and the longest tab name (`assets/data/sheet_viewer.json`).
  */
-export const VIEWER_LIMITS = {
-    maxBytes: 67108864,
-    maxRows: 20000,
-    maxColumns: 200,
-    maxCells: 400000,
-    minColumnWidth: 3,
-    maxColumnWidth: 32,
-    widthSampleRows: 300,
-    maxTabName: 24,
+export type ViewerLimits = {
+    maxBytes: number
+    maxRows: number
+    maxColumns: number
+    maxCells: number
+    minColumnWidth: number
+    maxColumnWidth: number
+    widthSampleRows: number
+    maxTabName: number
 }
 
-/** The shape of [[VIEWER_LIMITS]]. */
-export type ViewerLimits = typeof VIEWER_LIMITS
+/** The limits of the viewer (see [[ViewerLimits]]). */
+export const VIEWER_LIMITS: ViewerLimits = readAssetJson<ViewerLimits>(
+    "data",
+    "sheet_viewer.json",
+)
 
 /** A file that cannot be viewed; the message is short and fit to show as a note. */
 export class ViewerFileError extends Error {}
@@ -194,17 +198,12 @@ const isBinaryBook = (bytes: Buffer): boolean =>
  */
 export function openWorkbook(path: string, fallbackName: string): Workbook {
     const max = VIEWER_LIMITS
-    let bytes: Buffer
-    try {
-        if (statSync(path).size > max.maxBytes)
-            throw new ViewerFileError(
-                `file too large (${max.maxBytes / 2 ** 20} MB at most)`,
-            )
-        bytes = readFileSync(path)
-    } catch (error) {
-        if (error instanceof ViewerFileError) throw error
-        throw new ViewerFileError("cannot read that file")
-    }
+    const bytes = readBounded(
+        path,
+        max.maxBytes,
+        (message) => new ViewerFileError(message),
+        `file too large (${max.maxBytes / 2 ** 20} MB at most)`,
+    )
     const binary = isBinaryBook(bytes)
     if (!binary && bytes.includes(0)) throw new ViewerFileError("not a table")
     // text is decoded here (SheetJS would read bytes as Latin-1); a workbook is bytes

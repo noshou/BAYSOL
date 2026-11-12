@@ -4,6 +4,7 @@ import { Box, Text, useApp, useWindowSize } from "ink"
 import { type ReactNode, useRef, useState } from "react"
 import { appDir } from "./core/environment.js"
 import { MainMenu } from "./screens/menus.js"
+import { SheetViewerScreen } from "./screens/viewer.js"
 import { hasActiveRuns, quitAll } from "./store/run.js"
 import { readThemeName, writeThemeName } from "./store/settings-store.js"
 import { ThemePicker } from "./ui/input.js"
@@ -37,9 +38,11 @@ function savedTheme(): Theme {
  * screen the user was on. `^t`, on any screen, opens the theme picker over it; the
  * theme picked is remembered for the next start.
  *
+ * @param props.viewFile - a workbook or table file to open in the viewer at once instead
+ *     of the main menu (`--view FILE`, a developer's way to look at a file).
  * @returns the app.
  */
-export function App(): ReactNode {
+export function App({ viewFile }: { viewFile?: string }): ReactNode {
     const [theme, setTheme] = useState<Theme>(savedTheme)
     const [picking, setPicking] = useState(false)
     const { exit } = useApp()
@@ -95,7 +98,13 @@ export function App(): ReactNode {
                 ) : null}
                 <Box flexGrow={1} display={tooSmall ? "none" : "flex"}>
                     <NavProvider
-                        root={<MainMenu />}
+                        root={
+                            viewFile === undefined ? (
+                                <MainMenu />
+                            ) : (
+                                <SheetViewerScreen workbookPath={viewFile} />
+                            )
+                        }
                         suspended={tooSmall || picking}
                     />
                 </Box>

@@ -225,24 +225,24 @@ test("families", () => {
 })
 
 test("family templates: numbers fill the placeholders", () => {
-    assert.deepEqual(familyArg(peg(), 0, { n: "22" }), { arg: "PEG n=22" })
-    assert.deepEqual(familyArg(peg(), 0, { n: 22.0 }), { arg: "PEG n=22" })
-    assert.deepEqual(familyArg(peg(), 0, { n: " 22.5 " }), { arg: "PEG n=22.5" })
-    assert.deepEqual(familyArg(peg(), 1, { Mn: "3350" }), { arg: "PEG 3350" })
-    assert.deepEqual(familyArg(peg(), 1, { Mn: "1e6" }), { arg: "PEG 1000000" })
+    assert.deepEqual(familyArg(peg(), 1, { n: "22" }), { arg: "PEG n=22" })
+    assert.deepEqual(familyArg(peg(), 1, { n: 22.0 }), { arg: "PEG n=22" })
+    assert.deepEqual(familyArg(peg(), 1, { n: " 22.5 " }), { arg: "PEG n=22.5" })
+    assert.deepEqual(familyArg(peg(), 0, { Mn: "3350" }), { arg: "PEG 3350" })
+    assert.deepEqual(familyArg(peg(), 0, { Mn: "1e6" }), { arg: "PEG 1000000" })
     const brijArg = familyArg(brij(), 0, { nC: "12", nEO: "23" })
     assert.deepEqual(brijArg, { arg: "Brij nC=12 nEO=23" })
 })
 
 test("family templates: errors", () => {
-    assert.deepEqual(familyArg(peg(), 0, { n: "twenty" }), { error: "n: not a number" })
-    assert.deepEqual(familyArg(peg(), 0, {}), { error: "n: not a number" })
-    assert.deepEqual(familyArg(peg(), 0, { n: "NaN" }), { error: "n: not a number" })
-    assert.deepEqual(familyArg(peg(), 0, { n: "" }), { error: "n: not a number" })
-    assert.deepEqual(familyArg(peg(), 0, { n: "0" }), { error: "n: must be above 0" })
-    assert.deepEqual(familyArg(peg(), 0, { n: "-3" }), { error: "n: must be above 0" })
-    assert.deepEqual(familyArg(peg(), 0, { n: "1" }), { error: "n: at least 2" })
-    assert.deepEqual(familyArg(peg(), 0, { n: "2" }), { arg: "PEG n=2" })
+    assert.deepEqual(familyArg(peg(), 1, { n: "twenty" }), { error: "n: not a number" })
+    assert.deepEqual(familyArg(peg(), 1, {}), { error: "n: not a number" })
+    assert.deepEqual(familyArg(peg(), 1, { n: "NaN" }), { error: "n: not a number" })
+    assert.deepEqual(familyArg(peg(), 1, { n: "" }), { error: "n: not a number" })
+    assert.deepEqual(familyArg(peg(), 1, { n: "0" }), { error: "n: must be above 0" })
+    assert.deepEqual(familyArg(peg(), 1, { n: "-3" }), { error: "n: must be above 0" })
+    assert.deepEqual(familyArg(peg(), 1, { n: "1" }), { error: "n: at least 2" })
+    assert.deepEqual(familyArg(peg(), 1, { n: "2" }), { arg: "PEG n=2" })
     const noEO = familyArg(brij(), 0, { nC: "12", nEO: "" })
     assert.deepEqual(noEO, { error: "nEO: not a number" })
     assert.deepEqual(familyArg(peg(), 5, { n: "2" }), { error: "no such form" })
@@ -250,12 +250,12 @@ test("family templates: errors", () => {
 
 test("dextran and pullulan: a molar mass below 1000 counts as kDa", () => {
     const note = "below 1000 counts as kDa"
-    assert.deepEqual(familyArg(dextran(), 1, { Mn: "40" }), { arg: "dextran 40", note })
-    assert.deepEqual(familyArg(dextran(), 1, { Mn: "40000" }), { arg: "dextran 40000" })
-    assert.deepEqual(familyArg(dextran(), 0, { n: "250" }), { arg: "dextran n=250" })
-    const glucan = familyArg(need("glucan"), 1, { Mn: "100" })
+    assert.deepEqual(familyArg(dextran(), 0, { Mn: "40" }), { arg: "dextran 40", note })
+    assert.deepEqual(familyArg(dextran(), 0, { Mn: "40000" }), { arg: "dextran 40000" })
+    assert.deepEqual(familyArg(dextran(), 1, { n: "250" }), { arg: "dextran n=250" })
+    const glucan = familyArg(need("glucan"), 0, { Mn: "100" })
     assert.equal("note" in glucan && glucan.note, note)
-    assert.ok(!("note" in familyArg(peg(), 1, { Mn: "100" })))
+    assert.ok(!("note" in familyArg(peg(), 0, { Mn: "100" })))
 })
 
 test("the polymer basis of a row", () => {

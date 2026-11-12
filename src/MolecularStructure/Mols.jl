@@ -257,20 +257,47 @@ function _log_modified_amino_acids(pdb_path::AbstractString, atoms)::Nothing
 end
 
 """
+Log (`@info`, once per structure) the ligands the loader kept from the HETATM records of
+`atoms` ([`is_ligand`](@ref)), with the number of residues per residue name.
+"""
+function _log_ligands(pdb_path::AbstractString, atoms)::Nothing
+    kept = Dict{String,Set{Tuple{String,String}}}()
+    for at in atoms
+        ishetero(at) || continue
+        name = uppercase(resname(at))
+        (is_nucleotide(name) || is_amino_acid(name)) && continue
+        push!(get!(kept, name, Set{Tuple{String,String}}()), _residue_key(at))
+    end
+    isempty(kept) && return nothing
+    stem = replace(splitext(basename(pdb_path))[1], r"_pH[0-9.]+_.*$" => "")
+    _warn_once("ligands", joinpath(dirname(pdb_path), stem); level = :info) do
+        counts = join(
+            ("$k: $(length(v)) residue(s)" for (k, v) in sort!(collect(kept); by = first)),
+            ", ",
+        )
+        "\"$stem\": kept ligands from the HETATM records ($counts); they scatter " *
+        "without hydrogens"
+    end
+    return nothing
+end
+
+"""
 Parse whatever .pdb is at `pdb_path` into a Molecule.
 Works identically whether `pdb_path` is heavy-atom-only or hydrogenated:
-atoms are collected via standardselector alone (no heavyatomselector), so
+atoms are collected by [`_model_selector`](@ref) (no heavyatomselector), so
 a heavy-only file naturally yields just its heavy atoms, and a hydrogenated
-file keeps its hydrogens too.
+file keeps its hydrogens too. Ligands ([`is_ligand`](@ref)) are kept, waters never.
 
 # Arguments
 - `pdb_path`: path to any parseable .pdb, e.g. from [`reslove_struct`](@ref) or
     [`resolve_hydrogens`](@ref BAYSOL.Hydrogenator.resolve_hydrogens).
+- `ligands`: keep the ligands too (waters stay out; default [`KEEP_LIGANDS`](@ref));
+    `false` is the polymer alone ([`polymer_selector`](@ref)).
 
 # Returns
 - `Molecule` built from each atom's element and coordinates.
 """
-function load_molecule(pdb_path::AbstractString)::Molecule
+function load_molecule(pdb_path::AbstractString; ligands::Bool = KEEP_LIGANDS)::Molecule
     isfile(pdb_path) || throw(MoleculeError("no such file: $pdb_path"))
 
     key = splitext(basename(pdb_path))[1]
@@ -297,17 +324,20 @@ function load_molecule(pdb_path::AbstractString)::Molecule
     models = collectmodels(struc)
     isempty(models) && throw(MoleculeError("no atom records in \"$pdb_path\""))
     model = first(models)
-    atoms = collectatoms(model, _model_selector(model))
+    atoms = collectatoms(model, _model_selector(model; ligands))
 
     _log_modified_amino_acids(pdb_path, atoms)
+    ligands && _log_ligands(pdb_path, atoms)
 
     n        = length(atoms)
     elms_v   = Vector{String}(undef, n)
     coords_v = Vector{NTuple{3,Float64}}(undef, n)
 
     @inbounds for (i, at) in enumerate(atoms)
-        el          = element(at)
-        elms_v[i]   = isempty(el) ? _infer_element(atomname(at), ishetero(at)) : el
+        el = element(at)
+        # an ion written as an ATOM record (`MG` of residue `IUM`) is read like a HETATM one
+        hetero      = ishetero(at) || is_ligand(resname(at))
+        elms_v[i]   = isempty(el) ? _infer_element(atomname(at), hetero) : el
         c           = coords(at)
         coords_v[i] = (Float64(c[1]), Float64(c[2]), Float64(c[3]))
     end

@@ -571,6 +571,12 @@ export type Column<R> = {
  *     (the others are muted); none are when left out.
  * @property empty - what to say when there are no rows.
  * @property width - the cells the table may use (the body width of the terminal).
+ * @property inline - a node drawn in place of the text of one cell (an editor inside the
+ *     table): the row (index into `rows`), the column, the node and the cells it draws (the
+ *     rest of the cell is padded).
+ * @property note - lines of text under a row, in one column (the error of an inline
+ *     editor): the row, the column, the lines and their colour; the caller keeps the
+ *     rows they take out of `pageSize`.
  * @property border - the lines of the header rule and between the columns: `"single"`
  *     (smooth screens, default) or `"double"` (blocky screens, [[linesOf]]).
  */
@@ -584,6 +590,8 @@ type DataTableProps<R> = {
     emphasis?: (row: R) => boolean
     empty?:   string
     width:    number
+    inline?:  { row: number; column: number; node: ReactNode; cells: number }
+    note?:    { row: number; column: number; lines: string[]; color?: string }
     border?:  LineStyle
 }
 
@@ -623,34 +631,69 @@ export function columnWidths<R>(columns: Column<R>[], width: number): number[] {
  */
 export function DataTable<R>(props: DataTableProps<R>): ReactNode {
     const { columns, rows, cursor, offset, pageSize, mark, emphasis, empty, width } = props
+    const { inline, note } = props
     const border = props.border ?? "single"
     const theme = useTheme()
     const widths = columnWidths(columns, width)
 
-    // a row of text segments in the colour of the row, the separators in the border colour
+    // a row of text segments in the colour of the row, the separators in the border colour;
+    // a cell is text, or a node and the cells it draws
     const line = (
-        cells: string[],
+        cells: (string | { node: ReactNode; cells: number })[],
         lead: string,
         ink: string,
         bold: boolean,
+        inks?: Record<number, string>,
     ): ReactNode => (
         <Text>
             <Text color={ink} bold={bold}>{lead}</Text>
             {cells.map((c, i) => {
-                const col = columns[i] as Column<R>
                 const w = widths[i] as number
-                const cut = truncate(c, w)
-                const pad = " ".repeat(Math.max(0, w - displayWidth(cut)))
-                const body = col.align === "right" ? pad + cut : padWidth(cut, w)
+                const col = columns[i] as Column<R>
+                let body: ReactNode
+                if (typeof c === "string") {
+                    const cut = truncate(c, w)
+                    const pad = " ".repeat(Math.max(0, w - displayWidth(cut)))
+                    body = col.align === "right" ? pad + cut : padWidth(cut, w)
+                } else {
+                    body = (
+                        <>
+                            {c.node}
+                            {" ".repeat(Math.max(0, w - c.cells))}
+                        </>
+                    )
+                }
                 return (
                     // biome-ignore lint/suspicious/noArrayIndexKey: a column is its place
                     <Fragment key={i}>
                         {i > 0 ? <Bar style={border} /> : null}
-                        <Text color={ink} bold={bold}>{` ${body} `}</Text>
+                        <Text color={inks?.[i] ?? ink} bold={bold}>
+                            {" "}
+                            {body}
+                            {" "}
+                        </Text>
                     </Fragment>
                 )
             })}
         </Text>
+    )
+
+    // a line of the note under a row: blank cells, the text in the note's column
+    const noteLine = (
+        n: NonNullable<DataTableProps<R>["note"]>,
+        text: string,
+        k: number,
+        ink: string,
+    ): ReactNode => (
+        <Fragment key={k}>
+            {line(
+                columns.map((_, j) => (j === n.column ? text : "")),
+                "   ",
+                ink,
+                false,
+                n.color === undefined ? undefined : { [n.column]: n.color },
+            )}
+        </Fragment>
     )
 
     const shown = rows.slice(offset, offset + pageSize)
@@ -673,7 +716,19 @@ export function DataTable<R>(props: DataTableProps<R>): ReactNode {
                 return (
                     // biome-ignore lint/suspicious/noArrayIndexKey: position is the id
                     <Fragment key={offset + i}>
-                        {line(columns.map((c) => c.text(row)), lead, ink, on)}
+                        {line(
+                            columns.map((c, j) =>
+                                inline?.row === offset + i && inline.column === j
+                                    ? inline
+                                    : c.text(row),
+                            ),
+                            lead,
+                            ink,
+                            on,
+                        )}
+                        {note?.row === offset + i
+                            ? note.lines.map((text, k) => noteLine(note, text, k, ink))
+                            : null}
                     </Fragment>
                 )
             })}

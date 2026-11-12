@@ -1,0 +1,10 @@
+{
+    "maxBytes": 67108864,
+    "maxRows": 20000,
+    "maxColumns": 200,
+    "maxCells": 400000,
+    "minColumnWidth": 3,
+    "maxColumnWidth": 32,
+    "widthSampleRows": 300,
+    "maxTabName": 24
+}

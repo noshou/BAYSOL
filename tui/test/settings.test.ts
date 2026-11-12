@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// Tests of store/settings.ts: the definitions and the validation.
+// Tests of store/settings.ts: the definitions and the validation, and the tabs of a `set`
+// setting (`openTabs`/`stepTabs`, `tabLabel`, the boxes legend).
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { readAssetJson } from "../src/core/environment.js"
+import {
+    type LogsFlow,
+    type PlotsFlow,
+    type RunFlow,
+    readAssetJson,
+} from "../src/core/environment.js"
+import { openTabs, PICK_ONE_NOTE, stepTabs } from "../src/screens/screen-rules.js"
 import { colourNames } from "../src/store/colours.js"
+import type { ImportTunables } from "../src/store/data-table.js"
 import {
     type BrokenRelation,
     checkRelations,
@@ -18,6 +26,9 @@ import {
     validateValue,
 } from "../src/store/settings.js"
 import { wipeInvalid } from "../src/store/settings-store.js"
+import type { ViewerLimits } from "../src/store/view.js"
+import { boxesFit, legendFor } from "../src/ui/grid.js"
+import { keys, tabLabel } from "../src/ui/interaction.js"
 import { fixture } from "./support/fixtures.js"
 
 // ========================================================================================
@@ -111,7 +122,7 @@ type Case = {
     with?: Record<string, unknown>
 }
 
-/** Judges a case like `BAYSOL.load_settings`: what the wipe makes of a file holding it. */
+/** Judges a case like `load_settings` (settings-file.jl): what the wipe makes of a file. */
 function judge(c: Case) {
     const stored: Record<string, Record<string, unknown>> = {}
     for (const [name, value] of Object.entries({
@@ -651,4 +662,125 @@ test("an entry that is no map is wiped; a screen that is no map is ignored", () 
     )
     assert.equal(r.saved.get("RNG_SEED"), 3)
     assert.equal(wipeInvalid(catalog, { sampler: 5 }).saved.size, 0)
+})
+
+const choices = ["svg", "pdf", "png"]
+
+test("tabs: left and right stop at the ends, tab goes round", () => {
+    let edit = openTabs(choices, ["pdf"])
+    edit = stepTabs(edit, keys.left).state
+    assert.equal(edit.focus, 0)
+    edit = stepTabs(edit, keys.right).state
+    edit = stepTabs(edit, keys.right).state
+    edit = stepTabs(edit, keys.right).state
+    assert.equal(edit.focus, 2)
+    edit = stepTabs(edit, keys.tab).state
+    assert.equal(edit.focus, 0)
+})
+
+test("tabs: enter and space toggle the tab in focus, esc ends with the choices", () => {
+    let edit = openTabs(choices, ["pdf"])
+    edit = stepTabs(edit, keys.enter).state
+    assert.deepEqual([...edit.selected].sort(), ["pdf", "svg"])
+    edit = stepTabs(edit, keys.right).state
+    edit = stepTabs(edit, keys.space).state
+    assert.deepEqual([...edit.selected], ["svg"])
+    const done = stepTabs(edit, keys.escape)
+    assert.deepEqual(done.end, { kind: "done", value: ["svg"] })
+})
+
+test("tabs: a set needs one choice on, and ctrl-x leaves", () => {
+    let edit = openTabs(choices, ["svg"])
+    edit = stepTabs(edit, keys.enter).state
+    const blocked = stepTabs(edit, keys.escape)
+    assert.equal(blocked.end, undefined)
+    assert.equal(blocked.state.error, PICK_ONE_NOTE)
+    assert.deepEqual(stepTabs(edit, keys.back).end, { kind: "back" })
+})
+
+test("tab labels: on in brackets, off in parentheses, focus in capitals", () => {
+    assert.equal(tabLabel("pdf", true, false), "[pdf]")
+    assert.equal(tabLabel("pdf", false, true), "(PDF)")
+})
+
+test("a boxes legend fits one row only when the boxes and their gaps fit", () => {
+    const items = [legendFor("take", keys.enter), legendFor("cancel", keys.escape)]
+    const width = items.reduce((n, i) => n + i.label.length + 2 + i.keys.length + 4, 0) + 1
+    assert.ok(boxesFit(items, width))
+    assert.ok(!boxesFit(items, width - 1))
+})
+
+/** The keys of a type as a tree: `"array"` for an array, `"value"` for any other leaf. */
+type KeyTree<T> = T extends readonly unknown[] ? "array" : Branches<T>
+type Branches<T> = T extends object ? { [K in keyof T]-?: KeyTree<T[K]> } : "value"
+
+/** The same tree of parsed JSON. */
+function keyTree(json: unknown): unknown {
+    if (Array.isArray(json)) return "array"
+    if (typeof json !== "object" || json === null) return "value"
+    return Object.fromEntries(Object.entries(json).map(([k, v]) => [k, keyTree(v)]))
+}
+
+test("each tunables JSON asset has exactly the keys of its TypeScript type", () => {
+    // The types are erased at run time, so each shape is written once here, typed: a key
+    // added to a type without the JSON (or the reverse) fails to compile or to match.
+    const shapes: [string, unknown][] = []
+    const runFlow: KeyTree<RunFlow> = {
+        temperature: { default: "value", min: "value", max: "value", maxLength: "value" },
+        liveness: { staleSeconds: "value", claimRefreshSeconds: "value" },
+        claim: { maxStampTries: "value" },
+        abort: { graceSeconds: "value", killWaitSeconds: "value" },
+        screen: { tailLines: "value" },
+        julia: { threads: "value" },
+        log: { maxBytes: "value" },
+        archive: {
+            extension: "value",
+            level: "value",
+            wordSize: "value",
+            solid: "value",
+            maxEntryBytes: "value",
+            maxExtractBytes: "value",
+        },
+    }
+    const plotsFlow: KeyTree<PlotsFlow> = {
+        compileSeconds: "value",
+        engineArguments: "array",
+        searched: "array",
+        accepted: "array",
+        folder: "value",
+        dataFolder: "value",
+    }
+    const logsFlow: KeyTree<LogsFlow> = {
+        pager: { overlap: "value", sideStep: "value", tabWidth: "value" },
+        list: { stampWidth: "value", statusWidth: "value", sizeWidth: "value" },
+        options: { fileWidth: "value", sizeWidth: "value" },
+        watch: { pollSeconds: "value", closeSeconds: "value" },
+        corner: { separator: "value", minCells: "value" },
+    }
+    const viewerLimits: KeyTree<ViewerLimits> = {
+        maxBytes: "value",
+        maxRows: "value",
+        maxColumns: "value",
+        maxCells: "value",
+        minColumnWidth: "value",
+        maxColumnWidth: "value",
+        widthSampleRows: "value",
+        maxTabName: "value",
+    }
+    const importTunables: KeyTree<ImportTunables> = {
+        previewRows: "value",
+        sniffLines: "value",
+        commentChars: "array",
+        guesses: { q: "array", i: "array", sigma: "array" },
+    }
+    shapes.push(
+        ["run_flow.json", runFlow],
+        ["plots_flow.json", plotsFlow],
+        ["logs.json", logsFlow],
+        ["sheet_viewer.json", viewerLimits],
+        ["data_import.json", importTunables],
+    )
+    for (const [file, expected] of shapes) {
+        assert.deepEqual(keyTree(readAssetJson("data", file)), expected, file)
+    }
 })

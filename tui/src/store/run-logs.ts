@@ -10,10 +10,10 @@
  * odd.
  *
  * Contents: 1. the state of a run, the run list and the deletion; 2. the files of a run
- * (its own, flat, or under `logs/` in an older run); 3. the options of the logs menu
+ * (its own, flat); 3. the options of the logs menu
  * (`runItems`, `conditionsText`); 4. the restores
  * (`restoreSettings`, `restoreBuffer`, `restoreUnits`); 5. the runs and
- * models (`listOpenRuns`, `openRows`, `findWorkbook`, `firstErrorLine`).
+ * models (`listOpenRuns`, `openRows`, `firstErrorLine`).
  */
 
 import { lstatSync, readdirSync, rmSync } from "node:fs"
@@ -21,45 +21,29 @@ import { basename, isAbsolute, join } from "node:path"
 import { PACK_LOCK } from "../core/archive.js"
 import { RUN_FLOW } from "../core/environment.js"
 import {
-    ChangedOnDiskError,
     FileInUseError,
     isDict,
     isFolder,
-    ParentMissingError,
-    parseJson,
-    UnusableFileError,
     withFileLock,
 } from "../core/file-system.js"
 import { displayWidth, takeWidth, truncateStart } from "../core/terminal.js"
 import {
-    type BufferRow,
-    type Conditions,
-    conditionsOf,
-    readSolutes,
-    rowProblem,
-    writeSolutes,
-} from "./buffer.js"
-import { type DataMapping, readMapping, setEnergy, setUnits, type Units } from "./data.js"
-import { DataFileError } from "./data-table.js"
-import {
     assertNoLiveRun,
     livePid,
     newestRuns,
-    RunInProgressError,
     type RunStatus,
     runDirOf,
     startLockName,
 } from "./projects.js"
 import {
     archivePath,
+    RUN_FILES,
     RunFileMissing,
     RunFileTooLarge,
     readRunText,
     runExists,
-    runFolderFiles,
+    runFiles,
 } from "./run-archive.js"
-import { defaultCatalog } from "./settings.js"
-import { loadProject, wipeInvalid } from "./settings-store.js"
 
 // ---- 1. the state of a run, the run list and the deletion ------------------------------
 
@@ -217,7 +201,7 @@ export const RUN_GONE = "this run was deleted"
 
 /**
  * The text of one of a run's own files (read whole, read only), from the run's archive or
- * from its plain folder; an older run keeps them under `logs/`, which is looked in too.
+ * from its plain folder.
  *
  * @param name - a file of the run (`run.LOG`, `settings.json`, ...), never a path.
  * @throws Error `this run was deleted`, `this run has no <name>`, `<name> is too large
@@ -242,13 +226,13 @@ export function readLogText(runDir: string): string {
 }
 
 /**
- * The files of a run and their sizes, in the archive and in the plain folder (an older
- * run's `logs/` files too, under their own names; empty for a run without either).
+ * The files of a run and their sizes, in the archive and in the plain folder (empty for
+ * a run without either).
  *
  * @returns file name to bytes.
  */
 export function runFileSizes(runDir: string): Map<string, number> {
-    return new Map([...runFolderFiles(runDir, "logs"), ...runFolderFiles(runDir, "")])
+    return runFiles(runDir)
 }
 
 // ---- 3. the options of a run -----------------------------------------------------------
@@ -285,21 +269,36 @@ export type RunItem = {
 
 /** The options of a run, in the order of the list. */
 export const runItems: readonly RunItem[] = [
-    { label: "view run.LOG", file: "run.LOG", action: "pager" },
-    { label: "view settings", file: "settings.json", action: "pager", json: true },
+    { label: "view run.LOG", file: RUN_FILES.log, action: "pager" },
+    { label: "view settings", file: RUN_FILES.settings, action: "pager", json: true },
     {
         label: "restore settings",
-        file: "settings.json",
+        file: RUN_FILES.settings,
         action: "restore",
         restore: "settings",
     },
-    { label: "view buffer", file: "buffer.json", action: "pager", json: true },
-    { label: "restore buffer", file: "buffer.json", action: "restore", restore: "buffer" },
-    { label: "view units and energy", file: "data.json", action: "pager", json: true },
-    { label: "restore units", file: "data.json", action: "restore", restore: "units" },
-    { label: "view conditions", file: "run.LOG", action: "conditions" },
-    { label: "view solutes", file: "solutes.json", action: "pager", json: true },
-    { label: "view models", file: "models.json", action: "pager", json: true },
+    { label: "view buffer", file: RUN_FILES.buffer, action: "pager", json: true },
+    {
+        label: "restore buffer",
+        file: RUN_FILES.buffer,
+        action: "restore",
+        restore: "buffer",
+    },
+    {
+        label: "view units and energy",
+        file: RUN_FILES.dataInfo,
+        action: "pager",
+        json: true,
+    },
+    {
+        label: "restore units",
+        file: RUN_FILES.dataInfo,
+        action: "restore",
+        restore: "units",
+    },
+    { label: "view conditions", file: RUN_FILES.log, action: "conditions" },
+    { label: "view solutes", file: RUN_FILES.solutes, action: "pager", json: true },
+    { label: "view models", file: RUN_FILES.models, action: "pager", json: true },
 ]
 
 /**
@@ -356,175 +355,6 @@ export function conditionsText(log: string): string {
     return lines.length === 0 ? "the LOG records no conditions\n" : `${lines.join("\n")}\n`
 }
 
-// ---- 4. the restores -------------------------------------------------------------------
-
-/**
- * Putting a run's inputs back into the project (the `restore ...` options of the logs
- * menu). The caller reads the text of the run's own copy (`settings.json`, `buffer.json`,
- * `data.tsv`, `data.json`) and hands it here; nothing is ever written into the run, and
- * every write goes through the store that owns the file (its validation, its lock, its
- * atomic replace, `ChangedOnDiskError`). Every restore refuses while a run of the project
- * is live, and says in a short sentence what is wrong with a file it cannot use; nothing
- * is written then.
- */
-
-/** The error of a run file that cannot be restored; the message is short, for a note. */
-export class RestoreError extends Error {}
-
-/**
- * The JSON object in a text.
- *
- * @throws [[RestoreError]] `<name> is not usable` for anything else.
- */
-function objectOf(text: string, name: string): Record<string, unknown> {
-    let value: unknown
-    try {
-        value = parseJson(text)
-    } catch {
-        throw new RestoreError(`${name} is not usable`)
-    }
-    if (!isDict(value)) throw new RestoreError(`${name} is not usable`)
-    return value
-}
-
-/**
- * Restores the settings of the project to those of a run: every setting the run's
- * `settings.json` holds (a value that is not valid is left out) is set, and a setting the
- * project has saved that the run's file lacks goes to its default (that is what the run
- * used). The values are checked together with the rules between settings and saved
- * through the settings store (its lock and merge).
- *
- * @param globalDir - the BAYSOL folder (the baseline of a project's settings).
- * @throws [[RestoreError]] for a file that is no settings map or whose values break a
- *     rule; `RunInProgressError` for a live run; whatever the store throws (project gone,
- *     file in use).
- */
-export function restoreSettings(project: string, globalDir: string, text: string): void {
-    const stored = objectOf(text, "settings.json")
-    assertNoLiveRun(project)
-    const catalog = defaultCatalog()
-    const { settings } = loadProject(project, globalDir, catalog)
-    const kept = wipeInvalid(catalog, stored).saved
-    const changes: Record<string, unknown> = Object.fromEntries(kept)
-    for (const def of catalog.defs())
-        if (!kept.has(def.name) && settings.isSaved(def.name))
-            changes[def.name] = def.default
-    const result = settings.set(changes)
-    if (!result.ok) {
-        const first = [...result.errors][0]
-        throw new RestoreError(first ? `${first[0]} ${first[1]}` : "settings are not valid")
-    }
-    settings.save()
-}
-
-/**
- * What a run's `buffer.json` holds, for the question before it replaces the buffer.
- *
- * @returns the solutes and the conditions (`undefined` when it has none).
- * @throws [[RestoreError]] for a file that is not a buffer.
- */
-export function bufferFacts(text: string): {
-    rows: BufferRow[]
-    conditions: Conditions | undefined
-} {
-    const map = objectOf(text, "buffer.json")
-    const rows = map.solutes
-    if (!Array.isArray(rows)) throw new RestoreError("buffer.json has no solutes")
-    for (const row of rows) {
-        if (rowProblem(row) !== undefined)
-            throw new RestoreError("buffer.json is not usable")
-    }
-    return { rows: rows as BufferRow[], conditions: conditionsOf(map) }
-}
-
-/**
- * Starts watching the project's buffer file for the replace question: the version read
- * now is the one [[restoreBuffer]] checks, so a save by another copy while the question
- * is open makes the restore refuse (`ChangedOnDiskError`) instead of losing that save.
- * A buffer that cannot be read is not watched (the restore says why).
- */
-export function watchBuffer(project: string): void {
-    try {
-        readSolutes(project, { track: true })
-    } catch {
-        // an unusable file: the restore reports it
-    }
-}
-
-/**
- * Restores the buffer of the project to a run's: its solutes and its pH and σ in ONE
- * write (a run file without conditions leaves the project's own).
- *
- * @throws [[RestoreError]] for a file that is not a buffer; `RunInProgressError` for a
- *     live run; `ChangedOnDiskError`, `UnusableFileError`, `ProjectGoneError` from the
- *     buffer store.
- */
-export function restoreBuffer(project: string, text: string): void {
-    const { rows, conditions } = bufferFacts(text)
-    assertNoLiveRun(project)
-    writeSolutes(project, rows, conditions)
-}
-
-/**
- * The units, energy, source and import mapping of a run's `data.json`, checked.
- *
- * @returns the units of q, the X-ray energy (`undefined` when the run had none), the name
- *     of the file the curve came from and the mapping of the import, if it says.
- * @throws [[RestoreError]] `data.json is not usable` for units that are none of the two
- *     or an energy that is no number above 0.
- */
-function infoOf(json: string): {
-    units: Units
-    energy?: number
-    source?: string
-    mapping?: DataMapping
-} {
-    const { units, energy, source, mapping } = objectOf(json, "data.json")
-    const badUnits = units !== "nm-1" && units !== "A-1"
-    const badEnergy = energy != null && !(typeof energy === "number" && energy > 0)
-    if (badUnits || badEnergy) throw new RestoreError("data.json is not usable")
-    return {
-        units: units as Units,
-        energy: typeof energy === "number" ? energy : undefined,
-        source: typeof source === "string" ? source : undefined,
-        mapping: readMapping(mapping),
-    }
-}
-
-/**
- * Restores the units of q and the X-ray energy of the project's data to a run's: only
- * `data.json` is written (the table and the mapping never), through the data store's
- * edits.
- *
- * @throws [[RestoreError]] when it is not usable; `DataFileError` `no data yet` when the
- *     project has no data; `RunInProgressError` for a live run; `UnusableFileError`.
- */
-export function restoreUnits(project: string, json: string): void {
-    const { units, energy } = infoOf(json)
-    assertNoLiveRun(project)
-    setUnits(project, units)
-    if (energy !== undefined) setEnergy(project, energy)
-}
-
-/**
- * The words for a failure of a restore, for the line of a screen.
- *
- * @returns the message of the errors that say it themselves (a restore, the data store,
- *     an unusable file, a live run, another copy's save or lock, a deleted project), else
- *     `could not restore`.
- */
-export function restoreErrorNote(error: unknown): string {
-    const speaks =
-        error instanceof RestoreError ||
-        error instanceof DataFileError ||
-        error instanceof UnusableFileError ||
-        error instanceof RunInProgressError ||
-        error instanceof ChangedOnDiskError ||
-        error instanceof FileInUseError ||
-        error instanceof ParentMissingError
-    return speaks ? (error as Error).message : "could not restore"
-}
-
 // ---- 5. the runs and models of `open runs` ---------------------------------------------
 
 /**
@@ -555,14 +385,13 @@ type ModelState =
  * @property workbook - the results workbook of a finished model (a path in the run's
  *     folder, which may exist only in the archive: [[materializeRunFile]] gives a file),
  *     `undefined` for a model that is not done or has none.
- * @property plots - the model's plots text, `<model>-plots.txt` (`output/plots.txt` in an
- *     older run; it may not exist, the viewer says so).
+ * @property plots - the model's plots text, `<model>-plots.txt` (it may not exist, the
+ *     viewer says so).
  * @property plotSizes - the same plots at more sizes (`plot_sizes` of `run.json`), the
  *     viewer shows the largest that fits; empty for a run that has none.
  * @property overrides - the names of the settings the model has of its own.
  * @property tex - the `.tex` figures it has, in the archive or in its folder: names
- *     relative to the run folder (`<model>.tex`; `<model>/output/plots/<name>.tex` in an
- *     older run), sorted.
+ *     relative to the run folder (`<model>.tex`), sorted.
  */
 export type OpenModel = {
     name: string
@@ -606,49 +435,6 @@ export type OpenRun = {
 /** The name the comparison goes by in the list and in notes. */
 const COMPARE_NAME = "comparison"
 
-/** The folder of the comparison, in the run folder. */
-const COMPARE_FOLDER = "compare"
-
-/** The folder of a model that holds what `results` wrote. */
-const OUTPUT_FOLDER = "output"
-
-/** The folder of the `.tex` figures, in a model's output folder and in the comparison's. */
-const TEX_FOLDER = "plots"
-
-/** The `.tex` figures in a folder of a run, as paths relative to the run folder. */
-function texFiles(dir: string, folder: string): string[] {
-    return [...runFolderFiles(dir, folder).keys()]
-        .filter((n) => n.endsWith(".tex"))
-        .sort()
-        .map((n) => `${folder}/${n}`)
-}
-
-/** The name of a model's plain-text unicode plots in its output folder. */
-const PLOTS_FILE = "plots.txt"
-
-/**
- * The results workbook of a model: the `.xlsx` that `results` wrote into its output
- * folder. It is named for the model (`<model>.xlsx`), and that one is preferred, but the
- * real name is whatever is there: otherwise the first `.xlsx` in name order. Lock and
- * hidden files (`~$x.xlsx`, `.x.xlsx`) are not workbooks.
- *
- * @returns the path, or `undefined` when there is no workbook (or no folder).
- */
-export function findWorkbook(outputDir: string, model: string): string | undefined {
-    let names: string[]
-    try {
-        names = readdirSync(outputDir)
-    } catch {
-        return undefined
-    }
-    const books = names
-        .filter((n) => /\.xlsx$/i.test(n) && !n.startsWith("~$") && !n.startsWith("."))
-        .sort()
-    const named = books.find((n) => n === `${model}.xlsx`)
-    const pick = named ?? books[0]
-    return pick === undefined ? undefined : join(outputDir, pick)
-}
-
 /**
  * A file named in `run.json`, inside the run folder: a relative path with no `..`, no
  * drive and no backslash.
@@ -682,12 +468,9 @@ function overridesOf(list: unknown): string[] {
     return Array.isArray(list) ? list.filter((x): x is string => typeof x === "string") : []
 }
 
-/**
- * The names a `files` list of `run.json` holds (flat names of the run folder), or
- * `undefined` for an entry that has no such list (a run of an older layout).
- */
-function listedFiles(list: unknown): string[] | undefined {
-    if (!Array.isArray(list)) return undefined
+/** The names a `files` list of `run.json` holds (flat names of the run folder). */
+function listedFiles(list: unknown): string[] {
+    if (!Array.isArray(list)) return []
     return list.filter(
         (f): f is string => typeof f === "string" && f !== "" && !f.includes("/"),
     )
@@ -733,36 +516,20 @@ function openModels(
         if (!isDict(m) || typeof m.name !== "string") continue
         const name = m.name
         if (name === "" || name.startsWith(".") || basename(name) !== name) continue
-        const output = join(dir, name, OUTPUT_FOLDER)
         const state = modelState(m.status, run)
         const files = listedFiles(m.files)
-        if (files !== undefined) {
-            // the flat layout: the files are named in `run.json`
-            const book = files.includes(`${name}.xlsx`)
-                ? `${name}.xlsx`
-                : files.filter((f) => f.endsWith(".xlsx")).sort()[0]
-            out.push({
-                name,
-                state,
-                error: typeof m.error === "string" && m.error !== "" ? m.error : undefined,
-                workbook:
-                    state === "done" && book !== undefined ? join(dir, book) : undefined,
-                plots: join(dir, `${name}-plots.txt`),
-                plotSizes: plotFilesOf(dir, m.plot_sizes),
-                overrides: overridesOf(m.overrides),
-                tex: texOf(files),
-            })
-            continue
-        }
+        const book = files.includes(`${name}.xlsx`)
+            ? `${name}.xlsx`
+            : files.filter((f) => f.endsWith(".xlsx")).sort()[0]
         out.push({
             name,
             state,
             error: typeof m.error === "string" && m.error !== "" ? m.error : undefined,
-            workbook: state === "done" ? findWorkbook(output, name) : undefined,
-            plots: join(output, PLOTS_FILE),
+            workbook: state === "done" && book !== undefined ? join(dir, book) : undefined,
+            plots: join(dir, `${name}-plots.txt`),
             plotSizes: plotFilesOf(dir, m.plot_sizes),
             overrides: overridesOf(m.overrides),
-            tex: texFiles(dir, `${name}/${OUTPUT_FOLDER}/${TEX_FOLDER}`),
+            tex: texOf(files),
         })
     }
     return out
@@ -770,8 +537,7 @@ function openModels(
 
 /**
  * The comparison of a `run.json` (its `compare` entry), as a model named `comparison`:
- * its workbook is the `.xlsx` of `files` (else the one in `compare/`), its plots the
- * `compare/plots.txt`.
+ * its table `compare.tsv`, its figures and its plots `compare-plots.txt`.
  *
  * @returns it, or `undefined` for a run with no `compare` entry.
  */
@@ -784,38 +550,16 @@ function openCompare(
     if (!isDict(c)) return undefined
     const state = modelState(c.status, run)
     const files = listedFiles(c.files)
-    if (files !== undefined && files.length > 0) {
-        // the flat layout: `compare.tsv`, `compare.tex`, `compare-plots.txt`
-        const table = files.find((f) => f.endsWith(".tsv"))
-        return {
-            name: COMPARE_NAME,
-            state,
-            error: typeof c.error === "string" && c.error !== "" ? c.error : undefined,
-            workbook:
-                state === "done" && table !== undefined ? join(dir, table) : undefined,
-            plots: join(dir, "compare-plots.txt"),
-            plotSizes: plotFilesOf(dir, c.plot_sizes),
-            overrides: [],
-            tex: texOf(files),
-        }
-    }
-    const folder = join(dir, COMPARE_FOLDER)
-    const listed = (Array.isArray(c.files) ? c.files : [])
-        .filter((f) => typeof f === "string" && /\.xlsx$/i.test(f))
-        .map((f) => runFilePath(dir, f))
-        .find((f) => f !== undefined)
+    const table = files.find((f) => f.endsWith(".tsv"))
     return {
         name: COMPARE_NAME,
         state,
         error: typeof c.error === "string" && c.error !== "" ? c.error : undefined,
-        workbook:
-            state === "done"
-                ? (listed ?? findWorkbook(folder, `${basename(dir)}_compare`))
-                : undefined,
-        plots: join(folder, PLOTS_FILE),
+        workbook: state === "done" && table !== undefined ? join(dir, table) : undefined,
+        plots: join(dir, "compare-plots.txt"),
         plotSizes: plotFilesOf(dir, c.plot_sizes),
         overrides: [],
-        tex: texFiles(dir, `${COMPARE_FOLDER}/${TEX_FOLDER}`),
+        tex: texOf(files),
     }
 }
 

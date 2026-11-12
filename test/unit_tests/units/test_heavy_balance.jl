@@ -71,7 +71,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
                 :info,
                 r"dropped 3 heavy atom\(s\) of \"in.pdb\".*\(1 H5T removed",
             ) restore_dropped_atoms!(inp, out)
-            @test r == (restored = 3, added = 0, h5t_dropped = 1)
+            @test r == (restored = 3, added = 0, h5t_dropped = 1, ligands = 0)
             @test sort(atom_names(out, 1)) ==
                   sort(["P", "OP1", "OP2", BASE..., "H5'"])          # H5T gone, H5' stays
             @test "H5'" in atom_names(out, 1)
@@ -86,7 +86,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
             @test strip(ls[1][77:78]) == "P"
             # a second call finds nothing to do
             @test_logs restore_dropped_atoms!(inp, out) ==
-                       (restored = 0, added = 0, h5t_dropped = 0)
+                       (restored = 0, added = 0, h5t_dropped = 0, ligands = 0)
         end
 
         @testset "only the phosphorus: no H5T to remove elsewhere" begin
@@ -98,7 +98,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
                 inp,
                 out,
             )) ==
-                  (restored = 1, added = 0, h5t_dropped = 0)
+                  (restored = 1, added = 0, h5t_dropped = 0, ligands = 0)
             @test "P" in atom_names(out, 1)
             # a non-phosphorus atom that is lost does not touch H5T
             input = residue("G", 'A', 1, [BASE..., "N7"])
@@ -109,7 +109,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
                 inp,
                 out,
             )) ==
-                  (restored = 1, added = 0, h5t_dropped = 0)
+                  (restored = 1, added = 0, h5t_dropped = 0, ligands = 0)
             @test "H5T" in atom_names(out, 1) && "N7" in atom_names(out, 1)
         end
 
@@ -123,7 +123,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
             )
             before = read(out, String)
             @test (@test_logs restore_dropped_atoms!(inp, out)) ==
-                  (restored = 0, added = 0, h5t_dropped = 0)
+                  (restored = 0, added = 0, h5t_dropped = 0, ligands = 0)
             @test read(out, String) == before
             # hydrogens of the input are not heavy atoms: not lost when the output has none
             inp = wr(dir, "hin.pdb", [res; residue("ALA", 'A', 1, ["HA", "1HB"]; s0 = 50)])
@@ -146,7 +146,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
             out = wr(dir, "oc.out.pdb", output)
             before = read(out, String)
             @test (@test_logs restore_dropped_atoms!(inp, out)) ==
-                  (restored = 0, added = 0, h5t_dropped = 0)
+                  (restored = 0, added = 0, h5t_dropped = 0, ligands = 0)
             @test read(out, String) == before
             # an atom pdb2pqr adds (the OXT of a chain end) is counted and warned about
             input = residue("ALA", 'A', 1, ["N", "CA", "C", "O"])
@@ -158,7 +158,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
             before = read(out, String)
             warn = r"pdb2pqr added 1 heavy atom\(s\) to \"add.pdb\""
             r = @test_logs (:warn, warn) restore_dropped_atoms!(inp, out)
-            @test r == (restored = 0, added = 1, h5t_dropped = 0)
+            @test r == (restored = 0, added = 1, h5t_dropped = 0, ligands = 0)
             @test read(out, String) == before
             # lost and added at once, far apart: both
             input = residue("ALA", 'A', 1, ["N", "CA", "C", "O", "CB"])
@@ -168,7 +168,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
                 inp,
                 out,
             )
-            @test r == (restored = 1, added = 1, h5t_dropped = 0)
+            @test r == (restored = 1, added = 1, h5t_dropped = 0, ligands = 0)
             @test "CB" in atom_names(out, 1)
         end
 
@@ -189,12 +189,35 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
             out2 =
                 wr(dir, "bl2.out.pdb", [output; residue("G", 'B', 7, [BASE...]; s0 = 500)])
             @test (@test_logs restore_dropped_atoms!(inp, out2)).restored == 0
-            # waters and ligands absent from the output are left alone
+            # waters and placeholders (UNL) absent from the output are left alone
             input = [residue("ALA", 'A', 1, ["N", "CA", "C", "O"]);
-                residue("HOH", 'A', 101, ["O"]; rec = "HETATM", s0 = 50)]
+                residue("HOH", 'A', 101, ["O"]; rec = "HETATM", s0 = 50);
+                residue("UNL", 'A', 102, ["C", "N"]; rec = "HETATM", s0 = 60)]
             out = wr(dir, "w.out.pdb", residue("ALA", 'A', 1, ["N", "CA", "C", "O"]))
             @test (@test_logs restore_dropped_atoms!(wr(dir, "w.pdb", input), out)) ==
-                  (restored = 0, added = 0, h5t_dropped = 0)
+                  (restored = 0, added = 0, h5t_dropped = 0, ligands = 0)
+            @test countlines(out) == 4
+            # a ligand with a known composition that pdb2pqr dropped (an ATP-like GTP, a
+            # glycerol) is put back, verbatim and after the last atom record; one the
+            # output keeps (heme) is not duplicated
+            input = [residue("ALA", 'A', 1, ["N", "CA", "C", "O"]);
+                residue("GOL", 'A', 201, ["C", "N", "O"]; rec = "HETATM", s0 = 50);
+                residue("HEM", 'A', 202, ["C", "N"]; rec = "HETATM", s0 = 60)]
+            out = wr(
+                dir, "lig.out.pdb",
+                [residue("ALA", 'A', 1, ["N", "CA", "C", "O"]);
+                    residue("HEM", 'A', 202, ["C", "N"]; rec = "HETATM", s0 = 60);
+                    "END"],
+            )
+            r = @test_logs (:info, r"dropped 1 ligand residue") restore_dropped_atoms!(
+                wr(dir, "lig.pdb", input), out,
+            )
+            @test r == (restored = 0, added = 0, h5t_dropped = 0, ligands = 3)
+            got = readlines(out)
+            @test count(l -> startswith(l, "HETATM") && l[18:20] == "GOL", got) == 3
+            @test count(l -> startswith(l, "HETATM") && l[18:20] == "HEM", got) == 2
+            @test got[end] == "END"
+            @test got[end-1][18:20] == "GOL"
             # alternate locations are one atom
             alt = [residue("ALA", 'A', 1, ["N", "CA"]);
                 [l[1:16] * "B" * l[18:end] for l in residue("ALA", 'A', 1, ["N"]; s0 = 9)]]
@@ -205,7 +228,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
             lines = [residue("ALA", 'A', 1, ["N", "CA", "C", "O", "CB"]);
                 residue("ALA", 'A', 1, ["H", "HA", "1HB", "2HB"]; s0 = 50);
                 residue("HOH", 'B', 2, ["O"]; rec = "HETATM", s0 = 100)]
-            @test heavy_atom_count(wr(dir, "c.pdb", lines)) == 6          # waters count
+            @test heavy_atom_count(wr(dir, "c.pdb", lines)) == 5   # no waters
             # an element column decides when there is one
             d = [
                 pdbline("ATOM", 1, "HG", "MET", 'A', 1, "H");
@@ -226,9 +249,13 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
         @testset "the .balance file" begin
             out = joinpath(dir, "hyd.pdb")
             @test hydrogenation_balance(out) === nothing
-            _write_balance(out, (restored = 1, added = 2, h5t_dropped = 3))
-            @test read(out * ".balance", String) == "1\t2\t3\n"
-            @test hydrogenation_balance(out) == (restored = 1, added = 2, h5t_dropped = 3)
+            _write_balance(out, (restored = 1, added = 2, h5t_dropped = 3, ligands = 4))
+            @test read(out * ".balance", String) == "1\t2\t3\t4\n"
+            @test hydrogenation_balance(out) ==
+                  (restored = 1, added = 2, h5t_dropped = 3, ligands = 4)
+            # the three-field record of an older version is no record (the output is stale)
+            write(out * ".balance", "1\t2\t3\n")
+            @test hydrogenation_balance(out) === nothing
             write(out * ".balance", "1\t2\n")
             @test hydrogenation_balance(out) === nothing
             write(out * ".balance", "a\tb\tc\n")
@@ -250,7 +277,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
                 )
                 @test basename(hp) == "nt-bal-1ehz_pH7.4_amber_notitration.pdb"
                 @test hydrogenation_balance(hp) ==
-                      (restored = 1, added = 0, h5t_dropped = 1)
+                      (restored = 1, added = 0, h5t_dropped = 1, ligands = 0)
                 @test isfile(hp * ".balance")
                 # the phosphorus of residue 1 is in the output, the H5T is not
                 res1 = [
@@ -266,7 +293,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
                     titration = NoTitration(),
                 ) == hp
                 @test hydrogenation_balance(hp) ==
-                      (restored = 1, added = 0, h5t_dropped = 1)
+                      (restored = 1, added = 0, h5t_dropped = 1, ligands = 0)
                 @test heavy_atom_count(hp) == heavy_atom_count(path)
 
                 path = joinpath(dir, "nt-bal-1crn.pdb")
@@ -274,7 +301,7 @@ const BASE = ["O5'", "C5'", "C4'", "O4'", "C3'", "C2'", "C1'", "N9", "C8"]
                 hp = resolve_hydrogens(path, 7.4; titration = Propka())
                 b = hydrogenation_balance(hp)
                 # crambin has its OXT already
-                @test b == (restored = 0, added = 0, h5t_dropped = 0)
+                @test b == (restored = 0, added = 0, h5t_dropped = 0, ligands = 0)
                 @test b.added == heavy_atom_count(hp) - heavy_atom_count(path)
             finally
                 for f in readdir(_store_dir())

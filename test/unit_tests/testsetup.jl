@@ -16,6 +16,13 @@ if !@isdefined(check_float)
 
     check_float(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
 
+    # The value of every setting at its default, the `Dict` that the keyword helpers
+    # (`seed_keywords`, `run_keywords`, `results_keywords`) take: what `load_settings` of
+    # `tui/src/store/settings-file.jl` returns when there is no settings file.
+    default_settings() = Dict{Symbol,Any}(
+        n => BAYSOL.Pipeline._setting_default(n) for n in BAYSOL.Pipeline._setting_names()
+    )
+
     # Complex `Yₗᵐ` (packed row l(l+1)÷2 + m + 1, one column per point) from the one
     # implementation, the in-place `SphFuncs.sphHarm!`, which writes the real layout
     # [Re Y; −Im Y] per degree: builds the output and the workspace and converts (an

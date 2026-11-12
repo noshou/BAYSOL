@@ -28,6 +28,7 @@ import { isDict, type ReadOptions } from "../core/file-system.js"
 import {
     fold,
     formatNumber,
+    NAME_IN_USE,
     type NumberRules,
     type Parsed,
     parseNumber,
@@ -59,9 +60,6 @@ const FALLBACK_NOTE = "(fallback)"
 
 /** The message a name that is a built-in solute, polymer grade or family gets. */
 const BUILTIN_MESSAGE = "name is built-in"
-
-/** The message a name that another entry has gets. */
-const IN_USE_MESSAGE = "name in use"
 
 // ========================================================================================
 // 1. The entries and the table state
@@ -258,7 +256,7 @@ export function entryProblem(
     if (own) return own
     if (builtin?.(e.name)) return { field: "name", message: BUILTIN_MESSAGE }
     if (otherNames.some((n) => fold(n) === fold(e.name)))
-        return { field: "name", message: IN_USE_MESSAGE }
+        return { field: "name", message: NAME_IN_USE }
     return undefined
 }
 
@@ -283,7 +281,7 @@ export function problems(
         const message =
             fieldMessage(e) ??
             (builtin?.(e.name) ? BUILTIN_MESSAGE : undefined) ??
-            (seen.has(key) ? IN_USE_MESSAGE : undefined)
+            (seen.has(key) ? NAME_IN_USE : undefined)
         if (message) return [i, message]
         seen.add(key)
     }

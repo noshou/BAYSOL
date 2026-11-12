@@ -50,7 +50,7 @@ import {
 import { claimRun } from "../src/store/run.js"
 import { defaultCatalog } from "../src/store/settings.js"
 import { loadGlobal, loadProject, settingsFile } from "../src/store/settings-store.js"
-import { fixture, tempDir as tmp } from "./support/fixtures.js"
+import { fixture, runOn, tempDir } from "./support/fixtures.js"
 
 const worker = fileURLToPath(new URL("./support/lock-worker.ts", import.meta.url))
 
@@ -67,7 +67,7 @@ function runWorker(file: string, cycles: number): Promise<number | null> {
 // ---- the lock ----------------------------------------------------------------------
 
 test("four real processes counting under the lock lose no update", async () => {
-    const file = join(tmp(), "counter.txt")
+    const file = join(tempDir(), "counter.txt")
     writeFileSync(file, "0")
     const codes = await Promise.all([1, 2, 3, 4].map(() => runWorker(file, 25)))
     assert.deepEqual(codes, [0, 0, 0, 0])
@@ -76,7 +76,7 @@ test("four real processes counting under the lock lose no update", async () => {
 })
 
 test("the lock is released when the work throws, and the result is returned", () => {
-    const file = join(tmp(), "x.json")
+    const file = join(tempDir(), "x.json")
     assert.throws(
         () =>
             withFileLock(file, () => {
@@ -91,7 +91,7 @@ test("the lock is released when the work throws, and the result is returned", ()
 })
 
 test("a stale lock is broken", () => {
-    const file = join(tmp(), "x.json")
+    const file = join(tempDir(), "x.json")
     mkdirSync(`${file}.lock`)
     const old = new Date(Date.now() - 60_000)
     utimesSync(`${file}.lock`, old, old)
@@ -102,7 +102,7 @@ test("a stale lock is broken", () => {
 })
 
 test("a lock held by another copy times out with a clear error", () => {
-    const file = join(tmp(), "settings.json")
+    const file = join(tempDir(), "settings.json")
     mkdirSync(`${file}.lock`) // fresh: its owner is alive
     const t0 = Date.now()
     assert.throws(
@@ -128,7 +128,7 @@ const saved = (dir: string): Record<string, unknown> => {
 }
 
 test("two copies changing different settings both survive", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const a = loadGlobal(dir).settings
     const b = loadGlobal(dir).settings
     assert.equal(a.set({ N_ADAPT: 450 }).ok, true)
@@ -141,7 +141,7 @@ test("two copies changing different settings both survive", () => {
 })
 
 test("for the same setting the last save wins, and a reset is a change too", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const a = loadGlobal(dir).settings
     const b = loadGlobal(dir).settings
     a.set({ N_ADAPT: 450, N_DRAWS: 900 })
@@ -156,7 +156,7 @@ test("for the same setting the last save wins, and a reset is a change too", () 
 })
 
 test("project settings of two copies merge the same way", () => {
-    const root = tmp()
+    const root = tempDir()
     const p = join(root, "projects", "p")
     mkdirSync(p, { recursive: true })
     const a = loadProject(p, root).settings
@@ -169,7 +169,7 @@ test("project settings of two copies merge the same way", () => {
 })
 
 test("a garbled file is kept aside, never silently written over", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const a = loadGlobal(dir).settings
     a.set({ N_ADAPT: 450 })
     writeFileSync(settingsFile(dir), "{ garbled")
@@ -179,7 +179,7 @@ test("a garbled file is kept aside, never silently written over", () => {
 })
 
 test("the first load does not clobber a file that appeared meanwhile", () => {
-    const dir = tmp()
+    const dir = tempDir()
     // The other copy made its file first; a load under the lock finds it.
     writeFileSync(settingsFile(dir), writeJson({ sampler: { N_ADAPT: { value: 450 } } }))
     const r = loadGlobal(dir)
@@ -188,7 +188,7 @@ test("the first load does not clobber a file that appeared meanwhile", () => {
 })
 
 test("a save wipes a conflicting value from the other copy as a load does", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const a = loadGlobal(dir).settings
     a.set({ N_ADAPT: 450 })
     writeFileSync(
@@ -205,7 +205,7 @@ test("a save wipes a conflicting value from the other copy as a load does", () =
 const row = (fixture("buffer/buffer.json").solutes as BufferRow[])[0] as BufferRow
 
 test("a second writer is refused when another copy saved after it read", () => {
-    const dir = tmp()
+    const dir = tempDir()
     writeSolutes(dir, [row]) // this copy wrote and so knows the file
     // The other copy saves a different buffer, as a separate process would.
     const theirs = writeJson({ solutes: [row, row] })
@@ -224,25 +224,25 @@ test("a second writer is refused when another copy saved after it read", () => {
 })
 
 test("same content saved again is no change; a copy that never read may write", () => {
-    const dir = tmp()
+    const dir = tempDir()
     writeSolutes(dir, [row])
     writeAtomic(bufferFile(dir), readFileSync(bufferFile(dir), "utf-8"))
     writeSolutes(dir, [row, row])
-    const other = tmp()
+    const other = tempDir()
     writeAtomic(bufferFile(other), writeJson({ solutes: [row] }))
     writeSolutes(other, []) // never read this folder in this process
     assert.deepEqual(readSolutes(other), [])
 })
 
 test("a file that appeared after this copy found none is a change", () => {
-    const root = tmp()
+    const root = tempDir()
     assert.deepEqual(readCustomSolutes(root, { track: true }), [])
     writeAtomic(join(root, "custom-solutes.json"), writeJson({ solutes: [] }))
     assert.throws(() => writeCustomSolutes(root, []), ChangedOnDiskError)
 })
 
 test("a plain read never moves the base, a tracked read does", () => {
-    const dir = tmp()
+    const dir = tempDir()
     writeSolutes(dir, [row]) // baseline: one row
     readSolutes(dir, { track: true })
     const theirs = writeJson({ solutes: [row, row] })
@@ -256,7 +256,7 @@ test("a plain read never moves the base, a tracked read does", () => {
 })
 
 test("a plain read alone never makes a later save throw", () => {
-    const dir = tmp()
+    const dir = tempDir()
     writeAtomic(bufferFile(dir), writeJson({ solutes: [row] }))
     readSolutes(dir) // never tracked
     writeAtomic(bufferFile(dir), writeJson({ solutes: [row, row] }))
@@ -266,7 +266,7 @@ test("a plain read alone never makes a later save throw", () => {
 })
 
 test("the same holds for custom solutes", () => {
-    const root = tmp()
+    const root = tempDir()
     writeCustomSolutes(root, [])
     readCustomSolutes(root, { track: true })
     writeAtomic(join(root, "custom-solutes.json"), writeJson({ solutes: [], by: "b" }))
@@ -275,7 +275,7 @@ test("the same holds for custom solutes", () => {
 })
 
 test("noteRead of a missing file is a version too", () => {
-    const dir = tmp()
+    const dir = tempDir()
     noteRead(bufferFile(dir))
     writeAtomic(bufferFile(dir), writeJson({ solutes: [] }))
     assert.throws(() => writeSolutes(dir, []), ChangedOnDiskError)
@@ -284,12 +284,12 @@ test("noteRead of a missing file is a version too", () => {
 // ---- a deleted project is not made again -----------------------------------------------
 
 test("writes into a project that was deleted are refused and make nothing", () => {
-    const root = tmp()
+    const root = tempDir()
     const p = join(root, "projects", "gone")
     mkdirSync(p, { recursive: true })
     const settings = loadProject(p, root).settings
     settings.set({ N_ADAPT: 450 })
-    const src = join(tmp(), "m.pdb")
+    const src = join(tempDir(), "m.pdb")
     writeFileSync(src, "x")
     readSolutes(p, { track: true })
     rmSync(p, { recursive: true })
@@ -303,7 +303,7 @@ test("writes into a project that was deleted are refused and make nothing", () =
 })
 
 test("the global files still make the data folder", () => {
-    const dir = join(tmp(), "baysol-data")
+    const dir = join(tempDir(), "baysol-data")
     loadGlobal(dir).settings.set({ N_ADAPT: 450 })
     assert.equal(existsSync(settingsFile(dir)), true)
     writeCustomSolutes(join(dir, "sub"), [])
@@ -313,8 +313,8 @@ test("the global files still make the data folder", () => {
 // ---- creating things that must be new -------------------------------------------------
 
 test("a model name taken meanwhile is refused by the copy itself", () => {
-    const project = tmp()
-    const src = tmp()
+    const project = tempDir()
+    const src = tempDir()
     mkdirSync(join(src, "a"))
     mkdirSync(join(src, "b"))
     writeFileSync(join(src, "a", "m.pdb"), "first")
@@ -382,8 +382,8 @@ function runProject(root: string, id: string): string {
 }
 
 test("three real processes claiming a run in one project: exactly one wins", async () => {
-    const project = runProject(tmp(), "p")
-    const gate = join(tmp(), "gate")
+    const project = runProject(tempDir(), "p")
+    const gate = join(tempDir(), "gate")
     const workers = [1, 2, 3].map(() => spawnSupport("claim-worker.ts", [project, gate]))
     try {
         await new Promise((r) => setTimeout(r, 1500)) // all three wait at the gate
@@ -407,30 +407,30 @@ test("three real processes claiming a run in one project: exactly one wins", asy
 })
 
 test("a killed child becomes interrupted; a live one is never touched", async () => {
-    const project = runProject(tmp(), "p")
-    const run = join(project, "runs", "20260101T000000Z")
+    const project = runProject(tempDir(), "p")
+    const run = join(project, "runs", runOn("2026-01-01"))
     mkdirSync(run, { recursive: true })
     const julia = spawnSupport("fake-julia.ts", [project, "20", run], { FAKE_MODE: "hang" })
     try {
         assert.equal(await julia.next(), "fake julia started")
-        assert.equal(runStatus(project, "20260101T000000Z"), "running")
+        assert.equal(runStatus(project, runOn("2026-01-01")), "running")
         assert.equal(liveRun(project)?.pid, julia.child.pid)
         assert.deepEqual(markStaleRuns(project), [], "it lives: left alone")
         julia.kill("SIGKILL") // no chance to say goodbye
         await julia.exited
-        assert.equal(runStatus(project, "20260101T000000Z"), "running", "file not told")
+        assert.equal(runStatus(project, runOn("2026-01-01")), "running", "file not told")
         assert.equal(liveRun(project), undefined, "the pid is gone, the heartbeat is fresh")
-        assert.deepEqual(markStaleRuns(project), ["20260101T000000Z"])
-        assert.equal(runStatus(project, "20260101T000000Z"), "interrupted")
+        assert.deepEqual(markStaleRuns(project), [runOn("2026-01-01")])
+        assert.equal(runStatus(project, runOn("2026-01-01")), "interrupted")
     } finally {
         julia.kill()
     }
 })
 
 test("a project cannot be deleted while a run is live, and can when not", async () => {
-    const root = tmp()
+    const root = tempDir()
     const project = runProject(root, "p")
-    const run = join(project, "runs", "20260101T000000Z")
+    const run = join(project, "runs", runOn("2026-01-01"))
     mkdirSync(run, { recursive: true })
     const julia: ChildProcess = spawn("sleep", ["300"], { detached: true, stdio: "ignore" })
     try {
@@ -460,7 +460,7 @@ test("a project cannot be deleted while a run is live, and can when not", async 
 })
 
 test("recipe operations that read and write in one step never conflict", () => {
-    const root = tmp()
+    const root = tempDir()
     saveRecipe(root, "A", [row])
     readRecipes(root)
     // another copy adds a recipe
@@ -492,7 +492,7 @@ test("recipe operations that read and write in one step never conflict", () => {
 })
 
 test("the same holds for recipes", () => {
-    const root = tmp()
+    const root = tempDir()
     saveRecipe(root, "A", [row])
     readRecipes(root, { track: true })
     writeAtomic(recipesFile(root), writeJson({ recipes: [] }))

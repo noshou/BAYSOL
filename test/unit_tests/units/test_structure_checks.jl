@@ -83,6 +83,29 @@ atom_lines(path) =
             @test first(CHAIN_LETTERS) == 'A' && last(CHAIN_LETTERS) == '9'
         end
 
+        @testset "waters are removed on request, whatever their oxygen is called" begin
+            prot = residue("ALA", 'A', 1, ["N", "CA", "C", "O", "CB"])
+            ws = [
+                residue("HOH", 'A', 601, ["O1"]; rec = "ATOM", s0 = 100);
+                residue("HOH", 'A', 602, ["O"]; rec = "HETATM", s0 = 110);
+                residue("WAT", 'A', 603, ["OW"]; rec = "HETATM", s0 = 120)
+            ]
+            aniso = "ANISOU  100  O1  HOH A 601" * " "^40
+            path = wr(dir, "wat.pdb", [prot; ws[1:1]; aniso; ws[2:end]; "END"])
+            out = joinpath(dir, "wat.out.pdb")
+            # not asked: nothing to do
+            @test sanitized_copy(path, joinpath(dir, "wat0.out.pdb")) === nothing
+            @test structure_issues(path) == (relabelled = 0, dropped = 0)
+            @test sanitized_copy(path, out; waters = true) ==
+                  (relabelled = 0, dropped = 0)
+            # the rest is byte-identical: the protein records and END
+            @test readlines(out) == [prot; "END"]
+            # a file without waters needs nothing
+            clean = wr(dir, "nowat.pdb", prot)
+            @test sanitized_copy(clean, joinpath(dir, "nowat.out.pdb"); waters = true) ===
+                  nothing
+        end
+
         @testset "chains that reuse an id and residue numbers" begin
             one = [residue("A", 'A', 1, NUC); residue("C", 'A', 2, NUC; s0 = 100)]
             two =
@@ -429,12 +452,19 @@ atom_lines(path) =
                       (content = :nucleic, ff = :amber, titration = :none, reason = "")
                 hp = resolve_hydrogens(path, 7.4; ff = choice.ff, titration = NoTitration())
                 mol = load_molecule(hp)
-                # waters and ions are not loaded; heavy atoms: 7912 of the RNA + 56 GDP
-                @test n_atoms(mol) == 11996
-                nH = count(e -> uppercase(e) == "H", elms(mol))
-                @test nH == 4028 && n_atoms(mol) - nH == 7968
+                # waters are not loaded; the polymer is 7912 heavy atoms of the RNA + 56 GDP
+                # and 4028 hydrogens; the ligands (10 K, 10 Mg, 68 MO6 atoms: Mg(H2O)6, 12 H
+                # as the fixture has them) are 88 atoms more than before
+                # 2026-11-11, when n_atoms was 11996
+                poly = load_molecule(hp; ligands = false)
+                @test n_atoms(poly) == 11996
+                @test n_atoms(mol) == 11996 + 88
+                nH = count(e -> uppercase(e) == "H", elms(poly))
+                @test nH == 4028 && n_atoms(poly) - nH == 7968
+                @test count(e -> uppercase(e) == "H", elms(mol)) - nH == 12
                 # both chains are there (A and B reused, relabelled in the copy)
-                @test heavy_atom_count(path) == 8066 == heavy_atom_count(hp)
+                # (8066 with the 22 waters, which are removed before pdb2pqr)
+                @test heavy_atom_count(path) == 8044 == heavy_atom_count(hp)
             finally
                 for f in readdir(_store_dir())
                     startswith(f, "nt-checks-") &&

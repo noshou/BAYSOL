@@ -143,7 +143,7 @@ _warn_once(msg::Function, kind::String, path::AbstractString; level = :warn)::No
     _warn_once(kind, path, msg; level)
 
 """
-    sanitized_copy(in_path, out_path) -> Union{Nothing,NamedTuple}
+    sanitized_copy(in_path, out_path; waters = false) -> Union{Nothing,NamedTuple}
 
 Make the .pdb at `in_path` readable when it needs it, writing the repaired copy to
 `out_path`: a TER-separated block that reuses a chain id and its residue numbers (two
@@ -154,19 +154,28 @@ twice in the scattering profile, are dropped. Both are logged (`@warn`, once per
 Chain ids never reach the scattering model, so the relabelling changes nothing in the
 profile; the two real chains stay in the model.
 
+With `waters = true` every record of a water residue ([`WATER_NAMES`](@ref): `ATOM`,
+`HETATM` and the `ANISOU` after them) is dropped as well, whatever the name of its oxygen
+(`O`, `OW`, `O1`): waters never scatter in BAYSOL and pdb2pqr's water optimisation fails
+on a water oxygen it does not know. That is what the hydrogenation step asks for. The count
+is logged at debug level only (waters are very common) and not part of the result.
+
 # Returns
-`nothing` when the file needs neither (nothing is written), else `(; relabelled, dropped)`,
-the numbers of chains relabelled and duplicate atoms dropped.
+`nothing` when the file needs none of this (nothing is written), else `(; relabelled,
+dropped)`, the numbers of chains relabelled and duplicate atoms dropped.
 
 # Exceptions
 - `MoleculeError`: more chains need new ids than there are ids.
 - `SystemError`: a path cannot be read or written.
 """
-function sanitized_copy(in_path::AbstractString, out_path::AbstractString)
+function sanitized_copy(
+    in_path::AbstractString, out_path::AbstractString; waters::Bool = false,
+)
     plan = _structure_plan(in_path)
     counts = _plan_counts(plan)
-    counts.relabelled == 0 && counts.dropped == 0 && return nothing
     scan = plan.scan
+    water_lines = Set{Int}(a.i for a in scan.atoms if waters && a.resname in WATER_NAMES)
+    counts.relabelled == 0 && counts.dropped == 0 && isempty(water_lines) && return nothing
     block_of_ter = Dict(i => b for (i, b) in scan.ters)
     new_chain = Dict{Int,String}()
     for a in scan.atoms
@@ -183,7 +192,7 @@ function sanitized_copy(in_path::AbstractString, out_path::AbstractString)
     open(out_path, "w") do io
         dropped_prev = false
         for (i, l) in enumerate(scan.lines)
-            if i in plan.duplicates
+            if i in plan.duplicates || i in water_lines
                 dropped_prev = true
                 continue
             end
@@ -211,6 +220,10 @@ function sanitized_copy(in_path::AbstractString, out_path::AbstractString)
             "$(counts.relabelled) chain(s) of \"$(basename(in_path))\" reuse a chain id " *
             "and its residue numbers: relabelled ($shown)"
         end
+    end
+    if !isempty(water_lines)
+        @debug "removed $(length(water_lines)) water atom(s) of " *
+               "\"$(basename(in_path))\" before pdb2pqr"
     end
     counts.dropped > 0 && _warn_once(
         "dups", in_path,

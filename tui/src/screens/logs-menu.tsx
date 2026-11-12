@@ -12,10 +12,10 @@
 
 import { type ReactNode, useCallback, useEffect, useState } from "react"
 import { appDir, LOGS_FLOW } from "../core/environment.js"
-import { displayWidth } from "../core/terminal.js"
+import { messageOf } from "../core/file-system.js"
+import { clampIndex, displayWidth } from "../core/terminal.js"
 import { liveRun, type ProjectRef } from "../store/projects.js"
 import {
-    bufferFacts,
     conditionsText,
     listRuns,
     prettyJson,
@@ -23,22 +23,30 @@ import {
     type RunItem,
     type RunRow,
     readRunFile,
+    runFileSizes,
+    runItems,
+    sizeText,
+} from "../store/run-logs.js"
+import {
+    bufferFacts,
     restoreBuffer,
     restoreErrorNote,
     restoreSettings,
     restoreUnits,
-    runFileSizes,
-    runItems,
-    sizeText,
     watchBuffer,
-} from "../store/run-logs.js"
+} from "../store/run-restores.js"
 import { runDisplay } from "../store/run-stamp.js"
 import { cornerLabels, Frame, footerExtraLines } from "../ui/frame.js"
-import { type LegendItem, legendBack, legendFor, legendOf, moveLegend } from "../ui/grid.js"
+import {
+    cursorMoves,
+    type LegendItem,
+    legendBack, legendFor, legendOf, moveLegend } from "../ui/grid.js"
 import {
     type Question,
     questionLegend,
+    shownNote,
     useConfirm,
+    useNote,
 } from "../ui/input.js"
 import {
     keys,
@@ -86,20 +94,6 @@ function useTableRows(full: readonly LegendItem[]): number {
     const columns = useBodyColumns()
     const taller = footerExtraLines(full, columns, BASE_LEGEND_LINES, "blocky")
     return useBodyRows(TABLE_CHROME_ROWS + taller)
-}
-
-/** What a page says on its note row: the text and whether it is an error. */
-type Note = { text: string; error: boolean }
-
-/**
- * The text of an error for a note row.
- *
- * @param error - what was thrown.
- * @param fallback - what to say for an error without a message.
- * @returns the message.
- */
-function messageOf(error: unknown, fallback: string): string {
-    return error instanceof Error && error.message !== "" ? error.message : fallback
 }
 
 /** The one key of a page whose content is gone or cannot be shown. */
@@ -172,8 +166,7 @@ function LogsRun({ project, run }: { project: ProjectRef; run: RunRow }): ReactN
     const [sizes, setSizes] = useState(() => runFileSizes(run.dir))
     const [selected, setSelected] = useState(0)
     const [offset, setOffset] = useState(0)
-    const [note, setNote] = useState<Note | undefined>()
-    const say = (text: string, error = false): void => setNote({ text, error })
+    const { note, say, clear } = useNote()
 
     // a live run writes its files while the page is open: the sizes are read again
     useEffect(() => {
@@ -235,7 +228,8 @@ function LogsRun({ project, run }: { project: ProjectRef; run: RunRow }): ReactN
                 try {
                     if (it.restore === "settings")
                         restoreSettings(project.dir, appDir(), text)
-                    else if (it.restore === "buffer") restoreBuffer(project.dir, text)
+                    else if (it.restore === "buffer")
+                        restoreBuffer(project.dir, text)
                     else restoreUnits(project.dir, text)
                     say(`${it.restore} restored`)
                 } catch (error) {
@@ -249,7 +243,7 @@ function LogsRun({ project, run }: { project: ProjectRef; run: RunRow }): ReactN
 
     useKeys((press) => {
         if (gone || confirm.handleKey(press)) return
-        setNote(undefined)
+        clear()
         if (press.is(keys.back) || press.is(keys.escape)) nav.pop()
         else if (press.is(keys.up)) {
             setSelected(Math.max(0, index - 1))
@@ -269,14 +263,13 @@ function LogsRun({ project, run }: { project: ProjectRef; run: RunRow }): ReactN
     })
 
     const keysNow = legendOf([
-        moveLegend({ up: index > 0, down: index < runItems.length - 1 }),
+        moveLegend(cursorMoves(index, runItems.length)),
         legendFor("choose", keys.enter),
         legendBack,
     ])
     const legend = confirm.question ? questionLegend(confirm.question) : keysNow
     // what the note row says, most urgent first
-    let shown = note
-    if (confirm.note !== undefined) shown = { text: confirm.note, error: false }
+    let shown = shownNote(confirm, note)
     if (gone) shown = { text: RUN_GONE, error: true }
     return (
         <Frame
@@ -347,7 +340,7 @@ export function LogsRuns({ project }: { project: ProjectRef }): ReactNode {
     // the highlighted run is kept by NAME, so a list that changes under it keeps the cursor
     const [selectedId, setSelectedId] = useState<string | undefined>(runs[0]?.id)
     const [offset, setOffset] = useState(0)
-    const [note, setNote] = useState<Note | undefined>()
+    const { note, clear } = useNote()
 
     const refresh = useCallback(() => setRuns(listRuns(project.dir)), [project.dir])
     useEffect(() => {
@@ -384,13 +377,13 @@ export function LogsRuns({ project }: { project: ProjectRef }): ReactNode {
     const table = tableFor(Math.max(flow.stampWidth, Math.min(wanted, spare)))
 
     const step = (to: number): void => {
-        setSelectedId(runs[Math.min(Math.max(to, 0), runs.length - 1)]?.id)
+        setSelectedId(runs[clampIndex(to, runs.length)]?.id)
         setOffset(top)
     }
 
     useKeys((press) => {
         if (confirm.handleKey(press)) return
-        setNote(undefined)
+        clear()
         if (press.is(keys.back) || press.is(keys.escape)) nav.pop()
         else if (press.is(keys.up)) step(index - 1)
         else if (press.is(keys.down)) step(index + 1)
@@ -399,12 +392,12 @@ export function LogsRuns({ project }: { project: ProjectRef }): ReactNode {
     })
 
     const keysNow = legendOf([
-        moveLegend({ up: index > 0, down: index < runs.length - 1 }),
+        moveLegend(cursorMoves(index, runs.length)),
         current !== undefined && legendFor("open", keys.enter),
         legendBack,
     ])
     const legend = confirm.question ? questionLegend(confirm.question) : keysNow
-    const shown = confirm.note !== undefined ? { text: confirm.note, error: false } : note
+    const shown = shownNote(confirm, note)
     return (
         <Frame
             design="blocky"

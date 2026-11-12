@@ -524,7 +524,7 @@ end
         @test !FIT._retry_needed(plain.diagnostics, false)
         # the error says why
         err = FIT.NotConvergedError(FIT._convergence_problems(1.5, ok, ok))
-        @test occursin("nothing to report", sprint(showerror, err))
+        @test occursin("did not converge", sprint(showerror, err))
         @test occursin("1.5", sprint(showerror, err))
     end
 

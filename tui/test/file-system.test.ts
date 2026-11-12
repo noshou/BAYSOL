@@ -15,6 +15,7 @@ import {
 import { join } from "node:path"
 import { test } from "node:test"
 import {
+    DATA_EXTENSIONS,
     entryNames,
     isDict,
     isFile,
@@ -29,7 +30,7 @@ import {
     writeAtomic,
     writeJson,
 } from "../src/core/file-system.js"
-import { tempDir, tempDir as tmp } from "./support/fixtures.js"
+import { tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Files
@@ -52,7 +53,7 @@ test("writeJson indents by two and ends in a newline", () => {
 })
 
 test("readJson gives the fallback for a file that is not JSON", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const file = join(dir, "x.json")
     writeFileSync(file, "{ nope")
     assert.equal(readJson(file, "fb"), "fb")
@@ -64,7 +65,7 @@ test("readJson gives the fallback for a file that is not JSON", () => {
 })
 
 test("readMap says 'is not JSON' and 'is not <expected>'", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const file = join(dir, "m.json")
     const spec = {
         kind: "m",
@@ -95,7 +96,7 @@ test("readMap says 'is not JSON' and 'is not <expected>'", () => {
 test("isDict, isFile, isFolder, isReadable, entryNames, sortNoCase", () => {
     assert.equal(isDict({}), true)
     for (const x of [[], null, 1, "a", undefined]) assert.equal(isDict(x), false)
-    const dir = tmp()
+    const dir = tempDir()
     mkdirSync(join(dir, "Sub"))
     writeFileSync(join(dir, "b.txt"), "")
     writeFileSync(join(dir, "A.txt"), "")
@@ -134,4 +135,11 @@ test("the picker output is one path to a line", () => {
     assert.deepEqual(parsePickerOutput("/a/one.pdb\r\n\n"), ["/a/one.pdb"])
     assert.deepEqual(parsePickerOutput(""), [])
     assert.deepEqual(parsePickerOutput(undefined), [])
+})
+
+test("the curve extensions the prompts and the picker offer include .fit", () => {
+    assert.ok(DATA_EXTENSIONS.includes("fit"))
+    assert.ok(DATA_EXTENSIONS.includes("dat") && DATA_EXTENSIONS.includes("xlsx"))
+    for (const e of DATA_EXTENSIONS) assert.match(e, /^[a-z]+$/, e)
+    assert.equal(new Set(DATA_EXTENSIONS).size, DATA_EXTENSIONS.length)
 })

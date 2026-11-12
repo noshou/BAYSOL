@@ -10,7 +10,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { saveErrorNote } from "../core/file-system.js"
-import { type NumberRules, parseNumber, truncate } from "../core/terminal.js"
+import {
+    type NumberRules,
+    parseNumber,
+    truncate,
+    truncateStart,
+    wrapText,
+} from "../core/terminal.js"
 import {
     colourWords,
     listedName,
@@ -19,6 +25,7 @@ import {
     splitTopLevel,
 } from "../store/colours.js"
 import { Drafts, MAX_ROWS, type Row, rowMark } from "../store/lists.js"
+import { type Note, notesProblem } from "../store/notes.js"
 import {
     type PartKind,
     type SettingDef,
@@ -38,6 +45,7 @@ import {
 } from "../ui/grid.js"
 import {
     destructiveQuestion,
+    type NoteLine,
     type Question,
     questionLegend,
     useConfirm,
@@ -52,6 +60,7 @@ import {
     useListCursor,
     useNav,
 } from "../ui/interaction.js"
+import { TextBuffer } from "../ui/text-input.js"
 import { FIND_ROWS, type TableFind, useTableFind } from "./table-find.js"
 
 // ========================================================================================
@@ -101,14 +110,15 @@ export type TableFacts = {
 /**
  * The legend of a table with nothing open over it: `back` always, `save` when
  * something is unsaved, `edit` when a row can be opened, the arrows that move from the
- * cursor's row, the add keys when there is room, `remove` and `undo` when they have a
- * row to act on.
+ * cursor's row, `remove` and `undo` when they have a row to act on, the find and sort
+ * keys, and last the add keys when there is room (so the keys that work on rows stay
+ * together and the adds follow as a group).
  *
  * @param facts - what the table allows now.
  * @param adds - the add keys of this table (`add solute ^n`, ...); shown only when
  *     `facts.canAdd`.
  * @param editLabel - what Enter does on a row, `"edit"` when left out.
- * @param more - items that go last: the find and sort keys of a table of named rows.
+ * @param more - items after `remove`: the find and sort keys of a table of named rows.
  * @returns the items, in order.
  */
 export function tableLegend(
@@ -123,11 +133,11 @@ export function tableLegend(
         facts.dirty && !locked && legendFor("save", keys.save),
         facts.canEdit && legendFor(editLabel, keys.enter),
         moveLegend({ up: rows > 0 && cursor > 0, down: rows > 0 && cursor < rows - 1 }),
-        ...(facts.canAdd ? adds : []),
         facts.canRemove &&
             !locked && legendFor(facts.removeLabel ?? "remove", keys.remove),
         facts.canUndo && !locked && legendFor("undo", keys.undo),
         ...more,
+        ...(facts.canAdd ? adds : []),
     ])
 }
 
@@ -235,6 +245,10 @@ const FRAME_LEGEND_LINES = 3
  *     is then `saveErrorNote`); the row leaves the table and every other row keeps its
  *     drafts, still unsaved. A row never saved is dropped without a question. Left out,
  *     `^r` only marks the row (and `^w` removes it: a buffer's solutes).
+ * @property removeLabel - what `^r` is called when it marks (`remove` when left out).
+ * @property rowKeys - keys that act on the row under the cursor and show in the legend
+ *     only while the row can be opened (the notes `^e` of a recipe); like `adds`, give
+ *     them here too so the fullest legend counts them.
  * @property label - the name of an item. With it the table finds a row by name (`/`) and
  *     puts the rows in alphabetical order (`s`); both show in the legend only while they
  *     can do something.
@@ -248,8 +262,10 @@ export type TableScreenOptions<V> = {
     check:      (drafts: Drafts<V>) => [number, string] | undefined
     extraRows?: number
     adds?: LegendItem[]
+    rowKeys?:   LegendItem[]
     extraChanges?: number
     locked?:    string
+    removeLabel?: string
     erase?:     {
         what:   string
         name:   (saved: V) => string
@@ -351,10 +367,10 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
             locked: false,
             canRemove: true,
             canUndo: true,
-            removeLabel: erase ? "delete" : undefined,
+            removeLabel: erase ? "delete" : options.removeLabel,
             dirty: true,
         },
-        [...(options.adds ?? []), ...findKeys],
+        [...(options.adds ?? []), ...(options.rowKeys ?? []), ...findKeys],
     )
     // rows the footer takes beyond the three lines the frame's own count allows for (the
     // table screens are blocky: their footer's box takes two more)
@@ -365,8 +381,8 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
         const first = label && sorted ? start.sorted(label) : start
         return added.reduce((d, item) => d.add(item), first)
     })
-    const [note, setNoteState] = useState<{ text: string; isError: boolean } | undefined>(
-        locked ? { text: locked, isError: true } : undefined,
+    const [note, setNoteState] = useState<NoteLine | undefined>(
+        locked ? { text: locked, error: true } : undefined,
     )
     const [focusLast, setFocusLast] = useState(false)
     const bodyRows = useBodyRows(TABLE_CHROME_ROWS + extraRows + footerExtra)
@@ -389,7 +405,7 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
     }, [focusLast, cursor.set, drafts.length])
 
     const setNote = useCallback((text: string | undefined, isError = true) => {
-        setNoteState(text === undefined ? undefined : { text, isError })
+        setNoteState(text === undefined ? undefined : { text, error: isError })
     }, [])
     const replaceAt = useCallback((i: number, item: V) => {
         setDrafts((d) => d.set(i, item))
@@ -489,7 +505,7 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
         frameNoteIsError:
             guard.question === undefined &&
             removal.question === undefined &&
-            (note?.isError ?? false),
+            (note?.error ?? false),
         setNote,
         legendFull,
         legend: (adds, editLabel) => {
@@ -499,6 +515,9 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
             const row = drafts.rows[cursor.index]
             const several = label !== undefined && drafts.length > 1
             const more = legendOf([
+                ...(current !== undefined && !removed && !locked
+                    ? (options.rowKeys ?? [])
+                    : []),
                 several && legendFor("find", keys.find),
                 several && !drafts.isSorted(label) && legendFor("sort", keys.sort),
             ])
@@ -510,7 +529,7 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
                     canAdd: drafts.hasRoom && !locked,
                     locked: locked !== undefined,
                     canRemove: row !== undefined && !removed,
-                    removeLabel: erase ? "delete" : undefined,
+                    removeLabel: erase ? "delete" : options.removeLabel,
                     canUndo: row !== undefined && rowMark(row) !== undefined,
                     dirty: drafts.dirty || extraChanges > 0,
                 },
@@ -534,6 +553,68 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
 
 /** How an edit ended: with a value, abandoned, or by Ctrl-X (leave the whole sheet). */
 export type EditEnd<V> = { kind: "done"; value: V } | { kind: "cancel" } | { kind: "back" }
+
+/**
+ * The state of a set of choices being turned on and off (the `set` settings, shown as
+ * tabs).
+ *
+ * @property options - every choice, in order.
+ * @property selected - the ones that are on.
+ * @property focus - the index of the tab in focus.
+ * @property error - what was wrong with the last attempt.
+ */
+export type TabsEdit = {
+    options: readonly string[]
+    selected: ReadonlySet<string>
+    focus: number
+    error?: string
+}
+
+/** What Esc says when no choice is on: a set needs at least one. */
+export const PICK_ONE_NOTE = "pick one or more"
+
+/**
+ * Opens a set of choices with the first tab in focus.
+ *
+ * @param choices - every choice of the setting.
+ * @param current - the choices that are on.
+ * @returns the edit.
+ */
+export function openTabs(choices: readonly string[], current: readonly string[]): TabsEdit {
+    return { options: choices, selected: new Set(current), focus: 0 }
+}
+
+/**
+ * One key on the tabs: left and right move (stopping at the ends), Tab goes round,
+ * Enter and Space turn the tab in focus on or off, Esc is done and needs one choice on.
+ *
+ * @param edit - the state.
+ * @param press - the key.
+ * @returns the next state, and the end when Esc or Ctrl-X ended it.
+ */
+export function stepTabs(
+    edit: TabsEdit,
+    press: KeyInput,
+): { state: TabsEdit; end?: EditEnd<string[]> } {
+    const n = edit.options.length
+    const moved = (focus: number) => ({ state: { ...edit, focus, error: undefined } })
+    if (press.is(keys.back)) return { state: edit, end: { kind: "back" } }
+    if (press.is(keys.escape)) {
+        if (edit.selected.size === 0) return { state: { ...edit, error: PICK_ONE_NOTE } }
+        const value = edit.options.filter((o) => edit.selected.has(o))
+        return { state: edit, end: { kind: "done", value } }
+    }
+    if (press.is(keys.enter) || press.is(keys.space)) {
+        const option = edit.options[edit.focus] as string
+        const selected = new Set(edit.selected)
+        if (!selected.delete(option)) selected.add(option)
+        return { state: { ...edit, selected, error: undefined } }
+    }
+    if (press.is(keys.right)) return moved(Math.min(n - 1, edit.focus + 1))
+    if (press.is(keys.left)) return moved(Math.max(0, edit.focus - 1))
+    if (press.is(keys.tab)) return moved((edit.focus + 1) % n)
+    return { state: edit }
+}
 
 /** The longest text typed into a setting (a tuple is one line). */
 export const maxSettingText = 60
@@ -633,6 +714,245 @@ export function finishTuple(
 ): { value: SettingValue } | { error: string } {
     const checked = validateValue(def, tupleOf(def, parts))
     return checked.ok ? { value: checked.value } : { error: checked.error }
+}
+
+// --- a number typed into the value cell of the sheet
+
+/** The longest text typed into a number: what a cell can show beside its cursor. */
+export const maxNumberText = 16
+
+/** What the editor says when a character past [[maxNumberText]] is refused. */
+export const CAP_NOTE = `${maxNumberText} characters at most`
+
+/** The lines of a message under a value in the table (an error): two at most. */
+const noteLinesMax = 2
+
+/**
+ * The lines of a message under a value: wrapped to the column, at most two lines.
+ *
+ * @param text - the message.
+ * @param cells - the room.
+ * @returns the lines, one at least.
+ */
+export function noteLines(text: string, cells: number): string[] {
+    return wrapText(text, cells).slice(0, noteLinesMax)
+}
+
+/** The rows an inline error may take under the table row (reserved while editing). */
+export const NUMBER_NOTE_ROWS = noteLinesMax
+
+/**
+ * The state of an `int` or a `float` being typed into its row.
+ *
+ * @property def - the setting.
+ * @property buffer - the text and the cursor.
+ * @property error - what was wrong with the last attempt; the next key clears it.
+ */
+export type NumberEdit = { def: SettingDef; buffer: TextBuffer; error?: string }
+
+/**
+ * Opens a number for editing: its current value as text, the cursor at the end.
+ *
+ * @param def - the setting (an `int` or a `float`).
+ * @param current - its value now.
+ * @returns the edit.
+ */
+export function openNumber(def: SettingDef, current: SettingValue): NumberEdit {
+    const empty = new TextBuffer("", undefined, maxNumberText)
+    return { def, buffer: empty.replace(String(current)) }
+}
+
+/** Whether a press typed only blanks: a number never has one. */
+const isBlank = (press: KeyInput): boolean => press.typed && press.text.trim() === ""
+
+/**
+ * One key while a number is typed: a character, backspace, delete, left, right, home and
+ * end edit the text (typing past the cap says so, a blank is dropped), Enter takes the
+ * number if it is one within the limits of the setting, Esc drops the edit and Ctrl-X
+ * leaves the sheet.
+ *
+ * @param edit - the state.
+ * @param press - the key.
+ * @returns the next state, and the end when the key ended the edit.
+ */
+export function stepNumber(
+    edit: NumberEdit,
+    press: KeyInput,
+): { state: NumberEdit; end?: EditEnd<number> } {
+    if (press.is(keys.escape)) return { state: edit, end: { kind: "cancel" } }
+    if (press.is(keys.back)) return { state: edit, end: { kind: "back" } }
+    if (press.is(keys.enter)) {
+        const parsed = parseSetting(edit.def, edit.buffer.text)
+        if ("error" in parsed) return { state: { ...edit, error: parsed.error } }
+        return { state: edit, end: { kind: "done", value: parsed.value as number } }
+    }
+    if (isBlank(press)) return { state: edit }
+    if (press.typed && edit.buffer.full) return { state: { ...edit, error: CAP_NOTE } }
+    let buffer: TextBuffer
+    if (press.typed) buffer = edit.buffer.insert(press.text)
+    else if (press.is(keys.backspace)) buffer = edit.buffer.backspace()
+    else if (press.is(keys.delete)) buffer = edit.buffer.delete()
+    else if (press.is(keys.left)) buffer = edit.buffer.left()
+    else if (press.is(keys.right)) buffer = edit.buffer.right()
+    else if (press.is(keys.home)) buffer = edit.buffer.home()
+    else if (press.is(keys.end)) buffer = edit.buffer.end()
+    else return { state: edit }
+    return { state: { ...edit, buffer, error: undefined } }
+}
+
+/**
+ * Pasted text into a number: inserted at the cursor with every blank dropped.
+ *
+ * @param edit - the state.
+ * @param text - what was pasted.
+ * @returns the next state.
+ */
+export function pasteNumber(edit: NumberEdit, text: string): NumberEdit {
+    return {
+        ...edit,
+        buffer: edit.buffer.insert(text.replace(/\s+/g, "")),
+        error: undefined,
+    }
+}
+
+// --- a tuple edited part by part
+
+/**
+ * The state of a tuple being edited: one text for each part, one part in focus.
+ *
+ * @property def - the setting (a `tuple`).
+ * @property texts - the text of each part (a colour part holds its name or code).
+ * @property focus - the part being edited.
+ * @property fresh - the number parts not typed into yet: the first key replaces them.
+ * @property error - what was wrong with the last attempt; the next key clears it.
+ */
+export type TupleEdit = {
+    def: SettingDef
+    texts: readonly string[]
+    focus: number
+    fresh: ReadonlySet<number>
+    error?: string
+}
+
+/**
+ * What a key did to a tuple: the next state, the end when the key ended the edit, and
+ * `pick` when Enter on a colour part asks for the picker of that part.
+ */
+export type TupleStep = { state: TupleEdit; end?: EditEnd<SettingValue>; pick?: boolean }
+
+/** Whether the part in focus is a colour. */
+const colourFocused = (edit: TupleEdit): boolean =>
+    edit.def.partKinds[edit.focus] === "colour"
+
+/**
+ * Opens a tuple with each part as it is now, the first part in focus.
+ *
+ * @param def - the setting (a `tuple`).
+ * @param current - its value now.
+ * @returns the edit; the number parts are fresh.
+ */
+export function openTuple(def: SettingDef, current: SettingValue): TupleEdit {
+    return {
+        def,
+        texts: tupleParts(def, current).map(String),
+        focus: 0,
+        fresh: new Set(def.partKinds.flatMap((k, i) => (k === "colour" ? [] : [i]))),
+    }
+}
+
+/**
+ * Every part read by `parsePart`, then the tuple checked as a whole (`finishTuple`). A
+ * wrong part puts the focus on it and names it in the error.
+ */
+function commitTuple(edit: TupleEdit): TupleStep {
+    const { def } = edit
+    const parts: (number | string)[] = []
+    for (const [i, kind] of def.partKinds.entries()) {
+        const part = parsePart(kind, edit.texts[i] as string)
+        if ("error" in part)
+            return {
+                state: { ...edit, focus: i, error: `${def.partNames[i]}: ${part.error}` },
+            }
+        parts.push(part.value)
+    }
+    const done = finishTuple(def, parts)
+    if ("error" in done) return { state: { ...edit, error: done.error } }
+    return { state: edit, end: { kind: "done", value: done.value } }
+}
+
+/** The text of the part in focus replaced, the part no longer fresh. */
+function withText(edit: TupleEdit, text: string): TupleEdit {
+    const fresh = new Set(edit.fresh)
+    fresh.delete(edit.focus)
+    const texts = edit.texts.map((t, i) => (i === edit.focus ? text : t))
+    return { ...edit, texts, fresh, error: undefined }
+}
+
+/** The text of the part in focus as a buffer to type into (empty while still fresh). */
+function bufferOfFocus(edit: TupleEdit): TextBuffer {
+    const text = edit.fresh.has(edit.focus) ? "" : (edit.texts[edit.focus] as string)
+    return new TextBuffer(text, undefined, maxNumberText)
+}
+
+/**
+ * One key while a tuple is edited. Left and right (and up and down) move between the
+ * parts, Tab goes round them; text is typed into a number part (the first key replaces
+ * what the part had); Enter on a number part takes the whole tuple, on a colour part asks
+ * for the picker (`pick`); Esc drops the edit and Ctrl-X leaves the sheet.
+ *
+ * @param edit - the state.
+ * @param press - the key.
+ * @returns the next state, the end, or the request for the picker.
+ */
+export function stepTuple(edit: TupleEdit, press: KeyInput): TupleStep {
+    const n = edit.def.partNames.length
+    const focusOn = (to: number): TupleStep => ({
+        state: { ...edit, focus: Math.max(0, Math.min(n - 1, to)), error: undefined },
+    })
+    if (press.is(keys.escape)) return { state: edit, end: { kind: "cancel" } }
+    if (press.is(keys.back)) return { state: edit, end: { kind: "back" } }
+    if (press.is(keys.enter))
+        return colourFocused(edit) ? { state: edit, pick: true } : commitTuple(edit)
+    if (press.is(keys.left) || press.is(keys.up)) return focusOn(edit.focus - 1)
+    if (press.is(keys.right) || press.is(keys.down)) return focusOn(edit.focus + 1)
+    if (press.is(keys.tab)) return focusOn((edit.focus + 1) % n)
+    if (colourFocused(edit) || isBlank(press)) return { state: edit }
+    const buffer = bufferOfFocus(edit)
+    if (press.typed) {
+        if (buffer.full) return { state: { ...edit, error: CAP_NOTE } }
+        return { state: withText(edit, buffer.insert(press.text).text) }
+    }
+    if (press.is(keys.backspace)) return { state: withText(edit, buffer.backspace().text) }
+    return { state: edit }
+}
+
+/**
+ * The colour the picker gave, put into the part in focus; the focus goes on to the next
+ * part, or, from the last part, the whole tuple is taken.
+ *
+ * @param edit - the state (the colour part in focus).
+ * @param colour - the name or code picked.
+ * @returns the next state, or the end when the last part was the colour.
+ */
+export function takeColour(edit: TupleEdit, colour: string): TupleStep {
+    const next = withText(edit, colour)
+    if (edit.focus < edit.def.partNames.length - 1)
+        return { state: { ...next, focus: edit.focus + 1 } }
+    return commitTuple(next)
+}
+
+/**
+ * Pasted text into the number part in focus: the blanks dropped, the text replacing what
+ * the part had if it is still fresh.
+ *
+ * @param edit - the state.
+ * @param text - what was pasted.
+ * @returns the next state (unchanged on a colour part).
+ */
+export function pasteTuple(edit: TupleEdit, text: string): TupleEdit {
+    if (colourFocused(edit)) return edit
+    const buffer = bufferOfFocus(edit).insert(text.replace(/\s+/g, ""))
+    return withText(edit, buffer.text)
 }
 
 /**
@@ -922,10 +1242,12 @@ export function bufferLandingOptions(
 /**
  * The line of a recipe in the dropdown of the recipes to load.
  *
- * @returns `SEC buffer (3)`.
+ * @param template - what a template recipe is (`builtin`, `custom`, `table`, `invalid`).
+ * @returns `SEC buffer (3)`, `Tris pH (1, custom)` for a template.
  */
-export function recipeChoice(name: string, solutes: number): string {
-    return `${name} (${solutes})`
+export function recipeChoice(name: string, solutes: number, template?: string): string {
+    const kind = template === undefined ? "" : `, ${template}`
+    return `${name} (${solutes}${kind})`
 }
 
 /**
@@ -956,10 +1278,34 @@ function replaceQuestion(lead: string, name: string, room: number): Question {
  * @param n - how many solutes the buffer has.
  * @param recipe - the recipe's name.
  * @param room - the cells the note line has.
- * @returns `replace 3 solutes with recipe "NAME"?`, answered by `replace` and `keep`.
+ * @param notes - the recipe has notes, which replace the buffer's: `and notes` is said.
+ * @returns `replace 3 solutes with recipe "NAME"?` (`replace 3 solutes and notes with
+ *     recipe "NAME"?` with notes), answered by `replace` and `keep`.
  */
-export function replaceBufferQuestion(n: number, recipe: string, room: number): Question {
-    return replaceQuestion(`replace ${plural(n, "solute")} with recipe "`, recipe, room)
+export function replaceBufferQuestion(
+    n: number,
+    recipe: string,
+    room: number,
+    notes = false,
+    template = false,
+): Question {
+    const what = `${plural(n, "solute")}${notes ? " and notes" : ""}`
+    const kind = template ? "template" : "recipe"
+    return replaceQuestion(`replace ${what} with ${kind} "`, recipe, room)
+}
+
+/**
+ * The question asked when the buffer being saved has rows that follow a template.
+ *
+ * @returns `save "NAME" as a template? its rows follow pH, T`, answered by `template`
+ *     (Enter), `plain recipe` (`n`: the rows as they are) and `cancel` (Esc: nothing is
+ *     saved).
+ */
+export function saveAsTemplateQuestion(name: string, room: number): Question {
+    const tail = ' as a template? its rows follow pH, T'
+    const shown = fitName(name, room, `save ""${tail}`.length)
+    const text = `save "${shown}"${tail}`
+    return { text, yes: "template", other: "plain recipe", no: "cancel" }
 }
 
 /**
@@ -983,4 +1329,58 @@ export function savedAs(name: string, room: number): string {
 /** The message for a file that cannot be used: `recipes.json unusable!`. */
 export function unusable(file: string): string {
     return `${file} unusable!`
+}
+
+/**
+ * The drafts of a notes list with the text of one note replaced: what the editor's `^w`
+ * hands to the list's save.
+ *
+ * @param drafts - the list's drafts.
+ * @param index - the row of the note.
+ * @param text - its new text.
+ * @returns the new drafts.
+ * @throws Error with the message of [[notesProblem]] when the list would not be valid.
+ */
+export function withNoteText(
+    drafts: Drafts<Note>,
+    index: number,
+    text: string,
+): Drafts<Note> {
+    const next = drafts.set(index, { ...(drafts.value(index) as Note), text })
+    const why = notesProblem(next.toSave())
+    if (why !== undefined) throw new Error(why)
+    return next
+}
+
+/**
+ * The counter under the notes: where the cursor is and how much of the cap is used.
+ *
+ * @param line - the line of the cursor, from 1.
+ * @param lines - how many lines the text has.
+ * @param column - the cell of the cursor in its line, from 1.
+ * @param used - the characters of the text.
+ * @returns `line 3/12  col 7  482 characters`.
+ */
+export function notesCounter(
+    line: number,
+    lines: number,
+    column: number,
+    used: number,
+): string {
+    return `line ${line}/${lines}  col ${column}  ${used} characters`
+}
+
+/** The most cells of the owner in the title of the editor (the title keeps its own). */
+const OWNER_CELLS = 24
+
+/**
+ * The title of the editor screen: `<owner> / <note title>`, the owner cut from its start
+ * when it is long so the whole title fits the narrowest terminal.
+ *
+ * @param owner - the project's id, `buffer` or a recipe's name.
+ * @param title - the note's title.
+ * @returns the title.
+ */
+export function noteScreenTitle(owner: string, title: string): string {
+    return `${truncateStart(owner, OWNER_CELLS)} / ${title}`
 }

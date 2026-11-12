@@ -9,9 +9,10 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: StructureSource, LocalPathSource, PDBIDSource, URLSource,
     StructureSourceError, reslove_struct, load_molecule,
-    Molecule, n_atoms, elms, coords_cartesian, _store_dir
+    Molecule, n_atoms, elms, coords_cartesian, _store_dir, is_ligand
 using BioStructures:
-    BioStructures, MMCIFFormat, writepdb, standardselector, heavyatomselector
+    BioStructures, MMCIFFormat, writepdb, standardselector, heavyatomselector, ishetero,
+    resname
 
 include(joinpath(@__DIR__, "..", "floatcompare.jl"))   # close_
 
@@ -409,10 +410,17 @@ END
             # e.g. 7RSA-TEST.pdb, 1IGT-TEST.pdb), which reslove_struct's
             # pure-passthrough branch never strips.
             standard_only_n = length(BioStructures.collectatoms(struc[1], standardselector))
+            # the loader also keeps the ligands (heme, sugars, ions, ...; owner 2026-11-11),
+            # counted here straight off the parsed model
+            ligand_n = count(
+                a -> ishetero(a) && is_ligand(resname(a)),
+                BioStructures.collectatoms(struc[1]),
+            )
             mol = load_molecule(resolved)
             n = n_atoms(mol)
-            @test n == standard_only_n
-            is_cif && @test n == expected_n
+            @test n == standard_only_n + ligand_n
+            @test n_atoms(load_molecule(resolved; ligands = false)) == standard_only_n
+            is_cif && @test n == expected_n + ligand_n
             cc = coords_cartesian(mol)
             @test size(cc) == (3, n)
             @test all(isfinite, cc)

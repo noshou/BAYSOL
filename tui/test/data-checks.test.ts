@@ -12,8 +12,7 @@
 import assert from "node:assert/strict"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { test } from "node:test"
-import { renderToString } from "ink"
-import { createElement, type ReactElement } from "react"
+import { createElement, } from "react"
 import { DataImportScreen } from "../src/screens/data-import.js"
 import { ModelReferenceScreen } from "../src/screens/model-reference.js"
 import { writeData } from "../src/store/data.js"
@@ -26,9 +25,7 @@ import {
     readModelReferences,
     saveModelReference,
 } from "../src/store/model-references.js"
-import { NavProvider } from "../src/ui/interaction.js"
-import { defaultTheme, ThemeContext } from "../src/ui/theme.js"
-import { tempDir } from "./support/fixtures.js"
+import { drawScreen, tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. The warnings
@@ -90,18 +87,6 @@ function projectWithData(): { id: string; dir: string } {
     return { id: "P", dir }
 }
 
-/** Draws a screen at 80 columns. */
-function draw(screen: ReactElement): string {
-    return renderToString(
-        createElement(
-            ThemeContext.Provider,
-            { value: defaultTheme },
-            createElement(NavProvider, { root: screen }),
-        ),
-        { columns: 80 },
-    )
-}
-
 /** A fit file as SASBDB has it: q, the measured I, the model's I and the error. */
 function fitFile(model: (k: number, i: number) => number, header = true): string {
     const data = measured()
@@ -115,7 +100,7 @@ function fitFile(model: (k: number, i: number) => number, header = true): string
 test("the reference import starts at q col:1, I col:3 (the model) and no sigma", () => {
     const project = projectWithData()
     const text = fitFile((_, i) => i * 1.01234567)
-    const out = draw(
+    const out = drawScreen(
         createElement(DataImportScreen, {
             project,
             path: "/x/fit.dat",
@@ -137,7 +122,7 @@ test("the reference import starts at q col:1, I col:3 (the model) and no sigma",
 test("the data import warns when sigma is the model's curve", () => {
     const project = projectWithData()
     const source = textSource(fitFile((_, i) => i * 1.01, false))
-    const out = draw(
+    const out = drawScreen(
         createElement(DataImportScreen, {
             project,
             path: "/x/fit.dat",
@@ -152,7 +137,7 @@ test("the data import warns when sigma is the model's curve", () => {
 test("the reference import warns about the data's own column", () => {
     const project = projectWithData()
     // the model column holds the measured intensity: same numbers
-    const out = draw(
+    const out = drawScreen(
         createElement(DataImportScreen, {
             project,
             path: "/x/fit.dat",
@@ -212,7 +197,7 @@ test("the reference screen of a model shows its rows at 80 columns", () => {
         software: "FoXS",
         fit: "gone.tsv",
     })
-    const out = draw(
+    const out = drawScreen(
         createElement(ModelReferenceScreen, { project, file: "m1.pdb", stem: "m1" }),
     )
     for (const row of ["model", "curve", "software", "tag", "chi2", "rescale"])

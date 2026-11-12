@@ -305,7 +305,7 @@ const SETTING_LIMITS = (
 """
 The rules that tie settings above together, or that a tuple setting must obey, which a set
 of values must obey as a whole; each is a `(rule, setting, ...)` and is read by the
-terminal interface and by [`load_settings`](@ref BAYSOL.Pipeline.load_settings).
+terminal interface and by `load_settings`.
 `:inside`: `setting` lies strictly between the two numbers of the setting `of`;
 `:within_width`: `setting` is above 0 and at most the width of the pair `of`; `:ordered`:
 the pair `setting` has its first number below its second, and above `above` if there is
@@ -322,7 +322,7 @@ const SETTING_RELATIONS = (
 
 """
 The constants above that are settings, the ones a user may change: the terminal interface
-shows each on a page of its own, and [`load_settings`](@ref BAYSOL.Pipeline.load_settings)
+shows each on a page of its own, and `load_settings`
 accepts a saved value for these and for no other name.
 """
 const SETTING_NAMES = (

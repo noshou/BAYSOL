@@ -181,6 +181,7 @@ function steps(julia)
         ("tool-tests", true, ["bysl", "test"]),
         ("pmv-mean", true, ["bysl", "harvest", "pmv-mean"]),
         ("solute-index", true, ["bysl", "harvest", "solutes"]),
+        ("residue-table", true, ["bysl", "harvest", "residues"]),
         ("unit-tests", false, unit),
         ("concurrency-tests", false,
             [julia, "--startup-file=no", "-t", "6,1", "--project=" * in_root("test"),

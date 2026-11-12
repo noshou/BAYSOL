@@ -11,10 +11,13 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { lazyAsset } from "../core/environment.js"
 import { isDict, type ReadOptions } from "../core/file-system.js"
-import { fold } from "../core/terminal.js"
+import { fold, NAME_BLANK, NAME_CONTROL, NAME_IN_USE } from "../core/terminal.js"
 import { ListFile, MAX_ROWS } from "./lists.js"
+import { type Note, notesProblem, storedNotes } from "./notes.js"
 import { inProject } from "./projects.js"
 import { CONC_UNITS, type ConcUnit } from "./solutes.js"
+import type { Definition } from "./template-defs.js"
+import { cleanRow, type TemplateLink } from "./template-link.js"
 
 // ========================================================================================
 // 1. The buffer file
@@ -33,14 +36,16 @@ import { CONC_UNITS, type ConcUnit } from "./solutes.js"
  * keys of the file's map are kept as they are when the solutes are written. The file also
  * holds the conditions of the buffer, `"pH"` and `"sigma-pH"` (the standard uncertainty of
  * the pH, shown as σ to the user), next to `solutes`; both or neither ([[Conditions]],
- * [[conditionsProblem]]), and `"conc-unit"` (the unit the table shows, [[readConcUnit]]).
+ * [[conditionsProblem]]), the optional `"temperature"` (°C; a run needs it, a new buffer
+ * has none until `^g` sets it), and `"conc-unit"` (the unit the table shows,
+ * [[readConcUnit]]).
  * A missing or empty file is a buffer with no solutes and no pH;
  * a file that is not a JSON object (or whose `solutes` is
  * not an array of objects, or has a row that [[rowProblem]] refuses, or has more than
  * [[MAX_ROWS]]) is unusable, and is never written over.
  *
  * The kinds of row are the ones of `test/fixtures/buffer/buffer.json`, the file the Julia
- * loader (`BAYSOL.Pipeline.load_buffer`, `src/Pipeline/Buffer.jl`) is tested against
+ * loader (`load_buffer`, `buffer.jl` next to this file) is tested against
  * too. [[rowProblem]] checks the same keys and types as the loader, so a row the screen
  * writes is one the loader reads.
  */
@@ -71,11 +76,15 @@ export const kinds = [
  * @property name - the label the user gave it (the loader does not check it).
  * @property mM - the concentration, above 0.
  * @property sigma-mM - its standard uncertainty, 0 or more; required.
+ * @property template - the link to the buffer template that made the row, which makes
+ *     it follow the pH ([[TemplateLink]]); optional, and never checked by [[rowProblem]]
+ *     (an invalid one is dropped on reading, `cleanRow`).
  */
 export type RowBase = {
     name: string
     mM: number
     "sigma-mM": number
+    template?: TemplateLink
 }
 
 /** A row whose `arg` is a name BAYSOL looks up: a table name or a grade or family. */
@@ -152,16 +161,20 @@ export type CustomPolymerRow = RowBase & {
  *
  * @property pH - the pH, within [[phLimits]].
  * @property sigma-pH - its standard uncertainty, 0 or more (the screens call it σ).
+ * @property temperature - the temperature of the buffer, °C, within [[conditionLimits]];
+ *     absent in a new buffer (the buffer cannot run until it is set).
  */
 export type Conditions = {
     pH: number
     "sigma-pH": number
+    temperature?: number
 }
 
 /** `assets/data/buffer_conditions.json`; the Julia loader is tested against it. */
 type ConditionLimits = {
     pH: { min: number; max: number }
     sigmaPh: { min: number; max: number; default: number }
+    temperature: { min: number; max: number }
 }
 
 /** @returns the limits of the pH and of its uncertainty, and the default uncertainty. */
@@ -256,14 +269,21 @@ export function rowProblem(row: unknown): string | undefined {
 }
 
 /**
- * What is wrong with the pH and σ among the keys of a buffer's map: neither is there (a
- * buffer without conditions, which cannot be run), or both are numbers, the pH within
- * its limits and σ within its own (0 or more). The rules of the Julia loader.
+ * What is wrong with the pH, σ and temperature among the keys of a buffer's map: neither
+ * pH nor σ is there (a buffer without conditions, which cannot be run), or both are
+ * numbers, the pH within its limits and σ within its own (0 or more); a `temperature`,
+ * when the key is there, is a number within its limits. The rules of the Julia loader.
  */
 export function conditionsProblem(map: Record<string, unknown>): string | undefined {
+    const { pH, sigmaPh, temperature } = conditionLimits()
+    const t = map.temperature
+    if (
+        t !== undefined &&
+        !(isNumber(t) && t >= temperature.min && t <= temperature.max)
+    )
+        return `temperature must be a number from ${temperature.min} to ${temperature.max}`
     const has = "pH" in map || "sigma-pH" in map
     if (!has) return undefined
-    const { pH, sigmaPh } = conditionLimits()
     const ph = map.pH
     const sigma = map["sigma-pH"]
     if (!(isNumber(ph) && ph >= pH.min && ph <= pH.max))
@@ -280,7 +300,11 @@ export function conditionsProblem(map: Record<string, unknown>): string | undefi
  */
 export function conditionsOf(map: Record<string, unknown>): Conditions | undefined {
     if (!("pH" in map) || conditionsProblem(map) !== undefined) return undefined
-    return { pH: map.pH as number, "sigma-pH": map["sigma-pH"] as number }
+    return {
+        pH: map.pH as number,
+        "sigma-pH": map["sigma-pH"] as number,
+        ...(map.temperature !== undefined && { temperature: map.temperature as number }),
+    }
 }
 
 // --- the file
@@ -297,7 +321,7 @@ const bufferList = new ListFile<BufferRow>({
     plural: "solutes",
     noun: "buffer row",
     problem: rowProblem,
-    mapProblem: conditionsProblem,
+    mapProblem: (map) => conditionsProblem(map) ?? notesProblem(map.notes),
     createParents: false,
 })
 
@@ -310,7 +334,7 @@ const bufferList = new ListFile<BufferRow>({
  * @throws UnusableFileError if the file cannot be used.
  */
 export function readSolutes(projectDir: string, options: ReadOptions = {}): BufferRow[] {
-    return bufferList.read(projectDir, options)
+    return bufferList.read(projectDir, options).map(cleanRow)
 }
 
 /**
@@ -318,9 +342,12 @@ export function readSolutes(projectDir: string, options: ReadOptions = {}): Buff
  * through a temporary file that replaces it in one step. The file is made if there is
  * none; one that cannot be used is not touched.
  *
- * @param conditions - the pH and σ to write with them, `undefined` to leave the file's own
+ * @param conditions - the pH, σ and temperature to write with them (no temperature takes
+ *     the key off), `undefined` to leave the file's own
  *     (a buffer that has none stays without).
  * @param unit - the unit the table shows, `undefined` to leave the file's own.
+ * @param notes - the notes of the buffer (`"notes"`, absent for none, so an empty array
+ *     takes the key off), `undefined` to leave the file's own.
  * @throws ChangedOnDiskError if another copy of the program saved the file after this
  *     one read it (nothing is written); UnusableFileError (`not a valid buffer row: ...`,
  *     `too many solutes ...`, nothing written) for a row that [[rowProblem]] refuses or
@@ -332,10 +359,18 @@ export function writeSolutes(
     solutes: readonly BufferRow[],
     conditions?: Conditions,
     unit?: ConcUnit,
+    notes?: readonly Note[],
 ): string {
     const extras = {
-        ...(conditions && { pH: conditions.pH, "sigma-pH": conditions["sigma-pH"] }),
+        // an absent temperature is `undefined`: it takes the key off
+        ...(conditions && {
+            pH: conditions.pH,
+            "sigma-pH": conditions["sigma-pH"],
+            temperature: conditions.temperature,
+        }),
         ...(unit && { [concUnitKey]: unit }),
+        // `undefined` is left out of the JSON: it takes the key off
+        ...(notes && { notes: storedNotes(notes) }),
     }
     return inProject(projectDir, () => bufferList.write(projectDir, solutes, extras))
 }
@@ -351,6 +386,38 @@ export function readConditions(
     options: ReadOptions = {},
 ): Conditions | undefined {
     return conditionsOf(bufferList.readOther(projectDir, options))
+}
+
+/**
+ * The notes of the buffer of a project (`"notes"` next to `solutes`; Julia ignores them).
+ *
+ * @param options - `track: true` when read to be edited, as for [[readSolutes]].
+ * @returns the notes, empty for none.
+ * @throws UnusableFileError if the file cannot be used (invalid notes included).
+ */
+export function readBufferNotes(projectDir: string, options: ReadOptions = {}): Note[] {
+    const notes = bufferList.readOther(projectDir, options).notes
+    return Array.isArray(notes) ? (notes as Note[]) : []
+}
+
+/**
+ * Writes ONLY the notes of the buffer, at once: the file is re-read under the project's
+ * lock and just the `notes` key is replaced (an empty list takes it off); the solutes,
+ * the pH and the unit stay as the file has them. The version this process holds is
+ * renewed by the write, so a later [[writeSolutes]] of a table that read the file before
+ * is not refused for this write.
+ *
+ * @param notes - the notes; they must keep the rules of [[notesProblem]].
+ * @throws UnusableFileError for notes that break the rules or a file that cannot be
+ *     used (nothing is written); ProjectGoneError when the folder is gone.
+ */
+export function writeBufferNotes(projectDir: string, notes: readonly Note[]): void {
+    inProject(projectDir, () =>
+        bufferList.update(projectDir, (rows) => rows, {
+            // `undefined` is left out of the JSON: it takes the key off
+            extras: { notes: storedNotes(notes) },
+        }),
+    )
 }
 
 /**
@@ -411,7 +478,8 @@ export function resetBuffer(projectDir: string): string | undefined {
  * recipe is a named buffer: the same rows a project's `buffer.json` has (the schema of
  * `test/fixtures/buffer/buffer.json`, checked by [[rowProblem]]; custom rows are
  * snapshots, so a recipe is self-contained) and, when it has them, the buffer's pH and σ
- * as `"pH"` and `"sigma-pH"` (both or neither, the rules of [[conditionsProblem]]). A JSON
+ * as `"pH"` and `"sigma-pH"` (both or neither, the rules of [[conditionsProblem]]) and
+ * the optional `"temperature"` (°C). A JSON
  * object whose `recipes` is an array of objects, one for each recipe (the shape of
  * `test/fixtures/buffer/recipes.json`):
  *
@@ -426,7 +494,8 @@ export function resetBuffer(projectDir: string): string | undefined {
  * [[MAX_ROWS]] recipes, each of at most [[MAX_ROWS]] solutes. Other keys of the map, and of
  * a recipe, are kept as they are on write. A missing or empty file is no recipes; a file
  * that is not a JSON object, whose `recipes` is not an array of objects with a name, an
- * array of valid rows and valid conditions, that has a name twice or more recipes or
+ * array of valid rows and valid conditions and, when it has `"notes"`, valid notes
+ * ([[notesProblem]]), that has a name twice or more recipes or
  * solutes than the limits, is unusable, and is never written over. The project side never
  * reads this file: loading a recipe copies its rows into the project's own `buffer.json`
  * (and the Julia side only ever reads that file). The unit of the concentrations is not
@@ -439,21 +508,25 @@ export const MAX_NAME = 40
 /** The name of the file in the BAYSOL folder. */
 export const recipesFileName = "recipes.json"
 
-/** What the name problem says of a name that another recipe has. */
-const IN_USE_MESSAGE = "name in use"
-
 /**
  * A saved recipe. Keys other than these are kept as they are.
  *
  * @property name - the recipe's name, unique without regard to case.
  * @property solutes - the rows of the buffer it stands for.
  * @property pH - the buffer's pH, with `sigma-pH` (both or neither).
+ * @property temperature - the buffer's temperature, °C (optional).
+ * @property notes - the titled notes of the recipe ([[Note]]), absent when there are none.
+ * @property template - the definition of a template recipe (`template-recipes.ts`); kept
+ *     as it is, never checked here (a bad one makes the recipe an ordinary one).
  */
 export interface Recipe {
     name: string
     solutes: BufferRow[]
     pH?: number
     "sigma-pH"?: number
+    temperature?: number
+    notes?: Note[]
+    template?: unknown
     [other: string]: unknown
 }
 
@@ -464,12 +537,14 @@ export interface Recipe {
  * @property solutes - how many solutes it has.
  * @property kinds - the counts by kind, `1 solute 2 polymer 3 custom 4 seq`.
  * @property conditions - its pH and σ, `undefined` for none.
+ * @property notes - its notes, absent for none.
  */
 export interface RecipeSummary {
     name: string
     solutes: number
     kinds: string
     conditions?: Conditions
+    notes?: Note[]
 }
 
 /** The recipes file of the BAYSOL folder. */
@@ -485,9 +560,9 @@ export function recipesFile(root: string): string {
  * @returns a short message, or `undefined`.
  */
 export function recipeNameProblem(n: string): string | undefined {
-    if (n.trim() === "") return "type a name first!"
+    if (n.trim() === "") return NAME_BLANK
     if (n.trim().length > MAX_NAME) return `${MAX_NAME} characters at most`
-    if (/\p{Cc}/u.test(n)) return "no control characters"
+    if (/\p{Cc}/u.test(n)) return NAME_CONTROL
     return undefined
 }
 
@@ -524,12 +599,13 @@ export function renameProblem(
     const problem = recipeNameProblem(n)
     if (problem) return problem
     const others = recipes.filter((_, i) => i !== except)
-    return indexOfRecipe(others, n) === undefined ? undefined : IN_USE_MESSAGE
+    return indexOfRecipe(others, n) === undefined ? undefined : NAME_IN_USE
 }
 
 /**
  * What is wrong with a recipe: no name, not an array of at most [[MAX_ROWS]] valid buffer
- * rows, or a pH and σ that [[conditionsProblem]] refuses.
+ * rows, a pH and σ that [[conditionsProblem]] refuses, or notes that [[notesProblem]]
+ * refuses.
  *
  * @param r - a value of the file or of a save.
  * @returns the message, or `undefined`.
@@ -543,6 +619,8 @@ function recipeProblem(r: unknown): string | undefined {
         const why = isDict(row) ? rowProblem(row) : "a row is not a map"
         if (why !== undefined) return why
     }
+    const why = notesProblem(r.notes)
+    if (why !== undefined) return why
     return conditionsProblem(r)
 }
 
@@ -557,15 +635,22 @@ const recipeList = new ListFile<Recipe>({
     nameOf: (r) => r.name,
 })
 
-/** The recipes with their keys in file order: name, solutes, pH, sigma-pH, the rest. */
+/**
+ * The recipes with their keys in file order: name, solutes, pH, sigma-pH, temperature,
+ * notes, rest.
+ */
 function ordered(recipes: readonly Recipe[]): Recipe[] {
-    return recipes.map(({ name, solutes, pH, "sigma-pH": sigma, ...rest }) => ({
-        name,
-        solutes,
-        ...(pH !== undefined && { pH }),
-        ...(sigma !== undefined && { "sigma-pH": sigma }),
-        ...rest,
-    }))
+    return recipes.map(
+        ({ name, solutes, pH, "sigma-pH": sigma, temperature, notes, ...rest }) => ({
+            name,
+            solutes,
+            ...(pH !== undefined && { pH }),
+            ...(sigma !== undefined && { "sigma-pH": sigma }),
+            ...(temperature !== undefined && { temperature }),
+            ...(notes !== undefined && { notes }),
+            ...rest,
+        }),
+    )
 }
 
 /**
@@ -579,7 +664,9 @@ function ordered(recipes: readonly Recipe[]): Recipe[] {
  * @throws UnusableFileError (kind `recipes`) if the file cannot be used.
  */
 export function readRecipes(root: string, options: ReadOptions = {}): Recipe[] {
-    return recipeList.read(root, options)
+    return recipeList
+        .read(root, options)
+        .map((r) => ({ ...r, solutes: r.solutes.map(cleanRow) }))
 }
 
 /**
@@ -596,13 +683,20 @@ export function recipeSolutes(root: string, n: string): BufferRow[] | undefined 
 }
 
 /**
- * The pH and σ of a recipe.
+ * The pH, σ and temperature of a recipe.
  *
  * @returns them, `undefined` for a recipe without (or with ones [[conditionsProblem]]
  *     refuses).
  */
 export function recipeConditions(recipe: Recipe): Conditions | undefined {
     return conditionsOf(recipe)
+}
+
+/** The recipe with the pH, σ and, when there is one, the temperature put in. */
+function addConditions(rest: Recipe, c: Conditions): Recipe {
+    const out: Recipe = { ...rest, pH: c.pH, "sigma-pH": c["sigma-pH"] }
+    if (c.temperature !== undefined) out.temperature = c.temperature
+    return out
 }
 
 /**
@@ -613,10 +707,23 @@ export function recipeConditions(recipe: Recipe): Conditions | undefined {
  * @returns the recipe, its other keys kept.
  */
 export function withConditions(recipe: Recipe, conditions?: Conditions): Recipe {
-    const { pH: _ph, "sigma-pH": _sigma, ...rest } = recipe
+    const { pH: _ph, "sigma-pH": _sigma, temperature: _t, ...rest } = recipe
     return conditions === undefined
         ? rest
-        : { ...rest, pH: conditions.pH, "sigma-pH": conditions["sigma-pH"] }
+        : addConditions(rest, conditions)
+}
+
+/**
+ * A recipe with its notes set, or the key taken off when there are none.
+ *
+ * @param recipe - the recipe.
+ * @param notes - the notes it is to have.
+ * @returns the recipe, its other keys kept.
+ */
+export function withNotes(recipe: Recipe, notes: readonly Note[]): Recipe {
+    const { notes: _old, ...rest } = recipe
+    const stored = storedNotes(notes)
+    return stored === undefined ? rest : { ...rest, notes: stored }
 }
 
 /**
@@ -640,21 +747,31 @@ export function writeRecipes(root: string, recipes: readonly Recipe[]): string {
 
 /**
  * The recipes with one saved under a name: a recipe of that name (without regard to
- * case) is replaced where it stands (its other keys kept, its pH and σ those given:
- * none given, none kept), else the recipe goes at the end.
+ * case) is replaced where it stands (its other keys, its notes among them, kept; its pH
+ * and σ those given: none given, none kept), else the recipe goes at the end.
  */
 function withRecipe(
     recipes: readonly Recipe[],
     n: string,
     solutes: readonly BufferRow[],
     conditions: Conditions | undefined,
+    notes: readonly Note[] | undefined,
+    definition?: Definition,
 ): Recipe[] {
-    const recipe = withConditions({ name: n.trim(), solutes: [...solutes] }, conditions)
+    // the buffer's notes when it has any, else a recipe it replaces keeps its own
+    const base = withNotes(
+        withConditions({ name: n.trim(), solutes: [...solutes] }, conditions),
+        notes ?? [],
+    )
+    // the definition is the save's own: a template replaced by a recipe loses it
+    const recipe = definition === undefined ? base : { ...base, template: definition }
     const i = indexOfRecipe(recipes, n)
     if (i === undefined) return [...recipes, recipe]
-    return recipes.map((r, j) =>
-        j === i ? { ...withConditions(r, undefined), ...recipe } : r,
-    )
+    return recipes.map((r, j) => {
+        if (j !== i) return r
+        const { template: _old, ...kept } = withConditions(r, undefined)
+        return { ...kept, ...recipe }
+    })
 }
 
 /**
@@ -665,6 +782,10 @@ function withRecipe(
  * @param solutes - the rows.
  * @param conditions - the buffer's pH and σ, stored with the rows; `undefined` for a
  *     buffer without (the replaced recipe then has none either).
+ * @param notes - the buffer's notes: the recipe takes them when there are any; with none,
+ *     a recipe that is replaced keeps its own.
+ * @param definition - the definition of a template recipe (the `solutes` are then its
+ *     fixed rows); none makes an ordinary recipe, also of a template that is replaced.
  * @returns the file.
  * @throws UnusableFileError like [[writeRecipes]] (too many recipes or solutes, an
  *     invalid row or pH, a blank name, an unusable file).
@@ -674,9 +795,11 @@ export function saveRecipe(
     n: string,
     solutes: readonly BufferRow[],
     conditions?: Conditions,
+    notes?: readonly Note[],
+    definition?: Definition,
 ): string {
     recipeList.update(root, (recipes) =>
-        ordered(withRecipe(recipes, n, solutes, conditions)),
+        ordered(withRecipe(recipes, n, solutes, conditions, notes, definition)),
     )
     return recipesFile(root)
 }
@@ -703,6 +826,27 @@ export function renameRecipe(root: string, from: string, to: string): string | u
         return ordered(recipes.map((r, j) => (j === i ? { ...r, name: to.trim() } : r)))
     })
     return message
+}
+
+/**
+ * Changes one saved recipe in place, at once: the file is re-read under the lock, so
+ * nothing of the other recipes is lost.
+ *
+ * @param n - the recipe's name, without regard to case.
+ * @param change - given the recipe as it is on disk now; returns the recipe to keep.
+ * @returns whether there was such a recipe (nothing is written when there was not).
+ * @throws UnusableFileError like [[writeRecipes]].
+ */
+export function updateRecipe(
+    root: string,
+    n: string,
+    change: (recipe: Recipe) => Recipe,
+): boolean {
+    return recipeList.update(root, (recipes) => {
+        const i = indexOfRecipe(recipes, n)
+        if (i === undefined) return undefined
+        return ordered(recipes.map((r, j) => (j === i ? change(r) : r)))
+    })
 }
 
 /**
@@ -773,5 +917,6 @@ export function listRecipes(root: string): RecipeSummary[] {
         solutes: r.solutes.length,
         kinds: kindsSummary(r.solutes),
         conditions: recipeConditions(r),
+        ...(r.notes !== undefined && { notes: r.notes }),
     }))
 }

@@ -5,10 +5,13 @@ The pipeline entry points: [`seed_model`](@ref) builds a [`Inference.Seed`](@ref
 structure, a measured curve and a buffer, [`run_model`](@ref) samples it and summarizes the
 posterior, [`results`](@ref) draws the figures and writes the workbook of numbers,
 [`compare_results`](@ref) draws the models of one measured curve and the reference curves
-on one figure, and [`write_log`](@ref) writes the run log, and [`run_project`](@ref) does
-all of it for every model of a project folder and leaves a run folder. `BAYSOL.seed_model`,
-`BAYSOL.run_model`, `BAYSOL.results`, `BAYSOL.compare_results`, `BAYSOL.write_log` and
-`BAYSOL.run_project` are these functions, re-exported by the package root.
+on one figure, and [`write_log`](@ref) writes the run log. `BAYSOL.seed_model`,
+`BAYSOL.run_model`, `BAYSOL.results`, `BAYSOL.compare_results` and `BAYSOL.write_log`
+are these functions, re-exported by the package root. The module reads no settings file
+and no project folder: those, and `run_project`, which fits every model of a project
+folder, belong to the terminal interface (`tui/src/store/run-project.jl`) and call these
+entry points with the keywords of [`seed_keywords`](@ref), [`run_keywords`](@ref) and
+[`results_keywords`](@ref).
 """
 module Pipeline
 
@@ -171,8 +174,8 @@ const _REPORT_LABELS = Dict{String,String}(
     "chisq_red"     => "chi2",
 )
 
+include("ColourNotation.jl")
 include("Settings.jl")
-include("Buffer.jl")
 include("SeedModel.jl")
 include("RunModel.jl")
 include("Tables.jl")
@@ -180,13 +183,11 @@ include("Log.jl")
 include("Results.jl")
 include("Compare.jl")
 include("Summary.jl")
-include("RunProject.jl")
 
 export seed_model,
     run_model, print_summary, write_log,
-    results, compare_results, PlotStyle, Reference, font_available, load_settings,
-    settings_file, InvalidSettingsError, load_buffer, load_buffer_ph, InvalidBufferError,
-    seed_keywords, run_keywords, run_arguments, results_keywords, run_project
+    results, compare_results, PlotStyle, Reference, font_available, InvalidSettingsError,
+    seed_keywords, run_keywords, run_arguments, results_keywords
 public MAPParams, MAPResult, QuantileBounds, QuantileParams, QuantileCurves, QuantileResult
 
 end # module

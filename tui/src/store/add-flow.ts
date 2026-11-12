@@ -78,7 +78,7 @@ import {
     complete,
     type Drafts,
     hintsFor,
-    isFastaFile,
+    isSequenceFile,
     MAX_PATH_TYPED,
     MAX_ROWS,
     parseFile,
@@ -92,6 +92,7 @@ import {
     bufferRow,
     COLUMNS,
     cycle,
+    duplicateMessage,
     type EditField,
     family,
     familyArg,
@@ -107,6 +108,7 @@ import {
     SEQUENCE_KINDS,
     type Solute,
     type SoluteEntry,
+    sameSoluteKey,
     setSoluteField,
 } from "./solutes.js"
 
@@ -381,6 +383,13 @@ function startEdit(table: Drafts<Solute>, cursor: number): AddState {
 function picked(state: NameState, e: SoluteEntry): AddState {
     const i = state.added[0]
     const solute = { name: e.name, mM: null, sigmaMM: null }
+    // the same solute twice (`cl-` after `chloride`) is refused before the amounts
+    const twin = duplicateMessage(
+        state.table,
+        { ...solute, kind: e.kind, arg: e.target, custom: e.target } as Solute,
+        [i],
+    )
+    if (twin) return { ...state, problem: twin }
     const set = (s: Solute) => state.table.set(i, s)
     switch (e.kind) {
         case "nonbiological":
@@ -456,6 +465,24 @@ function takeRecords(
     const existing = state.table.length - state.added.length
     if (existing + records.length > MAX_ROWS) {
         return { ...state, problem: `over ${MAX_ROWS} rows` }
+    }
+    const made = records.map(
+        (r): Solute => ({
+            kind: state.seqKind,
+            name: r.id,
+            arg: r.letters,
+            mM: null,
+            sigmaMM: null,
+        }),
+    )
+    // a sequence that is in the buffer already, or twice in the file, is refused
+    const added = new Set(state.added)
+    for (const [k, row] of made.entries()) {
+        const same = made.slice(0, k).find((o) => sameSoluteKey(o) === sameSoluteKey(row))
+        const twin =
+            duplicateMessage(state.table, row, [...added]) ??
+            (same && `${row.name} already in the buffer (as ${same.name})`)
+        if (twin) return { ...state, problem: twin }
     }
     const [first, ...rest] = records.map(
         (r): Solute => ({
@@ -538,6 +565,12 @@ function paramsEnter(state: EditState): AddState {
         if (k + 1 < args.length) return asNext({ ...ctx, values, k: k + 1 })
         const result = familyArg(ctx.fam, ctx.formIndex, values)
         if ("error" in result) return { ...state, problem: result.error }
+        const twin = duplicateMessage(
+            state.table,
+            { ...rowSolute(state.table, state.i), arg: result.arg },
+            [state.i],
+        )
+        if (twin) return { ...state, problem: twin }
         const table = setSoluteField(state.table, state.i, "arg", result.arg)
         return nextField(state, table, { hint: result.note })
     }
@@ -637,7 +670,7 @@ function advanceChoice(
 
 /** The path prompt after an event. */
 function advancePath(state: PathState, event: AddEvent): AddState {
-    const hints = hintsFor(state.buffer, isFastaFile)
+    const hints = hintsFor(state.buffer, isSequenceFile)
     const at = Math.min(state.index, Math.max(0, hints.length - 1))
     switch (event.type) {
         case "cancel":
@@ -802,7 +835,7 @@ function view(state: AddState): FlowStep {
                 problem,
             }
         case "path": {
-            const hints = hintsFor(state.buffer, isFastaFile)
+            const hints = hintsFor(state.buffer, isSequenceFile)
             return {
                 type: "dropdown",
                 label: "path",

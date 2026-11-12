@@ -23,7 +23,12 @@ import {
 import { modelOverrides, modelScope, modelStem } from "../store/settings-store.js"
 import { Frame } from "../ui/frame.js"
 import { type LegendItem, legendFor, legendOf } from "../ui/grid.js"
-import { type Choice, destructiveQuestion, PathPrompt, usePickList } from "../ui/input.js"
+import {
+    type Choice,
+    destructiveQuestion,
+    PathPrompt,
+    usePickList,
+} from "../ui/input.js"
 import {
     type KeyInput,
     keys,
@@ -32,6 +37,7 @@ import {
     useNav,
     useScreenActive,
 } from "../ui/interaction.js"
+import { usePathField } from "../ui/prompt-flows.js"
 import { useTheme } from "../ui/theme.js"
 import { ModelReferenceScreen } from "./model-reference.js"
 import { SettingsMenu } from "./settings-screens.js"
@@ -90,14 +96,13 @@ export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
     const active = useScreenActive()
     const columns = useBodyColumns()
     const [mode, setMode] = useState<ModelsMode>("prompt")
-    const [typed, setTyped] = useState("")
-    const [problem, setProblem] = useState<string | undefined>()
     const [note, setNote] = useState<string | undefined>()
-    // the keys of the open path prompt, which knows how many names it hints
-    const [promptKeys, setPromptKeys] = useState<LegendItem[]>([])
-    // the prompt is remounted (a new key) to empty its field: the keys `o` and `m` are
-    // typed into it by the time the screen has seen them, and a copied path is cleared
-    const [fieldKey, setFieldKey] = useState(0)
+    // the prompt is remounted to empty its field: the keys `o` and `m` are typed into it
+    // by the time the screen has seen them, and a copied path is cleared
+    const clearNote = useCallback(() => setNote(undefined), [])
+    const field = usePathField(clearNote)
+    const { typed, problem, setProblem, promptKeys, setPromptKeys, fieldKey, resetField } =
+        field
     // bumped when the folder changes, so the lists below are read again
     const [version, setVersion] = useState(0)
     // biome-ignore lint/correctness/useExhaustiveDependencies: version = folder changed
@@ -108,16 +113,6 @@ export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
         () => modelOverrides(project.dir),
         [project.dir, version, nav.depth, active],
     )
-
-    const resetField = useCallback(() => {
-        setTyped("")
-        setFieldKey((k) => k + 1)
-    }, [])
-    const onChange = useCallback((text: string) => {
-        setTyped(text)
-        setProblem(undefined)
-        setNote(undefined)
-    }, [])
 
     const pickFiles = useCallback(async () => {
         setMode("picking")
@@ -208,7 +203,7 @@ export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
         setVersion((v) => v + 1)
         setNote(`copied ${basename(path)}`)
         resetField()
-    }, [names, project.dir, resetField])
+    }, [names, project.dir, resetField, setProblem])
 
     // only the keys that work now. The list shows its own (remove only with a model
     // highlighted, move only for several, tab only with one highlighted) or the answers
@@ -254,7 +249,7 @@ export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
                         onSubmit={submit}
                         onCancel={nothing}
                         onBack={nav.pop}
-                        onChange={onChange}
+                        onChange={field.onChange}
                         take="copy"
                         canTake={typed !== ""}
                         cancel={null}

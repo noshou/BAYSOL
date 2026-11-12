@@ -120,6 +120,70 @@ export function draftProblem(s: Solute, rowProblem: RowProblem): string | undefi
 }
 
 /**
+ * What makes two rows the same solute: the kind and the solute BAYSOL resolves the row to
+ * (the bundled table's name of an `arg`, a custom entry's name, the letters of a sequence),
+ * case and outer blanks ignored. `chloride` and `cl-` are one solute; `sodium chloride`,
+ * `chloride` and `sodium(1+)` are three; two polymer grades are two.
+ *
+ * @param s - the row.
+ * @returns the key, `undefined` for a row that has no name yet.
+ */
+export function sameSoluteKey(s: Solute): string | undefined {
+    const text = String(s.kind.startsWith("custom") ? (s.custom ?? s.name) : s.arg).trim()
+    if (text === "") return undefined
+    const resolved = s.kind === "nonbiological" || s.kind === "polymer"
+        ? (resolveBuiltin(text)?.target ?? text)
+        : text
+    return `${s.kind}|${fold(resolved)}`
+}
+
+/**
+ * The message when a row is a solute that another row of the table is already: `NAME
+ * already in the buffer (as FIRST)`. Rows marked to be removed do not count.
+ *
+ * @param table - the table.
+ * @param candidate - the row about to be set.
+ * @param skip - the indices of rows to leave out (the row being made or edited).
+ * @returns the message, `undefined` when it is a new solute.
+ */
+export function duplicateMessage(
+    table: Drafts<Solute>,
+    candidate: Solute,
+    skip: readonly number[] = [],
+): string | undefined {
+    const key = sameSoluteKey(candidate)
+    if (key === undefined) return undefined
+    for (let i = 0; i < table.length; i++) {
+        if (skip.includes(i) || table.rows[i].removed) continue
+        const other = table.value(i) as Solute
+        if (sameSoluteKey(other) === key) {
+            return `${candidate.name} already in the buffer (as ${other.name})`
+        }
+    }
+    return undefined
+}
+
+/**
+ * The first row that is a solute an earlier row is already.
+ *
+ * @param state - the table.
+ * @returns `[row index, message]`, `undefined` when every solute is there once.
+ */
+export function firstDuplicate(state: Drafts<Solute>): [number, string] | undefined {
+    const seen = new Map<string, string>()
+    for (let i = 0; i < state.length; i++) {
+        if (state.rows[i].removed) continue
+        const s = state.value(i) as Solute
+        const key = sameSoluteKey(s)
+        if (key === undefined) continue
+        const first = seen.get(key)
+        if (first !== undefined) return [i, `${s.name} already in the buffer (as ${first})`]
+        seen.set(key, s.name)
+    }
+    return undefined
+}
+
+/**
  * The first problem of the rows that stay at the next save.
  *
  * @returns `[row index, message]`, or `undefined` when every row that stays is complete.

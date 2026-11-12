@@ -6,17 +6,19 @@
 # constants (or from the helpers on the default settings) the result is that of the call
 # without them, and non-default values reach the code that reads them (the support of the
 # priors, the c1 window, the sampler's options, the precision of the tables).
-# The table of settings and keywords is checked in test_settings.jl.
+# The table of settings and keywords is checked at the end of this file; the reading of
+# settings.json is tested in tui/test/settings-file.test.jl.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 using Distributions: mean, params
-using BAYSOL.Pipeline: XLSX
+using BAYSOL.Pipeline:
+    XLSX, InvalidSettingsError, _checked_value, _setting_names,
+    _setting_default
 
 const _KW_CRAMBIN = joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1CRN-TEST.pdb")
-const _KW_DEFAULTS =
-    BAYSOL.load_settings(joinpath(tempdir(), "no", "such", "settings.json"))
+const _KW_DEFAULTS = default_settings()
 
 # the arguments of seed_model: a smooth curve of 30 points
 function _kw_args()
@@ -288,5 +290,201 @@ quiet(f) = redirect_stdout(f, devnull)
             write(other, "")
             @test_throws ErrorException P._engine_kwargs(nothing, other)
         end
+    end
+end
+
+# ---------------------------------------------------------------------------
+# every setting is a keyword of an entry point (the owner's rule: a user of the library
+# passes what the terminal interface keeps in settings.json)
+# ---------------------------------------------------------------------------
+
+@testset "every setting is a keyword of an entry point" begin
+    P = BAYSOL.Pipeline
+    rows = P.SETTING_KEYWORDS
+    # the keyword names of all methods of `f`
+    kws(f) = Set(reduce(vcat, [Base.kwarg_decl(m) for m in methods(f)]))
+    positional(f) = Set(reduce(vcat, [Base.method_argnames(m)[2:end] for m in methods(f)]))
+
+    @testset "the table covers the catalog exactly" begin
+        @test allunique(r.setting for r in rows)
+        @test Set(r.setting for r in rows) == Set(_setting_names())
+        @test length(rows) == 96
+    end
+
+    @testset "the keyword exists where the table says" begin
+        for r in rows
+            if r.entry === :seed_model
+                @test r.keyword in kws(BAYSOL.seed_model)
+            elseif r.entry === :run_model
+                @test r.keyword in kws(BAYSOL.run_model)
+            elseif r.entry === :results
+                @test r.keyword in kws(BAYSOL.results)
+            elseif r.entry === :run_project
+                # a switch of the run alone (checked through run_project's overrides, in
+                # tui/test/run-project.test.jl)
+                @test !(r.keyword in kws(BAYSOL.results))
+            elseif r.entry === :run_model_args
+                # the positional `n_adapt` of run_model; `n_samples` is N_ADAPT + N_DRAWS
+                @test :n_adapt in positional(BAYSOL.run_model) &&
+                      :n_samples in positional(BAYSOL.run_model)
+            elseif r.entry === :PlotStyle
+                @test r.keyword in fieldnames(BAYSOL.PlotStyle)
+            else
+                @test false
+            end
+        end
+        @test :style in kws(BAYSOL.results)
+        @test :font in kws(BAYSOL.results)
+        # checked keywords (the new ones) are exactly the ones validated at the entry
+        @test all(
+            r -> r.entry in (:seed_model, :run_model, :results),
+            filter(r -> r.check, rows),
+        )
+        # the 30 that had no keyword, 6 data ones, the terminal plot sizes, the plot dir,
+        # the compiler
+        @test count(r -> r.check, rows) == 39
+    end
+
+    defaults = default_settings()
+
+    @testset "the helpers carry the defaults of the settings" begin
+        for (helper, entry) in (
+            (BAYSOL.seed_keywords, :seed_model), (BAYSOL.run_keywords, :run_model),
+        )
+            k = helper(defaults)
+            mine = filter(r -> r.entry === entry, rows)
+            @test collect(keys(k)) == [r.keyword for r in mine]
+            for r in mine
+                @test k[r.keyword] == _setting_default(r.setting)
+            end
+        end
+        rk = BAYSOL.results_keywords(defaults)
+        @test rk.table_sigfigs == 17 && rk.tex == true && rk.compile == false
+        @test rk.formats == (:pdf,) && rk.style == BAYSOL.PlotStyle()
+        @test BAYSOL.run_arguments(defaults) == (n_samples = 1000, n_adapt = 300)
+        @test length(BAYSOL.seed_keywords(defaults)) == 24
+        @test length(BAYSOL.run_keywords(defaults)) == 22
+        # a changed setting is the keyword
+        s = copy(defaults)
+        s[:MAP_N_STARTS] = 9
+        s[:SASA_N_OCC] = 100
+        s[:N_ADAPT] = 50
+        s[:N_DRAWS] = 70
+        s[:PLOT_LW_MAP] = 3.5
+        @test BAYSOL.run_keywords(s).map_n_starts == 9
+        @test BAYSOL.seed_keywords(s).sasa_n_occ == 100
+        @test BAYSOL.run_arguments(s) == (n_samples = 120, n_adapt = 50)
+        @test BAYSOL.results_keywords(s).style.lw_map == 3.5
+        # the run keywords build the sampler options the defaults build
+        ck = P._checked_keywords(
+            :run_model,
+            NamedTuple{Tuple(r.keyword for r in rows if r.entry === :run_model && r.check)}(
+                Tuple(
+                    BAYSOL.run_keywords(defaults)[r.keyword]
+                    for r in rows if r.entry === :run_model && r.check
+                )),
+        )
+        a, b = BAYSOL.Inference.SamplerOptions(; ck...), BAYSOL.Inference.SamplerOptions()
+        @test all(f -> getfield(a, f) == getfield(b, f), fieldnames(typeof(a)))
+    end
+
+    @testset "the keywords are checked as load_settings checks the settings" begin
+        chk = P._checked_keywords
+        # the defaults pass and come back unchanged, in the types of the defaults
+        ok = chk(
+            :seed_model,
+            (; shell_sample = 256, sasa_n_occ = 104, φ_max = 2,
+                bounds_δρ₁₂ = (-10, 2), mode_δρ₁₂ = 1, excl_vol_corr_bounds = [0.8, 1.3]),
+        )
+        @test ok.shell_sample === 256 && ok.φ_max === 2.0
+        @test ok.bounds_δρ₁₂ === (-10.0, 2.0) && ok.excl_vol_corr_bounds === (0.8, 1.3)
+        # one bad value, the line is the one load_settings gives
+        for (entry, kw, setting, words) in (
+            (:run_model, (; map_n_starts = 0), "MAP_N_STARTS", "at least 1"),
+            (:run_model, (; map_jitter_radii = (3.0, -1.0, 12.0)), "MAP_JITTER_RADII",
+                "above 0"),
+            (:run_model, (; optimum_chain_fraction = 1.5), "OPTIMUM_CHAIN_FRACTION",
+                "at most 1"),
+            (:run_model, (; chain_start_radii = (4.0, 10.0)), "CHAIN_START_RADII",
+                "3 parts"),
+            (:run_model, (; harvest_cover = -1), "HARVEST_COVER", "at least 0"),
+            (:run_model, (; basin_restart_nats = NaN), "BASIN_RESTART_NATS", "finite"),
+            (:run_model, (; retry_n_draws = 1.5), "RETRY_N_DRAWS", "whole number"),
+            (:seed_model, (; φ_max = 0), "φ_max", "above 0"),
+            (:seed_model, (; shell_min_points = 0), "SHELL_MIN_POINTS", "at least 1"),
+            (:seed_model, (; bead_ray_range = -2.0), "BEAD_RAY_RANGE", "above 0"),
+            (:results, (; table_sigfigs = 0), "TABLE_SIGFIGS", "at least 1"),
+            (:results, (; table_sigfigs = 18), "TABLE_SIGFIGS", "at most 17"),
+        )
+            e = try
+                chk(entry, kw)
+            catch err
+                err
+            end
+            @test e isa InvalidSettingsError
+            @test length(e.problems) == 1 && startswith(e.problems[1], setting * " = ")
+            @test occursin(words, e.problems[1])
+            # the same text as `load_settings` for the same value
+            name = Symbol(setting)
+            msg = try
+                _checked_value(name, P._setting_input(first(values(kw))))
+                ""
+            catch err
+                err.msg
+            end
+            # (a rule between settings, not a limit of one, is the relations' text)
+            @test isempty(msg) || endswith(e.problems[1], ": " * msg)
+        end
+        # the relations between settings, with the same lines
+        for (kw, setting, words) in (
+            ((; bounds_δρ₁₂ = (-10.0, 2.0), mode_δρ₁₂ = 5.0), "MODE_δρ₁₂",
+                "strictly inside BOUNDS_δρ₁₂"),
+            ((; bounds_δρ₁₂ = (2.0, -10.0), mode_δρ₁₂ = 1.0), "BOUNDS_δρ₁₂",
+                "first part below its second"),
+            ((; excl_vol_corr_bounds = (0.8, 0.82), excl_vol_corr_eps = 0.05),
+                "EXCL_VOL_CORR_EPS", "at most the width"),
+            ((; shell_sample = 64, sasa_n_occ = 100), "SASA_N_OCC",
+                "at most SHELL_SAMPLE"),
+        )
+            e = try
+                chk(:seed_model, kw)
+            catch err
+                err
+            end
+            @test e isa InvalidSettingsError
+            @test any(p -> startswith(p, setting * " = ") && occursin(words, p), e.problems)
+        end
+        # all the problems at once; the error says the values were keywords
+        e = try
+            chk(:run_model, (; map_n_starts = 0, harvest_cover = -1))
+        catch err
+            err
+        end
+        @test length(e.problems) == 2
+        @test occursin("passed as keywords", sprint(showerror, e))
+        # the settings-file error keeps its hint
+        @test occursin("terminal interface", sprint(showerror, InvalidSettingsError(["x"])))
+        # a valid pair is fine where each alone would not be
+        @test chk(:seed_model, (; shell_sample = 64, sasa_n_occ = 64)).sasa_n_occ == 64
+        @test chk(:seed_model, (; bounds_δρ₁₂ = (-4, 6), mode_δρ₁₂ = 5)).mode_δρ₁₂ === 5.0
+    end
+
+    @testset "the overrides of run_project are checked together with the settings" begin
+        s = copy(defaults)
+        P._apply_keywords!(
+            s,
+            (; map_n_starts = 9, tex = nothing, formats = (:pdf, :svg),
+                n_draws = 5, mode_δρ₁₂ = nothing),
+        )
+        @test s[:MAP_N_STARTS] == 9 && s[:N_DRAWS] == 5 && s[:TARGET_ACCEPT] == 95
+        @test s[:FIGURES_FORMATS] == (:pdf, :svg)
+        # a rule against a value of the file is caught too
+        t = copy(defaults)
+        t[:SHELL_SAMPLE] = 100
+        @test_throws InvalidSettingsError P._apply_keywords!(t, (; sasa_n_occ = 104))
+        @test t[:SASA_N_OCC] == 104                       # unchanged on failure
+        u = copy(defaults)
+        @test_throws InvalidSettingsError P._apply_keywords!(u, (; thickness = -1.0))
+        @test u[:SHELL_THICKNESS] == 3.0
     end
 end

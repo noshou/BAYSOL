@@ -17,12 +17,12 @@ Writes the settings defaults to JSON.
 
     bysl harvest defaults [--check]
 
-    (none)      write tui/assets/data/default_settings.json, setting_relations.json
-                and colours.json from the Params.jl files (dev/scripts/harvest_defaults.jl)
-    --check     change nothing; exit 1 if one of the three is out of date
+    (none)      write tui/assets/data/default_settings.json and setting_relations.json
+                from the Params.jl files (dev/scripts/harvest_defaults.jl)
+    --check     change nothing; exit 1 if one of the two is out of date
 """
-# Runs the script that harvests the defaults into the file `out` (and the colours and the
-# rules beside it); true on success.
+# Runs the script that harvests the defaults into the file `out` (and the rules beside it);
+# true on success.
 harvest!(out)::Bool = sh(false, find_julia(), "--startup-file=no", "--project=" * root(),
     in_root("dev", "scripts", "harvest_defaults.jl"), out)
 
@@ -37,30 +37,85 @@ function run(argv::Vector{String})::Int
         fail(WHO, "unknown option $(argv[unknown]) (the only one is --check)")
     resources = in_root("tui", "assets", "data")
     defaults_file = joinpath(resources, "default_settings.json")
-    colours_file = joinpath(resources, "colours.json")
     relations_file = joinpath(resources, "setting_relations.json")
     if "--check" in argv
         scratch = joinpath(resources, "default_settings.check.json")
-        scratch_colours = joinpath(resources, "colours.check.json")
         scratch_rules = joinpath(resources, "setting_relations.check.json")
         same(fresh, old) = slurp8(fresh) == (isfile(old) ? slurp8(old) : nothing)
         try
             harvest!(scratch) || return 1
-            if same(scratch, defaults_file) && same(scratch_colours, colours_file) &&
-               same(scratch_rules, relations_file)
-                println(WHO, ": the defaults, the colours and the rules are up to date")
+            if same(scratch, defaults_file) && same(scratch_rules, relations_file)
+                println(WHO, ": the defaults and the rules are up to date")
                 return 0
             end
-            println(WHO, ": default_settings.json, colours.json or setting_relations.json ",
-                "is out of date")
+            println(WHO, ": default_settings.json or setting_relations.json is out of date")
             return 1
         finally
-            for f in (scratch, scratch_colours, scratch_rules)
+            for f in (scratch, scratch_rules)
                 rm(f; force = true)
             end
         end
     end
     return harvest!(defaults_file) ? 0 : 1
+end
+
+end
+
+module Colours
+
+using ...Common
+
+const WHO = "bysl harvest colours"
+
+const USAGE = """
+Writes the colour names of the terminal interface.
+
+    bysl harvest colours [--check]
+
+    (none)      write tui/assets/data/colours.json, colour-families.json and
+                colour-julia.json from the sets in dev/data/colours and
+                tui/assets/data/colour-sources.json (dev/scripts/harvest_colours.jl)
+    --check     change nothing; exit 1 if one of the three files is out of date
+"""
+
+"The tool's main program for the argument list `argv`; returns the exit status."
+function run(argv::Vector{String})::Int
+    if any(a -> a in ("--help", "-h"), argv)
+        usage(USAGE)
+        return 0
+    end
+    unknown = findfirst(!=("--check"), argv)
+    unknown === nothing ||
+        fail(WHO, "unknown option $(argv[unknown]) (the only one is --check)")
+    file = in_root("tui", "assets", "data", "colours.json")
+    script = in_root("dev", "scripts", "harvest_colours.jl")
+    harvest!(out)::Bool = sh(false, find_julia(), "--startup-file=no",
+        "--project=" * root(), script, out)
+    if "--check" in argv
+        scratch = joinpath(dirname(file), "colours.check.json")
+        julia_scratch = joinpath(dirname(file), "colour-julia.check.json")
+        julia_file = joinpath(dirname(file), "colour-julia.json")
+        families_scratch = joinpath(dirname(file), "colour-families.check.json")
+        families_file = joinpath(dirname(file), "colour-families.json")
+        same(fresh, old) = slurp8(fresh) == (isfile(old) ? slurp8(old) : nothing)
+        try
+            harvest!(scratch) || return 1
+            if same(scratch, file) && same(julia_scratch, julia_file) &&
+               same(families_scratch, families_file)
+                println(WHO, ": colours.json, colour-families.json and colour-julia.json ",
+                    "are up to date")
+                return 0
+            end
+            println(WHO, ": colours.json, colour-families.json or colour-julia.json is ",
+                "out of date")
+            return 1
+        finally
+            rm(scratch; force = true)
+            rm(julia_scratch; force = true)
+            rm(families_scratch; force = true)
+        end
+    end
+    return harvest!(file) ? 0 : 1
 end
 
 end
@@ -224,6 +279,138 @@ end
 
 end
 
+module Residues
+
+using JSON3
+
+using ...Common
+
+const WHO = "bysl harvest residues"
+
+const USAGE = """
+Writes the residue table of the terminal interface to JSON.
+
+    bysl harvest residues [--check]
+
+    (none)      write tui/assets/data/residues.json from the Chemical Component
+                Dictionary subset src/MolecularStructure/components.tsv: the
+                one-letter code of every amino-acid component, the base of every
+                DNA and RNA component
+    --check     change nothing; exit 1 if the file is out of date
+"""
+
+const TABLE_PATH = ("src", "MolecularStructure", "components.tsv")
+
+# The Julia file that defines `LEGACY_NUCLEOTIDE_NAMES`, the old residue names (`ADE`,
+# `GUA`, `CYT`, `URI`, `THY`) the structure side still reads; the table of the terminal
+# interface has them too, so a structure file with such names gives the same sequence.
+const LEGACY_PATH = ("src", "MolecularStructure", "MolecularStructure.jl")
+
+# The twenty standard amino acids and the two rare ones, three letters to one.
+const STANDARD = Dict("ALA" => "A", "ARG" => "R", "ASN" => "N", "ASP" => "D",
+    "CYS" => "C", "GLN" => "Q", "GLU" => "E", "GLY" => "G", "HIS" => "H", "ILE" => "I",
+    "LEU" => "L", "LYS" => "K", "MET" => "M", "PHE" => "F", "PRO" => "P", "SER" => "S",
+    "THR" => "T", "TRP" => "W", "TYR" => "Y", "VAL" => "V", "SEC" => "U", "PYL" => "O")
+
+# The letter of a base that is none of A C G T U (inosine, a base that is not named).
+const UNKNOWN_BASE = "N"
+
+# The letter of an amino acid without a standard parent.
+const UNKNOWN_AMINO = "X"
+
+"""
+    legacy_names(julia_text) -> Dict{String,String}
+
+The name => base pairs of the `LEGACY_NUCLEOTIDE_NAMES` constant in the text of
+`MolecularStructure.jl`.
+
+# Exceptions
+- `ErrorException`: the constant is not there, or has no pair.
+"""
+function legacy_names(julia_text::AbstractString)
+    m = match(r"const LEGACY_NUCLEOTIDE_NAMES\s*=\s*Dict\(([^)]*)\)"s, julia_text)
+    m === nothing && error("LEGACY_NUCLEOTIDE_NAMES not found in MolecularStructure.jl")
+    pairs = [(p[1], p[2]) for p in eachmatch(r"\"(\w+)\"\s*=>\s*\"(\w)\"", m[1])]
+    isempty(pairs) && error("LEGACY_NUCLEOTIDE_NAMES has no pair")
+    return Dict(pairs)
+end
+
+"""
+    residues(table_text, legacy = Dict()) -> (; protein, dna, rna)
+
+The residue names of the component table text: `protein` maps every peptide-linking
+component (`l-`, `d-` and plain, not `peptide-like`) to its one-letter code (the parent's
+when it has exactly one standard parent, itself when it is standard, else `X`); `dna` and
+`rna` map every component of that class with a linking type to its base (`N` when the
+table names none). The `legacy` names are added when the table does not have them: `THY`
+(base `T`) is DNA, the others RNA (a text of residue names has no `O2'` atom to tell
+`ADE GUA CYT` of DNA from RNA; the structure side decides by that atom, here RNA is the
+default and a `T` or `THY` in the chain makes it DNA).
+"""
+function residues(table_text::AbstractString, legacy = Dict{String,String}())
+    protein = Dict{String,String}()
+    dna = Dict{String,String}()
+    rna = Dict{String,String}()
+    for line in eachline(IOBuffer(table_text))
+        (isempty(line) || startswith(line, '#')) && continue
+        cols = split(line, '\t')
+        length(cols) >= 6 || continue
+        id, class, type, parent, base = cols[1], cols[2], cols[3], cols[4], cols[6]
+        if endswith(type, "peptide linking")
+            protein[id] = get(STANDARD, id, get(STANDARD, parent, UNKNOWN_AMINO))
+        elseif class in ("dna", "rna") && endswith(type, "linking")
+            (class == "dna" ? dna : rna)[id] = base == "-" ? UNKNOWN_BASE : base
+        end
+    end
+    for (name, base) in legacy
+        table = base == "T" ? dna : rna
+        haskey(dna, name) || haskey(rna, name) || (table[name] = base)
+    end
+    return (; protein, dna, rna)
+end
+
+jstr(s) = JSON3.write(String(s))
+
+"""
+    render(res) -> String
+
+The text of the file for `res` (the result of `residues`): one name to a line, sorted.
+"""
+function render(res)::String
+    entry(d, k) = string("  ", jstr(k), ": ", jstr(d[k]))
+    block(d) = join((entry(d, k) for k in sort!(collect(keys(d)))), ",\n")
+    return string("{\n \"protein\": {\n", block(res.protein), "\n },\n \"dna\": {\n",
+        block(res.dna), "\n },\n \"rna\": {\n", block(res.rna), "\n }\n}\n")
+end
+
+"The tool's main program for the argument list `argv`; returns the exit status."
+function run(argv::Vector{String})::Int
+    if any(a -> a in ("--help", "-h"), argv)
+        usage(USAGE)
+        return 0
+    end
+    unknown = findfirst(!=("--check"), argv)
+    unknown === nothing ||
+        fail(WHO, "unknown option $(argv[unknown]) (the only one is --check)")
+    out_file = in_root("tui", "assets", "data", "residues.json")
+    legacy = legacy_names(slurp8(in_root(LEGACY_PATH...)))
+    text = render(residues(slurp8(in_root(TABLE_PATH...)), legacy))
+    if "--check" in argv
+        if text == (isfile(out_file) ? slurp8(out_file) : nothing)
+            println(WHO, ": the residue table is up to date")
+            return 0
+        end
+        println(WHO, ": residues.json is out of date")
+        return 1
+    end
+    mkpath(dirname(out_file))
+    spit8(out_file, text)
+    println(WHO, ": wrote ", out_file)
+    return 0
+end
+
+end
+
 module PmvMean
 
 using JSON3
@@ -323,16 +510,18 @@ end
 const SUBS = [
     "defaults" =>
         (Defaults, "tui/assets/data/default_settings.json from the Params.jl files"),
+    "colours" => (Colours, "tui/assets/data/colours.json from the colour sets"),
     "solutes" => (Solutes, "tui/assets/data/solute_index.json from the solute tables"),
+    "residues" => (Residues, "tui/assets/data/residues.json from the component table"),
     "pmv-mean" => (PmvMean, "the mean PMV uncertainty, as a Julia constant"),
 ]
 
 const SUMMARY = """
 Regenerates the generated files and constants.
 
-    bysl harvest [defaults|solutes|pmv-mean] [--check]
+    bysl harvest [defaults|colours|solutes|residues|pmv-mean] [--check]
 
-With no name all three run. --check changes nothing and exits 1 if one is out of date.
+With no name all five run. --check changes nothing and exits 1 if one is out of date.
 """
 
 """

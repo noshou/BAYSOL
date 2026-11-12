@@ -641,9 +641,23 @@ test("a loaded recipe's pH and σ are an unsaved draft of the buffer", () => {
     assert.equal(draftOf({ ...own }, own), undefined, "the same is no change")
 })
 
-test("table legend: the keys that come last (find, sort) follow the rows", () => {
+test("a recipe's temperature is a draft; one without leaves the table's own", () => {
+    const own = { pH: 7, "sigma-pH": 0.1, temperature: 4 }
+    const cold = { pH: 6.8, "sigma-pH": 0.05, temperature: 10 }
+    assert.deepEqual(draftOf(cold, own), cold, "the recipe's temperature, unsaved")
+    // a recipe with a pH but no temperature keeps the table's temperature
+    const bare = { pH: 6.8, "sigma-pH": 0.05 }
+    assert.deepEqual(draftOf(bare, own), { ...bare, temperature: 4 })
+    assert.equal(draftOf({ pH: 7, "sigma-pH": 0.1 }, own), undefined, "same pH: no change")
+    // a table without a temperature takes the recipe's, or stays without
+    assert.deepEqual(draftOf(cold, { pH: 7, "sigma-pH": 0.1 }), cold)
+    assert.deepEqual(draftOf(bare, { pH: 7, "sigma-pH": 0.1 }), bare)
+})
+
+test("table legend: find and sort follow the row keys, the adds come last", () => {
     const more = [legendFor("find", keys.find)]
     const withMore = tableLegend(base, adds, "edit", more)
-    assert.equal(withMore.at(-1)?.label, "find")
+    const labels = withMore.map((i) => i.label)
+    assert.ok(labels.indexOf("find") < labels.indexOf(adds[0]?.label ?? ""), "adds last")
     assert.equal(tableLegend(base, adds).some((i) => i.label === "find"), false)
 })

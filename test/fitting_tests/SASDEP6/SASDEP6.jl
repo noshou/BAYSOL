@@ -38,6 +38,12 @@ const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDEP6.dat")
 # depositors dissolved GlcN·HCl, up to 0.2 M Cl⁻ (plus the base used to
 # reach pH 8.0) is also present but not modelled: the recipe is not stated.
 #
+# BUFFER OMISSIONS (not modelled; the recipe given by the depositors is incomplete or a
+# component is not in the tables):
+#   - GlcN·HCl chloride, up to 0.2 M: est. +0.29 % of water (8.2 e⁻ net per mmol Cl⁻:
+#     18 - 10·17.8/18.07; ≈ +0.0015 % per mM); only if GlcN·HCl was used
+#   - base used to reach pH 8.0 (cation, amount): unquantified, the recipe is not stated
+#
 # Curve units: the SASBDB .dat is in nm⁻¹ and is converted to Å⁻¹ (÷10). The
 # reference fit files are read from the same folder; each run's comparison
 # curve is the depositor's fit for that model.
@@ -77,6 +83,16 @@ const SOLUTES = Solute[
     # Cl⁻ counter-ion from HCl titration of Tris (see note above)
     NonBiological(0.013143, 0.001457, "chloride"),
 ]
+
+# The omissions listed under "BUFFER OMISSIONS" above, one line each. Every run of
+# this script, and every developer tool that loads it, warns about them.
+const BUFFER_OMISSIONS = String[
+    "GlcN·HCl chloride, up to 0.2 M: est. +0.29 % (only if GlcN·HCl was used)",
+    "base used to reach pH 8.0 (cation, amount): unquantified, recipe not stated",
+]
+isempty(BUFFER_OMISSIONS) ||
+    @warn "SASDEP6: buffer recipe is incomplete (known omissions, not modelled)" omissions =
+        BUFFER_OMISSIONS
 
 # ---------------------------------------------------------------------------
 #                       Forward-model / sampler wiring

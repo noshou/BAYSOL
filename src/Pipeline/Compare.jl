@@ -64,11 +64,12 @@ function _read_reference(path::AbstractString; q_scale::Real = 1.0)
 end
 
 """
-The reference curves of the folder `folder` (a project's `reference-fit/`): every file with
-one of the [`REFERENCE_EXTENSIONS`](@ref), in name order, read by `_read_reference`. A
-stem that is taken (`a.tsv` and `a.dat`) gets `-2`, `-3`, … so that every curve has its own
-name. A file that cannot be read is skipped and described in the returned problems; it
-never stops the others.
+The reference curves of the folder `folder` (a project's `reference-fit/`, or a run folder
+with `prefix = "reference-fit-"`, which is then left off the names): every file whose name
+starts with `prefix` and has one of the [`REFERENCE_EXTENSIONS`](@ref), in name order,
+read by `_read_reference`. A stem that is taken (`a.tsv` and `a.dat`) gets `-2`, `-3`, …
+so that every curve has its own name. A file that cannot be read is skipped and described in
+the returned problems; it never stops the others.
 
 # Returns
 - `(references, problems)`: the curves, and one line of text for each file that was
@@ -77,21 +78,26 @@ never stops the others.
 # Exceptions
 - None.
 """
-function _read_references(folder::AbstractString; q_scale::Real = 1.0)
+function _read_references(
+    folder::AbstractString; q_scale::Real = 1.0, prefix::AbstractString = "",
+)
     refs = Reference[]
     problems = String[]
     isdir(folder) || return refs, problems
     used = Set{String}()
     for f in sort(readdir(folder))
-        lowercase(splitext(f)[2]) in REFERENCE_EXTENSIONS || continue
+        startswith(f, prefix) && lowercase(splitext(f)[2]) in REFERENCE_EXTENSIONS ||
+            continue
         path = joinpath(folder, f)
         isfile(path) || continue
         try
             ref = _read_reference(path; q_scale)
-            name, k = ref.name, 1
+            base = ref.name
+            startswith(base, prefix) && (base = base[(length(prefix)+1):end])
+            name, k = base, 1
             while name in used
                 k += 1
-                name = string(ref.name, "-", k)
+                name = string(base, "-", k)
             end
             push!(used, name)
             push!(refs, Reference(name, ref.q, ref.I))
@@ -157,15 +163,6 @@ function _interp_onto(q::AbstractVector, x::AbstractVector, y::AbstractVector)
     end
     return out
 end
-
-"`(r, g, b)` of a [`ColorSpec`](@ref) as `#RRGGBB`."
-function _hex(spec::ColorSpec)
-    r, g, b, _ = _rgba(spec)
-    return @sprintf("#%02X%02X%02X", r, g, b)
-end
-
-"A [`ColorSpec`](@ref) as the text a person gave: the colour without its opacity."
-_colour_text(spec::ColorSpec) = string(spec isa Tuple ? spec[1] : spec)
 
 """
 The data of the comparison figure, prepared once for all three outputs. `fits` are the
@@ -328,61 +325,52 @@ end
 # ---------------------------------------------------------------------------
 
 """
-The two sheets of `<name>_compare.xlsx`. `compare`: `q (A^-1)`, `I_measured (a.u.)` and
-`sigma (a.u.)` of the measured curve as given, then a column `fit_<model> (a.u.)` for each
-model (its MAP curve) and `ref_<name> (a.u.)` for each reference, each interpolated linearly
-onto the measured q (empty outside the curve's own range; a curve on the measured q is
-exactly as it is). `legend`: for each column of curves the `kind` (`data`, `fit`,
-`reference`), `name`, `colour` (as given), `hex`, `marker`, `line` style, the MAP `chi2` of
-a model and a `note`, so a figure can be redrawn the same way anywhere.
+The table of `<name>_compare.tsv`, as `(header, columns)`: `q (A^-1)`,
+`I_measured (a.u.)` and `sigma (a.u.)` of the measured curve as given, then a column
+`fit_<model> (a.u.)` for each model (its MAP curve) and `ref_<name> (a.u.)` for each
+reference, each interpolated linearly onto the measured q (empty outside the curve's own
+range; a curve on the measured q is exactly as it is).
 """
-function _compare_sheets(c, style::PlotStyle)
+function _compare_table(c)
     q, I, σ = c.raw
     header = ["q (A^-1)", "I_measured (a.u.)", "sigma (a.u.)"]
     cols = Any[q, I, σ]
-    rows = NamedTuple[]
-    note(x) =
-        length(x) == length(q) && all(isapprox.(x, q; rtol = 1e-9)) ?
-        "on the measured q" : "interpolated onto the measured q"
-    push!(
-        rows,
-        (; column = header[2], kind = "data", name = "measured",
-            colour = _colour_text(style.color_data), hex = _hex(style.color_data),
-            marker = "*", line = "error bars", chi2 = missing, note = "as measured"),
-    )
     for m in c.models
         push!(header, "fit_$(m.name) (a.u.)")
         push!(cols, _interp_onto(q, m.map_raw.q, m.map_raw.I))
-        push!(
-            rows,
-            (; column = header[end], kind = "fit", name = m.name,
-                colour = String(m.color), hex = _hex(m.color), marker = missing,
-                line = "solid", chi2 = something(m.chi2, missing),
-                note = "MAP curve, " * note(m.map_raw.q)),
-        )
     end
     for r in c.refs
         push!(header, "ref_$(r.ref.name) (a.u.)")
         push!(cols, _interp_onto(q, r.ref.q, r.ref.I))
-        push!(
-            rows,
-            (; column = header[end], kind = "reference", name = r.ref.name,
-                colour = _colour_text(style.color_reference),
-                hex = _hex(style.color_reference), marker = String(r.marker),
-                line = "dashed", chi2 = missing, note = note(r.ref.q)),
-        )
     end
-    legend = _sheet(
-        "legend",
-        ["column", "kind", "name", "colour", "hex", "marker", "line", "chi2", "note"],
-        [
-            getfield.(rows, f) for f in (
-                :column, :kind, :name, :colour, :hex, :marker, :line, :chi2, :note,
-            )
-        ]...;
-        frozen = true,
-    )
-    return [_sheet("compare", header, cols...; frozen = true), legend]
+    return header, cols
+end
+
+"""
+Writes the comparison table `(header, cols)` as a tab-separated text file (a header line,
+then a row for each point of the measured curve; an empty cell where a curve does not reach;
+numbers rounded to `sigfigs` significant figures as the workbooks are). The file is written
+next to its final name and then renamed.
+
+# Returns
+- `path`.
+"""
+function _write_tsv(path::AbstractString, header, cols; sigfigs::Integer = TABLE_SIGFIGS)
+    mkpath(dirname(path))
+    tmp = path * ".part"
+    n = maximum(length, cols; init = 0)
+    open(tmp, "w") do io
+        println(io, join(header, '\t'))
+        for i in 1:n
+            cells = map(cols) do c
+                x = i <= length(c) ? _cell(c[i], sigfigs) : missing
+                ismissing(x) ? "" : string(x)
+            end
+            println(io, join(cells, '\t'))
+        end
+    end
+    mv(tmp, path; force = true)
+    return String(path)
 end
 
 # ---------------------------------------------------------------------------
@@ -401,18 +389,17 @@ FoXS, … ) as a dashed line in the reference colour carrying the marker of
 `style.markers_compare` that its place in `references` gives it (cycling). With a single
 model the posterior bounds band of the single-model figure is drawn too; with several the
 bands would hide each other and are left out. Log axes, as the other I(q) figures.
-[`run_project`](@ref) calls it after the last model of a run when the setting
+`run_project` calls it after the last model of a run when the setting
 `PLOT_COMPARE` is on, into the run's `compare/` folder.
 
 Three outputs come out of it, as from [`results`](@ref): the figure in the terminal
 (printed to `io`, `preview = true`), the pgfplots `<name>_compare.tex` in `dir/plots/`
 (`tex = true`; LaTeX is run only with `compile = true`, to the `formats`, and a failed run
-is a warning), and the workbook `dir/<name>_compare.xlsx` of the same curves, always
-written, with two sheets: `compare` (`q`, the measured `I` and `sigma`, then a column for
-the fit of each model and one for each reference, each interpolated onto the measured q:
-empty where a curve does not reach, exact where it is on that grid) and `legend` (the
-colour, marker and line style of each column, the models' MAP χ² and a note), so the
-figure can be drawn again in any other program.
+is a warning), and the table `dir/<name>_compare.tsv` of the same curves, always written,
+tab-separated (it compresses, unlike a workbook): `q`, the measured `I` and `sigma`, then a
+column for the fit of each model and one for each reference, each interpolated onto the
+measured q: empty where a curve does not reach, exact where it is on that grid. The
+figure's colours, markers and line styles are the settings' (`PLOT_COMPARE_*`).
 
 # Arguments
 - `fits`: the results of [`run_model`](@ref), one per model, of the SAME measured curve. A
@@ -495,8 +482,8 @@ function compare_results(
         tex && push!(written, _write_tex(td, stem))
     end
     compile && append!(written, _compile_tex(td, stem, formats, style.font))
-    book = joinpath(dir, name * "_compare.xlsx")
-    push!(written, _write_xlsx(book, _compare_sheets(c, style); sigfigs = table_sigfigs))
+    table = joinpath(dir, name * "_compare.tsv")
+    push!(written, _write_tsv(table, _compare_table(c)...; sigfigs = table_sigfigs))
     if tui_dir !== nothing
         texts = map(plot_tui_sizes) do (W, H)
             buf = IOBuffer()

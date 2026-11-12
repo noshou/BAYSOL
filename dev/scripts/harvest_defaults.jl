@@ -11,7 +11,6 @@
 # `markers` (an ordered list of marker names, `choices` being the names allowed).
 
 using BAYSOL
-using Colors: color_names
 using JSON3
 
 const ROOT = normpath(joinpath(@__DIR__, "..", ".."))
@@ -144,35 +143,17 @@ function relations_json(named::Set{Symbol})
     return "[\n" * join(lines, ",\n") * "\n]\n"
 end
 
-"""
-The colours a setting may hold as one JSON object, `"name": "#rrggbb"`: the names
-`Colors.parse` knows and their colour, which the terminal interface shows as a swatch.
-"""
-function colour_names()
-    hex(c) = "#" * join(string.(c; base = 16, pad = 2))
-    rows = [
-        " $(JSON3.write(name)): $(JSON3.write(hex(c)))"
-        for (name, c) in sort!(collect(color_names); by = first)
-    ]
-    return "{\n" * join(rows, ",\n") * "\n}\n"
-end
-
 function main(args)
     out = isempty(args) ? DEFAULT_OUT : abspath(only(args))
     text, named = harvest()
     mkpath(dirname(out))
     write(out, text)
-    colours = joinpath(
-        dirname(out),
-        replace(basename(out), "default_settings" => "colours"),
-    )
     relations = joinpath(
         dirname(out),
         replace(basename(out), "default_settings" => "setting_relations"),
     )
-    write(colours, colour_names())
     write(relations, relations_json(named))
-    println("harvest defaults: wrote $out, $colours and $relations")
+    println("harvest defaults: wrote $out and $relations")
     return 0
 end
 

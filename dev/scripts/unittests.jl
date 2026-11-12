@@ -8,6 +8,9 @@
 # Every ../test/unit_tests/units/test_*.jl is self-contained (each `include`s its own
 # testsetup.jl and declares its own `using`s), so it can also be run on its own, e.g.:
 #   julia --project=test test/unit_tests/units/test_atomicradii.jl
+# The Julia that only the terminal interface needs lives in ../tui/src/store/*.jl, and its
+# tests next to the TypeScript ones, ../tui/test/*.test.jl (kebab case, run the same way:
+#   julia --project=test tui/test/run-project.test.jl).
 #
 # Layout: the tests are in ../test/unit_tests/units/, with the setup they share
 # (testsetup.jl) beside them; the shared helpers are beside them in ../test/unit_tests/
@@ -16,25 +19,115 @@
 
 using Test
 
-# Every `test_*.jl` in units/, in name order, with the package-quality checks (Aqua,
-# ExplicitImports, JET) last. A new test file is picked up by creating it in units/.
+# Every `test_*.jl` in units/, in name order, then every `*.test.jl` of the terminal
+# interface's test folder, with the package-quality checks (Aqua, ExplicitImports, JET)
+# last. A new test file is picked up by creating it in one of the two folders.
 const UNITS_DIR = joinpath(@__DIR__, "..", "..", "test", "unit_tests", "units")
+const TUI_TEST_DIR = joinpath(@__DIR__, "..", "..", "tui", "test")
 const LAST = "test_quality.jl"
 const TEST_FILES =
-    let files = sort!(
-            filter(f -> startswith(f, "test_") && endswith(f, ".jl"), readdir(UNITS_DIR)),
+    let files = vcat(
+            sort!(
+                filter(
+                    f -> startswith(f, "test_") && endswith(f, ".jl"),
+                    readdir(UNITS_DIR),
+                ),
+            ),
+            sort!(filter(f -> endswith(f, ".test.jl"), readdir(TUI_TEST_DIR))),
         )
         [filter(!=(LAST), files); filter(==(LAST), files)]
     end
 
+"The path of the test file called `file` (in units/ or in the terminal interface's tests)."
+test_path(file) =
+    endswith(file, ".test.jl") ? joinpath(TUI_TEST_DIR, file) : joinpath(UNITS_DIR, file)
+
 # Command-line words select files by substring;
 # naming a word that matches no file is an error.
+# A worker process of a parallel run gets its files in this variable (exact names).
+const WORKER_FILES = "UNIT_WORKER_FILES"
+
 const SELECTED =
-    isempty(ARGS) ? TEST_FILES : filter(f -> any(occursin(a, f) for a in ARGS), TEST_FILES)
-isempty(SELECTED) && error("no test file in $UNITS_DIR matches: $(join(ARGS, ", "))")
+    if haskey(ENV, WORKER_FILES)
+        split(ENV[WORKER_FILES], ',')
+    elseif isempty(ARGS)
+        TEST_FILES
+    else
+        filter(f -> any(occursin(a, f) for a in ARGS), TEST_FILES)
+    end
+isempty(SELECTED) &&
+    error("no test file in $UNITS_DIR or $TUI_TEST_DIR matches: $(join(ARGS, ", "))")
+
+"""
+How long each file takes alone, in seconds (measured; a file not listed takes 1 s): the
+parallel run uses it to give each worker about the same work. `test_quality.jl` stays
+last in its worker (it checks the package after the other files have loaded).
+"""
+const FILE_SECONDS = Dict(
+    "test_sampler.jl" => 137, "run-project.test.jl" => 52,
+    "settings-file.test.jl" => 51,
+    "test_quality.jl" => 32, "test_modified_amino.jl" => 29, "test_plot.jl" => 26,
+    "test_concurrency.jl" => 15, "test_seed_diagnostics.jl" => 15,
+    "test_data_selection.jl" => 15, "test_allocations.jl" => 12,
+    "test_setting_keywords.jl" => 11, "test_modified_nucleotides.jl" => 9,
+    "test_nucleotide_fixtures.jl" => 7,
+)
+
+"""
+The files shared out to `jobs` workers, longest first, each to the one with the least work.
+"""
+function share_out(files, jobs)
+    groups = [String[] for _ in 1:jobs]
+    load = zeros(Int, jobs)
+    for file in sort(files; by = f -> -get(FILE_SECONDS, f, 1))
+        k = argmin(load)
+        push!(groups[k], file)
+        load[k] += get(FILE_SECONDS, file, 1)
+    end
+    for group in groups  # the package checks come last in their worker
+        sort!(group; by = f -> f == LAST ? 1 : 0)
+    end
+    return filter(!isempty, groups)
+end
+
+# The whole suite runs in `UNIT_JOBS` processes at once (default 2: each needs a few GB,
+# and a run that names files stays in one process, as the concurrency tests need).
+const JOBS = parse(Int, get(ENV, "UNIT_JOBS", "2"))
+
+if !haskey(ENV, WORKER_FILES) && isempty(ARGS) && JOBS > 1
+    groups = share_out(collect(SELECTED), JOBS)
+    logs = [tempname() * ".log" for _ in groups]
+    procs = map(zip(groups, logs)) do (group, log)
+        env = copy(ENV)
+        env[WORKER_FILES] = join(group, ',')
+        run(
+            pipeline(
+                setenv(
+                    `$(Base.julia_cmd()) --project=$(Base.active_project()) $(@__FILE__)`,
+                    env,
+                );
+                stdout = log,
+                stderr = log,
+            );
+            wait = false,
+        )
+    end
+    for (k, proc) in enumerate(procs)
+        wait(proc)
+        println("=== unit tests, worker $k of $(length(procs)): ", join(groups[k], " "))
+        print(read(logs[k], String))
+    end
+    failed = any(p -> !success(p), procs)
+    foreach(log -> rm(log; force = true), logs)
+    println(
+        failed ? "unit tests: FAILED in at least one worker" :
+        "unit tests: all workers passed",
+    )
+    exit(failed ? 1 : 0)
+end
 
 @testset "BAYSOL" begin
     for file in SELECTED
-        include(joinpath(UNITS_DIR, file))
+        include(test_path(file))
     end
 end

@@ -61,6 +61,17 @@ export const legendBack: LegendItem = legendFor("back", keys.back)
 export const legendEnter: LegendItem = legendFor("select", keys.enter)
 
 /**
+ * The up and down moves of a cursor in a list.
+ *
+ * @param index - where the cursor is.
+ * @param count - the number of rows.
+ * @returns up while there is a row above, down while there is a row below.
+ */
+export function cursorMoves(index: number, count: number): Moves {
+    return { up: index > 0, down: index < count - 1 }
+}
+
+/**
  * Which arrow keys do something right now.
  *
  * @property up - the cursor can go up.
@@ -228,9 +239,17 @@ function legendBands(items: readonly LegendItem[], room: number): LegendItem[][]
  *
  * @param items - the legend.
  * @param room - the cells a band may take.
+ * @param style - how it is drawn: a `boxes` legend that fits one row takes the three rows
+ *     of its boxes (the height of the small logo), one that does not fit is laid out as
+ *     columns, so it takes what [[legendBands]] says.
  * @returns the height, 0 for no items.
  */
-export function legendHeight(items: readonly LegendItem[], room: number): number {
+export function legendHeight(
+    items: readonly LegendItem[],
+    room: number,
+    style: LegendStyle = "columns",
+): number {
+    if (style === "boxes" && items.length > 0 && boxesFit(items, room)) return boxRows
     return legendBands(items, room).reduce(
         (sum, band) => sum + Math.max(...band.map((column) => column.length)),
         0,
@@ -238,16 +257,64 @@ export function legendHeight(items: readonly LegendItem[], room: number): number
 }
 
 /**
- * Keys with what they do, as `label: keys` pairs, in the muted colour, in columns
- * separated by `┃`.
+ * How a legend is drawn: `columns` puts the items in columns separated by `┃` (tables,
+ * forms and sheets); `boxes` puts each item in a small rounded box of its own, in one
+ * row (the menus and landings, whose footer has three rows for it). A `boxes` legend
+ * too wide for its room is drawn as columns, so it never overflows.
+ */
+export type LegendStyle = "columns" | "boxes"
+
+/** The rows of a box of the `boxes` style: the border above and below, and the text. */
+const boxRows = 3
+
+/** The cells of a box of the `boxes` style: the border and the padding on both sides. */
+const boxCells = 4
+
+/** The text of one item of a `boxes` legend. */
+const boxText = (item: LegendItem): string => `${item.label}: ${item.keys}`
+
+/**
+ * Whether a `boxes` legend fits one row of some room.
  *
- * @param items - the keys to show, in order.
- * @param room - the cells the legend may take; it lays itself out in as many bands under
- *     one another as that needs ([[legendBands]]).
+ * @param items - the legend.
+ * @param room - the cells the row may take.
+ * @returns the answer (the boxes are one cell apart).
+ */
+export function boxesFit(items: readonly LegendItem[], room: number): boolean {
+    const width = items.reduce((sum, i) => sum + displayWidth(boxText(i)) + boxCells, 0)
+    return width + Math.max(0, items.length - 1) <= room
+}
+
+/**
+ * Keys with what they do, as `label: keys` pairs, in the muted colour: in columns
+ * separated by `┃`, or each in a rounded box of its own.
+ *
+ * @param props.items - the keys to show, in order.
+ * @param props.room - the cells the legend may take; the `columns` style lays itself out
+ *     in as many bands under one another as that needs ([[legendBands]]).
+ * @param props.style - `"columns"` (default) or `"boxes"`.
  * @returns the legend.
  */
-export function Legend({ items, room }: { items: LegendItem[]; room: number }): ReactNode {
+export function Legend({
+    items,
+    room,
+    style = "columns",
+}: {
+    items: LegendItem[]
+    room: number
+    style?: LegendStyle
+}): ReactNode {
     const theme = useTheme()
+    if (style === "boxes" && boxesFit(items, room))
+        return (
+            <Box columnGap={1}>
+                {items.map((item) => (
+                    <Panel key={item.label} paddingX={1}>
+                        <Text color={theme.mt}>{boxText(item)}</Text>
+                    </Panel>
+                ))}
+            </Box>
+        )
     return (
         <Box flexDirection="column">
             {legendBands(items, room).map((band) => {
@@ -617,6 +684,8 @@ export type TaskbarItem = { label: string; key: KeyInput; onPress: () => void }
  *     it applies; the room for the keys is always reserved, so the grid never moves
  *     when items come and go. Esc does nothing at menu level: the only way out of the
  *     program is `q` in the main menu (and Ctrl-C / Ctrl-D, handled by the app).
+ * @property taskbarNote - a small box in the taskbar's corner while there is no taskbar
+ *     item, e.g. `missing components: models, data`; the box goes when items appear.
  * @property onKey - called, with the option the cursor is on, for every other key press,
  *     for the keys a menu adds (the settings menu's reset of an unusable file); not
  *     called while a hotkey is waiting.
@@ -636,6 +705,7 @@ type GridMenuProps<N extends MenuOptions> = {
     header?:   ReactNode
     onChoose:  (name: N) => void
     taskbar?:  TaskbarItem[]
+    taskbarNote?: string
     onKey?:    (press: KeyInput, selected: N) => void
     intercept?: (press: KeyInput) => boolean
     legend?:   string | ((selected: N) => string | undefined)
@@ -661,6 +731,7 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
         header,
         onChoose,
         taskbar,
+        taskbarNote,
         onKey,
         intercept,
         legend,
@@ -793,7 +864,7 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
                 justifyContent="flex-end"
             >
                 {overlay !== undefined && overlayLegend ? (
-                    <Legend items={overlayLegend} room={terminalColumns} />
+                    <Legend items={overlayLegend} room={terminalColumns} style="boxes" />
                 ) : (
                     <Box
                         width="100%"
@@ -814,7 +885,13 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
 
                         {/* the taskbar: only what applies now; its corner of the hint
                             area is always there, so nothing else moves */}
-                        {taskbar ? (
+                        {taskbar && taskbar.length === 0 && taskbarNote ? (
+                            <Panel borderColor={theme.mt} paddingX={1} flexShrink={1}>
+                                <Text color={theme.mt} wrap="truncate-end">
+                                    {taskbarNote}
+                                </Text>
+                            </Panel>
+                        ) : taskbar ? (
                             <Box justifyContent="flex-end" alignItems="flex-end">
                                 <Legend
                                     items={taskbar.map((i) => legendFor(i.label, i.key))}

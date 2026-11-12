@@ -9,10 +9,10 @@ using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
 const _FIXTURE_DIR_FIT1 =
-joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDA52")
+    joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDA52")
 const _DATA_PATH_FIT1 = joinpath(_FIXTURE_DIR_FIT1, "experimental_data", "SASDA52.dat")
-const _PDB_PATH_FIT1  = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1_model1.pdb")
-const _FIT_PATH_FIT1  = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1.fit")
+const _PDB_PATH_FIT1 = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1_model1.pdb")
+const _FIT_PATH_FIT1 = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1.fit")
 
 raw_fit1 = readdlm(_DATA_PATH_FIT1; skipstart = 4)
 

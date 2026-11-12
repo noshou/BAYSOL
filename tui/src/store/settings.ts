@@ -163,7 +163,7 @@ export class SettingDef {
 
 /**
  * The settings of the whole run, which a model's own settings may not name (Julia's
- * `RUN_LEVEL_SETTINGS` in `Pipeline/Settings.jl`, which refuses them with an error that
+ * `RUN_LEVEL_SETTINGS` in `settings-file.jl`, which refuses them with an error that
  * fails the run); every `PLOT_*` setting is one too (see [[isRunLevel]]). A test reads the
  * Julia source and compares, so the two cannot drift.
  */
@@ -353,8 +353,9 @@ export function settingNames(
  * limits and choices the harvest copied from the Params.jl files, a colour that
  * exists, the shape of a tuple, and the rules that tie settings together
  * (`setting_relations.json`). The Julia side makes the same checks on the same data
- * when it reads the settings (`BAYSOL.load_settings`), so what the terminal interface
- * keeps is what the code accepts; `test/fixtures/settings/cases.json` is read by both.
+ * when it reads the settings (`load_settings` of `settings-file.jl`), so what the terminal
+ * interface keeps is what the code accepts; `test/fixtures/settings/cases.json` is read by
+ * both.
  *
  * A value to check is "raw": whatever came from a file or from the keyboard. A value
  * saved in `settings.json` is checked like one that was typed or picked: JSON has no

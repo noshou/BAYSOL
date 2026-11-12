@@ -52,7 +52,7 @@ import {
     usedRows,
 } from "../src/store/polymers.js"
 import { isBuiltinName } from "../src/store/solutes.js"
-import { fixture, fixtureText, tempDir as tempRoot } from "./support/fixtures.js"
+import { fixture, fixtureText, tempDir } from "./support/fixtures.js"
 
 /** The fixtures the Julia loader is tested against too (`test/fixtures/buffer`). */
 const fixtureSolutes = () => fixture("buffer/custom-solutes.json").solutes as CustomEntry[]
@@ -583,7 +583,7 @@ const unusable = (f: () => unknown) =>
     )
 
 test("the fixture round trips", () => {
-    const root = tempRoot()
+    const root = tempDir()
     writeFileSync(customFile(root), fixtureText("buffer/custom-solutes.json"))
     const entries = fixture("buffer/custom-solutes.json").solutes as CustomEntry[]
     const read = readCustomSolutes(root)
@@ -596,7 +596,7 @@ test("the fixture round trips", () => {
 })
 
 test("polymers of the wrong shape are unusable", () => {
-    const root = tempRoot()
+    const root = tempDir()
     const old = {
         kind: "polymer",
         name: "o",
@@ -631,7 +631,7 @@ test("polymers of the wrong shape are unusable", () => {
 })
 
 test("the file is in the data folder and written atomically", () => {
-    const root = tempRoot()
+    const root = tempDir()
     // no file is no entries
     assert.deepEqual(readCustomSolutes(root), [])
     writeFileSync(customFile(root), "")
@@ -652,7 +652,7 @@ test("the file is in the data folder and written atomically", () => {
 })
 
 test("unusable files throw and are not written over", () => {
-    const root = tempRoot()
+    const root = tempDir()
     for (const bad of [
         '{"solutes"',
         "[1, 2]",
@@ -668,7 +668,7 @@ test("unusable files throw and are not written over", () => {
 })
 
 test("999 entries are fine, 1000 unusable", () => {
-    const root = tempRoot()
+    const root = tempDir()
     const many = (n: number) => Array.from({ length: n }, (_, i) => storeNonbio(`s${i}`))
     writeCustomSolutes(root, many(999))
     assert.equal(readCustomSolutes(root).length, 999)
@@ -683,7 +683,7 @@ test("999 entries are fine, 1000 unusable", () => {
 })
 
 test("names are unique, case-insensitively, at a write", () => {
-    const root = tempRoot()
+    const root = tempDir()
     unusable(() => writeCustomSolutes(root, [storeNonbio("A"), storeNonbio(" a ")]))
     assert.equal(existsSync(customFile(root)), false)
     writeCustomSolutes(root, [storeNonbio("A"), storeNonbio("B")])
@@ -691,7 +691,7 @@ test("names are unique, case-insensitively, at a write", () => {
 })
 
 test("removing one entry keeps the others and refuses after another copy saved", () => {
-    const root = tempRoot()
+    const root = tempDir()
     writeCustomSolutes(root, [storeNonbio("A"), storeNonbio("B"), storeNonbio("C")])
     const names = () => readCustomSolutes(root).map((e) => e.name)
     readCustomSolutes(root, { track: true })

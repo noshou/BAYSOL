@@ -11,7 +11,8 @@
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react"
 import { LOGS_FLOW } from "../core/environment.js"
-import { displayWidth, padWidth, truncate, wrapLine } from "../core/terminal.js"
+import { messageOf } from "../core/file-system.js"
+import { clampIndex, displayWidth, padWidth, truncate, wrapLine } from "../core/terminal.js"
 import {
     compilePlots,
     dataRoot,
@@ -47,6 +48,7 @@ import {
 } from "../store/view.js"
 import { cornerLabels, Frame, legendRoom } from "../ui/frame.js"
 import {
+    cursorMoves,
     type Design,
     type LegendItem,
     legendBack,
@@ -54,7 +56,17 @@ import {
     legendOf,
     moveLegend,
 } from "../ui/grid.js"
-import { destructiveQuestion, questionLegend, useConfirm } from "../ui/input.js"
+import {
+    DROPDOWN_CHROME,
+    Dropdown,
+    destructiveQuestion,
+    filterChoices,
+    questionLegend,
+    shownNote,
+    suggestionLines,
+    useConfirm,
+    useNote,
+} from "../ui/input.js"
 import {
     CursorList,
     keys,
@@ -81,14 +93,25 @@ const OPEN_FULL: LegendItem[] = [
     legendFor("move", [keys.up, keys.down]),
     legendFor("open", keys.enter),
     legendFor("run.LOG", keys.showLog),
-    legendFor("move data", keys.moveData),
-    legendFor("move tex", keys.moveTex),
-    legendFor("data here", keys.moveDataHere),
-    legendFor("tex here", keys.moveTexHere),
+    legendFor("data", keys.moveData),
+    legendFor("tex", keys.moveTex),
     legendFor("compile plots", keys.compilePlots),
     legendFor("delete run", keys.remove),
     legendBack,
 ]
+
+/** The first choice of the dropdown of a move: every model and the comparison. */
+const MOVE_ALL = "move all"
+
+/** The choices of a move: the whole run, then one model (or the comparison) each. */
+export function moveChoices(
+    models: readonly OpenModel[],
+): { label: string; value: string | null }[] {
+    return [
+        { label: MOVE_ALL, value: null },
+        ...models.map((m) => ({ label: `move by model: ${m.name}`, value: m.name })),
+    ]
+}
 
 /** The key of a selectable row: a model or the comparison of a run, or a run with none. */
 const rowKey = (row: OpenRow): string =>
@@ -231,7 +254,7 @@ export function TextPager(props: {
             const raw = pagerLines(load(), LOGS_FLOW.pager.tabWidth)
             return { lines: raw.flatMap((line) => wrapLine(line, width)) }
         } catch (error) {
-            const why = error instanceof Error ? error.message : "cannot read the file"
+            const why = messageOf(error, "cannot read the file")
             return { error: why }
         }
     }, [runDir, width])
@@ -332,7 +355,7 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
     // the highlighted row is kept by NAME, so a list that changes under it keeps the cursor
     const [selected, setSelected] = useState<string | undefined>()
     const [offset, setOffset] = useState(0)
-    const [note, setNote] = useState<{ text: string; error: boolean } | undefined>()
+    const { note, say, clear } = useNote()
     // what a plots action is doing (`compiling plots...`); the keys wait while it does
     const [busy, setBusy] = useState<string | undefined>()
 
@@ -355,7 +378,18 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
     )
     const at = stops[stop] ?? 0
     const current = rows[at]
-    const pageSize = useBodyRows()
+    // `shift+d` / `shift+t` open a dropdown under the list: the whole run, or one model
+    const [moving, setMoving] = useState<MoveKind | undefined>()
+    const [moveKeys, setMoveKeys] = useState<LegendItem[]>([])
+    const withFiles = (what: MoveKind, run: OpenRun): OpenModel[] =>
+        runModels(run).filter((m) => (what === "tex" ? m.tex.length > 0 : m.workbook))
+    const choices =
+        moving === undefined || current === undefined
+            ? []
+            : moveChoices(withFiles(moving, current.run))
+    const lines = Math.min(choices.length, suggestionLines)
+    const reserved = moving === undefined ? 0 : lines + DROPDOWN_CHROME
+    const pageSize = Math.max(3, useBodyRows() - reserved)
     const columns = useBodyColumns()
     // the cells of the note row of this (smooth) footer
     const noteRoom = legendRoom("smooth", columns)
@@ -370,7 +404,7 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
     )
 
     const step = (to: number): void => {
-        const i = stops[Math.min(Math.max(to, 0), stops.length - 1)]
+        const i = stops[clampIndex(to, stops.length)]
         if (i !== undefined) setSelected(rowKey(rows[i] as OpenRow))
         setOffset(top)
     }
@@ -379,39 +413,35 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
     const askDelete = (run: OpenRun): void => {
         const live = liveRun(project.dir)
         if (live !== undefined) {
-            setNote({ text: `a run is in progress (pid ${live.pid})`, error: true })
+            say(`a run is in progress (pid ${live.pid})`, true)
             return
         }
         confirm.ask(destructiveQuestion(`run ${runBrief(run.id)}`), () => {
             try {
                 deleteRun(project.dir, run.id)
-                setNote({ text: "run deleted", error: false })
+                say("run deleted")
             } catch (error) {
-                const text = error instanceof Error ? error.message : "could not delete"
-                setNote({ text, error: true })
+                say(messageOf(error, "could not delete"), true)
             }
             refresh()
         })
     }
 
     /**
-     * `shift+d` / `shift+t` move the data or the tex plots of the whole run (every model
-     * and the comparison), `d` / `t` those of the highlighted row alone, `shift+c`
-     * compiles the plots of the highlighted row: all into the folder of the setting. A
-     * failure is the note, which stays until the next key.
+     * Moves the data (`shift+d`) or the tex plots (`shift+t`) of some models of the run,
+     * or compiles the plots of the highlighted row (`shift+c`): into the folder of the
+     * setting, in a folder of the run's name. A failure is the note (until the next key).
      *
      * @param what - `data`, `tex` or `compile`.
-     * @param whole - the whole run instead of the highlighted row.
+     * @param models - the models (and comparison) to take.
      */
-    const filesAction = (what: MoveKind | "compile", whole: boolean): void => {
+    const filesAction = (
+        what: MoveKind | "compile",
+        models: readonly OpenModel[],
+    ): void => {
         if (current === undefined) return
         const { run } = current
-        const rows = whole
-            ? runModels(run)
-            : current.kind === "run"
-                ? []
-                : [current.model]
-        const units: PlotUnit[] = rows.map((m) => plotUnit(project.dir, run, m))
+        const units: PlotUnit[] = models.map((m) => plotUnit(project.dir, run, m))
         setBusy(
             what === "data"
                 ? "moving data..."
@@ -439,35 +469,51 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
                                 : plotRoot(settings.get("FIGURES_DIR")),
                             noteRoom,
                         )
-                setNote({ text, error: false })
+                say(text)
             } catch (error) {
-                const text = error instanceof Error ? error.message : "the plots failed"
-                setNote({ text, error: true })
+                say(messageOf(error, "the plots failed"), true)
             } finally {
                 setBusy(undefined)
             }
         })()
     }
 
+    const moveChosen = (name: string | null): void => {
+        const what = moving
+        setMoving(undefined)
+        if (what === undefined || current === undefined) return
+        const models = withFiles(what, current.run)
+        filesAction(what, name === null ? models : models.filter((m) => m.name === name))
+    }
+
+    /** Opens the dropdown of a move, or says there is nothing to move. */
+    const openMove = (what: MoveKind, run: OpenRun): void => {
+        if (withFiles(what, run).length > 0) {
+            setMoving(what)
+            return
+        }
+        say(what === "tex" ? "no plots (.tex) to move" : "no data to move", true)
+    }
+
     useKeys((press) => {
+        if (moving !== undefined) return
         if (confirm.handleKey(press)) return
         if (busy !== undefined) {
             // a plots action is running: only leaving works (it finishes on its own)
             if (press.is(keys.back) || press.is(keys.escape)) nav.pop()
             return
         }
-        setNote(undefined)
+        clear()
         if (press.is(keys.back) || press.is(keys.escape)) nav.pop()
         else if (press.is(keys.up)) step(stop - 1)
         else if (press.is(keys.down)) step(stop + 1)
         else if (current === undefined) return
         else if (press.is(keys.remove)) askDelete(current.run)
         // a capital press matches the plain key too, so the capitals are tested first
-        else if (press.is(keys.moveData)) filesAction("data", true)
-        else if (press.is(keys.moveTex)) filesAction("tex", true)
-        else if (press.is(keys.compilePlots)) filesAction("compile", false)
-        else if (press.is(keys.moveDataHere)) filesAction("data", false)
-        else if (press.is(keys.moveTexHere)) filesAction("tex", false)
+        else if (press.is(keys.moveData)) openMove("data", current.run)
+        else if (press.is(keys.moveTex)) openMove("tex", current.run)
+        else if (press.is(keys.compilePlots))
+            filesAction("compile", current.kind === "run" ? [] : [current.model])
         else if (press.is(keys.showLog))
             nav.push(
                 <TextPager
@@ -480,13 +526,10 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
             )
         else if (press.is(keys.enter)) {
             if (current.kind === "run")
-                return setNote({
-                    text: `${runBrief(current.run.id)} has no models`,
-                    error: false,
-                })
+                return say(`${runBrief(current.run.id)} has no models`)
             const { run, model } = current
             if (model.workbook === undefined)
-                return setNote({ text: noWorkbookNote(model, noteRoom), error: false })
+                return say(noWorkbookNote(model, noteRoom))
             nav.push(
                 <SheetViewerScreen
                     workbookPath={model.workbook}
@@ -501,27 +544,26 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
         }
     })
 
-    // the file actions are offered where there is something to take: the `here` ones for
-    // the highlighted row, the whole-run ones when the run has any
+    // the file actions are offered where there is something to take
     const here = current !== undefined && current.kind !== "run" ? current.model : undefined
     const hasTex = here !== undefined && here.tex.length > 0
-    const hasData = here !== undefined && here.workbook !== undefined
     const wholeRun = current === undefined ? [] : runModels(current.run)
+    const hasData = wholeRun.some((m) => m.workbook !== undefined)
     const hasTexRun = wholeRun.some((m) => m.tex.length > 0)
     const legend = confirm.question
         ? questionLegend(confirm.question)
-        : legendOf([
-            moveLegend({ up: stop > 0, down: stop < stops.length - 1 }),
-            current !== undefined && legendFor("open", keys.enter),
-            current !== undefined && legendFor("run.LOG", keys.showLog),
-            current !== undefined && legendFor("delete run", keys.remove),
-            hasData && legendFor("move data", keys.moveData),
-            hasTexRun && legendFor("move tex", keys.moveTex),
-            hasData && legendFor("data here", keys.moveDataHere),
-            hasTex && legendFor("tex here", keys.moveTexHere),
-            hasTex && legendFor("compile plots", keys.compilePlots),
-            legendBack,
-        ])
+        : moving !== undefined
+            ? moveKeys
+            : legendOf([
+                moveLegend(cursorMoves(stop, stops.length)),
+                current !== undefined && legendFor("open", keys.enter),
+                current !== undefined && legendFor("run.LOG", keys.showLog),
+                current !== undefined && legendFor("delete run", keys.remove),
+                hasData && legendFor("data", keys.moveData),
+                hasTexRun && legendFor("tex", keys.moveTex),
+                hasTex && legendFor("compile plots", keys.compilePlots),
+                legendBack,
+            ])
     // a model with settings of its own says which, when nothing else is to be said
     const own = current?.kind === "model" ? current.model.overrides : []
     const hint =
@@ -529,11 +571,8 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
             ? { text: truncate(`overrides: ${own.join(", ")}`, noteRoom), error: false }
             : undefined
     const shown =
-        confirm.note !== undefined
-            ? { text: confirm.note, error: false }
-            : busy !== undefined
-                ? { text: busy, error: false }
-                : (note ?? hint)
+        shownNote(confirm, undefined) ??
+        (busy !== undefined ? { text: busy, error: false } : (note ?? hint))
     return (
         <Frame
             title="open"
@@ -574,6 +613,17 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
                             </Box>
                         )
                     }}
+                />
+            )}
+            {moving !== undefined && (
+                <Dropdown<string | null>
+                    key={moving}
+                    label={`move ${moving}:`}
+                    search={filterChoices(choices)}
+                    lines={lines}
+                    onPick={moveChosen}
+                    onCancel={() => setMoving(undefined)}
+                    onLegend={setMoveKeys}
                 />
             )}
         </Frame>

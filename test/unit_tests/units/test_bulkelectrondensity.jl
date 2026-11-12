@@ -18,7 +18,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 const IFACE = BAYSOL.BulkElectronDensity
 using BAYSOL.PhysicalConstants:
-    AVOGADRO, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER
+    AVOGADRO, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER, HC_EV_ANGSTROM, energy_ev
 
 "Fully-qualified handle onto the submodule, for the private caches/tables below."
 const PMVMOD = BAYSOL.BulkElectronDensity
@@ -868,4 +868,14 @@ end
         # cm3 out of a ~1 L reference volume: tiny but nonzero
         @test 0.0 < Δv_protein < 1.0
     end
+end
+
+@testset "energy_ev: the unit of an energy" begin
+    @test energy_ev(12000, "eV") == 12000.0
+    @test energy_ev(12, "keV") == 12000.0
+    @test energy_ev(1, "A") == HC_EV_ANGSTROM
+    @test energy_ev(0.1, "nm") ≈ HC_EV_ANGSTROM
+    @test energy_ev(HC_EV_ANGSTROM / 12000, "A") ≈ 12000
+    @test energy_ev(HC_EV_ANGSTROM / 120000, "nm") ≈ 12000
+    @test_throws ArgumentError energy_ev(1, "mm")
 end

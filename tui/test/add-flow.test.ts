@@ -21,7 +21,7 @@ import {
 } from "../src/store/add-state.js"
 import { rowProblem } from "../src/store/buffer.js"
 import type { CustomEntry } from "../src/store/custom.js"
-import { Drafts, hintsFor, isFastaFile, MAX_ROWS } from "../src/store/lists.js"
+import { Drafts, hintsFor, isSequenceFile, MAX_ROWS } from "../src/store/lists.js"
 import {
     bufferRow,
     CONC_UNITS,
@@ -390,7 +390,8 @@ test("the family of an arg", () => {
     assert.deepEqual(familyMatch("PEG n=22")?.values, { n: "22" })
     assert.deepEqual(familyMatch("peg 3350")?.values, { Mn: "3350" })
     assert.deepEqual(familyMatch("Brij nC=12 nEO=9")?.values, { nC: "12", nEO: "9" })
-    assert.equal(familyMatch("PEG 3350")?.formIndex, 1)
+    assert.equal(familyMatch("PEG 3350")?.formIndex, 0)
+    assert.equal(familyMatch("PEG n=22")?.formIndex, 1)
     assert.equal(familyMatch("ficoll 70"), undefined)
     assert.equal(familyMatch("PEG 3350 extra"), undefined)
     assert.equal(familyMatch(""), undefined)
@@ -418,8 +419,8 @@ test("paths", () => {
     writeFileSync(join(root, "b.txt"), "x")
     writeFileSync(join(root, "c.FQ"), "@a\nA\n+\nI\n")
     mkdirSync(join(root, "dir"))
-    assert.deepEqual(hintsFor(`${root}/`, isFastaFile), ["dir/", "a.fasta", "c.FQ"])
-    assert.deepEqual(hintsFor(`${root}/a`, isFastaFile), ["a.fasta"])
+    assert.deepEqual(hintsFor(`${root}/`, isSequenceFile), ["dir/", "a.fasta", "c.FQ"])
+    assert.deepEqual(hintsFor(`${root}/a`, isSequenceFile), ["a.fasta"])
 })
 
 // ---- the steps of the flow, row by row against the fixture ----------------------------
@@ -453,21 +454,25 @@ test("non-biological solutes and grades", () => {
 })
 
 test("polymer families", () => {
-    // PEG by n: a choice of the forms first, then the number in the params cell
+    // PEG by Mn (the first form, the one a bottle label gives): a choice of the forms
+    // first, then the number in the params cell
     let flow = feed(add("polymer"), "peg", submit)
     assert.equal(dropdown(flow).label, "form")
     flow = feed(flow, submit)
     assert.equal(field(flow), "params")
-    assert.equal(prompt(flow).note, "units n", "the prompt is in the border note")
-    flow = feed(flow, "22", submit)
+    assert.equal(prompt(flow).note, "molar mass (g/mol)", "the prompt is the border note")
+    flow = feed(flow, "3350", submit)
     assert.equal(field(flow), "mM")
-    sameAsFixture(onlyRow(feed(flow, "0.1", submit, "0.01", submit)), "PEG 22")
-    // PEG by Mn: the second form
-    flow = feed(add("polymer"), "peg", submit, down, submit)
-    assert.equal(prompt(flow).note, "Mn (g/mol)")
     sameAsFixture(
-        onlyRow(feed(flow, "3350", submit, "0.05", submit, "0.003", submit)),
+        onlyRow(feed(flow, "0.05", submit, "0.003", submit)),
         "PEG 3350",
+    )
+    // PEG by n: the second form
+    flow = feed(add("polymer"), "peg", submit, down, submit)
+    assert.equal(prompt(flow).note, "number of repeat units")
+    sameAsFixture(
+        onlyRow(feed(flow, "22", submit, "0.1", submit, "0.01", submit)),
+        "PEG 22",
     )
     // two arguments: both asked, shown as typed
     flow = feed(add("polymer"), "pluronic", submit)
@@ -481,20 +486,20 @@ test("polymer families", () => {
         "Pluronic",
     )
     // an error of the family stays in the cell and says why
-    flow = feed(add("polymer"), "peg", submit, submit, "1", submit)
+    flow = feed(add("polymer"), "peg", submit, down, submit, "1", submit)
     assert.equal(prompt(flow).problem, "n: at least 2")
     assert.equal(field(flow), "params")
     assert.equal(prompt(flow).typed, "1")
     assert.equal(prompt(feed(flow, "x", submit)).problem, "n: not a number")
     assert.equal(field(feed(flow, "5", submit)), "mM")
     // dextran by Mn below 1000 says it counts as kDa, while mM is typed
-    flow = feed(add("polymer"), "dextran", submit, down, submit, "40", submit)
+    flow = feed(add("polymer"), "dextran", submit, submit, "40", submit)
     assert.equal(field(flow), "mM")
     assert.equal(prompt(flow).note, "below 1000 counts as kDa")
     assert.equal(onlyRow(feed(flow, "1", submit, "0.1", submit)).arg, "dextran 40")
-    flow = feed(add("polymer"), "dextran", submit, down, submit, "40", submit, "1", submit)
+    flow = feed(add("polymer"), "dextran", submit, submit, "40", submit, "1", submit)
     assert.equal(prompt(flow).note, undefined, "the note goes with the mM cell")
-    flow = feed(add("polymer"), "dextran", submit, down, submit, "40000", submit)
+    flow = feed(add("polymer"), "dextran", submit, submit, "40000", submit)
     assert.equal(prompt(flow).note, undefined)
 })
 
@@ -914,7 +919,7 @@ test("editing rows", () => {
     flow = feed(AddFlow.edit(on("PEG 22"), 0), submit)
     assert.equal(field(flow), "params")
     assert.equal(prompt(flow).typed, "22", "the old number is the start")
-    assert.equal(prompt(flow).note, "units n")
+    assert.equal(prompt(flow).note, "number of repeat units")
     flow = feed(flow, "30", submit)
     row = rows(flow)[0]
     assert.equal(row.arg, "PEG n=30")

@@ -1,0 +1,45 @@
+{
+    "previewRows": 12,
+    "sniffLines": 40,
+    "commentChars": [
+        "#",
+        ";",
+        "%",
+        "!"
+    ],
+    "guesses": {
+        "q": [
+            "q",
+            "s",
+            "qa",
+            "qnm",
+            "scatteringvector",
+            "scattering"
+        ],
+        "i": [
+            "i",
+            "iq",
+            "intensity",
+            "iobs",
+            "iexp",
+            "signal",
+            "counts"
+        ],
+        "sigma": [
+            "sigma",
+            "sig",
+            "err",
+            "error",
+            "di",
+            "ierr",
+            "erri",
+            "sigmai",
+            "sigmaiq",
+            "stdev",
+            "sd",
+            "uncertainty",
+            "dev",
+            "deltai"
+        ]
+    }
+}

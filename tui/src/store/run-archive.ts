@@ -32,6 +32,14 @@ import {
 } from "../core/archive.js"
 import { RUN_FLOW } from "../core/environment.js"
 import { isFile } from "../core/file-system.js"
+import {
+    discardTree,
+    expandWorkbook,
+    isWorkbookName,
+    rebuildWorkbook,
+    treeEntries,
+    WORKBOOK_MARK,
+} from "./workbook-tree.js"
 
 // ========================================================================================
 // 1. What is packed
@@ -44,30 +52,23 @@ import { isFile } from "../core/file-system.js"
  * While the run goes, and for a run whose pack failed, its files are in the plain folder
  * `runs/<stamp>/` instead (the run's name is the same either way).
  *
+ * A workbook goes in as the tree of its unzipped XML files (`m.xlsx` as `m/...`), which
+ * compresses far better; readers rebuild a proper `.xlsx` from it ([[materializeRunFile]],
+ * `store/workbook-tree.ts`).
+ *
  * Packing is atomic: the archive is made beside the folder, tested with `7z t`, compared
  * with the list of what was asked for, and only then are the packed files (and the
  * folder, once empty) removed. A failure leaves the run folder as it was.
  *
- * Runs of the older layouts still read: a folder with a `run.7z` inside (`run.json` and
- * the workbooks outside it, the rest under `logs/`, `<model>/output/`, `compare/`), or
- * plain folders. [[legacyNames]] says where an old run keeps a file the new layout names
- * flat.
+ * A run is one flat folder or its one archive.
  */
 
 /** The path of a run's archive, beside its folder (it may not exist). */
 export const archivePath = (runDir: string): string =>
     `${runDir}${RUN_FLOW.archive.extension}`
 
-/** The path of the archive of the older layout, inside the run folder. */
-const legacyArchivePath = (runDir: string): string =>
-    join(runDir, RUN_FLOW.archive.legacyName)
-
-/** The archives a run has, the new one first. */
-const archivesOf = (runDir: string): string[] =>
-    [archivePath(runDir), legacyArchivePath(runDir)].filter(isFile)
-
 /** Whether a run has been packed. */
-export const isPacked = (runDir: string): boolean => archivesOf(runDir).length > 0
+export const isPacked = (runDir: string): boolean => isFile(archivePath(runDir))
 
 /** Whether a run is there: its folder or its archive. */
 export const runExists = (runDir: string): boolean => {
@@ -80,9 +81,9 @@ export const runExists = (runDir: string): boolean => {
 
 /**
  * The files of a run folder that are packed: everything except the dot files and
- * folders (the `.claim` marker, the `.pack` lock, a staging folder), the archives and
- * their staging files. Links and anything that is not a plain file are left alone, and so
- * is a file whose name could not be an entry (a backslash, say).
+ * folders (the `.claim` marker, the `.pack` lock, a staging folder). Links and anything
+ * that is not a plain file are left alone, and so is a file whose name could not be an
+ * entry (a backslash, say).
  *
  * @param runDir - the run folder.
  * @returns `/`-separated paths relative to it, sorted.
@@ -99,7 +100,6 @@ export function packableFiles(runDir: string): string[] {
         for (const name of names) {
             if (name.startsWith(".")) continue
             const rel = prefix === "" ? name : `${prefix}/${name}`
-            if (prefix === "" && name.startsWith(RUN_FLOW.archive.legacyName)) continue
             let st: ReturnType<typeof lstatSync>
             try {
                 st = lstatSync(join(folder, name))
@@ -120,17 +120,30 @@ export function packableFiles(runDir: string): string[] {
  * the folder. Call it once the run's process is over.
  *
  * @param runDir - the run folder.
- * @returns how many files were packed (0: nothing to pack, or a run of the older layout
- *     that is packed already; no archive was made).
+ * @returns how many files were packed (0: nothing to pack; no archive was made).
  * @throws [[ArchiveError]] when the archive exists already or a step failed (the message
  *     says why; the folder is as it was).
  */
 export async function packRun(runDir: string): Promise<number> {
-    if (isFile(legacyArchivePath(runDir))) return 0
-    const files = packableFiles(runDir)
-    if (files.length === 0) return 0
-    await packFiles(runDir, archivePath(runDir), files)
-    removePacked(runDir, files)
+    const plain = packableFiles(runDir)
+    if (plain.length === 0) return 0
+    // a workbook goes in as its tree: the tree's files take the place of the `.xlsx`
+    const books = plain.filter(isWorkbookName)
+    const files = plain.filter((f) => !isWorkbookName(f))
+    // only the trees made here are taken away again if the pack fails
+    const opened: string[] = []
+    try {
+        for (const rel of books) {
+            files.push(...expandWorkbook(runDir, rel))
+            opened.push(rel)
+        }
+        files.sort()
+        await packFiles(runDir, archivePath(runDir), files)
+    } catch (error) {
+        for (const rel of opened) discardTree(runDir, rel)
+        throw error
+    }
+    removePacked(runDir, [...files, ...books])
     // what is left of the folder: the markers and staging folders of the run (never
     // data), then the folder itself if nothing else is in it
     try {
@@ -142,7 +155,7 @@ export async function packRun(runDir: string): Promise<number> {
     } catch {
         // something else is in the folder: it stays
     }
-    return files.length
+    return plain.length
 }
 
 // ========================================================================================
@@ -155,36 +168,19 @@ export class RunFileMissing extends Error {}
 /** A file over the size a reader takes. */
 export class RunFileTooLarge extends Error {}
 
-/** The files of a run's own that an older run keeps under `logs/`. */
-const LOG_FILES: ReadonlySet<string> = new Set([
-    "run.LOG",
-    "settings.json",
-    "buffer.json",
-    "data.tsv",
-    "data.json",
-    "solutes.json",
-    "models.json",
-    "model-settings.json",
-    "model-references.json",
-    "plots.txt",
-])
-
-/**
- * Where an older run keeps a file that the flat layout names `rel`: the inputs and the
- * logs were under `logs/`, the reference fits under `logs/reference-fit/` (or
- * `logs/references/`). A model's files are not mapped: `run.json` of an older run names
- * them with their old paths.
- *
- * @param rel - a flat name (`run.LOG`, `reference-fit-CRYSOL.tsv`).
- * @returns the older paths to try, none for a name that has none.
- */
-export function legacyNames(rel: string): string[] {
-    if (LOG_FILES.has(rel)) return [`logs/${rel}`]
-    const reference = /^reference-fit-(.+)$/.exec(rel)
-    if (reference?.[1] !== undefined)
-        return [`logs/reference-fit/${reference[1]}`, `logs/references/${reference[1]}`]
-    return []
-}
+/** The names of the files a run folder holds of its own (the flat layout). */
+export const RUN_FILES = {
+    log: "run.LOG",
+    settings: "settings.json",
+    buffer: "buffer.json",
+    dataTable: "data.tsv",
+    dataInfo: "data.json",
+    solutes: "solutes.json",
+    models: "models.json",
+    modelSettings: "model-settings.json",
+    modelReferences: "model-references.json",
+    plots: "plots.txt",
+} as const
 
 /** Where a file of a run is: a plain path, or an entry of an archive. */
 type Place = { plain: string } | { archive: string; name: string; size: number }
@@ -199,20 +195,14 @@ function archivedEntries(archive: string): Map<string, number> {
     }
 }
 
-/**
- * Finds a file of a run: tries the name as given, then the older paths it may have, each
- * in the plain folder first and then in the archives.
- */
+/** Finds a file of a run: in the plain folder first, then in the archive. */
 function locate(runDir: string, rel: string): Place | undefined {
-    for (const name of [rel, ...legacyNames(rel)]) {
-        const plain = join(runDir, ...name.split("/"))
-        if (isFile(plain)) return { plain }
-        for (const archive of archivesOf(runDir)) {
-            const size = archivedEntries(archive).get(name)
-            if (size !== undefined) return { archive, name, size }
-        }
-    }
-    return undefined
+    const plain = join(runDir, ...rel.split("/"))
+    if (isFile(plain)) return { plain }
+    const archive = archivePath(runDir)
+    if (!isFile(archive)) return undefined
+    const size = archivedEntries(archive).get(rel)
+    return size === undefined ? undefined : { archive, name: rel, size }
 }
 
 /** `run.json` texts kept by archive: an archive never changes, so its stamp is its key. */
@@ -220,8 +210,7 @@ const metadata = new Map<string, { stamp: string; text: string }>()
 
 /**
  * The bytes of a file of a run, from its plain folder when it is there (a run being run,
- * or one whose pack was interrupted), else from the archive. A flat name falls back to the
- * paths of the older layouts. Nothing is written.
+ * or one whose pack was interrupted), else from the archive. Nothing is written.
  *
  * @param runDir - the run (its folder's path, which need not exist once it is packed).
  * @param rel - the `/`-separated name (`run.LOG`, `crambin.xlsx`).
@@ -284,43 +273,55 @@ export function readRunText(
 /**
  * The archive that holds a file of a run, for a file the plain folder does not have.
  *
- * @param rel - the path relative to the run folder, as the archive names it.
+ * @param rel - the path relative to the run folder, as the archive names it; a workbook
+ *     (`m.xlsx`) is held as its tree (`m/...`).
  * @returns the archive, `undefined` when none holds it.
  */
 export function archiveHolding(runDir: string, rel: string): string | undefined {
-    return archivesOf(runDir).find((archive) => archivedEntries(archive).has(rel))
+    const holds = (archive: string): boolean =>
+        isWorkbookName(rel)
+            ? treeEntries(archive, rel).length > 0
+            : archivedEntries(archive).has(rel)
+    const archive = archivePath(runDir)
+    return isFile(archive) && holds(archive) ? archive : undefined
 }
 
 /**
- * The files directly in a folder of a run, plain and archived together (a plain file
- * wins).
+ * The files of a run's own top folder, plain and archived together (a plain file wins).
  *
  * @param runDir - the run (its folder's path).
- * @param folder - the `/`-separated folder relative to it (`""` is the run's own top:
- *     the flat layout; `logs`, `crambin/output/plots` are folders of the older layouts).
- * @returns file name to bytes; empty for a folder that is nowhere.
+ * @returns file name to bytes; empty for a run that is nowhere.
  */
-export function runFolderFiles(runDir: string, folder: string): Map<string, number> {
+export function runFiles(runDir: string): Map<string, number> {
     const sizes = new Map<string, number>()
-    const prefix = folder === "" ? "" : `${folder}/`
-    for (const archive of archivesOf(runDir)) {
+    const archive = archivePath(runDir)
+    if (isFile(archive)) {
+        // a workbook is held as a tree (`m/[Content_Types].xml`, ...): listed as `m.xlsx`
+        const trees = new Map<string, { size: number; book: boolean }>()
         for (const [name, size] of archivedEntries(archive)) {
-            if (!name.startsWith(prefix)) continue
-            const rest = name.slice(prefix.length)
-            if (!rest.includes("/")) sizes.set(rest, size)
+            const slash = name.indexOf("/")
+            if (slash < 0) {
+                sizes.set(name, size)
+                continue
+            }
+            const tree = trees.get(name.slice(0, slash)) ?? { size: 0, book: false }
+            tree.size += size
+            tree.book ||= name.slice(slash + 1) === WORKBOOK_MARK
+            trees.set(name.slice(0, slash), tree)
         }
+        for (const [folderName, tree] of trees)
+            if (tree.book) sizes.set(`${folderName}.xlsx`, tree.size)
     }
-    const parts = folder === "" ? [] : folder.split("/")
     let names: string[] = []
     try {
-        names = readdirSync(join(runDir, ...parts))
+        names = readdirSync(runDir)
     } catch {
         // no plain folder
     }
     for (const name of names) {
-        if (folder === "" && name.startsWith(".")) continue
+        if (name.startsWith(".")) continue
         try {
-            const st = statSync(join(runDir, ...parts, name))
+            const st = statSync(join(runDir, name))
             if (st.isFile()) sizes.set(name, st.size)
         } catch {
             // gone since the listing
@@ -358,18 +359,26 @@ function copiesFolder(): string {
  *
  * @param runDir - the run (its folder's path).
  * @param path - the file's path inside the run's folder, as `run.json` and the lists give
- *     it (`<run>/crambin.xlsx`); it need not exist.
+ *     it (`<run>/crambin.xlsx`); it need not exist. A workbook only in the archive is
+ *     rebuilt from its tree.
  * @returns the path to open.
  * @throws [[RunFileMissing]], [[RunFileTooLarge]], [[ArchiveError]] as [[readRunBytes]].
  */
 export function materializeRunFile(runDir: string, path: string): string {
     if (isFile(path)) return path
     const rel = relative(runDir, path).split(sep).join("/")
-    const bytes = readRunBytes(runDir, rel)
     const key = createHash("sha256").update(`${runDir}\0${rel}`).digest("hex").slice(0, 12)
     const folder = join(copiesFolder(), key)
     mkdirSync(folder, { recursive: true })
     const copy = join(folder, basename(rel))
-    writeFileSync(copy, bytes)
+    if (isWorkbookName(rel)) {
+        // held as a tree: zipped again into a proper workbook (an archive never changes,
+        // so a copy made earlier is the same file)
+        const archive = archiveHolding(runDir, rel)
+        if (archive === undefined) throw new RunFileMissing(`no ${rel}`)
+        if (!isFile(copy)) rebuildWorkbook(archive, rel, copy)
+        return copy
+    }
+    writeFileSync(copy, readRunBytes(runDir, rel))
     return copy
 }

@@ -81,7 +81,8 @@ end
 The selector of the canonical .pdb for `model`: [`_model_selector`](@ref) without hydrogens.
 Which atoms the canonical .pdb keeps: heavy atoms of standard residues and of nucleotides,
 including modified ones that are HETATM records (BioStructures' `heavyatomselector` would
-drop those); waters, ions, ligands and hydrogens are dropped.
+drop those), and the ligands of a known composition ([`KEEP_LIGANDS`](@ref)); waters,
+placeholders and hydrogens are dropped.
 """
 function _canonical_selector(model)
     keep = _model_selector(model)
@@ -115,8 +116,8 @@ Shared "produce candidate .pdb, then compare-or-write-or-throw" step used by
 [`LocalPathSource`](@ref) and [`URLSource`](@ref) (not [`PDBIDSource`](@ref),
 which has its own simpler fetch-if-missing path). Takes model 1 of the
 already-parsed BioStructures structure struc, writes it (filtered through
-`_canonical_selector`: standard and nucleotide heavy atoms, no waters, ions, ligands or
-hydrogens) to a temp file, then:
+`_canonical_selector`: standard and nucleotide heavy atoms and ligands of a known
+composition, no waters or hydrogens) to a temp file, then:
 
 - if nothing is stored under key yet, moves the temp file into place;
 - if something is and it's byte-identical, discards the temp file and
@@ -176,7 +177,8 @@ end
 
 Resolve source to an absolute path to a canonical .pdb file in
 [`_store_dir`](@ref) (one model only, the first unless `model` says another; modified
-nucleotides kept; no waters, ions, ligands or hydrogens). See [`StructureSource`](@ref) and
+nucleotides kept, ligands of a known composition kept ([`KEEP_LIGANDS`](@ref)); no waters
+or hydrogens). See [`StructureSource`](@ref) and
 its subtypes for per-variant behaviour.
 
 `model` is which model of a multi-model structure (an NMR ensemble) to resolve,

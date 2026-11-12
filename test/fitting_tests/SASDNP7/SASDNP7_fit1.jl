@@ -37,8 +37,8 @@ check_q_angstrom(qvals)
 # SWING, wavelength 0.1 nm as recorded => energy = hc/λ ≈ 12.4 keV (hc = 12398.42 eV·Å).
 # The curve is the one WITHOUT the Gd-HPDO3A contrast agent. The model has chains A, B, D
 # (aIF2-γ, aIF2-α, tRNA) with GNP, Mg²⁺ and modified tRNA nucleotides (4SU, H2U, OMC, 5MU,
-# PSU as HETATM), kept as deposited. GDPNP (1 mM, the GNP in the model) is not in the
-# bundled solute tables and is left out of the solutes.
+# PSU as HETATM), kept as deposited. GDPNP (1 mM, the GNP in the model) is listed as the
+# solute `gdpnp` (its tetrasodium salt, see the next paragraph).
 
 # GDPNP (1 mM) is modelled as its tetrasodium salt (3D-RISM estimate anchored on the
 # measured GTP tetrasodium, 288.8 ± 22 cm³/mol; not a measurement). The cations of the

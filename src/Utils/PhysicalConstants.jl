@@ -8,8 +8,8 @@ here (`using ..PhysicalConstants: AVOGADRO`).
 module PhysicalConstants
 
 export AVOGADRO, PLANCK_CONSTANT, SPEED_OF_LIGHT, ELEMENTARY_CHARGE, ANGSTROM_PER_METER,
-    HC_EV_ANGSTROM, WATER_MOLAR_MASS, WATER_DENSITY_UNCERTAINTY, KELL_DENSITY_NUM,
-    KELL_DENSITY_DEN, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER,
+    HC_EV_ANGSTROM, energy_ev, WATER_MOLAR_MASS, WATER_DENSITY_UNCERTAINTY,
+    KELL_DENSITY_NUM, KELL_DENSITY_DEN, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER,
     PM_PER_ANGSTROM, NM_INV_PER_ANGSTROM_INV, UNIT_OF_δρ, NS_PER_S, MS_PER_S,
     STANDARD_TEMPERATURE_C, BACKBONE_ELECTRONS
 
@@ -34,6 +34,30 @@ from wavelength: E (eV) = `HC_EV_ANGSTROM` / λ (Å).
 """
 const HC_EV_ANGSTROM =
     PLANCK_CONSTANT * SPEED_OF_LIGHT / ELEMENTARY_CHARGE * ANGSTROM_PER_METER
+
+"""
+    energy_ev(value, unit)
+
+The photon energy in eV of `value` read in `unit`: `"eV"` as it is, `"keV"` times 1000,
+`"nm"` and `"A"` a wavelength (nm, Å), `HC_EV_ANGSTROM` over the wavelength in Å.
+
+# Returns
+- The energy in eV, a `Float64`.
+
+# Exceptions
+- `ArgumentError` for a unit that is none of the four.
+"""
+function energy_ev(value::Real, unit)
+    unit == "eV" && return Float64(value)
+    unit == "keV" && return 1000.0 * value
+    unit == "A" && return HC_EV_ANGSTROM / value
+    unit == "nm" && return HC_EV_ANGSTROM / (10 * value)
+    throw(
+        ArgumentError(
+            "energy unit $(repr(unit)): expected \"eV\", \"keV\", \"nm\" or \"A\"",
+        ),
+    )
+end
 
 "Molar mass of H₂O, g·mol⁻¹ (IAPWS-95 value)."
 const WATER_MOLAR_MASS = 18.015268

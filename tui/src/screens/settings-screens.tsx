@@ -3,18 +3,27 @@
 // The settings screens: the sheet and its editors, the menu, and what the landings share.
 //
 // Contents:
-//   1. The editors: one text line, or a colour or font picked from a list
+//   1. The editors: a number inside its row, a tuple part by part, one text line, or a
+//      colour or font picked from a list
 //   2. `SettingsSheet`: one group of settings
 //   3. `SettingsMenu`: the groups
 //   4. Shared
 
 import { basename } from "node:path"
-import { Box, Text } from "ink"
-import { type ReactNode, useCallback, useMemo, useReducer, useState } from "react"
+import { Box, Text, usePaste } from "ink"
+import {
+    type ReactNode,
+    useCallback,
+    useEffect,
+    useMemo,
+    useReducer,
+    useRef,
+    useState,
+} from "react"
 import { appDir, cacheDir, readSystem } from "../core/environment.js"
 import { quarantine } from "../core/file-system.js"
 import { listFonts } from "../core/fonts.js"
-import { truncateStart, wrapText } from "../core/terminal.js"
+import { truncate, truncateStart, wrapText } from "../core/terminal.js"
 import { readRecipes, recipesFile } from "../store/buffer.js"
 import {
     colourFamily,
@@ -30,7 +39,6 @@ import { customFile, readCustomSolutes } from "../store/custom.js"
 import {
     type FontLists,
     modelSheets,
-    type PartKind,
     type SettingDef,
     type SettingValue,
     settingNames,
@@ -43,6 +51,7 @@ import {
 } from "../store/settings-store.js"
 import { Frame, footerExtraLines } from "../ui/frame.js"
 import {
+    cursorMoves,
     GridMenu,
     type LegendItem,
     legendBack,
@@ -61,6 +70,7 @@ import {
     useDiscardGuard,
 } from "../ui/input.js"
 import {
+    ChoiceTabs,
     type KeyInput,
     keys,
     NarrowWidth,
@@ -70,23 +80,43 @@ import {
     useKeys,
     useListCursor,
     useNav,
+    useScreenActive,
 } from "../ui/interaction.js"
-import { Bright, DataTable, Panel, useTheme } from "../ui/theme.js"
+import { fieldCells, TextBuffer, TextField } from "../ui/text-input.js"
+import {
+    Bright,
+    type Column,
+    columnWidths,
+    DataTable,
+    Panel,
+    useTheme,
+} from "../ui/theme.js"
 import { CustomSolutesTable, RecipesTable } from "./custom-solutes.js"
 import {
     type EditEnd,
-    finishTuple,
     hasColourPart,
     indexOfPick,
     type ListKind,
     maxNameText,
     maxSettingText,
+    NUMBER_NOTE_ROWS,
+    type NumberEdit,
     narrow,
-    parsePart,
+    noteLines,
+    openNumber,
+    openTabs,
+    openTuple,
     parseSetting,
+    pasteNumber,
+    pasteTuple,
     pickValue,
+    plural,
+    stepNumber,
+    stepTabs,
+    stepTuple,
     swatchColour,
-    tupleParts,
+    type TupleEdit,
+    takeColour,
     valueText,
     withDraft,
     withModelDraft,
@@ -102,13 +132,22 @@ const pickerLines = 5
 /** Whether a setting is picked from a list (a colour or a font). */
 const isPicked = (def: SettingDef): boolean => def.kind === "colour" || def.kind === "font"
 
-/** The rows an editor takes under the table: its label, an error, and the list. */
-const editorRows = (def: SettingDef): number =>
-    def.kind === "colour" || hasColourPart(def)
+/**
+ * The rows an editor takes under the table: its label, an error, and the list. A number
+ * has none (it is typed inside its row of the table); a tuple has a row for each part
+ * and the error, and room for the picker of a colour part.
+ */
+const editorRows = (def: SettingDef): number => {
+    if (def.kind === "tuple")
+        return Math.max(def.partNames.length + 1, hasColourPart(def) ? pickerLines + 5 : 0)
+    return def.kind === "colour"
         ? pickerLines + 5
         : isPicked(def)
             ? pickerLines + 3
-            : 3
+            : def.kind === "int" || def.kind === "float"
+                ? 0
+                : 3
+}
 
 /** The kinds typed as a list, which need a longer line (the default colours are 70). */
 const listKinds: ReadonlySet<string> = new Set(["colours", "markers", "sizes"])
@@ -129,13 +168,11 @@ type EditorProps = {
     onLegend: (keys: LegendItem[]) => void
 }
 
-/** What a setting's text line asks for, by its kind. */
+/** What a setting's text line asks for (a number or a tuple has an editor of its own). */
 function textHint(def: SettingDef): { label: string; placeholder?: string } {
     switch (def.kind) {
         case "set":
             return { label: "some of:", placeholder: def.choices.join(" ") }
-        case "tuple":
-            return { label: `${def.partNames.join(", ")}:` }
         case "ranges":
             return { label: "q ranges:", placeholder: "0.1-0.2, 0.5-0.6 (empty: none)" }
         case "strings":
@@ -157,7 +194,69 @@ function textHint(def: SettingDef): { label: string; placeholder?: string } {
 }
 
 /**
- * A number, some choices, a font or a tuple, typed as one line into the shared [[Prompt]]
+ * What a key does to an editor state: the next state, and how the edit ended if the key
+ * ended it.
+ */
+type EditorStep<S, V> = { state: S; end?: EditEnd<V> }
+
+/**
+ * Holds the state of a pure editor (`stepNumber`, `stepTuple`) and feeds it the keys and
+ * pastes of the screen. The state is also kept in a ref, so two keys that arrive before a
+ * redraw (a fast typist, a held key) each see the result of the one before.
+ *
+ * @param step - the editor's step function.
+ * @param onEnd - called once the edit is over, with how it ended and the last state.
+ * @param paste - how pasted text changes the state; without it pastes are ignored.
+ * @param active - whether the editor takes keys (false while a picker is open over it).
+ * @param initial - the state to start from; `open` gives one later.
+ * @returns the state (`undefined` while no edit is open), `open` and `apply`, which
+ *     takes a step as if a key had made it.
+ */
+function useEditState<S, V>(
+    step: (state: S, press: KeyInput) => EditorStep<S, V>,
+    onEnd: (end: EditEnd<V>, state: S) => void,
+    paste: ((state: S, text: string) => S) | undefined,
+    active: boolean,
+    initial?: S,
+): {
+    state: S | undefined
+    open: (state: S) => void
+    apply: (next: EditorStep<S, V>) => void
+} {
+    const [state, setState] = useState<S | undefined>(initial)
+    const latest = useRef<S | undefined>(initial)
+    const onTop = useScreenActive()
+    const keep = (next: S | undefined): void => {
+        latest.current = next
+        setState(next)
+    }
+    const apply = (next: EditorStep<S, V>): void => {
+        keep(next.end === undefined ? next.state : undefined)
+        if (next.end !== undefined) onEnd(next.end, next.state)
+    }
+    const open = (opened: S): void => keep(opened)
+    useKeys((press) => {
+        if (latest.current !== undefined) apply(step(latest.current, press))
+    }, state !== undefined && active)
+    usePaste(
+        (text) => {
+            if (latest.current !== undefined && paste !== undefined)
+                keep(paste(latest.current, text))
+        },
+        { isActive: onTop && state !== undefined && active && paste !== undefined },
+    )
+    return { state, open, apply }
+}
+
+/** The keys of a number typed into its row. */
+const numberKeys: LegendItem[] = legendOf([
+    legendFor("take", keys.enter),
+    legendFor("cancel", keys.escape),
+    legendBack,
+])
+
+/**
+ * A list, a path or an optional number, typed as one line into the shared [[Prompt]]
  * and read by `parseSetting`. A wrong text stays as an error under the line until the
  * next key.
  */
@@ -188,6 +287,37 @@ function TextEditor({ def, current, onEnd, onLegend }: EditorProps): ReactNode {
             onBack={() => onEnd({ kind: "back" })}
             onLegend={onLegend}
         />
+    )
+}
+
+/** Some of a few choices as tabs (a `set` setting, the figure formats). */
+function TabsEditor({ def, current, onEnd, onLegend }: EditorProps): ReactNode {
+    const theme = useTheme()
+    const [edit, setEdit] = useState(() => openTabs(def.choices, current as string[]))
+    useEffect(() => {
+        onLegend([
+            legendFor("move", [keys.left, keys.right], keys.tab),
+            legendFor("toggle", keys.enter, keys.space),
+            legendFor("done", keys.escape),
+        ])
+    }, [onLegend])
+    useKeys((press) => {
+        const step = stepTabs(edit, press)
+        setEdit(step.state)
+        if (step.end) onEnd(step.end)
+    })
+    return (
+        <Box flexDirection="column">
+            <Text bold color={theme.fg}>
+                {def.name}
+            </Text>
+            <ChoiceTabs
+                options={edit.options}
+                selected={edit.selected}
+                focus={edit.focus}
+            />
+            <Text color={theme.er}>{edit.error ?? " "}</Text>
+        </Box>
     )
 }
 
@@ -358,63 +488,91 @@ function PickerEditor({ def, current, fonts, onEnd, onLegend }: EditorProps): Re
 const partLabel = (def: SettingDef, index: number): string => `${def.partNames[index]}:`
 
 /**
- * A tuple with a colour part (`colour, opacity`), edited part by part: a colour part opens
- * the same picker as a colour setting, any other part a one-line number field with the
- * same checks as a typed tuple. Enter takes a part and goes on to the next; the last one
- * checks the whole tuple (a wrong one stays as an error under the field). Esc or back
- * ends the edit with nothing changed. A colour is kept as the picker gives it: a name
- * Julia reads, or else `#rrggbb` (see `colourOf`).
+ * A tuple edited part by part, a field for each part: left, right and Tab move the focus
+ * (the first key typed into a number part replaces it), Enter on a number part takes the
+ * whole tuple (a wrong one stays as an error under the fields, the part at fault in
+ * focus), Esc drops the edit. Enter on a colour part opens the same picker as a colour
+ * setting for that part and goes on to the next one; Esc in the picker comes back to the
+ * fields. A colour is kept as the picker gives it: a name Julia reads, or else `#rrggbb`
+ * (see `colourOf`).
  */
 function TupleEditor({ def, current, onEnd, onLegend }: EditorProps): ReactNode {
-    const [step, setStep] = useState(0)
-    const [parts, setParts] = useState<(number | string)[]>(() => tupleParts(def, current))
-    const [error, setError] = useState<string>()
-    const clearError = useCallback(() => setError(undefined), [])
-    const last = def.partNames.length - 1
-    const take = (value: number | string): void => {
-        const next = parts.map((p, i) => (i === step ? value : p))
-        if (step < last) {
-            setParts(next)
-            setStep(step + 1)
-            return
-        }
-        const done = finishTuple(def, next)
-        if ("error" in done) setError(done.error)
-        else onEnd({ kind: "done", value: done.value })
-    }
-    const kind = def.partKinds[step] as PartKind
-    if (kind === "colour")
+    const theme = useTheme()
+    const columns = useBodyColumns()
+    const [picking, setPicking] = useState(false)
+    const editor = useEditState<TupleEdit, SettingValue>(
+        (edit, press) => {
+            const next = stepTuple(edit, press)
+            if (next.pick) setPicking(true)
+            return next
+        },
+        (end) => onEnd(end),
+        pasteTuple,
+        !picking,
+        openTuple(def, current),
+    )
+    const edit = editor.state
+    const onColour = edit !== undefined && def.partKinds[edit.focus] === "colour"
+    useEffect(() => {
+        if (picking) return
+        onLegend([
+            legendFor("part", [keys.left, keys.right], keys.tab),
+            legendFor(onColour ? "pick colour" : "take", keys.enter),
+            legendFor("cancel", keys.escape),
+            legendBack,
+        ])
+    }, [picking, onColour, onLegend])
+    if (edit === undefined) return null
+    if (picking)
         return (
             <Picker
-                key={step}
+                key={edit.focus}
                 settingName={def.name}
                 kind="colour"
-                current={String(parts[step])}
-                label={partLabel(def, step)}
+                current={edit.texts[edit.focus] as string}
+                label={partLabel(def, edit.focus)}
                 onEnd={(end) => {
-                    if (end.kind === "done") take(end.value)
+                    if (end.kind === "done") {
+                        setPicking(false)
+                        editor.apply(takeColour(edit, end.value))
+                    } else if (end.kind === "cancel") setPicking(false)
                     else onEnd(end)
                 }}
                 onLegend={onLegend}
             />
         )
+    const label = Math.max(...def.partNames.map((n) => n.length))
+    const room = Math.max(5, columns - label - 6)
     return (
-        <Prompt
-            key={step}
-            label={partLabel(def, step)}
-            initial={String(parts[step])}
-            maxLength={maxSettingText}
-            error={error}
-            onChange={clearError}
-            onSubmit={(text) => {
-                const part = parsePart(kind, text)
-                if ("error" in part) setError(part.error)
-                else take(part.value)
-            }}
-            onCancel={() => onEnd({ kind: "cancel" })}
-            onBack={() => onEnd({ kind: "back" })}
-            onLegend={onLegend}
-        />
+        <Box flexDirection="column">
+            {def.partNames.map((name, i) => {
+                const focused = i === edit.focus
+                const text = edit.texts[i] as string
+                const ink = focused ? theme.fg : theme.mt
+                return (
+                    <Box key={name} columnGap={1}>
+                        <Text color={ink} bold={focused}>
+                            {focused ? ">" : " "} {name.padEnd(label)}:
+                        </Text>
+                        {def.partKinds[i] === "colour" ? (
+                            <>
+                                <Swatch colour={colourHex(text)} />
+                                <Text color={ink} inverse={focused}>
+                                    {truncate(text, room)}
+                                </Text>
+                            </>
+                        ) : focused && !edit.fresh.has(i) ? (
+                            <TextField buffer={new TextBuffer(text)} width={room} />
+                        ) : (
+                            <Text color={ink} inverse={focused}>
+                                {truncate(text, room)}
+                            </Text>
+                        )}
+                    </Box>
+                )
+            })}
+            <Text color={theme.er}>{truncate(edit.error ?? " ", columns)}</Text>
+        </Box>
     )
 }
 
@@ -450,14 +608,12 @@ const sheetFullFor = (scope: Scope): LegendItem[] => [
     legendFor(resetLabel(scope), keys.remove),
 ]
 
+/** The index of the value column of the table. */
+const VALUE_COLUMN = 1
+
 /** What the source column of a model's sheet says of a setting. */
 const OVERRIDDEN = "overridden"
 const INHERITED = "inherited"
-
-/** `1 setting`, `3 settings`. */
-function plural(n: number): string {
-    return `${n} setting${n === 1 ? "" : "s"}`
-}
 
 /** Copy of a map without some keys. */
 function without<V>(map: ReadonlyMap<string, V>, ...gone: string[]): Map<string, V> {
@@ -506,6 +662,14 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
     )
     const [, redraw] = useReducer((n: number) => n + 1, 0)
     const guard = useDiscardGuard(drafts.size)
+    // an int or a float is typed into the value cell of its row, not under the table
+    const numberEdit = useEditState<NumberEdit, number>(
+        stepNumber,
+        (end, last) => endNumber(end, last.def),
+        pasteNumber,
+        true,
+    )
+    const inline = numberEdit.state
 
     const defs = groups[group]?.settings ?? []
     const editedDef = editing === undefined ? undefined : settings.catalog.get(editing)
@@ -513,7 +677,13 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
     const sheetFull = sheetFullFor(scope)
     const footerExtra = footerExtraLines(sheetFull, columns, SHEET_LEGEND_LINES, "blocky")
     const pageSize = useBodyRows(
-        tableRows + footerExtra + (editedDef ? editorRows(editedDef) : descriptionLines),
+        tableRows +
+            footerExtra +
+            (inline
+                ? descriptionLines + NUMBER_NOTE_ROWS
+                : editedDef
+                    ? editorRows(editedDef)
+                    : descriptionLines),
     )
     const cursor = useListCursor(defs.length, pageSize)
     const here = defs[cursor.index] as SettingDef
@@ -567,8 +737,9 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
         const ev = settings.evaluate(changes)
         if (!ev.ok) {
             setErrors(ev.errors)
+            const count = plural(ev.errors.size, "setting")
             setStatus({
-                text: `${plural(ev.errors.size)} cannot be saved: see the rows marked !`,
+                text: `${count} cannot be saved: see the rows marked !`,
                 error: true,
             })
             return
@@ -580,13 +751,15 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
             setStatus({ text: `could not save: ${(e as Error).message}`, error: true })
             return
         }
-        setStatus({ text: `saved ${plural(drafts.size)}`, error: false })
+        setStatus({ text: `saved ${plural(drafts.size, "setting")}`, error: false })
         setDrafts(new Map())
         setErrors(new Map())
         redraw()
     }
     const edit = (d: SettingDef): void => {
         if (d.kind === "bool") draft(d, !(valueFor(d) as boolean))
+        else if (d.kind === "int" || d.kind === "float")
+            numberEdit.open(openNumber(d, valueFor(d)))
         else {
             if (d.kind === "font")
                 setFonts((was) => was ?? listFonts(readSystem(), cacheDir()))
@@ -599,6 +772,13 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
         else if (end.kind === "done" && editedDef !== undefined) {
             draft(editedDef, end.value)
             setDismissed((was) => new Set([...was, editedDef.name]))
+        }
+    }
+    function endNumber(end: EditEnd<number>, def: SettingDef): void {
+        if (end.kind === "back") guard.leave(nav.pop)
+        else if (end.kind === "done") {
+            draft(def, end.value)
+            setDismissed((was) => new Set([...was, def.name]))
         }
     }
     const goto = (g: number): void => {
@@ -618,7 +798,7 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
         else if (press.is(keys.enter)) edit(here)
         else if (press.is(keys.undo)) undo(here)
         else if (press.is(keys.remove) && resettable) resetGroup()
-    }, editing === undefined)
+    }, editing === undefined && inline === undefined)
 
     // --- drawing
     const fault = errors.get(here.name)
@@ -629,8 +809,9 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
         (fault && `${here.name} ${fault}`) ??
         (notice && `${here.name}: ${notice}`)
     const noteIsError = guard.question === undefined && (status?.error === true || !status)
-    const legend =
-        editedDef !== undefined
+    const legend = inline
+        ? numberKeys
+        : editedDef !== undefined
             ? promptKeys
             : legendOf([
                 legendBack,
@@ -638,13 +819,28 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
                 legendFor("edit", keys.enter),
                 hasNext && legendFor("next group", keys.right),
                 hasPrev && legendFor("prev group", keys.left),
-                moveLegend({ up: cursor.index > 0, down: cursor.index < defs.length - 1 }),
+                moveLegend(cursorMoves(cursor.index, defs.length)),
                 drafts.has(here.name) && legendFor("undo", keys.undo),
                 resettable && legendFor(resetLabel(scope), keys.remove),
             ])
     const longest = Math.max(1, ...defs.map((d) => d.name.length))
     const shade = swatchColour(here, valueFor(here))
     const description = wrapText(here.description, columns).slice(0, descriptionLines)
+    const tableColumns: Column<SettingDef>[] = [
+        { title: "name", width: longest, text: (d: SettingDef) => d.name },
+        { title: "value", text: (d: SettingDef) => valueText(d, valueFor(d)) },
+        ...(model
+            ? [
+                {
+                    title: "here",
+                    width: OVERRIDDEN.length,
+                    text: (d: SettingDef) => (overridden(d) ? OVERRIDDEN : INHERITED),
+                },
+            ]
+            : []),
+    ]
+    // the number being typed sits in the value cell of its row, its error under it
+    const valueWidth = columnWidths(tableColumns, columns)[VALUE_COLUMN] as number
 
     return (
         <Frame
@@ -665,23 +861,25 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
         >
             <DataTable
                 border="double"
-                columns={[
-                    { title: "name", width: longest, text: (d: SettingDef) => d.name },
-                    {
-                        title: "value",
-                        text: (d: SettingDef) => valueText(d, valueFor(d)),
-                    },
-                    ...(model
-                        ? [
-                            {
-                                title: "here",
-                                width: OVERRIDDEN.length,
-                                text: (d: SettingDef) =>
-                                    overridden(d) ? OVERRIDDEN : INHERITED,
-                            },
-                        ]
-                        : []),
-                ]}
+                columns={tableColumns}
+                inline={
+                    inline && {
+                        row: cursor.index,
+                        column: VALUE_COLUMN,
+                        node: <TextField buffer={inline.buffer} width={valueWidth} />,
+                        cells: fieldCells(inline.buffer, valueWidth),
+                    }
+                }
+                note={
+                    inline?.error === undefined
+                        ? undefined
+                        : {
+                            row: cursor.index,
+                            column: VALUE_COLUMN,
+                            lines: noteLines(inline.error, valueWidth),
+                            color: theme.er,
+                        }
+                }
                 emphasis={model ? overridden : undefined}
                 rows={defs}
                 cursor={cursor.index}
@@ -708,7 +906,15 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
                                 onEnd={endEdit}
                                 onLegend={setPromptKeys}
                             />
-                        ) : hasColourPart(editedDef) ? (
+                        ) : editedDef.kind === "set" ? (
+                            <TabsEditor
+                                key={editedDef.name}
+                                def={editedDef}
+                                current={valueFor(editedDef)}
+                                onEnd={endEdit}
+                                onLegend={setPromptKeys}
+                            />
+                        ) : editedDef.kind === "tuple" ? (
                             <TupleEditor
                                 key={editedDef.name}
                                 def={editedDef}

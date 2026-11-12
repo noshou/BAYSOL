@@ -35,12 +35,13 @@ import {
     FieldForm,
     type FormCell,
     type FormRow,
+    type FormScreen,
     Frame,
     placeAt,
     useFormScreen,
 } from "../ui/frame.js"
 import { useNav } from "../ui/interaction.js"
-import { useTheme } from "../ui/theme.js"
+import { type LineStyle, useTheme } from "../ui/theme.js"
 import { formLegend } from "./screen-rules.js"
 
 /** The cells of a unit row, in column order: the field of each. */
@@ -110,8 +111,72 @@ function padUnits(units: readonly EntryUnit[]): EntryUnit[] {
     return [...units, ...Array.from({ length: UNIT_ROWS }, blankUnit)].slice(0, UNIT_ROWS)
 }
 
+/**
+ * What a form page of the custom solutes is made of.
+ *
+ * @property form - the state of the page ([[useFormScreen]]).
+ * @property title - the title of the frame.
+ * @property subtitle - the subtitle of the frame.
+ * @property isNew - the entry is a new one (`^w` says `add to table`, else `accept`).
+ * @property rows - the rows of the form.
+ * @property preview - the lines under the form (the entry in words).
+ * @property border - the lines of the grid (`FieldForm`'s default when left out).
+ */
+type FormPageProps = {
+    form: FormScreen
+    title: string
+    subtitle: string | undefined
+    isNew: boolean
+    rows: readonly FormRow[]
+    preview: readonly string[]
+    border?: LineStyle
+}
+
+/**
+ * The page of a custom solute or polymer form: a blocky frame with the legend of the
+ * form, the note, the cells and the preview under them.
+ *
+ * @param props - see [[FormPageProps]].
+ * @returns the page.
+ */
+export function FormPage(props: FormPageProps): ReactNode {
+    const { form, rows, preview, border } = props
+    const theme = useTheme()
+    return (
+        <Frame
+            design="blocky"
+            title={props.title}
+            subtitle={props.subtitle}
+            legend={formLegend({
+                editing: form.edit !== undefined,
+                moves: form.moves,
+                canRestore: form.canRestore,
+                complete: form.complete,
+                acceptLabel: props.isNew ? "add to table" : "accept",
+            })}
+            note={form.note}
+            noteIsError={form.noteIsError}
+        >
+            <FieldForm
+                rows={rows}
+                pos={form.pos}
+                problem={form.problem}
+                edit={form.edit}
+                border={border}
+            />
+            <Box flexDirection="column" marginTop={form.edit ? 0 : 1}>
+                {preview.map((p) => (
+                    <Text key={p} color={theme.fg}>
+                        {p}
+                    </Text>
+                ))}
+            </Box>
+        </Frame>
+    )
+}
+
 /** The text a number cell starts from: plain decimal text, blank for none. */
-function numberText(v: unknown): string {
+function cellNumber(v: unknown): string {
     return typeof v === "number" ? formatNumber(v) : ""
 }
 
@@ -140,7 +205,6 @@ function numberText(v: unknown): string {
 export function CustomPolymerForm(props: CustomPolymerFormProps): ReactNode {
     const { others, onAccept } = props
     const nav = useNav()
-    const theme = useTheme()
     const [orig] = useState<PolymerEntry>(() => ({
         ...props.entry,
         units: padUnits(props.entry.units),
@@ -189,7 +253,7 @@ export function CustomPolymerForm(props: CustomPolymerFormProps): ReactNode {
         },
         editText: (pos) => {
             const v = cellValue(targetAt(pos))
-            return typeof v === "number" ? numberText(v) : String(v ?? "")
+            return typeof v === "number" ? cellNumber(v) : String(v ?? "")
         },
         take: (pos, text) => {
             const t = targetAt(pos)
@@ -263,8 +327,8 @@ export function CustomPolymerForm(props: CustomPolymerFormProps): ReactNode {
         const cells: FormCell[] = [
             { text: label, muted: u.label.trim() === "" },
             { text: u.formula },
-            { text: numberText(u.z) },
-            { text: numberText(u.slope) },
+            { text: cellNumber(u.z) },
+            { text: cellNumber(u.slope) },
             { text: sigma, muted: u.sigma === null },
         ]
         return {
@@ -281,43 +345,23 @@ export function CustomPolymerForm(props: CustomPolymerFormProps): ReactNode {
             cells: [
                 undefined,
                 { text: endsFormula },
-                { text: numberText(entry["z-ends"]) },
-                { text: numberText(entry["pmv-ends"]) },
-                { text: numberText(entry["sigma-ends"]) },
+                { text: cellNumber(entry["z-ends"]) },
+                { text: cellNumber(entry["pmv-ends"]) },
+                { text: cellNumber(entry["sigma-ends"]) },
             ],
         },
     ]
     const preview = useMemo(() => polymerPreview(entry), [entry])
 
     return (
-        <Frame
-            design="blocky"
+        <FormPage
+            form={form}
             title={orig.name === "" ? "new custom polymer" : "custom polymer"}
             subtitle={orig.name === "" ? undefined : orig.name}
-            legend={formLegend({
-                editing: form.edit !== undefined,
-                moves: form.moves,
-                canRestore: form.canRestore,
-                complete: form.complete,
-                acceptLabel: orig.name === "" ? "add to table" : "accept",
-            })}
-            note={form.note}
-            noteIsError={form.noteIsError}
-        >
-            <FieldForm
-                rows={rows}
-                pos={form.pos}
-                problem={form.problem}
-                edit={form.edit}
-                border="double"
-            />
-            <Box flexDirection="column" marginTop={form.edit ? 0 : 1}>
-                {preview.map((p) => (
-                    <Text key={p} color={theme.fg}>
-                        {p}
-                    </Text>
-                ))}
-            </Box>
-        </Frame>
+            isNew={orig.name === ""}
+            rows={rows}
+            preview={preview}
+            border="double"
+        />
     )
 }

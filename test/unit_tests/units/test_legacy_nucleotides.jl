@@ -23,7 +23,7 @@ using Printf: @sprintf
 using BAYSOL.MolecularStructure: LEGACY_NUCLEOTIDE_NAMES, BACKBONE_ATOMS, BACKBONE_MIN,
     _legacy_nucleotides, legacy_nucleotides_in_file, legacy_nucleotides_in_model,
     load_molecule, n_atoms, MoleculeError, component, is_nucleotide, nucleotide_selector,
-    polymer_selector,
+    polymer_selector, ligand_selector,
     _model_selector, residue_names, _store_dir
 using BAYSOL.Hydrogenator: relabel_modified, restore_modified!, hydrogenation_choice,
     resolve_hydrogens, Propka, _hydrogens_path, _pka_path
@@ -201,37 +201,47 @@ const _BASE_ADENINE = ["N9", "C8", "N7", "C5", "C6", "N6", "N1", "C2", "N3", "C4
             # as ATOM records: kept as always
             @test n_atoms(load_molecule(wr(dir, "atom.pdb", rename(rna, "ADE")))) ==
                   heavy_rna
-            # a free base ligand: dropped (HETATM, not a nucleotide) ...
-            # nothing is left
-            @test_throws MoleculeError load_molecule(wr(dir, "lig.pdb", ligand))
-            # ... beside a real RNA: dropped, the RNA kept
-            @test n_atoms(load_molecule(wr(dir, "rl.pdb", [rna; inchain(ligand, 'B')]))) ==
-                  heavy_rna
-            # one residue of four backbone atoms, alone: dropped; with a mate: kept
+            # a free base ligand is not a nucleotide: with the polymer alone nothing is left
+            # (a ligand since 2026-11-11, kept by default: its 10 heavy atoms) ...
+            lig = wr(dir, "lig.pdb", ligand)
+            @test_throws MoleculeError load_molecule(lig; ligands = false)
+            @test n_atoms(load_molecule(lig)) == 10
+            # ... beside a real RNA: the RNA alone, or the RNA and the ligand
+            rl = wr(dir, "rl.pdb", [rna; inchain(ligand, 'B')])
+            @test n_atoms(load_molecule(rl; ligands = false)) == heavy_rna
+            @test n_atoms(load_molecule(rl)) == heavy_rna + 10
+            # one residue of four backbone atoms, alone: not a nucleotide (a ligand by
+            # default); with a mate: kept
             four = ["O5'", "C5'", "C4'", "O4'"]
             r2 = hetero(rename(atoms_in(residue(rna, 2), four), "ADE"))
             r3 = hetero(rename(atoms_in(residue(rna, 3), four), "ADE"))
-            @test_throws MoleculeError load_molecule(wr(dir, "one.pdb", r2))
+            one = wr(dir, "one.pdb", r2)
+            @test_throws MoleculeError load_molecule(one; ligands = false)
+            @test n_atoms(load_molecule(one)) == 4
             @test n_atoms(load_molecule(wr(dir, "mate.pdb", [r2; r3]))) == 8
             # a P atom: kept alone
             @test n_atoms(
                 load_molecule(wr(dir, "p.pdb", hetero(rename(residue(rna, 2), "ADE")))),
             ) ==
                   length(residue(rna, 2))
-            # waters and ions beside it are dropped as ever
+            # waters beside it are dropped as ever, an ion is a ligand and kept
             ion = replace(ION, " A " => " B ")
             wat = replace(WATER, " A " => " B ")
-            @test n_atoms(load_molecule(wr(dir, "iw.pdb", [het; ion; wat]))) == heavy_rna
+            iw = wr(dir, "iw.pdb", [het; ion; wat])
+            @test n_atoms(load_molecule(iw; ligands = false)) == heavy_rna
+            @test n_atoms(load_molecule(iw)) == heavy_rna + 1
             # the selector is the model selector: nucleotide_selector alone would drop them
             path = wr(dir, "sel.pdb", het)
             model = first(collectmodels(BioStructures.read(path, PDBFormat)))
             ats = BioStructures.collectatoms(model)
             @test count(nucleotide_selector, ats) == 0
             @test count(_model_selector(model), ats) == heavy_rna
+            @test count(_model_selector(model; ligands = false), ats) == heavy_rna
             # a model without any legacy name takes the plain nucleotide selector
             plain =
                 first(collectmodels(BioStructures.read(wr(dir, "pl.pdb", rna), PDBFormat)))
-            @test _model_selector(plain) === polymer_selector
+            @test _model_selector(plain; ligands = false) === polymer_selector
+            @test _model_selector(plain) === ligand_selector
         finally
             rm(dir; recursive = true, force = true)
         end

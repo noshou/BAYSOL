@@ -3,8 +3,9 @@
 // Data table: reading any table a user has into a curve (rows, columns, checks).
 // The project's data files are in `data.ts`.
 
-import { readFileSync, statSync } from "node:fs"
 import * as XLSX from "xlsx"
+import { readAssetJson } from "../core/environment.js"
+import { readBounded } from "../core/file-system.js"
 import { fold, numberText, truncate } from "../core/terminal.js"
 
 // ========================================================================================
@@ -57,21 +58,21 @@ export type DataPoints = { q: number[]; i: number[]; sigma: number[]; dropped: n
 
 /**
  * The tunables of the import: the preview rows, the lines sniffed, the characters that
- * start a comment line and the lower-case header names that tell a column's role.
+ * start a comment line and the lower-case header names that tell a column's role
+ * (`assets/data/data_import.json`).
  */
-export const IMPORT_TUNABLES = {
-    previewRows: 12,
-    sniffLines: 40,
-    commentChars: ["#", ";", "%", "!"],
-    guesses: {
-        q: ["q", "s", "qa", "qnm", "scatteringvector", "scattering"],
-        i: ["i", "iq", "intensity", "iobs", "iexp", "signal", "counts"],
-        sigma: [
-            "sigma", "sig", "err", "error", "di", "ierr", "erri", "sigmai", "sigmaiq",
-            "stdev", "sd", "uncertainty", "dev", "deltai",
-        ],
-    } as Record<"q" | "i" | "sigma", string[]>,
+export type ImportTunables = {
+    previewRows: number
+    sniffLines: number
+    commentChars: string[]
+    guesses: Record<"q" | "i" | "sigma", string[]>
 }
+
+/** The tunables of the import (see [[ImportTunables]]). */
+export const IMPORT_TUNABLES: ImportTunables = readAssetJson<ImportTunables>(
+    "data",
+    "data_import.json",
+)
 
 /**
  * The separators the user can pick by name, in the order they cycle. `auto` lets SheetJS
@@ -181,21 +182,6 @@ export type Table = {
 /** The name of a column without a header. */
 const columnName = (index: number): string => `col:${index}`
 
-/**
- * Reads a file whole, refusing a huge one.
- *
- * @throws [[DataFileError]] for a file over the limit or one that cannot be read.
- */
-function readBounded(path: string): Buffer {
-    try {
-        if (statSync(path).size > MAX_DATA_BYTES) throw new DataFileError("file too large")
-        return readFileSync(path)
-    } catch (error) {
-        if (error instanceof DataFileError) throw error
-        throw new DataFileError("cannot read that file")
-    }
-}
-
 /** A cell as text: a number as `String(number)` (full precision), nothing as empty. */
 const cellText = (cell: unknown): string =>
     cell === null || cell === undefined ? "" : String(cell).trim()
@@ -258,7 +244,11 @@ function workbookSource(bytes: Buffer): Source {
  * @throws [[DataFileError]] with a short message.
  */
 export function loadSource(path: string): Source {
-    const bytes = readBounded(path)
+    const bytes = readBounded(
+        path,
+        MAX_DATA_BYTES,
+        (message) => new DataFileError(message),
+    )
     const magic = bytes.subarray(0, 4).toString("hex")
     if (magic === "504b0304") {
         return workbookSource(bytes)
@@ -610,16 +600,20 @@ export function extractCurve(table: Table, columns: CurveColumns): DataPoints {
         }
         const before = data.q[data.q.length - 1]
         if (before !== undefined && value.q <= before) {
-            // a row repeated exactly (merged data sets do it) is dropped; any other
-            // order is an error
+            // a row repeated exactly (merged data sets do it) is dropped; a q that goes
+            // back is an error; the same q with other values is kept (a file that stores
+            // q to three digits has such rows, e.g. SASDHT9; Julia bins them by q)
             const last = data.q.length - 1
             const same =
                 value.q === before &&
                 value.i === data.i[last] &&
                 (columns.sigma === undefined || value.sigma === data.sigma[last])
-            if (!same) throw new DataFileError(`${where} ${line}: q must increase`)
-            data.dropped++
-            continue
+            if (same) {
+                data.dropped++
+                continue
+            }
+            if (value.q < before)
+                throw new DataFileError(`${where} ${line}: q must increase`)
         }
         data.q.push(value.q)
         data.i.push(value.i)

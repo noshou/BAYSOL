@@ -97,7 +97,7 @@ const SETTING_LIMITS = (
 """
 The rules that tie settings above together, which a set of values must obey as a whole;
 each is a `(rule, setting, ...)` and is read by the terminal interface and by
-[`load_settings`](@ref BAYSOL.Pipeline.load_settings). `:at_most_setting`: `setting` is at
+`load_settings`. `:at_most_setting`: `setting` is at
 most the value of the setting `of`.
 """
 const SETTING_RELATIONS = (
@@ -106,7 +106,7 @@ const SETTING_RELATIONS = (
 
 """
 The constants above that are settings, the ones a user may change: the terminal interface
-shows each on a page of its own, and [`load_settings`](@ref BAYSOL.Pipeline.load_settings)
+shows each on a page of its own, and `load_settings`
 accepts a saved value for these and for no other name.
 """
 const SETTING_NAMES = (

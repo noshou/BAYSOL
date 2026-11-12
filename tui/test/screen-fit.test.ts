@@ -15,8 +15,8 @@ import assert from "node:assert/strict"
 import { copyFileSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
-import { renderToString } from "ink"
 import { createElement, type ReactElement } from "react"
+import { appDir } from "../src/core/environment.js"
 import { ChangedOnDiskError } from "../src/core/file-system.js"
 import { displayWidth, wrapLine } from "../src/core/terminal.js"
 import { CustomSolutesTable, RecipesTable } from "../src/screens/custom-solutes.js"
@@ -29,6 +29,13 @@ import { noWorkbookNote, OpenRuns } from "../src/screens/open-runs.js"
 import { ReferencesScreen } from "../src/screens/references-screen.js"
 import { RunScreen } from "../src/screens/run-screens.js"
 import { SettingsMenu, SettingsSheet } from "../src/screens/settings-screens.js"
+import { SolutesTable } from "../src/screens/solutes.js"
+import {
+    type BufferRow,
+    readConditions,
+    saveRecipe,
+    writeSolutes,
+} from "../src/store/buffer.js"
 import { writeData } from "../src/store/data.js"
 import type { RunView } from "../src/store/run.js"
 import {
@@ -36,15 +43,13 @@ import {
     briefError,
     failedNote,
     type OpenModel,
-    restoreErrorNote,
 } from "../src/store/run-logs.js"
+import { restoreErrorNote } from "../src/store/run-restores.js"
 import { runBrief } from "../src/store/run-stamp.js"
 import { globalScope, projectScope } from "../src/store/settings-store.js"
 import { cornerLabels, fitCorner, legendRoom } from "../src/ui/frame.js"
 import { destructiveQuestion } from "../src/ui/input.js"
-import { NavProvider } from "../src/ui/interaction.js"
-import { defaultTheme, ThemeContext } from "../src/ui/theme.js"
-import { fixtureText, tempDir } from "./support/fixtures.js"
+import { drawScreen, fixtureText, tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. The screens at 80 and 100 columns
@@ -158,15 +163,7 @@ const failedView: RunView = {
 
 /** Draws a screen on the default theme at some columns (24 rows). */
 function draw(screen: ReactElement, columns: number): string[] {
-    const out = renderToString(
-        createElement(
-            ThemeContext.Provider,
-            { value: defaultTheme },
-            createElement(NavProvider, { root: screen }),
-        ),
-        { columns },
-    )
-    return out.split("\n")
+    return drawScreen(screen, columns).split("\n")
 }
 
 test("every screen fits 80 x 24 and a wider terminal, and shows no cut message", () => {
@@ -215,11 +212,76 @@ test("every screen fits 80 x 24 and a wider terminal, and shows no cut message",
     }
 })
 
+test("the project menu: no run without a temperature, then shift+r at once", () => {
+    const project = scratchProject()
+    // an old buffer: pH and σ, no temperature
+    assert.equal(readConditions(project.dir)?.temperature, undefined)
+    const old = draw(createElement(ProjectMenu, { project }), 80).join("\n")
+    assert.ok(old.includes("missing: temperature"), old)
+    assert.ok(!old.includes("shift+r"), old)
+    // with a temperature the project is ready: the key is offered, and nothing asks
+    const rows = JSON.parse(fixtureText("buffer/buffer.json")).solutes as BufferRow[]
+    writeSolutes(project.dir, rows, { pH: 7.4, "sigma-pH": 0.1, temperature: 4 })
+    for (const columns of [80, 100]) {
+        const text = draw(createElement(ProjectMenu, { project }), columns).join("\n")
+        assert.ok(/run:\s+shift\+r/.test(text), text)
+        assert.ok(!text.includes("temperature"), text)
+        assert.ok(!text.includes("cannot run"), text)
+    }
+})
+
+test("the conditions row shows pH, σ and the temperature at 80 x 24", () => {
+    const rows = JSON.parse(fixtureText("buffer/buffer.json")).solutes as BufferRow[]
+    const cells = (conditions: object | undefined) =>
+        draw(
+            createElement(SolutesTable, {
+                items: rows,
+                conditions: conditions as never,
+                onNotes: () => {},
+                save: () => {},
+            }),
+            80,
+        )
+    const shown = cells({ pH: 7.5, "sigma-pH": 0.1, temperature: 4 })
+    const head = shown.find((l) => l.includes("pH") && l.includes("σ")) ?? ""
+    assert.ok(head.includes("T °C"), shown.join("\n"))
+    assert.ok(shown.some((l) => /7\.5\s+║\s+0\.1\s+║\s+4\b/.test(l)), shown.join("\n"))
+    // an old buffer: the temperature says it is not set
+    assert.ok(cells({ pH: 7.5, "sigma-pH": 0.1 }).join("\n").includes("not set"))
+    // no conditions at all
+    assert.ok(cells(undefined).join("\n").includes("not set"))
+})
+
+test("the recipes table shows the recipe's temperature", () => {
+    scratchProject() // points the data folder at a scratch one
+    saveRecipe(appDir(), "cold", [], { pH: 7.5, "sigma-pH": 0.1, temperature: 4 })
+    const text = draw(createElement(RecipesTable), 80)
+    assert.ok(text.some((l) => l.includes("°C")), text.join("\n"))
+    assert.ok(text.some((l) => /cold.*7\.5.*0\.1.*\b4\b/.test(l)), text.join("\n"))
+    for (const line of text) assert.ok(displayWidth(line) <= 80, line)
+})
+
+test("the recipes table marks templates and offers new template at 80", () => {
+    scratchProject()
+    const definition = { kind: "builtin", id: "tris", mM: 10, sigmaMM: 0.2 }
+    saveRecipe(appDir(), "T-buffer", [], undefined, undefined, definition as never)
+    const broken = { kind: "custom", name: "x" }
+    saveRecipe(appDir(), "broken", [], undefined, undefined, broken as never)
+    saveRecipe(appDir(), "plain", [])
+    const text = draw(createElement(RecipesTable), 80)
+    const joined = text.join("\n")
+    assert.ok(text.some((l) => /T-buf.*builtin/.test(l)), joined)
+    assert.ok(text.some((l) => /broken.*invalid/.test(l)), joined)
+    assert.ok(text.some((l) => /plain/.test(l) && !/builtin|invalid/.test(l)), joined)
+    assert.ok(joined.includes("new template"), joined)
+    for (const line of text) assert.ok(displayWidth(line) <= 80, line)
+})
+
 test("the open-runs legend with every file key fits 80 columns, nothing cut", () => {
     const project = scratchProject()
     const lines = draw(createElement(OpenRuns, { project }), 80)
     const text = lines.join("\n")
-    for (const label of ["move data", "move tex", "data here", "tex here", "compile plots"])
+    for (const label of ["data", "tex", "compile plots"])
         assert.ok(text.includes(label), `${label} is in the legend:\n${text}`)
     assert.ok(lines.length <= 24)
     for (const line of lines) assert.ok(displayWidth(line) <= 80, line)

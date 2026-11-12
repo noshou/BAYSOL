@@ -69,7 +69,7 @@ input out of it (see [`_check_nucleotides_kept`](@ref)). Heavy atoms pdb2pqr dro
 back ([`restore_dropped_atoms!`](@ref)).
 
 # Returns
-The counts `(; restored, added, h5t_dropped)` of that step.
+The counts `(; restored, added, h5t_dropped, ligands)` of that step.
 """
 function _run_pdb2pqr(
     in_path::AbstractString, ff::Symbol, titration_args::Vector{String},
@@ -82,9 +82,12 @@ function _run_pdb2pqr(
     pdb2pqr === nothing && throw(Pdb2pqrError("pdb2pqr not found in CondaPkg environment"))
     # modified nucleotides: hydrogenated through the standard residue of their base
     # chains that reuse an id and residue numbers get their own ids, true duplicate atoms
-    # are dropped (kept in the output: chain ids never reach the scattering model)
+    # are dropped (kept in the output: chain ids never reach the scattering model); waters
+    # never scatter and pdb2pqr's water optimisation fails on an oxygen not named O/OW
+    # (`O1` in old crystal files), so they are removed from the copy it gets
     sanitized = out_path * ".sanitized.pdb"
-    in_path = sanitized_copy(in_path, sanitized) === nothing ? in_path : sanitized
+    in_path =
+        sanitized_copy(in_path, sanitized; waters = true) === nothing ? in_path : sanitized
     relabeled = out_path * ".relabeled.pdb"
     rel = relabel_modified(in_path, relabeled)
     plan = rel.plan
@@ -160,11 +163,19 @@ function resolve_hydrogens(
     isfile(pdb_path) || throw(Pdb2pqrError("no such file: $pdb_path"))
     _ff_argument(ff)  # reject an unknown force field before anything is looked up
     out_path = _hydrogens_path(abspath(pdb_path), pH, ff, titration)
-    isfile(out_path) && return out_path
+    _cached(out_path) && return out_path
     # one pdb2pqr run per (structure, pH, ff, method); concurrent
     # callers wait, then find the cached file
     return @lock _path_lock(out_path) _resolve_hydrogens(pdb_path, pH, ff, titration)
 end
+
+"""
+Whether `out_path` is a usable cache hit: the file and its `.balance` side file. A file
+without the side file, or with the three-field one of the versions that put no ligand back,
+is recomputed (it lacks the ligands pdb2pqr dropped).
+"""
+_cached(out_path::AbstractString)::Bool =
+    isfile(out_path) && hydrogenation_balance(out_path) !== nothing
 
 """
 Record the heavy-atom `balance` ([`restore_dropped_atoms!`](@ref)) of the run that wrote
@@ -173,7 +184,8 @@ Record the heavy-atom `balance` ([`restore_dropped_atoms!`](@ref)) of the run th
 function _write_balance(out_path::AbstractString, balance)::Nothing
     write(
         out_path * ".balance",
-        "$(balance.restored)\t$(balance.added)\t$(balance.h5t_dropped)\n",
+        "$(balance.restored)\t$(balance.added)\t$(balance.h5t_dropped)\t" *
+        "$(balance.ligands)\n",
     )
     return nothing
 end
@@ -182,16 +194,16 @@ end
     hydrogenation_balance(hydrogenated_path) -> Union{Nothing,NamedTuple}
 
 The heavy-atom balance of the pdb2pqr run that wrote `hydrogenated_path`: `(; restored,
-added, h5t_dropped)`, the number of heavy atoms pdb2pqr dropped and that were put back, the
-number it added, and the `H5T` removed with a restored phosphorus; `nothing` when none was
-recorded (a file from an older version).
+added, h5t_dropped, ligands)`, the number of heavy atoms pdb2pqr dropped and that were put
+back, the number it added, the `H5T` removed with a restored phosphorus and the atoms of the
+ligand residues put back; `nothing` when none was recorded.
 """
 function hydrogenation_balance(path::AbstractString)
     f = path * ".balance"
     isfile(f) || return nothing
     v = tryparse.(Int, split(strip(read(f, String)), '\t'))
-    (length(v) == 3 && all(!isnothing, v)) || return nothing
-    return (; restored = v[1], added = v[2], h5t_dropped = v[3])
+    (length(v) == 4 && all(!isnothing, v)) || return nothing
+    return (; restored = v[1], added = v[2], h5t_dropped = v[3], ligands = v[4])
 end
 
 """
@@ -242,7 +254,7 @@ function _resolve_hydrogens(
     storedir = _store_dir()
     out_path = _hydrogens_path(abspdb, pH, ff, titration)
 
-    if !isfile(out_path)
+    if !_cached(out_path)
         records = _pKa_records(titration, abspdb)
         targs = _titration_arguments(titration, pH)
         # Cheap pre-check, straight from the pKa records, no file I/O: does a
@@ -295,7 +307,7 @@ function _resolve_hydrogens(
                 # per-chain slices into one hydrogenated structure (by text,
                 # the lines verbatim).
                 runs = Tuple{String,Vector{String}}[]
-                total = (; restored = 0, added = 0, h5t_dropped = 0)
+                total = (; restored = 0, added = 0, h5t_dropped = 0, ligands = 0)
                 for (i, (flags, group_chains)) in enumerate(groups)
                     tmp_out = joinpath(tmpdir, "run$(i).pdb")
                     b = _run_pdb2pqr(abspdb, ff, targs, flags, tmp_out)

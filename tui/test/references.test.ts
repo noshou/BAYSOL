@@ -36,14 +36,13 @@ import {
     deleteReference,
     freeStem,
     listReferences,
-    migrateReferences,
     readReferenceFile,
     referencesDir,
     referenceText,
     referenceUnits,
     safeStem,
 } from "../src/store/references.js"
-import { tempDir as temp } from "./support/fixtures.js"
+import { tempDir } from "./support/fixtures.js"
 
 /** A curve of `n` points with a sigma (or without). */
 function curve(n: number, sigma = true): DataPoints {
@@ -58,7 +57,7 @@ function curve(n: number, sigma = true): DataPoints {
 
 /** A project folder with data (so references may be added). */
 function project(units: "A-1" | "nm-1" = "A-1"): string {
-    const dir = temp()
+    const dir = tempDir()
     writeData(dir, curve(12), "data.dat", units, 12400)
     return dir
 }
@@ -182,14 +181,14 @@ test("references: the stem is made safe", () => {
 })
 
 test("references: no data yet, or no project, adds nothing", () => {
-    const empty = temp()
+    const empty = tempDir()
     assert.match(
         failure(() => addReference(empty, curve(4), "a.dat")),
         /import the data first/,
     )
     assert.ok(!existsSync(referencesDir(empty)))
     assert.match(failure(() => referenceUnits(empty)), /import the data first/)
-    const gone = join(temp(), "deleted")
+    const gone = join(tempDir(), "deleted")
     assert.throws(
         () => addReference(gone, curve(4), "a.dat"),
         (e) => e instanceof DataFileError || e instanceof ProjectGoneError,
@@ -243,7 +242,7 @@ test("references: an unusable file is listed with its reason and never touched",
 })
 
 test("references: Julia's reader rules: comments, separators, header, I <= 0", () => {
-    const dir = temp()
+    const dir = tempDir()
     const file = join(dir, "r.dat")
     writeFileSync(
         file,
@@ -263,7 +262,7 @@ test("references: delete takes a listed plain name; one already gone is no error
     const dir = project()
     const a = addReference(dir, curve(4), "a.dat")
     addReference(dir, curve(4), "b.dat")
-    writeFileSync(join(temp(), "outside.tsv"), "x")
+    writeFileSync(join(tempDir(), "outside.tsv"), "x")
     assert.equal(deleteReference(dir, "../data.tsv"), false)
     assert.equal(deleteReference(dir, "data.json"), false)
     assert.ok(existsSync(join(dir, "data.tsv")))
@@ -273,7 +272,7 @@ test("references: delete takes a listed plain name; one already gone is no error
         listReferences(dir).map((e) => e.name),
         ["b"],
     )
-    assert.equal(deleteReference(temp(), "x.tsv"), false)
+    assert.equal(deleteReference(tempDir(), "x.tsv"), false)
 })
 
 test("references: copies adding the same stem both succeed, with different names", () => {
@@ -285,34 +284,6 @@ test("references: copies adding the same stem both succeed, with different names
     const [entry] = listReferences(dir)
     assert.equal(deleteReference(dir, (entry as { file: string }).file), true)
     assert.equal(deleteReference(dir, (entry as { file: string }).file), false)
-})
-
-test("references: an old references/ folder is moved to reference-fit/", () => {
-    const dir = project()
-    const old = join(dir, "references")
-    mkdirSync(old)
-    writeFileSync(join(old, "CRYSOL.tsv"), "0.1\t2\n0.2\t1\n0.3\t1\n")
-    writeFileSync(join(old, "notes.md"), "kept")
-    assert.deepEqual(
-        listReferences(dir).map((e) => e.name),
-        ["CRYSOL"],
-    )
-    assert.ok(!existsSync(old), "the old folder is gone (renamed)")
-    assert.ok(existsSync(join(referencesDir(dir), "notes.md")), "every file came along")
-    assert.equal(migrateReferences(dir), false, "nothing more to move")
-    // adding to a project that still has the old folder moves it first
-    const second = project()
-    mkdirSync(join(second, "references"))
-    writeFileSync(join(second, "references", "a.tsv"), "0.1\t2\n0.2\t1\n0.3\t1\n")
-    assert.equal(addReference(second, curve(4), "b.dat"), "b")
-    assert.deepEqual(readdirSync(referencesDir(second)).sort(), ["a.tsv", "b.tsv"])
-    assert.ok(!existsSync(join(second, "references")))
-    // both folders present: the new one wins and the old one is left alone
-    const both = project()
-    mkdirSync(join(both, "references"))
-    mkdirSync(referencesDir(both))
-    assert.equal(migrateReferences(both), false)
-    assert.ok(existsSync(join(both, "references")))
 })
 
 // ========================================================================================

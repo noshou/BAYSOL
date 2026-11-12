@@ -79,6 +79,8 @@ test("only the table-style screens ask for the blocky design", () => {
     const allowed = [
         "custom-solutes.tsx",
         "logs-menu.tsx",
+        "notes-editor.tsx",
+        "notes-list.tsx",
         "polymers.tsx",
         "screen-rules.ts",
         "settings-screens.tsx",

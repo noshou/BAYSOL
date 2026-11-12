@@ -4,8 +4,9 @@
 // comparison, out of the run's archive or folder, into the plot folder), "move data" (the
 // workbooks and the comparison table, into the data folder) and "compile plots" (LaTeX on
 // the figures, the PDFs into the plot folder). They act on the whole run or on one row of
-// it; the destination folders are flat, named for the model, and never take the place of
-// a file that is there.
+// it; the files go into a folder of the run's name inside the destination folder
+// (`<plot folder>/<run>/`, `<data folder>/<run>/`), named for the model, and never take
+// the place of a file that is there.
 //
 // Contents:
 //   1. Where files go: the folders and the names
@@ -35,6 +36,7 @@ import {
 import { isFile } from "../core/file-system.js"
 import { displayWidth, truncate, truncateStart } from "../core/terminal.js"
 import { archiveHolding } from "./run-archive.js"
+import { isWorkbookName, rebuildWorkbook } from "./workbook-tree.js"
 
 // ========================================================================================
 // 1. Where files go
@@ -109,14 +111,23 @@ export function dataRoot(setting: unknown, dataFolder: () => string = appDir): s
 }
 
 /**
+ * The folder a run's files go into: a folder of the run's name inside the destination.
+ *
+ * @param root - the plot or data folder ([[plotRoot]], [[dataRoot]]).
+ * @param unit - a unit of the run.
+ * @returns the path (it is made when the files are put).
+ */
+const runFolder = (root: string, unit: PlotUnit): string => join(root, unit.run)
+
+/**
  * The name a unit's file has in the destination folder, keyed off the model: the file's
  * own name (`<model>.tex`, `<model>_hist_c1.tex`, `<model>.xlsx`); the comparison's
- * (`compare.tsv`, or `<run>_compare.xlsx` in an older run) becomes `<project>-compare.*`.
+ * (`compare.tsv`) becomes `<project>-compare.*`.
  */
 export function destinationName(unit: PlotUnit, rel: string): string {
     const base = basename(rel)
     if (unit.name !== COMPARISON) return base
-    return `${unit.project}-compare${base.replace(/^(?:.*_)?compare/, "")}`
+    return `${unit.project}-compare${base.replace(/^compare/, "")}`
 }
 
 /** A name with `-<k>` before its extension (`a.tex` is `a-2.tex`). */
@@ -169,7 +180,9 @@ async function bring(
         }
         const archive = archiveHolding(unit.runDir, rel)
         if (archive === undefined) throw new Error(`no ${basename(rel)} in the run`)
-        byArchive.set(archive, [...(byArchive.get(archive) ?? []), rel])
+        // a workbook is held as its XML tree: a proper .xlsx is zipped from it
+        if (isWorkbookName(rel)) rebuildWorkbook(archive, rel, join(tmp, basename(rel)))
+        else byArchive.set(archive, [...(byArchive.get(archive) ?? []), rel])
     }
     for (const [archive, names] of byArchive) {
         await withTempFolder("baysol-extract", async (from) => {
@@ -232,8 +245,9 @@ export type MoveKind = "tex" | "data"
 /**
  * Move tex / move data: copies the `.tex` figures (to the plot folder) or the data files,
  * the workbooks and the comparison table (to the data folder), of the units into the
- * folder, flat. The originals stay (they are in the run's archive); a file of the same
- * name there is never replaced: the unit's files take `-2`, `-3`, ... ([[freeNames]]).
+ * folder, in a folder of the run's name ([[runFolder]]). The originals stay (they are in
+ * the run's archive); a file of the same name there is never replaced: the unit's files
+ * take `-2`, `-3`, ... ([[freeNames]]).
  *
  * @param kind - which files.
  * @param units - the models (and comparison) to take.
@@ -260,7 +274,7 @@ export async function moveFiles(
             const names = await bring(unit, rels, tmp)
             count += putFiles(
                 tmp,
-                root,
+                runFolder(root, unit),
                 names.map((n, i) => [n, destinationName(unit, rels[i] as string)]),
             )
         })
@@ -361,7 +375,8 @@ function compileOne(
 /**
  * Compile plots: extracts (or copies) the units' `.tex` figures into a temporary folder
  * (always removed), runs the compiler on each there, and puts the PDFs into the plot
- * folder, flat, named for the model, never replacing a file ([[freeNames]]). Figures that
+ * folder, in the run's folder ([[runFolder]]), named for the model, never replacing a
+ * file ([[freeNames]]). Figures that
  * fail are named in the result; the others are still made.
  *
  * @param units - the models (and comparison) to take.
@@ -401,7 +416,7 @@ export async function compilePlots(
                     `${basename(wanted, ".tex")}.pdf`,
                 ])
             }
-            made += putFiles(tmp, root, done)
+            made += putFiles(tmp, runFolder(root, unit), done)
         })
     }
     if (made === 0) {

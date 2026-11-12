@@ -1,4 +1,4 @@
-S# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-3.0-or-later
 
 using DelimitedFiles
 using Statistics
@@ -53,7 +53,8 @@ check_q_angstrom(qvals)
 #             depositor's fit3 is a single-conformer CRYSOL fit.
 
 # BUFFER OMISSIONS (not modelled; the recipe given by the depositors is incomplete or a
-# component is not in the tables):
+# component is not in the tables): none. Every stated component is modelled; the
+# depositors state no salt, so none is added.
 
 const PH, σ_PH = 6.8, PH_METER_SIGMA
 

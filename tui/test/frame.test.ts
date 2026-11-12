@@ -22,13 +22,13 @@ import { positionStatus } from "../src/ui/input.js"
 test("the corner names the project, and the run once one is chosen", () => {
     assert.equal(cornerLabel("demo"), "project: demo")
     assert.equal(
-        cornerLabel("demo", "20261106T193308Z"),
+        cornerLabel("demo", "19-33-08-000_UTC_+0000_2026-11-06"),
         "project: demo · run: 19:33:08:000 UTC +00:00 · 2026-11-06",
     )
 })
 
 test("a corner that fits is drawn whole", () => {
-    const label = cornerLabel("demo", "20261106T193308Z")
+    const label = cornerLabel("demo", "19-33-08-000_UTC_+0000_2026-11-06")
     assert.equal(fitCorner(label, 78, "logs", "runs"), label)
     const fresh = cornerLabel("demo", "23-35-29-123_EST_-0500_2026-11-07")
     assert.equal(fresh, "project: demo · run: 23:35:29:123 EST -05:00 · 2026-11-07")
@@ -36,7 +36,8 @@ test("a corner that fits is drawn whole", () => {
 })
 
 test("a corner is cut before it can push the title, and never wider than its room", () => {
-    const label = cornerLabel("a-very-long-project-name", "20261106T193308Z")
+    const stamp = "19-33-08-000_UTC_+0000_2026-11-06"
+    const label = cornerLabel("a-very-long-project-name", stamp)
     const title = "logs"
     const subtitle = "view settings"
     for (const columns of [78, 60, 50, 40]) {

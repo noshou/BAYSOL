@@ -11,9 +11,9 @@
 //   3. `RecipesTable`: the saved recipes
 
 import { basename } from "node:path"
-import { Box, Text } from "ink"
-import { type ReactNode, useCallback, useMemo, useState } from "react"
+import { type ReactNode, useMemo, useRef, useState } from "react"
 import { appDir } from "../core/environment.js"
+import { saveErrorNote } from "../core/file-system.js"
 import { formatNumber } from "../core/terminal.js"
 import {
     kindsSummary,
@@ -25,8 +25,11 @@ import {
     recipesFileName,
     removeRecipe,
     renameProblem,
+    renameRecipe,
+    saveRecipe,
+    updateRecipe,
     withConditions,
-    writeRecipes,
+    withNotes,
 } from "../store/buffer.js"
 import {
     blankNonbio,
@@ -44,7 +47,8 @@ import {
     writeCustomSolutes,
 } from "../store/custom.js"
 import { breakdown, takeFormula } from "../store/formula.js"
-import { type Row, rowValue } from "../store/lists.js"
+import { Drafts, type Row, rowValue } from "../store/lists.js"
+import { notesCell } from "../store/notes.js"
 import {
     blankPolymer,
     formatRounded,
@@ -54,14 +58,19 @@ import {
 import { defaultCatalog } from "../store/settings.js"
 import { globalScope, loadScope } from "../store/settings-store.js"
 import { isBuiltinName } from "../store/solutes.js"
-import { FieldForm, type FormRow, Frame, placeAt, useFormScreen } from "../ui/frame.js"
-import { type LegendItem, legendFor } from "../ui/grid.js"
-import { Prompt } from "../ui/input.js"
-import { keyLabels, keys, scrollWindow, useKeys, useNav } from "../ui/interaction.js"
-import { type Column, DataTable, useTheme } from "../ui/theme.js"
-import { CustomPolymerForm } from "./polymers.js"
-import { formLegend, unusable, useTableScreen } from "./screen-rules.js"
+import { type Definition, normalizeDefinition } from "../store/template-defs.js"
+import { kindOf, templateOf, withTemplate } from "../store/template-recipes.js"
+import { type FormRow, Frame, placeAt, useFormScreen } from "../ui/frame.js"
+import { legendFor } from "../ui/grid.js"
+import { destructiveQuestion, questionLegend, useConfirm } from "../ui/input.js"
+import { keys, scrollWindow, useKeys, useNav } from "../ui/interaction.js"
+import { type Naming, useNamePrompt } from "../ui/prompt-flows.js"
+import { type Column, DataTable } from "../ui/theme.js"
+import { NotesList } from "./notes-list.js"
+import { CustomPolymerForm, FormPage } from "./polymers.js"
+import { plural, unusable, useTableScreen } from "./screen-rules.js"
 import { SolutesTable } from "./solutes.js"
+import { useTemplateWizard } from "./template-wizard.js"
 
 // ========================================================================================
 // 1. The non-biological form
@@ -124,7 +133,6 @@ function startText(entry: NonbioEntry, key: FieldKey): string {
 function CustomNonbioForm(props: CustomNonbioFormProps): ReactNode {
     const { others, fallback, onAccept } = props
     const nav = useNav()
-    const theme = useTheme()
     const [orig] = useState(props.entry)
     const [entry, setEntry] = useState(props.entry)
 
@@ -182,29 +190,14 @@ function CustomNonbioForm(props: CustomNonbioFormProps): ReactNode {
         [entry, fallback],
     )
     return (
-        <Frame
-            design="blocky"
+        <FormPage
+            form={form}
             title={orig.name === "" ? "new custom solute" : "custom solute"}
             subtitle={orig.name === "" ? "non-biological" : `${orig.name} · non-biological`}
-            legend={formLegend({
-                editing: form.edit !== undefined,
-                moves: form.moves,
-                canRestore: form.canRestore,
-                complete: form.complete,
-                acceptLabel: orig.name === "" ? "add to table" : "accept",
-            })}
-            note={form.note}
-            noteIsError={form.noteIsError}
-        >
-            <FieldForm rows={rows} pos={form.pos} problem={form.problem} edit={form.edit} />
-            <Box flexDirection="column" marginTop={form.edit ? 0 : 1}>
-                {preview.map((p) => (
-                    <Text key={p} color={theme.fg}>
-                        {p}
-                    </Text>
-                ))}
-            </Box>
-        </Frame>
+            isNew={orig.name === ""}
+            rows={rows}
+            preview={preview}
+        />
     )
 }
 
@@ -226,7 +219,7 @@ const CUSTOM_ADDS = [
 ]
 
 /** What the empty table says. */
-const CUSTOM_EMPTY_HINT = `none: ${keyLabels(keys.addNonbio, keys.addPolymer)} add`
+const CUSTOM_EMPTY_HINT = "none"
 
 /**
  * A number as a term of a sum: `+36.9` or `-5.2`, the number as typed.
@@ -451,13 +444,19 @@ export function CustomSolutesTable(): ReactNode {
 // ========================================================================================
 
 /** What the empty table says. */
-const RECIPES_EMPTY_HINT = `none: ${keys.addNonbio.label} adds`
+const RECIPES_EMPTY_HINT = "none"
 
 /** The add key of the legend (also what the footer reserves). */
-const RECIPE_ADDS = [legendFor("new recipe", keys.addNonbio)]
+const RECIPE_ADDS = [
+    legendFor("new recipe", keys.addNonbio),
+    legendFor("new template", keys.newTemplate),
+]
 
-/** The rows the name prompt takes under the table: the field and its error. */
-const PROMPT_ROWS = 3
+/** The keys of the legend that act on the row, shown while a row can be opened. */
+const RECIPE_ROW_KEYS = [
+    legendFor("notes", keys.notesList),
+    legendFor("edit template", keys.editTemplate),
+]
 
 /** The subtitle of the table of one recipe's solutes. */
 const RECIPE_SUBTITLE = "recipe"
@@ -466,6 +465,8 @@ const RECIPE_SUBTITLE = "recipe"
 const SOLUTES_WIDTH = 7
 const PH_WIDTH = 6
 const RECIPE_SIGMA_WIDTH = 8
+const RECIPE_TEMPERATURE_WIDTH = 6
+const RECIPE_TEMPLATE_WIDTH = 8
 
 /**
  * Loads the recipes of the BAYSOL folder once.
@@ -480,28 +481,29 @@ function loadRecipes(root: string): { items: Recipe[]; locked?: string } {
     }
 }
 
-/** What the name prompt is for: the row it renames, `undefined` for a new recipe. */
-type Naming = { index: number | undefined; initial: string }
-
 /**
  * The saved recipes of the user: one row for each recipe of the recipes file, with the
- * columns name, solutes (how many), kinds (`3 solute 1 polymer 2 custom 4 seq`), pH and
- * σ (blank for a recipe without). A row that is new or changed shows `*`; nothing of
- * that is written before `^w`.
+ * columns name, solutes (how many), kinds (`3 solute 1 polymer 2 custom 4 seq`), pH, σ
+ * (blank for a recipe without) and notes (their titles, blank for none).
  *
- * Keys: up and down move; Enter asks the recipe's name (prefilled: the rename) and then
- * opens its solutes in a [[SolutesTable]] (with the recipe's pH row, `^g`); `^n` does the
- * same for a new, empty recipe (never past 999); `^r` on a saved row asks `delete recipe
- * NAME? ...` and Enter deletes it from the file at once (the projects that loaded it keep
- * their own buffer; a row never saved just goes); `^u` undoes its last edit; `^w` saves
- * the list; `^x` goes back, asking first when something is unsaved. A name is not blank,
- * at most 40 characters, without control characters and unique among the other recipes
- * (case does not matter, a recipe may change only its case); a clash says `name in use`.
- * A file that cannot be used is told and left alone. The mechanics are `useTableScreen`.
- *
- * The solutes table of a recipe saves into the row here (it is a change of the row, shown
- * with `*`): the file only changes at `^w` of this table, so a rename and an edit of the
- * solutes are saved together.
+ * There is no unsaved state: every edit writes the file at once and the rows are read
+ * again from it. A template recipe (a `template` key: a shipped buffer, the user's own
+ * buffer or a table of amounts, `store/template-recipes.ts`) adds a `template` column
+ * (`builtin`, `custom`, `table`; `invalid` for a definition that cannot be used: the recipe
+ * is read-only, Enter tells the problem and only deleting works); `shift+t` makes one (a
+ * name, then the questions of `store/template-wizard.ts`, saved at once; its `solutes` are
+ * the fixed rows). Keys: up and down move; Enter asks the recipe's name (prefilled: the
+ * rename, written) and opens its solutes in a [[SolutesTable]] (its `^w` writes the
+ * recipe, pH row `^g` and notes `shift+n` included); `^n` does the same for a new, empty
+ * recipe (never past 999); `shift+n` opens the recipe's notes list ([[NotesList]], saved at
+ * once); `^r` marks the recipe (`-`), `^u` unmarks, and `^w`, shown only while a mark
+ * exists, asks `delete N recipes? this cannot be undone!` and removes the marked ones
+ * from the file (the projects that loaded one keep their own buffer); `^x` goes back,
+ * asking first while marks are pending. A name is not blank, at most 40 characters,
+ * without control characters and unique among the other recipes (case does not matter,
+ * a recipe may change only its case); a clash says `name in use`. A file that cannot be
+ * used is told and left alone. A failed write is the note. The mechanics are
+ * `useTableScreen`.
  *
  * @returns the screen.
  */
@@ -511,78 +513,193 @@ export function RecipesTable(): ReactNode {
     const loaded = useMemo(() => loadRecipes(root), [root])
     const t = useTableScreen<Recipe>({
         adds: RECIPE_ADDS,
+        rowKeys: RECIPE_ROW_KEYS,
         items: loaded.items,
         locked: loaded.locked,
-        erase: {
-            what: "recipe",
-            name: (recipe) => recipe.name,
-            remove: (recipe) => void removeRecipe(root, recipe.name, { guarded: true }),
-        },
-        save: (recipes) => void writeRecipes(root, recipes),
-        // names are checked when they are typed, the solutes when they are saved
+        removeLabel: "delete",
+        // every edit is written at once; `^w` only applies the marked removals (below)
+        save: () => undefined,
         check: () => undefined,
         label: (recipe) => recipe.name,
         sorted: true,
     })
-    const [naming, setNaming] = useState<Naming>()
-    const [problem, setProblem] = useState<string>()
-    // the keys of the open name prompt
-    const [nameKeys, setNameKeys] = useState<LegendItem[]>([])
-    // stable: a prompt reports its text again whenever this handler changes
-    const clearProblem = useCallback(() => setProblem(undefined), [])
+    const recipeOf = (r: Row<Recipe>) => rowValue(r) as Recipe
+    const confirm = useConfirm()
+    const marked = t.drafts.rows.filter((r) => r.removed)
 
-    /** Opens the solutes of a recipe (row `index`) on top of this table. */
-    const openSolutes = (index: number, recipe: Recipe) => {
+    /**
+     * Runs a write of the recipes file, then re-reads the file into the rows (a fresh
+     * baseline for the next write; the marks pending stay on their recipes). A failure is
+     * the screen's note.
+     *
+     * @returns whether it worked.
+     */
+    const written = (write: () => unknown): boolean => {
+        try {
+            write()
+            const names = new Set(marked.map((r) => recipeOf(r).name))
+            let next = Drafts.of(readRecipes(root, { track: true })).sorted((r) => r.name)
+            next.rows.forEach((r, i) => {
+                if (names.has(recipeOf(r).name)) next = next.remove(i)
+            })
+            t.adopt(next, false)
+            return true
+        } catch (error) {
+            t.setNote(saveErrorNote(error))
+            return false
+        }
+    }
+
+    /** Opens the solutes of a recipe on top of this table; its `^w` writes the recipe. */
+    const openSolutes = (recipe: Recipe) => {
         nav.push(
             <SolutesTable
                 title={recipe.name}
                 subtitle={RECIPE_SUBTITLE}
                 items={recipe.solutes}
                 conditions={recipeConditions(recipe)}
-                save={(rows, c) =>
-                    t.replaceAt(index, withConditions({ ...recipe, solutes: rows }, c))
-                }
+                notes={recipe.notes}
+                onNotes={(notes) => {
+                    const change = (r: Recipe) => withNotes(r, notes)
+                    if (!written(() => updateRecipe(root, recipe.name, change)))
+                        throw new Error("could not save the recipe")
+                }}
+                save={(rows, c) => {
+                    // the notes are the recipe's own on disk: rows and conditions only
+                    const change = (r: Recipe) => withConditions({ ...r, solutes: rows }, c)
+                    if (!written(() => updateRecipe(root, recipe.name, change)))
+                        throw new Error("could not save the recipe")
+                }}
                 idleNote={`${RECIPE_SUBTITLE}: ${recipe.name}`}
             />,
         )
     }
 
-    /** The name was accepted: a new row, or the rename of the row, then its solutes. */
-    const accept = (name: string, target: Naming) => {
-        setNaming(undefined)
-        const { index } = target
-        if (index === undefined) {
-            const recipe: Recipe = { name, solutes: [] }
-            const at = t.drafts.length
-            t.append(recipe)
-            return openSolutes(at, recipe)
-        }
-        const current = t.drafts.value(index) as Recipe
-        const recipe = { ...current, name }
-        if (name !== current.name) t.replaceAt(index, recipe)
-        openSolutes(index, recipe)
+    /** Opens the notes list of a recipe; saving there writes the recipe at once. */
+    const openNotes = (recipe: Recipe) => {
+        nav.push(
+            <NotesList
+                owner={recipe.name}
+                items={recipe.notes ?? []}
+                onSave={(notes) => {
+                    const change = (r: Recipe) => withNotes(r, notes)
+                    if (!written(() => updateRecipe(root, recipe.name, change)))
+                        throw new Error("could not save the recipe")
+                }}
+            />,
+        )
     }
 
-    const submit = (text: string, target: Naming) => {
-        const name = text.trim()
-        const others = t.drafts.rows.map((r) => ({ name: (rowValue(r) as Recipe).name }))
-        const bad = renameProblem(others, name, target.index)
-        if (bad !== undefined) return setProblem(bad)
-        accept(name, target)
+    /** The name was accepted: a new recipe, or the rename, written, then its solutes. */
+    const accept = (name: string, target: Naming) => {
+        const { index } = target
+        const current = index === undefined ? undefined : (t.drafts.value(index) as Recipe)
+        const write = () => {
+            if (current === undefined) return saveRecipe(root, name, [])
+            if (name === current.name) return undefined
+            const bad = renameRecipe(root, current.name, name)
+            if (bad !== undefined) throw new Error(bad)
+            return undefined
+        }
+        if (!written(write)) return
+        openSolutes({ ...(current ?? { solutes: [] }), name })
     }
+
+    // `new template` asks the name like `new recipe`, then the wizard asks the rest;
+    // `edit template` starts the wizard from the definition of the recipe under the cursor
+    const making = useRef<string | undefined>(undefined)
+    const editing = useRef<string | undefined>(undefined)
+    const wizard = useTemplateWizard(
+        (definition: Definition) => {
+            const edit = editing.current
+            editing.current = undefined
+            if (edit !== undefined) {
+                const change = (r: Recipe) => withTemplate(r, definition)
+                if (written(() => updateRecipe(root, edit, change)))
+                    t.setNote(`template "${edit}" changed`, false)
+                return
+            }
+            const name = making.current as string
+            making.current = undefined
+            if (written(() => saveRecipe(root, name, [], undefined, undefined, definition)))
+                t.setNote(`saved template "${name}"`, false)
+        },
+        (problem) => {
+            const edit = editing.current
+            making.current = undefined
+            editing.current = undefined
+            const what = edit === undefined ? "saved" : "changed"
+            t.setNote(`template not ${what}: ${problem}`, true)
+        },
+    )
+    /** Opens the wizard on the definition of a recipe (a bad one starts from nothing). */
+    const editTemplate = (recipe: Recipe) => {
+        if (recipe.template === undefined) {
+            return t.setNote(`${recipe.name} is not a template (shift+t makes one)`, true)
+        }
+        editing.current = recipe.name
+        making.current = undefined
+        wizard.start(recipe.name, { initial: normalizeDefinition(recipe.template) })
+    }
+    const accepted = (name: string, target: Naming) => {
+        if (making.current === "") {
+            making.current = name
+            wizard.start(name)
+        } else accept(name, target)
+    }
+
+    const naming = useNamePrompt({
+        label: "recipe name:",
+        maxLength: MAX_NAME,
+        check: (name, target) => {
+            const others = t.drafts.rows.map((r) => ({ name: recipeOf(r).name }))
+            return renameProblem(others, name, target.index)
+        },
+        accept: accepted,
+    })
 
     useKeys((press) => {
+        if (confirm.handleKey(press)) return
+        if (press.is(keys.save) && marked.length > 0 && !t.locked) {
+            const names = marked.map((r) => recipeOf(r).name)
+            const drop = () => {
+                for (const n of names) if (!written(() => removeRecipe(root, n))) return
+            }
+            const question = destructiveQuestion(plural(names.length, "recipe"))
+            return confirm.ask(question, drop)
+        }
         if (t.handleKey(press)) return
         if (press.is(keys.enter) && t.canEdit && t.current) {
-            setProblem(undefined)
-            setNaming({ index: t.cursor.index, initial: t.current.name })
+            const bad = templateOf(t.current)
+            if (bad && "problem" in bad)
+                // a template that cannot be used stays as it is: read-only, delete only
+                t.setNote(`${t.current.name}: ${bad.problem}`, true)
+            else naming.open(t.cursor.index, t.current.name)
         } else if (press.is(keys.addNonbio) && t.canAdd) {
-            setProblem(undefined)
-            setNaming({ index: undefined, initial: "" })
+            making.current = undefined
+            naming.open(undefined, "")
+        } else if (press.is(keys.newTemplate) && t.canAdd) {
+            making.current = ""
+            naming.open(undefined, "")
+        } else if (press.is(keys.notesList) && t.canEdit && t.current) {
+            openNotes(t.current)
+        } else if (press.is(keys.editTemplate) && t.canEdit && t.current) {
+            editTemplate(t.current)
         }
-    }, naming === undefined)
+    }, naming.naming === undefined && !wizard.open)
 
-    const recipeOf = (r: Row<Recipe>) => rowValue(r) as Recipe
+    // the template column is there only while a
+    // template recipe is: the rest keep their width
+    const kindText = (r: Row<Recipe>) => {
+        const kind = kindOf(recipeOf(r))
+        return kind === "recipe" ? "" : kind
+    }
+    const kindColumn: Column<Row<Recipe>> = {
+        title: "template",
+        width: RECIPE_TEMPLATE_WIDTH,
+        text: kindText,
+    }
+    const templateColumn = t.rows.some((r) => kindText(r) !== "") ? [kindColumn] : []
     const columns: Column<Row<Recipe>>[] = [
         { title: "name", grow: 3, text: (r) => recipeOf(r).name },
         {
@@ -591,7 +708,7 @@ export function RecipesTable(): ReactNode {
             align: "right",
             text: (r) => String(recipeOf(r).solutes.length),
         },
-        { title: "kinds", grow: 4, text: (r) => kindsSummary(recipeOf(r).solutes) },
+        { title: "kinds", grow: 2, text: (r) => kindsSummary(recipeOf(r).solutes) },
         {
             title: "pH",
             width: PH_WIDTH,
@@ -610,23 +727,37 @@ export function RecipesTable(): ReactNode {
                 return c === undefined ? "" : formatNumber(c["sigma-pH"])
             },
         },
+        {
+            title: "°C",
+            width: RECIPE_TEMPERATURE_WIDTH,
+            align: "right",
+            text: (r) => {
+                const temperature = recipeConditions(recipeOf(r))?.temperature
+                return temperature === undefined ? "" : formatNumber(temperature)
+            },
+        },
+        ...templateColumn,
+        { title: "notes", grow: 3, text: (r) => notesCell(recipeOf(r).notes) },
     ]
 
     // only the keys that work now; the name prompt has its own keys while it is open
-    const legend = naming ? nameKeys : t.legend(RECIPE_ADDS)
+    const asked = confirm.question ? questionLegend(confirm.question) : undefined
+    const typing = naming.naming ? naming.legend : (asked ?? t.legend(RECIPE_ADDS))
+    const legend = wizard.open ? wizard.legend : typing
     // the prompt takes the rows under the table, so the window shrinks to keep the cursor
-    const pageSize = naming ? Math.max(3, t.pageSize - PROMPT_ROWS) : t.pageSize
+    const pageSize = wizard.open
+        ? Math.max(3, t.pageSize - wizard.reserved)
+        : naming.pageSize(t.pageSize)
     const offset = scrollWindow(t.cursor.index, t.cursor.offset, pageSize, t.rows.length)
-    const changes = t.drafts.count
     return (
         <Frame
             design="blocky"
             title="recipes"
-            subtitle={changes > 0 ? `${changes} unsaved` : recipesFileName}
+            subtitle={marked.length > 0 ? `${marked.length} marked` : recipesFileName}
             legend={legend}
             legendFull={t.legendFull}
-            note={naming ? undefined : t.frameNote}
-            noteIsError={t.frameNoteIsError}
+            note={naming.naming || wizard.open ? undefined : (confirm.note ?? t.frameNote)}
+            noteIsError={confirm.question === undefined && t.frameNoteIsError}
         >
             <DataTable
                 border="double"
@@ -640,18 +771,8 @@ export function RecipesTable(): ReactNode {
                 width={t.width}
             />
             {t.finder}
-            {naming ? (
-                <Prompt
-                    label="recipe name:"
-                    initial={naming.initial}
-                    maxLength={MAX_NAME}
-                    error={problem}
-                    onChange={clearProblem}
-                    onLegend={setNameKeys}
-                    onSubmit={(text) => submit(text, naming)}
-                    onCancel={() => setNaming(undefined)}
-                />
-            ) : null}
+            {naming.prompt}
+            {wizard.entry}
         </Frame>
     )
 }

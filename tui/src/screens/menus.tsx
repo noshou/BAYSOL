@@ -11,11 +11,12 @@
 import { basename, join } from "node:path"
 import { Box, Text, useApp } from "ink"
 import { type ReactNode, useCallback, useMemo, useState } from "react"
-import { appDir, projectsDir, RUN_FLOW, readSystem, version } from "../core/environment.js"
+import { appDir, projectsDir, readSystem, version } from "../core/environment.js"
 import {
     copyOver,
     entryNames,
     isFolder,
+    messageOf,
     openFileManager,
     openFolder,
     quarantine,
@@ -31,6 +32,7 @@ import {
     indexOfRecipe,
     MAX_NAME,
     type Recipe,
+    readBufferNotes,
     readConcUnit,
     readConditions,
     readRecipes,
@@ -41,15 +43,16 @@ import {
     removeRecipe,
     resetBuffer,
     saveRecipe,
+    writeBufferNotes,
     writeConcUnit,
     writeSolutes,
 } from "../store/buffer.js"
 import { customFile, readCustomSolutes } from "../store/custom.js"
 import { MAX_ROWS } from "../store/lists.js"
+import type { Note } from "../store/notes.js"
 import {
     brokenNames,
     createProject,
-    defaultTemperature,
     deleteProject,
     hasRuns,
     InvalidNameError,
@@ -57,13 +60,13 @@ import {
     liveRun,
     type ProjectRef,
     projectNameProblem,
+    readProjectNotes,
+    writeProjectNotes,
 } from "../store/projects.js"
 import {
-    parseTemperature,
+    missingComponents,
     projectReadiness,
     RunSession,
-    TEMPERATURE_LABEL,
-    temperatureStart,
 } from "../store/run.js"
 import {
     globalScope,
@@ -73,8 +76,15 @@ import {
     settingsFile,
 } from "../store/settings-store.js"
 import { setConcUnit } from "../store/solutes.js"
+import {
+    kindOf,
+    offersTemplate,
+    recipeLoad,
+    recipeSave,
+} from "../store/template-recipes.js"
 import { Frame } from "../ui/frame.js"
 import {
+    cursorMoves,
     GridMenu,
     type LegendItem,
     legendBack,
@@ -112,6 +122,7 @@ import { CustomSolutesTable } from "./custom-solutes.js"
 import { DataScreen } from "./data-screen.js"
 import { LogsRuns } from "./logs-menu.js"
 import { ModelsScreen } from "./models.js"
+import { NotesList } from "./notes-list.js"
 import { OpenRuns } from "./open-runs.js"
 import { RunScreen } from "./run-screens.js"
 import {
@@ -123,6 +134,7 @@ import {
     REPLACES_HINT,
     recipeChoice,
     replaceRecipeQuestion,
+    saveAsTemplateQuestion,
     savedAs,
     TOO_MANY_RECIPES,
     unusable as unusable_,
@@ -141,6 +153,15 @@ import { SolutesTable } from "./solutes.js"
 // 1. The buffer landing
 // ========================================================================================
 
+/** What a recipe shown in the table changes from the plain rows. */
+type OpenExtra = { conditions?: Conditions; hint?: string; template?: boolean }
+
+/** The word a recipe's list line carries when it is a template, `undefined` otherwise. */
+function templateKind(recipe: Recipe): string | undefined {
+    const kind = kindOf(recipe)
+    return kind === "recipe" ? undefined : kind
+}
+
 /** What the landing is doing: waiting for a choice, picking a recipe, asking a name. */
 type LandingMode = "menu" | "load" | "save"
 
@@ -154,10 +175,16 @@ type LandingMode = "menu" | "load" | "save"
  *   unsaved ones and the recipe's pH and σ, when it has them, as an unsaved change (a
  *   recipe without leaves the buffer's own); at the first `^w` a buffer that has solutes
  *   asks `replace N solutes with recipe "NAME"?`. `no saved recipes!` for none.
+ *   A template recipe (`store/template-recipes.ts`) comes in as its fixed rows and the rows
+ *   of its definition at the recipe's pH and temperature (else the buffer's; with no pH
+ *   at all it asks to set one first), linked so that they follow the table's pH and
+ *   temperature; the question says `with template "NAME"?`. A definition that cannot be
+ *   used loads its fixed rows only, with the problem as the hint.
  * - `new recipe`: the table, empty; nothing is replaced before `^w`.
  * - `save current recipe globally`, when the buffer has solutes: asks a name (`replace
- *   "NAME"?` if a recipe has it) and saves the buffer as it is on disk, with its pH and σ,
- *   as a recipe.
+ *   "NAME"?` if a recipe has it; `save "NAME" as a template?` when the rows of one
+ *   template are linked: Enter saves the template, `n` the rows as a plain recipe, Esc
+ *   saves nothing) and saves the buffer as it is on disk, with its pH and σ, as a recipe.
  *
  * A line says what each file holds. A file that cannot be used is told and never written
  * over; `r` on its option offers to move it to `<name>.corrupt` and start empty (the
@@ -214,8 +241,9 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
         items?: readonly BufferRow[]
         draftRows?: readonly BufferRow[]
         draftConditions?: Conditions
+        draftNotes?: readonly Note[]
         hint?: string
-        replace?: { count: number; recipe: string }
+        replace?: { count: number; recipe: string; notes?: boolean; template?: boolean }
     }) => {
         setConcUnit(readConcUnit(dir))
         nav.push(
@@ -225,33 +253,82 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
                 draftRows={extra.draftRows}
                 conditions={readConditionsOrNone(dir)}
                 draftConditions={extra.draftConditions}
+                notes={readNotesOrNone(dir)}
+                draftNotes={extra.draftNotes}
+                onNotes={(notes) => writeBufferNotes(dir, notes)}
                 hint={extra.hint}
                 replace={extra.replace}
-                save={(rows, c, unit) => void writeSolutes(dir, rows, c, unit)}
+                save={(rows, c, unit, notes) =>
+                    void writeSolutes(dir, rows, c, unit, notes)
+                }
                 onUnit={(unit) => writeConcUnit(dir, unit)}
             />,
         )
     }
 
-    const pickRecipe = (recipe: Recipe) => {
+    /** Opens the table with the rows of a recipe as unsaved ones. */
+    const showRecipe = (recipe: Recipe, rows: readonly BufferRow[], extra: OpenExtra) => {
+        const notes = recipe.notes !== undefined
+        const template = extra.template
         setMode("menu")
         trackBuffer()
         openTable({
-            draftRows: recipe.solutes,
-            draftConditions: recipeConditions(recipe),
-            hint: solutes > 0 ? REPLACES_HINT : undefined,
-            replace: solutes > 0 ? { count: solutes, recipe: recipe.name } : undefined,
+            draftRows: rows,
+            draftConditions: extra.conditions ?? recipeConditions(recipe),
+            draftNotes: recipe.notes,
+            hint: extra.hint ?? (solutes > 0 ? REPLACES_HINT : undefined),
+            replace:
+                solutes > 0
+                    ? { count: solutes, recipe: recipe.name, notes, template }
+                    : undefined,
         })
     }
 
-    /** Writes the buffer as it is on disk, with its pH and σ, as the recipe `name`. */
-    const doSave = (name: string) => {
+    const pickRecipe = (recipe: Recipe) => {
+        const loaded = recipeLoad(recipe, readConditionsOrNone(dir))
+        if ("message" in loaded) {
+            setMode("menu")
+            return setMessage(loaded.message)
+        }
+        showRecipe(recipe, loaded.rows, {
+            conditions: loaded.conditions,
+            template: loaded.template || undefined,
+            hint: loaded.hint,
+        })
+    }
+
+    /**
+     * Writes the buffer as it is on disk, with its pH and σ, as the recipe `name`; as a
+     * template (its one group of linked rows becomes the definition, the other rows stay
+     * fixed) when `asTemplate`.
+     */
+    const doSave = (name: string, asTemplate = false) => {
         try {
-            saveRecipe(root, name, readSolutes(dir), readConditions(dir))
+            const notes = readBufferNotes(dir)
+            const { solutes: rows, definition } = recipeSave(readSolutes(dir), asTemplate)
+            saveRecipe(root, name, rows, readConditions(dir), notes, definition)
             setMessage(savedAs(name, room))
         } catch (error) {
             setMessage(saveFailure(error))
         }
+    }
+
+    /** Saves; rows that follow one template first ask template, plain recipe or cancel. */
+    const saveChecked = (name: string) => {
+        let offer = false
+        try {
+            offer = offersTemplate(readSolutes(dir))
+        } catch {
+            return doSave(name)
+        }
+        if (!offer) return doSave(name)
+        // Enter: the template; n: the plain recipe; Esc: nothing is saved
+        confirm.ask(
+            saveAsTemplateQuestion(name, room),
+            () => doSave(name, true),
+            undefined,
+            () => doSave(name),
+        )
     }
 
     const submitName = (text: string) => {
@@ -267,9 +344,9 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
         }
         setMode("menu")
         if (indexOfRecipe(saved, name) !== undefined)
-            confirm.ask(replaceRecipeQuestion(name, room), () => doSave(name))
+            confirm.ask(replaceRecipeQuestion(name, room), () => saveChecked(name))
         else if (saved.length >= MAX_ROWS) setMessage(TOO_MANY_RECIPES)
-        else doSave(name)
+        else saveChecked(name)
     }
 
     const choose = (id: LandingId) => {
@@ -318,7 +395,7 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
     const choices = useMemo<Choice<Recipe>[]>(
         () =>
             recipes.map((r) => ({
-                label: recipeChoice(r.name, r.solutes.length),
+                label: recipeChoice(r.name, r.solutes.length, templateKind(r)),
                 value: r,
             })),
         [recipes],
@@ -349,7 +426,7 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
     const listLegend = legendOf([
         legendBack,
         legendEnter,
-        moveLegend({ up: cursor.index > 0, down: cursor.index < options.length - 1 }),
+        moveLegend(cursorMoves(cursor.index, options.length)),
         unusable && legendFor("reset file", keys.reset),
     ])
     const modeLegend = { menu: listLegend, load: pickList.legend, save: saveKeys }[mode]
@@ -375,7 +452,11 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
                     <Text color={theme.mt}>
                         {conditions === undefined
                             ? "pH not set"
-                            : `pH ${formatNumber(conditions.pH)}  σ ${sigmaText}`}
+                            : `pH ${formatNumber(conditions.pH)}  σ ${sigmaText}  ${
+                                  conditions.temperature === undefined
+                                      ? "temperature not set"
+                                      : `${formatNumber(conditions.temperature)} °C`
+                              }`}
                     </Text>
                 )}
                 <Text color={theme.mt}>
@@ -419,6 +500,15 @@ function saveFailure(error: unknown): string {
     return saveErrorNote(error)
 }
 
+/** The notes of the buffer as they are on disk, none for a file that cannot be used. */
+function readNotesOrNone(dir: string): Note[] {
+    try {
+        return readBufferNotes(dir)
+    } catch {
+        return []
+    }
+}
+
 /** The pH and σ of the buffer file, `undefined` for none yet or a file that is unusable. */
 function readConditionsOrNone(dir: string): Conditions | undefined {
     try {
@@ -436,6 +526,10 @@ function readConditionsOrNone(dir: string): Conditions | undefined {
 export const projectMenuSpec = new MenuSpec(
     ["models", "data", "buffer", "logs", "settings", "open"], 2
 )
+
+/** What the menu says while the project cannot run (the taskbar has `notes` anyway). */
+const missingNotice = (missing: readonly string[]): string =>
+    `missing: ${missing.join(", ")}`
 
 /** The notice of the `logs` option when the project has no run yet. */
 const NO_RUNS_NOTICE = "no runs yet"
@@ -462,7 +556,7 @@ function settingsNotice(project: ProjectRef): string | undefined {
         reset = loadScope(projectScope(project)).reset
     } catch (error) {
         // a project that another copy deleted meanwhile: say so, do not crash
-        return error instanceof Error ? error.message : "could not open the project"
+        return messageOf(error, "could not open the project")
     }
     if (!reset) return undefined
     const file = basename(settingsFile(project.dir))
@@ -473,8 +567,8 @@ function settingsNotice(project: ProjectRef): string | undefined {
  * The menu of a project: models, data, buffer, logs, settings and open (the project's
  * folder in the file manager, or with a run its runs). `logs` opens the list of the runs
  * (reading and restoring a run's inputs and logs). The taskbar offers `run: shift+r` when
- * the project can run (it asks the temperature in a small prompt over the right half of
- * the grid, then starts the run and opens its screen).
+ * the project can run (it starts the run at once with the buffer's temperature and opens
+ * its screen; the project is not ready until the buffer has a temperature).
  *
  * @param project - the project.
  * @returns the screen.
@@ -482,10 +576,6 @@ function settingsNotice(project: ProjectRef): string | undefined {
 export function ProjectMenu({ project }: { project: ProjectRef }): ReactNode {
     const nav = useNav()
     const [notice, setNotice] = useState<string | undefined>(() => settingsNotice(project))
-    // the temperature prompt of a run: the text it starts with, its error, its keys
-    const [asking, setAsking] = useState<string | undefined>()
-    const [problem, setProblem] = useState<string | undefined>()
-    const [promptKeys, setPromptKeys] = useState<LegendItem[]>([])
     // the `open` dropdown (only with a run in the project) and its keys
     const { suspendTerminal } = useApp()
     const [choosing, setChoosing] = useState(false)
@@ -531,51 +621,60 @@ export function ProjectMenu({ project }: { project: ProjectRef }): ReactNode {
         [nav, project, suspendTerminal],
     )
 
-    /** `run: shift+r`: refuse a live run, else ask the temperature. */
-    const askTemperature = useCallback(() => {
+    /** `run: shift+r`: refuse a live run, else start at once (buffer's temperature). */
+    const startRun = useCallback(() => {
         const live = liveRun(project.dir)
         if (live !== undefined) return setNotice(`a run is in progress (pid ${live.pid})`)
         setNotice(undefined)
-        setProblem(undefined)
-        setAsking(temperatureStart(defaultTemperature(project.dir)))
-    }, [project.dir])
+        try {
+            const temperature = readConditions(project.dir)?.temperature
+            if (temperature === undefined) return setNotice(missingNotice(["temperature"]))
+            nav.push(<RunScreen session={RunSession.begin(project.dir, temperature)} />)
+        } catch (error) {
+            setNotice(messageOf(error, "could not start the run"))
+        }
+    }, [project.dir, nav])
 
-    /** Enter at the prompt: check the number, claim the folder and start the child. */
-    const startRun = useCallback(
-        (text: string) => {
-            const parsed = parseTemperature(text)
-            if ("error" in parsed) return setProblem(parsed.error)
-            try {
-                const session = RunSession.begin(project.dir, parsed.value)
-                setAsking(undefined)
-                nav.push(<RunScreen session={session} />)
-            } catch (error) {
-                setAsking(undefined)
-                setNotice(
-                    error instanceof Error ? error.message : "could not start the run",
-                )
-            }
-        },
-        [project.dir, nav],
-    )
+    /** `notes: shift+n`: the project's notes list; `^w` there writes `project.json`. */
+    const openNotes = useCallback(() => {
+        setNotice(undefined)
+        try {
+            const items = readProjectNotes(project.dir)
+            nav.push(
+                <NotesList
+                    owner={project.id}
+                    items={items}
+                    onSave={(notes) => writeProjectNotes(project.dir, notes)}
+                />,
+            )
+        } catch (error) {
+            setNotice(messageOf(error, "could not open the notes"))
+        }
+    }, [nav, project])
 
     // read again when this menu comes back to the top (the screen that was open over it
     // may have changed the models or the buffer) and after every notice
     // biome-ignore lint/correctness/useExhaustiveDependencies: active, notice = re-read
     const taskbar = useMemo<TaskbarItem[]>(
-        () =>
-            projectReadiness(project).run
-                ? [{ ...taskbarKeys.run, onPress: askTemperature }]
-                : [],
-        [project, active, notice, askTemperature],
+        () => [
+            ...(projectReadiness(project).run
+                ? [{ ...taskbarKeys.run, onPress: startRun }]
+                : []),
+            { ...taskbarKeys.notes, onPress: openNotes },
+        ],
+        [project, active, notice, startRun, openNotes],
     )
+
+    // while the project cannot run, a box names what is missing (shift+r replaces it)
+    // biome-ignore lint/correctness/useExhaustiveDependencies: active, notice = re-read
+    const missing = useMemo(() => missingComponents(project), [project, active, notice])
 
     return (
         <GridMenu
             spec={projectMenuSpec}
             header={<MenuHeader caption={`project: ${project.id}`} />}
             onChoose={choose}
-            notice={notice}
+            notice={notice ?? (missing.length > 0 ? missingNotice(missing) : undefined)}
             taskbar={taskbar}
             overlay={
                 choosing ? (
@@ -587,21 +686,9 @@ export function ProjectMenu({ project }: { project: ProjectRef }): ReactNode {
                         onCancel={() => setChoosing(false)}
                         onLegend={setOpenKeys}
                     />
-                ) : asking === undefined ? undefined : (
-                    <Prompt
-                        label={TEMPERATURE_LABEL}
-                        initial={asking}
-                        maxLength={RUN_FLOW.temperature.maxLength}
-                        take="run"
-                        error={problem}
-                        onChange={() => setProblem(undefined)}
-                        onLegend={setPromptKeys}
-                        onSubmit={startRun}
-                        onCancel={() => setAsking(undefined)}
-                    />
-                )
+                ) : undefined
             }
-            overlayLegend={choosing ? openKeys : promptKeys}
+            overlayLegend={openKeys}
         />
     )
 }

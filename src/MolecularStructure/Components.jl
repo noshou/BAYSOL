@@ -482,7 +482,8 @@ amino_parent(id::AbstractString) =
 The selector of the loader and the canonical writer: standard (ATOM) atoms and the HETATM
 atoms of residues that are part of the polymer, nucleotides and amino acids, modified ones
 included (`PSU`, `MSE`): `!ishetero(at) || is_nucleotide(name) || is_amino_acid(name)`.
-Waters, ions, ligands, saccharides and `UNK` are dropped.
+Waters, ions, ligands, saccharides and `UNK` are dropped (the loader adds the ligands back:
+[`ligand_selector`](@ref)).
 
 # Exceptions
 - `ComponentError`: as for [`is_nucleotide`](@ref), for a HETATM residue name.
@@ -492,6 +493,65 @@ function polymer_selector(at)
     name = resname(at)
     return is_nucleotide(name) || is_amino_acid(name)
 end
+
+"""
+    has_known_composition(formula::AbstractString) -> Bool
+
+Whether a component `formula` (`"C34 H32 Fe N4 O4"`, `"Mg"`) is a list of element symbols
+the radius table knows ([`element_radius`](@ref)), each with an optional count. The
+placeholders of the dictionary (`?` of `UNL`, `X` of `DUM`) and an empty formula are not.
+
+# Returns
+`true` when every token of `formula` is a known element with an optional count.
+
+# Exceptions
+None.
+"""
+function has_known_composition(formula::AbstractString)::Bool
+    tokens = split(formula)
+    isempty(tokens) && return false
+    for tok in tokens
+        m = match(r"^([A-Za-z]{1,2})(\d*)$", tok)
+        m === nothing && return false
+        element_radius(lowercase(m[1])) === nothing && return false
+    end
+    return true
+end
+
+"""
+    is_ligand(id::AbstractString) -> Bool
+
+Whether the residue `id` is a ligand the model keeps ([`KEEP_LIGANDS`](@ref)): a component
+that is not a nucleotide, an amino acid, a water ([`WATER_NAMES`](@ref)) or a placeholder
+([`DUMMY_RESIDUE_NAMES`](@ref)) and whose dictionary formula has a known element
+composition ([`has_known_composition`](@ref)): heme, nucleotide triphosphates, sugars,
+glycerol, ions (`MG`, `ZN`, `K`). A name the dictionary does not know has no composition:
+`false`.
+
+# Returns
+`true` for a ligand with a known composition.
+
+# Exceptions
+- `ComponentError`: as for [`component`](@ref).
+"""
+function is_ligand(id::AbstractString)::Bool
+    key = uppercase(strip(String(id)))
+    (key in WATER_NAMES || key in DUMMY_RESIDUE_NAMES) && return false
+    return !(is_nucleotide(key) || is_amino_acid(key)) &&
+           has_known_composition(component(key).formula)
+end
+
+"""
+    ligand_selector(at) -> Bool
+
+[`polymer_selector`](@ref) plus the HETATM atoms of ligands ([`is_ligand`](@ref)): the
+selector of the loader and the canonical writer while [`KEEP_LIGANDS`](@ref) is set. Waters,
+placeholders and residues of unknown composition are dropped.
+
+# Exceptions
+- `ComponentError`: as for [`is_nucleotide`](@ref), for a HETATM residue name.
+"""
+ligand_selector(at) = polymer_selector(at) || is_ligand(resname(at))
 
 """
 The distinct residue names of the ATOM and HETATM records of the .pdb at `path`, in order
@@ -602,15 +662,16 @@ _residue_key(at) = (
 
 """
 The atom selector of the loader and the canonical writer for a parsed `model`: standard
-atoms, HETATM atoms of nucleotides and amino acids ([`polymer_selector`](@ref)) and
-the HETATM atoms of
+atoms, HETATM atoms of nucleotides and amino acids ([`polymer_selector`](@ref)), the
+HETATM atoms of ligands when `ligands` ([`ligand_selector`](@ref)) and the HETATM atoms of
 the legacy-named nucleotide residues of `model` ([`legacy_nucleotides_in_model`](@ref)).
 """
-function _model_selector(model)
+function _model_selector(model; ligands::Bool = KEEP_LIGANDS)
     legacy = legacy_nucleotides_in_model(model)
-    isempty(legacy) && return polymer_selector
+    base = ligands ? ligand_selector : polymer_selector
+    isempty(legacy) && return base
     return function (at)
-        polymer_selector(at) && return true
+        base(at) && return true
         return haskey(legacy, _residue_key(at))
     end
 end

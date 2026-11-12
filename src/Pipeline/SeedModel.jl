@@ -177,11 +177,13 @@ Computes a NUTS seed from given data input:
 The crop, the exclusion and the scale are applied to the measured curve first, before the
 structure is touched, so a range that leaves fewer than 3 points fails at once; the
 number of points that remain after the binning must be at least 3 too (the scale and the
-background are fitted). Waters, ions and ligands are not part of the model (the loader
-keeps the polymer only), and which alternate location of an atom is used is that of
-BioStructures (the one of highest occupancy): neither is a keyword.
+background are fitted). Waters are not part of the model (the hydration shell stands for
+them) and ligands, ions included, are, as heavy atoms without hydrogens (the loader keeps
+every HETATM residue whose component has a known element composition), and which alternate
+location of an atom is used is that of BioStructures (the one of highest occupancy):
+neither is a keyword.
 
-Every setting of [`load_settings`](@ref) that the structure, shell and priors depend on is
+Every setting of `load_settings` that the structure, shell and priors depend on is
 a keyword here: [`seed_keywords`](@ref) turns the settings into them. The keywords added
 after `pmv_fallback_uncert` are checked as `load_settings` checks the setting of the same
 name (the lower-case keyword is the setting's name, `MAP_N_STARTS` → `map_n_starts`), and a
@@ -425,7 +427,8 @@ function seed_model(
                        "$(Hydrogenator.heavy_atom_count(hpath)) out" *
                        (
                            b === nothing ? "" :
-                           "; $(b.restored) restored, $(b.added) added by pdb2pqr"
+                           "; $(b.restored) restored, $(b.added) added by pdb2pqr" *
+                           (b.ligands > 0 ? ", $(b.ligands) ligand atoms put back" : "")
                        ) * "]",
             )
         end

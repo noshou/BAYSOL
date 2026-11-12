@@ -28,7 +28,8 @@ import {
     writeAtomic,
     writeJson,
 } from "../core/file-system.js"
-import { compareNoCase, fold } from "../core/terminal.js"
+import { compareNoCase, fold, NAME_IN_USE } from "../core/terminal.js"
+import { isStructureFile, structureFasta } from "./structure-sequences.js"
 
 // ========================================================================================
 // 1. Sequences: strict FASTA and FASTQ reader
@@ -139,14 +140,15 @@ export type SequenceRecords = Sequence[]
 export type SequenceResult = { records: SequenceRecords } | { error: string }
 
 /**
- * Whether a file name (or path) has one of the [[sequenceExtensions]].
+ * Whether a file name (or path) has one of the [[sequenceExtensions]], or is a PDB or
+ * mmCIF structure file (see `structure-sequences.ts`).
  *
  * @param fileName - the name or path.
  * @returns the answer (case does not matter).
  */
-export function isFastaFile(fileName: string): boolean {
+export function isSequenceFile(fileName: string): boolean {
     const low = fileName.toLowerCase()
-    return sequenceExtensions.some((e) => low.endsWith(e))
+    return sequenceExtensions.some((e) => low.endsWith(e)) || isStructureFile(low)
 }
 
 /** A failed result. */
@@ -327,7 +329,7 @@ export function residuesOf(records: SequenceRecords): number {
 }
 
 /**
- * Parses a file like [[parseText]].
+ * Parses a file like [[parseText]]; a PDB or mmCIF file gives its chains of this `kind`.
  *
  * @param path - the file.
  * @param kind - `dna`, `rna` or `protein`.
@@ -335,6 +337,10 @@ export function residuesOf(records: SequenceRecords): number {
  * @throws Error for another `kind`.
  */
 export function parseFile(path: string, kind: SequenceKind): SequenceResult {
+    if (isStructureFile(path)) {
+        const found = structureFasta(path, kind)
+        return "error" in found ? found : parseText(found.text, kind)
+    }
     let text: string
     try {
         text = readFileSync(path, "utf-8")
@@ -523,9 +529,6 @@ export const MAX_ROWS = 999
 // ========================================================================================
 // 4. List file
 // ========================================================================================
-
-/** What the message of a name used twice says (also the one of a rename onto a name). */
-const NAME_IN_USE = "name in use"
 
 /**
  * What a [[ListFile]] needs to know about its file.

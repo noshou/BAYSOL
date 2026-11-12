@@ -40,7 +40,7 @@ import {
     ViewerFileError,
     type ViewerLimits,
 } from "../src/store/view.js"
-import { tempDir as temp } from "./support/fixtures.js"
+import { tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Sheets
@@ -56,7 +56,7 @@ function workbook(): string {
     one["!ref"] = "A1:C31"
     XLSX.utils.book_append_sheet(wb, one, "one")
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[1, 2], [3, "日本語"]]), "two")
-    const path = join(temp(), "book.xlsx")
+    const path = join(tempDir(), "book.xlsx")
     writeFileSync(path, XLSX.write(wb, { type: "buffer", bookType: "xlsx" }))
     return path
 }
@@ -78,7 +78,7 @@ test("a workbook has one tab per sheet and parses a sheet when asked", () => {
 })
 
 test("a delimited file is one tab, read as UTF-8", () => {
-    const path = join(temp(), "t.csv")
+    const path = join(tempDir(), "t.csv")
     writeFileSync(path, "a,b\n1,日本語\n2,\"x,y\"\n")
     const book = openWorkbook(path, "t.csv")
     assert.deepEqual(book.names, ["t.csv"])
@@ -96,8 +96,8 @@ test("the file is only read: its bytes and times do not change", () => {
 })
 
 test("a missing, binary or oversize file is a short error", () => {
-    assert.throws(() => openWorkbook(join(temp(), "nope.xlsx"), "x"), ViewerFileError)
-    const bin = join(temp(), "b.bin")
+    assert.throws(() => openWorkbook(join(tempDir(), "nope.xlsx"), "x"), ViewerFileError)
+    const bin = join(tempDir(), "b.bin")
     writeFileSync(bin, Buffer.from([1, 0, 2, 0]))
     assert.throws(() => openWorkbook(bin, "b"), /not a table/)
 })
@@ -405,7 +405,7 @@ test("formulas are read from a workbook and shown instead of the values", () => 
     ws.A3 = { t: "n", v: 3, f: "SUM(A1:A2)" }
     XLSX.utils.book_append_sheet(wb, ws, "f")
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[1, 2]]), "plain")
-    const path = join(temp(), "formulas.xlsx")
+    const path = join(tempDir(), "formulas.xlsx")
     writeFileSync(path, XLSX.write(wb, { type: "buffer", bookType: "xlsx" }))
     const book = openWorkbook(path, "x")
     const sheet = book.sheet(0)
@@ -416,7 +416,7 @@ test("formulas are read from a workbook and shown instead of the values", () => 
     assert.deepEqual(plainValue, ["1"], "a cell without a formula shows its value")
     assert.equal(shownCells(sheet, false), sheet.cells)
     assert.equal(book.sheet(1).formulas, undefined, "no formulas, no toggle")
-    const csv = join(temp(), "t.csv")
+    const csv = join(tempDir(), "t.csv")
     writeFileSync(csv, "a,b\n1,2\n")
     assert.equal(openWorkbook(csv, "t").sheet(0).formulas, undefined)
 })

@@ -26,12 +26,14 @@ import {
     ParentMissingError,
     readJson,
     sortNoCase,
+    UnusableFileError,
     withFileLock,
     writeAtomic,
     writeJson,
 } from "../core/file-system.js"
-import { tooLong } from "../core/terminal.js"
+import { NAME_BLANK, tooLong } from "../core/terminal.js"
 import { checkPath } from "./lists.js"
+import { type Note, notesProblem, storedNotes } from "./notes.js"
 import { archivePath, readRunText, runExists } from "./run-archive.js"
 import { compareRunNames } from "./run-stamp.js"
 
@@ -48,8 +50,7 @@ import { compareRunNames } from "./run-stamp.js"
  *                               run.LOG, <model>.xlsx, ... (no subfolders)
  *
  * and once it is over the TUI packs it into ONE file, `<project>/runs/<run name>.7z`, with
- * everything in it (`run.json` too), and removes the folder. Runs of the older layouts
- * (a folder with a `run.7z` in it, or nested folders) are still read.
+ * everything in it (`run.json` too), and removes the folder.
  *
  * `runs/` is not made by the user or by a new project: a run makes it. Until then the
  * project has no runs, which is [[hasRuns]]. Nothing here deletes or overwrites a run.
@@ -188,31 +189,6 @@ export function newestRuns(projectDir: string): RunEntry[] {
         entries.push({ id, dir, json: readRunObject(dir) })
     }
     return entries
-}
-
-/**
- * The default of the temperature prompt: the `temperature_c` row (`name<spaces><TAB>value`,
- * in the header that ends at the first `---`) of the newest FINISHED run's
- * `run.LOG`. A run that is live or aborted, or whose log is missing or has no such
- * row, is skipped for the next older one.
- *
- * @param projectDir - the project's folder.
- * @returns the temperature in °C, or `undefined` when no run has one.
- */
-export function defaultTemperature(projectDir: string): number | undefined {
-    for (const { dir, json } of newestRuns(projectDir)) {
-        if (json?.status !== "done" && json?.status !== "failed") continue
-        try {
-            // the log of a packed run is read from its archive, a plain one from its folder
-            const log = readRunText(dir, "run.LOG", RUN_FLOW.log.maxBytes)
-            const header = log.split(/^---/m)[0] ?? ""
-            const t = Number(/^temperature_c[ \t]*\t[ \t]*(\S+)/m.exec(header)?.[1])
-            if (Number.isFinite(t)) return t
-        } catch {
-            // no log: the next older run
-        }
-    }
-    return undefined
 }
 
 /** The time of a `yyyy-MM-ddTHH:mm:ssZ` string, the way Julia writes times. */
@@ -391,6 +367,16 @@ const maxName = 40
 /** The name of the file that makes a folder a project. */
 const projectFileName = "project.json"
 
+/**
+ * The `project.json` of a project folder (id, creation time and the notes).
+ *
+ * @param projectDir - the project's folder.
+ * @returns its path; the file may be missing.
+ */
+export function projectFile(projectDir: string): string {
+    return join(projectDir, projectFileName)
+}
+
 /** Names a Windows file system keeps for devices, whatever the extension. */
 const reserved: ReadonlySet<string> = new Set([
     "con",
@@ -430,7 +416,7 @@ export function projectNameProblem(
 ): string | undefined {
     const lower = id.toLowerCase()
     const same = (names: readonly string[]) => names.some((n) => n.toLowerCase() === lower)
-    if (id.trim() === "") return "type a name first!"
+    if (id.trim() === "") return NAME_BLANK
     if (id.length > maxName) return tooLong("name", maxName)
     if (!nameCharacters.test(id)) return "use only a-z 0-9 . _ -"
     if (!nameStart.test(id)) return "start with a letter or digit"
@@ -446,10 +432,14 @@ export function projectNameProblem(
  *
  * @property id - the project's name, the same as its folder's.
  * @property created - the time it was made (ISO 8601, UTC), if the file says.
+ * @property notes - the project's notes (`"notes"`, see [[Note]]), if the file has valid
+ *     ones; a file whose notes are not valid still opens the project, and
+ *     [[readProjectNotes]] tells what is wrong.
  */
 export type ProjectInfo = {
     id: string
     created?: string
+    notes?: Note[]
 }
 
 /**
@@ -465,7 +455,64 @@ export function readProject(dir: string): ProjectInfo | undefined {
     if (!isDict(info)) return undefined
     if (info.id !== basename(dir)) return undefined
     const created = info.created
-    return typeof created === "string" ? { id: info.id, created } : { id: info.id }
+    const ok = notesProblem(info.notes) === undefined
+    const notes = ok ? (info.notes as Note[] | undefined) : undefined
+    return {
+        id: info.id,
+        ...(typeof created === "string" && { created }),
+        ...(notes !== undefined && { notes }),
+    }
+}
+
+/**
+ * The notes of a project, from its `project.json`.
+ *
+ * @param projectDir - the project's folder.
+ * @returns the notes, empty for none.
+ * @throws UnusableFileError (kind `project`) when the file has notes that
+ *     [[notesProblem]] refuses (the file is left alone) or is not a project's.
+ */
+export function readProjectNotes(projectDir: string): Note[] {
+    const info = readJson<undefined>(join(projectDir, projectFileName), undefined)
+    if (!isDict(info) || info.id !== basename(projectDir))
+        throw new UnusableFileError("project.json unusable", "project")
+    const why = notesProblem(info.notes)
+    if (why !== undefined) throw new UnusableFileError(why, "project")
+    return Array.isArray(info.notes) ? (info.notes as Note[]) : []
+}
+
+/**
+ * Writes the notes of a project into its `project.json`, every other key kept, through a
+ * temporary file that replaces it in one step, under the file's lock. An empty list takes
+ * the `notes` key off.
+ *
+ * @param projectDir - the project's folder.
+ * @param notes - the notes; they must keep the rules of [[notesProblem]].
+ * @throws UnusableFileError (kind `project`) for notes that break the rules or a file that
+ *     is not a project's (nothing is written); ProjectGoneError when the folder is gone.
+ */
+export function writeProjectNotes(projectDir: string, notes: readonly Note[]): void {
+    const stored = storedNotes(notes)
+    const why = notesProblem(stored)
+    if (why !== undefined) throw new UnusableFileError(why, "project")
+    const file = join(projectDir, projectFileName)
+    inProject(projectDir, () =>
+        withFileLock(
+            file,
+            () => {
+                const info = readJson<undefined>(file, undefined)
+                if (!isDict(info) || info.id !== basename(projectDir))
+                    throw new UnusableFileError("project.json unusable", "project")
+                const { notes: _old, ...rest } = info
+                writeAtomic(
+                    file,
+                    writeJson({ ...rest, ...(stored !== undefined && { notes: stored }) }),
+                    { createParents: false },
+                )
+            },
+            { createParents: false },
+        ),
+    )
 }
 
 /**

@@ -24,7 +24,7 @@ immutable value that is passed down to where they are read, so every field has t
 of its setting and the sampler's code stays type-stable. Every keyword is named after its
 constant and defaults to it, so `SamplerOptions()` is the sampler as it has always run.
 [`run_model`](@ref BAYSOL.Pipeline.run_model) builds one from its keywords of the same
-names, after the checks of [`load_settings`](@ref BAYSOL.Pipeline.load_settings); the
+names, after the checks of `load_settings`; the
 constructor itself checks nothing.
 
 # Fields

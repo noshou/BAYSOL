@@ -385,6 +385,40 @@ END
 
 end
 
+@testset "Pdb2pqr: waters with an oxygen named O1 (old crystal files)" begin
+    # pdb2pqr's water optimisation raises "Unable to find oxygen atom in HOH" for an
+    # oxygen not named O/OW; the hydrogenation step removes the waters first
+    dir = mktempdir()
+    try
+        rec(n, name, res, num, xyz, el) = string(
+            "ATOM  ", lpad(n, 5), " ", rpad(name, 4), " ", res, " A", lpad(num, 4),
+            "    ",
+            xyz, "  1.00 20.00          ", lpad(el, 2),
+        )
+        ala = [
+            rec(1, " N  ", "ALA", 1, " 17.208  26.496  -2.120", "N"),
+            rec(2, " CA ", "ALA", 1, " 17.586  25.166  -1.492", "C"),
+            rec(3, " C  ", "ALA", 1, " 18.376  25.526  -0.224", "C"),
+            rec(4, " O  ", "ALA", 1, " 18.800  26.649  -0.055", "O"),
+            rec(5, " CB ", "ALA", 1, " 18.268  24.389  -2.543", "C"),
+        ]
+        wat = rec(6, " O1 ", "HOH", 602, " 25.000  25.000  -1.000", "O")
+        path = joinpath(dir, "pdb2pqr-WAT.pdb")
+        write(path, join([ala; wat; "END"], "\n") * "\n")
+        rm(_hydrogens_path(path, 7.0, :parse, NoTitration()); force = true)
+        out = resolve_hydrogens(path, 7.0; titration = NoTitration())
+        lines = readlines(out)
+        @test isfile(out)
+        @test !any(l -> occursin("HOH", l), lines)
+        @test any(
+            l -> startswith(l, "ATOM") && l[18:20] == "ALA" && l[13:16] == " HA ",
+            lines,
+        )
+    finally
+        rm(dir; recursive = true, force = true)
+    end
+end
+
 @testset "Hydrogenator: force field and titration method are choices" begin
 
     @testset "an unknown force field raises Pdb2pqrError before any run" begin

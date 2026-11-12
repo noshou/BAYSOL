@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Tests of Harvest: the mean PMV uncertainty and the solute index, on small tables.
+# Tests of Harvest: the mean PMV uncertainty, the solute index and the residue
+# table, on small tables.
 
 using Test
 
@@ -111,6 +112,70 @@ end
             ),
         ),
     )
+end
+
+end
+
+# --- Residues
+
+module TResidues
+using Test
+using Dev
+using JSON3
+const H = Dev.Harvest.Residues
+
+const TABLE = join(
+    [
+        "# comment line",
+        "ALA\tother\tl-peptide linking\t-\tC3 H7 N O2\t-\t-",
+        "SEC\tother\tl-peptide linking\t-\tC3 H7 N O2 Se\t-\t-",
+        "MSE\tother\tl-peptide linking\tMET\tC5 H11 N O2 Se\t-\t-",
+        "DAL\tother\td-peptide linking\t-\tC3 H7 N O2\t-\t-",
+        "CRO\tother\tl-peptide linking\tTHR, TYR, GLY\tC15 H17 N3 O5\t-\t-",
+        "PEL\tother\tpeptide-like\tALA\tC3 H7 N O2\t-\t-",
+        "HOH\tother\tnon-polymer\t-\tH2 O\t-\t-",
+        "DA\tdna\tdna linking\t-\tC10 H14 N5 O6 P\tA\tself",
+        "DI\tdna\tdna linking\t-\tC10 H13 N4 O7 P\t-\t-",
+        "PSU\trna\trna linking\tU\tC9 H13 N2 O9 P\tU\tparent",
+        "A\trna\trna linking\t-\tC10 H14 N5 O7 P\tA\tself",
+        "",
+    ], "\n")
+
+@testset "residues: letters, parents and bases" begin
+    r = H.residues(TABLE)
+    @test r.protein == Dict("ALA" => "A", "SEC" => "U", "MSE" => "M", "DAL" => "X",
+        "CRO" => "X")
+    @test r.dna == Dict("DA" => "A", "DI" => "N")
+    @test r.rna == Dict("PSU" => "U", "A" => "A")
+end
+
+@testset "residues: the legacy names of MolecularStructure.jl are added" begin
+    pairs =
+        "\"ADE\" => \"A\", \"GUA\" => \"G\", \"CYT\" => \"C\", " *
+        "\"URI\" => \"U\", \"THY\" => \"T\""
+    legacy = H.legacy_names("const LEGACY_NUCLEOTIDE_NAMES =\n    Dict($pairs)\n")
+    @test legacy ==
+          Dict("ADE" => "A", "GUA" => "G", "CYT" => "C", "URI" => "U", "THY" => "T")
+    r = H.residues(TABLE, legacy)
+    @test r.dna["THY"] == "T"
+    @test all(
+        r.rna[n] == b for (n, b) in
+        ("ADE" => "A", "GUA" => "G", "CYT" => "C", "URI" => "U")
+    )
+    # a name the table already has keeps the table's class and base
+    @test H.residues(TABLE, Dict("DA"=>"G")).dna["DA"] == "A"
+    @test_throws ErrorException H.legacy_names("nothing here")
+end
+
+@testset "residues: the text is sorted JSON and reads back" begin
+    r = H.residues(TABLE)
+    text = H.render(r)
+    back = JSON3.read(text)
+    @test Dict(String(k) => String(v) for (k, v) in back[:protein]) == r.protein
+    @test Dict(String(k) => String(v) for (k, v) in back[:dna]) == r.dna
+    @test Dict(String(k) => String(v) for (k, v) in back[:rna]) == r.rna
+    @test H.render(r) == text
+    @test findfirst("\"ALA\"", text) < findfirst("\"DAL\"", text)
 end
 
 end

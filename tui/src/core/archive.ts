@@ -7,6 +7,7 @@
 //   1. The tool and the names: which 7-Zip, what an entry name may be
 //   2. Reading: listing and reading one entry, read only, with a size cap
 //   3. Writing: packing atomically, extracting into a temporary folder
+//   4. Zip files: a workbook opened into its tree and zipped back
 
 import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 import {
@@ -131,8 +132,12 @@ function stampOf(file: string): string | undefined {
  * @returns the standard output.
  * @throws [[ArchiveError]] when 7-Zip cannot run, fails, or prints more than `maxBytes`.
  */
-function sevenZipSync(args: string[], maxBytes: number): Buffer {
-    const r = spawnSync(archiveTool(), args, { maxBuffer: maxBytes, windowsHide: true })
+function sevenZipSync(args: string[], maxBytes: number, cwd?: string): Buffer {
+    const r = spawnSync(archiveTool(), args, {
+        maxBuffer: maxBytes,
+        windowsHide: true,
+        ...(cwd === undefined ? {} : { cwd }),
+    })
     if (r.error !== undefined) {
         const tooBig = (r.error as NodeJS.ErrnoException).code === "ENOBUFS"
         throw new ArchiveError(
@@ -240,6 +245,16 @@ function startIn(stream: ZipStream, cwd: string): ZipStream {
     return sevenZip.listen(stream)
 }
 
+/**
+ * The compression of a run's archive, all from `run_flow.json`: the level (`x`), the
+ * word size (`fb`, the most 7-Zip's LZMA2 takes) and solid mode (`s`), so the files of a
+ * run are compressed as one block, which is what makes many alike XML files small.
+ */
+const methodOptions = (): string[] => {
+    const { level, wordSize, solid } = RUN_FLOW.archive
+    return [`x=${level}`, `fb=${wordSize}`, `s=${solid ? "on" : "off"}`]
+}
+
 /** The options every command shares: this 7-Zip, 7z format, no wildcards, no prompts. */
 const common = (): SevenZipOptions => ({
     $bin: archiveTool(),
@@ -287,7 +302,7 @@ export async function packFiles(
             throw new ArchiveError(`${basenameOf(archive)} exists already`)
         const options: SevenZipOptions = {
             ...common(),
-            method: [`x=${RUN_FLOW.archive.level}`],
+            method: methodOptions(),
             $defer: true,
         }
         await finished(startIn(sevenZip.add(staging, [...files], options), folder))
@@ -387,4 +402,61 @@ export async function withTempFolder<T>(
     } finally {
         rmSync(folder, { recursive: true, force: true })
     }
+}
+
+// ========================================================================================
+// 4. Zip files (a `.xlsx` is one)
+// ========================================================================================
+
+/**
+ * Extracts every entry of an archive of any format into a folder (made if missing), with
+ * their paths. Used to open a workbook (`.xlsx`, a zip) into its XML tree.
+ *
+ * @throws [[ArchiveError]] when 7-Zip cannot run or fails.
+ */
+export function extractAllSync(archive: string, into: string): void {
+    sevenZipSync(
+        ["x", "-y", "-bd", "-spd", `-o${into}`, "--", archive],
+        RUN_FLOW.archive.maxEntryBytes,
+    )
+}
+
+/**
+ * Extracts the named entries of a 7z archive into a folder (made if missing), with their
+ * paths: the synchronous twin of [[extractEntries]] for readers that cannot wait.
+ *
+ * @throws [[ArchiveError]] when 7-Zip cannot run or fails.
+ */
+export function extractNamesSync(
+    archive: string,
+    names: readonly string[],
+    into: string,
+): void {
+    if (names.length === 0) return
+    sevenZipSync(
+        ["x", "-y", "-bd", "-spd", `-o${into}`, "--", archive, ...names],
+        RUN_FLOW.archive.maxEntryBytes,
+    )
+}
+
+/**
+ * Makes a zip of files of a folder, the same bytes for the same files: the entries are in
+ * the order given, deflated at the archive level, with the modification time of each
+ * file as the only timestamp (the caller gives the files a fixed time first). The zip is
+ * written to `out`, which must not exist.
+ *
+ * @param folder - the folder the names are relative to.
+ * @param files - the `/`-separated entry names, in order.
+ * @param out - the zip's path.
+ * @throws [[ArchiveError]] when 7-Zip cannot run or fails.
+ */
+export function zipFolderSync(folder: string, files: readonly string[], out: string): void {
+    // `-mtc=off`: no creation time (7-Zip would write the time of the packing); the access
+    // time is off by default, so the modification time, fixed by the caller, is all
+    const method = ["-tzip", `-mx=${RUN_FLOW.archive.level}`, "-mm=Deflate", "-mtc=off"]
+    sevenZipSync(
+        ["a", ...method, "-bd", "-y", "-spd", "--", out, ...files],
+        RUN_FLOW.archive.maxEntryBytes,
+        folder,
+    )
 }

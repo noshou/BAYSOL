@@ -19,8 +19,11 @@ import {
 import type { ProjectRef } from "../store/projects.js"
 import { listReferences } from "../store/references.js"
 import { Frame } from "../ui/frame.js"
-import { type LegendItem, legendBack, legendFor, legendOf, moveLegend } from "../ui/grid.js"
-import { Prompt } from "../ui/input.js"
+import {
+    cursorMoves,
+    type LegendItem,
+    legendBack, legendFor, legendOf, moveLegend } from "../ui/grid.js"
+import { Prompt, useNote } from "../ui/input.js"
 import {
     CursorList,
     type KeyInput,
@@ -92,7 +95,7 @@ export function ModelReferenceScreen(props: {
     const theme = useTheme()
     const [ref, setRef] = useState<ModelReference>(() => modelReference(project.dir, stem))
     const [edit, setEdit] = useState<Field | undefined>()
-    const [note, setNote] = useState<{ text: string; error: boolean } | undefined>()
+    const { note, say, clear } = useNote()
     const [promptKeys, setPromptKeys] = useState<LegendItem[]>([])
     const cursor = useListCursor(fields.length, fields.length)
     const field = fields[cursor.index] as Field
@@ -111,10 +114,10 @@ export function ModelReferenceScreen(props: {
                 saveModelReference(project.dir, stem, next)
                 setRef(next)
             } catch (error) {
-                setNote({ text: saveErrorNote(error), error: true })
+                say(saveErrorNote(error), true)
             }
         },
-        [project.dir, stem],
+        [project.dir, stem, say],
     )
 
     const stepCurve = (by: number) => {
@@ -124,7 +127,7 @@ export function ModelReferenceScreen(props: {
     }
 
     useKeys((press: KeyInput) => {
-        setNote(undefined)
+        clear()
         if (press.is(keys.up) || press.is(keys.shiftTab)) cursor.move(-1)
         else if (press.is(keys.down) || press.is(keys.tab)) cursor.move(1)
         else if (press.is(keys.back)) nav.pop()
@@ -159,11 +162,7 @@ export function ModelReferenceScreen(props: {
         if (field === "fit") return legendFor("change", keys.enter, [keys.left, keys.right])
         return legendFor(field === "rescale" ? "toggle" : "edit", keys.enter)
     }
-    const moves = moveLegend({
-        up: cursor.index > 0,
-        down: cursor.index < fields.length - 1,
-        tab: true,
-    })
+    const moves = moveLegend({ ...cursorMoves(cursor.index, fields.length), tab: true })
     const legend: LegendItem[] =
         edit === undefined ? legendOf([rowKey(), moves, legendBack]) : promptKeys
     const empty = EMPTY_MODEL_REFERENCE
@@ -211,7 +210,7 @@ export function ModelReferenceScreen(props: {
                     placeholder={placeholder[edit]}
                     onSubmit={submit}
                     onCancel={() => setEdit(undefined)}
-                    onChange={() => setNote(undefined)}
+                    onChange={clear}
                     take="set"
                     cancel="close"
                     onLegend={setPromptKeys}

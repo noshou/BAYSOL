@@ -49,13 +49,14 @@ import type { ProjectRef } from "../store/projects.js"
 import { addReference, referenceUnits } from "../store/references.js"
 import { Frame } from "../ui/frame.js"
 import {
+    cursorMoves,
     type LegendItem,
     legendBack,
     legendFor,
     legendOf,
     moveLegend,
 } from "../ui/grid.js"
-import { Entry, Prompt, type Suggestion } from "../ui/input.js"
+import { Entry, Prompt, type Suggestion, useNote } from "../ui/input.js"
 import {
     CursorList,
     type KeyInput,
@@ -250,7 +251,7 @@ export function DataImportScreen(props: {
             : {},
     )
     const [edit, setEdit] = useState<Field | undefined>()
-    const [note, setNote] = useState<{ text: string; error: boolean } | undefined>()
+    const { note, say, clear } = useNote()
     const [promptKeys, setPromptKeys] = useState<LegendItem[]>([])
 
     const sheets = sheetNames(source)
@@ -315,8 +316,6 @@ export function DataImportScreen(props: {
         [source, options, specQ, specI, specSigma, reference, measured],
     )
 
-    const say = (text: string, error = false) => setNote({ text, error })
-
     /** Changes the option or column row by a step, when it can be stepped. */
     const step = (f: Field, by: number) => {
         if (f === "separator")
@@ -365,6 +364,7 @@ export function DataImportScreen(props: {
                 keep?.units ?? DEFAULT_UNITS,
                 keep?.energy ?? undefined,
                 makeMapping(path, options, columns),
+                keep?.energy_unit,
             )
             onDone(data.q.length, data.dropped, undefined, warning)
             nav.pop()
@@ -375,7 +375,7 @@ export function DataImportScreen(props: {
 
     // the form: move, change, edit, import, back (an error stays until the next key)
     useKeys((press: KeyInput) => {
-        setNote(undefined)
+        clear()
         // Shift+Tab is tested first: a plain `keys.tab` matches either press
         if (press.is(keys.up) || press.is(keys.shiftTab)) cursor.move(-1)
         else if (press.is(keys.down) || press.is(keys.tab)) cursor.move(1)
@@ -397,7 +397,6 @@ export function DataImportScreen(props: {
     }
 
     const closeEdit = () => setEdit(undefined)
-    const onChange = useCallback(() => setNote(undefined), [])
     const suggest = useCallback((text: string) => suggestColumns(table, text), [table])
 
     const submitSkip = (text: string) => {
@@ -492,11 +491,7 @@ export function DataImportScreen(props: {
                 stepping
                     ? legendFor("change", keys.enter, [keys.left, keys.right])
                     : legendFor("edit", keys.enter),
-                moveLegend({
-                    up: cursor.index > 0,
-                    down: cursor.index < fields.length - 1,
-                    tab: true,
-                }),
+                moveLegend({ ...cursorMoves(cursor.index, fields.length), tab: true }),
                 legendBack,
             ])
             : promptKeys
@@ -554,7 +549,7 @@ export function DataImportScreen(props: {
                     placeholder="auto, tab, comma, ;, |, ~, space, or any characters"
                     onSubmit={submitSeparator}
                     onCancel={closeEdit}
-                    onChange={onChange}
+                    onChange={clear}
                     take="set"
                     cancel="close"
                     onLegend={setPromptKeys}
@@ -567,7 +562,7 @@ export function DataImportScreen(props: {
                     maxLength={6}
                     onSubmit={submitSkip}
                     onCancel={closeEdit}
-                    onChange={onChange}
+                    onChange={clear}
                     take="set"
                     cancel="close"
                     onLegend={setPromptKeys}
@@ -588,7 +583,7 @@ export function DataImportScreen(props: {
                     noMatch="no such column"
                     onSubmit={(text, suggestion) => submitColumn(edit, text, suggestion)}
                     onCancel={closeEdit}
-                    onChange={onChange}
+                    onChange={clear}
                     take="set"
                     cancel="close"
                     onLegend={setPromptKeys}

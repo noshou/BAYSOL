@@ -130,12 +130,14 @@ end
         @test hets["HOH"] == 160 && hets["MG"] == 6 && hets["MN"] == 3
 
         standard = 374 + 300 + 415 + 240
-        # the loader keeps the modified bases: 1,329 standard + 323 modified atoms
-        @test n_atoms(load_molecule(_fix("1EHZ"))) == standard + 323 == 1652
+        # the loader keeps the modified bases (1,329 standard + 323 modified atoms) and the
+        # nine Mg and Mn ions, ligands since 2026-11-11 (1652 before)
+        @test n_atoms(load_molecule(_fix("1EHZ"))) == standard + 323 + 9 == 1661
+        @test n_atoms(load_molecule(_fix("1EHZ"); ligands = false)) == 1652
         # also through the canonical .pdb written for the mmCIF fixture
         resolved = reslove_struct(LocalPathSource(_fix("1EHZ", "cif")))
         try
-            @test n_atoms(load_molecule(resolved)) == standard + 323
+            @test n_atoms(load_molecule(resolved)) == standard + 323 + 9
         finally
             rm(resolved; force = true)
         end
@@ -158,8 +160,9 @@ end
             # 1EHZ: 14 modified residues through their base, 149 of the 821 hydrogens;
             # pdb2pqr's 5TERM patch deletes the 5' phosphorus of residue 1: the pipeline
             # puts
-            # it back and drops that residue's H5T, so 1652 heavy atoms and 820 hydrogens
-            @test _hydrogenated(dir, "1EHZ") == (1652, 2472, 820, false, :amber)
+            # it back and drops that residue's H5T, so 1652 heavy atoms of the polymer (1661
+            # with the nine ions of the structure, kept since 2026-11-11) and 820 hydrogens
+            @test _hydrogenated(dir, "1EHZ") == (1661, 2481, 820, false, :amber)
             # the classification that sends them there
             for id in ("1BNA", "1RNA", "1SDR", "1EHZ")
                 c = hydrogenation_choice(
@@ -217,8 +220,10 @@ end
             @test choice ==
                   (content = :nucleic, ff = :amber, titration = :none, reason = "")
             hp = resolve_hydrogens(path, 7.4; ff = choice.ff, titration = NoTitration())
-            @test n_atoms(load_molecule(path)) == 330
-            @test n_atoms(load_molecule(hp)) == 504
+            # the two Na+ ions are ligands and kept since 2026-11-11 (330 and 504 before)
+            @test n_atoms(load_molecule(path)) == 330 + 2
+            @test n_atoms(load_molecule(hp)) == 504 + 2
+            @test n_atoms(load_molecule(path; ligands = false)) == 330
             # pdb2pqr with PARSE gives up on the total charge of the file (-12.68): a typed
             # Pdb2pqrError, which is why a nucleic acid goes through AMBER
             ok = try

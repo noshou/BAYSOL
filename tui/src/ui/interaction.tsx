@@ -12,6 +12,7 @@
 //   6. `useListCursor`: the cursor and offset of a list as state
 //   7. `CursorList` and `ListText`: a list drawn with a `>` cursor
 //   8. `Swatch`: the colour cell pair of a list row
+//   9. `ChoiceTabs`: a one-line row of on/off tabs
 
 import {
     Box,
@@ -30,6 +31,7 @@ import {
     useMemo,
     useState,
 } from "react"
+import { clampIndex } from "../core/terminal.js"
 import { useTheme } from "./theme.js"
 
 // ========================================================================================
@@ -338,6 +340,32 @@ export const keys = {
     /** Add a nucleotide (DNA or RNA) from a sequence file; also the custom landing. */
     addNucleotide: ctrlKey("e"),
 
+    /** Rename the highlighted note (the notes list; on the buffer's solutes table the
+     * same key adds a nucleotide: a different screen). */
+    notes:         ctrlKey("e"),
+
+    /** Open the notes list of the project (project menu), of the highlighted recipe
+     * (recipes table), of the buffer or of one recipe (their solutes table). */
+    notesList:     shiftKey("n"),
+
+    /** Add the rows of a standard buffer (Tris, HEPES, PBS ...) on the solutes table. */
+    bufferTemplate: shiftKey("b"),
+
+    /** Make a template: a recipe (recipes table) or rows (solutes table) that follow the
+     * pH and the temperature, from a shipped buffer, a custom one or a table. */
+    newTemplate:   shiftKey("t"),
+
+    /** Turn the rows of the solutes table into a template: a table of amounts that starts
+     * from them at the pH of the table. */
+    convertTemplate: shiftKey("v"),
+
+    /** Edit the definition of the template recipe under the cursor (recipes table). */
+    editTemplate:  shiftKey("e"),
+
+    /** The third answer of a question that has one besides Enter and Esc (`save as a
+     * template?`: the plain recipe). */
+    otherAnswer:   plainKey("n"),
+
     /** Edit the pH of a buffer (and its σ) on the solutes table. */
     editPh:        ctrlKey("g"),
 
@@ -397,19 +425,13 @@ export const keys = {
     /** Read the `run.LOG` of a run (`open runs`). */
     showLog:    ctrlKey("l"),
 
-    /** Move (copy) the `.tex` plots of the whole run, every model and the comparison, to
-     * the plot folder (`open runs`). */
+    /** Move (copy) the `.tex` plots of a run to the plot folder (`open runs`): a dropdown
+     * asks for the whole run or one model. */
     moveTex:         shiftKey("t"),
 
-    /** The same for the highlighted model or comparison alone. */
-    moveTexHere:     plainKey("t"),
-
-    /** Move (copy) the data of the whole run, the workbooks and the comparison table, to
-     * the data folder. */
+    /** Move (copy) the data of a run, the workbooks and the comparison table, to the data
+     * folder: the same dropdown. */
     moveData:        shiftKey("d"),
-
-    /** The same for the highlighted model or comparison alone. */
-    moveDataHere:    plainKey("d"),
 
     /** Compile the plots of the highlighted model or comparison with LaTeX into the
      * plot folder. */
@@ -467,7 +489,10 @@ export function keyPress(input: string, key: InkKey): KeyInput {
  * A screen passes an item to the menu only when it applies (see `GridMenu`), so the
  * label and the key are written here once.
  */
-export const taskbarKeys = {run: {label: "run", key: keys.runKey }} as const
+export const taskbarKeys = {
+    run: { label: "run", key: keys.runKey },
+    notes: { label: "notes", key: keys.notesList },
+} as const
 
 // ========================================================================================
 // 3. The key hook
@@ -648,7 +673,7 @@ export function stepIndex(
 ): number {
     if (count <= 0) return 0
     if (wrap) return (index + (down ? 1 : count - 1)) % count
-    return Math.min(Math.max(index + (down ? 1 : -1), 0), count - 1)
+    return clampIndex(index + (down ? 1 : -1), count)
 }
 
 // ========================================================================================
@@ -798,4 +823,53 @@ export const swatchCells = 2
  */
 export function Swatch({ colour }: { colour?: string }): ReactNode {
     return <Text backgroundColor={colour}>{" ".repeat(swatchCells)}</Text>
+}
+
+// ========================================================================================
+// 9. `ChoiceTabs`: a one-line row of on/off tabs
+// ========================================================================================
+
+/**
+ * One tab of a [[ChoiceTabs]] row as text: `[pdf]` when the choice is on, `(pdf)` when
+ * it is off, the tab in focus in capitals.
+ *
+ * @param option - the choice.
+ * @param on - whether it is on.
+ * @param focused - whether it is the tab in focus.
+ * @returns the text.
+ */
+export function tabLabel(option: string, on: boolean, focused: boolean): string {
+    const label = focused ? option.toUpperCase() : option
+    return on ? `[${label}]` : `(${label})`
+}
+
+/**
+ * A one-line row of tabs for a choice of a few options, each on or off. It only draws:
+ * the screen moves the focus and toggles (the figure formats of the output sheet, the
+ * units of q on the data screen).
+ *
+ * @param props.options - every choice, in order.
+ * @param props.selected - the choices that are on.
+ * @param props.focus - the index of the tab in focus; none when left out.
+ * @returns the row, the tab in focus bold, the ones that are off muted.
+ */
+export function ChoiceTabs(props: {
+    options: readonly string[]
+    selected: ReadonlySet<string>
+    focus?: number
+}): ReactNode {
+    const { options, selected, focus } = props
+    const theme = useTheme()
+    return (
+        <Box columnGap={1}>
+            {options.map((option, i) => {
+                const on = selected.has(option)
+                return (
+                    <Text key={option} bold={i === focus} color={on ? theme.fg : theme.mt}>
+                        {tabLabel(option, on, i === focus)}
+                    </Text>
+                )
+            })}
+        </Box>
+    )
 }

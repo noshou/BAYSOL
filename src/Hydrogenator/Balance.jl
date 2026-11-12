@@ -60,6 +60,43 @@ function _heavy_atoms_by_residue(path::AbstractString)
 end
 
 """
+Put the input residues `gone` (keys of `before`, [`_heavy_atoms_by_residue`](@ref)) that are
+ligands the model keeps ([`is_ligand`](@ref BAYSOL.MolecularStructure.is_ligand)) back
+into the file `out_path`, as the input's own records, after its last atom record.
+
+# Returns
+The number of atoms put back (0 leaves the file untouched).
+
+# Exceptions
+- `SystemError`: `out_path` cannot be read or written.
+- `ComponentError`: a residue name that could not be looked up (offline).
+"""
+function _restore_ligand_residues!(out_path::AbstractString, before, gone)::Int
+    lines = String[]
+    n_res = 0
+    for k in gone
+        atoms = before[k]
+        name = uppercase(strip(SubString(first(atoms).line, 18, 20)))
+        is_ligand(name) || continue
+        append!(lines, (a.line for a in atoms))
+        n_res += 1
+    end
+    isempty(lines) && return 0
+    out = readlines(out_path)
+    last_atom = findlast(l -> startswith(l, "ATOM") || startswith(l, "HETATM"), out)
+    last_atom === nothing && (last_atom = length(out))
+    open(out_path, "w") do io
+        for (i, l) in enumerate(out)
+            println(io, l)
+            i == last_atom && foreach(x -> println(io, x), lines)
+        end
+    end
+    @info "pdb2pqr dropped $n_res ligand residue(s) of \"$(basename(out_path))\" " *
+          "($(length(lines)) heavy atom(s) put back from the input)"
+    return length(lines)
+end
+
+"""
     restore_dropped_atoms!(in_path, out_path) -> NamedTuple
 
 Compare the heavy atoms of the pdb2pqr input `in_path` with its output `out_path`,
@@ -76,12 +113,16 @@ the `H5T` pdb2pqr put on its `O5'` is removed, since the oxygen is bonded to the
 phosphorus again.
 Heavy atoms the output has and
 the input does not (pdb2pqr adds some, `OXT` for instance) are not touched, only counted and
-warned about. Residues the output lacks altogether (waters, ligands) are left alone.
+warned about. A residue the output lacks altogether is left alone when it is a water or has
+no known composition, and put back with all its atoms, verbatim, when it is a ligand the
+model keeps ([`is_ligand`](@ref BAYSOL.MolecularStructure.is_ligand): pdb2pqr may drop a
+ligand it has no definition for and keeps heme without hydrogens). It carries no hydrogens.
 
 The file `out_path` is rewritten when something is restored.
 
 # Returns
-`(; restored, added, h5t_dropped)`: the counts.
+`(; restored, added, h5t_dropped, ligands)`: the counts, `ligands` the atoms of the
+ligand residues put back.
 
 # Exceptions
 - `SystemError`: a path cannot be read or written.
@@ -97,11 +138,12 @@ function restore_dropped_atoms!(in_path::AbstractString, out_path::AbstractStrin
     added = 0
     todo = Dict{Tuple{String,String},Vector{String}}()   # output residue key => lines
     restored = 0
+    gone = Tuple{String,String}[]   # input residues with no counterpart in the output
     for (k, atoms) in before
         okey = k
         if !haskey(after, okey)
-            k[1] == "" || continue
-            cands = get(by_number, k[2], Tuple{String,String}[])
+            cands = k[1] == "" ? get(by_number, k[2], Tuple{String,String}[]) : []
+            isempty(cands) && push!(gone, k)
             length(cands) == 1 || continue
             okey = only(cands)
         end
@@ -177,20 +219,22 @@ function restore_dropped_atoms!(in_path::AbstractString, out_path::AbstractStrin
               "restored from the input" *
               (h5t > 0 ? " ($h5t H5T removed with the restored phosphorus)" : "")
     end
+    ligands = _restore_ligand_residues!(out_path, before, gone)
     added > 0 && @warn "pdb2pqr added $added heavy atom(s) to \"$(basename(in_path))\" " *
           "(kept as pdb2pqr wrote them)"
-    return (; restored, added, h5t_dropped = h5t)
+    return (; restored, added, h5t_dropped = h5t, ligands)
 end
 
 """
 The number of heavy atoms of the .pdb at `path` ([`_heavy_atoms_by_residue`](@ref)), counted
-after [`sanitized_copy`](@ref) (so two chains that reuse an id count twice).
+after [`sanitized_copy`](@ref) with `waters = true` (so two chains that reuse an id count
+twice, and waters, which the hydrogenation step removes, not at all).
 """
 function heavy_atom_count(path::AbstractString)
     tmp = mktempdir()
     try
         copy = joinpath(tmp, "copy.pdb")
-        p = sanitized_copy(path, copy) === nothing ? path : copy
+        p = sanitized_copy(path, copy; waters = true) === nothing ? path : copy
         return sum(length, values(_heavy_atoms_by_residue(p)); init = 0)
     finally
         rm(tmp; recursive = true, force = true)

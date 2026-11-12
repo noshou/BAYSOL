@@ -1,0 +1,18 @@
+{
+    "compileSeconds": 180,
+    "engineArguments": [
+        "-interaction=nonstopmode",
+        "-halt-on-error"
+    ],
+    "searched": [
+        "lualatex",
+        "xelatex"
+    ],
+    "accepted": [
+        "lualatex",
+        "xelatex",
+        "pdflatex"
+    ],
+    "folder": "plots",
+    "dataFolder": "data"
+}

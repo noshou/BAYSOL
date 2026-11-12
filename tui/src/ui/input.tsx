@@ -123,6 +123,12 @@ function SuggestionList(props: {
 /** The most suggestions a list shows, status line not counted. */
 export const suggestionLines = 7
 
+/** The rows a one-line prompt takes under a table: the field and its error. */
+export const PROMPT_ROWS = 3
+
+/** The rows a dropdown takes besides its choices: label, field, status. */
+export const DROPDOWN_CHROME = 4
+
 /**
  * What an entry (the one engine behind [[Prompt]] and [[Dropdown]]) is told.
  *
@@ -423,6 +429,7 @@ type DropdownProps<T> = {
     label:      string
     search:     (text: string) => Choice<T>[]
     noMatch?:   string
+    placeholder?: string
     initial?:   string
     onPick:     (value: T) => void
     onCancel:   () => void
@@ -491,20 +498,69 @@ const maxWhatCells = 27
  * @property text - what is asked, e.g. `delete project demo? this cannot be undone!`.
  * @property yes - what Enter does, e.g. `delete`.
  * @property no - what Esc does, e.g. `keep`.
+ * @property other - a third answer, given by `n` (`keys.otherAnswer`), e.g. `plain
+ *     recipe`; only when [[Confirm.ask]] was given an action for it.
  */
-export type Question = { text: string; yes: string; no: string }
+export type Question = { text: string; yes: string; no: string; other?: string }
 
 /**
  * The legend of a question: what Enter does and what Esc does, from its own fields.
  *
  * @param question - the question.
- * @returns `yes: ⏎` and `no: esc`.
+ * @returns `yes: ⏎` and `no: esc`, with the third answer's `n` between them if any.
  */
 export function questionLegend(question: Question): LegendItem[] {
+    const other = question.other
     return [
         legendFor(question.yes, keys.enter),
+        ...(other === undefined ? [] : [legendFor(other, keys.otherAnswer)]),
         legendFor(question.no, keys.escape),
     ]
+}
+
+/** What a page says on its note row: the text and whether it is an error. */
+export type NoteLine = { text: string; error: boolean }
+
+/**
+ * The note row of a page as state: the last result (`say`), which the page clears at
+ * its next key (`clear`).
+ *
+ * @property note - what is on the note row, `undefined` for nothing.
+ * @property say - puts a note up; `error` draws it in the error colour.
+ * @property clear - takes the note down.
+ */
+export type NoteState = {
+    note: NoteLine | undefined
+    say: (text: string, error?: boolean) => void
+    clear: () => void
+}
+
+/**
+ * Keeps the note of a page. `say` and `clear` keep their identity, so they may stand in
+ * the dependencies of a callback.
+ *
+ * @returns the [[NoteState]].
+ */
+export function useNote(): NoteState {
+    const [note, setNote] = useState<NoteLine | undefined>()
+    const say = useCallback((text: string, error = false) => setNote({ text, error }), [])
+    const clear = useCallback(() => setNote(undefined), [])
+    return { note, say, clear }
+}
+
+/**
+ * The note a page shows: the text of an open question first (never an error), else the
+ * page's own note.
+ *
+ * @param confirm - the page's [[Confirm]].
+ * @param note - the page's own note.
+ * @returns what to put on the note row.
+ */
+export function shownNote(
+    confirm: Confirm,
+    note: NoteLine | undefined,
+): NoteLine | undefined {
+    return confirm.note !== undefined ? { text: confirm.note, error: false } : note
 }
 
 /**
@@ -513,7 +569,9 @@ export function questionLegend(question: Question): LegendItem[] {
  *
  * @property question - the open question, `undefined` while nothing is asked.
  * @property note - the text of the open question, for the note line.
- * @property ask - asks `question`; `action` runs if Enter answers it.
+ * @property ask - asks `question`; `action` runs if Enter answers it, `declined` (when
+ *     given) if Esc does, `other` (when given, with `question.other` naming it) if `n`
+ *     does.
  * @property handleKey - gives a key press to the open question: returns `true` when
  *     a question was open (the press was its answer, or ignored), so the screen
  *     stops there; `false` when nothing is asked and the screen handles the key.
@@ -521,8 +579,30 @@ export function questionLegend(question: Question): LegendItem[] {
 export type Confirm = {
     question: Question | undefined
     note:     string | undefined
-    ask:      (question: Question, action: () => void) => void
+    ask:      (
+        question: Question,
+        action: () => void,
+        declined?: () => void,
+        other?: () => void,
+    ) => void
     handleKey: (press: KeyInput) => boolean
+}
+
+/**
+ * What a key press answers to an open question.
+ *
+ * @param press - the key.
+ * @param hasOther - the question has a third answer ([[Question.other]]).
+ * @returns `yes` for Enter, `no` for Esc or Ctrl-X, `other` for `n` when there is a third
+ *     answer, `undefined` for any other key (it is ignored).
+ */
+export function answerOf(
+    press: KeyInput,
+    hasOther: boolean,
+): "yes" | "no" | "other" | undefined {
+    if (press.is(keys.enter)) return "yes"
+    if (press.is(keys.escape) || press.is(keys.back)) return "no"
+    return hasOther && press.is(keys.otherAnswer) ? "other" : undefined
 }
 
 /**
@@ -533,22 +613,31 @@ export type Confirm = {
  * @returns the [[Confirm]].
  */
 export function useConfirm(): Confirm {
-    const [pending, setPending] =
-        useState<{ question: Question; action: () => void } | null>(null)
+    const [pending, setPending] = useState<{
+        question: Question
+        action: () => void
+        declined?: () => void
+        other?: () => void
+    } | null>(null)
 
     const ask = useCallback(
-        (question: Question, action: () => void) => setPending({ question, action }),
+        (
+            question: Question,
+            action: () => void,
+            declined?: () => void,
+            other?: () => void,
+        ) => setPending({ question, action, declined, other }),
         []
     )
 
     const handleKey = useCallback((press: KeyInput): boolean => {
         if (pending === null) return false
-        if (press.is(keys.enter)) {
-            setPending(null)
-            pending.action()
-        } else if (press.is(keys.escape) || press.is(keys.back)) {
-            setPending(null)
-        }
+        const answer = answerOf(press, pending.other !== undefined)
+        if (answer === undefined) return true
+        setPending(null)
+        if (answer === "yes") pending.action()
+        else if (answer === "no") pending.declined?.()
+        else pending.other?.()
         return true
     }, [pending])
 
@@ -609,6 +698,9 @@ export function destructiveQuestion(what: string): Question {
 
 /** The legend item of the delete key, shown while the list holds an entry. */
 const deleteLegend: LegendItem = legendFor("delete", keys.remove)
+
+/** The legend item that says typing narrows a pick list (the field is always live). */
+const findLegend: LegendItem = { label: "find", keys: "type" }
 
 /**
  * What a pick list is told.
@@ -718,13 +810,18 @@ export function usePickList<T>(props: PickListProps<T>): PickList {
             label={label}
             search={search}
             noMatch="no match"
+            placeholder="type to find"
             active={confirm.question === undefined}
             onPick={onPick}
             onCancel={onCancel}
             onBack={onBack}
             take={take}
             cancel={cancel}
-            extras={[...actions.map((a) => legendFor(a.label, a.key)), deleteLegend]}
+            extras={[
+                findLegend,
+                ...actions.map((a) => legendFor(a.label, a.key)),
+                deleteLegend,
+            ]}
             onHighlight={setHighlighted}
             onLegend={setShown}
         />

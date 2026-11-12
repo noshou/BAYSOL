@@ -21,7 +21,7 @@ const SETTING_LIMITS = (SHELL_THICKNESS = (above = 0,),)
 
 """
 The constants above that are settings, the ones a user may change: the terminal interface
-shows each on a page of its own, and [`load_settings`](@ref BAYSOL.Pipeline.load_settings)
+shows each on a page of its own, and `load_settings`
 accepts a saved value for these and for no other name.
 """
 const SETTING_NAMES = (

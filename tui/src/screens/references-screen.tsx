@@ -9,9 +9,8 @@
 
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useMemo, useState } from "react"
-import { readSystem } from "../core/environment.js"
-import { pick } from "../core/file-system.js"
-import { shortNumber, truncate } from "../core/terminal.js"
+import { DATA_EXTENSIONS } from "../core/file-system.js"
+import { clampIndex, shortNumber, truncate } from "../core/terminal.js"
 import { dataErrorNote, readDataInfo, unitLabel } from "../store/data.js"
 import { loadSource } from "../store/data-table.js"
 import { checkPath, MAX_PATH_TYPED, pathSuggestions } from "../store/lists.js"
@@ -23,8 +22,18 @@ import {
     type ReferenceEntry,
 } from "../store/references.js"
 import { Frame } from "../ui/frame.js"
-import { type LegendItem, legendBack, legendFor, legendOf, moveLegend } from "../ui/grid.js"
-import { destructiveQuestion, PathPrompt, questionLegend, useConfirm } from "../ui/input.js"
+import {
+    cursorMoves,
+    type LegendItem,
+    legendBack, legendFor, legendOf, moveLegend } from "../ui/grid.js"
+import {
+    destructiveQuestion,
+    PathPrompt,
+    questionLegend,
+    shownNote,
+    useConfirm,
+    useNote,
+} from "../ui/input.js"
 import {
     type KeyInput,
     keys,
@@ -35,6 +44,7 @@ import {
     useNav,
     useScreenActive,
 } from "../ui/interaction.js"
+import { PICKING_NOTE, usePathField, usePathPick } from "../ui/prompt-flows.js"
 import { type Column, DataTable, Panel, useTheme } from "../ui/theme.js"
 import { DataImportScreen } from "./data-import.js"
 
@@ -42,9 +52,7 @@ import { DataImportScreen } from "./data-import.js"
 type Mode = "list" | "path" | "picking"
 
 /** The file extensions the path prompt hints (a typed path may have any name). */
-const hintedExtensions: ReadonlySet<string> = new Set([
-    "dat", "txt", "csv", "tsv", "tab", "xlsx",
-])
+const hintedExtensions: ReadonlySet<string> = new Set(DATA_EXTENSIONS)
 
 /** The names the path prompt completes: folders and the usual data files. */
 const acceptedHint = (name: string): boolean =>
@@ -52,9 +60,6 @@ const acceptedHint = (name: string): boolean =>
 
 /** The suggestions of the path prompt. */
 const suggestPaths = (text: string) => pathSuggestions(text, acceptedHint)
-
-/** The note while the picker window is open. */
-const PICKING_NOTE = "choose a file in the picker window..."
 
 /** The rows the table spends besides its curves: header, rule and the position line. */
 const TABLE_ROWS = 3
@@ -118,12 +123,10 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
     const active = useScreenActive()
     const confirm = useConfirm()
     const [mode, setMode] = useState<Mode>("list")
-    const [note, setNote] = useState<{ text: string; error: boolean } | undefined>()
-    const [problem, setProblem] = useState<string | undefined>()
-    const [typed, setTyped] = useState("")
-    const [promptKeys, setPromptKeys] = useState<LegendItem[]>([])
-    // the path prompt is remounted to empty its field
-    const [fieldKey, setFieldKey] = useState(0)
+    const { note, say, clear } = useNote()
+    const field = usePathField(clear)
+    const { typed, problem, setProblem, promptKeys, setPromptKeys, fieldKey, resetField } =
+        field
     // bumped to read the folder again: after a change and at every key of the list
     const [version, setVersion] = useState(0)
     // the highlighted file is kept by NAME, so a folder that changes under it keeps it
@@ -144,20 +147,15 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
     const here = entries[at]
     const top = scrollWindow(at, offset, pageSize, entries.length)
 
-    const say = useCallback((text: string, error = false) => setNote({ text, error }), [])
     const refresh = useCallback(() => setVersion((v) => v + 1), [])
-    const resetField = useCallback(() => {
-        setTyped("")
-        setFieldKey((k) => k + 1)
-    }, [])
     const toList = useCallback(() => {
         setMode("list")
         setProblem(undefined)
-    }, [])
+    }, [setProblem])
 
     /** Moves the highlight to a row, keeping the window around it. */
     const step = (to: number): void => {
-        const entry = entries[Math.min(Math.max(to, 0), entries.length - 1)]
+        const entry = entries[clampIndex(to, entries.length)]
         if (entry !== undefined) setSelected(entry.file)
         setOffset(top)
     }
@@ -204,28 +202,13 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
         }
     }
 
-    const submitPath = (text: string) => {
-        const bad = load(text.trim()) // a typed or pasted path may end in blanks
-        if (bad !== undefined) return setProblem(bad)
-        resetField()
-        toList()
-    }
-
-    const pickFile = async () => {
-        setMode("picking")
-        const result = await pick(readSystem(), readSystem().home, "data")
-        if ("problem" in result) say(result.problem, true)
-        else if (result.files[0] !== undefined) {
-            const bad = load(result.files[0])
-            if (bad !== undefined) say(bad, true)
-            else {
-                resetField()
-                return toList()
-            }
-        } else say("nothing was picked")
-        resetField()
-        setMode("path")
-    }
+    const { submitPath, pickFile } = usePathPick({
+        field,
+        load,
+        say,
+        setMode,
+        leave: toList,
+    })
 
     /** `^n`: a path prompt, once the project has data. */
     const add = () => {
@@ -252,7 +235,7 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
 
     useKeys((press: KeyInput) => {
         if (confirm.handleKey(press)) return
-        setNote(undefined)
+        clear()
         refresh()
         if (press.is(keys.back)) nav.pop()
         else if (press.is(keys.up)) step(at - 1)
@@ -267,12 +250,6 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
         if (typed === "" && press.is(keys.pickFiles)) void pickFile()
     }, mode === "path")
 
-    const onChange = useCallback((text: string) => {
-        setTyped(text)
-        setProblem(undefined)
-        setNote(undefined)
-    }, [])
-
     const legend: LegendItem[] = confirm.question
         ? questionLegend(confirm.question)
         : mode === "path"
@@ -286,17 +263,16 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
                     legendBack,
                     legendFor("add", keys.addReference),
                     here !== undefined && legendFor("delete", keys.remove),
-                    moveLegend({ up: at > 0, down: at < entries.length - 1 }),
+                    moveLegend(cursorMoves(at, entries.length)),
                 ])
     const shown =
-        confirm.note !== undefined
-            ? { text: confirm.note, error: false }
-            : mode === "picking"
-                ? { text: PICKING_NOTE, error: false }
-                : (note ??
-                    (referenceNote(here) === undefined
-                        ? undefined
-                        : { text: referenceNote(here) as string, error: false }))
+        shownNote(confirm, undefined) ??
+        (mode === "picking"
+            ? { text: PICKING_NOTE, error: false }
+            : (note ??
+                (referenceNote(here) === undefined
+                    ? undefined
+                    : { text: referenceNote(here) as string, error: false })))
 
     const table: Column<ReferenceEntry>[] = [
         { title: "name", text: (e) => referenceCells(e)[0] },
@@ -324,7 +300,7 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
                     <PathPrompt
                         key={fieldKey}
                         maxLength={MAX_PATH_TYPED}
-                        placeholder="any table: .dat, .csv, .tsv, .txt, .xlsx, ..."
+                        placeholder="any table: .dat, .fit, .csv, .tsv, .txt, .xlsx, ..."
                         suggest={suggestPaths}
                         error={problem}
                         onSubmit={submitPath}
@@ -333,7 +309,7 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
                             toList()
                         }}
                         onBack={nav.pop}
-                        onChange={onChange}
+                        onChange={field.onChange}
                         take="open"
                         canTake={typed !== ""}
                         cancel="close"

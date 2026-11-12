@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// Tests of store/run.ts: readiness, temperature prompt, claim, output tail, session.
+// Tests of store/run.ts: readiness, temperature, claim, output tail, session.
 
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
@@ -43,11 +43,13 @@ import {
     juliaCommand,
     type Launcher,
     markAllStaleRuns,
+    missingComponents,
     OutputTail,
     parseTemperature,
     projectReadiness,
     quitAll,
     RunSession,
+    runProjectFile,
     snapshotInputs,
     temperatureStart,
 } from "../src/store/run.js"
@@ -55,7 +57,7 @@ import {
     archivePath,
     isPacked,
     readRunText,
-    runFolderFiles,
+    runFiles,
 } from "../src/store/run-archive.js"
 import {
     compareRunNames,
@@ -68,7 +70,7 @@ import {
     zoneLabelWithSource,
 } from "../src/store/run-stamp.js"
 import { destructiveQuestion } from "../src/ui/input.js"
-import { fixture, tempDir, tempDir as tmp } from "./support/fixtures.js"
+import { fixture, runOn, scratchProject, tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Readiness
@@ -105,7 +107,10 @@ test("readiness: a run needs a model and a non-empty buffer", () => {
     assert.equal(projectReadiness(ref).run, false, "an empty buffer is not a buffer")
     writeSolutes(dir, [row])
     assert.equal(projectReadiness(ref).buffer, false, "solutes without a pH are no buffer")
+    // an old buffer (pH and σ, no temperature) is not ready until the temperature is set
     writeSolutes(dir, [row], { pH: 7.4, "sigma-pH": 0.1 })
+    assert.equal(projectReadiness(ref).buffer, false, "no temperature, no buffer")
+    writeSolutes(dir, [row], { pH: 7.4, "sigma-pH": 0.1, temperature: 25 })
     assert.deepEqual(projectReadiness(ref), {
         models: true, buffer: true, data: false, run: false,
     })
@@ -113,12 +118,33 @@ test("readiness: a run needs a model and a non-empty buffer", () => {
     writeData(dir, curve, "c.dat", "A-1")
     assert.equal(projectReadiness(ref).data, false)
     assert.equal(projectReadiness(ref).run, false)
-    setEnergy(dir, 12400)
+    setEnergy(dir, 12400, "eV")
     assert.deepEqual(projectReadiness(ref), {
         models: true, buffer: true, data: true, run: true,
     })
     writeFileSync(join(dir, "data.json"), "{ garbled")
     assert.equal(projectReadiness(ref).run, false)
+})
+
+test("missing components name what a run still lacks, and are empty at a go", () => {
+    const { dir, model } = setup()
+    const ref = { id: "p", dir }
+    assert.deepEqual(missingComponents(ref), [
+        "models", "solutes", "pH", "temperature", "data", "energy",
+    ])
+    addModel(dir, model)
+    writeSolutes(dir, [row])
+    assert.deepEqual(missingComponents(ref), ["pH", "temperature", "data", "energy"])
+    // an old project: pH and σ are there, the temperature is not
+    writeSolutes(dir, [row], { pH: 7.4, "sigma-pH": 0.1 })
+    assert.deepEqual(missingComponents(ref), ["temperature", "data", "energy"])
+    writeSolutes(dir, [row], { pH: 7.4, "sigma-pH": 0.1, temperature: 4 })
+    writeData(dir, curve, "c.dat", "A-1")
+    assert.deepEqual(missingComponents(ref), ["energy"])
+    setEnergy(dir, 12400, "eV")
+    assert.deepEqual(missingComponents(ref), [])
+    assert.equal(projectReadiness(ref).run, true)
+    assert.ok(missingComponents({ id: "g", dir: join(dir, "nowhere") }).length > 0)
 })
 
 test("readiness: an unreadable buffer or a missing folder counts as missing", () => {
@@ -132,7 +158,7 @@ test("readiness: an unreadable buffer or a missing folder counts as missing", ()
 })
 
 // ========================================================================================
-// 2. Temperature prompt
+// 2. Temperature
 // ========================================================================================
 
 test("a temperature is a number in the range of the asset file", () => {
@@ -150,24 +176,15 @@ test("a temperature is a number in the range of the asset file", () => {
         assert.deepEqual(parseTemperature(text), { error: "from 0 to 100 °C" }, text)
 })
 
-test("the prompt starts at the last temperature, else at the default", () => {
+test("the prompt starts at the buffer's temperature, else the default", () => {
     assert.equal(temperatureStart(), "25")
-    assert.equal(temperatureStart(37.5), "37.5")
+    assert.equal(temperatureStart(4), "4")
 })
 
 // ========================================================================================
 // 3. Claim
 // ========================================================================================
 
-
-/** A project folder with the inputs of a run. */
-function project(): string {
-    const dir = tmp()
-    writeFileSync(join(dir, "buffer.json"), '{"solutes": []}\n')
-    writeFileSync(join(dir, "data.tsv"), "0.1\t5\t0.1\n")
-    writeFileSync(join(dir, "data.json"), '{"units": "A-1", "energy": 8000}\n')
-    return dir
-}
 
 /** The run.json of a run that Julia is running now, with a fresh heartbeat. */
 function liveJson(pid: number, ms: number = Date.now()): string {
@@ -180,14 +197,14 @@ function liveJson(pid: number, ms: number = Date.now()): string {
 }
 
 test("the name is HH-MM-SS-mmm_TZ_±HHMM_YYYY-MM-DD, local time, Julia's name too", () => {
-    // the literals of `run_project: UTC time without a package` in test_runproject.jl
+    // the literals of `run_project: UTC time without a package` in run-project.test.jl
     const at = Date.UTC(2026, 10, 8, 4, 35, 29, 123)
     assert.equal(runStamp(at, -300, "EST"), "23-35-29-123_EST_-0500_2026-11-07")
     assert.equal(runStamp(at, 0, "UTC"), "04-35-29-123_UTC_+0000_2026-11-08")
     const sample = Date.UTC(2023, 10, 14, 22, 13, 20, 123)
     assert.equal(runStamp(sample, 330, "GMT"), "03-43-20-123_GMT_+0530_2023-11-15")
     assert.equal(runStamp(sample - 123, -300, "EST"), "17-13-20-000_EST_-0500_2023-11-14")
-    assert.equal(runStamp(0, 0, "UTC"), "00-00-00-000_UTC_+0000_1970-01-01")
+    assert.equal(runStamp(0, 0, "UTC"), runOn("1970-01-01"))
     // this machine's zone, whatever it is
     const shape = /^\d\d-\d\d-\d\d-\d{3}_\p{L}{3,}_[+-]\d{4}_\d{4}-\d\d-\d\d$/u
     assert.match(runStamp(Date.now()), shape)
@@ -302,7 +319,7 @@ test("a name is shown as 23:35:29:123 EST -05:00 · 2026-11-07, an old one too",
         "04:35:29:123 UTC +00:00 · 2026-11-08",
     )
     assert.equal(
-        runDisplay("20261106T193308Z"),
+        runDisplay("19-33-08-000_UTC_+0000_2026-11-06"),
         "19:33:08:000 UTC +00:00 · 2026-11-06",
     )
     assert.equal(
@@ -329,7 +346,8 @@ test("a name parses back to its instant, in both formats; near misses are no sta
     assert.equal(parseRunStamp("23-35-29-123_SãoPaulo_-0300_2026-11-07"), late)
     assert.equal(parseRunStamp("23-35-29-123_Sa\u0303oPaulo_-0300_2026-11-07"), late)
     assert.equal(parseRunStamp("23-35-29-123_Ürümqi_-0300_2026-11-07"), late)
-    assert.equal(parseRunStamp("20231114T221320Z"), Date.UTC(2023, 10, 14, 22, 13, 20))
+    const utc = Date.UTC(2023, 10, 14, 22, 13, 20)
+    assert.equal(parseRunStamp("22-13-20-000_UTC_+0000_2023-11-14"), utc)
     for (const bad of [
         "", "run", "17-13-20-000_EST_-0500_14-11-2023", "17-13-20-00_EST_-0500_2023-11-14",
         "17:13:20-000_EST_-0500_2023-11-14", "17-13-20-000_EST_0500_2023-11-14",
@@ -337,7 +355,8 @@ test("a name parses back to its instant, in both formats; near misses are no sta
         "17-13-20-000_E1T_-0500_2023-11-14", "17-13-20-000_UTC-0500_2023-11-14",
         "17-13-20-000_EST_-0500_2023-02-31", "24-13-20-000_EST_-0500_2023-11-14",
         "17-60-20-000_EST_-0500_2023-11-14", "17-13-20-000_EST_-0560_2023-11-14",
-        "17-13-20-000_EST_-0500_2023-13-14", "20231314T221320Z", "20231114T251320Z",
+        "17-13-20-000_EST_-0500_2023-13-14", "22-13-20-000_UTC_+0000_2023-13-14",
+        "25-13-20-000_UTC_+0000_2023-11-14",
         "17-13-20-000_E-T_-0500_2023-11-14", "17-13-20-000_E_T_-0500_2023-11-14",
         " 17-13-20-000_EST_-0500_2023-11-14", "17-13-20-000_EST_-0500_2023-11-14 ",
     ])
@@ -347,26 +366,26 @@ test("a name parses back to its instant, in both formats; near misses are no sta
 test("names sort by the instant, not the text; odd names come first (oldest)", () => {
     const names = [
         "23-35-29-123_EST_-0500_2026-11-07", // 04:35:29.123Z on the 8th
-        "20261108T043529Z", //                  an older, UTC, 123 ms earlier
+        "04-35-29-000_UTC_+0000_2026-11-08", //                  UTC, 123 ms earlier
         "01-00-00-000_GMT_+0100_2026-11-08", //  00:00Z on the 8th
         "zz-not-a-run",
-        "00-00-00-000_UTC_+0000_2026-11-09",
-        "20261101T000000Z",
+        runOn("2026-11-09"),
+        runOn("2026-11-01"),
         "23-35-29-123_SãoPaulo_-0300_2026-11-08", // 02:35:29.123Z on the 9th
     ]
     assert.deepEqual([...names].sort(compareRunNames), [
         "zz-not-a-run",
-        "20261101T000000Z",
+        runOn("2026-11-01"),
         "01-00-00-000_GMT_+0100_2026-11-08",
-        "20261108T043529Z",
+        "04-35-29-000_UTC_+0000_2026-11-08",
         "23-35-29-123_EST_-0500_2026-11-07",
-        "00-00-00-000_UTC_+0000_2026-11-09",
+        runOn("2026-11-09"),
         "23-35-29-123_SãoPaulo_-0300_2026-11-08",
     ])
 })
 
 test("a claim makes runs/<name>/ with its marker; a clash takes the next ms", () => {
-    const p = project()
+    const p = scratchProject()
     const at = Date.UTC(2026, 10, 6, 12, 0, 0, 500)
     const first = claimRun(p, at)
     assert.equal(first.id, runStamp(at), "the machine's own zone label")
@@ -387,10 +406,10 @@ test("a claim makes runs/<name>/ with its marker; a clash takes the next ms", ()
 })
 
 test("a start is refused while a run is live, with its pid; a dead one is not", () => {
-    const p = project()
+    const p = scratchProject()
     const runs = join(p, "runs")
-    mkdirSync(join(runs, "20260101T000000Z"), { recursive: true })
-    writeFileSync(join(runs, "20260101T000000Z", "run.json"), liveJson(process.pid))
+    mkdirSync(join(runs, runOn("2026-01-01")), { recursive: true })
+    writeFileSync(join(runs, runOn("2026-01-01"), "run.json"), liveJson(process.pid))
     assert.deepEqual(liveRun(p)?.pid, process.pid)
     assert.throws(
         () => claimRun(p),
@@ -400,23 +419,23 @@ test("a start is refused while a run is live, with its pid; a dead one is not", 
     )
     // a heartbeat a minute old, or a pid that does not exist, is not live
     writeFileSync(
-        join(runs, "20260101T000000Z", "run.json"),
+        join(runs, runOn("2026-01-01"), "run.json"),
         liveJson(process.pid, Date.now() - 61_000),
     )
     assert.equal(liveRun(p), undefined)
-    writeFileSync(join(runs, "20260101T000000Z", "run.json"), liveJson(2 ** 22 + 12345))
+    writeFileSync(join(runs, runOn("2026-01-01"), "run.json"), liveJson(2 ** 22 + 12345))
     assert.equal(liveRun(p), undefined)
     assert.ok(claimRun(p).id)
 })
 
 test("a project that is gone is not made again by a claim", () => {
-    const gone = join(tmp(), "gone")
+    const gone = join(tempDir(), "gone")
     assert.throws(() => claimRun(gone), /no longer exists/)
     assert.equal(existsSync(gone), false)
 })
 
 test("the snapshot copies the inputs into the run folder; no settings.json: {}", () => {
-    const p = project()
+    const p = scratchProject()
     const run = claimRun(p)
     snapshotInputs(p, run.dir)
     const logs = run.dir
@@ -427,14 +446,14 @@ test("the snapshot copies the inputs into the run folder; no settings.json: {}",
             readFileSync(join(p, name), "utf-8"),
         )
     // a missing curve stops the start with a clear message
-    const q = project()
+    const q = scratchProject()
     rmSync(join(q, "data.tsv"))
     const run2 = claimRun(q)
     assert.throws(() => snapshotInputs(q, run2.dir), /no data\.tsv/)
 })
 
 test("the snapshot also copies model-settings.json and the reference files", () => {
-    const p = project()
+    const p = scratchProject()
     const run = claimRun(p)
     snapshotInputs(p, run.dir)
     const logs = run.dir
@@ -445,7 +464,7 @@ test("the snapshot also copies model-settings.json and the reference files", () 
         "none made without any",
     )
     // a project with both: only the files Julia reads, whole
-    const q = project()
+    const q = scratchProject()
     const models = '{"crambin":{"model":{"Q_MAX":{"value":0.3}}}}\n'
     writeFileSync(join(q, "model-settings.json"), models)
     mkdirSync(join(q, "reference-fit", "folder.dat"), { recursive: true })
@@ -466,37 +485,25 @@ test("the snapshot also copies model-settings.json and the reference files", () 
     )
 })
 
-test("the snapshot of a project with the old references/ folder moves it", () => {
-    const q = project()
-    mkdirSync(join(q, "references"))
-    writeFileSync(join(q, "references", "CRYSOL.tsv"), "0.1\t2\n0.2\t1\n0.3\t1\n")
-    const run = claimRun(q)
-    snapshotInputs(q, run.dir)
-    assert.equal(existsSync(join(q, "references")), false, "moved")
-    assert.deepEqual(readdirSync(join(q, "reference-fit")), ["CRYSOL.tsv"])
-    assert.ok(existsSync(join(run.dir, "reference-fit-CRYSOL.tsv")))
-    assert.equal(existsSync(join(run.dir, "references")), false)
-})
-
 test("the startup sweep marks a dead run interrupted, and leaves a live one alone", () => {
-    const root = tmp()
+    const root = tempDir()
     const a = join(root, "a")
     const b = join(root, "b")
     for (const dir of [a, b]) {
-        mkdirSync(join(dir, "runs", "20260101T000000Z"), { recursive: true })
+        mkdirSync(join(dir, "runs", runOn("2026-01-01")), { recursive: true })
         writeFileSync(
             join(dir, "project.json"),
             writeJson({ id: dir === a ? "a" : "b", created: "x" }),
         )
     }
-    writeFileSync(join(a, "runs", "20260101T000000Z", "run.json"), liveJson(2 ** 22 + 777))
-    writeFileSync(join(b, "runs", "20260101T000000Z", "run.json"), liveJson(process.pid))
-    assert.deepEqual(markAllStaleRuns(root), ["a/20260101T000000Z"])
-    assert.equal(runStatus(a, "20260101T000000Z"), "interrupted")
-    assert.equal(runStatus(b, "20260101T000000Z"), "running")
+    writeFileSync(join(a, "runs", runOn("2026-01-01"), "run.json"), liveJson(2 ** 22 + 777))
+    writeFileSync(join(b, "runs", runOn("2026-01-01"), "run.json"), liveJson(process.pid))
+    assert.deepEqual(markAllStaleRuns(root), ["a/00-00-00-000_UTC_+0000_2026-01-01"])
+    assert.equal(runStatus(a, runOn("2026-01-01")), "interrupted")
+    assert.equal(runStatus(b, runOn("2026-01-01")), "running")
     // run.json keeps what Julia wrote, and gets an end time
     const json = JSON.parse(
-        readFileSync(join(a, "runs", "20260101T000000Z", "run.json"), "utf-8"),
+        readFileSync(join(a, "runs", runOn("2026-01-01"), "run.json"), "utf-8"),
     )
     assert.equal(json.pid, 2 ** 22 + 777)
     assert.match(json.ended, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/)
@@ -504,16 +511,16 @@ test("the startup sweep marks a dead run interrupted, and leaves a live one alon
 })
 
 test("a claimed folder whose starter died (no run.json) becomes interrupted too", () => {
-    const p = project()
-    const dir = join(p, "runs", "20260101T000000Z")
+    const p = scratchProject()
+    const dir = join(p, "runs", runOn("2026-01-01"))
     mkdirSync(dir, { recursive: true })
     writeFileSync(
         join(dir, CLAIM_FILE),
         writeJson({ pid: 2 ** 22 + 99, host: hostname(), time: isoStamp(Date.now()) }),
     )
     assert.equal(liveRun(p), undefined)
-    assert.deepEqual(markStaleRuns(p), ["20260101T000000Z"])
-    assert.equal(runStatus(p, "20260101T000000Z"), "interrupted")
+    assert.deepEqual(markStaleRuns(p), [runOn("2026-01-01")])
+    assert.equal(runStatus(p, runOn("2026-01-01")), "interrupted")
     assert.deepEqual(markStaleRuns(p), [], "a second sweep finds nothing to do")
 })
 
@@ -626,7 +633,7 @@ function alive(pid: number): boolean {
 const logText = (dir: string, name: string): string => readRunText(dir, name)
 
 test("a normal run: tail, packing, done, logs in the archive, conditions", async () => {
-    const p = project()
+    const p = scratchProject()
     const session = RunSession.begin(p, 21.5, fakeLauncher("done"))
     const phases: string[] = []
     session.subscribe(() => {
@@ -651,7 +658,7 @@ test("a normal run: tail, packing, done, logs in the archive, conditions", async
     assert.deepEqual(readdirSync(join(dir, "..")).filter((n) => !n.startsWith(".")), [
         `${view.id}.7z`,
     ])
-    const names = [...runFolderFiles(dir, "").keys()]
+    const names = [...runFiles(dir).keys()]
     for (const n of ["run.json", "run.LOG", "settings.json", "buffer.json", "data.tsv"])
         assert.ok(names.includes(n), n)
     assert.match(logText(dir, "run.LOG"), /temperature_c\t21\.5/)
@@ -659,7 +666,7 @@ test("a normal run: tail, packing, done, logs in the archive, conditions", async
 })
 
 test("a pack that fails leaves the run folder as it was and says why", async () => {
-    const p = project()
+    const p = scratchProject()
     const session = RunSession.begin(p, 21.5, fakeLauncher("done"), async () => {
         throw new Error("7-Zip failed: disk full")
     })
@@ -671,7 +678,7 @@ test("a pack that fails leaves the run folder as it was and says why", async () 
 })
 
 test("a run that failed ends failed with its error line as the note", async () => {
-    const p = project()
+    const p = scratchProject()
     const session = RunSession.begin(p, 20, fakeLauncher("failed"))
     assert.equal(await session.done, "failed")
     assert.equal(runStatus(p, session.view.id), "failed")
@@ -680,8 +687,8 @@ test("a run that failed ends failed with its error line as the note", async () =
 })
 
 test("abort stops the child and its grandchild and finishes the log", async () => {
-    const p = project()
-    const pids = join(tmp(), "pids")
+    const p = scratchProject()
+    const pids = join(tempDir(), "pids")
     const session = RunSession.begin(p, 20, fakeLauncher("hang", pids))
     await until(() => session.view.lines.includes("ready"), "the child")
     const [child, grandchild] = readFileSync(pids, "utf-8").trim().split(" ").map(Number)
@@ -714,8 +721,8 @@ test("a child that ignores SIGTERM is killed after the grace, with a note", asyn
     const before = flow.abort.graceSeconds
     flow.abort.graceSeconds = 0.4
     try {
-        const p = project()
-        const pids = join(tmp(), "pids")
+        const p = scratchProject()
+        const pids = join(tempDir(), "pids")
         const session = RunSession.begin(p, 20, fakeLauncher("stubborn", pids))
         await until(() => session.view.lines.includes("ready"), "the child")
         const [child, grandchild] = readFileSync(pids, "utf-8")
@@ -741,7 +748,7 @@ test("a child that ignores SIGTERM is killed after the grace, with a note", asyn
 })
 
 test("a child that dies without finishing its files: failed, exit recorded", async () => {
-    const p = project()
+    const p = scratchProject()
     const session = RunSession.begin(p, 20, fakeLauncher("crash"))
     assert.equal(await session.done, "failed")
     assert.equal(runStatus(p, session.view.id), "failed")
@@ -752,7 +759,7 @@ test("a child that dies without finishing its files: failed, exit recorded", asy
 })
 
 test("a child that writes nothing still leaves a failed run with its reason", async () => {
-    const p = project()
+    const p = scratchProject()
     const session = RunSession.begin(p, 20, fakeLauncher("silent"))
     assert.equal(await session.done, "failed")
     assert.equal(runStatus(p, session.view.id), "failed")
@@ -760,7 +767,7 @@ test("a child that writes nothing still leaves a failed run with its reason", as
 })
 
 test("a Julia that cannot be started is told, not a crash", async () => {
-    const p = project()
+    const p = scratchProject()
     const missing: Launcher = () =>
         spawn("/no/such/julia", [], { detached: true, stdio: ["pipe", "pipe", "pipe"] })
     const session = RunSession.begin(p, 20, missing)
@@ -770,7 +777,7 @@ test("a Julia that cannot be started is told, not a crash", async () => {
 })
 
 test("a start with missing inputs fails before any process; folder stays failed", () => {
-    const p = project()
+    const p = scratchProject()
     rmSync(join(p, "buffer.json"))
     let launched = false
     assert.throws(
@@ -787,7 +794,7 @@ test("a start with missing inputs fails before any process; folder stays failed"
 })
 
 test("quitAll aborts the run that is going and waits until it is over", async () => {
-    const p = project()
+    const p = scratchProject()
     const session = RunSession.begin(p, 20, fakeLauncher("hang"))
     await until(() => session.view.lines.includes("ready"), "the child")
     await quitAll("SIGHUP")
@@ -818,13 +825,17 @@ test("the Julia command and arguments: values travel in ARGS, not in the code", 
     assert.equal(args[4], "-e")
     assert.ok(!args[5]?.includes("/p q"), "the code holds no path")
     assert.match(args[5] ?? "", /ui = :tui/)
-    assert.deepEqual(args.slice(6), ["/p q/it's", "22.5", "/p q/it's/runs/x"])
+    assert.match(args[5] ?? "", /BAYSOLRun\.run_project\(ARGS\[2\]/)
+    assert.equal(args[6], runProjectFile)
+    assert.ok(runProjectFile.endsWith("run-project.jl") && existsSync(runProjectFile))
+    assert.deepEqual(args.slice(7), ["/p q/it's", "22.5", "/p q/it's/runs/x"])
+    assert.equal(juliaArgs(spec, "/repo", "1", "/x/run.jl")[6], "/x/run.jl")
     assert.ok(!juliaArgs(spec, undefined, "1").some((a) => a.startsWith("--project")))
 })
 
 test("runBrief: a run in as few cells as tell runs apart", () => {
     assert.equal(runBrief("14-19-18-912_EST_-0500_2026-11-09"), "14:19:18 2026-11-09")
-    assert.equal(runBrief("20260101T120000Z"), "12:00:00 2026-01-01")
+    assert.equal(runBrief("12-00-00-000_UTC_+0000_2026-01-01"), "12:00:00 2026-01-01")
     assert.equal(runBrief("not-a-run"), "not-a-run")
     const brief = runBrief("14-19-18-912_EST_-0500_2026-11-09")
     assert.equal(

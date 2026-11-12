@@ -2,31 +2,31 @@
  {"id": "peg", "label": "PEG",
   "names": ["peg","polyethylene glycol","poly(ethylene glycol)","polyethylene oxide","peo"],
   "forms": [
-   {"template":"PEG n={n}","args":[{"key":"n","min":2,"prompt":"units n"}]},
-   {"template":"PEG {Mn}","args":[{"key":"Mn","prompt":"Mn (g/mol)"}]}
+   {"template":"PEG {Mn}","args":[{"key":"Mn","prompt":"molar mass (g/mol)"}]},
+   {"template":"PEG n={n}","args":[{"key":"n","min":2,"prompt":"number of repeat units"}]}
   ]},
  {"id": "ppg", "label": "PPG",
   "names": ["ppg","polypropylene glycol","poly(propylene glycol)"],
   "forms": [
-   {"template":"PPG n={n}","args":[{"key":"n","min":2,"prompt":"units n"}]},
-   {"template":"PPG {Mn}","args":[{"key":"Mn","prompt":"Mn (g/mol)"}]}
+   {"template":"PPG {Mn}","args":[{"key":"Mn","prompt":"molar mass (g/mol)"}]},
+   {"template":"PPG n={n}","args":[{"key":"n","min":2,"prompt":"number of repeat units"}]}
   ]},
  {"id": "dextran", "label": "dextran",
   "names": ["dextran"],
   "forms": [
-   {"template":"dextran n={n}","args":[{"key":"n","min":2,"prompt":"units n"}]},
-   {"template":"dextran {Mn}","args":[{"key":"Mn","prompt":"Mn (kDa, or g/mol)"}]}
+   {"template":"dextran {Mn}","args":[{"key":"Mn","prompt":"molar mass (kDa, or g/mol)"}]},
+   {"template":"dextran n={n}","args":[{"key":"n","min":2,"prompt":"number of repeat units"}]}
   ]},
  {"id": "glucan", "label": "pullulan / glucan",
   "names": ["pullulan","glucan"],
   "forms": [
-   {"template":"pullulan n={n}","args":[{"key":"n","min":2,"prompt":"units n"}]},
-   {"template":"pullulan {Mn}","args":[{"key":"Mn","prompt":"Mn (kDa, or g/mol)"}]}
+   {"template":"pullulan {Mn}","args":[{"key":"Mn","prompt":"molar mass (kDa, or g/mol)"}]},
+   {"template":"pullulan n={n}","args":[{"key":"n","min":2,"prompt":"number of repeat units"}]}
   ]},
  {"id": "ucon", "label": "UCON",
   "names": ["ucon"],
   "forms": [
-   {"template":"UCON {Mn}","args":[{"key":"Mn","prompt":"Mn (g/mol)"}]}
+   {"template":"UCON {Mn}","args":[{"key":"Mn","prompt":"molar mass (g/mol)"}]}
   ]},
  {"id": "cyclodextrin", "label": "cyclodextrin",
   "names": ["cyclodextrin"],

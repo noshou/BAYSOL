@@ -22,7 +22,7 @@ using ..Runtime: Lazy, force, KeyedCache
 using ..MolecularStructure:
     _store_dir, component, ComponentError, AMBER_NUCLEIC_NAMES, WATER_NAMES,
     STANDARD_NUCLEOTIDES, BACKBONE_ATOMS, BACKBONE_MIN, legacy_nucleotides_in_file,
-    sanitized_copy, STANDARD_AMINO_ACIDS, amino_parent, _is_amino_type
+    sanitized_copy, STANDARD_AMINO_ACIDS, amino_parent, _is_amino_type, is_ligand
 
 # ---------------------------------------------------------------------------
 #   Constants and shared types

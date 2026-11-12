@@ -121,6 +121,18 @@ off as a residue).
 const NUCLEOBASE_ATOMS = ("N1", "N3", "N7", "N9", "C2", "C4", "C5", "C6", "C8")
 
 """
+Whether the model keeps the ligands of a structure (owner, 2026-11-11): the HETATM residues
+that are not waters, not placeholders ([`DUMMY_RESIDUE_NAMES`](@ref)) and whose component
+has a known element composition ([`is_ligand`](@ref): heme, nucleotide triphosphates,
+sugars, glycerol, ions) scatter as heavy atoms, as in CRYSOL, which keeps every non-water
+record. They carry no hydrogens (pdb2pqr leaves them as they are), a deficit of a fraction
+of a percent of the electrons, and take part in the excluded volume and the accessible
+surface like any atom. Waters stay out: the hydration shell stands for them. The default of
+the `ligands` keyword of [`load_molecule`](@ref); not a setting.
+"""
+const KEEP_LIGANDS = true
+
+"""
 The chain ids a chain that reuses an id (same residue numbers) is relabelled with, in
 order: `A-Z`, `a-z`, `0-9`. Chain ids never reach the scattering model.
 """

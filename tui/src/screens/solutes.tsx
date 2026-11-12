@@ -14,12 +14,13 @@ import { Text } from "ink"
 import {
     type ReactNode,
     useCallback,
+    useEffect,
     useMemo,
     useReducer,
     useRef,
     useState,
 } from "react"
-import { appDir, readSystem } from "../core/environment.js"
+import { appDir, RUN_FLOW, readSystem } from "../core/environment.js"
 import { pick } from "../core/file-system.js"
 import { formatNumber, parseNumber } from "../core/terminal.js"
 import { AddFlow } from "../store/add-flow.js"
@@ -40,18 +41,21 @@ import {
 } from "../store/buffer.js"
 import { type CustomEntry, customFile, readCustomSolutes } from "../store/custom.js"
 import {
-    isFastaFile,
+    isSequenceFile,
     isSequencePaste,
     pathSuggestions,
     type Row,
     rowValue,
 } from "../store/lists.js"
+import type { Note } from "../store/notes.js"
+import { parseTemperature, TEMPERATURE_LABEL, temperatureStart } from "../store/run.js"
 import {
     bufferRow,
     COLUMNS,
     type ConcUnit,
     concUnit,
     type EditField,
+    firstDuplicate,
     firstProblem,
     formatConc,
     NO_MATCH,
@@ -61,28 +65,37 @@ import {
     type Solute,
     soluteOf,
 } from "../store/solutes.js"
+import { cleanRow } from "../store/template-link.js"
 import { Frame } from "../ui/frame.js"
 import { type LegendItem, legendFor } from "../ui/grid.js"
 import {
+    DROPDOWN_CHROME,
     Dropdown,
     Entry,
     filterChoices,
+    PROMPT_ROWS,
     Prompt,
     questionLegend,
     type Suggestion,
     suggestionLines,
     useConfirm,
 } from "../ui/input.js"
-import { keyLabels, keys, scrollWindow, useKeys } from "../ui/interaction.js"
+import { keyLabels, keys, scrollWindow, useKeys, useNav } from "../ui/interaction.js"
 import { type Column, columnWidths, DataTable } from "../ui/theme.js"
+import { useBufferTemplate } from "./buffer-template.js"
+import { NotesList } from "./notes-list.js"
 import {
     replaceBufferQuestion,
     type TableScreen,
     useTableScreen,
 } from "./screen-rules.js"
+
 // ========================================================================================
 // 1. The check of a draft
 // ========================================================================================
+
+/** A row of a file as a draft, with its link to a buffer template checked. */
+const draftFrom = (row: BufferRow): Solute => cleanRow(soluteOf(row))
 
 /**
  * The loader's check of a draft, in the shape the table's `check` takes.
@@ -111,7 +124,7 @@ export const soluteProblem: RowProblem = (s) => rowProblem(bufferRow(s))
  * The rows an open flow takes under the table: its label, the messages, the suggestions
  * (`suggestionLines`) and the status line.
  */
-const FLOW_ROWS = suggestionLines + 4
+const FLOW_ROWS = suggestionLines + DROPDOWN_CHROME
 
 /** The fewest table rows left in view while a flow is open. */
 const MIN_TABLE_ROWS = 3
@@ -123,7 +136,7 @@ const customUnusable = (file: string) => `${file} unusable!`
 const PATH_PLACEHOLDER = "full path of a FASTA/FASTQ file, or the sequence itself"
 
 /** The suggestions of the path prompt of a sequence file: folders and FASTA/FASTQ files. */
-const suggestSequencePaths = (text: string) => pathSuggestions(text, isFastaFile)
+const suggestSequencePaths = (text: string) => pathSuggestions(text, isSequenceFile)
 
 /** The note while the picker window is open. */
 const PICKING_NOTE = "choose a file in the picker window..."
@@ -422,14 +435,23 @@ function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): SoluteF
  *     the buffer): nothing of them is written before `^w`, which then replaces the target's
  *     rows with the rows of the table.
  * @property conditions - the pH and σ the buffer holds now, `undefined` for none yet.
- * @property draftConditions - a pH and σ the table starts with as an unsaved change (the
- *     recipe's); `undefined` leaves the buffer's own.
+ * @property draftConditions - a pH, σ and temperature the table starts with as an unsaved
+ *     change (the recipe's; a recipe without a temperature keeps the table's); `undefined`
+ *     leaves the buffer's own.
+ * @property notes - the notes the buffer (or recipe) holds now, none when left out.
+ * @property draftNotes - notes the table starts with as an unsaved change (a recipe's, when
+ *     it has any, loaded into the buffer: the whole buffer is a draft then); `undefined`
+ *     leaves the buffer's own.
+ * @property onNotes - writes the notes of the list `shift+n` opens at once (it may throw):
+ *     notes are never a draft of the table, only the loaded recipe's are, until then.
  * @property hint - a note for the bottom line until the first `^w`.
  * @property idleNote - what the bottom line says when it has nothing else to say.
  * @property replace - when set, the first `^w` asks `replace N solutes with recipe
- *     "NAME"?` (the buffer has N solutes that the recipe's rows replace).
- * @property save - writes the rows and the pH and σ the buffer is to have (`^w`, after
- *     the check; the conditions are `undefined` while none is set); it throws if it
+ *     "NAME"?` (the buffer has N solutes that the recipe's rows replace; `and notes` is
+ *     said when the recipe's notes replace the buffer's).
+ * @property save - writes the rows, the pH and σ and the notes the buffer is to have
+ *     (`^w`, after the check; the conditions are `undefined` while none is set, the notes
+ *     an empty list); it throws if it
  *     cannot (the note is then `could not save!`) and the unit shown; it is called with
  *     complete rows only.
  * @property onUnit - called when `^k` turns the unit (the buffer keeps it at once; it is
@@ -442,10 +464,18 @@ type SolutesTableProps = {
     draftRows?: readonly BufferRow[]
     conditions?: Conditions
     draftConditions?: Conditions
+    notes?: readonly Note[]
+    draftNotes?: readonly Note[]
+    onNotes: (notes: Note[]) => void
     hint?: string
     idleNote?: string
-    replace?: { count: number; recipe: string }
-    save: (rows: BufferRow[], conditions: Conditions | undefined, unit: ConcUnit) => void
+    replace?: { count: number; recipe: string; notes?: boolean; template?: boolean }
+    save: (
+        rows: BufferRow[],
+        conditions: Conditions | undefined,
+        unit: ConcUnit,
+        notes: Note[],
+    ) => void
     onUnit?: (unit: ConcUnit) => void
 }
 
@@ -455,15 +485,16 @@ const ADDS: LegendItem[] = [
     legendFor("add polymer", keys.addPolymer),
     legendFor("add protein", keys.addProtein),
     legendFor("add DNA/RNA", keys.addNucleotide),
-    legendFor("edit pH", keys.editPh),
+    legendFor("buffer template", keys.bufferTemplate),
+    legendFor("new template", keys.newTemplate),
+    legendFor("rows to template", keys.convertTemplate),
+    legendFor("pH, σ, T", keys.editPh),
     legendFor("units", keys.units),
+    legendFor("notes", keys.notesList),
 ]
 
 /** The rows the pH row takes above the table: its header, its rule, the row, a blank. */
 const CONDITIONS_ROWS = 4
-
-/** The rows the pH and σ prompt takes under the table: the field and its error. */
-const PH_PROMPT_ROWS = 3
 
 /** The most characters of a typed pH and σ together. */
 const PH_MAX_LENGTH = 21
@@ -488,9 +519,9 @@ function parseRanged(
 const CONDITIONS_CELL = 10
 
 /**
- * The pH row as a table of its own: the headers `pH` and `σ`, one row, no cursor.
+ * The pH row as a table of its own: the headers `pH`, `σ` and `T °C`, one row, no cursor.
  *
- * @param c - the pH and σ now, `undefined` for none yet.
+ * @param c - the pH, σ and temperature now, `undefined` for none yet.
  * @returns the columns and the one row.
  */
 function conditionsTable(c: Conditions | undefined): {
@@ -499,28 +530,36 @@ function conditionsTable(c: Conditions | undefined): {
 } {
     const ph = c === undefined ? "not set" : formatNumber(c.pH)
     const sigma = c === undefined ? "" : formatNumber(c["sigma-pH"])
+    const temperature =
+        c?.temperature === undefined ? "not set" : formatNumber(c.temperature)
     return {
         columns: [
             { title: "pH", width: CONDITIONS_CELL, text: () => ph },
             { title: "σ", width: CONDITIONS_CELL, text: () => sigma },
+            { title: "T °C", width: CONDITIONS_CELL, text: () => temperature },
         ],
         rows: [""],
     }
 }
 
 /**
- * The unsaved pH and σ a table starts with: the ones a loaded recipe has, none when it
- * has none (the buffer's own stay) or when they are the buffer's already.
+ * The unsaved pH, σ and temperature a table starts with: the ones a loaded recipe has,
+ * none when it has none (the buffer's own stay) or when they are the buffer's already. A
+ * recipe without a temperature leaves the buffer's temperature as it is.
  *
- * @param loaded - the pH and σ of the recipe, `undefined` for none.
- * @param saved - the pH and σ of the buffer now.
+ * @param loaded - the pH, σ and temperature of the recipe, `undefined` for none.
+ * @param saved - the pH, σ and temperature of the buffer now.
  * @returns the draft, `undefined` for no change.
  */
 export function draftOf(
     loaded: Conditions | undefined,
     saved: Conditions | undefined,
 ): Conditions | undefined {
-    return isDeepStrictEqual(loaded, saved) ? undefined : loaded
+    const kept =
+        loaded && loaded.temperature === undefined && saved?.temperature !== undefined
+            ? { ...loaded, temperature: saved.temperature }
+            : loaded
+    return isDeepStrictEqual(kept, saved) ? undefined : kept
 }
 
 /** A field the table shows. */
@@ -574,9 +613,10 @@ function columnsOf(
  * a protein and DNA or RNA from a file (a dropdown or a prompt under the table), none
  * past 999 rows; `^r` marks the row to be removed; `^u` undoes its last change; `^w`
  * saves (a row that is not complete is told and nothing is saved); `^x` goes back, asking
- * first when something is unsaved. The pH row above the table (`pH` and `σ`, the
- * buffer's pH and the standard uncertainty of it) is edited with `^g`: two prompts, pH
- * then σ; it is an unsaved change like a row until `^w`. While a flow is open Esc and `^x`
+ * first when something is unsaved. The pH row above the table (`pH`, `σ` and `T °C`, the
+ * buffer's pH and the standard uncertainty of it, and the temperature) is edited with
+ * `^g`: two prompts, pH then σ, and one for the temperature; it is an unsaved change
+ * like a row until `^w`. While a flow is open Esc and `^x`
  * cancel it. `^k` turns the unit of the concentrations (mM, M, µM: display and entry
  * only, the file keeps mM). The mechanics are `useTableScreen`, the flows `useSoluteFlow`.
  *
@@ -585,8 +625,9 @@ function columnsOf(
  */
 export function SolutesTable(props: SolutesTableProps): ReactNode {
     const { title = "buffer", subtitle, idleNote } = props
-    const items = useMemo(() => props.items.map(soluteOf), [props.items])
-    const added = useMemo(() => (props.draftRows ?? []).map(soluteOf), [props.draftRows])
+    const items = useMemo(() => props.items.map(draftFrom), [props.items])
+    const added = useMemo(() => (props.draftRows ?? []).map(draftFrom), [props.draftRows])
+    const nav = useNav()
     const [hint, setHint] = useState(props.hint)
     const [replace, setReplace] = useState(props.replace)
     const confirm = useConfirm()
@@ -596,9 +637,18 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
         draft: draftOf(props.draftConditions, props.conditions),
     }))
     const shown = cond.draft ?? cond.saved
+    // the notes: what the buffer has, and what they were edited to (unsaved)
+    const [notes, setNotes] = useState<{ saved: Note[]; draft?: Note[] }>(() => {
+        const saved = [...(props.notes ?? [])]
+        const draft = props.draftNotes === undefined ? undefined : [...props.draftNotes]
+        return { saved, draft: isDeepStrictEqual(draft, saved) ? undefined : draft }
+    })
+    const shownNotes = notes.draft ?? notes.saved
     // the unit of the concentrations: module state, the state here redraws the screen
     const [unit, setUnit] = useState(concUnit)
-    const [asking, setAsking] = useState(false)
+    // `^g`: the pH and σ prompt, then the temperature prompt (holding the pH and σ typed)
+    const [asking, setAsking] = useState<"ph" | "temperature" | undefined>()
+    const [typedPh, setTypedPh] = useState<Conditions | undefined>()
     const [phProblem, setPhProblem] = useState<string | undefined>(undefined)
     const [phKeys, setPhKeys] = useState<LegendItem[]>([])
     const clearPhProblem = useCallback(() => setPhProblem(undefined), [])
@@ -608,18 +658,31 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
         added,
         extraRows: CONDITIONS_ROWS,
         adds: ADDS,
-        extraChanges: cond.draft ? 1 : 0,
+        extraChanges: (cond.draft ? 1 : 0) + (notes.draft ? 1 : 0),
         save: (rows) => {
-            props.save(rows.map(rowOf), shown, unit)
+            props.save(rows.map(rowOf), shown, unit, shownNotes)
             setCond({ saved: shown })
+            setNotes({ saved: shownNotes })
             // the buffer is replaced now, and what was said of it is done
             setReplace(undefined)
             setHint(undefined)
         },
-        check: (drafts) => firstProblem(drafts, soluteProblem),
+        check: (drafts) => firstProblem(drafts, soluteProblem) ?? firstDuplicate(drafts),
         label: (solute) => solute.name,
     })
     const flow = useSoluteFlow(t)
+    // a file or recipe that holds a solute twice opens, and says so
+    // biome-ignore lint/correctness/useExhaustiveDependencies: told once, when it opens
+    useEffect(() => {
+        const twin = firstDuplicate(t.drafts)
+        if (twin) t.setNote(`row ${twin[0] + 1}: ${twin[1]}`, true)
+    }, [])
+    const tmpl = useBufferTemplate(t, shown, (next) =>
+        setCond((c) => ({
+            ...c,
+            draft: isDeepStrictEqual(next, c.saved) ? undefined : next,
+        })),
+    )
 
     /** The pH row typed as `pH σ`; σ may be left out (the row's own, else the default). */
     const submitPh = (text: string) => {
@@ -631,8 +694,20 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
         const sigma = parseRanged(sigmaText, "σ", sigmaPh)
         if ("error" in sigma) return setPhProblem(sigma.error)
         setPhProblem(undefined)
-        setAsking(false)
-        const next: Conditions = { pH: pH.value, "sigma-pH": sigma.value }
+        setTypedPh({ pH: pH.value, "sigma-pH": sigma.value })
+        setAsking("temperature")
+    }
+
+    /** The temperature typed, the last prompt of `^g`: the whole row becomes the draft. */
+    const submitTemperature = (text: string) => {
+        const temperature = parseTemperature(text)
+        if ("error" in temperature) return setPhProblem(temperature.error)
+        setPhProblem(undefined)
+        setAsking(undefined)
+        const next: Conditions = {
+            ...(typedPh as Conditions),
+            temperature: temperature.value,
+        }
         // an edit back to what the target has is no change
         setCond((c) => ({
             ...c,
@@ -644,8 +719,14 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
         if (confirm.handleKey(press)) return
         const ready = firstProblem(t.drafts, soluteProblem) === undefined
         if (press.is(keys.save) && replace && !t.locked && ready) {
-            const { count, recipe } = replace
-            const question = replaceBufferQuestion(count, recipe, t.width - 4)
+            const { count, recipe, notes: withNotes, template } = replace
+            const question = replaceBufferQuestion(
+                count,
+                recipe,
+                t.width - 4,
+                withNotes,
+                template,
+            )
             confirm.ask(question, () => void t.handleKey(press))
             return
         }
@@ -656,15 +737,29 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
             setUnit(next)
             props.onUnit?.(next)
         }
-        else if (press.is(keys.editPh)) {
+        else if (press.is(keys.notesList)) {
+            nav.push(
+                <NotesList
+                    owner={title === "buffer" ? `buffer ${subtitle ?? ""}`.trim() : title}
+                    items={shownNotes}
+                    onSave={(list) => {
+                        props.onNotes(list)
+                        setNotes({ saved: list })
+                    }}
+                />,
+            )
+        } else if (press.is(keys.editPh)) {
             setPhProblem(undefined)
-            setAsking(true)
+            setAsking("ph")
         } else if (!t.canAdd) return
         else if (press.is(keys.addNonbio)) flow.add("nonbio")
         else if (press.is(keys.addPolymer)) flow.add("polymer")
         else if (press.is(keys.addProtein)) flow.add("protein")
         else if (press.is(keys.addNucleotide)) flow.add("nucleotide")
-    }, !flow.open && !asking)
+        else if (press.is(keys.bufferTemplate)) tmpl.start()
+        else if (press.is(keys.newTemplate)) tmpl.startNew()
+        else if (press.is(keys.convertTemplate)) tmpl.convert()
+    }, !flow.open && asking === undefined && !tmpl.open)
 
     const cellText = (v: View, field: Field, width: number) => {
         if (flow.cell?.row === v.i && flow.cell.field === field) return flow.cell.text
@@ -683,11 +778,15 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
     const quiet = t.frameNote === undefined
     const tableNote =
         t.frameNote ?? (t.current ? rowNote(t.current) : undefined) ?? hint ?? idleNote
-    const note = confirm.note ?? (flow.open ? flow.note : tableNote)
-    const changes = t.drafts.count + (cond.draft ? 1 : 0)
+    const openNote = tmpl.open ? tmpl.note : flow.open ? flow.note : tableNote
+    const note = confirm.note ?? openNote
+    const openLegend = tmpl.open ? tmpl.legend : flow.open ? flow.legend : legend
+    const shownLegend = asking ? phKeys : openLegend
+    const changes = t.drafts.count + (cond.draft ? 1 : 0) + (notes.draft ? 1 : 0)
     // the prompt takes rows under the table, so the window shrinks to keep the cursor
-    const pageSize = asking ? Math.max(3, flow.pageSize - PH_PROMPT_ROWS) : flow.pageSize
-    const offset = asking
+    const taken = asking ? PROMPT_ROWS : tmpl.reserved
+    const pageSize = taken > 0 ? Math.max(3, flow.pageSize - taken) : flow.pageSize
+    const offset = taken > 0
         ? scrollWindow(flow.cursor, flow.offset, pageSize, flow.rows.length)
         : flow.offset
     const small = conditionsTable(shown)
@@ -697,36 +796,46 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
             title={title}
             subtitle={changes > 0 ? `${changes} unsaved` : subtitle}
             legendFull={t.legendFull}
-            legend={asking ? phKeys : flow.open ? flow.legend : legend}
+            legend={shownLegend}
             note={note}
-            noteIsError={!flow.open && !quiet && !confirm.question && t.frameNoteIsError}
+            noteIsError={
+                tmpl.open
+                    ? tmpl.noteIsError
+                    : !flow.open && !quiet && !confirm.question && t.frameNoteIsError
+            }
         >
-            <DataTable
-                border="double"
-                columns={small.columns}
-                rows={small.rows}
-                cursor={-1}
-                offset={0}
-                pageSize={1}
-                mark={() => (cond.draft ? "*" : " ")}
-                width={t.width}
-            />
-            <Text> </Text>
-            <DataTable
-                border="double"
-                columns={columnsOf(cellText, widths)}
-                rows={view}
-                cursor={flow.cursor}
-                offset={offset}
-                pageSize={pageSize}
-                mark={(v) => t.mark(v.row)}
-                empty={EMPTY_HINT}
-                width={t.width}
-            />
+            {tmpl.page ?? (
+                <>
+                    <DataTable
+                        border="double"
+                        columns={small.columns}
+                        rows={small.rows}
+                        cursor={-1}
+                        offset={0}
+                        pageSize={1}
+                        mark={() => (cond.draft ? "*" : " ")}
+                        width={t.width}
+                    />
+                    <Text> </Text>
+                    <DataTable
+                        border="double"
+                        columns={columnsOf(cellText, widths)}
+                        rows={view}
+                        cursor={flow.cursor}
+                        offset={offset}
+                        pageSize={pageSize}
+                        mark={(v) => t.mark(v.row)}
+                        empty={EMPTY_HINT}
+                        width={t.width}
+                    />
+                </>
+            )}
+            {tmpl.entry}
             {flow.entry}
             {t.finder}
-            {asking ? (
+            {asking === "ph" ? (
                 <Prompt
+                    key="ph"
                     label="pH σ:"
                     initial={
                         shown
@@ -739,7 +848,19 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
                     onChange={clearPhProblem}
                     onLegend={setPhKeys}
                     onSubmit={submitPh}
-                    onCancel={() => setAsking(false)}
+                    onCancel={() => setAsking(undefined)}
+                />
+            ) : asking === "temperature" ? (
+                <Prompt
+                    key="temperature"
+                    label={TEMPERATURE_LABEL}
+                    initial={temperatureStart(shown?.temperature)}
+                    maxLength={RUN_FLOW.temperature.maxLength}
+                    error={phProblem}
+                    onChange={clearPhProblem}
+                    onLegend={setPhKeys}
+                    onSubmit={submitTemperature}
+                    onCancel={() => setAsking(undefined)}
                 />
             ) : null}
         </Frame>

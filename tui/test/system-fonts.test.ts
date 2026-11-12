@@ -18,8 +18,6 @@ import {
 } from "../src/core/fonts.js"
 import { tempDir } from "./support/fixtures.js"
 
-const tmp = (): string => tempDir()
-
 // --- building font files, byte by byte
 
 const u16 = (n: number): Buffer => Buffer.from([(n >> 8) & 255, n & 255])
@@ -128,7 +126,7 @@ function write(dir: string, name: string, content: Buffer | string): string {
 // --- reading a font file
 
 test("a TrueType or OpenType face is read, with or without a MATH table", () => {
-    const dir = tmp()
+    const dir = tempDir()
     assert.deepEqual(
         readFaces(write(dir, "a.ttf", fontBytes({ names: english("Plain Text") }))),
         [{ family: "Plain Text", math: false }],
@@ -156,7 +154,7 @@ test("a TrueType or OpenType face is read, with or without a MATH table", () => 
 })
 
 test("only the MATH table makes a math font, never the name", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const fake = write(
         dir,
         "fake.otf",
@@ -166,7 +164,7 @@ test("only the MATH table makes a math font, never the name", () => {
 })
 
 test("a collection gives each face its own table directory", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const file = write(
         dir,
         "c.ttc",
@@ -184,7 +182,7 @@ test("a collection gives each face its own table directory", () => {
 })
 
 test("name choice: typographic, English first, other languages, Mac, Unicode", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const family = (names: NameRecord[]): string | undefined =>
         readFaces(write(dir, "x.otf", fontBytes({ names })))[0]?.family
     assert.equal(
@@ -207,7 +205,7 @@ test("name choice: typographic, English first, other languages, Mac, Unicode", (
 })
 
 test("a face with no usable family name is left out", () => {
-    const dir = tmp()
+    const dir = tempDir()
     assert.deepEqual(readFaces(write(dir, "n1.ttf", fontBytes({}))), [])
     assert.deepEqual(
         readFaces(
@@ -222,7 +220,7 @@ test("a face with no usable family name is left out", () => {
 })
 
 test("files that are not fonts, or are damaged, have no faces and never throw", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const good = fontBytes({ names: english("Good Font"), math: true })
     const cases: [string, Buffer][] = [
         ["empty", Buffer.alloc(0)],
@@ -281,7 +279,7 @@ test("files that are not fonts, or are damaged, have no faces and never throw", 
 })
 
 test("reading randomly damaged fonts never fails and gives well-formed faces", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const sources = [
         fontBytes({ version: otf, names: english("Fuzz Font"), math: true }),
         ttcBytes([{ names: english("A One") }, { names: english("B Two"), math: true }]),
@@ -311,7 +309,7 @@ test("reading randomly damaged fonts never fails and gives well-formed faces", (
 // --- sorting, fingerprint, cache
 
 test("fonts are sorted into math and text, by case-blind order, a family once", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const files = [
         write(dir, "a.otf", fontBytes({ version: otf, names: english("Alpha Text") })),
         write(
@@ -339,7 +337,7 @@ test("fonts are sorted into math and text, by case-blind order, a family once", 
 })
 
 test("the fingerprint follows the files", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const a = write(dir, "a.ttf", fontBytes({ names: english("A Font") }))
     const b = write(dir, "b.ttf", fontBytes({ names: english("B Font") }))
     const before = fingerprint([a, b])
@@ -357,7 +355,7 @@ test("the fingerprint follows the files", () => {
 })
 
 test("the cache is used while the fonts are the same and mended when damaged", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const cache = join(dir, "cache", "fonts.json")
     const a = write(
         dir,
@@ -414,7 +412,7 @@ const system = (
 })
 
 test("the font folders of each system are the ones that exist", () => {
-    const home = tmp()
+    const home = tempDir()
     for (const d of [".local/share/fonts", ".fonts", "Library/Fonts", "Fonts"])
         mkdirSync(join(home, d), { recursive: true })
     const linux = defaultFontDirs(system("linux", {}, home))
@@ -456,7 +454,7 @@ test("what is named like a font file", () => {
 })
 
 test("the font files of the folders are gathered once each, other kinds left out", () => {
-    const home = tmp()
+    const home = tempDir()
     const a = write(
         home,
         ".fonts/one.otf",
@@ -508,9 +506,9 @@ test("the registry of Windows names the font files", () => {
 })
 
 test("TeX is found on the path", () => {
-    const bin = tmp()
+    const bin = tempDir()
     writeFileSync(join(bin, "kpsewhich"), "#!/bin/sh\n", { mode: 0o755 })
     assert.equal(texInstalled(system("linux", { PATH: bin })), true)
-    assert.equal(texInstalled(system("linux", { PATH: tmp() })), false)
+    assert.equal(texInstalled(system("linux", { PATH: tempDir() })), false)
     assert.equal(texInstalled(system("linux", {})), false)
 })

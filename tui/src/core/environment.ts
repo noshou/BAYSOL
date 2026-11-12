@@ -317,53 +317,67 @@ export function lazyAsset<T>(...path: string[]): () => T {
     return lazy(() => readAssetJson<T>(...path))
 }
 
+/** The shape of `assets/data/run_flow.json`. */
+export type RunFlow = {
+    temperature: { default: number; min: number; max: number; maxLength: number }
+    liveness: { staleSeconds: number; claimRefreshSeconds: number }
+    claim: { maxStampTries: number }
+    abort: { graceSeconds: number; killWaitSeconds: number }
+    screen: { tailLines: number }
+    julia: { threads: string }
+    log: { maxBytes: number }
+    archive: {
+        extension: string
+        level: number
+        wordSize: number
+        solid: boolean
+        maxEntryBytes: number
+        maxExtractBytes: number
+    }
+}
+
 /**
  * The tunables of the run flow: the temperature prompt (°C), how stale a heartbeat may
  * be (Julia's `RUN_STALE_S`), how a run folder is claimed, how long an abort waits, the
  * output lines the run screen keeps, the Julia `--threads` and the size cap of a
- * `run.LOG` shown in the pager.
+ * `run.LOG` shown in the pager. Read from `assets/data/run_flow.json`, where the 7z archive
+ * of a finished run (`core/archive.ts`, `store/run-archive.ts`) is the `archive` group: the
+ * extension of `runs/<stamp>.7z`, the name of the archive inside a run folder of the older
+ * layout, the compression level, the largest single entry read into memory and the most
+ * bytes one extraction may write.
  */
-export const RUN_FLOW = {
-    temperature: { default: 25, min: 0, max: 100, maxLength: 8 },
-    liveness: { staleSeconds: 60, claimRefreshSeconds: 10 },
-    claim: { maxStampTries: 600 },
-    abort: { graceSeconds: 5, killWaitSeconds: 5 },
-    screen: { tailLines: 500 },
-    julia: { threads: "auto,1" },
-    log: { maxBytes: 4194304 },
-    // the 7z archive of a finished run (`core/archive.ts`, `store/run-archive.ts`): the
-    // extension of `runs/<stamp>.7z`, the name of the archive inside a run folder of the
-    // older layout, the compression level, the largest single entry read into memory and
-    // the most bytes one extraction may write
-    archive: {
-        extension: ".7z",
-        legacyName: "run.7z",
-        level: 9,
-        maxEntryBytes: 33554432,
-        maxExtractBytes: 536870912,
-    },
+export const RUN_FLOW: RunFlow = readAssetJson<RunFlow>("data", "run_flow.json")
+
+/** The shape of `assets/data/plots_flow.json`. */
+export type PlotsFlow = {
+    compileSeconds: number
+    engineArguments: string[]
+    searched: string[]
+    accepted: string[]
+    folder: string
+    dataFolder: string
 }
 
 /**
  * The tunables of the plots actions of `open runs` (`store/plots.ts`): how long one LaTeX
  * run may take, the arguments every engine gets, the compilers looked for on the `PATH`
  * (in this order; a path that is set may also name `pdflatex`) and the names of the
- * plot folder and the data folder inside the BAYSOL data folder.
+ * plot folder and the data folder inside the BAYSOL data folder. Read from
+ * `assets/data/plots_flow.json`.
  */
-export const PLOTS_FLOW = {
-    compileSeconds: 180,
-    engineArguments: ["-interaction=nonstopmode", "-halt-on-error"],
-    searched: ["lualatex", "xelatex"],
-    accepted: ["lualatex", "xelatex", "pdflatex"],
-    folder: "plots",
-    dataFolder: "data",
+export const PLOTS_FLOW: PlotsFlow = readAssetJson<PlotsFlow>("data", "plots_flow.json")
+
+/** The shape of `assets/data/logs.json`. */
+export type LogsFlow = {
+    pager: { overlap: number; sideStep: number; tabWidth: number }
+    list: { stampWidth: number; statusWidth: number; sizeWidth: number }
+    options: { fileWidth: number; sizeWidth: number }
+    watch: { pollSeconds: number; closeSeconds: number }
+    corner: { separator: string; minCells: number }
 }
 
-/** The tunables of the logs menu and `open runs`: pager steps, columns, refresh, corner. */
-export const LOGS_FLOW = {
-    pager: { overlap: 1, sideStep: 8, tabWidth: 8 },
-    list: { stampWidth: 36, statusWidth: 11, sizeWidth: 9 },
-    options: { fileWidth: 15, sizeWidth: 9 },
-    watch: { pollSeconds: 2, closeSeconds: 2 },
-    corner: { separator: " · ", minCells: 6 },
-}
+/**
+ * The tunables of the logs menu and `open runs`: pager steps, columns, refresh, corner
+ * (`assets/data/logs.json`).
+ */
+export const LOGS_FLOW: LogsFlow = readAssetJson<LogsFlow>("data", "logs.json")

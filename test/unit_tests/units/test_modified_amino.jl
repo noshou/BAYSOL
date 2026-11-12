@@ -189,7 +189,8 @@ end
             @test total("MSE") == kept("MSE") > 0
             @test count(nucleotide_selector, ats) < count(polymer_selector, ats)  # MSE only
             @test kept("ALA") == total("ALA") > 0
-            # waters, ions, a ligand, a saccharide and UNK are dropped
+            # a water and UNK are dropped; an ion, a ligand and a saccharide are kept
+            # (ligands of a known composition, 2026-11-11)
             function het(name, atom, elem, n)
                 l = edit(first(l for l in LINES if startswith(l, "ATOM")); rec = "HETATM",
                     name, atom, elem)
@@ -203,15 +204,23 @@ end
             mol = @test_logs (:info,
                 Regex(
                     "kept modified amino acids from the HETATM records \\(MSE: 1 residue",
+                )) (:info,
+                Regex(
+                    "kept ligands from the HETATM records \\(ATP: 1 residue\\(s\\), " *
+                    "MG: 1 residue\\(s\\), NAG: 1 residue\\(s\\), TBU: 1 residue\\(s\\), " *
+                    "ZN: 1 residue",
                 )) load_molecule(path)
             # once per structure
             @test_logs load_molecule(path)
             ref = load_molecule(wr(dir, "ref.pdb", LINES))
-            @test n_atoms(mol) == n_atoms(ref)           # MSE kept, six extras dropped
+            # MSE kept, four ligands more than the reference, two dropped; the reference has
+            # a TBU (tert-butanol, 15 atoms) of 7RSA, a ligand that is kept
+            @test n_atoms(mol) == n_atoms(ref) + 4
+            @test n_atoms(load_molecule(path; ligands = false)) == n_atoms(ref) - 15
             @test count(e -> lowercase(e) == "se", elms(mol)) == 1
             # the same through reslove_struct for a .pdb (used in place) and a .cif
             @test n_atoms(load_molecule(reslove_struct(LocalPathSource(path)))) ==
-                  n_atoms(ref)
+                  n_atoms(ref) + 4
             # all residues written as HETATM: all kept
             @test n_atoms(load_molecule(wr(dir, "het.pdb", allhet()))) == n_atoms(ref)
         end
@@ -344,7 +353,8 @@ end
 
         ref = hydrogenated("nt-amino-ref", LINES)
         @testset "the unmodified reference" begin
-            @test ref.n == 1856 && ref.h == 905
+            # 1856 before 2026-11-11: the 15 atoms of the TBU ligand are kept, no hydrogens
+            @test ref.n == 1856 + 15 && ref.h == 905
             @test count(!is_h, ref.out) == 951
         end
 
@@ -382,7 +392,7 @@ end
 
         @testset "standard names written as HETATM give the unmodified structure" begin
             r = hydrogenated("nt-amino-allhet", allhet())
-            @test (r.n, r.h) == (1856, 905)
+            @test (r.n, r.h) == (1856 + 15, 905)
             @test !has_modified_amino(r.infos)
         end
 
@@ -471,18 +481,21 @@ end
                 "$(id)_fit1_model1.pdb")
             # the raw loader: the HETATM selenomethionines are in, standard names written as
             # HETATM too
-            @test n_atoms(load_molecule(fx("SASDH39"))) == 7223
-            @test n_atoms(load_molecule(fx("SASDNP7"))) == 5575
+            @test n_atoms(load_molecule(fx("SASDH39"))) == 7225      # 7223 and the two Mg
+            @test n_atoms(load_molecule(fx("SASDNP7"))) == 5608      # 5575, GNP (32) and Mg
             @test n_atoms(load_molecule(fx("SASDB48"))) == 3735
             tk5 = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDTK5",
                 "SASDTK5_fit2_model1.pdb")
-            @test n_atoms(load_molecule(tk5)) == 5092
-            # SASDH39: 20 selenomethionines (160 atoms), hydrogenated through MET
+            # the 202 atoms of PXX are in (5092 before 2026-11-11), the 7 UNK are not
+            @test n_atoms(load_molecule(tk5)) == 5294
+            @test n_atoms(load_molecule(tk5; ligands = false)) == 5092
+            # SASDH39: 20 selenomethionines (160 atoms), hydrogenated through MET; two Mg
+            # ions are kept (14270 before 2026-11-11)
             path = joinpath(dir, "nt-amino-h39.pdb")
             cp(fx("SASDH39"), path)
             hp = resolve_hydrogens(path, 7.4; ff = :parse, titration = Propka())
             infos = component.(residue_names(path))
-            @test n_atoms(load_molecule(hp)) == 14270
+            @test n_atoms(load_molecule(hp)) == 14272
             d = moded_aa_hyd(hp, infos)
             @test (d.residues, d.with_parent, d.no_parent) == (20, 20, 0)
             @test d.placed == 183

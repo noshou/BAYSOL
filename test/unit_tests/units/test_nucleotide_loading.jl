@@ -3,8 +3,9 @@
 # Exercises what the structure readers keep of a nucleic acid: `nucleotide_selector`,
 # `load_molecule`, the canonical .pdb that `reslove_struct` writes for a local .cif
 # (src/MolecularStructure/{Components,Mols,StructureSource}.jl). Modified nucleotides
-# (HETATM PSU, 5MC, ...) are kept; waters, ions, ligands and (in the canonical file)
-# hydrogens are dropped. Fixtures: 1EHZ (.pdb and .cif) and small synthetic files. The
+# (HETATM PSU, 5MC, ...) are kept, and so are the ligands and ions of a known composition
+# (KEEP_LIGANDS, 2026-11-11); waters, placeholders and (in the canonical file) hydrogens
+# are dropped. Fixtures: 1EHZ (.pdb and .cif) and small synthetic files. The
 # PDB-ID route is only exercised through a file already in the store and through the
 # selector its writer uses; no network, no pdb2pqr. Components not in the bundled table
 # are answered by a fake download hook ("no such component").
@@ -76,7 +77,7 @@ function lines_of(id, chain, nums)
 end
 
 # a tiny mmCIF: an RNA residue A with a hydrogen, a modified residue PSU with a hydrogen,
-# and an Mg ion, a water and a ligand (ATP) that must not survive
+# and an Mg ion and a ligand (ATP) that survive, and a water that must not
 const _MIXED_CIF = """
 data_NTLOAD
 loop_
@@ -189,12 +190,16 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
             nstd = sum(values(atoms))
             @test nstd == 1329
             mol = load_molecule(_fixture("1EHZ"))
-            @test n_atoms(mol) == 1652 == nstd + nmod
-            # waters and ions are not in it
+            # the nine Mg and Mn ions are ligands that are kept (1652 before 2026-11-11)
             @test hets["HOH"] == 160 && hets["MG"] == 6 && hets["MN"] == 3
-            @test !any(e -> lowercase(e) in ("mg", "mn"), elms(mol))
+            @test n_atoms(mol) == 1661 == nstd + nmod + hets["MG"] + hets["MN"]
+            @test count(e -> lowercase(e) == "mg", elms(mol)) == 6
+            @test count(e -> lowercase(e) == "mn", elms(mol)) == 3
+            # the polymer alone is what it was, and waters are never in it
+            @test n_atoms(load_molecule(_fixture("1EHZ"); ligands = false)) == 1652
             @test all(isfinite, coords_cartesian(mol))
-            # the same file with its modified residues stripped has 323 atoms fewer
+            # the same file with its modified residues stripped has 323 atoms fewer (and the
+            # nine ions are still there)
             lean = wr(
                 dir,
                 "lean.pdb",
@@ -203,14 +208,16 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
                     if !(startswith(l, "HETATM") && name_of(l) in modified)
                 ],
             )
-            @test n_atoms(load_molecule(lean)) == 1329
+            @test n_atoms(load_molecule(lean)) == 1329 + 9
             # the other nucleic acid fixtures are as before
             @test n_atoms(load_molecule(_fixture("1BNA"))) == 486
             @test n_atoms(load_molecule(_fixture("1RNA"))) == 582
             @test n_atoms(load_molecule(_fixture("1SDR"))) == 1006
-            # 246D has a DC in an RNA and two Na+: the ions are dropped
+            # 246D has a DC in an RNA and two Na+: the ions are kept (ligands)
             atoms246, hets246 = composition(_fixture("246D"))
-            @test n_atoms(load_molecule(_fixture("246D"))) == sum(values(atoms246))
+            @test n_atoms(load_molecule(_fixture("246D"))) ==
+                  sum(values(atoms246)) + hets246["NA"]
+            @test hets246["NA"] == 2
             @test n_atoms(load_molecule(_fixture("3HDD"))) == 1811
         end
 
@@ -222,11 +229,12 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
             rm(canon; force = true)
             resolved = reslove_struct(LocalPathSource(cif))
             @test resolved == canon && isfile(canon)
-            @test n_atoms(load_molecule(resolved)) == 1652
+            @test n_atoms(load_molecule(resolved)) == 1661
             atoms, hets = composition(resolved)
-            # modified bases are written as HETATM, with their own names; nothing else is
+            # modified bases and the nine ions are written as HETATM, with their own names;
+            # waters are not
             @test sum(values(atoms)) == 1329
-            @test sum(values(hets)) == 323
+            @test sum(values(hets)) == 323 + 9
             @test Set(keys(hets)) ==
                   Set([
                 "1MA",
@@ -240,8 +248,10 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
                 "OMG",
                 "PSU",
                 "YYG",
+                "MG",
+                "MN",
             ])
-            @test !any(l -> startswith(l, "HETATM") && name_of(l) in ("HOH", "MG", "MN"),
+            @test !any(l -> startswith(l, "HETATM") && name_of(l) == "HOH",
                 eachline(resolved))
             # a second call finds the same content
             @test reslove_struct(LocalPathSource(cif)) == canon
@@ -249,7 +259,7 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
             @test n_atoms(
                 load_molecule(reslove_struct(LocalPathSource(_fixture("1EHZ")))),
             ) ==
-                  1652
+                  1661
             @test reslove_struct(LocalPathSource(_fixture("1EHZ"))) ==
                   abspath(_fixture("1EHZ"))
             # the writer's selector gives the same atoms straight from the parsed model
@@ -257,11 +267,11 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
             model = first(collectmodels(struc))
             out = joinpath(dir, "writer.pdb")
             writepdb(out, model, _canonical_selector(model))
-            @test n_atoms(load_molecule(out)) == 1652
+            @test n_atoms(load_molecule(out)) == 1661
             @test read(out, String) == read(canon, String)
         end
 
-        @testset "reslove_struct: waters, ions, ligands and hydrogens dropped" begin
+        @testset "reslove_struct: waters and hydrogens dropped, ions and ligands kept" begin
             cif = joinpath(dir, "nt-load-mixed.cif")
             write(cif, _MIXED_CIF)
             canon = joinpath(_store_dir(), "nt-load-mixed.pdb")
@@ -275,8 +285,10 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
             @test [(l[1:6], name_of(l), strip(l[13:16])) for l in recs] == [
                 ("ATOM  ", "A", "P"), ("ATOM  ", "A", "O5'"), ("ATOM  ", "A", "C5'"),
                 ("HETATM", "PSU", "P"), ("HETATM", "PSU", "C1'"), ("HETATM", "PSU", "N1"),
+                ("HETATM", "MG", "MG"), ("HETATM", "ATP", "PG"),
             ]
-            @test n_atoms(load_molecule(resolved)) == 6
+            @test n_atoms(load_molecule(resolved)) == 8
+            @test n_atoms(load_molecule(resolved; ligands = false)) == 6
         end
 
         @testset "the PDB-ID route, offline" begin
@@ -298,16 +310,12 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
                 @test_throws MoleculeError load_molecule(path)
             end
             @test_throws MoleculeError load_molecule(joinpath(dir, "absent.pdb"))
-            # a file with waters, ions and ligands only: nothing is left
-            only_het = wr(
-                dir,
-                "het.pdb",
-                [
-                    ION,
-                    WATER,
-                ],
-            )
-            @test_throws MoleculeError load_molecule(only_het)
+            # a file with waters only: nothing is left; an ion beside them is a ligand, kept
+            only_water = wr(dir, "wat.pdb", [WATER])
+            @test_throws MoleculeError load_molecule(only_water)
+            only_het = wr(dir, "het.pdb", [ION, WATER])
+            @test n_atoms(load_molecule(only_het)) == 1
+            @test_throws MoleculeError load_molecule(only_het; ligands = false)
             # a file without nucleotides is a protein as before
             @test n_atoms(load_molecule(_fixture("1CRN"))) == 327
             # truncated lines: a parse error that names the file, typed
@@ -372,6 +380,22 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
             # an ATOM record trusts only the first letter: CA is carbon
             @test _infer_element("CA", false) == "C"
             @test _infer_element("", true) == "" && _infer_element("123", true) == ""
+            # an ion kept as an ATOM record (SASDAX2: `MG` of `IUM`, no element column)
+            mktempdir() do dir
+                path = joinpath(dir, "ion.pdb")
+                atoms = [  # name, residue, number, x
+                    ("N", "GLY", 1, 0.0), ("CA", "GLY", 1, 1.4), ("C", "GLY", 1, 2.0),
+                    ("O", "GLY", 1, 3.2), ("MG", "IUM", 601, 10.0),
+                ]
+                lines = map(enumerate(atoms)) do (i, (name, res, num, x))
+                    atom = name == "MG" ? rpad(name, 4) : " " * rpad(name, 3)
+                    "ATOM  " * lpad(i, 5) * " " * atom * " " * res * " A" *
+                    lpad(num, 4) *
+                    "    " * lpad(x, 8) * "   0.000   0.000  1.00  0.00"
+                end
+                write(path, join([lines; "END"; ""], "\n"))
+                @test "MG" in uppercase.(elms(load_molecule(path)))
+            end
         end
     finally
         _COMPONENT_DOWNLOAD[] = saved_hook

@@ -18,7 +18,7 @@ import {
     writeThemeName,
 } from "../src/store/settings-store.js"
 import { defaultTheme, type ThemeName, themeByName, themes } from "../src/ui/theme.js"
-import { tempDir as tmp } from "./support/fixtures.js"
+import { tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Store
@@ -59,7 +59,7 @@ function savedValues(dir: string): Record<string, unknown> {
 const wipedSettings = (r: LoadResult): string[] => r.wiped.map((w) => w.setting).sort()
 
 test("the first load makes an empty file that Julia reads, ", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const r = loadGlobal(dir)
     assert.deepEqual(JSON.parse(read(dir, "settings.json") as string), {})
     assert.deepEqual(r.wiped, [])
@@ -68,7 +68,7 @@ test("the first load makes an empty file that Julia reads, ", () => {
 })
 
 test("a save writes the shape Julia reads, in the order of the sheets", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const { settings } = loadGlobal(dir)
     assert.equal(
         settings.set({
@@ -102,7 +102,7 @@ test("a save writes the shape Julia reads, in the order of the sheets", () => {
 })
 
 test("colours, tuples and records are written as plain JSON", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const { settings } = loadGlobal(dir)
     assert.equal(
         settings.set({
@@ -121,7 +121,7 @@ test("colours, tuples and records are written as plain JSON", () => {
 })
 
 test("a load of a good file changes nothing", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const text = fileWith(
         ["N_ADAPT", 450],
         ["PLOT_COLOUR_MAP", "darkorange"],
@@ -136,7 +136,7 @@ test("a load of a good file changes nothing", () => {
 })
 
 test("a wiped value is a line of settings.log: time, setting, bad value, reason", () => {
-    const dir = tmp()
+    const dir = tempDir()
     writeFileSync(settingsFile(dir), fileWith(["N_ADAPT", 0], ["N_DRAWS", 900]))
     assert.equal(read(dir, "settings.log"), undefined, "nothing loaded, nothing logged")
     loadGlobal(dir)
@@ -152,7 +152,7 @@ test("a wiped value is a line of settings.log: time, setting, bad value, reason"
 })
 
 test("a value that is not valid is wiped and noticed, once", () => {
-    const dir = tmp()
+    const dir = tempDir()
     writeFileSync(
         settingsFile(dir),
         fileWith(["N_ADAPT", 0], ["N_DRAWS", 900], ["PLOT_COLOUR_MAP", "nope"]),
@@ -197,7 +197,7 @@ test("every kind of bad entry is wiped", () => {
         ],
     ]
     for (const [what, text] of cases) {
-        const dir = tmp()
+        const dir = tempDir()
         writeFileSync(settingsFile(dir), text)
         const r = loadGlobal(dir)
         assert.equal(r.settings.get("N_ADAPT"), 300, what)
@@ -223,7 +223,7 @@ test("a file that cannot be read is kept aside and replaced", () => {
         "\u0001\u0002\u0003\u0000￿",
     ]
     for (const text of bad) {
-        const dir = tmp()
+        const dir = tempDir()
         writeFileSync(settingsFile(dir), text)
         const r = loadGlobal(dir)
         assert.equal(r.reset, true, JSON.stringify(text))
@@ -236,7 +236,7 @@ test("a file that cannot be read is kept aside and replaced", () => {
 })
 
 test("values that break a rule together are wiped together, with a default alone", () => {
-    const dir = tmp()
+    const dir = tempDir()
     writeFileSync(settingsFile(dir), fileWith(["SASA_N_OCC", 200], ["SHELL_SAMPLE", 100]))
     const r = loadGlobal(dir)
     assert.equal(r.settings.get("SASA_N_OCC"), 104)
@@ -251,7 +251,7 @@ test("values that break a rule together are wiped together, with a default alone
 })
 
 test("a file of many bad values is cleaned in one load", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const rows: [string, unknown][] = [
         ["N_ADAPT", 0],
         ["N_DRAWS", "x"],
@@ -274,7 +274,7 @@ test("a file of many bad values is cleaned in one load", () => {
 })
 
 test("unknown names and screens are dropped quietly", () => {
-    const dir = tmp()
+    const dir = tempDir()
     writeFileSync(
         settingsFile(dir),
         '{"sampler": {"N_ADAPT": {"value": 450}, "NOT_A_SETTING": {"value": 1}},' +
@@ -287,7 +287,7 @@ test("unknown names and screens are dropped quietly", () => {
 })
 
 test("a change is checked before it is made", () => {
-    const { settings } = loadGlobal(tmp())
+    const { settings } = loadGlobal(tempDir())
     const bad: Record<string, unknown>[] = [
         { N_ADAPT: 0 },
         { N_ADAPT: "9" },
@@ -313,7 +313,7 @@ test("a change is checked before it is made", () => {
 })
 
 test("rules that tie settings together hold across a change, also among several", () => {
-    const { settings } = loadGlobal(tmp())
+    const { settings } = loadGlobal(tempDir())
     assert.equal(settings.set({ SHELL_SAMPLE: 300 }).ok, true)
     assert.equal(settings.set({ SASA_N_OCC: 250 }).ok, true)
     const low = settings.set({ SHELL_SAMPLE: 200 })
@@ -328,7 +328,7 @@ test("rules that tie settings together hold across a change, also among several"
 })
 
 test("q limits: Q_MIN below Q_MAX when both are given; null is saved as null", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const { settings } = loadGlobal(dir)
     const bad = settings.evaluate({ Q_MIN: 0.05, Q_MAX: 0.02 })
     assert.equal(bad.ok, false)
@@ -360,7 +360,7 @@ test("q limits: Q_MIN below Q_MAX when both are given; null is saved as null", (
     assert.deepEqual(again.settings.get("CHAINS"), ["A", "B"])
     const crossed = loadGlobal(
         (() => {
-            const d = tmp()
+            const d = tempDir()
             const text = fileWith(["Q_MIN", 0.5], ["Q_MAX", 0.1])
             writeFileSync(join(d, "settings.json"), text)
             return d
@@ -370,7 +370,7 @@ test("q limits: Q_MIN below Q_MAX when both are given; null is saved as null", (
 })
 
 test("reset goes back to the default, and the file follows", () => {
-    const dir = tmp()
+    const dir = tempDir()
     const { settings } = loadGlobal(dir)
     settings.set({ N_ADAPT: 450, N_DRAWS: 900 })
     assert.equal(settings.resetValue("N_ADAPT"), 300)
@@ -401,11 +401,11 @@ test("the default theme is one of the themes", () => {
 })
 
 test("no file means the default", () => {
-    assert.equal(readTheme(tmp()), defaultTheme.nm)
+    assert.equal(readTheme(tempDir()), defaultTheme.nm)
 })
 
 test("what is saved is what is read, for every theme there is", () => {
-    const dir = tmp()
+    const dir = tempDir()
     for (const name of known) {
         assert.ok(writeThemeName(dir, name))
         assert.equal(readTheme(dir), name)
@@ -413,7 +413,7 @@ test("what is saved is what is read, for every theme there is", () => {
 })
 
 test("a name no theme has, or a garbled file, means the default", () => {
-    const dir = tmp()
+    const dir = tempDir()
     writeFileSync(themeFile(dir), '{"theme":"no such theme"}')
     assert.equal(readTheme(dir), defaultTheme.nm)
     writeFileSync(themeFile(dir), "{ not json")
@@ -424,7 +424,7 @@ test("a name no theme has, or a garbled file, means the default", () => {
 })
 
 test("a garbled file is kept as .corrupt when the theme is saved", () => {
-    const dir = tmp()
+    const dir = tempDir()
     writeFileSync(themeFile(dir), "{ not json")
     assert.ok(writeThemeName(dir, "rose"))
     assert.equal(readFileSync(`${themeFile(dir)}.corrupt`, "utf-8"), "{ not json")
@@ -434,7 +434,7 @@ test("a garbled file is kept as .corrupt when the theme is saved", () => {
 
 test("an unwritable folder is not an error", () => {
     // a folder below a regular file can never be made
-    const dir = tmp()
+    const dir = tempDir()
     writeFileSync(join(dir, "a-file"), "x")
     assert.equal(writeThemeName(join(dir, "a-file", "sub"), "rose"), false)
 })
@@ -470,7 +470,7 @@ function projectIn(root: string, id: string): string {
 
 /** A global folder whose settings hold `values`, saved. */
 function globalWith(values: Record<string, unknown>): string {
-    const g = tmp()
+    const g = tempDir()
     const { settings } = loadGlobal(g)
     assert.equal(settings.set(values).ok, true)
     settings.save()
@@ -485,7 +485,7 @@ test("the first load makes an exact copy of the global settings", () => {
     assert.equal(r.settings.get("N_ADAPT"), 450)
     assert.deepEqual(r.wiped, [])
     assert.equal(r.reset, false)
-    const g2 = tmp()
+    const g2 = tempDir()
     const p2 = projectIn(g2, "q")
     loadProject(p2, g2)
     assert.ok(read(g2, "settings.json") !== undefined, "the global settings are made first")
@@ -493,7 +493,7 @@ test("the first load makes an exact copy of the global settings", () => {
 })
 
 test("a project does not follow later changes; a reset goes to the global value", () => {
-    const g = tmp()
+    const g = tempDir()
     const p = projectIn(g, "p")
     loadProject(p, g)
     const global = loadGlobal(g).settings
@@ -551,7 +551,7 @@ test("an invalid value goes back to the global value", () => {
 })
 
 test("a wiped value at the global default goes to that default", () => {
-    const g = tmp()
+    const g = tempDir()
     loadGlobal(g)
     const p = projectIn(g, "p")
     writeFileSync(settingsFile(p), fileWith(["N_ADAPT", "x"]))
@@ -588,7 +588,7 @@ test("a project file that cannot be read is replaced by the global settings", ()
 })
 
 test("a save in a project stays in the project", () => {
-    const g = tmp()
+    const g = tempDir()
     loadGlobal(g)
     const before = read(g, "settings.json")
     const p = projectIn(g, "p")
@@ -611,7 +611,7 @@ test("a save in a project stays in the project", () => {
 })
 
 test("projects are independent", () => {
-    const g = tmp()
+    const g = tempDir()
     loadGlobal(g)
     const a = projectIn(g, "a")
     const b = projectIn(g, "b")
@@ -627,7 +627,7 @@ test("projects are independent", () => {
 })
 
 test("a bad global file is mended by a project load too", () => {
-    const g = tmp()
+    const g = tempDir()
     const p = projectIn(g, "p")
     writeFileSync(settingsFile(g), fileWith(["N_ADAPT", -4]))
     const r = loadProject(p, g)

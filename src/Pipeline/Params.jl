@@ -57,9 +57,18 @@ Default `plot_dir` of [`results`](@ref): the folder the `.tex` figures are also 
 a path; `""` (the default) copies nothing. The terminal interface shows it as the "plot
 dir": when it is empty it moves and compiles plots into the `plots` folder of its own data
 folder, one folder for all projects, as `<plot dir>/<project>/<run>/<model>/`. A run made
-by [`run_project`](@ref) copies the figures of each model into that layout.
+by `run_project` copies the figures of each model into that layout.
 """
 const FIGURES_DIR = ""
+
+"""
+Default `table_dir` of `run_project`: the folder the workbooks and the comparison
+table of a run (`<model>.xlsx`, `compare.tsv`) are also copied to, a path; `""` (the
+default) copies nothing. The terminal interface shows it as the "data dir": when it is
+empty it moves data into the `data` folder of its own data folder, one folder for all
+projects. A file whose name is taken there gets `-2`, `-3`, ... and never replaces another.
+"""
+const TABLE_DIR = ""
 
 """
 Default `latex_compiler` of [`results`](@ref): the path of the LaTeX compiler that
@@ -74,9 +83,10 @@ const FIGURES_COMPILER = ""
 #                       Plot defaults (used by Results.jl)
 # ---------------------------------------------------------------------------
 #
-# Every value below is the default of the field of [`PlotStyle`](@ref) of the same name
-# (without the `PLOT_`). A colour is anything `Colors.parse` reads (a CSS/X11 name, a
-# `"#rrggbb"` string), or a `(colour, opacity)` tuple.
+# Every value below is the default of the field of [`PlotStyle`](@ref) of the
+# same name (without the `PLOT_`). A colour is a name of Colors.jl (the CSS and X11
+# names, any case) or a code (`#rgb`, `#rrggbb`, `rgb(r, g, b)`, `hsl(h, s%, l%)`,
+# `cmyk(c%, m%, y%, k%)`; see `ColourNotation.jl`), or a `(colour, opacity)` tuple.
 
 "Colour of the MAP curve and of the MAP marker of the histograms."
 const PLOT_COLOUR_MAP = :crimson
@@ -109,7 +119,7 @@ const PLOT_LW_MAP = 1.2
 const PLOT_LW_REFERENCE = 1.2
 
 """
-Whether [`run_project`](@ref) also makes the combined comparison figure of a run
+Whether `run_project` also makes the combined comparison figure of a run
 ([`compare_results`](@ref): the measured curve, the fitted curve of every model and the
 reference curves of the project's `reference-fit/` folder, on one plot, and the `compare`
 workbook with the same curves). It is made after the last model, in the run's `compare/`
@@ -118,11 +128,11 @@ folder, when at least one model was fitted.
 const PLOT_COMPARE = true
 
 """
-The colours of the fitted curves of the comparison figure, in order: the first model has
-the first colour, the second the second, and so on, starting again from the first when
-there are more models than colours. Each is a name `Colors.parse` reads or a `"#rrggbb"`
-string; the default is the Okabe-Ito set, which stays distinguishable with the common
-forms of colour blindness. At least one colour.
+The colours of the fitted curves of the comparison figure, in order: the first
+model has the first colour, the second the second, and so on, starting again from
+the first when there are more models than colours. Each is a colour name or a
+colour code (see `PLOT_COLOUR_MAP`); the default is the Okabe-Ito set, which stays
+distinguishable with the common forms of colour blindness. At least one colour.
 """
 const PLOT_COMPARE_COLOURS = (
     Symbol("#D55E00"), Symbol("#0072B2"), Symbol("#E69F00"), Symbol("#CC79A7"),
@@ -426,7 +436,7 @@ const SETTING_CHOICES = (
 """
 The rules that tie settings above together, or that a tuple setting must obey, which a set
 of values must obey as a whole; each is a `(rule, setting, ...)` and is read by the
-terminal interface and by [`load_settings`](@ref BAYSOL.Pipeline.load_settings).
+terminal interface and by `load_settings`.
 `:below_setting`: `setting` is below the setting `of` (skipped when either is `nothing`);
 `:all_above`: every number of `setting` is above `bound`; `:ordered`: the pair `setting`
 has its first number below its second, and above `above` if there is one; `:opacity`:
@@ -445,12 +455,12 @@ const SETTING_RELATIONS = (
 
 """
 The constants above that are settings, the ones a user may change: the terminal interface
-shows each on a page of its own, and [`load_settings`](@ref BAYSOL.Pipeline.load_settings)
+shows each on a page of its own, and `load_settings`
 accepts a saved value for these and for no other name.
 """
 const SETTING_NAMES = (
     :N_ADAPT, :N_DRAWS, :TABLE_SIGFIGS, :VAL_SIGMA, :FIGURES_TEX, :FIGURES_COMPILE,
-    :FIGURES_FORMATS, :FIGURES_DIR, :FIGURES_COMPILER, :PLOT_COLOUR_MAP,
+    :FIGURES_FORMATS, :FIGURES_DIR, :FIGURES_COMPILER, :TABLE_DIR, :PLOT_COLOUR_MAP,
     :PLOT_COLOUR_POSTERIOR, :PLOT_COLOUR_DATA,
     :PLOT_COLOUR_ERRORBAR, :PLOT_COLOUR_REFERENCE, :PLOT_COLOUR_BAND,
     :PLOT_COLOUR_BAND_RESID, :PLOT_COLOUR_HIST, :PLOT_COLOUR_AXIS, :PLOT_LW_MAP,
@@ -482,7 +492,7 @@ const SETTING_KINDS = (
     Q_MIN = :optional_float, Q_MAX = :optional_float, LMAX = :optional_int,
     EXCLUDE_Q = :ranges, CHAINS = :strings, PLOT_COMPARE_COLOURS = :colours,
     PLOT_COMPARE_MARKERS = :markers, PLOT_TUI_SIZES = :sizes, FIGURES_DIR = :path,
-    FIGURES_COMPILER = :path,
+    FIGURES_COMPILER = :path, TABLE_DIR = :path,
 )
 
 """

@@ -15,6 +15,7 @@ import assert from "node:assert/strict"
 import {
     chmodSync,
     existsSync,
+    mkdirSync,
     readdirSync,
     readFileSync,
     writeFileSync,
@@ -23,6 +24,7 @@ import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 import { test } from "node:test"
 import { readSystem } from "../src/core/environment.js"
+import { moveChoices } from "../src/screens/open-runs.js"
 import { parseSetting, valueText } from "../src/screens/screen-rules.js"
 import { readPlots } from "../src/screens/viewer.js"
 import {
@@ -37,21 +39,13 @@ import {
     plotUnit,
 } from "../src/store/plots.js"
 import { readRunText } from "../src/store/run-archive.js"
-import { listOpenRuns, runModels } from "../src/store/run-logs.js"
+import { listOpenRuns, type OpenModel, runModels } from "../src/store/run-logs.js"
 import { defaultCatalog, validateValue } from "../src/store/settings.js"
 import { makeRun } from "./support/fake-run.js"
-import { tempDir } from "./support/fixtures.js"
+import { scratchProject, tempDir } from "./support/fixtures.js"
+import { sheetsOf, tinyWorkbook } from "./support/workbook.js"
 
 const windows = process.platform === "win32"
-
-/** A project folder with the inputs of a run. */
-function project(): string {
-    const dir = tempDir()
-    writeFileSync(join(dir, "buffer.json"), '{"solutes": []}\n')
-    writeFileSync(join(dir, "data.tsv"), "0.1\t5\t0.1\n")
-    writeFileSync(join(dir, "data.json"), '{"units": "A-1", "energy": 8000}\n')
-    return dir
-}
 
 /** The units of a run (its model and its comparison), as `open runs` takes them. */
 function unitsOf(projectDir: string, dir: string): { model: PlotUnit; compare: PlotUnit } {
@@ -143,12 +137,6 @@ test("names are keyed off the model; the comparison's are named for the project"
     const compare = unit({ name: "comparison" })
     assert.equal(destinationName(compare, "compare.tsv"), "demo-compare.tsv")
     assert.equal(destinationName(compare, "compare.tex"), "demo-compare.tex")
-    // an older run's names
-    const stamp = "23-35-29-123_EST_-0500_2026-11-07"
-    assert.equal(
-        destinationName(compare, `compare/plots/${stamp}_compare.tex`),
-        "demo-compare.tex",
-    )
     // the project name is its folder's name; the data file is the workbook, relative
     const model = { name: "m", tex: [], workbook: join("/d", "m.xlsx") }
     const made = plotUnit("/data/projects/demo", { id: "r", dir: "/d" }, model)
@@ -174,21 +162,23 @@ test("a taken name numbers the whole set with -2, -3 before the extension", () =
 // 2. Move tex and move data
 // ========================================================================================
 
-test("move tex: from the archive or the folder, flat, named for the model", async () => {
+test("move tex: from the archive or the folder, into the run folder", async () => {
     const before = temps()
     const root = tempDir()
     const seen: string[][] = []
     for (const pack of [undefined, async () => 0]) {
-        const p = project()
+        const p = scratchProject()
         const { dir } = await makeRun(p, pack)
         const { model, compare } = unitsOf(p, dir)
         const target = join(root, pack === undefined ? "packed" : "plain")
+        const folder = join(target, model.run)
         const note = await moveFiles("tex", [model], target)
         assert.equal(note, `moved 2 plots to ${target}`)
-        assert.deepEqual(readdirSync(target).sort(), ["m.tex", "m_residuals.tex"])
+        assert.deepEqual(readdirSync(target), [model.run], "only the run's folder")
+        assert.deepEqual(readdirSync(folder).sort(), ["m.tex", "m_residuals.tex"])
         for (const name of ["m.tex", "m_residuals.tex"])
             assert.equal(
-                readFileSync(join(target, name), "utf-8"),
+                readFileSync(join(folder, name), "utf-8"),
                 readRunText(dir, name),
                 "same bytes",
             )
@@ -196,8 +186,8 @@ test("move tex: from the archive or the folder, flat, named for the model", asyn
         const all = await moveFiles("tex", [model, compare], target)
         assert.equal(all.startsWith("moved 3 plots to"), true)
         const project_ = p.split("/").pop() as string
-        seen.push(readdirSync(target).sort())
-        assert.ok(readdirSync(target).includes(`${project_}-compare.tex`))
+        seen.push(readdirSync(folder).sort())
+        assert.ok(readdirSync(folder).includes(`${project_}-compare.tex`))
     }
     // the second move of the same unit did not take the place of the first
     assert.deepEqual(seen[0], [
@@ -211,46 +201,53 @@ test("move tex: from the archive or the folder, flat, named for the model", asyn
 })
 
 test("move tex never replaces a file and keeps no staging file", async () => {
-    const p = project()
+    const p = scratchProject()
     const { dir } = await makeRun(p)
     const { model } = unitsOf(p, dir)
     const root = tempDir()
-    writeFileSync(join(root, "m.tex"), "old")
+    const folder = join(root, model.run)
+    mkdirSync(folder)
+    writeFileSync(join(folder, "m.tex"), "old")
     await moveFiles("tex", [model], root)
-    assert.equal(readFileSync(join(root, "m.tex"), "utf-8"), "old")
-    assert.deepEqual(readdirSync(root).sort(), [
+    assert.equal(readFileSync(join(folder, "m.tex"), "utf-8"), "old")
+    assert.deepEqual(readdirSync(folder).sort(), [
         "m-2.tex",
         "m.tex",
         "m_residuals-2.tex",
     ])
     // a third and a fourth take the next numbers
     await moveFiles("tex", [model], root)
-    assert.ok(existsSync(join(root, "m-3.tex")))
-    assert.ok(existsSync(join(root, "m_residuals-3.tex")))
-    assert.equal(readFileSync(join(root, "m.tex"), "utf-8"), "old", "still the old file")
-    assert.ok(!readdirSync(root).some((n) => n.includes(".tmp")))
+    assert.ok(existsSync(join(folder, "m-3.tex")))
+    assert.ok(existsSync(join(folder, "m_residuals-3.tex")))
+    assert.equal(readFileSync(join(folder, "m.tex"), "utf-8"), "old", "still the old file")
+    assert.ok(!readdirSync(folder).some((n) => n.includes(".tmp")))
 })
 
 test("move data: the workbook and the comparison table, into the data folder", async () => {
     for (const pack of [undefined, async () => 0]) {
-        const p = project()
+        const p = scratchProject()
         const { dir } = await makeRun(p, pack)
         const run = listOpenRuns(p).find((r) => r.dir === dir)
         assert.ok(run)
         const units = runModels(run).map((m) => plotUnit(p, run, m))
         const root = join(tempDir(), "data")
+        const folder = join(root, run.id)
         const note = await moveFiles("data", units, root)
         assert.equal(note, `moved 2 data files to ${root}`)
         const project_ = p.split("/").pop() as string
+        assert.deepEqual(readdirSync(root), [run.id], "only the run's folder")
         assert.deepEqual(
-            readdirSync(root).sort(),
+            readdirSync(folder).sort(),
             ["m.xlsx", `${project_}-compare.tsv`].sort(),
         )
-        assert.equal(readFileSync(join(root, "m.xlsx"), "utf-8"), "PK workbook")
+        assert.deepEqual(
+            sheetsOf(readFileSync(join(folder, "m.xlsx"))),
+            sheetsOf(tinyWorkbook()),
+        )
         // a second move keeps both sets
         await moveFiles("data", units, root)
         assert.deepEqual(
-            readdirSync(root).sort(),
+            readdirSync(folder).sort(),
             [
                 "m-2.xlsx",
                 "m.xlsx",
@@ -262,7 +259,7 @@ test("move data: the workbook and the comparison table, into the data folder", a
 })
 
 test("move: a plain run keeps its files; none to move is told", async () => {
-    const p = project()
+    const p = scratchProject()
     const { dir } = await makeRun(p, async () => 0)
     const { model } = unitsOf(p, dir)
     await moveFiles("tex", [model], tempDir())
@@ -327,10 +324,10 @@ test("a compiler path that is set is the only one tried, and must be an engine",
 // 4. Compile plots
 // ========================================================================================
 
-test("compile plots: PDFs land flat in the plot folder, built in a temp dir", async () => {
+test("compile plots: PDFs land in the run's folder, built in a temp dir", async () => {
     if (windows) return
     const before = temps()
-    const p = project()
+    const p = scratchProject()
     const { dir } = await makeRun(p)
     const { model, compare } = unitsOf(p, dir)
     const root = tempDir()
@@ -347,14 +344,16 @@ test("compile plots: PDFs land flat in the plot folder, built in a temp dir", as
         delete process.env.FAKE_LOG
     }
     const name = p.split("/").pop() as string
-    assert.deepEqual(readdirSync(root).sort(), [
+    const folder = join(root, model.run)
+    assert.deepEqual(readdirSync(root), [model.run], "only the run's folder")
+    assert.deepEqual(readdirSync(folder).sort(), [
         `${name}-compare.pdf`,
         "m-2.pdf",
         "m.pdf",
         "m_residuals-2.pdf",
         "m_residuals.pdf",
     ])
-    const pdf = readFileSync(join(root, "m.pdf"), "utf-8")
+    const pdf = readFileSync(join(folder, "m.pdf"), "utf-8")
     assert.match(pdf, /%PDF of m\.tex/)
     // it ran in temporary folders (not in the run, not in the plot folder), all removed
     const cwds = readFileSync(log, "utf-8").trim().split("\n")
@@ -371,7 +370,7 @@ test("compile plots: PDFs land flat in the plot folder, built in a temp dir", as
 
 test("compile plots: a figure that fails is named, the others are still made", async () => {
     if (windows) return
-    const p = project()
+    const p = scratchProject()
     const { dir } = await makeRun(p, async () => 0)
     const { model } = unitsOf(p, dir)
     const root = tempDir()
@@ -380,7 +379,7 @@ test("compile plots: a figure that fails is named, the others are still made", a
     const why = /1 failed: m\/m_residuals\.tex: ! Undefined control sequence\.$/
     assert.match(note, why)
     assert.match(note, /^compiled 1 plot, 1 failed: /)
-    assert.deepEqual(readdirSync(root), ["m.pdf"])
+    assert.deepEqual(readdirSync(join(root, model.run)), ["m.pdf"])
     // when every figure fails, it is an error that says why
     const only = { ...model, tex: model.tex.filter((t) => t.includes("residuals")) }
     await assert.rejects(
@@ -390,7 +389,7 @@ test("compile plots: a figure that fails is named, the others are still made", a
 })
 
 test("compile plots: no compiler is told, with where to set it; nothing made", async () => {
-    const p = project()
+    const p = scratchProject()
     const { dir } = await makeRun(p)
     const { model } = unitsOf(p, dir)
     const root = tempDir()
@@ -414,7 +413,7 @@ test("compile plots: no compiler is told, with where to set it; nothing made", a
 
 test("compile plots: an empty setting uses the PATH's lualatex", async () => {
     if (windows) return
-    const p = project()
+    const p = scratchProject()
     const { dir } = await makeRun(p)
     const { model } = unitsOf(p, dir)
     const root = tempDir()
@@ -429,7 +428,7 @@ test("compile plots: an empty setting uses the PATH's lualatex", async () => {
     } finally {
         delete process.env.FAKE_LOG
     }
-    assert.equal(readdirSync(root).length, 2)
+    assert.equal(readdirSync(join(root, model.run)).length, 2)
 })
 
 // ========================================================================================
@@ -463,7 +462,7 @@ test("the plot dir and the compiler path are path settings, empty by default", (
 
 test("the viewer reads a packed run's plots straight from the archive", async () => {
     const before = temps()
-    const p = project()
+    const p = scratchProject()
     const packed = await makeRun(p)
     const plain = await makeRun(p, async () => 0)
     for (const run of [packed, plain]) {
@@ -476,4 +475,14 @@ test("the viewer reads a packed run's plots straight from the archive", async ()
     assert.equal(readPlots(join(packed.dir, "nope.txt"), packed.dir).length, 0)
     assert.equal(readPlots(join(packed.dir, "m-plots.txt"), undefined).length, 0)
     assert.deepEqual(temps(), before)
+})
+
+test("the dropdown of a move offers the whole run, then each model", () => {
+    const model = (name: string) => ({ name }) as OpenModel
+    assert.deepEqual(moveChoices([model("a"), model("comparison")]), [
+        { label: "move all", value: null },
+        { label: "move by model: a", value: "a" },
+        { label: "move by model: comparison", value: "comparison" },
+    ])
+    assert.deepEqual(moveChoices([]), [{ label: "move all", value: null }])
 })

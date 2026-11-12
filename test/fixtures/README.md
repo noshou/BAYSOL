@@ -8,7 +8,7 @@ Data fixtures are grouped by kind, one directory per kind:
 | [`form-factors/`](#form-factor-oracle-fixtures-form-factors) | X-ray form-factor oracle data (`f0.csv`, `f1f2.csv`) from `xraydb`                                                                                                                 |
 | [`molecules/`](#structure-fixtures-molecules)                | Real RCSB PDB/mmCIF structures (10 protein, 6 nucleic-acid or mixed ones), used by `StructureSource`/pipeline tests                                                                |
 | [`components/`](#component-dictionary-fixtures-components)   | Three wwPDB Chemical Component Dictionary files, for the component-lookup tests                                                                                                    |
-| [`experiments/`](#sasbdb-experiment-fixtures-experiments)    | Real SASBDB entries (curve + fit + model + source paper), one dir per case; 57 entries: 27 protein-only and 30 with DNA or RNA (16 nucleic acid only, 14 protein and nucleic acid) |
+| [`experiments/`](#sasbdb-experiment-fixtures-experiments)    | Real SASBDB entries (curve + fit + model + source paper), one dir per case; 77 entries: 40 protein-only and 37 with DNA or RNA (16 nucleic acid only, 21 protein and nucleic acid; 20 of them added 2026-11-11 and not yet run) |
 
 ## Form-factor oracle
 
@@ -89,7 +89,7 @@ No other new data files serve the nucleic-acid tests: their inputs are the fixtu
 
 ## SASBDB experiment fixtures
 
- 57 SASBDB entries (27 protein-only, 16 nucleic acid only and 14 protein-nucleic acid mixtures), one directory per case, each holding (subset varies by
+ 77 SASBDB entries (40 protein-only, 16 nucleic acid only and 21 protein-nucleic acid mixtures), one directory per case, each holding (subset varies by
 case): the experimental scattering curve (`experimental_data/`), the
 deposited P(r) (`pddf/`), the depositors' own regularized fit(s)
 (`<CASE>_fit*.fit`/`.fir`/`.dat`), the fitted/source model coordinates
@@ -157,3 +157,23 @@ redistribution terms vary); fetch a paper from its DOI, which is also in the tab
 | `SASDYW6` | Cuéllar-Cruz, Siliqi & Moreno (2026)*ACS Omega*, "Insights into the Solution Structure and Oligomeric State of Fructose-1,6-bisphosphate Aldolase and Pyruvate Kinase from Nakaseomyces glabratus". [10.1021/acsomega.6c06099](https://doi.org/10.1021/acsomega.6c06099)                                                                                             | `test/fitting_tests/SASDYW6/SASDYW6_fit2.jl`   |
 | `SASDZC6` | "A highly dynamic active state for transducin-bound phosphodiesterase-6 in vertebrate phototransduction" -- bioRxiv preprint, accession`2026.04.01.715611` (`v3`). The DOI printed on the preprint is [10.64898/2026.04.01.715611](https://doi.org/10.64898/2026.04.01.715611) (it may not resolve yet); not linked to a publication in SASBDB's own metadata either. | `test/fitting_tests/SASDZC6/SASDZC6.jl`        |
 | `SASDZZ9` | Pongnan, Robinson, Kamonsutthipaijit, Fukamizo & Suginta (2026)*Biophys Rep (N Y)*, "The oligomeric state of chitooligosaccharide deacetylase from ... Vibrio campbellii". [10.1016/j.bpr.2026.100275](https://doi.org/10.1016/j.bpr.2026.100275)                                                                                                                     | `test/fitting_tests/SASDZZ9/SASDZZ9_fit1.jl`   |
+| `SASDAX2` | Svergun DI, Petoukhov MV, Koch MHJ, König S (2000) J Biol Chem, pyruvate decarboxylase from *Z. mobilis* (PMID 10617618; no DOI in SASBDB). PEG 1500 in the buffer (added 2026-11-11, not yet run; three pasted mail-header lines removed from the model's REMARK block, see its `README.txt`). |
+| `SASDBA8` | Shah et al. (2018) Nucleic Acids Res, RIG-I with 5'ppp hairpin RNA and AMP-PNP. [10.1093/nar/gkx1307](https://doi.org/10.1093/nar/gkx1307) (four EOM/RANCH members; added 2026-11-11, not yet run). |
+| `SASDF29` | Yadav et al. (2019) Nucleic Acids Res, STAU1 dsRBD4 with ARF1 RNA. [10.1093/nar/gkz1163](https://doi.org/10.1093/nar/gkz1163) (NMR bundle; added 2026-11-11, not yet run). |
+| `SASDHT9` | Horne et al. (2020) bioRxiv, "Mechanism of NanR gene repression and allosteric induction of bacterial sialic acid metabolism". [10.1101/2020.04.22.056440](https://doi.org/10.1101/2020.04.22.056440) (added 2026-11-11, not yet run). |
+| `SASDMM3` | McGinnis et al. (2022) Nat Commun, monomeric mycobacteriophage immunity repressor and a 13-bp DNA, free (no complex). [10.1038/s41467-022-31678-6](https://doi.org/10.1038/s41467-022-31678-6) (`.fit` line ends converted CR to LF; added 2026-11-11, not yet run). |
+| `SASDQ79` | Gedara et al. (2023) Nucleic Acids Res, DpdA D95A with 28-bp DNA. [10.1093/nar/gkad141](https://doi.org/10.1093/nar/gkad141) (added 2026-11-11, not yet run). |
+| `SASDQE9` | Prolić-Kalinšek et al. (2023) Acta Crystallogr D, YdaT with 30-bp DNA, Xplor-NIH two-MODEL ensembles. [10.1107/S2059798323001249](https://doi.org/10.1107/S2059798323001249) (added 2026-11-11, not yet run). |
+| `SASDRJ8` | de novo enterobactin esterase Syn-F4 (PDB 8H7D). [10.1073/pnas.2218281120](https://doi.org/10.1073/pnas.2218281120) (200 mM Arg-HCl; added 2026-11-11, not yet run). |
+| `SASDRS2` | Iqbal et al. (2023) J Biol Chem, collagen-like peptides. [10.1016/j.jbc.2022.102799](https://doi.org/10.1016/j.jbc.2022.102799) (added 2026-11-11, not yet run). |
+| `SASDRX8` | Argonaute (AfAgo) with a 14-bp DNA duplex, Nucleic Acids Res (2024). [10.1093/nar/gkad1241](https://doi.org/10.1093/nar/gkad1241) (added 2026-11-11, not yet run). |
+| `SASDV62` | Baranova et al. (2024) J Phys Chem B, hemoglobin-PEG interactions probed by SAXS (PDB 3ODQ model of the control). [10.1021/acs.jpcb.4c03003](https://doi.org/10.1021/acs.jpcb.4c03003) (added 2026-11-11, not yet run). |
+| `SASDV82` | Baranova et al. (2024) J Phys Chem B, hemoglobin-PEG interactions probed by SAXS (PDB 3ODQ model of the control). [10.1021/acs.jpcb.4c03003](https://doi.org/10.1021/acs.jpcb.4c03003) (added 2026-11-11, not yet run). |
+| `SASDV92` | Baranova et al. (2024) J Phys Chem B, hemoglobin-PEG interactions probed by SAXS (PDB 3ODQ model of the control). [10.1021/acs.jpcb.4c03003](https://doi.org/10.1021/acs.jpcb.4c03003) (added 2026-11-11, not yet run). |
+| `SASDVA2` | Baranova et al. (2024) J Phys Chem B, hemoglobin-PEG interactions probed by SAXS (PDB 3ODQ model of the control). [10.1021/acs.jpcb.4c03003](https://doi.org/10.1021/acs.jpcb.4c03003) (added 2026-11-11, not yet run). |
+| `SASDVB2` | Baranova et al. (2024) J Phys Chem B, hemoglobin-PEG interactions probed by SAXS (PDB 3ODQ model of the control). [10.1021/acs.jpcb.4c03003](https://doi.org/10.1021/acs.jpcb.4c03003) (added 2026-11-11, not yet run). |
+| `SASDVC2` | Baranova et al. (2024) J Phys Chem B, hemoglobin-PEG interactions probed by SAXS (PDB 3ODQ model of the control). [10.1021/acs.jpcb.4c03003](https://doi.org/10.1021/acs.jpcb.4c03003) (added 2026-11-11, not yet run). |
+| `SASDVD2` | Baranova et al. (2024) J Phys Chem B, hemoglobin-PEG interactions probed by SAXS (PDB 3ODQ model of the control). [10.1021/acs.jpcb.4c03003](https://doi.org/10.1021/acs.jpcb.4c03003) (added 2026-11-11, not yet run). |
+| `SASDVE2` | Baranova et al. (2024) J Phys Chem B, hemoglobin-PEG interactions probed by SAXS (PDB 3ODQ model of the control). [10.1021/acs.jpcb.4c03003](https://doi.org/10.1021/acs.jpcb.4c03003) (added 2026-11-11, not yet run). |
+| `SASDEM7` | Entry "Human glycine decarboxylase with glycine" (ESRF BM29; no publication in SASBDB; the crystal structures 6I33/6I34/6I35 are from the same group). Model `SASDEM7_6I35_AB.pdb` is NOT a SASBDB file: chains A and B and the PLG cofactor of PDB 6I35, extracted without changing coordinates (added 2026-11-11, not yet run). |
+| `SASDVN2` | Mishra et al. (2024) J Biol Chem, S. aureus Eap, polyvalent inhibitor of neutrophil serine proteases. [10.1016/j.jbc.2024.107627](https://doi.org/10.1016/j.jbc.2024.107627) (six MultiFoXS models, three FoXS fits; added 2026-11-11, not yet run).

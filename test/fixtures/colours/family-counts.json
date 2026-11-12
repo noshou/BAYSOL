@@ -1,0 +1,18 @@
+{
+ "note": "Golden counts of the names of each colour family (colour-families.json). Update deliberately, with `bysl harvest colours`, when the list or the family rules change.",
+ "total": 6428,
+ "families": {
+  "red": 572,
+  "orange": 273,
+  "yellow": 558,
+  "green": 893,
+  "cyan": 302,
+  "blue": 925,
+  "purple": 677,
+  "pink": 715,
+  "brown": 572,
+  "gray": 536,
+  "black": 87,
+  "white": 318
+ }
+}

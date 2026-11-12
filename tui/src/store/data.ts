@@ -42,7 +42,7 @@ import { lockedIn } from "./projects.js"
  * `.xlsx` workbook into a CLEAN `data.tsv` in the project (exactly three tab-separated
  * columns q, I, sigma, one measurement per row, no header, no comments, no unit text;
  * the original file is never touched) and writes what the numbers mean into
- * `data.json` (units of q, X-ray energy in eV, the source's file name, the point
+ * `data.json` (units of q, X-ray energy and its unit, the source's file name, the point
  * count). The units are not in the TSV so changing them later edits `data.json` only.
  *
  * `data.json` also REMEMBERS where the curve came from (the source path, the parse
@@ -73,6 +73,30 @@ export const unitsList: readonly Units[] = ["nm-1", "A-1"]
  */
 export function unitLabel(units: Units): string {
     return units === "nm-1" ? "nm⁻¹" : "Å⁻¹"
+}
+
+/**
+ * The unit the X-ray energy is read in: only a LABEL, like the units of q (the number is
+ * kept as typed, changing the unit never converts it; Julia converts to eV at run time).
+ */
+export type EnergyUnit = "eV" | "keV" | "nm" | "A"
+
+/** Every energy unit, in the order `^k` turns them. */
+export const energyUnitsList: readonly EnergyUnit[] = ["nm", "A", "eV", "keV"]
+
+/**
+ * The unit a NEW energy is entered in (a wavelength in nm is the most common). A
+ * `data.json` without the field is older and holds eV: readers default to eV, not this.
+ */
+export const DEFAULT_ENERGY_UNIT: EnergyUnit = "nm"
+
+/** How an energy unit is written for the user (`Å` is the precomposed U+00C5). */
+export const energyUnitLabel = (unit: EnergyUnit): string => (unit === "A" ? "Å" : unit)
+
+/** @returns the next unit of the cycle nm, Å, eV, keV, nm. */
+export function nextEnergyUnit(unit: EnergyUnit): EnergyUnit {
+    const at = energyUnitsList.indexOf(unit)
+    return energyUnitsList[(at + 1) % energyUnitsList.length] as EnergyUnit
 }
 
 /**
@@ -117,7 +141,7 @@ export const makeMapping = (
 
 /**
  * Reads the mapping of `data.json` leniently: a mapping is a convenience, so one that is
- * missing (an old file) or malformed is simply absent and never makes the data unusable.
+ * missing or malformed is simply absent and never makes the data unusable.
  */
 export function readMapping(value: unknown): DataMapping | undefined {
     if (!isDict(value) || !isDict(value.columns)) return undefined
@@ -130,6 +154,7 @@ export function readMapping(value: unknown): DataMapping | undefined {
         Number.isInteger(skipRows) &&
         skipRows >= 0 &&
         typeof comments === "boolean" &&
+        typeof sheet === "string" &&
         headerModes.includes(header as HeaderMode)
     if (!ok) return undefined
     const columns = {} as Record<Role, ColumnChoice>
@@ -140,19 +165,19 @@ export function readMapping(value: unknown): DataMapping | undefined {
             return undefined
         columns[role] = { spec: c.spec, column: c.column }
     }
-    const chosen = typeof sheet === "string" ? sheet : "" // absent in older files
-    return { ...(value as unknown as ParseOptions), sheet: chosen, path, columns }
+    return { ...(value as unknown as ParseOptions), sheet, path, columns }
 }
 
 /**
  * What `data.json` holds.
  *
  * @property units - the units of q in `data.tsv`.
- * @property energy - the X-ray energy in eV, `null` until the user gives it.
+ * @property energy - the X-ray energy as typed, in `energy_unit`; `null` until given.
  * @property source - the name (no folder) of the file the data came from.
  * @property points - the number of rows of `data.tsv`.
- * @property mapping - where the curve came from and how it was read; absent in a file
- *     written before the import remembered it.
+ * @property mapping - where the curve came from and how it was read; absent when the
+ *     data was not imported from a file.
+ * @property energy_unit - the unit of `energy` (a label, never converted here).
  */
 export type DataInfo = {
     units: Units
@@ -160,6 +185,7 @@ export type DataInfo = {
     source: string
     points: number
     mapping?: DataMapping
+    energy_unit: EnergyUnit
 }
 
 /** The units a freshly loaded file has when the project had none: Å⁻¹. */
@@ -196,18 +222,20 @@ function readInfoFile(file: string): DataInfo {
         throw unusableData(dataJsonName)
     }
     if (!isDict(value)) throw unusableData(dataJsonName)
-    const { units, energy, source, points } = value
+    const { units, energy, source, points, energy_unit } = value
     const ok =
         (units === "nm-1" || units === "A-1") &&
         (energy === null || (typeof energy === "number" && energy > 0)) &&
         typeof source === "string" &&
         typeof points === "number" &&
         Number.isInteger(points) &&
-        points >= MIN_POINTS
+        points >= MIN_POINTS &&
+        energyUnitsList.includes(energy_unit as EnergyUnit)
     if (!ok) throw unusableData(dataJsonName)
-    const info = { units, energy, source, points } as DataInfo
+    const info = { units, energy, source, points, energy_unit } as DataInfo
     const mapping = readMapping(value.mapping)
-    return mapping === undefined ? info : { ...info, mapping }
+    if (mapping !== undefined) info.mapping = mapping
+    return info
 }
 
 /**
@@ -216,10 +244,11 @@ function readInfoFile(file: string): DataInfo {
  * project (a deleted project is never brought back). An existing `data.json` that
  * cannot be used is never written over.
  *
- * @param energy - the energy in eV, or `undefined` while it is not known.
+ * @param energy - the energy as typed (in `energyUnit`), or `undefined` while unknown.
  * @param mapping - where the curve came from, to remember (see [[DataMapping]]).
- * @throws ProjectGoneError, FileInUseError, UnusableFileError (an old `data.json`),
- *     or whatever the write throws.
+ * @param energyUnit - the unit the energy is shown in.
+ * @throws ProjectGoneError, FileInUseError, UnusableFileError (a `data.json` that
+ *     cannot be read), or whatever the write throws.
  */
 export function writeData(
     projectDir: string,
@@ -228,6 +257,7 @@ export function writeData(
     units: Units,
     energy?: number,
     mapping?: DataMapping,
+    energyUnit: EnergyUnit = DEFAULT_ENERGY_UNIT,
 ): DataInfo {
     const info: DataInfo = {
         units,
@@ -235,6 +265,7 @@ export function writeData(
         source: basename(source),
         points: data.q.length,
         ...(mapping === undefined ? {} : { mapping }),
+        energy_unit: energyUnit,
     }
     const tsv = dataTsvFile(projectDir)
     const json = dataJsonFile(projectDir)
@@ -339,18 +370,32 @@ export function setUnits(projectDir: string, units: Units): DataInfo {
     return editInfo(projectDir, (old) => ({ ...old, units }))
 }
 
+/**
+ * Sets the unit the energy is shown in (always written). Only `data.json` is
+ * written.
+ *
+ * @throws as [[setUnits]].
+ */
+export function setEnergyUnit(projectDir: string, unit: EnergyUnit): DataInfo {
+    return editInfo(projectDir, (old) => ({ ...old, energy_unit: unit }))
+}
+
 /** What [[setEnergy]] says of an energy that is not above 0. */
 export const ENERGY_PROBLEM = "above 0, please"
 
 /**
- * Sets the X-ray energy. Only `data.json` is written.
+ * Sets the X-ray energy as typed, and its unit. Only `data.json` is written.
  *
  * @throws [[DataFileError]] for an energy that is not above 0 (and finite); otherwise
  *     as [[setUnits]].
  */
-export function setEnergy(projectDir: string, energy: number): DataInfo {
+export function setEnergy(
+    projectDir: string,
+    energy: number,
+    unit: EnergyUnit,
+): DataInfo {
     if (!Number.isFinite(energy) || energy <= 0) throw new DataFileError(ENERGY_PROBLEM)
-    return editInfo(projectDir, (old) => ({ ...old, energy }))
+    return editInfo(projectDir, (old) => ({ ...old, energy, energy_unit: unit }))
 }
 
 /**

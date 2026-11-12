@@ -27,13 +27,13 @@ import {
     modelStem,
     settingsFile,
 } from "../src/store/settings-store.js"
-import { tempDir as tmp } from "./support/fixtures.js"
+import { tempDir } from "./support/fixtures.js"
 
 const catalog = defaultCatalog()
 
 /** A global folder with the given global settings and a project folder in it. */
 function setup(global: Record<string, unknown> = {}): { g: string; p: string } {
-    const g = tmp()
+    const g = tempDir()
     const { settings } = loadGlobal(g)
     if (Object.keys(global).length > 0) {
         assert.equal(settings.set(global).ok, true)
@@ -55,11 +55,11 @@ const stored = (p: string): Record<string, Record<string, Record<string, unknown
 
 test("run-level: the TS list and the PLOT_ rule are Julia's", () => {
     const source = readFileSync(
-        fileURLToPath(new URL("../../src/Pipeline/Settings.jl", import.meta.url)),
+        fileURLToPath(new URL("../src/store/settings-file.jl", import.meta.url)),
         "utf-8",
     )
     const list = /const RUN_LEVEL_SETTINGS\s*=\s*\(([^)]*)\)/.exec(source)
-    assert.ok(list, "RUN_LEVEL_SETTINGS is in Pipeline/Settings.jl")
+    assert.ok(list, "RUN_LEVEL_SETTINGS is in store/settings-file.jl")
     const julia = (list?.[1] ?? "")
         .split(",")
         .map((t) => t.trim().replace(/^:/, ""))

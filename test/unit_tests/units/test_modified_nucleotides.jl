@@ -453,8 +453,9 @@ end
                 @test !isfile(_pka_path(path))              # no PROPKA for a nucleic acid
                 heavy_in = n_atoms(load_molecule(path))
                 mol = load_molecule(hp)
-                @test heavy_in == 1652
-                @test n_atoms(mol) == 2472
+                # 1652 and 2472 before 2026-11-11: the nine Mg and Mn ions are ligands, kept
+                @test heavy_in == 1652 + 9
+                @test n_atoms(mol) == 2472 + 9
                 lines = [
                     l for l in eachline(hp)
                     if (startswith(l, "ATOM") || startswith(l, "HETATM")) &&

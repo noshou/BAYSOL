@@ -1,0 +1,2260 @@
+[
+ {
+  "id": "tris",
+  "label": "Tris (tris(hydroxymethyl)aminomethane)",
+  "aliases": [
+   "tris",
+   "tris base",
+   "tris-hcl",
+   "tris hcl",
+   "trizma"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 8.072,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0279,
+    "dH_kJ_mol": 47.45,
+    "dCp_J_K_mol": -59,
+    "z_acid": 1,
+    "z_base": 0,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.68 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 8.3,
+      "itw25": 8.06,
+      "dT_calb": -0.031,
+      "dT_itw": -0.028
+     },
+     "pK_diff_vs_independent": {
+      "calb20": 0.021,
+      "itw25": 0.119
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": 0.0031,
+      "dT_itw": 0.0001
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   7.1,
+   9.1
+  ],
+  "default_titrant": {
+   "kind": "acid",
+   "ion": "chloride"
+  },
+  "solute": "tris",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "Amine base; titrated with HCl, so the counter-ion is chloride (repo SASDEM7/SASDMJ9/SASDMM3).",
+  "caveats": [
+   "strongly temperature dependent (about -0.028 pK/K): the pH must be taken at the temperature at which it was set",
+   "the pH of a Tris buffer drops by about 0.1 per 10-fold dilution (ITW IP-022EN); the template uses the thermodynamic pK and Davies"
+  ]
+ },
+ {
+  "id": "hepes",
+  "label": "HEPES",
+  "aliases": [
+   "hepes"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 7.564,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.012,
+    "dH_kJ_mol": 20.4,
+    "dCp_J_K_mol": 47,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.36 (evaluation code ABB: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 7.55,
+      "itw25": 7.48,
+      "gw20": 7.55,
+      "dT_calb": -0.014,
+      "dT_itw": -0.014
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.032,
+      "gw20": -0.032,
+      "itw25": -0.023
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": 0.002,
+      "dT_itw": 0.002
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   6.6,
+   8.6
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "hepes",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "Zwitterion (net 0) acid form, titrated with NaOH or KOH. pK1 (about 3.0, grade U) omitted: irrelevant at pH 6.5-8.5.",
+  "caveats": [
+   "the bundled table has `hepes` (neutral zwitterion) and `hepes anion`; the repo convention is neutral row plus counter-ion"
+  ]
+ },
+ {
+  "id": "mes",
+  "label": "MES",
+  "aliases": [
+   "mes"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 6.27,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0087,
+    "dH_kJ_mol": 14.8,
+    "dCp_J_K_mol": 5,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.44 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 6.15,
+      "itw25": 6.1,
+      "gw20": 6.15,
+      "dT_calb": -0.011,
+      "dT_itw": -0.011
+     },
+     "pK_diff_vs_independent": {
+      "calb20": 0.057,
+      "gw20": 0.057,
+      "itw25": 0.063
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": 0.0023,
+      "dT_itw": 0.0023
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   5.3,
+   7.3
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "mes",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "Zwitterion acid form titrated with NaOH (repo SASDF42, SASDRJ8)."
+ },
+ {
+  "id": "mops",
+  "label": "MOPS",
+  "aliases": [
+   "mops"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 7.184,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0124,
+    "dH_kJ_mol": 21.1,
+    "dCp_J_K_mol": 25,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.48 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 7.2,
+      "itw25": 7.14,
+      "gw20": 7.15,
+      "dT_calb": -0.006,
+      "dT_itw": -0.011
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.06,
+      "gw20": -0.01,
+      "itw25": -0.063
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": -0.0064,
+      "dT_itw": -0.0014
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   6.2,
+   8.2
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "mops",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "Zwitterion acid form titrated with NaOH.",
+  "caveats": [
+   "dpKa/dT: Calbiochem -0.006, ITW -0.011, Goldberg-derived -0.0124 (disagree by up to 0.0067 K^-1)"
+  ]
+ },
+ {
+  "id": "pipes",
+  "label": "PIPES",
+  "aliases": [
+   "pipes"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 7.141,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0066,
+    "dH_kJ_mol": 11.2,
+    "dCp_J_K_mol": 22,
+    "z_acid": -1,
+    "z_base": -2,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.54 (evaluation code ABA: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 6.8,
+      "itw25": 6.76,
+      "gw20": 6.82,
+      "dT_calb": -0.009,
+      "dT_itw": -0.0085
+     },
+     "pK_diff_vs_independent": {
+      "calb20": 0.053,
+      "gw20": 0.033,
+      "itw25": 0.06
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": 0.0024,
+      "dT_itw": 0.0019
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   6.1,
+   8.1
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "pipes",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "PIPES has two sulfonates: the buffering step is monoanion to dianion (z -1 to -2). Goldberg writes the step generically as HL+- = H+ + L-; the charges -1/-2 are fixed by the check that Davies-converting pK 7.141 (I = 0, Roy et al. 1981) to I = 0.1 M and 20 C gives 6.85, against Good 6.82 and Calbiochem 6.80 (a -1/0 assignment would give 7.1). With the neutral row `pipes` as solute the counter-ion Na+ is at least 1 per PIPES.",
+  "caveats": [
+   "the sodium amount (1 to 2 per PIPES) depends on the charge assignment -1/-2 described in notes"
+  ]
+ },
+ {
+  "id": "tes",
+  "label": "TES",
+  "aliases": [
+   "tes"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 7.55,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0189,
+    "dH_kJ_mol": 32.13,
+    "dCp_J_K_mol": 0,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.64 (evaluation code AAB: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 7.5,
+      "itw25": 7.4,
+      "gw20": 7.5,
+      "dT_calb": -0.02,
+      "dT_itw": -0.02
+     },
+     "pK_diff_vs_independent": {
+      "calb20": 0.039,
+      "gw20": 0.039,
+      "itw25": 0.043
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": 0.0011,
+      "dT_itw": 0.0011
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   6.5,
+   8.6
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "tes",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": ""
+ },
+ {
+  "id": "taps",
+  "label": "TAPS",
+  "aliases": [
+   "taps"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 8.44,
+    "pKa_sigma": 0.03,
+    "dpKa_dT_per_K": -0.0237,
+    "dH_kJ_mol": 40.4,
+    "dCp_J_K_mol": 15,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.61 (evaluation code BBB: pK +-0.03 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 8.4,
+      "gw20": 8.55
+     },
+     "pK_diff_vs_independent": {
+      "calb20": 0.054,
+      "gw20": -0.096
+     },
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "no independent dpKa/dT read"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   7.4,
+   9.4
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "taps",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": false,
+  "notes": "No independent d(pKa)/dT in the sources read (ITW and Calbiochem tables lack TAPS); Goldberg grade BBB.",
+  "caveats": [
+   "Good/Wikipedia 20 C pKa 8.55 vs Calbiochem 8.40"
+  ]
+ },
+ {
+  "id": "tricine",
+  "label": "Tricine",
+  "aliases": [
+   "tricine"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 8.135,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0184,
+    "dH_kJ_mol": 31.37,
+    "dCp_J_K_mol": -53,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.65 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 8.15,
+      "itw25": 8.05,
+      "gw20": 8.15,
+      "dT_calb": -0.021,
+      "dT_itw": -0.021
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.028,
+      "gw20": -0.028,
+      "itw25": -0.022
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": 0.0026,
+      "dT_itw": 0.0026
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   7.1,
+   9.1
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "tricine",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "pK1 2.023 (H2L+ to HL+-, grade AAB) omitted: irrelevant at pH 7-9."
+ },
+ {
+  "id": "bicine",
+  "label": "Bicine",
+  "aliases": [
+   "bicine"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 8.334,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0155,
+    "dH_kJ_mol": 26.34,
+    "dCp_J_K_mol": 0,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.12 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 8.35,
+      "itw25": 8.26,
+      "gw20": 8.35,
+      "dT_calb": -0.018,
+      "dT_itw": -0.018
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.044,
+      "gw20": -0.044,
+      "itw25": -0.033
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": 0.0025,
+      "dT_itw": 0.0025
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   7.3,
+   9.3
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "bicine",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "pK1 2.0 (grade DD) omitted: irrelevant at pH 7.5-9."
+ },
+ {
+  "id": "ches",
+  "label": "CHES",
+  "aliases": [
+   "ches"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 9.394,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0232,
+    "dH_kJ_mol": 39.55,
+    "dCp_J_K_mol": 9,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.21 (evaluation code AAB: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 9.5,
+      "itw25": 9.5,
+      "dT_calb": -0.009,
+      "dT_itw": -0.011
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.095,
+      "itw25": -0.213
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": -0.0142,
+      "dT_itw": -0.0122
+     },
+     "reasons_not_verified": [
+      "dpKa/dT disagrees: {'dT_calb': -0.0142, 'dT_itw': -0.0122}"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   8.4,
+   10.4
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "ches",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": false,
+  "notes": "",
+  "caveats": [
+   "dpKa/dT DISAGREES: Goldberg-derived -0.023 K^-1 (calorimetric dH 39.55 kJ/mol, grade A) against -0.009 (Calbiochem) and -0.011 (ITW); both vendor tables give pK about 9.5 at 20-25 C, 0.1-0.2 above the Davies-converted Goldberg value"
+  ]
+ },
+ {
+  "id": "caps",
+  "label": "CAPS",
+  "aliases": [
+   "caps"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 10.499,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0283,
+    "dH_kJ_mol": 48.1,
+    "dCp_J_K_mol": 57,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.18 (evaluation code AAC: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 10.4,
+      "dT_calb": -0.009
+     },
+     "pK_diff_vs_independent": {
+      "calb20": 0.135
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": -0.0193
+     },
+     "reasons_not_verified": [
+      "no independent pK within tolerance: {'calb20': 0.135}",
+      "dpKa/dT disagrees: {'dT_calb': -0.0193}"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   9.5,
+   11.5
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "caps",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": false,
+  "notes": "",
+  "caveats": [
+   "dpKa/dT DISAGREES: Goldberg-derived -0.028 K^-1 (dH 48.1 kJ/mol, grade A) against -0.009 (Calbiochem)"
+  ]
+ },
+ {
+  "id": "bis-tris",
+  "label": "Bis-tris",
+  "aliases": [
+   "bis-tris",
+   "bistris",
+   "bis tris"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 6.484,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0167,
+    "dH_kJ_mol": 28.4,
+    "dCp_J_K_mol": 27,
+    "z_acid": 1,
+    "z_base": 0,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.13 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 6.5,
+      "itw25": 6.46,
+      "dT_itw": -0.017
+     },
+     "pK_diff_vs_independent": {
+      "calb20": 0.176,
+      "itw25": 0.131
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_itw": 0.0003
+     },
+     "reasons_not_verified": [
+      "no independent pK within tolerance: {'calb20': 0.176, 'itw25': 0.131}"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   5.5,
+   7.5
+  ],
+  "default_titrant": {
+   "kind": "acid",
+   "ion": "chloride"
+  },
+  "solute": "bis-tris",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": false,
+  "notes": "Amine base titrated with HCl.",
+  "caveats": [
+   "Davies-converted pK at 20 C, 0.1 M is 0.13-0.18 above the vendor values (6.46-6.50): vendor values for amine buffers are closer to the thermodynamic pK"
+  ]
+ },
+ {
+  "id": "bis-tris-propane",
+  "label": "Bis-tris propane (BTP)",
+  "aliases": [
+   "bis-tris propane",
+   "btp",
+   "bistrispropane"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 6.65,
+    "pKa_sigma": 0.3,
+    "dpKa_dT_per_K": -0.016,
+    "dH_kJ_mol": null,
+    "dCp_J_K_mol": null,
+    "z_acid": 2,
+    "z_base": 1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.14 (evaluation code D: pK +-0.3 at I = 0); dpKa/dT from Mohan, Calbiochem Buffers booklet 2003, Table 2 (no dH in Goldberg)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 6.8,
+      "dT_calb": -0.016
+     },
+     "pK_diff_vs_independent": {
+      "calb20": 0.171
+     },
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "Goldberg pK grade D (+-0.30)",
+      "no independent pK within tolerance: {'calb20': 0.171}",
+      "no independent dpKa/dT read"
+     ]
+    },
+    "note": "dpKa/dT from Calbiochem (applies to the pKa near 6.8; no source read for pK2)"
+   },
+   {
+    "pKa25": 9.1,
+    "pKa_sigma": 0.3,
+    "dpKa_dT_per_K": null,
+    "dH_kJ_mol": null,
+    "dCp_J_K_mol": null,
+    "z_acid": 1,
+    "z_base": 0,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.14 (evaluation code D: pK +-0.3 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {},
+     "pK_diff_vs_independent": {},
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "Goldberg pK grade D (+-0.30)",
+      "no independent pK read",
+      "no independent dpKa/dT read"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   6.0,
+   9.6
+  ],
+  "default_titrant": {
+   "kind": "acid",
+   "ion": "chloride"
+  },
+  "solute": "bis-tris propane",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": false,
+  "notes": "Goldberg: 'The literature on Bis-tris propane is sparse' (one study, I = 0.012 M); both pK graded D (+-0.3).",
+  "caveats": [
+   "pK uncertain by +-0.3 (grade D); no dH, so the temperature coefficient is the single Calbiochem value -0.016 for group 1 only"
+  ]
+ },
+ {
+  "id": "imidazole",
+  "label": "Imidazole",
+  "aliases": [
+   "imidazole"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 6.993,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0215,
+    "dH_kJ_mol": 36.64,
+    "dCp_J_K_mol": -9,
+    "z_acid": 1,
+    "z_base": 0,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.41 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 7.0,
+      "itw25": 6.95,
+      "dT_itw": -0.02
+     },
+     "pK_diff_vs_independent": {
+      "calb20": 0.21,
+      "itw25": 0.15
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_itw": -0.0015
+     },
+     "reasons_not_verified": [
+      "no independent pK within tolerance: {'calb20': 0.21, 'itw25': 0.15}"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   6.0,
+   8.0
+  ],
+  "default_titrant": {
+   "kind": "acid",
+   "ion": "chloride"
+  },
+  "solute": "imidazole",
+  "species_rows": [
+   "imidazolium",
+   "imidazole"
+  ],
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": false,
+  "notes": "Titrated with HCl (the repo's convention for imidazole, SASDMJ9 header).",
+  "caveats": [
+   "Davies-converted pK at 0.1 M is 0.15-0.21 above the vendor values"
+  ]
+ },
+ {
+  "id": "glycine",
+  "label": "Glycine",
+  "aliases": [
+   "glycine",
+   "glycine-hcl",
+   "glycine-naoh"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 2.351,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0024,
+    "dH_kJ_mol": 4.0,
+    "dCp_J_K_mol": -139,
+    "z_acid": 1,
+    "z_base": 0,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.31 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "thermo_calb": 2.341,
+      "thermo_itw": 2.35
+     },
+     "pK_diff_vs_independent": {
+      "thermo_calb": 0.023,
+      "thermo_itw": 0.001
+     },
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "no independent dpKa/dT read"
+     ]
+    }
+   },
+   {
+    "pKa25": 9.78,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.026,
+    "dH_kJ_mol": 44.2,
+    "dCp_J_K_mol": -57,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.31 (evaluation code AAB: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "itw25": 9.78,
+      "dT_itw": -0.025,
+      "thermo_itw": 9.78
+     },
+     "pK_diff_vs_independent": {
+      "itw25": -0.107,
+      "thermo_itw": 0.0
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_itw": -0.001
+     },
+     "reasons_not_verified": [
+      "independent dpKa/dT could not be reproduced: the IP-022EN (2018-12) sheet prints -0.0025 where the asset recorded -0.025 (2026-11-12 independent re-check)"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   8.8,
+   10.8
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "glycine",
+  "species_rows": [
+   "glycinium",
+   "glycine",
+   "glycinate"
+  ],
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "Two groups; below pH 3.6 the buffer is glycine-HCl (titrant acid chloride), above 8.8 glycine-NaOH. Zwitterion `glycine` is the neutral reference."
+ },
+ {
+  "id": "acetate",
+  "label": "Acetate",
+  "aliases": [
+   "acetate",
+   "acetic acid",
+   "sodium acetate"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 4.756,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": 0.0002,
+    "dH_kJ_mol": -0.41,
+    "dCp_J_K_mol": -142,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.2 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "itw25": 4.76,
+      "dT_itw": 0.002,
+      "thermo_itw": 4.76
+     },
+     "pK_diff_vs_independent": {
+      "itw25": -0.111,
+      "thermo_itw": -0.004
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_itw": -0.0018
+     },
+     "reasons_not_verified": [
+      "independent dpKa/dT not found in the IP-022EN (2018-12) sheet read at the re-check (2026-11-12 independent re-check)"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   3.8,
+   5.8
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "acetic acid",
+  "species_rows": [
+   "acetic acid",
+   "acetate"
+  ],
+  "salt_rows": {
+   "sodium": [
+    "acetic acid",
+    "sodium acetate"
+   ],
+   "potassium": [
+    "acetic acid",
+    "potassium acetate"
+   ]
+  },
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "Acetic acid / acetate; the vendor value is the thermodynamic pK. Essentially temperature independent."
+ },
+ {
+  "id": "citrate",
+  "label": "Citrate (citric acid, 3 steps)",
+  "aliases": [
+   "citrate",
+   "citric acid",
+   "sodium citrate",
+   "trisodium citrate"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 3.128,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0024,
+    "dH_kJ_mol": 4.07,
+    "dCp_J_K_mol": -131,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.22 (evaluation code AAB: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {},
+     "pK_diff_vs_independent": {},
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "no independent pK read",
+      "no independent dpKa/dT read"
+     ]
+    }
+   },
+   {
+    "pKa25": 4.761,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0013,
+    "dH_kJ_mol": 2.23,
+    "dCp_J_K_mol": -178,
+    "z_acid": -1,
+    "z_base": -2,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.22 (evaluation code AAB: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 4.76,
+      "thermo_calb": 4.76
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.312,
+      "thermo_calb": 0.009
+     },
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "no independent dpKa/dT read"
+     ]
+    }
+   },
+   {
+    "pKa25": 6.396,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": 0.002,
+    "dH_kJ_mol": -3.38,
+    "dCp_J_K_mol": -254,
+    "z_acid": -2,
+    "z_base": -3,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.22 (evaluation code AAB: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "itw25": 6.4,
+      "dT_itw": 0.0,
+      "thermo_itw": 6.4
+     },
+     "pK_diff_vs_independent": {
+      "itw25": -0.539,
+      "thermo_itw": -0.004
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_itw": 0.002
+     },
+     "reasons_not_verified": [
+      "independent dpKa/dT not found in the IP-022EN (2018-12) sheet read at the re-check (2026-11-12 independent re-check)"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   3.7,
+   7.4
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "citric acid",
+  "species_rows": [
+   "citric acid",
+   "dihydrogen citrate",
+   "hydrogen citrate",
+   "citrate"
+  ],
+  "salt_rows": {
+   "sodium": [
+    "citric acid",
+    "sodium dihydrogen citrate",
+    "disodium hydrogen citrate",
+    "trisodium citrate"
+   ],
+   "potassium": [
+    "citric acid",
+    null,
+    null,
+    "tripotassium citrate"
+   ]
+  },
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "Three steps on the ladder citric acid (0), H2Cit- (-1), HCit2- (-2), Cit3- (-3). Method of SASDAX2: with the sodium salts as rows, sodium is inside the salt rows and no separate sodium row is added (counter-ion = 0 extra).",
+  "caveats": [
+   "strong chelator of Ca2+/Mg2+ (Calbiochem booklet), not modelled",
+   "ionic strength reaches 0.5 M at 100 mM citrate: Davies at the edge of its validity"
+  ]
+ },
+ {
+  "id": "phosphate",
+  "label": "Phosphate (phosphoric acid, 3 steps)",
+  "aliases": [
+   "phosphate",
+   "sodium phosphate",
+   "potassium phosphate",
+   "phosphoric acid"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 2.148,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": 0.0047,
+    "dH_kJ_mol": -8.0,
+    "dCp_J_K_mol": -141,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.51 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "thermo_calb": 2.12
+     },
+     "pK_diff_vs_independent": {
+      "thermo_calb": 0.005
+     },
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "no independent dpKa/dT read"
+     ]
+    }
+   },
+   {
+    "pKa25": 7.198,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0021,
+    "dH_kJ_mol": 3.6,
+    "dCp_J_K_mol": -230,
+    "z_acid": -1,
+    "z_base": -2,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.51 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 7.213,
+      "itw25": 7.2,
+      "dT_itw": -0.0028,
+      "thermo_calb": 7.213,
+      "thermo_itw": 7.2
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.324,
+      "itw25": -0.323,
+      "thermo_calb": -0.003,
+      "thermo_itw": -0.002
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_itw": 0.0007
+     },
+     "reasons_not_verified": []
+    }
+   },
+   {
+    "pKa25": 12.35,
+    "pKa_sigma": 0.03,
+    "dpKa_dT_per_K": -0.0094,
+    "dH_kJ_mol": 16.0,
+    "dCp_J_K_mol": -242,
+    "z_acid": -2,
+    "z_base": -3,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.51 (evaluation code BCA: pK +-0.03 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "thermo_calb": 12.32,
+      "thermo_itw": 12.33,
+      "dT_itw": -0.026
+     },
+     "pK_diff_vs_independent": {
+      "thermo_calb": 0.08,
+      "thermo_itw": 0.02
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_itw": 0.0166
+     },
+     "reasons_not_verified": [
+      "dpKa/dT disagrees: {'dT_itw': 0.0166}"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   6.2,
+   8.2
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "phosphoric acid",
+  "species_rows": [
+   "phosphoric acid",
+   "dihydrogen phosphate",
+   "hydrogen phosphate",
+   "phosphate"
+  ],
+  "salt_rows": {
+   "sodium": [
+    "phosphoric acid",
+    "sodium dihydrogen phosphate",
+    "disodium hydrogen phosphate",
+    "trisodium phosphate"
+   ],
+   "potassium": [
+    "phosphoric acid",
+    "potassium dihydrogen phosphate",
+    "dipotassium hydrogen phosphate",
+    "tripotassium phosphate"
+   ]
+  },
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "Method of SASDV82/SASDMZ9 etc.: the monobasic/dibasic split from pK2, sodium (or potassium) inside the salt rows.",
+  "caveats": [
+   "pK3 dpKa/dT: Goldberg-derived -0.009 against ITW -0.026 (disagree; irrelevant below pH 11)",
+   "precipitates Ca2+ and Mg2+, not modelled"
+  ]
+ },
+ {
+  "id": "borate",
+  "label": "Borate (boric acid)",
+  "aliases": [
+   "borate",
+   "boric acid",
+   "boric"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 9.237,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0081,
+    "dH_kJ_mol": 13.8,
+    "dCp_J_K_mol": -240,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.15 (evaluation code ABD: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 9.24,
+      "thermo_calb": 9.24,
+      "dT_itw": -0.008
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.067,
+      "thermo_calb": 0.04
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_itw": -0.0001
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   8.2,
+   10.2
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "boric acid",
+  "species_rows": [
+   "boric acid",
+   "borate"
+  ],
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "Only the monomeric step B(OH)3 + H2O = B(OH)4- + H+ (Goldberg writes H3BO3 = H+ + H2BO3-).",
+  "caveats": [
+   "above about 25 mM boron polyborate ions (B3O3(OH)4-, B4O5(OH)4 2-, ...) form and the monomer-only ladder is wrong; the template is not valid for concentrated borate or tetraborate (borax) recipes. Borate also complexes polyols (ITW IP-022EN)",
+   "Goldberg grade ABD: dCp (-240 J/K/mol) is an approximation (grade D)"
+  ]
+ },
+ {
+  "id": "carbonate",
+  "label": "Bicarbonate / carbonate",
+  "aliases": [
+   "bicarbonate",
+   "carbonate",
+   "sodium bicarbonate",
+   "hydrogen carbonate"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 6.351,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0054,
+    "dH_kJ_mol": 9.15,
+    "dCp_J_K_mol": -371,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.20 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {},
+     "pK_diff_vs_independent": {},
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "no independent pK read",
+      "no independent dpKa/dT read"
+     ]
+    }
+   },
+   {
+    "pKa25": 10.329,
+    "pKa_sigma": 0.03,
+    "dpKa_dT_per_K": -0.0086,
+    "dH_kJ_mol": 14.7,
+    "dCp_J_K_mol": -249,
+    "z_acid": -1,
+    "z_base": -2,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.20 (evaluation code BAA: pK +-0.03 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "itw25": 10.33,
+      "dT_itw": -0.009,
+      "thermo_itw": 10.33
+     },
+     "pK_diff_vs_independent": {
+      "itw25": -0.322,
+      "thermo_itw": -0.001
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_itw": 0.0004
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   9.3,
+   11.3
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "carbonic acid",
+  "species_rows": [
+   "carbonic acid",
+   "hydrogen carbonate",
+   "carbonate"
+  ],
+  "salt_rows": {
+   "sodium": [
+    "carbonic acid",
+    "sodium hydrogen carbonate",
+    "disodium carbonate"
+   ],
+   "potassium": [
+    "carbonic acid",
+    "potassium hydrogen carbonate",
+    "dipotassium carbonate"
+   ]
+  },
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "pK1 6.351 refers to CO2(aq) + H2CO3 together ('H2CO3*', Goldberg): it is the apparent first constant of a CO2-saturated solution, not of carbonic acid proper.",
+  "caveats": [
+   "open to the air the solution exchanges CO2: total carbonate is not conserved and the pH drifts; the template assumes a closed solution of the stated total concentration"
+  ]
+ },
+ {
+  "id": "ammonium",
+  "label": "Ammonium / ammonia",
+  "aliases": [
+   "ammonium",
+   "ammonia",
+   "ammonium chloride"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 9.245,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0305,
+    "dH_kJ_mol": 51.95,
+    "dCp_J_K_mol": 8,
+    "z_acid": 1,
+    "z_base": 0,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.7 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {},
+     "pK_diff_vs_independent": {},
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "no independent pK read",
+      "no independent dpKa/dT read"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   8.2,
+   10.2
+  ],
+  "default_titrant": {
+   "kind": "acid",
+   "ion": "chloride"
+  },
+  "solute": "ammonia",
+  "species_rows": [
+   "azanium",
+   "ammonia"
+  ],
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": false,
+  "notes": "NH4+ / NH3 titrated with HCl. No independent d(pKa)/dT and no conditional pK in the sources read (only Goldberg, grade AAA).",
+  "caveats": [
+   "NH3 is volatile: the free-base fraction is lost from open solutions"
+  ]
+ },
+ {
+  "id": "cacodylate",
+  "label": "Cacodylate (dimethylarsinic acid)  [ARSENIC: toxic, handle accordingly]",
+  "aliases": [
+   "cacodylate",
+   "cacodylic acid",
+   "sodium cacodylate"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 6.28,
+    "pKa_sigma": 0.03,
+    "dpKa_dT_per_K": 0.0018,
+    "dH_kJ_mol": -3.0,
+    "dCp_J_K_mol": -86,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.17 (evaluation code BBB: pK +-0.03 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 6.27,
+      "thermo_calb": 6.27
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.105,
+      "thermo_calb": 0.002
+     },
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "no independent dpKa/dT read"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   5.3,
+   7.3
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "dimethylarsinic acid",
+  "species_rows": [
+   "dimethylarsinic acid",
+   "dimethylarsinate"
+  ],
+  "salt_rows": {
+   "sodium": [
+    "dimethylarsinic acid",
+    "sodium dimethylarsinate"
+   ],
+   "potassium": [
+    "dimethylarsinic acid",
+    "potassium dimethylarsinate"
+   ]
+  },
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": false,
+  "notes": "Organoarsenic compound (about 54 % As by mass): toxic and an environmental hazard; the dimethylarsinic acid row of the bundled table is a 3D-RISM estimate (basis `estimated`), not a measured volume. pK1 1.78 (grade CBB) omitted.",
+  "caveats": [
+   "ARSENIC-containing buffer: As has Z = 33, the form factor and contrast of the solvent change noticeably; the bundled partial molar volume is only estimated"
+  ]
+ },
+ {
+  "id": "glycylglycine",
+  "label": "Glycylglycine",
+  "aliases": [
+   "glycylglycine",
+   "gly-gly"
+  ],
+  "kind": "buffer",
+  "available": false,
+  "groups": [
+   {
+    "pKa25": 8.265,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0255,
+    "dH_kJ_mol": 43.4,
+    "dCp_J_K_mol": -16,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.33 (evaluation code AAB: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 8.4,
+      "gw20": 8.2,
+      "dT_calb": -0.028
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.112,
+      "gw20": 0.088
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": 0.0025
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   7.3,
+   9.3
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": null,
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "pK1 3.140 (H2L+ to HL+-) omitted. No glycylglycine row in the bundled tables: add one before offering this template (`solute` null, `available` false).",
+  "caveats": [
+   "Good/Wikipedia 20 C pKa 8.20 vs Calbiochem 8.40: 0.2 apart"
+  ]
+ },
+ {
+  "id": "mopso",
+  "label": "MOPSO",
+  "aliases": [
+   "mopso"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 6.9,
+    "pKa_sigma": 0.03,
+    "dpKa_dT_per_K": -0.0147,
+    "dH_kJ_mol": 25.0,
+    "dCp_J_K_mol": 38,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.49 (evaluation code BCB: pK +-0.03 at I = 0)",
+    "verified": false,
+    "crosscheck": {
+     "independent_values": {
+      "gw20": 6.95
+     },
+     "pK_diff_vs_independent": {
+      "gw20": -0.083
+     },
+     "dpKa_dT_diff_vs_independent": {},
+     "reasons_not_verified": [
+      "no independent dpKa/dT read"
+     ]
+    }
+   }
+  ],
+  "usable_pH": [
+   5.9,
+   7.9
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "mopso",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": false,
+  "notes": "pK1 0.060 omitted. No independent d(pKa)/dT in the sources read."
+ },
+ {
+  "id": "aces",
+  "label": "ACES",
+  "aliases": [
+   "aces"
+  ],
+  "kind": "buffer",
+  "available": false,
+  "groups": [
+   {
+    "pKa25": 6.847,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0179,
+    "dH_kJ_mol": 30.43,
+    "dCp_J_K_mol": -49,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.1 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 6.9,
+      "itw25": 6.78,
+      "gw20": 6.88,
+      "dT_calb": -0.02,
+      "dT_itw": -0.02
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.069,
+      "gw20": -0.049,
+      "itw25": -0.04
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": 0.0021,
+      "dT_itw": 0.0021
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   5.8,
+   7.8
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": null,
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "No ACES row in the bundled tables: add one before offering this template (`solute` null, `available` false)."
+ },
+ {
+  "id": "ada",
+  "label": "ADA",
+  "aliases": [
+   "ada"
+  ],
+  "kind": "buffer",
+  "available": true,
+  "groups": [
+   {
+    "pKa25": 6.844,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0072,
+    "dH_kJ_mol": 12.23,
+    "dCp_J_K_mol": -144,
+    "z_acid": -1,
+    "z_base": -2,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.3 (evaluation code ABB: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 6.6,
+      "gw20": 6.62,
+      "dT_calb": -0.011
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.039,
+      "gw20": -0.059
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": 0.0038
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   5.8,
+   7.8
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": "ada",
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "The step near pH 7 is HL- to L2- (z -1 to -2); pK1 1.59 and pK2 2.48 omitted. ADA has two carboxylates, so with the neutral row `ada` the sodium amount is 1 to 2 per ADA (as for PIPES). Davies-converted pK 6.56 (20 C, 0.1 M) vs Calbiochem 6.60, Good 6.62.",
+  "caveats": [
+   "strong metal-ion binder (Cu2+, Ca2+, Mn2+; Calbiochem booklet)"
+  ]
+ },
+ {
+  "id": "hepps",
+  "label": "HEPPS / EPPS",
+  "aliases": [
+   "hepps",
+   "epps"
+  ],
+  "kind": "buffer",
+  "available": false,
+  "groups": [
+   {
+    "pKa25": 7.957,
+    "pKa_sigma": 0.003,
+    "dpKa_dT_per_K": -0.0125,
+    "dH_kJ_mol": 21.3,
+    "dCp_J_K_mol": 48,
+    "z_acid": 0,
+    "z_base": -1,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Sec. 8 summary table and Table 7.37 (evaluation code AAA: pK +-0.003 at I = 0)",
+    "verified": true,
+    "crosscheck": {
+     "independent_values": {
+      "calb20": 8.0,
+      "itw25": 8.0,
+      "gw20": 8.1,
+      "dT_calb": -0.007,
+      "dT_itw": -0.015
+     },
+     "pK_diff_vs_independent": {
+      "calb20": -0.087,
+      "gw20": -0.187,
+      "itw25": -0.15
+     },
+     "dpKa_dT_diff_vs_independent": {
+      "dT_calb": -0.0055,
+      "dT_itw": 0.0025
+     },
+     "reasons_not_verified": []
+    }
+   }
+  ],
+  "usable_pH": [
+   7.0,
+   9.0
+  ],
+  "default_titrant": {
+   "kind": "base",
+   "ion": "sodium"
+  },
+  "solute": null,
+  "counter_ion_rows": {
+   "cation": [
+    "sodium(1+)",
+    "potassium(1+)"
+   ],
+   "anion": [
+    "chloride"
+   ]
+  },
+  "verified": true,
+  "notes": "No HEPPS/EPPS row in the bundled tables: add one before offering this template (`solute` null, `available` false).",
+  "caveats": [
+   "dpKa/dT: Calbiochem -0.007, ITW -0.015, Goldberg-derived -0.0125 (the vendors disagree among themselves)"
+  ]
+ },
+ {
+  "id": "pbs",
+  "label": "PBS (phosphate-buffered saline), 1x",
+  "aliases": [
+   "pbs",
+   "phosphate buffered saline",
+   "phosphate-buffered saline",
+   "1x pbs"
+  ],
+  "kind": "mixture",
+  "components": [
+   {
+    "solute": "sodium chloride",
+    "mM": 137,
+    "sigma_mM": 1.37,
+    "source": "Wikipedia 'Phosphate-buffered saline' (read 2026-11-12), 1x column quoting Cold Spring Harbor Protocols 2006, pdb.rec8247 (the CSHP page itself returned HTTP 403); AppliChem/ITW Reagents infoPoint IP-022EN (2024-04), 'Recipes for commonly used buffer solutions' (read as PDF; cites Sambrook & Russell 2001 and Ausubel et al.)"
+   },
+   {
+    "solute": "potassium chloride",
+    "mM": 2.7,
+    "sigma_mM": 0.054,
+    "source": "Wikipedia 'Phosphate-buffered saline' (read 2026-11-12), 1x column quoting Cold Spring Harbor Protocols 2006, pdb.rec8247 (the CSHP page itself returned HTTP 403); AppliChem/ITW Reagents infoPoint IP-022EN (2024-04), 'Recipes for commonly used buffer solutions' (read as PDF; cites Sambrook & Russell 2001 and Ausubel et al.) (2.68 mM)"
+   },
+   {
+    "solute": "disodium hydrogen phosphate",
+    "mM": 10,
+    "sigma_mM": 0.2,
+    "source": "Wikipedia 'Phosphate-buffered saline' (read 2026-11-12), 1x column quoting Cold Spring Harbor Protocols 2006, pdb.rec8247 (the CSHP page itself returned HTTP 403); ITW 10.1 mM"
+   },
+   {
+    "solute": "potassium dihydrogen phosphate",
+    "mM": 1.8,
+    "sigma_mM": 0.036,
+    "source": "Wikipedia 'Phosphate-buffered saline' (read 2026-11-12), 1x column quoting Cold Spring Harbor Protocols 2006, pdb.rec8247 (the CSHP page itself returned HTTP 403); AppliChem/ITW Reagents infoPoint IP-022EN (2024-04), 'Recipes for commonly used buffer solutions' (read as PDF; cites Sambrook & Russell 2001 and Ausubel et al.)"
+   }
+  ],
+  "pH": 7.4,
+  "pH_adjust": {
+   "titrant": "HCl",
+   "model_amount_mM": 0.73,
+   "note": "the recipe says 'adjust to pH 7.4 with HCl'; the Davies model puts the pH of the unadjusted salts at 7.58 (22 C), and 0.73 mM HCl brings it to 7.4 (HPO4 2- 9.27, H2PO4- 2.53 mM). Optional chloride row; sigma = 100 % of it because the model pH of the nominal recipe misses the stated 7.4 by 0.18"
+  },
+  "verified": true,
+  "variants": [
+   {
+    "id": "pbs-dulbecco",
+    "label": "Dulbecco's PBS without Ca/Mg (Thermo Fisher 14190, read)",
+    "components": [
+     {
+      "solute": "sodium chloride",
+      "mM": 137.93
+     },
+     {
+      "solute": "potassium chloride",
+      "mM": 2.667
+     },
+     {
+      "solute": "disodium hydrogen phosphate",
+      "mM": 8.0597,
+      "note": "from the heptahydrate, 2160 mg/L, MW 268"
+     },
+     {
+      "solute": "potassium dihydrogen phosphate",
+      "mM": 1.4706
+     }
+    ],
+    "pH": null,
+    "source": "Thermo Fisher media formulation 14190 'DPBS, no calcium, no magnesium' (read; the page states no pH); Wikipedia lists 8.1 mM / 1.5 mM"
+   },
+   {
+    "id": "pbs-itw",
+    "label": "PBS 10x/10 from ITW IP-022EN",
+    "components": [
+     {
+      "solute": "sodium chloride",
+      "mM": 136.9
+     },
+     {
+      "solute": "potassium chloride",
+      "mM": 2.68
+     },
+     {
+      "solute": "disodium hydrogen phosphate",
+      "mM": 10.1
+     },
+     {
+      "solute": "potassium dihydrogen phosphate",
+      "mM": 1.8
+     }
+    ],
+    "pH": 7.4,
+    "source": "AppliChem/ITW Reagents infoPoint IP-022EN (2024-04), 'Recipes for commonly used buffer solutions' (read as PDF; cites Sambrook & Russell 2001 and Ausubel et al.)"
+   },
+   {
+    "id": "pbs-csh2018",
+    "label": "Cold Spring Harbor 2018 recipe with 2 mM KH2PO4",
+    "components": [],
+    "pH": null,
+    "source": "reported only by a web-search summary of cshprotocols pdb.rec099085 (page 403, NOT read): not usable; an 8 mM / 2 mM pair was not found in any source read"
+   }
+  ],
+  "notes": "Salt rows are ion-pair salts as in the bundled tables. The variants differ by about 20 % in phosphate; recipes disagree, so the nominal sigma of 2 % on phosphate understates the real spread between labs."
+ },
+ {
+  "id": "tbs",
+  "label": "TBS (Tris-buffered saline), 50 mM Tris-HCl 150 mM NaCl",
+  "aliases": [
+   "tbs",
+   "tris buffered saline",
+   "tris-buffered saline"
+  ],
+  "kind": "mixture",
+  "components": [
+   {
+    "solute": "sodium chloride",
+    "mM": 150,
+    "sigma_mM": 1.5,
+    "source": "Wikipedia 'Tris-buffered saline' (read), citing Medicago AB 2010 specification sheet"
+   }
+  ],
+  "buffer_components": [
+   {
+    "template": "tris",
+    "mM": 50,
+    "titrant": {
+     "kind": "acid",
+     "ion": "chloride"
+    },
+    "source": "same"
+   }
+  ],
+  "pH": 7.6,
+  "verified": false,
+  "variants": [
+   {
+    "id": "tbs-itw-1",
+    "components": [
+     {
+      "template": "tris",
+      "mM": 25
+     },
+     {
+      "solute": "potassium chloride",
+      "mM": 2.68
+     },
+     {
+      "solute": "sodium chloride",
+      "mM": 137
+     }
+    ],
+    "pH": 7.4,
+    "source": "AppliChem/ITW Reagents infoPoint IP-022EN (2024-04), 'Recipes for commonly used buffer solutions' (read as PDF; cites Sambrook & Russell 2001 and Ausubel et al.), TBS recipe 1 (3 g/L Tris)"
+   },
+   {
+    "id": "tbs-itw-2",
+    "components": [
+     {
+      "template": "tris",
+      "mM": 100
+     },
+     {
+      "solute": "sodium chloride",
+      "mM": 150
+     }
+    ],
+    "pH": 7.5,
+    "source": "AppliChem/ITW Reagents infoPoint IP-022EN (2024-04), 'Recipes for commonly used buffer solutions' (read as PDF; cites Sambrook & Russell 2001 and Ausubel et al.), TBS recipe 2 (0.1 M Tris-Cl, 8.77 g/L NaCl)"
+   }
+  ],
+  "notes": "Three recipes read, none the same (50 mM / pH 7.6 Wikipedia-Medicago; 25 mM / pH 7.4 and 100 mM / pH 7.5 ITW); Wikipedia states the allowed ranges NaCl 100-200 mM, Tris 5-100 mM, pH 7.2-8.0. The chloride from the HCl titration comes from the `tris` template (41.4 mM +- 2.4 at 50 mM, pH 7.6, 22 C)."
+ },
+ {
+  "id": "hbs",
+  "label": "HBS / HeBS (HEPES-buffered saline), 1x from the 2x transfection buffer",
+  "aliases": [
+   "hbs",
+   "hebs",
+   "hepes buffered saline",
+   "hepes-buffered saline"
+  ],
+  "kind": "mixture",
+  "components": [
+   {
+    "solute": "sodium chloride",
+    "mM": 140,
+    "sigma_mM": 1.4,
+    "source": "Teknova H1705 2X HBS pH 7.05 (read): 280 mM NaCl, diluted 1:1 as the page directs"
+   },
+   {
+    "solute": "disodium hydrogen phosphate",
+    "mM": 0.75,
+    "sigma_mM": 0.015,
+    "source": "Teknova H1705 (1.5 mM in 2x); ITW IP-022EN 'HeBS transfection buffer (2X)' 1.5 mM"
+   }
+  ],
+  "buffer_components": [
+   {
+    "template": "hepes",
+    "mM": 25,
+    "titrant": {
+     "kind": "base",
+     "ion": "sodium"
+    },
+    "source": "Teknova H1705 / ITW IP-022EN (50 mM in 2x)"
+   }
+  ],
+  "pH": 7.05,
+  "verified": true,
+  "variants": [
+   {
+    "id": "hbs-itw",
+    "pH": 7.1,
+    "note": "ITW IP-022EN says 'exactly adjust pH 7.1 with NaOH'; other Cold Spring Harbor 2x HBS recipes (pH 7.05-7.12, with 10 mM KCl and 12 mM dextrose) were seen only in web-search summaries, not read"
+   }
+  ],
+  "notes": "HBS has no single standard 1x recipe; lab buffers such as 20 mM HEPES 150 mM NaCl pH 7.4 are not templates: build them from the `hepes` template plus a sodium chloride row. The 1x here is the arithmetic dilution of the 2x calcium-phosphate transfection buffer (derived, flagged)."
+ },
+ {
+  "id": "ssc",
+  "label": "SSC, 1x (from 20x: 3 M NaCl, 0.3 M sodium citrate, pH 7.0)",
+  "aliases": [
+   "ssc",
+   "1x ssc",
+   "saline-sodium citrate"
+  ],
+  "kind": "mixture",
+  "components": [
+   {
+    "solute": "sodium chloride",
+    "mM": 150,
+    "sigma_mM": 1.5,
+    "source": "Thermo Fisher UltraPure 20X SSC 15557044 (read: 3.0 M NaCl, 0.3 M sodium citrate, pH 7.0) / 20; ITW IP-022EN SSC 20X: 88.23 g/L tri-Na citrate dihydrate = 0.3 M, 175.32 g/L NaCl = 3 M"
+   }
+  ],
+  "buffer_components": [
+   {
+    "template": "citrate",
+    "mM": 15,
+    "titrant": {
+     "kind": "acid",
+     "ion": "chloride"
+    },
+    "start_salt": "trisodium citrate",
+    "source": "same / 20"
+   }
+  ],
+  "pH": 7.0,
+  "verified": true,
+  "notes": "1x is the 20-fold dilution of the 20x stock (derived). Model at 22 C, I = 0.24 M: Cit3- 14.22, HCit2- 0.78 mM, 0.78 mM HCl needed from trisodium citrate. The 20x stock itself (I = 3.3 M) is outside the range of Davies and is not offered."
+ }
+]

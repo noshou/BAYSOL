@@ -4,7 +4,7 @@
 //
 // Contents:
 //   1. Readiness: what a project has of what a run needs
-//   2. Temperature prompt: the text of the prompt that starts a run
+//   2. Temperature: parsing the buffer's temperature, the start of its prompt
 //   3. Claim: the run folder's name, the claim, the snapshot of the inputs, stale sweeps
 //   4. Output: the tail of Julia's output that the run page shows
 //   5. Session: the Julia child process of one run, its phases and the quit/kill hooks
@@ -16,18 +16,20 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { stripVTControlCharacters } from "node:util"
 import { cacheDir, RUN_FLOW, repoRoot } from "../core/environment.js"
 import {
     copyOver,
     isFile,
+    messageOf,
     withFileLock,
     writeAtomic,
     writeJson,
 } from "../core/file-system.js"
 import { formatNumber, type Parsed, parseNumber } from "../core/terminal.js"
 import { bufferFile, readConditions, readSolutes } from "./buffer.js"
-import { dataIsReady, dataJsonFile, dataTsvFile } from "./data.js"
+import { dataIsReady, dataJsonFile, dataTsvFile, readDataInfo } from "./data.js"
 import { modelReferencesFile } from "./model-references.js"
 import type { ProjectRef } from "./projects.js"
 import {
@@ -39,14 +41,15 @@ import {
     liveRun,
     lockedIn,
     markStaleRuns,
+    projectFile,
     RunInProgressError,
     runDirOf,
     runStatus,
     settleRun,
     startLockName,
 } from "./projects.js"
-import { migrateReferences, referenceFiles, referencesDir } from "./references.js"
-import { packRun } from "./run-archive.js"
+import { referenceFiles, referencesDir } from "./references.js"
+import { packRun, RUN_FILES } from "./run-archive.js"
 import { briefError, firstErrorLine, readLogText } from "./run-logs.js"
 import { runStamp } from "./run-stamp.js"
 import { modelSettingsFile, settingsFile } from "./settings-store.js"
@@ -59,8 +62,9 @@ import { modelSettingsFile, settingsFile } from "./settings-store.js"
  * What a project has of what a run needs, one flag each.
  *
  * @property models - at least one model.
- * @property buffer - a buffer with at least one solute and its pH set (a buffer file
- *     that cannot be read counts as missing).
+ * @property buffer - a buffer with at least one solute, its pH and its temperature set (a
+ *     buffer file that cannot be read counts as missing; one without a temperature
+ *     is not ready until `^g` sets it).
  * @property data - the measured curve is loaded (`data.tsv` and `data.json` valid) and
  *     the X-ray energy is set (there is no default energy).
  * @property run - everything above is there, so a run can start.
@@ -90,22 +94,47 @@ export function projectReadiness(project: ProjectRef): Readiness {
     const buffer = attempt(
         () =>
             readSolutes(project.dir).length > 0 &&
-            readConditions(project.dir) !== undefined,
+            readConditions(project.dir)?.temperature !== undefined,
     )
     const data = attempt(() => dataIsReady(project.dir))
     return { models, buffer, data, run: models && buffer && data }
 }
 
-// ========================================================================================
-// 2. Temperature prompt
-// ========================================================================================
-
 /**
- * The one question a run asks: the temperature of the buffer, in °C, with no uncertainty.
- * The range and the starting value are `RUN_FLOW.temperature`.
+ * The parts a project still lacks before it can run, named for the user, in the order
+ * of the project menu: `models`, `solutes`, `pH`, `temperature`, `data`, `energy`.
+ * Empty exactly when
+ * [[projectReadiness]] says `run`. A folder that cannot be read lacks everything it holds.
+ *
+ * @param project - the project.
+ * @returns the names of what is missing.
+ * @throws never.
  */
+export function missingComponents(project: ProjectRef): string[] {
+    const attempt = <T>(read: () => T, otherwise: T): T => {
+        try {
+            return read()
+        } catch {
+            return otherwise
+        }
+    }
+    const missing: string[] = []
+    if (!attempt(() => listModels(project.dir).length > 0, false)) missing.push("models")
+    if (!attempt(() => readSolutes(project.dir).length > 0, false)) missing.push("solutes")
+    const conditions = attempt(() => readConditions(project.dir), undefined)
+    if (conditions === undefined) missing.push("pH")
+    if (conditions?.temperature === undefined) missing.push("temperature")
+    const data = attempt(() => readDataInfo(project.dir), undefined)
+    if (data?.kind !== "ok") missing.push("data")
+    if (data?.kind !== "ok" || data.info.energy === null) missing.push("energy")
+    return missing
+}
 
-/** The label of the temperature prompt. */
+// ========================================================================================
+// 2. Temperature
+// ========================================================================================
+
+/** The label of the temperature prompt of the buffer (`^g`, after pH and σ). */
 export const TEMPERATURE_LABEL = "temperature °C:"
 
 /**
@@ -125,13 +154,14 @@ export function parseTemperature(text: string): Parsed<number> {
 }
 
 /**
- * The text the temperature prompt starts with.
+ * The text the temperature prompt of the buffer starts with: the buffer's temperature,
+ * else the default of `RUN_FLOW.temperature`.
  *
- * @param last - the temperature of the newest finished run, if there is one.
- * @returns it, else the default of `RUN_FLOW.temperature`.
+ * @param held - the temperature the buffer has, if any.
+ * @returns the text.
  */
-export const temperatureStart = (last?: number): string =>
-    formatNumber(last ?? RUN_FLOW.temperature.default)
+export const temperatureStart = (held?: number): string =>
+    formatNumber(held ?? RUN_FLOW.temperature.default)
 
 // ========================================================================================
 // 3. Claim
@@ -213,8 +243,8 @@ export function claimRun(projectDir: string, now: number = Date.now()): ClaimedR
 /** The files of a project the snapshot copies, in the order they are locked and copied. */
 function snapshotFiles(projectDir: string): [string, string][] {
     return [
-        [settingsFile(projectDir), "settings.json"],
-        [bufferFile(projectDir), "buffer.json"],
+        [settingsFile(projectDir), RUN_FILES.settings],
+        [bufferFile(projectDir), RUN_FILES.buffer],
     ]
 }
 
@@ -226,8 +256,9 @@ function snapshotFiles(projectDir: string): [string, string][] {
  * never half a file. A project without `settings.json` gets `{}` (the defaults, as Julia
  * does). `model-settings.json`, `model-references.json` and the files of `reference-fit/`
  * are copied too when the project has them (Julia copies them itself otherwise, without
- * our locks). The models are not copied: Julia lists them (name, full path, size, sha256)
- * in `models.json` when the run starts.
+ * our locks), and so is `project.json`, which holds the project's notes. The models are
+ * not copied: Julia lists them (name, full path, size, sha256) in `models.json` when the
+ * run starts.
  *
  * @throws if a file the run needs (`buffer.json`, `data.tsv`, `data.json`) is missing,
  *     [[FileInUseError]], `ProjectGoneError`.
@@ -238,7 +269,7 @@ export function snapshotInputs(projectDir: string, runDir: string): void {
     for (const [from, name] of snapshotFiles(projectDir)) {
         lockedIn(projectDir, from, () => {
             if (isFile(from)) copyOver(from, join(logs, name))
-            else if (name === "settings.json") writeAtomic(join(logs, name), "{}\n")
+            else if (name === RUN_FILES.settings) writeAtomic(join(logs, name), "{}\n")
             else throw new Error(`the project has no ${name}`)
         })
     }
@@ -246,26 +277,31 @@ export function snapshotInputs(projectDir: string, runDir: string): void {
     const json = dataJsonFile(projectDir)
     lockedIn(projectDir, [tsv, json], () => {
         for (const [from, name] of [
-            [tsv, "data.tsv"],
-            [json, "data.json"],
+            [tsv, RUN_FILES.dataTable],
+            [json, RUN_FILES.dataInfo],
         ] as const) {
             if (!isFile(from)) throw new Error(`the project has no ${name}`)
             copyOver(from, join(logs, name))
         }
+    })
+    // `project.json` (id, creation time and the project's notes) travels with the run, so
+    // the notes end up in the run's archive; nothing reads it back but the user
+    const project = projectFile(projectDir)
+    lockedIn(projectDir, project, () => {
+        if (isFile(project)) copyOver(project, join(logs, "project.json"))
     })
     // the optional inputs, under their own locks: the per-model settings and the
     // reference curves (the files only; Julia reads them from the run folder and uses
     // `reference-fit-*` files that are there as they are)
     const models = modelSettingsFile(projectDir)
     lockedIn(projectDir, models, () => {
-        if (isFile(models)) copyOver(models, join(logs, "model-settings.json"))
+        if (isFile(models)) copyOver(models, join(logs, RUN_FILES.modelSettings))
     })
     const modelReferences = modelReferencesFile(projectDir)
     lockedIn(projectDir, modelReferences, () => {
         if (isFile(modelReferences))
-            copyOver(modelReferences, join(logs, "model-references.json"))
+            copyOver(modelReferences, join(logs, RUN_FILES.modelReferences))
     })
-    migrateReferences(projectDir) // an old `references/` folder gets its new name first
     const references = referencesDir(projectDir)
     lockedIn(projectDir, references, () => {
         const files = referenceFiles(projectDir)
@@ -433,10 +469,19 @@ export type LaunchSpec = { projectDir: string; runDir: string; temperature: numb
  */
 export type Launcher = (spec: LaunchSpec) => ChildProcess
 
-/** What Julia runs: the arguments come in `ARGS`, never spliced into the code. */
+/**
+ * The Julia file that does a run (`run-project.jl`, next to this file): it holds the module
+ * `BAYSOLRun` with `run_project`, which uses the package BAYSOL for the fit itself.
+ */
+export const runProjectFile = fileURLToPath(new URL("./run-project.jl", import.meta.url))
+
+/**
+ * What Julia runs: it loads the file of the run and calls `run_project`; the file and the
+ * values come in `ARGS`, never spliced into the code.
+ */
 const juliaProgram =
-    "using BAYSOL; BAYSOL.run_project(ARGS[1]; temperature = parse(Float64, ARGS[2]), " +
-    "ui = :tui, run_dir = ARGS[3])"
+    "include(ARGS[1]); BAYSOLRun.run_project(ARGS[2]; temperature = parse(Float64, " +
+    "ARGS[3]), ui = :tui, run_dir = ARGS[4])"
 
 /**
  * The Julia program to start: the `JULIA` environment variable (the one the dev tools
@@ -450,15 +495,18 @@ export function juliaCommand(env: Record<string, string | undefined>): string {
 /**
  * The arguments of the Julia child: no start-up file, no colour codes in the output, the
  * threads of `assets/data/run_flow.json`, the BAYSOL package folder (when the program
- * runs from a checkout), then `-e` the program and the three values it takes.
+ * runs from a checkout), then `-e` the program and the four values it takes (the Julia
+ * file of the run, the project, the temperature and the run folder).
  *
  * @param root - the package folder, or `undefined` (a packaged program: Julia's own
  *     environment holds BAYSOL).
+ * @param script - the Julia file of the run; `run-project.jl` next to this file.
  */
 export function juliaArgs(
     spec: LaunchSpec,
     root: string | undefined,
     threads: string,
+    script: string = runProjectFile,
 ): string[] {
     return [
         "--startup-file=no",
@@ -467,6 +515,7 @@ export function juliaArgs(
         ...(root === undefined ? [] : [`--project=${root}`]),
         "-e",
         juliaProgram,
+        script,
         spec.projectDir,
         String(spec.temperature),
         spec.runDir,
@@ -474,7 +523,7 @@ export function juliaArgs(
 }
 
 /**
- * The real launcher: `julia ... -e 'using BAYSOL; BAYSOL.run_project(...)'` in its own
+ * The real launcher: `julia ... -e 'include(...); BAYSOLRun.run_project(...)'` in its own
  * process group, with the same cache folder as this program and three pipes.
  *
  * @returns the child. A Julia that cannot be started arrives as its `error` event.
@@ -762,7 +811,7 @@ export class RunSession {
             try {
                 await this.pack(this.runDir)
             } catch (error) {
-                const why = error instanceof Error ? error.message : "unknown error"
+                const why = messageOf(error, "unknown error")
                 note = `not packed: ${why}`
             }
             this.update({ phase, note })

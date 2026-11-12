@@ -14,9 +14,6 @@ import moment from "moment-timezone"
 const runNameFormat =
     /^(\d\d)-(\d\d)-(\d\d)-(\d{3})_\p{L}{3,}_([+-])(\d\d)(\d\d)_(\d{4})-(\d\d)-(\d\d)$/u
 
-/** The older name of a run folder: the UTC time as `yyyyMMddTHHmmssZ`. */
-const oldRunNameFormat = /^(\d{4})(\d\d)(\d\d)T(\d\d)(\d\d)(\d\d)Z$/
-
 const pad = (n: number, width: number): string => String(n).padStart(width, "0")
 
 /** What a zone-label source gave: the label and which link of the chain served it. */
@@ -225,9 +222,9 @@ function localZoneLabel(ms: number, offsetMinutes: number): string {
 
 /**
  * The name of a run folder, the ONE definition of it (Julia's is `_run_stamp` in
- * `src/Pipeline/RunProject.jl`; both give the same text for the same instant, offset and
- * label): the local wall-clock time, the zone label, the offset from UTC and the local
- * date, `23-35-29-123_EST_-0500_2026-11-07`. Only digits, letters, hyphens and
+ * `run-project.jl` next to this file; both give the same text for the same instant,
+ * offset and label): the local wall-clock time, the zone label, the offset from UTC and
+ * the local date, `23-35-29-123_EST_-0500_2026-11-07`. Only digits, letters, hyphens and
  * underscores, so it needs no quoting anywhere.
  *
  * @param ms - the instant, Unix ms.
@@ -254,9 +251,8 @@ export function runStamp(
 
 /**
  * How a screen shows the name of a run: `23:35:29:123 EST -05:00 · 2026-11-07` for a name
- * of the current format (never the colon-less disk name), the same form with `UTC +00:00`
- * and `000` ms for an older `yyyyMMddTHHmmssZ` name, so that all rows look alike. A name
- * that is neither is shown as it is. Pure; every screen uses it.
+ * (never the colon-less disk name). A name that is not of the format is shown as it is.
+ * Pure; every screen uses it.
  *
  * @param raw - the run folder's name.
  * @returns the text.
@@ -269,18 +265,13 @@ export function runDisplay(raw: string): string {
         const clock = `${m[1]}:${m[2]}:${m[3]}:${m[4]}`
         return `${clock} ${zone} ${m[5]}${m[6]}:${m[7]} · ${m[8]}-${m[9]}-${m[10]}`
     }
-    const old = oldRunNameFormat.exec(name)
-    if (old !== null && parseRunStamp(name) !== undefined) {
-        const day = `${old[1]}-${old[2]}-${old[3]}`
-        return `${old[4]}:${old[5]}:${old[6]}:000 UTC +00:00 · ${day}`
-    }
     return raw
 }
 
 /**
  * The name of a run in as few cells as tell two runs apart, `14:19:18 2026-11-09` (the
  * clock to the second and the date, no milliseconds or zone), for a question or a note
- * that has little room. A name that is not of either format is returned as it is.
+ * that has little room. A name that is not of the format is returned as it is.
  *
  * @param raw - the run folder's name.
  * @returns the text, 19 cells for a real run.
@@ -290,9 +281,6 @@ export function runBrief(raw: string): string {
     const m = runNameFormat.exec(name)
     if (m !== null && parseRunStamp(name) !== undefined)
         return `${m[1]}:${m[2]}:${m[3]} ${m[8]}-${m[9]}-${m[10]}`
-    const old = oldRunNameFormat.exec(name)
-    if (old !== null && parseRunStamp(name) !== undefined)
-        return `${old[4]}:${old[5]}:${old[6]} ${old[1]}-${old[2]}-${old[3]}`
     return raw
 }
 
@@ -315,35 +303,27 @@ function utcInstant(
 }
 
 /**
- * The instant a run folder name denotes: the local time minus its offset, or the UTC time
- * of the older `yyyyMMddTHHmmssZ` name.
+ * The instant a run folder name denotes: the local time minus its offset.
  *
  * @param raw - the folder name (NFC-normalized first: macOS may return it decomposed).
- * @returns Unix ms, `undefined` when the name is neither format (a near miss included).
+ * @returns Unix ms, `undefined` when the name is not of the format (a near miss included).
  */
 export function parseRunStamp(raw: string): number | undefined {
     const name = raw.normalize("NFC")
     const m = runNameFormat.exec(name)
-    if (m !== null) {
-        const [h, mi, s, ms, oh, om, y, mo, d] = [1, 2, 3, 4, 6, 7, 8, 9, 10].map((i) =>
-            Number(m[i]),
-        ) as [number, number, number, number, number, number, number, number, number]
-        if (oh > 23 || om > 59) return undefined
-        const local = utcInstant(y, mo, d, h, mi, s, ms)
-        const offset = (oh * 60 + om) * 60000 * (m[5] === "-" ? -1 : 1)
-        return local === undefined ? undefined : local - offset
-    }
-    const old = oldRunNameFormat.exec(name)
-    if (old === null) return undefined
-    const [y, mo, d, h, mi, s] = old.slice(1).map(Number) as [
-        number, number, number, number, number, number,
-    ]
-    return utcInstant(y, mo, d, h, mi, s, 0)
+    if (m === null) return undefined
+    const [h, mi, s, ms, oh, om, y, mo, d] = [1, 2, 3, 4, 6, 7, 8, 9, 10].map((i) =>
+        Number(m[i]),
+    ) as [number, number, number, number, number, number, number, number, number]
+    if (oh > 23 || om > 59) return undefined
+    const local = utcInstant(y, mo, d, h, mi, s, ms)
+    const offset = (oh * 60 + om) * 60000 * (m[5] === "-" ? -1 : 1)
+    return local === undefined ? undefined : local - offset
 }
 
 /**
- * Orders run folder names by the instant they denote, oldest first, in either format. A
- * name that is neither format sorts before every real one (so it comes last in the
+ * Orders run folder names by the instant they denote, oldest first. A
+ * name that is not of the format sorts before every real one (so it comes last in the
  * newest-first lists), among its kind by name; equal instants by name.
  */
 export function compareRunNames(a: string, b: string): number {

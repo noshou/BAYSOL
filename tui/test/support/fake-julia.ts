@@ -4,11 +4,12 @@ import { spawn } from "node:child_process"
 import { appendFileSync, mkdirSync, renameSync, writeFileSync } from "node:fs"
 import { hostname } from "node:os"
 import { dirname, join } from "node:path"
+import { tinyWorkbook } from "./workbook.js"
 
 /**
  * A stand-in for Julia in the tests of the run flow: it takes the three arguments the
  * real child takes (project, temperature, run folder) and writes a `run.json` and a
- * `run.LOG` the way `BAYSOL.run_project` does (the run folder is flat), then behaves as
+ * `run.LOG` the way `BAYSOLRun.run_project` does (the run folder is flat), then behaves as
  * `FAKE_MODE` says:
  *
  * - `done`: prints a few lines (one with a carriage-return progress bar), finishes `done`.
@@ -68,9 +69,9 @@ const terminalPlots = (w: number, h: number): string =>
 /** The files of a finished model and of the comparison (`plots` mode). */
 function writeOutputs(): void {
     const dir = runDir as string
-    const files: Record<string, string> = {
+    const files: Record<string, string | Buffer> = {
         "m.LOG": "datetime\tnow\n",
-        "m.xlsx": "PK workbook",
+        "m.xlsx": tinyWorkbook(),
         "m-plots.txt": terminalPlots(70, 18),
         "m.tex": figure("fit"),
         "m_residuals.tex": figure("residuals"),

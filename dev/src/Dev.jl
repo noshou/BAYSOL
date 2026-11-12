@@ -27,7 +27,7 @@ const TASKS = [
     "fmt" =>
         (Fmt, "Format the code, re-wrap prose, check the layout (--check, --lines)"),
     "harvest" =>
-        (Harvest, "Regenerate the harvested files: defaults, solutes, pmv-mean"),
+        (Harvest, "Regenerate the harvested files: defaults, solutes, residues, pmv-mean"),
     "results" => (Results, "Run-log results: table, compare"),
     "precommit" =>
         (Checks.Precommit, "Every check before a commit (--quick: only the fast ones)"),

@@ -12,12 +12,13 @@
 import { Box, Text } from "ink"
 import { Fragment, type ReactNode, useCallback, useState } from "react"
 import { LOGS_FLOW } from "../core/environment.js"
-import { displayWidth, padWidth, truncate } from "../core/terminal.js"
+import { clampIndex, displayWidth, padWidth, truncate } from "../core/terminal.js"
 import { runBrief, runDisplay } from "../store/run-stamp.js"
 import {
     type Design,
     Legend,
     type LegendItem,
+    type LegendStyle,
     legendHeight,
     type Moves,
     smallLogo,
@@ -115,6 +116,17 @@ const FOOTER_GAP = 2
 const COUNTER_CELLS = 4
 
 /**
+ * How the keys of a footer are drawn: the smooth footer puts each key in a rounded box (and
+ * falls back to columns when the boxes do not fit one row), the blocky one keeps its
+ * columns inside the double-line box.
+ *
+ * @param design - which footer.
+ * @returns the legend style.
+ */
+export const legendStyle = (design: Design): LegendStyle =>
+    design === "smooth" ? "boxes" : "columns"
+
+/**
  * The cells the keys of the footer may take.
  *
  * @param design - which footer: the blocky one sits in a box of its own.
@@ -144,7 +156,7 @@ function footerLegendLines(
     columns: number,
     counter?: string,
 ): number {
-    return legendHeight(items, legendRoom(design, columns, counter))
+    return legendHeight(items, legendRoom(design, columns, counter), legendStyle(design))
 }
 
 /**
@@ -264,9 +276,10 @@ export function Frame(props: FrameProps): ReactNode {
     // if that is taller) plus the note, with the note and the keys at the bottom beside
     // the logo: a legend that shrinks leaves blank rows above the note, never a moved logo
     const room = legendRoom(design, columns, counter)
+    const style = legendStyle(design)
     const keyLines = Math.max(
-        legendHeight(legend, room),
-        legendFull ? legendHeight(legendFull, room) : 0,
+        legendHeight(legend, room, style),
+        legendFull ? legendHeight(legendFull, room, style) : 0,
     )
     const keysColumn = {
         flexDirection: "column",
@@ -296,7 +309,7 @@ export function Frame(props: FrameProps): ReactNode {
                 {logoBox}
                 <Box {...keysColumn}>
                     {noteLine}
-                    <Legend items={legend} room={room} />
+                    <Legend items={legend} room={room} style={style} />
                 </Box>
                 {counterBox}
             </Footer>
@@ -398,7 +411,7 @@ export function moveCell(
     dCol: number,
 ): CellPos {
     if (dRow !== 0) {
-        const row = Math.min(Math.max(pos.row + dRow, 0), valid.length - 1)
+        const row = clampIndex(pos.row + dRow, valid.length)
         const cols = valid[row] as readonly number[]
         const near = (a: number, b: number) =>
             Math.abs(a - pos.want) <= Math.abs(b - pos.want) ? a : b
@@ -406,7 +419,7 @@ export function moveCell(
     }
     const cols = valid[pos.row] as readonly number[]
     const at = Math.max(0, cols.indexOf(pos.col))
-    const col = cols[Math.min(Math.max(at + dCol, 0), cols.length - 1)] as number
+    const col = cols[clampIndex(at + dCol, cols.length)] as number
     return { row: pos.row, col, want: col }
 }
 

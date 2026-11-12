@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { renderToString } from "ink"
+import { createElement, type ReactElement } from "react"
+import { readAssetJson } from "../../src/core/environment.js"
+import { NavProvider } from "../../src/ui/interaction.js"
+import { defaultTheme, ThemeContext } from "../../src/ui/theme.js"
 
 /**
  * The fixtures the Julia side and this program are both tested against: the files of
@@ -54,22 +59,53 @@ export function tempDir(prefix = "baysol-test-"): string {
     return dir
 }
 
-/** One-letter codes of the twenty standard amino acids, by their PDB names. */
-const aminoLetters: Readonly<Record<string, string>> = {
-    ALA: "A", ARG: "R", ASN: "N", ASP: "D", CYS: "C", GLN: "Q", GLU: "E", GLY: "G",
-    HIS: "H", ILE: "I", LEU: "L", LYS: "K", MET: "M", PHE: "F", PRO: "P", SER: "S",
-    THR: "T", TRP: "W", TYR: "Y", VAL: "V",
+/**
+ * A project folder with the inputs of a run: an empty buffer and a three-column data
+ * file with its units.
+ *
+ * @returns the folder.
+ */
+export function scratchProject(): string {
+    const dir = tempDir()
+    writeFileSync(join(dir, "buffer.json"), '{"solutes": []}\n')
+    writeFileSync(join(dir, "data.tsv"), "0.1\t5\t0.1\n")
+    writeFileSync(join(dir, "data.json"), '{"units": "A-1", "energy": 8000}\n')
+    return dir
 }
+
+/**
+ * Draws a screen on the default theme, as the terminal would show it (24 rows).
+ *
+ * @param screen - the screen.
+ * @param columns - the width of the terminal.
+ * @returns the text, lines joined by newlines.
+ */
+export function drawScreen(screen: ReactElement, columns = 80): string {
+    return renderToString(
+        createElement(
+            ThemeContext.Provider,
+            { value: defaultTheme },
+            createElement(NavProvider, { root: screen }),
+        ),
+        { columns },
+    )
+}
+
+/** The residue names of `assets/data/residues.json`, name to one-letter code. */
+const residueLetters = readAssetJson<
+    Record<"protein" | "dna" | "rna", Record<string, string>>
+>("data", "residues.json")
 
 /**
  * The sequence of a chain, read from the SEQRES records of a PDB file of
  * `test/fixtures/molecules/` (real biology, not made up): amino acids and nucleotides
- * (`DA`, `DC`, ... or `A`, `U`, ...) as one letter each.
+ * (`DA`, `DC`, ... or `A`, `U`, ...) as one letter each, a modified residue as its
+ * parent (the table of `residues.json`).
  *
  * @param file - the file name, `1CRN-TEST.pdb`.
  * @param chain - the chain id.
  * @returns the letters.
- * @throws if the chain has no SEQRES or a residue is modified.
+ * @throws if the chain has no SEQRES or a residue has no letter.
  */
 export function seqresLetters(file: string, chain: string): string {
     const names = fixtureText(`molecules/${file}`)
@@ -79,9 +115,22 @@ export function seqresLetters(file: string, chain: string): string {
     if (names.length === 0) throw new Error(`no SEQRES of chain ${chain} in ${file}`)
     return names
         .map((n) => {
-            const letter = aminoLetters[n] ?? (/^D?[ACGTU]$/.test(n) ? n.slice(-1) : "")
-            if (letter === "") throw new Error(`modified residue ${n} in ${file}`)
-            return letter
+            // "X" (no amino acid) and "N" (no base) are the table's "unknown"
+            const amino = residueLetters.protein[n]
+            const base = residueLetters.dna[n] ?? residueLetters.rna[n]
+            if (amino !== undefined && amino !== "X") return amino
+            if (amino === undefined && base !== undefined && base !== "N") return base
+            throw new Error(`residue ${n} of ${file} has no letter`)
         })
         .join("")
 }
+
+/**
+ * A run folder name of the current format at a UTC time.
+ *
+ * @param date - `YYYY-MM-DD`.
+ * @param time - `HH-MM-SS`, midnight when left out.
+ * @returns the name (`00-00-00-000_UTC_+0000_2026-11-01`).
+ */
+export const runOn = (date: string, time = "00-00-00"): string =>
+    `${time}-000_UTC_+0000_${date}`

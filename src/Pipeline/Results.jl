@@ -13,7 +13,8 @@ using Colors: Colors
 const PGF = PGFPlotsX
 
 """
-A colour: anything `Colors.parse` reads (`:crimson`, `"crimson"`, `"#dc143c"`), or a
+A colour: a name of Colors.jl or a code (`:crimson`, `"crimson"`,
+`"#dc143c"`, `"rgb(220, 20, 60)"`; see `colour_rgb`), or a
 `(colour, opacity)` tuple such as `(:darkorange, 0.15)`.
 """
 const ColorSpec = Union{AbstractString,Symbol,Tuple{Union{AbstractString,Symbol},Real}}
@@ -297,11 +298,15 @@ end
 
 """
 A comparison figure's data: the positive measured points with their log-symmetric error
-bars, the MAP curve and the `reference`'s curve.
+bars, the MAP curve with its χ², and the `reference`'s curve with its own χ²
+(`ref_chi2`, text, or `nothing`).
 """
-function _comparison_data(result, data, reference::Reference, style::PlotStyle)
+function _comparison_data(
+    result, data, reference::Reference, style::PlotStyle; ref_chi2 = nothing,
+)
     c = _curve_data(result, data, style)
-    return (; c.q, c.I, c.σ, c.err_lo, c.err_hi, c.map, c.ylim, ref = reference)
+    return (; c.q, c.I, c.σ, c.err_lo, c.err_hi, c.map, c.ylim, c.chi2,
+        ref = reference, ref_chi2)
 end
 
 # ---------------------------------------------------------------------------
@@ -323,7 +328,7 @@ end
 "`(r, g, b, opacity)`, with the channels in 0:255, of a [`ColorSpec`](@ref)."
 function _rgba(spec::ColorSpec)
     col, α = spec isa Tuple ? (spec[1], Float64(spec[2])) : (spec, 1.0)
-    c = convert(Colors.RGB, Colors.parse(Colors.Colorant, String(col)))
+    c = colour_rgb(col)
     return (round(Int, 255 * Float64(Colors.red(c))),
         round(Int, 255 * Float64(Colors.green(c))),
         round(Int, 255 * Float64(Colors.blue(c))), α)
@@ -885,9 +890,16 @@ function _comparison_axis(c, style::PlotStyle)
                         line_width = "$(style.lw_reference)pt", mark = "none"},
                     _coords(ref.q, ref.I))
             ),
-            _legend(ref.name),
+            _legend(
+                c.ref_chi2 === nothing ? ref.name :
+                string(ref.name, "  (", c.ref_chi2, ")"),
+            ),
         ],
-        _map_plot(c, style, "BAYSOL MAP"),
+        _map_plot(
+            c, style,
+            c.chi2 === nothing ? "BAYSOL MAP" :
+            string("BAYSOL MAP  χ² = ", @sprintf("%.4g", c.chi2)),
+        ),
     )
     return _axis(
         _axis_options(style; ylabel = raw"$I(q)$", height = style.size_cm[2],
@@ -1001,22 +1013,24 @@ _term_kw(style::PlotStyle) = (
 )
 
 """
-The I(q) plot in the terminal: the data (orange) and the MAP curve. Both axes are log10 of
-the values and are labelled that way (the terminal axes print plain numbers, where a log
-axis would print exponents such as `10³⸱⁸⁷⁹¹³`). The bounds band and the reference curves
-are in the `.tex`, not here.
+The I(q) plot in the terminal: the MAP curve alone. The data points would fill a plot of a
+few dozen terminal cells with dots over the curve and make it unreadable, so the data are
+in the residuals plot, the `.tex` and the workbook; a fit without a MAP curve shows the
+data instead. Both axes are log10 of the values and are labelled that way (the terminal
+axes print plain numbers, where a log axis would print exponents such as `10³⸱⁸⁷⁹¹³`).
+The bounds band and the reference curves are in the `.tex`, not here.
 """
 function _preview_fit(c, style::PlotStyle)
     lg = log10
-    p = UnicodePlots.scatterplot(lg.(c.q), lg.(c.I); name = "data",
-        color = _rgb(style.color_posterior), xlabel = "log₁₀ q   (q in Å⁻¹)",
-        ylabel = "log₁₀ I(q)", title = _titled("fit", c.chi2), _term_kw(style)...)
-    if c.map !== nothing
-        ok = .!isnan.(c.map.I)
-        UnicodePlots.lineplot!(p, lg.(c.map.q[ok]), lg.(c.map.I[ok]); name = "MAP",
-            color = _rgb(style.color_map))
+    kw = (xlabel = "log₁₀ q   (q in Å⁻¹)", ylabel = "log₁₀ I(q)",
+        title = _titled("fit", c.chi2), _term_kw(style)...)
+    if c.map === nothing
+        return UnicodePlots.scatterplot(lg.(c.q), lg.(c.I); name = "data",
+            color = _rgb(style.color_posterior), kw...)
     end
-    return p
+    ok = .!isnan.(c.map.I)
+    return UnicodePlots.lineplot(lg.(c.map.q[ok]), lg.(c.map.I[ok]); name = "MAP",
+        color = _rgb(style.color_map), kw...)
 end
 
 """
@@ -1077,6 +1091,9 @@ _text_width(text::AbstractString) = maximum(textwidth, split(text, '\n'); init =
 # the tick labels and the label of the x axis); a size's plots are at most this and its
 # `height` tall.
 const _TERMINAL_EXTRA_ROWS = 5
+
+"A string with the terminal's colour codes removed (the plain text of `plots.txt`)."
+_plain_text(s::AbstractString) = replace(s, r"\e\[[0-9;?]*[ -/]*[@-~]" => "")
 
 """
 The text of a terminal plot that is `width` columns wide as a whole (labels, ticks and
@@ -1222,7 +1239,8 @@ group, so the log's timings list them; with `run_log` it calls [`write_log`](@re
 - `run_log`: also write the run's section of the folder's run log ([`write_log`](@ref)),
     `false` by default; the fitting tests set it. The log is then in the files returned.
 - `ref_chi2`: the reference χ², the depositor's with its method (`"CRYSOL 1.37"`), which
-    the log prints in the run's section as the `ref_chi2` row (only with `run_log`).
+    the log prints in the run's section as the `ref_chi2` row (only with `run_log`), and
+    the legend of each comparison figure prints beside the reference curve.
 - `form_factor_log`, `n_atoms`: the seed's `seed.fw.form_factor_log` and `seed.fw.n_atoms`
     for the `form_factor_log` and `run` sheets; given by themselves when `data` is a
     `Seed`.
@@ -1252,7 +1270,7 @@ group, so the log's timings list them; with `run_log` it calls [`write_log`](@re
     or `data` has no positive intensity, its three vectors differ in length,
     or `font` is not `nothing`, a font name or a pair of names.
 - [`InvalidSettingsError`](@ref) if `table_sigfigs` is not a whole number of at least 1
-    (the check of [`load_settings`](@ref) for `TABLE_SIGFIGS`), `plot_tui_sizes` is not
+    (the check of `load_settings` for `TABLE_SIGFIGS`), `plot_tui_sizes` is not
     a valid `PLOT_TUI_SIZES`, or `plot_dir` or `latex_compiler` is not a path (text
     without control characters).
 - `SystemError` if the plot folder cannot be made or written.
@@ -1440,7 +1458,7 @@ function results(
         suffix = length(refs) == 1 ? "_comparison" : "_comparison_" * _slug(ref.name)
         figure(
             "comparison " * ref.name,
-            () -> _comparison_data(result, data, ref, style),
+            () -> _comparison_data(result, data, ref, style; ref_chi2),
             suffix,
             c -> _comparison_axis(c, style),
             nothing,

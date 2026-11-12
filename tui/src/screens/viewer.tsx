@@ -12,7 +12,13 @@ import { basename, relative, sep } from "node:path"
 import { Box, Text } from "ink"
 import { Fragment, type ReactNode, useMemo, useState } from "react"
 import { isFile } from "../core/file-system.js"
-import { displayWidth, padWidth, truncate, writeTerminal } from "../core/terminal.js"
+import {
+    clampIndex,
+    displayWidth,
+    padWidth,
+    truncate,
+    writeTerminal,
+} from "../core/terminal.js"
 import { materializeRunFile, readRunText } from "../store/run-archive.js"
 import type { PlotFile } from "../store/run-logs.js"
 import {
@@ -52,7 +58,7 @@ import {
     legendOf,
     moveLegend,
 } from "../ui/grid.js"
-import { Prompt } from "../ui/input.js"
+import { Prompt, useNote } from "../ui/input.js"
 import {
     clampWindow,
     type KeyInput,
@@ -286,7 +292,7 @@ function TabBar(props: {
  *     window changes, the plot tab kept; `plotsPath` is the fallback (and for a caller
  *     with no sizes the only file).
  * @param props.runDir - the run folder the plots files are in: a plots file that is not on
- *     disk is read from its archive (`run.7z`).
+ *     disk is read from its archive (`<run>.7z`).
  * @param props.title - the title of the screen, `view` when left out.
  * @param props.design - `"blocky"` (the logs pages) or `"smooth"` (`open runs`, default).
  * @param props.corner - the text at the top right of the title row; none when left out.
@@ -385,8 +391,7 @@ export function SheetViewerScreen(props: {
     const [tabFirst, setTabFirst] = useState(0)
     const [positions, setPositions] = useState<Record<number, Pos>>({})
     const [plotPositions, setPlotPositions] = useState<Record<number, PlotPos>>({})
-    const [note, setNote] = useState<{ text: string; error: boolean } | undefined>()
-    const say = (text: string, error = false) => setNote({ text, error })
+    const { note, say, clear } = useNote()
     // find, jump, mark, copy and formulas (sheets mode)
     const [asking, setAsking] = useState<"find" | "jump" | undefined>()
     const [askKeys, setAskKeys] = useState<LegendItem[]>([])
@@ -534,8 +539,8 @@ export function SheetViewerScreen(props: {
     /** Puts the cursor on a cell, keeping it in view, and forgets nothing else. */
     const place = (row: number, column: number) => {
         if (sheet === undefined) return
-        const r = Math.min(Math.max(row, 0), sheet.rows - 1)
-        const c = Math.min(Math.max(column, 0), sheet.columns - 1)
+        const r = clampIndex(row, sheet.rows)
+        const c = clampIndex(column, sheet.columns)
         setPositions((s) => ({
             ...s,
             [tab]: {
@@ -548,7 +553,7 @@ export function SheetViewerScreen(props: {
     }
 
     const switchTab = (to: number) => {
-        const next = Math.min(Math.max(to, 0), names.length - 1)
+        const next = clampIndex(to, names.length)
         if (mode === "plots") setPlotTab(next)
         else setTab(next)
         setMark(undefined)
@@ -591,7 +596,7 @@ export function SheetViewerScreen(props: {
 
     // ---- keys
     useKeys((press: KeyInput) => {
-        setNote(undefined)
+        clear()
         if (copying) {
             setCopying(false)
             if (sheet === undefined) return
@@ -830,7 +835,7 @@ export function SheetViewerScreen(props: {
                 <Box flexGrow={1} />
                 {asking ? (
                     <Prompt
-                        label={asking === "find" ? "find:" : "go to:"}
+                        label={asking === "find" ? "find:" : "go to (B7, row 7, column B):"}
                         initial={asking === "find" ? search : ""}
                         maxLength={VIEWER_LIMITS.maxColumnWidth * 2}
                         take={asking === "find" ? "find" : "go"}

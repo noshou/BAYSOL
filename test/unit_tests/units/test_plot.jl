@@ -216,7 +216,7 @@ end
         XLSX = BAYSOL.Pipeline.XLSX
         mktempdir() do dir
             files = results(result, data; dir, name = "res_x", preview = false,
-                io = IOBuffer(),
+                io = IOBuffer(), ref_chi2 = "CRYSOL 1.37",
                 references = Reference("CRYSOL fit1", q, I_true .* 1.02))
             names = basename.(files)
             # the layout: .tex in plots/, the numbers in one workbook; no log unless asked
@@ -238,10 +238,11 @@ end
             # default-sized marker on every point
             @test occursin("draw={none}", tex) && !occursin("only marks, mark={none}", tex)
             @test occursin("error bars/error bar style={color=bserrorbar", tex)
-            @test occursin(
-                "CRYSOL fit1",
-                read(joinpath(dir, "plots", "res_x_comparison.tex"), String),
-            )
+            comparison = read(joinpath(dir, "plots", "res_x_comparison.tex"), String)
+            @test occursin("CRYSOL fit1", comparison)
+            # the legend carries the reference's chi2 text and the MAP curve's own chi2
+            @test occursin("(CRYSOL 1.37)", comparison)
+            @test occursin(r"BAYSOL MAP\s+χ² = ", comparison)
             # the workbook's sheets
             xf = XLSX.readxlsx(joinpath(dir, "res_x.xlsx"))
             sheets = XLSX.sheetnames(xf)
@@ -842,6 +843,18 @@ end
 @testset "compare_results" begin
     P = BAYSOL.Pipeline
     XLSX = P.XLSX
+    # a comparison table (`.tsv`) as a matrix: the header row as text, the numbers as
+    # `Float64` and an empty cell as `missing`
+    function tsv_table(path)
+        lines = readlines(path)
+        rows = [split(l, '\t'; keepempty = true) for l in lines]
+        out = Matrix{Any}(missing, length(rows), length(rows[1]))
+        out[1, :] = rows[1]
+        for (i, r) in enumerate(rows[2:end]), (j, c) in enumerate(r)
+            out[i+1, j] = isempty(c) ? missing : parse(Float64, c)
+        end
+        return out
+    end
     result1, data, I_true = scaled_result()
     q = data[1]
 
@@ -851,10 +864,10 @@ end
             io = IOBuffer()
             files = BAYSOL.compare_results([result1], data; names = ["m1"],
                 references = ref, dir, name = "run", io)
-            @test basename.(files) == ["run_compare.tex", "run_compare.xlsx"]
+            @test basename.(files) == ["run_compare.tex", "run_compare.tsv"]
             @test files[1] == joinpath(dir, "plots", "run_compare.tex")
-            @test files[2] == joinpath(dir, "run_compare.xlsx")
-            @test sort(readdir(dir)) == ["plots", "run_compare.xlsx"]    # no .part left
+            @test files[2] == joinpath(dir, "run_compare.tsv")
+            @test sort(readdir(dir)) == ["plots", "run_compare.tsv"]    # no .part left
             tex = read(files[1], String)
             # the model's colour is defined, the band of a single model is drawn, the
             # reference is dashed in the reference colour with its marker, in the legend
@@ -867,10 +880,8 @@ end
             text = String(take!(io))
             @test occursin("comparison", text) && occursin("data", text)
             @test occursin("CRYSOL fit1", text) && occursin("m1   χ² = 1.1", text)
-            # the workbook: the measured curve and one column per curve
-            xf = XLSX.readxlsx(files[2])
-            @test XLSX.sheetnames(xf) == ["compare", "legend"]
-            cmp = xf["compare"][:]
+            # the table: the measured curve and one column per curve
+            cmp = tsv_table(files[2])
             @test string.(cmp[1, :]) == ["q (A^-1)", "I_measured (a.u.)", "sigma (a.u.)",
                 "fit_m1 (a.u.)", "ref_CRYSOL fit1 (a.u.)"]
             @test size(cmp, 1) == length(q) + 1
@@ -881,18 +892,6 @@ end
             @test cmp[2, 5] == I_true[1] && cmp[4, 5] == I_true[3]
             @test cmp[3, 5] ≈ (I_true[1] + I_true[3]) / 2 atol = DEFAULT_ATOL
             @test ismissing(cmp[end, 5]) == (q[end] > q[end-1] && length(q) % 2 == 0)
-            lg = xf["legend"][:]
-            @test string.(lg[1, :]) == ["column", "kind", "name", "colour", "hex",
-                "marker", "line", "chi2", "note"]
-            @test string.(lg[2:end, 2]) == ["data", "fit", "reference"]
-            @test string.(lg[2:end, 3]) == ["measured", "m1", "CRYSOL fit1"]
-            @test string.(lg[2:end, 1]) == string.(cmp[1, [2, 4, 5]])
-            @test string.(lg[2:end, 4]) == ["gray20", "#D55E00", "mediumturquoise"]
-            @test string.(lg[2:end, 5]) == ["#333333", "#D55E00", "#48D1CC"]
-            @test check_float(lg[3, 8], 1.1) && ismissing(lg[2, 8])
-            @test string(lg[4, 6]) == "o" && string(lg[4, 7]) == "dashed"
-            @test occursin("on the measured q", string(lg[3, 9]))
-            @test occursin("interpolated", string(lg[4, 9]))
         end
     end
 
@@ -914,12 +913,6 @@ end
             @test !occursin("fill between", tex) && !occursin("bounds", tex)
             @test occursin("line width={2.5pt}", tex)
             @test count("mark={o}", tex) == 2 && count("mark={x}", tex) == 1
-            lg = XLSX.readxlsx(files[2])["legend"][:]
-            @test string.(lg[2:end, 2]) == ["data", "fit", "fit", "fit", "reference",
-                "reference", "reference"]
-            @test string.(lg[2:end, 5]) == ["#333333", "#FF0000", "#00FF00", "#FF0000",
-                "#48D1CC", "#48D1CC", "#48D1CC"]
-            @test string.(lg[6:end, 6]) == ["o", "x", "o"]
             @test P._assigned((:a, :b), 1) == :a && P._assigned((:a, :b), 5) == :a
             @test P._assigned((:a, :b), 4) == :b
         end
@@ -930,7 +923,7 @@ end
         r2, _, _ = scaled_result(; q2)
         mktempdir() do dir
             files = BAYSOL.compare_results([result1, r2], data; dir, preview = false)
-            cmp = XLSX.readxlsx(files[2])["compare"][:]
+            cmp = tsv_table(files[2])
             @test string.(cmp[1, 4:5]) == ["fit_model1 (a.u.)", "fit_model2 (a.u.)"]
             col = cmp[2:end, 5]
             inside = (q .>= q2[1]) .& (q .<= q2[end])
@@ -945,7 +938,7 @@ end
             files =
                 @test_logs (:warn, r"model dead has no MAP curve") BAYSOL.compare_results(
                     [result1, none], data; names = ["live", "dead"], dir, preview = false)
-            cmp = XLSX.readxlsx(files[2])["compare"][:]
+            cmp = tsv_table(files[2])
             @test size(cmp, 2) == 4 && string(cmp[1, 4]) == "fit_live (a.u.)"
             @test_throws ArgumentError BAYSOL.compare_results(
                 [none], data; dir, preview = false)
@@ -956,7 +949,7 @@ end
         mktempdir() do dir
             files = BAYSOL.compare_results([result1], data; dir, preview = false,
                 tex = false)
-            @test basename.(files) == ["res_compare.xlsx"] && !isdir(joinpath(dir, "plots"))
+            @test basename.(files) == ["res_compare.tsv"] && !isdir(joinpath(dir, "plots"))
         end
         mktempdir() do dir
             io = IOBuffer()

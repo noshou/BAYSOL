@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// Reference fits: the reference curves of a project (`<project>/reference-fit/`; the
-// folder was `references/` until 2026-11-09 and an old one is moved to the new name).
+// Reference fits: the reference curves of a project (`<project>/reference-fit/`).
 //
 // Julia reads every `.tsv`, `.dat` or `.txt` file there with two or three numeric columns
 // (q, I and an optional sigma that it reads and ignores; q in the units of `data.json`,
@@ -11,12 +10,11 @@
 // header, named by the stem of the source made safe, never over a file that is there.
 // Nothing here deletes anything by itself; a delete is asked for with the stem's name.
 
-import { mkdirSync, readFileSync, renameSync, statSync, unlinkSync } from "node:fs"
+import { mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs"
 import { basename, extname, join } from "node:path"
 import {
     entryNames,
     isFile,
-    isFolder,
     sortNoCase,
     writeAtomic,
 } from "../core/file-system.js"
@@ -27,9 +25,6 @@ import { lockedIn } from "./projects.js"
 
 /** The folder of a project that holds the reference curves. */
 const REFERENCES_FOLDER = "reference-fit"
-
-/** The name the folder had before 2026-11-09 (moved to [[REFERENCES_FOLDER]] on sight). */
-const LEGACY_REFERENCES_FOLDER = "references"
 
 /** The extensions Julia reads (compared in lower case). */
 const REFERENCE_EXTENSIONS: readonly string[] = [".tsv", ".dat", ".txt"]
@@ -46,41 +41,6 @@ const MAX_STEM = 60
 /** @returns the `reference-fit/` folder of a project (it may not exist). */
 export const referencesDir = (projectDir: string): string =>
     join(projectDir, REFERENCES_FOLDER)
-
-/**
- * Moves an old `references/` folder to `reference-fit/` (a plain rename: nothing is
- * lost) when the new one is not there. The caller holds the lock of `reference-fit`.
- * A failed rename leaves both folders as they are.
- *
- * @returns whether the folder was moved.
- */
-function moveLegacyFolder(projectDir: string): boolean {
-    const old = join(projectDir, LEGACY_REFERENCES_FOLDER)
-    const dir = referencesDir(projectDir)
-    if (isFolder(dir) || !isFolder(old)) return false
-    try {
-        renameSync(old, dir)
-        return true
-    } catch {
-        return false
-    }
-}
-
-/**
- * [[moveLegacyFolder]] under the project's lock of the folder, for a caller that does not
- * hold it. Never throws (a locked or vanished project is left as it is).
- *
- * @returns whether the folder was moved.
- */
-export function migrateReferences(projectDir: string): boolean {
-    const dir = referencesDir(projectDir)
-    if (isFolder(dir) || !isFolder(join(projectDir, LEGACY_REFERENCES_FOLDER))) return false
-    try {
-        return lockedIn(projectDir, dir, () => moveLegacyFolder(projectDir))
-    } catch {
-        return false
-    }
-}
 
 /**
  * One file of the `reference-fit/` folder.
@@ -183,7 +143,6 @@ export function referenceFiles(projectDir: string): string[] {
  * missing folder holds none. Nothing is changed, whatever the files are.
  */
 export function listReferences(projectDir: string): ReferenceEntry[] {
-    migrateReferences(projectDir)
     const dir = referencesDir(projectDir)
     return referenceFiles(projectDir).map((file) => {
         const name = stemOf(file)
@@ -259,7 +218,6 @@ export function addReference(projectDir: string, data: DataPoints, source: strin
     const dir = referencesDir(projectDir)
     return lockedIn(projectDir, dir, () => {
         referenceUnits(projectDir)
-        moveLegacyFolder(projectDir)
         try {
             mkdirSync(dir) // not recursive: the project's folder must be there
         } catch (error) {
@@ -285,7 +243,6 @@ export function addReference(projectDir: string, data: DataPoints, source: strin
 export function deleteReference(projectDir: string, file: string): boolean {
     const dir = referencesDir(projectDir)
     return lockedIn(projectDir, dir, () => {
-        moveLegacyFolder(projectDir)
         if (file !== basename(file) || !isReferenceFile(file) || !isFile(join(dir, file)))
             return false
         try {

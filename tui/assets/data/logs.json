@@ -1,0 +1,24 @@
+{
+    "pager": {
+        "overlap": 1,
+        "sideStep": 8,
+        "tabWidth": 8
+    },
+    "list": {
+        "stampWidth": 36,
+        "statusWidth": 11,
+        "sizeWidth": 9
+    },
+    "options": {
+        "fileWidth": 15,
+        "sizeWidth": 9
+    },
+    "watch": {
+        "pollSeconds": 2,
+        "closeSeconds": 2
+    },
+    "corner": {
+        "separator": " · ",
+        "minCells": 6
+    }
+}

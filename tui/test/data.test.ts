@@ -43,7 +43,7 @@ import {
     textSource,
 } from "../src/store/data-table.js"
 import { ProjectGoneError } from "../src/store/projects.js"
-import { tempDir as temp } from "./support/fixtures.js"
+import { tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Table parse
@@ -244,6 +244,12 @@ test("table: the first bad cell stops the extraction with line and column", () =
         failure(() => extractCurve(parse(lines.join("\n")), { q: 1, i: 2, sigma: 3 })),
         "line 5: q must increase",
     )
+    // the same q with other values is kept (q stored to three digits repeats)
+    lines[4] = `${lines[3]?.split(",")[0]},7,0.01`
+    const repeatedQ = extractCurve(parse(lines.join("\n")), { q: 1, i: 2, sigma: 3 })
+    assert.equal(repeatedQ.q[3], repeatedQ.q[4])
+    assert.equal(repeatedQ.i[4], 7)
+    lines[4] = "0.03,5,0.01"
     // a row with q not above 0 is dropped and counted, not an error
     lines[4] = "-1,5,0.01"
     const dropped = extractCurve(parse(lines.join("\n")), { q: 1, i: 2, sigma: 3 })
@@ -275,7 +281,7 @@ test("table: the preview limit keeps few rows but the header", () => {
 })
 
 test("table: an .xlsx goes through the same path (first sheet, any name)", () => {
-    const dir = temp()
+    const dir = tempDir()
     const sheet = XLSX.utils.aoa_to_sheet([
         ["Sample", "lysozyme"],
         ["q", "I", "sigma"],
@@ -313,7 +319,7 @@ test("table: an .xlsx goes through the same path (first sheet, any name)", () =>
 })
 
 test("table: binary, old .xls and missing files are refused", () => {
-    const dir = temp()
+    const dir = tempDir()
     const file = join(dir, "b.dat")
     writeFileSync(file, Buffer.from([1, 2, 0, 3]))
     assert.throws(() => loadSource(file), /not a text file/)
@@ -324,7 +330,7 @@ test("table: binary, old .xls and missing files are refused", () => {
 })
 
 test("table: a SASBDB-style .dat (free text, then q I sigma) imports with skip", () => {
-    const dir = temp()
+    const dir = tempDir()
     const file = join(dir, "sasbdb.dat")
     writeFileSync(
         file,
@@ -373,7 +379,7 @@ const writeBook = (
     const book = XLSX.utils.book_new()
     for (const [title, aoa] of sheets)
         XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(aoa), title)
-    const file = join(temp(), name)
+    const file = join(tempDir(), name)
     writeFileSync(file, XLSX.write(book, { type: "buffer", bookType }))
     return file
 }
@@ -458,7 +464,8 @@ function scriptRead(text: string, sigma: number) {
 
 test("real curves: every deposited file is detected, auto, as the scripts read it", () => {
     const ids = readdirSync(EXPERIMENTS).sort()
-    assert.equal(ids.length, 57)
+    // every fixture folder is read; the floor guards against a folder that went missing
+    assert.ok(ids.length >= 57, `${ids.length} fixture folders`)
     const separators = new Set<string>()
     for (const id of ids) {
         const [name, sigma] = FIT_FILES[id] ?? [`experimental_data/${id}.dat`, 3]
@@ -577,7 +584,7 @@ test("data: bad files give a short message that names the line and the column", 
 })
 
 test("data: writeData makes a clean TSV and data.json last", () => {
-    const dir = temp()
+    const dir = tempDir()
     const odd: DataPoints = { q: [], i: [], sigma: [], dropped: 0 }
     for (let k = 1; k <= 10; k++) {
         odd.q.push(k / 3)
@@ -587,6 +594,7 @@ test("data: writeData makes a clean TSV and data.json last", () => {
     const info = writeData(dir, odd, "/some/where/My Curve.csv", "nm-1", 12400)
     assert.deepEqual(info, {
         units: "nm-1", energy: 12400, source: "My Curve.csv", points: 10,
+        energy_unit: "nm",
     })
     const text = readFileSync(dataTsvFile(dir), "utf-8")
     const lines = text.trimEnd().split("\n")
@@ -603,23 +611,23 @@ test("data: writeData makes a clean TSV and data.json last", () => {
 })
 
 test("data: units and energy edit data.json only", () => {
-    const dir = temp()
+    const dir = tempDir()
     writeData(dir, expected, "c.dat", "A-1")
     assert.equal(dataIsReady(dir), false, "no energy yet")
     const before = readFileSync(dataTsvFile(dir))
     setUnits(dir, "nm-1")
-    setEnergy(dir, 8048)
+    setEnergy(dir, 8048, "eV")
     assert.deepEqual(readFileSync(dataTsvFile(dir)), before)
     const status = readDataInfo(dir)
     assert.equal(status?.kind === "ok" && status.info.units, "nm-1")
     assert.equal(status?.kind === "ok" && status.info.energy, 8048)
     assert.ok(dataIsReady(dir))
-    assert.throws(() => setEnergy(dir, 0), DataFileError)
-    assert.throws(() => setEnergy(dir, Number.NaN), DataFileError)
-    assert.throws(() => setEnergy(dir, -5), DataFileError)
+    assert.throws(() => setEnergy(dir, 0, "eV"), DataFileError)
+    assert.throws(() => setEnergy(dir, Number.NaN, "eV"), DataFileError)
+    assert.throws(() => setEnergy(dir, -5, "eV"), DataFileError)
     // no leftovers
     assert.equal(existsSync(`${dataJsonFile(dir)}.lock`), false)
-    const empty = temp()
+    const empty = tempDir()
     assert.throws(() => setUnits(empty, "nm-1"), /no data yet/)
     assert.equal(readDataInfo(empty), undefined)
 })
@@ -631,10 +639,10 @@ test("data: the unit labels have the right superscripts", () => {
 })
 
 test("data: a vanished project is an error with a note, nothing is recreated", () => {
-    const dir = join(temp(), "gone")
+    const dir = join(tempDir(), "gone")
     assert.throws(() => writeData(dir, expected, "c.dat", "A-1"), ProjectGoneError)
     assert.equal(existsSync(dir), false)
-    const live = temp()
+    const live = tempDir()
     writeData(live, expected, "c.dat", "A-1", 1000)
     rmSync(live, { recursive: true })
     assert.throws(() => setUnits(live, "nm-1"), ProjectGoneError)
@@ -645,7 +653,7 @@ test("data: a vanished project is an error with a note, nothing is recreated", (
 })
 
 test("data: garbled files are unusable, never overwritten, reset keeps them", () => {
-    const dir = temp()
+    const dir = tempDir()
     writeData(dir, expected, "c.dat", "A-1", 1000)
     writeFileSync(dataJsonFile(dir), "{ not json")
     assert.equal(readDataInfo(dir)?.kind, "unusable")
@@ -671,7 +679,7 @@ test("data: garbled files are unusable, never overwritten, reset keeps them", ()
 })
 
 test("data: a table that does not match its json, or is garbled, is unusable", () => {
-    const dir = temp()
+    const dir = tempDir()
     writeData(dir, expected, "c.dat", "A-1", 1000)
     writeFileSync(dataTsvFile(dir), "garbage\n")
     assert.equal(readDataInfo(dir)?.kind, "unusable")
@@ -683,7 +691,7 @@ test("data: a table that does not match its json, or is garbled, is unusable", (
 })
 
 test("data: the mapping is remembered in data.json; units and energy keep it", () => {
-    const dir = temp()
+    const dir = tempDir()
     const mapping = makeMapping(
         "/some/where/My Curve.dat",
         { separator: "auto", sheet: "", skipRows: 3, comments: true, header: "no" },
@@ -697,14 +705,14 @@ test("data: the mapping is remembered in data.json; units and energy keep it", (
     assert.deepEqual(info.mapping, mapping)
     assert.deepEqual(JSON.parse(readFileSync(dataJsonFile(dir), "utf-8")).mapping, mapping)
     setUnits(dir, "nm-1")
-    setEnergy(dir, 8048)
+    setEnergy(dir, 8048, "eV")
     const status = readDataInfo(dir)
     assert.equal(status?.kind, "ok")
     if (status?.kind === "ok") assert.deepEqual(status.info.mapping, mapping)
 })
 
-test("data: an old data.json still loads, a malformed mapping is dropped", () => {
-    const dir = temp()
+test("data: a file without a mapping loads, a malformed mapping is dropped", () => {
+    const dir = tempDir()
     writeData(dir, expected, "c.dat", "A-1", 1000)
     const old = JSON.parse(readFileSync(dataJsonFile(dir), "utf-8"))
     assert.equal("mapping" in old, false)

@@ -12,14 +12,15 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using BAYSOL.MolecularStructure: LocalPathSource, StructureSourceError, reslove_struct,
     keep_chains, load_molecule, n_atoms
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
-using BAYSOL.Pipeline: _checked_value, setting_kind, _select_curve, _apply_keywords!,
-    load_settings, _relation_problems
+using BAYSOL.Pipeline:
+    _checked_value, setting_kind, _select_curve, _apply_keywords!,
+    _relation_problems
 using BAYSOL.Shannon: model_on_raw, raw_interpolation
 using Logging
 
 const _DS_CRAMBIN = joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1CRN-TEST.pdb")
 const _DS_ZNI = joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1ZNI-TEST.cif")
-const _DS_DEFAULTS = load_settings(joinpath(tempdir(), "no", "such", "settings.json"))
+const _DS_DEFAULTS = default_settings()
 
 quiet(f) = redirect_stdout(f, devnull)
 
@@ -100,26 +101,6 @@ end
         for (a, b) in ((0.3, 0.05), (0.1, 0.1))
             p = _relation_problems(vals(a, b))
             @test length(p) == 1 && occursin("Q_MIN", p[1]) && occursin("Q_MAX", p[1])
-        end
-    end
-
-    @testset "settings.json: null is no limit" begin
-        mktempdir() do dir
-            path = joinpath(dir, "settings.json")
-            write(
-                path,
-                """{"data": {"Q_MIN": {"value": 0.05}, "Q_MAX": {"value": null},
-                              "EXCLUDE_Q": {"value": [[0.1, 0.12]]},
-                              "CHAINS": {"value": ["A"]}, "LMAX": {"value": 9}}}""",
-            )
-            s = load_settings(path)
-            @test s[:Q_MIN] === 0.05 && s[:Q_MAX] === nothing && s[:LMAX] === 9
-            @test s[:EXCLUDE_Q] == ((0.1, 0.12),) && s[:CHAINS] == ("A",)
-            write(path, """{"data": {"Q_MIN": {"value": 0.4}, "Q_MAX": {"value": 0.1}}}""")
-            e = with_logger(NullLogger()) do
-                error_of(() -> load_settings(path))
-            end
-            @test e isa BAYSOL.InvalidSettingsError && occursin("Q_MIN", e.problems[1])
         end
     end
 

@@ -7,8 +7,7 @@ import { existsSync } from "node:fs"
 import { basename } from "node:path"
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useMemo, useState } from "react"
-import { readSystem } from "../core/environment.js"
-import { pick } from "../core/file-system.js"
+import { DATA_EXTENSIONS } from "../core/file-system.js"
 import {
     parseNumber,
     plainNumber,
@@ -18,11 +17,17 @@ import {
 import {
     type DataMapping,
     type DataStatus,
+    DEFAULT_ENERGY_UNIT,
+    DEFAULT_UNITS,
     dataErrorNote,
     ENERGY_PROBLEM,
+    type EnergyUnit,
+    energyUnitLabel,
+    nextEnergyUnit,
     readDataInfo,
     resetData,
     setEnergy,
+    setEnergyUnit,
     setUnits,
     type Units,
     unitLabel,
@@ -34,6 +39,7 @@ import type { ProjectRef } from "../store/projects.js"
 import { listReferences } from "../store/references.js"
 import { Frame } from "../ui/frame.js"
 import {
+    cursorMoves,
     type LegendItem,
     legendBack,
     legendEnter,
@@ -41,7 +47,13 @@ import {
     legendOf,
     moveLegend,
 } from "../ui/grid.js"
-import { PathPrompt, Prompt, questionLegend, useConfirm } from "../ui/input.js"
+import {
+    PathPrompt,
+    Prompt,
+    questionLegend,
+    useConfirm,
+    useNote,
+} from "../ui/input.js"
 import {
     CursorList,
     type KeyInput,
@@ -53,19 +65,21 @@ import {
     useNav,
     useScreenActive,
 } from "../ui/interaction.js"
+import { PICKING_NOTE, usePathField, usePathPick } from "../ui/prompt-flows.js"
 import { Panel, useTheme } from "../ui/theme.js"
 import { DataImportScreen } from "./data-import.js"
 import { ReferencesScreen, referenceSummary } from "./references-screen.js"
 
-/** What the screen is doing: the options, a path prompt, the picker window or a number
- * prompt for the energy (the import itself is its own screen). */
+/** What the screen is doing: the options, a path prompt, the picker window, the tabs of
+ * the units of q or a number prompt for the energy (the import itself is its own
+ * screen). */
 type Mode = "menu" | "path" | "picking" | "energy"
 
 /** The options of the screen, in order. */
 const options = [
     { id: "load", label: "load a file" },
     { id: "mapping", label: "change the columns" },
-    { id: "units", label: "units" },
+    { id: "units", label: "q units" },
     { id: "energy", label: "energy" },
     { id: "reference fit", label: "reference fit" },
 ] as const
@@ -83,12 +97,13 @@ const LINE_NAME_WIDTH = 13
 const LOAD_FIRST = "load a file first"
 
 /** What is said when a file is to be loaded over data files that cannot be used. */
+/** What `^k` says on a row that has no unit. */
+const UNIT_ROWS = "^k changes the unit of q units or energy"
+
 const RESET_FIRST = `data files are unusable: reset them first (${keys.reset.label})`
 
 /** The file extensions the path prompt hints (a typed path may have any name). */
-const hintedExtensions: ReadonlySet<string> = new Set([
-    "dat", "txt", "csv", "tsv", "tab", "xlsx",
-])
+const hintedExtensions: ReadonlySet<string> = new Set(DATA_EXTENSIONS)
 
 /** The names the path prompt completes: folders and the usual data files. */
 const acceptedHint = (name: string): boolean =>
@@ -97,9 +112,11 @@ const acceptedHint = (name: string): boolean =>
 /** The suggestions of the path prompt. */
 const suggestDataPaths = (text: string) => pathSuggestions(text, acceptedHint)
 
-/** The note while the picker window is open. */
-const pickingNote = "choose a file in the picker window..."
 
+/** The energy for the summary: the number as typed and its unit label. */
+export function energyText(energy: number | null, unit: EnergyUnit): string {
+    return energy === null ? "not set" : `${plainNumber(energy)} ${energyUnitLabel(unit)}`
+}
 
 /**
  * The lines that describe the data of a project.
@@ -107,8 +124,8 @@ const pickingNote = "choose a file in the picker window..."
  * @param status - what [[readDataInfo]] found.
  * @param width - the cells a value may use.
  * @returns `name  value` pairs: the points, the q range in the units, the source, how it
- *     was read (when `data.json` remembers), the units and the energy; empty when there
- *     is no usable data.
+ *     was read (when `data.json` remembers) and the energy; empty when there is no usable
+ *     data. The q units are the unit of the q range line.
  */
 function describe(status: DataStatus | undefined, width: number): [string, string][] {
     if (status?.kind !== "ok") return []
@@ -136,10 +153,7 @@ function describe(status: DataStatus | undefined, width: number): [string, strin
                 ].join(", "),
             ],
         )
-    rows.push(
-        ["units", unit],
-        ["energy", info.energy === null ? "not set" : `${plainNumber(info.energy)} eV`],
-    )
+    rows.push(["energy", energyText(info.energy, info.energy_unit)])
     return rows
 }
 
@@ -149,9 +163,9 @@ function describe(status: DataStatus | undefined, width: number): [string, strin
  * how the file is read, the three columns, a live preview), which writes a clean
  * `data.tsv` into the project (the file itself is never touched). `change the columns`
  * opens the import again on the stored source with the stored choices (`data.json`
- * remembers them; an old file without them says so, a source that is gone is one line).
- * Two more options work once a file is loaded: the units of q (Enter turns them
- * between `nm⁻¹` and `Å⁻¹`)
+ * remembers them; data without them says so, a source that is gone is one line).
+ * Two more options work once a file is loaded: the units of q (Enter or `^k` turns
+ * `nm⁻¹` and `Å⁻¹` and saves at once; `^k` on `energy` turns its unit label)
  * and the X-ray energy in eV (a number above 0; there is no default and the project is
  * not ready for a run without it). Both are saved at once, to `data.json` only.
  *
@@ -172,12 +186,21 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
     const active = useScreenActive()
     const confirm = useConfirm()
     const [mode, setMode] = useState<Mode>("menu")
-    const [note, setNote] = useState<{ text: string; error: boolean } | undefined>()
-    const [problem, setProblem] = useState<string | undefined>()
-    const [typed, setTyped] = useState("")
-    const [promptKeys, setPromptKeys] = useState<LegendItem[]>([])
-    // the path prompt is remounted to empty its field (see the models screen)
-    const [fieldKey, setFieldKey] = useState(0)
+    // the unit of the energy prompt and the text it starts with (`^k` changes both)
+    const [energyUnit, setEnergyUnitNow] = useState<EnergyUnit>(DEFAULT_ENERGY_UNIT)
+    const [energyStart, setEnergyStart] = useState("")
+    const { note, say, clear } = useNote()
+    const field = usePathField(clear)
+    const {
+        typed,
+        problem,
+        setProblem,
+        promptKeys,
+        setPromptKeys,
+        fieldKey,
+        resetField,
+        onChange,
+    } = field
     // bumped to read the files again: after a save and at every key of the menu
     const [version, setVersion] = useState(0)
     const dir = project.dir
@@ -193,16 +216,11 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
     const loaded = status?.kind === "ok"
     const unusable = status?.kind === "unusable"
 
-    const say = useCallback((text: string, error = false) => setNote({ text, error }), [])
     const refresh = useCallback(() => setVersion((v) => v + 1), [])
-    const resetField = useCallback(() => {
-        setTyped("")
-        setFieldKey((k) => k + 1)
-    }, [])
     const toMenu = useCallback(() => {
         setMode("menu")
         setProblem(undefined)
-    }, [])
+    }, [setProblem])
 
     /**
      * Reads a file and opens the import screen on it (the options, the columns, the
@@ -251,35 +269,20 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         }
     }
 
-    const submitPath = (text: string) => {
-        const bad = load(text.trim()) // a typed or pasted path may end in blanks
-        if (bad !== undefined) return setProblem(bad)
-        resetField()
-        toMenu()
-    }
-
-    const pickFile = async () => {
-        setMode("picking")
-        const result = await pick(readSystem(), readSystem().home, "data")
-        if ("problem" in result) say(result.problem, true)
-        else if (result.files[0] !== undefined) {
-            const bad = load(result.files[0])
-            if (bad !== undefined) say(bad, true)
-            else {
-                resetField()
-                return toMenu()
-            }
-        } else say("nothing was picked")
-        resetField()
-        setMode("path")
-    }
+    const { submitPath, pickFile } = usePathPick({
+        field,
+        load,
+        say,
+        setMode,
+        leave: toMenu,
+    })
 
     const submitEnergy = (text: string) => {
         const parsed = parseNumber(text, { above: { limit: 0, message: ENERGY_PROBLEM } })
         if ("error" in parsed) return setProblem(parsed.error)
         try {
-            setEnergy(dir, parsed.value)
-            say(`energy ${plainNumber(parsed.value)} eV saved`)
+            setEnergy(dir, parsed.value, energyUnit)
+            say(`energy ${plainNumber(parsed.value)} ${energyUnitLabel(energyUnit)} saved`)
             refresh()
             toMenu()
         } catch (error) {
@@ -287,9 +290,9 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         }
     }
 
-    /** Enter on `units` turns q between the two units and saves at once. */
-    const flipUnits = (current: Units) => {
-        const next = unitsList[(unitsList.indexOf(current) + 1) % unitsList.length] as Units
+    /** Enter or `^k` on `units`: the other unit of q, saved at once. */
+    const turnUnits = (current: Units) => {
+        const next = unitsList.find((u) => u !== current) ?? DEFAULT_UNITS
         try {
             setUnits(dir, next)
             // a reference has no units of its own: it is read in the data's
@@ -313,18 +316,41 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         if (status?.kind !== "ok") return say(unusable ? RESET_FIRST : LOAD_FIRST, true)
         setProblem(undefined)
         if (id === "mapping") return reopen(status.info.mapping)
-        if (id === "units") flipUnits(status.info.units)
-        else setMode("energy")
+        if (id === "units") turnUnits(status.info.units)
+        else {
+            setEnergyUnitNow(status.info.energy_unit)
+            const { energy } = status.info
+            setEnergyStart(energy === null ? "" : plainNumber(energy))
+            setMode("energy")
+        }
+    }
+
+    /** `^k` on the menu: the unit of the row under the cursor, saved at once. */
+    const turnUnit = () => {
+        const id = options[cursor.index]?.id
+        if (id !== "units" && id !== "energy") return say(UNIT_ROWS)
+        if (status?.kind !== "ok") return say(unusable ? RESET_FIRST : LOAD_FIRST, true)
+        if (id === "units") return turnUnits(status.info.units)
+        if (status.info.energy === null) return say("set the energy first", true)
+        const next = nextEnergyUnit(status.info.energy_unit)
+        try {
+            setEnergyUnit(dir, next)
+            say(`energy shown in ${energyUnitLabel(next)}`)
+        } catch (error) {
+            say(dataErrorNote(error), true)
+        }
+        refresh()
     }
 
     // the menu: move, do, back, and reset for files that cannot be used
     useKeys((press: KeyInput) => {
         if (confirm.handleKey(press)) return
-        setNote(undefined)
+        clear()
         refresh()
         if (press.is(keys.up)) cursor.move(-1)
         else if (press.is(keys.down)) cursor.move(1)
         else if (press.is(keys.back)) nav.pop()
+        else if (press.is(keys.units)) turnUnit()
         else if (press.is(keys.enter)) {
             const option = options[cursor.index]
             if (option) choose(option.id)
@@ -354,11 +380,10 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         if (typed === "" && press.is(keys.pickFiles)) void pickFile()
     }, mode === "path")
 
-    const onChange = useCallback((text: string) => {
-        setTyped(text)
-        setProblem(undefined)
-        setNote(undefined)
-    }, [])
+    // `^k` in the energy prompt: the next unit label; the typed text is kept
+    useKeys((press: KeyInput) => {
+        if (press.is(keys.units)) setEnergyUnitNow(nextEnergyUnit(energyUnit))
+    }, mode === "energy")
 
     /** The keys that work now, for the mode the screen is in. */
     const legendNow = (): LegendItem[] => {
@@ -367,11 +392,11 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
             return legendOf([
                 legendBack,
                 legendEnter,
-                moveLegend({
-                    up: cursor.index > 0,
-                    down: cursor.index < options.length - 1,
-                }),
+                moveLegend(cursorMoves(cursor.index, options.length)),
                 unusable && legendFor("reset files", keys.reset),
+                (options[cursor.index]?.id === "units" ||
+                    options[cursor.index]?.id === "energy") &&
+                    legendFor("unit", keys.units),
             ])
         if (mode === "path")
             return legendOf([
@@ -383,7 +408,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
     const legend = legendNow()
 
     // the line above the keys: a question, the picker's wait, or the last result
-    const shownNote = confirm.note ?? (mode === "picking" ? pickingNote : note?.text)
+    const shownNote = confirm.note ?? (mode === "picking" ? PICKING_NOTE : note?.text)
     const noteIsError = !confirm.note && mode !== "picking" && note?.error
     return (
         <Frame
@@ -442,7 +467,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                     <PathPrompt
                         key={fieldKey}
                         maxLength={MAX_PATH_TYPED}
-                        placeholder="any table: .dat, .csv, .tsv, .txt, .xlsx, ..."
+                        placeholder="any table: .dat, .fit, .csv, .tsv, .txt, .xlsx, ..."
                         suggest={suggestDataPaths}
                         error={problem}
                         onSubmit={submitPath}
@@ -462,14 +487,11 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
             {mode === "energy" ? (
                 <Box marginTop={1}>
                     <Prompt
-                        label="energy (eV):"
-                        initial={
-                            status?.kind === "ok" && status.info.energy !== null
-                                ? plainNumber(status.info.energy)
-                                : ""
-                        }
+                        label={`energy (${energyUnitLabel(energyUnit)}):`}
+                        initial={energyStart}
                         maxLength={20}
-                        placeholder="X-ray energy in eV, above 0"
+                        placeholder={`X-ray energy in ${energyUnitLabel(energyUnit)}`}
+                        extras={[legendFor("unit", keys.units)]}
                         error={problem}
                         onSubmit={submitEnergy}
                         onCancel={toMenu}

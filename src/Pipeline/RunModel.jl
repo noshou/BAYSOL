@@ -214,7 +214,7 @@ trajectory's sample covariance, starting from the identity in the whitened coord
     `harvest_divergent::Integer=Inference.HARVEST_DIVERGENT` (8): the draws, and divergent
     draws, from which L-BFGS looks for optima the search missed.
 
-Every setting of [`load_settings`](@ref) that the sampler depends on is a keyword here
+Every setting of `load_settings` that the sampler depends on is a keyword here
 (`n_samples` and `n_adapt` are the positional arguments): [`run_keywords`](@ref) and
 [`run_arguments`](@ref) turn the settings into them. The keywords from `retry_n_adapt` on
 are those of [`Inference.SamplerOptions`](@ref); they are checked as `load_settings`

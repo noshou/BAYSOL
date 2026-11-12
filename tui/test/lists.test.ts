@@ -18,7 +18,7 @@ import {
 } from "../src/core/file-system.js"
 import {
     Drafts,
-    isFastaFile,
+    isSequenceFile,
     isSequencePaste,
     ListFile,
     MAX_ROWS,
@@ -29,7 +29,7 @@ import {
     type SequenceResult,
     summary,
 } from "../src/store/lists.js"
-import { tempDir as dir, seqresLetters, tempDir } from "./support/fixtures.js"
+import { seqresLetters, tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Sequences
@@ -235,10 +235,12 @@ test("file extensions", () => {
         "a.fq",
         "/x/y/A.FASTA",
         "B.Fq",
+        "1abc.pdb",
+        "2xyz.mmCIF",
     ])
-        assert.ok(isFastaFile(n), n)
-    for (const n of ["a.pdb", "a.txt", "fasta", "a.fa.gz", "", "a.fq.bak"])
-        assert.ok(!isFastaFile(n), n)
+        assert.ok(isSequenceFile(n), n)
+    for (const n of ["a.txt", "a.pdbx", "fasta", "a.fa.gz", "", "a.fq.bak"])
+        assert.ok(!isSequenceFile(n), n)
 })
 
 test("summaries", () => {
@@ -281,7 +283,7 @@ const list = new ListFile<Item>({
 const item = (name: string, n = 1): Item => ({ name, n })
 
 test("no file is an empty list; a write makes it and keeps the other keys", () => {
-    const d = dir()
+    const d = tempDir()
     assert.deepEqual(list.read(d), [])
     writeFileSync(list.file(d), writeJson({ other: { a: 1 }, items: [item("a")] }))
     list.write(d, [item("b")])
@@ -292,7 +294,7 @@ test("no file is an empty list; a write makes it and keeps the other keys", () =
 })
 
 test("a tracked read makes a later write after another save refuse", () => {
-    const d = dir()
+    const d = tempDir()
     list.write(d, [item("a")])
     list.read(d, { track: true })
     writeFileSync(list.file(d), writeJson({ items: [item("z")] })) // another copy
@@ -303,7 +305,7 @@ test("a tracked read makes a later write after another save refuse", () => {
 })
 
 test("a plain read does not move the base", () => {
-    const d = dir()
+    const d = tempDir()
     list.write(d, [item("a")])
     list.read(d, { track: true })
     writeFileSync(list.file(d), writeJson({ items: [item("z")] }))
@@ -312,7 +314,7 @@ test("a plain read does not move the base", () => {
 })
 
 test("an unusable file is told and never written over; reset keeps it", () => {
-    const d = dir()
+    const d = tempDir()
     for (const text of ["nope", "[]", '{"items": 3}', '{"items": [{"name":"a","n":-1}]}']) {
         writeFileSync(list.file(d), text)
         assert.throws(
@@ -330,7 +332,7 @@ test("an unusable file is told and never written over; reset keeps it", () => {
 })
 
 test("names differ without regard to case, on write and on read", () => {
-    const d = dir()
+    const d = tempDir()
     assert.throws(() => list.write(d, [item("A"), item(" a")]), /name in use/)
     assert.equal(existsSync(list.file(d)), false)
     writeFileSync(list.file(d), writeJson({ items: [item("A"), item("a")] }))
@@ -338,11 +340,14 @@ test("names differ without regard to case, on write and on read", () => {
 })
 
 test("an invalid entry is refused with its reason", () => {
-    assert.throws(() => list.write(dir(), [item("a", -1)]), /not a valid item: n is bad/)
+    assert.throws(
+        () => list.write(tempDir(), [item("a", -1)]),
+        /not a valid item: n is bad/,
+    )
 })
 
 test("the cap is MAX_ROWS", () => {
-    const d = dir()
+    const d = tempDir()
     const many = Array.from({ length: MAX_ROWS + 1 }, (_, i) => item(`i${i}`))
     assert.throws(() => list.write(d, many), /too many items/)
     list.write(d, many.slice(0, MAX_ROWS))
@@ -350,7 +355,7 @@ test("the cap is MAX_ROWS", () => {
 })
 
 test("remove drops one entry by name and keeps the rest and the other keys", () => {
-    const d = dir()
+    const d = tempDir()
     writeFileSync(
         list.file(d),
         writeJson({ keep: 1, items: [item("a"), item("B"), item("c")] }),
@@ -362,7 +367,7 @@ test("remove drops one entry by name and keeps the rest and the other keys", () 
 })
 
 test("remove: guarded refuses after another copy saved, unguarded does not", () => {
-    const d = dir()
+    const d = tempDir()
     list.write(d, [item("a"), item("b")])
     list.read(d, { track: true })
     writeFileSync(list.file(d), writeJson({ items: [item("a"), item("b"), item("c")] }))
@@ -372,7 +377,7 @@ test("remove: guarded refuses after another copy saved, unguarded does not", () 
 })
 
 test("update writes the change or leaves the file alone", () => {
-    const d = dir()
+    const d = tempDir()
     list.write(d, [item("a")])
     assert.equal(
         list.update(d, () => undefined),
@@ -386,7 +391,7 @@ test("update writes the change or leaves the file alone", () => {
 })
 
 test("createParents false does not make a folder that is gone", () => {
-    const d = dir()
+    const d = tempDir()
     const project = new ListFile<Item>({
         fileName: "p.json",
         key: "items",

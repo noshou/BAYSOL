@@ -122,6 +122,48 @@ export function isReadable(path: string): boolean {
     }
 }
 
+/**
+ * The text of an error for a note row.
+ *
+ * @param error - what was thrown.
+ * @param fallback - what to say for an error without a message.
+ * @returns the message of an `Error`, else `fallback`.
+ */
+export function messageOf(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message !== "" ? error.message : fallback
+}
+
+/**
+ * Reads a file whole, refusing a huge one.
+ *
+ * @param path - the file.
+ * @param maxBytes - the largest size read.
+ * @param fail - makes the error to throw from a message (a module's own error class).
+ * @param tooLarge - the message for a file over the limit.
+ * @returns the bytes.
+ * @throws what `fail` makes: `tooLarge` for a file over the limit, `cannot read that
+ * file` for any other failure.
+ */
+export function readBounded(
+    path: string,
+    maxBytes: number,
+    fail: (message: string) => Error,
+    tooLarge = "file too large",
+): Buffer {
+    let size: number
+    try {
+        size = statSync(path).size
+    } catch {
+        throw fail("cannot read that file")
+    }
+    if (size > maxBytes) throw fail(tooLarge)
+    try {
+        return readFileSync(path)
+    } catch {
+        throw fail("cannot read that file")
+    }
+}
+
 /** The names of everything in a folder. */
 export function entryNames(dir: string): string[] {
     try {
@@ -468,6 +510,17 @@ type PickerSpec = {
     multiple: boolean
 }
 
+/**
+ * The extensions of a curve file the data and reference prompts and the picker offer
+ * (lower case, no dot): delimited text, a workbook, and the usual names of small-angle
+ * scattering curves (`.fit` of CRYSOL and FoXS, `.int`, `.out`, `.sub`, `.abs`, `.rad`,
+ * `.saxs`). A typed path may have any name: this only lists files for the user.
+ */
+export const DATA_EXTENSIONS: readonly string[] = [
+    "dat", "txt", "csv", "tsv", "tab", "xlsx", "fit", "int", "out", "sub", "abs",
+    "rad", "saxs",
+]
+
 /** The pickers by kind: the models (several `.cif` and `.pdb` files), the buffer's
  * DNA, RNA and protein sequence file (ONE file, FASTA or FASTQ) and the measured curve
  * of a project (ONE delimited text file or `.xlsx` workbook). */
@@ -487,7 +540,7 @@ const pickerSpecs = {
     data: {
         title: "Choose a data file",
         label: "Data files",
-        exts: ["dat", "txt", "csv", "tsv", "tab", "xlsx"],
+        exts: [...DATA_EXTENSIONS],
         multiple: false,
     },
 } satisfies Record<string, PickerSpec>
