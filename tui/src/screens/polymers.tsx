@@ -54,7 +54,7 @@ const UNIT_HEADING = ["unit", "formula", "Z / unit", "PMV / unit", "± / unit"]
  * The cells of the end groups, in column order (column 0 has none): the formula that
  * only gives the Z, then the fields of the polymer.
  */
-const ENDS_KEYS = [undefined, "formula", "z-ends", "pmv-ends", "sigma-ends"] as const
+const ENDS_KEYS = [undefined, "formula", "zEnds", "pmvEnds", "sigmaEnds"] as const
 
 /** The rows of the form: the name, one for each unit, the end groups. */
 const UNIT_ROWS = MAX_UNITS
@@ -85,7 +85,7 @@ type CustomPolymerFormProps = {
 type Target =
     | { kind: "name" }
     | { kind: "unit"; unit: number; key: UnitKey }
-    | { kind: "ends"; key: "formula" | "z-ends" | "pmv-ends" | "sigma-ends" }
+    | { kind: "ends"; key: "formula" | "zEnds" | "pmvEnds" | "sigmaEnds" }
 
 /**
  * What a position of the cursor is.
@@ -96,7 +96,7 @@ type Target =
 function targetAt(pos: CellPos): Target {
     if (pos.row === 0) return { kind: "name" }
     if (pos.row === ENDS_ROW)
-        return { kind: "ends", key: ENDS_KEYS[pos.col] as "formula" | "z-ends" }
+        return { kind: "ends", key: ENDS_KEYS[pos.col] as "formula" | "zEnds" }
     return { kind: "unit", unit: pos.row - 1, key: UNIT_KEYS[pos.col] as UnitKey }
 }
 
@@ -181,7 +181,7 @@ function cellNumber(v: unknown): string {
 }
 
 /**
- * The form page of a custom polymer, a generic additive chain, PMV = pmv-ends + the sum
+ * The form page of a custom polymer, a generic additive chain, PMV = pmvEnds + the sum
  * of slope times count and Z likewise, of one to four kinds of repeat unit: the name, a
  * table of four unit rows (unit label, formula, Z, PMV slope and ± each), the end groups
  * on the same columns, and under them the chain in words with the user's labels
@@ -224,7 +224,7 @@ export function CustomPolymerForm(props: CustomPolymerFormProps): ReactNode {
         if (t.kind === "name") return withField(entry, "name", v) as PolymerEntry
         if (t.kind === "unit")
             return withField(entry, { unit: t.unit, key: t.key }, v) as PolymerEntry
-        return withField(entry, t.key as "z-ends", v) as PolymerEntry
+        return withField(entry, t.key as "zEnds", v) as PolymerEntry
     }
 
     // the polymer the form stands for: the used rows, a blank label as the offered one
@@ -238,7 +238,7 @@ export function CustomPolymerForm(props: CustomPolymerFormProps): ReactNode {
     const originalOf = (t: Target): unknown => {
         if (t.kind === "name") return orig.name
         if (t.kind === "unit") return getField(orig, { unit: t.unit, key: t.key })
-        return orig[t.key as "z-ends"]
+        return orig[t.key as "zEnds"]
     }
 
     const form = useFormScreen({
@@ -309,7 +309,7 @@ export function CustomPolymerForm(props: CustomPolymerFormProps): ReactNode {
                 const pos = placeAt(row, UNIT_KEYS.indexOf(f.key))
                 return { pos, message: found.message }
             }
-            const col = ENDS_KEYS.indexOf(f as "z-ends")
+            const col = ENDS_KEYS.indexOf(f as "zEnds")
             const pos = col > 0 ? placeAt(ENDS_ROW, col) : placeAt(0, 0)
             return { pos, message: found.message }
         },
@@ -345,9 +345,9 @@ export function CustomPolymerForm(props: CustomPolymerFormProps): ReactNode {
             cells: [
                 undefined,
                 { text: endsFormula },
-                { text: cellNumber(entry["z-ends"]) },
-                { text: cellNumber(entry["pmv-ends"]) },
-                { text: cellNumber(entry["sigma-ends"]) },
+                { text: cellNumber(entry.zEnds) },
+                { text: cellNumber(entry.pmvEnds) },
+                { text: cellNumber(entry.sigmaEnds) },
             ],
         },
     ]

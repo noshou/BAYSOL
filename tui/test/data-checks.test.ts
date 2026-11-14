@@ -173,11 +173,11 @@ test("a model's reference is kept sparse, in the JSON keys, beside the others", 
         m1: {
             tag: "fit3_model1",
             software: "MultiFoXS",
-            ref_chi2: "MultiFoXS 0.79",
+            refChi2: "MultiFoXS 0.79",
             fit: "fit3.tsv",
             rescale: true,
         },
-        m2: { ref_chi2: "CRYSOL 1.4" },
+        m2: { refChi2: "CRYSOL 1.4" },
     })
     assert.deepEqual(modelReference(dir, "m1"), ref)
     // a model that is emptied loses its key, the other keeps its entry

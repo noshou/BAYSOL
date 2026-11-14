@@ -195,12 +195,12 @@ function normalizeRow(x: unknown): TableRowDef | undefined {
  *
  * @param x - the raw value.
  * @returns the snapshot, `undefined` for nothing or what is not one (`z` and `pmv`
- *     numbers; `sigma-pmv` a number, else `null`).
+ *     numbers; `sigmaPmv` a number, else `null`).
  */
 function normalizeSnapshot(x: unknown): CustomSnapshot | undefined {
     if (!isObj(x) || !isNum(x.z) || !isNum(x.pmv)) return undefined
-    const sigma = x["sigma-pmv"]
-    return { z: x.z, pmv: x.pmv, "sigma-pmv": isNum(sigma) ? sigma : null }
+    const sigma = x.sigmaPmv
+    return { z: x.z, pmv: x.pmv, "sigmaPmv": isNum(sigma) ? sigma : null }
 }
 
 /**
@@ -218,7 +218,7 @@ function snapshotProblems(s: CustomSnapshot | undefined, label: string): string[
     if (!Number.isInteger(s.z) || s.z <= 0) {
         out.push(`${label}: z must be a whole number above 0`)
     }
-    const sigma = s["sigma-pmv"]
+    const sigma = s.sigmaPmv
     if (sigma !== null && sigma < 0) {
         out.push(`${label}: the volume uncertainty is below 0`)
     }
@@ -309,8 +309,8 @@ export function titrantIons(): { acid: string[]; base: string[] } {
     const acid = new Set<string>()
     const base = new Set<string>()
     for (const t of offered()) {
-        const rows = (t as { counter_ion_rows?: { cation?: string[]; anion?: string[] } })
-            .counter_ion_rows
+        const rows = (t as { counterIonRows?: { cation?: string[]; anion?: string[] } })
+            .counterIonRows
         for (const a of rows?.anion ?? []) acid.add(a)
         for (const c of rows?.cation ?? []) base.add(c)
     }
@@ -630,16 +630,16 @@ export function customToTemplate(def: CustomDefinition): Template {
         notes: UNSOURCED,
         groups: def.steps.map((s) => ({
             pKa25: s.pKa25,
-            pKa_sigma: LIMITS.customPKSigma,
-            dpKa_dT_per_K: s.dpKaDT ?? 0,
-            dH_kJ_mol: null,
-            dCp_J_K_mol: null,
-            z_acid: s.zAcid,
-            z_base: s.zAcid - 1,
+            pKaSigma: LIMITS.customPKSigma,
+            dpKaDtPerK: s.dpKaDT ?? 0,
+            dHKjMol: null,
+            dCpJKMol: null,
+            zAcid: s.zAcid,
+            zBase: s.zAcid - 1,
             verified: false,
         })),
-        usable_pH: [Math.min(...pKs) - 1, Math.max(...pKs) + 1],
-        default_titrant: { kind: def.titrant.kind, ion: def.titrant.ion },
+        usablePh: [Math.min(...pKs) - 1, Math.max(...pKs) + 1],
+        defaultTitrant: { kind: def.titrant.kind, ion: def.titrant.ion },
         solute: resolveBuiltin(def.solute)?.name ?? def.solute,
     }
 }
@@ -703,7 +703,7 @@ function runCustom(def: CustomDefinition, c: Conditions): RowsResult {
             sigmaMM: def.sigmaMM,
             pH: c.pH,
             sigmaPH: c.sigmaPH,
-            restI_mM: def.restMM ?? 0,
+            restIonicMM: def.restMM ?? 0,
             ...(def.titrant.kind === "base" ? { cation: def.titrant.ion } : {}),
             tempC: def.pHSetAt ?? c.temperatureC,
         })
@@ -751,14 +751,14 @@ export function rowsFor(definition: unknown, conditions: Conditions): RowsResult
     if (def.kind === "custom") return runCustom(def, conditions)
     try {
         const t = templateById(def.id) as Template
-        const asksPH = t.kind === "buffer" || (t.buffer_components?.length ?? 0) > 0
+        const asksPH = t.kind === "buffer" || (t.bufferComponents?.length ?? 0) > 0
         return computeTemplate({
             id: def.id,
             ...(def.mM === undefined ? {} : { mM: def.mM }),
             ...(def.sigmaMM === undefined ? {} : { sigmaMM: def.sigmaMM }),
             ...(asksPH ? { pH } : {}),
             sigmaPH,
-            restI_mM: def.restMM ?? 0,
+            restIonicMM: def.restMM ?? 0,
             ...(def.ion ? { cation: def.ion } : {}),
             tempC: def.pHSetAt ?? temperatureC,
         })

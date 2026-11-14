@@ -219,7 +219,7 @@ export function useBufferTemplate(
         lastPH.current = pH
         lastTemperature.current = temperature
         if (pH === undefined || !(phMoved || temperatureMoved)) return
-        const sigma = conditions?.["sigma-pH"] ?? 0.1
+        const sigma = conditions?.sigmaPh ?? 0.1
         const next = recompute(t.drafts, pH, sigma, temperature)
         const skipped = next.skipped.map((arg) => `${arg} already in the buffer`)
         const skippedNote = `${skipped.join(", ")}: not added by the template`
@@ -294,7 +294,7 @@ export function useBufferTemplate(
             }
             const made = rowsFor(definition, {
                 pH: c.pH,
-                sigmaPH: c["sigma-pH"],
+                sigmaPH: c.sigmaPh,
                 temperatureC: c.temperature,
             })
             if ("error" in made) return table.setNote(made.error, true)

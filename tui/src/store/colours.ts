@@ -3,17 +3,24 @@
 /**
  * The colours a figure setting may name, and how one looks as a terminal colour.
  *
- * A colour is written as a name of `assets/data/colours.json` (the CSS names, the X11 and
- * xkcd colours and the government, international and university colours, harvested by
- * `bysl harvest colours`; case, blanks, `-` and `_` do not count), or as a code: `#rgb`,
+ * A colour is written as a name of the list the colour sets of `assets/data/colour-sets/`
+ * make (the CSS names, the X11 and xkcd colours and the government, international and
+ * university colours, merged when the list is first needed, see `mergeColourSets`; case,
+ * blanks, `-` and `_` do not count), or as a code: `#rgb`,
  * `#rrggbb`, `rgb(r, g, b)` (0 to 255), `hsl(h, s%, l%)` or `cmyk(c%, m%, y%, k%)`. The
  * list is the terminal interface's own: Julia reads the codes and the names of Colors.jl
- * (the 148 CSS names and the X11 names, `colour-julia.json`), so a setting keeps such a
+ * (the 148 CSS names and the X11 names: sets `css`, `x11`), so a setting keeps such a
  * name or a code as it was typed and any other name as the `#rrggbb` of its colour. The
  * swatch of a colour is its `#rrggbb`.
  */
 
-import { lazy, readAssetJson } from "../core/environment.js"
+import { readFileSync } from "node:fs"
+import {
+    type ParseError,
+    parse as parseJsonc,
+    printParseErrorCode,
+} from "jsonc-parser"
+import { assetPath, lazy } from "../core/environment.js"
 import {
     colourNotations,
     fromHex,
@@ -50,24 +57,291 @@ export const fold = (name: string): string =>
 /** What a name is compared by: folded, only letters and digits. */
 export const colourKey = (name: string): string => fold(name).replace(/[^a-z0-9]/g, "")
 
-/** The colours of `colours.json` by name (read once; every lookup is a plain scan). */
-const table: () => { byName: Map<string, string> } = lazy(() => {
-    const file = readAssetJson<Record<string, string>>("data", "colours.json")
-    return { byName: new Map(Object.entries(file)) }
-})
+/** One colour of a set file, as it is written there (`assets/data/colour-sets/`). */
+interface SetColour {
+    name: string
+    hex: string
+    /** The name as the source wrote it, where `name` was cleaned (nbs-iscc, paul-tol). */
+    raw?: string
+    /** `false` for a value not checked against the source; absent means checked. */
+    verified?: boolean
+    /** The source of this value; absent means the `url` of the set. */
+    url?: string
+    /** The colour family, one of `FAMILIES` (written by `tui/dev/colour-families.ts`). */
+    family: string
+}
 
-/** The names Julia reads (`colour-julia.json`), with the colour the list gives them. */
-const julianNames: () => ReadonlySet<string> = lazy(
-    () => new Set(readAssetJson<string[]>("data", "colour-julia.json")),
+/** One colour set file. */
+export interface ColourSet {
+    set: string
+    title: string
+    licence: string
+    url: string
+    notes?: string
+    colours: SetColour[]
+}
+
+/** The merge rules of `colour-sets/index.jsonc`. */
+export interface ColourIndex {
+    order: string[]
+    julia: string[]
+    identifiers: Record<string, string>
+    hyphenated: string[]
+    common: Record<string, "all" | "no-digit" | "one-word">
+    renames: Record<string, string>
+    placeAbbreviations: [string, string][]
+    nationalNames: [string, string, string][]
+    winsorWords: Record<string, string>
+    excludedWords: string[]
+}
+
+/** A parsed `.jsonc` file; any syntax error is fatal (the parser alone is forgiving). */
+function readJsonc<T>(...path: string[]): T {
+    const file = assetPath(...path)
+    const errors: ParseError[] = []
+    const value = parseJsonc(readFileSync(file, "utf-8"), errors, {
+        allowTrailingComma: false,
+    }) as T
+    const first = errors[0]
+    if (first !== undefined)
+        throw new Error(`${file}: ${printParseErrorCode(first.error)} at ${first.offset}`)
+    return value
+}
+
+/** The merge rules of the sets (read once). */
+export const colourIndex: () => ColourIndex = lazy(() =>
+    readJsonc<ColourIndex>("data", "colour-sets", "index.jsonc"),
 )
+
+/**
+ * The colour sets of `assets/data/colour-sets/`, in priority order (read once: about
+ * 8,300 rows in 36 files).
+ *
+ * @returns the sets, the first having the plain name of a name two sets share.
+ */
+export const colourSets: () => readonly ColourSet[] = lazy(() =>
+    colourIndex().order.map((tag) => {
+        const set = readJsonc<ColourSet>("data", "colour-sets", `${tag}.jsonc`)
+        if (set.set !== tag) throw new Error(`${tag}.jsonc is the set ${set.set}`)
+        return set
+    }),
+)
+
+/** How one colour of a set came to be in the list. */
+interface Placed {
+    /** The name in the list (with its `(set)` tag if the plain name was taken). */
+    name: string
+    hex: string
+    /** The set it comes from and its row there. */
+    set: string
+    row: number
+    /** The lower-case name before clashes were settled. */
+    base: string
+}
+
+/** What the duplicate pass dropped and why. */
+interface Dropped {
+    dropped: string
+    kept: string
+    rule: "name" | "common" | "shortest"
+}
+
+/** The merged list. */
+export interface MergedColours {
+    /** The colours of the list, sorted by (lower-case name, name). */
+    list: Placed[]
+    /** Every colour placed before the duplicate pass (the dropped ones too). */
+    placed: Placed[]
+    dropped: Dropped[]
+    /** Per set: rows read, exact duplicates left out, tagged and numbered names. */
+    counts: Record<
+        string,
+        { raw: number; duplicates: number; tagged: number; numbered: number }
+    >
+}
+
+/** The words a clash name has for a set: `paul-tol` is `paul tol`. */
+function identifier(tag: string, index: ColourIndex): string {
+    const known = index.identifiers[tag]
+    if (known !== undefined) return known
+    return index.hyphenated.includes(tag) ? tag : tag.replaceAll("-", " ")
+}
+
+/** The lower-case name of a row of a set, before clashes are settled. */
+export function baseName(tag: string, raw: string, index: ColourIndex): string {
+    let name = raw.trim().toLowerCase()
+    if (tag === "tailwind") name = name.replaceAll(".", " ")
+    name = name.replace(/\bf\.s\.?\s*/g, "").trim()
+    for (const [pattern, short] of index.placeAbbreviations)
+        name = name.replace(new RegExp(pattern, "g"), short)
+    for (const [set, pattern, country] of index.nationalNames)
+        if (set === tag) name = name.replace(new RegExp(pattern, "g"), country)
+    if (tag === "winsor-newton")
+        name = name
+            .split(/\s+/)
+            .filter((w) => w !== "")
+            .map((w) => index.winsorWords[w] ?? w)
+            .join(" ")
+    return index.renames[name] ?? name
+}
+
+/** Whether a row is a name of an excluded word (the owner rule of `index.jsonc`). */
+export const isExcluded = (name: string, index: ColourIndex): boolean => {
+    const lower = name.toLowerCase()
+    return index.excludedWords.some((w) => lower.includes(w))
+}
+
+/** Whether a name is one everybody knows (`common` of `index.jsonc`). */
+function isCommon(tag: string, base: string, index: ColourIndex): boolean {
+    const rule = index.common[tag]
+    if (rule === "all") return true
+    if (rule === "no-digit") return !/\d/.test(base)
+    return rule === "one-word" && /^[a-z]+$/.test(base)
+}
+
+const compareText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+
+/**
+ * Merges the sets into the list: the same steps and results as `build` and `prune!` of
+ * the Julia harvester this replaces. Each set is read in priority order; a name is lower
+ * case; the same name (case, blanks, `-`, `_` and accents ignored) with the same colour
+ * as an earlier entry is left out; the same name with another colour is `name (set)`
+ * (`name (set 2)` if even that is taken). The duplicate pass then drops, of entries
+ * whose names are the same once folded, all but the first, and of each group with exactly
+ * one colour all but the common names (all if none: the shortest name stays).
+ *
+ * @param sets - the sets in priority order.
+ * @param index - the rules.
+ * @returns the list, what was placed before the pass, what the pass dropped and counts.
+ */
+export function mergeColourSets(
+    sets: readonly ColourSet[],
+    index: ColourIndex,
+): MergedColours {
+    const table = new Map<string, Placed>()
+    const claimed = new Map<string, Set<string>>()
+    const plainKeys = new Set<string>()
+    const counts: MergedColours["counts"] = {}
+    const placed: Placed[] = []
+    const place = new Map<string, number>()
+    for (const { set: tag, colours } of sets) {
+        const count = { raw: 0, duplicates: 0, tagged: 0, numbered: 0 }
+        counts[tag] = count
+        colours.forEach((row, at) => {
+            if (isExcluded(row.name, index)) return
+            count.raw++
+            const base = baseName(tag, row.name, index)
+            const key = colourKey(base)
+            const seen = claimed.get(key) ?? new Set<string>()
+            claimed.set(key, seen)
+            if (seen.has(row.hex)) {
+                count.duplicates++
+                return
+            }
+            let name = base
+            if (table.has(name) || plainKeys.has(key)) {
+                name = `${base} (${identifier(tag, index)})`
+                count.tagged++
+                if (table.has(name)) {
+                    let n = 1
+                    while (table.has(name)) {
+                        n++
+                        name = `${base} (${identifier(tag, index)} ${n})`
+                    }
+                    count.numbered++
+                }
+            }
+            seen.add(row.hex)
+            if (name === base) plainKeys.add(key)
+            const entry = { name, hex: row.hex, set: tag, row: at, base }
+            table.set(name, entry)
+            place.set(name, place.size + 1)
+            placed.push(entry)
+        })
+    }
+    const dropped: Dropped[] = []
+    const where = (name: string): number => place.get(name) as number
+    // entries with the same folded name: the first by priority stays
+    const byKey = new Map<string, string[]>()
+    for (const name of table.keys()) {
+        const key = colourKey(name)
+        byKey.set(key, [...(byKey.get(key) ?? []), name])
+    }
+    for (const names of byKey.values()) {
+        if (names.length < 2) continue
+        names.sort((a, b) => where(a) - where(b))
+        for (const name of names.slice(1)) {
+            dropped.push({ dropped: name, kept: names[0] as string, rule: "name" })
+            table.delete(name)
+        }
+    }
+    // entries with exactly one colour: the common names, else the shortest
+    const byColour = new Map<string, string[]>()
+    for (const [name, { hex }] of table)
+        byColour.set(hex, [...(byColour.get(hex) ?? []), name])
+    for (const names of byColour.values()) {
+        if (names.length < 2) continue
+        names.sort((a, b) => where(a) - where(b))
+        const common = names.filter((n) => {
+            const { set, base } = table.get(n) as Placed
+            return isCommon(set, base, index)
+        })
+        const shortest = [...names].sort(
+            (a, b) => [...a].length - [...b].length || where(a) - where(b),
+        )[0] as string
+        const keep = common.length > 0 ? common : [shortest]
+        for (const name of names) {
+            if (keep.includes(name)) continue
+            dropped.push({
+                dropped: name,
+                kept: keep.join(", "),
+                rule: common.length > 0 ? "common" : "shortest",
+            })
+            table.delete(name)
+        }
+    }
+    const list = [...table.values()].sort(
+        (a, b) =>
+            compareText(a.name.toLowerCase(), b.name.toLowerCase()) ||
+            compareText(a.name, b.name),
+    )
+    return { list, placed, dropped, counts }
+}
+
+/** The merged list with the families of the set files (read once). */
+const merged: () => MergedColours = lazy(() =>
+    mergeColourSets(colourSets(), colourIndex()),
+)
+
+/** The colours of the list by name (every lookup is a plain scan or a Map hit). */
+const table: () => { byName: Map<string, string> } = lazy(() => ({
+    byName: new Map(merged().list.map((c) => [c.name, c.hex])),
+}))
+
+/** The names Julia reads: the plain names the sets of `julia` of the index have. */
+export const juliaColourNames: () => ReadonlySet<string> = lazy(
+    () =>
+        new Set(
+            merged()
+                .list.filter(
+                    (c) => colourIndex().julia.includes(c.set) && c.name === c.base,
+                )
+                .map((c) => c.name),
+        ),
+)
+
+/** @returns every colour of the list as `[name, hex]`, in the order of `colourNames`. */
+export const colourList = (): readonly (readonly [string, string])[] => [
+    ...table().byName,
+]
 
 /** @returns every colour name, in the order of the (sorted) file. */
 export const colourNames = (): readonly string[] => [...table().byName.keys()]
 
 /**
  * The colour families of the picker's filter: the 11 basic colour terms and cyan. Every
- * name of the list is in exactly one (`colour-families.json`, computed by
- * `bysl harvest colours` from the colour: see the constants there).
+ * name of the list is in exactly one (the `family` of its row in the set file, written by
+ * `tui/dev/colour-families.ts` from the colour: see the constants there).
  */
 export const FAMILIES = [
     "red",
@@ -90,15 +364,17 @@ export type Family = (typeof FAMILIES)[number]
 /** The filter of the picker: one family, or `all`. */
 export type FamilyFilter = Family | "all"
 
-/** The family of each name of the list (read once). */
+/** The family of each name of the list (read once; from the `family` of the rows). */
 const families: () => ReadonlyMap<string, Family> = lazy(
-    () =>
-        new Map(
-            Object.entries(
-                readAssetJson<Record<string, Family>>("data", "colour-families.json"),
-            ),
-        ),
+    () => new Map(merged().list.map((c) => [c.name, rowFamily(c)])),
 )
+
+/** The family a placed colour has in its set file. */
+function rowFamily(c: Placed): Family {
+    const sets = colourSets()
+    const at = colourIndex().order.indexOf(c.set)
+    return (sets[at]?.colours[c.row]?.family ?? "") as Family
+}
 
 /**
  * The family of a listed colour, by its name or by a code.
@@ -163,7 +439,7 @@ export function parseColourCode(text: string): string | undefined {
 
 /**
  * The name of the list a text spells: the name itself in any case, else the first name
- * that differs only in blanks, `-` and `_` (the rule of `colour_rgb` in Julia).
+ * that differs only in blanks, `-` and `_` (the rule of `colourRgb` in Julia).
  *
  * @returns the listed name, or `undefined` if there is none.
  */
@@ -229,7 +505,7 @@ export function colourOf(raw: unknown): string | undefined {
     if (looksLikeCode(text)) return undefined
     const name = listedName(text)
     if (name === undefined) return undefined
-    return julianNames().has(name) ? name : table().byName.get(name)
+    return juliaColourNames().has(name) ? name : table().byName.get(name)
 }
 
 /** A name's key and where each of its words starts in that key. */

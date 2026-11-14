@@ -10,8 +10,8 @@
             "ignoreDependencies": ["@biomejs/biome"]
         },
         "tui": {
-            "entry": ["test/*.test.ts", "test/support/*.ts"],
-            "project": ["src/**/*.{ts,tsx}", "test/**/*.ts"],
+            "entry": ["test/*.test.ts", "test/support/*.ts", "dev/*.ts"],
+            "project": ["src/**/*.{ts,tsx}", "test/**/*.ts", "dev/**/*.ts"],
             // `reg` is the Windows registry tool that `core/fonts.ts` runs on Windows
             "ignoreBinaries": ["reg"]
         }

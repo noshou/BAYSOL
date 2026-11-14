@@ -38,9 +38,10 @@ function close(actual: number, expected: number, rel: number, what: string): voi
 // 1. The hand calculations of the repo, reproduced
 // ========================================================================================
 
-test("Tris 10 mM, pH 7.5, 0.1 M NaCl: the chloride of SASDEM7", () => {
-    // SASDEM7.jl: Cl- 0.008536 +- 0.000431 M, I = 0.1085 M; the notes table: 0.008537
-    const out = computeTemplate({ id: "tris", mM: 10, pH: 7.5, restI_mM: 100 })
+test("Tris 10 mM, pH 7.5, 0.1 M NaCl: the chloride of the removed SASDEM7", () => {
+    // the SASDEM7 script (removed): Cl- 0.008536 +- 0.000431 M, I = 0.1085 M; the notes
+    // table: 0.008537
+    const out = computeTemplate({ id: "tris", mM: 10, pH: 7.5, restIonicMM: 100 })
     close(row(out, "chloride").mM, 8.537, 0.001, "chloride")
     close(row(out, "chloride").sigmaMM, 0.431, 0.01, "sigma of chloride")
     close(out.I, 0.1085, 0.001, "I")
@@ -53,22 +54,23 @@ test("Tris 10 mM, pH 7.5, 0.1 M NaCl: the chloride of SASDEM7", () => {
     assert.equal(out.rows.length, 2)
 })
 
-test("Tris 10 mM with 0.2 M NaCl, 20 mM with 0.5 M: SASDMJ9 and SASDMM3", () => {
+test("Tris 10 mM with 0.2 M NaCl, 20 mM with 0.5 M: SASDMJ9, removed SASDMM3", () => {
     // notes table: 0.008588 +- 0.000422 (SASDMJ9 header), here 0.008589 +- 0.000424
-    const mj = computeTemplate({ id: "tris", mM: 10, pH: 7.5, restI_mM: 200 })
+    const mj = computeTemplate({ id: "tris", mM: 10, pH: 7.5, restIonicMM: 200 })
     close(row(mj, "chloride").mM, 8.589, 0.002, "SASDMJ9 chloride")
     close(row(mj, "chloride").sigmaMM, 0.424, 0.01, "SASDMJ9 sigma")
-    // SASDMM3 header: 0.017209 +- 0.000838, here 0.017212 +- 0.000843 (I 0.5172)
-    const mm = computeTemplate({ id: "tris", mM: 20, pH: 7.5, restI_mM: 500 })
+    // SASDMM3 (removed) header: 0.017209 +- 0.000838, here 0.017212 +- 0.000843 (I 0.5172)
+    const mm = computeTemplate({ id: "tris", mM: 20, pH: 7.5, restIonicMM: 500 })
     close(row(mm, "chloride").mM, 17.212, 0.002, "SASDMM3 chloride")
     close(row(mm, "chloride").sigmaMM, 0.843, 0.01, "SASDMM3 sigma")
 })
 
-test("HEPES 25 mM, pH 7.4 with NaOH: the sodium of SASDBA8", () => {
-    // SASDBA8.jl: 0.456 x 25 mM = 11.40 mM (file 0.011402), sigma 0.001681 (vendor dT);
+test("HEPES 25 mM, pH 7.4 with NaOH: the sodium of a removed fixture (SASDBA8)", () => {
+    // the SASDBA8 script (removed): 0.456 x 25 mM = 11.40 mM (file 0.011402),
+    // sigma 0.001681 (vendor dT);
     // notes table: 0.011395 M, sigma 0.001648, I 0.1739. The rest: 0.15 M NaCl + 2.5 mM
     // MgCl2 (7.5 mM) + 0.5 mM AMP-PNP(4-) with its 2 mM Na+ (5 mM) = 162.5 mM
-    const out = computeTemplate({ id: "hepes", mM: 25, pH: 7.4, restI_mM: 162.5 })
+    const out = computeTemplate({ id: "hepes", mM: 25, pH: 7.4, restIonicMM: 162.5 })
     close(row(out, "sodium(1+)").mM, 11.395, 0.002, "sodium")
     close(row(out, "sodium(1+)").sigmaMM, 1.648, 0.02, "sigma of sodium")
     close(out.I, 0.1739, 0.001, "I")
@@ -76,20 +78,20 @@ test("HEPES 25 mM, pH 7.4 with NaOH: the sodium of SASDBA8", () => {
 
 test("MES 25 mM, pH 6.5, 0.1 M NaCl + 0.2 M Arg-HCl: the sodium of SASDRJ8", () => {
     // SASDRJ8.jl: Na+ 0.017144 +- 0.001443, I 0.317; notes table 0.017140 +- 0.001440
-    const out = computeTemplate({ id: "mes", mM: 25, pH: 6.5, restI_mM: 300 })
+    const out = computeTemplate({ id: "mes", mM: 25, pH: 6.5, restIonicMM: 300 })
     close(row(out, "sodium(1+)").mM, 17.14, 0.002, "sodium")
     close(row(out, "sodium(1+)").sigmaMM, 1.44, 0.01, "sigma of sodium")
     close(out.I, 0.3171, 0.001, "I")
 })
 
-test("phosphate 100 mM, pH 7.0 at 20 C: the split of SASDV82", () => {
+test("phosphate 100 mM, pH 7.0 at 20 C: the split of the removed SASDV82", () => {
     const out = computeTemplate({ id: "phosphate", mM: 100, pH: 7.0, tempC: 20 })
     const hpo4 = row(out, "disodium hydrogen phosphate")
     const h2po4 = row(out, "sodium dihydrogen phosphate")
     // notes table: with dCp 60.01 / 39.99 (the table's dCp of -230 J/K/mol, this engine's)
     close(hpo4.mM, 60.01, 0.0005, "HPO4 with dCp")
     close(h2po4.mM, 39.99, 0.0005, "H2PO4 with dCp")
-    // SASDV82.jl: 60.1 / 39.9 mM (van't Hoff only), I 0.22
+    // the SASDV82 script (removed): 60.1 / 39.9 mM (van't Hoff only), I 0.22
     close(hpo4.mM, 60.1, 0.003, "HPO4 of SASDV82")
     close(h2po4.mM, 39.9, 0.003, "H2PO4 of SASDV82")
     close(out.I, 0.22, 0.002, "I")
@@ -218,7 +220,7 @@ test("a pH far outside the usable range warns", () => {
 })
 
 test("an ionic strength above 0.5 M warns about Davies", () => {
-    const out = computeTemplate({ id: "hepes", mM: 25, pH: 7.4, restI_mM: 800 })
+    const out = computeTemplate({ id: "hepes", mM: 25, pH: 7.4, restIonicMM: 800 })
     assert.ok(out.warnings.some((w) => w.includes("Davies")), out.warnings.join("|"))
 })
 
@@ -254,8 +256,8 @@ test("the counter-ion: chloride for an acid-titrated buffer, a cation for a base
 
 test("every offered template gives complete rows that pass the loader's check", () => {
     for (const t of offered()) {
-        const mid = t.usable_pH ? (t.usable_pH[0] + t.usable_pH[1]) / 2 : undefined
-        const out = computeTemplate({ id: t.id, mM: 20, pH: mid, restI_mM: 100 })
+        const mid = t.usablePh ? (t.usablePh[0] + t.usablePh[1]) / 2 : undefined
+        const out = computeTemplate({ id: t.id, mM: 20, pH: mid, restIonicMM: 100 })
         assert.ok(out.rows.length > 0, t.id)
         for (const r of out.rows) {
             assert.ok(r.mM > 0 && Number.isFinite(r.mM), `${t.id} ${r.name} ${r.mM}`)
@@ -300,11 +302,11 @@ const SWEEP = [-3, ...Array.from({ length: 29 }, (_, i) => i / 2), 20]
 test("a sweep of the pH for every template: finite, positive, balanced, monotone", () => {
     for (const t of offered()) {
         for (const mM of [20, 1e-9]) {
-            for (const restI_mM of [0, 500]) {
+            for (const restIonicMM of [0, 500]) {
                 let previous = Number.POSITIVE_INFINITY
                 for (const pH of SWEEP) {
-                    const what = `${t.id} ${mM} mM, rest ${restI_mM}, pH ${pH}`
-                    const out = computeTemplate({ id: t.id, mM, pH, restI_mM })
+                    const what = `${t.id} ${mM} mM, rest ${restIonicMM}, pH ${pH}`
+                    const out = computeTemplate({ id: t.id, mM, pH, restIonicMM })
                     assert.ok(out.pH >= 0 && out.pH <= 14, what)
                     const told = out.warnings.some((w) => w.includes("0 to 14"))
                     assert.equal(told, pH < 0 || pH > 14)

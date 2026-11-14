@@ -1,0 +1,23 @@
+// University brand colours
+
+{
+    "set": "univ-palestine",
+    "title": "Palestinian university brand colours (arab american uni University, Palestine Polytechnic University, Birzeit University)",
+    "licence": "brand-use terms not checked; colour values are facts; the Birzeit values come from the CMYK of a third-party brand mirror (sourceType other)",
+    "url": "https://aaup.edu/sites/default/files/2025-01/AAUP-Brand-Guidelines.pdf",
+    "colours": [
+        {"name": "birzeit green", "hex": "#167000", "verified": false, "url": "https://brand-genome.github.io/brands/birzeit-university/", "family": "green"},
+        {"name": "birzeit dark green", "hex": "#0d4000", "verified": false, "url": "https://brand-genome.github.io/brands/birzeit-university/", "family": "green"},
+        {"name": "birzeit beige", "hex": "#f0e8c4", "verified": false, "url": "https://brand-genome.github.io/brands/birzeit-university/", "family": "white"},
+        {"name": "birzeit khaki", "hex": "#e8d96e", "verified": false, "url": "https://brand-genome.github.io/brands/birzeit-university/", "family": "yellow"},
+        {"name": "ppu tan", "hex": "#d4b890", "url": "https://www.ppu.edu/p/sites/default/files/ppu-1774347413-%D8%AC%D8%A7%D9%85%D8%B9%D8%A9%20%D8%A8%D9%88%D9%84%D9%8A%D8%AA%D9%83%D9%86%D9%83%20%D9%81%D9%84%D8%B3%D8%B7%D9%8A%D9%86-%20%D8%AF%D9%84%D9%8A%D9%84%20%D8%A7%D9%84%D9%87%D9%88%D9%8A%D8%A9%20%D8%A7%D9%84%D8%A8%D8%B5%D8%B1%D9%8A%D8%A9%202025.pdf", "family": "brown"},
+        {"name": "ppu blue", "hex": "#184e82", "url": "https://www.ppu.edu/p/sites/default/files/ppu-1774347413-%D8%AC%D8%A7%D9%85%D8%B9%D8%A9%20%D8%A8%D9%88%D9%84%D9%8A%D8%AA%D9%83%D9%86%D9%83%20%D9%81%D9%84%D8%B3%D8%B7%D9%8A%D9%86-%20%D8%AF%D9%84%D9%8A%D9%84%20%D8%A7%D9%84%D9%87%D9%88%D9%8A%D8%A9%20%D8%A7%D9%84%D8%A8%D8%B5%D8%B1%D9%8A%D8%A9%202025.pdf", "family": "blue"},
+        {"name": "ppu red", "hex": "#c72127", "url": "https://www.ppu.edu/p/sites/default/files/ppu-1774347413-%D8%AC%D8%A7%D9%85%D8%B9%D8%A9%20%D8%A8%D9%88%D9%84%D9%8A%D8%AA%D9%83%D9%86%D9%83%20%D9%81%D9%84%D8%B3%D8%B7%D9%8A%D9%86-%20%D8%AF%D9%84%D9%8A%D9%84%20%D8%A7%D9%84%D9%87%D9%88%D9%8A%D8%A9%20%D8%A7%D9%84%D8%A8%D8%B5%D8%B1%D9%8A%D8%A9%202025.pdf", "family": "red"},
+        {"name": "ppu gray", "hex": "#d1d3d4", "url": "https://www.ppu.edu/p/sites/default/files/ppu-1774347413-%D8%AC%D8%A7%D9%85%D8%B9%D8%A9%20%D8%A8%D9%88%D9%84%D9%8A%D8%AA%D9%83%D9%86%D9%83%20%D9%81%D9%84%D8%B3%D8%B7%D9%8A%D9%86-%20%D8%AF%D9%84%D9%8A%D9%84%20%D8%A7%D9%84%D9%87%D9%88%D9%8A%D8%A9%20%D8%A7%D9%84%D8%A8%D8%B5%D8%B1%D9%8A%D8%A9%202025.pdf", "family": "gray"},
+        {"name": "arab american uni green", "hex": "#1e7800", "family": "green"},
+        {"name": "arab american uni red", "hex": "#dc1e00", "family": "red"},
+        {"name": "arab american uni maroon", "hex": "#990000", "family": "red"},
+        {"name": "arab american uni beige", "hex": "#e9d8bc", "family": "white"},
+        {"name": "arab american uni gray", "hex": "#e5e5e5", "family": "gray"}
+    ]
+}

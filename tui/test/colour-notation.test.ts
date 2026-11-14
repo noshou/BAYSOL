@@ -2,19 +2,18 @@
 
 // Tests of store/colour-notation.ts: every named colour written in HEX, RGB, HSL and CMYK
 // reads back as the same 8-bit colour, and the strings are those of the golden file that
-// the Julia resolver (test_colournames.jl) reads too.
+// the Julia resolver (test-colournames.jl) reads too.
 
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { test } from "node:test"
-import { readAssetJson } from "../src/core/environment.js"
 import {
     colourNotations,
     fromHex,
     parseColourCode,
     toHex,
 } from "../src/store/colour-notation.js"
-import { namesOfCode } from "../src/store/colours.js"
+import { colourList, namesOfCode } from "../src/store/colours.js"
 
 type Golden = {
     colours: { hex: string; rgb: string; hsl: string; cmyk: string }[]
@@ -30,8 +29,7 @@ const golden = JSON.parse(
 ) as Golden
 
 test("every named colour round-trips through every notation", () => {
-    const file = readAssetJson<Record<string, string>>("data", "colours.json")
-    for (const [name, hex] of Object.entries(file)) {
+    for (const [name, hex] of colourList()) {
         const rgb = fromHex(hex)
         const n = colourNotations(rgb)
         assert.equal(n.hex, hex, name)
@@ -53,9 +51,8 @@ test("the strings equal the golden file of the Julia resolver", () => {
 })
 
 test("a typed value lists every name with exactly that colour", () => {
-    const file = readAssetJson<Record<string, string>>("data", "colours.json")
     const byHex = new Map<string, string[]>()
-    for (const [name, hex] of Object.entries(file))
+    for (const [name, hex] of colourList())
         byHex.set(hex, [...(byHex.get(hex) ?? []), name])
     let shared = 0
     for (const [hex, names] of byHex) {

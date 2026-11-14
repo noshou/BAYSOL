@@ -29,7 +29,7 @@ const nonbio = (name: string, mM: number): Solute => ({
 /** A row a template made (it has a link), as the rows of an earlier flow are. */
 const linked = (name: string, mM: number): Solute => ({
     ...nonbio(name, mM),
-    template: { id: "tris", mM: 10, "sigma-mM": 0.2, titrant: "chloride" },
+    template: { id: "tris", mM: 10, "sigmaMm": 0.2, titrant: "chloride" },
 })
 
 /** The index of a template in the dropdown. */
@@ -41,7 +41,7 @@ function begin(
     pH: number | undefined = undefined,
     unit: ConcUnit = "mM",
 ): TemplateFlow {
-    const conditions = pH === undefined ? undefined : { pH, "sigma-pH": 0.1 }
+    const conditions = pH === undefined ? undefined : { pH, "sigmaPh": 0.1 }
     return new TemplateFlow({ drafts: Drafts.of(rows), conditions, unit })
 }
 
@@ -55,7 +55,7 @@ function answer(flow: TemplateFlow, texts: string[]): void {
 }
 
 /** The link of a row made by a template. */
-const linkOfSolute = (s: Solute) => s.template as { "set-at"?: unknown } | undefined
+const linkOfSolute = (s: Solute) => s.template as { "setAt"?: unknown } | undefined
 
 /** What the flow ended with (a function, so a check before it does not narrow). */
 const done = (flow: TemplateFlow) => flow.done
@@ -121,7 +121,7 @@ test("Tris: concentration, uncertainty, pH, rest of the recipe, then the rows", 
     const done = flow.done
     assert.ok(done && !done.cancelled)
     assert.equal(done.added, 2)
-    assert.deepEqual(done.conditions, { pH: 7.5, "sigma-pH": 0.1 })
+    assert.deepEqual(done.conditions, { pH: 7.5, "sigmaPh": 0.1 })
     // ordinary rows: new drafts, complete, passing the loader's check
     assert.equal(done.drafts.length, 3)
     const marks = done.drafts.rows.map((_, i) => done.drafts.mark(i))
@@ -196,7 +196,7 @@ test("a mixture: PBS has no questions; TBS asks the pH of its own", () => {
     assert.equal(confirm.phLine, "changes the pH 7 to 7.4")
     assert.equal(confirm.outcome.rows.length, 5)
     pbs.accept()
-    assert.deepEqual(pbs.done?.conditions, { pH: 7.4, "sigma-pH": 0.1 })
+    assert.deepEqual(pbs.done?.conditions, { pH: 7.4, "sigmaPh": 0.1 })
     assert.equal(pbs.done?.added, 5)
 
     const tbs = begin()
@@ -394,7 +394,7 @@ test("pH set at: buffer temperature (default), room, or another number", () => {
     const run = (pick: number, other?: string) => {
         const flow = new TemplateFlow({
             drafts: Drafts.of([]),
-            conditions: { pH: 7.5, "sigma-pH": 0.1, temperature: 4 },
+            conditions: { pH: 7.5, "sigmaPh": 0.1, temperature: 4 },
         })
         flow.pick(indexOf("tris"))
         for (const text of ["10", "0.2", "7.5"]) flow.submit(text)
@@ -413,7 +413,7 @@ test("pH set at: buffer temperature (default), room, or another number", () => {
     const setAt = (flow: TemplateFlow) => {
         flow.accept()
         const drafts = done(flow)?.drafts as Drafts<Solute>
-        return linkOfSolute(drafts.value(1) as Solute)?.["set-at"]
+        return linkOfSolute(drafts.value(1) as Solute)?.setAt
     }
     assert.equal(setAt(run(0)), "buffer", "the default")
     assert.equal(setAt(run(1)), 22)
@@ -432,14 +432,14 @@ test("pH set at: buffer temperature (default), room, or another number", () => {
     // the pH row of a flow that sets the pH keeps the buffer's temperature
     const flow = new TemplateFlow({
         drafts: Drafts.of([]),
-        conditions: { pH: 7, "sigma-pH": 0.1, temperature: 4 },
+        conditions: { pH: 7, "sigmaPh": 0.1, temperature: 4 },
     })
     flow.pick(indexOf("tris"))
     for (const text of ["10", "0.2", "7.5"]) flow.submit(text)
     flow.pick(0)
     flow.submit("")
     flow.accept()
-    assert.deepEqual(done(flow)?.conditions, { pH: 7.5, "sigma-pH": 0.1, temperature: 4 })
+    assert.deepEqual(done(flow)?.conditions, { pH: 7.5, "sigmaPh": 0.1, temperature: 4 })
 })
 
 test("pH set at is asked where the pH is asked: a mixture with a buffer, not PBS", () => {
@@ -451,7 +451,7 @@ test("pH set at is asked where the pH is asked: a mixture with a buffer, not PBS
     tbs.submit("")
     tbs.accept()
     const made = done(tbs)?.drafts as Drafts<Solute>
-    assert.equal(linkOfSolute(made.value(0) as Solute)?.["set-at"], 22)
+    assert.equal(linkOfSolute(made.value(0) as Solute)?.setAt, 22)
     const pbs = begin()
     pbs.pick(indexOf("pbs"))
     assert.equal(pbs.step.type, "confirm")

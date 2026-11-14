@@ -4,18 +4,21 @@
 // codes (#rgb, #rrggbb, rgb(), hsl()), lists and tuples with commas inside brackets.
 
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
 import { test } from "node:test"
-import { readAssetJson } from "../src/core/environment.js"
 import { narrow, parseSetting, pickValue } from "../src/screens/screen-rules.js"
 import {
     colourFamily,
     colourHex,
+    colourIndex,
     colourKey,
+    colourList,
     colourNames,
+    colourSets,
     colourWords,
     FAMILIES,
     fold,
+    isExcluded,
+    juliaColourNames,
     looksLikeCode,
     namesOfCode,
     narrowColours,
@@ -60,9 +63,8 @@ test("the list is lower case and unique, with no bare numbers or catalogue tags"
     assert.ok(names.every((n) => !/\b[a-z]{1,3}\.(?: |$)/.test(n)))
 })
 
-test("every listed name shows the colour the file gives it", () => {
-    const file = readAssetJson<Record<string, string>>("data", "colours.json")
-    for (const [name, hex] of Object.entries(file)) {
+test("every listed name shows the colour the list gives it", () => {
+    for (const [name, hex] of colourList()) {
         assert.equal(colourHex(name), hex, name)
         // any case of the name finds the same colour
         assert.equal(colourHex(name.toUpperCase()), hex, name)
@@ -83,21 +85,52 @@ test("the CSS names have the CSS colour (what Colors.jl gives them)", () => {
 })
 
 test("all 148 CSS names are in the list with the colour of the W3C table", () => {
-    const julia = readAssetJson<string[]>("data", "colour-julia.json")
-    const table = readFileSync(
-        new URL("../../dev/data/colours/css148.txt", import.meta.url),
-        "utf8",
-    )
-        .split("\n")
-        .filter((line) => line.trim() !== "")
-        .map((line) => line.trim().split(/\s+/) as [string, string])
-    assert.equal(table.length, 148)
+    const css = colourSets().find((set) => set.set === "css")
+    assert.ok(css)
+    assert.equal(css.colours.length, 148)
     // the names Julia reads (CSS and X11) are all listed, with the colour the list gives
-    for (const [name, hex] of table) {
+    const julia = juliaColourNames()
+    for (const { name, hex } of css.colours) {
         assert.equal(colourHex(name), hex, name)
-        assert.ok(julia.includes(name), name)
+        assert.ok(julia.has(name), name)
     }
     for (const name of julia) assert.ok(colourNames().includes(name), name)
+})
+
+// What the Julia test of the colour notation (test-colournames.jl) checked against
+// Colors.jl, kept as a static fixture: the CSS and X11 names Colors.jl knows keep the
+// colour it gives them. (Dropped: Colors.jl itself is not run here, so a change of the
+// package's table is not seen; the fixture is the list as it stood on 2026-11-13.)
+test("the names of Colors.jl keep the colour Colors.jl gives them", () => {
+    const fixtureFile = fixture("colours/colors-jl-names.json") as {
+        colours: Record<string, string>
+    }
+    const expected = Object.entries(fixtureFile.colours)
+    assert.equal(expected.length, 518)
+    assert.deepEqual(
+        [...juliaColourNames()].sort(),
+        expected.map(([name]) => name).sort(),
+    )
+    for (const [name, hex] of expected) assert.equal(colourHex(name), hex, name)
+})
+
+test("the sets keep the exclusion rule (owner, 2026-11-10)", () => {
+    const index = colourIndex()
+    assert.ok(index.excludedWords.length > 0)
+    for (const set of colourSets()) {
+        // no source of a set is in an excluded country (a `.il` domain)
+        for (const url of [set.url, ...set.colours.map((c) => c.url ?? "")])
+            assert.ok(!/^https?:\/\/[^/]*\.il(\/|$)/i.test(url), `${set.set}: ${url}`)
+        for (const { name, raw } of set.colours) {
+            assert.ok(!isExcluded(name, index), `${set.set}: ${name}`)
+            assert.ok(!isExcluded(raw ?? name, index), `${set.set}: ${raw}`)
+        }
+    }
+    for (const name of colourNames()) assert.ok(!isExcluded(name, index), name)
+    // the rule itself catches the names it is meant to
+    assert.ok(isExcluded("Israel blue", index))
+    assert.ok(!isExcluded("palestine crimson", index))
+    assert.ok(colourNames().includes("palestine crimson"))
 })
 
 test("codes: #rgb, #rrggbb, rgb(), hsl()", () => {
@@ -289,10 +322,11 @@ test("the merged sets: short places, expanded pigments, identifiers, exclusions"
 
 test("every name has exactly one family, and all twelve families are used", () => {
     const names = colourNames()
-    const file = readAssetJson<Record<string, string>>("data", "colour-families.json")
-    // one tag for each name of the list, and no tag for anything else
-    assert.deepEqual(Object.keys(file).sort(), [...names].sort())
-    for (const family of Object.values(file)) assert.ok(FAMILIES.includes(family as never))
+    // every row of every set has one of the twelve (written by tui/dev/colour-families.ts)
+    for (const set of colourSets())
+        for (const row of set.colours)
+            assert.ok(FAMILIES.includes(row.family as never), `${set.set}: ${row.name}`)
+    for (const n of names) assert.ok(colourFamily(n) !== undefined, n)
     assert.equal(FAMILIES.length, 12)
     for (const family of FAMILIES)
         assert.ok(

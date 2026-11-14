@@ -1,0 +1,91 @@
+id	name	smiles	charge	nconf	v_meas	provenance	fit
+K001	ethanol	CCO	0	1	55.10	measured 10.1007/978-3-642-71114-5_2	1
+K002	1-propanol	CCCO	0	3	70.66	measured 10.1007/BF00646936	1
+K003	1-butanol	CCCCO	0	3	86.60	measured 10.1007/978-3-642-71114-5_2	1
+K004	1-hexanol	CCCCCCO	0	5	118.65	measured 10.1007/978-3-642-71114-5_2	1
+K005	1-heptanol	CCCCCCCO	0	5	133.43	measured 10.1007/BF00646936	1
+K006	2-propanol	CC(C)O	0	1	71.92	measured 10.1007/BF00646936	1
+K007	2-methyl-2-propanol	CC(C)(C)O	0	1	87.74	measured 10.1007/BF00646936	1
+K008	cyclohexanol	OC1CCCCC1	0	1	103.50	measured 10.1007/978-3-642-71114-5_2	1
+K009	cyclopentanol	OC1CCCC1	0	1	89.00	measured 10.1007/978-3-642-71114-5_2	1
+K010	ethylene glycol	OCCO	0	3	54.63	measured 10.1016/j.jct.2008.04.007	1
+K011	1,3-propanediol	OCCCO	0	3	71.90	measured 10.1007/978-3-642-71114-5_2	1
+K012	1,4-butanediol	OCCCCO	0	5	88.33	measured 10.1007/978-3-642-71114-5_2	1
+K013	1,6-hexanediol	OCCCCCCO	0	5	120.47	measured 10.1016/j.jct.2007.01.009	1
+K014	1,8-octanediol	OCCCCCCCCO	0	5	152.60	measured 10.1007/978-3-642-71114-5_2	1
+K015	glycerol	OCC(O)CO	0	3	70.78	measured 10.1007/978-3-642-71114-5_2	1
+K016	erythritol	OCC(O)C(O)CO	0	5	87.10	measured 10.1007/978-3-642-71114-5_2	1
+K017	xylitol	OCC(O)C(O)C(O)CO	0	5	102.40	literature volume used when the set was built; source not recorded, re-verify	1
+K018	d-mannitol	OC[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO	0	5	119.37	measured 10.1007/BF00646936	1
+K019	1,4-cyclohexanediol	OC1CCC(O)CC1	0	1	105.30	measured 10.1007/978-3-642-71114-5_2	1
+K020	diethyl ether	CCOCC	0	3	90.40	measured 10.1007/978-3-642-71114-5_2	1
+K021	1,2-dimethoxyethane	COCCOC	0	5	95.88	measured 10.1007/978-3-642-71114-5_2	1
+K022	diglyme	COCCOCCOC	0	5	132.70	measured 10.1007/978-3-642-71114-5_2	1
+K023	1,4-dioxane	C1COCCO1	0	1	80.94	measured 10.1007/978-3-642-71114-5_2	1
+K024	18-crown-6	C1COCCOCCOCCOCCOCCO1	0	1	223.40	measured 10.1007/978-3-642-71114-5_2	1
+K025	15-crown-5	C1COCCOCCOCCOCCO1	0	1	186.08	measured 10.1007/978-3-642-71114-5_2	1
+K026	12-crown-4	C1COCCOCCOCCO1	0	1	149.90	measured 10.1007/978-3-642-71114-5_2	1
+K027	2-methoxyethanol	COCCO	0	3	75.15	measured 10.1007/978-3-642-71114-5_2	1
+K028	2-ethoxyethanol	CCOCCO	0	5	91.15	measured 10.1007/978-3-642-71114-5_2	1
+K029	2-butoxyethanol	CCCCOCCO	0	5	122.95	measured 10.1007/978-3-642-71114-5_2	1
+K030	diethoxymethane	CCOCOCC	0	5	113.88	measured 10.1007/978-3-642-71114-5_2	1
+K031	diethylene glycol	OCCOCCO	0	5	92.19	literature volume used when the set was built; source not recorded, re-verify	1
+K032	triethylene glycol	OCCOCCOCCO	0	5	129.27	literature volume used when the set was built; source not recorded, re-verify	1
+K033	tetraethylene glycol	OCCOCCOCCOCCO	0	5	166.30	literature volume used when the set was built; source not recorded, re-verify	1
+K034	glucose	OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O	0	3	111.59	measured 10.1007/978-3-642-71114-5_2	1
+K035	d-galactose	OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@H]1O	0	3	110.20	measured 10.1007/BF00646936	1
+K036	d-ribose	OC[C@H]1O[C@@H](O)[C@H](O)[C@@H]1O	0	3	95.20	measured 10.1016/0301-4622(89)80060-2	1
+K037	d-xylose	O[C@@H]1CO[C@@H](O)[C@H](O)[C@H]1O	0	1	95.40	measured 10.1007/BF00646936	1
+K038	2-deoxy-d-glucose	OC[C@H]1O[C@@H](O)CC(O)[C@@H]1O	0	3	110.40	measured 10.1007/978-3-642-71114-5_2	1
+K039	cellobiose	OC[C@H]1O[C@@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](O)O[C@@H]2CO)[C@H](O)[C@@H](O)[C@@H]1O	0	5	212.00	measured 10.1007/978-3-642-71114-5_2	1
+K040	sucrose	C([C@@H]1[C@H]([C@@H]([C@H]([C@H](O1)O[C@]2([C@H]([C@@H]([C@H](O2)CO)O)O)CO)O)O)O)O	0	5	211.44	measured 10.1007/978-3-642-71114-5_2	0
+K041	methyl beta-d-glucopyranoside	CO[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O	0	3	133.60	measured 10.1007/BF00646936	1
+K042	methyl alpha-d-glucopyranoside	CO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O	0	3	132.90	measured 10.1007/BF00646936	1
+K043	ethyl alpha-d-glucopyranoside	CCO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O	0	5	149.45	measured 10.1007/BF00646936	1
+K044	phenyl beta-d-glucopyranoside	OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O	0	5	177.50	measured 10.1007/BF00646936	1
+K045	octyl glucopyranoside	CCCCCCCCO[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O	0	5	244.00	measured 10.1007/s003960050558 (monomer; the earlier mixed 249.35 was wrong)	0
+K046	acetamide	CC(N)=O	0	1	55.70	measured 10.1007/978-3-642-71114-5_2	1
+K047	butanamide	CCCC(N)=O	0	3	87.10	measured 10.1007/978-3-642-71114-5_2	1
+K048	hexanamide	CCCCCC(N)=O	0	5	119.20	measured 10.1007/978-3-642-71114-5_2	1
+K049	dmf	CN(C)C=O	0	3	74.50	measured 10.1007/978-3-642-71114-5_2	1
+K050	dmac	CC(=O)N(C)C	0	1	89.70	measured 10.1007/978-3-642-71114-5_2	1
+K051	1-methyl-2-pyrrolidinone	CN1CCCC1=O	0	1	90.40	measured 10.1007/BF00646936	1
+K052	epsilon-caprolactam	O=C1CCCCCN1	0	1	105.00	measured 10.1007/BF00646936	1
+K053	1,1-diethylurea	CCN(CC)C(N)=O	0	3	114.90	measured 10.1007/978-3-642-71114-5_2	1
+K054	butylurea	CCCCNC(N)=O	0	5	116.10	measured 10.1007/978-3-642-71114-5_2	1
+K055	1-butanamine	CCCCN	0	3	89.80	measured 10.1007/978-3-642-71114-5_2	1
+K056	1-hexanamine	CCCCCCN	0	5	121.60	measured 10.1007/978-3-642-71114-5_2	1
+K057	diethylamine	CCNCC	0	3	91.68	measured 10.1007/978-3-642-71114-5_2	1
+K058	dibutylamine	CCCCNCCCC	0	5	155.40	measured 10.1007/978-3-642-71114-5_2	1
+K059	cyclohexanamine	NC1CCCCC1	0	1	105.35	measured 10.1007/978-3-642-71114-5_2	1
+K060	1-methylpiperidine	CN1CCCCC1	0	1	110.54	measured 10.1007/978-3-642-71114-5_2	1
+K061	4-methylmorpholine	CN1CCOCC1	0	1	101.29	measured 10.1007/978-3-642-71114-5_2	1
+K062	dabco	C1CN2CCN1CC2	0	1	105.92	measured 10.1007/BF00646936	1
+K063	acetonitrile	CC#N	0	1	47.40	measured 10.1007/978-3-642-71114-5_2	1
+K064	hexanenitrile	CCCCCC#N	0	5	111.91	measured 10.1007/978-3-642-71114-5_2	1
+K065	acetone	CC(C)=O	0	1	66.90	measured 10.1007/978-3-642-71114-5_2	1
+K066	2-pentanone	CCCC(C)=O	0	3	98.00	measured 10.1007/978-3-642-71114-5_2	1
+K067	cyclohexanone	O=C1CCCCC1	0	1	99.70	measured 10.1007/978-3-642-71114-5_2	1
+K068	ethyl acetate	CCOC(C)=O	0	3	88.90	measured 10.1007/978-3-642-71114-5_2	1
+K069	diethyl carbonate	CCOC(=O)OCC	0	3	113.10	measured 10.1007/BF00646936	1
+K070	gamma-butyrolactone	O=C1CCCO1	0	1	73.30	measured 10.1007/BF00646936	1
+K071	dimethyl sulfoxide	CS(C)=O	0	1	68.92	measured 10.1007/BF00646936	1
+K072	diethyl sulfide	CCSCC	0	3	99.50	measured 10.1007/BF00646936	1
+K073	benzene	c1ccccc1	0	1	83.10	measured 10.1007/BF00646936	1
+K074	benzyl alcohol	OCc1ccccc1	0	3	100.82	measured 10.1007/BF00646936	1
+K075	2-phenoxyethanol	OCCOc1ccccc1	0	5	133.60	measured 10.1016/j.molliq.2023.123403	1
+K076	aniline	Nc1ccccc1	0	1	89.30	measured 10.1007/978-3-642-71114-5_2	1
+K077	2-aminoethanol	NCCO	0	3	59.25	measured 10.1007/BF00646936	1
+K078	6-amino-1-hexanol	NCCCCCCO	0	5	123.38	measured 10.1007/BF00646936	1
+K079	diethanolamine	OCCNCCO	0	5	94.38	measured 10.1007/BF00646936	1
+K080	2-(diethylamino)ethanol	CCN(CC)CCO	0	5	123.04	measured 10.1007/978-3-642-71114-5_2	1
+K081	glycine	[NH3+]CC([O-])=O	0	3	43.28	derived 10.1016/j.jct.2013.11.022	1
+K082	dl-alanine	C[C@H]([NH3+])C([O-])=O	0	3	60.54	measured 10.1007/978-3-642-71114-5_2	1
+K083	dl-norleucine	CCCC[C@H]([NH3+])C([O-])=O	0	5	107.73	measured 10.1007/978-3-642-71114-5_2	1
+K084	4-aminobutanoic acid	[NH3+]CCCC([O-])=O	0	5	73.20	measured 10.1007/978-3-642-71114-5_2	1
+K085	6-aminohexanoic acid	[NH3+]CCCCCC([O-])=O	0	5	104.20	measured 10.1007/978-3-642-71114-5_2	1
+K086	8-aminooctanoic acid	[NH3+]CCCCCCCC([O-])=O	0	5	136.10	measured 10.1007/978-3-642-71114-5_2	1
+K087	betaine	C[N+](C)(C)CC([O-])=O	0	3	98.55	literature volume used when the set was built; source not recorded, re-verify	1
+K088	glycylglycine	[NH3+]CC(=O)NCC([O-])=O	0	5	76.30	literature volume used when the set was built; source not recorded, re-verify	1
+K089	triglycine	[NH3+]CC(=O)NCC(=O)NCC([O-])=O	0	5	112.20	literature volume used when the set was built; source not recorded, re-verify	1
+K090	methyl 6-o-octanoyl-beta-d-glucopyranoside	CCCCCCCC(=O)OC[C@H]1O[C@@H](OC)[C@H](O)[C@@H](O)[C@@H]1O	0	5	266.30	measured 10.1007/s003960050558	1

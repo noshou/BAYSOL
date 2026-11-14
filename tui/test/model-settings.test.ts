@@ -66,10 +66,10 @@ test("run-level: the TS list and the PLOT_ rule are Julia's", () => {
         .filter((t) => t !== "")
     assert.deepEqual([...julia].sort(), [...runLevelSettings].sort())
     const rule = new RegExp(
-        String.raw`_is_run_level\(name::Symbol\)\s*=\s*name in RUN_LEVEL_SETTINGS \|\|\s*` +
+        String.raw`_isRunLevel\(name::Symbol\)\s*=\s*name in RUN_LEVEL_SETTINGS \|\|\s*` +
             String.raw`startswith\(String\(name\), "([^"]*)"\)`,
     ).exec(source)
-    assert.ok(rule, "the PLOT_ rule is in _is_run_level")
+    assert.ok(rule, "the PLOT_ rule is in _isRunLevel")
     assert.equal(rule?.[1], RUN_LEVEL_PREFIX)
     // every one named exists in the catalog; every PLOT_ setting is run-level
     for (const name of runLevelSettings) assert.ok(catalog.get(name), name)

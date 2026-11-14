@@ -7,7 +7,7 @@ using Test
 include("helpers.jl")
 
 names = ARGS
-files = sort(filter(f -> startswith(f, "test_") && endswith(f, ".jl"), readdir(@__DIR__)))
+files = sort(filter(f -> startswith(f, "test-") && endswith(f, ".jl"), readdir(@__DIR__)))
 files = filter(f -> isempty(names) || any(n -> occursin(n, f), names), files)
 isempty(files) && (println(stderr, "bysl test: no test file matches"); exit(2))
 

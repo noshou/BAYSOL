@@ -9,7 +9,7 @@ import { tinyWorkbook } from "./workbook.js"
 /**
  * A stand-in for Julia in the tests of the run flow: it takes the three arguments the
  * real child takes (project, temperature, run folder) and writes a `run.json` and a
- * `run.LOG` the way `BAYSOLRun.run_project` does (the run folder is flat), then behaves as
+ * `run.LOG` the way `BAYSOLRun.runProject` does (the run folder is flat), then behaves as
  * `FAKE_MODE` says:
  *
  * - `done`: prints a few lines (one with a carriage-return progress bar), finishes `done`.
@@ -117,7 +117,7 @@ function runJson(status: string): void {
                     name: "m",
                     status: "done",
                     files: ["m.xlsx", "m.tex", "m_residuals.tex", "m-plots.txt"],
-                    plot_sizes: sizes("m"),
+                    plotSizes: sizes("m"),
                 },
             ]
             : [],
@@ -126,7 +126,7 @@ function runJson(status: string): void {
                 compare: {
                     status: "done",
                     files: ["compare.tex", "compare.tsv", "compare-plots.txt"],
-                    plot_sizes: sizes("compare"),
+                    plotSizes: sizes("compare"),
                 },
             }
             : {}),
@@ -153,7 +153,7 @@ mkdirSync(runDir as string, { recursive: true })
 runJson("running")
 writeFileSync(
     join(runDir as string, "run.LOG"),
-    `datetime\tnow\nproject\t${project}\ntemperature_c\t${temperature}\n\n--- output ---\n`,
+    `datetime\tnow\nproject\t${project}\ntemperatureC\t${temperature}\n\n--- output ---\n`,
 )
 process.stdout.write("fake julia started\n")
 

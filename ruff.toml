@@ -1,0 +1,16 @@
+# Ruff (formatter and linter) for the Python files of the repository: the tools of
+# dev/pmv-rism/. `bysl fmt` runs `ruff format` and `ruff check` with this file; the
+# layout rules are the repository's (4 spaces, 92 columns).
+line-length = 92
+indent-width = 4
+target-version = "py312"
+extend-exclude = ["sources", "_cache", "manuscript", "node_modules", ".CondaPkg",
+    "dev/pmv-rism/legacy"]   # legacy/: recovered copies of lost scripts, kept verbatim
+
+[format]
+indent-style = "space"
+quote-style = "double"
+
+[lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "C4", "PL", "RUF"]
+ignore = ["PLR0913", "PLR0912", "PLR0915", "PLR2004"]   # long signatures and magic numbers

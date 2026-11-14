@@ -1,18 +1,18 @@
 {
- "note": "Golden counts of the names of each colour family (colour-families.json). Update deliberately, with `bysl harvest colours`, when the list or the family rules change.",
- "total": 6428,
+ "note": "Golden counts of the names of each colour family (the family of the rows of tui/assets/data/colour-sets/, written by tui/dev/colour-families.ts). Update deliberately when the sets or the family rules change.",
+ "total": 6578,
  "families": {
-  "red": 572,
-  "orange": 273,
-  "yellow": 558,
-  "green": 893,
-  "cyan": 302,
-  "blue": 925,
+  "red": 599,
+  "orange": 280,
+  "yellow": 586,
+  "green": 922,
+  "cyan": 303,
+  "blue": 960,
   "purple": 677,
   "pink": 715,
-  "brown": 572,
-  "gray": 536,
-  "black": 87,
-  "white": 318
+  "brown": 588,
+  "gray": 539,
+  "black": 90,
+  "white": 319
  }
 }

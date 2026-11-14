@@ -65,10 +65,10 @@ export function linkFor(definition: Definition): TemplateLink {
     if (definition.kind !== "builtin") return { id: definition.kind, definition }
     const link: TemplateLink = { id: definition.id }
     if (definition.mM !== undefined) link.mM = definition.mM
-    if (definition.sigmaMM !== undefined) link["sigma-mM"] = definition.sigmaMM
+    if (definition.sigmaMM !== undefined) link.sigmaMm = definition.sigmaMM
     if (definition.ion !== undefined) link.titrant = definition.ion
-    if (definition.restMM !== undefined) link["rest-mM"] = definition.restMM
-    link["set-at"] = definition.pHSetAt ?? "buffer"
+    if (definition.restMM !== undefined) link.restMm = definition.restMM
+    link.setAt = definition.pHSetAt ?? "buffer"
     return link
 }
 
@@ -80,18 +80,18 @@ export function linkFor(definition: Definition): TemplateLink {
  */
 export function definitionOf(link: TemplateLink): Definition {
     if (link.definition) return link.definition
-    const at = link["set-at"]
+    const at = link.setAt
     return {
         kind: "builtin",
         id: link.id,
         ...(link.mM !== undefined && { mM: link.mM }),
-        ...(link["sigma-mM"] !== undefined && { sigmaMM: link["sigma-mM"] }),
+        ...(link.sigmaMm !== undefined && { sigmaMM: link.sigmaMm }),
         // `chloride` is an acid's anion, no cation: the definition leaves `ion` out then
         ...(link.titrant !== undefined && link.titrant !== "chloride"
             ? { ion: link.titrant }
             : {}),
         ...(typeof at === "number" && { pHSetAt: at }),
-        ...(link["rest-mM"] !== undefined && { restMM: link["rest-mM"] }),
+        ...(link.restMm !== undefined && { restMM: link.restMm }),
     }
 }
 
@@ -214,7 +214,7 @@ export function recipeLoad(
         }
     const made = templateRows(recipe, {
         pH: held.pH,
-        sigmaPH: held["sigma-pH"],
+        sigmaPH: held.sigmaPh,
         temperatureC: temperature,
     })
     if ("error" in made) return { message: `${recipe.name}: ${made.error}` }

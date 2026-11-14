@@ -1,0 +1,21 @@
+// Canadian provincial and territorial government colours
+
+{
+    "set": "saskatchewan",
+    "title": "Government of Saskatchewan digital design system 2021",
+    "licence": "Crown copyright; may be reproduced for non-commercial purposes (saskatchewan.ca/copyright); commercial use needs written permission",
+    "url": "https://taskroom.saskatchewan.ca/-/media/project/taskroom/documents/policy/digital-design-system-2021.pdf",
+    "colours": [
+        {"name": "saskatchewan football green", "hex": "#046a38", "family": "green"},
+        {"name": "saskatchewan living skies", "hex": "#41b6e6", "family": "blue"},
+        {"name": "saskatchewan midnight sky", "hex": "#00558c", "family": "blue"},
+        {"name": "saskatchewan lentils", "hex": "#64a70b", "family": "green"},
+        {"name": "saskatchewan buffalo grass", "hex": "#a4d65e", "family": "green"},
+        {"name": "saskatchewan canola", "hex": "#fbdd40", "family": "yellow"},
+        {"name": "saskatchewan flax", "hex": "#b9d9eb", "family": "blue"},
+        {"name": "saskatchewan graphite", "hex": "#333333", "family": "black"},
+        {"name": "saskatchewan smoke", "hex": "#666666", "family": "gray"},
+        {"name": "saskatchewan seagull", "hex": "#e1e3e6", "family": "white"},
+        {"name": "saskatchewan cloud", "hex": "#f5f5f5", "family": "white"}
+    ]
+}

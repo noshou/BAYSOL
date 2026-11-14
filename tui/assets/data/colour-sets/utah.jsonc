@@ -1,0 +1,14 @@
+{
+    "set": "utah",
+    "title": "State of Utah design tokens",
+    "licence": "Apache 2.0 (npm package version 5.3.0 licence field; tokens read from css)",
+    "url": "https://www.npmjs.com/package/@utahdts/utah-design-system",
+    "colours": [
+        {"name": "utah blue dark", "hex": "#071d49", "family": "blue"},
+        {"name": "utah blue medium", "hex": "#093692", "family": "blue"},
+        {"name": "utah blue light", "hex": "#81d0f0", "family": "blue"},
+        {"name": "utah gold light", "hex": "#ffb81d", "family": "yellow"},
+        {"name": "utah gold medium", "hex": "#ff8c03", "family": "orange"},
+        {"name": "utah red", "hex": "#aa0200", "family": "red"}
+    ]
+}

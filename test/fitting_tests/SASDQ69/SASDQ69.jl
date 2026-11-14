@@ -31,14 +31,14 @@ const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDQ69.dat")
 # hydrogens), so the nucleotide path of the pipeline (AMBER, no PROPKA) is exercised.
 #
 # Curve units: the SASBDB .dat is in Å⁻¹ (46 REMARK header lines, then q, I, σ); it is
-# a SEC-SAXS curve and 81 of its 849 points have I ≤ 0, which `seed_model` bins away.
+# a SEC-SAXS curve and 81 of its 849 points have I ≤ 0, which `seedModel` bins away.
 # The comparison curve is the depositor's FoXS fit ("# SAXS profile" file, columns q,
 # I_exp, σ, I_fit).
 
-qvals, I_exp, σ_exp = _read_curve(_DATA_PATH)
+qvals, iExp, σ_exp = _readCurve(_DATA_PATH)
 
 # qvals are already in Å⁻¹ (the SASBDB .dat range, 0.01-0.44, is checked below).
-check_q_angstrom(qvals)
+checkQAngstrom(qvals)
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -68,103 +68,108 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-const Q_MAX_FIT = 0.3
+# No q cut: the whole deposited curve (q 0.0104-0.4400 Å⁻¹) is fitted, `seedModel` drops
+# the non-positive bins. A cut at 0.3 Å⁻¹ was used before, but the 277 points above 0.3
+# Å⁻¹ (σ > 0) have a median I/σ of 0.66 and 28 % of them have I ≤ 0, so the data above it
+# are not demonstrably unusable (median I/σ 0.66 ≥ 0.5; median I/σ 1.20 ≥ 1 in the
+# lowest-q quarter (up to 0.33 Å⁻¹); rule in README.md).
+const Q_MAX_FIT = Inf
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 # The model's 630 GROMACS hydrogens are rebuilt by pdb2pqr.
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 # One run per atomic model with a deposited fit; `fit` is that model's
-# reference curve (q scaled to Å⁻¹ by `fit_scale`; the fitted intensity is
-# column `fit_col`; `rescale` = the file is normalized, scale it to the data).
+# reference curve (q scaled to Å⁻¹ by `fitScale`; the fitted intensity is
+# column `fitCol`; `rescale` = the file is normalized, scale it to the data).
 const RUNS = [
     (
     tag = "fit1_model1",
-    ref_chi2 = "FoXS 1.10",
+    refChi2 = "FoXS 1.10",
     pdb = "SASDQ69_fit1_model1.pdb",
     fit = "SASDQ69_fit1.fit",
-    fit_scale = 1.0,
-    fit_col = 4,
+    fitScale = 1.0,
+    fitCol = 4,
     rescale = false,
     software = "FoXS",
 ),   # deposited χ² = 1.100 (FoXS)
 ]
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
 `qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
+function fitSubset()
     keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdq69` samples. It is separate only because
+# Builds the Seed that `runSasdq69` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
-# `run_sasdq69` below is the whole story (build the seed, then sample it).
-function seed_sasdq69(run; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdq69` below is the whole story (build the seed, then sample it).
+function seedSasdq69(run; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, q_fit, I_fit,
+    s = BAYSOL.seedModel(
+        LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, qFit, iFit,
         σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdq69(
+function runSasdq69(
     run;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdq69(run; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdq69(run; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
 for run in RUNS
     # one set of outputs per run; a single-run entry keeps the plain `res*` names
     suffix = length(RUNS) == 1 ? "" : "_" * run.tag
 
-    result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdq69(run)
+    result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdq69(run)
 
     # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-    # run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
-    fit_curve = try
-        fc = _read_fit(joinpath(_FIXTURE_DIR, run.fit), run.fit_scale, run.fit_col)
-        fc !== nothing && run.rescale ? _rescale_fit(fc, q_fit, I_fit) : fc
+    # run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
+    fitCurve = try
+        fc = _readFit(joinpath(_FIXTURE_DIR, run.fit), run.fitScale, run.fitCol)
+        fc !== nothing && run.rescale ? _rescaleFit(fc, qFit, iFit) : fc
     catch e
         @warn "could not read the reference fit" run.fit exception = e
         nothing
     end
     references = BAYSOL.Reference[]
-    if fit_curve !== nothing
+    if fitCurve !== nothing
         push!(
             references,
             BAYSOL.Reference(
                 run.software * " " * run.tag * (run.rescale ? " (rescaled)" : ""),
-                fit_curve...; q_max = Q_MAX_FIT,
+                fitCurve...; qMax = Q_MAX_FIT,
             ),
         )
     end
     BAYSOL.results(
-        result, (q_fit, I_fit, σ_fit);
+        result, (qFit, iFit, σ_fit);
         dir = @__DIR__, name = "res$(suffix)", references,
-        form_factor_log = form_factor_log, n_atoms = n_atoms,
-        ref_chi2 = run.ref_chi2,
-        run_log = true,
+        formFactorLog = formFactorLog, nAtoms = nAtoms,
+        refChi2 = run.refChi2,
+        runLog = true,
     )
 
     # `@__DIR__` (this SASDQ69/ folder), not the caller's cwd.
-    BAYSOL.print_summary(result)
+    BAYSOL.printSummary(result)
 end

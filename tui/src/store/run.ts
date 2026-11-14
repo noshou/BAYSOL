@@ -471,17 +471,17 @@ export type Launcher = (spec: LaunchSpec) => ChildProcess
 
 /**
  * The Julia file that does a run (`run-project.jl`, next to this file): it holds the module
- * `BAYSOLRun` with `run_project`, which uses the package BAYSOL for the fit itself.
+ * `BAYSOLRun` with `runProject`, which uses the package BAYSOL for the fit itself.
  */
 export const runProjectFile = fileURLToPath(new URL("./run-project.jl", import.meta.url))
 
 /**
- * What Julia runs: it loads the file of the run and calls `run_project`; the file and the
+ * What Julia runs: it loads the file of the run and calls `runProject`; the file and the
  * values come in `ARGS`, never spliced into the code.
  */
 const juliaProgram =
-    "include(ARGS[1]); BAYSOLRun.run_project(ARGS[2]; temperature = parse(Float64, " +
-    "ARGS[3]), ui = :tui, run_dir = ARGS[4])"
+    "include(ARGS[1]); BAYSOLRun.runProject(ARGS[2]; temperature = parse(Float64, " +
+    "ARGS[3]), ui = :tui, runDir = ARGS[4])"
 
 /**
  * The Julia program to start: the `JULIA` environment variable (the one the dev tools
@@ -523,7 +523,7 @@ export function juliaArgs(
 }
 
 /**
- * The real launcher: `julia ... -e 'include(...); BAYSOLRun.run_project(...)'` in its own
+ * The real launcher: `julia ... -e 'include(...); BAYSOLRun.runProject(...)'` in its own
  * process group, with the same cache folder as this program and three pipes.
  *
  * @returns the child. A Julia that cannot be started arrives as its `error` event.

@@ -50,12 +50,12 @@ export interface Solute {
 }
 
 /**
- * A solute as the row of the buffer file: `sigmaMM` is written `sigma-mM` there.
+ * A solute as the row of the buffer file: `sigmaMM` is written `sigmaMm` there.
  *
  * Two types describe a solute on purpose. [[Solute]] is the draft in a table: camelCase
  * (`sigmaMM`), `null` for what is not typed yet, and no obligation to be complete.
  * `BufferRow` of ./buffer.ts is the row of the file, with the spelling the Julia loader
- * reads (`"sigma-mM"`) and every number given. This adapter is the one place that
+ * reads (`"sigmaMm"`) and every number given. This adapter is the one place that
  * turns the first into the second (the check of the file, `rowProblem`, runs on its
  * result), so no other module spells a key twice.
  *
@@ -63,15 +63,15 @@ export interface Solute {
  */
 export function bufferRow(s: Solute): Record<string, unknown> {
     const { sigmaMM, ...rest } = s
-    return { ...rest, "sigma-mM": sigmaMM }
+    return { ...rest, "sigmaMm": sigmaMM }
 }
 
 /**
- * A row of a buffer file as the draft a table edits: `sigma-mM` becomes
+ * A row of a buffer file as the draft a table edits: `sigmaMm` becomes
  * `sigmaMM`, the one renaming, which [[rowOf]] undoes. Every other key travels along.
  */
 export function soluteOf(row: BufferRow): Solute {
-    const { "sigma-mM": sigmaMM, ...rest } = row as BufferRow & Record<string, unknown>
+    const { "sigmaMm": sigmaMM, ...rest } = row as BufferRow & Record<string, unknown>
     return { ...rest, sigmaMM } as unknown as Solute
 }
 

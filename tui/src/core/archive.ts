@@ -257,6 +257,7 @@ const methodOptions = (): string[] => {
 
 /** The options every command shares: this 7-Zip, 7z format, no wildcards, no prompts. */
 const common = (): SevenZipOptions => ({
+    // biome-ignore lint/style/useNamingConvention: node-7z option
     $bin: archiveTool(),
     archiveType: "7z",
     noWildcards: true,
@@ -303,6 +304,7 @@ export async function packFiles(
         const options: SevenZipOptions = {
             ...common(),
             method: methodOptions(),
+            // biome-ignore lint/style/useNamingConvention: node-7z option
             $defer: true,
         }
         await finished(startIn(sevenZip.add(staging, [...files], options), folder))
@@ -381,6 +383,7 @@ export async function extractEntries(
         sevenZip.extractFull(archive, into, {
             ...common(),
             overwrite: "a",
+            // biome-ignore lint/style/useNamingConvention: node-7z option
             $cherryPick: [...names],
         }),
     )

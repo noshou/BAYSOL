@@ -1,0 +1,17 @@
+// Canadian provincial and territorial government colours
+
+{
+    "set": "nunavut",
+    "title": "Government of Nunavut visual identity guidelines: Authentic Nunavut arts brand (not the government identity)",
+    "licence": "Authentic Nunavut is a registered trademark (arts brand); permission-based use; colour values are facts",
+    "url": "https://www.gov.nu.ca/sites/default/files/publications/2023-03/visual_identity_guidelines.pdf",
+    "colours": [
+        {"name": "nunavut yellow", "hex": "#e7a615", "family": "yellow"},
+        {"name": "nunavut green", "hex": "#5c5600", "family": "brown"},
+        {"name": "nunavut blue", "hex": "#5a9699", "family": "blue"},
+        {"name": "nunavut orange", "hex": "#e48e19", "family": "orange"},
+        {"name": "nunavut teal", "hex": "#32b0a6", "family": "cyan"},
+        {"name": "nunavut deep blue", "hex": "#005569", "family": "blue"},
+        {"name": "nunavut sandstone", "hex": "#beb579", "family": "yellow"}
+    ]
+}

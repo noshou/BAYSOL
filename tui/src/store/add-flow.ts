@@ -30,7 +30,7 @@
 // (`advance(state, event)`), which is what the class wraps.
 //
 // The row keys follow `Solute` of ./solutes.ts (`sigmaMM`); `bufferRow` renames it to the
-// `sigma-mM` of the file (see ./solutes.ts), which `rowProblem` of ./buffer.ts checks.
+// `sigmaMm` of the file (see ./solutes.ts), which `rowProblem` of ./buffer.ts checks.
 //
 // The vocabulary of the flow (fields, entries, params cell, states, events, steps) is in
 // `solutes.ts`.

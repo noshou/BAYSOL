@@ -2,7 +2,7 @@
 
 // The references screen of a project: the reference curves in its `reference-fit/` folder
 // (the depositor's CRYSOL or FoXS fit, ...), which the comparison of a run draws with the
-// measured curve and the fits. `^n` adds one from any table (a path prompt, then the
+// measured curve and the fits. `shift+a` adds one from any table (a path prompt, then the
 // import screen of the data screen in its reference mode), `^r` deletes the highlighted
 // one after the destructive question. Nothing is listed from memory: the folder is read
 // again at every key and when the screen regains the focus, so another copy's change shows.
@@ -109,10 +109,10 @@ export function referenceNote(entry: ReferenceEntry | undefined): string | undef
 /**
  * The references of a project: a table of the curves in `reference-fit/` (name, points, q
  * range in the project's units), an unusable file listed as `unusable` with its reason as
- * the note (the program never deletes or changes it). Keys: up and down move, `^n` adds
- * (a path or, with an empty field, `o` for the file picker; the import screen then reads
- * q, I(q) and an optional sigma), `^r` (or Delete) deletes the highlighted one after the
- * question, `^x` goes back.
+ * the note (the program never deletes or changes it). Keys: up and down move,
+ * `shift+a` adds (a path or, with an empty field, `e` for the file picker; the import
+ * screen then reads q, I(q) and an optional sigma), `^r` (or Delete) deletes the
+ * highlighted one after the question, `^x` goes back.
  *
  * @param props - the project.
  * @returns the screen.
@@ -210,7 +210,7 @@ export function ReferencesScreen({ project }: { project: ProjectRef }): ReactNod
         leave: toList,
     })
 
-    /** `^n`: a path prompt, once the project has data. */
+    /** `shift+a`: a path prompt, once the project has data. */
     const add = () => {
         if (readDataInfo(dir)?.kind !== "ok") return say(IMPORT_DATA_FIRST, true)
         setProblem(undefined)

@@ -1,0 +1,219 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+# Tests for dev/src/seed-diagnostics.jl, the sampler diagnostics
+# used on the SASBDB fitting tests (through `bysl fits diagnose`). They run
+# on a small toy seed so that the diagnostics cannot rot unnoticed; the
+# numbers they produce on real fits are not asserted here.
+
+include(joinpath(@__DIR__, "..", "testsetup.jl"))
+
+using BAYSOL.BulkElectronDensity: Solute, NonBiological
+using BAYSOL.Scattering: forwardCache, ForwardCache
+using BAYSOL.MolecularStructure: MolecularStructure
+using StaticArrays: SVector
+using Random
+using Statistics: mean, median
+
+include(joinpath(@__DIR__, "..", "..", "..", "dev", "src", "seed-diagnostics.jl"))
+using .SeedDiagnostics
+
+const SDF = BAYSOL.Inference
+
+# 16 atoms on a helix (mixed n/c/o, non-planar), the same shape of fixture as
+# test-sampler.jl, self-contained here per this directory's one-file-one-concern convention.
+function sdgMol()
+    elms = repeat(["n", "c", "c", "o"], 4)
+    crds =
+        [(1.6 * cos(0.85 * i), 1.6 * sin(0.85 * i), 0.55 * i) for i in 0:(length(elms)-1)]
+    return MolecularStructure.create("sdg", elms, crds)
+end
+
+const SDG_Q = collect(range(0.0, 0.35; length = 10))
+
+"""
+A `Seed` on the toy helix with synthetic data (ξ_TRUE,
+c1 = 1.1) at ~1 % noise: smooth, well-posed, fast.
+"""
+function sdgSeed(; relNoise = 0.01)
+    fw = forwardCache(sdgMol(), SDG_Q, 3, 9000.0; chunk = UInt64(4))
+    y = referenceIntensity(fw, 1.7, 0.3, CRYSOL_SOLVENT_DENSITY, (1.05, -0.05, -1.0), 1.1)
+    σ = max.(abs.(y) .* relNoise, 1.0e-6)
+    Random.seed!(0x5D6)
+    iExp = y .+ randn(length(y)) .* σ
+    Random.seed!(0x5D7)
+    return SDF.seedSampler(
+        fw,
+        iExp,
+        σ,
+        7.4,
+        0.05,
+        Solute[NonBiological(0.15, 0.001, "sodium chloride")],
+    )
+end
+
+@testset "SeedDiagnostics" begin
+
+    @testset "ess: iid draws ≈ n, AR(1) draws ≈ n(1-ρ)/(1+ρ), constant → NaN" begin
+        Random.seed!(1)
+        n = 20_000
+        @test ess(randn(n)) > 0.8n
+        ρ = 0.9
+        x = zeros(n)
+        for i in 2:n
+            x[i] = ρ * x[i-1] + sqrt(1 - ρ^2) * randn()
+        end
+        @test ess(x; maxlag = 200) ≈ n * (1 - ρ) / (1 + ρ) rtol = 0.5
+        @test isnan(ess(fill(2.0, 100)))
+    end
+
+    # …by the free scale+offset
+    @testset "curve_chi2: an exact curve gives 0, a rescaled one is recovered" begin
+        q = collect(range(0.01, 0.3; length = 50))
+        I = 100 .* exp.(-q .^ 2 .* 200)
+        σ = 0.01 .* I
+        c = curve_chi2(q, I, σ, q, I)
+        @test c.n == 50 && c.raw < 1e-20 && c.fitted < 1e-20
+        c = curve_chi2(q, I, σ, q, 0.5 .* I .+ 3)
+        @test c.raw > 1 && c.fitted < 1e-12
+        @test_throws ArgumentError curve_chi2(q, I, σ, q .+ 10, I)
+    end
+
+    seed = sdgSeed()
+    rep = nuts_replica(seed; nSamples = 160, nAdapt = 80, rngSeed = 11)
+    sp = rep.sp
+
+    @testset "nuts_replica: shapes, a positive adapted step size, finite draws" begin
+        @test size(rep.W) == (4, 160) && size(rep.post) == (4, 80)
+        @test length(rep.stats) == 160
+        @test rep.ε > 0 && rep.ε0 > 0 && all(isfinite, rep.W)
+        @test rep.n_leapfrog == sum(s -> s.n_steps, rep.stats)
+        @test_throws ArgumentError nuts_replica(seed; nSamples = 10, nAdapt = 10)
+    end
+
+    # …the whitening is reused
+    @testset "nuts_replica: same rngSeed reproduces the chain" begin
+        again = nuts_replica(seed; nSamples = 160, nAdapt = 80, rngSeed = 11, sp = sp)
+        @test again.W == rep.W
+        @test again.sp === sp
+    end
+
+    @testset "gradient_w: matches a central difference of log π(θ(w))" begin
+        # a fixed point near the mode (a sampled one can sit at a kink of the profiled c1)
+        w = [0.3, -0.2, 0.5, -0.1]
+        g = gradient_w(seed, sp, w; tol = 1e-11)
+        @test length(g) == 4 && all(isfinite, g)
+        f(x) = SDF._logπ(
+            SDF._θ_of_w(SVector{4}(x...), sp),
+            seed.pr,
+            seed.wls,
+            seed.fw;
+            tab = seed.c1tab,
+            c1Tol = 1e-11,
+        )
+        h = 1e-5
+        for i in 1:4
+            e = zeros(4)
+            e[i] = h
+            @test g[i] ≈ (f(w .+ e) - f(w .- e)) / 2h rtol = 1e-3 atol = 1e-5
+        end
+    end
+
+    @testset "gradient_noise: zero against itself, and shrinking with the tolerance" begin
+        self = gradient_noise(seed, sp, rep.post; tol = 1e-11, ref_tol = 1e-11, n = 8)
+        @test all(==(0.0), self.noise)
+        @test length(self.noise) == length(self.grad_norm) == 8
+        loose = gradient_noise(seed, sp, rep.post; tol = 1e-2, n = 8)
+        tight = gradient_noise(seed, sp, rep.post; tol = SDF.EXCL_VOL_CORR_TOL, n = 8)
+        @test all(isfinite, loose.noise) && all(≥(0), loose.noise)
+        @test maximum(tight.noise) ≤ maximum(loose.noise)
+    end
+
+    # …on a stiff fit
+    @testset "regression: the default c1 tolerance keeps NUTS's gradient accurate" begin
+        # With σ = 1e-5·I the posterior is narrow and ∂²f/∂c1∂ξ large, so a c1 error δ
+        # perturbs the envelope- theorem gradient by about (∂²f/∂c1∂ξ)·δ, first order. At
+        # the old tolerance 1e-5 that error is of the order of the gradient itself (the
+        # sampler's step size collapses on real fits like this); at the package default it
+        # must be negligible. The first assertion fails if the fixture stops being stiff.
+        stiff = sdgSeed(; relNoise = 1e-5)
+        r = nuts_replica(stiff; nSamples = 200, nAdapt = 100, rngSeed = 5)
+        old = gradient_noise(stiff, r.sp, r.post; tol = 1e-5, n = 12)
+        now = gradient_noise(stiff, r.sp, r.post; tol = SDF.EXCL_VOL_CORR_TOL, n = 12)
+        @test median(old.noise) > 0.1 * median(old.grad_norm)
+        @test median(now.noise) < 0.01 * median(now.grad_norm)
+    end
+
+    @testset "local_curvature: one pair of eigenvalues per probed draw, λ_max ≥ λ_min" begin
+        lc = local_curvature(seed, sp, rep.post; n = 6)
+        @test length(lc.λmax) == length(lc.λmin) == 6
+        @test all(lc.λmax .≥ lc.λmin) && all(isfinite, lc.λmax)
+    end
+
+    starts = lbfgs_starts(seed; rngSeed = 3, nStarts = 4)
+
+    @testset "lbfgs_starts: each feasible start reports how it stopped" begin
+        @test !isempty(starts)
+        for o in starts
+            @test isfinite(o.f) && o.iters ≥ 0 && o.grad_gap ≥ 0
+            @test o.ξ[1] > 0 && 0.7 < o.c1 < 1.4
+        end
+        # reproducible under rngSeed
+        @test lbfgs_starts(seed; rngSeed = 3, nStarts = 4) == starts
+    end
+
+    # …a well-posed MAP is step-independent
+    @testset "hessian_sensitivity: eigenvalues for every step size" begin
+        hs = hessian_sensitivity(seed, sp.ẑ; rels = (0.3, 0.1))
+        @test length(hs.pass1) == 4 && sort(collect(keys(hs.pass2))) == [0.1, 0.3]
+        @test all(isfinite, hs.pass2[0.1]) && all(hs.σ_lap .> 0)
+    end
+
+    # …for a positive-definite Hessian
+    @testset "mode_table: best mode first, Laplace mass finite only" begin
+        modes = mode_table(seed, starts, sp)
+        @test !isempty(modes) && issorted(getproperty.(modes, :f))
+        @test all(m -> length(m.λ) == 4, modes)
+        @test all(m -> isnan(m.logMass) || isfinite(m.logMass), modes)
+    end
+
+    @testset "axis_scan: four axes, ratios finite, no c1 regime jump on a smooth fit" begin
+        scans = axis_scan(seed, sp; grid = 41)
+        @test length(scans) == 4 && [a.axis for a in scans] == 1:4
+        @test all(
+            a -> all(isfinite, a.ratio) && a.noise ≥ 0 && a.f2_max ≥ a.f2_median,
+            scans,
+        )
+        @test all(a -> a.c1_range[1] ≤ a.c1_range[2], scans)
+    end
+
+    @testset "diagnose: writes its report" begin
+        io = IOBuffer()
+        diagnose(io, seed; label = "toy", nSamples = 120, nAdapt = 60)
+        txt = String(take!(io))
+        for key in (
+            "toy",
+            "MAP search",
+            "NUTS:",
+            "L-BFGS starts",
+            "gradient error",
+            "distinct optima",
+        )
+            @test occursin(key, txt)
+        end
+    end
+
+    # …draw statistics
+    @testset "chain_report: one line per chain, divergent draws listed" begin
+        io = IOBuffer()
+        rows = chain_report(io, seed; label = "toy", nSamples = 60, nAdapt = 30,
+            rngSeed = 3)
+        txt = String(take!(io))
+        @test length(rows) ≥ BAYSOL.Inference.N_CHAINS
+        @test occursin("toy", txt) && occursin("pooled kept draws", txt)
+        @test all(r -> r.pooled == false || r.nPost ≥ 0, rows)
+        # the same seed gives the same report
+        io2 = IOBuffer()
+        chain_report(io2, seed; label = "toy", nSamples = 60, nAdapt = 30, rngSeed = 3)
+        @test String(take!(io2)) == txt
+    end
+end

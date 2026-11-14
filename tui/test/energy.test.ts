@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // Tests of the energy units of the data screen (a label, never converted): the
-// `energy_unit` field of data.json and the summary line.
+// `energyUnit` field of data.json and the summary line.
 
 import assert from "node:assert/strict"
 import { readFileSync, writeFileSync } from "node:fs"
@@ -52,14 +52,14 @@ test("energy: the summary is the number as typed and its unit, no conversion", (
     assert.equal(energyText(1.0332, "A"), "1.0332 Å")
 })
 
-test("energy: energy_unit in data.json, always written, invalid or missing refused", () => {
+test("energy: energyUnit in data.json, always written, invalid or missing refused", () => {
     const dir = tempDir()
     writeData(dir, curve, "c.dat", "A-1", 12000)
-    assert.equal(infoOf(dir).energy_unit, "nm", "the default unit is written")
-    assert.equal(fileOf(dir).energy_unit, "nm")
+    assert.equal(infoOf(dir).energyUnit, "nm", "the default unit is written")
+    assert.equal(fileOf(dir).energyUnit, "nm")
     setEnergyUnit(dir, "nm")
-    assert.equal(infoOf(dir).energy_unit, "nm")
-    assert.equal(fileOf(dir).energy_unit, "nm")
+    assert.equal(infoOf(dir).energyUnit, "nm")
+    assert.equal(fileOf(dir).energyUnit, "nm")
     // a label only: the number is not touched, and the other writers keep the unit
     assert.equal(infoOf(dir).energy, 12000)
     setEnergyUnit(dir, "keV")
@@ -68,23 +68,23 @@ test("energy: energy_unit in data.json, always written, invalid or missing refus
     setUnits(dir, "nm-1")
     setEnergy(dir, 8048, "nm")
     const kept = infoOf(dir)
-    assert.equal(kept.energy_unit, "nm")
+    assert.equal(kept.energyUnit, "nm")
     assert.equal(kept.energy, 8048)
     setEnergy(dir, 1.5, "A")
-    assert.equal(infoOf(dir).energy_unit, "A")
+    assert.equal(infoOf(dir).energyUnit, "A")
     setEnergy(dir, 8048, "nm")
-    writeData(dir, curve, "d.dat", "A-1", 8048, undefined, kept.energy_unit)
-    assert.equal(infoOf(dir).energy_unit, "nm")
+    writeData(dir, curve, "d.dat", "A-1", 8048, undefined, kept.energyUnit)
+    assert.equal(infoOf(dir).energyUnit, "nm")
     // eV is written like the others
     setEnergyUnit(dir, "eV")
-    assert.equal(fileOf(dir).energy_unit, "eV")
+    assert.equal(fileOf(dir).energyUnit, "eV")
     setEnergy(dir, 5, "nm")
-    assert.equal(fileOf(dir).energy_unit, "nm")
+    assert.equal(fileOf(dir).energyUnit, "nm")
     // an invalid value makes the file unusable
     for (const bad of ['"mm"', "3", "null", "undefined"]) {
         writeFileSync(
             dataJsonFile(dir),
-            `{"units":"A-1","energy":1,"source":"s","points":4,"energy_unit":${bad}}`,
+            `{"units":"A-1","energy":1,"source":"s","points":4,"energyUnit":${bad}}`,
         )
         assert.equal(readDataInfo(dir)?.kind, "unusable", bad)
     }
@@ -93,5 +93,5 @@ test("energy: energy_unit in data.json, always written, invalid or missing refus
         dataJsonFile(dir),
         '{"units":"A-1","energy":1,"source":"s","points":4}',
     )
-    assert.equal(readDataInfo(dir)?.kind, "unusable", "no energy_unit")
+    assert.equal(readDataInfo(dir)?.kind, "unusable", "no energyUnit")
 })

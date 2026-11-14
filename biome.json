@@ -6,6 +6,25 @@
     "formatter": { "enabled": false },
     "linter": {
         "enabled": true,
-        "rules": { "preset": "recommended" }
+        "rules": {
+            "preset": "recommended",
+            "style": { "useNamingConvention": {
+                    "level": "error",
+                    "options": {
+                        "strictCase": false,
+                        "requireAscii": false,
+                        "conventions": [
+                            {
+                                "selector": { "kind": "objectLiteralProperty" },
+                                "formats": ["camelCase", "CONSTANT_CASE"]
+                            },
+                            {
+                                "selector": { "kind": "importNamespace" },
+                                "formats": ["camelCase", "PascalCase", "CONSTANT_CASE"]
+                            }
+                        ]
+                    }
+                } }
+        }
     }
 }

@@ -29,7 +29,7 @@ import { useTableScreen, withNoteText } from "./screen-rules.js"
 const ADDS = [legendFor("new note", keys.addNonbio)]
 
 /** The key of the legend that acts on the highlighted note. */
-const ROW_KEYS = [legendFor("rename", keys.notes)]
+const ROW_KEYS = [legendFor("rename", keys.renameNote)]
 
 /** What the empty table says. */
 const EMPTY_HINT = "none"
@@ -45,11 +45,11 @@ const CHARS_WIDTH = 7
  *
  * Keys: up and down move; Enter opens the note in the [[NotesEditor]] (`^w` there, or
  * leaving it, saves the list through `onSave` at once); `^n` asks a title (`note 1`,
- * `note 2`, ... to start from) and opens a new, empty note; `^e` renames the note; `^r`
- * marks the row to go (`-`, undone by `^u`, gone at `^w`); `/` finds a row and `s` puts
- * them in alphabetical order; `^w` saves; `^x` goes back, asking first when something
- * is unsaved. A title is not blank, at most 40 characters, without control characters and
- * unique among the notes (case does not matter).
+ * `note 2`, ... to start from) and opens a new, empty note; `shift+m` renames the note;
+ * `^r` marks the row to go (`-`, undone by `^u`, gone at `^w`); `/` finds a row and
+ * `z` puts them in alphabetical order; `^w` saves; `^x` goes back, asking first when
+ * something is unsaved. A title is not blank, at most 40 characters, without control
+ * characters and unique among the notes (case does not matter).
  *
  * @param props.owner - whose notes they are, shown as the subtitle and in the editor's
  *     title.
@@ -131,7 +131,7 @@ export function NotesList(props: {
         if (t.handleKey(press)) return
         if (press.is(keys.enter) && t.canEdit && t.current) {
             openEditor(t.cursor.index, t.current)
-        } else if (press.is(keys.notes) && t.canEdit && t.current) {
+        } else if (press.is(keys.renameNote) && t.canEdit && t.current) {
             naming.open(t.cursor.index, t.current.title)
         } else if (press.is(keys.addNonbio) && t.canAdd) {
             const rows = t.drafts.rows.map((r) => ({ title: noteOf(r).title }))

@@ -17,4 +17,6 @@ Files:
                                    named "fit1" only to follow the layout of the other cases.
 There is no deposited fit, so there is no reference curve.
 The fitting script test/fitting_tests/SASDV82/ states the conditions it takes from the
-entry; the paper was not consulted.
+entry; the paper (PMC11440596) was read on 2026-11-13; see the script header.
+
+Fit range (2026-11-13): the script cuts at q = 0.25 1/A (flat noise floor: above it 261 points, median I/sigma -0.12, 54 % I <= 0).

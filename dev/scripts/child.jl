@@ -4,9 +4,9 @@
 # section of README.md). Do not run by hand: `bysl fits bench` starts it in a fresh
 # process, in the right environment, and collects the JSON it prints.
 #
-#   julia --project=<repo> child.jl <repo> <ID[:tag]> [n_samples n_adapt]
+#   julia --project=<repo> child.jl <repo> <ID[:tag]> [nSamples nAdapt]
 #
-# Without n_samples and n_adapt the fit uses whatever `run_model`
+# Without nSamples and nAdapt the fit uses whatever `runModel`
 # defaults to in <repo>, so the benchmark follows the code it
 # measures; the iterations actually used are recorded in the result.
 #
@@ -16,40 +16,41 @@
 using JSON3
 const T_PROC = time()
 const REPO, SPEC = ARGS[1], ARGS[2]
-# (n_samples, n_adapt), or the defaults
+# (nSamples, nAdapt), or the defaults
 const ITERATIONS = length(ARGS) ≥ 4 ? (parse(Int, ARGS[3]), parse(Int, ARGS[4])) : nothing
 
-# Every fit runs with this `rng_seed`, in the first and the
+# Every fit runs with this `rngSeed`, in the first and the
 # steady fit alike: the MAP search, the extra chains it may start and every chain depend on
 # the seed, so a fresh seed each time measures a different amount of work from one run to
-# the next (about one run in six of SASDBS6:fit2_model3 finds a second mode and starts two
-# more chains, which costs 60 to 90 %). The same seed in two revisions is the same work.
+# the next (about one run in six of the removed SASDBS6:fit2_model3 found a second mode
+# and started two more chains, which cost 60 to 90 %). The same seed in two revisions is
+# the same work.
 const RNG_SEED = 1
 
 t_using = @elapsed using BAYSOL
-t_tool  = @elapsed include(joinpath(REPO, "dev", "src", "fit_seed.jl"))
+t_tool  = @elapsed include(joinpath(REPO, "dev", "src", "fit-seed.jl"))
 id, tag = occursin(':', SPEC) ? String.(split(SPEC, ":"; limit = 2)) : (String(SPEC), "")
 
 function one_fit()
     local seed
-    seed_s = @elapsed (seed, _, _) = load_fit_seed(id, tag)
-    run_s = @elapsed redirect_stderr(devnull) do
-        ITERATIONS === nothing ? BAYSOL.run_model(seed; rng_seed = RNG_SEED) :
-        BAYSOL.run_model(seed, ITERATIONS...; rng_seed = RNG_SEED)
+    seedS = @elapsed (seed, _, _) = load_fit_seed(id, tag)
+    runS = @elapsed redirect_stderr(devnull) do
+        ITERATIONS === nothing ? BAYSOL.runModel(seed; rngSeed = RNG_SEED) :
+        BAYSOL.runModel(seed, ITERATIONS...; rngSeed = RNG_SEED)
     end
     st = seed.timing.stages
     return Dict{String,Any}(
-        "seed_s" => seed_s, "run_s" => run_s, "total_s" => seed_s + run_s,
-        "stage_name" => [s.name for s in st], "stage_depth" => [s.depth for s in st],
-        "stage_seconds" => [s.seconds for s in st],
-        "stage_compile" => [s.compile for s in st],
-        "stage_gc" => [s.gc for s in st],
-        "n_samples" => seed.timing.info["n_samples"],
-        "n_adapt" => seed.timing.info["n_adapt"],
-        "n_chains" => get(seed.timing.info, "n_chains", 1), "rng_seed" => RNG_SEED,
-        "n_atoms" => seed.fw.n_atoms, "n_q" => length(seed.fw.qvals),
+        "seedS" => seedS, "runS" => runS, "totalS" => seedS + runS,
+        "stageName" => [s.name for s in st], "stageDepth" => [s.depth for s in st],
+        "stageSeconds" => [s.seconds for s in st],
+        "stageCompile" => [s.compile for s in st],
+        "stageGc" => [s.gc for s in st],
+        "nSamples" => seed.timing.info["nSamples"],
+        "nAdapt" => seed.timing.info["nAdapt"],
+        "nChains" => get(seed.timing.info, "nChains", 1), "rngSeed" => RNG_SEED,
+        "nAtoms" => seed.fw.nAtoms, "nQ" => length(seed.fw.qvals),
         "lMax" => seed.fw.lMax,
-        "n_q_raw" => length(seed.shannon.q_raw), "rebin" => seed.shannon.rebin,
+        "nQRaw" => length(seed.shannon.qRaw), "rebin" => seed.shannon.rebin,
         "D" => seed.shannon.D,
     )
 end
@@ -59,8 +60,8 @@ second_fit = one_fit()
 JSON3.write(
     stdout,
     Dict{String,Any}(
-        "using_baysol_s" => t_using, "tooling_load_s" => t_tool,
-        "process_s" => time() - T_PROC,
+        "usingBaysolS" => t_using, "toolingLoadS" => t_tool,
+        "processS" => time() - T_PROC,
         "first" => first_fit, "second" => second_fit,
     ),
 )

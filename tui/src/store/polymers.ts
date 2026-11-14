@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // The custom polymers: a generic additive chain of 1 to 4 kinds of repeat unit,
-// `{kind, name, units: [{label, formula, z, slope, sigma}, ...], z-ends, pmv-ends,
-// sigma-ends}` (the schema is frozen in `test/fixtures/buffer/custom-solutes.json`; the
-// keys keep their file spelling, so `"z-ends"` is a quoted key, as in `./buffer.ts`):
-// PMV(n) = pmv-ends + sum(slope_i n_i), Z(n) = z-ends + sum(z_i n_i). The end groups have
+// `{kind, name, units: [{label, formula, z, slope, sigma}, ...], zEnds, pmvEnds,
+// sigmaEnds}` (the schema is frozen in `test/fixtures/buffer/custom-solutes.json`; the
+// keys keep their file spelling, so `"zEnds"` is a quoted key, as in `./buffer.ts`):
+// PMV(n) = pmvEnds + sum(slope_i n_i), Z(n) = zEnds + sum(zI n_i). The end groups have
 // no default: the user types them.
 //
 // Pure functions of an entry, so none of it needs a terminal: the types and checks of a
@@ -22,7 +22,7 @@ import { isProblem, parseFormula, takeFormula } from "./formula.js"
 
 /**
  * The relative uncertainty of the PMV of a polymer unit whose `sigma` is blank: 2 % of
- * the PMV. This is `POLYMER_UNKNOWN_REL_UNC` of `Polymers.jl` (BulkElectronDensity),
+ * the PMV. This is `POLYMER_UNKNOWN_REL_UNC` of `polymers.jl` (BulkElectronDensity),
  * where the blank is resolved; the screen only says `(2%)`.
  */
 export const POLYMER_UNKNOWN_REL_UNC = 0.02
@@ -62,17 +62,17 @@ export interface EntryUnit {
  * A custom polymer.
  *
  * @property units - 1 to [[MAX_UNITS]] kinds of repeat unit.
- * @property z-ends - the electrons of the end groups, 0 or more.
- * @property pmv-ends - their PMV.
- * @property sigma-ends - their uncertainty, `null` for none.
+ * @property zEnds - the electrons of the end groups, 0 or more.
+ * @property pmvEnds - their PMV.
+ * @property sigmaEnds - their uncertainty, `null` for none.
  */
 export interface PolymerEntry {
     kind: "polymer"
     name: string
     units: EntryUnit[]
-    "z-ends": number | null
-    "pmv-ends": number | null
-    "sigma-ends": number | null
+    "zEnds": number | null
+    "pmvEnds": number | null
+    "sigmaEnds": number | null
 }
 
 /** The cells of a unit. */
@@ -92,9 +92,9 @@ type TopField =
     | "pmv"
     | "sigma"
     | "units"
-    | "z-ends"
-    | "pmv-ends"
-    | "sigma-ends"
+    | "zEnds"
+    | "pmvEnds"
+    | "sigmaEnds"
 
 /** A field of an entry: a top field or a cell of a unit. */
 export type EntryField = TopField | UnitField
@@ -126,9 +126,9 @@ export function blankPolymer(): PolymerEntry {
         kind: "polymer",
         name: "",
         units: [blankUnit()],
-        "z-ends": null,
-        "pmv-ends": null,
-        "sigma-ends": null,
+        "zEnds": null,
+        "pmvEnds": null,
+        "sigmaEnds": null,
     }
 }
 
@@ -212,10 +212,10 @@ export function polymerProblem(e: PolymerEntry): FieldProblem | undefined {
     const dup = duplicateLabel(e.units)
     if (dup !== undefined)
         return { field: { unit: dup, key: "label" }, message: "unit label used" }
-    if (!isNumber(e["z-ends"])) return { field: "z-ends", message: "end groups needed" }
-    if (!isNumber(e["pmv-ends"])) return { field: "pmv-ends", message: "end groups needed" }
-    if (isNegative(e["sigma-ends"]))
-        return { field: "sigma-ends", message: "ends ± not below 0" }
+    if (!isNumber(e.zEnds)) return { field: "zEnds", message: "end groups needed" }
+    if (!isNumber(e.pmvEnds)) return { field: "pmvEnds", message: "end groups needed" }
+    if (isNegative(e.sigmaEnds))
+        return { field: "sigmaEnds", message: "ends ± not below 0" }
     return undefined
 }
 
@@ -226,8 +226,8 @@ export type PolymerSnapshot = Omit<CustomPolymerRow, keyof RowBase>
 
 /**
  * What a buffer row stores of a polymer with its counts: `{kind: "custom-polymer", custom,
- * units, z-ends, pmv-ends, sigma-ends, counts}`, the units copied with just their keys.
- * The row's own `name`, `mM` and `sigma-mM` are for the caller to add. The entry must be
+ * units, zEnds, pmvEnds, sigmaEnds, counts}`, the units copied with just their keys.
+ * The row's own `name`, `mM` and `sigmaMm` are for the caller to add. The entry must be
  * complete (see `fieldProblem` of ./custom.ts).
  *
  * @param entry - a stored polymer.
@@ -251,9 +251,9 @@ export function polymerSnapshot(
             slope: slope as number,
             sigma: sigma ?? null,
         })),
-        "z-ends": entry["z-ends"] as number,
-        "pmv-ends": entry["pmv-ends"] as number,
-        "sigma-ends": entry["sigma-ends"] ?? null,
+        "zEnds": entry.zEnds as number,
+        "pmvEnds": entry.pmvEnds as number,
+        "sigmaEnds": entry.sigmaEnds ?? null,
         counts: [...counts],
     }
 }
@@ -272,7 +272,7 @@ export function formatRounded(x: number | null | undefined): string | undefined 
 }
 
 /**
- * The formula of the end groups taken into the polymer: its `z-ends` is what the
+ * The formula of the end groups taken into the polymer: its `zEnds` is what the
  * formula comes to unless the formula is the one it had. The formula is not part of the
  * entry (the stored shape is frozen): it only gives the Z, and is not kept when the form
  * is opened again, so the caller keeps it.
@@ -288,10 +288,10 @@ export function takeEndsFormula(
     endsFormula: string,
     text: string,
 ): { entry: PolymerEntry; endsFormula: string; note: string | undefined } {
-    const r = takeFormula({ formula: endsFormula, z: entry["z-ends"] }, text, false)
+    const r = takeFormula({ formula: endsFormula, z: entry.zEnds }, text, false)
     const negative = r.value.z !== null && r.value.z < 0
     return {
-        entry: { ...entry, "z-ends": negative ? null : r.value.z },
+        entry: { ...entry, "zEnds": negative ? null : r.value.z },
         endsFormula: r.value.formula,
         note: negative ? "Z must be >= 0" : r.note,
     }
@@ -377,8 +377,8 @@ export function compactUnits(units: readonly EntryUnit[]): EntryUnit[] {
 /** A polymer with every number a chain needs, as [[chainValues]] takes it. */
 export interface CompletePolymer extends PolymerEntry {
     units: (EntryUnit & { z: number; slope: number })[]
-    "z-ends": number
-    "pmv-ends": number
+    "zEnds": number
+    "pmvEnds": number
 }
 
 /**
@@ -389,8 +389,8 @@ export interface CompletePolymer extends PolymerEntry {
  */
 function isComplete(e: PolymerEntry): e is CompletePolymer {
     return (
-        isNumber(e["z-ends"]) &&
-        isNumber(e["pmv-ends"]) &&
+        isNumber(e.zEnds) &&
+        isNumber(e.pmvEnds) &&
         e.units.every((u) => isNumber(u.z) && isNumber(u.slope))
     )
 }
@@ -420,7 +420,7 @@ function roundHalfEven(x: number): number {
 /**
  * What a chain of the units of a polymer, with `counts` repeat units of each kind,
  * comes to. This is the rule of `_ρₑ_i(::CustomPolymer)` in
- * `src/BulkElectronDensity/CalcDensity.jl`: ϕ° = pmv-ends + Σ slope·n, Z = round(z-ends
+ * `src/bulk-electron-density/calc-density.jl`: ϕ° = pmvEnds + Σ slope·n, Z = round(zEnds
  * + Σ Z_unit·n) (halves to even), σ = sqrt(Σ term² + σ_ends²) with term = σ_unit·n, or
  * 2 % of |slope·n| for a unit with no σ; when no σ is stated at all (neither of the ends
  * nor of a unit) σ is 2 % of |ϕ°|. Nothing is checked here (see [[fieldProblem]]).
@@ -436,9 +436,9 @@ export function chainValues(
     const units = entry.units
     const sum = (f: (u: CompletePolymer["units"][number], n: number) => number) =>
         units.reduce((s, u, i) => s + f(u, counts[i] as number), 0)
-    const pmv = entry["pmv-ends"] + sum((u, n) => u.slope * n)
-    const z = roundHalfEven(entry["z-ends"] + sum((u, n) => u.z * n))
-    const sEnds = entry["sigma-ends"]
+    const pmv = entry.pmvEnds + sum((u, n) => u.slope * n)
+    const z = roundHalfEven(entry.zEnds + sum((u, n) => u.z * n))
+    const sEnds = entry.sigmaEnds
     const unstated = sEnds === null && units.every((u) => u.sigma === null)
     const terms = (u: CompletePolymer["units"][number], n: number) =>
         u.sigma === null ? POLYMER_UNKNOWN_REL_UNC * Math.abs(u.slope * n) : u.sigma * n
@@ -490,11 +490,11 @@ function chainLine(e: CompletePolymer, k: number): string {
  */
 export function polymerPreview(entry: PolymerEntry): string[] {
     const e: PolymerEntry = { ...entry, units: compactUnits(entry.units) }
-    if (entry.units.every(unitBlank) && e["z-ends"] === null && e["pmv-ends"] === null)
+    if (entry.units.every(unitBlank) && e.zEnds === null && e.pmvEnds === null)
         return []
     const lines = [
-        equation("PMV", e["pmv-ends"], e.units.map((u) => [u.slope, u.label] as const)),
-        equation("Z", e["z-ends"], e.units.map((u) => [u.z, u.label] as const)),
+        equation("PMV", e.pmvEnds, e.units.map((u) => [u.slope, u.label] as const)),
+        equation("Z", e.zEnds, e.units.map((u) => [u.z, u.label] as const)),
     ]
     if (isComplete(e)) for (const k of PREVIEW_COUNTS) lines.push(chainLine(e, k))
     return lines

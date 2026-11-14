@@ -210,8 +210,8 @@ export function removeUnit(state: CustomState, i: number, j: number): CustomStat
  * needs a formula that is understood or a Z above 0, a PMV (a number, negative is fine
  * for an ion) and a ± of 0 or more when given. A polymer needs, of each unit, a label, a
  * Z or formula as above, a slope and a ± of 0 or more when given; labels that differ
- * (`unit label used`, case-insensitively); the end groups (`end groups needed`: `z-ends`
- * and `pmv-ends`, no default) and `sigma-ends` of 0 or more when given. Whether the name
+ * (`unit label used`, case-insensitively); the end groups (`end groups needed`: `zEnds`
+ * and `pmvEnds`, no default) and `sigmaEnds` of 0 or more when given. Whether the name
  * is taken is for [[entryProblem]] and [[problems]], which see the other entries.
  *
  * @param e - the entry.
@@ -296,9 +296,9 @@ export type NonbioSnapshot = Omit<CustomNonbioRow, keyof RowBase>
 /**
  * What a buffer row stores of a stored entry, so the project never reads the global
  * file. A non-biological entry gives `{kind: "custom-nonbio", custom, z, pmv,
- * sigma-pmv}`; a polymer, with its counts, `{kind: "custom-polymer", custom, units,
- * z-ends, pmv-ends, sigma-ends, counts}`, the units copied with just their keys. The
- * row's own `name`, `mM` and `sigma-mM` are for the caller to add. The entry must be
+ * sigmaPmv}`; a polymer, with its counts, `{kind: "custom-polymer", custom, units,
+ * zEnds, pmvEnds, sigmaEnds, counts}`, the units copied with just their keys. The
+ * row's own `name`, `mM` and `sigmaMm` are for the caller to add. The entry must be
  * complete (see [[fieldProblem]]).
  *
  * @param entry - a stored entry.
@@ -318,7 +318,7 @@ export function snapshot(
             custom: entry.name,
             z: entry.z as number,
             pmv: entry.pmv as number,
-            "sigma-pmv": entry.sigma ?? null,
+            "sigmaPmv": entry.sigma ?? null,
         }
     return polymerSnapshot(entry, counts ?? [])
 }
@@ -350,12 +350,12 @@ export type ParseField =
     | "label"
     | "formula"
     | "z"
-    | "z-ends"
+    | "zEnds"
     | "pmv"
     | "slope"
-    | "pmv-ends"
+    | "pmvEnds"
     | "sigma"
-    | "sigma-ends"
+    | "sigmaEnds"
 
 /**
  * What the text typed for a field comes to. The name must not be blank; a label is one
@@ -383,12 +383,12 @@ export function parseField(
             return { value: t }
         case "formula":
             return { value: t }
-        case "z-ends":
+        case "zEnds":
             return parseNumber(t, WHOLE_RULES)
         case "z":
             return parseNumber(t, Z_RULES)
         case "sigma":
-        case "sigma-ends":
+        case "sigmaEnds":
             return parseNumber(t, SIGMA_RULES)
         default:
             return parseNumber(t)
@@ -473,7 +473,7 @@ export function nonbioPreview(
  *                 "sigma": null},
  *                {"label": "B", "formula": "C3H6O", "z": 32, "slope": 53.1,
  *                 "sigma": 0.1}],
- *      "z-ends": 10, "pmv-ends": 19.24, "sigma-ends": null}
+ *      "zEnds": 10, "pmvEnds": 19.24, "sigmaEnds": null}
  *
  * The fields are explained above and in `./polymers.ts`; the schema is frozen in
  * `test/fixtures/buffer/custom-solutes.json`. Other keys of the map are kept as they are

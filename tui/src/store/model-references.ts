@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // The reference curve of a single model: `<project>/model-references.json`, which Julia
-// reads (`{"<model file stem>": {"tag", "software", "ref_chi2", "fit", "rescale"}}`). A
+// reads (`{"<model file stem>": {"tag", "software", "refChi2", "fit", "rescale"}}`). A
 // deposited entry has one fit file and one χ² for each atomic model, and the run draws
 // that curve with the data and the model's MAP curve, with both χ², on the model's own
 // figure and writes the χ² in the model's LOG.
@@ -60,7 +60,7 @@ export const modelReferencesFile = (projectDir: string): string =>
 const jsonKey: Record<keyof ModelReference, string> = {
     tag: "tag",
     software: "software",
-    refChi2: "ref_chi2",
+    refChi2: "refChi2",
     fit: "fit",
     rescale: "rescale",
 }

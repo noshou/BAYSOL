@@ -108,9 +108,9 @@ test("readiness: a run needs a model and a non-empty buffer", () => {
     writeSolutes(dir, [row])
     assert.equal(projectReadiness(ref).buffer, false, "solutes without a pH are no buffer")
     // an old buffer (pH and σ, no temperature) is not ready until the temperature is set
-    writeSolutes(dir, [row], { pH: 7.4, "sigma-pH": 0.1 })
+    writeSolutes(dir, [row], { pH: 7.4, "sigmaPh": 0.1 })
     assert.equal(projectReadiness(ref).buffer, false, "no temperature, no buffer")
-    writeSolutes(dir, [row], { pH: 7.4, "sigma-pH": 0.1, temperature: 25 })
+    writeSolutes(dir, [row], { pH: 7.4, "sigmaPh": 0.1, temperature: 25 })
     assert.deepEqual(projectReadiness(ref), {
         models: true, buffer: true, data: false, run: false,
     })
@@ -136,9 +136,9 @@ test("missing components name what a run still lacks, and are empty at a go", ()
     writeSolutes(dir, [row])
     assert.deepEqual(missingComponents(ref), ["pH", "temperature", "data", "energy"])
     // an old project: pH and σ are there, the temperature is not
-    writeSolutes(dir, [row], { pH: 7.4, "sigma-pH": 0.1 })
+    writeSolutes(dir, [row], { pH: 7.4, "sigmaPh": 0.1 })
     assert.deepEqual(missingComponents(ref), ["temperature", "data", "energy"])
-    writeSolutes(dir, [row], { pH: 7.4, "sigma-pH": 0.1, temperature: 4 })
+    writeSolutes(dir, [row], { pH: 7.4, "sigmaPh": 0.1, temperature: 4 })
     writeData(dir, curve, "c.dat", "A-1")
     assert.deepEqual(missingComponents(ref), ["energy"])
     setEnergy(dir, 12400, "eV")
@@ -197,7 +197,7 @@ function liveJson(pid: number, ms: number = Date.now()): string {
 }
 
 test("the name is HH-MM-SS-mmm_TZ_±HHMM_YYYY-MM-DD, local time, Julia's name too", () => {
-    // the literals of `run_project: UTC time without a package` in run-project.test.jl
+    // the literals of `runProject: UTC time without a package` in run-project.test.jl
     const at = Date.UTC(2026, 10, 8, 4, 35, 29, 123)
     assert.equal(runStamp(at, -300, "EST"), "23-35-29-123_EST_-0500_2026-11-07")
     assert.equal(runStamp(at, 0, "UTC"), "04-35-29-123_UTC_+0000_2026-11-08")
@@ -661,7 +661,7 @@ test("a normal run: tail, packing, done, logs in the archive, conditions", async
     const names = [...runFiles(dir).keys()]
     for (const n of ["run.json", "run.LOG", "settings.json", "buffer.json", "data.tsv"])
         assert.ok(names.includes(n), n)
-    assert.match(logText(dir, "run.LOG"), /temperature_c\t21\.5/)
+    assert.match(logText(dir, "run.LOG"), /temperatureC\t21\.5/)
     assert.equal(session.view.note, undefined)
 })
 
@@ -674,7 +674,7 @@ test("a pack that fails leaves the run folder as it was and says why", async () 
     const dir = runDirOf(p, session.view.id)
     assert.match(session.view.note ?? "", /not packed: .*disk full/)
     assert.equal(isPacked(dir), false)
-    assert.match(readFileSync(join(dir, "run.LOG"), "utf-8"), /temperature_c/)
+    assert.match(readFileSync(join(dir, "run.LOG"), "utf-8"), /temperatureC/)
 })
 
 test("a run that failed ends failed with its error line as the note", async () => {
@@ -825,7 +825,7 @@ test("the Julia command and arguments: values travel in ARGS, not in the code", 
     assert.equal(args[4], "-e")
     assert.ok(!args[5]?.includes("/p q"), "the code holds no path")
     assert.match(args[5] ?? "", /ui = :tui/)
-    assert.match(args[5] ?? "", /BAYSOLRun\.run_project\(ARGS\[2\]/)
+    assert.match(args[5] ?? "", /BAYSOLRun\.runProject\(ARGS\[2\]/)
     assert.equal(args[6], runProjectFile)
     assert.ok(runProjectFile.endsWith("run-project.jl") && existsSync(runProjectFile))
     assert.deepEqual(args.slice(7), ["/p q/it's", "22.5", "/p q/it's/runs/x"])

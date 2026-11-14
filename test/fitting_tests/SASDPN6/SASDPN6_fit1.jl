@@ -14,15 +14,15 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDPN6_fit1_model1.pdb")
 const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDPN6_fit1.fit")
 
 # The .dat has 2 lines of header and 7 lines of processing history at the end (frame
-# lists), which break `readdlm`, so `_read_curve` (common.jl, numeric rows only) reads it:
+# lists), which break `readdlm`, so `_readCurve` (common.jl, numeric rows only) reads it:
 # 2650 points.
-qvals, I_exp, σ_exp = _read_curve(_DATA_PATH)
+qvals, iExp, σ_exp = _readCurve(_DATA_PATH)
 @assert length(qvals) == 2650
 
 # qvals are in nm⁻¹ (0.024-7.37); must convert to Å⁻¹.
 qvals = qvals ./ NM_INV_PER_ANGSTROM_INV
 # The curve runs to 0.74 Å⁻¹, still inside `Q_SANITY_RANGE`.
-check_q_angstrom(qvals)
+checkQAngstrom(qvals)
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -75,12 +75,15 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# The .dat runs to 0.74 Å⁻¹ (the .fit file to 0.50 Å⁻¹); the fit is cut at 0.3 Å⁻¹ (425
-# of the .dat's 2650 points are ≤ 0, the first at 0.33 Å⁻¹, i.e. none inside the fit).
-const Q_MAX_FIT = 0.3
+# No q cut: the whole deposited curve (q 0.0024-0.7368 Å⁻¹) is fitted, `seedModel` drops
+# the non-positive bins. A cut at 0.3 Å⁻¹ was used before, but the 1576 points above 0.3
+# Å⁻¹ (σ > 0) have a median I/σ of 0.85 and 27 % of them have I ≤ 0, so the data above it
+# are not demonstrably unusable (median I/σ 0.85 ≥ 0.5; median I/σ 2.33 ≥ 1 in the
+# lowest-q quarter (up to 0.41 Å⁻¹); rule in README.md).
+const Q_MAX_FIT = Inf
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 # The deposited RNAMasonry model carries 731 hydrogens (builder names H01-H12). Runs
@@ -90,62 +93,62 @@ const Q_MAX_FIT = 0.3
 const ADD_HYDROGENS = true
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT`. (`seed_model`
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT`. (`seedModel`
 bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
+function fitSubset()
     keep = findall(≤(Q_MAX_FIT), qvals)
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdpn6_fit1` samples. It is separate only because
+# Builds the Seed that `runSasdpn6Fit1` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running the
 # fit; if you are reading this script as an example you can skip it:
-# `run_sasdpn6_fit1` below is the whole story (build the seed, then sample it).
-function seed_sasdpn6_fit1(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdpn6Fit1` below is the whole story (build the seed, then sample it).
+function seedSasdpn6Fit1(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdpn6_fit1(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdpn6Fit1(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdpn6_fit1(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdpn6Fit1(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdpn6_fit1()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdpn6Fit1()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
 crysol = readdlm(_FIT_PATH; skipstart = 1)
 reference = BAYSOL.Reference(
     "Pepsi-SAXS fit1",
     Float64.(crysol[:, 1]),
     Float64.(crysol[:, 4]);
-    q_max = Q_MAX_FIT,
+    qMax = Q_MAX_FIT,
 )
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res_fit1", references = reference,
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "Pepsi-SAXS 1.224",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "Pepsi-SAXS 1.224",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDPN6/ folder), not the caller's cwd.
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

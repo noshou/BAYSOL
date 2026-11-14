@@ -1,0 +1,13 @@
+// Canadian provincial and territorial government colours
+
+{
+    "set": "alberta",
+    "title": "Government of Alberta design tokens",
+    "licence": "Apache-2.0 (npm package version 2.12.9, LICENSE file verified; tokens.css)",
+    "url": "https://www.npmjs.com/package/@abgov/design-tokens",
+    "colours": [
+        {"name": "alberta sky dark", "hex": "#005072", "family": "blue"},
+        {"name": "alberta sky", "hex": "#0081a2", "family": "cyan"},
+        {"name": "alberta sky light", "hex": "#c8eefa", "family": "blue"}
+    ]
+}

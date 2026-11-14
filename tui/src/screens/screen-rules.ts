@@ -67,33 +67,15 @@ import { FIND_ROWS, type TableFind, useTableFind } from "./table-find.js"
 // 1. Tables and forms
 // ========================================================================================
 
-// The key legends of the screens, as pure functions of what the screen is doing right
-// now: a legend lists ONLY the keys that work at this moment (like the move hint of the
-// menus), so a key that would do nothing is not shown. Two shapes cover the screens:
-//
-//   - `tableLegend`: a table of editable rows (the solutes, the custom solutes), from
-//     where the cursor is and what the rows allow;
-//   - `formLegend`: a form page, from where the cursor is and what the form allows.
-//
-// A prompt or dropdown that is open gives its own legend (`entryLegend` in
-// `ui/legend.tsx`, reported by `Entry`'s `onLegend`), a question its answers
-// (`questionLegend` in `ui/input.tsx`). The screens only gather the facts
-// (`TableFacts`, ...) and call these, so the rules are in one place and tested without a
-// terminal.
+// Legends as pure functions of what a screen is doing: each lists only the keys that work
+// now. `tableLegend` serves tables of editable rows, `formLegend` form pages; an open
+// prompt or question supplies its own (`entryLegend`, `questionLegend`).
 
 /**
- * What a table's legend depends on.
- *
- * @property rows - how many rows the table has.
- * @property cursor - the row the cursor is on (meaningless for no rows).
- * @property canEdit - Enter may open the row under the cursor.
- * @property canAdd - an add key may add a row (room and no lock).
- * @property locked - the file cannot be used: nothing that changes something works.
- * @property canRemove - `^r` has something to mark: a row that is not marked yet.
- * @property canUndo - `^u` has something to undo on the row under the cursor.
- * @property removeLabel - what `^r` is called: `remove` when left out (a mark), `delete`
- *     for a table whose `^r` deletes the saved entry at once.
- * @property dirty - there are unsaved changes.
+ * What a table's legend depends on: `rows`, `cursor` (meaningless for no rows), whether
+ * Enter `canEdit`, an add key `canAdd`, `^r` `canRemove` and `^u` `canUndo`, the file is
+ * `locked`, there are `dirty` changes; `removeLabel` names `^r` (`remove` marks, `delete`
+ * erases the saved entry at once).
  */
 export type TableFacts = {
     rows: number
@@ -108,18 +90,15 @@ export type TableFacts = {
 }
 
 /**
- * The legend of a table with nothing open over it: `back` always, `save` when
- * something is unsaved, `edit` when a row can be opened, the arrows that move from the
- * cursor's row, `remove` and `undo` when they have a row to act on, the find and sort
- * keys, and last the add keys when there is room (so the keys that work on rows stay
- * together and the adds follow as a group).
+ * Legend of a table with nothing open over it: `back`, `save` if unsaved, `edit`, the
+ * arrows, `remove`/`undo` where they act, the find and sort keys, then the add keys when
+ * there is room.
  *
  * @param facts - what the table allows now.
  * @param adds - the add keys of this table (`add solute ^n`, ...); shown only when
  *     `facts.canAdd`.
  * @param editLabel - what Enter does on a row, `"edit"` when left out.
  * @param more - items after `remove`: the find and sort keys of a table of named rows.
- * @returns the items, in order.
  */
 export function tableLegend(
     facts: TableFacts,
@@ -142,13 +121,8 @@ export function tableLegend(
 }
 
 /**
- * What the legend of a form page depends on.
- *
- * @property editing - a cell's prompt is open.
- * @property moves - which arrows move the cursor to a neighbouring cell.
- * @property canRestore - `^u` has something to put back on this cell.
- * @property complete - nothing is missing, so `^w` would accept the form.
- * @property acceptLabel - what `^w` is called (`add to table`, `accept`).
+ * What a form legend depends on: a cell `editing`, which arrows `moves` the cursor,
+ * `canRestore` (`^u` on a changed cell), `complete` (`^w` would accept), `acceptLabel`.
  */
 export type FormFacts = {
     editing: boolean
@@ -159,12 +133,10 @@ export type FormFacts = {
 }
 
 /**
- * The legend of a form page: the prompt's keys while a cell is open, else `cancel`,
- * `accept` only when the form is complete, `edit`, the arrows that reach a neighbouring
- * cell and `restore` only on a cell that was changed.
+ * Legend of a form page: the prompt's keys while a cell is open, else `cancel`, `accept`
+ * (complete forms only), `edit`, the arrows and `restore` (changed cells only).
  *
  * @param facts - what the form is doing.
- * @returns the items, in order.
  */
 export function formLegend(facts: FormFacts): LegendItem[] {
     if (facts.editing) return entryLegend({ count: 0 })
@@ -181,29 +153,11 @@ export function formLegend(facts: FormFacts): LegendItem[] {
 // 2. The table screen: cursor, rows, marks and saving
 // ========================================================================================
 
-// The mechanics every table of editable rows shares (the custom solutes, the solutes of
-// a buffer): the rows being edited (`Drafts`), the cursor, the note, the
-// unsaved-changes guard and the keys that do not depend on what a row is. A screen calls
-// `useTableScreen` once, draws a `DataTable` and a `Frame` from what it returns, and
-// handles the keys of its own (Enter, the adds) after `handleKey` has had its turn:
-//
-//     const t = useTableScreen<MyItem>({ items, save, check })
-//     useKeys((press) => {
-//         if (t.handleKey(press)) return
-//         if (press.is(keys.enter) && t.canEdit) openForm(t.cursor.index, t.current)
-//         else if (press.is(keys.addNonbio) && t.canAdd) openForm(undefined, blank)
-//     })
-//     return (
-//         <Frame title="..." note={t.frameNote} noteIsError={t.frameNoteIsError}
-//             legend={[...]}>
-//             <DataTable columns={...} rows={t.rows} cursor={t.cursor.index}
-//                 offset={t.cursor.offset} pageSize={t.pageSize} mark={t.mark}
-//                 width={t.width} />
-//         </Frame>
-//     )
-//
-// A form page that makes or changes an item hands it back through `t.replaceAt(i, item)`
-// or `t.append(item)`; both only change the draft, nothing is saved before `^w`.
+// Shared mechanics of the tables of editable rows: drafts, cursor, note, unsaved-changes
+// guard and the keys that do not depend on the row. A screen calls `useTableScreen`,
+// draws a `DataTable` in a `Frame`, and handles its own keys (Enter, the adds) when
+// `handleKey` returns false. A form hands an item back through `t.replaceAt(i, item)` or
+// `t.append(item)`; nothing is saved before `^w`.
 
 /**
  * The rows a `DataTable` takes besides the rows themselves: its header, its rule and
@@ -215,45 +169,20 @@ const TABLE_CHROME_ROWS = 3
 const FRAME_LEGEND_LINES = 3
 
 /**
- * What a table screen is set up with.
+ * What a table screen is set up with. `items` is the file's content, read once; `added`
+ * are extra unsaved rows after it (the cursor stays at the top). `save` writes the items
+ * (throws on failure: note `could not save!`); `check` gives the first unsavable row as
+ * `[index, message]`, asked at `^w`. `extraRows` and `extraChanges` count rows and unsaved
+ * changes kept outside the table (a status line, a buffer's pH). `adds` and `rowKeys`
+ * list every key the legend can show, so the fullest legend (the footer height) is known.
+ * `locked`: file unusable, table empty, every changing key refused. `erase`: `^r` on a
+ * saved row asks `destructiveQuestion(what name)` and Enter calls `remove`, which deletes
+ * that entry from disk at once (throws on failure: `saveErrorNote`); an unsaved row is
+ * dropped without asking; left out, `^r` only marks the row and `^w` removes it.
+ * `removeLabel` names a marking `^r`. `label` enables find (`/`) and sort (`z`) by name;
+ * `sorted` sorts on open (needs `label`).
  *
  * @typeParam V - the item of a row.
- * @property items - what the file has now, read once when the screen opens.
- * @property added - items the table starts with as new, unsaved rows after `items` (a
- *     recipe loaded into the buffer): nothing of them is written before `^w`; the cursor
- *     stays at the top.
- * @property save - writes the items the file is to have (`Drafts.toSave`); it throws if
- *     it cannot (the note is then `could not save!`).
- * @property check - the first row that cannot be saved, as `[row index, message]`;
- *     `undefined` when all can. It is asked at `^w` before anything is written.
- * @property extraRows - rows the screen uses besides the frame and the table, taken off
- *     the page size (a status line); 0 when left out.
- * @property adds - every add key the screen can ever show in its legend (the same
- *     items it gives `legend`): with them the table works out its fullest legend
- *     ([[TableScreen.legendFull]]) so the screen's footer keeps one height and the body
- *     gives up the rows a taller one needs.
- * @property extraChanges - unsaved changes the screen keeps outside the rows (the pH of a
- *     buffer): added to the count that `^x` asks about and that makes `^w` offered; 0
- *     when left out.
- * @property locked - set when the file cannot be used: the table is empty, shows this
- *     as its note, and every key that changes something refuses (the file is never
- *     written over).
- * @property erase - set by a table of things the user made and keeps (custom solutes):
- *     `^r` on a row that exists in the file asks `destructiveQuestion(what name)`
- *     (`name` is the saved item's name, `what` e.g. `solute`) and Enter calls `remove`,
- *     which deletes just that entry from disk at once (it throws if it cannot: the note
- *     is then `saveErrorNote`); the row leaves the table and every other row keeps its
- *     drafts, still unsaved. A row never saved is dropped without a question. Left out,
- *     `^r` only marks the row (and `^w` removes it: a buffer's solutes).
- * @property removeLabel - what `^r` is called when it marks (`remove` when left out).
- * @property rowKeys - keys that act on the row under the cursor and show in the legend
- *     only while the row can be opened (the notes `^e` of a recipe); like `adds`, give
- *     them here too so the fullest legend counts them.
- * @property label - the name of an item. With it the table finds a row by name (`/`) and
- *     puts the rows in alphabetical order (`s`); both show in the legend only while they
- *     can do something.
- * @property sorted - the rows are put in alphabetical order when the table opens (the
- *     recipes, the custom solutes); needs `label`.
  */
 export type TableScreenOptions<V> = {
     items:      readonly V[]
@@ -276,39 +205,16 @@ export type TableScreenOptions<V> = {
 }
 
 /**
- * What a table screen gets back.
+ * What a table screen gets back: `drafts`, `rows`, `cursor`, `pageSize` and `width` for
+ * `DataTable`; `current` (the item under the cursor), `canEdit`, `canAdd` (room: 999 rows,
+ * no lock), `locked`; `frameNote` (the discard question, else the note) and
+ * `frameNoteIsError`; `setNote` (cleared by the next key), `mark` (`*`, `-` or a space),
+ * `replaceAt`, `append` (cursor on it), `adopt` (a new set of drafts, e.g. after an add
+ * flow); `legendFull` (reserves the footer height), `legend` (the answers while a
+ * question is open, else `tableLegend`), `handleKey` (true when handled), `finder` (the
+ * open finder under the table, else null).
  *
  * @typeParam V - the item of a row.
- * @property drafts - the rows with their drafts and marks.
- * @property rows - the same rows as an array, for `DataTable`; its cells come from
- *     `rowValue(row)`.
- * @property cursor - the list cursor over the rows.
- * @property pageSize - the rows of the table that fit.
- * @property width - the width of the body, for `DataTable`.
- * @property current - the item under the cursor as it stands now (`undefined` for none).
- * @property canEdit - Enter may open the row: there is one, it is not marked to go, the
- *     file is not locked.
- * @property canAdd - an add key may add a row: there is room (999) and no lock.
- * @property locked - the file cannot be used.
- * @property frameNote - the line for `Frame`: the discard question, else the note.
- * @property frameNoteIsError - draw `frameNote` in the error colour.
- * @property setNote - puts a note up (cleared by the next key); the screen uses it for
- *     what only it knows.
- * @property mark - the mark column of `DataTable`: `*`, `-` or a space.
- * @property replaceAt - makes an item the draft of a row.
- * @property append - adds an item as a new row at the end and puts the cursor on it.
- * @property adopt - takes a whole new set of drafts (what an add flow ended with), the
- *     cursor on the last row when `focusLast`.
- * @property legendFull - the fullest legend of the table (every key working at once),
- *     for the frame to reserve the height of (`Frame`'s `legendFull`).
- * @property legend - the keys that work now, for `Frame`: the answers while a question
- *     (discard, delete) is open, else the table's own (`tableLegend`: the arrows from
- *     the cursor's row, edit, remove, undo, save only where they act). Takes the add
- *     keys of the screen and what Enter does (`"edit"`).
- * @property handleKey - routes a key press; returns `true` when it was handled, so the
- *     screen stops there.
- * @property finder - the open finder to draw under the table, `null` while closed (a
- *     table with `label`); the table's page is shorter while it is open.
  */
 export type TableScreen<V> = {
     drafts:           Drafts<V>
@@ -334,21 +240,15 @@ export type TableScreen<V> = {
 }
 
 /**
- * The state and keys of a table of editable rows.
- *
- * Keys handled (`handleKey` returns `true`): up and down move the cursor; `^r` marks the
- * row under it to be removed (a row never saved goes at once); `^u` undoes its last
- * change; `^w` checks every row (`check`: the problem is the note, `row N: ...`, and the
- * cursor goes there) and else saves, the note `saved` or `could not save!`; `^x` leaves
- * through `nav.pop`, asking `discard N changes?` first when something is unsaved (Esc does
- * nothing); while that question is up it takes every key. Any other key
- * clears the note and returns `false`, and the screen handles it (Enter, the adds).
- * With `erase`, `^r` on a saved row asks and deletes that entry at once, see
- * [[TableScreenOptions]]; the question takes every key until answered.
+ * State and keys of a table of editable rows. `handleKey` returns true for: up/down; `^r`
+ * marks a row for removal (an unsaved row goes at once); `^u` undoes; `^w` checks every
+ * row (`row N: ...`, the cursor moves there) and else saves (`saved` / `could not save!`);
+ * `^x` leaves through `nav.pop`, asking `discard N changes?` first (Esc does nothing);
+ * while a question is open it takes every key. Other keys clear the note and return
+ * false. With `erase`, `^r` on a saved row asks and deletes it at once.
  *
  * @typeParam V - the item of a row.
  * @param options - see [[TableScreenOptions]].
- * @returns the state to draw and the key router, see [[TableScreen]].
  */
 export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V> {
     const { items, save, check, extraRows = 0, extraChanges = 0, locked, erase } = options
@@ -457,7 +357,7 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
         })
     }
 
-    /** `s`: the rows in alphabetical order, the cursor staying on its row. */
+    /** `z`: the rows in alphabetical order, the cursor staying on its row. */
     const sortRows = (by: (item: V) => string) => {
         const row = drafts.rows[cursor.index]
         const next = drafts.sorted(by)
@@ -555,13 +455,8 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
 export type EditEnd<V> = { kind: "done"; value: V } | { kind: "cancel" } | { kind: "back" }
 
 /**
- * The state of a set of choices being turned on and off (the `set` settings, shown as
- * tabs).
- *
- * @property options - every choice, in order.
- * @property selected - the ones that are on.
- * @property focus - the index of the tab in focus.
- * @property error - what was wrong with the last attempt.
+ * A set of choices being toggled (the `set` settings, shown as tabs): `options`,
+ * `selected`, the `focus`ed tab and the last `error`.
  */
 export type TabsEdit = {
     options: readonly string[]
@@ -578,19 +473,17 @@ export const PICK_ONE_NOTE = "pick one or more"
  *
  * @param choices - every choice of the setting.
  * @param current - the choices that are on.
- * @returns the edit.
  */
 export function openTabs(choices: readonly string[], current: readonly string[]): TabsEdit {
     return { options: choices, selected: new Set(current), focus: 0 }
 }
 
 /**
- * One key on the tabs: left and right move (stopping at the ends), Tab goes round,
- * Enter and Space turn the tab in focus on or off, Esc is done and needs one choice on.
+ * One key on the tabs: arrows move, Tab cycles, Enter/Space toggle, Esc ends (one must be
+ * on). Returns the next state and the end, if Esc or Ctrl-X ended it.
  *
  * @param edit - the state.
  * @param press - the key.
- * @returns the next state, and the end when Esc or Ctrl-X ended it.
  */
 export function stepTabs(
     edit: TabsEdit,
@@ -647,7 +540,7 @@ const nullWords = ["auto", "none"]
 
 /** What an optional number shows when it is not given: `auto` (whole), `none` (float). */
 const nullWord = (def: SettingDef): string =>
-    def.kind === "optional_int" ? "auto" : "none"
+    def.kind === "optionalInt" ? "auto" : "none"
 
 /** A hyphen that is a minus (`lo-hi`), not the sign of an exponent (`1e-3`). */
 const rangeHyphen = /(?<![eE])-/
@@ -701,12 +594,11 @@ export const hasColourPart = (def: SettingDef): boolean =>
     def.kind === "tuple" && def.partKinds.includes("colour")
 
 /**
- * The tuple the parts make, checked as a whole (what `parseSetting` does at the end of a
- * typed line).
+ * The tuple the parts make, checked as a whole: the value `validateValue` accepts, or the
+ * error.
  *
  * @param def - the tuple setting.
  * @param parts - one value for each part, in order.
- * @returns the value `validateValue` accepts, or what is wrong.
  */
 export function finishTuple(
     def: SettingDef,
@@ -728,11 +620,10 @@ export const CAP_NOTE = `${maxNumberText} characters at most`
 const noteLinesMax = 2
 
 /**
- * The lines of a message under a value: wrapped to the column, at most two lines.
+ * A message under a value, wrapped to the column in at most two lines.
  *
  * @param text - the message.
  * @param cells - the room.
- * @returns the lines, one at least.
  */
 export function noteLines(text: string, cells: number): string[] {
     return wrapText(text, cells).slice(0, noteLinesMax)
@@ -742,20 +633,16 @@ export function noteLines(text: string, cells: number): string[] {
 export const NUMBER_NOTE_ROWS = noteLinesMax
 
 /**
- * The state of an `int` or a `float` being typed into its row.
- *
- * @property def - the setting.
- * @property buffer - the text and the cursor.
- * @property error - what was wrong with the last attempt; the next key clears it.
+ * An `int` or `float` being typed into its row: `def`, the `buffer`, the last `error`
+ * (cleared by the next key).
  */
 export type NumberEdit = { def: SettingDef; buffer: TextBuffer; error?: string }
 
 /**
- * Opens a number for editing: its current value as text, the cursor at the end.
+ * Opens a number for editing: its value as text, the cursor at the end.
  *
  * @param def - the setting (an `int` or a `float`).
  * @param current - its value now.
- * @returns the edit.
  */
 export function openNumber(def: SettingDef, current: SettingValue): NumberEdit {
     const empty = new TextBuffer("", undefined, maxNumberText)
@@ -766,14 +653,12 @@ export function openNumber(def: SettingDef, current: SettingValue): NumberEdit {
 const isBlank = (press: KeyInput): boolean => press.typed && press.text.trim() === ""
 
 /**
- * One key while a number is typed: a character, backspace, delete, left, right, home and
- * end edit the text (typing past the cap says so, a blank is dropped), Enter takes the
- * number if it is one within the limits of the setting, Esc drops the edit and Ctrl-X
- * leaves the sheet.
+ * One key while a number is typed: editing keys change the text (past the cap it says so,
+ * blanks are dropped), Enter takes a number within the setting's limits, Esc drops the
+ * edit, Ctrl-X leaves the sheet. Returns the next state and the end, if the key ended it.
  *
  * @param edit - the state.
  * @param press - the key.
- * @returns the next state, and the end when the key ended the edit.
  */
 export function stepNumber(
     edit: NumberEdit,
@@ -801,11 +686,10 @@ export function stepNumber(
 }
 
 /**
- * Pasted text into a number: inserted at the cursor with every blank dropped.
+ * Pasted text into a number: inserted at the cursor, blanks dropped.
  *
  * @param edit - the state.
  * @param text - what was pasted.
- * @returns the next state.
  */
 export function pasteNumber(edit: NumberEdit, text: string): NumberEdit {
     return {
@@ -818,13 +702,9 @@ export function pasteNumber(edit: NumberEdit, text: string): NumberEdit {
 // --- a tuple edited part by part
 
 /**
- * The state of a tuple being edited: one text for each part, one part in focus.
- *
- * @property def - the setting (a `tuple`).
- * @property texts - the text of each part (a colour part holds its name or code).
- * @property focus - the part being edited.
- * @property fresh - the number parts not typed into yet: the first key replaces them.
- * @property error - what was wrong with the last attempt; the next key clears it.
+ * A tuple being edited: `def`, the `texts` of each part (a colour part holds its name or
+ * code), the `focus`ed part, the `fresh` number parts not yet typed into (the first key
+ * replaces them) and the last `error` (cleared by the next key).
  */
 export type TupleEdit = {
     def: SettingDef
@@ -835,8 +715,8 @@ export type TupleEdit = {
 }
 
 /**
- * What a key did to a tuple: the next state, the end when the key ended the edit, and
- * `pick` when Enter on a colour part asks for the picker of that part.
+ * What a key did to a tuple: the next state, the end if it ended the edit, and `pick`
+ * when Enter on a colour part asks for that part's picker.
  */
 export type TupleStep = { state: TupleEdit; end?: EditEnd<SettingValue>; pick?: boolean }
 
@@ -849,7 +729,6 @@ const colourFocused = (edit: TupleEdit): boolean =>
  *
  * @param def - the setting (a `tuple`).
  * @param current - its value now.
- * @returns the edit; the number parts are fresh.
  */
 export function openTuple(def: SettingDef, current: SettingValue): TupleEdit {
     return {
@@ -861,8 +740,8 @@ export function openTuple(def: SettingDef, current: SettingValue): TupleEdit {
 }
 
 /**
- * Every part read by `parsePart`, then the tuple checked as a whole (`finishTuple`). A
- * wrong part puts the focus on it and names it in the error.
+ * Reads every part with `parsePart`, then checks the tuple (`finishTuple`); a wrong part
+ * takes the focus.
  */
 function commitTuple(edit: TupleEdit): TupleStep {
     const { def } = edit
@@ -895,14 +774,12 @@ function bufferOfFocus(edit: TupleEdit): TextBuffer {
 }
 
 /**
- * One key while a tuple is edited. Left and right (and up and down) move between the
- * parts, Tab goes round them; text is typed into a number part (the first key replaces
- * what the part had); Enter on a number part takes the whole tuple, on a colour part asks
- * for the picker (`pick`); Esc drops the edit and Ctrl-X leaves the sheet.
+ * One key while a tuple is edited: arrows and Tab move between parts; text goes into a
+ * number part (the first key replaces its old text); Enter takes the tuple on a number
+ * part and asks for the picker (`pick`) on a colour part; Esc drops, Ctrl-X leaves.
  *
  * @param edit - the state.
  * @param press - the key.
- * @returns the next state, the end, or the request for the picker.
  */
 export function stepTuple(edit: TupleEdit, press: KeyInput): TupleStep {
     const n = edit.def.partNames.length
@@ -927,12 +804,11 @@ export function stepTuple(edit: TupleEdit, press: KeyInput): TupleStep {
 }
 
 /**
- * The colour the picker gave, put into the part in focus; the focus goes on to the next
- * part, or, from the last part, the whole tuple is taken.
+ * Puts the picker's colour into the focused part, then moves on (from the last part, takes
+ * the tuple).
  *
  * @param edit - the state (the colour part in focus).
  * @param colour - the name or code picked.
- * @returns the next state, or the end when the last part was the colour.
  */
 export function takeColour(edit: TupleEdit, colour: string): TupleStep {
     const next = withText(edit, colour)
@@ -942,12 +818,11 @@ export function takeColour(edit: TupleEdit, colour: string): TupleStep {
 }
 
 /**
- * Pasted text into the number part in focus: the blanks dropped, the text replacing what
- * the part had if it is still fresh.
+ * Pasted text into the focused number part: blanks dropped, replacing the old text if
+ * fresh (a colour part is unchanged).
  *
  * @param edit - the state.
  * @param text - what was pasted.
- * @returns the next state (unchanged on a colour part).
  */
 export function pasteTuple(edit: TupleEdit, text: string): TupleEdit {
     if (colourFocused(edit)) return edit
@@ -956,11 +831,10 @@ export function pasteTuple(edit: TupleEdit, text: string): TupleEdit {
 }
 
 /**
- * What typed text means for a setting that is typed (a number, an optional number, a
- * `set` of blank-separated choices, a font, a tuple as comma-separated parts, ranges as
- * `lo-hi, lo-hi`, chains as letters, colours and markers as words with commas or blanks
- * between them, sizes as `76x5, 100x9`): the value `validateValue` accepts, or what is
- * wrong. An empty font is the default font.
+ * What typed text means for a typed setting (number, optional number, `set` of
+ * blank-separated choices, font, tuple as comma-separated parts, `lo-hi` ranges, chain
+ * letters, colour and marker words, sizes like `76x5, 100x9`): the value `validateValue`
+ * accepts, or the error. An empty font is the default font.
  */
 export function parseSetting(
     def: SettingDef,
@@ -1003,7 +877,7 @@ export function parseSetting(
     ) {
         raw = null
     } else {
-        const whole = def.kind === "int" || def.kind === "optional_int"
+        const whole = def.kind === "int" || def.kind === "optionalInt"
         const parsed = parseNumber(text, numberRules[whole ? "int" : "float"])
         if ("error" in parsed) return parsed
         raw = parsed.value
@@ -1018,12 +892,11 @@ export function parseSetting(
 export const maxNameText = 40
 
 /**
- * The names a typed text narrows a list to: all of them for no text, else those that
- * start with it, and if none does, those that have it inside (case does not matter).
+ * The names a typed text narrows a list to: all for no text, else prefix matches, else
+ * substring matches (case-blind).
  *
  * @param names - the whole list.
  * @param typed - the text.
- * @returns the names that match, in the order of the list.
  */
 export function narrow(names: readonly string[], typed: string): string[] {
     const t = typed.trim().toLowerCase()
@@ -1033,11 +906,10 @@ export function narrow(names: readonly string[], typed: string): string[] {
 }
 
 /**
- * Where a name is in a list.
+ * The index of a name in a list, 0 if absent.
  *
  * @param names - the list.
  * @param name - the name (case does not matter).
- * @returns its index, or 0 if it is not there.
  */
 export function indexOfPick(names: readonly string[], name: string): number {
     const t = name.toLowerCase()
@@ -1049,14 +921,13 @@ export function indexOfPick(names: readonly string[], name: string): number {
 export type ListKind = "colour" | "font"
 
 /**
- * What Enter takes in a colour or font picker: a colour code typed out, else the
- * highlighted name, else (a machine with no list of fonts) the font text as it is.
+ * What Enter takes in a colour or font picker: a typed colour code, else the highlighted
+ * name, else (no font list) the typed text; or the error.
  *
  * @param kind - what is picked.
  * @param names - every name there is (empty for fonts on a machine with no list).
  * @param typed - the text in the field.
  * @param highlighted - the name highlighted in the narrowed list, if any.
- * @returns the value, or what is wrong.
  */
 export function pickValue(
     kind: ListKind,
@@ -1079,11 +950,10 @@ export function pickValue(
 const yesNo = { true: "yes", false: "no" } as const
 
 /**
- * The parts of a tuple value in order.
+ * The parts of a tuple value, in order.
  *
  * @param def - the tuple setting.
  * @param value - its value (an array, or an object keyed by the names of the parts).
- * @returns the parts.
  */
 export function tupleParts(def: SettingDef, value: SettingValue): (number | string)[] {
     return def.isRecord
@@ -1092,13 +962,12 @@ export function tupleParts(def: SettingDef, value: SettingValue): (number | stri
 }
 
 /**
- * A value as a sheet shows it, and as it is typed again to edit it: yes or no, the
- * choices that are on (`pdf png`), a tuple as its parts (`gray40, 0.6`), anything else
- * as it is.
+ * A value as a sheet shows it and as it is typed again to edit it: yes or no, the
+ * choices that are on (`pdf png`), a tuple as its parts (`gray40, 0.6`), else as is.
+ * Uncut: the caller fits it to its cell.
  *
  * @param def - the setting.
  * @param value - its value.
- * @returns the text, uncut: the caller fits it to its cell.
  */
 export function valueText(def: SettingDef, value: SettingValue): string {
     if (typeof value === "boolean") return yesNo[`${value}`]
@@ -1120,12 +989,11 @@ export function valueText(def: SettingDef, value: SettingValue): string {
 }
 
 /**
- * The colour a value shows a swatch of: a colour setting's own colour, or the colour
- * part of a tuple that begins with one.
+ * The colour a swatch shows: a colour setting's own, or the colour part of a tuple;
+ * `undefined` if none.
  *
  * @param def - the setting.
  * @param value - its value.
- * @returns the colour's name or `#rrggbb`, or `undefined` if the setting has none.
  */
 export function swatchColour(def: SettingDef, value: SettingValue): string | undefined {
     if (def.kind === "colour") return value as string
@@ -1135,13 +1003,12 @@ export function swatchColour(def: SettingDef, value: SettingValue): string | und
 }
 
 /**
- * The drafts after a setting is given a value: no draft if it is the saved value.
+ * The drafts after a setting gets a value: none if it is the saved value.
  *
  * @param drafts - setting name to its unsaved value.
  * @param name - the setting.
  * @param saved - the saved value of the setting.
  * @param value - the new value.
- * @returns the new drafts.
  */
 export function withDraft(
     drafts: ReadonlyMap<string, SettingValue>,
@@ -1156,13 +1023,11 @@ export function withDraft(
 }
 
 /**
- * [[withDraft]] for a model's settings, where a draft is also the removal of an override
- * that equals the project's value: a value equal to the project's value is a change
- * while the model has an override of that setting, because saving it removes it.
+ * [[withDraft]] for a model's settings: while the model overrides a setting, a value
+ * equal to the project's counts as a change, because saving it removes the override.
  *
  * @param settings - the model's settings (its value now, whether it is overridden, the
  *     project's value).
- * @returns the new drafts.
  */
 export function withModelDraft(
     drafts: ReadonlyMap<string, SettingValue>,
@@ -1213,13 +1078,11 @@ export type LandingId = "buffer" | "custom" | "load" | "new" | "save"
 export type LandingOption = { id: LandingId; label: string }
 
 /**
- * The options of the buffer landing, in order: the buffer, the custom solutes, `load a
- * recipe`, `new recipe` and, for a buffer that has solutes, `save current recipe
- * globally` (what does nothing is not offered).
+ * The buffer landing's options: the buffer, the custom solutes, `load a recipe`, `new
+ * recipe` and, for a buffer with solutes, `save current recipe globally`.
  *
  * @param buffer - the solutes of the buffer, `"unusable"` for a file that cannot be used.
  * @param custom - the custom solutes, `"unusable"` likewise.
- * @returns the options.
  */
 export function bufferLandingOptions(
     buffer: number | "unusable",
@@ -1240,10 +1103,10 @@ export function bufferLandingOptions(
 }
 
 /**
- * The line of a recipe in the dropdown of the recipes to load.
+ * A recipe's line in the load dropdown: `SEC buffer (3)`, `Tris pH (1, custom)` for a
+ * template.
  *
  * @param template - what a template recipe is (`builtin`, `custom`, `table`, `invalid`).
- * @returns `SEC buffer (3)`, `Tris pH (1, custom)` for a template.
  */
 export function recipeChoice(name: string, solutes: number, template?: string): string {
     const kind = template === undefined ? "" : `, ${template}`
@@ -1251,12 +1114,11 @@ export function recipeChoice(name: string, solutes: number, template?: string): 
 }
 
 /**
- * A name cut to fit a note so that the whole stays in its room.
+ * A name cut with an ellipsis to fit its room (at least 8 cells kept).
  *
  * @param name - the name.
  * @param room - the cells the whole note may take.
  * @param fixed - the cells the rest of the note takes.
- * @returns the name, with an ellipsis if it was cut; at least 8 cells are kept.
  */
 export function fitName(name: string, room: number, fixed: number): string {
     return truncate(name, Math.max(MIN_NAME, room - fixed))
@@ -1273,14 +1135,13 @@ function replaceQuestion(lead: string, name: string, room: number): Question {
 }
 
 /**
- * The question asked at the first `^w` of a recipe loaded over a buffer.
+ * The question at the first `^w` of a recipe loaded over a buffer: `replace 3 solutes
+ * with recipe "NAME"?` (`... solutes and notes ...` with notes); `replace` or `keep`.
  *
  * @param n - how many solutes the buffer has.
  * @param recipe - the recipe's name.
  * @param room - the cells the note line has.
  * @param notes - the recipe has notes, which replace the buffer's: `and notes` is said.
- * @returns `replace 3 solutes with recipe "NAME"?` (`replace 3 solutes and notes with
- *     recipe "NAME"?` with notes), answered by `replace` and `keep`.
  */
 export function replaceBufferQuestion(
     n: number,
@@ -1295,11 +1156,9 @@ export function replaceBufferQuestion(
 }
 
 /**
- * The question asked when the buffer being saved has rows that follow a template.
- *
- * @returns `save "NAME" as a template? its rows follow pH, T`, answered by `template`
- *     (Enter), `plain recipe` (`n`: the rows as they are) and `cancel` (Esc: nothing is
- *     saved).
+ * The question when the saved buffer has template-following rows: `save "NAME" as a
+ * template? its rows follow pH, T`; `template` (Enter), `plain recipe` (`w`) or `cancel`
+ * (Esc, nothing saved).
  */
 export function saveAsTemplateQuestion(name: string, room: number): Question {
     const tail = ' as a template? its rows follow pH, T'
@@ -1309,19 +1168,13 @@ export function saveAsTemplateQuestion(name: string, room: number): Question {
 }
 
 /**
- * The question asked when a recipe of the name typed exists.
- *
- * @returns `replace "NAME"?`, answered by `replace` and `keep`.
+ * The question when a recipe of that name exists: `replace "NAME"?`, `replace` or `keep`.
  */
 export function replaceRecipeQuestion(name: string, room: number): Question {
     return replaceQuestion('replace "', name, room)
 }
 
-/**
- * The message of a saved recipe.
- *
- * @returns `saved as "NAME"`.
- */
+/** The message of a saved recipe: `saved as "NAME"`. */
 export function savedAs(name: string, room: number): string {
     return `saved as "${fitName(name, room, 'saved as ""'.length)}"`
 }
@@ -1332,14 +1185,12 @@ export function unusable(file: string): string {
 }
 
 /**
- * The drafts of a notes list with the text of one note replaced: what the editor's `^w`
- * hands to the list's save.
+ * The drafts of a notes list with one note's text replaced (what the editor's `^w` hands
+ * to the list's save). Throws the message of [[notesProblem]] when the list is invalid.
  *
  * @param drafts - the list's drafts.
  * @param index - the row of the note.
  * @param text - its new text.
- * @returns the new drafts.
- * @throws Error with the message of [[notesProblem]] when the list would not be valid.
  */
 export function withNoteText(
     drafts: Drafts<Note>,
@@ -1353,13 +1204,12 @@ export function withNoteText(
 }
 
 /**
- * The counter under the notes: where the cursor is and how much of the cap is used.
+ * The counter under the notes: `line 3/12  col 7  482 characters`.
  *
  * @param line - the line of the cursor, from 1.
  * @param lines - how many lines the text has.
  * @param column - the cell of the cursor in its line, from 1.
  * @param used - the characters of the text.
- * @returns `line 3/12  col 7  482 characters`.
  */
 export function notesCounter(
     line: number,
@@ -1374,12 +1224,11 @@ export function notesCounter(
 const OWNER_CELLS = 24
 
 /**
- * The title of the editor screen: `<owner> / <note title>`, the owner cut from its start
- * when it is long so the whole title fits the narrowest terminal.
+ * The editor title `<owner> / <note title>`, the owner cut from its start so it fits the
+ * narrowest terminal.
  *
  * @param owner - the project's id, `buffer` or a recipe's name.
  * @param title - the note's title.
- * @returns the title.
  */
 export function noteScreenTitle(owner: string, title: string): string {
     return `${truncateStart(owner, OWNER_CELLS)} / ${title}`

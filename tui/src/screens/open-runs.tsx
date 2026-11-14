@@ -86,7 +86,7 @@ import { legendExtraRows, SheetViewerScreen } from "./viewer.js"
 // ========================================================================================
 
 // `open... > open runs` of the project menu: the runs and their models, the viewer above on
-// a model's results, `^r` to delete a run and `l` to read its `run.LOG`.
+// a model's results, `^r` to delete a run and `^l` to read its `run.LOG`.
 
 /** The keys `OpenRuns` can ever show: the frame reserves their height. */
 const OPEN_FULL: LegendItem[] = [
@@ -215,8 +215,8 @@ export function useRunWatch(runDir: string): boolean {
 }
 
 /**
- * The read-only pager of the program, ONE for every text of a run: its `run.LOG` (`l` in
- * `open runs`) and every view of the logs menu. Enter, Space and PgDn page down, `b` and
+ * The read-only pager of the program, ONE for every text of a run: its `run.LOG` (`^l` in
+ * `open runs`) and every view of the logs menu. Enter, Space and PgDn page down, `k` and
  * PgUp page up, the arrows move a line (or sideways, for the wide lines of a plot), Home
  * and End jump, Esc closes. The text is read once; a refusal (no file, too large, deleted)
  * is the note, and a run deleted while the page is open closes it with
@@ -338,7 +338,7 @@ export function TextPager(props: {
  * models. A run with several models is a heading with its models under it; a run with one
  * model is that one row; a run with none is a row of its own. Enter on a model that is done
  * opens the read-only viewer on its results workbook (with the model's `plots.txt` behind
- * `^p`); on any other model the note says why there is nothing to open. `l` shows the
+ * `P`); on any other model the note says why there is nothing to open. `^l` shows the
  * run's `run.LOG`; `^r` deletes the whole run folder after the usual question (refused
  * while a run of the project is live). The list is read again every few seconds and when
  * the screen comes back to the top.

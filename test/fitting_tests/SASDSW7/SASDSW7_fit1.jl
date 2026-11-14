@@ -19,12 +19,12 @@ raw = readdlm(_DATA_PATH; skipstart = 3)
 # skip. The third header line is long, so `readdlm` pads the file to 4 columns; only
 # columns 1-3 of the 1388 data rows are used.
 qvals = Float64.(raw[1:1388, 1])
-I_exp = Float64.(raw[1:1388, 2])
+iExp = Float64.(raw[1:1388, 2])
 σ_exp = Float64.(raw[1:1388, 3])
 
 # q is already in Å⁻¹ (range 0.01125-0.882, SASBDB "1/A", APS 12-ID-B); no unit
-# conversion is applied, `check_q_angstrom` asserts it.
-check_q_angstrom(qvals)
+# conversion is applied, `checkQAngstrom` asserts it.
+checkQAngstrom(qvals)
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -51,7 +51,7 @@ const ENERGY_EV     = HC_EV_ANGSTROM / 0.932   # ≈ 13303 eV, from the stated 0
 const TEMPERATURE_C = 22.0                     # 22 °C, SASBDB (measurement temperature)
 
 # Buffer components. All names below are in the bundled NonBiological tables
-# (src/BulkElectronDensity/NonBiological/nonbio_lookup.json).
+# (src/bulk-electron-density/non-biological/nonbio_lookup.json).
 # Counter-ions. Setting the pH adds titrant counter-ions that the deposited recipe does
 # not list. Assumed: 20 mM HEPES titrated with NaOH -> Na⁺ = C·0.2482 (pK(22 °C) = 7.601;
 # ΔH 21.0 kJ/mol). The pH is taken as set at room temperature (22 ± 3 °C), which fixes the
@@ -74,13 +74,12 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# 0.5: the data (and the Pepsi-SAXS fit) reach 0.88 Å⁻¹, far past the useful range of a
-# 7.8 kDa RNA (10 non-positive points, a flat tail); 0.5 Å⁻¹ keeps the shape and the
-# first minima and is the value used for the other nucleic-acid entries.
-const Q_MAX_FIT = 0.5
+# No q cut: the whole curve is fitted, up to 0.88 Å⁻¹ (the depositor's Pepsi-SAXS fit
+# covers the same range). The tail is weak but not noise (median I/σ 2.7 above 0.5 Å⁻¹,
+# 10 of the 1388 points have I ≤ 0, all in the last 0.1 Å⁻¹; `seedModel` drops them).
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 # ADD_HYDROGENS = true although the XPLOR-NIH model already carries 254 hydrogens, as for
@@ -88,62 +87,61 @@ const Q_MAX_FIT = 0.5
 const ADD_HYDROGENS = true
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` (no q cut).
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+function fitSubset()
+    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdsw7_fit1` samples. It is separate only because
+# Builds the Seed that `runSasdsw7Fit1` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running the
 # fit; if you are reading this script as an example you can skip it:
-# `run_sasdsw7_fit1` below is the whole story (build the seed, then sample it).
-function seed_sasdsw7_fit1(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdsw7Fit1` below is the whole story (build the seed, then sample it).
+function seedSasdsw7Fit1(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdsw7_fit1(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdsw7Fit1(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdsw7_fit1(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdsw7Fit1(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdsw7_fit1()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdsw7Fit1()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
 crysol = readdlm(_FIT_PATH; skipstart = 1)
 reference = BAYSOL.Reference(
     "Pepsi-SAXS fit1",
     Float64.(crysol[:, 1]),
     Float64.(crysol[:, 4]);
-    q_max = Q_MAX_FIT,
 )
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res_fit1", references = reference,
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "Pepsi-SAXS 2.688",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "Pepsi-SAXS 2.688",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDSW7/ folder), not the caller's cwd.
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

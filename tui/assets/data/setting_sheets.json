@@ -249,7 +249,7 @@
       },
       {
        "name": "LMAX",
-       "description": "Spherical-harmonic band limit of the forward model. auto takes q_max times the diameter of the scatterer cloud; lower is coarser and faster."
+       "description": "Spherical-harmonic band limit of the forward model. auto takes qMax times the diameter of the scatterer cloud; lower is coarser and faster."
       }
      ]
     }

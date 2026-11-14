@@ -10,7 +10,7 @@
 // is in the link: if the other salt rows change after the template was made, the link is
 // not worked out again (pick the template again to refresh).
 //
-// Limit: two groups with an identical link (same template, amounts, titrant, rest, set-at)
+// Limit: two groups with an identical link (same template, amounts, titrant, rest, setAt)
 // would share one key. The flow never makes a second one: picking the template again
 // replaces the rows of the first (`TemplateFlow.find`), so there is one group per link.
 
@@ -37,11 +37,11 @@ function linkOfSolute(s: Solute): TemplateLink | undefined {
  *
  * @param link - the link.
  * @param buffer - the temperature of the buffer, °C, `undefined` while it has none.
- * @returns the number of `set-at`; the buffer's temperature for `"buffer"` (22 while the
+ * @returns the number of `setAt`; the buffer's temperature for `"buffer"` (22 while the
  *     buffer has none).
  */
 export function setAtTemperature(link: TemplateLink, buffer: number | undefined): number {
-    const at = link["set-at"]
+    const at = link.setAt
     return typeof at === "number" ? at : (buffer ?? SET_TEMPERATURE_C)
 }
 
@@ -162,10 +162,10 @@ export function recompute(
                 outcome = computeTemplate({
                     id: link.id,
                     mM: link.mM,
-                    sigmaMM: link["sigma-mM"],
+                    sigmaMM: link.sigmaMm,
                     pH,
                     sigmaPH,
-                    restI_mM: link["rest-mM"],
+                    restIonicMM: link.restMm,
                     cation: link.titrant === "chloride" ? undefined : link.titrant,
                     tempC: setAtTemperature(link, temperature),
                 })
@@ -244,7 +244,7 @@ export function seedOfRows(
             const custom = {
                 z: Number(s.z),
                 pmv: Number(s.pmv),
-                "sigma-pmv": typeof s["sigma-pmv"] === "number" ? s["sigma-pmv"] : null,
+                "sigmaPmv": typeof s.sigmaPmv === "number" ? s.sigmaPmv : null,
             }
             rows.push({ name: s.name, arg: String(s.custom), custom, ...amounts })
         }

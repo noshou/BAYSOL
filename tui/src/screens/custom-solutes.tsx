@@ -260,7 +260,7 @@ export function formulaCell(e: CustomEntry): string {
 export function zCell(e: CustomEntry): string {
     if (e.kind !== "polymer") return e.z === null ? "" : String(e.z)
     const units = e.units.map((u) => [u.z, u.label] as const)
-    return sumText([...units, [e["z-ends"], ""]])
+    return sumText([...units, [e.zEnds, ""]])
 }
 
 /**
@@ -270,7 +270,7 @@ export function zCell(e: CustomEntry): string {
 export function pmvCell(e: CustomEntry): string {
     if (e.kind !== "polymer") return formatNumber(e.pmv)
     const units = e.units.map((u) => [u.slope, u.label] as const)
-    return sumText([...units, [e["pmv-ends"], ""]])
+    return sumText([...units, [e.pmvEnds, ""]])
 }
 
 /**
@@ -724,7 +724,7 @@ export function RecipesTable(): ReactNode {
             align: "right",
             text: (r) => {
                 const c = recipeConditions(recipeOf(r))
-                return c === undefined ? "" : formatNumber(c["sigma-pH"])
+                return c === undefined ? "" : formatNumber(c.sigmaPh)
             },
         },
         {

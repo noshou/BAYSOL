@@ -332,10 +332,10 @@ function logRows(text: string): Map<string, string> {
 
 /** The rows of a LOG that make up the conditions, with the label each is shown under. */
 const conditionRows: readonly [name: string, label: string, unit: string][] = [
-    ["temperature_c", "temperature", "°C"],
+    ["temperatureC", "temperature", "°C"],
     ["ph", "pH", ""],
-    ["sigma_ph", "σ", ""],
-    ["energy_ev", "energy", "eV"],
+    ["sigmaPh", "σ", ""],
+    ["energyEv", "energy", "eV"],
 ]
 
 /**
@@ -387,7 +387,7 @@ type ModelState =
  *     `undefined` for a model that is not done or has none.
  * @property plots - the model's plots text, `<model>-plots.txt` (it may not exist, the
  *     viewer says so).
- * @property plotSizes - the same plots at more sizes (`plot_sizes` of `run.json`), the
+ * @property plotSizes - the same plots at more sizes (`plotSizes` of `run.json`), the
  *     viewer shows the largest that fits; empty for a run that has none.
  * @property overrides - the names of the settings the model has of its own.
  * @property tex - the `.tex` figures it has, in the archive or in its folder: names
@@ -448,7 +448,7 @@ export function runFilePath(dir: string, name: unknown): string | undefined {
     return join(dir, ...name.split("/"))
 }
 
-/** The plot files of a `plot_sizes` list, smallest first; odd entries are left out. */
+/** The plot files of a `plotSizes` list, smallest first; odd entries are left out. */
 function plotFilesOf(dir: string, list: unknown): PlotFile[] {
     if (!Array.isArray(list)) return []
     const files: PlotFile[] = []
@@ -527,7 +527,7 @@ function openModels(
             error: typeof m.error === "string" && m.error !== "" ? m.error : undefined,
             workbook: state === "done" && book !== undefined ? join(dir, book) : undefined,
             plots: join(dir, `${name}-plots.txt`),
-            plotSizes: plotFilesOf(dir, m.plot_sizes),
+            plotSizes: plotFilesOf(dir, m.plotSizes),
             overrides: overridesOf(m.overrides),
             tex: texOf(files),
         })
@@ -557,7 +557,7 @@ function openCompare(
         error: typeof c.error === "string" && c.error !== "" ? c.error : undefined,
         workbook: state === "done" && table !== undefined ? join(dir, table) : undefined,
         plots: join(dir, "compare-plots.txt"),
-        plotSizes: plotFilesOf(dir, c.plot_sizes),
+        plotSizes: plotFilesOf(dir, c.plotSizes),
         overrides: [],
         tex: texOf(files),
     }

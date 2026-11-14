@@ -69,11 +69,11 @@ const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDVN2.dat")
 #
 # Curve units: the SASBDB .dat is already in Å⁻¹ (angular unit "1/A"; 912 points, 0.0104-
 # 0.472 Å⁻¹; the trailer after the data is the depositor's frame list, skipped by
-# `_read_curve`). The reference fit files are FoXS output in Å⁻¹: columns q, I_exp,
+# `_readCurve`). The reference fit files are FoXS output in Å⁻¹: columns q, I_exp,
 # I_model, error; the model column is already on the data's scale.
 
-qvals, I_exp, σ_exp = _read_curve(_DATA_PATH)
-check_q_angstrom(qvals)
+qvals, iExp, σ_exp = _readCurve(_DATA_PATH)
+checkQAngstrom(qvals)
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -152,107 +152,106 @@ const BUFFER_OMISSIONS = String[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# The curve reaches 0.472 Å⁻¹ but is at the noise floor beyond ~0.25 Å⁻¹ (mean I/σ
-# 2.2 in 0.20-0.25, 1.3 in 0.25-0.30, 1.1-1.7 above, 8 % of the points negative
-# in 0.40-0.45); the fit uses q ≤ 0.25 Å⁻¹.
-const Q_MAX_FIT = 0.25
+# No q cut: the whole curve is fitted, up to 0.472 Å⁻¹ (the FoXS fit covers the same
+# range). The tail is weak (mean I/σ 2.2 in 0.20-0.25, 1.3 in 0.25-0.30, 1.1-1.7 above,
+# 11 % of the points above 0.25 Å⁻¹ have I ≤ 0), but not a flat noise floor.
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # the models have heavy atoms only; Pdb2pqr at PH
 
 # One run per atomic model of every fit; `fit` is the FoXS curve of that model's fit (q in
-# Å⁻¹ already, `fit_scale` = 1; the fitted intensity is column `fit_col` = 3; the curve is
+# Å⁻¹ already, `fitScale` = 1; the fitted intensity is column `fitCol` = 3; the curve is
 # on the data's scale, so `rescale = false`). The deposited chi² of fit f is the same
-# for each of its members: 0.814083, 0.816708 and 0.813946.
-const MEMBERS = [(1, 1), (2, 1), (2, 2), (3, 1), (3, 2), (3, 3)]   # (fit, model)
-const DEPOSITED_CHI2 = ["0.81", "0.82", "0.81"]
+# for each of its members: 0.814083 (the 2- and 3-state fits were dropped: ensembles).
+const MEMBERS = [(1, 1)]   # (fit, model): the 1-state MultiFoXS fit, a single structure
+const DEPOSITED_CHI2 = ["0.81"]
 const RUNS = [
     (
         tag = "fit$(f)_model$m",
-        ref_chi2 = "MultiFoXS $(f)-state $(DEPOSITED_CHI2[f])",
+        refChi2 = "MultiFoXS $(f)-state $(DEPOSITED_CHI2[f])",
         pdb = "SASDVN2_fit$(f)_model$m.pdb",
         fit = "SASDVN2_fit$f.dat",
-        fit_scale = 1.0,
-        fit_col = 3,
+        fitScale = 1.0,
+        fitCol = 3,
         rescale = false,
         software = "MultiFoXS $(f)-state",
     ) for (f, m) in MEMBERS
 ]
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` (no q cut).
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+function fitSubset()
+    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdvn2` samples. It is separate only because
+# Builds the Seed that `runSasdvn2` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
-# `run_sasdvn2` below is the whole story (build the seed, then sample it).
-function seed_sasdvn2(run; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdvn2` below is the whole story (build the seed, then sample it).
+function seedSasdvn2(run; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, q_fit, I_fit,
+    s = BAYSOL.seedModel(
+        LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, qFit, iFit,
         σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdvn2(
+function runSasdvn2(
     run;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdvn2(run; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdvn2(run; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
 for run in RUNS
     # one set of outputs per run (`res_fit1_model1.xlsx`, ...)
     suffix = "_" * run.tag
 
-    result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdvn2(run)
+    result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdvn2(run)
 
     # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
-    # run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
-    fit_curve = try
-        fc = _read_fit(joinpath(_FIXTURE_DIR, run.fit), run.fit_scale, run.fit_col)
-        fc !== nothing && run.rescale ? _rescale_fit(fc, q_fit, I_fit) : fc
+    # run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
+    fitCurve = try
+        fc = _readFit(joinpath(_FIXTURE_DIR, run.fit), run.fitScale, run.fitCol)
+        fc !== nothing && run.rescale ? _rescaleFit(fc, qFit, iFit) : fc
     catch e
         @warn "could not read the reference fit" run.fit exception = e
         nothing
     end
     references = BAYSOL.Reference[]
-    if fit_curve !== nothing
+    if fitCurve !== nothing
         push!(
             references,
             BAYSOL.Reference(
                 run.software * " " * run.tag * (run.rescale ? " (rescaled)" : ""),
-                fit_curve...; q_max = Q_MAX_FIT,
+                fitCurve...,
             ),
         )
     end
     BAYSOL.results(
-        result, (q_fit, I_fit, σ_fit);
+        result, (qFit, iFit, σ_fit);
         dir = @__DIR__, name = "res$(suffix)", references,
-        form_factor_log = form_factor_log, n_atoms = n_atoms,
-        ref_chi2 = run.ref_chi2,
-        run_log = true,
+        formFactorLog = formFactorLog, nAtoms = nAtoms,
+        refChi2 = run.refChi2,
+        runLog = true,
     )
 
     # `@__DIR__` (this SASDVN2/ folder), not the caller's cwd.
-    BAYSOL.print_summary(result)
+    BAYSOL.printSummary(result)
 end

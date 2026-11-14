@@ -1,0 +1,247 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+# Helpers for the threaded stages: deterministic per-task random
+# streams, a task-per-item ordered map, and a scope that keeps
+# OpenBLAS single-threaded while Julia threads do the parallel work.
+#
+# Results never depend on the number of Julia threads: a stream belongs to the *work item*
+# it was derived for (MAP start `i`, chain `k`), not to the thread that happens to run it.
+
+using LinearAlgebra: BLAS
+using Random: Xoshiro
+
+export workerCount,
+    stream, drawBase, tmapItems, tmapBlocks, withBlasSingle, withWorkers, withChaos
+
+"""
+SplitMix64's output function: a bijective scramble of one `UInt64`. Defined here (not
+through `hash`) so a published seed gives the same streams on every Julia version.
+"""
+@inline function _splitmix(z::UInt64)::UInt64
+    z = (z ⊻ (z >> 30)) * 0xbf58476d1ce4e5b9
+    z = (z ⊻ (z >> 27)) * 0x94d049bb133111eb
+    return z ⊻ (z >> 31)
+end
+
+"""
+Number of Julia threads available to parallel stages (the default
+thread pool; an interactive thread, `-t N,1`, is left free).
+
+# Returns
+- `Int`, at least 1.
+
+# Exceptions
+- None.
+"""
+workerCount()::Int = (o = _WORKERS_OVERRIDE[]) > 0 ? o : Threads.nthreads(:default)
+
+"""
+Test hook: runs `f()` with [`workerCount`](@ref) reporting `n` (1 forces every
+threaded stage onto its serial path; larger values make the stages split their work
+for `n` workers, on however many Julia threads exist), then restores it. For comparing
+worker counts inside one process. Not for concurrent use by several callers at once.
+
+# Returns
+- Whatever `f()` returns.
+
+# Exceptions
+- `ArgumentError` if `n < 1`; whatever `f()` throws (the worker count is restored first).
+"""
+function withWorkers(f, n::Integer)
+    n ≥ 1 || throw(ArgumentError("withWorkers: n must be ≥ 1"))
+    prev = _WORKERS_OVERRIDE[]
+    _WORKERS_OVERRIDE[] = n
+    try
+        return f()
+    finally
+        _WORKERS_OVERRIDE[] = prev
+    end
+end
+
+"""
+Test hook: runs `f()` with every task of [`tmapItems`](@ref) first
+sleeping a random time of up to `maxDelay` seconds, so tasks start and
+finish in a different order on every run. Results of correct parallel
+code must not change. Not for concurrent use by several callers at once.
+
+# Returns
+- Whatever `f()` returns.
+
+# Exceptions
+- Whatever `f()` throws (the delay is reset first).
+"""
+function withChaos(f, maxDelay::Real)
+    prev = _CHAOS[]
+    _CHAOS[] = Float64(maxDelay)
+    try
+        return f()
+    finally
+        _CHAOS[] = prev
+    end
+end
+
+"""
+One fresh base value, drawn from the default RNG, so that `Random.seed!` before the call
+fixes it. A run uses it only when `rngSeed = nothing`; by default its base is
+`RNG_SEED`. It has 53 bits (below 2^53), so that
+it is written exactly as a number in the workbook (a spreadsheet number is a `Float64`).
+
+# Returns
+- `UInt64`, below 2^53.
+
+# Exceptions
+- None.
+"""
+drawBase()::UInt64 = rand(UInt64) >> 11
+
+"""
+The random stream of one work item, derived from the run's `base` value.
+
+`purpose` names what the stream is for (a fixed integer per use, e.g. MAP starts), `index`
+is the item's position in that use. Distinct `(purpose, index)` pairs give streams that
+are independent for all practical purposes; the same triple always gives the same stream.
+
+# Arguments
+- `base::UInt64`: the run's base value ([`drawBase`](@ref), or the user's `rngSeed`).
+- `purpose::Integer`: which use of randomness this is.
+- `index::Integer`: the item's index within that use.
+
+# Returns
+- `Xoshiro`, freshly seeded.
+
+# Exceptions
+- `InexactError` if `purpose` or `index` is negative.
+"""
+function stream(base::UInt64, purpose::Integer, index::Integer)::Xoshiro
+    z = _splitmix(base + _SPLITMIX_GAMMA * (UInt64(purpose) + 1))
+    z = _splitmix(z + _SPLITMIX_GAMMA * (UInt64(index) + 1))
+    return Xoshiro(z)
+end
+
+"""
+`f` applied to every element of `xs`, one task per element (no
+chunking: each item is heavy), returned in the order of `xs`. Serial
+when only one thread is available or there is at most one item.
+
+An exception raised by `f` is rethrown as itself (not wrapped in a
+`TaskFailedException`), so callers see the same error type at any thread count.
+
+# Returns
+- `Vector` of the results, `result[i] == f(xs[i])`.
+
+# Exceptions
+- Whatever `f` throws.
+"""
+function tmapItems(f::F, xs) where {F}
+    (workerCount() == 1 || length(xs) ≤ 1) && return map(f, xs)
+    # A captured variable that is reassigned after the closure is made lives in a box that
+    # the tasks would share: a data race waiting to happen, refused here.
+    any(==(Core.Box), fieldtypes(F)) && throw(
+        ArgumentError(
+            "tmapItems: the function captures a variable that is reassigned " *
+            "(a boxed capture); bind it once, or pass it as an argument",
+        ),
+    )
+    # The results go into a pre-typed vector (not the task map's own result,
+    # whose type inference cannot see), so callers stay type-stable.
+    R = Base.promote_op(f, eltype(xs))
+    out = Vector{R}(undef, length(xs))
+    _runItems!(out, f, xs)
+    return out
+end
+
+"""
+One work item of [`tmapItems`](@ref): `f`, the items and the output vector are fields
+of type `Any` on purpose, so the task code below compiles once per result type and not
+once per closure (the work in each item is heavy; one dynamic call is nothing).
+"""
+struct _ItemJob{R}
+    out::Vector{R}
+    f::Any
+    xs::Any
+    chaos::Float64
+end
+
+function _runItem(job::_ItemJob{R}, i::Int) where {R}
+    job.chaos > 0 && sleep(rand() * job.chaos)
+    job.out[i] = job.f(job.xs[i])
+    return nothing
+end
+
+"""
+Runs `f(xs[i])` into `out[i]` for every `i`, one task per item on the default thread
+pool, and waits for them; the first failing item's exception (by position) is rethrown as
+itself, not wrapped in `TaskFailedException`. Not specialized on `f` or `xs`.
+"""
+function _runItems!(out::Vector{R}, @nospecialize(f), @nospecialize(xs)) where {R}
+    job = _ItemJob{R}(out, f, xs, _CHAOS[])
+    tasks = Task[Threads.@spawn(_runItem(job, i)) for i in eachindex(out)]
+    # This thread, which may be the one that paused the garbage collector, polls for the
+    # end of the tasks and runs the collector's checkpoint meanwhile (workers cannot, see
+    # gcCheckpoint). A short job ends within a few yields (this thread runs queued
+    # tasks while it yields); a long one is waited for in 1 ms sleeps.
+    spins = 0
+    while !all(istaskdone, tasks)
+        gcCheckpoint()
+        (spins += 1) ≤ 50 ? yield() : sleep(0.001)
+    end
+    for t in tasks
+        if istaskfailed(t)
+            e = t.result
+            while e isa TaskFailedException
+                e = e.task.result
+            end
+            throw(e)
+        end
+    end
+    return out
+end
+
+"""
+`f` applied to the consecutive blocks of `block` items of `1:n` (`f(lo:hi)`), in block
+order: on the Julia threads ([`tmapItems`](@ref)) when `threaded`, else in a plain
+serial loop. For loops whose iterations are independent and write only their own outputs,
+so the blocks can run in any order. `threaded` is for the caller's size rule: below some
+input size the tasks cost more than they save, and the result does not depend on it.
+
+# Returns
+- `Vector` of the blocks' results, in block order.
+
+# Exceptions
+- Whatever `f` throws, as itself (see [`tmapItems`](@ref)).
+"""
+function tmapBlocks(f, n::Integer, block::Integer; threaded::Bool = true)
+    blocks = [lo:min(lo+block-1, n) for lo in 1:block:n]
+    return threaded ? tmapItems(f, blocks) : map(f, blocks)
+end
+
+"""
+Runs `f()` with OpenBLAS limited to one thread when Julia has several
+(concurrent tasks each calling a threaded BLAS oversubscribe the cores), and
+restores the previous BLAS thread count when the outermost scope ends. Scopes
+nest. With one Julia thread nothing is changed, so BLAS keeps its own threads.
+
+# Returns
+- Whatever `f()` returns.
+
+# Exceptions
+- Whatever `f()` throws (the BLAS thread count is restored first).
+"""
+function withBlasSingle(f)
+    workerCount() == 1 && return f()
+    lock(_BLAS_LOCK) do
+        if _BLAS_DEPTH[] == 0
+            _BLAS_SAVED[] = BLAS.get_num_threads()
+            BLAS.set_num_threads(1)
+        end
+        _BLAS_DEPTH[] += 1
+    end
+    try
+        return f()
+    finally
+        lock(_BLAS_LOCK) do
+            _BLAS_DEPTH[] -= 1
+            _BLAS_DEPTH[] == 0 && BLAS.set_num_threads(_BLAS_SAVED[])
+        end
+    end
+end

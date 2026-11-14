@@ -1,0 +1,19 @@
+// Canadian provincial and territorial government colours
+
+{
+    "set": "ns",
+    "title": "Government of Nova Scotia visual identity guide 2020",
+    "licence": "no licence text read; colour values are facts",
+    "url": "https://nsgov.github.io/patternlibrary/docs/NS-Visual-Identity-Guide-2020.pdf",
+    "colours": [
+        {"name": "nova scotia blue", "hex": "#005eb8", "family": "blue"},
+        {"name": "nova scotia red", "hex": "#da291c", "family": "red"},
+        {"name": "nova scotia yellow", "hex": "#ffd100", "family": "yellow"},
+        {"name": "nova scotia deep blue", "hex": "#005587", "family": "blue"},
+        {"name": "nova scotia cyan", "hex": "#009fdf", "family": "cyan"},
+        {"name": "nova scotia teal", "hex": "#00778b", "family": "cyan"},
+        {"name": "nova scotia sea blue", "hex": "#63b1bc", "family": "blue"},
+        {"name": "nova scotia mist blue", "hex": "#8db9ca", "family": "blue"},
+        {"name": "nova scotia pale blue", "hex": "#b9d9eb", "family": "blue"}
+    ]
+}

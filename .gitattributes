@@ -38,15 +38,3 @@ dev/**/*.jl linguist-detectable=true
 # Linguist treats everything under test/fixtures/ as vendored (default rule
 # `(^|/)[Tt]ests?/fixtures/`), which also hides these two hand-written code fixtures.
 test/fixtures/molecules/sequences.jl linguist-vendored=false linguist-detectable=true
-
-# TOMLS
-test/Project.toml linguist-detectable=true
-Project.toml linguist-detectable=true
-test/visualize/Project.toml linguist-detectable=true
-test/format/Project.toml linguist-detectable=true
-test/fitting_tests/Project.toml linguist-detectable=true
-docs/Project.toml linguist-documentation=false linguist-detectable=true
-dev/test/Project.toml linguist-detectable=true
-dev/Project.toml linguist-detectable=true
-.JuliaFormatter.toml linguist-detectable=true
-CondaPkg.toml linguist-detectable=true

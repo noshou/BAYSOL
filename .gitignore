@@ -122,3 +122,8 @@ notes/
 
 # sass (Ruby) cache
 .sass-cache/
+
+# 3D-RISM tools: everything pmv.py generates (dev/pmv-rism/)
+dev/pmv-rism/out/
+dev/pmv-rism/work/
+dev/pmv-rism/**/__pycache__/

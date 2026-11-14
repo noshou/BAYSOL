@@ -8,7 +8,7 @@ Two ways to use it, both without writing code:
 2. **A script** (the second guide below, "Second way: run it from a script"): you edit one short text file and run it. This is the way to script and to run batches; Julia users can also call the package directly ("For Julia users", at the end).
 
 - Documentation: [BAYSOL](https://noshou.github.io/BAYSOL/). Each module's README under `src/` is also a page there.
-- Worked analyses of 27 protein and 30 DNA/RNA SASBDB entries: [fitting tests](test/fitting_tests/README.md)
+- Worked analyses of 26 protein and 32 DNA/RNA SASBDB entries (each with a single-structure reference fit): [fitting tests](test/fitting_tests/README.md)
 - Developer tools (test runners, comparison, benchmarks, figure rendering): [dev](dev/README.md)
 
 ## Use BAYSOL from the terminal interface (no coding)
@@ -112,7 +112,7 @@ A new project gets a copy of the global settings; its own can then differ.
 ### 1. Add the 3D model
 
 Open **models** (`m`). Type or paste the **full path** of a `.cif` or `.pdb` file and press Enter
-(Tab completes a name; on an empty field, `o` opens your system's file chooser, and `m` lists the
+(Tab completes a name; on an empty field, `e` opens your system's file chooser, and `i` lists the
 models already in the project). The file is **copied** into the project's `models/` folder; your
 original is never touched. You can add several models: each is fitted in turn, in one run.
 `^r` on the model list deletes a model from the project (after a question). `^o` on the list opens the
@@ -187,7 +187,7 @@ changed. Back on the data screen, two more things are required:
 - **`energy`**: the X-ray energy as a wavelength in nm by default (above 0; `^k` relabels the unit nm, Å, eV or keV: the number is kept, Julia converts at run time). There is no default.
 - **`change the columns`** reopens the import with the choices you made, so you can correct them.
 - **`reference fit`** lists the **reference curves** of the project (the depositor's CRYSOL or FoXS fit, for
-  the comparison figure of a run). `^n` adds one from any table, through the same import screen with
+  the comparison figure of a run). `shift+a` adds one from any table, through the same import screen with
   only `q` and `I(q)` (and an optional `sigma`, `none` by default); the curve must be in the same units as
   the data. It is saved as a clean `<name>.tsv` in the project's `reference-fit/` folder (a taken name gets
   `-2`, `-3`; nothing is overwritten) and `^r` deletes the highlighted one, after a question. Adding needs the
@@ -310,7 +310,7 @@ manager. Once a run exists it offers `open project folder` and **`open runs`**.
   says why in the note row.
 - **Enter** on a `done` model opens the **results workbook** (`<model>.xlsx`) in a viewer, one
   tab per sheet: **`[`** and **`]`** change sheet, the arrows move the cursor.
-  **`^p`** switches to the **plots** of that model (the same text plots a script prints; one tab per
+  **`P`** switches to the **plots** of that model (the same text plots a script prints; one tab per
   plot), and back.
   The plots are written at several sizes; the viewer shows the largest that fits its window and picks
   again when you resize it.
@@ -318,9 +318,9 @@ manager. Once a run exists it offers `open project folder` and **`open runs`**.
   more row, `comparison`, after its models: Enter opens its workbook and plots. A model that has settings of
   its own is marked `*`, and the note row says which.
 - **`^l`** on a run reads its `run.LOG` (the full log, including the sampler's output and the
-  errors) in a pager: Enter, Space and PgDn page down, `b` and PgUp page up. Esc closes it.
-- **`shift+d`**, **`shift+t`** and **`shift+c`** take files out of a run. **`shift+d`** *moves the data*
-  (every model's workbook and the comparison table `.tsv`) to your data folder and **`shift+t`** *moves the tex
+  errors) in a pager: Enter, Space and PgDn page down, `k` and PgUp page up. Esc closes it.
+- **`shift+d`**, **`shift+l`** and **`shift+c`** take files out of a run. **`shift+d`** *moves the data*
+  (every model's workbook and the comparison table `.tsv`) to your data folder and **`shift+l`** *moves the tex
   plots* (every `.tex` figure of every model and the comparison) to your plot folder: each opens a dropdown,
   **`move all`** (the whole run) or **`move by model: NAME`** (one model, or the `comparison`). **`shift+c`**
   *compiles* the highlighted row's figures with LaTeX into PDFs in the plot folder. The folders are the
@@ -391,14 +391,14 @@ through a temporary file, so a crash never leaves half a file.
 | `^n`, `^p`, `^f`, `^e` | buffer: add a small molecule, a polymer, a protein, DNA/RNA |
 | `^g` | buffer: edit pH, σ and temperature |
 | `^k` | buffer: turn the unit of the concentrations (mM, M, µM) |
-| `o`, `m` (empty path field) | open the file chooser; list the models |
-| `r` (on an unusable file) | reset it |
+| `e`, `i` (empty path field) | open the file chooser; list the models |
+| `x` (on an unusable file) | reset it |
 | `Shift+R` | run (project menu, when ready) |
-| `Tab`, `Shift+Tab`, `^p`, `+` `-` | viewer: next/previous sheet or plot; sheets or plots; plots zoom |
-| `/`, `n`, `N`, `g` | viewer: find, next/previous match, go to a cell (`B7`, `7`, `B`) |
+| `Tab`, `Shift+Tab`, `P`, `+` `-` | viewer: next/previous sheet or plot; sheets or plots; plots zoom |
+| `/`, `.`, `,`, `j` | viewer: find, next/previous match, go to a cell (`B7`, `7`, `B`) |
 | `Space`, `c`, `f` | viewer: mark a range, copy it as TSV to the clipboard, show formulas |
-| `^l`, `b`, `Space` | `open runs`: read `run.LOG`; pager: page back, forward |
-| `shift+d`, `shift+t`, `shift+c` | `open runs`: move the data, move the tex plots (a dropdown: all, or one model), compile the highlighted row's plots |
+| `^l`, `k`, `Space` | `open runs`: read `run.LOG`; pager: page back, forward |
+| `shift+d`, `shift+l`, `shift+c` | `open runs`: move the data, move the tex plots (a dropdown: all, or one model), compile the highlighted row's plots |
 
 ### If something goes wrong in the terminal interface
 
@@ -406,12 +406,12 @@ through a temporary file, so a crash never leaves half a file.
 |---|---|
 | `BAYSOL: this program needs a terminal` | Run it from a terminal window, not from a pipe. A launcher with no terminal opens one (on Linux your `$TERMINAL`, the desktop's terminal, or the first known one) that runs the program again. |
 | A message instead of the screen | The window is under 80 x 24. Enlarge it. |
-| `buffer.json unusable!` (or `data`, `settings`, ...) with `r: reset` | The file was changed outside the interface or is damaged. `r` and Enter **reset** it to empty and keep the old one beside it as `<name>.corrupt`, so nothing is lost. |
+| `buffer.json unusable!` (or `data`, `settings`, ...) with `x: reset` | The file was changed outside the interface or is damaged. `x` and Enter **reset** it to empty and keep the old one beside it as `<name>.corrupt`, so nothing is lost. |
 | `changed on disk: another copy of BAYSOL saved it; reopen it` | A second copy of the program saved this file meanwhile. Leave the screen and reopen it. |
 | `missing components: ...` where `run: shift+r` should be | The box names what is missing (`models`, `solutes`, `pH`, `temperature`, `data`, `energy`); `run: shift+r` replaces it once the list is empty. |
 | `a run is in progress (pid N)` | The project already has a live run (maybe in another window). Wait for it, or stop it. A crashed run is marked `interrupted` after a minute and stops blocking. |
 | `could not start julia: ...` | `julia` is not on the PATH. Install it, or set the environment variable `JULIA` to its full path. |
-| A model is `failed`; its first error line is on the run screen | Read the `ERRORS` section at the end of `run.LOG` (`l` in `open runs`). Other models in the run are still fitted. |
+| A model is `failed`; its first error line is on the run screen | Read the `ERRORS` section at the end of `run.LOG` (`^l` in `open runs`). Other models in the run are still fitted. |
 | `WLSError` in the log | The fit had too few points (fewer than 3) or the model curve is flat across your q range. Check the curve, the q units and the energy. |
 | `a number, please` / `from 0 to 100 °C` | The temperature prompt of `^g` in the buffer wants a number in that range. |
 | An unknown residue or element error | The model has a residue BAYSOL does not know. It looks names up online: reconnect and retry. |
@@ -696,11 +696,11 @@ q, I, σ = q[keep], I[keep], σ[keep]
 println("Using $(length(q)) data points, q from $(minimum(q)) to $(maximum(q)) 1/A")
 
 # Build the model, sample it, write the results.
-seed   = BAYSOL.seed_model(STRUCTURE, ENERGY_EV, q, I, σ, PH, PH_UNCERTAINTY, SOLUTES;
+seed   = BAYSOL.seedModel(STRUCTURE, ENERGY_EV, q, I, σ, PH, PH_UNCERTAINTY, SOLUTES;
                            t = TEMPERATURE_C)
-result = BAYSOL.run_model(seed)
-BAYSOL.results(result, seed; dir = HERE, name = "res", font = nothing, run_log = true)
-BAYSOL.print_summary(result)
+result = BAYSOL.runModel(seed)
+BAYSOL.results(result, seed; dir = HERE, name = "res", font = nothing, runLog = true)
+BAYSOL.printSummary(result)
 # =========================== end ===========================
 ```
 
@@ -711,7 +711,7 @@ check a name (replace `glycerol` with your word):
 **macOS / Linux:**
 
 ```
-grep -i "glycerol" ~/BAYSOL-0.4.0/src/BulkElectronDensity/NonBiological/nonbio_lookup.json
+grep -i "glycerol" ~/BAYSOL-0.4.0/src/bulk-electron-density/non-biological/nonbio_lookup.json
 ```
 
 **Windows:**
@@ -893,13 +893,13 @@ LaTeX engine.) Alternatively, draw your own figures from the numbers in `res.xls
 
 ```julia
 using BAYSOL
-seed = BAYSOL.seed_model(structure, energy, q, I, σ, pH, σ_pH, solutes)
-res  = BAYSOL.run_model(seed)                    # NUTS: 300 warm-up + 700 draws, 8 chains
+seed = BAYSOL.seedModel(structure, energy, q, I, σ, pH, σ_pH, solutes)
+res  = BAYSOL.runModel(seed)                    # NUTS: 300 warm-up + 700 draws, 8 chains
 BAYSOL.results(res, seed; dir = "out")           # terminal plots, pgfplots .tex files, out/res.xlsx
-BAYSOL.print_summary(res)                        # χ², the parameters, the checks, the files
+BAYSOL.printSummary(res)                        # χ², the parameters, the checks, the files
 ```
 
-`results` also takes `compile = true` (PDF, SVG or PNG; needs `lualatex` or `xelatex`), a `PlotStyle`, a `font`, and `run_log = true` for the run log. Every option is explained in the [Pipeline guide](src/Pipeline/README.md). Start Julia with `julia -t auto` to use several threads; results are the same at any thread count ([Runtime guide](src/Runtime/README.md)).
+`results` also takes `compile = true` (PDF, SVG or PNG; needs `lualatex` or `xelatex`), a `PlotStyle`, a `font`, and `runLog = true` for the run log. Every option is explained in the [Pipeline guide](src/pipeline/README.md). Start Julia with `julia -t auto` to use several threads; results are the same at any thread count ([Runtime guide](src/runtime/README.md)).
 
 ## For developers: the tools and the tests
 
@@ -950,7 +950,7 @@ bysl <tool> --help           # the usage of one tool
 ### Where things are
 
 - [dev/README.md](dev/README.md): every tool, its options, the benchmark protocol and the diagnostics.
-- [test/README.md](test/README.md): the test tree. [Unit tests](test/unit_tests/README.md), [fitting tests](test/fitting_tests/README.md) (worked examples, with the Results table), [baselines](test/baselines/README.md) (the reference benchmark of each release), [fixtures](test/fixtures/README.md) (the data the tests read) and [visualizations](test/visualize/README.md).
+- [test/README.md](test/README.md): the test tree. [Unit tests](test/unit-tests/README.md), [fitting tests](test/fitting_tests/README.md) (worked examples, with the Results table), [baselines](test/baselines/README.md) (the reference benchmark of each release), [fixtures](test/fixtures/README.md) (the data the tests read) and [visualizations](test/visualize/README.md).
 - `dev/test/`: the tests of the tools (run by `bysl test`).
 - Before a commit, run `bysl precommit`: the tool tests, the unit suite, formatting, the line-length check, the Results-table check and a strict docs build.
 

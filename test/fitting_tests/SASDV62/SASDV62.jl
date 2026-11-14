@@ -38,11 +38,12 @@ const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDV62_fit2.fit")
 #
 # Curve units: the SASBDB .dat is in nm⁻¹ (angular_unit "1/nm"; s_min 0.089 and s_max
 # 3.997 nm⁻¹; three text lines, then q, I, σ, then trailing text, all skipped by
-# `_read_curve`) and is converted to Å⁻¹ (÷10). The intensities are in arbitrary units
+# `_readCurve`) and is converted to Å⁻¹ (÷10). The intensities are in arbitrary units
 # (SASBDB intensity_unit). 39 of the 680 points have I ≤ 0 (37 of them above 0.25 Å⁻¹);
-# the fit is cut at `Q_MAX_FIT` = 0.25 Å⁻¹, where the depositor's CRYSOL curve ends too
-# (the data go to 0.40 Å⁻¹ and are noise-dominated), and `seed_model` drops the
-# non-positive bins below it.
+# `seedModel` drops the non-positive bins. The whole curve is fitted (no q cut): the data
+# go to 0.40 Å⁻¹ but the depositor's CRYSOL curve ends at 0.2495 Å⁻¹, so the refChi2 is
+# not like for like. Above 0.25 Å⁻¹ the median I/σ is still 1.2 (14 % of the points have
+# I ≤ 0), a weak tail rather than a flat noise floor.
 #
 # Model and depositor fit: SASDV62 has TWO fits. fit1 is DAMMIN (dummy atoms, χ² 1.043;
 # not used). fit2 is CRYSOL against the atomic model, which SASBDB states is identical
@@ -56,7 +57,7 @@ const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDV62_fit2.fit")
 # the label is χ² (not χ) and the depositor's χ² is 1.098 (SASBDB chi_square_value).
 #
 # Haem: it is part of the macromolecule (SASBDB lists it among the sample molecules). The
-# loader keeps ligands of a known composition (`ligand_selector`, `KEEP_LIGANDS`, owner
+# loader keeps ligands of a known composition (`ligandSelector`, `KEEP_LIGANDS`, owner
 # decision 2026-11-11; `components.tsv` lists HEM as "other", non-polymer, C34 H32 Fe N4
 # O4), so the four HEM groups (4 x 43 heavy atoms, the Fe included, 4 x 616 Da, about
 # 3.8 % of the tetramer mass) ARE scattered, as in CRYSOL, which reads the HETATM records.
@@ -65,11 +66,11 @@ const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDV62_fit2.fit")
 # haemoglobin of unstated oxidation state.
 # ---------------------------------------------------------------------------
 
-qvals, I_exp, σ_exp = _read_curve(_DATA_PATH)
+qvals, iExp, σ_exp = _readCurve(_DATA_PATH)
 
 # qvals are in nm⁻¹; must convert to Å⁻¹.
 qvals = qvals ./ NM_INV_PER_ANGSTROM_INV
-check_q_angstrom(qvals)
+checkQAngstrom(qvals)
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -106,74 +107,71 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-const Q_MAX_FIT = 0.25
-
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 # The deposited model has no hydrogens: pdb2pqr/PROPKA place them at PH.
 const ADD_HYDROGENS = true
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` (no q cut).
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+function fitSubset()
+    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdv62` samples. It is separate only because
+# Builds the Seed that `runSasdv62` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
-# `run_sasdv62` below is the whole story (build the seed, then sample it).
-function seed_sasdv62(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdv62` below is the whole story (build the seed, then sample it).
+function seedSasdv62(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdv62(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdv62(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdv62(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdv62(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdv62()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdv62()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
 # The .fit file is CRYSOL's (fit2): columns q (Å⁻¹), I_exp, σ, I_fit.
 crysol = readdlm(_FIT_PATH; skipstart = 1)
 reference = BAYSOL.Reference(
     "CRYSOL fit2",
     Float64.(crysol[:, 1]),
     Float64.(crysol[:, 4]);
-    q_max = Q_MAX_FIT,
 )
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res", references = reference,
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "CRYSOL 1.098",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "CRYSOL 1.098",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDV62/ folder), not the caller's cwd.
 
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

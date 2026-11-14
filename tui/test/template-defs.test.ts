@@ -33,7 +33,7 @@ function rowsOf(r: RowsResult): Extract<RowsResult, { rows: unknown }> {
 }
 
 /** The snapshot of a custom solute. */
-const DYE = { z: 40, pmv: 300, "sigma-pmv": null }
+const DYE = { z: 40, pmv: 300, "sigmaPmv": null }
 
 /** A Tris-like custom buffer at the shipped constants (dH is not part of a definition). */
 const tris = (extra: Partial<CustomDefinition> = {}): CustomDefinition => ({
@@ -111,7 +111,7 @@ test("custom: every rule has its message", () => {
     )
     assert.ok(
         has(
-            bad({ solute: "my dye", soluteData: { ...DYE, "sigma-pmv": -1 } }),
+            bad({ solute: "my dye", soluteData: { ...DYE, "sigmaPmv": -1 } }),
             "uncertainty",
         ),
     )
@@ -231,7 +231,8 @@ test("builtin: known id, positive numbers", () => {
 
 test("custom Tris at the shipped constants equals the shipped Tris (25 C)", () => {
     const shipped = computeTemplate({
-        id: "tris", mM: 10, sigmaMM: 0.2, pH: 7.5, sigmaPH: 0.1, restI_mM: 100, tempC: 25,
+        id: "tris", mM: 10, sigmaMM: 0.2, pH: 7.5, sigmaPH: 0.1,
+        restIonicMM: 100, tempC: 25,
     })
     const mine = rowsOf(
         rowsFor(tris(), { pH: 7.5, sigmaPH: 0.1, temperatureC: 4 }),
@@ -255,7 +256,8 @@ test("custom Tris at the shipped constants equals the shipped Tris (25 C)", () =
 
 test("custom Tris at 22 C: linear dpKa/dT against Clarke-Glew, reported", () => {
     const shipped = computeTemplate({
-        id: "tris", mM: 10, sigmaMM: 0.2, pH: 7.5, sigmaPH: 0.1, restI_mM: 100, tempC: 22,
+        id: "tris", mM: 10, sigmaMM: 0.2, pH: 7.5, sigmaPH: 0.1,
+        restIonicMM: 100, tempC: 22,
     })
     const mine = rowsOf(
         rowsFor(tris({ pHSetAt: 22 }), { pH: 7.5, sigmaPH: 0.1, temperatureC: 4 }),
@@ -326,7 +328,7 @@ test("customToTemplate: the engine's shape, unverified", () => {
     assert.equal(t.kind, "buffer")
     assert.equal(t.groups?.length, 3)
     assert.deepEqual(
-        t.groups?.map((g) => [g.z_acid, g.z_base]),
+        t.groups?.map((g) => [g.zAcid, g.zBase]),
         [[0, -1], [-1, -2], [-2, -3]],
     )
     assert.equal(t.notes, "constants not sourced")
@@ -438,7 +440,8 @@ test("builtin through the dispatcher equals computeTemplate", () => {
     }
     const r = rowsOf(rowsFor(def, { pH: 7.5, sigmaPH: 0.1, temperatureC: 4 }))
     const e = computeTemplate({
-        id: "tris", mM: 10, sigmaMM: 0.2, pH: 7.5, sigmaPH: 0.1, restI_mM: 100, tempC: 22,
+        id: "tris", mM: 10, sigmaMM: 0.2, pH: 7.5, sigmaPH: 0.1,
+        restIonicMM: 100, tempC: 22,
     })
     assert.deepEqual(r.rows, e.rows)
     const flat = { pH: 5, sigmaPH: 0.1, temperatureC: 25 }

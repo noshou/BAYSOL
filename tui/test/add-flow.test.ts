@@ -42,7 +42,7 @@ import {
 import {
     seqresLetters,
     fixture as sharedFixture,
-    tempDir as tempRoot,
+    tempDir,
 } from "./support/fixtures.js"
 
 // ---- fixtures -------------------------------------------------------------------------
@@ -54,7 +54,7 @@ const fixture = sharedFixture("buffer/buffer.json").solutes as Record<string, un
 function fixtureRow(name: string): Solute {
     const row = fixture.find((r) => r.name === name)
     assert.ok(row, name)
-    const { "sigma-mM": sigmaMM, ...rest } = row
+    const { "sigmaMm": sigmaMM, ...rest } = row
     return { ...rest, sigmaMM } as Solute
 }
 
@@ -77,17 +77,17 @@ const ammonium: CustomEntry = {
 const chain1: CustomEntry = {
     kind: "polymer",
     name: "chain-1",
-    "z-ends": 10,
-    "pmv-ends": 19.24,
-    "sigma-ends": null,
+    "zEnds": 10,
+    "pmvEnds": 19.24,
+    "sigmaEnds": null,
     units: [{ label: "A", formula: "C2H4O", z: 24, slope: 36.73, sigma: null }],
 }
 const chain4: CustomEntry = {
     kind: "polymer",
     name: "chain-4",
-    "z-ends": 5,
-    "pmv-ends": 7.0,
-    "sigma-ends": 0.5,
+    "zEnds": 5,
+    "pmvEnds": 7.0,
+    "sigmaEnds": 0.5,
     units: [
         { label: "A", formula: "C2H4O", z: 10, slope: 1.0, sigma: null },
         { label: "B", formula: "C3H6O", z: 20, slope: 2.0, sigma: 0.1 },
@@ -388,6 +388,7 @@ test("params of a row", () => {
 
 test("the family of an arg", () => {
     assert.deepEqual(familyMatch("PEG n=22")?.values, { n: "22" })
+    // biome-ignore lint/style/useNamingConvention: polymer data key
     assert.deepEqual(familyMatch("peg 3350")?.values, { Mn: "3350" })
     assert.deepEqual(familyMatch("Brij nC=12 nEO=9")?.values, { nC: "12", nEO: "9" })
     assert.equal(familyMatch("PEG 3350")?.formIndex, 0)
@@ -401,7 +402,7 @@ test("the family of an arg", () => {
 // ---- paths ----------------------------------------------------------------------------
 
 test("paths", () => {
-    const root = tempRoot()
+    const root = tempDir()
     writeFileSync(join(root, "a.fasta"), ">a\nACGT\n")
     assert.equal(sequencePathProblem(""), "type a path first!")
     assert.equal(sequencePathProblem("a.fasta"), "use a full path")
@@ -514,15 +515,15 @@ test("custom solutes", () => {
         custom: "N-acetylcysteine ethyl ester",
         z: 102,
         pmv: 118.4,
-        "sigma-pmv": 4.0,
+        "sigmaPmv": 4.0,
         name: "N-acetylcysteine ethyl ester",
         mM: 5,
         sigmaMM: 0.1,
     })
     // a blank sigma of the entry is kept as null
     const amm = onlyRow(feed(add(), "amm-nitrate-x", submit, "10", submit, "0.2", submit))
-    assert.equal(amm["sigma-pmv"], null)
-    assert.ok("sigma-pmv" in amm)
+    assert.equal(amm.sigmaPmv, null)
+    assert.ok("sigmaPmv" in amm)
     // a custom polymer asks the count of each unit in the params cell
     let flow = feed(add("polymer"), "chain-4", submit)
     assert.equal(field(flow), "params")
@@ -630,7 +631,7 @@ test("sequences typed or pasted as text, linted like a file", () => {
         "T is DNA, not RNA (at 4)",
     )
     // an existing file wins; text that looks like a path is a path, with the path messages
-    const root = tempRoot()
+    const root = tempDir()
     const file = seqFile(root, "p.fa", `>p\n${dnaChain}\n`)
     assert.equal(
         onlyRow(feed(toPath("dna"), file, submit, "1", submit, "0.1", submit)).source,
@@ -646,7 +647,7 @@ test("sequences typed or pasted as text, linted like a file", () => {
 })
 
 test("sequences from files", () => {
-    const root = tempRoot()
+    const root = tempDir()
     const dna = seqFile(root, "primer.fasta", ">p1\nACGTTGCA\n")
     const two = seqFile(root, "two.fa", ">r1 first\nAC\nGT\n>r2\nGGCC\n")
     const rna = seqFile(root, "guide.fa", ">g1\nACGUUGCA\n")
@@ -859,7 +860,7 @@ test("cancel drops the new rows", () => {
         assert.equal(f.cursor, 0, `${label}: the cursor is where it was`)
     }
     // a file's rows all go, after the mM was taken
-    const root = tempRoot()
+    const root = tempDir()
     const two = seqFile(root, "two.fa", ">r1\nAC\n>r2\nGG\n")
     const flow = feed(add("nucleotide", base.table), submit, two, submit, "1", submit)
     assert.equal(rows(flow).length, 3)

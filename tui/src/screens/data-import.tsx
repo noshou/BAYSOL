@@ -364,7 +364,7 @@ export function DataImportScreen(props: {
                 keep?.units ?? DEFAULT_UNITS,
                 keep?.energy ?? undefined,
                 makeMapping(path, options, columns),
-                keep?.energy_unit,
+                keep?.energyUnit,
             )
             onDone(data.q.length, data.dropped, undefined, warning)
             nav.pop()

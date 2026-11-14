@@ -13,3 +13,6 @@ Files:
                                own SASDV62_fit2_model1.pdb has identical ATOM/HETATM records.
 There is no depositor fit, hence no .fit reference curve. The fitting script
 test/fitting_tests/SASDVA2/ states the conditions it takes from the entry and its assumptions.
+Paper (PMC11440596) read on 2026-11-13: Table 1 row and methods are quoted in the script header.
+
+Fit range (2026-11-13): the script cuts at q = 0.3 1/A (flat noise floor: above it 174 points, median I/sigma 0.06, 47 % I <= 0).

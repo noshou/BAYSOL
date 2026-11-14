@@ -1,0 +1,120 @@
+// How the colour sets of this folder are merged into the one list of the colour picker
+// (`tui/src/store/colours.ts`, `mergeColourSets`). This is the DATA of the merge; the
+// README of this folder tells the rules, the code applies them. Ported from the Julia
+// harvester (removed, see git history), whose results it reproduces name for name.
+{
+    // The sets in priority order: the first set keeps a plain name two sets share
+    // (`green` is the CSS green, `green (x11)` the X11 one). The first five are the
+    // standard sets, then the sets of the government, international-body, university,
+    // flag and community files, then the other colour dictionaries. A file of this
+    // folder is named `<set>.jsonc`.
+    "order": [
+        "css",
+        "x11",
+        "fed-std-595c",
+        "tailwind",
+        "xkcd",
+        "fip",
+        "eu",
+        "bc",
+        "ontario",
+        "alberta",
+        "govcanada",
+        "utah",
+        "quebec",
+        "yukon",
+        "saskatchewan",
+        "pei",
+        "nunavut",
+        "ns",
+        "nwt",
+        "intl",
+        "univ-us",
+        "univ-ca",
+        "univ-world",
+        "govuk",
+        "royal-navy",
+        "mod-uk",
+        "flags-national",
+        "flags-subnational",
+        "univ-palestine",
+        "wikipedia-colours",
+        "meodai",
+        "nbs-iscc",
+        "winsor-newton",
+        "crayola",
+        "paul-tol",
+        "resene"
+    ],
+
+    // The sets whose names Colors.jl of Julia reads as the same colours (a setting keeps
+    // such a name as it was typed, any other colour as `#rrggbb`).
+    "julia": ["css", "x11"],
+
+    // What a set is called inside the brackets of a clash name (`yellow (fed id prog)`),
+    // when its tag is not the best name. Any other tag is its words (`paul-tol` is
+    // `paul tol`), except the tags of `hyphenated`, which are part of the name of the
+    // standard (`fed-std-595c`).
+    "identifiers": { "fip": "fed id prog" },
+    "hyphenated": ["fed-std-595c"],
+
+    // The names everybody knows. When several names have exactly one colour they are
+    // all kept and the others dropped (a group with none keeps its shortest name):
+    // `all` = every name of the set, `no-digit` = a name without a digit (not `brown1`),
+    // `one-word` = a name of letters only.
+    "common": { "css": "all", "x11": "no-digit", "tailwind": "one-word", "xkcd": "one-word" },
+
+    // Names changed after reading them (a name too long or unclear as it is).
+    "renames": {
+        "blue with a hint of purple": "blue hint of purple",
+        "tabasco purple": "tabasco pink"
+    },
+
+    // Short forms of long place names, applied to every name: [pattern, short form]
+    // (a JavaScript regular expression, applied to the lower-case name).
+    "placeAbbreviations": [
+        ["\\bnewfoundland and labrador\\b", "nfld"],
+        ["\\bnorth ?west territories\\b", "nwt"],
+        ["\\bu\\.s\\.", "us"],
+        ["\\bd\\.c\\.", "dc"],
+        ["\\bppu\\b", "palestine polytechnic"]
+    ],
+
+    // How a country is named in the national flag entries when that is not its English
+    // short name (owner, 2026-11-10: Chad is `tchad`): [set, pattern, name].
+    "nationalNames": [["flags-national", "^chad\\b", "tchad"]],
+
+    // The pigment abbreviations and misspellings of the Winsor & Newton names, as
+    // `word: words` (applied to the words of the names of the set `winsor-newton`).
+    "winsorWords": {
+        "cd": "cadmium",
+        "co": "cobalt",
+        "cr": "chrome",
+        "mn": "manganese",
+        "perm": "permanent",
+        "trans": "transparent",
+        "orage": "orange",
+        "pthalo": "phthalo",
+        "davys": "davy's",
+        "paynes": "payne's"
+    },
+
+    // OWNER EXCLUSION RULE (2026-11-10): no entry carries a word of this list in its
+    // name, and no entry or set cites a source of Israel or of an Israeli institution
+    // (the loader leaves such an entry out, the test `colour sets keep the exclusion
+    // rule` checks the names, the sources and the web domains). Palestinian entries
+    // stay. Keep this list: a rebuild of the sets must never restore the entries.
+    "excludedWords": [
+        "israel",
+        "technion",
+        "weizmann",
+        "hebrew university",
+        "tel aviv",
+        "ben-gurion",
+        "ben gurion",
+        "bar-ilan",
+        "bar ilan",
+        "university of haifa",
+        "ariel university"
+    ]
+}

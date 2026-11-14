@@ -240,11 +240,11 @@ export class TemplateFlow {
                 mM: this.mM,
                 sigmaMM: this.sigmaMM,
                 pH: this.pH,
-                sigmaPH: this.start.conditions?.["sigma-pH"],
-                restI_mM: this.restI,
+                sigmaPH: this.start.conditions?.sigmaPh,
+                restIonicMM: this.restI,
                 cation: this.cation,
                 tempC: setAtTemperature(
-                    { id: t.id, "set-at": this.setAt },
+                    { id: t.id, "setAt": this.setAt },
                     this.start.conditions?.temperature,
                 ),
             })
@@ -337,7 +337,7 @@ export class TemplateFlow {
         if (needsConcentration(t)) out.push("conc", "sigma")
         if (titrantChoices(t).length > 0) out.push("ion")
         if (asksPH(t)) out.push("pH", "setat")
-        const inside = (t.buffer_components?.length ?? 0) > 0
+        const inside = (t.bufferComponents?.length ?? 0) > 0
         if (needsConcentration(t) || inside) out.push("rest")
         out.push("confirm")
         return out
@@ -472,19 +472,19 @@ export class TemplateFlow {
     private link(t: Template): TemplateLink | undefined {
         const rest = this.restI ?? 0
         if (t.kind === "mixture") {
-            return (t.buffer_components?.length ?? 0) > 0
-                ? { id: t.id, "rest-mM": rest, "set-at": this.setAt }
+            return (t.bufferComponents?.length ?? 0) > 0
+                ? { id: t.id, "restMm": rest, "setAt": this.setAt }
                 : undefined
         }
-        const acid = t.default_titrant?.kind === "acid"
+        const acid = t.defaultTitrant?.kind === "acid"
         const titrant = this.cation ?? (acid ? "chloride" : "sodium(1+)")
         return {
             id: t.id,
             mM: this.mM,
-            "sigma-mM": this.sigmaMM,
+            "sigmaMm": this.sigmaMM,
             titrant,
-            "rest-mM": rest,
-            "set-at": this.setAt,
+            "restMm": rest,
+            "setAt": this.setAt,
         }
     }
 
@@ -511,11 +511,11 @@ export class TemplateFlow {
             added++
         }
         const held = this.start.conditions
-        const sigma = held?.["sigma-pH"] ?? conditionLimits().sigmaPh.default
+        const sigma = held?.sigmaPh ?? conditionLimits().sigmaPh.default
         const conditions =
             held?.pH === outcome.pH
                 ? undefined
-                : withTemperature({ pH: outcome.pH, "sigma-pH": sigma }, held)
+                : withTemperature({ pH: outcome.pH, "sigmaPh": sigma }, held)
         this.done = { cancelled: false, drafts, conditions, added }
     }
 }

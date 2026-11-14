@@ -5,19 +5,19 @@
 # (`bysl harvest solutes`) dispatches to nested modules.
 module Dev
 
-include("Common.jl")
-include("Report.jl")
-include("Fmt.jl")
-include("Harvest.jl")
-include("Results.jl")
-include("Cache.jl")
-include("Checks.jl")
-include("Fits.jl")
-include("Extract.jl")
-include("Plots.jl")
-include("Vis.jl")
-include("Test.jl")
-include("Server.jl")
+include("common.jl")
+include("report.jl")
+include("fmt.jl")
+include("harvest.jl")
+include("results.jl")
+include("cache.jl")
+include("checks.jl")
+include("fits.jl")
+include("extract.jl")
+include("plots.jl")
+include("vis.jl")
+include("test.jl")
+include("server.jl")
 
 
 """
@@ -38,7 +38,7 @@ const TASKS = [
     "docs" => (Checks.Docs, "Build the documentation site (strict, about a minute)"),
     "cache" => (Cache, "The cache of the programs the tools start: list, clear"),
     "fits" => (Fits, "The fitting tests: run, list, diagnose, profile"),
-    "extract" => (Extract, "Regenerate bundled data: formfactor, components"),
+    "extract" => (Extract, "Regenerate bundled data: formfactor, components, pmv"),
     "plots" => (Plots, "LaTeX figures: render, fonts"),
     "vis" => (Vis, "The visual checks of the geometry code"),
     "test" =>
@@ -80,6 +80,6 @@ function main(task::AbstractString, args::AbstractVector{<:AbstractString})::Int
 end
 
 
-include("Precompile.jl")
+include("precompile.jl")
 
 end

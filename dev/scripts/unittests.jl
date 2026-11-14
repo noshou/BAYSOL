@@ -5,31 +5,31 @@
 #   julia --project=test dev/scripts/unittests.jl shannon wls
 #                                    # only the files whose name contains one of these
 #
-# Every ../test/unit_tests/units/test_*.jl is self-contained (each `include`s its own
+# Every ../test/unit-tests/units/test-*.jl is self-contained (each `include`s its own
 # testsetup.jl and declares its own `using`s), so it can also be run on its own, e.g.:
-#   julia --project=test test/unit_tests/units/test_atomicradii.jl
+#   julia --project=test test/unit-tests/units/test-atomicradii.jl
 # The Julia that only the terminal interface needs lives in ../tui/src/store/*.jl, and its
 # tests next to the TypeScript ones, ../tui/test/*.test.jl (kebab case, run the same way:
 #   julia --project=test tui/test/run-project.test.jl).
 #
-# Layout: the tests are in ../test/unit_tests/units/, with the setup they share
-# (testsetup.jl) beside them; the shared helpers are beside them in ../test/unit_tests/
+# Layout: the tests are in ../test/unit-tests/units/, with the setup they share
+# (testsetup.jl) beside them; the shared helpers are beside them in ../test/unit-tests/
 # (floatcompare.jl, geometry.jl); the data the tests read is in ../test/fixtures/
 # (sequences.jl, the protein/DNA/RNA sequences, sits with the molecules there).
 
 using Test
 
-# Every `test_*.jl` in units/, in name order, then every `*.test.jl` of the terminal
+# Every `test-*.jl` in units/, in name order, then every `*.test.jl` of the terminal
 # interface's test folder, with the package-quality checks (Aqua, ExplicitImports, JET)
 # last. A new test file is picked up by creating it in one of the two folders.
-const UNITS_DIR = joinpath(@__DIR__, "..", "..", "test", "unit_tests", "units")
+const UNITS_DIR = joinpath(@__DIR__, "..", "..", "test", "unit-tests", "units")
 const TUI_TEST_DIR = joinpath(@__DIR__, "..", "..", "tui", "test")
-const LAST = "test_quality.jl"
+const LAST = "test-quality.jl"
 const TEST_FILES =
     let files = vcat(
             sort!(
                 filter(
-                    f -> startswith(f, "test_") && endswith(f, ".jl"),
+                    f -> startswith(f, "test-") && endswith(f, ".jl"),
                     readdir(UNITS_DIR),
                 ),
             ),
@@ -60,17 +60,17 @@ isempty(SELECTED) &&
 
 """
 How long each file takes alone, in seconds (measured; a file not listed takes 1 s): the
-parallel run uses it to give each worker about the same work. `test_quality.jl` stays
+parallel run uses it to give each worker about the same work. `test-quality.jl` stays
 last in its worker (it checks the package after the other files have loaded).
 """
 const FILE_SECONDS = Dict(
-    "test_sampler.jl" => 137, "run-project.test.jl" => 52,
+    "test-sampler.jl" => 137, "run-project.test.jl" => 52,
     "settings-file.test.jl" => 51,
-    "test_quality.jl" => 32, "test_modified_amino.jl" => 29, "test_plot.jl" => 26,
-    "test_concurrency.jl" => 15, "test_seed_diagnostics.jl" => 15,
-    "test_data_selection.jl" => 15, "test_allocations.jl" => 12,
-    "test_setting_keywords.jl" => 11, "test_modified_nucleotides.jl" => 9,
-    "test_nucleotide_fixtures.jl" => 7,
+    "test-quality.jl" => 32, "test-modified-amino.jl" => 29, "test-plot.jl" => 26,
+    "test-concurrency.jl" => 15, "test-seed-diagnostics.jl" => 15,
+    "test-data-selection.jl" => 15, "test-allocations.jl" => 12,
+    "test-setting-keywords.jl" => 11, "test-modified-nucleotides.jl" => 9,
+    "test-nucleotide-fixtures.jl" => 7,
 )
 
 """

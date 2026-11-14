@@ -3,7 +3,7 @@
 /**
  * The notations a figure colour may be written in, and the maths that turns each into the
  * 8-bit sRGB colour and back: `#rrggbb` (and `#rgb`), `rgb(r, g, b)`, `hsl(h, s%, l%)` and
- * `cmyk(c%, m%, y%, k%)`. This is `src/Pipeline/ColourNotation.jl` line for line, and both
+ * `cmyk(c%, m%, y%, k%)`. This is `src/pipeline/colour-notation.jl` line for line, and both
  * read the golden file `test/fixtures/colours/notations.json`, so they cannot drift apart.
  *
  * A colour is three whole numbers 0 to 255; every value in between is a number. Rounding
@@ -82,7 +82,7 @@ function cmykToRgb(c: number, m: number, y: number, k: number): Rgb {
 
 // ---- writing -----------------------------------------------------------------------
 
-/** One colour in every notation (the same digits as `colour_notations` of Julia). */
+/** One colour in every notation (the same digits as `colourNotations` of Julia). */
 export type Notations = { hex: string; rgb: string; hsl: string; cmyk: string }
 
 /** The `#rrggbb` text of a colour. */

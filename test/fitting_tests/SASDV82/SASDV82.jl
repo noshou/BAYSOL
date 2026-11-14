@@ -27,8 +27,21 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDV82_fit1_model1.pdb")
 # Publication (SASBDB): Baranova I, Angelova A, Stransky J, Andreasson J, Angelov B,
 # "Hemoglobin-PEG Interactions Probed by Small-Angle X-ray Scattering: Insights for
 # Crystallization and Diagnostics Applications", J Phys Chem B 2024 (published 2024 Sep
-# 09), DOI 10.1021/acs.jpcb.4c03003. Entry: https://www.sasbdb.org/data/SASDV82/. The
-# conditions below are the SASBDB entry metadata; the paper was NOT consulted.
+# 09), DOI 10.1021/acs.jpcb.4c03003. Entry: https://www.sasbdb.org/data/SASDV82/.
+#
+# Conditions not named in the paper are the SASBDB metadata. PAPER CONSULTED
+# (2026-11-13, full text via Europe PMC, PMC11440596): Methods: lyophilized human Hb
+# (Sigma-Aldrich) in 100 mM sodium phosphate made by mixing Na2HPO4 and NaH2PO4 "in a
+# specified ratio" (the ratio is not given), pH set to 7.0 with 4 M HCl / 1 M NaOH; PEG
+# 600, 2000 and 4000 (Sigma-Aldrich) dissolved in the same buffer at pH 7.0; SAXS
+# samples 5 mg/mL Hb with PEG at 5, 10 and 20 % (w/v); laboratory SAXSpoint 2.0, 1.34 A,
+# 293 K (about 20 C), 1 mm capillary, 30 frames, buffer (with the same PEG) subtracted
+# in PRIMUS. About 86 % of the Hb is oxidized (metHb, UV-vis), which fits the 3ODQ
+# methemoglobin model. Paper Table 1 row of this entry: "Hb with 5% (w/v) PEG600", I(0)
+# Guinier 0.1100, Rg Guinier 2.39 nm, Rg P(r) 2.399 nm, Dmax 6.71 nm: this matches the
+# SASBDB values quoted above, so the entry is the "5 % (w/v) PEG 600" sample of the
+# paper. The paper fits CRYSOL to 3odq only for the SEC-SAXS control (SASDV62), not for
+# the PEG samples.
 #
 # Instrument (SASBDB): Anton Paar SAXSpoint 2.0 (in-house X-ray source, Eiger R 1M),
 # Institute of Biotechnology CAS, Centre of Molecular Structure, Vestec, Czech Republic;
@@ -39,12 +52,12 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDV82_fit1_model1.pdb")
 #
 # Curve units: the SASBDB .dat is in nm⁻¹ (angular_unit "1/nm"; s_min 0.083 and s_max
 # 3.997 nm⁻¹; three text lines, then q, I, σ, then trailing text, all skipped by
-# `_read_curve`) and is converted to Å⁻¹ (÷10). The intensities are in 1/cm
+# `_readCurve`) and is converted to Å⁻¹ (÷10). The intensities are in 1/cm
 # (SASBDB intensity_unit). The curve is NOISY: the first points have σ/I ≈ 0.2-0.4 (a weak
 # signal after the PEG-buffer subtraction at 5 mg/ml), and 234 of the 681 points
 # have I ≤ 0 (140 of them above 0.25 Å⁻¹). The fit is cut at `Q_MAX_FIT` = 0.25 Å⁻¹ (the
 # range of the control's CRYSOL fit; ASSUMED, no fit exists for this entry); 326
-# positive points remain below it and `seed_model` drops the non-positive bins.
+# positive points remain below it and `seedModel` drops the non-positive bins.
 # Expect a loose posterior.
 #
 # *** NO DEPOSITED FIT AND NO MODEL: SASBDB lists no fit, no model and no PDB link for
@@ -52,7 +65,7 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDV82_fit1_model1.pdb")
 # *** SASBDB file, "identical" to 3ODQ), copied as SASDV82_fit1_model1.pdb: the
 # *** assumption is that haemoglobin keeps its crystal structure in 5 % PEG 600 (the
 # *** paper is about PEG-haemoglobin interactions, so this need not hold). The depositors
-# *** give no CRYSOL curve for this entry, so there is NO reference curve and NO `ref_chi2`
+# *** give no CRYSOL curve for this entry, so there is NO reference curve and NO `refChi2`
 # *** (`results` is called without `references`; the control's curve is not drawn, since
 # *** it belongs to a different sample and curve).
 #
@@ -61,18 +74,18 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDV82_fit1_model1.pdb")
 # (beta), 4384 ATOM records (the tetramer), four HEM groups as HETATM records (43 atoms
 # each, 172 in all, one per chain), no waters and no hydrogens. The haem is part of the
 # macromolecule, and BAYSOL's loader keeps ligands of a known composition
-# (`ligand_selector`, `KEEP_LIGANDS`, owner decision 2026-11-11; `components.tsv` lists
+# (`ligandSelector`, `KEEP_LIGANDS`, owner decision 2026-11-11; `components.tsv` lists
 # HEM as "other", non-polymer), so the four HEM groups ARE scattered, without hydrogens:
 # 4 x 616 Da, about 3.8 % of the tetramer mass, 4556 heavy atoms in all. The model is the
 # iron(III) form (methaemoglobin); the sample is Sigma human haemoglobin of unstated
 # oxidation state.
 # ---------------------------------------------------------------------------
 
-qvals, I_exp, σ_exp = _read_curve(_DATA_PATH)
+qvals, iExp, σ_exp = _readCurve(_DATA_PATH)
 
 # qvals are in nm⁻¹; must convert to Å⁻¹.
 qvals = qvals ./ NM_INV_PER_ANGSTROM_INV
-check_q_angstrom(qvals)
+checkQAngstrom(qvals)
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -123,65 +136,68 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
+# q cut, kept (flat noise floor; rule in README.md): 0.25 Å⁻¹. The data run to 0.400 Å⁻¹,
+# but the 261 points above 0.25 Å⁻¹ (σ > 0) have a median I/σ of -0.12 and 54 % of them
+# have I ≤ 0; the lowest-q quarter of them (up to 0.29 Å⁻¹) has a median I/σ of -0.25.
 const Q_MAX_FIT = 0.25
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 # The deposited model has no hydrogens: pdb2pqr/PROPKA place them at PH.
 const ADD_HYDROGENS = true
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvals`/`iExp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
+function fitSubset()
     keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdv82` samples. It is separate only because
+# Builds the Seed that `runSasdv82` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
-# `run_sasdv82` below is the whole story (build the seed, then sample it).
-function seed_sasdv82(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdv82` below is the whole story (build the seed, then sample it).
+function seedSasdv82(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdv82(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdv82(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdv82(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdv82(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdv82()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdv82()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 # run's section of the folder's run log. No depositor fit exists for this entry, so there
-# is no `references` and no `ref_chi2` (see the header).
+# is no `references` and no `refChi2` (see the header).
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res",
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDV82/ folder), not the caller's cwd.
 
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

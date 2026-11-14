@@ -1,0 +1,12 @@
+// Canadian provincial and territorial government colours
+
+{
+    "set": "bc",
+    "title": "Government of British Columbia design tokens",
+    "licence": "Apache-2.0 (npm package @bcgov/design-tokens 5.1.0, LICENSE verified; values read from css/variables.css)",
+    "url": "https://www.npmjs.com/package/@bcgov/design-tokens",
+    "colours": [
+        {"name": "bc blue", "hex": "#013366", "family": "blue"},
+        {"name": "bc gold", "hex": "#fcba19", "family": "yellow"}
+    ]
+}

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // Buffer templates: from a standard buffer (Tris, HEPES, phosphate, PBS ...), its
-// concentration and the pH, the rows of the solutes table, the way the fitting scripts
-// work them out by hand (`test/fitting_tests/SASDEM7`, `SASDBA8`, `SASDRJ8`, `SASDAX2`,
-// `SASDV82`). Pure: no screen, no file but the constants asset. The constants, their
-// sources and what was checked are in `notes/buffer-templates.md`.
+// concentration and the pH, the rows of the solutes table, the way the fitting
+// scripts work them out by hand (`test/fitting_tests/SASDRJ8`, `SASDAX2`, `SASDMJ9`;
+// the scripts of SASDEM7, SASDBA8 and SASDV82, removed on 2026-11-12, are kept as
+// numbers in the tests). Pure: no screen, no file but the constants asset. The
+// constants, their sources and what was checked are in `notes/buffer-templates.md`.
 //
 // The method: the pK of each group is moved from 25 °C to the temperature the pH was set
 // at (Clarke and Glew, from `dH` and `dCp`); the species at the pH come from the ladder of
@@ -31,12 +32,12 @@ import { resolveBuiltin } from "./solutes.js"
 /** One acid-base step of a buffer: `A(zAcid) = H+ + B(zBase)`. */
 type Group = {
     pKa25: number
-    pKa_sigma: number
-    dpKa_dT_per_K: number | null
-    dH_kJ_mol: number | null
-    dCp_J_K_mol: number | null
-    z_acid: number
-    z_base: number
+    pKaSigma: number
+    dpKaDtPerK: number | null
+    dHKjMol: number | null
+    dCpJKMol: number | null
+    zAcid: number
+    zBase: number
     verified: boolean
 }
 
@@ -44,7 +45,7 @@ type Group = {
 type Titrant = { kind: "acid" | "base"; ion: string }
 
 /** A row of a mixture, as listed in the recipe. */
-type Component = { solute: string; mM: number; sigma_mM: number }
+type Component = { solute: string; mM: number; sigmaMm: number }
 
 /** A buffer inside a mixture (TBS, HBS, SSC): another template at a concentration. */
 type BufferComponent = { template: string; mM: number; titrant?: Titrant }
@@ -59,16 +60,16 @@ export type Template = {
     notes?: string
     // a buffer
     groups?: Group[]
-    usable_pH?: [number, number]
-    default_titrant?: Titrant
+    usablePh?: [number, number]
+    defaultTitrant?: Titrant
     solute?: string | null
-    species_rows?: string[]
-    salt_rows?: Record<string, (string | null)[]>
+    speciesRows?: string[]
+    saltRows?: Record<string, (string | null)[]>
     // a mixture
     components?: Component[]
-    buffer_components?: BufferComponent[]
+    bufferComponents?: BufferComponent[]
     pH?: number
-    pH_adjust?: { titrant: string; model_amount_mM: number; note: string }
+    pHAdjust?: { titrant: string; modelAmountMm: number; note: string }
 }
 
 /** The templates of the asset, read on first use. */
@@ -106,7 +107,7 @@ const UNVERIFIED_LABEL = "(constants not cross-checked)"
  */
 export function templateLine(t: Template): string {
     const name = shortName(t)
-    const where = t.kind === "mixture" ? "mixture" : `pH ${rangeText(t.usable_pH)}`
+    const where = t.kind === "mixture" ? "mixture" : `pH ${rangeText(t.usablePh)}`
     return `${name}, ${where}${t.verified ? "" : ` ${UNVERIFIED_LABEL}`}`
 }
 
@@ -134,7 +135,7 @@ export const needsConcentration = (t: Template): boolean => t.kind === "buffer"
  * @returns `true` when the pH is asked.
  */
 export const asksPH = (t: Template): boolean =>
-    t.kind === "buffer" || (t.buffer_components?.length ?? 0) > 0
+    t.kind === "buffer" || (t.bufferComponents?.length ?? 0) > 0
 
 /** The cations a base titrant may be: `[name, what]`, the default first. */
 const CATIONS: readonly [string, string][] = [
@@ -150,8 +151,8 @@ const CATIONS: readonly [string, string][] = [
  * @returns `[ion, label]` pairs, empty when there is no choice.
  */
 export function titrantChoices(t: Template): readonly [string, string][] {
-    if (t.kind !== "buffer" || t.default_titrant?.kind !== "base") return []
-    const first = t.default_titrant.ion === "potassium" ? 1 : 0
+    if (t.kind !== "buffer" || t.defaultTitrant?.kind !== "base") return []
+    const first = t.defaultTitrant.ion === "potassium" ? 1 : 0
     return [CATIONS[first], CATIONS[1 - first]]
 }
 
@@ -233,15 +234,15 @@ const CENTRE: Shifts = { dPH: 0, dT: 0, dPK: 0, aScale: 1, cScale: 1 }
  */
 function pKAt(g: Group, tempC: number, dT = 0): number {
     const T = tempC + dT + KELVIN
-    if (g.dH_kJ_mol !== null) {
-        const dH = g.dH_kJ_mol * 1000
-        const dCp = g.dCp_J_K_mol ?? 0
+    if (g.dHKjMol !== null) {
+        const dH = g.dHKjMol * 1000
+        const dCp = g.dCpJKMol ?? 0
         const lnRatio =
             (dH * (1 / T_REF - 1 / T) + dCp * (T_REF / T - 1 + Math.log(T / T_REF))) /
             R_GAS
         return g.pKa25 - lnRatio / Math.LN10
     }
-    if (g.dpKa_dT_per_K !== null) return g.pKa25 + g.dpKa_dT_per_K * (T - T_REF)
+    if (g.dpKaDtPerK !== null) return g.pKa25 + g.dpKaDtPerK * (T - T_REF)
     // no data: the value stays, and the σ allows a typical amine's slope
     return g.pKa25 + AMINE_SLOPE * dT
 }
@@ -273,6 +274,7 @@ type Speciation = {
     amounts: number[]
     charges: number[]
     counter: number
+    // biome-ignore lint/style/useNamingConvention: ionic strength symbol
     I: number
     converged: boolean
 }
@@ -300,7 +302,7 @@ function speciate(
     const A = DAVIES_A * shifts.aScale
     const total = C * shifts.cScale
     const pKs = groups.map((g) => pKAt(g, tempC, shifts.dT) + shifts.dPK)
-    const charges = [groups[0].z_acid, ...groups.map((g) => g.z_base)]
+    const charges = [groups[0].zAcid, ...groups.map((g) => g.zBase)]
     let I = restI
     let last: Speciation | undefined
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -309,7 +311,7 @@ function speciate(
         groups.forEach((g, k) => {
             const step =
                 pH + shifts.dPH - pKs[k] +
-                logGamma(g.z_acid, I, A) - logGamma(g.z_base, I, A)
+                logGamma(g.zAcid, I, A) - logGamma(g.zBase, I, A)
             logs.push(logs[k] + step)
         })
         const top = Math.max(...logs)
@@ -357,7 +359,8 @@ function sigmaShifts(sigmaPH: number, relC: number, pKSpread: number): Shifts[][
  * @property sigmaMM - its uncertainty, mM (2 % when left out).
  * @property pH - the pH of the buffer; a mixture's own is used when left out.
  * @property sigmaPH - σ of the pH (0.1 when left out).
- * @property restI_mM - the ionic strength of the rest of the recipe, mM (0 when left out).
+ * @property restIonicMM - the ionic strength of the rest of the recipe, mM (0 if left
+ *     out).
  * @property cation - the cation of a base titrant (`sodium(1+)` when left out).
  * @property tempC - the temperature the pH was set at, °C (22 when left out).
  */
@@ -367,7 +370,7 @@ export type Recipe = {
     sigmaMM?: number
     pH?: number
     sigmaPH?: number
-    restI_mM?: number
+    restIonicMM?: number
     cation?: string
     tempC?: number
 }
@@ -396,9 +399,9 @@ export type RowSpec = {
  *
  * @property z - its electrons.
  * @property pmv - its partial molar volume.
- * @property sigma-pmv - its uncertainty, `null` for the fallback.
+ * @property sigmaPmv - its uncertainty, `null` for the fallback.
  */
-export type CustomSnapshot = { z: number; pmv: number; "sigma-pmv": number | null }
+export type CustomSnapshot = { z: number; pmv: number; "sigmaPmv": number | null }
 
 /**
  * What a template comes to.
@@ -417,6 +420,7 @@ export type Outcome = {
     rows: RowSpec[]
     pH: number
     sigmaPH: number
+    // biome-ignore lint/style/useNamingConvention: ionic strength symbol
     I: number
     converged: boolean
     fractions?: number[]
@@ -466,7 +470,7 @@ const chargeText = (z: number): string => (z > 0 ? `+${z}` : `${z}`)
  */
 function saltNames(t: Template, cation: string, present: number[]): string[] | undefined {
     const key = cation.replace(/\(1\+\)$/, "")
-    const names = t.salt_rows?.[key]
+    const names = t.saltRows?.[key]
     if (!names) return undefined
     return present.every((i) => names[i]) ? (names as string[]) : undefined
 }
@@ -486,7 +490,7 @@ function bufferOutcome(
     const groups = t.groups as Group[]
     const C = r.mM / 1000
     const relC = Math.min(r.sigmaMM / r.mM, 0.99)
-    const spread = Math.max(PK_SPREAD, ...groups.map((g) => g.pKa_sigma))
+    const spread = Math.max(PK_SPREAD, ...groups.map((g) => g.pKaSigma))
     const run = (s: Shifts) => speciate(groups, C, r.pH, r.restI, r.tempC, s)
     const centre = run(CENTRE)
     const shifted = sigmaShifts(r.sigmaPH, relC, spread).map(([lo, hi]) => [
@@ -509,9 +513,9 @@ function bufferOutcome(
     const anion = Q > 0
     const counterName = anion ? "chloride" : r.cation
     const counterMM = Math.abs(Q) * 1000
-    const salts = !anion && t.species_rows ? saltNames(t, r.cation, present) : undefined
-    if (t.species_rows) {
-        const names = salts ?? t.species_rows
+    const salts = !anion && t.speciesRows ? saltNames(t, r.cation, present) : undefined
+    if (t.speciesRows) {
+        const names = salts ?? t.speciesRows
         for (const i of present) {
             const amount = centre.amounts[i] * 1000
             rows.push(rowOf(names[i], amount, sigma((s) => s.amounts[i]), true))
@@ -526,7 +530,7 @@ function bufferOutcome(
 
     const where = (g: Group) => pKAt(g, r.tempC)
     const names =
-        t.species_rows ?? centre.charges.map((z) => `${t.solute}(${chargeText(z)})`)
+        t.speciesRows ?? centre.charges.map((z) => `${t.solute}(${chargeText(z)})`)
     const shares = present
         .map((i) => `${names[i]} ${((centre.amounts[i] / C) * 100).toFixed(1)} %`)
         .join(", ")
@@ -570,7 +574,7 @@ function bufferWarnings(
     I: number,
 ): string[] {
     const out: string[] = []
-    const range = t.usable_pH
+    const range = t.usablePh
     if (range && (r.pH < range[0] || r.pH > range[1])) {
         out.push(`pH ${r.pH} is outside the usable range ${rangeText(range)}`)
     }
@@ -591,11 +595,11 @@ function bufferWarnings(
         }
     }
     const noSlope = groups.findIndex(
-        (g) => g.dH_kJ_mol === null && g.dpKa_dT_per_K === null,
+        (g) => g.dHKjMol === null && g.dpKaDtPerK === null,
     )
     if (noSlope >= 0) out.push(`step ${noSlope + 1} has no temperature coefficient`)
-    const loose = groups.find((g) => g.pKa_sigma >= 0.1)
-    if (loose) out.push(`pK uncertain by ±${loose.pKa_sigma} (one study)`)
+    const loose = groups.find((g) => g.pKaSigma >= 0.1)
+    if (loose) out.push(`pK uncertain by ±${loose.pKaSigma} (one study)`)
     return out
 }
 
@@ -612,14 +616,14 @@ function mixtureOutcome(
     r: { pH: number; sigmaPH: number; restI: number; cation: string; tempC: number },
 ): Omit<Outcome, "pH" | "sigmaPH"> {
     const rows: RowSpec[] = (t.components ?? []).map((c) =>
-        rowOf(c.solute, c.mM, c.sigma_mM),
+        rowOf(c.solute, c.mM, c.sigmaMm),
     )
     const own = rows.reduce((s, c) => s + c.mM * ionicPerMM(c.arg), 0) / 1000
     const explain = [`${shortName(t)}: the recipe as listed, pH ${r.pH}`]
     const warnings: string[] = []
     let I = own + r.restI
     let converged = true
-    for (const b of t.buffer_components ?? []) {
+    for (const b of t.bufferComponents ?? []) {
         const buffer = templateById(b.template) as Template
         const inner = bufferOutcome(buffer, {
             mM: b.mM,
@@ -636,10 +640,10 @@ function mixtureOutcome(
         converged = converged && inner.converged
         I = inner.I
     }
-    if (t.pH_adjust) {
-        const m = t.pH_adjust.model_amount_mM
+    if (t.pHAdjust) {
+        const m = t.pHAdjust.modelAmountMm
         rows.push(rowOf("chloride", m, m))
-        const acid = t.pH_adjust.titrant
+        const acid = t.pHAdjust.titrant
         explain.push(`adjusting to pH ${r.pH} with ${acid}: chloride ${m} mM`)
         warnings.push("the chloride of the pH adjustment is a model value (sigma 100 %)")
     }
@@ -677,7 +681,7 @@ export function computeWith(t: Template, recipe: Recipe): Outcome {
     const sigmaPH = recipe.sigmaPH ?? PH_SIGMA
     const common = {
         sigmaPH,
-        restI: Math.max(0, recipe.restI_mM ?? 0) / 1000,
+        restI: Math.max(0, recipe.restIonicMM ?? 0) / 1000,
         cation: recipe.cation ?? "sodium(1+)",
         tempC: recipe.tempC ?? SET_TEMPERATURE_C,
     }

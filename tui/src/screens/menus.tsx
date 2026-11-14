@@ -183,11 +183,11 @@ type LandingMode = "menu" | "load" | "save"
  * - `new recipe`: the table, empty; nothing is replaced before `^w`.
  * - `save current recipe globally`, when the buffer has solutes: asks a name (`replace
  *   "NAME"?` if a recipe has it; `save "NAME" as a template?` when the rows of one
- *   template are linked: Enter saves the template, `n` the rows as a plain recipe, Esc
+ *   template are linked: Enter saves the template, `w` the rows as a plain recipe, Esc
  *   saves nothing) and saves the buffer as it is on disk, with its pH and σ, as a recipe.
  *
  * A line says what each file holds. A file that cannot be used is told and never written
- * over; `r` on its option offers to move it to `<name>.corrupt` and start empty (the
+ * over; `x` on its option offers to move it to `<name>.corrupt` and start empty (the
  * table of an unusable file says so and edits nothing).
  *
  * Keys: up and down move, Enter opens, `^x` goes back.
@@ -217,7 +217,7 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
     ) as [FileCount, FileCount]
     // biome-ignore lint/correctness/useExhaustiveDependencies: these only re-read
     const conditions = useMemo(() => readConditionsOrNone(dir), [dir, nav.depth, resets])
-    const sigmaText = conditions ? formatNumber(conditions["sigma-pH"]) : ""
+    const sigmaText = conditions ? formatNumber(conditions.sigmaPh) : ""
     const options = bufferLandingOptions(n, custom)
     const cursor = useListCursor(options.length, options.length)
     const solutes = typeof n === "number" ? n : 0

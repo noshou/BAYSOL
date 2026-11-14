@@ -108,6 +108,7 @@ test("a sheet cut by the limits says how big it was", () => {
         Array.from({ length: 20 }, (_, r) => [r, r, r, r]),
     )
     const file = XLSX.write(
+        // biome-ignore lint/style/useNamingConvention: xlsx field names
         { SheetNames: ["s"], Sheets: { s: ws } },
         { type: "buffer", bookType: "xlsx" },
     )

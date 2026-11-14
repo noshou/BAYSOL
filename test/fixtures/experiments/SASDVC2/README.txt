@@ -11,3 +11,6 @@ Files:
 The entry has NO deposited atomic model and NO fit (SASBDB "fits": empty), so the
 fixture has no reference curve. The fitting script test/fitting_tests/SASDVC2/ states the
 conditions it takes from the entry and every assumption it makes.
+Paper (PMC11440596) read on 2026-11-13: Table 1 row and methods are quoted in the script header.
+
+Fit range (2026-11-13): the script cuts at q = 0.15 1/A (flat noise floor: above it 434 points, median I/sigma -0.20, 56 % I <= 0).

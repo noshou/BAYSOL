@@ -85,9 +85,9 @@ const unitB = (): EntryUnit => ({
 const polymer = (): PolymerEntry => ({
     kind: "polymer",
     name: "chain",
-    "z-ends": 10,
-    "pmv-ends": 19.24,
-    "sigma-ends": null,
+    "zEnds": 10,
+    "pmvEnds": 19.24,
+    "sigmaEnds": null,
     units: [unitA()],
 })
 
@@ -170,12 +170,12 @@ test("polymer units are addressed by unit and key", () => {
     const s = addEntry(Drafts.of<CustomEntry>([]), "polymer")
     const e = (t = s) => t.value(0) as PolymerEntry
     assert.deepEqual(e().units, [blankUnit()], "a blank polymer has one blank unit")
-    assert.equal(e()["z-ends"], null)
-    assert.equal(e()["pmv-ends"], null)
+    assert.equal(e().zEnds, null)
+    assert.equal(e().pmvEnds, null)
     const t = setField(s, 0, { unit: 0, key: "formula" }, "C2H4O")
     assert.equal(getField(e(t), { unit: 0, key: "formula" }), "C2H4O")
     assert.equal(e(t).units[0]?.formula, "C2H4O")
-    assert.equal(getField(e(setField(t, 0, "z-ends", 5)), "z-ends"), 5)
+    assert.equal(getField(e(setField(t, 0, "zEnds", 5)), "zEnds"), 5)
     // units are added up to 4 and removed down to 1
     const s4 = addUnit(addUnit(addUnit(s, 0), 0), 0)
     assert.equal(e(s4).units.length, 4)
@@ -212,10 +212,10 @@ test("polymer problems", () => {
         0,
         "unit label used",
     ])
-    assert.deepEqual(p({ ...polymer(), "z-ends": null }), [0, "end groups needed"])
-    assert.deepEqual(p({ ...polymer(), "pmv-ends": null }), [0, "end groups needed"])
-    assert.equal(p({ ...polymer(), "pmv-ends": -2 }), undefined, "negative is fine")
-    assert.deepEqual(p({ ...polymer(), "sigma-ends": -1 }), [0, "ends ± not below 0"])
+    assert.deepEqual(p({ ...polymer(), "zEnds": null }), [0, "end groups needed"])
+    assert.deepEqual(p({ ...polymer(), "pmvEnds": null }), [0, "end groups needed"])
+    assert.equal(p({ ...polymer(), "pmvEnds": -2 }), undefined, "negative is fine")
+    assert.deepEqual(p({ ...polymer(), "sigmaEnds": -1 }), [0, "ends ± not below 0"])
     assert.deepEqual(p({ ...polymer(), units: [] }), [0, "unit needed"])
     for (const m of [
         "label needed",
@@ -275,9 +275,9 @@ test("field problems tell their field", () => {
             message: "unit label used",
         },
     )
-    assert.equal(fieldProblem({ ...polymer(), "z-ends": null })?.field, "z-ends")
-    assert.equal(fieldProblem({ ...polymer(), "pmv-ends": null })?.field, "pmv-ends")
-    assert.equal(fieldProblem({ ...polymer(), "sigma-ends": -1 })?.field, "sigma-ends")
+    assert.equal(fieldProblem({ ...polymer(), "zEnds": null })?.field, "zEnds")
+    assert.equal(fieldProblem({ ...polymer(), "pmvEnds": null })?.field, "pmvEnds")
+    assert.equal(fieldProblem({ ...polymer(), "sigmaEnds": -1 })?.field, "sigmaEnds")
     for (const e of [nonbio(), polymer(), two, { ...nonbio(), pmv: null }])
         assert.equal(fieldMessage(e), fieldProblem(e)?.message)
     // one entry among the others: built-in and used names, case-insensitively
@@ -301,7 +301,7 @@ test("snapshots equal the buffer fixture", () => {
     const entries = fixtureSolutes()
     const byName = (n: string) => entries.find((e) => e.name === n) as CustomEntry
     const cut = (r: Record<string, unknown>) => {
-        const { name: _n, mM: _m, "sigma-mM": _s, ...rest } = r
+        const { name: _n, mM: _m, "sigmaMm": _s, ...rest } = r
         return rest
     }
     const rows = fixtureRows()
@@ -331,18 +331,18 @@ test("typed cells", () => {
     assert.ok("error" in parseField("z", "0"))
     assert.ok("error" in parseField("z", "2.5"))
     assert.deepEqual(parseField("pmv", "-3.5"), { value: -3.5 })
-    assert.deepEqual(parseField("pmv-ends", "19.24"), { value: 19.24 })
+    assert.deepEqual(parseField("pmvEnds", "19.24"), { value: 19.24 })
     assert.deepEqual(parseField("slope", "-1.5"), { value: -1.5 })
     assert.deepEqual(parseField("slope", "x"), { error: "a number, please" })
-    assert.deepEqual(parseField("z-ends", "10"), { value: 10 })
-    assert.deepEqual(parseField("z-ends", "0"), { value: 0 })
-    assert.ok("error" in parseField("z-ends", "1.5"))
+    assert.deepEqual(parseField("zEnds", "10"), { value: 10 })
+    assert.deepEqual(parseField("zEnds", "0"), { value: 0 })
+    assert.ok("error" in parseField("zEnds", "1.5"))
     assert.deepEqual(parseField("label", " A "), { value: "A" })
     assert.ok("error" in parseField("label", ""))
     assert.deepEqual(parseField("label", "a b"), { error: "one word, please" })
     assert.deepEqual(parseField("label", "123456789"), { error: "at most 8 characters" })
-    assert.deepEqual(parseField("sigma-ends", ""), { value: null })
-    assert.ok("error" in parseField("sigma-ends", "-1"))
+    assert.deepEqual(parseField("sigmaEnds", ""), { value: null })
+    assert.ok("error" in parseField("sigmaEnds", "-1"))
     assert.deepEqual(parseField("sigma", "  "), { value: null })
     assert.deepEqual(parseField("sigma", "-1"), { error: "not below 0" })
     assert.deepEqual(parseField("name", ""), { error: "name needed" })
@@ -352,7 +352,7 @@ test("typed cells", () => {
     assert.deepEqual(parseCell("formula", ""), { value: "" })
     assert.deepEqual(parseCell("z", ""), { value: null })
     assert.deepEqual(parseCell("slope", ""), { value: null })
-    assert.deepEqual(parseCell("z-ends", ""), { value: null })
+    assert.deepEqual(parseCell("zEnds", ""), { value: null })
     assert.deepEqual(parseCell("z", "5"), { value: 5 })
     assert.ok("error" in parseCell("z", "x"))
 })
@@ -389,19 +389,19 @@ test("a formula taken into an entry", () => {
     assert.equal(takeFormula(u, "NH4+", true, "A").note, "no charge allowed")
 })
 
-test("the end groups' formula gives z-ends", () => {
+test("the end groups' formula gives zEnds", () => {
     const r = takeEndsFormula(polymer(), "", "H2O")
-    assert.equal(r.entry["z-ends"], 10)
+    assert.equal(r.entry.zEnds, 10)
     assert.equal(r.endsFormula, "H2O")
     assert.equal(r.note, undefined)
     // the same formula keeps a Z typed over it
-    const same = takeEndsFormula({ ...polymer(), "z-ends": 7 }, "H2O", "H2O")
-    assert.equal(same.entry["z-ends"], 7)
+    const same = takeEndsFormula({ ...polymer(), "zEnds": 7 }, "H2O", "H2O")
+    assert.equal(same.entry.zEnds, 7)
     // a formula not understood leaves no Z
-    assert.equal(takeEndsFormula(polymer(), "", "Xx").entry["z-ends"], null)
+    assert.equal(takeEndsFormula(polymer(), "", "Xx").entry.zEnds, null)
     // a charged formula that sums below 0 is refused
     const neg = takeEndsFormula(polymer(), "", "H2+")
-    assert.equal(neg.entry["z-ends"], null)
+    assert.equal(neg.entry.zEnds, null)
     assert.equal(neg.note, "Z must be >= 0")
 })
 
@@ -465,9 +465,9 @@ test("the preview of a polymer form", () => {
     const form = (units: EntryUnit[], over: Partial<PolymerEntry> = {}): PolymerEntry => ({
         ...polymer(),
         name: "chain",
-        "z-ends": 10,
-        "pmv-ends": 9,
-        "sigma-ends": null,
+        "zEnds": 10,
+        "pmvEnds": 9,
+        "sigmaEnds": null,
         units,
         ...over,
     })
@@ -485,12 +485,12 @@ test("the preview of a polymer form", () => {
     ])
     // nothing before anything is given
     assert.deepEqual(
-        polymerPreview(form([blank], { "z-ends": null, "pmv-ends": null })),
+        polymerPreview(form([blank], { "zEnds": null, "pmvEnds": null })),
         [],
     )
     // what is missing is a ?, and no values are shown
     const half: EntryUnit = { ...blank, formula: "C2H4O", z: 24, label: "A" }
-    assert.deepEqual(polymerPreview(form([half], { "z-ends": null, "pmv-ends": null })), [
+    assert.deepEqual(polymerPreview(form([half], { "zEnds": null, "pmvEnds": null })), [
         "PMV = ? + ?·nA",
         "Z = ? + 24·nA",
     ])
@@ -518,14 +518,14 @@ test("the chain rule of the Julia type", () => {
         kind: "polymer",
         name: "",
         units,
-        "z-ends": zEnds,
-        "pmv-ends": pmvEnds,
-        "sigma-ends": sEnds,
+        "zEnds": zEnds,
+        "pmvEnds": pmvEnds,
+        "sigmaEnds": sEnds,
     })
     const two = (s1: number | null, s2: number | null, sEnds: number | null) =>
         chain([unit(24, 36.92, s1), unit(32, 53.13, s2)], 10, 9, sEnds)
     const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-9, `${a} vs ${b}`)
-    // the numbers of test_customsolutes.jl: counts 100 and 65, ends Z 10, PMV 9
+    // the numbers of test-customsolutes.jl: counts 100 and 65, ends Z 10, PMV 9
     const r = chainValues(two(null, null, null), [100, 65])
     assert.equal(r.z, 4490)
     near(r.pmv, 7154.45)
@@ -570,9 +570,9 @@ const storePolymer = (units: unknown[] = [storeUnit]): PolymerEntry =>
     ({
         kind: "polymer",
         name: "chain",
-        "z-ends": 10,
-        "pmv-ends": 19.24,
-        "sigma-ends": null,
+        "zEnds": 10,
+        "pmvEnds": 19.24,
+        "sigmaEnds": null,
         units,
     }) as PolymerEntry
 

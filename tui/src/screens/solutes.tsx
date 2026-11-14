@@ -73,6 +73,7 @@ import {
     Dropdown,
     Entry,
     filterChoices,
+    PathPrompt,
     PROMPT_ROWS,
     Prompt,
     questionLegend,
@@ -125,6 +126,9 @@ export const soluteProblem: RowProblem = (s) => rowProblem(bufferRow(s))
  * (`suggestionLines`) and the status line.
  */
 const FLOW_ROWS = suggestionLines + DROPDOWN_CHROME
+
+/** The rows the box of the path prompt adds (its top and bottom border). */
+const PATH_BOX_ROWS = 2
 
 /** The fewest table rows left in view while a flow is open. */
 const MIN_TABLE_ROWS = 3
@@ -283,7 +287,7 @@ function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): SoluteF
     const typed = step?.type === "dropdown" ? step.typed : undefined
     const canPick = step?.type === "dropdown" && step.filePicker === true && typed === ""
 
-    // `o` on an empty path field asks the desktop for a file; the field has the `o` by
+    // `e` on an empty path field asks the desktop for a file; the field has the `e` by
     // then, so it is emptied and the picked path put in
     useKeys((press) => {
         if (!press.is(keys.pickFiles) || !current) return
@@ -318,7 +322,8 @@ function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): SoluteF
 
     const rows = [...current.table.rows]
     const cursor = current.cursor
-    const pageSize = Math.max(MIN_TABLE_ROWS, t.pageSize - FLOW_ROWS)
+    const boxed = step.type === "dropdown" && step.label === "path" ? PATH_BOX_ROWS : 0
+    const pageSize = Math.max(MIN_TABLE_ROWS, t.pageSize - FLOW_ROWS - boxed)
     const { row, column } = step.cell
     const key = (label: string) => `${row}:${column}:${label}:${fieldKey}`
 
@@ -371,9 +376,8 @@ function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): SoluteF
     } else if (step.label === "path") {
         note = picking ? PICKING_NOTE : step.status
         entry = (
-            <Prompt
+            <PathPrompt
                 key={key("path")}
-                label="path:"
                 initial={step.typed}
                 maxLength={step.maxLength}
                 placeholder={PATH_PLACEHOLDER}
@@ -529,7 +533,7 @@ function conditionsTable(c: Conditions | undefined): {
     rows: string[]
 } {
     const ph = c === undefined ? "not set" : formatNumber(c.pH)
-    const sigma = c === undefined ? "" : formatNumber(c["sigma-pH"])
+    const sigma = c === undefined ? "" : formatNumber(c.sigmaPh)
     const temperature =
         c?.temperature === undefined ? "not set" : formatNumber(c.temperature)
     return {
@@ -687,14 +691,14 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
     /** The pH row typed as `pH σ`; σ may be left out (the row's own, else the default). */
     const submitPh = (text: string) => {
         const { pH: phLimits, sigmaPh } = conditionLimits()
-        const fallback = formatNumber(shown?.["sigma-pH"] ?? sigmaPh.default)
+        const fallback = formatNumber(shown?.sigmaPh ?? sigmaPh.default)
         const [phText = "", sigmaText = fallback] = text.trim().split(/\s+/)
         const pH = parseRanged(phText, "pH", phLimits)
         if ("error" in pH) return setPhProblem(pH.error)
         const sigma = parseRanged(sigmaText, "σ", sigmaPh)
         if ("error" in sigma) return setPhProblem(sigma.error)
         setPhProblem(undefined)
-        setTypedPh({ pH: pH.value, "sigma-pH": sigma.value })
+        setTypedPh({ pH: pH.value, "sigmaPh": sigma.value })
         setAsking("temperature")
     }
 
@@ -839,7 +843,7 @@ export function SolutesTable(props: SolutesTableProps): ReactNode {
                     label="pH σ:"
                     initial={
                         shown
-                            ? `${formatNumber(shown.pH)} ${formatNumber(shown["sigma-pH"])}`
+                            ? `${formatNumber(shown.pH)} ${formatNumber(shown.sigmaPh)}`
                             : ""
                     }
                     maxLength={PH_MAX_LENGTH}

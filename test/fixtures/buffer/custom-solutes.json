@@ -28,9 +28,9 @@
           "sigma": null
         }
       ],
-      "z-ends": 10,
-      "pmv-ends": 19.24,
-      "sigma-ends": null
+      "zEnds": 10,
+      "pmvEnds": 19.24,
+      "sigmaEnds": null
     },
     {
       "kind": "polymer",
@@ -65,9 +65,9 @@
           "sigma": 0.2
         }
       ],
-      "z-ends": 5,
-      "pmv-ends": 7,
-      "sigma-ends": 0.5
+      "zEnds": 5,
+      "pmvEnds": 7,
+      "sigmaEnds": 0.5
     }
   ]
 }

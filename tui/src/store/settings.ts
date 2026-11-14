@@ -19,7 +19,7 @@ import { colourNames, colourOf } from "./colours.js"
 
 /**
  * What the settings are: their names, kinds, defaults, limits and choices (harvested
- * from the Params.jl files into `assets/data/default_settings.json`), the rules that
+ * from the params.jl files into `assets/data/default_settings.json`), the rules that
  * tie settings together (`setting_relations.json`) and how the settings sheets lay
  * them out (`setting_sheets.json`, only the settings a run applies). Nothing here reads
  * a user's file or checks a value: the validation section below judges values,
@@ -35,8 +35,8 @@ export type SettingKind =
     | "font"
     | "set"
     | "tuple"
-    | "optional_int"
-    | "optional_float"
+    | "optionalInt"
+    | "optionalFloat"
     | "ranges"
     | "strings"
     | "colours"
@@ -49,13 +49,13 @@ export type PartKind = "int" | "float" | "colour"
 
 /**
  * The limits of a number setting, under the key names of the harvest: a value must be
- * `above` / `below` the bound (exclusive) or `at_least` / `at_most` it (inclusive).
+ * `above` / `below` the bound (exclusive) or `atLeast` / `atMost` it (inclusive).
  */
 export type Limits = {
     above?: number
     below?: number
-    at_least?: number
-    at_most?: number
+    atLeast?: number
+    atMost?: number
 }
 
 /**
@@ -80,11 +80,11 @@ export type SettingValue =
 /** The rules that tie settings together, as `setting_relations.json` names them. */
 type RuleName =
     | "inside"
-    | "within_width"
+    | "withinWidth"
     | "ordered"
-    | "all_above"
-    | "at_most_setting"
-    | "below_setting"
+    | "allAbove"
+    | "atMostSetting"
+    | "belowSetting"
     | "opacity"
 
 /**
@@ -92,10 +92,10 @@ type RuleName =
  *
  * @property rule - which rule.
  * @property setting - the setting the rule is about.
- * @property of - the other setting it compares with (`inside`, `within_width`,
- *     `at_most_setting`, `below_setting`).
+ * @property of - the other setting it compares with (`inside`, `withinWidth`,
+ *     `atMostSetting`, `belowSetting`).
  * @property above - the floor of the first part of a pair (`ordered`).
- * @property bound - the bound every part must exceed (`all_above`).
+ * @property bound - the bound every part must exceed (`allAbove`).
  */
 export type Relation = {
     rule: RuleName
@@ -350,10 +350,10 @@ export function settingNames(
 
 /**
  * The checks on the value of a setting, which no value may escape: its type, the
- * limits and choices the harvest copied from the Params.jl files, a colour that
+ * limits and choices the harvest copied from the params.jl files, a colour that
  * exists, the shape of a tuple, and the rules that tie settings together
  * (`setting_relations.json`). The Julia side makes the same checks on the same data
- * when it reads the settings (`load_settings` of `settings-file.jl`), so what the terminal
+ * when it reads the settings (`loadSettings` of `settings-file.jl`), so what the terminal
  * interface keeps is what the code accepts; `test/fixtures/settings/cases.json` is read by
  * both.
  *
@@ -409,8 +409,8 @@ function limitError(v: number, limits: SettingDef["limits"]): string | undefined
     ][] = [
         ["above", "above", (a, b) => a > b],
         ["below", "below", (a, b) => a < b],
-        ["at_least", "at least", (a, b) => a >= b],
-        ["at_most", "at most", (a, b) => a <= b],
+        ["atLeast", "at least", (a, b) => a >= b],
+        ["atMost", "at most", (a, b) => a <= b],
     ]
     for (const [key, words, ok] of checks) {
         const bound = limits[key]
@@ -439,7 +439,7 @@ function checkPart(raw: unknown, kind: PartKind): Checked {
         : { ok: true, value: colour }
 }
 
-/** A list of `[lo, hi]` pairs of q, each `0 <= lo < hi` (as `_range_value` of Julia). */
+/** A list of `[lo, hi]` pairs of q, each `0 <= lo < hi` (as `_rangeValue` of Julia). */
 function checkRanges(raw: unknown): Checked {
     if (!Array.isArray(raw))
         return { ok: false, error: "must be a list of (q_lo, q_hi) pairs" }
@@ -457,7 +457,7 @@ function checkRanges(raw: unknown): Checked {
     return { ok: true, value: pairs }
 }
 
-/** A list of unique chain ids, each one visible character (as `_chain_id` of Julia). */
+/** A list of unique chain ids, each one visible character (as `_chainId` of Julia). */
 function checkChains(raw: unknown): Checked {
     if (!Array.isArray(raw)) return { ok: false, error: "must be a list of chain ids" }
     for (const x of raw) {
@@ -562,7 +562,7 @@ function checkTuple(def: SettingDef, raw: unknown): Checked {
  *     `{ ok: false, error }` with a sentence such as `must be above 0`.
  */
 export function validateValue(def: SettingDef, raw: unknown): Checked {
-    if (raw === null && (def.kind === "optional_int" || def.kind === "optional_float"))
+    if (raw === null && (def.kind === "optionalInt" || def.kind === "optionalFloat"))
         return { ok: true, value: null }
     const limited = (x: number): Checked => {
         const error = limitError(x, def.limits)
@@ -574,7 +574,7 @@ export function validateValue(def: SettingDef, raw: unknown): Checked {
                 ? { ok: true, value: raw }
                 : { ok: false, error: "must be true or false" }
         case "int":
-        case "optional_int": {
+        case "optionalInt": {
             const n = wholeOf(raw)
             const or = def.kind === "int" ? "" : " or null"
             return n === undefined
@@ -582,7 +582,7 @@ export function validateValue(def: SettingDef, raw: unknown): Checked {
                 : limited(n)
         }
         case "float":
-        case "optional_float": {
+        case "optionalFloat": {
             const n = finiteOf(raw)
             const or = def.kind === "float" ? "" : " or null"
             return n === undefined
@@ -662,7 +662,7 @@ function relationReason(
     const v = values[r.setting]
     const other = r.of === undefined ? undefined : values[r.of]
     if (v === undefined || (r.of !== undefined && other === undefined)) return undefined
-    if (r.rule === "below_setting" && (v === null || other === null)) return undefined
+    if (r.rule === "belowSetting" && (v === null || other === null)) return undefined
     switch (r.rule) {
         case "inside": {
             const [lo, hi] = other as number[]
@@ -670,7 +670,7 @@ function relationReason(
                 ? undefined
                 : `must lie strictly inside ${r.of}`
         }
-        case "within_width": {
+        case "withinWidth": {
             const [lo, hi] = other as number[]
             return (v as number) > 0 && (v as number) <= (hi as number) - (lo as number)
                 ? undefined
@@ -684,15 +684,15 @@ function relationReason(
                 return `must have its first part above ${r.above}`
             return undefined
         }
-        case "all_above":
+        case "allAbove":
             return partsOf(v).every((p) => (p as number) > (r.bound as number))
                 ? undefined
                 : `must have every part above ${r.bound}`
-        case "at_most_setting":
+        case "atMostSetting":
             return (v as number) <= (other as number)
                 ? undefined
                 : `must be at most ${r.of}`
-        case "below_setting":
+        case "belowSetting":
             return (v as number) < (other as number)
                 ? undefined
                 : `must be below ${r.of}`
@@ -733,11 +733,11 @@ function reasonOfOther(r: Relation): string {
     switch (r.rule) {
         case "inside":
             return `must hold ${r.setting} strictly inside`
-        case "within_width":
+        case "withinWidth":
             return `width must exceed ${r.setting}`
-        case "at_most_setting":
+        case "atMostSetting":
             return `must be at least ${r.setting}`
-        case "below_setting":
+        case "belowSetting":
             return `must be above ${r.setting}`
         default:
             return ""

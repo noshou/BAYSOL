@@ -68,7 +68,7 @@ const isCell = (cell: string): boolean =>
     numberText(cell) !== undefined || /^[-+]?(inf|infinity|nan)$/i.test(cell)
 
 /**
- * Reads a reference file the way Julia does (`_read_reference`): lines are cut at a `#`,
+ * Reads a reference file the way Julia does (`_readReference`): lines are cut at a `#`,
  * blanks skipped, cells split on blanks, commas and semicolons, text lines before the
  * first numbers are a header; afterwards a line that is not 2 or 3 numbers is a problem.
  *

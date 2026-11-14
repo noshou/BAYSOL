@@ -140,7 +140,7 @@ function conditionsDetail(facts: ReturnType<typeof bufferFacts>): string {
     const { conditions } = facts
     return conditions === undefined
         ? "no pH"
-        : `pH ${conditions.pH}, σ ${conditions["sigma-pH"]}`
+        : `pH ${conditions.pH}, σ ${conditions.sigmaPh}`
 }
 
 /**

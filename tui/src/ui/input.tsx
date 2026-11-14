@@ -498,7 +498,7 @@ const maxWhatCells = 27
  * @property text - what is asked, e.g. `delete project demo? this cannot be undone!`.
  * @property yes - what Enter does, e.g. `delete`.
  * @property no - what Esc does, e.g. `keep`.
- * @property other - a third answer, given by `n` (`keys.otherAnswer`), e.g. `plain
+ * @property other - a third answer, given by `w` (`keys.otherAnswer`), e.g. `plain
  *     recipe`; only when [[Confirm.ask]] was given an action for it.
  */
 export type Question = { text: string; yes: string; no: string; other?: string }
@@ -507,7 +507,7 @@ export type Question = { text: string; yes: string; no: string; other?: string }
  * The legend of a question: what Enter does and what Esc does, from its own fields.
  *
  * @param question - the question.
- * @returns `yes: ⏎` and `no: esc`, with the third answer's `n` between them if any.
+ * @returns `yes: ⏎` and `no: esc`, with the third answer's `w` between them if any.
  */
 export function questionLegend(question: Question): LegendItem[] {
     const other = question.other
@@ -570,7 +570,7 @@ export function shownNote(
  * @property question - the open question, `undefined` while nothing is asked.
  * @property note - the text of the open question, for the note line.
  * @property ask - asks `question`; `action` runs if Enter answers it, `declined` (when
- *     given) if Esc does, `other` (when given, with `question.other` naming it) if `n`
+ *     given) if Esc does, `other` (when given, with `question.other` naming it) if `w`
  *     does.
  * @property handleKey - gives a key press to the open question: returns `true` when
  *     a question was open (the press was its answer, or ignored), so the screen
@@ -593,7 +593,7 @@ export type Confirm = {
  *
  * @param press - the key.
  * @param hasOther - the question has a third answer ([[Question.other]]).
- * @returns `yes` for Enter, `no` for Esc or Ctrl-X, `other` for `n` when there is a third
+ * @returns `yes` for Enter, `no` for Esc or Ctrl-X, `other` for `w` when there is a third
  *     answer, `undefined` for any other key (it is ignored).
  */
 export function answerOf(

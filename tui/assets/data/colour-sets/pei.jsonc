@@ -1,0 +1,16 @@
+// Canadian provincial and territorial government colours
+
+{
+    "set": "pei",
+    "title": "Prince Edward Island wordmark guidelines (DRAFT document)",
+    "licence": "DRAFT document; the wordmark is a registered trademark, permission needed to reproduce it; colour values are facts",
+    "url": "https://www.princeedwardisland.ca/sites/default/files/publications/wordmark_guidelines.pdf",
+    "colours": [
+        {"name": "pei lush", "hex": "#007960", "family": "green"},
+        {"name": "pei water", "hex": "#005cb9", "family": "blue"},
+        {"name": "pei soil", "hex": "#9e3223", "family": "red"},
+        {"name": "pei orange", "hex": "#ffab4d", "family": "orange"},
+        {"name": "pei warm gray", "hex": "#6f6259", "family": "gray"},
+        {"name": "pei cool gray", "hex": "#54565a", "family": "gray"}
+    ]
+}

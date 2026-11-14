@@ -17,10 +17,10 @@ const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDNP7_fit1.fit")
 raw = readdlm(_DATA_PATH)
 
 qvals = Float64.(raw[1:581, 1])
-I_exp = Float64.(raw[1:581, 2])
+iExp = Float64.(raw[1:581, 2])
 σ_exp = Float64.(raw[1:581, 3])
 
-check_q_angstrom(qvals)
+checkQAngstrom(qvals)
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -74,11 +74,8 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# The .dat and the .fit file both end at 0.40 Å⁻¹; the fit is cut at 0.3 Å⁻¹.
-const Q_MAX_FIT = 0.3
-
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 # no hydrogens in the deposited model; runs Pdb2pqr with PROPKA (protein + RNA
@@ -87,62 +84,60 @@ const Q_MAX_FIT = 0.3
 const ADD_HYDROGENS = true
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT`. (`seed_model`
+The whole curve: `qvals`, `I_exp`, `σ_exp`. (`seedModel`
 bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
-    keep = findall(≤(Q_MAX_FIT), qvals)
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+function fitSubset()
+    return qvals, iExp, σ_exp
 end
 
-# Builds the Seed that `run_sasdnp7_fit1` samples. It is separate only because
+# Builds the Seed that `runSasdnp7Fit1` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running the
 # fit; if you are reading this script as an example you can skip it:
-# `run_sasdnp7_fit1` below is the whole story (build the seed, then sample it).
-function seed_sasdnp7_fit1(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdnp7Fit1` below is the whole story (build the seed, then sample it).
+function seedSasdnp7Fit1(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdnp7_fit1(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdnp7Fit1(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdnp7_fit1(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdnp7Fit1(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdnp7_fit1()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdnp7Fit1()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
 crysol = readdlm(_FIT_PATH; skipstart = 1)
 reference = BAYSOL.Reference(
     "CRYSOL fit1",
     Float64.(crysol[:, 1]),
-    Float64.(crysol[:, 3]);
-    q_max = Q_MAX_FIT,
+    Float64.(crysol[:, 3]),
 )
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res_fit1", references = reference,
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "CRYSOL 29.579",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "CRYSOL 29.579",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDNP7/ folder), not the caller's cwd.
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

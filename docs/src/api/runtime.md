@@ -1,6 +1,6 @@
 # Runtime
 
-The process machinery the others run on (`src/Runtime/`): thread-safe memoization, per-stage timing,
+The process machinery the others run on (`src/runtime/`): thread-safe memoization, per-stage timing,
 garbage-collector pausing and the threading helpers.
 
 ```@autodocs

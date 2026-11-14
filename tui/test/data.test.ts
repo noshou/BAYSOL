@@ -428,14 +428,11 @@ const EXPERIMENTS = fileURLToPath(
 )
 
 /**
- * The 11 entries with no `experimental_data/<ID>.dat`: the file their script reads the
+ * The 8 entries with no `experimental_data/<ID>.dat`: the file their script reads the
  * curve from, and the column its script takes as sigma (`readdlm(...; skipstart)`).
  */
 const FIT_FILES: Record<string, [file: string, sigma: number]> = {
     SASDF42: ["SASDF42_fit1.fit", 3],
-    SASDJ62: ["SASDJ62_fit1.dat", 4],
-    SASDJ72: ["SASDJ72_fit1.fit", 3],
-    SASDMZ9: ["SASDMZ9_fit1.dat", 4],
     SASDN32: ["SASDN32_fit1.dat", 4],
     SASDV94: ["SASDV94_fit1.fit", 3],
     SASDWZ9: ["SASDWZ9_fit1.fit", 3],
@@ -446,7 +443,7 @@ const FIT_FILES: Record<string, [file: string, sigma: number]> = {
 }
 
 /**
- * The scripts' own reading (`_read_curve` in test/fitting_tests/common.jl): every line
+ * The scripts' own reading (`_readCurve` in test/fitting_tests/common.jl): every line
  * with numbers in columns 1, 2 and `sigma` (commas read as blanks), and the line of the
  * first one.
  */
@@ -465,7 +462,7 @@ function scriptRead(text: string, sigma: number) {
 test("real curves: every deposited file is detected, auto, as the scripts read it", () => {
     const ids = readdirSync(EXPERIMENTS).sort()
     // every fixture folder is read; the floor guards against a folder that went missing
-    assert.ok(ids.length >= 57, `${ids.length} fixture folders`)
+    assert.ok(ids.length >= 58, `${ids.length} fixture folders`)
     const separators = new Set<string>()
     for (const id of ids) {
         const [name, sigma] = FIT_FILES[id] ?? [`experimental_data/${id}.dat`, 3]
@@ -594,7 +591,7 @@ test("data: writeData makes a clean TSV and data.json last", () => {
     const info = writeData(dir, odd, "/some/where/My Curve.csv", "nm-1", 12400)
     assert.deepEqual(info, {
         units: "nm-1", energy: 12400, source: "My Curve.csv", points: 10,
-        energy_unit: "nm",
+        energyUnit: "nm",
     })
     const text = readFileSync(dataTsvFile(dir), "utf-8")
     const lines = text.trimEnd().split("\n")

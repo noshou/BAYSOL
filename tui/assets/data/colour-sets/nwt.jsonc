@@ -1,0 +1,24 @@
+// Canadian provincial and territorial government colours
+
+{
+    "set": "nwt",
+    "title": "Government of the Northwest Territories brand standards",
+    "licence": "no licence text read; colour values are facts",
+    "url": "https://www.eia.gov.nt.ca/sites/eia/files/content/gnwt_vip_standards3.1.pdf",
+    "colours": [
+        {"name": "nwt canadian shield", "hex": "#a7a9ac", "family": "gray"},
+        {"name": "nwt aurora dance", "hex": "#40bfb4", "family": "cyan"},
+        {"name": "nwt yellow gold", "hex": "#febe10", "family": "yellow"},
+        {"name": "nwt twilight", "hex": "#c75997", "family": "pink"},
+        {"name": "nwt ice blue", "hex": "#2699d5", "family": "blue"},
+        {"name": "nwt wild expanse", "hex": "#a15124", "family": "brown"},
+        {"name": "nwt canadian shield light", "hex": "#c2c4c6", "family": "gray"},
+        {"name": "nwt canadian shield dark", "hex": "#8b8d90", "family": "gray"},
+        {"name": "nwt aurora dance light", "hex": "#aeded9", "family": "cyan"},
+        {"name": "nwt aurora dance dark", "hex": "#009889", "family": "cyan"},
+        {"name": "nwt yellow gold light", "hex": "#ffd57a", "family": "yellow"},
+        {"name": "nwt yellow gold dark", "hex": "#dca510", "family": "yellow"},
+        {"name": "nwt ice blue light", "hex": "#c4daf1", "family": "blue"},
+        {"name": "nwt ice blue dark", "hex": "#0076b6", "family": "blue"}
+    ]
+}

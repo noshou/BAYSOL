@@ -30,7 +30,7 @@ import { fold, numberText, truncate } from "../core/terminal.js"
  * The fewest points a curve may have: the fewest BAYSOL itself can run with. The scale
  * and background of every model curve are a weighted least-squares fit (`wls`) that needs
  * at least 3 points on the fitted grid (a 2-parameter fit with a residual); with 1 or 2
- * points a run stops with a `WLSError`. Measured in smoke runs of `run_project`: 1 and 2
+ * points a run stops with a `WLSError`. Measured in smoke runs of `runProject`: 1 and 2
  * points fail, 3 run to the end (reduced chi-square infinite, no degrees of freedom left).
  * The limit is not ours to choose, so it is that need and no more.
  */

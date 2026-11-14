@@ -1,0 +1,16 @@
+// Canadian provincial and territorial government colours
+
+{
+    "set": "yukon",
+    "title": "Government of Yukon brand standards, colour palette",
+    "licence": "(c) Government of Yukon; no open licence seen (page 403 live, read from archive); colour values are facts",
+    "url": "https://guide.yukon.ca/en/content-and-design/brand-standards/colour-and-palettes-print",
+    "colours": [
+        {"name": "yukon midnight sun", "hex": "#f2a900", "family": "yellow"},
+        {"name": "yukon river blue", "hex": "#0097a9", "family": "blue"},
+        {"name": "yukon zinc", "hex": "#244c5a", "family": "blue"},
+        {"name": "yukon twilight", "hex": "#512a44", "family": "purple"},
+        {"name": "yukon bryum moss", "hex": "#7a9a01", "family": "green"},
+        {"name": "yukon lichen", "hex": "#dc4405", "family": "orange"}
+    ]
+}

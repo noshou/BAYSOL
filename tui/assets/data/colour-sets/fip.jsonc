@@ -1,0 +1,19 @@
+{
+    "set": "fip",
+    "title": "Canadian Federal Identity Program colours",
+    "licence": "Government of Canada, Treasury Board Secretariat, Design Standard for the Federal Identity Program (Tables 1 and 2, modified 2021-12-13); the page states no licence, only a Terms link; colour values are facts",
+    "url": "https://www.canada.ca/en/treasury-board-secretariat/services/government-communications/federal-identity-program/technical-specifications/official-symbols/colour-values.html",
+    "colours": [
+        {"name": "fip red", "hex": "#eb2d37", "family": "red"},
+        {"name": "pewter grey", "hex": "#969696", "family": "gray"},
+        {"name": "light grey", "hex": "#c8c8c8", "family": "gray"},
+        {"name": "dark grey", "hex": "#4b4b4b", "family": "gray"},
+        {"name": "yellow", "hex": "#fad714", "family": "yellow"},
+        {"name": "blue", "hex": "#005a9b", "family": "blue"},
+        {"name": "green", "hex": "#008750", "family": "green"},
+        {"name": "safety red", "hex": "#e60f2d", "family": "red"},
+        {"name": "black", "hex": "#000000", "family": "black"},
+        {"name": "white", "hex": "#ffffff", "family": "white"},
+        {"name": "canada red", "hex": "#eb2d37", "family": "red"}
+    ]
+}

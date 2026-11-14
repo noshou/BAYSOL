@@ -172,12 +172,12 @@ export function readMapping(value: unknown): DataMapping | undefined {
  * What `data.json` holds.
  *
  * @property units - the units of q in `data.tsv`.
- * @property energy - the X-ray energy as typed, in `energy_unit`; `null` until given.
+ * @property energy - the X-ray energy as typed, in `energyUnit`; `null` until given.
  * @property source - the name (no folder) of the file the data came from.
  * @property points - the number of rows of `data.tsv`.
  * @property mapping - where the curve came from and how it was read; absent when the
  *     data was not imported from a file.
- * @property energy_unit - the unit of `energy` (a label, never converted here).
+ * @property energyUnit - the unit of `energy` (a label, never converted here).
  */
 export type DataInfo = {
     units: Units
@@ -185,7 +185,7 @@ export type DataInfo = {
     source: string
     points: number
     mapping?: DataMapping
-    energy_unit: EnergyUnit
+    energyUnit: EnergyUnit
 }
 
 /** The units a freshly loaded file has when the project had none: Å⁻¹. */
@@ -222,7 +222,7 @@ function readInfoFile(file: string): DataInfo {
         throw unusableData(dataJsonName)
     }
     if (!isDict(value)) throw unusableData(dataJsonName)
-    const { units, energy, source, points, energy_unit } = value
+    const { units, energy, source, points, energyUnit } = value
     const ok =
         (units === "nm-1" || units === "A-1") &&
         (energy === null || (typeof energy === "number" && energy > 0)) &&
@@ -230,9 +230,9 @@ function readInfoFile(file: string): DataInfo {
         typeof points === "number" &&
         Number.isInteger(points) &&
         points >= MIN_POINTS &&
-        energyUnitsList.includes(energy_unit as EnergyUnit)
+        energyUnitsList.includes(energyUnit as EnergyUnit)
     if (!ok) throw unusableData(dataJsonName)
-    const info = { units, energy, source, points, energy_unit } as DataInfo
+    const info = { units, energy, source, points, energyUnit } as DataInfo
     const mapping = readMapping(value.mapping)
     if (mapping !== undefined) info.mapping = mapping
     return info
@@ -265,7 +265,7 @@ export function writeData(
         source: basename(source),
         points: data.q.length,
         ...(mapping === undefined ? {} : { mapping }),
-        energy_unit: energyUnit,
+        energyUnit: energyUnit,
     }
     const tsv = dataTsvFile(projectDir)
     const json = dataJsonFile(projectDir)
@@ -377,7 +377,7 @@ export function setUnits(projectDir: string, units: Units): DataInfo {
  * @throws as [[setUnits]].
  */
 export function setEnergyUnit(projectDir: string, unit: EnergyUnit): DataInfo {
-    return editInfo(projectDir, (old) => ({ ...old, energy_unit: unit }))
+    return editInfo(projectDir, (old) => ({ ...old, energyUnit: unit }))
 }
 
 /** What [[setEnergy]] says of an energy that is not above 0. */
@@ -395,7 +395,7 @@ export function setEnergy(
     unit: EnergyUnit,
 ): DataInfo {
     if (!Number.isFinite(energy) || energy <= 0) throw new DataFileError(ENERGY_PROBLEM)
-    return editInfo(projectDir, (old) => ({ ...old, energy, energy_unit: unit }))
+    return editInfo(projectDir, (old) => ({ ...old, energy, energyUnit: unit }))
 }
 
 /**

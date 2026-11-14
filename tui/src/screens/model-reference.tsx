@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// The reference curve of one model (`^f` on the models list): the curve of a depositor's
-// fit that goes with this model, its label and the depositor's χ². A run draws the curve
-// with the data and the model's MAP curve on the model's own figure and writes the χ² in
-// the model's LOG. Every change is saved at once into `model-references.json`.
+// The reference curve of one model (`shift+f` on the models list): the curve of a
+// depositor's fit that goes with this model, its label and the depositor's χ². A run draws
+// the curve with the data and the model's MAP curve on the model's own figure and writes
+// the χ² in the model's LOG. Every change is saved at once into `model-references.json`.
 
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useMemo, useState } from "react"
@@ -81,8 +81,8 @@ const placeholder: Partial<Record<Field, string>> = {
  * curve is scaled onto the data (Enter toggles).
  *
  * @param props.project - the project.
- * @param props.file - the model's file name (`SASDCQ2_fit3_model1.pdb`).
- * @param props.stem - the model's name in the files (`SASDCQ2_fit3_model1`).
+ * @param props.file - the model's file name (`SASDCQ2_fit2_model1.pdb`).
+ * @param props.stem - the model's name in the files (`SASDCQ2_fit2_model1`).
  * @returns the screen.
  */
 export function ModelReferenceScreen(props: {

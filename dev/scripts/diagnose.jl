@@ -10,7 +10,7 @@
 #   julia --project=test/fitting_tests dev/scripts/diagnose.jl \
 #       --<part> [options] ID[:tag] ...
 #
-# Parts (the work is done by dev/src/seed_diagnostics.jl;
+# Parts (the work is done by dev/src/seed-diagnostics.jl;
 # the options are listed by `bysl fits diagnose --help`):
 #   --report     MAP starts, Hessian, NUTS step size and depth,
 #                Laplace agreement, modes, gradient error
@@ -21,15 +21,15 @@
 #                divergent draw (which chains the divergences come from); --retry 1
 #                looks at the rerun `infer` does when R̂ is above the limit
 #
-# `ID` is a folder under test/fitting_tests/ (SASDBS6); `tag` picks one run of a script that
-# has several (fit2_model3); scripts with a single run take no tag. SASDMZ9 and SASDJ72 take
-# model1|model2(|model3). How the Seed is obtained is in dev/src/fit_seed.jl.
+# `ID` is a folder under test/fitting_tests/ (SASDTK5); `tag` picks one run of a script that
+# has several (fit3_model1); scripts with a single run take no tag. How the Seed is
+# obtained is in dev/src/fit-seed.jl.
 
 using Printf
 using BAYSOL
-include(joinpath(@__DIR__, "..", "src", "seed_diagnostics.jl"))
+include(joinpath(@__DIR__, "..", "src", "seed-diagnostics.jl"))
 using .SeedDiagnostics
-include(joinpath(@__DIR__, "..", "src", "fit_seed.jl"))
+include(joinpath(@__DIR__, "..", "src", "fit-seed.jl"))
 
 # `--key value` options and positional `ID[:tag]` specs.
 function parse_cli(args)
@@ -55,25 +55,25 @@ end
 # and FoXS evaluate). Nothing is sampled: the MAP search of the fit is enough.
 function residual_report(out, seed; label)
     Fit = BAYSOL.Inference
-    sp = Fit._sampling_space(seed)
+    sp = Fit._samplingSpace(seed)
     ξ = Fit.Ξ(sp.μ .+ sp.σ .* sp.ẑ, seed.pr)
-    ŷ, wfit, _ = Fit.profiled_corrs(seed.wls, ξ, seed.fw; tables = seed.c1tab)
-    pred = Fit.wls_predict(wfit, ŷ)
-    r = (seed.wls.I_obs .- pred) .* sqrt.(seed.wls.weights)
-    rs = BAYSOL.Shannon.residual_structure(r)
+    ŷ, wfit, _ = Fit.profiledCorrs(seed.wls, ξ, seed.fw; tables = seed.c1tab)
+    pred = Fit.wlsPredict(wfit, ŷ)
+    r = (seed.wls.iObs .- pred) .* sqrt.(seed.wls.weights)
+    rs = BAYSOL.Shannon.residualStructure(r)
     println(
         out,
         @sprintf("%s: fitted grid   %4d points  lag-1 %+.3f  runs z %+.2f  χ²_red %.4g",
-            label, length(r), rs.lag1, rs.runs_z, sum(abs2, r) / (length(r) - 3))
+            label, length(r), rs.lag1, rs.runsZ, sum(abs2, r) / (length(r) - 3))
     )
     sh = seed.shannon
     if sh !== nothing && sh.rebin > 0
-        r_raw = (sh.I_raw .- BAYSOL.Shannon.model_on_raw(sh, pred)) ./ sh.σ_raw
-        rr = BAYSOL.Shannon.residual_structure(r_raw)
+        r_raw = (sh.iRaw .- BAYSOL.Shannon.modelOnRaw(sh, pred)) ./ sh.σ_raw
+        rr = BAYSOL.Shannon.residualStructure(r_raw)
         println(
             out,
             @sprintf("%s: measured grid %4d points  lag-1 %+.3f  runs z %+.2f  χ²_red %.4g",
-                label, length(r_raw), rr.lag1, rr.runs_z,
+                label, length(r_raw), rr.lag1, rr.runsZ,
                 sum(abs2, r_raw) / (length(r_raw) - 3))
         )
     end
@@ -101,9 +101,9 @@ function main(args)
     opts, specs = parse_cli(rest)
     isempty(specs) && error("give at least one ID[:tag]")
     n_default = BAYSOL.Pipeline.N_ADAPT + BAYSOL.Pipeline.N_DRAWS
-    n_samples = parse(Int, get(opts, "samples", string(n_default)))
-    n_adapt = parse(Int, get(opts, "adapt", string(BAYSOL.Pipeline.N_ADAPT)))
-    # (the seeds of --chains are 64-bit: a report's `rng_seed` is a UInt64)
+    nSamples = parse(Int, get(opts, "samples", string(n_default)))
+    nAdapt = parse(Int, get(opts, "adapt", string(BAYSOL.Pipeline.N_ADAPT)))
+    # (the seeds of --chains are 64-bit: a report's `rngSeed` is a UInt64)
     chain_seeds = parse.(Int128, split(get(opts, "seeds", "7"), ","))
     out = haskey(opts, "out") ? open(opts["out"], "w") : stdout
     try
@@ -112,10 +112,10 @@ function main(args)
                 occursin(':', spec) ? String.(split(spec, ":"; limit = 2)) : (spec, "")
             seed, reference, label = load_fit_seed(id, tag)
             if cmd == "report"
-                diagnose(out, seed; label, reference, n_samples, n_adapt)
+                diagnose(out, seed; label, reference, nSamples, nAdapt)
             elseif cmd == "chains"
                 for s in chain_seeds
-                    chain_report(out, seed; label, n_samples, n_adapt, rng_seed = s,
+                    chain_report(out, seed; label, nSamples, nAdapt, rngSeed = s,
                         rerun = get(opts, "retry", "0") == "1")
                 end
             else

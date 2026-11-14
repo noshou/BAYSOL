@@ -18,20 +18,20 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDZC6_fit1_model1.pdb")
 #
 # SASDZC6_fit1.dat's header:
 #
-#   # SAXS profile: number of points = 1287, q_min = 0.00627815257757902,
-#     q_max = 0.299867391586304, delta_q = 0.000228296453350486
+#   # SAXS profile: number of points = 1287, qMin = 0.00627815257757902,
+#     qMax = 0.299867391586304, delta_q = 0.000228296453350486
 #   # offset = 0.00000000000000, scaling c = 4.04022206112393e-10,
 #     Chi^2 = 1.67566640325040
-#   #  q       exp_intensity   model_intensity error
+#   #  q       exp_intensity   modelIntensity error
 #
 # i.e. this is a FoXS-style fit1 dump (q, experimental I, FoXS-model I,
-# error), already in Å⁻¹ (q_max ≈ 0.30 Å⁻¹ matches the paper's stated
+# error), already in Å⁻¹ (qMax ≈ 0.30 Å⁻¹ matches the paper's stated
 # "~0.006-0.5 Å⁻¹" detector range, clipped by reduction)
 # so no nm⁻¹ → Å⁻¹ conversion is needed here.
 raw = readdlm(_DATA_PATH; skipstart = 3)
 
 qvals = Float64.(raw[:, 1])
-I_exp = Float64.(raw[:, 2])
+iExp = Float64.(raw[:, 2])
 σ_exp = Float64.(raw[:, 4])   # column 3 is FoXS's own model curve, not used
 
 # ---------------------------------------------------------------------------
@@ -172,14 +172,14 @@ const GAT_MOLARITY_σ   = MOLARITY_REL_SIGMA * GAT_MOLARITY
 # udenafil (the 3 μM small-molecule PDE6 inhibitor in this sample): no
 # measured V0 exists, so the table entry is our own estimate,
 # 399.6 ± 16.0 cm³/mol (basis=predicted; RDKit vdW-volume + polar-site
-# regression, method and validation in BulkElectronDensity/README.md,
+# regression, method and validation in bulk-electron-density/README.md,
 # "Adding a missing solute"). At 3 μM (roughly 2000× more dilute than the
 # 100 mM NaCl / 25 mM Tris buffer components) its contribution to the bulk
 # electron density is negligible regardless, so the estimate's ±4 % error
 # is irrelevant here; it is included so the solute list is complete.
 
 # Buffer components. Tris/NaCl/MgCl2/glycerol all resolve against
-# src/BulkElectronDensity/NonBiological/nonbio_lookup.json. Counter-ions (added
+# src/bulk-electron-density/non-biological/nonbio_lookup.json. Counter-ions (added
 # 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
 # not list. Assumed: 25 mM Tris titrated with HCl -> Cl⁻ = C·0.650 (pK(22 °C) =
 # 8.156). The pH is taken as set at room temperature (22 ± 3 °C), which fixes the
@@ -206,10 +206,8 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-const Q_MAX_FIT = 0.3   # SASDZC6_fit1.dat's q_max (≈0.2999 Å⁻¹)
-
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 # PDB 7JSN's four chains each start with a different free
@@ -219,56 +217,56 @@ const Q_MAX_FIT = 0.3   # SASDZC6_fit1.dat's q_max (≈0.2999 Å⁻¹)
 const ADD_HYDROGENS = true
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` (no q cut).
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+function fitSubset()
+    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdzc6` samples. It is separate only because
+# Builds the Seed that `runSasdzc6` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
-# `run_sasdzc6` below is the whole story (build the seed, then sample it).
-function seed_sasdzc6(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdzc6` below is the whole story (build the seed, then sample it).
+function seedSasdzc6(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdzc6(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdzc6(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdzc6(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdzc6(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdzc6()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdzc6()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res",
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "FoXS 1.68",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "FoXS 1.68",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDZC6/ folder), not the caller's cwd.
 
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

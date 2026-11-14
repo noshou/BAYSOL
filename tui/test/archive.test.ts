@@ -13,7 +13,6 @@ import assert from "node:assert/strict"
 import {
     chmodSync,
     existsSync,
-    mkdirSync,
     readdirSync,
     readFileSync,
     statSync,
@@ -49,17 +48,10 @@ import {
 } from "../src/store/run-archive.js"
 import { listOpenRuns, readRunFile, runFileSizes } from "../src/store/run-logs.js"
 import { makeRun } from "./support/fake-run.js"
-import { scratchProject, tempDir } from "./support/fixtures.js"
+import { scratchProject, tempDir, writeFiles } from "./support/fixtures.js"
 import { sheetsOf, tinyWorkbook } from "./support/workbook.js"
 
-/** Writes files (paths relative to `dir`, `/`-separated) with the given contents. */
-function write(dir: string, files: Record<string, string | Buffer>): void {
-    for (const [rel, body] of Object.entries(files)) {
-        const path = join(dir, ...rel.split("/"))
-        mkdirSync(join(path, ".."), { recursive: true })
-        writeFileSync(path, body)
-    }
-}
+const write = writeFiles
 
 /** Every file below `dir`, as sorted relative paths with their sizes (folders by name). */
 function snapshot(dir: string, prefix = ""): string[] {
@@ -415,7 +407,7 @@ test("readers give the same files from a packed run and from a plain one", async
         assert.equal(readRunText(packed.dir, rel), readRunText(plain.dir, rel), rel)
     // the run.LOG differs only in its start time; the conditions row is the same
     for (const run of [packed, plain])
-        assert.match(readRunFile(run.dir, "run.LOG"), /temperature_c\t25/)
+        assert.match(readRunFile(run.dir, "run.LOG"), /temperatureC\t25/)
     assert.deepEqual(
         [...runFileSizes(packed.dir).keys()].sort(),
         [...runFileSizes(plain.dir).keys()].sort(),

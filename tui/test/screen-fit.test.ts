@@ -221,7 +221,7 @@ test("the project menu: no run without a temperature, then shift+r at once", () 
     assert.ok(!old.includes("shift+r"), old)
     // with a temperature the project is ready: the key is offered, and nothing asks
     const rows = JSON.parse(fixtureText("buffer/buffer.json")).solutes as BufferRow[]
-    writeSolutes(project.dir, rows, { pH: 7.4, "sigma-pH": 0.1, temperature: 4 })
+    writeSolutes(project.dir, rows, { pH: 7.4, "sigmaPh": 0.1, temperature: 4 })
     for (const columns of [80, 100]) {
         const text = draw(createElement(ProjectMenu, { project }), columns).join("\n")
         assert.ok(/run:\s+shift\+r/.test(text), text)
@@ -242,19 +242,19 @@ test("the conditions row shows pH, σ and the temperature at 80 x 24", () => {
             }),
             80,
         )
-    const shown = cells({ pH: 7.5, "sigma-pH": 0.1, temperature: 4 })
+    const shown = cells({ pH: 7.5, "sigmaPh": 0.1, temperature: 4 })
     const head = shown.find((l) => l.includes("pH") && l.includes("σ")) ?? ""
     assert.ok(head.includes("T °C"), shown.join("\n"))
     assert.ok(shown.some((l) => /7\.5\s+║\s+0\.1\s+║\s+4\b/.test(l)), shown.join("\n"))
     // an old buffer: the temperature says it is not set
-    assert.ok(cells({ pH: 7.5, "sigma-pH": 0.1 }).join("\n").includes("not set"))
+    assert.ok(cells({ pH: 7.5, "sigmaPh": 0.1 }).join("\n").includes("not set"))
     // no conditions at all
     assert.ok(cells(undefined).join("\n").includes("not set"))
 })
 
 test("the recipes table shows the recipe's temperature", () => {
     scratchProject() // points the data folder at a scratch one
-    saveRecipe(appDir(), "cold", [], { pH: 7.5, "sigma-pH": 0.1, temperature: 4 })
+    saveRecipe(appDir(), "cold", [], { pH: 7.5, "sigmaPh": 0.1, temperature: 4 })
     const text = draw(createElement(RecipesTable), 80)
     assert.ok(text.some((l) => l.includes("°C")), text.join("\n"))
     assert.ok(text.some((l) => /cold.*7\.5.*0\.1.*\b4\b/.test(l)), text.join("\n"))

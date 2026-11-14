@@ -354,7 +354,7 @@ export function Legend({
  * ([[MenuOptions]]), and each name must have a `<name>.txt` in
  * `assets/menu-options/`.
  */
-const menuOptions = {
+export const menuOptions = {
     buffer:   { hotkey: plainKey("b") },
     data:     { hotkey: plainKey("d") },
     help:     { hotkey: plainKey("h") },

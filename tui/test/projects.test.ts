@@ -136,10 +136,10 @@ test("a live run, the pid rule and the heartbeat age", () => {
 
 test("settle changes only a running run, and leaves a live one", () => {
     const project = tempDir()
-    const done = finishedRun(project, runOn("2026-01-01"), "done", "temperature_c\t20\n")
+    const done = finishedRun(project, runOn("2026-01-01"), "done", "temperatureC\t20\n")
     assert.equal(settleRun(done, "aborted"), false)
     assert.equal(runStatus(project, runOn("2026-01-01")), "done")
-    const live = finishedRun(project, runOn("2026-01-02"), "running", "temperature_c\t20\n")
+    const live = finishedRun(project, runOn("2026-01-02"), "running", "temperatureC\t20\n")
     writeFileSync(
         join(live, "run.json"),
         writeJson({

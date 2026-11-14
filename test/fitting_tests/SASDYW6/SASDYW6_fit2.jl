@@ -35,7 +35,7 @@ raw = readdlm(_DATA_PATH; skipstart = 1)
 # in Å⁻¹ (range ≈0.0079-0.250 Å⁻¹, consistent with B21/Diamond's usable
 # q-range) -- no unit conversion applied.
 qvals = Float64.(raw[:, 1])
-I_exp = Float64.(raw[:, 2])
+iExp = Float64.(raw[:, 2])
 σ_exp = Float64.(raw[:, 3])
 
 # ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ const FBA1_MOLARITY   = FBA1_CONC_MG_ML / FBA1_MW    # ≈ 2.548e-5 M ≈ 25.5 �
 const FBA1_MOLARITY_σ = MOLARITY_REL_SIGMA * FBA1_MOLARITY
 
 # Buffer components. Cross-checked against
-# src/BulkElectronDensity/NonBiological/nonbio_lookup.json (case-insensitive
+# src/bulk-electron-density/non-biological/nonbio_lookup.json (case-insensitive
 # grep) and the sibling nonbiological.tsv.
 const SOLUTES = Solute[
     # The measured macromolecule is deliberately NOT listed: ρₑ is the buffer's
@@ -133,7 +133,7 @@ const SOLUTES = Solute[
     # exists (it hydrolyzes in water); the table entry
     # ("phenylmethanesulfonyl fluoride", resolves from "pmsf") is our own
     # estimate, 127.2 ± 5.0 cm³/mol (basis=predicted; see
-    # BulkElectronDensity/README.md, "Adding a missing solute"). It is the
+    # bulk-electron-density/README.md, "Adding a missing solute"). It is the
     # smallest-concentration component by far, so its ρₑ impact is minimal.
     NonBiological(0.001, 0.00005, "pmsf"),  # 1 mM PMSF, ±5% (unstable stock)
 ]
@@ -142,71 +142,68 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-const Q_MAX_FIT = 0.25   # the .fit file's own max q (0.249981 Å⁻¹); no further cut needed
-
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` (no q cut).
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+function fitSubset()
+    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdyw6_fit2` samples. It is separate only because
+# Builds the Seed that `runSasdyw6Fit2` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running the
 # fit; if you are reading this script as an example you can skip it:
-# `run_sasdyw6_fit2` below is the whole story (build the seed, then sample it).
-function seed_sasdyw6_fit2(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdyw6Fit2` below is the whole story (build the seed, then sample it).
+function seedSasdyw6Fit2(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_CIF_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_CIF_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdyw6_fit2(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdyw6Fit2(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdyw6_fit2(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdyw6Fit2(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdyw6_fit2()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdyw6Fit2()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
 crysol = readdlm(_FIT_PATH; skipstart = 1)
 reference = BAYSOL.Reference(
     "CRYSOL fit2",
     Float64.(crysol[:, 1]),
     Float64.(crysol[:, 4]);
-    q_max = Q_MAX_FIT,
 )
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res_fit2", references = reference,
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "CRYSOL 3.74",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "CRYSOL 3.74",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDYW6/ folder), not the caller's cwd.
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

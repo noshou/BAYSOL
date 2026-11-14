@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Helpers shared by the test_*.jl files (loaded by runtests.jl).
+# Helpers shared by the test-*.jl files (loaded by runtests.jl).
 module Helpers
 
 using Dev

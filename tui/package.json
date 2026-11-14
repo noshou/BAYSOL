@@ -16,6 +16,7 @@
     "@vvo/tzdb": "^6.204.0",
     "7zip-bin": "^5.2.0",
     "ink": "^8.0.0",
+    "jsonc-parser": "^3.3.1",
     "moment-timezone": "^0.6.6",
     "node-7z": "^3.0.0",
     "proper-lockfile": "^4.1.2",

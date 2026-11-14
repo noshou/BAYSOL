@@ -4,8 +4,8 @@
 // buffer row (`buffer.json`, `recipes.json`), recorded in every row of the group the
 // template made:
 //
-//     {"id": "tris", "mM": 10, "sigma-mM": 0.2, "titrant": "chloride", "rest-mM": 100,
-//      "set-at": "buffer"}
+//     {"id": "tris", "mM": 10, "sigmaMm": 0.2, "titrant": "chloride", "restMm": 100,
+//      "setAt": "buffer"}
 //
 // A row with a link follows the pH and the temperature of the table (`template-sync.ts`).
 // The link is optional
@@ -28,10 +28,10 @@ import {
  *
  * @property id - the template (`tris`, `pbs`, ...).
  * @property mM - the concentration of a buffer, mM (a mixture has none).
- * @property sigma-mM - its uncertainty, mM.
+ * @property sigmaMm - its uncertainty, mM.
  * @property titrant - the counter-ion the buffer was made with.
- * @property rest-mM - the ionic strength of the rest of the recipe, mM.
- * @property set-at - the temperature the pH was set at: `"buffer"` (the buffer's, so the
+ * @property restMm - the ionic strength of the rest of the recipe, mM.
+ * @property setAt - the temperature the pH was set at: `"buffer"` (the buffer's, so the
  *     rows follow its temperature) or a number of °C (fixed). Required of a shipped
  *     template's link (one without a valid one is not a link); a `custom` or `table`
  *     definition carries its own.
@@ -42,10 +42,10 @@ export type TemplateLink = {
     id: string
     definition?: Definition
     mM?: number
-    "sigma-mM"?: number
+    "sigmaMm"?: number
     titrant?: string
-    "rest-mM"?: number
-    "set-at"?: "buffer" | number
+    "restMm"?: number
+    "setAt"?: "buffer" | number
 }
 
 /** What the asset says of a template, as far as a link needs it. */
@@ -53,7 +53,7 @@ type Known = {
     id: string
     kind: string
     available?: boolean
-    buffer_components?: unknown[]
+    bufferComponents?: unknown[]
 }
 
 /** The templates a link may name, read on first use. */
@@ -89,24 +89,24 @@ export function linkOf(value: unknown): TemplateLink | undefined {
     if (t.kind === "buffer") {
         if (!(isNum(v.mM) && v.mM > 0)) return undefined
         link.mM = v.mM
-        if ("sigma-mM" in v) {
-            if (!(isNum(v["sigma-mM"]) && v["sigma-mM"] >= 0)) return undefined
-            link["sigma-mM"] = v["sigma-mM"]
+        if ("sigmaMm" in v) {
+            if (!(isNum(v.sigmaMm) && v.sigmaMm >= 0)) return undefined
+            link.sigmaMm = v.sigmaMm
         }
-    } else if (!t.buffer_components?.length) return undefined
+    } else if (!t.bufferComponents?.length) return undefined
     if ("titrant" in v) {
         if (typeof v.titrant !== "string" || v.titrant.trim() === "") return undefined
         link.titrant = v.titrant
     }
-    if ("rest-mM" in v) {
-        if (!(isNum(v["rest-mM"]) && v["rest-mM"] >= 0)) return undefined
-        link["rest-mM"] = v["rest-mM"]
+    if ("restMm" in v) {
+        if (!(isNum(v.restMm) && v.restMm >= 0)) return undefined
+        link.restMm = v.restMm
     }
     const { min, max } = RUN_FLOW.temperature
-    const at = v["set-at"]
+    const at = v.setAt
     // only "buffer" or a temperature in range is valid, and the key must be there
     if (!(at === "buffer" || (isNum(at) && at >= min && at <= max))) return undefined
-    link["set-at"] = at
+    link.setAt = at
     return link
 }
 
@@ -132,9 +132,9 @@ export function cleanRow<T extends object>(row: T): T {
  */
 export function keyOf(link: TemplateLink): string {
     const { id, mM, titrant } = link
-    const key = [id, mM, link["sigma-mM"], titrant, link["rest-mM"], link.definition]
-    // a link without `set-at` keeps the key it always had
-    return JSON.stringify("set-at" in link ? [...key, link["set-at"]] : key)
+    const key = [id, mM, link.sigmaMm, titrant, link.restMm, link.definition]
+    // a link without `setAt` keeps the key it always had
+    return JSON.stringify("setAt" in link ? [...key, link.setAt] : key)
 }
 
 /**
@@ -169,7 +169,7 @@ export function soluteFromSpec(r: RowSpec, template?: TemplateLink): Solute {
         custom: r.arg,
         z: r.custom.z,
         pmv: r.custom.pmv,
-        "sigma-pmv": r.custom["sigma-pmv"],
+        "sigmaPmv": r.custom.sigmaPmv,
         ...amounts,
         ...own,
     } as unknown as Solute

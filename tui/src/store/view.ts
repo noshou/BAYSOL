@@ -557,7 +557,7 @@ export const matchIndex = (matches: readonly CellAt[], row: number, column: numb
 }
 
 /**
- * Reads what `g` takes: a cell (`B7`), a row (`7`) or a column (`B`). A part left out
+ * Reads what `j` takes: a cell (`B7`), a row (`7`) or a column (`B`). A part left out
  * keeps the cursor's. A place outside the sheet is refused, not clamped: the user typed it.
  *
  * @param text - what was typed.

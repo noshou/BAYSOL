@@ -1,0 +1,10 @@
+{
+    "set": "eu",
+    "title": "European Union reflex blue and yellow (Regulation (EU) 2014/821 Annex II)",
+    "licence": "Open Government Licence v3.0 (stated on page; (c) Crown)",
+    "url": "https://www.legislation.gov.uk/eur/2014/821/annex/II",
+    "colours": [
+        {"name": "eu reflex blue", "hex": "#003399", "family": "blue"},
+        {"name": "eu yellow", "hex": "#ffcc00", "family": "yellow"}
+    ]
+}

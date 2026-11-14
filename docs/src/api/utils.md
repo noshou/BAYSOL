@@ -1,6 +1,6 @@
 # Utils
 
-The small scientific helpers the others build on (`src/Utils/`): physical constants and units
+The small scientific helpers the others build on (`src/utils/`): physical constants and units
 and the Shannon-channel data reduction.
 
 ## Utils

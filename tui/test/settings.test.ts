@@ -71,7 +71,7 @@ test("a setting is found by name; an unknown name is not", () => {
     assert.equal(def.kind, "int")
     assert.equal(def.sheet, "sampler")
     assert.equal(def.default, 300)
-    assert.deepEqual(def.limits, { at_least: 1 })
+    assert.deepEqual(def.limits, { atLeast: 1 })
     assert.ok(def.description.length > 0)
     assert.equal(catalog.get("NOPE"), undefined)
     assert.throws(() => catalog.require("NOPE"), /not a setting/)
@@ -95,7 +95,7 @@ test("every entry is complete and the data is sound", () => {
         assert.equal(def.default === null, def.kind.startsWith("optional"), def.name)
         assert.ok(
             Object.keys(def.limits).every((k) =>
-                ["above", "below", "at_least", "at_most"].includes(k),
+                ["above", "below", "atLeast", "atMost"].includes(k),
             ),
             def.name,
         )
@@ -122,7 +122,7 @@ type Case = {
     with?: Record<string, unknown>
 }
 
-/** Judges a case like `load_settings` (settings-file.jl): what the wipe makes of a file. */
+/** Judges a case like `loadSettings` (settings-file.jl): what the wipe makes of a file. */
 function judge(c: Case) {
     const stored: Record<string, Record<string, unknown>> = {}
     for (const [name, value] of Object.entries({
@@ -397,7 +397,7 @@ test("rules: inside, width, ordered, all above, at most, opacity", () => {
         false,
         "a rule whose other setting has no value is skipped",
     )
-    const width = rule({ rule: "within_width", setting: "E", of: "B" })
+    const width = rule({ rule: "withinWidth", setting: "E", of: "B" })
     assert.equal(broken(width, { E: 0.5, B: [1, 1.5] }), false)
     assert.equal(broken(width, { E: 0.6, B: [1, 1.5] }), true)
     assert.equal(broken(width, { E: 0, B: [1, 1.5] }), true)
@@ -408,15 +408,15 @@ test("rules: inside, width, ordered, all above, at most, opacity", () => {
     assert.equal(broken(ordered, { P: [1, 1] }), true)
     assert.equal(broken(floor, { P: [0.5, 1] }), false)
     assert.equal(broken(floor, { P: [0, 1] }), true)
-    const above = rule({ rule: "all_above", setting: "R", bound: 0 })
+    const above = rule({ rule: "allAbove", setting: "R", bound: 0 })
     assert.equal(broken(above, { R: [1, 2, 3] }), false)
     assert.equal(broken(above, { R: { width: 70, height: 18 } }), false)
     assert.equal(broken(above, { R: [1, 0, 3] }), true)
     assert.equal(broken(above, { R: { width: 0, height: 18 } }), true)
-    const atMost = rule({ rule: "at_most_setting", setting: "A", of: "B" })
+    const atMost = rule({ rule: "atMostSetting", setting: "A", of: "B" })
     assert.equal(broken(atMost, { A: 5, B: 5 }), false)
     assert.equal(broken(atMost, { A: 6, B: 5 }), true)
-    const below = rule({ rule: "below_setting", setting: "A", of: "B" })
+    const below = rule({ rule: "belowSetting", setting: "A", of: "B" })
     assert.equal(broken(below, { A: 1, B: 2 }), false)
     assert.equal(broken(below, { A: 2, B: 2 }), true)
     assert.equal(broken(below, { A: 3, B: 2 }), true)
@@ -608,7 +608,7 @@ test("fuzzing the value of every setting: one answer, kept again unchanged", () 
                 assert.ok((r.value as string[]).every((c) => d.choices.includes(c)))
             if (d.kind === "tuple")
                 assert.equal(Object.keys(r.value as object).length, d.partNames.length)
-            const { above, below, at_least: atLeast, at_most: atMost } = d.limits
+            const { above, below, atLeast, atMost } = d.limits
             if (typeof r.value === "number") {
                 if (above !== undefined) assert.ok(r.value > above)
                 if (below !== undefined) assert.ok(r.value < below)

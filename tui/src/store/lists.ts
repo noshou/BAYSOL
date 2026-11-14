@@ -38,29 +38,22 @@ import { isStructureFile, structureFasta } from "./structure-sequences.js"
 /**
  * A strict reader of FASTA and FASTQ text for the DNA, RNA and protein rows of the
  * buffer. [[parseText]] and [[parseFile]] give every record as a [[Sequence]], or an
- * error whose message is at most 22 characters (it is shown in a 24-character border
- * note). One record makes one buffer row.
+ * error of at most 22 characters (it is shown in a 24-character border note). One
+ * record makes one buffer row.
  *
- * The alphabets are the ones the Julia code accepts (`src/BulkElectronDensity`,
- * Nucleotide and Protein): DNA `A C G T` plus the IUPAC ambiguity codes
- * `R Y S W K M B D H V N`; RNA the same with `U` for `T` (`T` in RNA and `U` in DNA are
- * errors); protein the twenty residues `A C D E F G H I K L M N P Q R S T V W Y`,
- * selenocysteine `U`, pyrrolysine `O` and the ambiguity codes `B J Z`. `*` (any kind)
- * and `X` (protein) are placeholders Julia skips, so they are accepted and kept in the
- * sequence, but they are no residue and a record of nothing else is empty. THE LINT
- * ([[parseText]], one function for typed text, pasted text and files): a FASTA header
- * line is dropped, letters are upper-cased, white space, line breaks and the numbering
- * digits of a GenBank-style listing are dropped, and NOTHING else is repaired: a gap `-`,
- * a stray symbol, a `T` in RNA or a `U` in DNA is an error that names the character and
- * its place in the cleaned sequence (`invalid residue 'J' at 12`). A text with no header
- * is one sequence. Julia has no length cap, so there is none here.
+ * Alphabets are the ones the Julia code accepts: DNA `A C G T` plus the IUPAC codes
+ * `R Y S W K M B D H V N`; RNA the same with `U` for `T`; protein the twenty residues,
+ * `U`, `O` and the codes `B J Z`. `*` and `X` (protein) are placeholders: kept, but no
+ * residue. The lint, one function for typed text, pasted text and files: a FASTA header
+ * is dropped, letters are upper-cased, white space and numbering digits are dropped,
+ * and nothing else is repaired: a gap, a stray symbol, a `T` in RNA or a `U` in DNA is
+ * an error naming the character and its place (`invalid residue 'J' at 12`). A text
+ * with no header is one sequence. There is no length cap.
  *
- * FASTA: a `>` header line, then the sequence on one or more lines. FASTQ: strict four
- * line records `@id`, the sequence on one line, `+` (with or without a repeat of the id)
- * and a quality line of the same length; only the sequence is kept, and an `@` at the
- * start of a quality line is not a header. The id is the header up to the first white
- * space. Blank lines are allowed in FASTA anywhere and in FASTQ before the first and
- * after the last record only; CRLF line ends are fine.
+ * FASTA: a `>` header, then the sequence on one or more lines. FASTQ: strict four-line
+ * records (`@id`, sequence, `+`, quality of the same length); only the sequence is
+ * kept. The id is the header up to the first white space. Blank lines: anywhere in
+ * FASTA, only around the records in FASTQ; CRLF is fine.
  */
 
 /** A kind of sequence. */
@@ -108,25 +101,18 @@ class Sequence {
         readonly letters: string,
     ) {}
 
-    /**
-     * The number of residues: the letters without the placeholders `*` and `X`.
-     *
-     * @returns the count.
-     */
+    /** The number of residues: the letters without the placeholders `*` and `X`. */
     get residueCount(): number {
         return [...this.letters].filter((c) => !anyPlaceholder.has(c)).length
     }
 
     /**
-     * The compact text of the sequence for the params cell: `ACG…GCA (24 nt)` for DNA
-     * and RNA, `MKT…QLS (317 aa)` for a protein. The count suffix is always kept; the
-     * head and the tail of the sequence shrink (the head gets the odd letter) to make
-     * the whole at most `width` characters, and the sequence is shown whole when it
-     * fits.
+     * The compact text for the params cell: `ACG…GCA (24 nt)` (DNA, RNA) or
+     * `MKT…QLS (317 aa)`. The count is always kept; head and tail shrink (the head gets
+     * the odd letter) to fit `width`, and the sequence is whole when it fits.
      *
      * @param kind - the kind of sequence.
      * @param width - the most characters.
-     * @returns the text.
      */
     summary(kind: SequenceKind, width: number): string {
         return summary(kind, this.letters, width)
@@ -140,11 +126,9 @@ export type SequenceRecords = Sequence[]
 export type SequenceResult = { records: SequenceRecords } | { error: string }
 
 /**
- * Whether a file name (or path) has one of the [[sequenceExtensions]], or is a PDB or
- * mmCIF structure file (see `structure-sequences.ts`).
+ * Whether a file name has a [[sequenceExtensions]] extension or is a PDB or mmCIF file.
  *
  * @param fileName - the name or path.
- * @returns the answer (case does not matter).
  */
 export function isSequenceFile(fileName: string): boolean {
     const low = fileName.toLowerCase()
@@ -162,15 +146,14 @@ function clean(text: string, digits = false): string {
 }
 
 /**
- * Lints sequence text and checks it against the alphabet of its kind: the one rule of
- * every sequence the program takes (see the header of this section).
+ * Lints sequence text and checks it against the alphabet of its kind. Returns the clean
+ * letters (placeholders kept), or an error: `empty sequence`, `U is RNA, not DNA (at 5)`,
+ * `T is DNA, not RNA (at 5)` or `invalid residue 'J' at 12` (places count clean letters
+ * from 1).
  *
  * @param kind - the kind.
  * @param raw - the sequence as typed, pasted or read (no header line).
  * @param digits - drop numbering digits too (`true` for text and FASTA, not for FASTQ).
- * @returns the clean letters (placeholders kept), or the error: `empty sequence`,
- *     `U is RNA, not DNA (at 5)`, `T is DNA, not RNA (at 5)` or
- *     `invalid residue 'J' at 12` (places count the clean letters, from 1).
  */
 function checkSequence(
     kind: SequenceKind,
@@ -197,7 +180,6 @@ function checkSequence(
  *
  * @param header - the line, with its first character (`>` or `@`) still on.
  * @param fallback - the id when that is empty.
- * @returns the id.
  */
 function recordId(header: string, fallback: string): string {
     const id = header.slice(1).trim().split(/\s+/)[0] ?? ""
@@ -208,12 +190,10 @@ function recordId(header: string, fallback: string): string {
 type RawRecord = { id: string; raw: string }
 
 /**
- * The result for the raw records of a kind: each sequence cleaned and checked, the
- * first error returned.
+ * Cleans and checks the raw records of a kind; the first error wins.
  *
  * @param kind - the kind.
  * @param raws - the records.
- * @returns the records, or the first error.
  */
 function finish(
     kind: SequenceKind,
@@ -231,10 +211,9 @@ function finish(
 }
 
 /**
- * The records of FASTA lines.
+ * The raw records of FASTA lines.
  *
  * @param lines - the lines; the first is a header.
- * @returns the raw records.
  */
 function fastaRaws(lines: readonly string[]): RawRecord[] {
     const rest = lines.filter((l) => l.trim() !== "")
@@ -257,11 +236,10 @@ function fastaRaws(lines: readonly string[]): RawRecord[] {
 const fastqLines = 4
 
 /**
- * The result for FASTQ lines.
+ * The records of FASTQ lines, or the first error.
  *
  * @param kind - the kind.
  * @param lines - the lines, blank ones at both ends already dropped.
- * @returns the records, or the first error.
  */
 function fastqParse(kind: SequenceKind, lines: readonly string[]): SequenceResult {
     const acc: RawRecord[] = []
@@ -279,16 +257,13 @@ function fastqParse(kind: SequenceKind, lines: readonly string[]): SequenceResul
 }
 
 /**
- * Parses FASTA or FASTQ text, or bare sequence text, as sequences ([[parseText]]).
+ * Parses FASTA, FASTQ or bare sequence text (one record, `seq1`). The error is for: no
+ * records, an empty sequence, a broken FASTQ record, or a letter outside the alphabet.
+ * Throws for another `kind`.
  *
  * @param text - the text: FASTA, FASTQ, or one sequence with no header on any number of
  *     lines.
  * @param kind - `dna`, `rna` or `protein`.
- * @returns the records (a bare sequence is one record, `seq1`), or an error for: no
- *     records, an empty sequence, a FASTQ record that has a missing line or a quality
- *     line of another length, a letter outside the alphabet of `kind` (named, with its
- *     place).
- * @throws Error for another `kind`.
  */
 export function parseText(text: string, kind: SequenceKind): SequenceResult {
     if (!Object.hasOwn(alphabets, kind)) throw new Error(`unknown sequence kind ${kind}`)
@@ -306,12 +281,11 @@ export function parseText(text: string, kind: SequenceKind): SequenceResult {
 }
 
 /**
- * What a pasted text needs: whether it is not a field's text (it has a line break, or is
- * longer than the field holds), so it is taken as a sequence text at once.
+ * Whether a paste is not a field's text (a line break, or longer than `room`): it goes to
+ * [[parseText]].
  *
  * @param text - the text pasted.
  * @param room - the characters the field has room for.
- * @returns `true` when the paste goes to [[parseText]] instead of into the field.
  */
 export function isSequencePaste(text: string, room: number): boolean {
     const t = text.trim()
@@ -319,10 +293,9 @@ export function isSequencePaste(text: string, room: number): boolean {
 }
 
 /**
- * The residues of records (placeholders `*` and `X` not counted).
+ * The residues of records (placeholders not counted).
  *
  * @param records - the records.
- * @returns the total.
  */
 export function residuesOf(records: SequenceRecords): number {
     return records.reduce((n, r) => n + r.residueCount, 0)
@@ -330,11 +303,10 @@ export function residuesOf(records: SequenceRecords): number {
 
 /**
  * Parses a file like [[parseText]]; a PDB or mmCIF file gives its chains of this `kind`.
+ * Throws for another `kind`.
  *
  * @param path - the file.
  * @param kind - `dna`, `rna` or `protein`.
- * @returns the records, or an error; `cannot read file` when it cannot be read as text.
- * @throws Error for another `kind`.
  */
 export function parseFile(path: string, kind: SequenceKind): SequenceResult {
     if (isStructureFile(path)) {
@@ -359,7 +331,6 @@ const minShown = 3
  * @param kind - the kind of sequence.
  * @param letters - the sequence.
  * @param width - the most characters.
- * @returns the text.
  */
 export function summary(kind: SequenceKind, letters: string, width: number): string {
     const n = new Sequence("", letters).residueCount
@@ -378,9 +349,8 @@ export function summary(kind: SequenceKind, letters: string, width: number): str
 // ========================================================================================
 
 // Typing a path: the one place that checks a typed path and completes it. The model
-// prompt (`projects.ts`) and the sequence prompt of the add flow (`add-flow.ts`) differ
-// only in what files they want and in how many characters a message may have, so each
-// hands its own message budget and file filter to the functions here.
+// prompt and the add flow's sequence prompt differ only in file filter and message
+// budget, which each passes in.
 
 /** The most hints [[hintsFor]] gives. */
 const maxHints = 50
@@ -389,8 +359,8 @@ const maxHints = 50
 export const MAX_PATH_TYPED = 300
 
 /**
- * How many characters the message of a prompt may have: the model prompt has room for
- * 42, the sequence prompt of the add flow for 22. The wording of each is below.
+ * How many characters a prompt's message may have: 42 for the model prompt, 22 for the add
+ * flow.
  */
 export type PathBudget = 22 | 42
 
@@ -416,17 +386,14 @@ const WORDING: Record<
 }
 
 /**
- * What is wrong with a path as the file to read.
- *
- * The checks run in this order: empty, not absolute, not there, a folder, the wrong
- * kind of file, not readable.
+ * What is wrong with a path as the file to read, or `undefined`. Checked in order:
+ * empty, not absolute, not there, a folder, the wrong kind of file, not readable.
  *
  * @param path - the path typed.
  * @param budget - the characters the message may have; picks the wording.
  * @param wrongKind - when the prompt takes only some files: the test on the file's name
  *     and the message (within `budget`) for one that fails it; checked before
  *     readability. Omit it when any file will do.
- * @returns the message, `undefined` if the path is fine.
  */
 export function checkPath(
     path: string,
@@ -444,10 +411,9 @@ export function checkPath(
 }
 
 /**
- * The part of a typed path up to and with its last separator.
+ * The part of a typed path up to and with its last separator; `""` if none.
  *
  * @param text - the path typed.
- * @returns the part up to `/` (or the system's own separator); `""` when there is none.
  */
 function dirPart(text: string): string {
     const cut = Math.max(text.lastIndexOf("/"), text.lastIndexOf(sep))
@@ -455,15 +421,13 @@ function dirPart(text: string): string {
 }
 
 /**
- * The names a typed path can go on with, for the folder it is in: folders (with a `/`
- * at the end) first, then the files whose name `accept` takes, those that start with
- * what is typed after the last separator (case does not matter). A name that starts
- * with a dot is given only when a dot is typed.
+ * The names a typed path can go on with: folders (with a trailing `/`) first, then the
+ * files `accept` takes, those starting with what follows the last separator (case-blind).
+ * Dot names only when a dot is typed. At most 50; none unless `text` is an absolute path
+ * in an existing folder.
  *
  * @param text - the path typed.
  * @param accept - says whether a file name is wanted.
- * @returns at most 50 names; empty when `text` is not an absolute path in a folder
- *     that exists.
  */
 export function hintsFor(text: string, accept: (fileName: string) => boolean): string[] {
     const dir = dirPart(text)
@@ -487,19 +451,17 @@ export function hintsFor(text: string, accept: (fileName: string) => boolean): s
  *
  * @param text - the path typed.
  * @param hint - one of [[hintsFor]].
- * @returns the completed path.
  */
 export function complete(text: string, hint: string): string {
     return dirPart(text) + hint
 }
 
 /**
- * The suggestions of a path prompt: the folder's names that fit what is typed. Each is
- * shown by its name; Tab puts the whole completed path into the field.
+ * The suggestions of a path prompt: shown by name; Tab puts the completed path into the
+ * field.
  *
  * @param text - the path typed.
  * @param accept - says whether a file name is wanted.
- * @returns the suggestions, folders first; none for a folder that cannot be listed.
  */
 export function pathSuggestions(
     text: string,
@@ -520,9 +482,8 @@ export function pathSuggestions(
 // ========================================================================================
 
 /**
- * The most rows any list of the user holds: the solutes of a buffer, the custom
- * solutes. The counters of the tables have room
- * for three digits. Adding stops there, and a file that holds more is unusable.
+ * The most rows any user list holds (buffer solutes, custom solutes): the counters have
+ * room for three digits. Adding stops there; a file with more is unusable.
  */
 export const MAX_ROWS = 999
 
@@ -533,22 +494,19 @@ export const MAX_ROWS = 999
 /**
  * What a [[ListFile]] needs to know about its file.
  *
- * @property fileName - the name of the file in its folder, e.g. `buffer.json`.
- * @property key - the key of the JSON object under which the list is kept, e.g. `solutes`.
- * @property kind - the kind carried by the errors, so a screen can tell the files apart.
- * @property plural - what the entries are called in messages (`solutes`).
- * @property noun - what one entry is called in the message of a refused entry (`buffer
- *     row`, `custom solute`).
- * @property problem - what is wrong with one entry (a value of the file or of a save), or
- *     `undefined` when it is fine. Applied to every entry on read and on write.
- * @property nameOf - the name an entry is known by, left out for a list whose entries have
- *     none. With it, names must differ without regard to case (and to the spaces at the
- *     ends), and [[ListFile.remove]] and [[ListFile.indexOf]] work.
- * @property mapProblem - what is wrong with the other keys of the file's map (the buffer's
- *     pH and σ), or `undefined` when they are fine. Applied on read and on write, so a
- *     file with a bad value there is unusable and never written over.
- * @property createParents - `false` for a file that lives in a project's folder: a folder
- *     that is gone is not made again. Default `true`.
+ * @property fileName - the file's name in its folder, e.g. `buffer.json`.
+ * @property key - the JSON key of the list, e.g. `solutes`.
+ * @property kind - carried by the errors, so a screen can tell files apart.
+ * @property plural - what entries are called in messages (`solutes`).
+ * @property noun - what one entry is called in a refusal (`buffer row`).
+ * @property problem - what is wrong with one entry, or `undefined`; applied on read and
+ *     write.
+ * @property nameOf - an entry's name, if it has one. Names must then differ (case and end
+ *     spaces ignored), and `remove` and `indexOf` work.
+ * @property mapProblem - what is wrong with the file's other keys (pH, σ), or `undefined`;
+ *     applied on read and write.
+ * @property createParents - `false` for a file in a project folder: a gone folder is not
+ *     remade. Default `true`.
  */
 export type ListSpec<T> = {
     fileName: string
@@ -563,26 +521,21 @@ export type ListSpec<T> = {
 }
 
 /**
- * A JSON file that holds a list of entries under one key of a JSON object, the one
- * mechanism of the buffer of a project and the custom solutes:
+ * A JSON file holding a list of entries under one key of an object, the one mechanism
+ * of a project's buffer and the custom solutes:
  *
  *     {"<key>": [entry, entry, ...], ...other keys kept as they are...}
  *
- * It owns what those files have in common:
+ * - read, plain or `{track: true}` (the version read is the base the next write checks,
+ *   so a save after another copy saved is refused);
+ * - write under the file's lock through a temporary file, other keys kept;
+ * - a file that cannot be used (not JSON, not a map, a refused entry, a repeated name,
+ *   more than [[MAX_ROWS]]) is reported ([[UnusableFileError]]) and never written
+ *   over; [[ListFile.reset]] moves it aside;
+ * - the same rules for what a save is given;
+ * - removing one entry by name, and one read-change-write step ([[ListFile.update]]).
  *
- * - the read, plain or `{track: true}` (the version read is the base that the next write
- *   checks, so a save after another copy of the program saved the file is refused);
- * - the write, under the file's lock, through a temporary file, with the other keys of
- *   the map kept and the version noted afterwards;
- * - the rule that a file that cannot be used (not JSON, not a map, an entry that
- *   `problem` refuses, a name twice, more than [[MAX_ROWS]] entries) is told
- *   ([[UnusableFileError]]) and never written over; [[ListFile.reset]] moves it aside;
- * - the same rules for what a save is given, so a file the program writes is one it reads;
- * - removing one entry by name, and the read-change-write of one step
- *   ([[ListFile.update]]).
- *
- * A missing or empty file is an empty list. One instance serves every folder: each method
- * takes the folder the file is in.
+ * A missing or empty file is an empty list. One instance serves every folder.
  *
  * @typeParam T - the entry.
  */
@@ -613,11 +566,7 @@ export class ListFile<T> {
         return undefined
     }
 
-    /**
-     * The whole map of the file, checked.
-     *
-     * @throws UnusableFileError (the spec's kind) if the file cannot be used.
-     */
+    /** The whole map of the file, checked. Throws UnusableFileError if unusable. */
     private readMap(dir: string): Record<string, unknown> {
         const { fileName, kind, plural, key } = this.spec
         return readMap(this.file(dir), {
@@ -631,10 +580,9 @@ export class ListFile<T> {
     }
 
     /**
-     * The other keys of the file's map (everything but the list), checked like the rest.
+     * The file's other keys (all but the list), checked. Throws UnusableFileError.
      *
      * @param options - `track: true` starts an editing session, as for [[ListFile.read]].
-     * @throws UnusableFileError if the file cannot be used.
      */
     readOther(dir: string, options: ReadOptions = {}): Record<string, unknown> {
         if (options.track) noteRead(this.file(dir))
@@ -643,12 +591,11 @@ export class ListFile<T> {
     }
 
     /**
-     * The entries of the file in a folder.
+     * The entries of the file in a folder. Throws UnusableFileError.
      *
      * @param options - `track: true` when the entries are read to be edited and saved: the
      *     version read is then the one [[ListFile.write]] checks against. A plain read
      *     changes nothing about that.
-     * @throws UnusableFileError if the file cannot be used.
      */
     read(dir: string, options: ReadOptions = {}): T[] {
         if (options.track) noteRead(this.file(dir))
@@ -657,11 +604,8 @@ export class ListFile<T> {
     }
 
     /**
-     * Whether a list and the keys written with it may be written: the same rules the read
-     * applies.
-     *
-     * @throws UnusableFileError (the spec's kind) with the reason, before anything is
-     *     touched.
+     * Checks a list and its extra keys by the rules the read applies; throws
+     * UnusableFileError before anything is touched.
      */
     private assertWritable(list: readonly T[], extras: Record<string, unknown>): void {
         const why = this.listProblem(list) ?? this.spec.mapProblem?.(extras)
@@ -691,15 +635,13 @@ export class ListFile<T> {
     }
 
     /**
-     * Writes the entries as the list of the folder, the other keys of the file kept,
-     * through a temporary file that replaces it in one step. The file is made if there is
-     * none; one that cannot be used is not touched.
+     * Writes the entries, other keys kept, through a temporary file that replaces it in
+     * one step; the file is made if missing. Throws ChangedOnDiskError if another copy
+     * saved after this one read (nothing written), UnusableFileError for entries that
+     * break the rules or an unusable file.
      *
      * @param extras - other keys to set in the map in the same write (they replace the
      *     file's own values of those keys); they must keep `mapProblem`.
-     * @throws ChangedOnDiskError if another copy of the program saved the file after this
-     *     one read it (nothing is written); UnusableFileError (the spec's kind) for
-     *     entries that break the rules (nothing is written) or a file that cannot be used.
      */
     write(dir: string, list: readonly T[], extras: Record<string, unknown> = {}): string {
         const file = this.file(dir)
@@ -714,16 +656,15 @@ export class ListFile<T> {
     }
 
     /**
-     * Reads, changes and writes in one step under the lock, so a change never loses
-     * another copy's changes to the other entries.
+     * Reads, changes and writes in one step under the lock, so no other copy's changes
+     * are lost. Throws ChangedOnDiskError when `guarded` and the file changed since this
+     * process read it; UnusableFileError like [[ListFile.write]].
      *
      * @param change - given the entries as they are on disk now; returns the new list, or
      *     `undefined` to leave the file alone.
      * @param options - `guarded: true` for a caller that shows the file as it read it for
      *     editing: the change then refuses when another copy saved the file since;
      *     `extras`: other keys to set in the same write, as for [[ListFile.write]].
-     * @throws ChangedOnDiskError when `guarded` and the file changed since this process
-     *     read it; UnusableFileError like [[ListFile.write]].
      */
     update(
         dir: string,
@@ -745,11 +686,10 @@ export class ListFile<T> {
     }
 
     /**
-     * The position of the entry with a name.
+     * The position of the entry with a name. Throws for a list without `nameOf`.
      *
      * @param name - the name, compared without regard to case and to the spaces at the
      *     ends.
-     * @throws Error for a list without `nameOf`.
      */
     indexOf(list: readonly T[], name: string): number | undefined {
         const { nameOf } = this.spec
@@ -760,11 +700,8 @@ export class ListFile<T> {
     }
 
     /**
-     * Removes ONE entry by name, at once: the file is read again under the lock and only
-     * that entry is dropped.
-     *
-     * @returns whether there was such an entry (nothing is written when there was not).
-     * @throws like [[ListFile.update]].
+     * Removes ONE entry by name: the file is re-read under the lock and only that entry
+     * dropped. Returns whether it existed. Throws like [[ListFile.update]].
      */
     remove(dir: string, name: string, options: { guarded?: boolean } = {}): boolean {
         return this.update(
@@ -778,12 +715,9 @@ export class ListFile<T> {
     }
 
     /**
-     * Starts the list over after the file was found unusable: the file is renamed to
-     * `<name>.corrupt` (replacing an older one), so nothing is lost and a new one can be
-     * written.
-     *
-     * @returns the path of the kept file, or `undefined` if there was no file.
-     * @throws if it cannot be renamed.
+     * Starts over after the file was found unusable: renames it to `<name>.corrupt`
+     * (replacing an older one) so nothing is lost. Returns that path, or `undefined` if
+     * there was no file. Throws if it cannot be renamed.
      */
     reset(dir: string): string | undefined {
         return quarantine(this.file(dir))

@@ -250,7 +250,7 @@ export const plainKey = (letter: string): KeyInput => new KeyInput(letter)
 export const shiftKey = (letter: string): KeyInput =>
     new KeyInput(letter, false, "", true)
 
-/** A key only the capital letter matches; a legend shows the capital (`N`). */
+/** A key only the capital letter matches; a legend shows the capital (`P`). */
 class CapitalKey extends KeyInput {
     override get label(): string {
         return this.key_.toUpperCase()
@@ -258,8 +258,8 @@ class CapitalKey extends KeyInput {
 }
 
 /**
- * A capital-letter hotkey: only the capital matches it, and the legend shows `N`, not
- * `shift+n` (shorter, so a legend with many keys keeps its width).
+ * A capital-letter hotkey: only the capital matches it, and the legend shows `P`, not
+ * `shift+p` (shorter, so a legend with many keys keeps its width).
  *
  * @param letter - the letter, lower case.
  * @returns the key.
@@ -340,9 +340,8 @@ export const keys = {
     /** Add a nucleotide (DNA or RNA) from a sequence file; also the custom landing. */
     addNucleotide: ctrlKey("e"),
 
-    /** Rename the highlighted note (the notes list; on the buffer's solutes table the
-     * same key adds a nucleotide: a different screen). */
-    notes:         ctrlKey("e"),
+    /** Rename the highlighted note (the notes list). */
+    renameNote:    shiftKey("m"),
 
     /** Open the notes list of the project (project menu), of the highlighted recipe
      * (recipes table), of the buffer or of one recipe (their solutes table). */
@@ -363,44 +362,43 @@ export const keys = {
     editTemplate:  shiftKey("e"),
 
     /** The third answer of a question that has one besides Enter and Esc (`save as a
-     * template?`: the plain recipe). */
-    otherAnswer:   plainKey("n"),
+     * template?`: the plain recipe, `w` as in "without"). */
+    otherAnswer:   plainKey("w"),
 
     /** Edit the pH of a buffer (and its σ) on the solutes table. */
     editPh:        ctrlKey("g"),
 
     /** Change the family the colour picker narrows to (all, red, orange, ...). */
-    family:        ctrlKey("g"),
+    family:        ctrlKey("a"),
 
     /** Turn the unit of the concentrations of the buffer table (mM, M, µM). */
     units:         ctrlKey("k"),
 
     /** Add a reference curve (the references list of the data screen). */
-    addReference:  ctrlKey("n"),
+    addReference:  shiftKey("a"),
 
     /** Open the settings of the highlighted model (the models list). */
     modelSettings: ctrlKey("o"),
 
     /** Open the reference fit of the highlighted model (the models list). */
-    modelReference: ctrlKey("f"),
+    modelReference: shiftKey("f"),
 
     /** Pick files with the desktop file picker (an empty field). */
-    pickFiles: plainKey("o"),
+    pickFiles: plainKey("e"),
 
     /** Open the list of models (an empty field). */
-    openList:  plainKey("m"),
+    openList:  plainKey("i"),
 
     /** Reset an unusable file (a landing page). */
-    reset:     plainKey("r"),
+    reset:     plainKey("x"),
 
     // The file viewer (`screens/viewer.tsx`).
 
     /** The pager's page down (with Enter and PgDn). */
     space:      new KeyInput(" "),
 
-    /** Show the plots of a run instead of the sheets, and back (the same key on the
-     * polymer form is a different screen). */
-    plots:      ctrlKey("p"),
+    /** Show the plots of a run instead of the sheets, and back. */
+    plots:      capitalKey("p"),
 
     /** The previous and the next sheet (tab). */
     shiftTab:   shiftKey("tab"),
@@ -413,13 +411,13 @@ export const keys = {
     /** Search (`/`), the next and previous match, jump to a cell, copy, formulas. In a
      * table of named rows `/` finds a row and `s` puts the rows in alphabetical order. */
     find:       plainKey("/"),
-    sort:       plainKey("s"),
-    nextMatch:  plainKey("n"),
-    prevMatch:  capitalKey("n"),
-    jump:       plainKey("g"),
+    sort:       plainKey("z"),
+    nextMatch:  plainKey("."),
+    prevMatch:  plainKey(","),
+    jump:       plainKey("j"),
     copy:       plainKey("c"),
     copyRow:    plainKey("r"),
-    copyColumn: plainKey("l"),
+    copyColumn: plainKey("v"),
     formulas:   plainKey("f"),
 
     /** Read the `run.LOG` of a run (`open runs`). */
@@ -427,7 +425,7 @@ export const keys = {
 
     /** Move (copy) the `.tex` plots of a run to the plot folder (`open runs`): a dropdown
      * asks for the whole run or one model. */
-    moveTex:         shiftKey("t"),
+    moveTex:         shiftKey("l"),
 
     /** Move (copy) the data of a run, the workbooks and the comparison table, to the data
      * folder: the same dropdown. */
@@ -441,7 +439,7 @@ export const keys = {
     // and `home`/`end`.
 
     /** A page up (the other page-up key is `pageUp`). */
-    pageBack:   plainKey("b"),
+    pageBack:   plainKey("k"),
 } as const
 
 /** The names of Ink's flags for the keys that type nothing, and the name given each. */

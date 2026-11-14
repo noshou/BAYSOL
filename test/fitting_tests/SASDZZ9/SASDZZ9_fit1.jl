@@ -15,16 +15,16 @@ const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDZZ9_fit1.fit")
 # `experimental_data/` and `pddf/` are both empty for this fixture.
 raw = readdlm(_FIT_PATH; skipstart = 1)
 
-qvals_all = Float64.(raw[:, 1])
-I_all = Float64.(raw[:, 2])
+qvalsAll = Float64.(raw[:, 1])
+iAll = Float64.(raw[:, 2])
 σ_all = Float64.(raw[:, 3])
-I_crysol_all = Float64.(raw[:, 4])
+iCrysolAll = Float64.(raw[:, 4])
 
 # Units: the file's header line ("RGT:23.93", i.e. Rg = 23.93 Å) is
 # consistent with Dmax ≈ 3-4×Rg landing right on the coordinate-derived Dmax
 # computed below (≈70.6 Å, 23.93*3 ≈ 71.8) only if q is already in Å⁻¹.
-qvals = qvals_all
-I_exp = I_all
+qvals = qvalsAll
+iExp = iAll
 σ_exp = σ_all
 
 # ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ const NODB_MOLARITY   = NODB_CONC_MG_ML / NODB_MW   # ≈ 9.02e-5 M
 const NODB_MOLARITY_σ = MOLARITY_REL_SIGMA * NODB_MOLARITY
 
 # Buffer components. "sodium chloride" / "tris" both present verbatim in
-# src/BulkElectronDensity/NonBiological/nonbio_lookup.json. Counter-ions (added
+# src/bulk-electron-density/non-biological/nonbio_lookup.json. Counter-ions (added
 # 2026-10-01). Setting the pH adds titrant counter-ions that the deposited recipe does
 # not list. Assumed: 20 mM Tris titrated with HCl -> Cl⁻ = C·0.854 (pK(22 °C) =
 # 8.156). The pH is taken as set at room temperature (22 ± 3 °C), which fixes the
@@ -96,67 +96,66 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# Q_MAX_FIT is set to just above the file's q_max (0.387528). The spherical-harmonic
-# band limit lMax is not set here: `seed_model` takes it from the diameter of the
-# scatterer cloud and the largest fitted q (ceil(q_max * D)), and bins the curve to
-# the Shannon channels that diameter allows (see `rebin` there).
-const Q_MAX_FIT = 0.39
+# No q cut: the whole curve is fitted (the file's q ends at 0.387528 Å⁻¹). The
+# spherical-harmonic band limit lMax is not set here: `seedModel` takes it from the
+# diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and bins
+# the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` (no q cut).
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 The `σ_exp > 0` filter also drops this file's own leading q<0.0213
 placeholder rows (I_exp = σ_exp = 0, no experimental coverage there).
 """
-function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+function fitSubset()
+    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdzz9_fit1` samples. It is separate only because
+# Builds the Seed that `runSasdzz9Fit1` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running the
 # fit; if you are reading this script as an example you can skip it:
-# `run_sasdzz9_fit1` below is the whole story (build the seed, then sample it).
-function seed_sasdzz9_fit1(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdzz9Fit1` below is the whole story (build the seed, then sample it).
+function seedSasdzz9Fit1(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdzz9_fit1(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdzz9Fit1(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdzz9_fit1(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdzz9Fit1(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdzz9_fit1()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdzz9Fit1()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
-reference = BAYSOL.Reference("CRYSOL fit1", qvals_all, I_crysol_all; q_max = Q_MAX_FIT)
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
+reference = BAYSOL.Reference("CRYSOL fit1", qvalsAll, iCrysolAll)
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res_fit1", references = reference,
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "CRYSOL ≈ 34.5",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "CRYSOL ≈ 34.5",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDZZ9/ folder), not the caller's cwd.
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

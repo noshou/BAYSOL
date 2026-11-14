@@ -26,8 +26,21 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDV62_fit2_model1.pdb")
 # Publication (SASBDB): Baranova I, Angelova A, Stransky J, Andreasson J, Angelov B,
 # "Hemoglobin-PEG Interactions Probed by Small-Angle X-ray Scattering: Insights for
 # Crystallization and Diagnostics Applications", J Phys Chem B, 2024 Sep 9,
-# DOI 10.1021/acs.jpcb.4c03003. Entry: https://www.sasbdb.org/data/SASDVD2/. The conditions
-# below are the SASBDB entry metadata; the paper was NOT consulted for them.
+# DOI 10.1021/acs.jpcb.4c03003. Entry: https://www.sasbdb.org/data/SASDVD2/.
+#
+# Conditions not named in the paper are the SASBDB metadata. PAPER CONSULTED
+# (2026-11-13, full text via Europe PMC, PMC11440596): Methods: lyophilized human Hb
+# (Sigma-Aldrich) in 100 mM sodium phosphate made by mixing Na2HPO4 and NaH2PO4 "in a
+# specified ratio" (the ratio is not given), pH set to 7.0 with 4 M HCl / 1 M NaOH; PEG
+# 600, 2000 and 4000 (Sigma-Aldrich) dissolved in the same buffer at pH 7.0; SAXS
+# samples 5 mg/mL Hb with PEG at 5, 10 and 20 % (w/v); laboratory SAXSpoint 2.0, 1.34 A,
+# 293 K (about 20 C), 1 mm capillary, 30 frames, buffer (with the same PEG) subtracted
+# in PRIMUS. About 86 % of the Hb is oxidized (metHb, UV-vis), which fits the 3ODQ
+# methemoglobin model. Paper Table 1 row of this entry: "Hb with 5% (w/v) PEG4000", I(0)
+# Guinier 0.0970, Rg Guinier 2.39 nm, Rg P(r) 2.318 nm, Dmax 6.12 nm: this matches the
+# SASBDB values quoted above, so the entry is the "5 % (w/v) PEG 4000" sample of the
+# paper. The paper fits CRYSOL to 3odq only for the SEC-SAXS control (SASDV62), not for
+# the PEG samples.
 #
 # Instrument (SASBDB): Anton Paar SAXSpoint 2.0, in-house X-ray source, Eiger R 1M
 # detector, Institute of Biotechnology CAS / Centre of Molecular Structure, Vestec;
@@ -42,13 +55,13 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDV62_fit2_model1.pdb")
 # Curve: the SASBDB .dat is in nm⁻¹ (angular_unit "1/nm"; 681 points, q 0.0829 to 3.997
 # nm⁻¹, intensity in 1/cm), converted to Å⁻¹ (÷10): q 0.00829 to 0.3997 Å⁻¹. The file has
 # three text lines (sample, buffer name, parents), the three columns q, I, σ, and a
-# trailer of datop lines; `_read_curve` keeps only the numeric rows. The curve is the
+# trailer of datop lines; `_readCurve` keeps only the numeric rows. The curve is the
 # difference of the protein-in-PEG-buffer and the matched PEG-buffer measurements (the
 # datop line is "... SUB ..." and the parents are the Hb and the buffer runs of the
 # same PEG concentration), so the buffer subtraction used the SAME PEG buffer. 206 of the
 # 681 points have I ≤ 0 (124 of them at q < 0.3 Å⁻¹).
 # The data are noisy beyond q ≈ 0.2 Å⁻¹ (the signal falls to the size of σ); the fit is
-# cut at `Q_MAX_FIT`, and `seed_model` drops non-positive bins.
+# cut at `Q_MAX_FIT`, and `seedModel` drops non-positive bins.
 #
 # Model, NO depositor atomic fit (this is the point of the script): SASDVD2 carries
 # no CRYSOL/FoXS fit and no PDB link. The scripts therefore use the
@@ -59,7 +72,7 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDV62_fit2_model1.pdb")
 # formation", 3.1 Å, the alpha2beta2 tetramer: chains A and C alpha (141 residues
 # each), B and D beta (146 each), 4384 protein atoms in total, NO hydrogens, NO waters
 # (the file has none), and 4 heme groups (HEM, HETATM records, 43 atoms each, 172 in total,
-# residue 142 in alpha and 147 in beta). `seed_model` keeps the heavy atoms of the
+# residue 142 in alpha and 147 in beta). `seedModel` keeps the heavy atoms of the
 # standard amino acids and the ligands of a known composition (waters are dropped;
 # `KEEP_LIGANDS`, owner decision 2026-11-11), so the four hemes (and their Fe) ARE
 # scattered, without hydrogens: protein and hemes together are about 64.4 kDa (SASBDB's
@@ -71,11 +84,11 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDV62_fit2_model1.pdb")
 # is left out, as in SASDN32 and SASDJ62), and the depositor's chi² in the log is "—".
 # ---------------------------------------------------------------------------
 
-qvals, I_exp, σ_exp = _read_curve(_DATA_PATH)
+qvals, iExp, σ_exp = _readCurve(_DATA_PATH)
 
 # qvals are in nm⁻¹; must convert to Å⁻¹.
 qvals = qvals ./ NM_INV_PER_ANGSTROM_INV
-check_q_angstrom(qvals)
+checkQAngstrom(qvals)
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -134,65 +147,67 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
+# q cut, kept (flat noise floor; rule in README.md): 0.3 Å⁻¹. The data run to 0.400 Å⁻¹,
+# but the 174 points above 0.3 Å⁻¹ (σ > 0) have a median I/σ of 0.11 and 47 % of them have
+# I ≤ 0; the lowest-q quarter of them (up to 0.32 Å⁻¹) has a median I/σ of 0.06.
 const Q_MAX_FIT = 0.3
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 # The model has no hydrogens: pdb2pqr/PROPKA place them at PH.
 const ADD_HYDROGENS = true
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvals`/`iExp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
+function fitSubset()
     keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdvd2` samples. It is separate only because
+# Builds the Seed that `runSasdvd2` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
-# `run_sasdvd2` below is the whole story (build the seed, then sample it).
-function seed_sasdvd2(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdvd2` below is the whole story (build the seed, then sample it).
+function seedSasdvd2(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdvd2(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdvd2(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdvd2(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdvd2(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdvd2()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdvd2()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 # run's section of the folder's run log; there is no depositor fit, so no reference.
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res",
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "—",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDVD2/ folder), not the caller's cwd.
 
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

@@ -200,7 +200,7 @@ test("the comparison and the overrides of a run, and its plot sizes", () => {
         models: [
             {
                 name: "one", status: "done", files: ["one.xlsx"],
-                plot_sizes: sizes, overrides: ["Q_MAX", 7],
+                plotSizes: sizes, overrides: ["Q_MAX", 7],
             },
             { name: "two", status: "done" },
         ],
@@ -209,7 +209,7 @@ test("the comparison and the overrides of a run, and its plot sizes", () => {
             files: ["compare.tsv", "compare-plots.txt"],
             models: ["one", "two"],
             references: [],
-            plot_sizes: [{ file: "compare-plots_76x5.txt", width: 76, rows: 9 }],
+            plotSizes: [{ file: "compare-plots_76x5.txt", width: 76, rows: 9 }],
         },
     }, ["one.xlsx", "compare.tsv"])
     makeOpenRun(p, runOn("2026-11-02"), {
@@ -512,8 +512,8 @@ test("pretty JSON for the pager, any other text as it is", () => {
 
 test("the conditions are the first rows of each name of the LOG", () => {
     const log =
-        "datetime\tnow\ntemperature_c       \t22.5\nph\t7.4\nsigma_ph\t0.1\n" +
-        "energy_ev\t12000\n" +
+        "datetime\tnow\ntemperatureC       \t22.5\nph\t7.4\nsigmaPh\t0.1\n" +
+        "energyEv\t12000\n" +
         "\n--- output ---\nph\t99\n"
     assert.equal(
         conditionsText(log),
@@ -535,15 +535,15 @@ test("restore settings: the run's values are set, a saved one it lacks is reset"
 
 test("restore buffer: one write of solutes, pH and σ; a concurrent save stays", () => {
     const dir = project()
-    writeSolutes(dir, [rows[0] as BufferRow], { pH: 6, "sigma-pH": 0.2 })
-    const text = writeJson({ solutes: rows, pH: 7.4, "sigma-pH": 0.1 })
-    assert.deepEqual(bufferFacts(text).conditions, { pH: 7.4, "sigma-pH": 0.1 })
+    writeSolutes(dir, [rows[0] as BufferRow], { pH: 6, "sigmaPh": 0.2 })
+    const text = writeJson({ solutes: rows, pH: 7.4, "sigmaPh": 0.1 })
+    assert.deepEqual(bufferFacts(text).conditions, { pH: 7.4, "sigmaPh": 0.1 })
     restoreBuffer(dir, text)
     assert.equal(readSolutes(dir).length, rows.length)
-    assert.deepEqual(readConditions(dir), { pH: 7.4, "sigma-pH": 0.1 })
+    assert.deepEqual(readConditions(dir), { pH: 7.4, "sigmaPh": 0.1 })
     // the question reads the file, another copy saves, the restore refuses
     watchBuffer(dir)
-    const other = writeJson({ solutes: [rows[1]], pH: 5, "sigma-pH": 0.3 })
+    const other = writeJson({ solutes: [rows[1]], pH: 5, "sigmaPh": 0.3 })
     writeFileSync(join(dir, "buffer.json"), other)
     assert.throws(() => restoreBuffer(dir, text), ChangedOnDiskError)
     assert.match(restoreErrorNote(new ChangedOnDiskError("x")), /changed on disk/)
@@ -555,7 +555,7 @@ test("restore buffer: one write of solutes, pH and σ; a concurrent save stays",
 
 test("restore units: only data.json changes, and there must be data", () => {
     const dir = project()
-    const unitsOf = { units: "A-1", energy: 8000, energy_unit: "eV" }
+    const unitsOf = { units: "A-1", energy: 8000, energyUnit: "eV" }
     const info = writeJson({ ...unitsOf, mapping: MAPPING })
     assert.throws(() => restoreUnits(dir, info), /no data yet/)
     const curve = { q: [1, 2, 3, 4], i: [4, 3, 2, 1], sigma: [1, 1, 1, 1], dropped: 0 }
@@ -567,7 +567,7 @@ test("restore units: only data.json changes, and there must be data", () => {
     assert.ok(status?.kind === "ok" && status.info.energy === 8000)
     assert.ok(status?.kind === "ok" && status.info.mapping === undefined, "no mapping")
     assert.equal(readFileSync(join(dir, "data.tsv"), "utf-8"), table)
-    const bad = writeJson({ units: "x", energy_unit: "eV" })
+    const bad = writeJson({ units: "x", energyUnit: "eV" })
     assert.throws(() => restoreUnits(dir, bad), RestoreError)
 })
 
@@ -575,10 +575,10 @@ test("restore units brings the energy back with its unit label (required)", () =
     const dir = project()
     const curve = { q: [1, 2, 3, 4], i: [4, 3, 2, 1], sigma: [1, 1, 1, 1], dropped: 0 }
     writeData(dir, curve, "s", "nm-1", 5000)
-    restoreUnits(dir, writeJson({ units: "A-1", energy: 12, energy_unit: "keV" }))
+    restoreUnits(dir, writeJson({ units: "A-1", energy: 12, energyUnit: "keV" }))
     let status = readDataInfo(dir)
     assert.ok(status?.kind === "ok" && status.info.energy === 12)
-    assert.ok(status?.kind === "ok" && status.info.energy_unit === "keV")
+    assert.ok(status?.kind === "ok" && status.info.energyUnit === "keV")
     // a snapshot without the label is not usable
     assert.throws(
         () => restoreUnits(dir, writeJson({ units: "A-1", energy: 8000 })),
@@ -587,7 +587,7 @@ test("restore units brings the energy back with its unit label (required)", () =
     status = readDataInfo(dir)
     assert.ok(status?.kind === "ok" && status.info.energy === 12)
     assert.throws(
-        () => restoreUnits(dir, writeJson({ units: "A-1", energy: 8, energy_unit: "x" })),
+        () => restoreUnits(dir, writeJson({ units: "A-1", energy: 8, energyUnit: "x" })),
         RestoreError,
     )
 })
@@ -597,8 +597,8 @@ test("every restore refuses a live run and writes nothing", () => {
     const dir = join(root, "projects", "p")
     mkdirSync(join(dir, "runs"), { recursive: true })
     makeRun(dir, runOn("2026-11-01"), liveJson)
-    const text = writeJson({ solutes: rows, pH: 7.4, "sigma-pH": 0.1 })
-    const info = writeJson({ units: "nm-1", energy: 12000, energy_unit: "eV" })
+    const text = writeJson({ solutes: rows, pH: 7.4, "sigmaPh": 0.1 })
+    const info = writeJson({ units: "nm-1", energy: 12000, energyUnit: "eV" })
     const calls: [string, () => void][] = [
         ["settings", () => restoreSettings(dir, root, "{}")],
         ["buffer", () => restoreBuffer(dir, text)],
@@ -613,12 +613,12 @@ test("every restore refuses a live run and writes nothing", () => {
 
 test("a restore reads the plain files of a run and never writes into the run", () => {
     const dir = project()
-    const text = writeJson({ solutes: rows, pH: 7.4, "sigma-pH": 0.1 })
+    const text = writeJson({ solutes: rows, pH: 7.4, "sigmaPh": 0.1 })
     const files = {
         "buffer.json": text,
         "data.tsv": DATA,
         "data.json": writeJson({
-            units: "A-1", energy: 9000, energy_unit: "eV", source: "c.dat", points: 4,
+            units: "A-1", energy: 9000, energyUnit: "eV", source: "c.dat", points: 4,
         }),
     }
     const run = makeRun(dir, runOn("2026-11-01"), { status: "done" }, files)

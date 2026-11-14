@@ -2,8 +2,8 @@
 #
 # Conda environment for BAYSOL, managed by CondaPkg.jl. This exists solely to
 # auto-provision an isolated Python + `propka`/`pdb2pqr` install for
-# `src/MolecularStructure/Propka.jl` (per-residue pKa prediction via the
-# `propka3` CLI) and `src/MolecularStructure/Pdb2pqr.jl` (hydrogen addition
+# `src/molecular-structure/Propka.jl` (per-residue pKa prediction via the
+# `propka3` CLI) and `src/molecular-structure/Pdb2pqr.jl` (hydrogen addition
 # via the `pdb2pqr` CLI) without requiring users to have Python installed
 # themselves; CondaPkg vendors its own micromamba/pixi backend.
 
@@ -18,9 +18,9 @@
 python = ">=3.8,<3.13"
 
 [pip.deps]
-propka = ""
+propka = "==3.5.1"
 # pdb2pqr adds hydrogens (its own internal propka pass decides protonation
 # state); it depends on propka itself, so rides the same <3.13 cap above for
 # the same reason (propka 3.5.1's `Parameters.__annotations__` crash on
 # CPython 3.14, confirmed empirically against pdb2pqr 3.7.1 too).
-pdb2pqr = ""
+pdb2pqr = "==3.7.1"

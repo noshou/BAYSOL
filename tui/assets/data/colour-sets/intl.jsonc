@@ -1,0 +1,22 @@
+{
+    "set": "intl",
+    "title": "International bodies: UN, EU, WHO, UNESCO, NATO, UNHCR, UNDP, ASEAN brand pages",
+    "licence": "brand-use terms not checked; colour values are facts",
+    "url": "see each entry",
+    "colours": [
+        {"name": "un blue", "hex": "#009edb", "url": "https://www.un.org/styleguide/pdf/UN_brand_identity_quick_guide_2020.pdf", "family": "blue"},
+        {"name": "who blue", "hex": "#009fe3", "url": "https://healthcluster.who.int/docs/librariesprovider16/meeting-reports/visual-identity-guidelines.pdf", "family": "blue"},
+        {"name": "unesco blue", "hex": "#0069b4", "url": "https://www.unesco.org/sites/default/files/medias/fichiers/2024/02/UNESCO_WCCAE_Graphic_Charter_ENG.pdf", "family": "blue"},
+        {"name": "unesco red", "hex": "#e83f40", "url": "https://files.nettsteder.regjeringen.no/wpuploads01/sites/552/2023/12/UNESCO-logo-toolkti.pdf", "family": "red"},
+        {"name": "unesco yellow", "hex": "#fcc002", "url": "https://files.nettsteder.regjeringen.no/wpuploads01/sites/552/2023/12/UNESCO-logo-toolkti.pdf", "family": "yellow"},
+        {"name": "unesco light green", "hex": "#67bb89", "url": "https://files.nettsteder.regjeringen.no/wpuploads01/sites/552/2023/12/UNESCO-logo-toolkti.pdf", "family": "green"},
+        {"name": "unesco dark blue", "hex": "#183254", "url": "https://files.nettsteder.regjeringen.no/wpuploads01/sites/552/2023/12/UNESCO-logo-toolkti.pdf", "family": "blue"},
+        {"name": "nato blue", "hex": "#004990", "url": "https://www.nato.int/vigs/pdf/NATO-VIGs-2016-en.pdf", "family": "blue"},
+        {"name": "nato light blue", "hex": "#118acb", "url": "https://www.act.nato.int/wp-content/uploads/2023/06/NATO-VIGs-2016-en.pdf", "family": "blue"},
+        {"name": "unhcr blue", "hex": "#0072bc", "url": "https://dataviz.unhcr.org/guidance/", "family": "blue"},
+        {"name": "undp blue", "hex": "#0468b1", "verified": false, "url": "https://www.undp.org/sites/g/files/zskgke326/files/2021-08/UNDP%20Brand%20Manual%20rev.2020.pdf", "family": "blue"},
+        {"name": "asean blue", "hex": "#2c59a7", "url": "https://asean.org/wp-content/uploads/2026/07/ASEAN59_BrandingGuideline.pdf", "family": "blue"},
+        {"name": "asean yellow", "hex": "#fbf315", "url": "https://asean.org/wp-content/uploads/2026/07/ASEAN59_BrandingGuideline.pdf", "family": "yellow"},
+        {"name": "asean red", "hex": "#c73935", "url": "https://asean.org/wp-content/uploads/2026/07/ASEAN59_BrandingGuideline.pdf", "family": "red"}
+    ]
+}

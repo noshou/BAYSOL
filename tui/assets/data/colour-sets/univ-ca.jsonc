@@ -1,0 +1,40 @@
+// University brand colours
+
+{
+    "set": "univ-ca",
+    "title": "Canadian university brand pages",
+    "licence": "brand-use terms not checked; colour values are facts",
+    "url": "see each entry",
+    "colours": [
+        {"name": "queen's blue", "hex": "#002452", "url": "https://www.queensu.ca/brand-central/visual-identity/colours", "family": "blue"},
+        {"name": "queen's gold", "hex": "#fabd0f", "url": "https://www.queensu.ca/brand-central/visual-identity/colours", "family": "yellow"},
+        {"name": "queen's red", "hex": "#b90e31", "url": "https://www.queensu.ca/brand-central/visual-identity/colours", "family": "red"},
+        {"name": "waterloo gold", "hex": "#fed34c", "url": "https://uwaterloo.ca/brand/how-express-our-brand/colour", "family": "yellow"},
+        {"name": "dalhousie beak gold", "hex": "#ffd400", "url": "https://www.dal.ca/about/our-story/dal-brand.html", "family": "yellow"},
+        {"name": "dalhousie wingtip black", "hex": "#242424", "url": "https://www.dal.ca/about/our-story/dal-brand.html", "family": "black"},
+        {"name": "calgary gold", "hex": "#ffcd00", "url": "https://www.ucalgary.ca/brand/standards-and-guidelines/colours", "family": "yellow"},
+        {"name": "calgary red", "hex": "#d6001c", "url": "https://www.ucalgary.ca/brand/standards-and-guidelines/colours", "family": "red"},
+        {"name": "sfu red", "hex": "#cc0633", "url": "https://www.sfu.ca/communicators-toolkit/guides/brand-guide/colours.html", "family": "red"},
+        {"name": "sfu dark red", "hex": "#a6192e", "url": "https://www.sfu.ca/communicators-toolkit/guides/brand-guide/colours.html", "family": "red"},
+        {"name": "mcmaster maroon", "hex": "#7a003c", "url": "https://brand.mcmaster.ca/guidelines_introduction/visual-identity-guidelines/colour-palette/", "family": "red"},
+        {"name": "mcmaster grey", "hex": "#495965", "url": "https://brand.mcmaster.ca/guidelines_introduction/visual-identity-guidelines/colour-palette/", "family": "gray"},
+        {"name": "mcmaster gold", "hex": "#fdbf57", "url": "https://brand.mcmaster.ca/guidelines_introduction/visual-identity-guidelines/colour-palette/", "family": "yellow"},
+        {"name": "mcgill red", "hex": "#ed1b2f", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "red"},
+        {"name": "mcgill dark red", "hex": "#9e0918", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "red"},
+        {"name": "mcgill pale gray", "hex": "#f4f4f4", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "gray"},
+        {"name": "mcgill medium gray", "hex": "#d4d4d4", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "gray"},
+        {"name": "mcgill cool grey", "hex": "#5d6770", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "gray"},
+        {"name": "mcgill bright orange", "hex": "#f7941d", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "orange"},
+        {"name": "mcgill bright yellow", "hex": "#ffd400", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "yellow"},
+        {"name": "mcgill bright turquoise", "hex": "#27bdbe", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "cyan"},
+        {"name": "mcgill dark blue", "hex": "#024f6d", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "blue"},
+        {"name": "mcgill bright green", "hex": "#b2d235", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "green"},
+        {"name": "mcgill bright purple", "hex": "#c768a9", "url": "https://mcgill.ca/visual-identity/visual-identity-guide", "family": "purple"},
+        {"name": "u of t blue", "hex": "#1e3765", "url": "https://brand.utoronto.ca/r/e2NqGDQurQmhdtIHTMuXkqu9OMx9x21G081_KHO_uvo", "family": "blue"},
+        {"name": "u of t boundless blue", "hex": "#007fa3", "url": "https://adcomms.utoronto.ca/images/brand/assets/DefyGravity_BrandGuidelines-1.0.pdf", "family": "blue"},
+        {"name": "ubc blue", "hex": "#002145", "url": "https://assets.brand.ubc.ca/downloads/ubc_colour_guide.pdf", "family": "blue"},
+        {"name": "ubc secondary blue", "hex": "#0055b7", "url": "https://assets.brand.ubc.ca/downloads/ubc_colour_guide.pdf", "family": "blue"},
+        {"name": "western purple", "hex": "#4f2683", "url": "https://www.communications.uwo.ca/western_brand/vis_toolkit/colours.html", "family": "purple"},
+        {"name": "uottawa garnet", "hex": "#8f001a", "verified": false, "url": "https://www.uottawa.ca/about-us/administration-services/brand", "family": "red"}
+    ]
+}

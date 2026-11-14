@@ -82,8 +82,8 @@ type ModelsMode = "prompt" | "list" | "picking"
 /**
  * The models of a project: a prompt for the full absolute path of a `.cif` or `.pdb`
  * file, which is COPIED into the project's `models/` folder (the original is never
- * touched) and the prompt stays for the next one. With nothing typed `o` opens the
- * desktop's file picker and `m` the list of the models, where `^r` asks and then
+ * touched) and the prompt stays for the next one. With nothing typed `e` opens the
+ * desktop's file picker and `i` the list of the models, where `^r` asks and then
  * deletes the highlighted one at once; `^r` on the empty field opens the list with that
  * question already asked about the first model.
  *
@@ -97,7 +97,7 @@ export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
     const columns = useBodyColumns()
     const [mode, setMode] = useState<ModelsMode>("prompt")
     const [note, setNote] = useState<string | undefined>()
-    // the prompt is remounted to empty its field: the keys `o` and `m` are typed into it
+    // the prompt is remounted to empty its field: the keys `e` and `i` are typed into it
     // by the time the screen has seen them, and a copied path is cleared
     const clearNote = useCallback(() => setNote(undefined), [])
     const field = usePathField(clearNote)
@@ -156,7 +156,7 @@ export function ModelsScreen({ project }: { project: ProjectRef }): ReactNode {
             nav.push(<SettingsMenu scope={modelScope(project, modelStem(name))} />),
         [nav, project],
     )
-    /** `^f`: the reference fit of the highlighted model. */
+    /** `shift+f`: the reference fit of the highlighted model. */
     const openReference = useCallback(
         (name: string) =>
             nav.push(

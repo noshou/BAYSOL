@@ -203,7 +203,7 @@ export function zoneLabelWithSource(
 
 /**
  * The label of a zone for a run folder name (the chain of [[zoneLabelWithSource]]).
- * Julia's `_zone_label` has no tzdb: it keeps the platform's letters or the zone name.
+ * Julia's `_zoneLabel` has no tzdb: it keeps the platform's letters or the zone name.
  *
  * @param iana - the IANA zone name.
  * @param ms - the instant, Unix ms.
@@ -221,7 +221,7 @@ function localZoneLabel(ms: number, offsetMinutes: number): string {
 }
 
 /**
- * The name of a run folder, the ONE definition of it (Julia's is `_run_stamp` in
+ * The name of a run folder, the ONE definition of it (Julia's is `_runStamp` in
  * `run-project.jl` next to this file; both give the same text for the same instant,
  * offset and label): the local wall-clock time, the zone label, the offset from UTC and
  * the local date, `23-35-29-123_EST_-0500_2026-11-07`. Only digits, letters, hyphens and

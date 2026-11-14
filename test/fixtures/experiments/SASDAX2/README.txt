@@ -15,3 +15,6 @@ lines pasted into its REMARK block ("Content-type: text/plain...", "Content-disp
 inline...", "Content-transfer-encoding: 7bit" plus a blank line, after "REMARK 265"), which
 pdb2pqr rejects ("No biomolecule heavy atoms found"). Those lines were removed (line 65 is
 now a bare "REMARK 265"); no coordinate was changed.
+
+q cut (round 9, 2026-11-13): the script fits q <= 0.3 A^-1 and leaves out the noise tail: S/N about 1-2 from 0.2; above the cut 24 of 145 points non-positive, mean I/sigma 0.9.
+Every other entry without such a tail is fitted over its whole curve.

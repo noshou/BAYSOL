@@ -23,7 +23,7 @@ include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 #               paper (Rahman, Dalwani & Venkatesan 2025, Biochem Biophys Res
 #               Commun 769:151960) because no PDF is bundled here. Treat as
 #               provisional, SASBDB-page-sourced metadata, not paper-verified.
-#   [DEFAULT]   this package's own default (a constant in the Params.jl of the owning
+#   [DEFAULT]   this package's own default (a constant in the params.jl of the owning
 #               module), used because nothing case-specific was available.
 #   [PLACEHOLDER] a best-effort, UNVERIFIED guess with no direct source at
 #               all -- flagged loudly inline.
@@ -36,13 +36,13 @@ const _PDB_PATH = joinpath(_FIXTURE_DIR, "SASDX52_fit1_model1.pdb")
 const _FIT_PATH = joinpath(_FIXTURE_DIR, "SASDX52_fit1.fit")
 
 # No experimental_data/*.dat bundled: SASDX52_fit1.fit is the only source of
-# q/I/σ. 3 '#' header lines, 4 columns: q, exp_intensity, error, model_intensity.
+# q/I/σ. 3 '#' header lines, 4 columns: q, exp_intensity, error, modelIntensity.
 # q is already in Å⁻¹ (SASBDB .fit outputs are Å⁻¹, unlike some raw .dat
 # files which come in nm⁻¹ and need /10 -- no such conversion here).
 raw = readdlm(_FIT_PATH; skipstart = 3)
 
 qvals = Float64.(raw[:, 1])
-I_exp = Float64.(raw[:, 2])
+iExp = Float64.(raw[:, 2])
 σ_exp = Float64.(raw[:, 3])
 
 # ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ const FADD5_MOLARITY   = FADD5_CONC_MG_ML / FADD5_MW # ≈ 6.68e-5 M
 const FADD5_MOLARITY_σ = MOLARITY_REL_SIGMA * FADD5_MOLARITY   # σ not stated by SASBDB
 
 # Buffer components. All four species below were cross-checked against
-# src/BulkElectronDensity/NonBiological/nonbio_lookup.json and found
+# src/bulk-electron-density/non-biological/nonbio_lookup.json and found
 # present (no MISSING FROM PMV LOOKUP entries for this case):
 #   "sodium chloride"    -> "sodium chloride"
 #   "magnesium chloride" -> "magnesium dichloride"
@@ -143,77 +143,72 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# Full q-range of the only data source (SASDX52_fit1.fit): q_max ≈ 0.16996.
-# No additional high-q truncation is needed (the bundled .fit file is
-# already restricted to the fitted range), but Q_MAX_FIT/fit_subset() are
-# kept for consistency with the rest of this test family and as a guard
-# against any I_exp ≤ 0 points.
-const Q_MAX_FIT = 0.17
+# No q cut: the whole q-range of the only data source (SASDX52_fit1.fit, q to ≈0.17 Å⁻¹)
+# is fitted; `fitSubset` only guards against σ ≤ 0 points.
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` (no q cut).
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+function fitSubset()
+    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdx52` samples. It is separate only because
+# Builds the Seed that `runSasdx52` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
-# `run_sasdx52` below is the whole story (build the seed, then sample it).
-function seed_sasdx52(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdx52` below is the whole story (build the seed, then sample it).
+function seedSasdx52(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdx52(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdx52(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdx52(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdx52(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdx52()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdx52()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
 ref = readdlm(_FIT_PATH; skipstart = 3)
 reference = BAYSOL.Reference(
     "SASBDB fit1",
     Float64.(ref[:, 1]),
     Float64.(ref[:, 4]);
-    q_max = Q_MAX_FIT,
 )
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res", references = reference,
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "0.70 (method unconfirmed)",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "0.70 (method unconfirmed)",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDX52/ folder), not the caller's cwd.
 
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

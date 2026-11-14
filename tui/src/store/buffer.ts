@@ -27,14 +27,14 @@ import { cleanRow, type TemplateLink } from "./template-link.js"
  * The buffer of a project: `buffer.json` in the project's folder, a JSON object whose
  * `solutes` is an array of the solutes of the buffer, one object each:
  *
- *     {"kind": "nonbiological", "name": "NaCl", "arg": "NaCl", "mM": 200, "sigma-mM": 10}
+ *     {"kind": "nonbiological", "name": "NaCl", "arg": "NaCl", "mM": 200, "sigmaMm": 10}
  *
  * `name` is what the user calls it, `arg` what BAYSOL is given (the solute's name for a
- * non-biological one), `mM` the concentration and `sigma-mM` its standard uncertainty,
+ * non-biological one), `mM` the concentration and `sigmaMm` its standard uncertainty,
  * both in millimolar as they were typed (BAYSOL takes molar; that is for the run). The
- * keys keep their file spelling (`"sigma-mM"`), so a row is what the file holds. Other
+ * keys keep their file spelling (`"sigmaMm"`), so a row is what the file holds. Other
  * keys of the file's map are kept as they are when the solutes are written. The file also
- * holds the conditions of the buffer, `"pH"` and `"sigma-pH"` (the standard uncertainty of
+ * holds the conditions of the buffer, `"pH"` and `"sigmaPh"` (the standard uncertainty of
  * the pH, shown as σ to the user), next to `solutes`; both or neither ([[Conditions]],
  * [[conditionsProblem]]), the optional `"temperature"` (°C; a run needs it, a new buffer
  * has none until `^g` sets it), and `"conc-unit"` (the unit the table shows,
@@ -45,7 +45,7 @@ import { cleanRow, type TemplateLink } from "./template-link.js"
  * [[MAX_ROWS]]) is unusable, and is never written over.
  *
  * The kinds of row are the ones of `test/fixtures/buffer/buffer.json`, the file the Julia
- * loader (`load_buffer`, `buffer.jl` next to this file) is tested against
+ * loader (`loadBuffer`, `buffer.jl` next to this file) is tested against
  * too. [[rowProblem]] checks the same keys and types as the loader, so a row the screen
  * writes is one the loader reads.
  */
@@ -75,7 +75,7 @@ export const kinds = [
  *
  * @property name - the label the user gave it (the loader does not check it).
  * @property mM - the concentration, above 0.
- * @property sigma-mM - its standard uncertainty, 0 or more; required.
+ * @property sigmaMm - its standard uncertainty, 0 or more; required.
  * @property template - the link to the buffer template that made the row, which makes
  *     it follow the pH ([[TemplateLink]]); optional, and never checked by [[rowProblem]]
  *     (an invalid one is dropped on reading, `cleanRow`).
@@ -83,7 +83,7 @@ export const kinds = [
 export type RowBase = {
     name: string
     mM: number
-    "sigma-mM": number
+    "sigmaMm": number
     template?: TemplateLink
 }
 
@@ -110,14 +110,14 @@ type SequenceRow = RowBase & {
  * @property custom - the entry's name.
  * @property z - its electrons.
  * @property pmv - its partial molar volume.
- * @property sigma-pmv - its uncertainty, `null` for the fallback.
+ * @property sigmaPmv - its uncertainty, `null` for the fallback.
  */
 export type CustomNonbioRow = RowBase & {
     kind: "custom-nonbio"
     custom: string
     z: number
     pmv: number
-    "sigma-pmv": number | null
+    "sigmaPmv": number | null
 }
 
 /**
@@ -141,18 +141,18 @@ type CustomUnit = {
  * A row of a custom polymer: a snapshot of the custom entry and the counts of the row.
  *
  * @property counts - the number of each unit, in order of `units`.
- * @property z-ends - the electrons of the end groups.
- * @property pmv-ends - their volume.
- * @property sigma-ends - its uncertainty, `null` for none.
+ * @property zEnds - the electrons of the end groups.
+ * @property pmvEnds - their volume.
+ * @property sigmaEnds - its uncertainty, `null` for none.
  */
 export type CustomPolymerRow = RowBase & {
     kind: "custom-polymer"
     custom: string
     units: CustomUnit[]
     counts: number[]
-    "z-ends": number
-    "pmv-ends": number
-    "sigma-ends": number | null
+    "zEnds": number
+    "pmvEnds": number
+    "sigmaEnds": number | null
 }
 
 /**
@@ -160,13 +160,13 @@ export type CustomPolymerRow = RowBase & {
  * keep their file spelling, like a row's.
  *
  * @property pH - the pH, within [[phLimits]].
- * @property sigma-pH - its standard uncertainty, 0 or more (the screens call it σ).
+ * @property sigmaPh - its standard uncertainty, 0 or more (the screens call it σ).
  * @property temperature - the temperature of the buffer, °C, within [[conditionLimits]];
  *     absent in a new buffer (the buffer cannot run until it is set).
  */
 export type Conditions = {
     pH: number
-    "sigma-pH": number
+    "sigmaPh": number
     temperature?: number
 }
 
@@ -233,7 +233,7 @@ function customProblem(row: Dict): string | undefined {
     if (row.kind === "custom-nonbio") {
         if (!isInt(row.z)) return "z must be an integer"
         if (!isNumber(row.pmv)) return "pmv must be a number"
-        if (!isOptNum(row, "sigma-pmv")) return "sigma-pmv must be a number or null"
+        if (!isOptNum(row, "sigmaPmv")) return "sigmaPmv must be a number or null"
         return undefined
     }
     const { units, counts } = row
@@ -245,23 +245,23 @@ function customProblem(row: Dict): string | undefined {
     }
     if (!Array.isArray(counts) || !counts.every(isNumber)) return "counts must be numbers"
     if (counts.length !== units.length) return "counts needs one per unit"
-    if (!isInt(row["z-ends"])) return "z-ends must be an integer"
-    if (!isNumber(row["pmv-ends"])) return "pmv-ends must be a number"
-    if (!isOptNum(row, "sigma-ends")) return "sigma-ends must be a number or null"
+    if (!isInt(row.zEnds)) return "zEnds must be an integer"
+    if (!isNumber(row.pmvEnds)) return "pmvEnds must be a number"
+    if (!isOptNum(row, "sigmaEnds")) return "sigmaEnds must be a number or null"
     return undefined
 }
 
 /**
  * What is wrong with a buffer row for the Julia loader: a map of a known `kind` with an
- * `mM` above 0 and a `sigma-mM` of 0 or more (numbers), and the keys its kind needs
+ * `mM` above 0 and a `sigmaMm` of 0 or more (numbers), and the keys its kind needs
  * (see the top of this file). The name of a row is only a label and is not checked.
  */
 export function rowProblem(row: unknown): string | undefined {
     if (!isDict(row)) return "a row is not a map"
     if (!(kinds as readonly unknown[]).includes(row.kind)) return "unknown kind"
     if (!(isNumber(row.mM) && Number(row.mM) > 0)) return "mM must be above 0"
-    if (!(isNumber(row["sigma-mM"]) && Number(row["sigma-mM"]) >= 0))
-        return "sigma-mM must be 0 or more"
+    if (!(isNumber(row.sigmaMm) && Number(row.sigmaMm) >= 0))
+        return "sigmaMm must be 0 or more"
     if (row.kind === "custom-nonbio" || row.kind === "custom-polymer")
         return customProblem(row)
     if (!isName(row.arg)) return "arg must be a name"
@@ -282,14 +282,14 @@ export function conditionsProblem(map: Record<string, unknown>): string | undefi
         !(isNumber(t) && t >= temperature.min && t <= temperature.max)
     )
         return `temperature must be a number from ${temperature.min} to ${temperature.max}`
-    const has = "pH" in map || "sigma-pH" in map
+    const has = "pH" in map || "sigmaPh" in map
     if (!has) return undefined
     const ph = map.pH
-    const sigma = map["sigma-pH"]
+    const sigma = map.sigmaPh
     if (!(isNumber(ph) && ph >= pH.min && ph <= pH.max))
         return `pH must be a number from ${pH.min} to ${pH.max}`
     if (!(isNumber(sigma) && sigma >= sigmaPh.min && sigma <= sigmaPh.max))
-        return `sigma-pH must be a number from ${sigmaPh.min} to ${sigmaPh.max}`
+        return `sigmaPh must be a number from ${sigmaPh.min} to ${sigmaPh.max}`
     return undefined
 }
 
@@ -302,7 +302,7 @@ export function conditionsOf(map: Record<string, unknown>): Conditions | undefin
     if (!("pH" in map) || conditionsProblem(map) !== undefined) return undefined
     return {
         pH: map.pH as number,
-        "sigma-pH": map["sigma-pH"] as number,
+        "sigmaPh": map.sigmaPh as number,
         ...(map.temperature !== undefined && { temperature: map.temperature as number }),
     }
 }
@@ -365,7 +365,7 @@ export function writeSolutes(
         // an absent temperature is `undefined`: it takes the key off
         ...(conditions && {
             pH: conditions.pH,
-            "sigma-pH": conditions["sigma-pH"],
+            "sigmaPh": conditions.sigmaPh,
             temperature: conditions.temperature,
         }),
         ...(unit && { [concUnitKey]: unit }),
@@ -478,16 +478,16 @@ export function resetBuffer(projectDir: string): string | undefined {
  * recipe is a named buffer: the same rows a project's `buffer.json` has (the schema of
  * `test/fixtures/buffer/buffer.json`, checked by [[rowProblem]]; custom rows are
  * snapshots, so a recipe is self-contained) and, when it has them, the buffer's pH and σ
- * as `"pH"` and `"sigma-pH"` (both or neither, the rules of [[conditionsProblem]]) and
+ * as `"pH"` and `"sigmaPh"` (both or neither, the rules of [[conditionsProblem]]) and
  * the optional `"temperature"` (°C). A JSON
  * object whose `recipes` is an array of objects, one for each recipe (the shape of
  * `test/fixtures/buffer/recipes.json`):
  *
  *     {"recipes": [{"name": "SEC buffer",
  *                   "solutes": [{"kind": "nonbiological", "name": "NaCl",
- *                                "arg": "sodium chloride", "mM": 150, "sigma-mM": 5},
+ *                                "arg": "sodium chloride", "mM": 150, "sigmaMm": 5},
  *                               ...],
- *                   "pH": 6.8, "sigma-pH": 0.05},
+ *                   "pH": 6.8, "sigmaPh": 0.05},
  *                  ...]}
  *
  * A recipe is keyed by its name: unique without regard to case, not blank. At most
@@ -513,7 +513,7 @@ export const recipesFileName = "recipes.json"
  *
  * @property name - the recipe's name, unique without regard to case.
  * @property solutes - the rows of the buffer it stands for.
- * @property pH - the buffer's pH, with `sigma-pH` (both or neither).
+ * @property pH - the buffer's pH, with `sigmaPh` (both or neither).
  * @property temperature - the buffer's temperature, °C (optional).
  * @property notes - the titled notes of the recipe ([[Note]]), absent when there are none.
  * @property template - the definition of a template recipe (`template-recipes.ts`); kept
@@ -523,7 +523,7 @@ export interface Recipe {
     name: string
     solutes: BufferRow[]
     pH?: number
-    "sigma-pH"?: number
+    "sigmaPh"?: number
     temperature?: number
     notes?: Note[]
     template?: unknown
@@ -636,16 +636,16 @@ const recipeList = new ListFile<Recipe>({
 })
 
 /**
- * The recipes with their keys in file order: name, solutes, pH, sigma-pH, temperature,
+ * The recipes with their keys in file order: name, solutes, pH, sigmaPh, temperature,
  * notes, rest.
  */
 function ordered(recipes: readonly Recipe[]): Recipe[] {
     return recipes.map(
-        ({ name, solutes, pH, "sigma-pH": sigma, temperature, notes, ...rest }) => ({
+        ({ name, solutes, pH, "sigmaPh": sigma, temperature, notes, ...rest }) => ({
             name,
             solutes,
             ...(pH !== undefined && { pH }),
-            ...(sigma !== undefined && { "sigma-pH": sigma }),
+            ...(sigma !== undefined && { "sigmaPh": sigma }),
             ...(temperature !== undefined && { temperature }),
             ...(notes !== undefined && { notes }),
             ...rest,
@@ -694,7 +694,7 @@ export function recipeConditions(recipe: Recipe): Conditions | undefined {
 
 /** The recipe with the pH, σ and, when there is one, the temperature put in. */
 function addConditions(rest: Recipe, c: Conditions): Recipe {
-    const out: Recipe = { ...rest, pH: c.pH, "sigma-pH": c["sigma-pH"] }
+    const out: Recipe = { ...rest, pH: c.pH, "sigmaPh": c.sigmaPh }
     if (c.temperature !== undefined) out.temperature = c.temperature
     return out
 }
@@ -707,7 +707,7 @@ function addConditions(rest: Recipe, c: Conditions): Recipe {
  * @returns the recipe, its other keys kept.
  */
 export function withConditions(recipe: Recipe, conditions?: Conditions): Recipe {
-    const { pH: _ph, "sigma-pH": _sigma, temperature: _t, ...rest } = recipe
+    const { pH: _ph, "sigmaPh": _sigma, temperature: _t, ...rest } = recipe
     return conditions === undefined
         ? rest
         : addConditions(rest, conditions)

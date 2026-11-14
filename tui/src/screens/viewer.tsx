@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // The read-only file viewer (a workbook or a delimited file, with its plots text behind
-// `^p`) and its legends. `open-runs.tsx` is the screen that leads to it.
+// `P`) and its legends. `open-runs.tsx` is the screen that leads to it.
 //
 // Contents:
 //   1. The viewer legend: the sheet legend and the rows its fullest legend needs
@@ -126,13 +126,13 @@ export function legendExtraRows(
  * @property sheets - how many tabs there are.
  * @property active - the tab shown (0-based): previous exists from the second on, next
  *     until the last.
- * @property hasPlots - a plots file is there (the `^p` key works).
+ * @property hasPlots - a plots file is there (the `P` key works).
  * @property move - which arrows can move now (an edge has none past it).
  * @property zoom - whether a larger (`in`) or smaller (`out`) plot size exists.
  * @property cells - a sheet is shown (sheets mode): find, go to, mark and copy work.
  * @property marked - a range is marked (`mark` becomes `unmark`).
  * @property hasFormulas - the sheet has formulas (`f` works).
- * @property matches - a search found cells (`n` and shift+`n` work).
+ * @property matches - a search found cells (`.` and `,` work).
  */
 export type ViewerFacts = {
     plots: boolean
@@ -280,12 +280,12 @@ function TabBar(props: {
  * The read-only file viewer: a tabbed frame with two modes over the same tabs. The
  * workbook mode has one tab per sheet of a workbook (a delimited file is one tab) and a
  * scrollable grid (cursor cell, widths fitted to the text, the first row kept in view
- * when it is a header). The plots mode (`^p`) has one tab per terminal plot of a plots
+ * when it is a header). The plots mode (`P`) has one tab per terminal plot of a plots
  * file, painted in the theme's colours and scrolled when bigger than the panel. Nothing
  * is ever written: no edit key exists and the file is only read.
  *
  * @param props.workbookPath - the workbook or delimited file.
- * @param props.plotsPath - the plots text file; without it (or with no plot in it) `^p`
+ * @param props.plotsPath - the plots text file; without it (or with no plot in it) `P`
  *     is not offered and says `no plots`.
  * @param props.plotFiles - the same plots written at several sizes (width, rows of the
  *     tallest plot): the largest that fits the panel is shown and picked again when the
@@ -585,7 +585,7 @@ export function SheetViewerScreen(props: {
         goToMatch(matchFrom(list, cursor.row, cursor.column), list)
     }
 
-    /** `g` took a cell, a row or a column. */
+    /** `j` took a cell, a row or a column. */
     const submitJump = (text: string) => {
         setAsking(undefined)
         if (sheet === undefined) return
@@ -652,7 +652,6 @@ export function SheetViewerScreen(props: {
                 if (!hasFormulas) return say("no formulas here")
                 return setShowFormulas((v) => !v)
             }
-            // shift+n is tested first: a plain `n` matches either press
             if (press.is(keys.prevMatch) || press.is(keys.nextMatch)) {
                 if (search === "") return say("nothing searched: press /")
                 const dir = press.is(keys.prevMatch) ? -1 : 1
@@ -759,7 +758,12 @@ export function SheetViewerScreen(props: {
                 ? loaded.error
                 : undefined
     const shownNote = copying
-        ? { text: "copy: cell (c), row (r), column (l)?", error: false }
+        ? {
+            text:
+                `copy: cell (${keys.copy.label}), row (${keys.copyRow.label}), ` +
+                `column (${keys.copyColumn.label})?`,
+            error: false,
+        }
         : (note ?? (failure ? { text: failure, error: true } : undefined))
 
     return (

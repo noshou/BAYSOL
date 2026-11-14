@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict"
 import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 import { test } from "node:test"
 import type { System } from "../src/core/environment.js"
 import {
@@ -16,7 +16,7 @@ import {
     scanFonts,
     texInstalled,
 } from "../src/core/fonts.js"
-import { tempDir } from "./support/fixtures.js"
+import { tempDir, writeFiles } from "./support/fixtures.js"
 
 // --- building font files, byte by byte
 
@@ -117,10 +117,7 @@ function ttcBytes(specs: Spec[]): Buffer {
 }
 
 function write(dir: string, name: string, content: Buffer | string): string {
-    const file = join(dir, name)
-    mkdirSync(dirname(file), { recursive: true })
-    writeFileSync(file, content)
-    return file
+    return writeFiles(dir, { [name]: content })[0] as string
 }
 
 // --- reading a font file

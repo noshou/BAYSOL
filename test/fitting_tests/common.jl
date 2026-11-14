@@ -50,16 +50,16 @@ const MOLARITY_REL_SIGMA = 0.05
 Plausible range (Å⁻¹) of a SAXS curve's maximum q.
 A maximum outside it almost certainly means the
 curve is still in nm⁻¹ (or was converted twice);
-see `check_q_angstrom`.
+see `checkQAngstrom`.
 """
 const Q_SANITY_RANGE = (0.05, 2.0)
 
 """
-    check_q_angstrom(q)
+    checkQAngstrom(q)
 
 Asserts that `maximum(q)` lies inside `Q_SANITY_RANGE`, i.e. that `q` is in Å⁻¹.
 """
-function check_q_angstrom(q)
+function checkQAngstrom(q)
     lo, hi = Q_SANITY_RANGE
     @assert lo < maximum(q) < hi (
         "q range looks wrong (expected Å⁻¹ " *
@@ -68,14 +68,14 @@ function check_q_angstrom(q)
 end
 
 """
-    _read_curve(path) -> (q, I, σ)
+    _readCurve(path) -> (q, I, σ)
 
 Reads the numeric rows (three or more columns) of a
 SASBDB `.dat`, skipping the free-text header
 and any trailing beam information. The first three
 columns are q, I(q) and σ(q).
 """
-function _read_curve(path)
+function _readCurve(path)
     q = Float64[]
     I = Float64[]
     σ = Float64[]
@@ -92,15 +92,15 @@ function _read_curve(path)
 end
 
 """
-    _read_fit(path, q_scale, col) -> (q, I_fit) or nothing
+    _readFit(path, qScale, col) -> (q, I_fit) or nothing
 
 Reads a depositor fit file: the numeric rows with at least `col`
-columns, taking q from column 1 (scaled to Å⁻¹ by `q_scale`) and
+columns, taking q from column 1 (scaled to Å⁻¹ by `qScale`) and
 the fitted intensity from column `col` (the layout differs between
 CRYSOL, FoXS, OLIGOMER and EOM files). Returns `nothing` if there
 are no such rows.
 """
-function _read_fit(path, q_scale, col)
+function _readFit(path, qScale, col)
     q = Float64[]
     I = Float64[]
     for line in eachline(path)
@@ -108,33 +108,33 @@ function _read_fit(path, q_scale, col)
         length(t) ≥ max(col, 3) || continue
         v = tryparse.(Float64, t[1:col])
         any(isnothing, v) && continue
-        push!(q, v[1] * q_scale)
+        push!(q, v[1] * qScale)
         push!(I, v[col])
     end
     return isempty(q) ? nothing : (q, I)
 end
 
 """
-    _rescale_fit((q, I), q_data, I_data) -> (q, c·I)
+    _rescaleFit((q, I), qData, I_data) -> (q, c·I)
 
 Least-squares scale of a normalized fit curve onto the data
 (linear interpolation of the fit at the data's q).
 """
-function _rescale_fit(fit_curve, q_data, I_data)
-    qf, If = fit_curve
+function _rescaleFit(fitCurve, qData, iData)
+    qf, If = fitCurve
     p = sortperm(qf)
     qf = qf[p]
     If = If[p]
-    Ii = zeros(length(q_data))
-    ok = falses(length(q_data))
-    for (k, x) in enumerate(q_data)
+    ii = zeros(length(qData))
+    ok = falses(length(qData))
+    for (k, x) in enumerate(qData)
         (qf[1] ≤ x ≤ qf[end]) || continue
         j = clamp(searchsortedlast(qf, x), 1, length(qf) - 1)
         w = qf[j+1] > qf[j] ? (x - qf[j]) / (qf[j+1] - qf[j]) : 0.0
-        Ii[k] = If[j] * (1 - w) + If[j+1] * w
+        ii[k] = If[j] * (1 - w) + If[j+1] * w
         ok[k] = true
     end
-    any(ok) || return fit_curve
-    c = sum(I_data[ok] .* Ii[ok]) / sum(Ii[ok] .^ 2)
+    any(ok) || return fitCurve
+    c = sum(iData[ok] .* ii[ok]) / sum(ii[ok] .^ 2)
     return qf, If .* c
 end

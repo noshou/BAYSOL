@@ -1,0 +1,11 @@
+{
+    "set": "mod-uk",
+    "title": "UK Ministry of Defence design system brand colours",
+    "licence": "Crown copyright (values seen in a search snippet only; page not reachable)",
+    "url": "https://design-system.service.mod.gov.uk/styles/colour",
+    "colours": [
+        {"name": "mod uk purple", "hex": "#532a45", "verified": false, "family": "purple"},
+        {"name": "mod uk dark grey", "hex": "#323e48", "verified": false, "family": "blue"},
+        {"name": "mod uk dark blue", "hex": "#13284c", "verified": false, "family": "blue"}
+    ]
+}

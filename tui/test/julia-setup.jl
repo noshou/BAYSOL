@@ -4,7 +4,7 @@
 # tests, and the module `BAYSOLRun` of `src/store/run-project.jl` loaded once into `Main`
 # (the runner of the unit tests includes every file into one process; a standalone run,
 # `julia --project=test tui/test/buffer.test.jl`, loads it as well).
-include(joinpath(@__DIR__, "..", "..", "test", "unit_tests", "testsetup.jl"))
+include(joinpath(@__DIR__, "..", "..", "test", "unit-tests", "testsetup.jl"))
 
 if !isdefined(Main, :BAYSOLRun)
     include(joinpath(@__DIR__, "..", "src", "store", "run-project.jl"))

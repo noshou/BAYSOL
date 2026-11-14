@@ -185,8 +185,8 @@ function textHint(def: SettingDef): { label: string; placeholder?: string } {
             return { label: "sizes:", placeholder: "76x5, 100x9 (growing)" }
         case "path":
             return { label: "path:", placeholder: "empty: the default" }
-        case "optional_int":
-        case "optional_float":
+        case "optionalInt":
+        case "optionalFloat":
             return { label: "number:", placeholder: `empty: ${valueText(def, null)}` }
         default:
             return { label: "number:" }
@@ -998,7 +998,7 @@ const libraryFiles = {
 /**
  * The settings menu, for the global settings, those of one project or those of one model.
  * The global one also has the `recipes` and `solutes` options, which open the recipes
- * table and the custom solutes table; on one of them whose file cannot be used `r` offers
+ * table and the custom solutes table; on one of them whose file cannot be used `x` offers
  * to reset it to empty (the old file is kept beside it as `<name>.corrupt`).
  *
  * @param scope - whose settings.

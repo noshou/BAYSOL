@@ -16,10 +16,10 @@ const _FIT_PATH = joinpath(_FIXTURE_DIR, "SASDWZ9_fit1.fit")
 # standalone .dat and no GNOM .out were bundled).
 raw = readdlm(_FIT_PATH; skipstart = 6)
 
-qvals       = Float64.(raw[:, 1])
-I_exp       = Float64.(raw[:, 2])
-σ_exp       = Float64.(raw[:, 3])
-I_pepsi_fit = Float64.(raw[:, 4])   # Pepsi-SAXS's own fitted curve, for the comparison plot
+qvals = Float64.(raw[:, 1])
+iExp = Float64.(raw[:, 2])
+σ_exp = Float64.(raw[:, 3])
+iPepsiFit = Float64.(raw[:, 4])   # Pepsi-SAXS's own fitted curve, for the comparison plot
 
 # q is already in Å⁻¹ here (range ≈ 0.0083-0.3501, the usual protein-SAXS
 # scale) -- unlike SASDMJ9's SASBDB .dat export, no nm⁻¹ -> Å⁻¹ conversion
@@ -111,10 +111,8 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-const Q_MAX_FIT = 0.35   # the .fit file's own full q-range (≈0.0083-0.3501 Å⁻¹)
-
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true  # runs Pdb2pqr at PH; the NMR structure already carries
@@ -122,57 +120,57 @@ const ADD_HYDROGENS = true  # runs Pdb2pqr at PH; the NMR structure already carr
 # protonation states from the heavy-atom positions regardless.
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` (no q cut).
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
-    keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+function fitSubset()
+    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdwz9` samples. It is separate only because
+# Builds the Seed that `runSasdwz9` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
-# `run_sasdwz9` below is the whole story (build the seed, then sample it).
-function seed_sasdwz9(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdwz9` below is the whole story (build the seed, then sample it).
+function seedSasdwz9(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdwz9(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdwz9(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdwz9(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdwz9(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdwz9()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdwz9()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
-reference = BAYSOL.Reference("Pepsi-SAXS fit1", qvals, I_pepsi_fit; q_max = Q_MAX_FIT)
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
+reference = BAYSOL.Reference("Pepsi-SAXS fit1", qvals, iPepsiFit)
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res", references = reference,
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "Pepsi-SAXS 0.62",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "Pepsi-SAXS 0.62",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDWZ9/ folder), not the caller's cwd.
 
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

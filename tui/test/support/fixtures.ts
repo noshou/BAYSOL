@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -57,6 +57,22 @@ export function tempDir(prefix = "baysol-test-"): string {
     const dir = mkdtempSync(join(tmpdir(), prefix))
     made.add(dir)
     return dir
+}
+
+/**
+ * Writes files below a folder, making the folders between.
+ *
+ * @param dir - the folder.
+ * @param files - the paths relative to `dir` (`/`-separated) with their contents.
+ * @returns the absolute paths written, in the order given.
+ */
+export function writeFiles(dir: string, files: Record<string, string | Buffer>): string[] {
+    return Object.entries(files).map(([rel, body]) => {
+        const path = join(dir, ...rel.split("/"))
+        mkdirSync(join(path, ".."), { recursive: true })
+        writeFileSync(path, body)
+        return path
+    })
 }
 
 /**

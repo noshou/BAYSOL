@@ -43,7 +43,7 @@ const NACL: BufferRow = {
     name: "sodium chloride",
     arg: "sodium chloride",
     mM: 100,
-    "sigma-mM": 1,
+    "sigmaMm": 1,
 }
 
 const builtin = (): Definition => ({
@@ -148,7 +148,7 @@ test("saving the buffer as a template: one linked group becomes the definition",
 
 test("a template recipe round trips; a plain save over it drops the definition", () => {
     const root = tempDir()
-    const conditions = { pH: 7, "sigma-pH": 0.1, temperature: 4 }
+    const conditions = { pH: 7, "sigmaPh": 0.1, temperature: 4 }
     saveRecipe(root, "T", [NACL], conditions, undefined, custom())
     const [saved] = readRecipes(root)
     assert.deepEqual(saved?.template, custom())
@@ -180,7 +180,7 @@ test("a bad definition leaves the file usable and the recipe read-only (invalid)
 function linked(def: Definition, pH: number): Drafts<Solute> {
     const made = templateRows(recipe(def), { ...CONDITIONS, pH }) as { rows: BufferRow[] }
     const drafts = made.rows.map(
-        (r) => ({ ...r, sigmaMM: r["sigma-mM"] }) as unknown as Solute,
+        (r) => ({ ...r, sigmaMM: r.sigmaMm }) as unknown as Solute,
     )
     return Drafts.of(drafts)
 }

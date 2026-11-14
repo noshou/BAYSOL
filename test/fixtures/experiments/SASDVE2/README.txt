@@ -12,4 +12,6 @@ Files:
                                SASDVE2 itself has no atomic model and no PDB link; no depositor
                                fit curve exists, so there is no .fit file.
 The fitting script test/fitting_tests/SASDVE2/ states the conditions it takes from the entry;
-the paper was not consulted.
+the paper (PMC11440596) was read on 2026-11-13; see the script header.
+
+Fit range (2026-11-13): the script cuts at q = 0.3 1/A (flat noise floor: above it 174 points, median I/sigma -0.11, 56 % I <= 0).

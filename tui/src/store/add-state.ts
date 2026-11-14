@@ -451,7 +451,7 @@ export type AddEvent =
     | { type: "complete" }
     /** Escape: drop the rows of the add; an edit stops and keeps what was taken. */
     | { type: "cancel" }
-    /** What the desktop's file picker gave (`o` on an empty path). */
+    /** What the desktop's file picker gave (`e` on an empty path). */
     /** A text pasted that is not a field's (several lines, or longer than the field). */
     | { type: "paste"; text: string }
     | { type: "files"; result: { files: readonly string[] } | { problem: string } }
@@ -487,7 +487,7 @@ export interface DropdownStep {
     status?: string
     /** The border note: the basis of the highlighted entry's molarity. */
     note?: string
-    /** Whether `o` on an empty text asks for the desktop's file picker. */
+    /** Whether `e` on an empty text asks for the desktop's file picker. */
     filePicker?: boolean
     /** The message of the last event. */
     problem?: string

@@ -153,7 +153,7 @@ function describe(status: DataStatus | undefined, width: number): [string, strin
                 ].join(", "),
             ],
         )
-    rows.push(["energy", energyText(info.energy, info.energy_unit)])
+    rows.push(["energy", energyText(info.energy, info.energyUnit)])
     return rows
 }
 
@@ -169,7 +169,7 @@ function describe(status: DataStatus | undefined, width: number): [string, strin
  * and the X-ray energy in eV (a number above 0; there is no default and the project is
  * not ready for a run without it). Both are saved at once, to `data.json` only.
  *
- * Data files that cannot be used are told and never written over; `r` puts them aside
+ * Data files that cannot be used are told and never written over; `x` puts them aside
  * as `.corrupt`. The screen reads the files again at every key and when it regains the
  * focus, so another copy's change shows, and every failure of a save (project gone,
  * file in use) is a line of text.
@@ -318,7 +318,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         if (id === "mapping") return reopen(status.info.mapping)
         if (id === "units") turnUnits(status.info.units)
         else {
-            setEnergyUnitNow(status.info.energy_unit)
+            setEnergyUnitNow(status.info.energyUnit)
             const { energy } = status.info
             setEnergyStart(energy === null ? "" : plainNumber(energy))
             setMode("energy")
@@ -332,7 +332,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         if (status?.kind !== "ok") return say(unusable ? RESET_FIRST : LOAD_FIRST, true)
         if (id === "units") return turnUnits(status.info.units)
         if (status.info.energy === null) return say("set the energy first", true)
-        const next = nextEnergyUnit(status.info.energy_unit)
+        const next = nextEnergyUnit(status.info.energyUnit)
         try {
             setEnergyUnit(dir, next)
             say(`energy shown in ${energyUnitLabel(next)}`)

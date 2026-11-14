@@ -17,15 +17,15 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDN32_fit1_model1.pdb")
 # root, and no GNOM .out pddf file is bundled.
 #
 # `SASDN32_fit1.dat` header:
-#   # SAXS profile: number of points = 1211, q_min = 0.00297234626486897,
-#   #   q_max = 0.345499873161316, ...
+#   # SAXS profile: number of points = 1211, qMin = 0.00297234626486897,
+#   #   qMax = 0.345499873161316, ...
 #   # offset = ..., scaling c = ..., Chi^2 = ...
-#   #  q       exp_intensity   model_intensity error
+#   #  q       exp_intensity   modelIntensity error
 # i.e. 3 comment/header lines, then 1211 data rows in columns
 raw = readdlm(_DATA_PATH; skipstart = 3)
 
 qvals = Float64.(raw[:, 1])
-I_exp = Float64.(raw[:, 2])
+iExp = Float64.(raw[:, 2])
 σ_exp = Float64.(raw[:, 4])
 
 # ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ const SAS20D2_MOLARITY_σ = MOLARITY_REL_SIGMA * SAS20D2_MOLARITY
 #
 # maltoheptaose: V0 = 694.8 ± 5.8 cm³/mol (Hourston 1967 PhD thesis,
 # Table 6.1, 25 °C, measured from the partial specific volume 0.600 ±
-# 0.005 mL/g); an oligomer, so it is a `Polymer` solute (BulkElectronDensity/Polymers).
+# 0.005 mL/g); an oligomer, so it is a `Polymer` solute (bulk-electron-density/Polymers).
 # 5 mM is not negligible next to the 137 mM NaCl / 10 mM phosphate buffer
 # components, so it is included (previously omitted because no entry existed).
 const SOLUTES = Solute[
@@ -105,65 +105,70 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-const Q_MAX_FIT = 0.3
+# No q cut: the whole deposited curve (q 0.0030-0.3455 Å⁻¹) is fitted, `seedModel` drops
+# the non-positive bins. A cut at 0.3 Å⁻¹ was used before, but the 161 points above 0.3
+# Å⁻¹ (σ > 0) have a median I/σ of 0.91 and 23 % of them have I ≤ 0, so the data above it
+# are not demonstrably unusable (median I/σ 0.91 ≥ 0.5; I ≤ 0 share 23 % < 25 %; median
+# I/σ 1.09 ≥ 1 in the lowest-q quarter (up to 0.31 Å⁻¹); rule in README.md).
+const Q_MAX_FIT = Inf
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 const ADD_HYDROGENS = true   # runs Pdb2pqr at PH
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
 `qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
+function fitSubset()
     keep = findall(i -> qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0, eachindex(qvals))
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdn32` samples. It is separate only because
+# Builds the Seed that `runSasdn32` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
-# `run_sasdn32` below is the whole story (build the seed, then sample it).
-function seed_sasdn32(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdn32` below is the whole story (build the seed, then sample it).
+function seedSasdn32(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdn32(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdn32(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdn32(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdn32(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdn32()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdn32()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res",
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "FoXS 1.01",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "FoXS 1.01",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDN32/ folder), not the caller's cwd.
 
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

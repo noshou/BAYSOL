@@ -14,21 +14,21 @@ const _DATA_PATH_FIT1 = joinpath(_FIXTURE_DIR_FIT1, "experimental_data", "SASDA5
 const _PDB_PATH_FIT1 = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1_model1.pdb")
 const _FIT_PATH_FIT1 = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1.fit")
 
-raw_fit1 = readdlm(_DATA_PATH_FIT1; skipstart = 4)
+rawFit1 = readdlm(_DATA_PATH_FIT1; skipstart = 4)
 
 # 4 lines of headers (date/title line + 3 "<file> Conc = ... N1 = ... N2 = ..."
 # lines), then 2168 data rows (matches "N2 = 2168" in the header), followed by
 # a text footer (per-frame processing metadata for the sample and the two
 # buffer frames it was averaged/subtracted against) that we simply don't slice
 # into.
-qvals_fit1 = Float64.(raw_fit1[1:2168, 1])
-I_exp_fit1 = Float64.(raw_fit1[1:2168, 2])
-σ_exp_fit1 = Float64.(raw_fit1[1:2168, 3])
+qvalsFit1 = Float64.(rawFit1[1:2168, 1])
+iExpFit1 = Float64.(rawFit1[1:2168, 2])
+σ_exp_fit1 = Float64.(rawFit1[1:2168, 3])
 
 # qvals are in nm⁻¹ (SASBDB REMARK 265 in SASDA52_fit2_model1.pdb states
 # "ANGLE RANGE(MIN-MAX) (INVERSE NANOMETERS): 0.087-6.014", matching this
 # file's raw range exactly); must convert to Å⁻¹.
-qvals_fit1 = qvals_fit1 ./ NM_INV_PER_ANGSTROM_INV
+qvalsFit1 = qvalsFit1 ./ NM_INV_PER_ANGSTROM_INV
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -107,74 +107,71 @@ const SOLUTES_FIT1 = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-const Q_MAX_FIT_FIT1 = 0.5   # matches SASDA52_fit1.fit's q-range (0 to 0.5 Å⁻¹)
-
 const ADD_HYDROGENS_FIT1 = true   # runs Pdb2pqr at PH_FIT1
 
 """
-    fit_subset_fit1() -> (q, I, σ)
+    fitSubsetFit1() -> (q, I, σ)
 
-`qvals_fit1`/`I_exp_fit1`/`σ_exp_fit1` restricted to `q ≤ Q_MAX_FIT_FIT1` and `σ_exp > 0`.
-(`seed_model` bins the curve and drops the bins with non-positive intensity.)
+`qvalsFit1`/`I_exp_fit1`/`σ_exp_fit1` restricted to `σ_exp > 0`.
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset_fit1()
+function fitSubsetFit1()
     keep = findall(
-        i -> qvals_fit1[i] ≤ Q_MAX_FIT_FIT1 && σ_exp_fit1[i] > 0,
-        eachindex(qvals_fit1),
+        i -> σ_exp_fit1[i] > 0,
+        eachindex(qvalsFit1),
     )
-    return qvals_fit1[keep], I_exp_fit1[keep], σ_exp_fit1[keep]
+    return qvalsFit1[keep], iExpFit1[keep], σ_exp_fit1[keep]
 end
 
-# Builds the Seed that `run_sasda52_fit1` samples. It is separate only because
+# Builds the Seed that `runSasda52Fit1` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running the
 # fit; if you are reading this script as an example you can skip it:
-# `run_sasda52_fit1` below is the whole story (build the seed, then sample it).
-function seed_sasda52_fit1(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset_fit1()
+# `runSasda52Fit1` below is the whole story (build the seed, then sample it).
+function seedSasda52Fit1(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubsetFit1()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH_FIT1), ENERGY_EV_FIT1, q_fit, I_fit, σ_fit,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH_FIT1), ENERGY_EV_FIT1, qFit, iFit, σ_fit,
         PH_FIT1, σ_PH_FIT1, SOLUTES_FIT1;
-        add_hydrogens = ADD_HYDROGENS_FIT1, t = TEMPERATURE_C_FIT1,
+        addHydrogens = ADD_HYDROGENS_FIT1, t = TEMPERATURE_C_FIT1,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasda52_fit1(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasda52Fit1(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasda52_fit1(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasda52Fit1(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-resf1, fflogf1, natmsf1, (qf1, If1, σf1) = run_sasda52_fit1()
+resf1, fflogf1, natmsf1, (qf1, If1, σf1) = runSasda52Fit1()
 
-fit_fit1, divergence_rate_fit1, map_resf1, quantile_resf1 = resf1
+fitFit1, divergenceRateFit1, mapResf1, quantileResf1 = resf1
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
 crysol = readdlm(_FIT_PATH_FIT1; skipstart = 1)
 reference = BAYSOL.Reference(
     "CRYSOL fit1",
     Float64.(crysol[:, 1]),
-    Float64.(crysol[:, 4]);
-    q_max = Q_MAX_FIT_FIT1,
+    Float64.(crysol[:, 4]),
 )
 BAYSOL.results(
     resf1, (qf1, If1, σf1);
     dir = @__DIR__,
     name = "res_fit1",
     references = reference,
-    form_factor_log = fflogf1,
-    n_atoms = natmsf1,
-    ref_chi2 = "CRYSOL χ² 2.48 (χ² ≈ 6.2)",
-    run_log = true,
+    formFactorLog = fflogf1,
+    nAtoms = natmsf1,
+    refChi2 = "CRYSOL χ² 2.48 (χ² ≈ 6.2)",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDA52/ folder), not the caller's cwd.
-BAYSOL.print_summary(resf1)
+BAYSOL.printSummary(resf1)

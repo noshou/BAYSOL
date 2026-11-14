@@ -14,14 +14,14 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDVX2_fit1_model1.pdb")
 const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDVX2_fit1.fit")
 
 # The .dat has 3 lines of header and 45 lines of processing history at the end, and the
-# latter break `readdlm` (SASDVV4's has quote characters), so `_read_curve` (common.jl,
+# latter break `readdlm` (SASDVV4's has quote characters), so `_readCurve` (common.jl,
 # numeric rows only) reads it: 2625 points.
-qvals, I_exp, σ_exp = _read_curve(_DATA_PATH)
+qvals, iExp, σ_exp = _readCurve(_DATA_PATH)
 @assert length(qvals) == 2625
 
 # qvals are in nm⁻¹ (0.0255-7.35); must convert to Å⁻¹.
 qvals = qvals ./ NM_INV_PER_ANGSTROM_INV
-check_q_angstrom(qvals)
+checkQAngstrom(qvals)
 
 # ---------------------------------------------------------------------------
 #                            Solution conditions
@@ -66,11 +66,13 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# The .dat runs to 0.73 Å⁻¹ (the .fit file to 0.50 Å⁻¹); the fit is cut at 0.3 Å⁻¹.
+# q cut, kept (flat noise floor; rule in README.md): 0.3 Å⁻¹. The data run to 0.735 Å⁻¹,
+# but the 1559 points above 0.3 Å⁻¹ (σ > 0) have a median I/σ of -0.13 and 55 % of them
+# have I ≤ 0; the lowest-q quarter of them (up to 0.41 Å⁻¹) has a median I/σ of 0.39.
 const Q_MAX_FIT = 0.3
 
-# The spherical-harmonic band limit lMax is not set here: `seed_model` takes it from
-# the diameter of the scatterer cloud and the largest fitted q (ceil(q_max * D)), and
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
 # no hydrogens in the deposited model; runs Pdb2pqr at PH (PARSE, no PROPKA for a
@@ -78,62 +80,62 @@ const Q_MAX_FIT = 0.3
 const ADD_HYDROGENS = true
 
 """
-    fit_subset() -> (q, I, σ)
+    fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT`. (`seed_model`
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≤ Q_MAX_FIT`. (`seedModel`
 bins the curve and drops the bins with non-positive intensity.)
 """
-function fit_subset()
+function fitSubset()
     keep = findall(≤(Q_MAX_FIT), qvals)
-    return qvals[keep], I_exp[keep], σ_exp[keep]
+    return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
-# Builds the Seed that `run_sasdvx2_fit1` samples. It is separate only because
+# Builds the Seed that `runSasdvx2Fit1` samples. It is separate only because
 # the developer tools in test/utils/ build a fit's Seed without running the
 # fit; if you are reading this script as an example you can skip it:
-# `run_sasdvx2_fit1` below is the whole story (build the seed, then sample it).
-function seed_sasdvx2_fit1(; seed::Integer = SAMPLER_SEED)
-    q_fit, I_fit, σ_fit = fit_subset()
+# `runSasdvx2Fit1` below is the whole story (build the seed, then sample it).
+function seedSasdvx2Fit1(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
 
     Random.seed!(seed)
-    s = BAYSOL.seed_model(
-        LocalPathSource(_PDB_PATH), ENERGY_EV, q_fit, I_fit, σ_fit, PH, σ_PH, SOLUTES;
-        add_hydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
     )
     return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
 end
 
-function run_sasdvx2_fit1(;
-    n_samples::Int = N_SAMPLES,
-    n_adapt::Int = N_ADAPT,
+function runSasdvx2Fit1(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
     seed::Integer = SAMPLER_SEED,
 )
-    s, data = seed_sasdvx2_fit1(; seed)
-    res = BAYSOL.run_model(s, n_samples, n_adapt)
-    return res, s.fw.form_factor_log, s.fw.n_atoms, data
+    s, data = seedSasdvx2Fit1(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
-result, form_factor_log, n_atoms, (q_fit, I_fit, σ_fit) = run_sasdvx2_fit1()
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdvx2Fit1()
 
-fit, divergence_rate, map_result, quantile_result = result
+fit, divergenceRate, mapResult, quantileResult = result
 
 # `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
 
-# run's section of the folder's run log; `ref_chi2` is the depositor's χ² for the log.
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
 crysol = readdlm(_FIT_PATH; skipstart = 1)
 reference = BAYSOL.Reference(
     "Pepsi-SAXS fit1",
     Float64.(crysol[:, 1]),
     Float64.(crysol[:, 4]);
-    q_max = Q_MAX_FIT,
+    qMax = Q_MAX_FIT,
 )
 BAYSOL.results(
-    result, (q_fit, I_fit, σ_fit);
+    result, (qFit, iFit, σ_fit);
     dir = @__DIR__, name = "res_fit1", references = reference,
-    form_factor_log = form_factor_log, n_atoms = n_atoms,
-    ref_chi2 = "Pepsi-SAXS 6.974",
-    run_log = true,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "Pepsi-SAXS 6.974",
+    runLog = true,
 )
 
 # `@__DIR__` (this SASDVX2/ folder), not the caller's cwd.
-BAYSOL.print_summary(result)
+BAYSOL.printSummary(result)

@@ -160,17 +160,17 @@ function infoOf(json: string): {
     mapping?: DataMapping
 } {
     const info = objectOf(json, RUN_FILES.dataInfo)
-    const { units, energy, energy_unit, source, mapping } = info
+    const { units, energy, energyUnit, source, mapping } = info
     const badUnits = units !== "nm-1" && units !== "A-1"
     const badEnergy = energy != null && !(typeof energy === "number" && energy > 0)
     // the energy unit is a label, and always written
-    const badEnergyUnit = !energyUnitsList.includes(energy_unit as EnergyUnit)
+    const badEnergyUnit = !energyUnitsList.includes(energyUnit as EnergyUnit)
     if (badUnits || badEnergy || badEnergyUnit)
         throw new RestoreError("data.json is not usable")
     return {
         units: units as Units,
         energy: typeof energy === "number" ? energy : undefined,
-        energyUnit: energy_unit as EnergyUnit,
+        energyUnit: energyUnit as EnergyUnit,
         source: typeof source === "string" ? source : undefined,
         mapping: readMapping(mapping),
     }

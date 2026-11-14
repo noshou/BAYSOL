@@ -190,7 +190,7 @@ function poolOf(customs: readonly NonbioEntry[], initial?: Definition): Pool {
     for (const e of customs) {
         const { z, pmv } = e
         if (z === null || pmv === null) continue
-        keep(e.name, { z, pmv, "sigma-pmv": e.sigma })
+        keep(e.name, { z, pmv, "sigmaPmv": e.sigma })
     }
     return pool
 }

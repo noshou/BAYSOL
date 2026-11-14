@@ -440,13 +440,13 @@ test("sheet keys: find, go to, mark, copy; formulas and matches when they work",
     ])
     const pressed = (f = sheets) => viewerLegend(f).map((i) => `${i.label}=${i.keys}`)
     assert.ok(pressed().includes("find=/"))
-    assert.ok(pressed().includes("go to=g"))
+    assert.ok(pressed().includes("go to=j"))
     assert.ok(pressed().includes("mark=␣"))
     assert.ok(pressed().includes("copy=c"))
     const more = { ...sheets, hasFormulas: true, matches: true, marked: true }
     assert.ok(pressed(more).includes("formulas=f"))
-    assert.ok(pressed(more).includes("next match=n"))
-    assert.ok(pressed(more).includes("prev match=N"))
+    assert.ok(pressed(more).includes("next match=."))
+    assert.ok(pressed(more).includes("prev match=,"))
     assert.ok(pressed(more).includes("unmark=␣"))
     assert.ok(!labels(more).includes("mark"))
     // the plots mode has none of them
@@ -477,8 +477,8 @@ const polymer: PolymerEntry = {
         { label: "A", formula: "C2H4O", z: 24, slope: 36.9, sigma: null },
         { label: "B", formula: "C3H6O", z: 32, slope: 53.1, sigma: null },
     ],
-    "z-ends": 10,
-    "pmv-ends": 9,
+    "zEnds": 10,
+    "pmvEnds": 9,
 }
 
 const nonbio: NonbioEntry = {
@@ -499,13 +499,13 @@ test("a first minus is kept and a missing term is left out", () => {
     const e: PolymerEntry = {
         ...polymer,
         units: [{ label: "A", formula: "", z: 24, slope: -5.2, sigma: null }],
-        "pmv-ends": 3,
-        "z-ends": null,
+        "pmvEnds": 3,
+        "zEnds": null,
     }
     assert.equal(pmvCell(e), "-5.2A+3")
     assert.equal(zCell(e), "24A")
     assert.equal(formulaCell(e), "")
-    assert.equal(pmvCell({ ...e, "pmv-ends": -3 }), "-5.2A-3")
+    assert.equal(pmvCell({ ...e, "pmvEnds": -3 }), "-5.2A-3")
 })
 
 test("a non-biological row shows its numbers and the fallback for a blank ±", () => {
@@ -534,8 +534,8 @@ const rows = fixture("buffer/buffer.json").solutes as BufferRow[]
 test("a file row and a draft are the same solute", () => {
     for (const row of rows) {
         const s = soluteOf(row)
-        assert.equal("sigma-mM" in s, false)
-        assert.equal(s.sigmaMM, row["sigma-mM"])
+        assert.equal("sigmaMm" in s, false)
+        assert.equal(s.sigmaMM, row.sigmaMm)
         assert.deepEqual(rowOf(s), row, row.name)
         assert.equal(soluteProblem(s), undefined, row.name)
         assert.equal(rowProblem(rowOf(s)), undefined)
@@ -632,8 +632,8 @@ test("the replace questions fit their room and keep the name when they can", () 
 })
 
 test("a loaded recipe's pH and σ are an unsaved draft of the buffer", () => {
-    const own = { pH: 7, "sigma-pH": 0.1 }
-    const recipe = { pH: 6.8, "sigma-pH": 0.05 }
+    const own = { pH: 7, "sigmaPh": 0.1 }
+    const recipe = { pH: 6.8, "sigmaPh": 0.05 }
     assert.deepEqual(draftOf(recipe, own), recipe, "the recipe's, unsaved")
     assert.deepEqual(draftOf(recipe, undefined), recipe, "a buffer without any")
     assert.equal(draftOf(undefined, own), undefined, "a recipe without leaves the own")
@@ -642,16 +642,16 @@ test("a loaded recipe's pH and σ are an unsaved draft of the buffer", () => {
 })
 
 test("a recipe's temperature is a draft; one without leaves the table's own", () => {
-    const own = { pH: 7, "sigma-pH": 0.1, temperature: 4 }
-    const cold = { pH: 6.8, "sigma-pH": 0.05, temperature: 10 }
+    const own = { pH: 7, "sigmaPh": 0.1, temperature: 4 }
+    const cold = { pH: 6.8, "sigmaPh": 0.05, temperature: 10 }
     assert.deepEqual(draftOf(cold, own), cold, "the recipe's temperature, unsaved")
     // a recipe with a pH but no temperature keeps the table's temperature
-    const bare = { pH: 6.8, "sigma-pH": 0.05 }
+    const bare = { pH: 6.8, "sigmaPh": 0.05 }
     assert.deepEqual(draftOf(bare, own), { ...bare, temperature: 4 })
-    assert.equal(draftOf({ pH: 7, "sigma-pH": 0.1 }, own), undefined, "same pH: no change")
+    assert.equal(draftOf({ pH: 7, "sigmaPh": 0.1 }, own), undefined, "same pH: no change")
     // a table without a temperature takes the recipe's, or stays without
-    assert.deepEqual(draftOf(cold, { pH: 7, "sigma-pH": 0.1 }), cold)
-    assert.deepEqual(draftOf(bare, { pH: 7, "sigma-pH": 0.1 }), bare)
+    assert.deepEqual(draftOf(cold, { pH: 7, "sigmaPh": 0.1 }), cold)
+    assert.deepEqual(draftOf(bare, { pH: 7, "sigmaPh": 0.1 }), bare)
 })
 
 test("table legend: find and sort follow the row keys, the adds come last", () => {

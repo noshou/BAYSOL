@@ -54,7 +54,7 @@ const DEV_GUIDES = ["Commands" => "dev/README.md"]
 
 const TEST_GUIDES = [
     "Overview"       => "test/README.md",
-    "Unit tests"     => "test/unit_tests/README.md",
+    "Unit tests"     => "test/unit-tests/README.md",
     "Baselines"      => "test/baselines/README.md",
     "Fixtures"       => "test/fixtures/README.md",
     "Fitting tests"  => "test/fitting_tests/README.md",
@@ -80,7 +80,10 @@ mkpath(GUIDES_DIR)
 
 for (name, _) in DOC_MODULES
     cp(
-        joinpath(@__DIR__, "..", "src", name, "README.md"),
+        joinpath(
+            @__DIR__, "..", "src", lowercase(replace(name, r"(?<=[a-z])(?=[A-Z])" => "-")),
+            "README.md",
+        ),
         joinpath(GUIDES_DIR, lowercase(name) * ".md");
         force = true,
     )
@@ -128,7 +131,9 @@ readme = replace(
     readme,
     r"\]\(src/([A-Za-z]+)/README\.md\)" =>
         m ->
-            "](guides/" * lowercase(match(r"src/([A-Za-z]+)/", m).captures[1]) * ".md)",
+            "](guides/" *
+            replace(lowercase(match(r"src/([A-Za-z-]+)/", m).captures[1]), "-" => "") *
+            ".md)",
 )
 # The terminal interface guide (tui/README.md) is the page guides/tui.md.
 readme = replace(readme, "](tui/README.md)" => "](guides/tui.md)")
@@ -144,8 +149,8 @@ write(
 makedocs(
     sitename = "BAYSOL.jl",
     # The default HTML format, except for the size warning (see below). The themes are ours:
-    # docs/src/assets/themes/<name>.scss, compiled to <name>.css by compile_themes.jl and
-    # linked in place of Documenter's own by register_themes.jl after the build.
+    # docs/src/assets/themes/<name>.scss, compiled to <name>.css by compile-themes.jl and
+    # linked in place of Documenter's own by register-themes.jl after the build.
     modules = [BAYSOL; last.(DOC_MODULES); DOC_SUBMODULES],
     pages   = [
     "Home" => "index.md",
@@ -185,21 +190,21 @@ makedocs(
 
 # The release under the sidebar title on every page: `v0.3.0-wʋsg_n_yɩɩda` on a tag build
 # (the tag and its message; .github/workflows/docs.yml fetches the annotated tag), `dev`
-# otherwise. See release_label.jl.
-include(joinpath(@__DIR__, "release_label.jl"))
+# otherwise. See release-label.jl.
+include(joinpath(@__DIR__, "release-label.jl"))
 stamp_release_label(joinpath(@__DIR__, "build"), release_label(REPO_ROOT))
 
-# The four themes replace Documenter's own six (see register_themes.jl).
-include(joinpath(@__DIR__, "register_themes.jl"))
+# The four themes replace Documenter's own six (see register-themes.jl).
+include(joinpath(@__DIR__, "register-themes.jl"))
 register_themes(joinpath(@__DIR__, "build"))
 
-# The sun/moon button that cycles through the themes (see theme_toggle.jl).
-include(joinpath(@__DIR__, "theme_toggle.jl"))
+# The sun/moon button that cycles through the themes (see theme-toggle.jl).
+include(joinpath(@__DIR__, "theme-toggle.jl"))
 add_theme_toggle(joinpath(@__DIR__, "build"))
 
 # A short link to the latest release in the navbar of older ones, instead of Documenter's
-# pop-up (see version_notice.jl).
-include(joinpath(@__DIR__, "version_notice.jl"))
+# pop-up (see version-notice.jl).
+include(joinpath(@__DIR__, "version-notice.jl"))
 add_version_notice(joinpath(@__DIR__, "build"))
 
 # Deploys only from CI (.github/workflows/docs.yml): a push to master builds

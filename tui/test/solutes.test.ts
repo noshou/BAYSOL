@@ -77,9 +77,9 @@ const chain: CustomEntry = {
     kind: "polymer",
     name: "chain-2",
     units: [{ label: "A", formula: "C2H4O", z: 24, slope: 36.7, sigma: null }],
-    "z-ends": 10,
-    "pmv-ends": 19.2,
-    "sigma-ends": null,
+    "zEnds": 10,
+    "pmvEnds": 19.2,
+    "sigmaEnds": null,
 }
 const cnb: CustomEntry = {
     kind: "nonbiological",
@@ -228,7 +228,9 @@ test("family templates: numbers fill the placeholders", () => {
     assert.deepEqual(familyArg(peg(), 1, { n: "22" }), { arg: "PEG n=22" })
     assert.deepEqual(familyArg(peg(), 1, { n: 22.0 }), { arg: "PEG n=22" })
     assert.deepEqual(familyArg(peg(), 1, { n: " 22.5 " }), { arg: "PEG n=22.5" })
+    // biome-ignore lint/style/useNamingConvention: polymer data key
     assert.deepEqual(familyArg(peg(), 0, { Mn: "3350" }), { arg: "PEG 3350" })
+    // biome-ignore lint/style/useNamingConvention: polymer data key
     assert.deepEqual(familyArg(peg(), 0, { Mn: "1e6" }), { arg: "PEG 1000000" })
     const brijArg = familyArg(brij(), 0, { nC: "12", nEO: "23" })
     assert.deepEqual(brijArg, { arg: "Brij nC=12 nEO=23" })
@@ -250,11 +252,15 @@ test("family templates: errors", () => {
 
 test("dextran and pullulan: a molar mass below 1000 counts as kDa", () => {
     const note = "below 1000 counts as kDa"
+    // biome-ignore lint/style/useNamingConvention: polymer data key
     assert.deepEqual(familyArg(dextran(), 0, { Mn: "40" }), { arg: "dextran 40", note })
+    // biome-ignore lint/style/useNamingConvention: polymer data key
     assert.deepEqual(familyArg(dextran(), 0, { Mn: "40000" }), { arg: "dextran 40000" })
     assert.deepEqual(familyArg(dextran(), 1, { n: "250" }), { arg: "dextran n=250" })
+    // biome-ignore lint/style/useNamingConvention: polymer data key
     const glucan = familyArg(need("glucan"), 0, { Mn: "100" })
     assert.equal("note" in glucan && glucan.note, note)
+    // biome-ignore lint/style/useNamingConvention: polymer data key
     assert.ok(!("note" in familyArg(peg(), 0, { Mn: "100" })))
 })
 

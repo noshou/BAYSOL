@@ -1,0 +1,31 @@
+// University brand colours
+
+{
+    "set": "univ-world",
+    "title": "University brand pages outside the US and Canada",
+    "licence": "brand-use terms not checked; colour values are facts",
+    "url": "see each entry",
+    "colours": [
+        {"name": "cambridge blue", "hex": "#8ee8d8", "url": "https://www.cam.ac.uk/brand-resources/guidelines/colour", "family": "blue"},
+        {"name": "cambridge warm blue", "hex": "#00bdb6", "url": "https://www.cam.ac.uk/brand-resources/guidelines/colour", "family": "blue"},
+        {"name": "cambridge dark blue", "hex": "#133844", "url": "https://www.cam.ac.uk/brand-resources/guidelines/colour", "family": "blue"},
+        {"name": "imperial blue", "hex": "#003e74", "verified": false, "url": "https://www.imperial.ac.uk/brand-style-guide/visual-identity/brand-colours/", "family": "blue"},
+        {"name": "imperial light blue", "hex": "#d4effc", "verified": false, "url": "https://www.imperial.ac.uk/brand-style-guide/visual-identity/brand-colours/", "family": "blue"},
+        {"name": "imperial process blue", "hex": "#0091d4", "verified": false, "url": "https://www.imperial.ac.uk/brand-style-guide/visual-identity/brand-colours/", "family": "blue"},
+        {"name": "imperial pool blue", "hex": "#00a0c8", "verified": false, "url": "https://www.imperial.ac.uk/brand-style-guide/visual-identity/brand-colours/", "family": "blue"},
+        {"name": "imperial dark teal", "hex": "#0f8291", "verified": false, "url": "https://www.imperial.ac.uk/brand-style-guide/visual-identity/brand-colours/", "family": "cyan"},
+        {"name": "nus blue", "hex": "#003d7c", "verified": false, "url": "https://www.nus.edu.sg/identity/guidelines/corporate-colours", "family": "blue"},
+        {"name": "nus orange", "hex": "#ef7c00", "verified": false, "url": "https://nus.edu.sg/alumnet/docs/default-source/nus-cares-logo/nus-cares_logo-brand-guide.pdf", "family": "orange"},
+        {"name": "melbourne blue", "hex": "#094183", "verified": false, "url": "https://brandhub.unimelb.edu.au/guidelines/colour-palette", "family": "blue"},
+        {"name": "melbourne heritage blue", "hex": "#000f46", "verified": false, "url": "https://healthsciences.unimelb.edu.au/__data/assets/pdf_file/0009/5082156/UoM-Logo-Guidelines.pdf", "family": "blue"},
+        {"name": "ucl dark purple", "hex": "#361a54", "verified": false, "url": "https://www.ucl.ac.uk/brand-and-experience/brand/visual-guidelines/colour", "family": "purple"},
+        {"name": "ucl bright purple", "hex": "#993bff", "verified": false, "url": "https://www.ucl.ac.uk/brand-and-experience/brand/visual-guidelines/colour", "family": "purple"},
+        {"name": "ucl mid purple", "hex": "#ba82ff", "verified": false, "url": "https://www.ucl.ac.uk/brand-and-experience/brand/visual-guidelines/colour", "family": "purple"},
+        {"name": "ucl heritage blue", "hex": "#30d6ff", "verified": false, "url": "https://www.ucl.ac.uk/brand-and-experience/brand/ucl200/bicentenary-colours", "family": "blue"},
+        {"name": "utokyo blue", "hex": "#0b8bee", "verified": false, "url": "https://www.u-tokyo.ac.jp/content/400236233.pdf", "family": "blue"},
+        {"name": "utokyo yellow", "hex": "#ffcd00", "verified": false, "url": "https://www.u-tokyo.ac.jp/content/400236233.pdf", "family": "yellow"},
+        {"name": "uct blue", "hex": "#0099ff", "verified": false, "url": "https://uct.ac.za/staff/services-facilities-communication-marketing-branding/colour-palettes", "family": "blue"},
+        {"name": "uct red", "hex": "#bf1238", "verified": false, "url": "https://uct.ac.za/staff/services-facilities-communication-marketing-branding/colour-palettes", "family": "red"},
+        {"name": "uct navy", "hex": "#00247d", "verified": false, "url": "https://uct.ac.za/staff/services-facilities-communication-marketing-branding/colour-palettes", "family": "blue"}
+    ]
+}

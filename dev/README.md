@@ -17,7 +17,7 @@ The whole unit suite (no file names given) runs in `UNIT_JOBS` Julia processes a
 bysl unit shannon wls                                  # only the test files whose name contains one of these words
 bysl fits list                                         # the fitting tests and the tags each takes
 bysl fits run                                          # every fitting test
-bysl fits run SASDMJ9 SASDBS6                          # just these
+bysl fits run SASDMJ9 SASDTK5                          # just these
 bysl fits run SASDMJ9 --report                         # run it, then print its Results-table row
 bysl fits run --no-fit --table                         # rewrite the Results table in fitting_tests/README.md from the run logs
 bysl fits run SASDMJ9 --fixme                          # run it, then the sampler diagnostics
@@ -26,7 +26,7 @@ bysl fits run SASDMJ9 --bench --approved               # runs the benchmark (see
 bysl fits diagnose --residuals                         # no fit named: every run of every fitting test
 bysl fits diagnose SASDMJ9                             # every diagnostic part on this fit
 bysl fits diagnose --chains --seeds 1,2,3 SASDMJ9      # only the chains, three RNG seeds
-bysl fits diagnose --report --out /tmp/d SASDBS6:fit2_model3   # one part, written to /tmp/d/report.txt
+bysl fits diagnose --report --out /tmp/d SASDTK5:fit3_model1   # one part, written to /tmp/d/report.txt
 bysl fits profile SASDMJ9                              # where the static build spends its time
 bysl results table --update                            # regenerate the Results table in fitting_tests/README.md
 bysl results table --check                             # exit 1 if that table is stale
@@ -68,14 +68,14 @@ Every tool prints its usage with `--help`; a tool with subcommands (`fits`, `har
 | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `bysl.jl`                                                                                                                   | the launcher: client of the daemon, `daemon` management, `BYSL_DIRECT`                                                                                                                                                                                           |
 | `Project.toml`, `Manifest.toml`                                                                                             | the environment of the package `Dev`                                                                                                                                                                                                                             |
-| `src/Dev.jl`                                                                                                                | the registry of the tools and the dispatcher; `Server.jl` is the daemon, `Common.jl` the helpers every tool shares (the repository root, running programs, git, the fitting-test lookups, number formatting, the cache), `Precompile.jl` the precompile workload |
-| `src/Fmt.jl`, `Harvest.jl`, `Results.jl`, `Fits.jl`, `Plots.jl`, `Extract.jl`, `Checks.jl`, `Vis.jl`, `Cache.jl`, `Test.jl` | one file per tool (`bysl fmt`, `harvest`, `results`, `fits`, `plots`, `extract`, `precommit` with `unit` and `docs`, `vis`, `cache`, `test`)                                                                                                                     |
-| `src/Report.jl`                                                                                                             | the readers of a fitting-test run: `parse_log` turns the sections of a run log (`<ID>.LOG`) into maps of numbers, `parse_report` reads the text reports (`res*.txt`) of older revisions; used by `Results.jl`                                                    |
-| `test/`                                                                                                                     | the tests of the tools (`runtests.jl`, `test_*.jl`, `helpers.jl`, `data/`) and their own `Project.toml`; run by `bysl test`                                                                                                                                      |
-| `scripts/child.jl`, `diagnose.jl`, `profile_seed.jl`, `format.jl`, `harvest_defaults.jl`, `harvest_colours.jl`, `extract_formfactor.jl`, `unittests.jl` | the Julia scripts the tools start in another environment: the benchmark's measured process, the diagnostics, the profiler, JuliaFormatter, the two that need BAYSOL or SQLite from the root project, and the runner of the unit suite |
-| `src/fit_seed.jl`, `seed_diagnostics.jl` | the `Seed` a fitting test would sample, built without fitting, and the sampler diagnostics that run on any `Seed`; a unit test includes them (plain files, not part of the module `Dev`: `include`d by the scripts and the unit tests, which have BAYSOL) |
+| `src/Dev.jl`                                                                                                                | the registry of the tools and the dispatcher; `server.jl` is the daemon, `common.jl` the helpers every tool shares (the repository root, running programs, git, the fitting-test lookups, number formatting, the cache), `precompile.jl` the precompile workload |
+| `src/fmt.jl`, `harvest.jl`, `results.jl`, `fits.jl`, `Plots.jl`, `extract.jl`, `checks.jl`, `vis.jl`, `cache.jl`, `Test.jl` | one file per tool (`bysl fmt`, `harvest`, `results`, `fits`, `plots`, `extract`, `precommit` with `unit` and `docs`, `vis`, `cache`, `test`)                                                                                                                     |
+| `src/report.jl`                                                                                                             | the readers of a fitting-test run: `parse_log` turns the sections of a run log (`<ID>.LOG`) into maps of numbers, `parse_report` reads the text reports (`res*.txt`) of older revisions; used by `results.jl`                                                    |
+| `test/`                                                                                                                     | the tests of the tools (`runtests.jl`, `test-*.jl`, `helpers.jl`, `data/`) and their own `Project.toml`; run by `bysl test`                                                                                                                                      |
+| `scripts/child.jl`, `diagnose.jl`, `profile-seed.jl`, `format.jl`, `harvest-defaults.jl`, `extract-formfactor.jl`, `unittests.jl` | the Julia scripts the tools start in another environment: the benchmark's measured process, the diagnostics, the profiler, JuliaFormatter, the two that need BAYSOL or SQLite from the root project, and the runner of the unit suite |
+| `src/fit-seed.jl`, `seed-diagnostics.jl` | the `Seed` a fitting test would sample, built without fitting, and the sampler diagnostics that run on any `Seed`; a unit test includes them (plain files, not part of the module `Dev`: `include`d by the scripts and the unit tests, which have BAYSOL) |
 
-To add a tool, write a module with a `run(argv::Vector{String})::Int` and a `USAGE` text in `src/`, include it in `src/Dev.jl` and add it to `TASKS` there; a tool with subcommands nests one module per subcommand (see `Harvest.jl`). A tool returns its exit status and never exits the process, since it may run in the daemon; `fail(who, message)` stops it with status 2 and a message. Add its tests to a `test/test_*.jl` file.
+To add a tool, write a module with a `run(argv::Vector{String})::Int` and a `USAGE` text in `src/`, include it in `src/Dev.jl` and add it to `TASKS` there; a tool with subcommands nests one module per subcommand (see `harvest.jl`). A tool returns its exit status and never exits the process, since it may run in the daemon; `fail(who, message)` stops it with status 2 and a message. Add its tests to a `test/test-*.jl` file.
 
 ## bysl fmt
 
@@ -98,16 +98,15 @@ The code rule of the repository is **at most 92 characters per line** in code fi
 ## bysl harvest
 
 ```
-bysl harvest [defaults|colours|solutes|residues|pmv-mean] [--check]
+bysl harvest [defaults|solutes|residues|pmv-mean] [--check]
 ```
 
-Keeps the generated files and constants in step with their sources; with no name all five run, and `--check` changes nothing and exits 1 when something is out of date. `bysl precommit` runs the first form, so what a commit changes belongs to it. The harvested files are JSON.
+Keeps the generated files and constants in step with their sources; with no name all four run, and `--check` changes nothing and exits 1 when something is out of date. `bysl precommit` runs the first form, so what a commit changes belongs to it. The harvested files are JSON.
 
-- **`defaults`** writes `tui/assets/data/default_settings.json` (every setting: its default, type, limits and, where they apply, its choices, shape and part names, in the order of the `SETTING_NAMES` of the `Params.jl` files) and `setting_relations.json` (the rules that tie settings together). It runs `dev/scripts/harvest_defaults.jl` in the root project, since it reads the constants of the package. A table that names a setting `SETTING_NAMES` does not list, or a tuple with the wrong number of part names, is an error.
-- **`colours`** writes `tui/assets/data/colours.json` (every colour name the colour picker offers, with its `#rrggbb`) `colour-families.json` (the family of each name, one of 12: red, orange, yellow, green, cyan, blue, purple, pink, brown, gray, black, white, from its hue, saturation and lightness and the family word at the end of the name; the picker's filter reads it; the harvest prints the count of each) and `colour-julia.json` (the names of that list that Colors.jl reads as the same colour: the CSS and X11 names, which a setting keeps as names), from the colour sets in `dev/data/colours/` (`css148.txt`, `x11rgb.txt`, `FED-STD-595C.txt`, `tailwind.txt`, `xkcd.txt`, `NBS-ISCC-rgb.txt`, `winsor-newton-lab.txt`, `crayola.txt`, `paul-tol.txt`, `resenecolours.txt`; their licences and the rules that make the list are in the README there) and the sets of `tui/assets/data/colour-sources.json` (government, international-body, university and flag colours of countries, states, provinces and regions, each entry with its source URL, licence or terms and a `verified` flag, and for the flags the `source_type`: Wikipedia or the secondary flagcolorcodes.com). It runs `dev/scripts/harvest_colours.jl` (no network and no NamedColors.jl: the files are in the repository), so `--check` can say whether the list is up to date.
-- **`solutes`** writes `tui/assets/data/solute_index.json`: every name a user may type for a solute, to its canonical target (the lower-case IUPAC name of a non-biological solute, the grade of a polymer, the id of a polymer family), from the alias and value tables of `src/BulkElectronDensity` and `tui/resources/polymer_families.json`. A polymer's `basis` says what its molarity is per where that is not the moles of chains.
-- **`residues`** writes `tui/assets/data/residues.json` from `src/MolecularStructure/components.tsv` (three objects, name to letter: `protein` has every peptide-linking component with its one-letter code, the one of the parent for a modified residue, its own for the 22 standard ones, `X` when there is no single standard parent; `dna` and `rna` have every linking component of that class with its base, `N` when the table names none). The terminal interface reads it to turn the residue names of a structure file into a sequence. No cut was needed: the file has about 2,650 entries (37 KB).
-- **`pmv-mean`** rewrites the literal of `NONBIO_MEAN_UNCERTAINTY` in `src/BulkElectronDensity/BulkElectronDensity.jl` to the mean of the stated uncertainties of `nonbiological.json`, rounded to six decimals.
+- **`defaults`** writes `tui/assets/data/default_settings.json` (every setting: its default, type, limits and, where they apply, its choices, shape and part names, in the order of the `SETTING_NAMES` of the `params.jl` files) and `setting_relations.json` (the rules that tie settings together). It runs `dev/scripts/harvest-defaults.jl` in the root project, since it reads the constants of the package. A table that names a setting `SETTING_NAMES` does not list, or a tuple with the wrong number of part names, is an error.
+- **`solutes`** writes `tui/assets/data/solute_index.json`: every name a user may type for a solute, to its canonical target (the lower-case IUPAC name of a non-biological solute, the grade of a polymer, the id of a polymer family), from the alias and value tables of `src/bulk-electron-density` and `tui/resources/polymer_families.json`. A polymer's `basis` says what its molarity is per where that is not the moles of chains.
+- **`residues`** writes `tui/assets/data/residues.json` from `src/molecular-structure/components.tsv` (three objects, name to letter: `protein` has every peptide-linking component with its one-letter code, the one of the parent for a modified residue, its own for the 22 standard ones, `X` when there is no single standard parent; `dna` and `rna` have every linking component of that class with its base, `N` when the table names none). The terminal interface reads it to turn the residue names of a structure file into a sequence. No cut was needed: the file has about 2,650 entries (37 KB).
+- **`pmv-mean`** rewrites the literal of `NONBIO_MEAN_UNCERTAINTY` in `src/bulk-electron-density/bulk-electron-density.jl` to the mean of the stated uncertainties of `nonbiological.json`, rounded to six decimals.
 
 ## bysl results
 
@@ -131,7 +130,7 @@ bysl fits bench --approved [--state cold|warm] [--out FILE.json] ID[:tag] ...
 ```
 
 - **`list`** prints every fitting test with the tags it takes (`fit2_model1 ...`, or `(single run, no tag)`).
-- **`run`**: `ID ...` are folders of `test/fitting_tests/` (`SASDMJ9`, `SASDBS6`, ...). If one does not exist, nothing runs and the available folders are listed. With none given, every fitting test runs. Each fit is its script run with the `test/fitting_tests` environment; it rewrites its workbook, its figures and its section of the folder's run log (`<ID>.LOG`).
+- **`run`**: `ID ...` are folders of `test/fitting_tests/` (`SASDMJ9`, `SASDTK5`, ...). If one does not exist, nothing runs and the available folders are listed. With none given, every fitting test runs. Each fit is its script run with the `test/fitting_tests` environment; it rewrites its workbook, its figures and its section of the folder's run log (`<ID>.LOG`).
   - **`--no-fit`** skips the fits themselves, for when only a later step is wanted.
   - The steps run in a fixed order: the fits, then `--bench`, then `--report`, then `--table`, then `--fixme`. A failing step does not stop the later ones; the exit status is 1 if any failed.
   - **`--bench`** also runs the cold / steady-state benchmark on the selected fits, one `ID[:tag]` per run of each script. **Without `--approved` this only prints the benchmark's plan and runs nothing.** **`--approved`** is passed to the benchmark. Benchmark timings are only meaningful on a quiet machine, so a benchmark runs only after the repository owner has approved that run. `--approved` without `--bench` is an error.
@@ -139,7 +138,7 @@ bysl fits bench --approved [--state cold|warm] [--out FILE.json] ID[:tag] ...
   - **`--trace-compile FILE`** runs the fits with Julia's `--trace-compile=FILE`: the file lists the methods each fit's process had to compile at run time, i.e. what a precompile workload has not covered.
   - **`--fixme`** runs the sampler diagnostics (`bysl fits diagnose --report`) on every run of the selected fits: MAP starts, Hessian, step size and tree depth, gradient error, modes. Use it when a fit looks wrong.
 - **`diagnose`** runs the diagnostic parts described under "Sampler Diagnostics" below, on fits that already exist, without rerunning their fits or reports.
-- **`profile`** builds the `Seed` of each fitting test twice in one process (the first call warms the compiler) and profiles the second with Julia's sampling profiler: the stage timings of that build (each static stage with its note, e.g. `[cache hit]` or the residue counts of the nucleotide stages; see "Reports" below) and the samples by function, charged to the innermost BAYSOL function (its own code plus the libraries it calls) and inclusive. The profiler slows the code by a factor of several, so read the proportions, not the seconds. It is how the time in `forward_cache` was found; use `bysl fits bench --approved` or the reports to measure a change.
+- **`profile`** builds the `Seed` of each fitting test twice in one process (the first call warms the compiler) and profiles the second with Julia's sampling profiler: the stage timings of that build (each static stage with its note, e.g. `[cache hit]` or the residue counts of the nucleotide stages; see "Reports" below) and the samples by function, charged to the innermost BAYSOL function (its own code plus the libraries it calls) and inclusive. The profiler slows the code by a factor of several, so read the proportions, not the seconds. It is how the time in `forwardCache` was found; use `bysl fits bench --approved` or the reports to measure a change.
 - **`bench`** is the cold / steady-state benchmark driver (protocol below): a throwaway depot and repository copy, one `child.jl` process per fit, one JSON result.
 
 ## bysl vis
@@ -148,27 +147,28 @@ bysl fits bench --approved [--state cold|warm] [--out FILE.json] ID[:tag] ...
 bysl vis [NAME ...] [--list] [--dry-run]
 ```
 
-- **`NAME ...`** are the visual checks (see `--list`): `plastic_2d`, `plastic_3d`, `sasa_hydro` and `sasa_hydro_report`. An unknown name stops the run before anything starts. With none given, every check runs, one after the other.
-- Each check is one call in a fresh Julia process in `test/visualize`'s own environment. Everything but `sasa_hydro_report` opens a window, so it needs a display; `sasa_hydro_report` prints numbers only.
+- **`NAME ...`** are the visual checks (see `--list`): `plastic_2d`, `plastic_3d`, `sasa_hydro` and `sasaHydroReport`. An unknown name stops the run before anything starts. With none given, every check runs, one after the other.
+- Each check is one call in a fresh Julia process in `test/visualize`'s own environment. Everything but `sasaHydroReport` opens a window, so it needs a display; `sasaHydroReport` prints numbers only.
 
 ## bysl unit, bysl test
 
-`bysl unit` runs every `../test/unit_tests/units/test_*.jl` (or, given words, the files whose name contains one of them; a word that matches no file is an error); a new test file is picked up by creating it there. Each file is also runnable on its own (`julia --project=test test/unit_tests/units/test_sampler.jl`).
+`bysl unit` runs every `../test/unit-tests/units/test-*.jl` (or, given words, the files whose name contains one of them; a word that matches no file is an error); a new test file is picked up by creating it there. Each file is also runnable on its own (`julia --project=test test/unit-tests/units/test-sampler.jl`).
 
-`bysl test` runs the tests of the dev tools, `test/test_*.jl` in this folder, in their own environment (`test/Project.toml`, which has the package `Dev` as a path dependency). They cover the helpers, the formatter and its rules, the harvesters, the readers of the run logs and what is built on them, the extractors, the cache and the command lines of the tools. They run no fit and no benchmark (`fits bench` is tested only without `--approved`, on a sandbox). Given words, only the test files whose name contains one of them run (`bysl test fmt results`); the exit status is 1 if a test fails.
+`bysl test` runs the tests of the dev tools, `test/test-*.jl` in this folder, in their own environment (`test/Project.toml`, which has the package `Dev` as a path dependency). They cover the helpers, the formatter and its rules, the harvesters, the readers of the run logs and what is built on them, the extractors, the cache and the command lines of the tools. They run no fit and no benchmark (`fits bench` is tested only without `--approved`, on a sandbox). Given words, only the test files whose name contains one of them run (`bysl test fmt results`); the exit status is 1 if a test fails.
 
 ## bysl extract
 
 ```
-bysl extract formfactor xraydb.sqlite src/Scattering/form_factors.sqlite3
+bysl extract formfactor xraydb.sqlite src/scattering/form_factors.sqlite3
 bysl extract components [--check|--update] [SOURCE [OUT]] [--val-inference]
+bysl extract pmv SUBCOMMAND [args]        # run | batch | fit | holdout | estimate | row
 ```
 
 Offline tools that regenerate the data bundled with the package; neither runs at run time, and the results are checked in.
 
-**`formfactor`** rebuilds `src/Scattering/form_factors.sqlite3` from xraydb's `xraydb.sqlite` (Waasmaier-Kirfel f0, Chantler f1/f2, and deuterium as a copy of hydrogen). It runs `dev/scripts/extract_formfactor.jl` in the root project, which needs SQLite.jl. The database is built in a temporary file next to the destination and renamed over it when it is complete.
+**`formfactor`** rebuilds `src/scattering/form_factors.sqlite3` from xraydb's `xraydb.sqlite` (Waasmaier-Kirfel f0, Chantler f1/f2, and deuterium as a copy of hydrogen). It runs `dev/scripts/extract-formfactor.jl` in the root project, which needs SQLite.jl. The database is built in a temporary file next to the destination and renamed over it when it is complete.
 
-**`components`**: `src/MolecularStructure/components.tsv` is the built-in lookup of the component dictionary, so that a residue name is classified without a network. The tool regenerates it from the wwPDB file `components.cif.gz` (default `https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz`, or a local copy or other URL given as the first argument), reading the gzip as a stream. The file starts with `#` lines (source URL, the file's Last-Modified, the fetch date, `# rows: N`, the column names), then one row per component sorted by id, tab separated:
+**`components`**: `src/molecular-structure/components.tsv` is the built-in lookup of the component dictionary, so that a residue name is classified without a network. The tool regenerates it from the wwPDB file `components.cif.gz` (default `https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz`, or a local copy or other URL given as the first argument), reading the gzip as a stream. The file starts with `#` lines (source URL, the file's Last-Modified, the fetch date, `# rows: N`, the column names), then one row per component sorted by id, tab separated:
 
 
 | Column                | Content                                                                                                                                                            |
@@ -188,7 +188,7 @@ A missing field reads as `?`, and a tab inside a value becomes a space. `--check
 
 ```bash
 bysl extract components --check    # download the dictionary, compare with the table; exit 1 if stale
-bysl extract components --update   # ... and rewrite src/MolecularStructure/components.tsv
+bysl extract components --update   # ... and rewrite src/molecular-structure/components.tsv
 bysl extract components components.cif.gz --check   # from a local copy
 bysl extract components --val-inference             # precision of the base inference (no table written)
 ```
@@ -203,7 +203,7 @@ bysl plots fonts --list
 
 **`render`** renders the `.tex` figures that `results` writes. `DIR` is the folder with the files; `--recursive` also takes its subfolders. Each file is compiled with `lualatex` (or `xelatex`) in its own folder, with `-interaction=nonstopmode -halt-on-error`, and its `.aux` and `.log` are removed afterwards; a file that fails keeps its `.log` and the others still run. The default `--type pdf` needs only the engine; `svg`, `png` and `jpeg` convert the PDF with poppler's `pdftocairo` and remove it. Output files sit next to their `.tex`. The exit status is 1 if any file failed or no engine is installed. SVG is about four to five times the size of the PDF and its text is outlines, not text, so it is for web pages and slides.
 
-**`fonts`** asks the TeX Live installation whether a font can be used for the figures. For each `NAME` (a `fontspec` name such as `TeX Gyre Pagella` or `Latin Modern Math`; case and spaces do not matter) it prints `NAME: true` or `NAME: false`, and the exit status is 1 if any is `false`. Any font that says `true` is a valid `font` of `results`, as the text font, or as the second entry of a `("Text font", "Math font")` pair. `--list` prints every installed font family (from `fc-list`, or from LuaLaTeX's index where there is none), the math fonts first. The check is `luaotfload-tool --find`, which comes with TeX Live, and it does not rebuild the font database: a font installed since the database was last built needs `luaotfload-tool --update` first. Without `luaotfload-tool` the tool stops with a message, since nothing can be said about a font. `BAYSOL.font_available("NAME")` is the same question from Julia.
+**`fonts`** asks the TeX Live installation whether a font can be used for the figures. For each `NAME` (a `fontspec` name such as `TeX Gyre Pagella` or `Latin Modern Math`; case and spaces do not matter) it prints `NAME: true` or `NAME: false`, and the exit status is 1 if any is `false`. Any font that says `true` is a valid `font` of `results`, as the text font, or as the second entry of a `("Text font", "Math font")` pair. `--list` prints every installed font family (from `fc-list`, or from LuaLaTeX's index where there is none), the math fonts first. The check is `luaotfload-tool --find`, which comes with TeX Live, and it does not rebuild the font database: a font installed since the database was last built needs `luaotfload-tool --update` first. Without `luaotfload-tool` the tool stops with a message, since nothing can be said about a font. `BAYSOL.fontAvailable("NAME")` is the same question from Julia.
 
 ## bysl docs
 
@@ -221,18 +221,20 @@ bysl precommit [--quick] [--dry-run] [--threads N]
 
 The single entry point to run before a commit; a failing step does not stop the later ones and the exit status is 1 if any failed. Steps, in order: **tool-tests**, **pmv-mean**, **solute-index** and **residue-table** (the harvesters rewrite what is stale; the changed files belong in the commit), **unit-tests**, **concurrency-tests**, **whitespace** (trailing whitespace on the lines you changed, untracked files included, is stripped and reported, never a failure; only a leftover conflict marker fails), **default-settings** (the harvest of the defaults), **ts-format**, **ts-unused** ([Knip](https://knip.dev), config `knip.jsonc`: an unused dependency, file, export or type of `tui/` refuses the commit), **julia-format**, **line-length** (a line over 92 characters, a tab, or TypeScript, Julia or SCSS indented by anything but a multiple of 4 spaces refuses the commit; Julia lines that continue an expression after a trailing operator are exempt, JuliaFormatter aligns those), **results-table** and **docs-build** (the strict documentation build). `--quick` skips the Julia steps (unit-tests, concurrency-tests, default-settings, julia-format, docs-build). It never runs a fitting test or a benchmark.
 
+**`pmv`** runs `dev/pmv-rism/pmv.py`, the 3D-RISM partial-molar-volume tools (conformers, AmberTools 3D-RISM with cSPC/E water and the KH closure, a Bayesian group correction fitted on measured solutes, candidate rows for `src/bulk-electron-density/polymers/`, and the redo of the old `estimated` rows into `dev/pmv-rism/out/redone_rows.tsv`). It starts the Python of the AmberTools environment (`$AMBERHOME`, default `~/.conda/envs/amber26`, which also holds RDKit) with `-I`. It is not part of `bysl precommit`: a run takes hours of every core. `dev/pmv-rism/README.md` has the commands, inputs, outputs, run times and the rebuild-from-scratch recipe.
+
 ## Requirements
 
 `julia` (or `JULIA=/path/to/julia`) for everything. `bysl plots` needs a TeX Live installation (`lualatex` or `xelatex`, and `luaotfload-tool` for the fonts) and, for SVG, PNG and JPEG, poppler's `pdftocairo`. `bysl extract formfactor` runs in the root project, which has SQLite.jl.
 
 ## Reports
 
-The run log (`test/fitting_tests/<ID>/<ID>.LOG`, one file per fitting-test folder, tracked in git, a section for each run) is the one file the tools read: flat tab-aligned `name<TAB>value` rows (the timing table as a person reads it, between `--- timing ---` and `--- machine ---`), see `BAYSOL.write_log` and the Pipeline README. `src/Report.jl` turns a section into the map of numbers every tool uses (`parse_log`); older revisions keep their results in `res*.txt` text reports (the timing table printed the stages of the static build in the order the pipeline recorded them, a stage's note in square brackets on the lines under it), which `parse_report` reads. No tool reads a workbook.
+The run log (`test/fitting_tests/<ID>/<ID>.LOG`, one file per fitting-test folder, tracked in git, a section for each run) is the one file the tools read: flat tab-aligned `name<TAB>value` rows (the timing table as a person reads it, between `--- timing ---` and `--- machine ---`), see `BAYSOL.writeLog` and the Pipeline README. `src/report.jl` turns a section into the map of numbers every tool uses (`parse_log`); older revisions keep their results in `res*.txt` text reports (the timing table printed the stages of the static build in the order the pipeline recorded them, a stage's note in square brackets on the lines under it), which `parse_report` reads. No tool reads a workbook.
 
 
 | Stage (depth 1 of the static build)                             | When                                                                                   | Note                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `reslove_struct`                                                | always                                                                                 |                                                                                                                                                                                                                              |
+| `resloveStruct`                                                | always                                                                                 |                                                                                                                                                                                                                              |
 | `components`                                                    | always: the component table load and the lookups (builtin table, cache, RCSB download) | `[17 residue names: 17 builtin, 0 cache, 0 download]`                                                                                                                                                                        |
 | `structure checks`                                              | always                                                                                 | `[N chains relabelled, M duplicate atoms dropped, K dummy-like findings]`                                                                                                                                                    |
 | `classify`                                                      | with hydrogens                                                                         | `[nucleic: AMBER, titration none]`, `[mixed: PARSE, titration propka]`, `[protein: PARSE, titration propka]`, then optional `; N legacy-named ...`, `; N chains relabelled`, `; N dummy-like residues (undefined behaviour)` |
@@ -241,18 +243,18 @@ The run log (`test/fitting_tests/<ID>/<ID>.LOG`, one file per fitting-test folde
 | `modified nucleotide hydrogens`                                 | only when the structure has modified nucleotides                                       | `[14 residues: 14 hydrogenated through their base, 0 without a base; 149 hydrogens placed, 232 in the free components' formulas]`                                                                                            |
 | `modified amino acid hydrogens`                                 | only when the file has modified amino acids (HETATM, e.g. MSE), on every route         | `[20 residues: 20 hydrogenated through their parent, 0 without a parent; 183 hydrogens placed]`                                                                                                                              |
 | `heavy atoms`                                                   | with hydrogens                                                                         | `[N in, N out; R restored, A added by pdb2pqr]`                                                                                                                                                                              |
-| `load_molecule`, `SASA`, ...                                    | always                                                                                 |                                                                                                                                                                                                                              |
+| `loadMolecule`, `SASA`, ...                                    | always                                                                                 |                                                                                                                                                                                                                              |
 
-How the tools read them (`src/Report.jl`, by stage name over the `--- timing ---` block of the run log; a run that lacks a stage, or to which it did not apply, has `""` for it):
+How the tools read them (`src/report.jl`, by stage name over the `--- timing ---` block of the run log; a run that lacks a stage, or to which it did not apply, has `""` for it):
 
-- **Keys.** Seconds: `:components`, `:struct_chk`, `:classify`, `:propka`, `:pdb2pqr`, `:moded_hyd` (nucleotides), `:moded_aa_hyd`, `:heavy_atoms` (and the existing `:reslove_struct`, `:load_molecule`, ...). `:pdb2pqr` is the `pdb2pqr*` stage of the run, whichever of the three variants it was (the patterns match on the prefix, like `propka*`); a run records exactly one. `:comp_dwnld` is the `N` of the components note. The notes themselves are in the `stage_notes` of a run (a map from stage name to note; see `stage_notes` in `Report.jl`), not among the ordered keys, so the TSV (`bysl results table --tsv`) and `--csv-all` outputs (numbers only) do not change shape.
-- **Wall clock without external tools (`:wall_ex`, the convention of every comparison).** wall clock minus `:startup` (process start to `seed_model`) minus `:plot_timing` minus `:propka` minus `:pdb2pqr` (every `pdb2pqr*` stage) minus, only when `:comp_dwnld` is above 0, the seconds of `components` (a download is network time, and the stage cannot separate it from the table load; a lookup that downloaded nothing is computing and stays in). Everything else (`classify`, `modified amino acid hydrogens`, `structure checks`, `heavy atoms`, `modified nucleotide hydrogens`, `reslove_struct`) is in-process work and stays in the wall clock. A stage a report lacks contributes nothing, so the 53 reports of the original suite give exactly the numbers they always gave.
+- **Keys.** Seconds: `:components`, `:struct_chk`, `:classify`, `:propka`, `:pdb2pqr`, `:moded_hyd` (nucleotides), `:modedAaHyd`, `:heavy_atoms` (and the existing `:resloveStruct`, `:loadMolecule`, ...). `:pdb2pqr` is the `pdb2pqr*` stage of the run, whichever of the three variants it was (the patterns match on the prefix, like `propka*`); a run records exactly one. `:compDwnld` is the `N` of the components note. The notes themselves are in the `stage_notes` of a run (a map from stage name to note; see `stage_notes` in `report.jl`), not among the ordered keys, so the TSV (`bysl results table --tsv`) and `--csv-all` outputs (numbers only) do not change shape.
+- **Wall clock without external tools (`:wall_ex`, the convention of every comparison).** wall clock minus `:startup` (process start to `seedModel`) minus `:plot_timing` minus `:propka` minus `:pdb2pqr` (every `pdb2pqr*` stage) minus, only when `:compDwnld` is above 0, the seconds of `components` (a download is network time, and the stage cannot separate it from the table load; a lookup that downloaded nothing is computing and stays in). Everything else (`classify`, `modified amino acid hydrogens`, `structure checks`, `heavy atoms`, `modified nucleotide hydrogens`, `resloveStruct`) is in-process work and stays in the wall clock. A stage a report lacks contributes nothing, so the 53 reports of the original suite give exactly the numbers they always gave.
 - **`bysl results compare`.** The timing table has a row for each stage above (a stage no report of a column has shows `-`, not 0, and its ratio `n/a`; the `pdb2pqr (any variant)` row sums the variant of each run). Below it, the stage notes of the judged revision for every fit that is not a protein-only run with all caches hit (nucleic and mixed fits, a `cache miss`, a download), so the cache and the nucleotide counts behind a time are visible. `bysl results compare --bench` sums the stages by name prefix (`pdb2pqr` takes all three variants; the two `modified ... hydrogens` stages are separate prefixes) and shows a stage that a run did not have as `-`.
-- **`profile_seed.jl`** (`bysl fits profile`) prints every static stage with its note.
+- **`profile-seed.jl`** (`bysl fits profile`) prints every static stage with its note.
 
 ## Sampler Diagnostics
 
-`bysl fits diagnose` has three parts: `--residuals` (are the residuals at the MAP white) and two that answer "where do this fit's divergences and slow mixing come from?": `--report` (one NUTS chain started at the MAP, with the MAP search, the Hessian and the shape of the posterior around it) and `--chains` (the chains `run_model` actually runs, one line each: eight at the start, then up to a few more started at optima that carry mass; `--retry 1` shows the longer rerun `infer` does when R̂ is above 1.01). The output below is a real run on SASDX52 (16,882 atoms, `lMax` 38, 137 binned points), at the defaults of `run_model` (300 warm-up, 700 draws, target acceptance 95 %). It is cut into numbered blocks, each followed by what the block is for and how SASDX52 reads. Lines left out are marked `[…]`.
+`bysl fits diagnose` has three parts: `--residuals` (are the residuals at the MAP white) and two that answer "where do this fit's divergences and slow mixing come from?": `--report` (one NUTS chain started at the MAP, with the MAP search, the Hessian and the shape of the posterior around it) and `--chains` (the chains `runModel` actually runs, one line each: eight at the start, then up to a few more started at optima that carry mass; `--retry 1` shows the longer rerun `infer` does when R̂ is above 1.01). The output below is a real run on SASDX52 (16,882 atoms, `lMax` 38, 137 binned points), at the defaults of `runModel` (300 warm-up, 700 draws, target acceptance 95 %). It is cut into numbered blocks, each followed by what the block is for and how SASDX52 reads. Lines left out are marked `[…]`.
 
 ```bash
 bysl fits diagnose --report SASDX52
@@ -260,24 +262,24 @@ bysl fits diagnose --chains --seeds 6252506411145483830 SASDX52
 bysl fits diagnose --chains --retry 1 --seeds 6252506411145483830 SASDX52
 ```
 
-`6252506411145483830` is the `rng_seed` row of the fit's own run log, so `--chains` replays that very run; without `--seeds` the seed is 7. The thread count does not change any number.
+`6252506411145483830` is the `rngSeed` row of the fit's own run log, so `--chains` replays that very run; without `--seeds` the seed is 7. The thread count does not change any number.
 
 ### Part 1: --report
 
 **1. The fit.** What was loaded: the number of fitted points, atoms, `lMax`, the c1 tolerance, the support of the sampled contrasts, and the χ² of the deposited reference curve on our q set (a floor to compare the fit against).
 
 ```text
-SASDX52   n_q=137  n_atoms=16882  lMax=38  c1 tol=1.0e-8
+SASDX52   nQ=137  nAtoms=16882  lMax=38  c1 tol=1.0e-8
 δρ₃ support = [-11.35, 2.839]   δρ₁,₂ support = [-10.0, 2.0]
 reference curve on our q-set (n=409): χ²_red raw = 0.699, with free scale+offset = 0.701
 ```
 
-**2. The MAP search and the NUTS run.** `n_ok/n_starts` is how many of the L-BFGS starts made gave a result (64 random starts, then a second round of jittered starts around the optima of the first; block 5 lists the 64) and `n_modes` how many distinct optima they found. The NUTS line is one chain started at the MAP: the step size ε before and after adaptation, the leapfrog steps and tree depth, and the number of divergent transitions. The window means show whether the trees grow or shrink during warm-up; acceptance should sit at the target (0.95) and `|ΔH|`, the energy error, should be small.
+**2. The MAP search and the NUTS run.** `nOk/nStarts` is how many of the L-BFGS starts made gave a result (64 random starts, then a second round of jittered starts around the optima of the first; block 5 lists the 64) and `nModes` how many distinct optima they found. The NUTS line is one chain started at the MAP: the step size ε before and after adaptation, the leapfrog steps and tree depth, and the number of divergent transitions. The window means show whether the trees grow or shrink during warm-up; acceptance should sit at the target (0.95) and `|ΔH|`, the energy error, should be small.
 
 ```text
-MAP search: 0.1s  n_ok=70/70  n_modes=2  whitened=true
-NUTS: 0.1s  init ε=1.6  final ε=0.4087  mean n_steps=11.8 mean depth=3.33  frac(depth≥10)=0.000  diverged=2
-mean n_steps by window: [1:75]=12  [76:450]=12  [251:300]=10  [301:1000]=12
+MAP search: 0.1s  nOk=70/70  nModes=2  whitened=true
+NUTS: 0.1s  init ε=1.6  final ε=0.4087  mean nSteps=11.8 mean depth=3.33  frac(depth≥10)=0.000  diverged=2
+mean nSteps by window: [1:75]=12  [76:450]=12  [251:300]=10  [301:1000]=12
 mean accept = 0.927   mean |ΔH| = 0.070
 ```
 
@@ -367,12 +369,12 @@ SASDX52: the gradient error (median 6.7e-5, at most 1.4e-3) is four orders of ma
 
 ### Part 2: --chains
 
-One line per chain of `infer`, the chains `run_model` pools, for the run with the run's own `rng_seed` (the `run` sheet). The first eight chains are fixed: two at the MAP and three mirrored pairs further out. Chains after the eighth are started at optima that the harvest of the first chains' draws found to carry mass (see below), and their `start σ` is the optimum's distance from the MAP. Columns: `start σ`, the distance of the chain's start from the MAP in posterior sd (negative is the mirrored chain of a pair); `mode`, the posterior mode it settled in; `pooled`; `kept`, its post-warm-up draws that the pool keeps (a chain in a mode with no mass keeps none); `div` and `div%`, divergent transitions among them; `warm-up div`, divergences during warm-up (not part of the posterior); `ε`, `steps` and `accept`, its mean step size, leapfrog steps and acceptance; `mean log π`. After the table, every divergent draw: chain, iteration, ξ = (ρₑ, δρ₁, δρ₂, δρ₃), log π against the chain's median, leapfrog steps and tree depth.
+One line per chain of `infer`, the chains `runModel` pools, for the run with the run's own `rngSeed` (the `run` sheet). The first eight chains are fixed: two at the MAP and three mirrored pairs further out. Chains after the eighth are started at optima that the harvest of the first chains' draws found to carry mass (see below), and their `start σ` is the optimum's distance from the MAP. Columns: `start σ`, the distance of the chain's start from the MAP in posterior sd (negative is the mirrored chain of a pair); `mode`, the posterior mode it settled in; `pooled`; `kept`, its post-warm-up draws that the pool keeps (a chain in a mode with no mass keeps none); `div` and `div%`, divergent transitions among them; `warm-up div`, divergences during warm-up (not part of the posterior); `ε`, `steps` and `accept`, its mean step size, leapfrog steps and acceptance; `mean log π`. After the table, every divergent draw: chain, iteration, ξ = (ρₑ, δρ₁, δρ₂, δρ₃), log π against the chain's median, leapfrog steps and tree depth.
 
-**10. The run `run_model` does** (300 warm-up, 700 draws):
+**10. The run `runModel` does** (300 warm-up, 700 draws):
 
 ```text
-SASDX52: 10 chains, 300 warm-up + 700 draws, rng_seed 6252506411145483830, δ 95
+SASDX52: 10 chains, 300 warm-up + 700 draws, rngSeed 6252506411145483830, δ 95
 chain  start σ   mode  pooled  kept  div  div%  warm-up div       ε  steps  accept   mean log π
     1    +0.00      1  yes      700    0   0.0            1  0.2561   14.6   0.980       853.72
     2    +0.00      1  yes      700    1   0.1            4  0.2429   13.0   0.944       853.68
@@ -398,7 +400,7 @@ SASDX52: the run has 10 chains. Chains 9 and 10 are the extra ones; both start 5
 **11. The retry** (`--retry 1`: 2000 warm-up, 2000 draws, seeds derived from the run's, as `infer` does when R̂ is above 1.01):
 
 ```text
-SASDX52: 9 chains, 2000 warm-up + 2000 draws, rng_seed 6252506411145483830, δ 95  (the rerun)
+SASDX52: 9 chains, 2000 warm-up + 2000 draws, rngSeed 6252506411145483830, δ 95  (the rerun)
 chain  start σ   mode  pooled  kept  div  div%  warm-up div       ε  steps  accept   mean log π
     1    +0.00      1  yes     2000   26   1.3            9  0.2622   11.7   0.909       853.64
     2    +0.00      2  yes     2000  886  44.3            7  0.1827    8.9   0.405       853.24
@@ -430,7 +432,7 @@ SASDX52: the longer run is worse, not better. The divergences go from 5 to 970 (
 Performance claims in this repository are measured from a **cold state** and reported next to a **steady state**, so a speedup never comes from a cache that a user does not have on first use.
 
 ```bash
-bysl fits bench --approved --state cold --out test/baselines/<name>.json SASDMJ9 SASDBS6:fit2_model3 SASDJ62
+bysl fits bench --approved --state cold --out test/baselines/<name>.json SASDMJ9 SASDTK5:fit3_model1 SASDN32
 bysl results compare --bench new.json     # against the latest release's baseline
 ```
 
@@ -453,11 +455,11 @@ For each fit, in a fresh process (`child.jl` does the fit **twice** in one proce
 
 - **install**: `Pkg.instantiate()` + `Pkg.precompile()` seconds (zero extra work in the warm state);
 - **using BAYSOL**: loading the precompiled package;
-- **first fit**: script prelude and `seed_model` (`seed_s`), then `run_model` (`run_s`), with the per-stage
+- **first fit**: script prelude and `seedModel` (`seedS`), then `runModel` (`runS`), with the per-stage
   seconds, compile seconds and GC seconds from the pipeline's own `Timing` log;
 - **steady fit**: the second fit, with everything already compiled.
 
-Both fits run with the same pinned `rng_seed = 1` (`RNG_SEED` in `child.jl`; the JSON records it, and the number of chains), so a benchmark repeats the same work. A fresh seed each time does not: the MAP search can find a second optimum, which starts two extra chains and costs 60 to 90 % of `run_model` (on SASDBS6:fit2_model3 about one seed in six). The same seed in two revisions is the same work only while the model inputs are the same: a change of the buffer table changes a prior, and so the starting points. Check `n_chains` in both results before reading a difference as speed. `--threads N` sets `JULIA_NUM_THREADS` for the measured process (the v0.3.0 baseline was 4).
+Both fits run with the same pinned `rngSeed = 1` (`RNG_SEED` in `child.jl`; the JSON records it, and the number of chains), so a benchmark repeats the same work. A fresh seed each time does not: the MAP search can find a second optimum, which starts two extra chains and costs 60 to 90 % of `runModel` (on SASDTK5:fit3_model1 about one seed in six). The same seed in two revisions is the same work only while the model inputs are the same: a change of the buffer table changes a prior, and so the starting points. Check `nChains` in both results before reading a difference as speed. `--threads N` sets `JULIA_NUM_THREADS` for the measured process (the v0.3.0 baseline was 4).
 
 Keep the two apart: first-fit minus steady-fit is compilation, and PrecompileTools-style work trades first-fit time for install time, so both rows must be compared. Never quote a warm-state number as what a user gets. The report convention of the fitting tests (wall clock excluding propka, every pdb2pqr stage and a component download; see the stage section above) is unchanged; in the cold state those stages run for real and appear as their own rows.
 

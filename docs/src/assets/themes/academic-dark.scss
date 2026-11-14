@@ -58,7 +58,7 @@
     font-style: normal;
 }
 
-$themename: "academic-dark"; // the stylesheet is academic-dark.css (docs/compile_themes.jl)
+$themename: "academic-dark"; // the stylesheet is academic-dark.css (docs/compile-themes.jl)
 
 // Darkly wants to @import the Lato font by default, but we don't need it.
 $bulmaswatch-import-font: false;
@@ -281,7 +281,7 @@ html.theme--#{$themename} {
         border-top: none;
     }
     // The release under the sidebar title (`v0.3.0-wʋsg_n_yɩɩda`, `dev`), stamped into
-    // each page by docs/release_label.jl. Iosevka Charon Mono, which has the Latin-extended
+    // each page by docs/release-label.jl. Iosevka Charon Mono, which has the Latin-extended
     // and IPA letters of the release names (ʋ, ɩ) that Montserrat lacks.
     #documenter .docs-sidebar .docs-package-name .docs-release {
         display: block;
@@ -386,7 +386,7 @@ html.theme--#{$themename} {
         scrollbar-width: thin;
     }
 
-    // The light/dark button in the navbar (docs/theme_toggle.jl): transparent, sized and
+    // The light/dark button in the navbar (docs/theme-toggle.jl): transparent, sized and
     // centred like the navbar's other icon links. It holds a sun and a moon; this theme
     // hides the one that is not its own.
     #documenter .docs-navbar .docs-theme-toggle {
@@ -415,7 +415,7 @@ html.theme--#{$themename} {
 
     // Documenter's "This documentation is for an older version ..." pop-up is hidden: older
     // releases carry a short "Latest: vX.Y.Z" link in the navbar instead
-    // (docs/version_notice.jl).
+    // (docs/version-notice.jl).
     .warning-overlay-base {
         display: none;
     }

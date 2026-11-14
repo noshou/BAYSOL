@@ -225,13 +225,13 @@ test("the file rules: an array of {title, text}, no limit on count or length", (
 
 test("recipe notes round trip, are absent when empty, kept by save and rename", () => {
     const root = tempDir()
-    writeRecipes(root, [recipe("SEC", { pH: 7, "sigma-pH": 0.1, notes: two })])
+    writeRecipes(root, [recipe("SEC", { pH: 7, "sigmaPh": 0.1, notes: two })])
     const file = JSON.parse(readFileSync(recipesFile(root), "utf-8"))
     assert.deepEqual(Object.keys(file.recipes[0]), [
         "name",
         "solutes",
         "pH",
-        "sigma-pH",
+        "sigmaPh",
         "notes",
     ])
     assert.deepEqual(readRecipes(root)[0]?.notes, two)
@@ -289,7 +289,7 @@ test("buffer notes live next to solutes and survive writes that do not name them
     const dir = tempDir()
     writeSolutes(dir, [row], undefined, undefined, two)
     assert.deepEqual(readBufferNotes(dir), two)
-    writeSolutes(dir, [row, row], { pH: 7, "sigma-pH": 0.1 }, "M")
+    writeSolutes(dir, [row, row], { pH: 7, "sigmaPh": 0.1 }, "M")
     assert.deepEqual(readBufferNotes(dir), two, "kept by the other writers")
     writeSolutes(dir, [row], undefined, undefined, [])
     assert.deepEqual(readBufferNotes(dir), [])
@@ -303,7 +303,7 @@ test("buffer notes live next to solutes and survive writes that do not name them
 
 test("buffer notes are written alone, at once; a later table save is not refused", () => {
     const dir = tempDir()
-    const cond = { pH: 7, "sigma-pH": 0.1 }
+    const cond = { pH: 7, "sigmaPh": 0.1 }
     writeSolutes(dir, [row], cond, "M", two)
     // the table reads the file for editing, then notes are saved from its list
     const held = readSolutes(dir, { track: true })

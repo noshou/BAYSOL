@@ -45,7 +45,7 @@ const DYE: NonbioEntry = {
     sigma: null,
 }
 
-const SNAPSHOT = { z: 40, pmv: 300, "sigma-pmv": null }
+const SNAPSHOT = { z: 40, pmv: 300, "sigmaPmv": null }
 
 /** Answers the wizard step by step: the answers in order, a number picks, text types. */
 function drive(options: WizardOptions, answers: (number | string)[]): Definition {
@@ -245,7 +245,7 @@ const customRow = (): Solute =>
         custom: "My Dye",
         z: 40,
         pmv: 300,
-        "sigma-pmv": null,
+        "sigmaPmv": null,
         mM: 10,
         sigmaMM: 0.1,
     }) as unknown as Solute
@@ -312,7 +312,7 @@ test("the question names what each key does", () => {
         questionLegend(q).map((i) => [i.label, i.keys]),
         [
             ["template", "⏎"],
-            ["plain recipe", "n"],
+            ["plain recipe", "w"],
             ["cancel", "esc"],
         ],
     )
@@ -324,20 +324,20 @@ test("a key answers a question: Enter, n, Esc; n needs a third answer", () => {
     assert.equal(answerOf(new KeyInput("return"), true), "yes")
     assert.equal(answerOf(new KeyInput("escape"), true), "no")
     assert.equal(answerOf(new KeyInput("x", true), true), "no")
-    assert.equal(answerOf(new KeyInput("n", false, "n"), true), "other")
-    assert.equal(answerOf(new KeyInput("n", false, "n"), false), undefined)
+    assert.equal(answerOf(new KeyInput("w", false, "w"), true), "other")
+    assert.equal(answerOf(new KeyInput("w", false, "w"), false), undefined)
     assert.equal(answerOf(new KeyInput("q", false, "q"), true), undefined)
-    assert.ok(new KeyInput("n", false, "n").is(keys.otherAnswer))
+    assert.ok(new KeyInput("w", false, "w").is(keys.otherAnswer))
 })
 
-const CONDITIONS: Conditions = { pH: 7, "sigma-pH": 0.1, temperature: 25 }
+const CONDITIONS: Conditions = { pH: 7, "sigmaPh": 0.1, temperature: 25 }
 
 const SALT: BufferRow = {
     kind: "nonbiological",
     name: "sodium chloride",
     arg: "sodium chloride",
     mM: 100,
-    "sigma-mM": 1,
+    "sigmaMm": 1,
 }
 
 const tableDefinition = (): Definition =>
@@ -350,7 +350,7 @@ test("loading a plain recipe is its rows", () => {
 
 test("loading a template: its rows at the recipe's conditions, else the buffer's", () => {
     const recipe: Recipe = { name: "dye", solutes: [SALT], template: tableDefinition() }
-    const own = recipeLoad({ ...recipe, pH: 6, "sigma-pH": 0.1 }, CONDITIONS)
+    const own = recipeLoad({ ...recipe, pH: 6, "sigmaPh": 0.1 }, CONDITIONS)
     assert.ok("rows" in own && own.template)
     assert.equal(own.rows.length, 3, "the fixed row, then the table's two")
     assert.equal(own.rows[1]?.mM, 10, "the table at pH 6")
@@ -360,7 +360,7 @@ test("loading a template: its rows at the recipe's conditions, else the buffer's
     assert.ok("rows" in fromBuffer)
     assert.equal(fromBuffer.rows[1]?.mM, 11, "the buffer's pH 7: halfway")
     // neither has one: nothing is loaded
-    const bare = recipeLoad(recipe, { pH: 7, "sigma-pH": 0.1 })
+    const bare = recipeLoad(recipe, { pH: 7, "sigmaPh": 0.1 })
     assert.match((bare as { message: string }).message, /set the temperature first/)
     assert.ok(fromBuffer.rows.slice(1).every((r) => r.template !== undefined))
 })
@@ -371,7 +371,7 @@ test("loading a template with no pH anywhere, or outside its table, loads nothin
         (recipeLoad(recipe, undefined) as { message: string }).message,
         /set the pH first/,
     )
-    const far = recipeLoad(recipe, { pH: 12, "sigma-pH": 0.1, temperature: 25 })
+    const far = recipeLoad(recipe, { pH: 12, "sigmaPh": 0.1, temperature: 25 })
     assert.match((far as { message: string }).message, /^dye: pH 12 is outside/)
 })
 
@@ -410,5 +410,5 @@ test("saving: one linked group may be a template, anything else is a plain recip
 /** A buffer row of a template's row, as the file holds it. */
 function rowOfSpec(r: { name: string; arg: string; mM: number; sigmaMM: number }): object {
     const { name, arg, mM } = r
-    return { kind: "nonbiological", name, arg, mM, "sigma-mM": r.sigmaMM }
+    return { kind: "nonbiological", name, arg, mM, "sigmaMm": r.sigmaMM }
 }

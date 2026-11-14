@@ -43,7 +43,7 @@ import {
  * The settings of the user: the application-wide `settings.json` in the BAYSOL folder and
  * the `settings.json` of each project, which starts as an exact copy of the global one.
  *
- * The file has the shape Julia reads (`load_settings` of `settings-file.jl`): a map from
+ * The file has the shape Julia reads (`loadSettings` of `settings-file.jl`): a map from
  * the sheet ids (`sampler`, `model`, `output`, `plots`) to an object from setting name to
  * `{"value": v}`, e.g. `{"sampler": {"N_ADAPT": {"value": 450}}}`. Only a saved setting
  * has an

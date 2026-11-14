@@ -1,0 +1,11 @@
+// Canadian provincial and territorial government colours
+
+{
+    "set": "quebec",
+    "title": "Gouvernement du Québec visual identity (infolettre PIV No. 8, 2020)",
+    "licence": "no licence text in the document; colour values are facts",
+    "url": "https://www.piv.gouv.qc.ca/fileadmin/documents/infolettres/No.8_Ete_2020.pdf",
+    "colours": [
+        {"name": "québec blue", "hex": "#325ea8", "family": "blue"}
+    ]
+}

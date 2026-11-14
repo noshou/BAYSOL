@@ -1,8 +1,8 @@
 # Pipeline: run log and tables
 
-The run's other outputs (`src/Pipeline/`): `write_log` and the timing table (`Log.jl`), `print_summary` and the `run` sheet (`Summary.jl`) and the workbook writers (`Tables.jl`). The figures are on [Pipeline: results and figures](@ref) and the entry points on [Pipeline: entry points](@ref).
+The run's other outputs (`src/pipeline/`): `writeLog` and the timing table (`log.jl`), `printSummary` and the `run` sheet (`summary.jl`) and the workbook writers (`tables.jl`). The figures are on [Pipeline: results and figures](@ref) and the entry points on [Pipeline: entry points](@ref).
 
 ```@autodocs
 Modules = [BAYSOL.Pipeline]
-Pages   = ["Log.jl", "Summary.jl", "Tables.jl"]
+Pages   = ["log.jl", "summary.jl", "tables.jl"]
 ```
