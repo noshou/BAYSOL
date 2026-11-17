@@ -323,7 +323,7 @@ export type RunFlow = {
     liveness: { staleSeconds: number; claimRefreshSeconds: number }
     claim: { maxStampTries: number }
     abort: { graceSeconds: number; killWaitSeconds: number }
-    screen: { tailLines: number }
+    screen: { tailLines: number; refreshSeconds: number }
     julia: { threads: string }
     log: { maxBytes: number }
     archive: {
@@ -333,18 +333,23 @@ export type RunFlow = {
         solid: boolean
         maxEntryBytes: number
         maxExtractBytes: number
+        maxViewCacheBytes: number
     }
 }
 
 /**
  * The tunables of the run flow: the temperature prompt (°C), how stale a heartbeat may
  * be (Julia's `RUN_STALE_S`), how a run folder is claimed, how long an abort waits, the
- * output lines the run screen keeps, the Julia `--threads` and the size cap of a
- * `run.LOG` shown in the pager. Read from `assets/data/run_flow.json`, where the 7z archive
- * of a finished run (`core/archive.ts`, `store/run-archive.ts`) is the `archive` group: the
- * extension of `runs/<stamp>.7z`, the name of the archive inside a run folder of the older
- * layout, the compression level, the largest single entry read into memory and the most
- * bytes one extraction may write.
+ * output lines the run screen keeps, `screen.refreshSeconds` (the idle seconds before
+ * the last frame is painted again in place, 0 = off; `ui/screen-refresh.ts`), the Julia
+ * `--threads` and the size cap of a `run.LOG` shown in the pager. Read from
+ * `assets/data/run_flow.json`, where the 7z archive of a finished run
+ * (`core/archive.ts`, `store/run-archive.ts`) is the `archive` group: the extension of
+ * `runs/<stamp>.7z`, the name of the archive inside a run folder of the older layout,
+ * the compression level, the largest single entry read into memory and the most bytes
+ * one extraction may write, and `maxViewCacheBytes`, the most the temporary copies of
+ * archived workbooks that the viewers open may hold in all (`store/view-cache.ts`; the
+ * oldest copies are removed first).
  */
 export const RUN_FLOW: RunFlow = readAssetJson<RunFlow>("data", "run_flow.json")
 

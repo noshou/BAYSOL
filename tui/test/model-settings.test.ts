@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path"
 import { test } from "node:test"
 import { fileURLToPath } from "node:url"
-import { modelMenuSpec } from "../src/screens/settings-screens.js"
+import { modelMenuSpec } from "../src/screens/settings-menu.js"
 import { ProjectGoneError } from "../src/store/projects.js"
 import {
     defaultCatalog,

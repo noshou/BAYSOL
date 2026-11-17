@@ -28,9 +28,12 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import {
     ArchiveError,
-    extractAllSync,
+    type Entry,
+    extractAllAsync,
+    extractNamesAsync,
     extractNamesSync,
     listEntries,
+    zipFolderAsync,
     zipFolderSync,
 } from "../core/archive.js"
 import { RUN_FLOW } from "../core/environment.js"
@@ -109,12 +112,12 @@ function filesUnder(folder: string, prefix = ""): string[] {
  * @throws [[ArchiveError]] when something is in the way of the tree's folder or the
  *     workbook is not a zip; nothing is left behind then.
  */
-export function expandWorkbook(runDir: string, rel: string): string[] {
+export async function expandWorkbook(runDir: string, rel: string): Promise<string[]> {
     const folder = treeFolder(rel)
     const tree = join(runDir, ...folder.split("/"))
     if (existsSync(tree)) throw new ArchiveError(`${folder} is in the way of ${rel}`)
     try {
-        extractAllSync(join(runDir, ...rel.split("/")), tree)
+        await extractAllAsync(join(runDir, ...rel.split("/")), tree)
         return filesUnder(tree).map((file) => `${folder}/${file}`)
     } catch (error) {
         discardTree(runDir, rel)
@@ -142,42 +145,110 @@ const zipOrder = (files: readonly string[]): string[] => {
     return [...first, ...files.filter((f) => !first.includes(f)).sort()]
 }
 
+/** Counts this process's staging files, so two rebuilds of one file never share one. */
+let stagings = 0
+
 /**
- * Makes the `.xlsx` of a workbook that the archive holds as a tree.
+ * What a rebuild extracts: the archives that hold a tree, with its entries.
  *
- * @param archive - the archive's path.
- * @param rel - the workbook's name in it.
- * @param out - where the workbook is written (its folder must exist); a file there is
- *     replaced.
- * @throws [[ArchiveError]] when the archive holds no tree for it, the tree is over the
- *     size an extraction may take, or 7-Zip fails.
+ * @throws [[ArchiveError]] when no archive holds a tree, or it is over the size an
+ *     extraction may take.
  */
-export function rebuildWorkbook(archive: string, rel: string, out: string): void {
-    const entries = treeEntries(archive, rel)
+function planRebuild(
+    archives: string | readonly string[],
+    rel: string,
+): { archive: string; entries: Entry[] }[] {
+    const parts = (typeof archives === "string" ? [archives] : archives)
+        .map((archive) => ({ archive, entries: treeEntries(archive, rel) }))
+        .filter((part) => part.entries.length > 0)
+    const entries = parts.flatMap((part) => part.entries)
     if (entries.length === 0) throw new ArchiveError(`the archive holds no ${rel}`)
     const total = entries.reduce((sum, e) => sum + e.size, 0)
     if (total > RUN_FLOW.archive.maxExtractBytes)
         throw new ArchiveError(`${rel} is too large to open`)
+    return parts
+}
+
+/** Gives the extracted files the fixed time and returns the tree's root and file order. */
+function orderTree(tmp: string, rel: string): { root: string; order: string[] } {
+    const root = join(tmp, ...treeFolder(rel).split("/"))
+    const files = filesUnder(root)
+    for (const file of files) {
+        utimesSync(join(root, ...file.split("/")), FIXED_TIME, FIXED_TIME)
+    }
+    return { root, order: zipOrder(files) }
+}
+
+/** Puts the finished zip at `out` (copied, not renamed: another file system, maybe). */
+function publishZip(zip: string, out: string): void {
+    mkdirSync(dirname(out), { recursive: true })
+    stagings += 1
+    const staging = `${out}.tmp.${process.pid}.${stagings}`
+    copyFileSync(zip, staging)
+    renameSync(staging, out)
+}
+
+/**
+ * Makes the `.xlsx` of a workbook that the archive holds as a tree. The entries are
+ * stored, not compressed (the copy is temporary), so the same tree gives the same bytes.
+ *
+ * @param archives - the archive's path, or the archives of a run that hold the tree
+ *     together (the big `draws` sheet may be in an archive of its own).
+ * @param rel - the workbook's name in it.
+ * @param out - where the workbook is written (its folder is made); a file there is
+ *     replaced.
+ * @throws [[ArchiveError]] when the archive holds no tree for it, the tree is over the
+ *     size an extraction may take, or 7-Zip fails.
+ */
+export function rebuildWorkbook(
+    archives: string | readonly string[],
+    rel: string,
+    out: string,
+): void {
+    const parts = planRebuild(archives, rel)
     const tmp = mkdtempSync(join(tmpdir(), "baysol-book-"))
     try {
-        extractNamesSync(
-            archive,
-            entries.map((e) => e.name),
-            tmp,
-        )
-        const folder = treeFolder(rel)
-        const root = join(tmp, ...folder.split("/"))
-        const files = filesUnder(root)
-        for (const file of files) {
-            utimesSync(join(root, ...file.split("/")), FIXED_TIME, FIXED_TIME)
-        }
+        for (const part of parts)
+            extractNamesSync(
+                part.archive,
+                part.entries.map((e) => e.name),
+                tmp,
+            )
+        const { root, order } = orderTree(tmp, rel)
         const zip = join(tmp, "book.zip")
-        zipFolderSync(root, zipOrder(files), zip)
-        mkdirSync(dirname(out), { recursive: true })
-        const staging = `${out}.tmp.${process.pid}`
-        // copied, not renamed: the temporary folder may be on another file system
-        copyFileSync(zip, staging)
-        renameSync(staging, out)
+        // stored, not deflated: the copy is temporary, and level 9 cost seconds on a
+        // big sheet
+        zipFolderSync(root, order, zip, 0)
+        publishZip(zip, out)
+    } finally {
+        rmSync(tmp, { recursive: true, force: true })
+    }
+}
+
+/**
+ * [[rebuildWorkbook]] without blocking: 7-Zip runs as a child process and the screen keeps
+ * drawing (the walk of the extracted folder is the only synchronous part).
+ *
+ * @throws [[ArchiveError]] (as a rejection), as [[rebuildWorkbook]].
+ */
+export async function rebuildWorkbookAsync(
+    archives: string | readonly string[],
+    rel: string,
+    out: string,
+): Promise<void> {
+    const parts = planRebuild(archives, rel)
+    const tmp = mkdtempSync(join(tmpdir(), "baysol-book-"))
+    try {
+        for (const part of parts)
+            await extractNamesAsync(
+                part.archive,
+                part.entries.map((e) => e.name),
+                tmp,
+            )
+        const { root, order } = orderTree(tmp, rel)
+        const zip = join(tmp, "book.zip")
+        await zipFolderAsync(root, order, zip, 0)
+        publishZip(zip, out)
     } finally {
         rmSync(tmp, { recursive: true, force: true })
     }

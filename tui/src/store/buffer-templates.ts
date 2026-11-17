@@ -1,21 +1,18 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // Buffer templates: from a standard buffer (Tris, HEPES, phosphate, PBS ...), its
-// concentration and the pH, the rows of the solutes table, the way the fitting
-// scripts work them out by hand (`test/fitting_tests/SASDRJ8`, `SASDAX2`, `SASDMJ9`;
-// the scripts of SASDEM7, SASDBA8 and SASDV82, removed on 2026-11-12, are kept as
-// numbers in the tests). Pure: no screen, no file but the constants asset. The
-// constants, their sources and what was checked are in `notes/buffer-templates.md`.
+// concentration and the pH, the rows of the solutes table, as the fitting scripts work
+// them out by hand (`test/fitting_tests/SASDRJ8`, `SASDAX2`, `SASDMJ9`). Pure: no screen,
+// no file but the constants asset (constants and sources: `notes/buffer-templates.md`).
 //
-// The method: the pK of each group is moved from 25 °C to the temperature the pH was set
-// at (Clarke and Glew, from `dH` and `dCp`); the species at the pH come from the ladder of
-// the steps, `[B]/[A] = 10^(pH - pK) γ(zA) / γ(zB)`, with the Davies activity
-// coefficients `log γ = -A z² (√I / (1 + √I) - 0.3 I)` at the ionic strength of the whole
-// recipe, solved self-consistently; the charge of the buffer is balanced by the counter-ion
-// (chloride for a positive net charge, sodium or potassium for a negative one). σ is the
-// central-difference combination, in quadrature, of σ(pH), ±3 °C, ±0.02 pK, ±30 % of the
-// Davies shift and the uncertainty of the concentration.
-//
+// The method: each group's pK moves from 25 °C to the temperature the pH was set at
+// (Clarke and Glew, from `dH` and `dCp`); the species come from the ladder of the steps,
+// `[B]/[A] = 10^(pH - pK) γ(zA) / γ(zB)`, with Davies activity coefficients
+// `log γ = -A z² (√I / (1 + √I) - 0.3 I)` at the ionic strength of the whole recipe,
+// solved self-consistently; the counter-ion balances the charge (chloride for a positive
+// net charge, sodium or potassium for a negative one). σ combines, in quadrature and by
+// central differences, σ(pH), ±3 °C, ±0.02 pK, ±30 % of the Davies shift and the
+// concentration's uncertainty.//
 // Contents:
 //   1. The asset and the list of templates offered
 //   2. The numerics: pK(T), Davies, the species, the self-consistent ionic strength
@@ -76,8 +73,7 @@ export type Template = {
 const allTemplates = lazyAsset<Template[]>("data", "buffer_templates.json")
 
 /**
- * The templates the table offers: those with a bundled solute row (`available` is not
- * `false`), in the order of the asset.
+ * The templates the table offers (those with a bundled solute row), in asset order.
  *
  * @returns the templates.
  */
@@ -99,8 +95,8 @@ export function templateById(id: string): Template | undefined {
 const UNVERIFIED_LABEL = "(constants not cross-checked)"
 
 /**
- * A template as one line of the dropdown: the name (the label up to its first comma or
- * bracket), its usable pH range or `mixture`, and the unverified mark.
+ * A template as one line of the dropdown: the name, its usable pH range or `mixture`, and
+ * the unverified mark.
  *
  * @param t - the template.
  * @returns the text, e.g. `Tris, pH 7.1-9.1`.
@@ -128,8 +124,8 @@ function rangeText(range: [number, number] | undefined): string {
 export const needsConcentration = (t: Template): boolean => t.kind === "buffer"
 
 /**
- * Whether the pH is the user's to give: a buffer's is, a mixture's is its own except
- * where a buffer inside it (TBS, HBS, SSC) is worked out at it; PBS is fixed at 7.4.
+ * Whether the pH is the user's to give: a buffer's is; a mixture's is its own unless a
+ * buffer inside it (TBS, HBS, SSC) is worked out at it (PBS is fixed at 7.4).
  *
  * @param t - the template.
  * @returns `true` when the pH is asked.
@@ -144,8 +140,8 @@ const CATIONS: readonly [string, string][] = [
 ]
 
 /**
- * The titrants a template offers as a choice: the cations when it is titrated with a base
- * (the default first); nothing when its only counter-ion is chloride, or for a mixture.
+ * The titrants a template offers: the cations when titrated with a base (default first);
+ * nothing for a chloride counter-ion or a mixture.
  *
  * @param t - the template.
  * @returns `[ion, label]` pairs, empty when there is no choice.
@@ -160,7 +156,7 @@ export function titrantChoices(t: Template): readonly [string, string][] {
 // 2. The numerics
 // ========================================================================================
 
-/** The Davies constant at 25 °C, as the repo's scripts use it. */
+/** The Davies constant at 25 °C, as the scripts use it. */
 const DAVIES_A = 0.509
 
 /** The temperature (°C) the pH is taken as set at: room temperature, as the scripts do. */
@@ -172,7 +168,7 @@ const DAVIES_LIMIT_M = 0.5
 /** σ of the pH meter (pH), as `PH_METER_SIGMA` of the fitting scripts. */
 const PH_SIGMA = 0.1
 
-/** The ±temperature (°C) of the σ: the room temperature of the scripts, ±3 °C. */
+/** The ±temperature (°C) of the σ. */
 const TEMPERATURE_SPREAD_C = 3
 
 /** The ±pK of the σ, at least (the pK of a group graded worse is its own σ). */
@@ -193,7 +189,7 @@ const R_GAS = 8.314462618
 /** The offset between °C and K. */
 const KELVIN = 273.15
 
-/** The pK of a group with no temperature data changes by this much per K in the σ only. */
+/** The pK slope per K of a group with no temperature data, used in the σ only. */
 const AMINE_SLOPE = -0.03
 
 /** The species below this share of the total are left out of the rows. */
@@ -210,7 +206,7 @@ const PH_MAX = 14
 const I_TOLERANCE = 1e-13
 
 /**
- * What a run of the numerics varies: the shifts of the central differences.
+ * The shifts of the central differences.
  *
  * @property dPH - added to the pH.
  * @property dT - added to the temperature of the pH, °C.
@@ -261,7 +257,7 @@ function logGamma(z: number, I: number, A: number): number {
 }
 
 /**
- * What the numerics return for one set of shifts.
+ * The numerics' result for one set of shifts.
  *
  * @property amounts - the concentration of each species of the ladder, M.
  * @property charges - the charge of each species.
@@ -394,8 +390,8 @@ export type RowSpec = {
 }
 
 /**
- * What a row stores of a custom non-biological solute (the snapshot a `custom-nonbio` row
- * of the buffer file holds), so that a template of such a solute is self-contained.
+ * What a row stores of a custom non-biological solute (the snapshot of a `custom-nonbio`
+ * buffer row), so a template of it is self-contained.
  *
  * @property z - its electrons.
  * @property pmv - its partial molar volume.
@@ -404,7 +400,7 @@ export type RowSpec = {
 export type CustomSnapshot = { z: number; pmv: number; "sigmaPmv": number | null }
 
 /**
- * What a template comes to.
+ * The result of a template.
  *
  * @property rows - the rows to add.
  * @property pH - the pH to set (the mixture's, or the one given).
@@ -668,9 +664,8 @@ export function computeTemplate(recipe: Recipe): Outcome {
 }
 
 /**
- * A template object (not necessarily one of the asset: `template-defs.ts` builds the
- * custom ones) worked out for a pH and a concentration; `computeTemplate` without the
- * lookup by id.
+ * A template object (`template-defs.ts` builds the custom ones) worked out for a pH and a
+ * concentration; `computeTemplate` without the lookup by id.
  *
  * @param t - the template.
  * @param recipe - see [[Recipe]] (`id` is not read).
@@ -741,8 +736,8 @@ const IONIC_PER_M: Readonly<Record<string, number>> = {
 }
 
 /**
- * The ionic strength a solute adds per mM, for the salts and ions the table can name
- * safely (a 1:1 salt 1, a 2:1 salt 3, a lone ion a half); 0 for anything else.
+ * The ionic strength a solute adds per mM, for the salts and ions the table names (a 1:1
+ * salt 1, a 2:1 salt 3, a lone ion a half); 0 for anything else.
  *
  * @param arg - the name in the bundled tables.
  * @returns M per M of the solute, so mM per mM.

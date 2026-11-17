@@ -56,7 +56,8 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDVA2_3ODQ.pdb")
 # subtraction, read from the file header (the entry's own text). The SASBDB name of the
 # sample is "Human Haemoglobin (Sigma-Aldrich) with 20 % (w/v) PEG600 in 100mM Sodium
 # Phosphate buffer pH=7.0, c=5 mg/ml". 239 of 681 points have I ≤ 0 (noise beyond
-# q ≈ 0.3 Å⁻¹); the fit stops at `Q_MAX_FIT` and `seedModel` drops non-positive bins.
+# q ≈ 0.3 Å⁻¹); the fit is not cut (`Q_MAX_FIT` = Inf) and `seedModel` drops the
+# non-positive bins.
 #
 # *** NO DEPOSITED ATOMIC FIT, NO REFERENCE CURVE: this entry has no model and no fit in
 # *** SASBDB (the "fits" list is empty and there is no PDB link). The model used is that
@@ -145,10 +146,10 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# q cut, kept (flat noise floor; rule in README.md): 0.3 Å⁻¹. The data run to 0.400 Å⁻¹,
-# but the 174 points above 0.3 Å⁻¹ (σ > 0) have a median I/σ of 0.06 and 47 % of them have
-# I ≤ 0; the lowest-q quarter of them (up to 0.32 Å⁻¹) has a median I/σ of -0.06.
-const Q_MAX_FIT = 0.3
+# No q cut (owner, 2026-11-16; it was 0.3 Å⁻¹): the whole curve is fitted. The data run to
+# 0.400 Å⁻¹ and `seedModel` drops the non-positive bins; with the cut the chains sat in
+# different modes (R̂ above 1.5), uncut they converge in the smoke run.
+const Q_MAX_FIT = Inf
 
 # The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
 # the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
@@ -189,7 +190,20 @@ function runSasdva2(;
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seedSasdva2(; seed)
-    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    # the default rerun (2000 + 2000) left the chains in different places (R̂ above 1.5),
+    # so this entry reruns with a longer warm-up, more draws and chains started closer to
+    # the optimum. It still fails the strict gates (2026-11-16 probes, seed 0, retry up to
+    # 300000 draws): delta 5 R̂ 1.022, delta 10 R̂ 1.01 or divergent, delta 20-40 R̂ 1.03,
+    # delta 60 and up divergent; the MAP-jitter and prior (κ) sweeps of about 22 settings
+    # did not help either. Cause (2026-11-16 diagnostics): c1 is profiled, and with the four
+    # HEM ligands (without them R̂ is about 1.0) its optimum switches between two branches
+    # (c1 about 1.185 and 1.217) as ξ moves. The profiled -log π is the minimum of the two
+    # branches, so it has a kink (slope +59 to -164 across one step in the whitened w2,
+    # local curvature 6e3-2e4). Leapfrog energy error there forces ε to 2e-4 - 1e-3 and
+    # 1023-step trees. The c1 tolerance (gradient error at most 8e-5) is not the cause.
+    # Documented as failing; a fix means changing how c1 enters the posterior.
+    res = BAYSOL.runModel(s, nSamples, nAdapt; retryNAdapt = 6000, retryNDraws = 8000,
+        chainStartRadii = (2.0, 4.0, 6.0))
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 

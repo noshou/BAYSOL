@@ -7,6 +7,7 @@ import { readFileSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
 import * as XLSX from "xlsx"
+import { superscripts } from "../src/core/terminal.js"
 import {
     buildSheet,
     COPY_LIMIT,
@@ -192,6 +193,20 @@ test("a title is cut at three spaces and the braille blanks are no text", () => 
     )
     assert.deepEqual(plots.map((p) => p.title), ["fit", "\u03c1 (MAP 3)"])
     assert.equal(splitPlots(`${pad}\n┌──┐\n└──┘`)[0]?.title, "plot 1")
+})
+
+test("the tab of the residuals plot is just `residuals`", () => {
+    const pad = "\u2800".repeat(9)
+    const plots = splitPlots(
+        `${pad}residuals (2 off the plot)   \u03c7\u00b2 = 1.403${pad}\n┌──┐\n└──┘\n`,
+    )
+    assert.equal(plots[0]?.title, "residuals")
+})
+
+test("the bkgrndCorr tab prints `bkgrnd corr`, and still finds its figure", () => {
+    const pad = "\u2800".repeat(9)
+    const plots = splitPlots(`${pad}bkgrndCorr   (MAP -208)${pad}\n┌──┐\n└──┘\n`)
+    assert.equal(plots[0]?.title, "bkgrnd corr")
 })
 
 test("a blank line inside a plot does not cut it, a plot with no title is numbered", () => {
@@ -420,4 +435,30 @@ test("formulas are read from a workbook and shown instead of the values", () => 
     const csv = join(tempDir(), "t.csv")
     writeFileSync(csv, "a,b\n1,2\n")
     assert.equal(openWorkbook(csv, "t").sheet(0).formulas, undefined)
+})
+
+test("a comparison table keeps every row five cells wide, empty fits included", () => {
+    // the shape of compare.tsv: the fit columns are empty outside the fitted q window
+    // (the first and last rows), and the unit is written `A^-1`
+    const rows = [
+        "q (A^-1)\tI_measured (a.u.)\tsigma (a.u.)\tfit_m1 (a.u.)\tfit_m2 (a.u.)",
+        "0.009\t24089.76\t1854.071\t\t",
+        "0.011\t25238.6\t304.9845\t24352.8\t24765.1",
+        "0.012\t24344.44\t1088.746\t24320.1\t24730.1",
+        "0.9\t-151.5\t812.69\t\t",
+    ]
+    const path = join(tempDir(), "compare.tsv")
+    writeFileSync(path, `${rows.join("\n")}\n`)
+    const sheet = openWorkbook(path, "comparison").sheet(0)
+    assert.equal(sheet.columns, 5)
+    assert.equal(sheet.rows, 5)
+    for (const [i, row] of sheet.cells.entries())
+        assert.deepEqual(row, (rows[i] as string).split("\t").map(superscripts), `row ${i}`)
+    // the sigma column is the third in every row, whatever the fit cells hold
+    assert.deepEqual(
+        sheet.cells.map((r) => r[2]),
+        ["sigma (a.u.)", "1854.071", "304.9845", "1088.746", "812.69"],
+    )
+    // the header shows the unit with a real superscript
+    assert.equal(sheet.cells[0]?.[0], "q (Å⁻¹)")
 })

@@ -12,7 +12,7 @@ import assert from "node:assert/strict"
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
-import { createElement, type ReactElement } from "react"
+import { createElement } from "react"
 import { UnusableFileError } from "../src/core/file-system.js"
 import { displayWidth } from "../src/core/terminal.js"
 import {
@@ -64,7 +64,7 @@ import {
 } from "../src/store/projects.js"
 import { claimRun, snapshotInputs } from "../src/store/run.js"
 import { scrollWindow, taskbarKeys } from "../src/ui/interaction.js"
-import { drawScreen, fixture, tempDir } from "./support/fixtures.js"
+import { drawLines, fixture, tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. The editor rules
@@ -363,10 +363,6 @@ test("a run's snapshot carries the project's notes (project.json) and the buffer
 // 3. The screens
 // ========================================================================================
 
-function draw(screen: ReactElement, columns = 80): string[] {
-    return drawScreen(screen, columns).split("\n")
-}
-
 function fits(lines: string[], columns: number, what: string): void {
     assert.ok(lines.length <= 24, `${what}: ${lines.length} rows`)
     for (const line of lines)
@@ -377,7 +373,7 @@ test("the notes editor fits 80 x 24 with its text, counter and keys", () => {
     const text = Array.from({ length: 40 }, (_, i) => `line ${i + 1} ${"word ".repeat(30)}`)
     for (const initial of ["", "short\nnotes", text.join("\n")])
         for (const columns of [80, 100]) {
-            const lines = draw(
+            const lines = drawLines(
                 createElement(NotesEditor, {
                     owner: "SEC buffer",
                     title: "setup",
@@ -420,7 +416,7 @@ test("the editor's ^w goes through the list's save, owners take it", () => {
 
 test("the notes list shows titles and first lines and fits 80 x 24", () => {
     for (const columns of [80, 100]) {
-        const lines = draw(
+        const lines = drawLines(
             createElement(NotesList, { owner: "SEC", items: two, onSave: () => undefined }),
             columns,
         )
@@ -438,7 +434,7 @@ test("the recipes table has a notes column and shift+n, and fits 80 x 24", () =>
     process.env.BAYSOL_CACHE = `${home}/cache`
     writeRecipes(home, [recipe("with notes", { notes: two }), recipe("plain")])
     for (const columns of [80, 100]) {
-        const lines = draw(createElement(RecipesTable), columns)
+        const lines = drawLines(createElement(RecipesTable), columns)
         fits(lines, columns, "recipes")
         const all = lines.join("\n")
         assert.ok(all.includes("setup, so"), all)
@@ -451,7 +447,7 @@ test("the recipes table has a notes column and shift+n, and fits 80 x 24", () =>
 })
 
 test("the buffer table offers notes: shift+n and fits 80 x 24", () => {
-    const lines = draw(createElement(SolutesTable, {
+    const lines = drawLines(createElement(SolutesTable, {
             items: [],
             save: () => undefined,
             onNotes: () => undefined,

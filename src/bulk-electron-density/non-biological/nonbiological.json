@@ -1866,7 +1866,7 @@
   ],
   "dimethylarsinic acid": [
     68,
-    74.0,
+    79.95,
     5.0
   ],
   "pentane-1,5-diamine": [
@@ -2426,7 +2426,7 @@
   ],
   "sodium dimethylarsinate": [
     78,
-    59.5,
+    65.44,
     6.0
   ],
   "dipotassium carbonate": [
@@ -6647,7 +6647,7 @@
   "2-hydroxy-3-[(1-hydroxy-2-methylpropan-2-yl)amino]propane-1-sulfonate": [
     122,
     153.99,
-    4.20
+    4.2
   ],
   "2-[3-[[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino]propylamino]-2-(hydroxymethyl)propane-1,3-diol": [
     154,
@@ -6667,7 +6667,7 @@
   "2,2',2'',2'''-[ethane-1,2-diylbis(oxyethane-2,1-diylnitrilo)]tetraacetate": [
     202,
     210.79,
-    4.30
+    4.3
   ],
   "hydrogen 2,2',2'',2'''-[ethane-1,2-diylbis(oxyethane-2,1-diylnitrilo)]tetraacetate": [
     202,
@@ -6762,7 +6762,7 @@
   "1-ethylpyrrolidin-2-one": [
     62,
     111.11,
-    4.00
+    4.0
   ],
   "iron(3+) n,n-bis{2-[bis(carboxymethyl)amino]ethyl}glycinate(2-)": [
     231,
@@ -6871,18 +6871,18 @@
   ],
   "thiamine diphosphate": [
     220,
-    258.35,
-    10.64
+    260.4,
+    5.07
   ],
   "glycine;hydrochloride": [
     58,
-    72.35,
+    72.33,
     2.24
   ],
   "coenzyme a(4-)": [
     400,
-    416.45,
-    18.8
+    406.52,
+    5.68
   ],
   "azanium formate": [
     34,
@@ -6896,8 +6896,8 @@
   ],
   "3',3'',5',5''-tetrabromophenolsulfonphthalein": [
     320,
-    300.15,
-    15.45
+    317.84,
+    6.03
   ],
   "trisodium arsenate": [
     98,
@@ -6916,8 +6916,8 @@
   ],
   "methylarsonate(2-)": [
     68,
-    32.53,
-    6.8
+    31.2,
+    6.4
   ],
   "1,2-dimyristoyl-glycero-3-phosphocholine": [
     374,
@@ -6931,12 +6931,12 @@
   ],
   "n-carbamimidoyl-n-methylglycine phosphate": [
     120,
-    137.20,
+    137.2,
     5.04
   ],
   "pyridine-2,6-dicarboxylic acid": [
     86,
-    109.70,
+    109.7,
     4.24
   ],
   "glycocholate": [
@@ -6951,8 +6951,8 @@
   ],
   "tetrahydrofolate": [
     234,
-    284.2,
-    11.41
+    272.25,
+    5.1
   ],
   "trifluoroacetic acid": [
     56,
@@ -6976,13 +6976,13 @@
   ],
   "trimethylarsine oxide": [
     68,
-    89.06,
-    6.81
+    96.07,
+    6.4
   ],
   "2,9-dimethyl-4,7-diphenyl-1,10-phenanthroline": [
     190,
-    282.21,
-    12.51
+    324.13,
+    6.61
   ],
   "water": [
     10,
@@ -6991,8 +6991,8 @@
   ],
   "cytidine 3',5'-cyclic monophosphate(1-)": [
     158,
-    162.3,
-    4.74
+    158.17,
+    4.05
   ],
   "3,3-bis(4-hydroxyphenyl)-2-benzofuran-1(3h)-one": [
     166,
@@ -7032,12 +7032,12 @@
   "2,3,4,5,6-pentahydroxyhexanoic acid": [
     104,
     120.82,
-    4.00
+    4.0
   ],
   "3-hydroxy-4-[2-sulfonatophenylazo]-2,7-naphthalenedisulfonate": [
     250,
-    252.79,
-    15.8
+    248.83,
+    8.56
   ],
   "2-hydroxy-3-(morpholin-4-yl)propane-1-sulfonate": [
     120,
@@ -7061,8 +7061,8 @@
   ],
   "pyridoxal 5'-phosphate": [
     128,
-    152.45,
-    8.74
+    154.88,
+    4.07
   ],
   "hexa-2,4-dienoate": [
     60,
@@ -7071,12 +7071,12 @@
   ],
   "flavin adenine dinucleotide(2-)": [
     408,
-    432.0,
-    15.45
+    449.17,
+    5.51
   ],
   "3-hydroxy-4-(trimethylazaniumyl)butanoate;hydrochloride": [
     106,
-    143.08,
+    143.06,
     4.58
   ],
   "sodium 2,3,4,5,6-pentahydroxyhexanoate": [
@@ -7097,12 +7097,12 @@
   "pyridine-3-carboxamide": [
     64,
     96.89,
-    4.00
+    4.0
   ],
   "2,3,4,5,6-pentahydroxyhexanoate": [
     104,
     105.22,
-    4.00
+    4.0
   ],
   "potassium benzoate": [
     82,
@@ -7111,8 +7111,8 @@
   ],
   "reduced flavin adenine dinucleotide": [
     410,
-    466.29,
-    15.63
+    479.95,
+    5.97
   ],
   "sodium 4-[[4-(dimethylamino)phenyl]diazenyl]benzenesulfonate": [
     170,
@@ -7121,18 +7121,18 @@
   ],
   "2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol;hydrochloride": [
     132,
-    165.54,
+    165.52,
     6.65
   ],
   "uridine 3',5'-cyclic monophosphate(1-)": [
     158,
-    160.43,
-    4.74
+    153.44,
+    4.18
   ],
   "3-(2-pyridyl)-5,6-bis(4-phenylsulfonate)-1,2,4-triazine": [
     242,
-    277.85,
-    12.72
+    291.86,
+    7.39
   ],
   "iron(3+) trichloride": [
     77,
@@ -7156,7 +7156,7 @@
   ],
   "(trimethylazaniumyl)acetate;hydrochloride": [
     82,
-    128.64,
+    128.62,
     2.24
   ],
   "bis(azanium) hydrogen phosphate": [
@@ -7166,8 +7166,8 @@
   ],
   "dimethylarsinous acid": [
     60,
-    74.04,
-    6.81
+    73.95,
+    6.4
   ],
   "disodium tetraborate": [
     98,
@@ -7216,18 +7216,18 @@
   ],
   "sucrose octasulfate(8-)": [
     502,
-    523.53,
-    35.42
+    375.07,
+    18.63
   ],
   "acetylcarnitine": [
     110,
     148.51,
-    4.00
+    4.0
   ],
   "dimethylarsinic anhydride": [
     126,
-    133.65,
-    6.82
+    145.93,
+    6.4
   ],
   "bis(2-hydroxyethyl)dimethylazanium chloride": [
     92,
@@ -7236,8 +7236,8 @@
   ],
   "2-[[4-[ethyl-[(3-sulfonatophenyl)methyl]amino]phenyl]-(2-sulfonatophenyl)methylidene]cyclohexa-3,5-dien-1-one": [
     288,
-    365.62,
-    15.62
+    378.69,
+    7.27
   ],
   "n-carbamimidoyl-n-methylglycine monohydrate": [
     70,
@@ -7267,7 +7267,7 @@
   "3-(cyclohexylamino)propane-1-sulfonate": [
     120,
     169.94,
-    4.20
+    4.2
   ],
   "cytidine 3',5'-cyclic monophosphate": [
     158,
@@ -7281,13 +7281,13 @@
   ],
   "adenosine 3',5'-cyclic monophosphate(1-)": [
     170,
-    179.54,
-    4.49
+    172.46,
+    4.34
   ],
   "bis(2-hydroxyethyl)dimethylazanium": [
     74,
     117.82,
-    4.00
+    4.0
   ],
   "octadeca-9,12,15-trienoate": [
     154,
@@ -7301,12 +7301,12 @@
   ],
   "3-(2-pyridyl)-5,6-bis(4-phenylsulfonic acid)-1,2,4-triazine": [
     242,
-    307.97,
-    12.73
+    323.17,
+    7.66
   ],
   "2-amino-2-(hydroxymethyl)propane-1,3-diol;hydrochloride": [
     84,
-    103.67,
+    103.65,
     1.8
   ],
   "methanesulfonic acid": [
@@ -7366,12 +7366,12 @@
   ],
   "adenosine 5'-[γ-thio]triphosphate(4-)": [
     268,
-    215.38,
-    12.33
+    206.29,
+    5.88
   ],
   "n-acetylcysteine": [
     86,
-    116.80,
+    116.8,
     4.25
   ],
   "bis(azanium) nickel bis(sulfate) dodecahydrate": [
@@ -7402,7 +7402,7 @@
   "pyridine-4-carboxylic acid": [
     64,
     92.68,
-    4.00
+    4.0
   ],
   "sodium 2-(cyclohexylamino)ethane-1-sulfonate": [
     122,
@@ -7426,13 +7426,13 @@
   ],
   "flavin adenine dinucleotide": [
     408,
-    462.89,
-    15.52
+    481.23,
+    5.81
   ],
   "adenosine 5'-[α-thio]triphosphate(4-)": [
     268,
-    218.93,
-    12.49
+    205.7,
+    5.91
   ],
   "octadecanoic acid": [
     160,
@@ -7456,7 +7456,7 @@
   ],
   "3,3',3''-phosphoryltripropanoate": [
     140,
-    136.10,
+    136.1,
     4.03
   ],
   "iron(2+) dichloride": [
@@ -7476,7 +7476,7 @@
   ],
   "trisodium guanosine 5'-[β,γ-imido]triphosphate": [
     298,
-    227.75,
+    213.37,
     15.15
   ],
   "potassium 2-hydroxypropanoate": [
@@ -7486,7 +7486,7 @@
   ],
   "potassium dimethylarsinate": [
     86,
-    69.71,
+    75.65,
     6.18
   ],
   "diiron trisulfate": [
@@ -7501,8 +7501,8 @@
   ],
   "reduced flavin adenine dinucleotide(2-)": [
     410,
-    436.44,
-    15.92
+    448.58,
+    5.68
   ],
   "folic acid": [
     230,
@@ -7511,8 +7511,8 @@
   ],
   "tetrahydrofolic acid": [
     234,
-    302.03,
-    11.5
+    303.51,
+    5.25
   ],
   "3,3',3''-phosphoryltripropanoic acid": [
     140,
@@ -7536,18 +7536,18 @@
   ],
   "sucrose octasulfate": [
     502,
-    614.71,
-    35.41
+    474.41,
+    19.91
   ],
   "folate(2-)": [
     230,
-    270.3,
-    10.99
+    267.59,
+    5.1
   ],
   "3-amino-7-dimethylamino-2-methylphenazin-10-ium": [
     134,
-    206.08,
-    10.73
+    218.6,
+    4.7
   ],
   "4-[[4-(dimethylamino)phenyl]diazenyl]benzenesulfonate": [
     160,
@@ -7561,8 +7561,8 @@
   ],
   "acetyl coenzyme a": [
     422,
-    516.96,
-    18.7
+    501.56,
+    5.0
   ],
   "phosphatidylcholine": [
     420,
@@ -7592,12 +7592,12 @@
   "2-hydroxy-1,1-dimethylethylazanium": [
     50,
     93.06,
-    4.00
+    4.0
   ],
   "5-[2-oxo-1,3,3a,4,6,6a-hexahydrothieno[3,4-d]imidazol-4-yl]pentanoate": [
     130,
     162.61,
-    4.40
+    4.4
   ],
   "sodium trifluoroacetate": [
     66,
@@ -7617,7 +7617,7 @@
   "3-hydroxy-4-(trimethylazaniumyl)butanoate": [
     88,
     113.84,
-    4.00
+    4.0
   ],
   "adenosine 3',5'-cyclic monophosphate": [
     170,
@@ -7626,18 +7626,18 @@
   ],
   "pepstatin a(1-)": [
     374,
-    597.94,
-    15.6
+    590.0,
+    7.58
   ],
   "guanosine 3',5'-cyclic monophosphate(1-)": [
     178,
-    183.51,
-    4.74
+    173.7,
+    4.29
   ],
   "phenolsulfonphthalein": [
     184,
-    243.62,
-    15.44
+    261.36,
+    6.03
   ],
   "guanosine 3',5'-cyclic monophosphate": [
     178,
@@ -7661,8 +7661,8 @@
   ],
   "ubiquinone": [
     476,
-    870.11,
-    20.95
+    885.43,
+    6.12
   ],
   "guanidinium perchlorate": [
     82,
@@ -7671,13 +7671,13 @@
   ],
   "pyridoxal 5'-phosphate(2-)": [
     128,
-    121.53,
-    8.73
+    122.19,
+    4.0
   ],
   "pyridine-2-carboxylic acid": [
     64,
     93.86,
-    4.00
+    4.0
   ],
   "copper(2+) dichloride": [
     63,
@@ -7686,8 +7686,8 @@
   ],
   "methylarsonate": [
     68,
-    48.79,
-    6.8
+    49.04,
+    6.4
   ],
   "magnesium bis(2-hydroxybenzoate)": [
     154,
@@ -7701,13 +7701,13 @@
   ],
   "methylarsonic acid": [
     68,
-    62.63,
-    6.8
+    63.43,
+    6.4
   ],
   "coenzyme a": [
     400,
-    476.37,
-    18.98
+    465.04,
+    4.95
   ],
   "octadeca-9,12,15-trienoic acid": [
     154,
@@ -7716,8 +7716,8 @@
   ],
   "inosine 5'-diphosphate(3-)": [
     220,
-    187.26,
-    12.66
+    177.08,
+    4.41
   ],
   "riboflavin 5'-phosphate": [
     238,
@@ -7726,18 +7726,18 @@
   ],
   "disodium 2-[[4-[ethyl-[(3-sulfonatophenyl)methyl]amino]phenyl]-(2-sulfonatophenyl)methylidene]cyclohexa-3,5-dien-1-one": [
     302,
-    363.2,
+    376.27,
     15.68
   ],
   "acetyl coenzyme a(4-)": [
     422,
-    451.26,
-    19.09
+    440.04,
+    5.48
   ],
   "benzenecarboximidamide": [
     64,
     105.82,
-    4.00
+    4.0
   ],
   "sodium 2-oxopropanoate": [
     56,
@@ -7747,17 +7747,17 @@
   "2-amino-2-methylpropan-1-ol": [
     50,
     90.58,
-    4.00
+    4.0
   ],
   "inosine 5'-triphosphate(4-)": [
     260,
-    203.37,
-    11.42
+    192.66,
+    4.97
   ],
   "guanosine 5'-[γ-thio]triphosphate(4-)": [
     276,
-    223.25,
-    12.55
+    207.49,
+    5.64
   ],
   "4-o-alpha-d-glucopyranosyl-d-glucitol": [
     184,
@@ -7766,13 +7766,13 @@
   ],
   "adenosine 5'-[β,γ-imido]triphosphate(4-)": [
     260,
-    212.74,
-    12.11
+    198.36,
+    5.4
   ],
   "n-acetylcysteinate": [
     86,
     100.21,
-    4.20
+    4.2
   ],
   "octadeca-9,12-dienoate": [
     156,
@@ -7786,7 +7786,7 @@
   ],
   "3,3',3''-phosphanetriyltripropanoic acid;hydrochloride": [
     150,
-    195.84,
+    195.82,
     10.36
   ],
   "octadeca-9,12-dienoic acid": [
@@ -7796,7 +7796,7 @@
   ],
   "2,2'-(piperazine-1,4-diyl)di(ethane-1-sulfonate)": [
     160,
-    176.90,
+    176.9,
     5.62
   ],
   "zinc diacetate": [
@@ -7816,8 +7816,8 @@
   ],
   "thiamine diphosphate(2-)": [
     220,
-    227.67,
-    10.63
+    228.1,
+    5.61
   ],
   "sodium dihydrogen arsenate": [
     78,

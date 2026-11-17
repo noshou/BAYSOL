@@ -108,6 +108,13 @@ const STANDARD_AMINO_ATOMS = Dict(
     "VAL" => ("N", "CA", "C", "O", "CB", "CG1", "CG2"),
 )
 
+# the names a force field or an MD package gives to a protonation state of an amino
+# acid (`HIE`, `CYX`, ...): not standard residue names, but amino acids all the same
+const PROTONATION_STATE_NAMES = Set([
+    "HID", "HIE", "HIP", "HSD", "HSE", "HSP", "HIN", "CYX", "CYM", "CYS2", "ASH", "GLH",
+    "LYN", "LYP", "ARN", "TYM", "ASPH", "GLUH",
+])
+
 """
 The standard amino acid a modified amino acid `i` is run as in pdb2pqr, or `nothing`: its
 parent ([`aminoParent`](@ref BAYSOL.MolecularStructure.aminoParent)), unless it is a **D**
@@ -143,16 +150,18 @@ standard residue of that base ([`_standardName`](@ref)) and the record type `ATO
 pdb2pqr hydrogenates it. The other lines are copied unchanged.
 
 # Returns
-`(; plan, aliases, noBase, noParentAmino, renumbered)`: `aliases` maps `(residue key,
-atom name as run)` to the original atom-name field and element of the atoms run under a
-parent's name ([`AMINO_ATOM_ALIASES`](@ref)), for [`restoreModified!`](@ref);
-`noParentAmino` is the number of modified amino acid residues left as they were for
-want of a standard parent; `renumbered` says the atom serials were not all
-integers (hybrid-36) and the copy numbers its atoms afresh; `plan` maps the residue key
-`(chain, number with insertion code)` to
-`(; name, record)`, the original residue name and record type columns, for
-[`restoreModified!`](@ref); `noBase` is the number of modified residues left as they were
-for want of a base.
+`(; plan, aliases, noBase, noParentAmino, renumbered, stripped)`: `aliases` maps
+`(residue key, atom name as run)` to the original atom-name field and element of the
+atoms run under a parent's name ([`AMINO_ATOM_ALIASES`](@ref)), for
+[`restoreModified!`](@ref); `noParentAmino` is the number of modified amino acid
+residues left as they were for want of a standard parent; `renumbered` says the atom
+serials were not all integers (hybrid-36) and the copy numbers its atoms afresh; `plan`
+maps the residue key `(chain, number with insertion code)` to `(; name, record)`, the
+original residue name and record type columns, for [`restoreModified!`](@ref); `noBase`
+is the number of modified residues left as they were for want of a base; `stripped` is
+the number of atoms left out of the copy: hydrogens of amino acid `ATOM` records
+(pdb2pqr rebuilds them and stops on names it does not know, such as `H01`) and the
+extra heavy atoms of a residue, see `_isExtraAminoAtom`.
 
 # Exceptions
 - `SystemError`: a path cannot be read or written.
@@ -178,6 +187,7 @@ function relabelModified(inPath::AbstractString, outPath::AbstractString)
         eachline(inPath),
     )
     serial = 0
+    stripped = 0
     open(outPath, "w") do io
         for line in eachline(inPath)
             if renumber && (startswith(line, "ANISOU") || startswith(line, "CONECT"))
@@ -201,6 +211,18 @@ function relabelModified(inPath::AbstractString, outPath::AbstractString)
                     info.base === nothing && return (:nucleotide, nothing, info)
                     (:nucleotide, _standardName(info.class, info.base), info)
                 end
+                # a hydrogen of an amino acid residue is rebuilt by pdb2pqr,
+                # which reads the ones it does not know by name (`H01` of an
+                # MD frame) as a gap in the chain; nucleotide hydrogens are
+                # left alone (pdb2pqr keeps the ones it knows)
+                if startswith(line, "ATOM") && _isHydrogenRecord(line) &&
+                   (
+                       kind === :amino || haskey(STANDARD_AMINO_ATOMS, name) ||
+                       name in PROTONATION_STATE_NAMES
+                   )
+                    stripped += 1
+                    continue
+                end
                 key = _residueKey(line)
                 if kind === :amino && new !== nothing
                     new = _runsAsParent(info, atomsOf[key])
@@ -210,9 +232,22 @@ function relabelModified(inPath::AbstractString, outPath::AbstractString)
                     get(legacy, key, nothing)
                 lg === nothing || (new = _standardName(lg.class, lg.base))
                 haskey(plain, key) && (new = plain[key])
+                # the same for a standard residue that carries one (`CBS` of a serine that
+                # is part cysteine in the crystal)
+                if new === nothing && kind === :none && startswith(line, "ATOM") &&
+                   _isExtraAminoAtom(line, name, get(atomsOf, key, ()))
+                    stripped += 1
+                    continue
+                end
                 if new !== nothing
                     plan[key] = (; name = String(SubString(line, 18, 20)),
                         record = String(SubString(line, 1, 6)))
+                    # a heavy atom the parent does not have (the methyl `CZ` of a
+                    # methylhistidine) is held back, see `_isExtraAminoAtom`
+                    if kind === :amino && _isExtraAminoAtom(line, new, atomsOf[key])
+                        stripped += 1
+                        continue
+                    end
                     line =
                         "ATOM  " * SubString(line, 7, 17) * lpad(new, 3) *
                         SubString(line, 21)
@@ -249,7 +284,7 @@ function relabelModified(inPath::AbstractString, outPath::AbstractString)
     end
     return (;
         plan, aliases, noBase = length(skipped), noParentAmino = length(skippedAmino),
-        renumbered = renumber,
+        renumbered = renumber, stripped,
     )
 end
 
@@ -288,4 +323,37 @@ function restoreModified!(path::AbstractString, plan, aliases = nothing)::Nothin
     end
     write(path, join(lines, "\n") * "\n")
     return nothing
+end
+
+"Whether the `ATOM` line is a hydrogen or deuterium (element columns, else the atom name)."
+function _isHydrogenRecord(line::AbstractString)::Bool
+    length(line) >= 16 || return false
+    element = length(line) >= 78 ? strip(SubString(line, 77, 78)) : ""
+    isempty(element) || return element in ("H", "D")
+    return startswith(lstrip(isdigit, strip(SubString(line, 13, 16))), r"[HD]")
+end
+
+# Terminal oxygen names that are not in `STANDARD_AMINO_ATOMS` and that pdb2pqr knows.
+const _TERMINAL_ATOMS = ("OXT", "OT1", "OT2", "OC1", "OC2", "O1", "O2", "O'", "O''")
+
+"""
+    _isExtraAminoAtom(line, residue, atoms) -> Bool
+
+Whether the heavy atom of the `ATOM`/`HETATM` `line` is one that the standard amino acid
+`residue` does not have (the methyl `CZ` of a methylhistidine run as `HIS`, the `CBS` and
+`SG` of a serine that is part cysteine in the crystal) in a residue that has all the heavy
+atoms of it (`atoms` are the residue's atom names). pdb2pqr reads such an atom as a gap in
+the chain and stops, so [`relabelModified`](@ref) leaves it out of the copy it runs, and
+[`restoreDroppedAtoms!`](@ref) puts it back: no deposited heavy atom is lost. Hydrogens and
+the terminal oxygens pdb2pqr knows are not extra.
+"""
+function _isExtraAminoAtom(line::AbstractString, residue::AbstractString, atoms)::Bool
+    template = get(STANDARD_AMINO_ATOMS, residue, nothing)
+    template === nothing && return false
+    atom = String(strip(SubString(line, 13, 16)))
+    get(AMINO_ATOM_ALIASES, (residue, atom), atom) in template && return false
+    startswith(lstrip(isdigit, atom), 'H') && return false
+    atom in _TERMINAL_ATOMS && return false
+    have = Set(get(AMINO_ATOM_ALIASES, (residue, a), a) for a in atoms)
+    return all(in(have), template)
 end

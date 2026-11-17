@@ -8,19 +8,24 @@
 //   2. Packing: round trip, atomic failures, the lock, removing the packed files
 //   3. Reading: entry names, the size cap, the listing kept, extraction, the temp folder
 //   4. A run: what is packed, readers for packed, plain and older runs
+//   5. Workbooks in a run's archive (store/workbook-tree.ts): packed as the tree of
+//      their XML files, rebuilt as proper `.xlsx` files that read back the same
 
 import assert from "node:assert/strict"
 import {
     chmodSync,
     existsSync,
+    mkdirSync,
     readdirSync,
     readFileSync,
+    rmSync,
     statSync,
     writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
 import { test } from "node:test"
+import * as XLSX from "xlsx"
 import {
     ArchiveError,
     archiveTool,
@@ -34,21 +39,26 @@ import {
     withTempFolder,
 } from "../src/core/archive.js"
 import { RUN_FLOW } from "../src/core/environment.js"
-import { readRunObject } from "../src/store/projects.js"
+import { readRunObject, runIds } from "../src/store/projects.js"
 import {
     archivePath,
+    archivesOf,
     isPacked,
     materializeRunFile,
+    materializeRunFileAsync,
     packableFiles,
     packRun,
     RunFileMissing,
     RunFileTooLarge,
     readRunBytes,
     readRunText,
+    runFiles,
+    warmRunWorkbooks,
 } from "../src/store/run-archive.js"
 import { listOpenRuns, readRunFile, runFileSizes } from "../src/store/run-logs.js"
+import { rebuildWorkbook } from "../src/store/workbook-tree.js"
 import { makeRun } from "./support/fake-run.js"
-import { scratchProject, tempDir, writeFiles } from "./support/fixtures.js"
+import { runOn, scratchProject, tempDir, writeFiles } from "./support/fixtures.js"
 import { sheetsOf, tinyWorkbook } from "./support/workbook.js"
 
 const write = writeFiles
@@ -322,16 +332,20 @@ test("the temporary folder is removed after success and after a failure", async 
 // 4. A run: what is packed, the readers for packed, plain and older runs
 // ========================================================================================
 
-/** The names of the entries of a run's archive. */
+/** The names of the entries of all the archives of a run. */
 const entriesOf = (dir: string): string[] =>
-    listEntries(archivePath(dir)).map((e) => e.name)
+    archivesOf(dir).flatMap((a) => listEntries(a).map((e) => e.name))
 
-test("a packed run is ONE archive beside its folder, with everything in it", async () => {
+test("a packed run is its archives beside its folder, all its files in them", async () => {
     const p = scratchProject()
     const { dir } = await makeRun(p)
     assert.equal(isPacked(dir), true)
     assert.equal(existsSync(dir), false, "the folder is gone")
-    assert.deepEqual(readdirSync(join(p, "runs")), [`${basename(dir)}${".7z"}`])
+    assert.deepEqual(readdirSync(join(p, "runs")).sort(), [
+        `${basename(dir)}.7z`,
+        `${basename(dir)}.meta.7z`,
+    ])
+    assert.ok(listEntries(archivePath(dir, "meta")).some((e) => e.name === "run.json"))
     const inside = entriesOf(dir)
     for (const name of [
         "run.json",
@@ -436,7 +450,7 @@ test("readers refuse what is missing, too large, unsafe, or a broken archive", a
     assert.throws(() => readRunBytes(plain.dir, "data.tsv", 3), RunFileTooLarge)
     // an archive that is damaged is told, by name, and does not crash the page
     const broken = await makeRun(scratchProject())
-    writeFileSync(archivePath(broken.dir), "not an archive")
+    for (const archive of archivesOf(broken.dir)) writeFileSync(archive, "not an archive")
     assert.throws(
         () => readRunFile(broken.dir, "run.LOG"),
         /this run has no run\.LOG|the run's archive cannot be read/,
@@ -480,4 +494,188 @@ test("a workbook that is only in the archive is opened from a copy on disk", asy
     const there = join(plain.dir, "m.xlsx")
     assert.equal(materializeRunFile(plain.dir, there), there)
     assert.throws(() => materializeRunFile(dir, join(dir, "nope.xlsx")), RunFileMissing)
+})
+
+// ========================================================================================
+// 5. Workbooks in a run's archive
+// ========================================================================================
+
+/** A run folder (beside which its archive is made) holding `m.xlsx` and a log. */
+function runWith(book: Buffer | string = tinyWorkbook()): string {
+    const dir = join(tempDir(), "runs", runOn("2026-11-12"))
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, "m.xlsx"), book)
+    writeFileSync(join(dir, "run.LOG"), "datetime\tnow\n")
+    return dir
+}
+
+test("a packed run holds a workbook as its XML tree, folder left clean", async () => {
+    const dir = runWith()
+    assert.equal(await packRun(dir), 2)
+    const names = entriesOf(dir)
+    assert.equal(names.includes("m.xlsx"), false)
+    for (const name of [
+        "m/[Content_Types].xml",
+        "m/_rels/.rels",
+        "m/xl/workbook.xml",
+        "run.LOG",
+    ])
+        assert.ok(names.includes(name), name)
+    assert.equal(existsSync(dir), false, "no folder, no tree left behind")
+    // the files of the run still list it as a workbook, by its own name
+    assert.ok(runFiles(dir).has("m.xlsx"))
+})
+
+test("the rebuilt workbook reads back the same, formulas included", async () => {
+    const original = tinyWorkbook()
+    const dir = runWith(original)
+    await packRun(dir)
+    const copy = materializeRunFile(dir, join(dir, "m.xlsx"))
+    assert.deepEqual(sheetsOf(readFileSync(copy)), sheetsOf(original))
+    // a second ask is the same file
+    assert.equal(materializeRunFile(dir, join(dir, "m.xlsx")), copy)
+})
+
+test("a rebuilt workbook is a proper zip: [Content_Types].xml first", async () => {
+    const dir = runWith()
+    await packRun(dir)
+    const folder = tempDir()
+    const [a, b] = [join(folder, "a.xlsx"), join(folder, "b.xlsx")]
+    rebuildWorkbook(archivePath(dir), "m.xlsx", a)
+    rebuildWorkbook(archivePath(dir), "m.xlsx", b)
+    const bytes = readFileSync(a)
+    assert.equal(bytes.subarray(0, 4).toString("latin1"), "PK\u0003\u0004")
+    // the first local header: method 0 (stored: the copy
+    // is temporary), then the name of the first entry
+    assert.equal(bytes.readUInt16LE(8), 0)
+    const length = bytes.readUInt16LE(26)
+    assert.equal(bytes.subarray(30, 30 + length).toString("utf-8"), "[Content_Types].xml")
+    assert.ok(bytes.equals(readFileSync(b)), "deterministic")
+    assert.deepEqual(readdirSync(folder).sort(), ["a.xlsx", "b.xlsx"], "no staging file")
+})
+
+test("a workbook that is not a zip stops the pack, the run stays as it was", async () => {
+    const dir = runWith("not a workbook")
+    await assert.rejects(packRun(dir))
+    assert.deepEqual(readdirSync(dir).sort(), ["m.xlsx", "run.LOG"])
+    assert.equal(existsSync(archivePath(dir)), false)
+})
+
+test("something in the way of a workbook's tree stops the pack", async () => {
+    const dir = runWith()
+    writeFileSync(join(dir, "m"), "in the way")
+    await assert.rejects(packRun(dir), /in the way of m\.xlsx/)
+    assert.deepEqual(readdirSync(dir).sort(), ["m", "m.xlsx", "run.LOG"])
+})
+
+test("the tree packs smaller than the workbook it came from", async () => {
+    // many alike rows: what a results workbook is made of
+    const rows = Array.from({ length: 4000 }, (_, i) => [i / 4000, 100 - i / 50, 0.3])
+    const book = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), "fit")
+    const bytes = XLSX.write(book, { type: "buffer", bookType: "xlsx" }) as Buffer
+    const dir = runWith(bytes)
+    await packRun(dir)
+    assert.ok(statSync(archivePath(dir)).size < bytes.length)
+})
+
+test("a run is packed in groups: meta apart, a big sheet apart, all readable", async () => {
+    // 30000 rows x 6 columns of numbers: the sheet XML is well over the big-sheet size
+    const rows = Array.from({ length: 30000 }, (_, i) => [i, i / 7, i / 3, i * 2, i, 0.5])
+    const book = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), "draws")
+    const bytes = XLSX.write(book, { type: "buffer", bookType: "xlsx" }) as Buffer
+    const dir = runWith(bytes)
+    writeFileSync(join(dir, "run.json"), '{"status":"done"}')
+    writeFileSync(join(dir, "m-plots.txt"), "plots\n")
+    writeFileSync(join(dir, "m.tex"), "\\documentclass{standalone}\n")
+    const before = readFileSync(join(dir, "m.xlsx"))
+    await packRun(dir)
+    const names = (group: "meta" | "main" | "draws"): string[] =>
+        listEntries(archivePath(dir, group))
+            .map((e) => e.name)
+            .sort()
+    assert.deepEqual(names("meta"), ["m-plots.txt", "run.LOG", "run.json"])
+    assert.deepEqual(names("draws"), ["m/xl/worksheets/sheet1.xml"])
+    for (const name of ["m.tex", "m/xl/workbook.xml"])
+        assert.ok(names("main").includes(name), name)
+    assert.deepEqual(
+        readdirSync(join(dir, "..")).sort(),
+        (["meta", "draws", "main"] as const)
+            .map((g) => basename(archivePath(dir, g)))
+            .sort(),
+    )
+    // reads find a file in whichever archive holds it, and the listing counts the run once
+    assert.equal(readRunText(dir, "run.json"), '{"status":"done"}')
+    assert.equal(readRunText(dir, "m.tex"), "\\documentclass{standalone}\n")
+    assert.ok(runFiles(dir).has("m.xlsx") && runFiles(dir).has("run.json"))
+    assert.deepEqual(runIds(join(dir, "..", "..")), [basename(dir)])
+    // the workbook comes back whole from two archives
+    const out = join(tempDir(), "back.xlsx")
+    rebuildWorkbook([archivePath(dir, "main"), archivePath(dir, "draws")], "m.xlsx", out)
+    const back = XLSX.read(readFileSync(out))
+    const sheet = back.Sheets.draws as XLSX.WorkSheet
+    assert.equal(XLSX.utils.sheet_to_json(sheet).length, 29999)
+    assert.ok(before.length > 0)
+    assert.ok(readFileSync(materializeRunFile(dir, join(dir, "m.xlsx"))).length > 0)
+})
+
+test("a run packed as ONE archive (the older layout) still reads", async () => {
+    const dir = runWith()
+    await packFiles(dir, archivePath(dir), ["run.LOG"])
+    rmSync(join(dir, "run.LOG"))
+    assert.deepEqual(archivesOf(dir), [archivePath(dir)])
+    assert.match(readRunText(dir, "run.LOG"), /datetime/)
+})
+
+/** A 7-Zip that is the real one and writes a line to `log` for every extraction (`x`). */
+function countingTool(log: string): string {
+    const script = join(tempDir(), "7z-counts")
+    writeFileSync(
+        script,
+        [
+            "#!/bin/sh",
+            `if [ "$1" = "x" ]; then echo x >> "${log}"; fi`,
+            `exec "${archiveTool()}" "$@"`,
+            "",
+        ].join("\n"),
+    )
+    chmodSync(script, 0o755)
+    return script
+}
+
+/** How many extractions the counting tool has seen. */
+const extractions = (log: string): number =>
+    existsSync(log) ? readFileSync(log, "utf-8").trim().split("\n").length : 0
+
+test("the workbook copy is made async and warm-ups share one rebuild", async () => {
+    const original = tinyWorkbook()
+    const dir = runWith(original)
+    await packRun(dir)
+    const log = join(tempDir(), "x.log")
+    await withTool(countingTool(log), async () => {
+        const path = join(dir, "m.xlsx")
+        // two asks at once share one rebuild
+        const [a, b] = await Promise.all([
+            materializeRunFileAsync(dir, path),
+            materializeRunFileAsync(dir, path),
+        ])
+        assert.equal(a, b)
+        assert.deepEqual(sheetsOf(readFileSync(a)), sheetsOf(original))
+        const made = extractions(log)
+        assert.equal(made, 1)
+        // a warm-up of a run whose copy exists makes nothing, and the sync reader agrees
+        await warmRunWorkbooks(dir)
+        assert.equal(materializeRunFile(dir, path), a)
+        assert.equal(extractions(log), made)
+    })
+})
+
+test("a warm-up of a missing run or a damaged archive does not throw", async () => {
+    await warmRunWorkbooks(join(tempDir(), "runs", runOn("2026-11-12")))
+    const dir = runWith()
+    await packRun(dir)
+    for (const archive of archivesOf(dir)) writeFileSync(archive, "not an archive")
+    await warmRunWorkbooks(dir)
+    await assert.rejects(materializeRunFileAsync(dir, join(dir, "m.xlsx")))
 })

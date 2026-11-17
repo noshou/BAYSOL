@@ -263,9 +263,10 @@ that could not be computed counts as not converged).
 _worstEss(v::AbstractVector) = (isempty(v) || any(isnan, v)) ? NaN : minimum(v)
 
 """
-Why a run does not count as converged, from its worst R̂, smallest bulk ESS and smallest
-tail ESS: R̂ above [`RHAT_OK`](@ref) or not computable, or an ESS below [`ESS_MIN`](@ref) or
-not computable. NaN means "could not be computed" and is never read as fine.
+Why a run does not count as converged, from its worst R̂, smallest
+bulk ESS and smallest tail ESS: R̂ not below [`RHAT_OK`](@ref) or not
+computable, or an ESS not above [`ESS_MIN`](@ref) or not computable.
+NaN means "could not be computed" and is never read as fine.
 
 # Returns
 - `Vector{String}`: one sentence per problem, empty for a converged run.
@@ -274,15 +275,15 @@ function _convergenceProblems(rhat::Real, ess::Real, essTail::Real)
     out = String[]
     if !isfinite(rhat)
         push!(out, "R̂ could not be computed (too few draws, or a constant quantity)")
-    elseif rhat > RHAT_OK
-        push!(out, "the worst R̂, $(round(rhat; digits = 3)), is above $RHAT_OK")
+    elseif rhat >= RHAT_OK
+        push!(out, "the worst R̂, $(round(rhat; digits = 3)), is not below $RHAT_OK")
     end
     for (name, v) in (("bulk", ess), ("tail", essTail))
         if isnan(v)
             push!(out, "the $name effective sample size could not be computed")
-        elseif v < ESS_MIN
+        elseif v <= ESS_MIN
             essText = round(v; digits = 1)
-            push!(out, "the smallest $name ESS, $essText, is below $ESS_MIN")
+            push!(out, "the smallest $name ESS, $essText, is not above $ESS_MIN")
         end
     end
     return out

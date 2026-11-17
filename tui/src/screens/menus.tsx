@@ -117,11 +117,11 @@ import {
     useNav,
     useScreenActive,
 } from "../ui/interaction.js"
-import { useTheme } from "../ui/theme.js"
+import { ErrorText, useTheme } from "../ui/theme.js"
 import { CustomSolutesTable } from "./custom-solutes.js"
 import { DataScreen } from "./data-screen.js"
 import { LogsRuns } from "./logs-menu.js"
-import { ModelsScreen } from "./models.js"
+import { ModelScreen } from "./model-screen.js"
 import { NotesList } from "./notes-list.js"
 import { OpenRuns } from "./open-runs.js"
 import { RunScreen } from "./run-screens.js"
@@ -130,7 +130,6 @@ import {
     type LandingId,
     NO_RECIPES,
     NOT_SAVED,
-    NOTHING_REPLACED_HINT,
     REPLACES_HINT,
     recipeChoice,
     replaceRecipeQuestion,
@@ -146,7 +145,7 @@ import {
     SettingsMenu,
     unusableHint,
     useResetFile,
-} from "./settings-screens.js"
+} from "./settings-menu.js"
 import { SolutesTable } from "./solutes.js"
 
 // ========================================================================================
@@ -172,23 +171,23 @@ type LandingMode = "menu" | "load" | "save"
  * - `custom solutes (N)`: the user's table of non-biological solutes.
  * - `load a recipe`: a dropdown of the saved recipes with their solute counts (`^r`
  *   deletes the highlighted one), then the buffer's table with the recipe's rows as
- *   unsaved ones and the recipe's pH and σ, when it has them, as an unsaved change (a
- *   recipe without leaves the buffer's own); at the first `^w` a buffer that has solutes
- *   asks `replace N solutes with recipe "NAME"?`. `no saved recipes!` for none.
- *   A template recipe (`store/template-recipes.ts`) comes in as its fixed rows and the rows
- *   of its definition at the recipe's pH and temperature (else the buffer's; with no pH
- *   at all it asks to set one first), linked so that they follow the table's pH and
- *   temperature; the question says `with template "NAME"?`. A definition that cannot be
- *   used loads its fixed rows only, with the problem as the hint.
+ *   unsaved ones and its pH and σ, when it has them, as an unsaved change (without, the
+ *   buffer's own stay); the first `^w` of a buffer with solutes asks `replace N solutes
+ *   with recipe "NAME"?`. `no global recipes!` for none.
+ *   A template recipe (`store/template-recipes.ts`) comes in as its fixed rows plus the
+ *   rows of its definition at the recipe's pH and temperature (else the buffer's; with
+ *   no pH at all it asks to set one first), linked so they follow the table's pH and
+ *   temperature; the question says `with template "NAME"?`. An unusable definition loads
+ *   its fixed rows only, with the problem as the hint.
  * - `new recipe`: the table, empty; nothing is replaced before `^w`.
  * - `save current recipe globally`, when the buffer has solutes: asks a name (`replace
  *   "NAME"?` if a recipe has it; `save "NAME" as a template?` when the rows of one
- *   template are linked: Enter saves the template, `w` the rows as a plain recipe, Esc
- *   saves nothing) and saves the buffer as it is on disk, with its pH and σ, as a recipe.
+ *   template are linked: Enter saves the template, `w` a plain recipe, Esc nothing) and
+ *   saves the buffer as on disk, with its pH and σ, as a recipe.
  *
- * A line says what each file holds. A file that cannot be used is told and never written
- * over; `x` on its option offers to move it to `<name>.corrupt` and start empty (the
- * table of an unusable file says so and edits nothing).
+ * A line says what each file holds. An unusable file is told and never written over; `x`
+ * on its option offers to move it to `<name>.corrupt` and start empty (the table of an
+ * unusable file says so and edits nothing).
  *
  * Keys: up and down move, Enter opens, `^x` goes back.
  */
@@ -198,7 +197,12 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
     const columns = useBodyColumns()
     const confirm = useConfirm()
     const [mode, setMode] = useState<LandingMode>("menu")
-    const [message, setMessage] = useState<string>()
+    // the note row: a message is a problem (error background) unless said otherwise
+    const [shownMessage, setShownMessage] = useState<{ text: string; error: boolean }>()
+    const message = shownMessage?.text
+    const setMessage = useCallback((text?: string, error = true) => {
+        setShownMessage(text === undefined ? undefined : { text, error })
+    }, [])
     const [problem, setProblem] = useState<string>()
     const [recipes, setRecipes] = useState<Recipe[]>([])
     // the keys of the open name prompt
@@ -307,7 +311,7 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
             const notes = readBufferNotes(dir)
             const { solutes: rows, definition } = recipeSave(readSolutes(dir), asTemplate)
             saveRecipe(root, name, rows, readConditions(dir), notes, definition)
-            setMessage(savedAs(name, room))
+            setMessage(savedAs(name, room), false)
         } catch (error) {
             setMessage(saveFailure(error))
         }
@@ -360,7 +364,7 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
             }
         } else if (id === "new") {
             trackBuffer()
-            openTable({ hint: solutes > 0 ? NOTHING_REPLACED_HINT : undefined })
+            openTable({})
         } else if (id === "load") {
             try {
                 const saved = readRecipes(root)
@@ -403,7 +407,7 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
     const closeRecipes = useCallback(() => {
         setMode("menu")
         setMessage(NO_RECIPES)
-    }, [])
+    }, [setMessage])
     const pickList = usePickList<Recipe>({
         open: mode === "load",
         label: "load a recipe:",
@@ -437,6 +441,11 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
             subtitle={project.id}
             legend={legend}
             note={confirm.note ?? pickList.note ?? message}
+            noteIsError={
+                confirm.note === undefined &&
+                pickList.note === undefined &&
+                shownMessage?.error === true
+            }
         >
             <CursorList
                 items={options}
@@ -463,7 +472,7 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
                     {fileStatus("custom solutes", custom, "solute")}
                 </Text>
                 {unusable ? (
-                    <Text color={theme.er}>{unusableHint(file, columns)}</Text>
+                    <ErrorText>{unusableHint(file, columns)}</ErrorText>
                 ) : null}
             </Box>
             {mode === "load" ? <Box marginTop={1}>{pickList.list}</Box> : null}
@@ -478,7 +487,7 @@ export function BufferLanding({ project }: { project: ProjectRef }): ReactNode {
                         onSubmit={submitName}
                         onCancel={() => {
                             setMode("menu")
-                            setMessage(NOT_SAVED)
+                            setMessage(NOT_SAVED, false)
                         }}
                     />
                 </Box>
@@ -534,18 +543,18 @@ const missingNotice = (missing: readonly string[]): string =>
 /** The notice of the `logs` option when the project has no run yet. */
 const NO_RUNS_NOTICE = "no runs yet"
 
-/** What the `open` dropdown can do: the folder (file manager and a shell) or the runs. */
+/** What the `open` dropdown can do: the runs or the folder (file manager and a shell). */
 type OpenWhat = "folder" | "runs"
 
 /** The entries of the `open` dropdown, in order (the look and keys of `load project:`). */
 const openEntries: Choice<OpenWhat>[] = [
-    { label: "open project folder", value: "folder" },
     { label: "open runs", value: "runs" },
+    { label: "open project folder", value: "folder" },
 ]
 
 /**
- * Opens the project's settings once, which checks them: the notice says so if the
- * file could not be read and the global settings were put in its place.
+ * Opens the project's settings once, which checks them: the notice says so if the file
+ * could not be read and the global settings were put in its place.
  *
  * @param project - the project.
  * @returns the notice for the user, or `undefined` if the settings were fine.
@@ -565,10 +574,10 @@ function settingsNotice(project: ProjectRef): string | undefined {
 
 /**
  * The menu of a project: models, data, buffer, logs, settings and open (the project's
- * folder in the file manager, or with a run its runs). `logs` opens the list of the runs
- * (reading and restoring a run's inputs and logs). The taskbar offers `run: shift+r` when
- * the project can run (it starts the run at once with the buffer's temperature and opens
- * its screen; the project is not ready until the buffer has a temperature).
+ * folder in the file manager, or with a run its runs). `logs` lists the runs (reading and
+ * restoring a run's inputs and logs). The taskbar offers `run: shift+r` when the project
+ * can run: it starts the run at once with the buffer's temperature and opens its screen
+ * (not ready until the buffer has a temperature).
  *
  * @param project - the project.
  * @returns the screen.
@@ -589,7 +598,7 @@ export function ProjectMenu({ project }: { project: ProjectRef }): ReactNode {
         // another copy may have deleted the project while this menu was open
         if (!isFolder(project.dir))
             return setNotice(`project ${project.id} no longer exists`)
-        if (name === "models") nav.push(<ModelsScreen project={project} />)
+        if (name === "models") nav.push(<ModelScreen project={project} />)
         else if (name === "buffer") nav.push(<BufferLanding project={project} />)
         else if (name === "settings") {
             nav.push(<SettingsMenu scope={projectScope(project)} />)
@@ -712,11 +721,10 @@ const nameTyped = 60
 type Overlay = "new" | "load" | null
 
 /**
- * The main menu: make a project, load one, open the projects folder, the global
- * settings, help (not built) and quit. A name prompt or the project list opens right
- * under the grid. Deleting a project is not a menu option: while the `load` list is
- * open (so at least one project exists), `^r` (or Delete) asks about the highlighted
- * project and Enter then deletes it, as in the list of models.
+ * The main menu: make a project, load one, open the projects folder, the global settings,
+ * help (not built) and quit. A name prompt or the project list opens under the grid.
+ * Deleting is not a menu option: while the `load` list is open, `^r` (or Delete) asks
+ * about the highlighted project and Enter then deletes it, as in the list of models.
  *
  * @returns the screen.
  */
@@ -726,6 +734,8 @@ export function MainMenu(): ReactNode {
     const [overlay, setOverlay] = useState<Overlay>(null)
     const [error, setError] = useState<string>()
     const [notice, setNotice] = useState<string>()
+    // every notice is a problem but the confirmation of a deletion
+    const [noticeIsError, setNoticeIsError] = useState(true)
     const [newLegend, setNewLegend] = useState<LegendItem[]>([])
     // bumped when a project is deleted, so the list is read again
     const [listed, setListed] = useState(0)
@@ -734,6 +744,7 @@ export function MainMenu(): ReactNode {
 
     const choose = useCallback((name: (typeof mainMenuSpec.names)[number]) => {
         setNotice(undefined)
+        setNoticeIsError(true)
         setError(undefined)
         if (name === "quit") nav.quit()
         else if (name === "new") setOverlay("new")
@@ -799,10 +810,12 @@ export function MainMenu(): ReactNode {
         onDelete: (id) => {
             deleteProject(appDir(), id)
             setNotice(`deleted ${id}`)
+            setNoticeIsError(false)
             setListed((v) => v + 1)
         },
         onFail: (e) => {
             setNotice((e as Error).message)
+            setNoticeIsError(true)
             setListed((v) => v + 1)
         },
         onEmpty: closeOverlay,
@@ -833,6 +846,7 @@ export function MainMenu(): ReactNode {
             header={<MenuHeader caption={version} />}
             onChoose={choose}
             notice={pickList.note ?? notice}
+            noticeIsError={pickList.note === undefined && noticeIsError}
             overlay={shown}
             overlayLegend={overlay ? overlayLegend : undefined}
         />

@@ -4,7 +4,7 @@
 # this package composes correctly on real data: structure -> real PROPKA ->
 # (separately) real Pdb2pqr hydrogenation -> the full seedSampler/infer
 # NUTS chain. Every stage below calls the existing lower-level functions
-# directly (LocalPathSource, resloveStruct, loadMolecule, propkaPkas,
+# directly (LocalPathSource, resolveStruct, loadMolecule, propkaPkas,
 # resolveHydrogens, forwardCache,
 # seedSampler, infer) rather than any single convenience orchestrator,
 # so this is genuinely exercising composition, not one already-tested wrapper
@@ -16,7 +16,7 @@
 
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
-using BAYSOL.MolecularStructure: LocalPathSource, resloveStruct, loadMolecule,
+using BAYSOL.MolecularStructure: LocalPathSource, resolveStruct, loadMolecule,
     _storeDir, Molecule, nAtoms, elms, coordsCartesian
 using BAYSOL.Hydrogenator: propkaPkas, PropkaError, resolveHydrogens, Pdb2pqrError,
     Propka
@@ -97,7 +97,7 @@ end
     # (mirrors this package's own real usage: one PROPKA run per structure).
     # -----------------------------------------------------------------
     @test isfile(_FIXTURE_PATH)
-    resolvedPath = resloveStruct(LocalPathSource(_FIXTURE_PATH))
+    resolvedPath = resolveStruct(LocalPathSource(_FIXTURE_PATH))
     mol = loadMolecule(resolvedPath)
 
     # Force a fresh propka3 run: propkaPkas trusts a matching `.pka`

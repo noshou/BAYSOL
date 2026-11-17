@@ -1,0 +1,85 @@
+datetime	16-11-2026 19:22:06 -0500
+
+=== SASDVA2 ===
+revision                	d6f3f58-dirty
+julia                   	1.12.7
+baysol                  	v0.4.0-yals-n-gɛsga
+status                  	failed
+errorType               	BAYSOL.Inference.NotConvergedError
+error                   	NotConvergedError: the run did not converge: the worst R̂, 1.75, is not below 1.01; the smallest bulk ESS, 2.1, is not above 400.0; the smallest tail ESS, 17.4, is not above 400.0.
+D                       	75.6495
+energyEv                	9252.55
+lMax                    	30
+leapfrog                	5034297
+mapModes                	3
+nAdapt                  	300
+nAtoms                  	8943
+nChains                 	10
+nChainsPooled           	10
+nChannels               	9.14672
+nNonpositive            	44
+nQ                      	70
+nQRaw                   	681
+nSamples                	1000
+optima                  	3
+ph                      	7.0
+pmvFallbackUncert       	2.52583
+quantileHiPct           	97.725
+quantileLabel           	2sigma
+quantileLoPct           	2.27501
+rebin                   	12
+rngSeed                 	0
+sigmaPh                 	0.1
+temperatureC            	20.0
+
+--- timing ---
+stage                                                             seconds    % wall    (JIT)     (GC)  notes
+wall clock                                                        1148.02     100.0    (2.5)   (37.2)  process start to end
+  startup                                                            4.81       0.4    (0.0)    (0.6)  process start to seedModel
+  static build                                                       6.49       0.6    (1.5)    (0.0)
+    resolveStruct                                                 6.2e-05       0.0    (0.0)    (0.0)
+    components                                                    1.6e-03       0.0    (0.0)    (0.0)  20 residue names: 20 builtin, 0 cache, 0 download
+    structure checks                                                 0.02       0.0    (0.0)    (0.0)  0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings
+    classify                                                      5.0e-03       0.0    (0.0)    (0.0)  protein: PARSE, titration propka
+    propka                                                           1.62       0.1    (0.7)    (0.0)  cache miss
+    pdb2pqr                                                          3.76       0.3    (0.1)    (0.0)  cache hit
+    heavy atoms                                                      0.03       0.0    (0.0)    (0.0)  4556 in, 4556 out; 0 restored, 0 added by pdb2pqr
+    loadMolecule                                                     0.27       0.0    (0.2)    (0.0)
+    SASA                                                             0.15       0.0    (0.0)    (0.0)
+    shannon                                                       2.1e-03       0.0    (0.0)    (0.0)  diameter, binning
+    forwardCache                                                     0.21       0.0    (0.0)    (0.0)
+      vacuum + excluded volume                                       0.17       0.0    (0.0)    (0.0)  vols + B_lm
+      hydration                                                      0.03       0.0    (0.0)    (0.0)  B_lm
+      Gram + rM                                                   3.8e-04       0.0    (0.0)    (0.0)
+    seedSampler                                                      0.43       0.0    (0.4)    (0.0)  priors, WLS
+  sampling                                                         812.09      70.7    (0.9)   (26.9)
+    MAP search + whitening                                           0.07       0.0    (0.0)    (0.0)  88/88 starts, 3 modes
+    NUTS setup                                                    1.3e-04       0.0    (0.0)    (0.0)  starts, Hamiltonian
+    re-whitening: a chain found a basin 2.1 nats above the MAP       0.05       0.0    (0.0)    (0.0)
+    optima from the draws                                            7.05       0.6    (0.2)    (0.3)  2 extra chains
+    NUTS                                                            36.46       3.2    (0.7)    (1.3)  10k iters, 5034.3k leapfrog, 0.007 ms/step
+    6 posterior modes: mass by bridge sampling                       0.15       0.0    (0.0)    (0.0)
+    per-draw c1 re-profile + curves                                  0.08       0.0    (0.0)    (0.1)  6324 draws
+    MAP search + whitening                                           0.05       0.0    (0.0)    (0.0)  88/88 starts, 5 modes
+    NUTS setup                                                    5.4e-05       0.0    (0.0)    (0.0)  starts, Hamiltonian
+    re-whitening: a chain found a basin 2.2 nats above the MAP       0.04       0.0    (0.0)    (0.0)
+    NUTS setup                                                    5.4e-05       0.0    (0.0)    (0.0)  starts, Hamiltonian
+    optima from the draws                                          129.06      11.2    (0.0)    (4.3)  2 extra chains
+    NUTS                                                           636.83      55.5    (0.0)   (20.8)  140k iters, 90742.22k leapfrog, 0.007 ms/step
+    5 posterior modes: mass by bridge sampling                       1.75       0.2    (0.0)    (0.0)
+    per-draw c1 re-profile + curves                                  0.49       0.0    (0.0)    (0.0)  106752 draws
+  report write                                                    8.3e-07       0.0    (0.0)    (0.0)
+  unaccounted                                                      324.63      28.3    (0.0)    (9.7)
+GC: 37.17 s
+fit timing  = 1148.02 s
+plot timing = 0 s
+
+--- machine ---
+machine.os              	Linux aarch64-linux-gnu
+machine.cpu             	apple-m2
+machine.cpu_mhz         	600
+machine.cpus            	8
+machine.threads         	1
+machine.memory_gib      	15.3
+machine.loadStart       	1.37
+machine.free_gib_start  	8.5

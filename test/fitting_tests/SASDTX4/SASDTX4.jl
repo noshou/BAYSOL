@@ -171,7 +171,14 @@ function runSasdtx4(;
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seedSasdtx4(; seed)
-    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    # the default rerun (2000 + 2000) ended just short of the
+    # convergence gate (R̂ above 1.01 or bulk ESS under 400), so
+    # this entry reruns with a longer warm-up and 4 times the draws
+    # δ = 98, a much longer retry and chains started closer to the optimum: with seed 0
+    # this ends at R̂ 1.001, ESS above 8000 and no divergent draw (2026-11-16); at 95
+    # the divergence rate is above the limit.
+    res = BAYSOL.runModel(s, nSamples, nAdapt; δ = 98, retryNAdapt = 8000,
+        retryNDraws = 16000, chainStartRadii = (2.0, 4.0, 6.0))
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 

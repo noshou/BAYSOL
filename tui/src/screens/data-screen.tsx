@@ -7,11 +7,12 @@ import { existsSync } from "node:fs"
 import { basename } from "node:path"
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useMemo, useState } from "react"
-import { DATA_EXTENSIONS } from "../core/file-system.js"
+import { DATA_EXTENSIONS, saveErrorNote } from "../core/file-system.js"
 import {
     parseNumber,
     plainNumber,
     shortNumber,
+    truncate,
     truncateStart,
 } from "../core/terminal.js"
 import {
@@ -35,8 +36,20 @@ import {
 } from "../store/data.js"
 import { loadSource, roleLabel, roles } from "../store/data-table.js"
 import { checkPath, MAX_PATH_TYPED, pathSuggestions } from "../store/lists.js"
+import {
+    EMPTY_MODEL_REFERENCE,
+    MAX_REFERENCE_TEXT,
+    type ModelReference,
+    projectReference,
+    saveProjectReference,
+} from "../store/model-references.js"
 import type { ProjectRef } from "../store/projects.js"
-import { listReferences } from "../store/references.js"
+import {
+    currentReference,
+    deleteReferenceAsync,
+    IMPORT_DATA_FIRST,
+    listReferences,
+} from "../store/references.js"
 import { Frame } from "../ui/frame.js"
 import {
     cursorMoves,
@@ -48,6 +61,7 @@ import {
     moveLegend,
 } from "../ui/grid.js"
 import {
+    destructiveQuestion,
     PathPrompt,
     Prompt,
     questionLegend,
@@ -66,14 +80,13 @@ import {
     useScreenActive,
 } from "../ui/interaction.js"
 import { PICKING_NOTE, usePathField, usePathPick } from "../ui/prompt-flows.js"
-import { Panel, useTheme } from "../ui/theme.js"
+import { ErrorText, Panel, useTheme } from "../ui/theme.js"
 import { DataImportScreen } from "./data-import.js"
-import { ReferencesScreen, referenceSummary } from "./references-screen.js"
 
-/** What the screen is doing: the options, a path prompt, the picker window, the tabs of
- * the units of q or a number prompt for the energy (the import itself is its own
- * screen). */
-type Mode = "menu" | "path" | "picking" | "energy"
+/** What the screen is doing: the options, a path prompt (for the data or for the
+ * reference fit), the picker window, a number prompt for the energy or a text prompt for
+ * the reference (the import itself is its own screen). */
+type Mode = "menu" | "path" | "picking" | "energy" | "text"
 
 /** The options of the screen, in order. */
 const options = [
@@ -82,7 +95,22 @@ const options = [
     { id: "units", label: "q units" },
     { id: "energy", label: "energy" },
     { id: "reference fit", label: "reference fit" },
+    { id: "software", label: "reference software" },
+    { id: "chi2", label: "reference chi2" },
+    { id: "rescale", label: "reference rescale" },
 ] as const
+
+/** The options that edit a text of the project's reference, with their prompt and field. */
+const textFields = {
+    software: { field: "software", prompt: "software:", hint: "the program, e.g. FoXS" },
+    chi2: { field: "refChi2", prompt: "chi2:", hint: "the depositor's, e.g. FoXS 0.79" },
+} as const
+
+/** The options that need the project to have a reference fit. */
+const needsReference: ReadonlySet<string> = new Set(["software", "chi2", "rescale"])
+
+/** What is said when one of those comes before a reference fit. */
+const LOAD_REFERENCE_FIRST = "load a reference fit first"
 
 /** What is said when the columns are to be changed and none were recorded. */
 const NO_SOURCE = "no source recorded: load a file"
@@ -92,6 +120,9 @@ const alwaysOn: ReadonlySet<string> = new Set(["load", "reference fit"])
 
 /** The width of the name column of the summary (`reference fit` is the longest). */
 const LINE_NAME_WIDTH = 13
+
+/** What a reference field says while it is not set. */
+const UNSET = "-"
 
 /** What is said when `units`, `energy` or the columns come before a file. */
 const LOAD_FIRST = "load a file first"
@@ -112,6 +143,30 @@ const acceptedHint = (name: string): boolean =>
 /** The suggestions of the path prompt. */
 const suggestDataPaths = (text: string) => pathSuggestions(text, acceptedHint)
 
+
+/**
+ * The lines that describe the project's one reference fit.
+ *
+ * @param name - the curve's name, `undefined` without one.
+ * @param ref - the project's reference entry.
+ * @param width - the cells a value may use.
+ * @returns `name  value` pairs: the curve, its software, chi2 and rescale; empty without a
+ *     curve.
+ */
+export function referenceFacts(
+    name: string | undefined,
+    ref: ModelReference,
+    width: number,
+): [string, string][] {
+    if (name === undefined) return []
+    const text = (v: string) => truncate(v === "" ? UNSET : v, width)
+    return [
+        ["reference fit", truncate(name, width)],
+        ["ref software", text(ref.software)],
+        ["ref chi2", text(ref.refChi2)],
+        ["ref rescale", ref.rescale ? "on" : "off"],
+    ]
+}
 
 /** The energy for the summary: the number as typed and its unit label. */
 export function energyText(energy: number | null, unit: EnergyUnit): string {
@@ -189,6 +244,10 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
     // the unit of the energy prompt and the text it starts with (`^k` changes both)
     const [energyUnit, setEnergyUnitNow] = useState<EnergyUnit>(DEFAULT_ENERGY_UNIT)
     const [energyStart, setEnergyStart] = useState("")
+    // what the path prompt is for: the data, or the project's one reference fit
+    const [forReference, setForReference] = useState(false)
+    // the text of the reference being edited (`software` or `chi2`)
+    const [edit, setEdit] = useState<keyof typeof textFields | undefined>()
     const { note, say, clear } = useNote()
     const field = usePathField(clear)
     const {
@@ -210,9 +269,14 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
     const columns = useBodyColumns()
     const lines = describe(status, columns - 22)
     // biome-ignore lint/correctness/useExhaustiveDependencies: these only re-read
-    const references = useMemo(() => listReferences(dir), [dir, nav.depth, active, version])
-    const usable = references.filter((e) => e.unusable === undefined).length
-    const referencesText = referenceSummary(references, columns - 22)
+    const refEntry = useMemo(() => projectReference(dir), [dir, nav.depth, active, version])
+    // biome-ignore lint/correctness/useExhaustiveDependencies: these only re-read
+    const current = useMemo(
+        () => currentReference(dir, refEntry.fit),
+        [dir, refEntry.fit, nav.depth, active, version],
+    )
+    // an older folder may hold more curves: the run draws the project's one reference
+    const referenceLines = referenceFacts(current?.name, refEntry, columns - 22)
     const loaded = status?.kind === "ok"
     const unusable = status?.kind === "unusable"
 
@@ -231,6 +295,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
     const load = (path: string): string | undefined => {
         const bad = checkPath(path, 42)
         if (bad !== undefined) return bad
+        if (forReference) return loadReference(path)
         try {
             if (readDataInfo(dir)?.kind === "unusable") return RESET_FIRST
             nav.push(<DataImportScreen {...importProps(path)} />)
@@ -238,6 +303,59 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         } catch (error) {
             return dataErrorNote(error)
         }
+    }
+
+    /**
+     * Reads a file and opens the import screen on it in the reference mode; when it adds
+     * the curve, it becomes THE reference fit of the project, replacing the one that was
+     * (that file stays in `reference-fit/`, the run no longer draws it).
+     *
+     * @returns what is wrong with the file (nothing was changed), `undefined` on success.
+     */
+    const loadReference = (path: string): string | undefined => {
+        try {
+            if (readDataInfo(dir)?.kind !== "ok") return IMPORT_DATA_FIRST
+            nav.push(
+                <DataImportScreen
+                    project={project}
+                    path={path}
+                    source={loadSource(path)}
+                    reference
+                    onDone={(points, _dropped, name, warning) => {
+                        if (name === undefined) return
+                        try {
+                            saveProjectReference(dir, {
+                                ...EMPTY_MODEL_REFERENCE,
+                                fit: `${name}.tsv`,
+                            })
+                            const shown = truncateStart(name, 24)
+                            const text = `reference fit ${shown}: ${points} points`
+                            say(warning === undefined ? text : `${text}. ${warning}`)
+                        } catch (error) {
+                            say(saveErrorNote(error), true)
+                        }
+                        refresh()
+                    }}
+                />,
+            )
+            return undefined
+        } catch (error) {
+            return dataErrorNote(error)
+        }
+    }
+
+    /** Saves a changed reference entry at once; a failed save is a line of text. */
+    const change = (next: ModelReference) => {
+        try {
+            // an older folder's curve in use is named in the entry once it is edited
+            saveProjectReference(dir, {
+                ...next,
+                fit: next.fit === "" ? (current?.file ?? "") : next.fit,
+            })
+        } catch (error) {
+            say(saveErrorNote(error), true)
+        }
+        refresh()
     }
 
     /** What the import screen is given: the file read now, and what to say afterwards. */
@@ -309,10 +427,25 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
             if (unusable) return say(RESET_FIRST, true)
             setProblem(undefined)
             resetField()
+            setForReference(false)
             return setMode("path")
         }
-        // the references list opens without data (only adding one needs it)
-        if (id === "reference fit") return nav.push(<ReferencesScreen project={project} />)
+        // a reference fit is added with data only (it is read in the data's units)
+        if (id === "reference fit") {
+            if (unusable) return say(RESET_FIRST, true)
+            if (!loaded) return say(IMPORT_DATA_FIRST, true)
+            setProblem(undefined)
+            resetField()
+            setForReference(true)
+            return setMode("path")
+        }
+        if (needsReference.has(id)) {
+            if (current === undefined) return say(LOAD_REFERENCE_FIRST, true)
+            if (id === "rescale")
+                return change({ ...refEntry, rescale: !refEntry.rescale })
+            setEdit(id as keyof typeof textFields)
+            return setMode("text")
+        }
         if (status?.kind !== "ok") return say(unusable ? RESET_FIRST : LOAD_FIRST, true)
         setProblem(undefined)
         if (id === "mapping") return reopen(status.info.mapping)
@@ -323,6 +456,32 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
             setEnergyStart(energy === null ? "" : plainNumber(energy))
             setMode("energy")
         }
+    }
+
+    const submitText = (text: string) => {
+        if (edit === undefined) return
+        change({ ...refEntry, [textFields[edit].field]: text.trim() })
+        setEdit(undefined)
+        toMenu()
+    }
+
+    /** `^r` on a reference row: asks, then deletes the curve and clears the entry. */
+    const askRemove = () => {
+        if (current === undefined) return say(LOAD_REFERENCE_FIRST, true)
+        const { file, name } = current
+        confirm.ask(destructiveQuestion(`reference ${name}`), () => {
+            // the archive is rewritten in the background; the entry is cleared after it
+            say("removing the reference fit...")
+            void deleteReferenceAsync(dir, file).then(() => {
+                try {
+                    saveProjectReference(dir, EMPTY_MODEL_REFERENCE)
+                    say("reference fit deleted")
+                } catch (error) {
+                    say(saveErrorNote(error), true)
+                }
+                refresh()
+            })
+        })
     }
 
     /** `^k` on the menu: the unit of the row under the cursor, saved at once. */
@@ -342,6 +501,12 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         refresh()
     }
 
+    /** Whether the cursor is on one of the rows of the reference fit. */
+    const onReferenceRow = (): boolean => {
+        const id = options[cursor.index]?.id
+        return id === "reference fit" || (id !== undefined && needsReference.has(id))
+    }
+
     // the menu: move, do, back, and reset for files that cannot be used
     useKeys((press: KeyInput) => {
         if (confirm.handleKey(press)) return
@@ -351,6 +516,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
         else if (press.is(keys.down)) cursor.move(1)
         else if (press.is(keys.back)) nav.pop()
         else if (press.is(keys.units)) turnUnit()
+        else if (press.is(keys.remove) && onReferenceRow()) askRemove()
         else if (press.is(keys.enter)) {
             const option = options[cursor.index]
             if (option) choose(option.id)
@@ -394,6 +560,9 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                 legendEnter,
                 moveLegend(cursorMoves(cursor.index, options.length)),
                 unusable && legendFor("reset files", keys.reset),
+                onReferenceRow() &&
+                    current !== undefined &&
+                    legendFor("delete", keys.remove),
                 (options[cursor.index]?.id === "units" ||
                     options[cursor.index]?.id === "energy") &&
                     legendFor("unit", keys.units),
@@ -403,7 +572,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                 typed === "" && legendFor("pick file", keys.pickFiles),
                 ...promptKeys,
             ])
-        return mode === "energy" ? promptKeys : []
+        return mode === "energy" || mode === "text" ? promptKeys : []
     }
     const legend = legendNow()
 
@@ -431,18 +600,18 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                                 </Box>
                             ))
                         ) : unusable ? (
-                            <Text color={theme.er}>{status.message}</Text>
+                            <ErrorText>{status.message}</ErrorText>
                         ) : (
                             <Text color={theme.mt}>no data yet</Text>
                         )}
-                        {referencesText === undefined ? null : (
-                            <Box columnGap={1}>
-                                <Text color={theme.mt}>
-                                    {"reference fit".padEnd(LINE_NAME_WIDTH)}
+                        {referenceLines.map(([name, value]) => (
+                            <Box key={name} columnGap={1}>
+                                <Text color={theme.mt}>{name.padEnd(LINE_NAME_WIDTH)}</Text>
+                                <Text color={theme.fg} wrap="truncate-end">
+                                    {value}
                                 </Text>
-                                <Text color={theme.fg}>{referencesText}</Text>
                             </Box>
-                        )}
+                        ))}
                     </Panel>
                     <Box marginTop={1}>
                         <CursorList
@@ -452,10 +621,15 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                             lines={options.length}
                             active={mode === "menu"}
                             row={(o, on) => (
-                                <ListText on={on && (loaded || alwaysOn.has(o.id))}>
-                                    {o.id === "reference fit" && usable > 0
-                                        ? `${o.label} (${usable})`
-                                        : o.label}
+                                <ListText
+                                    on={
+                                        on &&
+                                        (needsReference.has(o.id)
+                                            ? current !== undefined
+                                            : loaded || alwaysOn.has(o.id))
+                                    }
+                                >
+                                    {o.label}
                                 </ListText>
                             )}
                         />
@@ -468,6 +642,7 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                         key={fieldKey}
                         maxLength={MAX_PATH_TYPED}
                         placeholder="any table: .dat, .fit, .csv, .tsv, .txt, .xlsx, ..."
+                        label={forReference ? "reference fit:" : undefined}
                         suggest={suggestDataPaths}
                         error={problem}
                         onSubmit={submitPath}
@@ -479,6 +654,26 @@ export function DataScreen({ project }: { project: ProjectRef }): ReactNode {
                         onChange={onChange}
                         take="load"
                         canTake={typed !== ""}
+                        cancel="close"
+                        onLegend={setPromptKeys}
+                    />
+                </Box>
+            ) : null}
+            {mode === "text" && edit !== undefined ? (
+                <Box marginTop={1}>
+                    <Prompt
+                        label={textFields[edit].prompt}
+                        initial={refEntry[textFields[edit].field]}
+                        maxLength={MAX_REFERENCE_TEXT}
+                        placeholder={textFields[edit].hint}
+                        onSubmit={submitText}
+                        onCancel={() => {
+                            setEdit(undefined)
+                            toMenu()
+                        }}
+                        onBack={nav.pop}
+                        onChange={clear}
+                        take="set"
                         cancel="close"
                         onLegend={setPromptKeys}
                     />

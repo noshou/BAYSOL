@@ -91,7 +91,7 @@ function _runPdb2pqr(
     relabeled = outPath * ".relabeled.pdb"
     rel = relabelModified(inPath, relabeled)
     plan = rel.plan
-    runIn = (isempty(plan) && !rel.renumbered) ? inPath : relabeled
+    runIn = (isempty(plan) && !rel.renumbered && rel.stripped == 0) ? inPath : relabeled
     # a nucleic chain that starts or ends with a non-nucleotide: those ends run apart
     isolated = outPath * ".isolated.pdb"
     iso = isolateChainEnds(runIn, isolated)
@@ -139,7 +139,7 @@ Add explicit hydrogens: runs pdb2pqr on the heavy-atom .pdb at `pdbPath` and
 returns the path to a hydrogen-included .pdb stored in the `MolecularStructure` store.
 
 # Arguments
-- `pdbPath`: path to a heavy-atom .pdb (e.g. from `resloveStruct`).
+- `pdbPath`: path to a heavy-atom .pdb (e.g. from `resolveStruct`).
 - `pH`: solution pH, passed to pdb2pqr and used to resolve the termini flags when
     `titration` is pH-driven.
 

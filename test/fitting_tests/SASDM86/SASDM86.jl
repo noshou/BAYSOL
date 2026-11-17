@@ -148,7 +148,11 @@ function runSasdm86(
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seedSasdm86(run; seed)
-    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    # the default rerun (2000 + 2000) left the chains in different places (R̂ above 1.5),
+    # so this entry reruns with a longer warm-up, more draws and chains started closer to
+    # the optimum
+    res = BAYSOL.runModel(s, nSamples, nAdapt; retryNAdapt = 6000, retryNDraws = 8000,
+        chainStartRadii = (2.0, 4.0, 6.0))
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 

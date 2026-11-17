@@ -200,6 +200,19 @@ test("move tex: from the archive or the folder, into the run folder", async () =
     assert.deepEqual(temps(), before)
 })
 
+test("an older figure (`\\rhoE`) is mended in the copy, not in the run", async () => {
+    const p = scratchProject()
+    const { dir } = await makeRun(p, async () => 0) // plain files: no archive
+    const { model } = unitsOf(p, dir)
+    const file = join(dir, "m.tex")
+    writeFileSync(file, "\\begin{axis}[xlabel={$\\rhoE$}]\n")
+    const target = tempDir()
+    await moveFiles("tex", [model], target)
+    const copy = readFileSync(join(target, model.run, "m.tex"), "utf-8")
+    assert.equal(copy, "\\begin{axis}[xlabel={$\\rho_e$}]\n")
+    assert.match(readFileSync(file, "utf-8"), /rhoE/, "the run's file is never changed")
+})
+
 test("move tex never replaces a file and keeps no staging file", async () => {
     const p = scratchProject()
     const { dir } = await makeRun(p)

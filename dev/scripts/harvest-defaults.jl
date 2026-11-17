@@ -99,7 +99,9 @@ function harvest()
         kind = BAYSOL.Pipeline.settingKind(name, v)
         choices = choices_of(name)
         if choices !== nothing
-            all(c -> c in choices, v) || error("setting $name: a default is no choice")
+            # a `:choice` default is one text, a `:set` or `:markers` default a list
+            all(c -> Symbol(c) in choices, kind === :choice ? (v,) : v) ||
+                error("setting $name: a default is no choice")
         end
         fields =
             Pair{String,Any}["default"=>v, "type"=>String(kind), "limits"=>limits_of(name)]

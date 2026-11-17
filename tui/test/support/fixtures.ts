@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+import assert from "node:assert/strict"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { renderToString } from "ink"
 import { createElement, type ReactElement } from "react"
-import { readAssetJson } from "../../src/core/environment.js"
+import { readAssetJson, type System } from "../../src/core/environment.js"
+import { writeJson } from "../../src/core/file-system.js"
+import type { Drafts } from "../../src/store/lists.js"
+import { defaultCatalog, type SettingDef } from "../../src/store/settings.js"
 import { NavProvider } from "../../src/ui/interaction.js"
 import { defaultTheme, ThemeContext } from "../../src/ui/theme.js"
 
@@ -150,3 +154,84 @@ export function seqresLetters(file: string, chain: string): string {
  */
 export const runOn = (date: string, time = "00-00-00"): string =>
     `${time}-000_UTC_+0000_${date}`
+
+/**
+ * A screen drawn on the default theme, as lines.
+ *
+ * @param screen - the screen.
+ * @param columns - the width of the terminal.
+ * @returns the drawn lines.
+ */
+export function drawLines(screen: ReactElement, columns = 80): string[] {
+    return drawScreen(screen, columns).split("\n")
+}
+
+/**
+ * The message of the error a call throws.
+ *
+ * @param run - the call, which must throw.
+ * @param type - the class the error must be an instance of.
+ * @returns the error's message.
+ * @throws an assertion error if nothing is thrown or the error is of another class.
+ */
+export function failure(
+    run: () => unknown,
+    type: abstract new (...args: never[]) => Error = Error,
+): string {
+    try {
+        run()
+    } catch (error) {
+        assert.ok(error instanceof type, `thrown: ${String(error)}`)
+        return (error as Error).message
+    }
+    return assert.fail("no error")
+}
+
+/**
+ * A fake `System` for the code that looks at the operating system and environment.
+ *
+ * @param os - the platform.
+ * @param env - the environment variables.
+ * @param home - the home folder.
+ * @returns the system.
+ */
+export const fakeSystem = (
+    os: NodeJS.Platform,
+    env: Record<string, string>,
+    home = "/home/u",
+): System => ({ os, env, home, cwd: "/work" })
+
+/** The marks of every row of some drafts (what changed, in the row's order). */
+export const marks = <T>(s: Drafts<T>) => s.rows.map((_, i) => s.mark(i))
+
+/** The value of every row of some drafts. */
+export const values = <T>(s: Drafts<T>) => s.rows.map((_, i) => s.value(i))
+
+/** The definition of a setting of the default catalog, which must be there. */
+export const settingDef = (name: string): SettingDef => defaultCatalog().require(name)
+
+/**
+ * Makes the plain (unpacked) run folder `runs/<id>/` of a project.
+ *
+ * @param project - the project folder.
+ * @param id - the run's name.
+ * @param json - the `run.json`: a string is written as it is, an object as JSON, none
+ *     writes no file.
+ * @param files - more files of the run, name to text.
+ * @returns the run's folder.
+ */
+export function plainRun(
+    project: string,
+    id: string,
+    json?: unknown,
+    files: Record<string, string> = {},
+): string {
+    const run = join(project, "runs", id)
+    mkdirSync(run, { recursive: true })
+    if (json !== undefined) {
+        const text = typeof json === "string" ? json : writeJson(json)
+        writeFileSync(join(run, "run.json"), text)
+    }
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(run, name), text)
+    return run
+}

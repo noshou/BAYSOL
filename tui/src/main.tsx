@@ -10,6 +10,9 @@ import {
     startAction,
 } from "./core/terminal.js"
 import { killAllNow, markAllStaleRuns, quitAll } from "./store/run.js"
+import { detectSixel } from "./store/sixel-detect.js"
+import { setSixelSupport } from "./store/sixel-support.js"
+import { installScreenRefresh } from "./ui/screen-refresh.js"
 
 // The entry point: in a terminal the program runs here; with no terminal (started from a
 // launcher) it opens a terminal emulator that runs the program again, and the copy that was
@@ -36,6 +39,12 @@ if (action === "run") {
     } catch {
         // an unreadable data folder is told by the screens; the sweep is only housekeeping
     }
+    // does the terminal draw sixel? asked ONCE, here, while nobody else reads stdin (Ink
+    // has not started); unsupported (the usual answer) keeps every plot Unicode
+    setSixelSupport(await detectSixel())
+    // the screen refresh (a removable workaround, see ui/screen-refresh.ts): delete this
+    // line to run without it; it goes in front of `render` to see Ink's first frame
+    installScreenRefresh()
     const app = render(<App viewFile={viewFile} />, {
         alternateScreen: true,
         exitOnCtrlC: false,

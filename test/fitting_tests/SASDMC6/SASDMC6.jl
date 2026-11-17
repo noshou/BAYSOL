@@ -148,7 +148,14 @@ function runSasdmc6(
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seedSasdmc6(run; seed)
-    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    # the default rerun (2000 + 2000) left the chains in different places (R̂ above 1.5),
+    # so this entry reruns with a longer warm-up, more draws and chains started closer to
+    # the optimum. The target acceptance is 60 percent (default 95): at 95 the step size
+    # collapsed to about 0.002 (tree depth 10) on this stiff 4-channel curve and the chains
+    # stayed in different regions; at 80 the full run still ended at R̂ 1.014, at 60 the
+    # step is about 0.25 (tree depth 4) and the smoke runs converged on three seeds.
+    res = BAYSOL.runModel(s, nSamples, nAdapt; δ = 60, retryNAdapt = 6000,
+        retryNDraws = 8000, chainStartRadii = (2.0, 4.0, 6.0))
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 

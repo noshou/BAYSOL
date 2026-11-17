@@ -146,7 +146,6 @@ const INTERP_DIGITS = 10
 // 2. Reading unknown input
 // ========================================================================================
 
-/** A finite number. */
 /** Whether a value is a finite number (the one test of the template files). */
 export const isNum = (x: unknown): x is number =>
     typeof x === "number" && Number.isFinite(x)
@@ -322,18 +321,37 @@ const rowKey = (arg: string): string =>
     (resolveBuiltin(arg)?.target ?? arg).trim().toLowerCase()
 
 /**
- * The problems of an optional number: wrong type, or outside `[lo, hi]`.
- *
- * @param label - the field.
- * @param v - the value (`undefined` is fine).
- * @param lo - the least.
- * @param hi - the most (`Infinity` for none).
- * @returns the problems.
+ * The problems of one validator, in the order they were found. The checks add to it
+ * (`undefined` adds nothing) and the validator returns [[list]].
  */
-function optionalRange(label: string, v: unknown, lo: number, hi: number): string[] {
-    if (v === undefined) return []
-    if (!isNum(v)) return [`${label} is not a number`]
-    return v < lo || v > hi ? [`${label} ${v} is outside ${lo} to ${hi}`] : []
+class Problems {
+    readonly list: string[] = []
+
+    /** Adds a problem, or nothing for `undefined`. */
+    add(text: string | undefined): void {
+        if (text !== undefined) this.list.push(text)
+    }
+
+    /**
+     * A number that must lie in `[lo, hi]`.
+     *
+     * @param label - the field, as the messages name it.
+     * @param v - the value.
+     * @param lo - the least.
+     * @param hi - the most (`Infinity` for none).
+     * @param optional - `undefined` is fine.
+     */
+    range(label: string, v: unknown, lo: number, hi: number, optional = false): void {
+        if (v === undefined && optional) return
+        if (!isNum(v)) this.add(`${label} is not a number`)
+        else if (v < lo || v > hi) this.add(`${label} ${v} is outside ${lo} to ${hi}`)
+    }
+
+    /** A number that must not be negative (`label` names the field). */
+    nonNegative(label: string, v: unknown): void {
+        if (!isNum(v)) this.add(`${label} is not a number`)
+        else if (v < 0) this.add(`${label} must not be negative`)
+    }
 }
 
 /**
@@ -347,24 +365,16 @@ function amountProblems(
     d: Record<string, unknown>,
     concentrationNeeded: boolean,
 ): string[] {
-    const out: string[] = []
-    if (d.mM === undefined && !concentrationNeeded) {
-        // a mixture has no concentration
-    } else if (!isNum(d.mM)) {
-        out.push("concentration is not a number")
-    } else if (!(d.mM > 0)) {
-        out.push("concentration must be above 0")
+    const bad = new Problems()
+    // a mixture has no concentration and no sigma
+    if (d.mM !== undefined || concentrationNeeded) {
+        if (!isNum(d.mM)) bad.add("concentration is not a number")
+        else if (!(d.mM > 0)) bad.add("concentration must be above 0")
     }
-    if (d.sigmaMM === undefined && !concentrationNeeded) {
-        // nothing
-    } else if (!isNum(d.sigmaMM)) {
-        out.push("sigma is not a number")
-    } else if (d.sigmaMM < 0) {
-        out.push("sigma must not be negative")
-    }
-    out.push(...optionalRange("pH set at", d.pHSetAt, LIMITS.tempMin, LIMITS.tempMax))
-    out.push(...optionalRange("rest of the recipe", d.restMM, 0, Number.POSITIVE_INFINITY))
-    return out
+    if (d.sigmaMM !== undefined || concentrationNeeded) bad.nonNegative("sigma", d.sigmaMM)
+    bad.range("pH set at", d.pHSetAt, LIMITS.tempMin, LIMITS.tempMax, true)
+    bad.range("rest of the recipe", d.restMM, 0, Number.POSITIVE_INFINITY, true)
+    return bad.list
 }
 
 /**
@@ -375,42 +385,37 @@ function amountProblems(
  */
 function stepProblems(steps: unknown): string[] {
     if (!Array.isArray(steps) || steps.length < 1) return ["at least one step is needed"]
-    const out: string[] = []
-    if (steps.length > LIMITS.maxSteps) out.push(`at most ${LIMITS.maxSteps} steps`)
+    const bad = new Problems()
+    if (steps.length > LIMITS.maxSteps) bad.add(`at most ${LIMITS.maxSteps} steps`)
     const zs: number[] = []
     steps.forEach((s, i) => {
         const n = i + 1
         if (!isObj(s)) {
-            out.push(`step ${n} is not a step`)
+            bad.add(`step ${n} is not a step`)
             return
         }
-        if (!isNum(s.pKa25)) {
-            out.push(`step ${n}: pKa is not a number`)
-        } else if (s.pKa25 < LIMITS.pKaMin || s.pKa25 > LIMITS.pKaMax) {
-            const range = `${LIMITS.pKaMin} to ${LIMITS.pKaMax}`
-            out.push(`step ${n}: pKa ${s.pKa25} is outside ${range}`)
-        }
+        bad.range(`step ${n}: pKa`, s.pKa25, LIMITS.pKaMin, LIMITS.pKaMax)
         if (s.dpKaDT !== undefined && !isNum(s.dpKaDT)) {
-            out.push(`step ${n}: dpKa/dT is not a number`)
+            bad.add(`step ${n}: dpKa/dT is not a number`)
         }
         const z = s.zAcid
         if (!isNum(z) || !Number.isInteger(z)) {
-            out.push(`step ${n}: charge is not an integer`)
+            bad.add(`step ${n}: charge is not an integer`)
         } else if (z < LIMITS.chargeMin || z > LIMITS.chargeMax) {
             const range = `${LIMITS.chargeMin} to ${LIMITS.chargeMax}`
-            out.push(`step ${n}: charge ${z} is outside ${range}`)
+            bad.add(`step ${n}: charge ${z} is outside ${range}`)
         } else {
             if (i > 0 && zs[i - 1] !== undefined && z !== zs[i - 1] - 1) {
                 const want = zs[i - 1] - 1
-                out.push(`step ${n}: charge ${z} must be ${want} (a step loses a proton)`)
+                bad.add(`step ${n}: charge ${z} must be ${want} (a step loses a proton)`)
             }
             if (z - 1 < LIMITS.chargeMin) {
-                out.push(`step ${n}: the base form would have charge ${z - 1}`)
+                bad.add(`step ${n}: the base form would have charge ${z - 1}`)
             }
         }
         zs[i] = isNum(z) ? z : Number.NaN
     })
-    return out
+    return bad.list
 }
 
 /**
@@ -421,27 +426,26 @@ function stepProblems(steps: unknown): string[] {
  */
 export function checkCustomDefinition(def: unknown): string[] {
     if (!isObj(def) || def.kind !== "custom") return ["not a custom definition"]
-    const out: string[] = []
+    const bad = new Problems()
     const name = text(def.name)
     if (name === undefined || name.length < 1 || name.length > LIMITS.nameMax) {
-        out.push(`name must be 1 to ${LIMITS.nameMax} characters`)
+        bad.add(`name must be 1 to ${LIMITS.nameMax} characters`)
     }
     const solute = text(def.solute)
-    if (!solute) {
-        out.push("a solute is needed")
-    } else {
-        // a name the bundled tables do not know is a custom solute: its snapshot is stored
-        if (!resolveBuiltin(solute)) {
-            const data = normalizeSnapshot(def.soluteData)
-            out.push(...snapshotProblems(data, `solute ${solute}`))
-        }
+    if (!solute) bad.add("a solute is needed")
+    // a name the bundled tables do not know is a custom solute: its snapshot is stored
+    else if (!resolveBuiltin(solute)) {
+        const data = normalizeSnapshot(def.soluteData)
+        bad.list.push(...snapshotProblems(data, `solute ${solute}`))
     }
     const stepsBad = stepProblems(def.steps)
-    out.push(...stepsBad)
-    out.push(...titrantProblems(def.titrant, def.steps, stepsBad.length === 0))
-    out.push(...amountProblems(def, true))
-    if (out.length === 0) out.push(...extremeProblems(def as unknown as CustomDefinition))
-    return out
+    bad.list.push(...stepsBad)
+    bad.list.push(...titrantProblems(def.titrant, def.steps, stepsBad.length === 0))
+    bad.list.push(...amountProblems(def, true))
+    if (bad.list.length === 0) {
+        bad.list.push(...extremeProblems(def as unknown as CustomDefinition))
+    }
+    return bad.list
 }
 
 /**
@@ -507,34 +511,33 @@ export function checkTableDefinition(def: unknown): string[] {
     if (!isObj(def) || def.kind !== "table") return ["not a table definition"]
     const points = def.points
     if (!Array.isArray(points)) return ["points are missing"]
-    const out: string[] = []
-    if (points.length < LIMITS.minPoints) out.push(`at least ${LIMITS.minPoints} points`)
-    if (points.length > LIMITS.maxPoints) out.push(`at most ${LIMITS.maxPoints} points`)
+    const bad = new Problems()
+    if (points.length < LIMITS.minPoints) bad.add(`at least ${LIMITS.minPoints} points`)
+    if (points.length > LIMITS.maxPoints) bad.add(`at most ${LIMITS.maxPoints} points`)
     let first: string[] | undefined
     let last = Number.NEGATIVE_INFINITY
     points.forEach((p, i) => {
         const n = i + 1
         if (!isObj(p)) {
-            out.push(`point ${n} is not a point`)
+            bad.add(`point ${n} is not a point`)
             return
         }
-        if (!isNum(p.pH)) {
-            out.push(`point ${n}: pH is not a number`)
-        } else if (p.pH < LIMITS.pHMin || p.pH > LIMITS.pHMax) {
-            out.push(`point ${n}: pH ${p.pH} is outside ${LIMITS.pHMin} to ${LIMITS.pHMax}`)
-        } else {
-            if (p.pH <= last) out.push(`point ${n}: pH ${p.pH} must be above ${last}`)
+        const known = bad.list.length
+        bad.range(`point ${n}: pH`, p.pH, LIMITS.pHMin, LIMITS.pHMax)
+        // only a pH that passed the range joins the order check
+        if (bad.list.length === known && isNum(p.pH)) {
+            if (p.pH <= last) bad.add(`point ${n}: pH ${p.pH} must be above ${last}`)
             last = p.pH
         }
-        const keys = rowsProblems(p.rows, n, out)
+        const keys = rowsProblems(p.rows, n, bad)
         if (keys === undefined) return
         if (first === undefined) {
             first = keys
         } else if (!sameSet(first, keys)) {
-            out.push(`point ${n}: lists other rows than point 1`)
+            bad.add(`point ${n}: lists other rows than point 1`)
         }
     })
-    return out
+    return bad.list
 }
 
 /**
@@ -542,41 +545,40 @@ export function checkTableDefinition(def: unknown): string[] {
  *
  * @param rows - the raw rows.
  * @param n - the point's number, for the messages.
- * @param out - the list the problems are added to.
+ * @param bad - the problems, which this adds to.
  * @returns the resolved names of the rows, `undefined` when the rows are unusable.
  */
-function rowsProblems(rows: unknown, n: number, out: string[]): string[] | undefined {
+function rowsProblems(rows: unknown, n: number, bad: Problems): string[] | undefined {
     if (!Array.isArray(rows)) {
-        out.push(`point ${n}: rows are missing`)
+        bad.add(`point ${n}: rows are missing`)
         return undefined
     }
-    if (rows.length < 1) out.push(`point ${n}: no rows`)
-    if (rows.length > LIMITS.maxRows) out.push(`point ${n}: at most ${LIMITS.maxRows} rows`)
+    if (rows.length < 1) bad.add(`point ${n}: no rows`)
+    if (rows.length > LIMITS.maxRows) bad.add(`point ${n}: at most ${LIMITS.maxRows} rows`)
     const keys: string[] = []
     let usable = true
     rows.forEach((r, j) => {
         const at = `point ${n}, row ${j + 1}`
         if (!isObj(r)) {
             usable = false
-            out.push(`${at} is not a row`)
+            bad.add(`${at} is not a row`)
             return
         }
         const arg = text(r.arg)
         if (!arg) {
             usable = false
-            out.push(`${at}: a solute name is needed`)
+            bad.add(`${at}: a solute name is needed`)
         } else {
             const key = rowKey(arg)
-            if (keys.includes(key)) out.push(`${at}: ${arg} is listed twice`)
+            if (keys.includes(key)) bad.add(`${at}: ${arg} is listed twice`)
             keys.push(key)
             if (!resolveBuiltin(arg)) {
-                out.push(...snapshotProblems(normalizeSnapshot(r.custom), `${at}: ${arg}`))
+                const custom = normalizeSnapshot(r.custom)
+                bad.list.push(...snapshotProblems(custom, `${at}: ${arg}`))
             }
         }
-        if (!isNum(r.mM)) out.push(`${at}: mM is not a number`)
-        else if (r.mM < 0) out.push(`${at}: mM must not be negative`)
-        if (!isNum(r.sigmaMM)) out.push(`${at}: sigma is not a number`)
-        else if (r.sigmaMM < 0) out.push(`${at}: sigma must not be negative`)
+        bad.nonNegative(`${at}: mM`, r.mM)
+        bad.nonNegative(`${at}: sigma`, r.sigmaMM)
     })
     return usable ? keys : undefined
 }
@@ -599,14 +601,15 @@ export function checkDefinition(def: unknown): string[] {
     const id = text(def.id)
     const t = id ? templateById(id) : undefined
     if (!t || t.available === false) return [`no buffer template ${String(def.id)}`]
-    const out = amountProblems(def, t.kind === "buffer")
+    const bad = new Problems()
+    bad.list.push(...amountProblems(def, t.kind === "buffer"))
     if (def.ion !== undefined) {
         const cations = titrantIons().base
         if (typeof def.ion !== "string" || !cations.includes(def.ion)) {
-            out.push(`ion must be one of ${cations.join(", ")}`)
+            bad.add(`ion must be one of ${cations.join(", ")}`)
         }
     }
-    return out
+    return bad.list
 }
 
 // ========================================================================================

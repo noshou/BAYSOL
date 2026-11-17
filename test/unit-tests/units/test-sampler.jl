@@ -509,13 +509,16 @@ end
         # same seeds, same result, retried or not
         again = FIT.infer(seed, 60, 30; rngSeed = 5, nChains = 2)
         @test again.samples == r.samples && again.diagnostics.retryKept == d.retryKept
-        # what counts as converged: R̂ at most RHAT_OK and both ESS at least ESS_MIN, with a
-        # NaN (could not be computed) never read as fine
-        ok = FIT.ESS_MIN
+        # what counts as converged: R̂ strictly below RHAT_OK and both ESS strictly
+        # above ESS_MIN, with a NaN (could not be computed) never read as fine
+        ok = FIT.ESS_MIN + 1
+        @test length(FIT._convergenceProblems(FIT.RHAT_OK, ok, ok)) == 1
+        @test length(FIT._convergenceProblems(1.005, FIT.ESS_MIN, ok)) == 1
+        @test length(FIT._convergenceProblems(1.005, ok, FIT.ESS_MIN)) == 1
         @test isempty(FIT._convergenceProblems(1.005, ok, ok))
         @test length(FIT._convergenceProblems(1.02, ok, ok)) == 1
-        @test length(FIT._convergenceProblems(1.005, ok - 1, ok)) == 1
-        @test length(FIT._convergenceProblems(1.005, ok, ok - 1)) == 1
+        @test length(FIT._convergenceProblems(1.005, ok - 2, ok)) == 1
+        @test length(FIT._convergenceProblems(1.005, ok, ok - 2)) == 1
         @test length(FIT._convergenceProblems(Inf, ok, ok)) == 1
         @test length(FIT._convergenceProblems(NaN, ok, ok)) == 1
         @test length(FIT._convergenceProblems(1.005, NaN, NaN)) == 2

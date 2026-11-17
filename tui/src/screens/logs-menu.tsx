@@ -2,19 +2,23 @@
 
 // The logs menu (`logs` of the project menu): the runs of a project, the options of one
 // run (views of the run's own files, from its archive or folder, and the restores that put
-// its inputs back into the project). `open... > open runs` (results, plots, `run.LOG`) is
-// `open-runs.tsx`, whose pager these pages reuse.
+// its inputs back into the project), and the ONE pager of a run's texts. `open... > open
+// runs` (results, plots) is `open-runs.tsx`; its `^l` opens this file's `RunLogScreen`, the
+// same screen as `view run.LOG` here.
 //
 // Contents:
 //   1. Layout: the rows the pages give their tables
-//   2. `LogsRun`: the options of one run, the restores
-//   3. `LogsRuns`: the list of the runs, the entry of the menu
+//   2. The pager: `useRunWatch`, `TextPager` and `RunLogScreen`
+//   3. `LogsRun`: the options of one run, the restores
+//   4. `LogsRuns`: the list of the runs, the entry of the menu
 
-import { type ReactNode, useCallback, useEffect, useState } from "react"
+import { Box, Text } from "ink"
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react"
 import { appDir, LOGS_FLOW } from "../core/environment.js"
 import { messageOf } from "../core/file-system.js"
-import { clampIndex, displayWidth } from "../core/terminal.js"
+import { clampIndex, displayWidth, superscripts, wrapLine } from "../core/terminal.js"
 import { liveRun, type ProjectRef } from "../store/projects.js"
+import { RUN_FILES, runExists, warmRunWorkbooks } from "../store/run-archive.js"
 import {
     conditionsText,
     listRuns,
@@ -22,6 +26,7 @@ import {
     RUN_GONE,
     type RunItem,
     type RunRow,
+    readLogText,
     readRunFile,
     runFileSizes,
     runItems,
@@ -36,9 +41,11 @@ import {
     watchBuffer,
 } from "../store/run-restores.js"
 import { runDisplay } from "../store/run-stamp.js"
+import { pagerLines } from "../store/view.js"
 import { cornerLabels, Frame, footerExtraLines } from "../ui/frame.js"
 import {
     cursorMoves,
+    type Design,
     type LegendItem,
     legendBack, legendFor, legendOf, moveLegend } from "../ui/grid.js"
 import {
@@ -57,8 +64,8 @@ import {
     useNav,
     useScreenActive,
 } from "../ui/interaction.js"
-import { type Column, columnWidths, DataTable } from "../ui/theme.js"
-import { TextPager, useRunWatch } from "./open-runs.js"
+import { PagerLine, PagerPrompt, pagerFullLegend, usePager } from "../ui/pager.js"
+import { type Column, columnWidths, DataTable, Panel, useTheme } from "../ui/theme.js"
 
 // ========================================================================================
 // 1. Layout
@@ -98,6 +105,186 @@ function useTableRows(full: readonly LegendItem[]): number {
 
 /** The one key of a page whose content is gone or cannot be shown. */
 const _CLOSE: LegendItem = legendFor("close", keys.escape, keys.back)
+
+// ========================================================================================
+// 2. The pager: `useRunWatch`, `TextPager` and `RunLogScreen`
+// ========================================================================================
+
+/** The keys of the pager, fullest first (the frame reserves their height). */
+const PAGER_FULL: LegendItem[] = [
+    ...pagerFullLegend(),
+    legendFor("close", keys.escape, keys.back),
+]
+
+/** The rows of the pager's panel that are not text: its borders and the status line. */
+const PAGER_CHROME_ROWS = 3
+
+/** The columns the pager's panel gives up: its two border columns and the padding. */
+const PAGER_CHROME_COLUMNS = 4
+
+/**
+ * Watches the folder of a run for a page that shows it: another copy of the program may
+ * delete the run while the page is open. Only the page on top looks (every
+ * `watch.pollSeconds`, and at once when a page comes back to the top). When the folder is
+ * gone the hook reports it; the page shows `this run was deleted` and the hook closes it
+ * after `watch.closeSeconds` (or at any key), so nothing crashes and nothing stays on
+ * screen.
+ *
+ * @param runDir - the run folder.
+ * @returns `true` once the folder was found gone.
+ */
+function useRunWatch(runDir: string): boolean {
+    const nav = useNav()
+    const active = useScreenActive()
+    const [gone, setGone] = useState(false)
+
+    useEffect(() => {
+        if (!active) return
+        const look = (): void => {
+            if (!runExists(runDir)) setGone(true)
+        }
+        look()
+        const timer = setInterval(look, LOGS_FLOW.watch.pollSeconds * 1000)
+        return () => clearInterval(timer)
+    }, [active, runDir])
+
+    useEffect(() => {
+        if (!gone || !active) return
+        const timer = setTimeout(nav.pop, LOGS_FLOW.watch.closeSeconds * 1000)
+        return () => clearTimeout(timer)
+    }, [gone, active, nav.pop])
+
+    // any key closes it sooner; the keys of the page itself are off while it is gone
+    useKeys(() => nav.pop(), gone)
+    return gone
+}
+
+/**
+ * The read-only pager of the program, ONE for every text of a run: its `run.LOG` (see
+ * [[RunLogScreen]]) and every view of the logs menu. The keys are those of [[usePager]]
+ * (shift+↓ and PgDn a page down, shift+↑ and PgUp a page up, the arrows a line or
+ * sideways, Home and End, find, go to a line, mark and copy); Esc closes (or drops the
+ * mark first). The text is read once; a refusal (no file, too large, deleted) is the note,
+ * and a run deleted while the page is open closes it with `this run was deleted`.
+ *
+ * @param props.title - the title of the screen (`logs`).
+ * @param props.subtitle - what is shown (`run.LOG`, `settings.json`).
+ * @param props.corner - the corner text (`cornerLabel`).
+ * @param props.runDir - the run folder, watched for its deletion.
+ * @param props.design - `"blocky"` on the logs pages, `"smooth"` when left out.
+ * @param props.load - reads the text (it may throw: the message is the note).
+ * @returns the screen.
+ */
+export function TextPager(props: {
+    title: string
+    subtitle: string
+    corner: string | readonly string[]
+    runDir: string
+    load: () => string
+    design?: Design
+}): ReactNode {
+    const { title, subtitle, corner, runDir, load, design = "smooth" } = props
+    const nav = useNav()
+    const theme = useTheme()
+    const columns = useBodyColumns()
+    const gone = useRunWatch(runDir)
+    const { note, say, clear } = useNote()
+    const [askKeys, setAskKeys] = useState<LegendItem[]>([])
+    const panel = design === "blocky" ? "double" : "round"
+    const width = Math.max(1, columns - PAGER_CHROME_COLUMNS)
+    // a line wider than the page continues on the next row, so no text runs off the edge
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `load` is read once per page
+    const loaded = useMemo((): { lines: string[] } | { error: string } => {
+        try {
+            const raw = pagerLines(load(), LOGS_FLOW.pager.tabWidth)
+            return { lines: raw.flatMap((line) => wrapLine(line, width)) }
+        } catch (error) {
+            const why = messageOf(error, "cannot read the file")
+            return { error: why }
+        }
+    }, [runDir, width])
+    const lines = "lines" in loaded ? loaded.lines : []
+    const pageRows = Math.max(
+        1,
+        useBodyRows(footerExtraLines(PAGER_FULL, columns, BASE_LEGEND_LINES, design)) -
+            PAGER_CHROME_ROWS,
+    )
+    const pager = usePager({
+        lines,
+        rows: pageRows,
+        width,
+        overlap: LOGS_FLOW.pager.overlap,
+        sideStep: LOGS_FLOW.pager.sideStep,
+        say,
+    })
+
+    useKeys((press) => {
+        if (gone) return
+        clear()
+        if (pager.handle(press)) return
+        if (press.is(keys.escape) || press.is(keys.back)) nav.pop()
+    }, pager.asking === undefined)
+
+    const error = gone ? RUN_GONE : "error" in loaded ? loaded.error : undefined
+    const shown = error !== undefined ? { text: error, error: true } : note
+    return (
+        <Frame
+            design={design}
+            title={title}
+            subtitle={subtitle}
+            corner={corner}
+            legend={
+                pager.asking
+                    ? askKeys
+                    : [...pager.legend, legendFor("close", keys.escape, keys.back)]
+            }
+            legendFull={PAGER_FULL}
+            note={shown?.text}
+            noteIsError={shown?.error}
+        >
+            <Panel style={panel} paddingX={1} flexDirection="column" flexGrow={1}>
+                {pager.shown.map((line) => (
+                    <PagerLine key={line.index} text={line.text} look={line.look} />
+                ))}
+                <Box flexGrow={1} />
+                {pager.asking ? (
+                    <PagerPrompt pager={pager} onLegend={setAskKeys} />
+                ) : (
+                    <Text color={theme.mt} wrap="truncate-end">
+                        {pager.status}
+                    </Text>
+                )}
+            </Panel>
+        </Frame>
+    )
+}
+
+/**
+ * The `run.LOG` of a run: the ONE screen both `open runs` (`^l`) and `logs > view run.LOG`
+ * open, the logs menu's pager page.
+ *
+ * @param props.projectId - the project, for the corner.
+ * @param props.runId - the run, for the corner.
+ * @param props.runDir - the run folder.
+ * @returns the screen.
+ */
+export function RunLogScreen(props: {
+    projectId: string
+    runId: string
+    runDir: string
+}): ReactNode {
+    const { projectId, runId, runDir } = props
+    return (
+        <TextPager
+            design="blocky"
+            title="logs"
+            subtitle="run.LOG"
+            corner={cornerLabels(projectId, runId)}
+            runDir={runDir}
+            load={() => readLogText(runDir)}
+        />
+    )
+}
 
 // ========================================================================================
 // 3. The options of a run
@@ -177,6 +364,12 @@ function LogsRun({ project, run }: { project: ProjectRef; run: RunRow }): ReactN
         return () => clearInterval(timer)
     }, [active, run.dir])
 
+    // the workbooks that only the archive holds are made in the background, so that a
+    // view of one finds its copy ready
+    useEffect(() => {
+        if (active) void warmRunWorkbooks(run.dir)
+    }, [active, run.dir])
+
     const pageSize = useTableRows(RUN_FULL)
     const index = Math.min(selected, runItems.length - 1)
     const top = scrollWindow(index, offset, pageSize, runItems.length)
@@ -196,12 +389,19 @@ function LogsRun({ project, run }: { project: ProjectRef; run: RunRow }): ReactN
         },
     ]
 
-    /** Opens a view. */
+    /** Opens a view; the `run.LOG` is the one screen `open runs` opens too. */
     const open = (it: RunItem): void => {
+        if (it.file === RUN_FILES.log) {
+            nav.push(
+                <RunLogScreen projectId={project.id} runId={run.id} runDir={run.dir} />,
+            )
+            return
+        }
         const load = (): string => {
             const text = readRunFile(run.dir, it.file)
-            if (it.action === "conditions") return conditionsText(text)
-            return it.json ? prettyJson(text) : text
+            // superscripts are display only: the restore path reads the raw text
+            if (it.action === "conditions") return superscripts(conditionsText(text))
+            return superscripts(it.json ? prettyJson(text) : text)
         }
         nav.push(
             <TextPager

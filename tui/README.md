@@ -7,7 +7,7 @@ for the terminal) and runs in any terminal of at least **80 columns by 24 rows**
 lists scroll and text wraps. It looks best with 24-bit colour. The fit itself is the Julia package: the
 interface starts Julia as a child process, shows its output live, and reads the files it writes.
 
-This page is the user guide and the reference; the last section is for contributors. The same steps, shorter,
+This page is the user guide and the reference; the [internals page](INTERNALS.md) is for contributors. The same steps, shorter,
 are in the first guide of the repository's main README.
 
 ## Contents
@@ -19,11 +19,11 @@ are in the first guide of the repository's main README.
 - Files on disk, with examples
 - Two copies at once
 - If something goes wrong
-- For contributors
+- For contributors: see the internals page
 
 ## Install and start
 
-You need **Julia 1.12**, **Node.js 22 or newer** (`node --version`) and a BAYSOL folder that contains `tui/`.
+You need **Julia 1.12**, **Node.js 24 or newer** (`node --version`) and a BAYSOL folder that contains `tui/`.
 The repository has **one** `node_modules`, at its root: `tui` is an npm workspace of the root `package.json`.
 
 ```bash
@@ -71,7 +71,7 @@ Windows) are written from the systems' documentation and are **untested**. The r
 6. `^x` to the project menu. A `run: shift+r` item appears at the bottom once everything is there.
 7. Press `Shift+R`: the run starts at once, at the buffer's temperature.
 8. Watch the run screen. When it says `done`, press Enter.
-9. `o` (open...), `open runs`, Enter on the model: the results workbook. `P` shows the plots.
+9. `o` (open...), `open runs`, Enter on the model: the results workbook. `shift+p` shows the plots.
 10. `^l` on a run reads its log; `^x` goes back; `^x` again and `q` on the main menu quits.
 
 ## Screens and keys
@@ -174,13 +174,16 @@ with its energy. There is no Shift+D; lower-case `d` is only `data`.
 ### Models
 
 `models` takes the **full absolute path** of a `.cif` or `.pdb` file. Names are hinted as you type and Tab
-completes. The file is **copied** into the project's `models/` folder (`copied lyz.cif`); the original is never
+completes. The file is **copied** into the project's `models.7z` archive (`copied lyz.cif`; 7-Zip, one solid LZMA2 block, rewritten atomically); the original is never
 touched, and an existing name is never overwritten. A project can hold several models; a run fits each in turn.
+The archive is written in the background: the note says `adding <name>...` (a list row says `(removing...)`) while
+7-Zip works, the screen stays usable, and the list is read again when the write ends. Leaving the screen or quitting
+(`^c`, `^d`) first lets the write finish, and the archive is replaced only as a whole, so it is never left half written.
 
 | Key | Does |
 | :-- | :-- |
-| `e` (on an empty field) | pick files in the desktop file chooser |
-| `i` (on an empty field) | list the project's models (`models (N): i`) |
+| `^v` (on an empty field) | pick files in the desktop file chooser |
+| `shift+h` (on an empty field) | list the project's models (`models (N): shift+h`) |
 | `^r` or Delete (on the list) | delete the highlighted model after a question |
 | `^o` (on the list) | the **settings of the highlighted model** (below) |
 
@@ -202,7 +205,7 @@ break a rule (a model's `Q_MIN` above the project's `Q_MAX`): that override is w
 
 ### Data
 
-The `data` screen has five options: `load a file`, `change the columns`, `q units`, `energy`, `reference fit`. Before a
+The `data` screen has eight options: `load a file`, `change the columns`, `q units`, `energy`, `reference fit`, `reference software`, `reference chi2`, `reference rescale`. Before a
 file is loaded it says `no data yet`.
 
 **`load a file`** asks for a path (names hinted, Tab completes, `o` on an empty field opens the file chooser).
@@ -296,23 +299,28 @@ one measurement per row, no header, no comments, no unit text); your file is nev
   is gone it says `source is gone: <name>`; an old `data.json` without a mapping says `no source recorded:
   load a file`.
 
-- **`reference fit`** opens the list of the project's **reference curves** (the depositor's CRYSOL or FoXS fit, ...)
-  that a run draws in its comparison figure. They are the files of `<project>/reference-fit/`). The summary of the data
-  screen says `reference fit  2 (name1, name2)` when there are some. The list opens at any time, but adding needs data
-  (`import the data first`), because a reference is in the **same units as the data** (`units` turns them for
-  both). The list shows each curve's name,
-  its points (those with q and I above 0, the ones a run draws) and its q range. `shift+a` adds one: a path prompt as for
-  `load a file`, then the same import screen (titled `reference fit`, the units in its subtitle) with roles `q` and
+- **`reference fit`** is the project's ONE **reference curve** (the depositor's CRYSOL or FoXS fit, ...), which a run
+  draws on the figure of every model and, alone, in the comparison figure. A path prompt as for `load a file` (it
+  needs data: `import the data first`, because a reference is in the **same units as the data**; `units` turns
+  them for both), then the same import screen (titled `reference fit`, the units in its subtitle) with roles `q` and
   `I(q)` and an optional `sigma`. The columns start as the depositors' fit files come: `q` is `col:1`, `I(q)` is
   `col:3` (the model's intensity; a table of two columns takes `col:2`) and `sigma` is `none` (a chosen sigma is
-  written, but a run reads and ignores it); the preview rounds numbers to five digits. `^w` adds. Rows with q (or a chosen sigma) not above 0 are dropped as in the data import, at least 3 points are
-  needed. The file written is clean: `<name>.tsv`, two or three tab-separated columns, no header. The name is the
+  written, but a run reads and ignores it); the preview rounds numbers to five digits. `^w` adds. Rows with q (or a
+  chosen sigma) not above 0 are dropped as in the data import, at least 3 points are needed. The file written is
+  clean: `<name>.tsv` in `<project>/reference-fit.7z`, two or three tab-separated columns, no header. The name is the
   source's file name without its extension, with every character that is not a letter, digit, `-`, `_` or `.` made
-  `_`; a taken name gets `-2`, `-3`, ..., so nothing is ever overwritten. `^r` (or Delete) deletes the highlighted
-  one after the question. A file in the folder that a run could not read is listed as `unusable` (its reason, such
-  as `line 3: a cell is no number`, is the note when it is highlighted) and is never changed by the program; put
-  the files there by hand if you like (`.tsv`, `.dat`, `.txt`, two or three numeric columns). A run copies the folder, `model-settings.json` and `model-references.json`, into its
-  run folder with the other inputs (the curves as `reference-fit-<file>`).
+  `_`; a taken name gets `-2`, `-3`, ..., so nothing is ever overwritten. **Loading another curve replaces the
+  reference** (its software, chi2 and rescale start empty; the earlier file stays in the folder, only the run no
+  longer draws it). The summary lines of the screen show `reference fit`, `ref software`, `ref chi2` and `ref rescale`
+  once there is one. `reference software` (`MultiFoXS 2-state`), `reference chi2` (the depositor's, with its method:
+  `MultiFoXS 2-state 0.79`) are text prompts and `reference rescale` toggles scaling the curve onto the data by least
+  squares (for a normalized fit); each change is saved at once into the entry `*` of
+  `<project>/model-references.json`. `^r` on a reference row deletes the curve after the question and clears the entry.
+  A folder made before the single reference may hold several files (or entries per model): the screen shows the one
+  named by the entry `*`, else the usable file changed most recently, and a run without an entry `*` still reads the
+  per-model entries and draws every curve of the folder, as before; nothing edits those entries any more. A run copies the
+  folder, `model-settings.json` and `model-references.json` into its run folder with the other inputs (the curves
+  as `reference-fit-<file>`).
 
 - **A wrong file or wrong columns is a warning, never a stop.** The note line says so while the columns are
   chosen and again after the import: `sigma is about I: a fit file? wrong file?` (the `sigma` column of a
@@ -320,14 +328,9 @@ one measurement per row, no header, no comments, no unit text); your file is nev
   the model); for a reference fit, `same numbers as the data: the model column?`, `5.2x off the data: wrong
   column?` (the median distance from the measured curve on its q) or `q range does not meet the data: units?`.
 
-- **The reference curve of one model.** On the models list `shift+f` (`reference`) opens the model's reference fit:
-  `model` (its file), `curve` (one of the project's reference curves or `none`; left, right or Enter go through them),
-  `software` (`MultiFoXS 2-state`), `tag` (`fit3_model1`), `chi2` (the depositor's, with its method:
-  `MultiFoXS 2-state 0.79`) and `rescale` (scale the curve onto the data by least squares, for a normalized fit).
-  Every change is saved at once into `<project>/model-references.json` (`{"<model>": {"tag", "software",
-  "refChi2", "fit", "rescale"}}`, sparse; the columns and units of the curve were chosen when it was imported).
-  A run then draws, on that model's figure (`<model>_comparison.tex`), the data, the reference curve (`software tag
-  (chi2)` in the legend) and the MAP curve with its own χ², and writes `refChi2` in the model's LOG.
+- **The reference on the figure of a model.** The project's reference fit (above) is drawn on every model's figure
+  (`<model>_comparison.tex`): the data, the reference curve (`software (chi2)` in the legend) and the MAP curve with
+  its own χ², and `refChi2` is written in the model's LOG. The model screen has no reference rows.
 
 A project can run only with valid data **and** an energy. A data file that cannot be used is told, never
 written over, and `r` puts it aside as `.corrupt`.
@@ -336,7 +339,7 @@ written over, and `r` puts it aside as `.corrupt`.
 
 `buffer` is a small page with up to five rows, `buffer (N solutes)`, `custom solutes (N)`, `load a recipe`,
 `new recipe` and, for a buffer that has solutes, `save current recipe globally`, and a one-line status of
-each file (`buffer: none yet`, `pH not set`, `buffer: unusable!`). `x` on an unusable file offers to reset it.
+each file (`buffer: none yet`, `pH not set`, `buffer: unusable!`). `shift+z` on an unusable file offers to reset it.
 
 **Recipes** are named buffers kept in the data folder (`recipes.json`, shared by every project). `save current
 recipe globally` asks a name (`replace "NAME"?` if one has it) and saves the buffer as it is on disk, with its
@@ -345,18 +348,18 @@ after a question) and opens the buffer table with the recipe's rows as unsaved o
 when it has them, come in as an unsaved change of the pH row (a recipe without leaves the buffer's own; one without a temperature leaves the buffer's temperature). At the
 first `^w` a buffer that has solutes asks `replace N solutes with recipe "NAME"?`. `new recipe` opens the table
 empty and replaces nothing before `^w`. Nothing is written before `^w`; the recipe is copied, not linked. The
-unit `^k` is not part of a recipe. **Global settings** has two more options under the four groups: `recipes` (`y`) and `solutes` (`t`) open the recipes table and the custom solutes table; `x` on an option whose file cannot be used offers to reset it (the old file stays as `<name>.corrupt`).
-In the recipes table, the custom solutes table and the buffer table, `/` finds a row by name (type part of it, `⏎` puts the cursor on it) and `z` puts the rows in alphabetical order (shown only while they are not); the recipes and the custom solutes also open in that order. The `x` reset legend shows only on the row whose file cannot be used. The path prompts (data, reference fit, models) are boxed like the other dropdowns.
+unit `^k` is not part of a recipe. **Global settings** has two more options under the four groups: `recipes` (`y`) and `solutes` (`t`) open the recipes table and the custom solutes table; `shift+z` on an option whose file cannot be used offers to reset it (the old file stays as `<name>.corrupt`).
+In the recipes table, the custom solutes table and the buffer table, `/` finds a row by name (type part of it, `⏎` puts the cursor on it) and `shift+s` puts the rows in alphabetical order (shown only while they are not); the recipes and the custom solutes also open in that order. The `shift+z` reset legend shows only on the row whose file cannot be used. The path prompts (data, reference fit, models) are boxed like the other dropdowns.
 **Template recipes (2026-11-12).** A recipe can be a *template*: it keeps its definition inside the recipe
 (`"template"` in `recipes.json`), so that what depends on the pH and the temperature is worked out when it is
 loaded. Three kinds: `builtin` (a shipped buffer: concentration, ±, titrant, `pH set at`, rest of the recipe), `custom`
 (your own buffer: 1 to 3 pKa steps with the pKa at 25 °C, d(pKa)/dT and the charge of the acid form, a titrant
 acid or base with its ion, concentration and ±; run by the same engine, labelled `constants not sourced`) and `table`
 (amounts of each row at two or more pH, interpolated linearly, a pH outside the points refused). The recipe's
-`solutes` are its fixed rows (salt, protein, ...). Make one with `shift+t` on the recipes table (a name, then the
+`solutes` are its fixed rows (salt, protein, ...). Make one with `shift+w` on the recipes table (a name, then the
 questions) or on the buffer table (the rows come in linked and follow the pH and temperature), or save a
 buffer whose rows follow one template with `save current recipe globally` (it asks `save "NAME" as a template?`;
-Enter saves the template, `n` a plain recipe, Esc saves nothing; rows of two templates cannot be one). The recipes
+Enter saves the template, `shift+x` a plain recipe, Esc saves nothing; rows of two templates cannot be one). The recipes
 table has a `template`
 column while one exists. Loading a template recipe adds its fixed rows and the rows of its definition at the recipe's pH
 and temperature (else the buffer's; no pH at all asks you to set it first), and they follow the buffer table's pH and
@@ -378,7 +381,7 @@ at once, into `buffer.json` or the recipe: only the solutes and the pH wait for 
 The list: Enter edits a note, `^n` a new one (asks the title), `shift+m` renames, `^r` marks it to go, `^w` saves. The
 editor is built in (arrows, home, end, page up and down, Enter, backspace, delete, paste; lines scroll sideways, they
 do not wrap): `^w` saves the note through the list's save at once (a project writes `project.json`; the buffer or
-recipe takes it as an unsaved change of its table), Esc and `^x` save a changed text and leave: nothing is dropped. Saving the buffer as a recipe
+recipe takes it as an unsaved change of its table), Esc and `^x` leave, asking `discard 1 change?` first when the text changed (Enter drops the edit). Saving the buffer as a recipe
 copies its notes in when it has any (else a replaced recipe keeps its own); loading a recipe brings its notes in as an
 unsaved change (the replace question then says `and notes`).
 The recipes table has the columns name, solutes, kinds (`3 solute 1 polymer 2 custom 4 seq`), pH, σ (blank for
@@ -452,7 +455,9 @@ save); a missing or unknown value opens in mM, and Julia ignores the key.
 `^n` (small molecules) and `^p` (polymers) in every project. A name the built-in list does not know says
 `no match (custom: buffer>custom solutes)`. The custom table has the columns name, formula, Z, PMV @ 25 °C and
 ±; a polymer shows its units by their labels (`A:C2H4O B:C3H6O`, Z `24A+32B+10`, PMV `36.9A+53.1B+9`). In
-the table, `^n` opens the form of a small molecule:
+the table, `^f` (protein) and `^e` (DNA or RNA) take a sequence the way the buffer does (a FASTA/FASTQ/PDB/mmCIF
+path, the picker, or the sequence pasted; one entry per record, named by its id); Z and PMV show `computed` because
+Julia works them out of the sequence, and Enter on such a row renames it. `^n` opens the form of a small molecule:
 
 ```
  new custom solute · non-biological
@@ -649,7 +654,7 @@ run is deleted in `open...` > `open runs`.
 
 | Option | Does |
 | :-- | :-- |
-| view run.LOG | the full log in a pager (Enter, Space, PgDn page down, `k`, PgUp page up, arrows, Home, End, Esc or `^x` closes) |
+| view run.LOG | the full log in the pager (below), the same screen as `^l` in `open runs` |
 | view / restore settings | the run's `settings.json`; restore sets the project's settings to it |
 | view / restore buffer | the run's `buffer.json`; restore puts its solutes and its pH and σ back together |
 | view / restore units | the run's `data.json`; restore sets only the units and the energy |
@@ -678,13 +683,15 @@ archive is zipped again from its tree into a proper `.xlsx` (`[Content_Types].xm
 every time) in a copy in a temporary folder that is removed when the program ends; files moved to the data folder
 are always proper `.xlsx` files.
 
+The screen is painted again in place every `screen.refreshSeconds` idle seconds (`run_flow.json`, default 5, 0 = off), on a resize and when the terminal gains focus, never over a sixel picture (a workaround for stray characters; `notes/tui.md`, "Screen refresh (workaround)").
+
 The pack is **atomic**: the archive is made as `<run>.7z.tmp.<pid>`, tested with `7z t` and compared with the list of
 what was packed, and only then renamed to `<run>.7z`; the packed originals are removed after that and never before.
 If anything fails (a full disk, a failed test) the run folder stays exactly as it was, the staged file is
 removed, and the note row on the run screen says why (`not packed: ...`); the run's
 own outcome is unchanged. While a pack runs, deleting that run is refused with `this run is being packed`.
 
-**Reading is the same for packed and plain runs.** The viewer's plots (`P`), `run.LOG` (`^l` and `view run.LOG`),
+**Reading is the same for packed and plain runs.** The viewer's plots (`shift+p`), `run.LOG` (`^l` and `view run.LOG`),
 the logs menu (every view, `conditions`, the restores) read the archive
 or, for a run that was never packed, the plain folder; the plots are read straight out of the archive (nothing is
 extracted to disk), always read-only, with a check of every entry name (no `..`, no absolute path) and a size cap
@@ -719,14 +726,16 @@ none is a row of its own. The state of a model is `done`, `failed`, `aborted`, `
   which (`overrides: Q_MAX, N_CHAINS`).
 - A run that made the **comparison** (one figure of the measured curve, every model and the references) has one
   more row, `comparison`, after its models: Enter opens `compare.tsv` in the same viewer (one table: the
-  measured curve, each model's fit and each reference on the measured q; `P` for the plot); a failed one says
+  measured curve, each model's fit and each reference on the measured q; a table only, no plots); a failed one says
   why in the note row.
 - **`shift+d`, `shift+l` and `shift+c`** move and compile the files of a run. **Move data** (`shift+d`) copies the
-  workbooks (`<model>.xlsx`) and the comparison table into the data folder; **move tex** (`shift+l`) copies the
+  workbooks (`<model>.xlsx`) and the comparison table into the data folder; **move tex plots** (`shift+l`) copies the
   `.tex` figures into the plot folder; each opens a dropdown, `move all` (every model and the `comparison`) or
   `move by model: NAME`; **compile plots** (`shift+c`, the highlighted row) extracts the figures to a temporary
   folder, runs the LaTeX compiler on each and puts the PDFs in the plot folder. The legend shows each key where
-  there is something to take. The files come from the run's archive (or its folder) and
+  there is something to take (`shift+c` only while a figure is not rendered yet; a rendered run's plots can be
+  shown as graphics with `shift+t` in the plots mode on a sixel terminal). The files come from the run's archive
+  (or its folder) and
   go into a folder of the run's name inside the destination (`<folder>/<run>/`), named for the model
   (`<model>.tex`, `<model>_hist_c1.tex`, `<model>.xlsx`; the comparison's are
   `<project>-compare.tsv`, `<project>-compare.tex`); when a name is taken, ALL the files of that model get `-2`, then
@@ -738,13 +747,22 @@ none is a row of its own. The state of a model is `done`, `failed`, `aborted`, `
   cannot be found is told in the note row, with where to set the path (a path that is set is never replaced by a
   different compiler); a figure that LaTeX rejects is named with the first line of its error, and the others are still
   made. A note, an error too, stays until the next key.
-- **`^l`** on a run opens `run.LOG` in a pager: Enter, Space and PgDn page down, `k` and PgUp page up, arrows,
-  Home and End move, Esc or `^x` closes. A live run can be read.
+- **`^l`** on a run opens `run.LOG` in the pager, the same screen as `logs > view run.LOG`. A live run can be
+  read.
+
+**The pager** (`run.LOG` and every view of the logs menu) and the viewer's Unicode plots have the same keys:
+`shift+↓` and PgDn a page down, `shift+↑` and PgUp a page up (both listed in the legend), the arrows a line (and
+sideways for wide lines), Home and End the first and last line, `/` find (the lines that contain the text, in
+any case, are underlined, the cursor goes to the first at or after it), `shift+k` and `shift+i` the next and
+previous match (round the ends), `shift+j` go to a line (its number), Space mark a line (moving extends the
+range; Space again or Esc clears it) and `shift+y` copy the marked lines, or the cursor line (OSC 52). One
+status line: `lines 1-15 of 63 · 24%`, then `match 2 / 5` and `marked 4-9` while there are any. Esc or `^x`
+closes the pager.
 - **`^r`** deletes the whole run folder after a question (`... this cannot be undone!`); a live run is refused
   (`a run is in progress`). There is no way to delete a single log file.
 
 **The viewer** shows one tab per sheet of the workbook (the `run` sheet first lists what ran: section, name,
-value, unit, meaning):
+value, unit; its status line says what the row under the cursor is):
 
 ```
  results · lyz.xlsx                       project: demo · run: 10:15:00:000 EST -05:00 · 2026-11-07
@@ -761,17 +779,21 @@ value, unit, meaning):
  │ A1 · row 1 / 61                                                            │
  ╰────────────────────────────────────────────────────────────────────────────╯
  ╭╮ ╭╮╷ ╷╭╮╭╮╷
- ├┴╮├┤╰┬╯╰╮│││    next sheet: tab ┃ plots: P
- ╰─╯╵╵ ╵ ╰╯╰╯╰─   move: ↑↓←→ ┃ back: ^x
+ ├┴╮├┤╰┬╯╰╮│││    next: tab ┃ plots: shift+p
+ ╰─╯╵╵ ╵ ╰╯╰╯╰─   move: ↑↓←→ ┃ back:  ^x
 ```
 
-(The sheet names and cells above are an example workbook; yours has the fit's own sheets.) **Tab** and **Shift+Tab** (or `]` and `[`) go to the
-next and previous sheet and stop at the ends; the legend lists only what works now: `next sheet` is missing
-on the last sheet, `prev sheet` on the first, and an arrow is missing when the cursor is at that edge. The arrows
-move the cursor, `^x` goes back. **`P`** switches to the **plots** of that model, one tab per
-plot of its `plots.txt` (`fit`, `residuals`, one per parameter, ...), and back with `P` again. In the plots
-mode **`+`** and **`-`** zoom in and out: they step to the next larger or smaller saved size of the plots (the
-largest that fits is chosen at first; the keys appear only while a larger or smaller size exists). A very large
+(The sheet names and cells above are an example workbook; yours has the fit's own sheets.) **Tab** and **Shift+Tab** go to the
+next and previous sheet and stop at the ends; the legend lists only what works now: `next` is missing
+on the last sheet, `prev` on the first, and an arrow is missing when the cursor is at that edge. The arrows
+move the cursor, `shift+↓`/PgDn and `shift+↑`/PgUp move it a page, `^x` goes back. **`shift+p`** switches to the
+**plots** of that model, one tab per plot of its `plots.txt` (`fit`, `residuals`, one per parameter, ...), and back
+with `shift+p` again (not offered for the comparison, which has no plots). The plots mode reads each plot with the
+pager's keys (above) and **`shift+=`** (`+`) and **`shift+-`** (`_`) zoom in and out: they step to the next larger or smaller saved size of the plots (the
+largest that fits is chosen at first; the keys appear only while a larger or smaller size exists). `shift+t`
+switches the plot type: the Unicode plot or the rendered figure (sixel graphics; offered only where the terminal
+draws sixel and the figure is rendered). The status line ends with one sentence about the column under the cursor (on the `run` sheet, about the selected row), cut to fit one line.
+A very large
 sheet is cut at a limit, and the status line says so. The first row is frozen when it is text. The viewer never
 writes, locks or changes a file.
 
@@ -780,11 +802,11 @@ In the sheets mode the viewer also has these keys (each shows in the legend only
 | Key | What it does |
 | :-- | :-- |
 | `/` | **find**: a prompt (Enter searches, Esc cancels) for text; the cells that contain it, in any case, are underlined and the cursor jumps to the first one at or after it. The status line shows `match 3 / 12`; the text is kept while the viewer is open, for every sheet |
-| `.`, `,` | the next and the previous match, wrapping round (shown while a search has matches; `no match` is a note when there is none) |
-| `j` | **go to**: a prompt for a cell (`B7`), a row (`7`, the column stays) or a column (`B`, the row stays); text that is none of these, or a place outside the sheet (`outside the sheet (A1:H60)`), is a note that stays until the next key |
+| `shift+k`, `shift+i` | the next and the previous match, wrapping round (shown while a search has matches; `no match` is a note when there is none) |
+| `shift+j` | **go to**: a prompt for a cell (`B7`), a row (`7`, the column stays) or a column (`B`, the row stays); text that is none of these, or a place outside the sheet (`outside the sheet (A1:H60)`), is a note that stays until the next key |
 | `Space` | **mark** the cursor cell as one corner of a range; moving the cursor extends the range (drawn highlighted, `range A1:B2` in the status line); `Space` again or `Esc` clears it |
-| `c` | **copy**: with a range marked it copies the range; without one the note asks `copy: cell (c), row (r), column (v)?` and the next key picks (`Esc` cancels) |
-| `f` | **formulas**: shows the formula text of the cells that have one (`=SUM(A1:A2)`) instead of their values, and back; on a sheet without formulas it says `no formulas here` (the key is in the legend only when the sheet has formulas) |
+| `shift+y` | **copy**: with a range marked it copies the range; without one the note asks `copy: cell (c), row (r), column (v)?` and the next key picks (`Esc` cancels; the only plain letters outside the menus) |
+| `shift+u` | **formulas**: shows the formula text of the cells that have one (`=SUM(A1:A2)`) instead of their values, and back; on a sheet without formulas it says `no formulas here` (the key is in the legend only when the sheet has formulas) |
 
 A copy is TAB-separated text, one line per row, sent to the clipboard through the terminal (the OSC 52 sequence,
 which also works over SSH; a terminal that does not accept it ignores it). The note says what went:
@@ -795,9 +817,12 @@ sequence to the terminal.
 The plots exist at several sizes (`PLOT_TUI_SIZES`, written by a run started from the terminal interface). The
 plots mode shows the **largest that fits the panel** (width and rows), the smallest if none does (then it
 scrolls), and picks again when the window is resized; the plot tab stays. The status line says which, `plot 1 / 9 ·
-76x10 · lines 1-12 of 12`. A run made before the sizes existed shows its `plots.txt`.
+76x10 · lines 1-12 of 12 · 100%`. A run made before the sizes existed shows its `plots.txt`.
 
 ## Keys at a glance
+
+A plain key acts only as a menu hotkey, a move (arrows, Enter, Esc, Tab, Backspace), typed text, `/` (find)
+or Space (mark); every other key is a Ctrl or a Shift key, and each key does one thing everywhere.
 
 | Key | Does |
 | :-- | :-- |
@@ -810,21 +835,25 @@ scrolls), and picks again when the window is resized; the plot tab stays. The st
 | `^u` | undo (a removal mark, or the change under the cursor) |
 | `^r` | remove a buffer row (mark), delete a project, recipe, custom solute, model, reference curve or run (asks), reset a settings group (on a model's sheet: `inherit group`) |
 | `^n` `^p` `^f` `^e` | buffer: add a small molecule, a polymer, a protein, DNA or RNA; `^n` also adds a recipe (recipes table); the global settings menu has the options `recipes` (`y`) and `solutes` (`t`) |
-| `^o` `shift+f` | models list: the settings, the reference fit of the highlighted model |
-| `shift+a` | references list (`data`, `reference fit`): add a reference curve |
+| `^o` | models list: the settings of the highlighted model |
 | `^g` | buffer: edit pH, σ and temperature |
 | `^k` | buffer: turn the unit of the concentrations (mM, M, µM) |
-| `e`, `i` | on an empty path field: the file chooser, the list of models |
-| `x` | on an unusable file: reset it (the old file is kept as `.corrupt`) |
+| `^v`, `shift+h` | on an empty path field: the file chooser, the list of models |
+| `shift+z` | on an unusable file: reset it (the old file is kept as `.corrupt`) |
+| `shift+x` | a question's third answer (`save as a template?`: the plain recipe) |
+| `/`, `shift+s` | tables of named rows: find a row, sort the rows |
+| `shift+w` | recipes and solutes tables: new template |
 | `Shift+R` | project menu: run (shown only when ready) |
-| `Tab`, `Shift+Tab` (also `]` `[`) | viewer: next and previous sheet or plot |
-| `+` `-` | viewer, plots mode: zoom in and out (a larger or smaller saved size) |
-| `P` | viewer: switch between sheets and plots |
-| `/`, `.`, `,`, `j` | viewer: find, next and previous match, go to a cell |
-| `Space`, `c`, `f` | viewer: mark a range, copy (OSC 52), show formulas |
+| `Tab`, `Shift+Tab` | viewer: next and previous sheet or plot |
+| `shift+=` `shift+-` | viewer, plots mode: zoom in and out (a larger or smaller saved size) |
+| `shift+p` | viewer: switch between sheets and plots (not for the comparison) |
+| `shift+t` | viewer, plots mode: the plot type (Unicode plot or rendered figure) |
+| `/`, `shift+k`, `shift+i`, `shift+j` | viewer and pager: find, next and previous match, go to a cell or line |
+| `Space`, `shift+y`, `shift+u` | viewer and pager: mark, copy (OSC 52); viewer: show formulas |
+| `c`, `r`, `v` | the viewer's copy question only: cell, row, column |
 | `^l` | `open runs`: read the run's `run.LOG` |
 | `shift+d`, `shift+l`, `shift+c` | `open runs`: move the data, move the tex plots (a dropdown: all, or one model), compile the highlighted row's plots |
-| `k`, `Space`, PgUp, PgDn | pager: page up and down |
+| `shift+↑` PgUp, `shift+↓` PgDn | viewer and pager: a page up and down |
 | menu hotkeys | main: `n` `l` `o` `s` `h` `q`; project: `m` `d` `b` `g` `s` `o`; settings: `u` `m` `a` `p` |
 
 ## Files on disk, with examples
@@ -845,10 +874,14 @@ renamed, so a reader never sees half a file.
         buffer.json          solutes, pH, sigmaPh
         data.tsv             q, I, sigma: three tab-separated columns
         data.json            units, energy, source, import choices
-        reference-fit/       reference curves: clean <name>.tsv (q, I[, sigma]), same units as data.tsv
+        reference-fit.7z     reference curves, flat: clean <name>.tsv (q, I[, sigma]), same units as data.tsv
+                             (older projects: a plain reference-fit/ folder, still read until the first change)
         model-settings.json  per-model overrides {"<model>": {sheet: {NAME: {"value": ...}}}}, sparse
-        model-references.json  per-model reference fit {"<model>": {tag, software, refChi2, fit, rescale}}, sparse
-        models/              copies of your .cif and .pdb files
+        model-references.json  the project's reference fit {"*": {software, refChi2, fit, rescale}} (older: per model {"<model>": ...}), sparse
+        models.7z            copies of your .cif and .pdb files, flat, and under generated/ the files Julia made
+                             from them (hydrogenated structures, PROPKA output); older projects: a plain models/
+                             folder, still read until the first add or remove packs it; the folder is then
+                             ignored and can be deleted by you: the program never deletes it
         runs/<HH-MM-SS-mmm_TZ_±HHMM_YYYY-MM-DD>.7z   e.g. 23-35-29-123_EST_-0500_2026-11-07.7z: ONE archive
                                    per run with everything in it, flat (while the run goes it is the folder
                                    <name>/ with the same files; see "The run archive")
@@ -859,6 +892,24 @@ renamed, so a reader never sees half a file.
             <model>.xlsx <model>.LOG <model>*.tex <model>-plots.txt <model>-<W>x<H>.txt
             compare.tsv compare.tex compare-plots.txt compare-<W>x<H>.txt
 ```
+
+**The terminal interface manages projects for you; a script uses plain folders.** The interface keeps the models
+and the reference curve of a project in `models.7z` and `reference-fit.7z`, and for each run it unpacks what Julia
+reads into a temporary folder, hands Julia a private cache folder holding the generated files stored in
+`models.7z` (`BAYSOL_CACHE`; the downloaded component files stay in the shared cache) and, when the run is over, stores
+the files Julia generated back into `models.7z`. Deleting a model deletes the files generated from it. Julia itself
+takes plain files and folders and never reads an archive: to run a project from a script (`runProject`), put the
+models in `<project>/models/` (`.cif` and `.pdb` files) and the curves in `<project>/reference-fit/`. For a project
+that was made in the interface, extract them first, in the project folder:
+
+```bash
+7z x models.7z -omodels            # the generated/ folder inside is ignored
+7z x reference-fit.7z -oreference-fit
+```
+
+A script run of a project that has `models.7z` and no model in `models/` stops with a message that says this and
+gives the first command. A script run uses the normal cache (`_cache/`, or the folder `BAYSOL_CACHE` names); the
+generated files it makes there are not put into `models.7z`.
 
 `settings.json` (global or project; the keys are the sheet, then the setting):
 
@@ -973,7 +1024,7 @@ import; `units` is `"nm-1"` or `"A-1"`):
 `run.LOG` has flat `name<TAB>value` rows: the setup (with `temperatureC`, `ph`, `sigmaPh`,
 `energyEv`), then the output, a `--- result ---` block and, if anything failed, an `=== ERRORS ===` section with
 each message and its stack. Nothing in a run folder is ever overwritten; the deletions are the explicit
-`delete run` and, once its archive has passed `7z t`, the files that were packed into it. A file that cannot be used is never written over: it is told, and `x` resets it, keeping the old
+`delete run` and, once its archive has passed `7z t`, the files that were packed into it. A file that cannot be used is never written over: it is told, and `shift+z` resets it, keeping the old
 one as `<name>.corrupt`.
 
 ## Two copies at once
@@ -990,7 +1041,7 @@ takes a lock too, so two copies starting at the same instant cannot both win; a 
 | :-- | :-- |
 | `BAYSOL: this program needs a terminal` | run it from a terminal window, not a pipe |
 | a message instead of the screen | the terminal is under 80 x 24: enlarge it |
-| `<file> unusable!` and `x: reset` | the file was edited by hand or damaged; `x` then Enter resets it to empty and keeps the old one as `<name>.corrupt` |
+| `<file> unusable!` and `shift+z: reset` | the file was edited by hand or damaged; `shift+z` then Enter resets it to empty and keeps the old one as `<name>.corrupt` |
 | `changed on disk: reopen it` | another copy of BAYSOL saved the file meanwhile: leave the screen and open it again |
 | `missing components: ...` instead of `run: shift+r` | the box lists what is missing: `models`, `solutes`, `pH`, `data`, `energy` |
 | `a run is in progress (pid N)` | a run of this project is live (maybe in another window); wait or stop it |
@@ -1004,125 +1055,4 @@ takes a lock too, so two copies starting at the same instant cannot both win; a 
 | the terminal looks broken after a crash | `reset` in the shell; the program restores the terminal on every normal exit |
 | a setting was reset with a note | `settings.log` beside `settings.json` lists each wiped value and why |
 
-## For contributors
-
-The interface only reads and writes the project's JSON files and starts programs; Julia knows nothing about it.
-`runProject` (Julia, `src/store/run-project.jl`) is the one entry the interface calls, with the arguments `projectDir`,
-`temperature`, `ui = :tui` and `runDir`; the same JSON files are read by Julia's `loadSettings` and
-`loadBuffer` (in `src/store/*.jl`), and the test fixtures `test/fixtures/settings/*.json` and `test/fixtures/buffer/*.json` at the
-repository root are shared by both sides, so a change to a file format changes both.
-
-#### The Julia side of the interface
-
-The Julia that only the interface needs lives in `tui/src/store/`, next to its TypeScript twin, and is **not** part of the `BAYSOL` package: `run-project.jl` (twin: `run.ts`, `projects.ts`) defines the module `BAYSOLRun` and includes `settings-file.jl` (`settings.json` and `model-settings.json`, twin `settings-store.ts`), `buffer.jl` (`buffer.json`, twin `buffer.ts`) and `model-references.jl` (`model-references.json`, twin `references.ts`). The module does `using BAYSOL` and reaches what `BAYSOL.Pipeline` does not export through a short `import BAYSOL.Pipeline: ...` list, so the package keeps only the fit, its outputs and the keyword side of the settings (`seedKeywords`, `runKeywords`, `resultsKeywords`, `InvalidSettingsError`). The interface starts it as `julia --project=<repo> -e 'include(ARGS[1]); BAYSOLRun.runProject(...)'` with the path of `run-project.jl` (`runProjectFile` in `run.ts`). Its tests are `tui/test/*.test.jl` (`bysl unit run-project`, `buffer.test`, `settings-file.test`), run by the same runner as the Julia unit tests, with the shared fixtures in `test/fixtures/`. The sections below are the contracts of these files.
-
-#### The settings of the user
-
-The terminal interface keeps the settings a user changed in `settings.json` in the BAYSOL folder (`settingsFile()` of `BAYSOLRun`: `$BAYSOL_HOME`, else `baysol` in the data folder of the system). `loadSettings()` reads it and gives the value of every setting, the saved one or the default, in the type the default has (an `Int`, a `Float64`, a `Tuple`, and so on); a missing file gives the defaults. **Nothing illegal gets through:** every saved value is checked before it is used, against its type, the `SETTING_LIMITS` and `SETTING_CHOICES` of its `params.jl`, a colour that exists, the shape of a tuple, and the `SETTING_RELATIONS` that tie settings together (`MODE_δρ₁₂` strictly inside `BOUNDS_δρ₁₂`, `SASA_N_OCC` at most `SHELL_SAMPLE`, an opacity between 0 and 1, ...). A file that cannot be read, or one invalid value, prints a warning for each problem and throws an `InvalidSettingsError`, so the fit that asked for the settings does not start. The terminal interface makes the same checks (on the same data, `bysl harvest defaults` writes it) each time a setting is saved, a sheet is opened or a project is opened; there an invalid value is wiped, back to its default, and the setting says so. The entry points `seedModel`, `runModel` and `results` of `BAYSOL` do not read the file themselves: `runProject` passes them what `loadSettings` returns, as keywords (`BAYSOL.seedKeywords`, `runKeywords`, `resultsKeywords`).
-
-
-#### The buffer of a project
-
-`loadBuffer(path)` reads the `buffer.json` that the terminal interface keeps in a project (concentrations in mM as typed) and returns the `Vector{Solute}` that `seedModel` takes, in file order, with the concentrations and their uncertainties divided by 1000 (mol/L). **A missing file is an error** (`InvalidBufferError`): BAYSOL does not guess a buffer, since a run on pure water by accident is worse than a stop. A file with no solutes is accepted with a warning (`the buffer has no solutes: pure water`). The file is an object with a `solutes` array; the schema is frozen in `test/fixtures/buffer/buffer.json`, which the interface's tests and `buffer.test.jl` share:
-
-| `kind` | Keys besides `mM`, `sigmaMm` (required; `mM` above 0, `sigmaMm` at least 0) | Solute |
-| --- | --- | --- |
-| `"nonbiological"`, `"polymer"` | `arg` (table name; grade or family string) | `NonBiological`, `Polymer` |
-| `"dna"`, `"rna"`, `"protein"` | `arg` (the clean sequence) | `DNA`, `RNA`, `Protein` |
-| `"custom-nonbio"` | `custom` (name), `z`, `pmv`, `sigmaPmv` (null = the fallback) | `CustomNonBio` |
-| `"custom-polymer"` | `custom` (name), `units` (1 to 4 of `z`, `slope`, `sigma`), `counts` (one per unit), `zEnds`, `pmvEnds`, `sigmaEnds` (null = none) | `CustomPolymer` |
-
-The file also holds the pH of the buffer and the standard uncertainty of it, `"pH"` and `"sigmaPh"` next to `solutes` (the terminal interface calls the second one σ), and the optional `"temperature"` in °C (0 to 100, validated when present, not returned by `loadBufferPh`: the run script takes the temperature as its argument from the interface). They come as both or neither: a pH from 0 to 14 and a `sigmaPh` from 0 to 14 (the limits are `BUFFER_PH_MIN` and the like, the same numbers as `tui/assets/data/buffer_conditions.json`). `loadBuffer` checks them when they are there and does not need them; `loadBufferPh(path)` returns `(pH = ..., σ_pH = ...)`, the `pH` and `σ_pH` of `seedModel`, and throws an `InvalidBufferError` when the buffer has none, because a run needs a pH.
-
-`name`, `source`, `record` and a unit's `label` and `formula` are labels only. The loader checks the shape (kind, keys, types, the concentration, the list lengths) and prints a warning for each problem before it throws one `InvalidBufferError` that lists them with 1-based row numbers; the ranges of the numbers (electrons above 0, a finite volume, a chain of at least 2 units) are refused by `ρₑ`, not repeated.
-
-#### The run of a project
-
-`runProject(projectDir; temperature, ui = :cli)` fits **every model of a project folder** in one process and writes the run folder `<project>/runs/<stamp>/` (`stamp` is the local time, the zone label, the offset from UTC and the date, `HH-MM-SS-mmm_TZ_±HHMM_YYYY-MM-DD`, e.g. `23-35-29-123_EST_-0500_2026-11-07`: only digits, letters, hyphens and underscores; the zone label is the platform's `Libc.strftime("%Z")` when it is 3 or more Unicode letters (accents kept, whitespace removed), else the zone's name from `TZ` or the `/etc/localtime` link (`Istanbul`, `SaoPaulo`), else `LOCAL`, never `GMT` or `UTC` as a stand-in; `run.json` times stay ISO-8601 UTC; macOS and Windows untested). It is what the terminal interface starts as a child process; it knows nothing of the interface and can be started from any shell. The project holds `settings.json` (what `loadSettings` reads: the settings of this project; missing means the defaults), `buffer.json` (the solutes with `pH` and `sigmaPh`, read by `loadBuffer` and `loadBufferPh`), `data.tsv` (three tab-separated columns q, I, sigma, no header) with `data.json` (`units`, `"nm-1"` or `"A-1"`: q is divided by 10 for `"nm-1"`; `energy`, the X-ray energy in eV; other keys such as `mapping` are ignored) and `models/` (`.cif` and `.pdb`) and, optionally, `reference-fit/` and `model-settings.json` and `model-references.json` (below). The `temperature` (°C) is the buffer's; it has no uncertainty.
-
-```
-<project>/runs/<stamp>/        FLAT: no subfolders (the terminal interface packs it, once the run
-                               is over, into one `<project>/runs/<stamp>.7z` and removes it)
-    run.json         status running|done|failed|aborted, pid, host, started/heartbeat/ended, versions, the models
-                     (name, full path, size, sha256, status, error, files, plotSizes, overrides), rng seed,
-                     timings, and the `compare` entry once the comparison was made (below)
-    run.LOG          the whole output, then `--- result ---` and, if anything failed, `=== ERRORS ===`
-    plots.txt        the unicode plots of every model, plain text, each under `=== <model> ===`
-    settings.json buffer.json solutes.json data.tsv data.json models.json   (the snapshot)
-    model-settings.json   (if the project has one)
-    model-references.json (if the project has one)
-    reference-fit-<file>  (the reference curves, copied from the project)
-    <model>.LOG      the log of the fit (`writeLog`); a failed model has `status` and `error` rows
-                     (a model is named by its file stem; a clash gets `-2`; `run` and `compare` are taken)
-    <model>.xlsx     the workbook
-    <model>*.tex     the figures: <model>.tex, <model>_hist_<parameter>.tex, ... (and the rendered files
-                     when the settings compile)
-    <model>-plots.txt  the terminal plots of the model as plain text; with `ui = :tui` also
-                     <model>-<W>x<H>.txt, one per size of `PLOT_TUI_SIZES`
-    compare.tsv      the combined comparison (when `plotCompare` is on and a model finished), with
-    compare.tex      compare-plots.txt (and, with `:tui`, compare-<W>x<H>.txt)
-```
-
-- **The inputs are copied into the run folder first and the run reads only the copies** (`solutes.json` is made from them: every solute with its electrons `Z`, partial molar volume and uncertainty at this pH, custom solutes as their snapshot, a sequence as its length and first residues, and the buffer's `rhoE`), so editing the project during the run changes nothing. A file already there (a caller that took its own snapshot under its locks) is used as it is.
-- **The folder is claimed** with a non-recursive `mkdir` (when the stamp exists, the next millisecond), after a check that no run of the project is live (`running`, a heartbeat under 60 s old, and the pid exists on this host: otherwise `a run is in progress (pid N)`). A caller that claims it itself passes `runDir`.
-- **`run.json` has one writer**, this function, which replaces it atomically (a temporary file renamed over it) at every change and every 10 s (`heartbeat`). The run folder, the keys and the states are a protocol with the interface (`RUN_*` constants in `run-project.jl` are guardrails, not settings).
-- **Failures do not stop the loop.** An exception while fitting one model (a missing form factor or radius, an unresolved residue, a run that did not converge) is caught, its message and stack go to the ERRORS section of `run.LOG`, the model is `failed` and the next one starts (the line on stderr is short, `model <name> failed: <reason>`, with `not converged` for a `NotConvergedError` and else the first sentence of the message cut to 50 characters; `run.json` and `run.LOG` keep the whole message); an invalid input (buffer, settings, data) fails the run before any model. The run ends `failed` if anything failed and `done` otherwise. Ctrl-C, SIGTERM and, with `ui = :tui`, the end of standard input (the interface died: the process exits, nothing is left over) end it as `aborted`, the files finished (the running model `aborted`, the rest `skipped`).
-- **`ui = :cli`** prints the plots as well as writing them; **`:tui`** never prints them (`plots.txt` only, and the other sizes below). The log, the summary of each fit and the sampler's output always go to stdout/stderr and are copied into `run.LOG`.
-- **The plot folder and the LaTeX compiler** (the settings `FIGURES_DIR` and `FIGURES_COMPILER`, the keywords `plotDir` and `latexCompiler` of `results`, the kind `path`: text without control characters, empty for "not set", at most 4096 characters). With a `plotDir` that is not `""`, `results` also copies its `.tex` figures into that folder (made if missing, a file of the same name replaced; the copies are not in the files returned). `runProject` gives each model the place `<plot dir>/<project>/<run>/<model>/` in it (one folder for all projects; the terminal interface's own "move tex" and "compile plots" put the files flat into the plot dir instead, named for the model, a taken name getting `-2`, `-3`, and never replacing a file; its default, when the setting is empty, is the `plots` folder of the BAYSOL data folder, and a Julia run with the setting empty copies nothing). **The data folder** (the setting `TABLE_DIR`, the keyword `tableDir` of `runProject`, the kind `path`, a setting of the whole run): when it is not `""`, `runProject` also copies the workbook of each model that finished (`<model>.xlsx`) and the comparison table (`<project>-compare.tsv`) into it at the end of the run, a taken name getting `-2`, `-3`, ... (all the files of one unit together) and never replacing a file; the terminal interface's "move data" uses the same setting (its default, when empty, is the `data` folder of the BAYSOL data folder). `latexCompiler` is the path of the compiler that `compile = true` runs (`lualatex`, `xelatex` or `pdflatex`, named by its file, `.exe` allowed): that compiler and no other is used, and a path that is not a file or not one of the three is an error (a warning of the failed figure, as any failed LaTeX run); a font needs `lualatex` or `xelatex`. `""` keeps the old rule: with a font `lualatex`, else `xelatex`, without one the first engine PGFPlotsX finds. Both are settings of the whole run, not of one model. `compareResults` does not take them.
-- **The terminal plots at several sizes** (`ui = :tui`; the setting `PLOT_TUI_SIZES`, the keyword `plotTuiSizes`, the kind `sizes`). A text plot cannot be resized afterwards, so a viewer that has to fit a window needs it drawn at several sizes beforehand. Besides `<model>-plots.txt`, which keeps the size of `PLOT_PREVIEW_SIZE` and is exactly what it always was, the run writes `<model>-<W>x<H>.txt` (and `compare-<W>x<H>.txt`) for every pair `(W, H)` of `PLOT_TUI_SIZES`: the same text as `<model>-plots.txt` (a title line above each boxed plot, a blank line between), `W` the width in terminal columns of the WHOLE plot (axis labels, ticks and legend included: the drawing is made at an area width that is corrected until its widest line is `W`) and `H` the rows of the plot area (the title, the borders, the ticks and the label add 5 rows to a curve plot; a histogram has about `H` bins and is cut down until it is at most `H + 5` rows). The default is `((76, 5), (100, 9), (130, 13), (170, 18))`: the smallest is 76 columns by 10 rows, which fits a window of 80 by 24. A list is valid when it is non-empty, every size is at least 24 by 3 and at most 400 by 100, and each size is larger than the one before in both width and height (the message is `PLOT_TUI_SIZES = ...: must grow in both width and height...`); in `settings.json` it is a list of `[width, height]` pairs. A plot whose labels need more room than the request (the residuals plot needs about 60 columns, a legend with long names more) is drawn as wide as it needs and cannot be cut, so the file's real size is measured: each model's entry of `run.json`, and the `compare` entry, has `plotSizes: [{file, width, rows}]` in the order of the setting (`file` in the run folder, `width` the widest line in terminal cells, as a viewer counts them, a braille blank U+2800 being one cell, `rows` the lines of the tallest plot in the file), the empty list with `ui = :cli` (which prints the default size only). The drawing at all sizes costs about 5 ms for the nine plots of a model once the code is compiled (about half a second more for the first model of a process). Measured on the crambin fixture (the fit and residuals plots, and the seven histograms; `rows` of the tallest): requested 76 by 5 gives 76 columns and 10 rows, 100 by 9 gives 100 and 14, 130 by 13 gives 130 and 18, 170 by 18 gives 170 and 23.
-- **The reference curve of single models** (`model-references.json`). A deposited entry has one fit file and one χ² for each atomic model; `<project>/model-references.json` gives them to the models: `{"<model>": {"fit": "SASDCQ2_fit3.tsv", "software": "MultiFoXS 2-state", "tag": "fit3_model1", "refChi2": "MultiFoXS 2-state 0.79", "rescale": false}}`, every key optional, the model its file stem. `fit` names a file of `reference-fit/` (q in the units of `data.json`, as the other references), `software` and `tag` label it (`software tag`, the file's name without both, `(rescaled)` added with `rescale`), `refChi2` is the depositor's χ² with its method and `rescale` scales the curve onto the measured one by least squares (a normalized fit). The model's `results` call gets the curve as its `references` and the text as `refChi2`, so its comparison figure `<model>_comparison.tex` (and `<model>_comparison` in the workbook) draws the data, the curve (`label  (refChi2)` in the legend) and the MAP curve (`BAYSOL MAP  χ² = ...`), and the model's LOG has the `refChi2` row. A file that cannot be read, a value of the wrong kind, an unknown key, a `fit` that is no file of `reference-fit/` and a name that is no model of the project are notes in the ERRORS section and are skipped; they fail nothing. The file is copied into the run folder with the other inputs. The combined comparison of the run keeps drawing every curve of `reference-fit/`.
-- **Settings of single models** (`model-settings.json`, the keyword `modelSettings`). A model may be fitted with settings of its own, on top of the project's: the file `<project>/model-settings.json` holds `{"<model>": {<sheet>: {"<SETTING>": {"value": ...}}}}`, the shape of `settings.json` for each model (the model is its file stem, the sheet names are free and only group the entries), read and checked as `settings.json` is (every value against its type and limits, then the rules between settings on the model's whole set). It is sparse: a model or a setting that is not in it is the project's. The keyword `modelSettings` is a `Dict` or `NamedTuple` from a model name to a `Dict` or `NamedTuple` of keywords (`modelSettings = (; crambin = (; qMax = 0.3, nChains = 8))`) and wins over the file; `nothing` clears a setting that may be `nothing` (`qMax`). The order of strength is `modelSettings`, the file, the keywords of the call (`qMax = 0.3` for every model), `settings.json`, the default: a model that gives a setting of its own keeps it whatever the call says for the project. **Which settings:** every one that belongs to a fit (the data selection `Q_MIN`, `Q_MAX`, `SIGMA_SCALE`, `EXCLUDE_Q`, the structure `CHAINS`, `MODEL`, `ADD_HYDROGENS`, `LMAX`, the model, shell, bead and prior settings, the sampler and the MAP search, `RNG_SEED`, `VAL_SIGMA`, `TARGET_ACCEPT`, `N_CHAINS`, `N_ADAPT`, `N_DRAWS`). **Not per model** (`RUN_LEVEL_SETTINGS` in `settings-file.jl`, and every `PLOT_*`): `TABLE_SIGFIGS`, `FIGURES_TEX`, `FIGURES_COMPILE`, `FIGURES_FORMATS` and all the `PLOT_*` settings (the look of the figures, `PLOT_COMPARE` and its colours, markers and line width, `PLOT_TUI_SIZES`); naming one in a model's table, or as a keyword of `modelSettings`, whatever its value, is an `InvalidSettingsError` that names the file or keyword, the model and the setting (`model-settings.json, model B: PLOT_COMPARE is a setting of the whole run, not of one model`). A test checks the list against the kinds of the catalog, so a new setting has to be classified. An unreadable file, an invalid value, a broken rule (a model's `Q_MIN` above the project's `Q_MAX`) fails the run **before any model starts**, like an invalid `settings.json`; a name in the file that is no model of the project (renamed or removed) is a note in the ERRORS section and is ignored; a keyword that is no setting's, or a table of the wrong shape, is an `ArgumentError` at once. The file is copied into the run folder with the other inputs. Each model's LOG has a setup row `override<Setting>` (lower case: `overrideQMax`) for every setting it was given of its own, a failed model's LOG too, and its `run.json` entry `overrides` lists their names (`["N_CHAINS", "Q_MAX"]`, sorted; empty for none). The buffer and the temperature are the project's: they are not per model, so the `solutes.json` snapshot is made with the project's `PMV_FALLBACK_UNCERT`. The comparison and its workbook stay valid when models were fitted to different data selections: every curve is drawn over its own q range and interpolated onto the measured grid only where it reaches (empty cells elsewhere).
-- `nSamples`, `nAdapt`, `sigma`, `rngSeed`, `nChains`, `retry`, `addHydrogens` and `lMax` (per model: see "Settings of single models" above) default to the project's settings (`N_ADAPT + N_DRAWS`, `N_ADAPT`, `VAL_SIGMA`, `RNG_SEED`, `N_CHAINS`, `ADD_HYDROGENS`, `LMAX`) and the defaults of `runModel`; the data and structure keywords (`qMin`, `qMax`, `sigmaScale`, `excludeQ`, `chains`, `model`) come from keywords or `settings.json` only (the project's `data.json` does not hold them yet); the seed keywords and the plot style come from the settings too. The other sampler settings are constants the sampler reads and are not applied per run.
-- **Reference fit.** The optional folder `<project>/reference-fit/` holds the reference curves the comparison draws: every `.tsv`, `.dat` or `.txt` file (any case of the extension) with two or three numeric columns (q in the units of the project's `data.json`, I, and an optional σ that is read and not used), separated by white space, tabs, commas or semicolons, is one curve named by its file stem (`CRYSOL.tsv` is `CRYSOL`; a taken stem gets `-2`). Blank lines, everything after a `#` and text lines before the first numbers (a header) are skipped. The files are copied into the run folder as `reference-fit-<file>` with the other inputs (an interface that took the snapshot itself has put them there) and read from there, q divided by 10 for `"nm-1"`. A file that cannot be read (a cell that is no number, other than 2 or 3 columns, no usable point) is skipped and named in the ERRORS section of `run.LOG` with its line, as a note: it never fails the run or changes its status. Without the folder the comparison has the models and the measured curve alone.
-- **The comparison.** After the last model, when `plotCompare` is on (the setting `PLOT_COMPARE`, default `true`) and at least one model finished (one is fine: the data, its fit and the references), `compareResults` draws every finished model, the references and the measured curve (see "The comparison figure") into the run folder: `compare.tex`, `compare.tsv`, and `compare-plots.txt` (the terminal plot as plain text, also appended as `=== compare ===` to `plots.txt`; printed to the terminal with `ui = :cli`, never with `:tui`; with `:tui` also `compare-<W>x<H>.txt` at the sizes of `PLOT_TUI_SIZES`). `run.json` then has a `compare` entry, `{status: "done"|"failed", files: [names in the run folder, the `compare-<W>x<H>.txt` not among them], models: [names], references: [names], plotSizes: [{file, width, rows}], error}`; the key is absent when no comparison was made (the switch off, no model finished, an interrupted run). A failure of the comparison is caught like a model's: a note in the ERRORS section, `compare.status` `"failed"` with its `error` line, and the run's status unchanged. A model cannot be named `compare` or `run` (the comparison's and the run's own files have those names): it gets `compare-2`, `run-2`.
-
-**Layout of `tui/src`** (four folders):
-
-| Folder | What lives there |
-| :-- | :-- |
-| `core/` | no UI: `environment.ts` (folders, the cache, asset lookup, the `RUN_FLOW` and `LOGS_FLOW` constants, the Julia command), `terminal.ts` (text width, wrapping, number parsing, `hasTerminal`), `file-system.ts` (JSON files, atomic writes, locks), `archive.ts` (7-Zip: atomic packing, read-only listing and reading of entries, extraction into a temporary folder), `fonts.ts` |
-| `store/` | the data layer, no React: settings, projects and the run folder, buffer and solutes, the add flow, custom solutes, data import, the run session and its logs, the run archive (`run-archive.ts`), the plots actions (`plots.ts`), the viewer's data |
-| `ui/` | the kit every screen is built from: `interaction.tsx` (the navigation stack, **all key definitions**, text input, cursor lists), `theme.tsx`, `grid.tsx` (menus and legends), `input.tsx` (prompts, dropdowns, questions, the theme picker), `frame.tsx` (the screen frame and forms) |
-| `screens/` | the screens: menus, data, solutes, custom solutes, settings, the run screen, the viewer and `open runs` |
-
-`main.tsx` is start-up only (it needs a terminal, sweeps stale runs, installs the SIGHUP and SIGTERM handlers);
-`app.tsx` is the `App` component (theme, size guard, the Ctrl-C handler, the navigation stack). `assets/` has the
-logos, the menu pictures and the data files (`setting_sheets.json` is the settings sheets).
-
-**Architecture in short.** Every key goes through one route: a screen calls `useKeys(handler, active)` and the
-handler asks `press.is(keys.x)`; keys are defined once in `ui/interaction.tsx` (and the menu hotkeys in
-`ui/grid.tsx`), never spelled elsewhere, and legends are built from the same definitions, so the hint can only
-list keys that work. State lives in `store/`; a screen is a thin view. A run is a Julia child process in its own
-process group, started by `RunSession` after the claim of a run folder under a lock; `run.json` has one writer
-(Julia) and liveness is `status running` plus a heartbeat under 60 s; the session aborts the group with SIGTERM
-and a grace time, then SIGKILL.
-
-**Commands** (from `tui/`, or the repository root with `-w tui`):
-
-```bash
-npm start       # run it
-npx tsc         # type-check (strict, no emit; also `npm run check`)
-npm test        # the node:test suite (tsx --test test/*.test.ts); takes minutes
-```
-
-Formatting and lint are the repository's: `bysl fmt` runs Biome (installed at the root) and the TypeScript
-whitespace rule, `bysl fmt --lines` fails on a line over 92 columns or an indentation that is not a multiple of
-4 (**exactly 4 spaces per level, continuation lines too**), and `bysl precommit` runs everything before a commit.
-Every source file starts with `# SPDX-License-Identifier: LGPL-3.0-or-later` in its comment syntax (`bysl fmt`
-adds it).
-
-**Tests.** Pure logic is unit-tested with `node:test` (`test/*.test.ts`); the run flow is tested with real
-processes (`concurrency.test.ts`: two processes claim a run, exactly one wins; a killed child becomes
-`interrupted`) and a stand-in for Julia, `test/support/fake-julia.ts` (modes `done`, `failed`, `hang`, ...; the
-environment variable `JULIA=<script>` makes the whole program use it). Tests never touch your data or cache
-folders: they use throwaway ones.
-
-**Checking a screen by hand.** Screens have no render tests; drive the real program in a pseudo-terminal: start
-`npm start` with `BAYSOL_HOME` and `BAYSOL_CACHE` pointing at scratch folders, a window size of 80 x 24 set with
-`TIOCSWINSZ`, wait a few seconds for the start, feed keystrokes, and read the screen with a terminal emulator
-library (for example Python's `pty` and `pyte`). Decode the output as a stream (a multi-byte character can be
-split between reads). The blocks in this guide were captured that way. Never point such a run at the real data
-folder.
-
-The earlier Clojure interface is gone; `tui/SPEC.md` is its specification, kept as the reference of the rules,
-numbers and messages the TypeScript version preserves.
+How the interface is built, the contracts of the files it shares with Julia (`settings.json`, `buffer.json`, the run folder) and how it is tested are on the [internals page](INTERNALS.md).

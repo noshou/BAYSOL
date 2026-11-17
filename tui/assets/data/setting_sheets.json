@@ -345,6 +345,14 @@
       {
        "name": "PLOT_TICK_COLOUR",
        "description": "Colour of the ticks."
+      },
+      {
+       "name": "PLOT_BG_COLOUR",
+       "description": "Colour of the plot background."
+      },
+      {
+       "name": "PLOT_TEXT_COLOUR",
+       "description": "Colour of the plot text: labels, tick labels and legends."
       }
      ]
     },
@@ -479,6 +487,10 @@
       {
        "name": "PLOT_LINMIN_TICKS",
        "description": "Number of minor ticks between major ticks on linear axes."
+      },
+      {
+       "name": "PLOT_Q_UNIT",
+       "description": "Unit of q in the plots and the workbook: inverse Ångström (Å⁻¹) or inverse nanometre (nm⁻¹). The fit and the log stay in Å⁻¹."
       },
       {
        "name": "PLOT_XTICK_ANGLE",

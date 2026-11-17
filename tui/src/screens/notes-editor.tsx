@@ -11,8 +11,9 @@ import { saveErrorNote } from "../core/file-system.js"
 import { textLength } from "../core/text-area.js"
 import { Frame } from "../ui/frame.js"
 import { type LegendItem, legendFor } from "../ui/grid.js"
-import { useNote } from "../ui/input.js"
+import { questionLegend, useDiscardGuard, useNote } from "../ui/input.js"
 import { keys, useBodyColumns, useBodyRows, useKeys, useNav } from "../ui/interaction.js"
+import { pageLegend } from "../ui/pager.js"
 import { TextAreaView, useTextArea } from "../ui/text-area.js"
 import { Panel, useTheme } from "../ui/theme.js"
 import { noteScreenTitle, notesCounter } from "./screen-rules.js"
@@ -32,6 +33,8 @@ const NOTES_LEGEND: LegendItem[] = [
     legendFor("save", keys.save),
     legendFor("new line", keys.enter),
     legendFor("move", [keys.up, keys.down, keys.left, keys.right], keys.home, keys.end),
+    pageLegend.next,
+    pageLegend.prev,
 ]
 
 /**
@@ -41,8 +44,8 @@ const NOTES_LEGEND: LegendItem[] = [
  * Keys: the arrows, home, end, page up and page down move; Enter starts a new line; typed
  * text and a paste (line breaks kept, tabs as spaces) are inserted; backspace and delete
  * remove, joining lines at a line's ends; `^w` hands the text to `onSave` (the screen
- * stays open); Esc and `^x` save a changed text the same way and leave, so nothing is
- * ever dropped (a save that throws is told in the note and the screen stays). There is
+ * stays open; a save that throws is told in the note); Esc and `^x` leave, and a changed
+ * text first asks `discard 1 change?`: Enter drops the edit, Esc keeps editing. There is
  * no limit on the length.
  * Long lines are not wrapped: they scroll sideways with the cursor. Under the panel the
  * counter says the line, the column and the characters.
@@ -68,6 +71,7 @@ export function NotesEditor(props: {
     const [saved, setSaved] = useState(initial)
     const { note, say, clear } = useNote()
     const changed = area.text !== saved
+    const guard = useDiscardGuard(changed ? 1 : 0)
     const columns = useBodyColumns()
     // the legend never changes height: it is the fullest one that is shown
     const rows = Math.max(3, useBodyRows(CHROME_ROWS + FOOTER_BOX_ROWS))
@@ -87,11 +91,11 @@ export function NotesEditor(props: {
     }
 
     useKeys((press) => {
+        if (guard.handleKey(press)) return
         clear()
         if (press.is(keys.save)) save()
-        else if (press.is(keys.escape) || press.is(keys.back)) {
-            if (!changed || save()) nav.pop()
-        } else input.edit(press, rows - 1)
+        else if (press.is(keys.escape) || press.is(keys.back)) guard.leave(nav.pop)
+        else input.edit(press, rows - 1)
     })
 
     const counter = notesCounter(
@@ -105,9 +109,9 @@ export function NotesEditor(props: {
             design="blocky"
             title={noteScreenTitle(owner, title)}
             subtitle={changed ? "unsaved" : undefined}
-            legend={NOTES_LEGEND}
-            note={note?.text}
-            noteIsError={note?.error}
+            legend={guard.question ? questionLegend(guard.question) : NOTES_LEGEND}
+            note={guard.note ?? note?.text}
+            noteIsError={guard.question ? false : note?.error}
         >
             <Panel style="double" paddingX={1}>
                 <TextAreaView area={area} rows={rows} width={width} />

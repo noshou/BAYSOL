@@ -4,7 +4,6 @@ import assert from "node:assert/strict"
 import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
-import type { System } from "../src/core/environment.js"
 import {
     defaultFontDirs,
     fingerprint,
@@ -16,7 +15,7 @@ import {
     scanFonts,
     texInstalled,
 } from "../src/core/fonts.js"
-import { tempDir, writeFiles } from "./support/fixtures.js"
+import { fakeSystem, tempDir, writeFiles } from "./support/fixtures.js"
 
 // --- building font files, byte by byte
 
@@ -397,30 +396,19 @@ test("the cache is used while the fonts are the same and mended when damaged", (
 
 // --- finding the files
 
-const system = (
-    os: NodeJS.Platform,
-    env: Record<string, string>,
-    home = "/home/u",
-): System => ({
-    os,
-    env,
-    home,
-    cwd: "/work",
-})
-
 test("the font folders of each system are the ones that exist", () => {
     const home = tempDir()
     for (const d of [".local/share/fonts", ".fonts", "Library/Fonts", "Fonts"])
         mkdirSync(join(home, d), { recursive: true })
-    const linux = defaultFontDirs(system("linux", {}, home))
+    const linux = defaultFontDirs(fakeSystem("linux", {}, home))
     assert.ok(linux.includes(join(home, ".local", "share", "fonts")))
     assert.ok(linux.includes(join(home, ".fonts")))
     assert.ok(!linux.some((d) => d.includes("Library")))
-    const mac = defaultFontDirs(system("darwin", {}, home))
+    const mac = defaultFontDirs(fakeSystem("darwin", {}, home))
     assert.ok(mac.includes(join(home, "Library", "Fonts")))
     assert.ok(!mac.some((d) => d.includes(".fonts")))
     const windows = defaultFontDirs(
-        system("win32", { WINDIR: home, LOCALAPPDATA: home }, home),
+        fakeSystem("win32", { WINDIR: home, LOCALAPPDATA: home }, home),
     )
     assert.ok(windows.includes(join(home, "Fonts")))
 })
@@ -465,7 +453,7 @@ test("the font files of the folders are gathered once each, other kinds left out
     write(home, ".fonts/readme.txt", "no")
     write(home, ".fonts/old.pfb", "no")
     // PATH is empty: no fc-list, no TeX; the walk of the folders is all there is
-    const found = fontFiles(system("linux", { PATH: "" }, home))
+    const found = fontFiles(fakeSystem("linux", { PATH: "" }, home))
     assert.ok(found.includes(a))
     assert.ok(found.includes(b))
     assert.ok(!found.some((f) => f.endsWith(".txt") || f.endsWith(".pfb")))
@@ -505,7 +493,7 @@ test("the registry of Windows names the font files", () => {
 test("TeX is found on the path", () => {
     const bin = tempDir()
     writeFileSync(join(bin, "kpsewhich"), "#!/bin/sh\n", { mode: 0o755 })
-    assert.equal(texInstalled(system("linux", { PATH: bin })), true)
-    assert.equal(texInstalled(system("linux", { PATH: tempDir() })), false)
-    assert.equal(texInstalled(system("linux", {})), false)
+    assert.equal(texInstalled(fakeSystem("linux", { PATH: bin })), true)
+    assert.equal(texInstalled(fakeSystem("linux", { PATH: tempDir() })), false)
+    assert.equal(texInstalled(fakeSystem("linux", {})), false)
 })

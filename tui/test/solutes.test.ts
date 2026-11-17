@@ -22,6 +22,7 @@ import {
     search,
     setSoluteField,
 } from "../src/store/solutes.js"
+import { marks } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Solute rows
@@ -33,7 +34,6 @@ const tris: Solute = { ...base, name: "tris", arg: "tris", mM: 10, sigmaMM: 0.5 
 const complete = () => undefined
 const blank: Solute = { kind: "nonbiological", name: "", arg: "", mM: null, sigmaMM: null }
 const incomplete = () => "unknown kind"
-const marks = (s: Drafts<Solute>) => s.rows.map((_, i) => s.mark(i))
 
 test("drafts and removals of solutes", () => {
     const s = Drafts.of([nacl, tris])

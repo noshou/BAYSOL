@@ -17,37 +17,28 @@ import { type Note, notesProblem, storedNotes } from "./notes.js"
 import { inProject } from "./projects.js"
 import { CONC_UNITS, type ConcUnit } from "./solutes.js"
 import type { Definition } from "./template-defs.js"
-import { cleanRow, type TemplateLink } from "./template-link.js"
+import { cleanRow, type TemplateLink } from "./template-rows.js"
 
 // ========================================================================================
 // 1. The buffer file
 // ========================================================================================
 
 /**
- * The buffer of a project: `buffer.json` in the project's folder, a JSON object whose
- * `solutes` is an array of the solutes of the buffer, one object each:
+ * The buffer of a project: `buffer.json` in its folder, a JSON object whose `solutes` is
+ * an array of rows, one object each:
  *
  *     {"kind": "nonbiological", "name": "NaCl", "arg": "NaCl", "mM": 200, "sigmaMm": 10}
  *
- * `name` is what the user calls it, `arg` what BAYSOL is given (the solute's name for a
- * non-biological one), `mM` the concentration and `sigmaMm` its standard uncertainty,
- * both in millimolar as they were typed (BAYSOL takes molar; that is for the run). The
- * keys keep their file spelling (`"sigmaMm"`), so a row is what the file holds. Other
- * keys of the file's map are kept as they are when the solutes are written. The file also
- * holds the conditions of the buffer, `"pH"` and `"sigmaPh"` (the standard uncertainty of
- * the pH, shown as σ to the user), next to `solutes`; both or neither ([[Conditions]],
- * [[conditionsProblem]]), the optional `"temperature"` (°C; a run needs it, a new buffer
- * has none until `^g` sets it), and `"conc-unit"` (the unit the table shows,
- * [[readConcUnit]]).
- * A missing or empty file is a buffer with no solutes and no pH;
- * a file that is not a JSON object (or whose `solutes` is
- * not an array of objects, or has a row that [[rowProblem]] refuses, or has more than
- * [[MAX_ROWS]]) is unusable, and is never written over.
+ * `name` is the user's label, `arg` what BAYSOL is given, `mM` and `sigmaMm` the
+ * concentration and its uncertainty in millimolar. Other keys of the file are kept on
+ * write. Next to `solutes` the file holds `"pH"` and `"sigmaPh"` (both or neither;
+ * [[Conditions]]), the optional `"temperature"` (°C; a run needs it) and `"conc-unit"`
+ * ([[readConcUnit]]). A missing or empty file is an empty buffer; a file that is not a
+ * JSON object, has a row [[rowProblem]] refuses, or has more than [[MAX_ROWS]] rows is
+ * unusable and never written over.
  *
- * The kinds of row are the ones of `test/fixtures/buffer/buffer.json`, the file the Julia
- * loader (`loadBuffer`, `buffer.jl` next to this file) is tested against
- * too. [[rowProblem]] checks the same keys and types as the loader, so a row the screen
- * writes is one the loader reads.
+ * The kinds of row are those of `test/fixtures/buffer/buffer.json`, which the Julia
+ * loader (`loadBuffer`) is tested against; [[rowProblem]] applies its rules.
  */
 
 /** The name of the file in a project's folder. */
@@ -76,9 +67,9 @@ export const kinds = [
  * @property name - the label the user gave it (the loader does not check it).
  * @property mM - the concentration, above 0.
  * @property sigmaMm - its standard uncertainty, 0 or more; required.
- * @property template - the link to the buffer template that made the row, which makes
- *     it follow the pH ([[TemplateLink]]); optional, and never checked by [[rowProblem]]
- *     (an invalid one is dropped on reading, `cleanRow`).
+ * @property template - the link to the buffer template that made the row
+ *     ([[TemplateLink]]); optional, never checked by [[rowProblem]] (an invalid one is
+ *     dropped on reading, `cleanRow`).
  */
 export type RowBase = {
     name: string
@@ -195,10 +186,7 @@ export function bufferFile(projectDir: string): string {
 
 type Dict = Record<string, unknown>
 
-/**
- * Whether a value is a number (not `NaN`; a boolean is none). The one test of "is a
- * number" that the loader's rules ([[rowProblem]]) and the custom entries share.
- */
+/** Whether a value is a number (not `NaN`, not a boolean). */
 export function isNumber(x: unknown): x is number {
     return typeof x === "number" && !Number.isNaN(x)
 }
@@ -252,9 +240,8 @@ function customProblem(row: Dict): string | undefined {
 }
 
 /**
- * What is wrong with a buffer row for the Julia loader: a map of a known `kind` with an
- * `mM` above 0 and a `sigmaMm` of 0 or more (numbers), and the keys its kind needs
- * (see the top of this file). The name of a row is only a label and is not checked.
+ * What is wrong with a buffer row for the Julia loader: a known `kind`, `mM` above 0,
+ * `sigmaMm` of 0 or more, and the keys its kind needs. The name is only a label.
  */
 export function rowProblem(row: unknown): string | undefined {
     if (!isDict(row)) return "a row is not a map"
@@ -269,10 +256,9 @@ export function rowProblem(row: unknown): string | undefined {
 }
 
 /**
- * What is wrong with the pH, σ and temperature among the keys of a buffer's map: neither
- * pH nor σ is there (a buffer without conditions, which cannot be run), or both are
- * numbers, the pH within its limits and σ within its own (0 or more); a `temperature`,
- * when the key is there, is a number within its limits. The rules of the Julia loader.
+ * What is wrong with the pH, σ and temperature of a buffer's map: neither pH nor σ is
+ * there, or both are numbers within their limits; a `temperature`, if present, is a
+ * number within its limits. The rules of the Julia loader.
  */
 export function conditionsProblem(map: Record<string, unknown>): string | undefined {
     const { pH, sigmaPh, temperature } = conditionLimits()
@@ -309,11 +295,7 @@ export function conditionsOf(map: Record<string, unknown>): Conditions | undefin
 
 // --- the file
 
-/**
- * The list file of the buffer: the mechanics (tracked read, locked write, unusable files,
- * the cap, the other keys kept) are [[ListFile]]'s. A project's folder that is gone is
- * not made again.
- */
+/** The list file of the buffer (mechanics: [[ListFile]]); a gone folder is not remade. */
 const bufferList = new ListFile<BufferRow>({
     fileName: bufferFileName,
     key: "solutes",
@@ -328,9 +310,9 @@ const bufferList = new ListFile<BufferRow>({
 /**
  * The solutes of the buffer of a project.
  *
- * @param options - `track: true` when the rows are read to be edited and saved: the
- *     version read is then the one [[writeSolutes]] checks against, so a save after
- *     another copy saved the file is refused. A plain read changes nothing about that.
+ * @param options - `track: true` when the rows are read to be edited: the version read
+ *     is then the one [[writeSolutes]] checks against (a save after another copy saved
+ *     the file is refused).
  * @throws UnusableFileError if the file cannot be used.
  */
 export function readSolutes(projectDir: string, options: ReadOptions = {}): BufferRow[] {
@@ -338,16 +320,14 @@ export function readSolutes(projectDir: string, options: ReadOptions = {}): Buff
 }
 
 /**
- * Writes the solutes of the buffer of a project, the other keys of the file kept,
- * through a temporary file that replaces it in one step. The file is made if there is
- * none; one that cannot be used is not touched.
+ * Writes the solutes of the buffer of a project, the other keys kept, through a temporary
+ * file renamed over it. The file is made if there is none; an unusable one is not touched.
  *
- * @param conditions - the pH, σ and temperature to write with them (no temperature takes
- *     the key off), `undefined` to leave the file's own
- *     (a buffer that has none stays without).
+ * @param conditions - the pH, σ and temperature to write (no temperature takes the key
+ *     off), `undefined` to leave the file's own.
  * @param unit - the unit the table shows, `undefined` to leave the file's own.
- * @param notes - the notes of the buffer (`"notes"`, absent for none, so an empty array
- *     takes the key off), `undefined` to leave the file's own.
+ * @param notes - the notes of the buffer (an empty array takes the key off), `undefined`
+ *     to leave the file's own.
  * @throws ChangedOnDiskError if another copy of the program saved the file after this
  *     one read it (nothing is written); UnusableFileError (`not a valid buffer row: ...`,
  *     `too many solutes ...`, nothing written) for a row that [[rowProblem]] refuses or
@@ -401,11 +381,9 @@ export function readBufferNotes(projectDir: string, options: ReadOptions = {}): 
 }
 
 /**
- * Writes ONLY the notes of the buffer, at once: the file is re-read under the project's
- * lock and just the `notes` key is replaced (an empty list takes it off); the solutes,
- * the pH and the unit stay as the file has them. The version this process holds is
- * renewed by the write, so a later [[writeSolutes]] of a table that read the file before
- * is not refused for this write.
+ * Writes ONLY the notes of the buffer: the file is re-read under the project's lock and
+ * just `notes` is replaced. The held version is renewed, so a later [[writeSolutes]] is
+ * not refused.
  *
  * @param notes - the notes; they must keep the rules of [[notesProblem]].
  * @throws UnusableFileError for notes that break the rules or a file that cannot be
@@ -436,11 +414,9 @@ export function readConcUnit(projectDir: string): ConcUnit {
 }
 
 /**
- * Writes the unit at once (^k), the rows and every other key as the file has them, under
- * the lock. Best effort: nothing happens for a buffer without a file (the first save
- * writes the unit), a file another copy changed since this one read it, or one that
- * cannot be used; the next `^w` then reports it. The version this process holds is
- * renewed only when the check passed, so a draft or another copy's save is never lost.
+ * Writes the unit at once (^k) under the lock. Best effort: nothing happens for a buffer
+ * without a file, a file another copy changed, or an unusable one; the next `^w` reports
+ * it. The held version is renewed only when the check passed.
  */
 export function writeConcUnit(projectDir: string, unit: ConcUnit): void {
     if (!existsSync(bufferFile(projectDir))) return
@@ -473,15 +449,10 @@ export function resetBuffer(projectDir: string): string | undefined {
 // ========================================================================================
 
 /**
- * The saved recipes of the user: `recipes.json` in the BAYSOL data folder, next to
- * `settings.json` and `custom-solutes.json` (it belongs to the user, not to a project). A
- * recipe is a named buffer: the same rows a project's `buffer.json` has (the schema of
- * `test/fixtures/buffer/buffer.json`, checked by [[rowProblem]]; custom rows are
- * snapshots, so a recipe is self-contained) and, when it has them, the buffer's pH and σ
- * as `"pH"` and `"sigmaPh"` (both or neither, the rules of [[conditionsProblem]]) and
- * the optional `"temperature"` (°C). A JSON
- * object whose `recipes` is an array of objects, one for each recipe (the shape of
- * `test/fixtures/buffer/recipes.json`):
+ * The saved recipes of the user: `recipes.json` in the BAYSOL data folder (not in a
+ * project). A recipe is a named buffer: the rows of a `buffer.json` and, when it has
+ * them, `"pH"`, `"sigmaPh"` and `"temperature"`. A JSON object whose `recipes` is an
+ * array (see `test/fixtures/buffer/recipes.json`):
  *
  *     {"recipes": [{"name": "SEC buffer",
  *                   "solutes": [{"kind": "nonbiological", "name": "NaCl",
@@ -491,15 +462,10 @@ export function resetBuffer(projectDir: string): string | undefined {
  *                  ...]}
  *
  * A recipe is keyed by its name: unique without regard to case, not blank. At most
- * [[MAX_ROWS]] recipes, each of at most [[MAX_ROWS]] solutes. Other keys of the map, and of
- * a recipe, are kept as they are on write. A missing or empty file is no recipes; a file
- * that is not a JSON object, whose `recipes` is not an array of objects with a name, an
- * array of valid rows and valid conditions and, when it has `"notes"`, valid notes
- * ([[notesProblem]]), that has a name twice or more recipes or
- * solutes than the limits, is unusable, and is never written over. The project side never
- * reads this file: loading a recipe copies its rows into the project's own `buffer.json`
- * (and the Julia side only ever reads that file). The unit of the concentrations is not
- * part of a recipe.
+ * [[MAX_ROWS]] recipes of at most [[MAX_ROWS]] solutes. Other keys are kept on write. A
+ * file that breaks these rules is unusable and never written over. The project side never
+ * reads this file: loading a recipe copies its rows into `buffer.json`. The concentration
+ * unit is not part of a recipe.
  */
 
 /** The most characters a recipe name typed in the TUI may have. */
@@ -554,8 +520,7 @@ export function recipesFile(root: string): string {
 
 /**
  * What is wrong with a text as the name of a recipe: blank, longer than [[MAX_NAME]], or
- * with a control character in it. Whether it is taken is for [[indexOfRecipe]] and
- * [[renameProblem]].
+ * with a control character. Whether it is taken is [[renameProblem]]'s.
  *
  * @returns a short message, or `undefined`.
  */
@@ -582,9 +547,9 @@ export function indexOfRecipe(
 }
 
 /**
- * What is wrong with a name for the recipe at a place in a list: the rules of
- * [[recipeNameProblem]], and a name that another recipe has already. The recipe itself may
- * keep its name, or change only its case (that is a rename, not a clash).
+ * What is wrong with a name for the recipe at a place in a list: [[recipeNameProblem]]'s
+ * rules, and a name another recipe has. The recipe itself may keep its name or change
+ * only its case.
  *
  * @param recipes - the recipes (or table rows holding a `name`).
  * @param n - the name typed.
@@ -603,9 +568,8 @@ export function renameProblem(
 }
 
 /**
- * What is wrong with a recipe: no name, not an array of at most [[MAX_ROWS]] valid buffer
- * rows, a pH and σ that [[conditionsProblem]] refuses, or notes that [[notesProblem]]
- * refuses.
+ * What is wrong with a recipe: no name, not at most [[MAX_ROWS]] valid rows, conditions
+ * [[conditionsProblem]] refuses, or notes [[notesProblem]] refuses.
  *
  * @param r - a value of the file or of a save.
  * @returns the message, or `undefined`.
@@ -657,9 +621,8 @@ function ordered(recipes: readonly Recipe[]): Recipe[] {
  * The recipes of the folder.
  *
  * @param root - the BAYSOL data folder.
- * @param options - `track: true` when the recipes are read to be edited and saved with
- *     [[writeRecipes]] (see [[readSolutes]]); a plain read leaves the base of the check
- *     alone.
+ * @param options - `track: true` when read to be edited and saved with
+ *     [[writeRecipes]] (see [[readSolutes]]).
  * @returns the recipes, in file order (empty for none).
  * @throws UnusableFileError (kind `recipes`) if the file cannot be used.
  */
@@ -727,13 +690,10 @@ export function withNotes(recipe: Recipe, notes: readonly Note[]): Recipe {
 }
 
 /**
- * Writes the recipes as those of the folder, the other keys of the file kept, through a
- * temporary file that replaces it in one step. The file is made if there is none; one
- * that cannot be used is not touched. It takes the lock on the file and refuses to
- * write when another copy of the program saved the file after this one read it (the
- * operations that read and write in one step, [[saveRecipe]] and [[renameRecipe]],
- * read again under the lock and so never conflict; [[removeRecipe]] does too unless
- * it is `guarded`, for a table that shows an older file).
+ * Writes the recipes of the folder, the other keys kept, through a temporary file renamed
+ * over it. It refuses when another copy saved the file since this one read it
+ * ([[saveRecipe]], [[renameRecipe]] and [[removeRecipe]] unless `guarded` re-read under
+ * the lock and never conflict).
  *
  * @param recipes - the recipes; they must keep the rules above.
  * @returns the file.
@@ -746,9 +706,8 @@ export function writeRecipes(root: string, recipes: readonly Recipe[]): string {
 }
 
 /**
- * The recipes with one saved under a name: a recipe of that name (without regard to
- * case) is replaced where it stands (its other keys, its notes among them, kept; its pH
- * and σ those given: none given, none kept), else the recipe goes at the end.
+ * The recipes with one saved under a name: a recipe of that name (any case) is replaced
+ * where it stands (other keys and notes kept; pH and σ those given), else it goes last.
  */
 function withRecipe(
     recipes: readonly Recipe[],
@@ -777,13 +736,12 @@ function withRecipe(
 /**
  * Saves a recipe (save as, or replace when the name exists) in the folder.
  *
- * @param n - the name; a recipe of that name (without regard to case) is replaced where
- *     it stands, under the new spelling, else the recipe goes at the end.
+ * @param n - the name; a recipe of that name (any case) is replaced where it stands,
+ *     under the new spelling, else the recipe goes at the end.
  * @param solutes - the rows.
  * @param conditions - the buffer's pH and σ, stored with the rows; `undefined` for a
  *     buffer without (the replaced recipe then has none either).
- * @param notes - the buffer's notes: the recipe takes them when there are any; with none,
- *     a recipe that is replaced keeps its own.
+ * @param notes - the buffer's notes; with none, a replaced recipe keeps its own.
  * @param definition - the definition of a template recipe (the `solutes` are then its
  *     fixed rows); none makes an ordinary recipe, also of a template that is replaced.
  * @returns the file.
@@ -850,13 +808,12 @@ export function updateRecipe(
 }
 
 /**
- * Removes ONE saved recipe, at once: it re-reads the file under the lock and drops that
- * recipe only, so it never loses another copy's changes to the other recipes.
+ * Removes ONE saved recipe at once: it re-reads the file under the lock and drops that
+ * recipe only, so another copy's changes to the others are never lost.
  *
  * @param n - the recipe's name, without regard to case.
- * @param options - `guarded: true` for a table that shows the file as it read it for
- *     editing: the removal then refuses when another copy saved the file since. A list
- *     that picks a recipe by name (the buffer landing) leaves it out.
+ * @param options - `guarded: true` for a table showing the file as read for editing: the
+ *     removal then refuses when another copy saved the file since.
  * @returns whether there was such a recipe (nothing is written when there was not).
  * @throws ChangedOnDiskError when `guarded` and the file changed since this process read
  *     it; UnusableFileError like [[writeRecipes]].

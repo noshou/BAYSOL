@@ -1,0 +1,76 @@
+datetime	16-11-2026 19:25:18 -0500
+
+=== SASDWS5 ===
+revision                	d6f3f58-dirty
+julia                   	1.12.7
+baysol                  	v0.4.0-yals-n-gɛsga
+status                  	failed
+errorType               	BAYSOL.Inference.NotConvergedError
+error                   	NotConvergedError: the run did not converge: 2.59 % of the transitions diverged, not below 0.1 %.
+D                       	71.4383
+energyEv                	10000.1
+lMax                    	53
+leapfrog                	229239
+mapModes                	3
+nAdapt                  	300
+nAtoms                  	3200
+nChains                 	10
+nChainsPooled           	10
+nChannels               	16.6671
+nNonpositive            	1
+nQ                      	218
+nQRaw                   	2654
+nSamples                	1000
+optima                  	2
+ph                      	7.4
+pmvFallbackUncert       	2.52583
+quantileHiPct           	97.725
+quantileLabel           	2sigma
+quantileLoPct           	2.27501
+rebin                   	13
+rngSeed                 	0
+sigmaPh                 	0.1
+temperatureC            	20.0
+
+--- timing ---
+stage                                             seconds    % wall    (JIT)     (GC)  notes
+wall clock                                          12.82     100.0    (2.0)    (1.1)  process start to end
+  startup                                            5.06      39.5    (0.0)    (0.6)  process start to seedModel
+  static build                                       2.29      17.9    (1.1)    (0.0)
+    resolveStruct                                 2.7e-05       0.0    (0.0)    (0.0)
+    components                                    6.9e-04       0.0    (0.0)    (0.0)  24 residue names: 24 builtin, 0 cache, 0 download
+    structure checks                                 0.01       0.1    (0.0)    (0.0)  0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings
+    classify                                      2.8e-03       0.0    (0.0)    (0.0)  mixed: PARSE, titration propka
+    propka                                           0.88       6.9    (0.7)    (0.0)  cache miss
+    pdb2pqr                                          0.84       6.5    (0.3)    (0.0)  mixed, propka; cache hit
+    heavy atoms                                   8.4e-03       0.1    (0.0)    (0.0)  1793 in, 1794 out; 1 restored, 1 added by pdb2pqr
+    loadMolecule                                     0.02       0.1    (0.0)    (0.0)
+    SASA                                             0.04       0.3    (0.0)    (0.0)
+    shannon                                       1.2e-03       0.0    (0.0)    (0.0)  diameter, binning
+    forwardCache                                     0.49       3.8    (0.0)    (0.0)
+      vacuum + excluded volume                       0.19       1.5    (0.0)    (0.0)  vols + B_lm
+      hydration                                      0.30       2.3    (0.0)    (0.0)  B_lm
+      Gram + rM                                   3.3e-03       0.0    (0.0)    (0.0)
+    seedSampler                                   1.3e-04       0.0    (0.0)    (0.0)  priors, WLS
+  sampling                                           5.36      41.8    (0.9)    (0.1)
+    MAP search + whitening                           0.08       0.6    (0.0)    (0.0)  76/76 starts, 3 modes
+    NUTS setup                                    1.7e-04       0.0    (0.0)    (0.0)  starts, Hamiltonian
+    optima from the draws                            0.78       6.1    (0.2)    (0.1)  2 extra chains
+    NUTS                                             4.27      33.3    (0.7)    (0.1)  10k iters, 229.24k leapfrog, 0.017 ms/step
+    2 posterior modes: mass by bridge sampling       0.14       1.1    (0.0)    (0.0)
+    per-draw c1 re-profile + curves                  0.09       0.7    (0.0)    (0.0)  8600 draws
+  report write                                    1.0e-06       0.0    (0.0)    (0.0)
+  unaccounted                                        0.11       0.8    (0.0)    (0.4)
+GC: 1.12 s
+fit timing  = 12.82 s
+plot timing = 0 s
+
+--- machine ---
+machine.os              	Linux aarch64-linux-gnu
+machine.cpu             	apple-m2
+machine.cpu_mhz         	600
+machine.cpus            	8
+machine.threads         	1
+machine.memory_gib      	15.3
+machine.loadStart       	1.14
+machine.free_gib_start  	7.8

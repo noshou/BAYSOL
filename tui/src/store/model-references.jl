@@ -15,8 +15,19 @@ depositor's χ² (copied into the run folder like `model-settings.json`):
 - `refChi2`: the depositor's χ² with its method (`"MultiFoXS 2-state 0.79"`), printed in
     the legend of that figure and as the `refChi2` row of the model's LOG.
 - `rescale`: scale the curve to the measured one by least squares (a normalized fit).
+
+The key `"*"` ([`PROJECT_REFERENCE_KEY`](@ref)) is the ONE reference of the project, which
+the TUI edits (the data screen): when it is present the run draws its `fit` for every model
+and, alone, in the comparison figure (an entry without `fit` leaves the comparison as it
+is),
+and the entries of single models are ignored. Without it the entries of single models
+apply as before and the comparison draws every curve of `reference-fit/` (projects made
+before the single reference).
 """
 const MODEL_REFERENCES_FILE = "model-references.json"
+
+"The key of the project's one reference in [`MODEL_REFERENCES_FILE`](@ref)."
+const PROJECT_REFERENCE_KEY = "*"
 
 "The keys of an entry of [`MODEL_REFERENCES_FILE`](@ref)."
 const MODEL_REFERENCE_KEYS = (:tag, :software, :refChi2, :fit, :rescale)

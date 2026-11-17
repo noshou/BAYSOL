@@ -208,7 +208,7 @@ the unit suite fails if it is stale. The terminal interface reads the same liter
 default `±` of a custom solute, so keep the markers and the one-line form.
 """
 # BEGIN harvested: nonbio-mean-uncertainty
-const NONBIO_MEAN_UNCERTAINTY = 2.949775
+const NONBIO_MEAN_UNCERTAINTY = 2.525827
 # END harvested: nonbio-mean-uncertainty
 
 include("calc-density.jl")   # water first: `_H2O_V0_25C` below needs its density

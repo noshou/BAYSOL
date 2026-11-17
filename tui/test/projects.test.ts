@@ -31,6 +31,7 @@ import {
     createProject,
     deleteModel,
     deleteProject,
+    extractModels,
     hasRuns,
     InvalidNameError,
     isoStamp,
@@ -46,18 +47,11 @@ import {
     settleRun,
 } from "../src/store/projects.js"
 import { destructiveQuestion } from "../src/ui/input.js"
-import { runOn, tempDir } from "./support/fixtures.js"
+import { plainRun, runOn, tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Run folder
 // ========================================================================================
-
-/** Makes `runs/<id>/` with a `run.json` holding `json` (none when `undefined`). */
-function makeRun(project: string, id: string, json?: string): void {
-    const dir = join(project, "runs", id)
-    mkdirSync(dir, { recursive: true })
-    if (json !== undefined) writeFileSync(join(dir, "run.json"), json)
-}
 
 test("a project with no runs/ folder has no runs", () => {
     const project = tempDir()
@@ -67,12 +61,12 @@ test("a project with no runs/ folder has no runs", () => {
 
 test("runs are the folders of runs/, oldest first, files are not runs", () => {
     const project = tempDir()
-    makeRun(project, "15-30-45-000_UTC_+0000_2026-11-02")
-    makeRun(project, runOn("2026-11-01"))
+    plainRun(project, "15-30-45-000_UTC_+0000_2026-11-02")
+    plainRun(project, runOn("2026-11-01"))
     // the new name sorts by its instant (23:00 at -05:00 on the 1st is 04:00Z on the 2nd)
-    makeRun(project, "23-00-00-000_EST_-0500_2026-11-01")
-    makeRun(project, "09-00-00-000_UTC_+0000_2026-11-02")
-    makeRun(project, "unreadable")
+    plainRun(project, "23-00-00-000_EST_-0500_2026-11-01")
+    plainRun(project, "09-00-00-000_UTC_+0000_2026-11-02")
+    plainRun(project, "unreadable")
     writeFileSync(join(project, "runs", "notes.txt"), "x")
     // the old layout is not read: logs/ and data/ hold no runs
     mkdirSync(join(project, "logs", runOn("2025-01-01")), { recursive: true })
@@ -89,17 +83,17 @@ test("runs are the folders of runs/, oldest first, files are not runs", () => {
 
 test("run.json says how a run ended; a bad file says nothing", () => {
     const project = tempDir()
-    makeRun(project, "a", '{"status": "running"}')
-    makeRun(project, "b", '{"status": "failed"}')
-    makeRun(project, "c", '{"status": "bogus"}')
-    makeRun(project, "d", "{ not json")
-    makeRun(project, "e")
+    plainRun(project, "a", '{"status": "running"}')
+    plainRun(project, "b", '{"status": "failed"}')
+    plainRun(project, "c", '{"status": "bogus"}')
+    plainRun(project, "d", "{ not json")
+    plainRun(project, "e")
     assert.equal(runStatus(project, "a"), "running")
     assert.equal(runStatus(project, "b"), "failed")
     for (const id of ["c", "d", "e", "missing"])
         assert.equal(runStatus(project, id), undefined, id)
     assert.equal(hasRuns(project), true)
-    makeRun(project, "f", '{"status": "done", "models": []}')
+    plainRun(project, "f", '{"status": "done", "models": []}')
     assert.equal(runStatus(project, "f"), "done")
 })
 
@@ -489,15 +483,17 @@ test("add copies and never moves", () => {
     const project = tempDir()
     const pdb = file(src, "one.pdb", "ATOM")
     assert.deepEqual(listModels(project), []) // no models/ folder: no models
-    const copy = addModel(project, pdb)
-    assert.equal(readFileSync(copy, "utf-8"), "ATOM")
-    assert.equal(copy, join(project, "models", "one.pdb"))
+    const archive = addModel(project, pdb)
+    assert.equal(archive, join(project, "models.7z"))
+    assert.ok(!existsSync(join(project, "models")), "no plain folder is made")
     assert.ok(existsSync(pdb), "the original is still there")
     assert.deepEqual(listModels(project), ["one.pdb"])
     // a model is never overwritten
     writeFileSync(pdb, "CHANGED")
     assert.throws(() => addModel(project, pdb))
-    assert.equal(readFileSync(join(project, "models", "one.pdb"), "utf-8"), "ATOM")
+    const into = join(tempDir(), "out")
+    extractModels(project, ["one.pdb"], into)
+    assert.equal(readFileSync(join(into, "one.pdb"), "utf-8"), "ATOM")
 })
 
 test("adding several", () => {
@@ -518,7 +514,9 @@ test("adding several", () => {
         skipped.map((s) => s[1]),
         ["a model with that name exists", "only .cif and .pdb files", "no such file"],
     )
-    assert.equal(readFileSync(join(project, "models", "a.pdb"), "utf-8"), "A") // first wins
+    const into = join(tempDir(), "out")
+    extractModels(project, ["a.pdb"], into)
+    assert.equal(readFileSync(join(into, "a.pdb"), "utf-8"), "A") // first wins
     for (const f of [a, b, dup, txt]) assert.ok(existsSync(f), "nothing was moved")
     assert.deepEqual(addModels(project, []), { copied: [], skipped: [] })
 })

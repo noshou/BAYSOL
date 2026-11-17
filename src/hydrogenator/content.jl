@@ -245,7 +245,7 @@ end
 hasModifiedAmino(infos) = any(_isModifiedAmino, infos)
 
 """
-    modedAaHyd(path, infos) -> NamedTuple
+    modifiedAminoHydrogens(path, infos) -> NamedTuple
 
 What the hydrogenation did for the **modified amino acids** (`MSE`, `SEP`, ..., HETATM or
 ATOM records) of the hydrogenated .pdb at `path`, a diagnostic for the timing log. They are
@@ -263,7 +263,7 @@ the file has on them.
 # Exceptions
 - `SystemError`: `path` cannot be read.
 """
-function modedAaHyd(path::AbstractString, infos)
+function modifiedAminoHydrogens(path::AbstractString, infos)
     modified = Set(i.id for i in infos if _isModifiedAmino(i))
     residues = Dict{Tuple{String,String,String},Int}()
     for line in eachline(path)

@@ -57,12 +57,15 @@ export function useTextArea(initial: string, active: boolean = true): TextAreaIn
         else if (press.is(keys.tab)) set((a) => a.insert(" ".repeat(TAB_SPACES)))
         else if (press.is(keys.backspace)) set((a) => a.backspace())
         else if (press.is(keys.delete)) set((a) => a.delete())
+        // a page before the arrows: a plain arrow also matches shift+arrow
+        else if (press.is(keys.pageUp) || press.is(keys.pageUpShift))
+            set((a) => a.move(-page))
+        else if (press.is(keys.pageDown) || press.is(keys.pageDownShift))
+            set((a) => a.move(page))
         else if (press.is(keys.left)) set((a) => a.left())
         else if (press.is(keys.right)) set((a) => a.right())
         else if (press.is(keys.up)) set((a) => a.up())
         else if (press.is(keys.down)) set((a) => a.down())
-        else if (press.is(keys.pageUp)) set((a) => a.move(-page))
-        else if (press.is(keys.pageDown)) set((a) => a.move(page))
         else if (press.is(keys.home)) set((a) => a.home())
         else if (press.is(keys.end)) set((a) => a.end())
         else return false

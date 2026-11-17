@@ -85,7 +85,7 @@ const themeList = [
         bg : "#F4D9A0",
         fg : "#452C08",
         mt : "#8d7a4e",
-        er : "#732D0A",
+        er : "#a93030",
         lg : "🍂"
     },
 
@@ -107,7 +107,7 @@ const themeList = [
         bg : "#54565b",
         fg : "#E7E3DC",
         mt : "#bcb9b2",
-        er : "#090909",
+        er : "#f39d9d",
         lg : "🪨"
     },
 
@@ -183,7 +183,7 @@ const themeList = [
         bg : "#FBE0CC",
         fg : "#5c0635",
         mt : "#cd4f6e",
-        er : "#8E1316",
+        er : "#f97f22",
         lg : "🍊"
     },
 
@@ -327,6 +327,33 @@ export const ThemeContext = createContext<Theme>(defaultTheme)
  */
 export function useTheme(): Theme {
     return useContext(ThemeContext)
+}
+
+/**
+ * The look of an error, the one place that decides it: the text itself in the error
+ * colour, on whatever background it is drawn (no filled band).
+ *
+ * @param theme - the theme in use.
+ * @returns the `color` prop of an Ink `Text`.
+ */
+export function errorStyle(theme: Theme): { color: string } {
+    return { color: theme.er }
+}
+
+/**
+ * A message that tells an error, in the error colour ([[errorStyle]]). A blank
+ * message draws nothing: nothing, or with `reserve` one blank row so the layout stays.
+ *
+ * @param props.children - the text.
+ * @param props.reserve - keep the row of a blank message.
+ * @returns the text, or nothing for a blank one.
+ */
+export function ErrorText(props: { children?: string; reserve?: boolean }): ReactNode {
+    const theme = useTheme()
+    const text = props.children
+    if (text === undefined || text.trim() === "")
+        return props.reserve ? <Text> </Text> : null
+    return <Text {...errorStyle(theme)}>{text}</Text>
 }
 
 /** The characters that ask for the colour (`FE0F`) or the text (`FE0E`) form of a glyph. */
@@ -591,7 +618,7 @@ type DataTableProps<R> = {
     empty?:   string
     width:    number
     inline?:  { row: number; column: number; node: ReactNode; cells: number }
-    note?:    { row: number; column: number; lines: string[]; color?: string }
+    note?:    { row: number; column: number; lines: string[]; error?: boolean }
     border?:  LineStyle
 }
 
@@ -644,6 +671,7 @@ export function DataTable<R>(props: DataTableProps<R>): ReactNode {
         ink: string,
         bold: boolean,
         inks?: Record<number, string>,
+        backs?: Record<number, string>,
     ): ReactNode => (
         <Text>
             <Text color={ink} bold={bold}>{lead}</Text>
@@ -667,7 +695,11 @@ export function DataTable<R>(props: DataTableProps<R>): ReactNode {
                     // biome-ignore lint/suspicious/noArrayIndexKey: a column is its place
                     <Fragment key={i}>
                         {i > 0 ? <Bar style={border} /> : null}
-                        <Text color={inks?.[i] ?? ink} bold={bold}>
+                        <Text
+                            color={inks?.[i] ?? ink}
+                            backgroundColor={backs?.[i]}
+                            bold={bold}
+                        >
                             {" "}
                             {body}
                             {" "}
@@ -691,7 +723,8 @@ export function DataTable<R>(props: DataTableProps<R>): ReactNode {
                 "   ",
                 ink,
                 false,
-                n.color === undefined ? undefined : { [n.column]: n.color },
+                n.error ? { [n.column]: errorStyle(theme).color } : undefined,
+                undefined,
             )}
         </Fragment>
     )

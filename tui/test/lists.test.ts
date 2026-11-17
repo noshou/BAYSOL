@@ -29,7 +29,7 @@ import {
     type SequenceResult,
     summary,
 } from "../src/store/lists.js"
-import { seqresLetters, tempDir } from "./support/fixtures.js"
+import { marks, seqresLetters, tempDir, values } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Sequences
@@ -410,9 +410,6 @@ test("createParents false does not make a folder that is gone", () => {
 // ========================================================================================
 // 3. Drafts
 // ========================================================================================
-
-const marks = (s: Drafts<string>) => s.rows.map((_, i) => s.mark(i))
-const values = (s: Drafts<string>) => s.rows.map((_, i) => s.value(i))
 
 test("saved rows are clean", () => {
     const s = Drafts.of(["a", "b"])

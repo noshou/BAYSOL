@@ -463,7 +463,7 @@ end
         @test P("lmng")[[1, 3]] == P("LMNG nC=10")[[1, 3]] &&
               P("lmng")[2] ≈ P("LMNG nC=10")[2]
         @test P("DDM")[1] == 278 && abs(P("DDM")[2] - P("maltoside nC=12")[2]) < 4.0
-        @test P("digitonin") == (660, 860.1, 8.0)
+        @test P("digitonin") == (660, 845.53, 10.05)
         # they live in Polymers/ now, not in NonBiological
         @test_throws ArgumentError IFACE.ϕ°("digitonin")
     end
@@ -727,7 +727,7 @@ end
         for n in ("MNG-3", "LMNG", "2,2-didecylpropane-1,3-bis-β-D-maltopyranoside")
             @test P(n)[2] ≈ 782.9
         end
-        @test P("Digitonine")[2] ≈ 860.1
+        @test P("Digitonine")[2] ≈ 845.53
         # two aliases that named other compounds were removed: DMG
         # is dimethylglycine, and digitoxigenin is not digitogenin
         @test_throws ArgumentError P("dmg")

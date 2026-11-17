@@ -26,9 +26,9 @@ import {
     takeColour,
 } from "../src/screens/screen-rules.js"
 import { defaultCatalog } from "../src/store/settings.js"
-import { Frame, legendStyle } from "../src/ui/frame.js"
+import { Frame, footerLegendStyle, legendStyle } from "../src/ui/frame.js"
 import { boxesFit, legendFor, legendHeight } from "../src/ui/grid.js"
-import { KeyInput, keys } from "../src/ui/interaction.js"
+import { KeyInput, keys, pressOf } from "../src/ui/interaction.js"
 import { fieldCells, TextBuffer } from "../src/ui/text-input.js"
 import { DataTable } from "../src/ui/theme.js"
 
@@ -55,15 +55,15 @@ test("a number opens as its value with the cursor at the end", () => {
 test("a number: typing, the cursor keys and backspace edit the text", () => {
     const def = catalog.require("N_ADAPT")
     let edit = openNumber(def, 300)
-    edit = stepNumber(edit, keys.home).state
+    edit = stepNumber(edit, pressOf(keys.home)).state
     assert.equal(edit.buffer.cursor, 0)
     edit = stepNumber(edit, typed("1")).state
-    edit = stepNumber(edit, keys.right).state
-    edit = stepNumber(edit, keys.delete).state
+    edit = stepNumber(edit, pressOf(keys.right)).state
+    edit = stepNumber(edit, pressOf(keys.delete)).state
     assert.equal(edit.buffer.text, "130")
-    edit = stepNumber(edit, keys.end).state
-    edit = stepNumber(edit, keys.left).state
-    edit = stepNumber(edit, keys.backspace).state
+    edit = stepNumber(edit, pressOf(keys.end)).state
+    edit = stepNumber(edit, pressOf(keys.left)).state
+    edit = stepNumber(edit, pressOf(keys.backspace)).state
     assert.equal(edit.buffer.text, "10")
 })
 
@@ -77,39 +77,39 @@ test("a number: a blank is dropped, a character past the cap says so", () => {
     assert.equal(edit.buffer.length, maxNumberText)
     assert.equal(edit.error, CAP_NOTE)
     // the next editing key clears the message
-    edit = stepNumber(edit, keys.backspace).state
+    edit = stepNumber(edit, pressOf(keys.backspace)).state
     assert.equal(edit.error, undefined)
 })
 
 test("a number: Enter takes a good number, a wrong one stays as an error", () => {
     const def = catalog.require("N_ADAPT")
-    const good = stepNumber(openNumber(def, 250), keys.enter)
+    const good = stepNumber(openNumber(def, 250), pressOf(keys.enter))
     assert.deepEqual(good.end, { kind: "done", value: 250 })
-    const bad = stepNumber(openNumber(def, 0), keys.enter)
+    const bad = stepNumber(openNumber(def, 0), pressOf(keys.enter))
     assert.equal(bad.end, undefined)
     assert.match(bad.state.error ?? "", /at least 1/)
-    const empty = stepNumber(openNumber(def, 5), keys.backspace)
-    assert.ok(stepNumber(empty.state, keys.enter).state.error)
+    const empty = stepNumber(openNumber(def, 5), pressOf(keys.backspace))
+    assert.ok(stepNumber(empty.state, pressOf(keys.enter)).state.error)
     const decimal = typeAll(openNumber(def, 5), ".5", stepNumber)
-    assert.ok(stepNumber(decimal, keys.enter).state.error)
+    assert.ok(stepNumber(decimal, pressOf(keys.enter)).state.error)
 })
 
 test("a number: a float takes decimals, Esc drops, Ctrl-X leaves", () => {
     const flt = catalog.defs().find((d) => d.kind === "float")
     assert.ok(flt)
-    const edit = stepNumber(openNumber(flt, 1), keys.backspace).state
+    const edit = stepNumber(openNumber(flt, 1), pressOf(keys.backspace)).state
     const typedIn = typeAll(edit, "0.25", stepNumber)
-    assert.deepEqual(stepNumber(typedIn, keys.enter).end?.kind, "done")
-    assert.deepEqual(stepNumber(typedIn, keys.escape).end, { kind: "cancel" })
-    assert.deepEqual(stepNumber(typedIn, keys.back).end, { kind: "back" })
+    assert.deepEqual(stepNumber(typedIn, pressOf(keys.enter)).end?.kind, "done")
+    assert.deepEqual(stepNumber(typedIn, pressOf(keys.escape)).end, { kind: "cancel" })
+    assert.deepEqual(stepNumber(typedIn, pressOf(keys.back)).end, { kind: "back" })
     assert.equal(typedIn.buffer.text, "0.25")
 })
 
 test("pasting into a number drops the blanks and clears the error", () => {
     const def = catalog.require("N_ADAPT")
-    let edit = stepNumber(openNumber(def, 0), keys.enter).state
+    let edit = stepNumber(openNumber(def, 0), pressOf(keys.enter)).state
     assert.ok(edit.error)
-    edit = pasteNumber(stepNumber(edit, keys.backspace).state, " 1 2\n3 ")
+    edit = pasteNumber(stepNumber(edit, pressOf(keys.backspace)).state, " 1 2\n3 ")
     assert.equal(edit.buffer.text, "123")
     assert.equal(edit.error, undefined)
 })
@@ -146,13 +146,13 @@ test("a tuple opens on its first part, number parts fresh, colour parts not", ()
 
 test("a tuple: left, right and tab move the focus, stopping or going round", () => {
     let edit = openTuple(radii, [4, 10, 20])
-    edit = stepTuple(edit, keys.left).state
+    edit = stepTuple(edit, pressOf(keys.left)).state
     assert.equal(edit.focus, 0)
-    edit = stepTuple(edit, keys.right).state
-    edit = stepTuple(edit, keys.right).state
-    edit = stepTuple(edit, keys.right).state
+    edit = stepTuple(edit, pressOf(keys.right)).state
+    edit = stepTuple(edit, pressOf(keys.right)).state
+    edit = stepTuple(edit, pressOf(keys.right)).state
     assert.equal(edit.focus, 2)
-    edit = stepTuple(edit, keys.tab).state
+    edit = stepTuple(edit, pressOf(keys.tab)).state
     assert.equal(edit.focus, 0)
 })
 
@@ -163,7 +163,7 @@ test("a tuple: the first key replaces a part, later keys add, backspace takes of
     assert.equal(edit.fresh.has(0), false)
     edit = typeAll(edit, ".5", stepTuple)
     assert.equal(edit.texts[0], "7.5")
-    edit = stepTuple(edit, keys.backspace).state
+    edit = stepTuple(edit, pressOf(keys.backspace)).state
     assert.equal(edit.texts[0], "7.")
     assert.equal(stepTuple(edit, typed(" ")).state.texts[0], "7.")
 })
@@ -171,31 +171,31 @@ test("a tuple: the first key replaces a part, later keys add, backspace takes of
 test("a tuple: Enter on a number part takes the whole tuple", () => {
     let edit = openTuple(radii, [4, 10, 20])
     edit = typeAll(edit, "5", stepTuple)
-    const done = stepTuple(edit, keys.enter)
+    const done = stepTuple(edit, pressOf(keys.enter))
     assert.deepEqual(done.end, { kind: "done", value: [5, 10, 20] })
 })
 
 test("a tuple: a wrong part puts the focus on it and names it", () => {
     let edit = openTuple(radii, [4, 10, 20])
-    edit = stepTuple(edit, keys.right).state
+    edit = stepTuple(edit, pressOf(keys.right)).state
     edit = typeAll(edit, "x", stepTuple)
-    const bad = stepTuple(edit, keys.enter)
+    const bad = stepTuple(edit, pressOf(keys.enter))
     assert.equal(bad.end, undefined)
     assert.match(bad.state.error ?? "", /^second: /)
     assert.equal(bad.state.focus, 1)
     // a key clears it
-    assert.equal(stepTuple(bad.state, keys.right).state.error, undefined)
+    assert.equal(stepTuple(bad.state, pressOf(keys.right)).state.error, undefined)
 })
 
 test("a tuple: Esc drops, Ctrl-X leaves", () => {
     const edit = openTuple(radii, [4, 10, 20])
-    assert.deepEqual(stepTuple(edit, keys.escape).end, { kind: "cancel" })
-    assert.deepEqual(stepTuple(edit, keys.back).end, { kind: "back" })
+    assert.deepEqual(stepTuple(edit, pressOf(keys.escape)).end, { kind: "cancel" })
+    assert.deepEqual(stepTuple(edit, pressOf(keys.back)).end, { kind: "back" })
 })
 
 test("a tuple: Enter on a colour part asks for the picker, typing does nothing", () => {
     const edit = openTuple(colourPair, ["gray40", 0.6])
-    assert.equal(stepTuple(edit, keys.enter).pick, true)
+    assert.equal(stepTuple(edit, pressOf(keys.enter)).pick, true)
     assert.deepEqual(stepTuple(edit, typed("r")).state, edit)
 })
 
@@ -205,7 +205,7 @@ test("a tuple: the colour picked is taken and the focus goes on", () => {
     assert.deepEqual(next.state.texts, ["red", "0.6"])
     assert.equal(next.state.focus, 1)
     assert.equal(next.end, undefined)
-    const done = stepTuple(typeAll(next.state, "0.3", stepTuple), keys.enter)
+    const done = stepTuple(typeAll(next.state, "0.3", stepTuple), pressOf(keys.enter))
     assert.deepEqual(done.end, { kind: "done", value: ["red", 0.3] })
 })
 
@@ -293,4 +293,28 @@ test("a smooth frame shows its keys as rounded boxes and still fits 80 x 24", ()
     assert.match(text, /╭[─]+╮/)
     assert.match(text, /│ back: /)
     assert.ok(text.split("\n").length <= 24)
+})
+
+test("a frame keeps one legend style whatever legend is shown (first and last tab)", () => {
+    const full = items(12)
+    const first = items(10)
+    const props = (legend: ReturnType<typeof items>) => ({
+        title: "plots",
+        legend,
+        legendFull: full,
+    })
+    const draw = (legend: ReturnType<typeof items>) =>
+        renderToString(
+            createElement(Frame, props(legend), createElement(Text, null, "body")),
+            { columns: 80 },
+        )
+    // the fullest legend does not fit one row, so no state of the screen is boxes
+    assert.ok(!boxesFit(full, 60))
+    assert.equal(footerLegendStyle("smooth", full, 60), "columns")
+    assert.equal(footerLegendStyle("smooth", undefined, 60), "boxes")
+    assert.equal(footerLegendStyle("smooth", items(2), 60), "boxes")
+    assert.equal(footerLegendStyle("blocky", full, 60), "columns")
+    for (const text of [draw(full), draw(first), draw(items(3))])
+        assert.doesNotMatch(text, /│ key0: /)
+    assert.match(draw(full), /┃/)
 })

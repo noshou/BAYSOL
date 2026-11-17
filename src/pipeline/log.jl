@@ -203,7 +203,7 @@ function _logStats(result)
         add!("pdb2pqrCache", occursin("cache miss", pq.note) ? "miss" : "hit")
     cmp = _logStage(log, "components")
     dl = cmp === nothing ? nothing : match(r"(\d+) download", cmp.note)
-    dl === nothing || add!("compDwnld", dl.captures[1])
+    dl === nothing || add!("componentDownloads", dl.captures[1])
 
     # the conditions the run was given, next to the atoms and the model
     for (k, from) in (
@@ -276,7 +276,7 @@ function _logStats(result)
     m = mp === nothing ? nothing : match(r"(\d+)/(\d+) starts, (\d+) modes?", mp.name)
     if m !== nothing
         add!("mapStartsOk", m.captures[1])
-        add!("mapStartsTot", m.captures[2])
+        add!("mapStartsTotal", m.captures[2])
         add!("mapModes", m.captures[3])
     end
     return rows
@@ -444,4 +444,87 @@ function writeLog(result; refChi2 = nothing, path = nothing, name = nothing)
     _updateLog(path, name, lines)
     log.info["log"] = abspath(path)
     return String(path)
+end
+
+"The stage log of the latest `seedModel` call, which `_runLogged` reads after a failure."
+const _LAST_LOG = Ref{Union{Nothing,StageLog}}(nothing)
+
+"The longest error message a failed run's log section keeps, in characters."
+const _LOG_ERROR_MAX = 1000
+
+"""
+The lines of the section of a run that failed with `err`: the rows of a normal section
+that are known without a result (`revision`, `julia`, `baysol`), `status` `failed`, the
+`errorType` and the `error` message on one line (line breaks become ` | `, cut at
+`_LOG_ERROR_MAX` characters), the scalar run facts `log` has recorded so far (`ph`,
+`nSamples`, ...), then the timing block as far as the run went (when `log` is a stage log)
+and the machine. There are no `fit` rows: their absence, with `status`, marks the failure.
+
+# Returns
+- The lines of the section.
+
+# Exceptions
+- None for the usual errors; `_runLogged` guards the call anyway.
+"""
+function _failureLines(err, log::Union{Nothing,StageLog})
+    msg = replace(sprint(showerror, err), r"\s*[\r\n]+\s*" => " | ", "\t" => " ")
+    msg = strip(msg)
+    length(msg) > _LOG_ERROR_MAX && (msg = first(msg, _LOG_ERROR_MAX) * "...")
+    rows = [["revision", _logRevision()], ["julia", string(VERSION)],
+        ["baysol", _logVersion()], ["status", "failed"],
+        ["errorType", string(typeof(err))], ["error", msg]]
+    if log !== nothing
+        skip = ("workbook", "log", "plots", "loadStart", "freeMemoryStart")
+        for k in sort!(collect(keys(log.info)))
+            v = log.info[k]
+            k in skip || !(v isa Union{Number,AbstractString,Bool}) ||
+                push!(rows, [k, _logCell(v)])
+        end
+    end
+    lines = _tabLines(rows)
+    log === nothing || append!(
+        lines, ["", "--- timing ---"], _timingText(_timingTable(log, tick())),
+    )
+    machine = _tabLines(_logMachine(something(log, StageLog())))
+    return vcat(lines, ["", "--- machine ---"], machine)
+end
+
+"""
+    _runLogged(script; path = nothing, name = nothing)
+
+Runs the fitting-test script `script` (`include`d in `Main`, as `julia script` would run
+it) and, if it throws, writes the failure to the run log before rethrowing: the section is
+named after the script (`SASDA52_fit1.jl` in `SASDA52/` gives `fit1`, `SASDA52.jl` the
+folder name) in `<folder>.LOG` next to it, replacing that run's earlier section, with the
+rows of `_failureLines`. `bysl fits run` starts every script this way. Not exported.
+
+# Returns
+- Whatever the script's last expression gives.
+
+# Exceptions
+- Whatever the script throws, unchanged (the log write is guarded and never hides it).
+"""
+function _runLogged(script::AbstractString; path = nothing, name = nothing)
+    try
+        return Base.include(Main, script)
+    catch err
+        try
+            inner = err isa LoadError ? err.error : err
+            dir = dirname(abspath(script))
+            folder = basename(dir)
+            if path === nothing
+                path = joinpath(dir, folder * ".LOG")
+            end
+            if name === nothing
+                stem = replace(basename(script), r"\.jl$" => "")
+                name =
+                    startswith(stem, folder * "_") ? stem[(length(folder)+2):end] :
+                    folder
+            end
+            _updateLog(path, name, _failureLines(inner, _LAST_LOG[]))
+        catch logErr
+            @warn "could not write the failure to the run log" exception = logErr
+        end
+        rethrow()
+    end
 end

@@ -6,7 +6,7 @@ import { appDir } from "./core/environment.js"
 import { MainMenu } from "./screens/menus.js"
 import { SheetViewerScreen } from "./screens/viewer.js"
 import { hasActiveRuns, quitAll } from "./store/run.js"
-import { readThemeName, writeThemeName } from "./store/settings-store.js"
+import { readThemeName, writeThemeName } from "./store/theme-file.js"
 import { ThemePicker } from "./ui/input.js"
 import { keys, minColumns, minRows, NavProvider, useKeys } from "./ui/interaction.js"
 import {
@@ -28,6 +28,24 @@ function savedTheme(): Theme {
     const known = themes.map((theme) => theme.nm)
     const name = readThemeName(appDir(), known, defaultTheme.nm)
     return themeByName(name) ?? defaultTheme
+}
+
+/**
+ * The last row of the screen: `theme (^t): <name>` and the logo at the right. It ends
+ * one column short (`paddingRight`), so no glyph, a two-cell emoji above all, ever sits in
+ * the bottom-right cell of the terminal (a wide glyph there is a weak spot of some
+ * terminals); that cell stays a plain space in the theme background.
+ *
+ * @param props.theme - the theme in use.
+ * @returns the row.
+ */
+export function ThemeLine({ theme }: { theme: Theme }): ReactNode {
+    return (
+        <Box flexGrow={1} justifyContent="flex-end" columnGap={1} paddingRight={1}>
+            <Text color={theme.mt}>theme ({keys.theme.label}): {theme.nm}</Text>
+            <Logo theme={theme} />
+        </Box>
+    )
 }
 
 /**
@@ -108,13 +126,8 @@ export function App({ viewFile }: { viewFile?: string }): ReactNode {
                         suspended={tooSmall || picking}
                     />
                 </Box>
-                <Box
-                    justifyContent="flex-end"
-                    columnGap={1}
-                    display={tooSmall ? "none" : "flex"}
-                >
-                    <Text color={theme.mt}>theme ({keys.theme.label}): {theme.nm}</Text>
-                    <Logo theme={theme} />
+                <Box display={tooSmall ? "none" : "flex"}>
+                    <ThemeLine theme={theme} />
                 </Box>
                 {picking && !tooSmall ? (
                     <Box

@@ -1,0 +1,75 @@
+datetime	16-11-2026 18:18:41 -0500
+
+=== SASDM96 ===
+revision                	d6f3f58-dirty
+julia                   	1.12.7
+baysol                  	v0.4.0-yals-n-gɛsga
+status                  	failed
+errorType               	BAYSOL.Inference.NotConvergedError
+error                   	NotConvergedError: the run did not converge: 1.48 % of the transitions diverged, not below 0.1 %.
+D                       	39.2321
+energyEv                	12002.3
+lMax                    	12
+leapfrog                	186455
+mapModes                	2
+nAdapt                  	300
+nAtoms                  	783
+nChains                 	8
+nChainsPooled           	8
+nChannels               	3.62507
+nNonpositive            	0
+nQ                      	45
+nQRaw                   	1035
+nSamples                	1000
+optima                  	1
+ph                      	7.2
+pmvFallbackUncert       	2.52583
+quantileHiPct           	97.725
+quantileLabel           	2sigma
+quantileLoPct           	2.27501
+rebin                   	12
+rngSeed                 	0
+sigmaPh                 	0.1
+temperatureC            	22.0
+
+--- timing ---
+stage                                             seconds    % wall    (JIT)     (GC)  notes
+wall clock                                           8.64     100.0    (1.9)    (0.9)  process start to end
+  startup                                            5.00      57.8    (0.0)    (0.6)  process start to seedModel
+  static build                                       1.18      13.6    (1.0)    (0.0)
+    resolveStruct                                 2.7e-05       0.0    (0.0)    (0.0)
+    components                                    3.4e-04       0.0    (0.0)    (0.0)  4 residue names: 4 builtin, 0 cache, 0 download
+    structure checks                                 0.01       0.1    (0.0)    (0.0)  0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings
+    classify                                      2.0e-03       0.0    (0.0)    (0.0)  nucleic: AMBER, titration none
+    pdb2pqr                                          0.91      10.5    (0.7)    (0.0)  nucleic, none; cache hit
+    heavy atoms                                   2.7e-03       0.0    (0.0)    (0.0)  507 in, 507 out; 0 restored, 0 added by pdb2pqr
+    loadMolecule                                     0.23       2.7    (0.2)    (0.0)
+    SASA                                          9.3e-03       0.1    (0.0)    (0.0)
+    shannon                                       7.0e-04       0.0    (0.0)    (0.0)  diameter, binning
+    forwardCache                                     0.01       0.2    (0.0)    (0.0)
+      vacuum + excluded volume                       0.01       0.1    (0.0)    (0.0)  vols + B_lm
+      hydration                                   2.7e-03       0.0    (0.0)    (0.0)  B_lm
+      Gram + rM                                   4.6e-05       0.0    (0.0)    (0.0)
+    seedSampler                                   8.4e-05       0.0    (0.0)    (0.0)  priors, WLS
+  sampling                                           2.06      23.8    (0.8)    (0.0)
+    MAP search + whitening                           0.04       0.5    (0.0)    (0.0)  70/70 starts, 2 modes
+    NUTS setup                                    1.2e-04       0.0    (0.0)    (0.0)  starts, Hamiltonian
+    optima from the draws                            0.16       1.8    (0.1)    (0.0)  0 extra chains
+    NUTS                                             1.77      20.4    (0.6)    (0.0)  8k iters, 186.46k leapfrog, 0.009 ms/step
+    2 posterior modes: mass by bridge sampling       0.07       0.8    (0.0)    (0.0)
+    per-draw c1 re-profile + curves                  0.02       0.3    (0.0)    (0.0)  6600 draws
+  report write                                    8.7e-07       0.0    (0.0)    (0.0)
+  unaccounted                                        0.41       4.7    (0.1)    (0.3)
+GC: 0.91 s
+fit timing  = 8.64 s
+plot timing = 0 s
+
+--- machine ---
+machine.os              	Linux aarch64-linux-gnu
+machine.cpu             	apple-m2
+machine.cpu_mhz         	600
+machine.cpus            	8
+machine.threads         	1
+machine.memory_gib      	15.3
+machine.loadStart       	1.9
+machine.free_gib_start  	8.4

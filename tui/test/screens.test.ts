@@ -46,9 +46,14 @@ import {
     withDraft,
     withModelDraft,
 } from "../src/screens/screen-rules.js"
-import { fileStatus } from "../src/screens/settings-screens.js"
+import { fileStatus } from "../src/screens/settings-menu.js"
 import { draftOf, soluteProblem } from "../src/screens/solutes.js"
-import { legendExtraRows, viewerFullLegend, viewerLegend } from "../src/screens/viewer.js"
+import {
+    legendExtraRows,
+    type ViewerFacts,
+    viewerFullLegend,
+    viewerLegend,
+} from "../src/screens/viewer.js"
 import { type BufferRow, rowProblem } from "../src/store/buffer.js"
 import { blankNonbio, type NonbioEntry } from "../src/store/custom.js"
 import { blankPolymer, type PolymerEntry } from "../src/store/polymers.js"
@@ -57,15 +62,13 @@ import { rowOf, soluteOf } from "../src/store/solutes.js"
 import { entryLegend, legendFor } from "../src/ui/grid.js"
 import { destructiveQuestion, questionLegend } from "../src/ui/input.js"
 import { keys } from "../src/ui/interaction.js"
-import { fixture } from "./support/fixtures.js"
+import { settingDef as def, fixture } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Setting edit
 // ========================================================================================
 
 const catalog = defaultCatalog()
-const def = (name: string) => catalog.require(name)
-
 test("number rules: whole numbers and decimals", () => {
     assert.deepEqual(parseNumber("12", numberRules.int), { value: 12 })
     assert.deepEqual(parseNumber("-3", numberRules.int), { value: -3 })
@@ -399,70 +402,103 @@ const facts = {
     active: 1,
     hasPlots: true,
     move: all,
+    pages: { up: false, down: false },
     zoom: { in: true, out: true },
     cells: false,
     marked: false,
     hasFormulas: false,
     matches: false,
 }
-const labels = (f = facts) => viewerLegend(f).map((i) => i.label)
+const labels = (f: ViewerFacts = facts) => viewerLegend(f).map((i) => i.label)
+const viewerKeys = (f: ViewerFacts = facts) =>
+    viewerLegend(f).map((i) => `${i.label}=${i.keys}`)
 
 test("the legend lists only keys that work now", () => {
     const one = { ...facts, sheets: 1, active: 0, hasPlots: false }
     assert.deepEqual(labels(one), ["move", "back"])
-    assert.deepEqual(labels(), ["next sheet", "prev sheet", "move", "plots", "back"])
-    // the keys are written the way they are pressed
-    const keysOf = (f = facts) => viewerLegend(f).map((i) => `${i.label}=${i.keys}`)
-    assert.ok(keysOf().includes("next sheet=tab"))
-    assert.ok(keysOf().includes("prev sheet=shift+tab"))
-    assert.ok(keysOf({ ...facts, plots: true }).includes("zoom in=shift++"))
+    assert.deepEqual(labels(), ["next", "prev", "move", "plots", "back"])
+    // the keys are written the way they are pressed; a capital is `shift+<letter>`
+    assert.ok(viewerKeys().includes("next=tab"))
+    assert.ok(viewerKeys().includes("prev=shift+tab"))
+    assert.ok(viewerKeys().includes("plots=shift+p"))
+    assert.ok(viewerKeys({ ...facts, plots: true }).includes("zoom in=shift+="))
+    assert.ok(viewerKeys({ ...facts, plots: true }).includes("zoom out=shift+-"))
     // the first tab has no previous one, the last has no next one
-    assert.ok(!labels({ ...facts, active: 0 }).includes("prev sheet"))
-    assert.ok(!labels({ ...facts, active: 2 }).includes("next sheet"))
+    assert.ok(!labels({ ...facts, active: 0 }).includes("prev"))
+    assert.ok(!labels({ ...facts, active: 2 }).includes("next"))
     // an arrow that cannot move is not shown
     const top = { ...facts, move: { ...all, up: false, left: false } }
     assert.deepEqual(viewerLegend(top).find((i) => i.label === "move")?.keys, "↓→")
-    // the plots mode: plots are named, zoom keys appear when a size exists
+    // the plots mode: zoom keys appear when a size exists
     const plots = labels({ ...facts, plots: true })
     assert.deepEqual(plots, [
-        "next plot", "prev plot", "move", "zoom in", "zoom out", "sheets", "back",
+        "next", "prev", "move", "zoom in", "zoom out", "graphics", "sheets", "back",
     ])
     assert.ok(!labels({ ...facts, plots: true, zoom: { in: false, out: true } })
         .includes("zoom in"))
     assert.ok(!labels({ ...facts, plots: true, hasPlots: false }).includes("sheets"))
+    // no plots (the comparison): no plots key
+    assert.ok(!labels({ ...facts, hasPlots: false }).includes("plots"))
+})
+
+test("pages: shift+↓ and pgdn, shift+↑ and pgup, both listed while they move", () => {
+    const paged = { ...facts, pages: { up: true, down: true } }
+    assert.ok(viewerKeys(paged).includes("next page=shift+↓ pgdn"))
+    assert.ok(viewerKeys(paged).includes("prev page=shift+↑ pgup"))
+    assert.ok(!labels({ ...paged, pages: { up: false, down: true } }).includes("prev page"))
+    assert.ok(viewerKeys({ ...paged, plots: true }).includes("next page=shift+↓ pgdn"))
+})
+
+test("plot type: shift+t switches the Unicode plot and the rendered figure", () => {
+    const p = { ...facts, plots: true }
+    assert.ok(viewerKeys({ ...p, graphics: false }).includes("graphics=shift+t"))
+    assert.ok(viewerKeys({ ...p, graphics: true }).includes("unicode=shift+t"))
+    assert.ok(labels(p).includes("graphics"), "offered without a figure: it says why not")
+    assert.ok(!labels({ ...facts, graphics: false }).includes("graphics"), "plots only")
 })
 
 test("sheet keys: find, go to, mark, copy; formulas and matches when they work", () => {
     const sheets = { ...facts, cells: true }
     assert.deepEqual(labels(sheets), [
-        "next sheet", "prev sheet", "move", "find", "go to", "mark", "copy",
-        "plots", "back",
+        "next", "prev", "move", "find", "go to", "mark", "copy", "plots", "back",
     ])
-    const pressed = (f = sheets) => viewerLegend(f).map((i) => `${i.label}=${i.keys}`)
+    const pressed = (f: ViewerFacts = sheets) => viewerKeys(f)
     assert.ok(pressed().includes("find=/"))
-    assert.ok(pressed().includes("go to=j"))
+    assert.ok(pressed().includes("go to=shift+j"))
     assert.ok(pressed().includes("mark=␣"))
-    assert.ok(pressed().includes("copy=c"))
+    assert.ok(pressed().includes("copy=shift+y"))
     const more = { ...sheets, hasFormulas: true, matches: true, marked: true }
-    assert.ok(pressed(more).includes("formulas=f"))
-    assert.ok(pressed(more).includes("next match=."))
-    assert.ok(pressed(more).includes("prev match=,"))
+    assert.ok(pressed(more).includes("formulas=shift+u"))
+    assert.ok(pressed(more).includes("next match=shift+k"))
+    assert.ok(pressed(more).includes("prev match=shift+i"))
     assert.ok(pressed(more).includes("unmark=␣"))
     assert.ok(!labels(more).includes("mark"))
-    // the plots mode has none of them
-    assert.ok(!labels({ ...more, plots: true }).includes("find"))
+    // a Unicode plot is a text: find, go to, mark and copy work there too, no formulas
+    const plot = labels({ ...more, plots: true })
+    for (const l of ["find", "go to", "unmark", "copy", "next match"])
+        assert.ok(plot.includes(l), l)
+    assert.ok(!plot.includes("formulas"))
+    // a picture (graphics) has none of them
+    assert.ok(!labels({ ...more, plots: true, graphics: true }).includes("find"))
     // the fullest legend holds them all
     const full = viewerFullLegend({ hasPlots: true }).map((i) => i.label)
     const wanted = ["find", "go to", "unmark", "copy", "formulas", "next match"]
-    for (const l of [...wanted, "prev match"]) assert.ok(full.includes(l), l)
+    for (const l of [...wanted, "prev match", "next page", "prev page"])
+        assert.ok(full.includes(l), l)
 })
 
 test("the fullest viewer legend leaves the grid room at 80x24", () => {
     // frame 7 + tabs/status 4 + letters 2 + header 2 = 15 rows besides the extra bands;
-    // 78 is the body width of an 80-column terminal: the 12 keys stay in one band
-    const extra = legendExtraRows(viewerFullLegend({ hasPlots: true }), 78, "smooth")
-    assert.equal(extra, 0)
-    assert.ok(24 - 15 - extra >= 8)
+    // 78 is the body width of an 80-column terminal. Since every key but navigation, `/`
+    // and Space is written `shift+<key>` and both page keys are listed (owner,
+    // 2026-11-14), the fullest legend takes a second band of three lines (it was one)
+    const full = viewerFullLegend({ hasPlots: true }, 78, "smooth")
+    const extra = legendExtraRows(full, 78, "smooth")
+    assert.equal(extra, 3)
+    assert.ok(24 - 15 - extra >= 6)
+    // the fullest is the longer of the sheets and the plots legends
+    const sheets = viewerFullLegend({ hasPlots: true })
+    assert.ok(extra >= legendExtraRows(sheets, 78, "smooth"))
 })
 
 // ========================================================================================
@@ -611,7 +647,7 @@ test("the recipe words", () => {
     assert.equal(recipeChoice("SEC buffer", 3), "SEC buffer (3)")
     assert.equal(unusable("recipes.json"), "recipes.json unusable!")
     assert.equal(savedAs("SEC", 40), 'saved as "SEC"')
-    assert.equal(NO_RECIPES, "no saved recipes!")
+    assert.equal(NO_RECIPES, "no global recipes!")
 })
 
 test("the replace questions fit their room and keep the name when they can", () => {

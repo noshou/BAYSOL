@@ -91,6 +91,9 @@ at_bound(v, lo, hi, tol) = v >= hi - tol || v <= lo + tol
 
 # The cells of one table row from a parsed run.
 function row(label, r, refChi2)
+    # a run that did not converge has no fit values, only its error (`status failed`)
+    isempty(r[:chi2_cmp]) &&
+        return [label, "**failed**", refChi2, "—", "—", "—", "—", "—"]
     rho, d1, d2, d3, c1, div, chi2 = (parse(Float64, r[k]) for k in
                               (:rhoE, :d1, :d2, :d3, :c1, :div, :chi2_cmp))
     # δρ₃ is bounded by the cavity occupancy, scaled by the run's own ρₑ
@@ -447,12 +450,12 @@ heading(text) = println("\n### ", text, "\n")
 
 # The stages of the report's timing table: (label, key).
 const TIMING_ROWS =
-    [("static build", :static_build), ("  resloveStruct", :resloveStruct),
+    [("static build", :static_build), ("  resolveStruct", :resolveStruct),
         ("  components", :components), ("  structure checks", :struct_chk),
         ("  classify", :classify), ("  propka", :propka),
         ("  pdb2pqr (any variant)", :pdb2pqr),
         ("  modified nucleotide hydrogens", :moded_hyd),
-        ("  modified amino acid hydrogens", :modedAaHyd),
+        ("  modified amino acid hydrogens", :modifiedAminoHydrogens),
         ("  heavy atoms", :heavy_atoms), ("  loadMolecule", :loadMolecule),
         ("  SASA", :sasa),
         ("  shannon", :shannon), ("  forwardCache", :fwd),
@@ -819,7 +822,7 @@ function notable(report)
     return any(n -> startswith(n, "[nucleic"), notes) ||
            any(n -> startswith(n, "[mixed"), notes) ||
            any(n -> occursin("cache miss", n), notes) ||
-           or_zero(get(report, :compDwnld, "")) > 0
+           or_zero(get(report, :componentDownloads, "")) > 0
 end
 
 # The notes of the judged column's fits that are not plain protein runs with every cache

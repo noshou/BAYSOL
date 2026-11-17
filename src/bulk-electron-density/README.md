@@ -29,13 +29,13 @@ with `Z_H2O = 10` and `10²⁷ Å³` per litre; `σ_w = ρ_w σ_ρ/ρ` with `σ_
 The central assumption is additivity at the dilute limit, `V_solution ≈ V_water + Σ nⱼ ϕ°ⱼ` (the error is the excess volume of mixing, of order 1 cm³ mol⁻¹ at ~0.1 M; at molar concentrations such as 6 M urea or 50 % glycerol it can fail by more and users must supply their own values). In one litre the solutes contribute `N_A Cⱼ Zⱼ` electrons and displace `Σ Cⱼ ϕ°ⱼ/10³` of the water volume:
 
 ```math
-\rhoE=\rho_w(t)+\sum_j C_j kJ,\qquad kJ=\frac{N_AZ_j}{10^{27}}-\rho_w(t)\frac{\phi^\circ_j}{10^{3}}
+\rho_e=\rho_w(t)+\sum_j C_j kJ,\qquad kJ=\frac{N_AZ_j}{10^{27}}-\rho_w(t)\frac{\phi^\circ_j}{10^{3}}
 ```
 
 (`C` in mol L⁻¹, `ϕ°` in cm³ mol⁻¹; the first term of `kⱼ` is what the solute would add if it displaced nothing, the second the electrons removed with the water.) A solute with `Z/ϕ° = 0.553` is electron-density matched to water; NaCl has 1.7, glycerol 0.70, urea 0.72. The model is linear in the molarities, so the delta-method uncertainty is exact to first order for independent inputs:
 
 ```math
-\sigma_{\rhoE}^2=\Big(1-\sum_j\frac{C_j\phi^\circ_j}{10^3}\Big)^2\sigma_w^2+\sum_jk_j^2\sigma_{C_j}^2+\sum_j\Big(\frac{C_j\rho_w}{10^3}\Big)^2\big(\sigma_{\phi_j}^2+\sigma_{\phi,T,j}^2\big)
+\sigma_{\rho_e}^2=\Big(1-\sum_j\frac{C_j\phi^\circ_j}{10^3}\Big)^2\sigma_w^2+\sum_jk_j^2\sigma_{C_j}^2+\sum_j\Big(\frac{C_j\rho_w}{10^3}\Big)^2\big(\sigma_{\phi_j}^2+\sigma_{\phi,T,j}^2\big)
 ```
 
 At buffer concentrations the recipe term (pipetting error) dominates; for a 6 M solute the table term does. Magnitudes at 25 °C: 150 mM NaCl +0.51 %, + 20 mM Tris +0.57 %, 5 % v/v glycerol (0.6846 M) +1.84 %, 6 M urea +8.15 %; an error of 2 cm³ mol⁻¹ in `ϕ°` of 6 M urea moves `ρₑ` by 1.1 %, the same error for a 20 mM buffer by ~10⁻⁴ of that: be careful with molar solutes, do not agonise over millimolar ones. Inputs are validated (`DomainError` for a non-positive molarity or a negative uncertainty, `ArgumentError` for an empty name or sequence).

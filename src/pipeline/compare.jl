@@ -180,26 +180,34 @@ over each other are not readable). Each reference has its marker (the `k`-th of
 function _compareData(fits, names, data, refs, style::PlotStyle)
     base = _curveData((nothing, nothing, nothing, nothing), data, style)
     floor_ = minimum(base.I) / 2
+    f = _qFactor(style)
     models = map(enumerate(fits)) do (k, r)
         mc = r[3][2]
         band = nothing
         if length(fits) == 1 && r[4] !== nothing
             b = r[4][2]["bounds"]
-            band = (q = b[:, 1], lo = max.(b[:, 2], floor_), hi = max.(b[:, 3], floor_))
+            band = (
+                q = f .* b[:, 1], lo = max.(b[:, 2], floor_),
+                hi = max.(b[:, 3], floor_),
+            )
         end
         return (;
             name = String(names[k]), color = _assigned(style.colorsCompare, k),
             tex = "bscompare$k", chi2 = _chi2(r),
-            map = (q = mc[:, 1], I = map(v -> v > 0 ? v : NaN, mc[:, 2])),
-            mapRaw = (q = mc[:, 1], I = mc[:, 2]), band,
+            map = (q = f .* mc[:, 1], I = map(v -> v > 0 ? v : NaN, mc[:, 2])),
+            mapRaw = (q = f .* mc[:, 1], I = mc[:, 2]), band,
         )
     end
     references = [
-        (; ref, marker = _assigned(style.markersCompare, k)) for
-        (k, ref) in enumerate(refs)
+        (;
+            ref = Reference(ref.name, f .* ref.q, ref.I),
+            marker = _assigned(style.markersCompare, k),
+        ) for (k, ref) in enumerate(refs)
     ]
     return (;
-        base.q, base.I, base.σ, base.errLo, base.errHi, base.ylim, raw = data, models,
+        base.q, base.I, base.σ, base.errLo, base.errHi, base.ylim,
+        raw = (f .* data[1], data[2], data[3]), models,
+        qUnit = style.qUnit,
         refs = references,
     )
 end
@@ -300,7 +308,7 @@ their marker.
 function _previewCompare(c, style::PlotStyle)
     lg = log10
     p = UnicodePlots.scatterplot(lg.(c.q), lg.(c.I); name = "data",
-        color = _rgb(style.colorPosterior), xlabel = "log₁₀ q   (q in Å⁻¹)",
+        color = _rgb(style.colorPosterior), xlabel = "log₁₀ q   (q in $(style.qUnit))",
         ylabel = "log₁₀ I(q)", title = "comparison", _termKw(style)...)
     for r in c.refs
         idx = unique(round.(Int, range(1, length(r.ref.q); length = _COMPARE_MARKS)))
@@ -325,7 +333,8 @@ end
 # ---------------------------------------------------------------------------
 
 """
-The table of `<name>_compare.tsv`, as `(header, columns)`: `q (A^-1)`,
+The table of `<name>_compare.tsv`, as `(header, columns)`: `q (A^-1)` (`q (nm^-1)` for
+`qUnit` `nm⁻¹`),
 `I_measured (a.u.)` and `sigma (a.u.)` of the measured curve as given, then a column
 `fit_<model> (a.u.)` for each model (its MAP curve) and `ref_<name> (a.u.)` for each
 reference, each interpolated linearly onto the measured q (empty outside the curve's own
@@ -333,7 +342,8 @@ range; a curve on the measured q is exactly as it is).
 """
 function _compareTable(c)
     q, I, σ = c.raw
-    header = ["q (A^-1)", "I_measured (a.u.)", "sigma (a.u.)"]
+    qHeader = c.qUnit == "nm⁻¹" ? "q (nm^-1)" : "q (A^-1)"
+    header = [qHeader, "I_measured (a.u.)", "sigma (a.u.)"]
     cols = Any[q, I, σ]
     for m in c.models
         push!(header, "fit_$(m.name) (a.u.)")

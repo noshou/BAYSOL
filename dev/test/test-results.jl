@@ -95,11 +95,11 @@ end
 @testset "every stage of the timing table, the MAP search and NUTS metadata" begin
     @test fields(
         "res_chains.txt",
-        [:static_build, :resloveStruct, :propka, :pdb2pqr,
+        [:static_build, :resolveStruct, :propka, :pdb2pqr,
             :loadMolecule, :sasa, :shannon, :fwd, :vac_excl, :hydration, :gram_rm,
             :seed_fitting, :sampling, :map_s, :nuts_setup, :nuts, :reprofile,
             :map_quantiles,
-            :report_write, :unaccounted, :gc, :mapStartsOk, :mapStartsTot, :mapModes,
+            :report_write, :unaccounted, :gc, :mapStartsOk, :mapStartsTotal, :mapModes,
             :nuts_iters, :leapfrog, :ms_per_step, :draws],
     ) ==
           ["0.13", "6.4e-05", "9.4e-04", "1.1e-05", "6.8e-03", "0.03", "4.3e-03", "0.09",
@@ -154,7 +154,7 @@ report_with(timing) =
     split(slurp8(joinpath(data_dir, "res_current.txt")),
         r"(?m)^=== Timing ==="; limit = 2)[1] * slurp8(joinpath(data_dir, timing))
 
-const NEW_STAGES = [:components, :compDwnld, :struct_chk, :classify,
+const NEW_STAGES = [:components, :componentDownloads, :struct_chk, :classify,
     :moded_hyd, :heavy_atoms]
 
 vals(r, ks) = [num_str(r[k]) for k in ks]
@@ -186,7 +186,7 @@ end
     downloaded = replace(replace(text, "0 cache, 0 download]" => "0 cache, 1 download]"),
         "6.4e-04" => "0.25")
     r = parse_report(downloaded)
-    @test vals(r, [:components, :compDwnld]) == ["0.25", "1"]
+    @test vals(r, [:components, :componentDownloads]) == ["0.25", "1"]
     @test near(0.39 - 0.01 - 0.25, r[:wall_ex])
     # 0 downloads: the table load stays in the wall clock
     @test near(0.38, parse_report(text)[:wall_ex])
@@ -240,16 +240,16 @@ end
 # of `Pipeline._write_timing`.
 @testset "modified amino acids" begin
     r = parse_report(report_with("timing_protein_mse.txt"))
-    @test vals(r, [:modedAaHyd, :moded_hyd]) == ["0.02", ""]
+    @test vals(r, [:modifiedAminoHydrogens, :moded_hyd]) == ["0.02", ""]
     @test vals(r, [:heavy_atoms, :pdb2pqr, :propka]) == ["0.03", "2.59", "8.6e-04"]
     @test near(3.39 - 0.00086 - 2.59, r[:wall_ex])
     r = parse_report(report_with("timing_mixed_mse.txt"))
-    @test vals(r, [:modedAaHyd, :pdb2pqr]) == ["0.01", "7.56"]
+    @test vals(r, [:modifiedAminoHydrogens, :pdb2pqr]) == ["0.01", "7.56"]
     @test near(8.86 - 0.003 - 7.56, r[:wall_ex])
     r = parse_report(report_with("timing_nucleic.txt"))
-    @test vals(r, [:moded_hyd, :modedAaHyd]) == ["0.02", ""]
+    @test vals(r, [:moded_hyd, :modifiedAminoHydrogens]) == ["0.02", ""]
     r = parse_report(report_with("timing_protein.txt"))
-    @test vals(r, [:moded_hyd, :modedAaHyd]) == ["", ""]
+    @test vals(r, [:moded_hyd, :modifiedAminoHydrogens]) == ["", ""]
     @test notes_of("timing_protein_mse.txt")["modified amino acid hydrogens"] ==
           "[1 residues: 1 hydrogenated through their parent, 0 without a parent; " *
           "9 hydrogens placed]"
@@ -264,7 +264,7 @@ end
         "classify" => "[protein: PARSE, titration propka]",
         "pdb2pqr (nucleic, none)" => "[cache hit]")
     r = parse_report(report_with("timing_notes_own_line.txt"))
-    @test vals(r, [:compDwnld, :components, :pdb2pqr]) == ["2", "2.7e-03", "0.04"]
+    @test vals(r, [:componentDownloads, :components, :pdb2pqr]) == ["2", "2.7e-03", "0.04"]
     @test r[:sasa] == "0.10"
 end
 
@@ -293,7 +293,7 @@ end
 const LOG_LINES = ["datetime\t27-10-2026 14:09:33 -0400", "", "=== fit1 ===",
     "revision        \t2d144a8", "refChi2        \tCRYSOL 1.5",
     "structure       \tnucleic",
-    "pdb2pqrCache   \tmiss", "compDwnld\t2", "nAtoms         \t2592",
+    "pdb2pqrCache   \tmiss", "componentDownloads\t2", "nAtoms         \t2592",
     "chi2            \t0.874", "rhoE           \t0.3362", "deltaRho1     \t-1.079",
     "deltaRho3     \t-5.49", "zDeltaRho3   \t0.4", "c1              \t1.2483",
     "c1Sat          \t1", "divergenceRate \t0.002", "leapfrog        \t69910",

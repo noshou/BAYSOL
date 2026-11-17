@@ -29,6 +29,32 @@ const ellipsis = "…"
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" })
 
+const superscriptOf: Readonly<Record<string, string>> = {
+    "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶",
+    "7": "⁷", "8": "⁸", "9": "⁹", "-": "⁻", "+": "⁺",
+}
+
+/**
+ * DATA text with its caret exponents as real superscripts: `A^-1` is `Å⁻¹` (a bare `A`
+ * with a negative exponent is the ångström, as the Julia tables write it), `10^-3` is
+ * `10⁻³`, `m^2` is `m²`, `K^(-1)` is `K⁻¹`. An exponent is a caret and a whole number
+ * (signed, bare or in parentheses); a caret before anything else (`^x`, the control-key
+ * stand-in of a legend) is left as it is, so never call this on key labels.
+ *
+ * @param text - the text to show.
+ * @returns the text with every such exponent turned.
+ */
+export function superscripts(text: string): string {
+    if (!text.includes("^")) return text
+    return text
+        .replace(/(?<![\p{L}\d])A\^(?=-\d)/gu, "Å^")
+        .replace(
+            /\^(?:\(([-+]?\d+)\)|([-+]?\d+))/g,
+            (_, inParens?: string, bare?: string) =>
+                [...((inParens ?? bare) as string)].map((c) => superscriptOf[c]).join(""),
+        )
+}
+
 /** The cells a text takes. */
 export function displayWidth(text: string): number {
     return stringWidth(text)

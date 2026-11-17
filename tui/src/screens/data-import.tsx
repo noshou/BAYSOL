@@ -6,7 +6,7 @@
 
 import { basename } from "node:path"
 import { Box, Text } from "ink"
-import { type ReactNode, useCallback, useMemo, useState } from "react"
+import { type ReactNode, useCallback, useMemo, useRef, useState } from "react"
 import { numberText, parseNumber, shortNumber, truncate } from "../core/terminal.js"
 import {
     type DataMapping,
@@ -46,7 +46,7 @@ import {
     type TableRow,
 } from "../store/data-table.js"
 import type { ProjectRef } from "../store/projects.js"
-import { addReference, referenceUnits } from "../store/references.js"
+import { addReferenceAsync, referenceUnits } from "../store/references.js"
 import { Frame } from "../ui/frame.js"
 import {
     cursorMoves,
@@ -68,7 +68,7 @@ import {
     useListCursor,
     useNav,
 } from "../ui/interaction.js"
-import { type Column, DataTable, Panel, useTheme } from "../ui/theme.js"
+import { type Column, DataTable, ErrorText, Panel, useTheme } from "../ui/theme.js"
 
 /** A row of the options panel: a parse option or one of the three columns. */
 type Field = "separator" | "sheet" | "comments" | "skip" | "header" | Role
@@ -252,6 +252,7 @@ export function DataImportScreen(props: {
     )
     const [edit, setEdit] = useState<Field | undefined>()
     const { note, say, clear } = useNote()
+    const saving = useRef(false)
     const [promptKeys, setPromptKeys] = useState<LegendItem[]>([])
 
     const sheets = sheetNames(source)
@@ -341,9 +342,20 @@ export function DataImportScreen(props: {
             if (reference) {
                 const full = parseTable(source, options)
                 const data = extractCurve(full, resolveReferenceColumns(specs, full.names))
-                const name = addReference(project.dir, data, path)
-                onDone(data.q.length, data.dropped, name, warning)
-                nav.pop()
+                // the archive is written in the background; the screen waits for it
+                saving.current = true
+                say("adding the reference fit...")
+                void addReferenceAsync(project.dir, data, path).then(
+                    (name) => {
+                        saving.current = false
+                        onDone(data.q.length, data.dropped, name, warning)
+                        nav.pop()
+                    },
+                    (error) => {
+                        saving.current = false
+                        say(dataErrorNote(error), true)
+                    },
+                )
                 return
             }
             const current = readDataInfo(project.dir)
@@ -375,6 +387,7 @@ export function DataImportScreen(props: {
 
     // the form: move, change, edit, import, back (an error stays until the next key)
     useKeys((press: KeyInput) => {
+        if (saving.current) return // a reference fit is being added
         clear()
         // Shift+Tab is tested first: a plain `keys.tab` matches either press
         if (press.is(keys.up) || press.is(keys.shiftTab)) cursor.move(-1)
@@ -444,7 +457,7 @@ export function DataImportScreen(props: {
             return <Text color={theme.mt}>{NO_SIGMA}</Text>
         const found = resolveColumn(specs[f], table.names)
         if ("error" in found)
-            return <Text color={theme.er}>{problemText(specs[f], found.error)}</Text>
+            return <ErrorText>{problemText(specs[f], found.error)}</ErrorText>
         const name = table.names[found.column - 1] as string
         return (
             <>

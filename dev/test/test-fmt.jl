@@ -433,7 +433,7 @@ end
     dir = scratch_dir()
     write_file(joinpath(dir, "src", "good-name.jl"), "x = 1\n")
     write_file(joinpath(dir, "src", "badName.jl"), "x = 1\n")
-    write_file(joinpath(dir, "dev", "snake_case", "ok.py"), "x = 1\n")
+    write_file(joinpath(dir, "dev", "snake_case", "ok.jl"), "x = 1\n")
     write_file(joinpath(dir, "dev", "data.JSON"), "{}\n")   # not a code extension
     Common.ROOT_OVERRIDE[] = dir
     try
@@ -444,33 +444,6 @@ end
         @test occursin(joinpath("dev", "snake_case") * "/", text)
         @test !occursin("good-name", text) && !occursin("data.JSON", text)
     finally
-        Common.ROOT_OVERRIDE[] = nothing
-    end
-end
-
-@testset "format_py: ruff format and lint (--py)" begin
-    dir = scratch_dir()
-    write_file(joinpath(dir, "ruff.toml"), "line-length = 92\nindent-width = 4\n")
-    Common.ROOT_OVERRIDE[] = dir
-    old = get(ENV, "RUFF", nothing)
-    try
-        # no Python file: nothing to do, and no ruff needed
-        @test Fmt.format_py(false, [dir])
-        write_file(joinpath(dir, "a.py"), "x   =  1\n")
-        # a ruff that fails fails the step
-        ENV["RUFF"] = "false"
-        @test !Fmt.format_py(false, [dir])
-        delete!(ENV, "RUFF")
-        if Sys.which("ruff") !== nothing
-            before = read(joinpath(dir, "a.py"), String)
-            @test !Fmt.format_py(false, [dir])             # --check: misformatted
-            @test read(joinpath(dir, "a.py"), String) == before
-            @test Fmt.format_py(true, [dir])               # rewrites it
-            @test read(joinpath(dir, "a.py"), String) == "x = 1\n"
-            @test Fmt.format_py(false, [dir])
-        end
-    finally
-        old === nothing ? delete!(ENV, "RUFF") : (ENV["RUFF"] = old)
         Common.ROOT_OVERRIDE[] = nothing
     end
 end

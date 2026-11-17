@@ -33,6 +33,7 @@ export type SettingKind =
     | "bool"
     | "colour"
     | "font"
+    | "choice"
     | "set"
     | "tuple"
     | "optionalInt"
@@ -283,6 +284,34 @@ export function modelSheets(catalog: SettingsCatalog): SheetDef[] {
 }
 
 /**
+ * The settings that only mean something when a project has more than one model (the
+ * colours of the models in the comparison figure): the sheets show them only then. They
+ * stay in the catalog, in `settings.json` and in the checks.
+ */
+export const multiModelSettings: readonly string[] = ["PLOT_COMPARE_COLOURS"]
+
+/**
+ * The sheets as the settings of a project or of the program show them: without the
+ * [[multiModelSettings]] unless `several` (the project has more than one model), a group
+ * with none left dropped.
+ */
+export function visibleSheets(
+    sheets: readonly SheetDef[],
+    several: boolean,
+): readonly SheetDef[] {
+    if (several) return sheets
+    return sheets.map((sheet) => ({
+        ...sheet,
+        groups: sheet.groups
+            .map((g) => ({
+                ...g,
+                settings: g.settings.filter((d) => !multiModelSettings.includes(d.name)),
+            }))
+            .filter((g) => g.settings.length > 0),
+    }))
+}
+
+/**
  * The catalog of the bundled data (`assets/data/*.json`), made once. The data ships with
  * the program and the unit tests check that it is sound.
  *
@@ -376,10 +405,16 @@ export function settingNames(
 export type Checked = { ok: true; value: SettingValue } | { ok: false; error: string }
 
 /** The most characters (code points) a font name has, as on the Julia side. */
-const maxFontName = 100
+const MAX_FONT_NAME = 100
 
 /** The most characters (code points) a `path` setting has, as on the Julia side. */
-const maxPathText = 4096
+const MAX_PATH_TEXT = 4096
+
+/** The most characters the editor takes when a list setting is typed (not validation). */
+export const MAX_LIST_TYPING = 200
+
+/** The most characters the editor takes when a path is typed (not validation). */
+export const MAX_PATH_TYPING = 1000
 
 /** What is said of a value that is no path (the words of the Julia side). */
 const pathError = "must be a path (text without control characters, or empty)"
@@ -609,7 +644,7 @@ export function validateValue(def: SettingDef, raw: unknown): Checked {
             const ok =
                 typeof raw === "string" &&
                 raw.trim() !== "" &&
-                [...raw].length <= maxFontName &&
+                [...raw].length <= MAX_FONT_NAME &&
                 !controlCharacter.test(raw)
             return ok
                 ? { ok: true, value: raw }
@@ -618,10 +653,15 @@ export function validateValue(def: SettingDef, raw: unknown): Checked {
         case "path": {
             const ok =
                 typeof raw === "string" &&
-                [...raw].length <= maxPathText &&
+                [...raw].length <= MAX_PATH_TEXT &&
                 !controlCharacter.test(raw)
             if (!ok) return { ok: false, error: pathError }
             return { ok: true, value: raw.trim() }
+        }
+        case "choice": {
+            if (typeof raw === "string" && def.choices.includes(raw))
+                return { ok: true, value: raw }
+            return { ok: false, error: `must be one of ${def.choices.join(", ")}` }
         }
         case "set": {
             const names: unknown[] = Array.isArray(raw) ? raw : []

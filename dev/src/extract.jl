@@ -6,6 +6,7 @@
 module Extract
 
 using ..Common
+using ..Pmv: Pmv
 
 # --- the form-factor database
 
@@ -762,54 +763,11 @@ end
 
 end
 
-# --- the 3D-RISM partial molar volumes
-
-module Pmv
-
-using ...Common
-
-const WHO = "bysl extract pmv"
-
-const USAGE = """
-Estimates partial molar volumes by 3D-RISM with a Bayesian group correction.
-
-    bysl extract pmv SUBCOMMAND [args]
-
-Runs dev/pmv-rism/pmv.py with the Python of the AmberTools environment (\$AMBERHOME,
-default ~/.conda/envs/amber26: RDKit, antechamber, parmchk2, tleap, rism3d.snglpnt). The
-subcommands are pmv.py's: run NAME SMILES NCONF CHARGE, batch FILE [--tier T], fit,
-holdout, estimate NAME SMILES, row NAME SMILES COMMON IUPAC FORMULA CHARGE [--apply],
-diagnostics REPORT, status, selftest (the last three are cheap and need no RISM).
-`bysl extract pmv --help` lists them. A 3D-RISM job is long and takes every core: run
-one at a time, on a quiet machine. Nothing is written to the package tables unless
-`row --apply` is given.
-"""
-
-"The Python of the AmberTools environment (\$AMBERHOME or ~/.conda/envs/amber26)."
-function amber_python()::String
-    home = get(ENV, "AMBERHOME", joinpath(homedir(), ".conda", "envs", "amber26"))
-    py = joinpath(home, "bin", "python")
-    isfile(py) || throw(ToolError("no Python in $home (set AMBERHOME)", 1))
-    return py
-end
-
-"`bysl extract pmv ARGS`: passes the arguments to dev/pmv-rism/pmv.py."
-function run(argv::Vector{String})::Int
-    if isempty(argv) || any(a -> a in ("--help", "-h"), argv)
-        usage(USAGE)
-        return 0
-    end
-    script = in_root("dev", "pmv-rism", "pmv.py")
-    return run_cmd([amber_python(), script, argv]) ? 0 : 1
-end
-
-end
-
 const SUBS = [
     "formfactor" => (FormFactor, "rebuild the form-factor database from xraydb.sqlite"),
     "components" =>
         (Components, "regenerate the component table from the wwPDB dictionary"),
-    "pmv" => (Pmv, "partial molar volumes by 3D-RISM (dev/pmv-rism/pmv.py)"),
+    "pmv" => (Pmv, "partial molar volumes by 3D-RISM (dev/pmv-rism/README.md)"),
 ]
 
 const SUMMARY =

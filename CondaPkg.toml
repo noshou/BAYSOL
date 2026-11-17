@@ -2,8 +2,8 @@
 #
 # Conda environment for BAYSOL, managed by CondaPkg.jl. This exists solely to
 # auto-provision an isolated Python + `propka`/`pdb2pqr` install for
-# `src/molecular-structure/Propka.jl` (per-residue pKa prediction via the
-# `propka3` CLI) and `src/molecular-structure/Pdb2pqr.jl` (hydrogen addition
+# `src/hydrogenator/propka.jl` (per-residue pKa prediction via the
+# `propka3` CLI) and `src/hydrogenator/pdb2pqr.jl` (hydrogen addition
 # via the `pdb2pqr` CLI) without requiring users to have Python installed
 # themselves; CondaPkg vendors its own micromamba/pixi backend.
 

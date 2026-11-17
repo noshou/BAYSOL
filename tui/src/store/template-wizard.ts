@@ -10,7 +10,7 @@
 // can start from a definition (the edit of a template: every prompt is prefilled) or from
 // the first point of a table (the conversion of the rows of a buffer).
 
-import { fold, formatNumber } from "../core/terminal.js"
+import { fold, formatNumber, type Parsed, parseNumber } from "../core/terminal.js"
 import {
     type CustomSnapshot,
     DEFAULT_RELATIVE_SIGMA,
@@ -65,29 +65,25 @@ const TRY_PH = 7
 /** The temperature it is tried at, °C. */
 const TRY_TEMPERATURE = 25
 
-/** What a parse gives. */
-type Parse<T> = { value: T } | { error: string }
-
-/** A finite number from text, within limits. */
+/** A finite number from text, within limits; the wording is the wizard's own. */
 function number(
     text: string,
     what: string,
     min = Number.NEGATIVE_INFINITY,
     max = Number.POSITIVE_INFINITY,
-): Parse<number> {
-    const t = text.trim()
-    const x = t === "" ? Number.NaN : Number(t)
-    if (!Number.isFinite(x)) return { error: `${what}: type a number` }
-    if (x < min || x > max) {
+): Parsed<number> {
+    const n = parseNumber(text)
+    if ("error" in n) return { error: `${what}: type a number` }
+    if (n.value < min || n.value > max) {
         const open = max === Number.POSITIVE_INFINITY
         const range = open ? `${min} or more` : `${min} to ${max}`
         return { error: `${what}: ${range}` }
     }
-    return { value: x }
+    return n
 }
 
 /** A whole number from text, within limits. */
-function whole(text: string, what: string, min: number, max: number): Parse<number> {
+function whole(text: string, what: string, min: number, max: number): Parsed<number> {
     const n = number(text, what, min, max)
     return "value" in n && !Number.isInteger(n.value)
         ? { error: `${what}: a whole number` }
@@ -98,7 +94,7 @@ function whole(text: string, what: string, min: number, max: number): Parse<numb
 function* promptFor<T>(
     label: string,
     initial: string,
-    parse: (text: string) => Parse<T>,
+    parse: (text: string) => Parsed<T>,
 ): Generator<WizardStep, T, Answer> {
     let problem: string | undefined
     for (;;) {
@@ -159,7 +155,7 @@ type Pool = Map<string, Resolved>
  * @param pool - the custom solutes the wizard knows.
  * @returns the bundled solute of that name, else the custom solute, else an error.
  */
-function resolveSolute(text: string, pool: Pool): Parse<Resolved> {
+function resolveSolute(text: string, pool: Pool): Parsed<Resolved> {
     const typed = text.trim()
     const found = resolveBuiltin(typed)
     if (found) return { value: { name: found.name, arg: found.name } }
@@ -313,7 +309,7 @@ export type PointRow = Resolved & { mM: number; sigmaMM: number }
 export type TableSeed = { pH: number; rows: PointRow[] }
 
 /** The amounts `MM σ` of a table row: the two numbers, in mM. */
-function amounts(text: string): Parse<{ mM: number; sigmaMM: number }> {
+function amounts(text: string): Parsed<{ mM: number; sigmaMM: number }> {
     const words = text.trim().split(/\s+/)
     if (words.length !== 2) return { error: "type: amount [mM], uncertainty [mM]" }
     const sigma = number(words[1] as string, "uncertainty", 0)
@@ -324,7 +320,7 @@ function amounts(text: string): Parse<{ mM: number; sigmaMM: number }> {
 }
 
 /** The text `SOLUTE mM σ` of a table row: the last two words are the numbers. */
-function tableRow(text: string, pool: Pool): Parse<PointRow> {
+function tableRow(text: string, pool: Pool): Parsed<PointRow> {
     const words = text.trim().split(/\s+/)
     if (words.length < 3) return { error: "type: solute, amount [mM], uncertainty [mM]" }
     const numbers = amounts(words.splice(-2).join(" "))

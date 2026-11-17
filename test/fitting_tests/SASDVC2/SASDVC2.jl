@@ -56,8 +56,9 @@ const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDVC2_3ODQ.pdb")
 # Curve: the SASBDB .dat is in nm⁻¹ (angular_unit "1/nm"; 0.083-3.997 nm⁻¹, 681 points,
 # intensity in 1/cm), converted to Å⁻¹ (÷10). The curve is signal only to q ≈ 0.12 Å⁻¹
 # (mean I/σ about 36 below 0.1 Å⁻¹, 5 in 0.1-0.15, about 0 above 0.15; 256 of the 681
-# points are ≤ 0). The fit is cut at `Q_MAX_FIT` = 0.15 Å⁻¹ (an assumption of this
-# script, not of SASBDB) and `seedModel` drops the non-positive bins.
+# points are ≤ 0). The fit is NOT cut (`Q_MAX_FIT` = Inf since 2026-11-16, it was 0.15 Å⁻¹;
+# an assumption of this script, not of SASBDB) and `seedModel` drops the
+# non-positive bins.
 # SASBDB: Guinier Rg 2.41 ± 0.03 nm, P(r) Rg 2.358 nm, Dmax 6.5 nm, Porod MW 21 kDa
 # (below the tetramer's 64.5 kDa: the Porod value of a noisy curve is not trusted),
 # experimental MW 60.3 kDa.
@@ -132,10 +133,11 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# q cut, kept (flat noise floor; rule in README.md): 0.15 Å⁻¹. The data run to 0.400 Å⁻¹,
+# No q cut (owner, 2026-11-16; it was 0.15 Å⁻¹): the whole curve is fitted. The
+# data run to 0.400 Å⁻¹,
 # but the 434 points above 0.15 Å⁻¹ (σ > 0) have a median I/σ of -0.20 and 56 % of them
 # have I ≤ 0; the lowest-q quarter of them (up to 0.21 Å⁻¹) has a median I/σ of -0.07.
-const Q_MAX_FIT = 0.15
+const Q_MAX_FIT = Inf
 
 # The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
 # the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
@@ -177,7 +179,11 @@ function runSasdvc2(;
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seedSasdvc2(; seed)
-    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    # the default rerun (2000 + 2000) left the chains in different places (R̂ above 1.5),
+    # so this entry reruns with a longer warm-up, more draws and chains started closer to
+    # the optimum
+    res = BAYSOL.runModel(s, nSamples, nAdapt; retryNAdapt = 6000, retryNDraws = 8000,
+        chainStartRadii = (2.0, 4.0, 6.0))
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 

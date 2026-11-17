@@ -52,22 +52,23 @@ RNG seed (SASDMZ9 model 3 at 1e-5: 13 to 820 steps per iteration over four seeds
 const EXCL_VOL_CORR_TOL = 1e-8
 
 """
-The rank-normalized split R̂ below which the pooled
-chains are reported as converged (Stan's recommendation).
+The rank-normalized split R̂ strictly below which the pooled
+chains are reported as converged (Stan's recommendation; owner, 2026-11-16: every gate is
+strict, a value equal to the limit fails).
 """
 const RHAT_OK = 1.01
 
 """
-The smallest bulk and tail effective sample size a run may have to count as converged:
-400 (Vehtari et al. 2021, the companion of the R̂ limit). Below it, or when an ESS cannot
-be computed, the run is retried and, if it is still below, [`NotConvergedError`](@ref) is
-thrown.
+The bulk and tail effective sample size must be strictly above this to
+count as converged: 400 (Vehtari et al. 2021, the companion of the R̂
+limit). At or below it, or when an ESS cannot be computed, the run is
+retried and, if it is still below, [`NotConvergedError`](@ref) is thrown.
 """
 const ESS_MIN = 400.0
 
 """
 Default `retry` of [`infer`](@ref) and [`runModel`](@ref BAYSOL.Pipeline.runModel):
-whether a run whose worst R̂ is above [`RHAT_OK`](@ref) is sampled once more, longer
+whether a run whose worst R̂ is not below [`RHAT_OK`](@ref) is sampled once more, longer
 ([`RETRY_N_ADAPT`](@ref), [`RETRY_N_DRAWS`](@ref)).
 """
 const RETRY = true
@@ -151,6 +152,15 @@ A chain is not pooled when more than this fraction
 of its post-warm-up transitions diverged.
 """
 const CHAIN_MAX_DIVERGENT = 0.5
+
+"""
+A run is failed when this fraction or more of its pooled post-warm-up transitions
+diverged (owner, 2026-11-16: the rate must stay strictly below 0.1 %), whatever its R̂
+and ESS: a step that cannot follow the curvature may leave regions of the posterior
+unsampled. It is checked by [`runModel`](@ref BAYSOL.Pipeline.runModel) together with
+the convergence gate, and a run at or above it throws [`NotConvergedError`](@ref).
+"""
+const MAX_DIVERGENT_RATE = 0.001
 
 """
 Offset that derives the rerun's `rngSeed` from the original one

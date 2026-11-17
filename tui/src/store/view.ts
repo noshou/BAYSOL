@@ -12,7 +12,7 @@ import { stripVTControlCharacters } from "node:util"
 import * as XLSX from "xlsx"
 import { readAssetJson } from "../core/environment.js"
 import { readBounded } from "../core/file-system.js"
-import { displayWidth } from "../core/terminal.js"
+import { displayWidth, superscripts } from "../core/terminal.js"
 import { scrollTo } from "../ui/interaction.js"
 
 // ========================================================================================
@@ -90,11 +90,14 @@ type RawCell = { t?: string; v?: unknown; w?: string; f?: string }
 /**
  * A cell's text as it is shown: the formatted text SheetJS made, else the value.
  * Control characters (tab, newline, escape, ...) become one space, so a cell is a clean
- * line that cannot move the cursor of the terminal or break a TSV row.
+ * line that cannot move the cursor of the terminal or break a TSV row. A caret exponent
+ * (`A^-1`) is shown as a superscript (`Å⁻¹` style: `A⁻¹`, see [[superscripts]]).
  */
 export function cellDisplay(cell: RawCell): string {
-    return cleanText(
-        cell.w ?? (cell.v === undefined || cell.v === null ? "" : String(cell.v)),
+    return superscripts(
+        cleanText(
+            cell.w ?? (cell.v === undefined || cell.v === null ? "" : String(cell.v)),
+        ),
     )
 }
 
@@ -314,14 +317,23 @@ export function stripAnsi(text: string): string {
 /** The top-left corners of a box (UnicodePlots' `:corners` and the rounded ones). */
 const boxTop = /[┌╭┏╔]/
 
+/** The words a tab prints for a plot's name; the name itself (the figure's key) stays. */
+const SHOWN_NAMES: Readonly<Record<string, string>> = { bkgrndCorr: "bkgrnd corr" }
+
+/** What a tab prints for a plot name (see [[SHOWN_NAMES]]). */
+const shownName = (name: string): string => SHOWN_NAMES[name] ?? name
+
 /**
  * The tab name of a title line. UnicodePlots pads a title with the blank braille
  * character (U+2800, which `trim` keeps) and BAYSOL writes `fit   chi2 = 0.4` or
- * `rho   (MAP 0.33)`: the name is what comes before the first run of three spaces.
+ * `rho   (MAP 0.33)`: the name is what comes before the first run of three spaces,
+ * without the `(n off the plot)` note UnicodePlots appends.
  */
 function tabName(line: string): string {
     const clean = line.replace(/[\u2800\s]+/g, (run) => (run.length >= 3 ? "   " : " "))
-    return (clean.trim().split("   ")[0] ?? "").trim()
+    const name = (clean.trim().split("   ")[0] ?? "").trim()
+    // UnicodePlots adds `(2 off the plot)` to a title whose points fall outside the axis
+    return shownName(name.replace(/\s*\(\d+ off the plot\)$/, ""))
 }
 
 /**
@@ -557,8 +569,9 @@ export const matchIndex = (matches: readonly CellAt[], row: number, column: numb
 }
 
 /**
- * Reads what `j` takes: a cell (`B7`), a row (`7`) or a column (`B`). A part left out
- * keeps the cursor's. A place outside the sheet is refused, not clamped: the user typed it.
+ * Reads what go to (`shift+j`) takes: a cell (`B7`), a row (`7`) or a column (`B`). A part
+ * left out keeps the cursor's. A place outside the sheet is refused, not clamped: the
+ * user typed it.
  *
  * @param text - what was typed.
  * @param at - the cursor.

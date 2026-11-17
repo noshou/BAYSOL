@@ -15,6 +15,7 @@ import { LOGS_FLOW } from "../core/environment.js"
 import { clampIndex, displayWidth, padWidth, truncate } from "../core/terminal.js"
 import { runBrief, runDisplay } from "../store/run-stamp.js"
 import {
+    boxesFit,
     type Design,
     Legend,
     type LegendItem,
@@ -25,17 +26,19 @@ import {
 } from "./grid.js"
 import { Prompt } from "./input.js"
 import { keys, useBodyColumns, useKeys } from "./interaction.js"
-import { Bar, type LineStyle, Panel, Rule, useTheme } from "./theme.js"
+import {
+    Bar,
+    ErrorText,
+    errorStyle,
+    type LineStyle,
+    Panel,
+    Rule,
+    useTheme,
+} from "./theme.js"
 
 // ========================================================================================
 // 1. `Frame`: title, body, legend and the theme line of a screen
 // ========================================================================================
-
-/**
- * The corner text of the logs and `open runs` pages: the muted line at the top right of the
- * title row, `project: <project name> · run: <run name>` (the run list, which has no run
- * chosen yet, shows only the project). Pure, so the rule is tested; `Frame` draws it.
- */
 
 /** The cells kept between the title (with its subtitle) and the corner. */
 const GAP = 2
@@ -55,9 +58,9 @@ export function cornerLabel(project: string, run?: string): string {
 }
 
 /**
- * The corner texts of a page, longest first (`fitCorner` takes the first that fits whole):
- * the full form of [[cornerLabel]], then the run as `runBrief` (`15:00:00 2026-11-09`),
- * then without the word `project`, then the run alone.
+ * The corner texts of a page, longest first (`fitCorner` takes the first that fits): the
+ * full [[cornerLabel]], then the run as `runBrief` (`15:00:00 2026-11-09`), then without
+ * the word `project`, then the run alone.
  *
  * @param project - the project's name.
  * @param run - the run's name, `undefined` on the run list.
@@ -77,8 +80,7 @@ export function cornerLabels(project: string, run?: string): string[] {
 
 /**
  * The corner as far as it fits: the first form that fits whole, else the last one cut
- * with an ellipsis before it can push the title, and left out altogether when what is
- * left is less than `corner.minCells` (a few cells of `pro…` say nothing).
+ * with an ellipsis, and none when less than `corner.minCells` is left.
  *
  * @param label - the corner text, or its forms from the longest.
  * @param columns - the width of the title row.
@@ -116,15 +118,32 @@ const FOOTER_GAP = 2
 const COUNTER_CELLS = 4
 
 /**
- * How the keys of a footer are drawn: the smooth footer puts each key in a rounded box (and
- * falls back to columns when the boxes do not fit one row), the blocky one keeps its
- * columns inside the double-line box.
+ * How the keys of a footer are drawn: the smooth footer puts each in a rounded box (columns
+ * when they do not fit one row), the blocky one keeps columns inside its double-line box.
  *
  * @param design - which footer.
  * @returns the legend style.
  */
 export const legendStyle = (design: Design): LegendStyle =>
     design === "smooth" ? "boxes" : "columns"
+
+/**
+ * The style a screen's footer keeps in every state: boxes only when the screen's fullest
+ * legend fits one row, else columns, so a legend with a key less does not switch style.
+ *
+ * @param design - which footer.
+ * @param full - the fullest legend of the screen, if it declares one.
+ * @param room - the cells the keys may take ([[legendRoom]]).
+ * @returns the legend style.
+ */
+export function footerLegendStyle(
+    design: Design,
+    full: readonly LegendItem[] | undefined,
+    room: number,
+): LegendStyle {
+    const style = legendStyle(design)
+    return style === "boxes" && full && !boxesFit(full, room) ? "columns" : style
+}
 
 /**
  * The cells the keys of the footer may take.
@@ -141,8 +160,7 @@ export function legendRoom(design: Design, columns: number, counter?: string): n
 }
 
 /**
- * The lines the keys of a footer take for a legend: the same count the frame reserves, so
- * a screen can take them off the rows of its body.
+ * The lines the keys of a footer take (the count the frame reserves, for the body's rows).
  *
  * @param items - the legend.
  * @param design - which footer.
@@ -160,8 +178,8 @@ function footerLegendLines(
 }
 
 /**
- * The rows a footer's keys take beyond the lines its screen's own row count allows for: the
- * one rule behind every screen that gives its body's page size up for a taller footer.
+ * The rows a footer's keys take beyond the lines the screen's row count allows for (the
+ * rule behind every screen that gives up body rows for a taller footer).
  *
  * @param items - the legend (the fullest, or the one shown).
  * @param columns - the width of the body (`useBodyColumns`).
@@ -185,24 +203,19 @@ export function footerExtraLines(
  * @property title - the name of the screen, e.g. `"sampler settings"`.
  * @property subtitle - what it is about, e.g. the project's name.
  * @property legend - the keys that work now.
- * @property legendFull - the fullest legend this screen can show (every key that can
- *     ever work on it). The footer reserves the height of that legend, so a key appearing
- *     or disappearing while the user works never moves the logo or the body: the
- *     footer's height depends on the screen and the terminal width only. Without it the
- *     footer takes the height of the legend shown now.
- * @property design - `"blocky"` for the table-style screens (tables, forms, settings
- *     sheets, logs): the blocky logo, the keys and the counter in one double-line box;
- *     `"smooth"` (default): the rounded logo, the keys loose. Its footer is taller by the
- *     box's two rows, which [[footerExtraLines]] reserves.
+ * @property legendFull - the fullest legend this screen can show. The footer reserves its
+ *     height, so a key appearing or disappearing never moves the logo or the body; without
+ *     it the footer takes the height of the legend shown now.
+ * @property design - `"blocky"` for the table-style screens: the blocky logo, keys and
+ *     counter in one double-line box (two rows taller, [[footerExtraLines]]); `"smooth"`
+ *     (default): the rounded logo, the keys loose.
  * @property counter - a short text in a box at the bottom right, such as
  *     `"sampler [1 / 6]"` or `"solutes [3 / 12]"`.
  * @property note - one line above the keys: a question (`discard 3 changes?`), an
  *     error, or a hint. It is cut to the width of the terminal.
  * @property noteIsError - draw the note in the error colour.
  * @property corner - a muted text at the top right of the title row (the logs and
- *     `open runs` pages show `project: <name> · run: <name>` there). It is cut with an
- *     ellipsis before it can push the title, and left out when too little room is left
- *     (`fitCorner`).
+ *     `open runs` pages show `project: <name> · run: <name>`), fitted by `fitCorner`.
  */
 type FrameProps = {
     title:        string
@@ -218,10 +231,9 @@ type FrameProps = {
 }
 
 /**
- * The common shape of every screen below the menus: a title, a body that takes the
- * rest of the terminal, and at the bottom the small BAYSOL logo, the keys that work, an
- * optional note and an optional counter. It reads the size of the terminal and keeps
- * no fixed size of its own.
+ * The common shape of every screen below the menus: a title, a body that takes the rest
+ * of the terminal, and at the bottom the small logo, the keys that work, an optional note
+ * and counter. It keeps no fixed size of its own.
  *
  * @param props - see [[FrameProps]].
  * @returns the screen.
@@ -245,12 +257,11 @@ export function Frame(props: FrameProps): ReactNode {
     const cornerShown =
         corner === undefined ? undefined : fitCorner(corner, columns, title, subtitle)
 
-    // the note has a row of its own whether there is one or not, so a note appearing
-    // never makes the footer taller (which would push the body, and the logo, up a row)
+    // the note has a row of its own, so a note appearing never makes the footer taller
     const noteLine = (
         <Box height={1} flexShrink={0}>
             {note ? (
-                <Text color={noteIsError ? theme.er : theme.fg}>
+                <Text {...(noteIsError ? errorStyle(theme) : { color: theme.fg })}>
                     {truncate(note, legendRoom(design, columns, counter))}
                 </Text>
             ) : null}
@@ -272,11 +283,11 @@ export function Frame(props: FrameProps): ReactNode {
         </Panel>
     ) : null
 
-    // the keys' column is as tall as the fullest legend of the screen (or the one shown,
-    // if that is taller) plus the note, with the note and the keys at the bottom beside
-    // the logo: a legend that shrinks leaves blank rows above the note, never a moved logo
+    // the keys' column is as tall as the fullest legend (or the one shown, if taller) plus
+    // the note, bottom-aligned: a shrinking legend leaves blank rows, never a moved logo
     const room = legendRoom(design, columns, counter)
-    const style = legendStyle(design)
+    // one style for every state: boxes only when even the fullest legend fits one row
+    const style = footerLegendStyle(design, legendFull, room)
     const keyLines = Math.max(
         legendHeight(legend, room, style),
         legendFull ? legendHeight(legendFull, room, style) : 0,
@@ -309,7 +320,9 @@ export function Frame(props: FrameProps): ReactNode {
                 {logoBox}
                 <Box {...keysColumn}>
                     {noteLine}
-                    <Legend items={legend} room={room} style={style} />
+                    <Box alignSelf="center">
+                        <Legend items={legend} room={room} style={style} />
+                    </Box>
                 </Box>
                 {counterBox}
             </Footer>
@@ -334,9 +347,8 @@ function Footer(props: { boxed: boolean; children: ReactNode }): ReactNode {
 // 2. Layout
 // ========================================================================================
 
-// The pure parts of a form page (`FieldForm`, `useFormScreen`, below): how wide
-// the columns of its cells are on a terminal of some width, and where the cursor goes
-// for an arrow key. A form is a few rows of cells; a row has one cell (a plain field) or
+// The pure parts of a form page (`FieldForm`, `useFormScreen`): the widths of its columns
+// and where the cursor goes for an arrow key. A row has one cell (a plain field) or
 // several (a small table, like the units of a polymer). The cursor is a cell.
 
 /** The narrowest a column of cells is squeezed to when the terminal is narrow. */
@@ -347,9 +359,8 @@ const MIN_CELL = 3
  *
  * @property row - the row.
  * @property col - the column of the cell, one of the valid columns of the row.
- * @property want - the column the user last asked for with left and right, kept while
- *     the cursor moves up and down so that a row with fewer cells does not make it
- *     forget the column (it goes to the nearest valid one of each row).
+ * @property want - the column last asked for with left and right, kept while the cursor
+ *     moves up and down so a row with fewer cells does not make it forget the column.
  */
 export interface CellPos {
     row: number
@@ -374,9 +385,8 @@ export function placeAt(row: number, col: number): CellPos {
  * @param natural - the width each column would like (its longest text).
  * @param room - the cells the columns may use together.
  * @param floor - the width below which no column is squeezed, [[MIN_CELL]] by default.
- * @returns one width per column: the natural ones if they fit, else the widest column
- *     loses a cell at a time (the first of equal ones) until they fit or all are at the
- *     floor.
+ * @returns one width per column: the natural ones if they fit, else the widest loses a
+ *     cell at a time (the first of equal ones) until they fit or all are at the floor.
  */
 function fitWidths(
     natural: readonly number[],
@@ -395,8 +405,8 @@ function fitWidths(
 
 /**
  * The cursor after an arrow key. Up and down go to the row above or below, to its valid
- * column nearest to the one asked for; left and right go to the previous and next valid
- * column of the row, and become the column asked for. Nothing wraps.
+ * column nearest the one asked for; left and right go to the previous or next valid
+ * column, which becomes the one asked for. Nothing wraps.
  *
  * @param valid - for each row, the columns that have a cell, ascending, none empty.
  * @param pos - where the cursor is.
@@ -449,14 +459,13 @@ export type FormCell = {
 }
 
 /**
- * One row of a [[FieldForm]]: a label and one or more cells, a column of a cell being
- * its place in the array (`undefined` leaves a column of the row empty).
+ * One row of a [[FieldForm]]: a label and cells, a cell's column being its place in the
+ * array (`undefined` leaves a column empty).
  *
  * @property label - what the row is, drawn muted before the cells.
  * @property cells - the cells, one per column.
- * @property heading - titles for the columns of a small table: this row starts the
- *     table, and it and the rows after it are drawn as a grid (the titles, a rule, the
- *     rows, `│` between the columns, all lines in the border colour).
+ * @property heading - titles for the columns of a small table: this row starts it, and
+ *     it and the rows after it are drawn as a grid in the border colour.
  */
 export type FormRow = {
     label:     string
@@ -542,10 +551,7 @@ function inColumn(text: string, c: number, m: Metrics): string {
     return padWidth(truncate(text, m.widths[c] as number), m.widths[c] as number)
 }
 
-/**
- * One row of the form: the cursor mark and the label, the cells (the one under the
- * cursor inverted) and the message of the row, if it has one.
- */
+/** One row of the form: cursor mark, label, cells (the cursor's inverted), row message. */
 function RowLine(props: {
     row:      FormRow
     on:       boolean
@@ -591,17 +597,17 @@ function RowLine(props: {
                     </Text>
                 )
             })}
-            {message ? <Text color={theme.er}>{`${gap}${message}`}</Text> : null}
+            {message ? `${gap}` : null}
+            <ErrorText>{message}</ErrorText>
         </Text>
     )
 }
 
 /**
- * A form page body: rows of a label and cells (one cell is a field, several are a small
- * table), the cursor on one cell drawn inverted, a message at the end of a row that has
- * a problem, and, while a cell is being edited, a prompt under the rows. It only draws;
- * the keys are those of `useFormScreen`. Columns are as wide as their longest text and
- * are squeezed, then truncated with `…`, when the terminal is narrow.
+ * A form page body: rows of a label and cells, the cursor's cell inverted, a message at
+ * the end of a row with a problem and, while a cell is edited, a prompt under the rows. It
+ * only draws; the keys are those of `useFormScreen`. Columns are as wide as their longest
+ * text, squeezed and then truncated with `…` on a narrow terminal.
  *
  * @param props - see [[FieldFormProps]].
  * @returns the form.
@@ -682,9 +688,8 @@ export function FieldForm(props: FieldFormProps): ReactNode {
 // ========================================================================================
 
 /**
- * What a form screen knows about its own cells; the hook asks for it when a key needs
- * it. Every function sees the current state of the screen (a new spec is made on every
- * render), so none of them keeps anything.
+ * What a form screen knows about its own cells; the hook asks when a key needs it. A new
+ * spec is made on every render, so none of the functions keeps anything.
  *
  * @property valid - for each row of the form, the columns that have a cell.
  * @property editLabel - the label of the prompt for a cell, e.g. `"name:"`.
@@ -695,8 +700,8 @@ export function FieldForm(props: FieldFormProps): ReactNode {
  * @property restore - puts a cell back to what it was when the form opened.
  * @property check - the first thing wrong with the form: where and what; `undefined`
  *     when it can be accepted.
- * @property canRestore - whether `^u` has anything to put back on a cell (the cell differs
- *     from what it was when the form opened); `true` for every cell when left out.
+ * @property canRestore - whether `^u` has anything to put back on a cell; `true` for
+ *     every cell when left out.
  * @property accept - the form is complete: hand it back and leave.
  * @property cancel - leave and change nothing.
  */
@@ -719,7 +724,7 @@ export type FormScreenSpec = {
  * @property edit - the prompt, while a cell is being typed into (for `FieldForm`).
  * @property problem - the row to flag after `^w` found a problem (for `FieldForm`).
  * @property note - the line for the `Frame`: what `^w` found, or what taking a cell said.
- * @property noteIsError - draw the note in the error colour (always true now).
+ * @property noteIsError - draw the note in the error colour (always true).
  * @property moves - which arrows move the cursor from `pos` (a neighbouring cell exists
  *     in that direction), for the legend.
  * @property canRestore - `^u` has something to put back on the cell under the cursor.
@@ -737,13 +742,11 @@ export type FormScreen = {
 }
 
 /**
- * The keys and state every form page has: up, down, left and right move the cursor over
- * the cells, Enter opens a prompt on the cell and takes what is typed (a mistake keeps it
- * open with a message), `^u` restores the cell, `^w` accepts the form only if
- * `spec.check` finds nothing (else the problem is the note, flagged on its row, and the
- * cursor goes there) and Esc or Ctrl-X cancel. While the prompt is open it takes the
- * keys, Esc closing just the prompt. The form page decides what the cells mean (the
- * spec) and draws them (`FieldForm`, `Frame`).
+ * The keys and state every form page has: the arrows move the cursor over the cells,
+ * Enter opens a prompt on the cell (a mistake keeps it open with a message), `^u`
+ * restores the cell, `^w` accepts the form only if `spec.check` finds nothing (else the
+ * problem is the note, flagged on its row, and the cursor goes there), Esc or Ctrl-X
+ * cancel. While the prompt is open it takes the keys, Esc closing just the prompt.
  *
  * @param spec - what the screen knows about its cells.
  * @returns what to draw.

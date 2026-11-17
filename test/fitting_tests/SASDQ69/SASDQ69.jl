@@ -132,7 +132,9 @@ function runSasdq69(
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seedSasdq69(run; seed)
-    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    # δ = 99: at the default 95 this entry diverged in 0.11 % of the transitions, above the
+    # 0.1 % limit (2026-11-16; see "When a run fails" in src/inference/README.md).
+    res = BAYSOL.runModel(s, nSamples, nAdapt; δ = 99)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 

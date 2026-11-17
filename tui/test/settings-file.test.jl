@@ -86,7 +86,7 @@ end
     defaults = defaultSettings()
     @test defaults isa Dict{Symbol,Any}
     @test Set(keys(defaults)) == Set(_settingNames())
-    @test length(defaults) == 96
+    @test length(defaults) == 99
     for n in _settingNames()
         @test defaults[n] == _settingDefault(n)
     end
@@ -349,7 +349,7 @@ const JUNK = ["null", "true", "false", "0", "1", "-1", "2.5", "1e999", "\"\"", "
     P = BAYSOL.Pipeline
     R = BAYSOLRun
     names = _settingNames()
-    @test length(names) == 96
+    @test length(names) == 99
     allLimits = _mergedTable(:SETTING_LIMITS)      # built once, not for every junk value
     allChoices = _mergedTable(:SETTING_CHOICES)
     for n in names
@@ -460,7 +460,7 @@ end
         @test (r isa Dict{Symbol,Any}) || (r isa InvalidSettingsError)
         if r isa Dict
             accepted += 1
-            @test length(r) == 96
+            @test length(r) == 99
             @test r[:N_ADAPT] isa Int && r[:N_ADAPT] >= 1
             @test r[:RNG_SEED] isa Int
             @test r[:FIGURES_TEX] isa Bool

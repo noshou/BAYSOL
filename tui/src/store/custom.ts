@@ -23,7 +23,7 @@
 //   3. The typed fields and what a cell shows
 //   4. The custom solutes file
 
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import { isDict, type ReadOptions } from "../core/file-system.js"
 import {
     fold,
@@ -34,7 +34,15 @@ import {
     parseNumber,
 } from "../core/terminal.js"
 import { type CustomNonbioRow, isNumber, type RowBase } from "./buffer.js"
-import { type Drafts, ListFile } from "./lists.js"
+import {
+    checkPath,
+    type Drafts,
+    ListFile,
+    parseFile,
+    parseText,
+    type SequenceKind,
+    type SequenceRecords,
+} from "./lists.js"
 import {
     blankPolymer,
     blankUnit,
@@ -81,8 +89,31 @@ export interface NonbioEntry {
     sigma: number | null
 }
 
+/**
+ * A custom protein, DNA or RNA: a named sequence, as the buffer's `^f` and `^e` take it
+ * (Julia works Z and PMV out of the sequence, so there are no numbers to type).
+ *
+ * @property sequence - the clean sequence.
+ * @property source - the file it came from (no folder) or `text`; provenance only.
+ * @property record - the id of the record; provenance only.
+ */
+export interface SequenceEntry {
+    kind: SequenceKind
+    name: string
+    sequence: string
+    source?: string
+    record?: string
+}
+
+/** The kinds of [[SequenceEntry]]. */
+const SEQUENCE_ENTRY_KINDS: ReadonlySet<string> = new Set(["dna", "rna", "protein"])
+
+/** Whether an entry is a [[SequenceEntry]]. */
+export const isSequenceEntry = (e: CustomEntry): e is SequenceEntry =>
+    SEQUENCE_ENTRY_KINDS.has(e.kind)
+
 /** An entry of `custom-solutes.json`, told apart by `kind`. */
-export type CustomEntry = NonbioEntry | PolymerEntry
+export type CustomEntry = NonbioEntry | PolymerEntry | SequenceEntry
 
 /** The kinds of custom entry. */
 export type CustomKind = CustomEntry["kind"]
@@ -199,6 +230,58 @@ export function removeUnit(state: CustomState, i: number, j: number): CustomStat
     return state.set(i, { ...e, units: e.units.filter((_, k) => k !== j) })
 }
 
+// --- sequence entries from what the buffer's `^f` and `^e` take
+
+/** The `source` of entries made from typed or pasted text (a file's carry its name). */
+const PASTED_SOURCE = "text"
+
+/**
+ * The entries of a typed path or sequence, or of a paste waiting, as the buffer's add flow
+ * takes them: text that names a path (a separator, a dot, `~` or a drive colon) is a file,
+ * anything else is sequence text. Each record is an entry named by its id; a name that is
+ * `taken` (or repeats in the file) gets `-2`, `-3`, ... after it.
+ *
+ * @param text - what is typed (blank takes `pasted`).
+ * @param kind - `protein`, `dna` or `rna`.
+ * @param pasted - the records of a paste, if one waits.
+ * @param taken - says whether a name is in use or built-in.
+ * @returns the entries, or the reason there are none (22 characters at most for a path).
+ */
+export function sequenceEntries(
+    text: string,
+    kind: SequenceKind,
+    pasted: SequenceRecords | undefined,
+    taken: (name: string) => boolean,
+): { entries: SequenceEntry[] } | { error: string } {
+    const typed = text.trim()
+    let records: SequenceRecords
+    let source = PASTED_SOURCE
+    if (typed === "") {
+        if (!pasted) return { error: "type a path or a sequence first!" }
+        records = pasted
+    } else if (!/[/\\.~:]/.test(typed)) {
+        const parsed = parseText(typed, kind)
+        if ("error" in parsed) return parsed
+        records = parsed.records
+    } else {
+        const problem = checkPath(typed, 22)
+        if (problem) return { error: problem }
+        const parsed = parseFile(typed, kind)
+        if ("error" in parsed) return parsed
+        records = parsed.records
+        source = basename(typed)
+    }
+    const used = new Set<string>()
+    const free = (name: string): boolean => !taken(name) && !used.has(fold(name))
+    const entries = records.map((r): SequenceEntry => {
+        let name = r.id
+        for (let n = 2; !free(name); n++) name = `${r.id}-${n}`
+        used.add(fold(name))
+        return { kind, name, sequence: r.letters, source, record: r.id }
+    })
+    return { entries }
+}
+
 // ========================================================================================
 // 2. The checks and the snapshot
 // ========================================================================================
@@ -220,6 +303,10 @@ export function removeUnit(state: CustomState, i: number, j: number): CustomStat
 export function fieldProblem(e: CustomEntry): FieldProblem | undefined {
     if (e.name.trim() === "") return { field: "name", message: "name needed" }
     if (e.kind === "polymer") return polymerProblem(e)
+    if (isSequenceEntry(e))
+        return e.sequence.trim() === ""
+            ? { field: "name", message: "sequence needed" }
+            : undefined
     const z = zProblem(e)
     if (z) return z
     if (!isNumber(e.pmv)) return { field: "pmv", message: "PMV needed" }
@@ -290,6 +377,14 @@ export function problems(
 
 // --- the snapshot a buffer row stores
 
+/** What a buffer row stores of a sequence entry: the ordinary sequence row's keys. */
+export type SequenceSnapshot = {
+    kind: SequenceKind
+    arg: string
+    source?: string
+    record?: string
+}
+
 /** What a buffer row stores of a non-biological entry, without the row's own keys. */
 export type NonbioSnapshot = Omit<CustomNonbioRow, keyof RowBase>
 
@@ -307,11 +402,18 @@ export type NonbioSnapshot = Omit<CustomNonbioRow, keyof RowBase>
  * @throws Error for a polymer when `counts` is not one number per unit.
  */
 export function snapshot(entry: NonbioEntry): NonbioSnapshot
+export function snapshot(entry: SequenceEntry): SequenceSnapshot
 export function snapshot(entry: PolymerEntry, counts: readonly number[]): PolymerSnapshot
 export function snapshot(
     entry: CustomEntry,
     counts?: readonly number[],
-): NonbioSnapshot | PolymerSnapshot {
+): NonbioSnapshot | PolymerSnapshot | SequenceSnapshot {
+    if (isSequenceEntry(entry)) {
+        const row: SequenceSnapshot = { kind: entry.kind, arg: entry.sequence }
+        if (entry.source !== undefined) row.source = entry.source
+        if (entry.record !== undefined) row.record = entry.record
+        return row
+    }
     if (entry.kind === "nonbiological")
         return {
             kind: "custom-nonbio",
@@ -494,6 +596,10 @@ export function customFile(root: string): string {
 /** What is wrong with an entry: not a map or, if a polymer, without 1 to 4 unit maps. */
 function listEntryProblem(e: unknown): string | undefined {
     if (!isDict(e)) return "an entry is not a map"
+    if (SEQUENCE_ENTRY_KINDS.has(String(e.kind)))
+        return typeof e.sequence === "string" && e.sequence.trim() !== ""
+            ? undefined
+            : "a sequence entry needs a sequence"
     if (e.kind !== "polymer") return undefined
     const u = e.units
     const ok = Array.isArray(u) && u.length >= 1 && u.length <= MAX_UNITS && u.every(isDict)

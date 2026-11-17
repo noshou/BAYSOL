@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// The reference curve of a single model: `<project>/model-references.json`, which Julia
-// reads (`{"<model file stem>": {"tag", "software", "refChi2", "fit", "rescale"}}`). A
-// deposited entry has one fit file and one χ² for each atomic model, and the run draws
-// that curve with the data and the model's MAP curve, with both χ², on the model's own
-// figure and writes the χ² in the model's LOG.
+// The reference of a project: `<project>/model-references.json`, which Julia reads
+// (`{"<key>": {"tag", "software", "refChi2", "fit", "rescale"}}`).
 //
-// The file is SPARSE: a model with nothing set has no entry, and a model that is no
-// longer in the project keeps its entry (Julia ignores it with a note). The columns and
-// the units of the curve were chosen when it was imported into `reference-fit/`, so
-// `fit` is only the name of that file.
+// A project has ONE reference fit, the entry under the key `*` ([[PROJECT_REFERENCE_KEY]]):
+// the curve (`fit`, a file of `reference-fit/`), the program that made it, the
+// depositor's χ² and whether the curve is rescaled onto the measured one. The data screen
+// edits it. The run draws that curve with the data and the MAP curve of EVERY model (with
+// both χ², on the model's own figure and in the model's LOG) and alone in the comparison
+// figure.
+//
+// Entries under a model's file stem (the older per-model references) are still read by
+// Julia, and only when the project has no `*` entry; no screen edits them any more and
+// [[saveModelReference]] keeps them untouched. The file is SPARSE: nothing set, no entry.
+// A model that is no longer in the project keeps its entry (Julia ignores it with a note).
+// The columns and the units of the curve were chosen when it was imported into
+// `reference-fit/`, so `fit` is only the name of that file.
 
 import { join } from "node:path"
 import {
@@ -51,6 +57,9 @@ export const EMPTY_MODEL_REFERENCE: ModelReference = {
 
 /** The longest any of the texts is (cells), so every screen can show it. */
 export const MAX_REFERENCE_TEXT = 40
+
+/** The key of the project's one reference in the file (no model stem can be this). */
+export const PROJECT_REFERENCE_KEY = "*"
 
 /** @returns the path of a project's `model-references.json`. */
 export const modelReferencesFile = (projectDir: string): string =>
@@ -113,6 +122,18 @@ export function readModelReferences(projectDir: string): Map<string, ModelRefere
  */
 export const modelReference = (projectDir: string, stem: string): ModelReference =>
     readModelReferences(projectDir).get(stem) ?? { ...EMPTY_MODEL_REFERENCE }
+
+/** @returns the project's one reference (all unset when it has none). */
+export const projectReference = (projectDir: string): ModelReference =>
+    modelReference(projectDir, PROJECT_REFERENCE_KEY)
+
+/**
+ * Saves the project's one reference; see [[saveModelReference]], which does the work.
+ *
+ * @throws ProjectGoneError, FileInUseError, or what the write throws.
+ */
+export const saveProjectReference = (projectDir: string, ref: ModelReference): void =>
+    saveModelReference(projectDir, PROJECT_REFERENCE_KEY, ref)
 
 /**
  * Saves one model's entry under the lock of the file, inside the project, over the file as

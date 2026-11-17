@@ -22,11 +22,11 @@ using BAYSOL.BulkElectronDensity: NonBiological, Solute
 using Printf: @sprintf
 using BAYSOL.MolecularStructure: component, isAminoAcid, aminoParent, isNucleotide,
     polymerSelector, nucleotideSelector, loadMolecule, nAtoms, elms, coordsCartesian,
-    radii, resloveStruct, LocalPathSource, residueNames, _storeDir, _WARNED,
+    radii, resolveStruct, LocalPathSource, residueNames, _storeDir, _WARNED,
     STANDARD_AMINO_ACIDS, _resolveParent, _AMINO_PARENTS, _isAminoType,
     _COMPONENT_DOWNLOAD, _COMPONENT_MEMO, _ComponentNotFound
 using BAYSOL.Hydrogenator: relabelModified, restoreModified!, resolveHydrogens, Propka,
-    hasModifiedAmino, modedAaHyd, AMINO_ATOM_ALIASES, STANDARD_AMINO_ATOMS,
+    hasModifiedAmino, modifiedAminoHydrogens, AMINO_ATOM_ALIASES, STANDARD_AMINO_ATOMS,
     _runsAsParent, _aminoRunAs, hydrogenationChoice, heavyAtomCount
 using BAYSOL.Runtime: force
 using BioStructures:
@@ -40,6 +40,8 @@ nameOf(l) = strip(l[18:20])
 atomOf(l) = strip(l[13:16])
 isAtomLine(l) = startswith(l, "ATOM") || startswith(l, "HETATM")
 isH(l) = strip(l[77:min(end, 78)]) in ("H", "D")
+# what relabelModified passes on: it leaves out the hydrogens of ATOM records
+withoutAtomH(lines) = [l for l in lines if !(startswith(l, "ATOM") && isH(l))]
 heavyLines(lines) = [l for l in lines if isAtomLine(l) && !isH(l)]
 
 # a line with another record type / residue name / atom name / element
@@ -218,8 +220,8 @@ end
             @test nAtoms(mol) == nAtoms(ref) + 5
             @test nAtoms(loadMolecule(path; ligands = false)) == nAtoms(ref) - 15
             @test count(e -> lowercase(e) == "se", elms(mol)) == 1
-            # the same through resloveStruct for a .pdb (used in place) and a .cif
-            @test nAtoms(loadMolecule(resloveStruct(LocalPathSource(path)))) ==
+            # the same through resolveStruct for a .pdb (used in place) and a .cif
+            @test nAtoms(loadMolecule(resolveStruct(LocalPathSource(path)))) ==
                   nAtoms(ref) + 5
             # all residues written as HETATM: all kept
             @test nAtoms(loadMolecule(wr(dir, "het.pdb", allhet()))) == nAtoms(ref)
@@ -248,7 +250,7 @@ end
                 @test !any(l -> atomOf(l) == "SE", met)
                 # restoring the (here unchanged) output gives the original lines back
                 restoreModified!(out, r.plan, r.aliases)
-                @test readlines(out) == lines
+                @test readlines(out) == withoutAtomH(lines)
             end
             # the alias table
             @test AMINO_ATOM_ALIASES == Dict(("MET", "SE") => "SD", ("CYS", "SE") => "SG")
@@ -261,7 +263,7 @@ end
             cys = [l for l in readlines(out) if resOf(l) == CYS1 && isAtomLine(l)]
             @test unique(nameOf.(cys)) == ["CYS"] && any(l -> atomOf(l) == "SG", cys)
             restoreModified!(out, r.plan, r.aliases)
-            @test readlines(out) == lines
+            @test readlines(out) == withoutAtomH(lines)
             # TYC: a terminal variant is run as its parent like any other
             lines = tyc("HETATM")
             src = wr(dir, "tyc.pdb", lines)
@@ -278,7 +280,7 @@ end
             @test isempty(r.plan) && r.noParentAmino == 0
             @test readlines(joinpath(dir, "allhet.out.pdb")) == readlines(src)
             # other lines and atom order are untouched
-            lines = mse("HETATM")
+            lines = withoutAtomH(mse("HETATM"))
             src = wr(dir, "order.pdb", lines)
             r = relabelModified(src, joinpath(dir, "order.out.pdb"))
             back = readlines(joinpath(dir, "order.out.pdb"))
@@ -318,7 +320,7 @@ end
             src = wr(dir, "incomplete.pdb", lines)
             r = relabelModified(src, joinpath(dir, "incomplete.out.pdb"))
             @test isempty(r.plan) && isempty(r.aliases) && r.noParentAmino == 1
-            @test readlines(joinpath(dir, "incomplete.out.pdb")) == lines
+            @test readlines(joinpath(dir, "incomplete.out.pdb")) == withoutAtomH(lines)
         end
 
         @testset "which residues the hydrogenation counts" begin
@@ -385,7 +387,7 @@ end
             @test count(e -> lowercase(e) == "s", elms(mol)) ==
                   count(e -> lowercase(e) == "s", elms(loadMolecule(ref.hp))) - 1
             # the diagnostic of the timing log
-            d = modedAaHyd(r.hp, r.infos)
+            d = modifiedAminoHydrogens(r.hp, r.infos)
             @test d.residues == 1 && d.withParent == 1 && d.noParent == 0
             @test d.placed == count(isH, res) > 0
         end
@@ -411,7 +413,7 @@ end
             @test count(isH, res) == inH > 0
             @test r.h ==
                   ref.h - count(isH, [l for l in ref.out if resOf(l) == ALA1]) + inH
-            d = modedAaHyd(r.hp, r.infos)
+            d = modifiedAminoHydrogens(r.hp, r.infos)
             @test (d.residues, d.withParent, d.noParent, d.placed) == (1, 0, 1, inH)
         end
 
@@ -426,7 +428,7 @@ end
             @test unique(nameOf.(res)) == ["MSE"]
             @test sort([atomOf(l) for l in res if !isH(l)]) ==
                   sort([atomOf(l) for l in lines if resOf(l) == MET1 && !isH(l)])
-            d = modedAaHyd(r.hp, r.infos)
+            d = modifiedAminoHydrogens(r.hp, r.infos)
             @test (d.residues, d.withParent, d.noParent) == (1, 0, 1)
         end
 
@@ -448,17 +450,17 @@ end
             end
             names(log) = [s.name for s in log.stages]
             note(log, n) = only(s.note for s in log.stages if s.name == n)
-            wiring = ("resloveStruct", "components", "structure checks", "classify",
+            wiring = ("resolveStruct", "components", "structure checks", "classify",
                 "propka", "pdb2pqr", "modified amino acid hydrogens", "heavy atoms",
                 "loadMolecule")
             log = seeded("nt-amino-seed", mse("HETATM"))
-            @test filter(in(wiring), names(log)) == ["resloveStruct", "components",
+            @test filter(in(wiring), names(log)) == ["resolveStruct", "components",
                 "structure checks", "classify", "propka", "pdb2pqr",
                 "modified amino acid hydrogens", "heavy atoms", "loadMolecule"]
             # the protein-only route: no force-field suffix on the stage, PARSE in the note
             @test note(log, "classify") == "[protein: PARSE, titration propka]"
             r = hydrogenated("nt-amino-seed", mse("HETATM"))
-            d = modedAaHyd(r.hp, r.infos)
+            d = modifiedAminoHydrogens(r.hp, r.infos)
             @test note(log, "modified amino acid hydrogens") ==
                   "[1 residues: 1 hydrogenated through their parent, 0 without a parent; " *
                   "$(d.placed) hydrogens placed]"
@@ -471,7 +473,7 @@ end
             # none of them: no such stage
             log = seeded("nt-amino-seed-ref", LINES)
             @test !("modified amino acid hydrogens" in names(log))
-            @test filter(in(wiring), names(log)) == ["resloveStruct", "components",
+            @test filter(in(wiring), names(log)) == ["resolveStruct", "components",
                 "structure checks", "classify", "propka", "pdb2pqr", "heavy atoms",
                 "loadMolecule"]
         end
@@ -501,7 +503,7 @@ end
             hp = resolveHydrogens(path, 7.4; ff = :parse, titration = Propka())
             infos = component.(residueNames(path))
             @test nAtoms(loadMolecule(hp)) == 14272
-            d = modedAaHyd(hp, infos)
+            d = modifiedAminoHydrogens(hp, infos)
             @test (d.residues, d.withParent, d.noParent) == (20, 20, 0)
             @test d.placed == 183
             # SASDB48: the twenty standard names written as HETATM, no amino-acid stage

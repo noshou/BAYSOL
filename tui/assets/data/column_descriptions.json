@@ -1,0 +1,159 @@
+{
+    "*": {
+        "q": "scattering vector q (Å⁻¹), the x axis",
+        "qNm": "scattering vector q (nm⁻¹), the x axis",
+        "I": "measured intensity at that q (a.u.)",
+        "sigma": "standard error of the measured intensity",
+        "parameter": "the fitted quantity this row is about",
+        "value": "its value"
+    },
+    "run": {
+        "section": "the part of the run this row belongs to",
+        "name": "the setting or statistic of the run",
+        "value": "its number (a flag is 0 or 1)",
+        "unit": "its unit, empty for a pure number"
+    },
+    "runRows": {
+        "nAtoms": "atoms in the model, hydrogens included",
+        "lmax": "highest spherical-harmonic degree used",
+        "dmax": "diameter of the scatterer cloud",
+        "pmvFallbackUncert": "uncertainty given to a solute that has none",
+        "lmaxPinned": "1 if lmax was set by hand, not from q",
+        "addHydrogens": "0 if the pipeline added no hydrogens",
+        "structureModel": "model used of a multi-model structure",
+        "qMin": "lowest q of the fitted range",
+        "qMax": "highest q of the fitted range",
+        "sigmaScale": "factor the measured errors were scaled by",
+        "nQInput": "measured points given, before any cut",
+        "nQCropped": "points outside qMin to qMax, left out",
+        "nQExcluded": "points in an excluded q range, left out",
+        "cavityFrac": "share of the hydration shell that is cavity",
+        "exclVolSat": "c1 at its bound: 1 upper, -1 lower, 0 none",
+        "nQRaw": "measured points before binning",
+        "nQ": "points fitted, after Shannon binning",
+        "channels": "Shannon channels in the measured q range",
+        "rebinChannels": "bins per Shannon channel",
+        "rebinMeasured": "measured points that went into the bins",
+        "rebinFitted": "binned points that were fitted",
+        "rebinNonPositiveDropped": "bins dropped for a non-positive intensity",
+        "nSamples": "NUTS iterations per chain, warm-up included",
+        "nAdapt": "warm-up iterations per chain",
+        "rngSeed": "random seed that reproduces the run",
+        "iterations": "posterior draws pooled from the used chains",
+        "meanAccept": "mean NUTS acceptance rate",
+        "treeDepthAvg": "mean depth of the NUTS trees",
+        "treeDepthMax": "deepest NUTS tree; at the limit is poor",
+        "meanNSteps": "mean leapfrog steps per iteration",
+        "ebfmi": "worst chain's E-BFMI; below 0.3 is poor",
+        "divergenceRate": "share of divergent draws; above 0.01 is poor",
+        "chainsPooled": "chains whose draws were pooled",
+        "chainsRun": "chains that were run",
+        "rhatMax": "worst split R-hat; above 1.01 is unconverged",
+        "essMin": "smallest bulk effective sample size",
+        "essTailMin": "smallest tail effective sample size",
+        "modes": "posterior modes the chains settled in",
+        "optima": "local optima that carry posterior mass",
+        "rewhitenedNats": "gain of a basin better than the MAP search",
+        "retryFirstRhat": "worst R-hat of the first, repeated run",
+        "retryKept": "1 if the repeated run's draws were kept",
+        "drawsRows": "rows of the draws sheet, one per draw",
+        "quantileLoPct": "lower percentile of the quantiles interval",
+        "quantileHiPct": "upper percentile of the quantiles interval"
+    },
+    "parameterRows": {
+        "logDensity": "log posterior density at the draw (nats)",
+        "rhoE": "electron density of the bulk solvent (e⁻/Å³)",
+        "deltaRho1": "contrast of the first water bead type (δρ₁)",
+        "deltaRho2": "contrast of the second water bead type (δρ₂)",
+        "deltaRho3": "cavity contrast (δρ₃); 0 = bulk density",
+        "scale": "intensity scale between model and data",
+        "bkgrndCorr": "constant background correction (a.u.)",
+        "exclVolCorr": "excluded-volume correction factor c1",
+        "chi2": "reduced χ² of the fit to the data"
+    },
+    "map": {
+        "parameter": "a fitted or derived quantity",
+        "value": "its value at the MAP (most probable) draw"
+    },
+    "quantiles": {
+        "parameter": "a fitted or derived quantity",
+        "quantileLo": "lower end of the credible interval",
+        "quantileHi": "upper end of the credible interval",
+        "boundLo": "smallest draw inside the interval",
+        "boundHi": "largest draw inside the interval"
+    },
+    "stdevFromPrior": {
+        "parameter": "a parameter that has a prior",
+        "zMap": "MAP distance from the prior mean, in SDs",
+        "zQuantileLo": "interval's lower end from the mean, in SDs",
+        "zQuantileHi": "interval's upper end from the mean, in SDs"
+    },
+    "modes": {
+        "mode": "number of the posterior mode",
+        "share": "this mode's share of the posterior mass",
+        "logMass": "bridge-sampling log mass of the mode (nats)",
+        "logMassErr": "bridge-sampling error of the log mass (nats)",
+        "chains": "number of chains that settled in this mode",
+        "kept": "1 if its draws are kept, 0 if negligible"
+    },
+    "optima": {
+        "optimum": "number of the optimum of the MAP search",
+        "share": "its share of the Laplace mass",
+        "chains": "number of chains that ended at this optimum",
+        "started": "number of those chains that started there"
+    },
+    "formFactorLog": {
+        "line": "one line of the form-factor log"
+    },
+    "data": {
+        "I": "measured intensity (arbitrary units)",
+        "sigma": "standard error of the measured intensity"
+    },
+    "model": {
+        "I_map": "model intensity of the MAP draw (a.u.)",
+        "quantileLo": "lower credible-interval curve of the model",
+        "quantileHi": "upper credible-interval curve of the model",
+        "boundLo": "lowest model curve inside the interval",
+        "boundHi": "highest model curve inside the interval"
+    },
+    "residuals": {
+        "I": "measured intensity (arbitrary units)",
+        "sigma": "standard error of the measured intensity",
+        "I_map": "model intensity of the MAP draw",
+        "residual": "measured minus MAP intensity (a.u.)"
+    },
+    "hist": {
+        "binLo": "lower edge of the histogram bin",
+        "binHi": "upper edge of the histogram bin",
+        "count": "number of draws that fall in the bin"
+    },
+    "ref": {
+        "I": "intensity of the reference curve (a.u.)"
+    },
+    "draws": {
+        "chain": "number of the chain the draw came from",
+        "draw": "position of the draw within its chain",
+        "rhoE (e-/A^3)": "solvent electron density ρₑ (e⁻/Å³)",
+        "deltaRho1 (0.03 e-/A^3)": "contrast δρ₁ of the first hydration shell",
+        "deltaRho2 (0.03 e-/A^3)": "contrast δρ₂ of the second hydration shell",
+        "deltaRho3 (0.03 e-/A^3)": "contrast δρ₃ of the third hydration shell",
+        "scale": "intensity scale factor of the draw",
+        "bkgrndCorr (a.u.)": "constant background correction (a.u.)",
+        "exclVolCorr (c1)": "excluded-volume correction c1 of the draw",
+        "chi2FitGrid": "reduced χ² of the draw on the fitted q grid",
+        "logDensity": "log posterior density of the draw",
+        "divergent": "1 if the sampler step diverged",
+        "treeDepth": "depth of the sampler's trajectory tree",
+        "nSteps": "number of leapfrog steps of the trajectory",
+        "stepSize": "step size the sampler used",
+        "acceptanceRate": "sampler acceptance rate of the draw"
+    },
+    "compare": {
+        "q (A^-1)": "scattering vector q (Å⁻¹)",
+        "q (nm^-1)": "scattering vector q (nm⁻¹)",
+        "I_measured (a.u.)": "measured intensity (arbitrary units)",
+        "sigma (a.u.)": "standard error of the measured intensity",
+        "fit_*": "MAP curve of that model on the measured q",
+        "ref_*": "reference curve on the measured q"
+    }
+}

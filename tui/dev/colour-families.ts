@@ -3,9 +3,10 @@
 /**
  * Writes the `family` of every colour of the sets in `tui/assets/data/colour-sets/`
  * (one of the 12 of `FAMILIES`: the filter of the colour picker). It ports the family
- * rules of the Julia harvester `harvest-colours.jl` (removed 2026-11-13; see git history) (`family_of` and what it uses) exactly and
- * edits the files with `jsonc-parser`'s `modify` and `applyEdits`, so the comments, the
- * order and the one-row-per-line layout of the files stay as they are.
+ * rules of the Julia harvester `harvest-colours.jl` (removed 2026-11-13; see git history)
+ * (`family_of` and what it uses) exactly and edits the files with `jsonc-parser`'s
+ * `modify` and `applyEdits`, so the comments, the order and the one-row-per-line layout
+ * of the files stay as they are.
  *
  * The family of a colour is computed from its name in the merged list (the name with its
  * `(set)` tag, as the picker shows it) and its colour; a colour the merge left out (an
@@ -149,12 +150,12 @@ function hslOf([r8, g8, b8]: Rgb8): [number, number, number] {
     const s = d / (1 - Math.abs(2 * l - 1))
     // Julia's `mod` follows the sign of the divisor
     const mod6 = (x: number): number => ((x % 6) + 6) % 6
-    const h =
-        hi === r
-            ? 60 * mod6((g - b) / d)
-            : hi === g
-              ? 60 * ((b - r) / d + 2)
-              : 60 * ((r - g) / d + 4)
+    let h = 60 * ((r - g) / d + 4)
+    if (hi === r) {
+        h = 60 * mod6((g - b) / d)
+    } else if (hi === g) {
+        h = 60 * ((b - r) / d + 2)
+    }
     return [h, s, l]
 }
 

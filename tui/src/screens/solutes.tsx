@@ -65,7 +65,7 @@ import {
     type Solute,
     soluteOf,
 } from "../store/solutes.js"
-import { cleanRow } from "../store/template-link.js"
+import { cleanRow } from "../store/template-rows.js"
 import { Frame } from "../ui/frame.js"
 import { type LegendItem, legendFor } from "../ui/grid.js"
 import {
@@ -111,15 +111,14 @@ export const soluteProblem: RowProblem = (s) => rowProblem(bufferRow(s))
 // ========================================================================================
 
 // The add and edit flows of the solutes table as a hook: the state machine of
-// `store/add-flow.ts` (which knows what is asked and in what order) drawn with the kit
-// under the table, and its result handed back to the table screen when it is done.
+// `store/add-flow.ts` (what is asked, in what order) drawn under the table, its result
+// handed back to the screen when done.
 //
-// While a flow is open the table shows the flow's own rows (the row being made is in them,
-// with the cell being typed into showing what is typed), its cursor and a window that
-// follows it; the screen's own keys are off and the prompt or dropdown below the table
-// takes them. When the flow ends, what it changed is applied to the screen's drafts
-// (`flowChanges`), so a cancelled add leaves no trace and an edit that was stopped keeps
-// the cells already taken.
+// While a flow is open the table shows the flow's own rows (the row being made, with the
+// cell being typed into showing what is typed), its cursor and a window that follows it;
+// the screen's keys are off and the prompt or dropdown below the table takes them. When
+// the flow ends, what it changed is applied to the screen's drafts (`flowChanges`), so a
+// cancelled add leaves no trace and a stopped edit keeps the cells already taken.
 
 /**
  * The rows an open flow takes under the table: its label, the messages, the suggestions
@@ -287,8 +286,8 @@ function useSoluteFlow(t: TableScreen<Solute>, root: string = appDir()): SoluteF
     const typed = step?.type === "dropdown" ? step.typed : undefined
     const canPick = step?.type === "dropdown" && step.filePicker === true && typed === ""
 
-    // `e` on an empty path field asks the desktop for a file; the field has the `e` by
-    // then, so it is emptied and the picked path put in
+    // `^v` on an empty path field asks the desktop for a file; the field is emptied and
+    // the picked path put in
     useKeys((press) => {
         if (!press.is(keys.pickFiles) || !current) return
         void (async () => {
@@ -607,20 +606,16 @@ function columnsOf(
 }
 
 /**
- * The table of the buffer of a project. One row for each solute
- * with the columns name, params (the numbers of a polymer, the summary of a sequence),
- * mM and ±. A row that is new or edited shows `*`, one marked to be removed `-`; nothing
- * is written before `^w`.
- *
+ * The table of the buffer of a project. One row per solute with the columns name, params
+ * (the numbers of a polymer, the summary of a sequence), mM and ±. A new or edited row
+ * shows `*`, one marked to be removed `-`; nothing is written before `^w`.
  * Keys: up and down move; Enter edits the row (name, params, mM, ±, each typed in a
  * prompt under the table); `^n`, `^p`, `^f`, `^e` add a non-biological solute, a polymer,
- * a protein and DNA or RNA from a file (a dropdown or a prompt under the table), none
- * past 999 rows; `^r` marks the row to be removed; `^u` undoes its last change; `^w`
- * saves (a row that is not complete is told and nothing is saved); `^x` goes back, asking
- * first when something is unsaved. The pH row above the table (`pH`, `σ` and `T °C`, the
- * buffer's pH and the standard uncertainty of it, and the temperature) is edited with
- * `^g`: two prompts, pH then σ, and one for the temperature; it is an unsaved change
- * like a row until `^w`. While a flow is open Esc and `^x`
+ * a protein and DNA or RNA from a file, none past 999 rows; `^r` marks the row to be
+ * removed; `^u` undoes its last change; `^w` saves (an incomplete row is told and nothing
+ * is saved); `^x` goes back, asking first when something is unsaved. The pH row above
+ * the table (`pH`, `σ`, `T °C`) is edited with `^g` (prompts for pH, σ and temperature)
+ * and is an unsaved change like a row until `^w`. While a flow is open Esc and `^x`
  * cancel it. `^k` turns the unit of the concentrations (mM, M, µM: display and entry
  * only, the file keeps mM). The mechanics are `useTableScreen`, the flows `useSoluteFlow`.
  *

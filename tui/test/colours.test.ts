@@ -2,10 +2,20 @@
 
 // Tests of store/colours.ts and of how the settings take a colour: names (any spelling),
 // codes (#rgb, #rrggbb, rgb(), hsl()), lists and tuples with commas inside brackets.
+// Also store/colour-notation.ts: every named colour written in HEX, RGB, HSL and CMYK
+// reads back as the same 8-bit colour, and the strings are those of the golden file that
+// the Julia resolver (test-colournames.jl) reads too.
 
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import { test } from "node:test"
 import { narrow, parseSetting, pickValue } from "../src/screens/screen-rules.js"
+import {
+    colourNotations,
+    fromHex,
+    parseColourCode as parseNotation,
+    toHex,
+} from "../src/store/colour-notation.js"
 import {
     colourFamily,
     colourHex,
@@ -27,15 +37,9 @@ import {
     parseColourCode,
     splitTopLevel,
 } from "../src/store/colours.js"
-import { defaultCatalog, validateValue } from "../src/store/settings.js"
+import { validateValue } from "../src/store/settings.js"
 import { positionStatus } from "../src/ui/input.js"
-import { fixture } from "./support/fixtures.js"
-
-const def = (name: string) => {
-    const found = defaultCatalog().get(name)
-    assert.ok(found, name)
-    return found
-}
+import { settingDef as def, fixture } from "./support/fixtures.js"
 
 test("the list is lower case and unique, with no bare numbers or catalogue tags", () => {
     const names = colourNames()
@@ -392,4 +396,57 @@ test("a clash tag shows its set with blanks (hyphens only in the standard's name
     assert.ok(spaced.length > 0)
     assert.deepEqual(narrowColours(names, "paul-tol"), spaced)
     assert.deepEqual(narrowColours(names, "nbs-iscc"), narrowColours(names, "nbs iscc"))
+})
+
+type Golden = {
+    colours: { hex: string; rgb: string; hsl: string; cmyk: string }[]
+    codes: { text: string; hex: string }[]
+    invalid: string[]
+}
+
+const golden = JSON.parse(
+    readFileSync(
+        new URL("../../test/fixtures/colours/notations.json", import.meta.url),
+        "utf8",
+    ),
+) as Golden
+
+test("every named colour round-trips through every notation", () => {
+    for (const [name, hex] of colourList()) {
+        const rgb = fromHex(hex)
+        const n = colourNotations(rgb)
+        assert.equal(n.hex, hex, name)
+        for (const text of [n.hex, n.rgb, n.hsl, n.cmyk])
+            assert.deepEqual(parseNotation(text), rgb, `${name}: ${text}`)
+    }
+})
+
+test("the strings equal the golden file of the Julia resolver", () => {
+    assert.ok(golden.colours.length > 100)
+    for (const row of golden.colours) {
+        const n = colourNotations(fromHex(row.hex))
+        assert.deepEqual(n, { hex: row.hex, rgb: row.rgb, hsl: row.hsl, cmyk: row.cmyk })
+    }
+    for (const row of golden.codes)
+        assert.deepEqual(parseNotation(row.text), fromHex(row.hex), row.text)
+    for (const text of golden.invalid)
+        assert.equal(parseNotation(text), undefined, text)
+})
+
+test("a typed value lists every name with exactly that colour", () => {
+    const byHex = new Map<string, string[]>()
+    for (const [name, hex] of colourList())
+        byHex.set(hex, [...(byHex.get(hex) ?? []), name])
+    let shared = 0
+    for (const [hex, names] of byHex) {
+        const n = colourNotations(fromHex(hex))
+        for (const text of [n.hex, n.rgb, n.hsl, n.cmyk])
+            assert.deepEqual(namesOfCode(text), names, text)
+        if (names.length > 1) shared++
+    }
+    assert.ok(shared > 0)
+    assert.deepEqual(namesOfCode("#a52a2a")?.includes("brown"), true)
+    assert.deepEqual(namesOfCode("rgb(1, 2, 3)"), [])
+    assert.equal(namesOfCode("brown"), undefined)
+    assert.equal(toHex([1, 2, 255]), "#0102ff")
 })

@@ -49,7 +49,7 @@ exclVolSat   = false
 === Timing ===                                       seconds    % wall    (JIT)
 wall clock  (seedModel → end of report)               56.43     100.0    (3.0)
   static build                                         24.43      43.3    (0.8)
-    resloveStruct                                   0.00
+    resolveStruct                                   0.00
     propka                [cache hit]                   0.00
     pdb2pqr               [cache hit]                   0.00
     loadMolecule                                       0.16

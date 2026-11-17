@@ -41,8 +41,9 @@ function main(args)
     for f in changed
         println(mode == "--apply" ? "formatted: " : "not formatted: ", f)
     end
-    println(length(files), " Julia files, ", length(changed),
-        mode == "--apply" ? " rewritten" : " not formatted")
+    # the total over every language is printed by `bysl fmt`
+    isempty(changed) || println(length(changed),
+        mode == "--apply" ? " Julia files rewritten" : " Julia files not formatted")
     exit(mode == "--check" && !isempty(changed) ? 1 : 0)
 end
 

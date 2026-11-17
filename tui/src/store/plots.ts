@@ -22,6 +22,7 @@ import {
     readFileSync,
     rmSync,
     statSync,
+    writeFileSync,
 } from "node:fs"
 import { basename, extname, isAbsolute, join, relative, sep } from "node:path"
 import { extractEntries, withTempFolder } from "../core/archive.js"
@@ -35,8 +36,8 @@ import {
 } from "../core/environment.js"
 import { isFile } from "../core/file-system.js"
 import { displayWidth, truncate, truncateStart } from "../core/terminal.js"
-import { archiveHolding } from "./run-archive.js"
-import { isWorkbookName, rebuildWorkbook } from "./workbook-tree.js"
+import { archivesHolding } from "./run-archive.js"
+import { isWorkbookName, rebuildWorkbookAsync } from "./workbook-tree.js"
 
 // ========================================================================================
 // 1. Where files go
@@ -117,7 +118,7 @@ export function dataRoot(setting: unknown, dataFolder: () => string = appDir): s
  * @param unit - a unit of the run.
  * @returns the path (it is made when the files are put).
  */
-const runFolder = (root: string, unit: PlotUnit): string => join(root, unit.run)
+export const runFolder = (root: string, unit: PlotUnit): string => join(root, unit.run)
 
 /**
  * The name a unit's file has in the destination folder, keyed off the model: the file's
@@ -158,6 +159,29 @@ export function freeNames(folder: string, names: readonly string[]): string[] {
 // ========================================================================================
 
 /**
+ * Macros and labels an older BAYSOL wrote into figures (`\rhoE` is no LaTeX macro: it is
+ * `\rho_e`; `$c1Factor$` is `c1`; `bkgrnd\_corr` is `bkgrnd corr`). A run's
+ * files are never changed, so the copy in the temporary folder is mended before it is
+ * compiled or moved.
+ */
+const LEGACY_TEX: readonly (readonly [RegExp, string])[] = [
+    [/\\rhoE(?![A-Za-z])/g, "\\rho_e"],
+    [/\$c1Factor\$/g, "c1"],
+    [/bkgrnd\\_corr/g, "bkgrnd corr"],
+]
+
+/**
+ * Mends the legacy macros of a `.tex` file in place (see [[LEGACY_TEX]]).
+ *
+ * @param file - the copy of the figure in the temporary folder.
+ */
+function mendTex(file: string): void {
+    const text = readFileSync(file, "utf-8")
+    const mended = LEGACY_TEX.reduce((t, [from, to]) => t.replace(from, () => to), text)
+    if (mended !== text) writeFileSync(file, mended)
+}
+
+/**
  * Puts files of a unit into the temporary folder `tmp`, flat, under their own names: from
  * the plain files of its run where they are and from the run's archive otherwise.
  *
@@ -178,10 +202,12 @@ async function bring(
             copyFileSync(plain, join(tmp, basename(rel)))
             continue
         }
-        const archive = archiveHolding(unit.runDir, rel)
+        const archives = archivesHolding(unit.runDir, rel)
+        const archive = archives[0]
         if (archive === undefined) throw new Error(`no ${basename(rel)} in the run`)
         // a workbook is held as its XML tree: a proper .xlsx is zipped from it
-        if (isWorkbookName(rel)) rebuildWorkbook(archive, rel, join(tmp, basename(rel)))
+        if (isWorkbookName(rel))
+            await rebuildWorkbookAsync(archives, rel, join(tmp, basename(rel)))
         else byArchive.set(archive, [...(byArchive.get(archive) ?? []), rel])
     }
     for (const [archive, names] of byArchive) {
@@ -191,6 +217,7 @@ async function bring(
                 copyFileSync(join(from, ...rel.split("/")), join(tmp, basename(rel)))
         })
     }
+    for (const rel of rels) if (extname(rel) === ".tex") mendTex(join(tmp, basename(rel)))
     return rels.map((rel) => basename(rel))
 }
 

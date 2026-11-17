@@ -63,13 +63,13 @@ position); scale, background and c1 are per-draw profiled quantities. The key na
 MAP value in the `MAPParams`.
 """
 const PLOT_HIST_PARAMS = [
-    ("ρₑ", raw"$\rhoE$", "slvntEDns", "rhoE"),
+    ("ρₑ", raw"$\rho_e$", "slvntEDns", "rhoE"),
     ("δρ₁", raw"$\delta\rho_1$", "deltaRho1", "deltaRho1"),
     ("δρ₂", raw"$\delta\rho_2$", "deltaRho2", "deltaRho2"),
     ("δρ₃", raw"$\delta\rho_3$", "deltaRho3", "deltaRho3"),
     ("scale", "scale", "scale", "scale"),
-    ("bkgrndCorr", raw"bkgrnd\_corr", "bkgrndCorr", "bkgrndCorr"),
-    ("c1", raw"$c1Factor$", "exclVolCorr", "c1"),
+    ("bkgrndCorr", "bkgrnd corr", "bkgrndCorr", "bkgrndCorr"),
+    ("c1", "c1", "exclVolCorr", "c1"),
 ]
 
 """

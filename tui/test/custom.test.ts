@@ -28,6 +28,8 @@ import {
     readCustomSolutes,
     removeCustomSolute,
     removeUnit,
+    type SequenceEntry,
+    sequenceEntries,
     setField,
     sigmaShown,
     snapshot,
@@ -705,4 +707,23 @@ test("removing one entry keeps the others and refuses after another copy saved",
     )
     assert.throws(() => removeCustomSolute(root, "A"), ChangedOnDiskError)
     assert.deepEqual(names(), ["A", "C", "D"], "nothing was written")
+})
+
+test("sequence entries come from pasted text, one per record, with free names", () => {
+    const made = sequenceEntries("ACGTACGT", "dna", undefined, (n) => n === "taken")
+    assert.ok("entries" in made)
+    const [e] = made.entries
+    assert.equal(e.kind, "dna")
+    assert.equal(e.sequence, "ACGTACGT")
+    assert.equal(e.source, "text")
+    assert.deepEqual(snapshot(e as SequenceEntry), {
+        kind: "dna",
+        arg: "ACGTACGT",
+        source: "text",
+        record: e.record,
+    })
+    assert.equal(entryProblem(e, undefined, []), undefined)
+    assert.deepEqual("error" in sequenceEntries("", "dna", undefined, () => false), true)
+    const empty = { ...e, sequence: " " }
+    assert.equal(entryProblem(empty, undefined, [])?.message, "sequence needed")
 })

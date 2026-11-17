@@ -14,7 +14,7 @@ import { basename } from "node:path"
 import { type ReactNode, useMemo, useRef, useState } from "react"
 import { appDir } from "../core/environment.js"
 import { saveErrorNote } from "../core/file-system.js"
-import { formatNumber } from "../core/terminal.js"
+import { fold, formatNumber } from "../core/terminal.js"
 import {
     kindsSummary,
     MAX_NAME,
@@ -37,17 +37,31 @@ import {
     customFile,
     entryProblem,
     getField,
+    isSequenceEntry,
     type NonbioEntry,
     nonbioPreview,
     parseCell,
     problems,
     readCustomSolutes,
     removeCustomSolute,
+    type SequenceEntry,
+    sequenceEntries,
     withField,
     writeCustomSolutes,
 } from "../store/custom.js"
 import { breakdown, takeFormula } from "../store/formula.js"
-import { Drafts, type Row, rowValue } from "../store/lists.js"
+import {
+    Drafts,
+    isSequenceFile,
+    isSequencePaste,
+    parseText,
+    pathSuggestions,
+    type Row,
+    rowValue,
+    type SequenceKind,
+    type SequenceRecords,
+    summary,
+} from "../store/lists.js"
 import { notesCell } from "../store/notes.js"
 import {
     blankPolymer,
@@ -61,8 +75,15 @@ import { isBuiltinName } from "../store/solutes.js"
 import { type Definition, normalizeDefinition } from "../store/template-defs.js"
 import { kindOf, templateOf, withTemplate } from "../store/template-recipes.js"
 import { type FormRow, Frame, placeAt, useFormScreen } from "../ui/frame.js"
-import { legendFor } from "../ui/grid.js"
-import { destructiveQuestion, questionLegend, useConfirm } from "../ui/input.js"
+import { type LegendItem, legendFor } from "../ui/grid.js"
+import {
+    Dropdown,
+    destructiveQuestion,
+    filterChoices,
+    PathPrompt,
+    questionLegend,
+    useConfirm,
+} from "../ui/input.js"
 import { keys, scrollWindow, useKeys, useNav } from "../ui/interaction.js"
 import { type Naming, useNamePrompt } from "../ui/prompt-flows.js"
 import { type Column, DataTable } from "../ui/theme.js"
@@ -201,6 +222,148 @@ function CustomNonbioForm(props: CustomNonbioFormProps): ReactNode {
     )
 }
 
+/** The kinds a sequence is added as, with the words of the dropdown. */
+const SEQUENCE_CHOICES: { label: string; value: SequenceKind }[] = [
+    { label: "DNA", value: "dna" },
+    { label: "RNA", value: "rna" },
+]
+
+/** What the path prompt of a sequence file says while empty. */
+const SEQUENCE_PLACEHOLDER =
+    "full path of a FASTA/FASTQ/PDB/mmCIF file, or the sequence itself"
+
+/**
+ * The page that takes sequences for the table the way the buffer's `^f` and `^e` do: DNA or
+ * RNA is asked first (for `nucleotide`), then a path or the sequence itself, typed or
+ * pasted. Every record becomes an entry, named by its id.
+ *
+ * @param props.kind - `protein` or `nucleotide`.
+ * @param props.taken - says whether a name is in use or built-in.
+ * @param props.onTake - called with the entries made; the page then closes.
+ * @returns the screen.
+ */
+function SequenceAdd(props: {
+    kind: "protein" | "nucleotide"
+    taken: (name: string) => boolean
+    onTake: (entries: SequenceEntry[]) => void
+}): ReactNode {
+    const { kind, taken, onTake } = props
+    const nav = useNav()
+    const [seqKind, setSeqKind] = useState<SequenceKind | undefined>(
+        kind === "protein" ? "protein" : undefined,
+    )
+    const [problem, setProblem] = useState<string | undefined>()
+    const [pasted, setPasted] = useState<SequenceRecords | undefined>()
+    const [stepKeys, setStepKeys] = useState<LegendItem[]>([])
+    const asked = seqKind === undefined
+    const title = kind === "protein" ? "add protein" : "add DNA/RNA"
+
+    const take = (text: string) => {
+        const made = sequenceEntries(text, seqKind as SequenceKind, pasted, taken)
+        if ("error" in made) {
+            setProblem(made.error)
+            return
+        }
+        onTake(made.entries)
+        nav.pop()
+    }
+    return (
+        <Frame
+            design="blocky"
+            title="custom solutes"
+            subtitle={title}
+            legend={stepKeys}
+            note={pasted ? "pasted: enter takes it" : undefined}
+        >
+            {asked ? (
+                <Dropdown<SequenceKind>
+                    label="kind:"
+                    search={filterChoices(SEQUENCE_CHOICES)}
+                    onPick={setSeqKind}
+                    onCancel={nav.pop}
+                    onLegend={setStepKeys}
+                />
+            ) : (
+                <PathPrompt
+                    placeholder={SEQUENCE_PLACEHOLDER}
+                    suggest={(text) => pathSuggestions(text, isSequenceFile)}
+                    onPaste={(text, room) => {
+                        if (!isSequencePaste(text, room)) return false
+                        const parsed = parseText(text, seqKind)
+                        if ("error" in parsed) setProblem(parsed.error)
+                        else {
+                            setProblem(undefined)
+                            setPasted(parsed.records)
+                        }
+                        return true
+                    }}
+                    error={problem}
+                    onChange={() => setProblem(undefined)}
+                    onSubmit={take}
+                    onCancel={nav.pop}
+                    onLegend={setStepKeys}
+                />
+            )}
+        </Frame>
+    )
+}
+
+/**
+ * The form page of a custom sequence: its name, to change, and what it is in words. The
+ * sequence itself is not edited here (add it again from a file).
+ *
+ * @param props.entry - the entry.
+ * @param props.others - the names of the other entries.
+ * @param props.onAccept - called with the renamed entry; the page then closes.
+ * @returns the screen.
+ */
+function SequenceForm(props: {
+    entry: SequenceEntry
+    others: readonly string[]
+    onAccept: (entry: SequenceEntry) => void
+}): ReactNode {
+    const { others, onAccept } = props
+    const nav = useNav()
+    const [orig] = useState(props.entry)
+    const [entry, setEntry] = useState(props.entry)
+    const form = useFormScreen({
+        valid: [[0]],
+        editLabel: () => "name:",
+        editText: () => entry.name,
+        take: (_pos, text) => {
+            setEntry({ ...entry, name: text.trim() })
+            return {}
+        },
+        restore: () => setEntry({ ...entry, name: orig.name }),
+        canRestore: () => entry.name !== orig.name,
+        check: () => {
+            const found = entryProblem(entry, isBuiltinName, others)
+            return found ? { pos: placeAt(0, 0), message: found.message } : undefined
+        },
+        accept: () => {
+            onAccept(entry)
+            nav.pop()
+        },
+        cancel: nav.pop,
+    })
+    const rows: FormRow[] = [{ label: "name", cells: [{ text: entry.name, wide: true }] }]
+    const preview = [
+        `${entry.kind}: ${summary(entry.kind, entry.sequence, SEQUENCE_CELL)}`,
+        `from ${entry.source ?? "?"}${entry.record ? ` (${entry.record})` : ""}; ` +
+            "Z and PMV are worked out of the sequence at the run",
+    ]
+    return (
+        <FormPage
+            form={form}
+            title="custom solute"
+            subtitle={`${orig.name} · ${orig.kind}`}
+            isNew={false}
+            rows={rows}
+            preview={preview}
+        />
+    )
+}
+
 // ========================================================================================
 // 2. The custom solutes table
 // ========================================================================================
@@ -216,7 +379,15 @@ const SIGMA_WIDTH = 10
 const CUSTOM_ADDS = [
     legendFor("add nonbio", keys.addNonbio),
     legendFor("add polymer", keys.addPolymer),
+    legendFor("add protein", keys.addProtein),
+    legendFor("add DNA/RNA", keys.addNucleotide),
 ]
+
+/** What the Z and PMV cells of a sequence say: Julia works them out of the sequence. */
+const COMPUTED = "computed"
+
+/** The characters of a sequence's summary in the formula cell. */
+const SEQUENCE_CELL = 24
 
 /** What the empty table says. */
 const CUSTOM_EMPTY_HINT = "none"
@@ -246,6 +417,9 @@ function sumText(terms: readonly (readonly [number | null, string])[]): string {
  * polymer as `A:C2H4O B:C3H6O` (a unit with no formula is left out).
  */
 export function formulaCell(e: CustomEntry): string {
+    if (isSequenceEntry(e)) {
+        return `${e.kind}: ${summary(e.kind, e.sequence, SEQUENCE_CELL)}`
+    }
     if (e.kind !== "polymer") return e.formula
     return e.units
         .filter((u) => u.formula.trim() !== "")
@@ -258,6 +432,7 @@ export function formulaCell(e: CustomEntry): string {
  * each unit by its label, then the end groups.
  */
 export function zCell(e: CustomEntry): string {
+    if (isSequenceEntry(e)) return COMPUTED
     if (e.kind !== "polymer") return e.z === null ? "" : String(e.z)
     const units = e.units.map((u) => [u.z, u.label] as const)
     return sumText([...units, [e.zEnds, ""]])
@@ -268,6 +443,7 @@ export function zCell(e: CustomEntry): string {
  * slope of each unit by its label, then the end groups.
  */
 export function pmvCell(e: CustomEntry): string {
+    if (isSequenceEntry(e)) return COMPUTED
     if (e.kind !== "polymer") return formatNumber(e.pmv)
     const units = e.units.map((u) => [u.slope, u.label] as const)
     return sumText([...units, [e.pmvEnds, ""]])
@@ -292,6 +468,7 @@ function polymerSigmaCell(e: PolymerEntry): string {
  * is computed here, the defaults apply at the run.
  */
 export function sigmaCell(e: CustomEntry, fallback: number): string {
+    if (isSequenceEntry(e)) return ""
     if (e.kind === "polymer") return polymerSigmaCell(e)
     return e.sigma === null ? `(${formatRounded(fallback)})` : formatNumber(e.sigma)
 }
@@ -363,12 +540,27 @@ export function CustomSolutesTable(): ReactNode {
         sorted: true,
     })
 
+    const addSequences = (kind: "protein" | "nucleotide") => {
+        const used = new Set(otherNames(t.drafts.rows, undefined).map(fold))
+        nav.push(
+            <SequenceAdd
+                kind={kind}
+                taken={(name) => isBuiltinName(name) || used.has(fold(name))}
+                onTake={(entries) => {
+                    for (const e of entries) t.append(e)
+                }}
+            />,
+        )
+    }
+
     const form = (entry: CustomEntry, row: number | undefined) => {
         const others = otherNames(t.drafts.rows, row)
         const done = (e: CustomEntry) =>
             row === undefined ? t.append(e) : t.replaceAt(row, e)
         nav.push(
-            entry.kind === "polymer" ? (
+            isSequenceEntry(entry) ? (
+                <SequenceForm entry={entry} others={others} onAccept={done} />
+            ) : entry.kind === "polymer" ? (
                 <CustomPolymerForm entry={entry} others={others} onAccept={done} />
             ) : (
                 <CustomNonbioForm
@@ -386,6 +578,8 @@ export function CustomSolutesTable(): ReactNode {
         if (press.is(keys.enter) && t.canEdit && t.current) form(t.current, t.cursor.index)
         else if (press.is(keys.addNonbio) && t.canAdd) form(blankNonbio(), undefined)
         else if (press.is(keys.addPolymer) && t.canAdd) form(blankPolymer(), undefined)
+        else if (press.is(keys.addProtein) && t.canAdd) addSequences("protein")
+        else if (press.is(keys.addNucleotide) && t.canAdd) addSequences("nucleotide")
     })
 
     const entryOf = (r: Row<CustomEntry>) => rowValue(r) as CustomEntry

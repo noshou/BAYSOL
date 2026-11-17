@@ -20,15 +20,15 @@ import { appDir } from "../src/core/environment.js"
 import { ChangedOnDiskError } from "../src/core/file-system.js"
 import { displayWidth, wrapLine } from "../src/core/terminal.js"
 import { CustomSolutesTable, RecipesTable } from "../src/screens/custom-solutes.js"
-import { DataScreen } from "../src/screens/data-screen.js"
+import { DataScreen, referenceFacts } from "../src/screens/data-screen.js"
 import { LogsRuns, modelsCell } from "../src/screens/logs-menu.js"
 import { BufferLanding, MainMenu, ProjectMenu } from "../src/screens/menus.js"
-import { ModelReferenceScreen } from "../src/screens/model-reference.js"
+import { ModelScreen, modelFacts } from "../src/screens/model-screen.js"
 import { ModelsScreen } from "../src/screens/models.js"
 import { noWorkbookNote, OpenRuns } from "../src/screens/open-runs.js"
-import { ReferencesScreen } from "../src/screens/references-screen.js"
 import { RunScreen } from "../src/screens/run-screens.js"
-import { SettingsMenu, SettingsSheet } from "../src/screens/settings-screens.js"
+import { SettingsMenu } from "../src/screens/settings-menu.js"
+import { SettingsSheet } from "../src/screens/settings-sheet.js"
 import { SolutesTable } from "../src/screens/solutes.js"
 import {
     type BufferRow,
@@ -37,6 +37,7 @@ import {
     writeSolutes,
 } from "../src/store/buffer.js"
 import { writeData } from "../src/store/data.js"
+import { EMPTY_MODEL_REFERENCE } from "../src/store/model-references.js"
 import type { RunView } from "../src/store/run.js"
 import {
     BRIEF_ERROR_WIDTH,
@@ -49,7 +50,7 @@ import { runBrief } from "../src/store/run-stamp.js"
 import { globalScope, projectScope } from "../src/store/settings-store.js"
 import { cornerLabels, fitCorner, legendRoom } from "../src/ui/frame.js"
 import { destructiveQuestion } from "../src/ui/input.js"
-import { drawScreen, fixtureText, tempDir } from "./support/fixtures.js"
+import { drawLines, fixtureText, tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. The screens at 80 and 100 columns
@@ -161,24 +162,14 @@ const failedView: RunView = {
     ],
 }
 
-/** Draws a screen on the default theme at some columns (24 rows). */
-function draw(screen: ReactElement, columns: number): string[] {
-    return drawScreen(screen, columns).split("\n")
-}
-
 test("every screen fits 80 x 24 and a wider terminal, and shows no cut message", () => {
     const project = scratchProject()
     const screens: Record<string, ReactElement> = {
         "main menu": createElement(MainMenu),
         "project menu": createElement(ProjectMenu, { project }),
+        model: createElement(ModelScreen, { project }),
         models: createElement(ModelsScreen, { project }),
-        "model reference": createElement(ModelReferenceScreen, {
-            project,
-            file: `${MODEL}.pdb`,
-            stem: MODEL,
-        }),
         data: createElement(DataScreen, { project }),
-        "reference fit": createElement(ReferencesScreen, { project }),
         "buffer landing": createElement(BufferLanding, { project }),
         "custom solutes": createElement(CustomSolutesTable),
         recipes: createElement(RecipesTable),
@@ -199,7 +190,7 @@ test("every screen fits 80 x 24 and a wider terminal, and shows no cut message",
             })
     for (const [name, screen] of Object.entries(screens)) {
         for (const columns of [80, 100]) {
-            const lines = draw(screen, columns)
+            const lines = drawLines(screen, columns)
             assert.ok(lines.length <= 24, `${name} at ${columns}: ${lines.length} rows`)
             for (const line of lines) {
                 assert.ok(
@@ -216,14 +207,14 @@ test("the project menu: no run without a temperature, then shift+r at once", () 
     const project = scratchProject()
     // an old buffer: pH and σ, no temperature
     assert.equal(readConditions(project.dir)?.temperature, undefined)
-    const old = draw(createElement(ProjectMenu, { project }), 80).join("\n")
+    const old = drawLines(createElement(ProjectMenu, { project }), 80).join("\n")
     assert.ok(old.includes("missing: temperature"), old)
     assert.ok(!old.includes("shift+r"), old)
     // with a temperature the project is ready: the key is offered, and nothing asks
     const rows = JSON.parse(fixtureText("buffer/buffer.json")).solutes as BufferRow[]
     writeSolutes(project.dir, rows, { pH: 7.4, "sigmaPh": 0.1, temperature: 4 })
     for (const columns of [80, 100]) {
-        const text = draw(createElement(ProjectMenu, { project }), columns).join("\n")
+        const text = drawLines(createElement(ProjectMenu, { project }), columns).join("\n")
         assert.ok(/run:\s+shift\+r/.test(text), text)
         assert.ok(!text.includes("temperature"), text)
         assert.ok(!text.includes("cannot run"), text)
@@ -233,7 +224,7 @@ test("the project menu: no run without a temperature, then shift+r at once", () 
 test("the conditions row shows pH, σ and the temperature at 80 x 24", () => {
     const rows = JSON.parse(fixtureText("buffer/buffer.json")).solutes as BufferRow[]
     const cells = (conditions: object | undefined) =>
-        draw(
+        drawLines(
             createElement(SolutesTable, {
                 items: rows,
                 conditions: conditions as never,
@@ -255,7 +246,7 @@ test("the conditions row shows pH, σ and the temperature at 80 x 24", () => {
 test("the recipes table shows the recipe's temperature", () => {
     scratchProject() // points the data folder at a scratch one
     saveRecipe(appDir(), "cold", [], { pH: 7.5, "sigmaPh": 0.1, temperature: 4 })
-    const text = draw(createElement(RecipesTable), 80)
+    const text = drawLines(createElement(RecipesTable), 80)
     assert.ok(text.some((l) => l.includes("°C")), text.join("\n"))
     assert.ok(text.some((l) => /cold.*7\.5.*0\.1.*\b4\b/.test(l)), text.join("\n"))
     for (const line of text) assert.ok(displayWidth(line) <= 80, line)
@@ -268,7 +259,7 @@ test("the recipes table marks templates and offers new template at 80", () => {
     const broken = { kind: "custom", name: "x" }
     saveRecipe(appDir(), "broken", [], undefined, undefined, broken as never)
     saveRecipe(appDir(), "plain", [])
-    const text = draw(createElement(RecipesTable), 80)
+    const text = drawLines(createElement(RecipesTable), 80)
     const joined = text.join("\n")
     assert.ok(text.some((l) => /T-buf.*builtin/.test(l)), joined)
     assert.ok(text.some((l) => /broken.*invalid/.test(l)), joined)
@@ -279,9 +270,9 @@ test("the recipes table marks templates and offers new template at 80", () => {
 
 test("the open-runs legend with every file key fits 80 columns, nothing cut", () => {
     const project = scratchProject()
-    const lines = draw(createElement(OpenRuns, { project }), 80)
+    const lines = drawLines(createElement(OpenRuns, { project }), 80)
     const text = lines.join("\n")
-    for (const label of ["data", "tex", "compile plots"])
+    for (const label of ["move data", "move tex plots", "compile plots"])
         assert.ok(text.includes(label), `${label} is in the legend:\n${text}`)
     assert.ok(lines.length <= 24)
     for (const line of lines) assert.ok(displayWidth(line) <= 80, line)
@@ -372,4 +363,40 @@ test("a failed model's note keeps its sentence and cuts only the name", () => {
     const tight = failedNote("SASDCQ2_with_a_name_much_too_long_for_it", LONG_ERROR, 40)
     assert.ok(tight.endsWith(" failed: not converged") && tight.startsWith("…"))
     assert.ok(displayWidth(tight) <= 40)
+})
+
+test("the model screen lists the facts of the model and its options", () => {
+    const project = scratchProject()
+    const facts = modelFacts(1, `${MODEL}.pdb`, ["c1Max"], 40)
+    assert.deepEqual(
+        facts.map(([name]) => name),
+        ["models", "model", "settings"],
+    )
+    assert.equal(facts.find(([n]) => n === "settings")?.[1], "c1Max")
+    assert.deepEqual(modelFacts(0, undefined, undefined, 40), [])
+    const text = drawLines(createElement(ModelScreen, { project }), 90).join("\n")
+    for (const word of ["load a model", "change a model", "settings"])
+        assert.match(text, new RegExp(word))
+    // the reference fit is the project's one: no row of the model screen edits it
+    assert.doesNotMatch(text, /reference|curve|software|chi2|rescale|\btag\b/)
+    assert.match(text, new RegExp(MODEL))
+})
+
+test("the data screen edits the project's one reference fit", () => {
+    assert.deepEqual(referenceFacts(undefined, EMPTY_MODEL_REFERENCE, 40), [])
+    const facts = referenceFacts(
+        "fit3",
+        { ...EMPTY_MODEL_REFERENCE, software: "FoXS", rescale: true },
+        40,
+    )
+    assert.deepEqual(facts, [
+        ["reference fit", "fit3"],
+        ["ref software", "FoXS"],
+        ["ref chi2", "-"],
+        ["ref rescale", "on"],
+    ])
+    const text = drawLines(createElement(DataScreen, { project: scratchProject() }), 90)
+    for (const word of ["reference fit", "reference software", "reference chi2"])
+        assert.match(text.join("\n"), new RegExp(word))
+    assert.match(text.join("\n"), /reference rescale/)
 })

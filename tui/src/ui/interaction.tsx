@@ -5,7 +5,7 @@
 //
 // Contents:
 //   1. Navigation: the screen stack and which screen listens
-//   2. Key values: `KeyInput`, `keys`, `ctrlKey`/`plainKey`/`shiftKey`, matching, labels
+//   2. Key values: `KeyInput` (a press), `Hotkey` (a wanted key), `keys`, matching, labels
 //   3. `useKeys`: the one handler hook, gated by the nav stack
 //   4. Layout: the terminal size and the room the screens get
 //   5. Scroll window: which rows of a long list are drawn (pure)
@@ -57,11 +57,7 @@ export type Nav = {
 const NavContext = createContext<Nav | null>(null)
 
 
-/**
- * Whether the screen that reads this is the one on top. Every screen stays mounted
- * while another is open on it (so it comes back as it was), and only the top one
- * takes keys.
- */
+/** Whether the reading screen is the one on top; only the top screen takes keys. */
 const ActiveContext = createContext<boolean>(true)
 
 /**
@@ -83,26 +79,24 @@ export function useScreenActive(): boolean {
 
 /**
  * Keeps the stack of open screens and draws all of them, the top one visible.
- * Lower screens keep their state because they are hidden, not unmounted.
+ * Lower screens are hidden, not unmounted, so they keep their state.
  *
  * @param root - the first screen.
  * @param suspended - `true` while nothing may take keys (the terminal is too small to
- *     show a screen): the screens stay mounted, so the user comes back to the one
- *     they were on, with its state, when the terminal is big enough again.
+ *     show a screen); the screens stay mounted.
  * @returns the provider; put it around the whole program.
  */
 export function NavProvider(
     { root, suspended = false }: { root: ReactElement; suspended?: boolean }
 ): ReactNode {
     const { exit } = useApp()
-    // ONE resize listener for every screen: each `useWindowSize` of Ink adds its own, and
-    // the screens of the stack stay mounted (more than ten hit Node's leak warning)
+    // ONE resize listener for all screens: each `useWindowSize` adds one (>10 warns)
     const { columns, rows } = useWindowSize()
     const size = useMemo(() => ({ columns, rows }), [columns, rows])
     const [stack, setStack] = useState<ReactElement[]>([root])
 
     const push = useCallback((screen: ReactElement) => setStack((s) => [...s, screen]), [])
-    // the first screen is never popped: going back from it would leave nothing to show
+    // the first screen is never popped
     const pop = useCallback(
         () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)),
         []
@@ -155,24 +149,38 @@ const namedLabels: Record<string, string> = {
     home:      "home",
     end:       "end",
     " ":       "␣",
-    "+":       "shift++",
+}
+
+/**
+ * What a legend shows for a key: `⏎`, `esc`, `tab`, `↑`, a letter, `^` and the letter for a
+ * Ctrl key, `shift+` and the letter for a Shift key.
+ *
+ * @param key_ - the name of the key.
+ * @param ctrl - whether Ctrl is held.
+ * @param shift - whether Shift is held.
+ * @returns the label.
+ */
+function labelOf(key_: string, ctrl: boolean, shift: boolean): string {
+    if (key_ in namedLabels) return `${shift ? "shift+" : ""}${namedLabels[key_]}`
+    if (ctrl) return `^${key_}`
+    return shift ? `shift+${key_}` : key_
 }
 
 /**
  * One key press: the name of the key, whether Ctrl and Shift were held, and the text it
- * typed.
+ * typed. A press is what `useKeys` and `keyPress` produce; a key the program WANTS is a
+ * [[Hotkey]], and a press is matched against it with `is`.
  *
  * The name is the typed character in lower case (`"n"`), or one of `"escape"`,
  * `"return"`, `"tab"`, `"backspace"`, `"delete"`, `"up"`, `"down"`, `"left"`,
- * `"right"`, `"pageup"`, `"pagedown"`, `"home"`, `"end"`. Menu hotkeys are
- * `KeyInput`s too, so a press is matched against a hotkey with `is`. Text entry
- * reads `text`, which keeps the capitals of what was typed (or pasted).
+ * `"right"`, `"pageup"`, `"pagedown"`, `"home"`, `"end"`. Text entry reads `text`, which
+ * keeps the capitals of what was typed (or pasted).
  *
  * @param key_ - the name of the key.
  * @param ctrl - whether Ctrl was held, `false` when left out.
  * @param text - what the key typed, `""` for a key that types nothing.
- * @param shift - whether the key is a capital letter (Shift, or Caps Lock), `false`
- *     when left out. In a hotkey it means "the capital only" (see `is`).
+ * @param shift - whether Shift was held: a capital letter (Shift, or Caps Lock), a shifted
+ *     symbol (`_`, `+`) or a Shift arrow; `false` when left out.
  */
 export class KeyInput {
     constructor(
@@ -183,32 +191,24 @@ export class KeyInput {
     ) {}
 
     /**
-     * Compares a press (this) with a wanted key, normally a hotkey from `keys`.
+     * Compares this press with a wanted key, always a [[Hotkey]] of this file.
      *
-     * The names and the Ctrl state must be equal. Shift is asymmetric on purpose: a
-     * wanted key that demands Shift (`shiftKey("d")`) matches only a capital press,
-     * while a wanted key that does not demand it matches either case. So every plain
-     * hotkey keeps working with Caps Lock or a capital typed by mistake, as it always
-     * did, and a screen can still give `D` a meaning of its own. A screen that has both
-     * `d` and `D` must test the Shift key first, because a capital press matches both.
+     * Names and Ctrl state must be equal. Shift is asymmetric on purpose: a wanted key
+     * that demands Shift (`keys.runKey`) matches only a capital press, one that does not
+     * matches either case (Caps Lock keeps working). A screen with both `d` and `D` must
+     * test Shift first, because a capital press matches both.
      *
-     * @param key - the wanted key (a hotkey).
+     * @param key - the wanted key.
      * @returns `true` when this press is that key.
      */
-    is (key: KeyInput) {
+    is (key: Hotkey) {
         return key.key_  === this.key_  && key.ctrl  === this.ctrl
             && (!key.shift || this.shift)
     }
 
-    /**
-     * What a legend shows for this key: `⏎`, `esc`, `tab`, `↑`, a letter, `^` and the
-     * letter for a Ctrl key, `shift+` and the letter for a Shift key.
-     */
+    /** What a legend shows for this press (see `labelOf`). */
     get label(): string {
-        if (this.key_ in namedLabels)
-            return `${this.shift ? "shift+" : ""}${namedLabels[this.key_]}`
-        if (this.ctrl) return `^${this.key_}`
-        return this.shift ? `shift+${this.key_}` : this.key_
+        return labelOf(this.key_, this.ctrl, this.shift)
     }
 
     /**
@@ -225,13 +225,66 @@ export class KeyInput {
     }
 }
 
+/** Set by the static block of [[Hotkey]]: the only way to make one (private here). */
+let makeHotkey!: (key_: string, ctrl: boolean, shift: boolean) => Hotkey
+
+/**
+ * A key the program WANTS (a [[KeyInput]] is a key that was pressed). Only this file can
+ * create one, so every key with a meaning is in `keys`, `taskbarKeys` or `menuOptions`.
+ * The private brand makes the type nominal: a press cannot stand in for a wanted key.
+ *
+ * @property key_ - the name of the key (see [[KeyInput]]).
+ * @property ctrl - whether Ctrl is demanded.
+ * @property shift - whether Shift is demanded ("the capital only", see `KeyInput.is`).
+ */
+export class Hotkey {
+    /** The nominal brand: no other type has it. */
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: the brand is never read
+    private readonly hotkeyBrand = true
+
+    static {
+        makeHotkey = (key_, ctrl, shift) => new Hotkey(key_, ctrl, shift)
+    }
+
+    private constructor(
+        readonly key_:  string,
+        readonly ctrl:  boolean,
+        readonly shift: boolean
+    ) {}
+
+    /**
+     * What a legend shows for this key: `⏎`, `esc`, `tab`, `↑`, a letter, `^` and the
+     * letter for a Ctrl key, `shift+` and the key for a Shift key (`shift+p`, `shift+-`,
+     * `shift+↓`; a capital is never written as such).
+     */
+    get label(): string {
+        return labelOf(this.key_, this.ctrl, this.shift)
+    }
+
+    /**
+     * The key spelled in words, for a note line: `enter` for Return, else the label
+     * (`esc`, `tab`, `^w`).
+     */
+    get name(): string {
+        return this.key_ === "return" ? "enter" : this.label
+    }
+}
+
+/**
+ * A key named only by its name (Enter, the arrows, a symbol).
+ *
+ * @param name - the name of the key.
+ * @returns the key.
+ */
+const namedKey = (name: string): Hotkey => makeHotkey(name, false, false)
+
 /**
  * A Ctrl hotkey.
  *
  * @param letter - the letter, lower case.
  * @returns the key, which a legend shows as `^letter`.
  */
-export const ctrlKey = (letter: string): KeyInput => new KeyInput(letter, true)
+const ctrlKey = (letter: string): Hotkey => makeHotkey(letter, true, false)
 
 /**
  * A plain letter hotkey; it matches the letter in either case (see `KeyInput.is`).
@@ -239,33 +292,27 @@ export const ctrlKey = (letter: string): KeyInput => new KeyInput(letter, true)
  * @param letter - the letter, lower case.
  * @returns the key, which a legend shows as the letter.
  */
-export const plainKey = (letter: string): KeyInput => new KeyInput(letter)
+const plainKey = (letter: string): Hotkey => makeHotkey(letter, false, false)
 
 /**
- * A Shift hotkey: only the capital letter matches it.
+ * A Shift hotkey: only the press with Shift matches it (the capital of a letter, the
+ * shifted symbol of a key such as `_` for `-`, an arrow with Shift).
  *
- * @param letter - the letter, lower case.
- * @returns the key, which a legend shows as `shift+letter`.
+ * @param name - the letter (lower case), the unshifted symbol or the name of the key.
+ * @returns the key, which a legend shows as `shift+` and the key (`shift+p`).
  */
-export const shiftKey = (letter: string): KeyInput =>
-    new KeyInput(letter, false, "", true)
+const shiftKey = (name: string): Hotkey => makeHotkey(name, false, true)
 
-/** A key only the capital letter matches; a legend shows the capital (`P`). */
-class CapitalKey extends KeyInput {
-    override get label(): string {
-        return this.key_.toUpperCase()
-    }
+/**
+ * The press that matches a wanted key, for code that must feed a key to a handler
+ * without a terminal (the tests).
+ *
+ * @param key - the wanted key.
+ * @returns a press with the same name, Ctrl and Shift state, typing no text.
+ */
+export function pressOf(key: Hotkey): KeyInput {
+    return new KeyInput(key.key_, key.ctrl, "", key.shift)
 }
-
-/**
- * A capital-letter hotkey: only the capital matches it, and the legend shows `P`, not
- * `shift+p` (shorter, so a legend with many keys keeps its width).
- *
- * @param letter - the letter, lower case.
- * @returns the key.
- */
-const capitalKey = (letter: string): KeyInput =>
-    new CapitalKey(letter, false, "", true)
 
 /**
  * What a legend shows for one or more keys, so a legend never spells a key itself.
@@ -275,34 +322,32 @@ const capitalKey = (letter: string): KeyInput =>
  *     being `↑↓`.
  * @returns the labels, e.g. `"←→ tab"`.
  */
-export function keyLabels(...parts: (KeyInput | KeyInput[])[]): string {
+export function keyLabels(...parts: (Hotkey | Hotkey[])[]): string {
     return parts
         .map((p) => (Array.isArray(p) ? p.map((k) => k.label).join("") : p.label))
         .join(" ")
 }
 
 /**
- * Every key the program gives a meaning, in one place so a screen never spells a key
- * itself. Ctrl-M, Ctrl-I, Ctrl-J, Ctrl-B, Ctrl-S, Ctrl-Q, Ctrl-Z and Ctrl-Y are not
- * usable: terminals send them as Enter, Tab, flow control, or take them. Ctrl-C and
- * Ctrl-D reach the program (Ink runs with `exitOnCtrlC: false`) and are reserved for
- * leaving it: `interrupt` and `eof`.
+ * Every key the program gives a meaning, in one place. Ctrl-M, I, J, B, S, Q, Z and Y
+ * are not usable: terminals send them as Enter, Tab or flow control, or take them.
+ * Ctrl-C and Ctrl-D reach the program (`exitOnCtrlC: false`) and only leave it.
  */
 export const keys = {
 
-    enter:     new KeyInput("return"),
-    escape:    new KeyInput("escape"),
-    tab:       new KeyInput("tab"),
-    backspace: new KeyInput("backspace"),
-    delete:    new KeyInput("delete"),
-    up:        new KeyInput("up"),
-    down:      new KeyInput("down"),
-    left:      new KeyInput("left"),
-    right:     new KeyInput("right"),
-    pageUp:    new KeyInput("pageup"),
-    pageDown:  new KeyInput("pagedown"),
-    home:      new KeyInput("home"),
-    end:       new KeyInput("end"),
+    enter:     namedKey("return"),
+    escape:    namedKey("escape"),
+    tab:       namedKey("tab"),
+    backspace: namedKey("backspace"),
+    delete:    namedKey("delete"),
+    up:        namedKey("up"),
+    down:      namedKey("down"),
+    left:      namedKey("left"),
+    right:     namedKey("right"),
+    pageUp:    namedKey("pageup"),
+    pageDown:  namedKey("pagedown"),
+    home:      namedKey("home"),
+    end:       namedKey("end"),
 
     /** Leave the program at once (the only exits are `q` in the main menu and this). */
     interrupt: ctrlKey("c"),
@@ -343,27 +388,23 @@ export const keys = {
     /** Rename the highlighted note (the notes list). */
     renameNote:    shiftKey("m"),
 
-    /** Open the notes list of the project (project menu), of the highlighted recipe
-     * (recipes table), of the buffer or of one recipe (their solutes table). */
+    /** Open the notes list of the project, recipe, buffer or one recipe's solutes. */
     notesList:     shiftKey("n"),
 
     /** Add the rows of a standard buffer (Tris, HEPES, PBS ...) on the solutes table. */
     bufferTemplate: shiftKey("b"),
 
-    /** Make a template: a recipe (recipes table) or rows (solutes table) that follow the
-     * pH and the temperature, from a shipped buffer, a custom one or a table. */
-    newTemplate:   shiftKey("t"),
+    /** Make a template (recipe or rows) that follows the pH and the temperature. */
+    newTemplate:   shiftKey("w"),
 
-    /** Turn the rows of the solutes table into a template: a table of amounts that starts
-     * from them at the pH of the table. */
+    /** Turn the rows of the solutes table into a template. */
     convertTemplate: shiftKey("v"),
 
     /** Edit the definition of the template recipe under the cursor (recipes table). */
     editTemplate:  shiftKey("e"),
 
-    /** The third answer of a question that has one besides Enter and Esc (`save as a
-     * template?`: the plain recipe, `w` as in "without"). */
-    otherAnswer:   plainKey("w"),
+    /** The third answer of a question besides Enter and Esc (`shift+x`, "without"). */
+    otherAnswer:   shiftKey("x"),
 
     /** Edit the pH of a buffer (and its σ) on the solutes table. */
     editPh:        ctrlKey("g"),
@@ -374,73 +415,66 @@ export const keys = {
     /** Turn the unit of the concentrations of the buffer table (mM, M, µM). */
     units:         ctrlKey("k"),
 
-    /** Add a reference curve (the references list of the data screen). */
-    addReference:  shiftKey("a"),
-
     /** Open the settings of the highlighted model (the models list). */
     modelSettings: ctrlKey("o"),
 
-    /** Open the reference fit of the highlighted model (the models list). */
-    modelReference: shiftKey("f"),
-
-    /** Pick files with the desktop file picker (an empty field). */
-    pickFiles: plainKey("e"),
+    /** Desktop file picker (empty path field); Ctrl, so a capital never triggers it. */
+    pickFiles: ctrlKey("v"),
 
     /** Open the list of models (an empty field). */
-    openList:  plainKey("i"),
+    openList:  shiftKey("h"),
 
     /** Reset an unusable file (a landing page). */
-    reset:     plainKey("x"),
+    reset:     shiftKey("z"),
 
-    // The file viewer (`screens/viewer.tsx`).
+    // The pages: the file viewer (`screens/viewer.tsx`) and the pager (`ui/pager.tsx`).
 
-    /** The pager's page down (with Enter and PgDn). */
-    space:      new KeyInput(" "),
+    /** A page down and a page up, besides PgDn and PgUp (`pageDown`, `pageUp`). */
+    pageDownShift: shiftKey("down"),
+    pageUpShift:   shiftKey("up"),
+
+    /** Mark a range (viewer) or a line (pager), and toggle a tab (settings): Space. */
+    mark:       namedKey(" "),
 
     /** Show the plots of a run instead of the sheets, and back. */
-    plots:      capitalKey("p"),
+    plots:      shiftKey("p"),
 
-    /** The previous and the next sheet (tab). */
+    /** The plots mode: Unicode plot or rendered figure (sixel terminals only). */
+    plotType:   shiftKey("t"),
+
+    /** The previous sheet or plot (the next one is `tab`). */
     shiftTab:   shiftKey("tab"),
-    zoomIn:     plainKey("+"),
-    zoomInAlt:  plainKey("="),
-    zoomOut:    plainKey("-"),
-    prevSheet:  plainKey("["),
-    nextSheet:  plainKey("]"),
 
-    /** Search (`/`), the next and previous match, jump to a cell, copy, formulas. In a
-     * table of named rows `/` finds a row and `s` puts the rows in alphabetical order. */
+    /** A larger and a smaller plot (`+` and `_`: the Shift of `=` and `-`). */
+    zoomIn:     shiftKey("="),
+    zoomOut:    shiftKey("-"),
+
+    /** Search (`/`), next/previous match, jump, copy, formulas; `sort` orders rows. */
     find:       plainKey("/"),
-    sort:       plainKey("z"),
-    nextMatch:  plainKey("."),
-    prevMatch:  plainKey(","),
-    jump:       plainKey("j"),
-    copy:       plainKey("c"),
+    sort:       shiftKey("s"),
+    nextMatch:  shiftKey("k"),
+    prevMatch:  shiftKey("i"),
+    jump:       shiftKey("j"),
+    copy:       shiftKey("y"),
+    formulas:   shiftKey("u"),
+
+    /** The answers of the viewer's copy question, only while it is asked. */
+    copyCell:   plainKey("c"),
     copyRow:    plainKey("r"),
     copyColumn: plainKey("v"),
-    formulas:   plainKey("f"),
 
     /** Read the `run.LOG` of a run (`open runs`). */
     showLog:    ctrlKey("l"),
 
-    /** Move (copy) the `.tex` plots of a run to the plot folder (`open runs`): a dropdown
-     * asks for the whole run or one model. */
+    /** Move (copy) the `.tex` plots of a run (or one model) to the plot folder. */
     moveTex:         shiftKey("l"),
 
-    /** Move (copy) the data of a run, the workbooks and the comparison table, to the data
-     * folder: the same dropdown. */
+    /** Move (copy) the workbooks and comparison table of a run to the data folder. */
     moveData:        shiftKey("d"),
 
-    /** Compile the plots of the highlighted model or comparison with LaTeX into the
-     * plot folder. */
+    /** Compile the plots of the highlighted model or comparison into the plot folder. */
     compilePlots:    shiftKey("c"),
-
-    // The `run.LOG` pager also takes `enter`, `space`, `pageDown`, `pageUp`, the arrows
-    // and `home`/`end`.
-
-    /** A page up (the other page-up key is `pageUp`). */
-    pageBack:   plainKey("k"),
-} as const
+} as const satisfies Record<string, Hotkey>
 
 /** The names of Ink's flags for the keys that type nothing, and the name given each. */
 const namedKeys: [keyof InkKey, string][] = [
@@ -459,6 +493,12 @@ const namedKeys: [keyof InkKey, string][] = [
     ["end",       keys.end.key_],
 ]
 
+/** Symbols typed with Shift (US layout): `_` is `shift+-`, `+` is `shift+=`. */
+const shiftedSymbols = new Map([
+    ["_", "-"],
+    ["+", "="],
+])
+
 /**
  * Turns what Ink's `useInput` reports into a `KeyInput`.
  *
@@ -472,25 +512,53 @@ const namedKeys: [keyof InkKey, string][] = [
  */
 export function keyPress(input: string, key: InkKey): KeyInput {
 
-    // non alpha-numeric key presses
     for (const [flag, name] of namedKeys) {
         if (key[flag]) return new KeyInput(name, false, "", key.shift === true)
     }
 
-    // alpha-numeric key presses; a capital letter is a Shift press
+    // alpha-numeric key presses; a capital letter is a Shift press, and so is a shifted
+    // symbol (`_` is Shift and `-`), which Ink reports without its Shift flag
     if (key.ctrl) return new KeyInput(input.toLowerCase(), true)
+    const base = shiftedSymbols.get(input)
+    if (base !== undefined) return new KeyInput(base, false, input, true)
     return new KeyInput(input.toLowerCase(), false, input, input !== input.toLowerCase())
 }
 
-/**
- * The taskbar items of the project menu: what each is called and the key that does it.
- * A screen passes an item to the menu only when it applies (see `GridMenu`), so the
- * label and the key are written here once.
- */
+/** The taskbar items of the project menu: label and key, written once (see `GridMenu`). */
 export const taskbarKeys = {
     run: { label: "run", key: keys.runKey },
     notes: { label: "notes", key: keys.notesList },
-} as const
+} as const satisfies Record<string, { label: string; key: Hotkey }>
+
+/**
+ * Every menu option and its hotkey. Names are the allowed `MenuOptions` of `grid.tsx`;
+ * each needs a `<name>.txt` in `assets/menu-options/`.
+ */
+export const menuOptions = {
+    buffer:   { hotkey: plainKey("b") },
+    data:     { hotkey: plainKey("d") },
+    help:     { hotkey: plainKey("h") },
+    load:     { hotkey: plainKey("l") },
+    logs:     { hotkey: plainKey("g") },
+    models:   { hotkey: plainKey("m") },
+    new:      { hotkey: plainKey("n") },
+    open:     { hotkey: plainKey("o") },
+    output:   { hotkey: plainKey("u") },
+    plots:    { hotkey: plainKey("p") },
+    quit:     { hotkey: plainKey("q") },
+    recipes:  { hotkey: plainKey("y") },
+    sampler:  { hotkey: plainKey("a") },
+    settings: { hotkey: plainKey("s") },
+    solutes:  { hotkey: plainKey("t") },
+} as const satisfies Record<string, { hotkey: Hotkey }>
+
+/** The arrow keys of a menu grid, by the move each one asks for. */
+export const arrowKeys = {
+    up:    keys.up,
+    down:  keys.down,
+    left:  keys.left,
+    right: keys.right,
+} as const satisfies Record<string, Hotkey>
 
 // ========================================================================================
 // 3. The key hook
@@ -498,10 +566,8 @@ export const taskbarKeys = {
 
 /**
  * Handles the key presses of a screen or of a part of one (a prompt, a dropdown).
- *
- * Ink calls every mounted `useInput`, so a handler must say when it is not the one
- * to listen: a screen below another one never listens, and a screen with a prompt
- * open passes `active = false` for its own handler while the prompt's is on.
+ * Ink calls every mounted `useInput`, so a handler passes `active = false` while
+ * another (a prompt) is the one to listen.
  *
  * @param handler - called with each press as a [[KeyInput]].
  * @param active - whether this handler is the one that listens, `true` when left out.
@@ -515,11 +581,7 @@ export function useKeys(handler: (press: KeyInput) => void, active: boolean = tr
 // 4. Layout: the terminal size and the room the screens get
 // ========================================================================================
 
-/**
- * The layout adapts to the terminal: nothing has a fixed width or height, text wraps
- * and lists scroll. Only a minimum is asked for, below which a screen says so instead
- * of drawing itself badly.
- */
+/** Nothing has a fixed size; only a minimum is asked for, below which a screen says so. */
 
 /** The narrowest terminal the screens are laid out for, in columns. */
 export const minColumns = 80
@@ -542,10 +604,7 @@ export function useTerminalSize(): { columns: number; rows: number } {
     return useContext(SizeContext)
 }
 
-/**
- * The rows that every screen keeps for itself: its title, the keys at the bottom
- * (the logo's three lines and a note line) and the theme line, with a little to spare.
- */
+/** The rows every screen keeps: title, keys, logo, note line and theme line, plus spare. */
 const frameRows = 10
 
 /**
@@ -571,11 +630,7 @@ export function useBodyColumns(): number {
     return narrowed ?? Math.max(minColumns, columns) - 2
 }
 
-/**
- * The width a box inside the body really has, when it is narrower than the body (the
- * panel of an open dropdown is half as wide): [[useBodyColumns]] answers with it, so a
- * list pads and truncates its rows to the panel and never wraps them.
- */
+/** The width of a box narrower than the body (a dropdown panel); [[useBodyColumns]]. */
 export const NarrowWidth = createContext<number | undefined>(undefined)
 
 /** The rows the app keeps under every screen for the theme line (`theme (^t): ...`). */
@@ -585,9 +640,7 @@ export const themeLineRows = 1
 // 5. Scroll window
 // ========================================================================================
 
-// The one place that decides which rows of a long list are drawn: the cursor of a table,
-// the suggestions under an input, the blocks of a settings sheet and the picker all ask
-// here, so they scroll the same way.
+// The one place that decides which rows of a long list are drawn, so all scroll alike.
 
 /**
  * Keeps a window of `size` rows inside a list of `count` rows.
@@ -711,7 +764,7 @@ export function useListCursor(
 ): ListCursor {
     const [state, setState] = useState({ index: initial, offset: 0 })
 
-    // clamp on read: the list may have shrunk since the state was set
+    // clamp on read: the list may have shrunk
     const index = Math.min(state.index, Math.max(0, count - 1))
     const offset = scrollWindow(index, state.offset, pageSize, count)
 
@@ -749,11 +802,9 @@ export function ListText(
 }
 
 /**
- * The one list with a cursor of the program: a `>` before the row the cursor is on, the
- * rows from `offset` on, `lines` of them, each drawn by `row`. The suggestions under an
- * input, the theme picker, the settings pickers and the options of the landing pages are
- * all this list; they differ in what a row looks like and in who owns the cursor (a
- * [[useListCursor]], or a highlight that scrolls with a centred window).
+ * The one list with a cursor of the program: a `>` before the cursor row, `lines` rows
+ * from `offset` on, each drawn by `row`. The owner of the cursor is a [[useListCursor]]
+ * or a highlight with a centred window.
  *
  * @typeParam T - what a row is made from.
  * @param props.items - every row of the list.

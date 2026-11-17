@@ -70,9 +70,9 @@ Every check before a commit.
     bysl precommit [--quick] [--dry-run] [--threads N]
 
 Steps, in order; all run, and the exit status is 1 if any failed:
-    tool-tests, pmv-mean, solute-index, unit-tests, concurrency-tests, whitespace,
-    default-settings, ts-format, ts-unused, julia-format, line-length, results-table,
-    docs-build
+    tool-tests, pmv-mean, solute-index, residue-table, unit-tests, concurrency-tests,
+    whitespace, default-settings, ts-format, ts-unused, julia-format, line-length,
+    results-table, docs-build
 
     --quick     skip the Julia steps (unit-tests, concurrency-tests,
                 default-settings, julia-format, docs-build)

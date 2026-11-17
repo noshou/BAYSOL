@@ -32,14 +32,8 @@ import { compareNoCase } from "./terminal.js"
 // ========================================================================================
 
 /**
- * The file handling the files of the user share: reading one with a fallback or with
- * the "unusable" rule (a file that is not what it should be is told, never written
- * over), and writing one through a temporary file that replaces it in one step.
- */
-
-/**
- * The error of a file that exists but cannot be used (it is not JSON, or not the kind
- * of map expected). It is told to the user and the file is never written over.
+ * The error of a file that exists but cannot be used (not JSON, or not the map expected).
+ * It is told to the user and the file is never written over.
  *
  * @param kind - which kind of file it is, so a screen can tell them apart.
  */
@@ -52,10 +46,7 @@ export class UnusableFileError extends Error {
     }
 }
 
-/**
- * Whether a value is a map, what `{...}` reads as in JSON: an object that is not an
- * array and not `null`.
- */
+/** Whether a value is a JSON map: an object, not an array, not `null`. */
 export function isDict(x: unknown): x is Record<string, unknown> {
     return typeof x === "object" && x !== null && !Array.isArray(x)
 }
@@ -63,8 +54,7 @@ export function isDict(x: unknown): x is Record<string, unknown> {
 /**
  * Reads JSON text strictly (no comments, no trailing commas).
  *
- * @param text - the JSON text; an empty (or blank) text is `null`, a file with nothing
- *     in it.
+ * @param text - the JSON text; an empty (or blank) text is `null`.
  * @throws SyntaxError if the text is not JSON.
  */
 export function parseJson(text: string): unknown {
@@ -85,8 +75,8 @@ export function readJson<T>(file: string, fallback: T): unknown | T {
 }
 
 /**
- * The JSON text of a value as the files of the user hold it: two-space indent and a
- * final newline, so a person can read and edit it.
+ * The JSON text of a value as the user's files hold it: two-space indent and a final
+ * newline.
  *
  * @throws TypeError for a value JSON cannot hold (a cycle, a bigint).
  */
@@ -194,8 +184,8 @@ export type MapSpec = {
 }
 
 /**
- * Reads the map in a file. It does not note the version ([[noteRead]]): the store
- * decides whether the read starts an editing session.
+ * Reads the map in a file. It does not note the version ([[noteRead]]): the store decides
+ * whether the read starts an editing session.
  *
  * @throws [[UnusableFileError]] for a file that is not JSON or not such a map.
  */
@@ -210,13 +200,10 @@ export function readMap(file: string, spec: MapSpec): Record<string, unknown> {
 }
 
 /**
- * Writes text to a file through a temporary file next to it that replaces it in one
- * step, so a reader (this program, Julia) never sees half a file; the folders are made
- * if there are none. The temporary file has a name of its own
- * (`<name>.<pid>.<random>.tmp`),
- * so two copies of the program saving at once never write into the same one: each rename
- * puts a whole file in place and the last one wins. A temporary file is never left
- * behind, even when the write fails.
+ * Writes text to a file through a temporary file next to it (`<name>.<pid>.<random>.tmp`,
+ * so two copies saving at once never share one) that replaces it in one step: a reader
+ * never sees half a file, the last rename wins, and no temporary file is left behind.
+ * The folders are made if there are none.
  *
  * @param options - `createParents: false` makes no folder: the file's folder must
  *     exist (a project's files, which must not bring back a deleted project).
@@ -271,9 +258,8 @@ function prepareFolder(file: string, options: FolderOptions): void {
 }
 
 /**
- * Copies a file over another one that may be there. The copy is made next to `to` under
- * a unique name and renamed into place, so a reader (the other copy of the program, or
- * Julia) never sees half a file.
+ * Copies a file over another one that may be there, through a uniquely named file next
+ * to `to` renamed into place, so a reader never sees half a file.
  *
  * @throws if it cannot be copied.
  */
@@ -317,16 +303,14 @@ export class FileInUseError extends Error {
 }
 
 /**
- * Runs `fn` while this process alone may change `file`: the read-modify-write of one
- * file, which two copies of the program must not interleave. The lock is a folder
- * `<file>.lock` next to the file (the file need not exist), refreshed by the library
- * and taken over when its owner died (no refresh for 10 s). It is not re-entrant: `fn`
- * must not lock the same file again. Waiting is by polling every 25 ms, for 3 s.
+ * Runs `fn` while this process alone may change `file` (a read-modify-write that two
+ * copies must not interleave). The lock is a folder `<file>.lock` (the file need not
+ * exist), taken over when its owner died (no refresh for 10 s). Not re-entrant. Waits by
+ * polling every 25 ms, for 3 s.
  *
  * @param options - as for [[writeAtomic]]: `createParents: false` for a project's files.
  * @throws [[ParentMissingError]] as for [[writeAtomic]]; [[FileInUseError]] if the lock
- *     stays taken for 3 s; whatever `fn` throws (the
- *     lock is always released).
+ *     stays taken for 3 s; whatever `fn` throws (the lock is always released).
  */
 export function withFileLock<T>(
     file: string,
@@ -341,9 +325,7 @@ export function withFileLock<T>(
     }
 }
 
-/**
- * Takes the lock of [[withFileLock]], waiting up to 3 s for another copy: the one place
- * that polls, shared by the sync and the async helper.
+/** Takes the lock of [[withFileLock]], waiting up to 3 s: the one place that polls.
  *
  * @throws [[ParentMissingError]], [[FileInUseError]] as for [[withFileLock]].
  */
@@ -373,10 +355,7 @@ function releaseLock(release: () => void): void {
     }
 }
 
-/**
- * What a file looked like when this process last read or wrote it; `null` is "there
- * was no file".
- */
+/** What a file looked like when this process last read or wrote it; `null`: no file. */
 type Version = { mtimeMs: number; size: number; hash: string } | null
 
 /** The version of each file this process has read or written, by absolute path. */
@@ -396,17 +375,13 @@ function versionOf(file: string): Version {
 /**
  * What the read function of a list file takes besides what to read.
  *
- * @property track - `true` when the read opens an editing session on the file (a table
- *     loads its rows to change them): the version read becomes the base that the next
- *     write checks ([[assertUnchanged]]). Left out, the read is plain and the base
- *     stays as it was.
+ * @property track - `true` when the read opens an editing session on the file: the
+ *     version read becomes the base the next write checks ([[assertUnchanged]]). Left
+ *     out, the read is plain and the base stays.
  */
 export type ReadOptions = { track?: boolean }
 
-/**
- * The error of a list file that another copy of the program saved after this one read
- * it: saving now would lose that copy's changes.
- */
+/** The error of a list file another copy saved after this one read it. */
 export class ChangedOnDiskError extends Error {
     constructor(readonly file: string) {
         super(
@@ -416,12 +391,11 @@ export class ChangedOnDiskError extends Error {
 }
 
 /**
- * Records the version of a file as this process now takes it to be (it read it, or
- * found none): the base for [[assertUnchanged]]. Only a read that opens an editing
- * session on the file calls this, and it calls it BEFORE reading, so a save by another
- * copy between the two can only make a later save refuse, never lose an update. A
- * plain read (a count, a list for display) must not call it, or it would accept another
- * copy's save as "current".
+ * Records the version of a file as this process takes it to be: the base for
+ * [[assertUnchanged]]. Only a read that opens an editing session calls this, BEFORE
+ * reading, so a save by another copy between the two can only make a later save refuse,
+ * never lose an update. A plain read must not call it, or it would accept another copy's
+ * save as "current".
  */
 export function noteRead(file: string): void {
     seen.set(resolve(file), versionOf(file))
@@ -451,8 +425,8 @@ export function assertUnchanged(file: string): void {
 }
 
 /**
- * Renames a file to `<name>.corrupt` in its folder (replacing an older one), so a file
- * that cannot be used is kept and a new one can take its place.
+ * Renames a file to `<name>.corrupt` (replacing an older one), so an unusable file is
+ * kept and a new one can take its place.
  *
  * @returns the path of the kept file, or `undefined` if there was no file.
  * @throws if it cannot be renamed.
@@ -465,9 +439,8 @@ export function quarantine(file: string): string | undefined {
 }
 
 /**
- * The words for a failed save, for a screen's note: what another copy of the program
- * did (`ChangedOnDiskError`, `FileInUseError`, `ParentMissingError` and its
- * `ProjectGoneError` say it themselves), else `could not save!`.
+ * The words for a failed save, for a note: the message of the errors another copy causes
+ * (`ChangedOnDiskError`, `FileInUseError`, `ParentMissingError`), else `could not save!`.
  */
 export function saveErrorNote(error: unknown): string {
     if (
@@ -483,17 +456,11 @@ export function saveErrorNote(error: unknown): string {
 // 2. File picker
 // ========================================================================================
 
-/**
- * The desktop's own file picker, to choose structure files (`.cif`, `.pdb`), several at
- * once: `zenity` or `kdialog` on Linux, AppleScript on macOS, PowerShell's open dialog on
- * Windows. The program is asked for the paths and prints them, one to a line. Only the
- * Linux commands have been run; the macOS and Windows ones come from the programs'
- * documentation and are untested.
- *
- * A picker is a window of its own, so it needs a desktop: without one (no `DISPLAY` or
- * `WAYLAND_DISPLAY` on Linux) or without any of the programs there is a short reason to
- * show instead. Programs are started with argument arrays, never through a shell.
- */
+// The desktop's own file picker: `zenity` or `kdialog` on Linux, AppleScript on macOS,
+// PowerShell's open dialog on Windows; it prints the paths, one to a line. Only the Linux
+// commands have been run; macOS and Windows are untested. A picker needs a desktop
+// (`DISPLAY` or `WAYLAND_DISPLAY` on Linux): without one, or without any of the
+// programs, a short reason is shown. Programs get argument arrays, never a shell.
 
 /**
  * What a picker asks for.
@@ -512,18 +479,16 @@ type PickerSpec = {
 
 /**
  * The extensions of a curve file the data and reference prompts and the picker offer
- * (lower case, no dot): delimited text, a workbook, and the usual names of small-angle
- * scattering curves (`.fit` of CRYSOL and FoXS, `.int`, `.out`, `.sub`, `.abs`, `.rad`,
- * `.saxs`). A typed path may have any name: this only lists files for the user.
+ * (lower case, no dot): delimited text, a workbook, and the usual SAS names. A typed
+ * path may have any name.
  */
 export const DATA_EXTENSIONS: readonly string[] = [
     "dat", "txt", "csv", "tsv", "tab", "xlsx", "fit", "int", "out", "sub", "abs",
     "rad", "saxs",
 ]
 
-/** The pickers by kind: the models (several `.cif` and `.pdb` files), the buffer's
- * DNA, RNA and protein sequence file (ONE file, FASTA or FASTQ) and the measured curve
- * of a project (ONE delimited text file or `.xlsx` workbook). */
+/** The pickers by kind: models (several `.cif`/`.pdb`), the buffer's sequence file (ONE,
+ * FASTA or FASTQ) and a project's measured curve (ONE text file or `.xlsx`). */
 const pickerSpecs = {
     structure: {
         title: "Choose models",
@@ -548,8 +513,7 @@ const pickerSpecs = {
 /** The kinds of picker. */
 export type PickerKind = keyof typeof pickerSpecs
 
-/** The result of [[pick]]: the files chosen (none if the window was closed), or why no
- * picker could be shown. */
+/** The result of [[pick]]: the files chosen (none if closed), or why no picker showed. */
 export type PickResult = { files: string[] } | { problem: string }
 
 /** The patterns of the extensions of a spec, in lower and upper case: `*.cif *.CIF`. */
@@ -712,14 +676,11 @@ export async function pick(
 // 3. Open folder
 // ========================================================================================
 
-/**
- * "Open" for a folder (the BAYSOL root or a project folder): the desktop's file manager
- * is tried, and a shell is started in the folder with the terminal of this program. The
- * macOS and Windows commands come from documentation and are untested.
- */
+// "Open" for a folder: the desktop's file manager is tried, and a shell is started in the
+// folder with this program's terminal. The macOS and Windows commands are untested.
 
-/** How long to wait for the file manager's command to fail before assuming it worked, in
- * milliseconds: a file manager keeps running, so only a quick failure is a failure. */
+/** How long to wait for the file manager to fail before assuming it worked (ms): it keeps
+ * running, so only a quick failure is a failure. */
 const fileManagerWaitMs = 2000
 
 /** The commands to try, in order, to open a folder in the desktop's file manager. */

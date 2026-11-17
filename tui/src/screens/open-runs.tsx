@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-// `open runs`, the screen of the project menu that leads to the file viewer, and the pager
-// of a run's `run.LOG` (one pager for every text of a run, with the run watch it needs).
+// `open runs`, the screen of the project menu that leads to the file viewer. A run's
+// `run.LOG` (`^l`) is the logs menu's `RunLogScreen` (`logs-menu.tsx`, the one pager).
 //
 // Contents:
 //   1. The rows of the list: keys, notes and the text of a row
-//   2. The pager: `useRunWatch` and `TextPager`
-//   3. `OpenRuns`: the runs of a project and the viewer on a done model
+//   2. `OpenRuns`: the runs of a project and the viewer on a done model
 
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react"
 import { LOGS_FLOW } from "../core/environment.js"
 import { messageOf } from "../core/file-system.js"
-import { clampIndex, displayWidth, padWidth, truncate, wrapLine } from "../core/terminal.js"
+import { clampIndex, displayWidth, padWidth, truncate } from "../core/terminal.js"
+import {
+    figurePairs,
+    listRendered,
+    mayRender,
+    unrenderedTex,
+} from "../store/plot-graphics.js"
 import {
     compilePlots,
     dataRoot,
@@ -21,9 +26,10 @@ import {
     type PlotUnit,
     plotRoot,
     plotUnit,
+    runFolder,
 } from "../store/plots.js"
 import { liveRun, type ProjectRef } from "../store/projects.js"
-import { runExists } from "../store/run-archive.js"
+import { warmRunWorkbooks } from "../store/run-archive.js"
 import {
     deleteRun,
     failedNote,
@@ -32,24 +38,13 @@ import {
     type OpenRow,
     type OpenRun,
     openRows,
-    RUN_GONE,
-    readLogText,
     runModels,
 } from "../store/run-logs.js"
 import { runBrief, runDisplay } from "../store/run-stamp.js"
 import { loadScope, projectScope } from "../store/settings-store.js"
-import {
-    clampTop,
-    lastTop,
-    pagerLines,
-    pagerStatus,
-    pageTop,
-    sliceCells,
-} from "../store/view.js"
 import { cornerLabels, Frame, legendRoom } from "../ui/frame.js"
 import {
     cursorMoves,
-    type Design,
     type LegendItem,
     legendBack,
     legendFor,
@@ -78,8 +73,9 @@ import {
     useNav,
     useScreenActive,
 } from "../ui/interaction.js"
-import { Panel, useTheme } from "../ui/theme.js"
-import { legendExtraRows, SheetViewerScreen } from "./viewer.js"
+import { ErrorText, useTheme } from "../ui/theme.js"
+import { RunLogScreen } from "./logs-menu.js"
+import { SheetViewerScreen } from "./viewer.js"
 
 // ========================================================================================
 // 1. The rows of the list
@@ -93,8 +89,8 @@ const OPEN_FULL: LegendItem[] = [
     legendFor("move", [keys.up, keys.down]),
     legendFor("open", keys.enter),
     legendFor("run.LOG", keys.showLog),
-    legendFor("data", keys.moveData),
-    legendFor("tex", keys.moveTex),
+    legendFor("move data", keys.moveData),
+    legendFor("move tex plots", keys.moveTex),
     legendFor("compile plots", keys.compilePlots),
     legendFor("delete run", keys.remove),
     legendBack,
@@ -158,179 +154,7 @@ export function openRowText(
 }
 
 // ========================================================================================
-// 2. The pager
-// ========================================================================================
-
-/** The keys of the pager, fullest first (the frame reserves their height). */
-const pageNext = legendFor("next page", keys.enter, keys.space, keys.pageDown)
-const pagePrev = legendFor("previous page", keys.pageBack, keys.pageUp)
-const PAGER_FULL: LegendItem[] = [
-    pageNext,
-    pagePrev,
-    legendFor("move", [keys.up, keys.down, keys.left, keys.right]),
-    legendFor("close", keys.escape, keys.back),
-]
-
-/** The rows of the pager's panel that are not text: its borders and the status line. */
-const PAGER_CHROME_ROWS = 3
-
-/** The columns the pager's panel gives up: its two border columns and the padding. */
-const PAGER_CHROME_COLUMNS = 4
-
-/**
- * Watches the folder of a run for a page that shows it: another copy of the program may
- * delete the run while the page is open. Only the page on top looks (every
- * `watch.pollSeconds`, and at once when a page comes back to the top). When the folder is
- * gone the hook reports it; the page shows `this run was deleted` and the hook closes it
- * after `watch.closeSeconds` (or at any key), so nothing crashes and nothing stays on
- * screen.
- *
- * @param runDir - the run folder.
- * @returns `true` once the folder was found gone.
- */
-export function useRunWatch(runDir: string): boolean {
-    const nav = useNav()
-    const active = useScreenActive()
-    const [gone, setGone] = useState(false)
-
-    useEffect(() => {
-        if (!active) return
-        const look = (): void => {
-            if (!runExists(runDir)) setGone(true)
-        }
-        look()
-        const timer = setInterval(look, LOGS_FLOW.watch.pollSeconds * 1000)
-        return () => clearInterval(timer)
-    }, [active, runDir])
-
-    useEffect(() => {
-        if (!gone || !active) return
-        const timer = setTimeout(nav.pop, LOGS_FLOW.watch.closeSeconds * 1000)
-        return () => clearTimeout(timer)
-    }, [gone, active, nav.pop])
-
-    // any key closes it sooner; the keys of the page itself are off while it is gone
-    useKeys(() => nav.pop(), gone)
-    return gone
-}
-
-/**
- * The read-only pager of the program, ONE for every text of a run: its `run.LOG` (`^l` in
- * `open runs`) and every view of the logs menu. Enter, Space and PgDn page down, `k` and
- * PgUp page up, the arrows move a line (or sideways, for the wide lines of a plot), Home
- * and End jump, Esc closes. The text is read once; a refusal (no file, too large, deleted)
- * is the note, and a run deleted while the page is open closes it with
- * `this run was deleted`.
- *
- * @param props.title - the title of the screen (`open`, `logs`).
- * @param props.subtitle - what is shown (`run.LOG`, `settings.json`).
- * @param props.corner - the corner text (`cornerLabel`).
- * @param props.runDir - the run folder, watched for its deletion.
- * @param props.design - `"blocky"` on the logs pages, `"smooth"` (default) in `open runs`.
- * @param props.load - reads the text (it may throw: the message is the note).
- * @returns the screen.
- */
-export function TextPager(props: {
-    title: string
-    subtitle: string
-    corner: string | readonly string[]
-    runDir: string
-    load: () => string
-    design?: Design
-}): ReactNode {
-    const { title, subtitle, corner, runDir, load, design = "smooth" } = props
-    const nav = useNav()
-    const theme = useTheme()
-    const columns = useBodyColumns()
-    const gone = useRunWatch(runDir)
-    const panel = design === "blocky" ? "double" : "round"
-    const [top, setTop] = useState(0)
-    const [left, setLeft] = useState(0)
-    const width = Math.max(1, columns - PAGER_CHROME_COLUMNS)
-    // a line wider than the page continues on the next row, so no text runs off the edge
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `load` is read once per page
-    const loaded = useMemo((): { lines: string[] } | { error: string } => {
-        try {
-            const raw = pagerLines(load(), LOGS_FLOW.pager.tabWidth)
-            return { lines: raw.flatMap((line) => wrapLine(line, width)) }
-        } catch (error) {
-            const why = messageOf(error, "cannot read the file")
-            return { error: why }
-        }
-    }, [runDir, width])
-    const lines = "lines" in loaded ? loaded.lines : []
-    const pageRows = Math.max(
-        1,
-        useBodyRows(legendExtraRows(PAGER_FULL, columns, design)) - PAGER_CHROME_ROWS,
-    )
-    const widest = useMemo(
-        () => lines.reduce((m, l) => Math.max(m, displayWidth(l)), 0),
-        [lines],
-    )
-    const maxLeft = Math.max(0, widest - width)
-    const shownTop = clampTop(top, lines.length, pageRows)
-    const shownLeft = Math.min(left, maxLeft)
-    const canDown = shownTop < lastTop(lines.length, pageRows)
-    const canUp = shownTop > 0
-
-    useKeys((press) => {
-        if (gone) return
-        const page = (down: boolean): void =>
-            setTop(pageTop(shownTop, lines.length, pageRows, LOGS_FLOW.pager.overlap, down))
-        if (press.is(keys.escape) || press.is(keys.back)) nav.pop()
-        else if (press.is(keys.enter) || press.is(keys.space) || press.is(keys.pageDown))
-            page(true)
-        else if (press.is(keys.pageBack) || press.is(keys.pageUp)) page(false)
-        else if (press.is(keys.down)) setTop(clampTop(shownTop + 1, lines.length, pageRows))
-        else if (press.is(keys.up)) setTop(clampTop(shownTop - 1, lines.length, pageRows))
-        else if (press.is(keys.home)) setTop(0)
-        else if (press.is(keys.end)) setTop(lastTop(lines.length, pageRows))
-        else if (press.is(keys.right))
-            setLeft(Math.min(shownLeft + LOGS_FLOW.pager.sideStep, maxLeft))
-        else if (press.is(keys.left))
-            setLeft(Math.max(shownLeft - LOGS_FLOW.pager.sideStep, 0))
-    })
-
-    const error = gone ? RUN_GONE : "error" in loaded ? loaded.error : undefined
-    return (
-        <Frame
-            design={design}
-            title={title}
-            subtitle={subtitle}
-            corner={corner}
-            legend={legendOf([
-                canDown && pageNext,
-                canUp && pagePrev,
-                moveLegend({
-                    up: canUp,
-                    down: canDown,
-                    left: shownLeft > 0,
-                    right: shownLeft < maxLeft,
-                }),
-                legendFor("close", keys.escape, keys.back),
-            ])}
-            legendFull={PAGER_FULL}
-            note={error}
-            noteIsError={error !== undefined}
-        >
-            <Panel style={panel} paddingX={1} flexDirection="column" flexGrow={1}>
-                {lines.slice(shownTop, shownTop + pageRows).map((line, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: a line is its place
-                    <Text key={shownTop + i} color={theme.fg} wrap="truncate">
-                        {sliceCells(line, shownLeft, width) || " "}
-                    </Text>
-                ))}
-                <Box flexGrow={1} />
-                <Text color={theme.mt} wrap="truncate-end">
-                    {pagerStatus(shownTop, lines.length, pageRows)}
-                </Text>
-            </Panel>
-        </Frame>
-    )
-}
-
-// ========================================================================================
-// 3. OpenRuns
+// 2. OpenRuns
 // ========================================================================================
 
 /**
@@ -338,8 +162,9 @@ export function TextPager(props: {
  * models. A run with several models is a heading with its models under it; a run with one
  * model is that one row; a run with none is a row of its own. Enter on a model that is done
  * opens the read-only viewer on its results workbook (with the model's `plots.txt` behind
- * `P`); on any other model the note says why there is nothing to open. `^l` shows the
- * run's `run.LOG`; `^r` deletes the whole run folder after the usual question (refused
+ * `shift+p`, the comparison too); on any other model the note says why there is
+ * nothing to open. `^l` shows the run's `run.LOG` (the logs menu's [[RunLogScreen]]);
+ * `^r` deletes the whole run folder after the usual question (refused
  * while a run of the project is live). The list is read again every few seconds and when
  * the screen comes back to the top.
  *
@@ -358,6 +183,8 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
     const { note, say, clear } = useNote()
     // what a plots action is doing (`compiling plots...`); the keys wait while it does
     const [busy, setBusy] = useState<string | undefined>()
+    // bumped when plots were rendered: the "render plots" gate is read again
+    const [renderTick, setRenderTick] = useState(0)
 
     const refresh = useCallback(() => setRuns(listOpenRuns(project.dir)), [project.dir])
     useEffect(() => {
@@ -378,7 +205,13 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
     )
     const at = stops[stop] ?? 0
     const current = rows[at]
-    // `shift+d` / `shift+t` open a dropdown under the list: the whole run, or one model
+    // the highlighted run's workbooks that only its archive holds are made in the
+    // background, so that opening one finds the copy ready
+    const warmDir = current?.run.dir
+    useEffect(() => {
+        if (active && warmDir !== undefined) void warmRunWorkbooks(warmDir)
+    }, [active, warmDir])
+    // `shift+d` / `shift+l` open a dropdown under the list: the whole run, or one model
     const [moving, setMoving] = useState<MoveKind | undefined>()
     const [moveKeys, setMoveKeys] = useState<LegendItem[]>([])
     const withFiles = (what: MoveKind, run: OpenRun): OpenModel[] =>
@@ -428,7 +261,7 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
     }
 
     /**
-     * Moves the data (`shift+d`) or the tex plots (`shift+t`) of some models of the run,
+     * Moves the data (`shift+d`) or the tex plots (`shift+l`) of some models of the run,
      * or compiles the plots of the highlighted row (`shift+c`): into the folder of the
      * setting, in a folder of the run's name. A failure is the note (until the next key).
      *
@@ -453,11 +286,21 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
             try {
                 const { settings } = loadScope(projectScope(project))
                 const compiler = settings.get("FIGURES_COMPILER")
+                const root = plotRoot(settings.get("FIGURES_DIR"))
+                // plots are rendered exactly once: only the figures with no render yet
+                const todo = units
+                    .map((u) => ({
+                        ...u,
+                        tex: unrenderedTex(u, listRendered(runFolder(root, u))),
+                    }))
+                    .filter((u) => u.tex.length > 0)
+                if (what === "compile" && todo.length === 0)
+                    throw new Error("plots are already rendered")
                 const text =
                     what === "compile"
                         ? await compilePlots(
-                            units,
-                            plotRoot(settings.get("FIGURES_DIR")),
+                            todo,
+                            root,
                             compiler,
                             noteRoom,
                         )
@@ -474,8 +317,18 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
                 say(messageOf(error, "the plots failed"), true)
             } finally {
                 setBusy(undefined)
+                setRenderTick((t) => t + 1)
             }
         })()
+    }
+
+    /** The plot folder of the project's settings, or `undefined` if they cannot be read. */
+    const figureRoot = (): string | undefined => {
+        try {
+            return plotRoot(loadScope(projectScope(project)).settings.get("FIGURES_DIR"))
+        } catch {
+            return undefined
+        }
     }
 
     const moveChosen = (name: string | null): void => {
@@ -512,16 +365,17 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
         // a capital press matches the plain key too, so the capitals are tested first
         else if (press.is(keys.moveData)) openMove("data", current.run)
         else if (press.is(keys.moveTex)) openMove("tex", current.run)
-        else if (press.is(keys.compilePlots))
+        else if (press.is(keys.compilePlots)) {
+            if (current.kind !== "run" && !renderable)
+                return say("plots are already rendered")
             filesAction("compile", current.kind === "run" ? [] : [current.model])
+        }
         else if (press.is(keys.showLog))
             nav.push(
-                <TextPager
-                    title="open"
-                    subtitle="run.LOG"
-                    corner={cornerLabels(project.id, current.run.id)}
+                <RunLogScreen
+                    projectId={project.id}
+                    runId={current.run.id}
                     runDir={current.run.dir}
-                    load={() => readLogText(current.run.dir)}
                 />,
             )
         else if (press.is(keys.enter)) {
@@ -530,14 +384,27 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
             const { run, model } = current
             if (model.workbook === undefined)
                 return say(noWorkbookNote(model, noteRoom))
+            // the comparison has plots too: its terminal plots and figures, like a model's
+            const compare = current.kind === "compare"
+            const root = figureRoot()
+            const unit = plotUnit(project.dir, run, model)
+            const figures =
+                root === undefined || model.tex.length === 0
+                    ? undefined
+                    : {
+                        dir: runFolder(root, unit),
+                        pairs: figurePairs(unit),
+                        writable: run.state !== "live",
+                    }
             nav.push(
                 <SheetViewerScreen
                     workbookPath={model.workbook}
                     plotsPath={model.plots}
                     plotFiles={model.plotSizes}
                     runDir={run.dir}
-                    title={current.kind === "compare" ? "comparison" : "results"}
-                    subtitle={current.kind === "compare" ? undefined : model.name}
+                    figures={figures}
+                    title={compare ? "comparison" : "results"}
+                    subtitle={compare ? undefined : model.name}
                     corner={cornerLabels(project.id, run.id)}
                 />,
             )
@@ -547,6 +414,15 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
     // the file actions are offered where there is something to take
     const here = current !== undefined && current.kind !== "run" ? current.model : undefined
     const hasTex = here !== undefined && here.tex.length > 0
+    // "render plots" only while figures are missing (read again after each render)
+    // biome-ignore lint/correctness/useExhaustiveDependencies: renderTick is the trigger
+    const renderable = useMemo(() => {
+        if (here === undefined || here.tex.length === 0) return false
+        if (current === undefined) return false
+        const root = figureRoot()
+        if (root === undefined) return false
+        return mayRender(plotUnit(project.dir, current.run, here), root)
+    }, [here, current, project.dir, renderTick])
     const wholeRun = current === undefined ? [] : runModels(current.run)
     const hasData = wholeRun.some((m) => m.workbook !== undefined)
     const hasTexRun = wholeRun.some((m) => m.tex.length > 0)
@@ -559,9 +435,9 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
                 current !== undefined && legendFor("open", keys.enter),
                 current !== undefined && legendFor("run.LOG", keys.showLog),
                 current !== undefined && legendFor("delete run", keys.remove),
-                hasData && legendFor("data", keys.moveData),
-                hasTexRun && legendFor("tex", keys.moveTex),
-                hasTex && legendFor("compile plots", keys.compilePlots),
+                hasData && legendFor("move data", keys.moveData),
+                hasTexRun && legendFor("move tex plots", keys.moveTex),
+                hasTex && renderable && legendFor("compile plots", keys.compilePlots),
                 legendBack,
             ])
     // a model with settings of its own says which, when nothing else is to be said
@@ -606,7 +482,7 @@ export function OpenRuns({ project }: { project: ProjectRef }): ReactNode {
                             <Box columnGap={2}>
                                 <ListText on={on}>{padWidth(text, nameWidth)}</ListText>
                                 {bad ? (
-                                    <Text color={theme.er}>{status}</Text>
+                                    <ErrorText>{status}</ErrorText>
                                 ) : (
                                     <ListText on={on}>{status}</ListText>
                                 )}

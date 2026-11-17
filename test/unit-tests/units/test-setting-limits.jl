@@ -42,7 +42,10 @@ end
     @testset "the choices of a setting hold its default" begin
         for (name, choices) in pairs(Pipeline.SETTING_CHOICES)
             @test isdefined(Pipeline, name)
-            @test all(c -> c in choices, getfield(Pipeline, name))
+            value = getfield(Pipeline, name)
+            # a `:choice` setting is one value, a `:tuple` one a tuple of values
+            parts = value isa AbstractString ? (value,) : value
+            @test all(c -> Symbol(c) in choices, parts)
             @test allunique(choices)
         end
     end

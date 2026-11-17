@@ -12,11 +12,9 @@ import {
     type LoadResult,
     loadGlobal,
     loadProject,
-    readThemeName,
     settingsFile,
-    themeFile,
-    writeThemeName,
 } from "../src/store/settings-store.js"
+import { readThemeName, themeFile, writeThemeName } from "../src/store/theme-file.js"
 import { defaultTheme, type ThemeName, themeByName, themes } from "../src/ui/theme.js"
 import { tempDir } from "./support/fixtures.js"
 

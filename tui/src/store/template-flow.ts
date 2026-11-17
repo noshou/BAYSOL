@@ -10,7 +10,12 @@
 // template; picking the template again adds rows again, and where rows of the same
 // names are there the flow asks whether they are replaced.
 
-import { formatNumber, type NumberRules, parseNumber } from "../core/terminal.js"
+import {
+    formatNumber,
+    type NumberRules,
+    type Parsed,
+    parseNumber,
+} from "../core/terminal.js"
 import { type Conditions, conditionLimits } from "./buffer.js"
 import {
     asksPH,
@@ -35,8 +40,7 @@ import {
     type Solute,
     sameSoluteKey,
 } from "./solutes.js"
-import type { TemplateLink } from "./template-link.js"
-import { setAtTemperature } from "./template-sync.js"
+import { setAtTemperature, type TemplateLink } from "./template-rows.js"
 
 /** One choice of a dropdown step: what is shown. */
 type TemplateChoice = { text: string; tag?: string }
@@ -120,6 +124,18 @@ const NOT_BELOW_ZERO: NumberRules = { atLeast: { limit: 0, message: "not below 0
 const POSITIVE = (what: string): NumberRules => ({
     above: { limit: 0, message: `${what} must be > 0` },
 })
+
+/** A pH within the limits of the pH row of the buffer. */
+function parsePH(text: string): Parsed<number> {
+    const { pH } = conditionLimits()
+    const range = `pH from ${pH.min} to ${pH.max}`
+    const n = parseNumber(text, { atLeast: { limit: pH.min, message: range } })
+    if ("error" in n) return n
+    return n.value > pH.max ? { error: range } : n
+}
+
+/** How a question that takes a number reads the text and stores the number. */
+type Answer = { parse: (text: string) => Parsed<number>; set: (n: number) => void }
 
 /**
  * The flow. Create it with the table's drafts and pH, read `step`, and forward the
@@ -387,63 +403,64 @@ export class TemplateFlow {
     }
 
     /**
+     * What typing at each prompt means: how the text is read and where the number goes.
+     * One row per question that takes a number, so `submit` is the same for all of them.
+     */
+    private answers(): Partial<Record<Ask, Answer>> {
+        const unit = this.unit
+        return {
+            conc: {
+                parse: (text) => parseNumber(text, POSITIVE(unit)),
+                set: (n) => {
+                    this.mM = fromShown(n, unit)
+                },
+            },
+            sigma: {
+                parse: (text) => parseNumber(text, NOT_BELOW_ZERO),
+                set: (n) => {
+                    this.sigmaMM = fromShown(n, unit)
+                },
+            },
+            pH: {
+                parse: parsePH,
+                set: (n) => {
+                    this.pH = n
+                },
+            },
+            "setat-other": {
+                parse: parseTemperature,
+                set: (n) => {
+                    this.setAt = n
+                },
+            },
+            rest: {
+                // blank: no rest, as 0
+                parse: (text) => {
+                    const n = parseNumber(text, { ...NOT_BELOW_ZERO, blank: true })
+                    return "error" in n ? n : { value: n.value ?? 0 }
+                },
+                set: (n) => {
+                    this.restI = n
+                },
+            },
+        }
+    }
+
+    /**
      * The user typed an answer to a prompt and pressed Enter.
      *
      * @param text - what is in the field.
      */
     submit(text: string): void {
         if (!this.template) return
-        switch (this.ask) {
-            case "conc": {
-                const n = parseNumber(text, POSITIVE(this.unit))
-                if ("error" in n) {
-                    this.fail(n.error)
-                    return
-                }
-                this.mM = fromShown(n.value, this.unit)
-                break
-            }
-            case "sigma": {
-                const n = parseNumber(text, NOT_BELOW_ZERO)
-                if ("error" in n) {
-                    this.fail(n.error)
-                    return
-                }
-                this.sigmaMM = fromShown(n.value, this.unit)
-                break
-            }
-            case "pH": {
-                const { pH } = conditionLimits()
-                const range = `pH from ${pH.min} to ${pH.max}`
-                const n = parseNumber(text, { atLeast: { limit: pH.min, message: range } })
-                if ("error" in n || n.value > pH.max) {
-                    this.fail("error" in n ? n.error : range)
-                    return
-                }
-                this.pH = n.value
-                break
-            }
-            case "setat-other": {
-                const n = parseTemperature(text)
-                if ("error" in n) {
-                    this.fail(n.error)
-                    return
-                }
-                this.setAt = n.value
-                break
-            }
-            case "rest": {
-                const n = parseNumber(text, { ...NOT_BELOW_ZERO, blank: true })
-                if ("error" in n) {
-                    this.fail(n.error)
-                    return
-                }
-                this.restI = n.value ?? 0
-                break
-            }
-            default:
-                return
+        const answer = this.answers()[this.ask]
+        if (!answer) return
+        const n = answer.parse(text)
+        if ("error" in n) {
+            this.fail(n.error)
+            return
         }
+        answer.set(n.value)
         this.next()
     }
 

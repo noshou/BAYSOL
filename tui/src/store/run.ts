@@ -13,7 +13,15 @@
 // the data of `open runs` in `run-logs.ts`.
 
 import { type ChildProcess, spawn, spawnSync } from "node:child_process"
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import {
+    appendFileSync,
+    mkdirSync,
+    readFileSync,
+    rmSync,
+    symlinkSync,
+    writeFileSync,
+} from "node:fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -22,6 +30,7 @@ import { cacheDir, RUN_FLOW, repoRoot } from "../core/environment.js"
 import {
     copyOver,
     isFile,
+    isFolder,
     messageOf,
     withFileLock,
     writeAtomic,
@@ -31,16 +40,23 @@ import { formatNumber, type Parsed, parseNumber } from "../core/terminal.js"
 import { bufferFile, readConditions, readSolutes } from "./buffer.js"
 import { dataIsReady, dataJsonFile, dataTsvFile, readDataInfo } from "./data.js"
 import { modelReferencesFile } from "./model-references.js"
+import { packState, settleWrites } from "./packs.js"
 import type { ProjectRef } from "./projects.js"
 import {
     CLAIM_FILE,
+    extractGenerated,
+    extractModels,
+    GENERATED_DIR,
     inProject,
     isoStamp,
     listModels,
     listProjects,
     liveRun,
     lockedIn,
+    MODELS_PACK,
     markStaleRuns,
+    modelsArchive,
+    packGenerated,
     projectFile,
     RunInProgressError,
     runDirOf,
@@ -48,11 +64,11 @@ import {
     settleRun,
     startLockName,
 } from "./projects.js"
-import { referenceFiles, referencesDir } from "./references.js"
-import { packRun, RUN_FILES } from "./run-archive.js"
+import { copyReferences, referencesArchive } from "./references.js"
+import { packRun, RUN_FILES, runCacheFolder, runModelsFolder } from "./run-archive.js"
 import { briefError, firstErrorLine, readLogText } from "./run-logs.js"
 import { runStamp } from "./run-stamp.js"
-import { modelSettingsFile, settingsFile } from "./settings-store.js"
+import { modelSettingsFile, modelStem, settingsFile } from "./settings-store.js"
 
 // ========================================================================================
 // 1. Readiness
@@ -62,11 +78,10 @@ import { modelSettingsFile, settingsFile } from "./settings-store.js"
  * What a project has of what a run needs, one flag each.
  *
  * @property models - at least one model.
- * @property buffer - a buffer with at least one solute, its pH and its temperature set (a
- *     buffer file that cannot be read counts as missing; one without a temperature
- *     is not ready until `^g` sets it).
+ * @property buffer - a buffer with at least one solute, its pH and its temperature set
+ *     (an unreadable file counts as missing; `^g` sets the temperature).
  * @property data - the measured curve is loaded (`data.tsv` and `data.json` valid) and
- *     the X-ray energy is set (there is no default energy).
+ *     the X-ray energy is set (there is no default).
  * @property run - everything above is there, so a run can start.
  */
 export type Readiness = {
@@ -77,8 +92,8 @@ export type Readiness = {
 }
 
 /**
- * Whether a project can run a fit, and which parts it still lacks. The project menu
- * shows the `run` item of its taskbar only when `run` is true.
+ * Whether a project can run a fit, and which parts it still lacks (the project menu shows
+ * `run` only when `run` is true).
  *
  * @throws never: a folder that cannot be read counts as missing parts.
  */
@@ -101,10 +116,9 @@ export function projectReadiness(project: ProjectRef): Readiness {
 }
 
 /**
- * The parts a project still lacks before it can run, named for the user, in the order
- * of the project menu: `models`, `solutes`, `pH`, `temperature`, `data`, `energy`.
- * Empty exactly when
- * [[projectReadiness]] says `run`. A folder that cannot be read lacks everything it holds.
+ * The parts a project still lacks before it can run, in the order of the project menu:
+ * `models`, `solutes`, `pH`, `temperature`, `data`, `energy`. Empty exactly when
+ * [[projectReadiness]] says `run`; an unreadable folder lacks all.
  *
  * @param project - the project.
  * @returns the names of what is missing.
@@ -154,8 +168,7 @@ export function parseTemperature(text: string): Parsed<number> {
 }
 
 /**
- * The text the temperature prompt of the buffer starts with: the buffer's temperature,
- * else the default of `RUN_FLOW.temperature`.
+ * The text the temperature prompt starts with: the buffer's, else the default.
  *
  * @param held - the temperature the buffer has, if any.
  * @returns the text.
@@ -168,11 +181,10 @@ export const temperatureStart = (held?: number): string =>
 // ========================================================================================
 
 /**
- * Starting a run, the part before any process exists: the NAME of the run folder, the
- * claim of it (one locked step that scans for a live run and makes the folder, so two
- * copies of the program starting at the same instant cannot both win) and the SNAPSHOT of
- * the inputs into its run folder (Julia reads only that copy, so editing the project
- * during a run changes nothing). The rules are those of notes/run-design.md, "Concurrency".
+ * Starting a run, before any process exists: the NAME of the run folder, the CLAIM of it
+ * (one locked step that scans for a live run and makes the folder, so two copies cannot
+ * both win) and the SNAPSHOT of the inputs (Julia reads only that copy, so editing the
+ * project during a run changes nothing). Rules: notes/run-design.md, "Concurrency".
  */
 
 /**
@@ -194,15 +206,12 @@ function writeClaim(runDir: string): void {
 }
 
 /**
- * Claims a new run folder of a project. Under `withFileLock(<project>/runs/.start)` it
- * looks for a live run and, if there is none, makes `runs/<name>/` with a NON-recursive
- * `mkdir` (the name is taken: the next millisecond is tried, so a folder is never
- * overwritten)
- * and leaves the claim marker in it, which keeps the folder live until Julia writes its
- * own `run.json`. The project must exist: nothing here brings a deleted project back.
+ * Claims a new run folder of a project. Under the lock `<project>/runs/.start` it looks
+ * for a live run and, if none, makes `runs/<name>/` with a NON-recursive `mkdir` (a taken
+ * name tries the next millisecond) and leaves the claim marker, which keeps the folder
+ * live until Julia writes its own `run.json`. The project must exist.
  *
- * @param now - the time in ms (the clock when left out; tests give a fixed one to make
- *     names clash).
+ * @param now - the time in ms (the clock when left out; tests give a fixed one).
  * @throws [[RunInProgressError]] (`a run is in progress (pid N)`); `ProjectGoneError` for
  *     a project that is not there; [[FileInUseError]] if the lock stays taken for 3 s;
  *     Error if no free name is found in `claim.maxStampTries` milliseconds.
@@ -249,16 +258,14 @@ function snapshotFiles(projectDir: string): [string, string][] {
 }
 
 /**
- * Copies the inputs of a run into its folder (flat: the run folder has no subfolders, the
- * reference fits are `reference-fit-<file>`), each under the lock of its own file
- * (`settings.json`, `buffer.json`, then `data.tsv` outside `data.json`, the order the data
- * writer locks them in), so a save in progress in another copy is waited for and a copy is
- * never half a file. A project without `settings.json` gets `{}` (the defaults, as Julia
- * does). `model-settings.json`, `model-references.json` and the files of `reference-fit/`
- * are copied too when the project has them (Julia copies them itself otherwise, without
- * our locks), and so is `project.json`, which holds the project's notes. The models are
- * not copied: Julia lists them (name, full path, size, sha256) in `models.json` when the
- * run starts.
+ * Copies the inputs of a run into its flat folder (reference fits as
+ * `reference-fit-<file>`), each under the lock of its own file (`settings.json`,
+ * `buffer.json`, then `data.tsv` outside `data.json`, the data writer's order), so a
+ * save in another copy is waited for. A project without `settings.json` gets `{}` (the
+ * defaults). `model-settings.json`, `model-references.json`, the reference curves
+ * (`reference-fit.7z` or the old folder) and `project.json` are copied when present. The
+ * models are not copied: Julia lists them in `models.json` when the run starts, except for
+ * a project that keeps them in `models.7z` ([[stageModels]] writes that file).
  *
  * @throws if a file the run needs (`buffer.json`, `data.tsv`, `data.json`) is missing,
  *     [[FileInUseError]], `ProjectGoneError`.
@@ -284,15 +291,12 @@ export function snapshotInputs(projectDir: string, runDir: string): void {
             copyOver(from, join(logs, name))
         }
     })
-    // `project.json` (id, creation time and the project's notes) travels with the run, so
-    // the notes end up in the run's archive; nothing reads it back but the user
+    // `project.json` (with the notes) travels with the run into its archive
     const project = projectFile(projectDir)
     lockedIn(projectDir, project, () => {
         if (isFile(project)) copyOver(project, join(logs, "project.json"))
     })
-    // the optional inputs, under their own locks: the per-model settings and the
-    // reference curves (the files only; Julia reads them from the run folder and uses
-    // `reference-fit-*` files that are there as they are)
+    // the optional inputs, under their own locks: per-model settings and reference curves
     const models = modelSettingsFile(projectDir)
     lockedIn(projectDir, models, () => {
         if (isFile(models)) copyOver(models, join(logs, RUN_FILES.modelSettings))
@@ -302,19 +306,107 @@ export function snapshotInputs(projectDir: string, runDir: string): void {
         if (isFile(modelReferences))
             copyOver(modelReferences, join(logs, RUN_FILES.modelReferences))
     })
-    const references = referencesDir(projectDir)
-    lockedIn(projectDir, references, () => {
-        const files = referenceFiles(projectDir)
-        if (files.length === 0) return
-        for (const file of files)
-            copyOver(join(references, file), join(logs, `reference-fit-${file}`))
+    // the reference curves (`reference-fit.7z`, or the old folder) and the models
+    // (extracted when the project keeps them in `models.7z`) under the archive's lock
+    lockedIn(projectDir, referencesArchive(projectDir), () => {
+        copyReferences(projectDir, logs)
+    })
+    stageModels(projectDir, runDir)
+}
+
+/** The names the run's own files use: a model may not take them (Julia's rule). */
+const RESERVED_MODEL_NAMES: readonly string[] = ["run", "compare"]
+
+/**
+ * When the project keeps its models in `models.7z`, extracts them into the run's own
+ * temporary folder ([[runModelsFolder]]) and writes the run's `models.json` with those
+ * paths, which Julia keeps when it finds the file: so Julia reads the models as it always
+ * did, a path to a file, and needs no 7-Zip. The entries follow Julia's own rule
+ * (`_projectModels`): file names in byte order, the stem as the name, `-2`, `-3`, ... for
+ * a taken stem or a name of the run's own files. A project without an archive is left to
+ * Julia (the old `models/` folder).
+ *
+ * The same archive holds the files Julia generated in earlier runs (hydrogenated
+ * structures, PROPKA output): they are extracted into the run's own cache folder
+ * ([[runCache]]), which the launcher gives Julia as `BAYSOL_CACHE`, so a repeated run finds
+ * them and the files of a new one are stored after the run ([[packGenerated]]). The
+ * components Julia downloads stay in the shared cache: the folder holds a link to it.
+ *
+ * @param sharedCache - the shared cache folder, only asked for when the project is packed.
+ *
+ * @returns the folder the models were extracted into, `undefined` when there is none.
+ * @throws ArchiveError (7-Zip missing or failing), ProjectGoneError, FileInUseError.
+ */
+export function stageModels(
+    projectDir: string,
+    runDir: string,
+    sharedCache: () => string = cacheDir,
+): string | undefined {
+    const archive = modelsArchive(projectDir)
+    return lockedIn(projectDir, archive, () => {
+        const state = packState(projectDir, MODELS_PACK)
+        if (state.kind !== "packed") return undefined
+        const folder = runModelsFolder(runDir)
+        rmSync(folder, { recursive: true, force: true })
+        const names = [...state.names].sort()
+        extractModels(projectDir, names, folder)
+        const used = new Set<string>(RESERVED_MODEL_NAMES)
+        const entries = names.map((file) => {
+            const path = join(folder, file)
+            const stem = modelStem(file)
+            let name = stem
+            for (let k = 2; used.has(name); k++) name = `${stem}-${k}`
+            used.add(name)
+            const bytes = readFileSync(path)
+            return {
+                name,
+                path,
+                size: bytes.length,
+                sha256: createHash("sha256").update(bytes).digest("hex"),
+            }
+        })
+        writeAtomic(join(runDir, RUN_FILES.models), `${JSON.stringify(entries, null, 2)}\n`)
+        const cache = runCacheFolder(runDir)
+        rmSync(cache, { recursive: true, force: true })
+        linkComponents(extractGenerated(projectDir, cache), sharedCache())
+        return folder
     })
 }
 
 /**
- * The startup sweep of every project: a `running` run nobody runs any more becomes
- * `interrupted` ([[markStaleRuns]]). A project that cannot be swept (a lock held, a folder
- * that vanished) is skipped; the sweep never stops the program from starting.
+ * Links the component files Julia downloads (`components/` of its cache) to the shared
+ * cache, so a run with its own cache folder does not fetch them again. Where a link
+ * cannot be made (Windows without the right) Julia downloads them again.
+ */
+function linkComponents(cache: string, shared: string): void {
+    try {
+        const components = join(shared, "components")
+        mkdirSync(components, { recursive: true })
+        symlinkSync(components, join(cache, "components"), "dir")
+    } catch {
+        // no link: the components are fetched into this run's cache
+    }
+}
+
+/**
+ * @returns the cache folder of a run whose project keeps its models in `models.7z`
+ *     ([[stageModels]] made it), `undefined` for the other projects (Julia then uses the
+ *     shared cache).
+ */
+export function runCache(runDir: string): string | undefined {
+    const folder = join(runCacheFolder(runDir), GENERATED_DIR)
+    return isFolder(folder) ? folder : undefined
+}
+
+/** Removes the folders [[stageModels]] made for a run (the models are in the project). */
+export function unstageModels(runDir: string): void {
+    rmSync(runModelsFolder(runDir), { recursive: true, force: true })
+    rmSync(runCacheFolder(runDir), { recursive: true, force: true })
+}
+
+/**
+ * The startup sweep of every project ([[markStaleRuns]]). A project that cannot be swept
+ * (a lock held, a folder gone) is skipped; the sweep never stops the program starting.
  */
 export function markAllStaleRuns(projectsRoot: string): string[] {
     const changed: string[] = []
@@ -330,9 +422,8 @@ export function markAllStaleRuns(projectsRoot: string): string[] {
 }
 
 /**
- * Gives up a claimed run whose start failed before Julia was running: the folder stays (a
- * run is never deleted by the program) and is marked `failed`, with the reason written
- * into its `run.LOG` by the caller.
+ * Gives up a claimed run whose start failed before Julia ran: the folder stays (a run is
+ * never deleted) marked `failed`; the caller writes the reason into `run.LOG`.
  */
 function abandonClaim(runDir: string): boolean {
     try {
@@ -347,10 +438,9 @@ function abandonClaim(runDir: string): boolean {
 // ========================================================================================
 
 /**
- * The live output of a run, as lines for the run screen. What Julia prints is not fit for
- * the screen as it comes: a progress bar rewrites its line with a carriage return and
- * colour and cursor codes are escape sequences. One small state per stream (standard
- * output and standard error) and the last lines of both.
+ * The live output of a run, as lines for the run screen. Julia's output is not fit as it
+ * comes: a progress bar rewrites its line with a carriage return, and colour and cursor
+ * codes are escapes. One small state per stream (stdout, stderr), the last lines of both.
  */
 
 /** The state of one stream: the unfinished line, a `\r` just seen, an unfinished escape. */
@@ -372,9 +462,9 @@ export class OutputTail {
 
     /**
      * Takes a piece of a stream. A line ends at a newline; a carriage return not followed
-     * by a newline sends the writing back to the start of the line (the next text replaces
-     * it, as a progress bar does); escape sequences are dropped (one cut by the end of the
-     * chunk waits for the next), a tab is spaces, other control characters are dropped.
+     * by one sends the writing back to the line start (the next text replaces it); escape
+     * sequences are dropped (one cut by the chunk's end waits for the next), a tab is
+     * spaces, other control characters are dropped.
      *
      * @param channel - which stream (0 and 1: each has its own unfinished line).
      */
@@ -399,10 +489,7 @@ export class OutputTail {
         if (this.done.length > this.max) this.done.splice(0, this.done.length - this.max)
     }
 
-    /**
-     * The lines so far: the finished ones, then the unfinished line of each stream that
-     * has one.
-     */
+    /** The lines so far: the finished ones, then each stream's unfinished line. */
     get lines(): string[] {
         const open = this.channels.map((c) => c.pending).filter((p) => p !== "")
         return [...this.done, ...open]
@@ -414,18 +501,14 @@ export class OutputTail {
 // ========================================================================================
 
 /**
- * One run of a project, from the claimed folder to its end: the snapshot, the Julia
- * child (its own process group, its stdin kept open because Julia ends the run when it
- * reaches end of file), the live output, the end (done, failed or aborted, read from the
- * `run.json` Julia wrote or, when Julia could not, written here), and the abort. Julia
- * knows nothing of this program; it reads the snapshot and writes plain files.
- * The screen only watches a [[RunSession]].
+ * One run of a project, from the claimed folder to its end: the snapshot, the Julia child
+ * (own process group, stdin kept open because Julia ends the run at end of file), the
+ * live output, the end (read from Julia's `run.json` or, failing that, written here) and
+ * the abort. Julia knows nothing of this program; the screen only watches a
+ * [[RunSession]].
  */
 
-/**
- * What the run is doing: runs, is being stopped, is being packed into its archive (the
- * process is over; see `run-archive.ts`), or is over.
- */
+/** What the run is doing: runs, is stopped, is packed (`run-archive.ts`), or is over. */
 export type RunPhase = "running" | "aborting" | "packing" | "done" | "failed" | "aborted"
 
 /** Whether a phase is an end: the run is over. */
@@ -459,47 +542,43 @@ export type RunView = {
  * @property projectDir - the project's folder.
  * @property runDir - the claimed run folder.
  * @property temperature - the buffer's temperature, °C.
+ * @property cache - the run's own cache folder (`BAYSOL_CACHE`), absent: the shared one.
  */
-export type LaunchSpec = { projectDir: string; runDir: string; temperature: number }
+export type LaunchSpec = {
+    projectDir: string
+    runDir: string
+    temperature: number
+    cache?: string
+}
 
 /**
- * Starts the process that fits the project. It must return a child with three pipes, in
- * a process group of its own (`detached`), so the abort can signal the whole group. The
- * real one starts Julia ([[juliaLauncher]]); the tests give a script in its place.
+ * Starts the process that fits the project: a child with three pipes in a process group
+ * of its own (`detached`), so the abort can signal the group. The real one starts Julia
+ * ([[juliaLauncher]]); the tests give a script.
  */
 export type Launcher = (spec: LaunchSpec) => ChildProcess
 
-/**
- * The Julia file that does a run (`run-project.jl`, next to this file): it holds the module
- * `BAYSOLRun` with `runProject`, which uses the package BAYSOL for the fit itself.
- */
+/** The Julia file of a run (`run-project.jl`): module `BAYSOLRun`, `runProject`. */
 export const runProjectFile = fileURLToPath(new URL("./run-project.jl", import.meta.url))
 
-/**
- * What Julia runs: it loads the file of the run and calls `runProject`; the file and the
- * values come in `ARGS`, never spliced into the code.
- */
+/** What Julia runs: the file and the values come in `ARGS`, never spliced into the code. */
 const juliaProgram =
     "include(ARGS[1]); BAYSOLRun.runProject(ARGS[2]; temperature = parse(Float64, " +
     "ARGS[3]), ui = :tui, runDir = ARGS[4])"
 
-/**
- * The Julia program to start: the `JULIA` environment variable (the one the dev tools
- * use), else `julia` on the PATH.
- */
+/** The Julia program to start: the `JULIA` environment variable, else `julia`. */
 export function juliaCommand(env: Record<string, string | undefined>): string {
     const named = (env.JULIA ?? "").trim()
     return named === "" ? "julia" : named
 }
 
 /**
- * The arguments of the Julia child: no start-up file, no colour codes in the output, the
- * threads of `assets/data/run_flow.json`, the BAYSOL package folder (when the program
- * runs from a checkout), then `-e` the program and the four values it takes (the Julia
- * file of the run, the project, the temperature and the run folder).
+ * The arguments of the Julia child: no start-up file, no colour codes, the threads of
+ * `assets/data/run_flow.json`, the package folder (from a checkout), then `-e` the
+ * program and its four values (Julia file, project, temperature, run folder).
  *
- * @param root - the package folder, or `undefined` (a packaged program: Julia's own
- *     environment holds BAYSOL).
+ * @param root - the package folder, or `undefined` (packaged: Julia's own environment
+ *     holds BAYSOL).
  * @param script - the Julia file of the run; `run-project.jl` next to this file.
  */
 export function juliaArgs(
@@ -524,7 +603,7 @@ export function juliaArgs(
 
 /**
  * The real launcher: `julia ... -e 'include(...); BAYSOLRun.runProject(...)'` in its own
- * process group, with the same cache folder as this program and three pipes.
+ * process group, with this program's cache folder and three pipes.
  *
  * @returns the child. A Julia that cannot be started arrives as its `error` event.
  */
@@ -533,14 +612,14 @@ const juliaLauncher: Launcher = (spec) =>
         detached: true,
         windowsHide: true,
         stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env, BAYSOL_CACHE: cacheDir() },
+        env: { ...process.env, BAYSOL_CACHE: spec.cache ?? cacheDir() },
     })
 
 /**
- * Sends a signal to a child's whole process group (the child and everything it started).
- * On Windows, which has no groups of signals, `taskkill /T` ends the tree.
+ * Sends a signal to a child's whole process group. On Windows, which has no signal
+ * groups, `taskkill /T` ends the tree.
  *
- * @param pid - the child's pid, which is also its group's id (it leads the group).
+ * @param pid - the child's pid, also its group's id (it leads the group).
  */
 function signalGroup(pid: number, signal: NodeJS.Signals): void {
     if (process.platform === "win32") {
@@ -571,8 +650,8 @@ function groupAlive(pid: number): boolean {
 }
 
 /**
- * Appends text to the run's `run.LOG` (made if Julia never got to), under the rule
- * that the file has one writer: this is only called once Julia is gone.
+ * Appends text to the run's `run.LOG` (made if Julia never got to). The file has one
+ * writer: this is only called once Julia is gone.
  *
  * @param text - what to add; an `=== ERRORS ===` heading goes first when the log has none.
  */
@@ -590,9 +669,8 @@ function appendToLog(runDir: string, text: string): void {
 }
 
 /**
- * The first error of the ERRORS section of a run's `run.LOG` in a few words, for the note
- * row of a failed run (`not converged`; this program's own `tui: ...` lines are short
- * and stay as they are). The whole text stays in `run.LOG`.
+ * The first error of a run's `run.LOG` ERRORS section in a few words, for the note row
+ * of a failed run (`tui: ...` lines stay as they are); the full text stays in the log.
  *
  * @returns the line, or `undefined` when the log cannot be read or has no error.
  */
@@ -669,9 +747,9 @@ export class RunSession {
     }
 
     /**
-     * Starts a run: claims the run folder (a live run refuses it), copies the inputs into
-     * it and starts the child. The claim and the copies are made before any process
-     * exists; if one fails the folder is marked `failed` and the error is thrown.
+     * Starts a run: claims the run folder (a live run refuses it), copies the inputs and
+     * starts the child. If a step fails the folder is marked `failed` and the error is
+     * thrown.
      *
      * @param launcher - what starts the child, [[juliaLauncher]] when left out.
      * @param pack - what packs the run once it is over, [[packRun]] when left out.
@@ -688,7 +766,12 @@ export class RunSession {
         let child: ChildProcess
         try {
             snapshotInputs(projectDir, claimed.dir)
-            child = launcher({ projectDir, runDir: claimed.dir, temperature })
+            child = launcher({
+                projectDir,
+                runDir: claimed.dir,
+                temperature,
+                cache: runCache(claimed.dir),
+            })
         } catch (error) {
             try {
                 appendToLog(
@@ -696,6 +779,7 @@ export class RunSession {
                     `tui: could not start: ${(error as Error).message}`,
                 )
             } finally {
+                unstageModels(claimed.dir)
                 abandonClaim(claimed.dir)
             }
             throw error
@@ -765,10 +849,7 @@ export class RunSession {
         this.timers.push(renew)
     }
 
-    /**
-     * Ends the run once the child has ended: gives the run its final status when Julia
-     * could not, records what happened and settles [[done]].
-     */
+    /** Ends the run once the child has: final status if Julia gave none, [[done]]. */
     private async finish(
         code: number | null,
         signal: NodeJS.Signals | null,
@@ -801,12 +882,10 @@ export class RunSession {
             let note = this.current.note
             const phase: RunPhase =
                 status === "done" ? "done" : status === "aborted" ? "aborted" : "failed"
-            // a failed run tells why: the first line of its ERRORS section (the full text
-            // stays in run.LOG)
+            // a failed run tells why: the first line of its ERRORS section
             if (phase === "failed" && note === undefined)
                 note = failureNote(this.runDir)
-            // the packing phase is shown; a pack that fails leaves the folder as it was and
-            // the note says why (the run's own outcome is unchanged)
+            // a pack that fails leaves the folder as it was; the outcome is unchanged
             this.update({ phase: "packing", note })
             try {
                 await this.pack(this.runDir)
@@ -814,20 +893,31 @@ export class RunSession {
                 const why = messageOf(error, "unknown error")
                 note = `not packed: ${why}`
             }
+            // what Julia generated goes into the project's `models.7z`, in the background
+            const cache = runCache(this.runDir)
+            if (phase === "done" && cache !== undefined) {
+                try {
+                    await packGenerated(this.projectDir, cache)
+                } catch (error) {
+                    const why = messageOf(error, "unknown error")
+                    const lead = note === undefined ? "" : `${note}; `
+                    note = `${lead}generated files not stored: ${why}`
+                }
+            }
             this.update({ phase, note })
         } catch (error) {
             this.update({ phase: "failed", note: (error as Error).message })
         } finally {
+            unstageModels(this.runDir)
             active.delete(this)
             this.resolveDone(this.current.phase)
         }
     }
 
     /**
-     * Stops the run: SIGTERM to the child's whole process group, then a few seconds for
-     * Julia to finish its log, then SIGKILL to the group; the end (status, the note in the
-     * run's errors) follows as for any end. Calling it again returns the same
-     * promise.
+     * Stops the run: SIGTERM to the child's process group, a few seconds for Julia to
+     * finish its log, then SIGKILL; the end follows as for any end. Calling it again
+     * returns the same promise.
      *
      * @param reason - what asked for it, e.g. `^c`; it goes into the run's errors.
      */
@@ -879,17 +969,19 @@ export function hasActiveRuns(): boolean {
 }
 
 /**
- * Stops every run that is going and waits until each is over, its status written: what
- * Ctrl-C, Ctrl-D, SIGHUP and SIGTERM do before the program leaves.
+ * Stops every run going and waits until each is over, and for the writes of the archives
+ * still going (Ctrl-C, Ctrl-D, SIGHUP, SIGTERM).
  */
 export async function quitAll(reason: string): Promise<void> {
     await Promise.all([...active].map((session) => session.abort(reason)))
+    // a write of `models.7z` or `reference-fit.7z` in the background finishes first
+    await settleWrites()
 }
 
 /**
- * Kills the process group of every run that is going, now and synchronously. Only for
- * the `exit` event of the process, when nothing can be awaited any more (a crash): no run
- * is left behind, and Julia's own end-of-input watch is the backstop.
+ * Kills the process group of every run going, synchronously: only for the process's
+ * `exit` event, when nothing can be awaited (a crash). Julia's end-of-input watch is the
+ * backstop.
  */
 export function killAllNow(): void {
     for (const session of active) session.killNow()

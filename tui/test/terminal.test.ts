@@ -3,11 +3,9 @@
 // Tests of `core/terminal.ts`: text in terminal cells, numbers and opening a terminal.
 
 import assert from "node:assert/strict"
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
-import type { System } from "../src/core/environment.js"
 import {
     displayWidth,
     formatNumber,
@@ -21,12 +19,14 @@ import {
     programCommand,
     shellQuote,
     startAction,
+    superscripts,
     takeWidth,
     terminalCandidates,
     terminalCommand,
     truncate,
     windowsTerminalCommand,
 } from "../src/core/terminal.js"
+import { fakeSystem, tempDir } from "./support/fixtures.js"
 
 test("numberText takes a decimal number as typed and nothing else", () => {
     for (const [text, x] of [
@@ -105,16 +105,9 @@ test("displayWidth measures the way Ink does, ambiguous width included", async (
     assert.equal(takeWidth("σσσσ", 3), "σσσ")
 })
 
-const system = (os: NodeJS.Platform, env: Record<string, string>): System => ({
-    os,
-    env,
-    home: "/home/u",
-    cwd: "/work",
-})
-
 /** A new folder holding an executable file for each name. */
 function binWith(...names: string[]): string {
-    const dir = mkdtempSync(join(tmpdir(), "baysol-test-"))
+    const dir = tempDir()
     for (const n of names) writeFileSync(join(dir, n), "#!/bin/sh\n", { mode: 0o755 })
     return dir
 }
@@ -123,7 +116,7 @@ const script = 'cd "$1" && shift && exec "$@"'
 
 test("candidates are ordered by who chose them", () => {
     const first = (env: Record<string, string>, n: number): string[] =>
-        terminalCandidates(system("linux", env)).slice(0, n)
+        terminalCandidates(fakeSystem("linux", env)).slice(0, n)
     assert.deepEqual(first({ TERMINAL: "kitty", XDG_CURRENT_DESKTOP: "KDE" }, 5), [
         "kitty",
         "xdg-terminal-exec",
@@ -155,7 +148,7 @@ test("candidates are ordered by who chose them", () => {
         "x-terminal-emulator",
     ])
     const all = terminalCandidates(
-        system("linux", { TERMINAL: "konsole", XDG_CURRENT_DESKTOP: "KDE" }),
+        fakeSystem("linux", { TERMINAL: "konsole", XDG_CURRENT_DESKTOP: "KDE" }),
     )
     assert.equal(all.length, new Set(all).size)
 })
@@ -248,28 +241,32 @@ test("macOS and Windows command lines", () => {
 
 test("openTerminalCommand per system", () => {
     const bin = binWith("konsole", "kitty")
-    assert.deepEqual(openTerminalCommand(system("linux", { PATH: bin }), ["prog"]), {
+    assert.deepEqual(openTerminalCommand(fakeSystem("linux", { PATH: bin }), ["prog"]), {
         command: [join(bin, "konsole"), "-e", "sh", "-c", script, "sh", "/work", "prog"],
     })
     assert.deepEqual(
-        openTerminalCommand(system("linux", { PATH: bin, TERMINAL: "kitty" }), ["prog"]),
+        openTerminalCommand(
+            fakeSystem("linux", { PATH: bin, TERMINAL: "kitty" }),
+            ["prog"],
+        ),
         {
             command: [join(bin, "kitty"), "sh", "-c", script, "sh", "/work", "prog"],
         },
     )
-    assert.deepEqual(openTerminalCommand(system("linux", { PATH: "" }), ["prog"]), {
+    assert.deepEqual(openTerminalCommand(fakeSystem("linux", { PATH: "" }), ["prog"]), {
         problem: "No supported Linux terminal emulator found",
     })
-    const mac = openTerminalCommand(system("darwin", {}), ["node"])
+    const mac = openTerminalCommand(fakeSystem("darwin", {}), ["node"])
     assert.ok("command" in mac && mac.command[0] === "osascript")
     const wt = binWith("wt.exe")
-    assert.deepEqual(openTerminalCommand(system("win32", { PATH: wt }), ["node"]), {
+    assert.deepEqual(openTerminalCommand(fakeSystem("win32", { PATH: wt }), ["node"]), {
         command: ["wt.exe", "-d", "/work", "node"],
     })
-    assert.deepEqual(openTerminalCommand(system("win32", { PATH: "" }), ["node"]), {
+    assert.deepEqual(openTerminalCommand(fakeSystem("win32", { PATH: "" }), ["node"]), {
         command: ["cmd.exe", "/c", "start", "BAYSOL", "/D", "/work", "node"],
     })
-    assert.deepEqual(openTerminalCommand(system("plan9" as NodeJS.Platform, {}), ["x"]), {
+    const plan9 = fakeSystem("plan9" as NodeJS.Platform, {})
+    assert.deepEqual(openTerminalCommand(plan9, ["x"]), {
         problem: "Unsupported operating system: plan9",
     })
 })
@@ -286,8 +283,21 @@ test("the program runs itself again with the same runtime and arguments", () => 
 })
 
 test("start-up: run in a terminal, else relaunch once, else fail", () => {
-    assert.equal(startAction(true, system("linux", {})), "run")
-    assert.equal(startAction(true, system("linux", { BAYSOL_IN_TERMINAL: "1" })), "run")
-    assert.equal(startAction(false, system("linux", {})), "relaunch")
-    assert.equal(startAction(false, system("linux", { BAYSOL_IN_TERMINAL: "1" })), "fail")
+    assert.equal(startAction(true, fakeSystem("linux", {})), "run")
+    assert.equal(startAction(true, fakeSystem("linux", { BAYSOL_IN_TERMINAL: "1" })), "run")
+    assert.equal(startAction(false, fakeSystem("linux", {})), "relaunch")
+    const inside = fakeSystem("linux", { BAYSOL_IN_TERMINAL: "1" })
+    assert.equal(startAction(false, inside), "fail")
+})
+
+test("superscripts turns caret exponents of data text into real superscripts", () => {
+    assert.equal(superscripts("q (A^-1)"), "q (Å⁻¹)")
+    assert.equal(superscripts("10^-3 and 10^12"), "10⁻³ and 10¹²")
+    assert.equal(superscripts("K^(-1) m^2 e^+3"), "K⁻¹ m² e⁺³")
+    assert.equal(superscripts("0.0067 K^-1"), "0.0067 K⁻¹")
+    // a bare A with a positive exponent, or a letter before the A, is not the ångström
+    assert.equal(superscripts("A^2 BA^-1"), "A² BA⁻¹")
+    // control-key stand-ins and a caret with no exponent stay
+    for (const text of ["^x", "back: ^x", "^w save", "a ^ b", "x^y", "no caret"])
+        assert.equal(superscripts(text), text)
 })

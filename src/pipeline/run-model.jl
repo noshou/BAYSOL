@@ -179,12 +179,12 @@ trajectory's sample covariance, starting from the identity in the whitened coord
     pairs); see [`Inference.infer`](@ref). The draws of the chains that did not
     fail are pooled, and the report gives the split R̂ and ESS of the pool.
 - `retry::Bool=Inference.RETRY` (true; a CLI and developer switch, not a setting):
-    rerun the sampler once, longer, always adapting again and from derived seeds, when the
-    run does not count as converged (R̂ above [`Inference.RHAT_OK`](@ref), an ESS below
-    [`Inference.ESS_MIN`](@ref), or either not computable); see
+    rerun the sampler once, longer, always adapting again and from derived seeds, when
+    the run does not count as converged (R̂ not below [`Inference.RHAT_OK`](@ref), an
+    ESS not above [`Inference.ESS_MIN`](@ref), or either not computable); see
     [`Inference.infer`](@ref). If the run is still not converged, `runModel` throws
-    [`Inference.NotConvergedError`](@ref) and nothing is reported. `retry = false` skips
-    both the rerun and the error: the run is only flagged in its summary.
+    [`Inference.NotConvergedError`](@ref) and nothing is reported. `retry = false`
+    skips both the rerun and the error: the run is only flagged in its summary.
 - `retryNAdapt::Integer=Inference.RETRY_N_ADAPT`, `retryNDraws::Integer=
     Inference.RETRY_N_DRAWS` (2000, 2000): warm-up and post-warm-up iterations per chain of
     the rerun.
@@ -353,6 +353,14 @@ function runModel(
             maxLlh = fit.stats[i].log_density
             maxIdx = i
         end
+    end
+    if retry && diverged >= Inference.MAX_DIVERGENT_RATE * length(fit.stats)
+        pct = round(100 * diverged / length(fit.stats); digits = 2)
+        limit = 100 * Inference.MAX_DIVERGENT_RATE
+        throw(
+            Inference.NotConvergedError(
+                ["$pct % of the transitions diverged, not below $limit %"]),
+        )
     end
     if diverged == length(fit.stats)
         println("WARNING: all runs diverged; MAP and quantiles not run!")

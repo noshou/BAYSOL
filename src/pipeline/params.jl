@@ -244,6 +244,16 @@ and slope up to the left. `0` leaves them horizontal.
 """
 const PLOT_XTICK_ANGLE = 45.0
 
+"""
+The unit of q in the plots and the workbook: `"Å⁻¹"` (the default) or `"nm⁻¹"`
+(`1 Å⁻¹ = 10 nm⁻¹`). Terminal plots, the `.tex` figures and the q columns of the workbook
+use it; the fit and the run log stay in Å⁻¹. The choices are `SETTING_CHOICES`.
+"""
+const PLOT_Q_UNIT = "Å⁻¹"
+
+"The factor that turns q in Å⁻¹ into each unit of [`PLOT_Q_UNIT`](@ref)."
+const Q_UNIT_FACTORS = Dict("Å⁻¹" => 1.0, "nm⁻¹" => 10.0)
+
 "The line width (pt) of the major axis ticks."
 const PLOT_LW_MAJOR_TICK = 0.8
 
@@ -255,6 +265,18 @@ The colour of the axis ticks, major and minor, and of the stubs that carry the x
 labels; a [`ColorSpec`](@ref BAYSOL.Pipeline.ColorSpec) like the other colours.
 """
 const PLOT_TICK_COLOUR = :black
+
+"""
+The background colour of every figure (the page of the standalone document and the plot
+area); a [`ColorSpec`](@ref BAYSOL.Pipeline.ColorSpec) like the other colours.
+"""
+const PLOT_BG_COLOUR = :white
+
+"""
+The colour of all the text of every figure (tick labels, axis labels, legends, titles);
+a [`ColorSpec`](@ref BAYSOL.Pipeline.ColorSpec) like the other colours.
+"""
+const PLOT_TEXT_COLOUR = :black
 
 "The line width (pt) of the axis lines (the box round each figure)."
 const PLOT_AXIS_LW = 1.2
@@ -431,6 +453,7 @@ marker may have, and it is an ordered list, not a subset (see `SETTING_KINDS`).
 """
 const SETTING_CHOICES = (
     FIGURES_FORMATS = (:pdf, :png, :svg), PLOT_COMPARE_MARKERS = PLOT_MARKER_NAMES,
+    PLOT_Q_UNIT = (Symbol("Å⁻¹"), Symbol("nm⁻¹")),
 )
 
 """
@@ -469,7 +492,8 @@ const SETTING_NAMES = (
     :PLOT_AXIS_LW, :PLOT_WIDTH_HEIGHT_CM, :PLOT_PREVIEW_SIZE, :PLOT_TEXT_FONT,
     :PLOT_MATH_FONT, :PLOT_HIST_BINS, :PLOT_YLIM_LOG, :PLOT_YLIM_LIN_PAD_FRAC,
     :PLOT_BORDER_PT, :PLOT_TICK_LENGTH_CM, :PLOT_LINMIN_TICKS, :PLOT_LW_MAJOR_TICK,
-    :PLOT_LW_MINOR_TICK, :PLOT_TICK_COLOUR, :PLOT_XTICK_ANGLE, :PLOT_XTICK_STUB_PT,
+    :PLOT_LW_MINOR_TICK, :PLOT_TICK_COLOUR, :PLOT_BG_COLOUR,
+    :PLOT_TEXT_COLOUR, :PLOT_XTICK_ANGLE, :PLOT_Q_UNIT, :PLOT_XTICK_STUB_PT,
     :PLOT_XTICK_ELBOW_PT, :PLOT_XTICK_LABEL_PAD_PT, :PLOT_YTICK_LABEL_PAD_PT,
     :Q_MIN, :Q_MAX, :SIGMA_SCALE, :EXCLUDE_Q, :LMAX, :CHAINS, :MODEL, :ADD_HYDROGENS,
     :PLOT_COMPARE, :PLOT_COMPARE_COLOURS, :PLOT_COMPARE_MARKERS, :PLOT_LW_COMPARE,
@@ -492,7 +516,7 @@ const SETTING_KINDS = (
     Q_MIN = :optionalFloat, Q_MAX = :optionalFloat, LMAX = :optionalInt,
     EXCLUDE_Q = :ranges, CHAINS = :strings, PLOT_COMPARE_COLOURS = :colours,
     PLOT_COMPARE_MARKERS = :markers, PLOT_TUI_SIZES = :sizes, FIGURES_DIR = :path,
-    FIGURES_COMPILER = :path, TABLE_DIR = :path,
+    FIGURES_COMPILER = :path, TABLE_DIR = :path, PLOT_Q_UNIT = :choice,
 )
 
 """

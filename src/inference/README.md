@@ -62,7 +62,7 @@ For `Φ(ξ, η)` maximised over nuisance `η`, `∇_ξ Φ_prof = ∇_ξΦ(ξ, η
 assembled from 15 contractions of the packed Gram columns, `T^{(0)}=Σ p G_c`, `T^{(1)}=Σ p g G_c`, `T^{(2)}=Σ p g² G_c`:
 
 ```math
-\frac{\partial\ell}{\partial\rhoE}=m\Big(-2\sum_i a_iT^{(1)}_{i,ex}+2\rho_eT^{(2)}_{ex,ex}\Big),\qquad
+\frac{\partial\ell}{\partial\rho_e}=m\Big(-2\sum_i a_iT^{(1)}_{i,ex}+2\rho_eT^{(2)}_{ex,ex}\Big),\qquad
 \frac{\partial\ell}{\partial\delta\rho_i}=2m\,u_\rho\Big(\sum_j a_jT^{(0)}_{ij}-\rho_eT^{(1)}_{i,ex}\Big)
 ```
 
@@ -113,7 +113,7 @@ Only `Ξ` is nonlinear; the maps `θ ↔ z ↔ w` are affine with constant Jacob
  Hamiltonian trajectories need an unconstrained space. With `σ(t) = 1/(1+e⁻ᵗ)`:
 
 ```math
-\theta=(a,t_1,t_2,t_3),\quad a=\ln\rhoE,\quad t_k=\mathrm{logit}\frac{\delta\rho_k-L_k}{W_k};\qquad
+\theta=(a,t_1,t_2,t_3),\quad a=\ln\rho_e,\quad t_k=\mathrm{logit}\frac{\delta\rho_k-L_k}{W_k};\qquad
 \Xi(\theta)=\big(e^a,\ L_k+W_k\,\sigma(t_k)\big)
 ```
 
@@ -177,7 +177,7 @@ Each chain uses multinomial NUTS with the generalised U-turn criterion (as in St
 - **Dynamics.** `H(x, p) = U(x) + ½ pᵀM⁻¹p`; kick–drift–kick leapfrog is volume-preserving, reversible and symplectic (second order, energy error ≈ O(ε²) bounded within the stability range), so the weights `e^{−H}` are the whole correction: the next state is drawn from the trajectory with probability ∝ `e^{−H}` (biased progressive sampling at the top level) and no accept–reject step is needed. The criterion stops when `ρ·p♯₋ ≤ 0` or `ρ·p♯₊ ≤ 0`, `ρ` the sum of the momenta.
 - **Step size.** Nesterov dual averaging in `log ε` (γ = 0.05, t₀ = 10, κ = 0.75, shrinkage point `log 10ε₀`) toward a tree-averaged acceptance `α̅ = mean_leaves min(1, e^{−(H'−H₀)})` of `TARGET_ACCEPT = 95` percent. The posteriors are strongly curved and often multimodal; on the 53 fits δ = 0.95 removed the divergences (three fits above 1 % went to ≤ 0.04 %) for 1.3× the steps of Stan's 0.8.
 - **Metric windows** (`nAdapt = 300`): ε only for iterations 1–75, covariance windows ending at 100, 150, 250, ε only for 251–300; at each window end the metric becomes `n/(n+5) Σ̂ + 10⁻³·5/(n+5) I` and dual averaging restarts. The retry (`nAdapt = 2000`) has windows ending at 100, 150, 250, 450, 850, 1950.
-- **Divergences.** A subtree diverges when `H' − H₀ > 1000` or `H'` is non-finite. They mark curvature the step cannot follow. A chain is dropped only if it errored or more than `CHAIN_MAX_DIVERGENT = 0.5` of its transitions diverged; the 1 % and 5-draws-per-fit figures are validation criteria, not tests in the program. Divergent draws are excluded from the MAP and the summaries, and up to `HARVEST_DIVERGENT` seed the optimum harvest. **E-BFMI** `= Σ(H_t − H_{t−1})² / Σ(H_t − H̄)² ≈ 2(1 − ρ₁)` is reported for the worst chain (below ~0.3 the energy random-walks slowly).
+- **Divergences.** A subtree diverges when `H' − H₀ > 1000` or `H'` is non-finite. They mark curvature the step cannot follow. A chain is dropped only if it errored or more than `CHAIN_MAX_DIVERGENT = 0.5` of its transitions diverged, and a whole run fails (`NotConvergedError`, checked by `runModel` with the convergence gate) when `MAX_DIVERGENT_RATE = 0.001` (0.1 %) or more of its pooled post-warm-up transitions diverged (owner, 2026-11-16), whatever its R̂ and ESS. Divergent draws are excluded from the MAP and the summaries, and up to `HARVEST_DIVERGENT` seed the optimum harvest. **E-BFMI** `= Σ(H_t − H_{t−1})² / Σ(H_t − H̄)² ≈ 2(1 − ρ₁)` is reported for the worst chain (below ~0.3 the energy random-walks slowly).
 
 ## Chains, modes and pooling
 
@@ -204,7 +204,88 @@ Within each mode (modes differ by construction), on the unthinned post-warm-up d
 - **Split R̂** on `2M` half-chains: `W` the mean within-sequence variance, `B` the between-sequence variance of means, `var⁺ = (n−1)/n W + B/n`, `R̂ = √(var⁺/W)`, so `R̂² − 1 ≈ τ_μ²/W` is the between-mean variance as a fraction of the within variance (1.01 ⇔ means within ≈ 0.14 within-sd). Rank normalisation (Blom scores) makes it location-robust; the folded version (about the median) catches differences of scale and tails; the larger is kept.
 - **ESS** `= S/τ̂`, `τ = 1 + 2Σρ_t`, the autocorrelation from the variogram (`ρ̂_t = 1 − (W − γ̄_t)/var⁺`) truncated by Geyer's initial positive/monotone pair sequence (max lag 250). A Monte Carlo standard error of a mean is `σ/√ESS`, of a 16/84 % interval end `1.52σ/√ESS` (more in the tails, where the default 2σ interval ends) (a few percent of σ at the default 5600 draws). The **tail ESS** is the one the intervals stand on; the rule of thumb is R̂ < 1.01 and ESS ≥ 100 per chain.
 
-The worst values over the diagnosed modes are reported (`rhatMax` flagged above `RHAT_OK = 1.01`, `essMin`, `essTailMin`). **Convergence and retry:** a run counts as converged when its worst R̂ is at most `RHAT_OK` (1.01) and its smallest bulk and tail ESS are at least `ESS_MIN` (400); an R̂ or ESS that could not be computed (too few draws, a constant quantity) counts as not converged. Otherwise the whole procedure, warm-up included, is always run once more with `RETRY_N_ADAPT = RETRY_N_DRAWS = 2000` and seeds derived by an odd-constant multiplication of `rngSeed` (`RETRY_SEED_OFFSET`: a different search, streams and directions, still deterministic), and the run with the smaller worst R̂ is kept (`retry = false` disables it (a CLI and developer switch); the report's `retry` line and `diagnostics.firstRhat`, `retryKept` say what happened). If the run is still not converged, `runModel` throws `NotConvergedError` and nothing is reported (`retry = false` skips both the rerun and the error). It cannot repair a structural failure (a second mode explored by a single chain keeps R̂ ≈ 1.7). Outcomes: 53/53 at R̂ ≤ 1.01 on the latest run, 8 retries (the validation records were removed; git history under `test/validation/rhat_retry/`). Convergence statistics detect chains that disagree, not chains that agree on a wrong region.
+The worst values over the diagnosed modes are reported (`rhatMax` flagged when not below `RHAT_OK = 1.01`, `essMin`, `essTailMin`). **Convergence and retry:** a run counts as converged when its worst R̂ is strictly below `RHAT_OK` (1.01) and its smallest bulk and tail ESS are strictly above `ESS_MIN` (400) (every gate is strict, owner 2026-11-16: a value equal to the limit fails); an R̂ or ESS that could not be computed (too few draws, a constant quantity) counts as not converged. Otherwise the whole procedure, warm-up included, is always run once more with `RETRY_N_ADAPT = RETRY_N_DRAWS = 2000` and seeds derived by an odd-constant multiplication of `rngSeed` (`RETRY_SEED_OFFSET`: a different search, streams and directions, still deterministic), and the run with the smaller worst R̂ is kept (`retry = false` disables it (a CLI and developer switch); the report's `retry` line and `diagnostics.firstRhat`, `retryKept` say what happened). If the run is still not converged, `runModel` throws `NotConvergedError` and nothing is reported (`retry = false` skips both the rerun and the error). It cannot repair a structural failure (a second mode explored by a single chain keeps R̂ ≈ 1.7). Outcomes: 53/53 at R̂ ≤ 1.01 on the latest run, 8 retries (the validation records were removed; git history under `test/validation/rhat_retry/`). Convergence statistics detect chains that disagree, not chains that agree on a wrong region.
+
+## When a run fails
+
+A run **fails** (`NotConvergedError`, no results written, the `.LOG` of the folder gets `status failed`
+and the reasons in its `error` row) when any of three gates is not passed. Every gate is strict (owner,
+2026-11-16): a value equal to the limit fails.
+
+| Gate | Passes when | Constant |
+|---|---|---|
+| worst split R̂ | strictly below 1.01 | `RHAT_OK` |
+| smallest bulk and tail ESS | strictly above 400 | `ESS_MIN` |
+| divergent transitions | strictly below 0.1 % of the pooled post-warm-up transitions | `MAX_DIVERGENT_RATE` |
+
+The ladder below is what we do, in this order, when a fit fails. It comes from fixing the benchmark entries
+(`test/fitting_tests/`); the entry named at each step is a real case, and its script carries the setting
+and a comment saying why. Every setting is a keyword of `runModel` (a script passes it there; the terminal
+interface takes it per model in `model-settings.json`). After any change, **check it on three seeds
+(`rngSeed` 0, 1, 2)**: one clean seed is luck, not a fix, and a rate close to a limit is noisy (4 divergent
+draws in 5600 are 0.07 %).
+
+1. **R̂ or ESS only marginal (R̂ 1.01 to 1.05, ESS a few hundred).** Longer chains. The first run is
+   retried once with a longer warm-up and more draws; when even that is marginal, raise
+   `retryNAdapt` and `retryNDraws` (for example 6000 and 8000: SASDMS6 needs `retryNDraws = 8000`). More
+   draws shrink the Monte-Carlo error of R̂ and raise ESS roughly in proportion; they cost only time. This
+   is the first thing to try because it changes nothing about the model.
+2. **Chains end in different regions (R̂ far above 1, `modes` above 1 with low ESS).** Start them closer to
+   the optimum with a smaller `chainStartRadii` (SASDJ66, SASDM86: `(2.0, 4.0, 6.0)`). The default radii
+   spread the chains widely, which on a flat or curved posterior can leave them in different parts of it
+   for the whole run. Note that the "modes" of a run are clusters of chains: with a tiny step size every
+   chain is its own cluster, so a high mode count is first a sign of poor mixing, not of a multimodal
+   posterior.
+3. **Too many divergent transitions (0.1 % or more) with a healthy R̂.** Raise the target acceptance `δ`
+   (`TARGET_ACCEPT`, a percentage; default 95) to 98 or 99 (SASDVN2, SASDNW9, SASDUP5, SASDMS6, SASDM76,
+   SASDX52). Step-size adaptation aims for a mean acceptance of `δ`; a higher target means a smaller step.
+   A divergence is the leapfrog integrator going unstable (energy error above 1000), which happens where the
+   curvature is too high for the step (stability needs roughly step < 2/√λ for the largest local curvature
+   λ). A smaller step keeps it stable there. It does not change the target distribution; the price is more
+   leapfrog steps per draw, so a longer run. It only works when the divergences come from the step being
+   too large in a few stiff places: an entry that diverges as often at 99 as at 95 has the structural
+   problem of step 6.
+4. **The opposite case: the step size collapses (about 0.002, tree depth 10, R̂ far above 1).** On a very
+   stiff or flat, curved posterior the default `δ` drives the step so small that the chains hardly move.
+   A **lower** `δ` (60 for SASDMC6) gives steps about a hundred times larger and the chains mix. Check the
+   divergence rate afterwards: a larger step is the one that can start to diverge, and the 0.1 % gate
+   judges that.
+5. **A q cut that leaves too few Shannon channels.** A fit to a curve cut at 0.15 to 0.3 Å⁻¹ can end up with
+   only 3 to 4 channels, so the posterior of the four nuisance parameters is nearly flat along curved
+   manifolds that no sampler crosses. Fitting the whole curve (`Q_MAX_FIT = Inf`; `seedModel` drops the
+   non-positive bins) removed the problem for SASDVB2 and SASDVC2. Keep a cut only when the data above it
+   really are noise.
+6. **Divergences that do not respond to `δ` (SASDWS5, SASDM96: 1.3 % to 2 % at 95, 98 and 99).** The step
+   size is not the cause: the log-density has a feature the integrator cannot cross at any step. This is the
+   structural case and it is not solved yet; see "Structural failures" below.
+
+**What does not fix a failed run** (measured, do not retry): a different prior width (`κ_δρ₁₂`,
+`κ_δρ₃`), Shannon binning (`rebin`), removing the HETATM ligands, or a different mass-matrix type
+(it is already dense). Weakening a gate is not a fix either: the gates are the definition of a run
+that can be trusted.
+
+### Structural failures
+
+*Open: the cause is narrowed down, the remedy is not decided.* SASDM96 and SASDWS5 keep 1.3 % to 2.6 %
+divergent transitions at `δ` 95 and 99 alike (step 0.09 to 0.34, tree depth 3 to 5), so a smaller step does
+not help. Measured on the divergent draws of one run each (seed 0):
+
+- **Not a gradient error.** The ForwardDiff gradient agrees with a central finite difference to
+  about 2·10⁻⁴ (relative) at divergent and at ordinary draws alike.
+- **Not the `c1` bound.** The divergent draws of SASDWS5 sit at `c1` ≈ 1.1, far from the 1.3 bound; those of
+  SASDM96 are not concentrated near it (3 % to 11 % within 0.002 of 1.3, against 4 % to 5 % of the
+  others). The log-density shows no kink there (one-sided slopes agree).
+- **They sit in a different part of the posterior.** In SASDM96 the divergent draws have a higher
+  `δρ₂` (about 0.85 against 0.25); in SASDWS5 a lower `δρ₁` (1.3 to 1.4 against 1.77, with the bulk pinned
+  near its bound 2.0) and a `δρ₃` nearer its upper tail. They are spread over all chains, so it is not one
+  stuck chain.
+- **The geometry is very stiff.** The log-posterior gradient in θ-space is 10³ to 10⁴ at ordinary
+  draws, and the Hessian of SASDM96 has eigenvalues from 0.6 to 1.3·10⁸. The mass matrix is one global
+  matrix learned in warm-up, so where the curvature differs from the average the same step is too large.
+
+What a user can do today is limited to the ladder above plus the checks: which parameter the divergent draws
+share (the `draws` sheet and the `divergent` flag), and whether the entry's buffer description
+(concentrations, uncertainties) is right, since a wrong solvent contrast pushes `δρ` to its bounds.
 
 ## Draws and summaries
 
@@ -218,7 +299,7 @@ The worst values over the diagnosed modes are reported (`rhatMax` flagged above 
 
 ```julia
 using BAYSOL
-using BAYSOL.MolecularStructure: LocalPathSource, resloveStruct, loadMolecule
+using BAYSOL.MolecularStructure: LocalPathSource, resolveStruct, loadMolecule
 using BAYSOL.Hydrogenator: propkaPkas, resolveHydrogens, Propka
 using BAYSOL.Scattering: forwardCache
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
@@ -231,7 +312,7 @@ SOLUTES = Solute[                       # buffer only: the measured protein is n
     NonBiological(0.005, 0.0001, "dtt"),
 ]
 
-path  = resloveStruct(LocalPathSource(pdbPath))
+path  = resolveStruct(LocalPathSource(pdbPath))
 hpath = resolveHydrogens(path, PH; titration = Propka(propkaPkas(path)))
 mol   = loadMolecule(hpath)
 fw    = forwardCache(mol, qFit, lMax, energy_eV)

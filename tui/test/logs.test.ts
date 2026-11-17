@@ -15,8 +15,8 @@ import { dirname, join, sep } from "node:path"
 import { test } from "node:test"
 import { RUN_FLOW } from "../src/core/environment.js"
 import { ChangedOnDiskError, isFolder, writeJson } from "../src/core/file-system.js"
-import { LogsRuns } from "../src/screens/logs-menu.js"
-import { noWorkbookNote, openRowText, TextPager } from "../src/screens/open-runs.js"
+import { LogsRuns, RunLogScreen, TextPager } from "../src/screens/logs-menu.js"
+import { noWorkbookNote, openRowText } from "../src/screens/open-runs.js"
 import {
     type BufferRow,
     readConditions,
@@ -53,7 +53,8 @@ import {
     watchBuffer,
 } from "../src/store/run-restores.js"
 import { settingsFile } from "../src/store/settings-store.js"
-import { fixture, runOn, tempDir } from "./support/fixtures.js"
+import { findLines, pagerFooter, parseLine, stepMatch } from "../src/ui/pager.js"
+import { fixture, plainRun, runOn, tempDir } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Open runs
@@ -299,20 +300,6 @@ function project(): string {
     return dir
 }
 
-/** Makes `runs/<id>/` with a `run.json` of `json` (none for `undefined`) and log files. */
-function makeRun(
-    dir: string,
-    id: string,
-    json?: unknown,
-    files: Record<string, string> = {},
-) {
-    const run = join(dir, "runs", id)
-    mkdirSync(run, { recursive: true })
-    if (json !== undefined) writeFileSync(join(run, "run.json"), writeJson(json))
-    for (const [name, text] of Object.entries(files)) writeFileSync(join(run, name), text)
-    return run
-}
-
 /** The `run.json` of a run whose process is alive (this one) and beats now. */
 const liveJson = {
     status: "running",
@@ -323,8 +310,8 @@ const liveJson = {
 
 test("delete run removes the whole folder and only that one", () => {
     const dir = project()
-    const keep = makeRun(dir, runOn("2026-11-01"), { status: "done" }, { "run.LOG": "x" })
-    const run = makeRun(dir, runOn("2026-11-02"), { status: "done" }, { "run.LOG": "y" })
+    const keep = plainRun(dir, runOn("2026-11-01"), { status: "done" }, { "run.LOG": "x" })
+    const run = plainRun(dir, runOn("2026-11-02"), { status: "done" }, { "run.LOG": "y" })
     mkdirSync(join(run, "model"))
     writeFileSync(join(run, "model", "model.LOG"), "z")
     deleteRun(dir, runOn("2026-11-02"))
@@ -335,8 +322,8 @@ test("delete run removes the whole folder and only that one", () => {
 
 test("delete run is refused while a run is live, and nothing is removed", () => {
     const dir = project()
-    const live = makeRun(dir, runOn("2026-11-02"), liveJson)
-    const old = makeRun(dir, runOn("2026-11-01"), { status: "done" })
+    const live = plainRun(dir, runOn("2026-11-02"), liveJson)
+    const old = plainRun(dir, runOn("2026-11-01"), { status: "done" })
     for (const id of [runOn("2026-11-02"), runOn("2026-11-01")])
         assert.throws(() => deleteRun(dir, id), RunInProgressError, id)
     assert.equal(isFolder(live), true)
@@ -345,7 +332,7 @@ test("delete run is refused while a run is live, and nothing is removed", () => 
 
 test("delete run takes a name of runs/ only, never a path", () => {
     const dir = project()
-    const run = makeRun(dir, runOn("2026-11-01"), { status: "done" })
+    const run = plainRun(dir, runOn("2026-11-01"), { status: "done" })
     for (const bad of ["", ".start", "..", "../runs", "a/b"])
         assert.throws(() => deleteRun(dir, bad), /not a run/, JSON.stringify(bad))
     assert.equal(isFolder(run), true)
@@ -354,9 +341,9 @@ test("delete run takes a name of runs/ only, never a path", () => {
 test("the run.LOG text is read plain, with a cap, and says why it cannot be", () => {
     const dir = project()
     const files = { "run.LOG": "a\tb\n" }
-    const run = makeRun(dir, runOn("2026-11-01"), { status: "done" }, files)
+    const run = plainRun(dir, runOn("2026-11-01"), { status: "done" }, files)
     assert.equal(readLogText(run), "a\tb\n")
-    const bare = makeRun(dir, runOn("2026-11-02"), { status: "done" })
+    const bare = plainRun(dir, runOn("2026-11-02"), { status: "done" })
     assert.throws(() => readLogText(bare), /no run\.LOG/)
     writeFileSync(join(bare, "run.LOG"), "x".repeat(RUN_FLOW.log.maxBytes + 1))
     assert.throws(() => readLogText(bare), /too large/)
@@ -368,7 +355,7 @@ test("the run.LOG text is read plain, with a cap, and says why it cannot be", ()
 test("a run's files are read plain: any name, a cap, and why one cannot be", () => {
     const dir = project()
     const files = { "plots.txt": "p\n" }
-    const run = makeRun(dir, runOn("2026-11-01"), { status: "done" }, files)
+    const run = plainRun(dir, runOn("2026-11-01"), { status: "done" }, files)
     assert.equal(readRunFile(run, "plots.txt"), "p\n")
     assert.throws(() => readRunFile(run, "buffer.json"), /this run has no buffer\.json/)
     assert.deepEqual(
@@ -383,17 +370,17 @@ test("a run's files are read plain: any name, a cap, and why one cannot be", () 
 
 test("the run list: newest first, each state, models, and a bad file is `unknown`", () => {
     const dir = project()
-    makeRun(dir, runOn("2026-11-01"), { status: "done", models: [{ name: "a" }] })
-    makeRun(dir, runOn("2026-11-02"), { status: "failed", models: [{ path: "/x/b.cif" }] })
-    makeRun(dir, runOn("2026-11-03"), { status: "aborted" })
+    plainRun(dir, runOn("2026-11-01"), { status: "done", models: [{ name: "a" }] })
+    plainRun(dir, runOn("2026-11-02"), { status: "failed", models: [{ path: "/x/b.cif" }] })
+    plainRun(dir, runOn("2026-11-03"), { status: "aborted" })
     // `running` with nobody behind it: interrupted (a dead pid on this host)
-    makeRun(dir, runOn("2026-11-04"), {
+    plainRun(dir, runOn("2026-11-04"), {
         status: "running",
         pid: 2 ** 22 + 5,
         host: hostname(),
         heartbeat: isoStamp(Date.now()),
     })
-    makeRun(dir, runOn("2026-11-05"))
+    plainRun(dir, runOn("2026-11-05"))
     writeFileSync(join(dir, "runs", runOn("2026-11-05"), "run.json"), "{ not json")
     const list = listRuns(dir)
     assert.deepEqual(
@@ -418,7 +405,7 @@ test("the run list: newest first, each state, models, and a bad file is `unknown
 test("a live run is listed as live, with its models and size", () => {
     const dir = project()
     const json = { ...liveJson, models: [{ name: "m" }] }
-    makeRun(dir, runOn("2026-11-01"), json, { "run.LOG": "x" })
+    plainRun(dir, runOn("2026-11-01"), json, { "run.LOG": "x" })
     const [run] = listRuns(dir)
     assert.equal(run?.state, "live")
     assert.equal(run?.live, true)
@@ -436,8 +423,8 @@ test("a project without runs, and files among the runs, list nothing odd", () =>
 
 test("a folder that vanishes while the list is made is skipped, nothing throws", () => {
     const dir = project()
-    makeRun(dir, runOn("2026-11-01"), { status: "done" })
-    const gone = makeRun(dir, runOn("2026-11-02"), { status: "done" })
+    plainRun(dir, runOn("2026-11-01"), { status: "done" })
+    const gone = plainRun(dir, runOn("2026-11-02"), { status: "done" })
     rmSync(gone, { recursive: true })
     assert.deepEqual(
         listRuns(dir).map((r) => r.id),
@@ -457,7 +444,7 @@ test("sizes read in bytes, then KB, MB, GB", () => {
 
 test("delete run: a deleted run is gone for the open pages, and the list loses it", () => {
     const dir = project()
-    const run = makeRun(dir, runOn("2026-11-01"), { status: "done" }, { "run.LOG": "x" })
+    const run = plainRun(dir, runOn("2026-11-01"), { status: "done" }, { "run.LOG": "x" })
     deleteRun(dir, runOn("2026-11-01"))
     assert.deepEqual(listRuns(dir), [])
     // what a page open on the run reads now
@@ -467,6 +454,41 @@ test("delete run: a deleted run is gone for the open pages, and the list loses i
 test("the logs menu and `open runs` share ONE pager", () => {
     assert.equal(typeof TextPager, "function")
     assert.equal(typeof LogsRuns, "function")
+})
+
+test("run.LOG: `open runs` and the logs menu open the ONE `RunLogScreen`", () => {
+    assert.equal(typeof RunLogScreen, "function")
+    const source = (name: string) =>
+        readFileSync(new URL(`../src/screens/${name}`, import.meta.url), "utf8")
+    for (const file of ["open-runs.tsx", "logs-menu.tsx"])
+        assert.match(source(file), /<RunLogScreen\b/, `${file} opens RunLogScreen`)
+    // `open runs` has no pager of its own
+    assert.doesNotMatch(source("open-runs.tsx"), /<TextPager\b/)
+})
+
+test("pager: find, step between matches round the ends, go to a line", () => {
+    const lines = ["alpha", "beta", "Alphabet", "gamma", "ALPHA"]
+    assert.deepEqual(findLines(lines, "alpha"), [0, 2, 4])
+    assert.deepEqual(findLines(lines, ""), [])
+    assert.equal(stepMatch([0, 2, 4], 1, 0), 2)
+    assert.equal(stepMatch([0, 2, 4], 2, 0), 2)
+    assert.equal(stepMatch([0, 2, 4], 2, 1), 4)
+    assert.equal(stepMatch([0, 2, 4], 4, 1), 0, "past the last: the first")
+    assert.equal(stepMatch([0, 2, 4], 0, -1), 4, "before the first: the last")
+    assert.equal(stepMatch([], 0, 1), undefined)
+    assert.deepEqual(parseLine(" 3 ", 5), { line: 2 })
+    assert.deepEqual(parseLine("x", 5), { error: "not a line number" })
+    assert.deepEqual(parseLine("9", 5), { error: "no line 9: 1 to 5" })
+    assert.deepEqual(parseLine("0", 5), { error: "no line 0: 1 to 5" })
+})
+
+test("pager: one footer, `lines 1-15 of 63 · 24%`, then the match and the mark", () => {
+    assert.equal(pagerFooter(0, 63, 15), "lines 1-15 of 63 · 24%")
+    assert.equal(
+        pagerFooter(0, 63, 15, ["match 1 / 3", undefined, "marked 2-4"]),
+        "lines 1-15 of 63 · 24% · match 1 / 3 · marked 2-4",
+    )
+    assert.equal(pagerFooter(0, 0, 15), "empty")
 })
 
 // ========================================================================================
@@ -596,7 +618,7 @@ test("every restore refuses a live run and writes nothing", () => {
     const root = tempDir()
     const dir = join(root, "projects", "p")
     mkdirSync(join(dir, "runs"), { recursive: true })
-    makeRun(dir, runOn("2026-11-01"), liveJson)
+    plainRun(dir, runOn("2026-11-01"), liveJson)
     const text = writeJson({ solutes: rows, pH: 7.4, "sigmaPh": 0.1 })
     const info = writeJson({ units: "nm-1", energy: 12000, energyUnit: "eV" })
     const calls: [string, () => void][] = [
@@ -621,7 +643,7 @@ test("a restore reads the plain files of a run and never writes into the run", (
             units: "A-1", energy: 9000, energyUnit: "eV", source: "c.dat", points: 4,
         }),
     }
-    const run = makeRun(dir, runOn("2026-11-01"), { status: "done" }, files)
+    const run = plainRun(dir, runOn("2026-11-01"), { status: "done" }, files)
     const before = folderSize(run)
     const target = project()
     restoreBuffer(target, readRunFile(run, "buffer.json"))

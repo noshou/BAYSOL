@@ -1,7 +1,7 @@
 === Timing ===                                                                                                                                                      seconds    % wall    (JIT)
 wall clock  (seedModel → end of report)                                                                                                                               0.39     100.0    (0.3)
   static build                                                                                                                                                         0.20      50.2    (0.1)
-    resloveStruct                                                                                                                                               7.0e-05
+    resolveStruct                                                                                                                                               7.0e-05
     components            [17 residue names: 17 builtin, 0 cache, 0 download]                                                                                       6.4e-04
     structure checks      [0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings]                                                                      0.01
     classify              [nucleic: AMBER, titration none]                                                                                                          2.7e-03

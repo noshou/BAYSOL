@@ -172,7 +172,7 @@ Computes a NUTS seed from given data input:
     are added ([`MolecularStructure.keepChains`](@ref)).
 -   `model::Integer = MODEL`: which model of a multi-model structure to use, counted from 1
     in file order (1 is the first model whatever its number, the default and what was
-    always read; [`MolecularStructure.resloveStruct`](@ref)).
+    always read; [`MolecularStructure.resolveStruct`](@ref)).
 
 The crop, the exclusion and the scale are applied to the measured curve first, before the
 structure is touched, so a range that leaves fewer than 3 points fails at once; the
@@ -274,6 +274,7 @@ function seedModel(
     return withGcPaused() do
         # the run's clock starts here; writeLog reads the wall clock off it
         log = StageLog()
+        _LAST_LOG[] = log        # a failed run's log section reads it (`_runLogged`)
 
         if !(length(qvals) == length(iExp) == length(σ_exp))
             throw(
@@ -320,8 +321,8 @@ function seedModel(
         # load pdb into cache, then add hydrogens if requested. What the residues are
         # (components) decides how: PARSE with PROPKA, except AMBER without PROPKA for a
         # nucleic acid alone.
-        path = timed!(log, :static, 1, "resloveStruct") do
-            p = MolecularStructure.resloveStruct(molSrc; model = ck.model)
+        path = timed!(log, :static, 1, "resolveStruct") do
+            p = MolecularStructure.resolveStruct(molSrc; model = ck.model)
             MolecularStructure.keepChains(p, ck.chains)
         end
 
@@ -408,7 +409,7 @@ function seedModel(
             # modified amino acids likewise, through their standard parent
             if Hydrogenator.hasModifiedAmino(infos)
                 tStage = tick()
-                a = Hydrogenator.modedAaHyd(hpath, infos)
+                a = Hydrogenator.modifiedAminoHydrogens(hpath, infos)
                 tock!(
                     log, :static, 1, "modified amino acid hydrogens", tStage;
                     note = "[$(a.residues) residues: $(a.withParent) hydrogenated " *

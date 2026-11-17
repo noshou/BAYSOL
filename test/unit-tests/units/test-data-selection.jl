@@ -4,13 +4,13 @@
 # `excludeQ`, `lMax`, `chains`, `model`, `addHydrogens`) and the catalog settings behind
 # them (`Q_MIN` ... `ADD_HYDROGENS`): the kinds of setting the catalog gained (a number that
 # may be null, a list of ranges, a list of chain ids), the curve selection, the
-# structure selection (`keepChains`, `resloveStruct(...; model)`), and `seedModel` on
+# structure selection (`keepChains`, `resolveStruct(...; model)`), and `seedModel` on
 # crambin with each keyword. With every keyword at its default the seed and a seeded run
 # are those of the call without them.
 include(joinpath(@__DIR__, "..", "testsetup.jl"))
 
 using BAYSOL.MolecularStructure:
-    LocalPathSource, StructureSourceError, resloveStruct,
+    LocalPathSource, StructureSourceError, resolveStruct,
     keepChains, loadMolecule, nAtoms
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 using BAYSOL.Pipeline:
@@ -253,29 +253,29 @@ end
                         ), "\n") * "\n"
                 multi = joinpath(cache, "multi.pdb")
                 write(multi, text)
-                @test resloveStruct(LocalPathSource(multi)) == abspath(multi)   # model 1
-                @test resloveStruct(LocalPathSource(multi); model = 1) == abspath(multi)
-                p2 = resloveStruct(LocalPathSource(multi); model = 2)
+                @test resolveStruct(LocalPathSource(multi)) == abspath(multi)   # model 1
+                @test resolveStruct(LocalPathSource(multi); model = 1) == abspath(multi)
+                p2 = resolveStruct(LocalPathSource(multi); model = 2)
                 @test p2 != abspath(multi) && occursin("multi_model2_", basename(p2))
                 kept = readlines(p2)
                 @test count(l -> startswith(l, "ATOM"), kept) == 40
                 @test !any(l -> startswith(l, "MODEL") || startswith(l, "ENDMDL"), kept)
                 @test kept[1] == "REMARK a header" && kept[end] == "END"
-                @test resloveStruct(LocalPathSource(multi); model = 2) == p2
-                e = errorOf(() -> resloveStruct(LocalPathSource(multi); model = 3))
+                @test resolveStruct(LocalPathSource(multi); model = 2) == p2
+                e = errorOf(() -> resolveStruct(LocalPathSource(multi); model = 3))
                 @test e isa StructureSourceError && occursin("2 model", e.msg)
-                e = errorOf(() -> resloveStruct(LocalPathSource(_DS_CRAMBIN); model = 2))
+                e = errorOf(() -> resolveStruct(LocalPathSource(_DS_CRAMBIN); model = 2))
                 @test e isa StructureSourceError && occursin("1 model", e.msg)
-                @test_throws StructureSourceError resloveStruct(
+                @test_throws StructureSourceError resolveStruct(
                     LocalPathSource(multi); model = 0,
                 )
             end
 
             @testset "the model of an mmCIF" begin
-                p1 = resloveStruct(LocalPathSource(_DS_ZNI))
+                p1 = resolveStruct(LocalPathSource(_DS_ZNI))
                 @test basename(p1) == "1ZNI-TEST.pdb"
-                @test resloveStruct(LocalPathSource(_DS_ZNI); model = 1) == p1
-                e = errorOf(() -> resloveStruct(LocalPathSource(_DS_ZNI); model = 2))
+                @test resolveStruct(LocalPathSource(_DS_ZNI); model = 1) == p1
+                e = errorOf(() -> resolveStruct(LocalPathSource(_DS_ZNI); model = 2))
                 @test e isa StructureSourceError && occursin("model 2", e.msg)
             end
         end
@@ -413,7 +413,7 @@ end
                 sall = BAYSOL.seedModel(za...; addHydrogens = false)
                 sac = BAYSOL.seedModel(za...; addHydrogens = false, chains = ("A", "C"))
                 @test sac.fw.nAtoms < sall.fw.nAtoms
-                path = resloveStruct(LocalPathSource(_DS_ZNI))
+                path = resolveStruct(LocalPathSource(_DS_ZNI))
                 @test sac.fw.nAtoms ==
                       nAtoms(loadMolecule(keepChains(path, ("A", "C"))))
                 @test sac.timing.info["structureChains"] == "A,C"

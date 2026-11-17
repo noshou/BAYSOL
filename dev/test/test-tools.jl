@@ -84,7 +84,7 @@ end
           count(
         n -> startswith(n, "SASD"),
         readdir(joinpath(repo_dir, "test", "fitting_tests")),
-    )
+    ) + count(startswith("SYN-"), split(strip(out), '\n'))
     @test says(out, "SASDRN5  fit2_model1 fit3_model1", "SASDMJ9  (single run, no tag)")
 end
 
@@ -120,7 +120,8 @@ end
           !occursin("=== fit", r[2])
     status, out = run_tool("fits", "list")
     lines = split(strip(out), '\n')
-    @test status == 0 && lines == sort(lines) && all(l -> occursin(r"^SASD\w+ ", l), lines)
+    @test status == 0 && lines == sort(lines) &&
+          all(l -> occursin(r"^(SASD\w+|SYN-[\w-]+) ", l), lines)
     @test any(startswith("SASDMJ9 "), lines) && !occursin("=== fit", out)
     @test run_tool("fits", "run", "SASDMJ9", "--approved", "--dry-run")[1] == 2
     status, out = run_tool("fits", "run", "SASDMJ9", "SASDRN5", "--bench", "--report",

@@ -401,10 +401,11 @@ end
                 ["logDensity", "divergent", "treeDepth", "nSteps",
                     "stepSize", "acceptanceRate"],
             )
-            # run: section | name | value | unit | meaning; a number on every row, the
-            # binning and the chains among them, the rows grouped by section, each explained
+            # run: section | name | value | unit (no explanatory text: that lives
+            # in the TUI's column_descriptions.json); a number on every row, the
+            # binning and the chains among them, the rows grouped by section
             run = xf["run"][:]
-            @test string.(run[1, :]) == ["section", "name", "value", "unit", "meaning"]
+            @test string.(run[1, :]) == ["section", "name", "value", "unit"]
             keys_ = string.(run[2:end, 2])
             for k in ("nAtoms", "lmax", "dmax", "rebinChannels", "rebinMeasured",
                 "rebinFitted", "rebinNonPositiveDropped", "treeDepthAvg",
@@ -423,7 +424,7 @@ end
             idx = [findfirst(==(x), P._RUN_SECTIONS) for x in sections]
             @test issorted(idx)                                # grouped, in the set order
             @test all(k -> haskey(P._RUN_INFO, k), keys_)      # every row is explained
-            @test all(m -> m isa AbstractString && length(m) > 10, run[2:end, 5])
+            @test size(run, 2) == 4                            # no meaning column
             # map and quantiles: one row for each reported quantity
             nk = length(BAYSOL.Pipeline._REPORT_KEYS)
             m = xf["map"][:]
@@ -573,6 +574,27 @@ end
         end
     end
 
+    @testset "a failed run still gets a log section (synthetic error, no fit)" begin
+        P = BAYSOL.Pipeline
+        mktempdir() do dir
+            sub = joinpath(dir, "SASDXXX")
+            mkpath(sub)
+            script = joinpath(sub, "SASDXXX_fit1.jl")
+            write(script, "error(\"boom\\nsecond line\")\n")
+            P._LAST_LOG[] = nothing
+            @test_throws Exception P._runLogged(script)
+            text = read(joinpath(sub, "SASDXXX.LOG"), String)
+            @test occursin("=== fit1 ===", text)
+            @test occursin(r"\nstatus\s+\tfailed\n", text)
+            @test occursin(r"\nerror\s+\tboom \| second line\n", text)
+            @test occursin("--- machine ---", text) && !occursin("--- timing ---", text)
+            # with a stage log the timing block follows; the parser of the dev tools
+            # reads the rows as any other
+            lines = P._failureLines(ErrorException("x"), StageLog())
+            @test "--- timing ---" in lines && "--- machine ---" in lines
+        end
+    end
+
 
     @testset "tables: numbers carry TABLE_SIGFIGS significant figures" begin
         P = BAYSOL.Pipeline
@@ -631,6 +653,8 @@ end
         @test PlotStyle().lwMinorTick == P.PLOT_LW_MINOR_TICK
         @test PlotStyle().colorTick == P.PLOT_TICK_COLOUR
         @test PlotStyle().colorAxis == P.PLOT_COLOUR_AXIS
+        @test PlotStyle().colorBg == P.PLOT_BG_COLOUR
+        @test PlotStyle().colorText == P.PLOT_TEXT_COLOUR
         @test PlotStyle().xtickLabelPadPt == P.PLOT_XTICK_LABEL_PAD_PT
         @test PlotStyle().sizeCm == P.PLOT_WIDTH_HEIGHT_CM == (16.0, 11.0)
         result, data, iTrue = syntheticResult()
@@ -706,7 +730,7 @@ end
             # the two lines, the MAP value in its own colour, μ dotted, both in the legend
             @test occursin("\\addlegendentry {\$\\mathrm{MAP} = -1.0\$}", src)
             @test occursin("\\addlegendentry {\$\\mu = ", src)
-            @test occursin("dotted", src) && occursin("draw=black, fill=white", src)
+            @test occursin("dotted", src) && occursin("draw=bstext, fill=bsbg", src)
             @test occursin("legend pos={north", src)
             # only the histograms carry them
             fit = read(joinpath(dir, "plots", "res.tex"), String)

@@ -229,6 +229,42 @@
       "expect": "black"
     },
     {
+      "setting": "PLOT_BG_COLOUR",
+      "value": "#101010",
+      "valid": true,
+      "expect": "#101010"
+    },
+    {
+      "setting": "PLOT_TEXT_COLOUR",
+      "value": "white",
+      "valid": true,
+      "expect": "white"
+    },
+    {
+      "setting": "PLOT_TEXT_COLOUR",
+      "value": "notacolour",
+      "valid": false,
+      "mention": "colour"
+    },
+    {
+      "setting": "PLOT_Q_UNIT",
+      "value": "nm⁻¹",
+      "valid": true,
+      "expect": "nm⁻¹"
+    },
+    {
+      "setting": "PLOT_Q_UNIT",
+      "value": "Å⁻¹",
+      "valid": true,
+      "expect": "Å⁻¹"
+    },
+    {
+      "setting": "PLOT_Q_UNIT",
+      "value": "mm",
+      "valid": false,
+      "mention": "one of"
+    },
+    {
       "setting": "PLOT_TEXT_FONT",
       "value": "Latin Modern Roman",
       "valid": true,

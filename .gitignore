@@ -123,7 +123,6 @@ notes/
 # sass (Ruby) cache
 .sass-cache/
 
-# 3D-RISM tools: everything pmv.py generates (dev/pmv-rism/)
+# 3D-RISM tools: everything `bysl extract pmv` generates (dev/pmv-rism/)
 dev/pmv-rism/out/
 dev/pmv-rism/work/
-dev/pmv-rism/**/__pycache__/

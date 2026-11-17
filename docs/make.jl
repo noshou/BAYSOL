@@ -91,6 +91,18 @@ end
 
 # The terminal interface's README (tui/README.md), copied the same way, as the first guide.
 cp(joinpath(REPO_ROOT, "tui", "README.md"), joinpath(GUIDES_DIR, "tui.md"); force = true)
+# Its internals page (tui/INTERNALS.md; split off to keep each page under the size warning).
+# The two pages link to each other as files, so the links are pointed at the copied pages.
+const TUI_GUIDE = joinpath(GUIDES_DIR, "tui.md")
+write(
+    TUI_GUIDE,
+    replace(read(TUI_GUIDE, String), "](INTERNALS.md)" => "](tui-internals.md)"),
+)
+const TUI_INTERNALS = read(joinpath(REPO_ROOT, "tui", "INTERNALS.md"), String)
+write(
+    joinpath(GUIDES_DIR, "tui-internals.md"),
+    replace(TUI_INTERNALS, "](README.md)" => "](tui.md)"),
+)
 
 # The test READMEs, with their relative links to each other pointed at the copied pages
 # (the READMEs link to one another as files, which would be dead links on the site).
@@ -137,6 +149,7 @@ readme = replace(
 )
 # The terminal interface guide (tui/README.md) is the page guides/tui.md.
 readme = replace(readme, "](tui/README.md)" => "](guides/tui.md)")
+readme = replace(readme, "](tui/INTERNALS.md)" => "](guides/tui-internals.md)")
 for (_, path) in vcat(DEV_GUIDES, TEST_GUIDES)
     page = "](testing/" * test_page(path) * ")"
     global readme = replace(readme, "](" * path * ")" => page)
@@ -156,7 +169,10 @@ makedocs(
     "Home" => "index.md",
     # The terminal interface guide comes first among the guides, then one per module.
     "Guides" => vcat(
-    ["Terminal UI" => "guides/tui.md"],
+    [
+    "Terminal UI" => "guides/tui.md",
+    "Terminal UI internals" => "guides/tui-internals.md"
+    ],
     [name => joinpath("guides", lowercase(name) * ".md") for (name, _) in DOC_MODULES]
     ),
     "Development" => [

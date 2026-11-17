@@ -13,7 +13,7 @@
 # The modules whose params.jl define settings.
 const _SETTING_MODULES = (Inference, Geometry, Scattering, @__MODULE__)
 
-const _COLOUR_SETTING = r"^PLOT_COLOUR_|^PLOT_TICK_COLOUR$"
+const _COLOUR_SETTING = r"^PLOT_COLOUR_|^PLOT_(TICK|BG|TEXT)_COLOUR$"
 const _FONT_SETTING = r"^PLOT_(TEXT|MATH)_FONT$"
 const _MAX_FONT_NAME = 100
 
@@ -88,7 +88,8 @@ _settingDefault(name::Symbol) = getfield(_settingOwner(name), name)
 
 """
 The kind of the setting `name` whose default is `v`: `:bool`, `:int`, `:float`,
-`:colour`, `:font`, `:set` (some of the choices of `SETTING_CHOICES`),
+`:colour`, `:font`, `:choice` (one of the choices of `SETTING_CHOICES`), `:set` (some of
+the choices of `SETTING_CHOICES`),
 `:tuple`, or one of the kinds of `SETTING_KINDS` that a default cannot tell
 (`:optionalFloat`, `:optionalInt`, `:ranges`, `:strings`, `:colours`, `:markers`,
 `:sizes`, `:path`).
@@ -247,6 +248,11 @@ function _checkedValue(name::Symbol, v)
             v isa AbstractString && length(v) <= _MAX_PATH_LENGTH && !any(iscntrl, v)
         ) || _bad("must be a path (text without control characters, or empty)")
         String(strip(v))
+    elseif kind === :choice
+        choices = String.(_mergedTable(:SETTING_CHOICES)[name])
+        (v isa Union{AbstractString,Symbol} && String(v) in choices) ||
+            _bad("must be one of $(join(choices, ", "))")
+        String(v)
     elseif kind === :set
         choices = _mergedTable(:SETTING_CHOICES)[name]
         (
@@ -421,6 +427,8 @@ const SETTING_KEYWORDS = (
     _kw(:PLOT_COLOUR_REFERENCE, :colorReference, :PlotStyle),
     _kw(:PLOT_COLOUR_AXIS, :colorAxis, :PlotStyle),
     _kw(:PLOT_TICK_COLOUR, :colorTick, :PlotStyle),
+    _kw(:PLOT_BG_COLOUR, :colorBg, :PlotStyle),
+    _kw(:PLOT_TEXT_COLOUR, :colorText, :PlotStyle),
     _kw(:PLOT_LW_MAP, :lwMap, :PlotStyle),
     _kw(:PLOT_LW_REFERENCE, :lwReference, :PlotStyle),
     _kw(:PLOT_LW_COMPARE, :lwCompare, :PlotStyle),
@@ -439,6 +447,7 @@ const SETTING_KEYWORDS = (
     _kw(:PLOT_PREVIEW_SIZE, :previewSize, :PlotStyle),
     _kw(:PLOT_BORDER_PT, :borderPt, :PlotStyle),
     _kw(:PLOT_XTICK_ANGLE, :xtickAngle, :PlotStyle),
+    _kw(:PLOT_Q_UNIT, :qUnit, :PlotStyle),
     _kw(:PLOT_AXIS_LW, :lwAxis, :PlotStyle),
     _kw(:PLOT_LW_MAJOR_TICK, :lwTick, :PlotStyle),
     _kw(:PLOT_LW_MINOR_TICK, :lwMinorTick, :PlotStyle),

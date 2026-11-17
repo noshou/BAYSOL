@@ -13,16 +13,16 @@ const WHO = "bysl fmt"
 const USAGE = """
 Formats the code and checks its layout.
 
-    bysl fmt [--julia|--ts|--scss|--py] [PATH ...]
-    bysl fmt --check [--julia|--ts|--scss|--py] [PATH ...]
+    bysl fmt [--julia|--ts|--scss] [PATH ...]
+    bysl fmt --check [--julia|--ts|--scss] [PATH ...]
     bysl fmt --lines [PATH ...]
 
-    (none)      rewrite Julia (JuliaFormatter), TypeScript (Biome), Python (ruff) and
-                SCSS files;
+    (none)      rewrite Julia (JuliaFormatter), TypeScript (Biome) and SCSS
+                files;
                 re-wrap long comments; add license headers
     --check     change nothing; list what a rewrite would change; exit 1 if any
     --lines     list lines over 92 characters and tabs in code files; exit 1 if any
-    --julia     only Julia files (likewise --ts, --scss, --py)
+    --julia     only Julia files (likewise --ts, --scss)
 
 Also checked: the release name in Project.toml (35 characters at most), the names in
 src/*/Params.jl (23 at most).
@@ -33,14 +33,17 @@ const LICENSE_ID = "LGPL-3.0-or-later"
 # The line-comment syntax of each code extension (see `Common.CODE_EXTENSIONS`).
 const TS_EXTENSIONS = (".ts", ".tsx", ".mts", ".cts")
 
-const COMMENT_PREFIXES = merge(Dict(".jl" => "#", ".py" => "#", ".scss" => "//"),
+const COMMENT_PREFIXES = merge(Dict(".jl" => "#", ".scss" => "//"),
     Dict(e => "//" for e in TS_EXTENSIONS))
 
 # The extensions each language flag of the tool covers.
 const LANGUAGE_EXTENSIONS =
-    Dict(:julia => (".jl",), :ts => TS_EXTENSIONS, :scss => (".scss",), :py => (".py",))
+    Dict(:julia => (".jl",), :ts => TS_EXTENSIONS, :scss => (".scss",))
 
-const LANGUAGES = (:julia, :ts, :scss, :py)
+const LANGUAGES = (:julia, :ts, :scss)
+
+# The words the file count of `bysl fmt` uses for each language.
+const LANGUAGE_LABELS = Dict(:julia => "Julia", :ts => "TypeScript", :scss => "SCSS")
 
 # --- text helpers
 
@@ -163,33 +166,6 @@ function format_ts(apply::Bool, paths)
     checked = run_cmd([biome, "check", apply ? ["--write"] : [], "--config-path=" * root(),
         [in_root(f) for f in files]])
     return (apply || isempty(changed)) && checked
-end
-
-# --- Python (ruff)
-
-# The ruff command: `RUFF` if set, else `ruff` on the PATH; `nothing` if there is none.
-ruff_command() = haskey(ENV, "RUFF") ? ENV["RUFF"] : Sys.which("ruff")
-
-# Formats (`apply`) or checks the Python files under `paths` with `ruff format`, then
-# lints them with `ruff check` (`ruff.toml` at the root); `--fix` only when `apply`. A
-# missing ruff with Python files present is a failure.
-function format_py(apply::Bool, paths)
-    files = [
-        f for f in unique(reduce(vcat, code_files.(paths); init = String[]))
-        if endswith(f, ".py")
-    ]
-    isempty(files) && return true
-    ruff = ruff_command()
-    if ruff === nothing
-        println(WHO, ": ruff is not installed (pipx install ruff), so Python layout ",
-            "and lint could not be checked")
-        return false
-    end
-    abs_files = [in_root(f) for f in files]
-    config = "--config=" * in_root("ruff.toml")
-    formatted = run_cmd([ruff, "format", config, apply ? [] : ["--check"], abs_files])
-    linted = run_cmd([ruff, "check", config, apply ? ["--fix"] : [], abs_files])
-    return formatted && linted
 end
 
 # --- SCSS indentation
@@ -433,18 +409,17 @@ end
 # deposited-data folders), by an external convention or are not source, so they are skipped.
 const NAME_SKIP_DIRS = (
     "test/fitting_tests", "test/synthetic_tests", "test/fixtures", "test/baselines",
-    "test/.CondaPkg", "docs/build", "dev/pmv-rism/legacy", "dev/pmv-rism/out",
+    "test/.CondaPkg", "docs/build", "dev/pmv-rism/out",
 )
 const NAME_ROOTS = ("src", "dev", "docs", "test", "tui")
-# Names the toolchain fixes: Julia wants src/<Package>.jl, Python wants `__init__.py`; these
-# are conventional.
+# Names the toolchain fixes: Julia wants src/<Package>.jl, these are conventional.
 const NAME_EXCEPTIONS = (
     "BAYSOL.jl", "Dev.jl", "README.md", "LICENSE", "Project.toml", "Manifest.toml",
     "CHANGELOG.md",
-    "JuliaManifest.toml", "CondaPkg.toml", "SPEC.md", "AGENTS.md", "__init__.py",
+    "JuliaManifest.toml", "CondaPkg.toml", "SPEC.md", "AGENTS.md",
 )
 const NAME_CHECKED_EXTENSIONS =
-    (".jl", ".ts", ".tsx", ".mts", ".cts", ".scss", ".py", ".yml")
+    (".jl", ".ts", ".tsx", ".mts", ".cts", ".scss", ".yml")
 const KEBAB_NAME = r"^_?[a-z0-9]+(-[a-z0-9]+)*$"   # a leading `_` is a Sass partial
 
 # True if the file or folder name `n` (a path component) is kebab-case: the stem of a file
@@ -469,7 +444,7 @@ function check_path_names()
             rel = relpath(dir, root())
             filter!(
                 d ->
-                    d != "node_modules" && d != "__pycache__" &&
+                    d != "node_modules" &&
                     !(joinpath(rel, d) in NAME_SKIP_DIRS), dirs)
             for d in dirs
                 kebab_name(d) || push!(bad, joinpath(rel, d) * "/")
@@ -953,7 +928,7 @@ end
 # --- the main program
 
 const LANGUAGE_FLAGS =
-    Dict("--julia" => :julia, "--ts" => :ts, "--scss" => :scss, "--py" => :py)
+    Dict("--julia" => :julia, "--ts" => :ts, "--scss" => :scss)
 
 """
     run(argv) -> Int
@@ -974,7 +949,7 @@ function run(argv::Vector{String})::Int
     bad === nothing || fail(
         WHO,
         "unknown option $(rest_args[bad]) (options: --check, --lines, " *
-        "--julia, --ts, --scss, --py)",
+        "--julia, --ts, --scss)",
     )
     if lines
         any(haskey(LANGUAGE_FLAGS, a) for a in rest_args) &&
@@ -995,12 +970,25 @@ function run(argv::Vector{String})::Int
     julia_ok = !wanted(:julia) || both_ok(:julia, format_julia)
     ts_ok = !wanted(:ts) || both_ok(:ts, format_ts)
     scss_ok = !wanted(:scss) || both_ok(:scss, format_scss)
-    py_ok = !wanted(:py) || format_py(apply, paths)
     # whatever the mode and the language: the release name and the names of the settings
     # stay within their length caps
     version_ok = check_version_name()
     names_ok = check_parameter_names() & check_path_names()
-    return all((header_ok, julia_ok, ts_ok, scss_ok, py_ok, version_ok, names_ok)) ? 0 : 1
+    ok = all((header_ok, julia_ok, ts_ok, scss_ok, version_ok, names_ok))
+    # how many files of each wanted language were looked at (the formatters count none)
+    files = unique(reduce(vcat, code_files.(paths); init = String[]))
+    per = [
+        string(
+            count(f -> splitext(f)[2] in LANGUAGE_EXTENSIONS[l], files),
+            " ",
+            LANGUAGE_LABELS[l],
+        )
+        for l in LANGUAGES if wanted(l)
+    ]
+    println(length(files), " files ", apply ? "formatted" : "checked", " (",
+        join(per, ", "), ")",
+        ok ? "" : ", problems found")
+    return ok ? 0 : 1
 end
 
 end

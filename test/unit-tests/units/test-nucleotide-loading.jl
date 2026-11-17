@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 # Exercises what the structure readers keep of a nucleic acid: `nucleotideSelector`,
-# `loadMolecule`, the canonical .pdb that `resloveStruct` writes for a local .cif
+# `loadMolecule`, the canonical .pdb that `resolveStruct` writes for a local .cif
 # (src/molecular-structure/{Components,Mols,StructureSource}.jl). Modified nucleotides
 # (HETATM PSU, 5MC, ...) are kept, and so are the ligands and ions of a known composition
 # (KEEP_LIGANDS, 2026-11-11); waters, placeholders and (in the canonical file) hydrogens
@@ -23,7 +23,7 @@ using Printf: @sprintf
 
 using BAYSOL.MolecularStructure: nucleotideSelector, loadMolecule, nAtoms, elms,
     coordsCartesian, MoleculeError, ComponentError, LocalPathSource, PDBIDSource,
-    resloveStruct, StructureSourceError, _storeDir, _inferElement,
+    resolveStruct, StructureSourceError, _storeDir, _inferElement,
     _canonicalSelector, _COMPONENT_DOWNLOAD, _COMPONENT_MEMO, _ComponentNotFound
 using BioStructures: BioStructures, PDBFormat, MMCIFFormat, collectatoms, collectmodels,
     writepdb, resname, ishetero, atomname
@@ -221,13 +221,13 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
             @test nAtoms(loadMolecule(_fixture("3HDD"))) == 1811
         end
 
-        @testset "resloveStruct: the .cif of 1EHZ gives the same atoms" begin
+        @testset "resolveStruct: the .cif of 1EHZ gives the same atoms" begin
             cif = joinpath(dir, "nt-load-1ehz.cif")
             cp(_fixture("1EHZ", "cif"), cif)
             canon = joinpath(_storeDir(), "nt-load-1ehz.pdb")
             push!(stored, canon)
             rm(canon; force = true)
-            resolved = resloveStruct(LocalPathSource(cif))
+            resolved = resolveStruct(LocalPathSource(cif))
             @test resolved == canon && isfile(canon)
             @test nAtoms(loadMolecule(resolved)) == 1661
             atoms, hets = composition(resolved)
@@ -254,13 +254,13 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
             @test !any(l -> startswith(l, "HETATM") && nameOf(l) == "HOH",
                 eachline(resolved))
             # a second call finds the same content
-            @test resloveStruct(LocalPathSource(cif)) == canon
+            @test resolveStruct(LocalPathSource(cif)) == canon
             # the .pdb route used in place: the same count
             @test nAtoms(
-                loadMolecule(resloveStruct(LocalPathSource(_fixture("1EHZ")))),
+                loadMolecule(resolveStruct(LocalPathSource(_fixture("1EHZ")))),
             ) ==
                   1661
-            @test resloveStruct(LocalPathSource(_fixture("1EHZ"))) ==
+            @test resolveStruct(LocalPathSource(_fixture("1EHZ"))) ==
                   abspath(_fixture("1EHZ"))
             # the writer's selector gives the same atoms straight from the parsed model
             struc = BioStructures.read(_fixture("1EHZ", "cif"), MMCIFFormat)
@@ -271,13 +271,13 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
             @test read(out, String) == read(canon, String)
         end
 
-        @testset "resloveStruct: waters and hydrogens dropped, ions and ligands kept" begin
+        @testset "resolveStruct: waters and hydrogens dropped, ions and ligands kept" begin
             cif = joinpath(dir, "nt-load-mixed.cif")
             write(cif, _MIXED_CIF)
             canon = joinpath(_storeDir(), "nt-load-mixed.pdb")
             push!(stored, canon)
             rm(canon; force = true)
-            resolved = resloveStruct(LocalPathSource(cif))
+            resolved = resolveStruct(LocalPathSource(cif))
             recs = [
                 l for l in eachline(resolved) if
                 startswith(l, "ATOM") || startswith(l, "HETATM")
@@ -296,8 +296,8 @@ HETATM 11 P PG ATP D . 9.000 2.000 3.000 1.00 10.00 103 D 1
             canon = joinpath(_storeDir(), "QQ9X.pdb")
             push!(stored, canon)
             cp(_fixture("1EHZ"), canon; force = true)
-            @test resloveStruct(PDBIDSource("qq9x")) == canon
-            @test resloveStruct(PDBIDSource("QQ9X")) == canon
+            @test resolveStruct(PDBIDSource("qq9x")) == canon
+            @test resolveStruct(PDBIDSource("QQ9X")) == canon
             rm(canon; force = true)
         end
 

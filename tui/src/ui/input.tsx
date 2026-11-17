@@ -19,6 +19,7 @@ import { entryLegend, type LegendItem, legendFor } from "./grid.js"
 import {
     CursorList,
     centredWindow,
+    type Hotkey,
     type KeyInput,
     keys,
     ListText,
@@ -32,7 +33,16 @@ import {
     useTerminalSize,
 } from "./interaction.js"
 import { TextField, useTextBuffer } from "./text-input.js"
-import { Bright, Logo, logoCells, Panel, type Theme, themes, useTheme } from "./theme.js"
+import {
+    Bright,
+    ErrorText,
+    Logo,
+    logoCells,
+    Panel,
+    type Theme,
+    themes,
+    useTheme,
+} from "./theme.js"
 
 // ========================================================================================
 // 1. Suggestions
@@ -42,11 +52,10 @@ import { Bright, Logo, logoCells, Panel, type Theme, themes, useTheme } from "./
  * One line of a list of suggestions.
  *
  * @property label - the text shown.
- * @property completion - what Tab puts into the input, `label` when left out (a path
- *     hint shows the file name but completes the whole path).
+ * @property completion - what Tab puts into the input, `label` when left out.
  * @property tag - a short kind shown muted after it (`solute`, `polymer`, `custom`).
- * @property swatch - a colour (`#rrggbb`) drawn as a swatch before the label. A list
- *     where any item has one keeps the column for all, so the labels stay aligned.
+ * @property swatch - a colour (`#rrggbb`) drawn before the label; a list where any item
+ *     has one keeps the column for all.
  */
 export type Suggestion = {
     label: string
@@ -138,22 +147,20 @@ export const DROPDOWN_CHROME = 4
  * @property placeholder - muted text while nothing is typed.
  * @property suggest - the suggestions for the typed text, best first; called on every
  *     change, so it must be fast. None given means a plain text input.
- * @property pick - `true` for a dropdown: Enter takes the highlighted suggestion, and
- *     nothing if there is none. `false`: Enter takes the typed text.
- * @property noMatch - the status line when there is no suggestion for the typed text
- *     (also for blank text when `counter` is set).
- * @property initialIndex - the suggestion highlighted at first, the best one when left out.
+ * @property pick - `true` for a dropdown: Enter takes the highlighted suggestion (nothing
+ *     if none). `false`: Enter takes the typed text.
+ * @property noMatch - the status line when there is no suggestion (also for blank text
+ *     when `counter` is set).
+ * @property initialIndex - the suggestion highlighted at first, the best when left out.
  * @property wrap - whether up and down go round at the ends of the list, `false` when
- *     left out (they stop).
+ *     left out.
  * @property lines - the most suggestions shown, [[suggestionLines]] when left out.
  * @property counter - show the place of the highlight (`3 of 12`) as the status line.
- * @property error - a message about the last attempt, shown under the field in the
- *     error colour; the screen clears it by changing it.
+ * @property error - a message about the last attempt, shown under the field.
  * @property onSubmit - called with the typed text and the highlighted suggestion.
  * @property onCancel - called for Esc, and for Ctrl-X when `onBack` is not given.
  * @property onBack - called for Ctrl-X (back one screen), when it differs from Esc.
- * @property onHighlight - called with the highlighted suggestion whenever it changes
- *     (a screen that acts on the highlighted item, e.g. to remove it).
+ * @property onHighlight - called with the highlighted suggestion whenever it changes.
  * @property take - what Enter is called in the legend (`"take"` when left out; `null`
  *     for an entry whose Enter does nothing).
  * @property canTake - a prompt's Enter has something to take, `true` when left out.
@@ -162,15 +169,11 @@ export const DROPDOWN_CHROME = 4
  *     (`delete ^r`), for the legend.
  * @property cancel - what Esc is called in the legend, `"cancel"` when left out; `null`
  *     for an entry that is the screen itself, where Esc does nothing and is not shown.
- * @property onLegend - called with the keys that work now (`entryLegend` of what the
- *     entry knows: how many suggestions it lists, whether it picks, whether it has an
- *     `onBack`, plus the five props above) whenever they change, so the screen shows
- *     them without keeping any of that itself.
+ * @property onLegend - called with the keys that work now (`entryLegend`) whenever they
+ *     change, so the screen need not keep that state itself.
  * @property active - whether the entry listens to keys, `true` when left out; a screen
- *     passes `false` while a question of its own (a confirm) is open over the entry, so
- *     the entry keeps its text and comes back as it was.
- * @property onChange - called with the typed text after every edit, so a screen can
- *     clear its error or check the text as it is typed.
+ *     passes `false` while a question of its own is open over it (the text is kept).
+ * @property onChange - called with the typed text after every edit.
  * @property onPaste - sees a pasted text first, with the room the field has left;
  *     `true` means the screen took it (the field is left alone).
  */
@@ -205,9 +208,8 @@ export type EntryProps<S extends Suggestion> = {
 
 /**
  * Something drawn beside an entry's list, right after its widest visible name: the entry
- * is as wide as that name, its marker and swatch, and `gap` cells (at least `min`, at most
- * what leaves `width` cells for the side), so the side moves with the list and costs no
- * extra render.
+ * is as wide as that name, its marker, swatch and `gap` cells (at least `min`, at most
+ * what leaves `width` for the side).
  *
  * @property width - the cells the side takes.
  * @property gap - the cells between the widest name shown and the side.
@@ -222,11 +224,10 @@ type EntrySide<S extends Suggestion> = {
 }
 
 /**
- * A one-line input with an optional list of suggestions under it. Keys: typing,
- * backspace, delete, left, right, home, end edit; up and down move the highlight;
- * Tab puts the highlighted suggestion into the input; Enter submits; Esc and Ctrl-X
- * cancel. While an entry is open it is the only thing on its screen that takes keys,
- * so the screen passes `active = false` to its own `useKeys`.
+ * A one-line input with an optional list of suggestions under it. Typing and the editing
+ * keys edit; up and down move the highlight; Tab puts the highlighted suggestion into the
+ * input; Enter submits; Esc and Ctrl-X cancel. While open it is the only thing on its
+ * screen that takes keys, so the screen passes `active = false` to its own `useKeys`.
  *
  * @param props - see [[EntryProps]].
  * @returns the label, the field, the error and the suggestions.
@@ -268,10 +269,9 @@ export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
         if (input.edit(press)) setHighlight(0)
     }, active)
 
-    // tell the screen about every change of the text, but not about the first text. The
-    // text is compared, not `onChange`: a screen passes a new function on every render,
-    // and that must not count as an edit (it cleared the screen's error the moment the
-    // error was set).
+    // tell the screen about every change of the text, not the first. The text is compared,
+    // not `onChange`: a screen passes a new function every render, which must not count
+    // as an edit (it cleared the screen's error the moment it was set)
     const last = useRef(text)
     useEffect(() => {
         if (last.current === text) return
@@ -279,12 +279,10 @@ export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
         onChange?.(text)
     }, [text, onChange])
 
-    // tell the screen which suggestion is highlighted, whenever that changes
     const current = items[marked]
     useEffect(() => onHighlight?.(current), [current, onHighlight])
 
-    // and the keys that work now, whenever they change (compared by value: the screen's
-    // extras are new arrays on every render)
+    // the keys that work now, compared by value (the screen's extras are new arrays)
     const legend = entryLegend({
         count: items.length,
         pick,
@@ -299,7 +297,6 @@ export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
     // biome-ignore lint/correctness/useExhaustiveDependencies: legendKey = value of legend
     useEffect(() => onLegend?.(legend), [legendKey, onLegend])
 
-    // beside the list: as wide as the widest name shown, its marker, swatch and a gap
     const swatched = items.some((item) => item.swatch !== undefined)
     const offset = centredWindow(items.length, marked, lines)
     const shownItems = items.slice(offset, offset + lines)
@@ -330,9 +327,9 @@ export function Entry<S extends Suggestion>(props: EntryProps<S>): ReactNode {
                 />
             </Box>
             {input.buffer.full && maxLength !== undefined ? (
-                <Text color={theme.er}>{maxLength} characters at most</Text>
+                <ErrorText>{`${maxLength} characters at most`}</ErrorText>
             ) : null}
-            {error ? <Text color={theme.er}>{error}</Text> : null}
+            <ErrorText>{error}</ErrorText>
             {suggest ? (
                 <SuggestionList
                     items={items}
@@ -370,9 +367,8 @@ export function Prompt(props: Omit<EntryProps<Suggestion>, "pick" | "noMatch">):
 }
 
 /**
- * A path prompt: a [[Prompt]] in a [[Panel]] as wide as the body, like the box of the
- * other dropdowns, so the field and the folder's names under it sit inside one frame.
- * The panel takes four cells (border and padding), and the entry is told so.
+ * A path prompt: a [[Prompt]] in a [[Panel]] as wide as the body. The panel takes four
+ * cells (border and padding), and the entry is told so.
  *
  * @param props - the props of a [[Prompt]]; `label` is `path:` when left out.
  * @returns the boxed prompt.
@@ -407,9 +403,8 @@ export type Choice<T> = Suggestion & { value: T }
  * What a dropdown is told.
  *
  * @property label - what is asked.
- * @property search - the choices for the typed text, best first. A dropdown of a few
- *     fixed choices returns all of them for any text, filtered by the text; a
- *     searched index returns nothing for a blank text.
+ * @property search - the choices for the typed text, best first (a searched index
+ *     returns nothing for a blank text).
  * @property noMatch - the status line when nothing matches the typed text.
  * @property initial - the starting text.
  * @property onPick - called with the value of the picked choice.
@@ -483,22 +478,17 @@ export function filterChoices<T>(choices: Choice<T>[]): (text: string) => Choice
 // 5. Confirmation
 // ========================================================================================
 
-/**
- * The most cells of what is deleted that the question shows: with `delete ` and the
- * warning the whole question is 58 cells, which fits the note row of every footer at
- * 80 columns.
- */
+/** The most cells of what is deleted the question shows (the whole question: 58 cells). */
 const maxWhatCells = 27
 
 /**
  * A question: what is asked and what its two answers do. The note line shows only the
- * text; the answers are in the legend as `yes: ⏎` and `no: esc`, both
- * from these fields, so the keys are written once and never repeated in the note.
+ * text; the answers are in the legend (`yes: ⏎`, `no: esc`).
  *
  * @property text - what is asked, e.g. `delete project demo? this cannot be undone!`.
  * @property yes - what Enter does, e.g. `delete`.
  * @property no - what Esc does, e.g. `keep`.
- * @property other - a third answer, given by `w` (`keys.otherAnswer`), e.g. `plain
+ * @property other - a third answer, given by `shift+x` (`keys.otherAnswer`), e.g. `plain
  *     recipe`; only when [[Confirm.ask]] was given an action for it.
  */
 export type Question = { text: string; yes: string; no: string; other?: string }
@@ -507,7 +497,7 @@ export type Question = { text: string; yes: string; no: string; other?: string }
  * The legend of a question: what Enter does and what Esc does, from its own fields.
  *
  * @param question - the question.
- * @returns `yes: ⏎` and `no: esc`, with the third answer's `w` between them if any.
+ * @returns `yes: ⏎` and `no: esc`, with the third answer's `shift+x` between them if any.
  */
 export function questionLegend(question: Question): LegendItem[] {
     const other = question.other
@@ -570,8 +560,8 @@ export function shownNote(
  * @property question - the open question, `undefined` while nothing is asked.
  * @property note - the text of the open question, for the note line.
  * @property ask - asks `question`; `action` runs if Enter answers it, `declined` (when
- *     given) if Esc does, `other` (when given, with `question.other` naming it) if `w`
- *     does.
+ *     given) if Esc does, `other` (when given, with `question.other` naming it) if
+ *     `shift+x` does.
  * @property handleKey - gives a key press to the open question: returns `true` when
  *     a question was open (the press was its answer, or ignored), so the screen
  *     stops there; `false` when nothing is asked and the screen handles the key.
@@ -593,8 +583,8 @@ export type Confirm = {
  *
  * @param press - the key.
  * @param hasOther - the question has a third answer ([[Question.other]]).
- * @returns `yes` for Enter, `no` for Esc or Ctrl-X, `other` for `w` when there is a third
- *     answer, `undefined` for any other key (it is ignored).
+ * @returns `yes` for Enter, `no` for Esc or Ctrl-X, `other` for `shift+x` when there is a
+ *     third answer, `undefined` for any other key (it is ignored).
  */
 export function answerOf(
     press: KeyInput,
@@ -605,10 +595,7 @@ export function answerOf(
     return hasOther && press.is(keys.otherAnswer) ? "other" : undefined
 }
 
-/**
- * Keeps one pending question. Used for every "are you sure": a warning before
- * something the user created is removed, and the unsaved-changes guard
- * ([[useDiscardGuard]]).
+/** Keeps one pending question: every "are you sure" and [[useDiscardGuard]] use it.
  *
  * @returns the [[Confirm]].
  */
@@ -674,12 +661,10 @@ export function useDiscardGuard(
 
 /**
  * The question asked before anything the user made is removed for good (a project, a
- * custom solute, a model). Every such removal asks exactly this, and
- * nothing is removed without it, so the wording is in one place.
+ * custom solute, a model); the wording is in one place.
  *
  * @param what - what is about to go, `<kind> <name>` (e.g. `project demo`); only the
- *     name (user data) is cut, from its start (`…ram1`), when the two do not fit
- *     [[maxWhatCells]], so the warning behind it is never the part that does not fit.
+ *     name is cut, from its start (`…ram1`), when it does not fit [[maxWhatCells]].
  * @returns the question, for [[Confirm.ask]]; the note is just its text, the keys that
  *     answer it are in the legend.
  */
@@ -708,21 +693,18 @@ const findLegend: LegendItem = { label: "find", keys: "type" }
  * @typeParam T - the value of an entry.
  * @property open - the list is shown (the keys of the hook are off while it is not).
  * @property label - what is asked, e.g. `load project:`.
- * @property entries - what the list holds; keep the array stable between renders (a
- *     `useMemo`), the screen reads it again by changing it.
+ * @property entries - what the list holds; keep the array stable between renders.
  * @property onPick - called with the value of the entry Enter takes.
  * @property onCancel - called for Esc, and for Ctrl-X when `onBack` is not given.
  * @property onBack - called for Ctrl-X, when it differs from Esc.
  * @property take - what Enter is called in the legend, `null` when picking does nothing.
  * @property cancel - what Esc is called in the legend.
- * @property onDelete - deletes the entry; it may throw. The screen reads the entries
- *     again (they change), so the list shows what is left.
+ * @property onDelete - deletes the entry; it may throw. The screen re-reads the entries.
  * @property onFail - called with what `onDelete` threw.
  * @property onEmpty - called when the last entry is gone, so the screen closes the list.
  * @property question - the question asked before `onDelete`, from the highlighted value.
- * @property action - more keys on the highlighted entry (`settings ^o`): each has its
- *     legend label, the key and what it does with the value; they work while no question
- *     is open. One action, or a list of them.
+ * @property action - more keys on the highlighted entry (`settings ^o`): legend label,
+ *     key and what it does with the value; they work while no question is open.
  */
 type PickListProps<T> = {
     open: boolean
@@ -741,7 +723,7 @@ type PickListProps<T> = {
 }
 
 /** One more key of a pick list: its legend label, the key and what it does. */
-type PickAction<T> = { label: string; key: KeyInput; run: (value: T) => void }
+type PickAction<T> = { label: string; key: Hotkey; run: (value: T) => void }
 
 /**
  * What [[usePickList]] gives the screen.
@@ -760,11 +742,9 @@ type PickList = {
 }
 
 /**
- * A pick list with delete, written once for the project list and the model list: a
- * [[Dropdown]] whose highlighted entry `^r` (or Delete) asks about with [[Question]]
- * `question(value)`; Enter then calls `onDelete`, Esc keeps it. While the
- * question is open the dropdown keeps its text but listens to nothing. The list closes
- * (`onEmpty`) when the last entry is gone.
+ * A pick list with delete, for the project list and the model list: a [[Dropdown]] whose
+ * highlighted entry `^r` (or Delete) asks about with `question(value)`; Enter then calls
+ * `onDelete`, Esc keeps it. The list closes (`onEmpty`) when the last entry is gone.
  *
  * @param props - see [[PickListProps]].
  * @returns the [[PickList]].
@@ -800,7 +780,6 @@ export function usePickList<T>(props: PickListProps<T>): PickList {
         })
     }, open)
 
-    // the last entry gone: the screen closes the list
     useEffect(() => {
         if (open && entries.length === 0) onEmpty()
     }, [open, entries, onEmpty])
@@ -868,10 +847,9 @@ function swatchesOf(theme: Theme): string[] {
 }
 
 /**
- * The popup that picks a theme: one row for each theme (its logo, its name and the
- * swatches of its four colours), scrolled with the arrow keys, Enter picks and Esc (or
- * `^t` again) leaves. It is drawn in the colours of the theme in use now; nothing
- * changes until a theme is picked. While it is open it is the only thing that takes keys.
+ * The popup that picks a theme: one row per theme (logo, name, four swatches), scrolled
+ * with the arrow keys; Enter picks, Esc (or `^t` again) leaves. It is drawn in the colours
+ * of the theme in use and is the only thing that takes keys while open.
  *
  * @param current - the theme in use; the cursor starts on it.
  * @param onPick - called with the theme that Enter picked.

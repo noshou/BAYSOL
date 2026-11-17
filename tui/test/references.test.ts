@@ -1,24 +1,19 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // Tests of store/references.ts: the reference curves of a project, the reference mode of
-// the import (an optional sigma) and the pure parts of the references screen.
+// the import (an optional sigma).
 
 import assert from "node:assert/strict"
 import {
     existsSync,
     mkdirSync,
-    readdirSync,
     readFileSync,
     rmSync,
+    utimesSync,
     writeFileSync,
 } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
-import {
-    referenceCells,
-    referenceNote,
-    referenceSummary,
-} from "../src/screens/references-screen.js"
 import { setUnits, writeData } from "../src/store/data.js"
 import {
     DataFileError,
@@ -33,16 +28,29 @@ import {
 import { ProjectGoneError } from "../src/store/projects.js"
 import {
     addReference,
+    addReferenceAsync,
+    copyReferences,
+    currentReference,
     deleteReference,
+    deleteReferenceAsync,
     freeStem,
     listReferences,
     readReferenceFile,
+    referenceFiles,
+    referencesArchive,
     referencesDir,
     referenceText,
     referenceUnits,
     safeStem,
 } from "../src/store/references.js"
-import { tempDir } from "./support/fixtures.js"
+import { tempDir, failure as thrown } from "./support/fixtures.js"
+
+/** The text of one reference file of a project, as a run gets it (`copyReferences`). */
+function held(dir: string, file: string): string {
+    const into = tempDir()
+    copyReferences(dir, into)
+    return readFileSync(join(into, `reference-fit-${file}`), "utf-8")
+}
 
 /** A curve of `n` points with a sigma (or without). */
 function curve(n: number, sigma = true): DataPoints {
@@ -62,15 +70,7 @@ function project(units: "A-1" | "nm-1" = "A-1"): string {
     return dir
 }
 
-const failure = (run: () => unknown): string => {
-    try {
-        run()
-    } catch (error) {
-        if (error instanceof DataFileError) return error.message
-        throw error
-    }
-    return ""
-}
+const failure = (run: () => unknown): string => thrown(run, DataFileError)
 
 // ========================================================================================
 // 1. The reference mode of the import
@@ -138,16 +138,17 @@ test("references: an added curve is a clean file, named by the safe stem", () =>
     const dir = project()
     const name = addReference(dir, curve(5), "/some/where/My Curve (CRYSOL).dat")
     assert.equal(name, "My_Curve__CRYSOL_")
-    const file = join(referencesDir(dir), `${name}.tsv`)
-    const text = readFileSync(file, "utf-8")
+    const text = held(dir, `${name}.tsv`)
     assert.equal(text.split("\n").length, 6)
     assert.equal(text.split("\n")[0], "0.01\t100\t0.5")
     assert.ok(!text.includes(" "))
     // two columns when the curve has no sigma
     const bare = addReference(dir, curve(5, false), "plain.csv")
-    const first2 = readFileSync(join(referencesDir(dir), `${bare}.tsv`), "utf-8")
-    assert.equal(first2.split("\n")[0], "0.01\t100")
-    assert.deepEqual(readdirSync(referencesDir(dir)).sort(), [`${name}.tsv`, "plain.tsv"])
+    assert.equal(held(dir, `${bare}.tsv`).split("\n")[0], "0.01\t100")
+    assert.deepEqual(referenceFiles(dir), [`${name}.tsv`, "plain.tsv"])
+    // the curves are in reference-fit.7z, no plain folder is made
+    assert.ok(existsSync(referencesArchive(dir)))
+    assert.ok(!existsSync(referencesDir(dir)))
     // the entries are read back the way Julia reads them
     const [first] = listReferences(dir)
     assert.equal(first?.name, "My_Curve__CRYSOL_")
@@ -159,13 +160,18 @@ test("references: an added curve is a clean file, named by the safe stem", () =>
 test("references: a taken name gets -2, -3, never over a file", () => {
     const dir = project()
     assert.equal(addReference(dir, curve(4), "a.dat"), "a")
-    const before = readFileSync(join(referencesDir(dir), "a.tsv"), "utf-8")
+    const before = held(dir, "a.tsv")
     assert.equal(addReference(dir, curve(6), "a.csv"), "a-2")
     assert.equal(addReference(dir, curve(7), "A.txt"), "A-3")
-    assert.equal(readFileSync(join(referencesDir(dir), "a.tsv"), "utf-8"), before)
+    assert.equal(held(dir, "a.tsv"), before)
     // a file of another extension or case that Julia would also read takes the stem
-    writeFileSync(join(referencesDir(dir), "b.DAT"), "1 2\n2 3\n3 4\n")
-    assert.equal(addReference(dir, curve(4), "b.xlsx"), "b-2")
+    // (here from an old plain folder, which the first add packs and leaves in place)
+    const old = project()
+    mkdirSync(referencesDir(old))
+    writeFileSync(join(referencesDir(old), "b.DAT"), "1 2\n2 3\n3 4\n")
+    assert.equal(addReference(old, curve(4), "b.xlsx"), "b-2")
+    assert.deepEqual(referenceFiles(old), ["b-2.tsv", "b.DAT"])
+    assert.ok(existsSync(join(referencesDir(old), "b.DAT")), "the old folder stays")
     assert.deepEqual(freeStem("x", ["x", "X-2", "x-3"]), "x-4")
     assert.equal(freeStem("y", ["x"]), "y")
 })
@@ -287,26 +293,39 @@ test("references: copies adding the same stem both succeed, with different names
 })
 
 // ========================================================================================
-// 3. The screen's pure parts
+// 3. The current reference
 // ========================================================================================
 
-test("references screen: cells, note and the data screen's summary line", () => {
+test("the project's one reference: the named file, else the newest usable one", () => {
     const dir = project()
-    addReference(dir, curve(5), "one.dat")
-    addReference(dir, curve(5), "two.dat")
-    writeFileSync(join(referencesDir(dir), "bad.txt"), "no")
-    const entries = listReferences(dir)
-    const bad = entries.find((e) => e.name === "bad")
-    assert.deepEqual(referenceCells(bad as never), ["bad", "unusable", ""])
-    assert.deepEqual(referenceCells(entries.find((e) => e.name === "one") as never), [
-        "one",
-        "5",
-        "0.01 to 0.05",
-    ])
-    assert.equal(referenceNote(bad), "bad.txt: no row of numbers")
-    assert.equal(referenceNote(entries[1]), undefined)
-    assert.equal(referenceNote(undefined), undefined)
-    assert.equal(referenceSummary(entries, 80), "2 (one, two), 1 unusable")
-    assert.equal(referenceSummary([], 80), undefined)
-    assert.ok((referenceSummary(entries, 12) as string).length <= 12)
+    assert.equal(currentReference(dir, ""), undefined)
+    // an older folder with several curves: the one changed last is the reference
+    const folder = referencesDir(dir)
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(join(folder, "a.tsv"), "0.1\t5\n0.2\t4\n")
+    writeFileSync(join(folder, "b.tsv"), "0.1\t5\n0.2\t4\n")
+    writeFileSync(join(folder, "bad.tsv"), "nothing\n")
+    utimesSync(join(folder, "a.tsv"), 100, 100)
+    utimesSync(join(folder, "b.tsv"), 200, 200)
+    utimesSync(join(folder, "bad.tsv"), 300, 300)
+    assert.equal(currentReference(dir, "")?.file, "b.tsv")
+    // the file the entry names wins, and a name that is gone falls back to the newest
+    assert.equal(currentReference(dir, "a.tsv")?.file, "a.tsv")
+    assert.equal(currentReference(dir, "gone.tsv")?.file, "b.tsv")
+    assert.equal(currentReference(dir, "bad.tsv")?.file, "b.tsv")
+})
+
+test("references: added and removed in the background through the archive", async () => {
+    const dir = project()
+    const first = await addReferenceAsync(dir, curve(4), "/x/fit.dat")
+    const second = await addReferenceAsync(dir, curve(5), "/x/fit.dat")
+    assert.deepEqual([first, second], ["fit", "fit-2"])
+    assert.deepEqual(referenceFiles(dir).sort(), ["fit-2.tsv", "fit.tsv"])
+    assert.ok(existsSync(referencesArchive(dir)))
+    assert.equal(await deleteReferenceAsync(dir, "fit.tsv"), true)
+    assert.equal(await deleteReferenceAsync(dir, "fit.tsv"), false)
+    assert.equal(await deleteReferenceAsync(dir, "../fit-2.tsv"), false)
+    assert.deepEqual(referenceFiles(dir), ["fit-2.tsv"])
+    // no data, no reference: refused before anything is queued
+    await assert.rejects(addReferenceAsync(tempDir(), curve(4), "a.dat"), DataFileError)
 })

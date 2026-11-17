@@ -11,7 +11,7 @@ using BAYSOL.Pipeline: _plotStyle
 using Main.BAYSOLRun: JSON3
 using Main.BAYSOLRun: _utcFields, _unixTime, _runStamp, _isoUtc, _parseIsoUtc,
     _parseRunStamp, _localOffset, _localZone, _zoneLabel, _zoneName, _claimRunDir,
-    _projectModels, _readSnapshotData, _liveRun,
+    _projectModels, _noModelsMessage, _readSnapshotData, _liveRun,
     _writeJsonAtomic, RUN_FOLDER, RUN_STALE_S
 
 const _RP_CRAMBIN =
@@ -224,6 +224,24 @@ end
     end
 end
 
+@testset "runProject: no models, and models kept in models.7z" begin
+    mktempdir() do dir
+        plain = _noModelsMessage(dir)
+        @test occursin("no model", plain) && !occursin("7z", plain)
+        # the terminal interface keeps the models in an archive: say how to run a script
+        write(joinpath(dir, "models.7z"), "x")
+        @test isempty(_projectModels(dir))
+        msg = _noModelsMessage(dir)
+        @test occursin("models.7z", msg) && occursin("terminal interface", msg)
+        @test occursin("7z x models.7z -omodels", msg)
+        # extracted into models/, Julia lists them and a generated/ folder is no model
+        mkpath(joinpath(dir, "models", "generated"))
+        write(joinpath(dir, "models", "a.pdb"), "x")
+        write(joinpath(dir, "models", "generated", "a_pH7.0_parse_none.pdb"), "x")
+        @test first.(_projectModels(dir)) == ["a"]
+    end
+end
+
 @testset "runProject: the data of the snapshot" begin
     mktempdir() do dir
         write(joinpath(dir, "data.tsv"), "1.0\t10\t1\n\n2.0\t20\t2\n")
@@ -298,7 +316,7 @@ end
     @test _plotStyle(s).lwMap == 3.5 && _plotStyle(s).colorMap == :navy
 end
 
-@testset "runProject: the plot folder is one for all projects, laid out per model" begin
+@testset "runProject: no plot folder is passed to results" begin
     s = BAYSOLRun.loadSettings(joinpath(mktempdir(), "none.json"))
     stamp = "23-35-29-123_EST_-0500_2026-11-07"
     st = (; project = joinpath("data", "projects", "demo"),
@@ -307,10 +325,9 @@ end
     # no plot folder (the default): the keywords are untouched
     @test kw.plotDir == "" && BAYSOLRun._modelResultsKw(kw, st, "crambin") === kw
     @test kw.latexCompiler == ""
-    # with one: <plot dir>/<project>/<run>/<model>
+    # with one it is dropped: plots go to the plot folder only by "move tex plots"
     kw2 = merge(kw, (; plotDir = joinpath("out", "plots")))
-    @test BAYSOLRun._modelResultsKw(kw2, st, "crambin").plotDir ==
-          joinpath("out", "plots", "demo", "23-35-29-123_EST_-0500_2026-11-07", "crambin")
+    @test BAYSOLRun._modelResultsKw(kw2, st, "crambin").plotDir == ""
 end
 
 @testset "runProject: arguments and the live run" begin
@@ -1392,6 +1409,41 @@ end
             errors = read(joinpath(r.dir, "run.LOG"), String)
             @test occursin("model m2: the reference fit was skipped", errors)
             @test occursin("there is no model named m3", errors)
+        end
+    end
+
+    @testset "the project's one reference (key *) is for every model" begin
+        mktempdir() do dir
+            makeProject(dir; models = ["m1.pdb" => _RP_CRAMBIN, "m2.pdb" => _RP_CRAMBIN])
+            mkpath(joinpath(dir, "reference-fit"))
+            for f in ("CRYSOL.tsv", "FoXS.tsv")
+                write(
+                    joinpath(dir, "reference-fit", f),
+                    join(
+                        ("$q\t$(900 * exp(-q^2 * 100 / 3))" for q in 1.0:0.5:3.0), "\n",
+                    ) * "\n",
+                )
+            end
+            # the entry of m1 is ignored once the project has its reference; `*` is not
+            # a model that is missing
+            write(
+                joinpath(dir, "model-references.json"),
+                """{"*": {"fit": "CRYSOL.tsv", "software": "CRYSOL",""" *
+                """"refChi2": "CRYSOL 1.4"},"m1": {"fit": "FoXS.tsv", "tag": "a"}}""",
+            )
+            seen = Dict{String,Any}()
+            function fit(st, rec, inputs, cfg, tee)
+                seen[rec.name] = cfg.modelRef
+                return nothing
+            end
+            r = quick(dir; fit)
+            @test r.status == :done
+            for m in ("m1", "m2")
+                @test only(seen[m].references).name == "CRYSOL" &&
+                      seen[m].refChi2 == "CRYSOL 1.4"
+            end
+            errors = read(joinpath(r.dir, "run.LOG"), String)
+            @test !occursin("there is no model named", errors)
         end
     end
 end

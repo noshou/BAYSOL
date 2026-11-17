@@ -61,7 +61,7 @@ Partition `v = (a, −ρₑ g)` with `a = (1, s₁, s₂, s₃)` and `G` into th
 
 ```math
 \hat I = A + g\,B + g^2 C,\qquad
-A=\mathbf a^\top G_{aa}\mathbf a,\quad B=-2\rhoE\,\mathbf a^\top G_{ae},\quad C=\rhoE^2\,G_{ee}
+A=\mathbf a^\top G_{aa}\mathbf a,\quad B=-2\rho_e\,\mathbf a^\top G_{ae},\quad C=\rho_e^2\,G_{ee}
 ```
 
 `A`, `B`, `C` are built once per `(ρₑ, δρ)` from the packed columns (off-diagonal pairs of `A` counted twice) and reused across the whole `c1` search, which is evaluated in Horner form `A + g(B + gC)`. Only truncation at `lMax`, the atom/bead discretisation and CRYSOL's common-volume envelope are approximations.

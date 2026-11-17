@@ -24,7 +24,7 @@ Base.showerror(io::IO, e::StructureSourceError) = print(io, "StructureSourceErro
 
 """
 Where to obtain a protein structure from. One concrete subtype per input
-shape; [`resloveStruct`](@ref) dispatches on it to produce a canonical,
+shape; [`resolveStruct`](@ref) dispatches on it to produce a canonical,
 cached local .pdb path.
 """
 abstract type StructureSource end
@@ -173,7 +173,7 @@ function _resolveCanonicalPdb(struc, key::AbstractString; model::Integer = 1)::S
 end
 
 """
-    resloveStruct(source::StructureSource; model = 1) -> String
+    resolveStruct(source::StructureSource; model = 1) -> String
 
 Resolve source to an absolute path to a canonical .pdb file in
 [`_storeDir`](@ref) (one model only, the first unless `model` says another; modified
@@ -195,9 +195,9 @@ a download to `<id>_model<k>.pdb`. The first model is resolved as it always was.
 - [`StructureSourceError`](@ref): a missing file, an unrecognised extension, a failed fetch
     or write, or a `model` that is below 1 or above the number of models.
 """
-function resloveStruct end
+function resolveStruct end
 
-function resloveStruct(source::LocalPathSource; model::Integer = 1)::String
+function resolveStruct(source::LocalPathSource; model::Integer = 1)::String
     path = source.path
     isfile(path) || throw(StructureSourceError("no such file: $path"))
     model >= 1 || throw(StructureSourceError("model must be at least 1, got $model"))
@@ -229,7 +229,7 @@ function resloveStruct(source::LocalPathSource; model::Integer = 1)::String
     end
 end
 
-function resloveStruct(source::PDBIDSource; model::Integer = 1)::String
+function resolveStruct(source::PDBIDSource; model::Integer = 1)::String
     id = uppercase(source.id)
     model >= 1 || throw(StructureSourceError("model must be at least 1, got $model"))
     existing = joinpath(_storeDir(), id * _modelSuffix(model) * ".pdb")
@@ -277,7 +277,7 @@ function _sniffFormat(path::AbstractString)
     return PDBFormat
 end
 
-function resloveStruct(source::URLSource; model::Integer = 1)::String
+function resolveStruct(source::URLSource; model::Integer = 1)::String
     url = source.url
     model >= 1 || throw(StructureSourceError("model must be at least 1, got $model"))
     key = source.id * _modelSuffix(model)

@@ -32,7 +32,7 @@ using BAYSOL
 
 using BAYSOL.MolecularStructure:
     loadMolecule, nAtoms, LocalPathSource,
-    resloveStruct, _storeDir
+    resolveStruct, _storeDir
 using BAYSOL.Hydrogenator: resolveHydrogens, Propka, NoTitration, Pdb2pqrError,
     _hydrogensPath, _pkaPath, hydrogenationChoice, NUCLEIC_FORCE_FIELD,
     DEFAULT_FORCE_FIELD
@@ -135,7 +135,7 @@ end
         @test nAtoms(loadMolecule(_fix("1EHZ"))) == standard + 323 + 9 == 1661
         @test nAtoms(loadMolecule(_fix("1EHZ"); ligands = false)) == 1652
         # also through the canonical .pdb written for the mmCIF fixture
-        resolved = resloveStruct(LocalPathSource(_fix("1EHZ", "cif")))
+        resolved = resolveStruct(LocalPathSource(_fix("1EHZ", "cif")))
         try
             @test nAtoms(loadMolecule(resolved)) == standard + 323 + 9
         finally

@@ -1,39 +1,31 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 // The add flow of the solutes table, as a state machine without a terminal. The four add
-// keys (`^n` a non-biological solute, `^p` a polymer, `^f` a protein file, `^e` a DNA or
-// RNA file) and the edit of an existing row each start a flow; a flow asks one thing at a
-// time:
+// keys (`^n` non-biological solute, `^p` polymer, `^f` protein file, `^e` DNA or RNA file)
+// and the edit of a row each start a flow, which asks one thing at a time:
 //
-//   name   a dropdown of every solute BAYSOL knows (`search` of ./solutes.ts, plus
-//          the custom solutes), narrowed by what is typed, for `^n` and `^p`;
+//   name   a dropdown of every solute BAYSOL knows (`search` of ./solutes.ts plus the
+//          custom solutes), narrowed by what is typed, for `^n` and `^p`;
 //   form   a polymer family with several forms (PEG by n or by Mn) asks which one;
 //   nuc    `^e` asks DNA or RNA first;
-//   path   the path of a sequence file (hinted as the models' paths are) or the sequence
-//          text itself, typed or pasted; a file is read and its text linted the same way;
-//          and every record of it becomes a row;
-//   edit   one cell is typed into: the name (free text), the params of a family (one
-//          argument at a time), mM, then +-;
+//   path   the path of a sequence file or the sequence text itself, typed or pasted;
+//          every record becomes a row;
+//   edit   one cell is typed into: the name, the params of a family, mM, then +-;
 //   done   nothing is asked any more: `table` holds the result.
 //
-// After the pick, by kind of the entry: a non-biological solute or a built-in polymer
-// grade goes on to mM and +-; a polymer family asks its numbers in the params cell
-// (`units n`, `Mn (g/mol)`, ...); a custom non-biological solute stores a snapshot of the
-// entry (the project never reads the global file); DNA, RNA and protein ask a path and
-// make one row for each record of the file, with the same mM and +-. The rows are those of
-// `test/fixtures/buffer/buffer.json`. The flow never saves: the rows are drafts of a
-// `Drafts<Solute>` until the screen's `^w`.
+// After the pick: a non-biological solute or built-in polymer grade goes on to mM and +-;
+// a polymer family asks its numbers in the params cell; a custom non-biological solute
+// stores a snapshot of the entry; DNA, RNA and protein make one row per record with the
+// same mM and +-. The rows are those of `test/fixtures/buffer/buffer.json`. The flow never
+// saves: the rows are drafts until the screen's `^w`.
 //
-// How a screen uses it: make an `AddFlow` (`AddFlow.add` or `AddFlow.edit`), draw
-// `flow.step` (a dropdown, a prompt or done), and forward what the user does as an
-// `AddEvent` through `flow.send`. Every transition is also a pure function
-// (`advance(state, event)`), which is what the class wraps.
+// A screen makes an `AddFlow` (`AddFlow.add` or `AddFlow.edit`), draws `flow.step` and
+// forwards what the user does as an `AddEvent` through `flow.send`. Every transition is
+// a pure function (`advance(state, event)`), which the class wraps.
 //
-// The row keys follow `Solute` of ./solutes.ts (`sigmaMM`); `bufferRow` renames it to the
-// `sigmaMm` of the file (see ./solutes.ts), which `rowProblem` of ./buffer.ts checks.
-//
-// The vocabulary of the flow (fields, entries, params cell, states, events, steps) is in
-// `solutes.ts`.
+// Row keys follow `Solute` of ./solutes.ts (`sigmaMM`); `bufferRow` renames it to the
+// file's `sigmaMm`, which `rowProblem` of ./buffer.ts checks. The vocabulary of the flow
+// (fields, entries, params cell, states, events, steps) is in `solutes.ts`.
 //
 // Contents:
 //   1. Building states: the state of a flow started, of a pick, of a field opened

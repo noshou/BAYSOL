@@ -308,7 +308,7 @@ end
     @testset "the table covers the catalog exactly" begin
         @test allunique(r.setting for r in rows)
         @test Set(r.setting for r in rows) == Set(_settingNames())
-        @test length(rows) == 96
+        @test length(rows) == 99
     end
 
     @testset "the keyword exists where the table says" begin

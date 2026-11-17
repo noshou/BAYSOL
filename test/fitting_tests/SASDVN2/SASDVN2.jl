@@ -215,7 +215,9 @@ function runSasdvn2(
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seedSasdvn2(run; seed)
-    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    # δ = 99: at the default 95 this entry exceeded the 0.1 % divergence limit; 99 passed
+    # seeds 0, 1 and 2 (2026-11-16; see "When a run fails" in src/inference/README.md).
+    res = BAYSOL.runModel(s, nSamples, nAdapt; δ = 99)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 

@@ -26,7 +26,7 @@ import {
     isFolder,
     withFileLock,
 } from "../core/file-system.js"
-import { displayWidth, takeWidth, truncateStart } from "../core/terminal.js"
+import { displayWidth, superscripts, takeWidth, truncateStart } from "../core/terminal.js"
 import {
     assertNoLiveRun,
     livePid,
@@ -37,6 +37,7 @@ import {
 } from "./projects.js"
 import {
     archivePath,
+    archivesOf,
     RUN_FILES,
     RunFileMissing,
     RunFileTooLarge,
@@ -79,7 +80,8 @@ function modelNames(json: Record<string, unknown> | undefined): string[] {
  * One run of the logs menu's list.
  *
  * @property id - the run's name, its stamp (`23-35-29-123_EST_-0500_2026-11-07`).
- * @property dir - the run's path: its folder, or where it was (the archive is `<dir>.7z`).
+ * @property dir - the run's path: its folder, or where it was (its archives are
+ *     `<dir>.7z` and the companions).
  * @property state - `live` for a run whose process is alive, `interrupted` for one that
  *     says `running` but nobody runs, else the status of `run.json`, or `unknown` when
  *     there is no readable file.
@@ -122,10 +124,12 @@ export function folderSize(dir: string): number {
 /** The bytes of a run: its folder (when it has one) and its archive. */
 function runSize(dir: string): number {
     let archived = 0
-    try {
-        archived = lstatSync(archivePath(dir)).size
-    } catch {
-        // no archive of the new layout
+    for (const archive of archivesOf(dir)) {
+        try {
+            archived += lstatSync(archive).size
+        } catch {
+            // gone since the listing
+        }
     }
     return folderSize(dir) + archived
 }
@@ -187,7 +191,9 @@ export function deleteRun(projectDir: string, id: string): void {
                     throw error
                 }
             }
-            rmSync(archivePath(dir), { force: true })
+            // the main archive first: the run is gone from the list at once
+            for (const group of ["main", "draws", "meta"] as const)
+                rmSync(archivePath(dir, group), { force: true })
             rmSync(dir, { recursive: true, force: true })
         },
         { createParents: false },
@@ -220,9 +226,9 @@ export function readRunFile(runDir: string, name: string): string {
     }
 }
 
-/** The text of a run's `run.LOG`: [[readRunFile]]. */
+/** The text of a run's `run.LOG` as shown ([[readRunFile]], exponents as superscripts). */
 export function readLogText(runDir: string): string {
-    return readRunFile(runDir, "run.LOG")
+    return superscripts(readRunFile(runDir, "run.LOG"))
 }
 
 /**

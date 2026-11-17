@@ -9,7 +9,7 @@ supports them.
 | [`unit-tests/`](unit-tests/README.md) | the unit and integration suite: one `test-*.jl` per module in `units/`, the setup they share (`testsetup.jl`) and the float-compare and geometry helpers they include |
 | [`baselines/`](baselines/README.md) | the reference benchmark run of each release, which `bysl results compare --bench` compares a new run with (and an untracked `results/` for runs that are not baselines) |
 | [`fixtures/`](fixtures/README.md) | the data the tests read: real PDB/mmCIF structures, the sequence corpus, form-factor oracle values and the SASBDB entries |
-| [`fitting_tests/`](fitting_tests/README.md) | 57 end-to-end SASBDB entries (27 protein, 30 DNA/RNA; 84 fits), each a script that doubles as a worked example, with the workbook of numbers, the timing table and the figures (`.tex`) it wrote |
+| [`fitting_tests/`](fitting_tests/README.md) | 112 end-to-end SASBDB entries (56 with a single-structure reference fit, 56 replacement entries; protein, DNA and RNA), each a script that doubles as a worked example, with the workbook of numbers, the timing table and the figures (`.tex`) it wrote |
 | [`visualize/`](visualize/README.md) | optional visual checks for the geometry code (plotting; not part of the suite) |
 
 Four Julia environments are involved: `test/` (the unit suite), `test/fitting_tests/` (no plotting package: the figures come from `BAYSOL.results`),

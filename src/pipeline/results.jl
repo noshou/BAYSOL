@@ -29,7 +29,8 @@ same name (`PlotStyle().colorMap` is `PLOT_COLOUR_MAP`).
 # Fields
 - `colorMap`, `colorPosterior`, `colorData`, `colorErrorbar`,
     `colorBand`, `colorBandResid`, `colorHist`, `colorReference`, `colorAxis`,
-    `colorTick`:
+    `colorTick`, `colorBg` (the background of the page and the plot area), `colorText`
+    (all text: tick labels, axis labels, legends, titles):
     [`ColorSpec`](@ref BAYSOL.Pipeline.ColorSpec)s.
 - `lwMap`, `lwReference`, `lwQuantile`,
     `lwQuantileResid`, `lwZeroLine`, `lwErrorbar`, `lwCompare`: line widths (pt).
@@ -49,6 +50,8 @@ same name (`PlotStyle().colorMap` is `PLOT_COLOUR_MAP`).
     length in cm, the minor ticks between two major ones of a linear axis) and the gap
     between the y axis and its tick labels (pt).
 - `xtickAngle`: the angle the x tick labels are turned by (degrees; 0 leaves them level).
+- `qUnit`: the unit of q in the plots and the workbook, `"Å⁻¹"` or `"nm⁻¹"`; the fit
+    stays in Å⁻¹.
 - `xtickLabelPadPt`: the gap between the end of an x tick and its label (pt).
 - `tickStubPt`, `tickElbowPt`: each x tick leaves the axis straight for `tickStubPt`
     and then bends for `tickElbowPt` towards its slanted label (pt).
@@ -70,6 +73,8 @@ Base.@kwdef struct PlotStyle
     colorReference::ColorSpec = PLOT_COLOUR_REFERENCE
     colorAxis::ColorSpec = PLOT_COLOUR_AXIS
     colorTick::ColorSpec = PLOT_TICK_COLOUR
+    colorBg::ColorSpec = PLOT_BG_COLOUR
+    colorText::ColorSpec = PLOT_TEXT_COLOUR
     lwMap::Float64 = PLOT_LW_MAP
     lwReference::Float64 = PLOT_LW_REFERENCE
     lwQuantile::Float64 = PLOT_LW_QUANTILE
@@ -88,6 +93,7 @@ Base.@kwdef struct PlotStyle
     previewSize::NamedTuple = PLOT_PREVIEW_SIZE
     borderPt::Float64 = PLOT_BORDER_PT
     xtickAngle::Float64 = PLOT_XTICK_ANGLE
+    qUnit::String = PLOT_Q_UNIT
     lwAxis::Float64 = PLOT_AXIS_LW
     lwTick::Float64 = PLOT_LW_MAJOR_TICK
     lwMinorTick::Float64 = PLOT_LW_MINOR_TICK
@@ -116,6 +122,7 @@ function _checkStyle(s::PlotStyle)
         "style.previewSize must have a positive width and height",
     )
     _need(isfinite(s.xtickAngle), "style.xtickAngle must be finite")
+    _need(haskey(Q_UNIT_FACTORS, s.qUnit), "style.qUnit must be Å⁻¹ or nm⁻¹")
     _need(
         !isempty(s.colorsCompare) && all(_isColour, s.colorsCompare),
         "style.colorsCompare must be a non-empty tuple of colours",
@@ -205,8 +212,9 @@ diverged).
 function _curveData(result, data, style::PlotStyle)
     _, _, mapResult, quantileResult = result
     q, I, σ = data
+    f = _qFactor(style)
     pos = I .> 0
-    q, I, σ = q[pos], I[pos], σ[pos]
+    q, I, σ = f .* q[pos], I[pos], σ[pos]
     isempty(I) && throw(ArgumentError("no positive intensity to plot"))
     floor_ = minimum(I) / 2
     logI = log10.(I)
@@ -217,12 +225,14 @@ function _curveData(result, data, style::PlotStyle)
     if quantileResult !== nothing
         _, curves = quantileResult
         b, qn = curves["bounds"], curves["quantiles"]
-        band = (q = b[:, 1], lo = max.(b[:, 2], floor_), hi = max.(b[:, 3], floor_))
-        quant = (q = qn[:, 1], lo = max.(qn[:, 2], floor_), hi = max.(qn[:, 3], floor_))
+        band = (q = f .* b[:, 1], lo = max.(b[:, 2], floor_), hi = max.(b[:, 3], floor_))
+        quant = (
+            q = f .* qn[:, 1], lo = max.(qn[:, 2], floor_), hi = max.(qn[:, 3], floor_),
+        )
     end
     if mapResult !== nothing
         mc = mapResult[2]
-        mapc = (q = mc[:, 1], I = map(v -> v > 0 ? v : NaN, mc[:, 2]))
+        mapc = (q = f .* mc[:, 1], I = map(v -> v > 0 ? v : NaN, mc[:, 2]))
     end
     lo, hi = extrema(I)
     return (;
@@ -241,14 +251,16 @@ function _residualData(result, data, style::PlotStyle)
     _, _, mapResult, quantileResult = result
     mapResult === nothing && return nothing
     q, I, σ = data
+    f = _qFactor(style)
+    q = f .* q
     iMap = mapResult[2][:, 2]
     resid = I .- iMap
     band = quant = nothing
     if quantileResult !== nothing
         _, curves = quantileResult
         b, qn = curves["bounds"], curves["quantiles"]
-        band = (q = b[:, 1], lo = b[:, 2] .- iMap, hi = b[:, 3] .- iMap)
-        quant = (q = qn[:, 1], lo = qn[:, 2] .- iMap, hi = qn[:, 3] .- iMap)
+        band = (q = f .* b[:, 1], lo = b[:, 2] .- iMap, hi = b[:, 3] .- iMap)
+        quant = (q = f .* qn[:, 1], lo = qn[:, 2] .- iMap, hi = qn[:, 3] .- iMap)
     end
     lo, hi = extrema(resid)
     pad = style.ylimLinPadFrac * (hi - lo)
@@ -345,7 +357,8 @@ _rgb(spec::ColorSpec) = _rgba(spec)[1:3]
 const _TEX_COLOURS = (
     map = "bsmap", posterior = "bsposterior", data = "bsdata", errorbar = "bserrorbar",
     band = "bsband", bandResid = "bsbandresid", hist = "bshist",
-    reference = "bsreference", axis = "bsaxis", tick = "bstick",
+    reference = "bsreference", axis = "bsaxis", tick = "bstick", bg = "bsbg",
+    text = "bstext",
 )
 
 """
@@ -421,6 +434,12 @@ function _texDocument(axis, style::PlotStyle)
         r, g, b, _ = _rgba(getfield(style, Symbol(:color, uppercasefirst(string(k)))))
         PGF.push_preamble!(td, "\\definecolor{$name}{RGB}{$r,$g,$b}")
     end
+    # the page background and the colour of all text (labels, legends, titles)
+    PGF.push_preamble!(
+        td,
+        "\\AtBeginDocument{\\pagecolor{$(_TEX_COLOURS.bg)}" *
+        "\\color{$(_TEX_COLOURS.text)}}",
+    )
     if (f = _fontNames(style.font)) !== nothing
         PGF.push_preamble!(td, "\\usepackage{unicode-math}", "\\setmainfont{$(f[1])}")
         f[2] === nothing || PGF.push_preamble!(td, "\\setmathfont{$(f[2])}")
@@ -434,7 +453,15 @@ _opacity(spec::ColorSpec) = _rgba(spec)[4]
 "Coordinates of `x`, `y`; a non-finite point breaks the line."
 _coords(x, y; kw...) = PGF.Coordinates(x, y; kw...)
 
-const _TEX_X = raw"$q$ (\AA$^{-1}$)"
+"The factor that turns q in Å⁻¹ into the unit of `style` (`qUnit`)."
+_qFactor(style::PlotStyle) = Q_UNIT_FACTORS[style.qUnit]
+
+"The header of the q columns of the workbook: `q` in Å⁻¹, `qNm` in nm⁻¹."
+_qHeader(style::PlotStyle) = style.qUnit == "nm⁻¹" ? "qNm" : "q"
+
+"The TeX x label of the figures: `q` and the unit of `style`."
+_texX(style::PlotStyle) =
+    style.qUnit == "nm⁻¹" ? raw"$q$ (nm$^{-1}$)" : raw"$q$ (\AA$^{-1}$)"
 
 """
 Round tick values (1, 2, 3, 5 × 10ᵏ; every integer multiple if that gives fewer than six)
@@ -536,6 +563,11 @@ function _styleTicks!(opts, style::PlotStyle; log::Bool = false)
         opts["minor y tick num"] = style.minorTicks
     end
     opts["yticklabel style"] = "xshift=-$(style.tickLabelPadPt)pt"
+    # the plot area in the background colour, all text in the text colour
+    opts["axis background/.style"] = "{fill=$(_TEX_COLOURS.bg)}"
+    opts["tick label style"] = "{text=$(_TEX_COLOURS.text)}"
+    opts["label style"] = "{text=$(_TEX_COLOURS.text)}"
+    opts["title style"] = "{text=$(_TEX_COLOURS.text)}"
     return opts
 end
 
@@ -586,7 +618,8 @@ function _xtickLeaders!(opts, style::PlotStyle)
     cmds = [
         "\\draw[$(_TEX_COLOURS.tick), line width=$(style.lwTick)pt] " *
         "(axis cs:$x,$ymin) -- ++(0pt,-$(stub)pt)$leg " *
-        "node[$node, inner sep=$(style.xtickLabelPadPt)pt, text=black] {$l};" for
+        "node[$node, inner sep=$(style.xtickLabelPadPt)pt, " *
+        "text=$(_TEX_COLOURS.text)] {$l};" for
         (x, l) in zip(ticks, labels)
     ]
     # the title goes below the longest label: its stub, elbow and slope, and its height
@@ -618,12 +651,14 @@ end
 function _axisOptions(style::PlotStyle; ylabel, height, log::Bool, ylim = nothing,
     xlim = nothing, legendPos = "south west")
     opts = @pgf {
-        xlabel = _TEX_X,
+        xlabel = _texX(style),
         ylabel = ylabel,
         width = "$(style.sizeCm[1])cm",
         height = "$(height)cm",
         legend_pos = legendPos,
-        legend_style = "draw=none, fill=none, font=\\footnotesize",
+        legend_style =
+            "draw=none, fill=none, text=$(_TEX_COLOURS.text), " *
+            "font=\\footnotesize",
         legend_cell_align = "left",
     }
     if log
@@ -826,7 +861,9 @@ function _histogramAxis(h, style::PlotStyle)
         xlabel = h.tex, ylabel = "count", ymin = 0, ymax = ymax,
         width = "$(pw)cm", height = "$(ph)cm",
         legend_pos = corner,
-        legend_style = "draw=black, fill=white, font=\\footnotesize, inner sep=3pt",
+        legend_style =
+            "draw=$(_TEX_COLOURS.text), fill=$(_TEX_COLOURS.bg), " *
+            "text=$(_TEX_COLOURS.text), font=\\footnotesize, inner sep=3pt",
         legend_cell_align = "left",
     }
     _setTicks!(opts, "x", _fittingTicks(first(h.edges), last(h.edges), pw)...)
@@ -888,7 +925,7 @@ function _comparisonAxis(c, style::PlotStyle)
                 PGF.Plot(
                     {color = _TEX_COLOURS.reference, dashed,
                         line_width = "$(style.lwReference)pt", mark = "none"},
-                    _coords(ref.q, ref.I))
+                    _coords(_qFactor(style) .* ref.q, ref.I))
             ),
             _legend(
                 c.refChi2 === nothing ? ref.name :
@@ -1022,7 +1059,7 @@ The bounds band and the reference curves are in the `.tex`, not here.
 """
 function _previewFit(c, style::PlotStyle)
     lg = log10
-    kw = (xlabel = "log₁₀ q   (q in Å⁻¹)", ylabel = "log₁₀ I(q)",
+    kw = (xlabel = "log₁₀ q   (q in $(style.qUnit))", ylabel = "log₁₀ I(q)",
         title = _titled("fit", c.chi2), _termKw(style)...)
     if c.map === nothing
         return UnicodePlots.scatterplot(lg.(c.q), lg.(c.I); name = "data",
@@ -1036,27 +1073,29 @@ end
 """
 The residuals plot in the terminal. The y-range is that of the 2 %–98 % quantiles of the
 residuals, padded, so that a few wild points (the lowest q of a curve) do not flatten the
-rest; the title says how many are outside it.
+rest.
 """
 function _previewResiduals(r, style::PlotStyle)
     lo, hi = quantile(r.resid, (0.02, 0.98))
     pad = 0.25 * max(hi - lo, eps())
     lo, hi = lo - pad, hi + pad
-    out = count(x -> !(lo ≤ x ≤ hi), r.resid)
     p = UnicodePlots.scatterplot(r.q, r.resid; name = "data - MAP",
-        color = _rgb(style.colorPosterior), xlabel = "q (Å⁻¹)",
+        color = _rgb(style.colorPosterior), xlabel = "q ($(style.qUnit))",
         ylabel = "I(q) - I_MAP(q)",
-        title = _titled(out == 0 ? "residuals" : "residuals ($out off the plot)", r.chi2),
+        title = _titled("residuals", r.chi2),
         ylim = (lo, hi), _termKw(style)...)
     UnicodePlots.hline!(p, 0.0; color = _rgb(style.colorMap))
     return p
 end
 
+"The words a histogram's title prints for its label (the label itself stays the key)."
+_shownLabel(label::AbstractString) = label == "bkgrndCorr" ? "bkgrnd corr" : String(label)
+
 "One posterior histogram in the terminal (orange); the MAP value is in the title."
 function _previewHistogram(h, style::PlotStyle)
     title =
-        h.mapValue === nothing ? h.label :
-        string(h.label, "   (MAP ", @sprintf("%.6g", h.mapValue), ")")
+        h.mapValue === nothing ? _shownLabel(h.label) :
+        string(_shownLabel(h.label), "   (MAP ", @sprintf("%.6g", h.mapValue), ")")
     return UnicodePlots.histogram(h.draws; nbins = style.histBins, title = title,
         xlabel = h.label, color = _rgb(style.colorHist), width = style.previewSize.width,
         border = :corners)
@@ -1386,12 +1425,18 @@ function results(
         c -> _fitAxis(c, style),
         (c, st) -> _previewFit(c, st),
         c -> begin
-            out = [_sheet("data", ["q", "I", "sigma"], q, I, σ)]
+            out = [_sheet(
+                    "data", [_qHeader(style), "I", "sigma"], _qFactor(style) .* q, I, σ,
+                )]
             c.map === nothing || push!(
                 out,
                 _sheet(
                     "model",
-                    ["q", "I_map", "quantileLo", "quantileHi", "boundLo", "boundHi"],
+                    [
+                        _qHeader(style), "I_map", "quantileLo", "quantileHi",
+                        "boundLo",
+                        "boundHi",
+                    ],
                     c.map.q, c.map.I,
                     c.quant === nothing ? Float64[] : c.quant.lo,
                     c.quant === nothing ? Float64[] : c.quant.hi,
@@ -1413,7 +1458,7 @@ function results(
             r -> [
                 _sheet(
                     "residuals",
-                    ["q", "I", "sigma", "I_map", "residual"],
+                    [_qHeader(style), "I", "sigma", "I_map", "residual"],
                     r.q,
                     r.I,
                     r.σ,
@@ -1465,8 +1510,8 @@ function results(
             c -> [
                 _sheet(
                     "ref_" * _slug(ref.name),
-                    ["q", "I"],
-                    ref.q, ref.I,
+                    [_qHeader(style), "I"],
+                    _qFactor(style) .* ref.q, ref.I,
                 ),
             ],
         )

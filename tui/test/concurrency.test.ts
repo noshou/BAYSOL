@@ -36,9 +36,11 @@ import {
     writeSolutes,
 } from "../src/store/buffer.js"
 import { readCustomSolutes, writeCustomSolutes } from "../src/store/custom.js"
+import { PackNameTaken } from "../src/store/packs.js"
 import {
     addModel,
     deleteProject,
+    extractModels,
     isoStamp,
     listModels,
     liveRun,
@@ -312,7 +314,7 @@ test("the global files still make the data folder", () => {
 
 // ---- creating things that must be new -------------------------------------------------
 
-test("a model name taken meanwhile is refused by the copy itself", () => {
+test("a model name taken meanwhile is refused by the add itself", () => {
     const project = tempDir()
     const src = tempDir()
     mkdirSync(join(src, "a"))
@@ -320,8 +322,10 @@ test("a model name taken meanwhile is refused by the copy itself", () => {
     writeFileSync(join(src, "a", "m.pdb"), "first")
     writeFileSync(join(src, "b", "m.pdb"), "second")
     addModel(project, join(src, "a", "m.pdb"))
-    assert.throws(() => addModel(project, join(src, "b", "m.pdb")), /EEXIST/)
-    assert.equal(readFileSync(join(project, "models", "m.pdb"), "utf-8"), "first")
+    assert.throws(() => addModel(project, join(src, "b", "m.pdb")), PackNameTaken)
+    const into = join(tempDir(), "out")
+    extractModels(project, ["m.pdb"], into)
+    assert.equal(readFileSync(join(into, "m.pdb"), "utf-8"), "first")
     assert.deepEqual(listModels(project), ["m.pdb"])
 })
 

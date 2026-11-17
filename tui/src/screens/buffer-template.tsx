@@ -5,14 +5,13 @@
 // table, or a page of its own for the rows to confirm) and hands the result to the table.
 
 import { Box, Text } from "ink"
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
-import { truncate } from "../core/terminal.js"
+import { type ReactNode, useCallback, useEffect, useRef } from "react"
+import { superscripts, truncate } from "../core/terminal.js"
 import type { Conditions } from "../store/buffer.js"
 import type { Drafts } from "../store/lists.js"
 import { type ConcUnit, formatConc, type Solute, sameSoluteKey } from "../store/solutes.js"
 import { type Definition, rowsFor } from "../store/template-defs.js"
 import { type ConfirmStep, TemplateFlow } from "../store/template-flow.js"
-import { soluteFromSpec } from "../store/template-link.js"
 import { linkFor } from "../store/template-recipes.js"
 import {
     changedGroups,
@@ -20,7 +19,8 @@ import {
     recompute,
     seedOfRows,
     signatures,
-} from "../store/template-sync.js"
+    soluteFromSpec,
+} from "../store/template-rows.js"
 import { type LegendItem, legendFor } from "../ui/grid.js"
 import {
     DROPDOWN_CHROME,
@@ -32,9 +32,9 @@ import {
     suggestionLines,
 } from "../ui/input.js"
 import { keys, useBodyColumns, useBodyRows, useKeys } from "../ui/interaction.js"
-import { type Column, DataTable, useTheme } from "../ui/theme.js"
+import { type Column, DataTable, ErrorText, useTheme } from "../ui/theme.js"
 import type { TableScreen } from "./screen-rules.js"
-import { useTemplateWizard } from "./template-wizard.js"
+import { useStepper, useTemplateWizard } from "./template-wizard.js"
 
 /** What the note says when a group stops following the pH. */
 const EDITED_NOTE = "edited by hand: no longer follows the pH"
@@ -137,13 +137,16 @@ function ConfirmPage(props: { step: ConfirmStep }): ReactNode {
     const rows = outcome.rows
     const fixed = TABLE_CHROME + rows.length + warnings.length + extra.length
     const room = Math.max(0, budget - fixed)
-    const explain = outcome.explain.slice(0, room)
+    const explain = outcome.explain.slice(0, room).map(superscripts)
     const lines = (list: string[], colour: string) =>
         list.map((text) => (
             <Text key={text} color={colour}>
                 {truncate(text, width)}
             </Text>
         ))
+    const problems = warnings.map((text) => (
+        <ErrorText key={text}>{truncate(superscripts(text), width)}</ErrorText>
+    ))
     return (
         <Box flexDirection="column">
             <Text color={theme.fg} bold>
@@ -159,7 +162,7 @@ function ConfirmPage(props: { step: ConfirmStep }): ReactNode {
                 width={width}
             />
             {lines(extra, theme.fg)}
-            {lines(warnings, theme.er)}
+            {problems}
             {lines(explain, theme.mt)}
         </Box>
     )
@@ -180,12 +183,8 @@ export function useBufferTemplate(
     setConditions: (next: Conditions) => void,
     initial?: TemplateFlow,
 ): BufferTemplate {
-    const run = useRef<TemplateFlow | undefined>(initial)
-    const [, setVersion] = useState(0)
-    const [stepKeys, setStepKeys] = useState<LegendItem[]>([])
     const tRef = useRef(t)
     tRef.current = t
-    const redraw = useCallback(() => setVersion((v) => v + 1), [])
 
     // Rows that follow the pH. `own` holds the signatures of the table this hook made
     // itself (a flow that ended, the rows worked out again), so that the guard below does
@@ -250,33 +249,22 @@ export function useBufferTemplate(
         )
     }, [pH, temperature, conditions, t, mark])
 
-    const settle = useCallback(() => {
-        const flow = run.current
-        const done = flow?.done
-        if (done) {
-            run.current = undefined
-            if (!done.cancelled) {
-                mark(done.drafts)
-                tRef.current.adopt(done.drafts, true)
-                if (done.conditions) setConditions(done.conditions)
-            }
-        }
-        redraw()
-    }, [redraw, setConditions, mark])
-
-    const forward = useCallback(
-        (act: (flow: TemplateFlow) => void) => {
-            if (!run.current) return
-            act(run.current)
-            settle()
+    const settle = useCallback(
+        (flow: TemplateFlow) => {
+            const done = flow.done
+            if (!done || done.cancelled) return
+            mark(done.drafts)
+            tRef.current.adopt(done.drafts, true)
+            if (done.conditions) setConditions(done.conditions)
         },
-        [settle],
+        [setConditions, mark],
     )
+    const stepper = useStepper(settle, initial)
+    const { forward } = stepper
 
     const start = useCallback(() => {
-        run.current = new TemplateFlow({ drafts: tRef.current.drafts, conditions })
-        redraw()
-    }, [conditions, redraw])
+        stepper.begin(new TemplateFlow({ drafts: tRef.current.drafts, conditions }))
+    }, [conditions, stepper.begin])
 
     // `shift+t`: the wizard makes a definition, its rows come in with their link;
     // `shift+v`: the same for the rows that are there (replaced by the linked ones)
@@ -338,7 +326,7 @@ export function useBufferTemplate(
         replacing.current = made.indices
         wizard.start("converted rows", { seed: made.seed })
     }, [wizard.start])
-    const flow = run.current
+    const flow = stepper.current
     const step = flow?.step
     const onConfirm = step?.type === "confirm" || step?.type === "replace"
     const stuck = step?.type === "confirm" && step.problem !== undefined
@@ -375,7 +363,7 @@ export function useBufferTemplate(
     let entry: ReactNode = null
     let reserved = 0
     let page: ReactNode = null
-    let legend: LegendItem[] = stepKeys
+    let legend: LegendItem[] = stepper.legend
     let note: string | undefined
     let noteIsError = false
     if (step.type === "pick" || step.type === "ion" || step.type === "setat") {
@@ -396,7 +384,7 @@ export function useBufferTemplate(
                 lines={lines}
                 onPick={(index) => forward((f) => f.pick(index))}
                 onCancel={() => forward((f) => f.cancel())}
-                onLegend={setStepKeys}
+                onLegend={stepper.setLegend}
             />
         )
     } else if (step.type === "prompt") {
@@ -410,7 +398,7 @@ export function useBufferTemplate(
                 error={step.problem}
                 onSubmit={(text) => forward((f) => f.submit(text))}
                 onCancel={() => forward((f) => f.cancel())}
-                onLegend={setStepKeys}
+                onLegend={stepper.setLegend}
             />
         )
     } else if (step.type === "confirm") {

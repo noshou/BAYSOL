@@ -13,19 +13,18 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
 import { fileURLToPath } from "node:url"
-import { legendFor, menuOptions, moveLegend } from "../src/ui/grid.js"
+import { legendFor, moveLegend } from "../src/ui/grid.js"
 import {
     centredWindow,
     clampWindow,
-    ctrlKey,
+    type Hotkey,
     KeyInput,
     keyLabels,
     keyPress,
     keys,
-    plainKey,
+    menuOptions,
     scrollTo,
     scrollWindow,
-    shiftKey,
     stepIndex,
 } from "../src/ui/interaction.js"
 import { TextBuffer } from "../src/ui/text-input.js"
@@ -52,10 +51,19 @@ test("labels: named keys, Ctrl, Shift and plain letters", () => {
     assert.equal(keys.pageUp.label, "pgup")
     assert.equal(keys.home.label, "home")
     assert.equal(keys.remove.label, "^r")
-    assert.equal(ctrlKey("w").label, "^w")
-    assert.equal(plainKey("o").label, "o")
-    assert.equal(shiftKey("d").label, "shift+d")
-    assert.equal(shiftKey("d").name, "shift+d")
+    assert.equal(keys.save.label, "^w")
+    assert.equal(keys.jump.label, "shift+j")
+    assert.equal(keys.moveData.label, "shift+d")
+    assert.equal(keys.moveData.name, "shift+d")
+    // a capital is always written `shift+<letter>`, never `P`
+    assert.equal(keys.plots.label, "shift+p")
+    assert.equal(keys.moveTex.label, "shift+l")
+    // shifted symbols and Shift arrows
+    assert.equal(keys.zoomIn.label, "shift+=")
+    assert.equal(keys.zoomOut.label, "shift+-")
+    assert.equal(keys.pageDownShift.label, "shift+↓")
+    assert.equal(keys.pageUpShift.label, "shift+↑")
+    assert.equal(keys.pickFiles.label, "^v")
     assert.equal(keys.enter.name, "enter")
     assert.equal(keys.escape.name, "esc")
 })
@@ -93,22 +101,89 @@ test("keyPress: a capital letter is a Shift press, a lower case one is not", () 
     assert.ok(keyPress("", { ...noFlags, pageDown: true }).is(keys.pageDown))
 })
 
+test("keyPress: a shifted symbol is the Shift of its key, its text kept", () => {
+    // Ink reports `_` and `+` without the Shift flag (checked in a pty)
+    const under = keyPress("_", noFlags)
+    const plus = keyPress("+", noFlags)
+    assert.ok(under.is(keys.zoomOut) && under.text === "_" && under.typed)
+    assert.ok(plus.is(keys.zoomIn) && plus.text === "+" && plus.typed)
+    // the plain keys are not the zoom keys
+    assert.ok(!keyPress("-", noFlags).is(keys.zoomOut))
+    assert.ok(!keyPress("=", noFlags).is(keys.zoomIn))
+})
+
+test("keyPress: shift+↓ and shift+↑ are page keys (ESC[1;2B reaches Ink as Shift)", () => {
+    const down = keyPress("", { ...noFlags, downArrow: true, shift: true })
+    const up = keyPress("", { ...noFlags, upArrow: true, shift: true })
+    assert.ok(down.is(keys.pageDownShift) && up.is(keys.pageUpShift))
+    // a plain arrow is no page key; a plain hotkey also matches the Shift press, so the
+    // page keys are read first (see `pageKey`)
+    const plain = keyPress("", { ...noFlags, downArrow: true })
+    assert.ok(!plain.is(keys.pageDownShift))
+    assert.ok(down.is(keys.down))
+})
+
+test("pageKey: shift+arrows and PgUp/PgDn turn a page, nothing else does", async () => {
+    const { pageKey, pageLegend } = await import("../src/ui/pager.js")
+    const press = (flags: Partial<typeof noFlags>) => keyPress("", { ...noFlags, ...flags })
+    assert.equal(pageKey(press({ downArrow: true, shift: true })), "down")
+    assert.equal(pageKey(press({ pageDown: true })), "down")
+    assert.equal(pageKey(press({ upArrow: true, shift: true })), "up")
+    assert.equal(pageKey(press({ pageUp: true })), "up")
+    assert.equal(pageKey(press({ downArrow: true })), undefined)
+    assert.equal(pageKey(keyPress(" ", noFlags)), undefined)
+    assert.equal(pageKey(keyPress("k", noFlags)), undefined)
+    // the legend lists both keys of each
+    assert.deepEqual(pageLegend.next, { label: "next page", keys: "shift+↓ pgdn" })
+    assert.deepEqual(pageLegend.prev, { label: "prev page", keys: "shift+↑ pgup" })
+})
+
 test("is: a plain hotkey matches either case, a Shift hotkey only the capital", () => {
     const lower = keyPress("d", noFlags)
     const cap = keyPress("D", noFlags)
-    assert.ok(lower.is(plainKey("d")))
-    assert.ok(cap.is(plainKey("d")))
-    assert.ok(cap.is(shiftKey("d")))
-    assert.ok(!lower.is(shiftKey("d")))
+    const s = keyPress("s", noFlags)
+    const capS = keyPress("S", noFlags)
+    assert.ok(!s.is(keys.sort))
+    assert.ok(capS.is(keys.sort))
+    // a plain hotkey (the copy answers, the menus) still answers its capital
+    assert.ok(keyPress("C", noFlags).is(keys.copyCell))
+    assert.ok(cap.is(keys.moveData))
+    assert.ok(!lower.is(keys.moveData))
     // Ctrl and names still have to be equal
-    assert.ok(!lower.is(ctrlKey("d")))
-    assert.ok(!lower.is(plainKey("g")))
+    assert.ok(!lower.is(keys.eof))
+    assert.ok(!lower.is(keys.jump))
     assert.ok(new KeyInput("r", true).is(keys.remove))
-    assert.ok(!new KeyInput("r", true).is(keys.reset))
+    assert.ok(!new KeyInput("z", true).is(keys.reset))
+})
+
+/**
+ * The plain (unmodified) keys that may have a meaning besides the menu hotkeys: the
+ * named keys (arrows, Enter, Esc, Tab, Backspace ...), Space (mark), `/` (find) and the
+ * answers of the viewer's copy question, asked while nothing else listens. Every other
+ * key needs Ctrl or Shift (owner, 2026-11-14).
+ */
+const plainAllowed = new Set([
+    "enter", "escape", "tab", "backspace", "delete", "up", "down", "left", "right",
+    "pageUp", "pageDown", "home", "end", "mark", "find",
+    "copyCell", "copyRow", "copyColumn",
+])
+
+test("raw keys only for navigation, find, mark and the copy question", () => {
+    for (const [action, key] of Object.entries(keys)) {
+        if (key.ctrl || key.shift) continue
+        assert.ok(plainAllowed.has(action), `${action} (${key.label}) needs Ctrl or Shift`)
+    }
+    for (const [name, option] of Object.entries(menuOptions))
+        assert.ok(!option.hotkey.ctrl && !option.hotkey.shift, `menu ${name} is plain`)
+})
+
+test("a label never shows a bare capital", () => {
+    for (const [action, key] of Object.entries(keys))
+        assert.ok(!/^[A-Z]$/.test(key.label), `${action} is labelled ${key.label}`)
 })
 
 /** What a press looks like to the user, for comparing inputs: Ctrl, Shift and the name. */
-const inputId = (key: KeyInput): string =>
+const inputId = (key: Hotkey): string =>
     `${key.ctrl ? "ctrl+" : ""}${key.shift ? "shift+" : ""}${key.key_}`
 
 test("every input in `keys` and in the menus is one action's, and no other's", () => {
@@ -143,6 +218,35 @@ function sourceTexts(dir: string = fileURLToPath(new URL("../src", import.meta.u
     return files.map((f): [string, string] => [f, readFileSync(f, "utf8")])
 }
 
+/** The files that insert typed text and so read `press.text` (the text entry code). */
+const textEntryFiles = ["text-input.tsx", "text-area.tsx"]
+
+test("no key is defined, spelled or compared outside `ui/interaction.tsx`", () => {
+    const stray: [string, RegExp][] = [
+        [
+            "a hotkey factory",
+            /\b(ctrlKey|plainKey|shiftKey|namedKey|makeHotkey)\(/,
+        ],
+        ["a Hotkey constructed", /new\s+Hotkey\b/],
+        ["Ink's useInput", /\buseInput\b/],
+        ["press.key_ against a literal", /\.key_\s*[!=]==/],
+        ["a key name against a literal", /\b(key|press)\.name\s*[!=]==/],
+    ]
+    const textRule: [string, RegExp] = [
+        "press.text against a literal outside text entry",
+        /\b(press|key)\.text\s*[!=]==\s*["'`]/,
+    ]
+    for (const [file, text] of sourceTexts()) {
+        const rules = textEntryFiles.some((f) => file.endsWith(f))
+            ? stray
+            : [...stray, textRule]
+        text.split("\n").forEach((line, i) => {
+            for (const [what, re] of rules)
+                assert.ok(!re.test(line), `${file}:${i + 1}: ${what}: use \`keys\``)
+        })
+    }
+})
+
 /**
  * The keys that no legend or note shows, on purpose, and why. Every other key of
  * `keys` must be spelled out to the user by a legend (`legendFor`, `keyLabels`) or by
@@ -169,10 +273,6 @@ const legendless: Record<string, string> = {
     theme: "shown on the theme line at the foot of every screen",
     runKey: "shown through `taskbarKeys`",
     notesList: "shown through `taskbarKeys`, and in notes of the solutes tables",
-    zoomInAlt: "the second key of `zoomIn`, which the legend shows",
-    prevSheet: "the second key of `shiftTab`, which the legend shows",
-    nextSheet: "the second key of `tab`, which the legend shows",
-    space: "the second key of the page-down and of the range mark; the legend shows it",
 }
 
 test("every key of the table is shown by a legend or is documented as legend-less", () => {
@@ -200,9 +300,9 @@ const menuModules = {
     projectMenuSpec: () =>
         import("../src/screens/menus.js").then((m) => m.projectMenuSpec),
     settingsMenuSpec: () =>
-        import("../src/screens/settings-screens.js").then((m) => m.settingsMenuSpec),
+        import("../src/screens/settings-menu.js").then((m) => m.settingsMenuSpec),
     globalMenuSpec: () =>
-        import("../src/screens/settings-screens.js").then((m) => m.globalMenuSpec),
+        import("../src/screens/settings-menu.js").then((m) => m.globalMenuSpec),
 }
 
 test("every option of a menu has a hotkey of its own", async () => {
@@ -210,7 +310,7 @@ test("every option of a menu has a hotkey of its own", async () => {
         const menu = await load()
         const seen = new Set<string>()
         for (const option of menu.names as readonly string[]) {
-            const opts = menu.opts as Record<string, { hotkey: KeyInput }>
+            const opts = menu.opts as unknown as Record<string, { hotkey: Hotkey }>
             const key = opts[option].hotkey
             const id = `${key.ctrl ? "^" : ""}${key.shift ? "S" : ""}${key.key_}`
             assert.ok(!seen.has(id), `${name}: ${option} repeats the hotkey ${id}`)

@@ -72,7 +72,7 @@ const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASD2P2_fit1.fit")
 # `dummyLikeResidues` (checks.jl, logged, flow unchanged) does not flag it (each residue
 # has far more than `DUMMY_MAX_HEAVY_ATOMS` = 2 heavy atoms; occupancy is 1.00). So the
 # file loads and the 120 heavy atoms scatter. What is lost: the canonical copy that
-# `resloveStruct` writes always drops hydrogens (`hydrogenselector` in
+# `resolveStruct` writes always drops hydrogens (`hydrogenselector` in
 # `_canonicalSelector`), `ADD_HYDROGENS = false` skips pdb2pqr, and a glycan is not
 # something PARSE/PROPKA can hydrogenate (the ids are not peptides or nucleotides, so
 # `hydrogenationChoice` would route it to the protein path). The model's 77 hydrogens

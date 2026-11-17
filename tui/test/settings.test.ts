@@ -18,18 +18,19 @@ import {
     type BrokenRelation,
     checkRelations,
     defaultCatalog,
+    multiModelSettings,
     type Relation,
     reasonFor,
-    type SettingDef,
     type SettingValue,
     settingNames,
     validateValue,
+    visibleSheets,
 } from "../src/store/settings.js"
 import { wipeInvalid } from "../src/store/settings-store.js"
 import type { ViewerLimits } from "../src/store/view.js"
 import { boxesFit, legendFor } from "../src/ui/grid.js"
-import { keys, tabLabel } from "../src/ui/interaction.js"
-import { fixture } from "./support/fixtures.js"
+import { keys, pressOf, tabLabel } from "../src/ui/interaction.js"
+import { settingDef as def, fixture } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Definitions
@@ -174,7 +175,6 @@ test("the cases both sides judge alike (test/fixtures/settings/cases.json)", () 
     }
 })
 
-const def = (name: string): SettingDef => catalog.require(name)
 const kept = (name: string, raw: unknown): SettingValue | string => {
     const r = validateValue(def(name), raw)
     return r.ok ? r.value : r.error
@@ -668,34 +668,34 @@ const choices = ["svg", "pdf", "png"]
 
 test("tabs: left and right stop at the ends, tab goes round", () => {
     let edit = openTabs(choices, ["pdf"])
-    edit = stepTabs(edit, keys.left).state
+    edit = stepTabs(edit, pressOf(keys.left)).state
     assert.equal(edit.focus, 0)
-    edit = stepTabs(edit, keys.right).state
-    edit = stepTabs(edit, keys.right).state
-    edit = stepTabs(edit, keys.right).state
+    edit = stepTabs(edit, pressOf(keys.right)).state
+    edit = stepTabs(edit, pressOf(keys.right)).state
+    edit = stepTabs(edit, pressOf(keys.right)).state
     assert.equal(edit.focus, 2)
-    edit = stepTabs(edit, keys.tab).state
+    edit = stepTabs(edit, pressOf(keys.tab)).state
     assert.equal(edit.focus, 0)
 })
 
 test("tabs: enter and space toggle the tab in focus, esc ends with the choices", () => {
     let edit = openTabs(choices, ["pdf"])
-    edit = stepTabs(edit, keys.enter).state
+    edit = stepTabs(edit, pressOf(keys.enter)).state
     assert.deepEqual([...edit.selected].sort(), ["pdf", "svg"])
-    edit = stepTabs(edit, keys.right).state
-    edit = stepTabs(edit, keys.space).state
+    edit = stepTabs(edit, pressOf(keys.right)).state
+    edit = stepTabs(edit, pressOf(keys.mark)).state
     assert.deepEqual([...edit.selected], ["svg"])
-    const done = stepTabs(edit, keys.escape)
+    const done = stepTabs(edit, pressOf(keys.escape))
     assert.deepEqual(done.end, { kind: "done", value: ["svg"] })
 })
 
 test("tabs: a set needs one choice on, and ctrl-x leaves", () => {
     let edit = openTabs(choices, ["svg"])
-    edit = stepTabs(edit, keys.enter).state
-    const blocked = stepTabs(edit, keys.escape)
+    edit = stepTabs(edit, pressOf(keys.enter)).state
+    const blocked = stepTabs(edit, pressOf(keys.escape))
     assert.equal(blocked.end, undefined)
     assert.equal(blocked.state.error, PICK_ONE_NOTE)
-    assert.deepEqual(stepTabs(edit, keys.back).end, { kind: "back" })
+    assert.deepEqual(stepTabs(edit, pressOf(keys.back)).end, { kind: "back" })
 })
 
 test("tab labels: on in brackets, off in parentheses, focus in capitals", () => {
@@ -730,7 +730,7 @@ test("each tunables JSON asset has exactly the keys of its TypeScript type", () 
         liveness: { staleSeconds: "value", claimRefreshSeconds: "value" },
         claim: { maxStampTries: "value" },
         abort: { graceSeconds: "value", killWaitSeconds: "value" },
-        screen: { tailLines: "value" },
+        screen: { tailLines: "value", refreshSeconds: "value" },
         julia: { threads: "value" },
         log: { maxBytes: "value" },
         archive: {
@@ -740,6 +740,7 @@ test("each tunables JSON asset has exactly the keys of its TypeScript type", () 
             solid: "value",
             maxEntryBytes: "value",
             maxExtractBytes: "value",
+            maxViewCacheBytes: "value",
         },
     }
     const plotsFlow: KeyTree<PlotsFlow> = {
@@ -783,4 +784,19 @@ test("each tunables JSON asset has exactly the keys of its TypeScript type", () 
     for (const [file, expected] of shapes) {
         assert.deepEqual(keyTree(readAssetJson("data", file)), expected, file)
     }
+})
+
+test("the colours of the models are on the sheets only for several models", () => {
+    const names = (several: boolean) =>
+        visibleSheets(defaultCatalog().sheets, several).flatMap((sheet) =>
+            sheet.groups.flatMap((g) => g.settings.map((d) => d.name)),
+        )
+    assert.ok(!names(false).includes("PLOT_COMPARE_COLOURS"))
+    assert.ok(names(true).includes("PLOT_COMPARE_COLOURS"))
+    // nothing else is hidden, and the catalog itself still knows the setting
+    assert.deepEqual(
+        names(true).filter((n) => !names(false).includes(n)),
+        [...multiModelSettings],
+    )
+    assert.ok(defaultCatalog().get("PLOT_COMPARE_COLOURS") !== undefined)
 })

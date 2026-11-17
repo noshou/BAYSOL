@@ -8,22 +8,38 @@
 //   1. The warnings: sigma that is the model's curve, a reference off the data
 //   2. The reference import screen: defaults, title, rounded cells, the warning
 //   3. The reference curve of a model: the file and the screen
+//   4. The energy units of the data screen (a label, never converted): the `energyUnit`
+//      field of data.json and the summary line
 
 import assert from "node:assert/strict"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { test } from "node:test"
-import { createElement, } from "react"
+import { createElement } from "react"
 import { DataImportScreen } from "../src/screens/data-import.js"
-import { ModelReferenceScreen } from "../src/screens/model-reference.js"
-import { writeData } from "../src/store/data.js"
+import { energyText } from "../src/screens/data-screen.js"
+import {
+    DEFAULT_ENERGY_UNIT,
+    dataJsonFile,
+    energyUnitLabel,
+    energyUnitsList,
+    nextEnergyUnit,
+    readDataInfo,
+    setEnergy,
+    setEnergyUnit,
+    setUnits,
+    writeData,
+} from "../src/store/data.js"
 import { referenceWarning, sigmaWarning } from "../src/store/data-checks.js"
 import { type DataPoints, textSource } from "../src/store/data-table.js"
 import {
     EMPTY_MODEL_REFERENCE,
     modelReference,
     modelReferencesFile,
+    PROJECT_REFERENCE_KEY,
+    projectReference,
     readModelReferences,
     saveModelReference,
+    saveProjectReference,
 } from "../src/store/model-references.js"
 import { drawScreen, tempDir } from "./support/fixtures.js"
 
@@ -190,19 +206,99 @@ test("a model's reference is kept sparse, in the JSON keys, beside the others", 
     assert.deepEqual([...readModelReferences(dir).keys()], ["m3"])
 })
 
-test("the reference screen of a model shows its rows at 80 columns", () => {
-    const project = projectWithData()
-    saveModelReference(project.dir, "m1", {
-        ...EMPTY_MODEL_REFERENCE,
-        software: "FoXS",
-        fit: "gone.tsv",
+test("the project's one reference is the `*` entry, apart from the models' entries", () => {
+    const dir = tempDir("baysol-projref-")
+    assert.deepEqual(projectReference(dir), EMPTY_MODEL_REFERENCE)
+    saveModelReference(dir, "m1", { ...EMPTY_MODEL_REFERENCE, fit: "old.tsv" })
+    saveProjectReference(dir, { ...EMPTY_MODEL_REFERENCE, fit: "fit3.tsv", rescale: true })
+    assert.deepEqual(JSON.parse(readFileSync(modelReferencesFile(dir), "utf-8")), {
+        m1: { fit: "old.tsv" },
+        [PROJECT_REFERENCE_KEY]: { fit: "fit3.tsv", rescale: true },
     })
-    const out = drawScreen(
-        createElement(ModelReferenceScreen, { project, file: "m1.pdb", stem: "m1" }),
+    assert.equal(PROJECT_REFERENCE_KEY, "*")
+    assert.equal(projectReference(dir).fit, "fit3.tsv")
+    // loading another reference replaces it; emptying it leaves the model's entry
+    saveProjectReference(dir, { ...EMPTY_MODEL_REFERENCE, fit: "fit4.tsv" })
+    assert.equal(projectReference(dir).rescale, false)
+    saveProjectReference(dir, EMPTY_MODEL_REFERENCE)
+    assert.deepEqual([...readModelReferences(dir).keys()], ["m1"])
+})
+
+// ========================================================================================
+// 4. The energy units
+// ========================================================================================
+
+const curve = {
+    q: [0.01, 0.02, 0.03, 0.04],
+    i: [4, 3, 2, 1],
+    sigma: [0.1, 0.1, 0.1, 0.1],
+    dropped: 0,
+}
+const fileOf = (dir: string) => JSON.parse(readFileSync(dataJsonFile(dir), "utf-8"))
+const infoOf = (dir: string) => {
+    const status = readDataInfo(dir)
+    assert.equal(status?.kind, "ok")
+    return status?.kind === "ok" ? status.info : assert.fail("no data")
+}
+
+test("energy: the unit cycle and the labels", () => {
+    assert.deepEqual(
+        energyUnitsList.map((u) => nextEnergyUnit(u)),
+        ["A", "eV", "keV", "nm"],
     )
-    for (const row of ["model", "curve", "software", "tag", "chi2", "rescale"])
-        assert.match(out, new RegExp(row))
-    assert.match(out, /m1\.pdb/)
-    assert.match(out, /gone\.tsv \(missing\)/)
-    for (const line of out.split("\n")) assert.ok(line.length <= 80, line)
+    assert.equal(DEFAULT_ENERGY_UNIT, "nm")
+    assert.deepEqual([...energyUnitsList], ["nm", "A", "eV", "keV"])
+    assert.equal(energyUnitLabel("A"), "Å")
+    assert.equal(energyUnitLabel("A").codePointAt(0), 0xc5)
+})
+
+test("energy: the summary is the number as typed and its unit, no conversion", () => {
+    assert.equal(energyText(null, "nm"), "not set")
+    assert.equal(energyText(12000, "eV"), "12000 eV")
+    assert.equal(energyText(12000, "keV"), "12000 keV")
+    assert.equal(energyText(1.0332, "A"), "1.0332 Å")
+})
+
+test("energy: energyUnit in data.json, always written, invalid or missing refused", () => {
+    const dir = tempDir()
+    writeData(dir, curve, "c.dat", "A-1", 12000)
+    assert.equal(infoOf(dir).energyUnit, "nm", "the default unit is written")
+    assert.equal(fileOf(dir).energyUnit, "nm")
+    setEnergyUnit(dir, "nm")
+    assert.equal(infoOf(dir).energyUnit, "nm")
+    assert.equal(fileOf(dir).energyUnit, "nm")
+    // a label only: the number is not touched, and the other writers keep the unit
+    assert.equal(infoOf(dir).energy, 12000)
+    setEnergyUnit(dir, "keV")
+    assert.equal(infoOf(dir).energy, 12000)
+    setEnergyUnit(dir, "nm")
+    setUnits(dir, "nm-1")
+    setEnergy(dir, 8048, "nm")
+    const kept = infoOf(dir)
+    assert.equal(kept.energyUnit, "nm")
+    assert.equal(kept.energy, 8048)
+    setEnergy(dir, 1.5, "A")
+    assert.equal(infoOf(dir).energyUnit, "A")
+    setEnergy(dir, 8048, "nm")
+    writeData(dir, curve, "d.dat", "A-1", 8048, undefined, kept.energyUnit)
+    assert.equal(infoOf(dir).energyUnit, "nm")
+    // eV is written like the others
+    setEnergyUnit(dir, "eV")
+    assert.equal(fileOf(dir).energyUnit, "eV")
+    setEnergy(dir, 5, "nm")
+    assert.equal(fileOf(dir).energyUnit, "nm")
+    // an invalid value makes the file unusable
+    for (const bad of ['"mm"', "3", "null", "undefined"]) {
+        writeFileSync(
+            dataJsonFile(dir),
+            `{"units":"A-1","energy":1,"source":"s","points":4,"energyUnit":${bad}}`,
+        )
+        assert.equal(readDataInfo(dir)?.kind, "unusable", bad)
+    }
+    // a file without the unit is unusable too
+    writeFileSync(
+        dataJsonFile(dir),
+        '{"units":"A-1","energy":1,"source":"s","points":4}',
+    )
+    assert.equal(readDataInfo(dir)?.kind, "unusable", "no energyUnit")
 })

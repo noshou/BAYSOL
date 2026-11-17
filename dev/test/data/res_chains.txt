@@ -58,7 +58,7 @@ param                     z_MAP    zQuantileLo    zQuantileHi
 === Timing ===                                       seconds    % wall    (JIT)
 wall clock  (seedModel → end of report)                1.58     100.0    (1.3)
   static build                                          0.13       8.3    (0.0)
-    resloveStruct                                6.4e-05
+    resolveStruct                                6.4e-05
     propka                [cache hit]                9.4e-04
     pdb2pqr               [cache hit]                1.1e-05
     loadMolecule                                    6.8e-03

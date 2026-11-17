@@ -6,23 +6,24 @@
 //   1. Run folder: status, liveness, settle
 //   2. Projects
 //   3. Models
+//   4. Models written in the background, and the generated files
 
-import {
-    constants,
-    copyFileSync,
-    lstatSync,
-    mkdirSync,
-    rmSync,
-    unlinkSync,
-} from "node:fs"
+import { lstatSync, mkdirSync, rmSync, statSync } from "node:fs"
 import { hostname } from "node:os"
 import { basename, join } from "node:path"
+import {
+    extractNamesSync,
+    isSafeEntryName,
+    type Locked,
+    listEntries,
+} from "../core/archive.js"
 import { ensureDir, projectsRoot, RUN_FLOW } from "../core/environment.js"
 import {
     entryNames,
     isDict,
     isFile,
     isFolder,
+    messageOf,
     ParentMissingError,
     readJson,
     sortNoCase,
@@ -34,7 +35,19 @@ import {
 import { NAME_BLANK, tooLong } from "../core/terminal.js"
 import { checkPath } from "./lists.js"
 import { type Note, notesProblem, storedNotes } from "./notes.js"
-import { archivePath, readRunText, runExists } from "./run-archive.js"
+import {
+    extractPack,
+    type Pack,
+    packAdd,
+    packAddAsync,
+    packChangeAsync,
+    packFile,
+    packNames,
+    packProblem,
+    packRemove,
+    packState,
+} from "./packs.js"
+import { archivePath, isCompanionArchive, readRunText, runExists } from "./run-archive.js"
 import { compareRunNames } from "./run-stamp.js"
 
 // ========================================================================================
@@ -42,18 +55,16 @@ import { compareRunNames } from "./run-stamp.js"
 // ========================================================================================
 
 /**
- * The runs of a project, as the program that makes them leaves them. A run is named by
- * its start time. While it goes it is a flat folder that Julia fills (the TUI claims it):
+ * The runs of a project, named by their start time. While it goes a run is a flat folder
+ * that Julia fills (the TUI claims it):
  *
  *     <project>/runs/<run name>/run.json   {"status": "running" | "done" | "failed" |
  *                                        "aborted", ...}
  *                               run.LOG, <model>.xlsx, ... (no subfolders)
  *
- * and once it is over the TUI packs it into ONE file, `<project>/runs/<run name>.7z`, with
- * everything in it (`run.json` too), and removes the folder.
- *
- * `runs/` is not made by the user or by a new project: a run makes it. Until then the
- * project has no runs, which is [[hasRuns]]. Nothing here deletes or overwrites a run.
+ * once over, the TUI packs it into ONE `<project>/runs/<run name>.7z` and removes the
+ * folder. `runs/` is made by a run, not by a new project ([[hasRuns]]). Nothing here
+ * deletes or overwrites a run.
  */
 
 /** The folder of a project that holds its runs. */
@@ -75,19 +86,17 @@ const statuses: readonly string[] = ["running", "done", "failed", "aborted", "in
 export const startLockName = ".start"
 
 /**
- * The marker a starter leaves in a run folder it has claimed, until Julia has written its
- * own `run.json` (loading Julia can take a minute): `{pid, host, time}`, renewed while the
- * starter waits. It makes the folder count as live for that time, so a second start is
- * refused in the gap.
+ * The marker a starter leaves in a run folder it has claimed until Julia writes its own
+ * `run.json` (loading can take a minute): `{pid, host, time}`, renewed while it waits.
+ * The folder counts as live meanwhile, so a second start is refused.
  */
 export const CLAIM_FILE = ".claim"
 
 /**
  * The names of the runs of a project.
  *
- * @returns the names of the folders and of the `<name>.7z` archives under `runs/` (not the
- *     dot-names, which are locks), each run once, oldest first by the instant the name
- *     denotes ([[compareRunNames]]); empty if the folder is not there.
+ * @returns the folders and `<name>.7z` archives under `runs/` (not the dot-names, which
+ *     are locks), each run once, oldest first ([[compareRunNames]]); empty if none.
  */
 export function runIds(projectDir: string): string[] {
     const dir = join(projectDir, runsFolder)
@@ -97,7 +106,12 @@ export function runIds(projectDir: string): string[] {
         // a name with a dot in front is a lock (`.start.lock`), never a run
         if (name.startsWith(".")) continue
         if (isFolder(join(dir, name))) ids.add(name)
-        else if (name.endsWith(ext) && name.length > ext.length && isFile(join(dir, name)))
+        else if (
+            name.endsWith(ext) &&
+            name.length > ext.length &&
+            !isCompanionArchive(name) &&
+            isFile(join(dir, name))
+        )
             ids.add(name.slice(0, -ext.length))
     }
     return [...ids].sort(compareRunNames)
@@ -143,9 +157,7 @@ function readObject(file: string): Record<string, unknown> | undefined {
     return isDict(value) ? value : undefined
 }
 
-/**
- * The `run.json` of a run: the plain file of a run folder, else the one in its archive
- * (read once while the archive stays as it is).
+/** The `run.json` of a run: the plain file of its folder, else the one in its archive.
  *
  * @returns the object, or `undefined` when the run has none or it is unreadable.
  */
@@ -175,11 +187,11 @@ export type RunEntry = {
 }
 
 /**
- * The runs of a project, newest first, each with its `run.json` read: the one walk the
- * run list and the `open runs` list share.
+ * The runs of a project, newest first, each with its `run.json` read (shared by the run
+ * list and the `open runs` list).
  *
- * @returns one entry per run folder that is still there when it is read (one deleted
- *     since the listing is skipped).
+ * @returns one entry per run still there when read (one deleted since the listing is
+ *     skipped).
  */
 export function newestRuns(projectDir: string): RunEntry[] {
     const entries: RunEntry[] = []
@@ -204,10 +216,7 @@ export function isoStamp(ms: number): string {
     return `${new Date(ms).toISOString().slice(0, 19)}Z`
 }
 
-/**
- * Whether a process with this id exists on this machine (a process of another user, which
- * the system will not let us signal, exists too).
- */
+/** Whether a process with this id exists here (one of another user, EPERM, exists too). */
 function pidExists(pid: number): boolean {
     try {
         process.kill(pid, 0)
@@ -222,10 +231,9 @@ const fresh = (time: number | undefined, now: number): boolean =>
     time !== undefined && now - time < RUN_FLOW.liveness.staleSeconds * 1000
 
 /**
- * The pid of a live run, which is Julia's rule exactly: its `run.json` says `running`,
- * the heartbeat is under a minute old and, when the run is on this host, its process
- * exists. A run folder that has no `run.json` yet but a fresh claim marker of a living
- * starter (Julia is still loading) is live too. A file that cannot be read is no run.
+ * The pid of a live run (Julia's rule exactly): its `run.json` says `running`, the
+ * heartbeat is under a minute old and, on this host, its process exists. A folder with no
+ * `run.json` yet but a fresh claim of a living starter is live too.
  *
  * @returns the pid (0 when it is not known), or `undefined` when the run is not live.
  */
@@ -263,11 +271,11 @@ export function assertNoLiveRun(projectDir: string): void {
 }
 
 /**
- * Gives a run that is not being run any more its final status, by an atomic replace of
- * `run.json` under its lock. The status is only changed when it is `running` NOW (the
- * file is read again under the lock), and with `ifStale` only when the run is not live
- * either, so a run of another copy that is alive is never touched. A run folder that has
- * no `run.json` (a start that never got to Julia) gets a small one.
+ * Gives a run that is no longer going its final status, by an atomic replace of
+ * `run.json` under its lock. The status changes only if it is `running` when read again
+ * under the lock, and with `ifStale` only if the run is not live, so a live run of
+ * another copy is never touched. A folder with no `run.json` (a start that never got to
+ * Julia) gets a small one.
  *
  * @param options - `ifStale`: leave a live run alone (the startup sweep); without it the
  *     caller knows the run is over (its own child has exited).
@@ -311,10 +319,9 @@ export function settleRun(
 }
 
 /**
- * The startup sweep for one project: every `running` run that is not live (its Julia was
- * killed, its machine rebooted, its starter died) becomes `interrupted`, each under the
- * lock of its `run.json` after the staleness is checked again. It also runs under the
- * project's `.start` lock, so it never meets a folder in the middle of being claimed.
+ * The startup sweep for one project: every `running` run that is not live (Julia killed,
+ * reboot, starter died) becomes `interrupted`. It runs under the project's `.start` lock,
+ * so it never meets a folder in the middle of being claimed.
  *
  * @throws FileInUseError if a lock stays taken for 3 s.
  */
@@ -336,21 +343,16 @@ export function markStaleRuns(projectDir: string): string[] {
 // ========================================================================================
 
 /**
- * The projects: one folder for each in the `projects` folder of the BAYSOL folder, named
- * by its id (the name the user typed). A folder is a project when it has a `project.json`
- * that says so (`{"id": "name", "created": "<time>"}` with the id of the folder's own
- * name); any other folder or file there is not one and is left alone, but its name is
- * taken.
+ * The projects: one folder each in the `projects` folder of the BAYSOL folder, named by
+ * its id. A folder is a project when its `project.json` says so (`{"id": "name",
+ * "created": "<time>"}`, the id being the folder's name); anything else there is left
+ * alone, but its name is taken.
  *
- * A new project gets an exact copy of the global `settings.json` as its own, which is its
- * starting point; what it changes after that is the project's alone. The copy is the
- * business of the settings module, so [[createProject]] takes it as a hook.
+ * A new project gets an exact copy of the global `settings.json` ([[createProject]] hook).
  *
- * A name must be new in the folder, without regard to case (a file system that does not
- * tell `Run` from `run` would not keep two apart), and a name that every system accepts:
- * letters, digits, `.`, `_` and `-`, starting with a letter or a digit, not ending in
- * `.`, at most 40 characters, and not a name a Windows device has (`con`, `nul`,
- * `com1`, ...).
+ * A name must be new without regard to case, and one every system accepts: letters,
+ * digits, `.`, `_` and `-`, starting with a letter or digit, not ending in `.`, at most
+ * 40 characters, and not a Windows device name (`con`, `nul`, `com1`, ...).
  */
 
 /**
@@ -400,10 +402,9 @@ const brokenMessage = "that name is taken by a broken project folder!"
 
 /**
  * What is wrong with `id` as the name of a new project, as a short message (the main
- * menu has room for 29 characters; the one for a broken folder is longer and the menu
- * makes room). The checks run in this order: empty, too long, characters, the first
- * character, a trailing dot, a reserved name, a name taken by a broken project folder,
- * a name taken.
+ * menu has room for 29 characters; the broken-folder one is longer). The checks run in
+ * order: empty, too long, characters, first character, trailing dot, reserved name,
+ * taken by a broken project folder, taken.
  *
  * @param existing - every name already in the projects folder, projects or not.
  * @param broken - the names of the folders that have a `project.json` that cannot be
@@ -432,9 +433,8 @@ export function projectNameProblem(
  *
  * @property id - the project's name, the same as its folder's.
  * @property created - the time it was made (ISO 8601, UTC), if the file says.
- * @property notes - the project's notes (`"notes"`, see [[Note]]), if the file has valid
- *     ones; a file whose notes are not valid still opens the project, and
- *     [[readProjectNotes]] tells what is wrong.
+ * @property notes - the project's notes ([[Note]]), if valid; invalid ones still open
+ *     the project, and [[readProjectNotes]] tells what is wrong.
  */
 export type ProjectInfo = {
     id: string
@@ -482,9 +482,8 @@ export function readProjectNotes(projectDir: string): Note[] {
 }
 
 /**
- * Writes the notes of a project into its `project.json`, every other key kept, through a
- * temporary file that replaces it in one step, under the file's lock. An empty list takes
- * the `notes` key off.
+ * Writes the notes of a project into its `project.json` (other keys kept) atomically,
+ * under the file's lock. An empty list takes the `notes` key off.
  *
  * @param projectDir - the project's folder.
  * @param notes - the notes; they must keep the rules of [[notesProblem]].
@@ -540,9 +539,8 @@ export function listProjects(root: string): string[] {
 }
 
 /**
- * The error of a write into a project whose folder is gone (another copy of the program
- * deleted the project). Nothing is made then: a write must not bring a deleted project
- * back as a broken folder that blocks its name.
+ * The error of a write into a project whose folder is gone (another copy deleted it).
+ * Nothing is made then, so a write never brings it back as a broken folder.
  */
 export class ProjectGoneError extends ParentMissingError {
     constructor(readonly projectDir: string) {
@@ -609,12 +607,11 @@ export type CreateHooks = {
 }
 
 /**
- * Makes a project: its folder, its `project.json` and, through the hook, an exact copy
- * of the global settings.
+ * Makes a project: its folder, its `project.json` and, through the hook, a copy of the
+ * global settings.
  *
  * @throws [[InvalidNameError]] if the name is not valid or is taken, and anything the
- *     hooks throw. A project that was half made is removed again (only the folder this
- *     call made).
+ *     hooks throw. A half-made project is removed again (only the folder this call made).
  */
 export function createProject(
     appRoot: string,
@@ -646,17 +643,15 @@ export function createProject(
 }
 
 /**
- * Deletes a project: its folder and everything in it, for good. Because this removes
- * what the user made, it checks first and deletes nothing unless every check passes:
- * the id is a valid project name (so it cannot be a path: no `/`, no `..`, no empty
- * name), the folder is a real directory (not a symbolic link, which could lead
- * anywhere) directly below `<root>/projects`, and it is a project (a readable
- * `project.json` with the same id), and no run of it is live (that check runs under the
- * lock that claims a run, so no run can start between the check and the removal).
+ * Deletes a project's folder and everything in it, for good, unless a check fails: the
+ * id is a valid project name (so no path), the folder is a real directory (not a link)
+ * directly below `<root>/projects`, it is a project (readable `project.json`, same id),
+ * and no run is live (checked under the lock that claims a run, so none starts before
+ * the removal).
  *
  * @throws [[RunInProgressError]] (`a run is in progress (pid N)`) for a live run; Error
- *     with a clear message when a check fails; nothing is deleted then. A
- *     folder that is already gone is not an error (it was deleted meanwhile).
+ *     with a clear message when a check fails; nothing is deleted then. A folder already
+ *     gone is not an error.
  */
 export function deleteProject(appRoot: string, id: string): void {
     if (id === "" || !nameCharacters.test(id) || !nameStart.test(id))
@@ -692,26 +687,24 @@ export function deleteProject(appRoot: string, id: string): void {
 // ========================================================================================
 
 /**
- * The models of a project: the structure files (`.cif` or `.pdb`) in its `models/`
- * folder. A model is always a COPY of the file the user named, never the file itself, so
- * adding one cannot lose anything; the only way a model leaves the folder is
- * [[deleteModel]], which the screen asks twice for. A project with no `models/` folder,
- * or an empty one, or one whose files were all deleted, has no models: nothing here
- * tells these apart ([[listModels]] is empty for all three, and the folder is never
- * removed).
+ * The models of a project: the structure files (`.cif` or `.pdb`) in its `models.7z`
+ * archive (`store/packs.ts`; `notes/models-7z.md`), or, for a project that has no archive
+ * yet, in its old `models/` folder. A model is always a COPY of the user's file; it leaves
+ * the list only by [[deleteModel]]. No archive, an empty one and a missing folder all mean
+ * no models. The old folder is never changed or removed here.
  */
 
-/** The file modelExtensions a model may have, lower case, without the dot. */
+/** The file extensions a model may have, lower case, without the dot. */
 const modelExtensions: ReadonlySet<string> = new Set(["cif", "pdb"])
 
 /** The message for a copy that failed for a reason the checks could not see. */
-export const copyFailed = "could not copy the file!"
+const copyFailed = "could not copy the file!"
 
 /**
- * The `models/` folder of a project.
+ * The old `models/` folder of a project, read while the project has no `models.7z`.
  *
  * @param projectDir - the project's folder.
- * @returns `<project>/models`; it may not exist yet.
+ * @returns `<project>/models`; it may not exist.
  */
 export function modelsDir(projectDir: string): string {
     return join(projectDir, "models")
@@ -725,23 +718,60 @@ export function modelsDir(projectDir: string): string {
  */
 export function accepted(fileName: string): boolean {
     const dot = fileName.lastIndexOf(".")
-    return dot >= 0 && modelExtensions.has(fileName.slice(dot + 1).toLowerCase())
+    return (
+        dot >= 0 &&
+        !fileName.includes("/") &&
+        modelExtensions.has(fileName.slice(dot + 1).toLowerCase())
+    )
 }
+
+/** The pack of the models: `models.7z`, and the `models/` folder it replaced. */
+export const MODELS_PACK: Pack = {
+    archive: "models.7z",
+    folder: "models",
+    accepts: accepted,
+}
+
+/** @returns the path of a project's `models.7z` (it may not exist). */
+export const modelsArchive = (projectDir: string): string =>
+    packFile(projectDir, MODELS_PACK)
 
 /**
  * The names of the models of a project.
  *
  * @param projectDir - the project's folder.
- * @returns the `.cif` and `.pdb` files in its `models/` folder, sorted without regard
- *     to case; empty when there are none, whether the folder is missing, empty or
- *     emptied.
+ * @returns the `.cif` and `.pdb` files of its `models.7z` (the entry list, nothing is
+ *     extracted), else of its `models/` folder, sorted without regard to case; empty when
+ *     there are none, whether the archive and the folder are missing, empty or emptied.
  */
 export function listModels(projectDir: string): string[] {
-    const dir = modelsDir(projectDir)
-    const files = entryNames(dir).filter(
-        (name) => accepted(name) && isFile(join(dir, name)),
-    )
-    return sortNoCase(files)
+    return packNames(projectDir, MODELS_PACK)
+}
+
+/**
+ * Why `models.7z` cannot be read (the models of the old folder are listed meanwhile).
+ *
+ * @returns a short sentence, `undefined` when the archive is fine or there is none.
+ */
+export const modelsProblem = (projectDir: string): string | undefined =>
+    packProblem(projectDir, MODELS_PACK)
+
+/**
+ * Puts models into a folder (made if need be) under their names: extracted from
+ * `models.7z` in one run of 7-Zip, or copied from the old folder.
+ *
+ * @param projectDir - the project's folder.
+ * @param names - the models, as [[listModels]] gives them.
+ * @param into - the folder.
+ * @throws ArchiveError for a name the project has no model of, or a 7-Zip that is missing
+ *     or fails.
+ */
+export function extractModels(
+    projectDir: string,
+    names: readonly string[],
+    into: string,
+): void {
+    extractPack(projectDir, MODELS_PACK, names, into)
 }
 
 /** The model prompt takes only structure files. */
@@ -770,27 +800,23 @@ export function modelPathProblem(
 }
 
 /**
- * Copies a file into the `models/` folder of a project, made if need be, under the same
- * name. The original is not touched, and a model that is there is never overwritten.
+ * Adds a copy of a file to the project's `models.7z` (made if need be, from the old
+ * `models/` folder plus the file, which stays) under the same name, as one atomic
+ * rewrite of the archive under its lock. The original is not touched and no model is
+ * overwritten.
  *
  * @param projectDir - the project's folder.
  * @param path - the file to copy.
- * @returns the copy.
+ * @returns the archive the model is in now.
  * @throws ProjectGoneError if the project's folder does not exist (it is not made);
- *     an error if the copy cannot be made, a model of that name being there included;
- *     nothing is deleted then.
+ *     PackNameTaken if a model of that name is there; ArchiveError if 7-Zip is missing or
+ *     fails; an error if the file cannot be read; the archive is then as it was.
  */
 export function addModel(projectDir: string, path: string): string {
-    const dir = modelsDir(projectDir)
-    const target = join(dir, basename(path))
-    return inProject(projectDir, () => {
-        try {
-            mkdirSync(dir) // not recursive: the project's folder must be there
-        } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
-        }
-        copyFileSync(path, target, constants.COPYFILE_EXCL)
-        return target
+    const archive = modelsArchive(projectDir)
+    return lockedIn(projectDir, archive, () => {
+        packAdd(projectDir, MODELS_PACK, basename(path), path)
+        return archive
     })
 }
 
@@ -833,19 +859,205 @@ export function addModels(projectDir: string, paths: readonly string[]): AddResu
 }
 
 /**
- * Deletes a model from the `models/` folder of a project. This is destructive and there
- * is no way back, so only a file that [[listModels]] lists is deleted, by its plain name
- * (a name with a path in it is refused).
+ * Deletes a model, for good: only one that [[listModels]] lists, by its plain name (a path
+ * is refused). The archive is rewritten without it and without the files generated
+ * from it; the models of an old `models/` folder are packed without it first and the
+ * folder is left as it was.
  *
  * @param projectDir - the project's folder.
  * @param modelName - the model's name.
- * @returns `true` if the file was deleted.
+ * @returns `true` if the model was deleted.
  */
 export function deleteModel(projectDir: string, modelName: string): boolean {
     if (!listModels(projectDir).includes(modelName)) return false
     try {
-        unlinkSync(join(modelsDir(projectDir), modelName))
-        return true
+        return lockedIn(projectDir, modelsArchive(projectDir), () =>
+            packRemove(
+                projectDir,
+                MODELS_PACK,
+                modelName,
+                generatedOf(projectDir, modelName),
+            ),
+        )
+    } catch {
+        return false
+    }
+}
+
+// ========================================================================================
+// 4. Models written in the background, and the generated files
+// ========================================================================================
+
+/**
+ * The files Julia generates from the models (the canonical `.pdb` of a `.cif`, the
+ * `.pka` of PROPKA, the hydrogenated `<stem>_pH<pH>_<ff>_<method>.pdb` with its
+ * `.balance`) are kept in `models.7z` under this folder name, so [[listModels]] (which
+ * accepts no entry with a `/`) never shows them. See `notes/models-7z.md`.
+ */
+export const GENERATED_DIR = "generated"
+
+/** The archive's entry of a generated file. */
+const generatedEntry = (file: string): string => `${GENERATED_DIR}/${file}`
+
+/** Whether an archive entry is a generated file. */
+const isGeneratedEntry = (entry: string): boolean => entry.startsWith(`${GENERATED_DIR}/`)
+
+/** The stem Julia keys its files by: a model's file name without the last extension. */
+const stemOfModel = (file: string): string => {
+    const dot = file.lastIndexOf(".")
+    return dot > 0 ? file.slice(0, dot) : file
+}
+
+/**
+ * Whether a generated file (its plain name) comes from the model with this stem: the
+ * stem's own `.pdb` and `.pka`, or anything that starts `<stem>_` (pH, model and chain
+ * variants). A stem that is a prefix of another model's takes that one's files too: the
+ * price is a repeated hydrogenation, never a stale file.
+ */
+function generatedFrom(stem: string, file: string): boolean {
+    return file === `${stem}.pdb` || file === `${stem}.pka` || file.startsWith(`${stem}_`)
+}
+
+/** The archive entries of the files generated from a model. */
+function generatedOf(projectDir: string, modelName: string): string[] {
+    const stem = stemOfModel(modelName)
+    return [...generatedFiles(projectDir).keys()]
+        .filter((file) => generatedFrom(stem, file))
+        .map(generatedEntry)
+}
+
+/** What a [[Locked]] step of the models archive is: the project's lock on the file. */
+const modelsLock =
+    (projectDir: string): Locked =>
+    (step) =>
+        lockedIn(projectDir, modelsArchive(projectDir), step)
+
+/** The generated files of a project: plain names, sizes (none without an archive). */
+export function generatedFiles(projectDir: string): Map<string, number> {
+    const found = new Map<string, number>()
+    const archive = modelsArchive(projectDir)
+    if (packState(projectDir, MODELS_PACK).kind !== "packed") return found
+    for (const e of listEntries(archive))
+        if (isGeneratedEntry(e.name))
+            found.set(e.name.slice(GENERATED_DIR.length + 1), e.size)
+    return found
+}
+
+/**
+ * Puts the generated files of the project into `<into>/generated` (made, empty when there
+ * are none), the folder to give Julia as its cache for the run.
+ *
+ * @returns that folder.
+ * @throws ArchiveError for a 7-Zip that is missing or fails.
+ */
+export function extractGenerated(projectDir: string, into: string): string {
+    const folder = join(into, GENERATED_DIR)
+    mkdirSync(folder, { recursive: true })
+    const names = [...generatedFiles(projectDir).keys()].map(generatedEntry)
+    if (names.length > 0) extractNamesSync(modelsArchive(projectDir), names, into)
+    return folder
+}
+
+/**
+ * After a run: stores what Julia generated into `models.7z`, asynchronously. Takes the
+ * regular files of the top of `folder` that the archive does not hold (or holds with
+ * another size) and that come from a model the project still has; a project without
+ * `models.7z` stores nothing (Julia used its normal cache).
+ *
+ * @param folder - the cache folder the run used ([[extractGenerated]] made it).
+ * @returns how many files were stored.
+ * @throws ArchiveError, ProjectGoneError, FileInUseError, as [[addModelsAsync]].
+ */
+export async function packGenerated(projectDir: string, folder: string): Promise<number> {
+    const found = new Map<string, string>()
+    for (const name of entryNames(folder)) {
+        const path = join(folder, name)
+        try {
+            if (!lstatSync(path).isFile()) continue
+        } catch {
+            continue
+        }
+        if (name.includes(".tmp.") || !isSafeEntryName(generatedEntry(name))) continue
+        found.set(name, path)
+    }
+    let stored = 0
+    await packChangeAsync(
+        projectDir,
+        MODELS_PACK,
+        (state) => {
+            if (state.kind !== "packed") return undefined
+            const held = generatedFiles(projectDir)
+            const stems = state.names.map(stemOfModel)
+            const add = new Map<string, string>()
+            for (const [name, path] of found) {
+                if (!stems.some((stem) => generatedFrom(stem, name))) continue
+                if (held.get(name) === statSync(path).size) continue
+                add.set(generatedEntry(name), path)
+            }
+            stored = add.size
+            return add.size === 0 ? undefined : { add }
+        },
+        modelsLock(projectDir),
+    )
+    return stored
+}
+
+/**
+ * [[addModels]] without blocking the screen: the files that pass [[modelPathProblem]] are
+ * added in ONE background rewrite of `models.7z` (the writes of this process queue, the
+ * archive's lock is held only for the final rename). A failed rewrite skips every file
+ * of the batch with [[copyFailed]] (an [[ArchiveError]] says why in `problem`).
+ *
+ * @returns what was copied and skipped, as [[addModels]]; `problem` is the archive's
+ *     error message when the rewrite failed.
+ * @throws never.
+ */
+export async function addModelsAsync(
+    projectDir: string,
+    paths: readonly string[],
+): Promise<AddResult & { problem?: string }> {
+    const result: AddResult & { problem?: string } = { copied: [], skipped: [] }
+    const files = new Map<string, string>()
+    const existing = [...listModels(projectDir)]
+    for (const path of paths) {
+        const reason = modelPathProblem(path, [...existing, ...files.keys()])
+        if (reason === undefined) files.set(basename(path), path)
+        else result.skipped.push([path, reason])
+    }
+    if (files.size === 0) return result
+    try {
+        await packAddAsync(projectDir, MODELS_PACK, files, modelsLock(projectDir))
+        result.copied.push(...files.keys())
+    } catch (error) {
+        result.problem = messageOf(error, copyFailed)
+        for (const path of files.values()) result.skipped.push([path, copyFailed])
+    }
+    return result
+}
+
+/**
+ * [[deleteModel]] without blocking the screen, and the files generated from the model go
+ * with it (a model of the same name added later starts clean).
+ *
+ * @returns whether the model was deleted; `false` when it was not there or the archive
+ *     could not be rewritten.
+ * @throws never.
+ */
+export async function deleteModelAsync(
+    projectDir: string,
+    modelName: string,
+): Promise<boolean> {
+    try {
+        return await packChangeAsync(
+            projectDir,
+            MODELS_PACK,
+            (state) => {
+                if (!state.names.includes(modelName)) return undefined
+                const generated = generatedOf(projectDir, modelName)
+                return { drop: [modelName, ...generated] }
+            },
+            modelsLock(projectDir),
+        )
     } catch {
         return false
     }

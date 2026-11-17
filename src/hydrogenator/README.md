@@ -1,9 +1,9 @@
 # Hydrogenator
 
-Turns a heavy-atom `.pdb` into one with explicit hydrogens, through two external tools run as subprocesses in a CondaPkg-managed Python environment: pdb2pqr (hydrogen placement) and propka3 (per-residue pKa prediction). It works on files, by path, in the `_cache/` store of `MolecularStructure`; `seedModel` calls it between `resloveStruct` and `loadMolecule`. A hydrogen is one electron and a volume, and about 13 % of a protein's electrons (C5H8N1.4O1.5 per residue: 60 electrons, 8 hydrogen; about 7 % for nucleic acids). The scattering contrast is the difference of two nearly equal quantities: with `Z` electrons in volume `V` in solvent of density `ρₑ`, the net count is `Z_net = Z − ρₑ V`, and a relative error `ε` in `Z` alone changes it by
+Turns a heavy-atom `.pdb` into one with explicit hydrogens, through two external tools run as subprocesses in a CondaPkg-managed Python environment: pdb2pqr (hydrogen placement) and propka3 (per-residue pKa prediction). It works on files, by path, in the `_cache/` store of `MolecularStructure` (or the folder `BAYSOL_CACHE` names: the generated files are named `<stem>_pH<pH>_<ff>_<method>.pdb` with a `.balance` side file, and `<stem>.pka` for PROPKA, so a caller that keeps them elsewhere, as the terminal interface does for a project, only has to give Julia that folder); `seedModel` calls it between `resolveStruct` and `loadMolecule`. A hydrogen is one electron and a volume, and about 13 % of a protein's electrons (C5H8N1.4O1.5 per residue: 60 electrons, 8 hydrogen; about 7 % for nucleic acids). The scattering contrast is the difference of two nearly equal quantities: with `Z` electrons in volume `V` in solvent of density `ρₑ`, the net count is `Z_net = Z − ρₑ V`, and a relative error `ε` in `Z` alone changes it by
 
 ```math
-\frac{\delta Z_{net}}{Z_{net}}=\frac{\epsilon}{1-\rhoE/\bar\rho_p},\qquad \bar\rho_p=\frac ZV
+\frac{\delta Z_{net}}{Z_{net}}=\frac{\epsilon}{1-\rho_e/\bar\rho_p},\qquad \bar\rho_p=\frac ZV
 ```
 
 For a protein (`ρ̄_p ≈ 0.43 e·Å⁻³` in water of 0.334) the amplification is ≈ 4.5: omitting the hydrogens would change the contrast of the whole particle by a factor of order one, not a few percent. (The same reasoning is why `ρₑ` of the buffer must be accurate to a fraction of a percent.)

@@ -8,7 +8,7 @@ Two ways to use it, both without writing code:
 2. **A script** (the second guide below, "Second way: run it from a script"): you edit one short text file and run it. This is the way to script and to run batches; Julia users can also call the package directly ("For Julia users", at the end).
 
 - Documentation: [BAYSOL](https://noshou.github.io/BAYSOL/). Each module's README under `src/` is also a page there.
-- Worked analyses of 26 protein and 32 DNA/RNA SASBDB entries (each with a single-structure reference fit): [fitting tests](test/fitting_tests/README.md)
+- Worked analyses of 112 SASBDB entries (protein, DNA and RNA; 56 with a single-structure reference fit, 56 replacement entries): [fitting tests](test/fitting_tests/README.md)
 - Developer tools (test runners, comparison, benchmarks, figure rendering): [dev](dev/README.md)
 
 ## Use BAYSOL from the terminal interface (no coding)
@@ -31,7 +31,7 @@ reference of every screen, key and file is the [terminal interface guide](tui/RE
 | What | Version | Check it with |
 |------|---------|---------------|
 | **Julia** | 1.12 | `julia --version` |
-| **Node.js** (runs the interface) | 22 or newer | `node --version` |
+| **Node.js** (runs the interface) | 24 or newer | `node --version` |
 | **BAYSOL** itself | a folder with `tui/` in it | |
 | A terminal at least **80 columns by 24 rows**, ideally with 24-bit colour | | |
 
@@ -112,7 +112,7 @@ A new project gets a copy of the global settings; its own can then differ.
 ### 1. Add the 3D model
 
 Open **models** (`m`). Type or paste the **full path** of a `.cif` or `.pdb` file and press Enter
-(Tab completes a name; on an empty field, `e` opens your system's file chooser, and `i` lists the
+(Tab completes a name; on an empty field, `^v` opens your system's file chooser, and `shift+h` lists the
 models already in the project). The file is **copied** into the project's `models/` folder; your
 original is never touched. You can add several models: each is fitted in turn, in one run.
 `^r` on the model list deletes a model from the project (after a question). `^o` on the list opens the
@@ -201,7 +201,7 @@ solutes. A **recipe** is a named buffer saved for every project (with its pH and
 one, or load one into this project's table (the list narrows as you type; nothing changes on disk until `^w`; a buffer that has solutes asks
 `replace N solutes with recipe "NAME"?`). `^e` in the global settings menu opens the recipes and the custom
 solutes. The recipes table saves every edit by itself; `^r` marks a recipe and `^w` (shown only then) deletes the marked ones. The project, the buffer and each recipe can carry titled **notes** (`shift+n` in the project menu and on the
-buffer table and the recipes table; a small built-in editor, no length limit; `^w` saves and so does leaving it; the buffer's notes are written at once, only solutes and pH wait for `^w`); the project's notes travel in
+buffer table and the recipes table; a small built-in editor, no length limit; `^w` saves; leaving with an unsaved edit asks `discard 1 change?` (Enter drops it); the buffer's notes are written at once, only solutes and pH wait for `^w`); the project's notes travel in
 every run's archive.
 
 **Buffer templates (`shift+b` on the table):** pick a standard buffer (Tris, HEPES, MES, phosphate, citrate, PBS, ...), type the concentration and the pH, and the rows of the buffer and of the counter-ion that titrating it to that pH adds are filled in, with uncertainties, from sourced constants (pK at the temperature of the pH, Davies activity, self-consistent ionic strength; assumptions: pH set at the buffer's temperature unless you choose 22 °C or another, HCl for amine bases, NaOH otherwise). The rows follow the pH row (and the temperature, when set at the buffer's) until you edit one by hand; pick the template again to change it. Two rows of the same solute (`cl-`, `chloride`) are refused.
@@ -309,16 +309,18 @@ manager. Once a run exists it offers `open project folder` and **`open runs`**.
   model with its state: `done`, `failed`, `aborted`, `interrupted`. A model that did not finish
   says why in the note row.
 - **Enter** on a `done` model opens the **results workbook** (`<model>.xlsx`) in a viewer, one
-  tab per sheet: **`[`** and **`]`** change sheet, the arrows move the cursor.
-  **`P`** switches to the **plots** of that model (the same text plots a script prints; one tab per
-  plot), and back.
+  tab per sheet: **Tab** and **Shift+Tab** change sheet, the arrows move the cursor.
+  **`shift+p`** switches to the **plots** of that model (the same text plots a script prints; one tab per
+  plot), and back; **`shift+t`** switches a plot between the text plot and the rendered figure where the
+  terminal can draw it.
   The plots are written at several sizes; the viewer shows the largest that fits its window and picks
   again when you resize it.
 - A run that made the **comparison** (the measured curve, every model and the references on one plot) has one
-  more row, `comparison`, after its models: Enter opens its workbook and plots. A model that has settings of
+  more row, `comparison`, after its models: Enter opens its table (no plots). A model that has settings of
   its own is marked `*`, and the note row says which.
 - **`^l`** on a run reads its `run.LOG` (the full log, including the sampler's output and the
-  errors) in a pager: Enter, Space and PgDn page down, `k` and PgUp page up. Esc closes it.
+  errors) in a pager, the same screen as `logs > view run.LOG`: **`shift+↓`** or PgDn a page down,
+  **`shift+↑`** or PgUp a page up, `/` find, `shift+j` go to a line, Space mark, `shift+y` copy. Esc closes it.
 - **`shift+d`**, **`shift+l`** and **`shift+c`** take files out of a run. **`shift+d`** *moves the data*
   (every model's workbook and the comparison table `.tsv`) to your data folder and **`shift+l`** *moves the tex
   plots* (every `.tex` figure of every model and the comparison) to your plot folder: each opens a dropdown,
@@ -391,13 +393,14 @@ through a temporary file, so a crash never leaves half a file.
 | `^n`, `^p`, `^f`, `^e` | buffer: add a small molecule, a polymer, a protein, DNA/RNA |
 | `^g` | buffer: edit pH, σ and temperature |
 | `^k` | buffer: turn the unit of the concentrations (mM, M, µM) |
-| `e`, `i` (empty path field) | open the file chooser; list the models |
-| `x` (on an unusable file) | reset it |
+| `^v`, `shift+h` (empty path field) | open the file chooser; list the models |
+| `shift+z` (on an unusable file) | reset it |
 | `Shift+R` | run (project menu, when ready) |
-| `Tab`, `Shift+Tab`, `P`, `+` `-` | viewer: next/previous sheet or plot; sheets or plots; plots zoom |
-| `/`, `.`, `,`, `j` | viewer: find, next/previous match, go to a cell (`B7`, `7`, `B`) |
-| `Space`, `c`, `f` | viewer: mark a range, copy it as TSV to the clipboard, show formulas |
-| `^l`, `k`, `Space` | `open runs`: read `run.LOG`; pager: page back, forward |
+| `Tab`, `Shift+Tab`, `shift+p`, `shift+t`, `shift+=` `shift+-` | viewer: next/previous sheet or plot; sheets or plots; plot type; plots zoom |
+| `/`, `shift+k`, `shift+i`, `shift+j` | viewer and pager: find, next/previous match, go to a cell (`B7`, `7`, `B`) or a line |
+| `Space`, `shift+y`, `shift+u` | viewer and pager: mark, copy to the clipboard; viewer: show formulas |
+| `shift+↑` PgUp, `shift+↓` PgDn | viewer and pager: a page up, a page down |
+| `^l` | `open runs`: read `run.LOG` |
 | `shift+d`, `shift+l`, `shift+c` | `open runs`: move the data, move the tex plots (a dropdown: all, or one model), compile the highlighted row's plots |
 
 ### If something goes wrong in the terminal interface
@@ -406,7 +409,7 @@ through a temporary file, so a crash never leaves half a file.
 |---|---|
 | `BAYSOL: this program needs a terminal` | Run it from a terminal window, not from a pipe. A launcher with no terminal opens one (on Linux your `$TERMINAL`, the desktop's terminal, or the first known one) that runs the program again. |
 | A message instead of the screen | The window is under 80 x 24. Enlarge it. |
-| `buffer.json unusable!` (or `data`, `settings`, ...) with `x: reset` | The file was changed outside the interface or is damaged. `x` and Enter **reset** it to empty and keep the old one beside it as `<name>.corrupt`, so nothing is lost. |
+| `buffer.json unusable!` (or `data`, `settings`, ...) with `shift+z: reset` | The file was changed outside the interface or is damaged. `shift+z` and Enter **reset** it to empty and keep the old one beside it as `<name>.corrupt`, so nothing is lost. |
 | `changed on disk: another copy of BAYSOL saved it; reopen it` | A second copy of the program saved this file meanwhile. Leave the screen and reopen it. |
 | `missing components: ...` where `run: shift+r` should be | The box names what is missing (`models`, `solutes`, `pH`, `temperature`, `data`, `energy`); `run: shift+r` replaces it once the list is empty. |
 | `a run is in progress (pid N)` | The project already has a live run (maybe in another window). Wait for it, or stop it. A crashed run is marked `interrupted` after a minute and stops blocking. |

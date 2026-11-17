@@ -3,14 +3,14 @@
 Converts a PDB ID, a local `.pdb`/`.cif` file or a URL into a parsed structure suitable for the forward model (`Scattering.forwardCache`).
 
 1. **Resolve** a source to a canonical local `.pdb` (`structure-source.jl`): the first model, heavy atoms of the polymer (protein, DNA/RNA, modified residues written as HETATM included) and every other non-water HETATM group (heme, ions, sugars, cofactors, `UNK`; `KEEP_LIGANDS`), no waters.
-2. **Add hydrogens** (optional) with [`Hydrogenator`](@ref BAYSOL.Hydrogenator), which has its own README. `seedModel(...; addHydrogens=false)` skips it, for pre-hydrogenated models (which pdb2pqr refuses, e.g. SASDP48). The hydrogenator caches in `_storeDir()`, the `_cache/` path this module provides; the report marks each step `[cache hit]`/`[cache miss]`.
+2. **Add hydrogens** (optional) with [`Hydrogenator`](@ref BAYSOL.Hydrogenator), which has its own README. `seedModel(...; addHydrogens=false)` skips it, for pre-hydrogenated models (which pdb2pqr refuses, e.g. SASDP48). The hydrogenator caches in `_storeDir()`, the `_cache/` path this module provides (the environment variable `BAYSOL_CACHE`, an absolute path, names another folder: the terminal interface sets it, and for a project that keeps its models in `models.7z` it gives each run a private folder holding the files generated before, which it stores back after the run; a script just uses `_cache/`); the report marks each step `[cache hit]`/`[cache miss]`.
 3. **Parse** into a `Molecule` (`mols.jl`).
 
 ```julia
-using BAYSOL.MolecularStructure: LocalPathSource, resloveStruct, loadMolecule
+using BAYSOL.MolecularStructure: LocalPathSource, resolveStruct, loadMolecule
 using BAYSOL.Hydrogenator: propkaPkas, resolveHydrogens, Propka
 
-path  = resloveStruct(LocalPathSource(pdbPath))
+path  = resolveStruct(LocalPathSource(pdbPath))
 hpath = resolveHydrogens(path, pH; titration = Propka(propkaPkas(path)))
 mol   = loadMolecule(hpath)
 ```
@@ -59,7 +59,7 @@ isNucleotide("5MC")    # true
 
 ## Structure Source
 
-`resloveStruct(source; model = 1)` → absolute path to a canonical `.pdb` in `_storeDir()` (the first model, or the `model`-th counted from 1: a later model of a `.pdb` is written to `<stem>_model<k>_<hash>.pdb`, of an mmCIF or download to `<id>_model<k>.pdb`; one beyond the last is a `StructureSourceError`; heavy atoms of the standard residues and of every nucleotide and amino acid, modified ones such as `PSU`, `5MC`, `MSE`, `SEP` included, and the ligands of a known composition (`KEEP_LIGANDS`); no waters or hydrogens).
+`resolveStruct(source; model = 1)` → absolute path to a canonical `.pdb` in `_storeDir()` (the first model, or the `model`-th counted from 1: a later model of a `.pdb` is written to `<stem>_model<k>_<hash>.pdb`, of an mmCIF or download to `<id>_model<k>.pdb`; one beyond the last is a `StructureSourceError`; heavy atoms of the standard residues and of every nucleotide and amino acid, modified ones such as `PSU`, `5MC`, `MSE`, `SEP` included, and the ligands of a known composition (`KEEP_LIGANDS`); no waters or hydrogens).
 
 - `LocalPathSource(path)`: a file on disk; if one already exists under that name the converted result is byte-compared, identical content is reused and different content raises `StructureSourceError`.
 - `PDBIDSource(id)`: a 4-character RCSB ID, fetched with `BioStructures.retrievepdb`, stored under the uppercased ID; a repeat request trusts an existing file.
@@ -78,4 +78,4 @@ isNucleotide("5MC")    # true
 
 `molecular-structure.jl` (which also holds the fixed component-download and structure-check constants) includes these files in dependency order and provides `_storeDir()`. The geometry constants (`N_VOL_SHELL`, `ATOM_BLOCK`, `ATOM_PARALLEL_MIN`) are fixed constants in `geometry.jl`.
 
-`keepChains(path, chains)` → `path` itself for no chains, else the path of a copy in `_storeDir()` (`<stem>_chains<ids>_<hash>.pdb`) holding the ATOM, HETATM, ANISOU and TER records of those chains (one-character ids, case counts; read as text, so it works on files BioStructures refuses, and before reused ids are relabelled); a chain the file lacks is a `StructureSourceError` that lists the ones it has. `seedModel` calls it after `resloveStruct`, from its `model` and `chains` keywords; without them nothing is written and the caches keep their keys.
+`keepChains(path, chains)` → `path` itself for no chains, else the path of a copy in `_storeDir()` (`<stem>_chains<ids>_<hash>.pdb`) holding the ATOM, HETATM, ANISOU and TER records of those chains (one-character ids, case counts; read as text, so it works on files BioStructures refuses, and before reused ids are relabelled); a chain the file lacks is a `StructureSourceError` that lists the ones it has. `seedModel` calls it after `resolveStruct`, from its `model` and `chains` keywords; without them nothing is written and the caches keep their keys.

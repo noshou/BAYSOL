@@ -57,9 +57,13 @@ function steps(flag, selected, requested, julia, trace)
                 (
                     "fit: $id",
                     "fit $id",
+                    # the script runs through `BAYSOL.Pipeline._runLogged`, so a failure
+                    # still writes its section of the run log
                     vcat([julia, "--startup-file=no"],
                         trace === nothing ? String[] : ["--trace-compile=$trace"],
-                        ["--project=" * in_root(FIT_DIR), script_of(id)]),
+                        ["--project=" * in_root(FIT_DIR), "-e",
+                            "using BAYSOL; BAYSOL.Pipeline._runLogged(ARGS[1])",
+                            script_of(id)]),
                 ),
             )
         end
@@ -108,8 +112,11 @@ function run(argv::Vector{String})::Int
     synthetic = filter(in(synthetic_ids()), specs)
     check_folders(WHO, filter(!in(synthetic), specs), false)
     isempty(synthetic) || !any(flag, ("--bench", "--report", "--table", "--fixme")) ||
-        fail(WHO, "synthetic entries ($(join(synthetic, ", "))) only run: no --bench, " *
-            "--report, --table or --fixme")
+        fail(
+            WHO,
+            "synthetic entries ($(join(synthetic, ", "))) only run: no --bench, " *
+            "--report, --table or --fixme",
+        )
     selected = isempty(specs) ? ids() : specs
     julia = find_julia()
     dry = flag("--dry-run")
@@ -599,11 +606,14 @@ function run(argv::Vector{String})::Int
 end
 end
 
+include("fits-export.jl")
+
 const SUBS = [
     "run" => (Fit, "run the fitting tests and the steps that follow them"),
     "list" => (List, "the fitting tests and their tags"),
     "diagnose" => (Diagnose, "sampler diagnostics on fits, without rerunning them"),
     "profile" => (Profile, "profile the static build of fitting tests"),
+    "export" => (Export, "fitting tests as TUI projects, each with one finished run"),
     "bench" => (Bench, "the cold / steady-state benchmark (needs --approved)"),
 ]
 

@@ -27,6 +27,7 @@ import { setEnergy, writeData } from "../src/store/data.js"
 import {
     addModel,
     CLAIM_FILE,
+    generatedFiles,
     isoStamp,
     liveRun,
     markStaleRuns,
@@ -631,6 +632,58 @@ function alive(pid: number): boolean {
 
 /** The text of a file of the run, from its archive or its plain folder. */
 const logText = (dir: string, name: string): string => readRunText(dir, name)
+
+test("a packed project gets its own run cache, generated files are stored", async () => {
+    const shared = join(tempDir(), "shared")
+    process.env.BAYSOL_CACHE = shared
+    const p = scratchProject()
+    const model = join(tempDir(), "a.pdb")
+    writeFileSync(model, "ATOM a")
+    addModel(p, model)
+    const caches: (string | undefined)[] = []
+    const generating: Launcher = (spec) => {
+        caches.push(spec.cache)
+        // Julia writes its generated files into BAYSOL_CACHE: here, the cache of the run
+        if (spec.cache !== undefined) {
+            writeFileSync(join(spec.cache, "a.pdb"), "canonical")
+            writeFileSync(join(spec.cache, "a_pH7.0_parse_propka.pdb"), "hydrogenated")
+        }
+        return fakeLauncher("done")(spec)
+    }
+    const first = RunSession.begin(p, 20, generating)
+    assert.equal(await first.done, "done")
+    assert.ok(caches[0] !== undefined && caches[0] !== shared)
+    assert.deepEqual([...generatedFiles(p).keys()].sort(), [
+        "a.pdb",
+        "a_pH7.0_parse_propka.pdb",
+    ])
+    // the next run finds them in its cache before Julia starts
+    const seen: string[] = []
+    const looking: Launcher = (spec) => {
+        seen.push(...readdirSync(spec.cache as string).sort())
+        return fakeLauncher("done")(spec)
+    }
+    const second = RunSession.begin(p, 20, looking)
+    assert.equal(await second.done, "done")
+    assert.deepEqual(seen, ["a.pdb", "a_pH7.0_parse_propka.pdb", "components"])
+    assert.ok(!existsSync(caches[0] as string), "the run's cache folder is removed")
+    // a failed run stores nothing new
+    writeFileSync(join(p, "buffer.json"), '{"solutes": []}\n')
+    const failing: Launcher = (spec) => {
+        writeFileSync(join(spec.cache as string, "a.pka"), "pka")
+        return fakeLauncher("failed")(spec)
+    }
+    await RunSession.begin(p, 20, failing).done
+    assert.ok(!generatedFiles(p).has("a.pka"))
+    // a project with no archive keeps the shared cache
+    const plain = scratchProject()
+    const none: Launcher = (spec) => {
+        caches.push(spec.cache)
+        return fakeLauncher("done")(spec)
+    }
+    await RunSession.begin(plain, 20, none).done
+    assert.equal(caches.at(-1), undefined)
+})
 
 test("a normal run: tail, packing, done, logs in the archive, conditions", async () => {
     const p = scratchProject()

@@ -320,7 +320,7 @@ a heavy-only file naturally yields just its heavy atoms, and a hydrogenated
 file keeps its hydrogens too. Ligands ([`isLigand`](@ref)) are kept, waters never.
 
 # Arguments
-- `pdbPath`: path to any parseable .pdb, e.g. from [`resloveStruct`](@ref) or
+- `pdbPath`: path to any parseable .pdb, e.g. from [`resolveStruct`](@ref) or
     [`resolveHydrogens`](@ref BAYSOL.Hydrogenator.resolveHydrogens).
 - `ligands`: keep the ligands too (waters stay out; default [`KEEP_LIGANDS`](@ref));
     `false` is the polymer alone ([`polymerSelector`](@ref)).

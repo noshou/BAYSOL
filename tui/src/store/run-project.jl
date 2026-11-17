@@ -578,6 +578,22 @@ function _projectModels(project::AbstractString)
 end
 
 """
+What a run says when the project has no model: the folder to put them in and, when the
+project keeps them in `models.7z` (the terminal interface does), how to run it from a
+script: Julia reads plain folders only, so the models are extracted first.
+
+# Returns
+- The message, a short sentence or two.
+"""
+function _noModelsMessage(project::AbstractString)
+    msg = "the project has no model (models/*.cif|pdb)"
+    isfile(joinpath(project, "models.7z")) || return msg
+    return msg * ": its models are stored in models.7z by the terminal interface; to " *
+           "run from a script extract them into a models/ folder first, in the project " *
+           "folder: 7z x models.7z -omodels"
+end
+
+"""
 Puts the inputs of the project `project` into the run folder `dir` (flat: the run folder has
 no subfolders), which the run reads from from then on: each of `RUN_INPUTS` is copied
 unless the folder already has it (an interface that took the snapshot itself, under its
@@ -855,15 +871,15 @@ function _measuredPlotSizes(dir::AbstractString, stem::AbstractString, sizes)
 end
 
 """
-The `results` keywords `kw` of a run for the model `name`: the plot folder, when there is
-one, is one folder for all projects and so gets the model's place in it,
-`<plot dir>/<project>/<run>/<model>` (the layout the terminal interface moves plots to);
-`st` is the run's state (its `project` and `dir`).
+The `results` keywords `kw` of a run for the model `name`, with no plot folder: the `.tex`
+figures stay in the run (and its archive) and only the user's explicit "move tex plots"
+(`shift+l`, open runs) puts copies in the plot folder, so `plotDir` is always emptied here
+whatever `FIGURES_DIR` says (owner, 2026-11-14: plots were copied there by themselves).
+`st` and `name` are kept for the callers.
 """
 function _modelResultsKw(kw, st, name::AbstractString)
     isempty(kw.plotDir) && return kw
-    place = joinpath(kw.plotDir, basename(st.project), basename(st.dir), name)
-    return merge(kw, (; plotDir = place))
+    return merge(kw, (; plotDir = ""))
 end
 
 """
@@ -1235,8 +1251,8 @@ that claims the folder itself, under its own lock, passes it as `runDir`.
         `mapJitterWithinNats`, `basinRestartNats`, `harvestCover`,
         `harvestDivergent` (the [`runKeywords`](@ref));
     - for [`results`](@ref): `tex`, `compile`, `formats`, `tableSigfigs`, `plotDir`
-        (`FIGURES_DIR`: the figures of each model are also copied to
-        `<plotDir>/<project>/<run>/<model>/`), `latexCompiler` (`FIGURES_COMPILER`) and
+        (`FIGURES_DIR`; `runProject` ignores it: the terminal interface moves the figures on
+        request), `latexCompiler` (`FIGURES_COMPILER`) and
         `style`, a
         [`PlotStyle`](@ref) that replaces the one the `PLOT_*` settings describe (the
         [`resultsKeywords`](@ref));
@@ -1457,8 +1473,7 @@ function runProject(
             solutes = loadBuffer(buffer)
             conditions = loadBufferPh(buffer)
             q, I, σ, energy = _readSnapshotData(logs)
-            isempty(models) &&
-                throw(ArgumentError("the project has no model (models/*.cif|pdb)"))
+            isempty(models) && throw(ArgumentError(_noModelsMessage(project)))
             seedKw = seedKeywords(settings)
             rows = _bufferObject(buffer, String[])[:solutes]
             snapshot = _solutesSnapshot(
@@ -1529,6 +1544,9 @@ function runProject(
             ownRefs, refNotes =
                 isfile(refFile) ? _readModelReferences(refFile) :
                 (Dict{String,Dict{Symbol,Any}}(), String[])
+            # the project's one reference (key `*`) is for every model and for the
+            # comparison; without it the entries of single models apply
+            projRef = pop!(ownRefs, PROJECT_REFERENCE_KEY, nothing)
             for model in sort!(collect(keys(ownRefs)))
                 any(m -> m.name == model, st.models) && continue
                 push!(
@@ -1537,6 +1555,13 @@ function runProject(
                 )
             end
             qScale = _snapshotQScale(logs)
+            if projRef !== nothing
+                proj = _modelReference(logs, "the project", projRef, (q, I), qScale)
+                append!(refNotes, proj.problems)
+                # the comparison draws that one curve (none when it cannot be read); an
+                # entry without `fit` leaves the folder's curves as they are
+                haskey(projRef, :fit) && (refs = proj.references)
+            end
             for rec in st.models
                 own = merge(
                     get(fromFile, rec.name, Dict{Symbol,Any}()),
@@ -1544,11 +1569,16 @@ function runProject(
                 )
                 sM = _modelSettings(settings, own, "model $(rec.name)")
                 rec.overrides = sort!(String.(collect(keys(own))))
-                mref = _modelReference(
-                    logs, rec.name, get(ownRefs, rec.name, Dict{Symbol,Any}()),
-                    (q, I), qScale,
-                )
-                append!(refNotes, mref.problems)
+                mref = if projRef !== nothing
+                    (; references = proj.references, refChi2 = proj.refChi2)
+                else
+                    entry = _modelReference(
+                        logs, rec.name, get(ownRefs, rec.name, Dict{Symbol,Any}()),
+                        (q, I), qScale,
+                    )
+                    append!(refNotes, entry.problems)
+                    entry
+                end
                 plans[rec.name] = (;
                     seedKw = seedKeywords(sM),
                     cfg = merge(

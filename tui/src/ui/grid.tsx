@@ -15,18 +15,20 @@ import { type ReactNode, useCallback, useEffect, useState } from "react"
 import { assetPath } from "../core/environment.js"
 import { displayWidth, padWidth } from "../core/terminal.js"
 import {
+    arrowKeys,
+    type Hotkey,
     type KeyInput,
     keyLabels,
     keys,
+    menuOptions,
     NarrowWidth,
-    plainKey,
     themeLineRows,
     useBodyColumns,
     useKeys,
     useNav,
     useTerminalSize,
 } from "./interaction.js"
-import { Panel, useTheme } from "./theme.js"
+import { ErrorText, Panel, useTheme } from "./theme.js"
 
 // ========================================================================================
 // 1. Legend: the keys at the bottom of a screen
@@ -41,21 +43,20 @@ import { Panel, useTheme } from "./theme.js"
 export type LegendItem = { label: string; keys: string }
 
 /**
- * A legend item whose keys are written from the key constants, so a legend cannot
- * drift from the key it describes.
+ * A legend item whose keys are written from the key constants, so a legend cannot drift
+ * from the key it describes.
  *
  * @param label - what the key does, e.g. `"save"`.
- * @param parts - the keys, as for `keyLabels`: a key, or an array for a run written
- *     together (`[keys.up, keys.down]` is `↑↓`).
+ * @param parts - the keys, as for `keyLabels`: a key, or an array written together
+ *     (`[keys.up, keys.down]` is `↑↓`).
  * @returns the item.
  * @throws never.
  */
-export function legendFor(label: string, ...parts: (KeyInput | KeyInput[])[]): LegendItem {
+export function legendFor(label: string, ...parts: (Hotkey | Hotkey[])[]): LegendItem {
     return { label, keys: keyLabels(...parts) }
 }
 
-/** The legend items that nearly every screen has. */
-/** Back one screen. */
+/** Back one screen (a legend item nearly every screen has). */
 export const legendBack: LegendItem = legendFor("back", keys.back)
 /** Choose or edit what the cursor is on. */
 export const legendEnter: LegendItem = legendFor("select", keys.enter)
@@ -90,9 +91,8 @@ export type Moves = {
 }
 
 /**
- * The `move` item of a legend, with only the arrows that work from where the cursor
- * is (like the move hint of the menus): `↑↓` in the middle of a list, `↓` on its first
- * row, `←→` between groups.
+ * The `move` item of a legend, with only the arrows that work from where the cursor is:
+ * `↑↓` in the middle of a list, `↓` on its first row, `←→` between groups.
  *
  * @param moves - which arrows work.
  * @returns the item, or `undefined` when no arrow works (nothing to move to).
@@ -101,7 +101,7 @@ export function moveLegend(moves: Moves): LegendItem | undefined {
     const arrows = [
         moves.up && keys.up, moves.down && keys.down,
         moves.left && keys.left, moves.right && keys.right,
-    ].filter((k): k is KeyInput => k !== false && k !== undefined)
+    ].filter((k): k is Hotkey => k !== false && k !== undefined)
     if (arrows.length === 0) return undefined
     return moves.tab && moves.down
         ? legendFor("move", arrows, keys.tab)
@@ -109,9 +109,8 @@ export function moveLegend(moves: Moves): LegendItem | undefined {
 }
 
 /**
- * Builds a legend from items that may not apply: a key that does nothing right now (undo
- * with nothing to undo, remove on an empty table) is left out, so the legend only ever
- * lists keys that work, as the move hint of the menus does.
+ * Builds a legend from items that may not apply: a key that does nothing right now is
+ * left out, so the legend only lists keys that work.
  *
  * @param items - the items; `false` and `undefined` are skipped, so a screen writes
  *     `canUndo && legendFor("undo", keys.undo)`.
@@ -128,14 +127,13 @@ export function legendOf(items: (LegendItem | false | undefined)[]): LegendItem[
  * @property pick - it is a dropdown: Enter takes the highlighted suggestion, so there
  *     must be one. A prompt takes what is typed.
  * @property canTake - a prompt's Enter has something to take (`true` when left out).
- * @property take - what Enter does, `"take"` when left out; `null` when Enter does
- *     nothing (a list that is only browsed), so it is not shown.
+ * @property take - what Enter does, `"take"` when left out; `null` for nothing (not shown).
  * @property extras - keys of this particular overlay (`file picker o`), shown before
  *     `cancel`.
  * @property listedExtras - keys that work only while something is listed (`delete ^r`),
  *     shown after `extras`.
- * @property cancel - what Esc does, `"cancel"` when left out; `null` when Esc does
- *     nothing (a prompt that is the screen itself), so it is not shown.
+ * @property cancel - what Esc does, `"cancel"` when left out; `null` for nothing (not
+ *     shown).
  * @property back - Ctrl-X goes back one screen (it differs from Esc), shown last.
  */
 export type EntryFacts = {
@@ -175,8 +173,12 @@ export function entryLegend(facts: EntryFacts): LegendItem[] {
 const columnLines = 3
 
 /**
- * Cuts a list into pieces of `size`, filled from the left, so only the last piece is
- * short (seven items are 3 + 3 + 1).
+ * The fewest columns a legend that would wrap is cut into (as tall as needed) when they
+ * fit.
+ */
+const longColumns = 3
+
+/** Cuts a list into pieces of `size`; only the last is short (seven items: 3 + 3 + 1).
  *
  * @param items - the list.
  * @param size - the most items in a piece.
@@ -201,25 +203,118 @@ const itemText = (item: LegendItem, labels: number): string =>
     `${padWidth(`${item.label}:`, labels + 1)} ${item.keys}`
 
 /**
- * Lays a legend out for some room. The items go in columns of up to three lines (the
- * height of the small logo) and the columns in as few bands as fit the width: a band is a
- * row of columns, a legend that does not fit one band takes more of them, one under the
- * other, so a legend with many keys grows downwards and never wider than its room. The
- * result depends only on the items and the room, so a screen can reserve the height of its
- * fullest legend ([[legendHeight]]) and its footer then never moves.
+ * The cells the labels of column `j` take over all `bands` (so the keys line up in a
+ * grid).
+ */
+const labelWidths = (bands: LegendItem[][][]): number[] =>
+    Array.from({ length: Math.max(...bands.map((b) => b.length)) }, (_, j) =>
+        Math.max(...bands.map((b) => (b[j] ? labelCells(b[j]) : 0))))
+
+/** The cells of each column of `bands` (the widest line of the column in any band). */
+function columnWidths(bands: LegendItem[][][]): number[] {
+    const labels = labelWidths(bands)
+    return labels.map((label, j) =>
+        Math.max(
+            ...bands.flatMap((b) =>
+                (b[j] ?? []).map((i) => displayWidth(itemText(i, label))),
+            ),
+        ))
+}
+
+/** The cells a grid of columns takes, with a `┃` and a space either side between them. */
+const gridWidth = (widths: number[]): number =>
+    widths.reduce((sum, w) => sum + w, 0) + (widths.length - 1) * (barCells + 1)
+
+/**
+ * Lays a legend out for some room as a grid: columns of at least three lines (the small
+ * logo's height) and at least three columns, in as few lines as fit the width. A legend
+ * widens as the room grows (more, shorter columns). One that does not fit in one band is
+ * cut into equal bands whose columns line up. The result depends only on items and room, so
+ * a screen can reserve the height of its fullest legend ([[legendHeight]]) and its footer
+ * never moves.
  *
  * @param items - the legend.
- * @param room - the cells a band may take (a column wider than that has a band to itself).
+ * @param room - the cells the grid may take (a column wider than that has a band to
+ *     itself).
  * @returns the bands, each a list of columns, each column a list of items.
  */
 function legendBands(items: readonly LegendItem[], room: number): LegendItem[][][] {
+    // the least tall of: a grid of three columns at least, one of two, columns of three
+    // lines as they fit (the earlier wins a tie)
+    const height = (bands: LegendItem[][][]): number =>
+        bands.reduce((sum, band) => sum + Math.max(...band.map((c) => c.length)), 0)
+    const options = [
+        bestBands(items, room, longColumns),
+        bestBands(items, room, longColumns - 1),
+        bandsOf(items, room, columnLines),
+    ].filter((o): o is LegendItem[][][] => o !== null)
+    return options.reduce((best, o) => (height(o) < height(best) ? o : best))
+}
+
+/**
+ * The bands of the least height whose grid fits `room` with at least `least` columns, or
+ * null.
+ */
+function bestBands(
+    items: readonly LegendItem[],
+    room: number,
+    least: number,
+): LegendItem[][][] | null {
+    let best: LegendItem[][][] | null = null
+    let bestHeight = Number.POSITIVE_INFINITY
+    for (let count = 1; count <= items.length; count++) {
+        const size = Math.ceil(items.length / count)
+        const groups = chunks([...items], size)
+        const fewest = least
+        for (let lines = Math.min(columnLines, size); lines <= size; lines++) {
+            const cols = Math.ceil(size / lines)
+            if (cols < fewest) break
+            const bands = groups.map((group) => balanced(group, cols))
+            // a grid whose columns line up across bands wins a tie with one that does not
+            const aligned = gridWidth(columnWidths(bands)) <= room
+            const height = count * lines + (aligned ? 0 : 0.5)
+            if (height >= bestHeight || !(aligned || bandsFit(bands, room))) continue
+            best = bands
+            bestHeight = height
+        }
+    }
+    return best
+}
+
+/**
+ * Whether every band fits `room` on its own (columns then need not line up across
+ * bands).
+ */
+const bandsFit = (bands: LegendItem[][][], room: number): boolean =>
+    bands.every((band) => gridWidth(columnWidths([band])) <= room)
+
+/** Cuts a list into `cols` columns, in order, whose lengths differ by at most one. */
+function balanced<T>(items: T[], cols: number): T[][] {
+    const out: T[][] = []
+    const base = Math.floor(items.length / cols)
+    const extra = items.length % cols
+    let from = 0
+    for (let c = 0; c < cols; c++) {
+        const n = base + (c < extra ? 1 : 0)
+        if (n > 0) out.push(items.slice(from, from + n))
+        from += n
+    }
+    return out
+}
+
+/** The bands of a legend cut into columns of `lines` items, as many per band as fit. */
+function bandsOf(
+    items: readonly LegendItem[],
+    room: number,
+    lines: number,
+): LegendItem[][][] {
     const widthOf = (column: LegendItem[], first: boolean): number =>
         Math.max(...column.map((i) => displayWidth(itemText(i, labelCells(column)))))
         + (first ? 0 : barCells)
     const bands: LegendItem[][][] = []
     let band: LegendItem[][] = []
     let used = 0
-    for (const column of chunks([...items], columnLines)) {
+    for (const column of chunks([...items], lines)) {
         const w = widthOf(column, band.length === 0)
         if (band.length > 0 && used + 1 + w > room) {
             bands.push(band)
@@ -239,9 +334,8 @@ function legendBands(items: readonly LegendItem[], room: number): LegendItem[][]
  *
  * @param items - the legend.
  * @param room - the cells a band may take.
- * @param style - how it is drawn: a `boxes` legend that fits one row takes the three rows
- *     of its boxes (the height of the small logo), one that does not fit is laid out as
- *     columns, so it takes what [[legendBands]] says.
+ * @param style - how it is drawn: a `boxes` legend that fits one row takes three rows,
+ *     one that does not is laid out as columns ([[legendBands]]).
  * @returns the height, 0 for no items.
  */
 export function legendHeight(
@@ -258,9 +352,8 @@ export function legendHeight(
 
 /**
  * How a legend is drawn: `columns` puts the items in columns separated by `┃` (tables,
- * forms and sheets); `boxes` puts each item in a small rounded box of its own, in one
- * row (the menus and landings, whose footer has three rows for it). A `boxes` legend
- * too wide for its room is drawn as columns, so it never overflows.
+ * forms, sheets); `boxes` puts each in a small rounded box in one row (menus and
+ * landings). A `boxes` legend too wide for its room is drawn as columns.
  */
 export type LegendStyle = "columns" | "boxes"
 
@@ -286,12 +379,12 @@ export function boxesFit(items: readonly LegendItem[], room: number): boolean {
 }
 
 /**
- * Keys with what they do, as `label: keys` pairs, in the muted colour: in columns
- * separated by `┃`, or each in a rounded box of its own.
+ * Keys with what they do, as `label: keys` pairs in the muted colour, in columns or in
+ * boxes.
  *
  * @param props.items - the keys to show, in order.
- * @param props.room - the cells the legend may take; the `columns` style lays itself out
- *     in as many bands under one another as that needs ([[legendBands]]).
+ * @param props.room - the cells the legend may take (`columns` uses as many bands as it
+ *     needs, [[legendBands]]).
  * @param props.style - `"columns"` (default) or `"boxes"`.
  * @returns the legend.
  */
@@ -315,9 +408,15 @@ export function Legend({
                 ))}
             </Box>
         )
+    const bands = legendBands(items, room)
+    // columns line up across bands when the room
+    // allows, else each band is as narrow as it is
+    const aligned = gridWidth(columnWidths(bands)) <= room
+    const labels = aligned ? labelWidths(bands) : null
+    const widths = aligned ? columnWidths(bands) : null
     return (
         <Box flexDirection="column">
-            {legendBands(items, room).map((band) => {
+            {bands.map((band) => {
                 // every `┃` is as tall as the tallest column of its band
                 const height = Math.max(...band.map((column) => column.length))
                 return (
@@ -332,7 +431,12 @@ export function Legend({
                                 <Box flexDirection="column">
                                     {column.map((item) => (
                                         <Text key={item.label} color={theme.mt}>
-                                            {itemText(item, labelCells(column))}
+                                            {labels && widths
+                                                ? padWidth(
+                                                    itemText(item, labels[i] ?? 0),
+                                                    widths[i] ?? 0,
+                                                )
+                                                : itemText(item, labelCells(column))}
                                         </Text>
                                     ))}
                                 </Box>
@@ -349,29 +453,6 @@ export function Legend({
 // 2. Menu options
 // ========================================================================================
 
-/**
- * Every menu option and its hotkey. Its keys are the allowed option names
- * ([[MenuOptions]]), and each name must have a `<name>.txt` in
- * `assets/menu-options/`.
- */
-export const menuOptions = {
-    buffer:   { hotkey: plainKey("b") },
-    data:     { hotkey: plainKey("d") },
-    help:     { hotkey: plainKey("h") },
-    load:     { hotkey: plainKey("l") },
-    logs:     { hotkey: plainKey("g") },
-    models:   { hotkey: plainKey("m") },
-    new:      { hotkey: plainKey("n") },
-    open:     { hotkey: plainKey("o") },
-    output:   { hotkey: plainKey("u") },
-    plots:    { hotkey: plainKey("p") },
-    quit:     { hotkey: plainKey("q") },
-    recipes:  { hotkey: plainKey("y") },
-    sampler:  { hotkey: plainKey("a") },
-    settings: { hotkey: plainKey("s") },
-    solutes:  { hotkey: plainKey("t") },
-} as const satisfies Record<string, { hotkey: KeyInput }>
-
 /** The name of a menu option: one of the keys of `menuOptions`. */
 export type MenuOptions = keyof typeof menuOptions
 
@@ -383,14 +464,13 @@ export type Art = {
 }
 
 /**
- * One loaded menu option: its art piece (`text`, `width`, `height`) and the
- * hotkey that selects it. The selected state is drawn with the theme's colours,
- * not with a second piece of art.
+ * One loaded menu option: its art piece and the hotkey that selects it. The selected
+ * state is drawn with the theme's colours, not a second piece of art.
  *
  * @property hotkey - the key that selects the option.
  */
 export type MenuOption = Art & {
-    hotkey: KeyInput
+    hotkey: Hotkey
 }
 
 /**
@@ -413,21 +493,18 @@ function loadArt(...path: string[]): Art {
 }
 
 /**
- * Loads menu options, each with its art piece, from
- * `assets/menu-options/<name>.txt`.
- *
+ * Loads menu options, each with its art piece, from `assets/menu-options/<name>.txt`.
  * Call it once, at module level: it reads the files from disk each time.
  *
  * @param names - the options to load.
- * @returns a record with exactly the given names as keys, each mapping to its
- *     [[MenuOption]]: its art with its size, and its hotkey. A name that was not
- *     passed is a type error to look up, and a passed one is never `undefined`.
+ * @returns a record with exactly the given names as keys, each its [[MenuOption]]; a name
+ *     not passed is a type error to look up.
  * @throws if a file cannot be read.
  */
 function loadOpts<N extends MenuOptions>(
     names: readonly N[]
 ): Record<N, MenuOption> {
-    // starts empty and is filled below, so the cast says "complete by the return"
+    // filled below, so the cast says "complete by the return"
     const result = {} as Record<N, MenuOption>
     for (const name of names) {
         result[name] = {
@@ -454,10 +531,7 @@ function menuCursor(): Art { return loadArt("menu-options", "cursor.txt") }
  */
 function menuLogo(): Art { return loadArt("logo", "logo-large.txt") }
 
-/**
- * The small BAYSOL logo at the bottom left of the screens below the menus: `blocky`
- * (square corners) on the table-style screens, `smooth` (rounded) on the others.
- */
+/** The small logo of the screens below the menus: `blocky` on tables, else `smooth`. */
 export type Design = "blocky" | "smooth"
 
 /**
@@ -468,7 +542,7 @@ export type Design = "blocky" | "smooth"
  * @throws if `assets/logo/logo-<design>.txt` cannot be read.
  */
 export function smallLogo(design: Design): Art {
-    return loadArt("logo", `logo-${design === "smooth" ? "small" : design}.txt`)
+    return loadArt("logo", `logo-small-${design}.txt`)
 }
 
 // ========================================================================================
@@ -483,10 +557,8 @@ const menuHeaderRows = logo.height + 1
 
 /**
  * What the top of a menu shows: the BAYSOL logo, centred, with one line under it (the
- * version on the main menu, the project's name on the project menu, ...).
- *
- * It has no margin of its own: the `GridMenu` that shows it puts one above it when
- * the terminal has room for it.
+ * version, the project's name, ...). It has no margin: the `GridMenu` adds one when the
+ * terminal has room.
  *
  * @param caption - the line under the logo.
  * @returns the header, to pass to a `GridMenu`.
@@ -535,14 +607,12 @@ const hotkeyDelay = 50
 type Direction = "up" | "down" | "left" | "right"
 
 /**
- * A menu laid out on a grid: which options it has, in which order, and the art that
- * goes with them (the option pictures, the cursor, one move hint per grid position).
- * It is built once, at module level, because it reads its art from disk.
+ * A menu laid out on a grid: its options in order and their art (pictures, cursor, one
+ * move hint per position). Built once, at module level, because it reads its art from
+ * disk.
  *
- * Positions count from the top-left, one row at a time; the last row may be short.
- * The arrows allowed from a position follow from the grid, and the move hint is drawn
- * from exactly those (`hint`), so it is always right for the option the cursor is on.
- *
+ * Positions count from the top-left, a row at a time; the last row may be short. The
+ * move hint (`hint`) is drawn from the arrows the grid allows.
  * @typeParam N - the names of the options.
  * @param names - the options, row by row, each with art in `assets/menu-options/`.
  * @param columns - how many options a row has.
@@ -551,10 +621,7 @@ type Direction = "up" | "down" | "left" | "right"
 export class MenuSpec<N extends MenuOptions> {
     readonly opts:    Record<N, MenuOption>
     readonly cursor:  Art
-    /**
-     * The width of one cell: the cursor, the gap, and the widest piece. Every cell uses
-     * it, so the columns mirror each other and the gap between them is in the middle.
-     */
+    /** The width of one cell (cursor, gap, widest piece); every cell uses it. */
     readonly cellWidth: number
 
     constructor(readonly names: readonly N[], readonly columns: number) {
@@ -586,9 +653,8 @@ export class MenuSpec<N extends MenuOptions> {
     }
 
     /**
-     * The hint that shows the arrows possible from an option: an arrow where the
-     * cursor can go that way, a blank where it cannot. It is drawn from the grid, so
-     * it follows the options there are (a short last row, a lone option).
+     * The hint that shows the arrows possible from an option: an arrow where the cursor
+     * can go that way, a blank where it cannot.
      *
      * @param name - the option the cursor is on.
      * @returns its art, 5 cells wide and 3 high.
@@ -631,16 +697,14 @@ export class MenuSpec<N extends MenuOptions> {
 }
 
 /** The arrow keys and the move each one asks for. */
-const arrowKeys: [KeyInput, Direction][] = [
-    [keys.up, "up"], [keys.down, "down"], [keys.left, "left"], [keys.right, "right"],
+const arrowMoves: [Hotkey, Direction][] = [
+    [arrowKeys.up, "up"], [arrowKeys.down, "down"],
+    [arrowKeys.left, "left"], [arrowKeys.right, "right"],
 ]
 
 /**
- * One option of the grid: the cursor slot and the text.
- *
- * The slot is always reserved, so the text does not move when the cursor does.
- * The cursor is drawn, and the text is in the full foreground colour, when the
- * option is active. Otherwise the text is muted.
+ * One option of the grid: the cursor slot (always reserved, so the text does not move)
+ * and the text, full foreground when active, else muted.
  *
  * @param spec - the menu the option belongs to.
  * @param name - the option to draw.
@@ -671,7 +735,7 @@ function Cell<N extends MenuOptions>(
  * @property key - its hotkey, normally a Shift key (see `KeyInput.is`).
  * @property onPress - called when the key is pressed.
  */
-export type TaskbarItem = { label: string; key: KeyInput; onPress: () => void }
+export type TaskbarItem = { label: string; key: Hotkey; onPress: () => void }
 
 /**
  * What the grid menu is told.
@@ -679,26 +743,25 @@ export type TaskbarItem = { label: string; key: KeyInput; onPress: () => void }
  * @property spec - the menu: its options and art.
  * @property header - what goes above the grid (the logo, a title).
  * @property onChoose - called when an option is chosen, by Enter or by its hotkey.
- * @property taskbar - extra actions that apply right now, shown as keys beside
- *     the move hint and each a hotkey of the menu. The screen passes an item only when
- *     it applies; the room for the keys is always reserved, so the grid never moves
- *     when items come and go. Esc does nothing at menu level: the only way out of the
- *     program is `q` in the main menu (and Ctrl-C / Ctrl-D, handled by the app).
- * @property taskbarNote - a small box in the taskbar's corner while there is no taskbar
- *     item, e.g. `missing components: models, data`; the box goes when items appear.
- * @property onKey - called, with the option the cursor is on, for every other key press,
- *     for the keys a menu adds (the settings menu's reset of an unusable file); not
- *     called while a hotkey is waiting.
+ * @property taskbar - extra actions that apply right now, shown beside the move hint,
+ *     each a hotkey of the menu. The room is always reserved, so the grid never moves.
+ *     Esc does nothing at menu level: the only way out of the program is `q` in the main
+ *     menu (and Ctrl-C / Ctrl-D, handled by the app).
+ * @property taskbarNote - a small box in the taskbar's corner while there is no item,
+ *     e.g. `missing components: models, data`.
+ * @property onKey - called, with the option the cursor is on, for every other key press
+ *     (keys a menu adds); not called while a hotkey is waiting.
  * @property intercept - called first with every key press; returns `true` when it took
  *     the press (an open question), and the menu then does nothing with it.
  * @property legend - extra text for the hint box, e.g. `"reset file: r"`; a function
  *     gets the option the cursor is on, so the text can follow the cursor.
  * @property notice - a line shown under the grid (an error, e.g. `no projects to load!`);
  *     the menu keeps taking keys.
- * @property overlayLegend - the keys of the open overlay, shown in place of the move
- *     hint while an overlay is open (so the hint box never lists keys that do nothing).
- * @property overlay - a prompt or dropdown to show in place of the hint box. While one
- *     is given the menu takes no keys, because the overlay is the one that listens.
+ * @property noticeIsError - the notice is a problem, drawn on the error background
+ *     (true when left out); `false` for plain information.
+ * @property overlayLegend - the keys of the open overlay, shown in place of the move hint.
+ * @property overlay - a prompt or dropdown over the grid. While one is given the menu
+ *     takes no keys: the overlay listens.
  */
 type GridMenuProps<N extends MenuOptions> = {
     spec:      MenuSpec<N>
@@ -710,17 +773,15 @@ type GridMenuProps<N extends MenuOptions> = {
     intercept?: (press: KeyInput) => boolean
     legend?:   string | ((selected: N) => string | undefined)
     notice?:   string
+    noticeIsError?: boolean
     overlay?:  ReactNode
     overlayLegend?: LegendItem[]
 }
 
 /**
- * A menu of options on a grid, moved with the arrow keys, chosen with Enter or with a
- * hotkey, and left with Ctrl-X (back); Esc does nothing here. The main menu, the project
- * menu and the settings menu are all this component with a different [[MenuSpec]].
- *
- * A hotkey first moves the cursor to its option and chooses it after `hotkeyDelay`, so
- * the highlight is seen before the screen changes.
+ * A menu of options on a grid, moved with the arrow keys, chosen with Enter or a hotkey,
+ * left with Ctrl-X (back); Esc does nothing here. A hotkey first moves the cursor and
+ * chooses after `hotkeyDelay`, so the highlight is seen before the screen changes.
  *
  * @param props - see [[GridMenuProps]].
  * @returns the menu: header, grid, and the hint box at the bottom.
@@ -738,6 +799,7 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
         overlay,
         overlayLegend,
         notice,
+        noticeIsError = true,
     } = props
     const theme = useTheme()
     const nav = useNav()
@@ -771,7 +833,7 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
         else if (press.is(keys.back)) nav.pop()
         else if (action) action.onPress()
         else {
-            const move = arrowKeys.find(([key]) => press.is(key))
+            const move = arrowMoves.find(([key]) => press.is(key))
             const next = move && spec.neighbour(selected, move[1])
             const hot  = spec.byHotkey(press)
             if (next) setSelected(next)
@@ -780,9 +842,8 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
         }
     }, overlay === undefined)
 
-    // the two blank rows (above the header, above the grid) are decoration: they go
-    // when the terminal is too short to fit them with everything else, so the notice
-    // never lands on the art
+    // the two blank rows (above the header and the grid) go when the terminal is too
+    // short, so the notice never lands on the art
     const { rows: terminalRows, columns: terminalColumns } = useTerminalSize()
     const bodyColumns = useBodyColumns()
     const overlayWidth = Math.min(Math.floor(bodyColumns / 2), overlayMaxWidth)
@@ -794,7 +855,6 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
     return (
         <Box flexDirection="column" alignItems="center" flexGrow={1}>
 
-            {/* header: the logo and version, or a title */}
             <Box marginTop={margin}>{header}</Box>
 
             {/* options grid: it takes all the room between the header and the hint, the
@@ -819,9 +879,8 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
                     </Box>
                 ))}
 
-                {/* an open prompt or list covers the whole right-hand column of the grid
-                    (the right half, as high as the grid) and nothing else, so the left
-                    column stays in view and opening it never moves the grid */}
+                {/* an open prompt or list covers only the right half of the grid, so the
+                    left stays in view and the grid never moves */}
                 {overlay !== undefined ? (
                     <Box
                         position="absolute"
@@ -847,15 +906,16 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
                 ) : null}
             </Box>
 
-            {/* the notice has a row of its own at all times, so showing one never moves
-                the grid */}
+            {/* the notice has a row of its own, so showing one never moves the grid */}
             <Box height={1} flexShrink={0}>
-                {notice ? <Text color={theme.er}>{notice}</Text> : null}
+                {noticeIsError ? (
+                    <ErrorText>{notice}</ErrorText>
+                ) : (
+                    <Text color={theme.fg}>{notice}</Text>
+                )}
             </Box>
 
-            {/* move hint: the arrows that work from the selected option, and the keys */}
-            {/* the same height whether it shows the hint or the keys of an overlay, so
-                opening an overlay never changes the room the grid has */}
+            {/* the move hint, or the keys of an overlay: the same height either way */}
             <Box
                 height={hintRows}
                 width={taskbar ? "100%" : undefined}
@@ -883,8 +943,7 @@ export function GridMenu<N extends MenuOptions>(props: GridMenuProps<N>): ReactN
                             </Text>
                         </Panel>
 
-                        {/* the taskbar: only what applies now; its corner of the hint
-                            area is always there, so nothing else moves */}
+                        {/* the taskbar: only what applies now */}
                         {taskbar && taskbar.length === 0 && taskbarNote ? (
                             <Panel borderColor={theme.mt} paddingX={1} flexShrink={1}>
                                 <Text color={theme.mt} wrap="truncate-end">

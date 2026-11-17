@@ -3,6 +3,9 @@
   "type": "module",
   "version": "1.0.0",
   "description": "The terminal interface of BAYSOL (TypeScript, Ink): make projects, add models and a buffer, edit settings, all from the keyboard. Runs in any terminal of at least 80 x 24; looks best with 24-bit colour.",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "tsx src/main.tsx",
     "check": "tsc",
@@ -13,14 +16,17 @@
   "license": "LGPL-3.0-or-later",
   "private": true,
   "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@vvo/tzdb": "^6.204.0",
     "7zip-bin": "^5.2.0",
     "ink": "^8.0.0",
     "jsonc-parser": "^3.3.1",
     "moment-timezone": "^0.6.6",
     "node-7z": "^3.0.0",
+    "pdf-raster": "0.2.0",
     "proper-lockfile": "^4.1.2",
     "react": "^19.3.1",
+    "sharp": "^0.35.5",
     "string-width": "^8.3.0",
     "wrap-ansi": "^10.0.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"

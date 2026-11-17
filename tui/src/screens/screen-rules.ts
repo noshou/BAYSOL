@@ -67,15 +67,13 @@ import { FIND_ROWS, type TableFind, useTableFind } from "./table-find.js"
 // 1. Tables and forms
 // ========================================================================================
 
-// Legends as pure functions of what a screen is doing: each lists only the keys that work
-// now. `tableLegend` serves tables of editable rows, `formLegend` form pages; an open
-// prompt or question supplies its own (`entryLegend`, `questionLegend`).
+// Legends are pure functions of what a screen is doing and list only the keys that work
+// now; an open prompt or question supplies its own (`entryLegend`, `questionLegend`).
 
 /**
- * What a table's legend depends on: `rows`, `cursor` (meaningless for no rows), whether
- * Enter `canEdit`, an add key `canAdd`, `^r` `canRemove` and `^u` `canUndo`, the file is
- * `locked`, there are `dirty` changes; `removeLabel` names `^r` (`remove` marks, `delete`
- * erases the saved entry at once).
+ * What a table's legend depends on: `rows`, `cursor` (meaningless for no rows), what
+ * `canEdit`/`canAdd`/`canRemove`/`canUndo` allow, `locked`, `dirty` changes; `removeLabel`
+ * names `^r` (`remove` marks, `delete` erases the saved entry at once).
  */
 export type TableFacts = {
     rows: number
@@ -153,16 +151,11 @@ export function formLegend(facts: FormFacts): LegendItem[] {
 // 2. The table screen: cursor, rows, marks and saving
 // ========================================================================================
 
-// Shared mechanics of the tables of editable rows: drafts, cursor, note, unsaved-changes
-// guard and the keys that do not depend on the row. A screen calls `useTableScreen`,
-// draws a `DataTable` in a `Frame`, and handles its own keys (Enter, the adds) when
-// `handleKey` returns false. A form hands an item back through `t.replaceAt(i, item)` or
-// `t.append(item)`; nothing is saved before `^w`.
+// Shared mechanics of the tables of editable rows. A screen calls `useTableScreen`, draws
+// a `DataTable` in a `Frame`, and handles its own keys when `handleKey` returns false. A
+// form hands an item back through `replaceAt` or `append`; nothing is saved before `^w`.
 
-/**
- * The rows a `DataTable` takes besides the rows themselves: its header, its rule and
- * its `n / total` counter.
- */
+/** The rows a `DataTable` takes besides its rows: header, rule and `n / total` counter. */
 const TABLE_CHROME_ROWS = 3
 
 /** The lines of keys `useBodyRows` already allows for (`frameRows` in ui/layout.ts). */
@@ -170,16 +163,14 @@ const FRAME_LEGEND_LINES = 3
 
 /**
  * What a table screen is set up with. `items` is the file's content, read once; `added`
- * are extra unsaved rows after it (the cursor stays at the top). `save` writes the items
- * (throws on failure: note `could not save!`); `check` gives the first unsavable row as
- * `[index, message]`, asked at `^w`. `extraRows` and `extraChanges` count rows and unsaved
- * changes kept outside the table (a status line, a buffer's pH). `adds` and `rowKeys`
- * list every key the legend can show, so the fullest legend (the footer height) is known.
- * `locked`: file unusable, table empty, every changing key refused. `erase`: `^r` on a
- * saved row asks `destructiveQuestion(what name)` and Enter calls `remove`, which deletes
- * that entry from disk at once (throws on failure: `saveErrorNote`); an unsaved row is
- * dropped without asking; left out, `^r` only marks the row and `^w` removes it.
- * `removeLabel` names a marking `^r`. `label` enables find (`/`) and sort (`z`) by name;
+ * are extra unsaved rows after it. `save` writes the items (throws on failure); `check`
+ * gives the first unsavable row as `[index, message]`, asked at `^w`. `extraRows` and
+ * `extraChanges` count rows and unsaved changes kept outside the table. `adds` and
+ * `rowKeys` list every key the legend can show, so the footer height is known. `locked`:
+ * file unusable, every changing key refused. `erase`: `^r` on a saved row asks
+ * `destructiveQuestion(what name)` and Enter calls `remove`, which deletes that entry from
+ * disk at once (throws on failure); left out, `^r` only marks the row and `^w` removes it.
+ * `removeLabel` names a marking `^r`. `label` enables find (`/`) and sort (`shift+s`);
  * `sorted` sorts on open (needs `label`).
  *
  * @typeParam V - the item of a row.
@@ -206,13 +197,12 @@ export type TableScreenOptions<V> = {
 
 /**
  * What a table screen gets back: `drafts`, `rows`, `cursor`, `pageSize` and `width` for
- * `DataTable`; `current` (the item under the cursor), `canEdit`, `canAdd` (room: 999 rows,
- * no lock), `locked`; `frameNote` (the discard question, else the note) and
- * `frameNoteIsError`; `setNote` (cleared by the next key), `mark` (`*`, `-` or a space),
- * `replaceAt`, `append` (cursor on it), `adopt` (a new set of drafts, e.g. after an add
- * flow); `legendFull` (reserves the footer height), `legend` (the answers while a
- * question is open, else `tableLegend`), `handleKey` (true when handled), `finder` (the
- * open finder under the table, else null).
+ * `DataTable`; `current` (the item under the cursor), `canEdit`, `canAdd` (room, no lock),
+ * `locked`; `frameNote` and `frameNoteIsError`; `setNote` (cleared by the next key),
+ * `mark` (`*`, `-` or a space), `replaceAt`, `append` (cursor on it), `adopt` (new
+ * drafts, e.g. after an add flow); `legendFull` (reserves the footer height), `legend`
+ * (the answers while a question is open, else `tableLegend`), `handleKey` (true when
+ * handled), `finder` (the open finder under the table, else null).
  *
  * @typeParam V - the item of a row.
  */
@@ -241,9 +231,8 @@ export type TableScreen<V> = {
 
 /**
  * State and keys of a table of editable rows. `handleKey` returns true for: up/down; `^r`
- * marks a row for removal (an unsaved row goes at once); `^u` undoes; `^w` checks every
- * row (`row N: ...`, the cursor moves there) and else saves (`saved` / `could not save!`);
- * `^x` leaves through `nav.pop`, asking `discard N changes?` first (Esc does nothing);
+ * marks a row for removal; `^u` undoes; `^w` checks every row (the cursor moves to a bad
+ * one) and else saves; `^x` leaves through `nav.pop`, asking `discard N changes?` first;
  * while a question is open it takes every key. Other keys clear the note and return
  * false. With `erase`, `^r` on a saved row asks and deletes it at once.
  *
@@ -272,8 +261,7 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
         },
         [...(options.adds ?? []), ...(options.rowKeys ?? []), ...findKeys],
     )
-    // rows the footer takes beyond the three lines the frame's own count allows for (the
-    // table screens are blocky: their footer's box takes two more)
+    // footer rows beyond the frame's three lines (the blocky footer box takes two more)
     const footerExtra = footerExtraLines(legendFull, width, FRAME_LEGEND_LINES, "blocky")
     const nav = useNav()
     const [drafts, setDrafts] = useState<Drafts<V>>(() => {
@@ -286,8 +274,8 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
     )
     const [focusLast, setFocusLast] = useState(false)
     const bodyRows = useBodyRows(TABLE_CHROME_ROWS + extraRows + footerExtra)
-    // the finder (`/`) takes rows under the table while it is open; it moves the cursor
-    // through a ref, because the cursor is made from the page size that depends on it
+    // the finder takes rows under the table; it moves the cursor through a ref because the
+    // cursor is made from the page size that depends on it
     const goRef = useRef<(i: number) => void>(() => undefined)
     const goTo = useCallback((i: number) => goRef.current(i), [])
     const find = useTableFind(drafts.rows, label, goTo)
@@ -315,7 +303,7 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
         setFocusLast(true)
     }, [])
 
-    /** Writes the file and stands at what was saved. */
+    /** Takes a new set of drafts, optionally putting the cursor on the last row. */
     const adopt = useCallback((next: Drafts<V>, focusEnd: boolean) => {
         setDrafts(next)
         if (focusEnd) setFocusLast(true)
@@ -341,10 +329,7 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
         write()
     }
 
-    /**
-     * `^r` on row `i` of a table that erases (`erase`): a saved row asks, and Enter
-     * deletes that one entry from the file now and drops the row.
-     */
+    /** `^r` on a saved row of an `erase` table: Enter deletes the entry now. */
     const eraseRow = (i: number, saved: V, how: NonNullable<typeof erase>) => {
         removal.ask(destructiveQuestion(`${how.what} ${how.name(saved)}`), () => {
             try {
@@ -357,7 +342,7 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
         })
     }
 
-    /** `z`: the rows in alphabetical order, the cursor staying on its row. */
+    /** `shift+s`: the rows in alphabetical order, the cursor staying on its row. */
     const sortRows = (by: (item: V) => string) => {
         const row = drafts.rows[cursor.index]
         const next = drafts.sorted(by)
@@ -497,7 +482,7 @@ export function stepTabs(
         const value = edit.options.filter((o) => edit.selected.has(o))
         return { state: edit, end: { kind: "done", value } }
     }
-    if (press.is(keys.enter) || press.is(keys.space)) {
+    if (press.is(keys.enter) || press.is(keys.mark)) {
         const option = edit.options[edit.focus] as string
         const selected = new Set(edit.selected)
         if (!selected.delete(option)) selected.add(option)
@@ -610,7 +595,7 @@ export function finishTuple(
 
 // --- a number typed into the value cell of the sheet
 
-/** The longest text typed into a number: what a cell can show beside its cursor. */
+/** The longest text typed into a number (what a cell can show beside its cursor). */
 export const maxNumberText = 16
 
 /** What the editor says when a character past [[maxNumberText]] is refused. */
@@ -831,6 +816,21 @@ export function pasteTuple(edit: TupleEdit, text: string): TupleEdit {
 }
 
 /**
+ * What a `choice` setting's text names: a choice typed in full, or its ASCII spelling
+ * (`A`, `A^-1`, `nm`, `nm^-1`, `1/nm`), else the text itself (which then fails the check).
+ */
+function choiceWord(def: SettingDef, text: string): string {
+    const t = text.trim()
+    if (def.choices.includes(t)) return t
+    const plain = t.toLowerCase().replace(/[\s^]/g, "")
+    const found = def.choices.find((c) => {
+        const spelt = c.toLowerCase().replace("⁻¹", "").replace("å", "a")
+        return plain === spelt || plain === `${spelt}-1` || plain === `1/${spelt}`
+    })
+    return found ?? t
+}
+
+/**
  * What typed text means for a typed setting (number, optional number, `set` of
  * blank-separated choices, font, tuple as comma-separated parts, `lo-hi` ranges, chain
  * letters, colour and marker words, sizes like `76x5, 100x9`): the value `validateValue`
@@ -856,6 +856,7 @@ export function parseSetting(
         if ("error" in sizes) return sizes
         raw = sizes.value
     } else if (def.kind === "set") raw = text.split(/\s+/).filter((w) => w !== "")
+    else if (def.kind === "choice") raw = choiceWord(def, text)
     else if (def.kind === "font") raw = text.trim() === "" ? def.default : text.trim()
     else if (def.kind === "path") raw = text.trim()
     else if (def.kind === "tuple") {
@@ -1049,7 +1050,7 @@ export function withModelDraft(
 // ========================================================================================
 
 /** The message when there is no recipe to load. */
-export const NO_RECIPES = "no saved recipes!"
+export const NO_RECIPES = "no global recipes!"
 
 /** The message when a name prompt of the landing is left. */
 export const NOT_SAVED = "not saved"
@@ -1059,9 +1060,6 @@ export const TOO_MANY_RECIPES = `${MAX_ROWS} recipes at most!`
 
 /** The note of a recipe that was loaded over a buffer that has solutes. */
 export const REPLACES_HINT = `replaces the buffer at ${keys.save.label}`
-
-/** The note of a new, empty buffer over one that has solutes. */
-export const NOTHING_REPLACED_HINT = `nothing is replaced until ${keys.save.label}`
 
 /** The cells of a name that a question always keeps. */
 const MIN_NAME = 8
@@ -1157,8 +1155,8 @@ export function replaceBufferQuestion(
 
 /**
  * The question when the saved buffer has template-following rows: `save "NAME" as a
- * template? its rows follow pH, T`; `template` (Enter), `plain recipe` (`w`) or `cancel`
- * (Esc, nothing saved).
+ * template? its rows follow pH, T`; `template` (Enter), `plain recipe` (`shift+x`) or
+ * `cancel` (Esc, nothing saved).
  */
 export function saveAsTemplateQuestion(name: string, room: number): Question {
     const tail = ' as a template? its rows follow pH, T'

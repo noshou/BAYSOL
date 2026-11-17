@@ -43,7 +43,7 @@ import {
     textSource,
 } from "../src/store/data-table.js"
 import { ProjectGoneError } from "../src/store/projects.js"
-import { tempDir } from "./support/fixtures.js"
+import { tempDir, failure as thrown } from "./support/fixtures.js"
 
 // ========================================================================================
 // 1. Table parse
@@ -63,15 +63,7 @@ const parse = (text: string, change: Partial<ParseOptions> = {}) =>
 const first3 = { q: 1, i: 2, sigma: 3 }
 
 /** The text of the error of an extraction. */
-const failure = (run: () => unknown): string => {
-    try {
-        run()
-    } catch (error) {
-        assert.ok(error instanceof DataFileError)
-        return error.message
-    }
-    return assert.fail("no error")
-}
+const failure = (run: () => unknown): string => thrown(run, DataFileError)
 
 test("table: separators are sniffed, each can be forced", () => {
     for (const [sep, name] of [

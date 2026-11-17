@@ -38,22 +38,18 @@ import { isStructureFile, structureFasta } from "./structure-sequences.js"
 /**
  * A strict reader of FASTA and FASTQ text for the DNA, RNA and protein rows of the
  * buffer. [[parseText]] and [[parseFile]] give every record as a [[Sequence]], or an
- * error of at most 22 characters (it is shown in a 24-character border note). One
- * record makes one buffer row.
+ * error of at most 22 characters (a 24-character border note). One record, one row.
  *
  * Alphabets are the ones the Julia code accepts: DNA `A C G T` plus the IUPAC codes
- * `R Y S W K M B D H V N`; RNA the same with `U` for `T`; protein the twenty residues,
- * `U`, `O` and the codes `B J Z`. `*` and `X` (protein) are placeholders: kept, but no
- * residue. The lint, one function for typed text, pasted text and files: a FASTA header
- * is dropped, letters are upper-cased, white space and numbering digits are dropped,
- * and nothing else is repaired: a gap, a stray symbol, a `T` in RNA or a `U` in DNA is
- * an error naming the character and its place (`invalid residue 'J' at 12`). A text
- * with no header is one sequence. There is no length cap.
+ * `R Y S W K M B D H V N`; RNA with `U` for `T`; protein the twenty residues, `U`, `O`
+ * and `B J Z`. `*` and `X` (protein) are placeholders: kept, but no residue. One lint
+ * serves typed text, pasted text and files: the header is dropped, letters upper-cased,
+ * white space and numbering digits dropped, nothing else repaired (an error names the
+ * character and its place). A text with no header is one sequence; there is no length cap.
  *
  * FASTA: a `>` header, then the sequence on one or more lines. FASTQ: strict four-line
  * records (`@id`, sequence, `+`, quality of the same length); only the sequence is
- * kept. The id is the header up to the first white space. Blank lines: anywhere in
- * FASTA, only around the records in FASTQ; CRLF is fine.
+ * kept. The id is the header up to the first white space. CRLF is fine.
  */
 
 /** A kind of sequence. */
@@ -108,8 +104,7 @@ class Sequence {
 
     /**
      * The compact text for the params cell: `ACG…GCA (24 nt)` (DNA, RNA) or
-     * `MKT…QLS (317 aa)`. The count is always kept; head and tail shrink (the head gets
-     * the odd letter) to fit `width`, and the sequence is whole when it fits.
+     * `MKT…QLS (317 aa)`. The count is kept; head and tail shrink to fit `width`.
      *
      * @param kind - the kind of sequence.
      * @param width - the most characters.
@@ -348,9 +343,8 @@ export function summary(kind: SequenceKind, letters: string, width: number): str
 // 2. Typed paths: check and complete
 // ========================================================================================
 
-// Typing a path: the one place that checks a typed path and completes it. The model
-// prompt and the add flow's sequence prompt differ only in file filter and message
-// budget, which each passes in.
+// The one place that checks a typed path and completes it; the model prompt and the add
+// flow's sequence prompt differ only in file filter and message budget.
 
 /** The most hints [[hintsFor]] gives. */
 const maxHints = 50
@@ -358,10 +352,7 @@ const maxHints = 50
 /** The most characters of a path typed in any path prompt. */
 export const MAX_PATH_TYPED = 300
 
-/**
- * How many characters a prompt's message may have: 42 for the model prompt, 22 for the add
- * flow.
- */
+/** The characters a prompt's message may have: 42 (model prompt) or 22 (add flow). */
 export type PathBudget = 22 | 42
 
 /** What is said of a path the prompt refuses, for each budget. */
@@ -392,8 +383,7 @@ const WORDING: Record<
  * @param path - the path typed.
  * @param budget - the characters the message may have; picks the wording.
  * @param wrongKind - when the prompt takes only some files: the test on the file's name
- *     and the message (within `budget`) for one that fails it; checked before
- *     readability. Omit it when any file will do.
+ *     and the message (within `budget`) for one that fails it.
  */
 export function checkPath(
     path: string,
@@ -481,10 +471,7 @@ export function pathSuggestions(
 // 3. Limit
 // ========================================================================================
 
-/**
- * The most rows any user list holds (buffer solutes, custom solutes): the counters have
- * room for three digits. Adding stops there; a file with more is unusable.
- */
+/** The most rows any user list holds (the counters have room for three digits). */
 export const MAX_ROWS = 999
 
 // ========================================================================================
@@ -521,18 +508,16 @@ export type ListSpec<T> = {
 }
 
 /**
- * A JSON file holding a list of entries under one key of an object, the one mechanism
- * of a project's buffer and the custom solutes:
+ * A JSON file holding a list of entries under one key of an object (a project's buffer,
+ * the custom solutes):
  *
  *     {"<key>": [entry, entry, ...], ...other keys kept as they are...}
  *
- * - read, plain or `{track: true}` (the version read is the base the next write checks,
- *   so a save after another copy saved is refused);
+ * - read, plain or `{track: true}` (the version read is the base the next write checks);
  * - write under the file's lock through a temporary file, other keys kept;
  * - a file that cannot be used (not JSON, not a map, a refused entry, a repeated name,
- *   more than [[MAX_ROWS]]) is reported ([[UnusableFileError]]) and never written
- *   over; [[ListFile.reset]] moves it aside;
- * - the same rules for what a save is given;
+ *   more than [[MAX_ROWS]]) is reported ([[UnusableFileError]]) and never written over;
+ *   [[ListFile.reset]] moves it aside;
  * - removing one entry by name, and one read-change-write step ([[ListFile.update]]).
  *
  * A missing or empty file is an empty list. One instance serves every folder.
@@ -593,9 +578,8 @@ export class ListFile<T> {
     /**
      * The entries of the file in a folder. Throws UnusableFileError.
      *
-     * @param options - `track: true` when the entries are read to be edited and saved: the
-     *     version read is then the one [[ListFile.write]] checks against. A plain read
-     *     changes nothing about that.
+     * @param options - `track: true` when read to be edited: the version read is then
+     *     the one [[ListFile.write]] checks against.
      */
     read(dir: string, options: ReadOptions = {}): T[] {
         if (options.track) noteRead(this.file(dir))
@@ -662,9 +646,9 @@ export class ListFile<T> {
      *
      * @param change - given the entries as they are on disk now; returns the new list, or
      *     `undefined` to leave the file alone.
-     * @param options - `guarded: true` for a caller that shows the file as it read it for
-     *     editing: the change then refuses when another copy saved the file since;
-     *     `extras`: other keys to set in the same write, as for [[ListFile.write]].
+     * @param options - `guarded: true` for a caller showing the file as read for editing:
+     *     the change then refuses when another copy saved since; `extras`: other keys to
+     *     set in the same write, as for [[ListFile.write]].
      */
     update(
         dir: string,
@@ -728,20 +712,16 @@ export class ListFile<T> {
 // 5. Drafts
 // ========================================================================================
 
-// The rows of a table being edited, with what has not been saved: the state the tables
-// of the solutes and of the custom solutes share, whatever a row holds.
-// A row is `{ saved, draft, removed }`:
+// The rows of a table being edited, with what has not been saved. A row is
+// `{ saved, draft, removed }`:
 //
 //   saved    what the file has (`undefined` for a row added since the last save)
 //   draft    what the row was edited to (`undefined` when it stands at what was saved)
 //   removed  the row is to go at the next save (shown with `-`); until then `undo`
 //            brings it back
 //
-// A row shows `*` while it is new or has a draft, `-` while it is to be removed.
-// `Drafts` is immutable: every change returns a new `Drafts`, which suits a screen that
-// keeps its state in a React hook.
-
-
+// A row shows `*` while new or drafted, `-` while to be removed. `Drafts` is immutable
+// (every change returns a new one), which suits state in a React hook.
 
 /** The mark of a row: `-` to be removed, `*` new or edited. */
 export type Mark = "-" | "*"
@@ -908,7 +888,7 @@ export class Drafts<V> {
         return Drafts.of(this.toSave())
     }
 
-    /** The row `i`, or a RangeError (the Clojure threw IndexOutOfBounds). */
+    /** The row `i`, or a RangeError. */
     private check(i: number): Row<V> {
         const row = this.rows[i]
         if (!row) throw new RangeError(`no row ${i}`)

@@ -4,7 +4,7 @@
 // what depends on the pH and the temperature (`template-defs.ts`), stored inside the
 // recipe. Its `solutes` are the FIXED rows (salt, protein, ...); loading it adds the rows
 // the definition comes to at the buffer's pH, σ and temperature, each with a link
-// (`template-link.ts`) so that they follow the conditions of the table. Julia never sees
+// (`template-rows.ts`) so that they follow the conditions of the table. Julia never sees
 // the definition: it reads rows only, and a row's `template` key is ignored there.
 //
 // Pure, nothing here throws. A definition that is not good makes the recipe an ordinary
@@ -24,7 +24,7 @@ import {
     soluteArg,
     soluteFromSpec,
     type TemplateLink,
-} from "./template-link.js"
+} from "./template-rows.js"
 
 /** What the definition of a recipe is: the definition, or what is wrong with it. */
 export type RecipeTemplate = { definition: Definition } | { problem: string }

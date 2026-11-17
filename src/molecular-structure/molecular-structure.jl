@@ -256,7 +256,7 @@ export lookupRadii, Ion, tryparseIon, ionKey, ionRadius, elementRadius, nearestI
     toSpherical, radii, vols, rMax, neighbourTree, elms, name, nAtoms,
     ComponentError, component, isNucleotide, nucleotideSelector,
     StructureSource, LocalPathSource,
-    PDBIDSource, URLSource, StructureSourceError, resloveStruct, keepChains,
+    PDBIDSource, URLSource, StructureSourceError, resolveStruct, keepChains,
     loadMolecule,
     excludedVolume
 

@@ -37,12 +37,11 @@ fail(who::AbstractString, msg::AbstractString) = throw(ToolError("$who: $msg", 2
 const LINE_LIMIT = 92
 
 "The extensions of the code the layout rules apply to."
-const CODE_EXTENSIONS = (".jl", ".ts", ".tsx", ".mts", ".cts", ".scss", ".yml", ".py")
+const CODE_EXTENSIONS = (".jl", ".ts", ".tsx", ".mts", ".cts", ".scss", ".yml")
 
 # Folders that hold no code of ours: version control, build output, caches, notes.
-# `legacy` holds verbatim copies of lost scripts (dev/pmv-rism/legacy), never reformatted.
 const SKIP_DIRS = ("build", ".git", "_cache", "sources", "manuscript", ".CondaPkg",
-    "node_modules", "legacy")
+    "node_modules")
 
 
 "The repository this package lives in (its tools, test/format environment, scripts)."
