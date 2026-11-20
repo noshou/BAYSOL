@@ -234,7 +234,7 @@ end
     @test k.κ_δρ₁₂ == κ_δρ₁₂ && k.κ_δρ₃ == κ_δρ₃
     @test k.pmvFallbackUncert == PMV_FALLBACK_UNCERT
     # the geometry, prior and c1 settings that are keywords of seedModel too
-    @test length(k) == 24 && k.shellSample == 256 && k.sasaNOcc == 104
+    @test length(k) == 25 && k.shellSample == 256 && k.sasaNOcc == 104
     # every keyword is one `seedModel` takes
     kw = Base.kwarg_decl(first(methods(seedModel)))
     @test all(n -> n in kw, keys(k))

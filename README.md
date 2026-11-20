@@ -64,8 +64,8 @@ takes several minutes; it is only so that your first fit is not the one that wai
 fit still downloads the helper programs PROPKA and pdb2pqr (they add hydrogen atoms) and needs
 internet.
 
-The interface needs a real terminal: started with its output redirected it prints `BAYSOL: this
-program needs a terminal` and stops. If the terminal is smaller than 80 x 24 it shows a message;
+The interface needs a real terminal: started with its output redirected it prints
+`BAYSOL: this program needs a terminal` and stops. If the terminal is smaller than 80 x 24 it shows a message;
 make the window bigger and the screen comes back as it was.
 
 **Where BAYSOL keeps your work** (the *data folder*, made on first start):
@@ -275,18 +275,17 @@ and 700 kept draws on each of 8 chains is the sampler default.
 When the project has a model, a buffer (with at least one solute, a pH and a temperature) and data (with its
 energy), the project menu shows **`run: shift+r`** at the bottom. Press **Shift+R**.
 
-1. The run starts at once, at the buffer's temperature (set with `^g` after the pH and σ; a project
-   made before that needs it set once: the prompt starts at your last run's temperature, so Enter
-   does it).
-2. The **run screen** shows Julia's output live. The keys are locked; the footer says `abort
-   and quit: ^c`. A fit takes from minutes to much longer, and the first one is slower because
+1. The run starts at once, at the buffer's temperature (set with `^g` after the pH and σ; the
+   prompt starts at your last run's temperature, so Enter does it).
+2. The **run screen** shows Julia's output live. The keys are locked; the footer says
+   `abort and quit: ^c`. A fit takes from minutes to much longer, and the first one is slower because
    of the compile.
 3. At the end the counter says `done`, `failed` or `aborted` and **Enter** goes back to the project
    menu. A failed run shows the first line of its error.
 
 **Ctrl-C (or Ctrl-D) stops the run and quits the program**: Julia is asked to finish its log, then
-stopped. Only one run per project can be live at once: another start says `a run is in progress
-(pid N)`. While it runs you can edit nothing that it uses: it works on a copy of your project
+stopped. Only one run per project can be live at once: another start says
+`a run is in progress (pid N)`. While it runs you can edit nothing that it uses: it works on a copy of your project
 files made at the start.
 
 ### 6. Read the results
@@ -836,8 +835,8 @@ The run ends with a few lines that start with `Fit finished:`.
   (or the error bars are too small). The number is calculated on your measured points.
 - **The four parameter lines**: ρₑ is the buffer's electron density, and δρ₁, δρ₂, δρ₃ are the
   contrasts of the water layers around your molecule. Each is printed with an interval.
-- **`Checks:`** says whether the sampler converged. Look for `converged` and `no divergent
-  transitions`. `NOT converged` means the chains did not agree, and the intervals should not be
+- **`Checks:`** says whether the sampler converged. Look for `converged` and
+  `no divergent transitions`. `NOT converged` means the chains did not agree, and the intervals should not be
   trusted.
 - **`Note:` lines** explain anything unusual. For example, that more than 1 % of the steps
   diverged, that the posterior has several modes (two or more equally plausible answers), or
@@ -959,4 +958,4 @@ bysl <tool> --help           # the usage of one tool
 
 ## What the numbers mean
 
-The reported parameters and uncertainties are conditional on the Gaussian scattering model, the measurement errors and the priors. Validation across 53 fits and three synthetic cases found no general justification for inflating the errors; an experimental correlated-discrepancy model risked absorbing systematic misfit and shifting estimates.
+The reported parameters and uncertainties are conditional on the Gaussian scattering model, the measurement errors and the priors. The errors are not inflated and no correlated discrepancy is modelled, so a systematic misfit of the model shows up as a large χ², not as wider intervals.

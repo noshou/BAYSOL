@@ -16,6 +16,28 @@ if !@isdefined(checkFloat)
 
     checkFloat(a, b; atol = DEFAULT_ATOL) = abs(a - b) < atol
 
+    # The folder of the experiment fixtures of the entry `id`. They are kept as one
+    # archive per entry (`test/fixtures/experiments/<id>.7z`, no plain folders): the
+    # plain folder is used when present, else the archive is unpacked once per process
+    # into a `mktempdir` that is removed at exit (an archive entry path starts with
+    # `<id>/`, or the files are flat in the archive). Test-only.
+    const _EXPERIMENT_DIRS = Dict{String,String}()
+    function experimentFixtureDir(id::AbstractString)::String
+        get!(_EXPERIMENT_DIRS, String(id)) do
+            base = joinpath(@__DIR__, "..", "fixtures", "experiments")
+            plain = joinpath(base, id)
+            isdir(plain) && return plain
+            archive = joinpath(base, "$id.7z")
+            isfile(archive) || error("no fixtures for $id in $base")
+            exe = Sys.which("7z")
+            exe === nothing && (exe = Sys.which("7zz"))
+            exe === nothing && error("7z (7-Zip) is not on the PATH")
+            tmp = mktempdir(; cleanup = true)
+            run(pipeline(`$exe x -y -o$tmp $archive`; stdout = devnull))
+            isdir(joinpath(tmp, id)) ? joinpath(tmp, id) : tmp
+        end
+    end
+
     # The value of every setting at its default, the `Dict` that the keyword helpers
     # (`seedKeywords`, `runKeywords`, `resultsKeywords`) take: what `loadSettings` of
     # `tui/src/store/settings-file.jl` returns when there is no settings file.

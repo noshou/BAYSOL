@@ -20,7 +20,9 @@ using BAYSOL.Scattering: speciesMultipoles, forwardCache, ForwardCache,
     excludedVolumeFactor, gram, partialWaveWeights, selfScatter, crossScatter,
     hydration,
     intensityTerms, modelIntensity, cavityShellFraction,
-    SHELL_THICKNESS, PROBE_RADIUS, B_LM_CHUNK
+    SHELL_THICKNESS, PROBE_RADIUS, B_LM_CHUNK, MemoryBudgetError, MEMORY_HEADROOM,
+    MEMORY_HEADROOM_MIN, MEMORY_HEADROOM_MAX
+using BAYSOL.Runtime: StageLog
 using BAYSOL.MolecularStructure: create, radii, vols
 using BAYSOL.PhysicalConstants: UNIT_OF_δρ
 using LinearAlgebra: Symmetric, issymmetric, eigvals
@@ -268,5 +270,87 @@ iyW    = partialWaveWeights(iyLmax)
         @test f == 0.0
         v = [sqrt(max(fc.G[k, k, 1], 0.0)) for k in 3:5]
         @test f == v[3] / sum(v)
+    end
+    @testset "the blocked build: every block size gives the one-pass Gram matrix" begin
+        mo = fwdMol()
+        one = forwardCache(mo, fwdQ, fwdLmax, fwdE; chunk = fwdChunk)
+        Q = length(fwdQ)
+        for b in (1, 2, 3, Q)
+            log = StageLog()
+            fc = forwardCache(mo, fwdQ, fwdLmax, fwdE; chunk = fwdChunk, blockQ = b,
+                stageLog = log)
+            @test maximum(abs, fc.G .- one.G) < 10 * DEFAULT_ATOL * maximum(abs, one.G)
+            @test maximum(abs, fc.gc .- one.gc) < 10 * DEFAULT_ATOL * maximum(abs, one.G)
+            @test fc.qvals == one.qvals && fc.rM == one.rM
+            @test log.info["forwardBlocks"] == cld(Q, b)
+            @test log.info["forwardBlockQ"] == b
+            @test log.info["forwardPeakGib"] > 0 && log.info["forwardEstGib"] > 0
+            # the stages of the blocks are summed: one row per stage, as in one pass
+            names = [st.name for st in log.stages]
+            @test allunique(names)
+            @test "Gram + rM" in names
+        end
+    end
+
+    @testset "the blocked build: the block size follows the free memory" begin
+        mo = fwdMol()
+        Q = length(fwdQ)
+        gib = 2^30
+        # plenty of memory: one block
+        a = forwardCache(mo, fwdQ, fwdLmax, fwdE; chunk = fwdChunk,
+            memory = () -> (64gib, 64gib))
+        # a budget between the one-q and the all-q estimate: several blocks of the
+        # size the estimate allows, and the same G
+        # the tiny structure's estimate is the pause budget plus kilobytes: give the
+        # machine one byte less than three q values need and see the plan shrink
+        sh = BAYSOL.Geometry.sasa(mo)
+        nsh = Tuple(
+            count(==(c), sh[3]) for c in
+            (BAYSOL.Geometry.CONVEX, BAYSOL.Geometry.CONCAVE, BAYSOL.Geometry.CAVITY)
+        )
+        estq(b) = BAYSOL.Scattering._forwardBytes(8, nsh, fwdLmax, b; chunk = fwdChunk)
+        total = 100 * gib
+        free = estq(3) + 10 * gib - 1       # headroom 10 % of 100 GiB = 10 GiB
+        log = StageLog()
+        fc = forwardCache(mo, fwdQ, fwdLmax, fwdE; chunk = fwdChunk,
+            memory = () -> (free, total), memoryHeadroom = 10, stageLog = log)
+        @test log.info["forwardBlockQ"] == 2          # 3 does not fit (one byte short)
+        @test log.info["forwardBlocks"] == cld(Q, 2)
+        @test maximum(abs, fc.G .- a.G) < 10 * DEFAULT_ATOL * maximum(abs, a.G)
+        # the headroom is a percentage of the total
+        log2 = StageLog()
+        forwardCache(mo, fwdQ, fwdLmax, fwdE; chunk = fwdChunk,
+            memory = () -> (free, total), memoryHeadroom = 5, stageLog = log2)
+        @test log2.info["forwardBlockQ"] > 2
+        @test log2.info["forwardBudgetGib"] ≈ (free - 5 * gib) / gib atol = 1e-3
+    end
+
+    @testset "the blocked build: it stops early when not even one q value fits" begin
+        mo = fwdMol()
+        e = try
+            forwardCache(mo, fwdQ, fwdLmax, fwdE; chunk = fwdChunk,
+                # headroom 10 % of 1 GiB, build needs > 1 GiB
+                memory = () -> (2^30, 2^30))
+            nothing
+        catch err
+            err
+        end
+        @test e isa MemoryBudgetError
+        @test e.lMax == fwdLmax && e.nQ == length(fwdQ) && e.nAtoms == 8
+        @test e.neededBytes > e.freeBytes - e.headroomBytes
+        msg = sprint(showerror, e)
+        @test occursin("lMax = $fwdLmax", msg) && occursin("$(length(fwdQ)) q values", msg)
+        @test occursin("GiB", msg) && occursin("memoryHeadroom", msg)
+        # nothing was allocated for the build: the error is thrown before any block
+        @test_throws MemoryBudgetError forwardCache(mo, fwdQ, fwdLmax, fwdE;
+            memory = () -> (0, 2^40), memoryHeadroom = MEMORY_HEADROOM)
+    end
+
+    @testset "memoryHeadroom: the setting and its limits" begin
+        @test MEMORY_HEADROOM isa Int
+        @test MEMORY_HEADROOM_MIN ≤ MEMORY_HEADROOM ≤ MEMORY_HEADROOM_MAX
+        @test BAYSOL.Scattering.SETTING_LIMITS.MEMORY_HEADROOM ==
+              (atLeast = MEMORY_HEADROOM_MIN, atMost = MEMORY_HEADROOM_MAX)
+        @test :MEMORY_HEADROOM in BAYSOL.Scattering.SETTING_NAMES
     end
 end

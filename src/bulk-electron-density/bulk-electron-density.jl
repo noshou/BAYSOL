@@ -8,7 +8,7 @@ module BulkElectronDensity
 using ..PhysicalConstants: STANDARD_TEMPERATURE_C, AVOGADRO, WATER_MOLAR_MASS,
     WATER_DENSITY_UNCERTAINTY,
     WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER,
-    KELL_DENSITY_NUM, KELL_DENSITY_DEN, BACKBONE_ELECTRONS
+    KELL_DENSITY_NUM, KELL_DENSITY_DEN, BACKBONE_ELECTRONS, LN10
 using ..Runtime: KeyedCache
 using JSON3: JSON3
 using FastClosures: @closure
@@ -208,7 +208,7 @@ the unit suite fails if it is stale. The terminal interface reads the same liter
 default `±` of a custom solute, so keep the markers and the one-line form.
 """
 # BEGIN harvested: nonbio-mean-uncertainty
-const NONBIO_MEAN_UNCERTAINTY = 2.525827
+const NONBIO_MEAN_UNCERTAINTY = 2.528038
 # END harvested: nonbio-mean-uncertainty
 
 include("calc-density.jl")   # water first: `_H2O_V0_25C` below needs its density
@@ -359,7 +359,7 @@ chain),
 `ϕ° = MALTOSIDE_V0_BASE + `[`ALKYL_ETHOXYLATE_V0_PER_CH2`](@ref)`·n`, monomer (infinite
 dilution): the
 3D-RISM estimate for decyl maltoside, 380.47 (3D-RISM 368.9 plus the Bayesian group
-correction fitted to 88 measured solutes, `dev/pmv-rism`), minus 10 CH₂ of 15.93 each."
+correction fitted to 88 measured solutes, `dev/src/pmv.jl`), minus 10 CH₂ of 15.93 each."
 const MALTOSIDE_V0_BASE = 221.17
 
 "Chain length at which the maltoside and LMNG schemes were calculated (decyl maltoside, and

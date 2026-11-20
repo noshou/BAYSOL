@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# 3D-RISM partial molar volumes (PMV) with a Bayesian group correction: the Julia port of
-# the former dev/pmv-rism Python tools. One module per part (paths, tables, the model, the
-# polymers rows, the 3D-RISM driver, the diagnostics, the self-test), one command line on
-# top (`bysl extract pmv SUBCOMMAND`). RDKit comes from RDKitMinimalLib.jl (group counts and
-# ETKDG embedding); AmberTools (antechamber, parmchk2, tleap, rism3d.snglpnt) stays an
-# external install used by `run` and `batch` only. Details in dev/pmv-rism/README.md.
+"""
+3D-RISM partial molar volumes (PMV) with a Bayesian group correction.
+One module per part (paths, tables, the model, the
+polymers rows, the 3D-RISM driver, the diagnostics, the self-test), one command line on
+top (`bysl extract pmv SUBCOMMAND`). RDKit comes from RDKitMinimalLib.jl (group counts and
+ETKDG embedding); AmberTools (antechamber, parmchk2, tleap, rism3d.snglpnt) stays an
+external install used by `run` and `batch` only. Details in dev/README.md ("pmv").
+"""
 module Pmv
 
 using ..Common
@@ -241,21 +243,19 @@ module Config
 
 using ...Common
 
-export HERE, DATA, POLYMERS, NONBIOLOGICAL, TABLES, NONBIO_LOOKUP, out_dir, ensure_out,
-    results_path, work_dir, amber_home, amber_env, OUT, RESULTS, WORK, AMBER
+export POLYMERS, NONBIOLOGICAL, TABLES, NONBIO_LOOKUP, out_dir, ensure_out,
+    results_path, work_dir, amber_home, amber_env, OUT, AMBER, NICE
 using Base.ScopedValues: ScopedValue
 
-# The settings the global options set for one call (`--out`, `--results`, `--work`), and
+# The setting the global option `--out` sets for one call, and
 # the AmberTools prefix a test can point elsewhere; `nothing` is "the environment, then
 # the default".
 const OUT = ScopedValue{Union{Nothing,String}}(nothing)
-const RESULTS = ScopedValue{Union{Nothing,String}}(nothing)
-const WORK = ScopedValue{Union{Nothing,String}}(nothing)
 const AMBER = ScopedValue{Union{Nothing,String}}(nothing)
+# The niceness (0 to 19) the AmberTools programs of a `batch` run get; 0 leaves them alone.
+const NICE = ScopedValue{Int}(0)
 
 # Everything is read at call time, so the root of a test or an option applies at once.
-HERE() = in_root("dev", "pmv-rism")
-DATA() = joinpath(HERE(), "data")
 POLYMERS() = in_root("src", "bulk-electron-density", "polymers")
 NONBIOLOGICAL() = in_root("src", "bulk-electron-density", "non-biological")
 TABLES() = [
@@ -264,11 +264,25 @@ TABLES() = [
 ]
 NONBIO_LOOKUP() = joinpath(NONBIOLOGICAL(), "nonbio_lookup.json")
 
-# The first of: the option, the environment variable, the default.
-_setting(opt, env, default) = something(opt[], get(ENV, env, nothing), default)
+"""
+    out_dir() -> String
 
-"Output folder: `--out`, env PMV_OUT, default `dev/pmv-rism/out` (not created here)."
-out_dir() = _setting(OUT, "PMV_OUT", joinpath(HERE(), "out"))
+The output folder, `--out DIR`. There is no default inside the repository, so a command
+that writes (fit, diagnostics, run, batch) without it is a usage error. Not created here.
+
+# Returns
+The folder as given (made absolute by the command line).
+
+# Exceptions
+`ToolError` (status 2) when `--out` was not given.
+"""
+function out_dir()
+    d = OUT[]
+    d === nothing && throw(
+        ToolError("bysl extract pmv: --out DIR is required (before the subcommand)", 2),
+    )
+    return d
+end
 
 "`out_dir()`, created if it does not exist."
 function ensure_out()
@@ -277,11 +291,23 @@ function ensure_out()
     return d
 end
 
-"The results.tsv of the runs: `--results`, env PMV_RESULTS, default `data/results.tsv`."
-results_path() = _setting(RESULTS, "PMV_RESULTS", joinpath(DATA(), "results.tsv"))
+"""
+    results_path() -> String
 
-"Scratch folder of the runs: `--work`, env PMV_WORK, default `dev/pmv-rism/work`."
-work_dir() = _setting(WORK, "PMV_WORK", joinpath(HERE(), "work"))
+Where `run` and `batch` append their finished runs: `results.tsv` in the output folder.
+The runs of the bundled `RESULTS` are the base every report reads; this file only adds to
+them (the last line of a name wins), and `batch` resumes from it.
+
+# Returns
+The file path (not created here).
+
+# Exceptions
+`ToolError` (status 2) when `--out` was not given.
+"""
+results_path() = joinpath(out_dir(), "results.tsv")
+
+"Scratch folder of the runs: `work` under the output folder (`--out`)."
+work_dir() = joinpath(out_dir(), "work")
 
 "AmberTools prefix: env AMBERHOME, default ~/.conda/envs/amber26."
 amber_home() =
@@ -304,9 +330,10 @@ module Tables
 
 using ...Common
 using ..Config
+using CSV: CSV
 using OrderedCollections: OrderedDict
 
-export read_tsv, read_results, calibration_table, electrons, ELEMENT_Z
+export read_tsv, read_results, calibration_table, RESULTS, CALIBRATION, electrons, ELEMENT_Z
 
 const ELEMENT_Z = Dict("H" => 1, "C" => 6, "N" => 7, "O" => 8, "P" => 15, "S" => 16,
     "Na" => 11)
@@ -319,16 +346,241 @@ function read_tsv(path)::Vector{Dict{String,String}}
     return [Dict{String,String}(zip(head, r)) for r in lines[2:end]]
 end
 
-"""
-    read_results(path = results_path()) -> OrderedDict
+"name => (n, mean, sd), in file order.
+Reference finished 3D-RISM runs: name, number of conformers n, mean and SD
+of the raw volumes (cm3/mol; `nan` for a single conformer.
+The runs used a 25 A box buffer, a 0.5 A grid and tolerance 1e-6. It is the former
+results.tsv of the old tool folder without the runs nothing reads any more."
+const RESULTS = OrderedDict{String,Tuple{Int,Float64,Float64}}(
+    String(r.name) => (r.n, r.mean, r.sd) for r in
+    CSV.File(
+        IOBuffer(
+            """
+            name   |  n |   mean |   sd
+            DM     | 10 | 368.91 | 3.41
+            K001   |  1 |  50.71 |  nan
+            K002   |  3 |  65.44 | 0.06
+            K003   |  3 |  79.91 | 0.18
+            K004   |  5 | 108.85 | 0.40
+            K005   |  5 | 123.66 | 0.39
+            K006   |  1 |  66.10 |  nan
+            K007   |  1 |  80.90 |  nan
+            K008   |  1 |  95.70 |  nan
+            K009   |  1 |  82.56 |  nan
+            K010   |  3 |  54.05 | 0.14
+            K011   |  3 |  68.42 | 0.19
+            K012   |  5 |  82.91 | 0.24
+            K013   |  5 | 112.48 | 0.43
+            K014   |  5 | 141.52 | 0.52
+            K015   |  3 |  72.57 | 0.06
+            K016   |  5 |  90.95 | 0.42
+            K017   |  5 | 109.24 | 0.40
+            K018   |  5 | 127.55 | 0.64
+            K019   |  1 |  99.92 |  nan
+            K020   |  3 |  82.20 | 0.30
+            K021   |  5 |  86.77 | 0.23
+            K022   |  5 | 121.52 | 0.36
+            K023   |  1 |  73.65 |  nan
+            K024   |  1 | 213.99 |  nan
+            K025   |  1 | 175.67 |  nan
+            K026   |  1 | 140.67 |  nan
+            K027   |  3 |  70.37 | 0.23
+            K028   |  5 |  85.71 | 0.28
+            K029   |  5 | 115.05 | 0.45
+            K030   |  5 | 102.27 | 0.18
+            K031   |  5 |  88.55 | 0.37
+            K032   |  5 | 123.92 | 0.27
+            K033   |  5 | 159.00 | 1.07
+            K034   |  3 | 117.97 | 0.04
+            K035   |  3 | 117.77 | 0.38
+            K036   |  3 | 100.28 | 0.39
+            K037   |  1 |  98.43 |  nan
+            K038   |  3 | 113.23 | 0.37
+            K039   |  5 | 217.40 | 2.37
+            K040   |  5 | 220.30 | 0.99
+            K041   |  3 | 134.34 | 0.80
+            K042   |  3 | 133.62 | 0.41
+            K043   |  5 | 150.50 | 0.60
+            K044   |  5 | 178.63 | 2.03
+            K045   |  5 | 237.60 | 0.75
+            K046   |  1 |  51.67 |  nan
+            K047   |  3 |  81.23 | 0.02
+            K048   |  5 | 110.73 | 0.23
+            K049   |  3 |  67.22 | 0.09
+            K050   |  1 |  82.21 |  nan
+            K051   |  1 |  86.18 |  nan
+            K052   |  1 |  96.87 |  nan
+            K053   |  3 | 103.24 | 0.08
+            K054   |  5 | 101.87 | 0.13
+            K055   |  3 |  80.64 | 0.11
+            K056   |  5 | 109.41 | 0.17
+            K057   |  3 |  82.26 | 0.22
+            K058   |  5 | 141.05 | 0.46
+            K059   |  1 |  96.61 |  nan
+            K060   |  1 |  98.41 |  nan
+            K061   |  1 |  89.94 |  nan
+            K062   |  1 |  94.71 |  nan
+            K063   |  1 |  46.34 |  nan
+            K064   |  5 | 105.26 | 0.23
+            K065   |  1 |  62.44 |  nan
+            K066   |  3 |  91.87 | 0.07
+            K067   |  1 |  92.52 |  nan
+            K068   |  3 |  83.20 | 0.10
+            K069   |  3 | 104.06 | 0.19
+            K070   |  1 |  70.20 |  nan
+            K071   |  1 |  63.92 |  nan
+            K072   |  3 |  89.45 | 0.60
+            K073   |  1 |  74.14 |  nan
+            K074   |  3 |  92.83 | 0.09
+            K075   |  5 | 112.48 | 0.31
+            K076   |  1 |  78.08 |  nan
+            K077   |  3 |  54.57 | 0.31
+            K078   |  5 | 112.97 | 0.17
+            K079   |  5 |  89.39 | 0.49
+            K080   |  5 | 116.90 | 1.30
+            K081   |  3 |  47.63 | 0.12
+            K082   |  3 |  64.26 | 0.11
+            K083   |  5 | 107.71 | 0.58
+            K084   |  5 |  75.32 | 2.96
+            K085   |  5 | 102.79 | 2.43
+            K086   |  5 | 130.85 | 1.53
+            K087   |  3 |  81.59 | 0.05
+            K088   |  5 |  84.34 | 0.10
+            K089   |  5 | 116.09 | 1.13
+            K090   |  5 | 255.27 | 0.98
+            Cymal6 | 10 | 383.01 | 2.73
+            tPCCaM | 10 | 412.77 | 1.91
+            OTG    |  6 | 244.70 | 0.57
+            SML    | 10 | 399.10 | 1.95
+            R001   |  8 | 143.39 | 1.57
+            R002   |  8 | 135.45 | 0.47
+            R003   |  8 | 166.89 | 0.71
+            M8     |  6 | 340.07 | 1.29
+            R004   |  8 | 160.47 | 0.48
+            R005   |  8 | 156.30 | 1.20
+            R006   |  8 | 148.10 | 0.77
+            R007   |  6 | 119.14 | 0.39
+            R008   |  6 | 133.55 | 0.60
+            R009   |  6 | 138.14 | 0.34
+            M9     |  6 | 353.91 | 4.04
+            R010   |  8 | 154.66 | 0.57
+            R011   |  8 | 141.57 | 0.49
+            R012   |  8 | 156.21 | 0.38
+            R013   |  8 | 165.60 | 0.27
+            R014   |  4 | 102.19 | 0.18
+            R015   |  3 |  84.82 | 0.28
+            R016   |  3 |  91.30 | 0.63
+            R017   |  6 | 113.13 | 0.40
+            R018   |  6 | 111.83 | 0.40
+            R019   |  8 | 144.27 | 1.12
+            R020   |  4 |  90.03 | 1.45
+            R021   |  6 | 112.67 | 0.41
+            R022   |  6 |  96.99 | 0.56
+            R023   |  3 |  88.26 | 0.34
+            R024   |  3 |  87.08 | 0.03
+            R025   |  4 | 106.84 | 0.11
+            R026   |  3 |  88.20 | 0.09
+            R027   |  3 |  94.52 | 0.36
+            R028   | 10 | 128.21 | 0.65
+            R029   | 10 | 113.52 | 0.84
+            R030   |  6 | 153.22 | 0.36
+            R031   |  6 | 136.83 | 0.60
+            M11    |  6 | 383.65 | 1.79
+            R032   |  6 | 169.41 | 0.67
+            R033   |  6 | 153.04 | 0.76
+            R034   |  8 | 179.11 | 1.40
+            R035   |  8 | 132.69 | 0.29
+            R036   |  8 | 141.97 | 0.35
+            R037   |  8 | 179.90 | 1.09
+            R038   |  8 | 135.36 | 0.32
+            M12    |  6 | 393.92 | 2.72
+            R042   | 10 | 205.81 | 0.83
+            M13    |  6 | 411.40 | 2.85
+            R043   | 10 | 211.33 | 0.88
+            G6     |  6 | 208.84 | 1.64
+            G9     |  6 | 252.44 | 0.69
+            G10    |  6 | 267.89 | 1.62
+            R044   | 10 | 218.34 | 0.92
+            Cymal3 |  6 | 340.41 | 2.03
+            Cymal4 |  6 | 352.41 | 0.93
+            Cymal5 |  6 | 367.92 | 1.09
+            Cymal7 |  6 | 396.38 | 1.25
+            FC8    |  6 | 231.76 | 1.78
+            FC10   |  6 | 260.96 | 1.45
+            FC12   |  6 | 291.07 | 2.08
+            FC14   |  6 | 319.40 | 1.41
+            FC16   |  6 | 348.07 | 1.39
+            DIG    |  4 | 836.47 | 4.23
+            S001   |  6 | 213.76 | 2.78
+            S002   |  6 | 211.85 | 2.26
+            S003   |  6 | 211.26 | 2.76
+            S004   |  6 | 203.56 | 1.76
+            S005   |  6 | 201.74 | 3.15
+            S006   |  6 | 182.20 | 1.01
+            S007   |  6 | 169.08 | 0.58
+            S008   |  6 | 171.03 | 0.72
+            S009   |  6 | 156.24 | 0.35
+            S010   |  6 | 153.29 | 0.38
+            S011   |  6 | 462.43 | 5.12
+            S012   |  6 | 432.17 | 3.28
+            S013   |  6 | 459.00 | 5.94
+            S014   |  6 | 429.44 | 3.76
+            S015   |  6 | 150.47 | 0.57
+            S016   |  6 | 119.58 | 0.22
+            S017   |  6 | 247.06 | 2.44
+            S018   |  6 | 250.55 | 0.95
+            S019   |  6 | 280.00 | 0.95
+            S020   |  6 | 487.20 | 1.53
+            S021   |  6 | 429.30 | 2.73
+            S022   |  6 | 451.92 | 1.62
+            S023   |  6 | 397.01 | 2.39
+            S024   |  6 | 248.85 | 2.53
+            S025   |  6 | 218.36 | 2.13
+            S026   |  6 | 825.89 | 6.41
+            S027   |  6 | 487.91 | 5.63
+            S028   |  6 | 395.80 | 1.62
+            S029   |  6 | 554.21 | 3.13
+            S030   |  6 | 280.46 | 0.07
+            S031   |  6 | 293.26 | 0.29
+            S032   |  6 | 263.75 | 0.41
+            S033   |  6 | 235.70 | 0.13
+            S034   |  6 | 292.18 | 0.13
+            S035   |  6 | 194.25 | 0.11
+            S036   |  6 | 231.80 | 0.78
+            S037   |  6 | 348.19 | 1.55
+            BTP0   | 10 | 199.89 | 1.82
+            BTP1   | 10 | 204.66 | 1.88
+            BTP2   | 10 | 206.07 | 1.16
+            TRIS0  |  3 |  87.74 | 0.48
+            TRIS1  |  3 |  92.58 | 0.90
+            """,
+        );
+        delim = '|',
+        stripwhitespace = true,
+        types = [String, Int, Float64, Float64],
+    )
+)
 
-name => (n, mean, sd) from results.tsv (the last line of a name wins; a missing file is
-empty). Columns: name, n, mean, sd, buffer, grid, tolerance.
+"""
+    read_results(path = nothing) -> OrderedDict
+
+name => (n, mean, sd) of the finished runs: the bundled `RESULTS`, then the lines of a
+results file added on top (the last line of a name wins). The file is `path`, else
+`results.tsv` under `--out` when that is given; a missing file adds nothing. File columns:
+name, n, mean, sd, buffer, grid, tolerance (tab separated).
+
+# Returns
+An ordered dictionary, the bundled runs first.
+
+# Exceptions
+A malformed number in the file is a `ArgumentError`.
 """
 function read_results(path = nothing)
-    r = OrderedDict{String,Tuple{Int,Float64,Float64}}()
-    p = path === nothing ? results_path() : string(path)
-    if isfile(p)
+    r = copy(RESULTS)
+    p =
+        path !== nothing ? string(path) :
+        OUT[] !== nothing ? joinpath(OUT[], "results.tsv") : nothing
+    if p !== nothing && isfile(p)
         for line in eachline(p)
             q = split(line, '\t')
             length(q) >= 4 &&
@@ -338,8 +590,341 @@ function read_results(path = nothing)
     return r
 end
 
-"Every row of data/calibration.tsv (id, name, smiles, charge, nconf, v_meas, fit)."
-calibration_table() = read_tsv(joinpath(DATA(), "calibration.tsv"))
+"""Provenance."""
+function _calibrationProvenance(source::AbstractString)::String
+    source == "unverified" &&
+        return "literature volume used when the set was built; " *
+               "source not recorded, re-verify"
+    startswith(source, "derived:") && return "derived " * source[9:end]
+    startswith(source, "monomer:") &&
+        return "measured " * source[9:end] *
+               " (monomer; the earlier mixed 249.35 was wrong)"
+    return "measured " * source
+end
+
+_readTable(text, types) =
+    CSV.File(IOBuffer(text); delim = '|', stripwhitespace = true, types = types)
+
+"""
+The calibration set: 90 solutes group corrections are fitted on.
+"""
+const CALIBRATION = let
+    names = Dict(
+        String(r.id) => String(r.name) for r in _readTable(
+            """
+            id   | name
+            K001 | ethanol
+            K002 | 1-propanol
+            K003 | 1-butanol
+            K004 | 1-hexanol
+            K005 | 1-heptanol
+            K006 | 2-propanol
+            K007 | 2-methyl-2-propanol
+            K008 | cyclohexanol
+            K009 | cyclopentanol
+            K010 | ethylene glycol
+            K011 | 1,3-propanediol
+            K012 | 1,4-butanediol
+            K013 | 1,6-hexanediol
+            K014 | 1,8-octanediol
+            K015 | glycerol
+            K016 | erythritol
+            K017 | xylitol
+            K018 | d-mannitol
+            K019 | 1,4-cyclohexanediol
+            K020 | diethyl ether
+            K021 | 1,2-dimethoxyethane
+            K022 | diglyme
+            K023 | 1,4-dioxane
+            K024 | 18-crown-6
+            K025 | 15-crown-5
+            K026 | 12-crown-4
+            K027 | 2-methoxyethanol
+            K028 | 2-ethoxyethanol
+            K029 | 2-butoxyethanol
+            K030 | diethoxymethane
+            K031 | diethylene glycol
+            K032 | triethylene glycol
+            K033 | tetraethylene glycol
+            K034 | glucose
+            K035 | d-galactose
+            K036 | d-ribose
+            K037 | d-xylose
+            K038 | 2-deoxy-d-glucose
+            K039 | cellobiose
+            K040 | sucrose
+            K041 | methyl beta-d-glucopyranoside
+            K042 | methyl alpha-d-glucopyranoside
+            K043 | ethyl alpha-d-glucopyranoside
+            K044 | phenyl beta-d-glucopyranoside
+            K045 | octyl glucopyranoside
+            K046 | acetamide
+            K047 | butanamide
+            K048 | hexanamide
+            K049 | dmf
+            K050 | dmac
+            K051 | 1-methyl-2-pyrrolidinone
+            K052 | epsilon-caprolactam
+            K053 | 1,1-diethylurea
+            K054 | butylurea
+            K055 | 1-butanamine
+            K056 | 1-hexanamine
+            K057 | diethylamine
+            K058 | dibutylamine
+            K059 | cyclohexanamine
+            K060 | 1-methylpiperidine
+            K061 | 4-methylmorpholine
+            K062 | dabco
+            K063 | acetonitrile
+            K064 | hexanenitrile
+            K065 | acetone
+            K066 | 2-pentanone
+            K067 | cyclohexanone
+            K068 | ethyl acetate
+            K069 | diethyl carbonate
+            K070 | gamma-butyrolactone
+            K071 | dimethyl sulfoxide
+            K072 | diethyl sulfide
+            K073 | benzene
+            K074 | benzyl alcohol
+            K075 | 2-phenoxyethanol
+            K076 | aniline
+            K077 | 2-aminoethanol
+            K078 | 6-amino-1-hexanol
+            K079 | diethanolamine
+            K080 | 2-(diethylamino)ethanol
+            K081 | glycine
+            K082 | dl-alanine
+            K083 | dl-norleucine
+            K084 | 4-aminobutanoic acid
+            K085 | 6-aminohexanoic acid
+            K086 | 8-aminooctanoic acid
+            K087 | betaine
+            K088 | glycylglycine
+            K089 | triglycine
+            K090 | methyl 6-o-octanoyl-beta-d-glucopyranoside
+            """,
+            String,
+        )
+    )
+
+    smiles = Dict(
+        String(r.id) => String(r.smiles) for r in _readTable(
+            """
+            id   | smiles
+            K001 | CCO
+            K002 | CCCO
+            K003 | CCCCO
+            K004 | CCCCCCO
+            K005 | CCCCCCCO
+            K006 | CC(C)O
+            K007 | CC(C)(C)O
+            K008 | OC1CCCCC1
+            K009 | OC1CCCC1
+            K010 | OCCO
+            K011 | OCCCO
+            K012 | OCCCCO
+            K013 | OCCCCCCO
+            K014 | OCCCCCCCCO
+            K015 | OCC(O)CO
+            K016 | OCC(O)C(O)CO
+            K017 | OCC(O)C(O)C(O)CO
+            K018 | OC[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO
+            K019 | OC1CCC(O)CC1
+            K020 | CCOCC
+            K021 | COCCOC
+            K022 | COCCOCCOC
+            K023 | C1COCCO1
+            K024 | C1COCCOCCOCCOCCOCCO1
+            K025 | C1COCCOCCOCCOCCO1
+            K026 | C1COCCOCCOCCO1
+            K027 | COCCO
+            K028 | CCOCCO
+            K029 | CCCCOCCO
+            K030 | CCOCOCC
+            K031 | OCCOCCO
+            K032 | OCCOCCOCCO
+            K033 | OCCOCCOCCOCCO
+            K034 | OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O
+            K035 | OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@H]1O
+            K036 | OC[C@H]1O[C@@H](O)[C@H](O)[C@@H]1O
+            K037 | O[C@@H]1CO[C@@H](O)[C@H](O)[C@H]1O
+            K038 | OC[C@H]1O[C@@H](O)CC(O)[C@@H]1O
+            K039 | OC[C@H]1O[C@@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](O)O[C@@H]2CO)\
+                [C@H](O)[C@@H](O)[C@@H]1O
+            K040 | C([C@@H]1[C@H]([C@@H]([C@H]([C@H](O1)O[C@]2([C@H]([C@@H]([C@H]\
+                (O2)CO)O)O)CO)O)O)O)O
+            K041 | CO[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O
+            K042 | CO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O
+            K043 | CCO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O
+            K044 | OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O
+            K045 | CCCCCCCCO[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O
+            K046 | CC(N)=O
+            K047 | CCCC(N)=O
+            K048 | CCCCCC(N)=O
+            K049 | CN(C)C=O
+            K050 | CC(=O)N(C)C
+            K051 | CN1CCCC1=O
+            K052 | O=C1CCCCCN1
+            K053 | CCN(CC)C(N)=O
+            K054 | CCCCNC(N)=O
+            K055 | CCCCN
+            K056 | CCCCCCN
+            K057 | CCNCC
+            K058 | CCCCNCCCC
+            K059 | NC1CCCCC1
+            K060 | CN1CCCCC1
+            K061 | CN1CCOCC1
+            K062 | C1CN2CCN1CC2
+            K063 | CC#N
+            K064 | CCCCCC#N
+            K065 | CC(C)=O
+            K066 | CCCC(C)=O
+            K067 | O=C1CCCCC1
+            K068 | CCOC(C)=O
+            K069 | CCOC(=O)OCC
+            K070 | O=C1CCCO1
+            K071 | CS(C)=O
+            K072 | CCSCC
+            K073 | c1ccccc1
+            K074 | OCc1ccccc1
+            K075 | OCCOc1ccccc1
+            K076 | Nc1ccccc1
+            K077 | NCCO
+            K078 | NCCCCCCO
+            K079 | OCCNCCO
+            K080 | CCN(CC)CCO
+            K081 | [NH3+]CC([O-])=O
+            K082 | C[C@H]([NH3+])C([O-])=O
+            K083 | CCCC[C@H]([NH3+])C([O-])=O
+            K084 | [NH3+]CCCC([O-])=O
+            K085 | [NH3+]CCCCCC([O-])=O
+            K086 | [NH3+]CCCCCCCC([O-])=O
+            K087 | C[N+](C)(C)CC([O-])=O
+            K088 | [NH3+]CC(=O)NCC([O-])=O
+            K089 | [NH3+]CC(=O)NCC(=O)NCC([O-])=O
+            K090 | CCCCCCCC(=O)OC[C@H]1O[C@@H](OC)[C@H](O)[C@@H](O)[C@@H]1O
+            """,
+            String)
+    )
+    [
+        Dict{String,String}(
+            "id" => String(r.id),
+            "name" => names[String(r.id)],
+            "smiles" => smiles[String(r.id)],
+            "charge" => String(r.charge),
+            "nconf" => String(r.nconf),
+            "v_meas" => String(r.v_meas),
+            "provenance" => _calibrationProvenance(r.source),
+            "fit" => String(r.fit),
+        ) for r in _readTable(
+            """
+            id   | charge | nconf | v_meas | fit | source
+            K001 |      0 |     1 |  55.10 |   1 | 10.1007/978-3-642-71114-5_2
+            K002 |      0 |     3 |  70.66 |   1 | 10.1007/BF00646936
+            K003 |      0 |     3 |  86.60 |   1 | 10.1007/978-3-642-71114-5_2
+            K004 |      0 |     5 | 118.65 |   1 | 10.1007/978-3-642-71114-5_2
+            K005 |      0 |     5 | 133.43 |   1 | 10.1007/BF00646936
+            K006 |      0 |     1 |  71.92 |   1 | 10.1007/BF00646936
+            K007 |      0 |     1 |  87.74 |   1 | 10.1007/BF00646936
+            K008 |      0 |     1 | 103.50 |   1 | 10.1007/978-3-642-71114-5_2
+            K009 |      0 |     1 |  89.00 |   1 | 10.1007/978-3-642-71114-5_2
+            K010 |      0 |     3 |  54.63 |   1 | 10.1016/j.jct.2008.04.007
+            K011 |      0 |     3 |  71.90 |   1 | 10.1007/978-3-642-71114-5_2
+            K012 |      0 |     5 |  88.33 |   1 | 10.1007/978-3-642-71114-5_2
+            K013 |      0 |     5 | 120.47 |   1 | 10.1016/j.jct.2007.01.009
+            K014 |      0 |     5 | 152.60 |   1 | 10.1007/978-3-642-71114-5_2
+            K015 |      0 |     3 |  70.78 |   1 | 10.1007/978-3-642-71114-5_2
+            K016 |      0 |     5 |  87.10 |   1 | 10.1007/978-3-642-71114-5_2
+            K017 |      0 |     5 | 102.40 |   1 | unverified
+            K018 |      0 |     5 | 119.37 |   1 | 10.1007/BF00646936
+            K019 |      0 |     1 | 105.30 |   1 | 10.1007/978-3-642-71114-5_2
+            K020 |      0 |     3 |  90.40 |   1 | 10.1007/978-3-642-71114-5_2
+            K021 |      0 |     5 |  95.88 |   1 | 10.1007/978-3-642-71114-5_2
+            K022 |      0 |     5 | 132.70 |   1 | 10.1007/978-3-642-71114-5_2
+            K023 |      0 |     1 |  80.94 |   1 | 10.1007/978-3-642-71114-5_2
+            K024 |      0 |     1 | 223.40 |   1 | 10.1007/978-3-642-71114-5_2
+            K025 |      0 |     1 | 186.08 |   1 | 10.1007/978-3-642-71114-5_2
+            K026 |      0 |     1 | 149.90 |   1 | 10.1007/978-3-642-71114-5_2
+            K027 |      0 |     3 |  75.15 |   1 | 10.1007/978-3-642-71114-5_2
+            K028 |      0 |     5 |  91.15 |   1 | 10.1007/978-3-642-71114-5_2
+            K029 |      0 |     5 | 122.95 |   1 | 10.1007/978-3-642-71114-5_2
+            K030 |      0 |     5 | 113.88 |   1 | 10.1007/978-3-642-71114-5_2
+            K031 |      0 |     5 |  92.19 |   1 | unverified
+            K032 |      0 |     5 | 129.27 |   1 | unverified
+            K033 |      0 |     5 | 166.30 |   1 | unverified
+            K034 |      0 |     3 | 111.59 |   1 | 10.1007/978-3-642-71114-5_2
+            K035 |      0 |     3 | 110.20 |   1 | 10.1007/BF00646936
+            K036 |      0 |     3 |  95.20 |   1 | 10.1016/0301-4622(89)80060-2
+            K037 |      0 |     1 |  95.40 |   1 | 10.1007/BF00646936
+            K038 |      0 |     3 | 110.40 |   1 | 10.1007/978-3-642-71114-5_2
+            K039 |      0 |     5 | 212.00 |   1 | 10.1007/978-3-642-71114-5_2
+            K040 |      0 |     5 | 211.44 |   0 | 10.1007/978-3-642-71114-5_2
+            K041 |      0 |     3 | 133.60 |   1 | 10.1007/BF00646936
+            K042 |      0 |     3 | 132.90 |   1 | 10.1007/BF00646936
+            K043 |      0 |     5 | 149.45 |   1 | 10.1007/BF00646936
+            K044 |      0 |     5 | 177.50 |   1 | 10.1007/BF00646936
+            K045 |      0 |     5 | 244.00 |   0 | monomer:10.1007/s003960050558
+            K046 |      0 |     1 |  55.70 |   1 | 10.1007/978-3-642-71114-5_2
+            K047 |      0 |     3 |  87.10 |   1 | 10.1007/978-3-642-71114-5_2
+            K048 |      0 |     5 | 119.20 |   1 | 10.1007/978-3-642-71114-5_2
+            K049 |      0 |     3 |  74.50 |   1 | 10.1007/978-3-642-71114-5_2
+            K050 |      0 |     1 |  89.70 |   1 | 10.1007/978-3-642-71114-5_2
+            K051 |      0 |     1 |  90.40 |   1 | 10.1007/BF00646936
+            K052 |      0 |     1 | 105.00 |   1 | 10.1007/BF00646936
+            K053 |      0 |     3 | 114.90 |   1 | 10.1007/978-3-642-71114-5_2
+            K054 |      0 |     5 | 116.10 |   1 | 10.1007/978-3-642-71114-5_2
+            K055 |      0 |     3 |  89.80 |   1 | 10.1007/978-3-642-71114-5_2
+            K056 |      0 |     5 | 121.60 |   1 | 10.1007/978-3-642-71114-5_2
+            K057 |      0 |     3 |  91.68 |   1 | 10.1007/978-3-642-71114-5_2
+            K058 |      0 |     5 | 155.40 |   1 | 10.1007/978-3-642-71114-5_2
+            K059 |      0 |     1 | 105.35 |   1 | 10.1007/978-3-642-71114-5_2
+            K060 |      0 |     1 | 110.54 |   1 | 10.1007/978-3-642-71114-5_2
+            K061 |      0 |     1 | 101.29 |   1 | 10.1007/978-3-642-71114-5_2
+            K062 |      0 |     1 | 105.92 |   1 | 10.1007/BF00646936
+            K063 |      0 |     1 |  47.40 |   1 | 10.1007/978-3-642-71114-5_2
+            K064 |      0 |     5 | 111.91 |   1 | 10.1007/978-3-642-71114-5_2
+            K065 |      0 |     1 |  66.90 |   1 | 10.1007/978-3-642-71114-5_2
+            K066 |      0 |     3 |  98.00 |   1 | 10.1007/978-3-642-71114-5_2
+            K067 |      0 |     1 |  99.70 |   1 | 10.1007/978-3-642-71114-5_2
+            K068 |      0 |     3 |  88.90 |   1 | 10.1007/978-3-642-71114-5_2
+            K069 |      0 |     3 | 113.10 |   1 | 10.1007/BF00646936
+            K070 |      0 |     1 |  73.30 |   1 | 10.1007/BF00646936
+            K071 |      0 |     1 |  68.92 |   1 | 10.1007/BF00646936
+            K072 |      0 |     3 |  99.50 |   1 | 10.1007/BF00646936
+            K073 |      0 |     1 |  83.10 |   1 | 10.1007/BF00646936
+            K074 |      0 |     3 | 100.82 |   1 | 10.1007/BF00646936
+            K075 |      0 |     5 | 133.60 |   1 | 10.1016/j.molliq.2023.123403
+            K076 |      0 |     1 |  89.30 |   1 | 10.1007/978-3-642-71114-5_2
+            K077 |      0 |     3 |  59.25 |   1 | 10.1007/BF00646936
+            K078 |      0 |     5 | 123.38 |   1 | 10.1007/BF00646936
+            K079 |      0 |     5 |  94.38 |   1 | 10.1007/BF00646936
+            K080 |      0 |     5 | 123.04 |   1 | 10.1007/978-3-642-71114-5_2
+            K081 |      0 |     3 |  43.28 |   1 | derived:10.1016/j.jct.2013.11.022
+            K082 |      0 |     3 |  60.54 |   1 | 10.1007/978-3-642-71114-5_2
+            K083 |      0 |     5 | 107.73 |   1 | 10.1007/978-3-642-71114-5_2
+            K084 |      0 |     5 |  73.20 |   1 | 10.1007/978-3-642-71114-5_2
+            K085 |      0 |     5 | 104.20 |   1 | 10.1007/978-3-642-71114-5_2
+            K086 |      0 |     5 | 136.10 |   1 | 10.1007/978-3-642-71114-5_2
+            K087 |      0 |     3 |  98.55 |   1 | unverified
+            K088 |      0 |     5 |  76.30 |   1 | unverified
+            K089 |      0 |     5 | 112.20 |   1 | unverified
+            K090 |      0 |     5 | 266.30 |   1 | 10.1007/s003960050558
+            """,
+            String,
+        )
+    ]
+end
+
+"""
+    calibration_table() -> Vector{Dict{String,String}}
+
+Every row of the bundled `CALIBRATION` as strings, keyed `id`, `name`, `smiles`, `charge`,
+`nconf`, `v_meas`, `provenance`, `fit`.
+"""
+function calibration_table()
+    return copy(CALIBRATION)
+end
 
 "Electron count of a molecular formula such as C22H42O11, charge-corrected."
 function electrons(formula::AbstractString, charge::Integer = 0)::Int
@@ -354,8 +939,7 @@ end
 
 using .Tables
 
-# --- the group-correction model
-
+"the group-correction model"
 module Model
 
 using ...Common
@@ -374,19 +958,24 @@ export BUFFER, GRID, TOL, CH2, ANCHOR, ANCHOR_SMILES, EXTRA_SD, MIN_SD, PATTERNS
     fit, load_model, correction, combine, conformer_error, total_sd, estimate, anchored,
     holdout
 
-# 3D-RISM box buffer (A), grid spacing and tolerance (the text is what results.tsv keeps).
+"""3D-RISM box buffer (A), grid spacing and tolerance."""
 const BUFFER, GRID, TOL = "25", "0.5", "1e-6"
-# CH2 increment, cm3/mol (measured sulfonates, PEG).
+
+"""CH2 increment, cm3/mol (measured sulfonates, PEG)."""
 const CH2 = 15.93
-# Decyl beta-maltoside: the validation anchor (published table value, unchanged here).
-const ANCHOR = ("DM", 373.3, 3.9)
-const ANCHOR_SMILES =
-    "CCCCCCCCCCO[C@H]1[C@@H]([C@H]([C@@H]([C@H](O1)CO)O[C@@H]2[C@@H]([C@H]" *
-    "([C@@H]([C@H](O2)CO)O)O)O)O)O"
-# Extra variance terms in quadrature (cm3/mol), see README "Uncertainty".
+
+"""Decyl beta-maltoside is the validation anchor."""
+const ANCHOR, ANCHOR_SMILES = ("DM", 373.3, 3.9),
+"CCCCCCCCCCO[C@H]1[C@@H]([C@H]" *
+"([C@@H]([C@H](O1)CO)O[C@@H]2[C@@H]([C@H]([C@@H]([C@H](O2)CO)O)O)O)O)O"
+
+""""Extra variance terms in quadrature (cm3/mol)"."""
 const EXTRA_SD, MIN_SD = 2.0, 4.0
-# Group features of the correction (fixed before the LOO error was looked at); the value is
-# the SMARTS, `nothing` for the ring count.
+
+"""
+Group features of the correction: the value is the SMARTS, or `nothing` for the ring
+count.
+"""
 const PATTERNS = [
     "CH3_CH2" => "[CX4;H2,H3]",
     "CH_C" => "[CX4;H1,H0]",
@@ -400,14 +989,26 @@ const PATTERNS = [
     "nitrile" => "[CX2]#[NX1]",
     "rings" => nothing,
 ]
+
 const NAMES = first.(PATTERNS)
 const RIDGE_LAMBDA = 1e-3
-# Bayesian priors: the CH2 correction is centred on CH2 minus the RISM slope per CH2
-# (fitted on the n-alkanols of the set); every other group on 0, sd 5;
-# s ~ InvGamma(2, 2*3^2).
-const SD_GROUP, SD_CH2, A0, S0 = 5.0, 1.5, 2.0, 3.0
-const ALKANOLS = Dict("ethanol" => 2, "1-propanol" => 3, "1-butanol" => 4,
-    "1-pentanol" => 5, "1-hexanol" => 6)
+
+"""
+Bayesian priors: the CH2 correction is centred on CH2 minus the RISM slope per CH2
+(fitted on the n-alkanols of the set); every other group on 0, sd 5;
+s ~ InvGamma(2, 2*3^2).
+"""
+const SD_GROUP, SD_CH2, A0, S0, ALKANOLS = 5.0,
+1.5,
+2.0,
+3.0,
+Dict(
+    "ethanol"    => 2,
+    "1-propanol" => 3,
+    "1-butanol"  => 4,
+    "1-pentanol" => 5,
+    "1-hexanol"  => 6,
+)
 
 """
     features(smiles) -> Vector{Float64}
@@ -427,7 +1028,7 @@ end
 """
     calibration(; fit_only = true, res = nothing) -> (rows, X, y, R)
 
-The rows of data/calibration.tsv with a finished RISM run (RISM name = the id column);
+The rows of the calibration set with a finished RISM run (RISM name = the id column);
 rows with fit = 0 are held out unless `fit_only` is false. `y = V - R`.
 """
 function calibration(; fit_only::Bool = true, res = nothing)
@@ -512,7 +1113,7 @@ function loo_bayes(X, y, m0, sd)
     return res, z
 end
 
-# numpy's `array_split` of `idx` into `k` parts: the first `length % k` parts one longer.
+"numpy's `array_split` of `idx` into `k` parts: the first `length % k` parts one longer."
 function _array_split(idx, k)
     n, r = divrem(length(idx), k)
     parts = Vector{Vector{Int}}()
@@ -676,8 +1277,7 @@ end
 
 using .Model
 
-# --- a polymers row for a finished run and its wiring into the tables
-
+"a polymers row for a finished run and its wiring into the tables"
 module Rows
 
 using ...Common
@@ -690,7 +1290,7 @@ using OrderedCollections: OrderedDict
 export make_row, wire, RUN_NOTE
 
 const RUN_NOTE =
-    "AmberTools 3D-RISM, cSPC/E, KH, GAFF2/AM1-BCC, RDKit conformers, dev/pmv-rism " *
+    "AmberTools 3D-RISM, cSPC/E, KH, GAFF2/AM1-BCC, RDKit conformers, " *
     "(bysl extract pmv) [monomer, infinite dilution, not micellar]"
 
 """
@@ -723,7 +1323,7 @@ function make_row(name, smiles, names, aliases, mdl, res)
     )
 end
 
-# The JSON text of the entries of `sel` (name => [z, v, sd]) as polymers.json is laid out.
+"The JSON text of the entries of `sel` (name => [z, v, sd]) as polymers.json is laid out."
 _sel_text(sel) = dumps(sel; indent = 2)
 
 """
@@ -787,8 +1387,7 @@ end
 
 using .Rows
 
-# --- the 3D-RISM driver
-
+"the 3D-RISM driver"
 module Rism
 
 using ...Common
@@ -796,6 +1395,7 @@ using ..Config
 using ..Tables
 using ..Model
 using ..Layout
+using Base.ScopedValues: with
 using Printf: @sprintf
 using RDKitMinimalLib
 
@@ -804,7 +1404,7 @@ export run_molecule, batch, conformer_volume, embed, xvv, antechamber_command,
 
 const A3_TO_CM3 = 0.602214076   # A^3 per molecule -> cm3/mol
 
-# The tleap script of one conformer.
+"The tleap script of one conformer."
 const LEAP_INPUT =
     "source leaprc.gaff2\nm = loadmol2 x.mol2\nloadamberparams x.frcmod\n" *
     "saveamberparm m x.prmtop x.inpcrd\nsavepdb m x.pdb\nquit\n"
@@ -830,7 +1430,11 @@ Runs the shell command `cmd` in `cwd` with the AmberTools environment, its outpu
 file `log` there; the exit status (0 is success).
 """
 function sh_log(cmd::AbstractString, cwd::AbstractString, log::AbstractString)::Int
-    c = addenv(Cmd(ignorestatus(`sh -c $cmd`); dir = cwd), amber_env()...)
+    # `nice` wraps the whole shell, so every program of the command inherits the level
+    # (setpriority on a Julia thread would only reach that thread, not the children).
+    level = Sys.iswindows() ? 0 : NICE[]
+    shell = level > 0 ? `nice -n $level sh -c $cmd` : `sh -c $cmd`
+    c = addenv(Cmd(ignorestatus(shell); dir = cwd), amber_env()...)
     open(joinpath(cwd, log), "w") do io
         return run(pipeline(c; stdout = io, stderr = io)).exitcode
     end
@@ -928,28 +1532,44 @@ function run_molecule(name, smiles, nconf, charge, seed = 1)
 end
 
 """
-    batch(path, tier = nothing)
+    batch(path, tiers = String[]; nice = 0)
 
 Runs the rows of a spec TSV (columns id, smiles, charge, nconf; a tier column filters
-with `tier`). The RISM name is the id. Sequential, skips ids already in results.tsv.
+with `tiers`, any of them, none meaning every row) in file order, the RISM name being the
+id. Sequential, resumable: an id already in results.tsv is skipped, so a stopped batch is
+simply started again. A job that fails (no conformer finished, or an error) is reported
+as `FAILED id` on stderr and the batch goes on. `nice` (1 to 19) lowers the priority of the
+AmberTools programs, with `nice -n N` (`--nice`). Returns the ids that
+failed.
 """
-function batch(path, tier = nothing)
+function batch(path, tiers = String[]; nice::Integer = 0)
     done = read_results()
-    for r in read_tsv(path)
-        (haskey(done, r["id"]) || (tier !== nothing && get(r, "tier", nothing) != tier)) &&
-            continue
-        run_molecule(r["id"], r["smiles"], parse(Int, r["nconf"]),
-            parse(Int, r["charge"]))
+    failed = String[]
+    with(NICE => Int(nice)) do
+        for r in read_tsv(path)
+            (
+                haskey(done, r["id"]) ||
+                (!isempty(tiers) && !(get(r, "tier", nothing) in tiers))
+            ) && continue
+            println("run ", r["id"])
+            ok = try
+                run_molecule(r["id"], r["smiles"], parse(Int, r["nconf"]),
+                    parse(Int, r["charge"])) !== nothing
+            catch err
+                println(stderr, "error in ", r["id"], ": ", sprint(showerror, err))
+                false
+            end
+            ok || (println(stderr, "FAILED ", r["id"]); push!(failed, r["id"]))
+        end
     end
-    return nothing
+    return failed
 end
 
 end
 
 using .Rism
 
-# --- read-only reports on the fit, the runs and the tables
-
+"read-only reports on the fit, the runs and the tables"
 module Diagnostics
 
 using ...Common
@@ -977,7 +1597,7 @@ const NOTE_RE = Regex(
 const USAGE = """
 Read-only reports on the fit, the runs and the tables.
 
-    bysl extract pmv diagnostics REPORT [options]
+    bysl extract pmv --out DIR diagnostics REPORT [options]
 
     residuals     per solute and per group feature: fit, LOO residual, z score
     cv            LOO and repeated k-fold RMS (Bayesian and ridge); --k N, --repeats N
@@ -997,10 +1617,10 @@ function _after(a, flag)
     return i === nothing || i == length(a) ? nothing : a[i+1]
 end
 
-# A table cell as text: strings as they are, numbers with two decimals.
+"A table cell as text: strings as they are, numbers with two decimals."
 _cell(c) = c isa AbstractString ? String(c) : ff(2, c)
 
-# Pads `s` to `w` characters on the right (by character count, as Python's `ljust`).
+"Pads `s` to `w` characters on the right (by character count, as Python's `ljust`)."
 _ljust(s, w) = s * " "^max(0, w - length(s))
 
 """
@@ -1010,8 +1630,10 @@ Prints an aligned table and writes it to `<out>/diagnostics/<report>.tsv`.
 """
 function emit(report, header, rows, title = nothing)
     cells = [String[_cell(c) for c in r] for r in rows]
-    widths = [max(length(h), (length(r[i]) for r in cells)...) for (i, h) in
-                                                          enumerate(header)]
+    widths = [
+        max(length(h),
+            (length(r[i]) for r in cells)...) for (i, h) in enumerate(header)
+    ]
     title === nothing || println("\n== ", title)
     println(join([_ljust(h, w) for (h, w) in zip(header, widths)], "  "))
     for r in cells
@@ -1168,7 +1790,7 @@ estimated_rows() = [
 match_runs(res, raw, n) =
     [k for (k, (kn, mu, _)) in res if kn == n && abs(mu - raw) <= 0.051]
 
-# id -> smiles from a spec TSV (the `batch` format).
+"id -> smiles from a spec TSV (the `batch` format)."
 spec_smiles(path) = Dict(r["id"] => r["smiles"] for r in read_tsv(path))
 
 """
@@ -1186,7 +1808,7 @@ function check_row(table, r, res, smiles)
     csd = m[:sd] == "nan" ? NaN : parse(Float64, m[:sd])
     runs = match_runs(res, raw, n)
     isempty(runs) && return "NO_RUN", "",
-    "no results.tsv entry with n=$n and mean $(pyfloat(raw))"
+    "no run with n=$n and mean $(pyfloat(raw)) in the results"
     v = parse(Float64, r["v0_cm3_per_mol"])
     sd = parse(Float64, r["uncertainty_cm3_per_mol"])
     bad = String[]
@@ -1207,7 +1829,7 @@ function check_row(table, r, res, smiles)
     return isempty(bad) ? "OK" : "MISMATCH", join(runs, "/"), join(bad, "; ") * drift
 end
 
-# The counts of the statuses as Python prints a dictionary: {'OK': 66, 'FREE_TEXT': 1}.
+"The counts of the statuses as Python prints a dictionary: {'OK': 66, 'FREE_TEXT': 1}."
 _pycounts(counts) = "{" * join(["'$k': $v" for (k, v) in counts], ", ") * "}"
 
 "Checks every estimated row; `--specs FILE` adds SMILES and recomputes corrections."
@@ -1285,8 +1907,7 @@ end
 
 using .Diagnostics
 
-# --- the checks of the regression on a synthetic table (no RISM, no results.tsv)
-
+"the checks of the regression on a synthetic table (no RISM, no results.tsv)"
 module SelfTest
 
 using ...Common
@@ -1366,12 +1987,8 @@ function run_checks(; say = println)
         )
         with(OUT => d) do
             check(
-                results_path() == joinpath(DATA(), "results.tsv") ||
-                    haskey(ENV, "PMV_RESULTS"),
-                "results.tsv defaults to data/results.tsv, whatever the output folder is")
-        end
-        with(RESULTS => p) do
-            check(results_path() == p, "--results overrides the location")
+                results_path() == joinpath(d, "results.tsv"),
+                "the results are written to results.tsv under --out")
         end
     end
     got = features("OCC(O)CC")   # 1,2-butanediol
@@ -1394,12 +2011,15 @@ end
 const USAGE = """
 3D-RISM partial molar volumes (PMV) with a Bayesian group correction.
 
-    bysl extract pmv [--out DIR] [--results FILE] [--work DIR] SUBCOMMAND [args]
+    bysl extract pmv --out DIR SUBCOMMAND [args]
 
     run NAME SMILES NCONF CHARGE [--seed N]
         conformers -> 3D-RISM -> results.tsv                      (heavy, AmberTools)
-    batch FILE.tsv [--tier T]
-        run every row of a spec TSV (id, smiles, charge, nconf), sequentially (heavy)
+    batch FILE.tsv [--tier T ...] [--nice N]
+        run every row of a spec TSV (id, smiles, charge, nconf [, tier]) in file order,
+        one at a time, skipping ids already in results.tsv; --tier (repeatable) keeps
+        those tiers, --nice N (1-19) lowers the priority of the AmberTools programs
+        (heavy)
     fit
         ridge + Bayesian model on the calibration set -> <out>/coefficients.json
     holdout
@@ -1416,14 +2036,14 @@ const USAGE = """
     selftest
         the regression on a synthetic table, no RISM
 
-Global options, before the subcommand: --out DIR (env PMV_OUT, default
-dev/pmv-rism/out), --results FILE (env PMV_RESULTS, default dev/pmv-rism/data/results.tsv),
---work DIR (env PMV_WORK, default dev/pmv-rism/work). Everything generated lives under
-those and is gitignored. Environment: AMBERHOME (default ~/.conda/envs/amber26:
-antechamber, parmchk2, tleap, rism3d.snglpnt); RDKit is RDKitMinimalLib.jl (no MMFF, so
-conformers are ETKDG embeddings from several seeds). A 3D-RISM job takes every core: run
-one at a time, on a quiet machine. Nothing is written to the package tables unless
-`row --apply` is given.
+Global option, before the subcommand: --out DIR (required; no default inside the
+repository). Everything the tool generates lives in it: the scratch of the runs
+(`DIR/work`), the results file (`DIR/results.tsv`, which `batch` resumes from), the model
+(`coefficients.json`) and the diagnostics. Environment: AMBERHOME (default
+~/.conda/envs/amber26: antechamber, parmchk2, tleap, rism3d.snglpnt); RDKit is
+RDKitMinimalLib.jl (no MMFF, so conformers are ETKDG embeddings from several seeds). A
+3D-RISM job takes every core: run one at a time, on a quiet machine. Nothing is written
+to the package tables unless `row --apply` is given.
 """
 
 const WHO = "bysl extract pmv"
@@ -1434,23 +2054,24 @@ function _opt(a, flag, default = nothing)
     return i === nothing || i == length(a) ? default : a[i+1]
 end
 
-# Every value following `flag` in `a`.
+"Every value following `flag` in `a`."
 _opt_values(a, flag) = [a[i+1] for (i, x) in enumerate(a) if x == flag && i < length(a)]
 
-# The arguments `a` must hold at least `n` positional values.
+"The arguments `a` must hold at least `n` positional values."
 _need(a, n, what) = length(a) >= n || fail(WHO, "usage: $what")
 
 function cmd_run(a)
     _need(a, 4, "run NAME SMILES NCONF CHARGE [--seed N]")
     seed = parse(Int, _opt(a, "--seed", "1"))
-    return run_molecule(a[1], a[2], parse(Int, a[3]), parse(Int, a[4]), seed) === nothing ?
-           1 : 0
+    return run_molecule(
+        a[1], a[2], parse(Int, a[3]), parse(Int, a[4]), seed) === nothing ? 1 : 0
 end
 
 function cmd_batch(a)
-    _need(a, 1, "batch FILE.tsv [--tier T]")
-    batch(a[1], _opt(a, "--tier"))
-    return 0
+    _need(a, 1, "batch FILE.tsv [--tier T ...] [--nice N]")
+    nice = parse(Int, _opt(a, "--nice", "0"))
+    0 <= nice <= 19 || fail(WHO, "--nice must be 0 to 19")
+    return isempty(batch(a[1], _opt_values(a, "--tier"); nice)) ? 0 : 1
 end
 
 function cmd_fit(_a)
@@ -1463,7 +2084,7 @@ function cmd_holdout(_a)
     return 0
 end
 
-# The results of the run `name`, or nothing after printing why there is none.
+"The results of the run `name`, or nothing after printing why there is none."
 function finished(name)
     res = read_results()
     haskey(res, name) && return res
@@ -1508,13 +2129,13 @@ const COMMANDS = [
 """
     run(argv) -> Int
 
-`bysl extract pmv [--out DIR] [--results FILE] [--work DIR] SUBCOMMAND [args]`: the
+`bysl extract pmv --out DIR SUBCOMMAND [args]`: the
 global options first (they apply to this call only), then the subcommand; the exit status.
 """
 function run(argv::Vector{String})::Int
     a = argv
     scoped = Pair[]
-    options = ["--out" => OUT, "--results" => RESULTS, "--work" => WORK]
+    options = ["--out" => OUT]
     while length(a) >= 2 && any(p -> first(p) == a[1], options)
         push!(
             scoped,

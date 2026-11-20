@@ -102,7 +102,7 @@ function stepOf<T extends TemplateStep["type"]>(
 
 test("the dropdown offers the available templates, labelled", () => {
     const { items } = stepOf(begin(), "pick")
-    assert.equal(items.length, 28)
+    assert.equal(items.length, 32)
     const texts = items.map((i) => i.text)
     assert.ok(texts.includes("Tris, pH 7.1-9.1"))
     assert.ok(texts.includes("PBS, mixture"))

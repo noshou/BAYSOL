@@ -40,6 +40,8 @@ import { fieldCells, TextField } from "../ui/text-input.js"
 import { type Column, columnWidths, DataTable, useTheme } from "../ui/theme.js"
 import {
     type EditEnd,
+    MEMORY_SETTING,
+    memoryHint,
     NUMBER_NOTE_ROWS,
     type NumberEdit,
     noteLines,
@@ -55,6 +57,7 @@ import {
 import {
     editorRows,
     isPicked,
+    LadderEditor,
     numberKeys,
     PickerEditor,
     TabsEditor,
@@ -314,7 +317,15 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
             ])
     const longest = Math.max(1, ...defs.map((d) => d.name.length))
     const shade = swatchColour(here, valueFor(here))
-    const description = wrapText(here.description, columns).slice(0, descriptionLines)
+    // the memory headroom says what its percent is on this machine, live while typed
+    const hint =
+        here.name === MEMORY_SETTING
+            ? memoryHint(inline ? inline.buffer.text : valueText(here, valueFor(here)))
+            : undefined
+    const description = wrapText(
+        hint === undefined ? here.description : `${hint}. ${here.description}`,
+        columns,
+    ).slice(0, descriptionLines)
     const tableColumns: Column<SettingDef>[] = [
         { title: "name", width: longest, text: (d: SettingDef) => d.name },
         { title: "value", text: (d: SettingDef) => valueText(d, valueFor(d)) },
@@ -397,6 +408,14 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
                             />
                         ) : editedDef.kind === "set" ? (
                             <TabsEditor
+                                key={editedDef.name}
+                                def={editedDef}
+                                current={valueFor(editedDef)}
+                                onEnd={endEdit}
+                                onLegend={setPromptKeys}
+                            />
+                        ) : editedDef.kind === "ladder" ? (
+                            <LadderEditor
                                 key={editedDef.name}
                                 def={editedDef}
                                 current={valueFor(editedDef)}

@@ -482,8 +482,14 @@ const FIT_DIR = "test/fitting_tests"
 # the SEED_ENTRY_OVERRIDES table in fit-seed.jl.
 const SPECIAL_TAGS = Dict{String,Vector{String}}()
 
-"The ids of all fitting tests, sorted."
-ids() = sort(filter(n -> startswith(n, "SASD"), readdir(in_root(FIT_DIR))))
+# A folder whose script is held (`<id>.jl.held`, no `.jl`) is not a fitting test: it
+# cannot be run, so it is left out of every list.
+_has_script(n) =
+    startswith(n, "SASD") &&
+    any(endswith(".jl"), readdir(in_root(FIT_DIR, n)))
+
+"The ids of all fitting tests (folders with a script), sorted."
+ids() = sort(filter(_has_script, readdir(in_root(FIT_DIR))))
 
 # The synthetic entries (an invented buffer around one PDB structure; no curve, no fit, no
 # LOG): they can be run like a fitting test, but `results`, `report` and the benchmark

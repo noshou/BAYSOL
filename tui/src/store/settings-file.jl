@@ -168,6 +168,31 @@ function loadSettings(path::AbstractString = settingsFile())
 end
 
 """
+    savedSettingNames(path = settingsFile()) -> Set{Symbol}
+
+The names of the settings the settings file `path` saves with a value: the ones the user
+set, as opposed to those that are at their default for want of an entry. A missing or
+unreadable file gives an empty set (`loadSettings` is the one that reports a bad file).
+
+# Returns
+- A `Set` of setting names.
+
+# Exceptions
+- None.
+"""
+function savedSettingNames(path::AbstractString = settingsFile())
+    isfile(path) || return Set{Symbol}()
+    try
+        content = _readJson(read(path, String))
+        content isa AbstractDict || return Set{Symbol}()
+        return Set(keys(first(_savedValues(content))))
+    catch e
+        e isa InterruptException && rethrow()
+        return Set{Symbol}()
+    end
+end
+
+"""
 The values of all the settings given what the settings file holds, `saved` (already read
 and wrapped in a `Some`, so that a file holding `null` is not mistaken for no file;
 `nothing` for no file), and the problems found: `(values, problems)`. A value that is

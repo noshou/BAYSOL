@@ -296,8 +296,8 @@ one measurement per row, no header, no comments, no unit text); your file is nev
   TSV is never rewritten). A new curve starts as `Å⁻¹`. Julia divides q by 10 when it reads nm⁻¹.
 - **`energy`**: the X-ray energy as typed, above 0, saved at once. There is **no default value**; a new entry is read in **nm** (a wavelength). Numbers only. `^k` (in the prompt or on the menu) turns the unit label nm, Å, eV, keV like the q units: the number is never changed, only how it is read (saved as `energyUnit` in `data.json`); `data.json` always holds it; Julia converts to eV at run time.
 - **`change the columns`** reopens the import on the stored source with the stored choices. If the source file
-  is gone it says `source is gone: <name>`; an old `data.json` without a mapping says `no source recorded:
-  load a file`.
+  is gone it says `source is gone: <name>`; an old `data.json` without a mapping says
+  `no source recorded: load a file`.
 
 - **`reference fit`** is the project's ONE **reference curve** (the depositor's CRYSOL or FoXS fit, ...), which a run
   draws on the figure of every model and, alone, in the comparison figure. A path prompt as for `load a file` (it
@@ -316,17 +316,15 @@ one measurement per row, no header, no comments, no unit text); your file is nev
   `MultiFoXS 2-state 0.79`) are text prompts and `reference rescale` toggles scaling the curve onto the data by least
   squares (for a normalized fit); each change is saved at once into the entry `*` of
   `<project>/model-references.json`. `^r` on a reference row deletes the curve after the question and clears the entry.
-  A folder made before the single reference may hold several files (or entries per model): the screen shows the one
-  named by the entry `*`, else the usable file changed most recently, and a run without an entry `*` still reads the
-  per-model entries and draws every curve of the folder, as before; nothing edits those entries any more. A run copies the
+  The screen shows the file named by the entry `*`, else the usable file changed most recently. A run copies the
   folder, `model-settings.json` and `model-references.json` into its run folder with the other inputs (the curves
   as `reference-fit-<file>`).
 
 - **A wrong file or wrong columns is a warning, never a stop.** The note line says so while the columns are
   chosen and again after the import: `sigma is about I: a fit file? wrong file?` (the `sigma` column of a
   measured curve is as big as I(q) and follows it: a SASBDB `.fit` file read as q, I, sigma, whose third column is
-  the model); for a reference fit, `same numbers as the data: the model column?`, `5.2x off the data: wrong
-  column?` (the median distance from the measured curve on its q) or `q range does not meet the data: units?`.
+  the model); for a reference fit, `same numbers as the data: the model column?`,
+  `5.2x off the data: wrong column?` (the median distance from the measured curve on its q) or `q range does not meet the data: units?`.
 
 - **The reference on the figure of a model.** The project's reference fit (above) is drawn on every model's figure
   (`<model>_comparison.tex`): the data, the reference curve (`software (chi2)` in the legend) and the MAP curve with
@@ -341,8 +339,8 @@ written over, and `r` puts it aside as `.corrupt`.
 `new recipe` and, for a buffer that has solutes, `save current recipe globally`, and a one-line status of
 each file (`buffer: none yet`, `pH not set`, `buffer: unusable!`). `shift+z` on an unusable file offers to reset it.
 
-**Recipes** are named buffers kept in the data folder (`recipes.json`, shared by every project). `save current
-recipe globally` asks a name (`replace "NAME"?` if one has it) and saves the buffer as it is on disk, with its
+**Recipes** are named buffers kept in the data folder (`recipes.json`, shared by every project).
+`save current recipe globally` asks a name (`replace "NAME"?` if one has it) and saves the buffer as it is on disk, with its
 pH and σ. `load a recipe` lists the saved recipes with their solute counts (type to find one: the list narrows as you type; `^r` deletes the highlighted one,
 after a question) and opens the buffer table with the recipe's rows as unsaved ones (`*`); the recipe's pH, σ and temperature,
 when it has them, come in as an unsaved change of the pH row (a recipe without leaves the buffer's own; one without a temperature leaves the buffer's temperature). At the
@@ -350,7 +348,7 @@ first `^w` a buffer that has solutes asks `replace N solutes with recipe "NAME"?
 empty and replaces nothing before `^w`. Nothing is written before `^w`; the recipe is copied, not linked. The
 unit `^k` is not part of a recipe. **Global settings** has two more options under the four groups: `recipes` (`y`) and `solutes` (`t`) open the recipes table and the custom solutes table; `shift+z` on an option whose file cannot be used offers to reset it (the old file stays as `<name>.corrupt`).
 In the recipes table, the custom solutes table and the buffer table, `/` finds a row by name (type part of it, `⏎` puts the cursor on it) and `shift+s` puts the rows in alphabetical order (shown only while they are not); the recipes and the custom solutes also open in that order. The `shift+z` reset legend shows only on the row whose file cannot be used. The path prompts (data, reference fit, models) are boxed like the other dropdowns.
-**Template recipes (2026-11-12).** A recipe can be a *template*: it keeps its definition inside the recipe
+**Template recipes.** A recipe can be a *template*: it keeps its definition inside the recipe
 (`"template"` in `recipes.json`), so that what depends on the pH and the temperature is worked out when it is
 loaded. Three kinds: `builtin` (a shipped buffer: concentration, ±, titrant, `pH set at`, rest of the recipe), `custom`
 (your own buffer: 1 to 3 pKa steps with the pKa at 25 °C, d(pKa)/dT and the charge of the acid form, a titrant
@@ -373,7 +371,7 @@ ones (save the buffer as a template to keep it). The wizard takes your custom so
 custom buffer's solute, the rows of a table); the definition then holds a snapshot of the solute (`z`, `pmv`,
 `sigmaPmv`), so it needs no custom file. Julia never sees a definition
 (it reads rows only; a row's `template` key is ignored).
-**Notes (2026-11-11):** a project, the buffer and every recipe can carry titled notes, `"notes": [{"title", "text"}]`
+**Notes:** a project, the buffer and every recipe can carry titled notes, `"notes": [{"title", "text"}]`
 (absent when there are none; no limit on the number or the length; a title is 1 to 40 characters, unique without
 regard to case). `shift+n` opens the notes list: `notes: shift+n` in the project menu's taskbar (written to
 `project.json` at `^w`, and copied into every run's archive), on the buffer table and on a recipe's own table (notes save by themselves,
@@ -388,8 +386,8 @@ The recipes table has the columns name, solutes, kinds (`3 solute 1 polymer 2 cu
 a recipe without) and notes (their titles); Enter asks the name (prefilled: the rename) and opens the recipe's own solutes table (its pH
 row too); `^n` a new recipe, `shift+n` its notes. **Edits save by themselves** (a new recipe, a rename, the
 solutes table's `^w`, the notes): the file is written at once and re-read, so the table has no unsaved state. `^r`
-marks a recipe for removal (`-`), `^u` unmarks, and `^w`, shown only while a mark exists, asks `delete N recipes?
-this cannot be undone!` and removes the marked ones; `^x` goes back (asking first while marks are pending).
+marks a recipe for removal (`-`), `^u` unmarks, and `^w`, shown only while a mark exists, asks
+`delete N recipes? this cannot be undone!` and removes the marked ones; `^x` goes back (asking first while marks are pending).
 
 **The solutes table** has a pH row above the solute rows (pH, σ and the temperature), then one row per solute:
 
@@ -587,11 +585,25 @@ setting `FIGURES_COMPILE` is off the sheets, it stays a keyword of `results` for
   any colour code or name separated by commas (names may have blanks: `green (xkcd), rgb(1, 2, 3), red`; a name outside the CSS set is saved as its `#rrggbb`;
   without a comma, blanks separate; at
   least one; repeats allowed; the first model has the first colour, and so on, starting again). `PLOT_COMPARE_MARKERS`:
-  marker names of the catalog, `o, square, triangle` (`o * square square* triangle triangle* diamond diamond*
-  pentagon pentagon* star x + asterisk oplus otimes`; an ordered list, not on/off). `PLOT_TUI_SIZES`: sizes of
+  marker names of the catalog, `o, square, triangle` (
+  `o * square square* triangle triangle* diamond diamond* pentagon pentagon* star x + asterisk oplus otimes`; an ordered list, not on/off). `PLOT_TUI_SIZES`: sizes of
   the terminal plots as `76x5, 100x9` (`76 x 5` and `×` are read too; whole numbers, each 24x3 to 400x100 and
   larger than the one before in both). A wrong line is refused with a short message and stays on screen. In
   `settings.json` they are lists: `["#D55E00", "red"]`, `["o", "square"]` and `[[76, 5], [100, 9]]`.
+  **The retry ladder** (`LADDER`, sampler sheet, group "retry ladder"; also in the settings of a single model) is a map
+  from the failure class a fit is diagnosed with (`stepCollapse`, `splitChains`, `divergent`, `structural`, `marginal`,
+  `generic`) to the rungs tried for it, in order (at most 3 reruns after the first attempt). Enter opens the ladder
+  editor: a header row for each class and a row for each rung. Up and down move, Enter edits a rung (a line
+  `name: KEY=value; KEY=value`, the name and its colon may be left out, a tuple value is comma-separated,
+  `CHAIN_START_RADII=1,2,3`, for example `delta 99: TARGET_ACCEPT=99`) or, on a class, adds a rung at its end; Ctrl+n adds a
+  rung to the class in focus, Ctrl+r removes the rung (on a class: all its rungs, which switches the class off), PageUp and
+  PageDown move a rung earlier or later; Esc takes the whole ladder (a wrong one stays as an error), Ctrl+x goes back
+  without it. A rung may override only fitting settings (`TARGET_ACCEPT`, `CHAIN_START_RADII`, `RETRY_N_ADAPT`,
+  `RETRY_N_DRAWS`, `SAMPLE_C1` (sample c1 as a fifth parameter), `RNG_SEED_STEP` (added to the seed); `N_ADAPT`, `N_DRAWS`,
+  `VAL_SIGMA`, `N_CHAINS`, the `OPTIMUM_*`, `MAP_*`, `BASIN_RESTART_NATS` and `HARVEST_*` settings are unvalidated); a plot or
+  file setting is refused with the list of allowed names. In `settings.json` and `model-settings.json` it is an object
+  from class to a list of `{"name": ..., "overrides": {...}}` (a class left out keeps its default rungs, `[]` switches it
+  off, `false` or `"off"` switches every class off). On the command line see "The command line of a run" below.
 - The data and structure settings (project settings; the data screen shows nothing new): `Q_MIN` and `Q_MAX` are
   optional q limits in Å⁻¹ (blank, `none` or `auto` clears one; `Q_MIN` must be below `Q_MAX`, an error on both
   rows at save), `SIGMA_SCALE` multiplies the standard errors, `LMAX` is an optional whole number (blank or
@@ -610,8 +622,7 @@ setting `FIGURES_COMPILE` is off the sheets, it stays a keyword of `results` for
 
 The project must have a model, a buffer with at least one solute, a pH and a temperature, and data with its energy. Then the
 project menu shows `run: shift+r`. **Shift+R** starts the run at once, with the temperature kept in the buffer
-(`buffer.json`, set with `^g` after the pH and σ; 0 to 100 °C, no uncertainty). A project made before the temperature
-moved into the buffer is not ready until `^g` sets it once: the prompt starts at the temperature of the newest finished
+(`buffer.json`, set with `^g` after the pH and σ; 0 to 100 °C, no uncertainty). A project without a temperature is not ready until `^g` sets it: the prompt starts at the temperature of the newest finished
 run, so Enter alone does it, and the menu says `missing: temperature`. If a run of this project is already
 going the start is refused with `a run is in progress (pid N)`.
 
@@ -666,6 +677,25 @@ the same checks as editing the file yourself; it is refused while a run is live
 (`a run is in progress (pid N)`), and fails with a note if another copy of the program changed the file after the
 question. Nothing is ever written into a run, and there is no way to delete a single log file. A page open on a run
 that another copy deletes says `this run was deleted` and closes.
+
+### The command line of a run
+
+Every setting that `runProject` takes as a keyword is a flag, so a run needs no terminal interface:
+
+```bash
+julia --project=. -e 'include("tui/src/store/run-project.jl"); exit(BAYSOLRun.runProjectCli(ARGS))' -- \
+    PROJECT --temperature 20 --nDraws 800 --memory-headroom 25 \
+    --ladder 'divergent=[{"name": "wide", "overrides": {"TARGET_ACCEPT": 99}}]' \
+    --model-setting 'm1={"qMin": 0.03}'
+```
+
+`--<name> VALUE` is the setting by the name of its keyword (`--nDraws`, `--n-draws` and `--N_DRAWS` are alike); VALUE is JSON
+(`800`, `false`, `null`, `[1, 2, 3]`) or plain text. `--ladder` takes `off`, a JSON map from failure class to rungs, the path of
+a JSON file, or one class as `CLASS=JSON` (repeatable: the classes add up); `--model-setting MODEL=JSON` gives settings to one
+model (repeatable; a JSON object from keyword to value, or a file). `--temperature` is required, `--run-dir` and `--n-samples`
+are optional, `--help` prints the list. A value is judged exactly as the same value in `settings.json` is, and a wrong one is
+refused before anything starts (exit status 2). Precedence is command line, then the settings files, then the defaults. The
+plot-look settings (`PLOT_*` other than the comparison switches) are set in `settings.json`; they are no flags.
 
 ### The run archive
 
@@ -816,8 +846,8 @@ sequence to the terminal.
 
 The plots exist at several sizes (`PLOT_TUI_SIZES`, written by a run started from the terminal interface). The
 plots mode shows the **largest that fits the panel** (width and rows), the smallest if none does (then it
-scrolls), and picks again when the window is resized; the plot tab stays. The status line says which, `plot 1 / 9 ·
-76x10 · lines 1-12 of 12 · 100%`. A run made before the sizes existed shows its `plots.txt`.
+scrolls), and picks again when the window is resized; the plot tab stays. The status line says which,
+`plot 1 / 9 · 76x10 · lines 1-12 of 12 · 100%`.
 
 ## Keys at a glance
 
@@ -875,13 +905,10 @@ renamed, so a reader never sees half a file.
         data.tsv             q, I, sigma: three tab-separated columns
         data.json            units, energy, source, import choices
         reference-fit.7z     reference curves, flat: clean <name>.tsv (q, I[, sigma]), same units as data.tsv
-                             (older projects: a plain reference-fit/ folder, still read until the first change)
         model-settings.json  per-model overrides {"<model>": {sheet: {NAME: {"value": ...}}}}, sparse
-        model-references.json  the project's reference fit {"*": {software, refChi2, fit, rescale}} (older: per model {"<model>": ...}), sparse
+        model-references.json  the project's reference fit {"*": {software, refChi2, fit, rescale}}, sparse
         models.7z            copies of your .cif and .pdb files, flat, and under generated/ the files Julia made
-                             from them (hydrogenated structures, PROPKA output); older projects: a plain models/
-                             folder, still read until the first add or remove packs it; the folder is then
-                             ignored and can be deleted by you: the program never deletes it
+                             from them (hydrogenated structures, PROPKA output)
         runs/<HH-MM-SS-mmm_TZ_±HHMM_YYYY-MM-DD>.7z   e.g. 23-35-29-123_EST_-0500_2026-11-07.7z: ONE archive
                                    per run with everything in it, flat (while the run goes it is the folder
                                    <name>/ with the same files; see "The run archive")

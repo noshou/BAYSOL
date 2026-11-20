@@ -198,7 +198,7 @@ function _computeBLm(
 
     if N > 0
         nchunk = min(Int(_chunk), N)
-        T = min(B_LM_TILE, nchunk)
+        T = _bLmTile(K, nchunk)
 
         # q-tile length so that W (every column, every degree, T atoms) fits
         # the budget of one worker, B_LM_W_BYTES. A constant, not a function
@@ -264,9 +264,7 @@ function _computeBLm(
         # the result is too. The workers hold one accumulator each, so their number
         # is also capped by B_LM_ACC_BYTES (the grouping, and with it the result, is
         # not: the wave size does not change the order of the additions).
-        nw =
-            (workerCount() > 1 && length(tiles) * Q ≥ B_LM_PARALLEL_MIN) ?
-            max(1, min(workerCount(), ng, B_LM_ACC_BYTES ÷ max(sizeof(accum), 1))) : 1
+        nw = _bLmWorkers(length(tiles), Q, sizeof(accum))
         pool = [zeros(Float64, size(accum)) for _ in 1:nw]
         # the work buffers, one set per worker, allocated here once (not inside the tasks)
         bufs = [_bLmBuffers(T, L, K, Q, ncol, nF, qTile) for _ in 1:nw]
@@ -327,6 +325,81 @@ function _computeBLm(
     end
 end
 
+"""
+Atoms per inner tile of [`_computeBLm`](@ref): [`B_LM_TILE`](@ref), cut so that the
+`2K × T` harmonics buffer of a worker stays within [`B_LM_A_BYTES`](@ref) (a function of
+`K` and the chunk only, never of the thread count or of Q, so the tiles and the rounding
+do not depend on either), at least 1.
+
+# Returns
+- `Int`, atoms per tile.
+
+# Exceptions
+None.
+"""
+_bLmTile(K::Integer, nchunk::Integer) =
+    max(1, min(B_LM_TILE, nchunk, B_LM_A_BYTES ÷ (2K * sizeof(Float64))))
+
+"""
+Number of tiles [`_computeBLm`](@ref) cuts `N` atoms into: chunks of `chunk` atoms, each
+cut into tiles of `T`.
+
+# Returns
+- `Int`, the tile count.
+
+# Exceptions
+None.
+"""
+_bLmTileCount(N::Integer, chunk::Integer, T::Integer) =
+    N == 0 ? 0 : sum(cld(min(chunk, N - s + 1), T) for s in 1:chunk:N)
+
+"""
+Workers [`_computeBLm`](@ref) runs its tile groups on: one for a small input, else the
+Julia workers, cut to the groups there are and to [`B_LM_ACC_BYTES`](@ref) of accumulators
+of `accBytes` each. Depends on the input only (and the worker count, which never changes
+the result).
+
+# Returns
+- `Int`, at least 1.
+
+# Exceptions
+None.
+"""
+function _bLmWorkers(nTiles::Integer, Q::Integer, accBytes::Integer)
+    (workerCount() > 1 && nTiles * Q ≥ B_LM_PARALLEL_MIN) || return 1
+    ng = max(1, min(B_LM_GROUPS, nTiles))
+    return max(1, min(workerCount(), ng, B_LM_ACC_BYTES ÷ max(accBytes, 1)))
+end
+
+"""
+Bytes [`_computeBLm`](@ref) holds at its peak apart from its result and its inputs, for
+`N` atoms, degree `lMax`, `Q` q values, `ncol` accumulator columns and `nF` per-atom
+amplitude columns: the accumulator, one scratch accumulator per worker and the work
+buffers of each worker ([`_bLmBuffers`](@ref)). The memory planner of
+[`forwardCache`](@ref) uses it, so it follows the allocations above.
+
+# Returns
+- `Int`, bytes.
+
+# Exceptions
+None.
+"""
+function _bLmBytes(N::Integer, lMax::Integer, Q::Integer, ncol::Integer, nF::Integer;
+    chunk::Integer = B_LM_CHUNK)
+    N == 0 && return 0
+    L = Int(lMax)
+    K = (L + 1) * (L + 2) ÷ 2
+    T = _bLmTile(K, min(Int(chunk), N))
+    qTile = clamp(B_LM_W_BYTES ÷ (sizeof(Float64) * ncol * T * (L + 1)), 1, Q)
+    acc = 2K * ncol * Q * sizeof(Float64)
+    nw = _bLmWorkers(_bLmTileCount(N, Int(chunk), T), Q, acc)
+    perWorker =
+        sizeof(Float64) * (
+            2K * T + Q * nF * T + ncol * qTile * T * (L + 1) +
+            qTile * (L + 8) + 2K + 5 * (L + 1)
+        )
+    return acc * (1 + nw) + nw * perWorker
+end
 
 """
 The work buffers of one worker of [`_computeBLm`](@ref) (see [`_bLmTiles!`](@ref)):
@@ -598,7 +671,7 @@ function selfScatter(
         @fastmath @simd for j in 1:(C*K)
             acc += wc[j] * abs2(bq[j, q])
         end
-        S[q] = 4π * acc
+        S[q] = FOUR_PI * acc
     end
     return S
 end
@@ -664,5 +737,5 @@ function crossScatter(
             S[q] += acc
         end
     end
-    return S .* (4π)
+    return S .* FOUR_PI
 end

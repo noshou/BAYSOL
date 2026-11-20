@@ -43,6 +43,8 @@ import {
     BRIEF_ERROR_WIDTH,
     briefError,
     failedNote,
+    ladderClassesOf,
+    ladderClassNotes,
     type OpenModel,
 } from "../src/store/run-logs.js"
 import { restoreErrorNote } from "../src/store/run-restores.js"
@@ -399,4 +401,20 @@ test("the data screen edits the project's one reference fit", () => {
     for (const word of ["reference fit", "reference software", "reference chi2"])
         assert.match(text.join("\n"), new RegExp(word))
     assert.match(text.join("\n"), /reference rescale/)
+})
+
+const EXHAUSTED =
+    "NotConvergedError: the run did not converge: ladder exhausted:; base: the worst R̂, " +
+    "1.2, is above 1.01; longer chains [marginal]: the smallest tail ESS, 304, is not " +
+    "above 400; delta 70 [stepCollapse]: the step size 1e-4 is too small; again " +
+    "[marginal]: the smallest tail ESS, 300, is not above 400."
+
+test("a failed ladder names its failure classes", () => {
+    assert.deepEqual(ladderClassesOf(EXHAUSTED), ["marginal", "stepCollapse"])
+    assert.deepEqual(ladderClassesOf(LONG_ERROR), [])
+    assert.equal(briefError(EXHAUSTED), "not converged: marginal +1")
+    const notes = ladderClassNotes(EXHAUSTED)
+    assert.equal(notes.length, 2)
+    assert.match(notes[0] ?? "", /^marginal: Sampling technically completes/)
+    assert.match(notes[1] ?? "", /^stepCollapse: The sampler's step size/)
 })

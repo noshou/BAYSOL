@@ -361,3 +361,36 @@ test("model: the overrides of the list are read without a change", () => {
     assert.equal(readFileSync(modelSettingsFile(p), "utf-8"), before)
     void g
 })
+
+test("model: a ladder is written as the whole class map; an invalid one is wiped", () => {
+    const { g, p } = setup()
+    const rungs = [{ name: "wide", overrides: { TARGET_ACCEPT: 97, RNG_SEED_STEP: 1 } }]
+    const { settings } = loadModel(p, "crambin", g)
+    assert.equal(settings.set({ LADDER: { divergent: rungs } }).ok, true)
+    settings.save()
+    const whole = settings.get("LADDER") as Record<string, unknown>
+    assert.deepEqual(whole.divergent, rungs)
+    assert.ok(Array.isArray(whole.stepCollapse))
+    assert.deepEqual(stored(p), { crambin: { sampler: { LADDER: { value: whole } } } })
+    assert.deepEqual(loadModel(p, "crambin", g).settings.get("LADDER"), whole)
+    // the project's own ladder is not touched
+    assert.ok(!readFileSync(settingsFile(p), "utf-8").includes("wide"))
+    // off is an override too: every class empty
+    assert.equal(settings.set({ LADDER: false }).ok, true)
+    settings.save()
+    const off = Object.fromEntries(Object.keys(whole).map((c) => [c, []]))
+    assert.deepEqual(stored(p), { crambin: { sampler: { LADDER: { value: off } } } })
+    // an out-of-scope setting in a rung is wiped on load
+    writeFileSync(
+        modelSettingsFile(p),
+        JSON.stringify({
+            m: {
+                sampler: {
+                    LADDER: { value: { divergent: [{ overrides: { PLOT_LW_MAP: 2 } }] } },
+                },
+            },
+        }),
+    )
+    const r = loadModel(p, "m", g)
+    assert.deepEqual(r.wiped.map((w) => w.setting), ["LADDER"])
+})

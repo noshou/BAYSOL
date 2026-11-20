@@ -17,7 +17,7 @@ using BAYSOL
 using BAYSOL.BulkElectronDensity: BulkElectronDensity, JSON3, Solute, ρₑ
 using BAYSOL.MolecularStructure: MolecularStructure, SHA
 using BAYSOL.Inference: Inference
-using BAYSOL.PhysicalConstants: energyEv
+using BAYSOL.PhysicalConstants: energyEv, KELVIN_OFFSET
 
 using Printf: @sprintf
 
@@ -29,16 +29,19 @@ import BAYSOL.Pipeline: seedModel, runModel, results, compareResults, writeLog,
     runKeywords, resultsKeywords, SETTING_KEYWORDS, REFERENCE_EXTENSIONS,
     FIGURES_COMPILE, FIGURES_COMPILER, FIGURES_DIR, FIGURES_FORMATS, FIGURES_TEX,
     TABLE_DIR, TABLE_SIGFIGS, VAL_SIGMA, N_ADAPT, N_DRAWS, PLOT_COMPARE,
+    LADDER_CLASSES,
     _SETTINGS_KEYWORD_HINT, _applyKeywords!, _bad, _checkedValue, _isNullable,
     _logCell, _logRevision, _plainText, _logStamp, _logVersion, _need, _readReference,
     _readReferences, _relationProblems, _settingDefault, _settingInput,
-    _settingNames, _tabLines, _textWidth, _updateLog
+    _settingNames, _tabLines, _textWidth, _updateLog, _plotStyle, _commitStatistics,
+    _LAST_LOG
 
 # The settings files, the buffer and the references of single models: the other files of
 # this module (`settings-file.jl` first, the others read JSON with its reader).
 include("settings-file.jl")
 include("buffer.jl")
 include("model-references.jl")
+include("cli.jl")
 
 # ---------------------------------------------------------------------------
 #          guardrails of the run folder (the interface relies on these)
@@ -845,7 +848,7 @@ end
 function _overrideRows(cfg)
     return [
         ["override" * join(uppercasefirst(lowercase(p)) for p in split(String(n), '_')),
-            v isa Real ? _logCell(v) : string(v)]
+            v isa Real ? _logCell(v) : n === :LADDER ? JSON3.write(v) : string(v)]
         for (n, v) in cfg.overrides
     ]
 end
@@ -912,7 +915,8 @@ into a staging folder that is then emptied into the run folder (flat: `<model>.x
 `.tex` figures `<model>*.tex`, the plots as plain text into `<model>-plots.txt`, and, when
 `ui` is `:cli`, to the terminal too; and under the model's name into the run's
 `plots.txt`; when `ui` is `:tui`, also `<model>-<W>x<H>.txt` for each size of the setting
-`PLOT_TUI_SIZES`) and `writeLog` into `<model>.LOG`, with a row `override<Setting>` for
+`PLOT_TUI_SIZES`), `writeLog` into `<model>.LOG` and the statistics into
+`statistics-<model>.LOG` (both written by `results`), with a row `override<Setting>` for
 each setting the model was given of its own. The files are listed in the model's `files`.
 """
 function _runModel!(st, rec, inputs, cfg, tee)
@@ -920,6 +924,7 @@ function _runModel!(st, rec, inputs, cfg, tee)
     mkpath(stage)
     logfile = joinpath(st.dir, rec.name * ".LOG")
     s = inputs
+    _LAST_LOG[] = nothing      # so a failure before `seedModel` finds no stale statistics
     seed = seedModel(
         MolecularStructure.LocalPathSource(rec.path), s.energy, s.q, s.I, s.σ, s.pH,
         s.σ_pH, s.solutes;
@@ -936,6 +941,14 @@ function _runModel!(st, rec, inputs, cfg, tee)
         tuiDir = st.ui === :tui ? stage : nothing, references = mref.references,
         refChi2 = mref.refChi2, kw...,
     )
+    # `results` always writes the run log and the statistics log into the staging folder
+    # (named after it): the run log is this model's `<model>.LOG` (`writeLog` below adds the
+    # overrides to it), the statistics become `statistics-<model>.LOG` beside it
+    stageLog = joinpath(stage, basename(stage) * ".LOG")
+    isfile(stageLog) && mv(stageLog, logfile; force = true)
+    stageStat = joinpath(stage, "statistics-" * basename(stage) * ".LOG")
+    isfile(stageStat) &&
+        mv(stageStat, joinpath(st.dir, "statistics-" * rec.name * ".LOG"); force = true)
     files = _flattenStage!(st, stage, rec.name)
     plotsFile = joinpath(st.dir, rec.name * "-plots.txt")
     _writePlots(st, plotsFile, rec.name, String(take!(buf)), tee)
@@ -1242,9 +1255,14 @@ that claims the folder itself, under its own lock, passes it as `runDir`.
     - for [`seedModel`](@ref): `thickness`, `probe`, `κ_δρ₁₂`, `κ_δρ₃`,
         `pmvFallbackUncert`, `bounds_δρ₁₂`, `mode_δρ₁₂`, `φ_max`, `exclVolCorrBounds`,
         `exclVolCorrEps`, `shellAreaPerPoint`, `shellMinPoints`, `shellSample`,
-        `sasaNOcc`, `beadRayRange`, `beadRayDirs` (the [`seedKeywords`](@ref));
+        `sasaNOcc`, `beadRayRange`, `beadRayDirs`, `memoryHeadroom` (percent of the
+        machine's memory kept free during the scattering build; the
+        [`seedKeywords`](@ref));
     - for [`runModel`](@ref): `nDraws` (`N_DRAWS`; `nSamples` wins if given), `δ`,
-        `retryNAdapt`, `retryNDraws`, `chainStartRadii`, `optimumChainCap`,
+        `retryNAdapt`, `retryNDraws`, `chainStartRadii`, `ladder` (the retry
+        ladder: a map from failure class to `(name, overrides)` rungs, or one class of it,
+        a JSON text of either, the path of a JSON file, `true` or `false`; see `LADDER`),
+        `optimumChainCap`,
         `optimumMinChains`, `optimumChainRadius`, `optimumChainFraction`,
         `mapMaxIter`, `mapNStarts`, `mapFSuccessive`, `mapOptimaKept`,
         `mapJitterRadii`, `mapJitterDirections`, `mapJitterMaxOptima`,
@@ -1332,9 +1350,11 @@ function runProject(
     sasaNOcc = nothing,
     beadRayRange = nothing,
     beadRayDirs = nothing,
+    memoryHeadroom = nothing,
     retryNAdapt = nothing,
     retryNDraws = nothing,
     chainStartRadii = nothing,
+    ladder = nothing,
     optimumChainCap = nothing,
     optimumMinChains = nothing,
     optimumChainRadius = nothing,
@@ -1370,7 +1390,7 @@ function runProject(
 )
     isdir(projectDir) || throw(ArgumentError("the project folder $projectDir is missing"))
     ui in RUN_UI || throw(ArgumentError("ui must be :cli or :tui, got $(repr(ui))"))
-    _need(isfinite(temperature) && temperature > -273.15,
+    _need(isfinite(temperature) && temperature > -KELVIN_OFFSET,
         "temperature must be above absolute zero (°C)")
     _need(heartbeat > 0, "heartbeat must be positive")
     _need(
@@ -1383,8 +1403,8 @@ function runProject(
         thickness, probe, κ_δρ₁₂, κ_δρ₃, pmvFallbackUncert, bounds_δρ₁₂,
         mode_δρ₁₂, φ_max, exclVolCorrBounds, exclVolCorrEps, shellAreaPerPoint,
         shellMinPoints, shellSample, sasaNOcc, beadRayRange, beadRayDirs,
-        nDraws,
-        δ, retryNAdapt, retryNDraws, chainStartRadii, optimumChainCap,
+        memoryHeadroom, nDraws,
+        δ, retryNAdapt, retryNDraws, chainStartRadii, ladder, optimumChainCap,
         optimumMinChains, optimumChainRadius, optimumChainFraction, mapMaxIter,
         mapNStarts, mapFSuccessive, mapOptimaKept, mapJitterRadii,
         mapJitterDirections, mapJitterMaxOptima, mapJitterWithinNats,
@@ -1468,6 +1488,17 @@ function runProject(
             end
             settings = loadSettings(joinpath(logs, "settings.json"))
             _applyKeywords!(settings, given)
+            # the settings the caller set, for the retry ladder (a rung never overrules
+            # one, even when it equals the default): the settings file, the keywords
+            # of this call and, in `makeCfg`, the model's own
+            projectSet = union(
+                savedSettingNames(joinpath(logs, "settings.json")),
+                Set{Symbol}(
+                    r.setting for r in SETTING_KEYWORDS if
+                    r.entry !== :PlotStyle && hasproperty(given, r.keyword) &&
+                        getfield(given, r.keyword) !== nothing
+                ),
+            )
             dataFolder = settings[:TABLE_DIR]
             buffer = joinpath(logs, "buffer.json")
             solutes = loadBuffer(buffer)
@@ -1517,7 +1548,8 @@ function runProject(
                     runKw = merge(
                         runKeywords(s),
                         (; sigma = sigmaM, rngSeed = seedM, retry,
-                            nChains = chainsM),
+                            nChains = chainsM,
+                            callerSet = union(projectSet, Set{Symbol}(own))),
                     ),
                     resultsKw = merge(
                         resultsKeywords(s),
@@ -1663,6 +1695,16 @@ function runProject(
                         )
                     catch e2
                         e2 isa InterruptException && rethrow()
+                    end
+                    # what the sampler recorded before the model failed
+                    try
+                        _LAST_LOG[] === nothing || _commitStatistics(
+                            _LAST_LOG[];
+                            path = joinpath(st.dir, "statistics-" * rec.name * ".LOG"),
+                            name = rec.name, failure = _briefError(e),
+                        )
+                    catch e3
+                        e3 isa InterruptException && rethrow()
                     end
                 end
                 rec.seconds = time() - t0

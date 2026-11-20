@@ -409,7 +409,7 @@ end
 # deposited-data folders), by an external convention or are not source, so they are skipped.
 const NAME_SKIP_DIRS = (
     "test/fitting_tests", "test/synthetic_tests", "test/fixtures", "test/baselines",
-    "test/.CondaPkg", "docs/build", "dev/pmv-rism/out",
+    "test/.CondaPkg", "docs/build",
 )
 const NAME_ROOTS = ("src", "dev", "docs", "test", "tui")
 # Names the toolchain fixes: Julia wants src/<Package>.jl, these are conventional.

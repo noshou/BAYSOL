@@ -15,8 +15,9 @@
             "entry": ["test/*.test.ts", "test/support/*.ts", "dev/*.ts", "src/store/frame-worker.ts"],
             "project": ["src/**/*.{ts,tsx}", "test/**/*.ts", "dev/**/*.ts"],
             // `reg` is the Windows registry tool that `core/fonts.ts` runs on Windows;
-            // `pdftocairo` is poppler's, run by the sixel rasteriser (optional, found at run time)
-            "ignoreBinaries": ["reg", "pdftocairo"]
+            // `pdftocairo` is poppler's, run by the sixel rasteriser (optional, found at run time);
+            // `7z` unpacks the fixture archives in `test/data.test.ts`
+            "ignoreBinaries": ["reg", "pdftocairo", "7z"]
         }
     }
 }

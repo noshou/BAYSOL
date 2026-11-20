@@ -217,6 +217,10 @@ bruteDiameter(P) = maximum(
         wide = repeat(Y, 1, 60)
         wideChi2 = BAYSOL.Pipeline._chisqMeasuredAll(info, wide)
         @test wideChi2 ≈ repeat(oneByOne, 60) rtol = 1e-10
+        # a raw point outside the fitted bin centres is not scored
+        @test count(BAYSOL.Pipeline._chisqMask(info)) ≤ length(info.qRaw)
+        used = info.qRaw[BAYSOL.Pipeline._chisqMask(info)]
+        @test all(first(info.q) .≤ used .≤ last(info.q))
         two = shannonData([0.1, 0.2, 0.3], [1.0, 2.0, 3.0], [0.1, 0.1, 0.1];
             D = 5.0, rebin = nothing)
         @test rawInterpolation(two) * [1.0, 2.0, 3.0] ≈ [1.0, 2.0, 3.0]
@@ -366,11 +370,13 @@ bruteDiameter(P) = maximum(
         res = BAYSOL.runModel(s, 120, 60; retry = false)
         mapParams = res[3][1]
         # the reported χ² is the one on the measured points
-        # (not the binned fit's own), n − 3 degrees of freedom
+        # (not the binned fit's own), over the raw points inside the fitted
+        # q range only, n − 3 degrees of freedom
         fitres = res[1]
         sh = s.shannon
         yMap = fitres.curves[:, argmax(getproperty.(fitres.stats, :log_density))]
-        rMap = (sh.iRaw .- modelOnRaw(sh, yMap)) ./ sh.σ_raw
+        use = BAYSOL.Pipeline._chisqMask(sh)
+        rMap = ((sh.iRaw .- modelOnRaw(sh, yMap)) ./ sh.σ_raw)[use]
         @test mapParams["chisqRed"] ≈ sum(abs2, rMap) / (length(rMap) - 3)
         # residual statistics are a dev tool
         @test !haskey(mapParams, "residLag1") && !haskey(mapParams, "chisqRedRaw")

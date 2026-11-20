@@ -47,7 +47,7 @@ function _gaussianDummy(
         @inbounds for k in 1:Q
             mq2 = -q2[k]
             for i in blk
-                out[i, k] = v[i] * exp(mq2 * v23[i] / (4π))
+                out[i, k] = v[i] * exp(mq2 * v23[i] / FOUR_PI)
             end
         end
     end

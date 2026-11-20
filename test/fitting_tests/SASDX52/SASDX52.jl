@@ -31,7 +31,7 @@ include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 # This case needs more scrutiny before being trusted than any of its siblings.
 # =============================================================================
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDX52")
+const _FIXTURE_DIR = fixtureDir("SASDX52")
 const _PDB_PATH = joinpath(_FIXTURE_DIR, "SASDX52_fit1_model1.pdb")
 const _FIT_PATH = joinpath(_FIXTURE_DIR, "SASDX52_fit1.fit")
 
@@ -184,10 +184,19 @@ function runSasdx52(;
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seedSasdx52(; seed)
-    # δ = 99: at the default 95 this entry exceeds the 0.1 % divergence limit; 99
-    # passes with the fixed seed 0 (0.048 %). Other seeds are marginal (0.1 % to
-    # 0.5 %): the divergence rate of this entry has a floor that δ does not remove.
-    res = BAYSOL.runModel(s, nSamples, nAdapt; δ = 99)
+    # δ = 99 and a one-rung ladder: with the profiled c1 this entry has a divergence floor
+    # of about 0.29 % that neither δ, the start radii nor longer runs remove (the share
+    # only gets measured better; 16000 draws per chain give 0.288 %), above the 0.1 %
+    # limit. Sampling c1 as a fifth parameter (the `structural` rung of the default
+    # ladder, here applied to the `divergent` class this entry is classified as) brings
+    # it to 0.045 % with R̂ 1.002 and tail ESS 1316 (seed 0, 2026-11-20).
+    res = BAYSOL.runModel(
+        s, nSamples, nAdapt;
+        δ = 99,
+        ladder = (
+            divergent = ((name = "sample c1", overrides = (SAMPLE_C1 = true,)),),
+        ),
+    )
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
@@ -209,7 +218,6 @@ BAYSOL.results(
     dir = @__DIR__, name = "res", references = reference,
     formFactorLog = formFactorLog, nAtoms = nAtoms,
     refChi2 = "0.70 (method unconfirmed)",
-    runLog = true,
 )
 
 # `@__DIR__` (this SASDX52/ folder), not the caller's cwd.

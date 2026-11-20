@@ -9,7 +9,7 @@ using BAYSOL.BulkElectronDensity:
     Solute, NonBiological, Polymer, DEFAULT_TEMPERATURE_C
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDAX2")
+const _FIXTURE_DIR = fixtureDir("SASDAX2")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDAX2.dat")
 const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDAX2_fit1_model1.pdb")
 const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDAX2_fit1.fit")
@@ -217,7 +217,6 @@ BAYSOL.results(
     dir = @__DIR__, name = "res", references = reference,
     formFactorLog = formFactorLog, nAtoms = nAtoms,
     refChi2 = "CRYSOL 0.668 (header Chi 0.816)",
-    runLog = true,
 )
 
 # `@__DIR__` (this SASDAX2/ folder), not the caller's cwd.

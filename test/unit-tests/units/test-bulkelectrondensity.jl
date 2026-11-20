@@ -695,7 +695,7 @@ end
                 ("bis-tris propane", "BTP", "Bis Tris Propane",
                     "1,3-Bis[tris(hydroxymethyl)methylamino]propane",
                     "2,2'-(propane-1,3-diyldiimino)bis" *
-                    "[2-(hydroxymethyl)propane-1,3-diol]"), 220.93),
+                    "[2-(hydroxymethyl)propane-1,3-diol]"), 209.14),
             (
                 ("tcep", "tris(2-carboxyethyl)phosphine",
                     "3,3',3''-phosphanetriyltripropionic acid",

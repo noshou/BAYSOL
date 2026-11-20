@@ -13,6 +13,12 @@ const _RUN_INFO = Dict(
     "dmax" => ("model", "Å"),
     "pmvFallbackUncert" => ("model", "cm³/mol"),
     "lmaxPinned" => ("model", ""),
+    "memoryHeadroom" => ("model", "% of RAM"),
+    "forwardBlocks" => ("model", "blocks"),
+    "forwardBlockQ" => ("model", "q values"),
+    "forwardBudgetGib" => ("model", "GiB"),
+    "forwardEstGib" => ("model", "GiB"),
+    "forwardPeakGib" => ("model", "GiB"),
     "addHydrogens" => ("model", ""),
     "structureModel" => ("model", ""),
     "qMin" => ("data", "Å⁻¹"),
@@ -23,7 +29,9 @@ const _RUN_INFO = Dict(
     "nQExcluded" => ("data", "points"),
     "cavityFrac" => ("model", ""),
     "exclVolSat" => ("model", ""),
+    "c1Kink" => ("model", ""),
     "nQRaw" => ("data", "points"),
+    "nQChi2" => ("data", "points"),
     "nQ" => ("data", "points"),
     "channels" => ("data", ""),
     "rebinChannels" => ("data", "bins"),
@@ -38,6 +46,8 @@ const _RUN_INFO = Dict(
     "treeDepthAvg" => ("sampler", ""),
     "treeDepthMax" => ("sampler", ""),
     "meanNSteps" => ("sampler", "steps"),
+    "stepSize" => ("sampler", ""),
+    "stepSizeMin" => ("sampler", ""),
     "ebfmi" => ("sampler", ""),
     "divergenceRate" => ("sampler", ""),
     "chainsPooled" => ("convergence", "chains"),
@@ -56,15 +66,30 @@ const _RUN_INFO = Dict(
 )
 
 """
-The `run` sheet: one row for each setting and statistic of the run, with the
-columns `section | name | value | unit`. The `section` is `model`, `data`,
-`sampler`, `convergence` or `output`, the rows are grouped by it, `value` is always
-a number (a flag is 0 or 1; `exclVolSat` is 0, +1 when `c1` sat on its upper bound
-and -1 on its lower one), and `unit` is empty for a pure number (no explanatory
-text is written to the workbook). `mapParams` is `nothing` when every draw diverged
-(the rows that depend on the MAP are then left out). A row whose source the run did
-not record is left out. The rows are those of `_RUN_INFO`. The data and structure
-choices (`qMin`, `qMax`, `sigmaScale`, the points left out, `structureModel`,
+The leapfrog step size each chain adapted to: the `step_size` of the chain's last draw (it
+is fixed after the warm-up). `stats` and `chain` are the sampler statistics of the draws
+and the chain of each.
+
+# Returns
+- A `Vector{Float64}`, one value for each chain.
+
+# Exceptions
+- None.
+"""
+function _chainStepSizes(stats, chain::AbstractVector)
+    return Float64[stats[findlast(==(c), chain)].step_size for c in unique(chain)]
+end
+
+"""
+The `run` sheet: one row for each setting and statistic of the run, with the columns
+`section | name | value | unit`. The `section` is `model`, `data`, `sampler`, `convergence`
+or `output`, the rows are grouped by it, `value` is always a number (a flag is 0 or 1,
+`c1Kink` is 1 when c1 had a kink and was sampled instead of profiled; `exclVolSat` is 0, +1
+when `c1` sat on its upper bound and -1 on its lower one), and `unit` is empty for a pure
+number (no explanatory text is written to the workbook). `mapParams` is `nothing` when
+every draw diverged (the rows that depend on the MAP are then left out). A row whose source
+the run did not record is left out. The rows are those of `_RUN_INFO`. The data and
+structure choices (`qMin`, `qMax`, `sigmaScale`, the points left out, `structureModel`,
 `addHydrogens`, `lmaxPinned`) are rows only when they differ from the defaults.
 """
 function _runSheet(fit, divergenceRate::Real, mapParams, info::AbstractDict)
@@ -88,16 +113,22 @@ function _runRows(fit, divergenceRate::Real, mapParams, info::AbstractDict)
     add!(k, v) = (push!(keys_, k); push!(vals, v))
     for (k, source) in (
         ("nAtoms", "nAtoms"), ("lmax", "lMax"), ("nQRaw", "nQRaw"),
-        ("nQ", "nQ"), ("nSamples", "nSamples"), ("nAdapt", "nAdapt"),
+        ("nQChi2", "nQChi2"), ("nQ", "nQ"), ("nSamples", "nSamples"),
+        ("nAdapt", "nAdapt"),
         ("rngSeed", "rngSeed"), ("quantileLoPct", "quantileLoPct"),
         ("quantileHiPct", "quantileHiPct"),
         ("pmvFallbackUncert", "pmvFallbackUncert"), ("qMin", "qMin"),
         ("qMax", "qMax"), ("sigmaScale", "sigmaScale"), ("nQInput", "nQInput"),
         ("nQCropped", "nQCropped"), ("nQExcluded", "nQExcluded"),
         ("structureModel", "structureModel"), ("addHydrogens", "addHydrogens"),
-        ("lmaxPinned", "lmaxPinned"),
+        ("lmaxPinned", "lmaxPinned"), ("c1Kink", "c1Kink"),
+        ("memoryHeadroom", "memoryHeadroom"), ("forwardBlocks", "forwardBlocks"),
+        ("forwardBlockQ", "forwardBlockQ"), ("forwardBudgetGib", "forwardBudgetGib"),
+        ("forwardEstGib", "forwardEstGib"), ("forwardPeakGib", "forwardPeakGib"),
     )
-        haskey(info, source) && add!(k, info[source])
+        # (a flag is a number in the sheet)
+        haskey(info, source) &&
+            add!(k, info[source] isa Bool ? Int(info[source]) : info[source])
     end
     if haskey(info, "D")
         add!("dmax", info["D"])
@@ -126,13 +157,20 @@ function _runRows(fit, divergenceRate::Real, mapParams, info::AbstractDict)
     add!("treeDepthAvg", mean(depth))
     add!("treeDepthMax", maximum(depth))
     add!("meanNSteps", mean(getproperty.(stats, :n_steps)))
+    # the step size each chain adapted to (fixed after the warm-up): the median and the
+    # smallest, which tell a collapsed step (about 0.002) from a healthy one (0.1 to 0.3)
+    steps = _chainStepSizes(stats, fit.chain)
+    add!("stepSize", median(steps))
+    add!("stepSizeMin", minimum(steps))
     add!("ebfmi", ebfmi)
     if mapParams !== nothing && haskey(mapParams, "cavityShellFrac")
         add!("cavityFrac", mapParams["cavityShellFrac"])
     end
 
-    # c1 is profiled, not sampled, so this says whether the MAP draw's profiled c1 hit
-    # the physical bound of Inference's EXCL_VOL_CORR_BOUNDS (Inference.exclVolSaturation)
+    # for a profiled c1 (the default; `c1Kink` = 1 when its profile had
+    # a kink and c1 was sampled instead, where it cannot leave its
+    # bounds) this says whether the MAP draw's c1 hit the physical bound
+    # of Inference's EXCL_VOL_CORR_BOUNDS (Inference.exclVolSaturation)
     add!("exclVolSat",
         mapParams === nothing ? 0 : Int(sign(get(mapParams, "exclVolSat", 0.0))))
     add!("divergenceRate", divergenceRate)

@@ -376,6 +376,8 @@ export type Recipe = {
  *
  * @property name - the name shown.
  * @property arg - the name in the bundled tables.
+ * @property kind - `"polymer"` for a bundled Polymer row (the glycylglycine species), left
+ *     out for a non-biological solute.
  * @property mM - the amount, mM.
  * @property sigmaMM - its uncertainty, mM.
  * @property custom - the snapshot of a custom solute: `arg` is then its name, not a name
@@ -384,6 +386,7 @@ export type Recipe = {
 export type RowSpec = {
     name: string
     arg: string
+    kind?: "polymer"
     mM: number
     sigmaMM: number
     custom?: CustomSnapshot
@@ -443,6 +446,12 @@ const cut = (x: number): number => Number(x.toPrecision(DIGITS))
 function rowOf(name: string, mM: number, sigmaMM: number, computed = false): RowSpec {
     const known = resolveBuiltin(name)
     const [m, s] = computed ? [cut(mM), cut(sigmaMM)] : [mM, sigmaMM]
+    // a bundled Polymer (the glycylglycine species) keeps the spelling of the template
+    // as its `arg`: the grade name may be parsed as a family (a peptide), a spelling
+    // that is not, the IUPAC name, reaches the table row
+    if (known?.kind === "polymer") {
+        return { name: known.name, arg: name, kind: "polymer", mM: m, sigmaMM: s }
+    }
     return { name: known?.name ?? name, arg: known?.target ?? name, mM: m, sigmaMM: s }
 }
 

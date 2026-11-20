@@ -412,7 +412,7 @@ atomLines(path) =
         end
 
         @testset "real fixtures" begin
-            fx(id, name) = joinpath(_FIXTURES, "experiments", id, name)
+            fx(id, name) = joinpath(Main.experimentFixtureDir(id), name)
             # the ordinary fixtures are untouched and clean
             for id in
                 ("1BNA", "1CRN", "1EHZ", "246D", "3HDD", "4HHB", "1IGT", "1RNA", "1SDR")
@@ -443,7 +443,7 @@ atomLines(path) =
         end
 
         @testset "SASDAC9 through the nucleic-acid route" begin
-            src = joinpath(_FIXTURES, "experiments", "SASDAC9", "SASDAC9_fit2_model1.pdb")
+            src = joinpath(Main.experimentFixtureDir("SASDAC9"), "SASDAC9_fit2_model1.pdb")
             path = joinpath(dir, "nt-checks-ac9.pdb")
             cp(src, path)
             try

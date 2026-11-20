@@ -174,8 +174,8 @@ export function soluteArg(s: { kind: string; arg?: unknown; custom?: unknown }):
 
 /**
  * The draft row a template makes of one of its rows: a bundled solute is a
- * `nonbiological` row; one with a custom snapshot is a `custom-nonbio` row (the keys the
- * loader reads, no `arg`).
+ * `nonbiological` row (a `polymer` row for the Polymer species of glycylglycine); one with
+ * a custom snapshot is a `custom-nonbio` row (the keys the loader reads, no `arg`).
  *
  * @param r - the row the template made.
  * @param template - the link that makes the row follow the conditions, left out for none.
@@ -185,7 +185,8 @@ export function soluteFromSpec(r: RowSpec, template?: TemplateLink): Solute {
     const own = template === undefined ? {} : { template }
     const amounts = { mM: r.mM, sigmaMM: r.sigmaMM }
     if (r.custom === undefined) {
-        return { kind: "nonbiological", name: r.name, arg: r.arg, ...amounts, ...own }
+        const kind = r.kind ?? "nonbiological"
+        return { kind, name: r.name, arg: r.arg, ...amounts, ...own }
     }
     return {
         kind: "custom-nonbio",

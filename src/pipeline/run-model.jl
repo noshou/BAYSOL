@@ -66,16 +66,33 @@ function _curveBands(qvals::AbstractVector, curves::AbstractMatrix, pLo::Real, p
 end
 
 """
+The raw points the measured χ² sums over: those inside the fitted range, `q[1] ≤ qRaw ≤
+q[end]` (the first and last bin centres). A raw point below the first fitted bin or above
+the last is one the fit never used, and the model there is only an extrapolation, so
+an unusable point (negative intensity with a large σ at the beam stop) would count
+tens to hundreds of σ² against a model that was never fitted to it, and the χ² would
+not be comparable with the depositor's, which covers the program's own range.
+
+# Returns
+- `BitVector`, one entry per raw point; `true` where the point enters the χ².
+"""
+function _chisqMask(sh::Shannon.ShannonInfo)::BitVector
+    return (sh.qRaw .>= first(sh.q)) .& (sh.qRaw .<= last(sh.q))
+end
+
+"""
 The reduced χ² of the model curve `y` (on the fitted grid of `sh`) against
 the measured curve: `y` is interpolated onto the measured q points
 ([`Shannon.modelOnRaw`](@ref BAYSOL.Utils.Shannon.modelOnRaw)) and the
-sum of squared normalized residuals is divided by the number of measured
-points less the three parameters fitted to the curve by minimization (scale,
-background and the excluded-volume correction c1). This is the χ² on the grid
-a program such as CRYSOL or FoXS evaluates, whatever binning the fit used.
+sum of squared normalized residuals over the raw points inside the fitted range
+([`_chisqMask`](@ref)) is divided by their number less the three parameters fitted
+to the curve by minimization (scale, background and the excluded-volume correction
+c1). This is the χ² on the grid a program such as CRYSOL or FoXS evaluates,
+whatever binning the fit used.
 """
 function _chisqMeasured(sh::Shannon.ShannonInfo, y::AbstractVector{<:Real})::Float64
-    r = (sh.iRaw .- Shannon.modelOnRaw(sh, y)) ./ sh.σ_raw
+    use = _chisqMask(sh)
+    r = ((sh.iRaw .- Shannon.modelOnRaw(sh, y)) ./ sh.σ_raw)[use]
     return sum(abs2, r) / (length(r) - 3)
 end
 
@@ -88,13 +105,16 @@ column, in blocks of columns so that the measured-grid residuals stay small.
 - `Vector{Float64}`, one reduced χ² per column.
 """
 function _chisqMeasuredAll(sh::Shannon.ShannonInfo, curves::AbstractMatrix{<:Real})
-    M = Shannon.rawInterpolation(sh)
-    nRaw = length(sh.iRaw)
+    use = findall(_chisqMask(sh))
+    M = Shannon.rawInterpolation(sh)[use, :]
+    iUse = sh.iRaw[use]
+    σUse = sh.σ_raw[use]
+    nUse = length(use)
     out = Vector{Float64}(undef, size(curves, 2))
-    block = max(1, 1_000_000 ÷ max(nRaw, 1))
+    block = max(1, 1_000_000 ÷ max(nUse, 1))
     for cols in Iterators.partition(axes(curves, 2), block)
-        R = (sh.iRaw .- M * curves[:, cols]) ./ sh.σ_raw
-        out[cols] = vec(sum(abs2, R; dims = 1)) ./ (nRaw - 3)
+        R = (iUse .- M * curves[:, cols]) ./ σUse
+        out[cols] = vec(sum(abs2, R; dims = 1)) ./ (nUse - 3)
     end
     return out
 end
@@ -185,6 +205,26 @@ trajectory's sample covariance, starting from the identity in the whitened coord
     [`Inference.infer`](@ref). If the run is still not converged, `runModel` throws
     [`Inference.NotConvergedError`](@ref) and nothing is reported. `retry = false`
     skips both the rerun and the error: the run is only flagged in its summary.
+- `kinkFallback::Bool=true` (a developer switch, not a setting): when the profiled c1 has a
+    kink and the sampled-c1 run then misses a gate, run the profiled four-parameter run
+    once without the kink watch and keep it if it passes (LOG rows `c1KinkFallback`,
+    `c1KinkProblems`).
+- `ladder=LADDER` (the setting `LADDER`; needs `retry`): when a run does not converge
+    after its retry and the fallback, the failure is classified from the failed attempt's
+    own diagnostics (`stepCollapse`, `splitChains`, `divergent`, `structural`, `marginal`
+    or `generic`, see [`LADDER`](@ref) and `_failureClass`) and the fit is rerun with the
+    next rung of that class, which changes only the settings it names in `overrides`
+    (`LADDER_OVERRIDABLE` lists what a rung may change); at most three reruns. A map from
+    class to a list of `(name, overrides)` rungs (it replaces only the classes it names),
+    a JSON text of it, the path of a JSON file, `true` (the default ladder), `false` or
+    `"off"`. The winning rung, the class that triggered each rerun and every failed
+    attempt are in the LOG rows `ladder`, `ladderClass`, `ladderAttempts`, `ladderRungs`
+    and `ladderRung`. Only when no rung is left does `runModel` throw.
+- `callerSet=nothing`: the names of the settings the caller set (a set of `Symbol`s, e.g.
+    `Set([:RETRY_N_DRAWS])`). A rung never changes `CHAIN_START_RADII`, `RETRY_N_ADAPT` or
+    `RETRY_N_DRAWS` when that name is in it, even if the value equals the default;
+    `runProject` fills it from the keywords, the settings file and the model's own
+    settings. With `nothing` a value still at its default counts as unset.
 - `retryNAdapt::Integer=Inference.RETRY_N_ADAPT`, `retryNDraws::Integer=
     Inference.RETRY_N_DRAWS` (2000, 2000): warm-up and post-warm-up iterations per chain of
     the rerun.
@@ -267,6 +307,351 @@ function runModel(
     basinRestartNats = Inference.BASIN_RESTART_NATS,
     harvestCover = Inference.HARVEST_COVER,
     harvestDivergent = Inference.HARVEST_DIVERGENT,
+    kinkFallback::Bool = true,
+    ladder = LADDER,
+    callerSet::Union{Nothing,AbstractSet{Symbol}} = nothing,
+)::Union{
+    Tuple{Inference.Inferred,Float64,MAPResult,QuantileResult},
+    Tuple{Inference.Inferred,Float64,Nothing,Nothing},
+}
+    kw = (;
+        sigma,
+        δ,
+        rngSeed,
+        nChains,
+        retry,
+        retryNAdapt,
+        retryNDraws,
+        chainStartRadii,
+        optimumChainCap,
+        optimumMinChains,
+        optimumChainRadius,
+        optimumChainFraction,
+        mapMaxIter,
+        mapNStarts,
+        mapFSuccessive,
+        mapOptimaKept,
+        mapJitterRadii,
+        mapJitterDirections,
+        mapJitterMaxOptima,
+        mapJitterWithinNats,
+        basinRestartNats,
+        harvestCover,
+        harvestDivergent,
+        kinkFallback,
+        sampleC1 = false,
+    )
+    return _runLadder(
+        seed, nSamples, nAdapt, kw, _checkedLadder(ladder); callerSet,
+    )
+end
+
+
+# The settings of a rung, by the keyword of `runModel` that carries each (the rows of
+# `SETTING_KEYWORDS` of `runModel`). `N_ADAPT` and `N_DRAWS` are the positional arguments
+# (`nSamples = nAdapt + nDraws`); `RNG_SEED_STEP` and `SAMPLE_C1` are ladder-only keys.
+const _RUNG_KEYWORD = Dict(
+    r.setting => r.keyword for r in SETTING_KEYWORDS if r.entry === :runModel
+)
+
+# The settings a rung changes only when the caller did not set them (a script's own
+# `retryNDraws = 8000` or `chainStartRadii` stays), with their defaults. Which settings the
+# caller set is `callerSet` of `runModel` (names of settings; `runProject` passes it: the
+# keywords, the settings file and the model's own settings). A direct caller of `runModel`
+# that gives no `callerSet` is judged by the value: one left at its default is unset, so
+# an explicit default looks unset there.
+const _CALLER_FIRST = Dict(
+    :CHAIN_START_RADII => Inference.CHAIN_START_RADII,
+    :RETRY_N_ADAPT => Inference.RETRY_N_ADAPT,
+    :RETRY_N_DRAWS => Inference.RETRY_N_DRAWS,
+)
+
+_sameValue(a, b) = a isa Union{Tuple,AbstractVector} ? Tuple(a) == Tuple(b) : a == b
+
+"The most reruns of the ladder in one `runModel` call (the base run is not counted)."
+const LADDER_MAX_RUNGS = 3
+
+# The thresholds that classify a failed attempt (`_failureClass`). They are heuristics
+# read off the benchmark runs and the README fix ladder, not settings: the evidence for
+# each, and what no run has checked, is in `src/inference/README.md`.
+
+"""
+The worst R̂ from which a failure counts as far from converged, not marginal: 1.05. The
+README's marginal band is R̂ 1.01 to 1.05 (SASDMS6, SASDDG7 at 1.045 with a bulk ESS of
+237), and the split-chain and collapsed-step cases it names sit well above it (SASDVA2 1.57
+to 1.82).
+"""
+const LADDER_RHAT_FAR = 1.05
+
+"""
+The median adapted step size below which the step counts as collapsed: 0.01. The README
+gives about 0.002 for a collapsed step (SASDMC6 before its fix, tree depth 10) against 0.1
+to 0.3 for a healthy one; 0.01 is five times above the collapse and ten times below the
+healthy step. Not yet checked against LOGs (the `stepSize` row is new).
+"""
+const LADDER_COLLAPSE_STEP = 0.01
+
+"""
+The mean tree depth that counts as at the limit (the sampler's maximum depth is 10): 8,
+the supporting signal of a collapse when R̂ is far and no step size is known. Depth alone
+is no collapse: SASDP74 passes its gates at a mean depth of 9.8.
+"""
+const LADDER_COLLAPSE_DEPTH = 8.0
+
+"""
+The divergent share from which divergences that survived a raised `TARGET_ACCEPT` count as
+structural, not a step too large: 1 %. The README's structural entries (SASDWS5, SASDM96)
+diverge at 1.3 % to 2 % at δ 95, 98 and 99; the near-gate failures of the 2026-11-18
+validation (SASDGA7, SASDPV7, SASDVE2) were 0.1 % to 0.43 % and δ 99 cleared 14 of 15.
+"""
+const LADDER_STRUCTURAL_SHARE = 0.01
+
+"""
+The failure `summary` of an attempt as a map of what `_failureClass` reads: the fit's own
+diagnostics after its warm-up (`rhat`, `ess` the smaller of the bulk and tail ESS,
+`divergentShare`, `treeDepthAvg`, `treeDepthMax`, `meanNSteps`, `meanAccept`, `stepSize`
+the median over the chains of the adapted step size, `stepSizeMin`, `modes`).
+
+# Returns
+- A `NamedTuple`, or `nothing` when the fit has no draws after the warm-up.
+
+# Exceptions
+- None.
+"""
+function _attemptSummary(fit::Inference.Inferred)
+    d = fit.diagnostics
+    kept = findall(>(d.nAdapt), fit.iteration)
+    isempty(kept) && return nothing
+    st = fit.stats[kept]
+    steps = _chainStepSizes(st, fit.chain[kept])
+    return (;
+        rhat = Inference._worstRhat(d),
+        ess = min(Inference._worstEss(d.ess), Inference._worstEss(d.essTail)),
+        divergentShare = count(s -> s.numerical_error, st) / length(st),
+        treeDepthAvg = mean(s -> s.tree_depth, st),
+        treeDepthMax = maximum(s -> s.tree_depth, st),
+        meanNSteps = mean(s -> s.n_steps, st),
+        meanAccept = mean(s -> s.acceptance_rate, st),
+        stepSize = median(steps),
+        stepSizeMin = minimum(steps),
+        modes = length(d.modeWeight),
+    )
+end
+
+"""
+The class of a failed attempt, from its `summary` (see `_attemptSummary`), in this order
+(the c1 kink is handled inside the attempt and never gets here):
+
+1. `:stepCollapse`: R̂ not below the gate and the median step size below
+   `LADDER_COLLAPSE_STEP`, or R̂ at `LADDER_RHAT_FAR` and the mean tree depth at
+   `LADDER_COLLAPSE_DEPTH`;
+2. `:splitChains`: R̂ at `LADDER_RHAT_FAR`, more than one mode, an ESS not above the gate
+   (and, by the order, no collapse);
+3. `:divergent`: a divergent share at the gate (`MAX_DIVERGENT_RATE`) with R̂ below
+   `LADDER_RHAT_FAR`; `:structural` instead when `deltaRaised` (an earlier rung of this
+   walk raised `TARGET_ACCEPT`) and the share is at `LADDER_STRUCTURAL_SHARE`;
+4. `:marginal`: R̂ below `LADDER_RHAT_FAR`, no divergence at the gate;
+5. `:generic`: everything else, and an attempt without a summary.
+
+# Returns
+- The class as a `Symbol` of `LADDER_CLASSES`.
+
+# Exceptions
+- None.
+"""
+function _failureClass(summary; deltaRaised::Bool = false)
+    summary === nothing && return :generic
+    s = summary
+    far = s.rhat >= LADDER_RHAT_FAR
+    gate = s.rhat >= Inference.RHAT_OK
+    collapsed = s.stepSize < LADDER_COLLAPSE_STEP
+    deep = far && s.treeDepthAvg >= LADDER_COLLAPSE_DEPTH
+    ((gate && collapsed) || deep) && return :stepCollapse
+    far && s.modes > 1 && s.ess <= Inference.ESS_MIN && return :splitChains
+    if s.divergentShare >= Inference.MAX_DIVERGENT_RATE && !far
+        deltaRaised && s.divergentShare >= LADDER_STRUCTURAL_SHARE && return :structural
+        return :divergent
+    end
+    far || return :marginal
+    return :generic
+end
+
+"The name of a rung: its own, else its overrides as `KEY=value` words."
+function _rungLabel(r)
+    isempty(r.name) || return r.name
+    return join(("$k=$(v)" for (k, v) in pairs(r.overrides)), " ")
+end
+
+"""
+The ladder as one readable line (the LOG row `ladderRungs`): per failure class, its rungs
+by name (`_rungLabel`), classes separated by ` | `, e.g.
+`stepCollapse: delta 70, delta 35 | splitChains: starts (2,4,6), close starts, longer`.
+The overrides of a rung are in the ladder definition (`LADDER`) and the attempts
+that ran are in the rows `ladder` and `ladderAttempts`, so they are not repeated here.
+"""
+function _ladderText(ladder)::String
+    return join(
+        ("$class: " * join(_rungLabel.(rungs), ", ") for (class, rungs) in pairs(ladder)),
+        " | ",
+    )
+end
+
+"""
+The arguments of `runModel` that the rung `rung` changes: the keywords `kw`, `nSamples`
+and `nAdapt` of the caller, with the overrides of the rung applied. `CHAIN_START_RADII`,
+`RETRY_N_ADAPT` and `RETRY_N_DRAWS` are applied only when the caller did not set that
+setting (`_CALLER_FIRST`): its name is not in `callerSet`, or, when `callerSet` is
+`nothing`, its value is still the default; `RNG_SEED_STEP` is added to
+`rngSeed` (nothing when the seed is `nothing`, a fresh draw); `SAMPLE_C1` sets `sampleC1`.
+
+# Returns
+- `(kw, nSamples, nAdapt)`.
+"""
+function _applyRung(
+    rung, kw::NamedTuple, nSamples::Int, nAdapt::Int; callerSet = nothing,
+)
+    draws = nSamples - nAdapt
+    for (name, v) in pairs(rung.overrides)
+        if name === :RNG_SEED_STEP
+            kw.rngSeed === nothing || (kw = merge(kw, (; rngSeed = kw.rngSeed + v)))
+        elseif name === :SAMPLE_C1
+            kw = merge(kw, (; sampleC1 = v))
+        elseif name === :N_ADAPT
+            nAdapt = v
+        elseif name === :N_DRAWS
+            draws = v
+        elseif haskey(_CALLER_FIRST, name)
+            # the caller's own value wins: only a setting the caller did not set is replaced
+            key = _RUNG_KEYWORD[name]
+            unset =
+                callerSet === nothing ? _sameValue(kw[key], _CALLER_FIRST[name]) :
+                !(name in callerSet)
+            unset && (kw = merge(kw, NamedTuple{(key,)}((v,))))
+        else
+            kw = merge(kw, NamedTuple{(_RUNG_KEYWORD[name],)}((v,)))
+        end
+    end
+    return kw, nAdapt + draws, nAdapt
+end
+
+"""
+Run `runner` (one attempt of [`runModel`](@ref), `_runModelOnce`) and, when the run does
+not converge, walk the ladder `ladder` (a map from failure class to rungs, see
+[`LADDER`](@ref)) before giving up: the failed attempt is classified (`_failureClass`)
+and the next unused rung of that class is run, up to `LADDER_MAX_RUNGS` times; the class
+is taken anew from each failed rerun, so the walk can change class. A rung that would
+change nothing for the caller's settings is skipped. Every attempt, the class that
+triggered it, its settings and why it failed are in the run's timing info (LOG rows
+`ladder`, `ladderClass`, `ladderAttempts`, `ladderRungs`, `ladderRung`); when no rung is
+left a [`Inference.NotConvergedError`](@ref) is thrown, with the attempts listed and the
+last attempt's summary. With the ladder off, or with `retry` off, the base run's error is
+rethrown as it is.
+
+# Returns
+- What `runModel` returns.
+
+# Exceptions
+- [`Inference.NotConvergedError`](@ref) when no rung is left.
+"""
+function _runLadder(
+    seed, nSamples, nAdapt, kw::NamedTuple, ladder; runner = _runModelOnce,
+    callerSet = nothing,
+)
+    active = kw.retry && any(!isempty, ladder)
+    attempts = String[]
+    classes = String[]
+    sbuf = Inference.statBuffer(seed.timing)
+    Inference.statReset!(sbuf)
+    function record(label, e)
+        push!(attempts, "$label: " * join(e.problems, "; "))
+        Inference.statNext!(sbuf, "not converged at $label: " * join(e.problems, "; "))
+        return nothing
+    end
+    err = nothing
+    try
+        res = runner(seed, nSamples, nAdapt; kw...)
+        _noteLadder(seed, attempts, classes, "base", 0, ladder)
+        return res
+    catch e
+        e isa Inference.NotConvergedError && active || rethrow()
+        record("base", e)
+        err = e
+    end
+    next = Dict(c => 1 for c in LADDER_CLASSES)
+    deltaRaised = false
+    reruns = 0
+    while reruns < LADDER_MAX_RUNGS
+        class = _failureClass(err.summary; deltaRaised)
+        rungs = ladder[class]
+        # the next rung of the class that changes something for this caller
+        rung = nothing
+        applied = nothing
+        while next[class] <= length(rungs) && rung === nothing
+            r = rungs[next[class]]
+            next[class] += 1
+            a = _applyRung(r, kw, nSamples, nAdapt; callerSet)
+            (a[1] == kw && a[2] == nSamples && a[3] == nAdapt) && continue
+            rung, applied = r, a
+        end
+        rung === nothing && break
+        kw2, n2, a2 = applied
+        reruns += 1
+        label = _rungLabel(rung)
+        push!(classes, String(class))
+        Inference.statLabel!(sbuf, "ladder rung " * label, "failure class " * String(class);
+            class = String(class), rung = label)
+        haskey(rung.overrides, :TARGET_ACCEPT) &&
+            rung.overrides.TARGET_ACCEPT > kw.δ && (deltaRaised = true)
+        @warn "not converged; ladder rung" class label
+        try
+            res = runner(seed, n2, a2; kw2...)
+            _noteLadder(seed, attempts, classes, label, reruns, ladder)
+            return res
+        catch e
+            e isa Inference.NotConvergedError || rethrow()
+            record("$label [$class]", e)
+            err = e
+        end
+    end
+    _noteLadder(seed, attempts, classes, "failed", -1, ladder)
+    throw(Inference.NotConvergedError(vcat(["ladder exhausted:"], attempts), err.summary))
+end
+
+function _noteLadder(seed, attempts, classes, outcome, rung, ladder)
+    seed.timing === nothing && return nothing
+    seed.timing.info["ladder"] = outcome
+    seed.timing.info["ladderClass"] = join(classes, " | ")
+    seed.timing.info["ladderAttempts"] = join(attempts, " | ")
+    seed.timing.info["ladderRungs"] = _ladderText(ladder)
+    seed.timing.info["ladderRung"] = rung
+    return nothing
+end
+
+function _runModelOnce(
+    seed::Inference.Seed,
+    nSamples::Int64,
+    nAdapt::Int64;
+    sigma, δ, rngSeed, nChains, retry,
+    retryNAdapt,
+    retryNDraws,
+    chainStartRadii,
+    optimumChainCap,
+    optimumMinChains,
+    optimumChainRadius,
+    optimumChainFraction,
+    mapMaxIter,
+    mapNStarts,
+    mapFSuccessive,
+    mapOptimaKept,
+    mapJitterRadii,
+    mapJitterDirections,
+    mapJitterMaxOptima,
+    mapJitterWithinNats,
+    basinRestartNats,
+    harvestCover,
+    harvestDivergent,
+    kinkFallback,
+    sampleC1::Bool,
 )::Union{
     Tuple{Inference.Inferred,Float64,MAPResult,QuantileResult},
     Tuple{Inference.Inferred,Float64,Nothing,Nothing},
@@ -300,12 +685,92 @@ function runModel(
     end
 
     # calculate unfiltered fit
-    fitUnfiltered =
-        Inference.infer(seed, nSamples, nAdapt; δ = δ, rngSeed = rngSeed,
+    # c1 is profiled; if that profile has a kink the run stops (`KinkDetected`, after the
+    # warm-up) and c1 is sampled as a fifth parameter instead, the LOG row `c1Kink`
+    seed.timing === nothing || (seed.timing.info["c1Kink"] = false)
+    runInfer =
+        s -> Inference.infer(s, nSamples, nAdapt; δ = δ, rngSeed = rngSeed,
             nChains = nChains, retry = retry, options = options)
+    seed4 = seed
+    sampledC1 = false
+    if sampleC1        # a ladder rung (`SAMPLE_C1`): c1 is sampled from the start
+        seed = Inference.sampleC1(seed)
+        sampledC1 = true
+        seed.timing === nothing || (seed.timing.info["c1Kink"] = true)
+    end
+    fitUnfiltered = try
+        runInfer(seed)
+    catch e
+        e isa Inference.KinkDetected || rethrow()
+        @warn "the profiled c1 has a kink; sampling c1 as a fifth parameter"
+        sb = Inference.statBuffer(seed.timing)
+        Inference.statStopped!(sb, "KinkDetected: the profiled c1 is kinked")
+        Inference.statStages!(sb, seed.timing)
+        Inference.statNext!(sb, "restart with c1 sampled as a fifth parameter")
+        Inference.statLabel!(sb, "sampled-c1 restart", "KinkDetected";
+            class = "kink", rung = "c1 sampled as a fifth parameter")
+        seed = Inference.sampleC1(seed)
+        sampledC1 = true
+        seed.timing === nothing || (seed.timing.info["c1Kink"] = true)
+        runInfer(seed)
+    end
+    # The kink detector can fire on a profile whose sampled-c1 run then misses a gate. If
+    # the profiled (four-parameter) run, without the watch, passes them, it is the fit
+    # (the kink is recorded in the LOG: `c1KinkFallback`, `c1KinkProblems`).
+    gateProblems =
+        f -> begin
+            ps = Inference._convergenceProblems(f.diagnostics)
+            kept = f.stats[findall(>(f.diagnostics.nAdapt), f.iteration)]
+            nDiv = count(st -> st.numerical_error, kept)
+            if !isempty(kept) && nDiv >= Inference.MAX_DIVERGENT_RATE * length(kept)
+                push!(
+                    ps,
+                    "$(round(100 * nDiv / length(kept); digits = 2)) % of the " *
+                    "transitions diverged",
+                )
+            end
+            return ps
+        end
+    if retry && sampledC1 && kinkFallback
+        problems = gateProblems(fitUnfiltered)
+        if !isempty(problems)
+            @warn "the sampled-c1 run missed its gates; trying the profiled run" problems
+            plain = Inference.SamplerOptions(; ck..., watchKink = false)
+            sb = Inference.statBuffer(seed.timing)
+            Inference.statNext!(
+                sb,
+                "profiled run without the kink watch: " *
+                join(problems, "; "),
+            )
+            Inference.statLabel!(
+                sb, "profiled fallback", "the sampled-c1 run missed its gates";
+                class = "convergence", rung = "profiled run without the kink watch",
+            )
+            alt = Inference.infer(seed4, nSamples, nAdapt; δ = δ, rngSeed = rngSeed,
+                nChains = nChains, retry = retry, options = plain)
+            if isempty(gateProblems(alt))
+                fitUnfiltered = alt
+                seed = seed4
+                Inference.statKeep!(sb, Inference.statAttempts(sb),
+                    "the profiled fallback passed the gates the sampled-c1 run missed")
+                if seed.timing !== nothing
+                    seed.timing.info["c1Kink"] = false
+                    seed.timing.info["c1KinkFallback"] = true
+                    seed.timing.info["c1KinkProblems"] = join(problems, "; ")
+                end
+            else
+                seed.timing === nothing ||
+                    (
+                        seed.timing.info["c1KinkFallbackFailed"] =
+                            join(gateProblems(alt), "; ")
+                    )
+            end
+        end
+    end
     if retry
         problems = Inference._convergenceProblems(fitUnfiltered.diagnostics)
-        isempty(problems) || throw(Inference.NotConvergedError(problems))
+        isempty(problems) ||
+            throw(Inference.NotConvergedError(problems, _attemptSummary(fitUnfiltered)))
     end
     tPost = tick()
 
@@ -359,7 +824,9 @@ function runModel(
         limit = 100 * Inference.MAX_DIVERGENT_RATE
         throw(
             Inference.NotConvergedError(
-                ["$pct % of the transitions diverged, not below $limit %"]),
+                ["$pct % of the transitions diverged, not below $limit %"],
+                _attemptSummary(fitUnfiltered),
+            ),
         )
     end
     if diverged == length(fit.stats)
@@ -382,7 +849,7 @@ function runModel(
             "exclVolCorr"     => fit.c1[maxIdx],
             "chisqRed"        => chisqMeas[maxIdx],
         )
-        pkeys = Inference.paramKeys(seed.pr)
+        pkeys = Inference.paramKeys(seed.pr, length(ξ_map))
         for (k, key) in enumerate(pkeys)
             mapParams[key] = ξ_map[k]
             mapParams["z"*uppercasefirst(key)] = zMap[k]

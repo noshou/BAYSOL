@@ -169,7 +169,7 @@ using DBInterface: DBInterface
 using FastClosures: @closure
 using LinearAlgebra: LinearAlgebra
 using ..Geometry: PROBE_RADIUS, ATOM_BLOCK, ATOM_PARALLEL_MIN
-using ..PhysicalConstants: UNIT_OF_δρ
+using ..PhysicalConstants: UNIT_OF_δρ, EV_EXP_COEFF, FOUR_PI
 using ..Runtime: gcCheckpoint, Lazy, force, tmapBlocks
 using LinearAlgebra: mul!
 
@@ -198,6 +198,24 @@ amplitude column, a q-tile) in
 chosen to fit it. 8 MiB: wider tiles measured no faster, and every worker holds one.
 """
 const B_LM_W_BYTES = 8 * 2^20
+
+"""
+Memory budget, in bytes, for the harmonics buffer (`2K × T` doubles) of one worker of
+[`Scattering.computeBLm`](@ref BAYSOL.Scattering.computeBLm): the tile length `T` is cut
+to fit it (`K` = (lMax+1)(lMax+2)/2). 256 MiB leaves `T` = 256 up to lMax ≈ 360; at lMax
+1185 the buffer would be 2.9 GB per worker, which no block of q values could shrink.
+Depends on lMax only, never on the thread count or on Q, so the result stays the same at
+any of them.
+"""
+const B_LM_A_BYTES = 256 * 2^20
+
+"""
+Safety factor on the byte estimate of the static build (`_forwardBytes`), covering what it
+does not count: BLAS and allocator overhead, fragmentation and the program's own garbage.
+Measured on SASDJL6 (2026-11-18): without it the process peaked about 1 GiB above the
+budget.
+"""
+const FORWARD_BYTES_SAFETY = 1.3
 
 """
 Number of tile groups of [`Scattering.computeBLm`](@ref BAYSOL.Scattering.computeBLm):
@@ -266,18 +284,6 @@ Floor applied to Chantler f2 table values before the log-log interpolation
 where the table stores an exact zero.
 """
 const F2_LOG_FLOOR = 1e-99
-
-"""
-Coefficients of
-[`excludedVolumeFactor`](@ref BAYSOL.Scattering.excludedVolumeFactor):
-(4π/3)^(2/3) / 4π.
-
-Converts CRYSOL's *radius* parameterisation into the *volume* parameterisation
-[`_gaussianDummy`](@ref BAYSOL.Scattering._gaussianDummy) is written in,
-via V = (4π/3) r³ (which is exactly `Geometry.sphereVolume`,
-so `rM` and the dummy volumes stay consistent).
-"""
-const EV_EXP_COEFF = (4π / 3)^(2 / 3) / (4π)
 
 """
 Species pairs (a, b), a ≤ b, in [`ForwardCache`](@ref)'s `Gc`

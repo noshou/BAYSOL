@@ -8,7 +8,9 @@
 # `tuple` and, for a setting that may be `null` or is a list, `optionalFloat`,
 # `optionalInt` (a number or `null`), `ranges` (a list of `[low, high]` pairs),
 # `strings` (a list of texts), `colours` (an ordered list of colour names or `#rrggbb`) and
-# `markers` (an ordered list of marker names, `choices` being the names allowed).
+# `markers` (an ordered list of marker names, `choices` being the names allowed) and
+# `ladder` (the retry ladder: a map from failure class to a list of `{name, overrides}`
+# rungs; `classes` names the classes, `overridable` the settings a rung may override).
 
 using BAYSOL
 using JSON3
@@ -108,6 +110,11 @@ function harvest()
         choices === nothing || push!(fields, "choices" => collect(choices))
         if kind === :tuple
             push!(fields, "shape" => shape_of(v), "parts" => parts_of(name, v))
+        end
+        if kind === :ladder
+            # the settings a rung may override: the interface checks each by its own entry
+            push!(fields, "overridable" => String.(BAYSOL.Pipeline.LADDER_OVERRIDABLE))
+            push!(fields, "classes" => String.(BAYSOL.Pipeline.LADDER_CLASSES))
         end
         push!(lines, " $(JSON3.write(String(name))): " * json_object(fields))
     end

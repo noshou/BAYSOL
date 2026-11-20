@@ -80,8 +80,12 @@ end
 end
 
 @testset "fitting-test lookups" begin
+    # only folders with a script count (held and dropped entries have none)
+    hasScript(n) = any(endswith(".jl"), readdir(joinpath(repo_dir, FIT_DIR, n)))
     @test length(ids()) ==
-          count(n -> startswith(n, "SASD") && isdir(joinpath(repo_dir, FIT_DIR, n)),
+          count(
+        n -> startswith(n, "SASD") && isdir(joinpath(repo_dir, FIT_DIR, n)) &&
+             hasScript(n),
         readdir(joinpath(repo_dir, FIT_DIR)))
     @test tags_of("SASDTK5") ==
           ["fit2_model1", "fit3_model1", "fit4_model1", "fit5_model1", "fit6_model1",

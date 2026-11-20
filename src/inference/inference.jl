@@ -7,14 +7,18 @@ module Inference
 
 using ..BulkElectronDensity: BulkElectronDensity, Solute, DEFAULT_TEMPERATURE_C
 using ..Shannon: ShannonInfo
-using AdvancedHMC: DenseEuclideanMetric, Hamiltonian, MassMatrixAdaptor,
-    find_good_stepsize, Leapfrog, StanHMCAdaptor, StepSizeAdaptor, sample,
-    HMCKernel, Trajectory, MultinomialTS, GeneralisedNoUTurn
+using AdvancedHMC: AdvancedHMC, DenseEuclideanMetric, Hamiltonian, MassMatrixAdaptor,
+    find_good_stepsize, Leapfrog, StanHMCAdaptor, StepSizeAdaptor,
+    HMCKernel, Trajectory, MultinomialTS, GeneralisedNoUTurn, pm_next!
 using FastClosures, StaticArrays, Distributions, ForwardDiff, DiffResults
+using FiniteDiff: FiniteDiff
+using Peaks: findmaxima, peakproms
 using SpecialFunctions: digamma, trigamma
 using ..Scattering: ForwardCache
-using ..PhysicalConstants: NS_PER_S, MS_PER_S
+using ..PhysicalConstants: NS_PER_S, MS_PER_S, LOG_TWO_PI
 using Printf: @sprintf
+using MCMCDiagnosticTools: MCMCDiagnosticTools
+using Statistics: mean
 using ..Runtime:
     withGcPaused, gcCheckpoint, drawBase, stream, tmapItems, StageLog,
     tick, tock!, fmtCount
@@ -191,14 +195,20 @@ const BoundedBeta = LocationScale{Float64,Continuous,Beta{Float64}}
 
 """
 Physical prior distributions over ξ = (ρₑ, δρ₁, δρ₂, δρ₃). δρ₃'s bounds are fixed
-at the mean of `ρₑPrior` (see [`_δρ₃_prior`](@ref)).
+at the mean of `ρₑPrior` (see [`_δρ₃_prior`](@ref)). The field `c1Prior` is the prior of
+the excluded-volume correction c1: any bounded continuous distribution, built by the
+function `c1Prior`. It is only used when c1 is sampled as a fifth parameter (the
+fallback for a kinked c1 profile, see `runModel`).
 """
 struct ξ_priors
     ρₑPrior::LogNormal{Float64}
     δρ₁Prior::BoundedBeta
     δρ₂Prior::BoundedBeta
     δρ₃Prior::BoundedBeta
+    c1Prior::ContinuousUnivariateDistribution
 end
+ξ_priors(ρₑ, δρ₁, δρ₂, δρ₃) =
+    ξ_priors(ρₑ, δρ₁, δρ₂, δρ₃, c1Prior())
 
 #----------------
 # Profiled c1
@@ -246,6 +256,35 @@ struct WLSError <: Exception
 end
 
 """
+    _C1Counts
+
+The tallies of the c1 search, kept for the run statistics: `solves` (c1 profile solves,
+one per `_c1Search`), `brentIters` (the iterations of their `Brent()` polishes), `scanEdge`
+(solves whose scan optimum lay at the first or last scan point, so the bracket was the
+padded window edge) and `wlsErrors` (the `WLSError`s the MAP search caught). Atomic
+increments, once per solve (a solve costs a scan over the whole c1 table and a Brent
+polish, so the counters are a negligible share of it); the statistics read the difference
+over an attempt.
+"""
+struct _C1Counts
+    solves::Threads.Atomic{Int}
+    brentIters::Threads.Atomic{Int}
+    scanEdge::Threads.Atomic{Int}
+    wlsErrors::Threads.Atomic{Int}
+end
+
+_C1Counts() = _C1Counts(
+    Threads.Atomic{Int}(0), Threads.Atomic{Int}(0), Threads.Atomic{Int}(0),
+    Threads.Atomic{Int}(0),
+)
+
+"The four tallies of `counts` as a `NamedTuple` of integers."
+c1Counts(counts::_C1Counts) = (
+    solves = counts.solves[], brentIters = counts.brentIters[],
+    scanEdge = counts.scanEdge[], wlsErrors = counts.wlsErrors[],
+)
+
+"""
     _C1Tables
 
 Static per-run tables for [`profiledCorrs`](@ref)'s c1 search: everything that depends
@@ -261,6 +300,8 @@ number of threads. Per-evaluation scratch is never stored here.
 - `cmin`, `cmax`, `eps::Float64`: the scan settings the tables were built for.
 - `q2max::Float64`: the largest q², which bounds the
     argument of the anchored envelope (see [`_anchor`](@ref)).
+- `counts::_C1Counts`: the tallies of the run statistics (the only part that is written
+    after construction, by atomic increments).
 """
 struct _C1Tables
     cs::Vector{Float64}
@@ -271,7 +312,11 @@ struct _C1Tables
     cmax::Float64
     eps::Float64
     q2max::Float64
+    counts::_C1Counts
 end
+
+_C1Tables(cs, g1, qvals, rM, cmin, cmax, eps, q2max) =
+    _C1Tables(cs, g1, qvals, rM, cmin, cmax, eps, q2max, _C1Counts())
 
 # The anchored envelope of the c1 search
 
@@ -294,6 +339,54 @@ const _RNG_JITTER = 3
 const _RNG_BRIDGE = 4
 const _RNG_MAP_JITTER = 5
 const _RNG_INITIAL_POINT = 6
+
+# Fixed internals of the c1 kink check (`_c1Kinked`, profiled-corrs.jl): not settings,
+# because changing them could break a run.
+
+"""
+Largest gap, in nats of log-likelihood, between the two highest prominent maxima of a c1
+scan for the profile to count as kinked at that draw: the lower branch then holds at least
+about 5 % of the conditional mass (`exp(-3)` against 1). A farther branch is a low-mass
+mode the sampler does not pick up. Fixed before the 2026-11-18 rerun of the suite.
+"""
+const C1_KINK_GAP = 3.0
+
+"""
+Number of post-warm-up draws a chain makes before the kink of the c1 profile is first
+looked for, and the most draws a single check examines (spread evenly over the draws so
+far), which bounds its cost.
+"""
+const C1_KINK_DRAWS = 200
+
+"""
+Further post-warm-up draws between two kink checks of a chain, so a kink that only shows
+after the chain has moved on is still found. A check costs one c1 scan per examined draw
+(at most `C1_KINK_DRAWS`), a small fraction of the NUTS work of that many draws.
+"""
+const C1_KINK_EVERY = 250
+
+"""
+Largest |t| the c1 centre ([`_c1Centre`](@ref)) may take: t is the logit of c1's position in
+its bounds, and a c1 at a bound has no finite t, so the root find stays inside ±this.
+"""
+const C1_CENTRE_T_MAX = 14.0
+
+"Newton iterations of the c1 centre's root find ([`_c1Centre`](@ref)) before it stops."
+const C1_CENTRE_MAX_ITER = 50
+
+"Step size (in t) at which the root find has converged ([`_c1Centre`](@ref))."
+const C1_CENTRE_TOL = 1.0e-10
+
+"Relative step of the central differences in the c1 centre's derivatives."
+const C1_CENTRE_FD_STEP = 1.0e-5
+
+"Smallest prominence (nats of log-likelihood) of a scan maximum that counts as a basin."
+const C1_KINK_PROMINENCE = 3.0
+
+"""
+Share of the examined draws with two or more basins from which the profile counts as kinked.
+"""
+const C1_KINK_SHARE = 0.02
 
 # The data a run starts from
 
@@ -332,16 +425,139 @@ struct Seed{T<:Real,N}
     shannon::Union{Nothing,ShannonInfo}
 end
 
+#----------------
+# SamplerOptions
+#----------------
 
+# ---------------------------------------------------------------------------
+
+"""
+    SamplerOptions(; retryNAdapt, retryNDraws, chainStartRadii, ...)
+
+The tunable settings of [`infer`](@ref) that are not its own arguments, gathered in one
+immutable value that is passed down to where they are read, so every field has the type
+of its setting and the sampler's code stays type-stable. Every keyword is named after its
+constant and defaults to it, so `SamplerOptions()` is the sampler as it has always run.
+[`runModel`](@ref BAYSOL.Pipeline.runModel) builds one from its keywords of the same
+names, after the checks of `loadSettings`; the
+constructor itself checks nothing.
+
+# Fields
+- `retryNAdapt::Int`, `retryNDraws::Int`: warm-up and post-warm-up iterations per chain
+    of the rerun ([`RETRY_N_ADAPT`](@ref), [`RETRY_N_DRAWS`](@ref)).
+- `chainStartRadii::Vector{Float64}`: [`CHAIN_START_RADII`](@ref).
+- `optimumChainCap::Int`, `optimumMinChains::Int`, `optimumChainRadius::Float64`,
+    `optimumChainFraction::Float64`: [`OPTIMUM_CHAIN_CAP`](@ref),
+    [`OPTIMUM_MIN_CHAINS`](@ref), [`OPTIMUM_CHAIN_RADIUS`](@ref),
+    [`OPTIMUM_CHAIN_FRACTION`](@ref).
+- `mapMaxIter::Int`, `mapNStarts::Int`, `mapFSuccessive::Int`,
+    `mapOptimaKept::Int`: [`MAP_MAX_ITER`](@ref), [`MAP_N_STARTS`](@ref),
+    [`MAP_F_SUCCESSIVE`](@ref), [`MAP_OPTIMA_KEPT`](@ref).
+- `mapJitterRadii::Vector{Float64}`, `mapJitterDirections::Int`,
+    `mapJitterMaxOptima::Int`, `mapJitterWithinNats::Float64`:
+    [`MAP_JITTER_RADII`](@ref), [`MAP_JITTER_DIRECTIONS`](@ref),
+    [`MAP_JITTER_MAX_OPTIMA`](@ref), [`MAP_JITTER_WITHIN_NATS`](@ref).
+- `basinRestartNats::Float64`: [`BASIN_RESTART_NATS`](@ref).
+- `harvestCover::Int`, `harvestDivergent::Int`: [`HARVEST_COVER`](@ref),
+    [`HARVEST_DIVERGENT`](@ref).
+- `watchKink::Bool`: whether a profiled run watches for a kinked c1 profile
+    ([`KinkDetected`](@ref)); `false` is the fallback of
+    [`runModel`](@ref BAYSOL.Pipeline.runModel) after a sampled-c1 run missed its gates
+    (not a setting, always `true` otherwise).
+
+# Returns
+- A `SamplerOptions` (the constructor converts each value to its field's type).
+
+# Exceptions
+- `MethodError`/`InexactError` if a value cannot be converted to its field's type.
+"""
+struct SamplerOptions
+    retryNAdapt::Int
+    retryNDraws::Int
+    chainStartRadii::Vector{Float64}
+    optimumChainCap::Int
+    optimumMinChains::Int
+    optimumChainRadius::Float64
+    optimumChainFraction::Float64
+    mapMaxIter::Int
+    mapNStarts::Int
+    mapFSuccessive::Int
+    mapOptimaKept::Int
+    mapJitterRadii::Vector{Float64}
+    mapJitterDirections::Int
+    mapJitterMaxOptima::Int
+    mapJitterWithinNats::Float64
+    basinRestartNats::Float64
+    harvestCover::Int
+    harvestDivergent::Int
+    watchKink::Bool
+end
+
+function SamplerOptions(;
+    retryNAdapt::Integer = RETRY_N_ADAPT,
+    retryNDraws::Integer = RETRY_N_DRAWS,
+    chainStartRadii = CHAIN_START_RADII,
+    optimumChainCap::Integer = OPTIMUM_CHAIN_CAP,
+    optimumMinChains::Integer = OPTIMUM_MIN_CHAINS,
+    optimumChainRadius::Real = OPTIMUM_CHAIN_RADIUS,
+    optimumChainFraction::Real = OPTIMUM_CHAIN_FRACTION,
+    mapMaxIter::Integer = MAP_MAX_ITER,
+    mapNStarts::Integer = MAP_N_STARTS,
+    mapFSuccessive::Integer = MAP_F_SUCCESSIVE,
+    mapOptimaKept::Integer = MAP_OPTIMA_KEPT,
+    mapJitterRadii = MAP_JITTER_RADII,
+    mapJitterDirections::Integer = MAP_JITTER_DIRECTIONS,
+    mapJitterMaxOptima::Integer = MAP_JITTER_MAX_OPTIMA,
+    mapJitterWithinNats::Real = MAP_JITTER_WITHIN_NATS,
+    basinRestartNats::Real = BASIN_RESTART_NATS,
+    harvestCover::Integer = HARVEST_COVER,
+    harvestDivergent::Integer = HARVEST_DIVERGENT,
+    watchKink::Bool = true,
+)
+    return SamplerOptions(
+        retryNAdapt, retryNDraws, collect(Float64, chainStartRadii),
+        optimumChainCap, optimumMinChains, optimumChainRadius,
+        optimumChainFraction, mapMaxIter, mapNStarts, mapFSuccessive,
+        mapOptimaKept, collect(Float64, mapJitterRadii), mapJitterDirections,
+        mapJitterMaxOptima, mapJitterWithinNats, basinRestartNats,
+        harvestCover, harvestDivergent, watchKink,
+    )
+end
+
+# Include order (no cycles). Everything a file needs when it is included, that is the
+# types in method signatures and struct fields, constants used at load time and the
+# supertypes, is defined above in this file or in a file included before it; function
+# bodies and default arguments are resolved at call time, so a call to a function of a
+# later file is fine and the files are ordered by their load-time needs only.
+#   priors.jl            the priors and the θ/ξ transform (needs the types above)
+#   profiled-corrs.jl    the profiled likelihood and the c1 search (priors)
+#   posterior.jl         log π and its gradient, `seedSampler`, the NUTS chain runner
+#                        and the re-profile of draws (needs `Seed`, `_C1Tables`)
+#   modes.jl             modes, bridge sampling, the convergence gates and the
+#                        `ChainDiagnostics`/`OptimumReport` types (needs nothing later)
+#   map.jl               the MAP search, chain starts, optima (needs `SamplerOptions`,
+#                        `OptimumReport`)
+#   infer.jl             `Inferred`, the chain-run records and `infer` (needs
+#                        `ChainDiagnostics` for `Inferred`'s field)
+#   diagnostics-format.jl, statistics.jl   the run statistics (need the types of all of
+#                        the above in signatures: `ChainDiagnostics`, `SamplerOptions`)
 include("priors.jl")
 include("profiled-corrs.jl")
 include("posterior.jl")
 include("modes.jl")
-include("infer.jl")
 include("map.jl")
+include("infer.jl")
+include("diagnostics-format.jl")
+include("statistics.jl")
 
 export Seed, Inferred, SamplerOptions,
-    seedSampler, infer, ChainDiagnostics, OptimumReport, NotConvergedError,
+    seedSampler, infer, ChainDiagnostics, OptimumReport, NotConvergedError, KinkDetected,
+    sampleC1,
+    StatBuffer, statBuffer, statReset!, statLabel!, statAttempt!, statKeep!, statLines,
+    statRow!, statText!, statProblem, statTable!, statPhase!, statStopped!, statNext!,
+    statStages!, statSection!, statKink!, statDivergences, statUnavailable!, statParse,
+    StatSection, STAT_SECTIONS, c1Counts, statAttempts, statisticsCap,
+    STATISTICS_MEMORY_SHARE, STATISTICS_BUFFER_MIN, STATISTICS_BUFFER_MAX,
     N_CHAINS,
     ρₑ_prior, δρ_prior, priorZScores,
     ξ_priors, θ_prior_moments, profiledCorrs, exclVolSaturation,

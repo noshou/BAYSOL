@@ -47,17 +47,53 @@ const MOLARITY_REL_SIGMA = 0.05
 # ---------------------------------------------------------------------------
 
 """
-Plausible range (Å⁻¹) of a SAXS curve's maximum q.
-A maximum outside it almost certainly means the
-curve is still in nm⁻¹ (or was converted twice);
-see `checkQAngstrom`.
+    fixtureDir(id) -> String
+
+The folder of the experiment fixtures (deposited curve, structure, `.fit`) of the entry
+`id`. The fixtures are kept as one archive per entry
+(`test/fixtures/experiments/<id>.7z`); `bysl fits run` unpacks it before the fit and
+exports `BAYSOL_FIXTURES`, the folder it unpacked into. Order: `\$BAYSOL_FIXTURES/<id>`
+if it exists, else the plain folder `test/fixtures/experiments/<id>` of the repository.
+
+# Returns
+- The folder path.
+
+# Exceptions
+- `ErrorException` if neither exists (`bysl fixtures unpack <id>` makes the first).
 """
-const Q_SANITY_RANGE = (0.05, 2.0)
+function fixtureDir(id::AbstractString)
+    root = get(ENV, "BAYSOL_FIXTURES", "")
+    isempty(root) || isdir(joinpath(root, id)) && return joinpath(root, id)
+    plain = joinpath(@__DIR__, "..", "fixtures", "experiments", id)
+    isdir(plain) && return plain
+    error(
+        "no fixtures for $id: run `bysl fixtures unpack $id` and set BAYSOL_FIXTURES " *
+        "to its folder (`bysl fits run $id` does both)",
+    )
+end
+
+"""
+Plausible range (Å⁻¹) of a SAXS/WAXS curve's maximum q: 0.05 to 3.5.
+A maximum outside it almost certainly means the curve is in the wrong unit (nm⁻¹ not
+converted, or converted twice). The ceiling is deliberately far below the form-factor
+table's limit (4π·6 = 75.40 Å⁻¹): the deposited curves reach at most 3.19 Å⁻¹ (SASDVV4;
+SASDVX4 and SASDVY4 1.9), whereas a typical nm⁻¹ curve left unconverted runs to
+4-6 and would pass a table-limit ceiling (the SASDJL6 / SASDJX7 case). A curve that
+legitimately runs beyond 3.5 Å⁻¹ is cut before the check, as SASDVV4 does.
+`bysl fits units` checks the conversion itself against the data's unit.
+"""
+const Q_SANITY_RANGE = (0.05, 3.5)
 
 """
     checkQAngstrom(q)
 
 Asserts that `maximum(q)` lies inside `Q_SANITY_RANGE`, i.e. that `q` is in Å⁻¹.
+
+# Returns
+- `nothing` when `maximum(q)` is inside the range.
+
+# Exceptions
+- `AssertionError` when `maximum(q)` is outside `Q_SANITY_RANGE`.
 """
 function checkQAngstrom(q)
     lo, hi = Q_SANITY_RANGE

@@ -774,6 +774,30 @@
       "mention": "at least 1"
     },
     {
+      "setting": "MEMORY_HEADROOM",
+      "value": 25,
+      "valid": true,
+      "expect": 25
+    },
+    {
+      "setting": "MEMORY_HEADROOM",
+      "value": 5,
+      "valid": true,
+      "expect": 5
+    },
+    {
+      "setting": "MEMORY_HEADROOM",
+      "value": 4,
+      "valid": false,
+      "mention": "at least 5"
+    },
+    {
+      "setting": "MEMORY_HEADROOM",
+      "value": 51,
+      "valid": false,
+      "mention": "at most 50"
+    },
+    {
       "setting": "HARVEST_COVER",
       "value": -1,
       "valid": false,
@@ -3355,6 +3379,1026 @@
       "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
       "valid": false,
       "mention": "must be a path"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "stepCollapse": [
+          {
+            "name": "delta 70",
+            "overrides": {
+              "TARGET_ACCEPT": 70
+            }
+          },
+          {
+            "name": "delta 35",
+            "overrides": {
+              "TARGET_ACCEPT": 35
+            }
+          }
+        ],
+        "splitChains": [
+          {
+            "name": "starts (2,4,6)",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                2.0,
+                4.0,
+                6.0
+              ]
+            }
+          },
+          {
+            "name": "close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000
+            }
+          }
+        ],
+        "divergent": [
+          {
+            "name": "delta 99",
+            "overrides": {
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer, next seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 99
+            }
+          }
+        ],
+        "structural": [
+          {
+            "name": "sample c1",
+            "overrides": {
+              "SAMPLE_C1": true
+            }
+          }
+        ],
+        "marginal": [
+          {
+            "name": "longer chains",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000
+            }
+          },
+          {
+            "name": "longer chains, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ],
+        "generic": [
+          {
+            "name": "longer, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ]
+      },
+      "valid": true,
+      "expect": {
+        "stepCollapse": [
+          {
+            "name": "delta 70",
+            "overrides": {
+              "TARGET_ACCEPT": 70
+            }
+          },
+          {
+            "name": "delta 35",
+            "overrides": {
+              "TARGET_ACCEPT": 35
+            }
+          }
+        ],
+        "splitChains": [
+          {
+            "name": "starts (2,4,6)",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                2.0,
+                4.0,
+                6.0
+              ]
+            }
+          },
+          {
+            "name": "close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000
+            }
+          }
+        ],
+        "divergent": [
+          {
+            "name": "delta 99",
+            "overrides": {
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer, next seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 99
+            }
+          }
+        ],
+        "structural": [
+          {
+            "name": "sample c1",
+            "overrides": {
+              "SAMPLE_C1": true
+            }
+          }
+        ],
+        "marginal": [
+          {
+            "name": "longer chains",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000
+            }
+          },
+          {
+            "name": "longer chains, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ],
+        "generic": [
+          {
+            "name": "longer, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "setting": "LADDER",
+      "value": false,
+      "valid": true,
+      "expect": {
+        "stepCollapse": [],
+        "splitChains": [],
+        "divergent": [],
+        "structural": [],
+        "marginal": [],
+        "generic": []
+      }
+    },
+    {
+      "setting": "LADDER",
+      "value": "off",
+      "valid": true,
+      "expect": {
+        "stepCollapse": [],
+        "splitChains": [],
+        "divergent": [],
+        "structural": [],
+        "marginal": [],
+        "generic": []
+      }
+    },
+    {
+      "setting": "LADDER",
+      "value": {},
+      "valid": true,
+      "expect": {
+        "stepCollapse": [
+          {
+            "name": "delta 70",
+            "overrides": {
+              "TARGET_ACCEPT": 70
+            }
+          },
+          {
+            "name": "delta 35",
+            "overrides": {
+              "TARGET_ACCEPT": 35
+            }
+          }
+        ],
+        "splitChains": [
+          {
+            "name": "starts (2,4,6)",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                2.0,
+                4.0,
+                6.0
+              ]
+            }
+          },
+          {
+            "name": "close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000
+            }
+          }
+        ],
+        "divergent": [
+          {
+            "name": "delta 99",
+            "overrides": {
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer, next seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 99
+            }
+          }
+        ],
+        "structural": [
+          {
+            "name": "sample c1",
+            "overrides": {
+              "SAMPLE_C1": true
+            }
+          }
+        ],
+        "marginal": [
+          {
+            "name": "longer chains",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000
+            }
+          },
+          {
+            "name": "longer chains, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ],
+        "generic": [
+          {
+            "name": "longer, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "generic": []
+      },
+      "valid": true,
+      "expect": {
+        "stepCollapse": [
+          {
+            "name": "delta 70",
+            "overrides": {
+              "TARGET_ACCEPT": 70
+            }
+          },
+          {
+            "name": "delta 35",
+            "overrides": {
+              "TARGET_ACCEPT": 35
+            }
+          }
+        ],
+        "splitChains": [
+          {
+            "name": "starts (2,4,6)",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                2.0,
+                4.0,
+                6.0
+              ]
+            }
+          },
+          {
+            "name": "close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000
+            }
+          }
+        ],
+        "divergent": [
+          {
+            "name": "delta 99",
+            "overrides": {
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer, next seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 99
+            }
+          }
+        ],
+        "structural": [
+          {
+            "name": "sample c1",
+            "overrides": {
+              "SAMPLE_C1": true
+            }
+          }
+        ],
+        "marginal": [
+          {
+            "name": "longer chains",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000
+            }
+          },
+          {
+            "name": "longer chains, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ],
+        "generic": []
+      }
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {
+              "N_ADAPT": 500,
+              "N_DRAWS": 800
+            }
+          }
+        ]
+      },
+      "valid": true,
+      "expect": {
+        "stepCollapse": [
+          {
+            "name": "delta 70",
+            "overrides": {
+              "TARGET_ACCEPT": 70
+            }
+          },
+          {
+            "name": "delta 35",
+            "overrides": {
+              "TARGET_ACCEPT": 35
+            }
+          }
+        ],
+        "splitChains": [
+          {
+            "name": "starts (2,4,6)",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                2.0,
+                4.0,
+                6.0
+              ]
+            }
+          },
+          {
+            "name": "close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000
+            }
+          }
+        ],
+        "divergent": [
+          {
+            "name": "",
+            "overrides": {
+              "N_ADAPT": 500,
+              "N_DRAWS": 800
+            }
+          }
+        ],
+        "structural": [
+          {
+            "name": "sample c1",
+            "overrides": {
+              "SAMPLE_C1": true
+            }
+          }
+        ],
+        "marginal": [
+          {
+            "name": "longer chains",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000
+            }
+          },
+          {
+            "name": "longer chains, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ],
+        "generic": [
+          {
+            "name": "longer, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "marginal": [
+          {
+            "name": " tight ",
+            "overrides": {
+              "MAP_JITTER_RADII": [
+                1,
+                2,
+                3
+              ],
+              "RNG_SEED_STEP": 2
+            }
+          }
+        ]
+      },
+      "valid": true,
+      "expect": {
+        "stepCollapse": [
+          {
+            "name": "delta 70",
+            "overrides": {
+              "TARGET_ACCEPT": 70
+            }
+          },
+          {
+            "name": "delta 35",
+            "overrides": {
+              "TARGET_ACCEPT": 35
+            }
+          }
+        ],
+        "splitChains": [
+          {
+            "name": "starts (2,4,6)",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                2.0,
+                4.0,
+                6.0
+              ]
+            }
+          },
+          {
+            "name": "close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000
+            }
+          }
+        ],
+        "divergent": [
+          {
+            "name": "delta 99",
+            "overrides": {
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer, next seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 99
+            }
+          }
+        ],
+        "structural": [
+          {
+            "name": "sample c1",
+            "overrides": {
+              "SAMPLE_C1": true
+            }
+          }
+        ],
+        "marginal": [
+          {
+            "name": "tight",
+            "overrides": {
+              "MAP_JITTER_RADII": [
+                1,
+                2,
+                3
+              ],
+              "RNG_SEED_STEP": 2
+            }
+          }
+        ],
+        "generic": [
+          {
+            "name": "longer, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "structural": [
+          {
+            "overrides": {
+              "SAMPLE_C1": true
+            }
+          }
+        ]
+      },
+      "valid": true,
+      "expect": {
+        "stepCollapse": [
+          {
+            "name": "delta 70",
+            "overrides": {
+              "TARGET_ACCEPT": 70
+            }
+          },
+          {
+            "name": "delta 35",
+            "overrides": {
+              "TARGET_ACCEPT": 35
+            }
+          }
+        ],
+        "splitChains": [
+          {
+            "name": "starts (2,4,6)",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                2.0,
+                4.0,
+                6.0
+              ]
+            }
+          },
+          {
+            "name": "close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000
+            }
+          }
+        ],
+        "divergent": [
+          {
+            "name": "delta 99",
+            "overrides": {
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "TARGET_ACCEPT": 99
+            }
+          },
+          {
+            "name": "delta 99, close starts, longer, next seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 99
+            }
+          }
+        ],
+        "structural": [
+          {
+            "name": "",
+            "overrides": {
+              "SAMPLE_C1": true
+            }
+          }
+        ],
+        "marginal": [
+          {
+            "name": "longer chains",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000
+            }
+          },
+          {
+            "name": "longer chains, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 6000,
+              "RETRY_N_DRAWS": 8000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ],
+        "generic": [
+          {
+            "name": "longer, next seed",
+            "overrides": {
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "setting": "LADDER",
+      "value": 5,
+      "valid": false,
+      "mention": "map from failure class"
+    },
+    {
+      "setting": "LADDER",
+      "value": "not a map",
+      "valid": false,
+      "mention": "map from failure class"
+    },
+    {
+      "setting": "LADDER",
+      "value": [],
+      "valid": false,
+      "mention": "map from failure class"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "kink": []
+      },
+      "valid": false,
+      "mention": "not a failure class"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": 5
+      },
+      "valid": false,
+      "mention": "list of rungs"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          5
+        ]
+      },
+      "valid": false,
+      "mention": "must be an object with overrides"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "name": "x"
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "needs overrides"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {}
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "at least one"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {
+              "TARGET_ACCEPT": 99
+            },
+            "extra": 1
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "only name and overrides"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {
+              "PLOT_LW_MAP": 2
+            }
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "fitting setting"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {
+              "RNG_SEED": 3
+            }
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "fitting setting"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {
+              "BOUNDS_δρ₁₂": [
+                -5,
+                1
+              ]
+            }
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "fitting setting"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {
+              "LADDER": []
+            }
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "fitting setting"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {
+              "TARGET_ACCEPT": 0
+            }
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "must be above 0"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1,
+                2
+              ]
+            }
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "3 parts"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {
+              "RNG_SEED_STEP": 1.5
+            }
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "whole number"
+    },
+    {
+      "setting": "LADDER",
+      "value": {
+        "divergent": [
+          {
+            "overrides": {
+              "SAMPLE_C1": 1
+            }
+          }
+        ]
+      },
+      "valid": false,
+      "mention": "true or false"
     }
   ]
 }

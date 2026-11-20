@@ -5,10 +5,11 @@ Main entrypoint for BAYSOL.
 """
 module Pipeline
 
-using Statistics: quantile, mean, var
+using JSON3: JSON3
+using Statistics: quantile, mean, median, var
 using Printf: @sprintf
 using StaticArrays: SVector
-using ..PhysicalConstants: NS_PER_S, UNIT_OF_δρ
+using ..PhysicalConstants: NS_PER_S, UNIT_OF_δρ, KELVIN_OFFSET, LN10
 using ..Runtime: StageLog, tick, tock!, timed!, stageSeconds, withGcPaused, tmapBlocks
 using ..MolecularStructure: MolecularStructure
 using ..Hydrogenator: Hydrogenator, Propka
@@ -56,11 +57,12 @@ none. Change it together with `version`: the run log prints both, as `v0.3.0-wʋ
 const RELEASE_NAME = String(get(Base.parsed_toml(_PROJECT_TOML), "release_name", ""))
 
 """
-(label, TeX label, key, file name) of each posterior histogram, each its own figure
-(`<name>_hist_<file name>.tex`). The first four are the sampled
-`ξ = (ρₑ, δρ₁, δρ₂, δρ₃)` in sample order (the histogram code indexes the draws by
-position); scale, background and c1 are per-draw profiled quantities. The key names the
-MAP value in the `MAPParams`.
+(label, TeX label, key, file name) of each posterior histogram, each its own
+figure (`<name>_hist_<file name>.tex`). The first four are the sampled
+`ξ = (ρₑ, δρ₁, δρ₂, δρ₃)` in sample order (the histogram code indexes the draws
+by position); scale, background and c1 are per-draw quantities (c1 profiled,
+or, when its profile had a kink, sampled as a fifth coordinate of ξ and read
+off `fit.c1` all the same). The key names the MAP value in the `MAPParams`.
 """
 const PLOT_HIST_PARAMS = [
     ("ρₑ", raw"$\rho_e$", "slvntEDns", "rhoE"),
@@ -175,7 +177,7 @@ include("compare.jl")
 include("summary.jl")
 
 export seedModel,
-    runModel, printSummary, writeLog,
+    runModel, printSummary, writeLog, writeStatistics,
     results, compareResults, PlotStyle, Reference, fontAvailable, InvalidSettingsError,
     seedKeywords, runKeywords, runArguments, resultsKeywords
 public MAPParams, MAPResult, QuantileBounds, QuantileParams, QuantileCurves, QuantileResult

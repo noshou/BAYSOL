@@ -7,6 +7,7 @@
 //   2. Project data files
 
 import assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
@@ -420,6 +421,18 @@ const EXPERIMENTS = fileURLToPath(
 )
 
 /**
+ * The entries are `<ID>.7z` archives (`bysl fixtures pack`): the one file a test reads is
+ * extracted with `7z` into `dir`, and the path of the extracted file is returned.
+ */
+function extractFixture(dir: string, id: string, name: string): string {
+    const archive = join(EXPERIMENTS, `${id}.7z`)
+    execFileSync("7z", ["x", "-y", `-o${dir}`, archive, `${id}/${name}`], {
+        stdio: "ignore",
+    })
+    return join(dir, id, name)
+}
+
+/**
  * The 8 entries with no `experimental_data/<ID>.dat`: the file their script reads the
  * curve from, and the column its script takes as sigma (`readdlm(...; skipstart)`).
  */
@@ -452,13 +465,17 @@ function scriptRead(text: string, sigma: number) {
 }
 
 test("real curves: every deposited file is detected, auto, as the scripts read it", () => {
-    const ids = readdirSync(EXPERIMENTS).sort()
-    // every fixture folder is read; the floor guards against a folder that went missing
-    assert.ok(ids.length >= 58, `${ids.length} fixture folders`)
+    const ids = readdirSync(EXPERIMENTS)
+        .filter((f) => f.endsWith(".7z"))
+        .map((f) => f.slice(0, -3))
+        .sort()
+    // every fixture archive is read; the floor guards against one that went missing
+    assert.ok(ids.length >= 58, `${ids.length} fixture archives`)
+    const dir = tempDir("fixtures-")
     const separators = new Set<string>()
     for (const id of ids) {
         const [name, sigma] = FIT_FILES[id] ?? [`experimental_data/${id}.dat`, 3]
-        const file = join(EXPERIMENTS, id, name)
+        const file = extractFixture(dir, id, name)
         const text = readFileSync(file, "utf-8")
         const want = scriptRead(text, sigma)
         const table = parseTable(loadSource(file), DEFAULT_PARSE_OPTIONS)

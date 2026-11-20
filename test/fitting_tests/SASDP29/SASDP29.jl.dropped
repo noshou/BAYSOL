@@ -1,0 +1,167 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+using DelimitedFiles
+using Statistics
+using Random
+using BAYSOL
+using BAYSOL.MolecularStructure: LocalPathSource
+using BAYSOL.BulkElectronDensity: Solute, NonBiological
+include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
+
+const _FIXTURE_DIR = fixtureDir("SASDP29")
+const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDP29.dat")
+const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDP29_fit2_model1.pdb")
+const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDP29_fit2.fit")
+
+# ---------------------------------------------------------------------------
+#                                 Source
+# ---------------------------------------------------------------------------
+#
+# SASBDB SASDP29: Gli-55 (Gli-55 - ssDNA aptamer specific to glioma brain tumor cells;
+# Artificially synthesized; 18.625 kDa SASBDB molecule MW, monomer) in the SASBDB buffer
+# "Dulbecco phosphate-buffered saline (DPBS)", pH 7.4. Sample: Gli-55 - ssDNA aptamer
+# specific to glioma brain tumor cells.
+#
+# Publication: Kichkailo A, Narodov A, Komarova M, Zamay T, Zamay G, Kolovskaya O,
+# Erakhtin E, Glazyrin Y, Veprintsev D, Moryachkov R, Zabluda V, Shchugoreva I,
+# Artyushenko P, Mironov V, Morozov D, Khorzhevskii V, Gorbushin A, Koshmanova A,
+# Nikolaeva E, Grinev I, Voronkovskii I, Grek D, Belugin K, Volzhentsev A, Badmaev O,
+# Luzan N, Lukyanenko K, Peters G, Lapin I, Kirichenko A, Konarev P, Morozov E, Mironov G,
+# Gargaun A, Muharemagic D, Zamay S, Kochkina E, Dymova M, Smolyarova T, Sokolov A,
+# Modestov A, Tokarev N, Shepelevich N, Ozerskaya A, Chanchikova N, Krat A, Zukov R,
+# Bakhtina V, Shnyakin P, Shesternya P, Svetlichnyi V, Petrova M, Artyukhov I, Tomilin F,
+# Berezovski M, "Development of DNA Aptamers for Visualization of Glial Brain Tumors and
+# Detection of Circulating Tumor Cells", Molecular Therapy - Nucleic Acids (2023 Mar), DOI
+# 10.1016/j.omtn.2023.03.015. Entry: https://www.sasbdb.org/data/SASDP29/.
+#
+# BUFFER SOURCE: SASBDB buffer fields ("Dulbecco phosphate-buffered saline (DPBS), with Ca
+# and Mg", pH 7.4). The paper (Mol Ther Nucleic Acids 2023) could not be retrieved (full
+# text service unavailable, not open access), so nothing was checked against it. DPBS with
+# Ca and Mg is entered with the Thermo Fisher formulation (137.93 mM NaCl, 2.67 mM KCl,
+# 8.06 mM Na2HPO4, 1.47 mM KH2PO4, 0.90 mM CaCl2, 0.49 mM MgCl2), salts as such, no
+# speciation. CURVE: the SASBDB .dat has NO σ column (kept as SASDP29_sasbdb.dat), so the
+# curve used is q, I_exp and Err of the DAMMIN fit file of the entry (same intensities as
+# the .dat, q in Å⁻¹, 0.0138 to 0.235 Å⁻¹), written as experimental_data/SASDP29.dat.
+#
+# Instrument and conditions (SASBDB): PETRA III, DESY; Hamburg, beamline EMBL P12, X-ray
+# synchrotron, detector Pilatus 6M; wavelength 0.124 nm = 1.24 Å (the `wavelength` field
+# is in nm; `xray_energy` is null, so the energy is hc/λ ≈ 9999 eV); cell temperature 20.4
+# °C; sample-detector distance 3.0 m.
+#
+# Curve units: the SASBDB .dat is labelled "1/A" (q 0.01382 to 0.2351 1/A, 805 points) and
+# is in Å⁻¹ already, so no conversion is applied (`checkQAngstrom` guards the range); 0
+# points have I ≤ 0. No q cut (the README noise-floor rule is not met: whole curve, σ > 0
+# points).
+#
+# Model and depositor fit: fit 2 of the entry is CRYSOL (chi_square_value 2.384); model:
+# SASBDB model software: GROMACS. SASDP29_fit2_model1.pdb: 1910 ATOM records (60 residues,
+# chains X), 1910 heavy atoms, no hydrogens; one structure only.
+# The fit file SASDP29_fit2.fit has 4 columns (q, I_exp, σ, I_fit), header "cluster_
+# Dro:0.075  Ra:1.400  RGT:27.86  Vol: 18985.  Chi^2: 2.384"; χ² recomputed from the file
+# with the data's σ is 2.381 (label 2.384), so the reference curve is column 4; q in Å⁻¹
+# (SASBDB fit_unit "1/A").
+#
+# Flags: the SASBDB .dat has no σ; σ taken from the Err column of the DAMMIN .fit; paper
+# not retrievable; whole entry wired from the files above; not run.
+# ---------------------------------------------------------------------------
+
+qvals, iExp, σ_exp = _readCurve(_DATA_PATH)
+
+# qvals are in Å⁻¹ already (the SASBDB label "1/A" is right for this entry).
+checkQAngstrom(qvals)
+
+# ---------------------------------------------------------------------------
+#                            Solution conditions
+# ---------------------------------------------------------------------------
+
+const PH, σ_PH = 7.4, PH_METER_SIGMA   # SASBDB pH 7.4 (no pH uncertainty stated)
+
+const ENERGY_EV     = HC_EV_ANGSTROM / 1.24   # ≈ 9999 eV, SASBDB wavelength 1.24 Å
+const TEMPERATURE_C = 20.4   # SASBDB cell temperature
+
+# Buffer "Dulbecco phosphate-buffered saline (DPBS)", pH 7.4 (SASBDB): no buffering
+# species, only the salts below.
+#
+# The measured macromolecule is deliberately NOT a solute (see BulkElectronDensity.Solute).
+const SOLUTES = Solute[
+    NonBiological(0.13793, 0.00276, "sodium chloride"),   # 137.9 mM, ±2%
+    NonBiological(0.00267, 5.34e-05, "potassium chloride"),   # 2.67 mM, ±2%
+    NonBiological(0.00806, 0.000161, "disodium hydrogen phosphate"),   # 8.06 mM, ±2%
+    NonBiological(0.00147, 2.94e-05, "potassium dihydrogen phosphate"),   # 1.47 mM, ±2%
+    NonBiological(0.0009, 1.8e-05, "calcium chloride"),   # 0.9 mM, ±2%
+    NonBiological(0.00049, 9.8e-06, "magnesium chloride"),   # 0.49 mM, ±2%
+]
+
+# ---------------------------------------------------------------------------
+#                       Forward-model / sampler wiring
+# ---------------------------------------------------------------------------
+
+# The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
+# the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
+# bins the curve to the Shannon channels that diameter allows (see `rebin` there).
+
+# The deposited model has no hydrogens: pdb2pqr/PROPKA place them at PH.
+const ADD_HYDROGENS = true
+
+"""
+    fitSubset() -> (q, I, σ)
+
+`qvals`/`iExp`/`σ_exp` restricted to `σ_exp > 0` (no q cut).
+(`seedModel` bins the curve and drops the bins with non-positive intensity.)
+"""
+function fitSubset()
+    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    return qvals[keep], iExp[keep], σ_exp[keep]
+end
+
+# Builds the Seed that `runSasdp29` samples. It is separate only because
+# the developer tools in test/utils/ build a fit's Seed without running
+# the fit; if you are reading this script as an example you can skip it:
+# `runSasdp29` below is the whole story (build the seed, then sample it).
+function seedSasdp29(; seed::Integer = SAMPLER_SEED)
+    qFit, iFit, σ_fit = fitSubset()
+
+    Random.seed!(seed)
+    s = BAYSOL.seedModel(
+        LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
+        addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
+    )
+    return s, (s.shannon.q, s.shannon.I, s.shannon.σ)   # the binned curve the fit saw
+end
+
+function runSasdp29(;
+    nSamples::Int = N_SAMPLES,
+    nAdapt::Int = N_ADAPT,
+    seed::Integer = SAMPLER_SEED,
+)
+    s, data = seedSasdp29(; seed)
+    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    return res, s.fw.formFactorLog, s.fw.nAtoms, data
+end
+
+result, formFactorLog, nAtoms, (qFit, iFit, σ_fit) = runSasdp29()
+
+fit, divergenceRate, mapResult, quantileResult = result
+
+# `results` writes the figures (terminal plots, pgfplots .tex), the workbook and this
+# run's section of the folder's run log; `refChi2` is the depositor's χ² for the log.
+
+# The .fit file is CRYSOL's (fit 2): columns q (Å⁻¹), I_exp, σ, I_fit.
+crysol = readdlm(_FIT_PATH; skipstart = 1)
+reference = BAYSOL.Reference(
+    "CRYSOL fit2",
+    Float64.(crysol[:, 1]),
+    Float64.(crysol[:, 4]),
+)
+BAYSOL.results(
+    result, (qFit, iFit, σ_fit);
+    dir = @__DIR__, name = "res",
+    references = reference,
+    formFactorLog = formFactorLog, nAtoms = nAtoms,
+    refChi2 = "CRYSOL 2.384",
+    runLog = true,
+)
+
+# `@__DIR__` (this SASDP29/ folder), not the caller's cwd.
+
+BAYSOL.printSummary(result)

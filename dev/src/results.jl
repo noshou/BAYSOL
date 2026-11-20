@@ -57,7 +57,8 @@ function log_paths()
         dir = joinpath(base, d)
         isdir(dir) || continue
         for f in readdir(dir)
-            endswith(f, ".LOG") && push!(found, joinpath(dir, f))
+            endswith(f, ".LOG") && !startswith(f, "statistics-") &&
+                push!(found, joinpath(dir, f))
         end
     end
     return sort(found)
@@ -333,7 +334,10 @@ log_runs(path, text) = [(run_key(path, title), r) for (title, r) in parse_log(te
 # in a revision from before the logs, its `res*.txt` text reports.
 function git_reports(rev)::ResultSet
     paths = split_lines(git("ls-tree", "-r", "--name-only", rev, FIT_DIR))
-    logs = filter(p -> occursin(Regex("^" * FIT_DIR * "/[^/]+/[^/]+\\.LOG\$"), p), paths)
+    logs = filter(
+        p -> occursin(Regex("^" * FIT_DIR * "/[^/]+/(?!statistics-)[^/]+\\.LOG\$"), p),
+        paths,
+    )
     texts =
         isempty(logs) ?
         filter(
@@ -357,7 +361,7 @@ function tree_reports()::ResultSet
         dir = joinpath(base, d)
         isdir(dir) || continue
         for f in readdir(dir)
-            endswith(f, ".LOG") || continue
+            endswith(f, ".LOG") && !startswith(f, "statistics-") || continue
             p = relpath(joinpath(dir, f), root())
             for (k, r) in log_runs(p, slurp8(joinpath(dir, f)))
                 push!(pairs, k => r)

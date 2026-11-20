@@ -291,7 +291,7 @@ function computeFormFactors(
 
     E  = Float64(energy)
     qs = collect(Float64, qvals)
-    ss = qs ./ (4π)
+    ss = qs ./ FOUR_PI
 
     tbl = Dict{String,Vector{ComplexF64}}()
     log = String[]

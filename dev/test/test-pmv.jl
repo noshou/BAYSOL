@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Tests of Pmv (`bysl extract pmv`, the port of dev/pmv-rism): the number layout and the
-# JSON writer and reader, the regression checks of the self-test, the ACCEPTANCE fit on the
+# Tests of Pmv (`bysl extract pmv`, the port of the former Python tools): the number
+# layout and the JSON writer and reader, the regression checks of the self-test, the
+# ACCEPTANCE fit on the
 # 88 calibration solutes against the numbers the Python tool printed (n 88, in-sample RMS
 # 2.96 / 2.96, LOO RMS 3.52 / 3.53, compared to 1e-6 relative), the estimates, the note
 # format the table checks parse, the row wiring on a scratch copy of the tables, and the
@@ -20,7 +21,8 @@ using .Main.Helpers
 const P = Dev.Pmv
 const L = Dev.Pmv.Layout
 
-# The numbers `pmv.py fit` printed on data/calibration.tsv + data/results.tsv (n = 88).
+# The numbers the Python `fit` of the former tool printed on the calibration set + the
+# results file (n = 88).
 const PY_FIT = (in_rms_bayes = 2.9590903293066053, in_rms_ridge = 2.957966707197874,
     loo_rms_bayes = 3.518663804223542, loo_rms_ridge = 3.5263538018077885,
     loo_z_sd_bayes = 1.1730667475713974)
@@ -69,7 +71,7 @@ end
     @test length(rows) == 2 && rows[1] == Dict("a" => "1", "b" => "2")
     @test rows[2] == Dict("a" => "short")
     @test P.electrons("C22H42O11") == 262 && P.electrons("Na", 1) == 10
-    @test isempty(P.read_results(joinpath(dir, "missing.tsv")))
+    @test isequal(P.read_results(joinpath(dir, "missing.tsv")), P.RESULTS)   # bundled base
 end
 
 @testset "the self-test passes" begin
@@ -241,6 +243,91 @@ end
     @test P.Rism.sh_log("exit 3", dir, "y.log") == 3
     # a failed embedding is a failed conformer, not an error
     @test P.Rism.conformer_volume(scratch_dir(), () -> nothing, 0) === nothing
+end
+
+@testset "batch: resume, tiers, failures and niceness (no AmberTools)" begin
+    dir = scratch_dir()
+    out = joinpath(dir, "out")
+    mkpath(out)
+    res = joinpath(out, "results.tsv")
+    write(res, "DONE1\t1\t10.0\tnan\t25\t0.5\t1e-6\n")
+    spec = joinpath(dir, "queue.tsv")
+    write(
+        spec,
+        join(
+            ["id\tsmiles\tcharge\tnconf\ttier",
+                "DONE1\tCCO\t0\t1\t1", "BAD2\t((not a smiles\t0\t1\t2",
+                "BAD3\t((not a smiles\t0\t1\t3"], "\n") * "\n",
+    )
+    with(P.Config.OUT => out) do
+        # the finished id is skipped; tiers keep only the named ones, in file order
+        @test redirect_stdio(; stdout = devnull, stderr = devnull) do
+            P.Rism.batch(spec, ["1"])
+        end == String[]
+        @test redirect_stdio(; stdout = devnull, stderr = devnull) do
+            P.Rism.batch(spec, ["2", "3"])
+        end == ["BAD2", "BAD3"]
+        status = redirect_stdio(; stdout = devnull, stderr = devnull) do
+            run_tool("extract", "pmv", "--out", out,
+                "batch", spec, "--tier", "3", "--nice", "19")[1]
+        end
+        @test status == 1                      # a failed job is a non-zero status
+    end
+    if !Sys.iswindows()
+        # the level reaches the programs of a command
+        with(P.Config.NICE => 7) do
+            @test P.Rism.sh_log("nice", dir, "n.log") == 0
+        end
+        base = parse(Int, readchomp(`nice`))   # nice adds to the level this process has
+        @test parse(Int, strip(read(joinpath(dir, "n.log"), String))) == min(19, base + 7)
+    end
+    status, out = run_tool("extract", "pmv", "batch", spec, "--nice", "40")
+    @test status == 2 && occursin("--nice must be 0 to 19", out)
+end
+
+@testset "embedded tables equal the old data files" begin
+    # Snapshots of the files the tables replaced: calibration.tsv as it was in HEAD (before
+    # the aligned layout), and the kept runs of results.tsv (floats written with repr).
+    data = joinpath(@__DIR__, "data")
+    old = [split(l, '\t') for l in eachline(joinpath(data, "pmv-calibration-old.tsv"))]
+    head, rows = old[1], old[2:end]
+    cal = P.calibration_table()
+    @test length(cal) == length(rows) == 90
+    for (r, c) in zip(rows, cal), (k, v) in zip(head, r)
+        @test c[k] == v
+    end
+    @test [c["id"] for c in cal] == [r[1] for r in rows]
+    res = [split(l, '\t') for l in eachline(joinpath(data, "pmv-results-old.tsv"))][2:end]
+    @test length(P.RESULTS) == length(res) == 196
+    @test collect(keys(P.RESULTS)) == [r[1] for r in res]
+    for r in res
+        @test P.RESULTS[r[1]][1] == parse(Int, r[2])
+        @test isequal(P.RESULTS[r[1]][2], parse(Float64, r[3]))
+        @test isequal(P.RESULTS[r[1]][3], parse(Float64, r[4]))
+    end
+end
+
+@testset "calibration set, results and required --out" begin
+    cal = P.calibration_table()
+    @test length(cal) == 90 && count(r -> r["fit"] == "1", cal) == 88
+    @test cal[1]["id"] == "K001" && cal[1]["smiles"] == "CCO" && cal[1]["v_meas"] == "55.10"
+    @test all(r -> length(r) == 8 && !isempty(r["provenance"]), cal)
+    # long SMILES survive the line joins of the source text
+    @test any(r -> length(r["smiles"]) > 80, cal)
+    # the bundled results have a finished run for every calibration solute and the anchor
+    res = P.read_results()
+    @test length(res) == 196 && haskey(res, "TRIS0") && isnan(res["K001"][3])
+    @test all(r -> haskey(res, r["id"]), cal)
+    # no folder inside the repository by default: --out is required
+    @test_throws ToolError P.Config.out_dir()
+    @test_throws ToolError P.Config.work_dir()
+    @test_throws ToolError P.Config.results_path()
+    status, out = run_tool("extract", "pmv", "fit")
+    @test status == 2 && occursin("--out DIR is required", out)
+    with(P.Config.OUT => "/x/o") do
+        @test P.Config.work_dir() == "/x/o/work"
+        @test P.Config.results_path() == "/x/o/results.tsv"
+    end
 end
 
 @testset "the command line" begin

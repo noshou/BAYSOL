@@ -144,7 +144,7 @@ function sphHarm!(
     (acond) || throw(SphHarmError(aerr))
 
     p0, p1, p2, cr, ci, a, b = S.p0, S.p1, S.p2, S.cr, S.ci, S.a, S.b
-    p00 = 1 / sqrt(4π)
+    p00 = 1 / sqrt(FOUR_PI)
     @inbounds for t in eachindex(θ)
         i = t - firstindex(θ) + 1
         x = cos(Float64(θ[t]))

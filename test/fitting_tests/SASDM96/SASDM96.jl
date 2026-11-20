@@ -7,7 +7,7 @@ using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDM96")
+const _FIXTURE_DIR = fixtureDir("SASDM96")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDM96.dat")
 
 # ---------------------------------------------------------------------------
@@ -74,10 +74,14 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# q cut, kept (flat noise floor; rule in README.md): 0.3 Å⁻¹. The data run to 0.350 Å⁻¹,
-# but the 174 points above 0.3 Å⁻¹ (σ > 0) have a median I/σ of 0.30 and 27 % of them have
-# I ≤ 0; the lowest-q quarter of them (up to 0.31 Å⁻¹) has a median I/σ of 0.64.
-const Q_MAX_FIT = 0.3
+# No q cut (2026-11-17). The data run to 0.350 Å⁻¹; the 174 points above 0.3 Å⁻¹
+# (σ > 0) have a median I/σ of 0.30 and 27 % of them have I ≤ 0, yet cutting made
+# the sampling WORSE: the cut fits had 1.5 % divergent transitions at 0.30 (45
+# points), 3.0 % at 0.27 (40) and failed on ESS at 0.22 (33), while the uncut fit
+# (52 points) has 0.07 % divergent, R̂ 1.002, χ² 1.08. (`seedModel` drops the
+# non-positive bins.) Unlike SASDWS5 and SASDMA6, whose divergences a cut at the
+# I/σ ≈ 2 point removed, here the points are needed as Shannon channels.
+const Q_MAX_FIT = Inf
 
 # The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
 # the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
@@ -137,7 +141,10 @@ function runSasdm96(
     seed::Integer = SAMPLER_SEED,
 )
     s, data = seedSasdm96(run; seed)
-    res = BAYSOL.runModel(s, nSamples, nAdapt)
+    # target acceptance 99 percent (default 95): this fit's c1 is sampled as a fifth
+    # parameter (its profile kinks), and at 95 the divergent share stayed at 0.9 percent,
+    # at 99 it fell to 0.02 percent for about 1.3 times the time (probe of 2026-11-17)
+    res = BAYSOL.runModel(s, nSamples, nAdapt; δ = 99)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
@@ -172,7 +179,6 @@ for run in RUNS
         dir = @__DIR__, name = "res$(suffix)", references,
         formFactorLog = formFactorLog, nAtoms = nAtoms,
         refChi2 = run.refChi2,
-        runLog = true,
     )
 
     # `@__DIR__` (this SASDM96/ folder), not the caller's cwd.

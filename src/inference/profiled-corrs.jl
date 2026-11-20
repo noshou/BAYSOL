@@ -4,12 +4,12 @@
 # and the excluded-volume correction c1 profiled out per evaluation (ProfiledCorrs).
 
 using StaticArrays
-using Optim: minimizer, optimize, Brent
+using Optim: minimizer, optimize, Brent, iterations
 using ForwardDiff
 using ..Scattering:
     ForwardCache, excludedVolumeFactor, intensityTerms,
-    modelIntensity, EV_EXP_COEFF
-using ..PhysicalConstants: UNIT_OF_δρ
+    modelIntensity
+using ..PhysicalConstants: UNIT_OF_δρ, EV_EXP_COEFF, LOG_TWO_PI
 using Bumper: @no_escape, @alloc
 using FastClosures
 
@@ -33,9 +33,7 @@ using FastClosures
 #
 # Sw, Swy, Swyy, and Σ log σᵢ² are all data-only.
 
-
 Base.showerror(io::IO, e::WLSError) = print(io, "WLSError: ", e.msg)
-
 
 """
 Construct the precomputed weighted data used by [`wlsFit`](@ref).
@@ -222,7 +220,7 @@ Profile log-likelihood with scale and background fitted at their WLS optimum.
 """
 wlsProfLl(f::WLSFit) =
     -(f.chi2 + f.sumLogVar) / 2 -
-    (f.dof + 2) * log(2π) / 2
+    (f.dof + 2) * LOG_TWO_PI / 2
 
 
 # ---------------------------------------------------------------------------
@@ -489,6 +487,7 @@ function _c1Search(
         chis = @alloc(Float64, length(cs))
         _scanChi2!(chis, A, B, C, tab, wls)
         iBest = argmin(chis)
+        (iBest == 1 || iBest == length(cs)) && Threads.atomic_add!(tab.counts.scanEdge, 1)
         loB = iBest == 1 ? lo : cs[iBest-1]
         hiB = iBest == length(cs) ? hi : cs[iBest+1]
     end
@@ -499,16 +498,17 @@ function _c1Search(
     χ²_at_c1 = @closure c1 -> reducedChi2(
         _wlsFromSums(_sumsAt(A, B, C, tab, wls, c1)..., n, wls),
     )
-    return minimizer(
-        optimize(
-            χ²_at_c1,
-            loB,
-            hiB,
-            Brent();
-            abs_tol = tol,
-            rel_tol = 0.0,
-        ),
+    res = optimize(
+        χ²_at_c1,
+        loB,
+        hiB,
+        Brent();
+        abs_tol = tol,
+        rel_tol = 0.0,
     )
+    Threads.atomic_add!(tab.counts.solves, 1)
+    Threads.atomic_add!(tab.counts.brentIters, iterations(res))
+    return minimizer(res)
 end
 
 """
@@ -676,6 +676,179 @@ function _profileLlGrad(
         ll = wlsProfLl(fit)
     end
     return ll, grad
+end
+
+"""
+The model curve and its WLS fit at the given c1 (no search), the per-draw report of a run
+that samples c1.
+
+# Returns
+- `(ŷ::Vector{Float64}, fit::WLSFit)`.
+
+# Exceptions
+- `WLSError`: as [`wlsFit`](@ref).
+"""
+function fixedC1Corrs(
+    wls::WLSData, ξ::SVector{4,Float64}, fw::ForwardCache, tab::_C1Tables, c1::Float64,
+)
+    Q = length(tab.qvals)
+    ŷ = Vector{Float64}(undef, Q)
+    @no_escape begin
+        A, B, C = @alloc(Float64, Q), @alloc(Float64, Q), @alloc(Float64, Q)
+        _intensityTerms!(A, B, C, fw.gc, ξ[1], _contrasts(ξ))
+        gv = _envelope!(@alloc(Float64, Q), tab, c1)
+        @inbounds @fastmath @simd for i in 1:Q
+            g = gv[i]
+            ŷ[i] = A[i] + g * (B[i] + g * C[i])
+        end
+    end
+    return ŷ, wlsFit(ŷ, wls)
+end
+
+"""
+∂ℓ/∂c1 at fixed ξ and c1, the derivative the five-parameter model needs and the profile
+(envelope theorem) never did: with m, b the scale and background fitted at that c1,
+
+    ∂ℓ/∂c1 = m · Σᵢ pᵢ (Bᵢ + 2 gᵢ Cᵢ) ∂gᵢ/∂c1,    ∂g/∂c1 = g (3/c1 − 2 c1 q² EV rM²),
+
+for g = c1³ exp(−q² k(c1)), k = (c1² − 1) EV rM² (`EV` = `EV_EXP_COEFF`), the same g as
+[`_envelope!`](@ref), and pᵢ as in [`_profileLlGrad`](@ref).
+
+# Returns
+- `Float64`: ∂ℓ/∂c1.
+
+# Exceptions
+- `WLSError`: as [`wlsFit`](@ref), if the model is flat.
+"""
+function _dllDc1(
+    wls::WLSData, ξ::SVector{N,Float64}, fw::ForwardCache, tab::_C1Tables, c1::Float64,
+) where {N}
+    Q = size(fw.gc, 1)
+    w = wls.weights
+    y = wls.iObs
+    q = tab.qvals
+    dk = 2c1 * EV_EXP_COEFF * tab.rM^2
+    s = 0.0
+    @no_escape begin
+        A, B, C = @alloc(Float64, Q), @alloc(Float64, Q), @alloc(Float64, Q)
+        _intensityTerms!(A, B, C, fw.gc, ξ[1], _contrasts(ξ))
+        fit = _wlsFromSums(_sumsAt(A, B, C, tab, wls, c1)..., Q, wls)
+        gv = _envelope!(@alloc(Float64, Q), tab, c1)
+        @inbounds for i in 1:Q
+            g = gv[i]
+            p = w[i] * (y[i] - fit.scale * (A[i] + g * (B[i] + g * C[i])) - fit.bkgrndCorr)
+            s += p * (B[i] + 2g * C[i]) * g * (3 / c1 - q[i]^2 * dk)
+        end
+        s *= fit.scale
+    end
+    return s
+end
+
+"""
+[`_profileLlGrad`](@ref) of the five-parameter ξ = (ρₑ, δρ₁, δρ₂, δρ₃, c1): ℓ and its
+gradient at the sampled c1, no profile search.
+
+# Returns
+- `(ll::Float64, ∇ℓ::SVector{5,Float64})`.
+"""
+function _llGradC1(
+    wls::WLSData, ξ::SVector{5,Float64}, fw::ForwardCache, tab::_C1Tables, tol::Float64,
+)
+    ξ4 = SVector{4}(ξ[1], ξ[2], ξ[3], ξ[4])
+    ll, g = _profileLlGrad(wls, ξ4, fw, tab, tol; c1 = ξ[5])
+    return ll, SVector{5}(g..., _dllDc1(wls, ξ4, fw, tab, ξ[5]))
+end
+
+"""
+d/dt of the log density of t given ξ₄, where c1 = lo + W·σ(t) and t carries the logistic
+density of a `Uniform` c1: ∂ℓ/∂c1 · W σ(t)(1 − σ(t)) + (1 − 2σ(t)). Its root is the mode of
+t given ξ₄ ([`_c1Centre`](@ref)).
+"""
+function _dLogDensT(
+    wls::WLSData, ξ4::SVector{4,Float64}, fw::ForwardCache, tab::_C1Tables,
+    t::Float64, lo::Float64, W::Float64,
+)
+    σ = logistic(t)
+    return _dllDc1(wls, ξ4, fw, tab, lo + W * σ) * W * σ * (1 - σ) + (1 - 2σ)
+end
+
+"""
+    _c1Centre(wls, ξ₄, fw, tab, lo, W) -> t̂
+
+The c1 coordinate the NUTS runs of a kinked fit are centred on: the mode t̂(ξ₄) of
+t = logit((c1 − lo)/W) given ξ₄, likelihood times the logistic density of the `Uniform` c1
+prior (so it is finite even when the likelihood wants c1 at a bound). The five-parameter
+run samples z = t − t̂(ξ₄) instead of t. That is a shift with Jacobian 1, so the target is
+the same, but the narrow ridge c1 forms with the δρ (c1 follows the δρ, within about a
+tenth of a percent) becomes a round blob in (ξ₄, z). Any t̂ would leave the target
+exact; the better it tracks the conditional mode the better conditioned the sampling is.
+
+The root is found by Newton from the profiled c1 (one scan and Brent, as profiling does),
+with central differences for the curvature. A dual ξ₄ gets the partials of t̂ from the
+implicit function theorem, ∂t̂/∂ξⱼ = −(∂f/∂ξⱼ)/(∂f/∂t) with f = [`_dLogDensT`](@ref)
+(central differences in ξⱼ), so the NUTS gradient is that of the map it samples through.
+
+# Arguments
+- `wls`, `ξ₄`, `fw`, `tab`: as [`profiledCorrs`](@ref); `ξ₄` is a Float64 or dual vector.
+- `lo`, `W`: the bounds of the c1 prior, `c1 = lo + W·σ(t)`.
+
+# Returns
+- `t̂`: a Float64 (a dual with the partials of t̂ for a dual ξ₄).
+
+# Exceptions
+- `WLSError`: as [`wlsFit`](@ref), if the model is flat.
+"""
+function _c1Centre(
+    wls::WLSData, ξ4::SVector{4,Float64}, fw::ForwardCache, tab::_C1Tables,
+    lo::Float64, W::Float64,
+)
+    c1Star = profiledCorrs(wls, ξ4, fw; tables = tab, tol = EXCL_VOL_CORR_TOL)[3]
+    tMax = C1_CENTRE_T_MAX
+    t = clamp(logit(clamp((c1Star - lo) / W, 1.0e-6, 1 - 1.0e-6)), -tMax, tMax)
+    h = C1_CENTRE_FD_STEP
+    for _ in 1:C1_CENTRE_MAX_ITER
+        f = _dLogDensT(wls, ξ4, fw, tab, t, lo, W)
+        fp =
+            (
+                _dLogDensT(wls, ξ4, fw, tab, t + h, lo, W) -
+                _dLogDensT(wls, ξ4, fw, tab, t - h, lo, W)
+            ) / 2h
+        # Newton where the log density is concave in t, a fixed uphill step where it is not
+        dt = clamp(fp < -1.0e-8 ? -f / fp : 0.1 * sign(f), -1.0, 1.0)
+        t = clamp(t + dt, -tMax, tMax)
+        abs(dt) < C1_CENTRE_TOL && break
+    end
+    return t
+end
+
+function _c1Centre(
+    wls::WLSData, ξ4::SVector{4,D}, fw::ForwardCache, tab::_C1Tables,
+    lo::Float64, W::Float64,
+) where {D<:ForwardDiff.Dual{<:Any,Float64}}
+    x = SVector{4,Float64}(ForwardDiff.value.(ξ4))
+    t = _c1Centre(wls, x, fw, tab, lo, W)
+    h = C1_CENTRE_FD_STEP
+    fp =
+        (
+            _dLogDensT(wls, x, fw, tab, t + h, lo, W) -
+            _dLogDensT(wls, x, fw, tab, t - h, lo, W)
+        ) / 2h
+    g = SVector{4,Float64}(
+        ntuple(
+            j -> begin
+                hj = h * max(1.0, abs(x[j]))
+                e = SVector{4,Float64}(ntuple(k -> k == j ? hj : 0.0, Val(4)))
+                dfj =
+                    (
+                        _dLogDensT(wls, x + e, fw, tab, t, lo, W) -
+                        _dLogDensT(wls, x - e, fw, tab, t, lo, W)
+                    ) / 2hj
+                -dfj / fp
+            end,
+            Val(4),
+        ),
+    )
+    return _dualOf(t, g, ξ4)
 end
 
 """
@@ -862,4 +1035,94 @@ function exclVolSaturation(
     c1 < cmin && return -1
     c1 > cmax && return 1
     return 0
+end
+
+"""
+    _twoBranches(ll) -> Bool
+
+Whether the log-likelihood scan `ll` over c1 has two prominent interior maxima (at least
+`C1_KINK_PROMINENCE` nats) whose tops lie within `C1_KINK_GAP` nats of each other: a
+second branch the sampler would pick up. A low-mass branch is no kink.
+
+# Returns
+- `Bool`.
+
+# Exceptions
+- None.
+"""
+function _twoBranches(ll::AbstractVector{<:Real})::Bool
+    peaks = peakproms(findmaxima(ll); min = C1_KINK_PROMINENCE)
+    length(peaks.indices) ≥ 2 || return false
+    tops = sort(ll[peaks.indices]; rev = true)
+    return tops[2] ≥ tops[1] - C1_KINK_GAP
+end
+
+"""
+Whether the profile of c1 of `fw` and `wls` has a kink at the draws `ξs`, the signature
+of a profile that switches between basins: at `C1_KINK_DRAWS` draws taken evenly from
+`ξs`, the scan log-likelihood is searched for interior maxima (`Peaks.findmaxima`) with
+a prominence of at least `C1_KINK_PROMINENCE` nats (`Peaks.peakproms`), and the profile
+counts as kinked when at least a share `C1_KINK_SHARE` of the draws has two or more
+whose two highest tops lie within `C1_KINK_GAP` nats of each other (a branch of
+negligible mass is no kink: the sampler would not visit it). A basin pinned at a bound
+is no basin (its saturation is intended, see `EXCL_VOL_CORR_BOUNDS`).
+
+Asked every few hundred draws of a profiled run, after the warm-up (see
+`_chainRunner`); a kink stops the run and `runModel` samples c1 instead,
+so a false alarm costs one extra run and a miss keeps the profiled run.
+
+# Returns
+- `Bool`.
+"""
+function _c1Kinked(
+    fw::ForwardCache, wls::WLSData, tab::_C1Tables, ξs::AbstractVector{<:SVector},
+)::Bool
+    r = _c1KinkCount(fw, wls, tab, ξs)
+    return r.nLooked > 0 && r.nKinked ≥ C1_KINK_SHARE * r.nLooked
+end
+
+"""
+The count behind [`_c1Kinked`](@ref): at the draws it looks at, how many have two basins.
+
+# Returns
+- `(; nLooked, nChecked, nKinked)`: the draws looked at, those of them with a finite scan,
+    and the ones whose scan has two or more competing basins.
+"""
+function _c1KinkCount(
+    fw::ForwardCache, wls::WLSData, tab::_C1Tables, ξs::AbstractVector{<:SVector},
+)
+    isempty(ξs) && return (nLooked = 0, nChecked = 0, nKinked = 0)
+    Q = size(fw.gc, 1)
+    dof = Q - 2
+    A, B, C = zeros(Q), zeros(Q), zeros(Q)
+    chis = zeros(length(tab.cs))
+    ll = zeros(length(tab.cs))
+    idx = unique(round.(Int, range(1, length(ξs); length = min(C1_KINK_DRAWS, length(ξs)))))
+    nKinked = 0
+    nChecked = 0
+    for i in idx
+        ξ = ξs[i]
+        _intensityTerms!(A, B, C, fw.gc, ξ[1], _contrasts(ξ))
+        _scanChi2!(chis, A, B, C, tab, wls)
+        # in place, no allocation: ll = -(dof/2)·χ², and a finite scan, and the number of
+        # interior points no lower than both neighbours (a superset of the maxima
+        # `findmaxima` returns, plateaus included): fewer than two of them cannot be two
+        # basins, so the peak search (which allocates) runs only for the rare scan that
+        # may have them
+        half = dof / 2
+        finite = true
+        @inbounds for j in eachindex(chis)
+            v = -half * chis[j]
+            ll[j] = v
+            finite &= isfinite(v)
+        end
+        finite || continue
+        nChecked += 1
+        nTop = 0
+        @inbounds for j in (firstindex(ll)+1):(lastindex(ll)-1)
+            nTop += (ll[j] ≥ ll[j-1]) & (ll[j] ≥ ll[j+1])
+        end
+        nTop ≥ 2 && _twoBranches(ll) && (nKinked += 1)
+    end
+    return (nLooked = length(idx), nChecked, nKinked)
 end

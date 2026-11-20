@@ -92,7 +92,7 @@ The kind of the setting `name` whose default is `v`: `:bool`, `:int`, `:float`,
 the choices of `SETTING_CHOICES`),
 `:tuple`, or one of the kinds of `SETTING_KINDS` that a default cannot tell
 (`:optionalFloat`, `:optionalInt`, `:ranges`, `:strings`, `:colours`, `:markers`,
-`:sizes`, `:path`).
+`:sizes`, `:path`, `:ladder`).
 """
 function settingKind(name::Symbol, v)
     haskey(_mergedTable(:SETTING_KINDS), name) &&
@@ -187,6 +187,134 @@ function _sizeValue(x)
 end
 
 """
+The ladder `v` of a `:ladder` setting (see `LADDER`): a map from failure class
+(`LADDER_CLASSES`) to a list of rungs, each an object `{name?, overrides}` whose
+`overrides` map setting names (`LADDER_OVERRIDABLE`, with the ladder-only `RNG_SEED_STEP`
+and `SAMPLE_C1`) to values checked as the setting itself is. A class that `v` does not
+name keeps its rungs in `base` (the default `LADDER`); a class given as `[]` is off.
+`v` may also be a text: a JSON map, or the path of a file holding one (the command-line
+form), or `"off"`. `false` and `"off"` switch every class off, `true` is `base`.
+
+# Returns
+- A `NamedTuple` with a key for every class, each a `Tuple` of
+  `(name = String, overrides = NamedTuple)`, the override keys sorted by name (a `Dict`
+  has no order), the values in the type of the setting's default.
+
+# Exceptions
+- `ArgumentError` saying what is wrong (a class that does not exist, a rung that is no
+  object, no `overrides`, a name that is not a fitting setting, a value its setting
+  refuses).
+"""
+function _ladderValue(v; base = LADDER)
+    off = NamedTuple{LADDER_CLASSES}(ntuple(_ -> (), length(LADDER_CLASSES)))
+    v === true && return base
+    v === false && return off
+    if v isa AbstractString
+        strip(v) == "off" && return off
+        text = isfile(v) ? read(v, String) : String(v)
+        v = try
+            JSON3.read(text)
+        catch
+            _bad("must be a map from failure class to rungs (JSON text, or a JSON file)")
+        end
+    end
+    (v isa Union{NamedTuple,AbstractDict}) ||
+        _bad(
+            "must be a map from failure class ($(join(LADDER_CLASSES, ", "))) to a " *
+            "list of rungs",
+        )
+    given = Symbol[Symbol(k) for k in keys(v)]
+    unknown = [k for k in given if k ∉ LADDER_CLASSES]
+    isempty(unknown) ||
+        _bad(
+            "$(join(unknown, ", ")) is not a failure class " *
+            "(classes: $(join(LADDER_CLASSES, ", ")))",
+        )
+    classes = map(LADDER_CLASSES) do c
+        c in given || return base[c]
+        return _rungList(c, v[c])
+    end
+    return NamedTuple{LADDER_CLASSES}(Tuple(classes))
+end
+
+"The rungs `v` of the failure class `class` (see `_ladderValue`)."
+function _rungList(class::Symbol, v)
+    (v isa Union{Tuple,AbstractVector}) ||
+        _bad("$class must be a list of rungs, each with overrides (`[]` switches it off)")
+    rungs = NamedTuple{(:name, :overrides),Tuple{String,NamedTuple}}[]
+    for (i, r) in enumerate(v)
+        (r isa Union{NamedTuple,AbstractDict}) ||
+            _bad("$class rung $i must be an object with overrides")
+        get(r, :overrides, nothing) isa Union{NamedTuple,AbstractDict} ||
+            _bad("$class rung $i needs overrides, an object of settings")
+        extra = [k for k in keys(r) if Symbol(k) ∉ (:name, :overrides)]
+        isempty(extra) ||
+            _bad("$class rung $i has $(join(extra, ", ")): only name and overrides")
+        ov = r[:overrides]
+        isempty(ov) && _bad("$class rung $i must override at least one setting")
+        keysOf = Symbol[Symbol(k) for k in keys(ov)]
+        allunique(keysOf) || _bad("$class rung $i names a setting twice")
+        sort!(keysOf)   # a Dict has no order: one canonical order for every source
+        vals = Any[]
+        for k in keysOf
+            val = ov[k]
+            if k === :RNG_SEED_STEP
+                _isWhole(val) ||
+                    _bad("$class rung $i RNG_SEED_STEP must be a whole number")
+                push!(vals, Int(val))
+                continue
+            elseif k === :SAMPLE_C1
+                val isa Bool || _bad("$class rung $i SAMPLE_C1 must be true or false")
+                push!(vals, val)
+                continue
+            end
+            k in LADDER_OVERRIDABLE ||
+                _bad(
+                    "$class rung $i: $k is not a fitting setting a rung may override " *
+                    "(allowed: $(join(LADDER_OVERRIDABLE, ", ")))",
+                )
+            push!(
+                vals,
+                try
+                    _checkedValue(k, _settingInput(val))
+                catch e
+                    e isa ArgumentError || rethrow()
+                    _bad("$class rung $i $k $(e.msg)")
+                end,
+            )
+        end
+        name = get(r, :name, "")
+        name isa AbstractString || _bad("$class rung $i name must be text")
+        push!(
+            rungs,
+            (
+                name = String(strip(name)),
+                overrides = NamedTuple{Tuple(keysOf)}(Tuple(vals)),
+            ),
+        )
+    end
+    return Tuple(rungs)
+end
+
+"""
+The ladder keyword `v` of [`runModel`](@ref) as a map of rungs (see `_ladderValue`).
+
+# Returns
+- A `NamedTuple` of class to `(name, overrides)` rungs.
+
+# Exceptions
+- [`InvalidSettingsError`](@ref) saying what is wrong with it.
+"""
+function _checkedLadder(v; base = LADDER)
+    return try
+        _ladderValue(v; base)
+    catch e
+        e isa ArgumentError || rethrow()
+        throw(InvalidSettingsError(["LADDER: $(e.msg)"], _SETTINGS_KEYWORD_HINT))
+    end
+end
+
+"""
 The value `v` of the setting `name`, in the type its default has; or an `ArgumentError`
 saying what is wrong. The limits are checked here too.
 """
@@ -234,6 +362,8 @@ function _checkedValue(name::Symbol, v)
             2:length(sizes)) ||
             _bad("must grow in both width and height, each size above the one before")
         sizes
+    elseif kind === :ladder
+        _ladderValue(v)
     elseif kind === :colour
         _isColour(v) || _bad("is not a colour")
         Symbol(v)
@@ -372,6 +502,7 @@ const SETTING_KEYWORDS = (
     _kw(:SASA_N_OCC, :sasaNOcc, :seedModel; check = true),
     _kw(:BEAD_RAY_RANGE, :beadRayRange, :seedModel; check = true),
     _kw(:BEAD_RAY_DIRS, :beadRayDirs, :seedModel; check = true),
+    _kw(:MEMORY_HEADROOM, :memoryHeadroom, :seedModel; check = true),
     _kw(:Q_MIN, :qMin, :seedModel; check = true),
     _kw(:Q_MAX, :qMax, :seedModel; check = true),
     _kw(:SIGMA_SCALE, :sigmaScale, :seedModel; check = true),
@@ -388,6 +519,7 @@ const SETTING_KEYWORDS = (
     _kw(:RETRY_N_ADAPT, :retryNAdapt, :runModel; check = true),
     _kw(:RETRY_N_DRAWS, :retryNDraws, :runModel; check = true),
     _kw(:CHAIN_START_RADII, :chainStartRadii, :runModel; check = true),
+    _kw(:LADDER, :ladder, :runModel),
     _kw(:OPTIMUM_CHAIN_CAP, :optimumChainCap, :runModel; check = true),
     _kw(:OPTIMUM_MIN_CHAINS, :optimumMinChains, :runModel; check = true),
     _kw(:OPTIMUM_CHAIN_RADIUS, :optimumChainRadius, :runModel; check = true),
@@ -511,7 +643,8 @@ The keywords of [`seedModel`](@ref) that a setting stands for, from `settings` (
 `κ_δρ₁₂`, `κ_δρ₃`, `pmvFallbackUncert` (`PMV_FALLBACK_UNCERT`), `bounds_δρ₁₂`,
 `mode_δρ₁₂`, `φ_max`, `exclVolCorrBounds` (`EXCL_VOL_CORR_BOUNDS`), `exclVolCorrEps`,
 `shellAreaPerPoint`, `shellMinPoints`, `shellSample`, `sasaNOcc`, `beadRayRange`,
-`beadRayDirs`, `qMin`, `qMax`, `sigmaScale`, `excludeQ`, `lMax` (`LMAX`), `chains`,
+`beadRayDirs`, `memoryHeadroom` (`MEMORY_HEADROOM`), `qMin`, `qMax`, `sigmaScale`,
+`excludeQ`, `lMax` (`LMAX`), `chains`,
 `model` and `addHydrogens` (the lower-case name of the setting where none is given). Pass
 it on with `seedModel(...; seedKeywords(settings)...)`. The sampler settings are
 [`runKeywords`](@ref), the output and plot settings [`resultsKeywords`](@ref); every
@@ -519,7 +652,7 @@ setting is a keyword of one of the three, and `settings.json` is one way, not th
 to supply them.
 
 # Returns
-- A `NamedTuple` of the 24 keywords.
+- A `NamedTuple` of the 25 keywords.
 
 # Exceptions
 - `KeyError` if `settings` lacks one of the settings (a `Dict` from `loadSettings` has
@@ -532,7 +665,8 @@ seedKeywords(settings::AbstractDict) = _keywords(settings, :seedModel)
 
 The keywords of [`runModel`](@ref) that a setting stands for, from `settings`: `sigma`
 (`VAL_SIGMA`), `δ` (`TARGET_ACCEPT`), `rngSeed`, `nChains`, `retryNAdapt`,
-`retryNDraws`, `chainStartRadii`, `optimumChainCap`, `optimumMinChains`,
+`retryNDraws`, `chainStartRadii`, `ladder` (`LADDER`), `optimumChainCap`,
+`optimumMinChains`,
 `optimumChainRadius`, `optimumChainFraction`, `mapMaxIter`, `mapNStarts`,
 `mapFSuccessive`, `mapOptimaKept`, `mapJitterRadii`, `mapJitterDirections`,
 `mapJitterMaxOptima`, `mapJitterWithinNats`, `basinRestartNats`, `harvestCover`
@@ -540,7 +674,7 @@ and `harvestDivergent`. Pass it on with `runModel(seed, runArguments(settings)..
 runKeywords(settings)...)`.
 
 # Returns
-- A `NamedTuple` of the 22 keywords.
+- A `NamedTuple` of the 23 keywords.
 
 # Exceptions
 - `KeyError` if `settings` lacks one of the settings.
@@ -639,7 +773,9 @@ function _applyKeywords!(settings::AbstractDict{Symbol,Any}, given::NamedTuple)
         # `nothing` takes the saved value, except for a setting that may be `nothing`
         v === nothing && !_isNullable(name) && continue
         try
-            changed[name] = _checkedValue(name, _settingInput(v))
+            changed[name] =
+                name === :LADDER ? _ladderValue(v; base = settings[:LADDER]) :
+                _checkedValue(name, _settingInput(v))
         catch e
             e isa ArgumentError || rethrow()
             push!(problems, "$name = $(repr(v)): $(e.msg)")

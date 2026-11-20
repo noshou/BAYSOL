@@ -82,7 +82,11 @@ end
     # one line per fitting-test folder (derived: the folders are the source)
     @test length(split(strip(out), '\n')) ==
           count(
-        n -> startswith(n, "SASD"),
+        n ->
+            startswith(n, "SASD") && any(
+                endswith(".jl"),
+                readdir(joinpath(repo_dir, "test", "fitting_tests", n)),
+            ),
         readdir(joinpath(repo_dir, "test", "fitting_tests")),
     ) + count(startswith("SYN-"), split(strip(out), '\n'))
     @test says(out, "SASDRN5  fit2_model1 fit3_model1", "SASDMJ9  (single run, no tag)")

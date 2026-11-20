@@ -191,7 +191,8 @@ end
         θ = SVector(-1.1, 0.2, 0.9, 0.4)
         ẑ = SVector(0.3, -0.2, 0.1, 0.5)
         S = @SMatrix [2.0 0.1 0.0 0.0; 0.0 0.5 0.2 0.0; 0.0 0.0 1.5 0.3; 0.1 0.0 0.0 0.7]
-        sp = FIT._SamplingSpace(μ, σ, ẑ, S, 1, 1, 1, true, 0, 0.0, FIT._Optimum{4,16}[])
+        sp = FIT._SamplingSpace(μ, σ, ẑ, S, 1, 1, 1, true, 0, 0.0, FIT._Optimum{4,16}[],
+            FIT._StartRecord[])
         w = S \ (FIT._standardize(θ, pr) - ẑ)
         @test all(isapprox.(FIT._θ_of_w(w, sp), θ; rtol = 1e-12))
     end
@@ -525,6 +526,24 @@ end
         # the retry follows it, however long the run was, and only when on
         @test FIT._retryNeeded(plain.diagnostics, true)
         @test !FIT._retryNeeded(plain.diagnostics, false)
+        # the divergent share counts the post-warm-up transitions only: errors during the
+        # warm-up (routine) never trigger a rerun, errors after it do
+        nA = plain.diagnostics.nAdapt
+        withErrors =
+            f -> begin
+                st = [
+                    merge(s, (; numerical_error = f(i))) for (i, s) in
+                    zip(plain.iteration, plain.stats)
+                ]
+                FIT.Inferred(plain.samples, st, plain.scale, plain.bkgrndCorr, plain.c1,
+                    plain.chisqRed, plain.curves, plain.chain, plain.iteration,
+                    plain.diagnostics, plain.timing)
+            end
+        warmOnly = withErrors(i -> i ≤ nA)
+        @test FIT._divergentShare(warmOnly) == 0.0
+        postErr = withErrors(i -> i > nA)
+        @test FIT._divergentShare(postErr) == 1.0
+        @test FIT._retryNeeded(plain.diagnostics, true, FIT._divergentShare(postErr))
         # the error says why
         err = FIT.NotConvergedError(FIT._convergenceProblems(1.5, ok, ok))
         @test occursin("did not converge", sprint(showerror, err))

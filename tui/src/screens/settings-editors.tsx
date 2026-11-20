@@ -18,11 +18,14 @@ import {
 } from "../store/colours.js"
 import {
     type FontLists,
+    type LadderMap,
+    MAX_LADDER_TYPING,
     MAX_LIST_TYPING,
     MAX_PATH_TYPING,
     type SettingDef,
     type SettingValue,
     settingNames,
+    validateValue,
 } from "../store/settings.js"
 import { type LegendItem, legendBack, legendFor, legendOf } from "../ui/grid.js"
 import { Entry, Prompt, type Suggestion } from "../ui/input.js"
@@ -39,24 +42,33 @@ import {
 import { TextBuffer, TextField } from "../ui/text-input.js"
 import { Bright, ErrorText, Panel, useTheme } from "../ui/theme.js"
 import {
+    dropRung,
     type EditEnd,
     hasColourPart,
     indexOfPick,
     type ListKind,
+    ladderRows,
     maxNameText,
     maxSettingText,
+    moveRung,
     narrow,
     openTabs,
     openTuple,
+    parseRung,
     parseSetting,
     pasteTuple,
     pickValue,
+    putRung,
+    rungText,
     stepTabs,
     stepTuple,
     type TupleEdit,
     takeColour,
     valueText,
 } from "./screen-rules.js"
+
+/** The rows of the ladder editor's list (a class and its rungs are one row each). */
+const ladderLines = 8
 
 /** The most colours or fonts the picker shows at once. */
 const pickerLines = 5
@@ -71,6 +83,7 @@ export const isPicked = (def: SettingDef): boolean =>
  * and the error, and room for the picker of a colour part.
  */
 export const editorRows = (def: SettingDef): number => {
+    if (def.kind === "ladder") return ladderLines + 3
     if (def.kind === "tuple")
         return Math.max(def.partNames.length + 1, hasColourPart(def) ? pickerLines + 5 : 0)
     return def.kind === "colour"
@@ -112,6 +125,12 @@ function textHint(def: SettingDef): { label: string; placeholder?: string } {
             return { label: "markers:", placeholder: "o, square, triangle" }
         case "sizes":
             return { label: "sizes:", placeholder: "76x5, 100x9 (growing)" }
+        case "ladder":
+            return {
+                label: "rungs:",
+                placeholder:
+                    "name: TARGET_ACCEPT=99; RNG_SEED_STEP=1 | next rung (empty: off)",
+            }
         case "path":
             return { label: "path:", placeholder: "empty: the default" }
         case "optionalInt":
@@ -200,9 +219,11 @@ export function TextEditor({ def, current, onEnd, onLegend }: EditorProps): Reac
             maxLength={
                 def.kind === "path"
                     ? MAX_PATH_TYPING
-                    : listKinds.has(def.kind)
-                        ? MAX_LIST_TYPING
-                        : maxSettingText
+                    : def.kind === "ladder"
+                        ? MAX_LADDER_TYPING
+                        : listKinds.has(def.kind)
+                            ? MAX_LIST_TYPING
+                            : maxSettingText
             }
             placeholder={placeholder}
             error={error}
@@ -505,6 +526,113 @@ export function TupleEditor({ def, current, onEnd, onLegend }: EditorProps): Rea
                 )
             })}
             <ErrorText reserve>{truncate(edit.error ?? "", columns)}</ErrorText>
+        </Box>
+    )
+}
+
+/**
+ * The retry ladder edited as a list: a row for each failure class (a header) and, under
+ * it, a row for each of its rungs. Up and down move; Enter on a rung edits it (a line of
+ * `name: KEY=value; ...`), on a class adds a rung at its end; Ctrl+n adds a rung to the
+ * class in focus; Ctrl+r removes the rung (on a class: all its rungs); PageUp and
+ * PageDown move a rung earlier or later in its class; Esc takes the whole ladder (a wrong
+ * one stays as an error), Ctrl+x goes back without it.
+ */
+export function LadderEditor({ def, current, onEnd, onLegend }: EditorProps): ReactNode {
+    const theme = useTheme()
+    const columns = useBodyColumns()
+    const [map, setMap] = useState<LadderMap>(current as LadderMap)
+    const [focus, setFocus] = useState(0)
+    const [typing, setTyping] = useState<{ cls: string; index: number; initial: string }>()
+    const [error, setError] = useState<string>()
+    const rows = useMemo(() => ladderRows(map, def.classes), [map, def.classes])
+    const row = rows[Math.min(focus, rows.length - 1)]
+    useEffect(() => {
+        if (typing) return
+        onLegend([
+            legendFor("move", [keys.up, keys.down]),
+            legendFor(row?.rung === undefined ? "add rung" : "edit", keys.enter),
+            legendFor("add", keys.addNonbio),
+            legendFor("remove", keys.remove),
+            legendFor("reorder", [keys.pageUp, keys.pageDown]),
+            legendFor("done", keys.escape),
+            legendBack,
+        ])
+    }, [typing, row?.rung, onLegend])
+    useKeys((press) => {
+        if (row === undefined) return
+        setError(undefined)
+        if (press.is(keys.up)) setFocus(Math.max(0, focus - 1))
+        else if (press.is(keys.down)) setFocus(Math.min(rows.length - 1, focus + 1))
+        else if (press.is(keys.enter)) {
+            const index = row.rung ?? (map[row.cls] ?? []).length
+            const old = row.rung === undefined ? undefined : map[row.cls]?.[row.rung]
+            const initial = old === undefined ? "" : rungText(old)
+            setTyping({ cls: row.cls, index, initial })
+        } else if (press.is(keys.addNonbio))
+            setTyping({ cls: row.cls, index: (map[row.cls] ?? []).length, initial: "" })
+        else if (press.is(keys.remove)) {
+            setMap(dropRung(map, row.cls, row.rung))
+            if (row.rung !== undefined) setFocus(Math.max(0, focus - 1))
+        } else if (press.is(keys.pageUp) && row.rung !== undefined) {
+            setMap(moveRung(map, row.cls, row.rung, -1))
+            setFocus(Math.max(0, focus - 1))
+        } else if (press.is(keys.pageDown) && row.rung !== undefined) {
+            setMap(moveRung(map, row.cls, row.rung, 1))
+            setFocus(Math.min(rows.length - 1, focus + 1))
+        } else if (press.is(keys.escape)) {
+            const checked = validateValue(def, map as SettingValue)
+            if (checked.ok) onEnd({ kind: "done", value: checked.value })
+            else setError(checked.error)
+        } else if (press.is(keys.back)) onEnd({ kind: "back" })
+    }, !typing)
+    if (typing)
+        return (
+            <Prompt
+                label={`${typing.cls}:`}
+                initial={typing.initial}
+                maxLength={MAX_LADDER_TYPING}
+                placeholder="name: TARGET_ACCEPT=99; RNG_SEED_STEP=1"
+                error={error}
+                onChange={() => setError(undefined)}
+                onSubmit={(text) => {
+                    const rung = parseRung(text)
+                    if ("error" in rung) return setError(rung.error)
+                    const next = putRung(map, typing.cls, typing.index, rung.value)
+                    const checked = validateValue(def, next as SettingValue)
+                    if (!checked.ok) return setError(checked.error)
+                    setMap(checked.value as LadderMap)
+                    setTyping(undefined)
+                }}
+                onCancel={() => setTyping(undefined)}
+                onBack={() => setTyping(undefined)}
+                onLegend={onLegend}
+            />
+        )
+    const first = Math.max(0, Math.min(focus - ladderLines + 1, rows.length - ladderLines))
+    const shown = rows.slice(first, first + ladderLines)
+    return (
+        <Box flexDirection="column">
+            {shown.map((r, i) => {
+                const at = first + i
+                const focused = at === focus
+                const ink = focused ? theme.fg : theme.mt
+                const text =
+                    r.rung === undefined
+                        ? `${r.cls} (${(map[r.cls] ?? []).length})`
+                        : `  ${r.rung + 1}. ${rungText(map[r.cls]?.[r.rung] as never)}`
+                return (
+                    <Text
+                        key={`${r.cls}-${r.rung}`}
+                        color={ink}
+                        bold={r.rung === undefined}
+                        inverse={focused}
+                    >
+                        {truncate(text, columns - 2)}
+                    </Text>
+                )
+            })}
+            <ErrorText reserve>{truncate(error ?? "", columns)}</ErrorText>
         </Box>
     )
 }

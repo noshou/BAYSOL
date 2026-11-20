@@ -193,7 +193,7 @@ uuid = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
 version = "0.4.8"
 
 [[deps.BAYSOL]]
-deps = ["AdvancedHMC", "BioStructures", "Bumper", "Colors", "CondaPkg", "DBInterface", "Dierckx", "DiffResults", "Distributions", "Downloads", "FastClosures", "ForwardDiff", "HypothesisTests", "JSON3", "LinearAlgebra", "LogExpFunctions", "MCMCDiagnosticTools", "NearestNeighbors", "Optim", "PGFPlotsX", "PrecompileTools", "Printf", "Quickhull", "Random", "SHA", "SQLite", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase", "UnicodePlots", "XLSX"]
+deps = ["AdvancedHMC", "BioStructures", "Bumper", "Colors", "CondaPkg", "DBInterface", "Dierckx", "DiffResults", "Distributions", "Downloads", "FastClosures", "FiniteDiff", "ForwardDiff", "HypothesisTests", "JSON3", "LinearAlgebra", "LogExpFunctions", "MCMCDiagnosticTools", "NearestNeighbors", "Optim", "PGFPlotsX", "Peaks", "PrecompileTools", "Printf", "QuadGK", "Quickhull", "Random", "SHA", "SQLite", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase", "UnicodePlots", "XLSX"]
 path = "../.."
 uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 version = "0.4.0"
@@ -1559,6 +1559,17 @@ deps = ["Dates", "PrecompileTools", "UUIDs"]
 git-tree-sha1 = "ba0dc8a8a67cacac4842631f960c046e4e563675"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 version = "2.8.8"
+
+[[deps.Peaks]]
+deps = ["SIMD"]
+git-tree-sha1 = "a9b6680fb7fb097fb6eb1210c35549218d73da84"
+uuid = "18e31ff7-3703-566c-8e60-38913d67486b"
+version = "0.6.2"
+weakdeps = ["Makie", "RecipesBase"]
+
+    [deps.Peaks.extensions]
+    MakieExt = "Makie"
+    PlotsExt = "RecipesBase"
 
 [[deps.Pidfile]]
 deps = ["FileWatching", "Test"]

@@ -6,8 +6,8 @@ The four entry points, re-bound by the package root as `BAYSOL.seedModel`, `BAYS
 using BAYSOL
 seed = BAYSOL.seedModel(src, energy, q, I, σ, pH, σ_pH, solutes) # rebin = 12 per Shannon channel, lMax from the structure
 res  = BAYSOL.runModel(seed) # 300 warm-up + 700 draws; runModel(seed, nSamples, nAdapt) to change
-BAYSOL.results(res, seed; dir = "out") # terminal plots, pgfplots .tex, and the workbook out/res.xlsx (with `runLog = true` also the run log out/out.LOG, written last)
-BAYSOL.writeLog(res) # the run log out/out.LOG (what `results(...; runLog = true)` does last)
+BAYSOL.results(res, seed; dir = "out") # terminal plots, pgfplots .tex, and the workbook out/res.xlsx and always the statistics out/statistics-out.LOG and the run log out/out.LOG (written last)
+BAYSOL.writeLog(res) # the run log out/out.LOG (what `results` does last)
 BAYSOL.printSummary(res) # what a run says at the end: one parameter, check or file per row, every line under 80 columns
 ```
 
@@ -23,7 +23,7 @@ A fitting-test script that throws (`NotConvergedError` after the retry, or anyth
 | `results.jl`   | `results`, `PlotStyle`, `Reference` and the data the figures are drawn from (see "The figures"); the figures' sheets (`data`, `model`, `residuals`, `hist_*`, `ref_*`)                                                                                                                                                                                           |
 | `compare.jl`   | `compareResults` (the combined comparison figure and its `.tsv` table, see "The comparison figure") and the reader of a project's `reference-fit/` folder |
 | `tables.jl`    | the sheet structure and the writers: the workbook and the `draws` sheet |
-| `log.jl`       | `writeLog`, the run log `<folder>.LOG`, and the timing table it is made from |
+| `log.jl`       | `writeLog`, the run log `<folder>.LOG`, and the timing table it is made from (how to read it: "Reading the logs" below) |
 | `summary.jl`   | the summary sheets of the workbook (`run`, `map`, `quantiles_<interval>`, `stdevFromPrior`, `modes`, `optima`, `formFactorLog`) and `printSummary` |
 
 ## The stages
@@ -39,11 +39,11 @@ A fitting-test script that throws (`NotConvergedError` after the retry, or anyth
 
 ## The figures
 
-`results(result, seed; dir, name = "res", references, style, font, preview = true, io, tex = true, compile = false, formats, runLog = false, refChi2)` makes the fit (data with error bars, the posterior bounds band and quantile curves, the MAP curve; log axes), the residuals and the posterior histograms (ρₑ, δρ₁, δρ₂, δρ₃, scale, background, c1, each its own figure `<name>_hist_<parameter>` with the MAP marked), plus one comparison figure per `Reference(name, q, I; qMax)` (data, the reference curve and the MAP curve: the depositor's CRYSOL, FoXS, … fit). Every figure is prepared once as plain arrays (`_curveData`, `_residualData`, `_histogramData`, `_comparisonData`) and drawn three ways:
+`results(result, seed; dir, name = "res", references, style, font, preview = true, io, tex = true, compile = false, formats, refChi2)` makes the fit (data with error bars, the posterior bounds band and quantile curves, the MAP curve; log axes), the residuals and the posterior histograms (ρₑ, δρ₁, δρ₂, δρ₃, scale, background, c1, each its own figure `<name>_hist_<parameter>` with the MAP marked), plus one comparison figure per `Reference(name, q, I; qMax)` (data, the reference curve and the MAP curve: the depositor's CRYSOL, FoXS, … fit). Every figure is prepared once as plain arrays (`_curveData`, `_residualData`, `_histogramData`, `_comparisonData`) and drawn three ways:
 
 - **in the terminal** (UnicodePlots, `preview = true`), printed to `io`; it needs nothing installed. It prints the fit (the MAP curve alone, as log₁₀ q against log₁₀ I(q): the data points would bury it in a plot a few dozen cells wide; they are in the residuals, the `.tex` and the workbook) and the residuals, both titled with the MAP's reduced χ²; the residuals are clipped to the 2–98 % range (the title counts the points outside); one orange histogram per parameter has its MAP value in the title. The bounds band and the reference curves are in the `.tex` only;
 - **as a pgfplots `.tex`** (PGFPlotsX, `tex = true`): a standalone LaTeX document per figure, written without LaTeX. LaTeX is run only with `compile = true` (to `formats = (:pdf,)`, or `:png`/`:svg`, which also need poppler's `pdftocairo`/`pdftoppm`); a failed run is a warning and the `.tex` stays. It takes about a second per figure, which is why it is off by default;
-- **as numbers**: the workbook described below, always written (and, with `runLog = true`, the run log).
+- **as numbers**: the workbook described below, always written, and so are the statistics log and the run log.
 
 **The layout** of the output folder `dir`: the `.tex` files, and what `compile = true` or `bysl plots render` makes from them, are in `dir/plots/`; the workbook `<name>.xlsx` is in `dir`, and so is the run log `<folder name>.LOG` (below), one file for the folder with a section for each run. `name` starts every file name, so several runs can share a folder (`res_fit1`, `res_fit2`). The subfolder name is `PLOT_SUBDIR` in `pipeline.jl` (a fixed constant, not a setting); a folder is created when something is written to it.
 
@@ -57,7 +57,7 @@ Colours, line widths, marker sizes, the histogram bins, one figure size (`sizeCm
 
 **The page** of a figure keeps a border of `PlotStyle`'s `borderPt` (8 pt) round it, so the last tick label, the legend and the axis title are not cut off at the right or top edge.
 
-The time of each figure (its data, preview, `.tex`, LaTeX run; one stage for each histogram) and of the workbook is recorded as stages of the `plot` group of the run's timing log, which is why `results` calls `writeLog` last (with `runLog = true`).
+The time of each figure (its data, preview, `.tex`, LaTeX run; one stage for each histogram) and of the workbook is recorded as stages of the `plot` group of the run's timing log, which is why `results` calls `writeLog` last.
 
 ## The comparison figure
 
@@ -92,20 +92,376 @@ The settings are `PLOT_COMPARE` (the switch of `runProject`, the keyword `plotCo
 
 **The `run` rows**, in order (a row is absent when the run did not record it):
 
-- Sizes: `nAtoms` (atoms of the hydrogenated structure), `lmax` (highest spherical-harmonic degree of the scattering model), `nQRaw` (measured points), `nQ` (points fitted after binning).
+- Sizes: `nAtoms` (atoms of the hydrogenated structure), `lmax` (highest spherical-harmonic degree of the scattering model), `nQRaw` (measured points), `nQChi2` (the measured points inside the fitted range, `q[1] ≤ q ≤ q[end]` of the fitted grid, that the reported χ² sums over, with `nQChi2 - 3` degrees of freedom: a point below the first fitted bin or above the last is not scored), `nQ` (points fitted after binning).
 - Sampler settings: `nSamples` (NUTS iterations of each chain, warm-up included), `nAdapt` (the warm-up part), `rngSeed` (0 unless changed; the same seed reproduces the run), `quantileLoPct` and `quantileHiPct` (the percentiles of the interval that `sigma` asked for). `pmvFallbackUncert` (cm³ mol⁻¹, the uncertainty given to a non-biological buffer solute whose table row states none; the setting `PMV_FALLBACK_UNCERT`, not recommended to change).
 - Shannon binning: `dmax` (Å, the maximum diameter of the atoms and hydration-shell beads), `channels` (q range × `dmax` / π, the number of independent Shannon channels), `rebinChannels` (bins per channel; 0 when the curve was fitted as measured), `rebinMeasured` and `rebinFitted` (points before and after), `rebinNonPositiveDropped` (bins with a non-positive mean that were dropped).
-- Sampler statistics: `iterations` (post-warm-up transitions of the pooled chains), `meanAccept` (mean acceptance rate; the target is `TARGET_ACCEPT`), `treeDepthAvg` and `treeDepthMax`, `meanNSteps` (leapfrog steps per iteration), `ebfmi` (energy-based fraction of missing information of the worst chain; below about 0.3 the momentum resampling explores poorly), `cavityFrac` (share of the hydration-shell volume carried by cavity beads; near 0 means `deltaRho3` has no likelihood and its posterior is its prior), `exclVolSat` (0, +1 if `c1` sat on its upper bound at the MAP, −1 on its lower), `divergenceRate` (share of divergent transitions).
+- Sampler statistics: `iterations` (post-warm-up transitions of the pooled chains), `meanAccept` (mean acceptance rate; the target is `TARGET_ACCEPT`), `treeDepthAvg` and `treeDepthMax`, `meanNSteps` (leapfrog steps per iteration), `stepSize` and `stepSizeMin` (median and minimum of the pooled chains' adapted step size; a value near 0.002 against 0.1 to 0.3 is a collapsed adaptation, the `stepCollapse` class of the retry ladder), `ebfmi` (energy-based fraction of missing information of the worst chain; below about 0.3 the momentum resampling explores poorly), `cavityFrac` (share of the hydration-shell volume carried by cavity beads; near 0 means `deltaRho3` has no likelihood and its posterior is its prior), `exclVolSat` (0, +1 if `c1` sat on its upper bound at the MAP, −1 on its lower), `divergenceRate` (share of divergent transitions).
+- Retry ladder: `ladder` (whether it ran), `ladderClass` (the failure class of the last failed attempt), `ladderAttempts`, `ladderRungs` (JSON) and `ladderRung` (0 the base run, `i` a rung, -1 none); see the inference README, "The retry ladder".
 - Output: `quantileLoPct` and `quantileHiPct` (above) and `drawsRows` (the rows of the `draws` sheet; the units of its columns are in their headers).
 - Chains: `chainsPooled` (chains whose draws are kept) of `chainsRun`, `rhatMax` (worst rank-normalized split R̂ over the four parameters and the log density; 1.01 or above, the chains have not converged), `essMin` and `essTailMin` (smallest bulk and tail effective sample sizes; 400 or below, or not computable, the run counts as not converged too), then, when they apply, `modes` and `optima` (their counts, with the sheets above), `rewhitenedNats` (log-density gain when the chains found a better basin than the MAP search) and `retryFirstRhat` with `retryKept` (the first run's R̂ when it was rerun, and 1 if the rerun was kept).
 
 ## The run log
 
-`writeLog(result; refChi2)` writes the run log: the file `<folder name>.LOG` of the output folder, **one file for the folder with a section for each run** (`=== fit3 ===`, named after the workbook, the folder's own name for `res.xlsx`); a second call replaces the run's own section. `results(...; runLog = true)` calls it last (`runLog` is `false` by default; every fitting-test script sets it). It is what a benchmark needs and no more. The first line, `datetime`, stamps the last write (day, 24-hour time, offset from UTC). A section is, in this order: **the run** as flat rows `name`, spaces, a tab, `value` (the cells are padded with spaces to a multiple of 8 and followed by one tab, so the columns line up at any tab width and a line still splits on its tabs): BAYSOL `revision` (with `-dirty` when tracked files have uncommitted changes, so that a run is tied to a commit only when the tree is clean), the `julia` version, the `baysol` version with its release name (`v0.3.0-wʋsg_n_yɩɩda`: the `version` and the `release_name` keys of `Project.toml`, changed together at a release), the `refChi2` (the depositor's χ² with its method, if given), the kind of `structure` and the pdb2pqr cache, the conditions it was given (`temperatureC`, `ph`, `sigmaPh`, `energyEv`), the atoms, the model and data sizes, the sampler's settings and the seed, the fit (the reduced `chi2` on the measured points, the MAP of `rhoE`, `deltaRho1..3`, `scale`, `bkgrndCorr` and `c1`, their `z_` scores from the prior, whether `c1` sits on a bound) and the sampler's health (`divergenceRate`, `nDivergent`, `rhatMax`, `essMin`, `essTailMin`, `ebfmi`, acceptance, tree depth, leapfrog steps and ms/step, the chains, `modes`, `optima`, a retry or a re-whitening); **`--- timing ---`**, the timing table as the reports always showed it, for a person to read: the stages indented by level, with seconds, `% wall`, `(JIT)` and `(GC)` on every row and a `notes` column at the end of the row (short, on the same line, without brackets: what the stage's name carried, such as the NUTS iterations and leapfrog steps or the MAP search's starts, and its own note, such as `cache hit`), the wall clock first (it starts with the process, Linux; elsewhere with the load of BAYSOL, the `startup` being the time before `seedModel`), the `plotting` group, `report write` and `unaccounted`, then `GC:` (the process's total) and the two halves of the wall clock, `fit timing` (everything but the plotting) and `plot timing`; and last **`--- machine ---`** (`machine.os`, cpu and its clock, cores, Julia threads, memory, the load and the free memory when the run started). A number that could not be computed (an E-BFMI of 0/0) has no row. `refChi2` is given to `results` as `refChi2 = "CRYSOL 1.37"`. Residual statistics (lag-1, runs z) are in no output; `bysl fits diagnose --residuals ID` prints them. The fitting-test scripts under `test/fitting_tests/` are deliberately self-contained examples of these calls.
+The section "Reading the logs (a guide)" below explains how to read this file and the statistics log, with a worked example and a checklist, and the two "Reference" sections after it list every row.
+
+`writeLog(result; refChi2)` writes the run log: the file `<folder name>.LOG` of the output folder, **one file for the folder with a section for each run** (`=== fit3 ===`, named after the workbook, the folder's own name for `res.xlsx`); a second call replaces the run's own section. `results` always calls it last (there is no switch). The `report write` row of the timing table covers the building of the text; the final write of the file is after the table was formatted and in no row (a file cannot contain the time of its own last write, a few milliseconds). The statistics are written before it, so their time is the `statistics` row of the `plotting` group. It is what a benchmark needs and no more. The first line, `datetime`, stamps the last write (day, 24-hour time, offset from UTC). A section is, in this order: **the run** as flat rows `name`, spaces, a tab, `value` (the cells are padded with spaces to a multiple of 8 and followed by one tab, so the columns line up at any tab width and a line still splits on its tabs): BAYSOL `revision` (with `-dirty` when tracked files have uncommitted changes, so that a run is tied to a commit only when the tree is clean), the `julia` version, the `baysol` version with its release name (`v0.3.0-wʋsg_n_yɩɩda`: the `version` and the `release_name` keys of `Project.toml`, changed together at a release), the `refChi2` (the depositor's χ² with its method, if given), the kind of `structure` and the pdb2pqr cache, the conditions it was given (`temperatureC`, `ph`, `sigmaPh`, `energyEv`), the atoms, the model and data sizes, the sampler's settings and the seed, the fit (the reduced `chi2` on the measured points, the MAP of `rhoE`, `deltaRho1..3`, `scale`, `bkgrndCorr` and `c1`, their `z_` scores from the prior, whether `c1` sits on a bound) and the sampler's health (`divergenceRate`, `nDivergent`, `rhatMax`, `essMin`, `essTailMin`, `ebfmi`, acceptance, tree depth, leapfrog steps and ms/step, the chains, `modes`, `optima`, a retry or a re-whitening); **`--- timing ---`**, the timing table as the reports always showed it, for a person to read: the stages indented by level, with seconds, `% wall`, `(JIT)` and `(GC)` on every row and a `notes` column at the end of the row (short, on the same line, without brackets: what the stage's name carried, such as the NUTS iterations and leapfrog steps or the MAP search's starts, and its own note, such as `cache hit`), the wall clock first (it starts with the process, Linux; elsewhere with the load of BAYSOL, the `startup` being the time before `seedModel`), the `plotting` group, `report write` and `unaccounted`, then `GC:` (the process's total) and the two halves of the wall clock, `fit timing` (everything but the plotting) and `plot timing`; and last **`--- machine ---`** (`machine.os`, cpu and its clock, cores, Julia threads, memory, the load and the free memory when the run started). A number that could not be computed (an E-BFMI of 0/0) has no row. `refChi2` is given to `results` as `refChi2 = "CRYSOL 1.37"`. Residual statistics (lag-1, runs z) are in no output; `bysl fits diagnose --residuals ID` prints them. The fitting-test scripts under `test/fitting_tests/` are deliberately self-contained examples of these calls.
+
+The workbook has a `divergences` sheet (one row for each divergent transition of every attempt: attempt, chain, draw, phase, the four parameters, log density, its distance from the chain median, leapfrog steps, tree depth; header only if none). A run that fails after divergent transitions still writes its workbook with the `run` (`status`, `errorType`, `error`) and `divergences` sheets; a failed write is a `workbookError` row of the run log, and the run's own error is rethrown. `writeStatistics(result)` writes `statistics-<folder name>.LOG`, next to the run log, with the same `=== <run> ===` sections (a rerun replaces its own section, in one rewrite) and the same flat `name`, tab, `value` rows. `results` always writes it, before the run log. It is the **exact statistics of what the run did**, recorded by `Inference` as each phase finished (`Inference.StatBuffer`, `src/inference/statistics.jl`), never replayed or estimated: **one block for each attempt, in order** (`--- attempt 1: base run ---`, the retry with the longer warm-up, each ladder rung with `triggeredBy` the failure class, the `KinkDetected` stop and the sampled-c1 restart, the profiled fallback), each with the settings the attempt used (`targetAccept`, `nChains`, `nSamples`, `nAdapt`, `nDraws`, `rngSeed`, `chainStartRadii`, `c1Mode` profiled or sampled, the MAP search's limits), the MAP search (starts ok and made, modes, evaluations, the MAP in z, and for each optimum its −log π, Laplace log mass and the eigenvalues of the Hessian), a table with a row for each chain (start in posterior standard deviations, pooled and why, mode, divergences in the warm-up and the draws, adapted step size, mean and largest tree depth, leapfrog steps, acceptance, E-BFMI, seconds), R̂ and the bulk and tail ESS of each parameter and of log π, the gate (`rhatMax`, `essMin`, `essTailMin`, `nDivergent`, `divergentShare`, `gate` passed or what failed it), the stage timings of that attempt and a `next` row (what the run did after it and why); the file ends with `--- result ---`: the attempts, which one is kept and why (or `failed`). A value that was not recorded is `unavailable` with its reason, never a zero; a failure of the statistics is a `statisticsError` row and never fails the fit (a failed run still gets its partial statistics, with `failed`). What needs the model again (gradient accuracy, curvature, axis scans, L-BFGS replays, the reference curve's χ²) stays in the dev tool `bysl fits diagnose`. The values are appended to a buffer as they appear and flushed to a scratch file in the system's temporary folder at every phase boundary and whenever the buffer passes `statisticsCap` (0.01 % of the memory budget of the static build, between 64 KiB and 64 MiB), so a run's memory use stays bounded; `results` moves them into the section. A `runModel` call without `results` writes no statistics file (the scratch file is removed at exit).
+
+## Reading the logs (a guide)
+
+A fit leaves two plain-text logs in its output folder: **the run log** `<folder>.LOG` (written by [`writeLog`](@ref BAYSOL.Pipeline.writeLog)) and **the statistics log** `statistics-<folder>.LOG` (written by [`writeStatistics`](@ref BAYSOL.Pipeline.writeStatistics)). `results` writes both, the statistics first and the run log last. This part is a how-to: which file to open, how to read a real one, how to tell whether a fit worked and what to change when it did not. The reference tables of every row, with units and what counts as a bad value, come after it ("Reference: the run log" and "Reference: the statistics log").
+
+### 1. The two files and when to open which
+
+- **The run log is the answer sheet.** One short row for each fact: what was fitted, the fitted parameters, the χ², whether the sampler converged, how long it took. It is small enough to read in a minute and to compare between runs, and it is what the Results table of `test/fitting_tests/README.md` and the dev tools (`bysl results table`, `bysl results compare`) read. Open it first, always.
+- **The statistics log is the flight recorder.** It records what the sampler did, **attempt by attempt** (an attempt is one pass of the sampler: the first run, then, when its checks failed, each repeat with changed settings), chain by chain, with far more numbers than anyone needs for a run that went well. Open it when the run log says a run failed, or passed with a number you do not like (a pinned parameter, a low `essMin`, divergences), because it says which chain, which attempt and which parameter is to blame.
+
+Both files follow the same layout, so what follows holds for both:
+
+- **One file for each folder**, whatever the number of runs in it. The first line is `datetime`, a tab and the stamp of the last write of the file (`19-11-2026 14:49:23 -0500`: day-month-year, 24-hour time, offset from UTC). The stamp belongs to the file, not to a run.
+- Each run has a section headed `=== <run> ===`, after a blank line. The run is named after the workbook: `res_fit3.xlsx` is `fit3`, `res.xlsx` is the folder's own name. A folder with several scripts (`fit1`, `fit2`) therefore has several sections in the same file.
+- **A rerun replaces its own section and nothing else.** The file is read, the section of that name is swapped for the new lines (or added at the end when it is new), the stamp is renewed, and the file is written beside itself and renamed over the old one, so an interrupted write never leaves half a file. The other runs' sections stay exactly as they were.
+- A row is `name`, spaces, one tab, `value`. The name is padded with spaces to a multiple of 8 characters so that the values line up in any viewer, and a line still splits on its tab (trim the padding). Numbers have 6 significant figures; flags are `true`/`false`, or `0`/`1` where the row says so.
+- A **row that is missing means "does not apply"**, not zero (the run log has no `modeShareMax` row for a run with a single posterior mode, no `ebfmi` when it could not be computed). In the statistics log a value that was not recorded is the word `unavailable`, never a zero.
+- Dashed headings divide a section into blocks: `--- timing ---` and `--- machine ---` in the run log; `--- attempt N: <label> ---` and `--- result ---` in the statistics log, whose blocks are in turn divided by `-- <name> --` lines.
+
+### 2. A worked walkthrough: a converged run
+
+This is `test/fitting_tests/SASDMJ9/SASDMJ9.LOG`, read from the top; rows are shown without their padding and some are left out. (This file was written before the `nQChi2` row and the readable `ladderRungs` line existed, so a fresh log has them and this one does not.)
+
+```text
+datetime        19-11-2026 14:49:23 -0500
+=== SASDMJ9 ===
+revision        02a565b-dirty
+julia           1.12.7
+refChi2         CRYSOL 1.37
+structure       protein
+pdb2pqrCache    hit
+```
+
+*Provenance.* `revision` ties the run to a commit, but `-dirty` means tracked files had uncommitted changes, so the run is not exactly reproducible from that commit (look for `-dirty` before you trust a before/after comparison of two logs). `refChi2` is the depositor's χ² and its program; BAYSOL never uses it, it is there to be compared with `chi2` below. `structure protein` says the structure was treated as protein; `pdb2pqrCache hit` says the protonated structure came from the cache, so the `pdb2pqr` timing row is near zero.
+
+```text
+temperatureC 20.0   ph 7.5   sigmaPh 0.1   energyEv 8050.92
+nAtoms 2592   lmax 37   dmax 63.872   nQRaw 2048   nQ 137
+nSamples 1000   nAdapt 300   rngSeed 0
+c1Kink false   ladder base   ladderClass (empty)   ladderAttempts (empty)   ladderRung 0
+```
+
+*Setup.* Check that these are the conditions you meant: the buffer's temperature and pH, the X-ray energy, 2592 atoms, a curve of 2048 measured points that the sampler fitted as 137 binned points, 1000 iterations per chain of which 300 are warm-up (the part where the sampler tunes itself and whose draws are thrown away). `rngSeed 0` means that rerunning gives the same numbers. `c1Kink false`: the excluded-volume factor `c1` was handled as usual (fitted for each draw). `ladder base` with the empty `ladderClass`/`ladderAttempts` and `ladderRung 0` is the best possible entry: **the first attempt passed its checks and nothing was repeated.** (`ladderRungs` is only the menu of repeats that were available; it does not say what ran.)
+
+```text
+rhoE 0.336153   deltaRho1 -1.08707   deltaRho2 1.95645   deltaRho3 -6.12247
+scale 8.11573e-6   bkgrndCorr 0.12526   c1 1.24844
+chi2 0.850869
+zRhoE -0.056   zDeltaRho1 -1.24   zDeltaRho2 4.37   zDeltaRho3 -0.89
+c1Sat 0   cavityFrac 0.0028941
+```
+
+*The fit.* `chi2 0.85` is the reduced χ² of the best (MAP) curve; against `refChi2` 1.37 it is lower (section 5 says what that does and does not mean). The z scores say how far each parameter moved from what the buffer table predicted, in prior standard deviations: `zRhoE` is about 0 (the solvent density is what the buffer says), but `zDeltaRho2` is 4.4, so the data pushed the second hydration-shell contrast far from its prior; that deserves a sentence in a write-up, it is not a failure. `c1Sat 0`: `c1` (1.248) is inside its allowed interval, not pinned at an end. `cavityFrac` is tiny, so the third contrast has almost no influence on the curve.
+
+```text
+divergenceRate 0.0   nDivergent 0   rhatMax 1.00381   essMin 2106.6   essTailMin 2384.56
+ebfmi 0.854734   meanAccept 0.959862   treeDepthAvg 2.90464   treeDepthMax 5
+stepSize 0.460292   stepSizeMin 0.310131   iterations 5600
+chainsPooled 8   chainsRun 8   modes 1   mapStartsOk 70   mapStartsTotal 70   mapModes 3
+```
+
+*Sampler health: the three gates.* These rows decide whether the run counts. `rhatMax` must be below 1.01 (here 1.004: the eight chains agree with each other). `essMin` and `essTailMin` must be above 400 (here 2107 and 2385: the 5600 kept draws are worth thousands of independent ones). The divergent share must be below 0.1 % (here 0). The other rows are context: the acceptance is near the 0.95 target, the trees are shallow (the limit is depth 10), the step size is 0.3 to 0.5 (a value near 0.002 would mean the adaptation collapsed) and `ebfmi` 0.85 is well above the 0.3 warning level. `chainsPooled 8` of `chainsRun 8`: no chain was thrown away. `modes 1` says all chains ended in one posterior mode. `mapModes 3` says the starting-point search found three different optima, but the chains, which started at several distances from the best one, all settled in the same mode, so the others do not matter here; with `modes` above 1 two more rows, `modeShareMax` and `modeShareMin`, appear.
+
+```text
+--- timing ---
+wall clock   12.24   100.0   (7.0)   (0.7)   process start to end
+  startup    4.30    35.1    ...
+  sampling   4.47    36.5    (4.0)   (0.1)
+  plotting   0.89    7.3     ...
+--- machine ---
+machine.os Linux aarch64-linux-gnu   machine.cpu apple-m2   machine.threads 4   machine.loadStart 1.57
+```
+
+*Timing and machine.* JIT is the time Julia spent compiling; in a fresh process it is most of the 12 s (here 7.0 s), so compare timings only between runs started the same way on a quiet machine (`machine.loadStart` is the load when the run began: a value above about 1 for each core spoils a timing).
+
+**What the statistics log of this run shows** (`statistics-SASDMJ9.LOG`). One block, `--- attempt 1: base run ---`, with `triggerClass none` and `rung none` in `settings`. The `-- chains --` table has eight rows, all `pooled yes`, `kept 700`, `div 0`; the chains started 0, 4, 10 and 20 posterior standard deviations from the best optimum (`start σ`), on both sides, and all ended in `mode 1`. `-- gate --` ends with `gate passed`, `-- attempts --` has one row (`1  base run  kept`) and `-- result --` says `keptBecause  it passed its gates`. One thing the run log does not show: `-- residuals --` has `durbinWatson 0.63` and `runsZ -4.84`, meaning the residuals come in long stretches of one sign. The fit passes every gate and its χ² is below 1, yet the model misses a smooth feature of the curve, and only the statistics log says so.
+
+### 3. A worked walkthrough: a failed run
+
+A run that fails its checks after every repeat has no fit rows at all. This is the section of `test/fitting_tests/SASDAP8/SASDAP8.LOG`:
+
+```text
+=== SASDAP8 ===
+status      failed
+errorType   BAYSOL.Inference.NotConvergedError
+error       NotConvergedError: the run did not converge: ladder exhausted:;
+            base: the smallest tail ESS, 304.8, is not above 400.0;
+            longer chains [marginal]: the smallest tail ESS, 304.8, is not above 400.0;
+            longer chains, next seed [marginal]: the worst R̂, 1.023, is not below 1.01;
+            the smallest bulk ESS, 184.8, is not above 400.0; the smallest tail ESS, 47.3, ...
+nSamples    14000   ph 7.6   ...
+```
+
+Read it like this. `status failed` with `NotConvergedError` is the sampler failing its gates, not a crash of the structure or file handling. The `error` row lists **every attempt** in order, each as `<attempt>: <the gates it missed>`: the base run had enough draws for R̂ but its tail ESS was 304.8 (needs more than 400); the repeat `longer chains` classed as `marginal` (a near miss) did not fix it; the last repeat, with a new seed, got worse (R̂ 1.023, bulk ESS 185, tail ESS 47). The word in brackets is the failure class (the sampler's own diagnosis, see the ladder in section 5). The `nSamples` row and the others after it are the settings recorded before the failure. Then open `statistics-SASDAP8.LOG`: it has one block for each of these attempts, with `triggeredBy` giving the reason it started, and the `-- chains --` and `-- bounds --` blocks of the last one show which chain strayed and which parameter sits at a prior bound.
+
+A failure that is not `NotConvergedError` points elsewhere: `test/fitting_tests/SASDC57/SASDC57.LOG` section `fit2` has `errorType BAYSOL.Hydrogenator.Pdb2pqrError` and the message of pdb2pqr itself (a gap in the structure), so the problem is the input structure and no sampler setting will help. `errorType` is always the first thing to read.
+
+### 4. Did my fit work? A checklist
+
+Go through these in order, in the run log. A fit is **trustworthy** only if 1 to 3 pass; 4 to 7 say how to describe it.
+
+1. **There are fit rows** (no `status failed`). If not, see section 3.
+2. **`rhatMax` below 1.01.** R̂ compares the chains with each other; 1.01 or more means they have not settled on the same distribution.
+3. **`essMin` and `essTailMin` above 400** (effective sample sizes: how many independent draws the correlated ones are worth, for the middle of the distribution and for its tails) **and `divergenceRate` below 0.001** (0.1 %; a divergent transition is a step where the sampler's numerical integration blew up, a sign of a sharp feature it cannot follow). A run that misses any of the three is repeated by the ladder and, if it still misses, fails: so a **logged fit that is present has passed all three**; the numbers still tell you how comfortably.
+4. **`c1Sat`.** 0 is normal. `+1` or `-1` means the best `c1` sits at the end of its allowed interval (0.8 to 1.3, a deliberate hard bound): the data want a larger or smaller excluded-volume correction than the model allows. That is a finding, not an error, and it is not to be softened; check the structure (missing parts, wrong oligomer, ligands), the buffer and the q range.
+5. **`c1Kink`.** `false` is normal. `true` means that the profile of `c1` had a kink (two competing solutions of `c1` for the same other parameters), so `c1` was sampled as a fifth parameter instead; the fit is valid. If `c1KinkFallback true` appears, the sampled-c1 run missed its gates and the plain run without the kink watch was kept instead (`c1KinkProblems` says what the first missed).
+6. **`ladder`.** `base` is the ideal. A rung name (`delta 70`, `longer chains`) means the first attempt failed and that repeat passed: the result is valid, but check `ladderAttempts` for what was wrong at first and expect a slower run. Settings you gave yourself are never overridden by a rung when you set them (`CHAIN_START_RADII`, `RETRY_N_ADAPT`, `RETRY_N_DRAWS`).
+7. **`modes`, `mapModes`, `zDeltaRho*`, `cavityFrac`.** A `modes` above 1 means the posterior has several separate peaks; read `modeShareMax`/`modeShareMin` for how much mass the main one has, and report the fit as multimodal. A z score beyond about 3 means that parameter was pulled far from its buffer prediction; a `cavityFrac` near 0 means `deltaRho3` is unconstrained by the data.
+
+**When a run fails, which setting to try.** Match the failure text to a class (the ladder tries these itself, in this order, and stops after three repeats; do it by hand when you want a different outcome). Keywords are those of `runModel` (and the names in `settings.json`; see "The settings as keywords"):
+
+| What the log says | Likely cause | Try |
+|---|---|---|
+| tail ESS or bulk ESS just under 400, R̂ under 1.05 (`[marginal]`) | too few draws | more draws: `nSamples`, `nAdapt` (positional arguments), `retryNAdapt`, `retryNDraws`; or another `rngSeed` |
+| R̂ large and `stepSize` around 0.002, or deep trees (`stepCollapse`) | step-size adaptation collapsed | a lower target acceptance, `δ = 70` then `35` |
+| R̂ 1.05 or more and a `modes` row or chains with different `mode` in the statistics log (`splitChains`) | chains started far apart in a multimodal posterior | closer starts, `chainStartRadii = (2, 4, 6)`, then `(1, 2, 3)` with `retryNAdapt = retryNDraws = 4000` |
+| divergent share 0.1 % or more with R̂ under 1.05 (`divergent`) | the sampler steps too boldly | a higher target acceptance, `δ = 99` (the ladder then also shortens the starts and lengthens the run) |
+| divergences remain after `δ = 99` at 1 % or more (`structural`) | a kinked or sharp `c1` profile | sample `c1` (the last rung does it); check that the fitted q range (`qMin`, `qMax`) contains no point the model cannot fit |
+| anything else (`generic`) | not diagnosed | longer chains and a new seed |
+| `Pdb2pqrError`, an error before sampling | the input structure | fix the structure (gaps, odd residues); no sampler setting helps |
+
+`retry = false` turns the whole ladder off (the first failure is final) and `ladder = ...` replaces its rungs (see the inference README, "The retry ladder").
+
+### 5. Comparing `chi2` with the depositor's `refChi2`
+
+`chi2` is the **reduced χ²**: the sum over the measured points of ((measured − model) / σ)², divided by the degrees of freedom `nQChi2 − 3` (`nQChi2` points, minus the scale, the background and `c1`, which are fitted for each draw). The sum runs over the raw measured points inside the range that was actually fitted, `q[1] ≤ q ≤ q[end]` of the fitted grid, and `nQChi2` is how many that is: a raw point below the first or above the last fitted bin is not scored. It is not `nQRaw` (all the points in the file) and not `nQ` (the points after binning, which is what the sampler fitted).
+
+To compare with `refChi2` honestly:
+
+- A reduced χ² near 1 means the model matches the data to within the stated errors; well above 1 means a misfit (or underestimated errors), well below 1 means overestimated errors or overfitting. A smaller number than the depositor's is **not** by itself "better".
+- Compare like with like: the depositor's number comes from the program named in `refChi2` (CRYSOL, FoXS, ...), on **their** q range and number of points, which may differ from `nQChi2` (for example SASDWT5 and SASDMU4, noted in `test/fitting_tests/README.md`); and it is a point fit with its own free parameters, whereas BAYSOL reports the MAP of a posterior with an additional `c1`.
+- Compare the **distribution**, not one fit, across entries: the Results table of `test/fitting_tests/README.md` (regenerated by `bysl results table --update`) puts `chi2`, `refChi2` and the gate rows side by side for every entry.
+
+### 6. Finding things
+
+From the shell (`LOG` rows are tab-separated, so `cut` and `awk -F'\t'` work; trim the padding):
+
+```bash
+grep -H "^chi2\|^rhatMax\|^essMin\|^ladder " test/fitting_tests/*/*.LOG | grep -v statistics     # the numbers of every entry
+grep -L "^chi2" test/fitting_tests/*/*.LOG                          # files with a failed run (no fit rows)
+grep -H "^status" test/fitting_tests/*/*.LOG                         # which sections failed
+grep -H "^c1Sat\s*.*[1-9]\|^c1Kink\s*.*true" test/fitting_tests/*/*.LOG   # entries at a c1 bound, entries with a kink
+awk '/^=== fit2 ===/{p=1;next} /^===/{p=0} p' SASDxxx.LOG            # one section of a file
+grep -n "^--- attempt\|^gate" test/fitting_tests/SASDAP8/statistics-SASDAP8.LOG    # the attempts and their gate verdicts
+```
+
+(`grep -L "^chi2"` also lists a file whose other sections passed; open it to see which section failed.) The dev tools read the same files and never run a fit:
+
+- `bysl results table` (`--update` to regenerate the Results table, `--check` to see that it is current) and `bysl results compare REV ...` (the working tree against git revisions or tags: `bysl results compare v0.4.0`) compare the run logs of different commits.
+- `bysl fits diagnose --report ID[:tag]` prints the MAP search, step size, tree depth and modes; `--chains` every chain (start, mode, divergences, steps, acceptance); `--residuals` the residuals at the MAP. These **rerun the sampler** on the entry to build what the statistics log does not record (gradient accuracy, curvature, axis scans); the statistics log itself needs no rerun.
+- In Julia, `BAYSOL.Inference.statParse` reads a statistics log back into data (`Inference.STAT_SECTIONS` lists the names and columns).
+
+## Reference: the run log
+
+Every row of a run section, in file order. *Unit* is empty for a pure number. *Bad value* says when to worry; "none" means a descriptive row. A row appears only when it applies.
+
+### Provenance, structure, caches
+
+| Row | Meaning | Unit | Bad value |
+|---|---|---|---|
+| `revision` | short git revision of the BAYSOL source; `-dirty` if tracked files had uncommitted changes, `unknown` outside a checkout | | `-dirty` (not reproducible from the commit alone) |
+| `julia` | Julia version | | none |
+| `baysol` | `v<version>-<release name>` of `Project.toml` | | none |
+| `refChi2` | the reference χ² given to `results`, as text with its method (`CRYSOL 1.37`); never used by the fit | | none |
+| `structure` | what the component table made of the input: `protein`, `nucleic` (DNA or RNA alone), `mixed` | | none |
+| `pdb2pqrCache` | `hit`: the protonated structure came from `_cache/`; `miss`: pdb2pqr ran | | none (a miss costs time) |
+| `componentDownloads` | residue names that needed a download of a component file | files | above 0 on a machine without network |
+
+### Setup: conditions, choices, sizes, settings
+
+| Row | Meaning | Unit | Bad value |
+|---|---|---|---|
+| `temperatureC`, `ph`, `sigmaPh`, `energyEv` | what `seedModel` was given: temperature, buffer pH and its uncertainty, X-ray energy | °C, –, –, eV | none |
+| `qMin`, `qMax` | the fitted range was cropped to these (only when set) | Å⁻¹ | none |
+| `sigmaScale` | factor the measured errors were multiplied by (only when not 1) | | far from 1 changes `chi2` by its square |
+| `excludeQ` | excluded q intervals, `lo-hi; lo-hi` | Å⁻¹ | none |
+| `nQInput`, `nQCropped`, `nQExcluded` | points given, left out by `qMin`/`qMax`, left out by `excludeQ` | points | none |
+| `structureModel`, `structureChains` | the model number of a multi-model file, the chains kept (only when set) | | none |
+| `addHydrogens` | `0`: the pipeline added no hydrogens | | none |
+| `lmaxPinned` | `1`: `lmax` was set by hand, not from `q` | | none |
+| `memoryHeadroom` | percent of the memory kept free in the scattering build | % | none |
+| `forwardBlocks`, `forwardBlockQ` | the scattering build was cut into this many blocks of this many q values (1 block: all at once) | blocks, points | none |
+| `forwardBudgetGib`, `forwardEstGib`, `forwardPeakGib` | memory budget, estimated size of one block, peak size after the build | GiB | peak above budget |
+| `override<Setting>` | a setting this model got differently from its project (`model-settings.json`) | | none |
+| `nAtoms` | atoms of the hydrogenated structure | atoms | none |
+| `lmax` | highest spherical-harmonic degree of the scattering model | | none |
+| `dmax` | diameter of the cloud of atoms and hydration-shell beads; fixes the Shannon binning | Å | none |
+| `nQRaw` | measured points as read | points | none |
+| `nQChi2` | raw points that `chi2` is summed over (inside the fitted range); `chi2` has `nQChi2 - 3` degrees of freedom | points | far below `nQRaw` (much of the curve not scored) |
+| `nQ` | points fitted after Shannon binning | points | very few (under about 20) |
+| `nSamples`, `nAdapt` | NUTS iterations of each chain, warm-up included; the warm-up part | iterations | `nAdapt` near `nSamples` leaves few draws |
+| `rngSeed` | seed; the same seed reproduces the run | | none |
+| `pmvFallbackUncert` | uncertainty given to a buffer solute whose table row states none | cm³ mol⁻¹ | none |
+| `c1Kink` | `true`: `c1` had a kink and was sampled as a fifth parameter; `false`: profiled | | none (informational) |
+| `c1KinkFallback`, `c1KinkProblems`, `c1KinkFallbackFailed` | after a kink: the plain profiled run was kept; the gates the sampled-c1 run missed; the gates the fallback missed too | | `c1KinkFallbackFailed` present |
+
+### The retry ladder
+
+| Row | Meaning | Unit | Bad value |
+|---|---|---|---|
+| `ladder` | `base`: the first run passed; a rung name (or its overrides as `KEY=value`): the repeat that passed; `failed`: all failed | | anything but `base` (read `ladderAttempts`) |
+| `ladderClass` | failure class of each repeat that was made, in order, ` | `-separated; empty for `base` | | non-empty |
+| `ladderAttempts` | for each failed attempt `<label>: <gates missed>`, ` | `-separated | | non-empty |
+| `ladderRungs` | the menu: per class its rung names, classes separated by ` | ` (`stepCollapse: delta 70, delta 35 | ...`); what ran is in the three rows above | | none |
+| `ladderRung` | number of repeats it took: 0 base, 1 first repeat, ..., -1 none passed | | above 0 |
+
+### The fit (the MAP: the best draw by log density)
+
+| Row | Meaning | Unit | Bad value |
+|---|---|---|---|
+| `rhoE` | solvent electron density the model used | in the units of the prior | none |
+| `deltaRho1`, `deltaRho2`, `deltaRho3` | the three hydration-shell contrasts | in the units of the priors (`DRO_UNIT` = 0.03 converts to e⁻/Å³) | at a prior bound (see `bounds` in the statistics log) |
+| `scale`, `bkgrndCorr` | overall intensity scale and constant background correction, solved by weighted least squares for each draw | intensity units | none |
+| `c1` | excluded-volume correction factor, hard-bounded to 0.8 to 1.3 | | at a bound (`c1Sat`) |
+| `chi2` | reduced χ² of the MAP curve on the `nQChi2` raw points, `Σ((I − model)/σ)² / (nQChi2 − 3)` | | far above 1 (misfit) or far below 1 (errors too large) |
+| `zRhoE`, `zDeltaRho1`, `zDeltaRho2`, `zDeltaRho3` | distance of the MAP from the prior mean, in prior standard deviations | σ | beyond about 3: the data overrode the buffer prediction |
+| `c1Sat` | 0 inside the bounds, +1 on the upper bound, −1 on the lower | | not 0 |
+| `cavityFrac` | share of the hydration-shell volume carried by cavity beads | | near 0: `deltaRho3` has no likelihood |
+
+### The sampler's health
+
+| Row | Meaning | Unit | Bad value |
+|---|---|---|---|
+| `divergenceRate` | share of the pooled post-warm-up transitions that diverged | fraction | 0.001 or more fails the run |
+| `nDivergent` | divergent transitions among the kept draws | draws | share 0.1 % or more |
+| `rhatMax` | worst split R̂ (rank-normalised) over the four parameters and the log density | | 1.01 or more fails |
+| `essMin`, `essTailMin` | smallest bulk and tail effective sample size over the same five | draws | 400 or below, or not computable, fails |
+| `ebfmi` | energy-based fraction of missing information of the worst chain | | below about 0.3 |
+| `meanAccept` | mean acceptance rate; target is `TARGET_ACCEPT`/100 | | far from the target |
+| `treeDepthAvg`, `treeDepthMax` | NUTS tree depth of the pooled draws | levels | max at 10 (the limit) |
+| `meanNSteps` | leapfrog steps for one iteration | steps | near 1000 (depth 10) |
+| `stepSize`, `stepSizeMin` | median and minimum adapted step size of the pooled chains | | about 0.002 (collapsed) |
+| `iterations` | post-warm-up transitions of the pooled chains | draws | none |
+| `leapfrog` | leapfrog steps of the whole NUTS stage, warm-up and discarded chains included | steps | none |
+| `msStep` | milliseconds per leapfrog step | ms | none (the cost of the model) |
+| `chainsPooled`, `chainsRun` | chains whose draws were kept, of those run (chains started at optima included) | chains | fewer pooled than run |
+| `mapStartsOk`, `mapStartsTotal` | L-BFGS starts that reached a finite optimum, of those made | starts | `Ok` well below `Total` |
+| `mapModes` | distinct optima the starting-point search found | optima | none (see `modes`) |
+| `modes` | posterior modes the chains settled in (1 when single) | modes | above 1: multimodal posterior |
+| `modeShareMax`, `modeShareMin` | largest and smallest share of the posterior mass among the modes (rows with `modes`) | fraction | `Max` far below 1 |
+| `optima` | local optima that carry mass (row when above 1 or when extra chains were started) | optima | none |
+| `rewhitenedNats` | log-density gain when the chains found a better basin than the MAP search | nats | above 0 (the MAP search missed the best basin) |
+| `retryFirstRhat`, `retryKept` | first run's R̂ when it was repeated; 1 if the repeat's draws were kept | | R̂ ≥ 1.01 |
+
+### The timing block
+
+Written for a person to read, not to parse. Columns: `stage`, `seconds`, `% wall`, `(JIT)` (seconds spent compiling), `(GC)` (seconds of garbage collection) and `notes` (what the stage's name carried: NUTS iterations, leapfrog steps and ms/step, the MAP search's starts, `cache hit`). Rows are indented two spaces for each level. `wall clock` runs from the start of the process (Linux; elsewhere from the load of BAYSOL) to the end; `startup` is the part before `seedModel`; `static build` and `sampling` group the stages of `seedModel` and `runModel`; `plotting` the figures and the statistics write; `report write` the building of this log's text; `unaccounted` what no stage covers (mostly the first call's compilation). Then `GC:` (the process's total), `fit timing` (everything but the plotting) and `plot timing`. The final write of the file is in no row. A time below 0.01 s is in scientific notation, exactly 0 is `0`. A bad value is a big `unaccounted` share on a warm run, or a `(JIT)` share that differs from the run you compare with.
+
+### The machine block
+
+| Row | Meaning | Unit | Bad value |
+|---|---|---|---|
+| `machine.os`, `machine.cpu` | system and processor | | none |
+| `machine.cpu_mhz` | clock the system reported (with frequency scaling it can be the idle clock) | MHz | none |
+| `machine.cpus`, `machine.threads` | hardware threads, Julia threads | threads | `threads` 1 on a many-core machine |
+| `machine.memory_gib`, `machine.free_gib_start` | total memory, free memory when the run started | GiB | little free memory |
+| `machine.loadStart` | load average when the run started | | above about 1 per core spoils a timing |
+
+### A failed run
+
+| Row | Meaning |
+|---|---|
+| `revision`, `julia`, `baysol` | as above |
+| `status` | `failed`; there are no fit rows |
+| `errorType` | the Julia exception type (`NotConvergedError` for missed gates after every repeat) |
+| `error` | the message on one line, line breaks as ` | `, cut at 1000 characters; for `NotConvergedError` every attempt and the gates it missed |
+| further rows | the scalar facts recorded before the failure (`ph`, `nSamples`, ...) |
+| `workbook` / `workbookError` | the path of the workbook of divergent transitions, written when some had diverged / why it could not be written |
+
+The timing and machine blocks follow as far as the run went; the run's statistics section is written too, with `failed` in its `result` block.
+
+## Reference: the statistics log
+
+The section of a run is a `--- attempt N: <label> ---` block for each attempt in order, then `--- result ---`. Attempts: the base run is 1; then the repeat with the longer warm-up, each ladder rung that ran (`ladder rung <name>`), the stop of the kink watch and the sampled-c1 restart, and the profiled fallback. Everything was recorded by the sampler as it happened; nothing is replayed or estimated (where `bysl fits diagnose` replays the model on a grid the log gives the same lines from the run's own draws, as proxies: see "Run statistics" of the inference README). A block is **scalars** (`name`, tab, `value` rows), a **table** (a tab-separated header, then one row for each item, ending at a blank line) or **text** (lines as `bysl fits diagnose` prints them). A recorder that fails writes a `statistics error` block (`statisticsError: <message>`) and never fails the fit. The divergent draws one by one are in the workbook's `divergences` sheet, not here. `Inference.STAT_SECTIONS` lists the names and columns.
+
+*Whitened coordinates `w`* below are the sampled parameters rescaled by the MAP search's curvature, so that a Gaussian posterior has standard deviation 1 on every axis. "Nats" are units of log probability. *Bad* is when to look closer.
+
+| Block (kind) | Row or column | Meaning | Unit | Bad value |
+|---|---|---|---|---|
+| `settings` (scalars) | `triggeredBy` | why this attempt started, as the gates the previous one missed (not on attempt 1) | | none |
+| | `triggerClass`, `rung` | failure class and ladder rung that produced this attempt; `none` for the base run | | none |
+| | `targetAccept` | dual-averaging target acceptance | % | none |
+| | `nChains`, `nSamples`, `nAdapt`, `nDraws` | chains; iterations per chain; warm-up; kept draws, `nSamples − nAdapt` | | none |
+| | `rngSeed` | seed of the attempt | | none |
+| | `chainStartRadii` | start distance of the chains from the MAP, in posterior standard deviations, cycled over the chains | σ | none |
+| | `c1Mode` | `profiled` or `sampled (fifth parameter)` | | none |
+| | `kinkWatch` | whether the kink check ran | | none |
+| | `mapNStarts`, `mapMaxIter` | starts of the MAP search; L-BFGS iteration limit | | none |
+| `problem` (text) | header lines | the attempt's label, `nQ`, `nAtoms`, `lMax`, the tolerance of the `c1` solve, and the supports of the contrasts (`δρ₃ support`, `δρ₁,₂ support`) | | none |
+| `map search` (text) | summary line | seconds; `nOk=<starts that reached an optimum>/<starts>`; `nModes` distinct optima; `whitened` (the sampler was whitened at the best one) | s | `nOk` well below the starts |
+| | start lines | per L-BFGS start: `f` (minus log probability at the end; lowest is best), `iters`, `g_conv`/`iter_limit` (which stopping rule fired), `evals`, `|∇f|∞` (final gradient) or `infeasible` | | `iter_limit=true` on many starts |
+| | Hessian line | eigenvalues of the curvature at the best optimum (floored at the constant named); a very small and a very large one = a parameter the data do not pin and one they pin hard | | none |
+| | `distinct optima` | for each optimum its `f`, its position `ξ` (ρₑ, δρ₁, δρ₂, δρ₃), `H-eig` and its `log Laplace mass` with the difference from the best in nats | nats | several optima within a few nats of each other |
+| `map search again` (text) | as `map search` | the same after a re-whitening, headed by its reason (numbered if repeated) | | none |
+| `nuts` (text) | `NUTS:` line | seconds of the slowest chain; initial and final step size `ε`; mean leapfrog steps and tree depth; `frac(depth≥10)` share of trees at the limit; `diverged` count | s | `frac(depth≥10)` above 0 |
+| | `mean nSteps by window` | mean leapfrog steps in the warm-up windows and the sampling | steps | not settling after the warm-up |
+| | `mean accept`, `mean \|ΔH\|` | mean acceptance (should be near `targetAccept`/100); mean absolute energy error | | acceptance far from the target |
+| `chains` (table, a row per chain) | `chain` | chain number | | none |
+| | `start σ` | start of the chain, in posterior standard deviations from the MAP | σ | none |
+| | `mode` | the posterior mode it settled in | | chains in different modes |
+| | `pooled`, `kept` | `yes` when its draws are kept; post-warm-up draws kept | draws | `no` |
+| | `div`, `div%` | divergent transitions after warm-up and their percentage of `kept` | draws, % | above 0.1 % |
+| | `warm-up div`, `warm-up div%` | the same during warm-up (not counted by the gate) | draws, % | very high (a hard start) |
+| | `ε`, `steps`, `accept` | mean step size, leapfrog steps and acceptance over the kept draws | | `ε` far below the other chains' |
+| | `mean log π` | mean log posterior density of the chain | | well below the other chains' (stuck in a worse basin) |
+| | `energy error sd`, `depth≥10`, `BFMI` | spread of the energy error; share of trees at the depth limit; E-BFMI of the chain | | `BFMI` below 0.3 |
+| | `c1 at bound` | share of draws whose `c1` is within 10⁻⁶ of a bound | fraction | above 0 |
+| | `gradient evals`, `non-finite` | gradient evaluations of the chain; those that were not finite | evals | many non-finite |
+| | `note` | `not pooled: <reason>` or `chain stopped: <reason>` | | any note |
+| `chain totals` (scalars) | `chainsRun`, `chainsPooled`, `pooledDraws` | chains run, pooled, draws in the pooled sample | | pooled < run |
+| | `divergentDraws`, `warmupDivergentDraws` | divergences among the pooled draws (the gate's numerator); over the warm-up | draws | share 0.1 % or more |
+| `kink check` (table, a row per chain; only when the watch ran) | `checks`, `drawsExamined`, `drawsTwoBasins`, `firedAtDraw` | checks made; draws the last one examined; how many had two `c1` basins; draw count at which the watch stopped the run (`none`) | draws | `firedAtDraw` not `none` (the run stopped and restarted with `c1` sampled) |
+| `posterior` (text) | `post-warmup w: sd` | standard deviation of the draws on each whitened axis (1: the Laplace approximation is right) | | far above 1 (heavy tail or another mode) |
+| | `cov(w) eigenvalues`, `skew`, `ESS` | eigenvalues of the covariance of `w` (all near 1 for a round posterior); skewness; effective sample size per axis | | eigenvalue far from 1; `\|skew\|` above 1 |
+| | `ℓπ at L-BFGS mode` / `best draw` / `median draw` | log density at the mode and at the best and median draw (for a 4-D Gaussian the median is about 1.7 below the mode) | nats | a median much further down |
+| | `sampled sd in z / Laplace σ_z` | sampled spread over the Laplace approximation's, per axis | | far from 1 |
+| `bounds` (table, a row per sampled coordinate) | `coordinate` | `slvntEDns` (ρₑ), `deltaRho1..3`, `c1` when sampled | | none |
+| | `median`, `sd` | of the draws | units of the coordinate | none |
+| | `distanceSd` | distance of the median from the nearer end of the prior's range, in `sd` | σ | below about 2 |
+| | `shareNearBound` | share of the draws within 0.1 `sd` of that end | fraction | above 0.05: pinned at a prior bound |
+| `axes` (text) | ratio lines `w1`..`w4` | for each distance `s` along an axis (listed in the heading), the excess of minus log π over `s²/2`, divided by `s²/2` (1 = Gaussian); `unavailable` where fewer than 5 draws lie in that bin | | far from 1 |
+| | `wN scan` lines | median and largest second derivative `f''` of the binned excess and where the largest sits; range of the re-profiled `c1` along the axis; `jumps` (neighbouring draws whose `c1` differ by more than 0.05); `c1-tol noise` is always `unavailable` | | `jumps` above 0 |
+| | `local λ_max` | largest curvature seen between consecutive draws (a lower bound of the true one), the stable step size it implies (an upper bound), and the adapted `ε` | | adapted `ε` above the stable one |
+| `correlation` (table) | one column per parameter | correlation of the sampled parameters over the pooled draws | | magnitude near 1 |
+| `residuals` (scalars) | `residualSource`, `residualCount` | the best sampled draw (with its log π) whose residuals are tested; their number | | none |
+| | `durbinWatson` | 2 for uncorrelated residuals, near 0 for a smooth systematic misfit | | below about 1 |
+| | `runsCount`, `runsExpected`, `runsZ`, `runsP` | runs of equal sign observed; expected for independent residuals; their z score and two-sided p | | `runsZ` below about −3 (long stretches of one sign) |
+| `convergence` (table, a row per parameter and `logDensity`) | `rhat`, `essBulk`, `essTail` | split R̂; bulk and tail effective sample sizes | , draws | 1.01 or more; 400 or below |
+| | `sd`, `mcse` | standard deviation of the draws; Monte Carlo standard error of the mean, `sd/√essBulk` | units of the coordinate | `mcse` not small against `sd` |
+| `gate` (scalars) | `rhatMax`, `essMin`, `essTailMin`, `nDivergent`, `divergentShare` | the three gate numbers | | as in the run log |
+| | `gate` | `passed`, or `failed: <the gates missed>` | | `failed` |
+| `modes` (scalars) | `modes` | posterior modes the chains settled in | | above 1 |
+| | `modeWeights`, `modeLogMass`, `modeLogMassErr` | posterior mass share of each mode; its log mass and the error of the log mass (bridge sampling) | fraction, nats | large `modeLogMassErr` |
+| | `weightsUncertain` | whether the bridge estimate is itself uncertain | | `true` |
+| | `rewhitenedNats` | log-density gain when the chains found a better basin than the MAP search | nats | above 0 |
+| `health` (scalars) | `stepSizeInitial`, `stepSizeReached` | mean step size at the start of the adaptation and at the end | | `Reached` about 0.002 |
+| | `leapfrogTotal`, `leapfrogSampling` | leapfrog steps of all chains with warm-up; of the post-warm-up draws only | steps | none |
+| | `leapfrogPerEss` | `leapfrogTotal / essMin`: the cost of one effective sample at the worst parameter | steps | hundreds or more |
+| | `gradientEvals`, `nonFiniteEvals` | gradient evaluations of all chains; those that were not finite and were rejected | evals | many non-finite |
+| | `curvatureSamples` | pairs of draws behind the `local λ_max` line | | none |
+| | `c1AtLowerBound`, `c1AtUpperBound` | share of re-profiled `c1` within 10⁻⁶ of the bound | fraction | above 0 |
+| `c1 search` (scalars) | `c1Solves`, `c1BrentIterations`, `c1BrentPerSolve` | solves of the one-dimensional `c1` problem; their Brent iterations; the mean | | `c1BrentPerSolve` much above 10 |
+| | `c1ScanAtEdge` | solves whose coarse scan ended at an edge of the interval | solves | a large share of `c1Solves` |
+| | `c1WlsErrors` | weighted least-squares failures inside the solves | | above 0 |
+| `stage timings` (table) | `stage`, `seconds`, `jit`, `gc`, `notes` | the stages this attempt added to the timing block | s | none |
+| `outcome` (scalars; only when something stopped or followed) | `stopped`, `next` | why the attempt ended early; what the run did after it and why | | none |
+| `statistics error` (text) | `statisticsError: ...` | a recorder that failed (the fit is unaffected) | | any |
+| `attempts` (table, end of the run) | `attempt`, `label`, `outcome` | each attempt and whether it was kept | | more than one row |
+| `result` (scalars) | `attempts`, `keptAttempt`, `keptLabel`, `keptBecause` | how many attempts; which one is the result and why | | `attempts` above 1 |
+| | `failed` | the failure text (a failed run only) | | present |
+| | `statisticsFlushes`, `statisticsFlushSeconds` | flushes of the recorder to its scratch file and their time (the recorder's own bookkeeping) | count, s | none |
 
 ## The settings as keywords
 
-**Every setting is a keyword.** The settings of `settings.json` are not the only way to give a value: each one is a keyword of `seedModel`, `runModel`, `results` or (in the terminal interface) `runProject`, named after the setting in lower case (`MAP_N_STARTS` is `mapNStarts`; the older keywords keep their names: `thickness` for `SHELL_THICKNESS`, `probe`, `sigma` for `VAL_SIGMA`, `δ` for `TARGET_ACCEPT`, `nAdapt` and `nSamples = N_ADAPT + N_DRAWS`, `tex`, `compile` and `formats` for the `FIGURES_*`), with the `params.jl` constant as its default, so a library user passes what the interface would have saved. `seedModel` takes the geometry, hydration-shell, prior and c1 settings, the data and structure settings (below) and (`thickness`, `probe`, `κ_δρ₁₂`, `κ_δρ₃`, `pmvFallbackUncert`, `bounds_δρ₁₂`, `mode_δρ₁₂`, `φ_max`, `exclVolCorrBounds`, `exclVolCorrEps`, `shellAreaPerPoint`, `shellMinPoints`, `shellSample`, `sasaNOcc`, `beadRayRange`, `beadRayDirs`), `runModel` the sampler (`sigma`, `δ`, `rngSeed`, `nChains`, `retryNAdapt`, `retryNDraws`, `chainStartRadii`, `optimumChainCap`, `optimumMinChains`, `optimumChainRadius`, `optimumChainFraction`, `mapMaxIter`, `mapNStarts`, `mapFSuccessive`, `mapOptimaKept`, `mapJitterRadii`, `mapJitterDirections`, `mapJitterMaxOptima`, `mapJitterWithinNats`, `basinRestartNats`, `harvestCover`, `harvestDivergent`) and `results` the table precision `tableSigfigs`, `tex`, `compile`, `formats`, `plotTuiSizes` (with the folder `tuiDir` to write the sizes into) and the `style` (a `PlotStyle`, the plot look). The keywords that are new (everything of the sampler and the model that had none) are checked **as `loadSettings` checks the setting of the same name**: the type, the limits and the rules between settings (`MODE_δρ₁₂` strictly inside `BOUNDS_δρ₁₂`, `EXCL_VOL_CORR_EPS` within the width of `EXCL_VOL_CORR_BOUNDS`, `SASA_N_OCC` at most `SHELL_SAMPLE`, positive radii), and a bad value throws the same `InvalidSettingsError`, with the line `SETTING = value: what is wrong` that the file would give (its closing sentence says that the values were keywords). The older keywords keep their own errors. The constants of `params.jl` stay the single definition: the keyword's default is the constant, and nothing is a mutable global.
+**Every setting is a keyword.** The settings of `settings.json` are not the only way to give a value: each one is a keyword of `seedModel`, `runModel`, `results` or (in the terminal interface) `runProject`, named after the setting in lower case (`MAP_N_STARTS` is `mapNStarts`; the older keywords keep their names: `thickness` for `SHELL_THICKNESS`, `probe`, `sigma` for `VAL_SIGMA`, `δ` for `TARGET_ACCEPT`, `nAdapt` and `nSamples = N_ADAPT + N_DRAWS`, `tex`, `compile` and `formats` for the `FIGURES_*`), with the `params.jl` constant as its default, so a library user passes what the interface would have saved. `seedModel` takes the geometry, hydration-shell, prior and c1 settings, the data and structure settings (below) and (`thickness`, `probe`, `κ_δρ₁₂`, `κ_δρ₃`, `pmvFallbackUncert`, `bounds_δρ₁₂`, `mode_δρ₁₂`, `φ_max`, `exclVolCorrBounds`, `exclVolCorrEps`, `shellAreaPerPoint`, `shellMinPoints`, `shellSample`, `sasaNOcc`, `beadRayRange`, `beadRayDirs`), `runModel` the sampler (`sigma`, `δ`, `rngSeed`, `nChains`, `retryNAdapt`, `retryNDraws`, `chainStartRadii`, `optimumChainCap`, `optimumMinChains`, `optimumChainRadius`, `optimumChainFraction`, `mapMaxIter`, `mapNStarts`, `mapFSuccessive`, `mapOptimaKept`, `mapJitterRadii`, `mapJitterDirections`, `mapJitterMaxOptima`, `mapJitterWithinNats`, `basinRestartNats`, `harvestCover`, `harvestDivergent`, `ladder`: the retry ladder, a list of rungs `{name?, overrides}` that replaces the default `LADDER`, an empty list or `false` for none, also as JSON text or the path of a JSON file; see the inference README) and `results` the table precision `tableSigfigs`, `tex`, `compile`, `formats`, `plotTuiSizes` (with the folder `tuiDir` to write the sizes into) and the `style` (a `PlotStyle`, the plot look). The keywords that are new (everything of the sampler and the model that had none) are checked **as `loadSettings` checks the setting of the same name**: the type, the limits and the rules between settings (`MODE_δρ₁₂` strictly inside `BOUNDS_δρ₁₂`, `EXCL_VOL_CORR_EPS` within the width of `EXCL_VOL_CORR_BOUNDS`, `SASA_N_OCC` at most `SHELL_SAMPLE`, positive radii), and a bad value throws the same `InvalidSettingsError`, with the line `SETTING = value: what is wrong` that the file would give (its closing sentence says that the values were keywords). The older keywords keep their own errors. The constants of `params.jl` stay the single definition: the keyword's default is the constant, and nothing is a mutable global.
 
 Three helpers turn a settings `Dict` (every setting by name, what the interface's `loadSettings` returns, or `Dict(n => default ...)`) into the keywords, to splat: `BAYSOL.seedKeywords(settings)` for `seedModel(...; seedKeywords(settings)...)` (24 keywords), `BAYSOL.runKeywords(settings)` for `runModel(seed, args...; runKeywords(settings)...)` (22) and `BAYSOL.resultsKeywords(settings)` for `results(...; resultsKeywords(settings)...)` (`tableSigfigs`, `tex`, `compile`, `formats`, `plotDir`, `latexCompiler` and the `style` of the `PLOT_*` settings). `nSamples` and `nAdapt` of `runModel` are positional, so `BAYSOL.runArguments(settings)` gives `(nSamples, nAdapt)` for `runModel(seed, runArguments(settings)...; runKeywords(settings)...)`. The table behind them is `SETTING_KEYWORDS` (setting, keyword, entry point); a test checks that every setting of the catalog is in it and that its keyword exists.
 

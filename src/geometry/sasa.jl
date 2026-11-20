@@ -317,7 +317,7 @@ function _sasaBlock(
         y = crds[2, i]
         z = crds[3, i]
         ρ = rads[i] + probe
-        full = 4 * π * ρ^2
+        full = FOUR_PI * ρ^2
         perPt = full / nPts   # every direction stands for this much
 
         empty!(candidates)

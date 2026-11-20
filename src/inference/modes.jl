@@ -163,7 +163,7 @@ function _bridgeHalf(wa::AbstractMatrix{Float64}, wb::AbstractMatrix{Float64},
     L = Matrix(F.L)
     linv = Matrix(inv(LowerTriangular(L)))
     # log of the Gaussian's normalization
-    c0 = sum(log, diag(L)) + d / 2 * log(2π)
+    c0 = sum(log, diag(L)) + d / 2 * LOG_TWO_PI
     n2 = n1
     q = Vector{Float64}(undef, max(n1, n2))
     t = similar(q)
@@ -382,4 +382,237 @@ function evenIndices(total::Int, n::Int)::Vector{Int}
     n ≤ 0 && return Int[]
     n ≥ total && return collect(1:total)
     return [clamp(round(Int, (i - 0.5) * total / n), 1, total) for i in 1:n]
+end
+
+# ---------------------------------------------------------------------------
+#   Chain diagnostics: what a run reports, the convergence gates, why a run fails
+# ---------------------------------------------------------------------------
+
+"""
+Convergence statistics of the pooled chains' post-warm-up draws, from MCMCDiagnosticTools.jl
+(Vehtari et al., 2021): the rank-normalized split R̂ (`rhat(kind = :rank)`: the larger of
+the value on the rank-normalized draws, which asks whether the chains agree in location, and
+on the rank-normalized draws folded around the median, which asks whether they agree in
+scale and tails), the bulk effective sample size (how many independent draws the centre of
+the distribution is worth) and the tail effective sample size (the same for the 5% and 95%
+quantiles, which the report's intervals and curve bands are made of). Every chain is split
+in halves first, so a chain that drifts shows up as two that disagree.
+
+# Arguments
+- `x::AbstractArray{<:Real,3}`: the draws, `draws × chains × quantities`.
+
+# Returns
+    -   `NamedTuple` `(rhat, ess, essTail)` of vectors with one entry per quantity; all
+        `NaN` when a chain has fewer than 8 draws (the stats need at least 4 per half).
+
+# Exceptions
+- None.
+"""
+function convergence(x::AbstractArray{<:Real,3})
+    n, _, q = size(x)
+    n < 8 && return (rhat = fill(NaN, q), ess = fill(NaN, q), essTail = fill(NaN, q))
+    return (rhat = vec(MCMCDiagnosticTools.rhat(x; kind = :rank)),
+        ess = vec(MCMCDiagnosticTools.ess(x; kind = :bulk)),
+        essTail = vec(MCMCDiagnosticTools.ess(x; kind = :tail)))
+end
+
+"""
+    OptimumReport
+
+An optimum of the posterior that carries mass (a Laplace share of at least
+[`OPTIMUM_MIN_SHARE`](@ref)), as [`infer`](@ref) found it: by the MAP search, by its
+jittered starts, or by L-BFGS from the draws of the first round of chains.
+
+# Fields
+- `ξ::Vector{Float64}`: the optimum, in the sampled parameters (ρₑ, δρ₁, δρ₂, δρ₃).
+- `logmass::Float64`, `share::Float64`: its Laplace log-mass and its share of the
+    total over the optima with a mass.
+- `chains::Int`: chains at it at the end (chains with at least
+    [`OPTIMUM_CHAIN_FRACTION`](@ref) of their draws within [`OPTIMUM_CHAIN_RADIUS`](@ref)
+    of it under its own Hessian).
+- `started::Int`: of those, how many `infer` started there because fewer than
+    [`OPTIMUM_MIN_CHAINS`](@ref) chains were.
+"""
+struct OptimumReport
+    ξ::Vector{Float64}
+    logmass::Float64
+    share::Float64
+    chains::Int
+    started::Int
+end
+
+"""
+    ChainDiagnostics
+
+What the chains of one [`infer`](@ref) call looked like.
+
+# Fields
+- `nChains::Int`: chains run, those started at optima included (the last `nExtra`).
+- `startScale::Vector{Float64}`: per chain, the signed distance of its start
+    from the MAP in posterior standard deviations (negative: the mirrored chain
+    of a pair; 0: the MAP): the distance actually used, after any halving, see
+    [`CHAIN_JITTER_MAX_HALVINGS`](@ref) and [`chainRadius`](@ref).
+- `pooled::Vector{Bool}`: per chain, whether it was pooled.
+- `reason::Vector{String}`: per chain, `"ok"` or why it was not pooled.
+- `rhat::Vector{Float64}`: [`convergence`](@ref)'s R̂ over each mode's
+    chains' post-warm-up draws (the worst of the modes that keep draws,
+    see [`MODE_NEGLIGIBLE`](@ref)), one entry per coordinate of ξ followed
+    by log π (with one chain in a mode it compares its two halves).
+- `ess::Vector{Float64}`: the bulk effective sample size, same layout.
+- `essTail::Vector{Float64}`: the tail effective sample size, same layout.
+- `rewhitened::Float64`: 0, or the nats by which the first round of chains
+    found a better basin than the MAP search ([`BASIN_RESTART_NATS`](@ref)):
+    the sampler was then re-whitened there and the chains rerun, and these
+    diagnostics are those of the second round.
+- `mode::Vector{Int}`: per chain, the posterior mode it settled in (chains
+    that agree, [`chainModes`](@ref)); 0 for a chain that was not pooled.
+- `modeWeight::Vector{Float64}`: per mode, its share of
+    the posterior mass; the pooled draws carry these shares.
+- `modeLogmass::Vector{Float64}`: per mode, the bridge-sampling
+    estimate of log mass ([`bridgeLogmass`](@ref)).
+- `modeErr::Vector{Float64}`: per mode, its approximate standard error in nats.
+- `weightsUncertain::Bool`: whether a bridge-sampling error was too large to apply
+    the weights ([`weightsUncertain`](@ref)): the chains of the modes that can matter
+    were then pooled as they came, and `modeWeight` is each mode's share of those
+    chains (0 for a mode that is negligible even at its most optimistic estimate).
+- `nAdapt::Int`: warm-up iterations per chain of the run these draws come from (the
+    caller's `nAdapt`, or [`RETRY_N_ADAPT`](@ref) when the rerun was kept).
+- `firstRhat::Float64`: the worst R̂ of the first run when [`infer`](@ref) reran
+    (see [`RHAT_OK`](@ref)); NaN when it did not.
+- `retryKept::Bool`: whether the rerun's draws are the ones returned (false if there
+    was no rerun, or the first run's R̂ was no worse).
+- `nExtra::Int`: chains started at an optimum that carries mass but had fewer than
+    [`OPTIMUM_MIN_CHAINS`](@ref) chains at it after the first round (they are the last
+    `nExtra` chains; `startScale` is the distance of the optimum from the MAP).
+- `optima::Vector{OptimumReport}`: the optima that carry mass, the best first.
+"""
+struct ChainDiagnostics
+    nChains::Int
+    startScale::Vector{Float64}
+    pooled::Vector{Bool}
+    reason::Vector{String}
+    rhat::Vector{Float64}
+    ess::Vector{Float64}
+    essTail::Vector{Float64}
+    rewhitened::Float64
+    mode::Vector{Int}
+    modeWeight::Vector{Float64}
+    modeLogmass::Vector{Float64}
+    modeErr::Vector{Float64}
+    weightsUncertain::Bool
+    nAdapt::Int
+    firstRhat::Float64
+    retryKept::Bool
+    nExtra::Int
+    optima::Vector{OptimumReport}
+end
+
+"""
+The largest R̂ of `d`; `Inf` if there is none or any is NaN (an R̂ that could not be
+computed counts as not converged), so that a run that could not be judged never beats one
+that could.
+"""
+function _worstRhat(d::ChainDiagnostics)
+    (isempty(d.rhat) || any(isnan, d.rhat)) && return Inf
+    return maximum(d.rhat)
+end
+
+"""
+The smallest of the effective sample sizes `v`; NaN if there are none or any is NaN (an ESS
+that could not be computed counts as not converged).
+"""
+_worstEss(v::AbstractVector) = (isempty(v) || any(isnan, v)) ? NaN : minimum(v)
+
+"""
+Why a run does not count as converged, from its worst R̂, smallest
+bulk ESS and smallest tail ESS: R̂ not below [`RHAT_OK`](@ref) or not
+computable, or an ESS not above [`ESS_MIN`](@ref) or not computable.
+NaN means "could not be computed" and is never read as fine.
+
+# Returns
+- `Vector{String}`: one sentence per problem, empty for a converged run.
+"""
+function _convergenceProblems(rhat::Real, ess::Real, essTail::Real)
+    out = String[]
+    if !isfinite(rhat)
+        push!(out, "R̂ could not be computed (too few draws, or a constant quantity)")
+    elseif rhat >= RHAT_OK
+        push!(out, "the worst R̂, $(round(rhat; digits = 3)), is not below $RHAT_OK")
+    end
+    for (name, v) in (("bulk", ess), ("tail", essTail))
+        if isnan(v)
+            push!(out, "the $name effective sample size could not be computed")
+        elseif v <= ESS_MIN
+            essText = round(v; digits = 1)
+            push!(out, "the smallest $name ESS, $essText, is not above $ESS_MIN")
+        end
+    end
+    return out
+end
+
+function _convergenceProblems(d::ChainDiagnostics)
+    return _convergenceProblems(_worstRhat(d), _worstEss(d.ess), _worstEss(d.essTail))
+end
+
+"""
+Thrown by [`infer`](@ref) when the profiled c1 of a four-parameter run is kinked
+([`_c1Kinked`](@ref), asked after warm-up): the profile switches between basins, NUTS
+cannot sample it, and the run stops at once. [`runModel`](@ref BAYSOL.Pipeline.runModel)
+catches it and samples c1 as a fifth parameter instead.
+"""
+struct KinkDetected <: Exception end
+
+Base.showerror(io::IO, ::KinkDetected) =
+    print(io, "KinkDetected: the profiled c1 has a kink, c1 has to be sampled")
+
+"""
+Thrown by [`runModel`](@ref BAYSOL.Pipeline.runModel) when a run is still not converged
+after its retry: a fit that did not converge has nothing worth reporting, so no result is
+returned and no report is written.
+
+# Fields
+- `problems::Vector{String}`: why the run does not count as converged.
+- `summary::Union{Nothing,NamedTuple}`: the failed attempt's own diagnostics (what
+  `runModel` classifies the failure from: worst R̂, smallest ESS, divergent share, tree
+  depth, step size, modes), `nothing` when it has none. `NotConvergedError(problems)`
+  leaves it out.
+"""
+struct NotConvergedError <: Exception
+    problems::Vector{String}
+    summary::Union{Nothing,NamedTuple}
+end
+
+NotConvergedError(problems::Vector{String}) = NotConvergedError(problems, nothing)
+
+function Base.showerror(io::IO, e::NotConvergedError)
+    print(io, "NotConvergedError: the run did not converge: ", join(e.problems, "; "), ".")
+end
+
+"""
+Which chains are pooled: every chain that ran, unless it failed or more than
+[`CHAIN_MAX_DIVERGENT`](@ref) of its post-warm-up transitions diverged. (A
+chain in a poorer mode is not dropped for that: the modes are weighted by their
+mass, see [`bridgeLogmass`](@ref).) `divRate[j]` is chain `j`'s divergent
+fraction and `error[j]` is `nothing` or why the chain could not be run.
+
+# Returns
+- `(pooled::Vector{Bool}, reason::Vector{String})`,
+    the reason being `"ok"` for a pooled chain.
+
+# Exceptions
+- None.
+"""
+function selectChains(divRate::AbstractVector{<:Real}, error::AbstractVector)
+    pooled = fill(true, length(error))
+    reason = fill("ok", length(error))
+    for j in eachindex(error)
+        if error[j] !== nothing
+            pooled[j] = false
+            reason[j] = "sampler error: $(error[j])"
+        elseif divRate[j] > CHAIN_MAX_DIVERGENT
+            pooled[j] = false
+            reason[j] = "$(round(Int, 100 * divRate[j])) % of transitions diverged"
+        end
+    end
+    return pooled, reason
 end

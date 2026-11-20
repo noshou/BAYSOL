@@ -304,7 +304,7 @@ function _peptide_ϕ°(
     fN = 1 / (1 + 10.0^(PEPTIDE_NH2_PKA - pH))  # fraction with the amine deprotonated
     v += PEPTIDE_COOH_DV * fC - PEPTIDE_NH2_DV * fN
     dvDph = (
-        log(10)
+        LN10
         *
         (
             -PEPTIDE_COOH_DV * fC * (1 - fC)

@@ -43,6 +43,7 @@ export type SettingKind =
     | "colours"
     | "markers"
     | "sizes"
+    | "ladder"
     | "path"
 
 /** The kinds a part of a tuple can have. */
@@ -66,7 +67,8 @@ export type Limits = {
  * `null` is an optional number that is not given (no limit, automatic), a list of
  * `[lo, hi]` pairs is a `ranges` setting (a list of `[width, height]` pairs `sizes`), a
  * list of single-character strings `strings` (of colours `colours`, of marker names
- * `markers`); a `path` is a string, empty for "not set".
+ * `markers`); a `path` is a string, empty for "not set"; a `ladder` is a map from failure
+ * class to rungs.
  */
 export type SettingValue =
     | null
@@ -77,6 +79,26 @@ export type SettingValue =
     | (number | string)[]
     | number[][]
     | Record<string, number>
+    | LadderMap
+
+/**
+ * One rung of the retry ladder (the `ladder` kind): a name (maybe empty) and the settings
+ * it overrides, by setting name, each in the type its setting has. `RNG_SEED_STEP` is the
+ * ladder-only whole number added to the seed.
+ */
+export type LadderRung = { name: string; overrides: Record<string, SettingValue> }
+
+/**
+ * The retry ladder: a map from failure class (`def.classes`) to the rungs that run, in
+ * order, when a fit fails in that class. A class with no rung is switched off.
+ */
+export type LadderMap = Record<string, LadderRung[]>
+
+/** The ladder-only override key: a whole number added to `RNG_SEED`. */
+const RNG_SEED_STEP = "RNG_SEED_STEP"
+
+/** The ladder-only override key: a bool that makes the rerun sample c1 as a parameter. */
+const SAMPLE_C1 = "SAMPLE_C1"
 
 /** The rules that tie settings together, as `setting_relations.json` names them. */
 type RuleName =
@@ -114,6 +136,8 @@ type RawDef = {
     shape?: PartKind[] | Record<string, PartKind>
     parts?: string[]
     choices?: string[]
+    overridable?: string[]
+    classes?: string[]
 }
 
 /** The groups of `setting_sheets.json`, as written there. */
@@ -142,6 +166,12 @@ export class SettingDef {
     readonly partKinds: readonly PartKind[]
     /** Whether a tuple is an object with named parts rather than an array. */
     readonly isRecord: boolean
+    /** The settings a ladder rung may override (a `ladder` setting; else empty). */
+    readonly overridable: readonly string[]
+    /** The failure classes of a ladder, in the order of Julia's `LADDER_CLASSES`. */
+    readonly classes: readonly string[]
+    /** The definitions of `overridable`, set by the catalog that holds them. */
+    overrideDefs: ReadonlyMap<string, SettingDef> = new Map()
 
     constructor(
         readonly name: string,
@@ -155,6 +185,8 @@ export class SettingDef {
         this.limits = raw.limits
         this.choices = raw.choices ?? []
         this.partNames = raw.parts ?? []
+        this.overridable = raw.overridable ?? []
+        this.classes = raw.classes ?? []
         const shape = raw.shape
         this.isRecord = shape !== undefined && !Array.isArray(shape)
         this.partKinds =
@@ -227,6 +259,15 @@ export class SettingsCatalog {
         private readonly hidden: readonly SettingDef[] = [],
     ) {
         for (const def of this.defs()) this.byName.set(def.name, def)
+        for (const def of this.byName.values()) {
+            if (def.kind !== "ladder") continue
+            def.overrideDefs = new Map(
+                def.overridable.flatMap((n) => {
+                    const d = this.byName.get(n)
+                    return d === undefined ? [] : [[n, d] as const]
+                }),
+            )
+        }
     }
 
     /** @returns every setting: those of the sheets in their order, then the hidden. */
@@ -413,6 +454,9 @@ const MAX_PATH_TEXT = 4096
 /** The most characters the editor takes when a list setting is typed (not validation). */
 export const MAX_LIST_TYPING = 200
 
+/** The longest typed ladder (rungs of `name: KEY=value; ...` words, see `parseLadder`). */
+export const MAX_LADDER_TYPING = 1000
+
 /** The most characters the editor takes when a path is typed (not validation). */
 export const MAX_PATH_TYPING = 1000
 
@@ -554,6 +598,101 @@ function checkSizes(raw: unknown): Checked {
 }
 
 /**
+ * A ladder (as `:ladder` of Julia): an object from failure class (`def.classes`) to a
+ * list of rungs, each `{name?, overrides}` with at least one override, a setting a rung
+ * may override (`def.overridable`) with a value its own setting accepts, or
+ * `RNG_SEED_STEP` (a whole number) or `SAMPLE_C1` (true or false). A class left out keeps
+ * the rungs of the default ladder, an empty list switches it off; `false` or `"off"` is
+ * every class off.
+ */
+function checkLadder(def: SettingDef, raw: unknown): Checked {
+    const isObject = (x: unknown): x is Record<string, unknown> =>
+        typeof x === "object" && x !== null && !Array.isArray(x)
+    const off = Object.fromEntries(def.classes.map((c) => [c, [] as LadderRung[]]))
+    if (raw === false || raw === "off") return { ok: true, value: off }
+    if (!isObject(raw))
+        return {
+            ok: false,
+            error:
+                "must be a map from failure class to a list of rungs " +
+                "(an empty list switches a class off)",
+        }
+    const base = def.default as LadderMap
+    const map: LadderMap = {}
+    for (const c of def.classes) map[c] = base[c] ?? []
+    for (const [cls, list] of Object.entries(raw)) {
+        if (!def.classes.includes(cls))
+            return {
+                ok: false,
+                error: `${cls} is not a failure class (${def.classes.join(", ")})`,
+            }
+        if (!Array.isArray(list))
+            return { ok: false, error: `${cls} must be a list of rungs` }
+        const rungs: LadderRung[] = []
+        for (const [k, r] of list.entries()) {
+            const where = `${cls} rung ${k + 1}`
+            if (!isObject(r))
+                return { ok: false, error: `${where} must be an object with overrides` }
+            const ov = r.overrides
+            if (!isObject(ov))
+                return {
+                    ok: false,
+                    error: `${where} needs overrides, an object of settings`,
+                }
+            const extra = Object.keys(r).filter((x) => x !== "name" && x !== "overrides")
+            if (extra.length > 0)
+                return {
+                    ok: false,
+                    error: `${where} has ${extra.join(", ")}: only name and overrides`,
+                }
+            const names = Object.keys(ov)
+            if (names.length === 0)
+                return { ok: false, error: `${where} must override at least one setting` }
+            const overrides: Record<string, SettingValue> = {}
+            for (const name of names) {
+                if (name === RNG_SEED_STEP) {
+                    const n = wholeOf(ov[name])
+                    if (n === undefined)
+                        return {
+                            ok: false,
+                            error: `${where} ${name} must be a whole number`,
+                        }
+                    overrides[name] = n
+                    continue
+                }
+                if (name === SAMPLE_C1) {
+                    if (typeof ov[name] !== "boolean")
+                        return {
+                            ok: false,
+                            error: `${where} ${name} must be true or false`,
+                        }
+                    overrides[name] = ov[name]
+                    continue
+                }
+                const target = def.overrideDefs.get(name)
+                if (target === undefined)
+                    return {
+                        ok: false,
+                        error:
+                            `${where}: ${name} is not a fitting setting ` +
+                            "a rung may override " +
+                            `(allowed: ${def.overridable.join(", ")})`,
+                    }
+                const v = validateValue(target, ov[name])
+                if (!v.ok) return { ok: false, error: `${where} ${name} ${v.error}` }
+                overrides[name] = v.value
+            }
+            const name = r.name ?? ""
+            if (typeof name !== "string")
+                return { ok: false, error: `${where} name must be text` }
+            rungs.push({ name: name.trim(), overrides })
+        }
+        map[cls] = rungs
+    }
+    return { ok: true, value: map }
+}
+
+/**
  * Checks a tuple value: an array of the number of parts of the default, or an object
  * with exactly its keys, each part of its kind.
  *
@@ -634,6 +773,8 @@ export function validateValue(def: SettingDef, raw: unknown): Checked {
             return checkMarkers(def, raw)
         case "sizes":
             return checkSizes(raw)
+        case "ladder":
+            return checkLadder(def, raw)
         case "colour": {
             const colour = colourOf(raw)
             return colour === undefined

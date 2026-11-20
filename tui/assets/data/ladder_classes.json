@@ -1,0 +1,8 @@
+{
+    "stepCollapse": "The sampler's step size has become too small or its integration has become ineffective.",
+    "splitChains": "Chains appear to be sampling different regions or modes of the posterior.",
+    "divergent": "NUTS encounters divergent transitions, suggesting problematic posterior geometry or numerical integration.",
+    "structural": "A more fundamental problem with the posterior geometry or model structure.",
+    "marginal": "Sampling technically completes, but convergence or effective sample size is inadequate.",
+    "generic": "A failure that doesn't fit the other categories."
+}

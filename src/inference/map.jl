@@ -45,6 +45,27 @@ struct _Optimum{N,L}
 end
 
 """
+    _StartRecord
+
+How one L-BFGS start of the MAP search ended, as the optimizer reported it (kept for the
+run statistics): the start's number, whether it was feasible, the objective at its optimum
+the iterations and objective evaluations, which stopping rules fired and the final gradient
+(`gNorm`, the largest absolute component, in z space). An infeasible start has `NaN` for `f`
+and `gNorm` and `0` iterations and evaluations.
+"""
+struct _StartRecord
+    start::Int
+    feasible::Bool
+    f::Float64
+    iters::Int
+    gConverged::Bool
+    fConverged::Bool
+    iterLimit::Bool
+    evals::Int
+    gNorm::Float64
+end
+
+"""
     _SamplingSpace
 
 The affine map from NUTS's coordinates w to θ-space, θ = μ + σ·(ẑ + S·w), plus what
@@ -65,6 +86,7 @@ the MAP search found. Immutable, built once per [`infer`](@ref) call.
     by [`BASIN_RESTART_NATS`](@ref) shows that a better basin exists).
 - `optima::Vector{_Optimum}`: the distinct optima found (the best [`MAP_OPTIMA_KEPT`](@ref)
     of them, lowest −log π first), each with its Laplace mass.
+- `starts::Vector{_StartRecord}`: how each L-BFGS start ended, in the order they ran.
 """
 struct _SamplingSpace{N,L}
     μ::SVector{N,Float64}
@@ -78,6 +100,7 @@ struct _SamplingSpace{N,L}
     nEvals::Int
     logπ::Float64
     optima::Vector{_Optimum{N,L}}
+    starts::Vector{_StartRecord}
 end
 
 "θ = μ + σ·(ẑ + S·w): NUTS coordinates w to θ-space (see [`_SamplingSpace`](@ref))."
@@ -109,6 +132,7 @@ function _neglogπ(
         -_logπ(μ .+ σ .* z, seed.pr, seed.wls, seed.fw; tab = seed.c1tab, c1Tol = tol)
     catch e
         e isa WLSError || rethrow()
+        Threads.atomic_add!(seed.c1tab.counts.wlsErrors, 1)     # the tally of the log
         return T(Inf)
     end
     return isfinite(v) ? v : T(Inf)
@@ -141,15 +165,24 @@ coordinate i, from its envelope-theorem gradient, with c1 profiled to
 function _fdHessian(
     z::SVector{N,Float64}, h::SVector{N,Float64}, μ, σ, seed::Seed,
 ) where {N}
-    cols = ntuple(Val(N)) do i
-        e = SVector(ntuple(j -> j == i ? h[i] : 0.0, Val(N)))
-        (
-            _neglogπ_grad(z + e, μ, σ, seed, EXCL_VOL_CORR_TOL) -
-            _neglogπ_grad(z - e, μ, σ, seed, EXCL_VOL_CORR_TOL)
-        ) / (2h[i])
-    end
-    H = hcat(cols...)
-    return (H + H') / 2
+    H = _centralJacobian(
+        u -> collect(_neglogπ_grad(z + h .* SVector{N}(u), μ, σ, seed, EXCL_VOL_CORR_TOL)),
+        h,
+    )
+    return SMatrix{N,N,Float64}((H + H') / 2)
+end
+
+"""
+Jacobian at the origin of the vector function `g` with central differences of step `h[i]`
+along coordinate i (`FiniteDiff.finite_difference_jacobian`
+on the rescaled argument u = x/h with a unit absolute step), as a plain `Matrix`.
+`g` takes the rescaled argument, so a gradient `∇f(x₀ + h∘u)` gives the Hessian of `f`.
+"""
+function _centralJacobian(g, h::SVector{N,Float64}) where {N}
+    J = FiniteDiff.finite_difference_jacobian(
+        g, zeros(N), Val(:central); relstep = 0.0, absstep = 1.0,
+    )
+    return J ./ collect(h)'
 end
 
 """
@@ -167,7 +200,8 @@ end
 """
 The L-BFGS machinery of the MAP search, as a closure: `run(z)` minimizes −log π (c1
 profiled to `EXCL_VOL_CORR_TOL`, the density NUTS samples) from `z`, and returns
-`(z, f, evals)` of the optimum, or `nothing` if the start is infeasible or ends
+`(z, f, evals, iters, gConverged, fConverged, iterLimit)` of the optimum (the last four
+how the optimizer stopped), or `nothing` if the start is infeasible or ends
 non-finite. `f` is the objective itself. `maxIter` caps the iterations of each start.
 """
 function _lbfgsRunner(
@@ -176,7 +210,7 @@ function _lbfgsRunner(
     successive_f_tol::Int = MAP_F_SUCCESSIVE,
     maxIter::Int = MAP_MAX_ITER,
 ) where {N}
-    μ, σ = θ_prior_moments(seed.pr)
+    μ, σ = θ_prior_moments(seed.pr, Val(N))
     f = z -> _neglogπ(SVector{N}(z...), μ, σ, seed, EXCL_VOL_CORR_TOL)
     fg! = (G, z) -> begin
         gcCheckpoint()
@@ -204,7 +238,13 @@ function _lbfgsRunner(
                 )
             v = Optim.minimum(res)
             isfinite(v) || return nothing
-            return (z = SVector{N}(minimizer(res)...), f = v, evals = Optim.f_calls(res))
+            return (
+                z = SVector{N}(minimizer(res)...), f = v, evals = Optim.f_calls(res),
+                iters = Optim.iterations(res), gConverged = Optim.g_converged(res),
+                fConverged = Optim.f_converged(res),
+                iterLimit = Optim.iteration_limit_reached(res),
+                gNorm = Optim.g_residual(res),
+            )
         end
     return run
 end
@@ -299,7 +339,7 @@ function _samplingSpace(
     base::UInt64 = drawBase(),
     extraStarts::AbstractVector = SVector{N,Float64}[],
 )::_SamplingSpace where {N}
-    μ, σ = θ_prior_moments(seed.pr)
+    μ, σ = θ_prior_moments(seed.pr, Val(N))
     run = _lbfgsRunner(
         seed; f_abstol, successive_f_tol, maxIter = options.mapMaxIter,
     )
@@ -313,7 +353,7 @@ function _samplingSpace(
         [z₀],
         [
             _standardize(
-                Θ(_ξ₀(seed.pr, stream(base, _RNG_MAP_STARTS, i)), seed.pr)[1],
+                _θOfξ(_ξ₀(seed.pr, Val(N), stream(base, _RNG_MAP_STARTS, i)), seed),
                 seed.pr,
             )
             for i in 2:options.mapNStarts
@@ -326,10 +366,19 @@ function _samplingSpace(
     optima = Tuple{SVector{N,Float64},Float64}[]
     nEvals = 0
     nTry = 0
+    records = _StartRecord[]
     function search!(zs)
         nTry += 1
         r = run(zs)
-        r === nothing && return
+        if r === nothing
+            push!(records, _StartRecord(nTry, false, NaN, 0, false, false, false, 0, NaN))
+            return
+        end
+        push!(
+            records,
+            _StartRecord(nTry, true, r.f, r.iters, r.gConverged,
+                r.fConverged, r.iterLimit, r.evals, r.gNorm),
+        )
         nEvals += r.evals
         push!(optima, (r.z, r.f))
         return
@@ -337,7 +386,9 @@ function _samplingSpace(
     foreach(search!, starts)
     iN = one(SMatrix{N,N,Float64})
     isempty(optima) &&
-        return _SamplingSpace(μ, σ, z₀, iN, 0, nTry, 0, false, nEvals, NaN, noOptima)
+        return _SamplingSpace(
+            μ, σ, z₀, iN, 0, nTry, 0, false, nEvals, NaN, noOptima, records,
+        )
 
     sort!(optima; by = last)            # lowest −log π first
     ẑ, fMode = optima[1]
@@ -364,7 +415,7 @@ function _samplingSpace(
 
     o₁ = mk(ẑ, fMode)
     all(isfinite, o₁.λ) || return _SamplingSpace(
-        μ, σ, ẑ, iN, length(optima), nTry, 1, false, nEvals, -fMode, [o₁],
+        μ, σ, ẑ, iN, length(optima), nTry, 1, false, nEvals, -fMode, [o₁], records,
     )
 
     # the second round: jittered starts around the distinct optima of the first
@@ -386,7 +437,7 @@ function _samplingSpace(
         ẑ, fMode = optima[1]
         o₁ = mk(ẑ, fMode)
         all(isfinite, o₁.λ) || return _SamplingSpace(
-            μ, σ, ẑ, iN, length(optima), nTry, 1, false, nEvals, -fMode, [o₁],
+            μ, σ, ẑ, iN, length(optima), nTry, 1, false, nEvals, -fMode, [o₁], records,
         )
     end
     λ₁, V₁ = max.(o₁.λ, MAP_HESS_EIG_FLOOR), o₁.V
@@ -421,6 +472,7 @@ function _samplingSpace(
     S = V .* (1 ./ sqrt.(λ))'    # V·diag(λ)^(-1/2): Sᵀ·H·S = I
     return _SamplingSpace(
         μ, σ, ẑ, S, length(optima), nTry, length(modes), true, nEvals, -fMode, found,
+        records,
     )
 end
 
@@ -469,4 +521,289 @@ function _harvestOptima(
     end
     sort!(known; by = o -> o.f)
     return known, nEvals
+end
+
+# ---------------------------------------------------------------------------
+#   Chain starts, draws in the whitened coordinates, the best draw
+# ---------------------------------------------------------------------------
+
+"""
+The nominal signed distance from the MAP, in posterior standard deviations, at which
+chain `k` of `n` starts: a single chain at the MAP (0); with several, chains 1 and 2
+both at the MAP (two independent chains of their own random streams from the same point:
+independent effective sample size within the main mode and a baseline for R̂ there), and
+chains 3 and up in mirrored pairs at the radii of [`CHAIN_START_RADII`](@ref) (the first
+of a pair positive, the second negative: the same random direction, opposite sides).
+`radii` replaces [`CHAIN_START_RADII`](@ref) (a non-empty vector or tuple).
+
+# Returns
+- `Float64`.
+
+# Exceptions
+- None.
+"""
+function chainRadius(
+    k::Int, n::Int, radii::Union{AbstractVector{<:Real},Tuple} = CHAIN_START_RADII,
+)::Float64
+    (n == 1 || k ≤ 2) && return 0.0
+    r = radii[min((k - 1) ÷ 2, length(radii))]
+    return isodd(k) ? r : -r
+end
+
+"""
+Start of chain `k` of `n` in NUTS's whitened coordinates w, with its signed distance
+from the MAP in posterior standard deviations ([`chainRadius`](@ref)). The start is
+`r·u` for a direction `u` on the unit sphere: a single chain, and chain 1, at the MAP
+(`w = 0`); chain 2 also at the MAP (its own random stream makes it an independent
+chain); chains 3 and up in mirrored pairs, chains `2p+1` and `2p+2` at `+r_p·u_p` and
+`-r_p·u_p`. The directions come from streams of the run's `base` (its
+`rngSeed`), under their own purpose tag. A start where log π or its gradient is not
+finite is pulled halfway back toward the MAP, up to [`CHAIN_JITTER_MAX_HALVINGS`](@ref)
+times, and the distance returned is the one used; a start that never becomes usable is the
+MAP itself (0).
+
+# Returns
+- `(w₀::Vector{Float64}, r::Float64)`.
+"""
+function _chainStart(
+    k::Int, n::Int, N::Int, ℓπ, ∂ℓπ∂w, base::UInt64,
+    radii::Union{AbstractVector{<:Real},Tuple} = CHAIN_START_RADII,
+)
+    r = chainRadius(k, n, radii)
+    r == 0 && return zeros(N), 0.0
+    z = randn(stream(base, _RNG_JITTER, (k - 1) ÷ 2), N)
+    u = z ./ sqrt(sum(abs2, z))
+    for _ in 0:CHAIN_JITTER_MAX_HALVINGS
+        w = r .* u
+        usable = try
+            v, g = ∂ℓπ∂w(w)
+            isfinite(v) && all(isfinite, g)
+        catch e
+            e isa InterruptException && rethrow()
+            false
+        end
+        usable && return w, r
+        r /= 2
+    end
+    return zeros(N), 0.0
+end
+
+"""
+The draws `ξs` in NUTS's whitened coordinates, one draw per row.
+
+# Returns
+- `Matrix{Float64}`, `length(ξs) × N`.
+"""
+function _drawsW(seed::Seed{<:Real,N}, sp, ξs::AbstractVector) where {N}
+    W = Matrix{Float64}(undef, length(ξs), N)
+    @inbounds for (i, ξ) in enumerate(ξs)
+        w = _w_of_θ(_θOfξ(ξ, seed), sp)
+        for j in 1:N
+            W[i, j] = w[j]
+        end
+    end
+    return W
+end
+
+"""
+The highest post-warm-up log density among the
+non-divergent draws of the chains that ran, and its ξ.
+
+# Returns
+- `NamedTuple` `(ld, ξ)`; `ld = -Inf` if there is no such draw.
+"""
+function _bestDraw(runs, post)
+    best = (ld = -Inf, ξ = nothing)
+    for r in runs
+        r.error === nothing || continue
+        for i in post
+            st = r.stats[i]
+            st.numerical_error || st.log_density <= best.ld ||
+                (best = (ld = st.log_density, ξ = r.ξ[i]))
+        end
+    end
+    return best
+end
+
+
+# ---------------------------------------------------------------------------
+#   Optima beyond the MAP search: shares, chains at them, chains started at them
+# ---------------------------------------------------------------------------
+
+"""
+The Laplace share of every optimum: `exp(logmass)` over the sum over those that have
+one; 0 for an optimum with none (`NaN`).
+"""
+function _optimumShares(optima)
+    lm = [o.logmass for o in optima]
+    ok = filter(!isnan, lm)
+    isempty(ok) && return zeros(length(optima))
+    top = maximum(ok)
+    tot = sum(exp(x - top) for x in ok)
+    return [isnan(x) ? 0.0 : exp(x - top) / tot for x in lm]
+end
+
+"""
+How many of the chains, whose post-warm-up draws are the rows of `wsRows` (whitened
+coordinates of `sp`), are at the optimum `o`: at least [`OPTIMUM_CHAIN_FRACTION`](@ref) of
+a chain's draws lie within [`OPTIMUM_CHAIN_RADIUS`](@ref) of it in the Mahalanobis distance
+of the Hessian there. 0 for an optimum without a positive definite Hessian. `radius` and
+`fraction` replace the two constants.
+"""
+function _chainsAt(
+    o, sp, wsRows;
+    radius::Real = OPTIMUM_CHAIN_RADIUS, fraction::Real = OPTIMUM_CHAIN_FRACTION,
+)
+    all(>(0), o.λ) || return 0
+    H = o.V * (o.λ .* o.V')
+    return count(wsRows) do W
+        size(W, 1) == 0 && return false
+        inside = count(axes(W, 1)) do i
+            d = sp.ẑ + sp.S * typeof(sp.ẑ)(@view W[i, :]) - o.z
+            d' * H * d ≤ radius^2
+        end
+        inside ≥ fraction * size(W, 1)
+    end
+end
+
+"""
+The first round of chains `runs` (with their `starts`), extended: L-BFGS from their draws
+for optima the MAP search did not report ([`_optimaAndExtraChains`](@ref)), then the
+chains that optima carrying mass are missing, run and appended (none for `nChains == 1`,
+which is a single chain). Also the [`OptimumReport`](@ref)s of the optima that carry mass.
+
+# Returns
+- `NamedTuple` `(runs, starts, nExtra, optimaReport)`.
+"""
+function _withOptimaChains(seed::Seed{<:Real,N}, sp, runs, starts, post,
+    nSamples, nAdapt, δ, base, nChains;
+    options::SamplerOptions = SamplerOptions()) where {N}
+    opt = _optimaAndExtraChains(seed, sp, runs, post; options = options)
+    if nChains > 1 && !isempty(opt.extraW)
+        ex = _runExtraChains(
+            seed, sp, nSamples, nAdapt, δ, base, opt.extraW, length(runs),
+        )
+        allRuns = vcat(runs, ex.runs)
+        wsRows = vcat(
+            opt.wsRows,
+            [_drawsW(seed, sp, r.ξ[post]) for r in ex.runs if r.error === nothing],
+        )
+        report = _optimumReports(
+            seed, sp, opt.optima, wsRows, opt.owner[ex.keep]; options = options,
+        )
+        return (runs = allRuns, starts = vcat(starts, ex.starts),
+            nExtra = length(ex.runs),
+            optimaReport = report)
+    end
+    report = _optimumReports(seed, sp, opt.optima, opt.wsRows, Int[]; options = options)
+    return (runs = runs, starts = starts, nExtra = 0, optimaReport = report)
+end
+
+"""
+After the first round of chains: the optima known (the MAP search's and those found by
+L-BFGS from the chains' draws, [`_harvestOptima`](@ref)), and the whitened starts of the
+chains that optima carrying mass ([`OPTIMUM_MIN_SHARE`](@ref)) are missing: up to
+[`OPTIMUM_MIN_CHAINS`](@ref) chains at each, [`OPTIMUM_CHAIN_CAP`](@ref) in all,
+the heaviest optimum first.
+
+# Returns
+- `(optima, extraW, owner, wsRows)`: the optima, the starts and, for each
+    start, the index in `optima` of the optimum it is at, and the whitened
+    post-warm-up draws of each chain (one matrix per chain that ran).
+"""
+function _optimaAndExtraChains(
+    seed::Seed{<:Real,N},
+    sp,
+    runs,
+    post;
+    options::SamplerOptions = SamplerOptions(),
+) where {N}
+    ran = [r for r in runs if r.error === nothing]
+    isempty(ran) && return (
+        optima = sp.optima, extraW = Vector{Float64}[], owner = Int[],
+        wsRows = Matrix{Float64}[],
+    )
+    wsRows = [_drawsW(seed, sp, r.ξ[post]) for r in ran]
+    ld = reduce(vcat, [getproperty.(r.stats[post], :log_density) for r in ran])
+    dv = reduce(vcat, [getproperty.(r.stats[post], :numerical_error) for r in ran])
+    optima, _ = _harvestOptima(
+        seed, sp, reduce(vcat, wsRows), ld, Vector{Bool}(dv); options = options,
+    )
+    shares = _optimumShares(optima)
+    extraW = Vector{Float64}[]
+    owner = Int[]
+    for i in sortperm(shares; rev = true)
+        shares[i] ≥ OPTIMUM_MIN_SHARE || break
+        need =
+            options.optimumMinChains - _chainsAt(
+                optima[i], sp, wsRows;
+                radius = options.optimumChainRadius,
+                fraction = options.optimumChainFraction,
+            )
+        need > 0 || continue
+        w = Vector(sp.S \ (optima[i].z - sp.ẑ))
+        for _ in 1:need
+            length(extraW) < options.optimumChainCap || break
+            push!(extraW, w)
+            push!(owner, i)
+        end
+    end
+    return (optima = optima, extraW = extraW, owner = owner, wsRows = wsRows)
+end
+
+"""
+The [`OptimumReport`](@ref)s of the optima that carry mass, the best first,
+with the chains at each after all the chains have run (`wsRows`: the
+whitened post-warm-up draws of each chain that ran); `owners` lists, for
+each chain started at an optimum, the index in `optima` of that optimum.
+"""
+function _optimumReports(
+    seed::Seed{<:Real,N}, sp, optima, wsRows, owners;
+    options::SamplerOptions = SamplerOptions(),
+) where {N}
+    shares = _optimumShares(optima)
+    out = OptimumReport[]
+    for i in sortperm(shares; rev = true)
+        shares[i] ≥ OPTIMUM_MIN_SHARE || break
+        push!(
+            out,
+            OptimumReport(
+                Vector(_ξOfθ(sp.μ .+ sp.σ .* optima[i].z, seed)), optima[i].logmass,
+                shares[i],
+                _chainsAt(
+                    optima[i], sp, wsRows;
+                    radius = options.optimumChainRadius,
+                    fraction = options.optimumChainFraction,
+                ),
+                count(==(i), owners),
+            ),
+        )
+    end
+    return out
+end
+
+"""
+Runs one NUTS chain at each of the whitened starts `wStarts`, as chains `k0 + 1`,
+`k0 + 2`, … (their streams belong to those indices). A start where log π or its gradient
+is not finite is dropped.
+
+# Returns
+-   `NamedTuple` `(runs, starts, keep)`: the [`_ChainRun`](@ref)s, their `(w₀, distance
+    from the MAP)` and the positions in `wStarts` that were run.
+"""
+function _runExtraChains(seed::Seed{<:Real,N}, sp, nSamples::Int64,
+    nAdapt::Int64, δ::Real, base::UInt64, wStarts::AbstractVector, k0::Int) where {N}
+    ℓπ, ∂ℓπ∂w, runChain = _chainRunner(seed, sp, nSamples, nAdapt, δ, base, false)
+    keep = filter(eachindex(wStarts)) do i
+        try
+            v, g = ∂ℓπ∂w(wStarts[i])
+            isfinite(v) && all(isfinite, g)
+        catch e
+            e isa InterruptException && rethrow()
+            false
+        end
+    end
+    runs = tmapItems(i -> runChain(k0 + findfirst(==(i), keep), wStarts[i]), keep)
+    starts = [(wStarts[i], sqrt(sum(abs2, wStarts[i]))) for i in keep]
+    return (runs = runs, starts = starts, keep = keep)
 end

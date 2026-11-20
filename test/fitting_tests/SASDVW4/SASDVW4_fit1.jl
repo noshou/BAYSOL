@@ -8,7 +8,7 @@ using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDVW4")
+const _FIXTURE_DIR = fixtureDir("SASDVW4")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDVW4.dat")
 const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDVW4_fit1_model1.pdb")
 const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDVW4_fit1.fit")
@@ -68,8 +68,9 @@ checkQAngstrom(qvals)
 # Recomputed from the `.fit` columns (q, I_exp, σ, I_fit; mean of ((I_exp - I_fit)/σ)²
 # over the 188 points, 0.018-1.0 Å⁻¹): 1.770, so the header is a chi2 and not a chi. The
 # SASBDB REST value agrees with the header (1.779, per notes/replacement-candidates.md).
-# refChi2 = "CRYSOL 1.779". The .fit file starts at 0.018 Å⁻¹, so the overlaid
-# reference curve does not cover the first points.
+# refChi2 = "CRYSOL 1.779". The .fit file starts at 0.018 Å⁻¹ (the .dat at 0.006 Å⁻¹, 12
+# more points; the .fit I_exp and σ equal the .dat), so q ≥ 0.018 Å⁻¹ is fitted
+# (`Q_MIN_FIT`, 2026-11-19) and BAYSOL and the depositor cover the same 188 points.
 #
 # Buffer (SASBDB buffer name):
 #
@@ -113,9 +114,10 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# No q cut: the whole curve is fitted, up to 1.0 Å⁻¹ (the .dat and the .fit file end
-# there). The tail is signal, not noise (median I/σ 2.9 above 0.3 Å⁻¹, no point with
-# I ≤ 0).
+# q cut at the start of the depositor's fit (0.018 Å⁻¹): the 12 lower points are left out.
+# The curve is fitted up to 1.0 Å⁻¹ (the .dat and the .fit file end there). The tail is
+# signal, not noise (median I/σ 2.9 above 0.3 Å⁻¹, no point with I ≤ 0).
+const Q_MIN_FIT = 0.018
 
 # The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
 # the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
@@ -128,11 +130,11 @@ const ADD_HYDROGENS = true
 """
     fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` (no q cut). (`seedModel`
+`qvals`/`I_exp`/`σ_exp` restricted to `q ≥ Q_MIN_FIT` and `σ_exp > 0`. (`seedModel`
 bins the curve and drops the bins with non-positive intensity.)
 """
 function fitSubset()
-    keep = findall(>(0), σ_exp)
+    keep = findall(i -> qvals[i] ≥ Q_MIN_FIT && σ_exp[i] > 0, eachindex(qvals))
     return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
@@ -179,7 +181,6 @@ BAYSOL.results(
     dir = @__DIR__, name = "res_fit1", references = reference,
     formFactorLog = formFactorLog, nAtoms = nAtoms,
     refChi2 = "CRYSOL 1.779",
-    runLog = true,
 )
 
 # `@__DIR__` (this SASDVW4/ folder), not the caller's cwd.

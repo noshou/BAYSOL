@@ -220,6 +220,11 @@ function _logStats(result)
     )
         haskey(info, k) && add!(k, info[k])
     end
+    # the memory-blocked scattering build: the headroom setting, the blocks, the memory
+    for k in ("memoryHeadroom", "forwardBlocks", "forwardBlockQ", "forwardBudgetGib",
+        "forwardEstGib", "forwardPeakGib")
+        haskey(info, k) && add!(k, info[k])
+    end
     # the settings this model was given that differ from the project's (`runProject`
     # with a `model-settings.json`): one row each, `override<Setting>`
     for k in sort!([k for k in keys(info) if startswith(k, "override")])
@@ -228,10 +233,16 @@ function _logStats(result)
 
     for k in
         (
-        "nAtoms", "lmax", "dmax", "nQRaw", "nQ", "nSamples", "nAdapt", "rngSeed",
+        "nAtoms", "lmax", "dmax", "nQRaw", "nQChi2", "nQ", "nSamples", "nAdapt", "rngSeed",
         "pmvFallbackUncert",
     )
         adopt!(k)
+    end
+    # whether the profiled c1 had a kink, so c1 was sampled (true) or profiled (false)
+    haskey(info, "c1Kink") && add!("c1Kink", info["c1Kink"])
+    for key in ("c1KinkFallback", "c1KinkProblems", "c1KinkFallbackFailed", "ladder",
+        "ladderClass", "ladderAttempts", "ladderRungs", "ladderRung")
+        haskey(info, key) && add!(key, info[key])
     end
     if mapParams !== nothing
         for k in _REPORT_KEYS
@@ -252,7 +263,8 @@ function _logStats(result)
     add!("divergenceRate", divergenceRate)
     add!("nDivergent", count(s -> s.numerical_error, fit.stats))
     for k in ("rhatMax", "essMin", "essTailMin", "ebfmi", "meanAccept",
-        "treeDepthAvg", "treeDepthMax", "meanNSteps", "iterations", "chainsPooled",
+        "treeDepthAvg", "treeDepthMax", "meanNSteps", "stepSize", "stepSizeMin",
+        "iterations", "chainsPooled",
         "chainsRun", "modes", "optima", "rewhitenedNats", "retryFirstRhat",
         "retryKept",
     )
@@ -367,6 +379,86 @@ function _updateLog(path::AbstractString, title::AbstractString, lines)
     return String(path)
 end
 
+# The file and the section name a run's log goes to: `path` and `name` as given, else the
+# `suffix`-file of the workbook's folder (`<folder>.LOG`, or `statistics-<folder>.LOG`) and
+# the section named after the workbook (`res.xlsx` gives the folder's name, `res_fit3.xlsx`
+# gives `fit3`). `nothing` for a run without a workbook.
+function _logTarget(log, path, name, kind)
+    wb = get(log.info, "workbook", nothing)
+    if path === nothing
+        wb isa AbstractString || return nothing
+        dir = dirname(wb)
+        folder = basename(abspath(dir))
+        path = joinpath(
+            dir,
+            kind == "statistics" ? "statistics-" * folder * ".LOG" :
+            folder * ".LOG",
+        )
+    end
+    if name === nothing
+        stem = wb isa AbstractString ? replace(basename(wb), r"\.xlsx$" => "") : "res"
+        name =
+            stem == "res" ? basename(abspath(dirname(path))) : replace(stem, r"^res_" => "")
+    end
+    return path, name
+end
+
+"""
+    writeStatistics(result; path = nothing, name = nothing, failure = nothing)
+
+Writes the run's statistics: the section of the run in `statistics-<folder name>.LOG`
+(next to the run log, the same `=== <run> ===` section naming, a second call for the
+same run replaces its section). The section is what `Inference` recorded while the run
+happened (`Inference.StatBuffer`) in the layout and wording of the dev tool's
+`bysl fits diagnose`: one block for each attempt in order (the base run, the retry with
+the longer warm-up, a ladder rung, the restart with c1 sampled; each says what triggered
+it, the failure class and the rung applied), with `settings`, `problem`, `map search`
+(L-BFGS starts with their stopping rules, the first-pass Hessian eigenvalues, the optima),
+`nuts`, the `chains` table (divergences split warm-up and sampling, BFMI, c1 at a bound,
+gradient evaluations), `posterior`, `bounds`, `axes`, `correlation`, `residuals`,
+`convergence` (R̂, ESS, Monte Carlo standard error), `gate`, `modes`, `health` (cost per
+effective sample, non-finite evaluations), `c1 search` (solves, Brent iterations), the
+`kink check`, the `stage timings` and the `outcome`; then the `attempts` table and the
+`result`. Every section starts with `-- <name> --`; `Inference.STAT_SECTIONS` and
+`src/inference/README.md` list the names, kinds and columns, and `Inference.statParse`
+reads a log. Where `bysl fits diagnose` replays the model on a grid the section gives the
+same lines from the run's own draws (the differences are in the README). Nothing is
+replayed or estimated: a value that was not recorded is written as `unavailable` with the
+reason. The divergent draws are not in the log; the workbook's `divergences` sheet holds
+them.
+
+# Arguments
+- `result`: a `runModel` return value.
+- `path`, `name`: the file and the section title instead of the ones the workbook gives.
+- `failure`: the text of the error that ended the run, for a section after a failure.
+
+# Returns
+- The path of the file, or `nothing` for a run without statistics or a workbook.
+
+# Exceptions
+- `SystemError` if the file cannot be written.
+"""
+function writeStatistics(result; path = nothing, name = nothing, failure = nothing)
+    log = result[1].timing
+    log === nothing && return nothing
+    return _commitStatistics(log; path, name, failure)
+end
+
+# Moves the statistics of the run in `log` into their section (replacing
+# the old one of the same run in one rewrite); the scratch file stays
+# until the next `runModel` or exit. `nothing` without a buffer.
+function _commitStatistics(log; path = nothing, name = nothing, failure = nothing)
+    buf = Inference.statBuffer(log)
+    # a failure before any attempt (the script died before `runModel`) has nothing to say
+    failure === nothing || Inference.statAttempts(buf) > 0 || return nothing
+    target = _logTarget(log, path, name, "statistics")
+    target === nothing && return nothing
+    path, name = target
+    _updateLog(path, name, Inference.statLines(buf; failure))
+    log.info["statisticsFile"] = abspath(path)
+    return String(path)
+end
+
 """
     writeLog(result; refChi2 = nothing, path = nothing, name = nothing)
 
@@ -400,9 +492,13 @@ The first line of the file, `datetime`, stamps the last write (day, 24-hour
 time, offset from UTC). The cells of a row are padded with spaces to a
 multiple of 8 and followed by one tab, so they line up at any tab width.
 
-[`results`](@ref) writes the log when it is given `runLog = true` (off by default; the
-fitting tests set it); call `writeLog` yourself otherwise, or again after `results` to
-include what came between. A folder's logs are tracked in git, which is why it is small.
+[`results`](@ref) always writes the log, last (there is no switch); call `writeLog`
+again after `results` to include what came between. A folder's logs are tracked in
+git, which is why it is small. The `report write` row of the timing table covers
+the building of the log's text; the final write of the file itself comes after the
+table was formatted and is in no row (a file cannot contain the time of its own
+last write; it is a few milliseconds). The sampler's own statistics, attempt by
+attempt, are in `statistics-<folder name>.LOG` ([`writeStatistics`](@ref)).
 
 # Arguments
 - `result`: a `runModel` return value.
@@ -422,17 +518,9 @@ function writeLog(result; refChi2 = nothing, path = nothing, name = nothing)
     tReport = tick()
     log = result[1].timing
     log === nothing && return nothing
-    wb = get(log.info, "workbook", nothing)
-    if path === nothing
-        wb isa AbstractString || return nothing
-        dir = dirname(wb)
-        path = joinpath(dir, basename(abspath(dir)) * ".LOG")
-    end
-    if name === nothing
-        stem = wb isa AbstractString ? replace(basename(wb), r"\.xlsx$" => "") : "res"
-        name =
-            stem == "res" ? basename(abspath(dirname(path))) : replace(stem, r"^res_" => "")
-    end
+    target = _logTarget(log, path, name, ".LOG")
+    target === nothing && return nothing
+    path, name = target
     meta = [["revision", _logRevision()], ["julia", string(VERSION)],
         ["baysol", _logVersion()]]
     refChi2 === nothing || push!(meta, ["refChi2", string(refChi2)])
@@ -459,6 +547,12 @@ that are known without a result (`revision`, `julia`, `baysol`), `status` `faile
 `_LOG_ERROR_MAX` characters), the scalar run facts `log` has recorded so far (`ph`,
 `nSamples`, ...), then the timing block as far as the run went (when `log` is a stage log)
 and the machine. There are no `fit` rows: their absence, with `status`, marks the failure.
+`workbook` (the path) is a row when the run's workbook of divergent transitions was
+written, and `workbookError` (the text of the error) when writing it failed.
+
+# Arguments
+- `err`, `log`: the error and the run's stage log; `workbook`, `workbookError`: the two
+    rows above, `nothing` for none.
 
 # Returns
 - The lines of the section.
@@ -466,13 +560,16 @@ and the machine. There are no `fit` rows: their absence, with `status`, marks th
 # Exceptions
 - None for the usual errors; `_runLogged` guards the call anyway.
 """
-function _failureLines(err, log::Union{Nothing,StageLog})
+function _failureLines(err, log::Union{Nothing,StageLog}; workbook = nothing,
+    workbookError = nothing)
     msg = replace(sprint(showerror, err), r"\s*[\r\n]+\s*" => " | ", "\t" => " ")
     msg = strip(msg)
     length(msg) > _LOG_ERROR_MAX && (msg = first(msg, _LOG_ERROR_MAX) * "...")
     rows = [["revision", _logRevision()], ["julia", string(VERSION)],
         ["baysol", _logVersion()], ["status", "failed"],
         ["errorType", string(typeof(err))], ["error", msg]]
+    workbook === nothing || push!(rows, ["workbook", string(workbook)])
+    workbookError === nothing || push!(rows, ["workbookError", string(workbookError)])
     if log !== nothing
         skip = ("workbook", "log", "plots", "loadStart", "freeMemoryStart")
         for k in sort!(collect(keys(log.info)))
@@ -496,7 +593,11 @@ Runs the fitting-test script `script` (`include`d in `Main`, as `julia script` w
 it) and, if it throws, writes the failure to the run log before rethrowing: the section is
 named after the script (`SASDA52_fit1.jl` in `SASDA52/` gives `fit1`, `SASDA52.jl` the
 folder name) in `<folder>.LOG` next to it, replacing that run's earlier section, with the
-rows of `_failureLines`. `bysl fits run` starts every script this way. Not exported.
+rows of `_failureLines`. `bysl fits run` starts every script this way. If transitions
+diverged before the failure the run's workbook is written too (`res_<run>.xlsx`, `res.xlsx`
+for the folder's own run) with the `run` (`status`, `errorType`, `error`) and `divergences`
+sheets; a failure before any divergent transition writes none. A workbook that cannot be
+written is a `workbookError` row of the section and never replaces the error. Not exported.
 
 # Returns
 - Whatever the script's last expression gives.
@@ -505,6 +606,8 @@ rows of `_failureLines`. `bysl fits run` starts every script this way. Not expor
 - Whatever the script throws, unchanged (the log write is guarded and never hides it).
 """
 function _runLogged(script::AbstractString; path = nothing, name = nothing)
+    # a script that dies before `seedModel` has no log of its own
+    _LAST_LOG[] = nothing
     try
         return Base.include(Main, script)
     catch err
@@ -521,7 +624,30 @@ function _runLogged(script::AbstractString; path = nothing, name = nothing)
                     startswith(stem, folder * "_") ? stem[(length(folder)+2):end] :
                     folder
             end
-            _updateLog(path, name, _failureLines(inner, _LAST_LOG[]))
+            # the workbook of a failed run with divergent transitions (the `run` and
+            # `divergences` sheets); a failing write is a `workbookError` row, never a
+            # replacement of the error that ended the run
+            wb, wbError = nothing, nothing
+            try
+                wb = _writeFailedWorkbook(
+                    joinpath(dir, name == folder ? "res.xlsx" : "res_" * name * ".xlsx"),
+                    inner, _LAST_LOG[],
+                )
+            catch wbErr
+                wbError = replace(first(sprint(showerror, wbErr), 300), r"[\r\n\t]+" => " ")
+            end
+            _updateLog(
+                path,
+                name,
+                _failureLines(
+                    inner, _LAST_LOG[]; workbook = wb, workbookError = wbError,
+                ),
+            )
+            # what the sampler recorded before it failed, in the folder's statistics file
+            _LAST_LOG[] === nothing || _commitStatistics(
+                _LAST_LOG[]; path = joinpath(dir, "statistics-" * folder * ".LOG"),
+                name, failure = first(sprint(showerror, inner), 400),
+            )
         catch logErr
             @warn "could not write the failure to the run log" exception = logErr
         end

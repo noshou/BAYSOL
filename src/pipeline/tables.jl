@@ -132,15 +132,16 @@ function _writeTables(dir, name, sheets, log; sigfigs::Integer = TABLE_SIGFIGS)
 end
 
 """
-The `draws` sheet: one tidy table, a row for each posterior draw of `fit`, in the order the
-chains are stored, with a frozen header row. The columns, with units in the header text:
-`chain` and `draw` (1-based, within the chain); the sampled parameters `rhoE` (e⁻/Å³) and
-`deltaRho1..3` (units of `UNIT_OF_δρ` e⁻/Å³); the quantities derived from each draw
-that the result already holds, `scale`, `bkgrndCorr`, `exclVolCorr` (the profiled c1)
-and `chi2FitGrid` (the reduced χ² on the fitted grid); and the sampler's flags of the
-draw: `logDensity`, `divergent` (1 for a divergent transition), `treeDepth`, `nSteps`,
-`stepSize` and `acceptanceRate`. A flag the sampler's statistics do not carry has no
-column. Nothing is recomputed: every column is read off `fit`.
+The `draws` sheet: one tidy table, a row for each posterior draw of `fit`, in the
+order the chains are stored, with a frozen header row. The columns, with units in the
+header text: `chain` and `draw` (1-based, within the chain); the sampled parameters
+`rhoE` (e⁻/Å³) and `deltaRho1..3` (units of `UNIT_OF_δρ` e⁻/Å³); the quantities
+derived from each draw that the result already holds, `scale`, `bkgrndCorr`,
+`exclVolCorr` (c1: profiled, or the sampled fifth coordinate when its profile had a
+kink) and `chi2FitGrid` (the reduced χ² on the fitted grid); and the sampler's flags
+of the draw: `logDensity`, `divergent` (1 for a divergent transition), `treeDepth`,
+`nSteps`, `stepSize` and `acceptanceRate`. A flag the sampler's statistics do not
+carry has no column. Nothing is recomputed: every column is read off `fit`.
 """
 function _drawsSheet(fit)
     n = length(fit.samples)
@@ -176,4 +177,72 @@ function _drawsSheet(fit)
     end
     all(c -> length(c) == n, cols) || error("the draws of the fit differ in length")
     return _sheet("draws", names, cols...; frozen = true)
+end
+
+"""
+The `divergences` sheet: one row for each divergent transition of the run, of every attempt
+(the base run, a retry, a ladder rung, the sampled-c1 restart), in the order the attempts
+recorded them, with a frozen header row. The columns: `attempt` (as in the statistics log's
+`attempts` table), `chain`, `draw` (the iteration within the chain, 1-based) and `phase`
+(`warm-up` or `sampling`); the first four sampled parameters `rhoE (e-/A^3)` and
+`deltaRho1..3` (units of `UNIT_OF_δρ` e⁻/Å³) at the divergent draw; `logDensity` and
+`logDensityFromChainMedian` (log π less the median log π of the chain's sampling draws);
+and the sampler's `nSteps` (leapfrog steps) and `treeDepth` of the transition. The sheet is
+written even when no transition diverged (the header row alone): its absence would not say
+that nothing diverged. Nothing is capped. The rows are the sampler's own per-draw records
+(`Inference.statDivergences`); the statistics log does not list them.
+
+# Arguments
+- `rows`: the `NamedTuple`s of `Inference.statDivergences`.
+
+# Returns
+- The sheet made by `_sheet`.
+
+# Exceptions
+- None.
+"""
+function _divergencesSheet(rows)
+    pcol(i) = Float64[r.xi[i] for r in rows]
+    return _sheet("divergences",
+        ["attempt", "chain", "draw", "phase", "rhoE (e-/A^3)",
+            "deltaRho1 ($(UNIT_OF_δρ) e-/A^3)", "deltaRho2 ($(UNIT_OF_δρ) e-/A^3)",
+            "deltaRho3 ($(UNIT_OF_δρ) e-/A^3)", "logDensity",
+            "logDensityFromChainMedian", "nSteps", "treeDepth"],
+        Int[r.attempt for r in rows], Int[r.chain for r in rows],
+        Int[r.draw for r in rows], String[r.phase for r in rows],
+        pcol(1), pcol(2), pcol(3), pcol(4), Float64[r.logπ for r in rows],
+        Float64[r.dLogπ for r in rows], Int[r.steps for r in rows],
+        Int[r.depth for r in rows]; frozen = true)
+end
+
+"""
+The workbook of a run that failed after some of its transitions diverged: the sheets that
+are honest after a failure, the `run` sheet (`status`, `errorType` and `error` rows, the
+columns of the run sheet of a successful run, the values text) and the `divergences` sheet
+([`_divergencesSheet`](@ref)). Nothing else exists to write (no draws were pooled). A run
+that failed without a divergent transition writes no workbook: nothing would be in it that
+the run log does not say.
+
+# Arguments
+- `path`: the workbook (`<folder>/res_<run>.xlsx`, `res.xlsx` for the folder's own run).
+- `err`: the error that ended the run; `log`: the run's stage log (`nothing`: no workbook).
+
+# Returns
+- The path of the workbook, or `nothing` if there is nothing to write.
+
+# Exceptions
+- Whatever the workbook write throws (the caller records it as `workbookError` and goes on
+    with the original error).
+"""
+function _writeFailedWorkbook(path::AbstractString, err, log::Union{Nothing,StageLog})
+    log === nothing && return nothing
+    rows = Inference.statDivergences(Inference.statBuffer(log))
+    isempty(rows) && return nothing
+    msg = replace(first(sprint(showerror, err), _LOG_ERROR_MAX), r"[\r\n\t]+" => " ")
+    run = _sheet("run", ["section", "name", "value", "unit"],
+        fill("run", 4), ["status", "errorType", "error", "divergentTransitions"],
+        Any["failed", string(typeof(err)), msg, length(rows)], fill(missing, 4))
+    sheets = [run, _divergencesSheet(rows)]
+    log.info["workbook"] = abspath(_writeXlsx(path, sheets))
+    return String(path)
 end

@@ -384,15 +384,18 @@ end
         @test quick(dir; fit = grab).status == :done
         inputs, cfg = seen[]
         @test inputs.seedKw == BAYSOL.seedKeywords(defaults)
-        @test cfg.runKw == merge(
+        @test Base.structdiff(cfg.runKw, (; callerSet = 0)) == merge(
             BAYSOL.runKeywords(defaults), (; retry = BAYSOL.Inference.RETRY),
         )
+        # only what `quick` gives is set: nothing of the retry settings
+        @test cfg.runKw.callerSet == Set([:Q_MIN, :Q_MAX, :LMAX])
         @test cfg.resultsKw == BAYSOL.resultsKeywords(defaults)
         @test (cfg.nSamples, cfg.nAdapt, cfg.δ) == (1000, 300, 95)
 
         # a keyword of every kind of entry point overrides the default
         r = quick(
             dir; fit = grab, thickness = 2.5, sasaNOcc = 100, shellSample = 200,
+            memoryHeadroom = 25,
             bounds_δρ₁₂ = (-8, 3), φ_max = 1.5, mapNStarts = 9,
             chainStartRadii = (1, 2, 3), harvestCover = 4, δ = 90, nDraws = 5,
             tex = false, formats = (:pdf, :svg), tableSigfigs = 5,
@@ -401,6 +404,8 @@ end
         @test r.status == :done
         inputs, cfg = seen[]
         @test inputs.seedKw.thickness == 2.5 && inputs.seedKw.sasaNOcc == 100
+        # the CLI/TUI keyword reaches seedModel
+        @test inputs.seedKw.memoryHeadroom == 25
         @test inputs.seedKw.shellSample == 200 && inputs.seedKw.φ_max == 1.5
         @test inputs.seedKw.bounds_δρ₁₂ == (-8.0, 3.0)
         @test inputs.seedKw.probe == defaults[:PROBE_RADIUS]      # the rest is as it was
@@ -422,6 +427,28 @@ end
         @test seen[][1].seedKw.sasaNOcc == 90 && seen[][2].runKw.mapNStarts == 12
         quick(dir; fit = grab, mapNStarts = 9)
         @test seen[][2].runKw.mapNStarts == 9 && seen[][1].seedKw.sasaNOcc == 90
+
+        # the settings the caller set reach the retry ladder as `callerSet`, also when the
+        # value is the default; a model's own settings are added for that model only
+        quick(dir; fit = grab, chainStartRadii = (4, 10, 20), retryNDraws = 8000)
+        @test issubset(
+            Set([:CHAIN_START_RADII, :RETRY_N_DRAWS, :MAP_N_STARTS, :SASA_N_OCC]),
+            seen[][2].runKw.callerSet,
+        )
+        write(
+            joinpath(dir, "settings.json"),
+            "{\"sampler\": {\"RETRY_N_ADAPT\": {\"value\": 2000}}}",
+        )
+        quick(dir; fit = grab)
+        @test :RETRY_N_ADAPT in seen[][2].runKw.callerSet
+        @test !(:RETRY_N_DRAWS in seen[][2].runKw.callerSet)
+        quick(dir; fit = grab, modelSettings = (; crambin = (; retryNDraws = 2000)))
+        @test :RETRY_N_DRAWS in seen[][2].runKw.callerSet
+        write(
+            joinpath(dir, "settings.json"),
+            "{\"sampler\": {\"MAP_N_STARTS\": {\"value\": 12}, " *
+            "\"SASA_N_OCC\": {\"value\": 90}}}",
+        )
 
         # a bad keyword value, or one that breaks a rule with the file's settings, fails
         # the run before any model, as a bad settings.json does

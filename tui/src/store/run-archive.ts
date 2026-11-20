@@ -56,7 +56,7 @@ import {
  * A finished run is `runs/<stamp>.7z` with the run's files in it as FLAT names
  * (`run.LOG`, `<model>.xlsx`, `<model>.tex`, `<model>-plots.txt`, `compare.tsv`, ...), and
  * up to two small companions that keep the cheap files away from the heavy ones (item 16
- * of `notes/ui-bugfix-plan.md`):
+ * of the UI bugfix list in `notes/release-0.5.0-todo.md`):
  *
  * - `<stamp>.meta.7z`: the small metadata (`run.json`, every `.LOG`, `.json`, `.tsv`,
  *   `plots.txt`, `<model>-plots.txt`), so a listing, the comparison and the open-runs

@@ -30,7 +30,7 @@ using BAYSOL.Hydrogenator: relabelModified, restoreModified!, hydrogenationChoic
 using BioStructures: BioStructures, PDBFormat, collectmodels
 
 const _FIXTURES = joinpath(@__DIR__, "..", "..", "fixtures")
-const _T55 = joinpath(_FIXTURES, "experiments", "SASDT55", "SASDT55_fit1_model1.pdb")
+const _T55 = joinpath(Main.experimentFixtureDir("SASDT55"), "SASDT55_fit1_model1.pdb")
 const _G24 = joinpath(_FIXTURES, "molecules", "SASDG24-legacy-rna.pdb")
 
 # a fixed-column ATOM/HETATM record (coordinates and the rest do not matter)

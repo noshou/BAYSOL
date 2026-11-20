@@ -8,7 +8,7 @@ using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDYW6")
+const _FIXTURE_DIR = fixtureDir("SASDYW6")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "SASDYW6_fit2.fit")
 const _CIF_PATH    = joinpath(_FIXTURE_DIR, "SASDYW6_fit2_model1.cif")
 # CRYSOL .fit carries the reference fit curve itself (col 4)
@@ -202,7 +202,6 @@ BAYSOL.results(
     dir = @__DIR__, name = "res_fit2", references = reference,
     formFactorLog = formFactorLog, nAtoms = nAtoms,
     refChi2 = "CRYSOL 3.74",
-    runLog = true,
 )
 
 # `@__DIR__` (this SASDYW6/ folder), not the caller's cwd.

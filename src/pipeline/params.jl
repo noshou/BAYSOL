@@ -384,6 +384,120 @@ as it is, with the hydrogens it carries. Which tool and force field do it is not
 """
 const ADD_HYDROGENS = true
 
+"""
+The failure classes of the ladder, the keys of `LADDER` in the order the classifier
+tries them after the c1 kink (which `runModel` handles in the attempt itself):
+`stepCollapse` (R̂ far above the gate with a collapsed step size), `splitChains` (R̂ far
+above the gate, several modes, low ESS, a healthy step), `divergent` (a divergent share at
+or above the gate with R̂ below the far limit), `structural` (a divergent share of 1 % or
+more that a raised `TARGET_ACCEPT` did not remove), `marginal` (R̂ or ESS just outside
+their gates, nothing else wrong) and `generic` (anything the others do not name). The
+thresholds are the documented constants of `run-model.jl` (`LADDER_RHAT_FAR` and the
+rest); they are not settings.
+"""
+const LADDER_CLASSES =
+    (:stepCollapse, :splitChains, :divergent, :structural, :marginal, :generic)
+
+"""
+The convergence ladder of [`runModel`](@ref): for each failure class (`LADDER_CLASSES`) an
+ordered list of rungs, each `(name, overrides)`. When a run still fails its gates after its
+own retry and the c1 kink fallback, `runModel` classifies the failure from the failed
+attempt's own diagnostics and reruns with the next unused rung of that class (a class can
+change from one attempt to the next; at most three reruns in all). A rung
+reruns the fit with the settings it names in `overrides` (catalog names, the values of
+`LADDER_OVERRIDABLE`, plus the ladder-only keys `RNG_SEED_STEP`, a whole number added to the
+run's `RNG_SEED`, and `SAMPLE_C1`, `true` to sample c1 as a fifth parameter) and nothing
+else; a rung that would change nothing for the caller's settings is skipped.
+`CHAIN_START_RADII`, `RETRY_N_ADAPT` and `RETRY_N_DRAWS` are applied only when the caller
+left them at their default. The defaults: `stepCollapse`: `TARGET_ACCEPT` 70, then 35 (a
+lower target is a larger step); `splitChains`: `CHAIN_START_RADII` (2, 4, 6), then (1, 2, 3)
+with a 4000 + 4000 rerun; `divergent`: `TARGET_ACCEPT` 99, then 99 with radii (1, 2, 3) and
+4000 + 4000, then that with `RNG_SEED_STEP` 1 (the validated rungs of the 2026-11-18
+report); `structural`: sample c1; `marginal`: retry lengths 6000 + 8000, then those with the
+next seed; `generic`: 4000 + 4000 with the next seed. A user value is a map from class to
+rung list and replaces only the classes it names (`[]` switches a class off; the whole
+ladder is off with `false`, `"off"` or a map with every class empty); the same in
+`settings.json`, `model-settings.json` (against the project's ladder) and the keyword
+`ladder` of `runModel` and `runProject`. The override keys are written sorted by name,
+the one order every source (a `Dict` has none) gives.
+"""
+const LADDER = (
+    stepCollapse = (
+        (name = "delta 70", overrides = (TARGET_ACCEPT = 70,)),
+        (name = "delta 35", overrides = (TARGET_ACCEPT = 35,)),
+    ),
+    splitChains = (
+        (name = "starts (2,4,6)", overrides = (CHAIN_START_RADII = (2.0, 4.0, 6.0),)),
+        (
+            name = "close starts, longer",
+            overrides = (
+                CHAIN_START_RADII = (1.0, 2.0, 3.0), RETRY_N_ADAPT = 4000,
+                RETRY_N_DRAWS = 4000,
+            ),
+        ),
+    ),
+    divergent = (
+        (name = "delta 99", overrides = (TARGET_ACCEPT = 99,)),
+        (
+            name = "delta 99, close starts, longer",
+            overrides = (
+                CHAIN_START_RADII = (1.0, 2.0, 3.0), RETRY_N_ADAPT = 4000,
+                RETRY_N_DRAWS = 4000, TARGET_ACCEPT = 99,
+            ),
+        ),
+        (
+            name = "delta 99, close starts, longer, next seed",
+            overrides = (
+                CHAIN_START_RADII = (1.0, 2.0, 3.0), RETRY_N_ADAPT = 4000,
+                RETRY_N_DRAWS = 4000, RNG_SEED_STEP = 1, TARGET_ACCEPT = 99,
+            ),
+        ),
+    ),
+    structural = ((name = "sample c1", overrides = (SAMPLE_C1 = true,)),),
+    marginal = (
+        (
+            name = "longer chains",
+            overrides = (RETRY_N_ADAPT = 6000, RETRY_N_DRAWS = 8000),
+        ),
+        (
+            name = "longer chains, next seed",
+            overrides = (
+                RETRY_N_ADAPT = 6000, RETRY_N_DRAWS = 8000, RNG_SEED_STEP = 1,
+            ),
+        ),
+    ),
+    generic = (
+        (
+        name = "longer, next seed",
+        overrides = (RETRY_N_ADAPT = 4000, RETRY_N_DRAWS = 4000, RNG_SEED_STEP = 1),
+    ),
+    ),
+)
+
+"""
+The settings a ladder rung may override: only the ones that steer the sampler, the starts
+and the seed of one fit (the `runModel` keywords). Never a plot, file, structure or buffer
+setting, and no `seedModel` setting either (a rung reruns `runModel` on the same seed, so a
+prior bound would have no effect); `LADDER` itself and `RETRY` are refused. VALIDATED:
+`TARGET_ACCEPT` upward (99), `CHAIN_START_RADII`, `RETRY_N_ADAPT`, `RETRY_N_DRAWS` and the
+ladder-only `RNG_SEED_STEP` (see `LADDER_VALIDATED`); every other name here, and a
+`TARGET_ACCEPT` below the default, is allowed but has not been checked against a benchmark.
+"""
+const LADDER_OVERRIDABLE = (
+    :TARGET_ACCEPT, :CHAIN_START_RADII, :RETRY_N_ADAPT, :RETRY_N_DRAWS, :N_ADAPT,
+    :N_DRAWS, :VAL_SIGMA, :N_CHAINS, :OPTIMUM_CHAIN_CAP, :OPTIMUM_MIN_CHAINS,
+    :OPTIMUM_CHAIN_RADIUS, :OPTIMUM_CHAIN_FRACTION, :MAP_MAX_ITER, :MAP_N_STARTS,
+    :MAP_F_SUCCESSIVE, :MAP_OPTIMA_KEPT, :MAP_JITTER_RADII, :MAP_JITTER_DIRECTIONS,
+    :MAP_JITTER_MAX_OPTIMA, :MAP_JITTER_WITHIN_NATS, :BASIN_RESTART_NATS,
+    :HARVEST_COVER,
+    :HARVEST_DIVERGENT, :RNG_SEED_STEP, :SAMPLE_C1,
+)
+
+"The ladder override keys that a benchmark report validated (the others are unvalidated)."
+const LADDER_VALIDATED = (
+    :TARGET_ACCEPT, :CHAIN_START_RADII, :RETRY_N_ADAPT, :RETRY_N_DRAWS, :RNG_SEED_STEP,
+)
+
 # Sanity limits: positive, inside their range, and never a zero where the code divides.
 @assert(isfinite(VAL_SIGMA) && VAL_SIGMA > 0, "VAL_SIGMA must be a finite number above 0")
 @assert(N_ADAPT ≥ 1 && N_DRAWS ≥ 1, "N_ADAPT and N_DRAWS must be at least 1")
@@ -497,7 +611,7 @@ const SETTING_NAMES = (
     :PLOT_XTICK_ELBOW_PT, :PLOT_XTICK_LABEL_PAD_PT, :PLOT_YTICK_LABEL_PAD_PT,
     :Q_MIN, :Q_MAX, :SIGMA_SCALE, :EXCLUDE_Q, :LMAX, :CHAINS, :MODEL, :ADD_HYDROGENS,
     :PLOT_COMPARE, :PLOT_COMPARE_COLOURS, :PLOT_COMPARE_MARKERS, :PLOT_LW_COMPARE,
-    :PLOT_TUI_SIZES,
+    :PLOT_TUI_SIZES, :LADDER,
 )
 
 """
@@ -508,7 +622,8 @@ its own), `:ranges` (a list of `(low, high)` pairs of q), `:strings` (a list of 
 colour may be repeated) and `:markers` (an ordered, non-empty list of marker names from
 the setting's `SETTING_CHOICES`; a name may be repeated) and `:sizes` (an ordered,
 non-empty list of `[width, height]` pairs of whole numbers, each larger than the one
-before in both) and `:path` (a text for a file or folder path, which may be empty for
+before in both), `:ladder` (a list of `(name, overrides)` rungs, see `LADDER`) and
+`:path` (a text for a file or folder path, which may be empty for
 "not set"; no control characters, at most 4096 characters). Every other setting has the
 kind of its default (`settingKind`).
 """
@@ -516,7 +631,7 @@ const SETTING_KINDS = (
     Q_MIN = :optionalFloat, Q_MAX = :optionalFloat, LMAX = :optionalInt,
     EXCLUDE_Q = :ranges, CHAINS = :strings, PLOT_COMPARE_COLOURS = :colours,
     PLOT_COMPARE_MARKERS = :markers, PLOT_TUI_SIZES = :sizes, FIGURES_DIR = :path,
-    FIGURES_COMPILER = :path, TABLE_DIR = :path, PLOT_Q_UNIT = :choice,
+    FIGURES_COMPILER = :path, TABLE_DIR = :path, PLOT_Q_UNIT = :choice, LADDER = :ladder,
 )
 
 """

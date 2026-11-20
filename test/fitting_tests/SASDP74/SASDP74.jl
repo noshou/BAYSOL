@@ -7,7 +7,7 @@ using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDP74")
+const _FIXTURE_DIR = fixtureDir("SASDP74")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDP74.dat")
 
 # ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDP74.dat")
 # Curve units: the SASBDB .dat is already in Å⁻¹ (q 0.0026-0.34 Å⁻¹, 2566 rows, two
 # free-text header lines, a trailer of frame bookkeeping; `_readCurve` keeps the numeric
 # rows). 246 rows have a non-positive intensity (noisy low q, σ ~ 0.08 at q = 0.0026),
-# dropped by `seedModel` after binning; the fit uses q ≤ 0.3 Å⁻¹ (evidence at
+# dropped by `seedModel` after binning; the fit uses q ≤ 0.25 Å⁻¹ (evidence at
 # `Q_MAX_FIT`), the .fit reaches 0.34.
 #
 # Model (fit2_model1, "PyMOL", type "atomic", symmetry P1; SASBDB comment "PDB:8A4I. Chains
@@ -107,10 +107,14 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# q cut, kept (flat noise floor; rule in README.md): 0.3 Å⁻¹. The data run to 0.340 Å⁻¹,
-# but the 305 points above 0.3 Å⁻¹ (σ > 0) have a median I/σ of 0.22 and 38 % of them have
-# I ≤ 0; the lowest-q quarter of them (up to 0.31 Å⁻¹) has a median I/σ of 0.23.
-const Q_MAX_FIT = 0.3
+# q cut: 0.25 Å⁻¹. The data run to 0.340 Å⁻¹ and the noise floor is flat above 0.3: the 305
+# points above 0.3 Å⁻¹ (σ > 0) have a median I/σ of 0.22 and 38 % of them have I ≤ 0. With
+# the cut at 0.3 the strict gates fail on every rung of the ladder (7.5 % divergent
+# transitions in the base run, 0.6 % to 1.9 % after the retries and the sampled-c1
+# restart: a 2026-11-20 rerun, ladder exhausted). At 0.25 the ladder passes at its
+# delta 99 rung with c1 sampled (R̂ 1.003, 0.036 % divergent, seed 0): the 0.25 to 0.3
+# range adds nearly nothing but a difficult posterior geometry (rule in README.md).
+const Q_MAX_FIT = 0.25
 
 # The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
 # the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
@@ -206,7 +210,6 @@ for run in RUNS
         dir = @__DIR__, name = "res$(suffix)", references,
         formFactorLog = formFactorLog, nAtoms = nAtoms,
         refChi2 = run.refChi2,
-        runLog = true,
     )
 
     # `@__DIR__` (this SASDP74/ folder), not the caller's cwd.

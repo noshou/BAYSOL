@@ -9,7 +9,8 @@ export AVOGADRO, PLANCK_CONSTANT, SPEED_OF_LIGHT, ELEMENTARY_CHARGE, ANGSTROM_PE
     HC_EV_ANGSTROM, energyEv, WATER_MOLAR_MASS, WATER_DENSITY_UNCERTAINTY,
     KELL_DENSITY_NUM, KELL_DENSITY_DEN, WATER_ELECTRONS, ANGSTROM3_PER_LITER, CM3_PER_LITER,
     PM_PER_ANGSTROM, NM_INV_PER_ANGSTROM_INV, UNIT_OF_δρ, NS_PER_S, MS_PER_S,
-    STANDARD_TEMPERATURE_C, BACKBONE_ELECTRONS
+    STANDARD_TEMPERATURE_C, BACKBONE_ELECTRONS, KELVIN_OFFSET, LN10,
+    EV_EXP_COEFF, FOUR_PI, LOG_TWO_PI
 
 "Avogadro constant, mol⁻¹ (CODATA, exact since the 2019 SI redefinition)."
 const AVOGADRO = 6.02214076e23
@@ -130,5 +131,32 @@ the temperature standard-state data (e.g. the
 bundled partial-molar-volume tables) are at.
 """
 const STANDARD_TEMPERATURE_C = 25.0
+
+"Kelvin minus °C: T (K) = t (°C) + `KELVIN_OFFSET` (absolute zero is −`KELVIN_OFFSET` °C)."
+const KELVIN_OFFSET = 273.15
+
+"Natural logarithm of 10."
+const LN10 = log(10)
+
+"""
+Coefficient of the excluded-volume exponent, (4π/3)^(2/3) / 4π, used by
+[`excludedVolumeFactor`](@ref BAYSOL.Scattering.excludedVolumeFactor) and by the
+`c1` profiling.
+
+Converts CRYSOL's *radius* parameterisation into the *volume* parameterisation
+[`_gaussianDummy`](@ref BAYSOL.Scattering._gaussianDummy) is written in,
+via V = (4π/3) r³ (which is exactly `Geometry.sphereVolume`,
+so `rM` and the dummy volumes stay consistent).
+"""
+const EV_EXP_COEFF = (4π / 3)^(2 / 3) / (4π)
+
+"""
+The solid angle of the sphere, 4π: the prefactor of the
+partial-wave expansion and the `s = q/4π` of the form factors.
+"""
+const FOUR_PI = 4π
+
+"Natural logarithm of 2π, `log(2π)`: the constant of the Gaussian log density."
+const LOG_TWO_PI = log(2π)
 
 end # module

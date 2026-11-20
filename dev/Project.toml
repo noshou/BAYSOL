@@ -3,6 +3,7 @@ uuid = "7d1c5e2a-3b0f-4c58-9a41-6e2f8b9d0c11"
 version = "0.1.0"
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
@@ -17,6 +18,7 @@ Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
+CSV = "0.10.17"
 CodecZlib = "0.7.9"
 Dates = "1.11.0"
 Downloads = "1.7.0"

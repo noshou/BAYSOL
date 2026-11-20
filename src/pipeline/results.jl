@@ -220,7 +220,7 @@ function _curveData(result, data, style::PlotStyle)
     logI = log10.(I)
     # capped: a σ far above I overflows exp10 to Inf, which PGFPlotsX rejects; a bar
     # that long runs off any axis anyway
-    log_σ = min.(σ ./ (I .* log(10)), 20.0)
+    log_σ = min.(σ ./ (I .* LN10), 20.0)
     band = quant = mapc = nothing
     if quantileResult !== nothing
         _, curves = quantileResult
@@ -1217,11 +1217,13 @@ and one **comparison** figure per entry of `references` (data, reference curve, 
 `<name>_comparison`, or `<name>_comparison_<reference name>` when there are several). The
 models of one run, with all the references, on ONE figure are [`compareResults`](@ref).
 
-The files are laid out under `dir`: the `.tex` figures (and what is compiled from them) in
-`dir/plots/`, and the numbers as one workbook `dir/<name>.xlsx`; the run's log (timings
-and what is worth tracking), which [`writeLog`](@ref) writes when `runLog = true`, is
-the section of `name` in `dir/<folder name>.LOG`. `name` is the first part of every file
-name, so several runs can share a folder. Three kinds of output come out of each figure:
+The files are laid out under `dir`: the `.tex` figures (and what is compiled from
+them) in `dir/plots/`, and the numbers as one workbook `dir/<name>.xlsx`; the
+run's log (timings and what is worth tracking), which [`writeLog`](@ref) writes
+last, is the section of `name` in `dir/<folder name>.LOG`, and the sampler's own
+statistics, attempt by attempt ([`writeStatistics`](@ref)), the section in
+`dir/statistics-<folder name>.LOG`. `name` is the first part of every file name,
+so several runs can share a folder. Three kinds of output come out of each figure:
 
 - a **terminal preview** printed to `io` (`preview = true`), made with UnicodePlots, which
     needs nothing installed;
@@ -1245,20 +1247,24 @@ name, so several runs can share a folder. Three kinds of output come out of each
         prior mean, in prior standard deviations (θ-space);
     - `modes` and `optima`: only when the posterior has more than one mode or optimum;
     - `formFactorLog`: only when `formFactorLog` is given or the seed has one;
-    - `data` (`q | I | sigma`, the fitted curve), `model` (`q | I_map | quantileLo |
-        quantileHi | boundLo | boundHi`), `residuals` (`q | I | sigma | I_map |
-        residual`), one `hist_<parameter>` (`binLo | binHi | count`) for each histogram,
-        `draws` (one tidy table, a row for each draw, header frozen and units in the
-        header text: `chain`, `draw` within the chain, the four sampled parameters,
-        `scale`, `bkgrndCorr`, `exclVolCorr`, `chi2FitGrid`, and the sampler's flags
-        `logDensity`, `divergent`, `treeDepth`, `nSteps`, `stepSize` and
-        `acceptanceRate`, each only if the statistics carry it) and one
-        `ref_<name>` (`q | I`) for each reference curve.
-    The README of `src/pipeline/` explains every row of `run`.
+    - `data` (`q | I | sigma`, the fitted curve), `model`
+        (`q | I_map | quantileLo | quantileHi | boundLo | boundHi`), `residuals`
+        (`q | I | sigma | I_map | residual`), one `hist_<parameter>`
+        (`binLo | binHi | count`) for each histogram, `divergences` (one row for each
+        divergent transition of every attempt, header only if none), `draws` (one tidy
+        table, a row for each draw, header frozen and units in the header text: `chain`,
+        `draw` within the chain, the four sampled parameters, `scale`, `bkgrndCorr`,
+        `exclVolCorr`, `chi2FitGrid`, and the sampler's flags `logDensity`, `divergent`,
+        `treeDepth`, `nSteps`, `stepSize` and `acceptanceRate`, each only if the
+        statistics carry it) and one `ref_<name>` (`q | I`) for each reference curve.
+        The README of `src/pipeline/` explains every row of `run`.
 
 The time of each figure (its data, preview, `.tex` and LaTeX run), of the summary tables
 and of writing the workbook is recorded in the run's timing log as stages of the `plot`
-group, so the log's timings list them; with `runLog` it calls [`writeLog`](@ref) last.
+group, so the log's timings list them (the statistics' own computation and write too, as
+`statistics`); it then always calls [`writeStatistics`](@ref) and [`writeLog`](@ref), last.
+A failure of the statistics never fails the call: it is the `statisticsError` row of the
+file.
 
 # Arguments
 - `result`: what `runModel` returned.
@@ -1275,10 +1281,8 @@ group, so the log's timings list them; with `runLog` it calls [`writeLog`](@ref)
     `lualatex` or `xelatex` to compile; the terminal plots and the data do not depend on it.
 - `preview`, `io`: whether to print the terminal plots, and where.
 - `tex`, `compile`, `formats`: as above.
-- `runLog`: also write the run's section of the folder's run log ([`writeLog`](@ref)),
-    `false` by default; the fitting tests set it. The log is then in the files returned.
 - `refChi2`: the reference χ², the depositor's with its method (`"CRYSOL 1.37"`), which
-    the log prints in the run's section as the `refChi2` row (only with `runLog`), and
+    the log prints in the run's section as the `refChi2` row, and
     the legend of each comparison figure prints beside the reference curve.
 - `formFactorLog`, `nAtoms`: the seed's `seed.fw.formFactorLog` and `seed.fw.nAtoms`
     for the `formFactorLog` and `run` sheets; given by themselves when `data` is a
@@ -1326,7 +1330,6 @@ function results(
     tex::Bool = FIGURES_TEX,
     compile::Bool = FIGURES_COMPILE,
     formats = FIGURES_FORMATS,
-    runLog::Bool = false,
     refChi2::Union{Nothing,AbstractString} = nothing,
     formFactorLog = nothing,
     nAtoms = nothing,
@@ -1486,6 +1489,13 @@ function results(
             )
         end
         push!(sheets, _drawsSheet(result[1]))
+        # every divergent transition of the run, empty if none (header only)
+        push!(
+            sheets,
+            _divergencesSheet(
+                Inference.statDivergences(Inference.statBuffer(result[1].timing)),
+            ),
+        )
         hs
     end
     for h in hists
@@ -1534,10 +1544,19 @@ function results(
     any(endswith(".tex"), written) &&
         (log.info["plots"] = abspath(joinpath(dir, PLOT_SUBDIR))) # printSummary names it
 
-    if runLog
-        logfile = writeLog(result; refChi2)
-        logfile === nothing || push!(written, logfile)
+    # the statistics the run recorded as it ran (written before the log, so that their time
+    # is a row of the log's timing table); an error here is a row, never a failed fit
+    statfile = timed!(log, :plot, 1, "statistics") do
+        try
+            writeStatistics(result)
+        catch err
+            @warn "could not write the statistics" exception = err
+            nothing
+        end
     end
+    statfile === nothing || push!(written, statfile)
+    logfile = writeLog(result; refChi2)
+    logfile === nothing || push!(written, logfile)
 
     return written
 end

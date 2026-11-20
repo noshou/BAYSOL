@@ -72,7 +72,7 @@ Every check before a commit.
 Steps, in order; all run, and the exit status is 1 if any failed:
     tool-tests, pmv-mean, solute-index, residue-table, unit-tests, concurrency-tests,
     whitespace, default-settings, ts-format, ts-unused, julia-format, line-length,
-    results-table, docs-build
+    results-table, q-units, docs-build
 
     --quick     skip the Julia steps (unit-tests, concurrency-tests,
                 default-settings, julia-format, docs-build)
@@ -196,6 +196,7 @@ function steps(julia)
         ("julia-format", false, ["bysl", "fmt", "--check", "--julia"]),
         ("line-length", true, ["bysl", "fmt", "--lines"]),
         ("results-table", true, ["bysl", "results", "table", "--check"]),
+        ("q-units", true, ["bysl", "fits", "units"]),
         ("docs-build", false, ["bysl", "docs"]),
     ]
 end

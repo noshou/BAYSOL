@@ -847,6 +847,11 @@
    "ion": "chloride"
   },
   "solute": "bis-tris propane",
+  "speciesRows": [
+   "bis-tris propane dication",
+   "bis-tris propane cation",
+   "bis-tris propane"
+  ],
   "counterIonRows": {
    "cation": [
     "sodium(1+)",
@@ -1704,8 +1709,31 @@
    "gly-gly"
   ],
   "kind": "buffer",
-  "available": false,
+  "available": true,
   "groups": [
+   {
+    "pKa25": 3.14,
+    "pKaSigma": 0.02,
+    "dpKaDtPerK": null,
+    "dHKjMol": null,
+    "dCpJKMol": null,
+    "zAcid": 1,
+    "zBase": 0,
+    "thermodynamic": true,
+    "scale": "thermodynamic pK, molality standard state (I = 0), 25 C, 0.1 MPa",
+    "source": "Goldberg, Kishore & Lennen 2002, J. Phys. Chem. Ref. Data 31, 231, DOI 10.1063/1.1416902, Table 7.33 (pK1 3.140, carboxyl of the cation); the evaluation code and any dH of this step were not recorded when it was first omitted, so sigma is the engine floor",
+    "verified": false,
+    "crosscheck": {
+     "independentValues": {},
+     "pKDiffVsIndependent": {},
+     "dpKaDtDiffVsIndependent": {},
+     "reasonsNotVerified": [
+      "no independent pK read",
+      "no dH or dpKa/dT recorded"
+     ]
+    },
+    "note": "far below the usable range (pH 7.3-9.3): the +1 species is a trace there"
+   },
    {
     "pKa25": 8.265,
     "pKaSigma": 0.003,
@@ -1743,7 +1771,12 @@
    "kind": "base",
    "ion": "sodium"
   },
-  "solute": null,
+  "solute": "glycylglycine",
+  "speciesRows": [
+   "glycylglycine(1+)",
+   "2-(2-aminoacetamido)acetic acid",
+   "glycylglycine(1-)"
+  ],
   "counterIonRows": {
    "cation": [
     "sodium(1+)",
@@ -1753,10 +1786,11 @@
     "chloride"
    ]
   },
-  "verified": true,
-  "notes": "pK1 3.140 (H2L+ to HL+-) omitted. No glycylglycine row in the bundled tables: add one before offering this template (`solute` null, `available` false).",
+  "verified": false,
+  "notes": "Three species (+1, zwitterion, -1) are Polymer rows of polymers.tsv: the zwitterion is measured (76.3, Diglycine), the +1 (84.7) and -1 (80.4) are predicted without uncertainty (10.1007/s00239-014-9616-1), which the owner accepted as an estimate (2026-11-18). The zwitterion is written under its IUPAC name because the Polymer name `glycylglycine` is parsed as the peptide GG, whose termini titrate with pH on top of the ladder.",
   "caveats": [
-   "Good/Wikipedia 20 C pKa 8.20 vs Calbiochem 8.40: 0.2 apart"
+   "Good/Wikipedia 20 C pKa 8.20 vs Calbiochem 8.40: 0.2 apart",
+   "the +1 and -1 species volumes are predicted (no uncertainty in the table): an estimate"
   ]
  },
  {
@@ -2256,5 +2290,112 @@
   "pH": 7.0,
   "verified": true,
   "notes": "1x is the 20-fold dilution of the 20x stock (derived). Model at 22 C, I = 0.24 M: Cit3- 14.22, HCit2- 0.78 mM, 0.78 mM HCl needed from trisodium citrate. The 20x stock itself (I = 3.3 M) is outside the range of Davies and is not offered."
+ },
+ {
+  "id": "te",
+  "label": "TE buffer (pH 8.0), 10 mM Tris-HCl 1 mM EDTA",
+  "aliases": [
+   "te",
+   "te buffer",
+   "1x te"
+  ],
+  "kind": "mixture",
+  "components": [
+   {
+    "solute": "disodium EDTA",
+    "mM": 1,
+    "sigmaMm": 0.02,
+    "source": "Promega 'Recipes for Common Laboratory Solutions' technical reference (read as PDF, pdftotext): '1X TE buffer (pH 8.0): 10mM Tris-HCl (pH 8.0), 1mM EDTA'; the stock recipe there uses Na2EDTA.2H2O. The EDTA protonation is not modelled (the partial molar volume of disodium EDTA is itself derived by additivity)"
+   }
+  ],
+  "bufferComponents": [
+   {
+    "template": "tris",
+    "mM": 10,
+    "titrant": {
+     "kind": "acid",
+     "ion": "chloride"
+    },
+    "source": "Promega 'Recipes for Common Laboratory Solutions' technical reference (read as PDF, pdftotext)"
+   }
+  ],
+  "pH": 8.0,
+  "verified": false,
+  "notes": "Recipe read; flagged unverified because the EDTA species are not in the speciation model (about 1 mM, so the effect on the solvent is small) and the disodium EDTA volume is derived, not measured. TE-4 (0.1 mM EDTA) is the same page, 2.21 g Tris + 0.037 g Na2EDTA.2H2O per litre (10 mM / 0.1 mM), not offered separately."
+ },
+ {
+  "id": "ste",
+  "label": "STE, 10 mM Tris-HCl 50 mM NaCl 1 mM EDTA (pH 8.0)",
+  "aliases": [
+   "ste",
+   "ste buffer"
+  ],
+  "kind": "mixture",
+  "components": [
+   {
+    "solute": "sodium chloride",
+    "mM": 50,
+    "sigmaMm": 0.5,
+    "source": "web-search summary of a lab notebook page (jeremiahfaith.com open notebook); the page itself was NOT read"
+   },
+   {
+    "solute": "disodium EDTA",
+    "mM": 1,
+    "sigmaMm": 0.02,
+    "source": "same (not read)"
+   }
+  ],
+  "bufferComponents": [
+   {
+    "template": "tris",
+    "mM": 10,
+    "titrant": {
+     "kind": "acid",
+     "ion": "chloride"
+    },
+    "source": "same (not read)"
+   }
+  ],
+  "pH": 8.0,
+  "verified": false,
+  "notes": "Unverified: composition known only from a search-result summary of one lab's page; STE varies between labs (NaCl 50-150 mM seen in summaries). Replace the source by a read primary reference before relying on it."
+ },
+ {
+  "id": "ni-nta-elution",
+  "label": "Ni-NTA elution buffer, 50 mM Na-phosphate 300 mM NaCl 250 mM imidazole (pH 8.0)",
+  "aliases": [
+   "ni-nta elution",
+   "his-tag elution",
+   "imidazole elution buffer"
+  ],
+  "kind": "mixture",
+  "components": [
+   {
+    "solute": "sodium chloride",
+    "mM": 300,
+    "sigmaMm": 3,
+    "source": "QIAGEN Ni-NTA Fast Start Kit page, FAQ-3353 (read): 'The composition of the elution buffer in the Ni-NTA Fast Start Kit is 50 mM Na-phosphate, 300 mM NaCl and 250 mM imidazole at pH 8.0.'"
+   },
+   {
+    "solute": "imidazole",
+    "mM": 250,
+    "sigmaMm": 5,
+    "source": "same; imidazole (pKa about 7) is about 10 % protonated at pH 8 and is entered as the neutral species (approximation)"
+   }
+  ],
+  "bufferComponents": [
+   {
+    "template": "phosphate",
+    "mM": 50,
+    "titrant": {
+     "kind": "base",
+     "ion": "sodium"
+    },
+    "source": "same"
+   }
+  ],
+  "pH": 8.0,
+  "verified": false,
+  "notes": "Elution recipe read from the vendor FAQ (the kit's own wording; FAQ-788 says the exact kit composition is confidential, and the QIAexpressionist handbook appendix is the reference for the lysis and wash buffers, which were not read: 10-20 mM imidazole per the QIAGEN Superflow page summary). Unverified because the imidazole acid-base equilibrium is not in the model (one buffer component per mixture) and 250 mM is a high ionic strength for the Davies model."
  }
 ]

@@ -415,10 +415,11 @@ export function parseTable(
     const { delimiter, width } = best
     const found = best.start >= 0
     const decimal = delimiter !== ","
-    // a data row has as many cells as the first one with a number in it, or is all numbers
+    // a data row is all numbers, or has the width of the first one and starts with a
+    // number (a footer such as `parent-buffer-frames: x.dat 0` starts with text)
     const isData = (cells: string[]): boolean =>
         (cells.length >= 2 && cells.every((c) => isNumber(c, decimal))) ||
-        (found && cells.length === width && cells.some((c) => isNumber(c, decimal)))
+        (found && cells.length === width && isNumber(cells[0] ?? "", decimal))
     const rest = body.slice(Math.max(0, best.start))
     const end = found ? rest.findIndex((row) => !isData(cellsOf(row, delimiter))) : -1
     const rows = (end < 0 ? rest : rest.slice(0, end)).slice(0, limit + 1)

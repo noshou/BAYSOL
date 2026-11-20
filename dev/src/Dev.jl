@@ -12,6 +12,7 @@ include("harvest.jl")
 include("results.jl")
 include("cache.jl")
 include("checks.jl")
+include("fixtures.jl")
 include("fits.jl")
 include("pmv.jl")
 include("extract.jl")
@@ -39,6 +40,8 @@ const TASKS = [
     "docs" => (Checks.Docs, "Build the documentation site (strict, about a minute)"),
     "cache" => (Cache, "The cache of the programs the tools start: list, clear"),
     "fits" => (Fits, "The fitting tests: run, list, diagnose, profile"),
+    "fixtures" =>
+        (Fixtures, "Fixture archive sets as .7z archives: list, pack, unpack, clean"),
     "extract" => (Extract, "Regenerate bundled data: formfactor, components, pmv"),
     "plots" => (Plots, "LaTeX figures: render, fonts"),
     "vis" => (Vis, "The visual checks of the geometry code"),

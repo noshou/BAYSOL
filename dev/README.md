@@ -24,7 +24,7 @@ bysl fits run SASDMJ9 --bench --approved               # runs the benchmark (see
 bysl fits diagnose --residuals                         # no fit named: every run of every fitting test
 bysl fits diagnose SASDMJ9                             # every diagnostic part on this fit
 bysl fits diagnose --chains --seeds 1,2,3 SASDMJ9      # only the chains, three RNG seeds
-bysl fits diagnose --report --out /tmp/d SASDTK5:fit3_model1   # one part, written to /tmp/d/report.txt
+bysl fits diagnose --report --out /tmp/d `SASDTK5:fit3_model1`   # one part, written to /tmp/d/report.txt
 bysl fits profile SASDMJ9                              # where the static build spends its time
 bysl results table --update                            # regenerate the Results table in fitting_tests/README.md
 bysl results table --check                             # exit 1 if that table is stale
@@ -44,9 +44,13 @@ bysl docs                                              # build the documentation
 bysl precommit                                         # all pre-commit checks
 bysl precommit --quick                                 # only the checks that take a second
 bysl cache list                                        # what the tools' programs left in the cache
+bysl fixtures list                                     # the archive sets, their archives, what is unpacked
+bysl fixtures pack                                     # test/fixtures/experiments/<ID>/ -> <ID>.7z (all, or the IDs named)
+bysl fixtures unpack SASDMJ9                           # the archive into the tmp folder (reused if complete)
+bysl fixtures clean                                    # remove the unpacked copies (only the tool's own tmp folder)
 ```
 
-The whole unit suite (no file names given) runs in `UNIT_JOBS` Julia processes at once (default 2; `UNIT_JOBS=1` is the old single process), with the files shared out by their measured times in `dev/scripts/unittests.jl`; a run that names files stays in one process. `bysl precommit` takes about 5.5 minutes with it.
+The whole unit suite (no file names given) runs in `UNIT_JOBS` Julia processes at once (default 2; `UNIT_JOBS=1` is a single process), with the files shared out by their measured times in `dev/scripts/unittests.jl`; a run that names files stays in one process. `bysl precommit` takes about 5.5 minutes with it.
 
 Every tool prints its usage with `--help`; a tool with subcommands (`fits`, `harvest`, `results`, `plots`, `extract`) lists them, and `bysl fits run --help` describes one. The ones that start long jobs (`fits run`, `fits diagnose`, `fits profile`, `fits bench`, `precommit`) accept `--dry-run` or print their plan (print the commands, run nothing). They stop before running anything if a name you give does not exist.
 
@@ -64,16 +68,16 @@ Every tool prints its usage with `--help`; a tool with subcommands (`fits`, `har
 ## Files
 
 
-| File or folder                                                                                                              | What it is                                                                                                                                                                                                                                                       |
-| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `bysl.jl`                                                                                                                   | the launcher: client of the daemon, `daemon` management, `BYSL_DIRECT`                                                                                                                                                                                           |
-| `Project.toml`, `Manifest.toml`                                                                                             | the environment of the package `Dev`                                                                                                                                                                                                                             |
-| `src/Dev.jl`                                                                                                                | the registry of the tools and the dispatcher; `server.jl` is the daemon, `common.jl` the helpers every tool shares (the repository root, running programs, git, the fitting-test lookups, number formatting, the cache), `precompile.jl` the precompile workload |
-| `src/fmt.jl`, `harvest.jl`, `results.jl`, `fits.jl`, `Plots.jl`, `extract.jl`, `checks.jl`, `vis.jl`, `cache.jl`, `Test.jl` | one file per tool (`bysl fmt`, `harvest`, `results`, `fits`, `plots`, `extract`, `precommit` with `unit` and `docs`, `vis`, `cache`, `test`)                                                                                                                     |
-| `src/report.jl`                                                                                                             | the readers of a fitting-test run: `parse_log` turns the sections of a run log (`<ID>.LOG`) into maps of numbers, `parse_report` reads the text reports (`res*.txt`) of older revisions; used by `results.jl`                                                    |
-| `test/`                                                                                                                     | the tests of the tools (`runtests.jl`, `test-*.jl`, `helpers.jl`, `data/`) and their own `Project.toml`; run by `bysl test`                                                                                                                                      |
-| `scripts/child.jl`, `diagnose.jl`, `profile-seed.jl`, `format.jl`, `harvest-defaults.jl`, `extract-formfactor.jl`, `unittests.jl` | the Julia scripts the tools start in another environment: the benchmark's measured process, the diagnostics, the profiler, JuliaFormatter, the two that need BAYSOL or SQLite from the root project, and the runner of the unit suite |
-| `src/fit-seed.jl`, `seed-diagnostics.jl` | the `Seed` a fitting test would sample, built without fitting, and the sampler diagnostics that run on any `Seed`; a unit test includes them (plain files, not part of the module `Dev`: `include`d by the scripts and the unit tests, which have BAYSOL) |
+| File or folder                                                                                                                    | What it is                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bysl.jl`                                                                                                                         | the launcher: client of the daemon, `daemon` management, `BYSL_DIRECT`                                                                                                                                                                                           |
+| `Project.toml`, `Manifest.toml`                                                                                                   | the environment of the package `Dev`                                                                                                                                                                                                                             |
+| `src/Dev.jl`                                                                                                                      | the registry of the tools and the dispatcher; `server.jl` is the daemon, `common.jl` the helpers every tool shares (the repository root, running programs, git, the fitting-test lookups, number formatting, the cache), `precompile.jl` the precompile workload |
+| `src/fmt.jl`, `harvest.jl`, `results.jl`, `fits.jl`, `fixtures.jl`, `fixture-store.jl`, `Plots.jl`, `extract.jl`, `checks.jl`, `vis.jl`, `cache.jl`, `Test.jl`       | one file per tool (`bysl fmt`, `harvest`, `results`, `fits`, `plots`, `extract`, `precommit` with `unit` and `docs`, `vis`, `cache`, `test`)                                                                                                                     |
+| `src/report.jl`                                                                                                                   | the readers of a fitting-test run: `parse_log` turns the sections of a run log (`<ID>.LOG`) into maps of numbers, `parse_report` reads the text reports (`res*.txt`) of older revisions; used by `results.jl`                                                    |
+| `test/`                                                                                                                           | the tests of the tools (`runtests.jl`, `test-*.jl`, `helpers.jl`, `data/`) and their own `Project.toml`; run by `bysl test`                                                                                                                                      |
+| `scripts/child.jl`, `diagnose.jl`, `profile-seed.jl`, `format.jl`, `harvest-defaults.jl`, `extract-formfactor.jl`, `unittests.jl` | the Julia scripts the tools start in another environment: the benchmark's measured process, the diagnostics, the profiler, JuliaFormatter, the two that need BAYSOL or SQLite from the root project, and the runner of the unit suite                            |
+| `src/fit-seed.jl`, `seed-diagnostics.jl`                                                                                          | the `Seed` a fitting test would sample, built without fitting, and the sampler diagnostics that run on any `Seed`; a unit test includes them (plain files, not part of the module `Dev`: `include`d by the scripts and the unit tests, which have BAYSOL)        |
 
 To add a tool, write a module with a `run(argv::Vector{String})::Int` and a `USAGE` text in `src/`, include it in `src/Dev.jl` and add it to `TASKS` there; a tool with subcommands nests one module per subcommand (see `harvest.jl`). A tool returns its exit status and never exits the process, since it may run in the daemon; `fail(who, message)` stops it with status 2 and a message. Add its tests to a `test/test-*.jl` file.
 
@@ -117,15 +121,36 @@ bysl results compare --bench [OLD.json] NEW.json
 ```
 
 - **`table`** generates the Results table of `test/fitting_tests/README.md` from the run logs `test/fitting_tests/*/<ID>.LOG`: `--update` rewrites it in place, `--check` exits 1 if it is stale (it compares cell by cell, so padding does not matter), `--tsv FILE` writes every quantity read from the logs, one row per run.
-- **`compare`** compares fitting-test results (the run logs; a revision from before the logs, its `res*.txt` reports) between git revisions and the working tree, which is the column that is judged. With no revision the comparison is with the latest release (the newest tag that starts with `v` and a digit). It prints the time of every stage, the χ² spread and the parameter distributions, the sampler health, the MAP search, the problem sizes, the posterior widths and the worst fits. A key a log does not carry (the dropped chains of an older format, say) shows `-`. `--bench` instead compares the JSON results of `bysl fits bench`: the last file is the one judged, and with a single file it is compared with the newest baseline of the latest release in `test/baselines/`.
+- **`compare`** compares fitting-test results (the run logs) between git revisions and the working tree, which is the column that is judged. With no revision the comparison is with the latest release (the newest tag that starts with `v` and a digit). It prints the time of every stage, the χ² spread and the parameter distributions, the sampler health, the MAP search, the problem sizes, the posterior widths and the worst fits. A key a log does not carry (the dropped chains of an older format, say) shows `-`. `--bench` instead compares the JSON results of `bysl fits bench`: the last file is the one judged, and with a single file it is compared with the newest baseline of the latest release in `test/baselines/`.
+
+## bysl fixtures
+
+```
+bysl fixtures list [--set NAME | --root DIR] [--tmp DIR]
+bysl fixtures pack [NAME ...] [--set NAME | --root DIR] [--force] [--flat]
+bysl fixtures unpack NAME ... [--set NAME | --root DIR] [--tmp DIR]
+bysl fixtures clean [--set NAME | --root DIR] [--tmp DIR]
+```
+
+The experiment fixtures (`test/fixtures/experiments/<ID>/`) are kept as one archive per entry, `<ID>.7z` next to the folder: 7z, LZMA2, `-mx=9`, solid, 64 MiB dictionary, every entry path starting with `<ID>/` (so `7z x -o<tmp> <ID>.7z` yields `<tmp>/<ID>/`). The 122 entries of 2026-11-18 take 15.7 MB instead of 126 MB.
+
+- **`pack`** writes the archive under a temporary name, checks it with `7z t` and against the folder's file list, and moves it into place; an archive newer than every file of its folder is skipped unless `--force`. Afterwards the plain folder is removed, but only once the archive has been extracted into a scratch folder and found identical to it byte for byte (a mismatch keeps the folder and fails); `--keep-source` keeps the folder. So a new entry is built as a plain folder, packed, and leaves only its `.7z`.
+- **`unpack`** extracts into the tmp root, `$BAYSOL_FIXTURES` if set, else `_cache/experiments` (gitignored). A copy is complete when its `<ID>.stamp` (archive size and mtime) matches, and is then reused. The extraction goes into a private folder and is moved into place, so an interrupted run leaves no half folder that looks complete.
+- **`clean`** removes only what the tool put in its own tmp root (unpacked folders, stamps, partial folders, the `.baysol-fixtures` marker) and refuses a folder without the marker; a folder that is not empty and was not made by the tool is never used as a tmp root.
+- **`fits run`** unpacks the fixtures of each fit BEFORE the fit's process (and clock) starts, exports `BAYSOL_FIXTURES` to it, and removes the copy afterwards, whether the fit succeeded or not, unless `--keep-fixtures`; a copy that was already there (an explicit `unpack`) is left. `fits diagnose` and `fits export` unpack on demand the same way. An entry with a stale archive (a file of the folder is newer) is read from its plain folder, and one without an archive too, until the owner removes the folders.
+
+**Archive sets.** The tool is generic: an archive set is a root folder holding one `<name>.7z` per item (the item's folder `<name>/` inside, or with `pack --flat` the item's files at the top level; `unpack` detects either layout and always yields `<tmp root>/<name>/`). Registered sets (`SETS` in `fixture-store.jl`): `experiments` (`test/fixtures/experiments`, the default) and `synthetic` (`test/fixtures/synthetic`, no archives yet). `--set NAME` picks one, `--root DIR` any other directory (its set name is the folder name); `list` shows packed, stale and unpacked counts per set, and one line per item with `--set`/`--root`. `test/fixtures/molecules` holds loose files, not one folder per item, so it is not a set. The tmp root of a set is `$BAYSOL_FIXTURES` for `experiments` (kept for the fitting scripts), else `$BAYSOL_FIXTURES_<SET>` (upper case, other characters `_`), else `<repo>/_cache/<set>`; `--tmp DIR` overrides it. The marker-file safety is the same for every set. `fits run` handles `SYN-*` entries with the `synthetic` set (`$BAYSOL_FIXTURES_SYNTHETIC`, `--keep-fixtures` applies); the synthetic scripts still read `test/fixtures/synthetic/<ID>` by a fixed path, so they need the plain folder until they are switched to an env-aware lookup.
+
+The scripts find their fixtures with `fixtureDir("<ID>")` of `test/fitting_tests/common.jl`: `$BAYSOL_FIXTURES/<ID>` if it exists, else the plain folder, else an error that names `bysl fixtures unpack`. The code is `src/fixture-store.jl` (a plain file, also included by `fit-seed.jl`) and `src/fixtures.jl`; tests in `test/test-fixtures.jl`.
 
 ## bysl fits
 
 ```
 bysl fits list
-bysl fits run [ID ...] [--no-fit] [--bench] [--approved] [--report] [--table] [--fixme] [--trace-compile FILE] [--dry-run]
+bysl fits run [ID ...] [--no-fit] [--bench] [--approved] [--report] [--table] [--fixme] [--keep-fixtures] [--trace-compile FILE] [--dry-run]
 bysl fits diagnose [--report] [--residuals] [--chains] [options] [ID[:tag] ...]
 bysl fits export [ID ...] [--all] [--out DIR] [--dry-run]
+bysl fits units [ID ...]                                  # q-unit guard: each script converts nm⁻¹ data (footer or .dat/.fit q-max ratio), nothing else
 bysl fits profile ID[:tag] [ID[:tag] ...] [--delay SECONDS] [--nuts] [--dry-run]
 bysl fits bench --approved [--state cold|warm] [--out FILE.json] ID[:tag] ...
 ```
@@ -221,9 +246,200 @@ Builds the site with Documenter.jl in `../docs/` (`julia --project=docs docs/mak
 bysl precommit [--quick] [--dry-run] [--threads N]
 ```
 
-The single entry point to run before a commit; a failing step does not stop the later ones and the exit status is 1 if any failed. Steps, in order: **tool-tests**, **pmv-mean**, **solute-index** and **residue-table** (the harvesters rewrite what is stale; the changed files belong in the commit), **unit-tests**, **concurrency-tests**, **whitespace** (trailing whitespace on the lines you changed, untracked files included, is stripped and reported, never a failure; only a leftover conflict marker fails), **default-settings** (the harvest of the defaults), **ts-format**, **ts-unused** ([Knip](https://knip.dev), config `knip.jsonc`: an unused dependency, file, export or type of `tui/` refuses the commit), **julia-format**, **line-length** (a line over 92 characters, a tab, or TypeScript, Julia or SCSS indented by anything but a multiple of 4 spaces refuses the commit; Julia lines that continue an expression after a trailing operator are exempt, JuliaFormatter aligns those), **results-table** and **docs-build** (the strict documentation build). `--quick` skips the Julia steps (unit-tests, concurrency-tests, default-settings, julia-format, docs-build). It never runs a fitting test or a benchmark.
+The single entry point to run before a commit; a failing step does not stop the later ones and the exit status is 1 if any failed. Steps, in order: **tool-tests**, **pmv-mean**, **solute-index** and **residue-table** (the harvesters rewrite what is stale; the changed files belong in the commit), **unit-tests**, **concurrency-tests**, **whitespace** (trailing whitespace on the lines you changed, untracked files included, is stripped and reported, never a failure; only a leftover conflict marker fails), **default-settings** (the harvest of the defaults), **ts-format**, **ts-unused** ([Knip](https://knip.dev), config `knip.jsonc`: an unused dependency, file, export or type of `tui/` refuses the commit), **julia-format**, **line-length** (a line over 92 characters, a tab, or TypeScript, Julia or SCSS indented by anything but a multiple of 4 spaces refuses the commit; Julia lines that continue an expression after a trailing operator are exempt, JuliaFormatter aligns those), **results-table**, **q-units** (`bysl fits units`) and **docs-build** (the strict documentation build). `--quick` skips the Julia steps (unit-tests, concurrency-tests, default-settings, julia-format, docs-build). It never runs a fitting test or a benchmark.
 
-**`pmv`** runs `dev/src/pmv.jl`, the 3D-RISM partial-molar-volume tools (conformers, AmberTools 3D-RISM with cSPC/E water and the KH closure, a Bayesian group correction fitted on measured solutes, candidate rows for `src/bulk-electron-density/polymers/`, and the redo of the old `estimated` rows into `dev/pmv-rism/out/redone_rows.tsv`). It is Julia (RDKit through RDKitMinimalLib.jl, no MMFF: several ETKDG seeds per run); only `run` and `batch` call the external AmberTools of `$AMBERHOME` (default `~/.conda/envs/amber26`). It is not part of `bysl precommit`: a run takes hours of every core. `dev/pmv-rism/README.md` has the commands, inputs, outputs, run times and the rebuild-from-scratch recipe.
+**`pmv`** runs `dev/src/pmv.jl`, the 3D-RISM partial-molar-volume tools (conformers, AmberTools 3D-RISM with cSPC/E water and the KH closure, a Bayesian group correction fitted on measured solutes, candidate rows for `src/bulk-electron-density/polymers/`, and the redo of the old `estimated` rows). It is Julia (RDKit through RDKitMinimalLib.jl, no MMFF: several ETKDG seeds per run); only `run` and `batch` call the external AmberTools of `$AMBERHOME` (default `~/.conda/envs/amber26`). It is not part of `bysl precommit`: a run takes hours of every core. Every command needs `--out DIR`; the section "pmv: partial molar volumes by 3D-RISM" below has the commands, inputs, outputs, run times and the rebuild-from-scratch recipe.
+
+## pmv: partial molar volumes by 3D-RISM
+
+Reconstructs the partial molar volume (PMV, cm3/mol) of a solute that has no measurement,
+for the `estimated` rows of the bulk-electron-density tables
+(`src/bulk-electron-density/polymers/` and `non-biological/`). The tools: a 3D-RISM
+driver, a Bayesian group correction fitted to measured solutes, and read-only diagnostics.
+All of it is `dev/src/pmv.jl` (module `Pmv`, run as `bysl extract pmv --out DIR SUBCOMMAND
+...`); the only other file is the queue of missing solutes, `dev/data/pmv-queue.tsv`.
+
+### Data inside `pmv.jl`
+
+Nothing is read at fit time: BAYSOL itself only reads the finished tables under
+`src/bulk-electron-density/`. `pmv.jl` is the workshop that produces their `estimated`
+rows, and its two bundled tables are the inputs of every command. Each is CSV text in the
+source, aligned as a table (columns padded to one width and separated by `|`, which occurs in
+no field; numbers right-aligned, text left-aligned; every line within 92 characters), read at
+module load by CSV.jl with `stripwhitespace = true` into a named constant.
+
+**`CALIBRATION_CSV` / `CALIBRATION`**: one measured solute per line, in three aligned tables
+keyed by `id` (`CALIBRATION_CSV`: `id | charge | nconf | v_meas | fit | source`,
+`CALIBRATION_NAMES_CSV`: `id | name`, `CALIBRATION_SMILES_CSV`: `id | smiles`; a SMILES
+or a name is too long to share a line); `CALIBRATION` joins them into the rows
+`id name smiles charge nconf v_meas provenance fit`. `source` is the DOI (`derived:DOI`,
+`monomer:DOI`, or `unverified`), which becomes the provenance text. `v_meas` is the measured
+PMV (cm3/mol, 25 C, infinite dilution) with its DOI in `source`; `nconf` is how many
+conformers its RISM run should use; `fit = 1` puts the line into the group-correction fit,
+`fit = 0` holds it out (the `holdout` report checks it against the model). It is the *only*
+place the model learns from, so a wrong `v_meas` moves every estimate: change it by hand
+in the source, then run `fit` again. The `id` (`K001`...) doubles as the RISM name.
+
+**`RESULTS_CSV` / `RESULTS`**: the finished 3D-RISM runs the tool still reads, `name | n |
+mean | sd` (`mean` is the raw RISM volume R of the conformer mean, `sd` the conformer
+spread, `nan` for one conformer). It holds the 90 calibration solutes, the 105 runs behind
+the `estimated` rows that `row` wrote (the `tables` check finds a row's run by n and mean)
+and `TRIS0`, the anchor of the queue's bis-tris jobs: 196 runs. Runs nothing reads (the
+runs of rows whose note is free text or anchored, superseded runs: OG, sucrose, R039 to
+R041, LMNG, R045 to R078, A001 to A008) were dropped on 2026-11-19 together with the old data folder; a run made now lands in `<out>/results.tsv`, which is read on top
+of the bundled runs (the last line of a name wins) and which `batch` resumes from. To keep
+a new run, add its line to `RESULTS_CSV` by hand; a table row keeps its own numbers in its
+note either way.
+
+Typical questions:
+
+| I want to | do this |
+| --- | --- |
+| see which calibration solutes or table rows still have no run | `bysl extract pmv --out DIR status` |
+| refit the group correction after editing `CALIBRATION_CSV` or adding runs | `bysl extract pmv --out DIR fit` (writes `DIR/coefficients.json`) |
+| know how good the fit is | `... diagnostics cv`, then `residuals` (a large `z` marks a solute the 11 groups cannot describe) |
+| estimate a new compound | `run NAME SMILES NCONF CHARGE`, `fit` if needed, `estimate NAME SMILES` (section below) |
+| check that the tables still agree with the runs | `... diagnostics tables` |
+| try the tool without Amber or hours of compute | `bysl extract pmv --out DIR selftest` (seconds, synthetic) |
+| test `run` on something tiny | `bysl extract pmv --out /tmp/o run K001 CCO 1 0` (ethanol, about 7 s) |
+
+### Output folder
+
+`--out DIR` is required (no default inside the repository) and holds everything the tool
+generates: `DIR/work` (one folder per molecule and conformer, with the Amber files),
+`DIR/results.tsv` (`name n mean sd buffer grid tolerance`, tab separated), `coefficients.json`
+and `diagnostics/`. The global option goes BEFORE the subcommand. Deleting the folder loses
+nothing but time (`fit` and `diagnostics all` rebuild their files).
+
+### Install
+
+- Julia only: the tool is the Julia package `Dev` (`dev/Project.toml`; CSV.jl reads the
+  bundled tables, about 0.1 s to load). RDKit is RDKitMinimalLib.jl, which has no MMFF and
+  no multi-conformer call, so the conformers of a run are ETKDG embeddings from several
+  seeds (`seed`, `seed + 1`, ...), not force-field relaxed (random-coordinate fallback if
+  an embedding fails).
+- AmberTools (antechamber, parmchk2, tleap, `rism3d.snglpnt`, `cSPCE_kh.xvv`) stays an
+  external install, default `~/.conda/envs/amber26` (set `AMBERHOME` otherwise):
+  `conda create -n amber26 -c conda-forge ambertools`. Only `run` and `batch` need it.
+- `selftest`, `diagnostics`, `status`, `fit`, `estimate`, `row` and `holdout` need no
+  external program.
+- Run 3D-RISM one job at a time on a quiet machine: it takes every core (about 3 min per
+  conformer for a decyl-maltoside-sized molecule).
+
+### Method
+
+1. RDKit ETKDG conformers (one embedding per seed, no MMFF; random-coordinate fallback), antechamber
+   AM1-BCC / GAFF2 charges, tleap.
+2. `rism3d.snglpnt`, cSPC/E water, KH closure, buffer 25 A, grid 0.5 A, tolerance 1e-6,
+   centering 2. PMV = `rism_partialMolarVolume` (A^3) x 0.602214076; the run's R is the
+   conformer mean, its SD the conformer spread.
+3. R is biased by chemical group. The correction `V - R = x . beta` has 11 features (SMARTS
+   in `dev/src/pmv.jl`, module `Model`: CH3/CH2, CH/C, OH, ether O, carbonyl O, neutral N, aromatic C, charge, S,
+   nitrile, rings), fitted on the measured solutes. Conjugate normal-inverse-gamma model:
+   prior sd 5 per group, the CH2 term centred on 15.93 minus the RISM slope per CH2
+   (n-alkanols of the set), sd 1.5, s ~ InvGamma(2, 2*3^2). A ridge fit (lambda 1e-3) is
+   the sanity check. The features were fixed before the LOO error was looked at.
+4. Direct estimate: `V = R + x . beta_mean`, sd = quadrature of the predictive sd, the
+   conformer error of the mean (SD / sqrt n) and 2.0 for unmodelled chemistry, never below
+   4.0. An anchored estimate `V = V_a + (R - R_a)` (anchor decyl maltoside) is reported for
+   the held-out solutes only.
+
+### Subcommands
+
+    bysl extract pmv --out DIR run NAME SMILES NCONF CHARGE [--seed N]   one molecule -> results.tsv
+    bysl extract pmv --out DIR batch FILE.tsv [--tier T ...] [--nice N]  rows id, smiles, charge, nconf [, tier];
+                                                     skips ids already in the results
+    bysl extract pmv --out DIR fit                                       DIR/coefficients.json, RMS numbers
+    bysl extract pmv --out DIR holdout                                   held-out solutes (JSON)
+    bysl extract pmv --out DIR estimate NAME SMILES                      V and sd of a finished run
+    bysl extract pmv --out DIR row NAME SMILES COMMON IUPAC FORMULA CHARGE [--alias A ...] [--apply]
+    bysl extract pmv selftest                                            synthetic checks, no RISM, seconds
+    bysl extract pmv --out DIR status [--specs FILE]                     rows with no finished run
+    bysl extract pmv --out DIR diagnostics REPORT [options]              read-only reports, below
+
+`row` prints a polymers row (basis `estimated`, the note format below) and with `--apply`
+appends it to `polymers.tsv`, `polymers.json` and `polymers_lookup.json` (idempotent; an
+alias another lookup owns is skipped; aliases are never inferred: pass alpha-anomer
+spellings with `--alias`). Measured values are never overwritten. Nonbiological rows are
+written by hand in the same note format.
+
+Diagnostics (each prints a table and writes `<out>/diagnostics/<report>.tsv`; they never
+run RISM and never write outside `<out>`):
+
+| report | content |
+| --- | --- |
+| `residuals` | per solute (worst LOO first: in-sample, LOO, ridge LOO, z, `!` for abs z above 2.5) and per group feature (n, mean/RMS residual) |
+| `cv` | in-sample, LOO and repeated k-fold RMS, Bayesian and ridge (`--k 10 --repeats 20`) |
+| `holdout` | the solutes with `fit = 0` against the model, direct and anchored |
+| `conformers` | n, mean, SD and standard error of every run; flags single-conformer runs and SD above `--flag 1.0` |
+| `coefficients` | prior, posterior mean and sd (Student-t marginal), shift in prior sds, ridge |
+| `tables` | every `estimated` row of both tables against the runs; `--specs FILE` also recomputes the correction from the SMILES of a batch spec |
+| `status` | calibration solutes, table rows (and `--specs` rows) with no run |
+| `all` | all but `status`; exit status 1 if a table row is a MISMATCH or has no run |
+
+`tables` statuses: OK (the raw value and conformer count of the row's note match a run, and
+V = raw + correction and the sd reproduce from the note's numbers); MISMATCH (they do not,
+or the correction drifted from the current model); `NO_RUN` (no run with that mean and n);
+`FREE_TEXT` (the note is not the format `row` writes: a hand-derived or anchored row that no run
+can reproduce, listed and not counted as failure). A row's run is found by value, not by
+name, because the tables do not store the RISM name. On the tables of 2026-11-19: 105 OK,
+49 FREE_TEXT.
+
+The note of a `row` has the form `3D-RISM raw value R (SD s over n conformers) plus the Bayesian group correction c (predictive sd p); ...`; `tables` parses exactly this, so do
+not reword it without changing `NOTE_RE` in `dev/src/pmv.jl`.
+
+### The queue of missing solutes
+
+`dev/data/pmv-queue.tsv` lists the solutes without a literature volume (`notes/solute-gaps.md`
+ranks them): `id smiles charge nconf tier name anchor neededBy`. The first four columns
+are the `batch` format, the others say what the job is for (`anchor` is the measured
+solute the difference is read against, `neededBy` the fitting tests or buffer templates).
+It stays a data file, not a constant (its lines are long and the job list is meant to be
+edited), and `batch` takes its path as an argument, with no default: `bysl extract pmv
+--out DIR batch dev/data/pmv-queue.tsv --nice 19` (`--tier 1 --tier 2` keeps those tiers;
+no `--tier`: all). The rows go one at a time in file order, an id already in the results
+(the bundled runs, or `DIR/results.tsv`) is skipped, so a stopped queue is started again
+as it is, and a failed job is reported (`FAILED id`, exit status 1 at the end) while the
+rest goes on (tier 1: the bis-tris propane species and the Tris anchors, done 2026-11-18;
+2: the other template buffers; 3: further predicted solutes). Never start it beside a fit
+or the unit suite. `test-solute-gaps.jl` keeps the table consistent (formal charge of each
+SMILES, tier order, the columns batch reads); `dev/test/test-pmv.jl` tests the resume,
+tier, failure and `--nice` behaviour of `batch` without AmberTools.
+
+### Add a calibration solute
+
+1. Append a line to each of the three calibration tables in `dev/src/pmv.jl` (`CALIBRATION_CSV`,
+   `CALIBRATION_NAMES_CSV`, `CALIBRATION_SMILES_CSV`), padded to the column widths. Use the next free `K###` id, the measured PMV at 25 C and infinite dilution with
+   its DOI in `source`, `fit = 1` (use `fit = 0` to hold it out of the fit).
+2. `bysl extract pmv --out DIR run K091 SMILES NCONF CHARGE` (the id is the RISM name; 1 conformer for rigid
+   molecules, 3 to 5 for flexible ones), then add its line to `RESULTS_CSV`.
+3. `bysl extract pmv --out DIR fit`, then `diagnostics residuals` (a new solute with a large z is
+   a sign of a missing group) and `diagnostics cv`.
+
+### Estimate a new compound end to end
+
+1. `bysl extract pmv --out DIR run NAME SMILES NCONF CHARGE` (charge of the species at the buffer pH, e.g. -1
+   for a sulfonate; 6 to 10 conformers for flexible molecules, check `diagnostics conformers` afterwards).
+2. `bysl extract pmv --out DIR fit` if `coefficients.json` is missing or the calibration changed.
+3. `bysl extract pmv --out DIR estimate NAME SMILES` prints R, the correction and `V +- sd`.
+4. `bysl extract pmv --out DIR row NAME SMILES COMMON IUPAC FORMULA CHARGE --alias ...` to look at the row,
+   then again with `--apply` to write it. Put the run's numbers in the row's note (the note
+   format above), and run `diagnostics tables` to confirm the row reproduces.
+
+### Limits
+
+- Monomer at infinite dilution, not micellar. Anions and zwitterions are erratic in raw
+  3D-RISM and the correction absorbs only part of it (charged: 9 solutes, RMS LOO 6.8).
+  Elements without GAFF2/AM1-BCC parameters (As) and salts have no run. Arsenic rows are
+  the phosphorus analogue (P for As) plus a P to As step of +5.29, the measured arsenic
+  acid (53.0) minus phosphoric acid (47.71), once per arsenic atom; the step is
+  not checked for other molecules.
+- 11 groups from 88 solutes: sparse groups (S, nitrile, 2 solutes each) have posterior
+  sds near the prior; aromatic C has 5 solutes. Extrapolating beyond the calibration
+  chemistry (large sugars, long surfactants) rests on additivity.
+- Large flexible molecules (LMNG) may fail to embed; a random-coordinate fallback exists.
+- Rows are matched to runs by value; a re-run with another seed changes the mean and the
+  row reports `NO_RUN` until the row is regenerated.
 
 ## Requirements
 
@@ -236,7 +452,7 @@ The run log (`test/fitting_tests/<ID>/<ID>.LOG`, one file per fitting-test folde
 
 | Stage (depth 1 of the static build)                             | When                                                                                   | Note                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `resolveStruct`                                                | always                                                                                 |                                                                                                                                                                                                                              |
+| `resolveStruct`                                                 | always                                                                                 |                                                                                                                                                                                                                              |
 | `components`                                                    | always: the component table load and the lookups (builtin table, cache, RCSB download) | `[17 residue names: 17 builtin, 0 cache, 0 download]`                                                                                                                                                                        |
 | `structure checks`                                              | always                                                                                 | `[N chains relabelled, M duplicate atoms dropped, K dummy-like findings]`                                                                                                                                                    |
 | `classify`                                                      | with hydrogens                                                                         | `[nucleic: AMBER, titration none]`, `[mixed: PARSE, titration propka]`, `[protein: PARSE, titration propka]`, then optional `; N legacy-named ...`, `; N chains relabelled`, `; N dummy-like residues (undefined behaviour)` |
@@ -245,7 +461,7 @@ The run log (`test/fitting_tests/<ID>/<ID>.LOG`, one file per fitting-test folde
 | `modified nucleotide hydrogens`                                 | only when the structure has modified nucleotides                                       | `[14 residues: 14 hydrogenated through their base, 0 without a base; 149 hydrogens placed, 232 in the free components' formulas]`                                                                                            |
 | `modified amino acid hydrogens`                                 | only when the file has modified amino acids (HETATM, e.g. MSE), on every route         | `[20 residues: 20 hydrogenated through their parent, 0 without a parent; 183 hydrogens placed]`                                                                                                                              |
 | `heavy atoms`                                                   | with hydrogens                                                                         | `[N in, N out; R restored, A added by pdb2pqr]`                                                                                                                                                                              |
-| `loadMolecule`, `SASA`, ...                                    | always                                                                                 |                                                                                                                                                                                                                              |
+| `loadMolecule`, `SASA`, ...                                     | always                                                                                 |                                                                                                                                                                                                                              |
 
 How the tools read them (`src/report.jl`, by stage name over the `--- timing ---` block of the run log; a run that lacks a stage, or to which it did not apply, has `""` for it):
 
@@ -285,8 +501,6 @@ mean nSteps by window: [1:75]=12  [76:450]=12  [251:300]=10  [301:1000]=12
 mean accept = 0.927   mean |ΔH| = 0.070
 ```
 
-SASDX52: two optima, two divergent transitions, acceptance 0.927 (target 0.95), no deep trees, and a final ε of 0.41 against 0.24 and 0.26 for the two chains of Part 2 that start at the MAP. This one chain is mostly healthy; the divergences show up in the chains of Part 2.
-
 **3. Is the Laplace whitening right?** The sampler works in coordinates `w` where the posterior is meant to be a unit Gaussian. `sd` should be near 1 for every axis; the eigenvalues of the draws' covariance say the same without the axes; `skew` away from 0 means a lopsided direction; `ESS` is the effective sample size per axis. The last two lines compare log π at the optimizer's mode with the draws (for a 4-D Gaussian the median draw sits about 1.7 below the mode) and the sampled spread with the Laplace one in the optimizer's coordinates.
 
 ```text
@@ -295,8 +509,6 @@ post-warmup w: sd = [0.9863, 1.556, 2.145, 1.218]   (1 = the Laplace whitening i
 ℓπ at L-BFGS mode = 855.8603   best draw = 855.7956   median draw = 854.1010   (4-D Gaussian: median ≈ mode − 1.7)
 sampled sd in z / Laplace σ_z = [0.9863, 1.083, 1.074, 2.047]
 ```
-
-SASDX52: the second and third whitened axes are 1.6 and 2.1 times wider than the Laplace guess, the third has skew 1.29, and the effective sample sizes of those two axes are 44 and 87 out of 700 draws. In the optimizer's coordinates the last axis is 2.0 times wider. The mode and the best draw agree to 0.07 nats, and the median draw sits 1.76 below the mode, as a Gaussian would.
 
 **4. How far each parameter is from its support bound.** In posterior standard deviations. A parameter within a few sd of a bound is cut by the prior's support and its posterior is not Gaussian there.
 
@@ -308,8 +520,6 @@ coordinate   median ξ       sd ξ     distance to nearest support bound / sd
   δρ₃         1.4416        2.13          0.657
 ```
 
-SASDX52: δρ₃ is 0.66 sd from its upper bound (2.839) and has a wide posterior (sd 2.13); δρ₂ is 5 sd from its bound and the others are far from theirs.
-
 **5. The 64 L-BFGS starts.** One line per start in the optimizer's coordinates: the final `f = −log π`, the iterations, whether it stopped on the gradient (`g_conv`) or on the iteration limit, how much the gradient changes between the working c1 tolerance and a much tighter one (a small value means the stop is not a gradient-error artefact) and c1 at the end. Starts that end on the same `f` found the same optimum.
 
 ```text
@@ -320,8 +530,6 @@ SASDX52: δρ₃ is 0.66 sd from its upper bound (2.839) and has a wide posterio
   […]  (60 more lines, same format)
 ```
 
-SASDX52: 52 of the 64 starts end at `f = −831.77` (c1 1.0875) and 12 at `f = −855.86` (c1 1.2335), the better optimum by 24 nats in `f`. Most starts land in the poor one, which is why the search runs many starts and picks by Laplace mass. The list reports two optima only; the third optimum of the closing list is not among them.
-
 **6. The Hessian at the mode.** Eigenvalues of the second derivative of `f` in the optimizer's coordinates (floor 1.0). Pass 1 is the Hessian used for whitening; pass 2 repeats it at several finite-difference step sizes to show it is stable.
 
 ```text
@@ -331,8 +539,6 @@ MAP Hessian eigenvalues (floor 1.0): pass 1 = [0.6629, 3.194, 19.44, 1319]
   pass 2, step 0.03·σ_lap: [0.9999, 2.966, 19.57, 1332]
   pass 2, step 0.01·σ_lap: [1, 2.97, 19.54, 1330]
 ```
-
-SASDX52: pass 2 is stable to the step size; the spread of eigenvalues (1 to about 1330) is the conditioning that `w` has to undo.
 
 **7. Shape along each whitened axis.** `Δf/(s²/2)` at displacements `s` (in whitened sd) from the mode: 1 everywhere is a Gaussian, above 1 is steeper than the whitening assumed (a wall), below 1 is flatter (a tail). The scans below it report, per axis, the noise from the c1 tolerance, the median and maximum curvature `f''` and the range of the profiled c1, with `jumps` counting discontinuities of c1 (a jump would break the gradient).
 
@@ -348,8 +554,6 @@ SASDX52: pass 2 is stable to the step size; the spread of eigenvalues (1 to abou
   w4 scan: c1-tol noise=7.37e-10  f''(median)=0.999 f''(max)=2.87 at s=2.98  c1 range=[1.2255,1.2420] jumps=0
 ```
 
-SASDX52: w3 is a wall on its negative side (13 times a Gaussian at s = −5, local curvature 19.6 near s = −3) and a long flat tail on its positive side (0.24 at s = +10). w2 is flat on its negative side (0.71 at s = −10) and steep on its positive side (3.66 at s = +10), and w4 is flat on its negative side and steep on its positive side (5 at s = +10). c1 is smooth on all four axes (no jumps).
-
 **8. The distinct optima.** Each optimum with its position ξ, the Hessian eigenvalues and its Laplace log-mass, `−f − ½ log det H`, and the difference from the best: a mode that merely exists is told from one that carries probability.
 
 ```text
@@ -358,16 +562,12 @@ distinct optima: 2
   mode 2: f=-831.766 ξ=[0.3406, 0.753, 1.627, -5.62]  H-eig=[0.9955, 1.213, 3.198, 90.48]  log Laplace mass=828.838 (Δ vs best = -21.4 nats)
 ```
 
-SASDX52: the second optimum is 21.4 nats lighter and carries no mass.
-
 **9. Gradient error and the stable step size.** The first line is the error the c1 tolerance puts in the gradient NUTS uses, against the size of the gradient (error ≪ gradient means it is not the cause of trouble). The second is the largest curvature `λ_max` along the draws and the step size ε a leapfrog integrator is stable for at that curvature, against the ε the sampler adapted.
 
 ```text
 gradient error from the c1 tolerance in w: min/median/max = [0, 6.698e-05, 0.001394]  vs |∇ℓπ| median = 1.63   (posterior-scale gradient ≈ 1)
 local λ_max(−∇²ℓπ) min/median/max = [0.9999, 1.139, 63.91]  → stable ε < [0.2502, 1.874] (worst, median);  adapted ε = 0.4087
 ```
-
-SASDX52: the gradient error (median 6.7e-5, at most 1.4e-3) is four orders of magnitude below the median gradient (1.63) and three below it at the worst draw, so it does not cause the divergences. The adapted ε (0.41) is above the step that is stable at the worst curvature along the draws (0.25, where `λ_max` reaches 64), and below the one stable at the median curvature (1.87): a step size that suits most of the posterior but not its steepest corner, which fits the two divergent transitions of block 2.
 
 ### Part 2: --chains
 
@@ -397,12 +597,10 @@ divergent draws:
   chain 9 iteration 688  ξ = [0.34038, -0.52483, -7.2085, -5.0625]  log π +846.99 vs chain median +853.73  steps 4  depth 2
 ```
 
-SASDX52: the run has 10 chains. Chains 9 and 10 are the extra ones; both start 5.43 sd from the MAP, the position of the optimum the harvest found (the third optimum of the closing list), and both end in mode 1, with the other chains. Chain 7 (the +20 sd start) ends in the second optimum and keeps no draws. There are 5 divergent draws in 6300 (0.08 %), spread over chains 2, 8 and 9: no chain has more than three, and chain 6 (ε = 0.085, 39 steps per iteration) has none. The draw of chain 2 lies at δρ₂ = −5.75 and δρ₃ = −6.11, far from the main mode's (−3.24, 1.17), with log π near that chain's median. The three of chain 9 are 4 to 7 nats below the chain's median log π, at δρ₃ = 2.79 (next to the upper bound 2.839), −3.74 and −5.06.
-
 **11. The retry** (`--retry 1`: 2000 warm-up, 2000 draws, seeds derived from the run's, as `infer` does when R̂ is above 1.01):
 
 ```text
-SASDX52: 9 chains, 2000 warm-up + 2000 draws, rngSeed 6252506411145483830, δ 95  (the rerun)
+SASDX52: 9 chains, 2000 warm-up + 2000 draws, rngSeed 6252506411145483830, δ 95
 chain  start σ   mode  pooled  kept  div  div%  warm-up div       ε  steps  accept   mean log π
     1    +0.00      1  yes     2000   26   1.3            9  0.2622   11.7   0.909       853.64
     2    +0.00      2  yes     2000  886  44.3            7  0.1827    8.9   0.405       853.24
@@ -420,21 +618,12 @@ divergent draws (first 12 of 970):
   […]  (10 more, all chain 1)
 ```
 
-SASDX52: the longer run is worse, not better. The divergences go from 5 to 970 (6.1 %), 886 of them in chain 2, which settled apart from the others (mode 2) with the lowest acceptance (0.405). The divergent draws listed all belong to chain 1, at δρ₂ ≈ −4.7 to −5.5 and δρ₃ ≈ −6.0 to −6.8; several are the same point repeated, a chain rejected from there again and again. A longer run seems to reach that region more often, but this single run does not show why.
-
-### What SASDX52 shows
-
-* The divergences are not the c1 tolerance (block 9: gradient error three to four orders below the gradient) and not a discontinuity of the profiled c1 (block 7: `jumps=0` on all four axes).
-* The posterior has a **third optimum** that the MAP search does not report (block 8 lists two). It carries about 4 % of the posterior mass by the Laplace estimate. No random start reaches it: 500 random L-BFGS starts gave 0 hits (a validation run, removed, in git history under `test/validation/optima_recall/`), and the 64 starts of block 5 end in the two known optima.
-* The sampler finds it from the draws instead: the harvest of optima from the first chains' draws finds it, and `infer` starts more chains there (block 10). Those chains tend to leave it again, so it holds far fewer of the pooled draws than its Laplace share.
-* The long retry (block 11) is where the divergences concentrate (chain 2: smaller ε, lowest acceptance), but this output does not show what puts it there.
-
 ## Benchmarks: cold start and steady state
 
 Performance claims in this repository are measured from a **cold state** and reported next to a **steady state**, so a speedup never comes from a cache that a user does not have on first use.
 
 ```bash
-bysl fits bench --approved --state cold --out test/baselines/<name>.json SASDMJ9 SASDTK5:fit3_model1 SASDN32
+bysl fits bench --approved --state cold --out test/baselines/<name>.json SASDMJ9 `SASDTK5:fit3_model1` SASDN32
 bysl results compare --bench new.json     # against the latest release's baseline
 ```
 
@@ -461,7 +650,7 @@ For each fit, in a fresh process (`child.jl` does the fit **twice** in one proce
   seconds, compile seconds and GC seconds from the pipeline's own `Timing` log;
 - **steady fit**: the second fit, with everything already compiled.
 
-Both fits run with the same pinned `rngSeed = 1` (`RNG_SEED` in `child.jl`; the JSON records it, and the number of chains), so a benchmark repeats the same work. A fresh seed each time does not: the MAP search can find a second optimum, which starts two extra chains and costs 60 to 90 % of `runModel` (on SASDTK5:fit3_model1 about one seed in six). The same seed in two revisions is the same work only while the model inputs are the same: a change of the buffer table changes a prior, and so the starting points. Check `nChains` in both results before reading a difference as speed. `--threads N` sets `JULIA_NUM_THREADS` for the measured process (the v0.3.0 baseline was 4).
+Both fits run with the same pinned `rngSeed = 1` (`RNG_SEED` in `child.jl`; the JSON records it, and the number of chains), so a benchmark repeats the same work. A fresh seed each time does not: the MAP search can find a second optimum, which starts two extra chains and costs 60 to 90 % of `runModel` (on `SASDTK5:fit3_model1` about one seed in six). The same seed in two revisions is the same work only while the model inputs are the same: a change of the buffer table changes a prior, and so the starting points. Check `nChains` in both results before reading a difference as speed. `--threads N` sets `JULIA_NUM_THREADS` for the measured process (the v0.3.0 baseline was 4).
 
 Keep the two apart: first-fit minus steady-fit is compilation, and PrecompileTools-style work trades first-fit time for install time, so both rows must be compared. Never quote a warm-state number as what a user gets. The report convention of the fitting tests (wall clock excluding propka, every pdb2pqr stage and a component download; see the stage section above) is unchanged; in the cold state those stages run for real and appear as their own rows.
 

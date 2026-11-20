@@ -19,7 +19,7 @@
 import { lstatSync, readdirSync, rmSync } from "node:fs"
 import { basename, isAbsolute, join } from "node:path"
 import { PACK_LOCK } from "../core/archive.js"
-import { RUN_FLOW } from "../core/environment.js"
+import { lazyAsset, RUN_FLOW } from "../core/environment.js"
 import {
     FileInUseError,
     isDict,
@@ -627,6 +627,46 @@ export function openRows(runs: readonly OpenRun[]): OpenRow[] {
     return rows
 }
 
+/**
+ * What each failure class of the retry ladder means (`assets/data/ladder_classes.json`,
+ * the classes of `LADDER_CLASSES` in `src/pipeline/params.jl`).
+ */
+const LADDER_CLASS_TEXT = lazyAsset<Record<string, string>>("data", "ladder_classes.json")
+
+/**
+ * The failure classes a `ladder exhausted` error names: each attempt of the ladder is
+ * written `<rung> [<class>]: <problem>`, so the classes are the bracketed words that are
+ * ladder classes, in the order they first appear. The base attempt carries no class.
+ *
+ * @param error - the error text (`NotConvergedError: ...`).
+ * @returns the distinct classes, empty when the error is no exhausted ladder.
+ */
+export function ladderClassesOf(error: string): string[] {
+    if (!error.includes("ladder exhausted")) return []
+    const known = LADDER_CLASS_TEXT()
+    const found: string[] = []
+    for (const m of error.matchAll(/\[(\w+)\]/g)) {
+        const name = m[1] ?? ""
+        if (name in known && !found.includes(name)) found.push(name)
+    }
+    return found
+}
+
+/**
+ * The meaning of each failure class of a failed ladder, one line per class
+ * (`<class>: <meaning>`), for the place that tells what happened to a run.
+ *
+ * @param error - the error text.
+ * @returns the lines, empty when the error names no class.
+ */
+export function ladderClassNotes(error: string): string[] {
+    const known = LADDER_CLASS_TEXT()
+    return ladderClassesOf(error).map((c) => `${c}: ${known[c] ?? ""}`)
+}
+
+/** ` +N` for the N classes a brief reason does not name, nothing for none. */
+const more = (n: number): string => (n > 0 ? ` +${n}` : "")
+
 /** The widest a brief reason may be (`briefError`): it has to share a note row. */
 export const BRIEF_ERROR_WIDTH = 30
 
@@ -652,6 +692,9 @@ const KNOWN_ERRORS: readonly (readonly [RegExp, string])[] = [
  */
 export function briefError(error: string): string {
     const first = (error.split(/\r?\n/)[0] ?? "").trim().replace(/^model .+?: /, "")
+    const classes = ladderClassesOf(first)
+    if (classes.length > 0 && /^NotConvergedError\b/.test(first))
+        return `not converged: ${classes[0]}${more(classes.length - 1)}`
     for (const [pattern, phrase] of KNOWN_ERRORS) if (pattern.test(first)) return phrase
     const plain = first.replace(/^[A-Z]\w*(?:Error|Exception): /, "")
     const sentence = (plain.split(/(?<=[.!?])\s/)[0] ?? plain).replace(/[.:;,]$/, "")

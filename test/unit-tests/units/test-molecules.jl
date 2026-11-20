@@ -348,7 +348,7 @@ _forcedRmax(m)  = getfield(getfield(m, :_rMax), :done)
     # propkaPkas -> resolveHydrogens -> loadMolecule.
 
     @testset "total excluded volume on SASDMJ9 is close to CRYSOL's own reported Vol" begin
-        fixtureDir = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDMJ9")
+        fixtureDir = experimentFixtureDir("SASDMJ9")
         pdbPath    = joinpath(fixtureDir, "SASDMJ9_fit1_model1.pdb")
         fitPath    = joinpath(fixtureDir, "SASDMJ9_fit1.fit")
         @test isfile(pdbPath) && isfile(fitPath)

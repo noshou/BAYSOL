@@ -13,6 +13,7 @@
 module Export
 
 using ..Common
+using ..Fixtures
 using Dates
 using JSON3
 
@@ -289,6 +290,32 @@ Exports one fitting test into `projects`. Returns `:written`, `:exists` or throw
 error whose message is the reason it was skipped.
 """
 function export_entry(id::AbstractString, projects::AbstractString, dry::Bool)
+    # the structures come from the fixtures: unpacked from the archive while this runs
+    return Fixtures.with_fixture(id) do fixtures
+        _export_entry(id, projects, dry, fixtures)
+    end
+end
+
+"""
+The section `section_name` of the statistics log `statistics-<id>.LOG` in `dir`, as the
+text of a one-section file (the datetime of the log's last write, a blank line, the
+`=== name ===` section), or `nothing` when there is no such file or section. The file
+is read like the run log ([`read_log`](@ref)) but is not a run log: `Report.parse_log`
+never sees it.
+"""
+function statistics_section(dir::AbstractString, id::AbstractString, section_name)
+    path = joinpath(dir, "statistics-$id.LOG")
+    isfile(path) || return nothing
+    log = read_log(path)
+    for (name, section) in log.sections
+        name == section_name || continue
+        return "datetime\t$(log.stamp)\n\n=== $name ===\n" *
+               join(section.lines, "\n") * "\n"
+    end
+    return nothing
+end
+
+function _export_entry(id, projects, dry, fixtures)
     dir = joinpath(root(), FIT_DIR, id)
     isdir(dir) || error("no folder $dir")
     isempty(workbooks(dir)) && error("no workbook (res*.xlsx): the fit has not been run")
@@ -297,7 +324,6 @@ function export_entry(id::AbstractString, projects::AbstractString, dry::Bool)
     log = read_log(logpath)
     script = joinpath(dir, "$id.jl")
     solutes = script_solutes(read(script, String))
-    fixtures = joinpath(root(), "test", "fixtures", "experiments", id)
     project = joinpath(projects, id)
     ispath(project) && return :exists
     # every model: its workbook, its LOG section, its structure
@@ -430,6 +456,13 @@ function write_run(project, id, name, log, models, conditions, solutes)
             join(m.section.lines, "\n") * "\n"
         write(joinpath(stage, "$(m.stem).LOG"), logtext)
         push!(files, "$(m.stem).LOG")
+        # the same run's section of `statistics-<ID>.LOG` (the sampler's statistics, one
+        # block for each attempt), pulled in beside it when the fit has one
+        stat = statistics_section(dirname(m.book), id, m.section_name)
+        if stat !== nothing
+            write(joinpath(stage, "statistics-$(m.stem).LOG"), stat)
+            push!(files, "statistics-$(m.stem).LOG")
+        end
         sort!(files)
         secs = parse(Float64, something(row_of(m.section, "wallSeconds"), "0"))
         seconds_total += secs
@@ -474,7 +507,8 @@ function write_run(project, id, name, log, models, conditions, solutes)
     )
     write(
         joinpath(stage, "run.LOG"),
-        "datetime\t$(log.stamp)\nproject\t$project\nrun\t$name\nui\ttui\nstarted\t$started\n" *
+        "datetime\t$(log.stamp)\nproject\t$project\nrun\t$name\nui\ttui\n" *
+        "started\t$started\n" *
         "temperatureC\t$(conditions.temp)\nph\t$(conditions.ph)\n" *
         "sigmaPh\t$(conditions.sigma)\nenergyEv\t$(conditions.energy)\n" *
         "models\t$(length(models))\nsource\timported by `bysl fits export` from the " *
@@ -496,7 +530,10 @@ function default_projects()
     base = if isabspath(home)
         home
     else
-        joinpath(get(ENV, "XDG_DATA_HOME", joinpath(homedir(), ".local", "share")), "baysol")
+        joinpath(
+            get(ENV, "XDG_DATA_HOME", joinpath(homedir(), ".local", "share")),
+            "baysol",
+        )
     end
     return joinpath(base, "projects")
 end
@@ -535,7 +572,8 @@ function run(argv::Vector{String})::Int
         end
     end
     println(
-        "written $(counts[:written]), would write $(counts[:dry]), exist $(counts[:exists]), " *
+        "written $(counts[:written]), would write $(counts[:dry]), " *
+        "exist $(counts[:exists]), " *
         "skipped $(counts[:skipped])",
     )
     return counts[:skipped] > 0 ? 1 : 0

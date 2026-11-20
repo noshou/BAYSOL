@@ -29,7 +29,11 @@ export const WORST_COUNTER = "AB20000 · row 20000 / 20000"
 export const DESCRIPTION_CELLS = 44
 
 /** The sheets whose rows are named parameters (the groups of `descriptionGroup`). */
-const PARAMETER_SHEETS: ReadonlySet<string> = new Set(["map", "quantiles", "stdevFromPrior"])
+const PARAMETER_SHEETS: ReadonlySet<string> = new Set([
+    "map",
+    "quantiles",
+    "stdevFromPrior",
+])
 
 const descriptions = lazyAsset<ColumnDescriptions>("data", "column_descriptions.json")
 
@@ -81,8 +85,9 @@ export function describeColumn(sheetName: string, header: string): string | unde
  * @param column - the cursor's column.
  * @returns the sentence: on the sheets `map`, `quantiles` and `stdevFromPrior` the
  *     description of the row's parameter (group `parameterRows`) in the `parameter`
- *     column, the other cells the column's; on the `run` sheet the description of the row's `name` (group
- *     `runRows`; a workbook of an older release may carry a fifth column, which is
+ *     column, the other cells the column's; on the `run` sheet the description of the row's
+ *     `name` (group `runRows`; a workbook of an older release may carry a fifth column,
+ *     which is
  *     ignored); otherwise the description of the column's header; `undefined` for neither.
  */
 export function cellDescription(

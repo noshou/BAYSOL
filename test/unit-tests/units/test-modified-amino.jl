@@ -483,15 +483,13 @@ end
                 id == "SASDH39" ?
                 joinpath(@__DIR__, "..", "..", "fixtures", "molecules",
                     "SASDH39-argonaute-dna.pdb") :
-                joinpath(@__DIR__, "..", "..", "fixtures", "experiments", id,
-                    "$(id)_fit1_model1.pdb")
+                joinpath(Main.experimentFixtureDir(id), "$(id)_fit1_model1.pdb")
             # the raw loader: the HETATM selenomethionines are in, standard names written as
             # HETATM too
             @test nAtoms(loadMolecule(fx("SASDH39"))) == 7225      # 7223 and the two Mg
             @test nAtoms(loadMolecule(fx("SASDNP7"))) == 5608      # 5575, GNP (32) and Mg
             @test nAtoms(loadMolecule(fx("SASDB48"))) == 3735
-            tk5 = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDTK5",
-                "SASDTK5_fit2_model1.pdb")
+            tk5 = joinpath(Main.experimentFixtureDir("SASDTK5"), "SASDTK5_fit2_model1.pdb")
             # the 202 atoms of PXX are in (5092 before
             # 2026-11-11), the 7 UNK too (2026-11-13)
             @test nAtoms(loadMolecule(tk5)) == 5301

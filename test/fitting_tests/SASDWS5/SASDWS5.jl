@@ -7,7 +7,7 @@ using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDWS5")
+const _FIXTURE_DIR = fixtureDir("SASDWS5")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDWS5.dat")
 
 # ---------------------------------------------------------------------------
@@ -98,9 +98,11 @@ const SOLUTES = Solute[
 #                       Forward-model / sampler wiring
 # ---------------------------------------------------------------------------
 
-# No q cut: the whole curve is fitted. The data reach 0.742 Å⁻¹ but the depositor's
-# CRYSOL fit stops at 0.40 Å⁻¹, so the refChi2 is not like for like. Above 0.4 Å⁻¹ the
-# median I/σ is 2.3 (4 % of the points have I ≤ 0).
+# Fit only q ≤ 0.4 Å⁻¹, matching the upper q limit of the depositor's CRYSOL fit.
+# The original curve extends to 0.742 Å⁻¹; above 0.4 Å⁻¹ the median I/σ is 2.3
+# (4 % of the points have I ≤ 0). Those points are excluded from the fit.
+# Without this cut the run diverged 2.59 % (any δ, any prior); with it, 0 % (2026-11-17).
+const Q_MAX = 0.4
 
 # The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
 # the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
@@ -128,11 +130,14 @@ const RUNS = [
 """
     fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` (no q cut).
+`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0` and `q ≤ Q_MAX`.
 (`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
 function fitSubset()
-    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    keep = findall(
+        i -> σ_exp[i] > 0 && qvals[i] <= Q_MAX,
+        eachindex(qvals),
+    )
     return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
@@ -194,7 +199,6 @@ for run in RUNS
         dir = @__DIR__, name = "res$(suffix)", references,
         formFactorLog = formFactorLog, nAtoms = nAtoms,
         refChi2 = run.refChi2,
-        runLog = true,
     )
 
     # `@__DIR__` (this SASDWS5/ folder), not the caller's cwd.

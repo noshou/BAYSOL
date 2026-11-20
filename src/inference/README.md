@@ -72,7 +72,13 @@ The gradient is a **hybrid**: one `ForwardDiff.gradient!` over the whole target 
 
 ### Profiling is not marginalising
 
-Integrating `(m, b)` out under a flat prior gives `ℓ_marg = ℓ_prof − ½ ln D + ln 2π`, an Occam factor that is not invariant to the units of `h` (a flat prior on `m` is not flat on `m/λ`), whereas the profile is invariant under `h → λh + β`. In the Gaussian approximation both have the same width; they differ in location and shape through the variation of `ln D(ξ)`, which matters in weakly constrained directions. `c1` is profiled in both. The reported probabilities are posterior probabilities of `ξ` *given the profile construction*.
+Integrating `(m, b)` out under a flat prior gives `ℓ_marg = ℓ_prof − ½ ln D + ln 2π`, an Occam factor that is not invariant to the units of `h` (a flat prior on `m` is not flat on `m/λ`), whereas the profile is invariant under `h → λh + β`. In the Gaussian approximation both have the same width; they differ in location and shape through the variation of `ln D(ξ)`, which matters in weakly constrained directions. `c1` is profiled in both (or sampled, see below). The reported probabilities are posterior probabilities of `ξ` *given the profile construction*.
+
+### Sampling c1 (fallback for a kinked profile)
+
+With several ligands the likelihood of `c1` can have two basins of nearly equal height (SASDVA2, four HEM ligands: `c1` ≈ 1.185 and 1.217). The profile `ℓ*(ξ) = max_c1 ℓ(ξ, c1)` then has a kink where the maximiser jumps, its envelope gradient jumps with it, and NUTS's step size collapses (R̂ 1.75). The scale and the background cannot do this: at fixed `ξ` and `c1` they enter linearly, so their weighted least-squares optimum is unique and smooth; only `c1` is nonlinear.
+
+A profiled run therefore asks `_c1Kinked` (`Peaks.jl`: two or more prominent interior maxima of the `c1` scan, the two highest within `C1_KINK_GAP` = 3 nats of each other so a branch the sampler would not visit is no kink, in a share of the draws) after the warm-up (whose mass matrix is not adapted yet), when a chain has `C1_KINK_DRAWS` draws and then every `C1_KINK_EVERY` draws (each check on at most `C1_KINK_DRAWS` draws spread over those so far, so it stays cheap), and once more on all of the chain's draws when it ends (a short chain, down to one draw, only then). The first chain that finds a kink stops all of them (`KinkDetected`), and `runModel` runs once more with `c1` as a fifth sampled parameter: `ξ = (ρₑ, δρ₁, δρ₂, δρ₃, c1)`, `c1 ~ Uniform(EXCL_VOL_CORR_BOUNDS)` (Distributions.jl), through the same logit as the δρ (`c1 = lo + (hi − lo)·σ(t)`; the prior and the Jacobian leave the standard logistic density in `t`). There is no profile search and no integral; `∂ℓ/∂c1` is analytic (`_dllDc1`, the envelope theorem no longer applies at a sampled `c1`). NUTS does not walk in `t` itself but in the non-centred shift `z = t − t̂(ξ₄)`, where `t̂` is the mode in `t` of the likelihood times the logistic density given `ξ₄` (`_c1Centre`: Newton from the profiled `c1`, gradient by the implicit function theorem). The shift has Jacobian 1, so the target is exactly that of the plain five-parameter model, but the narrow, curved ridge that `c1` forms with the δρ (plain sampling gave 2.5-20 % divergences on SASDM96 and SASDMC6) becomes a round blob. `_ξOfθ` and `_θOfξ` convert between the sampler's coordinates and `ξ`; stored draws carry the real `c1`. If that run misses a gate (R̂, ESS or a divergent share of 0.1 % or more) the usual retry fires, longer warm-up and run. Per-draw `c1` and χ² are those of the draw. The LOG row `c1Kink` is `true` for such a run and `false` otherwise. If the sampled-c1 run still misses a gate, `runModel` runs the profiled four-parameter run once without the kink watch (`SamplerOptions.watchKink = false`) and keeps it when it passes (LOG rows `c1KinkFallback`, `c1KinkProblems`). A run that still does not converge walks the retry ladder of `runModel` (see "The retry ladder" below) before `NotConvergedError` is thrown (LOG rows `ladder`, `ladderAttempts`, `ladderRungs`, `ladderRung`). Code: `_c1Kinked` in `profiled-corrs.jl`, `sampleC1` and the watch in `_chainRunner` in `posterior.jl`, the five-parameter methods of `Θ`, `Ξ`, `logjac` in `priors.jl`.
 
 ## Priors
 
@@ -147,7 +153,7 @@ The coordinates have prior scales differing by orders of magnitude (`σ(ρₑ)` 
 \mathbb E[t]=\psi(\alpha)-\psi(\beta),\qquad \mathrm{Var}[t]=\psi_1(\alpha)+\psi_1(\beta)
 ```
 
-(defaults: shell 2.065 ± 0.812, cavity 0.650 ± 1.357). This equalises marginal prior scales; it does not remove correlations, and the posterior is often far narrower than the prior (σ_z down to ~10⁻⁴ along δρ₁/δρ₂).
+(defaults: shell 2.065 ± 0.812, cavity 0.650 ± 1.357). This equalises marginal prior scales; it does not remove correlations, and the posterior is often far narrower than the prior (`σ_z` down to ~10⁻⁴ along δρ₁/δρ₂).
 
 ## Mode search, Laplace approximation and whitening
 
@@ -160,8 +166,8 @@ Stan's windowed adaptation, which AdvancedHMC copies, starts from `M⁻¹ = I` a
    \mathcal Z_L=\int e^{-f}\,dz\approx e^{-f(\hat z)}(2\pi)^{N/2}\det(H)^{-1/2},\qquad \ln\mathcal Z_L=-f-\tfrac12\sum_i\ln\lambda_i+\tfrac N2\ln 2\pi
    ```
 
-   with relative error `1 + O(1/λ)` (in 1-D the first correction is `1 − f₄/8f₂² + 5f₃²/24f₂³`, exact for the Gamma function against Stirling's series). Laplace masses are exactly covariant under affine maps (ratios are unchanged), but the approximation under-weights skewed basins (off by a factor 2 or more) and under-states the width of weakly constrained logit coordinates (δρ₃ of SASDEP6 `fit1_model1` and SASDLP4 `fit1_model2` come out 2–4× wider; elsewhere σ_z is 0.93–1.5× the Laplace σ_z). They decide where the sampler looks, not how much a region counts.
-3. **Hessian** by symmetrised central differences of the envelope gradient (`2N = 8` gradient evaluations), in two passes: step `MAP_HESS_STEP = 1e-4`, then `MAP_HESS_REL_STEP` (0.1) × each coordinate's Laplace σ from the first pass. The truncation error of a column is `h²/6 · ∇⁴f` and the noise `ε_g/h` (the gradient error of the `c1` tolerance), so the step must scale with σ_i; this is where the 1e-8 tolerance matters most.
+   with relative error `1 + O(1/λ)` (in 1-D the first correction is `1 − f₄/8f₂² + 5f₃²/24f₂³`, exact for the Gamma function against Stirling's series). Laplace masses are exactly covariant under affine maps (ratios are unchanged), but the approximation under-weights skewed basins (off by a factor 2 or more) and under-states the width of weakly constrained logit coordinates (δρ₃ of SASDEP6 `fit1_model1` and SASDLP4 `fit1_model2` come out 2–4× wider; elsewhere `σ_z` is 0.93–1.5× the Laplace `σ_z`). They decide where the sampler looks, not how much a region counts.
+3. **Hessian** by symmetrised central differences of the envelope gradient (`2N = 8` gradient evaluations), in two passes: step `MAP_HESS_STEP = 1e-4`, then `MAP_HESS_REL_STEP` (0.1) × each coordinate's Laplace σ from the first pass. The truncation error of a column is `h²/6 · ∇⁴f` and the noise `ε_g/h` (the gradient error of the `c1` tolerance), so the step must scale with `σ_i`; this is where the 1e-8 tolerance matters most.
 4. `H = V diag(λ) Vᵀ`, eigenvalues **floored** at `MAP_HESS_EIG_FLOOR = 1` (a ridge, saddle or direction wider than the prior keeps the prior scaling), `S = V diag(λ̃)^{−1/2}`. The whitening factor, the clustering metric and the basin comparison use the floored eigenvalues; the stored `logmass = −f − ½Σ ln λ_i` (and so the shares) uses the unfloored ones, and is NaN if any `λ_i ≤ 0`. The optima are clustered (Mahalanobis distance ≤ `MAP_MODE_SEP = 3`); the best `MAP_OPTIMA_KEPT = 8` are compared by floored Laplace mass, and the heaviest becomes the whitening centre (not necessarily the lowest optimum).
 
 NUTS samples `w` with `θ = μ_θ + σ_θ ⊙ (ẑ + S w)` (`_θ_of_w`), in which the posterior is ≈ `N(0, I)` and the chain starts at the mode (`w₀ = 0`). Without flooring `Sᵀ H S = I`; the whitened Hessian elsewhere measures only the non-Gaussian remainder (condition number ~1–10 instead of 10⁶). Whitening *is* the choice of the initial HMC metric: HMC with mass matrix `M = LLᵀ` in `x` is step-for-step identical to identity-metric HMC in `u = Lᵀx`. For a leapfrog step on a mode of curvature `λ` the stable range is `ε√λ < 2`, and a trajectory needs ~`(π/2)√(λ_max/λ_min)` steps, which is why the conditioning governs the cost. If no start reaches a finite optimum, `ẑ = z₀` and `S = I`; likewise if the Hessian is non-finite. Draws need no Jacobian to be mapped back; only converting a density does.
@@ -172,7 +178,7 @@ NUTS samples `w` with `θ = μ_θ + σ_θ ⊙ (ẑ + S w)` (`_θ_of_w`), in whic
 
 `infer(...; rngSeed)` is reproducible at any thread count, and by default (`RNG_SEED` = 0) every run is: the `UInt64` seed is mixed (SplitMix64) with each draw's purpose and index into that item's own `Xoshiro` stream (MAP start `i`, chain `k`; bridge proposals; the chain-start directions, each under its own purpose tag). The seed's own initial point, the first MAP start, is drawn by `seedSampler` from a stream of `RNG_SEED`, so the global RNG plays no part in a run. The seed is the `rngSeed` row of the run log and of the `run` sheet; `rngSeed = nothing` draws a fresh 53-bit seed instead (so a spreadsheet holds it exactly). The MAP search stays serial (threading measured slower, in a validation run now in git history under `test/validation/threading/`).
 
-Each chain uses multinomial NUTS with the generalised U-turn criterion (as in Stan; max tree depth 10, divergence threshold Δ_max = 1000), a `DenseEuclideanMetric(N)` (full covariance: the parameters multiply each other in `Î`, and a diagonal metric would cost ~√((1+r)/(1−r)) more steps for a pair with correlation `r`), `Leapfrog`, and `StanHMCAdaptor`:
+Each chain uses multinomial NUTS with the generalised U-turn criterion (as in Stan; max tree depth 10, divergence threshold `Δ_max` = 1000), a `DenseEuclideanMetric(N)` (full covariance: the parameters multiply each other in `Î`, and a diagonal metric would cost ~√((1+r)/(1−r)) more steps for a pair with correlation `r`), `Leapfrog`, and `StanHMCAdaptor`:
 
 - **Dynamics.** `H(x, p) = U(x) + ½ pᵀM⁻¹p`; kick–drift–kick leapfrog is volume-preserving, reversible and symplectic (second order, energy error ≈ O(ε²) bounded within the stability range), so the weights `e^{−H}` are the whole correction: the next state is drawn from the trajectory with probability ∝ `e^{−H}` (biased progressive sampling at the top level) and no accept–reject step is needed. The criterion stops when `ρ·p♯₋ ≤ 0` or `ρ·p♯₊ ≤ 0`, `ρ` the sum of the momenta.
 - **Step size.** Nesterov dual averaging in `log ε` (γ = 0.05, t₀ = 10, κ = 0.75, shrinkage point `log 10ε₀`) toward a tree-averaged acceptance `α̅ = mean_leaves min(1, e^{−(H'−H₀)})` of `TARGET_ACCEPT = 95` percent. The posteriors are strongly curved and often multimodal; on the 53 fits δ = 0.95 removed the divergences (three fits above 1 % went to ≤ 0.04 %) for 1.3× the steps of Stan's 0.8.
@@ -209,14 +215,67 @@ The worst values over the diagnosed modes are reported (`rhatMax` flagged when n
 ## When a run fails
 
 A run **fails** (`NotConvergedError`, no results written, the `.LOG` of the folder gets `status failed`
-and the reasons in its `error` row) when any of three gates is not passed. Every gate is strict (owner,
-2026-11-16): a value equal to the limit fails.
+and the reasons in its `error` row) when any of three gates is not passed. Every gate is strict: a value equal to the limit fails.
 
 | Gate | Passes when | Constant |
 |---|---|---|
 | worst split R̂ | strictly below 1.01 | `RHAT_OK` |
 | smallest bulk and tail ESS | strictly above 400 | `ESS_MIN` |
 | divergent transitions | strictly below 0.1 % of the pooled post-warm-up transitions | `MAX_DIVERGENT_RATE` |
+
+### The retry ladder (a setting)
+
+When the base run, its own longer retry and the sampled-c1 fallback have failed, `runModel` **classifies the
+failure** from the diagnostics of the failed attempt and walks the **rungs of that class**: each rung is a set
+of settings that replaces the call's for one more attempt, and the first attempt that passes the gates wins. After
+every failed attempt the failure is classified again (the class can change), at most `LADDER_MAX_RUNGS` = 3 reruns
+follow the base attempt (4 attempts in all), and when none passes `NotConvergedError` lists every attempt. The
+setting `LADDER` (keyword `ladder`) is a map from class to a list of rungs `{name?, overrides: {SETTING: value}}`.
+
+| class | diagnosed when (first match wins) | default rungs |
+|---|---|---|
+| `kink` | the profiled c1 has a kink (existing path, not a ladder class) | c1 sampled as a fifth parameter |
+| `stepCollapse` | R̂ at or above the gate and median adapted step size below `LADDER_COLLAPSE_STEP` = 0.01, or R̂ at least 1.05 and mean tree depth at least `LADDER_COLLAPSE_DEPTH` = 8 | (1) `TARGET_ACCEPT = 70`; (2) 35 |
+| `splitChains` | R̂ at least `LADDER_RHAT_FAR` = 1.05, more than one posterior mode, ESS at the floor or below | (1) `CHAIN_START_RADII = (2, 4, 6)`; (2) `(1, 2, 3)` with `RETRY_N_ADAPT = RETRY_N_DRAWS = 4000` |
+| `divergent` | divergent share at or above `MAX_DIVERGENT_RATE` and R̂ below 1.05 | (1) `TARGET_ACCEPT = 99`; (2) 99, radii `(1, 2, 3)`, 4000/4000; (3) rung 2 with `RNG_SEED_STEP = 1` |
+| `structural` | the `divergent` case after a rung that raised `TARGET_ACCEPT` has already run, with a share of at least `LADDER_STRUCTURAL_SHARE` = 1 % | `SAMPLE_C1 = true` (c1 sampled) |
+| `marginal` | R̂ below 1.05 (a near miss of the R̂/ESS gates) | (1) `RETRY_N_ADAPT = 6000`, `RETRY_N_DRAWS = 8000`; (2) that with `RNG_SEED_STEP = 1` |
+| `generic` | anything else, or no diagnostics | `RETRY_N_ADAPT = RETRY_N_DRAWS = 4000` with `RNG_SEED_STEP = 1` |
+
+All thresholds are documented constants of `pipeline/run-model.jl`, not settings. The collapse step size
+(about 0.002 on a collapsed run against 0.1 to 0.3 when healthy) is why the `stepCollapse` threshold sits at
+0.01; the mean tree depth alone is no sign of collapse, which is why depth is used only together with a far R̂.
+The `marginal` band is R̂ 1.01 to 1.05 and the `structural` share of divergent transitions is 1.3 to 2 %.
+`ebfmi` is not used by the classifier. Every run writes `stepSize` and `stepSizeMin` (median and minimum of
+the pooled chains' adapted step size, LOG and `run` sheet) and `ladderClass`, so the thresholds can be
+checked against the LOGs of any set of runs. Lower `TARGET_ACCEPT` values raise divergences, which is why 70
+and 35 are used only for `stepCollapse`.
+
+`retry = false` switches the whole walk off. A rung's `CHAIN_START_RADII`, `RETRY_N_ADAPT` and `RETRY_N_DRAWS` apply only when the
+caller did not set them, so a script's own values win (SASDMS6's `retryNDraws = 8000` stays 8000), and so does a value
+set to its default. `runProject` (and so the command line and the TUI) tracks what was set: a keyword or flag, an entry of
+`settings.json` or of the model's own settings; it hands the names to `runModel` as `callerSet`. A direct call of
+`runModel` without `callerSet` judges by the value instead: one still at its default counts as unset.
+A map names only the classes it changes
+(the others keep their default rungs), `[]` switches a class off, `false` or `"off"` every class. The ladder is given like
+any setting: `ladder` of `runModel`, `runProject`, the terminal interface (the ladder editor) and the command line
+(`--ladder`, `--model-setting`); `ladder` in `settings.json`; per model in `model-settings.json` (or the `modelSettings`
+keyword of `runProject`). Strength, weakest to strongest: default, `settings.json`, the keywords of the call (the command
+line), `model-settings.json`, the `modelSettings` keyword.
+
+```julia
+runProject(dir; ladder = "ladder.json")                          # every model
+runProject(dir; ladder = (; divergent = []))                      # no divergent rungs
+runProject(dir; modelSettings = (; m1 = (; ladder = "off")))      # this model: no ladder
+```
+
+A rung may override only fitting settings (anything that is a keyword of `runModel`): the ones the ladder uses are
+`TARGET_ACCEPT`, `CHAIN_START_RADII`, `RETRY_N_ADAPT`, `RETRY_N_DRAWS` and `RNG_SEED_STEP`, and `SAMPLE_C1` (a ladder-only
+switch: sample c1 as a fifth parameter); `N_ADAPT`, `N_DRAWS`, `VAL_SIGMA`, `N_CHAINS`, the `OPTIMUM_*`, `MAP_*`,
+`BASIN_RESTART_NATS` and `HARVEST_*` settings are accepted but no default rung uses them.
+Plot, output, run-level and prior or bound settings (`BOUNDS_*`, which `seedModel` reads once) are refused with an
+`InvalidSettingsError` naming the rung. The LOG records the class (`ladderClass`), the attempts (`ladderAttempts`), the
+rungs walked (`ladderRungs`, JSON) and the winner (`ladderRung`: 0 the base run, `i` a rung, -1 none).
 
 The ladder below is what we do, in this order, when a fit fails. It comes from fixing the benchmark entries
 (`test/fitting_tests/`); the entry named at each step is a real case, and its script carries the setting
@@ -255,9 +314,11 @@ draws in 5600 are 0.07 %).
    manifolds that no sampler crosses. Fitting the whole curve (`Q_MAX_FIT = Inf`; `seedModel` drops the
    non-positive bins) removed the problem for SASDVB2 and SASDVC2. Keep a cut only when the data above it
    really are noise.
-6. **Divergences that do not respond to `δ` (SASDWS5, SASDM96: 1.3 % to 2 % at 95, 98 and 99).** The step
-   size is not the cause: the log-density has a feature the integrator cannot cross at any step. This is the
-   structural case and it is not solved yet; see "Structural failures" below.
+6. **A q range that includes noise-dominated points.** Divergences that do not respond to `δ` or the prior can
+   come from fitting points whose signal is below the noise. Cutting at the point where the median I/σ falls to about 2
+
+   removes them. Item 5 is the opposite case, so test both a cut and no cut. Look at the
+   residuals of the fitted grid (lag-1 correlation, runs) before concluding the geometry is at fault.
 
 **What does not fix a failed run** (measured, do not retry): a different prior width (`κ_δρ₁₂`,
 `κ_δρ₃`), Shannon binning (`rebin`), removing the HETATM ligands, or a different mass-matrix type
@@ -266,26 +327,57 @@ that can be trusted.
 
 ### Structural failures
 
-*Open: the cause is narrowed down, the remedy is not decided.* SASDM96 and SASDWS5 keep 1.3 % to 2.6 %
-divergent transitions at `δ` 95 and 99 alike (step 0.09 to 0.34, tree depth 3 to 5), so a smaller step does
-not help. Measured on the divergent draws of one run each (seed 0):
+A run can keep a divergent share of 1 to 3 % at any `δ`, with a small adapted step and a shallow tree, so a
+smaller step does not help. The usual signs are:
 
-- **Not a gradient error.** The ForwardDiff gradient agrees with a central finite difference to
-  about 2·10⁻⁴ (relative) at divergent and at ordinary draws alike.
-- **Not the `c1` bound.** The divergent draws of SASDWS5 sit at `c1` ≈ 1.1, far from the 1.3 bound; those of
-  SASDM96 are not concentrated near it (3 % to 11 % within 0.002 of 1.3, against 4 % to 5 % of the
-  others). The log-density shows no kink there (one-sided slopes agree).
-- **They sit in a different part of the posterior.** In SASDM96 the divergent draws have a higher
-  `δρ₂` (about 0.85 against 0.25); in SASDWS5 a lower `δρ₁` (1.3 to 1.4 against 1.77, with the bulk pinned
-  near its bound 2.0) and a `δρ₃` nearer its upper tail. They are spread over all chains, so it is not one
-  stuck chain.
-- **The geometry is very stiff.** The log-posterior gradient in θ-space is 10³ to 10⁴ at ordinary
-  draws, and the Hessian of SASDM96 has eigenvalues from 0.6 to 1.3·10⁸. The mass matrix is one global
-  matrix learned in warm-up, so where the curvature differs from the average the same step is too large.
+- The gradient is not at fault: the ForwardDiff gradient agrees with a central finite difference to about
+  2·10⁻⁴ (relative) at divergent and at ordinary draws alike.
+- The `c1` bound is not the cause: the divergent draws are not concentrated near it, and the log density
+  shows no kink there.
+- The divergent draws sit in a different part of the posterior than the bulk (a different `δρ`), spread
+  over all chains, so it is not one stuck chain.
+- The geometry is very stiff: the gradient in θ-space is 10³ to 10⁴ at ordinary draws and the Hessian
+  eigenvalues span many orders of magnitude. The mass matrix is one global matrix learned in warm-up, so where
+  the curvature differs from the average the same step is too large.
 
-What a user can do today is limited to the ladder above plus the checks: which parameter the divergent draws
-share (the `draws` sheet and the `divergent` flag), and whether the entry's buffer description
-(concentrations, uncertainties) is right, since a wrong solvent contrast pushes `δρ` to its bounds.
+What a user can do is limited to the ladder above plus the checks: which parameter the divergent draws
+share (the `draws` sheet and the `divergent` flag), the q range (items 5 and 6 of the ladder), and whether the
+buffer description (concentrations, uncertainties) is right, since a wrong solvent contrast pushes `δρ` to its
+bounds.
+
+## Run statistics (the statistics log)
+
+`statistics.jl` records what each phase of a run computed, as it happens, in a `StatBuffer` (one per run, kept in the run's `StageLog` under `info["statistics"]`, locked, no global state): `_infer` starts an attempt block with `statAttempt!` and `statSettings!`, appends the MAP search (`statMapSearch!`) and, once the chains are pooled, the chain table, the posterior, bounds, axes, correlation, residual, convergence, gate, health and c1 sections and the stage timings (`statChains!`); `infer` labels the retry (`statLabel!`, with the failure class and the ladder rung), and `runModel` the ladder rungs, the `KinkDetected` stop and the sampled-c1 restart. `statKeep!` names the attempt that is the result and why. The buffer is flushed to a scratch file at each phase boundary and whenever it holds `statisticsCap(memoryHeadroom)` bytes (0.01 % of the forward cache's memory budget, held between 64 KiB and 64 MiB); `Pipeline.writeStatistics` moves the lines into the run's section of `statistics-<ID>.LOG`. A recorder that fails writes a `statisticsError` row and returns: the statistics never fail a run. Nothing replays or re-evaluates the model for the log, and a value that was not recorded is written as `unavailable`, never as a number. The divergent draws are not in the log (the workbook's `divergences` sheet has them).
+
+The layout and wording are those of the dev tool `bysl fits diagnose`. Where that tool replays the model on a grid, the log gives the same lines from the run's own draws, so they are proxies: the `axes` ratios and kinks are read from the draws binned along the whitened axes (`STAT_BIN_MIN` draws a bin, a c1 jump is `STAT_C1_JUMP`); the `local λ_max` line of `nuts` is the largest gradient-difference quotient of consecutive draws, a **lower bound** of the true `λ_max` (so the stable step size it implies is an upper bound); `bounds` counts draws near a bound; `residuals` tests the residuals of the draws' fitted curves (Durbin-Watson and a runs test); the posterior sd in w is compared with the Laplace whitening. The gradient error of the c1 tolerance and the second-pass Hessian are not in the log.
+
+The format is machine-readable. Every section starts with `-- <name> --` (an attempt block is `--- attempt N: <label> ---`); a scalars section is `name<TAB>value` rows; a table is a tab-separated header and rows, ended by a blank line or the next heading; free text lives only in `text` sections. `STAT_SECTIONS` holds this table (the unit test checks the writer against it) and `statParse` reads a log back.
+
+| section | level | kind | rows or columns |
+|---|---|---|---|
+| `settings` | attempt | scalars | triggeredBy, triggerClass, rung, targetAccept, nChains, nSamples, nAdapt, nDraws, rngSeed, chainStartRadii, c1Mode, kinkWatch, mapNStarts, mapMaxIter |
+| `problem` | attempt | text | free text lines |
+| `map search` | attempt | text | free text lines |
+| `map search again` | attempt | text | free text lines |
+| `nuts` | attempt | text | free text lines |
+| `chains` | attempt | table | chain, start σ, mode, pooled, kept, div, div%, warm-up div, warm-up div%, ε, steps, accept, mean log π, energy error sd, depth≥10, BFMI, c1 at bound, gradient evals, non-finite, note |
+| `chain totals` | attempt | scalars | chainsRun, chainsPooled, pooledDraws, divergentDraws, warmupDivergentDraws |
+| `posterior` | attempt | text | free text lines |
+| `bounds` | attempt | table | coordinate, median, sd, distanceSd, shareNearBound |
+| `axes` | attempt | text | free text lines |
+| `correlation` | attempt | table | parameter, then one column per sampled parameter |
+| `residuals` | attempt | scalars | residualSource, residualCount, durbinWatson, runsCount, runsExpected, runsZ, runsP |
+| `convergence` | attempt | table | parameter, rhat, essBulk, essTail, sd, mcse |
+| `gate` | attempt | scalars | rhatMax, essMin, essTailMin, nDivergent, divergentShare, gate |
+| `modes` | attempt | scalars | modes, modeWeights, modeLogMass, modeLogMassErr, weightsUncertain, rewhitenedNats |
+| `health` | attempt | scalars | stepSizeInitial, stepSizeReached, leapfrogTotal, leapfrogSampling, leapfrogPerEss, gradientEvals, nonFiniteEvals, curvatureSamples, c1AtLowerBound, c1AtUpperBound |
+| `c1 search` | attempt | scalars | c1Solves, c1BrentIterations, c1BrentPerSolve, c1ScanAtEdge, c1WlsErrors |
+| `kink check` | attempt | table | chain, checks, drawsExamined, drawsTwoBasins, firedAtDraw |
+| `stage timings` | attempt | table | stage, seconds, jit, gc, notes |
+| `outcome` | attempt | scalars | stopped, next |
+| `statistics error` | attempt | text | free text lines |
+| `attempts` | run | table | attempt, label, outcome |
+| `result` | run | scalars | attempts, keptAttempt, keptLabel, keptBecause, failed, statisticsFlushes, statisticsFlushSeconds |
 
 ## Draws and summaries
 
@@ -293,7 +385,7 @@ share (the `draws` sheet and the `divergent` flag), and whether the entry's buff
 
 - **MAP.** The reported "MAP" is the non-divergent draw of highest `log π` (a draw of the sampled density in `θ`, not the L-BFGS end point and not the mode of the physical-space density). In the Gaussian case the best of `S` draws has `χ²_min` median `√(8 ln 2/S)`: ≈ 0.18 posterior sd and 0.016 nats from the mode at `S = 5600`.
 - **Intervals.** Quantiles at the percentiles of ±`sigma` σ of a Normal (default 2σ: 2.28 – 97.72; any finite `sigma > 0`, with no upper limit) with Julia's linear-interpolation definition, and `"bounds"`, the smallest and largest actual draws inside them. Curve bands apply the same operation at each `q`: they are **pointwise** (the whole curve lies inside with probability at most 68 %) bands of the *fitted function*, not a posterior predictive (which would add `σᵢ²` and the variance of the nuisance parameters), and should not be compared with the scatter of the data. Divergent draws are removed, which biases the bands slightly narrow.
-- **χ² on the measured grid.** `modelOnRaw` interpolates the binned model onto the raw `q` by a cubic spline (`nRaw − 3` degrees of freedom). For a systematic misfit of `εσ` per raw point and `n` raw points per bin, the raw χ²_red ≈ `1 + ε²` and the binned ≈ `1 + nε²`: the binned statistic matches the independent-channel likelihood that is sampled, the measured-grid one is comparable with other programs.
+- **χ² on the measured grid.** `modelOnRaw` interpolates the binned model onto the raw `q` by a cubic spline (`nRaw − 3` degrees of freedom). For a systematic misfit of `εσ` per raw point and `n` raw points per bin, the raw `χ²_red` ≈ `1 + ε²` and the binned ≈ `1 + nε²`: the binned statistic matches the independent-channel likelihood that is sampled, the measured-grid one is comparable with other programs.
 
 ## Usage
 

@@ -11,7 +11,13 @@ import {
     type RunFlow,
     readAssetJson,
 } from "../src/core/environment.js"
-import { openTabs, PICK_ONE_NOTE, stepTabs } from "../src/screens/screen-rules.js"
+import {
+    MEMORY_SETTING,
+    memoryHint,
+    openTabs,
+    PICK_ONE_NOTE,
+    stepTabs,
+} from "../src/screens/screen-rules.js"
 import { colourNames } from "../src/store/colours.js"
 import type { ImportTunables } from "../src/store/data-table.js"
 import {
@@ -799,4 +805,14 @@ test("the colours of the models are on the sheets only for several models", () =
         [...multiModelSettings],
     )
     assert.ok(defaultCatalog().get("PLOT_COMPARE_COLOURS") !== undefined)
+})
+
+test("the memory headroom says what its percent is on this machine", () => {
+    const total = 16 * 2 ** 30
+    assert.equal(MEMORY_SETTING, "MEMORY_HEADROOM")
+    assert.equal(memoryHint("10", total), "10 % = 1.6 GiB of 16.0 GiB")
+    assert.equal(memoryHint(" 50 ", total), "50 % = 8.0 GiB of 16.0 GiB")
+    assert.equal(memoryHint("", total), undefined)
+    assert.equal(memoryHint("1e", total), undefined)
+    assert.ok(defaultCatalog().get(MEMORY_SETTING))
 })

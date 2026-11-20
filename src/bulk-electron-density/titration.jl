@@ -60,7 +60,7 @@ function _titrated(
     # do titration formula
     frac = acidic ? 1 / (1 + 10.0^(pKa - pH)) : 1 / (1 + 10.0^(pH - pKa))
     pmv = acidic ? v0 - dv * frac : v0 + dv * frac
-    dpmvDph = dv * log(10) * frac * (1 - frac)
+    dpmvDph = dv * LN10 * frac * (1 - frac)
 
     # propogate uncertainty
     var = u0^2 + (frac * du)^2 + (dpmvDph * σ_pH)^2

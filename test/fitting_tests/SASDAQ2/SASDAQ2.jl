@@ -8,7 +8,7 @@ using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDAQ2")
+const _FIXTURE_DIR = fixtureDir("SASDAQ2")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDAQ2.dat")
 const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDAQ2_fit1_model1.pdb")
 const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDAQ2_fit1.fit")
@@ -38,8 +38,10 @@ const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDAQ2_fit1.fit")
 # Curve units: the SASBDB .dat is in nm⁻¹ (angular_unit "1/nm"; s_min 0.087 and s_max
 # 6.015 nm⁻¹; three text lines, then q, I, σ, all skipped by `_readCurve`) and is
 # converted to Å⁻¹ (÷10). The intensities are on an arbitrary scale. All 2168 points
-# have I > 0 and σ > 0, so the whole curve (to 0.6015 Å⁻¹, the range of the deposited
-# CRYSOL curve) is fitted (no q cut).
+# have I > 0 and σ > 0. q cut (2026-11-19): 0.033 ≤ q ≤ 0.6001 Å⁻¹, the range of the
+# deposited CRYSOL fit file (2074 points with data; its I_exp and σ equal the .dat), so that
+# BAYSOL's χ² and the depositor's 4.009 cover the same points; the 94 points outside are
+# left out.
 #
 # Model and depositor fit: fit1 is CRYSOL 2.8 against PDB 1UBQ ("Structure of ubiquitin
 # refined at 1.8 Å resolution"), fit2 is DAMMIF (dummy atoms, χ² 14.23; not used).
@@ -98,17 +100,24 @@ const SOLUTES = Solute[
 # the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
 # bins the curve to the Shannon channels that diameter allows (see `rebin` there).
 
+# q range of the depositor's CRYSOL fit file (first point with data 0.03305, last 0.60009).
+const Q_MIN_FIT = 0.033
+const Q_MAX_FIT = 0.6001
+
 # The deposited model (1UBQ) has no hydrogens: pdb2pqr/PROPKA place them at PH.
 const ADD_HYDROGENS = true
 
 """
     fitSubset() -> (q, I, σ)
 
-`qvals`/`I_exp`/`σ_exp` restricted to `σ_exp > 0`.
+`qvals`/`I_exp`/`σ_exp` restricted to `Q_MIN_FIT ≤ q ≤ Q_MAX_FIT` and `σ_exp > 0`.
 (`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
 function fitSubset()
-    keep = findall(i -> σ_exp[i] > 0, eachindex(qvals))
+    keep = findall(
+        i -> Q_MIN_FIT ≤ qvals[i] ≤ Q_MAX_FIT && σ_exp[i] > 0,
+        eachindex(qvals),
+    )
     return qvals[keep], iExp[keep], σ_exp[keep]
 end
 
@@ -156,7 +165,6 @@ BAYSOL.results(
     dir = @__DIR__, name = "res", references = reference,
     formFactorLog = formFactorLog, nAtoms = nAtoms,
     refChi2 = "CRYSOL 4.009",
-    runLog = true,
 )
 
 # `@__DIR__` (this SASDAQ2/ folder), not the caller's cwd.

@@ -8,6 +8,7 @@
 //   3. Setting edit: the rules of the settings editors
 //   4. Landing words: the options and questions of the recipes and the landings
 
+import { totalmem } from "node:os"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { saveErrorNote } from "../core/file-system.js"
 import {
@@ -27,6 +28,8 @@ import {
 import { Drafts, MAX_ROWS, type Row, rowMark } from "../store/lists.js"
 import { type Note, notesProblem } from "../store/notes.js"
 import {
+    type LadderMap,
+    type LadderRung,
     type PartKind,
     type SettingDef,
     type SettingValue,
@@ -830,6 +833,135 @@ function choiceWord(def: SettingDef, text: string): string {
     return found ?? t
 }
 
+/** What one override value is typed as: numbers comma-separated, or `true`/`false`. */
+function overrideValue(word: string): unknown {
+    const t = word.trim()
+    if (t === "true" || t === "false") return t === "true"
+    const parts = t.split(",").map((x) => (x.trim() === "" ? Number.NaN : Number(x)))
+    if (parts.some(Number.isNaN)) return undefined
+    return parts.length === 1 ? parts[0] : parts
+}
+
+/**
+ * One rung as typed: `name: KEY=value; KEY=value` (the name and its colon may be left
+ * out; a tuple value is comma-separated, `1,2,3`; `SAMPLE_C1=true`). A name may not hold
+ * `:`, `=`, `;`, `|` or `/`.
+ *
+ * @returns the rung as `validateValue` reads it, or what is wrong.
+ */
+export function parseRung(text: string): { value: LadderRung } | { error: string } {
+    const named = /^\s*([^=;:|/]+?)\s*:(.*)$/.exec(text)
+    const name = named?.[1] ?? ""
+    const overrides: Record<string, SettingValue> = {}
+    for (const word of (named?.[2] ?? text).split(";")) {
+        if (word.trim() === "") continue
+        const eq = word.indexOf("=")
+        if (eq < 0) return { error: `${word.trim()} needs =value` }
+        const key = word.slice(0, eq).trim()
+        const value = overrideValue(word.slice(eq + 1))
+        if (value === undefined) return { error: `${key} needs numbers or true/false` }
+        overrides[key] = value as SettingValue
+    }
+    return { value: { name, overrides } }
+}
+
+/** A rung as `parseRung` reads it again. */
+export function rungText(r: LadderRung): string {
+    const words = Object.entries(r.overrides).map(
+        ([k, v]) => `${k}=${Array.isArray(v) ? v.join(",") : String(v)}`,
+    )
+    return `${r.name === "" ? "" : `${r.name}: `}${words.join("; ")}`
+}
+
+/**
+ * The retry ladder as typed: classes separated by ` // `, each `class: rung | rung`
+ * (rungs as `parseRung` reads them; `class: off` or nothing after the colon switches the
+ * class off). A class left out keeps its default rungs. Empty text, `off` or `none` is
+ * every class off.
+ *
+ * @returns the map as `validateValue` reads it (`false` for everything off), or what is
+ *     wrong.
+ */
+export function parseLadder(text: string): { value: unknown } | { error: string } {
+    if (text.trim() === "" || /^(off|none)$/i.test(text.trim())) return { value: false }
+    const map: Record<string, unknown[]> = {}
+    for (const part of text.split("//")) {
+        const m = /^\s*(\w+)\s*:(.*)$/s.exec(part)
+        if (m === null) return { error: `${part.trim()}: write class: rung | rung` }
+        const cls = m[1] as string
+        const body = (m[2] ?? "").trim()
+        const rungs: unknown[] = []
+        if (body !== "" && !/^(off|none)$/i.test(body))
+            for (const [k, one] of body.split("|").entries()) {
+                const rung = parseRung(one)
+                if ("error" in rung) return { error: `${cls} rung ${k + 1}: ${rung.error}` }
+                rungs.push(rung.value)
+            }
+        map[cls] = rungs
+    }
+    return { value: map }
+}
+
+/** A ladder as `parseLadder` reads it again: every class, `off` for no rung at all. */
+export function ladderText(map: LadderMap): string {
+    const classes = Object.entries(map)
+    if (classes.every(([, rungs]) => rungs.length === 0)) return "off"
+    return classes
+        .map(([c, rungs]) => {
+            const text = rungs.length === 0 ? "off" : rungs.map(rungText).join(" | ")
+            return `${c}: ${text}`
+        })
+        .join(" // ")
+}
+
+/** One row of the ladder editor: a class header (`rung` undefined) or one of its rungs. */
+export type LadderRow = { cls: string; rung?: number }
+
+/** The rows of the ladder editor: each class, then its rungs, in order. */
+export function ladderRows(map: LadderMap, classes: readonly string[]): LadderRow[] {
+    return classes.flatMap((cls) => [
+        { cls },
+        ...(map[cls] ?? []).map((_, rung) => ({ cls, rung })),
+    ])
+}
+
+/** The map with the rung `index` of `cls` replaced (`index` at the end appends). */
+export function putRung(
+    map: LadderMap,
+    cls: string,
+    index: number,
+    r: LadderRung,
+): LadderMap {
+    const rungs = [...(map[cls] ?? [])]
+    rungs[Math.min(index, rungs.length)] = r
+    return { ...map, [cls]: rungs }
+}
+
+/** The map without the rung `index` of `cls` (`undefined` index: the whole class). */
+export function dropRung(
+    map: LadderMap,
+    cls: string,
+    index: number | undefined,
+): LadderMap {
+    const rungs = index === undefined ? [] : (map[cls] ?? []).filter((_, i) => i !== index)
+    return { ...map, [cls]: rungs }
+}
+
+/** The map with the rung `index` of `cls` moved by `by` places (kept inside the class). */
+export function moveRung(
+    map: LadderMap,
+    cls: string,
+    index: number,
+    by: number,
+): LadderMap {
+    const rungs = [...(map[cls] ?? [])]
+    const to = index + by
+    if (to < 0 || to >= rungs.length) return map
+    const [one] = rungs.splice(index, 1)
+    rungs.splice(to, 0, one as LadderRung)
+    return { ...map, [cls]: rungs }
+}
+
 /**
  * What typed text means for a typed setting (number, optional number, `set` of
  * blank-separated choices, font, tuple as comma-separated parts, `lo-hi` ranges, chain
@@ -848,6 +980,10 @@ export function parseSetting(
     } else if (def.kind === "strings") {
         const t = text.trim()
         raw = /^(all)?$/i.test(t) ? [] : [...t.replace(/[\s,]+/g, "")]
+    } else if (def.kind === "ladder") {
+        const ladder = parseLadder(text)
+        if ("error" in ladder) return ladder
+        raw = ladder.value
     } else if (def.kind === "colours") {
         raw = colourWords(text)
     } else if (def.kind === "markers") raw = listWords(text)
@@ -962,6 +1098,26 @@ export function tupleParts(def: SettingDef, value: SettingValue): (number | stri
         : [...(value as (number | string)[])]
 }
 
+/** The setting whose percent is shown as memory on this machine (see [`memoryHint`]). */
+export const MEMORY_SETTING = "MEMORY_HEADROOM"
+
+const GIB = 2 ** 30
+
+/**
+ * What a memory-headroom percent means on this machine, as `10 % = 1.5 GiB of 15.3 GiB`,
+ * or `undefined` while the text is not a number (mid-typing). Live while editing: the
+ * caller passes the text being typed.
+ *
+ * @param text - the percent, as typed or as saved.
+ * @param total - the machine's total memory in bytes (the default asks the OS).
+ */
+export function memoryHint(text: string, total: number = totalmem()): string | undefined {
+    const percent = Number(text.trim())
+    if (text.trim() === "" || !Number.isFinite(percent)) return undefined
+    const gib = (bytes: number): string => (bytes / GIB).toFixed(1)
+    return `${text.trim()} % = ${gib((percent / 100) * total)} GiB of ${gib(total)} GiB`
+}
+
 /**
  * A value as a sheet shows it and as it is typed again to edit it: yes or no, the
  * choices that are on (`pdf png`), a tuple as its parts (`gray40, 0.6`), else as is.
@@ -984,6 +1140,7 @@ export function valueText(def: SettingDef, value: SettingValue): string {
         return (value as string[]).join(", ")
     if (def.kind === "sizes")
         return (value as number[][]).map(([w, h]) => `${w}x${h}`).join(", ")
+    if (def.kind === "ladder") return ladderText(value as LadderMap)
     if (def.kind === "tuple") return tupleParts(def, value).join(", ")
     if (def.kind === "path" && value === "") return "(default)"
     return String(value)

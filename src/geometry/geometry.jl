@@ -7,6 +7,7 @@ Point sets ([`plasticPoints`](@ref)), per-atom excluded (displaced-solvent) volu
 module Geometry
 
 using ..Runtime: tmapBlocks
+using ..PhysicalConstants: FOUR_PI
 using NearestNeighbors: inrange, inrange!, KDTree
 using LinearAlgebra: dot
 using StaticArrays: SVector

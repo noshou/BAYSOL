@@ -27,7 +27,7 @@
  "φ_max": {"default": 1.25, "type": "float", "limits": {"above": 0}},
  "EXCL_VOL_CORR_BOUNDS": {"default": [0.8, 1.3], "type": "tuple", "limits": {}, "shape": ["float", "float"], "parts": ["low", "high"]},
  "EXCL_VOL_CORR_EPS": {"default": 0.02, "type": "float", "limits": {"above": 0}},
- "PMV_FALLBACK_UNCERT": {"default": 2.525827, "type": "float", "limits": {"above": 0}},
+ "PMV_FALLBACK_UNCERT": {"default": 2.528038, "type": "float", "limits": {"above": 0}},
  "PROBE_RADIUS": {"default": 1.4, "type": "float", "limits": {"atLeast": 0}},
  "SHELL_AREA_PER_POINT": {"default": 4.0, "type": "float", "limits": {"above": 0}},
  "SHELL_MIN_POINTS": {"default": 55, "type": "int", "limits": {"atLeast": 1}},
@@ -36,6 +36,7 @@
  "BEAD_RAY_RANGE": {"default": 12.0, "type": "float", "limits": {"above": 0}},
  "BEAD_RAY_DIRS": {"default": 64, "type": "int", "limits": {"atLeast": 1}},
  "SHELL_THICKNESS": {"default": 3.0, "type": "float", "limits": {"above": 0}},
+ "MEMORY_HEADROOM": {"default": 10, "type": "int", "limits": {"atLeast": 5, "atMost": 50}},
  "N_ADAPT": {"default": 300, "type": "int", "limits": {"atLeast": 1}},
  "N_DRAWS": {"default": 700, "type": "int", "limits": {"atLeast": 1}},
  "TABLE_SIGFIGS": {"default": 17, "type": "int", "limits": {"atLeast": 1, "atMost": 17}},
@@ -97,5 +98,6 @@
  "PLOT_COMPARE_COLOURS": {"default": ["#D55E00", "#0072B2", "#E69F00", "#CC79A7", "#009E73", "#56B4E9", "#F0E442", "#999999"], "type": "colours", "limits": {}},
  "PLOT_COMPARE_MARKERS": {"default": ["o", "square", "triangle", "diamond", "x", "+", "star", "pentagon"], "type": "markers", "limits": {}, "choices": ["o", "*", "square", "square*", "triangle", "triangle*", "diamond", "diamond*", "pentagon", "pentagon*", "star", "x", "+", "asterisk", "oplus", "otimes"]},
  "PLOT_LW_COMPARE": {"default": 1.2, "type": "float", "limits": {"atLeast": 0}},
- "PLOT_TUI_SIZES": {"default": [[76, 5], [100, 9], [130, 13], [170, 18]], "type": "sizes", "limits": {}}
+ "PLOT_TUI_SIZES": {"default": [[76, 5], [100, 9], [130, 13], [170, 18]], "type": "sizes", "limits": {}},
+ "LADDER": {"default": {"stepCollapse": [{"name": "delta 70", "overrides": {"TARGET_ACCEPT": 70}}, {"name": "delta 35", "overrides": {"TARGET_ACCEPT": 35}}], "splitChains": [{"name": "starts (2,4,6)", "overrides": {"CHAIN_START_RADII": [2.0, 4.0, 6.0]}}, {"name": "close starts, longer", "overrides": {"CHAIN_START_RADII": [1.0, 2.0, 3.0], "RETRY_N_ADAPT": 4000, "RETRY_N_DRAWS": 4000}}], "divergent": [{"name": "delta 99", "overrides": {"TARGET_ACCEPT": 99}}, {"name": "delta 99, close starts, longer", "overrides": {"CHAIN_START_RADII": [1.0, 2.0, 3.0], "RETRY_N_ADAPT": 4000, "RETRY_N_DRAWS": 4000, "TARGET_ACCEPT": 99}}, {"name": "delta 99, close starts, longer, next seed", "overrides": {"CHAIN_START_RADII": [1.0, 2.0, 3.0], "RETRY_N_ADAPT": 4000, "RETRY_N_DRAWS": 4000, "RNG_SEED_STEP": 1, "TARGET_ACCEPT": 99}}], "structural": [{"name": "sample c1", "overrides": {"SAMPLE_C1": true}}], "marginal": [{"name": "longer chains", "overrides": {"RETRY_N_ADAPT": 6000, "RETRY_N_DRAWS": 8000}}, {"name": "longer chains, next seed", "overrides": {"RETRY_N_ADAPT": 6000, "RETRY_N_DRAWS": 8000, "RNG_SEED_STEP": 1}}], "generic": [{"name": "longer, next seed", "overrides": {"RETRY_N_ADAPT": 4000, "RETRY_N_DRAWS": 4000, "RNG_SEED_STEP": 1}}]}, "type": "ladder", "limits": {}, "overridable": ["TARGET_ACCEPT", "CHAIN_START_RADII", "RETRY_N_ADAPT", "RETRY_N_DRAWS", "N_ADAPT", "N_DRAWS", "VAL_SIGMA", "N_CHAINS", "OPTIMUM_CHAIN_CAP", "OPTIMUM_MIN_CHAINS", "OPTIMUM_CHAIN_RADIUS", "OPTIMUM_CHAIN_FRACTION", "MAP_MAX_ITER", "MAP_N_STARTS", "MAP_F_SUCCESSIVE", "MAP_OPTIMA_KEPT", "MAP_JITTER_RADII", "MAP_JITTER_DIRECTIONS", "MAP_JITTER_MAX_OPTIMA", "MAP_JITTER_WITHIN_NATS", "BASIN_RESTART_NATS", "HARVEST_COVER", "HARVEST_DIVERGENT", "RNG_SEED_STEP", "SAMPLE_C1"], "classes": ["stepCollapse", "splitChains", "divergent", "structural", "marginal", "generic"]}
 }

@@ -17,6 +17,10 @@ order (the keys of `runModel`'s parameter dictionaries).
 """
 paramKeys(::ξ_priors) = ("slvntEDns", "deltaRho1", "deltaRho2", "deltaRho3")
 
+"[`paramKeys`](@ref) of a run with `N` sampled parameters: c1 is the fifth when `N = 5`."
+paramKeys(p::ξ_priors, N::Integer) =
+    N == 5 ? (paramKeys(p)..., "exclVolCorr") : paramKeys(p)
+
 # ---------------------------------------------------------------------------
 #   Prior on the bulk electron density
 # ---------------------------------------------------------------------------
@@ -370,6 +374,28 @@ function δρ_prior(
     (δρ₁_prior, δρ₂_prior, _δρ₃_prior(κ_δρ₃, ρ̄ₑ; φ_max = φ_max))
 end
 
+"""
+    c1Prior(lo::Real = EXCL_VOL_CORR_BOUNDS[1], hi::Real = EXCL_VOL_CORR_BOUNDS[2])
+
+The prior of the excluded-volume correction c1, the one place that chooses its family
+(now `Uniform` on `(lo, hi)`). [`ξ_priors`](@ref) holds any bounded continuous
+distribution, so changing the prior means changing this function only.
+
+# Returns
+-   `ContinuousUnivariateDistribution`: the c1 prior, bounded (its `extrema` are the
+    c1 bounds the logit transform uses).
+
+# Exceptions
+- `ArgumentError` if `lo ≥ hi`.
+"""
+function c1Prior(
+    lo::Real = EXCL_VOL_CORR_BOUNDS[1],
+    hi::Real = EXCL_VOL_CORR_BOUNDS[2],
+)::ContinuousUnivariateDistribution
+    lo < hi || throw(ArgumentError("c1 bounds need lo < hi, got ($lo, $hi)"))
+    return Uniform(Float64(lo), Float64(hi))
+end
+
 # ---------------------------------------------------------------------------
 #   Parameter transform and Jacobian
 # ---------------------------------------------------------------------------
@@ -450,6 +476,17 @@ function Θ(ξ::SVector{4,<:Real}, p::ξ_priors)
 end
 
 """
+[`Θ`](@ref) of the five-parameter ξ = (ρₑ, δρ₁, δρ₂, δρ₃, c1): c1 on its uniform prior's
+bounds goes through the same logit as the δρ, t₅ = logit((c1 − lo)/(hi − lo)).
+"""
+function Θ(ξ::SVector{5,<:Real}, p::ξ_priors)
+    θ4, _ = Θ(SVector{4}(ξ[1], ξ[2], ξ[3], ξ[4]), p)
+    lo, hi = extrema(p.c1Prior)
+    θ = SVector{5}(θ4..., logit((ξ[5] - lo) / (hi - lo)))
+    return θ, logjac(θ, p)
+end
+
+"""
     θ ∈ ℝ⁴
     │
     │ Ξ: θ ⤇ ξ
@@ -476,6 +513,16 @@ function Ξ(θ::SVector{4,<:Real}, p::ξ_priors)
 end
 
 """
+[`Ξ`](@ref) of the five-parameter θ = (a, t₁, t₂, t₃, t₅): c1 = lo + (hi − lo)·σ(t₅).
+"""
+function Ξ(θ::SVector{5,<:Real}, p::ξ_priors)
+    lo, hi = extrema(p.c1Prior)
+    return SVector{5}(
+        Ξ(SVector{4}(θ[1], θ[2], θ[3], θ[4]), p)..., lo + (hi - lo) * logistic(θ[5]),
+    )
+end
+
+"""
 ln|det(∂ξ/∂θ)| of [`Ξ`](@ref) at θ, the Jacobian correction [`_logπ`](@ref)
 adds; identical to the `corr` [`Θ`](@ref) returns for ξ = Ξ(θ):
 
@@ -491,6 +538,10 @@ adds; identical to the `corr` [`Θ`](@ref) returns for ξ = Ξ(θ):
 logjac(θ::SVector{4,<:Real}, p::ξ_priors) =
     θ[1] + _tLogjac(θ[2], p.δρ₁Prior.σ) + _tLogjac(θ[3], p.δρ₂Prior.σ) +
     _tLogjac(θ[4], p.δρ₃Prior.σ)
+
+logjac(θ::SVector{5,<:Real}, p::ξ_priors) =
+    logjac(SVector{4}(θ[1], θ[2], θ[3], θ[4]), p) +
+    _tLogjac(θ[5], maximum(p.c1Prior) - minimum(p.c1Prior))
 
 # ---------------------------------------------------------------------------
 #   The priors of ξ, their moments and z-scores
@@ -542,6 +593,22 @@ function _calc_ξ_priors(
 end
 
 """
+    withC1Prior(p::ξ_priors, lo::Real, hi::Real) -> ξ_priors
+
+`p` with the `Uniform` prior of c1 on `(lo, hi)`, the bounds the c1 tables were built
+for. The prior only matters when c1 is sampled ([`sampleC1`](@ref)).
+
+# Returns
+- `ξ_priors`: the same δρ and ρₑ priors, a new c1 prior.
+
+# Exceptions
+- `ArgumentError` if `lo ≥ hi`.
+"""
+function withC1Prior(p::ξ_priors, lo::Real, hi::Real)::ξ_priors
+    return ξ_priors(p.ρₑPrior, p.δρ₁Prior, p.δρ₂Prior, p.δρ₃Prior, c1Prior(lo, hi))
+end
+
+"""
 Generates an initial physical parameter vector ξ₀, one draw from each prior.
 
 # Arguments
@@ -556,6 +623,29 @@ function _ξ₀(p::ξ_priors, rng::AbstractRNG = Random.default_rng())::SVector{
     δρ₂ = rand(rng, p.δρ₂Prior)
     δρ₃ = rand(rng, p.δρ₃Prior)
     return SVector(ρₑ, δρ₁, δρ₂, δρ₃)
+end
+
+_ξ₀(p::ξ_priors, ::Val{4}, rng::AbstractRNG = Random.default_rng()) = _ξ₀(p, rng)
+θ_prior_moments(p::ξ_priors, ::Val{4}) = θ_prior_moments(p)
+
+"""
+[`_ξ₀`](@ref) with c1 as a fifth coordinate: one more draw, from `p.c1Prior`.
+"""
+function _ξ₀(
+    p::ξ_priors, ::Val{5}, rng::AbstractRNG = Random.default_rng(),
+)::SVector{5,<:Real}
+    ξ = _ξ₀(p, rng)
+    return SVector(ξ..., rand(rng, p.c1Prior))
+end
+
+"""
+[`θ_prior_moments`](@ref) of the five-parameter θ: the logit of c1's `Uniform` prior is
+that of a Beta(1, 1) on the unit interval, so its moments are digamma(1) − digamma(1) = 0
+and √(2·trigamma(1)).
+"""
+function θ_prior_moments(p::ξ_priors, ::Val{5})
+    μ, σ = θ_prior_moments(p)
+    return SVector(μ..., 0.0), SVector(σ..., sqrt(2 * trigamma(1.0)))
 end
 
 """
@@ -615,7 +705,7 @@ omitted from the log-density in z (and w) space.
 - `SVector{N,<:Real}`: z.
 """
 function _standardize(θ::SVector{N,<:Real}, p::ξ_priors) where {N}
-    μ, σ = θ_prior_moments(p)
+    μ, σ = θ_prior_moments(p, Val(N))
     return (θ .- μ) ./ σ
 end
 
@@ -632,6 +722,6 @@ per-coordinate θ-space mean/std from [`θ_prior_moments`](@ref).
 """
 function priorZScores(ξ::SVector{N,<:Real}, p::ξ_priors)::SVector{N,Float64} where {N}
     θ, _ = Θ(ξ, p)
-    μ, σ = θ_prior_moments(p)
+    μ, σ = θ_prior_moments(p, Val(N))
     return (θ .- μ) ./ σ
 end

@@ -7,7 +7,7 @@ using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDMA6")
+const _FIXTURE_DIR = fixtureDir("SASDMA6")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDMA6.dat")
 
 # ---------------------------------------------------------------------------
@@ -89,7 +89,10 @@ const SOLUTES = Solute[
 # Å⁻¹ (σ > 0) have a median I/σ of 1.15 and 25 % of them have I ≤ 0, so the data above it
 # are not demonstrably unusable (median I/σ 1.15 ≥ 0.5; median I/σ 1.49 ≥ 1 in the
 # lowest-q quarter (up to 0.31 Å⁻¹); rule in README.md).
-const Q_MAX_FIT = Inf
+# q cut 0.28 Å⁻¹ (2026-11-17), where the median I/σ is about 2 (4.8 at 0.25-0.28, 1.9 at
+# 0.28-0.32, 12 % non-positive above). Uncut it diverged 31.7 % at any δ; with the cut 0 %,
+# R̂ 1.003, χ² 2.31 (see "The q cut" in README.md).
+const Q_MAX_FIT = 0.28
 
 # The spherical-harmonic band limit lMax is not set here: `seedModel` takes it from
 # the diameter of the scatterer cloud and the largest fitted q (ceil(qMax * D)), and
@@ -184,7 +187,6 @@ for run in RUNS
         dir = @__DIR__, name = "res$(suffix)", references,
         formFactorLog = formFactorLog, nAtoms = nAtoms,
         refChi2 = run.refChi2,
-        runLog = true,
     )
 
     # `@__DIR__` (this SASDMA6/ folder), not the caller's cwd.

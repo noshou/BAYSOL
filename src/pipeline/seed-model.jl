@@ -158,6 +158,12 @@ Computes a NUTS seed from given data input:
 -   `beadRayRange = BEAD_RAY_RANGE`, `beadRayDirs = BEAD_RAY_DIRS`: range in Å (12) and
     number of directions (64) of the cavity classification of the beads, forwarded to
     [`sasa`](@ref BAYSOL.Geometry.sasa).
+-   `memoryHeadroom = MEMORY_HEADROOM`: percent (a whole number, 5 to 50; 10) of the
+    machine's total memory to leave free while the scattering build runs. The build works
+    through the q values in blocks sized to `Sys.free_memory()` minus this headroom
+    ([`Scattering.forwardCache`](@ref)); the result does not depend on it, only the number
+    of blocks does. The run log records `forwardBlocks`, `forwardBlockQ`,
+    `forwardEstGib` and `forwardPeakGib`.
 
 -   `qMin = Q_MIN`, `qMax = Q_MAX`: the q range fitted, Å⁻¹, both ends included; a point
     outside it is left out. `nothing` (the default) is no limit. `qMin` must be below
@@ -202,13 +208,16 @@ points before and after, `structureModel`, `structureChains`, `addHydrogens`,
 - `DomainError`: qvals, `iExp`, and `σ_exp` have mismatched lengths, or
     `pmvFallbackUncert` is not finite and above 0.
 - [`InvalidSettingsError`](@ref): `bounds_δρ₁₂`, `mode_δρ₁₂`, `φ_max`,
-    `exclVolCorrBounds`, `exclVolCorrEps`, `shellAreaPerPoint`,
-    `shellMinPoints`, `shellSample`, `sasaNOcc`, `beadRayRange` or
-    `beadRayDirs`, `qMin`, `qMax`, `sigmaScale`, `excludeQ`, `chains` or `model` is
-    outside its limits or breaks a rule between them (`mode_δρ₁₂` not strictly inside
+    `exclVolCorrBounds`, `exclVolCorrEps`, `shellAreaPerPoint`, `shellMinPoints`,
+    `shellSample`, `sasaNOcc`, `beadRayRange` or `beadRayDirs`, `memoryHeadroom`,
+    `qMin`, `qMax`, `sigmaScale`, `excludeQ`, `chains` or `model` is outside its
+    limits or breaks a rule between them (`mode_δρ₁₂` not strictly inside
     `bounds_δρ₁₂`, `exclVolCorrEps` above the width of `exclVolCorrBounds`,
-    `sasaNOcc` above `shellSample`, `qMin` not below `qMax`, a range of `excludeQ`
-    with `q_lo` not below `q_hi`), with the line `loadSettings` gives.
+    `sasaNOcc` above `shellSample`, `qMin` not below `qMax`, a range of
+    `excludeQ` with `q_lo` not below `q_hi`), with the line `loadSettings` gives.
+- [`Scattering.MemoryBudgetError`](@ref): not even one q value of the scattering build
+    fits in the free memory minus the headroom (the message names the atoms, `lMax`, the
+    number of q values and the memory needed).
 - `MolecularStructure.StructureSourceError`: `model` is above the number of models of the
     structure, or `chains` names a chain it does not have (the message lists them).
 - `ArgumentError`: an input is outside its limits (a non-finite or non-positive q, σ_exp,
@@ -253,6 +262,7 @@ function seedModel(
     sasaNOcc = Geometry.SASA_N_OCC,
     beadRayRange = Geometry.BEAD_RAY_RANGE,
     beadRayDirs = Geometry.BEAD_RAY_DIRS,
+    memoryHeadroom = Scattering.MEMORY_HEADROOM,
     qMin = Q_MIN,
     qMax = Q_MAX,
     sigmaScale = SIGMA_SCALE,
@@ -266,8 +276,8 @@ function seedModel(
         :seedModel,
         (; bounds_δρ₁₂, mode_δρ₁₂, φ_max, exclVolCorrBounds, exclVolCorrEps,
             shellAreaPerPoint, shellMinPoints, shellSample, sasaNOcc,
-            beadRayRange, beadRayDirs, qMin, qMax, sigmaScale, excludeQ, chains,
-            model),
+            beadRayRange, beadRayDirs, memoryHeadroom, qMin, qMax, sigmaScale, excludeQ,
+            chains, model),
     )
     # the static build allocates large temporaries; collect
     # once per byte budget instead of whenever the heap grows
@@ -308,7 +318,7 @@ function seedModel(
             isfinite(pH) && isfinite(σ_pH) && σ_pH ≥ 0,
             "pH must be finite and σ_pH must not be negative",
         )
-        _need(isfinite(t) && t > -273.15, "t must be above absolute zero (°C)")
+        _need(isfinite(t) && t > -KELVIN_OFFSET, "t must be above absolute zero (°C)")
         _need(rebin === nothing || rebin ≥ 1, "rebin must be at least 1 (or nothing)")
         _need(maxBinBias > 0, "maxBinBias must be positive")
         _need(lMax === nothing || lMax ≥ 1, "lMax must be at least 1 (or nothing)")
@@ -477,6 +487,7 @@ function seedModel(
         )
         log.info["lMax"]              = info.lMax
         log.info["nQRaw"]             = length(info.qRaw)
+        log.info["nQChi2"]            = count(_chisqMask(info))
         log.info["rebin"]             = info.rebin
         log.info["D"]                 = info.D
         log.info["nChannels"]         = info.nChannels
@@ -503,6 +514,7 @@ function seedModel(
                 probe = probe,
                 nTarget = nTarget,
                 shell = shell,
+                memoryHeadroom = ck.memoryHeadroom,
                 stageLog = log,
             )
         end

@@ -19,6 +19,7 @@ import {
     offered,
     type RowSpec,
     restIonicStrength,
+    SET_TEMPERATURE_C,
     templateById,
     templateLine,
     titrantChoices,
@@ -36,6 +37,7 @@ import {
     type TableDefinition,
     tableRowsAt,
 } from "../src/store/template-defs.js"
+import { soluteFromSpec } from "../src/store/template-rows.js"
 
 /** `actual` is within `rel` (a fraction) of `expected`. */
 function close(actual: number, expected: number, rel: number, what: string): void {
@@ -613,12 +615,12 @@ test("TBS, HBS and SSC: their buffer worked out at the pH of the recipe", () => 
 
 test("the unavailable templates are not offered and cannot be computed", () => {
     const ids = offered().map((t) => t.id)
-    for (const id of ["aces", "glycylglycine", "hepps"]) {
+    for (const id of ["aces", "hepps"]) {
         assert.equal(templateById(id)?.available, false)
         assert.ok(!ids.includes(id), id)
         assert.throws(() => computeTemplate({ id, mM: 10, pH: 7.5 }), RangeError)
     }
-    assert.equal(ids.length, 31 - 3)
+    assert.equal(ids.length, 34 - 2)
     assert.ok(ids.includes("tris") && ids.includes("pbs"))
 })
 
@@ -693,6 +695,91 @@ test("the counter-ion: chloride for an acid-titrated buffer, a cation for a base
     assert.ok(na > 20 && na < 40, `${na}`)
 })
 
+test("bis-tris propane (two pK): three species rows, closed-form fractions, Cl", () => {
+    // 0.0001 mM and no other ions: I is about 1e-7 M, so the Davies terms are below 0.1 %
+    // and the fractions are the textbook diprotic ones at the pK of 22 C
+    // (pK1 6.65 - 0.016 x 3 K, pK2 9.1 without a slope)
+    const pK1 = 6.65 - 0.016 * (SET_TEMPERATURE_C - 25)
+    const pK2 = 9.1
+    for (const pH of [5, pK1, 8, pK2, 10.5]) {
+        const recipe = { id: "bis-tris-propane", mM: 0.0001, pH, restIonicMM: 0 }
+        const out = computeTemplate(recipe)
+        const w = [1, 10 ** (pH - pK1), 10 ** (2 * pH - pK1 - pK2)]
+        const sum = w[0] + w[1] + w[2]
+        assert.deepEqual(out.charges, [2, 1, 0])
+        out.fractions?.forEach((f, i) => {
+            assert.ok(Math.abs(f - w[i] / sum) < 0.002, `pH ${pH} species ${i}: ${f}`)
+        })
+        close(out.fractions?.reduce((a, b) => a + b, 0) as number, 1, 1e-12, "sum")
+    }
+    // 20 mM at pH 7.5 with 100 mM of other salt: all three species rows are the table's
+    // species, the chloride is exactly the charge they carry
+    const recipe = { id: "bis-tris-propane", mM: 20, pH: 7.5, restIonicMM: 100 }
+    const out = computeTemplate(recipe)
+    const species = [
+        ["bis-tris propane dication", 2],
+        ["bis-tris propane cation", 1],
+        ["bis-tris propane", 0],
+    ] as const
+    let charge = 0
+    for (const [name, z] of species) {
+        const row = rowNamed(out, name)
+        assert.ok(row.mM > 0, name)
+        charge += z * row.mM
+    }
+    close(rowNamed(out, "chloride").mM, charge, 2e-3, "chloride balances the cations")
+    // the total is the buffer's molarity
+    const total = species.reduce((s, [name]) => s + rowNamed(out, name).mM, 0)
+    close(total, 20, 1e-3, "species add up to the buffer")
+    // above pK2 only the neutral species is left and nothing needs balancing
+    const high = computeTemplate({ id: "bis-tris-propane", mM: 20, pH: 13 })
+    assert.deepEqual(
+        high.rows.map((r) => r.name),
+        ["bis-tris propane"],
+    )
+})
+
+test("glycylglycine (two pK): polymer rows, closed-form fractions, sodium", () => {
+    // 0.0001 mM and no other ions: the Davies terms are below 0.1 %, so the fractions are
+    // the textbook diprotic ones at the pK of 22 C (pK1 3.14 without a slope, pK2 8.265
+    // with -0.0255 per K)
+    const pK1 = 3.14
+    const pK2 = 8.265 - 0.0255 * (SET_TEMPERATURE_C - 25)
+    for (const pH of [2, pK1, 6, pK2, 10]) {
+        const recipe = { id: "glycylglycine", mM: 0.0001, pH, restIonicMM: 0 }
+        const out = computeTemplate(recipe)
+        const w = [1, 10 ** (pH - pK1), 10 ** (2 * pH - pK1 - pK2)]
+        const sum = w[0] + w[1] + w[2]
+        assert.deepEqual(out.charges, [1, 0, -1])
+        out.fractions?.forEach((f, i) => {
+            assert.ok(Math.abs(f - w[i] / sum) < 0.002, `pH ${pH} species ${i}: ${f}`)
+        })
+    }
+    // 20 mM at pH 8.3, 100 mM of other salt, titrated with NaOH: the three species are
+    // rows of the polymer table (the zwitterion under its IUPAC name, which is not parsed
+    // as the peptide GG), the sodium is the charge the anion carries
+    const recipe = { id: "glycylglycine", mM: 20, pH: 8.3, restIonicMM: 100 }
+    const out = computeTemplate(recipe)
+    const zwitterion = "2-(2-aminoacetamido)acetic acid"
+    const mine = out.rows.filter((r) => r.kind === "polymer")
+    assert.ok(mine.length >= 2)
+    const zwitter = out.rows.find((r) => r.arg === zwitterion)
+    assert.ok(zwitter && zwitter.mM > 0)
+    const anion = rowNamed(out, "glycylglycine(1-)")
+    assert.equal(anion.arg, "glycylglycine(1-)")
+    assert.equal(anion.kind, "polymer")
+    close(rowNamed(out, "sodium(1+)").mM, anion.mM, 2e-3, "sodium balances the anion")
+    close(mine.reduce((a, r) => a + r.mM, 0), 20, 1e-3, "species add up to the buffer")
+    // at low pH the cation is balanced by chloride
+    const acid = computeTemplate({ id: "glycylglycine", mM: 20, pH: 2, restIonicMM: 100 })
+    assert.ok(acid.rows.some((r) => r.name === "glycylglycine(1+)"))
+    assert.ok(acid.rows.some((r) => r.name === "chloride"))
+    // the engine writes polymer rows with their kind
+    const draft = soluteFromSpec(zwitter as RowSpec)
+    assert.equal(draft.kind, "polymer")
+    assert.equal(draft.arg, zwitterion)
+})
+
 test("every offered template gives complete rows that pass the loader's check", () => {
     for (const t of offered()) {
         const mid = t.usablePh ? (t.usablePh[0] + t.usablePh[1]) / 2 : undefined
@@ -701,7 +788,7 @@ test("every offered template gives complete rows that pass the loader's check", 
         for (const r of out.rows) {
             assert.ok(r.mM > 0 && Number.isFinite(r.mM), `${t.id} ${r.name} ${r.mM}`)
             assert.ok(r.sigmaMM >= 0 && Number.isFinite(r.sigmaMM), `${t.id} ${r.name}`)
-            const solute: Solute = { kind: "nonbiological", ...r }
+            const solute: Solute = { kind: r.kind ?? "nonbiological", ...r }
             assert.equal(rowProblem(bufferRow(solute)), undefined, `${t.id} ${r.name}`)
             assert.notEqual(r.arg, "", t.id)
         }

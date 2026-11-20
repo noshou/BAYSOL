@@ -454,7 +454,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    curve_chi2(q, I, σ, qRef, I_ref) -> NamedTuple
+    curve_chi2(q, I, σ, qRef, iRef) -> NamedTuple
 
 Reduced χ² of a reference curve (a CRYSOL / OLIGOMER / EOM `.fit`
 column) on the data points it covers, linearly interpolated: as given
@@ -467,10 +467,10 @@ of freedom), so curves in a different normalization compare fairly.
 # Exceptions
 - `ArgumentError` if the reference covers no data point.
 """
-function curve_chi2(q, I, σ, qRef, I_ref)
+function curve_chi2(q, I, σ, qRef, iRef)
     p = sortperm(qRef)
     qf = qRef[p]
-    If = I_ref[p]
+    If = iRef[p]
     ok = [qf[1] ≤ x ≤ qf[end] for x in q]
     any(ok) || throw(ArgumentError("the reference curve covers none of the data points"))
     Ii = map(q[ok]) do x
@@ -507,7 +507,7 @@ found, gradient error from the c1 tolerance, and local curvature along the chain
 # Keywords
 - `label = ""`, `nSamples`, `nAdapt` (default: the
     `runModel` defaults, `Pipeline.N_ADAPT + N_DRAWS`, `N_ADAPT`).
-- `reference = nothing`: `(; q, I, σ, qRef, I_ref)`
+- `reference = nothing`: `(; q, I, σ, qRef, iRef)`
     to add the reference curve's χ² on the same points.
 
 # Returns
@@ -746,12 +746,21 @@ not that run was kept.
 function chain_report(io::IO, seed::F.Seed; label = "",
     nSamples = R.N_ADAPT + R.N_DRAWS, nAdapt = R.N_ADAPT, rngSeed = 7,
     rerun = false, max_listed = 12)
+    # like `runModel`: a kinked c1 profile stops the
+    # run and c1 is sampled as a fifth parameter
+    run(s, seed0) =
+        try
+            F.infer(s, nSamples, nAdapt; rngSeed = seed0, retry = false)
+        catch e
+            e isa F.KinkDetected || rethrow()
+            F.infer(F.sampleC1(s), nSamples, nAdapt; rngSeed = seed0, retry = false)
+        end
     if rerun
         base = F._retrySeed(rngSeed % UInt64)
         nSamples, nAdapt = F.RETRY_N_ADAPT + F.RETRY_N_DRAWS, F.RETRY_N_ADAPT
-        fit = F.infer(seed, nSamples, nAdapt; rngSeed = base, retry = false)
+        fit = run(seed, base)
     else
-        fit = F.infer(seed, nSamples, nAdapt; rngSeed, retry = false)
+        fit = run(seed, rngSeed)
     end
     d = fit.diagnostics
     na = d.nAdapt

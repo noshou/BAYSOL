@@ -767,7 +767,7 @@ const SUBS = [
     "formfactor" => (FormFactor, "rebuild the form-factor database from xraydb.sqlite"),
     "components" =>
         (Components, "regenerate the component table from the wwPDB dictionary"),
-    "pmv" => (Pmv, "partial molar volumes by 3D-RISM (dev/pmv-rism/README.md)"),
+    "pmv" => (Pmv, "partial molar volumes by 3D-RISM (dev/README.md, pmv)"),
 ]
 
 const SUMMARY =

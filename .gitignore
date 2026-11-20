@@ -57,6 +57,7 @@ test/fitting_tests/**/*.txt
 # the run log of a fitting test is tracked (small: what a benchmark needs, see
 # BAYSOL.write_log); the upper-case suffix keeps it clear of the LaTeX `*.log` rule below,
 # and the exception is for a case-insensitive file system
+# (this also tracks `statistics-<ID>.LOG`, the run's sampler statistics)
 !test/fitting_tests/**/*.LOG
 
 # not sure why R History keeps popping up but removing it
@@ -122,7 +123,3 @@ notes/
 
 # sass (Ruby) cache
 .sass-cache/
-
-# 3D-RISM tools: everything `bysl extract pmv` generates (dev/pmv-rism/)
-dev/pmv-rism/out/
-dev/pmv-rism/work/

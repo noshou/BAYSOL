@@ -15,6 +15,25 @@ const X = Dev.Fits.Export
     @test_throws ErrorException X.run_name("yesterday")
 end
 
+@testset "the statistics log: a run's section is pulled in beside its LOG" begin
+    mktempdir() do dir
+        @test X.statistics_section(dir, "SASDXXX", "fit1") === nothing      # no file
+        write(
+            joinpath(dir, "statistics-SASDXXX.LOG"),
+            "datetime\t16-11-2026 18:19:34 -0500\n\n=== fit1 ===\nattempts\t1\n\n" *
+            "=== fit2 ===\nattempts\t2\n",
+        )
+        @test X.statistics_section(dir, "SASDXXX", "fit3") === nothing      # no section
+        text = X.statistics_section(dir, "SASDXXX", "fit2")
+        @test text == "datetime\t16-11-2026 18:19:34 -0500\n\n=== fit2 ===\nattempts\t2\n"
+        # the run log's reader sees only that one section, as for the LOG
+        write(joinpath(dir, "s.LOG"), text)
+        log = X.read_log(joinpath(dir, "s.LOG"))
+        @test first.(log.sections) == ["fit2"] &&
+              X.row_of(log.sections[1][2], "attempts") == "2"
+    end
+end
+
 @testset "solutes of a script" begin
     text = """
     const SOLUTES = Solute[

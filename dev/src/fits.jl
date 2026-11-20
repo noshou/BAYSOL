@@ -6,10 +6,13 @@
 module Fits
 
 using ..Common
+using ..Fixtures
 
 module Fit
 
 using ...Common
+using ...Fixtures
+using Base.ScopedValues: with
 
 const WHO = "bysl fits run"
 
@@ -29,7 +32,13 @@ Runs the fitting tests (test/fitting_tests/<ID>/) and what follows them.
     --trace-compile FILE
                 run the fits with Julia's --trace-compile=FILE
     --threads N Julia threads (4, auto, 4,1); default one
+    --keep-fixtures
+                keep the unpacked fixtures of each fit (default: removed after the fit)
     --dry-run   print the commands, run nothing
+
+Before each fit its fixtures are unpacked (`bysl fixtures unpack`, outside the fit's timing;
+\$BAYSOL_FIXTURES tells the script where; SYN-* entries use the `synthetic` set and
+\$BAYSOL_FIXTURES_SYNTHETIC) and afterwards the copy is removed.
 
 A failing step does not stop the others; the exit status is 1 if any failed.
 """
@@ -38,7 +47,7 @@ const FLAG_NAMES = [
     "--bench", "--approved",
     "--no-fit", "--report",
     "--table", "--fixme",
-    "--dry-run"]
+    "--keep-fixtures", "--dry-run"]
 
 # The options that take a value.
 const VALUED = ["--trace-compile"]
@@ -46,9 +55,9 @@ const VALUED = ["--trace-compile"]
 # The command that runs another tool of this package by its task name: `bysl <task> args`.
 tool(task, args...) = vcat(["bysl", task], collect(String, args))
 
-# The steps to run, in order, as (label, failure name, command).
+# The steps to run, in order, as (label, failure name, command, fixture id or nothing).
 function steps(flag, selected, requested, julia, trace)
-    out = Tuple{String,String,Vector{String}}[]
+    out = Tuple{String,String,Vector{String},Union{Nothing,String}}[]
     # 1. the fits: one Julia process per fitting test, in the fitting-test project
     if !flag("--no-fit")
         for id in selected
@@ -64,6 +73,7 @@ function steps(flag, selected, requested, julia, trace)
                         ["--project=" * in_root(FIT_DIR), "-e",
                             "using BAYSOL; BAYSOL.Pipeline._runLogged(ARGS[1])",
                             script_of(id)]),
+                    id,
                 ),
             )
         end
@@ -77,22 +87,56 @@ function steps(flag, selected, requested, julia, trace)
                 "benchmark",
                 "benchmark",
                 tool("fits", "bench", approved..., specs_of(selected)...),
+                nothing,
             ),
         )
     end
     # 3. the report: the Results-table rows of the selected fits
     flag("--report") &&
-        push!(out, ("report", "report", tool("results", "table", requested...)))
+        push!(out, ("report", "report", tool("results", "table", requested...), nothing))
     # 3b. the Results table of the fitting tests' README
     flag("--table") &&
-        push!(out, ("table", "table", tool("results", "table", "--update")))
+        push!(out, ("table", "table", tool("results", "table", "--update"), nothing))
     # 4. the diagnostics
     flag("--fixme") && push!(
         out,
         ("diagnostics", "diagnostics",
-            tool("fits", "diagnose", "--report", specs_of(selected)...)),
+            tool("fits", "diagnose", "--report", specs_of(selected)...), nothing),
     )
     return out
+end
+
+"""
+Runs `f()` (a fit) with the fixtures of `id` unpacked and `BAYSOL_FIXTURES` exported to the
+programs it starts. The unpacking happens before `f` is called, so the fit's own clock
+does not include it; the copy is removed afterwards, also when the fit failed, unless
+`keep`. A failed unpacking counts as a failed fit.
+"""
+function fit_with_fixtures(f, id, dry, keep)::Bool
+    set = startswith(id, "SYN-") ? "synthetic" : "experiments"
+    root = Fixtures.FixtureStore.tmp_root(set)
+    var = Fixtures.FixtureStore.env_var(set)
+    if dry
+        println("\$ bysl fixtures unpack ", id, " --set ", set, "   (", var, "=", root, ")")
+        return f()
+    end
+    fresh = false
+    try
+        _, fresh = Fixtures.fixture_dir(id; set)
+    catch err
+        err isa ToolError || rethrow()
+        println(stderr, err.message)
+        return false
+    end
+    try
+        return with(
+            Common.EXTRA_ENV => merge(Common.EXTRA_ENV[], Dict(var => root)),
+        ) do
+            f()
+        end
+    finally
+        fresh && !keep && Fixtures.FixtureStore.release(id; set, root)
+    end
 end
 
 "The tool's main program for the argument list `argv`; returns the exit status."
@@ -122,9 +166,17 @@ function run(argv::Vector{String})::Int
     dry = flag("--dry-run")
     # a failing step does not stop the others
     failed = String[]
-    for (label, failure, cmd) in steps(flag, selected, specs, julia, trace)
+    keep = flag("--keep-fixtures")
+    for (label, failure, cmd, id) in steps(flag, selected, specs, julia, trace)
         println("\n=== ", label)
-        run_step(dry, cmd) || push!(failed, failure)
+        if id === nothing
+            run_step(dry, cmd) || push!(failed, failure)
+        else
+            ok = fit_with_fixtures(id, dry, keep) do
+                run_step(dry, cmd)
+            end
+            ok || push!(failed, failure)
+        end
     end
     isempty(failed) && return 0
     println(stderr, "\n", WHO, ": failed: ", join(failed, ", "))
@@ -607,6 +659,7 @@ end
 end
 
 include("fits-export.jl")
+include("fits-units.jl")
 
 const SUBS = [
     "run" => (Fit, "run the fitting tests and the steps that follow them"),
@@ -614,6 +667,7 @@ const SUBS = [
     "diagnose" => (Diagnose, "sampler diagnostics on fits, without rerunning them"),
     "profile" => (Profile, "profile the static build of fitting tests"),
     "export" => (Export, "fitting tests as TUI projects, each with one finished run"),
+    "units" => (Units, "check each script's q-unit conversion against its data"),
     "bench" => (Bench, "the cold / steady-state benchmark (needs --approved)"),
 ]
 

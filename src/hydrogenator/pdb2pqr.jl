@@ -52,9 +52,66 @@ _cheapTerminusGroups(::Propka, records, pH::Real) =
     _terminusGroups(records, pH, _terminiChains(records))
 _cheapTerminusGroups(::NoTitration, _, ::Real) = Dict{Vector{String},Vector{String}}()
 
+"""
+Python snippet that starts pdb2pqr with its repair limit lifted. pdb2pqr rebuilds the heavy
+atoms a residue lacks only while at most 10 % (`REPAIR_LIMIT`) of the structure's heavy
+atoms are missing; above that it logs an error and goes on without repairing, and then
+stops on the hydrogens it put on the incomplete residues (`Found gap in biomolecule
+structure`; models with truncated side chains, SASDN75). The limit is a constant of
+`pdb2pqr.main` with no command-line option, so the module attribute is set before `main()`.
+"""
+const PDB2PQR_NO_REPAIR_LIMIT = join(
+    [
+        "import sys",
+        "import pdb2pqr.main as m",
+        "m.REPAIR_LIMIT = float('inf')",
+        "sys.argv = ['pdb2pqr'] + sys.argv[1:]",
+        "m.main()",
+    ],
+    "; ",
+)
+
+"""
+The command that runs pdb2pqr (`pdb2pqr`, the path of its entry script) with the repair
+limit lifted ([`PDB2PQR_NO_REPAIR_LIMIT`](@ref)): the Python of the same environment run
+on the snippet. Without a Python next to the entry script, the entry script itself.
+"""
+function _pdb2pqrCommand(pdb2pqr::AbstractString)::Cmd
+    for dir in (dirname(pdb2pqr), dirname(dirname(pdb2pqr)))
+        for name in ("python", "python.exe")
+            py = joinpath(dir, name)
+            isfile(py) && return `$py -c $PDB2PQR_NO_REPAIR_LIMIT`
+        end
+    end
+    return `$pdb2pqr`
+end
+
 # ---------------------------------------------------------------------------
 #                    pdb2pqr: explicit-hydrogen structure generation
 # ---------------------------------------------------------------------------
+
+"""
+    dropBlankLines(inPath, outPath) -> Bool
+
+Write to `outPath` a copy of the .pdb at `inPath` without its blank (or whitespace-only)
+lines. pdb2pqr's reader stops at the first blank line and goes on with what it has read
+so far, so a deposited file with a blank line in its header (the PHENIX statistics of
+SASDFZ3) reaches it as a few `REMARK` records and no atoms (`No biomolecule heavy atoms
+found`). Nothing is written when there is no such line.
+
+# Returns
+`true` when `outPath` was written (the file had a blank line), `false` otherwise.
+
+# Exceptions
+- `SystemError`: a path cannot be read or written.
+"""
+function dropBlankLines(inPath::AbstractString, outPath::AbstractString)::Bool
+    lines = readlines(inPath)
+    keep = filter(l -> !isempty(strip(l)), lines)
+    length(keep) == length(lines) && return false
+    write(outPath, join(keep, "\n") * "\n")
+    return true
+end
 
 """
 Run pdb2pqr on `inPath` with the force field `ff` (a [`FORCE_FIELDS`](@ref) entry),
@@ -88,16 +145,24 @@ function _runPdb2pqr(
     sanitized = outPath * ".sanitized.pdb"
     inPath =
         sanitizedCopy(inPath, sanitized; waters = true) === nothing ? inPath : sanitized
+    # residues without a backbone (C-alpha-only stretches, a split-off phosphate) cannot
+    # be built on: they stay out of the run and are put back as deposited
+    heldPath = outPath * ".held.pdb"
+    held = holdBackIncomplete(inPath, heldPath)
+    base = held.held == 0 ? inPath : heldPath
     relabeled = outPath * ".relabeled.pdb"
-    rel = relabelModified(inPath, relabeled)
+    rel = relabelModified(base, relabeled)
     plan = rel.plan
-    runIn = (isempty(plan) && !rel.renumbered && rel.stripped == 0) ? inPath : relabeled
+    runIn = (isempty(plan) && !rel.renumbered && rel.stripped == 0) ? base : relabeled
     # a nucleic chain that starts or ends with a non-nucleotide: those ends run apart
     isolated = outPath * ".isolated.pdb"
     iso = isolateChainEnds(runIn, isolated)
     iso.changed && (runIn = isolated)
+    # pdb2pqr reads a file only up to its first blank line
+    unblanked = outPath * ".unblanked.pdb"
+    dropBlankLines(runIn, unblanked) && (runIn = unblanked)
     errfile = outPath * ".stderr"   # in the caller's temporary directory
-    cmd = `$pdb2pqr --ff $ffArg $titrationArgs $flags`
+    cmd = `$(_pdb2pqrCommand(pdb2pqr)) --ff $ffArg $titrationArgs $flags`
     cmd = `$cmd --pdb-output $outPath $runIn $tmpPqr`
     try
         run(pipeline(setenv(cmd, tools.env); stdout = devnull, stderr = errfile))
@@ -114,8 +179,11 @@ function _runPdb2pqr(
     )
     restoreChainEnds!(outPath, iso, inPath)
     restoreModified!(outPath, plan, rel.aliases)
+    restoreHeldBack!(outPath, held)
     rm(relabeled; force = true)
+    rm(heldPath; force = true)
     rm(isolated; force = true)
+    rm(unblanked; force = true)
     balance = restoreDroppedAtoms!(inPath, outPath)
     _checkNucleotidesKept(inPath, outPath, ff)
     rm(sanitized; force = true)
@@ -291,7 +359,19 @@ function _resolveHydrogens(
                 # in exactly one group below, not silently dropped). It is read
                 # by text, from the chain-id column: BioStructures' strict parser
                 # refuses files pdb2pqr handles fine (hybrid-36 atom serials).
-                groups = _terminusGroups(records, pH, _textChainIds(abspdb))
+                # The chain ids as pdb2pqr sees them: after `sanitizedCopy`, which
+                # gives a reused id (SASDBZ2: ten blank-chain linkers) its own.
+                # The run outputs carry those ids and `_mergeChainsByText` keeps
+                # only the listed chains, so the ids of the original file alone
+                # dropped the relabelled chains from the merge.
+                chainsPdb = joinpath(tmpdir, "chains.pdb")
+                chainsSrc =
+                    if sanitizedCopy(abspdb, chainsPdb; waters = true) === nothing
+                        abspdb
+                    else
+                        chainsPdb
+                    end
+                groups = _terminusGroups(records, pH, _textChainIds(chainsSrc))
                 # Different chains need different --neutraln/--neutralc
                 # settings, which pdb2pqr can't apply per-chain in one run.
                 # Run pdb2pqr once per needed flag combination -- always on

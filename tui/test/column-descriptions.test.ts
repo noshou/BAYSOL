@@ -137,14 +137,20 @@ test("the parameter rows of map, quantiles and stdevFromPrior describe themselve
         assert.equal(cellDescription(sheet, cells, true, 1, 0), rhoE)
     // the value cell keeps its column's sentence; an unknown parameter falls back
     assert.equal(cellDescription("map", cells, true, 1, 1), describeColumn("map", "value"))
-    assert.equal(cellDescription("map", cells, true, 2, 0), describeColumn("map", "parameter"))
+    assert.equal(
+        cellDescription("map", cells, true, 2, 0),
+        describeColumn("map", "parameter"),
+    )
     // the pipeline's labels all have one
     const source = readFileSync(
         new URL("../../src/pipeline/pipeline.jl", import.meta.url),
         "utf8",
     )
-    const block = source.match(/_REPORT_LABELS = Dict\{String,String\}\(([^)]*)\)/s)?.[1] ?? ""
+    const pattern = /_REPORT_LABELS = Dict\{String,String\}\(([^)]*)\)/s
+    const block = source.match(pattern)?.[1] ?? ""
     const labels = [...block.matchAll(/=>\s*"(\w+)"/g)].map((m) => m[1] ?? "")
     assert.ok(labels.length >= 8)
-    for (const label of labels) assert.ok(all.parameterRows?.[label], `parameterRows.${label}`)
+    for (const label of labels) {
+        assert.ok(all.parameterRows?.[label], `parameterRows.${label}`)
+    }
 })

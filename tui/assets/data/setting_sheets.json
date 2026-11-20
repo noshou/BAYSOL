@@ -34,6 +34,15 @@
      ]
     },
     {
+     "title": "retry ladder",
+     "settings": [
+      {
+       "name": "LADDER",
+       "description": "What to try when a fit still fails its convergence gates after its rerun. A map from the diagnosed failure class (stepCollapse, splitChains, divergent, structural, marginal, generic) to the rungs of that class, tried in order (at most 3 reruns in all). Each rung reruns the fit with the sampler, start and seed settings it names and nothing else; an empty list switches a class off. Only the settings of the default rungs are validated on benchmark fits."
+      }
+     ]
+    },
+    {
      "title": "chains",
      "settings": [
       {
@@ -250,6 +259,15 @@
       {
        "name": "LMAX",
        "description": "Spherical-harmonic band limit of the forward model. auto takes qMax times the diameter of the scatterer cloud; lower is coarser and faster."
+      }
+     ]
+    },
+    {
+     "title": "memory",
+     "settings": [
+      {
+       "name": "MEMORY_HEADROOM",
+       "description": "Percent of the machine's total memory kept free while the scattering build runs (5 to 50). The build works through the q values in blocks that fit in the free memory minus this; the result is the same, a larger value only means more, smaller blocks."
       }
      ]
     }

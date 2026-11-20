@@ -1,0 +1,242 @@
+datetime	20-11-2026 00:14:53 -0500
+
+=== SASDBZ5 ===
+
+--- attempt 1: base run ---
+
+-- settings --
+triggerClass                    	none
+rung                            	none
+targetAccept                    	95.0
+nChains                         	8
+nSamples                        	1000
+nAdapt                          	300
+nDraws                          	700
+rngSeed                         	0
+chainStartRadii                 	4.0, 10.0, 20.0
+c1Mode                          	profiled
+kinkWatch                       	true
+mapNStarts                      	64
+mapMaxIter                      	500
+
+-- problem --
+====================================================================================================
+base run   nQ=230  nAtoms=5289  lMax=62  c1 tol=1.0e-8
+δρ₃ support = [-11.17, 2.791]   δρ₁,₂ support = [-10.0, 2.0]
+
+-- map search --
+MAP search: 0.1s  nOk=70/70  nModes=2  whitened=true
+L-BFGS starts (z space):
+  start 1: f=-926.9214 iters= 35 g_conv=false iter_limit=false evals=59 |∇f|∞=4.11e-04
+  start 2: f=-926.9214 iters= 41 g_conv=false iter_limit=false evals=65 |∇f|∞=3.08e-03
+  start 3: f=-926.9214 iters= 36 g_conv=false iter_limit=false evals=61 |∇f|∞=6.84e-04
+  start 4: f=-926.9214 iters= 40 g_conv=false iter_limit=false evals=63 |∇f|∞=3.47e-04
+  start 5: f=-926.9214 iters= 30 g_conv=false iter_limit=false evals=51 |∇f|∞=7.06e-04
+  start 6: f=-926.9214 iters= 35 g_conv=false iter_limit=false evals=75 |∇f|∞=4.03e-04
+  start 7: f=-926.9214 iters= 29 g_conv=false iter_limit=false evals=48 |∇f|∞=7.82e-04
+  start 8: f=-926.9214 iters= 31 g_conv=false iter_limit=false evals=94 |∇f|∞=1.36e-03
+  start 9: f=-926.9214 iters= 47 g_conv=false iter_limit=false evals=69 |∇f|∞=1.35e-03
+  start 10: f=-926.9214 iters= 36 g_conv=false iter_limit=false evals=68 |∇f|∞=8.84e-05
+  start 11: f=-894.2514 iters= 35 g_conv=false iter_limit=false evals=53 |∇f|∞=9.90e-05
+  start 12: f=-894.2514 iters= 27 g_conv=false iter_limit=false evals=45 |∇f|∞=1.42e-04
+  start 13: f=-926.9214 iters= 39 g_conv=false iter_limit=false evals=62 |∇f|∞=1.29e-03
+  start 14: f=-894.2514 iters= 25 g_conv=false iter_limit=false evals=49 |∇f|∞=1.01e-04
+  start 15: f=-926.9214 iters= 34 g_conv=false iter_limit=false evals=54 |∇f|∞=2.92e-04
+  start 16: f=-926.9214 iters= 42 g_conv=false iter_limit=false evals=60 |∇f|∞=2.73e-05
+  start 17: f=-894.2514 iters= 27 g_conv=false iter_limit=false evals=39 |∇f|∞=9.32e-06
+  start 18: f=-926.9214 iters= 36 g_conv=false iter_limit=false evals=64 |∇f|∞=8.71e-04
+  start 19: f=-926.9214 iters= 33 g_conv=false iter_limit=false evals=56 |∇f|∞=2.02e-03
+  start 20: f=-926.9214 iters= 37 g_conv=false iter_limit=false evals=50 |∇f|∞=4.41e-03
+  start 21: f=-926.9214 iters= 30 g_conv=false iter_limit=false evals=52 |∇f|∞=2.80e-05
+  start 22: f=-894.2514 iters= 23 g_conv=false iter_limit=false evals=39 |∇f|∞=4.96e-04
+  start 23: f=-926.9214 iters= 42 g_conv=false iter_limit=false evals=68 |∇f|∞=8.73e-04
+  start 24: f=-894.2514 iters= 37 g_conv=false iter_limit=false evals=50 |∇f|∞=6.77e-05
+  start 25: f=-926.9214 iters= 26 g_conv=false iter_limit=false evals=40 |∇f|∞=5.59e-04
+  start 26: f=-926.9214 iters= 36 g_conv=false iter_limit=false evals=47 |∇f|∞=2.13e-03
+  start 27: f=-926.9214 iters= 45 g_conv=false iter_limit=false evals=72 |∇f|∞=3.69e-05
+  start 28: f=-926.9214 iters= 39 g_conv=false iter_limit=false evals=91 |∇f|∞=1.02e-03
+  start 29: f=-926.9214 iters= 38 g_conv=false iter_limit=false evals=65 |∇f|∞=3.77e-04
+  start 30: f=-894.2514 iters= 32 g_conv=false iter_limit=false evals=43 |∇f|∞=3.97e-04
+  start 31: f=-926.9214 iters= 45 g_conv=false iter_limit=false evals=76 |∇f|∞=3.37e-06
+  start 32: f=-926.9214 iters= 57 g_conv=false iter_limit=false evals=103 |∇f|∞=1.31e-03
+  start 33: f=-926.9214 iters= 41 g_conv=false iter_limit=false evals=59 |∇f|∞=1.36e-03
+  start 34: f=-926.9214 iters= 45 g_conv=false iter_limit=false evals=63 |∇f|∞=6.57e-04
+  start 35: f=-926.9214 iters= 31 g_conv=false iter_limit=false evals=49 |∇f|∞=7.59e-04
+  start 36: f=-926.9214 iters= 43 g_conv=false iter_limit=false evals=88 |∇f|∞=2.00e-04
+  start 37: f=-926.9214 iters= 31 g_conv=false iter_limit=false evals=52 |∇f|∞=6.14e-04
+  start 38: f=-926.9214 iters= 31 g_conv=false iter_limit=false evals=49 |∇f|∞=8.16e-04
+  start 39: f=-926.9214 iters= 45 g_conv=false iter_limit=false evals=58 |∇f|∞=2.17e-04
+  start 40: f=-926.9214 iters= 36 g_conv=false iter_limit=false evals=53 |∇f|∞=6.84e-04
+  start 41: f=-926.9214 iters= 42 g_conv=false iter_limit=false evals=67 |∇f|∞=4.76e-04
+  start 42: f=-926.9214 iters= 43 g_conv=false iter_limit=false evals=80 |∇f|∞=7.56e-06
+  start 43: f=-926.9214 iters= 52 g_conv=false iter_limit=false evals=92 |∇f|∞=6.43e-04
+  start 44: f=-926.9214 iters= 47 g_conv=false iter_limit=false evals=74 |∇f|∞=1.25e-03
+  start 45: f=-926.9214 iters= 40 g_conv=false iter_limit=false evals=63 |∇f|∞=2.73e-05
+  start 46: f=-926.9214 iters= 29 g_conv=false iter_limit=false evals=53 |∇f|∞=1.41e-03
+  start 47: f=-926.9214 iters= 45 g_conv=false iter_limit=false evals=100 |∇f|∞=2.17e-03
+  start 48: f=-926.9214 iters= 31 g_conv=false iter_limit=false evals=48 |∇f|∞=7.33e-05
+  start 49: f=-926.9214 iters= 45 g_conv=false iter_limit=false evals=65 |∇f|∞=1.04e-04
+  start 50: f=-926.9214 iters= 37 g_conv=false iter_limit=false evals=61 |∇f|∞=5.88e-04
+  start 51: f=-926.9214 iters= 51 g_conv=false iter_limit=false evals=76 |∇f|∞=7.06e-04
+  start 52: f=-926.9214 iters= 38 g_conv=false iter_limit=false evals=53 |∇f|∞=2.08e-04
+  start 53: f=-926.9214 iters= 39 g_conv=false iter_limit=false evals=56 |∇f|∞=4.68e-04
+  start 54: f=-926.9214 iters= 38 g_conv=false iter_limit=false evals=74 |∇f|∞=1.81e-03
+  start 55: f=-926.9214 iters= 39 g_conv=false iter_limit=false evals=58 |∇f|∞=1.38e-03
+  start 56: f=-926.9214 iters= 48 g_conv=false iter_limit=false evals=83 |∇f|∞=3.04e-04
+  start 57: f=-926.9214 iters= 28 g_conv=false iter_limit=false evals=48 |∇f|∞=1.56e-04
+  start 58: f=-926.9214 iters= 45 g_conv=false iter_limit=false evals=74 |∇f|∞=2.95e-05
+  start 59: f=-926.9214 iters= 44 g_conv=false iter_limit=false evals=76 |∇f|∞=6.12e-04
+  start 60: f=-926.9214 iters= 42 g_conv=false iter_limit=false evals=77 |∇f|∞=9.24e-05
+  start 61: f=-926.9214 iters= 40 g_conv=false iter_limit=false evals=61 |∇f|∞=1.35e-03
+  start 62: f=-926.9214 iters= 39 g_conv=false iter_limit=false evals=61 |∇f|∞=5.36e-03
+  start 63: f=-926.9214 iters= 36 g_conv=false iter_limit=false evals=60 |∇f|∞=4.71e-04
+  start 64: f=-926.9214 iters= 36 g_conv=false iter_limit=false evals=61 |∇f|∞=4.10e-04
+  start 65: f=-926.9214 iters= 34 g_conv=false iter_limit=false evals=62 |∇f|∞=1.26e-04
+  start 66: f=-926.9214 iters= 33 g_conv=false iter_limit=false evals=53 |∇f|∞=1.14e-03
+  start 67: f=-926.9214 iters= 39 g_conv=false iter_limit=false evals=61 |∇f|∞=4.67e-04
+  start 68: f=-926.9214 iters= 27 g_conv=false iter_limit=false evals=46 |∇f|∞=3.34e-04
+  start 69: f=-926.9214 iters= 45 g_conv=false iter_limit=false evals=63 |∇f|∞=5.44e-04
+  start 70: f=-926.9214 iters= 52 g_conv=false iter_limit=false evals=69 |∇f|∞=2.24e-04
+MAP Hessian eigenvalues (floor 1.0): pass 1 = [1, 1.654, 13.84, 1.712e+04]
+distinct optima: 2
+  mode 1: f=-926.921 ξ=[0.335, -0.2091, 1.778, -5.535]  H-eig=[1, 1.654, 13.84, 1.712e+04]  log Laplace mass=920.482 (Δ vs best = 0 nats)
+  mode 2: f=-894.251 ξ=[0.335, 0.2859, -7.22, 2.376]  H-eig=[0.9999, 2.141, 13.47, 2620]  log Laplace mass=888.635 (Δ vs best = -31.8 nats)
+
+-- nuts --
+NUTS: 0.2s  init ε=2.149  final ε=0.3656  mean nSteps=10.0 mean depth=3.11  frac(depth≥10)=0.000  diverged=1
+mean nSteps by window: [1:75]=19  [76:450]=11  [251:300]=12  [301:1000]=10
+mean accept = 0.962   mean |ΔH| = 0.073
+
+-- chains --
+chain           	start σ         	mode            	pooled          	kept            	div             	div%            	warm-up div     	warm-up div%    	ε               	steps           	accept          	mean log π      	energy error sd 	depth≥10        	BFMI            	c1 at bound     	gradient evals  	non-finite      	note
+1               	+0.00           	1               	yes             	700             	0               	0.0             	3               	1.0             	0.3723          	9.1             	0.962           	924.72          	0.12            	0.000           	0.992           	0.000           	10762           	1               	
+2               	+0.00           	1               	yes             	700             	0               	0.0             	3               	1.0             	0.2852          	11.9            	0.980           	924.71          	0.0718          	0.000           	0.879           	0.000           	12775           	1               	
+3               	+4.00           	1               	yes             	700             	0               	0.0             	4               	1.3             	0.3638          	10.4            	0.973           	924.70          	0.0761          	0.000           	0.951           	0.000           	11056           	0               	
+4               	-4.00           	1               	yes             	700             	0               	0.0             	3               	1.0             	0.5098          	6.5             	0.942           	924.61          	0.186           	0.000           	0.963           	0.000           	8200            	0               	
+5               	+10.00          	1               	yes             	700             	0               	0.0             	4               	1.3             	0.3139          	12.3            	0.978           	924.82          	0.0807          	0.000           	1.001           	0.000           	13262           	0               	
+6               	-10.00          	2               	yes             	700             	0               	0.0             	2               	0.7             	0.3646          	10.0            	0.959           	892.14          	0.242           	0.000           	1.000           	unavailable     	15037           	0               	
+7               	+20.00          	1               	yes             	700             	0               	0.0             	4               	1.3             	0.4351          	8.3             	0.953           	924.80          	0.172           	0.000           	0.827           	0.000           	10272           	1               	
+8               	-20.00          	2               	yes             	700             	1               	0.1             	4               	1.3             	0.2803          	11.6            	0.948           	892.20          	0.161           	0.000           	1.082           	unavailable     	16357           	3               	
+
+-- chain totals --
+chainsRun                       	8
+chainsPooled                    	8
+pooledDraws                     	5600
+divergentDraws                  	1
+warmupDivergentDraws            	27
+
+-- kink check --
+chain           	checks          	drawsExamined   	drawsTwoBasins  	firedAtDraw
+1               	3               	200             	0               	none
+2               	3               	200             	0               	none
+3               	3               	200             	0               	none
+4               	3               	200             	0               	none
+5               	3               	200             	0               	none
+6               	3               	200             	0               	none
+7               	3               	200             	0               	none
+8               	3               	200             	0               	none
+
+-- posterior --
+post-warmup w: sd = [0.9988, 3.723, 7.145, 5.814]   (1 = the Laplace whitening is right)
+  cov(w) eigenvalues = [0.9758, 1.118, 28.64, 68.99]   skew = [-0.0378, -0.872, 1.244, 2.63]   ESS = [3863, 20.37, 20.49, 4348]
+ℓπ at L-BFGS mode = 926.9214   best draw = 926.9002   median draw = 924.4173   (4-D Gaussian: median ≈ mode − 1.7)
+sampled sd in z / Laplace σ_z = [0.9988, 4.975, 4.094, 5.013]
+
+-- bounds --
+coordinate      	median          	sd              	distanceSd      	shareNearBound
+slvntEDns       	0.334976        	3.58142e-5      	9353.16         	0.0
+deltaRho1       	-0.177145       	0.214764        	10.1374         	0.0
+deltaRho2       	1.77639         	3.9499          	0.0566126       	0.6975
+deltaRho3       	-4.64129        	3.52505         	1.85092         	0.137143
+
+-- axes --
+Δf/(s²/2) along whitened axes (1 = Gaussian), s = -10,-5,-3,-2,-1,-0.5,0.5,1,2,3,5,10
+  w1: unavailable unavailable    0.928    0.885    0.112    -2.66    -3.73    0.256    0.771    0.642 unavailable unavailable
+  w2: unavailable unavailable unavailable     1.72     1.43     1.07    0.445    0.546    0.477    0.384    0.292 unavailable
+  w3: unavailable unavailable    0.124    0.437    0.543    0.453     0.86     0.87    0.679    0.512 -0.00107    -1.56
+  w4:    -1.61    -7.36    -0.13    0.393    0.291    -0.16     1.04      1.1     1.14    -28.3    -10.3    -3.19
+  w1 scan: c1-tol noise=unavailable  f''(median)=0.673 f''(max)=4.59 at s=-2.52  c1 range=[1.1533,1.1651] jumps=0
+  w2 scan: c1-tol noise=unavailable  f''(median)=0.661 f''(max)=3.73 at s=-1.41  c1 range=[1.1535,1.1732] jumps=0
+  w3 scan: c1-tol noise=unavailable  f''(median)=0.605 f''(max)=0.773 at s=0.46  c1 range=[1.1491,1.1778] jumps=0
+  w4 scan: c1-tol noise=unavailable  f''(median)=0.548 f''(max)=1.16 at s=0.96  c1 range=[1.1479,1.1776] jumps=0
+local λ_max(−∇²ℓπ) min/median/max = [0.007719, 0.8822, 16.01]  → stable ε < [0.4998, 2.129] (worst, median);  adapted ε = 0.3656
+
+-- correlation --
+parameter       	slvntEDns       	deltaRho1       	deltaRho2       	deltaRho3
+slvntEDns       	1.0             	-0.0154419      	0.0194483       	-0.00844367
+deltaRho1       	-0.0154419      	1.0             	-0.970645       	0.982226
+deltaRho2       	0.0194483       	-0.970645       	1.0             	-0.918473
+deltaRho3       	-0.00844367     	0.982226        	-0.918473       	1.0
+
+-- residuals --
+residualSource                  	the best sampled draw (log π 926.9002)
+residualCount                   	230
+durbinWatson                    	1.77062
+runsCount                       	94
+runsExpected                    	115.687
+runsZ                           	-2.87411
+runsP                           	0.00405162
+
+-- convergence --
+parameter       	rhat            	essBulk         	essTail         	sd              	mcse
+slvntEDns       	1.00086         	3023.29         	2663.49         	3.58142e-5      	6.51352e-7
+deltaRho1       	1.00157         	2816.58         	1812.22         	0.214764        	0.0040467
+deltaRho2       	1.00277         	2602.25         	1724.46         	3.9499          	0.0774305
+deltaRho3       	1.00217         	2563.23         	1876.91         	3.52505         	0.069626
+logDensity      	1.00246         	1410.17         	1804.12         	14.1839         	0.37771
+
+-- gate --
+rhatMax                         	1.00277
+essMin                          	1410.17
+essTailMin                      	1724.46
+nDivergent                      	1
+divergentShare                  	0.000178571
+gate                            	passed
+
+-- modes --
+modes                           	2
+modeWeights                     	1.0, 1.46967e-14
+modeLogMass                     	930.724, 898.873
+modeLogMassErr                  	0.00256143, 0.00737071
+weightsUncertain                	false
+rewhitenedNats                  	0.0
+
+-- health --
+stepSizeInitial                 	2.14941
+stepSizeReached                 	0.36564
+leapfrogTotal                   	88948
+leapfrogSampling                	55995
+leapfrogPerEss                  	63.076
+gradientEvals                   	97721
+nonFiniteEvals                  	6
+curvatureSamples                	60631
+c1AtLowerBound                  	0.0
+c1AtUpperBound                  	0.0
+
+-- c1 search --
+c1Solves                        	115196
+c1BrentIterations               	1443420
+c1BrentPerSolve                 	12.5301
+c1ScanAtEdge                    	1289
+c1WlsErrors                     	0
+
+-- stage timings --
+stage           	seconds         	jit             	gc              	notes
+  MAP search + whitening (70/70 starts, 2 modes)	0.112039        	0.0353045       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000174833     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.82168         	1.80428         	0.0             	
+  NUTS  (8k iters, 88.95k leapfrog, 0.017 ms/step)	2.3821          	1.95133         	0.0             	
+  2 posterior modes: mass by bridge sampling	0.315015        	0.238934        	0.0             	
+  per-draw c1 re-profile + curves (6600 draws)	0.115323        	0.220221        	0.0             	
+
+-- attempts --
+attempt         	label           	outcome
+1               	base run        	kept
+
+-- result --
+attempts                        	1
+keptAttempt                     	1
+keptLabel                       	base run
+keptBecause                     	it passed its gates
+statisticsFlushes               	2
+statisticsFlushSeconds          	0.00012625

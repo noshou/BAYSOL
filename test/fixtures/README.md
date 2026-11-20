@@ -83,7 +83,7 @@ Filenames carry a `-TEST` suffix (distinct from the bare RCSB ID, e.g. `1CRN-TES
 
 ## Component dictionary fixtures
 
-Three files of the wwPDB Chemical Component Dictionary, one mmCIF per component, downloaded unmodified on 2026-10-15 from `https://files.rcsb.org/ligands/download/<ID>.cif`. The bundled table `src/molecular-structure/components.tsv` already holds all three ids, so `test-componentcache.jl` and `test-nucleotide-seed.jl` rewrite the residue id inside the file to one that is not in the table and serve it through the injectable download hook (`MolecularStructure._COMPONENT_DOWNLOAD`) or put it in the cache, then check what `component` returns against the table row.
+Three files of the wwPDB Chemical Component Dictionary, one mmCIF per component, downloaded unmodified from `https://files.rcsb.org/ligands/download/<ID>.cif`. The bundled table `src/molecular-structure/components.tsv` already holds all three ids, so `test-componentcache.jl` and `test-nucleotide-seed.jl` rewrite the residue id inside the file to one that is not in the table and serve it through the injectable download hook (`MolecularStructure._COMPONENT_DOWNLOAD`) or put it in the cache, then check what `component` returns against the table row.
 
 
 | file      | component                                                                       | role in the tests                                           |

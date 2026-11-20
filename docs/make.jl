@@ -197,7 +197,12 @@ makedocs(
     # module, so the warning levels are raised (the error levels stay).
     format = Documenter.HTML(;
         size_threshold_warn = 150 * 1024,
-        search_size_threshold_warn = 1024 * 1024,
+        # The fitting-tests README (the Results table, one row per entry, 116+ entries)
+        # is one table that cannot be split without losing it: this page alone is
+        # exempt from both size limits (Documenter's `size_threshold_ignore`).
+        size_threshold_ignore = ["testing/fitting_tests.md"],
+        # 2 MiB: the index is 1.08 MiB with the 116 fitting-test entries in the README
+        search_size_threshold_warn = 2 * 1024 * 1024,
     ),
     # Strict: every `@ref` resolves as of 2026-10-01, so a broken
     # cross-reference now fails the build (and the deploy) instead of

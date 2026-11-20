@@ -15,7 +15,9 @@
 #     5  sh_cavity   hydration shell, cavity beads   (enters with +dro_3)
 
 using ..MolecularStructure: Molecule, elms, vols
-using ..Runtime: StageLog, timed!
+using ..Runtime: Stage, StageLog, tick, timed!, GC_PAUSE_BUDGET
+
+export MemoryBudgetError
 
 """
 Species Gram matrix G of shape (n, n, Q) for the n multipole arrays in
@@ -115,7 +117,7 @@ following their eq. 13: `rM` = N⁻¹ Σⱼ `r_gj`, `r_gj` read off their Table 
 function meanAtomicRadius(mol::Molecule)::Float64
     v = vols(mol)
     isempty(v) && throw(ArgumentError("meanAtomicRadius: molecule has no atoms"))
-    return sum(cbrt(3.0 * vi / (4.0 * π)) for vi in v) / length(v)
+    return sum(cbrt(3.0 * vi / FOUR_PI) for vi in v) / length(v)
 end
 
 
@@ -174,9 +176,129 @@ struct ForwardCache
 end
 
 """
+The static build cannot run within the memory that is free: even a block of one q value
+([`forwardCache`](@ref)) needs more than `Sys.free_memory()` minus the headroom
+(`MEMORY_HEADROOM`, percent of the total memory).
+
+# Fields
+- `nAtoms::Int`, `lMax::Int`, `nQ::Int`: the structure, the band limit and the number of q
+    values of the build.
+- `neededBytes::Int`: the estimate for the smallest block (one q value).
+- `freeBytes::Int`, `headroomBytes::Int`: the free memory and the headroom left aside.
+"""
+struct MemoryBudgetError <: Exception
+    nAtoms::Int
+    lMax::Int
+    nQ::Int
+    neededBytes::Int
+    freeBytes::Int
+    headroomBytes::Int
+end
+
+function Base.showerror(io::IO, e::MemoryBudgetError)
+    gib(x) = round(x / 2^30; digits = 2)
+    print(io, "MemoryBudgetError: the scattering build of $(e.nAtoms) atoms with lMax = ",
+        "$(e.lMax) at $(e.nQ) q values does not fit in memory: even one q value needs ",
+        "about $(gib(e.neededBytes)) GiB, but only $(gib(e.freeBytes - e.headroomBytes)) ",
+        "GiB is available ($(gib(e.freeBytes)) GiB free minus the headroom of ",
+        "$(gib(e.headroomBytes)) GiB). Free memory, lower `memoryHeadroom` (down to ",
+        "$MEMORY_HEADROOM_MIN %), or lower `lMax` (or fit a smaller q range).")
+end
+
+"The free and the total memory of the machine in bytes (the default of `memory`)."
+_systemMemory() = (Int(Sys.free_memory()), Int(Sys.total_memory()))
+
+"""
+Estimated peak bytes of the static build of a block of `b` q values for `nAtoms` atoms and
+beads classes of `nShell` beads: the amplitudes, the accumulators and work buffers of
+[`_bLmBytes`](@ref), the multipoles held while the next species is built, and the
+garbage the paused collector may leave ([`GC_PAUSE_BUDGET`](@ref)). Deliberately on the
+high side (the vacuum term counted with two channels).
+
+# Returns
+- `Int`, bytes.
+
+# Exceptions
+None.
+"""
+function _forwardBytes(
+    nAtoms::Integer, nShell::NTuple{3,<:Integer}, lMax::Integer, b::Integer;
+    chunk::Integer = B_LM_CHUNK,
+)
+    K = (lMax + 1) * (lMax + 2) ÷ 2
+    one = 16 * K * b                         # one channel of one species, complex
+    held = 3one                              # vac (two channels) and ex
+    peak = nAtoms * b * 24 + _bLmBytes(nAtoms, lMax, b, 3, 3; chunk) + held
+    for n in nShell
+        peak = max(peak, held + n * b * 8 + _bLmBytes(n, lMax, b, 1, 1; chunk) + one)
+        held += one
+    end
+    return Int(ceil(FORWARD_BYTES_SAFETY * max(peak, held)) + GC_PAUSE_BUDGET)
+end
+
+"""
+Collects the garbage now, whatever a pause of the collector
+([`withGcPaused`](@ref BAYSOL.Runtime.withGcPaused)) says: a block of the static build is
+freed before the next one is built.
+
+# Returns
+- `nothing`.
+
+# Exceptions
+None.
+"""
+function _collectNow()
+    wasOn = GC.enable(true)
+    GC.gc()
+    GC.enable(wasOn)
+    return nothing
+end
+
+"""
+The blocks of q values the static build runs in: `(blockQ, nBlocks, estBytes, freeBytes,
+headroomBytes)`, the largest block whose estimate ([`_forwardBytes`](@ref)) fits in
+`free - headroom`, or `blockQ` if given.
+
+# Returns
+- `NamedTuple`-like plan with the fields above.
+
+# Exceptions
+- [`MemoryBudgetError`](@ref): a block of one q value does not fit.
+"""
+function _blockPlan(
+    nAtoms, nShell, lMax, Q, headroomPct, memory, chunk, blockQ,
+)
+    free, total = memory()
+    head = round(Int, headroomPct / 100 * total)
+    est(b) = _forwardBytes(nAtoms, nShell, lMax, b; chunk)
+    if blockQ === nothing
+        est(1) ≤ free - head ||
+            throw(MemoryBudgetError(nAtoms, lMax, Q, est(1), free, head))
+        b = Q
+        while est(b) > free - head
+            b -= 1
+        end
+    else
+        b = clamp(Int(blockQ), 1, Q)
+    end
+    return (; blockQ = b, nBlocks = cld(Q, b), estBytes = est(b), free, head)
+end
+
+"""
 Static geometry-only and fit independent calculations: the five species'
 multipoles ([`speciesMultipoles`](@ref)), reduced to the Gram matrix G(q), plus
 `rM`.
+
+The q values are worked through in blocks: the multipoles of all five species are built
+for one block, reduced to that block's columns of G at once and freed, then the next
+block, one after the other. G(q) at one q does not depend on the other q values, so the
+result is the one-pass result up to rounding, and the memory is that of one block (the
+multipoles of a large structure are `2K` doubles per q, K = (lMax+1)(lMax+2)/2, for each
+species). The block size is the largest whose estimate
+fits in `Sys.free_memory()` minus `memoryHeadroom` percent of `Sys.total_memory()`.
+A run log reads the result off `stageLog.info`: `forwardBlocks`, `forwardBlockQ`,
+`forwardBudgetGib`, `forwardEstGib` (the estimate for a block) and `forwardPeakGib` (the
+process's peak resident set, `Sys.maxrss()`, after the build).
 
 # Arguments
 - `mol::Molecule`.
@@ -190,13 +312,24 @@ multipoles ([`speciesMultipoles`](@ref)), reduced to the Gram matrix G(q), plus
     `nTarget = nothing`: hydration-shell geometry, forwarded to hydration.
 -   `shell::Union{Nothing,Tuple} = nothing`: a precomputed `sasa`
     result, see [`hydration`](@ref).
+-   `memoryHeadroom::Real = MEMORY_HEADROOM`: percent of the total memory to leave free.
+-   `memory::Function = _systemMemory`: a test hook, `() -> (freeBytes, totalBytes)`.
+-   `blockQ::Union{Nothing,Integer} = nothing`: a test hook, the block size in q values
+    (`nothing` plans it from the memory).
 -   `stageLog::Union{Nothing,StageLog} = nothing`: if given, the vacuum,
     excluded-volume, hydration and Gram + `rM` stages are recorded in it
-    (depth 2, group `:static`).
+    (depth 2, group `:static`, summed over the blocks), and the build's blocks and memory
+    in its `info`.
 
 The vacuum term's `formFactorTable` build diagnostics are always collected.
+
+# Returns
+- [`ForwardCache`](@ref).
+
+# Exceptions
+- [`MemoryBudgetError`](@ref): not even one q value fits in the free memory.
 """
-forwardCache(
+function forwardCache(
     mol::Molecule,
     qvals::AbstractVector{<:Real},
     lMax::Integer,
@@ -206,25 +339,80 @@ forwardCache(
     probe::Real                       = PROBE_RADIUS,
     nTarget::Union{Nothing,Integer}   = nothing,
     shell::Union{Nothing,Tuple}       = nothing,
+    memoryHeadroom::Real              = MEMORY_HEADROOM,
+    memory::Function                  = _systemMemory,
+    blockQ::Union{Nothing,Integer}    = nothing,
     stageLog::Union{Nothing,StageLog} = nothing,
-)::ForwardCache = begin
+)::ForwardCache
     formFactorLog = String[]
-    mp = speciesMultipoles(
-        mol, qvals, lMax, energy;
-        chunk = chunk,
-        thickness = thickness, probe = probe, nTarget = nTarget, shell = shell,
-        formFactorLog = formFactorLog, stageLog = stageLog,
-    )
-    G, rM = timed!(stageLog, :static, 2, "Gram + rM") do
-        gram(collect(mp), partialWaveWeights(lMax)), meanAtomicRadius(mol)
+    Q = length(qvals)
+    nAtoms = length(elms(mol))
+    # the accessible surface once for every block
+    if shell === nothing
+        shell = timed!(stageLog, :static, 2, "SASA") do
+            sasa(mol; probe = probe, nTarget = nTarget)
+        end
     end
-    ForwardCache(
+    nShell = Tuple(count(==(c), shell[3]) for c in (CONVEX, CONCAVE, CAVITY))
+    plan = _blockPlan(nAtoms, nShell, lMax, Q, memoryHeadroom, memory, chunk, blockQ)
+    weights = partialWaveWeights(lMax)
+    G = Array{Float64,3}(undef, 5, 5, Q)
+    # the stages of the blocks, summed by name in the order first seen
+    names = String[]
+    sums = Dict{String,NTuple{3,Float64}}()
+    add!(name, v) = begin
+        haskey(sums, name) || push!(names, name)
+        sums[name] = get(sums, name, (0.0, 0.0, 0.0)) .+ v
+    end
+    gramName = "Gram + rM"
+    for (i, q0) in enumerate(1:plan.blockQ:Q)
+        r = q0:min(q0+plan.blockQ-1, Q)
+        blockLog = stageLog === nothing ? nothing : StageLog()
+        mp = speciesMultipoles(
+            mol, collect(Float64, qvals[r]), lMax, energy;
+            chunk = chunk,
+            thickness = thickness, probe = probe, nTarget = nTarget, shell = shell,
+            formFactorLog = i == 1 ? formFactorLog : nothing, stageLog = blockLog,
+        )
+        t = tick()
+        G[:, :, r] = gram(collect(mp), weights)
+        if blockLog !== nothing
+            for st in blockLog.stages
+                add!(st.name, (st.seconds, st.compile, st.gc))
+            end
+            add!(gramName, ((time_ns() - t[1]) / 1e9, 0.0, 0.0))
+        end
+        # the block is freed before the next one is built
+        mp = nothing
+        r.stop < Q && _collectNow()
+    end
+    rM = meanAtomicRadius(mol)
+    if stageLog !== nothing
+        @lock stageLog.lock begin
+            for (k, name) in enumerate(names)
+                (s, c, g) = sums[name]
+                note =
+                    k == 1 && plan.nBlocks > 1 ?
+                    "[$(plan.nBlocks) blocks of $(plan.blockQ) q]" : ""
+                push!(stageLog.stages, Stage(:static, 2, name, s, c, g, note))
+            end
+        end
+        gib(x)                   = round(x / 2^30; digits = 3)
+        info                     = stageLog.info
+        info["forwardBlocks"]    = plan.nBlocks
+        info["forwardBlockQ"]    = plan.blockQ
+        info["memoryHeadroom"]   = memoryHeadroom
+        info["forwardBudgetGib"] = gib(plan.free - plan.head)
+        info["forwardEstGib"]    = gib(plan.estBytes)
+        info["forwardPeakGib"]   = gib(Sys.maxrss())
+    end
+    return ForwardCache(
         G,
         _packGram(G),
         collect(Float64, qvals),
         rM,
         formFactorLog,
-        length(elms(mol)),
+        nAtoms,
         lMax,
     )
 end

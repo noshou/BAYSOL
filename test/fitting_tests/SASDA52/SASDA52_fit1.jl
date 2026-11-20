@@ -8,8 +8,7 @@ using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, Protein, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR_FIT1 =
-    joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDA52")
+const _FIXTURE_DIR_FIT1 = fixtureDir("SASDA52")
 const _DATA_PATH_FIT1 = joinpath(_FIXTURE_DIR_FIT1, "experimental_data", "SASDA52.dat")
 const _PDB_PATH_FIT1 = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1_model1.pdb")
 const _FIT_PATH_FIT1 = joinpath(_FIXTURE_DIR_FIT1, "SASDA52_fit1.fit")
@@ -109,15 +108,21 @@ const SOLUTES_FIT1 = Solute[
 
 const ADD_HYDROGENS_FIT1 = true   # runs Pdb2pqr at PH_FIT1
 
+# q cut (2026-11-19) at the end of the depositor's CRYSOL fit file (last q 0.50002 Å⁻¹; the
+# data run to 0.6015 Å⁻¹, 371 more points). The depositor's χ (header "Chi: 2.483", so χ²
+# ≈ 6.17) is recomputed from the .fit columns (q, I_exp, σ, I_fit) over its 1797 rows with
+# data (q 0.0087-0.5000 Å⁻¹): 6.14. BAYSOL therefore fits the same range.
+const Q_MAX_FIT_FIT1 = 0.5001
+
 """
     fitSubsetFit1() -> (q, I, σ)
 
-`qvalsFit1`/`I_exp_fit1`/`σ_exp_fit1` restricted to `σ_exp > 0`.
+`qvalsFit1`/`I_exp_fit1`/`σ_exp_fit1` restricted to `q ≤ Q_MAX_FIT_FIT1` and `σ_exp > 0`.
 (`seedModel` bins the curve and drops the bins with non-positive intensity.)
 """
 function fitSubsetFit1()
     keep = findall(
-        i -> σ_exp_fit1[i] > 0,
+        i -> qvalsFit1[i] ≤ Q_MAX_FIT_FIT1 && σ_exp_fit1[i] > 0,
         eachindex(qvalsFit1),
     )
     return qvalsFit1[keep], iExpFit1[keep], σ_exp_fit1[keep]
@@ -169,8 +174,7 @@ BAYSOL.results(
     references = reference,
     formFactorLog = fflogf1,
     nAtoms = natmsf1,
-    refChi2 = "CRYSOL χ² 2.48 (χ² ≈ 6.2)",
-    runLog = true,
+    refChi2 = "CRYSOL 6.14 (the header Chi 2.48 is chi, not χ²)",
 )
 
 # `@__DIR__` (this SASDA52/ folder), not the caller's cwd.

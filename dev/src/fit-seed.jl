@@ -4,15 +4,18 @@
 # by the developer tools in this directory (`diagnose.jl`,
 # `child.jl`); not part of the package and not needed to use BAYSOL.
 #
-# Every script in test/fitting_tests/<ID>/ has a `seed_<id>(...)` function that
-# builds the `Seed` its `run_<id>(...)` then samples. That split exists only for
-# these tools; a user reading a script as an example can skip `seed_<id>`. The
+# Every script in test/fitting_tests/<ID>/ has a `seed<Id>(...)` function that
+# builds the `Seed` its `run<Id>(...)` then samples. That split exists only for
+# these tools; a user reading a script as an example can skip `seed<Id>`. The
 # scripts also run their fit at top level, so `load_fit_seed` reads a script only
 # up to its first top-level run statement and evaluates that part in a fresh
 # module, which defines the functions and constants without running anything.
 
-# Scripts whose `seed_*` entry point is not `seed_<id>(run)` (RUNS) or
-# `seed_<id>()` (single run): id => (module, tag) -> Seed. No fitting test needs one now
+# the fixtures, unpacked from their archives on demand (the same code `bysl fixtures` uses)
+isdefined(@__MODULE__, :FixtureStore) || include(joinpath(@__DIR__, "fixture-store.jl"))
+
+# Scripts whose `seed*` entry point is not `seed<Id>(run)` (RUNS) or
+# `seed<Id>()` (single run): id => (module, tag) -> Seed. No fitting test needs one now
 # (SASDMZ9 and SASDJ72, which did, were removed with the ensemble fits).
 const SEED_ENTRY_OVERRIDES = Dict{String,Function}()
 
@@ -41,6 +44,14 @@ function load_fit_seed(
     tag::AbstractString = "";
     seed_options::NamedTuple = (;),
 )
+    # the scripts read their fixtures through `fixtureDir` (test/fitting_tests/common.jl),
+    # which looks in $BAYSOL_FIXTURES: unpack the archive for the duration of the call
+    return FixtureStore.with_fixture(id) do _
+        _load_fit_seed(id, tag, seed_options)
+    end
+end
+
+function _load_fit_seed(id::AbstractString, tag::AbstractString, seed_options::NamedTuple)
     fit_dir = joinpath(@__DIR__, "..", "..", "test", "fitting_tests")
     dir = joinpath(fit_dir, id)
     isdir(dir) || error("no fitting test folder $dir")
@@ -53,10 +64,10 @@ function load_fit_seed(
     src = read(path, String)
 
     # stop before the first top-level statement that runs a fit: a loop over the runs
-    # or models, or an assignment from a `run_*(` call (`result, ... = run_x()`), or
+    # or models, or an assignment from a `run*(` call (`result, ... = runX()`), or
     # a bare `result1, ... =` whose call is on the next line
     m = match(
-        r"^(for (?:run|model) in (?:RUNS|\()|result\d*,|[^\s#][^\n]*=\s*run_\w+\()"m,
+        r"^(for (?:run|model) in (?:RUNS|\()|result\d*,|[^\s#][^\n]*=\s*run[A-Z]\w*\()"m,
         src,
     )
     m === nothing && error("$path: found no top-level run statement to stop before")
@@ -78,7 +89,8 @@ function load_fit_seed(
 
     runs = isdefined(mod, :RUNS) ? Core.eval(mod, :RUNS) : nothing
     # SASDTK5.jl -> seedSasdtk5, SASDA52_fit1.jl -> seedSasda52Fit1
-    entry = Symbol("seed_", lowercase(splitext(script)[1]))
+    entry =
+        Symbol("seed", join(uppercasefirst.(lowercase.(split(splitext(script)[1], "_")))))
     built = if haskey(SEED_ENTRY_OVERRIDES, id)
         SEED_ENTRY_OVERRIDES[id](mod, tag)
     elseif runs !== nothing
@@ -89,7 +101,7 @@ function load_fit_seed(
     else
         error("$path: no `$entry` entry point; add a SEED_ENTRY_OVERRIDES method for $id")
     end
-    seed = built[1]   # every seed_* returns (seed, (qFit, I_fit, σ_fit))
+    seed = built[1]   # every seed* returns (seed, (qFit, I_fit, σ_fit))
 
     reference = nothing
     fit_file, scale, col = if runs !== nothing
@@ -101,11 +113,11 @@ function load_fit_seed(
         fit_name = occursin("_fit", stem) ? stem : id * "_fit1"
         ("$fit_name.fit", 1.0, 4)   # CRYSOL .fit layout: q, I_exp, σ, I_fit
     end
-    fitPath = joinpath(fit_dir, "..", "fixtures", "experiments", id, fit_file)
+    fitPath = joinpath(FixtureStore.resolve(id)[1], fit_file)
     if isfile(fitPath) && isdefined(mod, :fitSubset)
         fc = Base.invokelatest(Core.eval(mod, :_readFit), fitPath, scale, col)
         q, I, σ = Base.invokelatest(Core.eval(mod, :fitSubset))
-        fc === nothing || (reference = (; q, I, σ, qRef = fc[1], I_ref = fc[2]))
+        fc === nothing || (reference = (; q, I, σ, qRef = fc[1], iRef = fc[2]))
     end
     return seed, reference, isempty(tag) ? id : "$id:$tag"
 end

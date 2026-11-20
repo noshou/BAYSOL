@@ -308,7 +308,7 @@ end
     @testset "the table covers the catalog exactly" begin
         @test allunique(r.setting for r in rows)
         @test Set(r.setting for r in rows) == Set(_settingNames())
-        @test length(rows) == 99
+        @test length(rows) == 101
     end
 
     @testset "the keyword exists where the table says" begin
@@ -340,9 +340,9 @@ end
             r -> r.entry in (:seedModel, :runModel, :results),
             filter(r -> r.check, rows),
         )
-        # the 30 that had no keyword, 6 data ones, the terminal plot sizes, the plot dir,
-        # the compiler
-        @test count(r -> r.check, rows) == 39
+        # the 30 that had no keyword, 6 data ones, the memory headroom, the terminal plot
+        # sizes, the plot dir, the compiler
+        @test count(r -> r.check, rows) == 40
     end
 
     defaults = defaultSettings()
@@ -362,8 +362,8 @@ end
         @test rk.tableSigfigs == 17 && rk.tex == true && rk.compile == false
         @test rk.formats == (:pdf,) && rk.style == BAYSOL.PlotStyle()
         @test BAYSOL.runArguments(defaults) == (nSamples = 1000, nAdapt = 300)
-        @test length(BAYSOL.seedKeywords(defaults)) == 24
-        @test length(BAYSOL.runKeywords(defaults)) == 22
+        @test length(BAYSOL.seedKeywords(defaults)) == 25
+        @test length(BAYSOL.runKeywords(defaults)) == 23
         # a changed setting is the keyword
         s = copy(defaults)
         s[:MAP_N_STARTS] = 9
@@ -413,6 +413,8 @@ end
             (:seedModel, (; φ_max = 0), "φ_max", "above 0"),
             (:seedModel, (; shellMinPoints = 0), "SHELL_MIN_POINTS", "at least 1"),
             (:seedModel, (; beadRayRange = -2.0), "BEAD_RAY_RANGE", "above 0"),
+            (:seedModel, (; memoryHeadroom = 4), "MEMORY_HEADROOM", "at least 5"),
+            (:seedModel, (; memoryHeadroom = 51), "MEMORY_HEADROOM", "at most 50"),
             (:results, (; tableSigfigs = 0), "TABLE_SIGFIGS", "at least 1"),
             (:results, (; tableSigfigs = 18), "TABLE_SIGFIGS", "at most 17"),
         )

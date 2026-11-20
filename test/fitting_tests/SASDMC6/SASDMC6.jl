@@ -7,7 +7,7 @@ using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDMC6")
+const _FIXTURE_DIR = fixtureDir("SASDMC6")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDMC6.dat")
 
 # ---------------------------------------------------------------------------
@@ -154,8 +154,12 @@ function runSasdmc6(
     # collapsed to about 0.002 (tree depth 10) on this stiff 4-channel curve and the chains
     # stayed in different regions; at 80 the full run still ended at R̂ 1.014, at 60 the
     # step is about 0.25 (tree depth 4) and the smoke runs converged on three seeds.
-    res = BAYSOL.runModel(s, nSamples, nAdapt; δ = 60, retryNAdapt = 6000,
-        retryNDraws = 8000, chainStartRadii = (2.0, 4.0, 6.0))
+    # 2026-11-17: c1 is sampled as a fifth parameter here (its profile kinks); with the
+    # start radii (1, 2, 3) and the target acceptance at 70 percent, the long rerun (6000
+    # warm-up + 8000 draws) ended at R̂ 1.000 and 0.003 percent divergent (at 60 percent and
+    # radii (2, 4, 6) it ended at 0.15 percent, at 50 percent at 0.65 percent)
+    res = BAYSOL.runModel(s, nSamples, nAdapt; δ = 70, retryNAdapt = 6000,
+        retryNDraws = 8000, chainStartRadii = (1.0, 2.0, 3.0))
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
@@ -190,7 +194,6 @@ for run in RUNS
         dir = @__DIR__, name = "res$(suffix)", references,
         formFactorLog = formFactorLog, nAtoms = nAtoms,
         refChi2 = run.refChi2,
-        runLog = true,
     )
 
     # `@__DIR__` (this SASDMC6/ folder), not the caller's cwd.

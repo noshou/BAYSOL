@@ -12,7 +12,8 @@ using ..MolecularStructure:
     _storeDir, component, ComponentError, AMBER_NUCLEIC_NAMES, WATER_NAMES,
     STANDARD_NUCLEOTIDES, BACKBONE_ATOMS, BACKBONE_MIN, legacyNucleotidesInFile,
     sanitizedCopy, STANDARD_AMINO_ACIDS, aminoParent, _isAminoType,
-    isNucleotide, isAminoAcid, elementRadius, _inferElement
+    isNucleotide, isAminoAcid, elementRadius, _inferElement, PROTEIN_BACKBONE_ATOMS,
+    NUCLEOBASE_ATOMS
 
 # ---------------------------------------------------------------------------
 #   Constants and shared types
@@ -140,6 +141,7 @@ end
 include("propka.jl")
 include("pdb2pqr.jl")
 include("modified.jl")
+include("incomplete.jl")
 include("chain-ends.jl")
 include("balance.jl")
 include("content.jl")

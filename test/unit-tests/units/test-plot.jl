@@ -30,6 +30,7 @@ function syntheticResult(; nDraws = 300, withMap = true, seed = 1)
     ]
     stats = [
         (; numerical_error = i % 50 == 0, acceptance_rate = 0.9, tree_depth = 3,
+            step_size = 0.5,
             n_steps = 7, hamiltonian_energy = randn(rng)) for i in 1:nDraws
     ]
     diagnostics = BAYSOL.Inference.ChainDiagnostics(3, zeros(3), fill(true, 3),
@@ -219,8 +220,9 @@ end
                 io = IOBuffer(), refChi2 = "CRYSOL 1.37",
                 references = Reference("CRYSOL fit1", q, iTrue .* 1.02))
             names = basename.(files)
-            # the layout: .tex in plots/, the numbers in one workbook; no log unless asked
-            @test sort(readdir(dir)) == ["plots", "res_x.xlsx"]
+            # the layout: .tex in plots/, the numbers in one workbook; the two logs
+            logs = [basename(dir) * ".LOG", "statistics-" * basename(dir) * ".LOG"]
+            @test sort(readdir(dir)) == sort(["plots", "res_x.xlsx", logs...])
             texFiles = ["res_x.tex", "res_x_residuals.tex", "res_x_comparison.tex",
                 ["res_x_hist_$(h[4]).tex" for h in PLOT_HIST_PARAMS]...]
             for f in texFiles
@@ -271,7 +273,7 @@ end
             @test hdr == ["chain", "draw", "rhoE (e-/A^3)", "deltaRho1 (0.03 e-/A^3)",
                 "deltaRho2 (0.03 e-/A^3)", "deltaRho3 (0.03 e-/A^3)", "scale",
                 "bkgrndCorr (a.u.)", "exclVolCorr (c1)", "chi2FitGrid", "divergent",
-                "treeDepth", "nSteps", "acceptanceRate"]
+                "treeDepth", "nSteps", "stepSize", "acceptanceRate"]
             # three chains of 100: `draw` counts from 1 within each
             @test dr[2:end, 1] == repeat(1:3, inner = 100) &&
                   dr[2:end, 2] == repeat(1:100, 3)
@@ -318,7 +320,10 @@ end
                     preview = false,
                     tex = false,
                 )
-            @test basename.(files) == ["res.xlsx"] && readdir(dir) == ["res.xlsx"]
+            @test basename.(files)[1] == "res.xlsx" && length(files) == 3
+            @test sort(readdir(dir)) ==
+                  sort(["res.xlsx", basename(dir) * ".LOG",
+                "statistics-" * basename(dir) * ".LOG"])
         end
     end
 
@@ -381,11 +386,13 @@ end
         XLSX = BAYSOL.Pipeline.XLSX
         mktempdir() do dir
             files = results(result, seed; dir, name = "res_w", preview = false,
-                tex = false, runLog = true,
+                tex = false,
                 references = Reference("CRYSOL", seed.shannon.q, seed.shannon.I))
-            @test basename.(files) == ["res_w.xlsx", basename(dir) * ".LOG"]
-            # the workbook and the log, no data/ folder, no .part left over
-            @test sort(readdir(dir)) == sort(["res_w.xlsx", basename(dir) * ".LOG"])
+            stat = "statistics-" * basename(dir) * ".LOG"
+            @test basename.(files) == ["res_w.xlsx", stat, basename(dir) * ".LOG"]
+            # the workbook, the statistics and the log, no data/ folder, no .part left over
+            @test sort(readdir(dir)) ==
+                  sort(["res_w.xlsx", stat, basename(dir) * ".LOG"])
             xf = XLSX.readxlsx(joinpath(dir, "res_w.xlsx"))
             sheets = XLSX.sheetnames(xf)
             @test sheets[1:4] == ["run", "map", "quantiles2sigma", "stdevFromPrior"]
@@ -408,8 +415,9 @@ end
             @test string.(run[1, :]) == ["section", "name", "value", "unit"]
             keys_ = string.(run[2:end, 2])
             for k in ("nAtoms", "lmax", "dmax", "rebinChannels", "rebinMeasured",
-                "rebinFitted", "rebinNonPositiveDropped", "treeDepthAvg",
-                "treeDepthMax", "ebfmi", "exclVolSat", "chainsPooled", "chainsRun",
+                "rebinFitted", "rebinNonPositiveDropped", "treeDepthAvg", "stepSize",
+                "stepSizeMin", "treeDepthMax", "ebfmi", "exclVolSat", "chainsPooled",
+                "chainsRun",
                 "rhatMax", "essMin", "essTailMin", "pmvFallbackUncert", "drawsRows")
                 @test k in keys_
             end
@@ -465,7 +473,7 @@ end
         result = (merge(result[1], (; stats = flat)), result[2:end]...)
         XLSX = BAYSOL.Pipeline.XLSX
         mktempdir() do dir
-            results(result, data; dir, preview = false, tex = false, runLog = true)
+            results(result, data; dir, preview = false, tex = false)
             run = XLSX.readxlsx(joinpath(dir, "res.xlsx"))["run"][:]
             @test ismissing(run[findfirst(==("ebfmi"), string.(run[:, 2])), 3])
             @test !any(x -> isequal(x, "NaN"), run[:, 3])
@@ -504,9 +512,8 @@ end
         result, data, _ = syntheticResult()
         mktempdir() do dir
             results(result, data; dir, name = "res_fit1", preview = false, tex = false,
-                runLog = true, refChi2 = "CRYSOL 1.5")
-            results(result, data; dir, name = "res_fit2", preview = false, tex = false,
-                runLog = true)
+                refChi2 = "CRYSOL 1.5")
+            results(result, data; dir, name = "res_fit2", preview = false, tex = false)
             logfile = joinpath(dir, basename(dir) * ".LOG")
             text = read(logfile, String)
             # a section for each run, named after it
@@ -574,6 +581,28 @@ end
         end
     end
 
+    @testset "results always writes the statistics and the run log; runLog is gone" begin
+        result, data, _ = syntheticResult()
+        mktempdir() do dir
+            files = results(result, data; dir, name = "res_fit1", preview = false,
+                tex = false)
+            stat = joinpath(dir, "statistics-" * basename(dir) * ".LOG")
+            @test stat in files && joinpath(dir, basename(dir) * ".LOG") in files
+            # the statistics are written before the run log, whose timing table lists them
+            @test findfirst(==(stat), files) < findlast(endswith(".LOG"), files)
+            text = read(stat, String)
+            @test occursin("=== fit1 ===", text) && occursin("-- result --", text)
+            # no attempt was recorded for a synthetic result: said so, no invented values
+            @test occursin("attempts", text) && occursin("unavailable", text)
+            @test occursin(
+                "statistics",
+                read(joinpath(dir, basename(dir) * ".LOG"), String),
+            )
+            @test_throws MethodError results(result, data; dir, preview = false,
+                tex = false, runLog = true)
+        end
+    end
+
     @testset "a failed run still gets a log section (synthetic error, no fit)" begin
         P = BAYSOL.Pipeline
         mktempdir() do dir
@@ -630,7 +659,7 @@ end
         @test occursin("every draw diverged", nomap[1])
         # the files results wrote are named, the wall clock is last
         mktempdir() do dir
-            results(result, data; dir, preview = false, runLog = true)
+            results(result, data; dir, preview = false)
             lines = BAYSOL.Pipeline._summaryLines(result)
             @test occursin("res.xlsx", only(filter(contains("Results:"), lines)))
             @test occursin("plots/", only(filter(contains("Figures:"), lines)))
@@ -829,7 +858,7 @@ end
         @test top == [
             "summary data", "fit", "residuals", "histogram data",
             ["histogram " * h[4] for h in PLOT_HIST_PARAMS]..., "comparison CRYSOL",
-            "data files",
+            "data files", "statistics",
         ]
         child = [s.name for s in log.stages if s.group === :plot && s.depth == 2]
         @test all(in(("data", "tex")), child)             # no preview, no LaTeX

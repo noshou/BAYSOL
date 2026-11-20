@@ -86,7 +86,7 @@ end
     defaults = defaultSettings()
     @test defaults isa Dict{Symbol,Any}
     @test Set(keys(defaults)) == Set(_settingNames())
-    @test length(defaults) == 99
+    @test length(defaults) == 101
     for n in _settingNames()
         @test defaults[n] == _settingDefault(n)
     end
@@ -349,7 +349,7 @@ const JUNK = ["null", "true", "false", "0", "1", "-1", "2.5", "1e999", "\"\"", "
     P = BAYSOL.Pipeline
     R = BAYSOLRun
     names = _settingNames()
-    @test length(names) == 99
+    @test length(names) == 101
     allLimits = _mergedTable(:SETTING_LIMITS)      # built once, not for every junk value
     allChoices = _mergedTable(:SETTING_CHOICES)
     for n in names
@@ -386,6 +386,12 @@ const JUNK = ["null", "true", "false", "0", "1", "-1", "2.5", "1e999", "\"\"", "
                 elseif kind === :sizes
                     @test v isa Tuple && !isempty(v) && all(x -> x isa Tuple{Int,Int}, v)
                     @test all(k -> v[k][1] > v[k-1][1] && v[k][2] > v[k-1][2], 2:length(v))
+                elseif kind === :ladder
+                    @test v isa NamedTuple && keys(v) == P.LADDER_CLASSES
+                    @test all(
+                        r -> r.overrides isa NamedTuple,
+                        (r for c in values(v) for r in c),
+                    )
                 elseif kind === :font
                     @test v isa String && !isempty(strip(v))
                 elseif kind === :path
@@ -460,7 +466,7 @@ end
         @test (r isa Dict{Symbol,Any}) || (r isa InvalidSettingsError)
         if r isa Dict
             accepted += 1
-            @test length(r) == 99
+            @test length(r) == 101
             @test r[:N_ADAPT] isa Int && r[:N_ADAPT] >= 1
             @test r[:RNG_SEED] isa Int
             @test r[:FIGURES_TEX] isa Bool
@@ -723,4 +729,76 @@ end
         end
         @test e isa InvalidSettingsError && occursin("Q_MIN", e.problems[1])
     end
+end
+
+# ---------------------------------------------------------------------------
+# the retry ladder on every path a setting takes: settings.json, the keyword `ladder` of
+# `runProject` (a list, JSON text or the path of a JSON file: the command-line forms),
+# `model-settings.json` / `modelSettings` per model. All reach `runModel` as the same rungs.
+# ---------------------------------------------------------------------------
+
+@testset "the ladder reaches runModel the same way from every path" begin
+    P = BAYSOL.Pipeline
+    R = BAYSOLRun
+    rungs = """{"divergent": [{"name": "wide", "overrides": {"TARGET_ACCEPT": 97}},
+                {"overrides": {"N_ADAPT": 500, "N_DRAWS": 700, "RNG_SEED_STEP": 2}}]}"""
+    expected = P._checkedLadder(rungs)
+    @test length(expected.divergent) == 2 && expected.divergent[1].name == "wide"
+    @test expected.marginal == P.LADDER.marginal      # a class not named keeps the default
+    # settings.json
+    fromFile = withFile(saved("LADDER", rungs)) do path
+        with_logger(NullLogger()) do
+            R.loadSettings(path)
+        end
+    end
+    @test fromFile[:LADDER] == expected
+    @test P.runKeywords(fromFile).ladder == expected
+    # the default is the validated map and "off" switches every class off
+    @test P.runKeywords(defaultSettings()).ladder == P.LADDER
+    off = withFile(saved("LADDER", "\"off\"")) do path
+        with_logger(NullLogger()) do
+            R.loadSettings(path)
+        end
+    end
+    @test all(isempty, values(P.runKeywords(off).ladder))
+    # the keyword of runProject: JSON text, a file path and a map, same as settings.json
+    mktempdir() do dir
+        file = joinpath(dir, "ladder.json")
+        write(file, rungs)
+        for given in (rungs, file, R._readJson(rungs))
+            s = copy(defaultSettings())
+            P._applyKeywords!(s, (; ladder = given))
+            @test P.runKeywords(s).ladder == expected
+        end
+    end
+    # a model of its own: modelSettings (keyword form)
+    table = R._modelKeywordTable((; m1 = (; ladder = rungs)))
+    own = R._checkModelKeywords(table)
+    sM = R._modelSettings(defaultSettings(), own["m1"], "model m1")
+    @test P.runKeywords(sM).ladder == expected
+    @test P.runKeywords(defaultSettings()).ladder == P.LADDER   # the project is unchanged
+    # model-settings.json itself: the file `runProject` reads, then the model's settings
+    mktempdir() do dir
+        file = joinpath(dir, "model-settings.json")
+        write(file, "{\"m1\": {\"sampler\": {\"LADDER\": {\"value\": $rungs}}}}")
+        own = with_logger(NullLogger()) do
+            R._readModelSettings(file)
+        end
+        @test own["m1"][:LADDER] == expected
+        sM = R._modelSettings(defaultSettings(), own["m1"], "model m1")
+        @test P.runKeywords(sM).ladder == expected
+        write(
+            file,
+            "{\"m1\": {\"sampler\": {\"LADDER\": {\"value\": {\"divergent\": " *
+            "[{\"overrides\": {\"PLOT_LW_MAP\": 1}}]}}}}}",
+        )
+        @test_throws InvalidSettingsError with_logger(NullLogger()) do
+            R._readModelSettings(file)
+        end
+    end
+    # a model's rungs are checked like the project's: out-of-scope settings are refused
+    bad = R._modelKeywordTable((;
+        m1 = (; ladder = """{"divergent": [{"overrides": {"PLOT_LW_MAP": 1}}]}""")
+    ))
+    @test_throws InvalidSettingsError R._checkModelKeywords(bad)
 end

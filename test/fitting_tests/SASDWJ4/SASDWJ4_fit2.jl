@@ -8,7 +8,7 @@ using BAYSOL.MolecularStructure: LocalPathSource
 using BAYSOL.BulkElectronDensity: Solute, NonBiological
 include(joinpath(@__DIR__, "..", "common.jl"))   # shared constants and helpers
 
-const _FIXTURE_DIR = joinpath(@__DIR__, "..", "..", "fixtures", "experiments", "SASDWJ4")
+const _FIXTURE_DIR = fixtureDir("SASDWJ4")
 const _DATA_PATH   = joinpath(_FIXTURE_DIR, "experimental_data", "SASDWJ4.dat")
 const _PDB_PATH    = joinpath(_FIXTURE_DIR, "SASDWJ4_fit2_model1.pdb")
 const _FIT_PATH    = joinpath(_FIXTURE_DIR, "SASDWJ4_fit2.fit")
@@ -155,7 +155,6 @@ BAYSOL.results(
     dir = @__DIR__, name = "res_fit2", references = reference,
     formFactorLog = formFactorLog, nAtoms = nAtoms,
     refChi2 = "Pepsi-SAXS 10.774",
-    runLog = true,
 )
 
 # `@__DIR__` (this SASDWJ4/ folder), not the caller's cwd.
