@@ -103,10 +103,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running the
 # fit; if you are reading this script as an example you can skip it:
 # `runSasdj66Fit1` below is the whole story (build the seed, then sample it).
-function seedSasdj66Fit1(; seed::Integer = SAMPLER_SEED)
+function seedSasdj66Fit1()
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
         addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
@@ -117,9 +116,8 @@ end
 function runSasdj66Fit1(;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdj66Fit1(; seed)
+    s, data = seedSasdj66Fit1()
     # the default rerun (2000 + 2000) left the chains in different places (R̂ above 1.5),
     # so this entry reruns with a longer warm-up and more draws
     res = BAYSOL.runModel(s, nSamples, nAdapt; retryNAdapt = 6000, retryNDraws = 8000,

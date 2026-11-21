@@ -168,7 +168,7 @@ numbers evaluated (plain arithmetic only), concentrations in mol/L turned into m
 Throws for anything else.
 """
 function script_solutes(text::AbstractString)
-    start = findfirst(r"^const SOLUTES\s*=\s*Solute\["m, text)
+    start = findfirst(r"^const SOLUTES(?:_FIT\d+)?\s*=\s*Solute\["m, text)
     start === nothing && error("no `const SOLUTES = Solute[` block")
     i = last(start)
     depth = 1
@@ -315,6 +315,18 @@ function statistics_section(dir::AbstractString, id::AbstractString, section_nam
     return nothing
 end
 
+"""
+The script of a fitting-test folder: `<id>.jl`, else its only `.jl` file (the folders of a
+single numbered fit are `<id>_fit2.jl` and the like), `nothing` when there is no unique one.
+"""
+function fit_script(dir, id)
+    isdir(dir) || return nothing
+    plain = joinpath(dir, "$id.jl")
+    isfile(plain) && return plain
+    found = [f for f in readdir(dir) if endswith(f, ".jl")]
+    return length(found) == 1 ? joinpath(dir, only(found)) : nothing
+end
+
 function _export_entry(id, projects, dry, fixtures)
     dir = joinpath(root(), FIT_DIR, id)
     isdir(dir) || error("no folder $dir")
@@ -322,7 +334,8 @@ function _export_entry(id, projects, dry, fixtures)
     logpath = joinpath(dir, "$id.LOG")
     isfile(logpath) || error("no $id.LOG")
     log = read_log(logpath)
-    script = joinpath(dir, "$id.jl")
+    script = fit_script(dir, id)
+    script === nothing && error("no single script (<id>.jl) in $dir")
     solutes = script_solutes(read(script, String))
     project = joinpath(projects, id)
     ispath(project) && return :exists
@@ -401,7 +414,10 @@ function _export_entry(id, projects, dry, fixtures)
             "temperature" => parse(Float64, conditions.temp),
         ),
     )
-    write(joinpath(project, "settings.json"), "{}\n")
+    write_json(
+        joinpath(project, "settings.json"),
+        settings_table(script_overrides(scriptText, default_ladder())),
+    )
     write_json(
         joinpath(project, "project.json"),
         Dict("id" => id, "created" => utc_of(log.stamp)),
@@ -410,7 +426,8 @@ function _export_entry(id, projects, dry, fixtures)
         for s in unique(m.structure for m in models)
             cp(s, joinpath(project, "models", basename(s)))
         end
-        write_run(project, id, name, log, models, conditions, solutes)
+        refs = write_references(project, models)
+        write_run(project, id, name, log, models, conditions, solutes, refs)
     catch
         # the project this call began is left half written: remove it, so a rerun is clean
         rm(project; recursive = true, force = true)
@@ -427,11 +444,171 @@ function write_json(path, value)
     end
 end
 
+# The keywords of `runModel` that the scripts set, by the setting each one is.
+const _SCRIPT_KEYWORDS = Dict(
+    "δ" => "TARGET_ACCEPT",
+    "retryNAdapt" => "RETRY_N_ADAPT",
+    "retryNDraws" => "RETRY_N_DRAWS",
+    "chainStartRadii" => "CHAIN_START_RADII",
+)
+
+"""
+The script's overrides in the shape of `settings.json`:
+`{"<sheet>": {"<NAME>": {"value": ...}}}`, which is what `loadSettings`
+reads (a flat `{NAME: value}` is refused as "screen NAME is not an
+object of settings"). Every setting a script can override (the
+`runModel` keywords and the retry ladder) is on the `sampler` sheet.
+
+# Returns
+A `Dict{String,Any}`, empty when there is no override (the project then uses the defaults).
+"""
+function settings_table(overrides::AbstractDict)
+    isempty(overrides) && return Dict{String,Any}()
+    return Dict{String,Any}(
+        "sampler" => Dict{String,Any}(n => Dict("value" => v) for (n, v) in overrides),
+    )
+end
+
+"""
+The reference curves a fitting test's workbook holds: one `ref_<name>` sheet (columns `q`,
+`I`) for each reference the script gave to `results`, as `<name>.tsv` files of clean
+text, two tab-separated columns without a header, which is how the terminal interface
+keeps a reference curve.
+
+# Returns
+A vector of `file => text` pairs, empty when the fit had no reference.
+"""
+function reference_curves(book::AbstractString)
+    out = Pair{String,String}[]
+    for s in sheet_names(book)
+        startswith(s, "ref_") || continue
+        rows = read_sheet(book, s)
+        good = [r for r in rows[2:end] if length(r) >= 2 && all(x -> x isa Float64, r[1:2])]
+        isempty(good) && continue
+        push!(
+            out,
+            string(s[5:end], ".tsv") =>
+                join(("$(r[1])\t$(r[2])" for r in good), "\n") * "\n",
+        )
+    end
+    return out
+end
+
+"""
+The `{software, refChi2}` of a LOG `refChi2` value such as `CRYSOL 1.523` (the program,
+then the depositor's χ²); a value without a trailing number is all `software`.
+"""
+function reference_label(text)
+    m = match(r"^(.*\S)\s+([0-9.]+)$", something(text, ""))
+    return m === nothing ? (String(something(text, "")), "") : (String(m[1]), String(m[2]))
+end
+
+"""
+The sampler settings a fitting script gives to `runModel(...)`, as the `settings.json`
+of its project: `δ = 99` is `TARGET_ACCEPT`, `retryNAdapt`, `retryNDraws` and
+`chainStartRadii` are the settings of those names, and a `ladder = (<class> = ((name =
+"...", overrides = (SETTING = value,)),),)` keyword replaces that class in `LADDER`
+(`defaultLadder`, the other classes stay). A keyword that is not understood is an error:
+an override must never be dropped silently.
+
+# Returns
+A `Dict{String,Any}`, empty when the call has no keyword.
+
+# Exceptions
+`ErrorException` for a keyword or value this function cannot read.
+"""
+function script_overrides(text::AbstractString, defaultLadder = nothing)
+    out = Dict{String,Any}()
+    start = findfirst("runModel(", text)
+    start === nothing && return out
+    depth, i = 1, last(start) + 1
+    while depth > 0 && i <= lastindex(text)
+        c = text[i]
+        depth += c == '(' ? 1 : c == ')' ? -1 : 0
+        i = nextind(text, i)
+    end
+    call =
+        join((first(split(l, '#')) for l in split(text[(last(start)+1):(i-2)], '\n')), " ")
+    # the ladder keyword first: it holds parentheses of its own
+    m = match(r"ladder\s*=\s*\((.*)\)\s*,?\s*$", call)
+    if m !== nothing
+        ladder = defaultLadder === nothing ? Dict{String,Any}() : copy(defaultLadder)
+        rungPattern = Regex(
+            raw"(\w+)\s*=\s*\(\(name\s*=\s*\"([^\"]+)\"\s*,\s*" *
+            raw"overrides\s*=\s*\(\s*(\w+)\s*=\s*([\w.]+)\s*,?\s*\)\)\s*,?\)",
+        )
+        for r in eachmatch(rungPattern, m[1])
+            value = r[4] in ("true", "false") ? r[4] == "true" : parse(Float64, r[4])
+            ladder[r[1]] = Any[Dict("name" => r[2], "overrides" => Dict(r[3] => value))]
+        end
+        isempty(ladder) && error("the ladder keyword of runModel is not readable: $(m[1])")
+        out["LADDER"] = ladder
+        call = call[1:(first(findfirst("ladder", call))-1)]
+    end
+    for k in eachmatch(r"(δ|\w+)\s*=\s*(\([^)]*\)|[\d.]+)", call)
+        name = get(_SCRIPT_KEYWORDS, k[1], nothing)
+        name === nothing && error("runModel keyword `$(k[1])` has no setting")
+        nums = [parse(Float64, x.match) for x in eachmatch(r"[\d.]+", k[2])]
+        out[name] =
+            startswith(k[2], "(") ? nums :
+            (isinteger(nums[1]) ? Int(nums[1]) : nums[1])
+    end
+    return out
+end
+
+"""
+Writes the reference curves of the fit into `project`: `reference-fit.7z` (the curves,
+flat) and `model-references.json`. One model gives the project's one reference (the entry
+`*`, used by every model), several models each keep their own (an entry per model stem).
+The program and the depositor's χ² come from the LOG row `refChi2`, as `CRYSOL 1.523`.
+
+# Returns
+The `file => text` pairs written, empty when no model has a reference.
+"""
+function write_references(project, models)
+    curves = Dict(m.stem => reference_curves(m.book) for m in models)
+    files = Dict{String,String}()
+    for cs in values(curves), (f, t) in cs
+        files[f] = t
+    end
+    isempty(files) && return Pair{String,String}[]
+    stage = mktempdir()
+    for (f, t) in files
+        write(joinpath(stage, f), t)
+    end
+    archive = joinpath(project, "reference-fit.7z")
+    members = sort(collect(keys(files)))
+    Base.run(Cmd(`7z a -t7z -mx=5 -bso0 -bsp0 $archive $members`; dir = stage))
+    rm(stage; recursive = true)
+    entry(m) = begin
+        software, chi = reference_label(row_of(m.section, "refChi2"))
+        e = Dict{String,Any}("fit" => first(first(curves[m.stem])))
+        isempty(software) || (e["software"] = software)
+        isempty(chi) || (e["refChi2"] = chi)
+        e
+    end
+    withRef = [m for m in models if !isempty(curves[m.stem])]
+    entries =
+        length(models) == 1 ? Dict("*" => entry(first(models))) :
+        Dict(m.stem => entry(m) for m in withRef)
+    write_json(joinpath(project, "model-references.json"), entries)
+    return sort(collect(files); by = first)
+end
+
 """
 Writes the run `name` of `project`: a staging folder with the flat files, packed into
 `runs/<name>.7z` with 7-Zip, the staging removed (the program's own folder).
 """
-function write_run(project, id, name, log, models, conditions, solutes)
+function write_run(
+    project,
+    id,
+    name,
+    log,
+    models,
+    conditions,
+    solutes,
+    refs = Pair{String,String}[],
+)
     runs = joinpath(project, "runs")
     mkpath(runs)
     stage = mktempdir()
@@ -516,10 +693,29 @@ function write_run(project, id, name, log, models, conditions, solutes)
         "(no live output; the terminal plots were never written)\n",
     )
     write(joinpath(stage, "solutes.json"), JSON3.write(Dict("solutes" => solutes)))
+    for (file, text) in refs
+        write(joinpath(stage, "reference-fit-" * file), text)
+    end
+    # the run's own copy of the project's inputs, as a run of the terminal interface keeps
+    # them: the logs menu restores them (`restore settings`, `buffer`, `data`) from here
+    for f in ("settings.json", "buffer.json", "data.tsv", "data.json")
+        cp(joinpath(project, f), joinpath(stage, f))
+    end
     archive = joinpath(runs, name * ".7z")
     Base.run(Cmd(`7z a -t7z -mx=5 -bso0 -bsp0 $archive $(readdir(stage))`; dir = stage))
     rm(stage; recursive = true)
     return archive
+end
+
+"The default `LADDER` setting of the terminal interface (its `default_settings.json`)."
+function default_ladder()
+    file = joinpath(root(), "tui", "assets", "data", "default_settings.json")
+    d = JSON3.read(read(file, String))
+    return Dict{String,Any}(
+        String(k) =>
+            Any[Dict{String,Any}(String(kk) => vv for (kk, vv) in pairs(r)) for r in v]
+        for (k, v) in pairs(d[:LADDER][:default])
+    )
 end
 
 # --- the command ------------------------------------------------------------------
@@ -552,7 +748,7 @@ function run(argv::Vector{String})::Int
         isempty(ids) || fail(WHO, "--all takes no ID")
         ids = sort([
             d for d in readdir(joinpath(root(), FIT_DIR)) if
-            isfile(joinpath(root(), FIT_DIR, d, d * ".jl"))
+            fit_script(joinpath(root(), FIT_DIR, d), d) !== nothing
         ])
     end
     isempty(ids) && fail(WHO, "name the fitting tests, or give --all")

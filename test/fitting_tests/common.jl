@@ -25,9 +25,6 @@ const N_ADAPT = BAYSOL.Pipeline.N_ADAPT
 `run_<id>`)."
 const N_SAMPLES = N_ADAPT + BAYSOL.Pipeline.N_DRAWS
 
-"RNG seed passed to `Random.seed!` before each fit."
-const SAMPLER_SEED = 0
-
 # ---------------------------------------------------------------------------
 #                     Solution-condition uncertainty defaults
 # ---------------------------------------------------------------------------

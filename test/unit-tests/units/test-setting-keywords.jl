@@ -414,7 +414,7 @@ end
             (:seedModel, (; shellMinPoints = 0), "SHELL_MIN_POINTS", "at least 1"),
             (:seedModel, (; beadRayRange = -2.0), "BEAD_RAY_RANGE", "above 0"),
             (:seedModel, (; memoryHeadroom = 4), "MEMORY_HEADROOM", "at least 5"),
-            (:seedModel, (; memoryHeadroom = 51), "MEMORY_HEADROOM", "at most 50"),
+            (:seedModel, (; memoryHeadroom = 81), "MEMORY_HEADROOM", "at most 80"),
             (:results, (; tableSigfigs = 0), "TABLE_SIGFIGS", "at least 1"),
             (:results, (; tableSigfigs = 18), "TABLE_SIGFIGS", "at most 17"),
         )

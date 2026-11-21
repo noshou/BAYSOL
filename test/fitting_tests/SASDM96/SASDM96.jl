@@ -122,10 +122,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdm96` below is the whole story (build the seed, then sample it).
-function seedSasdm96(run; seed::Integer = SAMPLER_SEED)
+function seedSasdm96(run)
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, qFit, iFit,
         σ_fit, PH, σ_PH, SOLUTES;
@@ -138,9 +137,8 @@ function runSasdm96(
     run;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdm96(run; seed)
+    s, data = seedSasdm96(run)
     # target acceptance 99 percent (default 95): this fit's c1 is sampled as a fifth
     # parameter (its profile kinks), and at 95 the divergent share stayed at 0.9 percent,
     # at 99 it fell to 0.02 percent for about 1.3 times the time (probe of 2026-11-17)

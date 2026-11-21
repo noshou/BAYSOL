@@ -454,9 +454,6 @@ const MAX_PATH_TEXT = 4096
 /** The most characters the editor takes when a list setting is typed (not validation). */
 export const MAX_LIST_TYPING = 200
 
-/** The longest typed ladder (rungs of `name: KEY=value; ...` words, see `parseLadder`). */
-export const MAX_LADDER_TYPING = 1000
-
 /** The most characters the editor takes when a path is typed (not validation). */
 export const MAX_PATH_TYPING = 1000
 

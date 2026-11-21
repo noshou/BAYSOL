@@ -149,10 +149,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasda58` below is the whole story (build the seed, then sample it).
-function seedSasda58(; seed::Integer = SAMPLER_SEED)
+function seedSasda58()
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
         addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
@@ -163,9 +162,8 @@ end
 function runSasda58(;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasda58(; seed)
+    s, data = seedSasda58()
     res = BAYSOL.runModel(s, nSamples, nAdapt)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end

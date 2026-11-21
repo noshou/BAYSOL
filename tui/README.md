@@ -113,7 +113,7 @@ The program only paints cells; it never changes your terminal's own colours.
                 ██╔═██╗ ██╔═██║   ╚██╔╝   ╚══██║ ██║ ██║ ██
                 █████╔╝ ██║ ██║    ██║    █████║ ╚████╔╝ ████╗
                 ╚════╝  ╚═╝ ╚═╝    ╚═╝    ╚════╝  ╚═══╝  ╚═══╝
-                              v0.4.0 yals-n-gɛsga
+                              v0.5.0 tabl_n_wilge
    ╭─╮  ╔╗╦╔═╗╦ ╦ ┌╴┌┐╷╶┐                       ╦  ╔═╗╔═╗╔╦╗ ┌╴╷  ╶┐
    │▶│  ║║║╠╣ ║║║ │ │└┤ │                       ║  ║ ║╠═╣ ║║ │ │   │
    ╰─╯  ╝╚╝╚═╝╚╩╝ └╴╵ ╵╶┘                       ╩═╝╚═╝╩ ╩═╩╝ └╴└─╴╶┘
@@ -592,13 +592,14 @@ setting `FIGURES_COMPILE` is off the sheets, it stays a keyword of `results` for
   `settings.json` they are lists: `["#D55E00", "red"]`, `["o", "square"]` and `[[76, 5], [100, 9]]`.
   **The retry ladder** (`LADDER`, sampler sheet, group "retry ladder"; also in the settings of a single model) is a map
   from the failure class a fit is diagnosed with (`stepCollapse`, `splitChains`, `divergent`, `structural`, `marginal`,
-  `generic`) to the rungs tried for it, in order (at most 3 reruns after the first attempt). Enter opens the ladder
-  editor: a header row for each class and a row for each rung. Up and down move, Enter edits a rung (a line
-  `name: KEY=value; KEY=value`, the name and its colon may be left out, a tuple value is comma-separated,
-  `CHAIN_START_RADII=1,2,3`, for example `delta 99: TARGET_ACCEPT=99`) or, on a class, adds a rung at its end; Ctrl+n adds a
-  rung to the class in focus, Ctrl+r removes the rung (on a class: all its rungs, which switches the class off), PageUp and
-  PageDown move a rung earlier or later; Esc takes the whole ladder (a wrong one stays as an error), Ctrl+x goes back
-  without it. A rung may override only fitting settings (`TARGET_ACCEPT`, `CHAIN_START_RADII`, `RETRY_N_ADAPT`,
+  `generic`) to the rungs tried for it, in order. Enter opens the ladder editor, a scrolling list with one row per
+  rung in the order tried, `condition ▸ name ▸ N overrides`, and a counter (`rung 12 of 300`); the conditions read
+  `step size collapsed`, `chains disagree`, `divergent draws`, `kinked c1 profile`, `near the R̂/ESS limits` and
+  `any other failure`. Up, down, PageUp, PageDown, Home and End move. Ctrl+n adds a rung (pick its condition, then
+  give it a name or leave it empty); Enter opens a rung. Ctrl+r removes a rung and Shift+up or Shift+down moves it
+  earlier or later among those of its condition; Ctrl+u puts the ladder back to its default; Esc takes the whole
+  ladder (a wrong one stays as an error), Ctrl+x goes back
+  without it. In a rung, the condition and name rows open a picker or a prompt, and the overrides are listed below them: Ctrl+n adds one (a picker over the settings a rung may change, each with its description, the ones already set left out), Enter edits its value with the setting's own editor, Ctrl+r removes it, Shift+up and Shift+down move it, Ctrl+u reverts the rung to how it was opened, Esc closes the rung (one without overrides is dropped). There is no limit on rungs or overrides, but a fit is rerun 3 times at most, whatever the number of rungs (a sampler rule). A rung may override only fitting settings (`TARGET_ACCEPT`, `CHAIN_START_RADII`, `RETRY_N_ADAPT`,
   `RETRY_N_DRAWS`, `SAMPLE_C1` (sample c1 as a fifth parameter), `RNG_SEED_STEP` (added to the seed); `N_ADAPT`, `N_DRAWS`,
   `VAL_SIGMA`, `N_CHAINS`, the `OPTIMUM_*`, `MAP_*`, `BASIN_RESTART_NATS` and `HARVEST_*` settings are unvalidated); a plot or
   file setting is refused with the list of allowed names. In `settings.json` and `model-settings.json` it is an object
@@ -662,6 +663,12 @@ the results workbook and plots. It lists the runs, newest first (by the instant 
 models and its size. The list refreshes every two seconds; `project: <name>` is at the top right. **Enter** opens
 the run's options (`project: <name> · run: <run>` at the top right). Nothing is deleted from the logs menu: a
 run is deleted in `open...` > `open runs`.
+
+The list is page 1 of 2 (`runs [1 / 2]` in the corner box); **→** switches to page 2, `statistics [2 / 2]`: the
+sampler statistics of the highlighted run, every `statistics-<model>.LOG` it holds one after the other, in the pager
+(the keys below; **←** or Esc returns to the list). The file is parsed, not shown raw: per model the attempts and the
+result first, then each attempt's sections as aligned tables and name/value rows (numbers rounded to five digits, empty
+columns dropped, wide tables turned over, the MAP search's per-start lines summarised, its optima a table). A run without statistics says `this run has no statistics`.
 
 | Option | Does |
 | :-- | :-- |
@@ -1038,7 +1045,7 @@ import; `units` is `"nm-1"` or `"A-1"`):
   "heartbeat": "2026-11-07T10:15:42Z",
   "ended": "2026-11-07T10:15:42Z",
   "julia": "1.12.7",
-  "baysol": "v0.4.0",
+  "baysol": "v0.5.0",
   "rngSeed": 0,
   "models": [
     { "name": "lyz", "path": ".../models/lyz.cif", "size": 98765, "sha256": "...",

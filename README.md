@@ -535,15 +535,15 @@ The last command should print something starting with `julia version 1.12`.
 #### Step 3. Download BAYSOL
 
 1. In your browser, open
-   <https://github.com/noshou/BAYSOL/archive/refs/tags/v0.4.0.zip>. A ZIP file downloads.
+   <https://github.com/noshou/BAYSOL/archive/refs/tags/v0.5.0.zip>. A ZIP file downloads.
 2. Unzip it: double-click it (macOS), right-click and choose *Extract* (Linux), or right-click
-   and choose *Extract All* (Windows). A folder called `BAYSOL-0.4.0` appears.
+   and choose *Extract All* (Windows). A folder called `BAYSOL-0.5.0` appears.
 3. Move that folder into your **home folder**: the folder named after you (in Finder's sidebar
    on a Mac, in *Files* on Linux, or `C:\Users\<your name>` on Windows). Do not put it inside
    OneDrive on Windows if you can avoid it.
 
-From here on, the folder is written `~/BAYSOL-0.4.0` on macOS and Linux, and
-`$HOME\BAYSOL-0.4.0` on Windows.
+From here on, the folder is written `~/BAYSOL-0.5.0` on macOS and Linux, and
+`$HOME\BAYSOL-0.5.0` on Windows.
 
 #### Step 4. A plain-text editor
 
@@ -570,14 +570,14 @@ the prompt comes back.
 **macOS / Linux:**
 
 ```
-cd ~/BAYSOL-0.4.0
+cd ~/BAYSOL-0.5.0
 julia --project=test/fitting_tests -e 'using Pkg; Pkg.instantiate()'
 ```
 
 **Windows:**
 
 ```
-cd $HOME\BAYSOL-0.4.0
+cd $HOME\BAYSOL-0.5.0
 julia --project=test/fitting_tests -e 'using Pkg; Pkg.instantiate()'
 ```
 
@@ -713,13 +713,13 @@ check a name (replace `glycerol` with your word):
 **macOS / Linux:**
 
 ```
-grep -i "glycerol" ~/BAYSOL-0.4.0/src/bulk-electron-density/non-biological/nonbio_lookup.json
+grep -i "glycerol" ~/BAYSOL-0.5.0/src/bulk-electron-density/non-biological/nonbio_lookup.json
 ```
 
 **Windows:**
 
 ```
-Select-String -Pattern "glycerol" -Path "$HOME\BAYSOL-0.4.0\src\BulkElectronDensity\NonBiological\nonbio_lookup.json"
+Select-String -Pattern "glycerol" -Path "$HOME\BAYSOL-0.5.0\src\BulkElectronDensity\NonBiological\nonbio_lookup.json"
 ```
 
 If a line comes back, the name works. If nothing does, try a synonym or the formula. BAYSOL does
@@ -799,14 +799,14 @@ From the BAYSOL folder, run your script. Use your folder's real name.
 **macOS / Linux:**
 
 ```
-cd ~/BAYSOL-0.4.0
+cd ~/BAYSOL-0.5.0
 julia --project=test/fitting_tests ~/my_rna_experiment/run.jl
 ```
 
 **Windows:**
 
 ```
-cd $HOME\BAYSOL-0.4.0
+cd $HOME\BAYSOL-0.5.0
 julia --project=test/fitting_tests $HOME\my_rna_experiment\run.jl
 ```
 
@@ -874,7 +874,7 @@ LaTeX engine.) Alternatively, draw your own figures from the numbers in `res.xls
 ### Checklist
 
 - [ ] Julia installed and `julia --version` shows 1.12
-- [ ] The `BAYSOL-0.4.0` folder is in your home folder
+- [ ] The `BAYSOL-0.5.0` folder is in your home folder
 - [ ] The first-time setup command finished without errors
 - [ ] The RNA example (`SASDAC9`) reached its summary
 - [ ] Your folder has `data.dat`, `structure.pdb`, `run.jl`

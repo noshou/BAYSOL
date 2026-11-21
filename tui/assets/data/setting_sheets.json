@@ -9,27 +9,27 @@
      "settings": [
       {
        "name": "N_ADAPT",
-       "description": "Number of warm-up iterations per chain, used to tune the sampler before draws are kept."
+       "description": "Warm-up iterations per chain (default 300): they tune step size and mass matrix and are then discarded. Too few and the chains may not converge; more is slower."
       },
       {
        "name": "N_DRAWS",
-       "description": "Posterior draws kept per chain after warm-up. More draws give smoother intervals but longer runs."
+       "description": "Posterior draws kept per chain after warm-up (default 700). More draws give smoother intervals and larger effective sample sizes, in proportion to run time."
       },
       {
        "name": "RETRY_N_ADAPT",
-       "description": "Warm-up iterations per chain of the rerun that follows a failed convergence check; it adapts again from scratch."
+       "description": "Warm-up iterations per chain (default 2000) of the rerun after a failed convergence check (R̂ too high). It adapts from scratch, ignoring the first run."
       },
       {
        "name": "RETRY_N_DRAWS",
-       "description": "Draws kept per chain after the warm-up of the rerun."
+       "description": "Draws kept per chain (default 2000) after the warm-up of the rerun that follows a failed convergence check. Longer helps R̂ and effective sample size."
       },
       {
        "name": "RNG_SEED",
-       "description": "Seed of every random draw. The same seed reproduces a run exactly."
+       "description": "Seed of every random choice (starts, directions, sampler). Same seed, same run, on any number of threads. Default 0; none draws a fresh seed each run."
       },
       {
        "name": "TARGET_ACCEPT",
-       "description": "Target acceptance rate of the No-U-Turn Sampler (NUTS), in percent. Higher means smaller steps, fewer divergent transitions and more leapfrog steps. Not recommended to change."
+       "description": "NUTS target acceptance, in percent (default 95; Stan uses 80). Higher gives smaller steps: fewer divergences, about 1.3x the work. Lower is faster but may diverge."
       }
      ]
     },
@@ -38,7 +38,7 @@
      "settings": [
       {
        "name": "LADDER",
-       "description": "What to try when a fit still fails its convergence gates after its rerun. A map from the diagnosed failure class (stepCollapse, splitChains, divergent, structural, marginal, generic) to the rungs of that class, tried in order (at most 3 reruns in all). Each rung reruns the fit with the sampler, start and seed settings it names and nothing else; an empty list switches a class off. Only the settings of the default rungs are validated on benchmark fits."
+       "description": "Reruns tried, in order, when a fit still fails its gates: a list of rungs per failure class (3 reruns at most). Empty list = class off."
       }
      ]
     },
@@ -47,27 +47,27 @@
      "settings": [
       {
        "name": "N_CHAINS",
-       "description": "Number of independent chains. Chains 1 and 2 start at the maximum a posteriori (MAP) point; the others start in mirrored pairs."
+       "description": "Number of independent chains (default 8). Chains 1 and 2 start at the MAP point, the rest in mirrored pairs. More chains check convergence better but cost time."
       },
       {
        "name": "CHAIN_START_RADII",
-       "description": "Start distances, in standard deviations, from the MAP point of mirrored chain pairs (±r). Far starts find second modes. Not recommended to change."
+       "description": "Distance of each mirrored chain pair's start from the MAP, in standard deviations (default 4, 10, 20); the last repeats. Far starts find second modes; a draw is ~2 away."
       },
       {
        "name": "OPTIMUM_CHAIN_CAP",
-       "description": "Cap on the number of extra chains started at optima. Not recommended to change."
+       "description": "Most extra chains started at optima that have too few chains (default 6, see OPTIMUM_MIN_CHAINS). It limits the added run time when there are many optima."
       },
       {
        "name": "OPTIMUM_MIN_CHAINS",
-       "description": "Minimum number of chains each massive optimum (at least 1 % Laplace mass) should have; missing chains are started there."
+       "description": "Minimum chains (default 2) on each optimum holding at least 1 % of the posterior mass; missing chains are started there. Too few and that mode's weight is unreliable."
       },
       {
        "name": "OPTIMUM_CHAIN_RADIUS",
-       "description": "Mahalanobis radius around an optimum within which a draw counts as being at it. Not recommended to change."
+       "description": "How close a draw must be to a posterior peak to count as sitting on it, in standard deviations of that peak (4 holds 99 % of a Gaussian). Sets which chains are at which peak."
       },
       {
        "name": "OPTIMUM_CHAIN_FRACTION",
-       "description": "Share of a chain's draws that must lie within the radius for the chain to count as at the optimum. Not recommended to change."
+       "description": "Share of a chain's draws (default 0.5) that must lie within OPTIMUM_CHAIN_RADIUS of an optimum for the chain to count as being at it. Higher is stricter."
       }
      ]
     },
@@ -76,19 +76,19 @@
      "settings": [
       {
        "name": "MAP_MAX_ITER",
-       "description": "Maximum number of L-BFGS optimizer steps per start. Not recommended to change."
+       "description": "Most L-BFGS optimizer steps per start of the MAP search (default 500). A start stops earlier when converged; too low can stop it short of the peak."
       },
       {
        "name": "MAP_N_STARTS",
-       "description": "Number of L-BFGS starts of the search for the posterior mode. More starts miss fewer basins but run slower. Not recommended to change."
+       "description": "Number of L-BFGS starts of the MAP search (default 64): the initial point plus prior draws. More starts miss fewer small basins, at a cost of milliseconds each."
       },
       {
        "name": "MAP_F_SUCCESSIVE",
-       "description": "Stop a start when −log π (the negative log posterior) improves by less than 1e-6 nats for this many iterations in a row. Not recommended to change."
+       "description": "A start ends when the negative log posterior improves by under 1e-6 for this many iterations in a row (default 3). Higher is stricter and slower."
       },
       {
        "name": "MAP_OPTIMA_KEPT",
-       "description": "Of the optima found, keep the best N (lowest −log π) and compare them by Laplace mass to choose the whitening point. Not recommended to change."
+       "description": "How many of the best optima found (lowest negative log posterior, default 8) are compared by Laplace mass to choose where to whiten and are known to the sampler."
       }
      ]
     },
@@ -97,19 +97,19 @@
      "settings": [
       {
        "name": "MAP_JITTER_RADII",
-       "description": "Distances, in standard deviations, from an optimum at which its extra L-BFGS restarts begin. Not recommended to change."
+       "description": "Distances from an optimum, in standard deviations (default 3, 6, 12), of the extra L-BFGS restarts that look for neighbouring optima. Larger reaches farther."
       },
       {
        "name": "MAP_JITTER_DIRECTIONS",
-       "description": "Random directions tried at each jitter radius. Not recommended to change."
+       "description": "Random directions tried at each jitter radius (default 2). More directions find more neighbouring optima; each is one extra L-BFGS start."
       },
       {
        "name": "MAP_JITTER_MAX_OPTIMA",
-       "description": "Jitter only the best N optima (lowest −log π). Not recommended to change."
+       "description": "Jitter around at most this many distinct optima (default 4), lowest negative log posterior first. Higher costs more starts and may find more optima."
       },
       {
        "name": "MAP_JITTER_WITHIN_NATS",
-       "description": "Only optima within this many nats of the lowest are jittered. Not recommended to change."
+       "description": "Only optima within this many nats (default 15) of the lowest negative log posterior are jittered around; worse ones are too improbable to matter."
       }
      ]
     },
@@ -118,15 +118,15 @@
      "settings": [
       {
        "name": "BASIN_RESTART_NATS",
-       "description": "If a draw beats the maximum a posteriori (MAP) point by more than this many nats, a better basin was missed: re-whiten there and rerun the chain. Not recommended to change."
+       "description": "If a sampled draw beats the MAP's log posterior by more than this (default 2 nats), a better basin was missed: re-whiten there and rerun the chains. Lower restarts more."
       },
       {
        "name": "HARVEST_COVER",
-       "description": "After the first round, run L-BFGS from this many draws to find missed optima. Not recommended to change."
+       "description": "After the first round, run L-BFGS from this many well-spread draws (default 16) to find optima the chains visited but the starts missed. More finds more, costs more."
       },
       {
        "name": "HARVEST_DIVERGENT",
-       "description": "Also run L-BFGS from at most this many divergent draws. Not recommended to change."
+       "description": "Also run L-BFGS from up to this many divergent draws (default 8), spread out as above. Divergences often sit near a missed optimum or narrow ridge."
       }
      ]
     }
@@ -267,7 +267,7 @@
      "settings": [
       {
        "name": "MEMORY_HEADROOM",
-       "description": "Percent of the machine's total memory kept free while the scattering build runs (5 to 50). The build works through the q values in blocks that fit in the free memory minus this; the result is the same, a larger value only means more, smaller blocks."
+       "description": "Percent of total memory kept free during the scattering build (5 to 80). Larger means smaller blocks and the same result."
       }
      ]
     }

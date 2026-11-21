@@ -335,8 +335,11 @@ _summary(; kw...) = merge(
         run(_ladderValue(_one("divergent", """{"RNG_SEED_STEP": 1}""")), [div]; kw = fresh)
         @test length(calls) == 1
         # any other fitting keyword reaches runModel under its own name
-        run(_ladderValue(_one("divergent", """{"N_CHAINS": 6, "VAL_SIGMA": 3.0}""")), [div])
-        @test calls[2].kw.nChains == 6 && calls[2].kw.sigma == 3.0
+        run(
+            _ladderValue(_one("divergent", """{"N_CHAINS": 6, "MAP_N_STARTS": 12}""")),
+            [div],
+        )
+        @test calls[2].kw.nChains == 6 && calls[2].kw.mapNStarts == 12
         # a rung that converges wins and the rest never run
         n = Ref(0)
         win(seed, n_, a; kw...) =

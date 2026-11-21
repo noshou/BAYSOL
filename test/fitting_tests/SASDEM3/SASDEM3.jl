@@ -101,10 +101,9 @@ end
 
 # Builds the Seed that `runSasdem3` samples (separate only so the developer tools can
 # build a fit's Seed without running it; `runSasdem3` below is the whole story).
-function seedSasdem3(run; seed::Integer = SAMPLER_SEED)
+function seedSasdem3(run)
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, qFit, iFit,
         σ_fit, PH, σ_PH, SOLUTES;
@@ -117,9 +116,8 @@ function runSasdem3(
     run;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdem3(run; seed)
+    s, data = seedSasdem3(run)
     res = BAYSOL.runModel(s, nSamples, nAdapt)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end

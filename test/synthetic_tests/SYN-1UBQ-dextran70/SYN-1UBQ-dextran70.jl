@@ -104,8 +104,7 @@ end
 # sigma at every grid point, which only lets `seedModel` build the forward model; no
 # number of it enters the profile below. rebin = nothing: no Shannon binning, the Seed
 # keeps the 99 grid points (checked below).
-function seedSynthetic(; seed::Integer = 0)
-    Random.seed!(seed)
+function seedSynthetic()
     ones_ = ones(length(Q_GRID))
     s = BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, Q_GRID, ones_, ones_, PH, σ_PH, SOLUTES;

@@ -429,7 +429,7 @@ const LADDER = (
     splitChains = (
         (name = "starts (2,4,6)", overrides = (CHAIN_START_RADII = (2.0, 4.0, 6.0),)),
         (
-            name = "close starts, longer",
+            name = "close starts + longer",
             overrides = (
                 CHAIN_START_RADII = (1.0, 2.0, 3.0), RETRY_N_ADAPT = 4000,
                 RETRY_N_DRAWS = 4000,
@@ -439,14 +439,14 @@ const LADDER = (
     divergent = (
         (name = "delta 99", overrides = (TARGET_ACCEPT = 99,)),
         (
-            name = "delta 99, close starts, longer",
+            name = "delta 99 + close starts",
             overrides = (
                 CHAIN_START_RADII = (1.0, 2.0, 3.0), RETRY_N_ADAPT = 4000,
                 RETRY_N_DRAWS = 4000, TARGET_ACCEPT = 99,
             ),
         ),
         (
-            name = "delta 99, close starts, longer, next seed",
+            name = "delta 99 + close starts + seed",
             overrides = (
                 CHAIN_START_RADII = (1.0, 2.0, 3.0), RETRY_N_ADAPT = 4000,
                 RETRY_N_DRAWS = 4000, RNG_SEED_STEP = 1, TARGET_ACCEPT = 99,
@@ -460,7 +460,7 @@ const LADDER = (
             overrides = (RETRY_N_ADAPT = 6000, RETRY_N_DRAWS = 8000),
         ),
         (
-            name = "longer chains, next seed",
+            name = "longer chains + seed",
             overrides = (
                 RETRY_N_ADAPT = 6000, RETRY_N_DRAWS = 8000, RNG_SEED_STEP = 1,
             ),
@@ -468,7 +468,7 @@ const LADDER = (
     ),
     generic = (
         (
-        name = "longer, next seed",
+        name = "longer + seed",
         overrides = (RETRY_N_ADAPT = 4000, RETRY_N_DRAWS = 4000, RNG_SEED_STEP = 1),
     ),
     ),
@@ -485,7 +485,7 @@ ladder-only `RNG_SEED_STEP` (see `LADDER_VALIDATED`); every other name here, and
 """
 const LADDER_OVERRIDABLE = (
     :TARGET_ACCEPT, :CHAIN_START_RADII, :RETRY_N_ADAPT, :RETRY_N_DRAWS, :N_ADAPT,
-    :N_DRAWS, :VAL_SIGMA, :N_CHAINS, :OPTIMUM_CHAIN_CAP, :OPTIMUM_MIN_CHAINS,
+    :N_DRAWS, :N_CHAINS, :OPTIMUM_CHAIN_CAP, :OPTIMUM_MIN_CHAINS,
     :OPTIMUM_CHAIN_RADIUS, :OPTIMUM_CHAIN_FRACTION, :MAP_MAX_ITER, :MAP_N_STARTS,
     :MAP_F_SUCCESSIVE, :MAP_OPTIMA_KEPT, :MAP_JITTER_RADII, :MAP_JITTER_DIRECTIONS,
     :MAP_JITTER_MAX_OPTIMA, :MAP_JITTER_WITHIN_NATS, :BASIN_RESTART_NATS,

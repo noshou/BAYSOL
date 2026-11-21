@@ -121,10 +121,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdap8` below is the whole story (build the seed, then sample it).
-function seedSasdap8(; seed::Integer = SAMPLER_SEED)
+function seedSasdap8()
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
         addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
@@ -135,9 +134,8 @@ end
 function runSasdap8(;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdap8(; seed)
+    s, data = seedSasdap8()
     # start radii (1, 2, 3) instead of (4, 10, 20): in the first run the 14 chains, eight of
     # them from the far starts (±10, ±20) and the others from secondary modes, did not mix
     # (bulk ESS 170, tail ESS 47 to 206, R̂ 1.02 to 1.03; two chains sat at step size 0 with

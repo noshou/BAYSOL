@@ -154,10 +154,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdtx4` below is the whole story (build the seed, then sample it).
-function seedSasdtx4(; seed::Integer = SAMPLER_SEED)
+function seedSasdtx4()
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
         addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
@@ -168,9 +167,8 @@ end
 function runSasdtx4(;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdtx4(; seed)
+    s, data = seedSasdtx4()
     # the default rerun (2000 + 2000) ended just short of the
     # convergence gate (R̂ above 1.01 or bulk ESS under 400), so
     # this entry reruns with a longer warm-up and 4 times the draws

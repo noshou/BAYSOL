@@ -19,7 +19,7 @@ All fits use the `runModel` defaults: eight NUTS chains (more when the optima se
 
 **The q cut.** The default is no cut: `Q_MAX_FIT = Inf`, the whole deposited curve is fitted (only points with σ ≤ 0 are dropped by `fitSubset`; `seedModel` drops the non-positive bins). A finite `Q_MAX_FIT` is kept in two cases. (a) The data above it are demonstrably unusable, tested on the points above the cut with σ > 0: at least 20 of them, a median I/σ below 0.5, at least 25 % with I ≤ 0 and a median I/σ below 1 in the lowest-q quarter of them (a noise floor scatters about zero; a positive offset is a background problem, which the background term absorbs). (b) **The uncut fit diverges** (more than 0.1 % divergent transitions at any `δ`) **and a cut where the median I/σ falls to about 2 removes the divergences** (for example SASDWS5 with a cut at 0.4 Å⁻¹, SASDMA6 with a cut at 0.28 Å⁻¹ and SASDP74 with a cut at 0.25 Å⁻¹, where the strict gates failed on every rung at 0.3; the points above those cuts are noise-dominated but not yet at the 0.5 threshold of (a)). A cut can also do harm: SASDUU3 fails with one and is fitted uncut, and SASDM96 diverged 1.5 % cut at 0.3 Å⁻¹, 3.0 % at 0.27 and failed on ESS at 0.22, and passes uncut (0.07 %), because the cut leaves too few Shannon channels. So test both directions (uncut, and cut at I/σ ≈ 2) and keep what passes the gates. The depositor's q range, the run time and the model's reach are not reasons. Each script's comment at `Q_MAX_FIT` gives the measured numbers, and the audit of every script is in `notes/qcut-audit.md`.
 
-Settings shared by every script live in `common.jl`, which each script includes: the sampler defaults (`N_SAMPLES`, `N_ADAPT`, `SAMPLER_SEED`), the default pH σ (`PH_METER_SIGMA` = 0.1) and macromolecule-molarity σ (`MOLARITY_REL_SIGMA` = 5 %), the nm⁻¹ → Å⁻¹ conversion and q-unit sanity check, the `.dat`/fit-file readers, (the figures are drawn by `BAYSOL.results`; its look is a `PlotStyle`, see the Pipeline README). Change them there, not in individual scripts. A script that deliberately differs keeps its own value inline, with a comment.
+Settings shared by every script live in `common.jl`, which each script includes: the sampler defaults (`N_SAMPLES`, `N_ADAPT`), the default pH σ (`PH_METER_SIGMA` = 0.1) and macromolecule-molarity σ (`MOLARITY_REL_SIGMA` = 5 %), the nm⁻¹ → Å⁻¹ conversion and q-unit sanity check, the `.dat`/fit-file readers, (the figures are drawn by `BAYSOL.results`; its look is a `PlotStyle`, see the Pipeline README). Change them there, not in individual scripts. A script that deliberately differs keeps its own value inline, with a comment.
 
 ## Results
 
@@ -49,7 +49,6 @@ A run that does not pass the convergence gate (R̂ < 1.01 and bulk and tail ESS 
 | SASDBZ5 — | 0.96 | CRYSOL 1.248 | −0.21 | 1.76 | −5.58 | 1.159 | 0 |
 | SASDC36 fit1_model1 | 1.02 | CRYSOL 1.469 | 0.40 | −3.21 | −1.19 | 1.068 | 0 |
 | SASDC36 fit2_model1 | 1.11 | SREFLEX 1.001 | −1.29 | −2.47 | −10.59 | 1.220 | 0.0 % |
-| SASDC57 fit2 | **failed** |  | — | — | — | — | — |
 | SASDC57 — | 1.14 | CRYSOL 1.059 | −0.87 | −0.61 | −10.32 | 1.238 | 0 |
 | SASDCA3 fit3 | 1.54 | CRYSOL 1.643 | 0.54 | 0.67 | −0.56 | 1.164 | 0 |
 | SASDCD8 — | 259 | CRYSOL 274.778 | −0.12 | −6.96 | **−11.16** | 1.261 | 0 |
@@ -1074,3 +1073,7 @@ julia --project=test/fitting_tests test/fitting_tests/SASDYM2/SASDYM2.jl
 Fits a MultiFoXS-derived model of human prothrombin (chain A) with the G-quadruplex-forming DNA aptamer NU172 (chain E; 80.2 kDa; 0.22 mg/mL) in 10 mM Tris-HCl, 137 mM NaCl, 2.7 mM KCl, 5 mM CaCl₂, 1 % v/v glycerol, pH 7.4, 20 °C, 13.05 keV (0.095 nm read as the B21 wavelength), q ≤ 0.3 Å⁻¹. **Unique:** a protein-DNA model; the deposited buffer text ends with a comma (a component may be missing, none is guessed); 380 non-positive points (handled by the binning); the deposited FoXS χ² 0.286 means the error bars are overestimated. Seed build: 9787 atoms from the 5128 deposited. Overlays the FoXS fit.
 
 **Known buffer omission:** the component after the comma that ends the recipe is unknown (est. 0.002 to 0.015 % per mM).
+
+## Overrides of a fit and `bysl fits export`
+
+A script's sampler overrides are keywords of its `runModel(...)` call (`δ = 99`, `retryNAdapt`, `retryNDraws`, `chainStartRadii`, `ladder`). `bysl fits export` turns them into the project's `settings.json`; an unknown keyword is an error. The seed is the one global `rngSeed` (`RNG_SEED`, default 0): scripts no longer carry a seed of their own. See `dev/README.md` ("export") for the parser.

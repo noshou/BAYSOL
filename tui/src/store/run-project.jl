@@ -478,9 +478,38 @@ function _briefError(e)
     return String(strip(at === nothing ? cut : cut[1:prevind(cut, at)]))
 end
 
-"The error `e` with its stack as the text of an ERRORS entry headed by `what`."
+# What each failure class of the fix ladder means, the one table the terminal interface
+# reads too (`assets/data/ladder_classes.json`).
+const _LADDER_CLASS_MEANINGS = JSON3.read(
+    read(joinpath(@__DIR__, "..", "..", "assets", "data", "ladder_classes.json"), String),
+)
+
+"""
+The `(class, meaning)` pairs of the failure classes a non-converged error names: the
+`[class]` tags of its attempts, each class once, in order. An error that is not an
+exhausted ladder names none.
+"""
+function _ladderClasses(message::AbstractString)
+    occursin("ladder exhausted", message) || return Tuple{String,String}[]
+    seen = String[]
+    for m in eachmatch(r"\[([A-Za-z]+)\]", message)
+        c = String(m.captures[1])
+        haskey(_LADDER_CLASS_MEANINGS, Symbol(c)) && !(c in seen) && push!(seen, c)
+    end
+    return [(c, String(_LADDER_CLASS_MEANINGS[Symbol(c)])) for c in seen]
+end
+
+"""
+The error `e` with its stack as the text of an ERRORS entry headed by `what`. After a
+failed ladder the first line is followed by what each failure class it hit means, so the
+log says what happened without a lookup (the first line stays the one the terminal reads).
+"""
 function _errorText(what::AbstractString, e, bt)
-    return string(what, ": ", sprint(showerror, e, bt))
+    text = string(what, ": ", sprint(showerror, e, bt))
+    notes = ["  $c: $m" for (c, m) in _ladderClasses(sprint(showerror, e))]
+    isempty(notes) && return text
+    head, rest = occursin('\n', text) ? split(text, '\n'; limit = 2) : (text, "")
+    return join(vcat([head, "Failure classes of the ladder:"], notes, [rest]), "\n")
 end
 
 # ---------------------------------------------------------------------------
@@ -836,10 +865,18 @@ wrong, in the layout of the other LOGs.
 """
 function _failedModelLog(path, name, rows, message)
     firstLine = String(first(split(message, '\n')))
+    classes = _ladderClasses(message)
+    classRows = [["failureClass", join(first.(classes), " ")]]
+    for (c, m) in classes
+        push!(classRows, ["failureClass" * uppercasefirst(c), m])
+    end
     _updateLog(
         path,
         name,
-        _tabLines(vcat(rows, [["status", "failed"], ["error", firstLine]])),
+        _tabLines(
+            vcat(rows, [["status", "failed"], ["error", firstLine]],
+                isempty(classes) ? Vector{String}[] : classRows),
+        ),
     )
     return nothing
 end

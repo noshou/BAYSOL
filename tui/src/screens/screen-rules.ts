@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { saveErrorNote } from "../core/file-system.js"
 import {
     type NumberRules,
+    padWidth,
     parseNumber,
     truncate,
     truncateStart,
@@ -31,7 +32,7 @@ import {
     type LadderMap,
     type LadderRung,
     type PartKind,
-    type SettingDef,
+    SettingDef,
     type SettingValue,
     validateValue,
 } from "../store/settings.js"
@@ -833,96 +834,139 @@ function choiceWord(def: SettingDef, text: string): string {
     return found ?? t
 }
 
-/** What one override value is typed as: numbers comma-separated, or `true`/`false`. */
-function overrideValue(word: string): unknown {
-    const t = word.trim()
-    if (t === "true" || t === "false") return t === "true"
-    const parts = t.split(",").map((x) => (x.trim() === "" ? Number.NaN : Number(x)))
-    if (parts.some(Number.isNaN)) return undefined
-    return parts.length === 1 ? parts[0] : parts
+// --- the retry ladder, as the ladder editor shows it
+
+/**
+ * What each failure class is called in the ladder editor, in the order Julia tries them
+ * (`LADDER_CLASSES`). The class id is what `settings.json` keeps.
+ */
+export const LADDER_CONDITIONS: Readonly<Record<string, string>> = {
+    stepCollapse: "step size collapsed",
+    splitChains: "chains disagree",
+    divergent: "divergent draws",
+    structural: "kinked c1 profile",
+    marginal: "near the R̂/ESS limits",
+    generic: "any other failure",
+}
+
+/** The plain-language name of a failure class (the id itself if it has none). */
+export const conditionLabel = (cls: string): string => LADDER_CONDITIONS[cls] ?? cls
+
+/** The most characters of a rung's name. */
+export const MAX_RUNG_NAME = 60
+
+/** The most rungs of one failure class the sampler would reach: it reruns 3 times. */
+export const LADDER_RERUNS = 3
+
+/**
+ * The two overrides that are no setting of the catalog (only a rung has them), as the
+ * editor needs to know them: the kind, a starting value and what they do.
+ */
+type LadderOnly = { type: "int" | "bool"; value: SettingValue; text: string }
+const LADDER_ONLY: Readonly<Record<string, LadderOnly>> =
+    {
+        RNG_SEED_STEP: {
+            type: "int",
+            value: 1,
+            text: "added to the run seed for this rung",
+        },
+        SAMPLE_C1: { type: "bool", value: false, text: "sample c1 as a fifth parameter" },
+    }
+
+/** The synthetic definitions of the ladder-only overrides, made once. */
+const ladderOnlyDefs = new Map<string, SettingDef>(
+    Object.entries(LADDER_ONLY).map(([name, one]) => [
+        name,
+        new SettingDef(
+            name,
+            { default: one.value, type: one.type, limits: {} },
+            "sampler",
+            "retry ladder",
+            one.text,
+        ),
+    ]),
+)
+
+/**
+ * The definition a rung's override is edited by: the catalog's own setting, or a
+ * synthetic one for `RNG_SEED_STEP` and `SAMPLE_C1`.
+ *
+ * @returns the definition, `undefined` for a name the editor cannot edit.
+ */
+export function overrideDef(ladder: SettingDef, name: string): SettingDef | undefined {
+    return ladder.overrideDefs.get(name) ?? ladderOnlyDefs.get(name)
 }
 
 /**
- * One rung as typed: `name: KEY=value; KEY=value` (the name and its colon may be left
- * out; a tuple value is comma-separated, `1,2,3`; `SAMPLE_C1=true`). A name may not hold
- * `:`, `=`, `;`, `|` or `/`.
- *
- * @returns the rung as `validateValue` reads it, or what is wrong.
+ * The settings a rung may still get an override for: `ladder.overridable` (read from the
+ * catalog, never listed here) and the two ladder-only keys, less those it already has,
+ * as far as they can be edited.
  */
-export function parseRung(text: string): { value: LadderRung } | { error: string } {
-    const named = /^\s*([^=;:|/]+?)\s*:(.*)$/.exec(text)
-    const name = named?.[1] ?? ""
-    const overrides: Record<string, SettingValue> = {}
-    for (const word of (named?.[2] ?? text).split(";")) {
-        if (word.trim() === "") continue
-        const eq = word.indexOf("=")
-        if (eq < 0) return { error: `${word.trim()} needs =value` }
-        const key = word.slice(0, eq).trim()
-        const value = overrideValue(word.slice(eq + 1))
-        if (value === undefined) return { error: `${key} needs numbers or true/false` }
-        overrides[key] = value as SettingValue
-    }
-    return { value: { name, overrides } }
-}
-
-/** A rung as `parseRung` reads it again. */
-export function rungText(r: LadderRung): string {
-    const words = Object.entries(r.overrides).map(
-        ([k, v]) => `${k}=${Array.isArray(v) ? v.join(",") : String(v)}`,
+export function addableOverrides(ladder: SettingDef, rung: LadderRung): string[] {
+    const names = [...new Set([...ladder.overridable, ...ladderOnlyDefs.keys()])]
+    return names.filter(
+        (n) => !(n in rung.overrides) && overrideDef(ladder, n) !== undefined,
     )
-    return `${r.name === "" ? "" : `${r.name}: `}${words.join("; ")}`
+}
+
+/** What an override's setting does, for the picker (empty if the catalog says nothing). */
+export const overrideDescription = (ladder: SettingDef, name: string): string =>
+    overrideDef(ladder, name)?.description ?? ""
+
+/** An override's value as the settings sheets show it. */
+export function overrideValueText(
+    ladder: SettingDef,
+    name: string,
+    value: SettingValue,
+): string {
+    const def = overrideDef(ladder, name)
+    return def === undefined ? String(value) : valueText(def, value)
 }
 
 /**
- * The retry ladder as typed: classes separated by ` // `, each `class: rung | rung`
- * (rungs as `parseRung` reads them; `class: off` or nothing after the colon switches the
- * class off). A class left out keeps its default rungs. Empty text, `off` or `none` is
- * every class off.
- *
- * @returns the map as `validateValue` reads it (`false` for everything off), or what is
- *     wrong.
+ * The ladder in one short phrase for the settings table: `default`, `off`, or how many
+ * classes differ from the default (`edited: 2 of 6 classes`).
  */
-export function parseLadder(text: string): { value: unknown } | { error: string } {
-    if (text.trim() === "" || /^(off|none)$/i.test(text.trim())) return { value: false }
-    const map: Record<string, unknown[]> = {}
-    for (const part of text.split("//")) {
-        const m = /^\s*(\w+)\s*:(.*)$/s.exec(part)
-        if (m === null) return { error: `${part.trim()}: write class: rung | rung` }
-        const cls = m[1] as string
-        const body = (m[2] ?? "").trim()
-        const rungs: unknown[] = []
-        if (body !== "" && !/^(off|none)$/i.test(body))
-            for (const [k, one] of body.split("|").entries()) {
-                const rung = parseRung(one)
-                if ("error" in rung) return { error: `${cls} rung ${k + 1}: ${rung.error}` }
-                rungs.push(rung.value)
-            }
-        map[cls] = rungs
-    }
-    return { value: map }
+function ladderSummary(map: LadderMap, base: LadderMap): string {
+    const classes = Object.keys(base)
+    if (classes.every((c) => (map[c] ?? []).length === 0)) return "off"
+    const edited = classes.filter(
+        (c) => JSON.stringify(map[c] ?? []) !== JSON.stringify(base[c] ?? []),
+    ).length
+    return edited === 0 ? "default" : `edited: ${edited} of ${classes.length} classes`
 }
 
-/** A ladder as `parseLadder` reads it again: every class, `off` for no rung at all. */
-export function ladderText(map: LadderMap): string {
-    const classes = Object.entries(map)
-    if (classes.every(([, rungs]) => rungs.length === 0)) return "off"
-    return classes
-        .map(([c, rungs]) => {
-            const text = rungs.length === 0 ? "off" : rungs.map(rungText).join(" | ")
-            return `${c}: ${text}`
-        })
-        .join(" // ")
+/** One rung of the ladder: its failure class and its place among that class's rungs. */
+export type RungRef = { cls: string; index: number }
+
+/** Every rung, in the order tried: by class (the order of `classes`), then in the class. */
+export function ladderRungs(map: LadderMap, classes: readonly string[]): RungRef[] {
+    return classes.flatMap((cls) => (map[cls] ?? []).map((_, index) => ({ cls, index })))
 }
 
-/** One row of the ladder editor: a class header (`rung` undefined) or one of its rungs. */
-export type LadderRow = { cls: string; rung?: number }
+/** The place of a rung in `ladderRungs` (-1 if there is none like it). */
+export const rungPlace = (
+    map: LadderMap,
+    classes: readonly string[],
+    ref: RungRef,
+): number =>
+    ladderRungs(map, classes).findIndex((r) => r.cls === ref.cls && r.index === ref.index)
 
-/** The rows of the ladder editor: each class, then its rungs, in order. */
-export function ladderRows(map: LadderMap, classes: readonly string[]): LadderRow[] {
-    return classes.flatMap((cls) => [
-        { cls },
-        ...(map[cls] ?? []).map((_, rung) => ({ cls, rung })),
-    ])
+/** The rung a reference names. */
+export const rungOf = (map: LadderMap, ref: RungRef): LadderRung | undefined =>
+    map[ref.cls]?.[ref.index]
+
+/** How many overrides a rung has, said for the list: `3 overrides`. */
+const overrideCount = (rung: LadderRung): string => {
+    const n = Object.keys(rung.overrides).length
+    return `${n} ${n === 1 ? "override" : "overrides"}`
+}
+
+/** A rung's row of the list: `condition ▸ name ▸ N overrides`, the conditions aligned. */
+export function rungRowText(rung: LadderRung, cls: string, conditionWidth: number): string {
+    const name = rung.name === "" ? "(unnamed)" : rung.name
+    const condition = padWidth(conditionLabel(cls), conditionWidth)
+    return `${condition} ▸ ${name} ▸ ${overrideCount(rung)}`
 }
 
 /** The map with the rung `index` of `cls` replaced (`index` at the end appends). */
@@ -963,6 +1007,75 @@ export function moveRung(
 }
 
 /**
+ * The rung under another condition: it leaves its class and ends the rungs of the new
+ * one (the order tried is by class, then by place in it).
+ *
+ * @returns the map and where the rung is now; the same map and place if the class is
+ *     the rung's own or the rung does not exist.
+ */
+export function recondition(
+    map: LadderMap,
+    ref: RungRef,
+    cls: string,
+): { map: LadderMap; ref: RungRef } {
+    const rung = rungOf(map, ref)
+    if (rung === undefined || cls === ref.cls) return { map, ref }
+    const gone = dropRung(map, ref.cls, ref.index)
+    const next = putRung(gone, cls, (gone[cls] ?? []).length, rung)
+    return { map: next, ref: { cls, index: (next[cls] ?? []).length - 1 } }
+}
+
+/** The map with a rung's name changed. */
+export function renameRung(map: LadderMap, ref: RungRef, name: string): LadderMap {
+    const rung = rungOf(map, ref)
+    return rung === undefined ? map : putRung(map, ref.cls, ref.index, { ...rung, name })
+}
+
+/** The map with one override of a rung set (a new one ends the rung's list). */
+export function setOverride(
+    map: LadderMap,
+    ref: RungRef,
+    name: string,
+    value: SettingValue,
+): LadderMap {
+    const rung = rungOf(map, ref)
+    if (rung === undefined) return map
+    const overrides = { ...rung.overrides, [name]: value }
+    return putRung(map, ref.cls, ref.index, { ...rung, overrides })
+}
+
+/** The map without one override of a rung. */
+export function dropOverride(map: LadderMap, ref: RungRef, name: string): LadderMap {
+    const rung = rungOf(map, ref)
+    if (rung === undefined) return map
+    const overrides = Object.fromEntries(
+        Object.entries(rung.overrides).filter(([n]) => n !== name),
+    )
+    return putRung(map, ref.cls, ref.index, { ...rung, overrides })
+}
+
+/** The map with one override moved by `by` places in its rung's list. */
+export function moveOverride(
+    map: LadderMap,
+    ref: RungRef,
+    name: string,
+    by: number,
+): LadderMap {
+    const rung = rungOf(map, ref)
+    if (rung === undefined) return map
+    const entries = Object.entries(rung.overrides)
+    const from = entries.findIndex(([n]) => n === name)
+    const to = from + by
+    if (from < 0 || to < 0 || to >= entries.length) return map
+    const [one] = entries.splice(from, 1)
+    entries.splice(to, 0, one as [string, SettingValue])
+    return putRung(map, ref.cls, ref.index, {
+        ...rung,
+        overrides: Object.fromEntries(entries),
+    })
+}
+
+/**
  * What typed text means for a typed setting (number, optional number, `set` of
  * blank-separated choices, font, tuple as comma-separated parts, `lo-hi` ranges, chain
  * letters, colour and marker words, sizes like `76x5, 100x9`): the value `validateValue`
@@ -980,10 +1093,6 @@ export function parseSetting(
     } else if (def.kind === "strings") {
         const t = text.trim()
         raw = /^(all)?$/i.test(t) ? [] : [...t.replace(/[\s,]+/g, "")]
-    } else if (def.kind === "ladder") {
-        const ladder = parseLadder(text)
-        if ("error" in ladder) return ladder
-        raw = ladder.value
     } else if (def.kind === "colours") {
         raw = colourWords(text)
     } else if (def.kind === "markers") raw = listWords(text)
@@ -1140,7 +1249,8 @@ export function valueText(def: SettingDef, value: SettingValue): string {
         return (value as string[]).join(", ")
     if (def.kind === "sizes")
         return (value as number[][]).map(([w, h]) => `${w}x${h}`).join(", ")
-    if (def.kind === "ladder") return ladderText(value as LadderMap)
+    if (def.kind === "ladder")
+        return ladderSummary(value as LadderMap, def.default as unknown as LadderMap)
     if (def.kind === "tuple") return tupleParts(def, value).join(", ")
     if (def.kind === "path" && value === "") return "(default)"
     return String(value)

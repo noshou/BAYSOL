@@ -116,10 +116,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdm76` below is the whole story (build the seed, then sample it).
-function seedSasdm76(run; seed::Integer = SAMPLER_SEED)
+function seedSasdm76(run)
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, qFit, iFit,
         σ_fit, PH, σ_PH, SOLUTES;
@@ -132,9 +131,8 @@ function runSasdm76(
     run;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdm76(run; seed)
+    s, data = seedSasdm76(run)
     # δ = 99: at the default 95 this entry exceeded the 0.1 % divergence limit; 99 passed
     # seeds 0, 1 and 2 (2026-11-16; see "When a run fails" in src/inference/README.md).
     res = BAYSOL.runModel(s, nSamples, nAdapt; δ = 99)

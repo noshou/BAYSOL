@@ -102,19 +102,25 @@ const ComponentInfo = @NamedTuple{
 }
 
 """
-Hydrogens in a dictionary formula such as `"C9 H13 N2 O9 P"`: the count of the `H` and `D`
-(deuterium) entries; an entry without a number counts once.
+Atoms of a dictionary formula such as `"C9 H13 N2 O9 P"` that pass `keep(element)`, counted;
+an entry without a number counts once.
 """
-function _countHydrogens(formula::AbstractString)::Int
+function _formulaCount(keep, formula::AbstractString)::Int
     n = 0
     for tok in split(formula)
         m = match(r"^([A-Za-z]+)(\d*)$", tok)
         m === nothing && continue
-        (m[1] == "H" || m[1] == "D") || continue
+        keep(m[1]) || continue
         n += isempty(m[2]) ? 1 : parse(Int, m[2])
     end
     return n
 end
+
+"""
+Hydrogens in a dictionary formula such as `"C9 H13 N2 O9 P"`: the count of the `H` and `D`
+(deuterium) entries; an entry without a number counts once.
+"""
+_countHydrogens(formula::AbstractString)::Int = _formulaCount(in(("H", "D")), formula)
 
 "`:dna`, `:rna` or `:other` from a dictionary `_chem_comp.type` (lower case)."
 function _componentClass(type::AbstractString)::Symbol

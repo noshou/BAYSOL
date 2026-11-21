@@ -167,10 +167,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdx52` below is the whole story (build the seed, then sample it).
-function seedSasdx52(; seed::Integer = SAMPLER_SEED)
+function seedSasdx52()
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
         addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
@@ -181,9 +180,8 @@ end
 function runSasdx52(;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdx52(; seed)
+    s, data = seedSasdx52()
     # δ = 99 and a one-rung ladder: with the profiled c1 this entry has a divergence floor
     # of about 0.29 % that neither δ, the start radii nor longer runs remove (the share
     # only gets measured better; 16000 draws per chain give 0.288 %), above the 0.1 %

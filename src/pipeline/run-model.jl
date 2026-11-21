@@ -485,7 +485,7 @@ end
 """
 The ladder as one readable line (the LOG row `ladderRungs`): per failure class, its rungs
 by name (`_rungLabel`), classes separated by ` | `, e.g.
-`stepCollapse: delta 70, delta 35 | splitChains: starts (2,4,6), close starts, longer`.
+`stepCollapse: delta 70, delta 35 | splitChains: starts (2,4,6), close starts + longer`.
 The overrides of a rung are in the ladder definition (`LADDER`) and the attempts
 that ran are in the rows `ladder` and `ladderAttempts`, so they are not repeated here.
 """

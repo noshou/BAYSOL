@@ -129,10 +129,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdmc6` below is the whole story (build the seed, then sample it).
-function seedSasdmc6(run; seed::Integer = SAMPLER_SEED)
+function seedSasdmc6(run)
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, qFit, iFit,
         σ_fit, PH, σ_PH, SOLUTES;
@@ -145,9 +144,8 @@ function runSasdmc6(
     run;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdmc6(run; seed)
+    s, data = seedSasdmc6(run)
     # the default rerun (2000 + 2000) left the chains in different places (R̂ above 1.5),
     # so this entry reruns with a longer warm-up, more draws and chains started closer to
     # the optimum. The target acceptance is 60 percent (default 95): at 95 the step size

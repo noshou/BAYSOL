@@ -28,6 +28,7 @@ import {
     type RunRow,
     readLogText,
     readRunFile,
+    readStatisticsText,
     runFileSizes,
     runItems,
     sizeText,
@@ -131,10 +132,12 @@ const PAGER_CHROME_COLUMNS = 4
  * screen.
  *
  * @param runDir - the run folder.
+ * @param close - what closes the page (default: pop it off the screen stack).
  * @returns `true` once the folder was found gone.
  */
-function useRunWatch(runDir: string): boolean {
+function useRunWatch(runDir: string, close?: () => void): boolean {
     const nav = useNav()
+    const leave = close ?? nav.pop
     const active = useScreenActive()
     const [gone, setGone] = useState(false)
 
@@ -150,12 +153,12 @@ function useRunWatch(runDir: string): boolean {
 
     useEffect(() => {
         if (!gone || !active) return
-        const timer = setTimeout(nav.pop, LOGS_FLOW.watch.closeSeconds * 1000)
+        const timer = setTimeout(leave, LOGS_FLOW.watch.closeSeconds * 1000)
         return () => clearTimeout(timer)
-    }, [gone, active, nav.pop])
+    }, [gone, active, leave])
 
     // any key closes it sooner; the keys of the page itself are off while it is gone
-    useKeys(() => nav.pop(), gone)
+    useKeys(() => leave(), gone)
     return gone
 }
 
@@ -173,6 +176,11 @@ function useRunWatch(runDir: string): boolean {
  * @param props.runDir - the run folder, watched for its deletion.
  * @param props.design - `"blocky"` on the logs pages, `"smooth"` when left out.
  * @param props.load - reads the text (it may throw: the message is the note).
+ * @param props.counter - the frame's counter (`statistics [2 / 2]`), none when left out.
+ * @param props.onClose - what Esc does instead of popping the page (the page of a
+ *     screen that has several).
+ * @param props.onLeft - what the left arrow does instead of a sideways step (lines are
+ *     wrapped, so there is nothing to scroll sideways); with it the legend names `back`.
  * @returns the screen.
  */
 export function TextPager(props: {
@@ -182,12 +190,17 @@ export function TextPager(props: {
     runDir: string
     load: () => string
     design?: Design
+    counter?: string
+    onClose?: () => void
+    onLeft?: { label: string; run: () => void }
 }): ReactNode {
     const { title, subtitle, corner, runDir, load, design = "smooth" } = props
+    const { counter, onClose, onLeft } = props
     const nav = useNav()
+    const close = onClose ?? nav.pop
     const theme = useTheme()
     const columns = useBodyColumns()
-    const gone = useRunWatch(runDir)
+    const gone = useRunWatch(runDir, close)
     const { note, say, clear } = useNote()
     const [askKeys, setAskKeys] = useState<LegendItem[]>([])
     const panel = design === "blocky" ? "double" : "round"
@@ -221,8 +234,12 @@ export function TextPager(props: {
     useKeys((press) => {
         if (gone) return
         clear()
+        if (onLeft && press.is(keys.left)) {
+            onLeft.run()
+            return
+        }
         if (pager.handle(press)) return
-        if (press.is(keys.escape) || press.is(keys.back)) nav.pop()
+        if (press.is(keys.escape) || press.is(keys.back)) close()
     }, pager.asking === undefined)
 
     const error = gone ? RUN_GONE : "error" in loaded ? loaded.error : undefined
@@ -233,12 +250,17 @@ export function TextPager(props: {
             title={title}
             subtitle={subtitle}
             corner={corner}
+            counter={counter}
             legend={
                 pager.asking
                     ? askKeys
-                    : [...pager.legend, legendFor("close", keys.escape, keys.back)]
+                    : [
+                        ...pager.legend,
+                        ...(onLeft ? [legendFor(onLeft.label, keys.left)] : []),
+                        legendFor("close", keys.escape, keys.back),
+                    ]
             }
-            legendFull={PAGER_FULL}
+            legendFull={onLeft ? [...PAGER_FULL, legendFor("runs", keys.left)] : PAGER_FULL}
             note={shown?.text}
             noteIsError={shown?.error}
         >
@@ -506,6 +528,7 @@ function LogsRun({ project, run }: { project: ProjectRef; run: RunRow }): ReactN
 const RUNS_FULL: LegendItem[] = [
     legendFor("move", [keys.up, keys.down]),
     legendFor("open", keys.enter),
+    legendFor("statistics", keys.right),
     legendBack,
 ]
 
@@ -540,6 +563,9 @@ export function LogsRuns({ project }: { project: ProjectRef }): ReactNode {
     // the highlighted run is kept by NAME, so a list that changes under it keeps the cursor
     const [selectedId, setSelectedId] = useState<string | undefined>(runs[0]?.id)
     const [offset, setOffset] = useState(0)
+    // page 1 is the list, page 2 the statistics of the highlighted run (left and right
+    // switch, as the groups of a settings sheet do)
+    const [page, setPage] = useState(0)
     const { note, clear } = useNote()
 
     const refresh = useCallback(() => setRuns(listRuns(project.dir)), [project.dir])
@@ -588,12 +614,31 @@ export function LogsRuns({ project }: { project: ProjectRef }): ReactNode {
         else if (press.is(keys.up)) step(index - 1)
         else if (press.is(keys.down)) step(index + 1)
         else if (current === undefined) return
+        else if (press.is(keys.right)) setPage(1)
         else if (press.is(keys.enter)) nav.push(<LogsRun project={project} run={current} />)
-    })
+    }, page === 0)
+
+    if (page === 1 && current !== undefined) {
+        return (
+            <TextPager
+                key={current.id}
+                design="blocky"
+                title="logs"
+                subtitle="statistics"
+                corner={cornerLabels(project.id, current.id)}
+                counter="statistics [2 / 2]"
+                runDir={current.dir}
+                load={() => readStatisticsText(current.dir)}
+                onClose={() => setPage(0)}
+                onLeft={{ label: "runs", run: () => setPage(0) }}
+            />
+        )
+    }
 
     const keysNow = legendOf([
         moveLegend(cursorMoves(index, runs.length)),
         current !== undefined && legendFor("open", keys.enter),
+        current !== undefined && legendFor("statistics", keys.right),
         legendBack,
     ])
     const legend = confirm.question ? questionLegend(confirm.question) : keysNow
@@ -604,11 +649,7 @@ export function LogsRuns({ project }: { project: ProjectRef }): ReactNode {
             title="logs"
             subtitle="runs"
             corner={cornerLabels(project.id)}
-            counter={
-                runs.length > 0 && !confirm.question
-                    ? `runs [${index + 1} / ${runs.length}]`
-                    : undefined
-            }
+            counter={runs.length > 0 && !confirm.question ? "runs [1 / 2]" : undefined}
             legend={legend}
             legendFull={RUNS_FULL}
             note={shown?.text}

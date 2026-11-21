@@ -116,10 +116,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdmj9` below is the whole story (build the seed, then sample it).
-function seedSasdmj9(; seed::Integer = SAMPLER_SEED)
+function seedSasdmj9()
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
         addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
@@ -130,9 +129,8 @@ end
 function runSasdmj9(;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdmj9(; seed)
+    s, data = seedSasdmj9()
     res = BAYSOL.runModel(s, nSamples, nAdapt)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end

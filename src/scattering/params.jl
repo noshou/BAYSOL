@@ -28,7 +28,7 @@ const MEMORY_HEADROOM = 10
 const MEMORY_HEADROOM_MIN = 5
 
 "The most `MEMORY_HEADROOM` allowed, in percent: more would leave the build too little."
-const MEMORY_HEADROOM_MAX = 50
+const MEMORY_HEADROOM_MAX = 80
 
 @assert(
     MEMORY_HEADROOM_MIN ≤ MEMORY_HEADROOM ≤ MEMORY_HEADROOM_MAX,

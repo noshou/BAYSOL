@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 using StaticArrays
-using LinearAlgebra: Symmetric, eigen, diag
+using LinearAlgebra: Symmetric, eigen, diag, norm
 using Optim: Optim, optimize, LBFGS, Options, OnceDifferentiable, minimizer
 using ForwardDiff, DiffResults
 
@@ -283,13 +283,13 @@ of piling up on its bulk. Fewer than `k` if the rows run out of distinct points.
 function _farthestCover(W::AbstractMatrix{<:Real}, k::Int, first::Int)
     n = size(W, 1)
     taken = [first]
-    d = [sqrt(sum(abs2, @view(W[i, :]) .- @view(W[first, :]))) for i in 1:n]
+    d = [norm(@view(W[i, :]) .- @view(W[first, :])) for i in 1:n]
     while length(taken) < min(k, n)
         j = argmax(d)
         d[j] > 0 || break
         push!(taken, j)
         for i in 1:n
-            d[i] = min(d[i], sqrt(sum(abs2, @view(W[i, :]) .- @view(W[j, :]))))
+            d[i] = min(d[i], norm(@view(W[i, :]) .- @view(W[j, :])))
         end
     end
     return taken
@@ -429,7 +429,7 @@ function _samplingSpace(
         for r in options.mapJitterRadii, _ in 1:options.mapJitterDirections
             ctr += 1
             u = randn(stream(base, _RNG_MAP_JITTER, ctr), N)
-            search!(zᵢ + r .* (half * SVector{N}(u ./ sqrt(sum(abs2, u)))))
+            search!(zᵢ + r .* (half * SVector{N}(u ./ norm(u))))
         end
     end
     sort!(optima; by = last)
@@ -572,7 +572,7 @@ function _chainStart(
     r = chainRadius(k, n, radii)
     r == 0 && return zeros(N), 0.0
     z = randn(stream(base, _RNG_JITTER, (k - 1) ÷ 2), N)
-    u = z ./ sqrt(sum(abs2, z))
+    u = z ./ norm(z)
     for _ in 0:CHAIN_JITTER_MAX_HALVINGS
         w = r .* u
         usable = try
@@ -804,6 +804,6 @@ function _runExtraChains(seed::Seed{<:Real,N}, sp, nSamples::Int64,
         end
     end
     runs = tmapItems(i -> runChain(k0 + findfirst(==(i), keep), wStarts[i]), keep)
-    starts = [(wStarts[i], sqrt(sum(abs2, wStarts[i]))) for i in keep]
+    starts = [(wStarts[i], norm(wStarts[i])) for i in keep]
     return (runs = runs, starts = starts, keep = keep)
 end

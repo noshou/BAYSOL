@@ -195,7 +195,7 @@ errorType   BAYSOL.Inference.NotConvergedError
 error       NotConvergedError: the run did not converge: ladder exhausted:;
             base: the smallest tail ESS, 304.8, is not above 400.0;
             longer chains [marginal]: the smallest tail ESS, 304.8, is not above 400.0;
-            longer chains, next seed [marginal]: the worst R̂, 1.023, is not below 1.01;
+            longer chains + seed [marginal]: the worst R̂, 1.023, is not below 1.01;
             the smallest bulk ESS, 184.8, is not above 400.0; the smallest tail ESS, 47.3, ...
 nSamples    14000   ph 7.6   ...
 ```

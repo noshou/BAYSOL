@@ -129,10 +129,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdm86` below is the whole story (build the seed, then sample it).
-function seedSasdm86(run; seed::Integer = SAMPLER_SEED)
+function seedSasdm86(run)
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, qFit, iFit,
         σ_fit, PH, σ_PH, SOLUTES;
@@ -145,9 +144,8 @@ function runSasdm86(
     run;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdm86(run; seed)
+    s, data = seedSasdm86(run)
     # the default rerun (2000 + 2000) left the chains in different places (R̂ above 1.5),
     # so this entry reruns with a longer warm-up, more draws and chains started closer to
     # the optimum

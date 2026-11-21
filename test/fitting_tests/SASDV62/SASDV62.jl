@@ -129,10 +129,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdv62` below is the whole story (build the seed, then sample it).
-function seedSasdv62(; seed::Integer = SAMPLER_SEED)
+function seedSasdv62()
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
         addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
@@ -143,9 +142,8 @@ end
 function runSasdv62(;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdv62(; seed)
+    s, data = seedSasdv62()
     res = BAYSOL.runModel(s, nSamples, nAdapt)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end

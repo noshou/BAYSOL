@@ -138,10 +138,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdnw9` below is the whole story (build the seed, then sample it).
-function seedSasdnw9(; seed::Integer = SAMPLER_SEED)
+function seedSasdnw9()
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
         addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
@@ -152,9 +151,8 @@ end
 function runSasdnw9(;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdnw9(; seed)
+    s, data = seedSasdnw9()
     # δ = 99: at the default 95 this entry exceeded the 0.1 % divergence limit; 99 passed
     # seeds 0, 1 and 2 (2026-11-16; see "When a run fails" in src/inference/README.md).
     res = BAYSOL.runModel(s, nSamples, nAdapt; δ = 99)

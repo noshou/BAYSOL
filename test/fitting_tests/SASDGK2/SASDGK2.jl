@@ -102,10 +102,9 @@ end
 
 # Builds the Seed that `runSasdgk2` samples (separate only so the developer tools can
 # build a fit's Seed without running it; `runSasdgk2` below is the whole story).
-function seedSasdgk2(run; seed::Integer = SAMPLER_SEED)
+function seedSasdgk2(run)
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, qFit, iFit,
         σ_fit, PH, σ_PH, SOLUTES;
@@ -118,9 +117,8 @@ function runSasdgk2(
     run;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdgk2(run; seed)
+    s, data = seedSasdgk2(run)
     res = BAYSOL.runModel(s, nSamples, nAdapt)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end

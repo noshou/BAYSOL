@@ -198,6 +198,22 @@ export function footerExtraLines(
 }
 
 /**
+ * The height of the keys' column of a footer.
+ *
+ * @param keyLines - the lines the keys take (the fullest legend, up to the logo's height).
+ * @param logoRows - the height of the small logo, the least the footer takes.
+ * @param hasNote - a note is shown above the keys.
+ * @returns the rows: the logo's height, or more when the keys and the note need them.
+ */
+export function footerKeyRows(
+    keyLines: number,
+    logoRows: number,
+    hasNote: boolean,
+): number {
+    return Math.max(logoRows, keyLines + (hasNote ? 1 : 0))
+}
+
+/**
  * What a screen tells the frame.
  *
  * @property title - the name of the screen, e.g. `"sampler settings"`.
@@ -257,16 +273,15 @@ export function Frame(props: FrameProps): ReactNode {
     const cornerShown =
         corner === undefined ? undefined : fitCorner(corner, columns, title, subtitle)
 
-    // the note has a row of its own, so a note appearing never makes the footer taller
-    const noteLine = (
+    // the note has the row above the keys: free while the keys leave one inside the logo's
+    // height (a note appearing never moves the logo), else the footer is a row taller
+    const noteLine = note ? (
         <Box height={1} flexShrink={0}>
-            {note ? (
-                <Text {...(noteIsError ? errorStyle(theme) : { color: theme.fg })}>
-                    {truncate(note, legendRoom(design, columns, counter))}
-                </Text>
-            ) : null}
+            <Text {...(noteIsError ? errorStyle(theme) : { color: theme.fg })}>
+                {truncate(note, legendRoom(design, columns, counter))}
+            </Text>
         </Box>
-    )
+    ) : null
     const logoBox = (
         <Box
             width={art.width}
@@ -283,20 +298,22 @@ export function Frame(props: FrameProps): ReactNode {
         </Panel>
     ) : null
 
-    // the keys' column is as tall as the fullest legend (or the one shown, if taller) plus
-    // the note, bottom-aligned: a shrinking legend leaves blank rows, never a moved logo
+    // the keys' column is as tall as the logo, or as the legend (the fullest one, up to the
+    // logo's height, or the one shown, if taller) plus the note when there is one,
+    // bottom-aligned: a shrinking legend leaves blank rows inside the logo's height, never
+    // a moved logo, and a legend that fills the logo adds no blank row for a note not shown
     const room = legendRoom(design, columns, counter)
     // one style for every state: boxes only when even the fullest legend fits one row
     const style = footerLegendStyle(design, legendFull, room)
     const keyLines = Math.max(
         legendHeight(legend, room, style),
-        legendFull ? legendHeight(legendFull, room, style) : 0,
+        legendFull ? Math.min(legendHeight(legendFull, room, style), art.height) : 0,
     )
     const keysColumn = {
         flexDirection: "column",
         flexGrow: 1,
         justifyContent: "flex-end",
-        height: keyLines + 1,
+        height: footerKeyRows(keyLines, art.height, note !== undefined && note !== ""),
     } as const
 
     return (

@@ -185,10 +185,9 @@ end
 # the developer tools in test/utils/ build a fit's Seed without running
 # the fit; if you are reading this script as an example you can skip it:
 # `runSasdvb2` below is the whole story (build the seed, then sample it).
-function seedSasdvb2(; seed::Integer = SAMPLER_SEED)
+function seedSasdvb2()
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, qFit, iFit, σ_fit, PH, σ_PH, SOLUTES;
         addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C,
@@ -199,9 +198,8 @@ end
 function runSasdvb2(;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdvb2(; seed)
+    s, data = seedSasdvb2()
     # the default rerun (2000 + 2000) left the chains in different places, and more draws
     # alone made it worse (R̂ 1.9), so this entry reruns with a longer warm-up, more draws
     # and chains started closer to the optimum (the far starts find a second mode)

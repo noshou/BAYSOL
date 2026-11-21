@@ -72,6 +72,9 @@ type SettingsSheetProps = { scope: Scope; sheetId: string }
 /** The lines the description of the highlighted setting may take (always reserved). */
 const descriptionLines = 3
 
+/** The cells of the memory column: `50 % = 15.3 GiB of 15.3 GiB` and a little more. */
+const MEMORY_HINT_WIDTH = 28
+
 /** The rows the table spends besides its settings: header, rule and the position line. */
 const tableRows = 3
 
@@ -177,6 +180,8 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
                     ? editorRows(editedDef)
                     : descriptionLines),
     )
+    // the ladder editor takes the whole body: its rungs and overrides scroll there
+    const ladderRows = useBodyRows(footerExtra)
     const cursor = useListCursor(defs.length, pageSize)
     const here = defs[cursor.index] as SettingDef
 
@@ -317,18 +322,22 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
             ])
     const longest = Math.max(1, ...defs.map((d) => d.name.length))
     const shade = swatchColour(here, valueFor(here))
-    // the memory headroom says what its percent is on this machine, live while typed
-    const hint =
-        here.name === MEMORY_SETTING
-            ? memoryHint(inline ? inline.buffer.text : valueText(here, valueFor(here)))
-            : undefined
-    const description = wrapText(
-        hint === undefined ? here.description : `${hint}. ${here.description}`,
-        columns,
-    ).slice(0, descriptionLines)
+    const description = wrapText(here.description, columns).slice(0, descriptionLines)
+    // the memory headroom says what its percent is on this machine, live while typed,
+    // in a column of its own to the right of the value
+    const memoryOf = (d: SettingDef): string =>
+        d.name !== MEMORY_SETTING
+            ? ""
+            : (memoryHint(
+                    inline && d === here ? inline.buffer.text : valueText(d, valueFor(d)),
+                ) ?? "")
+    const hasMemory = defs.some((d) => d.name === MEMORY_SETTING)
     const tableColumns: Column<SettingDef>[] = [
         { title: "name", width: longest, text: (d: SettingDef) => d.name },
         { title: "value", text: (d: SettingDef) => valueText(d, valueFor(d)) },
+        ...(hasMemory
+            ? [{ title: "on this machine", text: memoryOf, width: MEMORY_HINT_WIDTH }]
+            : []),
         ...(model
             ? [
                 {
@@ -359,6 +368,17 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
             note={note || undefined}
             noteIsError={noteIsError}
         >
+            {editedDef?.kind === "ladder" ? (
+                <LadderEditor
+                    key={editedDef.name}
+                    def={editedDef}
+                    current={valueFor(editedDef)}
+                    rows={ladderRows}
+                    onEnd={endEdit}
+                    onLegend={setPromptKeys}
+                />
+            ) : (
+                <>
             <DataTable
                 border="double"
                 columns={tableColumns}
@@ -414,14 +434,6 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
                                 onEnd={endEdit}
                                 onLegend={setPromptKeys}
                             />
-                        ) : editedDef.kind === "ladder" ? (
-                            <LadderEditor
-                                key={editedDef.name}
-                                def={editedDef}
-                                current={valueFor(editedDef)}
-                                onEnd={endEdit}
-                                onLegend={setPromptKeys}
-                            />
                         ) : editedDef.kind === "tuple" ? (
                             <TupleEditor
                                 key={editedDef.name}
@@ -455,6 +467,8 @@ export function SettingsSheet({ scope, sheetId }: SettingsSheetProps): ReactNode
                     </Box>
                 )}
             </Box>
+                </>
+            )}
         </Frame>
     )
 }

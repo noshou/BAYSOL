@@ -20,12 +20,14 @@ import { createElement } from "react"
 import { displayWidth } from "../src/core/terminal.js"
 import {
     cornerLabel,
+    Frame,
     fitCorner,
     footerExtraLines,
+    footerKeyRows,
     moveCell,
     placeAt,
 } from "../src/ui/frame.js"
-import { legendFor } from "../src/ui/grid.js"
+import { type LegendItem, legendFor } from "../src/ui/grid.js"
 import { positionStatus } from "../src/ui/input.js"
 import { keys } from "../src/ui/interaction.js"
 import {
@@ -49,6 +51,36 @@ test("the corner names the project, and the run once one is chosen", () => {
         cornerLabel("demo", "19-33-08-000_UTC_+0000_2026-11-06"),
         "project: demo · run: 19:33:08:000 UTC +00:00 · 2026-11-06",
     )
+})
+
+test("the footer is as tall as its logo; a note or long legend adds only its rows", () => {
+    assert.equal(footerKeyRows(0, 3, false), 3)
+    assert.equal(footerKeyRows(2, 3, true), 3)
+    assert.equal(footerKeyRows(3, 3, false), 3)
+    assert.equal(footerKeyRows(3, 3, true), 4)
+    const items = (n: number): LegendItem[] =>
+        Array.from({ length: n }, (_, i) => legendFor(`key${i}`, keys.enter))
+    const rows = (design: "blocky" | "smooth", shown: number, full: number, note = "") =>
+        renderToString(
+            createElement(Frame, {
+                title: "t",
+                legend: items(shown),
+                legendFull: items(full),
+                design,
+                counter: "x [1 / 2]",
+                note,
+            }),
+            { columns: 80 },
+        ).split("\n").length
+    // title, margin, then the logo's 3 rows (and the box's 2 rows when blocky), however
+    // tall the fullest legend is
+    for (const [shown, full] of [[3, 3], [3, 9], [9, 9], [10, 10]]) {
+        assert.equal(rows("smooth", shown, full), 5)
+        assert.equal(rows("blocky", shown, full), 7)
+    }
+    assert.equal(rows("smooth", 3, 9, "sure?"), 6)
+    assert.equal(rows("smooth", 3, 3), rows("smooth", 3, 3, "sure?") - 1)
+    assert.equal(rows("smooth", 3, 3, "sure?"), rows("smooth", 9, 9, "sure?"))
 })
 
 test("a corner that fits is drawn whole", () => {

@@ -38,6 +38,7 @@ import {
     RUN_GONE,
     readLogText,
     readRunFile,
+    readStatisticsText,
     runFilePath,
     runFileSizes,
     runItems,
@@ -53,6 +54,7 @@ import {
     watchBuffer,
 } from "../src/store/run-restores.js"
 import { settingsFile } from "../src/store/settings-store.js"
+import { formatStatistics, shorten } from "../src/store/statistics-text.js"
 import { findLines, pagerFooter, parseLine, stepMatch } from "../src/ui/pager.js"
 import { fixture, plainRun, runOn, tempDir } from "./support/fixtures.js"
 
@@ -350,6 +352,21 @@ test("the run.LOG text is read plain, with a cap, and says why it cannot be", ()
     rmSync(run, { recursive: true })
     assert.throws(() => readLogText(run), new RegExp(RUN_GONE))
     assert.equal(isFolder(run), false)
+})
+
+test("the statistics are every statistics-<model>.LOG of the run, in name order", () => {
+    const dir = project()
+    const files = {
+        "run.LOG": "x\n",
+        "statistics-b.LOG": "=== b ===\n",
+        "statistics-a.LOG": "=== a ===\n",
+    }
+    const run = plainRun(dir, runOn("2026-11-01"), { status: "done" }, files)
+    assert.equal(readStatisticsText(run), "=== a ===\n\n=== b ===\n")
+    const bare = plainRun(dir, runOn("2026-11-02"), { status: "done" }, { "run.LOG": "x" })
+    assert.throws(() => readStatisticsText(bare), /no statistics/)
+    rmSync(run, { recursive: true })
+    assert.throws(() => readStatisticsText(run), new RegExp(RUN_GONE))
 })
 
 test("a run's files are read plain: any name, a cap, and why one cannot be", () => {
@@ -655,4 +672,47 @@ test("a restore reads the plain files of a run and never writes into the run", (
         [...runFileSizes(run).keys()].sort(),
         ["buffer.json", "data.json", "data.tsv", "run.json"],
     )
+})
+
+test("statistics: sections become tables and rows, the starts one summary", () => {
+    const text = [
+        "datetime\t20-11-2026 01:20:44 -0500",
+        "",
+        "=== M ===",
+        "",
+        "--- attempt 1: base run ---",
+        "",
+        "-- settings --",
+        "nChains                         \t8",
+        "targetAccept                    \t70.0",
+        "",
+        "-- map search --",
+        "MAP search: 0.4s",
+        "L-BFGS starts (z space):",
+        "  start 1: f=-10.5 iters=  2 g_conv=true iter_limit=false evals=20 |∇f|∞=1e-9",
+        "  start 2: f=-9.5 iters=  3 g_conv=false iter_limit=true evals=40 |∇f|∞=2e-3",
+        "",
+        "-- gate --",
+        "parameter\trhat\tnote",
+        "a        \t1.00896\t",
+        "b        \t1.2\t",
+        "",
+        "-- attempts --",
+        "attempt\tlabel\toutcome",
+        "1\tbase run\tkept",
+        "",
+    ].join("\n")
+    const out = formatStatistics(text)
+    // the outcome of the attempts comes before the attempt itself
+    assert.ok(out.indexOf("── attempts ──") < out.indexOf("attempt 1: base run"))
+    assert.match(out, /targetAccept {2}70\n/)
+    assert.match(out, /2 starts: best f -10\.5, worst -9\.5/)
+    assert.match(out, /1 reached the gradient tolerance, 1 the iteration limit/)
+    assert.doesNotMatch(out, /start 1:/)
+    // the empty `note` column is dropped, the numbers are shortened and align right
+    assert.match(out, /parameter {3}rhat\n/)
+    assert.match(out, /a {10}1\.009\n/)
+    assert.equal(shorten("0.0000123456"), "1.235e-5")
+    assert.equal(shorten("1252783"), "1252783")
+    assert.equal(formatStatistics("not a log"), "not a log")
 })

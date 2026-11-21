@@ -187,6 +187,37 @@ end
     @test length(long) <= BAYSOLRun._BRIEF_ERROR_WIDTH && !endswith(long, " ")
 end
 
+@testset "runProject: a failed ladder says what its classes mean in the logs" begin
+    exhausted = BAYSOL.Inference.NotConvergedError([
+        "ladder exhausted:",
+        "longer chains [marginal]: R̂ 1.02",
+        "next seed [marginal]: R̂ 1.03",
+        "wide [divergent]: 2 % divergent",
+    ])
+    classes = BAYSOLRun._ladderClasses(sprint(showerror, exhausted))
+    @test first.(classes) == ["marginal", "divergent"]
+    @test startswith(last(classes[1]), "Sampling technically completes")
+    # a plain non-convergence and any other error name no class
+    plain = BAYSOL.Inference.NotConvergedError(["the worst R̂ is above 1.01 [marginal]"])
+    @test isempty(BAYSOLRun._ladderClasses(sprint(showerror, plain)))
+    @test isempty(BAYSOLRun._ladderClasses("boom"))
+    # the ERRORS entry: first line first, then the meanings, then the rest
+    text = BAYSOLRun._errorText("model m1", exhausted, Ptr{Cvoid}[])
+    lines = split(text, '\n')
+    @test startswith(lines[1], "model m1: NotConvergedError")
+    @test lines[2] == "Failure classes of the ladder:"
+    @test startswith(lines[3], "  marginal: ") && startswith(lines[4], "  divergent: ")
+    # the failed model's LOG carries the rows
+    mktempdir() do dir
+        path = joinpath(dir, "m1.LOG")
+        BAYSOLRun._failedModelLog(path, "m1", [["ph", "7.4"]], sprint(showerror, exhausted))
+        rows = logRows(path)
+        @test rows["status"] == "failed"
+        @test rows["failureClass"] == "marginal divergent"
+        @test haskey(rows, "failureClassMarginal") && haskey(rows, "failureClassDivergent")
+    end
+end
+
 @testset "runProject: claiming a run folder" begin
     mktempdir() do dir
         runs = joinpath(dir, "runs")

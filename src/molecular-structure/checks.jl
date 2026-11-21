@@ -254,16 +254,7 @@ _isHeavy(a) =
     !(isempty(a.element) && !isempty(a.name) && first(lstrip(isdigit, a.name)) in "HD")
 
 "Heavy atoms in a component `formula` (`C9 H13 N2 O9 P` is 13)."
-function _heavyInFormula(formula::AbstractString)::Int
-    n = 0
-    for tok in split(formula)
-        m = match(r"^([A-Za-z]+)(\d*)$", tok)
-        m === nothing && continue
-        m[1] in ("H", "D") && continue
-        n += isempty(m[2]) ? 1 : parse(Int, m[2])
-    end
-    return n
-end
+_heavyInFormula(formula::AbstractString)::Int = _formulaCount(!in(("H", "D")), formula)
 
 """
     dummyLikeResidues(path) -> NamedTuple

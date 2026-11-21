@@ -119,8 +119,7 @@ const _Q   = Q_GRID
 const _IPH = ones(length(_Q))
 const _SPH = ones(length(_Q))
 
-function seedSynthetic(; seed::Integer = SAMPLER_SEED)
-    Random.seed!(seed)
+function seedSynthetic()
     return BAYSOL.seedModel(
         LocalPathSource(_PDB_PATH), ENERGY_EV, _Q, _IPH, _SPH, PH, σ_PH, SOLUTES;
         addHydrogens = ADD_HYDROGENS, t = TEMPERATURE_C, rebin = nothing,

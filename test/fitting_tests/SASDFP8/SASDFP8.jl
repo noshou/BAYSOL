@@ -102,10 +102,9 @@ end
 
 # Builds the Seed that `runSasdfp8` samples (separate only so the developer tools can
 # build a fit's Seed without running it; `runSasdfp8` below is the whole story).
-function seedSasdfp8(run; seed::Integer = SAMPLER_SEED)
+function seedSasdfp8(run)
     qFit, iFit, σ_fit = fitSubset()
 
-    Random.seed!(seed)
     s = BAYSOL.seedModel(
         LocalPathSource(joinpath(_FIXTURE_DIR, run.pdb)), ENERGY_EV, qFit, iFit,
         σ_fit, PH, σ_PH, SOLUTES;
@@ -118,9 +117,8 @@ function runSasdfp8(
     run;
     nSamples::Int = N_SAMPLES,
     nAdapt::Int = N_ADAPT,
-    seed::Integer = SAMPLER_SEED,
 )
-    s, data = seedSasdfp8(run; seed)
+    s, data = seedSasdfp8(run)
     res = BAYSOL.runModel(s, nSamples, nAdapt)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end

@@ -45,6 +45,7 @@ import {
     runExists,
     runFiles,
 } from "./run-archive.js"
+import { formatStatistics } from "./statistics-text.js"
 
 // ---- 1. the state of a run, the run list and the deletion ------------------------------
 
@@ -229,6 +230,26 @@ export function readRunFile(runDir: string, name: string): string {
 /** The text of a run's `run.LOG` as shown ([[readRunFile]], exponents as superscripts). */
 export function readLogText(runDir: string): string {
     return superscripts(readRunFile(runDir, "run.LOG"))
+}
+
+/**
+ * The statistics of a run as shown: every `statistics-<model>.LOG` the run holds (one per
+ * model, written by the sampler for finished and failed models alike), in name order,
+ * one after the other ([[readRunFile]]'s refusals, exponents as superscripts).
+ *
+ * @param runDir - the run folder.
+ * @returns the text.
+ * @throws `Error` - `this run has no statistics`, or what [[readRunFile]] says.
+ */
+export function readStatisticsText(runDir: string): string {
+    const names = [...runFileSizes(runDir).keys()]
+        .filter((name) => /^statistics-.+\.LOG$/.test(name))
+        .sort()
+    if (names.length === 0)
+        throw new Error(runExists(runDir) ? "this run has no statistics" : RUN_GONE)
+    return superscripts(
+        formatStatistics(names.map((name) => readRunFile(runDir, name)).join("\n")),
+    )
 }
 
 /**

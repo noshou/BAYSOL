@@ -5,7 +5,7 @@
 
 import { Box, Text, usePaste } from "ink"
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { truncate } from "../core/terminal.js"
+import { truncate, wrapText } from "../core/terminal.js"
 import {
     colourFamily,
     colourHex,
@@ -19,7 +19,7 @@ import {
 import {
     type FontLists,
     type LadderMap,
-    MAX_LADDER_TYPING,
+    type LadderRung,
     MAX_LIST_TYPING,
     MAX_PATH_TYPING,
     type SettingDef,
@@ -28,47 +28,70 @@ import {
     validateValue,
 } from "../store/settings.js"
 import { type LegendItem, legendBack, legendFor, legendOf } from "../ui/grid.js"
-import { Entry, Prompt, type Suggestion } from "../ui/input.js"
+import {
+    DROPDOWN_CHROME,
+    Dropdown,
+    Entry,
+    filterChoices,
+    Prompt,
+    positionStatus,
+    type Suggestion,
+    suggestionLines,
+} from "../ui/input.js"
 import {
     ChoiceTabs,
+    CursorList,
     type KeyInput,
     keys,
+    ListText,
     NarrowWidth,
     Swatch,
     useBodyColumns,
     useKeys,
+    useListCursor,
     useScreenActive,
 } from "../ui/interaction.js"
 import { TextBuffer, TextField } from "../ui/text-input.js"
 import { Bright, ErrorText, Panel, useTheme } from "../ui/theme.js"
 import {
+    addableOverrides,
+    conditionLabel,
+    dropOverride,
     dropRung,
     type EditEnd,
     hasColourPart,
     indexOfPick,
+    LADDER_RERUNS,
     type ListKind,
-    ladderRows,
+    ladderRungs,
+    MAX_RUNG_NAME,
     maxNameText,
     maxSettingText,
+    moveOverride,
     moveRung,
     narrow,
     openTabs,
     openTuple,
-    parseRung,
+    overrideDef,
+    overrideDescription,
+    overrideValueText,
     parseSetting,
     pasteTuple,
     pickValue,
     putRung,
-    rungText,
+    type RungRef,
+    recondition,
+    renameRung,
+    rungOf,
+    rungPlace,
+    rungRowText,
+    setOverride,
     stepTabs,
     stepTuple,
     type TupleEdit,
     takeColour,
     valueText,
 } from "./screen-rules.js"
-
-/** The rows of the ladder editor's list (a class and its rungs are one row each). */
-const ladderLines = 8
 
 /** The most colours or fonts the picker shows at once. */
 const pickerLines = 5
@@ -83,7 +106,6 @@ export const isPicked = (def: SettingDef): boolean =>
  * and the error, and room for the picker of a colour part.
  */
 export const editorRows = (def: SettingDef): number => {
-    if (def.kind === "ladder") return ladderLines + 3
     if (def.kind === "tuple")
         return Math.max(def.partNames.length + 1, hasColourPart(def) ? pickerLines + 5 : 0)
     return def.kind === "colour"
@@ -125,12 +147,6 @@ function textHint(def: SettingDef): { label: string; placeholder?: string } {
             return { label: "markers:", placeholder: "o, square, triangle" }
         case "sizes":
             return { label: "sizes:", placeholder: "76x5, 100x9 (growing)" }
-        case "ladder":
-            return {
-                label: "rungs:",
-                placeholder:
-                    "name: TARGET_ACCEPT=99; RNG_SEED_STEP=1 | next rung (empty: off)",
-            }
         case "path":
             return { label: "path:", placeholder: "empty: the default" }
         case "optionalInt":
@@ -219,11 +235,9 @@ export function TextEditor({ def, current, onEnd, onLegend }: EditorProps): Reac
             maxLength={
                 def.kind === "path"
                     ? MAX_PATH_TYPING
-                    : def.kind === "ladder"
-                        ? MAX_LADDER_TYPING
-                        : listKinds.has(def.kind)
-                            ? MAX_LIST_TYPING
-                            : maxSettingText
+                    : listKinds.has(def.kind)
+                        ? MAX_LIST_TYPING
+                        : maxSettingText
             }
             placeholder={placeholder}
             error={error}
@@ -530,108 +544,437 @@ export function TupleEditor({ def, current, onEnd, onLegend }: EditorProps): Rea
     )
 }
 
+/** The rows the ladder editor spends besides its list: a header, a note and the error. */
+const LADDER_CHROME = 3
+
+/** What the ladder editor is showing now. */
+type LadderStep =
+    /** The rungs, in the order tried. */
+    | { at: "list" }
+    /** The picker of a condition: for a rung being added, or for `from`'s own. */
+    | { at: "condition"; from?: RungSheet }
+    /** The prompt of a name: of a new rung of `cls`, or of the rung of `from`. */
+    | { at: "name"; cls: string; from?: RungSheet }
+    /** The sheet of one rung: its condition, its name and its overrides. */
+    | ({ at: "rung" } & RungSheet)
+    /** The picker of a setting to override. */
+    | ({ at: "setting" } & RungSheet)
+    /** The editor of the value of one override (`adding`: it is not in the rung yet). */
+    | ({ at: "value"; name: string } & RungSheet)
+
+/** The rung of a sheet, and what it was when the sheet was opened (to revert to). */
+type RungSheet = { ref: RungRef; opened: LadderRung }
+
+/** What the ladder editor is told. */
+type LadderProps = {
+    def: SettingDef
+    current: SettingValue
+    /** The rows the editor may use in all (the body under the frame's header). */
+    rows: number
+    onEnd: (end: EditEnd<SettingValue>) => void
+    onLegend: (keys: LegendItem[]) => void
+}
+
+/** The value editor of an override, by the kind of its setting (the sheets' own). */
+function OverrideValueEditor(props: {
+    ladder: SettingDef
+    name: string
+    current: SettingValue
+    onEnd: (end: EditEnd<SettingValue>) => void
+    onLegend: (keys: LegendItem[]) => void
+}): ReactNode {
+    const { ladder, name, current, onEnd, onLegend } = props
+    const theme = useTheme()
+    const columns = useBodyColumns()
+    const target = overrideDef(ladder, name) as SettingDef
+    const editor =
+        target.kind === "tuple" ? (
+            <TupleEditor def={target} current={current} onEnd={onEnd} onLegend={onLegend} />
+        ) : target.kind === "set" ? (
+            <TabsEditor def={target} current={current} onEnd={onEnd} onLegend={onLegend} />
+        ) : (
+            <TextEditor def={target} current={current} onEnd={onEnd} onLegend={onLegend} />
+        )
+    return (
+        <Box flexDirection="column">
+            <Text color={theme.fg} bold>
+                {truncate(name, columns)}
+            </Text>
+            <Text color={theme.mt}>{truncate(target.description, columns)}</Text>
+            {editor}
+        </Box>
+    )
+}
+
 /**
- * The retry ladder edited as a list: a row for each failure class (a header) and, under
- * it, a row for each of its rungs. Up and down move; Enter on a rung edits it (a line of
- * `name: KEY=value; ...`), on a class adds a rung at its end; Ctrl+n adds a rung to the
- * class in focus; Ctrl+r removes the rung (on a class: all its rungs); PageUp and
- * PageDown move a rung earlier or later in its class; Esc takes the whole ladder (a wrong
+ * The retry ladder, edited as a scrolling list of rungs in the order tried, each
+ * `condition ▸ name ▸ N overrides` (the condition is the failure class, in plain words).
+ * It fills the body of the sheet and scrolls like the other lists (`useListCursor`).
+ *
+ * In the list: up and down move, PgUp and PgDn page, Enter opens the rung, Ctrl+n adds a
+ * rung (pick its condition, then give it a name, then its first override), Ctrl+r
+ * removes it, Shift+up and Shift+down move it earlier or later among those of its
+ * condition, Ctrl+u puts the default ladder back, Esc takes the whole ladder (a wrong
  * one stays as an error), Ctrl+x goes back without it.
+ *
+ * The sheet of a rung lists its condition and name (Enter changes them) and its
+ * overrides, `SETTING  value`: Enter edits the value with the setting's own editor (a
+ * bool flips), Ctrl+n adds an override (pick from the settings a rung may override),
+ * Ctrl+r removes it, Shift+up and Shift+down move it, Ctrl+u reverts the rung to how it
+ * was opened, Esc closes the sheet (a rung left with no override is dropped).
  */
-export function LadderEditor({ def, current, onEnd, onLegend }: EditorProps): ReactNode {
+export function LadderEditor({
+    def,
+    current,
+    rows,
+    onEnd,
+    onLegend,
+}: LadderProps): ReactNode {
     const theme = useTheme()
     const columns = useBodyColumns()
     const [map, setMap] = useState<LadderMap>(current as LadderMap)
-    const [focus, setFocus] = useState(0)
-    const [typing, setTyping] = useState<{ cls: string; index: number; initial: string }>()
+    const [step, setStep] = useState<LadderStep>({ at: "list" })
     const [error, setError] = useState<string>()
-    const rows = useMemo(() => ladderRows(map, def.classes), [map, def.classes])
-    const row = rows[Math.min(focus, rows.length - 1)]
+    // what the highlighted setting of the picker does
+    const [described, setDescribed] = useState("")
+    const rungs = useMemo(() => ladderRungs(map, def.classes), [map, def.classes])
+    const lines = Math.max(3, rows - LADDER_CHROME)
+    const list = useListCursor(rungs.length, lines)
+
+    // the rung of the sheet (and of the pickers and editors opened from it)
+    const sheetOf = step.at === "list" ? undefined : "opened" in step ? step : step.from
+    const rung = sheetOf === undefined ? undefined : rungOf(map, sheetOf.ref)
+    const names = rung === undefined ? [] : Object.keys(rung.overrides)
+    const sheet = useListCursor(2 + names.length, lines)
+    const onOverride = sheet.index >= 2
+
+    const conditionWidth = Math.max(0, ...def.classes.map((c) => conditionLabel(c).length))
+
+    // --- the legends of the two views (a picker or an editor gives its own)
+    const inRung = step.at === "rung"
     useEffect(() => {
-        if (typing) return
-        onLegend([
-            legendFor("move", [keys.up, keys.down]),
-            legendFor(row?.rung === undefined ? "add rung" : "edit", keys.enter),
-            legendFor("add", keys.addNonbio),
-            legendFor("remove", keys.remove),
-            legendFor("reorder", [keys.pageUp, keys.pageDown]),
-            legendFor("done", keys.escape),
-            legendBack,
-        ])
-    }, [typing, row?.rung, onLegend])
+        if (step.at === "list")
+            onLegend([
+                legendFor("move", [keys.up, keys.down]),
+                legendFor("open", keys.enter),
+                legendFor("add rung", keys.addNonbio),
+                legendFor("remove", keys.remove),
+                legendFor("reorder", [keys.pageUpShift, keys.pageDownShift]),
+                legendFor("default", keys.undo),
+                legendFor("done", keys.escape),
+                legendBack,
+            ])
+        else if (inRung)
+            onLegend([
+                legendFor("move", [keys.up, keys.down]),
+                legendFor("edit", keys.enter),
+                legendFor("add override", keys.addNonbio),
+                ...(onOverride
+                    ? [
+                        legendFor("remove", keys.remove),
+                        legendFor("reorder", [keys.pageUpShift, keys.pageDownShift]),
+                    ]
+                    : []),
+                legendFor("revert rung", keys.undo),
+                legendFor("close", keys.escape),
+                legendBack,
+            ])
+    }, [step.at, inRung, onOverride, onLegend])
+
+    // --- the list
+    const openRung = (r: RungRef): void => {
+        const one = rungOf(map, r)
+        if (one === undefined) return
+        sheet.set(0)
+        setStep({ at: "rung", ref: r, opened: one })
+    }
     useKeys((press) => {
-        if (row === undefined) return
         setError(undefined)
-        if (press.is(keys.up)) setFocus(Math.max(0, focus - 1))
-        else if (press.is(keys.down)) setFocus(Math.min(rows.length - 1, focus + 1))
+        const at = rungs[list.index]
+        if (press.is(keys.pageUpShift) || press.is(keys.pageDownShift)) {
+            const by = press.is(keys.pageUpShift) ? -1 : 1
+            const next = rungs[list.index + by]
+            if (at === undefined || next === undefined || next.cls !== at.cls) return
+            setMap(moveRung(map, at.cls, at.index, by))
+            list.move(by)
+        } else if (press.is(keys.up)) list.move(-1)
+        else if (press.is(keys.down)) list.move(1)
+        else if (press.is(keys.pageUp)) list.move(-lines)
+        else if (press.is(keys.pageDown)) list.move(lines)
+        else if (press.is(keys.home)) list.set(0)
+        else if (press.is(keys.end)) list.set(rungs.length - 1)
         else if (press.is(keys.enter)) {
-            const index = row.rung ?? (map[row.cls] ?? []).length
-            const old = row.rung === undefined ? undefined : map[row.cls]?.[row.rung]
-            const initial = old === undefined ? "" : rungText(old)
-            setTyping({ cls: row.cls, index, initial })
-        } else if (press.is(keys.addNonbio))
-            setTyping({ cls: row.cls, index: (map[row.cls] ?? []).length, initial: "" })
+            if (at !== undefined) openRung(at)
+        } else if (press.is(keys.addNonbio)) setStep({ at: "condition" })
         else if (press.is(keys.remove)) {
-            setMap(dropRung(map, row.cls, row.rung))
-            if (row.rung !== undefined) setFocus(Math.max(0, focus - 1))
-        } else if (press.is(keys.pageUp) && row.rung !== undefined) {
-            setMap(moveRung(map, row.cls, row.rung, -1))
-            setFocus(Math.max(0, focus - 1))
-        } else if (press.is(keys.pageDown) && row.rung !== undefined) {
-            setMap(moveRung(map, row.cls, row.rung, 1))
-            setFocus(Math.min(rows.length - 1, focus + 1))
+            if (at !== undefined) setMap(dropRung(map, at.cls, at.index))
+        } else if (press.is(keys.undo)) {
+            setMap(def.default as LadderMap)
+            list.set(0)
         } else if (press.is(keys.escape)) {
             const checked = validateValue(def, map as SettingValue)
             if (checked.ok) onEnd({ kind: "done", value: checked.value })
             else setError(checked.error)
         } else if (press.is(keys.back)) onEnd({ kind: "back" })
-    }, !typing)
-    if (typing)
+    }, step.at === "list")
+
+    // --- the sheet of a rung
+    const closeSheet = (ref: RungRef): void => {
+        // a rung with no override runs nothing (and the ladder would be refused)
+        const empty = Object.keys(rungOf(map, ref)?.overrides ?? {}).length === 0
+        const next = empty ? dropRung(map, ref.cls, ref.index) : map
+        setMap(next)
+        list.set(Math.max(0, rungPlace(map, def.classes, ref)))
+        setStep({ at: "list" })
+    }
+    const toggle = (ref: RungRef, name: string, now: SettingValue): void =>
+        setMap(setOverride(map, ref, name, !now))
+    useKeys((press) => {
+        if (step.at !== "rung") return
+        setError(undefined)
+        const { ref, opened } = step
+        const name = names[sheet.index - 2]
+        const onName = name !== undefined
+        if (press.is(keys.pageUpShift) || press.is(keys.pageDownShift)) {
+            const by = press.is(keys.pageUpShift) ? -1 : 1
+            if (onName && sheet.index + by >= 2 && sheet.index + by < 2 + names.length) {
+                setMap(moveOverride(map, ref, name, by))
+                sheet.move(by)
+            }
+        } else if (press.is(keys.up)) sheet.move(-1)
+        else if (press.is(keys.down)) sheet.move(1)
+        else if (press.is(keys.pageUp)) sheet.move(-lines)
+        else if (press.is(keys.pageDown)) sheet.move(lines)
+        else if (press.is(keys.enter)) {
+            if (sheet.index === 0) setStep({ at: "condition", from: { ref, opened } })
+            else if (sheet.index === 1) {
+                setStep({ at: "name", cls: ref.cls, from: { ref, opened } })
+            }
+            else if (onName) {
+                const kind = overrideDef(def, name)?.kind
+                const value = rung?.overrides[name] as SettingValue
+                if (kind === "bool") toggle(ref, name, value)
+                else setStep({ at: "value", name, ref, opened })
+            }
+        } else if (press.is(keys.addNonbio)) {
+            if (rung !== undefined && addableOverrides(def, rung).length === 0)
+                setError("every setting a rung may override is already set")
+            else setStep({ at: "setting", ref, opened })
+        } else if (press.is(keys.remove)) {
+            if (onName) setMap(dropOverride(map, ref, name))
+        } else if (press.is(keys.undo)) setMap(putRung(map, ref.cls, ref.index, opened))
+        else if (press.is(keys.escape)) closeSheet(ref)
+        else if (press.is(keys.back)) onEnd({ kind: "back" })
+    }, step.at === "rung")
+
+    // --- the pickers, the prompt and the value editor
+    const choiceLines = Math.max(3, Math.min(suggestionLines, rows - DROPDOWN_CHROME))
+    if (step.at === "condition") {
+        const from = step.from
+        const choices = def.classes.map((cls) => ({
+            label: conditionLabel(cls),
+            value: cls,
+        }))
         return (
-            <Prompt
-                label={`${typing.cls}:`}
-                initial={typing.initial}
-                maxLength={MAX_LADDER_TYPING}
-                placeholder="name: TARGET_ACCEPT=99; RNG_SEED_STEP=1"
-                error={error}
-                onChange={() => setError(undefined)}
-                onSubmit={(text) => {
-                    const rung = parseRung(text)
-                    if ("error" in rung) return setError(rung.error)
-                    const next = putRung(map, typing.cls, typing.index, rung.value)
-                    const checked = validateValue(def, next as SettingValue)
-                    if (!checked.ok) return setError(checked.error)
-                    setMap(checked.value as LadderMap)
-                    setTyping(undefined)
+            <Dropdown<string>
+                label="condition:"
+                search={filterChoices(choices)}
+                lines={Math.min(choiceLines, choices.length)}
+                onPick={(cls) => {
+                    if (from === undefined) return setStep({ at: "name", cls })
+                    const moved = recondition(map, from.ref, cls)
+                    setMap(moved.map)
+                    setStep({ at: "rung", ref: moved.ref, opened: from.opened })
                 }}
-                onCancel={() => setTyping(undefined)}
-                onBack={() => setTyping(undefined)}
+                onCancel={() =>
+                    setStep(from === undefined ? { at: "list" } : { at: "rung", ...from })
+                }
+                onBack={() => onEnd({ kind: "back" })}
                 onLegend={onLegend}
             />
         )
-    const first = Math.max(0, Math.min(focus - ladderLines + 1, rows.length - ladderLines))
-    const shown = rows.slice(first, first + ladderLines)
+    }
+    if (step.at === "name") {
+        const from = step.from
+        const cls = step.cls
+        return (
+            <Prompt
+                label="name:"
+                initial={from === undefined ? "" : (rung?.name ?? "")}
+                maxLength={MAX_RUNG_NAME}
+                placeholder="optional: what the rung is for"
+                onSubmit={(text) => {
+                    const name = text.trim()
+                    if (from !== undefined) {
+                        setMap(renameRung(map, from.ref, name))
+                        return setStep({ at: "rung", ...from })
+                    }
+                    // a new rung ends the rungs of its
+                    // condition; its first override is next
+                    const made: LadderRung = { name, overrides: {} }
+                    const ref = { cls, index: (map[cls] ?? []).length }
+                    const next = putRung(map, cls, ref.index, made)
+                    setMap(next)
+                    list.set(Math.max(0, rungPlace(next, def.classes, ref)))
+                    sheet.set(0)
+                    setStep({ at: "setting", ref, opened: made })
+                }}
+                onCancel={() =>
+                    setStep(from === undefined ? { at: "list" } : { at: "rung", ...from })
+                }
+                onBack={() => onEnd({ kind: "back" })}
+                onLegend={onLegend}
+            />
+        )
+    }
+    if (step.at === "setting") {
+        const { ref, opened } = step
+        const addable = rung === undefined ? [] : addableOverrides(def, rung)
+        const choices = addable.map((name) => ({ label: name, value: name }))
+        const room = Math.max(3, Math.min(suggestionLines, rows - DROPDOWN_CHROME - 2))
+        return (
+            <Box flexDirection="column">
+                <Dropdown<string>
+                    label="setting:"
+                    search={filterChoices(choices)}
+                    lines={Math.min(room, Math.max(1, choices.length))}
+                    noMatch="no such setting a rung may override"
+                    onHighlight={(name) =>
+                        setDescribed(
+                            name === undefined ? "" : overrideDescription(def, name),
+                        )
+                    }
+                    onPick={(name) => {
+                        const target = overrideDef(def, name) as SettingDef
+                        if (target.kind === "bool") {
+                            const flipped = !(target.default as boolean)
+                            const next = setOverride(map, ref, name, flipped)
+                            setMap(next)
+                            const overrides = rungOf(next, ref)?.overrides ?? {}
+                            sheet.set(2 + Object.keys(overrides).length - 1)
+                            return setStep({ at: "rung", ref, opened })
+                        }
+                        setStep({ at: "value", name, ref, opened })
+                    }}
+                    onCancel={() => setStep({ at: "rung", ref, opened })}
+                    onBack={() => onEnd({ kind: "back" })}
+                    onLegend={onLegend}
+                />
+                <Text color={theme.mt}>
+                    {wrapText(described, columns).slice(0, 2).join("\n")}
+                </Text>
+            </Box>
+        )
+    }
+    if (step.at === "value") {
+        const { ref, opened, name } = step
+        const target = overrideDef(def, name) as SettingDef
+        return (
+            <OverrideValueEditor
+                key={name}
+                ladder={def}
+                name={name}
+                current={rung?.overrides[name] ?? target.default}
+                onEnd={(end) => {
+                    if (end.kind === "back") return onEnd({ kind: "back" })
+                    if (end.kind === "done") {
+                        const next = setOverride(map, ref, name, end.value)
+                        setMap(next)
+                        const names = Object.keys(rungOf(next, ref)?.overrides ?? {})
+                        const at = names.indexOf(name)
+                        sheet.set(2 + at)
+                    }
+                    setStep({ at: "rung", ref, opened })
+                }}
+                onLegend={onLegend}
+            />
+        )
+    }
+
+    // --- the drawing of the list and of the sheet
+    if (step.at === "rung" && rung !== undefined && sheetOf !== undefined) {
+        const place = rungPlace(map, def.classes, sheetOf.ref)
+        const labelWidth = Math.max(
+            "condition".length,
+            ...names.map((n) => n.length),
+        )
+        const rowsText = [
+            `${"condition".padEnd(labelWidth)}  ${conditionLabel(sheetOf.ref.cls)}`,
+            `${"name".padEnd(labelWidth)}  ${rung.name === "" ? "(unnamed)" : rung.name}`,
+            ...names.map((n) => {
+                const value = overrideValueText(def, n, rung.overrides[n] as SettingValue)
+                return `${n.padEnd(labelWidth)}  ${value}`
+            }),
+        ]
+        const highlighted = onOverride ? names[sheet.index - 2] : undefined
+        return (
+            <Box flexDirection="column">
+                <Text color={theme.fg} bold>
+                    {truncate(
+                        `rung ${place + 1} of ${rungs.length} · ` +
+                            positionStatus(sheet.index, rowsText.length) +
+                            (names.length === 0 ? " · no override yet: add one" : ""),
+                        columns,
+                    )}
+                </Text>
+                <CursorList
+                    items={rowsText}
+                    index={sheet.index}
+                    offset={sheet.offset}
+                    lines={lines}
+                    row={(text, on) => (
+                        <ListText on={on}>{truncate(text, columns - 2)}</ListText>
+                    )}
+                />
+                <Box flexGrow={1} />
+                <Text color={theme.mt}>
+                    {truncate(
+                        highlighted === undefined
+                            ? ""
+                            : overrideDescription(def, highlighted),
+                        columns,
+                    )}
+                </Text>
+                <ErrorText reserve>{truncate(error ?? "", columns)}</ErrorText>
+            </Box>
+        )
+    }
     return (
         <Box flexDirection="column">
-            {shown.map((r, i) => {
-                const at = first + i
-                const focused = at === focus
-                const ink = focused ? theme.fg : theme.mt
-                const text =
-                    r.rung === undefined
-                        ? `${r.cls} (${(map[r.cls] ?? []).length})`
-                        : `  ${r.rung + 1}. ${rungText(map[r.cls]?.[r.rung] as never)}`
-                return (
-                    <Text
-                        key={`${r.cls}-${r.rung}`}
-                        color={ink}
-                        bold={r.rung === undefined}
-                        inverse={focused}
-                    >
-                        {truncate(text, columns - 2)}
-                    </Text>
-                )
-            })}
+            <Text color={theme.fg} bold>
+                {truncate(
+                    rungs.length === 0
+                        ? "no rungs: the ladder is off"
+                        : `rung ${list.index + 1} of ${rungs.length}`,
+                    columns,
+                )}
+            </Text>
+            <CursorList
+                items={rungs}
+                index={list.index}
+                offset={list.offset}
+                lines={lines}
+                row={(r, on) => (
+                    <ListText on={on}>
+                        {truncate(
+                            rungRowText(
+                                rungOf(map, r) as LadderRung,
+                                r.cls,
+                                conditionWidth,
+                            ),
+                            columns - 2,
+                        )}
+                    </ListText>
+                )}
+            />
+            <Box flexGrow={1} />
+            <Text color={theme.mt}>
+                {truncate(
+                    `a fit is rerun ${LADDER_RERUNS} times at most, ` +
+                        "whatever the number of rungs",
+                    columns,
+                )}
+            </Text>
             <ErrorText reserve>{truncate(error ?? "", columns)}</ErrorText>
         </Box>
     )

@@ -158,7 +158,7 @@ Computes a NUTS seed from given data input:
 -   `beadRayRange = BEAD_RAY_RANGE`, `beadRayDirs = BEAD_RAY_DIRS`: range in Å (12) and
     number of directions (64) of the cavity classification of the beads, forwarded to
     [`sasa`](@ref BAYSOL.Geometry.sasa).
--   `memoryHeadroom = MEMORY_HEADROOM`: percent (a whole number, 5 to 50; 10) of the
+-   `memoryHeadroom = MEMORY_HEADROOM`: percent (a whole number, 5 to 80; 10) of the
     machine's total memory to leave free while the scattering build runs. The build works
     through the q values in blocks sized to `Sys.free_memory()` minus this headroom
     ([`Scattering.forwardCache`](@ref)); the result does not depend on it, only the number
