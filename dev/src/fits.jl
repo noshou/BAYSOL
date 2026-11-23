@@ -29,8 +29,13 @@ Runs the fitting tests (test/fitting_tests/<ID>/) and what follows them.
     --report    then print the Results-table rows of the fits
     --table     then rewrite the Results table of the README
     --fixme     then run the sampler diagnostics (`fits diagnose --report`)
-    --trace-compile FILE
-                run the fits with Julia's --trace-compile=FILE
+    --trace-compile DIR
+                run each fit with Julia's --trace-compile=DIR/<ID>.jl (one file per fit:
+                the flag truncates its file at the start of every process)
+    --scratch DIR
+                run a copy of each entry under DIR (the script, `common.jl` and a link to
+                `test/fixtures`), so that the workbook, the run log and the plots of the
+                fit land in DIR and the tracked files of the repository stay as they are
     --threads N Julia threads (4, auto, 4,1); default one
     --keep-fixtures
                 keep the unpacked fixtures of each fit (default: removed after the fit)
@@ -41,6 +46,11 @@ Before each fit its fixtures are unpacked (`bysl fixtures unpack`, outside the f
 \$BAYSOL_FIXTURES_SYNTHETIC) and afterwards the copy is removed.
 
 A failing step does not stop the others; the exit status is 1 if any failed.
+
+A fit that seems stuck (far past its time in the entry's LOG, one thread busy, no output)
+or does not converge: stop it and try a new seed, `runModel(...; rngSeed = 1)` in a copy
+of the script (the default seed is 0). A few entries are seed-sensitive (SASDP74, SASDVQ8,
+SASDAP8); the retry ladder only helps within a seed.
 """
 
 const FLAG_NAMES = [
@@ -50,13 +60,50 @@ const FLAG_NAMES = [
     "--keep-fixtures", "--dry-run"]
 
 # The options that take a value.
-const VALUED = ["--trace-compile"]
+const VALUED = ["--trace-compile", "--scratch"]
 
 # The command that runs another tool of this package by its task name: `bysl <task> args`.
 tool(task, args...) = vcat(["bysl", task], collect(String, args))
 
+"""
+    mirror_entry(id, scratch) -> String
+
+Copies the entry `id` (a fitting test or a `SYN-*` entry) into `scratch` with the layout
+the scripts rely on (`test/fitting_tests/<id>/` or `test/synthetic_tests/<id>/`,
+`test/fitting_tests/common.jl`, `test/fixtures`) and returns the path of the copied script.
+What an earlier fit wrote (`plots/`, `.xlsx` workbooks, `.LOG` files) is not copied; the
+fixtures folder is symlinked, and copied only where a link cannot be made.
+
+# Returns
+The script's path in `scratch`.
+
+# Exceptions
+`ToolError` when the entry has no script.
+"""
+function mirror_entry(id, scratch)
+    script = script_of(id)
+    tree = id in synthetic_ids() ? SYNTHETIC_DIR : FIT_DIR
+    dest = mkpath(joinpath(scratch, tree, id))
+    for f in readdir(dirname(script))
+        src = joinpath(dirname(script), f)
+        (f == "plots" || endswith(f, ".xlsx") || endswith(f, ".LOG")) && continue
+        cp(src, joinpath(dest, f); force = true)
+    end
+    mkpath(joinpath(scratch, FIT_DIR))
+    cp(in_root(FIT_DIR, "common.jl"), joinpath(scratch, FIT_DIR, "common.jl"); force = true)
+    fixtures = joinpath(scratch, "test", "fixtures")
+    if !ispath(fixtures)
+        try
+            symlink(in_root("test", "fixtures"), fixtures)
+        catch
+            cp(in_root("test", "fixtures"), fixtures)
+        end
+    end
+    return joinpath(dest, basename(script))
+end
+
 # The steps to run, in order, as (label, failure name, command, fixture id or nothing).
-function steps(flag, selected, requested, julia, trace)
+function steps(flag, selected, requested, julia, trace, scratch = nothing)
     out = Tuple{String,String,Vector{String},Union{Nothing,String}}[]
     # 1. the fits: one Julia process per fitting test, in the fitting-test project
     if !flag("--no-fit")
@@ -69,10 +116,12 @@ function steps(flag, selected, requested, julia, trace)
                     # the script runs through `BAYSOL.Pipeline._runLogged`, so a failure
                     # still writes its section of the run log
                     vcat([julia, "--startup-file=no"],
-                        trace === nothing ? String[] : ["--trace-compile=$trace"],
+                        trace === nothing ? String[] :
+                        ["--trace-compile=" * joinpath(trace, id * ".jl")],
                         ["--project=" * in_root(FIT_DIR), "-e",
                             "using BAYSOL; BAYSOL.Pipeline._runLogged(ARGS[1])",
-                            script_of(id)]),
+                            scratch === nothing ? script_of(id) : mirror_entry(id, scratch),
+                        ]),
                     id,
                 ),
             )
@@ -164,10 +213,12 @@ function run(argv::Vector{String})::Int
     selected = isempty(specs) ? ids() : specs
     julia = find_julia()
     dry = flag("--dry-run")
+    trace === nothing || dry || mkpath(trace)
     # a failing step does not stop the others
     failed = String[]
     keep = flag("--keep-fixtures")
-    for (label, failure, cmd, id) in steps(flag, selected, specs, julia, trace)
+    scratch = haskey(Dict(opts), "--scratch") ? abspath(Dict(opts)["--scratch"]) : nothing
+    for (label, failure, cmd, id) in steps(flag, selected, specs, julia, trace, scratch)
         println("\n=== ", label)
         if id === nothing
             run_step(dry, cmd) || push!(failed, failure)

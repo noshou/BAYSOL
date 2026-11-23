@@ -14,7 +14,7 @@ using Statistics
 using LinearAlgebra
 using BAYSOL.Shannon: ShannonInfo, SHANNON_REBIN, BIN_BIAS_MAX, cloudDiameter, autoLmax,
     shannonData, modelOnRaw, rawInterpolation,
-    residualStructure, binBiasRatio
+    residualStructure, binBiasRatio, _runsZ
 using BAYSOL.BulkElectronDensity: NonBiological, Solute
 using BAYSOL.Scattering: forwardCache, hydration
 using BAYSOL.Geometry: sasa
@@ -420,6 +420,17 @@ bruteDiameter(P) = maximum(
         # the bin map, band limit and channel count are those of the binning that was kept
         @test length(auto.bin) == length(q) && maximum(auto.bin) == length(auto.q)
         @test auto.lMax == autoLmax(D, maximum(auto.q))
+    end
+
+    @testset "runs test z against the values of HypothesisTests.WaldWolfowitzTest" begin
+        # values from HypothesisTests 0.12 on these exact sequences
+        @test _runsZ(Bool[1, 0, 1, 1, 0, 0, 1, 0, 1, 1]) ≈ 0.8429272304235239 atol =
+            DEFAULT_ATOL
+        @test _runsZ(Bool[1, 1, 1, 0, 0, 0, 1, 1]) ≈ -1.441800221524424 atol = DEFAULT_ATOL
+        @test _runsZ(Bool[1, 0, 1, 0, 1]) ≈ 1.7457431218879382 atol = DEFAULT_ATOL
+        r = [0.3, -1.2, 0.5, 0.9, -0.4, -0.2, 1.1, -0.7, 0.1, 0.6, -0.9, 0.2]
+        @test residualStructure(r).runsZ ≈ 1.3533392381794218 atol = DEFAULT_ATOL
+        @test isnan(_runsZ(fill(true, 5)))
     end
 
 end

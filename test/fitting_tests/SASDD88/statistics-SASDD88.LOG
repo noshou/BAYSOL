@@ -1,4 +1,4 @@
-datetime	20-11-2026 00:33:20 -0500
+datetime	22-11-2026 22:52:58 -0500
 
 === fit2_model1 ===
 
@@ -109,7 +109,7 @@ distinct optima: 2
   mode 2: f=501.758 ξ=[0.3405, 0.4223, -5.311, 2.179]  H-eig=[0.9999, 2.14, 23.09, 1.51e+04]  log Laplace mass=-508.519 (Δ vs best = -14.9 nats)
 
 -- nuts --
-NUTS: 0.2s  init ε=2.5  final ε=0.3756  mean nSteps=10.1 mean depth=3.12  frac(depth≥10)=0.000  diverged=0
+NUTS: 0.1s  init ε=2.5  final ε=0.3756  mean nSteps=10.1 mean depth=3.12  frac(depth≥10)=0.000  diverged=0
 mean nSteps by window: [1:75]=15  [76:450]=11  [251:300]=10  [301:1000]=10
 mean accept = 0.963   mean |ΔH| = 0.070
 
@@ -228,12 +228,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 2 modes)	0.0632959       	0.0346216       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000128918     	0.0             	0.0             	
-  optima from the draws, 0 extra chains	1.81784         	1.80543         	0.0             	
-  NUTS  (8k iters, 85.58k leapfrog, 0.011 ms/step)	2.21426         	1.95202         	0.0             	
-  2 posterior modes: mass by bridge sampling	0.277592        	0.244582        	0.0             	
-  per-draw c1 re-profile + curves (7300 draws)	0.111198        	0.205322        	0.0             	
+  MAP search + whitening (76/76 starts, 2 modes)	0.0610031       	0.0330942       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000115792     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.77262         	1.76058         	0.0             	
+  NUTS  (8k iters, 85.58k leapfrog, 0.010 ms/step)	2.18482         	1.95958         	0.0             	
+  2 posterior modes: mass by bridge sampling	0.267575        	0.232775        	0.0             	
+  per-draw c1 re-profile + curves (7300 draws)	0.133828        	0.312797        	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -245,7 +245,7 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	0.000123294
+statisticsFlushSeconds          	0.000124292
 
 === fit3_model1 ===
 
@@ -475,11 +475,11 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 2 modes)	0.0387417       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	5.9084e-5       	0.0             	0.0             	
-  optima from the draws, 0 extra chains	0.0539076       	0.0             	0.0             	
-  NUTS  (8k iters, 119.29k leapfrog, 0.010 ms/step)	0.387724        	0.0             	0.0             	
-  per-draw c1 re-profile + curves (8000 draws)	0.0145457       	0.0             	0.0             	
+  MAP search + whitening (76/76 starts, 2 modes)	0.0381465       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	5.6791e-5       	0.0             	0.0             	
+  optima from the draws, 0 extra chains	0.0742838       	0.0             	0.0             	
+  NUTS  (8k iters, 119.29k leapfrog, 0.011 ms/step)	0.438703        	0.0             	0.0             	
+  per-draw c1 re-profile + curves (8000 draws)	0.0112474       	0.0             	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -491,4 +491,4 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	9.8292e-5
+statisticsFlushSeconds          	0.000102542

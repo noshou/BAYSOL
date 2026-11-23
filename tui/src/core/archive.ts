@@ -40,6 +40,7 @@ import { path7za } from "7zip-bin"
 import sevenZip, { type SevenZipOptions, type ZipStream } from "node-7z"
 import { lock } from "proper-lockfile"
 import { findExecutable, RUN_FLOW, readSystem } from "./environment.js"
+import { extractNativeAsset, inSingleExecutable } from "./native-assets.js"
 
 // ========================================================================================
 // 1. The tool and the names
@@ -66,13 +67,25 @@ let tool: string | undefined
  */
 export function archiveTool(): string {
     if (tool !== undefined) return tool
-    const found = [path7za, ...["7zz", "7z", "7za"].map(onPath)].filter(
+    const found = [bundledTool(), ...["7zz", "7z", "7za"].map(onPath)].filter(
         (p): p is string => p !== undefined && runnable(p),
     )
     const first = found[0]
     if (first === undefined) throw new ArchiveError("no 7-Zip found: install 7z")
     tool = first
     return first
+}
+
+/**
+ * The 7-Zip that came with the program: the `7zip-bin` binary of a checkout, or the one
+ * the packaged app carries as an asset of its executable (written into the cache first).
+ */
+function bundledTool(): string | undefined {
+    try {
+        return inSingleExecutable() ? extractNativeAsset(`native/7za${process.platform === "win32" ? ".exe" : ""}`) : path7za
+    } catch {
+        return undefined
+    }
 }
 
 /** A program on the `PATH`, or `undefined`. */

@@ -7,6 +7,47 @@ threading helpers (random streams per work item, ordered task maps, the BLAS sco
 """
 module Runtime
 
+using SQLite: SQLite
+using DBInterface: DBInterface
+
+# the SQLite library (path of the jll), for `sqlite3_deserialize`, which SQLite.jl lacks
+const _LIBSQLITE = SQLite.C.SQLite_jll.libsqlite
+
+"""
+    memoryDb(bytes) -> SQLite.DB
+
+A read-only SQLite database opened from `bytes`, the contents of a database file. The
+bundled tables (`form_factors.sqlite3`, `atomic_radii.sqlite3`) are read into the package
+when it is built, so an installed app has no data folder to find, move or damage.
+
+`bytes` must stay alive and unchanged while the database is open (a module-level
+constant does); SQLite reads it in place.
+
+# Returns
+The database; close it with `DBInterface.close!`.
+
+# Exceptions
+- `ErrorException`: SQLite refuses the bytes (not a database).
+"""
+function memoryDb(bytes::Vector{UInt8})::SQLite.DB
+    db = SQLite.DB()   # an empty in-memory database to deserialize into
+    n = Int64(length(bytes))
+    READONLY = Cuint(4)   # SQLITE_DESERIALIZE_READONLY: SQLite never writes to `bytes`
+    rc = GC.@preserve bytes @ccall _LIBSQLITE.sqlite3_deserialize(
+        db.handle::Ptr{Cvoid}, "main"::Cstring, pointer(bytes)::Ptr{UInt8},
+        n::Int64, n::Int64, READONLY::Cuint,
+    )::Cint
+    # deserializing is lazy: the first read tells whether the bytes are a database
+    try
+        rc == 0 || error("code $rc")
+        DBInterface.execute(db, "SELECT count(*) FROM sqlite_master") |> collect
+    catch err
+        DBInterface.close!(db)
+        error("memoryDb: SQLite refused the bytes ($(sprint(showerror, err)))")
+    end
+    return db
+end
+
 # --- constants and shared state (the included files use them) ---
 
 # Fixed internals, not settings: changing them could break a run.

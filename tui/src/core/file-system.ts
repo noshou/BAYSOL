@@ -749,6 +749,38 @@ function runShellIn(system: System, dir: string): string | undefined {
     return result.error ? `could not start a shell: ${result.error.message}` : undefined
 }
 
+/** The exit status of the setup wizard after an uninstall (`UNINSTALLED` of `BAYSOLSetup`). */
+export const SETUP_UNINSTALLED = 22
+
+/**
+ * Runs the setup wizard of the packaged app (`<bundle>/baysol setup`) on the terminal until
+ * the user leaves it; the wizard does not offer to launch anything from here.
+ *
+ * @param env - the environment; `BAYSOL_BUNDLE` (set by the launcher) names the app.
+ * @returns `problem`: a text if there is no packaged app or the wizard could not be started;
+ *     `uninstalled`: true if the user uninstalled the app (nothing is left to return to).
+ */
+export function runSetupWizard(env: NodeJS.ProcessEnv): {
+    problem?: string
+    uninstalled: boolean
+} {
+    const bundle = env.BAYSOL_BUNDLE
+    if (!bundle) {
+        return { problem: "the setup wizard belongs to the packaged app", uninstalled: false }
+    }
+    const result = spawnSync(join(bundle, "baysol"), ["setup"], {
+        stdio: "inherit",
+        env: { ...env, BAYSOL_NO_LAUNCH: "1" },
+    })
+    if (result.error) {
+        return {
+            problem: `could not start the setup wizard: ${result.error.message}`,
+            uninstalled: false,
+        }
+    }
+    return { uninstalled: result.status === SETUP_UNINSTALLED }
+}
+
 /**
  * The whole of "Open": the file manager is tried (a failure is reported through
  * `warn`), then a shell runs in the folder until the user leaves it.

@@ -1,0 +1,17 @@
+name = "BAYSOLRun"
+entryfile = "src/baysol-run.jl"
+uuid = "ddc2d533-6b3e-4051-a2d8-71ee69d924c4"
+version = "0.5.0"
+
+[deps]
+BAYSOL = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
+BAYSOLSetup = "4b0c7a52-3f0e-4d52-9a6e-6a1f0d2c8e11"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+
+[sources]
+BAYSOL = {path = "../.."}
+BAYSOLSetup = {path = "../../setup-wizard"}
+
+[compat]
+julia = "1.11"

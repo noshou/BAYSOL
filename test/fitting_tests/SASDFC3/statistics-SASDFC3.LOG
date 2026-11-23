@@ -1,4 +1,4 @@
-datetime	20-11-2026 00:44:55 -0500
+datetime	22-11-2026 23:08:13 -0500
 
 === fit1 ===
 
@@ -25,7 +25,7 @@ base run   nQ=819  nAtoms=69385  lMax=97  c1 tol=1.0e-8
 δρ₃ support = [-11.26, 2.815]   δρ₁,₂ support = [-10.0, 2.0]
 
 -- map search --
-MAP search: 0.3s  nOk=70/70  nModes=2  whitened=true
+MAP search: 0.2s  nOk=70/70  nModes=2  whitened=true
 L-BFGS starts (z space):
   start 1: f=5707.3112 iters= 36 g_conv=false iter_limit=false evals=54 |∇f|∞=5.16e-02
   start 2: f=5707.3112 iters= 45 g_conv=false iter_limit=false evals=73 |∇f|∞=5.12e-03
@@ -103,7 +103,7 @@ distinct optima: 2
   mode 2: f=7900.958 ξ=[0.3378, 0.09297, -1.187, 2.81]  H-eig=[1.041, 2.311, 1.242e+04, 1.539e+06]  log Laplace mass=-7913.234 (Δ vs best = -2.19e+03 nats)
 
 -- nuts --
-NUTS: 0.7s  init ε=3  final ε=0.5662  mean nSteps=6.5 mean depth=2.73  frac(depth≥10)=0.000  diverged=0
+NUTS: 0.4s  init ε=3  final ε=0.5662  mean nSteps=6.5 mean depth=2.73  frac(depth≥10)=0.000  diverged=0
 mean nSteps by window: [1:75]=13  [76:450]=7  [251:300]=7  [301:1000]=6
 mean accept = 0.953   mean |ΔH| = 0.089
 
@@ -222,11 +222,11 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.260198        	0.0346668       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000323293     	0.0             	0.0             	
-  optima from the draws, 0 extra chains	1.89352         	1.85749         	0.0             	
-  NUTS  (8k iters, 57.79k leapfrog, 0.074 ms/step)	3.32855         	2.03964         	0.0             	
-  per-draw c1 re-profile + curves (8000 draws)	0.188132        	0.190734        	0.0             	
+  MAP search + whitening (70/70 starts, 2 modes)	0.241402        	0.0329551       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000313583     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.78468         	1.74989         	0.0             	
+  NUTS  (8k iters, 57.79k leapfrog, 0.048 ms/step)	2.74383         	1.94928         	0.0             	
+  per-draw c1 re-profile + curves (8000 draws)	0.161469        	0.193112        	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -238,4 +238,4 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	0.000119167
+statisticsFlushSeconds          	0.000119542

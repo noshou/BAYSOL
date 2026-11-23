@@ -1,0 +1,12 @@
+SYNTHETIC buffer (invented, not measured): SYN-1EHZ-sucrose30
+host	1EHZ (rna), 2481 atoms, lMax 46, rM 1.1597 Å
+temperature_C	25.0
+pH	7.0	σ_pH	0.1
+energy_eV	8041.52	wavelength_A	1.5418
+rho_e_e_per_A3	0.367629
+sigma_rho_e_e_per_A3	0.000692
+rho_e_water_e_per_A3	0.333292	sigma	0.000007
+rho_e_relative_to_water	1.10302
+shell_contrasts_relative	(1.0, 1.0, 0.0)	c1	1.0	scale 1, background 0
+composition (mol/L, ±σ):
+  sucrose	0.876432	0.01753

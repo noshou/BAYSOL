@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Exercises tui/src/store/run-project.jl (and model-references.jl): `runProject` and
+# Exercises tui/julia/src/baysol-run.jl (and model-references.jl): `runProject` and
 # the run folder it writes (the layout, the states of run.json, the rows of the LOGs, a
 # failing model that does not stop the loop, an interrupt that marks the run aborted,
 # the claim of the folder, the snapshot of the inputs). Most tests replace the fit of a

@@ -40,7 +40,7 @@ if !@isdefined(checkFloat)
 
     # The value of every setting at its default, the `Dict` that the keyword helpers
     # (`seedKeywords`, `runKeywords`, `resultsKeywords`) take: what `loadSettings` of
-    # `tui/src/store/settings-file.jl` returns when there is no settings file.
+    # `tui/julia/src/settings-file.jl` returns when there is no settings file.
     defaultSettings() = Dict{Symbol,Any}(
         n => BAYSOL.Pipeline._settingDefault(n) for n in BAYSOL.Pipeline._settingNames()
     )

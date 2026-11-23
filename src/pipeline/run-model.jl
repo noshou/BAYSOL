@@ -210,16 +210,17 @@ trajectory's sample covariance, starting from the identity in the whitened coord
     once without the kink watch and keep it if it passes (LOG rows `c1KinkFallback`,
     `c1KinkProblems`).
 - `ladder=LADDER` (the setting `LADDER`; needs `retry`): when a run does not converge
-    after its retry and the fallback, the failure is classified from the failed attempt's
-    own diagnostics (`stepCollapse`, `splitChains`, `divergent`, `structural`, `marginal`
-    or `generic`, see [`LADDER`](@ref) and `_failureClass`) and the fit is rerun with the
-    next rung of that class, which changes only the settings it names in `overrides`
-    (`LADDER_OVERRIDABLE` lists what a rung may change); at most three reruns. A map from
-    class to a list of `(name, overrides)` rungs (it replaces only the classes it names),
-    a JSON text of it, the path of a JSON file, `true` (the default ladder), `false` or
-    `"off"`. The winning rung, the class that triggered each rerun and every failed
-    attempt are in the LOG rows `ladder`, `ladderClass`, `ladderAttempts`, `ladderRungs`
-    and `ladderRung`. Only when no rung is left does `runModel` throw.
+    after its retry and the fallback, the failure is classified from the failed
+    attempt's own diagnostics (`stepCollapse`, `splitChains`, `divergent`,
+    `structural`, `marginal` or `generic`, see [`LADDER`](@ref) and `_failureClass`)
+    and the fit is rerun with the next rung of that class, which changes only the
+    settings it names in `overrides` (`LADDER_OVERRIDABLE` lists what a rung may
+    change); the reruns stop when one passes or the class has no unused rung left. A
+    map from class to a list of `(name, overrides)` rungs (it replaces only the classes
+    it names), a JSON text of it, the path of a JSON file, `true` (the default ladder),
+    `false` or `"off"`. The winning rung, the class that triggered each rerun and every
+    failed attempt are in the LOG rows `ladder`, `ladderClass`, `ladderAttempts`,
+    `ladderRungs` and `ladderRung`. Only when no rung is left does `runModel` throw.
 - `callerSet=nothing`: the names of the settings the caller set (a set of `Symbol`s, e.g.
     `Set([:RETRY_N_DRAWS])`). A rung never changes `CHAIN_START_RADII`, `RETRY_N_ADAPT` or
     `RETRY_N_DRAWS` when that name is in it, even if the value equals the default;
@@ -367,9 +368,6 @@ const _CALLER_FIRST = Dict(
 )
 
 _sameValue(a, b) = a isa Union{Tuple,AbstractVector} ? Tuple(a) == Tuple(b) : a == b
-
-"The most reruns of the ladder in one `runModel` call (the base run is not counted)."
-const LADDER_MAX_RUNGS = 3
 
 # The thresholds that classify a failed attempt (`_failureClass`). They are heuristics
 # read off the benchmark runs and the README fix ladder, not settings: the evidence for
@@ -538,8 +536,10 @@ end
 Run `runner` (one attempt of [`runModel`](@ref), `_runModelOnce`) and, when the run does
 not converge, walk the ladder `ladder` (a map from failure class to rungs, see
 [`LADDER`](@ref)) before giving up: the failed attempt is classified (`_failureClass`)
-and the next unused rung of that class is run, up to `LADDER_MAX_RUNGS` times; the class
-is taken anew from each failed rerun, so the walk can change class. A rung that would
+and the next unused rung of that class is run; the class is taken anew from each failed
+rerun, so the walk can change class. The walk ends when a rerun passes or the class the
+last failure falls into has no unused rung left (every rung is used at most once, so it
+always ends). A rung that would
 change nothing for the caller's settings is skipped. Every attempt, the class that
 triggered it, its settings and why it failed are in the run's timing info (LOG rows
 `ladder`, `ladderClass`, `ladderAttempts`, `ladderRungs`, `ladderRung`); when no rung is
@@ -580,7 +580,7 @@ function _runLadder(
     next = Dict(c => 1 for c in LADDER_CLASSES)
     deltaRaised = false
     reruns = 0
-    while reruns < LADDER_MAX_RUNGS
+    while true
         class = _failureClass(err.summary; deltaRaised)
         rungs = ladder[class]
         # the next rung of the class that changes something for this caller

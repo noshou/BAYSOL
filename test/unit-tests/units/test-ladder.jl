@@ -13,7 +13,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using BAYSOL.Pipeline:
     InvalidSettingsError, _ladderValue, _checkedLadder, _runLadder, _applyKeywords!,
     _failureClass, LADDER, LADDER_CLASSES, LADDER_OVERRIDABLE, LADDER_VALIDATED,
-    LADDER_MAX_RUNGS, LADDER_RHAT_FAR, LADDER_COLLAPSE_STEP, _ladderText
+    LADDER_RHAT_FAR, LADDER_COLLAPSE_STEP, _ladderText
 using BAYSOL.Inference: NotConvergedError, CHAIN_START_RADII
 
 const _OFF = NamedTuple{LADDER_CLASSES}(ntuple(_ -> (), length(LADDER_CLASSES)))
@@ -202,7 +202,9 @@ _summary(; kw...) = merge(
     @testset "the ladder as one readable line (the LOG row ladderRungs)" begin
         txt = _ladderText(LADDER)
         # per class its rung names, classes joined by " | ", no JSON
-        @test startswith(txt, "stepCollapse: delta 70, delta 35 | splitChains: ")
+        @test startswith(
+            txt, "stepCollapse: delta 70, delta 35, delta 35 + seed | splitChains: ",
+        )
         @test count(" | ", txt) == length(LADDER_CLASSES) - 1
         @test !occursin('{', txt) && !occursin('"', txt) && !occursin('\n', txt)
         for class in LADDER_CLASSES
@@ -250,9 +252,9 @@ _summary(; kw...) = merge(
         # the ladder off: the base run once, its own error
         e = run(_OFF, [div])
         @test length(calls) == 1 && e.problems == ["R-hat 1.5"]
-        # a divergent failure walks the validated rungs, in order, to the cap
+        # a divergent failure walks every rung of its class, in order, then stops
         e = run(LADDER, [div])
-        @test length(calls) == 1 + LADDER_MAX_RUNGS
+        @test length(calls) == 1 + length(LADDER[:divergent])
         @test occursin("ladder exhausted", join(e.problems))
         @test [c.kw.δ for c in calls] == [95, 99, 99, 99]
         @test calls[2].kw.chainStartRadii == CHAIN_START_RADII
@@ -268,7 +270,7 @@ _summary(; kw...) = merge(
         # the first rung (radii only) changes nothing and is skipped; the second keeps the
         # radii and changes only what the caller did not set
         @test [c.kw.chainStartRadii for c in calls] ==
-              [CHAIN_START_RADII, CHAIN_START_RADII]
+              [CHAIN_START_RADII, CHAIN_START_RADII, CHAIN_START_RADII]
         @test calls[2].kw.retryNDraws == 4000
         # without `callerSet` the same default value looks unset and is replaced
         run(LADDER, [split]; kw = explicitRadii)
@@ -286,13 +288,15 @@ _summary(; kw...) = merge(
         @test [c.kw.retryNDraws for c in calls] == [2000, 8000, 8000]
         # each class selects its own rungs and logs its name
         run(LADDER, [collapse])
-        @test [c.kw.δ for c in calls] == [95, 70, 35]
-        @test info()["ladderClass"] == "stepCollapse | stepCollapse"
+        @test [c.kw.δ for c in calls] == [95, 70, 35, 35]
+        @test [c.kw.rngSeed for c in calls] == [0, 0, 0, 1]     # the third rung: next seed
+        @test info()["ladderClass"] == "stepCollapse | stepCollapse | stepCollapse"
         run(LADDER, [split])
         @test [c.kw.chainStartRadii for c in calls] ==
-              [CHAIN_START_RADII, (2.0, 4.0, 6.0), (1.0, 2.0, 3.0)]
+              [CHAIN_START_RADII, (2.0, 4.0, 6.0), (1.0, 2.0, 3.0), (1.0, 2.0, 3.0)]
         @test calls[3].kw.retryNDraws == 4000
-        @test info()["ladderClass"] == "splitChains | splitChains"
+        @test [c.kw.rngSeed for c in calls] == [0, 0, 0, 1]     # the third rung: next seed
+        @test info()["ladderClass"] == "splitChains | splitChains | splitChains"
         run(LADDER, [marginal])
         @test [c.kw.retryNDraws for c in calls] == [2000, 8000, 8000]
         @test [c.kw.retryNAdapt for c in calls] == [2000, 6000, 6000]
@@ -305,8 +309,10 @@ _summary(; kw...) = merge(
         @test info()["ladderClass"] == "generic"
         # the class is taken anew from each failed rerun
         run(LADDER, [marginal, collapse, collapse])
-        @test info()["ladderClass"] == "marginal | stepCollapse | stepCollapse"
-        @test [c.kw.δ for c in calls] == [95, 95, 70, 35]
+        @test info()["ladderClass"] ==
+              "marginal | stepCollapse | stepCollapse | stepCollapse"
+        # the walk goes on until the class is used up (three stepCollapse rungs)
+        @test [c.kw.δ for c in calls] == [95, 95, 70, 35, 35]
         # divergences that survive a raised δ at a high share are structural: c1 is sampled
         big = _summary(divergentShare = 0.02)
         run(LADDER, [big, big, big])

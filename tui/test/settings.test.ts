@@ -695,7 +695,7 @@ test("tabs: enter and space toggle the tab in focus, esc ends with the choices",
     assert.deepEqual(done.end, { kind: "done", value: ["svg"] })
 })
 
-test("tabs: a set needs one choice on, and ctrl-x leaves", () => {
+test("tabs: a set needs one choice on, and ^x leaves", () => {
     let edit = openTabs(choices, ["svg"])
     edit = stepTabs(edit, pressOf(keys.enter)).state
     const blocked = stepTabs(edit, pressOf(keys.escape))

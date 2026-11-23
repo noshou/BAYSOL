@@ -38,7 +38,7 @@
      "settings": [
       {
        "name": "LADDER",
-       "description": "Reruns tried, in order, when a fit still fails its gates: a list of rungs per failure class (3 reruns at most). Empty list = class off."
+       "description": "What to rerun when a fit still fails its gates. A failed fit is sorted into one of 6 failure classes; each class has a list of fixes, tried one per rerun, in order, until the fit passes or no unused fix is left in the class it falls into. Empty list = class off."
       }
      ]
     },

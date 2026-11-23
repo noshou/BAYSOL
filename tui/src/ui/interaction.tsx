@@ -329,9 +329,9 @@ export function keyLabels(...parts: (Hotkey | Hotkey[])[]): string {
 }
 
 /**
- * Every key the program gives a meaning, in one place. Ctrl-M, I, J, B, S, Q, Z and Y
+ * Every key the program gives a meaning, in one place. ^m, I, J, B, S, Q, Z and Y
  * are not usable: terminals send them as Enter, Tab or flow control, or take them.
- * Ctrl-C and Ctrl-D reach the program (`exitOnCtrlC: false`) and only leave it.
+ * ^c and ^d reach the program (`exitOnCtrlC: false`) and only leave it.
  */
 export const keys = {
 
@@ -355,7 +355,7 @@ export const keys = {
     /** Leave the program at once, like `interrupt` (end of input). */
     eof:       ctrlKey("d"),
 
-    /** The taskbar of the project menu: start a run (Shift+R). */
+    /** The taskbar of the project menu: start a run (shift+r). */
     runKey:     shiftKey("r"),
 
     /** Back one screen, from any mode; never quits. */
@@ -423,6 +423,9 @@ export const keys = {
 
     /** Open the list of models (an empty field). */
     openList:  shiftKey("h"),
+
+    /** The setup wizard of the packaged app (main menu; it has no tile). */
+    setup:     shiftKey("a"),
 
     /** Reset an unusable file (a landing page). */
     reset:     shiftKey("z"),

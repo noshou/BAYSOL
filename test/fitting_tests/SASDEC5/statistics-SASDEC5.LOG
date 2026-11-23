@@ -1,4 +1,4 @@
-datetime	20-11-2026 00:40:47 -0500
+datetime	22-11-2026 23:02:05 -0500
 
 === SASDEC5 ===
 
@@ -25,7 +25,7 @@ base run   nQ=68  nAtoms=18451  lMax=75  c1 tol=1.0e-8
 δρ₃ support = [-11.18, 2.796]   δρ₁,₂ support = [-10.0, 2.0]
 
 -- map search --
-MAP search: 0.1s  nOk=76/76  nModes=2  whitened=true
+MAP search: 0.0s  nOk=76/76  nModes=2  whitened=true
 L-BFGS starts (z space):
   start 1: f=-371.0507 iters= 30 g_conv=false iter_limit=false evals=39 |∇f|∞=3.10e-05
   start 2: f=-373.1945 iters= 26 g_conv=false iter_limit=false evals=43 |∇f|∞=1.44e-05
@@ -229,12 +229,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 2 modes)	0.0588699       	0.0351552       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000129335     	0.0             	0.0             	
-  optima from the draws, 1 extra chain	2.1292          	1.93585         	0.0             	
-  NUTS  (9k iters, 136.07k leapfrog, 0.008 ms/step)	2.54766         	2.07829         	0.0             	
-  2 posterior modes: mass by bridge sampling	0.31303         	0.244824        	0.0             	
-  per-draw c1 re-profile + curves (7314 draws)	0.110978        	0.225102        	0.0             	
+  MAP search + whitening (76/76 starts, 2 modes)	0.0561558       	0.0327899       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000124626     	0.0             	0.0             	
+  optima from the draws, 1 extra chain	2.07898         	1.88908         	0.0             	
+  NUTS  (9k iters, 136.07k leapfrog, 0.008 ms/step)	2.56782         	2.08695         	0.0             	
+  2 posterior modes: mass by bridge sampling	0.297425        	0.226144        	0.0             	
+  per-draw c1 re-profile + curves (7314 draws)	0.149018        	0.376836        	0.0             	
 
 -- outcome --
 next                            	retry with a longer warm-up: the smallest bulk ESS, 304.9, is not above 400.0; the smallest tail ESS, 310.8, is not above 400.0
@@ -347,7 +347,7 @@ distinct optima: 2
   mode 2: f=-371.051 ξ=[0.3355, 0.2504, -0.8486, 1.738]  H-eig=[1, 2.558, 47.04, 490]  log Laplace mass=365.558 (Δ vs best = -2.91 nats)
 
 -- nuts --
-NUTS: 1.3s  init ε=2.4  final ε=0.2424  mean nSteps=17.0 mean depth=3.59  frac(depth≥10)=0.000  diverged=0
+NUTS: 1.4s  init ε=2.4  final ε=0.2424  mean nSteps=17.0 mean depth=3.59  frac(depth≥10)=0.000  diverged=0
 mean nSteps by window: [1:75]=14  [76:450]=17  [451:1950]=14  [1951:2000]=18  [2001:4000]=17
 mean accept = 0.971   mean |ΔH| = 0.057
 
@@ -466,12 +466,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 2 modes)	0.0350955       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	6.1709e-5       	0.0             	0.0             	
-  optima from the draws, 0 extra chains	0.0168929       	0.0             	0.0             	
-  NUTS  (32k iters, 506.87k leapfrog, 0.010 ms/step)	1.74922         	0.0             	0.209279        	
-  2 posterior modes: mass by bridge sampling	0.197647        	0.0             	0.0             	
-  per-draw c1 re-profile + curves (29162 draws)	0.077401        	0.0             	0.0             	
+  MAP search + whitening (76/76 starts, 2 modes)	0.0330866       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	6.0542e-5       	0.0             	0.0             	
+  optima from the draws, 0 extra chains	0.0168862       	0.0             	0.0             	
+  NUTS  (32k iters, 506.87k leapfrog, 0.010 ms/step)	1.48572         	0.0             	0.210456        	
+  2 posterior modes: mass by bridge sampling	0.196204        	0.0             	0.0             	
+  per-draw c1 re-profile + curves (29162 draws)	0.0726646       	0.0             	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -484,4 +484,4 @@ keptAttempt                     	2
 keptLabel                       	retry, longer warm-up
 keptBecause                     	the retry passed its gates or was no worse in R̂ (worst R̂ 1.006 against 1.0099)
 statisticsFlushes               	5
-statisticsFlushSeconds          	0.000189708
+statisticsFlushSeconds          	0.000212959

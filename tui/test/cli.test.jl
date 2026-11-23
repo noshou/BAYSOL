@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Exercises tui/src/store/cli.jl: the command line of a run. Every flag is the setting of
+# Exercises tui/julia/src/cli.jl: the command line of a run. Every flag is the setting of
 # the same name in settings.json, so the test is that the command-line form and the file
 # form give the same value (a number, a bool, a list, the ladder, a setting of one model),
 # that precedence is flag > file > default, that every checked setting of the table is a
@@ -234,10 +234,10 @@ end
 
 @testset "the documented command: julia -e '...runProjectCli(ARGS)' -- PROJECT ..." begin
     root = normpath(joinpath(@__DIR__, "..", ".."))
-    file = joinpath(root, "tui", "src", "store", "run-project.jl")
-    program = "include(\"$file\"); exit(BAYSOLRun.runProjectCli(ARGS))"
+    env = joinpath(root, "tui", "julia")
+    program = "using BAYSOLRun; exit(BAYSOLRun.runProjectCli(ARGS))"
     out = IOBuffer()
-    cmd = `$(Base.julia_cmd()) --startup-file=no --project=$root -e $program -- proj
+    cmd = `$(Base.julia_cmd()) --startup-file=no --project=$env -e $program -- proj
         --temperature 20 --nDraws -3`
     proc = run(pipeline(ignorestatus(cmd); stdout = out, stderr = out))
     text = String(take!(out))

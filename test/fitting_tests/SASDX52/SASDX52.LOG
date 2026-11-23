@@ -1,9 +1,9 @@
-datetime	20-11-2026 10:09:47 -0500
+datetime	23-11-2026 01:59:55 -0500
 
 === SASDX52 ===
-revision                	02a565b-dirty
+revision                	727f0801-dirty
 julia                   	1.12.7
-baysol                  	v0.4.0-yals-n-gɛsga
+baysol                  	v0.5.0-tabl_n_wilge
 refChi2                 	0.70 (method unconfirmed)
 structure               	protein
 pdb2pqrCache            	hit
@@ -15,9 +15,9 @@ energyEv                	13000.3
 memoryHeadroom          	10
 forwardBlocks           	1
 forwardBlockQ           	137
-forwardBudgetGib        	7.46
+forwardBudgetGib        	10.108
 forwardEstGib           	1.165
-forwardPeakGib          	1.335
+forwardPeakGib          	1.431
 nAtoms                  	16882
 lmax                    	38
 dmax                    	223.692
@@ -32,7 +32,7 @@ c1Kink                  	true
 ladder                  	sample c1
 ladderClass             	divergent
 ladderAttempts          	base: the smallest tail ESS, 248.7, is not above 400.0
-ladderRungs             	stepCollapse: delta 70, delta 35 | splitChains: starts (2,4,6), close starts, longer | divergent: sample c1 | structural: sample c1 | marginal: longer chains, longer chains, next seed | generic: longer, next seed
+ladderRungs             	stepCollapse: delta 70, delta 35, delta 35 + seed | splitChains: starts (2,4,6), close starts + longer, close starts + longer + seed | divergent: sample c1 | structural: sample c1 | marginal: longer chains, longer chains + seed | generic: longer + seed
 ladderRung              	1
 rhoE                    	0.340567
 deltaRho1               	-0.331861
@@ -75,99 +75,99 @@ mapModes                	3
 
 --- timing ---
 stage                                             seconds    % wall    (JIT)     (GC)  notes
-wall clock                                          42.33     100.0    (7.4)    (2.6)  process start to end
-  startup                                            4.32      10.2    (0.0)    (0.4)  process start to seedModel
-  static build                                       0.76       1.8    (0.2)    (0.0)
-    resolveStruct                                 6.0e-05       0.0    (0.0)    (0.0)
+wall clock                                          48.71     100.0    (7.5)    (2.5)  process start to end
+  startup                                            4.26       8.7    (0.0)    (0.4)  process start to seedModel
+  static build                                       6.73      13.8    (0.3)    (0.0)
+    resolveStruct                                 5.8e-05       0.0    (0.0)    (0.0)
     components                                    2.8e-03       0.0    (0.0)    (0.0)  20 residue names: 20 builtin, 0 cache, 0 download
     structure checks                                 0.03       0.1    (0.0)    (0.0)  0 chains relabelled, 0 duplicate atoms dropped, 0 dummy-like findings
-    classify                                      7.9e-03       0.0    (0.0)    (0.0)  protein: PARSE, titration propka
-    propka                                        3.2e-04       0.0    (0.0)    (0.0)  cache hit
-    pdb2pqr                                          0.04       0.1    (0.0)    (0.0)  cache hit
+    classify                                      7.7e-03       0.0    (0.0)    (0.0)  protein: PARSE, titration propka
+    propka                                           1.96       4.0    (0.0)    (0.0)  cache miss
+    pdb2pqr                                          3.98       8.2    (0.1)    (0.0)  cache hit
     heavy atoms                                      0.04       0.1    (0.0)    (0.0)  8414 in, 8414 out; 0 restored, 0 added by pdb2pqr
     loadMolecule                                     0.08       0.2    (0.0)    (0.0)
-    SASA                                             0.17       0.4    (0.1)    (0.0)
-    shannon                                          0.01       0.0    (0.0)    (0.0)  diameter, binning
-    forwardCache                                     0.38       0.9    (0.1)    (0.0)
-      vacuum + excluded volume                       0.22       0.5    (0.0)    (0.0)  vols + B_lm
-      hydration                                      0.16       0.4    (0.0)    (0.0)  B_lm
-      Gram + rM                                   1.4e-03       0.0    (0.0)    (0.0)
-    seedSampler                                   1.5e-04       0.0    (0.0)    (0.0)  priors, WLS
-  sampling                                          42.05      99.3    (4.7)    (2.3)
+    SASA                                             0.21       0.4    (0.1)    (0.0)
+    shannon                                       8.6e-03       0.0    (0.0)    (0.0)  diameter, binning
+    forwardCache                                     0.41       0.8    (0.1)    (0.0)
+      vacuum + excluded volume                       0.21       0.4    (0.1)    (0.0)  vols + B_lm
+      hydration                                      0.19       0.4    (0.0)    (0.0)  B_lm
+      Gram + rM                                   1.1e-03       0.0    (0.0)    (0.0)
+    seedSampler                                   1.2e-04       0.0    (0.0)    (0.0)  priors, WLS
+  sampling                                          42.21      86.6    (4.8)    (2.0)
     MAP search + whitening                           0.07       0.2    (0.0)    (0.0)  70/70 starts, 3 modes
     NUTS setup                                    1.4e-04       0.0    (0.0)    (0.0)  starts, Hamiltonian
-    optima from the draws                            2.27       5.4    (1.8)    (0.2)  2 extra chains
-    NUTS                                             2.91       6.9    (2.0)    (0.2)  10k iters, 207.2k leapfrog, 0.013 ms/step
-    2 posterior modes: mass by bridge sampling       0.29       0.7    (0.2)    (0.0)
-    per-draw c1 re-profile + curves                  0.16       0.4    (0.3)    (0.0)  9300 draws
+    optima from the draws                            2.17       4.4    (1.8)    (0.1)  2 extra chains
+    NUTS                                             2.93       6.0    (2.1)    (0.1)  10k iters, 207.2k leapfrog, 0.012 ms/step
+    2 posterior modes: mass by bridge sampling       0.29       0.6    (0.2)    (0.0)
+    per-draw c1 re-profile + curves                  0.14       0.3    (0.3)    (0.0)  9300 draws
     MAP search + whitening                           0.03       0.1    (0.0)    (0.0)  70/70 starts, 2 modes
-    NUTS setup                                    7.2e-05       0.0    (0.0)    (0.0)  starts, Hamiltonian
-    optima from the draws                            1.44       3.4    (0.0)    (0.1)  2 extra chains
-    NUTS                                             4.02       9.5    (0.0)    (0.3)  40k iters, 893.46k leapfrog, 0.012 ms/step
-    2 posterior modes: mass by bridge sampling       0.28       0.7    (0.0)    (0.0)
+    NUTS setup                                    7.7e-05       0.0    (0.0)    (0.0)  starts, Hamiltonian
+    optima from the draws                            1.43       2.9    (0.0)    (0.0)  2 extra chains
+    NUTS                                             4.47       9.2    (0.0)    (0.5)  40k iters, 893.46k leapfrog, 0.012 ms/step
+    2 posterior modes: mass by bridge sampling       0.27       0.6    (0.0)    (0.0)
     per-draw c1 re-profile + curves                  0.12       0.3    (0.0)    (0.0)  36000 draws
-    MAP search + whitening                           0.23       0.6    (0.0)    (0.0)  70/70 starts, 3 modes
+    MAP search + whitening                           0.23       0.5    (0.0)    (0.0)  70/70 starts, 3 modes
     NUTS setup                                    3.7e-04       0.0    (0.0)    (0.0)  starts, Hamiltonian
-    optima from the draws                            1.44       3.4    (0.2)    (0.0)  2 extra chains
-    NUTS                                             5.04      11.9    (0.2)    (0.2)  10k iters, 281.16k leapfrog, 0.042 ms/step
-    2 posterior modes: mass by bridge sampling       0.28       0.7    (0.0)    (0.0)
+    optima from the draws                            1.39       2.9    (0.2)    (0.0)  2 extra chains
+    NUTS                                             4.69       9.6    (0.2)    (0.3)  10k iters, 281.16k leapfrog, 0.042 ms/step
+    2 posterior modes: mass by bridge sampling       0.31       0.6    (0.0)    (0.0)
     per-draw c1 re-profile + curves                  0.01       0.0    (0.0)    (0.0)  9300 draws
-    MAP search + whitening                           0.28       0.7    (0.0)    (0.0)  76/76 starts, 3 modes
+    MAP search + whitening                           0.28       0.6    (0.0)    (0.0)  76/76 starts, 3 modes
     NUTS setup                                    2.5e-04       0.0    (0.0)    (0.0)  starts, Hamiltonian
-    optima from the draws                            5.20      12.3    (0.0)    (0.2)  2 extra chains
-    NUTS                                            16.80      39.7    (0.0)    (0.9)  40k iters, 993.59k leapfrog, 0.042 ms/step
-    2 posterior modes: mass by bridge sampling       0.77       1.8    (0.0)    (0.0)
-    per-draw c1 re-profile + curves                  0.19       0.5    (0.0)    (0.1)  38000 draws
-    MAP + quantiles                                  0.21       0.5    (0.0)    (0.1)
-  plotting                                           1.05       2.5    (0.5)    (0.2)
-    summary data                                  8.5e-03       0.0    (0.0)    (0.0)
+    optima from the draws                            5.03      10.3    (0.0)    (0.1)  2 extra chains
+    NUTS                                            17.25      35.4    (0.0)    (0.8)  40k iters, 993.59k leapfrog, 0.044 ms/step
+    2 posterior modes: mass by bridge sampling       0.78       1.6    (0.0)    (0.0)
+    per-draw c1 re-profile + curves                  0.09       0.2    (0.0)    (0.1)  38000 draws
+    MAP + quantiles                                  0.21       0.4    (0.0)    (0.1)
+  plotting                                           1.07       2.2    (0.5)    (0.2)
+    summary data                                  8.6e-03       0.0    (0.0)    (0.0)
     fit                                              0.19       0.4    (0.2)    (0.0)
-      data                                        2.0e-05       0.0    (0.0)    (0.0)
+      data                                        1.8e-05       0.0    (0.0)    (0.0)
       preview                                        0.14       0.3    (0.1)    (0.0)
-      tex                                         9.8e-03       0.0    (0.0)    (0.0)
+      tex                                         1.0e-02       0.0    (0.0)    (0.0)
     residuals                                        0.04       0.1    (0.0)    (0.0)
       data                                        1.2e-07       0.0    (0.0)    (0.0)
-      preview                                     2.4e-04       0.0    (0.0)    (0.0)
+      preview                                     1.8e-04       0.0    (0.0)    (0.0)
       tex                                            0.02       0.0    (0.0)    (0.0)
     histogram data                                   0.03       0.1    (0.0)    (0.0)
-    histogram rhoE                                   0.15       0.4    (0.1)    (0.0)
-      data                                        2.5e-07       0.0    (0.0)    (0.0)
-      preview                                        0.15       0.4    (0.1)    (0.0)
-      tex                                         3.7e-04       0.0    (0.0)    (0.0)
-    histogram deltaRho1                           5.9e-04       0.0    (0.0)    (0.0)
-      data                                              0       0.0    (0.0)    (0.0)
-      preview                                     4.4e-04       0.0    (0.0)    (0.0)
-      tex                                         1.5e-04       0.0    (0.0)    (0.0)
-    histogram deltaRho2                           5.1e-04       0.0    (0.0)    (0.0)
-      data                                              0       0.0    (0.0)    (0.0)
-      preview                                     3.9e-04       0.0    (0.0)    (0.0)
-      tex                                         1.2e-04       0.0    (0.0)    (0.0)
-    histogram deltaRho3                           4.6e-04       0.0    (0.0)    (0.0)
-      data                                        8.3e-08       0.0    (0.0)    (0.0)
-      preview                                     3.5e-04       0.0    (0.0)    (0.0)
-      tex                                         1.2e-04       0.0    (0.0)    (0.0)
-    histogram scale                                  0.01       0.0    (0.0)    (0.0)
-      data                                        4.1e-08       0.0    (0.0)    (0.0)
-      preview                                     3.8e-04       0.0    (0.0)    (0.0)
-      tex                                            0.01       0.0    (0.0)    (0.0)
-    histogram bkgrndCorr                          5.6e-04       0.0    (0.0)    (0.0)
+    histogram rhoE                                   0.15       0.3    (0.2)    (0.0)
       data                                        4.2e-08       0.0    (0.0)    (0.0)
+      preview                                        0.15       0.3    (0.2)    (0.0)
+      tex                                         3.9e-04       0.0    (0.0)    (0.0)
+    histogram deltaRho1                           6.1e-04       0.0    (0.0)    (0.0)
+      data                                        4.1e-08       0.0    (0.0)    (0.0)
+      preview                                     4.5e-04       0.0    (0.0)    (0.0)
+      tex                                         1.6e-04       0.0    (0.0)    (0.0)
+    histogram deltaRho2                           5.2e-04       0.0    (0.0)    (0.0)
+      data                                        4.1e-08       0.0    (0.0)    (0.0)
       preview                                     3.9e-04       0.0    (0.0)    (0.0)
-      tex                                         1.7e-04       0.0    (0.0)    (0.0)
-    histogram c1                                  4.6e-04       0.0    (0.0)    (0.0)
-      data                                              0       0.0    (0.0)    (0.0)
+      tex                                         1.3e-04       0.0    (0.0)    (0.0)
+    histogram deltaRho3                           4.8e-04       0.0    (0.0)    (0.0)
+      data                                        4.1e-08       0.0    (0.0)    (0.0)
       preview                                     3.5e-04       0.0    (0.0)    (0.0)
       tex                                         1.2e-04       0.0    (0.0)    (0.0)
-    comparison SASBDB fit1                        9.6e-04       0.0    (0.0)    (0.0)
+    histogram scale                                  0.02       0.0    (0.0)    (0.0)
+      data                                        4.2e-08       0.0    (0.0)    (0.0)
+      preview                                     3.8e-04       0.0    (0.0)    (0.0)
+      tex                                            0.02       0.0    (0.0)    (0.0)
+    histogram bkgrndCorr                          6.3e-04       0.0    (0.0)    (0.0)
+      data                                        4.2e-08       0.0    (0.0)    (0.0)
+      preview                                     4.4e-04       0.0    (0.0)    (0.0)
+      tex                                         1.8e-04       0.0    (0.0)    (0.0)
+    histogram c1                                  4.9e-04       0.0    (0.0)    (0.0)
+      data                                        4.1e-08       0.0    (0.0)    (0.0)
+      preview                                     3.5e-04       0.0    (0.0)    (0.0)
+      tex                                         1.3e-04       0.0    (0.0)    (0.0)
+    comparison SASBDB fit1                        1.2e-03       0.0    (0.0)    (0.0)
       data                                        1.9e-05       0.0    (0.0)    (0.0)
-      tex                                         8.9e-04       0.0    (0.0)    (0.0)
-    data files                                       0.61       1.4    (0.0)    (0.2)
-    statistics                                    3.2e-03       0.0    (0.0)    (0.0)
-  report write                                       0.01       0.0    (0.0)    (0.0)
-  unaccounted                                       -5.87     -13.9    (2.0)    (0.0)
-GC: 2.58 s
-fit timing  = 41.28 s
-plot timing = 1.05 s
+      tex                                         1.1e-03       0.0    (0.0)    (0.0)
+    data files                                       0.61       1.3    (0.0)    (0.2)
+    statistics                                    3.6e-03       0.0    (0.0)    (0.0)
+  report write                                       0.06       0.1    (0.0)    (0.0)
+  unaccounted                                       -5.61     -11.5    (2.0)    (0.0)
+GC: 2.48 s
+fit timing  = 47.65 s
+plot timing = 1.07 s
 
 --- machine ---
 machine.os              	Linux aarch64-linux-gnu
@@ -176,5 +176,5 @@ machine.cpu_mhz         	600
 machine.cpus            	8
 machine.threads         	4
 machine.memory_gib      	15.3
-machine.loadStart       	1.39
-machine.free_gib_start  	9.1
+machine.loadStart       	1.41
+machine.free_gib_start  	11.9

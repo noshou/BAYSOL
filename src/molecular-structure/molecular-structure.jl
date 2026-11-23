@@ -9,7 +9,7 @@ using SQLite: SQLite
 using DBInterface: DBInterface
 using FastClosures: @closure
 using ..PhysicalConstants: PM_PER_ANGSTROM
-using ..Runtime: Lazy, force, KeyedCache
+using ..Runtime: Lazy, force, KeyedCache, memoryDb
 using NearestNeighbors: KDTree
 
 import ..Geometry: coordsCartesian, radii, rMax, neighbourTree
@@ -87,6 +87,11 @@ The bundled component table: one row per wwPDB component, `id`, `class`, `type`,
 """
 const COMPONENTS_TABLE = joinpath(@__DIR__, "components.tsv")
 include_dependency(COMPONENTS_TABLE)   # editing the table rebuilds the package
+
+"""
+The text of the table, read into the package when it is built (no data folder at run time).
+"""
+const _COMPONENTS_TEXT = read(COMPONENTS_TABLE, String)
 
 """
 The twenty standard amino acids: a HETATM amino acid with another name is *modified*

@@ -5,14 +5,19 @@
 // Backgrounds: a PDF or SVG is drawn onto white (what it paints itself stays), a PNG keeps
 // its own alpha channel (the sixel encoder flattens what is left transparent).
 //
-// Libraries (all native, loaded on first use): `@resvg/resvg-js` for SVG, `sharp` for PNG
-// and for scaling, `pdf-raster` (PDFium) for PDF with `pdftocairo` (poppler) as the
-// fallback when PDFium cannot be loaded or fails. The PDF choice lives in ONE place,
-// [[PDF_RENDERERS]].
+// Libraries (loaded on first use): `@resvg/resvg-js` (native) for SVG, `pngjs` for
+// PNG, [[resizeRgba]] for scaling, `pdf-raster` (PDFium, native) for PDF with
+// `pdftocairo` (poppler) as the fallback when PDFium cannot be loaded or fails. In
+// the packaged app the native files are assets of the executable
+// (`core/native-assets.ts`). The PDF choice lives in ONE place, [[PDF_RENDERERS]].
 
 import { spawn } from "node:child_process"
 import { readFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { extname } from "node:path"
+import { PNG } from "pngjs"
+import { extractNativeAsset, inSingleExecutable, loadNativeAddon } from "../core/native-assets.js"
+import { flattenOnWhite, resizeRgba } from "./raster-scale.js"
 import type { RgbaImage } from "./sixel-types.js"
 
 /** Why a figure could not be rasterised: a sentence for the user. */
@@ -39,45 +44,87 @@ const PDF_RENDERERS: readonly ("pdf-raster" | "pdftocairo")[] = [
 /** Largest side of a box taken, in pixels (a guard against a runaway request). */
 const MAX_SIDE = 16384
 
+/** The native files of the packaged app (assets of the single executable, see the build). */
+const NATIVE_RESVG = "native/resvg.node"
+const NATIVE_PDF_RASTER = "native/pdf-raster.node"
+const NATIVE_PDFIUM = "native/pdfium"
+
+/** The native `Resvg` class: its constructor takes the SVG and the options as JSON text. */
+type NativeResvg = new (
+    svg: Buffer,
+    options?: string,
+) => {
+    width: number
+    height: number
+    render(): { width: number; height: number; pixels: Buffer }
+}
+
 /**
- * Decodes encoded image bytes (PNG) to RGBA scaled to fit the box.
- *
- * @param flatten - draw onto white (true) or keep the alpha channel (false).
+ * The native `Resvg` class: from the extracted addon of the packaged app, else from the
+ * `@resvg/resvg-js` package of a checkout (its binding module, not the JS wrapper that
+ * turns the options into JSON, so both paths call it the same way).
  */
-async function decodeFit(
-    bytes: Buffer,
-    widthPx: number,
-    heightPx: number,
-    flatten: boolean,
-): Promise<RgbaImage> {
-    const { default: sharp } = await import("sharp")
-    let image = sharp(bytes)
-    if (flatten) image = image.flatten({ background: WHITE })
-    const { data, info } = await image
-        .ensureAlpha()
-        .resize({ width: widthPx, height: heightPx, fit: "inside" })
-        .raw()
-        .toBuffer({ resolveWithObject: true })
-    return { width: info.width, height: info.height, data: new Uint8Array(data) }
+function nativeResvg(): NativeResvg {
+    if (inSingleExecutable())
+        return loadNativeAddon(extractNativeAsset(NATIVE_RESVG)).Resvg as NativeResvg
+    const specifier = "@resvg/resvg-js/js-binding.js" // not a literal: the bundle has no use for it
+    const binding = createRequire(import.meta.url)(specifier) as Record<string, unknown>
+    return binding.Resvg as NativeResvg
+}
+
+/** RGBA pixels of an encoded PNG. */
+function decodePng(bytes: Buffer): RgbaImage {
+    const png = PNG.sync.read(bytes)
+    return { width: png.width, height: png.height, data: new Uint8Array(png.data) }
+}
+
+/** The size of an image fitted into a box with the aspect kept (at least 1 x 1). */
+function fitSize(image: RgbaImage, widthPx: number, heightPx: number) {
+    const scale = Math.min(widthPx / image.width, heightPx / image.height)
+    return {
+        width: Math.max(1, Math.round(image.width * scale)),
+        height: Math.max(1, Math.round(image.height * scale)),
+    }
+}
+
+/** Fits an image into the box, drawn onto white first when `flatten`. */
+function fit(image: RgbaImage, widthPx: number, heightPx: number, flatten: boolean) {
+    const { width, height } = fitSize(image, widthPx, heightPx)
+    const scaled = resizeRgba(image, width, height)
+    return flatten ? flattenOnWhite(scaled) : scaled
 }
 
 /** An SVG drawn onto white, scaled to fit the box. */
 async function rasteriseSvg(path: string, widthPx: number, heightPx: number) {
-    const { Resvg } = await import("@resvg/resvg-js")
+    const Resvg = nativeResvg()
     const svg = readFileSync(path)
     const size = new Resvg(svg)
     const wide = size.width / size.height >= widthPx / heightPx
     const fitTo = wide
         ? { mode: "width" as const, value: widthPx }
         : { mode: "height" as const, value: heightPx }
-    const png = new Resvg(svg, { fitTo, background: WHITE }).render().asPng()
-    // through sharp once more: the rounding of the fit is then the same as for the others
-    return decodeFit(Buffer.from(png), widthPx, heightPx, true)
+    const image = new Resvg(svg, JSON.stringify({ fitTo, background: WHITE })).render()
+    const raster = {
+        width: image.width,
+        height: image.height,
+        data: new Uint8Array(image.pixels),
+    }
+    return fit(raster, widthPx, heightPx, true)
+}
+
+/** The page converter of `pdf-raster`, its native files from the executable when packaged. */
+async function pdfConvert() {
+    if (inSingleExecutable()) {
+        // the wrapper reads these two variables before it looks for a platform package
+        process.env.NAPI_RS_NATIVE_LIBRARY_PATH ??= extractNativeAsset(NATIVE_PDF_RASTER)
+        process.env.PDFIUM_LIB_PATH ??= extractNativeAsset(NATIVE_PDFIUM)
+    }
+    return (await import("pdf-raster")).convert
 }
 
 /** The first page of a PDF as PNG bytes through PDFium, at `dpi`. */
 async function pdfPngByPdfRaster(path: string, dpi: number): Promise<Buffer> {
-    const { convert } = await import("pdf-raster")
+    const convert = await pdfConvert()
     const [page] = await convert(path, { pages: [0], dpi, outputFormat: "png" })
     if (page === undefined) throw new Error("no page")
     return page.data
@@ -114,16 +161,14 @@ async function rasterisePdf(path: string, widthPx: number, heightPx: number) {
     for (const renderer of PDF_RENDERERS) {
         const render = renderer === "pdf-raster" ? pdfPngByPdfRaster : pdfPngByPdftocairo
         try {
-            const { default: sharp } = await import("sharp")
-            const probe = await sharp(await render(path, PDF_POINTS_PER_INCH)).metadata()
-            const w = probe.width ?? 0
-            const h = probe.height ?? 0
-            if (w === 0 || h === 0) throw new Error("empty page")
+            const probe = decodePng(await render(path, PDF_POINTS_PER_INCH))
+            if (probe.width === 0 || probe.height === 0) throw new Error("empty page")
             // dpi that makes the page at least as large as the box, so it is only shrunk
             const dpi = Math.ceil(
-                PDF_POINTS_PER_INCH * Math.max(widthPx / w, heightPx / h, 1),
+                PDF_POINTS_PER_INCH *
+                    Math.max(widthPx / probe.width, heightPx / probe.height, 1),
             )
-            return await decodeFit(await render(path, dpi), widthPx, heightPx, true)
+            return fit(decodePng(await render(path, dpi)), widthPx, heightPx, true)
         } catch (error) {
             problems.push(`${renderer}: ${error instanceof Error ? error.message : error}`)
         }
@@ -155,7 +200,7 @@ export async function rasterise(
         if (ext === ".svg") return await rasteriseSvg(path, widthPx, heightPx)
         if (ext === ".pdf") return await rasterisePdf(path, widthPx, heightPx)
         if (ext === ".png")
-            return await decodeFit(readFileSync(path), widthPx, heightPx, false)
+            return fit(decodePng(readFileSync(path)), widthPx, heightPx, false)
     } catch (error) {
         if (error instanceof RasteriseError) throw error
         throw new RasteriseError(

@@ -64,7 +64,10 @@ function _runPropka3(abspdb::String, storedir::String, pkaPath::String)::Nothing
     tmp = mktempdir(storedir)
     try
         try
-            cmd = setenv(`$(tools.propka3) $abspdb`, tools.env; dir = tmp)
+            tool =
+                tools.pytools === nothing ? `$(tools.propka3)` :
+                `$(tools.pytools) propka3`
+            cmd = setenv(`$tool $abspdb`, tools.env; dir = tmp)
             errfile = joinpath(tmp, "stderr.txt")
             try
                 run(pipeline(cmd; stdout = devnull, stderr = errfile))

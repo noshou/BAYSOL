@@ -389,7 +389,7 @@ export function DataImportScreen(props: {
     useKeys((press: KeyInput) => {
         if (saving.current) return // a reference fit is being added
         clear()
-        // Shift+Tab is tested first: a plain `keys.tab` matches either press
+        // shift+tab is tested first: a plain `keys.tab` matches either press
         if (press.is(keys.up) || press.is(keys.shiftTab)) cursor.move(-1)
         else if (press.is(keys.down) || press.is(keys.tab)) cursor.move(1)
         else if (press.is(keys.back)) nav.pop()

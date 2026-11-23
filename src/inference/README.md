@@ -228,15 +228,15 @@ and the reasons in its `error` row) when any of three gates is not passed. Every
 When the base run, its own longer retry and the sampled-c1 fallback have failed, `runModel` **classifies the
 failure** from the diagnostics of the failed attempt and walks the **rungs of that class**: each rung is a set
 of settings that replaces the call's for one more attempt, and the first attempt that passes the gates wins. After
-every failed attempt the failure is classified again (the class can change), at most `LADDER_MAX_RUNGS` = 3 reruns
-follow the base attempt (4 attempts in all), and when none passes `NotConvergedError` lists every attempt. The
+every failed attempt the failure is classified again (the class can change), and reruns stop only when one passes or the class the last
+failure falls into has no unused rung left (each rung runs at most once; there is no fixed cap), and then `NotConvergedError` lists every attempt. The
 setting `LADDER` (keyword `ladder`) is a map from class to a list of rungs `{name?, overrides: {SETTING: value}}`.
 
 | class | diagnosed when (first match wins) | default rungs |
 |---|---|---|
 | `kink` | the profiled c1 has a kink (existing path, not a ladder class) | c1 sampled as a fifth parameter |
-| `stepCollapse` | R̂ at or above the gate and median adapted step size below `LADDER_COLLAPSE_STEP` = 0.01, or R̂ at least 1.05 and mean tree depth at least `LADDER_COLLAPSE_DEPTH` = 8 | (1) `TARGET_ACCEPT = 70`; (2) 35 |
-| `splitChains` | R̂ at least `LADDER_RHAT_FAR` = 1.05, more than one posterior mode, ESS at the floor or below | (1) `CHAIN_START_RADII = (2, 4, 6)`; (2) `(1, 2, 3)` with `RETRY_N_ADAPT = RETRY_N_DRAWS = 4000` |
+| `stepCollapse` | R̂ at or above the gate and median adapted step size below `LADDER_COLLAPSE_STEP` = 0.01, or R̂ at least 1.05 and mean tree depth at least `LADDER_COLLAPSE_DEPTH` = 8 | (1) `TARGET_ACCEPT = 70`; (2) 35; (3) 35 with `RNG_SEED_STEP = 1` |
+| `splitChains` | R̂ at least `LADDER_RHAT_FAR` = 1.05, more than one posterior mode, ESS at the floor or below | (1) `CHAIN_START_RADII = (2, 4, 6)`; (2) `(1, 2, 3)` with `RETRY_N_ADAPT = RETRY_N_DRAWS = 4000`; (3) rung 2 with `RNG_SEED_STEP = 1` |
 | `divergent` | divergent share at or above `MAX_DIVERGENT_RATE` and R̂ below 1.05 | (1) `TARGET_ACCEPT = 99`; (2) 99, radii `(1, 2, 3)`, 4000/4000; (3) rung 2 with `RNG_SEED_STEP = 1` |
 | `structural` | the `divergent` case after a rung that raised `TARGET_ACCEPT` has already run, with a share of at least `LADDER_STRUCTURAL_SHARE` = 1 % | `SAMPLE_C1 = true` (c1 sampled) |
 | `marginal` | R̂ below 1.05 (a near miss of the R̂/ESS gates) | (1) `RETRY_N_ADAPT = 6000`, `RETRY_N_DRAWS = 8000`; (2) that with `RNG_SEED_STEP = 1` |

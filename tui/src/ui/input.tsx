@@ -10,7 +10,7 @@
 //   4. `Dropdown`: a pick `Entry` over a list of choices
 //   5. Confirmation: `Question`, `useConfirm`, `useDiscardGuard`
 //   6. `usePickList`: dropdown + delete + question wiring
-//   7. `ThemePicker`: the list of themes, opened with Ctrl-T
+//   7. `ThemePicker`: the list of themes, opened with ^t
 
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -158,8 +158,8 @@ export const DROPDOWN_CHROME = 4
  * @property counter - show the place of the highlight (`3 of 12`) as the status line.
  * @property error - a message about the last attempt, shown under the field.
  * @property onSubmit - called with the typed text and the highlighted suggestion.
- * @property onCancel - called for Esc, and for Ctrl-X when `onBack` is not given.
- * @property onBack - called for Ctrl-X (back one screen), when it differs from Esc.
+ * @property onCancel - called for Esc, and for ^x when `onBack` is not given.
+ * @property onBack - called for ^x (back one screen), when it differs from Esc.
  * @property onHighlight - called with the highlighted suggestion whenever it changes.
  * @property take - what Enter is called in the legend (`"take"` when left out; `null`
  *     for an entry whose Enter does nothing).
@@ -226,7 +226,7 @@ type EntrySide<S extends Suggestion> = {
 /**
  * A one-line input with an optional list of suggestions under it. Typing and the editing
  * keys edit; up and down move the highlight; Tab puts the highlighted suggestion into the
- * input; Enter submits; Esc and Ctrl-X cancel. While open it is the only thing on its
+ * input; Enter submits; Esc and ^x cancel. While open it is the only thing on its
  * screen that takes keys, so the screen passes `active = false` to its own `useKeys`.
  *
  * @param props - see [[EntryProps]].
@@ -408,8 +408,8 @@ export type Choice<T> = Suggestion & { value: T }
  * @property noMatch - the status line when nothing matches the typed text.
  * @property initial - the starting text.
  * @property onPick - called with the value of the picked choice.
- * @property onCancel - called for Esc, and for Ctrl-X when `onBack` is not given.
- * @property onBack - called for Ctrl-X, when it differs from Esc.
+ * @property onCancel - called for Esc, and for ^x when `onBack` is not given.
+ * @property onBack - called for ^x, when it differs from Esc.
  * @property active - whether the dropdown listens to keys, `true` when left out.
  * @property onHighlight - called with the value of the highlighted choice whenever it
  *     changes (`undefined` when none).
@@ -554,7 +554,7 @@ export function shownNote(
 }
 
 /**
- * A question that Enter confirms and Esc (or Ctrl-X) declines, kept as state so a
+ * A question that Enter confirms and Esc (or ^x) declines, kept as state so a
  * screen can show it as its note and route keys to it first.
  *
  * @property question - the open question, `undefined` while nothing is asked.
@@ -583,7 +583,7 @@ export type Confirm = {
  *
  * @param press - the key.
  * @param hasOther - the question has a third answer ([[Question.other]]).
- * @returns `yes` for Enter, `no` for Esc or Ctrl-X, `other` for `shift+x` when there is a
+ * @returns `yes` for Enter, `no` for Esc or ^x, `other` for `shift+x` when there is a
  *     third answer, `undefined` for any other key (it is ignored).
  */
 export function answerOf(
@@ -638,7 +638,7 @@ export function useConfirm(): Confirm {
  *
  * @param changes - how many unsaved changes the screen holds.
  * @returns the [[Confirm]] to route keys to, and `leave`, which a screen calls with
- *     what it would do (`nav.pop`) when Ctrl-X asks to leave.
+ *     what it would do (`nav.pop`) when ^x asks to leave.
  */
 export function useDiscardGuard(
     changes: number,
@@ -695,8 +695,8 @@ const findLegend: LegendItem = { label: "find", keys: "type" }
  * @property label - what is asked, e.g. `load project:`.
  * @property entries - what the list holds; keep the array stable between renders.
  * @property onPick - called with the value of the entry Enter takes.
- * @property onCancel - called for Esc, and for Ctrl-X when `onBack` is not given.
- * @property onBack - called for Ctrl-X, when it differs from Esc.
+ * @property onCancel - called for Esc, and for ^x when `onBack` is not given.
+ * @property onBack - called for ^x, when it differs from Esc.
  * @property take - what Enter is called in the legend, `null` when picking does nothing.
  * @property cancel - what Esc is called in the legend.
  * @property onDelete - deletes the entry; it may throw. The screen re-reads the entries.
@@ -815,7 +815,7 @@ export function usePickList<T>(props: PickListProps<T>): PickList {
 }
 
 // ========================================================================================
-// 7. `ThemePicker`: the list of themes, opened with Ctrl-T
+// 7. `ThemePicker`: the list of themes, opened with ^t
 // ========================================================================================
 
 /** The rows of the popup that are not list entries: its border, key row and header row. */

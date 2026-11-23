@@ -37,6 +37,7 @@ import {
     runStatus,
 } from "../src/store/projects.js"
 import {
+    bundledCommand,
     claimRun,
     elapsedText,
     isEnd,
@@ -50,9 +51,9 @@ import {
     projectReadiness,
     quitAll,
     RunSession,
-    runProjectFile,
     snapshotInputs,
     temperatureStart,
+    traceFlag,
 } from "../src/store/run.js"
 import {
     archivePath,
@@ -863,6 +864,20 @@ test("the clock reads m:ss, then h:mm:ss", () => {
     assert.equal(elapsedText(-5), "0:00")
 })
 
+test("the trace flag exists only when the packaging build asks for it", () => {
+    assert.deepEqual(traceFlag({}, 7), [])
+    const one = traceFlag({ BAYSOL_TRACE_COMPILE: "/t" }, 7)
+    const two = traceFlag({ BAYSOL_TRACE_COMPILE: "/t" }, 7)
+    assert.match(one[0] ?? "", /^--trace-compile=\/t\/tui-7-\d+\.jl$/)
+    assert.notEqual(one[0], two[0])
+})
+
+test("the packaged app runs a fit through the baysol executable beside the TUI", () => {
+    const spec = { projectDir: "/p", runDir: "/r", temperature: 20 }
+    assert.equal(bundledCommand({}, spec), undefined)
+    assert.equal(bundledCommand({ BAYSOL_BUNDLE: "/no/such/bundle" }, spec), undefined)
+})
+
 test("the Julia command and arguments: values travel in ARGS, not in the code", () => {
     assert.equal(juliaCommand({}), "julia")
     assert.equal(juliaCommand({ JULIA: "/opt/julia/bin/julia" }), "/opt/julia/bin/julia")
@@ -873,17 +888,18 @@ test("the Julia command and arguments: values travel in ARGS, not in the code", 
         "--startup-file=no",
         "--color=no",
         "--threads=auto,1",
-        "--project=/repo",
+        "--project=/repo/tui/julia",
     ])
     assert.equal(args[4], "-e")
     assert.ok(!args[5]?.includes("/p q"), "the code holds no path")
     assert.match(args[5] ?? "", /ui = :tui/)
-    assert.match(args[5] ?? "", /BAYSOLRun\.runProject\(ARGS\[2\]/)
-    assert.equal(args[6], runProjectFile)
-    assert.ok(runProjectFile.endsWith("run-project.jl") && existsSync(runProjectFile))
-    assert.deepEqual(args.slice(7), ["/p q/it's", "22.5", "/p q/it's/runs/x"])
-    assert.equal(juliaArgs(spec, "/repo", "1", "/x/run.jl")[6], "/x/run.jl")
-    assert.ok(!juliaArgs(spec, undefined, "1").some((a) => a.startsWith("--project")))
+    assert.match(args[5] ?? "", /^using BAYSOLRun; BAYSOLRun\.runProject\(ARGS\[1\]/)
+    assert.ok(!args[5]?.includes("include"), "nothing is included")
+    assert.deepEqual(args.slice(6), ["/p q/it's", "22.5", "/p q/it's/runs/x"])
+    const packaged = juliaArgs(spec, undefined, "1")
+    assert.ok(!packaged.some((a) => a.startsWith("--project")))
+    assert.equal(packaged[3], "-e")
+    assert.deepEqual(packaged.slice(5), ["/p q/it's", "22.5", "/p q/it's/runs/x"])
 })
 
 test("runBrief: a run in as few cells as tell runs apart", () => {

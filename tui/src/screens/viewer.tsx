@@ -862,7 +862,7 @@ export function SheetViewerScreen(props: {
             setMode((m) => (m === "plots" ? "sheets" : "plots"))
             return setTabFirst(0)
         }
-        // Shift+Tab is tested first: a plain `keys.tab` matches either press
+        // shift+tab is tested first: a plain `keys.tab` matches either press
         if (press.is(keys.shiftTab)) return active > 0 && switchTab(active - 1)
         if (press.is(keys.tab)) return active < names.length - 1 && switchTab(active + 1)
         if (press.is(keys.plotType)) {

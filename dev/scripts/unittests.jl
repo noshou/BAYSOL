@@ -8,7 +8,7 @@
 # Every ../test/unit-tests/units/test-*.jl is self-contained (each `include`s its own
 # testsetup.jl and declares its own `using`s), so it can also be run on its own, e.g.:
 #   julia --project=test test/unit-tests/units/test-atomicradii.jl
-# The Julia that only the terminal interface needs lives in ../tui/src/store/*.jl, and its
+# The Julia that only the terminal interface needs lives in ../tui/julia/src/*.jl, and its
 # tests next to the TypeScript ones, ../tui/test/*.test.jl (kebab case, run the same way:
 #   julia --project=test tui/test/run-project.test.jl).
 #

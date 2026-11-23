@@ -1,0 +1,9 @@
+SYN-1EHZ-ubq30: SYNTHETIC buffer, host 1EHZ
+rho_e (e/A^3)	0.33730647660060004
+sigma_rho_e (e/A^3)	0.00011726962508149166
+rho_e water (e/A^3)	0.3332920001104711
+T (C), pH, sigma_pH	25.0	7.4	0.1
+contrasts (delta rho 1..3, CRYSOL3 defaults)	1.0	1.0	0.0
+composition (type, name or sequence, mol/L, sigma)
+NonBiological	sodium chloride	0.15	0.0015
+Protein	MQIFVKTLTGKT...(76 letters)	0.00349773	0.0001749

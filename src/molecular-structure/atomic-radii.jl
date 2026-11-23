@@ -55,22 +55,26 @@ struct _RadiiTables
     charges :: Dict{String,Vector{Int}}
 end
 
-"Absolute path to the bundled `atomic_radii.sqlite3`, next to this file."
-_dbpath()::String = joinpath(@__DIR__, "atomic_radii.sqlite3")
-include_dependency(_dbpath())
+"""
+The bundled `atomic_radii.sqlite3`, next to this
+file, read into the package when it is built.
+"""
+const _DB_FILE = joinpath(@__DIR__, "atomic_radii.sqlite3")
+include_dependency(_DB_FILE)   # editing the table rebuilds the package
+const _DB_BYTES = read(_DB_FILE)
 
 """
 Read the SQLite file into a [`_RadiiTables`](@ref), sorting each element's charge list.
 
 # Arguments
-- `path`: SQLite database file (defaults to [`_dbpath`](@ref)); must exist.
+- `path`: SQLite database file; the default is the bundled one (`_DB_BYTES`).
 """
-function _readTables(path::String = _dbpath())::_RadiiTables
-    isfile(path) || error("AtomicRadii: missing data file $path")
+function _readTables(path::Union{Nothing,String} = nothing)::_RadiiTables
+    path === nothing || isfile(path) || error("AtomicRadii: missing data file $path")
     ionic   = Dict{String,Float64}()
     atomic  = Dict{String,Tuple{Float64,String}}()
     charges = Dict{String,Vector{Int}}()
-    db      = SQLite.DB(path)
+    db      = path === nothing ? memoryDb(_DB_BYTES) : SQLite.DB(path)
     try
         DBInterface.execute(db, "PRAGMA query_only = ON;")
         for row in DBInterface.execute(db, "SELECT ion, radius FROM ionic_radii")

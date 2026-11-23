@@ -80,19 +80,27 @@ Set the environment variable `BAYSOL_HOME` (an absolute path) to use another fol
 `BAYSOL_CACHE` for the cache; a relative path is ignored. To try the interface without touching
 your real work: `BAYSOL_HOME=/tmp/baysol-try npm start`.
 
+### The packaged app and its setup wizard
+
+If you have the packaged app instead of the source, start it with `baysol`. The first start opens a
+small **setup wizard** (projects folder, caches, threads per fit, menu entry, Desktop icon, taskbar pin (GNOME) and PATH link; nothing is
+written until you choose Apply). It comes back with `baysol setup` or with **shift+a** on the main menu, and
+also repairs the shortcuts and **uninstalls** (the app and caches, keeping your projects, or everything: type
+`delete` to confirm). The launcher passes the app's folder to the program as `BAYSOL_BUNDLE`.
+
 ### The main menu
 
 The first screen is the main menu with the logo, the release name and six options: **new
 project**, **load project**, **open** (the data folder in your file manager, with a shell in it
-until you leave it), **settings** (the global ones), **help** (a placeholder: it says it is not
-built yet) and **quit**.
+until you leave it), **settings** (the global ones), **help** (a page about the projects, the keys, the setup
+wizard and uninstalling) and **quit**.
 
 - Move with the arrow keys and press **Enter**, or press the option's letter: `n`, `l`, `o`, `s`,
   `h`, `q`. The box at the bottom lists the keys that work from where the cursor is, and nothing else.
-- **`q`** in the main menu quits. **Ctrl-C** and **Ctrl-D** quit from anywhere (they also stop a
+- **`q`** in the main menu quits. **^c** and **^d** quit from anywhere (they also stop a
   run that is going). **Esc never quits**: it only closes what is open (a prompt, a list, a
-  viewer). **Ctrl-X** goes back one screen.
-- **Ctrl-T** opens the theme list, on any screen: 20 themes (10 light, 10 dark), each with an
+  viewer). **^x** goes back one screen.
+- **^t** opens the theme list, on any screen: 20 themes (10 light, 10 dark), each with an
   emoji and its colours. Arrows move, Enter picks, Esc leaves. The theme you leave in is the one the
   next start uses.
 
@@ -152,7 +160,7 @@ options, on the right a live preview of how the file is read, with the file's ow
 - `separator` (auto, tab, comma, semicolon, whitespace), `comments` (lines starting with `#`,
   `;`, `%` or `!`) and `header` (auto, yes, no: is there a row of column names?) turn with
   **Enter** or the left and right arrows. `skip rows` takes a number. Up and down, or **Tab** and
-  **Shift+Tab**, move between the options.
+  **shift+tab**, move between the options.
 - **The three columns** `I(q)`, `q` and `sigma` start as a guess. Enter on one opens a prompt:
   type a **column number** (`2` or `col:2`) or a **header name** (any capitals; Tab completes).
   Sigma, the error of each point, is required.
@@ -273,7 +281,7 @@ and 700 kept draws on each of 8 chains is the sampler default.
 ### 5. Run
 
 When the project has a model, a buffer (with at least one solute, a pH and a temperature) and data (with its
-energy), the project menu shows **`run: shift+r`** at the bottom. Press **Shift+R**.
+energy), the project menu shows **`run: shift+r`** at the bottom. Press **shift+r**.
 
 1. The run starts at once, at the buffer's temperature (set with `^g` after the pH and σ; the
    prompt starts at your last run's temperature, so Enter does it).
@@ -283,7 +291,7 @@ energy), the project menu shows **`run: shift+r`** at the bottom. Press **Shift+
 3. At the end the counter says `done`, `failed` or `aborted` and **Enter** goes back to the project
    menu. A failed run shows the first line of its error.
 
-**Ctrl-C (or Ctrl-D) stops the run and quits the program**: Julia is asked to finish its log, then
+**^c (or ^d) stops the run and quits the program**: Julia is asked to finish its log, then
 stopped. Only one run per project can be live at once: another start says
 `a run is in progress (pid N)`. While it runs you can edit nothing that it uses: it works on a copy of your project
 files made at the start.
@@ -308,7 +316,7 @@ manager. Once a run exists it offers `open project folder` and **`open runs`**.
   model with its state: `done`, `failed`, `aborted`, `interrupted`. A model that did not finish
   says why in the note row.
 - **Enter** on a `done` model opens the **results workbook** (`<model>.xlsx`) in a viewer, one
-  tab per sheet: **Tab** and **Shift+Tab** change sheet, the arrows move the cursor.
+  tab per sheet: **Tab** and **shift+tab** change sheet, the arrows move the cursor.
   **`shift+p`** switches to the **plots** of that model (the same text plots a script prints; one tab per
   plot), and back; **`shift+t`** switches a plot between the text plot and the rendered figure where the
   terminal can draw it.
@@ -386,6 +394,7 @@ through a temporary file, so a crash never leaves half a file.
 | `^x` | back one screen; never quits |
 | `q` (main menu), `^c`, `^d` | quit (`^c`/`^d` also stop a run) |
 | `^t` | theme list |
+| `shift+a` (main menu) | the setup wizard of the packaged app |
 | `^w` | save every change on the screen |
 | `^u` | undo |
 | `^r` | remove or delete the highlighted item (asks first); reset a group of settings |
@@ -394,8 +403,8 @@ through a temporary file, so a crash never leaves half a file.
 | `^k` | buffer: turn the unit of the concentrations (mM, M, µM) |
 | `^v`, `shift+h` (empty path field) | open the file chooser; list the models |
 | `shift+z` (on an unusable file) | reset it |
-| `Shift+R` | run (project menu, when ready) |
-| `Tab`, `Shift+Tab`, `shift+p`, `shift+t`, `shift+=` `shift+-` | viewer: next/previous sheet or plot; sheets or plots; plot type; plots zoom |
+| `shift+r` | run (project menu, when ready) |
+| `Tab`, `shift+tab`, `shift+p`, `shift+t`, `shift+=` `shift+-` | viewer: next/previous sheet or plot; sheets or plots; plot type; plots zoom |
 | `/`, `shift+k`, `shift+i`, `shift+j` | viewer and pager: find, next/previous match, go to a cell (`B7`, `7`, `B`) or a line |
 | `Space`, `shift+y`, `shift+u` | viewer and pager: mark, copy to the clipboard; viewer: show formulas |
 | `shift+↑` PgUp, `shift+↓` PgDn | viewer and pager: a page up, a page down |

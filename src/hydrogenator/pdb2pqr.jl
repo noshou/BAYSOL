@@ -74,9 +74,13 @@ const PDB2PQR_NO_REPAIR_LIMIT = join(
 """
 The command that runs pdb2pqr (`pdb2pqr`, the path of its entry script) with the repair
 limit lifted ([`PDB2PQR_NO_REPAIR_LIMIT`](@ref)): the Python of the same environment run
-on the snippet. Without a Python next to the entry script, the entry script itself.
+on the snippet. Without a Python next to the entry script, or for a frozen copy
+(`BAYSOL_PDB2PQR`), the entry script itself.
 """
 function _pdb2pqrCommand(pdb2pqr::AbstractString)::Cmd
+    # A frozen pdb2pqr (`BAYSOL_PDB2PQR`) already
+    # carries the lifted limit in its entry script.
+    _toolOverride("BAYSOL_PDB2PQR") == pdb2pqr && return `$pdb2pqr`
     for dir in (dirname(pdb2pqr), dirname(dirname(pdb2pqr)))
         for name in ("python", "python.exe")
             py = joinpath(dir, name)
@@ -162,7 +166,10 @@ function _runPdb2pqr(
     unblanked = outPath * ".unblanked.pdb"
     dropBlankLines(runIn, unblanked) && (runIn = unblanked)
     errfile = outPath * ".stderr"   # in the caller's temporary directory
-    cmd = `$(_pdb2pqrCommand(pdb2pqr)) --ff $ffArg $titrationArgs $flags`
+    tool =
+        tools.pytools === nothing ? _pdb2pqrCommand(pdb2pqr) :
+        `$(tools.pytools) pdb2pqr`
+    cmd = `$tool --ff $ffArg $titrationArgs $flags`
     cmd = `$cmd --pdb-output $outPath $runIn $tmpPqr`
     try
         run(pipeline(setenv(cmd, tools.env); stdout = devnull, stderr = errfile))

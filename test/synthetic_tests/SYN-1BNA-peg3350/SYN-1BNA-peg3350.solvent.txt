@@ -1,0 +1,15 @@
+entry	SYN-1BNA-peg3350
+synthetic	yes (invented buffer, no measured curve)
+host	1BNA
+rho_e	0.33577999802695835	e/A^3
+sigma_rho_e	0.00018676084305456827	e/A^3
+rho_e_water	0.3332920001104711	e/A^3 (pure water, same temperature)
+contrast_over_water	0.002487997916487239	e/A^3
+temperature	25.0	C
+pH	7.0	sigma 0.1
+energy	8041.522793695696	eV
+delta_rho_relative	1.0 1.0 0.0	dimensionless (x 0.03 e/A^3)
+c1	1.0	uncorrected, scale 1, background 0
+q_grid	0.01:0.005:0.5	A^-1, 99 points
+composition
+  Polymer	PEG 3350	0.014925	mol/L

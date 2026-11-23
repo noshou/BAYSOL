@@ -411,7 +411,7 @@ const NAME_SKIP_DIRS = (
     "test/fitting_tests", "test/synthetic_tests", "test/fixtures", "test/baselines",
     "test/.CondaPkg", "docs/build",
 )
-const NAME_ROOTS = ("src", "dev", "docs", "test", "tui")
+const NAME_ROOTS = ("src", "dev", "docs", "test", "tui", "setup-wizard")
 # Names the toolchain fixes: Julia wants src/<Package>.jl, these are conventional.
 const NAME_EXCEPTIONS = (
     "BAYSOL.jl", "Dev.jl", "README.md", "LICENSE", "Project.toml", "Manifest.toml",
@@ -431,7 +431,8 @@ function kebab_name(n::AbstractString)
     return occursin(KEBAB_NAME, stem)
 end
 
-# Checks the names of the files and folders under `src`, `dev`, `docs`, `test` and `tui`
+# Checks the names of the files and folders under `NAME_ROOTS` (`src`, `dev`, `docs`,
+# `test`, `tui` and `setup-wizard`)
 # (not `node_modules`, `NAME_SKIP_DIRS`, and the data files, whose names follow their
 # source: `.txt`, `.tsv`, `.json`, `.dat`, `.pdb`, `.fit`); prints each offender and
 # returns false, or returns true.

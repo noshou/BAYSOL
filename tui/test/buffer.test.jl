@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Exercises tui/src/store/buffer.jl: `loadBuffer` reads the buffer.json of a project (mM as
+# Exercises tui/julia/src/buffer.jl: `loadBuffer` reads the buffer.json of a project (mM as
 # typed) into the `Vector{Solute}` of `seedModel` (mol/L), against the fixture shared with
 # the terminal interface (test/fixtures/buffer/buffer.json), the shape errors, the missing
 # file, the empty buffer, the pH and sigmaPh (`loadBufferPh`); and `seedKeywords`

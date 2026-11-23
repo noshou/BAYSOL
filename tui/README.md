@@ -23,6 +23,17 @@ are in the first guide of the repository's main README.
 
 ## Install and start
 
+**The packaged app** (a bundle with its own Julia, Node and a precompiled BAYSOL, made by `bysl pkg`) starts with its
+launcher, `baysol`. The launcher sets `BAYSOL_BUNDLE` (the folder of the app) and, from `install.json` in the per-user
+config folder, `BAYSOL_HOME`, `BAYSOL_CACHE` and `BAYSOL_THREADS` (a variable you set yourself wins). On the first start
+(no `install.json`, a terminal) it opens the **setup wizard**; later `baysol setup` opens it, and so does `shift+a` on
+the main menu. The wizard sets the projects folder, the caches, the threads per fit and the shortcuts (desktop entry,
+PATH link), repairs the shortcuts and uninstalls (the app and caches, or everything including the projects, which asks
+for the word `delete`). Nothing is written until you apply; changes apply at the next start. After an uninstall the
+terminal interface quits (the wizard's exit status 22). The `help` page says the same.
+
+The rest of this section is the source checkout.
+
 You need **Julia 1.12**, **Node.js 24 or newer** (`node --version`) and a BAYSOL folder that contains `tui/`.
 The repository has **one** `node_modules`, at its root: `tui` is an npm workspace of the root `package.json`.
 
@@ -69,7 +80,7 @@ Windows) are written from the systems' documentation and are **untested**. The r
 5. `^x`, then `b` (buffer), Enter on `buffer`: `^g` for the pH and the temperature (`7.4 0.1`, then `25`), `^n` for each solute (name, concentration, ±;
    `^k` turns the unit), `^w` to save.
 6. `^x` to the project menu. A `run: shift+r` item appears at the bottom once everything is there.
-7. Press `Shift+R`: the run starts at once, at the buffer's temperature.
+7. Press `shift+r`: the run starts at once, at the buffer's temperature.
 8. Watch the run screen. When it says `done`, press Enter.
 9. `o` (open...), `open runs`, Enter on the model: the results workbook. `shift+p` shows the plots.
 10. `^l` on a run reads its log; `^x` goes back; `^x` again and `q` on the main menu quits.
@@ -86,10 +97,10 @@ Every other screen is smooth: the rounded logo, rounded panels, thin single-line
 
 - **Esc** closes what is open (a prompt, a list, a question, a pager). It never quits and does nothing at
   menu level.
-- **Ctrl-X** goes back one screen, from any mode. It never quits.
-- **`q`** on the main menu, **Ctrl-C** and **Ctrl-D** are the only ways to leave the program. Ctrl-C and Ctrl-D
+- **^x** goes back one screen, from any mode. It never quits.
+- **`q`** on the main menu, **^c** and **^d** are the only ways to leave the program. ^c and ^d
   first stop a run that is going, then leave.
-- **Ctrl-T** opens the theme list on any screen (also during a run).
+- **^t** opens the theme list on any screen (also during a run).
 - `^s`, `^q`, `^z` and `^y` are taken by the terminal; `^m`, `^i`, `^j` arrive as Enter, Tab and Enter.
 - **Unsaved changes ask** (`discard N changes?`: Enter discards, Esc keeps) when you leave a screen with
   unsaved changes. **Removing anything you made asks** (`delete X? this cannot be undone!`: Enter deletes,
@@ -141,7 +152,7 @@ The options are drawn as pictures (new project, load project, open, settings, he
 | load project | `l` | a list of your projects; Enter opens one, `^r` (or Delete) deletes the highlighted one after a question, Tab completes a typed name. With no project: `no projects to load!` |
 | open | `o` | opens the **data folder** in the file manager and gives you a shell in it; leave the shell to come back |
 | settings | `s` | the **global** settings sheets (see Settings) |
-| help | `h` | a placeholder: `help is not built yet` |
+| help | `h` | a read-only page (the pager keys): the projects, the keys, the setup wizard and how to uninstall |
 | quit | `q` | leaves the program |
 
 A project name uses letters, digits, `.`, `_` and `-`, starts with a letter or a digit, has at most 40
@@ -169,7 +180,7 @@ The options are pictures, two to a row (three rows), under `project: <name>`:
 
 The **taskbar** at the bottom right shows an extra item only when it applies, reached by its Shift key:
 Until then a small box in its place says `missing components: <list>` (`models`, `solutes`, `pH`, `temperature`, `data`, `energy`). **`run: shift+r`** appears when the project has a model, a buffer (at least one solute, a pH and a temperature) and valid data
-with its energy. There is no Shift+D; lower-case `d` is only `data`.
+with its energy. There is no shift+d; lower-case `d` is only `data`.
 
 ### Models
 
@@ -246,7 +257,7 @@ or an `.xlsx` workbook (its first sheet) is accepted. The **import screen** open
 | `header` | auto, yes, no | auto: the line above the data is the header if it has as many fields as the data |
 | `I(q)`, `q`, `sigma` | a number, `col:N` or a header name | Enter opens a prompt with suggestions (case-insensitive, Tab completes); sigma is required |
 
-Enter or the left and right arrows cycle a choice. Up and down, or **Tab** (down) and **Shift+Tab** (up), move
+Enter or the left and right arrows cycle a choice. Up and down, or **Tab** (down) and **shift+tab** (up), move
 through the options and stop at the ends; in a prompt Tab completes as before. **How the data are found:** they start at the first line that
 splits into at least two numbers and end at the first line that is not a data row (a footer); everything before
 is header text. So the five header lines of a SASBDB `.dat` file need no `skip rows` (the preview above starts
@@ -595,11 +606,11 @@ setting `FIGURES_COMPILE` is off the sheets, it stays a keyword of `results` for
   `generic`) to the rungs tried for it, in order. Enter opens the ladder editor, a scrolling list with one row per
   rung in the order tried, `condition ▸ name ▸ N overrides`, and a counter (`rung 12 of 300`); the conditions read
   `step size collapsed`, `chains disagree`, `divergent draws`, `kinked c1 profile`, `near the R̂/ESS limits` and
-  `any other failure`. Up, down, PageUp, PageDown, Home and End move. Ctrl+n adds a rung (pick its condition, then
-  give it a name or leave it empty); Enter opens a rung. Ctrl+r removes a rung and Shift+up or Shift+down moves it
-  earlier or later among those of its condition; Ctrl+u puts the ladder back to its default; Esc takes the whole
-  ladder (a wrong one stays as an error), Ctrl+x goes back
-  without it. In a rung, the condition and name rows open a picker or a prompt, and the overrides are listed below them: Ctrl+n adds one (a picker over the settings a rung may change, each with its description, the ones already set left out), Enter edits its value with the setting's own editor, Ctrl+r removes it, Shift+up and Shift+down move it, Ctrl+u reverts the rung to how it was opened, Esc closes the rung (one without overrides is dropped). There is no limit on rungs or overrides, but a fit is rerun 3 times at most, whatever the number of rungs (a sampler rule). A rung may override only fitting settings (`TARGET_ACCEPT`, `CHAIN_START_RADII`, `RETRY_N_ADAPT`,
+  `any other failure`. Up, down, PageUp, PageDown, Home and End move. ^n adds a rung (pick its condition, then
+  give it a name or leave it empty); Enter opens a rung. ^r removes a rung and shift+up or shift+down moves it
+  earlier or later among those of its condition; ^u puts the ladder back to its default; Esc takes the whole
+  ladder (a wrong one stays as an error), ^x goes back
+  without it. In a rung, the condition and name rows open a picker or a prompt, and the overrides are listed below them: ^n adds one (a picker over the settings a rung may change, each with its description, the ones already set left out), Enter edits its value with the setting's own editor, ^r removes it, shift+up and shift+down move it, ^u reverts the rung to how it was opened, Esc closes the rung (one without overrides is dropped). There is no limit on rungs or overrides, but a fit is rerun 3 times at most, whatever the number of rungs (a sampler rule). A rung may override only fitting settings (`TARGET_ACCEPT`, `CHAIN_START_RADII`, `RETRY_N_ADAPT`,
   `RETRY_N_DRAWS`, `SAMPLE_C1` (sample c1 as a fifth parameter), `RNG_SEED_STEP` (added to the seed); `N_ADAPT`, `N_DRAWS`,
   `VAL_SIGMA`, `N_CHAINS`, the `OPTIMUM_*`, `MAP_*`, `BASIN_RESTART_NATS` and `HARVEST_*` settings are unvalidated); a plot or
   file setting is refused with the list of allowed names. In `settings.json` and `model-settings.json` it is an object
@@ -622,7 +633,7 @@ setting `FIGURES_COMPILE` is off the sheets, it stays a keyword of `results` for
 ### Run
 
 The project must have a model, a buffer with at least one solute, a pH and a temperature, and data with its energy. Then the
-project menu shows `run: shift+r`. **Shift+R** starts the run at once, with the temperature kept in the buffer
+project menu shows `run: shift+r`. **shift+r** starts the run at once, with the temperature kept in the buffer
 (`buffer.json`, set with `^g` after the pH and σ; 0 to 100 °C, no uncertainty). A project without a temperature is not ready until `^g` sets it: the prompt starts at the temperature of the newest finished
 run, so Enter alone does it, and the menu says `missing: temperature`. If a run of this project is already
 going the start is refused with `a run is in progress (pid N)`.
@@ -644,7 +655,7 @@ The **run screen** is a live view of the last lines of Julia's output (the full 
 run's `run.LOG`); the plots are not shown here, they are in the results. The counter reads `running 0:42`,
 `aborting`, `packing` (the run is over and its files are being put into the run's archive, see "The run archive" below), `done`, `failed` or `aborted`. Keys are locked except `^t` and:
 
-- **Ctrl-C or Ctrl-D**: abort and **quit the whole program**. Julia is asked to stop (SIGTERM) and given a few
+- **^c or ^d**: abort and **quit the whole program**. Julia is asked to stop (SIGTERM) and given a few
   seconds to finish its log, then killed. Julia prints a stack trace for the signal; it is not an error of the
   run.
 - at the end, **Enter** returns to the project menu. A failed run shows the first line of its `ERRORS` section
@@ -690,7 +701,7 @@ that another copy deletes says `this run was deleted` and closes.
 Every setting that `runProject` takes as a keyword is a flag, so a run needs no terminal interface:
 
 ```bash
-julia --project=. -e 'include("tui/src/store/run-project.jl"); exit(BAYSOLRun.runProjectCli(ARGS))' -- \
+julia --project=tui/julia -e 'using BAYSOLRun; exit(BAYSOLRun.runProjectCli(ARGS))' -- \
     PROJECT --temperature 20 --nDraws 800 --memory-headroom 25 \
     --ladder 'divergent=[{"name": "wide", "overrides": {"TARGET_ACCEPT": 99}}]' \
     --model-setting 'm1={"qMin": 0.03}'
@@ -820,7 +831,7 @@ value, unit; its status line says what the row under the cursor is):
  ╰─╯╵╵ ╵ ╰╯╰╯╰─   move: ↑↓←→ ┃ back:  ^x
 ```
 
-(The sheet names and cells above are an example workbook; yours has the fit's own sheets.) **Tab** and **Shift+Tab** go to the
+(The sheet names and cells above are an example workbook; yours has the fit's own sheets.) **Tab** and **shift+tab** go to the
 next and previous sheet and stop at the ends; the legend lists only what works now: `next` is missing
 on the last sheet, `prev` on the first, and an arrow is missing when the cursor is at that edge. The arrows
 move the cursor, `shift+↓`/PgDn and `shift+↑`/PgUp move it a page, `^x` goes back. **`shift+p`** switches to the
@@ -866,6 +877,7 @@ or Space (mark); every other key is a Ctrl or a Shift key, and each key does one
 | arrows, Enter | move, select or edit; a letter on a menu picks its option |
 | `Esc` | closes what is open (prompt, list, question, pager); never quits |
 | `^x` | back one screen; never quits |
+| `shift+a` (main menu) | the setup wizard of the packaged app (paths, repair, uninstall) |
 | `q` (main menu), `^c`, `^d` | quit (`^c` and `^d` stop a running fit first) |
 | `^t` | the theme list |
 | `^w` | save every change on the screen |
@@ -880,8 +892,8 @@ or Space (mark); every other key is a Ctrl or a Shift key, and each key does one
 | `shift+x` | a question's third answer (`save as a template?`: the plain recipe) |
 | `/`, `shift+s` | tables of named rows: find a row, sort the rows |
 | `shift+w` | recipes and solutes tables: new template |
-| `Shift+R` | project menu: run (shown only when ready) |
-| `Tab`, `Shift+Tab` | viewer: next and previous sheet or plot |
+| `shift+r` | project menu: run (shown only when ready) |
+| `Tab`, `shift+tab` | viewer: next and previous sheet or plot |
 | `shift+=` `shift+-` | viewer, plots mode: zoom in and out (a larger or smaller saved size) |
 | `shift+p` | viewer: switch between sheets and plots (not for the comparison) |
 | `shift+t` | viewer, plots mode: the plot type (Unicode plot or rendered figure) |

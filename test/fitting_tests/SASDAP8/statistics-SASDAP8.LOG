@@ -1,4 +1,4 @@
-datetime	20-11-2026 00:13:28 -0500
+datetime	22-11-2026 22:27:22 -0500
 
 === SASDAP8 ===
 
@@ -116,7 +116,7 @@ distinct optima: 3
   mode 3: f=-17.029 ξ=[0.3346, -1.09, 1.354, -2.09]  H-eig=[0.933, 1.354, 4.954, 5254]  log Laplace mass=11.828 (Δ vs best = -4.21 nats)
 
 -- nuts --
-NUTS: 10.1s  init ε=1.9  final ε=0.2714  mean nSteps=186.4 mean depth=4.62  frac(depth≥10)=0.167  diverged=0
+NUTS: 9.9s  init ε=1.9  final ε=0.2714  mean nSteps=186.4 mean depth=4.62  frac(depth≥10)=0.167  diverged=0
 mean nSteps by window: [1:75]=156  [76:450]=172  [251:300]=159  [301:1000]=186
 mean accept = 0.959   mean |ΔH| = 0.040
 
@@ -239,12 +239,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (82/82 starts, 3 modes)	0.112671        	0.0330055       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000144708     	0.0             	0.0             	
-  optima from the draws, 4 extra chains	12.0212         	1.82826         	0.45236         	
-  NUTS  (12k iters, 2143.05k leapfrog, 0.011 ms/step)	20.4158         	1.95968         	0.680996        	
-  5 posterior modes: mass by bridge sampling	0.419093        	0.237067        	0.0             	
-  per-draw c1 re-profile + curves (8358 draws)	0.134915        	0.281263        	0.0             	
+  MAP search + whitening (82/82 starts, 3 modes)	0.109768        	0.0330436       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.00014375      	0.0             	0.0             	
+  optima from the draws, 4 extra chains	11.7701         	1.81502         	0.359683        	
+  NUTS  (12k iters, 2143.05k leapfrog, 0.011 ms/step)	19.9456         	1.94562         	0.493313        	
+  5 posterior modes: mass by bridge sampling	0.412383        	0.226841        	0.0             	
+  per-draw c1 re-profile + curves (8358 draws)	0.171468        	0.371686        	0.0             	
 
 -- outcome --
 next                            	retry with a longer warm-up: the worst R̂, 2.089, is not below 1.01; the smallest bulk ESS, 1.8, is not above 400.0; the smallest tail ESS, 11.6, is not above 400.0
@@ -371,7 +371,7 @@ distinct optima: 4
   mode 4: f=-14.883 ξ=[0.3346, 0.7766, 1.077, 1.889]  H-eig=[-4.775e+04, 0.662, 514.5, 2.585e+05]  log Laplace mass=unavailable (Δ vs best = unavailable nats)
 
 -- nuts --
-NUTS: 44.7s  init ε=1.834  final ε=0.3363  mean nSteps=262.3 mean depth=4.74  frac(depth≥10)=0.250  diverged=0
+NUTS: 43.8s  init ε=1.834  final ε=0.3363  mean nSteps=262.3 mean depth=4.74  frac(depth≥10)=0.250  diverged=0
 mean nSteps by window: [1:75]=166  [76:450]=185  [451:1950]=265  [1951:2000]=264  [2001:4000]=262
 mean accept = 0.951   mean |ΔH| = 0.053
 
@@ -494,12 +494,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (88/88 starts, 4 modes)	0.0634574       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	7.7583e-5       	0.0             	0.0             	
-  optima from the draws, 4 extra chains	44.7147         	0.0             	2.54677         	
-  NUTS  (48k iters, 12198.79k leapfrog, 0.011 ms/step)	84.1684         	0.0             	3.81368         	
-  5 posterior modes: mass by bridge sampling	0.523712        	0.0             	0.0             	
-  per-draw c1 re-profile + curves (40906 draws)	0.130042        	0.0             	0.0             	
+  MAP search + whitening (88/88 starts, 4 modes)	0.0627782       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	7.6625e-5       	0.0             	0.0             	
+  optima from the draws, 4 extra chains	43.8012         	0.0             	2.10686         	
+  NUTS  (48k iters, 12198.79k leapfrog, 0.011 ms/step)	81.8354         	0.0             	3.20744         	
+  5 posterior modes: mass by bridge sampling	0.528814        	0.0             	0.0             	
+  per-draw c1 re-profile + curves (40906 draws)	0.140552        	0.0             	0.0             	
 
 -- outcome --
 next                            	not converged at base: the worst R̂, 1.045, is not below 1.01; the smallest bulk ESS, 55.1, is not above 400.0; the smallest tail ESS, 16.9, is not above 400.0
@@ -742,12 +742,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (82/82 starts, 3 modes)	0.0693783       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	7.8709e-5       	0.0             	0.0             	
-  optima from the draws, 4 extra chains	10.2771         	0.0             	0.524762        	
-  NUTS  (12k iters, 2143.05k leapfrog, 0.011 ms/step)	18.8849         	0.0             	0.880898        	
-  5 posterior modes: mass by bridge sampling	0.198479        	0.0             	0.0             	
-  per-draw c1 re-profile + curves (8358 draws)	0.0345976       	0.0             	0.0             	
+  MAP search + whitening (82/82 starts, 3 modes)	0.0688968       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	7.8708e-5       	0.0             	0.0             	
+  optima from the draws, 4 extra chains	10.3329         	0.0             	0.415438        	
+  NUTS  (12k iters, 2143.05k leapfrog, 0.011 ms/step)	18.7673         	0.0             	0.763452        	
+  5 posterior modes: mass by bridge sampling	0.207221        	0.0             	0.0             	
+  per-draw c1 re-profile + curves (8358 draws)	0.0350306       	0.0             	0.0             	
 
 -- outcome --
 next                            	retry with a longer warm-up: the worst R̂, 2.089, is not below 1.01; the smallest bulk ESS, 1.8, is not above 400.0; the smallest tail ESS, 11.6, is not above 400.0
@@ -874,7 +874,7 @@ distinct optima: 4
   mode 4: f=-14.883 ξ=[0.3346, 0.7766, 1.077, 1.889]  H-eig=[-4.775e+04, 0.662, 514.5, 2.585e+05]  log Laplace mass=unavailable (Δ vs best = unavailable nats)
 
 -- nuts --
-NUTS: 162.8s  init ε=1.834  final ε=0.2903  mean nSteps=183.2 mean depth=4.55  frac(depth≥10)=0.167  diverged=0
+NUTS: 161.5s  init ε=1.834  final ε=0.2903  mean nSteps=183.2 mean depth=4.55  frac(depth≥10)=0.167  diverged=0
 mean nSteps by window: [1:75]=166  [76:450]=185  [451:5950]=258  [5951:6000]=196  [6001:14000]=183
 mean accept = 0.958   mean |ΔH| = 0.039
 
@@ -997,12 +997,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (88/88 starts, 4 modes)	0.0635378       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	7.35e-5         	0.0             	0.0             	
-  optima from the draws, 4 extra chains	162.998         	0.0             	8.42829         	
-  NUTS  (168k iters, 35693.97k leapfrog, 0.011 ms/step)	223.598         	0.0             	10.5147         	
-  4 posterior modes: mass by bridge sampling	1.85982         	0.0             	0.0             	
-  per-draw c1 re-profile + curves (147508 draws)	0.410557        	0.0             	0.0440635       	
+  MAP search + whitening (88/88 starts, 4 modes)	0.0628907       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	7.425e-5        	0.0             	0.0             	
+  optima from the draws, 4 extra chains	161.639         	0.0             	8.32251         	
+  NUTS  (168k iters, 35693.97k leapfrog, 0.011 ms/step)	222.01          	0.0             	10.5052         	
+  4 posterior modes: mass by bridge sampling	1.9258          	0.0             	0.0             	
+  per-draw c1 re-profile + curves (147508 draws)	0.385069        	0.0             	0.0200147       	
 
 -- attempts --
 attempt         	label           	outcome
@@ -1017,4 +1017,4 @@ keptAttempt                     	4
 keptLabel                       	retry, longer warm-up
 keptBecause                     	the retry passed its gates or was no worse in R̂ (worst R̂ 1.0004 against 2.0893)
 statisticsFlushes               	11
-statisticsFlushSeconds          	0.000377376
+statisticsFlushSeconds          	0.000468376

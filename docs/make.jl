@@ -104,6 +104,13 @@ write(
     replace(TUI_INTERNALS, "](README.md)" => "](tui.md)"),
 )
 
+# The setup wizard's README (setup-wizard/README.md), copied the same way.
+cp(
+    joinpath(REPO_ROOT, "setup-wizard", "README.md"),
+    joinpath(GUIDES_DIR, "setup-wizard.md");
+    force = true,
+)
+
 # The test READMEs, with their relative links to each other pointed at the copied pages
 # (the READMEs link to one another as files, which would be dead links on the site).
 const TESTING_DIR = joinpath(@__DIR__, "src", "testing")
@@ -171,7 +178,8 @@ makedocs(
     "Guides" => vcat(
     [
     "Terminal UI" => "guides/tui.md",
-    "Terminal UI internals" => "guides/tui-internals.md"
+    "Terminal UI internals" => "guides/tui-internals.md",
+    "Setup wizard" => "guides/setup-wizard.md"
     ],
     [name => joinpath("guides", lowercase(name) * ".md") for (name, _) in DOC_MODULES]
     ),
