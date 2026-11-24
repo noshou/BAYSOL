@@ -123,7 +123,10 @@ export function repoRoot(
 // 3. Version: the program's version, read from the project file
 // ========================================================================================
 
-/** `v<version> <release_name>`: the `Project.toml` of the checkout, or the `VERSION` asset of a packaged app; else `unknown`. */
+/**
+ * `v<version> <release_name>`: the `Project.toml` of the checkout, or the `VERSION` asset
+ * of a packaged app; else `unknown`.
+ */
 function readVersion(): string {
     const root = repoRoot()
     if (root === undefined) {
@@ -306,7 +309,10 @@ export const cacheDir: () => string = lazy(() => {
  */
 const ASSETS_ROOT = join(fileURLToPath(new URL("../..", import.meta.url)), "assets")
 
-/** @returns the absolute path of a file below the checkout's `assets/` (not in a packaged app). */
+/**
+ * @returns the absolute path of a file below the checkout's `assets/` (not in a packaged
+ * app).
+ */
 export function assetPath(...path: string[]): string {
     return join(ASSETS_ROOT, ...path)
 }
@@ -319,7 +325,9 @@ export function assetPath(...path: string[]): string {
  * @throws if the asset does not exist.
  */
 export function readAssetText(...path: string[]): string {
-    return isSea() ? getAsset(path.join("/"), "utf8") : readFileSync(assetPath(...path), "utf-8")
+    return isSea()
+        ? getAsset(path.join("/"), "utf8")
+        : readFileSync(assetPath(...path), "utf-8")
 }
 
 /** Reads a JSON file below `assets/` (harvested or hand-written, never written here). */

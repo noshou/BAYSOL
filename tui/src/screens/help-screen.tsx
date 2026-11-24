@@ -21,9 +21,9 @@ export function helpText(): string {
         "the solvent nuisance parameters, so a fit comes with probabilities.",
         "",
         "Projects",
-        "  A project is a folder (data, buffer, models, settings, runs). New makes one, Load",
-        "  opens one, Open shows the projects folder in the file manager. Settings on the",
-        "  main menu are global; each project can override them.",
+        "  A project is a folder (data, buffer, models, settings, runs). New makes one,",
+        "  Load opens one, Open shows the projects folder in the file manager. Settings",
+        "  on the main menu are global; each project can override them.",
         "",
         "Keys",
         "  arrows, Enter   move and choose          Esc   closes what is open; never quits",
@@ -46,7 +46,7 @@ export function helpText(): string {
         "    Everything        also deletes the projects folder (type delete to confirm).",
         "  The program quits when the app is gone.",
         "",
-        "Documentation: the README of the repository and the docs site (guides per module).",
+        "Documentation: the repository README and the docs site (guides per module).",
     ].join("\n")
 }
 

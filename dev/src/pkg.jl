@@ -105,7 +105,7 @@ rung(overrides) = Dict(
 )
 few = (; nSamples = 60, nAdapt = 60, retryNAdapt = 60, retryNDraws = 60)
 variants = [
-    (; ui = :tui, tex = true, compile = false),
+    (; ui = :tui, watchStdin = false, tex = true, compile = false),
     (; ui = :cli, tex = true, compile, formats = [:pdf, :png, :svg]),
     (;
         ui = :cli,
@@ -326,6 +326,10 @@ function problems(path::AbstractString, pattern = PROBLEM_LINE; limit = 12)::Vec
     return hits[max(1, end-limit+1):end]
 end
 
+"The log file of the step `name` (`<work>/logs/<name with odd characters as ->.log`)."
+step_log(name::AbstractString) =
+    joinpath(LOG_DIR[], replace(name, r"[^A-Za-z0-9._-]+" => "-") * ".log")
+
 """
     logged(f, path)
 
@@ -350,7 +354,7 @@ the report line, and a failure is also shown on the terminal, as every `top` ste
 stage) is. True when it did not fail.
 """
 function step(name::AbstractString, f; top::Bool = false, pattern = PROBLEM_LINE)::Bool
-    path = joinpath(LOG_DIR[], replace(name, r"[^A-Za-z0-9._-]+" => "-") * ".log")
+    path = step_log(name)
     t0 = time()
     ok, peak = watch_memory() do
         try
@@ -687,7 +691,8 @@ function stage_pytools(work)
         --include-package-data=pdb2pqr --include-package-data=propka
         --python-flag=no_docstrings --noinclude-unittest-mode=nofollow
         --noinclude-setuptools-mode=nofollow --noinclude-pytest-mode=nofollow
-        --noinclude-pydoc-mode=nofollow --assume-yes-for-downloads --output-dir=$out --output-filename=baysol-pytools
+        --noinclude-pydoc-mode=nofollow --assume-yes-for-downloads --output-dir=$out
+        --output-filename=baysol-pytools
         $entry`; log = joinpath(work, "pytools.log"),
         env = Dict("PATH" => dirname(py) * (Sys.iswindows() ? ";" : ":") * ENV["PATH"]))
     need(ok, "Nuitka failed (see $(joinpath(work, "pytools.log")))")
@@ -765,7 +770,9 @@ function stage_tui(work)
         stub,
         "export default {}; export const path7za = \"\"\n",
     )
-    banner = "import{createRequire as __cr}from'node:module';const require=__cr(import.meta.url);"
+    banner =
+        "import{createRequire as __cr}from'node:module';" *
+        "const require=__cr(import.meta.url);"
     bundle = joinpath(dir, "baysol-tui.mjs")
     esbuild = joinpath(Common.root(), "node_modules", ".bin", "esbuild")
     aliases = [
@@ -773,9 +780,9 @@ function stage_tui(work)
         m in ("react-devtools-core", "7zip-bin")
     ]
     ok = rc(
-        `$esbuild $(joinpath(tui, "src", "main.tsx")) --bundle --platform=node --main-fields=module,main --format=esm
-        --target=node24 --minify --log-level=warning --outfile=$bundle --banner:js=$banner
-        $aliases`,
+        `$esbuild $(joinpath(tui, "src", "main.tsx")) --bundle --platform=node
+        --main-fields=module,main --format=esm --target=node24 --minify
+        --log-level=warning --outfile=$bundle --banner:js=$banner $aliases`,
     )
     need(ok, "esbuild failed")
     version_file = joinpath(dir, "VERSION")
@@ -924,7 +931,7 @@ workload exists to compile that code, so a skip means it was not exercised.
 A `ToolError` naming the step, when its log has a "reference fit was skipped" line.
 """
 function check_no_skipped_reference(name)
-    path = joinpath(LOG_DIR[], replace(name, r"[^A-Za-z0-9._-]+" => "-") * ".log")
+    path = step_log(name)
     isfile(path) || return nothing
     occursin("reference fit was skipped", read(path, String)) &&
         throw(ToolError("$WHO: $name skipped its reference fit (see $path)", 1))
@@ -955,13 +962,15 @@ function trace_output_variants(work, dir, julia, env)
     write(driver, OUTPUT_DRIVER)
     compile = Sys.which("lualatex") !== nothing && Sys.which("pdftocairo") !== nothing
     label = "output variants $(first(WORKLOAD)) (rendered: $compile)"
-    step(label,
+    ok = step(label,
         () -> run_env(
             `$julia --startup-file=no --threads=4
             --trace-compile=$(joinpath(out, "outputs.jl"))
             --project=$(joinpath(Common.root(), "tui", "julia")) $driver $project 20
             $compile`,
             env))
+    # a failed variant run is a build error, and a rerun must not skip it as done
+    ok || throw(ToolError("$WHO: the output variants failed (see $(step_log(label)))", 1))
     check_no_skipped_reference(label)
     write(joinpath(out, "outputs.done"), "")
     return nothing
@@ -1051,12 +1060,19 @@ function stage_trace(work)
     tests = joinpath(dir, "tests")
     mkpath(tests)
     unit = joinpath(root, "dev", "scripts", "unittests.jl")
-    isfile(joinpath(tests, "unit.jl")) ||
-        step("unit suite",
+    if !isfile(joinpath(tests, "unit.jl"))
+        ok = step("unit suite",
             () -> run_env(
                 `$julia --startup-file=no --trace-compile=$(joinpath(tests, "unit.jl"))
                 --project=$(joinpath(root, "test")) $unit`, env);
             pattern = r"Test Failed|Error During Test|Some tests did not pass|^ERROR")
+        if !ok  # a partial trace must not count as done on a rerun
+            rm(joinpath(tests, "unit.jl"); force = true)
+            throw(
+                ToolError("$WHO: the unit suite failed (see $(step_log("unit suite")))", 1),
+            )
+        end
+    end
     for f in sort(filter(endswith(".test.jl"), readdir(joinpath(root, "tui", "test"))))
         out = joinpath(tests, "tui-" * f)
         isfile(out) && continue
@@ -1095,6 +1111,10 @@ function stage_julia(work, workload)
     # juliac and gcc write about 6 GB to the temp folder: a tmpfs /tmp is too small
     pytools = joinpath(work, "pytools", "baysol-pytools.dist", exe("baysol-pytools"))
     need(isfile(pytools), "the workload fits need the pytools stage first")
+    # the workload fits read their reference fits as a user's run does (`reference-fit/`)
+    for p in readdir(workload; join = true)
+        isdir(p) && unpack_references(p)
+    end
     statements = joinpath(work, "statements.jl")
     # the JLL libraries of depot artifacts are opened by bare name (see `jll_libraries`)
     libs = jll_libraries(project)
@@ -1122,6 +1142,8 @@ function stage_julia(work, workload)
         end
     end
     need(ok, "juliac failed (see $log)")
+    isfile(log) && occursin("reference fit was skipped", read(log, String)) &&
+        throw(ToolError("$WHO: a workload fit skipped its reference fit (see $log)", 1))
     finish(work, "julia")
 end
 
@@ -1201,7 +1223,8 @@ end
 const JLL_LIBRARIES_SCRIPT = raw"""
 using TOML
 root = dirname(Sys.BINDIR)
-for (name, entries) in TOML.parsefile(joinpath(dirname(Base.active_project()), "Manifest.toml"))["deps"]
+manifest = joinpath(dirname(Base.active_project()), "Manifest.toml")
+for (name, entries) in TOML.parsefile(manifest)["deps"]
     endswith(name, "_jll") || continue
     for e in entries
         M = Base.require(Base.PkgId(Base.UUID(e["uuid"]), name))
@@ -1712,7 +1735,8 @@ function make_archive(work, archive)
         "no 7-Zip found (npm install gives 7zip-bin, or put 7zz on PATH)",
     )
     ok = rc(
-        `$sevenzip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15 $archive $(joinpath(work, "bundle", "baysol"))`,
+        `$sevenzip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15 $archive
+        $(joinpath(work, "bundle", "baysol"))`,
     )
     need(ok && isfile(archive), "the archive was not written")
 end

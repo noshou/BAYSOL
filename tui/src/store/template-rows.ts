@@ -416,7 +416,9 @@ export function seedOfRows(
             return { problem: `row ${i + 1}: the amount is not complete` }
         }
         const amounts = { mM, sigmaMM }
-        if (s.kind === "nonbiological") rows.push({ name: s.name, arg: soluteArg(s), ...amounts })
+        if (s.kind === "nonbiological") {
+            rows.push({ name: s.name, arg: soluteArg(s), ...amounts })
+        }
         else {
             const custom = {
                 z: Number(s.z),

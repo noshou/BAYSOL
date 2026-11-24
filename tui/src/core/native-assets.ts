@@ -5,7 +5,14 @@
 // (`native/<name>`), and the first use writes it into the cache folder, where it runs from.
 // A file already there with the right size is reused, so the cost is paid once per version.
 
-import { chmodSync, existsSync, mkdirSync, renameSync, statSync, writeFileSync } from "node:fs"
+import {
+    chmodSync,
+    existsSync,
+    mkdirSync,
+    renameSync,
+    statSync,
+    writeFileSync,
+} from "node:fs"
 import { basename, join } from "node:path"
 import { getRawAsset, isSea } from "node:sea"
 import { cacheDir, version } from "./environment.js"

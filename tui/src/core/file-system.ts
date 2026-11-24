@@ -749,7 +749,7 @@ function runShellIn(system: System, dir: string): string | undefined {
     return result.error ? `could not start a shell: ${result.error.message}` : undefined
 }
 
-/** The exit status of the setup wizard after an uninstall (`UNINSTALLED` of `BAYSOLSetup`). */
+/** The exit status of the setup wizard after an uninstall (`UNINSTALLED` of the wizard). */
 export const SETUP_UNINSTALLED = 22
 
 /**
@@ -757,8 +757,9 @@ export const SETUP_UNINSTALLED = 22
  * the user leaves it; the wizard does not offer to launch anything from here.
  *
  * @param env - the environment; `BAYSOL_BUNDLE` (set by the launcher) names the app.
- * @returns `problem`: a text if there is no packaged app or the wizard could not be started;
- *     `uninstalled`: true if the user uninstalled the app (nothing is left to return to).
+ * @returns `problem`: a text if there is no packaged app or the wizard could not be
+ *     started; `uninstalled`: true if the user uninstalled the app (nothing is left to
+ *     return to).
  */
 export function runSetupWizard(env: NodeJS.ProcessEnv): {
     problem?: string
@@ -766,7 +767,10 @@ export function runSetupWizard(env: NodeJS.ProcessEnv): {
 } {
     const bundle = env.BAYSOL_BUNDLE
     if (!bundle) {
-        return { problem: "the setup wizard belongs to the packaged app", uninstalled: false }
+        return {
+            problem: "the setup wizard belongs to the packaged app",
+            uninstalled: false,
+        }
     }
     const result = spawnSync(join(bundle, "baysol"), ["setup"], {
         stdio: "inherit",

@@ -36,7 +36,9 @@ test("without a packaged app the wizard is a problem, not an uninstall", () => {
 const posixOnly = { skip: process.platform === "win32" }
 
 test("the wizard's exit status says whether the app was uninstalled", posixOnly, () => {
-    assert.deepEqual(runSetupWizard({ BAYSOL_BUNDLE: fakeBundle(0) }), { uninstalled: false })
+    assert.deepEqual(runSetupWizard({ BAYSOL_BUNDLE: fakeBundle(0) }), {
+        uninstalled: false,
+    })
     assert.deepEqual(runSetupWizard({ BAYSOL_BUNDLE: fakeBundle(SETUP_UNINSTALLED) }), {
         uninstalled: true,
     })

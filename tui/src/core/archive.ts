@@ -82,7 +82,8 @@ export function archiveTool(): string {
  */
 function bundledTool(): string | undefined {
     try {
-        return inSingleExecutable() ? extractNativeAsset(`native/7za${process.platform === "win32" ? ".exe" : ""}`) : path7za
+        const name = `native/7za${process.platform === "win32" ? ".exe" : ""}`
+        return inSingleExecutable() ? extractNativeAsset(name) : path7za
     } catch {
         return undefined
     }

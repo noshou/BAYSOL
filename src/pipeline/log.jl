@@ -157,7 +157,9 @@ function _logRevision()
         dir === nothing && return "unknown"
         file = joinpath(dir, "REVISION")
         isfile(file) && return String(strip(read(file, String)))
-        rev = readchomp(pipeline(`git -C $dir rev-parse --short HEAD`; stderr = devnull))
+        rev = String(
+            readchomp(pipeline(`git -C $dir rev-parse --short HEAD`; stderr = devnull)),
+        )
         dirty = readchomp(
             pipeline(
                 `git -C $dir status --porcelain --untracked-files=no`;

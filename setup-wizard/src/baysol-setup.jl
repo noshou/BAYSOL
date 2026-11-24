@@ -567,7 +567,8 @@ The `Info.plist` of the app bundle in `~/Applications` (macOS). `icon` is the na
 function infoPlist(; icon::AbstractString = ICON_NAME, exe::AbstractString = "BAYSOL")
     return """
         <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
             <key>CFBundleName</key><string>BAYSOL</string>
@@ -1200,9 +1201,9 @@ end
 """
     runWizard(bundle; io, env, home, firstRun, launch) -> Int
 
-The interactive wizard: welcome, then a menu (set up or change, repair, uninstall) that comes
-back after each step (a cancel included) until Quit. With `launch` it asks, after a setup or
-a repair, what to start now.
+The interactive wizard: welcome, then a menu (set up or change, repair, uninstall) that
+comes back after each step (a cancel included) until Quit. With `launch` it asks, after a
+setup or a repair, what to start now.
 
 # Returns
 The exit status: 0, `LAUNCH_TUI` or `LAUNCH_CLI` (the choice of the launch question),
