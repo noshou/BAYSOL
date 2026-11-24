@@ -102,8 +102,10 @@ end
         r"(?s)=== diagnose: report.*=== diagnose: residuals.*=== diagnose: chains",
         out)
     @test says(out,
-        "diagnose.jl --chains --seeds 1,2 --samples 50 --out /nowhere/chains.txt SASDMJ9",
-        "diagnose.jl --report --samples 50 --out /nowhere/report.txt SASDMJ9")
+        "diagnose.jl --chains --seeds 1,2 --samples 50 --out " *
+        joinpath("/nowhere", "chains.txt") * " SASDMJ9",
+        "diagnose.jl --report --samples 50 --out " *
+        joinpath("/nowhere", "report.txt") * " SASDMJ9")
 end
 
 @testset "diagnose: every fit by default; parts can be selected" begin
@@ -141,7 +143,9 @@ end
         run_tool("fits", "run", "SASDMJ9", "--trace-compile", "/tmp/x", "--dry-run")
     @test status == 0 &&
           occursin(
-        r"--trace-compile=/tmp/x/SASDMJ9.jl.*SASDMJ9.jl",
+        Regex(
+            "--trace-compile=\\Q" * joinpath("/tmp/x", "SASDMJ9.jl") * "\\E.*SASDMJ9.jl",
+        ),
         replace(out, "\n" => " "),
     )
     r = run_tool("fits", "run", "SASDMJ9", "--trace-compile")

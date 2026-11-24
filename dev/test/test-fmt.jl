@@ -81,8 +81,9 @@ end
 
 @testset "check lists and apply repairs, in an isolated folder" begin
     dir = scratch_dir()
-    stub = joinpath(dir, "biome-stub")
-    write(stub, "#!/bin/sh\nexit 0\n")
+    # a program that succeeds and does nothing: a batch file on Windows, a script elsewhere
+    stub = joinpath(dir, Sys.iswindows() ? "biome-stub.cmd" : "biome-stub")
+    write(stub, Sys.iswindows() ? "@exit /b 0\r\n" : "#!/bin/sh\nexit 0\n")
     chmod(stub, 0o755)
     write_file(joinpath(dir, "a.ts"), "export {}  \n\n\n")
     write_file(joinpath(dir, "types.d.ts"), "declare const x: number\t\n")

@@ -374,14 +374,16 @@ end
 """
     find_julia() -> String
 
-The Julia executable: `\$JULIA` if set, else `julia` from the PATH. An error if it cannot
-be found.
+The Julia executable: `\$JULIA` if set, else `julia` from the PATH, else the Julia that is
+running this code. (`Sys.which` cannot see the `julia.exe` that juliaup puts in
+`WindowsApps`, an app execution alias, so on Windows the PATH lookup can fail for a Julia
+that is installed and running.) An error if none can be found.
 """
 function find_julia()::String
     julia = get(ENV, "JULIA", "julia")
-    Sys.which(julia) === nothing &&
-        throw(ToolError("julia not found (set JULIA to its path)", 1))
-    return julia
+    Sys.which(julia) === nothing || return julia
+    haskey(ENV, "JULIA") || return joinpath(Sys.BINDIR, Sys.iswindows() ? "julia.exe" : "julia")
+    throw(ToolError("julia not found (set JULIA to its path)", 1))
 end
 
 # --- git
