@@ -7,17 +7,20 @@
         ".": {
             // Biome is run by the dev tools (`bysl fmt`), not imported by any file, so it
             // looks unused to a scan of the code.
-            "ignoreDependencies": ["@biomejs/biome"]
+            // `postject` injects the blob into the Node single executable in `bysl pkg`
+            // (`dev/src/pkg.jl`), a Julia program that knip does not read.
+            "ignoreDependencies": ["@biomejs/biome", "postject"]
         },
         "tui": {
             // `frame-worker.ts` is started by `new Worker(new URL(...))` in `store/frame-render.ts`,
             // which knip does not follow
             "entry": ["test/*.test.ts", "test/support/*.ts", "dev/*.ts", "src/store/frame-worker.ts"],
             "project": ["src/**/*.{ts,tsx}", "test/**/*.ts", "dev/**/*.ts"],
-            // `reg` is the Windows registry tool that `core/fonts.ts` runs on Windows;
-            // `pdftocairo` is poppler's, run by the sixel rasteriser (optional, found at run time);
-            // `7z` unpacks the fixture archives in `test/data.test.ts`
-            "ignoreBinaries": ["reg", "pdftocairo", "7z"]
+            // `@resvg/resvg-js` is loaded by `store/sixel-raster.ts` through a specifier that
+            // is not a literal (the bundle must not follow it), so a scan does not see it
+            "ignoreDependencies": ["@resvg/resvg-js"],
+            // `pdftocairo` is poppler's, run by the sixel rasteriser (optional, found at run time)
+            "ignoreBinaries": ["pdftocairo"]
         }
     }
 }

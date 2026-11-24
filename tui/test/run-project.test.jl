@@ -394,10 +394,18 @@ end
         @test _liveRun(joinpath(dir, RUN_FOLDER)) === nothing
         beat(time(); status = "done")
         @test _liveRun(joinpath(dir, RUN_FOLDER)) === nothing
-        if Sys.isunix()
+        if Main.BAYSOLRun.Platform.isunix()
             beat(time(); pid = 2^22 + 12345)            # above any pid_max
             @test _liveRun(joinpath(dir, RUN_FOLDER)) === nothing
         end
+        # a process that existed and has ended is gone on every system; this one is alive
+        @test Main.BAYSOLRun._pidExists(getpid()) === true
+        child = run(`$(Base.julia_cmd()) --startup-file=no -e "nothing"`; wait = false)
+        childPid = getpid(child)
+        wait(child)
+        @test Main.BAYSOLRun._pidExists(childPid) === false
+        beat(time(); pid = childPid)
+        @test _liveRun(joinpath(dir, RUN_FOLDER)) === nothing
         @test quick(dir; fit = noopFit).status == :done
     end
 end

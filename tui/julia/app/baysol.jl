@@ -6,7 +6,8 @@
 # run-tui`) and the setup wizard (`baysol setup`). Nothing in it knows the checkout it was
 # built in: every file it needs is found beside the executable.
 #
-#   <bundle>/baysol  baysol-tui  julia/ (the libraries)  lib/pytools/  the icon  the launcher
+#   <bundle>/baysol  baysol-tui  julia/ (the libraries)  lib/pytools/  the icon
+#   the launcher
 #
 # When `BAYSOL_WORKLOAD` names a folder at build time, the file `workload.jl` runs the
 # projects in it, so the code of a real fit is compiled into the executable.

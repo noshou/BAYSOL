@@ -5,11 +5,12 @@
 
 module TFixtures
 using Test
+using Dev: Platform
 using .Main.Helpers
 using Dev.Fixtures: FixtureStore as FS
 
 @testset "fixtures: pack, unpack, resolve, clean" begin
-    if Sys.which("7z") === nothing
+    if Platform.which("7z") === nothing
         @test_skip false
     else
         exp = mktempdir()
@@ -96,13 +97,15 @@ end
     @test FS.env_var("synthetic") == "BAYSOL_FIXTURES_SYNTHETIC"
     @test FS.env_var("my-set") == "BAYSOL_FIXTURES_MY_SET"
     withenv("BAYSOL_FIXTURES" => nothing, "BAYSOL_FIXTURES_SYNTHETIC" => nothing) do
-        @test FS.tmp_root("experiments") == joinpath(FS.REPO, "_cache", "experiments")
-        @test FS.tmp_root("synthetic") == joinpath(FS.REPO, "_cache", "synthetic")
+        @test FS.tmp_root("experiments") ==
+              joinpath(Platform.default_cache(), "fixtures", "experiments")
+        @test FS.tmp_root("synthetic") ==
+              joinpath(Platform.default_cache(), "fixtures", "synthetic")
     end
     withenv("BAYSOL_FIXTURES_SYNTHETIC" => "/tmp/x-syn") do
         @test FS.tmp_root("synthetic") == normpath("/tmp/x-syn")
     end
-    if Sys.which("7z") !== nothing
+    if Platform.which("7z") !== nothing
         base = mktempdir()
         tmp = joinpath(mktempdir(), "unpacked")
         mkpath(joinpath(base, "ITEM", "sub"))

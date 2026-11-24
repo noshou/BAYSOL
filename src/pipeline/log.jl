@@ -309,7 +309,7 @@ load and the free memory when the run started (a busy machine spoils a timing).
 function _logMachine(log::StageLog)
     cpu = first(Sys.cpu_info())
     gib(x) = _logCell(round(x / 2^30; digits = 1))
-    rows = [["machine.os", string(Sys.KERNEL, " ", Sys.MACHINE)],
+    rows = [["machine.os", Platform.describe()],
         ["machine.cpu", cpu.model == "unknown" ? Sys.CPU_NAME : strip(cpu.model)],
         ["machine.cpu_mhz", string(cpu.speed)],
         ["machine.cpus", string(Sys.CPU_THREADS)],
@@ -326,7 +326,25 @@ end
 The stamp of a write of the log: the day, the time (24 hours) and 
 the offset from UTC (ex: `27-10-2026 14:09:33 +0200`).
 """
-_logStamp() = Libc.strftime("%d-%m-%Y %H:%M:%S %z", time())
+function _logStamp()
+    t = time()
+    tm = Libc.TmStruct(t)
+    # The offset from UTC is worked out here, not asked of the C library: `%z` prints the
+    # NAME of the zone on Windows ("Eastern Standard Time"), not `-0500`. The local calendar
+    # fields of this instant, read as if they were UTC, minus the instant itself, are the
+    # offset in seconds (days from the civil date: Howard Hinnant's algorithm).
+    m = Int(tm.month) + 1
+    y = Int(tm.year) + 1900 - (m <= 2)
+    era = fld(y, 400)
+    yoe = y - 400era
+    doy = fld(153 * (m > 2 ? m - 3 : m + 9) + 2, 5) + Int(tm.mday) - 1
+    days = 146097era + 365yoe + fld(yoe, 4) - fld(yoe, 100) + doy - 719468
+    localSeconds = 86400days + 3600Int(tm.hour) + 60Int(tm.min) + Int(tm.sec)
+    minutes = round(Int, (localSeconds - floor(Int, t)) / 60)
+    offset = string(minutes < 0 ? '-' : '+', lpad(abs(minutes) ÷ 60, 2, '0'),
+        lpad(abs(minutes) % 60, 2, '0'))
+    return string(Libc.strftime("%d-%m-%Y %H:%M:%S", t), " ", offset)
+end
 
 """
 Lays out `rows` (each a vector of cells) as lines of tab-separated cells that line up in any

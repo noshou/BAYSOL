@@ -14,6 +14,7 @@ module Export
 
 using ..Common
 using ..Fixtures
+using ...Platform: Platform
 using Dates
 using JSON3
 
@@ -80,8 +81,16 @@ end
 
 # --- the workbook -----------------------------------------------------------------
 
+"The 7-Zip program, by its full path (on the `PATH` or in the folder an installer used)."
+function seven_zip()::String
+    exe = Platform.find_tool("7z", "7zz")
+    exe === nothing &&
+        error("7z (7-Zip) is not on the PATH nor in the folders installers use for it")
+    return exe
+end
+
 "The text of one file of an `.xlsx` (a zip), read by 7-Zip."
-unzip(path, entry) = read(`7z x -so $path $entry`, String)
+unzip(path, entry) = read(`$(seven_zip()) x -so $path $entry`, String)
 
 xml_text(s) = replace(
     s,
@@ -151,7 +160,7 @@ function read_sheet(path::AbstractString, sheet::AbstractString)
 end
 
 "The names of the files of a zip, one string (to see whether a part exists)."
-unzip_list(path) = read(`7z l -slt $path`, String)
+unzip_list(path) = read(`$(seven_zip()) l -slt $path`, String)
 
 "The sheet names of a workbook."
 function sheet_names(path::AbstractString)
@@ -578,7 +587,7 @@ function write_references(project, models)
     end
     archive = joinpath(project, "reference-fit.7z")
     members = sort(collect(keys(files)))
-    Base.run(Cmd(`7z a -t7z -mx=5 -bso0 -bsp0 $archive $members`; dir = stage))
+    Base.run(Cmd(`$(seven_zip()) a -t7z -mx=5 -bso0 -bsp0 $archive $members`; dir = stage))
     rm(stage; recursive = true)
     entry(m) = begin
         software, chi = reference_label(row_of(m.section, "refChi2"))
@@ -702,7 +711,12 @@ function write_run(
         cp(joinpath(project, f), joinpath(stage, f))
     end
     archive = joinpath(runs, name * ".7z")
-    Base.run(Cmd(`7z a -t7z -mx=5 -bso0 -bsp0 $archive $(readdir(stage))`; dir = stage))
+    Base.run(
+        Cmd(
+            `$(seven_zip()) a -t7z -mx=5 -bso0 -bsp0 $archive $(readdir(stage))`;
+            dir = stage,
+        ),
+    )
     rm(stage; recursive = true)
     return archive
 end

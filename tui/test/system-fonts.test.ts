@@ -12,6 +12,7 @@ import {
     loadFonts,
     parseRegistryFonts,
     readFaces,
+    registryFontsCommand,
     scanFonts,
     texInstalled,
 } from "../src/core/fonts.js"
@@ -496,4 +497,26 @@ test("TeX is found on the path", () => {
     assert.equal(texInstalled(fakeSystem("linux", { PATH: bin })), true)
     assert.equal(texInstalled(fakeSystem("linux", { PATH: tempDir() })), false)
     assert.equal(texInstalled(fakeSystem("linux", {})), false)
+})
+
+test("the registry fonts come from PowerShell as UTF-8, not from `reg query`", () => {
+    const [program, flag, mode, script] = registryFontsCommand()
+    assert.equal(program, "powershell")
+    assert.equal(flag, "-NoProfile")
+    assert.equal(mode, "-Command")
+    // UTF-8 output, both hives, the key once with
+    // single backslashes, reg-query-shaped lines
+    assert.match(script ?? "", /OutputEncoding = \(New-Object System\.Text\.UTF8Encoding \$false\)/)
+    assert.match(script ?? "", /'HKLM','HKCU'/)
+    assert.ok(
+        (script ?? "").includes(
+            ":\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'",
+        ),
+    )
+    assert.ok(!(script ?? "").includes("\\\\"))
+    assert.ok((script ?? "").includes("REG_SZ"))
+    // its lines parse like the output of `reg query`, an accented path included
+    const mine = "C:\\Users\\Zo\u00eb\\fonts\\Mine.ttf"
+    const line = `    Mine (TrueType)    REG_SZ    ${mine}`
+    assert.deepEqual(parseRegistryFonts(line, "C:\\Windows\\Fonts"), [mine])
 })

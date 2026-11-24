@@ -184,6 +184,7 @@ end
 module TCache
 
 using Test
+using Dev: Platform
 using Dev.Common
 using .Main.Helpers
 
@@ -198,7 +199,8 @@ end
 
 @testset "the cache is the operating system's, never the repository's" begin
     withenv("BAYSOL_CACHE" => nothing, "XDG_CACHE_HOME" => "/xdg/cache") do
-        Sys.islinux() && @test cache_root() == "/xdg/cache/baysol/_cache"
+        Platform.islinux() && @test cache_root() == "/xdg/cache/baysol/_structures"
+        @test cache_root() == Platform.default_structure_cache()
     end
     withenv("BAYSOL_CACHE" => "relative/dir") do
         @test !startswith(cache_root(), joinpath(repo_dir, "_cache"))

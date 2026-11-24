@@ -16,7 +16,11 @@ import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { extname } from "node:path"
 import { PNG } from "pngjs"
-import { extractNativeAsset, inSingleExecutable, loadNativeAddon } from "../core/native-assets.js"
+import {
+    extractNativeAsset,
+    inSingleExecutable,
+    loadNativeAddon,
+} from "../core/native-assets.js"
 import { flattenOnWhite, resizeRgba } from "./raster-scale.js"
 import type { RgbaImage } from "./sixel-types.js"
 
@@ -44,7 +48,9 @@ const PDF_RENDERERS: readonly ("pdf-raster" | "pdftocairo")[] = [
 /** Largest side of a box taken, in pixels (a guard against a runaway request). */
 const MAX_SIDE = 16384
 
-/** The native files of the packaged app (assets of the single executable, see the build). */
+/**
+ * The native files of the packaged app (assets of the single executable, see the build).
+ */
 const NATIVE_RESVG = "native/resvg.node"
 const NATIVE_PDF_RASTER = "native/pdf-raster.node"
 const NATIVE_PDFIUM = "native/pdfium"
@@ -67,7 +73,8 @@ type NativeResvg = new (
 function nativeResvg(): NativeResvg {
     if (inSingleExecutable())
         return loadNativeAddon(extractNativeAsset(NATIVE_RESVG)).Resvg as NativeResvg
-    const specifier = "@resvg/resvg-js/js-binding.js" // not a literal: the bundle has no use for it
+    // not a literal: the bundle has no use for it
+    const specifier = "@resvg/resvg-js/js-binding.js"
     const binding = createRequire(import.meta.url)(specifier) as Record<string, unknown>
     return binding.Resvg as NativeResvg
 }
@@ -112,7 +119,9 @@ async function rasteriseSvg(path: string, widthPx: number, heightPx: number) {
     return fit(raster, widthPx, heightPx, true)
 }
 
-/** The page converter of `pdf-raster`, its native files from the executable when packaged. */
+/**
+ * The page converter of `pdf-raster`, its native files from the executable when packaged.
+ */
 async function pdfConvert() {
     if (inSingleExecutable()) {
         // the wrapper reads these two variables before it looks for a platform package

@@ -21,7 +21,7 @@ import {
     writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { delimiter, join } from "node:path"
+import { basename, delimiter, join } from "node:path"
 import { test } from "node:test"
 import { readSystem } from "../src/core/environment.js"
 import { moveChoices } from "../src/screens/open-runs.js"
@@ -185,7 +185,7 @@ test("move tex: from the archive or the folder, into the run folder", async () =
         // the whole run: the comparison comes as <project>-compare.tex
         const all = await moveFiles("tex", [model, compare], target)
         assert.equal(all.startsWith("moved 3 plots to"), true)
-        const project_ = p.split("/").pop() as string
+        const project_ = basename(p)
         seen.push(readdirSync(folder).sort())
         assert.ok(readdirSync(folder).includes(`${project_}-compare.tex`))
     }
@@ -247,7 +247,7 @@ test("move data: the workbook and the comparison table, into the data folder", a
         const folder = join(root, run.id)
         const note = await moveFiles("data", units, root)
         assert.equal(note, `moved 2 data files to ${root}`)
-        const project_ = p.split("/").pop() as string
+        const project_ = basename(p)
         assert.deepEqual(readdirSync(root), [run.id], "only the run's folder")
         assert.deepEqual(
             readdirSync(folder).sort(),

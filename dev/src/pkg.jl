@@ -23,6 +23,7 @@
 module PkgTool
 
 using ..Common
+using ..Platform: Platform
 using Dates
 
 const WHO = "bysl pkg"
@@ -36,11 +37,12 @@ and the icons, `baysol-<semver>-<os>-<arch>.zip` (deflate, 7-Zip maximum setting
 
     --out DIR       the folder the archive is written to (default: the folder you run
                     this from)
-    --work DIR      scratch folder (default `baysol/baysol-pkg-work` in the cache home of
-                    the system); a build starts COLD: an earlier folder is removed first,
-                    and the build uses its own Julia depot, uv, Nuitka and fit caches
-                    inside it, never yours. Removed when the archive is written, the
-                    caches even with --keep-work (a failed run keeps all of it)
+    --work DIR      scratch folder (default `baysol-pkg-work` in the cache folder of
+                    BAYSOL, `Platform.cache_dir()`); a build starts COLD: an earlier
+                    folder is removed first, and the build uses its own Julia depot, uv,
+                    Nuitka and fit caches inside it, never yours. Removed when the
+                    archive is written, the caches even with --keep-work (a failed run
+                    keeps all of it)
     --workload DIR  project folders the build fits once (default: exported by `bysl fits
                     export` from the entries of WORKLOAD)
     --stage NAME    run only this stage (pytools, tui, trace, julia, bundle); it needs
@@ -141,6 +143,16 @@ const NODE_VERSION = "26.13.1"
 const PY_PACKAGES = ["propka==3.5.1", "pdb2pqr==3.7.1", "nuitka==4.3.5", "patchelf"]
 const PY_VERSION = "3.12"
 
+"""
+    py_packages(os = Platform.os()) -> Vector{String}
+
+The pins [`PY_PACKAGES`](@ref) installs into the build's venv. `patchelf` (which sets the
+RUNPATH of the Julia executable, Linux only: [`set_runtime_rpath`](@ref)) is left out on
+the other systems, where it has no wheel and pip would try to build it.
+"""
+py_packages(os::Symbol = Platform.os()) =
+    os === :linux ? copy(PY_PACKAGES) : filter(p -> p != "patchelf", PY_PACKAGES)
+
 const STAGES = ["pytools", "tui", "trace", "julia", "bundle"]
 
 # --- memory
@@ -227,7 +239,7 @@ seconds meanwhile (Linux; elsewhere the peak is `nothing`). `peak` is
 memory of that tree.
 """
 function watch_memory(f; period = 2)
-    Sys.islinux() || return f(), nothing
+    Platform.islinux() || return f(), nothing
     peak = [0, 0]
     sample() = peak .= max.(peak, tree_memory())
     sample()
@@ -258,7 +270,7 @@ function guarded(cmd::Cmd; env = Dict{String,String}(), dir = pwd(), log = nothi
     proc = Base.run(pipeline(c; stdout = out, stderr = out); wait = false)
     stopped = Ref(false)
     watch =
-        Sys.islinux() ?
+        Platform.islinux() ?
         @async(begin
             while process_running(proc)
                 if swap_low(parse_meminfo(read("/proc/meminfo", String)))
@@ -381,12 +393,14 @@ end
 Writes the report file: the date, the revision, the machine, then [`REPORT`](@ref).
 """
 function write_report(path::AbstractString, archive::AbstractString)
-    info = Sys.islinux() ? parse_meminfo(read("/proc/meminfo", String)) : Dict{String,Int}()
+    info =
+        Platform.islinux() ? parse_meminfo(read("/proc/meminfo", String)) :
+        Dict{String,Int}()
     mib(k) = get(info, k, 0) ÷ 1024
     open(path, "w") do io
         println(io, "bysl pkg   ", Dates.format(Dates.now(), "yyyy-mm-dd HH:MM"))
         println(io, "revision   ", build_revision())
-        println(io, "machine    ", Sys.ARCH, ", ", Sys.CPU_THREADS, " threads, RAM ",
+        println(io, "machine    ", Platform.arch(), ", ", Sys.CPU_THREADS, " threads, RAM ",
             mib("MemTotal"), " MiB, swap ", mib("SwapTotal"), " MiB")
         println(io, "archive    ", archive)
         println(
@@ -403,8 +417,9 @@ end
 
 "The `(os, arch)` names Node and the notes use: `(\"linux\", \"arm64\")` and the like."
 function system_names()
-    os = Sys.islinux() ? "linux" : Sys.isapple() ? "darwin" : "win"
-    arch = Sys.ARCH === :aarch64 ? "arm64" : Sys.ARCH === :x86_64 ? "x64" : string(Sys.ARCH)
+    os = Platform.islinux() ? "linux" : Platform.ismacos() ? "darwin" : "win"
+    a = Platform.arch()
+    arch = a === :aarch64 ? "arm64" : a === :x86_64 ? "x64" : string(a)
     return os, arch
 end
 
@@ -416,14 +431,14 @@ function node_download(version = NODE_VERSION)
     return "https://nodejs.org/dist/v$version/$name.$ext", name, ext
 end
 
-exe(name) = Sys.iswindows() ? name * ".exe" : name
+exe(name) = Platform.exe(name)
 
 """
 The icon file of the bundle on this system, at its root: `baysol.ico` (Windows) or
 `baysol.icns` (macOS and Linux; the setup wizard unpacks the sizes of it into the user's
 `hicolor` theme on Linux). [`pack_icon`](@ref) writes it from the PNG sizes in `icons/`.
 """
-icon_file() = Sys.iswindows() ? "baysol.ico" : "baysol.icns"
+icon_file() = Platform.iswindows() ? "baysol.ico" : "baysol.icns"
 
 "The `.icns` entry type of each pixel size macOS knows (all PNG)."
 const ICNS_TYPES = Dict(
@@ -554,7 +569,9 @@ on Windows, an `.icns` elsewhere (with the extra sizes on Linux only).
 function pack_icon(dest::AbstractString, dir::AbstractString)::String
     sizes = icon_sizes(dir)
     isempty(sizes) && error("icon: no icon_NxN.png files in $dir")
-    bytes = Sys.iswindows() ? ico_bytes(sizes) : icns_bytes(sizes; extra = Sys.islinux())
+    bytes =
+        Platform.iswindows() ? ico_bytes(sizes) :
+        icns_bytes(sizes; extra = Platform.islinux())
     write(dest, bytes)
     return dest
 end
@@ -568,9 +585,9 @@ entry or a terminal elsewhere): a bash script on Linux, a zsh `.command` file
 on macOS, a `.cmd` file on Windows. macOS and Windows untested.
 """
 function launcher()
-    if Sys.iswindows()
+    if Platform.iswindows()
         return "baysol.cmd", "@echo off\r\n\"%~dp0baysol.exe\" %*\r\n"
-    elseif Sys.isapple()
+    elseif Platform.ismacos()
         return "BAYSOL.command", raw"""
             #!/bin/zsh
             cd "${0:A:h}" || exit 1
@@ -614,11 +631,45 @@ function find_7z()
     bundled = joinpath(Common.root(), "node_modules", "7zip-bin",
         os == "win" ? "win" : os == "darwin" ? "mac" : "linux", arch, exe("7za"))
     isfile(bundled) && return bundled
-    for p in ("7zz", "7z", "7za")
-        w = Sys.which(p)
-        w === nothing || return w
+    return Platform.find_tool("7zz", "7z", "7za")
+end
+
+"""
+    node_tool(name; modules = joinpath(Common.root(), "node_modules")) -> String
+
+The program `name` of the npm packages (`node_modules/.bin/name`). On Windows `.bin/name`
+is a shell script that cannot be spawned, and `name.cmd` is the shim that can, so that one
+is taken when it exists (npm writes it only on Windows).
+"""
+function node_tool(name::AbstractString; modules = joinpath(Common.root(), "node_modules"))
+    shim = joinpath(modules, ".bin", name * ".cmd")
+    return isfile(shim) ? shim : joinpath(modules, ".bin", name)
+end
+
+"""
+    node_program(node_dir) -> String
+
+The `node` program of an unpacked official Node.js build: `node.exe` in the top folder on
+Windows (the archive is a zip), `bin/node` elsewhere.
+"""
+node_program(node_dir::AbstractString) =
+    Platform.iswindows() ? joinpath(node_dir, exe("node")) :
+    joinpath(node_dir, "bin", exe("node"))
+
+"""
+    unpack_command(archive, dir) -> Union{Cmd,Nothing}
+
+The command that unpacks the Node.js `archive` into `dir`: 7-Zip for a `.zip` (the `tar`
+on a Windows PATH may be Git's GNU tar, which cannot read a zip), `tar` otherwise; `nothing`
+for a zip when no 7-Zip is found.
+"""
+function unpack_command(archive::AbstractString, dir::AbstractString)
+    if endswith(archive, ".zip")
+        seven = find_7z()
+        seven === nothing && return nothing
+        return `$seven x -y $("-o" * dir) $archive`
     end
-    return nothing
+    return `tar -xf $archive -C $dir`
 end
 
 # --- stages
@@ -673,11 +724,11 @@ if __name__ == "__main__":
 
 "Stage `pytools`: propka3 and pdb2pqr as one Nuitka standalone program."
 function stage_pytools(work)
-    Sys.which("uv") === nothing && need(false, "uv is needed for the Python tools")
+    Platform.which("uv") === nothing && need(false, "uv is needed for the Python tools")
     venv = joinpath(work, "pyvenv")
-    py = joinpath(venv, Sys.iswindows() ? "Scripts" : "bin", exe("python"))
+    py = joinpath(venv, Platform.iswindows() ? "Scripts" : "bin", exe("python"))
     ok = isdir(venv) || rc(`uv venv --python $PY_VERSION $venv`)
-    ok &= rc(`uv pip install --python $py $PY_PACKAGES`)
+    ok &= rc(`uv pip install --python $py $(py_packages())`)
     need(ok, "the Python environment failed")
     out = joinpath(work, "pytools")
     entry = joinpath(work, "baysol-pytools.py")
@@ -687,9 +738,10 @@ function stage_pytools(work)
         --include-package-data=pdb2pqr --include-package-data=propka
         --python-flag=no_docstrings --noinclude-unittest-mode=nofollow
         --noinclude-setuptools-mode=nofollow --noinclude-pytest-mode=nofollow
-        --noinclude-pydoc-mode=nofollow --assume-yes-for-downloads --output-dir=$out --output-filename=baysol-pytools
+        --noinclude-pydoc-mode=nofollow --assume-yes-for-downloads --output-dir=$out
+        --output-filename=$(exe("baysol-pytools"))
         $entry`; log = joinpath(work, "pytools.log"),
-        env = Dict("PATH" => dirname(py) * (Sys.iswindows() ? ";" : ":") * ENV["PATH"]))
+        env = Dict("PATH" => dirname(py) * Platform.PATH_SEP * ENV["PATH"]))
     need(ok, "Nuitka failed (see $(joinpath(work, "pytools.log")))")
     finish(work, "pytools")
 end
@@ -757,24 +809,27 @@ function stage_tui(work)
     if !isdir(node_dir)
         archive = joinpath(dir, "node." * ext)
         isfile(archive) || need(rc(`curl -fL -o $archive $url`), "download of Node")
-        need(rc(`tar -xf $archive -C $dir`), "unpacking Node")
+        unpack = unpack_command(archive, dir)
+        need(unpack !== nothing && rc(unpack), "unpacking Node (a zip needs 7-Zip)")
     end
-    node = joinpath(node_dir, "bin", exe("node"))
+    node = node_program(node_dir)
     stub = joinpath(dir, "stub.mjs")
     write(
         stub,
         "export default {}; export const path7za = \"\"\n",
     )
-    banner = "import{createRequire as __cr}from'node:module';const require=__cr(import.meta.url);"
+    banner =
+        "import{createRequire as __cr}from'node:module';" *
+        "const require=__cr(import.meta.url);"
     bundle = joinpath(dir, "baysol-tui.mjs")
-    esbuild = joinpath(Common.root(), "node_modules", ".bin", "esbuild")
+    esbuild = node_tool("esbuild")
     aliases = [
         "--alias:$m=$stub" for
         m in ("react-devtools-core", "7zip-bin")
     ]
     ok = rc(
-        `$esbuild $(joinpath(tui, "src", "main.tsx")) --bundle --platform=node --main-fields=module,main --format=esm
-        --target=node24 --minify --log-level=warning --outfile=$bundle --banner:js=$banner
+        `$esbuild $(joinpath(tui, "src", "main.tsx")) --bundle --platform=node --main-fields=module,main
+        --format=esm --target=node24 --minify --log-level=warning --outfile=$bundle --banner:js=$banner
         $aliases`,
     )
     need(ok, "esbuild failed")
@@ -794,10 +849,13 @@ function stage_tui(work)
         need(rc(`$node --experimental-sea-config sea.json`), "SEA blob")
         out = exe("baysol-tui")
         cp(node, out; force = true)
-        strip_binary(out)  # before the blob goes in, never after
-        postject = joinpath(Common.root(), "node_modules", ".bin", "postject")
+        # before the blob goes in, never after; not on Windows: the official node.exe is
+        # built with MSVC (its symbols are in a PDB, so there is nothing to strip) and
+        # carries an Authenticode signature that a strip tool may refuse
+        Platform.iswindows() || strip_binary(out)
+        postject = node_tool("postject")
         fuse = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2"
-        extra = Sys.isapple() ? ["--macho-segment-name", "NODE_SEA"] : String[]
+        extra = Platform.ismacos() ? ["--macho-segment-name", "NODE_SEA"] : String[]
         need(rc(`$postject $out NODE_SEA_BLOB sea.blob --sentinel-fuse $fuse $extra`),
             "postject (is it installed? npm i -D postject at the repository root)")
     end
@@ -953,7 +1011,8 @@ function trace_output_variants(work, dir, julia, env)
     cp(first_model, replace(first_model, r"\.pdb$" => "-2.pdb"))
     driver = joinpath(work, "output-driver.jl")
     write(driver, OUTPUT_DRIVER)
-    compile = Sys.which("lualatex") !== nothing && Sys.which("pdftocairo") !== nothing
+    compile =
+        Platform.which("lualatex") !== nothing && Platform.which("pdftocairo") !== nothing
     label = "output variants $(first(WORKLOAD)) (rendered: $compile)"
     step(label,
         () -> run_env(
@@ -982,7 +1041,7 @@ function trace_project_runs(work, dir, julia, env)
     runs = mkpath(joinpath(dir, "runs"))
     projects = mkpath(joinpath(dir, "projects"))
     workload = workload_folder(work, nothing)
-    node = Sys.which("node")
+    node = Platform.which("node")
     need(node !== nothing, "node is needed to run the interface's run code")
     app = joinpath(root, "tui", "julia")
     cli = "using BAYSOLRun; exit(BAYSOLRun.runProjectCli(ARGS; io = stderr))"
@@ -1106,12 +1165,14 @@ function stage_julia(work, workload)
         jll_search_env(joinpath(work, "jll-lib"), libs),
         "BAYSOL_STATEMENTS" => statements,
         "BAYSOL_BUILD_REVISION" => build_revision(),
-        "TMPDIR" => mkpath(joinpath(work, "tmp")))
+        "TMPDIR" => mkpath(joinpath(work, "tmp")),
+        # Windows takes its temp folder from TMP / TEMP, not TMPDIR
+        "TMP" => joinpath(work, "tmp"), "TEMP" => joinpath(work, "tmp"))
     log = joinpath(work, "julia.log")
     ok = step("juliac (precompile, workload fits, compile, link)",
         () -> guarded(
             `$(find_julia()) --startup-file=no --project=$project $juliac --output-exe
-            $(exe("baysol")) --relative-rpath $entry`;
+            $(exe("baysol")) $(juliac_flags()) $entry`;
             env, dir, log,
         ); pattern = r"^ERROR|Failed to|Exception")
     # what the build-time workload and the compiler said, from the juliac log
@@ -1126,17 +1187,46 @@ function stage_julia(work, workload)
 end
 
 """
+    juliac_flags(os = Platform.os()) -> Vector{String}
+
+The flags after the output name in the command of `juliac.jl`: `--relative-rpath` (the exe
+looks for its libraries in an adjacent `julia/` folder) everywhere but on Windows, where
+`juliac.jl` stops with "unimplemented" on it; a Windows exe finds its DLLs in its own
+folder, so [`runtime_layout`](@ref) puts them there.
+"""
+juliac_flags(os::Symbol = Platform.os()) =
+    os === :windows ? String[] : ["--relative-rpath"]
+
+"""
+    runtime_layout(out, os = Platform.os()) -> NamedTuple
+
+Where the runtime libraries go in the bundle `out`: `libjulia` (the libraries beside
+libjulia in Julia's `lib`) and `private` (those of `lib/julia`, and the JLL libraries). On
+Linux and macOS they are `out/julia` and `out/julia/julia`, named by the RUNPATH of the
+exe. Windows has no RUNPATH: the loader looks in the folder of the exe first (and Julia
+opens the libraries it names without a path the same way), and Julia's own `bin` holds
+every DLL, so both are `out` itself.
+"""
+function runtime_layout(out::AbstractString, os::Symbol = Platform.os())
+    os === :windows && return (; libjulia = String(out), private = String(out))
+    return (; libjulia = joinpath(out, "julia"), private = joinpath(out, "julia", "julia"))
+end
+
+"""
     copy_runtime(dest)
 
-Copies the runtime libraries of the running Julia to `dest` (`julia/` beside the exe),
+Copies the runtime libraries of the running Julia to `dest` (`runtime_layout(out).libjulia`,
+`julia/` beside the exe on Linux and macOS, the folder of the exe on Windows),
 laid out as Julia's own installation is: `lib/*` (libjulia) in `dest` and `lib/julia/*`
 (libjulia-internal, LLVM, OpenBLAS, the JLLs) in `dest/julia`, because libjulia asks for
 `julia/libopenlibm.so`, `julia/libstdc++.so.6` ... relative to itself. The exe's RUNPATH
 must name both folders (`runtime_rpath`). The bare names `libopenlibm.so` and
 `libopenblas64_.so` are dlopen'd by Julia and are shipped as real files under those names.
+On Windows Julia's `bin` holds all the DLLs and has no `julia/` folder, so they all land
+in `dest`.
 """
 function copy_runtime(dest)
-    lib = normpath(joinpath(Sys.BINDIR, "..", Sys.iswindows() ? "bin" : "lib"))
+    lib = normpath(joinpath(Sys.BINDIR, "..", Platform.iswindows() ? "bin" : "lib"))
     for (d, to) in ((lib, dest), (joinpath(lib, "julia"), joinpath(dest, "julia")))
         isdir(d) || continue
         mkpath(to)
@@ -1160,8 +1250,13 @@ function bare_name(dir, file)
     return nothing
 end
 
-"Libraries that Julia dlopens by a name without a version, so the bundle needs that name."
-const BARE_RUNTIME_NAMES = ["libopenlibm.so", "libopenblas64_.so", "libpcre2-8.so"]
+"""
+Libraries that Julia dlopens by a name without a version, so the bundle needs that name
+(with the extension of this system: `.so`, `.dylib`, `.dll`).
+"""
+const BARE_RUNTIME_NAMES =
+    ["libopenlibm", "libopenblas64_", "libpcre2-8"] .*
+    ("." * Base.BinaryPlatforms.platform_dlext())
 
 """
     baked_artifacts(file) -> Vector{String}
@@ -1201,7 +1296,8 @@ end
 const JLL_LIBRARIES_SCRIPT = raw"""
 using TOML
 root = dirname(Sys.BINDIR)
-for (name, entries) in TOML.parsefile(joinpath(dirname(Base.active_project()), "Manifest.toml"))["deps"]
+manifest = joinpath(dirname(Base.active_project()), "Manifest.toml")
+for (name, entries) in TOML.parsefile(manifest)["deps"]
     endswith(name, "_jll") || continue
     for e in entries
         M = Base.require(Base.PkgId(Base.UUID(e["uuid"]), name))
@@ -1256,11 +1352,9 @@ function jll_search_env(dir, libs)
     for (_, _, _, path) in libs
         cp(path, joinpath(dir, basename(path)); force = true, follow_symlinks = true)
     end
-    var =
-        Sys.iswindows() ? "PATH" :
-        Sys.isapple() ? "DYLD_FALLBACK_LIBRARY_PATH" : "LD_LIBRARY_PATH"
+    var = Platform.library_path_variable()
     old = get(ENV, var, "")
-    return var => isempty(old) ? dir : dir * (Sys.iswindows() ? ";" : ":") * old
+    return var => isempty(old) ? dir : dir * Platform.PATH_SEP * old
 end
 
 """
@@ -1286,7 +1380,7 @@ function write_jll_preferences(dir, libs)
         end
     end
     write(joinpath(dir, "LocalPreferences.toml"), join(prefs, "\n") * "\n")
-    return "@" * (Sys.iswindows() ? ";" : ":") * dir * (Sys.iswindows() ? ";" : ":") *
+    return "@" * Platform.PATH_SEP * dir * Platform.PATH_SEP *
            "@stdlib"
 end
 
@@ -1294,11 +1388,11 @@ end
     install_jll_libraries(exe_path, libs, dest)
 
 Puts the libraries of `libs` into `dest/julia/julia` (where libjulia-internal looks for
-what Julia opens by name) and, for every artifact hash baked into the executable, a
-folder `dest/share/julia/artifacts/<hash>` with a marker file: every JLL still asks for
-its artifact folder at startup (a juliac executable searches `<its folder>/share/julia`
-as a depot), and only that the folder exists matters, because the libraries are opened
-by name.
+what Julia opens by name; `dest` itself on Windows, see [`runtime_layout`](@ref)) and, for
+every artifact hash baked into the executable, a folder
+`dest/share/julia/artifacts/<hash>` with a marker file: every JLL still asks for its
+artifact folder at startup (a juliac executable searches `<its folder>/share/julia` as a
+depot), and only that the folder exists matters, because the libraries are opened by name.
 
 # Returns
 The hashes.
@@ -1307,7 +1401,7 @@ The hashes.
 `SystemError` when a file cannot be copied.
 """
 function install_jll_libraries(exe_path, libs, dest)
-    nested = mkpath(joinpath(dest, "julia", "julia"))
+    nested = mkpath(runtime_layout(dest).private)
     for (_, _, _, path) in libs
         cp(path, joinpath(nested, basename(path)); follow_symlinks = true, force = true)
     end
@@ -1325,9 +1419,22 @@ The RUNPATH of the exe on Linux: the folder of libjulia and its nested `julia/` 
 """
 const RUNTIME_RPATH = "\$ORIGIN/julia/julia:\$ORIGIN/julia"
 
-"Points the exe's RUNPATH at the runtime folders (Linux; `patchelf` of the build's venv)."
+"""
+Points the exe's RUNPATH at the runtime folders: on Linux with `patchelf` of the build's
+venv; on macOS the exe made by `juliac --relative-rpath` names `@loader_path/julia` and
+`@loader_path` only, and `libjulia-internal` sits one folder deeper (`julia/julia`), so
+that one is added with `install_name_tool` (untested; the signature it invalidates is the
+reason for the ad-hoc `codesign` the first macOS build may need, see `dev/README.md`).
+Windows has no RUNPATH ([`runtime_layout`](@ref)).
+"""
 function set_runtime_rpath(work, exe_path)
-    Sys.islinux() || return
+    if Platform.ismacos()
+        rpath = "@loader_path/julia/julia"
+        need(rc(`install_name_tool -add_rpath $rpath $exe_path`),
+            "install_name_tool failed")
+        return
+    end
+    Platform.islinux() || return
     patchelf = joinpath(work, "pyvenv", "bin", "patchelf")
     need(isfile(patchelf), "patchelf not found: $patchelf (stage pytools installs it)")
     need(rc(`$patchelf --set-rpath $RUNTIME_RPATH $exe_path`), "patchelf failed")
@@ -1579,7 +1686,7 @@ function strip_command_lines(os::Symbol, tool, libs, exes)
 end
 
 "The system as [`strip_command_lines`](@ref) names it."
-this_os() = Sys.iswindows() ? :windows : Sys.isapple() ? :macos : :linux
+this_os() = Platform.os() === :other ? :linux : Platform.os()
 
 "Total size in bytes of the files below `dir` (links not followed)."
 function tree_bytes(dir::AbstractString)
@@ -1609,7 +1716,7 @@ of the finished `baysol-tui` moves the injected segment and the program prints n
 A `ToolError` when the strip command fails.
 """
 function strip_binary(path::AbstractString; os::Symbol = this_os(), tool = nothing)
-    tool === nothing && (tool = Sys.which(STRIP_TOOL))
+    tool === nothing && (tool = Platform.find_tool(STRIP_TOOL))
     if tool === nothing
         note("  strip: WARNING, $(basename(path)) left unstripped (no $STRIP_TOOL)";
             terminal = true)
@@ -1619,6 +1726,34 @@ function strip_binary(path::AbstractString; os::Symbol = this_os(), tool = nothi
         need(rc(Cmd(l)), "strip failed: $(basename(path))")
     end
     return true
+end
+
+"""
+    run_strip(lines, files; runner = l -> rc(Cmd(l))) -> Vector{String}
+
+Runs the strip command lines of `strip_command_lines` (`files` are the files they name).
+Stripping only saves space, so a file the tool refuses (a signed PE file, say) must not fail
+a build that took hours: when a line fails, each of its files is retried alone (the tool
+leaves a file it refuses as it was) and the refused files are returned.
+
+# Returns
+The refused files; empty when every command succeeded.
+
+# Exceptions
+None.
+"""
+function run_strip(lines, files; runner = l -> rc(Cmd(l)))::Vector{String}
+    named = Set(String.(files))
+    failed = String[]
+    for l in lines
+        runner(l) && continue
+        mine = [f for f in l if f in named]
+        head = l[1:(length(l)-length(mine))]
+        for f in mine
+            runner(vcat(head, [f])) || push!(failed, f)
+        end
+    end
+    return failed
 end
 
 """
@@ -1633,15 +1768,21 @@ report and on the terminal and leaves the files as they are.
 `true` when stripped, `false` when skipped.
 
 # Exceptions
-A `ToolError` when a `strip` command fails.
+None: a file the strip tool refuses is reported (see [`run_strip`](@ref)) and left as it is.
 """
 function strip_bundle(out::AbstractString, exes; os::Symbol = this_os(), tool = nothing)
     before = tree_bytes(out)
     libs, bins = strip_targets(out, exes)
     lines = try
-        tool === nothing && (tool = Sys.which(STRIP_TOOL))
+        tool === nothing && (tool = Platform.find_tool(STRIP_TOOL))
         tool === nothing &&
-            throw(ToolError("$WHO: no $STRIP_TOOL program on the PATH", 1))
+            throw(
+                ToolError(
+                    "$WHO: no $STRIP_TOOL program on the PATH or in the usual install " *
+                    "folders",
+                    1,
+                ),
+            )
         strip_command_lines(os, tool, libs, bins)
     catch e
         e isa ToolError || rethrow()
@@ -1652,9 +1793,13 @@ function strip_bundle(out::AbstractString, exes; os::Symbol = this_os(), tool = 
         )
         return false
     end
-    for l in lines
-        need(rc(Cmd(l)), "strip failed: $(join(l[1:min(end, 3)], ' ')) ...")
-    end
+    failed = run_strip(lines, vcat(libs, bins))
+    isempty(failed) || note(
+        "  strip: WARNING, $(length(failed)) files left unstripped (the tool refused " *
+        "them): " *
+        join(basename.(first(failed, 8)), ", ") * (length(failed) > 8 ? ", ..." : "");
+        terminal = true,
+    )
     after = tree_bytes(out)
     note(
         "  strip: $(length(libs)) libraries, $(length(bins)) executables, " *
@@ -1682,12 +1827,12 @@ function stage_bundle(work)
     cp(joinpath(work, "pytools", "baysol-pytools.dist"), joinpath(out, "lib", "pytools"))
     freed = prune_pytools(joinpath(out, "lib", "pytools"))
     note("  pytools: $(round(freed / 2^20; digits = 1)) MiB of unused numpy files left out")
-    copy_runtime(joinpath(out, "julia"))
+    copy_runtime(runtime_layout(out).libjulia)
     # only the icon of this system, and the script that starts the terminal interface
     pack_icon(joinpath(out, icon_file()), joinpath(root, "icons"))
     name, text = launcher()
     write(joinpath(out, name), text)
-    Sys.iswindows() || chmod(joinpath(out, name), 0o755)
+    Platform.iswindows() || chmod(joinpath(out, name), 0o755)
     cp(joinpath(root, "LICENSE"), joinpath(out, "LICENSE"))
     # last: every file is in place and patchelf is done; only the bundle's copies are
     # touched, never the Julia installation they came from
@@ -1712,7 +1857,8 @@ function make_archive(work, archive)
         "no 7-Zip found (npm install gives 7zip-bin, or put 7zz on PATH)",
     )
     ok = rc(
-        `$sevenzip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15 $archive $(joinpath(work, "bundle", "baysol"))`,
+        `$sevenzip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15
+        $archive $(joinpath(work, "bundle", "baysol"))`,
     )
     need(ok && isfile(archive), "the archive was not written")
 end
@@ -1756,7 +1902,8 @@ Whether `work` is a scratch folder of this tool: named `baysol-pkg-work*` and ho
 stage marker or the `logs` folder, so a folder of anything else is never removed.
 """
 function looks_like_work(work::AbstractString)::Bool
-    startswith(basename(rstrip(work, '/')), "baysol-pkg-work") || return false
+    startswith(basename(rstrip(work, Platform.DIR_SEPARATORS)), "baysol-pkg-work") ||
+        return false
     isdir(work) || return false
     return isdir(joinpath(work, "logs")) || any(s -> done(work, s), STAGES)
 end
@@ -1816,7 +1963,7 @@ Removes the scratch folder of a finished build. Only a folder that is named
 `baysol-pkg-work*` and holds the tool's `pytools.done` or `bundle.done` marker is removed.
 """
 function remove_work(work)
-    startswith(basename(rstrip(work, '/')), "baysol-pkg-work") ||
+    startswith(basename(rstrip(work, Platform.DIR_SEPARATORS)), "baysol-pkg-work") ||
         throw(ToolError("$WHO: refusing to remove $work", 1))
     (done(work, "bundle") || done(work, "pytools")) ||
         throw(ToolError("$WHO: $work does not look like this tool's folder", 1))
@@ -1825,11 +1972,25 @@ end
 
 # --- the program
 
+"""
+    preflight_programs(os = Platform.os()) -> Vector{String}
+
+The programs the preflight wants on the PATH. A C compiler (`gcc`, which `juliac.jl` links
+with) is one on Linux and macOS only: on Windows `juliac.jl` takes the `gcc.exe` of a
+MinGW-w64 artifact it downloads into the Julia depot (the network is needed once per cold
+depot), unless `JULIA_CC` names another compiler. `tar` reads the Node.js archive of
+Linux and macOS only (the zip of Windows goes through 7-Zip).
+"""
+function preflight_programs(os::Symbol = Platform.os())
+    os === :windows && return ["uv", "curl", "npm"]
+    return ["uv", "curl", "tar", "gcc", "npm"]
+end
+
 "The preflight lines `(ok, what, detail)` for the options."
 function preflight(archive)
     cs = Tuple{Bool,String,String}[]
     push!(cs, (!ispath(archive), "archive is new", archive))
-    if Sys.islinux()
+    if Platform.islinux()
         info = parse_meminfo(read("/proc/meminfo", String))
         mib = (get(info, "MemTotal", 0) + get(info, "SwapTotal", 0)) ÷ 1024
         push!(
@@ -1837,8 +1998,8 @@ function preflight(archive)
             (mib >= 24_000, "RAM + swap >= 24 GiB (juliac peaks near 22 GiB)", "$mib MiB"),
         )
     end
-    for p in ("uv", "curl", "tar", "gcc", "npm")
-        w = Sys.which(p)
+    for p in preflight_programs()
+        w = Platform.which(p)
         push!(cs, (w !== nothing, "program $p", something(w, "not on PATH")))
     end
     push!(
@@ -1871,7 +2032,7 @@ function run(argv::Vector{String})::Int
     opts = Dict(a.opts)
     archive = joinpath(abspath(get(opts, "--out", pwd())), this_archive())
     work = abspath(
-        get(opts, "--work", joinpath(Common.cache_home(), "baysol", "baysol-pkg-work")),
+        get(opts, "--work", joinpath(Platform.cache_dir(), "baysol-pkg-work")),
     )
     only = get(opts, "--stage", nothing)
     only === nothing || only in STAGES || fail(WHO, "unknown stage $only")

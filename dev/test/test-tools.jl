@@ -10,11 +10,12 @@ using Test
 
 module TCli
 using Test
+using Dev: Platform
 using Dev.Common: ids, specs_of
 using .Main.Helpers
 
 @testset "fonts check names against TeX Live" begin
-    if Sys.which("luaotfload-tool") !== nothing
+    if Platform.which("luaotfload-tool") !== nothing
         ok = run_tool("plots", "fonts", "Latin Modern Roman")
         no = run_tool("plots", "fonts", "No Such Font Zzz")
         both = run_tool("plots", "fonts", "Latin Modern Roman", "No Such Font Zzz")
@@ -144,7 +145,8 @@ end
     @test status == 0 &&
           occursin(
         Regex(
-            "--trace-compile=\\Q" * joinpath("/tmp/x", "SASDMJ9.jl") * "\\E.*SASDMJ9.jl",
+            "--trace-compile=\\Q" * joinpath(abspath("/tmp/x"), "SASDMJ9.jl") *
+            "\\E.*SASDMJ9.jl",
         ),
         replace(out, "\n" => " "),
     )

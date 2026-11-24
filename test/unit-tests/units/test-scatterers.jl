@@ -1076,8 +1076,10 @@ const SCAT_STUBAMP = ComplexF64[
         @test scatToyI(bEx, bSh, scatWconv, 0.0, 0.4) == 0.4^2 .* sSh
         @test all(iszero, scatToyI(bEx, bSh, scatWconv, 0.0, 0.0))
         # and with the two species identical the three terms cancel identically
-        @test crossScatter(bEx, bEx, scatWconv) == sEx
-        @test all(iszero, scatToyI(bEx, bEx, scatWconv, 0.75, 0.75))
+        # (to rounding: selfScatter and crossScatter are two kernels, and the FMA
+        # contraction and SIMD order differ by CPU)
+        @test isapprox(crossScatter(bEx, bEx, scatWconv), sEx; rtol = 1e-12)
+        @test maximum(abs, scatToyI(bEx, bEx, scatWconv, 0.75, 0.75)) ≤ 1e-12 * maximum(sEx)
     end
 
     # -----------------------------------------------------------------------

@@ -15,7 +15,13 @@
 # Unpacked copies live in the set's tmp root (`tmp_root(set)`): `<name>/` plus a stamp
 # `<name>.stamp` (archive size and mtime) written after the folder is complete. A folder
 # without a matching stamp is incomplete and is unpacked again.
+# `fit-seed.jl` includes this file outside `Dev`, so it brings the system module itself.
+isdefined(@__MODULE__, :Platform) ||
+    include(joinpath(@__DIR__, "..", "..", "platform.jl"))
+
 module FixtureStore
+
+using ..Platform: Platform
 
 const REPO = normpath(joinpath(@__DIR__, "..", ".."))
 
@@ -57,10 +63,13 @@ env_var(set::AbstractString)::String =
 
 """
 The folder of the unpacked fixtures of `set`:
-`\$(env_var(set))`, else `<repo>/_cache/<set>`.
+`\$(env_var(set))`, else `fixtures/<set>` in the general cache (`Platform.default_cache()`:
+`_cache` in the caches folder of the system, see `Platform.cache_dir`).
 """
-tmp_root(set::AbstractString = "experiments")::String =
-    abspath(get(ENV, env_var(set), joinpath(REPO, "_cache", String(set))))
+tmp_root(set::AbstractString = "experiments")::String = abspath(
+    get(ENV, env_var(set),
+        joinpath(Platform.default_cache(), "fixtures", String(set))),
+)
 
 "The archive of the item `id` in the root `base`."
 archive_path(id::AbstractString, base = EXPERIMENTS) = joinpath(base, string(id, ".7z"))
@@ -85,9 +94,9 @@ end
 # --- 7z
 
 function _sevenzip()::String
-    exe = Sys.which("7z")
-    exe === nothing && (exe = Sys.which("7zz"))
-    exe === nothing && error("7z (7-Zip) is not on the PATH")
+    exe = Platform.find_tool("7z", "7zz")
+    exe === nothing &&
+        error("7z (7-Zip) is not on the PATH nor in the folders installers use for it")
     return exe
 end
 

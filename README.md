@@ -20,11 +20,11 @@ same window. It runs on **Linux, macOS and Windows**. The second way, for script
 batches, is the script guide ("Second way: run it from a script") further down. The full
 reference of every screen, key and file is the [terminal interface guide](tui/README.md).
 
-> **Status, said plainly.** The developers have run the interface on **Linux (ARM)**. The
-> macOS and Windows parts (opening a folder or a file chooser from the interface, stopping a
-> run) are written from the documentation of those systems and **have not been tested**; on
-> Windows, WSL is the safest route (see Step 1 of the script guide). Everything you do inside
-> the interface (menus, forms, tables, viewers) works the same on every system.
+> **Status, said plainly.** The developers have run the interface on **Linux (ARM)** and on
+> **Windows 11**. **macOS has not been tested**: its parts (opening a folder or a file chooser
+> from the interface, stopping a run) are written from the documentation of that system.
+> Everything you do inside the interface (menus, forms, tables, viewers) works the same on every
+> system.
 
 ### What you need
 
@@ -70,11 +70,11 @@ make the window bigger and the screen comes back as it was.
 
 **Where BAYSOL keeps your work** (the *data folder*, made on first start):
 
-| System | Data folder | Downloaded structures (a cache you may delete) |
+| System | Data folder | Downloaded structures (a cache you may delete; the setup wizard's `_structures`) |
 |--------|-------------|---------------------------------|
-| Linux | `$XDG_DATA_HOME/baysol`, else `~/.local/share/baysol` | `$XDG_CACHE_HOME/baysol/_cache`, else `~/.cache/baysol/_cache` |
-| macOS | `~/Library/Application Support/baysol` | `~/Library/Caches/baysol/_cache` |
-| Windows | `%LOCALAPPDATA%\baysol` | `%LOCALAPPDATA%\baysol\_cache` |
+| Linux | `$XDG_DATA_HOME/baysol`, else `~/.local/share/baysol` | `$XDG_CACHE_HOME/baysol/_structures`, else `~/.cache/baysol/_structures` |
+| macOS | `~/Library/Application Support/baysol` | `~/Library/Caches/baysol/_structures` |
+| Windows | `%LOCALAPPDATA%\baysol` | `%LOCALAPPDATA%\baysol-cache\_structures` (a sibling of the data folder, so the cache is not swept up with your work; the same with or without the setup wizard) |
 
 Set the environment variable `BAYSOL_HOME` (an absolute path) to use another folder, and
 `BAYSOL_CACHE` for the cache; a relative path is ignored. To try the interface without touching
@@ -199,7 +199,7 @@ changed. Back on the data screen, two more things are required:
   only `q` and `I(q)` (and an optional `sigma`, `none` by default); the curve must be in the same units as
   the data. It is saved as a clean `<name>.tsv` in the project's `reference-fit/` folder (a taken name gets
   `-2`, `-3`; nothing is overwritten) and `^r` deletes the highlighted one, after a question. Adding needs the
-  data first. On macOS and Windows the file chooser of this option is untested like the others.
+  data first. On macOS the file chooser of this option is untested like the others.
 
 ### 3. Set up the buffer
 
@@ -440,11 +440,11 @@ terminal and edit one small text file. You do not need to write any code.
 
 > **Status, said plainly.** Here you run one short text file (a "script") from a terminal; for
 > menus and a run key, use the terminal interface above. The developers have run BAYSOL on **Linux
-> (ARM)**. **macOS, Windows and Intel/AMD machines have not been tested yet.** The steps below
-> use only standard tools, so they should work, but if one fails, copy the error message from
-> the terminal and send it to the developers. **On Windows, the safest route is to use WSL**
-> (Windows Subsystem for Linux, a free Linux inside Windows) and follow the Linux steps; see
-> Step 1. "If something goes wrong" lists the problems most likely to come up.
+> (ARM)** and the tests, the tools and the terminal interface on **Windows 11**. **macOS and
+> Intel/AMD Linux machines have not been tested yet.** The steps below use only standard
+> tools, so they should work, but if one fails, copy the error message from the terminal and
+> send it to the developers. **If plain Windows gives you trouble, WSL** (Windows Subsystem
+> for Linux, a free Linux inside Windows) is the fallback: follow the Linux steps; see Step 1. "If something goes wrong" lists the problems most likely to come up.
 
 ---
 
@@ -501,11 +501,11 @@ followed by **Enter** (**Return** on a Mac).
 | **Linux** | Open the application called *Terminal* (often **Ctrl + Alt + T**). |
 | **Windows** | Open the Start menu, type `PowerShell`, and open **Windows PowerShell**. Use PowerShell, **not** "Command Prompt". |
 
-**Windows only: should you use WSL?** Because the developers have not tested BAYSOL on Windows,
-the most reliable route is WSL. In PowerShell run `wsl --install`, restart the computer when
+**Windows only: should you use WSL?** BAYSOL has been run on Windows 11, but Linux is where it
+has had the most use, so WSL is the fallback if something fails. In PowerShell run `wsl --install`, restart the computer when
 asked, open **Ubuntu** from the Start menu, and then follow every step below **as Linux**. Your
-Windows files are visible inside Ubuntu under `/mnt/c/Users/<your name>/`. If you would rather try
-plain Windows first, the steps below also cover it.
+Windows files are visible inside Ubuntu under `/mnt/c/Users/<your name>/`. If you would rather use
+plain Windows (the default), the steps below also cover it.
 
 In the rest of this guide, commands marked **macOS / Linux** go in a macOS or Linux terminal (or
 Ubuntu under WSL), and commands marked **Windows** go in PowerShell.
@@ -874,7 +874,7 @@ LaTeX engine.) Alternatively, draw your own figures from the numbers in `res.xls
 | `no numbers found in …` | The curve file does not have three number columns. Open it and look. |
 | Results look absurd (huge χ², tiny `q` range) | Wrong `Q_UNITS`. See "What the curve file must look like". |
 | It stops at "propka" or "pdb2pqr" with a download error | These helpers are fetched on first use and need internet. Connect and rerun. |
-| (Windows) errors about a file path or a program that cannot be started | Windows is the least tested platform. Use WSL (Step 1) and follow the Linux steps. |
+| (Windows) errors about a file path or a program that cannot be started | Windows has had less use than Linux. If it persists, use WSL (Step 1) and follow the Linux steps. |
 | An error that mentions an unknown residue | Your structure has a residue name BAYSOL does not know. It looks unknown names up online, so reconnect and retry; if it persists, tell the developers the name. |
 | A log message about **undefined behaviour** or dummy atoms | Your model looks like a bead or dummy-atom model. BAYSOL expects an atomic model. |
 | It seems frozen | The first run can take many minutes with no output while code compiles. Wait; use Ctrl + C only if nothing has happened for a very long time. |
@@ -922,7 +922,7 @@ BAYSOL is Julia, and so are the tools around it (tests, result comparison, forma
 |------|----------|---------|
 | **Julia 1.12** | the package, the tools, the unit suite, the docs build | yes (as in "Step 2" above; `JULIA=/path/to/julia` picks another) |
 | **git** | `bysl results compare` reads other revisions | for that |
-| **LuaLaTeX or XeLaTeX** (TeX Live), plus poppler for PNG/SVG | `bysl plots` | optional |
+| **LuaLaTeX or XeLaTeX** (TeX Live), plus poppler for PNG/SVG | `bysl plots`; compiling figures (the `.tex` files are written without it) | optional (the minimum: `bysl deps`) |
 
 ### One-time setup
 
@@ -957,6 +957,9 @@ bysl <tool> --help           # the usage of one tool
 | `bysl results compare REV` | compare fitting-test results with a git revision |
 | `bysl results table --update` | regenerate the Results table in the fitting-test README |
 | `bysl fits bench` | the cold/steady benchmark (prints its plan unless `--approved`) |
+| `bysl deps` | what a developer needs (git, Node, 7-Zip, TeX, ...), what this machine has, how to install the rest |
+| `bysl pkg` | build the packaged app for this system (a long job; not yet run on Windows or macOS) |
+| `bysl audit DIR` | the libraries the binaries of a built bundle need: bundle, system, relies, MISSING |
 
 ### Where things are
 

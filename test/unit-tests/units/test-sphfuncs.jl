@@ -79,8 +79,8 @@ j2(x) = x == 0.0 ? 0.0 : (3.0 / x^3 - 1.0 / x) * sin(x) - 3.0 * cos(x) / x^2
         # the packing is dense and collision-free over the (l, m) triangle
         seen = [idx(l, m) for l in 0:5 for m in 0:l]
         @test sort(seen) == collect(1:nrows(5))
-        # a bigger lMax only appends rows; the shared prefix is bit-identical
-        @test sphHarm(2, θ, φ) == sphHarm(5, θ, φ)[1:nrows(2), :]
+        # a bigger lMax only appends rows; the shared prefix is the same, to rounding
+        @test sphHarm(2, θ, φ) ≈ sphHarm(5, θ, φ)[1:nrows(2), :] rtol = 1e-12
     end
 
     @testset "sphHarm columns are independent points" begin

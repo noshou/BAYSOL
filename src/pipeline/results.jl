@@ -402,7 +402,7 @@ was last built needs `luaotfload-tool --update` first.
     can be said about the font.
 """
 function fontAvailable(name::AbstractString)::Bool
-    tool = Sys.which("luaotfload-tool")
+    tool = Platform.which("luaotfload-tool")
     tool === nothing && error(
         "fontAvailable needs luaotfload-tool, which comes with TeX Live; " *
         "none is on the PATH",
@@ -945,14 +945,18 @@ function _comparisonAxis(c, style::PlotStyle)
 end
 
 """
-Write `td`, the LaTeX document of a figure, as `<stem>.tex`.
+Write `td`, the LaTeX document of a figure, as `<stem>.tex`. Needs no LaTeX engine: only
+compiling does (and a failed compile is a warning).
 
 # Returns
 - The path.
 """
 function _writeTex(td, stem::AbstractString)
     mkpath(dirname(stem))
-    PGF.save(stem * ".tex", td)
+    # `latex_engine` is given although a `.tex` file needs no LaTeX: its default,
+    # `PGFPlotsX.latexengine()`, is evaluated on every call and throws when no LaTeX is
+    # installed, which would make writing the source of a figure fail without TeX
+    PGF.save(stem * ".tex", td; latex_engine = PGF.PDFLATEX)
     return stem * ".tex"
 end
 
@@ -988,8 +992,8 @@ function _engineKwargs(font, compiler::AbstractString = "")
         return (; latex_engine = _LATEX_ENGINES[key])
     end
     names === nothing && return (;)
-    if Sys.which("lualatex") !== nothing
-        if Sys.which("luaotfload-tool") !== nothing
+    if Platform.which("lualatex") !== nothing
+        if Platform.which("luaotfload-tool") !== nothing
             for n in names
                 n === nothing || fontAvailable(n) ||
                     error(
@@ -1002,7 +1006,7 @@ function _engineKwargs(font, compiler::AbstractString = "")
         end
         return (; latex_engine = PGF.LUALATEX)
     end
-    Sys.which("xelatex") !== nothing && return (; latex_engine = PGF.XELATEX)
+    Platform.which("xelatex") !== nothing && return (; latex_engine = PGF.XELATEX)
     error(
         "a font needs lualatex or xelatex, and neither is installed " *
         "(use font = nothing for the LaTeX default font)",
@@ -1024,7 +1028,7 @@ function _compileTex(td, stem::AbstractString, formats, font = nothing, compiler
     # the compiler's own folder first on the PATH, so PGFPlotsX runs that one
     pathEnv =
         isempty(compiler) ? ENV["PATH"] :
-        string(dirname(abspath(compiler)), Sys.iswindows() ? ';' : ':', ENV["PATH"])
+        string(dirname(abspath(compiler)), Platform.PATH_SEP, ENV["PATH"])
     for fmt in formats
         path = string(stem, ".", fmt)
         try

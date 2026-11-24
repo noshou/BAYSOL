@@ -5,6 +5,9 @@
 # (`bysl harvest solutes`) dispatches to nested modules.
 module Dev
 
+# The one module that detects the operating system (platform.jl, by relative path).
+include(joinpath(@__DIR__, "..", "..", "platform.jl"))
+
 include("common.jl")
 include("report.jl")
 include("fmt.jl")
@@ -19,6 +22,8 @@ include("pmv.jl")
 include("extract.jl")
 include("plots.jl")
 include("vis.jl")
+include("audit.jl")
+include("deps.jl")
 include("test.jl")
 include("server.jl")
 
@@ -43,6 +48,12 @@ const TASKS = [
     "fits" => (Fits, "The fitting tests: run, list, diagnose, profile"),
     "pkg" =>
         (PkgTool, "Build the packaged app: three executables, data, icons (this OS)"),
+    "audit" => (
+        Audit,
+        "Audit a built bundle: the libraries its binaries need, found or missing",
+    ),
+    "deps" =>
+        (Deps, "The developer toolchain: what is installed, how to install the rest"),
     "fixtures" =>
         (Fixtures, "Fixture archive sets as .7z archives: list, pack, unpack, clean"),
     "extract" => (Extract, "Regenerate bundled data: formfactor, components, pmv"),

@@ -84,7 +84,7 @@ export type RefreshStream = Pick<
 }
 
 /** What the refresher uses of the input stream. */
-export type RefreshInput = Pick<NodeJS.ReadStream, "read">
+type RefreshInput = Pick<NodeJS.ReadStream, "read">
 
 /** The write function of a stream. */
 type WriteFn = NodeJS.WriteStream["write"]

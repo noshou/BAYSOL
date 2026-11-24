@@ -9,6 +9,7 @@ using Test
 
 module TFormat
 using Test
+using Dev: Platform
 using Dev.Common
 using Dev.Fmt
 using .Main.Helpers
@@ -82,8 +83,8 @@ end
 @testset "check lists and apply repairs, in an isolated folder" begin
     dir = scratch_dir()
     # a program that succeeds and does nothing: a batch file on Windows, a script elsewhere
-    stub = joinpath(dir, Sys.iswindows() ? "biome-stub.cmd" : "biome-stub")
-    write(stub, Sys.iswindows() ? "@exit /b 0\r\n" : "#!/bin/sh\nexit 0\n")
+    stub = joinpath(dir, Platform.iswindows() ? "biome-stub.cmd" : "biome-stub")
+    write(stub, Platform.iswindows() ? "@exit /b 0\r\n" : "#!/bin/sh\nexit 0\n")
     chmod(stub, 0o755)
     write_file(joinpath(dir, "a.ts"), "export {}  \n\n\n")
     write_file(joinpath(dir, "types.d.ts"), "declare const x: number\t\n")
@@ -236,6 +237,7 @@ end
 module TBiome
 
 using Test
+using Dev: Platform
 using Dev
 using Dev.Common
 using .Main.Helpers
@@ -250,7 +252,7 @@ end
 
 SPDX = "SPDX-License-Identifier: LGPL-3.0-or-later"
 
-if !Sys.iswindows()
+if !Platform.iswindows()
     @testset "TypeScript layout and lint are Biome's: how it is called" begin
         dir = scratch_dir()
         log = joinpath(dir, "calls.log")
@@ -285,7 +287,7 @@ if !Sys.iswindows()
         write_file(joinpath(dir, "a.ts"), "// $SPDX\n\nexport {}\n")
         # an empty root hides the repository's node_modules, PATH hides a global Biome
         withenv("BIOME" => nothing, "PATH" => "/usr/bin:/bin", "BAYSOL_ROOT" => dir) do
-            Sys.which("biome") === nothing || return
+            Platform.which("biome") === nothing || return
             ok = Ref(true)
             _, out = run_tool_call() do
                 ok[] = Dev.Fmt.format_ts(false, [dir])
@@ -441,8 +443,8 @@ end
         status = Ref(true)
         text = capture_stdout(() -> status[] = Fmt.check_path_names())
         @test !status[]
-        @test occursin(joinpath("src", "badName.jl"), text)
-        @test occursin(joinpath("dev", "snake_case") * "/", text)
+        @test occursin("src/badName.jl", text)
+        @test occursin("dev/snake_case/", text)
         @test !occursin("good-name", text) && !occursin("data.JSON", text)
     finally
         Common.ROOT_OVERRIDE[] = nothing

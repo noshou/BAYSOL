@@ -29,9 +29,12 @@ if !@isdefined(checkFloat)
             isdir(plain) && return plain
             archive = joinpath(base, "$id.7z")
             isfile(archive) || error("no fixtures for $id in $base")
-            exe = Sys.which("7z")
-            exe === nothing && (exe = Sys.which("7zz"))
-            exe === nothing && error("7z (7-Zip) is not on the PATH")
+            exe = BAYSOL.Platform.find_tool("7z", "7zz")
+            exe === nothing &&
+                error(
+                    "7z (7-Zip) is not on the PATH nor in the folders installers use " *
+                    "for it",
+                )
             tmp = mktempdir(; cleanup = true)
             run(pipeline(`$exe x -y -o$tmp $archive`; stdout = devnull))
             isdir(joinpath(tmp, id)) ? joinpath(tmp, id) : tmp

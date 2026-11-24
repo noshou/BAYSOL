@@ -8,36 +8,20 @@ using SHA
 
 const HERE = dirname(abspath(@__FILE__))
 const ROOT = dirname(HERE)
+
+# The one module that detects the operating system (shared by relative path).
+include(joinpath(ROOT, "platform.jl"))
 const PKG = HERE
 const JULIA_EXE = get(ENV, "JULIA", "julia")
 
 # One daemon per checkout and user: its state folder and socket are named after both.
 const KEY = bytes2hex(sha256(ROOT))[1:12]
-const USER =
-    Sys.iswindows() ? get(ENV, "USERNAME", "user") :
-    string(ccall(:getuid, Cuint, ()))
-const STATE_DIR = if Sys.iswindows()
-    joinpath(
-        get(
-            ENV,
-            "LOCALAPPDATA",
-            joinpath(
-                homedir(),
-                "AppData",
-                "Local",
-            ),
-        ),
-        "bysl",
-        KEY,
-    )
-elseif Sys.isapple()
-    joinpath(get(ENV, "TMPDIR", "/tmp"), "bysl-$USER-$KEY")
-else
-    joinpath(get(ENV, "XDG_RUNTIME_DIR", "/tmp"), "bysl-$USER-$KEY")
-end
+const USER = Platform.user_id()
+const STATE_DIR =
+    Platform.iswindows() ? joinpath(Platform.runtime_home(), "bysl", KEY) :
+    joinpath(Platform.runtime_home(), "bysl-$USER-$KEY")
 const SOCKET =
-    Sys.iswindows() ? "\\\\.\\pipe\\bysl-$USER-$KEY" :
-    joinpath(STATE_DIR, "sock")
+    Platform.iswindows() ? "\\\\.\\pipe\\bysl-$USER-$KEY" : joinpath(STATE_DIR, "sock")
 const STARTED_FILE = joinpath(STATE_DIR, "started")
 const LOG_FILE = joinpath(STATE_DIR, "log")
 
@@ -95,7 +79,7 @@ end
 
 function start_daemon()
     mkpath(STATE_DIR)
-    Sys.iswindows() || chmod(STATE_DIR, 0o700)
+    Platform.iswindows() || chmod(STATE_DIR, 0o700)
     idle  = get(ENV, "BYSL_IDLE", "28800")
     expr1 = "using Dev;"
     expr2 = " Dev.Server.serve(ARGS[1], ARGS[2]; idle = parse(Int, ARGS[3]))"

@@ -13,7 +13,6 @@
 
 import assert from "node:assert/strict"
 import {
-    chmodSync,
     existsSync,
     mkdirSync,
     readdirSync,
@@ -23,8 +22,10 @@ import {
     writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { basename, join } from "node:path"
+import { basename, join, normalize } from "node:path"
 import { test } from "node:test"
+import { fileURLToPath } from "node:url"
+import { crc32 } from "node:zlib"
 import * as XLSX from "xlsx"
 import {
     ArchiveError,
@@ -37,8 +38,10 @@ import {
     removePacked,
     setArchiveTool,
     withTempFolder,
+    zipFolderAsync,
+    zipFolderSync,
 } from "../src/core/archive.js"
-import { RUN_FLOW } from "../src/core/environment.js"
+import { isWindows, RUN_FLOW, readSystem } from "../src/core/environment.js"
 import { readRunObject, runIds } from "../src/store/projects.js"
 import {
     archivePath,
@@ -76,33 +79,46 @@ function snapshot(dir: string, prefix = ""): string[] {
 }
 
 /**
+ * What the stand-in 7-Zip does besides passing the call on (see support/archive-stub.cjs).
+ */
+type Stub = { fail?: string; log?: string }
+
+/**
  * A 7-Zip that is the real one, except that it fails (exit 2, a message on stderr) for the
- * command letter `fails`; the stand-in of a disk that fills up (`a`) or an archive that
+ * command letter `on`; the stand-in of a disk that fills up (`a`) or an archive that
  * does not test (`t`).
  */
-function failingTool(on: string): string {
-    const script = join(tempDir(), "7z-fails")
-    writeFileSync(
-        script,
-        [
-            "#!/bin/sh",
-            `if [ "$1" = "${on}" ]; then echo "ERROR: simulated failure" >&2; exit 2; fi`,
-            `exec "${archiveTool()}" "$@"`,
-            "",
-        ].join("\n"),
-    )
-    chmodSync(script, 0o755)
-    return script
-}
+const failingTool = (on: string): Stub => ({ fail: on })
 
-/** Runs `fn` with the archive tool replaced, and puts the real one back. */
-async function withTool<T>(tool: string, fn: () => Promise<T>): Promise<T> {
+/** A 7-Zip that is the real one and writes a line to `log` for every extraction (`x`). */
+const countingTool = (log: string): Stub => ({ log })
+
+/**
+ * Runs `fn` with the archive tool replaced by the stand-in, and puts the real one back.
+ * The tool is `node` itself with a preloaded script, so it is a plain executable that
+ * spawns the same way on Linux, macOS and Windows (no shell, no compiler).
+ */
+async function withTool<T>(stub: Stub, fn: () => Promise<T>): Promise<T> {
     const real = archiveTool()
-    setArchiveTool(tool)
+    const keys = ["NODE_OPTIONS", "BAYSOL_STUB_REAL", "BAYSOL_STUB_FAIL", "BAYSOL_STUB_LOG"]
+    const saved = keys.map((k) => process.env[k])
+    const preload = fileURLToPath(new URL("./support/archive-stub.cjs", import.meta.url))
+    process.env.NODE_OPTIONS = `--require ${JSON.stringify(preload.replaceAll("\\", "/"))}`
+    process.env.BAYSOL_STUB_REAL = real
+    if (stub.fail === undefined) delete process.env.BAYSOL_STUB_FAIL
+    else process.env.BAYSOL_STUB_FAIL = stub.fail
+    if (stub.log === undefined) delete process.env.BAYSOL_STUB_LOG
+    else process.env.BAYSOL_STUB_LOG = stub.log
+    setArchiveTool(process.execPath)
     try {
         return await fn()
     } finally {
         setArchiveTool(real)
+        keys.forEach((k, i) => {
+            const v = saved[i]
+            if (v === undefined) delete process.env[k]
+            else process.env[k] = v
+        })
     }
 }
 
@@ -136,7 +152,9 @@ test("an entry name is a relative path of plain parts", () => {
 test("the tool is a 7-Zip that runs (the bundled binary gets its execute bit)", () => {
     const tool = archiveTool()
     assert.ok(existsSync(tool))
-    assert.ok((statSync(tool).mode & 0o111) !== 0, "executable")
+    // Windows has no execute mode bits: an .exe runs by its extension
+    if (isWindows(readSystem())) assert.match(tool, /\.exe$/i)
+    else assert.ok((statSync(tool).mode & 0o111) !== 0, "executable")
 })
 
 // ========================================================================================
@@ -384,17 +402,21 @@ test("packableFiles: the rules, and odd names left alone", async () => {
     const { dir } = await makeRun(p, async () => 0)
     assert.equal(isPacked(dir), false)
     write(dir, { "m.XLSX": "x", "~$m.xlsx": "x", ".hidden": "x", ".stage-m/a.tex": "x" })
-    write(dir, { "out\\put.txt": "x" })
+    // a backslash is a name on POSIX; on Windows it is a separator (a file in a folder)
+    const backslash = !isWindows(readSystem())
+    if (backslash) write(dir, { "out\\put.txt": "x" })
     const files = packableFiles(dir)
     assert.ok(files.includes("run.LOG") && files.includes("m.tex"))
     assert.ok(files.includes("run.json") && files.includes("m.xlsx"), "everything")
-    assert.ok(files.includes("m.XLSX") && files.includes("compare.tsv"))
+    // a case-insensitive file system holds m.XLSX and m.xlsx as one file
+    const folded = isWindows(readSystem()) || readSystem().os === "darwin"
+    assert.ok((folded || files.includes("m.XLSX")) && files.includes("compare.tsv"))
     for (const left of [
         ".claim",
         ".hidden",
         ".stage-m/a.tex",
         "~$m.xlsx",
-        "out\\put.txt",
+        ...(backslash ? ["out\\put.txt"] : []),
     ])
         assert.equal(files.includes(left), false, left)
     assert.deepEqual(files, [...files].sort())
@@ -477,10 +499,12 @@ test("open runs lists a packed run's files like a plain run's", async () => {
             ],
         )
         // the sized plot files are not on disk in the packed run, but they read
-        const file = m?.plotSizes[0]?.path.split("/").pop() ?? ""
+        const file = basename(m?.plotSizes[0]?.path ?? "")
         assert.match(readRunText(run.dir, file), /fit/)
     }
-    assert.ok([packed.dir, plain.dir].every((d) => runs.some((r) => r.dir === d)))
+    assert.ok(
+        [packed.dir, plain.dir].every((d) => runs.some((r) => normalize(r.dir) === normalize(d))),
+    )
 })
 
 test("a workbook that is only in the archive is opened from a copy on disk", async () => {
@@ -552,6 +576,70 @@ test("a rebuilt workbook is a proper zip: [Content_Types].xml first", async () =
     assert.equal(bytes.subarray(30, 30 + length).toString("utf-8"), "[Content_Types].xml")
     assert.ok(bytes.equals(readFileSync(b)), "deterministic")
     assert.deepEqual(readdirSync(folder).sort(), ["a.xlsx", "b.xlsx"], "no staging file")
+})
+
+/** The entries of a zip read from its local headers: name, method, CRC, data. */
+function localEntries(
+    zip: Buffer,
+): { name: string; method: number; crc: number; data: Buffer }[] {
+    const out = []
+    let at = 0
+    while (zip.readUInt32LE(at) === 0x04034b50) {
+        const flags = zip.readUInt16LE(at + 6)
+        assert.equal(flags & 0x8, 0, "no data descriptor")
+        assert.equal(flags & 0x800, 0x800, "names are UTF-8")
+        const size = zip.readUInt32LE(at + 18)
+        const start = at + 30 + zip.readUInt16LE(at + 26) + zip.readUInt16LE(at + 28)
+        out.push({
+            name: zip
+                .subarray(at + 30, at + 30 + zip.readUInt16LE(at + 26))
+                .toString("utf-8"),
+            method: zip.readUInt16LE(at + 8),
+            crc: zip.readUInt32LE(at + 14),
+            data: zip.subarray(start, start + size),
+        })
+        at = start + size
+    }
+    return out
+}
+
+test("a stored zip keeps the order given, on every OS, and reads back", async () => {
+    const folder = tempDir()
+    const files: Record<string, string> = {
+        "[Content_Types].xml": "<Types/>",
+        "_rels/.rels": "<Relationships/>",
+        "docProps/app.xml": "<Properties/>",
+        "xl/Worksheets/ρ.xml": "<worksheet/>".repeat(50),
+        "empty.xml": "",
+    }
+    write(folder, files)
+    // the order a case-insensitive sort would break, and a reverse one
+    for (const order of [Object.keys(files), Object.keys(files).reverse()]) {
+        for (const mode of ["sync", "async"]) {
+            const out = join(tempDir(), "o.zip")
+            if (mode === "sync") zipFolderSync(folder, order, out, 0)
+            else await zipFolderAsync(folder, order, out, 0)
+            const entries = localEntries(readFileSync(out))
+            assert.deepEqual(
+                entries.map((e) => e.name),
+                order,
+            )
+            for (const e of entries) {
+                assert.equal(e.method, 0)
+                assert.equal(e.crc, crc32(Buffer.from(files[e.name] as string)))
+                assert.equal(e.data.toString("utf-8"), files[e.name])
+            }
+            // 7-Zip reads it, with the same bytes
+            assert.deepEqual(
+                listEntries(out)
+                    .map((e) => e.name)
+                    .sort(),
+                order.slice().sort(),
+            )
+            for (const name of order)
+                assert.equal(readEntry(out, name).toString("utf-8"), files[name])
+        }
+    }
 })
 
 test("a workbook that is not a zip stops the pack, the run stays as it was", async () => {
@@ -627,22 +715,6 @@ test("a run packed as ONE archive (the older layout) still reads", async () => {
     assert.deepEqual(archivesOf(dir), [archivePath(dir)])
     assert.match(readRunText(dir, "run.LOG"), /datetime/)
 })
-
-/** A 7-Zip that is the real one and writes a line to `log` for every extraction (`x`). */
-function countingTool(log: string): string {
-    const script = join(tempDir(), "7z-counts")
-    writeFileSync(
-        script,
-        [
-            "#!/bin/sh",
-            `if [ "$1" = "x" ]; then echo x >> "${log}"; fi`,
-            `exec "${archiveTool()}" "$@"`,
-            "",
-        ].join("\n"),
-    )
-    chmodSync(script, 0o755)
-    return script
-}
 
 /** How many extractions the counting tool has seen. */
 const extractions = (log: string): number =>

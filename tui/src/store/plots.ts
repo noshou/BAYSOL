@@ -211,7 +211,7 @@ async function bring(
         else byArchive.set(archive, [...(byArchive.get(archive) ?? []), rel])
     }
     for (const [archive, names] of byArchive) {
-        await withTempFolder("baysol-extract", async (from) => {
+        await withTempFolder("extract", async (from) => {
             await extractEntries(archive, names, from)
             for (const rel of names)
                 copyFileSync(join(from, ...rel.split("/")), join(tmp, basename(rel)))
@@ -297,7 +297,7 @@ export async function moveFiles(
     let count = 0
     for (const unit of taking) {
         const rels = filesOf(unit)
-        await withTempFolder("baysol-move", async (tmp) => {
+        await withTempFolder("move", async (tmp) => {
             const names = await bring(unit, rels, tmp)
             count += putFiles(
                 tmp,
@@ -428,7 +428,7 @@ export async function compilePlots(
     let made = 0
     const failed: string[] = []
     for (const unit of withPlots) {
-        await withTempFolder("baysol-compile", async (tmp) => {
+        await withTempFolder("compile", async (tmp) => {
             const names = await bring(unit, unit.tex, tmp)
             const done: [string, string][] = []
             for (const [i, name] of names.entries()) {

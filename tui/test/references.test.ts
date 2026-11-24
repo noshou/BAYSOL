@@ -181,7 +181,11 @@ test("references: the stem is made safe", () => {
     assert.equal(safeStem("../..hidden.csv"), "hidden")
     assert.equal(safeStem("...dat"), "reference")
     assert.equal(safeStem("é-ß_1.tsv"), "é-ß_1")
-    assert.equal(safeStem("a/b\\c:d*.dat"), "b_c_d_")
+    // a backslash separates folders on Windows, and is a character of a name elsewhere
+    assert.equal(
+        safeStem("a/b\\c:d*.dat"),
+        process.platform === "win32" ? "c_d_" : "b_c_d_",
+    )
     assert.ok(safeStem(`${"x".repeat(200)}.dat`).length <= 60)
     assert.equal(safeStem(".dat"), "dat")
 })

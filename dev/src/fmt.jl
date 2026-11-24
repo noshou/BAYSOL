@@ -6,6 +6,7 @@
 module Fmt
 
 using ..Common
+using ..Platform: Platform
 using ..Common: LINE_LIMIT
 
 const WHO = "bysl fmt"
@@ -128,13 +129,15 @@ format_julia(apply::Bool, paths) = run_cmd([find_julia(), "--startup-file=no",
 # folder just below it, else `biome` on the PATH; `nothing` if there is none.
 function biome_command()
     haskey(ENV, "BIOME") && return ENV["BIOME"]
-    for name in ("biome", "biome.cmd")
+    # on Windows `.bin/biome` is a shell script that cannot be spawned; `biome.cmd` can
+    # (the name is only there on Windows, so no check of the system is needed)
+    for name in ("biome.cmd", "biome")
         for dir in vcat([root()], filter(isdir, readdir(root(); join = true)))
             path = joinpath(dir, "node_modules", ".bin", name)
             isfile(path) && return path
         end
     end
-    return Sys.which("biome")
+    return Platform.which("biome")
 end
 
 # Formats (`apply`) or checks the TypeScript files under `paths`: trailing white
@@ -442,17 +445,17 @@ function check_path_names()
         base = in_root(top)
         isdir(base) || continue
         for (dir, dirs, files) in walkdir(base)
-            rel = relpath(dir, root())
+            rel = replace(relpath(dir, root()), '\\' => '/')
             filter!(
                 d ->
                     d != "node_modules" &&
-                    !(joinpath(rel, d) in NAME_SKIP_DIRS), dirs)
+                    !("$rel/$d" in NAME_SKIP_DIRS), dirs)
             for d in dirs
-                kebab_name(d) || push!(bad, joinpath(rel, d) * "/")
+                kebab_name(d) || push!(bad, "$rel/$d" * "/")
             end
             for f in files
                 any(e -> endswith(f, e), NAME_CHECKED_EXTENSIONS) || continue
-                kebab_name(f) || push!(bad, joinpath(rel, f))
+                kebab_name(f) || push!(bad, "$rel/$f")
             end
         end
     end

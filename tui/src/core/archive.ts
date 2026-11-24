@@ -17,7 +17,6 @@ import {
     copyFileSync,
     lstatSync,
     mkdirSync,
-    mkdtempSync,
     readdirSync,
     readFileSync,
     renameSync,
@@ -29,18 +28,18 @@ import {
 import {
     copyFile as copyFileAsync,
     mkdir as mkdirAsync,
-    mkdtemp as mkdtempAsync,
     rm as rmAsync,
     writeFile as writeFileAsync,
 } from "node:fs/promises"
-import { tmpdir } from "node:os"
 import { dirname, isAbsolute, join } from "node:path"
 import { crc32 } from "node:zlib"
 import { path7za } from "7zip-bin"
 import sevenZip, { type SevenZipOptions, type ZipStream } from "node-7z"
 import { lock } from "proper-lockfile"
-import { findExecutable, RUN_FLOW, readSystem } from "./environment.js"
+import { exeName, findExecutable, RUN_FLOW, readSystem } from "./environment.js"
 import { extractNativeAsset, inSingleExecutable } from "./native-assets.js"
+import { scratchTemp } from "./scratch.js"
+import { writeStoredZipAsync, writeStoredZipSync } from "./zip-writer.js"
 
 // ========================================================================================
 // 1. The tool and the names
@@ -82,7 +81,9 @@ export function archiveTool(): string {
  */
 function bundledTool(): string | undefined {
     try {
-        return inSingleExecutable() ? extractNativeAsset(`native/7za${process.platform === "win32" ? ".exe" : ""}`) : path7za
+        return inSingleExecutable()
+            ? extractNativeAsset(`native/${exeName(readSystem(), "7za")}`)
+            : path7za
     } catch {
         return undefined
     }
@@ -296,7 +297,7 @@ function contentOf(archive: string, entries: Entry[]): Map<string, Buffer> | und
     const kept = contents.get(archive)
     if (kept?.stamp === stamp) return kept.files
     if (entries.reduce((sum, e) => sum + e.size, 0) > CONTENT_MAX_BYTES) return undefined
-    const folder = mkdtempSync(join(tmpdir(), "baysol-run-"))
+    const folder = scratchTemp("run")
     try {
         extractAllSync(archive, folder)
         const files = new Map<string, Buffer>()
@@ -518,7 +519,7 @@ export function rewriteArchiveSync(
     const bad = names.find((n) => !isSafeEntryName(n))
     if (bad !== undefined) throw new ArchiveError(`not a safe name to pack: ${bad}`)
     const staging = `${archive}.tmp.${process.pid}`
-    const folder = mkdtempSync(join(tmpdir(), "baysol-pack-"))
+    const folder = scratchTemp("pack")
     try {
         const carried = keep.filter((k) => !add.has(k))
         if (carried.length > 0) {
@@ -600,7 +601,7 @@ export async function rewriteArchiveAsync(
     if (bad !== undefined) throw new ArchiveError(`not a safe name to pack: ${bad}`)
     const before = stampOf(archive)
     const staging = `${archive}.tmp.${process.pid}.${++stagingCount}`
-    const folder = await mkdtempAsync(join(tmpdir(), "baysol-pack-"))
+    const folder = scratchTemp("pack")
     try {
         const carried = keep.filter((k) => !add.has(k))
         if (carried.length > 0) {
@@ -722,13 +723,13 @@ export async function extractEntries(
  * Runs `fn` with a new empty temporary folder and removes the folder afterwards, whatever
  * `fn` does.
  *
- * @param prefix - the start of the folder's name.
+ * @param purpose - the scratch folder it is made in (`core/scratch.ts`).
  */
 export async function withTempFolder<T>(
-    prefix: string,
+    purpose: string,
     fn: (folder: string) => Promise<T>,
 ): Promise<T> {
-    const folder = mkdtempSync(join(tmpdir(), `${prefix}-`))
+    const folder = scratchTemp(purpose)
     try {
         return await fn(folder)
     } finally {
@@ -782,6 +783,9 @@ export function extractNamesSync(
     )
 }
 
+/** Whether the zip is written here, not by 7-Zip: see zip-writer.ts (the entry order). */
+const mustWriteZip = (level: number): boolean => level === 0
+
 /**
  * Makes a zip of files of a folder, the same bytes for the same files: the entries are in
  * the order given, deflated at `level` (default the archive level; 0 stores the entries
@@ -801,6 +805,10 @@ export function zipFolderSync(
     out: string,
     level: number = RUN_FLOW.archive.level,
 ): void {
+    if (mustWriteZip(level)) {
+        writeStoredZipSync(folder, files, out)
+        return
+    }
     // `-mtc=off`: no creation time (7-Zip would write the time of the packing); the access
     // time is off by default, so the modification time, fixed by the caller, is all
     const method = ["-tzip", `-mx=${level}`, "-mtc=off"]
@@ -841,6 +849,12 @@ export function zipFolderAsync(
     out: string,
     level: number = RUN_FLOW.archive.level,
 ): Promise<void> {
+    if (mustWriteZip(level))
+        return writeStoredZipAsync(folder, files, out).catch((error: unknown) => {
+            throw error instanceof ArchiveError
+                ? error
+                : new ArchiveError(`zip failed: ${(error as Error).message}`)
+        })
     const method = ["-tzip", `-mx=${level}`, "-mtc=off"]
     if (level > 0) method.push("-mm=Deflate")
     return sevenZipAsync(

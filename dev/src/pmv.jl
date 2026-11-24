@@ -1391,6 +1391,7 @@ using .Rows
 module Rism
 
 using ...Common
+using ...Platform: Platform
 using ..Config
 using ..Tables
 using ..Model
@@ -1432,7 +1433,7 @@ file `log` there; the exit status (0 is success).
 function sh_log(cmd::AbstractString, cwd::AbstractString, log::AbstractString)::Int
     # `nice` wraps the whole shell, so every program of the command inherits the level
     # (setpriority on a Julia thread would only reach that thread, not the children).
-    level = Sys.iswindows() ? 0 : NICE[]
+    level = Platform.iswindows() ? 0 : NICE[]
     shell = level > 0 ? `nice -n $level sh -c $cmd` : `sh -c $cmd`
     c = addenv(Cmd(ignorestatus(shell); dir = cwd), amber_env()...)
     open(joinpath(cwd, log), "w") do io

@@ -20,8 +20,8 @@ import {
     statSync,
     writeFileSync,
 } from "node:fs"
-import { homedir } from "node:os"
-import { delimiter, dirname, isAbsolute, join, parse, resolve } from "node:path"
+import { homedir, tmpdir } from "node:os"
+import { delimiter, dirname, isAbsolute, join, parse, resolve, sep } from "node:path"
 import { getAsset, isSea } from "node:sea"
 import { fileURLToPath } from "node:url"
 
@@ -60,17 +60,30 @@ export const isMac = (system: System): boolean => system.os === "darwin"
 /** @returns `true` if `system` is a Linux. */
 export const isLinux = (system: System): boolean => system.os === "linux"
 
+/** @returns the file name of the executable `name` on `system` (`name.exe` on Windows). */
+export const exeName = (system: System, name: string): string =>
+    isWindows(system) ? `${name}.exe` : name
+
 /**
  * Finds a program the way a shell would.
  *
  * @param system - the machine; its `PATH` is searched (on Windows the extensions
  *     `.exe`, `.cmd` and `.bat` are tried too).
- * @param program - a name looked up on the `PATH`, or a path (anything with a `/`).
+ * @param program - a name looked up on the `PATH`, or a path (anything with a `/`; on
+ *     Windows a `\` too).
  * @returns the absolute path of the executable file, or `undefined` if there is none.
  */
 export function findExecutable(system: System, program: string): string | undefined {
-    const extensions = isWindows(system) ? ["", ".exe", ".cmd", ".bat"] : [""]
-    const dirs = program.includes("/")
+    // Windows: a bare name finds `name.exe` before the extensionless `name` (a shell script
+    // such as the `npm` beside `npm.cmd`, which cannot be started); a name that already has
+    // an extension is tried as it is first
+    const extensions = !isWindows(system)
+        ? [""]
+        : /\.[^./\\]+$/.test(program)
+          ? ["", ".exe", ".cmd", ".bat"]
+          : [".exe", ".cmd", ".bat", ""]
+    const isPath = program.includes("/") || (isWindows(system) && program.includes("\\"))
+    const dirs = isPath
         ? [""]
         : (system.env.PATH ?? "").split(delimiter).filter((d) => d !== "")
     for (const dir of dirs) {
@@ -123,7 +136,10 @@ export function repoRoot(
 // 3. Version: the program's version, read from the project file
 // ========================================================================================
 
-/** `v<version> <release_name>`: the `Project.toml` of the checkout, or the `VERSION` asset of a packaged app; else `unknown`. */
+/**
+ * `v<version> <release_name>`: the `Project.toml` of the checkout, or the `VERSION` asset of a
+ * packaged app; else `unknown`.
+ */
 function readVersion(): string {
     const root = repoRoot()
     if (root === undefined) {
@@ -218,12 +234,64 @@ function appRoot(system: System): string {
 }
 
 /**
- * The cache folder: `$BAYSOL_CACHE` if that is an absolute path, else `baysol/_cache`
- * inside the cache home of the system.
+ * THE folder that holds BAYSOL's caches (`_cache`, `_structures`): `baysol` in the cache
+ * home of the system. Where the system has one folder for data and caches (Windows) that
+ * would lie inside the projects folder (`<data home>/baysol`), so the caches go to the
+ * sibling `<data home>/baysol-cache`. Mirrors `Platform.cache_dir` in `platform.jl`; both
+ * tests pin the same paths, so the two cannot drift.
  */
-function cacheRoot(system: System): string {
-    return envDir(system, cacheVar) ?? join(cacheHome(system), "baysol", "_cache")
+export function cacheFolder(system: System): string {
+    const caches = join(cacheHome(system), "baysol")
+    const projects = join(dataHome(system), "baysol")
+    return isWithin(caches, projects) ? `${projects}-cache` : caches
 }
+
+/** Whether `path` is `dir` or inside it (any case when this program runs on Windows). */
+function isWithin(path: string, dir: string): boolean {
+    const fold = (p: string): string => {
+        const n = resolve(p).replace(/[/]+$/, "")
+        return process.platform === "win32" ? n.toLowerCase() : n
+    }
+    const p = fold(path)
+    const d = fold(dir)
+    return p === d || p.startsWith(d + sep)
+}
+
+/**
+ * The general cache, `_cache` in [[cacheFolder]] (`Platform.default_cache`; fixtures live in
+ * it).
+ */
+export const defaultCache = (system: System): string => join(cacheFolder(system), "_cache")
+
+/**
+ * The default structure cache, `_structures` in [[cacheFolder]]
+ * (`Platform.default_structure_cache`).
+ */
+export const defaultStructureCache = (system: System): string =>
+    join(cacheFolder(system), "_structures")
+
+/**
+ * The folder the fit reads as `BAYSOL_CACHE` and this program uses as its cache:
+ * `$BAYSOL_CACHE` if that is an absolute path, else [[defaultStructureCache]]
+ * (`Platform.structure_cache`).
+ */
+export function structureCache(system: System): string {
+    return envDir(system, cacheVar) ?? defaultStructureCache(system)
+}
+
+/**
+ * THE folder of every temporary file BAYSOL makes: `baysol` in the temporary folder of the
+ * system (`Platform.tmp_dir` in `platform.jl`; both tests pin the same names). One folder
+ * per process lies below it ([[tmpProcessFolder]]); nothing in it matters after the program
+ * ends, and the program sweeps the folders of dead processes at start.
+ *
+ * @param base - the system's temporary folder (`os.tmpdir()`).
+ */
+export const tmpFolder = (base: string = tmpdir()): string => join(base, "baysol")
+
+/** The folder of one process below [[tmpFolder]] (`Platform.tmp_process_dir`). */
+export const tmpProcessFolder = (pid: number, base: string = tmpdir()): string =>
+    join(tmpFolder(base), String(pid))
 
 /** The projects folder inside a BAYSOL folder. */
 export function projectsRoot(root: string): string {
@@ -266,10 +334,10 @@ export const projectsDir: () => string = lazy(() => ensureDir(projectsRoot(appDi
 /**
  * Whether a folder is the default cache folder of a machine, ignoring `BAYSOL_CACHE`.
  *
- * @returns `true` if `dir` is `baysol/_cache` in the cache home of `system`.
+ * @returns `true` if `dir` is the default structure cache of `system`.
  */
 function isDefaultCache(system: System, dir: string): boolean {
-    const stock = cacheRoot({ ...system, env: { ...system.env, [cacheVar]: "" } })
+    const stock = structureCache({ ...system, env: { ...system.env, [cacheVar]: "" } })
     try {
         return realpathSync(stock) === realpathSync(dir)
     } catch {
@@ -293,7 +361,7 @@ function tagCache(system: System, dir: string): string {
 /** The cache folder, made (and marked) on first use. */
 export const cacheDir: () => string = lazy(() => {
     const system = readSystem()
-    return tagCache(system, ensureDir(cacheRoot(system)))
+    return tagCache(system, ensureDir(structureCache(system)))
 })
 
 // ========================================================================================
@@ -306,7 +374,9 @@ export const cacheDir: () => string = lazy(() => {
  */
 const ASSETS_ROOT = join(fileURLToPath(new URL("../..", import.meta.url)), "assets")
 
-/** @returns the absolute path of a file below the checkout's `assets/` (not in a packaged app). */
+/**
+ * @returns the absolute path of a file below the checkout's `assets/` (not in a packaged app).
+ */
 export function assetPath(...path: string[]): string {
     return join(ASSETS_ROOT, ...path)
 }
@@ -319,7 +389,9 @@ export function assetPath(...path: string[]): string {
  * @throws if the asset does not exist.
  */
 export function readAssetText(...path: string[]): string {
-    return isSea() ? getAsset(path.join("/"), "utf8") : readFileSync(assetPath(...path), "utf-8")
+    return isSea()
+        ? getAsset(path.join("/"), "utf8")
+        : readFileSync(assetPath(...path), "utf-8")
 }
 
 /** Reads a JSON file below `assets/` (harvested or hand-written, never written here). */
