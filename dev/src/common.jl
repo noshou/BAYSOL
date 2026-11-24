@@ -382,7 +382,8 @@ that is installed and running.) An error if none can be found.
 function find_julia()::String
     julia = get(ENV, "JULIA", "julia")
     Sys.which(julia) === nothing || return julia
-    haskey(ENV, "JULIA") || return joinpath(Sys.BINDIR, Sys.iswindows() ? "julia.exe" : "julia")
+    haskey(ENV, "JULIA") ||
+        return joinpath(Sys.BINDIR, Sys.iswindows() ? "julia.exe" : "julia")
     throw(ToolError("julia not found (set JULIA to its path)", 1))
 end
 

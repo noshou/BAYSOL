@@ -62,6 +62,79 @@ end
     end
 end
 
+@testset "build log: terminal plots and noise are left out, the facts stay" begin
+    plot = join(
+        [
+            "                 ⠀⠀⠀⠀⠀⠈⠉⠉⠑⠒⠢⠤⢄⣀⠀⠀⠀  SASDVA2_3ODQ   χ² = 1.402",
+            "   log₁₀ I(q)     ⠀⠀⠀⠀⠀⠀⠀⠀⢹⠀⠀⠀⠂⠀⢀⡠⡄⠀",
+            "   [1.22, 1.23)  █████████████████████▊ 11 510",
+            "                 └                         ┘",
+            "                                                   c1",
+        ],
+        "\n",
+    )
+    text = join(
+        [
+            "Fit finished: reduced χ² = 4.52 on the measured points",
+            plot,
+            "\e[32mcompiled\e[0m 5328 statements",
+            "downloading 10%\rdownloading 50%\rdownloading 100%",
+            "same",
+            "same",
+            "same",
+            "",
+            "",
+            "",
+            "tail",
+            "x" ^ 300,
+            "",
+            "",
+        ],
+        "\n",
+    )
+    lines = P.clean_log(text)
+    @test lines == [
+        "Fit finished: reduced χ² = 4.52 on the measured points",
+        "compiled 5328 statements",
+        "downloading 100%",
+        "same   (x 3)",
+        "",
+        "tail",
+        "x" ^ (P.LOG_LINE_MAX - 3) * "...",
+    ]
+    @test P.clean_log(plot) == String[]
+    many = ["line $i" for i in 1:500]
+    t = P.trim_log(many)
+    @test length(t) == P.LOG_KEEP_HEAD + 1 + P.LOG_KEEP_TAIL
+    @test t[P.LOG_KEEP_HEAD+1] ==
+          "... $(500 - P.LOG_KEEP_HEAD - P.LOG_KEEP_TAIL) lines left out ..."
+    @test first(t) == "line 1" && last(t) == "line 500"
+    @test P.trim_log(["a", "b"]) == ["a", "b"]
+
+    mktempdir() do d
+        log(n, body) = (f = joinpath(d, n * ".log"); write(f, body); f)
+        empty!(P.REPORT)
+        empty!(P.STEP_LOGS)
+        P.note("stage julia ok    12.3 s   peak RAM 100 MiB, swap 5 MiB")
+        push!(P.STEP_LOGS, "juliac" => log("a", text))
+        push!(P.STEP_LOGS, "only a plot" => log("b", plot))
+        push!(P.STEP_LOGS, "never ran" => joinpath(d, "missing.log"))
+        out = joinpath(d, "build-logs", "baysol-9.9.9-linux-arm64.LOG")
+        P.write_build_log(out, "/somewhere/baysol-9.9.9-linux-arm64.zip")
+        got = read(out, String)
+        @test occursin(r"^datetime\s+\t\d{4}-\d\d-\d\d \d\d:\d\d:\d\d [+-]\d{4}\n"m, got)
+        @test occursin(r"^archive\s+\tbaysol-9\.9\.9-linux-arm64\.zip$"m, got)
+        @test occursin("--- stages ---\nstage julia ok    12.3 s   peak RAM 100 MiB", got)
+        @test occursin("--- step: juliac ---\nFit finished: reduced χ² = 4.52", got)
+        @test !occursin("only a plot", got) && !occursin("never ran", got)
+        @test !any(c -> '\u2800' <= c <= '\u28ff' || c == '█', got)
+        @test occursin("--- machine ---", got)
+        # every row's value starts at a tab stop, whatever the name's length
+        @test all(l -> (i = findfirst('\t', l); i === nothing || (i - 1) % 8 == 0),
+            filter(l -> occursin(r"^[a-z]+\s*\t", l), split(got, '\n')))
+    end
+end
+
 @testset "merged statements" begin
     lines = [
         "precompile(Tuple{typeof(BAYSOL.f), Int64})",

@@ -290,6 +290,12 @@ whole output of each step, never the report.
 """
 const LOG_DIR = Ref("")
 
+"""
+The steps run so far as `name => log path`, in the order they started: what the build log
+([`write_build_log`](@ref)) is made from. Emptied at the start of a build.
+"""
+const STEP_LOGS = Pair{String,String}[]
+
 "Lines of a step log that `problems` reports for a failed step."
 const PROBLEM_LINE =
     r"Test Failed|Error During Test|Some tests did not pass|^ERROR|[Ee]xception|" *
@@ -355,6 +361,7 @@ stage) is. True when it did not fail.
 """
 function step(name::AbstractString, f; top::Bool = false, pattern = PROBLEM_LINE)::Bool
     path = step_log(name)
+    push!(STEP_LOGS, name => path)
     t0 = time()
     ok, peak = watch_memory() do
         try
@@ -399,6 +406,145 @@ function write_report(path::AbstractString, archive::AbstractString)
         )
         println(io)
         foreach(l -> println(io, l), REPORT)
+    end
+    return nothing
+end
+
+# --- the build log (tracked in the repository)
+
+"The folder of the build logs below the repository root."
+const BUILD_LOG_DIR = ("dev", "build-logs")
+
+"Lines of a step log kept at its start and at its end (the middle is progress output)."
+const LOG_KEEP_HEAD = 40
+const LOG_KEEP_TAIL = 120
+
+"The longest line of a step log kept; a longer one is cut."
+const LOG_LINE_MAX = 160
+
+"""
+A line of a terminal plot: Braille cells (the scatter plots), block characters (the
+histograms) or the frame characters. Such lines are left out of the build log.
+"""
+const PLOT_CHARS = r"[\u2800-\u28ff\u2580-\u259f\u2502\u250c\u2510\u2514\u2518]"
+
+"A terminal colour or cursor sequence."
+const ANSI_SEQUENCE = r"\e\[[0-9;?]*[ -/]*[@-~]"
+
+"""
+    clean_log(text) -> Vector{String}
+
+The lines of one step log worth keeping: no terminal colours, a progress bar redrawn with
+`\\r` counts as its last drawing, terminal plots and their centred titles and labels are
+left out ([`PLOT_CHARS`](@ref); a line indented 30 columns or more), trailing blanks and
+runs of blank lines are removed, a line is cut at [`LOG_LINE_MAX`](@ref) characters and a
+line repeated right after itself becomes one line with `(x N)`.
+"""
+function clean_log(text::AbstractString)::Vector{String}
+    kept = String[]
+    for raw in split(text, '\n')
+        parts = filter(!isempty, split(raw, '\r'))
+        line =
+            rstrip(replace(isempty(parts) ? "" : String(parts[end]), ANSI_SEQUENCE => ""))
+        (occursin(PLOT_CHARS, line) || occursin(r"^\s{30,}\S", line)) && continue
+        isempty(line) && (isempty(kept) || isempty(last(kept))) && continue
+        length(line) > LOG_LINE_MAX && (line = first(line, LOG_LINE_MAX - 3) * "...")
+        push!(kept, line)
+    end
+    while !isempty(kept) && isempty(last(kept))
+        pop!(kept)
+    end
+    out = String[]
+    i = 1
+    while i <= length(kept)
+        n = 1
+        while i + n <= length(kept) && kept[i+n] == kept[i] && !isempty(kept[i])
+            n += 1
+        end
+        push!(out, n == 1 ? kept[i] : "$(kept[i])   (x $n)")
+        i += n
+    end
+    return out
+end
+
+"""
+    trim_log(lines; head = LOG_KEEP_HEAD, tail = LOG_KEEP_TAIL) -> Vector{String}
+
+`lines` when there are at most `head + tail` of them, else the first `head`, one line that
+says how many were left out, and the last `tail`.
+"""
+function trim_log(
+    lines::Vector{String};
+    head::Int = LOG_KEEP_HEAD,
+    tail::Int = LOG_KEEP_TAIL,
+)
+    length(lines) <= head + tail && return lines
+    gone = length(lines) - head - tail
+    return vcat(lines[1:head], ["... $gone lines left out ..."], lines[(end-tail+1):end])
+end
+
+"""
+The processor model: `Sys.cpu_info` when it knows it, else the `Model name` of `lscpu`
+(Asahi reports `unknown` there), else `unknown`.
+"""
+function cpu_model()::String
+    model = Sys.cpu_info()[1].model
+    model == "unknown" || return model
+    try
+        m = match(r"^Model name:\s*(.+)$"m, read(`lscpu`, String))
+        m === nothing || return String(strip(m[1]))
+    catch
+    end
+    return model
+end
+
+"The pretty name of the operating system (Linux: `PRETTY_NAME` of `os-release`)."
+function os_description()::String
+    if Sys.islinux() && isfile("/etc/os-release")
+        m = match(r"^PRETTY_NAME=\"?([^\"\n]*)"m, read("/etc/os-release", String))
+        m === nothing || return String(m[1])
+    end
+    return string(Sys.KERNEL)
+end
+
+"""
+    write_build_log(path, archive)
+
+Writes the build log of a finished full build: flat `name<TAB>value` rows (version,
+archive, revision, tools, machine), the stages as the report has them (time and peak memory
+of each), the cleaned log of every step ([`clean_log`](@ref), [`trim_log`](@ref); a step
+with nothing left is not listed) and the machine. It is the only record of a build kept
+in the repository; the step logs themselves go with the scratch folder.
+"""
+function write_build_log(path::AbstractString, archive::AbstractString)
+    info = Sys.islinux() ? parse_meminfo(read("/proc/meminfo", String)) : Dict{String,Int}()
+    mib(k) = get(info, k, 0) ÷ 1024
+    os, arch = system_names()
+    mkpath(dirname(path))
+    open(path, "w") do io
+        row(k, v) = println(io, rpad(k, cld(length(k) + 1, 8) * 8), "\t", v)
+        row("datetime", Libc.strftime("%Y-%m-%d %H:%M:%S %z", time()))
+        row("version", version_line())
+        row("archive", basename(archive))
+        row("revision", build_revision())
+        row("julia", VERSION)
+        row("node", NODE_VERSION)
+        row("python", PY_VERSION)
+        row("system", "$os-$arch, $(os_description())")
+        println(io, "\n--- stages ---")
+        foreach(l -> println(io, l), REPORT)
+        for (name, log) in STEP_LOGS
+            isfile(log) || continue
+            lines = trim_log(clean_log(read(log, String)))
+            isempty(lines) && continue
+            println(io, "\n--- step: ", name, " ---")
+            foreach(l -> println(io, l), lines)
+        end
+        println(io, "\n--- machine ---")
+        row("cpu", cpu_model())
+        row("threads", Sys.CPU_THREADS)
+        row("ram", "$(mib("MemTotal")) MiB")
+        row("swap", "$(mib("SwapTotal")) MiB")
     end
     return nothing
 end
@@ -1916,6 +2062,7 @@ function run(argv::Vector{String})::Int
     workload = get(opts, "--workload", nothing)
     REAL_OUT[] = stdout
     empty!(REPORT)
+    empty!(STEP_LOGS)
     LOG_DIR[] = mkpath(joinpath(work, "logs"))
     report = joinpath(dirname(archive), "baysol-pkg-report.txt")
     t_all = time()
@@ -1963,6 +2110,19 @@ function run(argv::Vector{String})::Int
     println("report: ", report)
     failed && return 1
     if only === nothing
+        # the one record kept of a build (the step logs go with the scratch folder below)
+        build_log = joinpath(
+            Common.root(),
+            BUILD_LOG_DIR...,
+            replace(basename(archive),
+                r"\.zip$" => ".LOG"),
+        )
+        try
+            write_build_log(build_log, archive)
+            println("build log: ", build_log)
+        catch e
+            println("build log not written: ", sprint(showerror, e))
+        end
         remove_caches(work)  # always: the depot and the other caches are never kept
         "--keep-work" in a.flags || remove_work(work)
         println("archive: ", archive)

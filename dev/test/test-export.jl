@@ -115,7 +115,8 @@ end
             @test !ispath(joinpath(dir, "SASDMJ9"))
             @test X.run(["SASDMJ9", "--out", dir]) == 0
             project = joinpath(dir, "SASDMJ9")
-            for f in ("data.tsv", "data.json", "buffer.json", "settings.json", "project.json")
+            for f in
+                ("data.tsv", "data.json", "buffer.json", "settings.json", "project.json")
                 @test isfile(joinpath(project, f))
             end
             @test length(readdir(joinpath(project, "runs"))) == 1
