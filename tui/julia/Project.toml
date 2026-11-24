@@ -1,7 +1,7 @@
 name = "BAYSOLRun"
 entryfile = "src/baysol-run.jl"
 uuid = "ddc2d533-6b3e-4051-a2d8-71ee69d924c4"
-version = "0.5.0"
+version = "0.5.1"
 
 [deps]
 BAYSOL = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"

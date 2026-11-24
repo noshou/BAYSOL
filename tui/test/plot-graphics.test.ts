@@ -241,7 +241,7 @@ function fakeStream(): { stream: NodeJS.WriteStream; out: string[] } {
             out.push(String(text))
             return true
         },
-    } as unknown as NodeJS.WriteStream
+    } as NodeJS.WriteStream
     return { stream, out }
 }
 

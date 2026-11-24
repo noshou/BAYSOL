@@ -347,9 +347,16 @@ function finished(stream: ZipStream): Promise<void> {
  */
 type Deferred = { _bin: string; _args: string[]; _childProcess?: ChildProcess }
 
+/** Whether a stream still holds the command of a deferred 7-Zip. */
+function isDeferred(stream: ZipStream): stream is ZipStream & Deferred {
+    const d: Record<string, unknown> = { ...stream }
+    return typeof d._bin === "string" && Array.isArray(d._args)
+}
+
 /** Starts a deferred stream's 7-Zip in `cwd` and wires the stream to it. */
 function startIn(stream: ZipStream, cwd: string): ZipStream {
-    const d = stream as unknown as Deferred
+    if (!isDeferred(stream)) throw new Error("7-Zip stream was not deferred")
+    const d = stream
     d._childProcess = spawn(d._bin, d._args, { cwd, windowsHide: true })
     return sevenZip.listen(stream)
 }

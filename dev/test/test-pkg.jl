@@ -23,6 +23,43 @@ end
     info["SwapFree"] = 20_000_000
     @test !P.swap_low(info)
     @test !P.swap_low(Dict{String,Int}())      # no swap: nothing to watch
+    @test P.process_memory("Name: x\nVmRSS:\t  2048 kB\nVmSwap:\t  1024 kB\n") == (2, 1)
+    @test P.process_memory("") == (0, 0)
+    @test sort(P.descendants(Dict(2 => 1, 3 => 2, 4 => 1, 9 => 8), 1)) == [1, 2, 3, 4]
+    value, peak = P.watch_memory(() -> 42; period = 0.05)
+    @test value == 42
+    Sys.islinux() && @test peak.ram > 0 && peak.swap >= 0
+    Sys.islinux() && @test P.tree_memory()[1] > 0
+end
+
+@testset "report: steps log to files, the report holds the status" begin
+    mktempdir() do d
+        P.LOG_DIR[] = d
+        empty!(P.REPORT)
+        P.REAL_OUT[] = devnull
+        @test P.step("quiet", () -> (println("x"); run(`echo child-output`); true))
+        @test occursin("child-output", read(joinpath(d, "quiet.log"), String))
+        @test !P.step("false", () -> false)
+        @test !P.step("throws", () -> error("boom"))
+        @test !P.step("tests", () -> (println("Test Failed at a.jl:1"); false);
+            pattern = r"Test Failed")
+        @test count(l -> occursin(" FAIL ", l), P.REPORT) == 3
+        @test any(l -> occursin("ERROR: boom", l), P.REPORT)
+        @test any(l -> occursin("Test Failed at a.jl:1", l), P.REPORT)
+        @test any(l -> occursin(r"quiet\s+ok\s+\d", l), P.REPORT)
+        # the terminal output of the step is not in the report
+        @test !any(l -> occursin("child-output", l), P.REPORT)
+        log = joinpath(d, "log.txt")
+        write(log, join(["l$i" for i in 1:20], "\n") * "\nmodel a failed: x\n")
+        @test P.problems(log) == ["model a failed: x"]
+        @test P.problems(log, r"zzz") ==
+              ["l16", "l17", "l18", "l19", "l20", "model a failed: x"]
+        @test P.problems(joinpath(d, "none")) == String[]
+        P.write_report(joinpath(d, "report.txt"), "a.zip")
+        text = read(joinpath(d, "report.txt"), String)
+        @test startswith(text, "bysl pkg") && occursin("archive    a.zip", text)
+        P.REAL_OUT[] = stdout
+    end
 end
 
 @testset "merged statements" begin
@@ -71,6 +108,24 @@ end
     P.finish(dir, "pytools")
     P.remove_work(dir)
     @test !ispath(dir)
+end
+
+@testset "cold caches" begin
+    env = P.cold_env("/w/baysol-pkg-work")
+    @test env["JULIA_DEPOT_PATH"] == joinpath("/w/baysol-pkg-work", "depot")
+    @test startswith(env["BAYSOL_CACHE"], "/w/baysol-pkg-work")
+    @test startswith(env["UV_CACHE_DIR"], "/w/baysol-pkg-work")
+    dir = mkpath(joinpath(mktempdir(), "baysol-pkg-work"))
+    @test_throws Dev.Common.ToolError P.remove_caches(dir)        # not ours yet
+    mkpath(joinpath(dir, "logs"))
+    for c in P.COLD_CACHES
+        write(joinpath(mkpath(joinpath(dir, c)), "x"), "1")
+    end
+    mkpath(joinpath(dir, "pytools"))
+    @test P.remove_caches(dir) == length(P.COLD_CACHES)
+    @test !any(c -> ispath(joinpath(dir, c)), P.COLD_CACHES)
+    @test isdir(joinpath(dir, "pytools"))                          # only the caches
+    @test !P.looks_like_work(mktempdir())
 end
 
 @testset "plan" begin
@@ -172,6 +227,19 @@ end
         mk("7zip-bin", "mac", "arm64", "7za")
         mac = P.native_assets(dir; os = "darwin", arch = "arm64")
         @test endswith(mac["native/pdfium"], "libpdfium.dylib")
+    end
+end
+
+@testset "jll_search_env: bare names resolve while the build runs" begin
+    mktempdir() do d
+        src = joinpath(d, "hash", "lib")
+        mkpath(src)
+        write(joinpath(src, "libearcut.so"), "e")
+        libs = [("EarCut_jll", "u", "libearcut_path", joinpath(src, "libearcut.so"))]
+        var, value = P.jll_search_env(joinpath(d, "jll-lib"), libs)
+        @test var in ("LD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "PATH")
+        @test startswith(value, joinpath(d, "jll-lib"))
+        @test read(joinpath(d, "jll-lib", "libearcut.so"), String) == "e"
     end
 end
 
@@ -289,5 +357,113 @@ end
         @test P.install_jll_libraries(exe, [("A_jll", "u", "k", lib)], out) == ["b"^40]
         @test isfile(joinpath(out, "julia", "julia", "libA.so"))
         @test isdir(joinpath(out, "share", "julia", "artifacts", "b"^40))
+    end
+end
+
+@testset "pkg: libraries and frozen files the app never loads" begin
+    for n in ("libgit2.so.1.9", "libuv.so.2", "libdSFMT.so", "libgmpxx.so.4", "sys.so")
+        @test occursin(P.RUNTIME_SKIP, n)
+    end
+    for n in ("libgmp.so.10", "libjulia.so.1.12", "libopenblas64_.so")
+        @test !occursin(P.RUNTIME_SKIP, n)
+    end
+    mktempdir() do dir
+        mkpath(joinpath(dir, "numpy", "random"))
+        mkpath(joinpath(dir, "numpy", "_core"))
+        write(joinpath(dir, "numpy", "random", "mtrand.so"), "12345")
+        write(joinpath(dir, "numpy", "random", "note.txt"), "x")
+        write(joinpath(dir, "numpy", "_core", "_multiarray_umath.so"), "y")
+        write(joinpath(dir, "libscipy_openblas64_-1b7162d6.so"), "z")
+        @test P.prune_pytools(dir) == 5
+        @test !isfile(joinpath(dir, "numpy", "random", "mtrand.so"))
+        @test isfile(joinpath(dir, "numpy", "random", "note.txt"))
+        @test isfile(joinpath(dir, "numpy", "_core", "_multiarray_umath.so"))
+        @test isfile(joinpath(dir, "libscipy_openblas64_-1b7162d6.so"))
+    end
+end
+
+@testset "pkg: the app is built for the generic CPU" begin
+    @test P.CPU_TARGET == "generic"
+end
+
+@testset "pkg: strip command lines per platform" begin
+    libs = ["/b/a.so", "/b/c.so.1"]
+    exes = ["/b/baysol"]
+    @test P.strip_linux("strip", libs, exes) == [
+        ["strip", "--strip-all", "/b/a.so", "/b/c.so.1"],
+        ["strip", "--strip-all", "/b/baysol"],
+    ]
+    @test P.strip_macos("strip", ["/b/a.dylib"], exes) ==
+          [["strip", "-x", "/b/a.dylib"], ["strip", "-S", "-x", "/b/baysol"]]
+    @test P.strip_windows("strip", ["/b/a.dll"], exes) ==
+          [["strip", "--strip-all", "/b/a.dll"], ["strip", "--strip-all", "/b/baysol"]]
+    @test P.strip_command_lines(:windows, "s", libs, exes) ==
+          P.strip_windows("s", libs, exes)
+    @test P.STRIP_TOOL == "llvm-strip"
+    @test_throws P.ToolError P.strip_command_lines(:plan9, "strip", libs, exes)
+    @test P.strip_command_lines(:linux, "s", libs, exes) == P.strip_linux("s", libs, exes)
+    @test P.strip_command_lines(:macos, "s", libs, exes) == P.strip_macos("s", libs, exes)
+    many = ["/b/l$i.so" for i in 1:(2*P.STRIP_CHUNK+1)]
+    lines = P.strip_linux("strip", many, String[])
+    @test length(lines) == 3
+    @test all(l -> length(l) <= P.STRIP_CHUNK + 2, lines)
+    @test reduce(vcat, [l[3:end] for l in lines]) == many
+    @test P.strip_linux("strip", String[], String[]) == []
+end
+
+@testset "pkg: strip targets and the bundle step" begin
+    mktempdir() do dir
+        elf = UInt8[0x7f, 0x45, 0x4c, 0x46, 1, 2, 3]
+        write(joinpath(dir, "libx.so"), elf)
+        write(joinpath(dir, "libx.so.1.2"), elf)
+        write(joinpath(dir, "libscript.so"), "GROUP ( libgcc_s.so.1 )")
+        write(joinpath(dir, "readme.txt"), elf)
+        write(joinpath(dir, "baysol"), elf)
+        write(joinpath(dir, "baysol-tui"), elf)
+        Sys.iswindows() || symlink("libx.so", joinpath(dir, "liblink.so"))
+        libs, exes = P.strip_targets(dir, [joinpath(dir, "baysol"), joinpath(dir, "nope")])
+        @test basename.(libs) == ["libx.so", "libx.so.1.2"]
+        @test basename.(exes) == ["baysol"]
+        @test P.tree_bytes(dir) > 0
+
+        empty!(P.REPORT)
+        P.REAL_OUT[] = devnull
+        before = read(joinpath(dir, "libx.so"))
+        # a system without a command: reported, not a failure
+        empty!(P.REPORT)
+        @test !P.strip_bundle(dir, [joinpath(dir, "baysol")]; os = :plan9, tool = "x")
+        @test any(l -> occursin("left unstripped", l) && occursin("plan9", l), P.REPORT)
+        @test read(joinpath(dir, "libx.so")) == before
+    end
+end
+
+@testset "reference fits of the trace projects" begin
+    mktempdir() do dir
+        @test P.unpack_references(dir) == 0       # no archive: nothing to unpack
+        sz = P.find_7z()
+        if sz !== nothing
+            stage = mkpath(joinpath(dir, "stage"))
+            write(joinpath(stage, "CRYSOL_fit1.tsv"), "0.1\t1.0\t0.1\n")
+            archive = joinpath(dir, "reference-fit.7z")
+            run(
+                pipeline(`$sz a $archive $(joinpath(stage, "CRYSOL_fit1.tsv"))`;
+                    stdout = devnull),
+            )
+            @test P.unpack_references(dir) == 1
+            @test isfile(joinpath(dir, "reference-fit", "CRYSOL_fit1.tsv"))
+            @test P.unpack_references(dir) == 0   # the folder is there: left alone
+        end
+    end
+    mktempdir() do logs
+        old = P.LOG_DIR[]
+        P.LOG_DIR[] = logs
+        try
+            write(joinpath(logs, "run-a.log"), "fine\n")
+            @test P.check_no_skipped_reference("run a") === nothing
+            write(joinpath(logs, "run-b.log"), "model x: the reference fit was skipped\n")
+            @test_throws Dev.Common.ToolError P.check_no_skipped_reference("run b")
+        finally
+            P.LOG_DIR[] = old
+        end
     end
 end

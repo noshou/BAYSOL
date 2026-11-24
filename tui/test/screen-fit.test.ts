@@ -302,7 +302,7 @@ const NOTE_ROOM = legendRoom("blocky", 78)
 
 /** What a model of the owner's example looks like in a list. */
 const failedModel = (error?: string): OpenModel =>
-    ({ name: MODEL, state: "failed", error }) as unknown as OpenModel
+    ({ name: MODEL, state: "failed", error }) as OpenModel
 
 test("the messages the screens build fit the note row of a blocky footer", () => {
     assert.equal(NOTE_ROOM, 58)

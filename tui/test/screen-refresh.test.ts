@@ -71,8 +71,8 @@ function rig(seconds = 5): Rig {
     const input = new FakeInput()
     const shown = { value: false }
     const refresher = new ScreenRefresher({
-        stream: term as unknown as NodeJS.WriteStream,
-        stdin: input as unknown as NodeJS.ReadStream,
+        stream: term,
+        stdin: input,
         seconds,
         sixelShown: () => shown.value,
     })
@@ -230,7 +230,7 @@ test("a setting of 0 switches it off: nothing wrapped, no focus reporting", () =
     const term = new FakeTerminal()
     const before = term.write
     const refresher = new ScreenRefresher({
-        stream: term as unknown as NodeJS.WriteStream,
+        stream: term,
         seconds: 0,
         sixelShown: () => false,
     })
@@ -247,7 +247,7 @@ test("no terminal, no frame: nothing is wrapped or replayed", () => {
     term.isTTY = false
     const before = term.write
     new ScreenRefresher({
-        stream: term as unknown as NodeJS.WriteStream,
+        stream: term,
         seconds: 1,
         sixelShown: () => false,
     }).install()
@@ -359,8 +359,8 @@ test("uninstall puts the writers back and stops the timer", () => {
     const write = term.write
     const read = input.read
     const refresher = new ScreenRefresher({
-        stream: term as unknown as NodeJS.WriteStream,
-        stdin: input as unknown as NodeJS.ReadStream,
+        stream: term,
+        stdin: input,
         seconds: 1,
         sixelShown: () => false,
     })
@@ -378,7 +378,7 @@ test("installScreenRefresh: the stop it returns takes the wrapper away", () => {
     const term = new FakeTerminal()
     const before = term.write
     const stop = installScreenRefresh({
-        stream: term as unknown as NodeJS.WriteStream,
+        stream: term,
         stdin: undefined,
         seconds: 1,
     })
@@ -407,7 +407,7 @@ const place: Placement = {
 function run(order: "none" | "refresh-first" | "painter-first"): string[] {
     const term = new FakeTerminal()
     const sink = term.out
-    const stream = term as unknown as NodeJS.WriteStream
+    const stream = term
     const painter = new SixelPainter(stream, 30, true)
     const refresher = new ScreenRefresher({
         stream,
@@ -437,7 +437,7 @@ test("stacking with the painter in either order keeps Ink's writes as they are",
 test("with the painter's wrapper on top of ours, a picture still stops the refresh", () => {
     for (const order of ["refresh-first", "painter-first"] as const) {
         const term = new FakeTerminal()
-        const stream = term as unknown as NodeJS.WriteStream
+        const stream = term
         const painter = new SixelPainter(stream, 30, true)
         const refresher = new ScreenRefresher({
             stream,
@@ -468,7 +468,7 @@ test("the wrapper hands every write on with its own arguments", () => {
         return true
     }
     const refresher = new ScreenRefresher({
-        stream: term as unknown as NodeJS.WriteStream,
+        stream: term,
         seconds: 1,
         sixelShown: () => false,
     })

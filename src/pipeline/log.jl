@@ -150,12 +150,13 @@ package folder, which is read instead.
 """
 function _logRevision()
     try
-        env = strip(get(ENV, "BAYSOL_REVISION", ""))  # a packaged app's launcher gives it
+        # a packaged app's launcher gives it
+        env = String(strip(get(ENV, "BAYSOL_REVISION", "")))
         isempty(env) || return env
         dir = pkgdir(@__MODULE__)
         dir === nothing && return "unknown"
         file = joinpath(dir, "REVISION")
-        isfile(file) && return strip(read(file, String))
+        isfile(file) && return String(strip(read(file, String)))
         rev = readchomp(pipeline(`git -C $dir rev-parse --short HEAD`; stderr = devnull))
         dirty = readchomp(
             pipeline(

@@ -15,7 +15,8 @@ using REPL.Terminals: TTYTerminal, raw!
 
 export clearCache, openFolder, fileManagerCommands, shellCommand, drawIcon, needsSetup,
     hasProject, check, cleanPath, Install, defaultInstall,
-    installFile, readInstall, writeInstall, applyInstall, rollback!, uninstall, runWizard,
+    installFile, manifestFile, readManifest, readInstall, writeInstall, applyInstall,
+    rollback!, uninstall, runWizard,
     LAUNCH_TUI, LAUNCH_CLI, UNINSTALLED
 
 "The marker file of a cache folder (the one the interface writes)."
@@ -296,9 +297,9 @@ end
 """
 Puts the sizes of the bundle's icon into the user's `hicolor` theme (Linux), each file
 exactly as it is in the bundle, and returns whether any went in, with a line to say so.
-Every file and folder is undone by `journal`.
+Every file and folder is undone by `journal` and noted in `made` (the manifest).
 """
-function _installIcons!(journal, bundle; env = ENV, home = homedir())
+function _installIcons!(journal, made, bundle; env = ENV, home = homedir())
     pngs = [
         p for p in iconPngs(joinpath(bundle, ICON_FILE)) if haskey(HICOLOR_SIZES, first(p))
     ]
@@ -307,12 +308,25 @@ function _installIcons!(journal, bundle; env = ENV, home = homedir())
     end
     files = iconFiles(first.(pngs); env, home)
     for (file, (_, bytes)) in zip(files, pngs)
-        _mkpath!(journal, dirname(file))
+        _madeDir!(made, journal, dirname(file))
         _backup!(journal, file)
-        write(file, bytes)
+        write(_madeFile!(made, file), bytes)
     end
     _refreshIcons(; env, home)
     return true, "icon: $(length(files)) sizes in $(hicolorDir(; env, home))"
+end
+
+"""
+Tells the desktops about a changed folder of entries (`update-desktop-database`, when the
+program is installed; a missing one is ignored).
+"""
+function _refreshEntries(dir::AbstractString)
+    isdir(dir) && Sys.which("update-desktop-database") !== nothing || return nothing
+    try
+        run(pipeline(`update-desktop-database -q $dir`; stderr = devnull))
+    catch
+    end
+    return nothing
 end
 
 "The desktop entry of a bundle: absolute paths, as the specification asks."
@@ -336,9 +350,15 @@ function targets(; env = ENV, home = homedir())
         Sys.isapple() ? joinpath(home, "Applications") :
         joinpath(something(_env(env, "XDG_DATA_HOME"),
             joinpath(home, ".local", "share")), "applications")
+    startMenu = joinpath(something(_env(env, "APPDATA"),
+        joinpath(home, "AppData", "Roaming")),
+        "Microsoft", "Windows", "Start Menu", "Programs")
     return (desktop = joinpath(apps, "baysol.desktop"),
         icon = joinpath(desktopDir(; env, home), "BAYSOL.desktop"),
-        link = joinpath(home, ".local", "bin", "baysol"))
+        link = joinpath(home, ".local", "bin", "baysol"),
+        app = joinpath(home, "Applications", "BAYSOL.app"),
+        lnk = joinpath(startMenu, "BAYSOL.lnk"),
+        ico = joinpath(dirname(installFile(; env, home)), "baysol.ico"))
 end
 
 """
@@ -427,13 +447,14 @@ end
 
 "Makes `dir` and its parents; what is newly made is removed again by the undo."
 function _mkpath!(journal, dir)
-    isdir(dir) && return
+    isdir(dir) && return nothing
     top = dir
     while !isdir(dirname(top)) && dirname(top) != top
         top = dirname(top)
     end
     mkpath(dir)
     push!(journal, () -> rm(top; recursive = true, force = true))
+    return top
 end
 
 "Notes what is at `path` (nothing, a file, a link), so the undo can put it back."
@@ -447,6 +468,174 @@ function _backup!(journal, path)
     else
         push!(journal, () -> rm(path; force = true))
     end
+end
+
+# ---- the install manifest and the entries of macOS and Windows -------------------------
+
+"""
+The file name of the install manifest, beside `install.json`: one line for each file or
+folder the wizard made for the icons and entries (`file<TAB>path`, `dir<TAB>path`).
+Uninstall removes what the manifest names and nothing else.
+"""
+const MANIFEST_FILE = "install-manifest.txt"
+
+"The manifest file of this user."
+manifestFile(; env = ENV, home = homedir()) =
+    joinpath(dirname(installFile(; env, home)), MANIFEST_FILE)
+
+"Notes a made file in `made` (a list of manifest lines) and returns its path."
+_madeFile!(made, path) = (push!(made, "file\t" * path); path)
+
+"Makes `dir` as [`_mkpath!`](@ref) does and notes the folders that are new in `made`."
+function _madeDir!(made, journal, dir)
+    new = String[]  # every level that does not exist yet, so the removal is level by level
+    d = dir
+    while !isdir(d) && dirname(d) != d
+        push!(new, d)
+        d = dirname(d)
+    end
+    _mkpath!(journal, dir)
+    append!(made, "dir\t" .* new)
+    return nothing
+end
+
+"""
+    readManifest(file) -> Vector{Pair{String,String}}
+
+The lines of an install manifest as `kind => path` (`"file"` or `"dir"`); empty if the
+file is missing. Lines of another shape are skipped.
+
+# Returns
+The entries, in file order.
+
+# Exceptions
+None.
+"""
+function readManifest(file::AbstractString)::Vector{Pair{String,String}}
+    out = Pair{String,String}[]
+    isfile(file) || return out
+    for line in eachline(file)
+        kind, sep, path = partition3(line)
+        isempty(sep) && continue
+        kind in ("file", "dir") && isabspath(path) && push!(out, kind => path)
+    end
+    return out
+end
+
+partition3(line) = (a = split(line, '\t'; limit = 2); length(a) == 2 ?
+                                   (a[1], "\t", a[2]) : (line, "", ""))
+
+"Writes `made` to `file`, with what an earlier manifest already named (no duplicates)."
+function _writeManifest(file, made)
+    old = ["$(k)\t$(p)" for (k, p) in readManifest(file)]
+    mkpath(dirname(file))
+    write(file, join(unique([old; made]), "\n") * "\n")
+    return file
+end
+
+"""
+Removes what `entries` name: files (a link only if it points into `bundle`), then the
+folders, deepest first, and only when they are empty. Nothing else is touched. Returns the
+log and the entries it kept (a link that points elsewhere).
+"""
+function _removeManifest(entries, bundle)
+    log, kept = String[], Pair{String,String}[]
+    for (kind, path) in entries
+        kind == "file" || continue
+        if islink(path)
+            startswith(readlink(path), bundle) || (push!(kept, kind => path); continue)
+        elseif !isfile(path)
+            continue
+        end
+        rm(path; force = true)
+        push!(log, "removed $path")
+    end
+    dirs = sort([p for (k, p) in entries if k == "dir"]; by = length, rev = true)
+    for d in dirs
+        if isdir(d) && isempty(readdir(d))
+            rm(d)
+            push!(log, "removed $d")
+        end
+    end
+    return log, kept
+end
+
+"""
+The `Info.plist` of the app bundle in `~/Applications` (macOS). `icon` is the name of the
+`.icns` in `Contents/Resources`, `exe` the script in `Contents/MacOS`.
+"""
+function infoPlist(; icon::AbstractString = ICON_NAME, exe::AbstractString = "BAYSOL")
+    return """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleName</key><string>BAYSOL</string>
+            <key>CFBundleDisplayName</key><string>BAYSOL</string>
+            <key>CFBundleIdentifier</key><string>org.baysol.app</string>
+            <key>CFBundleExecutable</key><string>$exe</string>
+            <key>CFBundleIconFile</key><string>$icon</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>NSHighResolutionCapable</key><true/>
+        </dict>
+        </plist>
+        """
+end
+
+"""
+Makes `BAYSOL.app` at `app` (macOS; untested): `Contents/Info.plist` naming the icon, the
+`.icns` copied from `icns` into `Contents/Resources`, and a small script in
+`Contents/MacOS` that opens the bundle's `BAYSOL.command` in Terminal. Every file and
+folder is noted in `made`. Returns a line to say what was done.
+"""
+function _installMacApp!(journal, made, bundle, app, icns)
+    _madeDir!(made, journal, joinpath(app, "Contents", "MacOS"))
+    _madeDir!(made, journal, joinpath(app, "Contents", "Resources"))
+    plist = _madeFile!(made, joinpath(app, "Contents", "Info.plist"))
+    write(plist, infoPlist())
+    exe = _madeFile!(made, joinpath(app, "Contents", "MacOS", "BAYSOL"))
+    command = joinpath(bundle, "BAYSOL.command")
+    write(exe, "#!/bin/zsh\nexec /usr/bin/open -a Terminal \"$command\"\n")
+    chmod(exe, 0o755)
+    if isfile(icns)
+        res = _madeFile!(made, joinpath(app, "Contents", "Resources", ICON_NAME * ".icns"))
+        cp(icns, res; force = true)
+    end
+    return "app bundle $app (macOS, untested)"
+end
+
+"""
+Makes the shortcut `lnk` to `target` with the icon `ico` (Windows; untested) through
+PowerShell's `WScript.Shell`; the paths travel in environment variables, so no quoting.
+"""
+function _makeShortcut(lnk, target, ico, workdir)
+    script =
+        "\$s = (New-Object -ComObject WScript.Shell).CreateShortcut(\$env:BAYSOL_LNK);" *
+        "\$s.TargetPath = \$env:BAYSOL_TARGET; \$s.IconLocation = \$env:BAYSOL_ICO;" *
+        "\$s.WorkingDirectory = \$env:BAYSOL_DIR; \$s.Save()"
+    cmd = addenv(`powershell -NoProfile -NonInteractive -Command $script`,
+        "BAYSOL_LNK" => lnk, "BAYSOL_TARGET" => target, "BAYSOL_ICO" => ico,
+        "BAYSOL_DIR" => workdir)
+    run(pipeline(cmd; stdout = devnull))
+    return nothing
+end
+
+"""
+Puts the `.ico` of the bundle at `icoDest` and a Start Menu shortcut `lnk` to `baysol.exe`
+(Windows; untested). `makeShortcut(lnk, target, ico, workdir)` creates the `.lnk`. Every
+file is noted in `made`. Returns a line to say what was done.
+"""
+function _installWindows!(journal, made, bundle, lnk, icoDest, ico;
+    makeShortcut = _makeShortcut, home = homedir())
+    _madeDir!(made, journal, dirname(icoDest))
+    _madeDir!(made, journal, dirname(lnk))
+    if isfile(ico)
+        cp(ico, _madeFile!(made, icoDest); force = true)
+    end
+    makeShortcut(_madeFile!(made, lnk), joinpath(bundle, "baysol.exe"),
+        isfile(ico) ? icoDest : joinpath(bundle, "baysol.exe"), home)
+    return "start menu shortcut $lnk (Windows, untested)"
 end
 
 """
@@ -490,31 +679,47 @@ An `IOError` if a folder or file cannot be written.
 function applyInstall(i::Install, bundle::AbstractString; env = ENV, home = homedir(),
     journal::Vector{Function} = Function[])
     log = String[]
+    made = String[]  # the manifest lines of the icons and entries
     for d in (i.home, i.cache, i.structureCache)
         _mkpath!(journal, d)
         push!(log, "folder $d")
     end
     t = targets(; env, home)
     icon = ICON_FALLBACK
-    if Sys.islinux() && (i.desktop || i.taskbarPin || i.desktopIcon)
-        installed, line = _installIcons!(journal, bundle; env, home)
+    entries = i.desktop || i.taskbarPin
+    if Sys.islinux() && (entries || i.desktopIcon)
+        installed, line = _installIcons!(journal, made, bundle; env, home)
         installed && (icon = ICON_NAME)
         push!(log, line)
     end
-    if i.desktop || i.taskbarPin
+    if entries
         if Sys.islinux()
-            _mkpath!(journal, dirname(t.desktop))
+            _madeDir!(made, journal, dirname(t.desktop))
             _backup!(journal, t.desktop)
-            write(t.desktop, desktopEntry(bundle; icon))
+            write(_madeFile!(made, t.desktop), desktopEntry(bundle; icon))
+            _refreshEntries(dirname(t.desktop))
             push!(log, "menu entry $(t.desktop)")
+        elseif Sys.isapple()
+            _madeDir!(made, journal, dirname(t.app))
+            push!(
+                log,
+                _installMacApp!(journal, made, bundle, t.app,
+                    joinpath(bundle, ICON_FILE)),
+            )
+        elseif Sys.iswindows()
+            push!(
+                log,
+                _installWindows!(journal, made, bundle, t.lnk, t.ico,
+                    joinpath(bundle, ICON_FILE); home),
+            )
         else
-            push!(log, "menu entry skipped (Linux only, untested elsewhere)")
+            push!(log, "menu entry skipped (not supported on this system)")
         end
     end
     if i.desktopIcon
         if Sys.islinux() && isdir(dirname(t.icon))
             _backup!(journal, t.icon)
-            write(t.icon, desktopEntry(bundle; icon))
+            write(_madeFile!(made, t.icon), desktopEntry(bundle; icon))
             chmod(t.icon, 0o755)  # the desktops start an executable entry
             # GNOME also wants it marked as trusted; other desktops ignore the attribute
             Sys.which("gio") === nothing || try
@@ -534,10 +739,11 @@ function applyInstall(i::Install, bundle::AbstractString; env = ENV, home = home
     i.taskbarPin && push!(log, _pin!(journal, env))
     if i.pathLink
         if Sys.isunix()
-            _mkpath!(journal, dirname(t.link))
+            _madeDir!(made, journal, dirname(t.link))
             _backup!(journal, t.link)
             islink(t.link) && rm(t.link)
             symlink(joinpath(bundle, "baysol"), t.link)
+            _madeFile!(made, t.link)
             push!(log, "link $(t.link)")
         else
             push!(log, "PATH link skipped (not supported on this system)")
@@ -546,6 +752,9 @@ function applyInstall(i::Install, bundle::AbstractString; env = ENV, home = home
     cfg = installFile(; env, home)
     _mkpath!(journal, dirname(cfg))
     _backup!(journal, cfg)
+    mf = manifestFile(; env, home)
+    _backup!(journal, mf)
+    _writeManifest(mf, made)
     push!(log, "wrote " * writeInstall(cfg, i))  # last: no install.json means not done
     return log
 end
@@ -619,9 +828,14 @@ function check(bundle::AbstractString; env = ENV, home = homedir())
     end
     t = targets(; env, home)
     launcher = joinpath(bundle, "baysol")
+    if Sys.isapple() && (i.desktop || i.taskbarPin) && !isdir(t.app)
+        push!(fixable, "the app bundle is missing: $(t.app)")
+    elseif Sys.iswindows() && (i.desktop || i.taskbarPin) && !isfile(t.lnk)
+        push!(fixable, "the Start Menu shortcut is missing: $(t.lnk)")
+    end
     for (on, file, what) in ((i.desktop || i.taskbarPin, t.desktop, "menu entry"),
         (i.desktopIcon, t.icon, "desktop icon"))
-        on || continue
+        on && Sys.islinux() || continue
         if !isfile(file)
             push!(fixable, "the $what is missing: $file")
         elseif !occursin("Exec=\"$launcher\"", read(file, String))
@@ -657,9 +871,11 @@ _ours(dir) = isdir(dir) && (isfile(joinpath(dir, CACHE_TAG)) || isempty(readdir(
 """
     uninstall(bundle; data, i, env, home) -> Vector{String}
 
-Removes the app side: the menu entry, the Desktop icon, the taskbar pin, the PATH link (only
-if it points into `bundle`), `install.json`, the bundle folder and the cache folders (only
-if they carry the marker or are empty). The projects folder stays unless `data = true`.
+Removes the app side: the icons, menu entry, app bundle or shortcut, Desktop
+icon and PATH link that the install manifest names (a link only if it points
+into `bundle`; nothing the manifest does not name), the taskbar pin, the
+manifest, `install.json`, the bundle folder and the cache folders (only if they
+carry the marker or are empty). The projects folder stays unless `data = true`.
 
 # Returns
 A line for each thing removed or kept.
@@ -673,21 +889,16 @@ function uninstall(bundle::AbstractString; data::Bool = false,
     cfg = installFile(; env, home)
     i = something(i, readInstall(cfg), defaultInstall(; env, home))
     t = targets(; env, home)
-    for f in (t.desktop, t.icon)
-        isfile(f) && (rm(f); push!(log, "removed $f"))
-    end
+    mf = manifestFile(; env, home)
+    # the icons and entries: exactly what the manifest names, and nothing else
+    lines, kept = _removeManifest(readManifest(mf), bundle)
+    append!(log, lines)
     if Sys.islinux()
-        gone = [f for f in iconFiles(keys(HICOLOR_SIZES); env, home) if isfile(f)]
-        foreach(rm, gone)
-        isempty(gone) ||
-            (_refreshIcons(; env, home); push!(log, "removed $(length(gone)) icon sizes"))
+        _refreshIcons(; env, home)
+        _refreshEntries(dirname(t.desktop))
     end
     pin = _unpin()
     pin === nothing || push!(log, pin)
-    if islink(t.link) && startswith(readlink(t.link), bundle)
-        rm(t.link)
-        push!(log, "removed $(t.link)")
-    end
     for c in (i.cache, i.structureCache)
         if _ours(c)
             rm(c; recursive = true)
@@ -700,6 +911,11 @@ function uninstall(bundle::AbstractString; data::Bool = false,
         isdir(i.home) && (rm(i.home; recursive = true); push!(log, "removed $(i.home)"))
     else
         push!(log, "kept the projects: $(i.home)")
+    end
+    if isempty(kept)
+        isfile(mf) && (rm(mf); push!(log, "removed $mf"))
+    else
+        write(mf, join(["$k\t$p" for (k, p) in kept], "\n") * "\n")  # for a later uninstall
     end
     isfile(cfg) && (rm(cfg); push!(log, "removed $cfg"))
     isdir(bundle) && (rm(bundle; recursive = true); push!(log, "removed $bundle"))

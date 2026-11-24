@@ -199,7 +199,7 @@ test("a bad definition leaves the file usable and the recipe read-only (invalid)
 function linked(def: Definition, pH: number): Drafts<Solute> {
     const made = templateRows(recipe(def), { ...CONDITIONS, pH }) as { rows: BufferRow[] }
     const drafts = made.rows.map(
-        (r) => ({ ...r, sigmaMM: r.sigmaMm }) as unknown as Solute,
+        (r) => ({ ...r, sigmaMM: r.sigmaMm }) as Solute,
     )
     return Drafts.of(drafts)
 }
@@ -500,7 +500,7 @@ const customRow = (): Solute =>
         "sigmaPmv": null,
         mM: 10,
         sigmaMM: 0.1,
-    }) as unknown as Solute
+    }) as Solute
 
 test("the rows that can follow the pH are the seed; the others stay", () => {
     const polymer = soluteRow({ kind: "polymer", name: "PEG", arg: "PEG" })

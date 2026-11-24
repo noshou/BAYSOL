@@ -398,10 +398,10 @@ function picked(state: NameState, e: SoluteEntry): AddState {
             return familyStart(state, table, i, fam, 0)
         }
         case "custom-nonbio": {
-            const snap = {
+            const snap: Solute = {
                 ...snapshot(e.entry as NonbioEntry),
                 ...solute,
-            } as unknown as Solute // a custom row has no `arg`
+            } // a custom row has no `arg`
             const probe = { ...snap, mM: 1, sigmaMM: 0 }
             if (rowProblem(bufferRow(probe)))
                 return { ...state, problem: "custom entry invalid" }
@@ -411,8 +411,8 @@ function picked(state: NameState, e: SoluteEntry): AddState {
             const entry = e.entry as PolymerEntry
             const labels = entry.units.map((u) => u.label)
             const ones = labels.map(() => 1)
-            const probe = { ...snapshot(entry, ones), mM: 1, sigmaMM: 0 }
-            if (rowProblem(bufferRow(probe as unknown as Solute)))
+            const probe: Solute = { ...solute, ...snapshot(entry, ones), mM: 1, sigmaMM: 0 }
+            if (rowProblem(bufferRow(probe)))
                 return { ...state, problem: "custom entry invalid" }
             const table = set({ ...solute, kind: "custom-polymer" } as Solute)
             const ctx: CountsContext = {

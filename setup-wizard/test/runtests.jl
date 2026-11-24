@@ -3,7 +3,8 @@
 using Test
 using BAYSOLSetup
 using BAYSOLSetup: targets, defaultThreads, desktopDir, desktopEntry, _pinned, _unpinned,
-    iconPngs, iconFiles, hicolorDir, ICON_FILE
+    iconPngs, iconFiles, hicolorDir, ICON_FILE, readManifest, manifestFile,
+    _installMacApp!, _installWindows!
 
 # a stand-in PNG (signature and header only) of px x px pixels
 function fakePng(px)
@@ -123,6 +124,7 @@ end
             uninstall(b; env = e, home = d)
             @test !isfile(t.icon) && !isfile(t.desktop)
             @test !any(isfile, sizes)
+            @test !isfile(manifestFile(; env = e, home = d))
         end
         @test _pinned(["a.desktop"], "baysol.desktop") == ["a.desktop", "baysol.desktop"]
         @test _pinned(["baysol.desktop"], "baysol.desktop") == ["baysol.desktop"]
@@ -133,6 +135,79 @@ end
         writeInstall(f, j)
         @test readInstall(f) == j
     end
+    @testset "uninstall removes only what the manifest names" begin
+        d = mktempdir()
+        e = Dict(
+            "XDG_DATA_HOME" => joinpath(d, "d"),
+            "XDG_CONFIG_HOME" => joinpath(d, "cfg"),
+        )
+        b = mkpath(joinpath(d, "bundle"))
+        fakeIcns(joinpath(b, ICON_FILE), ["icp4" => 16, "ic08" => 256])
+        i = Install(; home = joinpath(d, "h"), cache = joinpath(d, "c"),
+            structureCache = joinpath(d, "s"), desktop = true)
+        if Sys.islinux()
+            applyInstall(i, b; env = e, home = d)
+            m = readManifest(manifestFile(; env = e, home = d))
+            files = [p for (k, p) in m if k == "file"]
+            @test length(files) == 3  # two icon sizes and the entry
+            @test all(isfile, files)
+            @test occursin(".desktop", join(files))
+            # a file of someone else in the theme, and an icon of another app
+            other = joinpath(dirname(files[1]), "other.png")
+            write(other, "x")
+            keep = joinpath(d, "d", "applications", "other.desktop")
+            write(keep, "x")
+            uninstall(b; i, env = e, home = d)
+            @test !any(isfile, files)
+            @test isfile(other) && isfile(keep)
+            # a second uninstall without a manifest removes no icons and entries
+            mkpath(b)
+            fakeIcns(joinpath(b, ICON_FILE), ["icp4" => 16, "ic08" => 256])
+            applyInstall(i, b; env = e, home = d)
+            rm(manifestFile(; env = e, home = d))
+            uninstall(mkpath(joinpath(d, "b2")); i, env = e, home = d)
+            @test all(isfile, files)
+        end
+    end
+
+    @testset "macOS app bundle and Windows shortcut builders (any OS, stubs)" begin
+        d = mktempdir()
+        icns = joinpath(d, "baysol.icns")
+        fakeIcns(icns, ["icp4" => 16])
+        made, journal = String[], Function[]
+        app = joinpath(d, "Applications", "BAYSOL.app")
+        BAYSOLSetup._installMacApp!(journal, made, joinpath(d, "bundle"), app, icns)
+        @test isfile(joinpath(app, "Contents", "Info.plist"))
+        @test occursin(
+            "baysol</string>",
+            read(joinpath(app, "Contents", "Info.plist"), String),
+        )
+        @test isfile(joinpath(app, "Contents", "Resources", "baysol.icns"))
+        exe = joinpath(app, "Contents", "MacOS", "BAYSOL")
+        @test occursin("BAYSOL.command", read(exe, String))
+        @test count(startswith("file\t"), made) == 3
+        # an uninstall by this manifest leaves the app folder gone and nothing else
+        sibling = joinpath(d, "Applications", "Other.app")
+        mkpath(sibling)
+        entries = [first(split(l, '\t')) => last(split(l, '\t')) for l in made]
+        BAYSOLSetup._removeManifest(entries, joinpath(d, "bundle"))
+        @test !isdir(app) && isdir(sibling)
+        made = String[]
+        lnk = joinpath(d, "Start", "BAYSOL.lnk")
+        ico = joinpath(d, "baysol.ico")
+        write(ico, "ico")
+        seen = Ref{Any}(nothing)
+        stub = (l, t, ic, w) -> (write(l, "lnk"); seen[] = (l, t, ic))
+        BAYSOLSetup._installWindows!(Function[], made, joinpath(d, "bundle"), lnk,
+            joinpath(d, "cfg", "baysol.ico"), ico; makeShortcut = stub, home = d)
+        @test isfile(lnk) && isfile(joinpath(d, "cfg", "baysol.ico"))
+        @test seen[][2] == joinpath(d, "bundle", "baysol.exe")
+        entries = [first(split(l, '\t')) => last(split(l, '\t')) for l in made]
+        BAYSOLSetup._removeManifest(entries, joinpath(d, "bundle"))
+        @test !ispath(lnk) && !ispath(joinpath(d, "cfg", "baysol.ico")) &&
+              !isdir(dirname(lnk))
+    end
+
     @testset "a failed apply is undone" begin
         d = mktempdir()
         e = Dict("XDG_DATA_HOME" => joinpath(d, "d"),

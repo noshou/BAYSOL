@@ -1250,7 +1250,7 @@ export function valueText(def: SettingDef, value: SettingValue): string {
     if (def.kind === "sizes")
         return (value as number[][]).map(([w, h]) => `${w}x${h}`).join(", ")
     if (def.kind === "ladder")
-        return ladderSummary(value as LadderMap, def.default as unknown as LadderMap)
+        return ladderSummary(value as LadderMap, def.default as LadderMap)
     if (def.kind === "tuple") return tupleParts(def, value).join(", ")
     if (def.kind === "path" && value === "") return "(default)"
     return String(value)

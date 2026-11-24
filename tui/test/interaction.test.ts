@@ -310,7 +310,7 @@ test("every option of a menu has a hotkey of its own", async () => {
         const menu = await load()
         const seen = new Set<string>()
         for (const option of menu.names as readonly string[]) {
-            const opts = menu.opts as unknown as Record<string, { hotkey: Hotkey }>
+            const opts = menu.opts as Record<string, { hotkey: Hotkey }>
             const key = opts[option].hotkey
             const id = `${key.ctrl ? "^" : ""}${key.shift ? "S" : ""}${key.key_}`
             assert.ok(!seen.has(id), `${name}: ${option} repeats the hotkey ${id}`)

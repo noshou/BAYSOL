@@ -34,6 +34,7 @@ import { type ReactNode, useId, useLayoutEffect, useRef } from "react"
 import { centreCells } from "../store/plot-graphics.js"
 import type { CellSize } from "../store/sixel-types.js"
 import { useScreenActive } from "./interaction.js"
+import type { RefreshStream } from "./screen-refresh.js"
 import { useTheme } from "./theme.js"
 
 const ESC = "\u001b"
@@ -127,7 +128,7 @@ export class SixelPainter {
      *     (default: when the stream is a terminal).
      */
     constructor(
-        private readonly stream: NodeJS.WriteStream,
+        private readonly stream: RefreshStream,
         private readonly delayMs: number = REPAINT_DELAY_MS,
         private readonly sync: boolean = stream.isTTY === true,
     ) {}

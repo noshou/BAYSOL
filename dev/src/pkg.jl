@@ -11,15 +11,19 @@
 #   baysol-tui      the terminal interface: an esbuild bundle in a Node single executable
 #   lib/pytools/baysol-pytools   propka3 and pdb2pqr frozen by Nuitka (one program)
 #
-# plus `julia/` (the runtime libraries), the icon of the system and the launcher script,
-# at the root. The data tables, the revision are inside `baysol` and the assets and the
-# version inside `baysol-tui`, so there is no data, assets, VERSION or REVISION to lose.
-# Stages are resumable (a marker file per stage in the work folder); the build is stopped
+# plus `julia/` (the runtime libraries), the icon of the system and the launcher script, at
+# the root. The data tables, the revision are inside `baysol` and the assets and the version
+# inside `baysol-tui`, so there is no data, assets, VERSION or REVISION to lose. A build is
+# COLD, always (owner, 2026-11-23): it starts from an empty scratch folder and uses its own
+# Julia depot, uv, Nuitka and fit caches inside it (`cold_env`), never the user's, and
+# deletes them when the archive is written. Only `--resume` (or `--stage`) continues an
+# earlier, failed build: a marker file per stage in the work folder. The build is stopped
 # when free swap drops under 500 MB (zswap and zram show as swap), by PID, never by name.
 # macOS and Windows paths are written and untested: they say so when they do not apply.
 module PkgTool
 
 using ..Common
+using Dates
 
 const WHO = "bysl pkg"
 
@@ -27,17 +31,22 @@ const USAGE = """
 Build the packaged app for this system: ONE archive with the three executables, the runtime
 and the icons, `baysol-<semver>-<os>-<arch>.zip` (deflate, 7-Zip maximum settings).
 
-    bysl pkg [--out DIR] [--work DIR] [--workload DIR] [--stage NAME] [--keep-work]
-             [--dry-run]
+    bysl pkg    [--out DIR] [--work DIR] [--workload DIR] [--stage NAME] [--resume]
+                [--keep-work] [--dry-run]
 
     --out DIR       the folder the archive is written to (default: the folder you run
                     this from)
     --work DIR      scratch folder (default `baysol/baysol-pkg-work` in the cache home of
-                    the system); removed when the archive is written (a failed run keeps
-                    it, a rerun continues where it stopped)
+                    the system); a build starts COLD: an earlier folder is removed first,
+                    and the build uses its own Julia depot, uv, Nuitka and fit caches
+                    inside it, never yours. Removed when the archive is written, the
+                    caches even with --keep-work (a failed run keeps all of it)
     --workload DIR  project folders the build fits once (default: exported by `bysl fits
                     export` from the entries of WORKLOAD)
-    --stage NAME    run only this stage (pytools, tui, trace, julia, bundle)
+    --stage NAME    run only this stage (pytools, tui, trace, julia, bundle); it needs
+                    the earlier stages' folder, so it implies --resume
+    --resume        continue the folder of a failed build (its caches included) instead
+                    of starting cold; stages with a marker are skipped
     --keep-work     keep the scratch folder after the archive is written
     --dry-run       print the plan and the preflight, build nothing
 
@@ -98,7 +107,13 @@ few = (; nSamples = 60, nAdapt = 60, retryNAdapt = 60, retryNDraws = 60)
 variants = [
     (; ui = :tui, tex = true, compile = false),
     (; ui = :cli, tex = true, compile, formats = [:pdf, :png, :svg]),
-    (; ui = :cli, tex = true, compile, formats = [:pdf], style = PlotStyle(font = nothing)),
+    (;
+        ui = :cli,
+        tex = true,
+        compile,
+        formats = [:pdf],
+        style = BAYSOL.PlotStyle(font = nothing),
+    ),
     (; ui = :cli, few..., ladder = rung((; SAMPLE_C1 = true))),
     (; ui = :cli, few..., ladder = rung((; RNG_SEED_STEP = 1))),
 ]
@@ -151,6 +166,87 @@ function swap_low(info; floor = MIN_FREE_SWAP_MIB)::Bool
 end
 
 """
+    process_memory(status) -> NTuple{2,Int}
+
+The `(RSS, swap)` in MiB of one process, from the text of its `/proc/<pid>/status`
+(`VmRSS`, `VmSwap`); `(0, 0)` for a kernel thread or an empty text.
+"""
+function process_memory(status::AbstractString)::NTuple{2,Int}
+    function field(k)
+        m = match(Regex("^$k:\\s+(\\d+) kB", "m"), status)
+        return m === nothing ? 0 : parse(Int, m[1])
+    end
+    return (field("VmRSS") ÷ 1024, field("VmSwap") ÷ 1024)
+end
+
+"""
+    descendants(parents, root) -> Vector{Int}
+
+`root` and every process below it, from a `pid => parent pid` map.
+"""
+function descendants(parents::AbstractDict{Int,Int}, root::Integer)::Vector{Int}
+    found = [Int(root)]
+    i = 1
+    while i <= length(found)
+        for (pid, ppid) in parents
+            ppid == found[i] && pid ∉ found && push!(found, pid)
+        end
+        i += 1
+    end
+    return found
+end
+
+"The `(RSS, swap)` MiB summed over this process and all its children (Linux `/proc`)."
+function tree_memory(root::Integer = getpid())::NTuple{2,Int}
+    parents = Dict{Int,Int}()
+    for d in readdir("/proc")
+        all(isdigit, d) || continue
+        try
+            m = match(r"^\d+ \(.*\) \S (\d+)"s, read("/proc/$d/stat", String))
+            m === nothing || (parents[parse(Int, d)] = parse(Int, m[1]))
+        catch
+        end
+    end
+    total = (0, 0)
+    for pid in descendants(parents, root)
+        try
+            total = total .+ process_memory(read("/proc/$pid/status", String))
+        catch
+        end
+    end
+    return total
+end
+
+"""
+    watch_memory(f; period = 2) -> (value, peak)
+
+Calls `f()` and samples the memory of the processes it starts (this process and all its
+children, so juliac, gcc, Nuitka or 7-Zip, never the rest of the machine) every `period`
+seconds meanwhile (Linux; elsewhere the peak is `nothing`). `peak` is
+`(ram = MiB, swap = MiB)`, each the highest sample of the resident and the swapped-out
+memory of that tree.
+"""
+function watch_memory(f; period = 2)
+    Sys.islinux() || return f(), nothing
+    peak = [0, 0]
+    sample() = peak .= max.(peak, tree_memory())
+    sample()
+    running = Ref(true)
+    watcher = @async while running[]
+        sample()
+        sleep(period)
+    end
+    value = try
+        f()
+    finally
+        running[] = false
+        wait(watcher)
+        sample()
+    end
+    return value, (ram = peak[1], swap = peak[2])
+end
+
+"""
     guarded(cmd; env = Dict(), dir = pwd(), log = nothing) -> Bool
 
 Runs `cmd` (output to the file `log` when given) and kills it, by PID, when the swap runs
@@ -178,6 +274,129 @@ function guarded(cmd::Cmd; env = Dict{String,String}(), dir = pwd(), log = nothi
     stopped[] &&
         throw(ToolError("$WHO: stopped, free swap under $MIN_FREE_SWAP_MIB MiB", 1))
     return success(proc)
+end
+
+# --- the report
+
+"The terminal the tool was started with (`step` points `stdout` and `stderr` elsewhere)."
+const REAL_OUT = Ref{IO}(stdout)
+
+"The lines of the report file, in order: stages, steps, problems."
+const REPORT = String[]
+
+"""
+The folder of the step logs (`<work>/logs`): the
+whole output of each step, never the report.
+"""
+const LOG_DIR = Ref("")
+
+"Lines of a step log that `problems` reports for a failed step."
+const PROBLEM_LINE =
+    r"Test Failed|Error During Test|Some tests did not pass|^ERROR|[Ee]xception|" *
+    r"FAILED|failed:"
+
+"""
+    note(line; terminal = false)
+
+Adds `line` to the report (and shows it on the terminal the tool was started with when
+`terminal`).
+"""
+function note(line::AbstractString; terminal::Bool = false)
+    push!(REPORT, line)
+    if terminal
+        println(REAL_OUT[], line)
+        flush(REAL_OUT[])
+    end
+    return nothing
+end
+
+"""
+    problems(path, pattern = PROBLEM_LINE; limit = 12) -> Vector{String}
+
+The lines of the log `path` that match `pattern`, trimmed to 160 characters, at most `limit`
+(the last ones when there are more); the last 6 lines of the log when none matches, and
+none when the file does not exist.
+"""
+function problems(path::AbstractString, pattern = PROBLEM_LINE; limit = 12)::Vector{String}
+    isfile(path) || return String[]
+    lines = [strip(l) for l in eachline(path)]
+    cut(l) = length(l) > 160 ? first(l, 157) * "..." : String(l)
+    hits = [cut(l) for l in lines if occursin(pattern, l)]
+    isempty(hits) && return [cut(l) for l in lines[max(1, end-5):end] if !isempty(l)]
+    return hits[max(1, end-limit+1):end]
+end
+
+"""
+    logged(f, path)
+
+Calls `f()` with `stdout` and `stderr` (also those of the programs it starts) written to
+the file `path`; returns what `f` returns.
+"""
+function logged(f, path::AbstractString)
+    mkpath(dirname(path))
+    return open(path, "w") do io
+        redirect_stdio(f; stdout = io, stderr = io)
+    end
+end
+
+"""
+    step(name, f; top = false, pattern = PROBLEM_LINE) -> Bool
+
+Runs `f()` with its output in `<LOG_DIR>/<name>.log`, timing it and sampling the memory of
+the processes it starts ([`watch_memory`](@ref)), and adds one line to the report:
+`name`, `ok` or `FAIL`, the wall time and the peak RAM and swap. A step fails when `f`
+returns `false` or throws; the lines of its log that matter ([`problems`](@ref)) follow
+the report line, and a failure is also shown on the terminal, as every `top` step (a
+stage) is. True when it did not fail.
+"""
+function step(name::AbstractString, f; top::Bool = false, pattern = PROBLEM_LINE)::Bool
+    path = joinpath(LOG_DIR[], replace(name, r"[^A-Za-z0-9._-]+" => "-") * ".log")
+    t0 = time()
+    ok, peak = watch_memory() do
+        try
+            logged(f, path) !== false
+        catch e
+            open(path, "a") do io
+                println(io, "ERROR: ", sprint(showerror, e))
+            end
+            false
+        end
+    end
+    mem = peak === nothing ? "" : "   peak RAM $(peak.ram) MiB, swap $(peak.swap) MiB"
+    line = string(top ? "" : "  ", rpad(name, top ? 10 : 36), ok ? " ok    " : " FAIL  ",
+        lpad(round(time() - t0; digits = 1), 8), " s", mem)
+    note(line; terminal = top || !ok)
+    if !ok
+        for l in problems(path, pattern)
+            note("      " * l; terminal = true)
+        end
+        note("      log: $path"; terminal = true)
+    end
+    return ok
+end
+
+"""
+    write_report(path, archive)
+
+Writes the report file: the date, the revision, the machine, then [`REPORT`](@ref).
+"""
+function write_report(path::AbstractString, archive::AbstractString)
+    info = Sys.islinux() ? parse_meminfo(read("/proc/meminfo", String)) : Dict{String,Int}()
+    mib(k) = get(info, k, 0) ÷ 1024
+    open(path, "w") do io
+        println(io, "bysl pkg   ", Dates.format(Dates.now(), "yyyy-mm-dd HH:MM"))
+        println(io, "revision   ", build_revision())
+        println(io, "machine    ", Sys.ARCH, ", ", Sys.CPU_THREADS, " threads, RAM ",
+            mib("MemTotal"), " MiB, swap ", mib("SwapTotal"), " MiB")
+        println(io, "archive    ", archive)
+        println(
+            io,
+            "peaks      the processes of the step only (RSS and swapped-out memory)",
+        )
+        println(io)
+        foreach(l -> println(io, l), REPORT)
+    end
+    return nothing
 end
 
 # --- the system
@@ -575,6 +794,7 @@ function stage_tui(work)
         need(rc(`$node --experimental-sea-config sea.json`), "SEA blob")
         out = exe("baysol-tui")
         cp(node, out; force = true)
+        strip_binary(out)  # before the blob goes in, never after
         postject = joinpath(Common.root(), "node_modules", ".bin", "postject")
         fuse = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2"
         extra = Sys.isapple() ? ["--macho-segment-name", "NODE_SEA"] : String[]
@@ -671,6 +891,47 @@ function run_env(cmd::Cmd, env)
 end
 
 """
+    unpack_references(project) -> Int
+
+Unpacks `<project>/reference-fit.7z` (what `bysl fits export` writes and the interface
+reads) into `<project>/reference-fit/`, the folder the command line (`baysol run`) and
+`runProject` read, so a traced run takes the reference path a user's run takes. A project
+that has the folder, or no archive, is left alone.
+
+# Returns
+The number of files unpacked.
+
+# Exceptions
+A `ToolError` when no 7-Zip is found or the archive does not unpack.
+"""
+function unpack_references(project)::Int
+    archive = joinpath(project, "reference-fit.7z")
+    target = joinpath(project, "reference-fit")
+    (isfile(archive) && !isdir(target)) || return 0
+    sevenzip = find_7z()
+    need(sevenzip !== nothing, "no 7-Zip found to unpack $archive")
+    need(rc(`$sevenzip x -y -o$target $archive`), "unpacking $archive")
+    return length(readdir(target))
+end
+
+"""
+    check_no_skipped_reference(name)
+
+Fails the build when the log of the step `name` says a reference fit was skipped: the
+workload exists to compile that code, so a skip means it was not exercised.
+
+# Exceptions
+A `ToolError` naming the step, when its log has a "reference fit was skipped" line.
+"""
+function check_no_skipped_reference(name)
+    path = joinpath(LOG_DIR[], replace(name, r"[^A-Za-z0-9._-]+" => "-") * ".log")
+    isfile(path) || return nothing
+    occursin("reference fit was skipped", read(path, String)) &&
+        throw(ToolError("$WHO: $name skipped its reference fit (see $path)", 1))
+    return nothing
+end
+
+"""
     trace_output_variants(work, dir, julia, env)
 
 Fits a copy of the first `WORKLOAD` entry (under `<dir>/projects/outputs`), with a second
@@ -686,17 +947,22 @@ function trace_output_variants(work, dir, julia, env)
     project = joinpath(mkpath(joinpath(dir, "projects")), "outputs")
     rm(project; recursive = true, force = true)
     cp(joinpath(workload_folder(work, nothing), first(WORKLOAD)), project)
+    unpack_references(project)
     models = joinpath(project, "models")
     first_model = joinpath(models, only(filter(endswith(".pdb"), readdir(models))))
     cp(first_model, replace(first_model, r"\.pdb$" => "-2.pdb"))
     driver = joinpath(work, "output-driver.jl")
     write(driver, OUTPUT_DRIVER)
     compile = Sys.which("lualatex") !== nothing && Sys.which("pdftocairo") !== nothing
-    println("trace: output variants of $(first(WORKLOAD)) (rendered: $compile)")
-    run_env(`$julia --startup-file=no --threads=4
-        --trace-compile=$(joinpath(out, "outputs.jl"))
-        --project=$(joinpath(Common.root(), "tui", "julia")) $driver $project 20 $compile`,
-        env) || println("trace: the output variants failed")
+    label = "output variants $(first(WORKLOAD)) (rendered: $compile)"
+    step(label,
+        () -> run_env(
+            `$julia --startup-file=no --threads=4
+            --trace-compile=$(joinpath(out, "outputs.jl"))
+            --project=$(joinpath(Common.root(), "tui", "julia")) $driver $project 20
+            $compile`,
+            env))
+    check_no_skipped_reference(label)
     write(joinpath(out, "outputs.done"), "")
     return nothing
 end
@@ -726,17 +992,19 @@ function trace_project_runs(work, dir, julia, env)
         copy = joinpath(projects, name)
         rm(copy; recursive = true, force = true)
         cp(joinpath(workload, id), copy)
-        println("trace: real $how run of $id")
-        ok = if how == "cli"
-            run_env(`$julia --startup-file=no --threads=4
-                --trace-compile=$(joinpath(runs, name * ".jl")) --project=$app -e $cli
-                $copy --temperature 20`, env)
-        else
-            driver = joinpath(root, "tui", "test", "support", "trace-run.ts")
-            run_env(`$node --import tsx $driver $copy 20`,
-                merge(env, Dict("BAYSOL_TRACE_COMPILE" => runs)))
-        end
-        ok || println("trace: the $how run of $id failed")
+        how == "cli" && unpack_references(copy)  # the interface reads the archive itself
+        step("$how run $id",
+            () -> if how == "cli"
+                run_env(
+                    `$julia --startup-file=no --threads=4
+                    --trace-compile=$(joinpath(runs, name * ".jl")) --project=$app -e $cli
+                    $copy --temperature 20`, env)
+            else
+                driver = joinpath(root, "tui", "test", "support", "trace-run.ts")
+                run_env(`$node --import tsx $driver $copy 20`,
+                    merge(env, Dict("BAYSOL_TRACE_COMPILE" => runs)))
+            end)
+        check_no_skipped_reference("$how run $id")
         write(joinpath(runs, name * ".done"), "")
     end
     return nothing
@@ -768,32 +1036,34 @@ function stage_trace(work)
     # build resumes at the fit it was in, whose partial trace is then overwritten
     pending = filter(id -> !isfile(joinpath(fits, id * ".done")),
         vcat(TRACE_FITS, Common.synthetic_ids()))
-    println("trace: ", length(pending), " fits to run")
+    note("  trace: $(length(pending)) fits to run")
     for id in pending
-        withenv(env...) do
-            Common.run_step(
-                false,
-                ["bysl", "fits", "run", id, "--trace-compile", fits,
-                    "--scratch", results, "--threads", "4"],
-            ) || println("trace: $id failed (kept as far as it got)")
-        end
+        step("fit $id",
+            () -> withenv(env...) do
+                Common.run_step(
+                    false,
+                    ["bysl", "fits", "run", id, "--trace-compile", fits,
+                        "--scratch", results, "--threads", "4"],
+                )
+            end)
         write(joinpath(fits, id * ".done"), "")
     end
     tests = joinpath(dir, "tests")
     mkpath(tests)
     unit = joinpath(root, "dev", "scripts", "unittests.jl")
     isfile(joinpath(tests, "unit.jl")) ||
-        run_env(
-            `$julia --startup-file=no --trace-compile=$(joinpath(tests, "unit.jl"))
-        --project=$(joinpath(root, "test")) $unit`, env) ||
-        println("trace: the unit suite failed")
+        step("unit suite",
+            () -> run_env(
+                `$julia --startup-file=no --trace-compile=$(joinpath(tests, "unit.jl"))
+                --project=$(joinpath(root, "test")) $unit`, env);
+            pattern = r"Test Failed|Error During Test|Some tests did not pass|^ERROR")
     for f in sort(filter(endswith(".test.jl"), readdir(joinpath(root, "tui", "test"))))
         out = joinpath(tests, "tui-" * f)
         isfile(out) && continue
-        run_env(`$julia --startup-file=no --trace-compile=$out
-            --project=$(joinpath(root, "test")) $(joinpath(root, "tui", "test", f))`, env,
-        ) ||
-            println("trace: $f failed")
+        step("tui test $f",
+            () -> run_env(`$julia --startup-file=no --trace-compile=$out
+                --project=$(joinpath(root, "test")) $(joinpath(root, "tui", "test", f))`,
+                env))
     end
     trace_project_runs(work, dir, julia, env)
     trace_output_variants(work, dir, julia, env)
@@ -803,9 +1073,17 @@ function stage_trace(work)
     end
     statements = merge_statements(lines; allowed = app_modules())
     write(joinpath(work, "statements.jl"), join(statements, "\n") * "\n")
-    println("trace: ", length(statements), " statements")
+    note("  trace: $(length(statements)) merged statements")
     finish(work, "trace")
 end
+
+"""
+The CPU target of the compiled app. `generic` runs on every CPU of the architecture
+(owner, 2026-11-23): juliac's default is `native`, which lets LLVM use the build machine's
+own instructions (an Apple M2's, say) and crash with SIGILL elsewhere, and per-CPU variants
+only add code for no measured gain on float64 NUTS loops.
+"""
+const CPU_TARGET = "generic"
 
 "Stage `julia`: juliac builds `baysol` with the workload run at build time."
 function stage_julia(work, workload)
@@ -821,18 +1099,29 @@ function stage_julia(work, workload)
     # the JLL libraries of depot artifacts are opened by bare name (see `jll_libraries`)
     libs = jll_libraries(project)
     write(joinpath(dir, "jll-libraries.tsv"), join([join(l, '\t') for l in libs], '\n'))
-    env = Dict("BAYSOL_WORKLOAD" => workload, "BAYSOL_PYTOOLS" => pytools,
+    env = Dict("JULIA_CPU_TARGET" => CPU_TARGET, "BAYSOL_WORKLOAD" => workload,
+        "BAYSOL_PYTOOLS" => pytools,
         "JULIA_LOAD_PATH" =>
             write_jll_preferences(joinpath(work, "jll-preferences"), libs),
+        jll_search_env(joinpath(work, "jll-lib"), libs),
         "BAYSOL_STATEMENTS" => statements,
         "BAYSOL_BUILD_REVISION" => build_revision(),
         "TMPDIR" => mkpath(joinpath(work, "tmp")))
-    ok = guarded(
-        `$(find_julia()) --startup-file=no --project=$project $juliac --output-exe
-        $(exe("baysol")) --relative-rpath $entry`;
-        env, dir, log = joinpath(work, "julia.log"),
-    )
-    need(ok, "juliac failed (see $(joinpath(work, "julia.log")))")
+    log = joinpath(work, "julia.log")
+    ok = step("juliac (precompile, workload fits, compile, link)",
+        () -> guarded(
+            `$(find_julia()) --startup-file=no --project=$project $juliac --output-exe
+            $(exe("baysol")) --relative-rpath $entry`;
+            env, dir, log,
+        ); pattern = r"^ERROR|Failed to|Exception")
+    # what the build-time workload and the compiler said, from the juliac log
+    if isfile(log)
+        for l in eachline(log)
+            occursin(r"^statements:", l) && note("  juliac: $l")
+            occursin(r"model .* failed:|run cannot start", l) && note("  workload: $l")
+        end
+    end
+    need(ok, "juliac failed (see $log)")
     finish(work, "julia")
 end
 
@@ -953,6 +1242,28 @@ function jll_libraries(project::AbstractString)::Vector{NTuple{4,String}}
 end
 
 """
+    jll_search_env(dir, libs) -> Pair{String,String}
+
+Copies the JLL libraries of `libs` into `dir` under their bare names and returns the
+environment variable (`LD_LIBRARY_PATH`, `DYLD_FALLBACK_LIBRARY_PATH` or `PATH`) that
+lets the loader find them there. The preferences of `write_jll_preferences` make every
+JLL open its library by bare name, also while the packages precompile and while the
+workload runs inside the build, so the build process needs those names to resolve (the
+finished executable finds them beside itself).
+"""
+function jll_search_env(dir, libs)
+    mkpath(dir)
+    for (_, _, _, path) in libs
+        cp(path, joinpath(dir, basename(path)); force = true, follow_symlinks = true)
+    end
+    var =
+        Sys.iswindows() ? "PATH" :
+        Sys.isapple() ? "DYLD_FALLBACK_LIBRARY_PATH" : "LD_LIBRARY_PATH"
+    old = get(ENV, var, "")
+    return var => isempty(old) ? dir : dir * (Sys.iswindows() ? ";" : ":") * old
+end
+
+"""
     write_jll_preferences(dir, libs) -> String
 
 Writes an environment `dir` that sets the preference `<product>_path` of each JLL of
@@ -1029,8 +1340,43 @@ Libraries of the Julia installation that the app never loads: its own test libra
 default system image `sys.so` (traced with `LD_DEBUG=files`: a juliac executable never
 loads it, it carries its own compiled code).
 """
-const RUNTIME_SKIP =
-    r"^(libccalltest|libccalllazy|libllvmcalltest)|\.debug$|^libgcc_s\.so$|^sys\.(so|dylib|dll)$"
+const RUNTIME_SKIP = Regex(
+    "^(libccalltest|libccalllazy|libllvmcalltest)|\\.debug\$|^libgcc_s\\.so\$|" *
+    "^sys\\.(so|dylib|dll)\$|" *
+    "^(libgit2|libuv|libdSFMT|libgmpxx)\\.(so|dylib|dll)",
+)
+
+"""
+Files of the frozen Python tools that propka and pdb2pqr never load, as paths relative to
+`lib/pytools`: `numpy/random` is imported lazily and neither tool imports it (checked on
+1CRN with the propka titration, the result is byte-identical without it). The numpy BLAS
+(`libscipy_openblas64_*`) is NOT here: `numpy/_core/_multiarray_umath.so` needs it, and
+pdb2pqr fails to import numpy without it (checked).
+"""
+const PYTOOLS_SKIP = r"^numpy/random/[^/]+\.(so|dylib|pyd)$"
+
+"""
+    prune_pytools(dir) -> Int
+
+Removes the files of `dir` (the copy of the frozen tools in the bundle) that match
+`PYTOOLS_SKIP`.
+
+# Returns
+The bytes freed.
+
+# Exceptions
+None.
+"""
+function prune_pytools(dir::AbstractString)::Int
+    freed = 0
+    for (d, _, files) in walkdir(dir), f in files
+        path = joinpath(d, f)
+        occursin(PYTOOLS_SKIP, replace(relpath(path, dir), '\\' => '/')) || continue
+        freed += filesize(path)
+        rm(path)
+    end
+    return freed
+end
 
 """
     runtime_files(dir) -> Vector{Pair{String,String}}
@@ -1082,6 +1428,242 @@ function version_line()
     return "v" * field("version") * " " * field("release_name")
 end
 
+# --- strip: the symbols of the bundle's own copies
+
+"The one strip program, LLVM's: it reads ELF, Mach-O and PE, so no system needs another."
+const STRIP_TOOL = "llvm-strip"
+
+"Most files one `strip` command line takes (a long list is split, never one huge line)."
+const STRIP_CHUNK = 100
+
+"The first bytes of the files strip can handle: ELF, Mach-O (thin and fat) and PE."
+const BINARY_MAGIC = [
+    UInt8[0x7f, 0x45, 0x4c, 0x46],
+    UInt8[0xfe, 0xed, 0xfa, 0xce], UInt8[0xfe, 0xed, 0xfa, 0xcf],
+    UInt8[0xce, 0xfa, 0xed, 0xfe], UInt8[0xcf, 0xfa, 0xed, 0xfe],
+    UInt8[0xca, 0xfe, 0xba, 0xbe],
+    UInt8[0x4d, 0x5a],  # PE (Windows): "MZ"
+]
+
+"""
+    binary_file(path) -> Bool
+
+True when `path` is a regular file (not a link) that starts with an ELF, Mach-O or PE magic
+number, so that scripts and linker scripts named `.so` are left alone.
+
+# Returns
+`true` or `false`.
+
+# Exceptions
+None: an unreadable file is not a binary.
+"""
+function binary_file(path::AbstractString)::Bool
+    (isfile(path) && !islink(path)) || return false
+    head = try
+        open(io -> read(io, 4), path)
+    catch
+        return false
+    end
+    return any(m -> length(head) >= length(m) && head[1:length(m)] == m, BINARY_MAGIC)
+end
+
+"""
+    strip_targets(dir, exes) -> (libs, exes)
+
+The files of `dir` to strip: every shared library (`.so`, `.so.N`,
+`.dylib`, `.dll`) that is a binary, and the executables named in `exes`
+(paths) that are binaries. Links are skipped, so a file is stripped once.
+
+# Returns
+Two sorted vectors of paths.
+
+# Exceptions
+Whatever `walkdir` throws for an unreadable folder.
+"""
+function strip_targets(dir::AbstractString, exes)
+    libs = String[]
+    for (d, _, names) in walkdir(dir), n in names
+        occursin(r"\.(so(\.\d+)*|dylib|dll)$"i, n) || continue
+        path = joinpath(d, n)
+        binary_file(path) && push!(libs, path)
+    end
+    return sort!(libs), sort!(String[e for e in exes if binary_file(e)])
+end
+
+"The `files` in lists of at most `STRIP_CHUNK`, each behind `head` (an argument vector)."
+function strip_lines(head::Vector{String}, files)
+    files = String.(files)
+    return [
+        vcat(head, files[i:min(i+STRIP_CHUNK-1, end)]) for
+        i in 1:STRIP_CHUNK:length(files)
+    ]
+end
+
+"""
+    strip_linux(tool, libs, exes) -> Vector{Vector{String}}
+
+The `llvm-strip` command lines: `--strip-all` on the libraries and on the executables
+(measured on linux-aarch64: the Julia metadata, hence the stack-trace file:line, is not
+DWARF and survives; 12 fit runs of each variant passed; llvm's `--strip-all` removes only
+17 KB more than `--strip-unneeded`, which is free). Pure: nothing is run.
+
+# Returns
+Argument vectors, `tool` first.
+
+# Exceptions
+None.
+"""
+function strip_linux(tool::AbstractString, libs, exes)
+    tool = String(tool)
+    return vcat(
+        strip_lines([tool, "--strip-all"], libs),
+        strip_lines([tool, "--strip-all"], exes),
+    )
+end
+
+"""
+    strip_macos(tool, libs, exes) -> Vector{Vector{String}}
+
+The macOS `llvm-strip` command lines: `-x` (local symbols) on the dylibs, `-S -x` (debug
+and local symbols) on the executables. Pure. Best effort, untested until the owner builds
+on a Mac (stripping also invalidates a code signature, so sign after it).
+
+# Returns
+Argument vectors, `tool` first.
+
+# Exceptions
+None.
+"""
+function strip_macos(tool::AbstractString, libs, exes)
+    tool = String(tool)
+    return vcat(strip_lines([tool, "-x"], libs), strip_lines([tool, "-S", "-x"], exes))
+end
+
+"""
+    strip_windows(tool, libs, exes) -> Vector{Vector{String}}
+
+The Windows `llvm-strip` command lines (it reads PE/COFF): `--strip-all` on the
+DLLs and the executables. Pure. Best effort, untested until the owner builds on Windows.
+
+# Returns
+Argument vectors, `tool` first.
+
+# Exceptions
+None.
+"""
+function strip_windows(tool::AbstractString, libs, exes)
+    tool = String(tool)
+    return vcat(
+        strip_lines([tool, "--strip-all"], libs),
+        strip_lines([tool, "--strip-all"], exes),
+    )
+end
+
+"""
+    strip_command_lines(os, tool, libs, exes) -> Vector{Vector{String}}
+
+The command lines for `os` (`:linux`, `:macos` or `:windows`); each platform has its own
+function ([`strip_linux`](@ref), [`strip_macos`](@ref), [`strip_windows`](@ref)).
+
+# Returns
+Argument vectors.
+
+# Exceptions
+A `ToolError` for an unknown `os`.
+"""
+function strip_command_lines(os::Symbol, tool, libs, exes)
+    os === :linux && return strip_linux(tool, libs, exes)
+    os === :macos && return strip_macos(tool, libs, exes)
+    os === :windows && return strip_windows(tool, libs, exes)
+    throw(ToolError("$WHO: no strip for the system $os", 1))
+end
+
+"The system as [`strip_command_lines`](@ref) names it."
+this_os() = Sys.iswindows() ? :windows : Sys.isapple() ? :macos : :linux
+
+"Total size in bytes of the files below `dir` (links not followed)."
+function tree_bytes(dir::AbstractString)
+    total = 0
+    for (d, _, names) in walkdir(dir), n in names
+        p = joinpath(d, n)
+        islink(p) || (total += filesize(p))
+    end
+    return total
+end
+
+"Bytes as MiB with one decimal."
+mib_text(bytes) = round(bytes / 2^20; digits = 1)
+
+"""
+    strip_binary(path; os = this_os(), tool = nothing) -> Bool
+
+Strips one executable with the command of [`strip_command_lines`](@ref). The Node binary
+of the terminal interface goes through here BEFORE `postject` injects the blob: any strip
+of the finished `baysol-tui` moves the injected segment and the program prints nothing
+(measured), while a stripped Node takes the blob and runs (147 to 112 MiB on linux-aarch64).
+
+# Returns
+`true` when stripped, `false` (with a warning in the report) when there is no `llvm-strip`.
+
+# Exceptions
+A `ToolError` when the strip command fails.
+"""
+function strip_binary(path::AbstractString; os::Symbol = this_os(), tool = nothing)
+    tool === nothing && (tool = Sys.which(STRIP_TOOL))
+    if tool === nothing
+        note("  strip: WARNING, $(basename(path)) left unstripped (no $STRIP_TOOL)";
+            terminal = true)
+        return false
+    end
+    for l in strip_command_lines(os, tool, String[], [path])
+        need(rc(Cmd(l)), "strip failed: $(basename(path))")
+    end
+    return true
+end
+
+"""
+    strip_bundle(out, exes; os = this_os(), tool = nothing) -> Bool
+
+Strips the copies in the bundle folder `out` (never the Julia installation they came
+from): every shared library and the executables `exes`, and adds the size before and
+after to the report. Without a `strip` program, or on a system with none, it warns in the
+report and on the terminal and leaves the files as they are.
+
+# Returns
+`true` when stripped, `false` when skipped.
+
+# Exceptions
+A `ToolError` when a `strip` command fails.
+"""
+function strip_bundle(out::AbstractString, exes; os::Symbol = this_os(), tool = nothing)
+    before = tree_bytes(out)
+    libs, bins = strip_targets(out, exes)
+    lines = try
+        tool === nothing && (tool = Sys.which(STRIP_TOOL))
+        tool === nothing &&
+            throw(ToolError("$WHO: no $STRIP_TOOL program on the PATH", 1))
+        strip_command_lines(os, tool, libs, bins)
+    catch e
+        e isa ToolError || rethrow()
+        note(
+            "  strip: WARNING, left unstripped ($(e.message)); " *
+            "the bundle is $(mib_text(before)) MiB";
+            terminal = true,
+        )
+        return false
+    end
+    for l in lines
+        need(rc(Cmd(l)), "strip failed: $(join(l[1:min(end, 3)], ' ')) ...")
+    end
+    after = tree_bytes(out)
+    note(
+        "  strip: $(length(libs)) libraries, $(length(bins)) executables, " *
+        "$(mib_text(before)) MiB -> $(mib_text(after)) MiB " *
+        "(saved $(mib_text(before - after)) MiB)",
+    )
+    return true
+end
+
 "Stage `bundle`: puts the parts together in `<work>/bundle/baysol`."
 function stage_bundle(work)
     root = Common.root()
@@ -1098,6 +1680,8 @@ function stage_bundle(work)
     cp(joinpath(work, "tui", exe("baysol-tui")), joinpath(out, exe("baysol-tui")))
     mkpath(joinpath(out, "lib"))
     cp(joinpath(work, "pytools", "baysol-pytools.dist"), joinpath(out, "lib", "pytools"))
+    freed = prune_pytools(joinpath(out, "lib", "pytools"))
+    note("  pytools: $(round(freed / 2^20; digits = 1)) MiB of unused numpy files left out")
     copy_runtime(joinpath(out, "julia"))
     # only the icon of this system, and the script that starts the terminal interface
     pack_icon(joinpath(out, icon_file()), joinpath(root, "icons"))
@@ -1105,6 +1689,13 @@ function stage_bundle(work)
     write(joinpath(out, name), text)
     Sys.iswindows() || chmod(joinpath(out, name), 0o755)
     cp(joinpath(root, "LICENSE"), joinpath(out, "LICENSE"))
+    # last: every file is in place and patchelf is done; only the bundle's copies are
+    # touched, never the Julia installation they came from
+    strip_bundle(out,
+        [
+            joinpath(out, exe("baysol")),
+            joinpath(out, "lib", "pytools", exe("baysol-pytools")),
+        ])
     finish(work, "bundle")
 end
 
@@ -1124,6 +1715,98 @@ function make_archive(work, archive)
         `$sevenzip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15 $archive $(joinpath(work, "bundle", "baysol"))`,
     )
     need(ok && isfile(archive), "the archive was not written")
+end
+
+# --- cold caches
+
+"The caches inside the scratch folder (names of folders there) that are always deleted."
+const COLD_CACHES = ["depot", "uv-cache", "nuitka-cache", "fit-cache"]
+
+"""
+    cold_env(work) -> Dict{String,String}
+
+The environment of every program of a build: a Julia depot of its own (`JULIA_DEPOT_PATH`:
+compiled caches, artifacts and scratch spaces; `JULIAUP_DEPOT_PATH` keeps the `julia`
+launcher finding the user's installation), and uv, Nuitka and the fit structures cache
+(`BAYSOL_CACHE`) inside `work`, so nothing is taken from a warm cache of the user.
+
+# Returns
+The variables, `name => value`.
+
+# Exceptions
+None.
+"""
+function cold_env(work::AbstractString)::Dict{String,String}
+    juliaup = get(ENV, "JULIAUP_DEPOT_PATH") do
+        first(Base.DEPOT_PATH)
+    end
+    return Dict(
+        "JULIA_DEPOT_PATH" => joinpath(work, "depot"),
+        "JULIAUP_DEPOT_PATH" => juliaup,
+        "UV_CACHE_DIR" => joinpath(work, "uv-cache"),
+        "NUITKA_CACHE_DIR" => joinpath(work, "nuitka-cache"),
+        "BAYSOL_CACHE" => joinpath(work, "fit-cache"),
+    )
+end
+
+"""
+    looks_like_work(work) -> Bool
+
+Whether `work` is a scratch folder of this tool: named `baysol-pkg-work*` and holding a
+stage marker or the `logs` folder, so a folder of anything else is never removed.
+"""
+function looks_like_work(work::AbstractString)::Bool
+    startswith(basename(rstrip(work, '/')), "baysol-pkg-work") || return false
+    isdir(work) || return false
+    return isdir(joinpath(work, "logs")) || any(s -> done(work, s), STAGES)
+end
+
+"""
+    remove_caches(work) -> Int
+
+Deletes the cold caches of `COLD_CACHES` below `work` (never anything else there).
+
+# Returns
+How many folders were removed.
+
+# Exceptions
+A `ToolError` when `work` is not a scratch folder of this tool.
+"""
+function remove_caches(work::AbstractString)::Int
+    looks_like_work(work) || throw(ToolError("$WHO: refusing to clean $work", 1))
+    n = 0
+    for c in COLD_CACHES
+        p = joinpath(work, c)
+        isdir(p) || continue
+        rm(p; recursive = true, force = true)
+        n += 1
+    end
+    return n
+end
+
+"""
+    ensure_depot(work, julia)
+
+Installs the packages of the projects the build's Julia programs use (the app, the unit
+suite and the fitting tests) into the build's own depot, once (`depot.done`), so the
+first program does not fail on an empty depot. Needs the network.
+
+# Exceptions
+A `ToolError` when an install fails.
+"""
+function ensure_depot(work::AbstractString, julia::AbstractString)
+    done(work, "depot") && return nothing
+    for rel in ("tui/julia", "test", "test/fitting_tests")
+        project = joinpath(Common.root(), split(rel, '/')...)
+        step("julia packages $rel (cold depot)",
+            () -> run_env(
+                `$julia --startup-file=no --project=$project
+                -e "using Pkg; Pkg.instantiate()"`,
+                Dict{String,String}()); top = true) ||
+            throw(ToolError("$WHO: packages of $rel could not be installed", 1))
+    end
+    finish(work, "depot")
+    return nothing
 end
 
 """
@@ -1183,7 +1866,7 @@ function run(argv::Vector{String})::Int
         return 0
     end
     a = split_args(WHO, ["--out", "--work", "--workload", "--stage"],
-        ["--dry-run", "--keep-work"], argv)
+        ["--dry-run", "--keep-work", "--resume"], argv)
     isempty(a.specs) || fail(WHO, "unexpected argument $(first(a.specs))")
     opts = Dict(a.opts)
     archive = joinpath(abspath(get(opts, "--out", pwd())), this_archive())
@@ -1199,30 +1882,64 @@ function run(argv::Vector{String})::Int
     println("stages: ", join(STAGES, " > "), "   archive: ", archive, "   work: ", work)
     "--dry-run" in a.flags && return all(first, cs) ? 0 : 1
     all(first, cs) || return 1
+    resume = "--resume" in a.flags || only !== nothing
+    if !resume && ispath(work)
+        looks_like_work(work) ||
+            fail(WHO, "$work exists and is not this tool's folder (remove it yourself)")
+        rm(work; recursive = true, force = true)  # cold: nothing of an earlier build
+    end
     mkpath(work)
     workload = get(opts, "--workload", nothing)
-    for s in STAGES
-        only !== nothing && s != only && continue
-        if done(work, s) && only === nothing
-            println("stage $s: done before, skipped")
-            continue
-        end
-        println("stage $s ...")
-        t = @elapsed if s == "pytools"
-            stage_pytools(work)
-        elseif s == "tui"
-            stage_tui(work)
-        elseif s == "trace"
-            stage_trace(work)
-        elseif s == "julia"
-            stage_julia(work, workload_folder(work, workload))
-        else
-            stage_bundle(work)
-            only === nothing && make_archive(work, archive)
-        end
-        println("stage $s: ", round(t; digits = 1), " s")
+    REAL_OUT[] = stdout
+    empty!(REPORT)
+    LOG_DIR[] = mkpath(joinpath(work, "logs"))
+    report = joinpath(dirname(archive), "baysol-pkg-report.txt")
+    t_all = time()
+    failed = false
+    cold = cold_env(work)
+    for (k, v) in cold
+        k == "JULIAUP_DEPOT_PATH" || mkpath(v)
     end
+    # every child program (and this process's own `withenv` users) sees the cold caches
+    withenv(cold...) do
+        try
+            ensure_depot(work, find_julia())
+        catch e
+            e isa ToolError || rethrow()
+            note("depot: $(e.message)"; terminal = true)
+            failed = true
+        end
+        for s in STAGES
+            failed && break
+            only !== nothing && s != only && continue
+            if done(work, s) && only === nothing && resume
+                note(rpad(s, 10) * " skipped (done before)"; terminal = true)
+                continue
+            end
+            ok = step("stage $s",
+                () -> if s == "pytools"
+                    stage_pytools(work)
+                elseif s == "tui"
+                    stage_tui(work)
+                elseif s == "trace"
+                    stage_trace(work)
+                elseif s == "julia"
+                    stage_julia(work, workload_folder(work, workload))
+                else
+                    stage_bundle(work)
+                    only === nothing &&
+                        step("archive (7-Zip)", () -> make_archive(work, archive))
+                end; top = true)
+            write_report(report, archive)
+            ok || (failed = true; break)
+        end
+    end
+    note("total      $(round((time() - t_all) / 60; digits = 1)) min"; terminal = true)
+    write_report(report, archive)
+    println("report: ", report)
+    failed && return 1
     if only === nothing
+        remove_caches(work)  # always: the depot and the other caches are never kept
         "--keep-work" in a.flags || remove_work(work)
         println("archive: ", archive)
     end

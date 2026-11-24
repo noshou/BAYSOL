@@ -41,7 +41,8 @@ import type { Drafts, SequenceKind, } from "./lists.js"
 export interface Solute {
     kind: string
     name: string
-    arg: string
+    /** The bundled name; a custom row has none. */
+    arg?: string
     /** The concentration in mM; `null` until typed. */
     mM: number | null
     /** The uncertainty of the concentration in mM; `null` until typed. */
@@ -72,7 +73,7 @@ export function bufferRow(s: Solute): Record<string, unknown> {
  */
 export function soluteOf(row: BufferRow): Solute {
     const { "sigmaMm": sigmaMM, ...rest } = row as BufferRow & Record<string, unknown>
-    return { ...rest, sigmaMM } as unknown as Solute
+    return { ...rest, sigmaMM } as Solute
 }
 
 /**
@@ -82,7 +83,7 @@ export function soluteOf(row: BufferRow): Solute {
  *     (`soluteProblem` of the screens).
  */
 export function rowOf(s: Solute): BufferRow {
-    return bufferRow(s) as unknown as BufferRow
+    return bufferRow(s) as BufferRow
 }
 
 /** Tells what a buffer row lacks for the Julia loader (the check of the buffer file). */

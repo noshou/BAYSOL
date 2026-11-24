@@ -54,7 +54,17 @@ It records `home`, `cache`, `structureCache`, `desktop`, `desktopIcon`, `taskbar
 
 ### The icon
 
-`bysl pkg` packs the hand-made PNG sizes of `icons/` (`icon_NxN.png`, `icon_NxN@2x.png`; nothing is resized or generated) into the one icon file at the root of the bundle. On Linux the wizard unpacks each size into `$XDG_DATA_HOME/icons/hicolor/<N>x<N>/apps/baysol.png` (1024 px as `512x512@2`) and the desktop entries say `Icon=baysol`, so the desktop picks the size that fits the place (menu, dock, Desktop) and scales the nearest one for a size that is missing. Without PNG sizes in the file the entries use a generic icon. Repair restores missing sizes, and uninstall removes them again.
+`bysl pkg` packs the hand-made PNG sizes of `icons/` (`icon_NxN.png`, `icon_NxN@2x.png`; nothing is resized or generated) into the one icon file at the root of the bundle. On Linux the wizard unpacks each size into `$XDG_DATA_HOME/icons/hicolor/<N>x<N>/apps/baysol.png` (1024 px as `512x512@2`) and the desktop entries say `Icon=baysol`, so the desktop picks the size that fits the place (menu, dock, Desktop) and scales the nearest one for a size that is missing. Without PNG sizes in the file the entries use a generic icon. Repair restores missing sizes, and uninstall removes them again. After the files are written the wizard runs `gtk-update-icon-cache` (only where the user theme already has a cache) and `update-desktop-database`, each only if installed.
+
+| System  | What the wizard installs for the icon                                                                                             | Status   |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Linux   | the hicolor PNGs above and `~/.local/share/applications/baysol.desktop` (`Icon=baysol`, `Exec` the bundle's `baysol`)            | tested   |
+| macOS   | `~/Applications/BAYSOL.app`: `Contents/Info.plist` (names the icon), `Contents/Resources/baysol.icns`, a script in `Contents/MacOS` that opens `BAYSOL.command` in Terminal | untested |
+| Windows | `baysol.ico` copied beside `install.json` and a Start Menu shortcut `BAYSOL.lnk` to `baysol.exe` (made through PowerShell `WScript.Shell`) | untested |
+
+### The install manifest
+
+Every file and folder the wizard makes for the icons, entries and the PATH link is listed in `install-manifest.txt`, beside `install.json` (`file<TAB>path`, `dir<TAB>path`; folders only the levels that were new). Uninstall removes exactly what the manifest names (folders only when they are empty, a link only when it points into the bundle) and then the manifest. Without a manifest it removes no icons or entries.
 
 ## Exit status
 
