@@ -223,7 +223,8 @@ end
     @test occursin("source leaprc.gaff2", P.Rism.LEAP_INPUT)
     with(P.Config.AMBER => "/opt/amber") do
         @test P.Config.amber_home() == "/opt/amber"
-        @test P.Rism.xvv() == "/opt/amber/dat/rism1d/cSPCE/cSPCE_kh.xvv"
+        @test P.Rism.xvv() ==
+              joinpath("/opt/amber", "dat", "rism1d", "cSPCE", "cSPCE_kh.xvv")
         @test first(P.Config.amber_env()) == ("PATH" => "/opt/amber/bin:" * ENV["PATH"])
     end
     block = P.Rism.embed("CCO", 7)

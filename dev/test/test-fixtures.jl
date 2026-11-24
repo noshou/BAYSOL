@@ -100,7 +100,7 @@ end
         @test FS.tmp_root("synthetic") == joinpath(FS.REPO, "_cache", "synthetic")
     end
     withenv("BAYSOL_FIXTURES_SYNTHETIC" => "/tmp/x-syn") do
-        @test FS.tmp_root("synthetic") == "/tmp/x-syn"
+        @test FS.tmp_root("synthetic") == normpath("/tmp/x-syn")
     end
     if Sys.which("7z") !== nothing
         base = mktempdir()
