@@ -43,9 +43,9 @@ const TARGET_HELP = """
     --set NAME  the archive set, one of
                 $(join(FixtureStore.set_names(), ", ")) (default experiments)
     --root DIR  any folder with one <name>.7z per item instead of a set (its tmp root
-                is \$BAYSOL_FIXTURES_<FOLDER NAME> or <repo>/_cache/<folder name>)
+                is \$BAYSOL_FIXTURES_<FOLDER NAME> or <cache>/fixtures/<folder name>)
     --tmp DIR   unpack into DIR instead of the set's tmp root (\$BAYSOL_FIXTURES for
-                experiments, \$BAYSOL_FIXTURES_<SET>, else <repo>/_cache/<set>)"""
+                experiments, \$BAYSOL_FIXTURES_<SET>, else <cache>/fixtures/<set>)"""
 
 # The archive set the options name: `(; set, base, root, explicit)`; `explicit` is true
 # when `--set` or `--root` was given.

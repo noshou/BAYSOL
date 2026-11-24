@@ -2,6 +2,7 @@
 
 using Test
 using BAYSOLSetup
+const Platform = BAYSOLSetup.Platform
 using BAYSOLSetup: targets, defaultThreads, desktopDir, desktopEntry, _pinned, _unpinned,
     iconPngs, iconFiles, hicolorDir, ICON_FILE, readManifest, manifestFile,
     _installMacApp!, _installWindows!
@@ -24,26 +25,43 @@ function fakeIcns(file, sizes)
     return write(file, vcat(codeunits("icns"), be(8 + length(body)), body))
 end
 
+# the variables that place the data, cache and configuration folders: XDG on Linux, the
+# Windows ones on Windows (where data and cache share LOCALAPPDATA); macOS has none
+function placeEnv(d; data = joinpath(d, "d"), cache = joinpath(d, "c"),
+    config = joinpath(d, "cfg"))
+    Platform.iswindows() && return Dict("LOCALAPPDATA" => data, "APPDATA" => config)
+    return Dict("XDG_DATA_HOME" => data, "XDG_CACHE_HOME" => cache,
+        "XDG_CONFIG_HOME" => config)
+end
+# where the folders land for `placeEnv` (macOS ignores the variables, so it is not asked)
+winOr(win, other) = Platform.iswindows() ? win : other
+
 # every path goes into a temporary folder: no test touches the real home
 @testset "BAYSOLSetup" begin
     home = mktempdir()
-    env = Dict(
-        "XDG_DATA_HOME" => joinpath(home, "d"),
-        "XDG_CACHE_HOME" => joinpath(home, "c"),
-        "XDG_CONFIG_HOME" => joinpath(home, "cfg"),
-    )
+    env = placeEnv(home)
     @testset "defaults follow XDG, a relative XDG value is ignored" begin
         d = defaultInstall(; env, home)
-        @test d.home == joinpath(home, "d", "baysol")
-        @test d.cache == joinpath(home, "c", "baysol", "_cache")
-        @test installFile(; env, home) == joinpath(home, "cfg", "baysol", "install.json")
-        rel = Dict("XDG_DATA_HOME" => "relative/path")
-        stock = joinpath(home, ".local", "share", "baysol")
+        if !Platform.ismacos()
+            @test d.home == joinpath(home, "d", "baysol")
+            @test d.structureCache ==
+                  winOr(joinpath(home, "d", "baysol-cache", "_structures"),
+                joinpath(home, "c", "baysol", "_structures"))
+            @test !hasfield(Install, :cache)  # the separate cache folder is gone
+            @test installFile(; env, home) ==
+                  joinpath(home, "cfg", "baysol", "install.json")
+        end
+        rel = Dict("XDG_DATA_HOME" => "relative/path", "LOCALAPPDATA" => "relative/path")
+        stock =
+            Platform.iswindows() ? joinpath(home, "AppData", "Local", "baysol") :
+            Platform.ismacos() ?
+            joinpath(home, "Library", "Application Support", "baysol") :
+            joinpath(home, ".local", "share", "baysol")
         @test defaultInstall(; env = rel, home).home == stock
     end
     @testset "install.json round trip, odd characters, damaged file" begin
         f = joinpath(home, "x", "install.json")
-        i = Install(; home = "/a \"b\"/c\\d", cache = "/k", structureCache = "/s",
+        i = Install(; home = "/a \"b\"/c\\d", structureCache = "/s",
             desktop = true)
         writeInstall(f, i)
         @test readInstall(f) == i
@@ -56,42 +74,52 @@ end
     write(joinpath(bundle, "baysol"), "#!/bin/sh\n")
     @testset "check finds what is wrong and applyInstall repairs it" begin
         d = mktempdir()
-        e = Dict("XDG_DATA_HOME" => joinpath(d, "d"),
-            "XDG_CONFIG_HOME" => joinpath(d, "cfg"))
+        e = placeEnv(d)
         b = mkpath(joinpath(d, "bundle"))
         c = check(b; env = e, home = d)
         @test any(occursin("install.json is missing", x) for x in c.fixable)
         @test length(c.missing) == length(BAYSOLSetup.BUNDLE_FILES)
-        i = Install(; home = joinpath(d, "h"), cache = joinpath(d, "c"),
-            structureCache = joinpath(d, "s"), desktop = true, pathLink = true)
+        i = Install(;
+            home = joinpath(d, "h"),
+            structureCache = joinpath(d, "s"),
+            desktop = true,
+            pathLink = true,
+        )
         applyInstall(i, b; env = e, home = d)
         @test isempty(check(b; env = e, home = d).fixable)
-        rm(i.cache; recursive = true)
-        rm(targets(; env = e, home = d).desktop)
+        rm(i.structureCache; recursive = true)
+        # the menu entry (Linux), the Start Menu shortcut (Windows)
+        entry =
+            Platform.iswindows() ? targets(; env = e, home = d).lnk :
+            targets(; env = e, home = d).desktop
+        Platform.ismacos() || rm(entry)
         write(installFile(; env = e, home = d), "{ broken")
         c = check(b; env = e, home = d)
         @test any(occursin("damaged", x) for x in c.fixable)
         write(installFile(; env = e, home = d), "")
         writeInstall(installFile(; env = e, home = d), i)
         c = check(b; env = e, home = d)
-        @test length(c.fixable) == 2  # cache folder and desktop entry
+        # cache folder and desktop entry (macOS: only the cache folder, the app is kept)
+        @test length(c.fixable) == (Platform.ismacos() ? 1 : 2)
         applyInstall(i, b; env = e, home = d)
         @test isempty(check(b; env = e, home = d).fixable)
     end
     @testset "desktop icon, pin lists, new icon" begin
         d = mktempdir()
-        e = Dict("XDG_DATA_HOME" => joinpath(d, "d"),
-            "XDG_CONFIG_HOME" => joinpath(d, "cfg"), "XDG_CURRENT_DESKTOP" => "KDE")
+        e = merge(placeEnv(d), Dict("XDG_CURRENT_DESKTOP" => "KDE"))
         @test desktopDir(; env = e, home = d) == joinpath(d, "Desktop")
-        if Sys.islinux()
+        if Platform.islinux()
             mkpath(joinpath(d, "cfg"))
             write(joinpath(d, "cfg", "user-dirs.dirs"),
                 "XDG_DESKTOP_DIR=\"\$HOME/Schreibtisch\"\n")
             @test desktopDir(; env = e, home = d) == joinpath(d, "Schreibtisch")
             b = mkpath(joinpath(d, "bundle"))
             fakeIcns(joinpath(b, ICON_FILE), ["icp4" => 16, "ix22" => 22, "ic10" => 1024])
-            i = Install(; home = joinpath(d, "h"), cache = joinpath(d, "c"),
-                structureCache = joinpath(d, "s"), desktopIcon = true, taskbarPin = true,
+            i = Install(;
+                home = joinpath(d, "h"),
+                structureCache = joinpath(d, "s"),
+                desktopIcon = true,
+                taskbarPin = true,
             )
             log = applyInstall(i, b; env = e, home = d)  # no Desktop folder yet
             t = targets(; env = e, home = d)
@@ -130,22 +158,22 @@ end
         @test _pinned(["baysol.desktop"], "baysol.desktop") == ["baysol.desktop"]
         @test _unpinned(["a.desktop", "baysol.desktop"], "baysol.desktop") == ["a.desktop"]
         f = joinpath(d, "i.json")
-        j = Install(; home = "/a", cache = "/k", structureCache = "/s",
+        j = Install(; home = "/a", structureCache = "/s",
             desktopIcon = true, taskbarPin = true)
         writeInstall(f, j)
         @test readInstall(f) == j
     end
     @testset "uninstall removes only what the manifest names" begin
         d = mktempdir()
-        e = Dict(
-            "XDG_DATA_HOME" => joinpath(d, "d"),
-            "XDG_CONFIG_HOME" => joinpath(d, "cfg"),
-        )
+        e = placeEnv(d)
         b = mkpath(joinpath(d, "bundle"))
         fakeIcns(joinpath(b, ICON_FILE), ["icp4" => 16, "ic08" => 256])
-        i = Install(; home = joinpath(d, "h"), cache = joinpath(d, "c"),
-            structureCache = joinpath(d, "s"), desktop = true)
-        if Sys.islinux()
+        i = Install(;
+            home = joinpath(d, "h"),
+            structureCache = joinpath(d, "s"),
+            desktop = true,
+        )
+        if Platform.islinux()
             applyInstall(i, b; env = e, home = d)
             m = readManifest(manifestFile(; env = e, home = d))
             files = [p for (k, p) in m if k == "file"]
@@ -210,14 +238,17 @@ end
 
     @testset "a failed apply is undone" begin
         d = mktempdir()
-        e = Dict("XDG_DATA_HOME" => joinpath(d, "d"),
-            "XDG_CONFIG_HOME" => joinpath(d, "cfg"))
+        e = placeEnv(d)
         old = joinpath(d, "old")
         mkpath(old)
         # the structure cache sits under a plain file, so its mkpath fails midway
         write(joinpath(d, "file"), "x")
-        i = Install(; home = joinpath(d, "new", "h"), cache = joinpath(d, "c"),
-            structureCache = joinpath(d, "file", "s"), desktop = true, pathLink = true)
+        i = Install(;
+            home = joinpath(d, "new", "h"),
+            structureCache = joinpath(d, "file", "s"),
+            desktop = true,
+            pathLink = true,
+        )
         journal = Function[]
         @test_throws Exception applyInstall(i, d; env = e, home = d, journal)
         rollback!(journal)
@@ -227,17 +258,33 @@ end
         # a good apply over an existing entry and link restores them on rollback
         b = mkpath(joinpath(d, "bundle"))
         t = targets(; env = e, home = d)
-        mkpath(dirname(t.desktop))
-        write(t.desktop, "mine")
-        mkpath(dirname(t.link))
-        symlink("/usr/bin/env", t.link)
-        good = Install(; home = joinpath(d, "h"), cache = joinpath(d, "c2"),
-            structureCache = joinpath(d, "s2"), desktop = true, pathLink = true)
+        # a menu entry of the user's (Linux only: Windows has a shortcut, made afresh)
+        if Platform.islinux()
+            mkpath(dirname(t.desktop))
+            write(t.desktop, "mine")
+        end
+        # the PATH link is made on Unix only (a symlink needs a privilege on Windows)
+        if Platform.isunix()
+            mkpath(dirname(t.link))
+            symlink("/usr/bin/env", t.link)
+        end
+        good = Install(;
+            home = joinpath(d, "h"),
+            structureCache = joinpath(d, "s2"),
+            desktop = true,
+            pathLink = true,
+        )
         journal = Function[]
         applyInstall(good, b; env = e, home = d, journal)
-        @test readlink(t.link) == joinpath(b, "baysol")
+        if Platform.isunix()
+            @test readlink(t.link) == joinpath(b, "baysol")
+        end
         rollback!(journal)
-        @test read(t.desktop, String) == "mine" && readlink(t.link) == "/usr/bin/env"
+        if Platform.islinux()
+            @test read(t.desktop, String) == "mine"
+        end
+        Platform.isunix() && @test readlink(t.link) == "/usr/bin/env"
+        Platform.iswindows() && @test !ispath(t.lnk)
         @test !isdir(joinpath(d, "h")) && !isfile(installFile(; env = e, home = d))
     end
     @testset "an existing project folder is recognised and kept" begin
@@ -246,54 +293,69 @@ end
         mkpath(joinpath(d, "projects"))
         write(joinpath(d, "projects", "p.txt"), "x")
         @test hasProject(d)
-        e = Dict("XDG_CONFIG_HOME" => joinpath(d, "cfg"))
-        i = Install(; home = d, cache = joinpath(d, "c"), structureCache = joinpath(d, "s"))
+        e = placeEnv(d)
+        i = Install(; home = d, structureCache = joinpath(d, "s"))
         applyInstall(i, d; env = e, home = d)  # no error on the existing folder
         @test isfile(joinpath(d, "projects", "p.txt"))
         @test readInstall(installFile(; env = e, home = d)).home == d
     end
     @testset "first run, threads, typed paths" begin
         fresh = mktempdir()
-        e = Dict("XDG_CONFIG_HOME" => joinpath(fresh, "cfg"))
+        e = placeEnv(fresh)
         @test needsSetup(; env = e, home = fresh)
-        i = Install(; home = "/h", cache = "/c", structureCache = "/s", threads = 3)
+        i = Install(; home = "/h", structureCache = "/s", threads = 3)
         writeInstall(installFile(; env = e, home = fresh), i)
         @test !needsSetup(; env = e, home = fresh)
         @test readInstall(installFile(; env = e, home = fresh)).threads == 3
         writeInstall(installFile(; env = e, home = fresh),
-            Install(; home = " ", cache = "/c", structureCache = "/s"))
+            Install(; home = " ", structureCache = "/s"))
         @test needsSetup(; env = e, home = fresh)
         @test 1 <= defaultThreads() <= 8
-        @test cleanPath("~/a/../b"; home = "/u") == "/u/b"
-        @test cleanPath("  /x//y/ "; home = "/u") == "/x/y"
-        @test cleanPath("rel/dir"; home = "/u") == "/u/rel/dir"
+        # a POSIX-style home is absolute on Windows too, with its own separators there
+        @test cleanPath("~/a/../b"; home = "/u") == normpath("/u/b")
+        @test cleanPath("  /x//y/ "; home = "/u") == normpath("/x/y")
+        @test cleanPath("rel/dir"; home = "/u") == normpath("/u/rel/dir")
+        @test cleanPath("/"; home = "/u") == normpath("/")
+        if Platform.iswindows()
+            @test cleanPath("C:\\"; home = "C:\\u") == "C:\\"
+            @test cleanPath("C:\\x\\y\\"; home = "C:\\u") == "C:\\x\\y"
+            @test cleanPath("~\\z"; home = "C:\\u") == "C:\\u\\z"
+        end
     end
     @testset "apply makes folders, entry, link, install.json" begin
-        i = Install(; home = joinpath(home, "P"), cache = joinpath(home, "C"),
-            structureCache = joinpath(home, "S"), desktop = true, pathLink = true)
+        i = Install(;
+            home = joinpath(home, "P"),
+            structureCache = joinpath(home, "S"),
+            desktop = true,
+            pathLink = true,
+        )
         applyInstall(i, bundle; env, home)
-        @test isdir(i.home) && isdir(i.cache) && isdir(i.structureCache)
+        @test isdir(i.home) && isdir(i.structureCache)
         t = targets(; env, home)
-        if Sys.islinux()
+        if Platform.islinux()
             exec = "Exec=\"$(joinpath(bundle, "baysol"))\""
             @test occursin(exec, read(t.desktop, String))
         end
-        @test readlink(t.link) == joinpath(bundle, "baysol")
+        Platform.isunix() && @test readlink(t.link) == joinpath(bundle, "baysol")
+        Platform.iswindows() && @test isfile(t.lnk)
         @test readInstall(installFile(; env, home)) == i
         applyInstall(i, bundle; env, home)  # a second run is the same
-        @test readlink(t.link) == joinpath(bundle, "baysol")
+        Platform.isunix() && @test readlink(t.link) == joinpath(bundle, "baysol")
+        @test isempty(check(bundle; env, home).fixable)
     end
     @testset "uninstall: caches always go, projects only with data" begin
         i = readInstall(installFile(; env, home))
         write(joinpath(i.home, "project.txt"), "x")
-        write(joinpath(i.cache, "CACHEDIR.TAG"), "tag")
-        write(joinpath(i.structureCache, "foreign.txt"), "not ours")
+        write(joinpath(i.structureCache, "CACHEDIR.TAG"), "tag")
         keep = mkpath(joinpath(home, "keep-bundle"))
+        write(joinpath(keep, "baysol"), "")  # a bundle holds the program
         uninstall(keep; i, env, home)  # app and caches
         @test isfile(joinpath(i.home, "project.txt")) && !isdir(keep)
-        @test !isdir(i.cache)  # marked cache removed
-        @test isfile(joinpath(i.structureCache, "foreign.txt"))  # not marked: kept
+        @test !isdir(i.structureCache)  # marked cache removed
         @test isfile(installFile(; env, home)) == false
+        # a cache that is not marked (and not empty) is kept, with the projects removed
+        mkpath(i.structureCache)
+        write(joinpath(i.structureCache, "foreign.txt"), "not ours")
         uninstall(bundle; data = true, i, env, home)
         @test !isdir(i.home) && !isdir(bundle)
         @test isfile(joinpath(i.structureCache, "foreign.txt"))
@@ -301,14 +363,95 @@ end
     end
     @testset "a link that points elsewhere is not removed" begin
         t = targets(; env, home)
-        mkpath(dirname(t.link))
-        symlink("/usr/bin/env", t.link)
-        uninstall(mkpath(joinpath(home, "b2")); env, home)
-        @test islink(t.link)
+        if Platform.isunix()
+            mkpath(dirname(t.link))
+            symlink("/usr/bin/env", t.link)
+            uninstall(mkpath(joinpath(home, "b2")); env, home)
+            @test islink(t.link)
+        end
     end
     @testset "exit statuses: the TUI's SETUP_UNINSTALLED is the wizard's" begin
         @test UNINSTALLED == 22  # tui/src/core/file-system.ts SETUP_UNINSTALLED
         @test length(unique((0, LAUNCH_TUI, LAUNCH_CLI, UNINSTALLED))) == 4
+    end
+    @testset "default caches never sit inside the projects folder" begin
+        d = defaultInstall(; env, home)
+        @test !BAYSOLSetup._within(d.structureCache, d.home)
+        # an unrelated folder is not "within"; the folder itself and a child are
+        @test BAYSOLSetup._within(joinpath(home, "a", "b"), joinpath(home, "a"))
+        @test BAYSOLSetup._within(joinpath(home, "a"), joinpath(home, "a"))
+        @test !BAYSOLSetup._within(joinpath(home, "ab"), joinpath(home, "a"))
+        if Platform.iswindows()
+            @test d.home == joinpath(home, "d", "baysol")
+            @test d.structureCache == joinpath(home, "d", "baysol-cache", "_structures")
+        end
+    end
+    @testset "PATH link is offered except on Windows" begin
+        ch = BAYSOLSetup.shortcutChoices()
+        @test ("PATH link" in ch) == !Platform.iswindows()
+        @test length(ch) == (Platform.iswindows() ? 3 : 4)
+    end
+    @testset "_removeBundle: refusals, real removal, the PowerShell command" begin
+        scratch = mktempdir()
+        mkbundle(name) = (b = mkpath(joinpath(scratch, name));
+            write(joinpath(b, "baysol"), ""); b)
+        rb = BAYSOLSetup._removeBundle
+        recorded = Cmd[]
+        spawn(c) = (push!(recorded, c); nothing)
+        # refused: root, home, a parent of the projects folder, a folder with no program,
+        # a relative or non-normal path; nothing is spawned or deleted
+        for (p, protect) in (
+            (abspath("/"), String[]),
+            (homedir(), String[]),
+            (scratch, String[]),                       # no baysol program in it
+            (mkbundle("holds-projects"), [joinpath(scratch, "holds-projects", "p")]),
+            ("relative", String[]),
+            (joinpath(scratch, "x", "..", "y"), String[]),
+        )
+            line = rb(p, protect; spawn)
+            @test startswith(line, "kept ")
+            @test isempty(recorded)
+        end
+        @test isdir(joinpath(scratch, "holds-projects"))
+        # a plain bundle is removed for real
+        b = mkbundle("plain")
+        mkpath(joinpath(b, "lib", "deep"))
+        @test rb(b, [joinpath(scratch, "projects")]; spawn) == "removed $b"
+        @test !ispath(b)
+        @test isempty(recorded)
+        # a stray sibling is never touched
+        @test isdir(joinpath(scratch, "holds-projects"))
+        # the command: the path is in the environment, never in the script
+        for name in ("sp ace", "qu\"ote", "dollar\$env", "uni-é-ß-日本", "semi;colon'")
+            c = BAYSOLSetup._cleanupCommand(joinpath(scratch, name))
+            @test any(==("BAYSOL_GONE=" * joinpath(scratch, name)), c.env)
+            @test !any(a -> occursin(name, a), c.exec)
+            @test c.exec[1] == "powershell"
+            @test occursin("-LiteralPath \$env:BAYSOL_GONE", c.exec[end])
+            @test c.flags & Base.UV_PROCESS_DETACHED != 0
+        end
+        # an in-use bundle (Windows: rm fails) hands the removal to the spawner
+        if Platform.iswindows()
+            b = mkbundle("busy")
+            f = open(joinpath(b, "baysol"), "r")  # an open file blocks the delete
+            try
+                line = rb(b; spawn)
+                @test occursin("in use", line)
+                @test length(recorded) == 1
+                @test recorded[1].dir == scratch
+            finally
+                close(f)
+            end
+        end
+        # uninstall passes the projects folder as protected
+        keep = mkbundle("keepme")
+        i = Install(;
+            home = joinpath(keep, "projects"),
+            structureCache = joinpath(scratch, "s"),
+        )
+        log = uninstall(keep; i, env, home = mktempdir())
+        @test any(l -> startswith(l, "kept $keep") && occursin("contains", l), log)
+        @test isdir(keep)
     end
     @testset "clearCache empties only a BAYSOL cache" begin
         d = mkpath(joinpath(mktempdir(), "c"))
@@ -323,16 +466,250 @@ end
         @test occursin("kept", clearCache(f))
         @test isfile(joinpath(f, "k.txt"))
         @test occursin("no folder", clearCache(joinpath(f, "nope")))
+        # an entry that cannot be removed (a loaded library on Windows) does not stop the
+        # rest: it is kept and named, the others go
+        b = mkpath(joinpath(mktempdir(), "busy"))
+        write(joinpath(b, BAYSOLSetup.CACHE_TAG), "")
+        write(joinpath(b, "free.pdb"), "x")
+        write(joinpath(b, "locked.dll"), "y")
+        line = clearCache(
+            b;
+            remove = p ->
+                basename(p) == "locked.dll" ? error("in use") : rm(p; force = true),
+        )
+        @test occursin("1 entries", line) && occursin("kept locked.dll", line)
+        @test sort(readdir(b)) == sort([BAYSOLSetup.CACHE_TAG, "locked.dll"])
     end
     @testset "openFolder: a missing folder, and the shell runs in the folder" begin
         io = IOBuffer()
         @test !openFolder("/no/such/folder"; io, managers = Cmd[], shell = nothing)
         d = realpath(mktempdir())
         out = joinpath(d, "pwd.txt")
-        sh = `sh -c "pwd > $out"`
+        # `cd` alone prints the folder in cmd.exe, `pwd` in sh
+        sh = Platform.iswindows() ? `cmd.exe /d /c cd '>' $out` : `sh -c "pwd > $out"`
         @test openFolder(d; io, managers = Cmd[], shell = sh)
-        @test readchomp(out) == d
+        @test lowercase(readchomp(out)) == lowercase(d)
         @test occursin("No file manager", String(take!(io)))
-        @test shellCommand(; env = Dict("SHELL" => "/bin/zsh")) == `/bin/zsh`
+        if Platform.iswindows()
+            @test shellCommand(; env = Dict("COMSPEC" => raw"C:\x\cmd.exe")) ==
+                  Cmd([raw"C:\x\cmd.exe"])
+            @test shellCommand(; env = Dict("COMSPEC" => "rel")) == `cmd.exe`
+        else
+            @test shellCommand(; env = Dict("SHELL" => "/bin/zsh")) == `/bin/zsh`
+        end
+    end
+    @testset "dependency check" begin
+        items = defaultItems()
+        byId(rs, id) = only(r for r in rs if r.item.id == id)
+        # a PATH that holds only the programs named; nothing real is looked at
+        fakeWhich(names...) = n -> n in names ? "/fake/bin/$n" : nothing
+        big = (30, 100)
+        @testset "OS gating and detection" begin
+            only_win = DepItem("w", "Windows only", :optional, [:windows], "why", false,
+                Route[], Pair{Symbol,String}[])
+            r = scanDependencies([only_win]; os = :linux, which = fakeWhich(), dims = big)
+            @test !only(r).applicable && !only(r).found
+            r = scanDependencies([only_win]; os = :windows, which = fakeWhich(),
+                dims = big, detect = (i, e, w, d) -> BAYSOLSetup.Detection(true, "x"))
+            @test only(r).applicable && only(r).found
+            none = scanDependencies(; os = :linux, env = Dict{String,String}(),
+                which = fakeWhich(), dims = big)
+            @test !byId(none, "latex").found && !byId(none, "sixel").found
+            @test byId(none, "size").found
+            @test !byId(
+                scanDependencies(; env = Dict{String,String}(),
+                    which = fakeWhich(), dims = (23, 100)), "size").found
+            @test !byId(
+                scanDependencies(; env = Dict{String,String}(),
+                    which = fakeWhich(), dims = (30, 79)), "size").found
+            tex = scanDependencies(; env = Dict{String,String}(),
+                which = fakeWhich("xelatex"), dims = big)
+            @test byId(tex, "latex").found
+            @test occursin("xelatex", byId(tex, "latex").detail)
+            for (env, found) in (Dict("TERM_PROGRAM" => "iTerm.app") => true,
+                Dict("TERM_PROGRAM" => "WezTerm") => true,
+                Dict("WT_SESSION" => "x") => true,
+                Dict("KONSOLE_VERSION" => "2312") => true, Dict("TERM" => "foot") => true,
+                Dict("TERM" => "xterm-256color") => false,
+                Dict("TERM_PROGRAM" => "Apple_Terminal") => false)
+                r = scanDependencies(; env, which = fakeWhich(), dims = big)
+                @test byId(r, "sixel").found == found
+            end
+            r = scanDependencies(; env = Dict("TERM" => "xterm"),
+                which = fakeWhich("wezterm"), dims = big)
+            @test !byId(r, "sixel").found && occursin("wezterm", byId(r, "sixel").detail)
+            for v in ("truecolor", "24bit")
+                r = scanDependencies(; env = Dict("COLORTERM" => v), which = fakeWhich(),
+                    dims = big)
+                @test byId(r, "truecolor").found
+            end
+            @test !byId(
+                scanDependencies(; env = Dict("COLORTERM" => ""),
+                    which = fakeWhich(), dims = big), "truecolor").found
+        end
+        @testset "report content" begin
+            r = scanDependencies(items; os = :linux, env = Dict{String,String}(),
+                which = fakeWhich("lualatex"), dims = big)
+            io = IOBuffer()
+            dependencyReport(io, r)
+            text = String(take!(io))
+            @test occursin("present", text) && occursin("lualatex", text)
+            @test occursin("missing (optional)", text) && occursin("Sixel", text)
+            @test occursin("hint", text)
+            @test occursin("Unicode plots", text)
+            @test !occursin("Julia required", text)
+            gone = [DepResult(items[1], false, false, "")]
+            io = IOBuffer()
+            dependencyReport(io, gone)
+            @test occursin("not applicable", String(take!(io)))
+            # the check never looks for what the bundle carries
+            @test !any(
+                occursin(p, lowercase(join([i.id * i.name for i in items])))
+                for p in ("julia", "node", "python", "7-zip", "7za")
+            )
+            @test all(i -> i.level in (:optional, :info), items)
+        end
+        # an answers sequence: asks are scripted, installs are recorded and never run
+        script(picks) =
+            (p = copy(picks); (prompt, choices) -> isempty(p) ? 0 : popfirst!(p))
+        latexOnly = [items[1]]
+        @testset "no install without a yes; admin and missing manager" begin
+            ran = Cmd[]
+            runner = c -> (push!(ran, c); true)
+            io = IOBuffer()
+            # macOS cask needs admin: shown, never run, even on "Install" being absent
+            a = offerInstall(io, items[1], :macos; which = fakeWhich("brew"), runner,
+                ask = (p, c) -> (@test !("Install now" in c); 1))
+            @test a == "later" && isempty(ran)
+            @test occursin("sudo brew install --cask mactex-no-gui", String(take!(io)))
+            # Windows has no route for TeX Live: manual text, no winget needed
+            a = offerInstall(io, items[1], :windows; which = fakeWhich("winget"), runner,
+                ask = (p, c) -> 2)
+            @test a == "no" && isempty(ran)
+            @test occursin("install-tl", String(take!(io)))
+            # a route whose manager is missing falls back to the manual text
+            a = offerInstall(io, items[1], :linux; which = fakeWhich(), runner,
+                ask = (p, c) -> 3)
+            out = String(take!(io))
+            @test a == "never" && isempty(ran)
+            @test occursin("No package manager found", out) &&
+                  occursin("texlive packages", out)
+            # a runnable route (winget, no admin): only the explicit Install now runs it
+            term = items[2]
+            a = offerInstall(io, term, :windows; which = fakeWhich("winget"), runner,
+                ask = (p, c) -> 2)  # Not now
+            @test a == "later" && isempty(ran)
+            a = offerInstall(io, term, :windows; which = fakeWhich("winget"), runner,
+                ask = (p, c) -> 0)  # menu cancelled
+            @test a == "later" && isempty(ran)
+            a = offerInstall(io, term, :windows; which = fakeWhich("winget"), runner,
+                ask = (p, c) -> 1)  # Install now
+            @test a == "yes" && length(ran) == 1
+            @test ran[1] == Cmd(["/fake/bin/winget", "install", "--id",
+                "Microsoft.WindowsTerminal", "-e"])
+            # a failing install is "later", not "yes"
+            a = offerInstall(io, term, :windows; which = fakeWhich("winget"),
+                runner = c -> false, ask = (p, c) -> 1)
+            @test a == "later"
+        end
+        @testset "answers are remembered in install.json" begin
+            d = mktempdir()
+            e = placeEnv(d)
+            file = installFile(; env = e, home = d)
+            ran = Cmd[]
+            runner = c -> (push!(ran, c); true)
+            env0 = Dict{String,String}()
+            asks = String[]
+            run1(picks; kw...) = checkDependencies(IOBuffer(); env = e, home = d,
+                os = :windows, which = fakeWhich("winget"), runner, dims = big,
+                detect = (i, en, w, dm) -> BAYSOLSetup._detect(i, env0, w, dm),
+                ask = (p, c) -> (push!(asks, p); popfirst!(picks)), kw...)
+            # before the first setup there is no file: nothing is written
+            run1([1, 2]; items)
+            @test !isfile(file) && isempty(ran)
+            # the folder of install.json exists once set up
+            i = Install(; home = "/h", structureCache = "/s", threads = 2)
+            writeInstall(file, i)
+            empty!(asks)
+            # latex: Windows has no route (Not now = 1); sixel: winget route, Install now
+            run1([1, 1])
+            @test readDepAnswers(file) == Dict("latex" => "later", "sixel" => "yes")
+            @test length(ran) == 1
+            back = readInstall(file)
+            @test back.threads == 2 && back.home == "/h"  # other fields kept
+            @test occursin("\"dep.latex\": \"later\"", read(file, String))
+            # asked again for "later" (the sixel item is still not detected here)
+            empty!(asks)
+            run1([2, 4])  # latex: No; sixel: Never
+            @test length(asks) == 2
+            @test readDepAnswers(file) == Dict("latex" => "no", "sixel" => "never")
+            # the first run does not ask "no" or "never" again
+            empty!(asks)
+            run1(Int[]; firstRun = true)
+            @test isempty(asks)
+            # the menu asks "no" again, but never "never"
+            empty!(asks)
+            run1([3])  # latex: Never ask again
+            @test length(asks) == 1
+            @test readDepAnswers(file)["latex"] == "never"
+            empty!(asks)
+            run1(Int[])
+            @test isempty(asks)
+            # applying a setup again keeps the answers (Repair uses the current ones)
+            cur = readInstall(file)
+            applyInstall(cur, d; env = e, home = d)
+            @test readDepAnswers(file) == Dict("latex" => "never", "sixel" => "never")
+        end
+        @testset "an old install.json still reads" begin
+            d = mktempdir()
+            f = joinpath(d, "install.json")
+            write(
+                f,
+                """
+           {
+               "home": "/h",
+               "cache": "/c",
+               "structureCache": "/s",
+               "desktop": true,
+               "threads": 4,
+               "opens": "cli"
+           }
+           """,
+            )
+            i = readInstall(f)
+            @test i !== nothing && i.opens == "cli" && i.threads == 4 && i.desktop
+            @test isempty(i.deps)
+            # the old `cache` key is ignored and not written back
+            out = joinpath(d, "out.json")
+            writeInstall(out, i)
+            @test !occursin("\"cache\"", read(out, String))
+            @test readInstall(out) == i
+            @test isempty(readDepAnswers(f)) && isempty(readDepAnswers(f * ".none"))
+            # an unknown answer word is ignored, a known one is read
+            write(
+                f,
+                "{\"home\":\"/h\",\"cache\":\"/c\",\"structureCache\":\"/s\"," *
+                "\"dep.latex\":\"bogus\",\"dep.sixel\":\"no\"}",
+            )
+            @test readDepAnswers(f) == Dict("sixel" => "no")
+        end
+        @testset "rollback restores install.json with its answers" begin
+            d = mktempdir()
+            e = placeEnv(d)
+            file = installFile(; env = e, home = d)
+            i = Install(;
+                home = joinpath(d, "h"),
+                structureCache = joinpath(d, "s"),
+                deps = Dict("latex" => "never"),
+            )
+            writeInstall(file, i)
+            journal = Function[]
+            applyInstall(
+                Install(; home = joinpath(d, "h2"), structureCache = joinpath(d, "s")), d;
+                env = e, home = d, journal)
+            @test isempty(readDepAnswers(file))
+            rollback!(journal)
+            @test readInstall(file) == i
+        end
     end
 end

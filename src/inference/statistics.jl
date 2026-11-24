@@ -19,6 +19,7 @@
 using Statistics: mean, median, std, cor, cov
 using LinearAlgebra: Symmetric, eigvals, diag
 using ..Scattering: MEMORY_HEADROOM, _systemMemory
+using ..Platform
 
 "The share of the memory budget a [`StatBuffer`](@ref) may hold before it flushes."
 const STATISTICS_MEMORY_SHARE = 1.0e-4
@@ -281,9 +282,17 @@ function _statFlush!(b::StatBuffer)
     isempty(b.lines) && return nothing
     t = time_ns()
     if b.spill === nothing
-        path = tempname() * ".statistics"
+        # in this process's folder of BAYSOL's one temporary root (`Platform.tmp_dir`)
+        dir = mkpath(Platform.tmp_process_dir())
+        path = joinpath(dir, basename(tempname()) * ".statistics")
         b.spill = path
-        atexit(() -> rm(path; force = true))     # our own scratch file
+        atexit() do                              # our own scratch file and folder
+            rm(path; force = true)
+            try
+                rm(dir)                          # only while it is empty
+            catch
+            end
+        end
     end
     open(b.spill, "a") do io
         foreach(l -> println(io, l), b.lines)

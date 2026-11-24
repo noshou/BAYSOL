@@ -20,13 +20,11 @@
 import {
     copyFileSync,
     mkdirSync,
-    mkdtempSync,
     readFileSync,
     rmSync,
     writeFileSync,
 } from "node:fs"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import {
     ArchiveError,
@@ -44,6 +42,7 @@ import {
     quarantine,
     sortNoCase,
 } from "../core/file-system.js"
+import { scratchTemp } from "../core/scratch.js"
 
 // ========================================================================================
 // 1. What a pack is and how it reads
@@ -253,7 +252,7 @@ export function packAddText(
     name: string,
     text: string,
 ): void {
-    const folder = mkdtempSync(join(tmpdir(), "baysol-add-"))
+    const folder = scratchTemp("add")
     try {
         const source = join(folder, "source")
         writeFileSync(source, text)
@@ -358,7 +357,7 @@ export function packChangeAsync(
         let folder: string | undefined
         try {
             if (wanted.texts !== undefined && wanted.texts.size > 0) {
-                folder = await mkdtemp(join(tmpdir(), "baysol-add-"))
+                folder = scratchTemp("add")
                 for (const [name, text] of wanted.texts) {
                     const source = join(folder, `${added.size}-text`)
                     await writeFile(source, text)

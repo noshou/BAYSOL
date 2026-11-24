@@ -13,6 +13,7 @@ import { join } from "node:path"
 import { test } from "node:test"
 import { fileURLToPath } from "node:url"
 import * as XLSX from "xlsx"
+import { archiveTool } from "../src/core/archive.js"
 import { numberText } from "../src/core/terminal.js"
 import {
     dataIsReady,
@@ -426,7 +427,7 @@ const EXPERIMENTS = fileURLToPath(
  */
 function extractFixture(dir: string, id: string, name: string): string {
     const archive = join(EXPERIMENTS, `${id}.7z`)
-    execFileSync("7z", ["x", "-y", `-o${dir}`, archive, `${id}/${name}`], {
+    execFileSync(archiveTool(), ["x", "-y", `-o${dir}`, archive, `${id}/${name}`], {
         stdio: "ignore",
     })
     return join(dir, id, name)

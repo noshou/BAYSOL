@@ -3,6 +3,7 @@
 import { render } from "ink"
 import { App } from "./app.js"
 import { appDir, projectsDir, readSystem } from "./core/environment.js"
+import { startScratch } from "./core/scratch.js"
 import {
     hasTerminal,
     programCommand,
@@ -28,6 +29,11 @@ if (viewAt >= 0 && viewFile === undefined) {
 const action = startAction(hasTerminal(), system)
 
 if (action === "run") {
+    // the temporary files (`<tmp>/baysol/<pid>`, core/scratch.ts): the folders dead
+    // processes left are swept, and the exit hook that removes this process's folder is
+    // registered NOW (every normal way out ends in the `exit` event: ^c and the main
+    // menu's Quit end the program, SIGHUP/SIGTERM below call process.exit); it never throws
+    startScratch()
     // the alternate screen (like vim): a frame as tall as the terminal would otherwise
     // make it scroll a line on every redraw, and the shell is restored on exit
     // ^c is a key like any other for Ink (`App` handles it with ^d), so the

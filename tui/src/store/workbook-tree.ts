@@ -17,14 +17,12 @@ import {
     copyFileSync,
     existsSync,
     mkdirSync,
-    mkdtempSync,
     readdirSync,
     renameSync,
     rmSync,
     statSync,
     utimesSync,
 } from "node:fs"
-import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import {
     ArchiveError,
@@ -37,6 +35,7 @@ import {
     zipFolderSync,
 } from "../core/archive.js"
 import { RUN_FLOW } from "../core/environment.js"
+import { scratchTemp } from "../core/scratch.js"
 
 // ========================================================================================
 // 1. Names
@@ -206,7 +205,7 @@ export function rebuildWorkbook(
     out: string,
 ): void {
     const parts = planRebuild(archives, rel)
-    const tmp = mkdtempSync(join(tmpdir(), "baysol-book-"))
+    const tmp = scratchTemp("book")
     try {
         for (const part of parts)
             extractNamesSync(
@@ -237,7 +236,7 @@ export async function rebuildWorkbookAsync(
     out: string,
 ): Promise<void> {
     const parts = planRebuild(archives, rel)
-    const tmp = mkdtempSync(join(tmpdir(), "baysol-book-"))
+    const tmp = scratchTemp("book")
     try {
         for (const part of parts)
             await extractNamesAsync(

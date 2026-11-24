@@ -792,9 +792,12 @@ test("a child that ignores SIGTERM is killed after the grace, with a note", asyn
         // julia could not finish its files: the status and the note are written here
         assert.equal(runStatus(p, session.view.id), "aborted")
         const log = await logText(runDirOf(p, session.view.id), "run.LOG")
+        // Windows has no SIGTERM to ignore: the whole tree is ended at once (taskkill /F),
+        // so there is no grace to run out and no "killed" in the note
+        const aborted = /=== ERRORS ===\ntui: aborted from the terminal interface \(\^d\)/
         assert.match(
             log,
-            /=== ERRORS ===\ntui: aborted from the terminal interface \(\^d\); killed/,
+            process.platform === "win32" ? aborted : new RegExp(`${aborted.source}; killed`),
         )
     } finally {
         flow.abort.graceSeconds = before
@@ -868,7 +871,10 @@ test("the trace flag exists only when the packaging build asks for it", () => {
     assert.deepEqual(traceFlag({}, 7), [])
     const one = traceFlag({ BAYSOL_TRACE_COMPILE: "/t" }, 7)
     const two = traceFlag({ BAYSOL_TRACE_COMPILE: "/t" }, 7)
-    assert.match(one[0] ?? "", /^--trace-compile=\/t\/tui-7-\d+\.jl$/)
+    assert.match(
+        (one[0] ?? "").replaceAll("\\", "/"),
+        /^--trace-compile=\/t\/tui-7-\d+\.jl$/,
+    )
     assert.notEqual(one[0], two[0])
 })
 
@@ -888,7 +894,7 @@ test("the Julia command and arguments: values travel in ARGS, not in the code", 
         "--startup-file=no",
         "--color=no",
         "--threads=auto,1",
-        "--project=/repo/tui/julia",
+        `--project=${join("/repo", "tui", "julia")}`,
     ])
     assert.equal(args[4], "-e")
     assert.ok(!args[5]?.includes("/p q"), "the code holds no path")

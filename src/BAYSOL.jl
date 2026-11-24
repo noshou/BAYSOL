@@ -6,6 +6,10 @@ hydration-shell contrasts) with the excluded-volume correction profiled out.
 """
 module BAYSOL
 
+# The one module that detects the operating system (shared by every project of the
+# repository by relative path, see platform.jl).
+include("../platform.jl")
+
 include("utils/utils.jl")
 
 # The Utils submodules are bound here,

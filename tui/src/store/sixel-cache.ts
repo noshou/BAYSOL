@@ -21,15 +21,14 @@
 
 import {
     mkdirSync,
-    mkdtempSync,
     renameSync,
     rmSync,
     statSync,
     writeFileSync,
 } from "node:fs"
-import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { ArchiveError, addToArchive, isSafeEntryName } from "../core/archive.js"
+import { scratchTemp } from "../core/scratch.js"
 import { archivePath, readRunText } from "./run-archive.js"
 import type { CellSize, SixelBox } from "./sixel-types.js"
 
@@ -241,7 +240,7 @@ export async function writeRunBytes(
         return
     }
     const archive = archivePath(runDir)
-    const stage = mkdtempSync(join(tmpdir(), "baysol-sixel-"))
+    const stage = scratchTemp("sixel")
     try {
         const path = join(stage, ...name.split("/"))
         mkdirSync(dirname(path), { recursive: true })

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import { spawn } from "node:child_process"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { Launcher } from "../../src/store/run.js"
 import { RunSession } from "../../src/store/run.js"
@@ -43,5 +44,5 @@ export async function makeRun(
 ): Promise<{ dir: string; id: string }> {
     const session = RunSession.begin(projectDir, 25, fakeLauncher("plots"), pack)
     await session.done
-    return { dir: `${projectDir}/runs/${session.view.id}`, id: session.view.id }
+    return { dir: join(projectDir, "runs", session.view.id), id: session.view.id }
 }

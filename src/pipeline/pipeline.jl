@@ -9,6 +9,7 @@ using JSON3: JSON3
 using Statistics: quantile, mean, median, var
 using Printf: @sprintf
 using StaticArrays: SVector
+using ..Platform: Platform
 using ..PhysicalConstants: NS_PER_S, UNIT_OF_δρ, KELVIN_OFFSET, LN10
 using ..Runtime: StageLog, tick, tock!, timed!, stageSeconds, withGcPaused, tmapBlocks
 using ..MolecularStructure: MolecularStructure

@@ -119,7 +119,7 @@ A fit leaves two plain-text logs in its output folder: **the run log** `<folder>
 
 Both files follow the same layout, so what follows holds for both:
 
-- **One file for each folder**, whatever the number of runs in it. The first line is `datetime`, a tab and the stamp of the last write of the file (`19-11-2026 14:49:23 -0500`: day-month-year, 24-hour time, offset from UTC). The stamp belongs to the file, not to a run.
+- **One file for each folder**, whatever the number of runs in it. The first line is `datetime`, a tab and the stamp of the last write of the file (`19-11-2026 14:49:23 -0500`: day-month-year, 24-hour time, offset from UTC, worked out in `_logStamp` from the civil time rather than from the C library's `%z`, which prints the zone name on Windows). The stamp belongs to the file, not to a run.
 - Each run has a section headed `=== <run> ===`, after a blank line. The run is named after the workbook: `res_fit3.xlsx` is `fit3`, `res.xlsx` is the folder's own name. A folder with several scripts (`fit1`, `fit2`) therefore has several sections in the same file.
 - **A rerun replaces its own section and nothing else.** The file is read, the section of that name is swapped for the new lines (or added at the end when it is new), the stamp is renewed, and the file is written beside itself and renamed over the old one, so an interrupted write never leaves half a file. The other runs' sections stay exactly as they were.
 - A row is `name`, spaces, one tab, `value`. The name is padded with spaces to a multiple of 8 characters so that the values line up in any viewer, and a line still splits on its tab (trim the padding). Numbers have 6 significant figures; flags are `true`/`false`, or `0`/`1` where the row says so.

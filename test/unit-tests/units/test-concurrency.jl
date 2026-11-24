@@ -3,7 +3,7 @@
 # Concurrency and race tests for the threaded stages. A real race detector is
 # not available for Julia code, so these tests stress the architecture instead:
 #
-#   * results are bit-identical at every worker count (1, 2, 3, 5, 7,
+#   * results are the same to rounding at every worker count (1, 2, 3, 5, 7,
 #     8, 24) and under "chaos" scheduling (every task starts after a
 #     random delay, so start and finish orders change on every run);
 #   * the same kernels called from several tasks at once give
@@ -39,30 +39,41 @@ using Random
 # ---------------------------------------------------------------------------
 
 """
-A fingerprint of a result: a hash of the bits of every float
-(so -0.0, NaN payloads and last-bit differences count).
+Whether `a` and `b` agree to rounding: arrays, tuples and structs of numbers, to a
+relative 1e-11 of the largest magnitude of the array (the entries near zero of a
+partial-wave expansion carry the rounding of the big ones); anything else (the enums of
+the bead classes) must be equal. Not bit for bit: the last digits depend on the CPU
+(the BLAS kernels, FMA contraction and SIMD order differ between x86-64 models and ARM),
+and on how many BLAS threads there are. A race or a lost update is orders of magnitude
+larger than this tolerance.
 """
-fpr(x::AbstractArray{Float64}) = hash(reinterpret(UInt64, vec(collect(x))))
-fpr(x::AbstractArray{ComplexF64}) =
-    hash(reinterpret(UInt64, vec(collect(reinterpret(Float64, vec(collect(x)))))))
-fpr(x::AbstractArray) = hash(Int.(vec(collect(x))))        # enums such as the bead classes
-fpr(t::Tuple) = hash(map(fpr, t))
-fpr(x) = hash(x)
+function numclose(a::AbstractArray{<:Number}, b)
+    size(a) == size(b) || return false
+    scale = maximum(abs, a; init = 0.0)
+    return all(i -> abs(a[i] - b[i]) ≤ 1e-11 * scale, eachindex(a))
+end
+# not numbers: the enums of the bead classes
+numclose(a::AbstractArray, b) = a == b
+numclose(a::Number, b) = isapprox(a, b; rtol = 1e-11)
+numclose(a::Tuple, b) = length(a) == length(b) && all(map(numclose, a, b))
+numclose(a, b) =
+    isstructtype(typeof(a)) && typeof(a) === typeof(b) && fieldcount(typeof(a)) > 0 ?
+    all(i -> numclose(getfield(a, i), getfield(b, i)), 1:fieldcount(typeof(a))) : a == b
 
 """
-Whether `f()` gives the same bits at every worker count in `workers`
-under chaos scheduling as with the serial paths (`withWorkers(1)`);
-`reps` repeats per count. Reports the first mismatching count.
+Whether `f()` gives the same result (`numclose`) at every worker count in `workers`
+under chaos scheduling as with the serial paths (`withWorkers(1)`); `reps` repeats per
+count. Reports the first mismatching count.
 """
-function identicalAcrossWorkers(f; workers = (2, 3, 5, 7, 8, 24), chaos = 0.003, reps = 1)
-    ref = fpr(withWorkers(f, 1))
+function agreeAcrossWorkers(f; workers = (2, 3, 5, 7, 8, 24), chaos = 0.003, reps = 1)
+    ref = withWorkers(f, 1)
     for n in workers, r in 1:reps
         got = withWorkers(n) do
             withChaos(chaos) do
                 f()
             end
         end
-        fpr(got) == ref || (
+        numclose(got, ref) || (
             @info "result differs from the serial one" workers = n repetition = r;
             return false
         )
@@ -303,38 +314,38 @@ nCollections() = Base.gc_num().pause
     end
 
     # -----------------------------------------------------------------------
-    @testset "excluded volumes: bit-identical at every worker count, under chaos" begin
-        @test identicalAcrossWorkers(() -> vols(concMol()))
+    @testset "excluded volumes: the same to rounding at every worker count, under \n        chaos" begin
+        @test agreeAcrossWorkers(() -> vols(concMol()))
     end
 
-    @testset "SASA cloud and bead classes: bit-identical" begin
-        @test identicalAcrossWorkers(() -> sasa(concMol()); workers = (2, 3, 7, 24))
+    @testset "SASA cloud and bead classes: the same to rounding" begin
+        @test agreeAcrossWorkers(() -> sasa(concMol()); workers = (2, 3, 7, 24))
     end
 
-    @testset "_gaussianDummy: bit-identical" begin
+    @testset "_gaussianDummy: the same to rounding" begin
         v = 20.0 .+ 10.0 .* rand(Xoshiro(3), 6000)
         q = collect(range(0.0, 0.3; length = 150))
-        @test identicalAcrossWorkers(() -> BAYSOL.Scattering._gaussianDummy(v, q))
+        @test agreeAcrossWorkers(() -> BAYSOL.Scattering._gaussianDummy(v, q))
     end
 
     # …and exception-free under 24 workers
-    @testset "computeBLm: bit-identical, repeatable" begin
+    @testset "computeBLm: the same to rounding, repeatable" begin
         inp = concBlmInputs(1)
-        @test identicalAcrossWorkers(() -> blm(inp); reps = 2)
+        @test agreeAcrossWorkers(() -> blm(inp); reps = 2)
         # the same threaded call, repeated: always the
-        # same bits (a lost update would show up here)
-        ref = fpr(withWorkers(() -> blm(inp), 1))
+        # same result (a lost update would show up here)
+        serial = withWorkers(() -> blm(inp), 1)
         got = withWorkers(6) do
             withChaos(0.002) do
-                [fpr(blm(inp)) for _ in 1:12]
+                [blm(inp) for _ in 1:12]
             end
         end
-        @test all(==(ref), got)
+        @test all(g -> numclose(g, serial), got)
     end
 
-    @testset "the whole static build (speciesMultipoles) is bit-identical" begin
+    @testset "the whole static build (speciesMultipoles) is the same to rounding" begin
         q = collect(range(0.01, 0.3; length = 210))
-        @test identicalAcrossWorkers(
+        @test agreeAcrossWorkers(
             () -> speciesMultipoles(concMol(), q, 8, 9000.0);
             workers = (2, 5, 24),
         )
@@ -344,25 +355,25 @@ nCollections() = Base.gc_num().pause
     # …(no hidden shared state)
     @testset "concurrent callers: each gets its own serial result" begin
         inputs = [concBlmInputs(s) for s in 1:4]
-        refs = withWorkers(() -> [fpr(blm(i)) for i in inputs], 1)
+        refs = withWorkers(() -> [blm(i) for i in inputs], 1)
         for chaos in (0.0, 0.003)
             got = withWorkers(4) do
                 withChaos(chaos) do
-                    tasks = [Threads.@spawn(fpr(blm(i))) for i in inputs]
+                    tasks = [Threads.@spawn(blm(i)) for i in inputs]
                     fetch.(tasks)
                 end
             end
-            @test got == refs
+            @test all(numclose.(got, refs))
         end
         # the same for the molecule kernels, two molecules at once
         mRefs = withWorkers(1) do
-            (fpr(vols(concMol(15))), fpr(vols(concMol(16))))
+            (vols(concMol(15)), vols(concMol(16)))
         end
         mGot = withWorkers(4) do
-            ts = [Threads.@spawn(fpr(vols(concMol(n)))) for n in (15, 16)]
+            ts = [Threads.@spawn(vols(concMol(n))) for n in (15, 16)]
             Tuple(fetch.(ts))
         end
-        @test mGot == mRefs
+        @test all(numclose.(mGot, mRefs))
     end
 
     # -----------------------------------------------------------------------

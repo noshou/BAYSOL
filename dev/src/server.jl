@@ -7,6 +7,7 @@ module Server
 using Sockets
 
 using ..Dev
+using ..Platform: Platform
 using ..Common: clear_cache!
 
 "The environment variables a client passes on to the command it runs."
@@ -71,9 +72,9 @@ much longer than half an hour, so the default is 8 hours).
 """
 function serve(state::AbstractString, socket::AbstractString; idle::Real = 8 * 3600)
     mkpath(state)
-    Sys.iswindows() || rm(socket; force = true)
+    Platform.iswindows() || rm(socket; force = true)
     server = listen(socket)
-    Sys.iswindows() || chmod(socket, 0o600)
+    Platform.iswindows() || chmod(socket, 0o600)
     write(joinpath(state, "started"), string(getpid()))
     last = Ref(time())
     @async while isopen(server)
@@ -109,7 +110,7 @@ function serve(state::AbstractString, socket::AbstractString; idle::Real = 8 * 3
         e isa Union{Base.IOError,EOFError} || rethrow()
     finally
         isopen(server) && close(server)
-        Sys.iswindows() || rm(socket; force = true)
+        Platform.iswindows() || rm(socket; force = true)
         rm(joinpath(state, "started"); force = true)
         # what the programs it ran created in the cache goes with it, but for the
         # structures and components (see `clear_cache!`)

@@ -10,6 +10,7 @@ using ..Common
 module Render
 
 using ...Common
+using ...Platform: Platform
 
 const WHO = "bysl plots render"
 
@@ -47,7 +48,7 @@ end
 "The path of the first of `names` on the PATH; an error that says what to install."
 function find_program(names, hint)
     for n in names
-        p = Sys.which(n)
+        p = Platform.which(n)
         p === nothing || return p
     end
     throw(ToolError("could not find $(join(names, " or ")) on the PATH; $hint", 1))
@@ -117,6 +118,7 @@ end
 module Fonts
 
 using ...Common
+using ...Platform: Platform
 
 const WHO = "bysl plots fonts"
 
@@ -147,7 +149,7 @@ family can have several, separated by commas), or else from LuaLaTeX's index, wh
 are lower case without spaces (which [`available`](@ref) accepts as well).
 """
 function families()::Vector{String}
-    if Sys.which("fc-list") !== nothing
+    if Platform.which("fc-list") !== nothing
         names = String[]
         for line in split(quiet(`fc-list : family`), '\n')
             append!(names, strip.(split(line, ',')))
@@ -166,7 +168,7 @@ function run(argv::Vector{String})::Int
         return 0
     end
     (; flags, specs) = split_args(WHO, String[], ["--list"], argv)
-    Sys.which("luaotfload-tool") === nothing && fail(WHO,
+    Platform.which("luaotfload-tool") === nothing && fail(WHO,
         "luaotfload-tool not found: it comes with TeX Live, " *
         "and without it no font can be checked")
     if !isempty(flags) && !isempty(specs)

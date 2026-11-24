@@ -9,6 +9,7 @@ using SQLite: SQLite
 using DBInterface: DBInterface
 using FastClosures: @closure
 using ..PhysicalConstants: PM_PER_ANGSTROM
+using ..Platform: Platform
 using ..Runtime: Lazy, force, KeyedCache, memoryDb
 using NearestNeighbors: KDTree
 
@@ -16,14 +17,14 @@ import ..Geometry: coordsCartesian, radii, rMax, neighbourTree
 using ..Geometry: SphereCloud, excludedVolume
 
 """
-The local store (downloaded structures, component files, hydrogenated copies). It is the
-folder the environment variable `BAYSOL_CACHE` names when that is an absolute path (the
-terminal interface sets it to the operating system's cache folder), otherwise `_cache/`
-in the package root. Created on first use.
+The local store (downloaded structures, component files, hydrogenated copies): the
+structure cache, `Platform.structure_cache()`. That is the folder the environment variable
+`BAYSOL_CACHE` names when it is an absolute path (the launcher and the terminal interface
+set it), otherwise `_structures` in the caches folder of the system (`Platform.cache_dir`),
+the same folder the setup wizard proposes. Created on first use.
 """
 function _storeDir()::String
-    env = get(ENV, "BAYSOL_CACHE", "")
-    dir = isabspath(env) ? env : joinpath(pkgdir(@__MODULE__), "_cache")
+    dir = Platform.structure_cache()
     mkpath(dir)
     return dir
 end
