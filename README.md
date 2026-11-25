@@ -27,6 +27,13 @@ the bug.
 - *Opening the wizard after that* shows `could not start the setup wizard: spawnSync .../baysol
   ENOENT`: the program it starts is gone. Until this is fixed, quit BAYSOL with `q` after an
   uninstall.
+- *Uninstalling leaves files behind.* After `App and caches` only the projects folder may stay;
+  after `Everything` not even that. Left on macOS: an empty `settings.json` in the projects
+  folder though there were no projects, the rest of the cache folder beside `_structures` (its
+  parent is kept too), the temporary folder `<tmp>/baysol`, and the icon in the Dock. The
+  interface that is still open after an uninstall (first bug) can write some of them again.
+- *The tests of the interface leave `baysol-help-*` folders* (and `<tmp>/baysol`) in the
+  temporary folder.
 - *The icon of the setup wizard is drawn with half blocks (`▀`)* and the large logo of the main
   menu with full blocks (`█`). In a terminal whose font does not fill the cell with them,
   strips of the wrong colour cross the icon and gaps show between the rows of the logo. Seen in
@@ -44,6 +51,10 @@ the bug.
   run by the wizard. It should not be asked as a question then.
 - *SASDMJ9 has two chi-squared values*: 0.856 from the script of its fitting test, 2.649 from
   the exported project in the packaged program. The cause is not known.
+- *The report and the build log of `bysl pkg` say `ram 0 MiB` and `swap 0 MiB` on macOS and
+  Windows*: `write_report` and the build log (`dev/src/pkg.jl`) read `/proc/meminfo`, which only
+  Linux has, and print 0 for what is missing. The peak memory of each stage, the preflight for
+  24 GiB and the stop on low swap do not run there either.
 - *`bysl pkg` does not start the program it built*, so a package that cannot start passes.
 - *`bysl audit` lists `libz` and `libpython` as missing* in the macOS bundle, where both are
   shipped and found.
