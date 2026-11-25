@@ -58,7 +58,7 @@ the bug.
 - *Gatekeeper blocks a package downloaded with a browser*: it is signed ad hoc, not with a
   Developer ID. Run `xattr -dr com.apple.quarantine baysol` on the unpacked folder.
 - *The default Terminal font (SF Mono 11) makes the interface look bad.* The wizard suggests
-  Menlo 14; The character and line spacing has to be set to 1.0 by hand.
+  Menlo 14; the character and line spacing have to be set to 1.0 by hand.
 - *Terminal shows no sixel figures*; use iTerm2 or WezTerm. Installing Homebrew and iTerm2 from
   the wizard and starting BAYSOL from its icon were tried and work; opening it in WezTerm and
   the Desktop permission prompt are untested.
