@@ -71,6 +71,9 @@ const MAC_FONT_SET =
 "The items of the check."
 function defaultItems()::Vector{DepItem}
     allOS = [:windows, :macos, :linux]
+    brew = DepItem("brew", "Homebrew", :optional, [:macos],
+        "Only to install optional things such as iTerm2 from here; BAYSOL works without it.",
+        false, Route[], [:macos => "By hand: https://brew.sh"])
     latex = DepItem("latex", "LaTeX engine (TeX Live)", :optional, allOS,
         "Only renders plots to PDF. It is large (gigabytes); BAYSOL works without it.",
         false,
@@ -146,7 +149,7 @@ function defaultItems()::Vector{DepItem}
                 "In Terminal > Settings > Profiles, pick this window's profile, then Text: " *
                 "set character spacing and line spacing to 1.0.",
         ])
-    return [latex, sixel, color, size, font, spacing]
+    return [brew, latex, sixel, color, size, font, spacing]
 end
 
 """
@@ -167,6 +170,12 @@ function _find(name::AbstractString)::Union{String,Nothing}
 end
 
 # ---- the detectors ---------------------------------------------------------------------
+
+"Homebrew, on the PATH or in its own folders (`_find`)."
+function _detectBrew(which)::Detection
+    p = which("brew")::Union{String,Nothing}
+    return p === nothing ? Detection(false, "not installed") : Detection(true, p)
+end
 
 "The first LaTeX engine on the PATH (`which` is `Platform.which`, or a stand-in)."
 function _detectLatex(which)::Detection
@@ -307,6 +316,7 @@ end
 
 "The detector of `item`, chosen by its id."
 function _detect(item::DepItem, env, which, dims::Tuple{Int,Int})::Detection
+    item.id == "brew" && return _detectBrew(which)
     item.id == "latex" && return _detectLatex(which)
     item.id == "sixel" && return _detectSixel(env, which)
     item.id == "truecolor" && return _detectTruecolor(env)
@@ -445,25 +455,50 @@ const BREW_INSTALL = Cmd([
 "Where iTerm2 is downloaded by hand."
 const ITERM_PAGE = "https://iterm2.com/downloads.html"
 
+"Runs Homebrew's installer; whether Homebrew is there afterwards."
+function _installBrew(io::IO, which, runner)::Bool
+    ok = runner(BREW_INSTALL)::Bool && (which("brew")::Union{String,Nothing}) !== nothing
+    ok || println(io, "  Homebrew was not installed.")
+    return ok
+end
+
+"What the user should know before Homebrew's installer runs."
+function _brewNote(io::IO)
+    println(io, "  Homebrew's own installer asks for your password, and it may download")
+    println(io, "  Apple's Command Line Tools.")
+    return nothing
+end
+
+"The offer of Homebrew (macOS). Returns the answer to remember."
+function _offerBrew(io::IO, item::DepItem; which, runner, ask)::String
+    _brewNote(io)
+    println(io, "  ", manualText(item, :macos))
+    pick =
+        ask("Install Homebrew?", ["Install now", "Not now", "No", "Never ask again"])::Int
+    if pick == 1
+        _installBrew(io, which, runner) || return "later"
+        println(io, "  Done.")
+        return "yes"
+    end
+    return pick == 3 ? "no" : pick == 4 ? "never" : "later"
+end
+
 """
 The offer of iTerm2 on a Mac without Homebrew: Homebrew and then iTerm2, or the download
 page of iTerm2. Nothing runs without that choice. Returns the answer to remember.
 """
 function _offerITerm(io::IO, item::DepItem; which, runner, ask)::String
     println(io, "  Homebrew and iTerm2 are not installed.")
-    println(io, "  Homebrew's own installer asks for your password, and it may download")
-    println(io, "  Apple's Command Line Tools. iTerm2 alone needs neither.")
+    _brewNote(io)
+    println(io, "  The iTerm2 download page needs no Homebrew.")
     pick = ask("Install iTerm2?",
         ["Install Homebrew, then iTerm2", "Open the iTerm2 download page", "Not now",
             "No",
             "Never ask again"])::Int
     if pick == 1
-        ok = runner(BREW_INSTALL)::Bool
+        _installBrew(io, which, runner) || return "later"
         brew = which("brew")::Union{String,Nothing}
-        if !ok || brew === nothing
-            println(io, "  Homebrew was not installed.")
-            return "later"
-        end
+        brew === nothing && return "later"
         ok = runner(Cmd([brew, "install", "--cask", "iterm2"]))::Bool
         println(
             io,
@@ -494,6 +529,7 @@ function offerInstall(io::IO, item::DepItem, os::Symbol; which = _find,
     route = pickRoute(item, os, which)
     manual = manualText(item, os)
     println(io, item.name, ": ", item.why)
+    item.id == "brew" && return _offerBrew(io, item; which, runner, ask)
     item.id == "sixel" && os == :macos && route === nothing &&
         return _offerITerm(io, item; which, runner, ask)
     canRun = false

@@ -600,7 +600,8 @@ winOr(win, other) = Platform.iswindows() ? win : other
         end
     end
     @testset "dependency check" begin
-        items = defaultItems()
+        # Homebrew (macOS) comes first and has tests of its own
+        items = filter(i -> i.id != "brew", defaultItems())
         byId(rs, id) = only(r for r in rs if r.item.id == id)
         # a PATH that holds only the programs named; nothing real is looked at
         fakeWhich(names...) = n -> n in names ? "/fake/bin/$n" : nothing
@@ -647,6 +648,34 @@ winOr(win, other) = Platform.iswindows() ? win : other
             @test !byId(
                 scanDependencies(; env = Dict("COLORTERM" => ""),
                     which = fakeWhich(), dims = big), "truecolor").found
+        end
+        @testset "Homebrew on macOS" begin
+            brew = first(defaultItems())
+            @test brew.id == "brew" && brew.oses == [:macos]
+            scan(w; os = :macos) = only(scanDependencies([brew]; os, which = w, dims = big))
+            @test !scan(fakeWhich()).found && scan(fakeWhich("brew")).found
+            @test !scan(fakeWhich(); os = :linux).applicable
+            ran, have = Cmd[], Set{String}()
+            which = n -> n in have ? "/fake/bin/$n" : nothing
+            offer(k, runner = c -> (push!(ran, c); true)) =
+                offerInstall(IOBuffer(), brew, :macos; which, runner, ask = (p, c) -> k)
+            @test [offer(k) for k in (0, 2, 3, 4)] == ["later", "later", "no", "never"]
+            @test isempty(ran)
+            @test offer(1) == "later"  # the installer ended without Homebrew
+            @test offer(1, c -> false) == "later"
+            # Homebrew just installed: the iTerm2 offer that follows uses it
+            d = mktempdir()
+            empty!(ran)
+            prompts = String[]
+            runner = c -> (push!(ran, c); push!(have, "brew"); true)
+            checkDependencies(IOBuffer(); env = placeEnv(d), home = d, os = :macos, which,
+                dims = big, runner,
+                items = [brew, only(i for i in items if i.id == "sixel")],
+                detect = (a...) -> BAYSOLSetup.Detection(false, ""),
+                ask = (p, c) -> (push!(prompts, c[1]); 1))
+            @test prompts == ["Install now", "Install now"]
+            @test ran == [BAYSOLSetup.BREW_INSTALL,
+                Cmd(["/fake/bin/brew", "install", "--cask", "iterm2"])]
         end
         @testset "iTerm2 on a Mac without Homebrew" begin
             sixel = only(i for i in items if i.id == "sixel")
