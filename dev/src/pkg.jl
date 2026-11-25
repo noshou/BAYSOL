@@ -537,7 +537,11 @@ function write_build_log(path::AbstractString, archive::AbstractString)
     mkpath(dirname(path))
     open(path, "w") do io
         row(k, v) = println(io, rpad(k, cld(length(k) + 1, 8) * 8), "\t", v)
-        row("datetime", Libc.strftime("%Y-%m-%d %H:%M:%S %z", time()))
+        row(
+            "datetime",
+            string(Libc.strftime("%Y-%m-%d %H:%M:%S", time()), " ",
+                Platform.utc_offset_text()),
+        )
         row("version", version_line())
         row("archive", basename(archive))
         row("revision", build_revision())
@@ -1018,7 +1022,12 @@ function workload_folder(work, given)
     given === nothing || return given
     dir = joinpath(work, "workload")
     isdir(dir) ||
-        need(run_step(false, ["bysl", "fits", "export", WORKLOAD..., "--out", dir]),
+        need(
+            run_step(
+                false,
+                ["bysl", "fits", "export", WORKLOAD..., "--out", dir,
+                    "--from", joinpath(work, "trace", "results")],
+            ),
             "export of the workload projects")
     return dir
 end

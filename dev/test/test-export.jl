@@ -145,3 +145,18 @@ end
         end
     end
 end
+
+@testset "export --from reads a scratch tree, not the checkout" begin
+    mktempdir() do out
+        mktempdir() do scratch
+            # the folder of the fit is not in the scratch tree: skipped, status 1, and
+            # nothing is taken from the checkout's own folder instead
+            @test X.run(["SASDMJ9", "--out", out, "--from", scratch]) == 1
+            @test !ispath(joinpath(out, "SASDMJ9"))
+            # a folder with the fit's script and LOG but no workbook is the same case the
+            # message names: the fit has not been run
+            mkpath(joinpath(scratch, "test", "fitting_tests", "SASDMJ9"))
+            @test X.run(["SASDMJ9", "--out", out, "--from", scratch]) == 1
+        end
+    end
+end

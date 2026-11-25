@@ -330,22 +330,7 @@ the offset from UTC (ex: `27-10-2026 14:09:33 +0200`).
 """
 function _logStamp()
     t = time()
-    tm = Libc.TmStruct(t)
-    # The offset from UTC is worked out here, not asked of the C library: `%z` prints the
-    # NAME of the zone on Windows ("Eastern Standard Time"), not `-0500`. The local calendar
-    # fields of this instant, read as if they were UTC, minus the instant itself, are the
-    # offset in seconds (days from the civil date: Howard Hinnant's algorithm).
-    m = Int(tm.month) + 1
-    y = Int(tm.year) + 1900 - (m <= 2)
-    era = fld(y, 400)
-    yoe = y - 400era
-    doy = fld(153 * (m > 2 ? m - 3 : m + 9) + 2, 5) + Int(tm.mday) - 1
-    days = 146097era + 365yoe + fld(yoe, 4) - fld(yoe, 100) + doy - 719468
-    localSeconds = 86400days + 3600Int(tm.hour) + 60Int(tm.min) + Int(tm.sec)
-    minutes = round(Int, (localSeconds - floor(Int, t)) / 60)
-    offset = string(minutes < 0 ? '-' : '+', lpad(abs(minutes) ÷ 60, 2, '0'),
-        lpad(abs(minutes) % 60, 2, '0'))
-    return string(Libc.strftime("%d-%m-%Y %H:%M:%S", t), " ", offset)
+    return string(Libc.strftime("%d-%m-%Y %H:%M:%S", t), " ", Platform.utc_offset_text(t))
 end
 
 """
