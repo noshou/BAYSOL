@@ -77,8 +77,8 @@ the bug.
   It should be Yes or No, and Yes should set the spacing to 1.0. Terminal has no scripting for
   it; importing a profile with that spacing is to be tried.
 - *`The icon opens it in:` says `Automatic (iTerm2 now)`*: the `(iTerm2 now)` should go.
-- *Uninstalling leaves the icon in the Dock*, where it points to the deleted `BAYSOL.app`. The
-  uninstall should remove every Dock entry of `org.baysol.app`, also one the user dragged there
+- *Uninstalling leaves the icon in the Dock* (macOS only: on Linux with GNOME `_unpin` removes
+  the pin), where it points to the deleted `BAYSOL.app`. The uninstall should remove every Dock entry of `org.baysol.app`, also one the user dragged there
   (the wizard makes none and so lists none in its manifest).
 - *The app icon is clipped.* The icon works, but its artwork has to be redone for macOS.
 - *Some texts still say that macOS is untested*, also below.
