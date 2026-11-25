@@ -2208,6 +2208,8 @@ function run(argv::Vector{String})::Int
     println("stages: ", join(STAGES, " > "), "   archive: ", archive, "   work: ", work)
     "--dry-run" in a.flags && return all(first, cs) ? 0 : 1
     all(first, cs) || return 1
+    # the report and the archive go there; `--out` may not exist yet
+    mkpath(dirname(archive))
     resume = "--resume" in a.flags || only !== nothing
     if !resume && ispath(work)
         looks_like_work(work) ||
