@@ -162,6 +162,40 @@ function find_tool(names::AbstractString...; dirs = tool_dirs())::Union{String,N
     return nothing
 end
 
+"""
+    utc_offset(t = time()) -> Int
+
+The offset of this machine's time zone from UTC, in seconds (east is positive), at the Unix
+time `t`, daylight saving included. It is worked out here and not asked of the C library,
+whose `strftime` `%z` prints the NAME of the zone on Windows ("Eastern Standard Time"), not
+`-0500`: the local calendar fields of `t` (`Libc.TmStruct`), read as if they were UTC,
+minus `t` itself (days from the civil date: Howard Hinnant's algorithm). The same on every
+system.
+"""
+function utc_offset(t::Real = time())::Int
+    ft = floor(Int, t)
+    tm = Libc.TmStruct(ft)
+    m = Int(tm.month) + 1
+    y = Int(tm.year) + 1900 - (m <= 2)
+    era = fld(y, 400)
+    yoe = y - 400era
+    doy = fld(153 * (m > 2 ? m - 3 : m + 9) + 2, 5) + Int(tm.mday) - 1
+    days = 146097era + 365yoe + fld(yoe, 4) - fld(yoe, 100) + doy - 719468
+    return 86400days + 3600Int(tm.hour) + 60Int(tm.min) + Int(tm.sec) - ft
+end
+
+"""
+    utc_offset_text(t = time()) -> String
+
+[`utc_offset`](@ref) as `+HHMM` or `-HHMM` (such as `-0500`), to the minute, the form the
+logs and reports stamp their times with.
+"""
+function utc_offset_text(t::Real = time())::String
+    minutes = round(Int, utc_offset(t) / 60)
+    return string(minutes < 0 ? '-' : '+', lpad(abs(minutes) ÷ 60, 2, '0'),
+        lpad(abs(minutes) % 60, 2, '0'))
+end
+
 # An absolute value of an environment variable, else `nothing`.
 function _abs(env, name)
     v = strip(get(env, name, ""))

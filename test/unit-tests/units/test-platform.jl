@@ -164,3 +164,17 @@ exit 0
         Platform.iswindows() || Platform.ismacos() || @test isempty(Platform.tool_dirs())
     end
 end
+
+@testset "utc_offset: the zone's offset as a number, on every system" begin
+    t = 1.7e9
+    off = Platform.utc_offset(t)
+    @test off isa Int && abs(off) <= 14 * 3600 && off % 60 == 0
+    text = Platform.utc_offset_text(t)
+    @test occursin(r"^[+-]\d{4}$", text)
+    @test (text[1] == '-') == (off < 0)
+    @test parse(Int, text[2:3]) * 3600 + parse(Int, text[4:5]) * 60 == abs(off)
+    # two instants a half year apart can differ by the daylight-saving hour, no more
+    @test abs(Platform.utc_offset(t) - Platform.utc_offset(t + 182 * 86400)) <= 3600
+    # the stamp the logs use ends with that offset, never with a zone name
+    @test occursin(r"[+-]\d{4}$", BAYSOL.Pipeline._logStamp())
+end

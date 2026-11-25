@@ -136,9 +136,7 @@ Windows) taken as if it were UTC, minus `t`. Run on Linux and Windows 11; macOS 
 - None.
 """
 function _localOffset(t::Real)
-    tm = Libc.TmStruct(floor(Int, t))
-    return _unixTime(tm.year + 1900, tm.month + 1, tm.mday, tm.hour, tm.min, tm.sec) -
-           floor(Int, t)
+    return Platform.utc_offset(t)
 end
 
 # `text` as a zone label: whitespace, underscores and hyphens removed, kept only when what
