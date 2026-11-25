@@ -49,9 +49,10 @@ the bug.
 - *The default Terminal font (SF Mono 11) makes the interface look bad.* The wizard suggests
   Menlo 14; Terminal has no scripting for the character and line spacing, so 1.0 has to be set
   by hand.
-- *Terminal shows no sixel figures*; use iTerm2 or WezTerm. Opening BAYSOL in them from the app
-  icon, the Homebrew installation of the wizard, the Desktop permission prompt and a
-  double click in Finder are untested.
+- *Terminal shows no sixel figures*; use iTerm2 or WezTerm. Installing Homebrew and iTerm2 from
+  the wizard and starting BAYSOL from its icon were tried and work; opening it in WezTerm and
+  the Desktop permission prompt are untested.
+- *The app icon is clipped.* The icon works, but its artwork has to be redone for macOS.
 - *Some texts still say that macOS is untested*, also below.
 - *Three tests of the interface fail*: `compile plots` and two of the zip64 archive tests (955
   of 958 pass). Once a fourth failed that passed in three reruns; which one was not
