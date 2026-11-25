@@ -935,4 +935,17 @@ winOr(win, other) = Platform.iswindows() ? win : other
             @test readInstall(file) == i
         end
     end
+
+    @testset "icon" begin
+        S = BAYSOLSetup
+        @test S._plainIcon(Dict("TERM_PROGRAM" => "Apple_Terminal"))
+        @test !S._plainIcon(Dict("TERM_PROGRAM" => "iTerm.app"))
+        @test allequal(length.(S.ICON_CELLS))
+        for truecolor in (true, false)
+            drawn = sprint(io -> S.drawIcon(io; truecolor, plain = true))
+            @test count('\n', drawn) == length(S.ICON_CELLS)
+            @test isempty(strip(replace(drawn, r"\e\[[0-9;]*m" => "")))
+            @test occursin('▀', sprint(io -> S.drawIcon(io; truecolor, plain = false)))
+        end
+    end
 end

@@ -11,6 +11,53 @@ Two ways to use it, both without writing code:
 - Worked analyses of 112 SASBDB entries (protein, DNA and RNA; 56 with a single-structure reference fit, 56 replacement entries): [fitting tests](test/fitting_tests/README.md)
 - Developer tools (test runners, comparison, benchmarks, figure rendering): [dev](dev/README.md)
 
+## Known bugs
+
+Version 0.5.1 is a proof of concept: the packaged program installs, opens and fits on Apple
+Silicon, Linux (ARM) and Windows 11, with the bugs below. They are to be fixed in 0.5.2.
+"Fixed in the source" means that the 0.5.1 macOS package built on 25 November 2026 still has
+the bug.
+
+**Every system** (shared code; seen on macOS, not yet checked on the others)
+
+- *Uninstalling from the interface returns to the menu.* After the setup wizard, opened with
+  `shift+a`, has removed the app, the main menu comes back and its options can still be
+  selected. `afterSetup` (`tui/julia/app/bundle.jl`) turns the status `UNINSTALLED` (22) into
+  0, and the interface quits only on 22 (`runSetupWizard` in `tui/src/core/file-system.ts`).
+- *Opening the wizard after that* shows `could not start the setup wizard: spawnSync .../baysol
+  ENOENT`: the program it starts is gone. Until this is fixed, quit BAYSOL with `q` after an
+  uninstall.
+- *The icon of the setup wizard is drawn with half blocks (`▀`)* and the large logo of the main
+  menu with full blocks (`█`). In a terminal whose font does not fill the cell with them,
+  strips of the wrong colour cross the icon and gaps show between the rows of the logo. Seen in
+  the Terminal of macOS, where it is fixed in the source (both are drawn with coloured spaces
+  there; the new logo of the menu has not been looked at in Terminal yet). Other terminals keep
+  the blocks and can show the same.
+- *SASDMJ9 has two chi-squared values*: 0.856 from the script of its fitting test, 2.649 from
+  the exported project in the packaged program. The cause is not known.
+- *`bysl pkg` does not start the program it built*, so a package that cannot start passes.
+- *`bysl audit` lists `libz` and `libpython` as missing* in the macOS bundle, where both are
+  shipped and found.
+
+**macOS**
+
+- *Quitting can leave a window that says `[Process completed]`.* The launcher now closes its
+  own Terminal window after a clean end; this was tested only with a stand-in program. A window
+  you opened yourself stays, and so does one after an error.
+- *Gatekeeper blocks a package downloaded with a browser*: it is signed ad hoc, not with a
+  Developer ID. Run `xattr -dr com.apple.quarantine baysol` on the unpacked folder.
+- *The default Terminal font (SF Mono 11) makes the interface look bad.* The wizard suggests
+  Menlo 14; Terminal has no scripting for the character and line spacing, so 1.0 has to be set
+  by hand.
+- *Terminal shows no sixel figures*; use iTerm2 or WezTerm. Opening BAYSOL in them from the app
+  icon, the Homebrew installation of the wizard, the Desktop permission prompt and a
+  double click in Finder are untested.
+- *Some texts still say that macOS is untested*, also below.
+- *Three tests of the interface fail*: `compile plots` and two of the zip64 archive tests (955
+  of 958 pass). Once a fourth failed that passed in three reruns; which one was not
+  recorded.
+- *Intel Macs, the figures made with TeX and the complete `bysl precommit` are untested.*
+
 ## Use BAYSOL from the terminal interface (no coding)
 
 The terminal interface (TUI) is the first way to use BAYSOL: a full-screen program that runs in

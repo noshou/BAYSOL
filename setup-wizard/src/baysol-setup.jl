@@ -1259,6 +1259,23 @@ const ICON = (
 const ICON_RGB = Dict('k' => (0, 0, 0), 'p' => (255, 97, 126), 't' => (0, 255, 204))
 const ICON_256 = Dict('k' => 16, 'p' => 204, 't' => 49)
 
+"""
+The icon at 18 x 9 cells, one letter a cell, for a terminal whose `▀` does not
+fill exactly the upper half of its cell ([`_plainIcon`](@ref)). A cell is about twice as
+high as wide, so two letters side by side are a square.
+"""
+const ICON_CELLS = (
+    "pppppppppppppppppp",
+    "ppkkkkkkkkkkkkkkpp",
+    "ppkkkttttttkkkkkpp",
+    "ppkkkttkkkkttkkkpp",
+    "ppkkkttttttkkkkkpp",
+    "ppkkkttkkkkttkkkpp",
+    "ppkkkttttttkkkkkpp",
+    "ppkkkkkkkkkkkkkkpp",
+    "pppppppppppppppppp",
+)
+
 "The icon halved: each 2 x 2 block of pixels averaged, so the edges blend (16 x 16)."
 function _halved()
     px(y, x) = ICON_RGB[ICON[y][x]]
@@ -1270,10 +1287,17 @@ function _halved()
 end
 
 """
-    drawIcon(io; truecolor) -> Nothing
+Whether the icon is drawn without `▀`: in the Terminal of macOS, which starts the glyph
+below the top of its cell, so a strip of the lower pixel shows above the upper one.
+"""
+_plainIcon(env = ENV) = get(env, "TERM_PROGRAM", "") == "Apple_Terminal"
+
+"""
+    drawIcon(io; truecolor, plain) -> Nothing
 
 Draws the icon at 16 x 8 character cells: the 32 x 32 pixels averaged to 16 x 16 (the edges
 blend) and drawn with `▀` (the upper pixel is the foreground, the lower one the background).
+With `plain` it is [`ICON_CELLS`](@ref) instead, drawn with coloured spaces alone.
 
 # Returns
 `nothing`.
@@ -1282,7 +1306,22 @@ blend) and drawn with `▀` (the upper pixel is the foreground, the lower one th
 None.
 """
 function drawIcon(io::IO = stdout;
-    truecolor::Bool = get(ENV, "COLORTERM", "") in ("truecolor", "24bit"))
+    truecolor::Bool = get(ENV, "COLORTERM", "") in ("truecolor", "24bit"),
+    plain::Bool = _plainIcon())
+    if plain
+        bg = truecolor ? c -> "48;2;" * join(ICON_RGB[c], ';') : c -> "48;5;$(ICON_256[c])"
+        for row in ICON_CELLS
+            print(io, "  ")
+            last = nothing
+            for c in row
+                c == last || print(io, "\e[", bg(c), "m")
+                print(io, ' ')
+                last = c
+            end
+            println(io, "\e[0m")
+        end
+        return nothing
+    end
     cube(v) = round(Int, v / 255 * 5)
     code(c) =
         truecolor ? join(round.(Int, c), ';') :
