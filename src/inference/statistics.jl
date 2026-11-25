@@ -36,7 +36,7 @@ const STATISTICS_BUFFER_MAX = 67_108_864
 The size, in bytes, at which a [`StatBuffer`](@ref) flushes to its scratch file even
 between two phases: `STATISTICS_MEMORY_SHARE` (0.01 %) of the memory budget the forward
 cache works in (the free memory minus `headroom` percent of the total, the same
-`Sys.free_memory()` / `Sys.total_memory()` reading as the static build,
+`Platform.free_memory()` / `Sys.total_memory()` reading as the static build,
 `Scattering._systemMemory`), held between `STATISTICS_BUFFER_MIN` and
 `STATISTICS_BUFFER_MAX`. A run's statistics are a few kilobytes per attempt, so the cap is a
 guard against a run that records far more (many chains, many rungs), not a limit met in

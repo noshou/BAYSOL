@@ -38,8 +38,7 @@ finally
         end
     end
     println("install.json:")
-    file = joinpath(sandbox, Platform.iswindows() ? joinpath("AppData", "Roaming") : "cfg",
-        "baysol", "install.json")
+    file = joinpath(Platform.config_home(; env, home = sandbox), "baysol", "install.json")
     println(isfile(file) ? read(file, String) : "  (none)")
     rm(sandbox; recursive = true, force = true)
 end

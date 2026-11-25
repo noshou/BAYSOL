@@ -210,9 +210,25 @@ winOr(win, other) = Platform.iswindows() ? win : other
             "baysol</string>",
             read(joinpath(app, "Contents", "Info.plist"), String),
         )
+        @test occursin("<string>arm64</string>",
+            read(joinpath(app, "Contents", "Info.plist"), String))
         @test isfile(joinpath(app, "Contents", "Resources", "baysol.icns"))
         exe = joinpath(app, "Contents", "MacOS", "BAYSOL")
         @test occursin("BAYSOL.command", read(exe, String))
+        # the path survives the shell, and a moved bundle is noticed
+        odd = joinpath(d, "a \$HOME `x` \"q\" 'r'")
+        script = BAYSOLSetup._macAppScript(odd)
+        arg = Base.shell_split(split(split(script, "command="; limit = 2)[2], '\n')[1])
+        @test only(arg) == joinpath(odd, "BAYSOL.command")
+        @test BAYSOLSetup._isMacAppOf(app, joinpath(d, "bundle"))
+        @test !BAYSOLSetup._isMacAppOf(app, joinpath(d, "moved"))
+        # an apply over an app that exists is undone to what was there
+        before = read(exe, String)
+        again = Function[]
+        BAYSOLSetup._installMacApp!(again, String[], joinpath(d, "moved"), app, icns)
+        @test read(exe, String) != before
+        rollback!(again)
+        @test read(exe, String) == before
         @test count(startswith("file\t"), made) == 3
         # an uninstall by this manifest leaves the app folder gone and nothing else
         sibling = joinpath(d, "Applications", "Other.app")
@@ -234,6 +250,88 @@ winOr(win, other) = Platform.iswindows() ? win : other
         BAYSOLSetup._removeManifest(entries, joinpath(d, "bundle"))
         @test !ispath(lnk) && !ispath(joinpath(d, "cfg", "baysol.ico")) &&
               !isdir(dirname(lnk))
+    end
+
+    @testset "the terminal of the macOS icon" begin
+        choices = BAYSOLSetup._terminalChoices
+        @test first.(choices(["iterm2", "wezterm"])) ==
+              ["auto", "iterm2", "wezterm", "terminal"]
+        @test last(choices(["wezterm"])[1]) == "Automatic (WezTerm now)"
+        @test first.(choices(String[])) == ["auto", "terminal"]
+        d = mktempdir()
+        f = joinpath(d, "i.json")
+        for id in BAYSOLSetup.MAC_TERMINAL_IDS
+            i = Install(; home = "/a", structureCache = "/s", terminal = id)
+            writeInstall(f, i)
+            @test readInstall(f) == i
+        end
+        write(f, replace(read(f, String), "wezterm" => "bogus"))
+        @test readInstall(f).terminal == "auto"
+        # the script run for real, with a stand-in `open` and application folder
+        if Platform.ismacos()
+            apps = mkpath(joinpath(d, "Apps"))
+            seen = joinpath(d, "seen")
+            open_ = joinpath(d, "open")
+            write(open_, "#!/bin/zsh\nprint -rl -- \"\$@\" > $seen\n")
+            chmod(open_, 0o755)
+            b = joinpath(d, "my 'b'")
+            cmd = joinpath(b, "BAYSOL.command")
+            function opened(id)
+                s = replace(BAYSOLSetup._macAppScript(b, id), "/usr/bin/open" => open_,
+                    "in /Applications" => "in $apps")
+                file = joinpath(d, "run.zsh")
+                write(file, s)
+                run(addenv(`/bin/zsh $file`, "HOME" => joinpath(d, "nohome")))
+                return readlines(seen)
+            end
+            term = ["-a", "Terminal", cmd]
+            wez = ["-a", joinpath(apps, "WezTerm.app"), "-n", "--args", "start", "--", cmd]
+            iterm = ["-a", joinpath(apps, "iTerm.app"), cmd]
+            @test all(opened(id) == term for id in BAYSOLSetup.MAC_TERMINAL_IDS)
+            mkdir(joinpath(apps, "WezTerm.app"))
+            @test opened("auto") == wez && opened("wezterm") == wez
+            @test opened("iterm2") == term && opened("terminal") == term
+            mkdir(joinpath(apps, "iTerm.app"))
+            @test opened("auto") == iterm && opened("iterm2") == iterm
+            @test opened("wezterm") == wez && opened("terminal") == term
+        end
+    end
+
+    Platform.ismacos() && @testset "macOS Desktop icon" begin
+        d = mktempdir()
+        e = placeEnv(d)
+        b = mkpath(joinpath(d, "bundle"))
+        write(joinpath(b, "baysol"), "")
+        i = Install(; home = joinpath(d, "h"), structureCache = joinpath(d, "s"),
+            desktopIcon = true)
+        t = targets(; env = e, home = d)
+        log = applyInstall(i, b; env = e, home = d)  # no Desktop folder yet
+        @test any(occursin("desktop icon skipped", x) for x in log)
+        @test isdir(t.app)  # the icon needs the app bundle
+        mkpath(dirname(t.macIcon))
+        missing_(c) = any(occursin("desktop icon is missing", x) for x in c.fixable)
+        @test missing_(check(b; env = e, home = d))
+        # something else of that name is left alone
+        write(t.macIcon, "mine")
+        applyInstall(i, b; env = e, home = d)
+        @test read(t.macIcon, String) == "mine"
+        rm(t.macIcon)
+        # undone by a rollback
+        journal = Function[]
+        applyInstall(i, b; env = e, home = d, journal)
+        @test readlink(t.macIcon) == t.app
+        rollback!(journal)
+        @test !islink(t.macIcon)
+        # a refusal does not fail the setup
+        chmod(dirname(t.macIcon), 0o555)
+        log = applyInstall(i, b; env = e, home = d)
+        @test any(occursin("macOS refused", x) for x in log)
+        chmod(dirname(t.macIcon), 0o755)
+        applyInstall(i, b; env = e, home = d)
+        applyInstall(i, b; env = e, home = d)  # a second run is the same
+        @test isempty(check(b; env = e, home = d).fixable)
+        uninstall(b; i, env = e, home = d)
+        @test !islink(t.macIcon) && !isdir(t.app)
     end
 
     @testset "a failed apply is undone" begin
@@ -387,9 +485,12 @@ winOr(win, other) = Platform.iswindows() ? win : other
         end
     end
     @testset "PATH link is offered except on Windows" begin
-        ch = BAYSOLSetup.shortcutChoices()
-        @test ("PATH link" in ch) == !Platform.iswindows()
-        @test length(ch) == (Platform.iswindows() ? 3 : 4)
+        fields(os) = first.(BAYSOLSetup.shortcutChoices(os))
+        @test fields(:linux) == [:desktop, :desktopIcon, :taskbarPin, :pathLink]
+        @test fields(:windows) == [:desktop, :desktopIcon, :taskbarPin]
+        @test fields(:macos) == [:desktop, :desktopIcon, :pathLink]  # no GNOME pin
+        @test !any(occursin("GNOME", last(c)) for c in BAYSOLSetup.shortcutChoices(:macos))
+        @test BAYSOLSetup.shortcutChoices() == BAYSOLSetup.shortcutChoices(Platform.os())
     end
     @testset "_removeBundle: refusals, real removal, the PowerShell command" begin
         scratch = mktempdir()
@@ -547,6 +648,97 @@ winOr(win, other) = Platform.iswindows() ? win : other
                 scanDependencies(; env = Dict("COLORTERM" => ""),
                     which = fakeWhich(), dims = big), "truecolor").found
         end
+        @testset "iTerm2 on a Mac without Homebrew" begin
+            sixel = only(i for i in items if i.id == "sixel")
+            ran, have = Cmd[], Set{String}()
+            which = n -> n in have ? "/fake/bin/$n" : nothing
+            brewComes = c -> (push!(ran, c); push!(have, "brew"); true)
+            function offer(pick; runner = c -> (push!(ran, c); true), os = :macos)
+                empty!(ran)
+                return offerInstall(IOBuffer(), sixel, os; which, runner,
+                    ask = (p, c) -> pick)
+            end
+            @test [offer(k) for k in (0, 3, 4, 5)] == ["later", "later", "no", "never"]
+            @test isempty(ran)  # nothing runs without the choice
+            @test offer(2) == "later"
+            @test only(ran) == Cmd(["/usr/bin/open", BAYSOLSetup.ITERM_PAGE])
+            # the installer fails, or ends without Homebrew: iTerm2 is not tried
+            @test offer(1; runner = c -> (push!(ran, c); false)) == "later"
+            @test length(ran) == 1
+            @test offer(1) == "later" && length(ran) == 1
+            @test offer(1; runner = brewComes) == "yes"
+            @test ran[1] == BAYSOLSetup.BREW_INSTALL
+            @test ran[2] == Cmd(["/fake/bin/brew", "install", "--cask", "iterm2"])
+            # Homebrew is there now: the plain offer
+            @test offer(1) == "yes" && only(ran) == ran[1] && "install" in ran[1].exec
+            # iTerm2 installed, but BAYSOL runs in Terminal: nothing to install
+            r = scanDependencies([sixel]; env = Dict("TERM_PROGRAM" => "Apple_Terminal"),
+                which = fakeWhich("iTerm.app"), dims = big)
+            @test only(r).found && occursin("iTerm2 is installed", only(r).detail)
+            r = scanDependencies([sixel]; env = Dict("TERM_PROGRAM" => "Apple_Terminal"),
+                which = fakeWhich("WezTerm.app"), dims = big)
+            @test only(r).found && occursin("WezTerm is installed", only(r).detail)
+        end
+        @testset "Terminal font on macOS" begin
+            font = only(i for i in items if i.id == "font")
+            mac = Dict("TERM_PROGRAM" => "Apple_Terminal")
+            found(f; env = mac, w = fakeWhich("osascript")) =
+                BAYSOLSetup._detectFont(env, w; read = _ -> f).found
+            @test !found("SFMono-Regular 11") && !found("SFMono-Bold 14")
+            @test found("Menlo-Regular 14")
+            # not asked: the font is unknown, or it is another terminal
+            @test found(nothing) && found("") && found("SFMono-Regular 11"; w = fakeWhich())
+            @test found("SFMono-Regular 11"; env = Dict("TERM_PROGRAM" => "iTerm.app"))
+            @test BAYSOLSetup._macFont("/no/such/osascript") === nothing
+            for os in (:linux, :windows)
+                r = scanDependencies([font]; os, env = mac, which = fakeWhich(), dims = big)
+                @test !only(r).applicable
+            end
+            # changed only after an explicit yes
+            ran = Cmd[]
+            offer(pick, io = IOBuffer()) = offerInstall(io, font, :macos;
+                which = fakeWhich("osascript"), runner = c -> (push!(ran, c); true),
+                ask = (p, c) -> (@test c[1] == "Change now"; pick))
+            @test [offer(k) for k in (0, 2, 3, 4)] == ["later", "later", "no", "never"]
+            @test isempty(ran)
+            io = IOBuffer()
+            @test offer(1, io) == "yes"
+            @test only(ran) ==
+                  Cmd(["/fake/bin/osascript", "-e", BAYSOLSetup.MAC_FONT_SET])
+            text = String(take!(io))
+            @test occursin("osascript -e 'tell", text) && occursin("to undo", text)
+            report = IOBuffer()
+            dependencyReport(report, [DepResult(font, true, false, "SFMono-Regular 11")])
+            @test occursin("suggestion", String(take!(report)))
+        end
+        @testset "Terminal spacing on macOS" begin
+            spacing = only(i for i in items if i.id == "spacing")
+            mac = Dict("TERM_PROGRAM" => "Apple_Terminal")
+            found(x; env = mac) =
+                BAYSOLSetup._detectSpacing(env, fakeWhich(); read = _ -> x).found
+            @test found((1.0, 1.0)) && found(nothing)
+            @test !found((1.004032258064516, 1.0)) && !found((1.0, 1.1))
+            @test !found((0.9959677419354839, 1.0))
+            @test found((1.2, 1.2); env = Dict("TERM_PROGRAM" => "iTerm.app"))
+            @test BAYSOLSetup._macSpacing(fakeWhich()) === nothing
+            @test BAYSOLSetup._macSpacing(fakeWhich("osascript", "defaults", "plutil")) ===
+                  nothing
+            parsed = BAYSOLSetup._parseSpacing
+            @test parsed("<dict></dict>") == (1.0, 1.0)
+            @test parsed(
+                "<key>FontWidthSpacing</key>\n\t<real>1.004</real>" *
+                "<key>FontHeightSpacing</key><integer>2</integer>",
+            ) == (1.004, 2.0)
+            ran = Cmd[]
+            io = IOBuffer()
+            answers = [
+                offerInstall(io, spacing, :macos; which = fakeWhich(),
+                    runner = c -> (push!(ran, c); true), ask = (p, c) -> k) for k in 0:4
+            ]
+            @test answers == ["later", "yes", "later", "no", "never"]
+            @test isempty(ran)
+            @test occursin("character spacing and line spacing to 1.0", String(take!(io)))
+        end
         @testset "report content" begin
             r = scanDependencies(items; os = :linux, env = Dict{String,String}(),
                 which = fakeWhich("lualatex"), dims = big)
@@ -628,7 +820,9 @@ winOr(win, other) = Platform.iswindows() ? win : other
             run1([1, 2]; items)
             @test !isfile(file) && isempty(ran)
             # the folder of install.json exists once set up
-            i = Install(; home = "/h", structureCache = "/s", threads = 2)
+            # (folders that can be made: the apply below makes them)
+            h = joinpath(d, "h")
+            i = Install(; home = h, structureCache = joinpath(d, "s"), threads = 2)
             writeInstall(file, i)
             empty!(asks)
             # latex: Windows has no route (Not now = 1); sixel: winget route, Install now
@@ -636,7 +830,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
             @test readDepAnswers(file) == Dict("latex" => "later", "sixel" => "yes")
             @test length(ran) == 1
             back = readInstall(file)
-            @test back.threads == 2 && back.home == "/h"  # other fields kept
+            @test back.threads == 2 && back.home == h  # other fields kept
             @test occursin("\"dep.latex\": \"later\"", read(file, String))
             # asked again for "later" (the sixel item is still not detected here)
             empty!(asks)

@@ -731,3 +731,44 @@ end
         @test isempty(P.build_log_files(joinpath(dir, "none"), String[]))
     end
 end
+
+@testset "macOS: the Mach-O files of a bundle and their signatures" begin
+    mktempdir() do dir
+        mkpath(joinpath(dir, "lib"))
+        macho = [0xcf, 0xfa, 0xed, 0xfe, 0x00]
+        for f in ("baysol", joinpath("lib", "b.dylib"), joinpath("lib", "a.so"))
+            write(joinpath(dir, f), macho)
+        end
+        write(joinpath(dir, "note.txt"), "text")
+        write(joinpath(dir, "empty.so"), "")
+        # the libraries before the executable, nothing else
+        files = P.macho_files(dir)
+        @test relpath.(files, dir) ==
+              [joinpath("lib", "a.so"), joinpath("lib", "b.dylib"), "baysol"]
+        ran = Vector{String}[]
+        P.sign_macos(files; runner = c -> (push!(ran, collect(c.exec)); true))
+        @test length(ran) == 6
+        @test ran[1] == ["codesign", "--force", "--sign", "-", files[1]]
+        @test ran[2] == ["codesign", "--verify", "--strict", files[1]]
+        # a refused signature stops the build
+        @test_throws Exception P.sign_macos(files; runner = _ -> false)
+    end
+end
+
+@testset "macOS: the names the runtime libraries are shipped under" begin
+    names(file, bare, id) = P.macos_names(file, bare; id)
+    @test names("libz.1.3.1.dylib", nothing, "@rpath/libz.1.dylib") == ["libz.1.dylib"]
+    @test names("libopenlibm.4.0.dylib", "libopenlibm.dylib",
+        "@rpath/libopenlibm.4.dylib") == ["libopenlibm.4.dylib", "libopenlibm.dylib"]
+    v = "$(VERSION.major).$(VERSION.minor)"
+    # one name only: two copies would be two runtimes
+    @test names("libjulia-internal.$v.7.dylib", nothing,
+        "@rpath/libjulia-internal.dylib") == ["libjulia-internal.$v.dylib"]
+    @test names("/x/libfoo.dylib", nothing, nothing) == ["libfoo.dylib"]
+    ran = Vector{String}[]
+    P.relink_macos(["/b/libjulia-codegen.$v.dylib", "/b/baysol"];
+        runner = c -> (push!(ran, collect(c.exec)); true))
+    @test "@rpath/libjulia-internal.$v.dylib" in ran[2] && !("-id" in ran[2])
+    @test "-id" in ran[1] && ran[1][end] == "/b/libjulia-codegen.$v.dylib"
+    @test_throws Exception P.relink_macos(["/b/x"]; runner = _ -> false)
+end

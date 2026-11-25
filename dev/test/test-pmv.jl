@@ -301,11 +301,14 @@ end
         @test status == 1                      # a failed job is a non-zero status
     end
     if !Platform.iswindows()
-        # the level reaches the programs of a command
+        # the level reaches the programs of a command (`ps`: the `nice` of macOS prints
+        # no level when it is run without a command, as GNU's does)
+        probe = "ps -o nice= -p \$\$"
         with(P.Config.NICE => 7) do
-            @test P.Rism.sh_log("nice", dir, "n.log") == 0
+            @test P.Rism.sh_log(probe, dir, "n.log") == 0
         end
-        base = parse(Int, readchomp(`nice`))   # nice adds to the level this process has
+        # nice adds to the level this process has
+        base = parse(Int, strip(readchomp(`sh -c $probe`)))
         @test parse(Int, strip(read(joinpath(dir, "n.log"), String))) == min(19, base + 7)
     end
     status, out = run_tool("extract", "pmv", "batch", spec, "--nice", "40")

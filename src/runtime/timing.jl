@@ -75,7 +75,7 @@ mutable struct StageLog
             # the machine at the start of the run, for the log
             Dict{String,Any}(
                 "loadStart" => first(Sys.loadavg()),
-                "freeMemoryStart" => Sys.free_memory(),
+                "freeMemoryStart" => Platform.free_memory(),
             ),
             ReentrantLock(),
         )

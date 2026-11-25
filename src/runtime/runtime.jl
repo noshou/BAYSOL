@@ -9,6 +9,7 @@ module Runtime
 
 using SQLite: SQLite
 using DBInterface: DBInterface
+using ..Platform: Platform
 
 # the SQLite library (path of the jll), for `sqlite3_deserialize`, which SQLite.jl lacks
 const _LIBSQLITE = SQLite.C.SQLite_jll.libsqlite
