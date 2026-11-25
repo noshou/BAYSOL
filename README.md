@@ -30,8 +30,8 @@ the bug.
 - *Uninstalling leaves files behind.* After `App and caches` only the projects folder may stay;
   after `Everything` not even that. Left on macOS: an empty `settings.json` in the projects
   folder though there were no projects, the rest of the cache folder beside `_structures` (its
-  parent is kept too), the temporary folder `<tmp>/baysol`, and the icon in the Dock. The
-  interface that is still open after an uninstall (first bug) can write some of them again.
+  parent is kept too) and the temporary folder `<tmp>/baysol`. The interface that is still open
+  after an uninstall (first bug) can write some of them again.
 - *The tests of the interface leave `baysol-help-*` folders* (and `<tmp>/baysol`) in the
   temporary folder.
 - *The icon of the setup wizard is drawn with half blocks (`▀`)* and the large logo of the main
@@ -77,6 +77,9 @@ the bug.
   It should be Yes or No, and Yes should set the spacing to 1.0. Terminal has no scripting for
   it; importing a profile with that spacing is to be tried.
 - *`The icon opens it in:` says `Automatic (iTerm2 now)`*: the `(iTerm2 now)` should go.
+- *Uninstalling leaves the icon in the Dock*, where it points to the deleted `BAYSOL.app`. The
+  uninstall should remove every Dock entry of `org.baysol.app`, also one the user dragged there
+  (the wizard makes none and so lists none in its manifest).
 - *The app icon is clipped.* The icon works, but its artwork has to be redone for macOS.
 - *Some texts still say that macOS is untested*, also below.
 - *Three tests of the interface fail*: `compile plots` and two of the zip64 archive tests (955
