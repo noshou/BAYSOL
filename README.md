@@ -33,6 +33,9 @@ the bug.
   the Terminal of macOS, where it is fixed in the source (both are drawn with coloured spaces
   there; the new logo of the menu has not been looked at in Terminal yet). Other terminals keep
   the blocks and can show the same.
+- *The setup wizard has far too many options* and is confusing to read: a menu of six entries,
+  then folders, threads, launcher, terminal, shortcuts and, for each missing item, four answers
+  (Install now, Not now, No, Never ask again). It needs fewer questions and sensible defaults.
 - *SASDMJ9 has two chi-squared values*: 0.856 from the script of its fitting test, 2.649 from
   the exported project in the packaged program. The cause is not known.
 - *`bysl pkg` does not start the program it built*, so a package that cannot start passes.
@@ -41,9 +44,11 @@ the bug.
 
 **macOS**
 
-- *Quitting can leave a window that says `[Process completed]`.* The launcher now closes its
-  own Terminal window after a clean end; this was tested only with a stand-in program. A window
-  you opened yourself stays, and so does one after an error.
+- *Quitting still leaves a window that says `[Process completed]`.* The launcher of the package
+  (`launcher` in `dev/src/pkg.jl`) should close its own Terminal window after a clean end, but
+  the window stays. The cause is not confirmed. One fault found: the launcher takes the first
+  window with its tty, and Terminal reports the old tty of a finished window even after a new
+  one has the same, so it can pick the wrong window, or close it.
 - *Gatekeeper blocks a package downloaded with a browser*: it is signed ad hoc, not with a
   Developer ID. Run `xattr -dr com.apple.quarantine baysol` on the unpacked folder.
 - *The default Terminal font (SF Mono 11) makes the interface look bad.* The wizard suggests
