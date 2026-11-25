@@ -34,8 +34,14 @@ the bug.
   there; the new logo of the menu has not been looked at in Terminal yet). Other terminals keep
   the blocks and can show the same.
 - *The setup wizard has far too many options* and is confusing to read: a menu of six entries,
-  then folders, threads, launcher, terminal, shortcuts and, for each missing item, four answers
-  (Install now, Not now, No, Never ask again). It needs fewer questions and sensible defaults.
+  then folders, threads, launcher, terminal, shortcuts and the missing items. It needs fewer
+  questions and sensible defaults.
+- *The questions of the wizard are not yes or no.* A missing item is asked with Install now,
+  Not now, No and Never ask again, which do not make sense together. Every question of this
+  kind should be Yes or No.
+- *`Install LaTeX engine (TeX Live)?` can have no answer that installs it*: it was shown with Not
+  now, No and Never ask again only, because an install that needs administrator rights is never
+  run by the wizard. It should not be asked as a question then.
 - *SASDMJ9 has two chi-squared values*: 0.856 from the script of its fitting test, 2.649 from
   the exported project in the packaged program. The cause is not known.
 - *`bysl pkg` does not start the program it built*, so a package that cannot start passes.
@@ -52,11 +58,14 @@ the bug.
 - *Gatekeeper blocks a package downloaded with a browser*: it is signed ad hoc, not with a
   Developer ID. Run `xattr -dr com.apple.quarantine baysol` on the unpacked folder.
 - *The default Terminal font (SF Mono 11) makes the interface look bad.* The wizard suggests
-  Menlo 14; Terminal has no scripting for the character and line spacing, so 1.0 has to be set
-  by hand.
+  Menlo 14; The character and line spacing has to be set to 1.0 by hand.
 - *Terminal shows no sixel figures*; use iTerm2 or WezTerm. Installing Homebrew and iTerm2 from
   the wizard and starting BAYSOL from its icon were tried and work; opening it in WezTerm and
   the Desktop permission prompt are untested.
+- *`Change the Terminal spacing?` changes nothing*: it shows the steps and offers `I changed it`.
+  It should be Yes or No, and Yes should set the spacing to 1.0. Terminal has no scripting for
+  it; importing a profile with that spacing is to be tried.
+- *`The icon opens it in:` says `Automatic (iTerm2 now)`*: the `(iTerm2 now)` should go.
 - *The app icon is clipped.* The icon works, but its artwork has to be redone for macOS.
 - *Some texts still say that macOS is untested*, also below.
 - *Three tests of the interface fail*: `compile plots` and two of the zip64 archive tests (955
