@@ -95,7 +95,8 @@ function parse(zip: Buffer): {
         })
         at += 46 + nameLength + extraLength
     }
-    assert.equal(at, (z64?.offset ?? eocd.offset) + (z64?.size ?? eocd.size), "directory size")
+    const dirEnd = (z64?.offset ?? eocd.offset) + (z64?.size ?? eocd.size)
+    assert.equal(at, dirEnd, "directory size")
     return { central, eocd, ...(z64 ? { z64 } : {}), ...(locator ? { locator } : {}) }
 }
 
@@ -121,8 +122,15 @@ async function make(limits: ZipLimits): Promise<Buffer> {
     assert.ok(bytes.equals(readFileSync(async_)), "sync and async agree")
     const tested = spawnSync(archiveTool(), ["t", "-bd", sync], { encoding: "utf-8" })
     assert.equal(tested.status, 0, `7-Zip: ${tested.stdout}${tested.stderr}`)
-    assert.deepEqual(listEntries(sync).map((e) => e.name).sort(), [...ORDER].sort())
-    for (const name of ORDER) assert.equal(readEntry(sync, name).toString("utf-8"), FILES[name])
+    assert.deepEqual(
+        listEntries(sync)
+            .map((e) => e.name)
+            .sort(),
+        [...ORDER].sort(),
+    )
+    for (const name of ORDER) {
+        assert.equal(readEntry(sync, name).toString("utf-8"), FILES[name])
+    }
     return bytes
 }
 
@@ -189,7 +197,10 @@ test(
         assert.equal(zip.readUInt32LE(at + 22), 0xffffffff)
         const nameLength = zip.readUInt16LE(at + 26)
         assert.equal(zip.readUInt16LE(at + 28), 20)
-        assert.deepEqual(values(zip.subarray(at + 30 + nameLength, at + 50 + nameLength)), [20, 20])
+        assert.deepEqual(
+            values(zip.subarray(at + 30 + nameLength, at + 50 + nameLength)),
+            [20, 20],
+        )
         // the others stay classic
         for (const c of p.central.filter((c) => c !== big)) {
             assert.equal(c.version, 20)
@@ -222,7 +233,8 @@ test(
         for (const [i, c] of rest.entries()) {
             const at = places[i] as number
             assert.equal(zip.readUInt32LE(at), 0x04034b50)
-            assert.equal(zip.subarray(at + 30, at + 30 + Buffer.byteLength(c.name)).toString(), c.name)
+            const nameEnd = at + 30 + Buffer.byteLength(c.name)
+            assert.equal(zip.subarray(at + 30, nameEnd).toString(), c.name)
         }
         // the directory is past the limit too
         assert.ok(p.z64)

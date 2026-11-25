@@ -13,13 +13,7 @@
 #
 # plus `julia/` (the runtime libraries), the icon of the system and the launcher script, at
 # the root. The data tables, the revision are inside `baysol` and the assets and the version
-# inside `baysol-tui`, so there is no data, assets, VERSION or REVISION to lose. A build is
-# COLD, always (owner, 2026-11-23): it starts from an empty scratch folder and uses its own
-# Julia depot, uv, Nuitka and fit caches inside it (`cold_env`), never the user's, and
-# deletes them when the archive is written. Only `--resume` (or `--stage`) continues an
-# earlier, failed build: a marker file per stage in the work folder. The build is stopped
-# when free swap drops under 500 MB (zswap and zram show as swap), by PID, never by name.
-# macOS and Windows paths are written and untested: they say so when they do not apply.
+# inside `baysol-tui`.
 module PkgTool
 
 using ..Common
@@ -34,6 +28,7 @@ and the icons, `baysol-<semver>-<os>-<arch>.zip` (deflate, 7-Zip maximum setting
 
     bysl pkg    [--out DIR] [--work DIR] [--workload DIR] [--stage NAME] [--resume]
                 [--keep-work] [--dry-run]
+    bysl pkg log [NAME...] [--steps]
 
     --out DIR       the folder the archive is written to (default: the folder you run
                     this from)
@@ -51,6 +46,11 @@ and the icons, `baysol-<semver>-<os>-<arch>.zip` (deflate, 7-Zip maximum setting
                     of starting cold; stages with a marker are skipped
     --keep-work     keep the scratch folder after the archive is written
     --dry-run       print the plan and the preflight, build nothing
+
+    log             read the build logs of `dev/build-logs/` (those whose file name contains
+                    a NAME, else all) as a short view: version, system, host, and the time
+                    and peak RAM and swap of each stage; several logs end with one
+                    comparison row each; --steps adds the steps inside a stage
 
 The stages, in order: `pytools` (propka and pdb2pqr, Nuitka), `tui` (Node single
 executable), `trace` (the fits of TRACE_ENTRIES and every synthetic fit, run on copies
@@ -983,8 +983,9 @@ function stage_tui(work)
         m in ("react-devtools-core", "7zip-bin")
     ]
     ok = rc(
-        `$esbuild $(joinpath(tui, "src", "main.tsx")) --bundle --platform=node --main-fields=module,main --format=esm
-        --target=node24 --minify --log-level=warning --outfile=$bundle --banner:js=$banner
+        `$esbuild $(joinpath(tui, "src", "main.tsx")) --bundle --platform=node
+        --main-fields=module,main --format=esm --target=node24 --minify
+        --log-level=warning --outfile=$bundle --banner:js=$banner
         $aliases`,
     )
     need(ok, "esbuild failed")
@@ -2032,7 +2033,8 @@ function make_archive(work, archive)
         "no 7-Zip found (npm install gives 7zip-bin, or put 7zz on PATH)",
     )
     ok = rc(
-        `$sevenzip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15 $archive $(joinpath(work, "bundle", "baysol"))`,
+        `$sevenzip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15 $archive
+        $(joinpath(work, "bundle", "baysol"))`,
     )
     need(ok && isfile(archive), "the archive was not written")
 end
@@ -2200,6 +2202,7 @@ function run(argv::Vector{String})::Int
         usage(USAGE)
         return 0
     end
+    isempty(argv) || argv[1] != "log" || return log_command(argv[2:end])
     a = split_args(WHO, ["--out", "--work", "--workload", "--stage"],
         ["--dry-run", "--keep-work", "--resume"], argv)
     isempty(a.specs) || fail(WHO, "unexpected argument $(first(a.specs))")
@@ -2265,12 +2268,16 @@ function run(argv::Vector{String})::Int
                     stage_julia(work, workload_folder(work, workload))
                 else
                     stage_bundle(work)
-                    only === nothing &&
-                        step("archive (7-Zip)", () -> make_archive(work, archive))
+                    true    # a `false` would count as a failed stage
                 end; top = true)
             write_report(report, archive)
             ok || (failed = true; break)
         end
+    end
+    # a full run always ends with the archive, also when `--resume` found every stage done
+    if !failed && only === nothing
+        step("archive (7-Zip)", () -> make_archive(work, archive); top = true) ||
+            (failed = true)
     end
     note("total      $(round((time() - t_all) / 60; digits = 1)) min"; terminal = true)
     write_report(report, archive)
@@ -2296,5 +2303,7 @@ function run(argv::Vector{String})::Int
     end
     return 0
 end
+
+include("pkg-log.jl")
 
 end

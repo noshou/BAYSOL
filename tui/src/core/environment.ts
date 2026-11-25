@@ -258,8 +258,8 @@ function isWithin(path: string, dir: string): boolean {
 }
 
 /**
- * The general cache, `_cache` in [[cacheFolder]] (`Platform.default_cache`; fixtures live in
- * it).
+ * The general cache, `_cache` in [[cacheFolder]] (`Platform.default_cache`; fixtures live
+ * in it).
  */
 export const defaultCache = (system: System): string => join(cacheFolder(system), "_cache")
 

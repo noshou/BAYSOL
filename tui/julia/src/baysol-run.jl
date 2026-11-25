@@ -533,23 +533,30 @@ end
 # rights exists, an invalid id does not, and a handle whose exit code is not STILL_ACTIVE
 # (259) belongs to a process that has ended (its id may stay open while a handle is held).
 # Standard library only: `ccall` into kernel32 with concrete signatures.
-function _pidExistsWindows(pid::Int)::Union{Bool,Nothing}
-    (pid > 0 && pid <= typemax(UInt32)) || return false
-    h = ccall((:OpenProcess, "kernel32"), stdcall, Ptr{Cvoid},
-        # PROCESS_QUERY_LIMITED_INFORMATION
-        (UInt32, Int32, UInt32), 0x00001000, 0, pid % UInt32)
-    if h == C_NULL
-        err = ccall((:GetLastError, "kernel32"), stdcall, UInt32, ())
-        err == 5 && return true    # ERROR_ACCESS_DENIED: it exists
-        err == 87 && return false  # ERROR_INVALID_PARAMETER: no such process
-        return nothing
+# `@static`: `stdcall` cannot be compiled for any other system (LLVM aborts with
+# "Unsupported calling convention" when juliac compiles the function on aarch64 Linux), so
+# only Windows gets the real function.
+@static if Sys.iswindows()
+    function _pidExistsWindows(pid::Int)::Union{Bool,Nothing}
+        (pid > 0 && pid <= typemax(UInt32)) || return false
+        h = ccall((:OpenProcess, "kernel32"), stdcall, Ptr{Cvoid},
+            # PROCESS_QUERY_LIMITED_INFORMATION
+            (UInt32, Int32, UInt32), 0x00001000, 0, pid % UInt32)
+        if h == C_NULL
+            err = ccall((:GetLastError, "kernel32"), stdcall, UInt32, ())
+            err == 5 && return true    # ERROR_ACCESS_DENIED: it exists
+            err == 87 && return false  # ERROR_INVALID_PARAMETER: no such process
+            return nothing
+        end
+        code = Ref{UInt32}(0)
+        ok = ccall((:GetExitCodeProcess, "kernel32"), stdcall, Int32,
+            (Ptr{Cvoid}, Ref{UInt32}), h, code)
+        ccall((:CloseHandle, "kernel32"), stdcall, Int32, (Ptr{Cvoid},), h)
+        ok == 0 && return nothing
+        return code[] == 259
     end
-    code = Ref{UInt32}(0)
-    ok = ccall((:GetExitCodeProcess, "kernel32"), stdcall, Int32,
-        (Ptr{Cvoid}, Ref{UInt32}), h, code)
-    ccall((:CloseHandle, "kernel32"), stdcall, Int32, (Ptr{Cvoid},), h)
-    ok == 0 && return nothing
-    return code[] == 259
+else
+    _pidExistsWindows(::Int)::Union{Bool,Nothing} = nothing
 end
 
 """

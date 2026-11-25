@@ -503,7 +503,9 @@ test("open runs lists a packed run's files like a plain run's", async () => {
         assert.match(readRunText(run.dir, file), /fit/)
     }
     assert.ok(
-        [packed.dir, plain.dir].every((d) => runs.some((r) => normalize(r.dir) === normalize(d))),
+        [packed.dir, plain.dir].every((d) =>
+            runs.some((r) => normalize(r.dir) === normalize(d)),
+        ),
     )
 })
 

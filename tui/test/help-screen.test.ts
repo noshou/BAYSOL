@@ -27,6 +27,13 @@ test("the help text covers setup and uninstalling", () => {
     assert.match(text, /baysol setup/)
 })
 
+test("the help text tells what to do with a fit that does not converge", () => {
+    const text = helpText()
+    assert.match(text, /Fits that do not converge/)
+    assert.match(text, /another seed/)
+    assert.match(text, /shorter ladder/)
+})
+
 test("without a packaged app the wizard is a problem, not an uninstall", () => {
     const result = runSetupWizard({})
     assert.equal(result.uninstalled, false)

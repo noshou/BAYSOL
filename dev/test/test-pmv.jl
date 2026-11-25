@@ -108,7 +108,7 @@ end
 
 const OUT = scratch_dir()
 
-@needs_rdkit @testset "ACCEPTANCE: the fit on 88 calibration solutes reproduces the Python \n    numbers" begin
+@needs_rdkit @testset "ACCEPTANCE: the 88-solute fit reproduces the Python numbers" begin
     status, out = run_tool("extract", "pmv", "--out", OUT, "fit")
     @test status == 0
     out_model = with(P.Config.OUT => OUT) do

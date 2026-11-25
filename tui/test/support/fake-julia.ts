@@ -167,7 +167,9 @@ if (mode === "done" || mode === "failed" || mode === "plots") {
     setTimeout(() => process.exit(3), 100)
 } else {
     // hang, stubborn, eof: a grandchild in the same group, then wait
-    const grandchild = spawn(process.execPath, ["-e", "setTimeout(() => {}, 300000)"], { stdio: "ignore" })
+    const grandchild = spawn(process.execPath, ["-e", "setTimeout(() => {}, 300000)"], {
+        stdio: "ignore",
+    })
     if (process.env.FAKE_PIDFILE)
         writeFileSync(process.env.FAKE_PIDFILE, `${process.pid} ${grandchild.pid}\n`)
     process.stdout.write("ready\n")

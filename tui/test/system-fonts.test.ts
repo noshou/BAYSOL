@@ -506,7 +506,10 @@ test("the registry fonts come from PowerShell as UTF-8, not from `reg query`", (
     assert.equal(mode, "-Command")
     // UTF-8 output, both hives, the key once with
     // single backslashes, reg-query-shaped lines
-    assert.match(script ?? "", /OutputEncoding = \(New-Object System\.Text\.UTF8Encoding \$false\)/)
+    assert.match(
+        script ?? "",
+        /OutputEncoding = \(New-Object System\.Text\.UTF8Encoding \$false\)/,
+    )
     assert.match(script ?? "", /'HKLM','HKCU'/)
     assert.ok(
         (script ?? "").includes(

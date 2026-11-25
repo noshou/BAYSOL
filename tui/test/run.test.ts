@@ -797,7 +797,9 @@ test("a child that ignores SIGTERM is killed after the grace, with a note", asyn
         const aborted = /=== ERRORS ===\ntui: aborted from the terminal interface \(\^d\)/
         assert.match(
             log,
-            process.platform === "win32" ? aborted : new RegExp(`${aborted.source}; killed`),
+            process.platform === "win32"
+                ? aborted
+                : new RegExp(`${aborted.source}; killed`),
         )
     } finally {
         flow.abort.graceSeconds = before

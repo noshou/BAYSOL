@@ -291,6 +291,15 @@ energy), the project menu shows **`run: shift+r`** at the bottom. Press **shift+
 3. At the end the counter says `done`, `failed` or `aborted` and **Enter** goes back to the project
    menu. A failed run shows the first line of its error.
 
+**A fit that takes far longer than similar ones.** When the first attempt is borderline (the
+chains nearly agree, `R̂` just above 1.01), the retry ladder runs longer warm-ups and longer
+chains, and each rung costs more than the one before; the ladder does not guarantee that the
+fit ends in convergence. The number of attempts also depends on the seed and on the computer:
+the same fit can take 3 attempts on one machine and 10 on another. If a fit is much slower than
+usual, stop it with **^c** and try another **RNG seed** (Settings, sampler, sampling) or a
+shorter **retry ladder** (Settings, sampler, retry ladder) before allowing more; a different seed
+costs one normal attempt, but do not shop for a seed that passes: report the one you used. A failed run still writes its log, with the class of the failure.
+
 **^c (or ^d) stops the run and quits the program**: Julia is asked to finish its log, then
 stopped. Only one run per project can be live at once: another start says
 `a run is in progress (pid N)`. While it runs you can edit nothing that it uses: it works on a copy of your project
@@ -422,6 +431,7 @@ through a temporary file, so a crash never leaves half a file.
 | `missing components: ...` where `run: shift+r` should be | The box names what is missing (`models`, `solutes`, `pH`, `temperature`, `data`, `energy`); `run: shift+r` replaces it once the list is empty. |
 | `a run is in progress (pid N)` | The project already has a live run (maybe in another window). Wait for it, or stop it. A crashed run is marked `interrupted` after a minute and stops blocking. |
 | `could not start julia: ...` | `julia` is not on the PATH. Install it, or set the environment variable `JULIA` to its full path. |
+| A fit runs far longer than similar ones | The retry ladder is working through a borderline fit and may not converge. Stop it (`^c`), then try another RNG seed or a shorter retry ladder (see "5. Run"). |
 | A model is `failed`; its first error line is on the run screen | Read the `ERRORS` section at the end of `run.LOG` (`^l` in `open runs`). Other models in the run are still fitted. |
 | `WLSError` in the log | The fit had too few points (fewer than 3) or the model curve is flat across your q range. Check the curve, the q units and the energy. |
 | `a number, please` / `from 0 to 100 °C` | The temperature prompt of `^g` in the buffer wants a number in that range. |

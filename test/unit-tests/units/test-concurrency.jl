@@ -314,7 +314,7 @@ nCollections() = Base.gc_num().pause
     end
 
     # -----------------------------------------------------------------------
-    @testset "excluded volumes: the same to rounding at every worker count, under \n        chaos" begin
+    @testset "excluded volumes: the same to rounding at every worker count, chaos" begin
         @test agreeAcrossWorkers(() -> vols(concMol()))
     end
 
