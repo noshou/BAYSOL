@@ -52,9 +52,28 @@ const LATEX_ENGINES = ("lualatex", "xelatex", "pdflatex")
 "The terminal size the interface needs (columns, rows): `minColumns` and `minRows`."
 const MIN_TERMINAL = (80, 24)
 
+"The font (PostScript name) and size (points) that the check suggests for Terminal.app."
+const MAC_FONT = ("Menlo-Regular", 14)
+
+"AppleScript: the profile of the front Terminal window (the one the wizard runs in)."
+const MAC_PROFILE = "settings set (name of current settings of front window)"
+
+"AppleScript that reads the font and size of the front Terminal window."
+const MAC_FONT_READ =
+    "tell application \"Terminal\" to get (font name of $MAC_PROFILE) & \" \" & " *
+    "(font size of $MAC_PROFILE)"
+
+"AppleScript that gives that profile the suggested font and size."
+const MAC_FONT_SET =
+    "tell application \"Terminal\" to tell $MAC_PROFILE to set " *
+    "{font name, font size} to {\"$(MAC_FONT[1])\", $(MAC_FONT[2])}"
+
 "The items of the check."
 function defaultItems()::Vector{DepItem}
     allOS = [:windows, :macos, :linux]
+    brew = DepItem("brew", "Homebrew", :optional, [:macos],
+        "Only to install optional things such as iTerm2 from here; BAYSOL works without it.",
+        false, Route[], [:macos => "By hand: https://brew.sh"])
     latex = DepItem("latex", "LaTeX engine (TeX Live)", :optional, allOS,
         "Only renders plots to PDF. It is large (gigabytes); BAYSOL works without it.",
         false,
@@ -111,10 +130,52 @@ function defaultItems()::Vector{DepItem}
     size = DepItem("size", "Terminal of at least 80 x 24", :info, allOS,
         "The interface asks for 80 columns and 24 rows; resize the window if it is " *
         "smaller.", false, Route[], Pair{Symbol,String}[])
-    return [latex, sixel, color, size]
+    font = DepItem("font", "Terminal font", :optional, [:macos],
+        "Terminal's default font, SF Mono, can draw the logo, borders and text roughly. " *
+        "Menlo $(MAC_FONT[2]) pt (part of macOS) is suggested. It changes the Terminal " *
+        "profile of this window, for every window that uses it.",
+        false, [Route(:macos, "osascript", ["-e", MAC_FONT_SET], false)],
+        [
+            :macos =>
+                "By hand, or to undo: Terminal > Settings > Profiles > Text > Font " *
+                "(the default is SF Mono 11 pt).",
+        ])
+    spacing = DepItem("spacing", "Terminal character and line spacing", :optional,
+        [:macos],
+        "Spacing other than 1.0 can leave gaps in the logo and borders.",
+        false, Route[],
+        [
+            :macos =>
+                "In Terminal > Settings > Profiles, pick this window's profile, then Text: " *
+                "set character spacing and line spacing to 1.0.",
+        ])
+    return [brew, latex, sixel, color, size, font, spacing]
+end
+
+"""
+Where the program `name` is (`Platform.which`), or `nothing`. On macOS also Homebrew in its
+own folders (an app opened from Finder does not have them on the PATH) and an app
+(`iTerm.app`) in the application folders.
+"""
+function _find(name::AbstractString)::Union{String,Nothing}
+    p = Platform.which(name)::Union{String,Nothing}
+    (p === nothing && Platform.ismacos()) || return p
+    places =
+        name == "brew" ? ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] :
+        endswith(name, ".app") ?
+        ["/Applications/$name", joinpath(homedir(), "Applications", name)] :
+        String[]
+    k = findfirst(ispath, places)
+    return k === nothing ? nothing : places[k]
 end
 
 # ---- the detectors ---------------------------------------------------------------------
+
+"Homebrew, on the PATH or in its own folders (`_find`)."
+function _detectBrew(which)::Detection
+    p = which("brew")::Union{String,Nothing}
+    return p === nothing ? Detection(false, "not installed") : Detection(true, p)
+end
 
 "The first LaTeX engine on the PATH (`which` is `Platform.which`, or a stand-in)."
 function _detectLatex(which)::Detection
@@ -145,6 +206,10 @@ function _detectSixel(env, which)::Detection
     elseif haskey(env, "KONSOLE_VERSION")
         return Detection(true, "Konsole (sixel needs a recent version)")
     end
+    for t in MAC_TERMINALS
+        which(t.app)::Union{String,Nothing} === nothing || return Detection(true,
+            "$(t.name) is installed; start BAYSOL from it for rendered figures")
+    end
     for name in ("wezterm", "foot", "konsole")
         (which(name)::Union{String,Nothing}) === nothing && continue
         return Detection(
@@ -171,12 +236,93 @@ function _detectSize(dims::Tuple{Int,Int})::Detection
     return Detection(ok, "$cols x $rows")
 end
 
+"""
+The font and size of the front Terminal window (`SFMono-Regular 11`), `nothing` on failure.
+"""
+function _macFont(osascript::AbstractString)::Union{String,Nothing}
+    try
+        cmd = Cmd([osascript, "-e", MAC_FONT_READ])
+        return String(strip(read(pipeline(cmd; stderr = devnull), String)))
+    catch e
+        e isa InterruptException && rethrow()
+        return nothing
+    end
+end
+
+"""
+Whether the font needs no change: only SF Mono in Terminal.app is told to change. Another
+terminal, and a font that cannot be read, are left alone. `read` is `_macFont` or a
+stand-in.
+"""
+function _detectFont(env, which; read = _macFont)::Detection
+    get(env, "TERM_PROGRAM", "") == "Apple_Terminal" ||
+        return Detection(true, "not Terminal.app")
+    exe = which("osascript")::Union{String,Nothing}
+    font = exe === nothing ? nothing : read(exe)::Union{String,Nothing}
+    (font === nothing || isempty(font)) && return Detection(true, "could not be read")
+    return Detection(!startswith(font, "SFMono"), font)
+end
+
+"AppleScript that reads the name of the front Terminal window's profile."
+const MAC_PROFILE_READ = "tell application \"Terminal\" to get name of current settings of front window"
+
+"""
+The character and line spacing in the property list `xml` of a Terminal profile. A profile
+leaves out the spacing that was never changed, which is 1.
+"""
+function _parseSpacing(xml::AbstractString)::Tuple{Float64,Float64}
+    value(key) = begin
+        m = match(Regex("<key>$key</key>\\s*<(?:real|integer)>([^<]+)<"), xml)
+        m === nothing ? 1.0 : parse(Float64, m[1]::AbstractString)
+    end
+    return value("FontWidthSpacing"), value("FontHeightSpacing")
+end
+
+"""
+The spacing of the front Terminal window's profile, as Terminal has saved it; `nothing` when
+it cannot be read. Nothing is written.
+"""
+function _macSpacing(which)::Union{Tuple{Float64,Float64},Nothing}
+    tools = map(which, ("osascript", "defaults", "plutil"))
+    any(isnothing, tools) && return nothing
+    osascript, defaults, plutil = tools
+    try
+        quiet(cmd) = pipeline(cmd; stderr = devnull)
+        profile = strip(read(quiet(`$osascript -e $MAC_PROFILE_READ`), String))
+        isempty(profile) && return nothing
+        path = "Window Settings." * replace(profile, "." => "\\.")  # a dot parts the path
+        plist = read(quiet(`$defaults export com.apple.Terminal -`))
+        extract = quiet(`$plutil -extract $path xml1 -o - -`)
+        return _parseSpacing(read(pipeline(extract; stdin = IOBuffer(plist)), String))
+    catch e
+        e isa InterruptException && rethrow()
+        return nothing
+    end
+end
+
+"""
+Whether the spacing is 1.0 both ways. Another terminal, and a spacing that cannot be read,
+are left alone. `read` is `_macSpacing` or a stand-in.
+"""
+function _detectSpacing(env, which; read = _macSpacing)::Detection
+    get(env, "TERM_PROGRAM", "") == "Apple_Terminal" ||
+        return Detection(true, "not Terminal.app")
+    got = read(which)::Union{Tuple{Float64,Float64},Nothing}
+    got === nothing && return Detection(true, "could not be read")
+    ok = all(x -> isapprox(x, 1; atol = 1e-4), got)
+    w, h = round.(got; digits = 4)
+    return Detection(ok, "character $w, line $h")
+end
+
 "The detector of `item`, chosen by its id."
 function _detect(item::DepItem, env, which, dims::Tuple{Int,Int})::Detection
+    item.id == "brew" && return _detectBrew(which)
     item.id == "latex" && return _detectLatex(which)
     item.id == "sixel" && return _detectSixel(env, which)
     item.id == "truecolor" && return _detectTruecolor(env)
     item.id == "size" && return _detectSize(dims)
+    item.id == "font" && return _detectFont(env, which)
+    item.id == "spacing" && return _detectSpacing(env, which)
     return Detection(false, "")
 end
 
@@ -188,7 +334,7 @@ false). `env`, `which` and `dims` (rows, columns) can be faked by a test.
 """
 function scanDependencies(items::Vector{DepItem} = defaultItems();
     os::Symbol = Platform.os(),
-    env = ENV, which = Platform.which, dims::Tuple{Int,Int} = displaysize(stdout),
+    env = ENV, which = _find, dims::Tuple{Int,Int} = displaysize(stdout),
     detect = _detect)::Vector{DepResult}
     out = DepResult[]
     for item in items
@@ -208,6 +354,7 @@ end
 function _status(r::DepResult)::String
     r.applicable || return "not applicable"
     r.found && return r.item.hint ? "present (hint)" : "present"
+    r.item.id in ("font", "spacing") && return "suggestion"
     r.item.level == :required && return "MISSING (required)"
     r.item.level == :optional && return "missing (optional)"
     return "no"
@@ -253,7 +400,8 @@ function saveDepAnswers(answers::Dict{String,String}; env = ENV, home = homedir(
         Install(; home = i.home,
             structureCache = i.structureCache, desktop = i.desktop,
             desktopIcon = i.desktopIcon, taskbarPin = i.taskbarPin, pathLink = i.pathLink,
-            threads = i.threads, opens = i.opens, deps = answers),
+            threads = i.threads, opens = i.opens,
+            terminal = i.terminal, deps = answers),
     )
     return true
 end
@@ -262,7 +410,8 @@ end
 
 "The text of a route as the user would type it (`sudo` first when it needs rights)."
 function routeText(r::Route)::String
-    return join([(r.admin ? ["sudo"] : String[]); r.manager; r.args], " ")
+    args = [occursin(' ', a) ? "'$a'" : a for a in r.args]
+    return join([(r.admin ? ["sudo"] : String[]); r.manager; args], " ")
 end
 
 "The first route for `os` whose package manager is found, or `nothing`."
@@ -295,6 +444,77 @@ end
 _askChoice(prompt::AbstractString, choices::Vector{String})::Int =
     request(prompt, RadioMenu(choices))
 
+"The installer of Homebrew, as https://brew.sh gives it (it asks before it does anything)."
+const BREW_INSTALL = Cmd([
+    "/bin/bash",
+    "-c",
+    "script=\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/" *
+    "install.sh) && exec /bin/bash -c \"\$script\"",
+])
+
+"Where iTerm2 is downloaded by hand."
+const ITERM_PAGE = "https://iterm2.com/downloads.html"
+
+"Runs Homebrew's installer; whether Homebrew is there afterwards."
+function _installBrew(io::IO, which, runner)::Bool
+    ok = runner(BREW_INSTALL)::Bool && (which("brew")::Union{String,Nothing}) !== nothing
+    ok || println(io, "  Homebrew was not installed.")
+    return ok
+end
+
+"What the user should know before Homebrew's installer runs."
+function _brewNote(io::IO)
+    println(io, "  Homebrew's own installer asks for your password, and it may download")
+    println(io, "  Apple's Command Line Tools.")
+    return nothing
+end
+
+"The offer of Homebrew (macOS). Returns the answer to remember."
+function _offerBrew(io::IO, item::DepItem; which, runner, ask)::String
+    _brewNote(io)
+    println(io, "  ", manualText(item, :macos))
+    pick =
+        ask("Install Homebrew?", ["Install now", "Not now", "No", "Never ask again"])::Int
+    if pick == 1
+        _installBrew(io, which, runner) || return "later"
+        println(io, "  Done.")
+        return "yes"
+    end
+    return pick == 3 ? "no" : pick == 4 ? "never" : "later"
+end
+
+"""
+The offer of iTerm2 on a Mac without Homebrew: Homebrew and then iTerm2, or the download
+page of iTerm2. Nothing runs without that choice. Returns the answer to remember.
+"""
+function _offerITerm(io::IO, item::DepItem; which, runner, ask)::String
+    println(io, "  Homebrew and iTerm2 are not installed.")
+    _brewNote(io)
+    println(io, "  The iTerm2 download page needs no Homebrew.")
+    pick = ask("Install iTerm2?",
+        ["Install Homebrew, then iTerm2", "Open the iTerm2 download page", "Not now",
+            "No",
+            "Never ask again"])::Int
+    if pick == 1
+        _installBrew(io, which, runner) || return "later"
+        brew = which("brew")::Union{String,Nothing}
+        brew === nothing && return "later"
+        ok = runner(Cmd([brew, "install", "--cask", "iterm2"]))::Bool
+        println(
+            io,
+            ok ?
+            "  Done. The BAYSOL icon now opens in iTerm2, unless you chose another terminal." :
+            "  Homebrew is installed, but iTerm2 could not be.",
+        )
+        return ok ? "yes" : "later"
+    elseif pick == 2
+        runner(Cmd(["/usr/bin/open", ITERM_PAGE]))::Bool ||
+            println(io, "  Could not open it: ", ITERM_PAGE)
+        return "later"
+    end
+    return pick == 4 ? "no" : pick == 5 ? "never" : "later"
+end
+
 """
     offerInstall(io, item, os; which, runner, ask) -> String
 
@@ -304,11 +524,14 @@ The command only runs when the user picks Install now, only when the package man
 found and the command needs no administrator rights; otherwise the command or the manual
 text is shown. `runner(cmd) -> Bool` runs it (a test passes one that only records).
 """
-function offerInstall(io::IO, item::DepItem, os::Symbol; which = Platform.which,
+function offerInstall(io::IO, item::DepItem, os::Symbol; which = _find,
     runner = _runCommand, ask = _askChoice)::String
     route = pickRoute(item, os, which)
     manual = manualText(item, os)
     println(io, item.name, ": ", item.why)
+    item.id == "brew" && return _offerBrew(io, item; which, runner, ask)
+    item.id == "sixel" && os == :macos && route === nothing &&
+        return _offerITerm(io, item; which, runner, ask)
     canRun = false
     if route === nothing
         any(r -> r.os == os, item.routes) &&
@@ -320,13 +543,21 @@ function offerInstall(io::IO, item::DepItem, os::Symbol; which = Platform.which,
         isempty(manual) || println(io, "  ", manual)
     else
         println(io, "  Command: ", routeText(route))
+        item.id == "font" && println(io, "  ", manual)
         canRun = true
     end
+    font = item.id == "font"  # a setting, nothing is installed
+    if item.id == "spacing"  # Terminal has no command for it: the user changes it
+        pick = ask("Change the Terminal spacing?",
+            ["I changed it", "Not now", "No", "Never ask again"])::Int
+        return pick in 1:4 ? ("yes", "later", "no", "never")[pick] : "later"
+    end
     names =
-        canRun ? ["Install now", "Not now", "No", "Never ask again"] :
+        canRun ? [font ? "Change now" : "Install now", "Not now", "No", "Never ask again"] :
         ["Not now", "No", "Never ask again"]
     answers = canRun ? ["install", "later", "no", "never"] : ["later", "no", "never"]
-    pick = ask("Install " * item.name * "?", names)::Int
+    pick = ask(font ? "Change the Terminal font?" : "Install " * item.name * "?",
+        names)::Int
     (pick < 1 || pick > length(answers)) && return "later"
     answers[pick] == "install" || return answers[pick]
     route === nothing && return "later"  # unreachable: canRun implies a route
@@ -348,7 +579,7 @@ each item, nothing without an explicit yes). The answers are remembered in `inst
 item after `yes` are asked again. Info items are only reported.
 """
 function checkDependencies(io::IO = stdout; env = ENV, home = homedir(),
-    firstRun::Bool = false, os::Symbol = Platform.os(), which = Platform.which,
+    firstRun::Bool = false, os::Symbol = Platform.os(), which = _find,
     dims::Tuple{Int,Int} = displaysize(io), runner = _runCommand, ask = _askChoice,
     items::Vector{DepItem} = defaultItems(), detect = _detect)::Vector{DepResult}
     results = scanDependencies(items; os, env, which, dims, detect)

@@ -29,8 +29,9 @@ Writes finished fitting tests as projects of the terminal interface, each with o
     --all       every fitting test that has a workbook
     --out DIR   the projects folder to write into (default: the BAYSOL data folder,
                 \$BAYSOL_HOME or \$XDG_DATA_HOME/baysol, then `projects`)
-    --from DIR  read the fits' workbooks, LOGs and scripts from `DIR/test/fitting_tests/<ID>`
-                (a `bysl fits run --scratch DIR` tree) instead of the checkout's own
+    --from DIR  read the fits' workbooks, LOGs and scripts from
+                `DIR/test/fitting_tests/<ID>` (a `bysl fits run --scratch DIR` tree)
+                instead of the checkout's own
                 folders, which only hold a workbook where the fit was run in place
     --dry-run   say what would be written, write nothing
 

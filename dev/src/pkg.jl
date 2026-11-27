@@ -13,13 +13,7 @@
 #
 # plus `julia/` (the runtime libraries), the icon of the system and the launcher script, at
 # the root. The data tables, the revision are inside `baysol` and the assets and the version
-# inside `baysol-tui`, so there is no data, assets, VERSION or REVISION to lose. A build is
-# COLD, always (owner, 2026-11-23): it starts from an empty scratch folder and uses its own
-# Julia depot, uv, Nuitka and fit caches inside it (`cold_env`), never the user's, and
-# deletes them when the archive is written. Only `--resume` (or `--stage`) continues an
-# earlier, failed build: a marker file per stage in the work folder. The build is stopped
-# when free swap drops under 500 MB (zswap and zram show as swap), by PID, never by name.
-# macOS and Windows paths are written and untested: they say so when they do not apply.
+# inside `baysol-tui`.
 module PkgTool
 
 using ..Common
@@ -34,6 +28,7 @@ and the icons, `baysol-<semver>-<os>-<arch>.zip` (deflate, 7-Zip maximum setting
 
     bysl pkg    [--out DIR] [--work DIR] [--workload DIR] [--stage NAME] [--resume]
                 [--keep-work] [--dry-run]
+    bysl pkg log [NAME...] [--steps]
 
     --out DIR       the folder the archive is written to (default: the folder you run
                     this from)
@@ -51,6 +46,11 @@ and the icons, `baysol-<semver>-<os>-<arch>.zip` (deflate, 7-Zip maximum setting
                     of starting cold; stages with a marker are skipped
     --keep-work     keep the scratch folder after the archive is written
     --dry-run       print the plan and the preflight, build nothing
+
+    log             read the build logs of `dev/build-logs/` (those whose file name contains
+                    a NAME, else all) as a short view: version, system, host, and the time
+                    and peak RAM and swap of each stage; several logs end with one
+                    comparison row each; --steps adds the steps inside a stage
 
 The stages, in order: `pytools` (propka and pdb2pqr, Nuitka), `tui` (Node single
 executable), `trace` (the fits of TRACE_ENTRIES and every synthetic fit, run on copies
@@ -736,17 +736,62 @@ end
 The script of this system that starts `baysol` (it opens what the setup wizard
 chose, TUI or CLI) from the unpacked folder (a double click on macOS, the menu
 entry or a terminal elsewhere): a bash script on Linux, a zsh `.command` file
-on macOS, a `.cmd` file on Windows. macOS and Windows untested.
+on macOS, a `.cmd` file on Windows (untested). The macOS one closes the Terminal window that
+was opened for it after a clean end; an error, or a shell of the user, keeps it.
 """
 function launcher()
     if Platform.iswindows()
         return "baysol.cmd", "@echo off\r\n\"%~dp0baysol.exe\" %*\r\n"
     elseif Platform.ismacos()
-        return "BAYSOL.command", raw"""
-            #!/bin/zsh
-            cd "${0:A:h}" || exit 1
-            exec ./baysol "$@"
-            """
+        return "BAYSOL.command",
+        raw"""
+#!/bin/zsh
+cd "${0:A:h}" || exit 1
+# the Terminal window this script runs in, empty in another terminal or with more tabs
+window=""
+tty=$(tty)
+if [[ $TERM_PROGRAM == Apple_Terminal && $tty == /dev/* ]]; then
+    window=$(/usr/bin/osascript - "$tty" 2>/dev/null <<'END'
+on run argv
+    tell application "Terminal"
+        repeat with w in windows
+            try
+                if (count of tabs of w) is 1 and tty of tab 1 of w is item 1 of argv then
+                    return id of w
+                end if
+            end try
+        end repeat
+    end tell
+    return ""
+end run
+END
+)
+fi
+./baysol "$@"
+code=$?
+# Finder and BAYSOL.app open a window only for this: close it after a clean end, once its
+# shell is gone (a shell the user works in stays, and so does its window)
+if [[ $window == <-> && ( $code == 0 || $code == 130 || $code == 22 ) ]]; then
+    (
+        trap "" HUP
+        for _ in {1..50}; do
+            sleep 0.2
+            kill -0 $PPID 2>/dev/null && continue
+            sleep 0.5
+            /usr/bin/osascript - "$window" <<'END'
+on run argv
+    tell application "Terminal"
+        set w to window id ((item 1 of argv) as integer)
+        if (count of tabs of w) is 1 then close w saving no
+    end tell
+end run
+END
+            break
+        done
+    ) </dev/null >/dev/null 2>&1 &!
+fi
+exit $code
+"""
     end
     return "baysol.sh", raw"""
         #!/usr/bin/env bash
@@ -983,8 +1028,9 @@ function stage_tui(work)
         m in ("react-devtools-core", "7zip-bin")
     ]
     ok = rc(
-        `$esbuild $(joinpath(tui, "src", "main.tsx")) --bundle --platform=node --main-fields=module,main --format=esm
-        --target=node24 --minify --log-level=warning --outfile=$bundle --banner:js=$banner
+        `$esbuild $(joinpath(tui, "src", "main.tsx")) --bundle --platform=node
+        --main-fields=module,main --format=esm --target=node24 --minify
+        --log-level=warning --outfile=$bundle --banner:js=$banner
         $aliases`,
     )
     need(ok, "esbuild failed")
@@ -1008,11 +1054,15 @@ function stage_tui(work)
         # built with MSVC (its symbols are in a PDB, so there is nothing to strip) and
         # carries an Authenticode signature that a strip tool may refuse
         Platform.iswindows() || strip_binary(out)
+        # postject must not leave a stale signature behind the injected segment
+        Platform.ismacos() && need(rc(`codesign --remove-signature $out`),
+            "codesign --remove-signature failed")
         postject = node_tool("postject")
         fuse = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2"
         extra = Platform.ismacos() ? ["--macho-segment-name", "NODE_SEA"] : String[]
         need(rc(`$postject $out NODE_SEA_BLOB sea.blob --sentinel-fuse $fuse $extra`),
             "postject (is it installed? npm i -D postject at the repository root)")
+        Platform.ismacos() && sign_macos([joinpath(dir, out)])
     end
     finish(work, "tui")
 end
@@ -1408,9 +1458,66 @@ function copy_runtime(dest)
         for (name, from) in runtime_files(d)
             # a library Julia opens by its bare name is shipped under that name
             bare = bare_name(d, from)
-            cp(from, joinpath(to, something(bare, name)); follow_symlinks = true)
+            names = Platform.ismacos() ? macos_names(from, bare) : [something(bare, name)]
+            for n in names
+                # forced: macOS names two real files of OpenBLAS alike
+                cp(from, joinpath(to, n); follow_symlinks = true, force = true)
+            end
         end
     end
+end
+
+"""
+    macos_names(file, bare; id = install_name(file)) -> Vector{String}
+
+The names the library `file` is shipped under on macOS: its install name, which is what the
+programs that link it ask for (`libz.1.dylib`, where the file is `libz.1.3.1.dylib`), and
+the `bare` name Julia opens it by, if it has one. `libjulia-internal` and
+`libjulia-codegen` have only the name libjulia opens ([`versioned_julia`](@ref)): a second
+copy would be a second Julia runtime in the process.
+"""
+function macos_names(file, bare; id = install_name(file))::Vector{String}
+    base = basename(something(id, file))
+    return unique([versioned_julia(base); something(bare, String[])])
+end
+
+"The install name of the Mach-O library `file` (`otool -D`), `nothing` if it has none."
+function install_name(file)::Union{String,Nothing}
+    lines = split(readchomp(`otool -D $file`), '\n')
+    return length(lines) > 1 ? String(lines[end]) : nothing
+end
+
+"""
+`libjulia-internal.dylib` (the install name) as `libjulia-internal.1.12.dylib` (the name
+libjulia opens), `libjulia-codegen` likewise; any other `name` as it is.
+"""
+function versioned_julia(name::AbstractString)::String
+    m = match(r"^(libjulia-(?:internal|codegen))\.dylib$", name)
+    return m === nothing ? String(name) :
+           "$(m[1]).$(VERSION.major).$(VERSION.minor).dylib"
+end
+
+"""
+    relink_macos(files; runner = rc)
+
+Points the links of `files` to the install names that [`versioned_julia`](@ref) renames at
+the new names. Invalidates the signatures: before [`sign_macos`](@ref).
+"""
+function relink_macos(files; runner = rc)
+    edits = String[]
+    for lib in ("libjulia-internal.dylib", "libjulia-codegen.dylib")
+        append!(edits, ["-change", "@rpath/$lib", "@rpath/$(versioned_julia(lib))"])
+    end
+    for f in files
+        base = basename(f)
+        isfile(f) && chmod(f, filemode(f) | 0o200)      # artifact libraries are read-only
+        id =
+            startswith(base, r"libjulia-(internal|codegen)") ? ["-id", "@rpath/$base"] :
+            String[]
+        need(runner(`install_name_tool $edits $id $f`),
+            "install_name_tool failed: $base")
+    end
+    return nothing
 end
 
 """
@@ -1605,8 +1712,15 @@ Windows has no RUNPATH ([`runtime_layout`](@ref)).
 function set_runtime_rpath(work, exe_path)
     if Platform.ismacos()
         rpath = "@loader_path/julia/julia"
-        need(rc(`install_name_tool -add_rpath $rpath $exe_path`),
-            "install_name_tool failed")
+        # juliac's rpath to the folder of the exe itself holds no library of the bundle;
+        # the header has no room for both it and the longer names of `relink_macos`
+        need(
+            rc(
+                `install_name_tool -delete_rpath @loader_path/ -add_rpath $rpath
+                $exe_path`,
+            ),
+            "install_name_tool failed",
+        )
         return
     end
     Platform.islinux() || return
@@ -1984,6 +2098,40 @@ function strip_bundle(out::AbstractString, exes; os::Symbol = this_os(), tool = 
     return true
 end
 
+"""
+    macho_files(dir) -> Vector{String}
+
+The Mach-O files (thin 64-bit or universal, by their first four bytes) below `dir`, links
+left out: the libraries first, the files without a library extension (the executables) last.
+"""
+function macho_files(dir::AbstractString)::Vector{String}
+    magics = ([0xcf, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe])
+    found = String[]
+    for (d, _, names) in walkdir(dir), n in names
+        path = joinpath(d, n)
+        (islink(path) || !isfile(path)) && continue
+        open(io -> read(io, 4), path) in magics && push!(found, path)
+    end
+    return sort!(found; by = f -> (!occursin(r"\.(so|dylib)$", f), f))
+end
+
+"""
+    sign_macos(files; runner = rc)
+
+Signs each of `files` ad hoc (no certificate) and verifies it. Stripping, `postject` and
+`install_name_tool` invalidate a signature, and Apple Silicon kills a program whose
+signature is not valid. An ad-hoc signature does NOT satisfy Gatekeeper: a copy that was
+downloaded needs `xattr -dr com.apple.quarantine`, or a Developer ID and notarization.
+"""
+function sign_macos(files; runner = rc)
+    for f in files
+        need(runner(`codesign --force --sign - $f`), "codesign failed: $(basename(f))")
+        need(runner(`codesign --verify --strict $f`),
+            "the signature is not valid: $(basename(f))")
+    end
+    return nothing
+end
+
 "Stage `bundle`: puts the parts together in `<work>/bundle/baysol`."
 function stage_bundle(work)
     root = Common.root()
@@ -2009,6 +2157,10 @@ function stage_bundle(work)
     write(joinpath(out, name), text)
     Platform.iswindows() || chmod(joinpath(out, name), 0o755)
     cp(joinpath(root, "LICENSE"), joinpath(out, "LICENSE"))
+    julia_files(dir) = filter(!startswith(joinpath(dir, "lib")), macho_files(dir))
+    Platform.ismacos() && relink_macos(
+        filter(f -> basename(f) != exe("baysol-tui"), julia_files(out)),
+    )
     # last: every file is in place and patchelf is done; only the bundle's copies are
     # touched, never the Julia installation they came from
     strip_bundle(out,
@@ -2016,6 +2168,8 @@ function stage_bundle(work)
             joinpath(out, exe("baysol")),
             joinpath(out, "lib", "pytools", exe("baysol-pytools")),
         ])
+    # after everything that changes a binary
+    Platform.ismacos() && sign_macos(macho_files(out))
     finish(work, "bundle")
 end
 
@@ -2032,7 +2186,8 @@ function make_archive(work, archive)
         "no 7-Zip found (npm install gives 7zip-bin, or put 7zz on PATH)",
     )
     ok = rc(
-        `$sevenzip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15 $archive $(joinpath(work, "bundle", "baysol"))`,
+        `$sevenzip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15 $archive
+        $(joinpath(work, "bundle", "baysol"))`,
     )
     need(ok && isfile(archive), "the archive was not written")
 end
@@ -2200,6 +2355,7 @@ function run(argv::Vector{String})::Int
         usage(USAGE)
         return 0
     end
+    isempty(argv) || argv[1] != "log" || return log_command(argv[2:end])
     a = split_args(WHO, ["--out", "--work", "--workload", "--stage"],
         ["--dry-run", "--keep-work", "--resume"], argv)
     isempty(a.specs) || fail(WHO, "unexpected argument $(first(a.specs))")
@@ -2265,12 +2421,16 @@ function run(argv::Vector{String})::Int
                     stage_julia(work, workload_folder(work, workload))
                 else
                     stage_bundle(work)
-                    only === nothing &&
-                        step("archive (7-Zip)", () -> make_archive(work, archive))
+                    true    # a `false` would count as a failed stage
                 end; top = true)
             write_report(report, archive)
             ok || (failed = true; break)
         end
+    end
+    # a full run always ends with the archive, also when `--resume` found every stage done
+    if !failed && only === nothing
+        step("archive (7-Zip)", () -> make_archive(work, archive); top = true) ||
+            (failed = true)
     end
     note("total      $(round((time() - t_all) / 60; digits = 1)) min"; terminal = true)
     write_report(report, archive)
@@ -2296,5 +2456,7 @@ function run(argv::Vector{String})::Int
     end
     return 0
 end
+
+include("pkg-log.jl")
 
 end

@@ -44,17 +44,32 @@ const MAX_THREADS = 8
 defaultThreads() = clamp(Sys.CPU_THREADS, 1, MAX_THREADS)
 
 """
-What the wizard decides. `home` is the BAYSOL folder (projects), `structureCache` THE
-cache folder (the structures that later runs reuse; what the fit reads as
-`BAYSOL_CACHE`; the wizard calls it the cache folder, the JSON key keeps its old name);
-`desktop` says whether the entry in the application menu is made,
-`desktopIcon` whether the launcher is also put on the Desktop, `taskbarPin` whether it is
-pinned to the taskbar or dock, and `pathLink` whether the link on the PATH is made;
-`threads` is the default number of threads of a fit; `opens` says what the launcher
-(the icon, or `baysol` alone) starts: `"tui"` (the terminal interface) or `"cli"` (a shell
-with the command line ready). `deps` holds the answers about the optional dependencies
-(`id => "yes" | "no" | "later" | "never"`, see `dependencies.jl`); an `install.json` without
-them reads as no answers.
+The sixel terminals of macOS that the icon can open, in order of preference: the id in
+`install.json`, the name, the app, and the arguments of `open` after `-a <app>` that run
+`\$command`. kitty, Ghostty and Warp are not here: they draw no sixel.
+"""
+const MAC_TERMINALS = (
+    (id = "iterm2", name = "iTerm2", app = "iTerm.app", args = "\"\$command\""),
+    (id = "wezterm", name = "WezTerm", app = "WezTerm.app",
+        args = "-n --args start -- \"\$command\""),
+)
+
+"What `terminal` of an [`Install`](@ref) can be."
+const MAC_TERMINAL_IDS = ("auto", "terminal", (t.id for t in MAC_TERMINALS)...)
+
+"""
+What the wizard decides. `home` is the BAYSOL folder (projects), `structureCache` THE cache
+folder (the structures that later runs reuse; what the fit reads as `BAYSOL_CACHE`; the
+wizard calls it the cache folder, the JSON key keeps its old name); `desktop` says whether
+the entry in the application menu is made, `desktopIcon` whether the launcher is also put
+on the Desktop, `taskbarPin` whether it is pinned to the taskbar or dock, and `pathLink`
+whether the link on the PATH is made; `threads` is the default number of threads of a fit;
+`opens` says what the launcher (the icon, or `baysol` alone) starts: `"tui"` (the terminal
+interface) or `"cli"` (a shell with the command line ready). `terminal` is the terminal
+that the icon of macOS opens: `"auto"` (the first sixel terminal that is installed, else
+Terminal), `"terminal"` or an id of `MAC_TERMINALS`. `deps` holds the answers about the
+optional dependencies (`id => "yes" | "no" | "later" | "never"`, see `dependencies.jl`); an
+`install.json` without them reads as no answers.
 """
 Base.@kwdef struct Install
     home::String
@@ -65,6 +80,7 @@ Base.@kwdef struct Install
     pathLink::Bool = false
     threads::Int = defaultThreads()
     opens::String = "tui"
+    terminal::String = "auto"
     deps::Dict{String,String} = Dict{String,String}()
 end
 
@@ -73,7 +89,8 @@ Base.:(==)(a::Install, b::Install) =
     a.home == b.home && a.structureCache == b.structureCache &&
     a.desktop == b.desktop && a.desktopIcon == b.desktopIcon &&
     a.taskbarPin == b.taskbarPin && a.pathLink == b.pathLink &&
-    a.threads == b.threads && a.opens == b.opens && a.deps == b.deps
+    a.threads == b.threads && a.opens == b.opens && a.terminal == b.terminal &&
+    a.deps == b.deps
 
 # ---- the folders of the system (XDG on Linux, the usual ones elsewhere) ---------------
 
@@ -145,6 +162,7 @@ function writeInstall(file::AbstractString, i::Install)
         "desktop" => string(i.desktop), "desktopIcon" => string(i.desktopIcon),
         "taskbarPin" => string(i.taskbarPin), "pathLink" => string(i.pathLink),
         "threads" => string(i.threads), "opens" => _quote(i.opens),
+        "terminal" => _quote(i.terminal),
     ]
     for k in sort!(collect(keys(i.deps)))
         push!(rows, "dep.$k" => _quote(i.deps[k]))
@@ -189,7 +207,8 @@ function readInstall(file::AbstractString)
         desktop = bool("desktop"), desktopIcon = bool("desktopIcon"),
         taskbarPin = bool("taskbarPin"), pathLink = bool("pathLink"),
         threads = t === nothing ? defaultThreads() : parse(Int, t[1]),
-        opens = str("opens") in ("tui", "cli") ? str("opens") : "tui", deps)
+        opens = str("opens") in ("tui", "cli") ? str("opens") : "tui",
+        terminal = str("terminal") in MAC_TERMINAL_IDS ? str("terminal") : "auto", deps)
 end
 
 """
@@ -371,6 +390,7 @@ function targets(; env = ENV, home = homedir())
         icon = joinpath(desktopDir(; env, home), "BAYSOL.desktop"),
         link = joinpath(home, ".local", "bin", "baysol"),
         app = joinpath(home, "Applications", "BAYSOL.app"),
+        macIcon = joinpath(desktopDir(; env, home), "BAYSOL.app"),
         lnk = joinpath(startMenu, "BAYSOL.lnk"),
         ico = joinpath(dirname(installFile(; env, home)), "baysol.ico"))
 end
@@ -548,16 +568,19 @@ function _writeManifest(file, made)
 end
 
 """
-Removes what `entries` name: files (a link only if it points into `bundle`), then the
+Removes what `entries` name: files (a link only if it points into `bundle` or is a link to
+the app bundle `app`), then the
 folders, deepest first, and only when they are empty. Nothing else is touched. Returns the
 log and the entries it kept (a link that points elsewhere).
 """
-function _removeManifest(entries, bundle)
+function _removeManifest(entries, bundle, app = nothing)
     log, kept = String[], Pair{String,String}[]
     for (kind, path) in entries
         kind == "file" || continue
         if islink(path)
-            startswith(readlink(path), bundle) || (push!(kept, kind => path); continue)
+            target = readlink(path)
+            startswith(target, bundle) || target == app ||
+                (push!(kept, kind => path); continue)
         elseif !isfile(path)
             continue
         end
@@ -577,11 +600,14 @@ end
 """
 The `Info.plist` of the app bundle in `~/Applications` (macOS). `icon` is the name of the
 `.icns` in `Contents/Resources`, `exe` the script in `Contents/MacOS`.
+The architectures are
+named because a script has none: without them Apple Silicon starts it under Rosetta.
 """
 function infoPlist(; icon::AbstractString = ICON_NAME, exe::AbstractString = "BAYSOL")
     return """
         <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" \n            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
             <key>CFBundleName</key><string>BAYSOL</string>
@@ -592,31 +618,88 @@ function infoPlist(; icon::AbstractString = ICON_NAME, exe::AbstractString = "BA
             <key>CFBundlePackageType</key><string>APPL</string>
             <key>CFBundleVersion</key><string>1</string>
             <key>NSHighResolutionCapable</key><true/>
+            <key>LSArchitecturePriority</key>
+            <array><string>arm64</string><string>x86_64</string></array>
         </dict>
         </plist>
         """
 end
 
 """
+The script in `Contents/MacOS` of the app bundle; the path is quoted for the shell. It looks
+for the terminal when it runs, so one that is installed or removed later is noticed;
+Terminal is what is left.
+"""
+function _macAppScript(bundle::AbstractString, terminal::AbstractString = "auto")::String
+    command = Base.shell_escape_posixly(joinpath(bundle, "BAYSOL.command"))
+    lines = ["#!/bin/zsh", "command=$command"]
+    for t in MAC_TERMINALS
+        terminal in ("auto", t.id) || continue
+        push!(lines,
+            "for app in /Applications/$(t.app) \"\$HOME\"/Applications/$(t.app); do",
+            "    [[ -d \$app ]] && /usr/bin/open -a \"\$app\" $(t.args) && exit 0",
+            "done")
+    end
+    push!(lines, "exec /usr/bin/open -a Terminal \"\$command\"")
+    return join(lines, "\n") * "\n"
+end
+
+"The choices of the terminal on macOS as `id => text`, given the `found` (installed) ids."
+function _terminalChoices(found)::Vector{Pair{String,String}}
+    here = [t for t in MAC_TERMINALS if t.id in found]
+    auto = isempty(here) ? "Terminal" : first(here).name
+    return ["auto" => "Automatic ($auto now)"; [t.id => t.name for t in here];
+        "terminal" => "Terminal (no rendered figures)"]
+end
+
+"""
 Makes `BAYSOL.app` at `app` (macOS; untested): `Contents/Info.plist` naming the icon, the
 `.icns` copied from `icns` into `Contents/Resources`, and a small script in
-`Contents/MacOS` that opens the bundle's `BAYSOL.command` in Terminal. Every file and
+`Contents/MacOS` that opens the bundle's `BAYSOL.command` in `terminal`. Every file and
 folder is noted in `made`. Returns a line to say what was done.
 """
-function _installMacApp!(journal, made, bundle, app, icns)
+function _installMacApp!(journal, made, bundle, app, icns, terminal = "auto")
     _madeDir!(made, journal, joinpath(app, "Contents", "MacOS"))
     _madeDir!(made, journal, joinpath(app, "Contents", "Resources"))
     plist = _madeFile!(made, joinpath(app, "Contents", "Info.plist"))
+    _backup!(journal, plist)
     write(plist, infoPlist())
     exe = _madeFile!(made, joinpath(app, "Contents", "MacOS", "BAYSOL"))
-    command = joinpath(bundle, "BAYSOL.command")
-    write(exe, "#!/bin/zsh\nexec /usr/bin/open -a Terminal \"$command\"\n")
+    _backup!(journal, exe)
+    write(exe, _macAppScript(bundle, terminal))
     chmod(exe, 0o755)
     if isfile(icns)
         res = _madeFile!(made, joinpath(app, "Contents", "Resources", ICON_NAME * ".icns"))
+        _backup!(journal, res)
         cp(icns, res; force = true)
     end
     return "app bundle $app (macOS, untested)"
+end
+
+"Whether `link` is the Desktop icon of macOS: a link to the app bundle `app`."
+_isMacIcon(link, app)::Bool = islink(link) && readlink(link) == app
+
+"""
+Makes the Desktop icon of macOS: `link`, a link to the app bundle `app`. Something else of
+that name is left alone, and a refusal (macOS asks before a terminal may write to the
+Desktop) does not fail the setup. Returns a line to say what was done.
+"""
+function _installMacIcon!(journal, made, link, app)::String
+    isdir(dirname(link)) || return "desktop icon skipped (no folder $(dirname(link)))"
+    try
+        if !_isMacIcon(link, app)
+            (islink(link) || ispath(link)) &&
+                return "desktop icon skipped (something else is at $link)"
+            symlink(app, link)
+            push!(journal, () -> _isMacIcon(link, app) && rm(link))
+        end
+    catch e
+        e isa Base.IOError || rethrow()
+        return "desktop icon skipped (macOS refused; allow Terminal the Desktop folder " *
+               "in System Settings > Privacy & Security > Files & Folders, then Repair)"
+    end
+    _madeFile!(made, link)
+    return "desktop icon $link"
 end
 
 """
@@ -682,7 +765,8 @@ Makes the folders, writes `install.json` and, if asked, the entry in the applica
 the icon on the Desktop, the taskbar pin and the link on the PATH. Every step pushes how to
 undo it onto `journal`; [`rollback!`](@ref) runs them. The entries are only written for
 Linux, the pin only for GNOME there (macOS and Windows: untested, the wizard says so and
-skips them). A pin needs the menu entry, so it writes that too.
+skips them), except the app bundle and Desktop icon of macOS and the Start Menu shortcut of
+Windows. A pin needs the menu entry, so it writes that too.
 
 # Returns
 A line for each thing done or skipped.
@@ -700,7 +784,8 @@ function applyInstall(i::Install, bundle::AbstractString; env = ENV, home = home
     end
     t = targets(; env, home)
     icon = ICON_FALLBACK
-    entries = i.desktop || i.taskbarPin
+    # the Desktop icon of macOS is a link to the app bundle, so it needs that
+    entries = i.desktop || i.taskbarPin || (Platform.ismacos() && i.desktopIcon)
     if Platform.islinux() && (entries || i.desktopIcon)
         installed, line = _installIcons!(journal, made, bundle; env, home)
         installed && (icon = ICON_NAME)
@@ -718,7 +803,7 @@ function applyInstall(i::Install, bundle::AbstractString; env = ENV, home = home
             push!(
                 log,
                 _installMacApp!(journal, made, bundle, t.app,
-                    joinpath(bundle, ICON_FILE)),
+                    joinpath(bundle, ICON_FILE), i.terminal),
             )
         elseif Platform.iswindows()
             push!(
@@ -746,8 +831,10 @@ function applyInstall(i::Install, bundle::AbstractString; env = ENV, home = home
             push!(log, "desktop icon $(t.icon)")
         elseif Platform.islinux()
             push!(log, "desktop icon skipped (no folder $(dirname(t.icon)))")
+        elseif Platform.ismacos()
+            push!(log, _installMacIcon!(journal, made, t.macIcon, t.app))
         else
-            push!(log, "desktop icon skipped (Linux only, untested elsewhere)")
+            push!(log, "desktop icon skipped (Linux and macOS only)")
         end
     end
     i.taskbarPin && push!(log, _pin!(journal, env))
@@ -806,6 +893,13 @@ const LAUNCHER_FILE =
 const BUNDLE_FILES = (_exe("baysol"), _exe("baysol-tui"), LAUNCHER_FILE,
     joinpath("lib", "pytools", _exe("baysol-pytools")), ICON_FILE)
 
+"Whether the script of the app bundle `app` (macOS) starts `bundle`."
+function _isMacAppOf(app::AbstractString, bundle::AbstractString,
+    terminal::AbstractString = "auto")::Bool
+    script = joinpath(app, "Contents", "MacOS", "BAYSOL")
+    return isfile(script) && read(script, String) == _macAppScript(bundle, terminal)
+end
+
 """
     check(bundle; env, home) -> NamedTuple
 
@@ -842,11 +936,16 @@ function check(bundle::AbstractString; env = ENV, home = homedir())
     end
     t = targets(; env, home)
     launcher = joinpath(bundle, "baysol")
-    if Platform.ismacos() && (i.desktop || i.taskbarPin) && !isdir(t.app)
+    macApp = Platform.ismacos() && (i.desktop || i.taskbarPin || i.desktopIcon)
+    if macApp && !isdir(t.app)
         push!(fixable, "the app bundle is missing: $(t.app)")
+    elseif macApp && !_isMacAppOf(t.app, bundle, i.terminal)
+        push!(fixable, "the app bundle starts another bundle or terminal: $(t.app)")
     elseif Platform.iswindows() && (i.desktop || i.taskbarPin) && !isfile(t.lnk)
         push!(fixable, "the Start Menu shortcut is missing: $(t.lnk)")
     end
+    Platform.ismacos() && i.desktopIcon && !_isMacIcon(t.macIcon, t.app) &&
+        push!(fixable, "the desktop icon is missing: $(t.macIcon)")
     for (on, file, what) in ((i.desktop || i.taskbarPin, t.desktop, "menu entry"),
         (i.desktopIcon, t.icon, "desktop icon"))
         on && Platform.islinux() || continue
@@ -905,7 +1004,7 @@ function uninstall(bundle::AbstractString; data::Bool = false,
     t = targets(; env, home)
     mf = manifestFile(; env, home)
     # the icons and entries: exactly what the manifest names, and nothing else
-    lines, kept = _removeManifest(readManifest(mf), bundle)
+    lines, kept = _removeManifest(readManifest(mf), bundle, t.app)
     append!(log, lines)
     if Platform.islinux()
         _refreshIcons(; env, home)
@@ -928,6 +1027,7 @@ function uninstall(bundle::AbstractString; data::Bool = false,
     if isempty(kept)
         isfile(mf) && (rm(mf); push!(log, "removed $mf"))
     else
+        mkpath(dirname(mf))  # on macOS it is the projects folder, which `data` removed
         write(mf, join(["$k\t$p" for (k, p) in kept], "\n") * "\n")  # for a later uninstall
     end
     isfile(cfg) && (rm(cfg); push!(log, "removed $cfg"))
@@ -1159,6 +1259,23 @@ const ICON = (
 const ICON_RGB = Dict('k' => (0, 0, 0), 'p' => (255, 97, 126), 't' => (0, 255, 204))
 const ICON_256 = Dict('k' => 16, 'p' => 204, 't' => 49)
 
+"""
+The icon at 18 x 9 cells, one letter a cell, for a terminal whose `▀` does not
+fill exactly the upper half of its cell ([`_plainIcon`](@ref)). A cell is about twice as
+high as wide, so two letters side by side are a square.
+"""
+const ICON_CELLS = (
+    "pppppppppppppppppp",
+    "ppkkkkkkkkkkkkkkpp",
+    "ppkkkttttttkkkkkpp",
+    "ppkkkttkkkkttkkkpp",
+    "ppkkkttttttkkkkkpp",
+    "ppkkkttkkkkttkkkpp",
+    "ppkkkttttttkkkkkpp",
+    "ppkkkkkkkkkkkkkkpp",
+    "pppppppppppppppppp",
+)
+
 "The icon halved: each 2 x 2 block of pixels averaged, so the edges blend (16 x 16)."
 function _halved()
     px(y, x) = ICON_RGB[ICON[y][x]]
@@ -1170,10 +1287,17 @@ function _halved()
 end
 
 """
-    drawIcon(io; truecolor) -> Nothing
+Whether the icon is drawn without `▀`: in the Terminal of macOS, which starts the glyph
+below the top of its cell, so a strip of the lower pixel shows above the upper one.
+"""
+_plainIcon(env = ENV) = get(env, "TERM_PROGRAM", "") == "Apple_Terminal"
+
+"""
+    drawIcon(io; truecolor, plain) -> Nothing
 
 Draws the icon at 16 x 8 character cells: the 32 x 32 pixels averaged to 16 x 16 (the edges
 blend) and drawn with `▀` (the upper pixel is the foreground, the lower one the background).
+With `plain` it is [`ICON_CELLS`](@ref) instead, drawn with coloured spaces alone.
 
 # Returns
 `nothing`.
@@ -1182,7 +1306,22 @@ blend) and drawn with `▀` (the upper pixel is the foreground, the lower one th
 None.
 """
 function drawIcon(io::IO = stdout;
-    truecolor::Bool = get(ENV, "COLORTERM", "") in ("truecolor", "24bit"))
+    truecolor::Bool = get(ENV, "COLORTERM", "") in ("truecolor", "24bit"),
+    plain::Bool = _plainIcon())
+    if plain
+        bg = truecolor ? c -> "48;2;" * join(ICON_RGB[c], ';') : c -> "48;5;$(ICON_256[c])"
+        for row in ICON_CELLS
+            print(io, "  ")
+            last = nothing
+            for c in row
+                c == last || print(io, "\e[", bg(c), "m")
+                print(io, ' ')
+                last = c
+            end
+            println(io, "\e[0m")
+        end
+        return nothing
+    end
     cube(v) = round(Int, v / 255 * 5)
     code(c) =
         truecolor ? join(round.(Int, c), ';') :
@@ -1227,15 +1366,20 @@ function _apply(io, i, bundle; env, home)
 end
 
 """
-The entries of the shortcuts menu, in the order `Install` reads them (menu entry, Desktop
-icon, taskbar pin, PATH link). Windows has no PATH link: a link is a symlink (a privilege
+The entries of the shortcuts menu for the system `os`: the field of [`Install`](@ref) each
+one sets and its text. macOS has no pin (only GNOME's is done; drag BAYSOL to the Dock
+there). Windows has no PATH link: a link is a symlink (a privilege
 there), and editing the user's `PATH` in the registry from here would risk the whole
 variable (`setx` cuts it at 1024 characters and turns `%VARS%` into fixed text), so the
 item is not offered; the Start Menu shortcut starts BAYSOL instead.
 """
-function shortcutChoices()::Vector{String}
-    items = ["Application menu entry", "Desktop icon", "Pin to taskbar (GNOME)"]
-    Platform.iswindows() || push!(items, "PATH link")
+function shortcutChoices(os::Symbol = Platform.os())::Vector{Pair{Symbol,String}}
+    link = :pathLink => "PATH link"
+    os == :macos && return [:desktop => "Applications entry (BAYSOL.app)",
+        :desktopIcon => "Desktop icon", link]
+    items = [:desktop => "Application menu entry", :desktopIcon => "Desktop icon",
+        :taskbarPin => "Pin to taskbar (GNOME)"]
+    os == :windows || push!(items, link)
     return items
 end
 
@@ -1355,19 +1499,44 @@ function runWizard(bundle::AbstractString = get(ENV, "BAYSOL_BUNDLE", pwd());
                 n = clamp(something(n, cur.threads), 1, 256)
                 o = request("The icon opens:", RadioMenu(["TUI", "CLI (a shell)"]))
                 o < 1 && throw(InterruptException())
-                opts = request("Shortcuts (Enter, then d):",
-                    MultiSelectMenu(shortcutChoices()),
+                terminal = cur.terminal
+                found = [x.id for x in MAC_TERMINALS if _find(x.app) !== nothing]
+                if Platform.ismacos() && !isempty(found)  # else there is nothing to choose
+                    ts = _terminalChoices(found)
+                    k = request("The icon opens it in:", RadioMenu(last.(ts));
+                        cursor = something(findfirst(x -> first(x) == terminal, ts), 1))
+                    k < 1 && throw(InterruptException())
+                    terminal = first(ts[k])
+                end
+                choices = shortcutChoices()
+                picked = request("Shortcuts (Enter, then d):",
+                    MultiSelectMenu(last.(choices)),
                 )
+                opts = Set(first(choices[k]) for k in picked)
                 i = Install(; home = h, structureCache = s, deps = cur.deps,
-                    desktop = 1 in opts, desktopIcon = 2 in opts,
-                    taskbarPin = 3 in opts, pathLink = 4 in opts, threads = n,
-                    opens = o == 2 ? "cli" : "tui")
+                    desktop = :desktop in opts, desktopIcon = :desktopIcon in opts,
+                    taskbarPin = :taskbarPin in opts, pathLink = :pathLink in opts,
+                    threads = n,
+                    opens = o == 2 ? "cli" : "tui", terminal)
                 println(io, "Will set up:")
                 println(io, "  projects   ", i.home)
                 println(io, "  cache      ", i.structureCache)
                 println(io, "  threads    ", i.threads)
                 println(io, "  icon opens ", uppercase(i.opens))
-                i.desktop && println(io, "  application menu entry")
+                isempty(found) || !Platform.ismacos() ||
+                    println(
+                        io,
+                        "  terminal   ",
+                        Dict(_terminalChoices(found))[
+                            terminal in first.(_terminalChoices(found)) ? terminal :
+                            "auto"],
+                    )
+                i.desktop && println(
+                    io,
+                    Platform.ismacos() ?
+                    "  Applications entry (BAYSOL.app)" :
+                    "  application menu entry",
+                )
                 i.desktopIcon && println(io, "  desktop icon")
                 i.taskbarPin && println(io, "  taskbar pin")
                 i.pathLink && println(io, "  PATH link")

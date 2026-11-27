@@ -15,6 +15,7 @@
 #     5  sh_cavity   hydration shell, cavity beads   (enters with +dro_3)
 
 using ..MolecularStructure: Molecule, elms, vols
+using ..Platform: Platform
 using ..Runtime: Stage, StageLog, tick, timed!, GC_PAUSE_BUDGET
 
 export MemoryBudgetError
@@ -177,7 +178,7 @@ end
 
 """
 The static build cannot run within the memory that is free: even a block of one q value
-([`forwardCache`](@ref)) needs more than `Sys.free_memory()` minus the headroom
+([`forwardCache`](@ref)) needs more than `Platform.free_memory()` minus the headroom
 (`MEMORY_HEADROOM`, percent of the total memory).
 
 # Fields
@@ -206,7 +207,7 @@ function Base.showerror(io::IO, e::MemoryBudgetError)
 end
 
 "The free and the total memory of the machine in bytes (the default of `memory`)."
-_systemMemory() = (Int(Sys.free_memory()), Int(Sys.total_memory()))
+_systemMemory() = (Platform.free_memory(), Int(Sys.total_memory()))
 
 """
 Estimated peak bytes of the static build of a block of `b` q values for `nAtoms` atoms and
@@ -295,7 +296,7 @@ block, one after the other. G(q) at one q does not depend on the other q values,
 result is the one-pass result up to rounding, and the memory is that of one block (the
 multipoles of a large structure are `2K` doubles per q, K = (lMax+1)(lMax+2)/2, for each
 species). The block size is the largest whose estimate
-fits in `Sys.free_memory()` minus `memoryHeadroom` percent of `Sys.total_memory()`.
+fits in `Platform.free_memory()` minus `memoryHeadroom` percent of `Sys.total_memory()`.
 A run log reads the result off `stageLog.info`: `forwardBlocks`, `forwardBlockQ`,
 `forwardBudgetGib`, `forwardEstGib` (the estimate for a block) and `forwardPeakGib` (the
 process's peak resident set, `Sys.maxrss()`, after the build).

@@ -11,6 +11,83 @@ Two ways to use it, both without writing code:
 - Worked analyses of 112 SASBDB entries (protein, DNA and RNA; 56 with a single-structure reference fit, 56 replacement entries): [fitting tests](test/fitting_tests/README.md)
 - Developer tools (test runners, comparison, benchmarks, figure rendering): [dev](dev/README.md)
 
+## Known bugs
+
+Version 0.5.1 is a proof of concept: the packaged program installs, opens and fits on Apple
+Silicon, Linux (ARM) and Windows 11, with the bugs below. They are to be fixed in 0.5.2.
+"Fixed in the source" means that the 0.5.1 macOS package built on 25 November 2026 still has
+the bug.
+
+**Every system** (shared code; seen on macOS, not yet checked on the others)
+
+- *Uninstalling from the interface returns to the menu.* After the setup wizard, opened with
+  `shift+a`, has removed the app, the main menu comes back and its options can still be
+  selected. `afterSetup` (`tui/julia/app/bundle.jl`) turns the status `UNINSTALLED` (22) into
+  0, and the interface quits only on 22 (`runSetupWizard` in `tui/src/core/file-system.ts`).
+- *Opening the wizard after that* shows `could not start the setup wizard: spawnSync .../baysol
+  ENOENT`: the program it starts is gone. Until this is fixed, quit BAYSOL with `q` after an
+  uninstall.
+- *Uninstalling leaves files behind.* After `App and caches` only the projects folder may stay;
+  after `Everything` not even that. Left on macOS: an empty `settings.json` in the projects
+  folder though there were no projects, the rest of the cache folder beside `_structures` (its
+  parent is kept too) and the temporary folder `<tmp>/baysol`. The interface that is still open
+  after an uninstall (first bug) can write some of them again.
+- *The tests of the interface leave `baysol-help-*` folders* (and `<tmp>/baysol`) in the
+  temporary folder.
+- *The icon of the setup wizard is drawn with half blocks (`▀`)* and the large logo of the main
+  menu with full blocks (`█`). In a terminal whose font does not fill the cell with them,
+  strips of the wrong colour cross the icon and gaps show between the rows of the logo. Seen in
+  the Terminal of macOS, where it is fixed in the source (both are drawn with coloured spaces
+  there; the new logo of the menu has not been looked at in Terminal yet). Other terminals keep
+  the blocks and can show the same.
+- *The setup wizard has far too many options* and is confusing to read: a menu of six entries,
+  then folders, threads, launcher, terminal, shortcuts and the missing items. It needs fewer
+  questions and sensible defaults.
+- *The questions of the wizard are not yes or no.* A missing item is asked with Install now,
+  Not now, No and Never ask again, which do not make sense together. Every question of this
+  kind should be Yes or No.
+- *`Install LaTeX engine (TeX Live)?` can have no answer that installs it*: it was shown with Not
+  now, No and Never ask again only, because an install that needs administrator rights is never
+  run by the wizard. It should not be asked as a question then.
+- *SASDMJ9 has two chi-squared values*: 0.856 from the script of its fitting test, 2.649 from
+  the exported project in the packaged program. The cause is not known.
+- *The report and the build log of `bysl pkg` say `ram 0 MiB` and `swap 0 MiB` on macOS and
+  Windows*: `write_report` and the build log (`dev/src/pkg.jl`) read `/proc/meminfo`, which only
+  Linux has, and print 0 for what is missing. The peak memory of each stage, the preflight for
+  24 GiB and the stop on low swap do not run there either.
+- *`bysl pkg` does not start the program it built*, so a package that cannot start passes.
+- *`bysl audit` lists `libz` and `libpython` as missing* in the macOS bundle, where both are
+  shipped and found.
+
+**macOS**
+
+- *Quitting still leaves a window that says `[Process completed]`.* The launcher of the package
+  (`launcher` in `dev/src/pkg.jl`) should close its own Terminal window after a clean end, but
+  the window stays. The cause is not confirmed. One fault found: the launcher takes the first
+  window with its tty, and Terminal reports the old tty of a finished window even after a new
+  one has the same, so it can pick the wrong window, or close it.
+- *Gatekeeper blocks a package downloaded with a browser*: it is signed ad hoc, not with a
+  Developer ID. Run `xattr -dr com.apple.quarantine baysol` on the unpacked folder.
+- *The default Terminal font (SF Mono 11) makes the interface look bad.* The wizard suggests
+  Menlo 14; the character and line spacing have to be set to 1.0 by hand.
+- *Terminal shows no sixel figures*; use iTerm2 or WezTerm. Installing Homebrew and iTerm2 from
+  the wizard and starting BAYSOL from its icon were tried and work; opening it in WezTerm and
+  the Desktop permission prompt are untested.
+- *`Change the Terminal spacing?` changes nothing*: it shows the steps and offers `I changed it`.
+  It should be Yes or No, and Yes should set the spacing to 1.0. Terminal has no scripting for
+  it; importing a profile with that spacing is to be tried.
+- *`The icon opens it in:` says `Automatic (iTerm2 now)`*: the `(iTerm2 now)` should go.
+- *Uninstalling leaves the icon in the Dock* (macOS only: on Linux with GNOME `_unpin` removes
+  the pin), where it points to the deleted `BAYSOL.app`. The uninstall should remove every Dock
+  entry of `org.baysol.app`, also one the user dragged there (the wizard makes none and so lists
+  none in its manifest).
+- *The app icon is clipped.* The icon works, but its artwork has to be redone for macOS.
+- *Some texts still say that macOS is untested*, also below.
+- *Three tests of the interface fail*: `compile plots` and two of the zip64 archive tests (955
+  of 958 pass). Once a fourth failed that passed in three reruns; which one was not
+  recorded.
+- *Intel Macs, the figures made with TeX and the complete `bysl precommit` are untested.*
+
 ## Use BAYSOL from the terminal interface (no coding)
 
 The terminal interface (TUI) is the first way to use BAYSOL: a full-screen program that runs in
@@ -291,6 +368,15 @@ energy), the project menu shows **`run: shift+r`** at the bottom. Press **shift+
 3. At the end the counter says `done`, `failed` or `aborted` and **Enter** goes back to the project
    menu. A failed run shows the first line of its error.
 
+**A fit that takes far longer than similar ones.** When the first attempt is borderline (the
+chains nearly agree, `R̂` just above 1.01), the retry ladder runs longer warm-ups and longer
+chains, and each rung costs more than the one before; the ladder does not guarantee that the
+fit ends in convergence. The number of attempts also depends on the seed and on the computer:
+the same fit can take 3 attempts on one machine and 10 on another. If a fit is much slower than
+usual, stop it with **^c** and try another **RNG seed** (Settings, sampler, sampling) or a
+shorter **retry ladder** (Settings, sampler, retry ladder) before allowing more; a different seed
+costs one normal attempt, but do not shop for a seed that passes: report the one you used. A failed run still writes its log, with the class of the failure.
+
 **^c (or ^d) stops the run and quits the program**: Julia is asked to finish its log, then
 stopped. Only one run per project can be live at once: another start says
 `a run is in progress (pid N)`. While it runs you can edit nothing that it uses: it works on a copy of your project
@@ -422,6 +508,7 @@ through a temporary file, so a crash never leaves half a file.
 | `missing components: ...` where `run: shift+r` should be | The box names what is missing (`models`, `solutes`, `pH`, `temperature`, `data`, `energy`); `run: shift+r` replaces it once the list is empty. |
 | `a run is in progress (pid N)` | The project already has a live run (maybe in another window). Wait for it, or stop it. A crashed run is marked `interrupted` after a minute and stops blocking. |
 | `could not start julia: ...` | `julia` is not on the PATH. Install it, or set the environment variable `JULIA` to its full path. |
+| A fit runs far longer than similar ones | The retry ladder is working through a borderline fit and may not converge. Stop it (`^c`), then try another RNG seed or a shorter retry ladder (see "5. Run"). |
 | A model is `failed`; its first error line is on the run screen | Read the `ERRORS` section at the end of `run.LOG` (`^l` in `open runs`). Other models in the run are still fitted. |
 | `WLSError` in the log | The fit had too few points (fewer than 3) or the model curve is flat across your q range. Check the curve, the q units and the energy. |
 | `a number, please` / `from 0 to 100 °C` | The temperature prompt of `^g` in the buffer wants a number in that range. |

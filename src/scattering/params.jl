@@ -17,7 +17,7 @@ const SHELL_THICKNESS = 3.0
 Memory to leave free for other programs while the static build runs, in percent of the
 machine's total memory (`Sys.total_memory()`). The build of the species Gram matrix
 ([`forwardCache`](@ref)) works through the q values in blocks, and the size of a block is
-chosen so that the build stays within `Sys.free_memory()` minus this headroom: 10 % of
+chosen so that the build stays within `Platform.free_memory()` minus this headroom: 10 % of
 15.3 GiB leaves 1.5 GiB. A larger headroom means more, smaller blocks (and a little more
 time), never a different result. Allowed values are `MEMORY_HEADROOM_MIN` to
 `MEMORY_HEADROOM_MAX`; a whole number.

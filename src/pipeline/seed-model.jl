@@ -160,7 +160,7 @@ Computes a NUTS seed from given data input:
     [`sasa`](@ref BAYSOL.Geometry.sasa).
 -   `memoryHeadroom = MEMORY_HEADROOM`: percent (a whole number, 5 to 80; 10) of the
     machine's total memory to leave free while the scattering build runs. The build works
-    through the q values in blocks sized to `Sys.free_memory()` minus this headroom
+    through the q values in blocks sized to `Platform.free_memory()` minus this headroom
     ([`Scattering.forwardCache`](@ref)); the result does not depend on it, only the number
     of blocks does. The run log records `forwardBlocks`, `forwardBlockQ`,
     `forwardEstGib` and `forwardPeakGib`.

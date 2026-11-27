@@ -165,6 +165,14 @@ exit 0
     end
 end
 
+@testset "free_memory: between the free pages and the total" begin
+    free = Platform.free_memory()
+    @test free isa Int && 0 < free <= Sys.total_memory()
+    # macOS: the kernel answers, with more than the empty pages (a quarter less for drift)
+    Platform.ismacos() && @test Platform._mac_available_memory() > 0.75 * Sys.free_memory()
+    @test (Platform._mac_available_memory() === nothing) == !Platform.ismacos()
+end
+
 @testset "utc_offset: the zone's offset as a number, on every system" begin
     t = 1.7e9
     off = Platform.utc_offset(t)

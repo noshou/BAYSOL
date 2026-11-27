@@ -220,7 +220,12 @@ function start(base: string, how: string): Promise<Child> {
         child.stdout?.on("data", (chunk: Buffer) => {
             text += chunk.toString()
             if (text.includes("\n"))
-                resolve({ child, folder: (text.split("\n")[0] as string).trim(), exited, kill })
+                resolve({
+                    child,
+                    folder: (text.split("\n")[0] as string).trim(),
+                    exited,
+                    kill,
+                })
         })
         child.on("exit", () => reject(new Error(`exited early: ${text}`)))
     })
@@ -239,7 +244,9 @@ for (const how of ["exit", "throw", "reject"]) {
 for (const signal of ["SIGTERM", "SIGHUP"] as const) {
     test(
         `the process folder is removed on ${signal}`,
-        { skip: process.platform === "win32" && "Windows has no signals that run handlers" },
+        {
+            skip: process.platform === "win32" && "Windows has no signal handlers",
+        },
         async () => {
             const base = tempDir()
             const run = await start(base, "wait")

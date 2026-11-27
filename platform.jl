@@ -354,6 +354,39 @@ function shell(; env = ENV)::String
 end
 
 """
+    free_memory() -> Int
+
+The memory, in bytes, that a program can still take without the system swapping out others.
+`Sys.free_memory()`, except on macOS: there it counts only the pages that hold nothing at
+all, a few per cent of the memory of any machine that has been up for a while, because
+the system keeps the contents of files until someone asks for the memory. The macOS value
+adds the inactive pages, but no more of them than there are file-backed pages
+(`host_statistics64`): an anonymous page is only freed by compressing or swapping it.
+`Sys.free_memory()` when the call fails.
+"""
+function free_memory()::Int
+    ismacos() && return something(_mac_available_memory(), Int(Sys.free_memory()))
+    return Int(Sys.free_memory())
+end
+
+# Free plus reclaimable memory of macOS in bytes; `nothing` when the kernel call fails.
+function _mac_available_memory()::Union{Int,Nothing}
+    ismacos() || return nothing
+    # vm_statistics64 in 32-bit words (from 1): free_count 1, inactive_count 3,
+    # speculative_count 24 (file-backed, and part of free_count already),
+    # external_page_count 35
+    info = zeros(UInt32, 64)
+    count = Ref{Cuint}(38)                      # HOST_VM_INFO64_REV1_COUNT
+    host = ccall(:mach_host_self, Cuint, ())
+    status = ccall(:host_statistics64, Cint, (Cuint, Cint, Ptr{UInt32}, Ref{Cuint}),
+        host, 4, info, count)                   # HOST_VM_INFO64
+    status == 0 || return nothing
+    files = max(Int(info[35]) - Int(info[24]), 0)
+    pages = Int(info[1]) + min(Int(info[3]), files)
+    return pages * Int(ccall(:getpagesize, Cint, ()))
+end
+
+"""
     library_path_variable() -> String
 
 The environment variable the system's dynamic loader searches for shared libraries:

@@ -665,3 +665,110 @@ end
         end
     end
 end
+
+@testset "build log reader: stages, peaks and the short view" begin
+    text = join(
+        [
+            "datetime        \t2026-11-24 23:06:42 -0500",
+            "version \tv0.5.1 pẽnegda",
+            "revision        \tf0f169c4-dirty",
+            "julia   \t1.12.7",
+            "node    \t26.13.1",
+            "python  \t3.12",
+            "system  \tlinux-arm64, Fedora Linux Asahi Remix 45",
+            "",
+            "--- stages ---",
+            "pytools skipped (done before)",
+            "stage julia ok      2020.3 s   peak RAM 11961 MiB, swap 16019 MiB",
+            "  juliac              ok     1500.0 s   peak RAM 11000 MiB, swap 15000 MiB",
+            "stage bundle FAIL      13.2 s   peak RAM 1403 MiB, swap 0 MiB",
+            "  pytools: 4.0 MiB of unused numpy files left out",
+            "total      33.7 min",
+            "",
+            "--- step: stage julia ---",
+            "datetime\tnot a row of the head",
+            "",
+            "--- machine ---",
+            "cpu     \tBlizzard-M2",
+            "threads \t8",
+            "ram     \t15624 MiB",
+            "swap    \t49147 MiB",
+        ],
+        "\n",
+    )
+    b = P.parse_build_log(text)
+    @test b.rows["version"] == "v0.5.1 pẽnegda"
+    @test b.rows["datetime"] == "2026-11-24 23:06:42 -0500"    # not the step's row
+    @test b.rows["cpu"] == "Blizzard-M2"
+    @test [(s.name, s.top, s.ok) for s in b.stages] ==
+          [("stage julia", true, true), ("juliac", false, true),
+        ("stage bundle", true, false)]
+    @test b.stages[1].seconds == 2020.3
+    @test (b.stages[1].ram, b.stages[1].swap) == (11961, 16019)
+    @test b.skipped == ["pytools"]
+    @test b.total == 33.7
+    short = P.format_build_log(b)
+    @test any(l -> occursin("total", l) && occursin("33.7 min", l), short)
+    @test any(l -> occursin("julia", l) && occursin("11.7 GiB", l), short)
+    @test any(l -> occursin("bundle FAIL", l), short)
+    @test !any(l -> occursin("juliac", l), short)
+    @test any(l -> occursin("juliac", l), P.format_build_log(b; steps = true))
+    @test any(l -> occursin("Blizzard-M2", l) && occursin("RAM 15.3 GiB", l), short)
+    summary = P.format_build_summary(["a.LOG" => b])
+    @test occursin("11.7 GiB", summary[2]) && occursin("15.6 GiB", summary[2])
+    @test endswith(summary[2], "FAIL")
+    # the reader copes with a log that has no stage table
+    @test P.parse_build_log("").total === nothing
+    @test P.duration_text(59.6) == "60 s" && P.duration_text(180) == "3.0 min"
+    @test P.size_text(nothing) == "-" && P.size_text(512) == "512 MiB"
+    mktempdir() do dir
+        write(joinpath(dir, "baysol-0.5.1-linux-arm64.LOG"), text)
+        write(joinpath(dir, "baysol-0.5.1-windows-x64.LOG"), text)
+        write(joinpath(dir, "notes.txt"), "")
+        @test length(P.build_log_files(dir, String[])) == 2
+        @test basename.(P.build_log_files(dir, ["WINDOWS"])) ==
+              ["baysol-0.5.1-windows-x64.LOG"]
+        @test isempty(P.build_log_files(joinpath(dir, "none"), String[]))
+    end
+end
+
+@testset "macOS: the Mach-O files of a bundle and their signatures" begin
+    mktempdir() do dir
+        mkpath(joinpath(dir, "lib"))
+        macho = [0xcf, 0xfa, 0xed, 0xfe, 0x00]
+        for f in ("baysol", joinpath("lib", "b.dylib"), joinpath("lib", "a.so"))
+            write(joinpath(dir, f), macho)
+        end
+        write(joinpath(dir, "note.txt"), "text")
+        write(joinpath(dir, "empty.so"), "")
+        # the libraries before the executable, nothing else
+        files = P.macho_files(dir)
+        @test relpath.(files, dir) ==
+              [joinpath("lib", "a.so"), joinpath("lib", "b.dylib"), "baysol"]
+        ran = Vector{String}[]
+        P.sign_macos(files; runner = c -> (push!(ran, collect(c.exec)); true))
+        @test length(ran) == 6
+        @test ran[1] == ["codesign", "--force", "--sign", "-", files[1]]
+        @test ran[2] == ["codesign", "--verify", "--strict", files[1]]
+        # a refused signature stops the build
+        @test_throws Exception P.sign_macos(files; runner = _ -> false)
+    end
+end
+
+@testset "macOS: the names the runtime libraries are shipped under" begin
+    names(file, bare, id) = P.macos_names(file, bare; id)
+    @test names("libz.1.3.1.dylib", nothing, "@rpath/libz.1.dylib") == ["libz.1.dylib"]
+    @test names("libopenlibm.4.0.dylib", "libopenlibm.dylib",
+        "@rpath/libopenlibm.4.dylib") == ["libopenlibm.4.dylib", "libopenlibm.dylib"]
+    v = "$(VERSION.major).$(VERSION.minor)"
+    # one name only: two copies would be two runtimes
+    @test names("libjulia-internal.$v.7.dylib", nothing,
+        "@rpath/libjulia-internal.dylib") == ["libjulia-internal.$v.dylib"]
+    @test names("/x/libfoo.dylib", nothing, nothing) == ["libfoo.dylib"]
+    ran = Vector{String}[]
+    P.relink_macos(["/b/libjulia-codegen.$v.dylib", "/b/baysol"];
+        runner = c -> (push!(ran, collect(c.exec)); true))
+    @test "@rpath/libjulia-internal.$v.dylib" in ran[2] && !("-id" in ran[2])
+    @test "-id" in ran[1] && ran[1][end] == "/b/libjulia-codegen.$v.dylib"
+    @test_throws Exception P.relink_macos(["/b/x"]; runner = _ -> false)
+end

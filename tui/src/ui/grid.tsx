@@ -10,7 +10,14 @@
 //   4. `GridMenu`: the grid component with its taskbar
 
 import { Box, Text } from "ink"
-import { type ReactNode, useCallback, useEffect, useState } from "react"
+import {
+    createElement,
+    Fragment,
+    type ReactNode,
+    useCallback,
+    useEffect,
+    useState,
+} from "react"
 import { readAssetText } from "../core/environment.js"
 import { displayWidth, padWidth } from "../core/terminal.js"
 import {
@@ -555,6 +562,27 @@ const logo = menuLogo()
 const menuHeaderRows = logo.height + 1
 
 /**
+ * Whether the blocks of the logo are drawn as coloured spaces: in the Terminal of macOS,
+ * whose `█` does not fill its cell, so gaps show between the rows.
+ */
+function solidLogo(): boolean { return process.env.TERM_PROGRAM === "Apple_Terminal" }
+
+/**
+ * The logo with each run of `█` as spaces on a background.
+ *
+ * @param color - the colour of the blocks.
+ * @returns the runs of the logo, to put in a `Text`.
+ */
+function logoRuns(color: string): ReactNode {
+    const runs = logo.text.split(/(█+)/).map((run) =>
+        run.startsWith("█")
+            ? createElement(Text, { backgroundColor: color }, " ".repeat(run.length))
+            : run
+    )
+    return createElement(Fragment, null, ...runs)
+}
+
+/**
  * What the top of a menu shows: the BAYSOL logo, centred, with one line under it (the
  * version, the project's name, ...). It has no margin: the `GridMenu` adds one when the
  * terminal has room.
@@ -567,7 +595,7 @@ export function MenuHeader({ caption }: { caption: string }): ReactNode {
     return (
         <Box flexDirection="column" alignItems="center">
             <Box width={logo.width} height={logo.height} flexShrink={0}>
-                <Text color={theme.fg}>{logo.text}</Text>
+                <Text color={theme.fg}>{solidLogo() ? logoRuns(theme.fg) : logo.text}</Text>
             </Box>
             <Text color={theme.mt}> {caption} </Text>
         </Box>

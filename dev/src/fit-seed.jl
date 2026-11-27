@@ -46,12 +46,62 @@ function load_fit_seed(
 )
     # the scripts read their fixtures through `fixtureDir` (test/fitting_tests/common.jl),
     # which looks in $BAYSOL_FIXTURES: unpack the archive for the duration of the call
+    info = load_fit_seed_info(id, tag; seed_options)
+    return info.seed, info.reference, info.label
+end
+
+"""
+    load_fit_seed_info(id, tag = ""; seed_options = (;))
+        -> (; seed, reference, label, fitFile, software, fitHeader)
+
+[`load_fit_seed`](@ref) with what else the script says about the depositor's fit:
+`fitFile`, the name of its `.fit` file; `software`, the `software` field of the run
+(`nothing` for a script without a `RUNS` table or a run without the field); and
+`fitHeader`, the first three lines of the `.fit` file (`""` if the file is missing).
+A script with a single run in `RUNS` also accepts `tag = ""`.
+
+# Returns
+- The named tuple above.
+
+# Exceptions
+- As for [`load_fit_seed`](@ref).
+"""
+function load_fit_seed_info(
+    id::AbstractString,
+    tag::AbstractString = "";
+    seed_options::NamedTuple = (;),
+)
     return FixtureStore.with_fixture(id) do _
-        _load_fit_seed(id, tag, seed_options)
+        _load_fit_seed(id, tag, seed_options, true)
     end
 end
 
-function _load_fit_seed(id::AbstractString, tag::AbstractString, seed_options::NamedTuple)
+"""
+    load_fit_header(id, tag = "") -> (; fitFile, software, fitHeader)
+
+The part of [`load_fit_seed_info`](@ref) that needs no structure work: the script's
+constants are evaluated but the `Seed` is not built (no hydrogenation). `fitFile`,
+`software` and `fitHeader` are as there.
+
+# Returns
+- The named tuple above.
+
+# Exceptions
+- As for [`load_fit_seed`](@ref).
+"""
+function load_fit_header(id::AbstractString, tag::AbstractString = "")
+    info = FixtureStore.with_fixture(id) do _
+        _load_fit_seed(id, tag, (;), false)
+    end
+    return (; info.fitFile, info.software, info.fitHeader)
+end
+
+function _load_fit_seed(
+    id::AbstractString,
+    tag::AbstractString,
+    seed_options::NamedTuple,
+    build::Bool,
+)
     fit_dir = joinpath(@__DIR__, "..", "..", "test", "fitting_tests")
     dir = joinpath(fit_dir, id)
     isdir(dir) || error("no fitting test folder $dir")
@@ -91,21 +141,27 @@ function _load_fit_seed(id::AbstractString, tag::AbstractString, seed_options::N
     # SASDTK5.jl -> seedSasdtk5, SASDA52_fit1.jl -> seedSasda52Fit1
     entry =
         Symbol("seed", join(uppercasefirst.(lowercase.(split(splitext(script)[1], "_")))))
-    built = if haskey(SEED_ENTRY_OVERRIDES, id)
-        SEED_ENTRY_OVERRIDES[id](mod, tag)
-    elseif runs !== nothing
-        run = only(filter(r -> r.tag == tag, runs))
-        Base.invokelatest(Core.eval(mod, entry), run)
-    elseif isdefined(mod, entry)
-        Base.invokelatest(Core.eval(mod, entry))
-    else
-        error("$path: no `$entry` entry point; add a SEED_ENTRY_OVERRIDES method for $id")
-    end
-    seed = built[1]   # every seed* returns (seed, (qFit, I_fit, σ_fit))
+    built =
+        !build ? nothing :
+        if haskey(SEED_ENTRY_OVERRIDES, id)
+            SEED_ENTRY_OVERRIDES[id](mod, tag)
+        elseif runs !== nothing
+            run = _run_of(runs, tag)
+            Base.invokelatest(Core.eval(mod, entry), run)
+        elseif isdefined(mod, entry)
+            Base.invokelatest(Core.eval(mod, entry))
+        else
+            error(
+                "$path: no `$entry` entry point; add a SEED_ENTRY_OVERRIDES method for $id",
+            )
+        end
+    seed = build ? built[1] : nothing   # every seed* returns (seed, (qFit, I_fit, σ_fit))
 
     reference = nothing
+    software = nothing
     fit_file, scale, col = if runs !== nothing
-        r = only(filter(r -> r.tag == tag, runs))
+        r = _run_of(runs, tag)
+        software = get(r, :software, nothing)
         (r.fit, r.fitScale, r.fitCol)
     else
         # SASDWJ4_fit2.jl -> SASDWJ4_fit2.fit; a script without a fit suffix is fit1
@@ -114,10 +170,19 @@ function _load_fit_seed(id::AbstractString, tag::AbstractString, seed_options::N
         ("$fit_name.fit", 1.0, 4)   # CRYSOL .fit layout: q, I_exp, σ, I_fit
     end
     fitPath = joinpath(FixtureStore.resolve(id)[1], fit_file)
-    if isfile(fitPath) && isdefined(mod, :fitSubset)
+    header = isfile(fitPath) ? join(first(readlines(fitPath), 3), "\n") : ""
+    if build && isfile(fitPath) && isdefined(mod, :fitSubset)
         fc = Base.invokelatest(Core.eval(mod, :_readFit), fitPath, scale, col)
         q, I, σ = Base.invokelatest(Core.eval(mod, :fitSubset))
         fc === nothing || (reference = (; q, I, σ, qRef = fc[1], iRef = fc[2]))
     end
-    return seed, reference, isempty(tag) ? id : "$id:$tag"
+    label = isempty(tag) ? id : "$id:$tag"
+    return (; seed, reference, label, fitFile = fit_file, software, fitHeader = header)
+end
+
+# The run of `RUNS` with this tag; the only run when `tag` is empty and there is one.
+function _run_of(runs, tag)
+    found = filter(r -> r.tag == tag, runs)
+    isempty(found) && isempty(tag) && length(runs) == 1 && return only(runs)
+    return only(found)
 end

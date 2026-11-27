@@ -2,7 +2,8 @@
 
 # The end-to-end fitting tests (test/fitting_tests/<ID>/) and what is done with them:
 # running them (`bysl fits run`), listing them (`bysl fits list`), the sampler diagnostics
-# (`bysl fits diagnose`) and the profile of the static build (`bysl fits profile`).
+# (`bysl fits diagnose`), the profile of the static build (`bysl fits profile`) and the
+# excluded-volume radius table (`bysl fits radius`).
 module Fits
 
 using ..Common
@@ -711,6 +712,7 @@ end
 
 include("fits-export.jl")
 include("fits-units.jl")
+include("fits-radius.jl")
 
 const SUBS = [
     "run" => (Fit, "run the fitting tests and the steps that follow them"),
@@ -719,6 +721,10 @@ const SUBS = [
     "profile" => (Profile, "profile the static build of fitting tests"),
     "export" => (Export, "fitting tests as TUI projects, each with one finished run"),
     "units" => (Units, "check each script's q-unit conversion against its data"),
+    "radius" => (
+        Radius,
+        "the excluded-volume radius r0 of each fit against the reference tool's",
+    ),
     "bench" => (Bench, "the cold / steady-state benchmark (needs --approved)"),
 ]
 
