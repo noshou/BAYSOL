@@ -171,6 +171,7 @@
   "(2s,3s,4r,5s,6s)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol": "(2R,3R,4S,5R,6R)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
   "methyl .beta.-d-galactopyranoside": "(2R,3R,4S,5R,6R)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
   "methyl beta-d-galactopyranoside": "(2R,3R,4S,5R,6R)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
+  "methyl beta-d-galactoside": "(2R,3R,4S,5R,6R)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
 
   "(2r,3r,4s,5r,6s)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol": "(2R,3R,4S,5R,6S)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
   "(2s,3s,4r,5s,6r)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol": "(2R,3R,4S,5R,6S)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
@@ -228,6 +229,7 @@
   "methyl .beta.-d-glucopyranoside": "(2R,3S,4S,5R,6R)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
   "methyl beta -d-glucopyranoside": "(2R,3S,4S,5R,6R)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
   "methyl beta-d-glucopyranoside": "(2R,3S,4S,5R,6R)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
+  "methyl beta-d-glucoside": "(2R,3S,4S,5R,6R)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
 
   "(2r,3s,4s,5r,6s)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol": "(2R,3S,4S,5R,6S)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
   "(2s,3r,4r,5s,6r)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol": "(2R,3S,4S,5R,6S)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
@@ -266,6 +268,7 @@
   "alpha-d-mannopyranoside, methyl": "(2R,3S,4S,5S,6S)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
   "methyl .alpha.-d-mannopyranoside": "(2R,3S,4S,5S,6S)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
   "methyl alpha-d-mannopyranoside": "(2R,3S,4S,5S,6S)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
+  "methyl alpha-d-mannoside": "(2R,3S,4S,5S,6S)-2-(hydroxymethyl)-6-methoxyoxane-3,4,5-triol",
 
   "(2s,3r,4s,5r)-2-methoxyoxane-3,4,5-triol": "(2S,3R,4S,5R)-2-methoxyoxane-3,4,5-triol",
   "(2r,3s,4r,5s)-2-methoxyoxane-3,4,5-triol": "(2S,3R,4S,5R)-2-methoxyoxane-3,4,5-triol",
@@ -378,6 +381,7 @@
   "1,10-phenanthroline": "1,10-phenanthroline",
   "phenanthroline": "1,10-phenanthroline",
   "1,10-phenanthroline monohydrate": "1,10-phenanthroline",
+  "o-phenanthroline": "1,10-phenanthroline",
 
   "1,2-dicarboxyethan-1-aminium": "1,2-dicarboxyethan-1-aminium",
   "(1s)-1,2-dicarboxyethan-1-aminium": "1,2-dicarboxyethan-1-aminium",
@@ -388,8 +392,12 @@
   "l-aspartic acid(1+)": "1,2-dicarboxyethan-1-aminium",
 
   "1,2-diethoxyethane": "1,2-diethoxyethane",
+  "ethylene glycol diethyl ether": "1,2-diethoxyethane",
 
   "1,2-dimethoxyethane": "1,2-dimethoxyethane",
+  "ethylene glycol dimethyl ether": "1,2-dimethoxyethane",
+  "glyme": "1,2-dimethoxyethane",
+  "monoglyme": "1,2-dimethoxyethane",
 
   "1,2-dimyristoyl-glycero-3-phosphocholine": "1,2-dimyristoyl-glycero-3-phosphocholine",
   "1,2-di-o-myristoyl-sn-glycero-3-phosphocholine": "1,2-dimyristoyl-glycero-3-phosphocholine",
@@ -410,14 +418,22 @@
   "dopc": "1,2-dioleoyl-glycero-3-phosphocholine",
   "lecithindioleoyl": "1,2-dioleoyl-glycero-3-phosphocholine",
   "phosphatidylcholines (egg)": "1,2-dioleoyl-glycero-3-phosphocholine",
+  "dioleoylphosphatidylcholine": "1,2-dioleoyl-glycero-3-phosphocholine",
 
   "1,3,5,7-tetraazatricyclo[3.3.1.1^{3,7}]decane": "1,3,5,7-tetraazatricyclo[3.3.1.1^{3,7}]decane",
   "1,3,5,7-tetraazatricyclo[3.3.1.1(3,7)]decane": "1,3,5,7-tetraazatricyclo[3.3.1.1^{3,7}]decane",
   "hexamethylenetetramine": "1,3,5,7-tetraazatricyclo[3.3.1.1^{3,7}]decane",
+  "hexamine": "1,3,5,7-tetraazatricyclo[3.3.1.1^{3,7}]decane",
+  "methenamine": "1,3,5,7-tetraazatricyclo[3.3.1.1^{3,7}]decane",
+  "urotropine": "1,3,5,7-tetraazatricyclo[3.3.1.1^{3,7}]decane",
 
   "1,3,5-triazine": "1,3,5-triazine",
+  "s-triazine": "1,3,5-triazine",
+  "sym-triazine": "1,3,5-triazine",
 
   "1,3,5-trioxane": "1,3,5-trioxane",
+  "s-trioxane": "1,3,5-trioxane",
+  "trioxane": "1,3,5-trioxane",
 
   "1,3,7-trimethyl-3,7-dihydro-1h-purine-2,6-dione": "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione",
   "1,3,7-trimethyl-1h-purine-2,6-dione": "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione",
@@ -494,6 +510,8 @@
   "1,4-dimethyl-2,5-piperazinedione": "1,4-dimethylpiperazine-2,5-dione",
 
   "1,4-dioxane": "1,4-dioxane",
+  "dioxane": "1,4-dioxane",
+  "p-dioxane": "1,4-dioxane",
 
   "1,4-disulfanylbutane-2,3-diol": "1,4-disulfanylbutane-2,3-diol",
   "dithiothreitol": "1,4-disulfanylbutane-2,3-diol",
@@ -503,12 +521,15 @@
   "1,4-dithiothreitol": "1,4-disulfanylbutane-2,3-diol",
   "1,4-dithio-dl-threitol": "1,4-disulfanylbutane-2,3-diol",
   "dl-1,4-dithiothreitol": "1,4-disulfanylbutane-2,3-diol",
+  "cleland's reagent": "1,4-disulfanylbutane-2,3-diol",
 
   "1,7-dihydro-6h-purin-6-one": "1,7-dihydro-6H-purin-6-one",
   "1,7-dihydropurin-6-one": "1,7-dihydro-6H-purin-6-one",
   "hypoxanthine": "1,7-dihydro-6H-purin-6-one",
 
   "1-bromopropane": "1-bromopropane",
+  "n-propyl bromide": "1-bromopropane",
+  "propyl bromide": "1-bromopropane",
 
   "1-cyclopentylethan-1-ol": "1-cyclopentylethan-1-ol",
   "(+)-1-cyclopentylethan-1-ol": "1-cyclopentylethan-1-ol",
@@ -587,6 +608,7 @@
 
   "1-ethoxy-2-(2-ethoxyethoxy)ethane": "1-ethoxy-2-(2-ethoxyethoxy)ethane",
   "bis(2-ethoxyethyl) ether": "1-ethoxy-2-(2-ethoxyethoxy)ethane",
+  "diethylene glycol diethyl ether": "1-ethoxy-2-(2-ethoxyethoxy)ethane",
 
   "1-ethyl-3-methyl-1h-imidazol-3-ium bromide": "1-ethyl-3-methyl-1H-imidazol-3-ium bromide",
   "1-ethyl-3-methylimidazol-3-ium bromide": "1-ethyl-3-methyl-1H-imidazol-3-ium bromide",
@@ -634,6 +656,7 @@
 
   "1-methoxy-2-(2-methoxyethoxy)ethane": "1-methoxy-2-(2-methoxyethoxy)ethane",
   "diglyme": "1-methoxy-2-(2-methoxyethoxy)ethane",
+  "diethylene glycol dimethyl ether": "1-methoxy-2-(2-methoxyethoxy)ethane",
 
   "1-methyl-1h-imidazole": "1-methyl-1H-imidazole",
   "1-methylimidazole": "1-methyl-1H-imidazole",
@@ -660,8 +683,10 @@
   "trans-1-methyl-1,2-cyclohexanediol": "1-methylcyclohexane-1,2-diol",
 
   "1-methylpiperazine": "1-methylpiperazine",
+  "n-methylpiperazine": "1-methylpiperazine",
 
   "1-methylpiperidine": "1-methylpiperidine",
+  "n-methylpiperidine": "1-methylpiperidine",
 
   "1-methylpyridin-1-ium": "1-methylpyridin-1-ium",
   "1-methylpyridinium": "1-methylpyridin-1-ium",
@@ -669,8 +694,11 @@
   "1-methylpyrrolidin-2-one": "1-methylpyrrolidin-2-one",
   "1-methyl-2-pyrrolidinone": "1-methylpyrrolidin-2-one",
   "nmp": "1-methylpyrrolidin-2-one",
+  "n-methyl-2-pyrrolidone": "1-methylpyrrolidin-2-one",
+  "n-methylpyrrolidone": "1-methylpyrrolidin-2-one",
 
   "1-methylpyrrolidine": "1-methylpyrrolidine",
+  "n-methylpyrrolidine": "1-methylpyrrolidine",
 
   "1-methylpyrrolidine-2-carboxylate": "1-methylpyrrolidine-2-carboxylate",
   "(+)-1-methylpyrrolidine-2-carboxylate": "1-methylpyrrolidine-2-carboxylate",
@@ -1296,6 +1324,7 @@
   "dgtp4-": "2'-deoxyguanosine 5'-triphosphate(4-)",
 
   "2'-deoxyinosine": "2'-deoxyinosine",
+  "deoxyinosine": "2'-deoxyinosine",
 
   "2'-deoxyuridine": "2'-deoxyuridine",
   "(beta 1-(2-deoxyribopyranosyl))thymidine": "2'-deoxyuridine",
@@ -1498,6 +1527,8 @@
   "2,2',2''-nitrilotris(ethan-1-ol)": "2,2',2''-nitrilotri(ethan-1-ol)",
   "2,2′,2′′-nitrilotriethanol": "2,2',2''-nitrilotri(ethan-1-ol)",
   "triethanolamine": "2,2',2''-nitrilotri(ethan-1-ol)",
+  "tris(2-hydroxyethyl)amine": "2,2',2''-nitrilotri(ethan-1-ol)",
+  "trolamine": "2,2',2''-nitrilotri(ethan-1-ol)",
 
   "2,2',2''-nitrilotriacetate": "2,2',2''-nitrilotriacetate",
   "nitrilotriacetate": "2,2',2''-nitrilotriacetate",
@@ -1576,11 +1607,16 @@
   "2,2'-(azanediyl)bis(ethan-1-ol)": "2,2'-azanediyldi(ethan-1-ol)",
   "2,2′-azanediyldiethanol": "2,2'-azanediyldi(ethan-1-ol)",
   "diethanolamine": "2,2'-azanediyldi(ethan-1-ol)",
+  "dea": "2,2'-azanediyldi(ethan-1-ol)",
 
   "2,2'-bipyridine": "2,2'-bipyridine",
+  "2,2'-bipyridyl": "2,2'-bipyridine",
+  "bipy": "2,2'-bipyridine",
+  "bipyridine": "2,2'-bipyridine",
 
   "2,2'-sulfanediyldi(ethan-1-ol)": "2,2'-sulfanediyldi(ethan-1-ol)",
   "2,2'-thiodiethanol": "2,2'-sulfanediyldi(ethan-1-ol)",
+  "thiodiglycol": "2,2'-sulfanediyldi(ethan-1-ol)",
 
   "2,2,2-trifluoroethan-1-ol": "2,2,2-trifluoroethan-1-ol",
   "1h,1h-perfluoroethanol": "2,2,2-trifluoroethan-1-ol",
@@ -1612,11 +1648,15 @@
 
   "2,2-dimethylpropan-1-ol": "2,2-dimethylpropan-1-ol",
   "2,2-dimethyl-1-propanol": "2,2-dimethylpropan-1-ol",
+  "neopentyl alcohol": "2,2-dimethylpropan-1-ol",
 
   "2,2-dimethylpropane-1,3-diol": "2,2-dimethylpropane-1,3-diol",
   "2,2-dimethyl-1,3-propanediol": "2,2-dimethylpropane-1,3-diol",
+  "neopentyl glycol": "2,2-dimethylpropane-1,3-diol",
 
   "2,2-dimethylpropanoic acid": "2,2-dimethylpropanoic acid",
+  "pivalic acid": "2,2-dimethylpropanoic acid",
+  "trimethylacetic acid": "2,2-dimethylpropanoic acid",
 
   "2,3,4,5,6-pentahydroxyhexanoate": "2,3,4,5,6-pentahydroxyhexanoate",
   "d-gluconate": "2,3,4,5,6-pentahydroxyhexanoate",
@@ -1737,6 +1777,7 @@
   "2,5,8,11,14-pentaoxapentadecane": "2,5,8,11,14-pentaoxapentadecane",
   "pentaglyme precursor": "2,5,8,11,14-pentaoxapentadecane",
   "tetraglyme": "2,5,8,11,14-pentaoxapentadecane",
+  "tetraethylene glycol dimethyl ether": "2,5,8,11,14-pentaoxapentadecane",
 
   "2,5,8,11-tetraoxadodecane": "2,5,8,11-tetraoxadodecane",
   "tetraglyme precursor": "2,5,8,11-tetraoxadodecane",
@@ -1823,6 +1864,7 @@
   "2-(dimethylamino)ethan-1-ol": "2-(dimethylamino)ethan-1-ol",
   "2-(dimethylamino)ethanol": "2-(dimethylamino)ethan-1-ol",
   "dmea": "2-(dimethylamino)ethan-1-ol",
+  "deanol": "2-(dimethylamino)ethan-1-ol",
 
   "2-(ethylamino)ethan-1-ol": "2-(ethylamino)ethan-1-ol",
   "2-(ethylamino)ethanol": "2-(ethylamino)ethan-1-ol",
@@ -1846,6 +1888,7 @@
 
   "2-(methylamino)ethan-1-ol": "2-(methylamino)ethan-1-ol",
   "2-(methylamino)ethanol": "2-(methylamino)ethan-1-ol",
+  "n-methylethanolamine": "2-(methylamino)ethan-1-ol",
 
   "2-(morpholin-4-yl)ethane-1-sulfonate": "2-(morpholin-4-yl)ethane-1-sulfonate",
   "2-(morpholin-4-yl)ethanesulfonate": "2-(morpholin-4-yl)ethane-1-sulfonate",
@@ -1860,6 +1903,8 @@
   "mes free acid": "2-(morpholin-4-yl)ethane-1-sulfonic acid",
   "mes hydrate": "2-(morpholin-4-yl)ethane-1-sulfonic acid",
   "mes monohydrate": "2-(morpholin-4-yl)ethane-1-sulfonic acid",
+  "2-morpholinoethanesulfonic acid": "2-(morpholin-4-yl)ethane-1-sulfonic acid",
+  "mes buffer": "2-(morpholin-4-yl)ethane-1-sulfonic acid",
 
   "2-(phosphonooxy)prop-2-enoate": "2-(phosphonooxy)prop-2-enoate",
   "2-(phosphonooxy)acrylate": "2-(phosphonooxy)prop-2-enoate",
@@ -1896,6 +1941,8 @@
 
   "2-(propan-2-yloxy)propane": "2-(propan-2-yloxy)propane",
   "diisopropyl ether": "2-(propan-2-yloxy)propane",
+  "dipe": "2-(propan-2-yloxy)propane",
+  "isopropyl ether": "2-(propan-2-yloxy)propane",
 
   "2-[(dioxidophosphoryl)oxy]prop-2-enoate": "2-[(dioxidophosphoryl)oxy]prop-2-enoate",
   "2-(phosphonatooxy)prop-2-enoate": "2-[(dioxidophosphoryl)oxy]prop-2-enoate",
@@ -2040,6 +2087,7 @@
   "hepes free acid": "2-[4-(2-hydroxyethyl)piperazin-1-yl]ethane-1-sulfonic acid",
   "n-(2-hydroxyethyl)piperazine-n'-(2-ethanesulfonic acid)": "2-[4-(2-hydroxyethyl)piperazin-1-yl]ethane-1-sulfonic acid",
   "n-(2-hydroxyethyl)piperazine-n′-(2-ethanesulfonic acid)": "2-[4-(2-hydroxyethyl)piperazin-1-yl]ethane-1-sulfonic acid",
+  "hepes buffer": "2-[4-(2-hydroxyethyl)piperazin-1-yl]ethane-1-sulfonic acid",
 
   "2-[[4-[ethyl-[(3-sulfonatophenyl)methyl]amino]phenyl]-(2-sulfonatophenyl)methylidene]cyclohexa-3,5-dien-1-one": "2-[[4-[ethyl-[(3-sulfonatophenyl)methyl]amino]phenyl]-(2-sulfonatophenyl)methylidene]cyclohexa-3,5-dien-1-one",
 
@@ -2048,6 +2096,7 @@
   "bis tris": "2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol",
   "bis(2-hydroxyethyl)amino tris(hydroxymethyl)methane": "2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol",
   "bis-tris": "2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol",
+  "bistris": "2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol",
 
   "2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol;hydrochloride": "2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol;hydrochloride",
   "bis-tris hydrochloride": "2-[bis(2-hydroxyethyl)amino]-2-(hydroxymethyl)propane-1,3-diol;hydrochloride",
@@ -2077,6 +2126,8 @@
   "trizma base": "2-amino-2-(hydroxymethyl)propane-1,3-diol",
   "trometamol": "2-amino-2-(hydroxymethyl)propane-1,3-diol",
   "tromethamine": "2-amino-2-(hydroxymethyl)propane-1,3-diol",
+  "tris-base": "2-amino-2-(hydroxymethyl)propane-1,3-diol",
+  "trizma": "2-amino-2-(hydroxymethyl)propane-1,3-diol",
 
   "2-amino-2-(hydroxymethyl)propane-1,3-diol;hydrochloride": "2-amino-2-(hydroxymethyl)propane-1,3-diol;hydrochloride",
   "tris base hydrochloride": "2-amino-2-(hydroxymethyl)propane-1,3-diol;hydrochloride",
@@ -2203,6 +2254,7 @@
 
   "2-aminoethane-1-thiol": "2-aminoethane-1-thiol",
   "cysteamine": "2-aminoethane-1-thiol",
+  "2-mercaptoethylamine": "2-aminoethane-1-thiol",
 
   "2-aminohexanoic acid": "2-aminohexanoic acid",
   "(+)-2-aminohexanoic acid": "2-aminohexanoic acid",
@@ -2256,6 +2308,7 @@
   "norleucine, d-(-)-": "2-aminohexanoic acid",
   "norleucine, l-": "2-aminohexanoic acid",
   "rac-2-aminohexanoic acid": "2-aminohexanoic acid",
+  "norleucine": "2-aminohexanoic acid",
 
   "2-aminopentanoic acid": "2-aminopentanoic acid",
   "(+)-2-aminopentanoic acid": "2-aminopentanoic acid",
@@ -2314,9 +2367,14 @@
 
   "2-bromo-2-nitropropane-1,3-diol": "2-bromo-2-nitropropane-1,3-diol",
   "bronopol": "2-bromo-2-nitropropane-1,3-diol",
+  "2-bromo-2-nitro-1,3-propanediol": "2-bromo-2-nitropropane-1,3-diol",
 
   "2-butoxyethan-1-ol": "2-butoxyethan-1-ol",
   "2-butoxyethanol": "2-butoxyethan-1-ol",
+  "butyl cellosolve": "2-butoxyethan-1-ol",
+  "butyl glycol": "2-butoxyethan-1-ol",
+  "egbe": "2-butoxyethan-1-ol",
+  "ethylene glycol monobutyl ether": "2-butoxyethan-1-ol",
 
   "2-deoxy-glucose": "2-deoxy-glucose",
   "(3r,4s,5r)-3,4,5,6-tetrahydroxyhexanal": "2-deoxy-glucose",
@@ -2369,10 +2427,15 @@
 
   "2-ethoxyethan-1-ol": "2-ethoxyethan-1-ol",
   "2-ethoxyethanol": "2-ethoxyethan-1-ol",
+  "cellosolve": "2-ethoxyethan-1-ol",
+  "ethyl cellosolve": "2-ethoxyethan-1-ol",
+  "ethylene glycol monoethyl ether": "2-ethoxyethan-1-ol",
 
   "2-hydroxy-1,1-dimethylethylazanium": "2-hydroxy-1,1-dimethylethylazanium",
 
   "2-hydroxy-2-methylpropanoic acid": "2-hydroxy-2-methylpropanoic acid",
+  "2-hydroxyisobutyric acid": "2-hydroxy-2-methylpropanoic acid",
+  "alpha-hydroxyisobutyric acid": "2-hydroxy-2-methylpropanoic acid",
 
   "2-hydroxy-3-(morpholin-4-yl)propane-1-sulfonate": "2-hydroxy-3-(morpholin-4-yl)propane-1-sulfonate",
   "mopso anion": "2-hydroxy-3-(morpholin-4-yl)propane-1-sulfonate",
@@ -3097,6 +3160,7 @@
   "2-hydroxypropane-1,2,3-tricarboxylic acid monohydrate": "2-hydroxypropane-1,2,3-tricarboxylic acid",
   "citric acid monohydrate": "2-hydroxypropane-1,2,3-tricarboxylic acid",
   "c6h8o7": "2-hydroxypropane-1,2,3-tricarboxylic acid",
+  "anhydrous citric acid": "2-hydroxypropane-1,2,3-tricarboxylic acid",
 
   "2-hydroxypropanoate": "2-hydroxypropanoate",
   "(+)-2-hydroxypropanoate": "2-hydroxypropanoate",
@@ -3221,6 +3285,8 @@
 
   "2-methoxyethan-1-ol": "2-methoxyethan-1-ol",
   "2-methoxyethanol": "2-methoxyethan-1-ol",
+  "ethylene glycol monomethyl ether": "2-methoxyethan-1-ol",
+  "methyl cellosolve": "2-methoxyethan-1-ol",
 
   "2-methyl-1,4,5,6-tetrahydropyrimidine-4-carboxylic acid": "2-methyl-1,4,5,6-tetrahydropyrimidine-4-carboxylic acid",
   "(4s)-2-methyl-1,4,5,6-tetrahydropyrimidine-4-carboxylic acid": "2-methyl-1,4,5,6-tetrahydropyrimidine-4-carboxylic acid",
@@ -3234,6 +3300,9 @@
 
   "2-methylalanine": "2-methylalanine",
   "2-amino-2-methylpropanoic acid": "2-methylalanine",
+  "2-aminoisobutyric acid": "2-methylalanine",
+  "aib": "2-methylalanine",
+  "alpha-aminoisobutyric acid": "2-methylalanine",
 
   "2-methylbenzoate": "2-methylbenzoate",
   "2-toluate": "2-methylbenzoate",
@@ -3268,6 +3337,8 @@
 
   "2-methylbutan-2-ol": "2-methylbutan-2-ol",
   "2-methyl-2-butanol": "2-methylbutan-2-ol",
+  "tert-amyl alcohol": "2-methylbutan-2-ol",
+  "tert-pentanol": "2-methylbutan-2-ol",
 
   "2-methylbutanoic acid": "2-methylbutanoic acid",
   "(+)-(s)-2-methylbutanoic acid": "2-methylbutanoic acid",
@@ -3350,6 +3421,7 @@
   "l-(-)-2-methyloxolane": "2-methyloxolane",
   "l-2-methyloxolane": "2-methyloxolane",
   "rac-2-methyloxolane": "2-methyloxolane",
+  "2-methf": "2-methyloxolane",
 
   "2-methylpentane-2,4-diol": "2-methylpentane-2,4-diol",
   "(+)-2-methylpentane-2,4-diol": "2-methylpentane-2,4-diol",
@@ -3438,15 +3510,20 @@
 
   "2-methylpropan-1-amine": "2-methylpropan-1-amine",
   "2-methyl-1-propanamine": "2-methylpropan-1-amine",
+  "isobutylamine": "2-methylpropan-1-amine",
 
   "2-methylpropan-1-aminium": "2-methylpropan-1-aminium",
   "isobutylammonium": "2-methylpropan-1-aminium",
 
   "2-methylpropan-1-ol": "2-methylpropan-1-ol",
   "2-methyl-1-propanol": "2-methylpropan-1-ol",
+  "iso-butanol": "2-methylpropan-1-ol",
+  "isobutanol": "2-methylpropan-1-ol",
+  "isobutyl alcohol": "2-methylpropan-1-ol",
 
   "2-methylpropan-2-amine": "2-methylpropan-2-amine",
   "2-methyl-2-propanamine": "2-methylpropan-2-amine",
+  "tert-butylamine": "2-methylpropan-2-amine",
 
   "2-methylpropan-2-aminium": "2-methylpropan-2-aminium",
   "tert-butylammonium": "2-methylpropan-2-aminium",
@@ -4328,6 +4405,7 @@
 
   "3-aminopropanoic acid": "3-aminopropanoic acid",
   "beta-alanine": "3-aminopropanoic acid",
+  "3-aminopropionic acid": "3-aminopropanoic acid",
 
   "3-bromoprop-1-ene": "3-bromoprop-1-ene",
   "3-bromo-1-propene": "3-bromoprop-1-ene",
@@ -4407,6 +4485,7 @@
 
   "3-hydroxybenzonitrile": "3-hydroxybenzonitrile",
   "m-cyanophenol": "3-hydroxybenzonitrile",
+  "3-cyanophenol": "3-hydroxybenzonitrile",
 
   "3-methoxypropan-1-amine": "3-methoxypropan-1-amine",
   "3-methoxy-1-propanamine": "3-methoxypropan-1-amine",
@@ -4449,6 +4528,8 @@
 
   "3-methylbutanoic acid": "3-methylbutanoic acid",
   "isovaleric acid": "3-methylbutanoic acid",
+  "3-methylbutyric acid": "3-methylbutanoic acid",
+  "isopentanoic acid": "3-methylbutanoic acid",
 
   "3-methylphenol": "3-methylphenol",
   "1-hydroxy-3-methylbenzene": "3-methylphenol",
@@ -4484,6 +4565,7 @@
   "toluene,3-hydroxy  (meta-cresol)": "3-methylphenol",
 
   "3-methylpyridine": "3-methylpyridine",
+  "3-picoline": "3-methylpyridine",
 
   "3-nitrophenol": "3-nitrophenol",
   "m-nitrophenol": "3-nitrophenol",
@@ -4513,12 +4595,14 @@
 
   "3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}propane-1-sulfonic acid": "3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}propane-1-sulfonic acid",
   "taps": "3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}propane-1-sulfonic acid",
+  "n-tris(hydroxymethyl)methyl-3-aminopropanesulfonic acid": "3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}propane-1-sulfonic acid",
 
   "4,4'-bipyridine": "4,4'-bipyridine",
 
   "4,5-bis(hydroxymethyl)-2-methylpyridin-3-ol": "4,5-bis(hydroxymethyl)-2-methylpyridin-3-ol",
   "pyridoxine": "4,5-bis(hydroxymethyl)-2-methylpyridin-3-ol",
   "vitamin b6": "4,5-bis(hydroxymethyl)-2-methylpyridin-3-ol",
+  "pyridoxol": "4,5-bis(hydroxymethyl)-2-methylpyridin-3-ol",
 
   "4-(methoxycarbonyl)phenolate": "4-(methoxycarbonyl)phenolate",
 
@@ -4535,14 +4619,19 @@
 
   "4-aminobutanoic acid": "4-aminobutanoic acid",
   "gaba": "4-aminobutanoic acid",
+  "4-aminobutyric acid": "4-aminobutanoic acid",
+  "gamma-aminobutyric acid": "4-aminobutanoic acid",
 
   "4-aminopyrimidin-2(1h)-one": "4-aminopyrimidin-2(1H)-one",
   "cytosine": "4-aminopyrimidin-2(1H)-one",
 
   "4-hydroxybenzaldehyde": "4-hydroxybenzaldehyde",
+  "p-hydroxybenzaldehyde": "4-hydroxybenzaldehyde",
 
   "4-hydroxybenzonitrile": "4-hydroxybenzonitrile",
   "p-cyanophenol": "4-hydroxybenzonitrile",
+  "4-cyanophenol": "4-hydroxybenzonitrile",
+  "p-hydroxybenzonitrile": "4-hydroxybenzonitrile",
 
   "4-hydroxybutanamide": "4-hydroxybutanamide",
 
@@ -4629,6 +4718,7 @@
   "l-hydroxyproline": "4-hydroxyproline",
   "l-proline, 4-hydroxy-, cis-": "4-hydroxyproline",
   "proline, 4-hydroxy-": "4-hydroxyproline",
+  "hydroxyproline": "4-hydroxyproline",
 
   "4-methylbenzoate": "4-methylbenzoate",
   "4-toluenecarboxylate": "4-methylbenzoate",
@@ -4665,10 +4755,14 @@
   "toluenecarboxylic acid": "4-methylbenzoic acid",
 
   "4-methylmorpholine": "4-methylmorpholine",
+  "n-methylmorpholine": "4-methylmorpholine",
+  "nmm": "4-methylmorpholine",
 
   "4-methylpentan-2-one": "4-methylpentan-2-one",
   "methyl isobutyl ketone": "4-methylpentan-2-one",
   "mibk": "4-methylpentan-2-one",
+  "hexone": "4-methylpentan-2-one",
+  "isobutyl methyl ketone": "4-methylpentan-2-one",
 
   "4-methylphenol": "4-methylphenol",
   "1-hydroxy-4-methylbenzene": "4-methylphenol",
@@ -4710,6 +4804,8 @@
   "toluene,4-hydroxy  (para-cresol)": "4-methylphenol",
 
   "4-methylpyridine": "4-methylpyridine",
+  "4-picoline": "4-methylpyridine",
+  "gamma-picoline": "4-methylpyridine",
 
   "4-nitrophenol": "4-nitrophenol",
   "p-nitrophenol": "4-nitrophenol",
@@ -4845,6 +4941,7 @@
   "5-amino-1-pentanol": "5-aminopentan-1-ol",
 
   "5-aminopentanoic acid": "5-aminopentanoic acid",
+  "5-aminovaleric acid": "5-aminopentanoic acid",
 
   "5-hydroxy-2-methyl-1,4,5,6-tetrahydropyrimidine-4-carboxylic acid": "5-hydroxy-2-methyl-1,4,5,6-tetrahydropyrimidine-4-carboxylic acid",
   "(4s,5s)-5-hydroxy-2-methyl-1,4,5,6-tetrahydropyrimidine-4-carboxylic acid": "5-hydroxy-2-methyl-1,4,5,6-tetrahydropyrimidine-4-carboxylic acid",
@@ -5124,6 +5221,8 @@
   "6-amino-1-hexanol": "6-aminohexan-1-ol",
 
   "6-aminohexanoic acid": "6-aminohexanoic acid",
+  "aminocaproic acid": "6-aminohexanoic acid",
+  "epsilon-aminocaproic acid": "6-aminohexanoic acid",
 
   "6-deoxy-mannose": "6-deoxy-mannose",
   "(2r,3r,4s,5s)-2,3,4,5-tetrahydroxyhexanal": "6-deoxy-mannose",
@@ -5268,6 +5367,7 @@
 
   "7h-purin-6-amine": "7H-purin-6-amine",
   "adenine": "7H-purin-6-amine",
+  "6-aminopurine": "7H-purin-6-amine",
 
   "7h-purine": "7H-purine",
   "purine": "7H-purine",
@@ -5335,14 +5435,19 @@
   "acetic acid glacial": "acetic acid",
   "ethanoic acid": "acetic acid",
   "vinegar acid": "acetic acid",
+  "glacial acetic acid": "acetic acid",
 
   "acetone": "acetone",
   "dimethyl ketone": "acetone",
   "propan-2-one": "acetone",
   "propanone": "acetone",
+  "2-propanone": "acetone",
+  "dimethylketone": "acetone",
 
   "acetonitrile": "acetonitrile",
   "ethanenitrile": "acetonitrile",
+  "acn": "acetonitrile",
+  "methyl cyanide": "acetonitrile",
 
   "acetyl coenzyme a": "acetyl coenzyme A",
   "ac-coenzyme a": "acetyl coenzyme A",
@@ -5883,12 +5988,16 @@
   "aluminium potassium sulfate": "aluminium potassium bis(sulfate) dodecahydrate",
   "aluminum potassium sulfate dodecahydrate": "aluminium potassium bis(sulfate) dodecahydrate",
   "potassium alum": "aluminium potassium bis(sulfate) dodecahydrate",
+  "potash alum": "aluminium potassium bis(sulfate) dodecahydrate",
 
   "aluminium(3+)": "aluminium(3+)",
   "aluminum": "aluminium(3+)",
+  "al3+": "aluminium(3+)",
+  "aluminum ion": "aluminium(3+)",
 
   "ammonia": "ammonia",
   "azane": "ammonia",
+  "nh3": "ammonia",
 
   "ammonia;water": "ammonia;water",
   "ammonium hydroxide": "ammonia;water",
@@ -6212,6 +6321,8 @@
 
   "azanium": "azanium",
   "ammonium": "azanium",
+  "ammonium ion": "azanium",
+  "nh4+": "azanium",
 
   "azanium acetate": "azanium acetate",
   "ammonium acetate": "azanium acetate",
@@ -6229,6 +6340,7 @@
   "azanium chloride": "azanium chloride",
   "ammonium chloride": "azanium chloride",
   "nh4cl": "azanium chloride",
+  "sal ammoniac": "azanium chloride",
 
   "azanium dihydrogen phosphate": "azanium dihydrogen phosphate",
   "ammonium dihydrogen phosphate": "azanium dihydrogen phosphate",
@@ -6253,6 +6365,7 @@
 
   "azanium nitrate": "azanium nitrate",
   "ammonium nitrate": "azanium nitrate",
+  "nh4no3": "azanium nitrate",
 
   "azanium perchlorate": "azanium perchlorate",
   "ammonium perchlorate": "azanium perchlorate",
@@ -6260,15 +6373,19 @@
   "azepan-2-one": "azepan-2-one",
   "epsilon-caprolactam": "azepan-2-one",
   "hexahydro-2h-azepin-2-one": "azepan-2-one",
+  "caprolactam": "azepan-2-one",
 
   "azepane": "azepane",
   "hexahydro-1h-azepine": "azepane",
+  "hexamethyleneimine": "azepane",
 
   "azetidine": "azetidine",
 
   "azide": "azide",
 
   "aziridine": "aziridine",
+  "ethyleneimine": "aziridine",
+  "ethylenimine": "aziridine",
 
   "azocane": "azocane",
   "octahydroazocine": "azocane",
@@ -6290,10 +6407,12 @@
   "benzenecarbaldehyde": "benzaldehyde",
 
   "benzene": "benzene",
+  "benzol": "benzene",
 
   "benzene-1,2-diol": "benzene-1,2-diol",
   "1,2-benzenediol": "benzene-1,2-diol",
   "catechol": "benzene-1,2-diol",
+  "pyrocatechol": "benzene-1,2-diol",
 
   "benzene-1,3,5-triol": "benzene-1,3,5-triol",
   "1,2,5-trihydroxybenzene": "benzene-1,3,5-triol",
@@ -6339,15 +6458,18 @@
   "benzene-1,3-diol": "benzene-1,3-diol",
   "1,3-benzenediol": "benzene-1,3-diol",
   "resorcinol": "benzene-1,3-diol",
+  "resorcin": "benzene-1,3-diol",
 
   "benzene-1,4-diol": "benzene-1,4-diol",
   "1,4-benzenediol": "benzene-1,4-diol",
   "hydroquinone": "benzene-1,4-diol",
+  "quinol": "benzene-1,4-diol",
 
   "benzenecarboximidamide": "benzenecarboximidamide",
   "benzamidine": "benzenecarboximidamide",
 
   "benzenesulfonate": "benzenesulfonate",
+  "besylate": "benzenesulfonate",
 
   "benzenethiol": "benzenethiol",
   "thiophenol": "benzenethiol",
@@ -6362,6 +6484,7 @@
 
   "beryllium(2+)": "beryllium(2+)",
   "beryllium": "beryllium(2+)",
+  "be2+": "beryllium(2+)",
 
   "bis(2-hydroxyethyl)dimethylazanium": "bis(2-hydroxyethyl)dimethylazanium",
   "(2-hydroxyethyl)dimethylammonium": "bis(2-hydroxyethyl)dimethylazanium",
@@ -6404,6 +6527,7 @@
   "ammonium sulfate": "bis(azanium) sulfate",
   "diammonium sulfate": "bis(azanium) sulfate",
   "(nh4)2so4": "bis(azanium) sulfate",
+  "ammonium sulphate": "bis(azanium) sulfate",
 
   "bismuth(3+)": "bismuth(3+)",
   "bi cation": "bismuth(3+)",
@@ -6483,8 +6607,10 @@
   "bromide ion": "bromide",
 
   "bromoethane": "bromoethane",
+  "ethyl bromide": "bromoethane",
 
   "bromomethane": "bromomethane",
+  "methyl bromide": "bromomethane",
 
   "butan-1-amine": "butan-1-amine",
   "1-butanamine": "butan-1-amine",
@@ -6606,6 +6732,7 @@
   "rac-butan-2-ol": "butan-2-ol",
   "s-(+)-2-butanol": "butan-2-ol",
   "sec-butanol": "butan-2-ol",
+  "sec-butyl alcohol": "butan-2-ol",
 
   "butan-2-one": "butan-2-one",
   "2-butanone": "butan-2-one",
@@ -6614,6 +6741,7 @@
   "methyl ethyl ketone": "butan-2-one",
 
   "butanamide": "butanamide",
+  "butyramide": "butanamide",
 
   "butane-1,2,3,4-tetrol": "butane-1,2,3,4-tetrol",
   "erythritol": "butane-1,2,3,4-tetrol",
@@ -6661,6 +6789,8 @@
 
   "butane-1,4-diamine": "butane-1,4-diamine",
   "putrescine": "butane-1,4-diamine",
+  "1,4-butanediamine": "butane-1,4-diamine",
+  "1,4-diaminobutane": "butane-1,4-diamine",
 
   "butane-1,4-diaminium": "butane-1,4-diaminium",
   "butane-1,4-diamine dication": "butane-1,4-diaminium",
@@ -6687,8 +6817,11 @@
   "succinic acid": "butanedioic acid",
 
   "butanenitrile": "butanenitrile",
+  "butyronitrile": "butanenitrile",
+  "n-butyronitrile": "butanenitrile",
 
   "butanoate": "butanoate",
+  "butyrate": "butanoate",
 
   "butanoic acid": "butanoic acid",
   "butyric acid": "butanoic acid",
@@ -6717,6 +6850,8 @@
 
   "cadmium(2+)": "cadmium(2+)",
   "cadmium": "cadmium(2+)",
+  "cadmium ion": "cadmium(2+)",
+  "cd2+": "cadmium(2+)",
 
   "caesium bromide": "caesium bromide",
   "cesium bromide": "caesium bromide",
@@ -6736,6 +6871,8 @@
 
   "caesium(1+)": "caesium(1+)",
   "cesium": "caesium(1+)",
+  "cesium ion": "caesium(1+)",
+  "cs+": "caesium(1+)",
 
   "calcium bis(2,3,4,5,6-pentahydroxyhexanoate)": "calcium bis(2,3,4,5,6-pentahydroxyhexanoate)",
   "calcium gluconate": "calcium bis(2,3,4,5,6-pentahydroxyhexanoate)",
@@ -6770,9 +6907,12 @@
 
   "calcium sulfate": "calcium sulfate",
   "caso4": "calcium sulfate",
+  "calcium sulphate": "calcium sulfate",
 
   "calcium(2+)": "calcium(2+)",
   "calcium": "calcium(2+)",
+  "ca2+": "calcium(2+)",
+  "calcium ion": "calcium(2+)",
 
   "carbon dioxide": "carbon dioxide",
   "[co2]": "carbon dioxide",
@@ -6823,6 +6963,7 @@
 
   "carbonate": "carbonate",
   "carbonate buffer": "carbonate",
+  "carbonate ion": "carbonate",
 
   "carbonic acid": "carbonic acid",
   "acidosan": "carbonic acid",
@@ -6915,9 +7056,12 @@
 
   "chromium(3+)": "chromium(3+)",
   "chromium(iii)": "chromium(3+)",
+  "cr3+": "chromium(3+)",
 
   "cobalt(2+)": "cobalt(2+)",
   "cobalt": "cobalt(2+)",
+  "co2+": "cobalt(2+)",
+  "cobalt ion": "cobalt(2+)",
 
   "cobalt(2+) 2,2',2''-nitrilotriacetate": "cobalt(2+) 2,2',2''-nitrilotriacetate",
   "co-nta": "cobalt(2+) 2,2',2''-nitrilotriacetate",
@@ -6943,6 +7087,7 @@
   "cobalt(2+) sulfate": "cobalt(2+) sulfate",
   "cobalt sulfate": "cobalt(2+) sulfate",
   "cobalt(ii) sulfate": "cobalt(2+) sulfate",
+  "cobalt sulphate": "cobalt(2+) sulfate",
 
   "coenzyme a": "coenzyme A",
   "3'-phosphoadenosine-(5')diphospho(4')pantatheine": "coenzyme A",
@@ -6970,6 +7115,9 @@
 
   "copper(2+)": "copper(2+)",
   "copper": "copper(2+)",
+  "copper ion": "copper(2+)",
+  "cu2+": "copper(2+)",
+  "cupric ion": "copper(2+)",
 
   "copper(2+) 2,2',2''-nitrilotriacetate": "copper(2+) 2,2',2''-nitrilotriacetate",
   "copper nitrilotriacetate": "copper(2+) 2,2',2''-nitrilotriacetate",
@@ -6996,6 +7144,8 @@
   "copper sulfate": "copper(2+) sulfate",
   "copper(ii) sulfate": "copper(2+) sulfate",
   "cuso4": "copper(2+) sulfate",
+  "copper sulphate": "copper(2+) sulfate",
+  "cupric sulfate": "copper(2+) sulfate",
 
   "cyanate": "cyanate",
   "carbonyl amide": "cyanate",
@@ -7052,10 +7202,12 @@
 
   "cyclohexanamine": "cyclohexanamine",
   "cyclohexan-1-amine": "cyclohexanamine",
+  "cyclohexylamine": "cyclohexanamine",
 
   "cyclohexane-1,2,3,4,5,6-hexol": "cyclohexane-1,2,3,4,5,6-hexol",
   "inositol": "cyclohexane-1,2,3,4,5,6-hexol",
   "myo-inositol": "cyclohexane-1,2,3,4,5,6-hexol",
+  "cyclohexanehexol": "cyclohexane-1,2,3,4,5,6-hexol",
 
   "cyclohexane-1,4-diamine": "cyclohexane-1,4-diamine",
   "trans-1,4-cyclohexanediamine": "cyclohexane-1,4-diamine",
@@ -7127,6 +7279,7 @@
   "cyclooctan-1-one": "cyclooctanone",
 
   "cyclopentanamine": "cyclopentanamine",
+  "cyclopentylamine": "cyclopentanamine",
 
   "cyclopentanol": "cyclopentanol",
   "cyclopentan-1-ol": "cyclopentanol",
@@ -7516,6 +7669,7 @@
   "seracic acid": "decanedioic acid",
 
   "decanoate": "decanoate",
+  "caprate": "decanoate",
 
   "decanoic acid": "decanoic acid",
   "1-decanoic acid": "decanoic acid",
@@ -7575,6 +7729,8 @@
 
   "dichloromethane": "dichloromethane",
   "methylene chloride": "dichloromethane",
+  "dcm": "dichloromethane",
+  "methylene dichloride": "dichloromethane",
 
   "dichromate": "dichromate",
   "(cr2o7)(2-)": "dichromate",
@@ -7600,6 +7756,7 @@
   "cu2dtpa-": "dicopper(2+) N,N-bis{2-[bis(carboxymethyl)amino]ethyl}glycinate(1-)",
 
   "diethoxymethane": "diethoxymethane",
+  "ethylal": "diethoxymethane",
 
   "diethyl carbonate": "diethyl carbonate",
 
@@ -7688,6 +7845,7 @@
   "h2dtpa3-": "dihydrogen N,N-bis{2-[bis(carboxymethyl)amino]ethyl}glycinate(3-)",
 
   "dihydrogen phosphate": "dihydrogen phosphate",
+  "dihydrogen phosphate ion": "dihydrogen phosphate",
 
   "dihydrogen prop-1-ene-1,2,3-tricarboxylate": "dihydrogen prop-1-ene-1,2,3-tricarboxylate",
   "(z)-2-(carboxymethyl)-4-hydroxy-4-oxobut-2-enoate": "dihydrogen prop-1-ene-1,2,3-tricarboxylate",
@@ -7713,14 +7871,19 @@
   "fe2(so4)3": "diiron trisulfate",
   "ferric sulfate": "diiron trisulfate",
   "iron(iii) sulfate": "diiron trisulfate",
+  "ferric sulphate": "diiron trisulfate",
+  "iron(iii) sulphate": "diiron trisulfate",
 
   "dilanthanum trisulfate": "dilanthanum trisulfate",
   "lanthanum sulfate": "dilanthanum trisulfate",
 
   "dilithium sulfate": "dilithium sulfate",
   "lithium sulfate": "dilithium sulfate",
+  "lithium sulphate": "dilithium sulfate",
 
   "dimethoxymethane": "dimethoxymethane",
+  "formaldehyde dimethyl acetal": "dimethoxymethane",
+  "methylal": "dimethoxymethane",
 
   "dimethyl carbonate": "dimethyl carbonate",
 
@@ -8073,10 +8236,12 @@
   "dipotassium oxalate": "dipotassium oxalate",
   "dipotassium ethanedioate": "dipotassium oxalate",
   "potassium oxalate": "dipotassium oxalate",
+  "potassium oxalate monohydrate": "dipotassium oxalate",
 
   "dipotassium sulfate": "dipotassium sulfate",
   "k2so4": "dipotassium sulfate",
   "potassium sulfate": "dipotassium sulfate",
+  "potassium sulphate": "dipotassium sulfate",
 
   "dirubidium sulfate": "dirubidium sulfate",
   "rubidium sulfate": "dirubidium sulfate",
@@ -8092,6 +8257,7 @@
   "edta na2": "disodium 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate",
   "edta-na2": "disodium 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate",
   "na2edta": "disodium 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate",
+  "edetate disodium": "disodium 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate",
 
   "disodium 2,2'-(piperazine-1,4-diyl)di(ethane-1-sulfonate)": "disodium 2,2'-(piperazine-1,4-diyl)di(ethane-1-sulfonate)",
   "disodium 2,2'-(piperazine-1,4-diyl)bis(ethane-1-sulfonate)": "disodium 2,2'-(piperazine-1,4-diyl)di(ethane-1-sulfonate)",
@@ -8102,9 +8268,12 @@
 
   "disodium 2,3-dihydroxybutanedioate": "disodium 2,3-dihydroxybutanedioate",
   "sodium tartrate": "disodium 2,3-dihydroxybutanedioate",
+  "disodium tartrate": "disodium 2,3-dihydroxybutanedioate",
+  "sodium tartrate dihydrate": "disodium 2,3-dihydroxybutanedioate",
 
   "disodium 2-[[4-[ethyl-[(3-sulfonatophenyl)methyl]amino]phenyl]-(2-sulfonatophenyl)methylidene]cyclohexa-3,5-dien-1-one": "disodium 2-[[4-[ethyl-[(3-sulfonatophenyl)methyl]amino]phenyl]-(2-sulfonatophenyl)methylidene]cyclohexa-3,5-dien-1-one",
   "brilliant blue fcf": "disodium 2-[[4-[ethyl-[(3-sulfonatophenyl)methyl]amino]phenyl]-(2-sulfonatophenyl)methylidene]cyclohexa-3,5-dien-1-one",
+  "acid blue 9": "disodium 2-[[4-[ethyl-[(3-sulfonatophenyl)methyl]amino]phenyl]-(2-sulfonatophenyl)methylidene]cyclohexa-3,5-dien-1-one",
 
   "disodium 2-hydroxybutanedioate": "disodium 2-hydroxybutanedioate",
   "disodium malate": "disodium 2-hydroxybutanedioate",
@@ -8166,6 +8335,8 @@
   "disodium hydrogen phosphate dihydrate": "disodium hydrogen phosphate",
   "disodium hydrogen phosphate heptahydrate": "disodium hydrogen phosphate",
   "disodium hydrogen phosphate dodecahydrate": "disodium hydrogen phosphate",
+  "dibasic sodium phosphate": "disodium hydrogen phosphate",
+  "sodium hydrogen phosphate": "disodium hydrogen phosphate",
 
   "disodium iron(3+) n,n-bis{2-[bis(carboxymethyl)amino]ethyl}glycinate": "disodium iron(3+) N,N-bis{2-[bis(carboxymethyl)amino]ethyl}glycinate",
   "na2fedtpa": "disodium iron(3+) N,N-bis{2-[bis(carboxymethyl)amino]ethyl}glycinate",
@@ -8190,6 +8361,7 @@
   "na2so4": "disodium sulfate",
   "sodium sulfate": "disodium sulfate",
   "sodium sulfate decahydrate": "disodium sulfate",
+  "sodium sulphate": "disodium sulfate",
 
   "disodium sulfite": "disodium sulfite",
   "sodium sulfite": "disodium sulfite",
@@ -8206,6 +8378,7 @@
 
   "disodium thiosulfate": "disodium thiosulfate",
   "sodium thiosulfate": "disodium thiosulfate",
+  "sodium thiosulphate": "disodium thiosulfate",
 
   "disodium tungstate": "disodium tungstate",
   "sodium tungstate": "disodium tungstate",
@@ -8224,6 +8397,7 @@
   "pyrosulfite": "disulfite",
   "pyrosulfite (s2o52-)": "disulfite",
   "s2o5-2": "disulfite",
+  "metabisulphite": "disulfite",
 
   "dithionate": "dithionate",
   "(o3sso3)(2-)": "dithionate",
@@ -8329,8 +8503,10 @@
   "sarkosyl anion": "dodecanoylsarcosinate",
 
   "dodecyl sulfate": "dodecyl sulfate",
+  "lauryl sulfate": "dodecyl sulfate",
 
   "dodecyltrimethylazanium": "dodecyltrimethylazanium",
+  "dodecyltrimethylammonium": "dodecyltrimethylazanium",
 
   "dodecyltrimethylazanium bromide": "dodecyltrimethylazanium bromide",
   "dodecyltrimethylammonium bromide": "dodecyltrimethylazanium bromide",
@@ -8371,6 +8547,8 @@
 
   "ethane-1,2-diamine": "ethane-1,2-diamine",
   "ethylenediamine": "ethane-1,2-diamine",
+  "1,2-diaminoethane": "ethane-1,2-diamine",
+  "1,2-ethanediamine": "ethane-1,2-diamine",
 
   "ethane-1,2-diol": "ethane-1,2-diol",
   "1,2-ethanediol": "ethane-1,2-diol",
@@ -8391,10 +8569,13 @@
   "thioacetamide": "ethanethioamide",
 
   "ethanethiol": "ethanethiol",
+  "ethyl mercaptan": "ethanethiol",
 
   "ethanol": "ethanol",
   "ethyl alcohol": "ethanol",
   "grain alcohol": "ethanol",
+  "absolute ethanol": "ethanol",
+  "etoh": "ethanol",
 
   "ethoxyethane": "ethoxyethane",
   "diethyl ether": "ethoxyethane",
@@ -8402,6 +8583,7 @@
 
   "ethyl acetate": "ethyl acetate",
   "ethyl ethanoate": "ethyl acetate",
+  "etoac": "ethyl acetate",
 
   "ethyl carbamate": "ethyl carbamate",
   "urethane": "ethyl carbamate",
@@ -8489,6 +8671,7 @@
   "fluoride": "fluoride",
 
   "fluoromethane": "fluoromethane",
+  "methyl fluoride": "fluoromethane",
 
   "folate(2-)": "folate(2-)",
   "folate": "folate(2-)",
@@ -8624,6 +8807,7 @@
   "aldehydo-d-galacturonic acid": "galacturonic acid",
   "dl-galacturonic acid": "galacturonic acid",
   "dl-galacturonicacid": "galacturonic acid",
+  "d-galacturonic acid": "galacturonic acid",
 
   "glucuronic acid": "glucuronic acid",
   "(2r,3r,4r,5s)-2,3,4,5-tetrahydroxy-6-oxohexanoic acid": "glucuronic acid",
@@ -8857,6 +9041,7 @@
   "gold(iii) cation": "gold(3+)",
 
   "guanidinium": "guanidinium",
+  "guanidine": "guanidinium",
 
   "guanidinium acetate": "guanidinium acetate",
 
@@ -9143,6 +9328,8 @@
 
   "heptan-1-amine": "heptan-1-amine",
   "1-heptanamine": "heptan-1-amine",
+  "1-aminoheptane": "heptan-1-amine",
+  "n-heptylamine": "heptan-1-amine",
 
   "heptan-1-aminium": "heptan-1-aminium",
   "c7h18n+": "heptan-1-aminium",
@@ -9334,6 +9521,8 @@
   "silicon hexafluoride ion": "hexafluorosilicate(2-)",
 
   "hexafluorosilicic acid": "hexafluorosilicic acid",
+  "fluorosilicic acid": "hexafluorosilicic acid",
+  "fluosilicic acid": "hexafluorosilicic acid",
 
   "hexan-1-amine": "hexan-1-amine",
   "1-hexanamine": "hexan-1-amine",
@@ -9449,6 +9638,7 @@
 
   "hexanoic acid": "hexanoic acid",
   "caproic acid": "hexanoic acid",
+  "n-caproic acid": "hexanoic acid",
 
   "hexyl sulfate": "hexyl sulfate",
 
@@ -9599,6 +9789,7 @@
 
   "hydrogen 2,3-dihydroxybutanedioate": "hydrogen 2,3-dihydroxybutanedioate",
   "hydrogen tartrate": "hydrogen 2,3-dihydroxybutanedioate",
+  "bitartrate": "hydrogen 2,3-dihydroxybutanedioate",
 
   "hydrogen 2-hydroxybutanedioate": "hydrogen 2-hydroxybutanedioate",
   "(+)-hydrogen 2-hydroxybutanedioate": "hydrogen 2-hydroxybutanedioate",
@@ -9732,6 +9923,7 @@
   "hydrogen carbonate": "hydrogen carbonate",
   "bicarbonate": "hydrogen carbonate",
   "bicarbonate buffer": "hydrogen carbonate",
+  "hydrogencarbonate": "hydrogen carbonate",
 
   "hydrogen chromate": "hydrogen chromate",
   "[cro3(oh)](-)": "hydrogen chromate",
@@ -10004,6 +10196,7 @@
   "peroxide (ho21-)": "hydroperoxide",
 
   "hydroxide": "hydroxide",
+  "hydroxide ion": "hydroxide",
 
   "hydroxyacetamide": "hydroxyacetamide",
   "2-hydroxyacetamide": "hydroxyacetamide",
@@ -10149,8 +10342,10 @@
   "iodate": "iodate",
 
   "iodide": "iodide",
+  "iodide ion": "iodide",
 
   "iodomethane": "iodomethane",
+  "methyl iodide": "iodomethane",
 
   "iron(2+)": "iron(2+)",
   "iron(ii)": "iron(2+)",
@@ -10224,6 +10419,7 @@
   "l-isomer isoleucine": "isoleucine",
   "norvaline, 3-methyl-": "isoleucine",
   "valeric acid, 2-amino-3-methyl-": "isoleucine",
+  "ile": "isoleucine",
 
   "isoleucinium": "isoleucinium",
   "(1s,2s)-1-carboxy-2-methylbutan-1-aminium": "isoleucinium",
@@ -10246,6 +10442,7 @@
   "d(+)-lactose": "lactose",
   "d-lactose": "lactose",
   "milk sugar": "lactose",
+  "lactose monohydrate": "lactose",
 
   "lanthanum trichloride": "lanthanum trichloride",
   "lanthanum chloride": "lanthanum trichloride",
@@ -10255,6 +10452,8 @@
 
   "lanthanum(3+)": "lanthanum(3+)",
   "lanthanum": "lanthanum(3+)",
+  "la3+": "lanthanum(3+)",
+  "lanthanum ion": "lanthanum(3+)",
 
   "lead(2+)": "lead(2+)",
   "lead": "lead(2+)",
@@ -10361,6 +10560,7 @@
   "lithium perchlorate": "lithium perchlorate",
 
   "lithium trifluoromethanesulfonate": "lithium trifluoromethanesulfonate",
+  "lithium triflate": "lithium trifluoromethanesulfonate",
 
   "lithium(1+)": "lithium(1+)",
   "li+": "lithium(1+)",
@@ -10436,6 +10636,7 @@
   "lysine, d-": "lysine",
   "lysine, l- (8ci)": "lysine",
   "rac-lysine": "lysine",
+  "lys": "lysine",
 
   "lysine;hydrochloride": "lysine;hydrochloride",
   "(2r)-2,6-diaminohexanoic acid;hydrochloride": "lysine;hydrochloride",
@@ -10503,6 +10704,7 @@
   "mgso4": "magnesium sulfate",
   "magnesium sulfate heptahydrate": "magnesium sulfate",
   "epsom salt": "magnesium sulfate",
+  "magnesium sulphate": "magnesium sulfate",
 
   "magnesium(2+)": "magnesium(2+)",
   "magnesium": "magnesium(2+)",
@@ -10516,6 +10718,7 @@
   "d(+)-maltose": "maltose",
   "d-maltose": "maltose",
   "malt sugar": "maltose",
+  "maltose monohydrate": "maltose",
 
   "manganate": "manganate",
   "[mno4](2-)": "manganate",
@@ -10532,6 +10735,8 @@
 
   "manganese(2+)": "manganese(2+)",
   "manganese(ii)": "manganese(2+)",
+  "manganese ion": "manganese(2+)",
+  "mn2+": "manganese(2+)",
 
   "manganese(2+) dichloride": "manganese(2+) dichloride",
   "manganese dichloride": "manganese(2+) dichloride",
@@ -10577,17 +10782,21 @@
   "methane": "methane",
 
   "methanesulfonate": "methanesulfonate",
+  "mesylate": "methanesulfonate",
 
   "methanesulfonic acid": "methanesulfonic acid",
   "mesylic acid": "methanesulfonic acid",
   "methanesulphonic acid": "methanesulfonic acid",
   "msa": "methanesulfonic acid",
+  "methylsulfonic acid": "methanesulfonic acid",
 
   "methanethiol": "methanethiol",
+  "methyl mercaptan": "methanethiol",
 
   "methanol": "methanol",
   "methyl alcohol": "methanol",
   "wood alcohol": "methanol",
+  "meoh": "methanol",
 
   "methioninate": "methioninate",
   "(2s)-2-amino-4-methylsulfanylbutanoate": "methioninate",
@@ -10690,6 +10899,7 @@
 
   "methylurea": "methylurea",
   "1-methylurea": "methylurea",
+  "n-methylurea": "methylurea",
 
   "molybdate": "molybdate",
   "[moo4](2-)": "molybdate",
@@ -10806,6 +11016,7 @@
 
   "n,n-diethylethanamine": "N,N-diethylethanamine",
   "triethylamine": "N,N-diethylethanamine",
+  "et3n": "N,N-diethylethanamine",
 
   "n,n-diethylethanaminium": "N,N-diethylethanaminium",
   "triethylammonium": "N,N-diethylethanaminium",
@@ -10855,6 +11066,7 @@
 
   "n,n-dimethylformamide": "N,N-dimethylformamide",
   "dmf": "N,N-dimethylformamide",
+  "dimethylformamide": "N,N-dimethylformamide",
 
   "n,n-dimethylmethanamine": "N,N-dimethylmethanamine",
   "trimethylamine": "N,N-dimethylmethanamine",
@@ -10949,6 +11161,7 @@
   "btp(1+)": "N-(3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}propyl)-1,3-dihydroxy-2-(hydroxymethyl)propan-2-aminium",
   "btp+": "N-(3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}propyl)-1,3-dihydroxy-2-(hydroxymethyl)propan-2-aminium",
   "btph+": "N-(3-{[1,3-dihydroxy-2-(hydroxymethyl)propan-2-yl]amino}propyl)-1,3-dihydroxy-2-(hydroxymethyl)propan-2-aminium",
+
   "1,3-dihydroxy-2-(hydroxymethyl)propan-2-aminium (tris(hydroxymethyl)methylaminium)": "1,3-dihydroxy-2-(hydroxymethyl)propan-2-aminium (tris(hydroxymethyl)methylaminium)",
   "1,3-dihydroxy-2-(hydroxymethyl)propan-2-aminium": "1,3-dihydroxy-2-(hydroxymethyl)propan-2-aminium (tris(hydroxymethyl)methylaminium)",
   "tris(hydroxymethyl)methylaminium": "1,3-dihydroxy-2-(hydroxymethyl)propan-2-aminium (tris(hydroxymethyl)methylaminium)",
@@ -11147,6 +11360,7 @@
   "dihexylazanium": "N-hexylhexan-1-aminium",
 
   "n-methylacetamide": "N-methylacetamide",
+  "nma": "N-methylacetamide",
 
   "n-methylformamide": "N-methylformamide",
 
@@ -11214,6 +11428,7 @@
   "n1,n2-bis(2-aminoethyl)ethane-1,2-diamine": "N1,N2-bis(2-aminoethyl)ethane-1,2-diamine",
   "n,n'-bis(2-aminoethyl)ethane-1,2-diamine": "N1,N2-bis(2-aminoethyl)ethane-1,2-diamine",
   "triethylenetetramine": "N1,N2-bis(2-aminoethyl)ethane-1,2-diamine",
+  "trien": "N1,N2-bis(2-aminoethyl)ethane-1,2-diamine",
 
   "n1-(2-aminoethyl)ethane-1,2-diamine": "N1-(2-aminoethyl)ethane-1,2-diamine",
   "diethylenetriamine": "N1-(2-aminoethyl)ethane-1,2-diamine",
@@ -11241,6 +11456,8 @@
 
   "nickel(2+)": "nickel(2+)",
   "nickel": "nickel(2+)",
+  "ni2+": "nickel(2+)",
+  "nickel ion": "nickel(2+)",
 
   "nickel(2+) 2,2',2''-nitrilotriacetate": "nickel(2+) 2,2',2''-nitrilotriacetate",
   "ni-nta": "nickel(2+) 2,2',2''-nitrilotriacetate",
@@ -11504,10 +11721,13 @@
   "ss-nicotinamide mononucleotide": "nicotinamide mononucleotide (oxidized), neutral",
 
   "nitrate": "nitrate",
+  "nitrate ion": "nitrate",
 
   "nitric acid": "nitric acid",
+  "hno3": "nitric acid",
 
   "nitrite": "nitrite",
+  "nitrite ion": "nitrite",
 
   "nitrobenzene": "nitrobenzene",
 
@@ -11578,6 +11798,7 @@
   "water-solubleazelaicacid": "nonanedioic acid",
 
   "nonanoate": "nonanoate",
+  "pelargonate": "nonanoate",
 
   "nonanoic acid": "nonanoic acid",
   "1-nonanoate": "nonanoic acid",
@@ -11788,6 +12009,7 @@
   "octanenitrile": "octanenitrile",
 
   "octanoate": "octanoate",
+  "caprylate": "octanoate",
 
   "octanoic acid": "octanoic acid",
   "0ctanoic acid": "octanoic acid",
@@ -11850,6 +12072,7 @@
   "octyl beta-d-glucoside": "octyl glucopyranoside",
   "octyl beta-d-glucopyranoside": "octyl glucopyranoside",
   "beta-og": "octyl glucopyranoside",
+  "octyl-beta-d-glucopyranoside": "octyl glucopyranoside",
 
   "octyl sulfate": "octyl sulfate",
 
@@ -11901,9 +12124,13 @@
   "oxetane": "oxetane",
 
   "oxirane": "oxirane",
+  "ethylene oxide": "oxirane",
 
   "oxolan-2-one": "oxolan-2-one",
   "gamma-butyrolactone": "oxolan-2-one",
+  "butyrolactone": "oxolan-2-one",
+  "gbl": "oxolan-2-one",
+  "γ-butyrolactone": "oxolan-2-one",
 
   "oxolan-2-ylmethanol": "oxolan-2-ylmethanol",
   "((s)-(+)-tetrahydrofurfuryl alcohol)": "oxolan-2-ylmethanol",
@@ -12080,6 +12307,7 @@
 
   "pentan-2-one": "pentan-2-one",
   "2-pentanone": "pentan-2-one",
+  "methyl propyl ketone": "pentan-2-one",
 
   "pentan-3-ol": "pentan-3-ol",
   "3-pentanol": "pentan-3-ol",
@@ -12089,6 +12317,8 @@
 
   "pentane-1,5-diamine": "pentane-1,5-diamine",
   "cadaverine": "pentane-1,5-diamine",
+  "1,5-diaminopentane": "pentane-1,5-diamine",
+  "1,5-pentanediamine": "pentane-1,5-diamine",
 
   "pentane-1,5-diaminium": "pentane-1,5-diaminium",
   "pentane-1,5-diamine dication": "pentane-1,5-diaminium",
@@ -12113,6 +12343,7 @@
   "glutaric acid": "pentanedioic acid",
 
   "pentanenitrile": "pentanenitrile",
+  "valeronitrile": "pentanenitrile",
 
   "pentanoate": "pentanoate",
   "c5h9o2-": "pentanoate",
@@ -12200,8 +12431,10 @@
   "tetraoxorhenate(vii)": "perrhenate",
 
   "phenol": "phenol",
+  "carbolic acid": "phenol",
 
   "phenolate": "phenolate",
+  "phenoxide": "phenolate",
 
   "phenolsulfonphthalein": "phenolsulfonphthalein",
   "phenol red": "phenolsulfonphthalein",
@@ -12366,6 +12599,7 @@
 
   "piperazine-2,5-dione": "piperazine-2,5-dione",
   "glycine anhydride": "piperazine-2,5-dione",
+  "2,5-diketopiperazine": "piperazine-2,5-dione",
 
   "piperidin-1-ium": "piperidin-1-ium",
   "piperidinium": "piperidin-1-ium",
@@ -12373,6 +12607,8 @@
   "piperidin-2-one": "piperidin-2-one",
   "2-piperidinone": "piperidin-2-one",
   "delta-valerolactam": "piperidin-2-one",
+  "2-piperidone": "piperidin-2-one",
+  "valerolactam": "piperidin-2-one",
 
   "piperidine": "piperidine",
 
@@ -12433,6 +12669,7 @@
   "kh2po4": "potassium dihydrogen phosphate",
   "monopotassium phosphate": "potassium dihydrogen phosphate",
   "potassium phosphate monobasic": "potassium dihydrogen phosphate",
+  "monobasic potassium phosphate": "potassium dihydrogen phosphate",
 
   "potassium dimethylarsinate": "potassium dimethylarsinate",
   "potassium cacodylate": "potassium dimethylarsinate",
@@ -12447,6 +12684,7 @@
   "potassium hydrogen carbonate": "potassium hydrogen carbonate",
   "khco3": "potassium hydrogen carbonate",
   "potassium bicarbonate": "potassium hydrogen carbonate",
+  "potassium hydrogencarbonate": "potassium hydrogen carbonate",
 
   "potassium hydroxide": "potassium hydroxide",
   "caustic potash": "potassium hydroxide",
@@ -12462,8 +12700,10 @@
   "potassium nitrite": "potassium nitrite",
 
   "potassium perchlorate": "potassium perchlorate",
+  "kclo4": "potassium perchlorate",
 
   "potassium permanganate": "potassium permanganate",
+  "kmno4": "potassium permanganate",
 
   "potassium sodium 2,3-dihydroxybutanedioate": "potassium sodium 2,3-dihydroxybutanedioate",
   "sodium potassium tartrate": "potassium sodium 2,3-dihydroxybutanedioate",
@@ -12477,6 +12717,8 @@
 
   "potassium(1+)": "potassium(1+)",
   "potassium": "potassium(1+)",
+  "k+": "potassium(1+)",
+  "potassium ion": "potassium(1+)",
 
   "praseodymium(3+)": "praseodymium(3+)",
   "pr(3+)": "praseodymium(3+)",
@@ -12611,6 +12853,7 @@
 
   "propan-1-amine": "propan-1-amine",
   "1-propanamine": "propan-1-amine",
+  "n-propylamine": "propan-1-amine",
 
   "propan-1-aminium": "propan-1-aminium",
   "propylammonium": "propan-1-aminium",
@@ -12623,6 +12866,8 @@
 
   "propan-2-amine": "propan-2-amine",
   "2-propanamine": "propan-2-amine",
+  "2-aminopropane": "propan-2-amine",
+  "isopropylamine": "propan-2-amine",
 
   "propan-2-ol": "propan-2-ol",
   "2-propanol": "propan-2-ol",
@@ -12635,6 +12880,7 @@
   "isopropylurea": "propan-2-ylurea",
 
   "propanamide": "propanamide",
+  "propionamide": "propanamide",
 
   "propane": "propane",
 
@@ -12677,6 +12923,7 @@
   "l-propane-1,2-diamine": "propane-1,2-diamine",
   "r-propylenediamine": "propane-1,2-diamine",
   "rac-propane-1,2-diamine": "propane-1,2-diamine",
+  "1,2-diaminopropane": "propane-1,2-diamine",
 
   "propane-1,2-diol": "propane-1,2-diol",
   "(+)-propane-1,2-diol": "propane-1,2-diol",
@@ -12747,6 +12994,7 @@
 
   "propane-1,3-diaminium": "propane-1,3-diaminium",
   "propane-1,3-diamine dication": "propane-1,3-diaminium",
+  "trimethylene diamine": "propane-1,3-diaminium",
 
   "propane-1,3-diol": "propane-1,3-diol",
   "1,3-propanediol": "propane-1,3-diol",
@@ -12773,6 +13021,7 @@
   "malonic acid": "propanedioic acid",
 
   "propanenitrile": "propanenitrile",
+  "propionitrile": "propanenitrile",
 
   "propanoate": "propanoate",
   "propionate": "propanoate",
@@ -12908,6 +13157,8 @@
 
   "rubidium(1+)": "rubidium(1+)",
   "rubidium": "rubidium(1+)",
+  "rb+": "rubidium(1+)",
+  "rubidium ion": "rubidium(1+)",
 
   "samarium(3+)": "samarium(3+)",
   "samarium (iii) ion": "samarium(3+)",
@@ -13076,6 +13327,8 @@
 
   "silver(1+)": "silver(1+)",
   "silver": "silver(1+)",
+  "ag+": "silver(1+)",
+  "silver ion": "silver(1+)",
 
   "sodium 1-chlorobutanoate": "sodium 1-chlorobutanoate",
 
@@ -13145,6 +13398,8 @@
   "sodium acetate trihydrate": "sodium acetate",
   "naoac": "sodium acetate",
   "naac": "sodium acetate",
+  "sodium acetate anhydrous": "sodium acetate",
+  "sodium ethanoate": "sodium acetate",
 
   "sodium arsenite": "sodium arsenite",
   "naaso2": "sodium arsenite",
@@ -13159,6 +13414,7 @@
   "nabr": "sodium bromide",
 
   "sodium butanoate": "sodium butanoate",
+  "sodium butyrate": "sodium butanoate",
 
   "sodium chloride": "sodium chloride",
   "common salt": "sodium chloride",
@@ -13228,8 +13484,10 @@
   "na glycocholate": "sodium glycocholate",
 
   "sodium heptanoate": "sodium heptanoate",
+  "sodium enanthate": "sodium heptanoate",
 
   "sodium hexanoate": "sodium hexanoate",
+  "sodium caproate": "sodium hexanoate",
 
   "sodium hydrogen 2,3-dihydroxybutanedioate": "sodium hydrogen 2,3-dihydroxybutanedioate",
   "sodium hydrogen tartrate": "sodium hydrogen 2,3-dihydroxybutanedioate",
@@ -13237,12 +13495,17 @@
   "sodium hydrogen carbonate": "sodium hydrogen carbonate",
   "nahco3": "sodium hydrogen carbonate",
   "sodium bicarbonate": "sodium hydrogen carbonate",
+  "baking soda": "sodium hydrogen carbonate",
+  "sodium hydrogencarbonate": "sodium hydrogen carbonate",
 
   "sodium hydrogen sulfate": "sodium hydrogen sulfate",
   "sodium bisulfate": "sodium hydrogen sulfate",
+  "sodium bisulphate": "sodium hydrogen sulfate",
+  "sodium hydrogen sulphate": "sodium hydrogen sulfate",
 
   "sodium hydroxide": "sodium hydroxide",
   "naoh": "sodium hydroxide",
+  "caustic soda": "sodium hydroxide",
 
   "sodium iodide": "sodium iodide",
   "nai": "sodium iodide",
@@ -13268,12 +13531,15 @@
   "nano3": "sodium nitrate",
 
   "sodium nitrite": "sodium nitrite",
+  "nano2": "sodium nitrite",
 
   "sodium nonanoate": "sodium nonanoate",
+  "sodium pelargonate": "sodium nonanoate",
 
   "sodium octanoate": "sodium octanoate",
 
   "sodium pentanoate": "sodium pentanoate",
+  "sodium valerate": "sodium pentanoate",
 
   "sodium perchlorate": "sodium perchlorate",
   "naclo4": "sodium perchlorate",
@@ -13418,6 +13684,8 @@
   "sulfide (hs1-)": "sulfanide",
 
   "sulfate": "sulfate",
+  "sulfate ion": "sulfate",
+  "sulphate ion": "sulfate",
 
   "sulfite": "sulfite",
   "[sho3](-)": "sulfite",
@@ -13497,9 +13765,11 @@
   "tetrabutylazanium bromide": "tetrabutylazanium bromide",
   "tetra-n-butylammonium bromide": "tetrabutylazanium bromide",
   "tetrabutylammonium bromide": "tetrabutylazanium bromide",
+  "tbab": "tetrabutylazanium bromide",
 
   "tetrabutylazanium chloride": "tetrabutylazanium chloride",
   "tetra-n-butylammonium chloride": "tetrabutylazanium chloride",
+  "tbacl": "tetrabutylazanium chloride",
 
   "tetrabutylazanium iodide": "tetrabutylazanium iodide",
   "tetra-n-butylammonium iodide": "tetrabutylazanium iodide",
@@ -13530,6 +13800,7 @@
 
   "tetraethylazanium iodide": "tetraethylazanium iodide",
   "tetraethylammonium iodide": "tetraethylazanium iodide",
+  "teai": "tetraethylazanium iodide",
 
   "tetrafluoroboranuide": "tetrafluoroboranuide",
   "[bf4](-)": "tetrafluoroboranuide",
@@ -13563,6 +13834,7 @@
   "tetrahydrofolic acid": "tetrahydrofolic acid",
 
   "tetramethoxymethane": "tetramethoxymethane",
+  "tetramethyl orthocarbonate": "tetramethoxymethane",
 
   "tetramethylazanium": "tetramethylazanium",
   "tetramethylammonium": "tetramethylazanium",
@@ -13572,6 +13844,7 @@
 
   "tetramethylazanium chloride": "tetramethylazanium chloride",
   "tetramethylammonium chloride": "tetramethylazanium chloride",
+  "tmacl": "tetramethylazanium chloride",
 
   "tetramethylazanium iodide": "tetramethylazanium iodide",
   "tetramethylammonium iodide": "tetramethylazanium iodide",
@@ -13589,6 +13862,7 @@
   "tetraphenylborate": "tetraphenylborate",
 
   "tetraphenylphosphonium": "tetraphenylphosphonium",
+  "tetraphenylphosphonium ion": "tetraphenylphosphonium",
 
   "tetrapropylazanium": "tetrapropylazanium",
   "tetra-n-propylammonium": "tetrapropylazanium",
@@ -13614,6 +13888,7 @@
 
   "tetrasodium diphosphate": "tetrasodium diphosphate",
   "sodium pyrophosphate": "tetrasodium diphosphate",
+  "tetrasodium pyrophosphate": "tetrasodium diphosphate",
 
   "tetrathionate": "tetrathionate",
   "2,2,5,5-tetraoxido-1,6-dioxy-2,3,4,5-tetrasulfy-[6]catenate(2-)": "tetrathionate",
@@ -13746,9 +14021,11 @@
   "thiosulfuric acid (h2s2o3)": "thiosulfuric acid",
 
   "thiourea": "thiourea",
+  "thiocarbamide": "thiourea",
 
   "thorium(4+)": "thorium(4+)",
   "thorium": "thorium(4+)",
+  "th4+": "thorium(4+)",
 
   "threoninate": "threoninate",
   "(2s,3r)-2-amino-3-hydroxybutanoate": "threoninate",
@@ -14268,6 +14545,7 @@
   "para-tyrosine": "tyrosine",
   "rac-tyrosine": "tyrosine",
   "tyrosine, d-": "tyrosine",
+  "tyr": "tyrosine",
 
   "tyrosinium": "tyrosinium",
   "(1s)-1-carboxy-2-(4-hydroxyphenyl)ethanaminium": "tyrosinium",
@@ -14600,6 +14878,10 @@
   "ultrapure water": "water",
   "dihydrogen monoxide": "water",
   "light water": "water",
+  "deionised water": "water",
+  "deionized water": "water",
+  "distilled water": "water",
+  "double distilled water": "water",
 
   "xenon": "xenon",
   "54xe": "xenon",
@@ -14681,7 +14963,43 @@
   "znso4": "zinc sulfate",
   "zinc sulfate heptahydrate": "zinc sulfate",
   "zinc sulfate monohydrate": "zinc sulfate",
+  "zinc sulphate": "zinc sulfate",
 
   "zinc(2+)": "zinc(2+)",
-  "zinc": "zinc(2+)"
+  "zinc": "zinc(2+)",
+
+  "2-[bis(2-hydroxyethyl)azaniumyl]-2-(hydroxymethyl)propane-1,3-diol": "2-[bis(2-hydroxyethyl)azaniumyl]-2-(hydroxymethyl)propane-1,3-diol",
+  "bis-tris cation": "2-[bis(2-hydroxyethyl)azaniumyl]-2-(hydroxymethyl)propane-1,3-diol",
+  "bis-tris hydron": "2-[bis(2-hydroxyethyl)azaniumyl]-2-(hydroxymethyl)propane-1,3-diol",
+  "bis-tris-h+": "2-[bis(2-hydroxyethyl)azaniumyl]-2-(hydroxymethyl)propane-1,3-diol",
+  "bis-trish+": "2-[bis(2-hydroxyethyl)azaniumyl]-2-(hydroxymethyl)propane-1,3-diol",
+
+  "2-[(2-amino-2-oxoethyl)amino]ethane-1-sulfonic acid": "2-[(2-amino-2-oxoethyl)amino]ethane-1-sulfonic acid",
+  "2-[(2-amino-2-oxoethyl)amino]ethanesulfonic acid": "2-[(2-amino-2-oxoethyl)amino]ethane-1-sulfonic acid",
+  "aces": "2-[(2-amino-2-oxoethyl)amino]ethane-1-sulfonic acid",
+  "n-(2-acetamido)-2-aminoethanesulfonic acid": "2-[(2-amino-2-oxoethyl)amino]ethane-1-sulfonic acid",
+  "n-(carbamoylmethyl)taurine": "2-[(2-amino-2-oxoethyl)amino]ethane-1-sulfonic acid",
+
+  "2-[(2-amino-2-oxoethyl)amino]ethane-1-sulfonate": "2-[(2-amino-2-oxoethyl)amino]ethane-1-sulfonate",
+  "aces anion": "2-[(2-amino-2-oxoethyl)amino]ethane-1-sulfonate",
+  "aces monoanion": "2-[(2-amino-2-oxoethyl)amino]ethane-1-sulfonate",
+
+  "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonic acid": "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonic acid",
+  "4-(2-hydroxyethyl)-1-piperazinepropanesulfonic acid": "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonic acid",
+  "4-(2-hydroxyethyl)piperazine-1-propanesulfonic acid": "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonic acid",
+  "epps": "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonic acid",
+  "hepps": "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonic acid",
+  "hepps free acid": "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonic acid",
+  "n-(2-hydroxyethyl)piperazine-n'-(3-propanesulfonic acid)": "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonic acid",
+
+  "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonate": "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonate",
+  "epps anion": "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonate",
+  "hepps anion": "3-[4-(2-hydroxyethyl)piperazin-1-yl]propane-1-sulfonate",
+
+  "3,3',3''-phosphanetriyltri(propan-1-ol)": "3,3',3''-phosphanetriyltri(propan-1-ol)",
+  "3,3',3''-phosphanetriyltripropan-1-ol": "3,3',3''-phosphanetriyltri(propan-1-ol)",
+  "thp": "3,3',3''-phosphanetriyltri(propan-1-ol)",
+  "tris(3-hydroxypropyl)phosphine": "3,3',3''-phosphanetriyltri(propan-1-ol)",
+  "tris(hydroxypropyl)phosphine": "3,3',3''-phosphanetriyltri(propan-1-ol)",
+  "tris-(3-hydroxypropyl)phosphine": "3,3',3''-phosphanetriyltri(propan-1-ol)"
 }

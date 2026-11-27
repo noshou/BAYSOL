@@ -382,7 +382,7 @@ for the `estimated` rows of the bulk-electron-density tables
 (`src/bulk-electron-density/polymers/` and `non-biological/`). The tools: a 3D-RISM
 driver, a Bayesian group correction fitted to measured solutes, and read-only diagnostics.
 All of it is `dev/src/pmv.jl` (module `Pmv`, run as `bysl extract pmv --out DIR SUBCOMMAND
-...`); the only other file is the queue of missing solutes, `dev/data/pmv-queue.tsv`.
+...`); it has no other file.
 
 ### Data inside `pmv.jl`
 
@@ -409,7 +409,7 @@ in the source, then run `fit` again. The `id` (`K001`...) doubles as the RISM na
 mean | sd` (`mean` is the raw RISM volume R of the conformer mean, `sd` the conformer
 spread, `nan` for one conformer). It holds the 90 calibration solutes, the 105 runs behind
 the `estimated` rows that `row` wrote (the `tables` check finds a row's run by n and mean)
-and `TRIS0`, the anchor of the queue's bis-tris jobs: 196 runs. Runs nothing reads (the
+and `TRIS0`, the anchor of the bis-tris species: 196 runs. Runs nothing reads (the
 runs of rows whose note is free text or anchored, superseded runs: OG, sucrose, R039 to
 R041, LMNG, R045 to R078, A001 to A008) were dropped on 2026-11-19 together with the old data folder; a run made now lands in `<out>/results.tsv`, which is read on top
 of the bundled runs (the last line of a name wins) and which `batch` resumes from. To keep
@@ -512,24 +512,6 @@ name, because the tables do not store the RISM name. On the tables of 2026-11-19
 
 The note of a `row` has the form `3D-RISM raw value R (SD s over n conformers) plus the Bayesian group correction c (predictive sd p); ...`; `tables` parses exactly this, so do
 not reword it without changing `NOTE_RE` in `dev/src/pmv.jl`.
-
-### The queue of missing solutes
-
-`dev/data/pmv-queue.tsv` lists the solutes without a literature volume (`notes/solute-gaps.md`
-ranks them): `id smiles charge nconf tier name anchor neededBy`. The first four columns
-are the `batch` format, the others say what the job is for (`anchor` is the measured
-solute the difference is read against, `neededBy` the fitting tests or buffer templates).
-It stays a data file, not a constant (its lines are long and the job list is meant to be
-edited), and `batch` takes its path as an argument, with no default: `bysl extract pmv
---out DIR batch dev/data/pmv-queue.tsv --nice 19` (`--tier 1 --tier 2` keeps those tiers;
-no `--tier`: all). The rows go one at a time in file order, an id already in the results
-(the bundled runs, or `DIR/results.tsv`) is skipped, so a stopped queue is started again
-as it is, and a failed job is reported (`FAILED id`, exit status 1 at the end) while the
-rest goes on (tier 1: the bis-tris propane species and the Tris anchors, done 2026-11-18;
-2: the other template buffers; 3: further predicted solutes). Never start it beside a fit
-or the unit suite. `test-solute-gaps.jl` keeps the table consistent (formal charge of each
-SMILES, tier order, the columns batch reads); `dev/test/test-pmv.jl` tests the resume,
-tier, failure and `--nice` behaviour of `batch` without AmberTools.
 
 ### Add a calibration solute
 

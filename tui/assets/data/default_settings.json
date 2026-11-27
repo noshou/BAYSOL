@@ -27,7 +27,7 @@
  "φ_max": {"default": 1.25, "type": "float", "limits": {"above": 0}},
  "EXCL_VOL_CORR_BOUNDS": {"default": [0.8, 1.3], "type": "tuple", "limits": {}, "shape": ["float", "float"], "parts": ["low", "high"]},
  "EXCL_VOL_CORR_EPS": {"default": 0.02, "type": "float", "limits": {"above": 0}},
- "PMV_FALLBACK_UNCERT": {"default": 2.528038, "type": "float", "limits": {"above": 0}},
+ "PMV_FALLBACK_UNCERT": {"default": 2.542961, "type": "float", "limits": {"above": 0}},
  "PROBE_RADIUS": {"default": 1.4, "type": "float", "limits": {"atLeast": 0}},
  "SHELL_AREA_PER_POINT": {"default": 4.0, "type": "float", "limits": {"above": 0}},
  "SHELL_MIN_POINTS": {"default": 55, "type": "int", "limits": {"atLeast": 1}},

@@ -98,8 +98,8 @@ temperature terms) and `speciesRows` names one row of this table per species, mo
 its volume by adding or improving a row (`basis` as above), never by code. The unit test
 `test-buffer-species.jl` checks every ladder against the table (resolution, charge, one hydrogen per
 step, shared electron count). Single-step buffers use one row at the full molarity. Rows that are still
-`predicted`, `estimated` or `obigt-unverified` and the 3D-RISM queue that replaces them are listed in
-`notes/solute-gaps.md` (`dev/data/pmv-queue.tsv`, `test-solute-gaps.jl`).
+`predicted`, `estimated` or `obigt-unverified` are listed in `notes/solute-gaps.md`; a better value
+comes from `bysl extract pmv` (`dev/README.md`, "Estimate a new compound end to end").
 
 **Names.** Every common, trade, older or abbreviated name is an alias of one **preferred IUPAC name**, non-stereospecific (no R/S, E/Z, D/L, cis/trans, α/β unless the isomers' volumes differ by more than 1 cm³ mol⁻¹ with grade A/B evidence on both sides; maleate/fumarate and distinct diastereomers such as hexitols stay separate), in the flat `nonbio_lookup.json` (lowercase alias → target; one block per target, the self-mapping first, aliases sorted). The resolver decides (OPSIN, PubChem, RDKit); names no tool parses (NAD family, polymers, many sugars) stay and are marked unverified. Every alias met anywhere must be added there, **never as its own JSON key**; `ϕ°(name)` lowercases and resolves through the lookup first. An unknown name raises `ArgumentError("unknown solute")`.
 
