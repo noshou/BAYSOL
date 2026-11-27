@@ -9,6 +9,15 @@ using JSON3
 
 const X = Dev.Fits.Export
 
+@testset "the SHA-256 of a structure is computed in Julia (no sha256sum on Windows)" begin
+    mktempdir() do dir
+        f = joinpath(dir, "abc.pdb")
+        write(f, "abc")
+        @test X.file_sha256(f) ==
+              "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    end
+end
+
 @testset "LOG datetime to run name and instant" begin
     @test X.run_name("16-11-2026 18:19:34 -0500") == "18-19-34-000_LOC_-0500_2026-11-16"
     @test X.run_name("16-11-2026 18:19:34 +0000") == "18-19-34-000_UTC_+0000_2026-11-16"

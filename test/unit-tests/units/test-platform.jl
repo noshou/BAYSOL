@@ -10,6 +10,8 @@ using BAYSOL: Platform
     @testset "detection" begin
         @test count((Platform.iswindows(), Platform.ismacos(), Platform.islinux())) <= 1
         @test Platform.isunix() == !Platform.iswindows()
+        @test Platform.islinuxx64() == (Platform.islinux() && Platform.isx64())
+        @test !(Platform.islinuxx64() && Platform.ismacosx64())
         @test Platform.os() in (:windows, :macos, :linux, :other)
         @test (Platform.os() === :windows) == Platform.iswindows()
         @test Platform.arch() isa Symbol

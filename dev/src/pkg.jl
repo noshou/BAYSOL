@@ -208,8 +208,46 @@ function descendants(parents::AbstractDict{Int,Int}, root::Integer)::Vector{Int}
     return found
 end
 
-"The `(RSS, swap)` MiB summed over this process and all its children (Linux `/proc`)."
+"""
+    machine_memory() -> (ram, swap)
+
+The total RAM and swap of the machine in MiB (`nothing` for a value the system does not
+give: the swap of Windows). Linux reads `/proc/meminfo`, macOS `vm.swapusage`.
+"""
+function machine_memory()
+    ram = Int(Sys.total_memory()) ÷ 1024^2
+    swap = if Platform.islinux()
+        get(parse_meminfo(read("/proc/meminfo", String)), "SwapTotal", 0) ÷ 1024
+    else
+        s = Platform.swap_usage()
+        s === nothing ? nothing : s[1] ÷ 1024^2
+    end
+    return (ram = ram, swap = swap)
+end
+
+"A MiB value for the report, `unknown` when the system does not give it."
+mib_or_unknown(v) = v === nothing ? "unknown" : "$v MiB"
+
+"""
+The `(RSS, swap)` MiB summed over this process and all its children: Linux `/proc`; macOS
+`ps` (the RSS of the tree, and the swap in use of the whole machine, which has no
+per-process figure).
+"""
 function tree_memory(root::Integer = getpid())::NTuple{2,Int}
+    if Platform.ismacos()
+        parents = Dict{Int,Int}()
+        rss = Dict{Int,Int}()
+        for l in split(read(`ps -axo pid=,ppid=,rss=`, String), '\n')
+            f = split(l)
+            length(f) == 3 || continue
+            pid, ppid, kb = parse.(Int, f)
+            parents[pid] = ppid
+            rss[pid] = kb
+        end
+        used = Platform.swap_usage()
+        return (sum((get(rss, p, 0) for p in descendants(parents, root)); init = 0) ÷ 1024,
+            used === nothing ? 0 : used[2] ÷ 1024^2)
+    end
     parents = Dict{Int,Int}()
     for d in readdir("/proc")
         all(isdigit, d) || continue
@@ -234,12 +272,12 @@ end
 
 Calls `f()` and samples the memory of the processes it starts (this process and all its
 children, so juliac, gcc, Nuitka or 7-Zip, never the rest of the machine) every `period`
-seconds meanwhile (Linux; elsewhere the peak is `nothing`). `peak` is
+seconds meanwhile (Linux and macOS; on Windows the peak is `nothing`). `peak` is
 `(ram = MiB, swap = MiB)`, each the highest sample of the resident and the swapped-out
 memory of that tree.
 """
 function watch_memory(f; period = 2)
-    Platform.islinux() || return f(), nothing
+    (Platform.islinux() || Platform.ismacos()) || return f(), nothing
     peak = [0, 0]
     sample() = peak .= max.(peak, tree_memory())
     sample()
@@ -308,6 +346,40 @@ The steps run so far as `name => log path`, in the order they started: what the 
 """
 const STEP_LOGS = Pair{String,String}[]
 
+"""
+The file `<work>/history.tsv` that keeps the report lines (`R<TAB>line`) and steps
+(`S<TAB>name<TAB>log`) of every run of one work folder, so that the build log of a resumed
+build has the whole build and not only its last run. Empty outside a build.
+"""
+const HISTORY = Ref("")
+
+"The report lines and steps of the earlier runs of this work folder (`--resume`)."
+const PRIOR_REPORT = String[]
+const PRIOR_STEPS = Pair{String,String}[]
+
+"Appends one row to [`HISTORY`](@ref); never an error (the history is a record only)."
+function remember(fields::AbstractString...)::Nothing
+    isempty(HISTORY[]) && return nothing
+    try
+        open(io -> println(io, join(fields, '\t')), HISTORY[], "a")
+    catch
+    end
+    return nothing
+end
+
+"Loads the rows of [`HISTORY`](@ref) into [`PRIOR_REPORT`](@ref) and [`PRIOR_STEPS`](@ref)."
+function load_history()::Nothing
+    empty!(PRIOR_REPORT)
+    empty!(PRIOR_STEPS)
+    isfile(HISTORY[]) || return nothing
+    for l in eachline(HISTORY[])
+        f = split(l, '\t')
+        f[1] == "R" && length(f) >= 2 && push!(PRIOR_REPORT, join(f[2:end], '\t'))
+        f[1] == "S" && length(f) == 3 && push!(PRIOR_STEPS, f[2] => f[3])
+    end
+    return nothing
+end
+
 "Lines of a step log that `problems` reports for a failed step."
 const PROBLEM_LINE =
     r"Test Failed|Error During Test|Some tests did not pass|^ERROR|[Ee]xception|" *
@@ -321,6 +393,7 @@ Adds `line` to the report (and shows it on the terminal the tool was started wit
 """
 function note(line::AbstractString; terminal::Bool = false)
     push!(REPORT, line)
+    remember("R", line)
     if terminal
         println(REAL_OUT[], line)
         flush(REAL_OUT[])
@@ -374,6 +447,7 @@ stage) is. True when it did not fail.
 function step(name::AbstractString, f; top::Bool = false, pattern = PROBLEM_LINE)::Bool
     path = step_log(name)
     push!(STEP_LOGS, name => path)
+    remember("S", name, path)
     t0 = time()
     ok, peak = watch_memory() do
         try
@@ -404,15 +478,12 @@ end
 Writes the report file: the date, the revision, the machine, then [`REPORT`](@ref).
 """
 function write_report(path::AbstractString, archive::AbstractString)
-    info =
-        Platform.islinux() ? parse_meminfo(read("/proc/meminfo", String)) :
-        Dict{String,Int}()
-    mib(k) = get(info, k, 0) ÷ 1024
+    m = machine_memory()
     open(path, "w") do io
         println(io, "bysl pkg   ", Dates.format(Dates.now(), "yyyy-mm-dd HH:MM"))
         println(io, "revision   ", build_revision())
         println(io, "machine    ", Platform.arch(), ", ", Sys.CPU_THREADS, " threads, RAM ",
-            mib("MemTotal"), " MiB, swap ", mib("SwapTotal"), " MiB")
+            mib_or_unknown(m.ram), ", swap ", mib_or_unknown(m.swap))
         println(io, "archive    ", archive)
         println(
             io,
@@ -531,9 +602,11 @@ with nothing left is not listed) and the machine. It is the only record of a bui
 in the repository; the step logs themselves go with the scratch folder.
 """
 function write_build_log(path::AbstractString, archive::AbstractString)
-    info = Sys.islinux() ? parse_meminfo(read("/proc/meminfo", String)) : Dict{String,Int}()
-    mib(k) = get(info, k, 0) ÷ 1024
+    m = machine_memory()
     os, arch = system_names()
+    # before the file is opened: this log is tracked, and the rewrite of it would make the
+    # revision read `-dirty` on a build that started from a clean tree
+    revision = build_revision()
     mkpath(dirname(path))
     open(path, "w") do io
         row(k, v) = println(io, rpad(k, cld(length(k) + 1, 8) * 8), "\t", v)
@@ -544,14 +617,22 @@ function write_build_log(path::AbstractString, archive::AbstractString)
         )
         row("version", version_line())
         row("archive", basename(archive))
-        row("revision", build_revision())
+        row("revision", revision)
         row("julia", VERSION)
         row("node", NODE_VERSION)
         row("python", PY_VERSION)
         row("system", "$os-$arch, $(os_description())")
         println(io, "\n--- stages ---")
+        if !isempty(PRIOR_REPORT)
+            println(io, "(the runs before the last one of this build, then the last run)")
+            foreach(l -> println(io, l), PRIOR_REPORT)
+            println(io, "--- last run ---")
+        end
         foreach(l -> println(io, l), REPORT)
-        for (name, log) in STEP_LOGS
+        # a step of an earlier run keeps its log in the work folder; a step run again has
+        # the log of its last run only
+        again = Set(first.(STEP_LOGS))
+        for (name, log) in vcat(filter(p -> !(first(p) in again), PRIOR_STEPS), STEP_LOGS)
             isfile(log) || continue
             lines = trim_log(clean_log(read(log, String)))
             isempty(lines) && continue
@@ -561,8 +642,8 @@ function write_build_log(path::AbstractString, archive::AbstractString)
         println(io, "\n--- machine ---")
         row("cpu", cpu_model())
         row("threads", Sys.CPU_THREADS)
-        row("ram", "$(mib("MemTotal")) MiB")
-        row("swap", "$(mib("SwapTotal")) MiB")
+        row("ram", mib_or_unknown(m.ram))
+        row("swap", mib_or_unknown(m.swap))
     end
     return nothing
 end
@@ -1393,6 +1474,68 @@ function link_wrapper(work::AbstractString)::String
 end
 
 """
+The text of `juliac.jl` that fixes the threads of the process that builds the image (and runs
+the workload fits of the build): `addenv(cmd, "OPENBLAS_NUM_THREADS" => 1, "JULIA_NUM_THREADS" => 1)`.
+Neither the environment nor `--threads` of `juliac.jl` changes it (measured: the build
+process has 1 thread either way), so [`patched_juliac`](@ref) rewrites it in a copy.
+"""
+const JULIAC_THREADS_TEXT = "\"JULIA_NUM_THREADS\" => 1)"
+
+"""
+    juliac_threads() -> Int
+
+The Julia threads of the process that builds the image: `BAYSOL_JULIAC_THREADS` if it is a
+positive integer, else 1 under Rosetta 2 (more threads risk its garbage-collector hang, see the
+README) and 4 elsewhere (as the trace stage runs its fits). The workload fits of the julia
+stage took 3 h 54 min on one thread (linux-x86-64) and 9 h on Windows.
+"""
+function juliac_threads()::Int
+    n = tryparse(Int, get(ENV, "BAYSOL_JULIAC_THREADS", ""))
+    n !== nothing && n >= 1 && return n
+    return Platform.isrosetta() ? 1 : 4
+end
+
+"""
+    patched_juliac(work; bindir = Sys.BINDIR) -> String
+
+A copy of the `juliac` folder of the Julia installation (with the `julia-config.jl` it includes)
+under `<work>/juliac-threads`, where the thread count of the build process is read from
+`BAYSOL_JULIAC_THREADS` (default 1, as before) instead of being fixed at 1. Everything else of
+`juliac.jl` is unchanged; `OPENBLAS_NUM_THREADS` stays 1.
+
+# Returns
+The path of the patched `juliac.jl`.
+
+# Exceptions
+A `ToolError` when `juliac.jl` has not exactly one line of [`JULIAC_THREADS_TEXT`](@ref)
+(another Julia than the one this was written for): the stage must not run unpatched unseen.
+"""
+function patched_juliac(work::AbstractString; bindir = Sys.BINDIR)::String
+    share = normpath(joinpath(bindir, "..", "share", "julia"))
+    src = joinpath(share, "juliac", "juliac.jl")
+    text = read(src, String)
+    count(JULIAC_THREADS_TEXT, text) == 1 || throw(
+        ToolError(
+            "$WHO: $src does not have exactly one `$JULIAC_THREADS_TEXT` " *
+            "(a Julia other than 1.12 ?): the threads of the build cannot be set",
+            1,
+        ),
+    )
+    root = joinpath(work, "juliac-threads")
+    ispath(root) && rm_tree(root)
+    dest = mkpath(joinpath(root, "share", "julia"))
+    cp(joinpath(share, "juliac"), joinpath(dest, "juliac"))
+    cp(joinpath(share, "julia-config.jl"), joinpath(dest, "julia-config.jl"))
+    patched = joinpath(dest, "juliac", "juliac.jl")
+    write(
+        patched,
+        replace(text, JULIAC_THREADS_TEXT =>
+            "\"JULIA_NUM_THREADS\" => get(ENV, \"BAYSOL_JULIAC_THREADS\", \"1\"))"),
+    )
+    return patched
+end
+
+"""
 The CPU target of the compiled app. `generic` runs on every CPU of the architecture
 (owner, 2026-11-23): juliac's default is `native`, which lets LLVM use the build machine's
 own instructions (an Apple M2's, say) and crash with SIGILL elsewhere, and per-CPU variants
@@ -1405,6 +1548,10 @@ function stage_julia(work, workload)
     dir = mkpath(joinpath(work, "julia"))
     juliac = joinpath(Sys.BINDIR, "..", "share", "julia", "juliac", "juliac.jl")
     need(isfile(juliac), "juliac.jl not found: $juliac")
+    # more than one thread only where it is safe (`juliac_threads`): under Rosetta 2 the stock
+    # `juliac.jl` runs, as before
+    threads = juliac_threads()
+    threads > 1 && (juliac = patched_juliac(work))
     entry = joinpath(Common.root(), "tui", "julia", "app", "baysol.jl")
     project = joinpath(Common.root(), "tui", "julia")
     # juliac and gcc write about 6 GB to the temp folder: a tmpfs /tmp is too small
@@ -1418,9 +1565,8 @@ function stage_julia(work, workload)
     # the JLL libraries of depot artifacts are opened by bare name (see `jll_libraries`)
     libs = jll_libraries(project)
     write(joinpath(dir, "jll-libraries.tsv"), join([join(l, '\t') for l in libs], '\n'))
-    # no thread count here: `juliac.jl` starts the process that runs the workload with
-    # `JULIA_NUM_THREADS=1`, which overrides this environment (so the workload fits of the
-    # build run on one thread; see the README, "far too slow")
+    # the thread count of the build process: `juliac.jl` fixes it at 1 and overrides this
+    # environment, so `patched_juliac` reads `BAYSOL_JULIAC_THREADS` instead (see `juliac_threads`)
     env = Dict("JULIA_CPU_TARGET" => CPU_TARGET, "BAYSOL_WORKLOAD" => workload,
         "BAYSOL_PYTOOLS" => pytools,
         "JULIA_LOAD_PATH" =>
@@ -1433,6 +1579,7 @@ function stage_julia(work, workload)
         "TMP" => joinpath(work, "tmp"), "TEMP" => joinpath(work, "tmp"))
     # `juliac.jl` splits `JULIA_CC` like a shell would: quote the path
     Platform.islinux() && (env["JULIA_CC"] = "\"" * link_wrapper(work) * "\"")
+    threads > 1 && (env["BAYSOL_JULIAC_THREADS"] = string(threads))
     log = joinpath(work, "julia.log")
     ok = step("juliac (precompile, workload fits, compile, link)",
         () -> guarded(
@@ -2530,6 +2677,8 @@ function run(argv::Vector{String})::Int
     empty!(REPORT)
     empty!(STEP_LOGS)
     LOG_DIR[] = mkpath(joinpath(work, "logs"))
+    HISTORY[] = joinpath(work, "history.tsv")
+    load_history()   # nothing on a cold build (the folder was emptied above)
     report = joinpath(dirname(archive), "baysol-pkg-report.txt")
     t_all = time()
     failed = false

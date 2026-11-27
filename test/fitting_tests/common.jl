@@ -26,11 +26,16 @@ const N_ADAPT = BAYSOL.Pipeline.N_ADAPT
 const N_SAMPLES = N_ADAPT + BAYSOL.Pipeline.N_DRAWS
 
 """
-The `rngSeed` of SASDJ66, a marginal entry: its seed 0 passes on arm64 and Linux, and does
-not converge on macOS x86_64 (R̂ above 1.1, ESS under 70), so that system takes seed 1 and
-every other system keeps the default. SASDAP8 needed another seed ([`SASDAP8_FIT_SEED`](@ref)).
+The `rngSeed` of SASDJ66, a marginal entry: its seed 0 passes on arm64 and Linux arm64, and
+does not converge on macOS x86_64 (R̂ above 1.1, ESS under 70), so that system takes seed 1.
+On Linux x86_64 (Ubuntu 24.04 in WSL2, 2026-11-26) seeds 0 and 1 end `ladder exhausted` (R̂
+1.9, ESS 2), seed 2 converges at the second rung (R̂ 1.007) and seed 3 at the first rung
+(`delta 99`, R̂ 1.004, 75 s, `--threads 4`): that system takes seed 3. Every other system
+keeps the default. SASDAP8 needed another seed ([`SASDAP8_FIT_SEED`](@ref)).
 """
-const MARGINAL_FIT_SEED = BAYSOL.Platform.ismacosx64() ? 1 : BAYSOL.Inference.RNG_SEED
+const MARGINAL_FIT_SEED =
+    BAYSOL.Platform.ismacosx64() ? 1 :
+    BAYSOL.Platform.islinuxx64() ? 3 : BAYSOL.Inference.RNG_SEED
 
 """
 The `rngSeed` of SASDAP8, a marginal entry: its seed 0 passes on arm64 and Linux. On macOS

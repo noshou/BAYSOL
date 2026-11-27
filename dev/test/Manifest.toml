@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "8833035020b783ea5f96f2c0fed5e90d48f04310"
+project_hash = "6d83eb9f13c2a05386f730c427317d9801675bad"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -65,7 +65,7 @@ uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 version = "1.11.0"
 
 [[deps.Dev]]
-deps = ["CSV", "CodecZlib", "Dates", "Downloads", "JSON3", "LinearAlgebra", "OrderedCollections", "PrecompileTools", "Printf", "RDKitMinimalLib", "Random", "Sockets", "Statistics"]
+deps = ["CSV", "CodecZlib", "Dates", "Downloads", "JSON3", "LinearAlgebra", "OrderedCollections", "PrecompileTools", "Printf", "RDKitMinimalLib", "Random", "SHA", "Sockets", "Statistics"]
 path = ".."
 uuid = "7d1c5e2a-3b0f-4c58-9a41-6e2f8b9d0c11"
 version = "0.1.0"

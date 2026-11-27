@@ -136,6 +136,39 @@ end
     end
 end
 
+@testset "the build log keeps every run of a resumed build" begin
+    mktempdir() do d
+        old = joinpath(d, "old.log")
+        write(old, "Fit finished: reduced χ² = 1.0\n")
+        P.HISTORY[] = joinpath(d, "history.tsv")
+        empty!(P.REPORT)
+        empty!(P.STEP_LOGS)
+        P.note("trace      FAIL  12.0 s")
+        P.remember("S", "stage trace", old)
+        P.load_history()
+        @test P.PRIOR_REPORT == ["trace      FAIL  12.0 s"]
+        @test P.PRIOR_STEPS == ["stage trace" => old]
+        # the next run: its own lines come after the earlier ones
+        empty!(P.REPORT)
+        P.note("trace      skipped (done before)")
+        out = joinpath(d, "b", "x.LOG")
+        P.write_build_log(out, "/s/baysol-9.9.9-linux-arm64.zip")
+        got = read(out, String)
+        @test occursin("trace      FAIL  12.0 s\n--- last run ---\ntrace      skipped", got)
+        @test occursin("--- step: stage trace ---\nFit finished: reduced χ² = 1.0", got)
+        P.HISTORY[] = ""
+        empty!(P.PRIOR_REPORT)
+        empty!(P.PRIOR_STEPS)
+    end
+end
+
+@testset "the machine memory is given on every system" begin
+    m = P.machine_memory()
+    @test m.ram > 0
+    @test m.swap === nothing || m.swap >= 0
+    @test P.mib_or_unknown(nothing) == "unknown" && P.mib_or_unknown(8) == "8 MiB"
+end
+
 @testset "merged statements" begin
     lines = [
         "precompile(Tuple{typeof(BAYSOL.f), Int64})",
@@ -276,6 +309,52 @@ end
     p = P.link_wrapper(w)
     @test isfile(p) && endswith(read(p, String), "exec gcc \"\$@\" -lm\n")
     Sys.iswindows() || @test Sys.isexecutable(p)
+end
+
+@testset "the threads of the juliac build process" begin
+    default = Platform.isrosetta() ? 1 : 4
+    withenv("BAYSOL_JULIAC_THREADS" => nothing) do
+        @test P.juliac_threads() == default
+    end
+    withenv("BAYSOL_JULIAC_THREADS" => "6") do
+        @test P.juliac_threads() == 6
+    end
+    for bad in ("0", "-2", "many", "")
+        withenv("BAYSOL_JULIAC_THREADS" => bad) do
+            @test P.juliac_threads() == default
+        end
+    end
+    # a copy of juliac.jl whose build process takes its threads from the environment
+    root = mktempdir()
+    bin = mkpath(joinpath(root, "bin"))
+    juliac = mkpath(joinpath(root, "share", "julia", "juliac"))
+    line = "cmd = addenv(`x`, \"OPENBLAS_NUM_THREADS\" => 1, \"JULIA_NUM_THREADS\" => 1)
+"
+    write(joinpath(juliac, "juliac.jl"), "# juliac
+" * line * "run(cmd)
+")
+    write(joinpath(juliac, "Artifacts.toml"), "# artifacts
+")
+    write(joinpath(root, "share", "julia", "julia-config.jl"), "# config
+")
+    work = mktempdir()
+    path = P.patched_juliac(work; bindir = bin)
+    text = read(path, String)
+    @test occursin("get(ENV, \"BAYSOL_JULIAC_THREADS\", \"1\")", text)
+    @test occursin("\"OPENBLAS_NUM_THREADS\" => 1", text)
+    @test !occursin("\"JULIA_NUM_THREADS\" => 1)", text)
+    @test isfile(joinpath(dirname(path), "Artifacts.toml"))
+    @test isfile(joinpath(dirname(dirname(path)), "julia-config.jl"))
+    @test read(joinpath(juliac, "juliac.jl"), String) == "# juliac
+" * line * "run(cmd)
+"
+    P.patched_juliac(work; bindir = bin)             # a second call replaces the copy
+    # another juliac.jl (no such line, or two): the stage stops instead of running unpatched
+    write(joinpath(juliac, "juliac.jl"), "run(cmd)
+")
+    @test_throws Dev.Common.ToolError P.patched_juliac(work; bindir = bin)
+    write(joinpath(juliac, "juliac.jl"), line * line)
+    @test_throws Dev.Common.ToolError P.patched_juliac(work; bindir = bin)
 end
 
 @testset "cold caches" begin

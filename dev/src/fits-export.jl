@@ -17,6 +17,15 @@ using ..Fixtures
 using ...Platform: Platform
 using Dates
 using JSON3
+using SHA: sha256
+
+"""
+    file_sha256(path) -> String
+
+The SHA-256 of the file `path` as 64 lower-case hex digits, computed in Julia (Windows has no
+`sha256sum`: spawning it made `bysl fits export` skip every entry there).
+"""
+file_sha256(path::AbstractString)::String = bytes2hex(open(sha256, path))
 
 const WHO = "bysl fits export"
 
@@ -667,7 +676,7 @@ function write_run(
                 "name" => m.stem,
                 "path" => joinpath(project, "models", basename(m.structure)),
                 "size" => filesize(m.structure),
-                "sha256" => first(split(read(`sha256sum $(m.structure)`, String))),
+                "sha256" => file_sha256(m.structure),
                 "status" => "done", "seconds" => secs, "error" => nothing,
                 "plotSizes" => Any[], "overrides" => Any[], "files" => files,
             ),

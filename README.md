@@ -96,6 +96,13 @@ the bug.
   seed 0 everywhere but on macOS x86_64. A seed that converges says nothing about why the
   sampler is so close to the limit on these two; the cause of the difference is not known, and
   other marginal entries can fail the same way.
+- *SASDMC6 is far slower on x86_64 Linux (Intel i5-8400, WSL2) than on arm64, and a seed may be
+  the reason; not tested.* With the default seed it finished without failure, but its fit took
+  355 s in the trace stage and 444 s in the julia stage (both passes 430 to 445 s), against 20 s in
+  the arm64 build log, a 17 times gap where the other fits are 1.2 to 3.7 times apart. The
+  `SASDMC6.jl` script has no seed setting of its own. No seed hunt has been run on Linux x86_64 for
+  it yet: until one is, the default seed stays, and no seed is recommended for this platform.
+  Windows x86_64 and macOS arm64 use the default seed as well.
 - *`bysl pkg` could not start the x64 7-Zip of `7zip-bin` on Intel macOS or under Rosetta 2*: the
   npm package ships `mac/x64/7za` without the execute bit (only `mac/arm64/7za` has it, and
   `7zip-bin` has no install script), so the build stopped with `IOError: could not spawn` at its

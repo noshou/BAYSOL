@@ -65,6 +65,13 @@ Whether this is Linux.
 islinux() = Sys.islinux()
 
 """
+    islinuxx64() -> Bool
+
+Whether this is Linux on an x86_64 Julia (the counterpart of [`ismacosx64`](@ref)).
+"""
+islinuxx64() = islinux() && isx64()
+
+"""
     isunix() -> Bool
 
 Whether this is a Unix-like system (Linux, macOS, BSD): POSIX signals and permissions,
@@ -421,6 +428,24 @@ function _mac_available_memory()::Union{Int,Nothing}
     size = Ref{Csize_t}(0)
     ccall(:host_page_size, Cint, (Cuint, Ref{Csize_t}), host, size) == 0 || return nothing
     return pages * Int(size[])
+end
+
+"""
+    swap_usage() -> Union{NTuple{2,Int},Nothing}
+
+The `(total, used)` swap in bytes of macOS (`vm.swapusage`); `nothing` on another system or
+when the call fails (Linux reads `/proc/meminfo`, which the caller parses).
+"""
+function swap_usage()::Union{NTuple{2,Int},Nothing}
+    ismacos() || return nothing
+    # struct xsw_usage: total, avail, used (UInt64), page size (UInt32), encrypted (Bool)
+    buf = zeros(UInt64, 4)
+    size = Ref{Csize_t}(sizeof(buf))
+    status = ccall(:sysctlbyname, Cint,
+        (Cstring, Ptr{UInt64}, Ref{Csize_t}, Ptr{Cvoid}, Csize_t),
+        "vm.swapusage", buf, size, C_NULL, 0)
+    status == 0 || return nothing
+    return (Int(buf[1]), Int(buf[3]))
 end
 
 """
