@@ -4,8 +4,9 @@
 # environment the other programs and the package read, the threads, and the start of the
 # terminal interface. Only the standard library and the two packages of the entry.
 
-"The file name of an executable on this system."
-exeName(name) = Sys.iswindows() ? name * ".exe" : name
+# The one place that detects the system (`platform.jl` of the repository), by way of the
+# setup wizard that holds it, so that the entry includes no file of its own.
+const Platform = BAYSOLSetup.Platform
 
 """
     bundleDir() -> String
@@ -51,7 +52,7 @@ function prepareEnvironment(bundle::AbstractString)::Nothing
         return nothing
     end
     setDefault("BAYSOL_BUNDLE", bundle)
-    pytools = joinpath(bundle, "lib", "pytools", exeName("baysol-pytools"))
+    pytools = joinpath(bundle, "lib", "pytools", Platform.exe("baysol-pytools"))
     isfile(pytools) && setDefault("BAYSOL_PYTOOLS", pytools)
     setDefault("BAYSOL_REVISION", BUILD_REVISION)
     i = BAYSOLSetup.readInstall(BAYSOLSetup.installFile())
@@ -90,7 +91,7 @@ Runs `baysol-tui` of the bundle with the terminal; the exit status. The interfac
 fits as `baysol run-tui ...` of this same executable.
 """
 function startTui(bundle::AbstractString, args::Vector{String})::Int
-    tui = joinpath(bundle, exeName("baysol-tui"))
+    tui = joinpath(bundle, Platform.exe("baysol-tui"))
     if !isfile(tui)
         println(stderr, "baysol: the terminal interface is missing: $tui")
         return 1
@@ -112,9 +113,8 @@ end
 "A shell with the bundle on its `PATH` and the usage printed: what a CLI icon opens."
 function startShell(bundle::AbstractString)::Int
     print(USAGE)
-    shell = Sys.iswindows() ? get(ENV, "COMSPEC", "cmd.exe") : get(ENV, "SHELL", "/bin/sh")
-    sep = Sys.iswindows() ? ";" : ":"
-    path = bundle * sep * get(ENV, "PATH", "")
+    shell = Platform.shell()
+    path = bundle * Platform.PATH_SEP * get(ENV, "PATH", "")
     return run(ignorestatus(addenv(Cmd([shell]), "PATH" => path))).exitcode
 end
 

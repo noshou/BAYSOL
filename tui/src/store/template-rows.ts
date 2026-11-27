@@ -418,8 +418,7 @@ export function seedOfRows(
         const amounts = { mM, sigmaMM }
         if (s.kind === "nonbiological") {
             rows.push({ name: s.name, arg: soluteArg(s), ...amounts })
-        }
-        else {
+        } else {
             const custom = {
                 z: Number(s.z),
                 pmv: Number(s.pmv),

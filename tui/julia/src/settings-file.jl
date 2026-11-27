@@ -30,16 +30,7 @@ function settingsFile()
     root = if absolute(env("BAYSOL_HOME"))
         env("BAYSOL_HOME")
     else
-        data = if Sys.iswindows()
-            absolute(env("LOCALAPPDATA")) ? env("LOCALAPPDATA") :
-            joinpath(homedir(), "AppData", "Local")
-        elseif Sys.isapple()
-            joinpath(homedir(), "Library", "Application Support")
-        else
-            absolute(env("XDG_DATA_HOME")) ? env("XDG_DATA_HOME") :
-            joinpath(homedir(), ".local", "share")
-        end
-        joinpath(data, "baysol")
+        joinpath(Platform.data_home(), "baysol")
     end
     return joinpath(root, "settings.json")
 end

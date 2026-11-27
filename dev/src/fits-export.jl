@@ -14,6 +14,7 @@ module Export
 
 using ..Common
 using ..Fixtures
+using ...Platform: Platform
 using Dates
 using JSON3
 
@@ -28,6 +29,9 @@ Writes finished fitting tests as projects of the terminal interface, each with o
     --all       every fitting test that has a workbook
     --out DIR   the projects folder to write into (default: the BAYSOL data folder,
                 \$BAYSOL_HOME or \$XDG_DATA_HOME/baysol, then `projects`)
+    --from DIR  read the fits' workbooks, LOGs and scripts from `DIR/test/fitting_tests/<ID>`
+                (a `bysl fits run --scratch DIR` tree) instead of the checkout's own
+                folders, which only hold a workbook where the fit was run in place
     --dry-run   say what would be written, write nothing
 
 A project that already exists is left alone (reported as skipped); so is an entry whose
@@ -80,8 +84,16 @@ end
 
 # --- the workbook -----------------------------------------------------------------
 
+"The 7-Zip program, by its full path (on the `PATH` or in the folder an installer used)."
+function seven_zip()::String
+    exe = Platform.find_tool("7z", "7zz")
+    exe === nothing &&
+        error("7z (7-Zip) is not on the PATH nor in the folders installers use for it")
+    return exe
+end
+
 "The text of one file of an `.xlsx` (a zip), read by 7-Zip."
-unzip(path, entry) = read(`7z x -so $path $entry`, String)
+unzip(path, entry) = read(`$(seven_zip()) x -so $path $entry`, String)
 
 xml_text(s) = replace(
     s,
@@ -151,7 +163,7 @@ function read_sheet(path::AbstractString, sheet::AbstractString)
 end
 
 "The names of the files of a zip, one string (to see whether a part exists)."
-unzip_list(path) = read(`7z l -slt $path`, String)
+unzip_list(path) = read(`$(seven_zip()) l -slt $path`, String)
 
 "The sheet names of a workbook."
 function sheet_names(path::AbstractString)
@@ -289,10 +301,15 @@ end
 Exports one fitting test into `projects`. Returns `:written`, `:exists` or throws an
 error whose message is the reason it was skipped.
 """
-function export_entry(id::AbstractString, projects::AbstractString, dry::Bool)
+function export_entry(
+    id::AbstractString,
+    projects::AbstractString,
+    dry::Bool;
+    base::AbstractString = root(),
+)
     # the structures come from the fixtures: unpacked from the archive while this runs
     return Fixtures.with_fixture(id) do fixtures
-        _export_entry(id, projects, dry, fixtures)
+        _export_entry(id, projects, dry, fixtures; base)
     end
 end
 
@@ -327,8 +344,8 @@ function fit_script(dir, id)
     return length(found) == 1 ? joinpath(dir, only(found)) : nothing
 end
 
-function _export_entry(id, projects, dry, fixtures)
-    dir = joinpath(root(), FIT_DIR, id)
+function _export_entry(id, projects, dry, fixtures; base = root())
+    dir = joinpath(base, FIT_DIR, id)
     isdir(dir) || error("no folder $dir")
     isempty(workbooks(dir)) && error("no workbook (res*.xlsx): the fit has not been run")
     logpath = joinpath(dir, "$id.LOG")
@@ -578,7 +595,7 @@ function write_references(project, models)
     end
     archive = joinpath(project, "reference-fit.7z")
     members = sort(collect(keys(files)))
-    Base.run(Cmd(`7z a -t7z -mx=5 -bso0 -bsp0 $archive $members`; dir = stage))
+    Base.run(Cmd(`$(seven_zip()) a -t7z -mx=5 -bso0 -bsp0 $archive $members`; dir = stage))
     rm(stage; recursive = true)
     entry(m) = begin
         software, chi = reference_label(row_of(m.section, "refChi2"))
@@ -702,7 +719,12 @@ function write_run(
         cp(joinpath(project, f), joinpath(stage, f))
     end
     archive = joinpath(runs, name * ".7z")
-    Base.run(Cmd(`7z a -t7z -mx=5 -bso0 -bsp0 $archive $(readdir(stage))`; dir = stage))
+    Base.run(
+        Cmd(
+            `$(seven_zip()) a -t7z -mx=5 -bso0 -bsp0 $archive $(readdir(stage))`;
+            dir = stage,
+        ),
+    )
     rm(stage; recursive = true)
     return archive
 end
@@ -740,15 +762,17 @@ function run(argv::Vector{String})::Int
         usage(USAGE)
         return 0
     end
-    args = split_args(WHO, ["--out"], ["--all", "--dry-run"], argv)
+    args = split_args(WHO, ["--out", "--from"], ["--all", "--dry-run"], argv)
     all = "--all" in args.flags
     dry = "--dry-run" in args.flags
+    froms = [last(p) for p in args.opts if first(p) == "--from"]
+    base = isempty(froms) ? root() : abspath(last(froms))
     ids = args.specs
     if all
         isempty(ids) || fail(WHO, "--all takes no ID")
         ids = sort([
-            d for d in readdir(joinpath(root(), FIT_DIR)) if
-            fit_script(joinpath(root(), FIT_DIR, d), d) !== nothing
+            d for d in readdir(joinpath(base, FIT_DIR)) if
+            fit_script(joinpath(base, FIT_DIR, d), d) !== nothing
         ])
     end
     isempty(ids) && fail(WHO, "name the fitting tests, or give --all")
@@ -758,7 +782,7 @@ function run(argv::Vector{String})::Int
     counts = Dict(:written => 0, :exists => 0, :dry => 0, :skipped => 0)
     for id in ids
         try
-            r = export_entry(id, projects, dry)
+            r = export_entry(id, projects, dry; base)
             counts[r] += 1
             println("  ", rpad(id, 9), r == :exists ? "exists, left alone" : String(r))
         catch e

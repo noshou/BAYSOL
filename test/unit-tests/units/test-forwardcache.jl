@@ -169,11 +169,12 @@ iyW    = partialWaveWeights(iyLmax)
         for k in 1:iyQ
             @test issymmetric(G[:, :, k])
         end
-        # the diagonal is exactly selfScatter, and selfScatter == crossScatter(B, B)
+        # the diagonal is exactly selfScatter, and selfScatter == crossScatter(B, B) up to
+        # rounding (two kernels: the FMA contraction and SIMD order differ by CPU)
         for a in 1:3
             s = selfScatter(bs[a], iyW)
             @test G[a, a, :] == s
-            @test crossScatter(bs[a], bs[a], iyW) == s
+            @test isapprox(crossScatter(bs[a], bs[a], iyW), s; rtol = 1e-12)
         end
         # the off-diagonal is exactly crossScatter
         @test G[1, 2, :] == crossScatter(bs[1], bs[2], iyW)

@@ -19,8 +19,7 @@ import {
     statSync,
     writeFileSync,
 } from "node:fs"
-import { tmpdir } from "node:os"
-import { basename, dirname, join, relative, sep } from "node:path"
+import { basename, join, relative, sep } from "node:path"
 import {
     ArchiveError,
     isSafeEntryName,
@@ -31,13 +30,8 @@ import {
 } from "../core/archive.js"
 import { RUN_FLOW } from "../core/environment.js"
 import { isFile } from "../core/file-system.js"
-import {
-    makeViewFolder,
-    removeProcessFolder,
-    sweepDeadFolders,
-    touchCopy,
-    trimCopies,
-} from "./view-cache.js"
+import { scratchFolder } from "../core/scratch.js"
+import { touchCopy, trimCopies } from "./view-cache.js"
 import {
     discardTree,
     expandWorkbook,
@@ -433,25 +427,15 @@ export function runFiles(runDir: string): Map<string, number> {
 // 3. Files for the viewers
 // ========================================================================================
 
-/** The folder the copies are made in: made on first use, removed when the program ends. */
-let copies: string | undefined
-
 /**
- * The folder of the copies of archived files, `<tmpdir>/baysol-<pid>/view`. The first use
- * sweeps the folders that dead processes left (`baysol-<pid>` of a pid that no longer
- * exists) and registers the exit hook that removes this process's folder.
+ * The folder of the copies of archived files, `<tmp>/baysol/<pid>/view` (the process's
+ * scratch folder, `core/scratch.ts`: swept at start when its process is dead, removed at
+ * exit). Made on first use.
  */
-function copiesFolder(): string {
-    if (copies !== undefined) return copies
-    const base = tmpdir()
-    sweepDeadFolders(base, process.pid)
-    copies = makeViewFolder(base, process.pid)
-    process.once("exit", () => removeProcessFolder(base, process.pid))
-    return copies
-}
+const copiesFolder = (): string => scratchFolder("view")
 
 /**
- * The folder a run's models are extracted into while it runs, `<tmpdir>/baysol-<pid>/
+ * The folder a run's models are extracted into while it runs, `<tmp>/baysol/<pid>/
  * run-models/<key>`: in the same process folder as the view copies (swept when its process
  * is dead, removed at exit) but NOT inside `view/`, which is trimmed by size and must never
  * evict the models of a running fit. It is not made here.
@@ -460,11 +444,11 @@ function copiesFolder(): string {
  */
 export function runModelsFolder(runDir: string): string {
     const key = createHash("sha256").update(runDir).digest("hex").slice(0, 12)
-    return join(dirname(copiesFolder()), "run-models", key)
+    return join(scratchFolder("run-models"), key)
 }
 
 /**
- * The folder the cache of a run is made in while it runs, `<tmpdir>/baysol-<pid>/
+ * The folder the cache of a run is made in while it runs, `<tmp>/baysol/<pid>/
  * run-cache/<key>`, next to [[runModelsFolder]] and swept the same way. It holds the
  * generated files of a project that keeps its models in `models.7z`
  * (`extractGenerated`). It is not made here.
@@ -473,7 +457,7 @@ export function runModelsFolder(runDir: string): string {
  */
 export function runCacheFolder(runDir: string): string {
     const key = createHash("sha256").update(runDir).digest("hex").slice(0, 12)
-    return join(dirname(copiesFolder()), "run-cache", key)
+    return join(scratchFolder("run-cache"), key)
 }
 
 /** Where the copy of a file of a run goes, and the folder name that identifies it. */

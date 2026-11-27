@@ -13,10 +13,15 @@ module BAYSOLSetup
 using REPL.TerminalMenus: RadioMenu, MultiSelectMenu, request
 using REPL.Terminals: TTYTerminal, raw!
 
+include(joinpath(@__DIR__, "..", "..", "platform.jl"))
+include(joinpath(@__DIR__, "dependencies.jl"))  # the optional-dependency check
+
 export clearCache, openFolder, fileManagerCommands, shellCommand, drawIcon, needsSetup,
     hasProject, check, cleanPath, Install, defaultInstall,
     installFile, manifestFile, readManifest, readInstall, writeInstall, applyInstall,
     rollback!, uninstall, runWizard,
+    DepItem, Route, DepResult, defaultItems, scanDependencies, dependencyReport,
+    checkDependencies, offerInstall, readDepAnswers, saveDepAnswers,
     LAUNCH_TUI, LAUNCH_CLI, UNINSTALLED
 
 "The marker file of a cache folder (the one the interface writes)."
@@ -39,18 +44,20 @@ const MAX_THREADS = 8
 defaultThreads() = clamp(Sys.CPU_THREADS, 1, MAX_THREADS)
 
 """
-What the wizard decides. `home` is the BAYSOL folder (projects), `cache` the shared
-cache, `structureCache` the cache of the structure preparation (what the fit reads as
-`BAYSOL_CACHE`); `desktop` says whether the entry in the application menu is made,
+What the wizard decides. `home` is the BAYSOL folder (projects), `structureCache` THE
+cache folder (the structures that later runs reuse; what the fit reads as
+`BAYSOL_CACHE`; the wizard calls it the cache folder, the JSON key keeps its old name);
+`desktop` says whether the entry in the application menu is made,
 `desktopIcon` whether the launcher is also put on the Desktop, `taskbarPin` whether it is
 pinned to the taskbar or dock, and `pathLink` whether the link on the PATH is made;
 `threads` is the default number of threads of a fit; `opens` says what the launcher
 (the icon, or `baysol` alone) starts: `"tui"` (the terminal interface) or `"cli"` (a shell
-with the command line ready).
+with the command line ready). `deps` holds the answers about the optional dependencies
+(`id => "yes" | "no" | "later" | "never"`, see `dependencies.jl`); an `install.json` without
+them reads as no answers.
 """
 Base.@kwdef struct Install
     home::String
-    cache::String
     structureCache::String
     desktop::Bool = false
     desktopIcon::Bool = false
@@ -58,35 +65,25 @@ Base.@kwdef struct Install
     pathLink::Bool = false
     threads::Int = defaultThreads()
     opens::String = "tui"
+    deps::Dict{String,String} = Dict{String,String}()
 end
+
+# the answers are a Dict (mutable), which the default `==` of a struct compares by identity
+Base.:(==)(a::Install, b::Install) =
+    a.home == b.home && a.structureCache == b.structureCache &&
+    a.desktop == b.desktop && a.desktopIcon == b.desktopIcon &&
+    a.taskbarPin == b.taskbarPin && a.pathLink == b.pathLink &&
+    a.threads == b.threads && a.opens == b.opens && a.deps == b.deps
 
 # ---- the folders of the system (XDG on Linux, the usual ones elsewhere) ---------------
 
 _env(env, name) = (v = strip(get(env, name, "")); isabspath(v) ? v : nothing)
 
 "The data folder of the system: where `baysol/` (the projects) goes by default."
-function dataHome(; env = ENV, home = homedir())
-    Sys.iswindows() && return something(_env(env, "LOCALAPPDATA"),
-        joinpath(home, "AppData", "Local"))
-    Sys.isapple() && return joinpath(home, "Library", "Application Support")
-    return something(_env(env, "XDG_DATA_HOME"), joinpath(home, ".local", "share"))
-end
-
-"The cache folder of the system."
-function cacheHome(; env = ENV, home = homedir())
-    Sys.iswindows() && return something(_env(env, "LOCALAPPDATA"),
-        joinpath(home, "AppData", "Local"))
-    Sys.isapple() && return joinpath(home, "Library", "Caches")
-    return something(_env(env, "XDG_CACHE_HOME"), joinpath(home, ".cache"))
-end
+dataHome(; env = ENV, home = homedir()) = Platform.data_home(; env, home)
 
 "The folder of `install.json`: the configuration folder of the system, never the data."
-function configHome(; env = ENV, home = homedir())
-    Sys.iswindows() && return something(_env(env, "APPDATA"),
-        joinpath(home, "AppData", "Roaming"))
-    Sys.isapple() && return joinpath(home, "Library", "Application Support")
-    return something(_env(env, "XDG_CONFIG_HOME"), joinpath(home, ".config"))
-end
+configHome(; env = ENV, home = homedir()) = Platform.config_home(; env, home)
 
 """
     installFile(; env, home) -> String
@@ -105,7 +102,11 @@ installFile(; env = ENV, home = homedir()) =
 """
     defaultInstall(; env, home) -> Install
 
-The defaults: the projects in the data folder of the system, the caches in its cache folder.
+The defaults: the projects in the data folder of the system, the cache in its cache
+folder. Where the system has one folder for both (Windows: `%LOCALAPPDATA%`), the cache
+would land inside the projects folder (`...\\baysol\\_structures`), so it goes to the
+sibling `baysol-cache` instead; the projects folder stays where earlier installs put
+it. The rule is `Platform.cache_dir`, the one default of the whole project.
 
 # Returns
 An [`Install`](@ref) with no desktop entry and no PATH link.
@@ -113,11 +114,13 @@ An [`Install`](@ref) with no desktop entry and no PATH link.
 # Exceptions
 None.
 """
-defaultInstall(; env = ENV, home = homedir()) = Install(;
-    home = joinpath(dataHome(; env, home), "baysol"),
-    cache = joinpath(cacheHome(; env, home), "baysol", "_cache"),
-    structureCache = joinpath(cacheHome(; env, home), "baysol", "_structures"),
-)
+function defaultInstall(; env = ENV, home = homedir())
+    return Install(; home = joinpath(dataHome(; env, home), "baysol"),
+        structureCache = Platform.default_structure_cache(; env, home))
+end
+
+"Whether `path` is `dir` or inside it (compared on normal paths, any case on Windows)."
+_within(path::AbstractString, dir::AbstractString) = Platform.within(path, dir)
 
 # ---- install.json: a flat object of strings and booleans ------------------------------
 
@@ -137,12 +140,15 @@ An `IOError` if the folder cannot be made or written.
 function writeInstall(file::AbstractString, i::Install)
     mkpath(dirname(file))
     rows = [
-        "home" => _quote(i.home), "cache" => _quote(i.cache),
+        "home" => _quote(i.home),
         "structureCache" => _quote(i.structureCache),
         "desktop" => string(i.desktop), "desktopIcon" => string(i.desktopIcon),
         "taskbarPin" => string(i.taskbarPin), "pathLink" => string(i.pathLink),
         "threads" => string(i.threads), "opens" => _quote(i.opens),
     ]
+    for k in sort!(collect(keys(i.deps)))
+        push!(rows, "dep.$k" => _quote(i.deps[k]))
+    end
     tmp = file * ".tmp"
     write(tmp, "{\n" * join(["    \"$k\": $v" for (k, v) in rows], ",\n") * "\n}\n")
     mv(tmp, file; force = true)
@@ -171,14 +177,19 @@ function readInstall(file::AbstractString)
         m !== nothing &&
             m[1] == "true"
     )
-    (h, c, s) = (str("home"), str("cache"), str("structureCache"))
-    any(isnothing, (h, c, s)) && return nothing
+    # an older file may still hold a `cache` key: it is ignored, and not written back
+    (h, s) = (str("home"), str("structureCache"))
+    any(isnothing, (h, s)) && return nothing
     t = match(r"\"threads\"\s*:\s*(\d+)", text)
-    return Install(; home = h, cache = c, structureCache = s,
+    deps = Dict{String,String}()
+    for m in eachmatch(r"\"dep\.([a-z0-9]+)\"\s*:\s*\"(yes|no|later|never)\"", text)
+        deps[String(m[1])] = String(m[2])
+    end
+    return Install(; home = h, structureCache = s,
         desktop = bool("desktop"), desktopIcon = bool("desktopIcon"),
         taskbarPin = bool("taskbarPin"), pathLink = bool("pathLink"),
         threads = t === nothing ? defaultThreads() : parse(Int, t[1]),
-        opens = str("opens") in ("tui", "cli") ? str("opens") : "tui")
+        opens = str("opens") in ("tui", "cli") ? str("opens") : "tui", deps)
 end
 
 """
@@ -194,17 +205,20 @@ None.
 """
 function needsSetup(; env = ENV, home = homedir())
     i = readInstall(installFile(; env, home))
-    return i === nothing || any(isempty ∘ strip, (i.home, i.cache, i.structureCache))
+    return i === nothing || any(isempty ∘ strip, (i.home, i.structureCache))
 end
 
 "A folder as the user typed it: `~` expanded, made absolute and normal."
 function cleanPath(text::AbstractString; home = homedir())
     t = strip(text)
     t == "~" && return home
-    startswith(t, "~/") && (t = joinpath(home, t[3:end]))
+    any(c -> startswith(t, "~$c"), Platform.DIR_SEPARATORS) &&
+        (t = joinpath(home, t[3:end]))
     isabspath(t) || (t = joinpath(home, t))  # a relative name is under the home folder
     p = normpath(t)
-    return length(p) > 1 ? rstrip(p, '/') : p
+    # no trailing separator, but a root (`/`, `C:\`) keeps its own
+    q = rstrip(p, Platform.DIR_SEPARATORS)
+    return isempty(splitdrive(q)[2]) ? p : q
 end
 
 # ---- the path-dependent install options -----------------------------------------------
@@ -214,7 +228,7 @@ The icon file at the root of the bundle: `baysol.ico` on Windows, `baysol.icns` 
 (`bysl pkg` packs it from the hand-made PNG sizes of `icons/`, nothing is resized).
 On Linux the wizard unpacks the sizes of the `.icns` into the user's `hicolor` theme.
 """
-const ICON_FILE = Sys.iswindows() ? "baysol.ico" : "baysol.icns"
+const ICON_FILE = Platform.iswindows() ? "baysol.ico" : "baysol.icns"
 
 "The icon name of the desktop entries; the theme finds the size that fits."
 const ICON_NAME = "baysol"
@@ -285,7 +299,7 @@ function _refreshIcons(; env = ENV, home = homedir())
     catch
     end
     if isfile(joinpath(dir, "icon-theme.cache")) &&
-       Sys.which("gtk-update-icon-cache") !== nothing
+       Platform.which("gtk-update-icon-cache") !== nothing
         try
             run(pipeline(`gtk-update-icon-cache -q -t -f $dir`; stderr = devnull))
         catch
@@ -321,7 +335,7 @@ Tells the desktops about a changed folder of entries (`update-desktop-database`,
 program is installed; a missing one is ignored).
 """
 function _refreshEntries(dir::AbstractString)
-    isdir(dir) && Sys.which("update-desktop-database") !== nothing || return nothing
+    isdir(dir) && Platform.which("update-desktop-database") !== nothing || return nothing
     try
         run(pipeline(`update-desktop-database -q $dir`; stderr = devnull))
     catch
@@ -347,7 +361,7 @@ end
 "The places the options write to (so a test can point them into a temporary folder)."
 function targets(; env = ENV, home = homedir())
     apps =
-        Sys.isapple() ? joinpath(home, "Applications") :
+        Platform.ismacos() ? joinpath(home, "Applications") :
         joinpath(something(_env(env, "XDG_DATA_HOME"),
             joinpath(home, ".local", "share")), "applications")
     startMenu = joinpath(something(_env(env, "APPDATA"),
@@ -375,7 +389,7 @@ None.
 """
 function desktopDir(; env = ENV, home = homedir())
     fallback = joinpath(home, "Desktop")
-    Sys.islinux() || return fallback
+    Platform.islinux() || return fallback
     file = joinpath(configHome(; env, home), "user-dirs.dirs")
     isfile(file) || return fallback
     m = match(r"^\s*XDG_DESKTOP_DIR=\"([^\"]+)\"\s*$"m, read(file, String))
@@ -394,7 +408,7 @@ _gnome(env) = occursin("GNOME", uppercase(get(env, "XDG_CURRENT_DESKTOP", "")))
 
 "The favourites of GNOME as a list, or `nothing` if `gsettings` cannot say."
 function _favorites()
-    Sys.which("gsettings") === nothing && return nothing
+    Platform.which("gsettings") === nothing && return nothing
     try
         text = read(pipeline(`gsettings get org.gnome.shell favorite-apps`;
             stderr = devnull), String)
@@ -421,7 +435,7 @@ Pins the entry to the taskbar where that is possible and says what was done. GNO
 the only desktop done: KDE, macOS and Windows are told to pin by hand (untested elsewhere).
 """
 function _pin!(journal, env)
-    if !Sys.islinux()
+    if !Platform.islinux()
         return "taskbar pin skipped (Linux with GNOME only; pin it by hand)"
     elseif !_gnome(env)
         return "taskbar pin skipped (not GNOME; open the menu entry, right click, pin it)"
@@ -438,7 +452,7 @@ end
 
 "Removes the pin again (an uninstall); returns a line, or `nothing` if there was none."
 function _unpin()
-    Sys.islinux() || return nothing
+    Platform.islinux() || return nothing
     old = _favorites()
     (old === nothing || !(PIN_ID in old)) && return nothing
     _setFavorites(_unpinned(old, PIN_ID))
@@ -567,8 +581,7 @@ The `Info.plist` of the app bundle in `~/Applications` (macOS). `icon` is the na
 function infoPlist(; icon::AbstractString = ICON_NAME, exe::AbstractString = "BAYSOL")
     return """
         <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" \n            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
             <key>CFBundleName</key><string>BAYSOL</string>
@@ -681,33 +694,33 @@ function applyInstall(i::Install, bundle::AbstractString; env = ENV, home = home
     journal::Vector{Function} = Function[])
     log = String[]
     made = String[]  # the manifest lines of the icons and entries
-    for d in (i.home, i.cache, i.structureCache)
+    for d in (i.home, i.structureCache)
         _mkpath!(journal, d)
         push!(log, "folder $d")
     end
     t = targets(; env, home)
     icon = ICON_FALLBACK
     entries = i.desktop || i.taskbarPin
-    if Sys.islinux() && (entries || i.desktopIcon)
+    if Platform.islinux() && (entries || i.desktopIcon)
         installed, line = _installIcons!(journal, made, bundle; env, home)
         installed && (icon = ICON_NAME)
         push!(log, line)
     end
     if entries
-        if Sys.islinux()
+        if Platform.islinux()
             _madeDir!(made, journal, dirname(t.desktop))
             _backup!(journal, t.desktop)
             write(_madeFile!(made, t.desktop), desktopEntry(bundle; icon))
             _refreshEntries(dirname(t.desktop))
             push!(log, "menu entry $(t.desktop)")
-        elseif Sys.isapple()
+        elseif Platform.ismacos()
             _madeDir!(made, journal, dirname(t.app))
             push!(
                 log,
                 _installMacApp!(journal, made, bundle, t.app,
                     joinpath(bundle, ICON_FILE)),
             )
-        elseif Sys.iswindows()
+        elseif Platform.iswindows()
             push!(
                 log,
                 _installWindows!(journal, made, bundle, t.lnk, t.ico,
@@ -718,12 +731,12 @@ function applyInstall(i::Install, bundle::AbstractString; env = ENV, home = home
         end
     end
     if i.desktopIcon
-        if Sys.islinux() && isdir(dirname(t.icon))
+        if Platform.islinux() && isdir(dirname(t.icon))
             _backup!(journal, t.icon)
             write(_madeFile!(made, t.icon), desktopEntry(bundle; icon))
             chmod(t.icon, 0o755)  # the desktops start an executable entry
             # GNOME also wants it marked as trusted; other desktops ignore the attribute
-            Sys.which("gio") === nothing || try
+            Platform.which("gio") === nothing || try
                 run(
                     pipeline(`gio set $(t.icon) metadata::trusted true`;
                         stdout = devnull, stderr = devnull),
@@ -731,7 +744,7 @@ function applyInstall(i::Install, bundle::AbstractString; env = ENV, home = home
             catch
             end
             push!(log, "desktop icon $(t.icon)")
-        elseif Sys.islinux()
+        elseif Platform.islinux()
             push!(log, "desktop icon skipped (no folder $(dirname(t.icon)))")
         else
             push!(log, "desktop icon skipped (Linux only, untested elsewhere)")
@@ -739,7 +752,7 @@ function applyInstall(i::Install, bundle::AbstractString; env = ENV, home = home
     end
     i.taskbarPin && push!(log, _pin!(journal, env))
     if i.pathLink
-        if Sys.isunix()
+        if Platform.isunix()
             _madeDir!(made, journal, dirname(t.link))
             _backup!(journal, t.link)
             islink(t.link) && rm(t.link)
@@ -779,14 +792,15 @@ hasProject(dir::AbstractString) =
 # ---- is the install whole? ---------------------------------------------------------------
 
 "The file name of an executable on this system."
-_exe(name) = Sys.iswindows() ? name * ".exe" : name
+_exe(name) = Platform.exe(name)
 
 """
 The start script of the bundle on this system
 (`bysl pkg` writes it; the menu entry runs `baysol`).
 """
 const LAUNCHER_FILE =
-    Sys.iswindows() ? "baysol.cmd" : Sys.isapple() ? "BAYSOL.command" : "baysol.sh"
+    Platform.iswindows() ? "baysol.cmd" :
+    Platform.ismacos() ? "BAYSOL.command" : "baysol.sh"
 
 "The files of the bundle the launcher and the entry need (a repair cannot restore them)."
 const BUNDLE_FILES = (_exe("baysol"), _exe("baysol-tui"), LAUNCHER_FILE,
@@ -817,33 +831,32 @@ function check(bundle::AbstractString; env = ENV, home = homedir())
         )
         i = defaultInstall(; env, home)
     end
-    for (what, d) in (("projects", i.home), ("cache", i.cache),
-        ("structure cache", i.structureCache))
+    for (what, d) in (("projects", i.home), ("cache", i.structureCache))
         if isempty(strip(d))
             push!(fixable, "the $what folder is blank in install.json")
         elseif !isdir(d)
             push!(fixable, "the $what folder is missing: $d")
-        elseif !Sys.iswindows() && !(uperm(d) & 0x02 != 0)
+        elseif !Platform.iswindows() && !(uperm(d) & 0x02 != 0)
             push!(fixable, "the $what folder is not writable: $d")
         end
     end
     t = targets(; env, home)
     launcher = joinpath(bundle, "baysol")
-    if Sys.isapple() && (i.desktop || i.taskbarPin) && !isdir(t.app)
+    if Platform.ismacos() && (i.desktop || i.taskbarPin) && !isdir(t.app)
         push!(fixable, "the app bundle is missing: $(t.app)")
-    elseif Sys.iswindows() && (i.desktop || i.taskbarPin) && !isfile(t.lnk)
+    elseif Platform.iswindows() && (i.desktop || i.taskbarPin) && !isfile(t.lnk)
         push!(fixable, "the Start Menu shortcut is missing: $(t.lnk)")
     end
     for (on, file, what) in ((i.desktop || i.taskbarPin, t.desktop, "menu entry"),
         (i.desktopIcon, t.icon, "desktop icon"))
-        on && Sys.islinux() || continue
+        on && Platform.islinux() || continue
         if !isfile(file)
             push!(fixable, "the $what is missing: $file")
         elseif !occursin("Exec=\"$launcher\"", read(file, String))
             push!(fixable, "the $what points to another bundle: $file")
         end
     end
-    if Sys.islinux() && (i.desktop || i.taskbarPin || i.desktopIcon)
+    if Platform.islinux() && (i.desktop || i.taskbarPin || i.desktopIcon)
         sizes = [first(p) for p in iconPngs(joinpath(bundle, ICON_FILE))]
         gone = [f for f in iconFiles(sizes; env, home) if !isfile(f)]
         isempty(gone) || push!(
@@ -851,7 +864,7 @@ function check(bundle::AbstractString; env = ENV, home = homedir())
             "icon sizes are missing: $(length(gone)) in $(hicolorDir(; env, home))",
         )
     end
-    if i.pathLink
+    if i.pathLink && Platform.isunix()  # the link is only made there (see applyInstall)
         if !islink(t.link)
             push!(fixable, "the PATH link is missing: $(t.link)")
         elseif readlink(t.link) != launcher
@@ -894,19 +907,18 @@ function uninstall(bundle::AbstractString; data::Bool = false,
     # the icons and entries: exactly what the manifest names, and nothing else
     lines, kept = _removeManifest(readManifest(mf), bundle)
     append!(log, lines)
-    if Sys.islinux()
+    if Platform.islinux()
         _refreshIcons(; env, home)
         _refreshEntries(dirname(t.desktop))
     end
     pin = _unpin()
     pin === nothing || push!(log, pin)
-    for c in (i.cache, i.structureCache)
-        if _ours(c)
-            rm(c; recursive = true)
-            push!(log, "removed $c")
-        elseif isdir(c)
-            push!(log, "kept $c (not marked as BAYSOL's)")
-        end
+    c = i.structureCache
+    if _ours(c)
+        rm(c; recursive = true)
+        push!(log, "removed $c")
+    elseif isdir(c)
+        push!(log, "kept $c (not marked as BAYSOL's)")
     end
     if data
         isdir(i.home) && (rm(i.home; recursive = true); push!(log, "removed $(i.home)"))
@@ -919,8 +931,80 @@ function uninstall(bundle::AbstractString; data::Bool = false,
         write(mf, join(["$k\t$p" for (k, p) in kept], "\n") * "\n")  # for a later uninstall
     end
     isfile(cfg) && (rm(cfg); push!(log, "removed $cfg"))
-    isdir(bundle) && (rm(bundle; recursive = true); push!(log, "removed $bundle"))
+    isdir(bundle) && push!(log,
+        _removeBundle(bundle, String[i.home, i.structureCache, dirname(cfg)]))
     return log
+end
+
+"""
+Why `bundle` must not be deleted, or `nothing` if it may be: it has to be an absolute,
+normal path of at least two levels (never a root), a folder that holds the program
+(`baysol` or `baysol.exe`, so it is a bundle and not some folder), and it must neither be
+nor contain the user's home folder or any of `protect` (projects, caches, configuration).
+"""
+function _bundleRefusal(
+    bundle::AbstractString,
+    protect::Vector{String},
+)::Union{String,Nothing}
+    isabspath(bundle) || return "the path is not absolute"
+    normpath(bundle) == bundle || return "the path is not in normal form"
+    isempty(splitdir(dirname(bundle))[2]) && return "it is a root folder or directly in one"
+    isdir(bundle) || return "it is not a folder"
+    (isfile(joinpath(bundle, "baysol")) || isfile(joinpath(bundle, "baysol.exe"))) ||
+        return "it holds no baysol program, so it is not a bundle"
+    for p in [homedir(); protect]
+        isempty(strip(p)) && continue
+        _within(p, bundle) && return "it contains $p"
+    end
+    return nothing
+end
+
+"""
+The command that removes `bundle` once this process has ended (Windows). The path travels
+in the environment variable `BAYSOL_GONE`, never in the script text, so no quoting or
+injection is possible whatever the name holds (spaces, quotes, `\$`, non-ASCII).
+"""
+function _cleanupCommand(bundle::AbstractString)::Cmd
+    script =
+        "Start-Sleep -Seconds 3; Remove-Item -LiteralPath \$env:BAYSOL_GONE " *
+        "-Recurse -Force -ErrorAction SilentlyContinue"
+    cmd = addenv(`powershell -NoProfile -NonInteractive -Command $script`,
+        "BAYSOL_GONE" => String(bundle))
+    return Cmd(cmd; detach = true, dir = dirname(bundle))
+end
+
+function _spawnCleanup(cmd::Cmd)::Nothing
+    run(pipeline(cmd; stdin = devnull, stdout = devnull, stderr = devnull); wait = false)
+    return nothing
+end
+
+"""
+Removes the bundle folder once [`_bundleRefusal`](@ref) finds nothing against it (else it
+is kept and the line says why). On Windows the running program (`baysol.exe`, the
+libraries it loaded) and a shell standing in the folder cannot be deleted, so what stays is
+removed by a detached PowerShell a moment after this process has ended (`spawn` starts it;
+a test passes a recorder). Returns the line for the log.
+"""
+function _removeBundle(bundle::AbstractString, protect::Vector{String} = String[];
+    spawn = _spawnCleanup)
+    why = _bundleRefusal(bundle, protect)
+    why === nothing || return "kept $bundle ($why)"
+    try
+        rm(bundle; recursive = true)
+        return "removed $bundle"
+    catch
+        Platform.iswindows() || rethrow()
+    end
+    try  # the folder must not be this process's own working directory
+        _within(pwd(), bundle) && cd(dirname(bundle))
+    catch
+    end
+    try
+        spawn(_cleanupCommand(bundle))::Nothing
+    catch e
+        return "could not remove $bundle (" * sprint(showerror, e) * "); delete it by hand"
+    end
+    return "$bundle is in use; it is removed when BAYSOL has exited"
 end
 
 # ---- the folders: open one, clear a cache
@@ -933,22 +1017,31 @@ Empties the cache folder `dir` (the folder itself stays), only if it is BAYSOL's
 the `CACHE_TAG` marker or is empty. The projects folder has no such function on purpose.
 
 # Returns
-A line that says what happened.
-
-# Exceptions
-An `IOError` if something cannot be removed.
+A line that says what happened. An entry that cannot be removed (Windows will not delete a
+library that a running BAYSOL has loaded, e.g. under `native/`) does not stop the rest: it
+is kept and named in the line.
 """
-function clearCache(dir::AbstractString)
+function clearCache(dir::AbstractString; remove = _removeEntry)
     isdir(dir) || return "no folder $dir"
     _ours(dir) || return "kept $dir (not marked as BAYSOL's)"
     n = 0
+    busy = String[]
     for f in readdir(dir; join = true)
         basename(f) == CACHE_TAG && continue
-        rm(f; recursive = true, force = true)
-        n += 1
+        try
+            remove(f)::Nothing
+            n += 1
+        catch
+            push!(busy, basename(f))
+        end
     end
-    return "cleared $dir ($n entries)"
+    line = "cleared $dir ($n entries)"
+    isempty(busy) ||
+        (line *= "; kept " * join(busy, ", ") * " (in use? close BAYSOL and try again)")
+    return line
 end
+
+_removeEntry(path::AbstractString)::Nothing = rm(path; recursive = true, force = true)
 
 """
     fileManagerCommands() -> Vector{Cmd}
@@ -959,11 +1052,12 @@ Windows. Only those found on the PATH are listed.
 """
 function fileManagerCommands()
     names =
-        Sys.isapple() ? [["open"]] :
-        Sys.iswindows() ? [["explorer"]] :
+        Platform.ismacos() ? [["open"]] :
+        Platform.iswindows() ? [["explorer"]] :
         [["xdg-open"], ["gio", "open"]]
     return [
-        Cmd([Sys.which(n[1]), n[2:end]...]) for n in names if Sys.which(n[1]) !== nothing
+        Cmd([Platform.which(n[1]), n[2:end]...]) for
+        n in names if Platform.which(n[1]) !== nothing
     ]
 end
 
@@ -974,8 +1068,7 @@ The user's shell: `\$SHELL` (else `/bin/sh`) on Linux and macOS, `%COMSPEC%` (el
 `cmd.exe`) on Windows.
 """
 function shellCommand(; env = ENV)
-    Sys.iswindows() && return Cmd([something(_env(env, "COMSPEC"), "cmd.exe")])
-    return Cmd([something(_env(env, "SHELL"), "/bin/sh")])
+    return Cmd([Platform.shell(; env)])
 end
 
 "How long to wait for the file manager to fail before assuming it worked (seconds)."
@@ -1006,7 +1099,7 @@ function openFolder(dir::AbstractString; io::IO = stdout, managers = fileManager
             process_running(p) || break
             sleep(0.05)
         end
-        if !process_running(p) && !success(p) && !Sys.iswindows()
+        if !process_running(p) && !success(p) && !Platform.iswindows()
             continue
         end
         started = true
@@ -1133,6 +1226,19 @@ function _apply(io, i, bundle; env, home)
     end
 end
 
+"""
+The entries of the shortcuts menu, in the order `Install` reads them (menu entry, Desktop
+icon, taskbar pin, PATH link). Windows has no PATH link: a link is a symlink (a privilege
+there), and editing the user's `PATH` in the registry from here would risk the whole
+variable (`setx` cuts it at 1024 characters and turns `%VARS%` into fixed text), so the
+item is not offered; the Start Menu shortcut starts BAYSOL instead.
+"""
+function shortcutChoices()::Vector{String}
+    items = ["Application menu entry", "Desktop icon", "Pin to taskbar (GNOME)"]
+    Platform.iswindows() || push!(items, "PATH link")
+    return items
+end
+
 "After a setup: what to start now. Returns 0 (nothing), `LAUNCH_TUI` or `LAUNCH_CLI`."
 function _launchMenu()
     pick = request("Launch:", RadioMenu(["TUI", "CLI", "Quit"]))
@@ -1201,9 +1307,10 @@ end
 """
     runWizard(bundle; io, env, home, firstRun, launch) -> Int
 
-The interactive wizard: welcome, then a menu (set up or change, repair, uninstall) that
-comes back after each step (a cancel included) until Quit. With `launch` it asks, after a
-setup or a repair, what to start now.
+The interactive wizard: welcome, then a menu (set up or change, repair, check the optional
+dependencies, folders, uninstall) that comes
+back after each step (a cancel included) until Quit. With `launch` it asks, after a setup or
+a repair, what to start now.
 
 # Returns
 The exit status: 0, `LAUNCH_TUI` or `LAUNCH_CLI` (the choice of the launch question),
@@ -1226,8 +1333,9 @@ function runWizard(bundle::AbstractString = get(ENV, "BAYSOL_BUNDLE", pwd());
         choice =
             firstRun ? 1 :
             request("Choose:",
-                RadioMenu(["Set up or change", "Repair", "Folders", "Uninstall", "Quit"]))
-        (choice < 1 || choice == 5) && break  # Quit, or the menu was aborted
+                RadioMenu(["Set up or change", "Repair", "Check dependencies", "Folders",
+                    "Uninstall", "Quit"]))
+        (choice < 1 || choice == 6) && break  # Quit, or the menu was aborted
         cur = something(readInstall(installFile(; env, home)), defaultInstall(; env, home))
         gone = false
         try
@@ -1242,26 +1350,21 @@ function runWizard(bundle::AbstractString = get(ENV, "BAYSOL_BUNDLE", pwd());
                     hasProject(h) && println(io,
                         "Found one there; only one can exist; using it.")
                 end
-                c = cleanPath(_ask(io, "Cache folder", cur.cache); home)
-                s = cleanPath(_ask(io, "Structure cache", cur.structureCache); home)
+                s = cleanPath(_ask(io, "Cache folder", cur.structureCache); home)
                 n = tryparse(Int, _ask(io, "Threads per fit", string(cur.threads)))
                 n = clamp(something(n, cur.threads), 1, 256)
                 o = request("The icon opens:", RadioMenu(["TUI", "CLI (a shell)"]))
                 o < 1 && throw(InterruptException())
                 opts = request("Shortcuts (Enter, then d):",
-                    MultiSelectMenu([
-                        "Application menu entry", "Desktop icon",
-                        "Pin to taskbar (GNOME)", "PATH link",
-                    ]),
+                    MultiSelectMenu(shortcutChoices()),
                 )
-                i = Install(; home = h, cache = c, structureCache = s,
+                i = Install(; home = h, structureCache = s, deps = cur.deps,
                     desktop = 1 in opts, desktopIcon = 2 in opts,
                     taskbarPin = 3 in opts, pathLink = 4 in opts, threads = n,
                     opens = o == 2 ? "cli" : "tui")
                 println(io, "Will set up:")
                 println(io, "  projects   ", i.home)
-                println(io, "  cache      ", i.cache)
-                println(io, "  structures ", i.structureCache)
+                println(io, "  cache      ", i.structureCache)
                 println(io, "  threads    ", i.threads)
                 println(io, "  icon opens ", uppercase(i.opens))
                 i.desktop && println(io, "  application menu entry")
@@ -1271,6 +1374,7 @@ function runWizard(bundle::AbstractString = get(ENV, "BAYSOL_BUNDLE", pwd());
                 if request("Apply?", RadioMenu(["Apply", "Cancel"])) == 1
                     if _apply(io, i, bundle; env, home)
                         println(io, "Done.")
+                        firstRun && checkDependencies(io; env, home, firstRun)
                         started = launch ? _launchMenu() : 0
                     end
                 else
@@ -1290,23 +1394,23 @@ function runWizard(bundle::AbstractString = get(ENV, "BAYSOL_BUNDLE", pwd());
                     end
                 end
             elseif choice == 3
-                dirs = [("projects", cur.home), ("cache", cur.cache),
-                    ("structure cache", cur.structureCache)]
+                checkDependencies(io; env, home)
+            elseif choice == 4
+                dirs = [("projects", cur.home), ("cache", cur.structureCache)]
                 pick = request(
                     "Folders:",
                     RadioMenu([
-                        "Open projects", "Open cache", "Open structure cache",
-                        "Clear cache", "Clear structure cache", "Back"]),
+                        "Open projects", "Open cache", "Clear cache", "Back"]),
                 )
-                if 1 <= pick <= 3
+                if 1 <= pick <= 2
                     openFolder(dirs[pick][2]; io)
-                elseif pick == 4 || pick == 5
-                    d = dirs[pick-2][2]
+                elseif pick == 3
+                    d = dirs[2][2]
                     println(io, "Empties ", d)
                     request("Clear?", RadioMenu(["Clear", "Cancel"])) == 1 ?
                     println(io, clearCache(d)) : println(io, "Nothing removed.")
                 end
-            elseif choice == 4
+            elseif choice == 5
                 while true  # a cancel of the confirmation comes back to this menu
                     what = request(
                         "Uninstall:",

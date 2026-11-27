@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import assert from "node:assert/strict"
-import { type ChildProcess, spawn } from "node:child_process"
+import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 import {
     existsSync,
     mkdirSync,
@@ -368,7 +368,12 @@ function spawnSupport(script: string, args: string[], env: Record<string, string
         /** Ends the worker's whole process group. */
         kill: (signal: NodeJS.Signals = "SIGKILL") => {
             try {
-                process.kill(-(child.pid as number), signal)
+                // Windows has no process groups to signal: end the tree by pid
+                if (process.platform === "win32")
+                    spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+                        windowsHide: true,
+                    })
+                else process.kill(-(child.pid as number), signal)
             } catch {
                 // already gone
             }
@@ -436,7 +441,11 @@ test("a project cannot be deleted while a run is live, and can when not", async 
     const project = runProject(root, "p")
     const run = join(project, "runs", runOn("2026-01-01"))
     mkdirSync(run, { recursive: true })
-    const julia: ChildProcess = spawn("sleep", ["300"], { detached: true, stdio: "ignore" })
+    const julia: ChildProcess = spawn(
+        process.execPath,
+        ["-e", "setTimeout(() => {}, 300000)"],
+        { detached: true, stdio: "ignore" },
+    )
     try {
         writeFileSync(
             join(run, "run.json"),

@@ -104,37 +104,59 @@ end
     end
 end
 
+# The workbook (`res*.xlsx`, git-ignored) is what a fit leaves; without a run there is
+# nothing to export, on any platform.
 @testset "export of SASDMJ9 into a scratch folder" begin
-    mktempdir() do dir
-        @test X.run(["SASDMJ9", "--out", dir, "--dry-run"]) == 0
-        @test !ispath(joinpath(dir, "SASDMJ9"))
-        @test X.run(["SASDMJ9", "--out", dir]) == 0
-        project = joinpath(dir, "SASDMJ9")
-        for f in ("data.tsv", "data.json", "buffer.json", "settings.json", "project.json")
-            @test isfile(joinpath(project, f))
+    if isempty(X.workbooks(joinpath(Dev.Common.root(), X.FIT_DIR, "SASDMJ9")))
+        @info "no workbook of SASDMJ9 (the fit has not been run): export test skipped"
+    else
+        mktempdir() do dir
+            @test X.run(["SASDMJ9", "--out", dir, "--dry-run"]) == 0
+            @test !ispath(joinpath(dir, "SASDMJ9"))
+            @test X.run(["SASDMJ9", "--out", dir]) == 0
+            project = joinpath(dir, "SASDMJ9")
+            for f in
+                ("data.tsv", "data.json", "buffer.json", "settings.json", "project.json")
+                @test isfile(joinpath(project, f))
+            end
+            @test length(readdir(joinpath(project, "runs"))) == 1
+            # the reference fit of the workbook: packed curves and the label of the model
+            if isfile(joinpath(project, "reference-fit.7z"))
+                refs = JSON3.read(
+                    read(joinpath(project, "model-references.json"), String),
+                    Dict{String,Any},
+                )
+                @test haskey(refs, "*") && haskey(refs["*"], "fit")
+                members = read(`7z l -slt $(joinpath(project, "reference-fit.7z"))`, String)
+                @test occursin("Path = $(refs["*"]["fit"])\n", members)
+            end
+            # the run keeps its own copy of the inputs, for the logs menu's restore options
+            runArchive = joinpath(project, "runs", only(readdir(joinpath(project, "runs"))))
+            listing = read(`7z l -slt $runArchive`, String)
+            for f in ("settings.json", "buffer.json", "data.tsv", "data.json")
+                @test occursin("Path = $f\n", listing)
+            end
+            # a second export leaves the project alone
+            before = readdir(joinpath(project, "runs"))
+            @test X.run(["SASDMJ9", "--out", dir]) == 0
+            @test readdir(joinpath(project, "runs")) == before
+            # an unknown test is skipped and reported through the exit status
+            @test X.run(["SASDNOPE", "--out", dir]) == 1
         end
-        @test length(readdir(joinpath(project, "runs"))) == 1
-        # the reference fit of the workbook: packed curves and the label of the model
-        if isfile(joinpath(project, "reference-fit.7z"))
-            refs = JSON3.read(
-                read(joinpath(project, "model-references.json"), String),
-                Dict{String,Any},
-            )
-            @test haskey(refs, "*") && haskey(refs["*"], "fit")
-            members = read(`7z l -slt $(joinpath(project, "reference-fit.7z"))`, String)
-            @test occursin("Path = $(refs["*"]["fit"])\n", members)
+    end
+end
+
+@testset "export --from reads a scratch tree, not the checkout" begin
+    mktempdir() do out
+        mktempdir() do scratch
+            # the folder of the fit is not in the scratch tree: skipped, status 1, and
+            # nothing is taken from the checkout's own folder instead
+            @test X.run(["SASDMJ9", "--out", out, "--from", scratch]) == 1
+            @test !ispath(joinpath(out, "SASDMJ9"))
+            # a folder with the fit's script and LOG but no workbook is the same case the
+            # message names: the fit has not been run
+            mkpath(joinpath(scratch, "test", "fitting_tests", "SASDMJ9"))
+            @test X.run(["SASDMJ9", "--out", out, "--from", scratch]) == 1
         end
-        # the run keeps its own copy of the inputs, for the logs menu's restore options
-        runArchive = joinpath(project, "runs", only(readdir(joinpath(project, "runs"))))
-        listing = read(`7z l -slt $runArchive`, String)
-        for f in ("settings.json", "buffer.json", "data.tsv", "data.json")
-            @test occursin("Path = $f\n", listing)
-        end
-        # a second export leaves the project alone
-        before = readdir(joinpath(project, "runs"))
-        @test X.run(["SASDMJ9", "--out", dir]) == 0
-        @test readdir(joinpath(project, "runs")) == before
-        # an unknown test is skipped and reported through the exit status
-        @test X.run(["SASDNOPE", "--out", dir]) == 1
     end
 end

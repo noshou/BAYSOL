@@ -192,7 +192,7 @@ function steps(julia)
         ("default-settings", false, ["bysl", "harvest", "defaults"]),
         ("ts-format", true, ["bysl", "fmt", "--check", "--ts"]),
         # Knip (config: knip.jsonc): unused dependencies, files, exports and types of tui/
-        ("ts-unused", true, [in_root("node_modules", ".bin", "knip"), "--no-progress"]),
+        ("ts-unused", true, [node_bin("knip"), "--no-progress"]),
         ("julia-format", false, ["bysl", "fmt", "--check", "--julia"]),
         ("line-length", true, ["bysl", "fmt", "--lines"]),
         ("results-table", true, ["bysl", "results", "table", "--check"]),

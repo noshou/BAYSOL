@@ -311,7 +311,7 @@ load and the free memory when the run started (a busy machine spoils a timing).
 function _logMachine(log::StageLog)
     cpu = first(Sys.cpu_info())
     gib(x) = _logCell(round(x / 2^30; digits = 1))
-    rows = [["machine.os", string(Sys.KERNEL, " ", Sys.MACHINE)],
+    rows = [["machine.os", Platform.describe()],
         ["machine.cpu", cpu.model == "unknown" ? Sys.CPU_NAME : strip(cpu.model)],
         ["machine.cpu_mhz", string(cpu.speed)],
         ["machine.cpus", string(Sys.CPU_THREADS)],
@@ -328,7 +328,10 @@ end
 The stamp of a write of the log: the day, the time (24 hours) and 
 the offset from UTC (ex: `27-10-2026 14:09:33 +0200`).
 """
-_logStamp() = Libc.strftime("%d-%m-%Y %H:%M:%S %z", time())
+function _logStamp()
+    t = time()
+    return string(Libc.strftime("%d-%m-%Y %H:%M:%S", t), " ", Platform.utc_offset_text(t))
+end
 
 """
 Lays out `rows` (each a vector of cells) as lines of tab-separated cells that line up in any

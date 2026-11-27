@@ -25,9 +25,10 @@ const DOC_MODULES = [
     "Pipeline"            => BAYSOL.Pipeline,
 ]
 
-# Documented modules that have no page of their own: Utils
-# is the only module with submodules, covered by its page.
-const DOC_SUBMODULES = [BAYSOL.PhysicalConstants, BAYSOL.Shannon]
+# Documented modules that have no module README of their own: the submodules of Utils
+# (covered by its page) and Platform (platform.jl at the root, `api/platform.md`; its guide
+# is a section of dev/README.md).
+const DOC_SUBMODULES = [BAYSOL.PhysicalConstants, BAYSOL.Shannon, BAYSOL.Platform]
 
 # A module whose API reference spans several pages lists them here (title =>
 # page); every other module has the single page `api/<lowercase name>.md`.
@@ -189,7 +190,12 @@ makedocs(
     "Testing" => [
     title => joinpath("testing", test_page(path)) for (title, path) in TEST_GUIDES
     ],
-    "API Reference" => [name => api_pages(name) for (name, _) in DOC_MODULES]
+    "API Reference" => vcat(
+    [name => api_pages(name) for (name, _) in DOC_MODULES],
+    # the operating-system module (platform.jl at the root, no README of its own: its
+    # guide is a section of dev/README.md)
+    ["Platform" => "api/platform.md"]
+    )
     ],
     # :exports would require every exported docstring across every submodule
     # to be referenced in a docs page -- most of this package's functions are
@@ -204,7 +210,7 @@ makedocs(
     # grew) over the default 500 KiB. The Scattering page is one coherent
     # module, so the warning levels are raised (the error levels stay).
     format = Documenter.HTML(;
-        size_threshold_warn = 150 * 1024,
+        size_threshold_warn = 160 * 1024,  # the Inference API page is 155 KiB
         # The fitting-tests README (the Results table, one row per entry, 116+ entries)
         # is one table that cannot be split without losing it: this page alone is
         # exempt from both size limits (Documenter's `size_threshold_ignore`).

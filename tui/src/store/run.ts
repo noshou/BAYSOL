@@ -26,7 +26,14 @@ import {
 import { hostname } from "node:os"
 import { join } from "node:path"
 import { stripVTControlCharacters } from "node:util"
-import { cacheDir, RUN_FLOW, repoRoot } from "../core/environment.js"
+import {
+    cacheDir,
+    exeName,
+    isWindows,
+    RUN_FLOW,
+    readSystem,
+    repoRoot,
+} from "../core/environment.js"
 import {
     copyOver,
     isFile,
@@ -661,7 +668,7 @@ export function bundledCommand(
 ): [string, string[]] | undefined {
     const bundle = env.BAYSOL_BUNDLE
     if (!bundle) return undefined
-    const exe = join(bundle, process.platform === "win32" ? "baysol.exe" : "baysol")
+    const exe = join(bundle, exeName(readSystem(), "baysol"))
     if (!existsSync(exe)) return undefined
     return [exe, ["run-tui", spec.projectDir, String(spec.temperature), spec.runDir]]
 }
@@ -673,7 +680,7 @@ export function bundledCommand(
  * @param pid - the child's pid, also its group's id (it leads the group).
  */
 function signalGroup(pid: number, signal: NodeJS.Signals): void {
-    if (process.platform === "win32") {
+    if (isWindows(readSystem())) {
         spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true })
         return
     }
@@ -691,7 +698,7 @@ function signalGroup(pid: number, signal: NodeJS.Signals): void {
 
 /** Whether anything of a process group is still alive. */
 function groupAlive(pid: number): boolean {
-    if (process.platform === "win32") return false
+    if (isWindows(readSystem())) return false
     try {
         process.kill(-pid, 0)
         return true

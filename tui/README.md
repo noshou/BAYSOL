@@ -50,7 +50,7 @@ a first fit also downloads the helper programs PROPKA and pdb2pqr and needs inte
 `julia --startup-file=no --color=no --threads=auto,1 --project=<repository root> ...`; the program is `julia` on
 the PATH, or the one named by the environment variable `JULIA`.
 
-Started with no terminal (a launcher) the program opens a terminal emulator that runs it again (Linux: `$TERMINAL`, the desktop's terminal, then every known one; macOS and Windows untested); the copy that was opened never opens a second one, and a pipe prints `BAYSOL: this program needs a terminal` and
+Started with no terminal (a launcher) the program opens a terminal emulator that runs it again (Linux: `$TERMINAL`, the desktop's terminal, then every known one; macOS untested; on Windows Windows Terminal, else a new console window); the copy that was opened never opens a second one, and a pipe prints `BAYSOL: this program needs a terminal` and
 stops. `npm start -- --view FILE` opens a workbook or table in the viewer instead of the main menu. Made smaller than 80 x 24 it shows a message in place of the screen and returns to the same screen when
 the terminal is big enough again. The release name on the main menu comes from the repository's `Project.toml`.
 
@@ -59,16 +59,15 @@ the terminal is big enough again. The release name on the main menu comes from t
 | System | Data folder | Cache of downloaded structures |
 | :-- | :-- | :-- |
 | any, if `BAYSOL_HOME` / `BAYSOL_CACHE` is an absolute path | `$BAYSOL_HOME` | `$BAYSOL_CACHE` |
-| Linux and others | `$XDG_DATA_HOME/baysol`, else `~/.local/share/baysol` | `$XDG_CACHE_HOME/baysol/_cache`, else `~/.cache/baysol/_cache` |
-| macOS | `~/Library/Application Support/baysol` | `~/Library/Caches/baysol/_cache` |
-| Windows | `%LOCALAPPDATA%\baysol` | `%LOCALAPPDATA%\baysol\_cache` |
+| Linux and others | `$XDG_DATA_HOME/baysol`, else `~/.local/share/baysol` | `$XDG_CACHE_HOME/baysol/_structures`, else `~/.cache/baysol/_structures` |
+| macOS | `~/Library/Application Support/baysol` | `~/Library/Caches/baysol/_structures` |
+| Windows | `%LOCALAPPDATA%\baysol` | `%LOCALAPPDATA%\baysol-cache\_structures` (a sibling of the data folder: Windows has one folder for both, and a cache inside the data folder would be swept up with the work) |
 
 A relative path in an environment variable is ignored. The folders are made on first use. The cache can be
 deleted at any time; it is rebuilt when needed. To try the program without touching your real work, start it as
 `BAYSOL_HOME=/tmp/baysol-try BAYSOL_CACHE=/tmp/baysol-try-cache npm start`.
 
-The macOS and Windows parts (the desktop file chooser, also of the references, opening a folder in the file manager, stopping a run on
-Windows) are written from the systems' documentation and are **untested**. The rest behaves the same everywhere.
+The interface has been run on Linux and on Windows 11. The macOS parts (the desktop file chooser, also of the references, opening a folder in the file manager) are written from the system's documentation and are **untested**. The rest behaves the same everywhere. The one place that reads the operating system is `src/core/environment.ts` (see [the internals](INTERNALS.md)).
 
 ## A first session in ten steps
 
@@ -590,8 +589,8 @@ setting `FIGURES_COMPILE` is off the sheets, it stays a keyword of `results` for
   `~/.local/share/fonts`, plus `fc-list`; macOS `/System/Library/Fonts`, `/Library/Fonts`, `~/Library/Fonts`;
   Windows `C:\Windows\Fonts`, the user's font folder and the registry) and, with TeX installed, the LuaLaTeX font
   database or the `texmf` trees. The result is cached in `fonts.json` of the cache folder with a fingerprint of
-  the files (paths, sizes, times), so an installed or removed font makes the scan run again. The macOS and
-  Windows parts are untested.
+  the files (paths, sizes, times), so an installed or removed font makes the scan run again. On Windows the registry
+  is read through PowerShell and decoded as UTF-8 (a path with an accented user name stays intact). The macOS part is untested.
 - **Three list settings** are typed as one line and shown the same way. `PLOT_COMPARE_COLOURS`: colour names or
   any colour code or name separated by commas (names may have blanks: `green (xkcd), rgb(1, 2, 3), red`; a name outside the CSS set is saved as its `#rrggbb`;
   without a comma, blanks separate; at
@@ -728,7 +727,7 @@ stays as it is, so the run list stays fast. A workbook goes into the archive as 
 `m/_rels/.rels`, `m/xl/...`), which 7-Zip compresses much better than the zip it already is; the archive is packed
 with the highest settings (`x=9`, word size 273, solid, all from `run_flow.json`). A workbook that is only in the
 archive is zipped again from its tree into a proper `.xlsx` (`[Content_Types].xml` first, deflated, the same bytes
-every time) in a copy in a temporary folder that is removed when the program ends; files moved to the data folder
+every time; at level 0 the zip is stored without compression by the program's own writer, `src/core/zip-writer.ts`, since 7-Zip sorts the entries by name, with zip64 structures where a size or a count needs them) in a copy in the program's temporary folder (see **Temporary files** below); files moved to the data folder
 are always proper `.xlsx` files.
 
 The screen is painted again in place every `screen.refreshSeconds` idle seconds (`run_flow.json`, default 5, 0 = off), on a resize and when the terminal gains focus, never over a sixel picture (a workaround for stray characters; `notes/tui.md`, "Screen refresh (workaround)").
@@ -743,7 +742,7 @@ own outcome is unchanged. While a pack runs, deleting that run is refused with `
 the logs menu (every view, `conditions`, the restores) read the archive
 or, for a run that was never packed, the plain folder; the plots are read straight out of the archive (nothing is
 extracted to disk), always read-only, with a check of every entry name (no `..`, no absolute path) and a size cap
-per entry. Extracting (move and compile plots) uses a temporary folder that is always removed. The archive is made
+per entry. Extracting (move and compile plots) uses a temporary folder of the program (removed right after use). The archive is made
 by 7-Zip (the `7zip-bin` binary, run through `node-7z`; a `7z`, `7zz` or `7za` on the `PATH` is the fallback when
 the bundled one cannot run).
 
@@ -939,9 +938,11 @@ renamed, so a reader never sees half a file.
             compare.tsv compare.tex compare-plots.txt compare-<W>x<H>.txt
 ```
 
+**Temporary files.** Every temporary file the interface makes lives under ONE root, `baysol` in the temporary folder of the system (`<tmp>/baysol`, `Platform.tmp_dir` in `platform.jl`, `tmpFolder` in `src/core/environment.ts`), with one folder per process, `<tmp>/baysol/<pid>/`, and a folder per purpose in it (`view`: the `.xlsx` copies the viewers open, capped in size; `run-models` and `run-cache`: what a running fit reads and writes; `book`, `pack`, `add`, `run`, `sixel`, `extract`, `move`, `compile`: the staging folders of one operation, removed as soon as it is done; `native`: the natives when the cache's copy is locked). No other code asks for the system's temporary folder (a test checks `src`). `src/core/scratch.ts` keeps it clean: at start (before the first screen) it removes the folders of processes that are no longer running (a crash, a closed terminal, a power loss; a pid is dead when `process.kill(pid, 0)` says `ESRCH`, so a folder whose pid another program reuses waits until that program ends) and, once, the folders older versions left loose in the temporary folder (`baysol-<pid>` of a dead pid; `baysol-book-*`, `baysol-pack-*`, `baysol-run-*`, `baysol-add-*`, `baysol-sixel-*`, `baysol-extract-*`, `baysol-move-*`, `baysol-compile-*` older than a day; nothing else); every 30 minutes (a timer that does not keep the program alive) it removes what nobody touched for an hour and evicts the least recently used entries while the process folder is over 2 GiB (never the models of a running fit, its cache or the natives); and an exit hook, registered at start, removes the process folder on every way out: `^c`, `^d` and Quit from the main menu end the program normally, SIGHUP and SIGTERM call `process.exit`, an uncaught exception still emits `exit`. On Windows a signal sent with `kill` ends the program without running anything, and a closed console arrives as SIGHUP; a killed program (or a power loss) leaves its folder for the next start to remove. The system wipes its temporary folder now and then too. The cache folder (`BAYSOL_CACHE`) is different: it holds only what must last (the structures later runs reuse, `fonts.json`, and the natives of the single executable in `native/`, ONE folder holding one version's files and a `.version` stamp, replaced when the version changes), and the interface never clears it; only the setup wizard does (Clear cache, Uninstall).
+
 **The terminal interface manages projects for you; a script uses plain folders.** The interface keeps the models
 and the reference curve of a project in `models.7z` and `reference-fit.7z`, and for each run it unpacks what Julia
-reads into a temporary folder, hands Julia a private cache folder holding the generated files stored in
+reads into the program's temporary folder, hands Julia a private cache folder holding the generated files stored in
 `models.7z` (`BAYSOL_CACHE`; the downloaded component files stay in the shared cache) and, when the run is over, stores
 the files Julia generated back into `models.7z`. Deleting a model deletes the files generated from it. Julia itself
 takes plain files and folders and never reads an archive: to run a project from a script (`runProject`), put the
@@ -954,7 +955,7 @@ that was made in the interface, extract them first, in the project folder:
 ```
 
 A script run of a project that has `models.7z` and no model in `models/` stops with a message that says this and
-gives the first command. A script run uses the normal cache (`_cache/`, or the folder `BAYSOL_CACHE` names); the
+gives the first command. A script run uses the normal cache (`_structures` in the table above, or the folder `BAYSOL_CACHE` names); the
 generated files it makes there are not put into `models.7z`.
 
 `settings.json` (global or project; the keys are the sheet, then the setting):

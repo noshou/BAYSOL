@@ -1,0 +1,74 @@
+bysl pkg   2026-11-24 21:26
+revision   100c4651
+machine    x86_64, 6 threads, RAM 0 MiB, swap 0 MiB
+archive    C:\Users\Nathan\BAYSOL\baysol-0.5.1-windows-x64.zip
+peaks      the processes of the step only (RSS and swapped-out memory)
+
+julia packages tui/julia (cold depot) ok       476.3 s
+julia packages test (cold depot) ok       391.8 s
+julia packages test/fitting_tests (cold depot) ok       273.5 s
+stage pytools ok       494.2 s
+stage tui  ok        27.1 s
+  trace: 48 fits to run
+  fit SASDMJ9                          ok        31.5 s
+  fit SASDAN8                          ok        38.9 s
+  fit SASDAH5                          ok        30.1 s
+  fit SASDVA2                          ok      3474.2 s
+  fit SASDMC6                          ok       173.7 s
+  fit SASDUX3                          ok       731.4 s
+  fit SASDX52                          ok        78.8 s
+  fit SASDJ66                          ok        43.7 s
+  fit SASDP74                          ok       113.4 s
+  fit SASDG44                          ok        53.4 s
+  fit SASDAP8                          ok       348.7 s
+  fit SASDT65                          ok       267.7 s
+  fit SASDTV4                          ok       955.4 s
+  fit SASDCE8                          ok       316.9 s
+  fit SYN-1BNA-bsa-rna                 ok         8.6 s
+  fit SYN-1BNA-ficoll70                ok         9.5 s
+  fit SYN-1BNA-nacl2m                  ok         7.5 s
+  fit SYN-1BNA-peg3350                 ok         9.1 s
+  fit SYN-1BNA-pll                     ok         9.0 s
+  fit SYN-1BNA-ternary                 ok         7.6 s
+  fit SYN-1BNA-tmao1m                  ok         7.6 s
+  fit SYN-1BNA-trna2                   ok         8.0 s
+  fit SYN-1CRN-dna-rna                 ok         8.8 s
+  fit SYN-1CRN-glycerol40              ok         8.3 s
+  fit SYN-1CRN-ova50                   ok         8.0 s
+  fit SYN-1CRN-peg400                  ok         9.1 s
+  fit SYN-1CRN-pva                     ok         9.1 s
+  fit SYN-1CRN-water                   ok         7.6 s
+  fit SYN-1EHZ-argtris                 ok         9.0 s
+  fit SYN-1EHZ-dnaduplex1              ok         9.4 s
+  fit SYN-1EHZ-peg-bsa                 ok         9.5 s
+  fit SYN-1EHZ-peg20000                ok        10.4 s
+  fit SYN-1EHZ-pvp                     ok         9.8 s
+  fit SYN-1EHZ-sucrose30               ok         8.3 s
+  fit SYN-1EHZ-ubq30                   ok         8.8 s
+  fit SYN-1UBQ-dextran70               ok        10.2 s
+  fit SYN-1UBQ-dna24at1                ok         9.0 s
+  fit SYN-1UBQ-imidazole300            ok         8.6 s
+  fit SYN-1UBQ-lyz20                   ok         8.0 s
+  fit SYN-1UBQ-nacl150                 ok         7.7 s
+  fit SYN-1UBQ-urea6m                  ok         7.7 s
+  fit SYN-6LYZ-bsa100                  ok         9.6 s
+  fit SYN-6LYZ-gdmcl4m                 ok         9.0 s
+  fit SYN-6LYZ-mgcl2kcl                ok         7.7 s
+  fit SYN-6LYZ-peg8000                 ok         9.2 s
+  fit SYN-6LYZ-pluronicf127            ok         9.2 s
+  fit SYN-6LYZ-rnaap24                 ok         8.1 s
+  fit SYN-6LYZ-ubq-dna                 ok         8.2 s
+  unit suite                           ok       928.4 s
+  tui test buffer.test.jl              ok        14.4 s
+  tui test cli.test.jl                 ok        44.3 s
+  tui test run-project.test.jl         ok       147.5 s
+  tui test settings-file.test.jl       ok        58.6 s
+stage trace FAIL    8150.4 s
+      SASDAN8  skipped: Dev.Common.ToolError("bysl fixtures: no workbook (res*.xlsx): the fit has not been run", 1)
+      SASDAH5  skipped: Dev.Common.ToolError("bysl fixtures: no workbook (res*.xlsx): the fit has not been run", 1)
+      SASDVA2  skipped: Dev.Common.ToolError("bysl fixtures: no workbook (res*.xlsx): the fit has not been run", 1)
+      SASDMC6  skipped: Dev.Common.ToolError("bysl fixtures: no workbook (res*.xlsx): the fit has not been run", 1)
+      written 0, would write 0, exist 0, skipped 5
+      ERROR: Dev.Common.ToolError("bysl pkg: export of the workload projects", 1)
+      log: C:\Users\Nathan\AppData\Local\baysol-cache\baysol-pkg-work\logs\stage-trace.log
+total      163.6 min

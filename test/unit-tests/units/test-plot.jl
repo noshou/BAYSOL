@@ -816,7 +816,7 @@ end
     end
 
     @testset "fontAvailable asks the TeX Live installation" begin
-        if Sys.which("luaotfload-tool") === nothing
+        if BAYSOL.Platform.which("luaotfload-tool") === nothing
             @test_throws ErrorException BAYSOL.fontAvailable("Latin Modern Roman")
         else
             @test BAYSOL.fontAvailable("Latin Modern Roman") === true

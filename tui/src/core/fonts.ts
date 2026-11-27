@@ -28,7 +28,7 @@ import { writeAtomic } from "./file-system.js"
  *   `/Library/Fonts`, `C:\Windows\Fonts` ...), walked: this needs no program, so it
  *   works on Linux, macOS and Windows alike. The files fontconfig reports (`fc-list`)
  *   are added when that is installed, and on Windows the files the registry lists
- *   (`reg query`).
+ *   (a PowerShell read of the registry).
  * - With TeX (`kpsewhich` or `luaotfload-tool` on the path): the files the LuaLaTeX font
  *   database lists, which include the fonts of TeX's own `texmf` trees. With no such
  *   database the OpenType and TrueType fonts of the `texmf` trees are walked instead.
@@ -493,23 +493,47 @@ export function parseRegistryFonts(output: string | undefined, fontsDir: string)
 }
 
 /**
+ * The PowerShell command that prints the installed fonts of the registry in the format of
+ * `reg query` (`    Name (TrueType)    REG_SZ    file`), one line a value, for the
+ * machine and for the user. The registry is read as Unicode and the text written as
+ * UTF-8, because `reg query` writes the console's OEM code page, which is not what the
+ * output is decoded as: a font installed under a folder with an accented user name would
+ * come back garbled.
+ *
+ * @returns the program and its arguments.
+ */
+export function registryFontsCommand(): string[] {
+    const hives = registryHives.map((h) => `'${h}'`).join(",")
+    return [
+        "powershell",
+        "-NoProfile",
+        "-Command",
+        "$ErrorActionPreference = 'SilentlyContinue'; " +
+            "[Console]::OutputEncoding = (New-Object System.Text.UTF8Encoding $false); " +
+            `foreach ($h in ${hives}) { ` +
+            `$k = Get-Item -LiteralPath ($h + ':${registryFontsKey}'); ` +
+            "if ($k) { foreach ($n in $k.GetValueNames()) { " +
+            "'    {0}    REG_SZ    {1}' -f $n, $k.GetValue($n) } } }",
+    ]
+}
+
+/**
  * On Windows, the font files the registry lists as installed, for the machine and for
- * the user (some lie outside the system's font folders). Untested on Windows.
+ * the user (some lie outside the system's font folders). Run on Windows 11.
  *
  * @param system - the machine.
- * @returns the paths; none elsewhere or when `reg` cannot run.
+ * @returns the paths; none elsewhere or when PowerShell cannot run.
  */
 function registryFonts(system: System): string[] {
     if (!isWindows(system)) return []
-    const fontsDir = `${system.env.WINDIR || "C:\\Windows"}\\Fonts`
-    return registryHives.flatMap((hive) => {
-        const result = spawnSync("reg", ["query", hive + registryFontsKey], {
-            encoding: "utf8",
-            env: system.env,
-            stdio: ["ignore", "pipe", "ignore"],
-        })
-        return parseRegistryFonts(result.error ? undefined : result.stdout, fontsDir)
+    const fontsDir = `${system.env.WINDIR || "C:Windows"}Fonts`
+    const [program, ...args] = registryFontsCommand() as [string, ...string[]]
+    const result = spawnSync(program, args, {
+        encoding: "utf8",
+        env: system.env,
+        stdio: ["ignore", "pipe", "ignore"],
     })
+    return parseRegistryFonts(result.error ? undefined : result.stdout, fontsDir)
 }
 
 /**

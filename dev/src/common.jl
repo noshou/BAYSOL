@@ -5,11 +5,12 @@
 module Common
 
 using Printf: Printf
+using ..Platform: Platform
 using Base.ScopedValues: ScopedValue, with
 
 export rm_tree, split_lines, run_step, git_output, dispatch, cache_root, clear_cache!,
     manifest_entries, track_cache, register_cache,
-    ToolError, fail, root, in_root,
+    ToolError, fail, root, in_root, node_bin,
     char_count, code_files, usage, slurp8,
     spit8,
     split_args, take_threads, sh, run_cmd, find_julia, git, num_str, fmt, FIT_DIR,
@@ -65,6 +66,17 @@ end
 "The path of `parts` under the root."
 in_root(parts...) = joinpath(root(), parts...)
 
+# The program `name` of `node_modules/.bin`: `name.cmd` where there is one (on Windows
+# `.bin/name` is a shell script that cannot be spawned, `.bin/name.cmd` can; the `.cmd` is
+# only there on Windows, so no check of the system is needed), else `name`.
+function node_bin(name::AbstractString)::String
+    for file in (string(name, ".cmd"), name)
+        path = in_root("node_modules", ".bin", file)
+        isfile(path) && return path
+    end
+    return in_root("node_modules", ".bin", name)
+end
+
 "Characters of `s`, not UTF-8 bytes or UTF-16 units: a code point counts once."
 char_count(s::AbstractString) = length(s)
 
@@ -117,10 +129,10 @@ end
 # --- the cache
 #
 # The programs the tools start (the unit suite, the fits, the formatter bridge) keep their
-# downloads and derived files in the cache folder of the operating system, the folder the
-# terminal interface uses: `BAYSOL_CACHE` when that is an absolute path, else
-# `baysol/_cache` in the cache home (`%LOCALAPPDATA%` on Windows, `~/Library/Caches` on
-# macOS, `$XDG_CACHE_HOME` or `~/.cache` elsewhere). Never the `_cache/` of the repository.
+# downloads and derived files in the structure cache, the folder the terminal interface and
+# the launcher use: `BAYSOL_CACHE` when that is an absolute path, else `_structures` in the
+# caches folder (`Platform.cache_dir`: `baysol` in the cache home of the system, or the
+# sibling `baysol-cache` of the data folder on Windows). Never a folder of the repository.
 #
 # What a program creates there is recorded in a manifest, and the daemon clears those
 # files when it exits (`clear_cache!`): downloaded structures (`.pdb`, `.cif`,
@@ -128,22 +140,10 @@ end
 # are expensive to get again, and so is anything that was there before a program ran.
 
 "The folder of the operating system in which programs keep their caches."
-function cache_home()::String
-    home = homedir()
-    if Sys.iswindows()
-        return get(ENV, "LOCALAPPDATA", joinpath(home, "AppData", "Local"))
-    elseif Sys.isapple()
-        return joinpath(home, "Library", "Caches")
-    end
-    xdg = get(ENV, "XDG_CACHE_HOME", "")
-    return isabspath(xdg) ? xdg : joinpath(home, ".cache")
-end
+cache_home()::String = Platform.cache_home()
 
 "The cache folder of the programs the tools start (see above)."
-function cache_root()::String
-    env = get(ENV, "BAYSOL_CACHE", "")
-    return isabspath(env) ? env : joinpath(cache_home(), "baysol", "_cache")
-end
+cache_root()::String = Platform.structure_cache()
 
 """
 The file that lists what the tools' programs created in the cache, one relative path a
@@ -374,14 +374,17 @@ end
 """
     find_julia() -> String
 
-The Julia executable: `\$JULIA` if set, else `julia` from the PATH. An error if it cannot
-be found.
+The Julia executable: `\$JULIA` if set, else `julia` from the PATH, else the Julia that is
+running this code. (`Sys.which` cannot see the `julia.exe` that juliaup puts in
+`WindowsApps`, an app execution alias, so on Windows the PATH lookup can fail for a Julia
+that is installed and running.) An error if none can be found.
 """
 function find_julia()::String
     julia = get(ENV, "JULIA", "julia")
-    Sys.which(julia) === nothing &&
-        throw(ToolError("julia not found (set JULIA to its path)", 1))
-    return julia
+    Platform.which(julia) === nothing || return julia
+    haskey(ENV, "JULIA") ||
+        return joinpath(Sys.BINDIR, Platform.exe("julia"))
+    throw(ToolError("julia not found (set JULIA to its path)", 1))
 end
 
 # --- git

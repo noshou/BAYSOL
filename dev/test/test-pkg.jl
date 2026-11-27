@@ -4,6 +4,7 @@
 # merge of the traced statements, the guards of the scratch folder, the plan).
 
 using Test
+using Dev: Platform
 using TOML
 using Dev
 using JSON3
@@ -28,8 +29,8 @@ end
     @test sort(P.descendants(Dict(2 => 1, 3 => 2, 4 => 1, 9 => 8), 1)) == [1, 2, 3, 4]
     value, peak = P.watch_memory(() -> 42; period = 0.05)
     @test value == 42
-    Sys.islinux() && @test peak.ram > 0 && peak.swap >= 0
-    Sys.islinux() && @test P.tree_memory()[1] > 0
+    Platform.islinux() && @test peak.ram > 0 && peak.swap >= 0
+    Platform.islinux() && @test P.tree_memory()[1] > 0
 end
 
 @testset "report: steps log to files, the report holds the status" begin
@@ -62,6 +63,79 @@ end
     end
 end
 
+@testset "build log: terminal plots and noise are left out, the facts stay" begin
+    plot = join(
+        [
+            "                 ⠀⠀⠀⠀⠀⠈⠉⠉⠑⠒⠢⠤⢄⣀⠀⠀⠀  SASDVA2_3ODQ   χ² = 1.402",
+            "   log₁₀ I(q)     ⠀⠀⠀⠀⠀⠀⠀⠀⢹⠀⠀⠀⠂⠀⢀⡠⡄⠀",
+            "   [1.22, 1.23)  █████████████████████▊ 11 510",
+            "                 └                         ┘",
+            "                                                   c1",
+        ],
+        "\n",
+    )
+    text = join(
+        [
+            "Fit finished: reduced χ² = 4.52 on the measured points",
+            plot,
+            "\e[32mcompiled\e[0m 5328 statements",
+            "downloading 10%\rdownloading 50%\rdownloading 100%",
+            "same",
+            "same",
+            "same",
+            "",
+            "",
+            "",
+            "tail",
+            "x" ^ 300,
+            "",
+            "",
+        ],
+        "\n",
+    )
+    lines = P.clean_log(text)
+    @test lines == [
+        "Fit finished: reduced χ² = 4.52 on the measured points",
+        "compiled 5328 statements",
+        "downloading 100%",
+        "same   (x 3)",
+        "",
+        "tail",
+        "x" ^ (P.LOG_LINE_MAX - 3) * "...",
+    ]
+    @test P.clean_log(plot) == String[]
+    many = ["line $i" for i in 1:500]
+    t = P.trim_log(many)
+    @test length(t) == P.LOG_KEEP_HEAD + 1 + P.LOG_KEEP_TAIL
+    @test t[P.LOG_KEEP_HEAD+1] ==
+          "... $(500 - P.LOG_KEEP_HEAD - P.LOG_KEEP_TAIL) lines left out ..."
+    @test first(t) == "line 1" && last(t) == "line 500"
+    @test P.trim_log(["a", "b"]) == ["a", "b"]
+
+    mktempdir() do d
+        log(n, body) = (f = joinpath(d, n * ".log"); write(f, body); f)
+        empty!(P.REPORT)
+        empty!(P.STEP_LOGS)
+        P.note("stage julia ok    12.3 s   peak RAM 100 MiB, swap 5 MiB")
+        push!(P.STEP_LOGS, "juliac" => log("a", text))
+        push!(P.STEP_LOGS, "only a plot" => log("b", plot))
+        push!(P.STEP_LOGS, "never ran" => joinpath(d, "missing.log"))
+        out = joinpath(d, "build-logs", "baysol-9.9.9-linux-arm64.LOG")
+        P.write_build_log(out, "/somewhere/baysol-9.9.9-linux-arm64.zip")
+        got = read(out, String)
+        @test occursin(r"^datetime\s+\t\d{4}-\d\d-\d\d \d\d:\d\d:\d\d [+-]\d{4}\n"m, got)
+        @test occursin(r"^archive\s+\tbaysol-9\.9\.9-linux-arm64\.zip$"m, got)
+        @test occursin("--- stages ---\nstage julia ok    12.3 s   peak RAM 100 MiB", got)
+        @test occursin("--- step: juliac ---\nFit finished: reduced χ² = 4.52", got)
+        @test !occursin("only a plot", got) && !occursin("never ran", got)
+        @test !any(c -> '\u2800' <= c <= '\u28ff' || c == '█', got)
+        @test occursin("--- machine ---", got)
+        # every row's value starts at a tab stop, whatever the name's length
+        @test all(l -> (i = findfirst('\t', l); i === nothing || (i - 1) % 8 == 0),
+            filter(l -> occursin(r"^[a-z]+\s*\t", l), split(got, '\n')))
+    end
+end
+
 @testset "merged statements" begin
     lines = [
         "precompile(Tuple{typeof(BAYSOL.f), Int64})",
@@ -91,6 +165,39 @@ end
     @test all(l -> !occursin(r"NtTest_|JET", l), kept)
     @test any(occursin("BAYSOLRun", l) for l in kept)
     @test "BAYSOLRun" in P.app_modules() && "Base" in P.app_modules()
+end
+
+@testset "the Platform module in the statements" begin
+    # every app package holds its own copy of platform.jl:
+    # BAYSOL.Platform, BAYSOLSetup.Platform, BAYSOLRun.Platform;
+    # Dev.Platform belongs to the development tools only
+    app = [
+        "precompile(Tuple{typeof(BAYSOL.Platform.exe), String})",
+        "precompile(Tuple{typeof(BAYSOL.Platform.which), String})",
+        "precompile(Tuple{typeof(BAYSOLSetup.Platform.data_home)})",
+        "precompile(Tuple{typeof(BAYSOLSetup.Platform.iswindows)})",
+        "precompile(Tuple{typeof(BAYSOLRun.Platform.exe), String})",
+        "precompile(Tuple{typeof(BAYSOLRun.Platform.shell)})",
+        "precompile(Tuple{typeof(BAYSOLSetup.Platform.which), String})",
+    ]
+    dev = [
+        "precompile(Tuple{typeof(Dev.Platform.exe), String})",
+        "precompile(Tuple{typeof(Dev.Platform.which), String})",
+        "precompile(Tuple{typeof(Dev.PkgTool.find_7z)})",
+        "precompile(Tuple{typeof(Dev.Common.run_cmd), Cmd})",
+        # an app function with a Dev-only argument type, and a script's alias
+        "precompile(Tuple{typeof(BAYSOL.Platform.exe), Dev.Common.ToolError})",
+        "precompile(Tuple{typeof(Main.Platform.exe), String})",
+        "precompile(Tuple{typeof(Main.BAYSOLSetup.Platform.exe), String})",
+    ]
+    allowed = Set(["Base", "Core", "BAYSOL", "BAYSOLSetup", "BAYSOLRun"])
+    @test P.merge_statements(vcat(dev, app, dev)) == app
+    @test P.merge_statements(vcat(dev, app); allowed) == app
+    @test P.merge_statements(dev; allowed) == String[]
+    # the modules an app statement names are the first one only: `Platform` is a submodule
+    @test all(l -> [m[1] for m in eachmatch(P._MODULE_NAME, l)] ⊆ allowed, app)
+    # the manifest of the app lists the three packages
+    @test issubset(["BAYSOL", "BAYSOLSetup", "BAYSOLRun"], P.app_modules())
 end
 
 @testset "a printed Char literal becomes evaluable" begin
@@ -141,13 +248,19 @@ end
             P.pack_icon(joinpath(dir, P.icon_file()), joinpath(Dev.Common.root(), "icons"))
         @test filesize(dest) > 1000
     end
-    @test startswith(text, Sys.iswindows() ? "@echo off" : "#!")
+    @test startswith(text, Platform.iswindows() ? "@echo off" : "#!")
 end
 
 @testset "the embedded Python entry is valid and complete" begin
     @test occursin("def main() -> int:", P.PYTOOLS_ENTRY)
     @test occursin("m.REPAIR_LIMIT = float(\"inf\")", P.PYTOOLS_ENTRY)
-    if Sys.which("python3") !== nothing
+    # a `python3` that is only a Windows app-execution alias does not run: ask it
+    python_runs = try
+        success(`python3 --version`)
+    catch
+        false
+    end
+    if python_runs
         f = tempname() * ".py"
         write(f, P.PYTOOLS_ENTRY)
         @test success(
@@ -303,8 +416,8 @@ end
         nested = joinpath(d, "julia")
         all = [joinpath(r, f) for (r, _, fs) in walkdir(d) for f in fs]
         @test !any(islink, all)
-        @test isfile(joinpath(d, "libjulia.so.1.12")) || !Sys.islinux()
-        if Sys.islinux()
+        @test isfile(joinpath(d, "libjulia.so.1.12")) || !Platform.islinux()
+        if Platform.islinux()
             @test isfile(joinpath(nested, "libjulia-internal.so.1.12"))
             @test isfile(joinpath(nested, "libopenlibm.so"))
             @test isfile(joinpath(nested, "libopenblas64_.so"))
@@ -355,9 +468,94 @@ end
         write(lib, "so")
         out = joinpath(d, "out")
         @test P.install_jll_libraries(exe, [("A_jll", "u", "k", lib)], out) == ["b"^40]
-        @test isfile(joinpath(out, "julia", "julia", "libA.so"))
+        @test isfile(joinpath(P.runtime_layout(out).private, "libA.so"))
         @test isdir(joinpath(out, "share", "julia", "artifacts", "b"^40))
     end
+end
+
+@testset "pkg: the runtime layout per system" begin
+    @test P.runtime_layout("/o", :linux) ==
+          (; libjulia = joinpath("/o", "julia"), private = joinpath("/o", "julia", "julia"))
+    @test P.runtime_layout("/o", :macos) == P.runtime_layout("/o", :linux)
+    # Windows: every DLL beside the exe (no RUNPATH, `juliac --relative-rpath` is refused)
+    @test P.runtime_layout("/o", :windows) == (; libjulia = "/o", private = "/o")
+    @test P.juliac_flags(:windows) == String[]
+    @test P.juliac_flags(:linux) == ["--relative-rpath"]
+    @test P.juliac_flags(:macos) == ["--relative-rpath"]
+    @test P.juliac_flags() == P.juliac_flags(Platform.os())
+    # the bare names carry the extension of this system
+    @test all(endswith("." * Base.BinaryPlatforms.platform_dlext()), P.BARE_RUNTIME_NAMES)
+    @test "libopenblas64_." * Base.BinaryPlatforms.platform_dlext() in P.BARE_RUNTIME_NAMES
+end
+
+@testset "pkg: what a Windows runtime folder ships and prunes" begin
+    # the DLLs of Julia's `bin` (1.12, Windows): the test libraries, libgit2, libdSFMT and
+    # libgmpxx go; libuv-2.dll and every mingw runtime DLL the others import stay
+    mktempdir() do dir
+        keep = ["libjulia.dll", "libjulia-internal.dll", "libjulia-codegen.dll",
+            "libLLVM-18jl.dll", "libopenblas64_.dll", "libopenlibm.dll",
+            "libgcc_s_seh-1.dll",
+            "libgfortran-5.dll", "libquadmath-0.dll", "libstdc++-6.dll",
+            "libwinpthread-1.dll", "libgmp-10.dll", "libmpfr-6.dll", "libpcre2-8-0.dll",
+            "libuv-2.dll", "libatomic-1.dll", "libssp-0.dll", "libz.dll"]
+        skip = ["libccalltest.dll", "libccalllazyfoo.dll", "libccalllazybar.dll",
+            "libllvmcalltest.dll", "libgit2.dll", "libdSFMT.dll", "libgmpxx.dll"]
+        for n in vcat(keep, skip, ["julia.exe", "README.txt"])
+            write(joinpath(dir, n), "x")
+        end
+        @test first.(P.runtime_files(dir)) == sort(keep)
+        out = mkpath(joinpath(dir, "out"))
+        for (name, from) in P.runtime_files(dir)
+            cp(from, joinpath(P.runtime_layout(out, :windows).libjulia, name))
+        end
+        @test sort(readdir(out)) == sort(keep)
+    end
+end
+
+@testset "pkg: Windows and Python details of the stages" begin
+    @test "patchelf" in P.py_packages(:linux)
+    @test !("patchelf" in P.py_packages(:windows)) && !("patchelf" in P.py_packages(:macos))
+    @test all(p -> p in P.py_packages(:linux), P.py_packages(:windows))
+    @test "nuitka==4.3.5" in P.py_packages(:windows)
+    # a C compiler is a Linux and macOS requirement: juliac downloads MinGW-w64 on Windows
+    @test !("gcc" in P.preflight_programs(:windows))
+    @test "gcc" in P.preflight_programs(:linux) && "gcc" in P.preflight_programs(:macos)
+    mktempdir() do d
+        bin = mkpath(joinpath(d, ".bin"))
+        write(joinpath(bin, "esbuild"), "#!/bin/sh")
+        @test P.node_tool("esbuild"; modules = d) == joinpath(bin, "esbuild")
+        write(joinpath(bin, "esbuild.cmd"), "@echo off")       # npm writes it on Windows
+        @test P.node_tool("esbuild"; modules = d) == joinpath(bin, "esbuild.cmd")
+        @test P.node_tool("postject"; modules = d) == joinpath(bin, "postject")
+    end
+    nd = joinpath("x", "node-v26-win-x64")
+    @test P.node_program(nd) ==
+          (Platform.iswindows() ? joinpath(nd, "node.exe") : joinpath(nd, "bin", "node"))
+    @test P.unpack_command("a.tar.xz", "d") == `tar -xf a.tar.xz -C d`
+    zipcmd = P.unpack_command("a.zip", "d")
+    @test zipcmd === nothing || any(==("-od"), zipcmd.exec)
+    # a trailing separator of the work folder is no reason to refuse it
+    mktempdir() do d
+        work = mkpath(joinpath(d, "baysol-pkg-work"))
+        mkpath(joinpath(work, "logs"))
+        @test P.looks_like_work(work)
+        @test P.looks_like_work(work * "/")
+        Platform.iswindows() && @test P.looks_like_work(work * "\\")
+    end
+end
+
+@testset "pkg: a refused strip is reported, not fatal" begin
+    files = ["/b/a.dll", "/b/bad.dll", "/b/c.dll"]
+    lines = P.strip_windows("s", files, String[])
+    ran = Vector{String}[]
+    runner(l) = (push!(ran, l); !("/b/bad.dll" in l))
+    @test P.run_strip(lines, files; runner) == ["/b/bad.dll"]
+    @test ran[1] == lines[1]
+    @test ran[2:end] == [
+        ["s", "--strip-all", "/b/a.dll"], ["s", "--strip-all", "/b/bad.dll"],
+        ["s", "--strip-all", "/b/c.dll"],
+    ]
+    @test P.run_strip(lines, files; runner = _ -> true) == String[]
 end
 
 @testset "pkg: libraries and frozen files the app never loads" begin
@@ -420,7 +618,7 @@ end
         write(joinpath(dir, "readme.txt"), elf)
         write(joinpath(dir, "baysol"), elf)
         write(joinpath(dir, "baysol-tui"), elf)
-        Sys.iswindows() || symlink("libx.so", joinpath(dir, "liblink.so"))
+        Platform.iswindows() || symlink("libx.so", joinpath(dir, "liblink.so"))
         libs, exes = P.strip_targets(dir, [joinpath(dir, "baysol"), joinpath(dir, "nope")])
         @test basename.(libs) == ["libx.so", "libx.so.1.2"]
         @test basename.(exes) == ["baysol"]

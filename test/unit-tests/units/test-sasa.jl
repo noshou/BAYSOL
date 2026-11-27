@@ -135,11 +135,14 @@ const SASA_WITNESS_LOSS_MAX = 0.0092
         [(0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (0.0, 3.0, 0.0), (1.0, 1.0, 1.0)]
         m = sasaMol(els, crds)
         ref = Geometry.sasa(m; probe = probe)
+        # `sasa` gives (areas, weights, bead classes): the numbers agree to rounding, the
+        # classes exactly
+        same(a, b) = a[1] ≈ b[1] && a[2] ≈ b[2] && a[3] == b[3]
         for _ in 1:3
-            @test Geometry.sasa(m; probe = probe) == ref       # bit-identical
+            @test same(Geometry.sasa(m; probe = probe), ref)
         end
         # a freshly-built but geometrically identical molecule agrees too
-        @test Geometry.sasa(sasaMol(els, crds); probe = probe) == ref
+        @test same(Geometry.sasa(sasaMol(els, crds); probe = probe), ref)
     end
 
     @testset "probe scaling on a lone atom is exactly (r + probe)²" begin

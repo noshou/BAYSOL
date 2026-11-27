@@ -577,7 +577,10 @@ function windowsCommand(startDir: string, spec: PickerSpec): string[] {
         "powershell",
         "-NoProfile",
         "-Command",
-        "Add-Type -AssemblyName System.Windows.Forms; " +
+        // the output is read as UTF-8; PowerShell
+        // writes the console's OEM code page otherwise
+        "[Console]::OutputEncoding = (New-Object System.Text.UTF8Encoding $false); " +
+            "Add-Type -AssemblyName System.Windows.Forms; " +
             "$d = New-Object System.Windows.Forms.OpenFileDialog; " +
             `$d.Multiselect = ${spec.multiple ? "$true" : "$false"}; ` +
             `$d.Title = '${spec.title}'; ` +
@@ -749,7 +752,9 @@ function runShellIn(system: System, dir: string): string | undefined {
     return result.error ? `could not start a shell: ${result.error.message}` : undefined
 }
 
-/** The exit status of the setup wizard after an uninstall (`UNINSTALLED` of the wizard). */
+/**
+ * The exit status of the setup wizard after an uninstall (`UNINSTALLED` of `BAYSOLSetup`).
+ */
 export const SETUP_UNINSTALLED = 22
 
 /**

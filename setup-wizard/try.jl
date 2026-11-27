@@ -6,14 +6,18 @@
 # The sandbox is removed when the wizard ends; what it wrote is listed first.
 
 const HERE = @__DIR__
+include(joinpath(HERE, "..", "platform.jl"))
 sandbox = mktempdir()
 bundle = mkpath(joinpath(sandbox, "bundle"))
-for f in ("baysol", joinpath("sysimage", "baysol.so"), "baysol.icns")
+for f in ("baysol", joinpath("sysimage", "baysol.so"), "baysol.icns", "baysol.ico")
     mkpath(dirname(joinpath(bundle, f)))
     write(joinpath(bundle, f), "")
 end
 env = Dict(
     "HOME" => sandbox,
+    "USERPROFILE" => sandbox,  # Windows: `homedir()` reads this, not HOME
+    "LOCALAPPDATA" => joinpath(sandbox, "AppData", "Local"),
+    "APPDATA" => joinpath(sandbox, "AppData", "Roaming"),
     "JULIA_DEPOT_PATH" => get(ENV, "JULIA_DEPOT_PATH", joinpath(homedir(), ".julia")),
     "XDG_DATA_HOME" => joinpath(sandbox, "d"),
     "XDG_CACHE_HOME" => joinpath(sandbox, "c"),
@@ -34,7 +38,8 @@ finally
         end
     end
     println("install.json:")
-    file = joinpath(sandbox, "cfg", "baysol", "install.json")
+    file = joinpath(sandbox, Platform.iswindows() ? joinpath("AppData", "Roaming") : "cfg",
+        "baysol", "install.json")
     println(isfile(file) ? read(file, String) : "  (none)")
     rm(sandbox; recursive = true, force = true)
 end

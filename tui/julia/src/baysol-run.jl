@@ -10,6 +10,8 @@
 
 module BAYSOLRun
 
+include(joinpath(@__DIR__, "..", "..", "..", "platform.jl"))
+
 using BAYSOL
 # JSON3 and SHA are dependencies of BAYSOL; they are taken through the modules that use
 # them, so this file runs in any environment that holds BAYSOL (the repository's, or the
@@ -125,7 +127,7 @@ end
 The offset from UTC, in seconds (east positive), of this machine's time zone at the Unix
 time `t`. It is the local civil time (`Libc.TmStruct`, which reads the zone and its
 daylight saving, on Linux, macOS and Windows alike: `%z` of `strftime` is a zone NAME on
-Windows) taken as if it were UTC, minus `t`. macOS and Windows are untested.
+Windows) taken as if it were UTC, minus `t`. Run on Linux and Windows 11; macOS is untested.
 
 # Returns
 - The offset in seconds, such as `-18000` for UTC-05:00.
@@ -134,9 +136,7 @@ Windows) taken as if it were UTC, minus `t`. macOS and Windows are untested.
 - None.
 """
 function _localOffset(t::Real)
-    tm = Libc.TmStruct(floor(Int, t))
-    return _unixTime(tm.year + 1900, tm.month + 1, tm.mday, tm.hour, tm.min, tm.sec) -
-           floor(Int, t)
+    return Platform.utc_offset(t)
 end
 
 # `text` as a zone label: whitespace, underscores and hyphens removed, kept only when what
@@ -151,7 +151,7 @@ end
 The name of this machine's time zone for a label: the last path segment of the `TZ`
 environment variable (`America/Sao_Paulo` is `SaoPaulo`) when it is set, else of the
 target of the `/etc/localtime` link (`.../zoneinfo/Asia/Kolkata` is `Kolkata`), with the
-underscores removed. macOS and Windows untested (Windows has neither).
+underscores removed. macOS untested (Windows has neither).
 
 # Returns
 - The name, or `nothing` when the zone has no name made of letters.
@@ -202,7 +202,7 @@ function _zoneLabel(
     return "LOCAL"
 end
 
-# The label of this machine's time zone at the Unix time `t` (macOS and Windows untested).
+# The label of this machine's time zone at the Unix time `t` (macOS untested).
 _localZone(t::Real) = _zoneLabel(Libc.strftime("%Z", floor(Int, t)))
 
 """
@@ -518,9 +518,38 @@ end
 
 # Whether a process with this id exists on this machine (`nothing` when it cannot be told).
 function _pidExists(pid::Integer)
-    Sys.isunix() || return nothing
+    Platform.isunix() && return _pidExistsPosix(Int(pid))
+    Platform.iswindows() && return _pidExistsWindows(Int(pid))
+    return nothing
+end
+
+# POSIX: signal 0 only checks; EPERM means the process exists but is not ours.
+function _pidExistsPosix(pid::Int)::Bool
     r = ccall(:kill, Cint, (Cint, Cint), pid, 0)
     return r == 0 || Libc.errno() == Libc.EPERM
+end
+
+# Windows: open the process with the least right; one that cannot be opened for lack of
+# rights exists, an invalid id does not, and a handle whose exit code is not STILL_ACTIVE
+# (259) belongs to a process that has ended (its id may stay open while a handle is held).
+# Standard library only: `ccall` into kernel32 with concrete signatures.
+function _pidExistsWindows(pid::Int)::Union{Bool,Nothing}
+    (pid > 0 && pid <= typemax(UInt32)) || return false
+    h = ccall((:OpenProcess, "kernel32"), stdcall, Ptr{Cvoid},
+        # PROCESS_QUERY_LIMITED_INFORMATION
+        (UInt32, Int32, UInt32), 0x00001000, 0, pid % UInt32)
+    if h == C_NULL
+        err = ccall((:GetLastError, "kernel32"), stdcall, UInt32, ())
+        err == 5 && return true    # ERROR_ACCESS_DENIED: it exists
+        err == 87 && return false  # ERROR_INVALID_PARAMETER: no such process
+        return nothing
+    end
+    code = Ref{UInt32}(0)
+    ok = ccall((:GetExitCodeProcess, "kernel32"), stdcall, Int32,
+        (Ptr{Cvoid}, Ref{UInt32}), h, code)
+    ccall((:CloseHandle, "kernel32"), stdcall, Int32, (Ptr{Cvoid},), h)
+    ok == 0 && return nothing
+    return code[] == 259
 end
 
 """
@@ -716,7 +745,9 @@ function _readSnapshotData(dir::AbstractString)
     (isfinite(ev) && ev > 0) ||
         throw(ArgumentError("data.json: the energy is $ev eV, expected above 0"))
     q, I, σ = Float64[], Float64[], Float64[]
-    for (n, line) in enumerate(eachline(tsv))
+    # `readlines`, not `eachline(path)`: that keeps the file open when a line throws, and
+    # Windows cannot delete or rename an open file
+    for (n, line) in enumerate(readlines(tsv))
         isempty(strip(line)) && continue
         cells = split(line, '\t')
         length(cells) >= 3 ||
