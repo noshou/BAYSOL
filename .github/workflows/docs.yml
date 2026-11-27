@@ -12,8 +12,10 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: docs-${{ github.ref }}
-  cancel-in-progress: true
+  # one group for every ref: master and a tag both push to gh-pages, and two runs at once
+  # lose the push race ("rejected ... remote contains work you do not have")
+  group: docs-deploy
+  cancel-in-progress: false
 
 jobs:
   docs:
