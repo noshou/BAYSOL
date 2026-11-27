@@ -10,6 +10,9 @@
 *.scss  linguist-detectable=true
 *.css   linguist-detectable=false
 
+# The one JavaScript file (a stand-in for 7-Zip in the tests) stays out of the language stats
+*.cjs   linguist-detectable=false
+
 # Hand-written files under docs/ (the site's build scripts, theme sources and the vendored
 # Sass/CSS they compile against): override Linguist's documentation heuristic, which
 # otherwise excludes anything under docs/ from language stats.

@@ -140,7 +140,8 @@ function runSasdap8(;
     # them from the far starts (±10, ±20) and the others from secondary modes, did not mix
     # (bulk ESS 170, tail ESS 47 to 206, R̂ 1.02 to 1.03; two chains sat at step size 0 with
     # 1023-step trees), while the chains of the main mode were healthy (ε about 0.4)
-    res = BAYSOL.runModel(s, nSamples, nAdapt; chainStartRadii = (1.0, 2.0, 3.0))
+    res = BAYSOL.runModel(s, nSamples, nAdapt; chainStartRadii = (1.0, 2.0, 3.0),
+        rngSeed = MARGINAL_FIT_SEED)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 

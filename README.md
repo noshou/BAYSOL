@@ -55,6 +55,84 @@ the bug.
   Windows*: `write_report` and the build log (`dev/src/pkg.jl`) read `/proc/meminfo`, which only
   Linux has, and print 0 for what is missing. The peak memory of each stage, the preflight for
   24 GiB and the stop on low swap do not run there either.
+- *macOS has no fixed swap, so the memory checks of `bysl pkg` need a different design there,
+  not only another source for the same numbers.* Linux has a swap size that is set up front
+  (`SwapTotal`, `SwapFree`), and the preflight (RAM + swap >= 24 GiB) and the stop on free swap
+  under 500 MiB (`swap_low`, `MIN_FREE_SWAP_MIB`) are written for that. macOS makes encrypted
+  swap files in `/private/var/vm` on demand, so `sysctl vm.swapusage` says 0 MiB total until
+  the system swaps, and how much swap there can be depends on the free disk space of the
+  system volume. The juliac stage needs about 24 GiB in all (on Linux, 10 GiB resident and 14 GiB
+  swapped), so on a Mac with 16 GB of RAM the build has to be managed by the free disk: a
+  preflight of RAM + free disk, a watch of the free disk (and `vm.swapusage`, `hw.memsize`,
+  `memory_pressure`) with a stop before the disk is full, and a note of the peak in the report.
+- *The report of `bysl pkg` says `4 threads` for a Mac that has 8* (the macOS arm64 build of
+  0.5.1 ran on a 16 GB M2, which Julia and the system report with 8 threads). The line of the
+  report that has the machine (`write_report` in `dev/src/pkg.jl`) prints `Sys.CPU_THREADS`; the
+  cause of the wrong count is not known. With `ram 0 MiB` above, the report cannot be used to
+  tell which machine a build ran on, or how much memory it needed.
+- *Under Rosetta 2 (an x86_64 build on an Apple Silicon Mac) the free memory is read four times
+  too low*, and every fit stops with `MemoryBudgetError`. `_mac_available_memory`
+  (`platform.jl`) multiplies the page counts of `host_statistics64`, which the Apple Silicon
+  kernel gives in 16384-byte pages, by `getpagesize()`, which a translated process is told is
+  4096. Measured on a 16 GB M2: 2.03 GiB read under Rosetta, 8.04 GiB native. Fixed: the page
+  size now comes from `host_page_size` (16384 in both), which gave 8.09 GiB under Rosetta. The
+  fix has no test yet (the bug cannot be seen in a native run). Real Intel Macs have 4096 in
+  both and were never affected.
+- *The unit test `chains: mirrored starts, pooling and determinism` fails in the x86_64 build
+  under Rosetta*: `test-sampler.jl:426` expects `d.nChains == N_CHAINS == 8` and gets 9 (the
+  fit adds a chain at an optimum its search found, up to `OPTIMUM_CHAIN_CAP`, so the count
+  depends on the optima found). The fixed seed passes in the arm64 build. The cause is not
+  known; a difference of the arithmetic of the `generic` CPU target (no fused multiply-add on
+  x86_64) is one guess, not tested. On macOS x86_64 the test now accepts 8 or more chains and
+  every other system still demands exactly 8, which hides the difference and does not explain
+  it.
+- *Two marginal fitting tests do not converge on macOS x86_64 with the default seed*: SASDJ66
+  (R̂ 1.14, bulk ESS 26) and SASDAP8 (R̂ 1.16 to 1.38, bulk ESS 13 to 27) end with
+  `NotConvergedError: ladder exhausted` under Rosetta, and pass with seed 0 on arm64. Their
+  scripts take `rngSeed = MARGINAL_FIT_SEED` (`test/fitting_tests/common.jl`): seed 1 on macOS
+  x86_64, the default 0 everywhere else. A seed that converges says nothing about why the
+  sampler is so close to the limit on these two; the cause of the difference is not known, and
+  other marginal entries can fail the same way.
+- *`bysl pkg` could not start the x64 7-Zip of `7zip-bin` on Intel macOS or under Rosetta 2*: the
+  npm package ships `mac/x64/7za` without the execute bit (only `mac/arm64/7za` has it, and
+  `7zip-bin` has no install script), so the build stopped with `IOError: could not spawn` at its
+  first use. Fixed: `find_7z` (`dev/src/pkg.jl`) makes the bundled `7za` executable. Untested on
+  a real Intel Mac.
+- *A step of the trace stage of `bysl pkg` can hang for ever.* The interface run of SASDAH5
+  (`tui/test/support/trace-run.ts`, started by the trace stage) sat for 1 h 48 min at 0% CPU in
+  the x86_64 build under Rosetta 2: the Node driver waits for the Julia run, and Julia waits on
+  its socket to the driver, both idle, and the log empty (the same step takes 25 s on arm64, and
+  the same step of SASDMJ9 and SASDAN8 passed in that build). The cause is not known, a race in
+  the launcher or a Rosetta timing issue are guesses. The steps have no timeout, so the build
+  does not go on by itself; killing the two processes lets it go on, and the step then counts
+  as ended, like a failed fit (see below).
+- *`bysl pkg` is far too slow because it uses one or two cores of eight.* The stages and the fits
+  run one after another (`one fit at a time` in the trace stage), each Julia process with a fixed
+  `--threads=4` (`dev/src/pkg.jl`), so one process works at a time: measured in the x86_64 build
+  on an 8-core M2, 100% to 200% of the 800% available. The arm64 macOS build took 159 min: the
+  trace stage 58 min, juliac 39 min and the 7-Zip archive 46 min (the archive is deflate at
+  maximum settings, which is probably single-threaded; not checked). For the next version:
+  fits and runs that do not depend on each other could go in parallel (limited by memory, a fit
+  needs 2 to 6 GB), the thread count could follow the machine, and the archive could use a
+  faster setting or a multi-threaded method.
+- *A run on x86_64 can climb the retry ladder to 10 retries and take nearly two hours* (reported by
+  the owner, 25 November 2026: the fit, the machine and the log were not recorded here, so
+  they are to be added). It is the same behaviour as the non-converging SASDJ66 and SASDAP8 on
+  macOS x86_64: a marginal fit that passes at the first attempt on arm64 can need many rungs on
+  x86_64. The ladder is unbounded on purpose: its rungs are the user's setting (`LADDER`), a
+  ladder that goes deep with many reruns usually points to a poor seed or parameter setup, and
+  nothing stops a user from asking for it, so no cap on the rungs or the time is to be added.
+  The x86_64 build under Rosetta 2 was watched at SASDVA2 (its command-line run in the trace
+  stage): after the kink fallback it had started its first rung (`delta 99`) within 15 minutes
+  and was still in it after 28, where arm64 passes that run in about 130 s; the depth it
+  reached is not recorded here.
+- *`bysl pkg --resume` skips a fit that failed*: the trace stage writes the marker of a fit
+  (`trace/fits/<id>.done`) when the fit has been run, also when it failed, and a resumed build
+  skips every fit that has one. After a build that failed because the fits failed (seen when the
+  memory guard stopped all 48 of them under Rosetta), the resume found no workbook of any fit
+  and stopped at the export of the workload projects (`no workbook (res*.xlsx): the fit has
+  not been run`). The marker should be written only for a fit that passed; a workaround is to
+  delete `trace/fits/*.done` in the work folder before resuming.
 - *`bysl pkg` does not start the program it built*, so a package that cannot start passes.
 - *`bysl audit` lists `libz` and `libpython` as missing* in the macOS bundle, where both are
   shipped and found.
@@ -66,8 +144,12 @@ the bug.
   the window stays. The cause is not confirmed. One fault found: the launcher takes the first
   window with its tty, and Terminal reports the old tty of a finished window even after a new
   one has the same, so it can pick the wrong window, or close it.
-- *Gatekeeper blocks a package downloaded with a browser*: it is signed ad hoc, not with a
-  Developer ID. Run `xattr -dr com.apple.quarantine baysol` on the unpacked folder.
+- *The program is marked as needing macOS 26*, the system it was built on, so it may not start
+  on an older one (not tried). Most of the bundle needs 11.0 and numpy 14.0; setting
+  `MACOSX_DEPLOYMENT_TARGET=14.0` in `bysl pkg` is to be tried.
+- *The program holds the paths of the machine it was built on* (about 8200 strings with the home
+  folder, so also the user name of the builder). They are not needed to run it. Seen on macOS;
+  a build on another system can have the same.
 - *The default Terminal font (SF Mono 11) makes the interface look bad.* The wizard suggests
   Menlo 14; the character and line spacing have to be set to 1.0 by hand.
 - *Terminal shows no sixel figures*; use iTerm2 or WezTerm. Installing Homebrew and iTerm2 from
@@ -87,6 +169,44 @@ the bug.
   of 958 pass). Once a fourth failed that passed in three reruns; which one was not
   recorded.
 - *Intel Macs, the figures made with TeX and the complete `bysl precommit` are untested.*
+- *Note, not a bug: the x86_64 build (Rosetta 2) and arm64 agree on what the data constrain, and
+  differ on what they do not.* On 13 fitting tests, chi², `rhoE` and `c1` agree with the
+  committed reference logs to about 0.1% (`c1` of SASDX52: 4%). `deltaRho1` to `3`, `scale` and
+  `bkgrndCorr` differ by 1% to 30%, and in SASDX52 by more (`deltaRho3` changes sign), and the
+  number of modes found differs in SASDP74, SASDT65 and SASDTV4. This fits a posterior that is
+  multimodal in the weakly constrained directions and well defined in the constrained ones. It
+  was not checked mode by mode, nor against the posterior spreads, nor against the spread
+  between seeds on arm64, and the reference logs may not come from arm64 macOS. A chi² far below
+  1 (SASDX52: 0.29) says little about a fit, so a difference in it is not a reason to look
+  closer. The fits with a fixed amount of work (the synthetic ones) took about 1.3 times as long
+  as on arm64.
+
+## Notes on validating and reporting results (draft, to be checked with a statistician)
+
+Written down on 25 November 2026 from a discussion of the x86_64 macOS build; it has not been
+reviewed by a statistician, and it is guidance, not a validation.
+
+- *Reproducing CRYSOL curves does not validate the posterior.* It shows that the forward model
+  gives CRYSOL-quality curves. Whether the credible intervals are honest is a separate question:
+  different parameter sets can give the same curve (the mode counts of the fitting tests). The
+  `SYN-` entries have known true parameters, so the coverage of the intervals of `rhoE` and
+  `c1` over many synthetic runs can be checked directly.
+- *Report:* the constrained parameters (`rhoE`, `c1`) with credible intervals, not only the MAP;
+  chi² with its q range, `nQChi2` and degrees of freedom; whether R̂, ESS and the divergence
+  checks passed, the number of modes and the ladder rung that passed (the retries change the
+  sampler settings); the commit, the seed and the architecture; the weakly constrained
+  parameters (`deltaRho1` to `3`, `scale`, `bkgrndCorr`) as nuisance parameters with their
+  intervals, labelled as weakly identified.
+- *Do not report:* a single value of a weakly constrained parameter as a physical quantity (a
+  MAP of a multimodal region is the mode that run found); a chi² far below 1 as evidence of a
+  good fit; a result found by trying seeds until one converges, without saying so (give the
+  rate over seeds). The seed of SASDJ66 and SASDAP8 on macOS x86_64 is such a workaround.
+- *Sensitivity checks that are safe:* the seed, the q range and binning, and the priors of the
+  weakly constrained parameters; if `rhoE` and `c1` do not move, the claim about them is
+  supported. Fixing the hydration-shell contrasts is an ablation to try: compare the widths of
+  the intervals as well as the values, since fixing a nuisance parameter makes the others look
+  too sure. Do not remove the per-draw fitted `scale`, background and `c1`: they define how the
+  curve is scored.
 
 ## Use BAYSOL from the terminal interface (no coding)
 
@@ -164,6 +284,32 @@ small **setup wizard** (projects folder, caches, threads per fit, menu entry, De
 written until you choose Apply). It comes back with `baysol setup` or with **shift+a** on the main menu, and
 also repairs the shortcuts and **uninstalls** (the app and caches, keeping your projects, or everything: type
 `delete` to confirm). The launcher passes the app's folder to the program as `BAYSOL_BUNDLE`.
+
+#### Installing the packaged app on macOS (Apple Silicon)
+
+The app is signed ad hoc, not with a paid Apple Developer ID, so macOS blocks a copy that was
+downloaded with a browser or came by AirDrop, e-mail or a chat program. There are two ways.
+
+**With curl** (a file it downloads is not marked, so nothing is blocked), once the package is
+attached to the release:
+
+```
+curl -fLO https://github.com/noshou/BAYSOL/releases/download/v0.5.1/baysol-0.5.1-macos-arm64.zip
+unzip baysol-0.5.1-macos-arm64.zip
+./baysol/baysol
+```
+
+**Downloaded in another way:** if macOS says that it cannot check the program, or that it is from
+an unidentified developer, unpack the ZIP, open Terminal in the folder it was unpacked in, remove
+the mark and start it:
+
+```
+xattr -dr com.apple.quarantine baysol
+./baysol/baysol
+```
+
+Do this only for a package you got from the BAYSOL releases page. A Mac that a school or company
+manages can refuse it all the same.
 
 ### The main menu
 

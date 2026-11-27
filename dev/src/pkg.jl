@@ -824,12 +824,25 @@ function this_archive()
     )
 end
 
-"The 7-Zip program: the `7za` of the npm package `7zip-bin`, else `7zz`, `7z`, `7za`."
+"""
+The 7-Zip program: the `7za` of the npm package `7zip-bin`, else `7zz`, `7z`, `7za`. The
+package ships `mac/x64/7za` without the execute bit (only `mac/arm64/7za` has it), so a build
+on Intel macOS or under Rosetta 2 could not start it: it is made executable here.
+"""
 function find_7z()
     os, arch = system_names()
     bundled = joinpath(Common.root(), "node_modules", "7zip-bin",
         os == "win" ? "win" : os == "darwin" ? "mac" : "linux", arch, exe("7za"))
-    isfile(bundled) && return bundled
+    if isfile(bundled)
+        if !Platform.iswindows() && !Sys.isexecutable(bundled)
+            try
+                chmod(bundled, 0o755)
+            catch
+                # a read-only tree: the build stops at the first use, as it did before
+            end
+        end
+        return bundled
+    end
     return Platform.find_tool("7zz", "7z", "7za")
 end
 

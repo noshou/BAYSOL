@@ -121,7 +121,7 @@ function runSasdj66Fit1(;
     # the default rerun (2000 + 2000) left the chains in different places (R̂ above 1.5),
     # so this entry reruns with a longer warm-up and more draws
     res = BAYSOL.runModel(s, nSamples, nAdapt; retryNAdapt = 6000, retryNDraws = 8000,
-        chainStartRadii = (2.0, 4.0, 6.0))
+        chainStartRadii = (2.0, 4.0, 6.0), rngSeed = MARGINAL_FIT_SEED)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 

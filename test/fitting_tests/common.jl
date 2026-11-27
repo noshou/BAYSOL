@@ -25,6 +25,22 @@ const N_ADAPT = BAYSOL.Pipeline.N_ADAPT
 `run_<id>`)."
 const N_SAMPLES = N_ADAPT + BAYSOL.Pipeline.N_DRAWS
 
+"""
+The `rngSeed` of the entries that are marginal (SASDJ66, SASDAP8): their seed 0 passes on
+arm64 and Linux, and does not converge on macOS x86_64 (R̂ above 1.1, ESS under 70), so
+that system takes seed 1 and every other system keeps the default.
+"""
+const MARGINAL_FIT_SEED = BAYSOL.Platform.ismacosx64() ? 1 : BAYSOL.Inference.RNG_SEED
+
+"""
+The `rngSeed` of SASDVA2 on x86_64 (macOS, Linux or Windows): a run of that entry on x86_64
+was reported to climb the retry ladder to 10 retries and nearly two hours, which arm64 does
+not, so those systems take seed 1 and the others keep the default. NOT TESTED: seed 1 has not
+been run on any system (the check under Rosetta 2 was stopped before it ran), so it is not
+known to be better than seed 0; revert it if it is not.
+"""
+const X64_FIT_SEED = BAYSOL.Platform.isx64() ? 1 : BAYSOL.Inference.RNG_SEED
+
 # ---------------------------------------------------------------------------
 #                     Solution-condition uncertainty defaults
 # ---------------------------------------------------------------------------

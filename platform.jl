@@ -25,6 +25,22 @@ Whether this is macOS.
 ismacos() = Sys.isapple()
 
 """
+    isx64() -> Bool
+
+Whether this Julia is an x86_64 build, on any system (Intel and AMD processors, and an Apple
+Silicon Mac running the x86_64 build under Rosetta 2).
+"""
+isx64() = Sys.ARCH === :x86_64
+
+"""
+    ismacosx64() -> Bool
+
+Whether this is macOS on an x86_64 Julia: an Intel Mac, or an Apple Silicon Mac running the
+x86_64 build under Rosetta 2.
+"""
+ismacosx64() = ismacos() && isx64()
+
+"""
     islinux() -> Bool
 
 Whether this is Linux.
@@ -383,7 +399,11 @@ function _mac_available_memory()::Union{Int,Nothing}
     status == 0 || return nothing
     files = max(Int(info[35]) - Int(info[24]), 0)
     pages = Int(info[1]) + min(Int(info[3]), files)
-    return pages * Int(ccall(:getpagesize, Cint, ()))
+    # the kernel's page size, not `getpagesize()`: a process translated by Rosetta 2 is told
+    # 4096 while the counts above are in the 16384-byte pages of the Apple Silicon kernel
+    size = Ref{Csize_t}(0)
+    ccall(:host_page_size, Cint, (Cuint, Ref{Csize_t}), host, size) == 0 || return nothing
+    return pages * Int(size[])
 end
 
 """

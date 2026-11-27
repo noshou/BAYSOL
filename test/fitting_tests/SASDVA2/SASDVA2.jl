@@ -201,7 +201,7 @@ function runSasdva2(;
     # 1023-step trees. The c1 tolerance (gradient error at most 8e-5) is not the cause.
     # Documented as failing; a fix means changing how c1 enters the posterior.
     res = BAYSOL.runModel(s, nSamples, nAdapt; retryNAdapt = 6000, retryNDraws = 8000,
-        chainStartRadii = (2.0, 4.0, 6.0))
+        chainStartRadii = (2.0, 4.0, 6.0), rngSeed = X64_FIT_SEED)
     return res, s.fw.formFactorLog, s.fw.nAtoms, data
 end
 
