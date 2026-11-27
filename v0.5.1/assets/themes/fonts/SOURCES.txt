@@ -1,0 +1,18 @@
+# Font provenance
+
+* **TeX Gyre Pagella** 
+  * GUST e-foundry, v2.609.
+  * Source: [https://www.gust.org.pl/projects/e-foundry/tex-gyre/pagella
+  * License: GUST Font License (GFL), also distributed under the LPPL.
+
+- **Montserrat**
+  - Julieta Ulanovsky et al., variable font [https://github.com/google/fonts/tree/main/ofl/montserrat ](https://github.com/google/fonts/tree/main/ofl/montserrat)
+  - License: SIL Open Font License 1.1.
+- **Fira Code**
+  - Nikita Prokopov et al., v6.2, official prebuilt WOFF2 release assets
+  - Source: [https://github.com/tonsky/FiraCode/releases/tag/6.2
+  - License: SIL Open Font License 1.1.
+- **Iosevka Charon Mono** (Regular)
+  - Iosevka Project authors / jul-sh, v34.100, from Google Fonts (google/fonts `ofl/iosevkacharonmono`, upstream commit 727f134), subset with fontTools to Latin, Latin Extended, IPA, combining marks and punctuation (U+0020-007E, U+00A0-036F, U+1E00-1EFF, U+2010-205E) and converted to WOFF2. Used for the release name under the sidebar title.
+  - Source: [https://github.com/jul-sh/iosevka-charon](https://github.com/jul-sh/iosevka-charon)
+  - License: SIL Open Font License 1.1 (no Reserved Font Name).
