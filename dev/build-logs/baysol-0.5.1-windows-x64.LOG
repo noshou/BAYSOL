@@ -1,0 +1,52 @@
+datetime        	2026-11-26 02:13:43 -0500
+version 	v0.5.1 pẽnegda
+archive 	baysol-0.5.1-windows-x64.zip
+revision        	c9348d82-dirty
+julia   	1.12.7
+node    	26.13.1
+python  	3.12
+system  	win-x64, NT
+
+--- stages ---
+pytools    skipped (done before)
+tui        skipped (done before)
+trace      skipped (done before)
+  juliac (precompile, workload fits, compile, link) ok     32681.3 s
+  juliac: statements: 5421 compiled, 27 not
+stage julia ok     32684.7 s
+  pytools: 2.0 MiB of unused numpy files left out
+  strip: WARNING, 7 files left unstripped (the tool refused them): libRmath-julia.dll, libddierckx.dll, libdl.dll, libearcut.dll, libopenspecfun.dll, libsqlite3-0.dll, libstdc++-6.dll
+  strip: 69 libraries, 2 executables, 1505.6 MiB -> 1240.3 MiB (saved 265.3 MiB)
+stage bundle ok        19.4 s
+archive (7-Zip) ok      3892.6 s
+total      610.0 min
+
+--- step: stage bundle ---
+C:\Program Files\LLVM\bin\llvm-strip.exe: error: permission denied   (x 3)
+C:\Program Files\LLVM\bin\llvm-strip.exe: error: 'C:\Users\Nathan\AppData\Local\baysol-cache\baysol-pkg-work\bundle\baysol\libearcut.dll': invalid SymbolTabl...
+C:\Program Files\LLVM\bin\llvm-strip.exe: error: permission denied   (x 2)
+C:\Program Files\LLVM\bin\llvm-strip.exe: error: 'C:\Users\Nathan\AppData\Local\baysol-cache\baysol-pkg-work\bundle\baysol\libstdc++-6.dll': invalid SymbolTa...
+C:\Program Files\LLVM\bin\llvm-strip.exe: error: permission denied   (x 3)
+C:\Program Files\LLVM\bin\llvm-strip.exe: error: 'C:\Users\Nathan\AppData\Local\baysol-cache\baysol-pkg-work\bundle\baysol\libearcut.dll': invalid SymbolTabl...
+C:\Program Files\LLVM\bin\llvm-strip.exe: error: permission denied   (x 2)
+C:\Program Files\LLVM\bin\llvm-strip.exe: error: 'C:\Users\Nathan\AppData\Local\baysol-cache\baysol-pkg-work\bundle\baysol\libstdc++-6.dll': invalid SymbolTa...
+
+--- step: archive (7-Zip) ---
+7-Zip (a) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+
+Scanning the drive:
+14 folders, 113 files, 1300584192 bytes (1241 MiB)
+
+Creating archive: C:\Users\Nathan\BAYSOL\baysol-0.5.1-windows-x64.zip
+
+Add new data to archive: 14 folders, 113 files, 1300584192 bytes (1241 MiB)
+
+Files read from disk: 113
+Archive size: 318994015 bytes (305 MiB)
+Everything is Ok
+
+--- machine ---
+cpu     	Intel(R) Core(TM) i5-8400 CPU @ 2.80GHz
+threads 	6
+ram     	0 MiB
+swap    	0 MiB

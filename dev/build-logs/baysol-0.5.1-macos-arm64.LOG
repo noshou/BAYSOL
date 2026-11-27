@@ -1,0 +1,2151 @@
+datetime        	2026-11-26 18:48:36 -0500
+version 	v0.5.1 pẽnegda
+archive 	baysol-0.5.1-macos-arm64.zip
+revision        	d67550c9
+julia   	1.12.7
+node    	26.13.1
+python  	3.12
+system  	darwin-arm64, Darwin
+
+--- stages ---
+julia packages tui/julia (cold depot) ok       318.4 s   peak RAM 6464 MiB, swap 288 MiB
+julia packages test (cold depot) ok       268.1 s   peak RAM 6395 MiB, swap 288 MiB
+julia packages test/fitting_tests (cold depot) ok       173.3 s   peak RAM 5955 MiB, swap 288 MiB
+stage pytools ok       174.0 s   peak RAM 6229 MiB, swap 280 MiB
+stage tui  ok         8.1 s   peak RAM 731 MiB, swap 280 MiB
+  trace: 48 fits to run
+  fit SASDMJ9                          ok        19.0 s   peak RAM 2233 MiB, swap 280 MiB
+  fit SASDAN8                          ok        24.2 s   peak RAM 2447 MiB, swap 280 MiB
+  fit SASDAH5                          ok        14.1 s   peak RAM 2434 MiB, swap 280 MiB
+  fit SASDVA2                          ok       270.3 s   peak RAM 4743 MiB, swap 280 MiB
+  fit SASDMC6                          ok        18.2 s   peak RAM 2491 MiB, swap 280 MiB
+  fit SASDUX3                          ok       368.9 s   peak RAM 7549 MiB, swap 280 MiB
+  fit SASDX52                          ok        46.4 s   peak RAM 3406 MiB, swap 280 MiB
+  fit SASDJ66                          ok        32.4 s   peak RAM 4024 MiB, swap 280 MiB
+  fit SASDP74                          ok       151.1 s   peak RAM 3294 MiB, swap 280 MiB
+  fit SASDG44                          ok        28.3 s   peak RAM 2895 MiB, swap 280 MiB
+  fit SASDAP8                          ok       344.5 s   peak RAM 6144 MiB, swap 280 MiB
+  fit SASDT65                          ok       133.4 s   peak RAM 3969 MiB, swap 280 MiB
+  fit SASDTV4                          ok       302.5 s   peak RAM 4227 MiB, swap 280 MiB
+  fit SASDCE8                          ok       167.3 s   peak RAM 8766 MiB, swap 280 MiB
+  fit SYN-1BNA-bsa-rna                 ok         6.2 s   peak RAM 1178 MiB, swap 280 MiB
+  fit SYN-1BNA-ficoll70                ok         6.1 s   peak RAM 1196 MiB, swap 280 MiB
+  fit SYN-1BNA-nacl2m                  ok         4.1 s   peak RAM 890 MiB, swap 280 MiB
+  fit SYN-1BNA-peg3350                 ok         6.1 s   peak RAM 1191 MiB, swap 280 MiB
+  fit SYN-1BNA-pll                     ok         6.1 s   peak RAM 1197 MiB, swap 280 MiB
+  fit SYN-1BNA-ternary                 ok         4.1 s   peak RAM 891 MiB, swap 280 MiB
+  fit SYN-1BNA-tmao1m                  ok         4.1 s   peak RAM 894 MiB, swap 280 MiB
+  fit SYN-1BNA-trna2                   ok         6.1 s   peak RAM 1225 MiB, swap 280 MiB
+  fit SYN-1CRN-dna-rna                 ok         6.1 s   peak RAM 1247 MiB, swap 280 MiB
+  fit SYN-1CRN-glycerol40              ok         6.1 s   peak RAM 1211 MiB, swap 280 MiB
+  fit SYN-1CRN-ova50                   ok         6.1 s   peak RAM 1214 MiB, swap 280 MiB
+  fit SYN-1CRN-peg400                  ok         6.1 s   peak RAM 1194 MiB, swap 280 MiB
+  fit SYN-1CRN-pva                     ok         6.1 s   peak RAM 1208 MiB, swap 280 MiB
+  fit SYN-1CRN-water                   ok         4.1 s   peak RAM 934 MiB, swap 280 MiB
+  fit SYN-1EHZ-argtris                 ok         6.1 s   peak RAM 1187 MiB, swap 280 MiB
+  fit SYN-1EHZ-dnaduplex1              ok         6.1 s   peak RAM 1190 MiB, swap 280 MiB
+  fit SYN-1EHZ-peg-bsa                 ok         6.1 s   peak RAM 1225 MiB, swap 280 MiB
+  fit SYN-1EHZ-peg20000                ok         6.1 s   peak RAM 1207 MiB, swap 280 MiB
+  fit SYN-1EHZ-pvp                     ok         6.1 s   peak RAM 1202 MiB, swap 280 MiB
+  fit SYN-1EHZ-sucrose30               ok         6.1 s   peak RAM 1284 MiB, swap 280 MiB
+  fit SYN-1EHZ-ubq30                   ok         6.1 s   peak RAM 1220 MiB, swap 280 MiB
+  fit SYN-1UBQ-dextran70               ok         6.1 s   peak RAM 1194 MiB, swap 280 MiB
+  fit SYN-1UBQ-dna24at1                ok         6.1 s   peak RAM 1252 MiB, swap 280 MiB
+  fit SYN-1UBQ-imidazole300            ok         6.1 s   peak RAM 1194 MiB, swap 280 MiB
+  fit SYN-1UBQ-lyz20                   ok         6.1 s   peak RAM 1230 MiB, swap 280 MiB
+  fit SYN-1UBQ-nacl150                 ok         6.1 s   peak RAM 1229 MiB, swap 280 MiB
+  fit SYN-1UBQ-urea6m                  ok         6.1 s   peak RAM 935 MiB, swap 280 MiB
+  fit SYN-6LYZ-bsa100                  ok         6.2 s   peak RAM 1248 MiB, swap 280 MiB
+  fit SYN-6LYZ-gdmcl4m                 ok         6.1 s   peak RAM 1252 MiB, swap 280 MiB
+  fit SYN-6LYZ-mgcl2kcl                ok         6.1 s   peak RAM 1238 MiB, swap 280 MiB
+  fit SYN-6LYZ-peg8000                 ok         6.1 s   peak RAM 1207 MiB, swap 280 MiB
+  fit SYN-6LYZ-pluronicf127            ok         6.1 s   peak RAM 1194 MiB, swap 280 MiB
+  fit SYN-6LYZ-rnaap24                 ok         6.1 s   peak RAM 1248 MiB, swap 280 MiB
+  fit SYN-6LYZ-ubq-dna                 ok         6.1 s   peak RAM 1247 MiB, swap 280 MiB
+  unit suite                           ok       433.4 s   peak RAM 5109 MiB, swap 280 MiB
+  tui test buffer.test.jl              ok         8.1 s   peak RAM 1256 MiB, swap 272 MiB
+  tui test cli.test.jl                 ok        30.2 s   peak RAM 2312 MiB, swap 272 MiB
+  tui test run-project.test.jl         ok        88.7 s   peak RAM 2022 MiB, swap 272 MiB
+  tui test settings-file.test.jl       ok        22.2 s   peak RAM 1361 MiB, swap 272 MiB
+  cli run SASDMJ9                      ok        26.3 s   peak RAM 2411 MiB, swap 272 MiB
+  tui run SASDMJ9                      ok        26.2 s   peak RAM 2576 MiB, swap 272 MiB
+  cli run SASDAN8                      ok        62.5 s   peak RAM 2904 MiB, swap 272 MiB
+  tui run SASDAN8                      ok        62.4 s   peak RAM 3012 MiB, swap 272 MiB
+  cli run SASDAH5                      ok        26.3 s   peak RAM 2916 MiB, swap 272 MiB
+  tui run SASDAH5                      ok        26.2 s   peak RAM 2868 MiB, swap 272 MiB
+  cli run SASDVA2                      ok       124.9 s   peak RAM 4762 MiB, swap 272 MiB
+  tui run SASDVA2                      ok       189.5 s   peak RAM 4817 MiB, swap 272 MiB
+  cli run SASDMC6                      ok       125.0 s   peak RAM 4076 MiB, swap 272 MiB
+  tui run SASDMC6                      ok       167.4 s   peak RAM 4226 MiB, swap 272 MiB
+  output variants SASDMJ9 (rendered: false) ok        36.4 s   peak RAM 2606 MiB, swap 272 MiB
+  trace: 5427 merged statements
+stage trace ok      3582.0 s   peak RAM 8767 MiB, swap 280 MiB
+  juliac (precompile, workload fits, compile, link) ok      1856.1 s   peak RAM 8260 MiB, swap 272 MiB
+  juliac: statements: 5400 compiled, 27 not
+stage julia ok      1858.0 s   peak RAM 8272 MiB, swap 272 MiB
+  pytools: 2.8 MiB of unused numpy files left out
+  strip: 53 libraries, 2 executables, 1185.5 MiB -> 1153.3 MiB (saved 32.2 MiB)
+stage bundle ok        16.7 s   peak RAM 2490 MiB, swap 272 MiB
+archive (7-Zip) ok      2741.1 s   peak RAM 730 MiB, swap 272 MiB
+total      152.3 min
+
+--- step: julia packages tui/julia (cold depot) ---
+Precompiling packages...
+  72490.6 ms  ✓ Pkg (serial)
+  1 dependency successfully precompiled in 73 seconds
+  Installing known registries into `~/Library/Caches/baysol/baysol-pkg-work/depot`
+       Added `General` registry to ~/Library/Caches/baysol/baysol-pkg-work/depot/registries
+   Installed HypergeometricFunctions ───── v0.3.31
+   Installed ConsoleProgressMonitor ────── v0.1.2
+   Installed BioGenerics ───────────────── v0.1.6
+   Installed LoggingExtras ─────────────── v1.2.0
+   Installed Accessors ─────────────────── v0.1.46
+   Installed Preferences ───────────────── v1.6.1
+   Installed StatsFuns ─────────────────── v2.3.1
+   Installed AbstractMCMC ──────────────── v5.18.0
+   Installed PDMats ────────────────────── v0.11.41
+   Installed MarchingCubes ─────────────── v0.1.11
+   Installed Dierckx ───────────────────── v0.5.4
+   Installed ColorSchemes ──────────────── v3.32.0
+   Installed EarCut_jll ────────────────── v3.2.3+0
+   Installed InlineStrings ─────────────── v2.0.1
+   Installed Contour ───────────────────── v0.6.3
+   Installed StaticArrays ──────────────── v1.9.25
+   Installed ProgressMeter ─────────────── v1.13.0
+   Installed Roots ─────────────────────── v3.0.14
+   Installed EnumX ─────────────────────── v1.0.7
+   Installed UnicodePlots ──────────────── v3.9.0
+   Installed Statistics ────────────────── v1.11.5
+   Installed NearestNeighbors ──────────── v0.4.29
+   Installed InitialValues ─────────────── v0.3.1
+   Installed Polynomials ───────────────── v4.1.6
+   Installed Gamma ─────────────────────── v1.2.1
+   Installed Quickhull ─────────────────── v0.2.2
+   Installed LogDensityProblemsAD ──────── v1.13.2
+   Installed Distances ─────────────────── v0.10.12
+   Installed Missings ──────────────────── v1.2.1
+   Installed SIMD ──────────────────────── v3.8.2
+   Installed IrrationalConstants ───────── v0.2.7
+   Installed CodecInflate64 ────────────── v0.1.3
+   Installed FiniteDiff ────────────────── v2.33.0
+   Installed ZipArchives ───────────────── v2.6.1
+   Installed PtrArrays ─────────────────── v1.4.0
+... 187 lines left out ...
+    676.7 ms  ✓ JLLWrappers
+    319.4 ms  ✓ PrecompileTools
+    627.7 ms  ✓ SuiteSparse
+    603.1 ms  ✓ FillArrays → FillArraysSparseArraysExt
+    400.1 ms  ✓ Statistics → SparseArraysExt
+    592.2 ms  ✓ Adapt → AdaptSparseArraysExt
+    575.8 ms  ✓ Distances → DistancesSparseArraysExt
+    483.8 ms  ✓ ColorTypes → StyledStringsExt
+   2010.8 ms  ✓ ColorVectorSpace
+    520.5 ms  ✓ SortingAlgorithms
+   1066.3 ms  ✓ QuadGK
+   2886.2 ms  ✓ Colors
+    493.6 ms  ✓ LogDensityProblemsAD
+    501.5 ms  ✓ LogExpFunctions → LogExpFunctionsInverseFunctionsExt
+    513.9 ms  ✓ Gamma
+    792.4 ms  ✓ TerminalLoggers
+    809.4 ms  ✓ Setfield
+    588.0 ms  ✓ ArrayInterface → ArrayInterfaceSparseArraysExt
+    278.2 ms  ✓ ArrayInterface → ArrayInterfaceFillArraysExt
+    246.0 ms  ✓ ArrayInterface → ArrayInterfaceStaticArraysCoreExt
+   2143.4 ms  ✓ Accessors
+    530.5 ms  ✓ dlfcn_win32_jll
+    360.1 ms  ✓ Rmath_jll
+   1582.9 ms  ✓ Tables
+    358.7 ms  ✓ EarCut_jll
+    582.9 ms  ✓ Dierckx_jll
+    391.0 ms  ✓ OpenSpecFun_jll
+   1032.9 ms  ✓ RecipesBase
+    495.9 ms  ✓ ADTypes
+    289.5 ms  ✓ CommonSolve
+    691.8 ms  ✓ BioSymbols
+   1959.6 ms  ✓ SIMD
+   5032.5 ms  ✓ StaticArrays
+   4484.5 ms  ✓ ZipArchives
+   5553.4 ms  ✓ Parsers
+    841.9 ms  ✓ PDMats
+   2596.7 ms  ✓ StatsBase
+   3060.8 ms  ✓ ColorSchemes
+    910.1 ms  ✓ HypergeometricFunctions
+    393.6 ms  ✓ FiniteDiff
+    495.6 ms  ✓ Accessors → LinearAlgebraExt
+    370.7 ms  ✓ SQLite_jll
+    791.0 ms  ✓ Rmath
+   1208.7 ms  ✓ StructArrays
+    268.4 ms  ✓ StructUtils → StructUtilsTablesExt
+  30697.4 ms  ✓ REPL
+   2688.1 ms  ✓ PGFPlotsX
+    825.0 ms  ✓ Dierckx
+   1464.4 ms  ✓ DifferentiationInterface
+    266.0 ms  ✓ ADTypes → ADTypesConstructionBaseExt
+   1928.9 ms  ✓ SpecialFunctions
+    508.7 ms  ✓ LogDensityProblemsAD → LogDensityProblemsADADTypesExt
+    602.6 ms  ✓ Peaks
+    483.6 ms  ✓ MultiFloats
+    622.9 ms  ✓ StaticArrays → StaticArraysStatisticsExt
+    404.3 ms  ✓ FillArrays → FillArraysStaticArraysExt
+    361.9 ms  ✓ Adapt → AdaptStaticArraysExt
+    368.6 ms  ✓ ConstructionBase → ConstructionBaseStaticArraysExt
+    389.7 ms  ✓ Accessors → StaticArraysExt
+  11981.1 ms  ✓ Polynomials
+    266.1 ms  ✓ InlineStrings → ParsersExt
+   2477.0 ms  ✓ MarchingCubes
+   5975.7 ms  ✓ JSON3
+   8250.6 ms  ✓ JSON
+    626.6 ms  ✓ FillArrays → FillArraysPDMatsExt
+    660.0 ms  ✓ PDMats → StatsBaseExt
+    575.5 ms  ✓ FiniteDiff → FiniteDiffSparseArraysExt
+    369.5 ms  ✓ FiniteDiff → FiniteDiffStaticArraysExt
+    815.0 ms  ✓ BangBang
+   2348.1 ms  ✓ Roots
+   2156.7 ms  ✓ SQLite
+    456.5 ms  ✓ StructArrays → StructArraysAdaptExt
+    422.7 ms  ✓ StructArrays → StructArraysSparseArraysExt
+    280.7 ms  ✓ StructArrays → StructArraysLinearAlgebraExt
+    931.1 ms  ✓ StructArrays → StructArraysStaticArraysExt
+    313.8 ms  ✓ Accessors → StructArraysExt
+    444.6 ms  ✓ StructUtils → StructUtilsDBInterfaceExt
+    704.4 ms  ✓ PGFPlotsX → ContourExt
+   1151.1 ms  ✓ BAYSOLSetup
+    400.1 ms  ✓ PGFPlotsX → ColorsExt
+    562.5 ms  ✓ PGFPlotsX → StatsBaseExt
+    322.4 ms  ✓ DifferentiationInterface → DifferentiationInterfaceFiniteDiffExt
+    562.4 ms  ✓ DifferentiationInterface → DifferentiationInterfaceStaticArraysExt
+    382.0 ms  ✓ DiffRules
+    438.6 ms  ✓ DifferentiationInterface → DifferentiationInterfaceSparseArraysExt
+    674.1 ms  ✓ ColorVectorSpace → SpecialFunctionsExt
+    624.8 ms  ✓ LogDensityProblemsAD → LogDensityProblemsADDifferentiationInterfaceExt
+   1732.5 ms  ✓ StatsFuns
+    699.1 ms  ✓ Peaks → PlotsExt
+    942.9 ms  ✓ Polynomials → PolynomialsRecipesBaseExt
+   3096.2 ms  ✓ NearestNeighbors
+    564.7 ms  ✓ JSON → JSONSerializationExt
+   5832.4 ms  ✓ BioStructures
+    605.5 ms  ✓ BangBang → BangBangStaticArraysExt
+   2425.0 ms  ✓ AbstractMCMC
+    312.4 ms  ✓ BangBang → BangBangStructArraysExt
+    313.1 ms  ✓ BangBang → BangBangTablesExt
+   4647.7 ms  ✓ GeometryBasics
+   1180.8 ms  ✓ NLSolversBase
+   2958.7 ms  ✓ ForwardDiff
+    489.3 ms  ✓ StatsFuns → InverseFunctionsExt
+   1033.3 ms  ✓ MCMCDiagnosticTools
+   2068.1 ms  ✓ AdvancedHMC
+  42389.7 ms  ✓ XLSX
+   1187.4 ms  ✓ LineSearches
+    651.3 ms  ✓ ForwardDiff → ForwardDiffStaticArraysExt
+    385.0 ms  ✓ LogDensityProblemsAD → LogDensityProblemsADForwardDiffExt
+    938.9 ms  ✓ DifferentiationInterface → DifferentiationInterfaceForwardDiffExt
+    579.5 ms  ✓ Roots → RootsForwardDiffExt
+   4100.1 ms  ✓ Distributions
+    879.4 ms  ✓ AdvancedHMC → AdvancedHMCADTypesExt
+   1099.7 ms  ✓ XLSX → StyledStringsSstsExt
+   3354.3 ms  ✓ Optim
+  40178.6 ms  ✓ UnicodePlots
+  18166.6 ms  ✓ Quickhull
+ 119672.5 ms  ✓ BAYSOL
+   5901.5 ms  ✓ BAYSOLRun
+  203 dependencies successfully precompiled in 239 seconds. 19 already precompiled.
+  19 dependencies precompiled but different versions are currently loaded (ArgTools, Base64, Dates, Downloads, JuliaSyntaxHighlighting, LibCURL, LibCURL_jll,...
+  1 dependency had output during precompilation:
+
+--- step: julia packages test (cold depot) ---
+   Installed HypergeometricFunctions ── v0.3.30
+   Installed Compiler ───────────────── v0.1.1
+   Installed BioGenerics ────────────── v0.1.5
+   Installed OffsetArrays ───────────── v1.17.0
+   Installed StatsFuns ──────────────── v2.2.1
+   Installed Accessors ──────────────── v0.1.45
+   Installed Preferences ────────────── v1.6.0
+   Installed StatisticalTraits ──────── v3.5.0
+   Installed ProgressMeter ──────────── v1.11.0
+   Installed Pidfile ────────────────── v1.3.0
+   Installed AbstractMCMC ───────────── v5.16.0
+   Installed InlineStrings ──────────── v1.4.6
+   Installed Tracy ──────────────────── v0.1.6
+   Installed CEnum ──────────────────── v0.5.0
+   Installed LegendrePolynomials ────── v0.4.5
+   Installed CodeTracking ───────────── v3.0.2
+   Installed AllocCheck ─────────────── v0.2.6
+   Installed ExplicitImports ────────── v1.15.0
+   Installed Roots ──────────────────── v3.0.8
+   Installed StaticArrays ───────────── v1.9.22
+   Installed LibTracyClient_jll ─────── v0.13.1+0
+   Installed Polynomials ────────────── v4.1.3
+   Installed LogDensityProblemsAD ───── v1.13.1
+   Installed Gamma ──────────────────── v1.2.0
+   Installed Missings ───────────────── v1.2.0
+   Installed SIMD ───────────────────── v3.7.2
+   Installed CondaPkg ───────────────── v0.2.36
+   Installed Revise ─────────────────── v3.17.1
+   Installed IrrationalConstants ────── v0.2.6
+   Installed LoweredCodeUtils ───────── v3.9.0
+   Installed JSON ───────────────────── v1.8.1
+   Installed SpecialFunctions ───────── v2.9.0
+   Installed JuliaSyntax ────────────── v1.0.2
+   Installed LLVM ───────────────────── v9.13.2
+   Installed NaNMath ────────────────── v1.1.4
+   Installed ColorSchemes ───────────── v3.31.0
+   Installed StaticArraysCore ───────── v1.4.4
+   Installed MCMCDiagnosticTools ────── v0.3.19
+   Installed micromamba_jll ─────────── v2.3.1+0
+   Installed WeakRefStrings ─────────── v2.0.0
+... 103 lines left out ...
+    554.3 ms  ✓ JLLWrappers
+    627.9 ms  ✓ StatisticalTraits
+    427.3 ms  ✓ Compat → CompatLinearAlgebraExt
+    281.4 ms  ✓ Pidfile
+    523.7 ms  ✓ InverseFunctions → InverseFunctionsTestExt
+    452.5 ms  ✓ LogExpFunctions → LogExpFunctionsInverseFunctionsExt
+   1014.6 ms  ✓ AbstractFFTs → AbstractFFTsTestExt
+    516.5 ms  ✓ Gamma
+    650.6 ms  ✓ Setfield
+   1174.9 ms  ✓ StructArrays
+   2116.8 ms  ✓ Accessors
+   2272.2 ms  ✓ StatsBase
+    488.5 ms  ✓ ColorTypes → StyledStringsExt
+   5469.0 ms  ✓ JuliaInterpreter
+   1594.1 ms  ✓ ColorVectorSpace
+    904.7 ms  ✓ RecipesBase
+    487.5 ms  ✓ ADTypes
+    283.5 ms  ✓ CommonSolve
+   2623.5 ms  ✓ Colors
+    691.1 ms  ✓ BioSymbols
+   4964.0 ms  ✓ StaticArrays
+   3940.8 ms  ✓ ZipArchives
+   6060.8 ms  ✓ SIMD
+    507.2 ms  ✓ dlfcn_win32_jll
+    369.6 ms  ✓ Rmath_jll
+    362.2 ms  ✓ LibTracyClient_jll
+    368.8 ms  ✓ Dierckx_jll
+   5515.8 ms  ✓ Parsers
+    361.1 ms  ✓ EarCut_jll
+    820.2 ms  ✓ micromamba_jll
+    961.4 ms  ✓ LLVMExtra_jll
+    391.4 ms  ✓ OpenSpecFun_jll
+    660.3 ms  ✓ pixi_jll
+    734.9 ms  ✓ MLJModelInterface
+   1251.1 ms  ✓ Aqua
+    901.0 ms  ✓ HypergeometricFunctions
+    440.5 ms  ✓ StructArrays → StructArraysAdaptExt
+    422.2 ms  ✓ StructArrays → StructArraysSparseArraysExt
+    279.9 ms  ✓ StructArrays → StructArraysLinearAlgebraExt
+    504.1 ms  ✓ Accessors → StructArraysExt
+    299.3 ms  ✓ Accessors → LinearAlgebraExt
+    385.6 ms  ✓ Accessors → TestExt
+    691.4 ms  ✓ PDMats → StatsBaseExt
+    594.8 ms  ✓ PGFPlotsX → StatsBaseExt
+   6646.1 ms  ✓ LoweredCodeUtils
+   1318.7 ms  ✓ DifferentiationInterface
+    248.5 ms  ✓ ADTypes → ADTypesConstructionBaseExt
+  12265.7 ms  ✓ Polynomials
+    507.2 ms  ✓ LogDensityProblemsAD → LogDensityProblemsADADTypesExt
+    603.4 ms  ✓ PGFPlotsX → ColorsExt
+   2637.0 ms  ✓ ColorSchemes
+    601.8 ms  ✓ StaticArrays → StaticArraysStatisticsExt
+    383.6 ms  ✓ FillArrays → FillArraysStaticArraysExt
+    358.8 ms  ✓ Adapt → AdaptStaticArraysExt
+    378.3 ms  ✓ ConstructionBase → ConstructionBaseStaticArraysExt
+  23258.1 ms  ✓ ExplicitImports
+    356.5 ms  ✓ FiniteDiff → FiniteDiffStaticArraysExt
+    925.7 ms  ✓ StructArrays → StructArraysStaticArraysExt
+   5631.1 ms  ✓ BioStructures
+    383.2 ms  ✓ Accessors → StaticArraysExt
+   2479.4 ms  ✓ MarchingCubes
+   1006.3 ms  ✓ Peaks
+    812.4 ms  ✓ MultiFloats
+    379.8 ms  ✓ SQLite_jll
+    587.6 ms  ✓ Rmath
+    592.1 ms  ✓ Dierckx
+   1356.3 ms  ✓ Tracy
+    288.8 ms  ✓ InlineStrings → ParsersExt
+   4033.5 ms  ✓ JSON
+   5744.5 ms  ✓ JSON3
+   1739.9 ms  ✓ MicroMamba
+   1550.1 ms  ✓ SpecialFunctions
+    652.8 ms  ✓ BangBang
+   2222.5 ms  ✓ Roots
+   5835.7 ms  ✓ LLVM
+    577.1 ms  ✓ DifferentiationInterface → DifferentiationInterfaceStaticArraysExt
+    326.2 ms  ✓ DifferentiationInterface → DifferentiationInterfaceFiniteDiffExt
+    450.5 ms  ✓ DifferentiationInterface → DifferentiationInterfaceSparseArraysExt
+   1009.4 ms  ✓ Polynomials → PolynomialsRecipesBaseExt
+    496.9 ms  ✓ LogDensityProblemsAD → LogDensityProblemsADDifferentiationInterfaceExt
+   3185.0 ms  ✓ NearestNeighbors
+  10018.6 ms  ✓ Revise
+   4285.2 ms  ✓ GeometryBasics
+    847.3 ms  ✓ Peaks → PlotsExt
+   1925.9 ms  ✓ SQLite
+   1855.7 ms  ✓ CondaPkg
+    593.4 ms  ✓ LegendrePolynomials
+    378.4 ms  ✓ DiffRules
+    341.7 ms  ✓ ColorVectorSpace → SpecialFunctionsExt
+   1579.7 ms  ✓ StatsFuns
+    622.0 ms  ✓ BangBang → BangBangStaticArraysExt
+   1888.6 ms  ✓ AbstractMCMC
+    313.7 ms  ✓ BangBang → BangBangStructArraysExt
+    308.3 ms  ✓ BangBang → BangBangTablesExt
+  34009.2 ms  ✓ XLSX
+   1159.4 ms  ✓ NLSolversBase
+    771.4 ms  ✓ Revise → DistributedExt
+  40614.3 ms  ✓ UnicodePlots
+  31060.9 ms  ✓ GPUCompiler
+   2888.0 ms  ✓ ForwardDiff
+    507.9 ms  ✓ StatsFuns → StatsFunsInverseFunctionsExt
+   2128.1 ms  ✓ AdvancedHMC
+   1020.5 ms  ✓ XLSX → StyledStringsSstsExt
+   1209.5 ms  ✓ LineSearches
+   1310.6 ms  ✓ AllocCheck
+    652.6 ms  ✓ ForwardDiff → ForwardDiffStaticArraysExt
+    387.7 ms  ✓ LogDensityProblemsAD → LogDensityProblemsADForwardDiffExt
+    924.9 ms  ✓ DifferentiationInterface → DifferentiationInterfaceForwardDiffExt
+    559.3 ms  ✓ Roots → RootsForwardDiffExt
+   3997.3 ms  ✓ Distributions
+  18914.1 ms  ✓ Quickhull
+    858.8 ms  ✓ AdvancedHMC → AdvancedHMCADTypesExt
+   1096.8 ms  ✓ Distributions → DistributionsTestExt
+   1361.4 ms  ✓ MCMCDiagnosticTools
+   2721.9 ms  ✓ Optim
+  59851.9 ms  ✓ JET
+ 125254.2 ms  ✓ BAYSOL
+  172 dependencies successfully precompiled in 264 seconds. 88 already precompiled.
+  24 dependencies precompiled but different versions are currently loaded (ArgTools, Base64, Dates, Downloads, JuliaSyntaxHighlighting, LibCURL, LibCURL_jll,...
+  2 dependencies had output during precompilation:
+
+--- step: julia packages test/fitting_tests (cold depot) ---
+   Installed DelimitedFiles ─ v1.9.1
+   Installed EarCut_jll ───── v2.2.4+0
+   Installed JSON ─────────── v1.9.0
+   Installed ColorTypes ───── v0.12.1
+   Installed GeometryBasics ─ v0.5.13
+   Installed Colors ───────── v0.13.1
+   Installed AbstractMCMC ─── v5.17.0
+  Installing 1 artifacts
+   Installed artifact EarCut      46.5 KiB
+Precompiling packages...
+    317.9 ms  ✓ DelimitedFiles
+    364.5 ms  ✓ EarCut_jll
+   1291.5 ms  ✓ ColorTypes
+   1567.7 ms  ✓ AbstractMCMC
+   1778.8 ms  ✓ ColorVectorSpace
+    283.9 ms  ✓ ColorTypes → StyledStringsExt
+   4667.9 ms  ✓ JSON
+   2628.0 ms  ✓ Colors
+    558.5 ms  ✓ ColorVectorSpace → SpecialFunctionsExt
+   2044.6 ms  ✓ AdvancedHMC
+   1458.2 ms  ✓ CondaPkg
+   7386.1 ms  ✓ GeometryBasics
+    400.9 ms  ✓ PGFPlotsX → ColorsExt
+    838.0 ms  ✓ AdvancedHMC → AdvancedHMCADTypesExt
+   2376.4 ms  ✓ ColorSchemes
+  18075.8 ms  ✓ Quickhull
+  32816.6 ms  ✓ XLSX
+    941.7 ms  ✓ XLSX → StyledStringsSstsExt
+  37543.3 ms  ✓ UnicodePlots
+ 120525.6 ms  ✓ BAYSOL
+  20 dependencies successfully precompiled in 169 seconds. 209 already precompiled.
+  24 dependencies precompiled but different versions are currently loaded (ArgTools, Base64, Dates, Downloads, JuliaSyntaxHighlighting, LibCURL, LibCURL_jll,...
+
+--- step: stage pytools ---
+Using CPython 3.12.16
+Creating virtual environment at: /Users/noso/Library/Caches/baysol/baysol-pkg-work/pyvenv
+Activate with: source /Users/noso/Library/Caches/baysol/baysol-pkg-work/pyvenv/bin/activate
+Using Python 3.12.16 environment at: /Users/noso/Library/Caches/baysol/baysol-pkg-work/pyvenv
+Resolved 11 packages in 1.19s
+   Building nuitka==4.3.5
+Downloading numpy (5.3MiB)
+ Downloaded numpy
+      Built nuitka==4.3.5
+Prepared 11 packages in 1.00s
+Installed 11 packages in 38ms
+ + certifi==2026.11.20
+ + charset-normalizer==3.5.3
+ + docutils==0.17.1
+ + idna==3.20
+ + mmcif-pdbx==2.1.0
+ + nuitka==4.3.5
+ + numpy==2.5.5
+ + pdb2pqr==3.7.1
+ + propka==3.5.1
+ + requests==2.34.2
+ + urllib3==2.8.0
+
+--- step: stage tui ---
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+100 55.6M  100 55.6M    0     0  48.9M      0  0:00:01  0:00:01 --:--:-- 48.9M
+Wrote single executable preparation blob to sea.blob
+Start injection of NODE_SEA_BLOB in baysol-tui...
+💉 Injection done!
+
+--- step: stage trace ---
+$ bysl fits export SASDMJ9 SASDAN8 SASDAH5 SASDVA2 SASDMC6 --out /Users/noso/Library/Caches/baysol/baysol-pkg-work/workload --from /Users/noso/Library/Caches...
+bysl fits export: writing into /Users/noso/Library/Caches/baysol/baysol-pkg-work/workload
+  SASDMJ9  written
+  SASDAN8  written
+  SASDAH5  written
+  SASDVA2  written
+  SASDMC6  written
+written 5, would write 0, exist 0, skipped 0
+
+7-Zip (a) [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=utf8,Utf16=on,HugeFiles=on,64 bits,8 CPUs LE)
+
+Scanning the drive for archives:
+1 file, 7435 bytes (8 KiB)
+
+Extracting archive: /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDMJ9-cli/reference-fit.7z
+--
+Path = /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDMJ9-cli/reference-fit.7z
+Type = 7z
+Physical Size = 7435
+Headers Size = 138
+Method = LZMA2:15
+Solid = -
+Blocks = 1
+
+Everything is Ok
+
+Size:       31935
+Compressed: 7435
+
+7-Zip (a) [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=utf8,Utf16=on,HugeFiles=on,64 bits,8 CPUs LE)
+
+Scanning the drive for archives:
+1 file, 11002 bytes (11 KiB)
+
+Extracting archive: /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDAN8-cli/reference-fit.7z
+--
+Path = /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDAN8-cli/reference-fit.7z
+Type = 7z
+Physical Size = 11002
+Headers Size = 170
+Method = LZMA2:15
+Solid = -
+Blocks = 1
+
+Everything is Ok
+
+Size:       29306
+Compressed: 11002
+
+7-Zip (a) [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=utf8,Utf16=on,HugeFiles=on,64 bits,8 CPUs LE)
+
+Scanning the drive for archives:
+1 file, 4307 bytes (5 KiB)
+
+Extracting archive: /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDAH5-cli/reference-fit.7z
+--
+Path = /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDAH5-cli/reference-fit.7z
+Type = 7z
+Physical Size = 4307
+Headers Size = 146
+Method = LZMA2:24k
+Solid = -
+Blocks = 1
+
+Everything is Ok
+
+Size:       17023
+Compressed: 4307
+
+7-Zip (a) [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=utf8,Utf16=on,HugeFiles=on,64 bits,8 CPUs LE)
+
+Scanning the drive for archives:
+1 file, 5308 bytes (6 KiB)
+
+Extracting archive: /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDMC6-cli/reference-fit.7z
+--
+Path = /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDMC6-cli/reference-fit.7z
+Type = 7z
+Physical Size = 5308
+Headers Size = 154
+Method = LZMA2:24k
+Solid = -
+Blocks = 1
+
+Everything is Ok
+
+Size:       22907
+Compressed: 5308
+
+7-Zip (a) [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=utf8,Utf16=on,HugeFiles=on,64 bits,8 CPUs LE)
+
+Scanning the drive for archives:
+1 file, 7435 bytes (8 KiB)
+
+Extracting archive: /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/outputs/reference-fit.7z
+--
+Path = /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/outputs/reference-fit.7z
+Type = 7z
+Physical Size = 7435
+Headers Size = 138
+Method = LZMA2:15
+Solid = -
+Blocks = 1
+
+Everything is Ok
+
+Size:       31935
+Compressed: 7435
+
+--- step: fit SASDMJ9 ---
+   [-1.31, -1.3 )    0
+   [-0.94, -0.93)    0
+
+   [1.8  , 1.805)    0
+   [1.805, 1.81 )    0
+   [1.81 , 1.815)    0
+   [1.82 , 1.825)    0
+   [1.825, 1.83 )    0
+
+   [1.1e-5 , 1.12e-5)    0
+
+   [0.1  , 0.102)    0
+
+Fit finished: reduced χ² = 0.86 on the measured points
+  ρₑ   0.3362  (0.3361–0.3362)
+  δρ₁  −1.078  (−1.194 – −0.9914)
+  δρ₂  1.965  (1.892–1.994)
+  δρ₃  −5.536  (−10.26 – 1.127)
+  Checks:  converged (R̂ 1.002)
+           no divergent transitions
+           8 of 8 chains used
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDMJ9/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDMJ9/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDMJ9/SASDMJ9.LOG
+Wall clock: 10.3 s
+$ bysl fits run SASDMJ9 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDMJ9
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDAN8 ---
+   [-3.64, -3.62)    0
+
+   [0.95, 1.0 )    0
+   [1.0 , 1.05)    0
+   [1.2 , 1.25)    0
+   [1.25, 1.3 )    0
+
+   [-16.5, -16.0)    0
+
+Fit finished: reduced χ² = 1.19 on the measured points
+  ρₑ   0.336  (0.3359–0.3361)
+  δρ₁  0.06571  (0.04595–0.09716)
+  δρ₂  −3.929  (−4.214 – −3.759)
+  δρ₃  2.554  (1.914–2.787)
+  Checks:  converged (R̂ 1.003)
+           no divergent transitions
+           8 of 8 chains used
+  Note: 2 posterior modes (see the modes sheet)
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDAN8/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDAN8/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDAN8/SASDAN8.LOG
+Wall clock: 18.9 s
+$ bysl fits run SASDAN8 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDAN8
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDAH5 ---
+   [1.984 , 1.9845)    0
+   [1.9855, 1.986 )    0
+   [1.986 , 1.9865)    0
+
+   [1.785, 1.79 )    0
+   [1.79 , 1.795)    0
+   [1.795, 1.8  )    0
+   [1.815, 1.82 )    0
+
+   [-3.15, -3.1 )    0
+   [-3.1 , -3.05)    0
+
+[ Info: 248 backbone-less polymer residue(s) of "hydrogenated.pdb" (248 atoms) kept as deposited, without hydrogens
+   [1.135e-6, 1.14e-6 )    0
+
+   [0.0582, 0.0584)    0
+   [0.0584, 0.0586)    0
+
+   [1.1848, 1.185 )    0
+   [1.185 , 1.1852)    0
+
+Fit finished: reduced χ² = 1.47 on the measured points
+  ρₑ   0.3376  (0.3373–0.3379)
+  δρ₁  1.997  (1.993–2)
+  δρ₂  1.955  (1.883–1.994)
+  δρ₃  −3.955  (−4.45 – −3.451)
+  Checks:  converged (R̂ 1.005)
+           no divergent transitions
+           8 of 8 chains used
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDAH5/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDAH5/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDAH5/SASDAH5.LOG
+Wall clock: 10.0 s
+$ bysl fits run SASDAH5 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDAH5
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDVA2 ---
+   [-1.6, -1.5)    0
+   [ 1.3,  1.4)    0
+
+[ Info: "SASDVA2_3ODQ": kept ligands from the HETATM records (HEM: 4 residue(s)); they scatter with the hydrogens the file gives, none are added
+   [-0.0035, -0.0034)    0
+
+   [0.99, 1.0 )    0
+   [1.0 , 1.01)    0
+   [1.01, 1.02)    0
+   [1.03, 1.04)    0
+
+Fit finished: reduced χ² = 1.17 on the measured points
+  ρₑ   0.3466  (0.3438–0.3497)
+  δρ₁  −0.06333  (−0.8047 – −0.001611)
+  δρ₂  0.5211  (−4.19 – 0.4448)
+  δρ₃  −2.072  (−9.045 – 1.844)
+  Checks:  converged (R̂ 1.003)
+           0.1 % divergent transitions
+           12 of 12 chains used
+  Note: 2 posterior modes (see the modes sheet)
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDVA2/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDVA2/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDVA2/SASDVA2.LOG
+Wall clock: 265.0 s
+$ bysl fits run SASDVA2 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDVA2
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDMC6 ---
+   [0.336355, 0.33636 )    0
+
+   [ 0.045,  0.05 )    0
+
+   [-3.4, -3.2)    0
+
+[ Info: "SASDMC6_fit1_model1": kept ligands from the HETATM records (K: 2 residue(s)); they scatter with the hydrogens the file gives, none are added
+
+   [1.242 , 1.2425)    0
+
+Fit finished: reduced χ² = 3.17 on the measured points
+  ρₑ   0.3363  (0.3362–0.3363)
+  δρ₁  −0.02766  (−0.0592 – 0.00815)
+  δρ₂  0.3508  (−1.464 – 1.86)
+  δρ₃  −2.364  (−9.289 – 2.559)
+  Checks:  converged (R̂ 1.009)
+           0.0 % divergent transitions
+           8 of 8 chains used
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDMC6/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDMC6/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDMC6/SASDMC6.LOG
+Wall clock: 12.9 s
+$ bysl fits run SASDMC6 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDMC6
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDUX3 ---
+   [-4.0, -3.8)    0
+
+[ Info: pdb2pqr dropped 17 heavy atom(s) of "SASDUX3_fit1_model1.pdb"; restored from the input
+[ Info: "SASDUX3_fit1_model1": kept ligands from the HETATM records (ADP: 17 residue(s), MG: 17 residue(s)); they scatter with the hydrogens the file gives, ...
+   [0.000105, 0.00011 )    0
+
+   [ 1.0,  1.5)    0
+   [ 1.5,  2.0)    0
+
+   [1.16, 1.18)    0
+   [1.18, 1.2 )    0
+   [1.2 , 1.22)    0
+
+Fit finished: reduced χ² = 0.91 on the measured points
+  ρₑ   0.3357  (0.3355–0.3358)
+  δρ₁  −0.2029  (−1.007 – 1.769)
+  δρ₂  −0.7519  (−1.863 – 1.637)
+  δρ₃  −1.814  (−9.268 – 2.315)
+  Checks:  converged (R̂ 1.000)
+           0.0 % divergent transitions
+           10 of 10 chains used
+  Note: 2 posterior modes (see the modes sheet)
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDUX3/res_fit1.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDUX3/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDUX3/SASDUX3.LOG
+Wall clock: 363.4 s
+$ bysl fits run SASDUX3 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDUX3
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDX52 ---
+   [0.3398 , 0.33985)    0
+   [0.34145, 0.3415 )    0
+
+   [-0.74, -0.72)    0
+   [-0.72, -0.7 )    0
+   [-0.7 , -0.68)    0
+   [-0.68, -0.66)    0
+   [-0.66, -0.64)    0
+   [-0.64, -0.62)    0
+
+   [-0.4, -0.2)    0
+
+   [2.3e-8, 2.4e-8)    0
+   [2.6e-8, 2.7e-8)    0
+   [2.8e-8, 2.9e-8)    0
+
+Fit finished: reduced χ² = 0.29 on the measured points
+  ρₑ   0.3406  (0.3402–0.341)
+  δρ₁  −0.3319  (−0.434 – −0.1028)
+  δρ₂  −4.487  (−5.73 – −1.559)
+  δρ₃  −5.844  (−4.714 – 2.696)
+  Checks:  converged (R̂ 1.002)
+           0.1 % divergent transitions
+           10 of 10 chains used
+  Note: 2 posterior modes (see the modes sheet)
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDX52/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDX52/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDX52/SASDX52.LOG
+Wall clock: 40.9 s
+$ bysl fits run SASDX52 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDX52
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDJ66 ---
+   [0.33512, 0.33513)    0
+
+   [-4.8, -4.6)    0
+
+[ Info: pdb2pqr dropped 2 heavy atom(s) of "SASDJ66_fit1_model1.pdb"; restored from the input (2 H5T removed with the restored phosphorus)
+   [4.0e-5, 4.2e-5)    0
+   [4.6e-5, 4.8e-5)    0
+
+   [-0.06, -0.05)    0
+   [-0.04, -0.03)    0
+   [-0.01,  0.0 )    0
+   [ 0.0 ,  0.01)    0
+   [ 0.02,  0.03)    0
+
+   [1.21, 1.22)    0
+   [1.22, 1.23)    0
+   [1.23, 1.24)    0
+   [1.24, 1.25)    0
+   [1.25, 1.26)    0
+   [1.26, 1.27)    0
+
+Fit finished: reduced χ² = 0.99 on the measured points
+  ρₑ   0.3353  (0.3352–0.3354)
+  δρ₁  −0.8679  (−1.064 – 1.827)
+  δρ₂  0.3165  (−2.532 – 1.711)
+  δρ₃  −2.153  (−9.04 – 2.49)
+  Checks:  converged (R̂ 1.004)
+           0.0 % divergent transitions
+           9 of 9 chains used
+  Note: c1 (excluded volume) sits on its bound
+  Note: 2 posterior modes (see the modes sheet)
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDJ66/res_fit1.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDJ66/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDJ66/SASDJ66.LOG
+Wall clock: 28.0 s
+$ bysl fits run SASDJ66 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDJ66
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDP74 ---
+   [0.33618, 0.33619)    0
+
+   [ 0.04,  0.06)    0
+   [ 0.06,  0.08)    0
+
+   [-1.4, -1.3)    0
+   [-1.3, -1.2)    0
+   [-1.2, -1.1)    0
+
+   [2.5e-7 , 3.0e-7 )    0
+
+   [-0.0078, -0.0076)    0
+
+   [1.278, 1.279)    0
+   [1.279, 1.28 )    0
+
+Fit finished: reduced χ² = 1.03 on the measured points
+  ρₑ   0.3361  (0.336–0.3361)
+  δρ₁  −0.1599  (−0.3169 – −0.03828)
+  δρ₂  0.232  (−0.4025 – 0.7524)
+  δρ₃  −8.463  (−10.84 – −2.541)
+  Checks:  converged (R̂ 1.003)
+           0.0 % divergent transitions
+           8 of 8 chains used
+  Note: 2 posterior modes (see the modes sheet)
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDP74/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDP74/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDP74/SASDP74.LOG
+Wall clock: 145.6 s
+$ bysl fits run SASDP74 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDP74
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDG44 ---
+   [-0.4, -0.2)    0
+   [-0.2,  0.0)    0
+   [ 0.0,  0.2)    0
+   [ 0.2,  0.4)    0
+
+   [4.0e-5, 4.2e-5)    0
+   [4.6e-5, 4.8e-5)    0
+   [4.8e-5, 5.0e-5)    0
+   [5.0e-5, 5.2e-5)    0
+
+   [-4.4, -4.2)    0
+
+   [1.2 , 1.21)    0
+   [1.21, 1.22)    0
+   [1.22, 1.23)    0
+
+Fit finished: reduced χ² = 0.34 on the measured points
+  ρₑ   0.3357  (0.3356–0.3358)
+  δρ₁  0.6589  (−3.382 – 1.731)
+  δρ₂  −2.157  (−3.052 – 1.464)
+  δρ₃  1.521  (−6.088 – 2.672)
+  Checks:  converged (R̂ 1.005)
+           no divergent transitions
+           8 of 8 chains used
+  Note: 2 posterior modes (see the modes sheet)
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDG44/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDG44/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDG44/SASDG44.LOG
+Wall clock: 23.3 s
+$ bysl fits run SASDG44 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDG44
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDAP8 ---
+   [0.33451 , 0.334515)    0
+
+   [-0.7 , -0.65)    0
+   [-0.65, -0.6 )    0
+   [-0.6 , -0.55)    0
+   [-0.55, -0.5 )    0
+   [-0.5 , -0.45)    0
+   [-0.45, -0.4 )    0
+   [-0.4 , -0.35)    0
+   [-0.35, -0.3 )    0
+   [-0.3 , -0.25)    0
+   [-0.25, -0.2 )    0
+   [-0.2 , -0.15)    0
+   [-0.15, -0.1 )    0
+   [-0.1 , -0.05)    0
+   [-0.05, -0.0 )    0
+   [-0.0 ,  0.05)    0
+   [ 0.05,  0.1 )    0
+   [ 0.1 ,  0.15)    0
+   [ 0.15,  0.2 )    0
+   [ 0.2 ,  0.25)    0
+   [ 0.25,  0.3 )    0
+   [ 0.3 ,  0.35)    0
+   [ 0.35,  0.4 )    0
+   [ 0.4 ,  0.45)    0
+   [ 0.45,  0.5 )    0
+   [ 0.5 ,  0.55)    0
+   [ 0.55,  0.6 )    0
+   [ 0.6 ,  0.65)    0
+   [ 0.65,  0.7 )    0
+
+   [1.264, 1.266)    0
+   [1.266, 1.268)    0
+   [1.268, 1.27 )    0
+   [1.27 , 1.272)    0
+   [1.272, 1.274)    0
+   [1.274, 1.276)    0
+   [1.276, 1.278)    0
+   [1.278, 1.28 )    0
+   [1.28 , 1.282)    0
+   [1.282, 1.284)    0
+   [1.284, 1.286)    0
+   [1.286, 1.288)    0
+   [1.288, 1.29 )    0
+   [1.29 , 1.292)    0
+
+Fit finished: reduced χ² = 0.85 on the measured points
+  ρₑ   0.3346  (0.3345–0.3346)
+  δρ₁  0.887  (−0.8642 – 0.9438)
+  δρ₂  −0.3851  (−2.943 – 0.5784)
+  δρ₃  −1.537  (−8.97 – 2.492)
+  Checks:  converged (R̂ 1.000)
+           no divergent transitions
+           12 of 12 chains used
+  Note: c1 (excluded volume) sits on its bound
+  Note: 4 posterior modes (see the modes sheet)
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDAP8/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDAP8/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDAP8/SASDAP8.LOG
+Wall clock: 339.2 s
+$ bysl fits run SASDAP8 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDAP8
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDT65 ---
+   [0.33955, 0.3396 )    0
+
+   [0.94 , 0.945)    0
+
+   [-3.4 , -3.35)    0
+   [-3.3 , -3.25)    0
+
+   [6.6e-9, 6.7e-9)    0
+   [6.7e-9, 6.8e-9)    0
+   [6.8e-9, 6.9e-9)    0
+
+Fit finished: reduced χ² = 1.08 on the measured points
+  ρₑ   0.3404  (0.34–0.341)
+  δρ₁  1.076  (0.9754–1.091)
+  δρ₂  −2.613  (−3.038 – −1.869)
+  δρ₃  −3.533  (−9.961 – −0.5759)
+  Checks:  converged (R̂ 1.005)
+           no divergent transitions
+           8 of 8 chains used
+  Note: 3 posterior modes (see the modes sheet)
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDT65/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDT65/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDT65/SASDT65.LOG
+Wall clock: 128.0 s
+$ bysl fits run SASDT65 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDT65
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDTV4 ---
+   [0.33586, 0.33587)    0
+   [0.33588, 0.33589)    0
+
+   [0.125, 0.126)    0
+   [0.126, 0.127)    0
+
+   [ 0.09,  0.1 )    0
+   [ 0.11,  0.12)    0
+
+   [-4.65, -4.6 )    0
+
+   [-0.0152, -0.015 )    0
+   [-0.015 , -0.0148)    0
+
+   [1.21125, 1.2113 )    0
+   [1.2113 , 1.21135)    0
+
+Fit finished: reduced χ² = 1.34 on the measured points
+  ρₑ   0.3357  (0.3356–0.3358)
+  δρ₁  0.1546  (0.1369–0.1598)
+  δρ₂  −0.09685  (−0.1091 – 0.03585)
+  δρ₃  −4.042  (−4.406 – −3.734)
+  Checks:  converged (R̂ 1.004)
+           no divergent transitions
+           8 of 8 chains used
+  Note: 5 posterior modes (see the modes sheet)
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDTV4/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDTV4/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDTV4/SASDTV4.LOG
+Wall clock: 298.1 s
+$ bysl fits run SASDTV4 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDTV4
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SASDCE8 ---
+   [-0.3775, -0.377 )    0
+   [-0.377 , -0.3765)    0
+
+   [1.9936, 1.9938)    0
+   [1.9938, 1.994 )    0
+   [1.994 , 1.9942)    0
+
+   [-1.35, -1.34)    0
+
+[ Info: "SASDCE8_fit1_model1": kept ligands from the HETATM records (DOM: 4 residue(s), DTT: 4 residue(s)); they scatter with the hydrogens the file gives, n...
+   [1.45e-5 , 1.452e-5)    0
+
+   [4.12 , 4.125)    0
+
+   [1.13225, 1.1323 )    0
+   [1.1323 , 1.13235)    0
+
+Fit finished: reduced χ² = 28.98 on the measured points
+  ρₑ   0.3361  (0.336–0.3362)
+  δρ₁  −0.3827  (−0.3857 – −0.3799)
+  δρ₂  1.999  (1.997–2)
+  δρ₃  −1.491  (−1.572 – −1.409)
+  Checks:  converged (R̂ 1.002)
+           no divergent transitions
+           8 of 8 chains used
+  Results: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDCE8/res.xlsx
+  Figures: ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDCE8/plots/
+  Log:     ../Library/Caches/baysol/baysol-pkg-work/trace/results/test/fitting_tests/SASDCE8/SASDCE8.LOG
+Wall clock: 163.1 s
+$ bysl fits run SASDCE8 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-pkg-w...
+
+=== fit: SASDCE8
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1BNA-bsa-rna ---
+rho_e buffer = 0.33917774154861446 ± 0.0002021991543061581 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-1BNA-bsa-rna --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-1BNA-bsa-rna
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1BNA-ficoll70 ---
+rho_e = 0.34414758020729047 +- 0.001137717073593733 e/A^3 (water 0.3332920001104711)
+wrote SYN-1BNA-ficoll70.profile.tsv and SYN-1BNA-ficoll70.solvent.txt
+$ bysl fits run SYN-1BNA-ficoll70 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/ba...
+
+=== fit: SYN-1BNA-ficoll70
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1BNA-nacl2m ---
+SYN-1BNA-nacl2m: ρₑ = 0.355944 ± 0.000227 e/Å³ (water 0.333292); I(q=0.01) = 4.965e+06
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-1BNA-nacl2m/SYN-1BNA-nacl2m.profile.tsv and /Users/noso/Librar...
+$ bysl fits run SYN-1BNA-nacl2m --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bays...
+
+=== fit: SYN-1BNA-nacl2m
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1BNA-peg3350 ---
+rho_e = 0.33577999802695835 +- 0.00018676084305456827 e/A^3 (water 0.3332920001104711)
+wrote SYN-1BNA-peg3350.profile.tsv and SYN-1BNA-peg3350.solvent.txt
+$ bysl fits run SYN-1BNA-peg3350 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-1BNA-peg3350
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1BNA-pll ---
+rho_e = 0.3333569459618606 +- 7.429832480754832e-6 e/A^3 (water 0.3332920001104711)
+wrote SYN-1BNA-pll.profile.tsv and SYN-1BNA-pll.solvent.txt
+$ bysl fits run SYN-1BNA-pll --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-...
+
+=== fit: SYN-1BNA-pll
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1BNA-ternary ---
+SYN-1BNA-ternary: ρₑ = 0.366941 ± 0.000497 e/Å³ (water 0.333292); I(q=0.01) = 4.7e+06
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-1BNA-ternary/SYN-1BNA-ternary.profile.tsv and /Users/noso/Libr...
+$ bysl fits run SYN-1BNA-ternary --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-1BNA-ternary
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1BNA-tmao1m ---
+SYN-1BNA-tmao1m: ρₑ = 0.334148 ± 0.000019 e/Å³ (water 0.333292); I(q=0.01) = 5.511e+06
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-1BNA-tmao1m/SYN-1BNA-tmao1m.profile.tsv and /Users/noso/Librar...
+$ bysl fits run SYN-1BNA-tmao1m --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bays...
+
+=== fit: SYN-1BNA-tmao1m
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1BNA-trna2 ---
+rho_e buffer = 0.3353159887914946 ± 2.3832069818868638e-5 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-1BNA-trna2 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bayso...
+
+=== fit: SYN-1BNA-trna2
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1CRN-dna-rna ---
+rho_e buffer = 0.33547430334674505 ± 2.5560872306743523e-5 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-1CRN-dna-rna --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-1CRN-dna-rna
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1CRN-glycerol40 ---
+SYN-1CRN-glycerol40: ρₑ = 0.368702 ± 0.004944 e/Å³ (water 0.333292); I(q=0.01) = 1.589e+06
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-1CRN-glycerol40/SYN-1CRN-glycerol40.profile.tsv and /Users/nos...
+$ bysl fits run SYN-1CRN-glycerol40 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/...
+
+=== fit: SYN-1CRN-glycerol40
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1CRN-ova50 ---
+rho_e buffer = 0.33882631187366924 ± 0.0001926500594765513 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-1CRN-ova50 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bayso...
+
+=== fit: SYN-1CRN-ova50
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1CRN-peg400 ---
+rho_e = 0.33797201573727836 +- 0.0003660375124122107 e/A^3 (water 0.3332920001104711)
+wrote SYN-1CRN-peg400.profile.tsv and SYN-1CRN-peg400.solvent.txt
+$ bysl fits run SYN-1CRN-peg400 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bays...
+
+=== fit: SYN-1CRN-peg400
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1CRN-pva ---
+rho_e = 0.33559908760128326 +- 0.0001619506339633263 e/A^3 (water 0.3332920001104711)
+wrote SYN-1CRN-pva.profile.tsv and SYN-1CRN-pva.solvent.txt
+$ bysl fits run SYN-1CRN-pva --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-...
+
+=== fit: SYN-1CRN-pva
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1CRN-water ---
+SYN-1CRN-water: ρₑ = 0.333292 ± 0.000007 e/Å³ (water 0.333292); I(q=0.01) = 1.983e+06
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-1CRN-water/SYN-1CRN-water.profile.tsv and /Users/noso/Library/...
+$ bysl fits run SYN-1CRN-water --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bayso...
+
+=== fit: SYN-1CRN-water
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1EHZ-argtris ---
+[ Info: pdb2pqr dropped 1 heavy atom(s) of "hydrogenated.pdb.sanitized.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: "1EHZ": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+SYN-1EHZ-argtris: ρₑ = 0.343498 ± 0.000481 e/Å³ (water 0.333292); I(q=0.01) = 5.727e+07
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-1EHZ-argtris/SYN-1EHZ-argtris.profile.tsv and /Users/noso/Libr...
+$ bysl fits run SYN-1EHZ-argtris --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-1EHZ-argtris
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1EHZ-dnaduplex1 ---
+[ Info: pdb2pqr dropped 1 heavy atom(s) of "hydrogenated.pdb.sanitized.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: "1EHZ": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+rho_e buffer = 0.33514921683090054 ± 1.9727478836216557e-5 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-1EHZ-dnaduplex1 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/...
+
+=== fit: SYN-1EHZ-dnaduplex1
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1EHZ-peg-bsa ---
+[ Info: "1EHZ": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+rho_e buffer = 0.34150326285506355 ± 0.00027507096279849873 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-1EHZ-peg-bsa --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-1EHZ-peg-bsa
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1EHZ-peg20000 ---
+[ Info: pdb2pqr dropped 1 heavy atom(s) of "hydrogenated.pdb.sanitized.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: "1EHZ": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+rho_e = 0.3347957515987863 +- 0.00011246900661088047 e/A^3 (water 0.3332920001104711)
+wrote SYN-1EHZ-peg20000.profile.tsv and SYN-1EHZ-peg20000.solvent.txt
+$ bysl fits run SYN-1EHZ-peg20000 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/ba...
+
+=== fit: SYN-1EHZ-peg20000
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1EHZ-pvp ---
+[ Info: "1EHZ": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+rho_e = 0.3361426192478593 +- 0.00016866997668645072 e/A^3 (water 0.3332920001104711)
+wrote SYN-1EHZ-pvp.profile.tsv and SYN-1EHZ-pvp.solvent.txt
+$ bysl fits run SYN-1EHZ-pvp --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/baysol-...
+
+=== fit: SYN-1EHZ-pvp
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1EHZ-sucrose30 ---
+[ Info: "1EHZ": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+SYN-1EHZ-sucrose30: ρₑ = 0.367629 ± 0.000692 e/Å³ (water 0.333292); I(q=0.01) = 5.066e+07
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-1EHZ-sucrose30/SYN-1EHZ-sucrose30.profile.tsv and /Users/noso/...
+$ bysl fits run SYN-1EHZ-sucrose30 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/b...
+
+=== fit: SYN-1EHZ-sucrose30
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1EHZ-ubq30 ---
+[ Info: "1EHZ": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+rho_e buffer = 0.33730647660060004 ± 0.00011726962508149166 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-1EHZ-ubq30 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bayso...
+
+=== fit: SYN-1EHZ-ubq30
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1UBQ-dextran70 ---
+rho_e = 0.34422382074483726 +- 0.0006894755035753597 e/A^3 (water 0.3332920001104711)
+wrote SYN-1UBQ-dextran70.profile.tsv and SYN-1UBQ-dextran70.solvent.txt
+$ bysl fits run SYN-1UBQ-dextran70 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/b...
+
+=== fit: SYN-1UBQ-dextran70
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1UBQ-dna24at1 ---
+rho_e buffer = 0.3351450995462893 ± 1.907383265816651e-5 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-1UBQ-dna24at1 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/ba...
+
+=== fit: SYN-1UBQ-dna24at1
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1UBQ-imidazole300 ---
+SYN-1UBQ-imidazole300: ρₑ = 0.339638 ± 0.000089 e/Å³ (water 0.333292); I(q=0.01) = 5.771e+06
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-1UBQ-imidazole300/SYN-1UBQ-imidazole300.profile.tsv and /Users...
+$ bysl fits run SYN-1UBQ-imidazole300 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/bayso...
+
+=== fit: SYN-1UBQ-imidazole300
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1UBQ-lyz20 ---
+rho_e buffer = 0.33660231829287657 ± 8.262081537167792e-5 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-1UBQ-lyz20 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bayso...
+
+=== fit: SYN-1UBQ-lyz20
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1UBQ-nacl150 ---
+SYN-1UBQ-nacl150: ρₑ = 0.334991 ± 0.000018 e/Å³ (water 0.333292); I(q=0.01) = 5.945e+06
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-1UBQ-nacl150/SYN-1UBQ-nacl150.profile.tsv and /Users/noso/Libr...
+$ bysl fits run SYN-1UBQ-nacl150 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-1UBQ-nacl150
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-1UBQ-urea6m ---
+SYN-1UBQ-urea6m: ρₑ = 0.360468 ± 0.000553 e/Å³ (water 0.333292); I(q=0.01) = 5.025e+06
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-1UBQ-urea6m/SYN-1UBQ-urea6m.profile.tsv and /Users/noso/Librar...
+$ bysl fits run SYN-1UBQ-urea6m --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bays...
+
+=== fit: SYN-1UBQ-urea6m
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-6LYZ-bsa100 ---
+rho_e buffer = 0.34303950502034714 ± 0.0004028769539690595 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-6LYZ-bsa100 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bays...
+
+=== fit: SYN-6LYZ-bsa100
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-6LYZ-gdmcl4m ---
+SYN-6LYZ-gdmcl4m: ρₑ = 0.363706 ± 0.000633 e/Å³ (water 0.333292); I(q=0.01) = 1.342e+07
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-6LYZ-gdmcl4m/SYN-6LYZ-gdmcl4m.profile.tsv and /Users/noso/Libr...
+$ bysl fits run SYN-6LYZ-gdmcl4m --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-6LYZ-gdmcl4m
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-6LYZ-mgcl2kcl ---
+SYN-6LYZ-mgcl2kcl: ρₑ = 0.335024 ± 0.000024 e/Å³ (water 0.333292); I(q=0.01) = 1.619e+07
+wrote /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/results/test/synthetic_tests/SYN-6LYZ-mgcl2kcl/SYN-6LYZ-mgcl2kcl.profile.tsv and /Users/noso/Li...
+$ bysl fits run SYN-6LYZ-mgcl2kcl --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/ba...
+
+=== fit: SYN-6LYZ-mgcl2kcl
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-6LYZ-peg8000 ---
+rho_e = 0.33729717980583046 +- 0.00029937947452887405 e/A^3 (water 0.3332920001104711)
+wrote SYN-6LYZ-peg8000.profile.tsv and SYN-6LYZ-peg8000.solvent.txt
+$ bysl fits run SYN-6LYZ-peg8000 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-6LYZ-peg8000
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-6LYZ-pluronicf127 ---
+rho_e = 0.33541195257786394 +- 0.00011863272141966358 e/A^3 (water 0.3332920001104711)
+wrote SYN-6LYZ-pluronicf127.profile.tsv and SYN-6LYZ-pluronicf127.solvent.txt
+$ bysl fits run SYN-6LYZ-pluronicf127 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/bayso...
+
+=== fit: SYN-6LYZ-pluronicf127
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-6LYZ-rnaap24 ---
+rho_e buffer = 0.3351562852204394 ± 1.916969880647592e-5 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-6LYZ-rnaap24 --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-6LYZ-rnaap24
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: fit SYN-6LYZ-ubq-dna ---
+rho_e buffer = 0.33669293309037 ± 7.97035369546038e-5 e/A^3 (water 0.3332920001104711)
+$ bysl fits run SYN-6LYZ-ubq-dna --trace-compile /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/fits --scratch /Users/noso/Library/Caches/baysol/bay...
+
+=== fit: SYN-6LYZ-ubq-dna
+$ /Users/noso/.julia/juliaup/julia-1.12.7+0.aarch64.apple.darwin14/Julia-1.12.app/Contents/Resources/julia/bin/julia --startup-file=no --trace-compile=/Users...
+
+--- step: unit suite ---
+=== model a-broken ===
+model a-broken failed: MoleculeError: no atom records in
+=== model crambin ===
+Fit finished: reduced χ² = 0.06 on the measured points
+  ρₑ   0.335  (0.3349–0.3351)
+  δρ₁  0.4087  (0.2233–0.6811)
+  δρ₂  0.891  (−1.777 – 1.727)
+  δρ₃  −2.683  (−8.423 – 2.259)
+  Checks:  NOT converged:
+             the worst R̂, 1.142, is not below 1.01
+             the smallest bulk ESS, 15.4, is not above 400.0
+             the smallest tail ESS, 116.9, is not above 400.0
+           no divergent transitions
+           2 of 2 chains used
+  Note: chains not converged: run longer first
+Wall clock: 1.7 s
+[ Info: pdb2pqr dropped 28 heavy atom(s) of "nt-ends-met.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: pdb2pqr dropped 1 heavy atom(s) of "nt-ends-gtp.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: concurrency tests: 4 Julia threads, workerCount() = 4
+[ Info: "1ZNI-TEST": kept ligands from the HETATM records (CL: 3 residue(s), ZN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: pdb2pqr dropped 1 heavy atom(s) of "hydrogenated.pdb.sanitized.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: 2 backbone-less polymer residue(s) of "res.pdb" (5 atoms) kept as deposited, without hydrogens
+[ Info: propka3 (fresh) on 1CRN-TEST.pdb took 0.05s
+[ Info: pdb2pqr (fresh) on 1CRN-TEST.pdb took 0.19s
+[ Info: forwardCache on 1CRN-TEST (327 atoms) took 0.01s
+[ Info: infer (20 samples, 10 adapt) took 0.52s
+[ Info: "het": kept ligands from the HETATM records (ADE: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "lig": kept ligands from the HETATM records (ADE: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "rl": kept ligands from the HETATM records (ADE: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "one": kept ligands from the HETATM records (ADE: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "mate": kept ligands from the HETATM records (ADE: 2 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "p": kept ligands from the HETATM records (ADE: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "iw": kept ligands from the HETATM records (ADE: 3 residue(s), MG: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "3ODQ-hemoglobin": kept ligands from the HETATM records (HEM: 4 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "z": kept ligands from the HETATM records (ZN: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "n": kept ligands from the HETATM records (NAG: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "lig-4hhb": kept ligands from the HETATM records (HEM: 4 residue(s), PO4: 2 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "ref": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "het": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "nt-amino-ref": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+... 1 lines left out ...
+[ Info: "nt-amino-mse": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "nt-amino-allhet": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "nt-amino-dala": kept modified amino acids from the HETATM records (2RA: 1 residue(s)); they are hydrogenated through their standard parent where the...
+[ Info: "nt-amino-dala": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "nt-amino-tyc": kept modified amino acids from the HETATM records (TYC: 1 residue(s)); they are hydrogenated through their standard parent where they...
+[ Info: "nt-amino-tyc": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "nt-amino-incomplete": kept modified amino acids from the HETATM records (MSE: 1 residue(s)); they are hydrogenated through their standard parent whe...
+[ Info: "nt-amino-incomplete": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "nt-amino-seed": kept modified amino acids from the HETATM records (MSE: 1 residue(s)); they are hydrogenated through their standard parent where the...
+[ Info: "nt-amino-seed": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "nt-amino-seed-d": kept modified amino acids from the HETATM records (2RA: 1 residue(s)); they are hydrogenated through their standard parent where t...
+[ Info: "nt-amino-seed-d": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "nt-amino-seed-ref": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "SASDH39-argonaute-dna": kept modified amino acids from the HETATM records (MSE: 20 residue(s)); they are hydrogenated through their standard parent ...
+[ Info: "SASDH39-argonaute-dna": kept ligands from the HETATM records (MG: 2 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "SASDNP7_fit1_model1": kept ligands from the HETATM records (GNP: 1 residue(s), MG: 1 residue(s)); they scatter with the hydrogens the file gives, no...
+[ Info: "SASDTK5_fit2_model1": kept ligands from the HETATM records (PXX: 2 residue(s), UNK: 3 residue(s)); they scatter with the hydrogens the file gives, n...
+[ Info: pdb2pqr dropped 4 heavy atom(s) of "run1.pdb.sanitized.pdb"; restored from the input (4 H5T removed with the restored phosphorus)
+[ Info: pdb2pqr dropped 4 heavy atom(s) of "run2.pdb.sanitized.pdb"; restored from the input (4 H5T removed with the restored phosphorus)
+[ Info: "nt-amino-h39": kept modified amino acids from the HETATM records (MSE: 20 residue(s)); they are hydrogenated through their standard parent where the...
+[ Info: "nt-amino-h39": kept ligands from the HETATM records (MG: 2 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: pdb2pqr dropped 1 heavy atom(s) of "hydrogenated.pdb.sanitized.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: "nt-mod-1ehz": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added   (x 2)
+[ Info: pdb2pqr dropped 1 heavy atom(s) of "nt-mod-nobase.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: "1EHZ-TEST": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added   (x 2)
+[ Info: pdb2pqr dropped 1 heavy atom(s) of "hydrogenated.pdb.sanitized.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: "nt-fix-1ehz": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added   (x 2)
+[ Info: "nt-fix-246d": kept ligands from the HETATM records (NA: 2 residue(s)); they scatter with the hydrogens the file gives, none are added   (x 2)
+[ Info: "lean": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "246D-TEST": kept ligands from the HETATM records (NA: 2 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "nt-load-1ehz": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are a...
+[ Info: "writer": kept ligands from the HETATM records (MG: 6 residue(s), MN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "nt-load-mixed": kept ligands from the HETATM records (ATP: 1 residue(s), MG: 1 residue(s)); they scatter with the hydrogens the file gives, none are...
+[ Info: "het": kept ligands from the HETATM records (MG: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: pdb2pqr dropped 1 heavy atom(s) of "nt-seed-mod.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: pdb2pqr dropped 1 heavy atom(s) of "nt-seed-std.pdb"; restored from the input (1 H5T removed with the restored phosphorus)
+[ Info: witness pass, large surface atom r = 2.0 Å: exposed in 96 cases (34 sliver ≤ 5 %), 0 bailed; its area 992.5 → 992.5 Å² (lost 0.0 %)
+[ Info: witness pass, large surface atom r = 3.48 Å: exposed in 96 cases (46 sliver ≤ 5 %), 2 bailed; its area 1446.0 → 1443.7 Å² (lost 0.16 %)
+[ Info: witness pass, large surface atom r = 5.0 Å: exposed in 93 cases (57 sliver ≤ 5 %), 3 bailed; its area 1873.9 → 1867.9 Å² (lost 0.32 %)
+[ Info: witness pass, all surface-atom cases: 470104.0 → 470084.5 Å² (lost 0.004 %; budget 0.92 %)
+[ Info: "nt-checks-ac9": kept ligands from the HETATM records (K: 10 residue(s), MG: 10 residue(s), MO6: 8 residue(s)); they scatter with the hydrogens the f...
+[ Info: Downloading file from PDB: ZZZZ
+[ Info: Downloading file from PDB: 1CRN
+[ Info: "1IGT-TEST": kept ligands from the HETATM records (BMA: 2 residue(s), FUC: 1 residue(s), FUL: 1 residue(s), GAL: 2 residue(s), MAN: 4 residue(s), NAG...
+[ Info: "1MBN-TEST": kept ligands from the HETATM records (HEM: 1 residue(s), OH: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "1ZNI-TEST": kept ligands from the HETATM records (CL: 3 residue(s), ZN: 3 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "4HHB-TEST": kept ligands from the HETATM records (HEM: 4 residue(s), PO4: 2 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "6PTI-TEST": kept ligands from the HETATM records (PO4: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: "7RSA-TEST": kept ligands from the HETATM records (TBU: 1 residue(s)); they scatter with the hydrogens the file gives, none are added
+[ Info: Downloading file from PDB: 1UBQ
+[ Info: Downloading file from PDB: 6LYZ
+[ Info: Downloading file from PDB: 4HHB
+[ Info: "4HHB": kept ligands from the HETATM records (HEM: 4 residue(s), PO4: 2 residue(s)); they scatter with the hydrogens the file gives, none are added
+model b failed: ArgumentError: no radius for the element Xx
+model a failed: ArgumentError: no radius for the element Xx
+the comparison failed: BoundsError: attempt to access 3×1 Matrix{Float64} at index [1:3, 2]
+model B failed: ArgumentError: no radius for the element Xx
+=== model crambin ===   (x 11)
+=== model m1 ===
+=== model m2 ===
+=== model m3 ===
+=== model m1 ===
+=== model m2 ===
+=== model m3 ===
+=== model a ===
+=== model b ===
+=== model c ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model crambin ===   (x 4)
+=== model m1 ===
+=== model m2 ===
+=== model m1 ===
+=== model m2 ===
+
+=== model m1 ===
+=== model m2 ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model crambin ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model m1 ===
+=== model m2 ===
+=== model m1 ===
+=== model m2 ===
+Test Summary: |  Pass  Broken  Total     Time
+BAYSOL        | 45703       1  45704  7m11.8s
+
+--- step: tui test buffer.test.jl ---
+Test Summary:                  | Pass  Total  Time
+loadBuffer: the shared fixture |   29     29  1.4s
+Test Summary:                             | Pass  Total  Time
+loadBuffer: missing file and empty buffer |    7      7  0.3s
+Test Summary:                                                        | Pass  Total  Time
+loadBuffer: the notes of the interface are not the loader's business |    2      2  0.0s
+Test Summary:             | Pass  Total  Time
+loadBuffer: invalid files |   40     40  0.3s
+Test Summary:                                  | Pass  Total  Time
+the JSON reader on the shapes the buffer needs |    3      3  0.0s
+Test Summary: | Pass  Total  Time
+seedKeywords  |    7      7  0.6s
+Test Summary:                                   | Pass  Total  Time
+loadBufferPh: the shared fixture and the limits |    6      6  0.0s
+Test Summary:                 | Pass  Total  Time
+loadBufferPh: what is refused |   25     25  0.1s
+Test Summary:                          | Pass  Total  Time
+loadBufferPh: the optional temperature |   21     21  0.0s
+Test Summary:                                                         | Pass  Total  Time
+loadBuffer: a row that follows the pH (`template`) loads like any row |    3      3  0.0s
+Test Summary:                                | Pass  Total  Time
+loadBuffer: the same solute twice is refused |    3      3  0.0s
+
+--- step: tui test cli.test.jl ---
+Test Summary:                                 | Pass  Total  Time
+a flag equals the same value in settings.json |   12     12  8.3s
+Test Summary:                                   | Pass  Total  Time
+the ladder: a whole map, one class, off, a file |    9      9  1.6s
+Test Summary:          | Pass  Total  Time
+a setting of one model |    8      8  2.4s
+Test Summary:                       | Pass  Total  Time
+precedence is flag > file > default |    5      5  0.0s
+Test Summary:                                                      | Pass  Total  Time
+every row of SETTING_KEYWORDS is a flag, and bad lines are refused |  373    373  1.7s
+Test Summary:                             | Pass  Total  Time
+the look of the plots goes into the style |    5      5  0.4s
+Test Summary:                                                 | Pass  Total  Time
+the relations are checked on the settings the run starts from |    5      5  0.5s
+Test Summary:                                | Pass  Total  Time
+--ladder off, then a class: that class alone |    2      2  0.0s
+Test Summary:                            | Pass  Total  Time
+runProjectCli hands runProject the flags |   10     10  1.0s
+Test Summary:                                                            | Pass  Total  Time
+the documented command: julia -e '...runProjectCli(ARGS)' -- PROJECT ... |    1      1  9.2s
+
+--- step: tui test run-project.test.jl ---
+=== model a-broken ===
+model a-broken failed: MoleculeError: no atom records in
+=== model crambin ===
+Fit finished: reduced χ² = 0.06 on the measured points
+  ρₑ   0.335  (0.3349–0.3351)
+  δρ₁  0.4087  (0.2233–0.6811)
+  δρ₂  0.891  (−1.777 – 1.727)
+  δρ₃  −2.683  (−8.423 – 2.259)
+  Checks:  NOT converged:
+             the worst R̂, 1.142, is not below 1.01
+             the smallest bulk ESS, 15.4, is not above 400.0
+             the smallest tail ESS, 116.9, is not above 400.0
+           no divergent transitions
+           2 of 2 chains used
+  Note: chains not converged: run longer first
+Wall clock: 4.2 s
+model b failed: ArgumentError: no radius for the element Xx
+model a failed: ArgumentError: no radius for the element Xx
+the comparison failed: BoundsError: attempt to access 3×1 Matrix{Float64} at index [1:3, 2]
+model B failed: ArgumentError: no radius for the element Xx
+Test Summary:                          | Pass  Total  Time
+runProject: UTC time without a package |   98     98  0.6s
+Test Summary:                                     | Pass  Total  Time
+runProject: a failed model is told in a few words |    4      4  0.0s
+Test Summary:                                                      | Pass  Total  Time
+runProject: a failed ladder says what its classes mean in the logs |   10     10  0.8s
+Test Summary:                     | Pass  Total  Time
+runProject: claiming a run folder |    6      6  0.1s
+Test Summary:                       | Pass  Total  Time
+runProject: the models of a project |    3      3  0.1s
+Test Summary:                                       | Pass  Total  Time
+runProject: no models, and models kept in models.7z |    5      5  0.0s
+Test Summary:                        | Pass  Total  Time
+runProject: the data of the snapshot |   13     13  0.3s
+Test Summary:                              | Pass  Total  Time
+runProject: the plot style of the settings |   42     42  0.5s
+Test Summary:                                   | Pass  Total  Time
+runProject: no plot folder is passed to results |    3      3  0.2s
+=== model crambin ===
+Test Summary:                          | Pass  Total   Time
+runProject: arguments and the live run |   16     16  10.3s
+=== model crambin ===   (x 10)
+Test Summary:                                              | Pass  Total   Time
+runProject: every setting is a keyword and reaches the fit |   39     39  14.6s
+=== model m1 ===
+=== model m2 ===
+=== model m3 ===
+=== model m1 ===
+=== model m2 ===
+=== model m3 ===
+Test Summary:                                         | Pass  Total  Time
+runProject: the folder, run.json and the LOG of a run |   44     44  1.7s
+=== model a ===
+=== model b ===
+=== model c ===
+Test Summary:                                                | Pass  Total  Time
+runProject: a failing model is recorded and the loop goes on |   15     15  1.5s
+=== model a ===
+=== model b ===
+=== model a ===
+=== model crambin ===
+Test Summary:                                  | Pass  Total  Time
+runProject: an interrupt marks the run aborted |    9      9  2.6s
+=== model crambin ===
+Test Summary:             | Pass  Total  Time
+runProject: the heartbeat |    2      2  4.8s
+=== model crambin ===
+Test Summary:                                        | Pass  Total  Time
+runProject: the snapshot does not follow later edits |    7      7  0.8s
+=== model crambin ===
+Test Summary:                                                  | Pass  Total  Time
+runProject: a claimed folder and a snapshot made by the caller |    5      5  0.7s
+Test Summary:                         | Pass  Total   Time
+runProject: the whole fit, end to end |   36     36  12.3s
+=== model m1 ===
+=== model m2 ===
+=== model m1 ===
+=== model m2 ===
+
+=== model m1 ===
+=== model m2 ===
+Test Summary:                              | Pass  Total  Time
+runProject: the comparison figure of a run |   35     35  4.8s
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+Test Summary:                                                 | Pass  Total  Time
+runProject: tableDir copies the data without replacing a file |    8      8  2.4s
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model b ===
+=== model a ===
+=== model crambin ===
+Test Summary:                                              | Pass  Total  Time
+runProject: the comparison switched off, absent or failing |   20     20  4.8s
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+=== model A ===
+=== model B ===
+Test Summary:                             | Pass  Total   Time
+runProject: the settings of single models |   73     73  17.3s
+=== model m1 ===
+=== model m2 ===
+=== model m1 ===
+=== model m2 ===
+Test Summary:                                    | Pass  Total  Time
+runProject: the reference curve of single models |   23     23  1.8s
+Test Summary:                                              | Pass  Total  Time
+runProject takes the keyword of every setting of the table |   62     62  0.0s
+
+--- step: tui test settings-file.test.jl ---
+Test Summary:   | Pass  Total  Time
+the JSON reader |   46     46  0.2s
+Test Summary:                            | Pass  Total  Time
+settings that are not saved are defaults |  213    213  1.9s
+Test Summary:      | Pass  Total  Time
+valid saved values |   52     52  0.4s
+Test Summary:                  | Pass  Total  Time
+the problems say what is wrong |   11     11  0.2s
+Test Summary:               | Pass  Total  Time
+a file that is not settings |   28     28  0.1s
+Test Summary:                    | Pass  Total  Time
+rules that tie settings together |   26     26  0.3s
+Test Summary:          | Pass  Total  Time
+the settings file path |    6      6  0.1s
+Test Summary:                            | Pass  Total  Time
+fuzzing the saved value of every setting | 3281   3281  2.6s
+Test Summary:                | Pass  Total  Time
+fuzzing the text of the file |  778    778  0.3s
+Test Summary:                           | Pass  Total  Time
+random garbage never crashes the reader |  400    400  0.0s
+Test Summary:                    | Pass  Total  Time
+the cases both sides judge alike | 1256   1256  0.9s
+Test Summary:                         | Pass  Total  Time
+the settings of the comparison figure |   45     45  3.7s
+Test Summary:                   | Pass  Total  Time
+the sizes of the terminal plots |   54     54  1.3s
+Test Summary:                       | Pass  Total  Time
+which settings may differ per model |   33     33  1.4s
+Test Summary:                                        | Pass  Total  Time
+settings.json: null is no limit (the data selection) |    3      3  0.0s
+Test Summary:                                            | Pass  Total  Time
+the ladder reaches runModel the same way from every path |   15     15  3.5s
+
+--- step: cli run SASDMJ9 ---
+=== model SASDMJ9_fit1_model1 ===
+Fit finished: reduced χ² = 2.65 on the measured points
+  ρₑ   0.3362  (0.3361–0.3362)
+  δρ₁  −1.087  (−1.196 – −0.992)
+  δρ₂  1.957  (1.89–1.994)
+  δρ₃  −5.343  (−10.28 – 1.187)
+  Checks:  converged (R̂ 1.004)
+           no divergent transitions
+           8 of 8 chains used
+Wall clock: 4.9 s
+
+   [-1.31, -1.3 )    0
+
+   [1.77, 1.78)    0
+   [1.78, 1.79)    0
+   [1.79, 1.8 )    0
+   [1.81, 1.82)    0
+
+--- step: tui run SASDMJ9 ---
+trace-run: /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDMJ9-tui ended done
+
+--- step: cli run SASDAN8 ---
+=== model SASDAN8_fit1_model1 ===
+Fit finished: reduced χ² = 2.16 on the measured points
+  ρₑ   0.3355  (0.3355–0.3356)
+  δρ₁  0.06575  (0.04717–0.09836)
+  δρ₂  −3.938  (−4.216 – −3.769)
+  δρ₃  2.462  (1.876–2.784)
+  Checks:  converged (R̂ 1.002)
+           no divergent transitions
+           8 of 8 chains used
+  Note: 2 posterior modes (see the modes sheet)
+Wall clock: 43.4 s
+
+   [0.33542 , 0.335425)    0
+   [0.335425, 0.33543 )    0
+
+   [-4.44, -4.42)    0
+   [-4.4 , -4.38)    0
+
+   [1.15, 1.2 )    0
+   [1.35, 1.4 )    0
+
+   [0.009 , 0.0095)    0
+
+   [1.2418, 1.242 )    0
+
+--- step: tui run SASDAN8 ---
+trace-run: /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDAN8-tui ended done
+
+--- step: cli run SASDAH5 ---
+=== model SASDAH5_fit1_model1 ===
+Fit finished: reduced χ² = 4.52 on the measured points
+  ρₑ   0.339  (0.3387–0.3392)
+  δρ₁  1.997  (1.992–2)
+  δρ₂  1.959  (1.886–1.994)
+  δρ₃  −3.939  (−4.464 – −3.449)
+  Checks:  converged (R̂ 1.004)
+           no divergent transitions
+           8 of 8 chains used
+Wall clock: 5.8 s
+
+   [1.9825, 1.983 )    0
+   [1.983 , 1.9835)    0
+   [1.9835, 1.984 )    0
+   [1.985 , 1.9855)    0
+   [1.987 , 1.9875)    0
+   [1.9875, 1.988 )    0
+
+   [1.815, 1.82 )    0
+
+   [-3.05, -3.0 )    0
+
+   [1.135e-6, 1.14e-6 )    0
+
+   [0.0582, 0.0584)    0
+   [0.059 , 0.0592)    0
+
+   [1.1834, 1.1836)    0
+
+--- step: tui run SASDAH5 ---
+trace-run: /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDAH5-tui ended done
+
+--- step: cli run SASDVA2 ---
+=== model SASDVA2_3ODQ ===
+[ Info: "SASDVA2_3ODQ": kept ligands from the HETATM records (HEM: 4 residue(s)); they scatter with the hydrogens the file gives, none are added
+Fit finished: reduced χ² = 1.40 on the measured points
+  ρₑ   0.3469  (0.3438–0.3497)
+  δρ₁  −0.06831  (−0.7983 – −0.002251)
+  δρ₂  0.5774  (−4.182 – 0.4076)
+  δρ₃  −2.285  (−9.036 – 1.865)
+  Checks:  converged (R̂ 1.000)
+           0.0 % divergent transitions
+           12 of 12 chains used
+  Note: 2 posterior modes (see the modes sheet)
+Wall clock: 102.6 s
+
+   [ 0.8,  0.9)    0
+   [ 1.0,  1.1)    0
+   [ 1.1,  1.2)    0
+   [ 1.2,  1.3)    0
+   [ 1.3,  1.4)    0
+   [ 1.4,  1.5)    0
+
+   [0.86, 0.87)    0
+   [0.87, 0.88)    0
+   [0.88, 0.89)    0
+   [0.89, 0.9 )    0
+   [0.9 , 0.91)    0
+   [0.91, 0.92)    0
+   [0.92, 0.93)    0
+   [0.93, 0.94)    0
+   [0.94, 0.95)    0
+   [0.95, 0.96)    0
+   [0.96, 0.97)    0
+   [0.97, 0.98)    0
+   [0.98, 0.99)    0
+   [0.99, 1.0 )    0
+   [1.0 , 1.01)    0
+   [1.01, 1.02)    0
+   [1.02, 1.03)    0
+   [1.03, 1.04)    0
+   [1.04, 1.05)    0
+   [1.05, 1.06)    0
+   [1.06, 1.07)    0
+   [1.07, 1.08)    0
+   [1.08, 1.09)    0
+
+--- step: tui run SASDVA2 ---
+trace-run: /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDVA2-tui ended done
+
+--- step: cli run SASDMC6 ---
+=== model SASDMC6_fit1_model1 ===
+[ Info: "SASDMC6_fit1_model1": kept ligands from the HETATM records (K: 2 residue(s)); they scatter with the hydrogens the file gives, none are added
+Fit finished: reduced χ² = 5.10 on the measured points
+  ρₑ   0.3364  (0.3363–0.3365)
+  δρ₁  −0.02996  (−0.05987 – 0.008956)
+  δρ₂  0.3972  (−1.423 – 1.844)
+  δρ₃  −2.321  (−9.278 – 2.47)
+  Checks:  converged (R̂ 1.000)
+           0.1 % divergent transitions
+           8 of 8 chains used
+Wall clock: 104.4 s
+
+--- step: tui run SASDMC6 ---
+trace-run: /Users/noso/Library/Caches/baysol/baysol-pkg-work/trace/projects/SASDMC6-tui ended done
+
+--- step: output variants SASDMJ9 (rendered: false) ---
+=== model SASDMJ9_fit1_model1-2 ===
+Fit finished: reduced χ² = 2.65 on the measured points
+  ρₑ   0.3362  (0.3361–0.3362)
+  δρ₁  −1.087  (−1.196 – −0.992)
+  δρ₂  1.957  (1.89–1.994)
+  δρ₃  −5.343  (−10.28 – 1.187)
+  Checks:  converged (R̂ 1.004)
+           no divergent transitions
+           8 of 8 chains used
+Wall clock: 6.5 s
+=== model SASDMJ9_fit1_model1 ===
+Fit finished: reduced χ² = 2.65 on the measured points
+  ρₑ   0.3362  (0.3361–0.3362)
+  δρ₁  −1.087  (−1.196 – −0.992)
+  δρ₂  1.957  (1.89–1.994)
+  δρ₃  −5.343  (−10.28 – 1.187)
+  Checks:  converged (R̂ 1.004)
+           no divergent transitions
+           8 of 8 chains used
+Wall clock: 0.5 s
+=== model SASDMJ9_fit1_model1-2 ===
+Fit finished: reduced χ² = 2.65 on the measured points
+  ρₑ   0.3362  (0.3361–0.3362)
+  δρ₁  −1.087  (−1.196 – −0.992)
+  δρ₂  1.957  (1.89–1.994)
+  δρ₃  −5.343  (−10.28 – 1.187)
+  Checks:  converged (R̂ 1.004)
+           no divergent transitions
+           8 of 8 chains used
+Wall clock: 0.5 s
+
+   [-1.31, -1.3 )    0
+
+   [1.77, 1.78)    0
+   [1.78, 1.79)    0
+   [1.79, 1.8 )    0
+   [1.81, 1.82)    0
+
+=== model SASDMJ9_fit1_model1 ===
+Fit finished: reduced χ² = 2.65 on the measured points
+  ρₑ   0.3362  (0.3361–0.3362)
+  δρ₁  −1.087  (−1.196 – −0.992)
+  δρ₂  1.957  (1.89–1.994)
+  δρ₃  −5.343  (−10.28 – 1.187)
+  Checks:  converged (R̂ 1.004)
+           no divergent transitions
+           8 of 8 chains used
+Wall clock: 0.5 s
+
+   [-1.31, -1.3 )    0
+
+   [1.77, 1.78)    0
+   [1.78, 1.79)    0
+   [1.79, 1.8 )    0
+   [1.81, 1.82)    0
+
+=== model SASDMJ9_fit1_model1-2 ===
+Fit finished: reduced χ² = 2.65 on the measured points
+  ρₑ   0.3362  (0.3361–0.3362)
+  δρ₁  −1.087  (−1.196 – −0.992)
+  δρ₂  1.957  (1.89–1.994)
+  δρ₃  −5.343  (−10.28 – 1.187)
+  Checks:  converged (R̂ 1.004)
+           no divergent transitions
+           8 of 8 chains used
+Wall clock: 0.5 s
+
+   [-1.31, -1.3 )    0
+
+   [1.77, 1.78)    0
+   [1.78, 1.79)    0
+   [1.79, 1.8 )    0
+   [1.81, 1.82)    0
+
+=== model SASDMJ9_fit1_model1 ===
+Fit finished: reduced χ² = 2.65 on the measured points
+  ρₑ   0.3362  (0.3361–0.3362)
+  δρ₁  −1.087  (−1.196 – −0.992)
+  δρ₂  1.957  (1.89–1.994)
+  δρ₃  −5.343  (−10.28 – 1.187)
+  Checks:  converged (R̂ 1.004)
+           no divergent transitions
+           8 of 8 chains used
+Wall clock: 0.6 s
+
+   [-1.31, -1.3 )    0
+
+   [1.77, 1.78)    0
+   [1.78, 1.79)    0
+   [1.79, 1.8 )    0
+   [1.81, 1.82)    0
+
+--- step: stage julia ---
+7-Zip (a) [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=utf8,Utf16=on,HugeFiles=on,64 bits,8 CPUs LE)
+
+Scanning the drive for archives:
+1 file, 4307 bytes (5 KiB)
+
+Extracting archive: /Users/noso/Library/Caches/baysol/baysol-pkg-work/workload/SASDAH5/reference-fit.7z
+--
+Path = /Users/noso/Library/Caches/baysol/baysol-pkg-work/workload/SASDAH5/reference-fit.7z
+Type = 7z
+Physical Size = 4307
+Headers Size = 146
+Method = LZMA2:24k
+Solid = -
+Blocks = 1
+
+Everything is Ok
+
+Size:       17023
+Compressed: 4307
+
+7-Zip (a) [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=utf8,Utf16=on,HugeFiles=on,64 bits,8 CPUs LE)
+
+Scanning the drive for archives:
+1 file, 11002 bytes (11 KiB)
+
+Extracting archive: /Users/noso/Library/Caches/baysol/baysol-pkg-work/workload/SASDAN8/reference-fit.7z
+--
+Path = /Users/noso/Library/Caches/baysol/baysol-pkg-work/workload/SASDAN8/reference-fit.7z
+Type = 7z
+Physical Size = 11002
+Headers Size = 170
+Method = LZMA2:15
+Solid = -
+Blocks = 1
+
+Everything is Ok
+
+Size:       29306
+Compressed: 11002
+
+7-Zip (a) [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=utf8,Utf16=on,HugeFiles=on,64 bits,8 CPUs LE)
+
+Scanning the drive for archives:
+1 file, 5308 bytes (6 KiB)
+
+Extracting archive: /Users/noso/Library/Caches/baysol/baysol-pkg-work/workload/SASDMC6/reference-fit.7z
+--
+Path = /Users/noso/Library/Caches/baysol/baysol-pkg-work/workload/SASDMC6/reference-fit.7z
+Type = 7z
+Physical Size = 5308
+Headers Size = 154
+Method = LZMA2:24k
+Solid = -
+Blocks = 1
+
+Everything is Ok
+
+Size:       22907
+Compressed: 5308
+
+7-Zip (a) [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=utf8,Utf16=on,HugeFiles=on,64 bits,8 CPUs LE)
+
+Scanning the drive for archives:
+1 file, 7435 bytes (8 KiB)
+
+Extracting archive: /Users/noso/Library/Caches/baysol/baysol-pkg-work/workload/SASDMJ9/reference-fit.7z
+--
+Path = /Users/noso/Library/Caches/baysol/baysol-pkg-work/workload/SASDMJ9/reference-fit.7z
+Type = 7z
+Physical Size = 7435
+Headers Size = 138
+Method = LZMA2:15
+Solid = -
+Blocks = 1
+
+Everything is Ok
+
+Size:       31935
+Compressed: 7435
+
+--- step: stage bundle ---
+/Library/Developer/CommandLineTools/usr/bin/install_name_tool: warning: changes being made to the file will invalidate the code signature in: /Users/noso/Lib...   (x 46)
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libLLVM.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libRmath-julia.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libamd.3.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libatomic.1.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libblastrampoline.5.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libbtf.2.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libcamd.3.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libccolamd.3.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libcholmod.5.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libcolamd.3.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libcrypto.3.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libcurl.4.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libddierckx.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libearcut.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libgcc_s.1.1.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libgfortran.5.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libgit2.1.9.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libgmp.10.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libgmpxx.4.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libgomp.1.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libjulia-codegen.1.12.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libjulia-internal.1.12.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libklu.2.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libldl.3.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libmpfr.6.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libnghttp2.14.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libopenblas64_.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libopenlibm.4.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libopenlibm.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libopenspecfun.2.1.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libpcre2-8.0.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libpcre2-8.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libquadmath.0.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/librbio.4.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libspqr.4.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libsqlite3.0.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libssh2.1.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libssl.3.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libssp.0.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libstdc++.6.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libsuitesparseconfig.7.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libumfpack.6.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libunwind.1.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libuv.2.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/julia/libz.1.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/julia/libjulia.1.12.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/lib/pytools/charset_normalizer/cd.so: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/lib/pytools/charset_normalizer/md.so: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/lib/pytools/libpython3.12.dylib: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/lib/pytools/numpy/_core/_multiarray_tests.so: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/lib/pytools/numpy/_core/_multiarray_umath.so: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/lib/pytools/numpy/fft/_pocketfft_umath.so: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/lib/pytools/numpy/linalg/_umath_linalg.so: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/baysol: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/baysol-tui: replacing existing signature
+/Users/noso/Library/Caches/baysol/baysol-pkg-work/bundle/baysol/lib/pytools/baysol-pytools: replacing existing signature
+
+--- step: archive (7-Zip) ---
+7-Zip (a) [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+p7zip Version 16.02 (locale=utf8,Utf16=on,HugeFiles=on,64 bits,8 CPUs LE)
+
+Scanning the drive:
+23 folders, 84 files, 1204013288 bytes (1149 MiB)
+
+Creating archive: /Users/noso/BAYSOL-out/baysol-0.5.1-macos-arm64.zip
+
+Items to compress: 107
+
+Files read from disk: 84
+Archive size: 297160572 bytes (284 MiB)
+Everything is Ok
+
+--- machine ---
+cpu     	Apple M2
+threads 	4
+ram     	16384 MiB
+swap    	1024 MiB
