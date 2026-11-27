@@ -22,8 +22,8 @@ using SHA: sha256
 """
     file_sha256(path) -> String
 
-The SHA-256 of the file `path` as 64 lower-case hex digits, computed in Julia (Windows has no
-`sha256sum`: spawning it made `bysl fits export` skip every entry there).
+The SHA-256 of the file `path` as 64 lower-case hex digits, computed in Julia (Windows
+has no `sha256sum`: spawning it made `bysl fits export` skip every entry there).
 """
 file_sha256(path::AbstractString)::String = bytes2hex(open(sha256, path))
 

@@ -38,20 +38,20 @@ const MARGINAL_FIT_SEED =
     BAYSOL.Platform.islinuxx64() ? 3 : BAYSOL.Inference.RNG_SEED
 
 """
-The `rngSeed` of SASDAP8, a marginal entry: its seed 0 passes on arm64 and Linux. On macOS
-x86_64 under Rosetta 2 seeds 0, 1, 2 and 3 all ended `ladder exhausted`, and seed 4 passed at
-the rung `longer chains + seed` (the base run and `longer chains` had a bulk ESS of 304 against
-the 400 gate; one run, 1112 s). That system takes seed 4 and every other system keeps the
-default.
+The `rngSeed` of SASDAP8, a marginal entry: its seed 0 passes on arm64 and
+Linux. On macOS x86_64 under Rosetta 2 seeds 0, 1, 2 and 3 all ended
+`ladder exhausted`, and seed 4 passed at the rung `longer chains + seed` (the
+base run and `longer chains` had a bulk ESS of 304 against the 400 gate; one
+run, 1112 s). That system takes seed 4 and every other system keeps the default.
 """
 const SASDAP8_FIT_SEED = BAYSOL.Platform.ismacosx64() ? 4 : BAYSOL.Inference.RNG_SEED
 
 """
-The `rngSeed` of SASDVA2 on x86_64 (macOS, Linux or Windows): a run of that entry on x86_64
-was reported to climb the retry ladder to 10 retries and nearly two hours, which arm64 does
-not, so those systems take seed 1 and the others keep the default. NOT TESTED: seed 1 has not
-been run on any system (the check under Rosetta 2 was stopped before it ran), so it is not
-known to be better than seed 0; revert it if it is not.
+The `rngSeed` of SASDVA2 on x86_64 (macOS, Linux or Windows): a run of that entry on
+x86_64 was reported to climb the retry ladder to 10 retries and nearly two hours, which
+arm64 does not, so those systems take seed 1 and the others keep the default. NOT
+TESTED: seed 1 has not been run on any system (the check under Rosetta 2 was stopped
+before it ran), so it is not known to be better than seed 0; revert it if it is not.
 """
 const X64_FIT_SEED = BAYSOL.Platform.isx64() ? 1 : BAYSOL.Inference.RNG_SEED
 

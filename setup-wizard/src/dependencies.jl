@@ -72,7 +72,8 @@ const MAC_FONT_SET =
 function defaultItems()::Vector{DepItem}
     allOS = [:windows, :macos, :linux]
     brew = DepItem("brew", "Homebrew", :optional, [:macos],
-        "Only to install optional things such as iTerm2 from here; BAYSOL works without it.",
+        "Only to install optional things such as iTerm2 from here; " *
+        "BAYSOL works without it.",
         false, Route[], [:macos => "By hand: https://brew.sh"])
     latex = DepItem("latex", "LaTeX engine (TeX Live)", :optional, allOS,
         "Only renders plots to PDF. It is large (gigabytes); BAYSOL works without it.",
@@ -146,7 +147,8 @@ function defaultItems()::Vector{DepItem}
         false, Route[],
         [
             :macos =>
-                "In Terminal > Settings > Profiles, pick this window's profile, then Text: " *
+                "In Terminal > Settings > Profiles, pick this window's profile, " *
+                "then Text: " *
                 "set character spacing and line spacing to 1.0.",
         ])
     return [brew, latex, sixel, color, size, font, spacing]
@@ -264,7 +266,9 @@ function _detectFont(env, which; read = _macFont)::Detection
 end
 
 "AppleScript that reads the name of the front Terminal window's profile."
-const MAC_PROFILE_READ = "tell application \"Terminal\" to get name of current settings of front window"
+const MAC_PROFILE_READ =
+    "tell application \"Terminal\" to " *
+    "get name of current settings of front window"
 
 """
 The character and line spacing in the property list `xml` of a Terminal profile. A profile
@@ -503,7 +507,8 @@ function _offerITerm(io::IO, item::DepItem; which, runner, ask)::String
         println(
             io,
             ok ?
-            "  Done. The BAYSOL icon now opens in iTerm2, unless you chose another terminal." :
+            "  Done. The BAYSOL icon now opens in iTerm2, " *
+            "unless you chose another terminal." :
             "  Homebrew is installed, but iTerm2 could not be.",
         )
         return ok ? "yes" : "later"

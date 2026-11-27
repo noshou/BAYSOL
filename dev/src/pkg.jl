@@ -907,8 +907,8 @@ end
 
 """
 The 7-Zip program: the `7za` of the npm package `7zip-bin`, else `7zz`, `7z`, `7za`. The
-package ships `mac/x64/7za` without the execute bit (only `mac/arm64/7za` has it), so a build
-on Intel macOS or under Rosetta 2 could not start it: it is made executable here.
+package ships `mac/x64/7za` without the execute bit (only `mac/arm64/7za` has it), so a
+build on Intel macOS or under Rosetta 2 could not start it: it is made executable here.
 """
 function find_7z()
     os, arch = system_names()
@@ -1474,20 +1474,21 @@ function link_wrapper(work::AbstractString)::String
 end
 
 """
-The text of `juliac.jl` that fixes the threads of the process that builds the image (and runs
-the workload fits of the build): `addenv(cmd, "OPENBLAS_NUM_THREADS" => 1, "JULIA_NUM_THREADS" => 1)`.
-Neither the environment nor `--threads` of `juliac.jl` changes it (measured: the build
-process has 1 thread either way), so [`patched_juliac`](@ref) rewrites it in a copy.
+The text of `juliac.jl` that fixes the threads of the process that builds the
+image (and runs the workload fits of the build):
+`addenv(cmd, "OPENBLAS_NUM_THREADS" => 1, "JULIA_NUM_THREADS" => 1)`. Neither the
+environment nor `--threads` of `juliac.jl` changes it (measured: the build process
+has 1 thread either way), so [`patched_juliac`](@ref) rewrites it in a copy.
 """
 const JULIAC_THREADS_TEXT = "\"JULIA_NUM_THREADS\" => 1)"
 
 """
     juliac_threads() -> Int
 
-The Julia threads of the process that builds the image: `BAYSOL_JULIAC_THREADS` if it is a
-positive integer, else 1 under Rosetta 2 (more threads risk its garbage-collector hang, see the
-README) and 4 elsewhere (as the trace stage runs its fits). The workload fits of the julia
-stage took 3 h 54 min on one thread (linux-x86-64) and 9 h on Windows.
+The Julia threads of the process that builds the image: `BAYSOL_JULIAC_THREADS` if it is
+a positive integer, else 1 under Rosetta 2 (more threads risk its garbage-collector
+hang, see the README) and 4 elsewhere (as the trace stage runs its fits). The workload
+fits of the julia stage took 3 h 54 min on one thread (linux-x86-64) and 9 h on Windows.
 """
 function juliac_threads()::Int
     n = tryparse(Int, get(ENV, "BAYSOL_JULIAC_THREADS", ""))
@@ -1498,10 +1499,10 @@ end
 """
     patched_juliac(work; bindir = Sys.BINDIR) -> String
 
-A copy of the `juliac` folder of the Julia installation (with the `julia-config.jl` it includes)
-under `<work>/juliac-threads`, where the thread count of the build process is read from
-`BAYSOL_JULIAC_THREADS` (default 1, as before) instead of being fixed at 1. Everything else of
-`juliac.jl` is unchanged; `OPENBLAS_NUM_THREADS` stays 1.
+A copy of the `juliac` folder of the Julia installation (with the `julia-config.jl` it
+includes) under `<work>/juliac-threads`, where the thread count of the build process is
+read from `BAYSOL_JULIAC_THREADS` (default 1, as before) instead of being fixed at 1.
+Everything else of `juliac.jl` is unchanged; `OPENBLAS_NUM_THREADS` stays 1.
 
 # Returns
 The path of the patched `juliac.jl`.
@@ -1529,8 +1530,12 @@ function patched_juliac(work::AbstractString; bindir = Sys.BINDIR)::String
     patched = joinpath(dest, "juliac", "juliac.jl")
     write(
         patched,
-        replace(text, JULIAC_THREADS_TEXT =>
-            "\"JULIA_NUM_THREADS\" => get(ENV, \"BAYSOL_JULIAC_THREADS\", \"1\"))"),
+        replace(
+            text,
+            JULIAC_THREADS_TEXT =>
+                "\"JULIA_NUM_THREADS\" => " *
+                "get(ENV, \"BAYSOL_JULIAC_THREADS\", \"1\"))",
+        ),
     )
     return patched
 end
@@ -1548,8 +1553,8 @@ function stage_julia(work, workload)
     dir = mkpath(joinpath(work, "julia"))
     juliac = joinpath(Sys.BINDIR, "..", "share", "julia", "juliac", "juliac.jl")
     need(isfile(juliac), "juliac.jl not found: $juliac")
-    # more than one thread only where it is safe (`juliac_threads`): under Rosetta 2 the stock
-    # `juliac.jl` runs, as before
+    # more than one thread only where it is safe (`juliac_threads`):
+    # under Rosetta 2 the stock `juliac.jl` runs, as before
     threads = juliac_threads()
     threads > 1 && (juliac = patched_juliac(work))
     entry = joinpath(Common.root(), "tui", "julia", "app", "baysol.jl")
@@ -1565,8 +1570,9 @@ function stage_julia(work, workload)
     # the JLL libraries of depot artifacts are opened by bare name (see `jll_libraries`)
     libs = jll_libraries(project)
     write(joinpath(dir, "jll-libraries.tsv"), join([join(l, '\t') for l in libs], '\n'))
-    # the thread count of the build process: `juliac.jl` fixes it at 1 and overrides this
-    # environment, so `patched_juliac` reads `BAYSOL_JULIAC_THREADS` instead (see `juliac_threads`)
+    # the thread count of the build process: `juliac.jl` fixes it
+    # at 1 and overrides this environment, so `patched_juliac`
+    # reads `BAYSOL_JULIAC_THREADS` instead (see `juliac_threads`)
     env = Dict("JULIA_CPU_TARGET" => CPU_TARGET, "BAYSOL_WORKLOAD" => workload,
         "BAYSOL_PYTOOLS" => pytools,
         "JULIA_LOAD_PATH" =>
@@ -2239,10 +2245,10 @@ end
 
 `false` when `path` is a 64-bit little-endian ELF file whose loadable segments the loader
 would refuse: for each `PT_LOAD` segment the file offset and the virtual address must agree
-modulo the alignment of the segment (`ld.so` stops with "ELF load command address/offset not
-page-aligned" otherwise). `llvm-strip` 18.1.3 (Ubuntu 24.04) breaks `libunwind.so.8` of Julia
-this way (measured: segment 3 moved from offset 0x7d000 to 0x285f8 at address 0x233000).
-`true` for everything else, so a file that is no ELF file is left alone.
+modulo the alignment of the segment (`ld.so` stops with "ELF load command address/offset
+not page-aligned" otherwise). `llvm-strip` 18.1.3 (Ubuntu 24.04) breaks `libunwind.so.8` of
+Julia this way (measured: segment 3 moved from offset 0x7d000 to 0x285f8 at address
+0x233000). `true` for everything else, so a file that is no ELF file is left alone.
 """
 function elf_load_ok(path::AbstractString)::Bool
     return open(path) do io
@@ -2272,10 +2278,10 @@ end
 """
     strip_checked(lines, files; os = this_os(), runner = l -> rc(Cmd(l))) -> NamedTuple
 
-[`run_strip`](@ref), and on Linux a check of each stripped file with [`elf_load_ok`](@ref): a
-file the strip tool left unloadable is put back as it was (the copies made before stripping
-are removed afterwards). Stripping only saves space, so an unstripped library is better than
-one that does not load.
+[`run_strip`](@ref), and on Linux a check of each stripped file with
+[`elf_load_ok`](@ref): a file the strip tool left unloadable is put back as it
+was (the copies made before stripping are removed afterwards). Stripping only
+saves space, so an unstripped library is better than one that does not load.
 
 # Returns
 `(failed, restored)`: the files the tool refused, and the files that were put back.
@@ -2504,17 +2510,20 @@ function looks_like_work(work::AbstractString)::Bool
     return isdir(joinpath(work, "logs")) || any(s -> done(work, s), STAGES)
 end
 
-"The extended-length prefix of Windows (backslash, backslash, question mark, backslash): it lifts the 260 character limit of a path."
+"""
+The extended-length prefix of Windows (backslash, backslash, question
+mark, backslash): it lifts the 260 character limit of a path.
+"""
 const LONG_PATH_PREFIX = "\\\\?\\"
 
 """
     rm_tree(path)
 
 Removes the folder `path` with everything in it. On Windows a path of more than 260
-characters cannot be removed by its plain name (`rm` then stops with "directory not empty":
-the file inside is out of reach), and the MinGW-w64 artifact of the build's depot has such
-paths (270 characters, measured); the extended-length prefix (`LONG_PATH_PREFIX`) lifts the limit, so the folder is
-removed by its prefixed full name there.
+characters cannot be removed by its plain name (`rm` then stops with "directory not
+empty": the file inside is out of reach), and the MinGW-w64 artifact of the build's depot
+has such paths (270 characters, measured); the extended-length prefix (`LONG_PATH_PREFIX`)
+lifts the limit, so the folder is removed by its prefixed full name there.
 """
 function rm_tree(path::AbstractString)
     p = String(path)

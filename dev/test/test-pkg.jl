@@ -264,7 +264,8 @@ end
     @test !ispath(base)
 end
 
-# A 64-bit little-endian ELF header with the given PT_LOAD segments `(offset, vaddr, align)`.
+# A 64-bit little-endian ELF header with the given
+# PT_LOAD segments `(offset, vaddr, align)`.
 function fake_elf64(segments)
     io = IOBuffer()
     write(io, UInt8[0x7f, 0x45, 0x4c, 0x46, 2, 1, 1, 0])
@@ -284,11 +285,17 @@ end
     dir = mktempdir()
     good = joinpath(dir, "good.so")
     # libunwind.so.8 of Julia: the third segment at offset 0x7d000 for address 0x233000
-    write(good, fake_elf64([(0, 0, 0x200000), (0x27e78, 0x227e78, 0x200000),
-        (0x7d000, 0x233000, 0x1000)]))
+    write(
+        good,
+        fake_elf64([(0, 0, 0x200000), (0x27e78, 0x227e78, 0x200000),
+            (0x7d000, 0x233000, 0x1000)]),
+    )
     bad = joinpath(dir, "bad.so")                    # after llvm-strip 18.1.3: 0x285f8
-    write(bad, fake_elf64([(0, 0, 0x200000), (0x27e78, 0x227e78, 0x200000),
-        (0x285f8, 0x233000, 0x1000)]))
+    write(
+        bad,
+        fake_elf64([(0, 0, 0x200000), (0x27e78, 0x227e78, 0x200000),
+            (0x285f8, 0x233000, 0x1000)]),
+    )
     text = joinpath(dir, "script.sh")
     write(text, "#!/bin/sh\n")
     @test P.elf_load_ok(good) && !P.elf_load_ok(bad) && P.elf_load_ok(text)
@@ -333,10 +340,16 @@ end
     write(joinpath(juliac, "juliac.jl"), "# juliac
 " * line * "run(cmd)
 ")
-    write(joinpath(juliac, "Artifacts.toml"), "# artifacts
-")
-    write(joinpath(root, "share", "julia", "julia-config.jl"), "# config
-")
+    write(
+        joinpath(juliac, "Artifacts.toml"),
+        "# artifacts
+",
+    )
+    write(
+        joinpath(root, "share", "julia", "julia-config.jl"),
+        "# config
+",
+    )
     work = mktempdir()
     path = P.patched_juliac(work; bindir = bin)
     text = read(path, String)
@@ -350,8 +363,11 @@ end
 "
     P.patched_juliac(work; bindir = bin)             # a second call replaces the copy
     # another juliac.jl (no such line, or two): the stage stops instead of running unpatched
-    write(joinpath(juliac, "juliac.jl"), "run(cmd)
-")
+    write(
+        joinpath(juliac, "juliac.jl"),
+        "run(cmd)
+",
+    )
     @test_throws Dev.Common.ToolError P.patched_juliac(work; bindir = bin)
     write(joinpath(juliac, "juliac.jl"), line * line)
     @test_throws Dev.Common.ToolError P.patched_juliac(work; bindir = bin)
