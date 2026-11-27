@@ -1157,11 +1157,15 @@ function merge_statements(lines; allowed = nothing)::Vector{String}
 end
 
 "The environment of every program the trace stage runs: the frozen Python tools, 4 threads,
-the unit suite in one process (`UNIT_JOBS=1`) so that its trace is whole."
+the unit suite in one process (`UNIT_JOBS=1`) so that its trace is whole. The interface's
+runs read `BAYSOL_THREADS` (their launcher passes `--threads=auto,1` otherwise, which
+overrides `JULIA_NUM_THREADS`): with 8 threads two of five of them hung for ever under
+Rosetta 2, and the fits and command-line runs at 4 threads never did."
 function trace_env(work)
     return Dict(
         "BAYSOL_PYTOOLS" => joinpath(work, "pytools", "baysol-pytools.dist",
             exe("baysol-pytools")), "JULIA_NUM_THREADS" => "4",
+        "BAYSOL_THREADS" => "4",
         "UNIT_JOBS" => "1")  # the unit suite in one process, so its trace is whole
 end
 
@@ -1369,6 +1373,26 @@ function stage_trace(work)
 end
 
 """
+    link_wrapper(work) -> String
+
+The compiler `juliac.jl` links with on Linux (`JULIA_CC`): `gcc` with `-lm` after the other
+arguments. The link command of `juliac.jl` names `-ljulia -ljulia-internal` and no `-lm`,
+and the linker of Ubuntu 24.04 (binutils 2.42) no longer takes `libm` from the libraries
+that need it: the link failed with "undefined reference to symbol 'floorf@@GLIBC_2.2.5'
+... DSO missing from command line" after a 4 hour run (the objects are in `<work>/tmp`,
+so a link can be redone by hand with the failed command and `-lm`).
+
+# Returns
+The path of the script, in `work`.
+"""
+function link_wrapper(work::AbstractString)::String
+    path = joinpath(work, "link-gcc.sh")
+    write(path, "#!/bin/sh\nexec gcc \"\$@\" -lm\n")
+    chmod(path, 0o755)
+    return path
+end
+
+"""
 The CPU target of the compiled app. `generic` runs on every CPU of the architecture
 (owner, 2026-11-23): juliac's default is `native`, which lets LLVM use the build machine's
 own instructions (an Apple M2's, say) and crash with SIGILL elsewhere, and per-CPU variants
@@ -1394,6 +1418,9 @@ function stage_julia(work, workload)
     # the JLL libraries of depot artifacts are opened by bare name (see `jll_libraries`)
     libs = jll_libraries(project)
     write(joinpath(dir, "jll-libraries.tsv"), join([join(l, '\t') for l in libs], '\n'))
+    # no thread count here: `juliac.jl` starts the process that runs the workload with
+    # `JULIA_NUM_THREADS=1`, which overrides this environment (so the workload fits of the
+    # build run on one thread; see the README, "far too slow")
     env = Dict("JULIA_CPU_TARGET" => CPU_TARGET, "BAYSOL_WORKLOAD" => workload,
         "BAYSOL_PYTOOLS" => pytools,
         "JULIA_LOAD_PATH" =>
@@ -1404,6 +1431,8 @@ function stage_julia(work, workload)
         "TMPDIR" => mkpath(joinpath(work, "tmp")),
         # Windows takes its temp folder from TMP / TEMP, not TMPDIR
         "TMP" => joinpath(work, "tmp"), "TEMP" => joinpath(work, "tmp"))
+    # `juliac.jl` splits `JULIA_CC` like a shell would: quote the path
+    Platform.islinux() && (env["JULIA_CC"] = "\"" * link_wrapper(work) * "\"")
     log = joinpath(work, "julia.log")
     ok = step("juliac (precompile, workload fits, compile, link)",
         () -> guarded(
@@ -2059,6 +2088,77 @@ function run_strip(lines, files; runner = l -> rc(Cmd(l)))::Vector{String}
 end
 
 """
+    elf_load_ok(path) -> Bool
+
+`false` when `path` is a 64-bit little-endian ELF file whose loadable segments the loader
+would refuse: for each `PT_LOAD` segment the file offset and the virtual address must agree
+modulo the alignment of the segment (`ld.so` stops with "ELF load command address/offset not
+page-aligned" otherwise). `llvm-strip` 18.1.3 (Ubuntu 24.04) breaks `libunwind.so.8` of Julia
+this way (measured: segment 3 moved from offset 0x7d000 to 0x285f8 at address 0x233000).
+`true` for everything else, so a file that is no ELF file is left alone.
+"""
+function elf_load_ok(path::AbstractString)::Bool
+    return open(path) do io
+        magic = read(io, 4)
+        magic == UInt8[0x7f, 0x45, 0x4c, 0x46] || return true
+        read(io, UInt8) == 2 || return true          # ELFCLASS64 only
+        read(io, UInt8) == 1 || return true          # little endian only
+        seek(io, 0x20)
+        phoff = read(io, UInt64)
+        seek(io, 0x36)
+        phentsize = Int(read(io, UInt16))
+        phnum = Int(read(io, UInt16))
+        for i in 0:(phnum-1)
+            seek(io, phoff + i * phentsize)
+            ptype = read(io, UInt32)
+            skip(io, 4)                              # p_flags
+            offset = read(io, UInt64)
+            vaddr = read(io, UInt64)
+            skip(io, 8 + 8 + 8)                      # p_paddr, p_filesz, p_memsz
+            align = read(io, UInt64)
+            ptype == 1 && align > 1 && (vaddr % align != offset % align) && return false
+        end
+        return true
+    end
+end
+
+"""
+    strip_checked(lines, files; os = this_os(), runner = l -> rc(Cmd(l))) -> NamedTuple
+
+[`run_strip`](@ref), and on Linux a check of each stripped file with [`elf_load_ok`](@ref): a
+file the strip tool left unloadable is put back as it was (the copies made before stripping
+are removed afterwards). Stripping only saves space, so an unstripped library is better than
+one that does not load.
+
+# Returns
+`(failed, restored)`: the files the tool refused, and the files that were put back.
+
+# Exceptions
+None.
+"""
+function strip_checked(lines, files; os::Symbol = this_os(), runner = l -> rc(Cmd(l)))
+    check = os === :linux
+    backup(f) = f * ".pre-strip"
+    check && for f in files
+        isfile(f) && !islink(f) && cp(f, backup(f); force = true)
+    end
+    failed = run_strip(lines, files; runner)
+    restored = String[]
+    if check
+        for f in files
+            isfile(backup(f)) || continue
+            if !elf_load_ok(f)
+                mv(backup(f), f; force = true)
+                push!(restored, f)
+            else
+                rm(backup(f); force = true)
+            end
+        end
+    end
+    return (; failed, restored)
+end
+
+"""
     strip_bundle(out, exes; os = this_os(), tool = nothing) -> Bool
 
 Strips the copies in the bundle folder `out` (never the Julia installation they came
@@ -2095,7 +2195,14 @@ function strip_bundle(out::AbstractString, exes; os::Symbol = this_os(), tool = 
         )
         return false
     end
-    failed = run_strip(lines, vcat(libs, bins))
+    (; failed, restored) = strip_checked(lines, vcat(libs, bins); os)
+    isempty(restored) || note(
+        "  strip: WARNING, $(length(restored)) files put back unstripped (the strip tool " *
+        "left them unloadable): " *
+        join(basename.(first(restored, 8)), ", ") *
+        (length(restored) > 8 ? ", ..." : "");
+        terminal = true,
+    )
     isempty(failed) || note(
         "  strip: WARNING, $(length(failed)) files left unstripped (the tool refused " *
         "them): " *
@@ -2250,6 +2357,26 @@ function looks_like_work(work::AbstractString)::Bool
     return isdir(joinpath(work, "logs")) || any(s -> done(work, s), STAGES)
 end
 
+"The extended-length prefix of Windows (backslash, backslash, question mark, backslash): it lifts the 260 character limit of a path."
+const LONG_PATH_PREFIX = "\\\\?\\"
+
+"""
+    rm_tree(path)
+
+Removes the folder `path` with everything in it. On Windows a path of more than 260
+characters cannot be removed by its plain name (`rm` then stops with "directory not empty":
+the file inside is out of reach), and the MinGW-w64 artifact of the build's depot has such
+paths (270 characters, measured); the extended-length prefix (`LONG_PATH_PREFIX`) lifts the limit, so the folder is
+removed by its prefixed full name there.
+"""
+function rm_tree(path::AbstractString)
+    p = String(path)
+    if Platform.iswindows() && !startswith(p, LONG_PATH_PREFIX)
+        p = LONG_PATH_PREFIX * abspath(p)
+    end
+    rm(p; recursive = true, force = true)
+end
+
 """
     remove_caches(work) -> Int
 
@@ -2267,7 +2394,7 @@ function remove_caches(work::AbstractString)::Int
     for c in COLD_CACHES
         p = joinpath(work, c)
         isdir(p) || continue
-        rm(p; recursive = true, force = true)
+        rm_tree(p)
         n += 1
     end
     return n
@@ -2309,7 +2436,7 @@ function remove_work(work)
         throw(ToolError("$WHO: refusing to remove $work", 1))
     (done(work, "bundle") || done(work, "pytools")) ||
         throw(ToolError("$WHO: $work does not look like this tool's folder", 1))
-    rm(work; recursive = true, force = true)
+    rm_tree(work)
 end
 
 # --- the program
@@ -2344,6 +2471,9 @@ function preflight(archive)
         w = Platform.which(p)
         push!(cs, (w !== nothing, "program $p", something(w, "not on PATH")))
     end
+    # the strip tool is needed, not optional: a build of hours must not end unstripped
+    strip = Platform.find_tool(STRIP_TOOL)
+    push!(cs, (strip !== nothing, "program $STRIP_TOOL", something(strip, "not found")))
     push!(
         cs,
         (
@@ -2392,7 +2522,7 @@ function run(argv::Vector{String})::Int
     if !resume && ispath(work)
         looks_like_work(work) ||
             fail(WHO, "$work exists and is not this tool's folder (remove it yourself)")
-        rm(work; recursive = true, force = true)  # cold: nothing of an earlier build
+        rm_tree(work)  # cold: nothing of an earlier build
     end
     mkpath(work)
     workload = get(opts, "--workload", nothing)
@@ -2463,8 +2593,13 @@ function run(argv::Vector{String})::Int
         catch e
             println("build log not written: ", sprint(showerror, e))
         end
-        remove_caches(work)  # always: the depot and the other caches are never kept
-        "--keep-work" in a.flags || remove_work(work)
+        # the archive is written: a folder that cannot be removed must not fail the build
+        try
+            remove_caches(work)  # always: the depot and the other caches are never kept
+            "--keep-work" in a.flags || remove_work(work)
+        catch e
+            println("cleanup incomplete (remove $work yourself): ", sprint(showerror, e))
+        end
         println("archive: ", archive)
     end
     return 0

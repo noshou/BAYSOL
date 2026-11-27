@@ -67,12 +67,12 @@ non_tex() = Dict(
     s = D.survey(:linux; probes = probes(absent = ["git", "tex-engine", "llvm-strip"]))
     st = Dict(i.name => x for (i, x, _) in s)
     @test st["git"] == :missing && st["tex-engine"] == :optional &&
-          st["llvm-strip"] == :optional
+          st["llvm-strip"] == :missing
     @test byname("julia").required == false
     @test all(
         n -> byname(n).required,
         ["git", "node", "npm-packages", "7z", "uv", "curl",
-            "tar", "gcc", "memory"],
+            "tar", "gcc", "llvm-strip", "memory"],
     )
 end
 
@@ -88,10 +88,13 @@ end
 
     # only an optional item missing: exit status 0
     status, text, _ = with_tex(TexSys()) do
-        survey_text(:macos; absent = ["tex-engine", "llvm-strip"])
+        survey_text(:macos; absent = ["tex-engine"])
     end
-    @test status == 0 &&
-          says(text, "brew install --cask basictex", "brew install llvm")
+    @test status == 0 && says(text, "brew install --cask basictex")
+
+    # llvm-strip is required: without it the status is 1 and the install is offered
+    status, text, _ = survey_text(:macos; absent = ["llvm-strip"])
+    @test status == 1 && says(text, "MISSING", "brew install llvm")
 
     status, text, _ = survey_text(:windows; absent = ["git", "7z", "gcc", "tar"])
     @test status == 1

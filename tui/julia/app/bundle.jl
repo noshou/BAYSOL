@@ -69,13 +69,15 @@ end
 
 Runs `f()` when this process has the threads a fit needs; a compiled executable takes no
 `--threads` flag, so with one thread and no `JULIA_NUM_THREADS` the same command is started
-again with the variable set (`BAYSOL_THREADS`, else the number of CPU threads, at most 8).
+again with the variable set (`BAYSOL_THREADS`, else the number of CPU threads, at most 8,
+and at most 4 under Rosetta 2: with 8 threads Julia's stop-the-world for the garbage
+collector hung for ever in `thread_get_state` of Rosetta, in 2 of 5 interface runs of a build).
 The exit status.
 """
 function withThreads(f, bundle::AbstractString, args::Vector{String})::Int
     if Threads.nthreads() == 1 && isempty(get(ENV, "JULIA_NUM_THREADS", ""))
         n = something(tryparse(Int, get(ENV, "BAYSOL_THREADS", "")),
-            clamp(Sys.CPU_THREADS, 1, 8))
+            clamp(Sys.CPU_THREADS, 1, Platform.isrosetta() ? 4 : 8))
         n > 1 || return f()
         exe = unsafe_string(Base.JLOptions().julia_bin)
         proc = run(ignorestatus(addenv(Cmd([exe; args]), "JULIA_NUM_THREADS" => string(n))))

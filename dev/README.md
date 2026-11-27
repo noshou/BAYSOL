@@ -335,7 +335,7 @@ Prints what a developer needs and what this machine has, one line per item with 
 | `npm-packages` | yes | `node_modules` of the checkout; the install is `npm ci` |
 | `7z` | yes | 7-Zip (`7z` or `7zz`) on the PATH for the tests and `bysl fixtures`; `bysl pkg` itself uses the npm `7zip-bin` |
 | `uv`, `curl`, `tar`, `gcc` | yes | the programs of `PkgTool.preflight_programs` (one list for both tools). On Windows `gcc` and `tar` are `n/a`: juliac downloads its own MinGW-w64 gcc and Nuitka uses MSVC or downloads MinGW64 (network needed), and the Node zip goes through 7-Zip |
-| `llvm-strip` | no | LLVM, the strip tool of `bysl pkg` (it warns without) |
+| `llvm-strip` | yes | LLVM, the strip tool of `bysl pkg` (the preflight stops without it; on Windows it is also found in `C:\Program Files\LLVM\bin`) |
 | `patchelf` | no | Linux only; comes with the build's venv |
 | `memory` | yes | Linux only: RAM plus swap of at least 24 GiB, the check of `bysl pkg` |
 | `rdkit` | no | `RDKit_jll` for the pmv tools. **Windows: unavailable** (its `librdkitcffi.dll` exports none of the functions that RDKitMinimalLib calls, and the newest `RDKit_jll` has no such library): the report says the pmv tools are skipped and no install is ever offered |

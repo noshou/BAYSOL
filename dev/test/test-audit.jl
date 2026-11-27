@@ -145,6 +145,7 @@ end
         @test sc(:pe, lib) == :unknown
     end
     @test sc(:pe, "python312.dll") == :unknown
+    @test sc(:pe, "PROPSYS.dll") == :system
     @test sc(:elf, "libc.so.6") == :system && sc(:elf, "libm.so.6") == :system
     @test sc(:elf, "ld-linux-x86-64.so.2") == :system
     @test sc(:elf, "libpthread.so.0") == :system
@@ -268,6 +269,9 @@ end
     @test status == 1 && says(out, "libfoo.so", "MISSING", "1 missing")
     write_file(joinpath(dir, "libfoo.so"), fake_elf(["libc.so.6"]; soname = "libfoo.so"))
     status, out = run_tool("audit", dir)
+    @test status == 0 && says(out, "2 binaries", "0 missing")
+    # a trailing separator on the folder (shell completion) changes nothing
+    status, out = run_tool("audit", dir * "/")
     @test status == 0 && says(out, "2 binaries", "0 missing")
     # a library the launcher puts on the loader's path: --search
     other = scratch_dir()

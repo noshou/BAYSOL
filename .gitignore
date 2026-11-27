@@ -123,3 +123,9 @@ notes/
 
 # sass (Ruby) cache
 .sass-cache/
+
+# bysl pkg status report (written beside the archive)
+baysol-pkg-report.txt
+
+# the build logs of `bysl pkg` are kept (the *.log rule above matches *.LOG where the file system ignores case)
+!dev/build-logs/*.LOG

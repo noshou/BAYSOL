@@ -88,9 +88,12 @@ the bug.
   it.
 - *Two marginal fitting tests do not converge on macOS x86_64 with the default seed*: SASDJ66
   (R̂ 1.14, bulk ESS 26) and SASDAP8 (R̂ 1.16 to 1.38, bulk ESS 13 to 27) end with
-  `NotConvergedError: ladder exhausted` under Rosetta, and pass with seed 0 on arm64. Their
-  scripts take `rngSeed = MARGINAL_FIT_SEED` (`test/fitting_tests/common.jl`): seed 1 on macOS
-  x86_64, the default 0 everywhere else. A seed that converges says nothing about why the
+  `NotConvergedError: ladder exhausted` under Rosetta, and pass with seed 0 on arm64. SASDJ66
+  passed with seed 1 (`MARGINAL_FIT_SEED`, `test/fitting_tests/common.jl`). SASDAP8 did not:
+  seeds 0, 1, 2 and 3 all ended `ladder exhausted`, and seed 4 passed at the rung `longer
+  chains + seed` (`SASDAP8_FIT_SEED`; the base run and `longer chains` had a bulk ESS of 304
+  against the 400 gate, one run of 1112 s, chi² 0.85, R̂ 1.0003, 4 modes). Both take the default
+  seed 0 everywhere but on macOS x86_64. A seed that converges says nothing about why the
   sampler is so close to the limit on these two; the cause of the difference is not known, and
   other marginal entries can fail the same way.
 - *`bysl pkg` could not start the x64 7-Zip of `7zip-bin` on Intel macOS or under Rosetta 2*: the
@@ -98,14 +101,22 @@ the bug.
   `7zip-bin` has no install script), so the build stopped with `IOError: could not spawn` at its
   first use. Fixed: `find_7z` (`dev/src/pkg.jl`) makes the bundled `7za` executable. Untested on
   a real Intel Mac.
-- *A step of the trace stage of `bysl pkg` can hang for ever.* The interface run of SASDAH5
-  (`tui/test/support/trace-run.ts`, started by the trace stage) sat for 1 h 48 min at 0% CPU in
-  the x86_64 build under Rosetta 2: the Node driver waits for the Julia run, and Julia waits on
-  its socket to the driver, both idle, and the log empty (the same step takes 25 s on arm64, and
-  the same step of SASDMJ9 and SASDAN8 passed in that build). The cause is not known, a race in
-  the launcher or a Rosetta timing issue are guesses. The steps have no timeout, so the build
-  does not go on by itself; killing the two processes lets it go on, and the step then counts
-  as ended, like a failed fit (see below).
+- *Under Rosetta 2 an interface run of the trace stage of `bysl pkg` hung for ever, twice* (the
+  interface runs of SASDAH5 and SASDVA2, 1 h 48 min and 56 min at 0% CPU when they were
+  killed, the same two steps take 25 s and 3 min on arm64). Stack samples of the second one
+  (`sample`, taken before killing it) show the cause: the main thread of Julia is in the garbage
+  collector (`gcCheckpoint`, `gc-pause.jl`, into `jl_gc_wait_for_the_world`), waiting for the
+  other threads to stop at a safepoint; the thread that handles the safepoint faults
+  (`mach_segv_listener`) is stuck in `thread_get_state` inside Rosetta; the 8 worker threads
+  wait for it. It is Julia's macOS safepoint handling under Rosetta, not BAYSOL code. The
+  interface starts Julia with `--threads=auto,1` (8 threads on an 8-core Mac); the fits and the
+  command-line runs of the same build used 4 threads and did not hang in about 50 runs, so 4
+  threads is the working assumption, not a proven safe number. Fixed in two places: the trace
+  stage sets `BAYSOL_THREADS=4` for the interface runs (`trace_env`), and the packaged app
+  starts itself with at most 4 threads under Rosetta 2 when the user has set no thread count
+  (`withThreads`, `Platform.isrosetta` in `platform.jl`). Neither is tested in a real run yet;
+  the Rosetta check was tested alone (true under Rosetta, false native). A stuck pair can still
+  be killed by hand, and the step then counts as ended, like a failed fit (see below).
 - *`bysl pkg` is far too slow because it uses one or two cores of eight.* The stages and the fits
   run one after another (`one fit at a time` in the trace stage), each Julia process with a fixed
   `--threads=4` (`dev/src/pkg.jl`), so one process works at a time: measured in the x86_64 build
@@ -114,7 +125,15 @@ the bug.
   maximum settings, which is probably single-threaded; not checked). For the next version:
   fits and runs that do not depend on each other could go in parallel (limited by memory, a fit
   needs 2 to 6 GB), the thread count could follow the machine, and the archive could use a
-  faster setting or a multi-threaded method.
+  faster setting or a multi-threaded method. The julia stage (juliac, which runs the five workload fits of the build twice) is the
+  worst case, and it is single-threaded by Julia itself: `juliac.jl` of Julia 1.12.7 starts the
+  process that runs the workload with `JULIA_NUM_THREADS=1` and `OPENBLAS_NUM_THREADS=1` (its
+  line 171), so a thread count in the environment of `stage_julia` is overridden; one was tried
+  (4) and the process had 1 (measured). A Windows x86_64 build showed one thread at 100% CPU and
+  4.3 h for one pass of SASDVA2. Not fixed. For the next version: a copy of `juliac.jl` with
+  those values changed, or the workload fits in a child Julia started with `--threads`; under
+  Rosetta 2 more threads risk the garbage-collector hang described above, so one thread is the
+  safe choice there.
 - *A run on x86_64 can climb the retry ladder to 10 retries and take nearly two hours* (reported by
   the owner, 25 November 2026: the fit, the machine and the log were not recorded here, so
   they are to be added). It is the same behaviour as the non-converging SASDJ66 and SASDAP8 on

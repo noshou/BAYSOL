@@ -217,6 +217,67 @@ end
     @test !ispath(dir)
 end
 
+@testset "a folder with paths over 260 characters is removed (Windows)" begin
+    base = mkpath(joinpath(mktempdir(), "baysol-pkg-work", "depot"))
+    deep = base
+    while length(deep) < 300
+        deep = joinpath(deep, "a_long_folder_name_" * "x"^30)
+    end
+    # Windows creates and fills such a path only by its prefixed name
+    full = Platform.iswindows() ? P.LONG_PATH_PREFIX * abspath(deep) : deep
+    mkpath(full)
+    write(joinpath(full, "f.hpp"), "1")
+    P.rm_tree(base)
+    @test !ispath(base)
+end
+
+# A 64-bit little-endian ELF header with the given PT_LOAD segments `(offset, vaddr, align)`.
+function fake_elf64(segments)
+    io = IOBuffer()
+    write(io, UInt8[0x7f, 0x45, 0x4c, 0x46, 2, 1, 1, 0])
+    write(io, zeros(UInt8, 8))                       # e_ident padding
+    write(io, UInt16(3), UInt16(62), UInt32(1))      # type, machine, version
+    write(io, UInt64(0), UInt64(64), UInt64(0))      # entry, phoff, shoff
+    write(io, UInt32(0), UInt16(64), UInt16(56), UInt16(length(segments)))
+    write(io, UInt16(64), UInt16(0), UInt16(0))      # shentsize, shnum, shstrndx
+    for (offset, vaddr, align) in segments
+        write(io, UInt32(1), UInt32(5), UInt64(offset), UInt64(vaddr), UInt64(vaddr))
+        write(io, UInt64(0x100), UInt64(0x100), UInt64(align))
+    end
+    return take!(io)
+end
+
+@testset "a file the strip tool left unloadable is put back" begin
+    dir = mktempdir()
+    good = joinpath(dir, "good.so")
+    # libunwind.so.8 of Julia: the third segment at offset 0x7d000 for address 0x233000
+    write(good, fake_elf64([(0, 0, 0x200000), (0x27e78, 0x227e78, 0x200000),
+        (0x7d000, 0x233000, 0x1000)]))
+    bad = joinpath(dir, "bad.so")                    # after llvm-strip 18.1.3: 0x285f8
+    write(bad, fake_elf64([(0, 0, 0x200000), (0x27e78, 0x227e78, 0x200000),
+        (0x285f8, 0x233000, 0x1000)]))
+    text = joinpath(dir, "script.sh")
+    write(text, "#!/bin/sh\n")
+    @test P.elf_load_ok(good) && !P.elf_load_ok(bad) && P.elf_load_ok(text)
+    # the "strip" replaces good.so by the broken layout and shrinks the script
+    original = read(good)
+    runner(l) = (write(good, read(bad)); write(text, "#"); true)
+    r = P.strip_checked([["strip", good, text]], [good, text]; os = :linux, runner)
+    @test r.restored == [good] && r.failed == String[]
+    @test read(good) == original && read(text) == codeunits("#")
+    @test !any(endswith(".pre-strip"), readdir(dir))
+    # no check (and no copy) on the other systems
+    r = P.strip_checked([["strip", good]], [good]; os = :windows, runner)
+    @test isempty(r.restored) && read(good) == read(bad)
+end
+
+@testset "juliac links with -lm" begin
+    w = mktempdir()
+    p = P.link_wrapper(w)
+    @test isfile(p) && endswith(read(p, String), "exec gcc \"\$@\" -lm\n")
+    Sys.iswindows() || @test Sys.isexecutable(p)
+end
+
 @testset "cold caches" begin
     env = P.cold_env("/w/baysol-pkg-work")
     @test env["JULIA_DEPOT_PATH"] == joinpath("/w/baysol-pkg-work", "depot")

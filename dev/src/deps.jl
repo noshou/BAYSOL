@@ -493,8 +493,8 @@ const ITEMS = Item[
                 route = "the command line tools; gcc is Apple's clang"),
             linux = apt("build-essential"))),
     Item("llvm-strip",
-        "LLVM's strip, the one strip tool of `bysl pkg` (without it the " *
-        "build warns and leaves files unstripped)", false,
+        "LLVM's strip, the one strip tool of `bysl pkg` (the preflight " *
+        "stops without it)", true,
         () -> detect_program("llvm-strip"; version = ("--version",),
             hints = joinpath.(program_files(), "LLVM", "bin")),
         os -> per(os;

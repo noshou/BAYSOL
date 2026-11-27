@@ -41,6 +41,23 @@ x86_64 build under Rosetta 2.
 ismacosx64() = ismacos() && isx64()
 
 """
+    isrosetta() -> Bool
+
+Whether this process is an x86_64 program translated by Rosetta 2 on an Apple Silicon Mac
+(the kernel's `sysctl.proc_translated` is 1). `false` on every other system, and on an
+Intel Mac, where the x86_64 program is native.
+"""
+function isrosetta()::Bool
+    ismacosx64() || return false
+    translated = Ref{Cint}(0)
+    size = Ref{Csize_t}(sizeof(Cint))
+    status = ccall(:sysctlbyname, Cint,
+        (Cstring, Ref{Cint}, Ref{Csize_t}, Ptr{Cvoid}, Csize_t),
+        "sysctl.proc_translated", translated, size, C_NULL, 0)
+    return status == 0 && translated[] == 1
+end
+
+"""
     islinux() -> Bool
 
 Whether this is Linux.

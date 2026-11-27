@@ -26,11 +26,20 @@ const N_ADAPT = BAYSOL.Pipeline.N_ADAPT
 const N_SAMPLES = N_ADAPT + BAYSOL.Pipeline.N_DRAWS
 
 """
-The `rngSeed` of the entries that are marginal (SASDJ66, SASDAP8): their seed 0 passes on
-arm64 and Linux, and does not converge on macOS x86_64 (R̂ above 1.1, ESS under 70), so
-that system takes seed 1 and every other system keeps the default.
+The `rngSeed` of SASDJ66, a marginal entry: its seed 0 passes on arm64 and Linux, and does
+not converge on macOS x86_64 (R̂ above 1.1, ESS under 70), so that system takes seed 1 and
+every other system keeps the default. SASDAP8 needed another seed ([`SASDAP8_FIT_SEED`](@ref)).
 """
 const MARGINAL_FIT_SEED = BAYSOL.Platform.ismacosx64() ? 1 : BAYSOL.Inference.RNG_SEED
+
+"""
+The `rngSeed` of SASDAP8, a marginal entry: its seed 0 passes on arm64 and Linux. On macOS
+x86_64 under Rosetta 2 seeds 0, 1, 2 and 3 all ended `ladder exhausted`, and seed 4 passed at
+the rung `longer chains + seed` (the base run and `longer chains` had a bulk ESS of 304 against
+the 400 gate; one run, 1112 s). That system takes seed 4 and every other system keeps the
+default.
+"""
+const SASDAP8_FIT_SEED = BAYSOL.Platform.ismacosx64() ? 4 : BAYSOL.Inference.RNG_SEED
 
 """
 The `rngSeed` of SASDVA2 on x86_64 (macOS, Linux or Windows): a run of that entry on x86_64

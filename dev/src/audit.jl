@@ -265,7 +265,7 @@ const WINDOWS_SYSTEM = Set(
             "d2d1",
             "opengl32", "glu32", "hid", "avrt", "credui", "winspool", "userenv",
             "ntmarta",
-            "mscoree"], ".dll"),
+            "mscoree", "propsys"], ".dll"),
 )
 
 # The Visual C++ redistributable: a part of Windows only if some other program installed it.
@@ -557,9 +557,11 @@ function run(argv::Vector{String})::Int
     end
     a = split_args(WHO, ["--search"], ["--files", "--strict"], argv)
     length(a.specs) == 1 || fail(WHO, "give exactly one folder")
-    root = abspath(a.specs[1])
+    # a trailing separator (`dir/` from a shell completion) would break the folder tests
+    bare(p) = (q = abspath(p); length(q) > 3 ? rstrip(q, ['/', '\\']) : q)
+    root = bare(a.specs[1])
     isdir(root) || fail(WHO, "no folder $root")
-    search = [abspath(v) for (k, v) in a.opts if k == "--search"]
+    search = [bare(v) for (k, v) in a.opts if k == "--search"]
     items, unreadable = scan(root)
     isempty(items) && fail(WHO, "no executable or library under $root")
     entries = audit_imports(root, items; search)
