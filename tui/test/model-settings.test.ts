@@ -55,11 +55,11 @@ const stored = (p: string): Record<string, Record<string, Record<string, unknown
 
 test("run-level: the TS list and the PLOT_ rule are Julia's", () => {
     const source = readFileSync(
-        fileURLToPath(new URL("../src/store/settings-file.jl", import.meta.url)),
+        fileURLToPath(new URL("../julia/src/settings-file.jl", import.meta.url)),
         "utf-8",
     )
     const list = /const RUN_LEVEL_SETTINGS\s*=\s*\(([^)]*)\)/.exec(source)
-    assert.ok(list, "RUN_LEVEL_SETTINGS is in store/settings-file.jl")
+    assert.ok(list, "RUN_LEVEL_SETTINGS is in julia/src/settings-file.jl")
     const julia = (list?.[1] ?? "")
         .split(",")
         .map((t) => t.trim().replace(/^:/, ""))

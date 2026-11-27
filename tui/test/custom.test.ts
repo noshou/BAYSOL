@@ -318,7 +318,7 @@ test("snapshots equal the buffer fixture", () => {
         )
     assert.deepEqual(snapshot(polymer(), [3]).counts, [3])
     assert.throws(() => snapshot(polymer(), [1, 2]))
-    assert.throws(() => snapshot(polymer(), undefined as unknown as number[]))
+    assert.throws(() => snapshot(polymer(), JSON.parse("null")))
 })
 
 test("typed cells", () => {
@@ -624,7 +624,7 @@ test("polymers of the wrong shape are unusable", () => {
         assert.throws(() => writeCustomSolutes(root, [storeNonbio()]))
     }
     rmSync(customFile(root))
-    unusable(() => writeCustomSolutes(root, [old as unknown as CustomEntry]))
+    unusable(() => writeCustomSolutes(root, JSON.parse(JSON.stringify([old]))))
     unusable(() => writeCustomSolutes(root, [storePolymer([])]))
     assert.equal(existsSync(customFile(root)), false, "nothing was made")
     readCustomSolutes(root, { track: true }) // reopened: the folder has no file now

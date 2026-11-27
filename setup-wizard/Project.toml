@@ -1,0 +1,10 @@
+name = "BAYSOLSetup"
+entryfile = "src/baysol-setup.jl"
+uuid = "4b0c7a52-3f0e-4d52-9a6e-6a1f0d2c8e11"
+version = "0.5.1"
+
+[deps]
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+
+[compat]
+julia = "1.10"

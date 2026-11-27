@@ -1,4 +1,4 @@
-datetime	20-11-2026 02:55:52 -0500
+datetime	23-11-2026 01:59:06 -0500
 
 === SASDWZ9 ===
 
@@ -229,12 +229,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 2 modes)	0.0635176       	0.0341763       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000153959     	0.0             	0.0             	
-  optima from the draws, 1 extra chain	2.14906         	1.95255         	0.0             	
-  NUTS  (9k iters, 111.14k leapfrog, 0.013 ms/step)	2.73438         	2.14391         	0.0             	
-  2 posterior modes: mass by bridge sampling	0.315609        	0.247048        	0.0             	
-  per-draw c1 re-profile + curves (8176 draws)	0.114332        	0.204181        	0.0             	
+  MAP search + whitening (76/76 starts, 2 modes)	0.0616101       	0.0327462       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000138333     	0.0             	0.0             	
+  optima from the draws, 1 extra chain	2.08164         	1.88825         	0.0             	
+  NUTS  (9k iters, 111.14k leapfrog, 0.013 ms/step)	2.66324         	2.08951         	0.0             	
+  2 posterior modes: mass by bridge sampling	0.300564        	0.234115        	0.0             	
+  per-draw c1 re-profile + curves (8176 draws)	0.137358        	0.308524        	0.0             	
 
 -- outcome --
 next                            	retry with a longer warm-up: the smallest bulk ESS, 323.1, is not above 400.0; the smallest tail ESS, 131.4, is not above 400.0
@@ -347,7 +347,7 @@ distinct optima: 2
   mode 2: f=-1183.150 ξ=[0.3351, 0.3653, -1.35, -3.151]  H-eig=[0.9192, 1.5, 7.613, 196.7]  log Laplace mass=1179.333 (Δ vs best = -2.14 nats)
 
 -- nuts --
-NUTS: 1.2s  init ε=2.5  final ε=0.2359  mean nSteps=14.4 mean depth=3.55  frac(depth≥10)=0.000  diverged=0
+NUTS: 1.1s  init ε=2.5  final ε=0.2359  mean nSteps=14.4 mean depth=3.55  frac(depth≥10)=0.000  diverged=0
 mean nSteps by window: [1:75]=13  [76:450]=12  [451:1950]=14  [1951:2000]=17  [2001:4000]=14
 mean accept = 0.966   mean |ΔH| = 0.065
 
@@ -466,12 +466,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 2 modes)	0.0289245       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	7.7875e-5       	0.0             	0.0             	
-  optima from the draws, 0 extra chains	0.0175775       	0.0             	0.0             	
-  NUTS  (32k iters, 444.64k leapfrog, 0.015 ms/step)	2.0952          	0.0             	0.201909        	
-  2 posterior modes: mass by bridge sampling	0.241643        	0.0             	0.0             	
-  per-draw c1 re-profile + curves (27116 draws)	0.0962481       	0.0             	0.0             	
+  MAP search + whitening (76/76 starts, 2 modes)	0.0286232       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	7.3875e-5       	0.0             	0.0             	
+  optima from the draws, 0 extra chains	0.0182064       	0.0             	0.0             	
+  NUTS  (32k iters, 444.64k leapfrog, 0.013 ms/step)	1.77147         	0.0             	0.217273        	
+  2 posterior modes: mass by bridge sampling	0.234092        	0.0             	0.0             	
+  per-draw c1 re-profile + curves (27116 draws)	0.0947875       	0.0             	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -484,4 +484,4 @@ keptAttempt                     	2
 keptLabel                       	retry, longer warm-up
 keptBecause                     	the retry passed its gates or was no worse in R̂ (worst R̂ 1.0024 against 1.0059)
 statisticsFlushes               	5
-statisticsFlushSeconds          	0.00022725
+statisticsFlushSeconds          	0.000210666

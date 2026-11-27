@@ -30,7 +30,7 @@ const action = startAction(hasTerminal(), system)
 if (action === "run") {
     // the alternate screen (like vim): a frame as tall as the terminal would otherwise
     // make it scroll a line on every redraw, and the shell is restored on exit
-    // Ctrl-C is a key like any other for Ink (`App` handles it with Ctrl-D), so the
+    // ^c is a key like any other for Ink (`App` handles it with ^d), so the
     // run screen can take the abort over later
     // a `running` run that nobody runs any more (a killed Julia, a reboot) is `interrupted`
     try {
@@ -49,7 +49,7 @@ if (action === "run") {
         alternateScreen: true,
         exitOnCtrlC: false,
     })
-    // SIGHUP (the terminal went away) and SIGTERM do what Ctrl-C does: stop the run that
+    // SIGHUP (the terminal went away) and SIGTERM do what ^c does: stop the run that
     // is going, restore the terminal, leave. Whatever else ends the
     // process, the last gasp kills the Julia child's group, so none is left over.
     for (const [signal, code] of [["SIGHUP", 129], ["SIGTERM", 143]] as const) {

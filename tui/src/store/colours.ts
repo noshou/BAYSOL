@@ -14,13 +14,12 @@
  * swatch of a colour is its `#rrggbb`.
  */
 
-import { readFileSync } from "node:fs"
 import {
     type ParseError,
     parse as parseJsonc,
     printParseErrorCode,
 } from "jsonc-parser"
-import { assetPath, lazy } from "../core/environment.js"
+import { lazy, readAssetText } from "../core/environment.js"
 import {
     colourNotations,
     fromHex,
@@ -97,9 +96,9 @@ export interface ColourIndex {
 
 /** A parsed `.jsonc` file; any syntax error is fatal (the parser alone is forgiving). */
 function readJsonc<T>(...path: string[]): T {
-    const file = assetPath(...path)
+    const file = path.join("/")
     const errors: ParseError[] = []
-    const value = parseJsonc(readFileSync(file, "utf-8"), errors, {
+    const value = parseJsonc(readAssetText(...path), errors, {
         allowTrailingComma: false,
     }) as T
     const first = errors[0]

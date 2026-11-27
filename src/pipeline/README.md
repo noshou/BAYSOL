@@ -221,8 +221,8 @@ Go through these in order, in the run log. A fit is **trustworthy** only if 1 to
 | What the log says | Likely cause | Try |
 |---|---|---|
 | tail ESS or bulk ESS just under 400, R̂ under 1.05 (`[marginal]`) | too few draws | more draws: `nSamples`, `nAdapt` (positional arguments), `retryNAdapt`, `retryNDraws`; or another `rngSeed` |
-| R̂ large and `stepSize` around 0.002, or deep trees (`stepCollapse`) | step-size adaptation collapsed | a lower target acceptance, `δ = 70` then `35` |
-| R̂ 1.05 or more and a `modes` row or chains with different `mode` in the statistics log (`splitChains`) | chains started far apart in a multimodal posterior | closer starts, `chainStartRadii = (2, 4, 6)`, then `(1, 2, 3)` with `retryNAdapt = retryNDraws = 4000` |
+| R̂ large and `stepSize` around 0.002, or deep trees (`stepCollapse`) | step-size adaptation collapsed | a lower target acceptance, `δ = 70`, then `35`, then `35` with the next seed |
+| R̂ 1.05 or more and a `modes` row or chains with different `mode` in the statistics log (`splitChains`) | chains started far apart in a multimodal posterior | closer starts, `chainStartRadii = (2, 4, 6)`, then `(1, 2, 3)` with `retryNAdapt = retryNDraws = 4000`, then that with the next seed |
 | divergent share 0.1 % or more with R̂ under 1.05 (`divergent`) | the sampler steps too boldly | a higher target acceptance, `δ = 99` (the ladder then also shortens the starts and lengthens the run) |
 | divergences remain after `δ = 99` at 1 % or more (`structural`) | a kinked or sharp `c1` profile | sample `c1` (the last rung does it); check that the fitted q range (`qMin`, `qMax`) contains no point the model cannot fit |
 | anything else (`generic`) | not diagnosed | longer chains and a new seed |
@@ -310,7 +310,7 @@ Every row of a run section, in file order. *Unit* is empty for a pure number. *B
 | `ladder` | `base`: the first run passed; a rung name (or its overrides as `KEY=value`): the repeat that passed; `failed`: all failed | | anything but `base` (read `ladderAttempts`) |
 | `ladderClass` | failure class of each repeat that was made, in order, ` | `-separated; empty for `base` | | non-empty |
 | `ladderAttempts` | for each failed attempt `<label>: <gates missed>`, ` | `-separated | | non-empty |
-| `ladderRungs` | the menu: per class its rung names, classes separated by ` | ` (`stepCollapse: delta 70, delta 35 | ...`); what ran is in the three rows above | | none |
+| `ladderRungs` | the menu: per class its rung names, classes separated by ` | ` (`stepCollapse: delta 70, delta 35, delta 35 + seed | ...`); what ran is in the three rows above | | none |
 | `ladderRung` | number of repeats it took: 0 base, 1 first repeat, ..., -1 none passed | | above 0 |
 
 ### The fit (the MAP: the best draw by log density)
@@ -502,7 +502,7 @@ The functions are public in `BAYSOL` (reached qualified, like the other entry po
 
 ## The project folder, the settings file and the run
 
-`loadSettings`, `settingsFile`, `loadBuffer`, `loadBufferPh` and `runProject` are not part of this module: the project folder, the files the terminal interface keeps (`settings.json`, `model-settings.json`, `buffer.json`, `model-references.json`) and the run folder are its business, and their Julia code lives with the interface, in `tui/src/store/*.jl` (the module `BAYSOLRun`, loaded from `run-project.jl`); see the section "The Julia side of the interface" of `tui/INTERNALS.md`. The module here reads no settings file: the caller passes the settings as keywords, or as the `Dict` that `seedKeywords`, `runKeywords`, `runArguments` and `resultsKeywords` take.
+`loadSettings`, `settingsFile`, `loadBuffer`, `loadBufferPh` and `runProject` are not part of this module: the project folder, the files the terminal interface keeps (`settings.json`, `model-settings.json`, `buffer.json`, `model-references.json`) and the run folder are its business, and their Julia code lives with the interface, in `tui/julia/src/*.jl` (the package `BAYSOLRun`); see the section "The Julia side of the interface" of `tui/INTERNALS.md`. The module here reads no settings file: the caller passes the settings as keywords, or as the `Dict` that `seedKeywords`, `runKeywords`, `runArguments` and `resultsKeywords` take.
 
 ## Colours
 

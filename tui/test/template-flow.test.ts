@@ -642,7 +642,7 @@ test("the link is kept by the buffer file and a recipe; a bad one is dropped", (
     assert.deepEqual(soluteOf(back[1]).template, LINK)
     // a recipe round trip
     saveRecipe(dir, "mine", rows, { pH: 7.5, "sigmaPh": 0.1 })
-    const recipe = recipeSolutes(dir, "mine") as unknown as { template?: unknown }[]
+    const recipe = recipeSolutes(dir, "mine") as { template?: unknown }[]
     assert.deepEqual(recipe[1].template, LINK)
     assert.equal(recipe[0].template, undefined)
     assert.equal(readRecipes(dir).length, 1)

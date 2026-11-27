@@ -17,6 +17,7 @@
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { join } from "node:path"
 import { test } from "node:test"
 import {
@@ -240,7 +241,7 @@ function fakeStream(): { stream: NodeJS.WriteStream; out: string[] } {
             out.push(String(text))
             return true
         },
-    } as unknown as NodeJS.WriteStream
+    } as NodeJS.WriteStream
     return { stream, out }
 }
 
@@ -532,9 +533,9 @@ test("a PNG keeps its alpha, a PDF is drawn on white", async () => {
     } catch {
         pdf = undefined // no poppler here: the PDF part is skipped
     }
-    const { default: sharp } = await import("sharp")
     const png = join(dir, "fig.png")
-    await sharp(readFileSync(svg)).png().toFile(png)
+    const Resvg = createRequire(import.meta.url)("@resvg/resvg-js").Resvg
+    writeFileSync(png, new Resvg(readFileSync(svg)).render().asPng())
     const p = await rasterise(png, 400, 400)
     assert.deepEqual([p.width, p.height], [400, 200])
     assert.equal(p.data[3], 0, "the PNG's transparent corner stays transparent")

@@ -1,4 +1,4 @@
-datetime	20-11-2026 01:18:24 -0500
+datetime	22-11-2026 23:48:12 -0500
 
 === SASDM36 ===
 
@@ -103,7 +103,7 @@ distinct optima: 2
   mode 2: f=-329.910 ξ=[0.336, -0.3264, 1.832, -10.75]  H-eig=[0.9042, 1.757, 3.574, 2.868e+04]  log Laplace mass=323.910 (Δ vs best = -93.7 nats)
 
 -- nuts --
-NUTS: 0.6s  init ε=0.6002  final ε=0.1374  mean nSteps=29.4 mean depth=4.26  frac(depth≥10)=0.000  diverged=0
+NUTS: 0.4s  init ε=0.6002  final ε=0.1374  mean nSteps=29.4 mean depth=4.26  frac(depth≥10)=0.000  diverged=0
 mean nSteps by window: [1:75]=76  [76:450]=33  [251:300]=35  [301:1000]=29
 mean accept = 0.954   mean |ΔH| = 0.086
 
@@ -222,12 +222,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.0895335       	0.0339988       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000132292     	0.0             	0.0             	
-  optima from the draws, 0 extra chains	1.8092          	1.7952          	0.0             	
-  NUTS  (8k iters, 276.33k leapfrog, 0.012 ms/step)	2.9219          	1.95461         	0.14188         	
-  2 posterior modes: mass by bridge sampling	0.280581        	0.241607        	0.0             	
-  per-draw c1 re-profile + curves (7300 draws)	0.104864        	0.198062        	0.0             	
+  MAP search + whitening (70/70 starts, 2 modes)	0.0860729       	0.0327821       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000127042     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.76312         	1.74953         	0.0             	
+  NUTS  (8k iters, 276.33k leapfrog, 0.011 ms/step)	2.77343         	1.94908         	0.0472626       	
+  2 posterior modes: mass by bridge sampling	0.273742        	0.233393        	0.0             	
+  per-draw c1 re-profile + curves (7300 draws)	0.103287        	0.182393        	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -239,4 +239,4 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	0.000118667
+statisticsFlushSeconds          	0.00012575

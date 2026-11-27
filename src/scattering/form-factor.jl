@@ -40,9 +40,10 @@ struct _FFTables
     ch::Dict{String,_Chantler}
 end
 
-"Path to the bundled database."
-_dbpath() = joinpath(@__DIR__, "form_factors.sqlite3")
-include_dependency(_dbpath())
+"The bundled database file, read into the package when it is built."
+const _DB_FILE = joinpath(@__DIR__, "form_factors.sqlite3")
+include_dependency(_DB_FILE)   # editing the table rebuilds the package
+const _DB_BYTES = read(_DB_FILE)
 
 """
 Read `form_factors.sqlite3` into an [`_FFTables`](@ref).
@@ -50,7 +51,7 @@ Read `form_factors.sqlite3` into an [`_FFTables`](@ref).
 function _readTables()::_FFTables
     wk = Dict{String,NTuple{11,Float64}}()
     ch = Dict{String,_Chantler}()
-    db = SQLite.DB(_dbpath())
+    db = memoryDb(_DB_BYTES)
     try
         for r in DBInterface.execute(
             db,

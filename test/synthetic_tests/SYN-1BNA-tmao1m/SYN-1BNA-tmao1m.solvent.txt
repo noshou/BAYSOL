@@ -1,0 +1,12 @@
+SYNTHETIC buffer (invented, not measured): SYN-1BNA-tmao1m
+host	1BNA (dna), 758 atoms, lMax 25, rM 1.1468 Å
+temperature_C	25.0
+pH	7.0	σ_pH	0.1
+energy_eV	8041.52	wavelength_A	1.5418
+rho_e_e_per_A3	0.334148
+sigma_rho_e_e_per_A3	0.000019
+rho_e_water_e_per_A3	0.333292	sigma	0.000007
+rho_e_relative_to_water	1.00257
+shell_contrasts_relative	(1.0, 1.0, 0.0)	c1	1.0	scale 1, background 0
+composition (mol/L, ±σ):
+  trimethylamine n-oxide	1.0	0.02

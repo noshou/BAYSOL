@@ -1,0 +1,15 @@
+entry	SYN-1CRN-peg400
+synthetic	yes (invented buffer, no measured curve)
+host	1CRN
+rho_e	0.33797201573727836	e/A^3
+sigma_rho_e	0.0003660375124122107	e/A^3
+rho_e_water	0.3332920001104711	e/A^3 (pure water, same temperature)
+contrast_over_water	0.004680015626807255	e/A^3
+temperature	25.0	C
+pH	7.0	sigma 0.1
+energy	8041.522793695696	eV
+delta_rho_relative	1.0 1.0 0.0	dimensionless (x 0.03 e/A^3)
+c1	1.0	uncorrected, scale 1, background 0
+q_grid	0.01:0.005:0.5	A^-1, 99 points
+composition
+  Polymer	PEG 400	0.25	mol/L

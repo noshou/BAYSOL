@@ -170,6 +170,7 @@ using FastClosures: @closure
 using LinearAlgebra: LinearAlgebra
 using ..Geometry: PROBE_RADIUS, ATOM_BLOCK, ATOM_PARALLEL_MIN
 using ..PhysicalConstants: UNIT_OF_δρ, EV_EXP_COEFF, FOUR_PI
+using ..Runtime: memoryDb
 using ..Runtime: gcCheckpoint, Lazy, force, tmapBlocks
 using LinearAlgebra: mul!
 

@@ -25,11 +25,14 @@ deps = ["LinearAlgebra"]
 git-tree-sha1 = "d92ad398961a3ed262d8bf04a1a2b8340f915fef"
 uuid = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 version = "1.5.0"
-weakdeps = ["ChainRulesCore", "Test"]
 
     [deps.AbstractFFTs.extensions]
     AbstractFFTsChainRulesCoreExt = "ChainRulesCore"
     AbstractFFTsTestExt = "Test"
+
+    [deps.AbstractFFTs.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[deps.AbstractMCMC]]
 deps = ["BangBang", "ConsoleProgressMonitor", "Dates", "Distributed", "LogDensityProblems", "Logging", "LoggingExtras", "ProgressLogging", "Random", "StatsBase", "TerminalLoggers", "UUIDs"]
@@ -193,10 +196,10 @@ uuid = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
 version = "0.4.8"
 
 [[deps.BAYSOL]]
-deps = ["AdvancedHMC", "BioStructures", "Bumper", "Colors", "CondaPkg", "DBInterface", "Dierckx", "DiffResults", "Distributions", "Downloads", "FastClosures", "FiniteDiff", "ForwardDiff", "HypothesisTests", "JSON3", "LinearAlgebra", "LogExpFunctions", "MCMCDiagnosticTools", "NearestNeighbors", "Optim", "PGFPlotsX", "Peaks", "PrecompileTools", "Printf", "QuadGK", "Quickhull", "Random", "SHA", "SQLite", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase", "UnicodePlots", "XLSX"]
+deps = ["AdvancedHMC", "BioStructures", "Bumper", "Colors", "DBInterface", "Dierckx", "DiffResults", "Distributions", "Downloads", "FastClosures", "FiniteDiff", "ForwardDiff", "JSON3", "LinearAlgebra", "LogExpFunctions", "MCMCDiagnosticTools", "NearestNeighbors", "Optim", "PGFPlotsX", "Peaks", "PrecompileTools", "Printf", "Quickhull", "Random", "SHA", "SQLite", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase", "UnicodePlots", "XLSX"]
 path = "../.."
 uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
-version = "0.5.0"
+version = "0.5.1"
 
 [[deps.BangBang]]
 deps = ["Accessors", "ConstructionBase", "InitialValues", "LinearAlgebra"]
@@ -417,12 +420,6 @@ deps = ["Observables", "Preferences"]
 git-tree-sha1 = "7bc84b769c1d384315e7b5c4ac03a6c303e6cf35"
 uuid = "95dc2771-c249-4cd0-9c9f-1f3b4330693c"
 version = "0.1.8"
-
-[[deps.CondaPkg]]
-deps = ["JSON", "Markdown", "MicroMamba", "Pidfile", "Pkg", "Preferences", "Scratch", "TOML", "pixi_jll"]
-git-tree-sha1 = "2b1afb8ae65a0758795b00adafb37f97e67ef0e9"
-uuid = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
-version = "0.2.36"
 
 [[deps.ConsoleProgressMonitor]]
 deps = ["Logging", "ProgressMeter"]
@@ -707,11 +704,14 @@ deps = ["Compat", "Dates"]
 git-tree-sha1 = "3bab2c5aa25e7840a4b065805c0cdfc01f3068d2"
 uuid = "48062228-2e41-5def-b9a4-89aafe57970f"
 version = "0.9.24"
-weakdeps = ["Mmap", "Test"]
 
     [deps.FilePathsBase.extensions]
     FilePathsBaseMmapExt = "Mmap"
     FilePathsBaseTestExt = "Test"
+
+    [deps.FilePathsBase.weakdeps]
+    Mmap = "a63ad114-7e13-5084-954f-fe012c677804"
+    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
@@ -886,12 +886,6 @@ git-tree-sha1 = "31bb6c92405c084617facc1d7ed9eb6c402d061e"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.30"
 
-[[deps.HypothesisTests]]
-deps = ["Combinatorics", "Distributions", "LinearAlgebra", "Printf", "Random", "Roots", "Statistics", "StatsAPI", "StatsBase", "StatsFuns"]
-git-tree-sha1 = "0b7026cbe6b5380b8f8a5c2a7306363e2ebd2146"
-uuid = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
-version = "0.12.2"
-
 [[deps.ImageAxes]]
 deps = ["AxisArrays", "ImageBase", "ImageCore", "Reexport", "SimpleTraits"]
 git-tree-sha1 = "e12629406c6c4442539436581041d372d69c55ba"
@@ -1025,11 +1019,14 @@ weakdeps = ["Random", "RecipesBase", "Statistics"]
 git-tree-sha1 = "a779299d77cd080bf77b97535acecd73e1c5e5cb"
 uuid = "3587e190-3f89-42d0-90ee-14403ec27112"
 version = "0.1.17"
-weakdeps = ["Dates", "Test"]
 
     [deps.InverseFunctions.extensions]
     InverseFunctionsDatesExt = "Dates"
     InverseFunctionsTestExt = "Test"
+
+    [deps.InverseFunctions.weakdeps]
+    Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[deps.IrrationalConstants]]
 git-tree-sha1 = "b2d91fe939cae05960e760110b328288867b5758"
@@ -1127,11 +1124,6 @@ version = "23.1.1+0"
 git-tree-sha1 = "f88f3ccef05a6a72a0cf0ed417c8fd68530f4ab2"
 uuid = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 version = "1.4.1"
-
-[[deps.LazyArtifacts]]
-deps = ["Artifacts", "Pkg"]
-uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
-version = "1.11.0"
 
 [[deps.LazyModules]]
 git-tree-sha1 = "a560dd966b386ac9ae60bdd3a3d3a326062d3c3e"
@@ -1336,12 +1328,6 @@ deps = ["ColorTypes", "FileIO", "GeometryBasics", "Printf"]
 git-tree-sha1 = "9b77b95be61c88dfaec00c0acfe39a6157131cdf"
 uuid = "7269a6da-0436-5bbc-96c2-40638cbb6118"
 version = "0.5.5"
-
-[[deps.MicroMamba]]
-deps = ["Pkg", "Scratch", "micromamba_jll"]
-git-tree-sha1 = "535656ce55266bfed0575cd051acc4f36dc869a0"
-uuid = "0b3b1443-0f03-428d-bdfb-f27f9c1191ea"
-version = "0.1.15"
 
 [[deps.Missings]]
 deps = ["DataAPI"]
@@ -1570,12 +1556,6 @@ weakdeps = ["Makie", "RecipesBase"]
     [deps.Peaks.extensions]
     MakieExt = "Makie"
     PlotsExt = "RecipesBase"
-
-[[deps.Pidfile]]
-deps = ["FileWatching", "Test"]
-git-tree-sha1 = "2d8aaf8ee10df53d0dfb9b8ee44ae7c04ced2b03"
-uuid = "fa939f87-e72e-5be4-a000-7fc836dbe307"
-version = "1.3.0"
 
 [[deps.Pixman_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LLVMOpenMP_jll", "Libdl"]
@@ -2043,11 +2023,6 @@ git-tree-sha1 = "81c9b4137edfe56a56efcdcb35d721b2ce3e2416"
 uuid = "5d786b92-1e48-4d6f-9151-6b4477ca9bed"
 version = "0.1.8"
 
-[[deps.Test]]
-deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
-uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-version = "1.11.0"
-
 [[deps.TiffImages]]
 deps = ["CodecZstd", "ColorTypes", "DataStructures", "DocStringExtensions", "FileIO", "FixedPointNumbers", "IndirectArrays", "Inflate", "Mmap", "OffsetArrays", "PkgVersion", "PrecompileTools", "ProgressMeter", "SIMD", "UUIDs"]
 git-tree-sha1 = "9ca5f1f2d42f80df4b8c9f6ab5a64f438bbd9976"
@@ -2375,12 +2350,6 @@ git-tree-sha1 = "4e4282c4d846e11dce56d74fa8040130b7a95cb3"
 uuid = "c5f90fcd-3b7e-5836-afba-fc50a0988cb2"
 version = "1.6.0+0"
 
-[[deps.micromamba_jll]]
-deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
-git-tree-sha1 = "717df6f6892af4ee13279a73aa58474e58a88667"
-uuid = "f8abcde7-e9b7-5caa-b8af-a437887ae8e4"
-version = "2.3.1+0"
-
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
@@ -2390,12 +2359,6 @@ version = "1.64.0+1"
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 version = "17.7.0+0"
-
-[[deps.pixi_jll]]
-deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
-git-tree-sha1 = "56c56fede8f01e1be7e2fdf1eb911487640619a0"
-uuid = "4d7b5844-a134-5dcd-ac86-c8f19cd51bed"
-version = "0.76.2+0"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

@@ -1,4 +1,4 @@
-datetime	20-11-2026 01:56:08 -0500
+datetime	23-11-2026 00:18:23 -0500
 
 === SASDRS2 ===
 
@@ -102,7 +102,7 @@ distinct optima: 1
   mode 1: f=-902.262 ξ=[0.3357, 0.6414, -3.857, -2.582]  H-eig=[0.9999, 1.417, 5.611, 348.3]  log Laplace mass=898.299 (Δ vs best = 0 nats)
 
 -- nuts --
-NUTS: 0.2s  init ε=3  final ε=0.4163  mean nSteps=9.4 mean depth=3.01  frac(depth≥10)=0.000  diverged=0
+NUTS: 0.3s  init ε=3  final ε=0.4163  mean nSteps=9.4 mean depth=3.01  frac(depth≥10)=0.000  diverged=0
 mean nSteps by window: [1:75]=9  [76:450]=10  [251:300]=10  [301:1000]=9
 mean accept = 0.960   mean |ΔH| = 0.079
 
@@ -221,11 +221,11 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 1 mode)	0.066967        	0.0339642       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000147876     	0.0             	0.0             	
-  optima from the draws, 0 extra chains	1.80528         	1.79359         	0.0             	
-  NUTS  (8k iters, 77.06k leapfrog, 0.015 ms/step)	2.31887         	1.97857         	0.0             	
-  per-draw c1 re-profile + curves (8000 draws)	0.102126        	0.193584        	0.0             	
+  MAP search + whitening (70/70 starts, 1 mode)	0.0651236       	0.0326112       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.00014075      	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.76991         	1.75844         	0.0             	
+  NUTS  (8k iters, 77.06k leapfrog, 0.015 ms/step)	2.3063          	1.95671         	0.0             	
+  per-draw c1 re-profile + curves (8000 draws)	0.105737        	0.18443         	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -237,4 +237,4 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	0.000117918
+statisticsFlushSeconds          	0.000128417

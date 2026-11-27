@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Exercises tui/src/store/settings-file.jl: the reader of settings.json and `loadSettings`,
+# Exercises tui/julia/src/settings-file.jl: the reader of settings.json and `loadSettings`,
 # which checks every saved value before any code uses one. Valid files of every kind of
 # setting, the cases shared with the terminal interface (test/fixtures/settings/cases.json),
 # corrupt files (bad JSON, wrong types, the rules that tie settings together), and seeded

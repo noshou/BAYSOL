@@ -1,5 +1,6 @@
 {
     "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+    "plugins": ["./tui/lint/no-double-cast.grit"],
     "files": {
         "includes": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts", "!**/node_modules", "!docs/build"]
     },

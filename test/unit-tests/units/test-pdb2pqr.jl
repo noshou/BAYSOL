@@ -461,3 +461,45 @@ end
         end
     end
 end
+
+@testset "Hydrogenator: frozen tools (BAYSOL_PROPKA3, BAYSOL_PDB2PQR)" begin
+    H = BAYSOL.Hydrogenator
+    mktempdir() do dir
+        propka = joinpath(dir, "propka3")
+        pdb2pqr = joinpath(dir, "pdb2pqr")
+        write(propka, "#!/bin/sh\n")
+        write(pdb2pqr, "#!/bin/sh\n")
+        # BAYSOL_PYTOOLS (set when the suite runs against the packaged tools) wins over
+        # the two variables below, so it is cleared here
+        withenv("BAYSOL_PROPKA3" => propka, "BAYSOL_PDB2PQR" => pdb2pqr,
+            "BAYSOL_PYTOOLS" => nothing) do
+            @test H._toolOverride("BAYSOL_PROPKA3") == propka
+            tools = H._readCondaTools()
+            @test tools.propka3 == propka && tools.pdb2pqr == pdb2pqr
+            # a frozen pdb2pqr is run as it is, not through a Python snippet
+            @test H._pdb2pqrCommand(pdb2pqr) == `$pdb2pqr`
+        end
+        withenv("BAYSOL_PROPKA3" => joinpath(dir, "missing"), "BAYSOL_PDB2PQR" => "") do
+            @test H._toolOverride("BAYSOL_PROPKA3") === nothing
+            @test H._toolOverride("BAYSOL_PDB2PQR") === nothing
+        end
+    end
+end
+
+@testset "Hydrogenator: one frozen program (BAYSOL_PYTOOLS)" begin
+    H = BAYSOL.Hydrogenator
+    mktempdir() do dir
+        tool = joinpath(dir, "baysol-pytools")
+        write(tool, "#!/bin/sh\n")
+        withenv("BAYSOL_PYTOOLS" => tool, "BAYSOL_PROPKA3" => nothing,
+            "BAYSOL_PDB2PQR" => nothing) do
+            tools = H._readCondaTools()
+            # all three names point at the one program; no CondaPkg environment is built
+            @test tools.pytools == tool
+            @test tools.propka3 == tool && tools.pdb2pqr == tool
+        end
+        withenv("BAYSOL_PYTOOLS" => joinpath(dir, "missing")) do
+            @test H._toolOverride("BAYSOL_PYTOOLS") === nothing
+        end
+    end
+end

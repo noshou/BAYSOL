@@ -40,7 +40,7 @@ import {
     type Solute,
     sameSoluteKey,
 } from "./solutes.js"
-import { setAtTemperature, type TemplateLink } from "./template-rows.js"
+import { setAtTemperature, soluteArg, type TemplateLink } from "./template-rows.js"
 
 /** One choice of a dropdown step: what is shown. */
 type TemplateChoice = { text: string; tag?: string }
@@ -244,7 +244,7 @@ export class TemplateFlow {
             .filter((r) => !r.removed)
             .map((r) => {
                 const s = (r.draft ?? r.saved) as Solute
-                return { arg: s.arg, mM: s.mM }
+                return { arg: soluteArg(s), mM: s.mM }
             })
     }
 

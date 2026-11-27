@@ -1,4 +1,4 @@
-datetime	20-11-2026 00:52:27 -0500
+datetime	22-11-2026 23:17:08 -0500
 
 === SASDJB2 ===
 
@@ -25,7 +25,7 @@ base run   nQ=85  nAtoms=4141  lMax=24  c1 tol=1.0e-8
 δρ₃ support = [-11.19, 2.797]   δρ₁,₂ support = [-10.0, 2.0]
 
 -- map search --
-MAP search: 0.1s  nOk=70/70  nModes=2  whitened=true
+MAP search: 0.0s  nOk=70/70  nModes=2  whitened=true
 L-BFGS starts (z space):
   start 1: f=-595.7670 iters= 13 g_conv=false iter_limit=false evals=16 |∇f|∞=1.48e-04
   start 2: f=-655.1654 iters= 32 g_conv=false iter_limit=false evals=47 |∇f|∞=1.45e-04
@@ -222,11 +222,11 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.0569626       	0.0350796       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000130001     	0.0             	0.0             	
-  optima from the draws, 0 extra chains	1.80805         	1.79591         	0.0             	
-  NUTS  (8k iters, 66.7k leapfrog, 0.012 ms/step)	2.17672         	1.93704         	0.0             	
-  per-draw c1 re-profile + curves (8000 draws)	0.10627         	0.200729        	0.0             	
+  MAP search + whitening (70/70 starts, 2 modes)	0.0537714       	0.0325793       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.00012125      	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.76792         	1.75605         	0.0             	
+  NUTS  (8k iters, 66.7k leapfrog, 0.013 ms/step)	2.2083          	1.95151         	0.0             	
+  per-draw c1 re-profile + curves (8000 draws)	0.0913843       	0.182352        	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -238,4 +238,4 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	0.000116751
+statisticsFlushSeconds          	0.000126375

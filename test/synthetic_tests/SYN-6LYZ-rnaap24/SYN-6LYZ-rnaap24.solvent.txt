@@ -1,0 +1,11 @@
+SYN-6LYZ-rnaap24: SYNTHETIC buffer, host 6LYZ
+rho_e (e/A^3)	0.3351562852204394
+sigma_rho_e (e/A^3)	1.916969880647592e-5
+rho_e water (e/A^3)	0.3332920001104711
+T (C), pH, sigma_pH	25.0	7.4	0.1
+contrasts (delta rho 1..3, CRYSOL3 defaults)	1.0	1.0	0.0
+composition (type, name or sequence, mol/L, sigma)
+NonBiological	sodium chloride	0.15	0.0015
+RNA	AAAAAAAAAAAAAAAAAAAAAAAA	6.61158e-5	3.306e-6
+RNA	UUUUUUUUUUUUUUUUUUUUUUUU	6.61158e-5	3.306e-6
+NonBiological	sodium(1+)	0.00304132	0.0001521

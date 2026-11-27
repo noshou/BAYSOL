@@ -76,7 +76,7 @@ test("keyLabels: space between keys, runs written together", () => {
     assert.equal(moveLegend({ up: true, down: true })?.keys, "↑↓")
     assert.equal(moveLegend({ left: true, right: true })?.keys, "←→")
     assert.equal(moveLegend({}), undefined)
-    // Tab and Shift+Tab: the one that works is added (the import screen)
+    // Tab and shift+tab: the one that works is added (the import screen)
     assert.equal(moveLegend({ down: true, tab: true })?.keys, "↓ tab")
     assert.equal(moveLegend({ up: true, down: true, tab: true })?.keys, "↑↓ tab")
     assert.equal(moveLegend({ up: true, tab: true })?.keys, "↑", "last row: no Tab")
@@ -92,7 +92,7 @@ test("keyPress: a capital letter is a Shift press, a lower case one is not", () 
     assert.equal(cap.text, "D")
     assert.equal(keyPress("5", noFlags).shift, false)
     assert.equal(keyPress("w", { ...noFlags, ctrl: true }).ctrl, true)
-    // Tab and Shift+Tab: both are `keys.tab`, only Shift+Tab is `keys.shiftTab`
+    // Tab and shift+tab: both are `keys.tab`, only shift+tab is `keys.shiftTab`
     const tab = keyPress("", { ...noFlags, tab: true })
     const back = keyPress("", { ...noFlags, tab: true, shift: true })
     assert.ok(tab.is(keys.tab) && !tab.is(keys.shiftTab))
@@ -310,7 +310,7 @@ test("every option of a menu has a hotkey of its own", async () => {
         const menu = await load()
         const seen = new Set<string>()
         for (const option of menu.names as readonly string[]) {
-            const opts = menu.opts as unknown as Record<string, { hotkey: Hotkey }>
+            const opts = menu.opts as Record<string, { hotkey: Hotkey }>
             const key = opts[option].hotkey
             const id = `${key.ctrl ? "^" : ""}${key.shift ? "S" : ""}${key.key_}`
             assert.ok(!seen.has(id), `${name}: ${option} repeats the hotkey ${id}`)

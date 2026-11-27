@@ -1,4 +1,4 @@
-datetime	20-11-2026 02:39:56 -0500
+datetime	23-11-2026 01:12:54 -0500
 
 === fit1_model1 ===
 
@@ -115,8 +115,8 @@ chain           	checks          	drawsExamined   	drawsTwoBasins  	firedAtDraw
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.0889068       	0.0352469       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000156167     	0.0             	0.0             	
+  MAP search + whitening (70/70 starts, 2 modes)	0.0856136       	0.0327517       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000151875     	0.0             	0.0             	
 
 -- outcome --
 stopped                         	KinkDetected: the profiled c1 is kinked
@@ -225,7 +225,7 @@ distinct optima: 3
   mode 3: f=609.084 ξ=[0.3415, 0.568, 1.971, -4.782]  H-eig=[0, 0.05783, 1, 1.504, 241.2]  log Laplace mass=unavailable (Δ vs best = unavailable nats)
 
 -- nuts --
-NUTS: 1.2s  init ε=2.312  final ε=0.2345  mean nSteps=15.7 mean depth=3.81  frac(depth≥10)=0.000  diverged=0
+NUTS: 1.0s  init ε=2.312  final ε=0.2345  mean nSteps=15.7 mean depth=3.81  frac(depth≥10)=0.000  diverged=0
 mean nSteps by window: [1:75]=28  [76:450]=17  [251:300]=19  [301:1000]=16
 mean accept = 0.988   mean |ΔH| = 0.025
 
@@ -338,11 +338,11 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 3 modes)	0.437825        	0.00262593      	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000431252     	0.0             	0.0             	
-  optima from the draws, 0 extra chains	0.377266        	0.203081        	0.0             	
-  NUTS  (8k iters, 138.18k leapfrog, 0.062 ms/step)	2.62972         	0.214809        	0.079304        	
-  per-draw c1 re-profile + curves (8000 draws)	0.0104219       	0.00791599      	0.0             	
+  MAP search + whitening (70/70 starts, 3 modes)	0.434708        	0.00212346      	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000409834     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	0.415502        	0.241416        	0.0             	
+  NUTS  (8k iters, 138.18k leapfrog, 0.052 ms/step)	2.27476         	0.2527          	0.10065         	
+  per-draw c1 re-profile + curves (8000 draws)	0.0084153       	0.00695818      	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -355,4 +355,4 @@ keptAttempt                     	2
 keptLabel                       	sampled-c1 restart
 keptBecause                     	it passed its gates
 statisticsFlushes               	4
-statisticsFlushSeconds          	0.000180667
+statisticsFlushSeconds          	0.000167125

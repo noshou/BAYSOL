@@ -1,4 +1,4 @@
-datetime	20-11-2026 01:51:16 -0500
+datetime	23-11-2026 00:11:58 -0500
 
 === SASDPV7 ===
 
@@ -229,13 +229,13 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 2 modes)	0.0546653       	0.0337024       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000137167     	0.0             	0.0             	
-  re-whitening: a chain found a basin 3.3 nats above the MAP	0.0473755       	0.0216092       	0.0             	
-  optima from the draws, 1 extra chain	2.35557         	1.93635         	0.0514493       	
-  NUTS  (9k iters, 247.17k leapfrog, 0.010 ms/step)	3.20778         	2.11766         	0.0514493       	
-  2 posterior modes: mass by bridge sampling	0.308102        	0.233438        	0.0             	
-  per-draw c1 re-profile + curves (5838 draws)	0.137464        	0.288905        	0.0             	
+  MAP search + whitening (76/76 starts, 2 modes)	0.0533512       	0.0327403       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000130875     	0.0             	0.0             	
+  re-whitening: a chain found a basin 3.3 nats above the MAP	0.0470232       	0.0208718       	0.0             	
+  optima from the draws, 1 extra chain	2.33795         	1.9125          	0.0623429       	
+  NUTS  (9k iters, 247.17k leapfrog, 0.010 ms/step)	3.17424         	2.13379         	0.0623429       	
+  2 posterior modes: mass by bridge sampling	0.311687        	0.229773        	0.0             	
+  per-draw c1 re-profile + curves (5838 draws)	0.0978493       	0.190168        	0.0             	
 
 -- outcome --
 next                            	retry with a longer warm-up: the worst R̂, 1.012, is not below 1.01; the smallest bulk ESS, 285.2, is not above 400.0
@@ -348,7 +348,7 @@ distinct optima: 2
   mode 2: f=-532.373 ξ=[0.3365, 0.8535, -0.2199, -2.874]  H-eig=[1, 1.309, 1.767, 8.864]  log Laplace mass=530.863 (Δ vs best = 0.183 nats)
 
 -- nuts --
-NUTS: 1.9s  init ε=1.449  final ε=0.1286  mean nSteps=26.5 mean depth=4.22  frac(depth≥10)=0.000  diverged=54
+NUTS: 1.7s  init ε=1.449  final ε=0.1286  mean nSteps=26.5 mean depth=4.22  frac(depth≥10)=0.000  diverged=54
 mean nSteps by window: [1:75]=59  [76:450]=32  [451:1950]=27  [1951:2000]=29  [2001:4000]=27
 mean accept = 0.951   mean |ΔH| = 0.055
 
@@ -469,13 +469,13 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 2 modes)	0.0168109       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	7.5833e-5       	0.0             	0.0             	
-  re-whitening: a chain found a basin 3.3 nats above the MAP	0.0567252       	0.0             	0.0             	
-  optima from the draws, 2 extra chains	1.46375         	0.128835        	0.0966046       	
-  NUTS  (40k iters, 1114.22k leapfrog, 0.011 ms/step)	4.9054          	0.128835        	0.435711        	
-  2 posterior modes: mass by bridge sampling	0.31785         	0.0             	0.0             	
-  per-draw c1 re-profile + curves (38004 draws)	0.0838277       	0.0             	0.0             	
+  MAP search + whitening (76/76 starts, 2 modes)	0.0166084       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	6.4417e-5       	0.0             	0.0             	
+  re-whitening: a chain found a basin 3.3 nats above the MAP	0.0841754       	0.0             	0.0             	
+  optima from the draws, 2 extra chains	1.39413         	0.0826473       	0.104934        	
+  NUTS  (40k iters, 1114.22k leapfrog, 0.011 ms/step)	4.26918         	0.0826473       	0.492973        	
+  2 posterior modes: mass by bridge sampling	0.310979        	0.0             	0.0             	
+  per-draw c1 re-profile + curves (38004 draws)	0.0957166       	0.0             	0.0             	
 
 -- outcome --
 next                            	not converged at base: 0.22 % of the transitions diverged, not below 0.1 %
@@ -709,13 +709,13 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 2 modes)	0.020314        	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	7.1542e-5       	0.0             	0.0             	
-  re-whitening: a chain found a basin 3.4 nats above the MAP	0.0856022       	0.0             	0.0             	
-  optima from the draws, 2 extra chains	0.532931        	0.0             	0.0573377       	
-  NUTS  (10k iters, 495.67k leapfrog, 0.011 ms/step)	1.91513         	0.0             	0.117514        	
-  2 posterior modes: mass by bridge sampling	0.158668        	0.0             	0.0             	
-  per-draw c1 re-profile + curves (8225 draws)	0.0369146       	0.0             	0.0             	
+  MAP search + whitening (76/76 starts, 2 modes)	0.0199227       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	6.875e-5        	0.0             	0.0             	
+  re-whitening: a chain found a basin 3.4 nats above the MAP	0.101549        	0.0             	0.0             	
+  optima from the draws, 2 extra chains	0.509876        	0.0             	0.047531        	
+  NUTS  (10k iters, 495.67k leapfrog, 0.011 ms/step)	1.83345         	0.0             	0.240023        	
+  2 posterior modes: mass by bridge sampling	0.108387        	0.0             	0.0             	
+  per-draw c1 re-profile + curves (8225 draws)	0.0288885       	0.0             	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -729,4 +729,4 @@ keptAttempt                     	3
 keptLabel                       	ladder rung delta 99
 keptBecause                     	it passed its gates
 statisticsFlushes               	8
-statisticsFlushSeconds          	0.000307458
+statisticsFlushSeconds          	0.000310709

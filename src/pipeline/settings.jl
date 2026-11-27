@@ -8,7 +8,7 @@
 # `InvalidSettingsError` (and the same lines whether it came from a keyword or from a
 # settings file). The Pipeline module reads no settings file: the file side
 # (`settings.json`, `model-settings.json`, `loadSettings`) is in
-# `tui/src/store/settings-file.jl`, and hands this side the `Dict` of values.
+# `tui/julia/src/settings-file.jl`, and hands this side the `Dict` of values.
 
 # The modules whose params.jl define settings.
 const _SETTING_MODULES = (Inference, Geometry, Scattering, @__MODULE__)

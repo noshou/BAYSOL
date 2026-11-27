@@ -16,6 +16,7 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import {
     appendFileSync,
+    existsSync,
     mkdirSync,
     readFileSync,
     rmSync,
@@ -24,7 +25,6 @@ import {
 } from "node:fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
-import { fileURLToPath } from "node:url"
 import { stripVTControlCharacters } from "node:util"
 import { cacheDir, RUN_FLOW, repoRoot } from "../core/environment.js"
 import {
@@ -558,13 +558,14 @@ export type LaunchSpec = {
  */
 export type Launcher = (spec: LaunchSpec) => ChildProcess
 
-/** The Julia file of a run (`run-project.jl`): module `BAYSOLRun`, `runProject`. */
-export const runProjectFile = fileURLToPath(new URL("./run-project.jl", import.meta.url))
-
-/** What Julia runs: the file and the values come in `ARGS`, never spliced into the code. */
+/**
+ * What Julia runs: the package `BAYSOLRun` (`tui/julia`; in a packaged run it is part of
+ * the sysimage, so nothing is compiled at start). The values are `ARGS[1..3]` (project,
+ * temperature, run folder), never spliced into the code.
+ */
 const juliaProgram =
-    "include(ARGS[1]); BAYSOLRun.runProject(ARGS[2]; temperature = parse(Float64, " +
-    "ARGS[3]), ui = :tui, runDir = ARGS[4])"
+    "using BAYSOLRun; BAYSOLRun.runProject(ARGS[1]; temperature = parse(Float64, " +
+    "ARGS[2]), ui = :tui, runDir = ARGS[3])"
 
 /** The Julia program to start: the `JULIA` environment variable, else `julia`. */
 export function juliaCommand(env: Record<string, string | undefined>): string {
@@ -574,46 +575,96 @@ export function juliaCommand(env: Record<string, string | undefined>): string {
 
 /**
  * The arguments of the Julia child: no start-up file, no colour codes, the threads of
- * `assets/data/run_flow.json`, the package folder (from a checkout), then `-e` the
- * program and its four values (Julia file, project, temperature, run folder).
+ * `assets/data/run_flow.json`, the environment of the package `BAYSOLRun` (`tui/julia`
+ * of a checkout), then `-e` the program and its three values (project, temperature,
+ * run folder).
  *
- * @param root - the package folder, or `undefined` (packaged: Julia's own environment
- *     holds BAYSOL).
- * @param script - the Julia file of the run; `run-project.jl` next to this file.
+ * @param root - the package folder, or `undefined` (packaged: the sysimage holds BAYSOL and
+ *     `BAYSOLRun`, and the launcher chose the environment).
  */
 export function juliaArgs(
     spec: LaunchSpec,
     root: string | undefined,
     threads: string,
-    script: string = runProjectFile,
 ): string[] {
     return [
         "--startup-file=no",
         "--color=no",
         `--threads=${threads}`,
-        ...(root === undefined ? [] : [`--project=${root}`]),
+        ...(root === undefined ? [] : [`--project=${join(root, "tui", "julia")}`]),
         "-e",
         juliaProgram,
-        script,
         spec.projectDir,
         String(spec.temperature),
         spec.runDir,
     ]
 }
 
+let traceCount = 0
+
 /**
- * The real launcher: `julia ... -e 'include(...); BAYSOLRun.runProject(...)'` in its own
+ * The `--trace-compile` flag of a Julia child when `BAYSOL_TRACE_COMPILE` names a folder
+ * (the packaging build records what the TUI tests make Julia compile): one file per child.
+ */
+export function traceFlag(
+    env: Record<string, string | undefined>,
+    pid: number,
+): string[] {
+    const dir = env.BAYSOL_TRACE_COMPILE
+    if (!dir) return []
+    traceCount += 1
+    return [`--trace-compile=${join(dir, `tui-${pid}-${traceCount}.jl`)}`]
+}
+
+/** The threads of a run: `BAYSOL_THREADS` (the setup wizard's choice), else the default. */
+function juliaThreads(): string {
+    return process.env.BAYSOL_THREADS || RUN_FLOW.julia.threads
+}
+
+/**
+ * The real launcher: `julia ... -e 'using BAYSOLRun; BAYSOLRun.runProject(...)'` in its own
  * process group, with this program's cache folder and three pipes.
  *
  * @returns the child. A Julia that cannot be started arrives as its `error` event.
  */
-const juliaLauncher: Launcher = (spec) =>
-    spawn(juliaCommand(process.env), juliaArgs(spec, repoRoot(), RUN_FLOW.julia.threads), {
+const juliaLauncher: Launcher = (spec) => {
+    const packaged = bundledCommand(process.env, spec)
+    const [command, args] = packaged ?? [
+        juliaCommand(process.env),
+        [
+            ...traceFlag(process.env, process.pid),
+            ...juliaArgs(spec, repoRoot(), juliaThreads()),
+        ],
+    ]
+    return spawn(command, args, {
         detached: true,
         windowsHide: true,
         stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env, BAYSOL_CACHE: spec.cache ?? cacheDir() },
+        env: {
+            ...process.env,
+            BAYSOL_CACHE: spec.cache ?? cacheDir(),
+            ...(packaged ? { JULIA_NUM_THREADS: juliaThreads() } : {}),
+        },
     })
+}
+
+/**
+ * The packaged app's way to a fit: the `baysol` executable beside this program
+ * (`BAYSOL_BUNDLE`) with `run-tui PROJECT TEMPERATURE RUNDIR`.
+ *
+ * @returns the command and its arguments, or `undefined` when there is no bundle (a
+ *     checkout starts Julia instead).
+ */
+export function bundledCommand(
+    env: Record<string, string | undefined>,
+    spec: LaunchSpec,
+): [string, string[]] | undefined {
+    const bundle = env.BAYSOL_BUNDLE
+    if (!bundle) return undefined
+    const exe = join(bundle, process.platform === "win32" ? "baysol.exe" : "baysol")
+    if (!existsSync(exe)) return undefined
+    return [exe, ["run-tui", spec.projectDir, String(spec.temperature), spec.runDir]]
+}
 
 /**
  * Sends a signal to a child's whole process group. On Windows, which has no signal
@@ -970,7 +1021,7 @@ export function hasActiveRuns(): boolean {
 
 /**
  * Stops every run going and waits until each is over, and for the writes of the archives
- * still going (Ctrl-C, Ctrl-D, SIGHUP, SIGTERM).
+ * still going (^c, ^d, SIGHUP, SIGTERM).
  */
 export async function quitAll(reason: string): Promise<void> {
     await Promise.all([...active].map((session) => session.abort(reason)))

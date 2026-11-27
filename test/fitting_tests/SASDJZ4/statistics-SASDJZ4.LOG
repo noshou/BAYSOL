@@ -1,4 +1,4 @@
-datetime	20-11-2026 00:56:19 -0500
+datetime	22-11-2026 23:28:49 -0500
 
 === fit1 ===
 
@@ -222,11 +222,11 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.0874876       	0.0350725       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000183084     	0.0             	0.0             	
-  optima from the draws, 0 extra chains	1.81725         	1.80138         	0.0             	
-  NUTS  (8k iters, 57.8k leapfrog, 0.023 ms/step)	2.35804         	1.98897         	0.0             	
-  per-draw c1 re-profile + curves (8000 draws)	0.13064         	0.195526        	0.0             	
+  MAP search + whitening (70/70 starts, 2 modes)	0.0954436       	0.0401163       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000174918     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.76099         	1.74536         	0.0             	
+  NUTS  (8k iters, 57.8k leapfrog, 0.021 ms/step)	2.28968         	1.94209         	0.0             	
+  per-draw c1 re-profile + curves (8000 draws)	0.109481        	0.184504        	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -238,4 +238,4 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	0.000114541
+statisticsFlushSeconds          	0.000119667

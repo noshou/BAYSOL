@@ -611,16 +611,16 @@ function OverrideValueEditor(props: {
  * `condition ▸ name ▸ N overrides` (the condition is the failure class, in plain words).
  * It fills the body of the sheet and scrolls like the other lists (`useListCursor`).
  *
- * In the list: up and down move, PgUp and PgDn page, Enter opens the rung, Ctrl+n adds a
- * rung (pick its condition, then give it a name, then its first override), Ctrl+r
- * removes it, Shift+up and Shift+down move it earlier or later among those of its
- * condition, Ctrl+u puts the default ladder back, Esc takes the whole ladder (a wrong
- * one stays as an error), Ctrl+x goes back without it.
+ * In the list: up and down move, PgUp and PgDn page, Enter opens the rung, ^n adds a
+ * rung (pick its condition, then give it a name, then its first override), ^r
+ * removes it, shift+up and shift+down move it earlier or later among those of its
+ * condition, ^u puts the default ladder back, Esc takes the whole ladder (a wrong
+ * one stays as an error), ^x goes back without it.
  *
  * The sheet of a rung lists its condition and name (Enter changes them) and its
  * overrides, `SETTING  value`: Enter edits the value with the setting's own editor (a
- * bool flips), Ctrl+n adds an override (pick from the settings a rung may override),
- * Ctrl+r removes it, Shift+up and Shift+down move it, Ctrl+u reverts the rung to how it
+ * bool flips), ^n adds an override (pick from the settings a rung may override),
+ * ^r removes it, shift+up and shift+down move it, ^u reverts the rung to how it
  * was opened, Esc closes the sheet (a rung left with no override is dropped).
  */
 export function LadderEditor({

@@ -403,28 +403,32 @@ The convergence ladder of [`runModel`](@ref): for each failure class (`LADDER_CL
 ordered list of rungs, each `(name, overrides)`. When a run still fails its gates after its
 own retry and the c1 kink fallback, `runModel` classifies the failure from the failed
 attempt's own diagnostics and reruns with the next unused rung of that class (a class can
-change from one attempt to the next; at most three reruns in all). A rung
+change from one attempt to the next; the reruns stop when one passes or the class has no
+unused rung left). A rung
 reruns the fit with the settings it names in `overrides` (catalog names, the values of
 `LADDER_OVERRIDABLE`, plus the ladder-only keys `RNG_SEED_STEP`, a whole number added to the
 run's `RNG_SEED`, and `SAMPLE_C1`, `true` to sample c1 as a fifth parameter) and nothing
 else; a rung that would change nothing for the caller's settings is skipped.
 `CHAIN_START_RADII`, `RETRY_N_ADAPT` and `RETRY_N_DRAWS` are applied only when the caller
 left them at their default. The defaults: `stepCollapse`: `TARGET_ACCEPT` 70, then 35 (a
-lower target is a larger step); `splitChains`: `CHAIN_START_RADII` (2, 4, 6), then (1, 2, 3)
-with a 4000 + 4000 rerun; `divergent`: `TARGET_ACCEPT` 99, then 99 with radii (1, 2, 3) and
-4000 + 4000, then that with `RNG_SEED_STEP` 1 (the validated rungs of the 2026-11-18
-report); `structural`: sample c1; `marginal`: retry lengths 6000 + 8000, then those with the
-next seed; `generic`: 4000 + 4000 with the next seed. A user value is a map from class to
-rung list and replaces only the classes it names (`[]` switches a class off; the whole
-ladder is off with `false`, `"off"` or a map with every class empty); the same in
-`settings.json`, `model-settings.json` (against the project's ladder) and the keyword
-`ladder` of `runModel` and `runProject`. The override keys are written sorted by name,
-the one order every source (a `Dict` has none) gives.
+lower target is a larger step), then 35 with `RNG_SEED_STEP` 1 (a collapsed step size is
+often a poor start, which only another seed changes); `splitChains`: `CHAIN_START_RADII` (2,
+4, 6), then (1, 2, 3) with a 4000 + 4000 rerun, then that with `RNG_SEED_STEP` 1;
+`divergent`: `TARGET_ACCEPT` 99, then 99 with radii (1, 2, 3) and 4000 + 4000, then that
+with `RNG_SEED_STEP` 1 (the validated rungs of the 2026-11-18 report); `structural`: sample
+c1; `marginal`: retry lengths 6000 + 8000, then those with the next seed; `generic`: 4000 +
+4000 with the next seed. A user value is a map from class to rung list and replaces only the
+classes it names (`[]` switches a class off; the whole ladder is off with `false`, `"off"`
+or a map with every class empty); the same in `settings.json`, `model-settings.json`
+(against the project's ladder) and the keyword `ladder` of `runModel` and `runProject`. The
+override keys are written sorted by name, the one order every source (a `Dict` has none)
+gives.
 """
 const LADDER = (
     stepCollapse = (
         (name = "delta 70", overrides = (TARGET_ACCEPT = 70,)),
         (name = "delta 35", overrides = (TARGET_ACCEPT = 35,)),
+        (name = "delta 35 + seed", overrides = (RNG_SEED_STEP = 1, TARGET_ACCEPT = 35)),
     ),
     splitChains = (
         (name = "starts (2,4,6)", overrides = (CHAIN_START_RADII = (2.0, 4.0, 6.0),)),
@@ -433,6 +437,13 @@ const LADDER = (
             overrides = (
                 CHAIN_START_RADII = (1.0, 2.0, 3.0), RETRY_N_ADAPT = 4000,
                 RETRY_N_DRAWS = 4000,
+            ),
+        ),
+        (
+            name = "close starts + longer + seed",
+            overrides = (
+                CHAIN_START_RADII = (1.0, 2.0, 3.0), RETRY_N_ADAPT = 4000,
+                RETRY_N_DRAWS = 4000, RNG_SEED_STEP = 1,
             ),
         ),
     ),

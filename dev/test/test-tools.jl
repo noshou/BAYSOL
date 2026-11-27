@@ -138,9 +138,12 @@ end
     status, out = run_tool("fits", "run", "SASDMJ9", "--bench", "--approved", "--dry-run")
     @test status == 0 && occursin("bysl fits bench --approved SASDMJ9", out)
     status, out =
-        run_tool("fits", "run", "SASDMJ9", "--trace-compile", "/tmp/x.jl", "--dry-run")
+        run_tool("fits", "run", "SASDMJ9", "--trace-compile", "/tmp/x", "--dry-run")
     @test status == 0 &&
-          occursin(r"--trace-compile=/tmp/x.jl.*SASDMJ9.jl", replace(out, "\n" => " "))
+          occursin(
+        r"--trace-compile=/tmp/x/SASDMJ9.jl.*SASDMJ9.jl",
+        replace(out, "\n" => " "),
+    )
     r = run_tool("fits", "run", "SASDMJ9", "--trace-compile")
     @test r[1] == 2 && says(r[2], "needs a value")
     status, out = run_tool("fits", "run", "SASDMJ9", "--no-fit", "--table", "--dry-run")

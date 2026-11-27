@@ -497,7 +497,7 @@ export type FormRow = {
  * @property initial - the text to start from.
  * @property error - what was wrong with the last attempt, under the field.
  * @property onSubmit - called with the text when Enter takes it.
- * @property onCancel - called for Esc and Ctrl-X.
+ * @property onCancel - called for Esc and ^x.
  * @property onChange - called after every edit (keep it stable, see `Entry`).
  */
 type FieldFormEdit = {
@@ -762,7 +762,7 @@ export type FormScreen = {
  * The keys and state every form page has: the arrows move the cursor over the cells,
  * Enter opens a prompt on the cell (a mistake keeps it open with a message), `^u`
  * restores the cell, `^w` accepts the form only if `spec.check` finds nothing (else the
- * problem is the note, flagged on its row, and the cursor goes there), Esc or Ctrl-X
+ * problem is the note, flagged on its row, and the cursor goes there), Esc or ^x
  * cancel. While the prompt is open it takes the keys, Esc closing just the prompt.
  *
  * @param spec - what the screen knows about its cells.

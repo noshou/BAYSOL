@@ -1,4 +1,4 @@
-datetime	20-11-2026 15:48:57 -0500
+datetime	22-11-2026 22:32:45 -0500
 
 === SASDC57 ===
 
@@ -103,7 +103,7 @@ distinct optima: 2
   mode 2: f=-544.081 ξ=[0.3387, 1.995, 1.009, 2.767]  H-eig=[1, 1.437, 2.315, 5.741]  log Laplace mass=542.606 (Δ vs best = -697 nats)
 
 -- nuts --
-NUTS: 0.1s  init ε=1.716  final ε=0.4283  mean nSteps=8.4 mean depth=2.95  frac(depth≥10)=0.000  diverged=0
+NUTS: 0.2s  init ε=1.716  final ε=0.4283  mean nSteps=8.4 mean depth=2.95  frac(depth≥10)=0.000  diverged=0
 mean nSteps by window: [1:75]=10  [76:450]=10  [251:300]=10  [301:1000]=8
 mean accept = 0.960   mean |ΔH| = 0.079
 
@@ -222,11 +222,11 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.0828371       	0.034           	0.0
-  NUTS setup (starts, Hamiltonian)	0.000139125     	0.0             	0.0
-  optima from the draws, 0 extra chains	1.64892         	1.6371          	0.0
-  NUTS  (8k iters, 72.03k leapfrog, 0.012 ms/step)	2.63227         	1.76303         	0.0
-  per-draw c1 re-profile + curves (8000 draws)	0.141998        	0.0852836       	0.0
+  MAP search + whitening (70/70 starts, 2 modes)	0.0767325       	0.03271         	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000136916     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.77055         	1.75864         	0.0             	
+  NUTS  (8k iters, 72.03k leapfrog, 0.015 ms/step)	2.25972         	1.95521         	0.0             	
+  per-draw c1 re-profile + curves (8000 draws)	0.0957079       	0.182372        	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -238,4 +238,4 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	0.000111957
+statisticsFlushSeconds          	0.000115959

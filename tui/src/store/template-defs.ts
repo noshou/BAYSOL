@@ -443,7 +443,7 @@ export function checkCustomDefinition(def: unknown): string[] {
     bad.list.push(...titrantProblems(def.titrant, def.steps, stepsBad.length === 0))
     bad.list.push(...amountProblems(def, true))
     if (bad.list.length === 0) {
-        bad.list.push(...extremeProblems(def as unknown as CustomDefinition))
+        bad.list.push(...extremeProblems(def as CustomDefinition))
     }
     return bad.list
 }

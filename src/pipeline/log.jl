@@ -144,13 +144,22 @@ end
 
 """
 The short git revision of the BAYSOL source tree, with `-dirty` when it has uncommitted
-changes to tracked files, `unknown` when it is not a git checkout.
+changes to tracked files, `unknown` when it is not a git checkout. A packaged copy of the
+sources has no `.git`; the packaging writes the revision into a `REVISION` file in the
+package folder, which is read instead.
 """
 function _logRevision()
     try
+        # a packaged app's launcher gives it
+        env = String(strip(get(ENV, "BAYSOL_REVISION", "")))
+        isempty(env) || return env
         dir = pkgdir(@__MODULE__)
         dir === nothing && return "unknown"
-        rev = readchomp(pipeline(`git -C $dir rev-parse --short HEAD`; stderr = devnull))
+        file = joinpath(dir, "REVISION")
+        isfile(file) && return String(strip(read(file, String)))
+        rev = String(
+            readchomp(pipeline(`git -C $dir rev-parse --short HEAD`; stderr = devnull)),
+        )
         dirty = readchomp(
             pipeline(
                 `git -C $dir status --porcelain --untracked-files=no`;

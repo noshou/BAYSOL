@@ -9,10 +9,9 @@
 //   3. Menu header: the logo block above a menu
 //   4. `GridMenu`: the grid component with its taskbar
 
-import { readFileSync } from "node:fs"
 import { Box, Text } from "ink"
 import { type ReactNode, useCallback, useEffect, useState } from "react"
-import { assetPath } from "../core/environment.js"
+import { readAssetText } from "../core/environment.js"
 import { displayWidth, padWidth } from "../core/terminal.js"
 import {
     arrowKeys,
@@ -79,7 +78,7 @@ export function cursorMoves(index: number, count: number): Moves {
  * @property down - the cursor can go down.
  * @property left - there is something to the left (a previous group).
  * @property right - there is something to the right (a next group).
- * @property tab - Tab (down) and Shift+Tab (up) move too: the legend adds `tab` while
+ * @property tab - Tab (down) and shift+tab (up) move too: the legend adds `tab` while
  *     down works.
  */
 export type Moves = {
@@ -134,7 +133,7 @@ export function legendOf(items: (LegendItem | false | undefined)[]): LegendItem[
  *     shown after `extras`.
  * @property cancel - what Esc does, `"cancel"` when left out; `null` for nothing (not
  *     shown).
- * @property back - Ctrl-X goes back one screen (it differs from Esc), shown last.
+ * @property back - ^x goes back one screen (it differs from Esc), shown last.
  */
 export type EntryFacts = {
     count: number
@@ -483,7 +482,7 @@ export type MenuOption = Art & {
  * @throws if the file does not exist or cannot be read.
  */
 function loadArt(...path: string[]): Art {
-    const text = readFileSync(assetPath(...path), "utf-8")
+    const text = readAssetText(...path)
     const lines = text.split("\n")
     return {
         text,
@@ -746,7 +745,7 @@ export type TaskbarItem = { label: string; key: Hotkey; onPress: () => void }
  * @property taskbar - extra actions that apply right now, shown beside the move hint,
  *     each a hotkey of the menu. The room is always reserved, so the grid never moves.
  *     Esc does nothing at menu level: the only way out of the program is `q` in the main
- *     menu (and Ctrl-C / Ctrl-D, handled by the app).
+ *     menu (and ^c / ^d, handled by the app).
  * @property taskbarNote - a small box in the taskbar's corner while there is no item,
  *     e.g. `missing components: models, data`.
  * @property onKey - called, with the option the cursor is on, for every other key press
@@ -780,7 +779,7 @@ type GridMenuProps<N extends MenuOptions> = {
 
 /**
  * A menu of options on a grid, moved with the arrow keys, chosen with Enter or a hotkey,
- * left with Ctrl-X (back); Esc does nothing here. A hotkey first moves the cursor and
+ * left with ^x (back); Esc does nothing here. A hotkey first moves the cursor and
  * chooses after `hotkeyDelay`, so the highlight is seen before the screen changes.
  *
  * @param props - see [[GridMenuProps]].

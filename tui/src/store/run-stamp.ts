@@ -222,7 +222,7 @@ function localZoneLabel(ms: number, offsetMinutes: number): string {
 
 /**
  * The name of a run folder, the ONE definition of it (Julia's is `_runStamp` in
- * `run-project.jl` next to this file; both give the same text for the same instant,
+ * `baysol-run.jl` in `tui/julia/src`; both give the same text for the same instant,
  * offset and label): the local wall-clock time, the zone label, the offset from UTC and
  * the local date, `23-35-29-123_EST_-0500_2026-11-07`. Only digits, letters, hyphens and
  * underscores, so it needs no quoting anywhere.

@@ -165,7 +165,7 @@ export function readMapping(value: unknown): DataMapping | undefined {
             return undefined
         columns[role] = { spec: c.spec, column: c.column }
     }
-    return { ...(value as unknown as ParseOptions), sheet, path, columns }
+    return { ...(value as ParseOptions), sheet, path, columns }
 }
 
 /**

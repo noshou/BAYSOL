@@ -143,7 +143,8 @@ export function parseColourCode(text: string): Rgb | undefined {
     const rgb = codeNumbers(t, "rgb", ["", "", ""])
     if (rgb !== undefined) {
         if (!rgb.every((x) => Number.isInteger(x) && x >= 0 && x <= 255)) return undefined
-        return rgb as unknown as Rgb
+        const [r, g, b] = rgb as [number, number, number]
+        return [r, g, b]
     }
     const hsl = codeNumbers(t, "hsl", ["", "%", "%"])
     if (hsl !== undefined) {
@@ -162,5 +163,7 @@ export function parseColourCode(text: string): Rgb | undefined {
 }
 
 /** The channels of a `#rrggbb` text. */
-export const fromHex = (hex: string): Rgb =>
-    [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as unknown as Rgb
+export function fromHex(hex: string): Rgb {
+    const part = (i: number): number => Number.parseInt(hex.slice(i, i + 2), 16)
+    return [part(1), part(3), part(5)]
+}

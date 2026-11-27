@@ -94,7 +94,7 @@ test("a number: Enter takes a good number, a wrong one stays as an error", () =>
     assert.ok(stepNumber(decimal, pressOf(keys.enter)).state.error)
 })
 
-test("a number: a float takes decimals, Esc drops, Ctrl-X leaves", () => {
+test("a number: a float takes decimals, Esc drops, ^x leaves", () => {
     const flt = catalog.defs().find((d) => d.kind === "float")
     assert.ok(flt)
     const edit = stepNumber(openNumber(flt, 1), pressOf(keys.backspace)).state
@@ -187,7 +187,7 @@ test("a tuple: a wrong part puts the focus on it and names it", () => {
     assert.equal(stepTuple(bad.state, pressOf(keys.right)).state.error, undefined)
 })
 
-test("a tuple: Esc drops, Ctrl-X leaves", () => {
+test("a tuple: Esc drops, ^x leaves", () => {
     const edit = openTuple(radii, [4, 10, 20])
     assert.deepEqual(stepTuple(edit, pressOf(keys.escape)).end, { kind: "cancel" })
     assert.deepEqual(stepTuple(edit, pressOf(keys.back)).end, { kind: "back" })

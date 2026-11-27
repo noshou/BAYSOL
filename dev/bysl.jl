@@ -42,7 +42,7 @@ const STARTED_FILE = joinpath(STATE_DIR, "started")
 const LOG_FILE = joinpath(STATE_DIR, "log")
 
 # The tools that start long Julia processes run in a process of their own.
-const OWN_PROCESS = ("fits", "docs", "unit", "test", "precommit", "vis")
+const OWN_PROCESS = ("fits", "docs", "unit", "test", "precommit", "vis", "pkg")
 
 # Runs the tool in a fresh Julia process, with this terminal, and exits with its status.
 function run_direct(args)
@@ -102,7 +102,7 @@ function start_daemon()
     expr  = expr1 * expr2
     cmd   = `$JULIA_EXE --startup-file=no --project=$PKG -e $expr $STATE_DIR $SOCKET $idle`
     log   = open(LOG_FILE, "w")
-    # `detach` puts the daemon in a process group of its own, so a Ctrl-C meant for a
+    # `detach` puts the daemon in a process group of its own, so a ^c meant for a
     # command does not reach it and it outlives the terminal
     run(pipeline(detach(cmd); stdout = log, stderr = log); wait = false)
     close(log)

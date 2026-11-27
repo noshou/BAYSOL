@@ -155,20 +155,17 @@ end
 All rows of the bundled table, by id, read from `components.tsv` (`#` lines are comments).
 
 # Exceptions
-- `ComponentError`: the file is missing or has a row that has neither the five fields
+- `ComponentError`: the table has a row that has neither the five fields
     (`id`, `class`, `type`, `parent`, `formula`) nor those five plus `base` and
     `base_source` (`-` for none; a five-field row has no base).
 """
 function _readComponents()::Dict{String,ComponentInfo}
-    isfile(COMPONENTS_TABLE) || throw(
-        ComponentError("the bundled component table is missing: $COMPONENTS_TABLE"),
-    )
     table = Dict{String,ComponentInfo}()
-    for line in eachline(COMPONENTS_TABLE)
+    for line in eachline(IOBuffer(_COMPONENTS_TEXT))
         (isempty(line) || startswith(line, '#')) && continue
         f = split(line, '\t')
         length(f) in (5, 7) || throw(
-            ComponentError("malformed row in $COMPONENTS_TABLE: \"$line\""),
+            ComponentError("malformed row in components.tsv: \"$line\""),
         )
         id = String(f[1])
         table[id] = ComponentInfo((
@@ -196,19 +193,16 @@ from `components.tsv`: the parent column of the rows whose type names a peptide
 whose parent cannot be resolved (a list of different ones, none) are absent.
 
 # Exceptions
-- `ComponentError`: the table is missing or malformed.
+- `ComponentError`: the table is malformed.
 """
 function _readAminoParents()::Dict{String,String}
-    isfile(COMPONENTS_TABLE) || throw(
-        ComponentError("the bundled component table is missing: $COMPONENTS_TABLE"),
-    )
     raw = Dict{String,Union{Nothing,String}}()
     types = Dict{String,String}()
-    for line in eachline(COMPONENTS_TABLE)
+    for line in eachline(IOBuffer(_COMPONENTS_TEXT))
         (isempty(line) || startswith(line, '#')) && continue
         f = split(line, '\t')
         length(f) in (5, 7) || throw(
-            ComponentError("malformed row in $COMPONENTS_TABLE: \"$line\""),
+            ComponentError("malformed row in components.tsv: \"$line\""),
         )
         raw[f[1]] = f[4] == "-" ? nothing : String(f[4])
         types[f[1]] = f[3]

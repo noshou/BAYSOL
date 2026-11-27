@@ -1,4 +1,4 @@
-datetime	20-11-2026 02:37:03 -0500
+datetime	23-11-2026 01:09:26 -0500
 
 === SASDVE7 ===
 
@@ -222,12 +222,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.0632825       	0.0337733       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000119292     	0.0             	0.0             	
-  optima from the draws, 0 extra chains	1.8014          	1.78649         	0.0             	
-  NUTS  (8k iters, 227.5k leapfrog, 0.009 ms/step)	2.53157         	1.92482         	0.0504395       	
-  2 posterior modes: mass by bridge sampling	0.296471        	0.2349          	0.0             	
-  per-draw c1 re-profile + curves (5900 draws)	0.122353        	0.307845        	0.0             	
+  MAP search + whitening (70/70 starts, 2 modes)	0.0613546       	0.0325543       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000116958     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.76636         	1.75218         	0.0             	
+  NUTS  (8k iters, 227.5k leapfrog, 0.009 ms/step)	2.50656         	1.95078         	0.0460331       	
+  2 posterior modes: mass by bridge sampling	0.28608         	0.22514         	0.0             	
+  per-draw c1 re-profile + curves (5900 draws)	0.143986        	0.350545        	0.0             	
 
 -- outcome --
 next                            	retry with a longer warm-up: the worst R̂, 1.015, is not below 1.01
@@ -453,12 +453,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.0276447       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	5.7875e-5       	0.0             	0.0             	
-  optima from the draws, 0 extra chains	0.0675587       	0.0             	0.0             	
-  NUTS  (32k iters, 744.62k leapfrog, 0.010 ms/step)	2.05812         	0.0             	0.336539        	
-  2 posterior modes: mass by bridge sampling	0.18959         	0.0             	0.0             	
-  per-draw c1 re-profile + curves (28000 draws)	0.0924892       	0.0             	0.0             	
+  MAP search + whitening (70/70 starts, 2 modes)	0.0271224       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	5.4792e-5       	0.0             	0.0             	
+  optima from the draws, 0 extra chains	0.0185426       	0.0             	0.0             	
+  NUTS  (32k iters, 744.62k leapfrog, 0.010 ms/step)	2.00848         	0.0             	0.347061        	
+  2 posterior modes: mass by bridge sampling	0.189521        	0.0             	0.0             	
+  per-draw c1 re-profile + curves (28000 draws)	0.0885405       	0.0             	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -471,4 +471,4 @@ keptAttempt                     	2
 keptLabel                       	retry, longer warm-up
 keptBecause                     	the retry passed its gates or was no worse in R̂ (worst R̂ 1.0046 against 1.015)
 statisticsFlushes               	5
-statisticsFlushSeconds          	0.00021946
+statisticsFlushSeconds          	0.000213582

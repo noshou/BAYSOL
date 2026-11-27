@@ -3647,6 +3647,13 @@
             "overrides": {
               "TARGET_ACCEPT": 35
             }
+          },
+          {
+            "name": "delta 35 + seed",
+            "overrides": {
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 35
+            }
           }
         ],
         "splitChains": [
@@ -3670,6 +3677,19 @@
               ],
               "RETRY_N_ADAPT": 4000,
               "RETRY_N_DRAWS": 4000
+            }
+          },
+          {
+            "name": "close starts + longer + seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
             }
           }
         ],
@@ -3764,6 +3784,13 @@
             "overrides": {
               "TARGET_ACCEPT": 35
             }
+          },
+          {
+            "name": "delta 35 + seed",
+            "overrides": {
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 35
+            }
           }
         ],
         "splitChains": [
@@ -3787,6 +3814,19 @@
               ],
               "RETRY_N_ADAPT": 4000,
               "RETRY_N_DRAWS": 4000
+            }
+          },
+          {
+            "name": "close starts + longer + seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
             }
           }
         ],
@@ -3879,6 +3919,13 @@
             "overrides": {
               "TARGET_ACCEPT": 35
             }
+          },
+          {
+            "name": "delta 35 + seed",
+            "overrides": {
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 35
+            }
           }
         ],
         "splitChains": [
@@ -3902,6 +3949,19 @@
               ],
               "RETRY_N_ADAPT": 4000,
               "RETRY_N_DRAWS": 4000
+            }
+          },
+          {
+            "name": "close starts + longer + seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
             }
           }
         ],
@@ -3982,6 +4042,13 @@
             "overrides": {
               "TARGET_ACCEPT": 35
             }
+          },
+          {
+            "name": "delta 35 + seed",
+            "overrides": {
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 35
+            }
           }
         ],
         "splitChains": [
@@ -4005,6 +4072,19 @@
               ],
               "RETRY_N_ADAPT": 4000,
               "RETRY_N_DRAWS": 4000
+            }
+          },
+          {
+            "name": "close starts + longer + seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
             }
           }
         ],
@@ -4101,6 +4181,13 @@
             "overrides": {
               "TARGET_ACCEPT": 35
             }
+          },
+          {
+            "name": "delta 35 + seed",
+            "overrides": {
+              "RNG_SEED_STEP": 1,
+              "TARGET_ACCEPT": 35
+            }
           }
         ],
         "splitChains": [
@@ -4124,6 +4211,19 @@
               ],
               "RETRY_N_ADAPT": 4000,
               "RETRY_N_DRAWS": 4000
+            }
+          },
+          {
+            "name": "close starts + longer + seed",
+            "overrides": {
+              "CHAIN_START_RADII": [
+                1.0,
+                2.0,
+                3.0
+              ],
+              "RETRY_N_ADAPT": 4000,
+              "RETRY_N_DRAWS": 4000,
+              "RNG_SEED_STEP": 1
             }
           }
         ],

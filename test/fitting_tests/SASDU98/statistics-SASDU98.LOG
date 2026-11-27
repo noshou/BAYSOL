@@ -1,4 +1,4 @@
-datetime	20-11-2026 02:25:38 -0500
+datetime	23-11-2026 00:51:23 -0500
 
 === SASDU98 ===
 
@@ -25,7 +25,7 @@ base run   nQ=58  nAtoms=23370  lMax=16  c1 tol=1.0e-8
 δρ₃ support = [-11.2, 2.801]   δρ₁,₂ support = [-10.0, 2.0]
 
 -- map search --
-MAP search: 0.1s  nOk=70/70  nModes=3  whitened=true
+MAP search: 0.0s  nOk=70/70  nModes=3  whitened=true
 L-BFGS starts (z space):
   start 1: f=-432.8680 iters= 15 g_conv=false iter_limit=false evals=25 |∇f|∞=1.75e-05
   start 2: f=-505.4663 iters= 34 g_conv=true iter_limit=false evals=59 |∇f|∞=6.71e-07
@@ -223,12 +223,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 3 modes)	0.0572448       	0.0343781       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000122458     	0.0             	0.0             	
-  optima from the draws, 0 extra chains	1.80878         	1.79992         	0.0             	
-  NUTS  (8k iters, 114.81k leapfrog, 0.008 ms/step)	2.2973          	1.99785         	0.0             	
-  2 posterior modes: mass by bridge sampling	0.300953        	0.236109        	0.0             	
-  per-draw c1 re-profile + curves (5200 draws)	0.108813        	0.22033         	0.0             	
+  MAP search + whitening (70/70 starts, 3 modes)	0.0552236       	0.0327322       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000114417     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.75832         	1.75005         	0.0             	
+  NUTS  (8k iters, 114.81k leapfrog, 0.009 ms/step)	2.28678         	1.95393         	0.0             	
+  2 posterior modes: mass by bridge sampling	0.299868        	0.226194        	0.0             	
+  per-draw c1 re-profile + curves (5200 draws)	0.135407        	0.320995        	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -240,4 +240,4 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	0.000120584
+statisticsFlushSeconds          	0.000126916

@@ -1,0 +1,15 @@
+entry	SYN-6LYZ-pluronicf127
+synthetic	yes (invented buffer, no measured curve)
+host	6LYZ
+rho_e	0.33541195257786394	e/A^3
+sigma_rho_e	0.00011863272141966358	e/A^3
+rho_e_water	0.3332920001104711	e/A^3 (pure water, same temperature)
+contrast_over_water	0.002119952467392827	e/A^3
+temperature	25.0	C
+pH	7.0	sigma 0.1
+energy	8041.522793695696	eV
+delta_rho_relative	1.0 1.0 0.0	dimensionless (x 0.03 e/A^3)
+c1	1.0	uncorrected, scale 1, background 0
+q_grid	0.01:0.005:0.5	A^-1, 99 points
+composition
+  Polymer	Pluronic F127	0.0039672	mol/L

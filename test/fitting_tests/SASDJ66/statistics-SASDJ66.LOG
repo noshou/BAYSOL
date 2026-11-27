@@ -1,4 +1,4 @@
-datetime	20-11-2026 00:51:38 -0500
+datetime	22-11-2026 23:16:02 -0500
 
 === fit1 ===
 
@@ -230,12 +230,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 1 mode)	0.0498981       	0.0341075       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000148585     	0.0             	0.0             	
-  optima from the draws, 2 extra chains	2.03521         	1.8665          	0.0             	
-  NUTS  (10k iters, 136.64k leapfrog, 0.013 ms/step)	2.60451         	2.00732         	0.0             	
-  2 posterior modes: mass by bridge sampling	0.318252        	0.259159        	0.0             	
-  per-draw c1 re-profile + curves (9392 draws)	0.140818        	0.277415        	0.0             	
+  MAP search + whitening (76/76 starts, 1 mode)	0.0478966       	0.0325387       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000136875     	0.0             	0.0             	
+  optima from the draws, 2 extra chains	1.99409         	1.82769         	0.0             	
+  NUTS  (10k iters, 136.64k leapfrog, 0.013 ms/step)	2.59702         	2.0313          	0.0             	
+  2 posterior modes: mass by bridge sampling	0.315345        	0.248436        	0.0             	
+  per-draw c1 re-profile + curves (9392 draws)	0.141015        	0.294934        	0.0             	
 
 -- outcome --
 next                            	retry with a longer warm-up: the worst R̂, 1.021, is not below 1.01; the smallest bulk ESS, 376.6, is not above 400.0; the smallest tail ESS, 103.6, is not above 400.0
@@ -348,7 +348,7 @@ distinct optima: 2
   mode 2: f=-73.221 ξ=[0.3353, 0.9821, 0.08145, -2.096]  H-eig=[0.9999, 1.204, 1.426, 2.341]  log Laplace mass=72.525 (Δ vs best = 1.65 nats)
 
 -- nuts --
-NUTS: 13.0s  init ε=1.316  final ε=0.131  mean nSteps=46.5 mean depth=4.76  frac(depth≥10)=0.000  diverged=0
+NUTS: 10.2s  init ε=1.316  final ε=0.131  mean nSteps=46.5 mean depth=4.76  frac(depth≥10)=0.000  diverged=0
 mean nSteps by window: [1:75]=19  [76:450]=24  [451:5950]=21  [5951:6000]=73  [6001:14000]=46
 mean accept = 0.976   mean |ΔH| = 0.042
 
@@ -467,22 +467,22 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 1 mode)	0.0156909       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	7.7125e-5       	0.0             	0.0             	
-  optima from the draws, 0 extra chains	0.0619374       	0.0             	0.0             	
-  NUTS  (112k iters, 4012.59k leapfrog, 0.016 ms/step)	20.2807         	0.0             	1.17906         	
-  3 posterior modes: mass by bridge sampling	0.892663        	0.0             	0.105196        	
-  per-draw c1 re-profile + curves (64454 draws)	0.207662        	0.0             	0.0             	
+  MAP search + whitening (76/76 starts, 1 mode)	0.015473        	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	7.6875e-5       	0.0             	0.0             	
+  optima from the draws, 0 extra chains	0.063401        	0.0             	0.0             	
+  NUTS  (112k iters, 4012.59k leapfrog, 0.013 ms/step)	14.3366         	0.0             	1.48018         	
+  3 posterior modes: mass by bridge sampling	0.822173        	0.0             	0.0575611       	
+  per-draw c1 re-profile + curves (64454 draws)	0.208132        	0.0             	0.0             	
 
 -- outcome --
 next                            	not converged at base: the worst R̂, 1.021, is not below 1.01; the smallest bulk ESS, 376.6, is not above 400.0; the smallest tail ESS, 103.6, is not above 400.0
 
---- attempt 3: ladder rung longer chains, next seed ---
+--- attempt 3: ladder rung longer chains + seed ---
 
 -- settings --
 triggeredBy                     	failure class marginal
 triggerClass                    	marginal
-rung                            	longer chains, next seed
+rung                            	longer chains + seed
 targetAccept                    	95.0
 nChains                         	8
 nSamples                        	1000
@@ -497,7 +497,7 @@ mapMaxIter                      	500
 
 -- problem --
 ====================================================================================================
-ladder rung longer chains, next seed   nQ=144  nAtoms=1401  lMax=40  c1 tol=1.0e-8
+ladder rung longer chains + seed   nQ=144  nAtoms=1401  lMax=40  c1 tol=1.0e-8
 δρ₃ support = [-11.18, 2.794]   δρ₁,₂ support = [-10.0, 2.0]
 
 -- map search --
@@ -705,23 +705,23 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 1 mode)	0.0159215       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	7.7459e-5       	0.0             	0.0             	
-  optima from the draws, 1 extra chain	0.382536        	0.14226         	0.0             	
-  NUTS  (9k iters, 134.03k leapfrog, 0.013 ms/step)	0.835216        	0.14226         	0.0             	
-  2 posterior modes: mass by bridge sampling	0.0850403       	0.0             	0.0             	
-  per-draw c1 re-profile + curves (8986 draws)	0.0539409       	0.0             	0.0             	
+  MAP search + whitening (76/76 starts, 1 mode)	0.0156048       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	7.525e-5        	0.0             	0.0             	
+  optima from the draws, 1 extra chain	0.391078        	0.137087        	0.0             	
+  NUTS  (9k iters, 134.03k leapfrog, 0.012 ms/step)	0.799483        	0.137087        	0.0             	
+  2 posterior modes: mass by bridge sampling	0.0907153       	0.0             	0.0             	
+  per-draw c1 re-profile + curves (8986 draws)	0.0535441       	0.0             	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
 1               	base run        	dropped
 2               	retry, longer warm-up	dropped
-3               	ladder rung longer chains, next seed	kept
+3               	ladder rung longer chains + seed	kept
 
 -- result --
 attempts                        	3
 keptAttempt                     	3
-keptLabel                       	ladder rung longer chains, next seed
+keptLabel                       	ladder rung longer chains + seed
 keptBecause                     	it passed its gates
 statisticsFlushes               	8
-statisticsFlushSeconds          	0.000296002
+statisticsFlushSeconds          	0.000309957

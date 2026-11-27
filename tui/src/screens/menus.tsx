@@ -20,6 +20,7 @@ import {
     openFileManager,
     openFolder,
     quarantine,
+    runSetupWizard,
     saveErrorNote,
     UnusableFileError,
 } from "../core/file-system.js"
@@ -82,6 +83,7 @@ import {
     recipeLoad,
     recipeSave,
 } from "../store/template-recipes.js"
+import { useFooterHint } from "../ui/footer-hint.js"
 import { Frame } from "../ui/frame.js"
 import {
     cursorMoves,
@@ -120,6 +122,7 @@ import {
 import { ErrorText, useTheme } from "../ui/theme.js"
 import { CustomSolutesTable } from "./custom-solutes.js"
 import { DataScreen } from "./data-screen.js"
+import { HelpScreen } from "./help-screen.js"
 import { LogsRuns } from "./logs-menu.js"
 import { ModelScreen } from "./model-screen.js"
 import { NotesList } from "./notes-list.js"
@@ -722,7 +725,7 @@ type Overlay = "new" | "load" | null
 
 /**
  * The main menu: make a project, load one, open the projects folder, the global settings,
- * help (not built) and quit. A name prompt or the project list opens under the grid.
+ * help and quit. A name prompt or the project list opens under the grid.
  * Deleting is not a menu option: while the `load` list is open, `^r` (or Delete) asks
  * about the highlighted project and Enter then deletes it, as in the list of models.
  *
@@ -741,6 +744,23 @@ export function MainMenu(): ReactNode {
     const [listed, setListed] = useState(0)
 
     const closeOverlay = useCallback(() => setOverlay(null), [])
+    useFooterHint(`setup (${keys.setup.label})`, useScreenActive())
+
+    // the setup wizard of the packaged app takes the terminal until the user leaves it
+    const setup = useCallback(() => {
+        setNotice(undefined)
+        void suspendTerminal(async () => {
+            const { problem, uninstalled } = runSetupWizard(process.env)
+            if (uninstalled) nav.quit() // the app is gone: nothing to return to
+            else if (problem !== undefined) {
+                setNoticeIsError(true)
+                setNotice(problem)
+            }
+        })
+    }, [suspendTerminal, nav])
+    useKeys((press) => {
+        if (press.is(keys.setup)) setup()
+    }, overlay === null)
 
     const choose = useCallback((name: (typeof mainMenuSpec.names)[number]) => {
         setNotice(undefined)
@@ -752,7 +772,7 @@ export function MainMenu(): ReactNode {
             if (listProjects(projectsDir()).length === 0) setNotice("no projects to load!")
             else setOverlay("load")
         } else if (name === "settings") nav.push(<SettingsMenu scope={globalScope} />)
-        else if (name === "help") setNotice("help is not built yet")
+        else if (name === "help") nav.push(<HelpScreen />)
         else if (name === "open") {
             // the shell takes the terminal until the user leaves it
             void suspendTerminal(async () => {

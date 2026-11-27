@@ -1,0 +1,11 @@
+language js
+
+// `x as unknown as T` switches the type checker off for one expression.
+// Narrow with a type guard, or give the value its real type.
+`$value as unknown as $type` where {
+    register_diagnostic(
+        span = $type,
+        message = "`as unknown as` bypasses the type checker; use a type guard or the real type.",
+        severity = "error"
+    )
+}

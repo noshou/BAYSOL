@@ -1,0 +1,11 @@
+SYN-1CRN-dna-rna: SYNTHETIC buffer, host 1CRN
+rho_e (e/A^3)	0.33547430334674505
+sigma_rho_e (e/A^3)	2.5560872306743523e-5
+rho_e water (e/A^3)	0.3332920001104711
+T (C), pH, sigma_pH	25.0	7.4	0.1
+contrasts (delta rho 1..3, CRYSOL3 defaults)	1.0	1.0	0.0
+composition (type, name or sequence, mol/L, sigma)
+NonBiological	sodium chloride	0.15	0.0015
+DNA	CGCGAATTCGCG	0.000274244	1.371e-5
+RNA	GCGGAUUUAGCU...(76 letters)	8.03536e-5	4.018e-6
+NonBiological	sodium(1+)	0.0090432	0.0004522

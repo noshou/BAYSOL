@@ -40,6 +40,7 @@ import { path7za } from "7zip-bin"
 import sevenZip, { type SevenZipOptions, type ZipStream } from "node-7z"
 import { lock } from "proper-lockfile"
 import { findExecutable, RUN_FLOW, readSystem } from "./environment.js"
+import { extractNativeAsset, inSingleExecutable } from "./native-assets.js"
 
 // ========================================================================================
 // 1. The tool and the names
@@ -66,13 +67,26 @@ let tool: string | undefined
  */
 export function archiveTool(): string {
     if (tool !== undefined) return tool
-    const found = [path7za, ...["7zz", "7z", "7za"].map(onPath)].filter(
+    const found = [bundledTool(), ...["7zz", "7z", "7za"].map(onPath)].filter(
         (p): p is string => p !== undefined && runnable(p),
     )
     const first = found[0]
     if (first === undefined) throw new ArchiveError("no 7-Zip found: install 7z")
     tool = first
     return first
+}
+
+/**
+ * The 7-Zip that came with the program: the `7zip-bin` binary of a checkout, or the one
+ * the packaged app carries as an asset of its executable (written into the cache first).
+ */
+function bundledTool(): string | undefined {
+    try {
+        const name = `native/7za${process.platform === "win32" ? ".exe" : ""}`
+        return inSingleExecutable() ? extractNativeAsset(name) : path7za
+    } catch {
+        return undefined
+    }
 }
 
 /** A program on the `PATH`, or `undefined`. */
@@ -334,9 +348,16 @@ function finished(stream: ZipStream): Promise<void> {
  */
 type Deferred = { _bin: string; _args: string[]; _childProcess?: ChildProcess }
 
+/** Whether a stream still holds the command of a deferred 7-Zip. */
+function isDeferred(stream: ZipStream): stream is ZipStream & Deferred {
+    const d: Record<string, unknown> = { ...stream }
+    return typeof d._bin === "string" && Array.isArray(d._args)
+}
+
 /** Starts a deferred stream's 7-Zip in `cwd` and wires the stream to it. */
 function startIn(stream: ZipStream, cwd: string): ZipStream {
-    const d = stream as unknown as Deferred
+    if (!isDeferred(stream)) throw new Error("7-Zip stream was not deferred")
+    const d = stream
     d._childProcess = spawn(d._bin, d._args, { cwd, windowsHide: true })
     return sevenZip.listen(stream)
 }

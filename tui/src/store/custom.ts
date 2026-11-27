@@ -157,7 +157,7 @@ function isUnitField(field: EntryField): field is UnitField {
  * @returns the value (`undefined` for a field the kind of entry has not).
  */
 export function getField(e: CustomEntry, field: EntryField): unknown {
-    if (!isUnitField(field)) return (e as unknown as Record<string, unknown>)[field]
+    if (!isUnitField(field)) return Reflect.get(e, field) as unknown
     return e.kind === "polymer" ? e.units[field.unit]?.[field.key] : undefined
 }
 

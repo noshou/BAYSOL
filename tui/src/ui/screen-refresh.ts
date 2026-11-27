@@ -74,6 +74,18 @@ const HOME_ERASE = `${ESC}[1;1H${ESC}[J`
 /** The only escape sequences a frame may hold: styles. Anything else is not replayed. */
 const STYLE = new RegExp(`${ESC}\\[[0-9;]*m`, "g")
 
+/** What the refresher uses of the output stream (a real or a fake terminal). */
+export type RefreshStream = Pick<
+    NodeJS.WriteStream,
+    "isTTY" | "columns" | "rows" | "write"
+> & {
+    on(event: "resize", listener: () => void): unknown
+    off(event: "resize", listener: () => void): unknown
+}
+
+/** What the refresher uses of the input stream. */
+type RefreshInput = Pick<NodeJS.ReadStream, "read">
+
 /** The write function of a stream. */
 type WriteFn = NodeJS.WriteStream["write"]
 
@@ -187,8 +199,8 @@ export function mayRefresh(state: RefreshState): boolean {
  * @property sixelShown - whether a sixel picture is shown now.
  */
 export type RefreshOptions = {
-    stream: NodeJS.WriteStream
-    stdin?: NodeJS.ReadStream
+    stream: RefreshStream
+    stdin?: RefreshInput
     seconds: number
     sixelShown: () => boolean
 }

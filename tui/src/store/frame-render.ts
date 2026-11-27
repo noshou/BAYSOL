@@ -30,6 +30,7 @@ import {
     RASTER_MAX_RAW,
     rasterCacheName,
 } from "./raster-cache.js"
+import { resizeRgba } from "./raster-scale.js"
 import { readRunBytes } from "./run-archive.js"
 import {
     cacheMatches,
@@ -129,19 +130,12 @@ async function master(req: RenderRequest): Promise<RgbaImage> {
 }
 
 /** Resamples the master to what fits `w` x `h` (the master itself when it is that). */
-async function derive(image: RgbaImage, w: number, h: number): Promise<RgbaImage> {
+function derive(image: RgbaImage, w: number, h: number): RgbaImage {
     const scale = Math.min(w / image.width, h / image.height)
     const dw = Math.max(1, Math.round(image.width * scale))
     const dh = Math.max(1, Math.round(image.height * scale))
     if (dw === image.width && dh === image.height) return image
-    const { default: sharp } = await import("sharp")
-    const { data, info } = await sharp(image.data, {
-        raw: { width: image.width, height: image.height, channels: 4 },
-    })
-        .resize({ width: dw, height: dh, fit: "fill", kernel: "lanczos3" })
-        .raw()
-        .toBuffer({ resolveWithObject: true })
-    return { width: info.width, height: info.height, data: new Uint8Array(data) }
+    return resizeRgba(image, dw, dh)
 }
 
 // ========================================================================================
@@ -174,7 +168,7 @@ export async function renderFrame(req: RenderRequest): Promise<Frame> {
             }
     }
     const base = await master(req)
-    const image = await derive(
+    const image = derive(
         base,
         Math.round(req.widthPx * req.zoom),
         Math.round(req.heightPx * req.zoom),

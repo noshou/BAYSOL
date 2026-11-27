@@ -7,6 +7,7 @@ import { MainMenu } from "./screens/menus.js"
 import { SheetViewerScreen } from "./screens/viewer.js"
 import { hasActiveRuns, quitAll } from "./store/run.js"
 import { readThemeName, writeThemeName } from "./store/theme-file.js"
+import { FooterHintContext } from "./ui/footer-hint.js"
 import { ThemePicker } from "./ui/input.js"
 import { keys, minColumns, minRows, NavProvider, useKeys } from "./ui/interaction.js"
 import {
@@ -37,13 +38,17 @@ function savedTheme(): Theme {
  * terminals); that cell stays a plain space in the theme background.
  *
  * @param props.theme - the theme in use.
+ * @param props.hint - a hint of the screen on top, shown at the left end.
  * @returns the row.
  */
-export function ThemeLine({ theme }: { theme: Theme }): ReactNode {
+export function ThemeLine({ theme, hint }: { theme: Theme; hint?: string }): ReactNode {
     return (
-        <Box flexGrow={1} justifyContent="flex-end" columnGap={1} paddingRight={1}>
-            <Text color={theme.mt}>theme ({keys.theme.label}): {theme.nm}</Text>
-            <Logo theme={theme} />
+        <Box flexGrow={1} justifyContent="space-between" paddingLeft={1} paddingRight={1}>
+            <Text color={theme.mt}>{hint ?? ""}</Text>
+            <Box columnGap={1}>
+                <Text color={theme.mt}>theme ({keys.theme.label}): {theme.nm}</Text>
+                <Logo theme={theme} />
+            </Box>
         </Box>
     )
 }
@@ -63,6 +68,7 @@ export function ThemeLine({ theme }: { theme: Theme }): ReactNode {
 export function App({ viewFile }: { viewFile?: string }): ReactNode {
     const [theme, setTheme] = useState<Theme>(savedTheme)
     const [picking, setPicking] = useState(false)
+    const [hint, setHint] = useState<string>()
     const { exit } = useApp()
     const { columns, rows } = useWindowSize()
     const tooSmall = columns < minColumns || rows < minRows
@@ -72,7 +78,7 @@ export function App({ viewFile }: { viewFile?: string }): ReactNode {
         if (press.is(keys.theme)) setPicking(true)
     }, !picking)
 
-    // Ctrl-C and Ctrl-D (with `q` in the main menu the only exits; Esc never quits). While
+    // ^c and ^d (with `q` in the main menu the only exits; Esc never quits). While
     // a run is going the first press only stops the run (its Julia stopped, its status
     // written, its logs packed) and the screen stays; the next press, while that happens
     // or once the run is over, ends the program.
@@ -102,6 +108,7 @@ export function App({ viewFile }: { viewFile?: string }): ReactNode {
 
     return (
         <ThemeContext.Provider value={theme}>
+            <FooterHintContext.Provider value={setHint}>
             <Box
                 width={columns}
                 height={rows}
@@ -127,7 +134,7 @@ export function App({ viewFile }: { viewFile?: string }): ReactNode {
                     />
                 </Box>
                 <Box display={tooSmall ? "none" : "flex"}>
-                    <ThemeLine theme={theme} />
+                    <ThemeLine theme={theme} hint={hint} />
                 </Box>
                 {picking && !tooSmall ? (
                     <Box
@@ -145,6 +152,7 @@ export function App({ viewFile }: { viewFile?: string }): ReactNode {
                     </Box>
                 ) : null}
             </Box>
+            </FooterHintContext.Provider>
         </ThemeContext.Provider>
     )
 }

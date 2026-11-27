@@ -1,4 +1,4 @@
-datetime	20-11-2026 02:53:16 -0500
+datetime	23-11-2026 01:28:01 -0500
 
 === SASDWR5 ===
 
@@ -221,11 +221,11 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 1 mode)	0.123885        	0.0357312       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.00018625      	0.0             	0.0             	
-  optima from the draws, 0 extra chains	1.81665         	1.79839         	0.0             	
-  NUTS  (8k iters, 65.87k leapfrog, 0.024 ms/step)	2.41849         	1.93515         	0.0             	
-  per-draw c1 re-profile + curves (8000 draws)	0.114122        	0.191329        	0.0             	
+  MAP search + whitening (70/70 starts, 1 mode)	0.11922         	0.03272         	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000174459     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.77591         	1.75792         	0.0             	
+  NUTS  (8k iters, 65.87k leapfrog, 0.022 ms/step)	2.43549         	1.95872         	0.0             	
+  per-draw c1 re-profile + curves (8000 draws)	0.118122        	0.192448        	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -237,4 +237,4 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	0.00012
+statisticsFlushSeconds          	0.000126001

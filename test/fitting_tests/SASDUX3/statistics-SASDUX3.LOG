@@ -1,4 +1,4 @@
-datetime	20-11-2026 02:29:00 -0500
+datetime	23-11-2026 01:01:01 -0500
 
 === fit1 ===
 
@@ -109,7 +109,7 @@ distinct optima: 2
   mode 2: f=2590.666 ξ=[0.3357, 1.038, 0.5455, -1.657]  H-eig=[0.9999, 1.337, 2.054, 3.842]  log Laplace mass=-2591.844 (Δ vs best = 0.789 nats)
 
 -- nuts --
-NUTS: 0.9s  init ε=1.54  final ε=0.245  mean nSteps=15.0 mean depth=3.58  frac(depth≥10)=0.000  diverged=3
+NUTS: 0.7s  init ε=1.54  final ε=0.245  mean nSteps=15.0 mean depth=3.58  frac(depth≥10)=0.000  diverged=3
 mean nSteps by window: [1:75]=32  [76:450]=18  [251:300]=17  [301:1000]=15
 mean accept = 0.962   mean |ΔH| = 0.061
 
@@ -230,13 +230,13 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (76/76 starts, 1 mode)	0.0868713       	0.0342297       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000253835     	0.0             	0.0             	
-  re-whitening: a chain found a basin 3.9 nats above the MAP	0.0736485       	0.0203339       	0.0             	
-  optima from the draws, 2 extra chains	2.72479         	1.86299         	0.0669212       	
-  NUTS  (10k iters, 173.4k leapfrog, 0.041 ms/step)	4.59615         	2.05556         	0.0669212       	
-  2 posterior modes: mass by bridge sampling	0.392313        	0.234449        	0.0             	
-  per-draw c1 re-profile + curves (7864 draws)	0.158282        	0.283123        	0.0             	
+  MAP search + whitening (76/76 starts, 1 mode)	0.0849406       	0.0326885       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000255        	0.0             	0.0             	
+  re-whitening: a chain found a basin 3.9 nats above the MAP	0.0784622       	0.0207333       	0.0             	
+  optima from the draws, 2 extra chains	2.55172         	1.81269         	0.0603912       	
+  NUTS  (10k iters, 173.4k leapfrog, 0.031 ms/step)	4.12751         	2.0326          	0.0603912       	
+  2 posterior modes: mass by bridge sampling	0.372395        	0.225788        	0.0             	
+  per-draw c1 re-profile + curves (7864 draws)	0.182875        	0.2079          	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -248,4 +248,4 @@ keptAttempt                     	1
 keptLabel                       	base run
 keptBecause                     	it passed its gates
 statisticsFlushes               	2
-statisticsFlushSeconds          	0.000116959
+statisticsFlushSeconds          	0.000122166

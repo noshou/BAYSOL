@@ -440,7 +440,7 @@ export function useTableScreen<V>(options: TableScreenOptions<V>): TableScreen<V
 // 3. Settings: typed text to a value, and how a value shows
 // ========================================================================================
 
-/** How an edit ended: with a value, abandoned, or by Ctrl-X (leave the whole sheet). */
+/** How an edit ended: with a value, abandoned, or by ^x (leave the whole sheet). */
 export type EditEnd<V> = { kind: "done"; value: V } | { kind: "cancel" } | { kind: "back" }
 
 /**
@@ -469,7 +469,7 @@ export function openTabs(choices: readonly string[], current: readonly string[])
 
 /**
  * One key on the tabs: arrows move, Tab cycles, Enter/Space toggle, Esc ends (one must be
- * on). Returns the next state and the end, if Esc or Ctrl-X ended it.
+ * on). Returns the next state and the end, if Esc or ^x ended it.
  *
  * @param edit - the state.
  * @param press - the key.
@@ -644,7 +644,7 @@ const isBlank = (press: KeyInput): boolean => press.typed && press.text.trim() =
 /**
  * One key while a number is typed: editing keys change the text (past the cap it says so,
  * blanks are dropped), Enter takes a number within the setting's limits, Esc drops the
- * edit, Ctrl-X leaves the sheet. Returns the next state and the end, if the key ended it.
+ * edit, ^x leaves the sheet. Returns the next state and the end, if the key ended it.
  *
  * @param edit - the state.
  * @param press - the key.
@@ -765,7 +765,7 @@ function bufferOfFocus(edit: TupleEdit): TextBuffer {
 /**
  * One key while a tuple is edited: arrows and Tab move between parts; text goes into a
  * number part (the first key replaces its old text); Enter takes the tuple on a number
- * part and asks for the picker (`pick`) on a colour part; Esc drops, Ctrl-X leaves.
+ * part and asks for the picker (`pick`) on a colour part; Esc drops, ^x leaves.
  *
  * @param edit - the state.
  * @param press - the key.
@@ -1250,7 +1250,7 @@ export function valueText(def: SettingDef, value: SettingValue): string {
     if (def.kind === "sizes")
         return (value as number[][]).map(([w, h]) => `${w}x${h}`).join(", ")
     if (def.kind === "ladder")
-        return ladderSummary(value as LadderMap, def.default as unknown as LadderMap)
+        return ladderSummary(value as LadderMap, def.default as LadderMap)
     if (def.kind === "tuple") return tupleParts(def, value).join(", ")
     if (def.kind === "path" && value === "") return "(default)"
     return String(value)

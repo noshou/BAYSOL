@@ -202,8 +202,11 @@ end
         nSamples, nAdapt = 20, 10
         local fit
         tNuts = @elapsed begin
+            # A smoke run of the 4-parameter path: 10 warm-up draws are too few for the c1
+            # kink watch, which would stop it with `KinkDetected` (`runModel` handles that).
             fit = infer(
                 seed, nSamples, nAdapt; nChains = 1, retry = false,
+                options = BAYSOL.Inference.SamplerOptions(watchKink = false),
             )
         end
         samples, stats = fit.samples, fit.stats

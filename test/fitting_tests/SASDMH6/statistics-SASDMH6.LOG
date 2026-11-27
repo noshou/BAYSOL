@@ -1,4 +1,4 @@
-datetime	20-11-2026 01:22:31 -0500
+datetime	22-11-2026 23:52:23 -0500
 
 === SASDMH6 ===
 
@@ -222,12 +222,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.0497047       	0.0339794       	0.0             	
-  NUTS setup (starts, Hamiltonian)	0.000119708     	0.0             	0.0             	
-  optima from the draws, 0 extra chains	1.81636         	1.80634         	0.0             	
-  NUTS  (8k iters, 105.47k leapfrog, 0.010 ms/step)	2.31059         	1.98446         	0.0             	
-  2 posterior modes: mass by bridge sampling	0.286044        	0.241499        	0.0             	
-  per-draw c1 re-profile + curves (6600 draws)	0.116281        	0.273066        	0.0             	
+  MAP search + whitening (70/70 starts, 2 modes)	0.0479309       	0.0325596       	0.0             	
+  NUTS setup (starts, Hamiltonian)	0.000115917     	0.0             	0.0             	
+  optima from the draws, 0 extra chains	1.77603         	1.76632         	0.0             	
+  NUTS  (8k iters, 105.47k leapfrog, 0.010 ms/step)	2.27969         	1.97373         	0.0             	
+  2 posterior modes: mass by bridge sampling	0.276395        	0.233538        	0.0             	
+  per-draw c1 re-profile + curves (6600 draws)	0.123137        	0.291952        	0.0             	
 
 -- outcome --
 next                            	retry with a longer warm-up: 
@@ -333,7 +333,7 @@ distinct optima: 2
   mode 2: f=-207.189 ξ=[0.3362, 1.843, -4.625, -2.604]  H-eig=[0.9786, 1.013, 1.423, 3.677]  log Laplace mass=206.366 (Δ vs best = -95.6 nats)
 
 -- nuts --
-NUTS: 0.6s  init ε=1  final ε=0.33  mean nSteps=11.7 mean depth=3.28  frac(depth≥10)=0.000  diverged=29
+NUTS: 0.5s  init ε=1  final ε=0.33  mean nSteps=11.7 mean depth=3.28  frac(depth≥10)=0.000  diverged=29
 mean nSteps by window: [1:75]=20  [76:450]=13  [451:1950]=11  [1951:2000]=14  [2001:4000]=12
 mean accept = 0.956   mean |ΔH| = 0.075
 
@@ -452,12 +452,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.0152672       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	5.8959e-5       	0.0             	0.0             	
-  optima from the draws, 0 extra chains	0.0168632       	0.0             	0.0             	
-  NUTS  (32k iters, 379.85k leapfrog, 0.009 ms/step)	1.04169         	0.0             	0.071311        	
-  2 posterior modes: mass by bridge sampling	0.189225        	0.0             	0.0             	
-  per-draw c1 re-profile + curves (28000 draws)	0.083137        	0.0             	0.0             	
+  MAP search + whitening (70/70 starts, 2 modes)	0.0149623       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	5.5875e-5       	0.0             	0.0             	
+  optima from the draws, 0 extra chains	0.0833148       	0.0             	0.0             	
+  NUTS  (32k iters, 379.85k leapfrog, 0.009 ms/step)	1.14686         	0.0             	0.0638903       	
+  2 posterior modes: mass by bridge sampling	0.196551        	0.0             	0.0             	
+  per-draw c1 re-profile + curves (28000 draws)	0.0662467       	0.0             	0.0             	
 
 -- outcome --
 next                            	not converged at base: 0.24 % of the transitions diverged, not below 0.1 %
@@ -683,12 +683,12 @@ c1WlsErrors                     	0
 
 -- stage timings --
 stage           	seconds         	jit             	gc              	notes
-  MAP search + whitening (70/70 starts, 2 modes)	0.0150735       	0.0             	0.0             	
-  NUTS setup (starts, Hamiltonian)	5.6708e-5       	0.0             	0.0             	
-  optima from the draws, 0 extra chains	0.00632731      	0.0             	0.0             	
-  NUTS  (8k iters, 203.21k leapfrog, 0.008 ms/step)	0.544705        	0.0             	0.0             	
-  2 posterior modes: mass by bridge sampling	0.0723439       	0.0             	0.0             	
-  per-draw c1 re-profile + curves (6600 draws)	0.0202678       	0.0             	0.0             	
+  MAP search + whitening (70/70 starts, 2 modes)	0.0148015       	0.0             	0.0             	
+  NUTS setup (starts, Hamiltonian)	5.4834e-5       	0.0             	0.0             	
+  optima from the draws, 0 extra chains	0.0556355       	0.0             	0.0             	
+  NUTS  (8k iters, 203.21k leapfrog, 0.008 ms/step)	0.535154        	0.0             	0.0             	
+  2 posterior modes: mass by bridge sampling	0.106119        	0.0             	0.0             	
+  per-draw c1 re-profile + curves (6600 draws)	0.0222169       	0.0             	0.0             	
 
 -- attempts --
 attempt         	label           	outcome
@@ -702,4 +702,4 @@ keptAttempt                     	3
 keptLabel                       	ladder rung delta 99
 keptBecause                     	it passed its gates
 statisticsFlushes               	8
-statisticsFlushSeconds          	0.000289418
+statisticsFlushSeconds          	0.000294126

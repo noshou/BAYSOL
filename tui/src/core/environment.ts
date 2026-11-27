@@ -22,6 +22,7 @@ import {
 } from "node:fs"
 import { homedir } from "node:os"
 import { delimiter, dirname, isAbsolute, join, parse, resolve } from "node:path"
+import { getAsset, isSea } from "node:sea"
 import { fileURLToPath } from "node:url"
 
 // ========================================================================================
@@ -122,10 +123,20 @@ export function repoRoot(
 // 3. Version: the program's version, read from the project file
 // ========================================================================================
 
-/** `v<version> <release_name>` from the `Project.toml` of BAYSOL, or `unknown`. */
+/**
+ * `v<version> <release_name>`: the `Project.toml` of the checkout, or the `VERSION` asset
+ * of a packaged app; else `unknown`.
+ */
 function readVersion(): string {
     const root = repoRoot()
-    if (root === undefined) return "unknown"
+    if (root === undefined) {
+        // a packaged app has no checkout: `bysl pkg` puts the version in the executable
+        try {
+            return isSea() ? readAssetText("VERSION").trim() : "unknown"
+        } catch {
+            return "unknown"
+        }
+    }
     try {
         const toml = readFileSync(join(root, "Project.toml"), "utf8")
         const field = (key: string) =>
@@ -292,24 +303,36 @@ export const cacheDir: () => string = lazy(() => {
 // 5. Assets: the bundled JSON files and the flows they hold
 // ========================================================================================
 
-/** The environment variable that names the `assets/` folder. */
-const assetsVar = "BAYSOL_ASSETS"
+/**
+ * The `assets/` folder of the checkout. A packaged app has none: its assets are inside
+ * the executable (Node single-executable assets, keyed by their path below `assets/`).
+ */
+const ASSETS_ROOT = join(fileURLToPath(new URL("../..", import.meta.url)), "assets")
 
-/** The `assets/` folder: `BAYSOL_ASSETS`, else the one beside `src/` of this checkout. */
-function assetsRoot(): string {
-    const named = (process.env[assetsVar] ?? "").trim()
-    if (isAbsolute(named)) return named
-    return join(fileURLToPath(new URL("../..", import.meta.url)), "assets")
+/**
+ * @returns the absolute path of a file below the checkout's `assets/` (not in a packaged
+ * app).
+ */
+export function assetPath(...path: string[]): string {
+    return join(ASSETS_ROOT, ...path)
 }
 
-/** @returns the absolute path of a file below `assets/`. */
-export function assetPath(...path: string[]): string {
-    return join(assetsRoot(), ...path)
+/**
+ * Reads a text file below `assets/`: from the executable when this is a packaged app,
+ * else from the checkout.
+ *
+ * @param path - the folders and the file name below `assets/`, one string each.
+ * @throws if the asset does not exist.
+ */
+export function readAssetText(...path: string[]): string {
+    return isSea()
+        ? getAsset(path.join("/"), "utf8")
+        : readFileSync(assetPath(...path), "utf-8")
 }
 
 /** Reads a JSON file below `assets/` (harvested or hand-written, never written here). */
 export function readAssetJson<T>(...path: string[]): T {
-    return JSON.parse(readFileSync(assetPath(...path), "utf-8")) as T
+    return JSON.parse(readAssetText(...path)) as T
 }
 
 /** A JSON asset read on first use: the function returns the same value each time. */

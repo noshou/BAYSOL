@@ -1,0 +1,10 @@
+SYN-1BNA-trna2: SYNTHETIC buffer, host 1BNA
+rho_e (e/A^3)	0.3353159887914946
+sigma_rho_e (e/A^3)	2.3832069818868638e-5
+rho_e water (e/A^3)	0.3332920001104711
+T (C), pH, sigma_pH	25.0	7.4	0.1
+contrasts (delta rho 1..3, CRYSOL3 defaults)	1.0	1.0	0.0
+composition (type, name or sequence, mol/L, sigma)
+NonBiological	sodium chloride	0.15	0.0015
+RNA	GCGGAUUUAGCU...(76 letters)	8.03536e-5	4.018e-6
+NonBiological	sodium(1+)	0.00602652	0.0003013

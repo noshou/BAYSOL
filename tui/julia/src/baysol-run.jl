@@ -1250,7 +1250,7 @@ or radius, a residue that cannot be resolved, a run that did not converge, ...) 
 written to the ERRORS section, the model is `failed` in `run.json` and the next model
 starts; the run ends `failed` if anything failed (an invalid input, such as a buffer or a
 setting, fails the run before any model) and `done` if all models did. An
-`InterruptException` (Ctrl-C), a SIGTERM (an exit hook: Julia prints a stack for the signal,
+`InterruptException` (^c), a SIGTERM (an exit hook: Julia prints a stack for the signal,
 which is no error of the run) or, with `watchStdin`, the end of the standard input (the
 caller closed or died: the process exits, none is left over) ends the run as `aborted`: the
 model that was running is `aborted`, the rest `skipped`, the files are finished and nothing
