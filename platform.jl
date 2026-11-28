@@ -403,15 +403,99 @@ the system keeps the contents of files until someone asks for the memory. The ma
 adds the inactive pages, but no more of them than there are file-backed pages
 (`host_statistics64`): an anonymous page is only freed by compressing or swapping it.
 `Sys.free_memory()` when the call fails.
+
+Under Rosetta 2 (see [`isrosetta`](@ref)) the page counts are the Apple Silicon kernel's
+16384-byte pages while `getpagesize()` says 4096; the page size therefore comes from
+`host_page_size`, or from the header of `vm_stat` when that fails, and the result is capped
+at the machine's memory. Only the pure parts (`_parse_vm_stat`, `_mac_available_bytes`) are
+tested off macOS.
+
+# Returns
+Bytes, an `Int`.
+
+# Exceptions
+None: a failing kernel call falls back to `Sys.free_memory()`.
 """
 function free_memory()::Int
     ismacos() && return something(_mac_available_memory(), Int(Sys.free_memory()))
     return Int(Sys.free_memory())
 end
 
-# Free plus reclaimable memory of macOS in bytes; `nothing` when the kernel call fails.
+# The pages of macOS that a program can take, in bytes: the empty pages plus the inactive
+# ones, but no more inactive pages than there are file-backed (non-speculative) pages.
+# Pure, so canned counts test it on any system. Never more than `total` (when given).
+function _mac_available_bytes(free::Integer, inactive::Integer, speculative::Integer,
+    external::Integer, pageSize::Integer; total::Integer = typemax(Int))::Int
+    files = max(Int(external) - Int(speculative), 0)
+    pages = Int(free) + min(Int(inactive), files)
+    return min(pages * Int(pageSize), Int(total))
+end
+
+# Reads the text of `vm_stat` ("Mach Virtual Memory Statistics: (page size of N bytes)" and
+# one "Pages ...: N." row per counter). The page size in that header is the kernel's, also
+# for a program translated by Rosetta 2, whose `getpagesize()` says 4096 while the kernel
+# counts in 16384-byte pages. Returns the available bytes (as `_mac_available_bytes`), or
+# `nothing` when the header or a counter is missing. Pure.
+function _parse_vm_stat(
+    text::AbstractString;
+    total::Integer = typemax(Int),
+)::Union{Int,Nothing}
+    m = match(r"page size of (\d+) bytes", text)
+    m === nothing && return nothing
+    pageSize = parse(Int, m.captures[1])
+    count(name) = begin
+        r = match(Regex("^" * name * ":\\s+(\\d+)\\.?\\s*\$", "m"), text)
+        r === nothing ? nothing : parse(Int, r.captures[1])
+    end
+    free = count("Pages free")
+    inactive = count("Pages inactive")
+    speculative = count("Pages speculative")
+    external = count("File-backed pages")
+    any(isnothing, (free, inactive, speculative, external)) && return nothing
+    # `vm_stat` prints free_count minus speculative_count;
+    # host_statistics64 has them together
+    return _mac_available_bytes(free + speculative, inactive, speculative, external,
+        pageSize; total)
+end
+
+# Whether an available figure is implausible: under 3 % of the memory of the machine,
+# which a healthy macOS (it keeps file contents until asked) hardly ever shows. Pure.
+_mac_implausibly_low(available::Integer, total::Integer) =
+    total > 0 && available < 0.03 * total
+
+# The kernel's page size in bytes, `nothing` when the call fails.
+function _mac_kernel_page_size(host)::Union{Int,Nothing}
+    size = Ref{Csize_t}(0)
+    ccall(:host_page_size, Cint, (Cuint, Ref{Csize_t}), host, size) == 0 || return nothing
+    return Int(size[])
+end
+
+# Free plus reclaimable memory of macOS in bytes; `nothing` when the kernel
+# call fails. The counts of `host_statistics64` are in the kernel's pages; the
+# size comes from `host_page_size`, never `getpagesize()` (4096 under Rosetta
+# 2, where the counts are in 16384). When that call fails, the text of
+# `vm_stat` (its header names the kernel's page size) is read. The result is
+# capped at the machine's memory, and a figure under 3 % of it is logged once.
 function _mac_available_memory()::Union{Int,Nothing}
     ismacos() || return nothing
+    total = Int(Sys.total_memory())
+    available = _mac_available_host(total)
+    if available === nothing
+        try
+            available = _parse_vm_stat(read(`vm_stat`, String); total)
+        catch
+            return nothing
+        end
+    end
+    available === nothing && return nothing
+    if _mac_implausibly_low(available, total)
+        rosetta = isrosetta()
+        @warn "macOS reports very little free memory" available total rosetta maxlog = 1
+    end
+    return available
+end
+
+function _mac_available_host(total::Integer)::Union{Int,Nothing}
     # vm_statistics64 in 32-bit words (from 1): free_count 1, inactive_count 3,
     # speculative_count 24 (file-backed, and part of free_count already),
     # external_page_count 35
@@ -421,13 +505,9 @@ function _mac_available_memory()::Union{Int,Nothing}
     status = ccall(:host_statistics64, Cint, (Cuint, Cint, Ptr{UInt32}, Ref{Cuint}),
         host, 4, info, count)                   # HOST_VM_INFO64
     status == 0 || return nothing
-    files = max(Int(info[35]) - Int(info[24]), 0)
-    pages = Int(info[1]) + min(Int(info[3]), files)
-    # the kernel's page size, not `getpagesize()`: a process translated by Rosetta 2 is told
-    # 4096 while the counts above are in the 16384-byte pages of the Apple Silicon kernel
-    size = Ref{Csize_t}(0)
-    ccall(:host_page_size, Cint, (Cuint, Ref{Csize_t}), host, size) == 0 || return nothing
-    return pages * Int(size[])
+    pageSize = _mac_kernel_page_size(host)
+    pageSize === nothing && return nothing
+    return _mac_available_bytes(info[1], info[3], info[24], info[35], pageSize; total)
 end
 
 """

@@ -327,9 +327,8 @@ export function writeTerminal(sequence: string): boolean {
  * Opening a terminal emulator that runs a command, for a program started without a
  * terminal (from a desktop icon, say): which emulator to use on Linux (the user's
  * choice, the desktop's, then every known one), how each is told to run a command, and
- * the command lines for each system. The Linux command lines have been checked only as
- * far as they are built; the macOS and Windows ones come from documentation and are
- * untested.
+ * the command lines for each system. The command lines are built from the
+ * programs' documentation.
  */
 
 /** The environment variable set in a terminal this program opened, so that the copy
@@ -403,7 +402,7 @@ const desktopTerminals: Record<string, string[]> = {
  * How a terminal emulator is told to run a command instead of a shell: the arguments
  * that go between its name and the command. `-e` is the convention of xterm and most
  * others follow it, so it is the default. Verified in the Clojure version: konsole
- * (`-e`); the rest is from the programs' documentation and untested.
+ * (`-e`); the rest is from the programs' documentation.
  */
 const execFlags: Record<string, string[]> = {
     "xdg-terminal-exec": [], // takes the command directly
@@ -486,7 +485,7 @@ export function shellQuote(s: string): string {
 
 /**
  * The command line that opens Terminal.app on macOS running a command in a folder: an
- * AppleScript, with the shell line given as an argument of the script. Untested.
+ * AppleScript, with the shell line given as an argument of the script.
  *
  * @param dir - the folder.
  * @param command - the command and its arguments.
@@ -509,7 +508,6 @@ export function macTerminalCommand(dir: string, command: string[]): string[] {
 
 /**
  * The command line that opens a terminal on Windows running a command in a folder.
- * Untested.
  *
  * @param windowsTerminal - `true` if Windows Terminal (`wt.exe`) is installed.
  * @param dir - the folder.

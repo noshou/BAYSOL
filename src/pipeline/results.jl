@@ -1435,6 +1435,16 @@ function results(
             out = [_sheet(
                     "data", [_qHeader(style), "I", "sigma"], _qFactor(style) .* q, I, σ,
                 )]
+            # the curve as measured, which the χ² of the run is computed on (`data` is the
+            # fitted, Shannon-binned curve); an export of the run needs it to rerun the fit
+            raw = get(log.info, "rawCurve", nothing)
+            raw === nothing || push!(
+                out,
+                _sheet(
+                    "dataRaw", [_qHeader(style), "I", "sigma"],
+                    _qFactor(style) .* raw[1], raw[2], raw[3],
+                ),
+            )
             c.map === nothing || push!(
                 out,
                 _sheet(

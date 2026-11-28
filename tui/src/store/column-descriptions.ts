@@ -86,9 +86,9 @@ export function describeColumn(sheetName: string, header: string): string | unde
  * @returns the sentence: on the sheets `map`, `quantiles` and `stdevFromPrior` the
  *     description of the row's parameter (group `parameterRows`) in the `parameter`
  *     column, the other cells the column's; on the `run` sheet the description of the row's
- *     `name` (group `runRows`; a workbook of an older release may carry a fifth column,
- *     which is
- *     ignored); otherwise the description of the column's header; `undefined` for neither.
+ *     `name` (group `runRows`, `attempt<k><Field>` by `attempt<Field>`; a workbook of an
+ *     older release may carry a fifth column, which is ignored); otherwise the
+ *     description of the column's header; `undefined` for neither.
  */
 export function cellDescription(
     sheetName: string,
@@ -101,7 +101,10 @@ export function cellDescription(
     const heads = cells[0] ?? []
     if (sheetName === "run" && row > 0) {
         const name = cells[row]?.[heads.indexOf("name")]?.trim() ?? ""
-        const own = descriptions().runRows?.[name]
+        const rows = descriptions().runRows
+        // `attempt<k><Field>` (run k of the sampler)
+        // shares the sentence of `attempt<Field>`
+        const own = rows?.[name] ?? rows?.[name.replace(/^attempt\d+/, "attempt")]
         if (own) return own
     }
     if (PARAMETER_SHEETS.has(descriptionGroup(sheetName)) && row > 0) {

@@ -127,7 +127,7 @@ end
 The offset from UTC, in seconds (east positive), of this machine's time zone at the Unix
 time `t`. It is the local civil time (`Libc.TmStruct`, which reads the zone and its
 daylight saving, on Linux, macOS and Windows alike: `%z` of `strftime` is a zone NAME on
-Windows) taken as if it were UTC, minus `t`. Run on Linux and Windows 11; macOS is untested.
+Windows) taken as if it were UTC, minus `t`. Run on Linux, Windows 11 and macOS.
 
 # Returns
 - The offset in seconds, such as `-18000` for UTC-05:00.
@@ -151,7 +151,7 @@ end
 The name of this machine's time zone for a label: the last path segment of the `TZ`
 environment variable (`America/Sao_Paulo` is `SaoPaulo`) when it is set, else of the
 target of the `/etc/localtime` link (`.../zoneinfo/Asia/Kolkata` is `Kolkata`), with the
-underscores removed. macOS untested (Windows has neither).
+underscores removed. (Windows has neither.)
 
 # Returns
 - The name, or `nothing` when the zone has no name made of letters.
@@ -202,7 +202,7 @@ function _zoneLabel(
     return "LOCAL"
 end
 
-# The label of this machine's time zone at the Unix time `t` (macOS untested).
+# The label of this machine's time zone at the Unix time `t`.
 _localZone(t::Real) = _zoneLabel(Libc.strftime("%Z", floor(Int, t)))
 
 """

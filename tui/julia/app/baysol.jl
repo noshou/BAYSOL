@@ -13,7 +13,7 @@
 # projects in it, so the code of a real fit is compiled into the executable.
 
 using BAYSOLRun
-using BAYSOLSetup
+using SetupWizard
 
 include("bundle.jl")
 
@@ -27,7 +27,8 @@ usage: baysol                  the terminal interface (the setup on the first st
        baysol tui              the terminal interface
        baysol run PROJECT --temperature T [options]
                                a fit of a project folder (baysol run --help)
-       baysol setup            the setup wizard: folders, shortcuts, repair, uninstall
+       baysol setup            the setup wizard: folders, shortcuts, uninstall
+       baysol setup --advanced the wizard, in Advanced (repair, dependencies, folders)
        baysol version
 """
 
@@ -62,12 +63,14 @@ function baysolMain(args::Vector{String})::Int
             0
         end
     elseif cmd == "setup"
-        return afterSetup(bundle, BAYSOLSetup.runWizard(bundle; launch = !noLaunch()))
+        return afterSetup(bundle,
+            SetupWizard.runWizard(bundle; launch = !noLaunch(),
+                advanced = "--advanced" in rest))
     elseif cmd == "tui"
         return startTui(bundle, rest)
     elseif cmd == ""
         needsSetup() && return afterSetup(bundle,
-            BAYSOLSetup.runWizard(bundle; firstRun = true, launch = !noLaunch()))
+            SetupWizard.runWizard(bundle; firstRun = true, launch = !noLaunch()))
         return launchChosen(bundle)
     end
     println(stderr, "baysol: unknown command $cmd\n")

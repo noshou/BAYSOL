@@ -353,6 +353,7 @@ _summary(; kw...) = merge(
         @test _runLadder(seed, 1000, 300, base, LADDER; runner = win) == :ok
         @test n[] == 2
         @test info()["ladder"] == "delta 99" && info()["ladderRung"] == 1
+        @test info()["retryRungs"] == sum(length, values(LADDER))
         # retry off: no ladder, the base error as it is
         run(LADDER, [div]; kw = merge(base, (; retry = false)))
         @test length(calls) == 1

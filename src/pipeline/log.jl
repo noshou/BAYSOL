@@ -253,6 +253,7 @@ function _logStats(result)
         "ladderClass", "ladderAttempts", "ladderRungs", "ladderRung")
         haskey(info, key) && add!(key, info[key])
     end
+    _attemptRows!(add!, info)
     if mapParams !== nothing
         for k in _REPORT_KEYS
             k == "logDensity" && continue
@@ -303,10 +304,24 @@ function _logStats(result)
     return rows
 end
 
+# The peak resident set of the process formatted by `fmt` (bytes -> text), or `unknown`.
+function _logPeakRss(fmt)
+    try
+        rss = Sys.maxrss()
+        return rss > 0 ? fmt(rss) : "unknown"
+    catch
+        return "unknown"
+    end
+end
+
 """
 The machine the run was made on, as the last rows of its section (`[name, value]` pairs):
 the system, the processor and its clock, the cores, the Julia threads, the memory, and the
-load and the free memory when the run started (a busy machine spoils a timing).
+load and the free memory when the run started (a busy machine spoils a timing), then the
+free memory when the log is written (`machine.free_gib_end`) and the peak resident set of
+the process (`machine.peak_rss_gib`, `Sys.maxrss()`; `unknown` where the system gives none).
+The peak is the whole process since its start (Julia, JIT and structure loading included),
+not the fit alone; the memory rows are in GiB with one decimal, like `machine.memory_gib`.
 """
 function _logMachine(log::StageLog)
     cpu = first(Sys.cpu_info())
@@ -321,6 +336,8 @@ function _logMachine(log::StageLog)
         push!(rows, ["machine.loadStart", _logCell(log.info["loadStart"])])
     haskey(log.info, "freeMemoryStart") &&
         push!(rows, ["machine.free_gib_start", gib(log.info["freeMemoryStart"])])
+    push!(rows, ["machine.free_gib_end", gib(Platform.free_memory())])
+    push!(rows, ["machine.peak_rss_gib", _logPeakRss(gib)])
     return rows
 end
 
@@ -471,6 +488,38 @@ function _commitStatistics(log; path = nothing, name = nothing, failure = nothin
     return String(path)
 end
 
+# The sampler runs of the fit as LOG rows: `retryCount` (the runs after the first: the
+# retry with a longer warm-up, the sampled-c1 restart, the profiled fallback, a ladder
+# rung), `retryRungs` (the rungs the ladder defines) and, for each run `k` (1 is the
+# first), `attempt<k>Class` (what triggered it: none, convergence, KinkDetected or a ladder
+# class), `attempt<k>Label`, `Seed`, `Delta` (the target acceptance, %), `NAdapt`,
+# `NDraws`, `Rhat`, `Ess`, `Divergent` (the share) and `Seconds`; a field the run never
+# reached (it was stopped by the kink watch, say) has no row.
+const _ATTEMPT_FIELDS = (
+    "Class" => "class", "Label" => "label", "Seed" => "seed", "Delta" => "delta",
+    "NAdapt" => "nAdapt", "NDraws" => "nDraws", "Rhat" => "rhat", "Ess" => "ess",
+    "Divergent" => "divergent", "Seconds" => "seconds",
+)
+
+function _attemptRows!(
+    add!,
+    info;
+    fields = _ATTEMPT_FIELDS,
+    maxAttempts::Integer = typemax(Int),
+)
+    haskey(info, "retryRungs") && add!("retryRungs", info["retryRungs"])
+    sb = get(info, "statistics", nothing)
+    sb isa Inference.StatBuffer || return nothing
+    records = Inference.statRecords(sb)
+    isempty(records) && return nothing
+    add!("retryCount", length(records) - 1)
+    for (k, r) in enumerate(records), (suffix, key) in fields
+        k > maxAttempts && break
+        haskey(r, key) && add!("attempt$k$suffix", r[key])
+    end
+    return nothing
+end
+
 """
     writeLog(result; refChi2 = nothing, path = nothing, name = nothing)
 
@@ -493,12 +542,16 @@ each, and a second call replaces the run's own section). The lines are flat, tab
   z-scores from the prior, the cavity fraction;
 - the sampler's health: divergences, R̂, effective sample sizes, E-BFMI, acceptance, tree
   depth, leapfrog steps, the chains, modes and optima, a retry or a re-whitening;
+- the retry trail: `retryCount`, `retryRungs` and one group of rows `attempt<k>...` for
+  every run of the sampler (what triggered it, its seed, δ, iterations, R̂, ESS,
+  divergent share and seconds);
 - `--- timing ---`: the timing table as the reports showed it, for a person to read: the
   stages indented by level with their seconds, share of the wall clock, JIT and GC and a
   `notes` column (short, on the same line, no brackets), then the process's GC and the fit
   and plot timings;
 - `--- machine ---`, last: the system, the processor and its clock, the cores and Julia
-  threads, the memory, and the load and the free memory when the run started.
+  threads, the memory, the load and the free memory when the run started, the free memory
+  at the write and the process's peak resident set (whole process since its start).
 
 The first line of the file, `datetime`, stamps the last write (day, 24-hour
 time, offset from UTC). The cells of a row are padded with spaces to a

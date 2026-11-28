@@ -16,10 +16,13 @@ const how = process.argv[2] ?? "wait"
 startScratch()
 const folder = scratchFolder("view")
 writeFileSync(join(folder, "copy.xlsx"), "x")
-process.stdout.write(`${folder}\n`)
-// the signals are handled the way main.tsx does: leave through process.exit
+// the signals are handled the way main.tsx does: leave through process.exit. The handlers
+// are installed before the test is told where the folder is: the test sends its signal as
+// soon as it has read that line, and a signal that arrives first kills the process with
+// no exit hook
 for (const [signal, code] of [["SIGHUP", 129], ["SIGTERM", 143]] as const)
     process.on(signal, () => process.exit(code))
+process.stdout.write(`${folder}\n`)
 const timer = setInterval(() => {}, 1000)
 if (how === "exit") process.exit(0)
 if (how === "throw") setTimeout(() => { throw new Error("boom") }, 10)

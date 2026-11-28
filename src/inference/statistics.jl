@@ -175,6 +175,10 @@ that record into it (every method takes `lock`).
 - `divergences`: one row per divergent draw of
     every attempt (see [`statDivergences`](@ref)).
 - `c1base`: the c1 search tallies when the current attempt began.
+- `records`: one row per attempt in order, `name => value` (`label`, `class`, `seed`,
+    `delta`, `nAdapt`, `nDraws`, `rhat`, `ess`, `divergent`, `seconds`; a field the attempt
+    never reached is absent), see [`statAttemptInfo!`](@ref); they become the LOG rows
+    `attempt<k>...`.
 """
 mutable struct StatBuffer
     const lock::ReentrantLock
@@ -195,6 +199,7 @@ mutable struct StatBuffer
     kink::Vector{NTuple{5,Int}}
     divergences::Vector{Any}
     c1base::Any
+    records::Vector{Dict{String,Any}}
 end
 
 const _NO_PENDING = (label = "", trigger = "", class = "", rung = "")
@@ -203,6 +208,7 @@ StatBuffer(; cap::Integer = statisticsCap()) = StatBuffer(
     ReentrantLock(), String[], 0, cap, nothing, 0.0, 0, String[], _NO_PENDING, 0, "", 0,
     0,
     Tuple{String,String}[], String[], NTuple{5,Int}[], Any[], nothing,
+    Dict{String,Any}[],
 )
 
 """
@@ -255,6 +261,7 @@ function statReset!(b::StatBuffer)
         empty!(b.kink)
         empty!(b.divergences)
         b.c1base = nothing
+        empty!(b.records)
     end
     return nothing
 end
@@ -487,6 +494,11 @@ function statAttempt!(b::StatBuffer, timing)
         row("rung", isempty(p.rung) ? "none" : p.rung)
         b.stage0 = timing === nothing ? 0 : length(timing.stages)
         b.c1base = nothing
+        push!(
+            b.records,
+            Dict{String,Any}("label" => label,
+                "class" => isempty(p.class) ? "none" : p.class),
+        )
         return k
     end
 end
@@ -528,6 +540,7 @@ function _statSettings!(
     statRow!(b, "nAdapt", nAdapt)
     statRow!(b, "nDraws", nSamples - nAdapt)
     statRow!(b, "rngSeed", base)
+    statAttemptInfo!(b; seed = base, delta = δ, nAdapt = nAdapt, nDraws = nSamples - nAdapt)
     statRow!(b, "chainStartRadii", options.chainStartRadii)
     statRow!(b, "c1Mode", N == 4 ? "profiled" : "sampled (fifth parameter)")
     statRow!(b, "kinkWatch", options.watchKink)
@@ -1272,6 +1285,39 @@ function statKeep!(b::StatBuffer, k::Integer, why::AbstractString)
     end
     return nothing
 end
+
+"""
+Adds fields to the record of the attempt in progress (the last one started), for the LOG
+rows `attempt<k>...`; a name given again is overwritten.
+
+# Returns
+- `nothing`.
+
+# Exceptions
+- None.
+"""
+statAttemptInfo!(::Nothing; kw...) = nothing
+function statAttemptInfo!(b::StatBuffer; kw...)
+    lock(b.lock) do
+        isempty(b.records) && return nothing
+        for (k, v) in kw
+            b.records[end][String(k)] = v
+        end
+    end
+    return nothing
+end
+
+"""
+The records of the attempts so far, in order (copies, `name => value` each).
+
+# Returns
+- `Vector{Dict{String,Any}}`, empty for `nothing`.
+
+# Exceptions
+- None.
+"""
+statRecords(::Nothing) = Dict{String,Any}[]
+statRecords(b::StatBuffer) = lock(() -> copy.(b.records), b.lock)
 
 "The number of attempts the buffer has started."
 statAttempts(::Nothing) = 0

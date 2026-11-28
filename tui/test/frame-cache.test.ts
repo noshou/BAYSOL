@@ -105,6 +105,20 @@ function gated(key: string, log: string[]) {
 
 const settle = () => new Promise((r) => setImmediate(r))
 
+/**
+ * Polls until `ok()` holds (a background write), at most 5 s; a failed read is "not yet".
+ */
+async function waitFor(ok: () => boolean): Promise<void> {
+    for (const end = Date.now() + 5000; Date.now() < end; ) {
+        try {
+            if (ok()) return
+        } catch {
+            // the file is not there yet
+        }
+        await new Promise((r) => setTimeout(r, 20))
+    }
+}
+
 test("the queue makes the wanted frame first, then the rest, one at a time", async () => {
     const lru = new FrameLru(1000)
     const queue = new FrameQueue(lru)
@@ -250,8 +264,8 @@ test("a frame comes from the run's raster; a damaged raster is replaced", async 
     assert.equal(first.width, 120)
     assert.equal(first.fullWidth, 240)
     await settle()
-    await new Promise((r) => setTimeout(r, 100))
     const file = join(run, rasterCacheName("fig", 240, 120))
+    await waitFor(() => existsSync(file))
     assert.ok(existsSync(file), readdirSync(run).join(","))
     // a pan is a crop of the same raster: another frame, no new file
     const panned = await renderFrame({ ...req, left: 5 })
@@ -260,6 +274,6 @@ test("a frame comes from the run's raster; a damaged raster is replaced", async 
     writeFileSync(file, readFileSync(file).subarray(0, 40))
     const again = await renderFrame({ ...req, stamp: 8 })
     assert.equal(again.fullWidth, 240)
-    await new Promise((r) => setTimeout(r, 100))
+    await waitFor(() => decodeRaster(readFileSync(file), 8) !== undefined)
     assert.ok(decodeRaster(readFileSync(file), 8) !== undefined)
 })

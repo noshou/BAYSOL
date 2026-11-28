@@ -4,16 +4,23 @@
 // `runSetupWizard` of `core/file-system.ts`).
 
 import assert from "node:assert/strict"
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { test } from "node:test"
+import { after, test } from "node:test"
 import { runSetupWizard, SETUP_UNINSTALLED } from "../src/core/file-system.js"
 import { helpText } from "../src/screens/help-screen.js"
+
+/** The folders the tests made; removed after the last test. */
+const made: string[] = []
+after(() => {
+    for (const dir of made) rmSync(dir, { recursive: true, force: true })
+})
 
 /** A bundle whose `baysol` exits with a status. */
 function fakeBundle(status: number): string {
     const dir = mkdtempSync(join(tmpdir(), "baysol-help-"))
+    made.push(dir)
     const launcher = join(dir, "baysol")
     writeFileSync(launcher, `#!/bin/sh\nexit ${status}\n`)
     chmodSync(launcher, 0o755)
@@ -49,4 +56,14 @@ test("the wizard's exit status says whether the app was uninstalled", posixOnly,
     assert.deepEqual(runSetupWizard({ BAYSOL_BUNDLE: fakeBundle(SETUP_UNINSTALLED) }), {
         uninstalled: true,
     })
+})
+
+test("a bundle without its program is a clear problem, not a crash", posixOnly, () => {
+    const dir = mkdtempSync(join(tmpdir(), "baysol-help-"))
+    made.push(dir)
+    const result = runSetupWizard({ BAYSOL_BUNDLE: dir })
+    assert.equal(result.uninstalled, false)
+    assert.match(result.problem ?? "", /cannot start/)
+    assert.match(result.problem ?? "", /uninstalled/)
+    assert.doesNotMatch(result.problem ?? "", /ENOENT/)
 })

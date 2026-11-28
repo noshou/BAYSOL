@@ -60,10 +60,44 @@ const _RUN_INFO = Dict(
     "rewhitenedNats" => ("convergence", "nats"),
     "retryFirstRhat" => ("convergence", ""),
     "retryKept" => ("convergence", ""),
+    "retryCount" => ("convergence", "runs"),
+    "retryRungs" => ("convergence", "rungs"),
     "drawsRows" => ("output", "rows"),
     "quantileLoPct" => ("output", "%"),
     "quantileHiPct" => ("output", "%"),
 )
+
+# The per-run rows `attempt<k><Field>` of the run sheet (the LOG has them too, plus the
+# text and seed fields: a sheet value is a number, and a 64-bit seed is not exact as one):
+# field suffix, key of the statistics record and unit. Only the first `_RUN_ATTEMPTS_MAX`
+# runs of the sampler get rows (the LOG has all of them).
+const _RUN_ATTEMPT_FIELDS = (
+    "Delta" => "delta", "NAdapt" => "nAdapt", "NDraws" => "nDraws", "Rhat" => "rhat",
+    "Ess" => "ess", "Divergent" => "divergent", "Seconds" => "seconds",
+)
+const _RUN_ATTEMPT_UNITS = Dict(
+    "Delta" => "%", "NAdapt" => "iterations", "NDraws" => "draws", "Rhat" => "",
+    "Ess" => "draws", "Divergent" => "", "Seconds" => "s",
+)
+const _RUN_ATTEMPTS_MAX = 12
+
+"""
+The `(section, unit)` of a row of the run sheet: the entry of `_RUN_INFO`, or for
+`attempt<k><Field>` the convergence section and the unit of the field.
+
+# Returns
+- A `Tuple{String,String}`, or `nothing` for a name that is no row.
+
+# Exceptions
+- None.
+"""
+function _runMeta(name::AbstractString)
+    haskey(_RUN_INFO, name) && return _RUN_INFO[name]
+    m = match(r"^attempt\d+([A-Za-z]+)$", name)
+    m === nothing && return nothing
+    unit = get(_RUN_ATTEMPT_UNITS, m.captures[1], nothing)
+    return unit === nothing ? nothing : ("convergence", unit)
+end
 
 """
 The leapfrog step size each chain adapted to: the `step_size` of the chain's last draw (it
@@ -96,8 +130,8 @@ function _runSheet(fit, divergenceRate::Real, mapParams, info::AbstractDict)
     keys_, vals = _runRows(fit, divergenceRate, mapParams, info)
     # grouped by section, in the order of the rows within it
     order = sortperm(
-        keys_; by = k -> findfirst(==(_RUN_INFO[k][1]), _RUN_SECTIONS), alg = MergeSort)
-    meta = [_RUN_INFO[keys_[i]] for i in order]
+        keys_; by = k -> findfirst(==(_runMeta(k)[1]), _RUN_SECTIONS), alg = MergeSort)
+    meta = [_runMeta(keys_[i]) for i in order]
     return _sheet("run", ["section", "name", "value", "unit"],
         first.(meta), keys_[order], vals[order],
         [isempty(m[2]) ? missing : m[2] for m in meta])
@@ -191,6 +225,7 @@ function _runRows(fit, divergenceRate::Real, mapParams, info::AbstractDict)
         add!("retryFirstRhat", d.firstRhat)
         add!("retryKept", d.retryKept ? 1 : 0)
     end
+    _attemptRows!(add!, info; fields = _RUN_ATTEMPT_FIELDS, maxAttempts = _RUN_ATTEMPTS_MAX)
     return keys_, vals
 end
 

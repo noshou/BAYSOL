@@ -344,12 +344,23 @@ function expand_path(p, loader_dir, exe_dir)
 end
 
 """
-    candidates(needs, lib, file, root, search) -> Vector{String}
+    candidates(needs, lib, file, root, search; inherited = String[]) -> Vector{String}
 
 The full paths where the loader of the format of `needs` would look for `lib`, imported by
-the `file` of the bundle `root`; `search` are extra folders for the loader.
+the `file` of the bundle `root`; `search` are extra folders for the loader. `inherited` are
+folders of the `LC_RPATH` entries of the programs of the bundle, already expanded: dyld
+resolves an `@rpath/` import with the rpaths of the whole chain of images that loaded the
+file, up to the main executable, not with the file's own alone (a dylib of the bundle that
+has no rpath of its own is found through the executable's).
 """
-function candidates(n::Needs, lib, file, root, search)::Vector{String}
+function candidates(
+    n::Needs,
+    lib,
+    file,
+    root,
+    search;
+    inherited = String[],
+)::Vector{String}
     here = dirname(file)
     out = String[]
     if n.format == :pe
@@ -365,6 +376,7 @@ function candidates(n::Needs, lib, file, root, search)::Vector{String}
         if startswith(lib, "@rpath/")
             rest = lib[8:end]
             append!(out, joinpath.(expand_path.(n.rpaths, here, root), rest))
+            append!(out, joinpath.(inherited, rest))
         elseif startswith(lib, "@")
             push!(out, expand_path(lib, here, root))
         else
@@ -393,12 +405,20 @@ The status of the import `lib` of `file` (an absolute path in the bundle `root`)
 with the path relative to the root (or the absolute path in a `search` folder), `:system`,
 `:relies` or `:missing`.
 """
-function classify(n::Needs, lib, file, root; search = String[], has = make_has())
+function classify(
+    n::Needs,
+    lib,
+    file,
+    root;
+    search = String[],
+    has = make_has(),
+    inherited = String[],
+)
     root = normpath(root)
     inside(c) =
         any(d -> startswith(normpath(c), normpath(d) * Base.Filesystem.path_separator),
             vcat([root], search))
-    for c in candidates(n, lib, file, root, search)
+    for c in candidates(n, lib, file, root, search; inherited)
         inside(c) && has(c, n.format == :pe) || continue
         startswith(normpath(c), root) &&
             return (:bundle, replace(relpath(c, root), '\\' => '/'))
@@ -411,6 +431,23 @@ function classify(n::Needs, lib, file, root; search = String[], has = make_has()
 end
 
 """
+    inherited_rpaths(root, items) -> Vector{String}
+
+The folders of the `LC_RPATH` entries of the Mach-O programs of `items` (the files with no
+install name, `@executable_path` and `@loader_path` being the program's own folder),
+expanded: the `@rpath` search path every library it loads inherits.
+"""
+function inherited_rpaths(root, items)::Vector{String}
+    dirs = String[]
+    for (rel, n) in items
+        (n.format == :macho && isempty(n.id)) || continue
+        here = dirname(joinpath(root, rel))
+        append!(dirs, expand_path.(n.rpaths, here, here))
+    end
+    return unique(dirs)
+end
+
+"""
     audit_imports(root, items; search = String[], has = make_has()) -> Vector{Entry}
 
 Classifies every import of `items` (pairs of a file path relative to `root` and its
@@ -418,10 +455,11 @@ Classifies every import of `items` (pairs of a file path relative to `root` and 
 """
 function audit_imports(root, items; search = String[], has = make_has())
     entries = Entry[]
+    inherited = inherited_rpaths(root, items)
     for (rel, n) in items
         file = joinpath(root, rel)
         for lib in n.needed
-            status, where = classify(n, lib, file, root; search, has)
+            status, where = classify(n, lib, file, root; search, has, inherited)
             push!(entries, Entry(rel, n.format, lib, status, where))
         end
     end

@@ -624,6 +624,8 @@ function _noteLadder(seed, attempts, classes, outcome, rung, ladder)
     seed.timing.info["ladderAttempts"] = join(attempts, " | ")
     seed.timing.info["ladderRungs"] = _ladderText(ladder)
     seed.timing.info["ladderRung"] = rung
+    # how many rungs the ladder defines (the LOG row `retryRungs`)
+    seed.timing.info["retryRungs"] = sum(length, values(ladder); init = 0)
     return nothing
 end
 

@@ -173,15 +173,15 @@ uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 version = "0.5.1"
 
 [[deps.BAYSOLRun]]
-deps = ["BAYSOL", "BAYSOLSetup", "Printf", "REPL"]
+deps = ["BAYSOL", "SetupWizard", "Printf", "REPL"]
 entryfile = "src/baysol-run.jl"
 path = "."
 uuid = "ddc2d533-6b3e-4051-a2d8-71ee69d924c4"
 version = "0.5.1"
 
-[[deps.BAYSOLSetup]]
+[[deps.SetupWizard]]
 deps = ["REPL"]
-entryfile = "src/baysol-setup.jl"
+entryfile = "src/setup-wizard.jl"
 path = "../../setup-wizard"
 uuid = "4b0c7a52-3f0e-4d52-9a6e-6a1f0d2c8e11"
 version = "0.5.1"

@@ -24,6 +24,7 @@ import {
     mkdirSync,
     mkdtempSync,
     readdirSync,
+    rmdirSync,
     rmSync,
     statSync,
     writeFileSync,
@@ -110,7 +111,8 @@ function removeFolder(path: string): void {
 }
 
 /**
- * Removes a process's whole folder, the exit hook's job. Never throws.
+ * Removes a process's whole folder, the exit hook's job, and then the scratch root if that
+ * is empty now (so an uninstalled program leaves no `<tmp>/baysol`). Never throws.
  *
  * @param root - the scratch root.
  * @param pid - the process.
@@ -120,6 +122,11 @@ export function removeProcessFolder(root: string, pid: number): void {
         removeFolder(processFolder(root, pid))
     } catch {
         // busy or gone: the next start's sweep finds it
+    }
+    try {
+        rmdirSync(root) // only succeeds when empty: no other process's folder is in it
+    } catch {
+        // not empty, gone, or busy: fine
     }
 }
 

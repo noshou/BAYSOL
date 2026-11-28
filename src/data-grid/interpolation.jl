@@ -5,10 +5,10 @@ The factorised moment system of the interpolating spline through the nodes `x`: 
 second derivatives `m` at the nodes solve one tridiagonal system whose matrix depends
 only on `x`, so it is eliminated once here and solved for any number of curves.
 
-- `x`: the nodes (strictly increasing, at least two).
-- `h`: the node spacings.
-- `w`, `piv`, `up`: the multipliers, pivots and upper diagonal of the eliminated system
-  for the interior moments (empty below four nodes).
+-   `x`: the nodes (strictly increasing, at least two).
+-   `h`: the node spacings.
+-   `w`, `piv`, `up`: the multipliers, pivots and upper diagonal of the eliminated system
+    for the interior moments (empty below four nodes).
 """
 struct _SplineSystem
     x::Vector{Float64}

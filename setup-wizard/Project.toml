@@ -1,5 +1,5 @@
-name = "BAYSOLSetup"
-entryfile = "src/baysol-setup.jl"
+name = "SetupWizard"
+entryfile = "src/setup-wizard.jl"
 uuid = "4b0c7a52-3f0e-4d52-9a6e-6a1f0d2c8e11"
 version = "0.5.1"
 

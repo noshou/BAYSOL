@@ -423,12 +423,12 @@ end
         nSamples, nAdapt = 60, 30
         r = FIT.infer(seed, nSamples, nAdapt; rngSeed = 5, retry = false)
         d = r.diagnostics
-        # macOS x86_64 (also under Rosetta) finds an optimum more and adds a chain: 9
-        if BAYSOL.Platform.ismacosx64()
-            @test d.nChains >= FIT.N_CHAINS == 8
-        else
-            @test d.nChains == FIT.N_CHAINS == 8
-        end
+        # the 8 base chains, plus the chains started at the optima the MAP search finds
+        # (macOS x86_64, Rosetta and some packaged builds find one more): never fewer
+        # than the base and never more than the cap on the extra ones
+        @test FIT.N_CHAINS == 8
+        @test FIT.N_CHAINS <= d.nChains <= FIT.N_CHAINS + FIT.OPTIMUM_CHAIN_CAP
+        @test d.nChains - FIT.N_CHAINS == d.nExtra
         # chains 1 and 2 at the MAP, then mirrored pairs at the CHAIN_START_RADII
         # (never farther than nominal, nearer only if a start had to be pulled back)
         @test d.startScale[1] == 0 && d.startScale[2] == 0

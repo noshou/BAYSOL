@@ -444,9 +444,13 @@ function _runCommand(cmd::Cmd)::Bool
     end
 end
 
-"Asks which of `choices` (the number picked, below 1 when the menu was cancelled)."
+"""
+Asks a question of the check: Yes or No, typed like every other question of the wizard
+(`choices` is always [`YES_NO`](@ref)). Returns 1 for Yes, 2 for No. ^c throws an
+`InterruptException`, which ends the wizard as at any other question.
+"""
 _askChoice(prompt::AbstractString, choices::Vector{String})::Int =
-    request(prompt, RadioMenu(choices))
+    _askYesNo(stdout, prompt, false) ? 1 : 2
 
 "The installer of Homebrew, as https://brew.sh gives it (it asks before it does anything)."
 const BREW_INSTALL = Cmd([
@@ -473,61 +477,61 @@ function _brewNote(io::IO)
     return nothing
 end
 
+"The two answers of every question: Yes or No."
+const YES_NO = ["Yes", "No"]
+
+"""
+The answer to remember for a pick of [`YES_NO`](@ref): `"yes"`, `"no"`, and `"later"` when
+the menu was cancelled.
+"""
+_yesNo(pick::Integer)::String = pick == 1 ? "yes" : pick == 2 ? "no" : "later"
+
 "The offer of Homebrew (macOS). Returns the answer to remember."
 function _offerBrew(io::IO, item::DepItem; which, runner, ask)::String
     _brewNote(io)
     println(io, "  ", manualText(item, :macos))
-    pick =
-        ask("Install Homebrew?", ["Install now", "Not now", "No", "Never ask again"])::Int
-    if pick == 1
-        _installBrew(io, which, runner) || return "later"
-        println(io, "  Done.")
-        return "yes"
-    end
-    return pick == 3 ? "no" : pick == 4 ? "never" : "later"
+    answer = _yesNo(ask("Install Homebrew?", YES_NO)::Int)
+    answer == "yes" || return answer
+    _installBrew(io, which, runner) || return "later"
+    println(io, "  Done.")
+    return "yes"
 end
 
 """
-The offer of iTerm2 on a Mac without Homebrew: Homebrew and then iTerm2, or the download
-page of iTerm2. Nothing runs without that choice. Returns the answer to remember.
+The offer of iTerm2 on a Mac without Homebrew: Homebrew and then iTerm2 after a Yes. The
+download page of iTerm2 (no Homebrew needed) is named in the text. Nothing runs without
+the Yes. Returns the answer to remember.
 """
 function _offerITerm(io::IO, item::DepItem; which, runner, ask)::String
     println(io, "  Homebrew and iTerm2 are not installed.")
     _brewNote(io)
-    println(io, "  The iTerm2 download page needs no Homebrew.")
-    pick = ask("Install iTerm2?",
-        ["Install Homebrew, then iTerm2", "Open the iTerm2 download page", "Not now",
-            "No",
-            "Never ask again"])::Int
-    if pick == 1
-        _installBrew(io, which, runner) || return "later"
-        brew = which("brew")::Union{String,Nothing}
-        brew === nothing && return "later"
-        ok = runner(Cmd([brew, "install", "--cask", "iterm2"]))::Bool
-        println(
-            io,
-            ok ?
-            "  Done. The BAYSOL icon now opens in iTerm2, " *
-            "unless you chose another terminal." :
-            "  Homebrew is installed, but iTerm2 could not be.",
-        )
-        return ok ? "yes" : "later"
-    elseif pick == 2
-        runner(Cmd(["/usr/bin/open", ITERM_PAGE]))::Bool ||
-            println(io, "  Could not open it: ", ITERM_PAGE)
-        return "later"
-    end
-    return pick == 4 ? "no" : pick == 5 ? "never" : "later"
+    println(io, "  Without Homebrew, download iTerm2 by hand: ", ITERM_PAGE)
+    answer = _yesNo(ask("Install iTerm2 (Homebrew first)?", YES_NO)::Int)
+    answer == "yes" || return answer
+    _installBrew(io, which, runner) || return "later"
+    brew = which("brew")::Union{String,Nothing}
+    brew === nothing && return "later"
+    ok = runner(Cmd([brew, "install", "--cask", "iterm2"]))::Bool
+    println(
+        io,
+        ok ?
+        "  Done. The BAYSOL icon now opens in iTerm2, " *
+        "unless you chose another terminal." :
+        "  Homebrew is installed, but iTerm2 could not be.",
+    )
+    return ok ? "yes" : "later"
 end
 
 """
     offerInstall(io, item, os; which, runner, ask) -> String
 
 Offers to install a missing `item` and returns the answer to remember: `"yes"` (the
-command ran and succeeded), `"later"` (not now, or it failed), `"no"` or `"never"`.
-The command only runs when the user picks Install now, only when the package manager is
-found and the command needs no administrator rights; otherwise the command or the manual
-text is shown. `runner(cmd) -> Bool` runs it (a test passes one that only records).
+command ran and succeeded), `"later"` (the menu was cancelled, or it failed, or the item is
+only a note), `"no"`. Every question is Yes or No. The command only runs on a Yes, only
+when the package manager is found and the command needs no administrator rights. When no
+answer could install the item (it needs administrator rights, has no package manager here,
+or is a manual step) nothing is asked: the command or the instruction is shown as a note.
+`runner(cmd) -> Bool` runs a command (a test passes one that only records).
 """
 function offerInstall(io::IO, item::DepItem, os::Symbol; which = _find,
     runner = _runCommand, ask = _askChoice)::String
@@ -537,35 +541,31 @@ function offerInstall(io::IO, item::DepItem, os::Symbol; which = _find,
     item.id == "brew" && return _offerBrew(io, item; which, runner, ask)
     item.id == "sixel" && os == :macos && route === nothing &&
         return _offerITerm(io, item; which, runner, ask)
-    canRun = false
-    if route === nothing
-        any(r -> r.os == os, item.routes) &&
-            println(io, "  No package manager found for it on this system.")
+    if item.id == "spacing"  # Terminal has no command for it: the steps are shown on a Yes
+        answer = _yesNo(ask("Change the Terminal spacing?", YES_NO)::Int)
+        answer == "yes" && println(io, "  ", manual)
+        return answer
+    end
+    if route === nothing || route.admin  # no answer installs it: a note, not a question
+        if route === nothing
+            any(r -> r.os == os, item.routes) &&
+                println(io, "  No package manager found for it on this system.")
+        else
+            println(io, "  Note: this needs administrator rights, so BAYSOL does not ",
+                "run it. Run:")
+            println(io, "    ", routeText(route))
+        end
         isempty(manual) || println(io, "  ", manual)
-    elseif route.admin
-        println(io, "  This needs administrator rights, so BAYSOL does not run it. Run:")
-        println(io, "    ", routeText(route))
-        isempty(manual) || println(io, "  ", manual)
-    else
-        println(io, "  Command: ", routeText(route))
-        item.id == "font" && println(io, "  ", manual)
-        canRun = true
+        return "later"
     end
     font = item.id == "font"  # a setting, nothing is installed
-    if item.id == "spacing"  # Terminal has no command for it: the user changes it
-        pick = ask("Change the Terminal spacing?",
-            ["I changed it", "Not now", "No", "Never ask again"])::Int
-        return pick in 1:4 ? ("yes", "later", "no", "never")[pick] : "later"
-    end
-    names =
-        canRun ? [font ? "Change now" : "Install now", "Not now", "No", "Never ask again"] :
-        ["Not now", "No", "Never ask again"]
-    answers = canRun ? ["install", "later", "no", "never"] : ["later", "no", "never"]
-    pick = ask(font ? "Change the Terminal font?" : "Install " * item.name * "?",
-        names)::Int
-    (pick < 1 || pick > length(answers)) && return "later"
-    answers[pick] == "install" || return answers[pick]
-    route === nothing && return "later"  # unreachable: canRun implies a route
+    println(io, "  Command: ", routeText(route))
+    font && println(io, "  ", manual)
+    answer = _yesNo(
+        ask(font ? "Change the Terminal font?" : "Install " * item.name * "?",
+            YES_NO)::Int,
+    )
+    answer == "yes" || return answer
     exe = which(route.manager)::Union{String,Nothing}
     exe === nothing && return "later"
     ok = runner(Cmd([exe; route.args]))::Bool
@@ -579,7 +579,8 @@ end
 
 Scans, prints the report and, for each missing item, offers to install it (a prompt for
 each item, nothing without an explicit yes). The answers are remembered in `install.json`
-(`"dep.<id>"`): `never` is never asked again; `no` is not asked again at the first run
+(`"dep.<id>"`): a stored `never` (from an older version, no question gives it now) is never
+asked again; `no` is not asked again at the first run
 (`firstRun`) but is when the user asks for the check from the menu; `later` and a missing
 item after `yes` are asked again. Info items are only reported.
 """

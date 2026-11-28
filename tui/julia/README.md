@@ -7,7 +7,7 @@
 | [`src/`](src/README.md) | the `BAYSOLRun` module: `runProject`, the command line, and the readers of the project's JSON files |
 | [`app/`](app/README.md) | the entry of the packaged `baysol` executable (built by `bysl pkg` with `juliac`) |
 
-The environment (`Project.toml`) depends on `BAYSOL` (the repository root) and `BAYSOLSetup` (`setup-wizard/`) through `[sources]`, and on nothing else but the standard library. It has no Conda environment: the Python tools are frozen into `baysol-pytools` by `bysl pkg`.
+The environment (`Project.toml`) depends on `BAYSOL` (the repository root) and `SetupWizard` (`setup-wizard/`) through `[sources]`, and on nothing else but the standard library. It has no Conda environment: the Python tools are frozen into `baysol-pytools` by `bysl pkg`.
 
 ```bash
 julia --project=tui/julia -e 'using BAYSOLRun'     # precompiles it

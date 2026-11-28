@@ -164,6 +164,38 @@ fake_has(files) = (path, ci) -> begin
     ci ? lowercase(p) in lowercase.(files) : p in files
 end
 
+@testset "Mach-O: @rpath resolves through the rpaths of the executable" begin
+    root = abspath(joinpath(tempdir(), "bundle"))
+    r(p...) = replace(joinpath(root, p...), '\\' => '/')
+    files = ["baysol", "julia/julia/libz.1.dylib", "lib/pytools/libpython3.12.dylib",
+        "lib/pytools/baysol-pytools"]
+    items = [
+        "baysol" => A.Needs(:macho, ["@rpath/libz.1.dylib"],
+            ["@executable_path/julia", "@executable_path/julia/julia"], ""),
+        # a dylib without a rpath of its own asks for a sibling through the executable's
+        "julia/julia/libcurl.4.dylib" =>
+            A.Needs(:macho, ["@rpath/libz.1.dylib"], String[], "@rpath/libcurl.4.dylib"),
+        "lib/pytools/baysol-pytools" =>
+            A.Needs(:macho,
+                ["@rpath/libpython3.12.dylib", "/usr/lib/libSystem.B.dylib"],
+                ["@executable_path"], ""),
+        "julia/julia/libz.1.dylib" =>
+            A.Needs(:macho, String[], String[], "@rpath/libz.1.dylib"),
+    ]
+    @test A.inherited_rpaths(root, items) ==
+          [joinpath(root, "julia"), joinpath(root, "julia", "julia"),
+        joinpath(root, "lib", "pytools")]
+    entries = A.audit_imports(root, items; has = fake_has(r.(files)))
+    status = Dict((e.file, e.lib) => e.status for e in entries)
+    @test status[("baysol", "@rpath/libz.1.dylib")] == :bundle
+    @test status[("julia/julia/libcurl.4.dylib", "@rpath/libz.1.dylib")] == :bundle
+    @test status[("lib/pytools/baysol-pytools", "@rpath/libpython3.12.dylib")] == :bundle
+    @test status[("lib/pytools/baysol-pytools", "/usr/lib/libSystem.B.dylib")] == :system
+    # a library nowhere on any rpath is still missing
+    gone = A.audit_imports(root, items; has = fake_has(["baysol"]))
+    @test any(e -> e.status == :missing && e.lib == "@rpath/libz.1.dylib", gone)
+end
+
 @testset "search of the loaders" begin
     root = abspath(joinpath(tempdir(), "bundle"))
     r(p...) = replace(joinpath(root, p...), '\\' => '/')

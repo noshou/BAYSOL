@@ -506,3 +506,52 @@ cell(lines, name) = split(lineOf(lines, name), '\t')[2]
         end
     end
 end
+
+@testset "retry trail: attempt records and the LOG rows" begin
+    b = StatBuffer()
+    @test BAYSOL.Inference.statRecords(b) == Dict{String,Any}[]
+    # no attempt started: nothing to attach to
+    BAYSOL.Inference.statAttemptInfo!(b; rhat = 1.0)
+    @test isempty(BAYSOL.Inference.statRecords(b))
+    statAttempt!(b, nothing)
+    BAYSOL.Inference.statAttemptInfo!(b; seed = UInt64(7), delta = 95.0, nAdapt = 300,
+        nDraws = 700, rhat = 1.04, ess = 250.0, divergent = 0.002, seconds = 12.5)
+    statLabel!(b, "retry, longer warm-up", "R-hat"; class = "convergence", rung = "x")
+    statAttempt!(b, nothing)
+    # the second run was stopped before it finished: only what it was given
+    BAYSOL.Inference.statAttemptInfo!(b; seed = UInt64(9), delta = 95.0, nAdapt = 2000)
+    rec = BAYSOL.Inference.statRecords(b)
+    @test length(rec) == 2
+    @test rec[1]["class"] == "none" && rec[1]["label"] == "base run"
+    @test rec[2]["class"] == "convergence" && !haskey(rec[2], "rhat")
+    # the rows: only the fields an attempt has, old info without a buffer adds none
+    rows = Pair{String,Any}[]
+    P = BAYSOL.Pipeline
+    P._attemptRows!((k, v) -> push!(rows, k => v), Dict{String,Any}())
+    @test isempty(rows)
+    info = Dict{String,Any}("statistics" => b, "retryRungs" => 9)
+    P._attemptRows!((k, v) -> push!(rows, k => v), info)
+    d = Dict(rows)
+    @test d["retryCount"] == 1 && d["retryRungs"] == 9
+    @test d["attempt1Seed"] == UInt64(7) && d["attempt1Rhat"] == 1.04
+    @test d["attempt1Ess"] == 250.0 && d["attempt1Divergent"] == 0.002
+    @test d["attempt1Seconds"] == 12.5 && d["attempt1NDraws"] == 700
+    @test d["attempt2Class"] == "convergence" && d["attempt2NAdapt"] == 2000
+    @test !haskey(d, "attempt2Rhat") && !haskey(d, "attempt3Class")
+    # the run sheet's rows: numbers only, a section and unit each, capped
+    sheetRows = Pair{String,Any}[]
+    P._attemptRows!(
+        (k, v) -> push!(sheetRows, k => v), info;
+        fields = P._RUN_ATTEMPT_FIELDS, maxAttempts = 1,
+    )
+    sd = Dict(sheetRows)
+    @test sd["retryCount"] == 1 && sd["attempt1Rhat"] == 1.04
+    @test !haskey(sd, "attempt1Seed") && !haskey(sd, "attempt1Class")
+    @test !haskey(sd, "attempt2NAdapt")
+    @test P._runMeta("attempt3Seconds") == ("convergence", "s")
+    @test P._runMeta("retryCount") == ("convergence", "runs")
+    @test P._runMeta("attempt1Class") === nothing && P._runMeta("nope") === nothing
+    # a reset (a new runModel) forgets them
+    statReset!(b)
+    @test isempty(BAYSOL.Inference.statRecords(b))
+end

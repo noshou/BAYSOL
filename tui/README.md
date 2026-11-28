@@ -732,6 +732,8 @@ are always proper `.xlsx` files.
 
 The screen is painted again in place every `screen.refreshSeconds` idle seconds (`run_flow.json`, default 5, 0 = off), on a resize and when the terminal gains focus, never over a sixel picture (a workaround for stray characters; `notes/tui.md`, "Screen refresh (workaround)").
 
+The bottom row of every screen shows a clock (`Fri, 27 Nov 2026, 14:03:22-CET (UTC+01:00)`, 24-hour, ticking each second, right of the theme switcher); it is left out when the terminal is too narrow for it and while a plot picture is shown.
+
 The pack is **atomic**: the archive is made as `<run>.7z.tmp.<pid>`, tested with `7z t` and compared with the list of
 what was packed, and only then renamed to `<run>.7z`; the packed originals are removed after that and never before.
 If anything fails (a full disk, a failed test) the run folder stays exactly as it was, the staged file is

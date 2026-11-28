@@ -43,3 +43,31 @@ for (const [columns, rows] of [
         }
     })
 }
+
+test("the clock shows when it fits, is dropped when not, the last cell stays empty", () => {
+    const theme = themes[0] as (typeof themes)[number]
+    for (const [columns, hint, clock] of [
+        [100, undefined, true],
+        [80, undefined, true],
+        [50, undefined, false],
+        [80, "x".repeat(40), false],
+    ] as const) {
+        const frame = createElement(
+            Box,
+            {
+                width: columns,
+                height: 3,
+                flexDirection: "column",
+                backgroundColor: theme.bg,
+            },
+            createElement(Box, { flexGrow: 1 }),
+            createElement(ThemeLine, { theme, hint, columns }),
+        )
+        const lines = renderToString(frame, { columns }).replace(/\n+$/, "").split("\n")
+        const plain = stripVTControlCharacters(lines[lines.length - 1] as string)
+        assert.equal(/\d\d:\d\d:\d\d/.test(plain), clock, `${columns} ${hint ?? ""}`)
+        assert.equal(plain.includes("theme ("), true)
+        assert.equal(displayWidth(plain.trimEnd()) <= columns - 1, true)
+        if (clock) assert.equal(displayWidth(plain.trimEnd()), columns - 1)
+    }
+})

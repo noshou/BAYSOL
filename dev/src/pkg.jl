@@ -29,8 +29,9 @@ and the icons, `baysol-<semver>-<os>-<arch>.zip` (deflate, 7-Zip maximum setting
     bysl pkg    [--out DIR] [--work DIR] [--workload DIR] [--stage NAME] [--resume]
                 [--keep-work] [--dry-run]
     bysl pkg log [NAME...] [--steps]
+    bysl pkg size DIR [--archive FILE] [--dry-run]
 
-    --out DIR       the folder the archive is written to (default: the folder you run
+    --out DIR      the folder the archive is written to (default: the folder you run
                     this from)
     --work DIR      scratch folder (default `baysol-pkg-work` in the cache folder of
                     BAYSOL, `Platform.cache_dir()`); a build starts COLD: an earlier
@@ -47,6 +48,35 @@ and the icons, `baysol-<semver>-<os>-<arch>.zip` (deflate, 7-Zip maximum setting
     --keep-work     keep the scratch folder after the archive is written
     --dry-run       print the plan and the preflight, build nothing
 
+    Environment: BAYSOL_JULIAC_STRIP=metadata|none|ir  strip flags of the juliac compile
+                    command (default metadata: --strip-metadata; none: stock; ir adds
+                    --strip-metadata --strip-ir, opt-in); recorded as `juliacStrip` in the
+                    build LOG. BAYSOL_JULIAC_THREADS=N  threads of the build process
+                    Size reductions, all off by default, each a row of the build LOG and
+                    followed by the smoke test (a Python reduction also starts the
+                    frozen tools): BAYSOL_DEDUPE=identical  byte-identical files of one
+                    name become relative symlinks (Linux, macOS; Windows only reports;
+                    the zip must carry links: test the unpack); BAYSOL_PY_PRUNE=on
+                    removes the globs of dev/pytools-prune.txt from lib/pytools;
+                    BAYSOL_JULIA_PRUNE=on removes test, docs, *.md and build sources of
+                    the depot packages in the bundle (never src, artifacts, tomls)
+                    Guards and limits (each a documented const of pkg-machine.jl):
+                    BAYSOL_PKG_FIT_TIMEOUT_MIN=N (480) and BAYSOL_PKG_STEP_TIMEOUT_MIN=N
+                    (360) end one trace fit or step after N minutes; BAYSOL_PKG_HANG_MIN=N
+                    (30) ends a step with no output and no CPU for N minutes (0 turns a
+                    limit off; the killed step fails, `--resume` runs it again; row
+                    `timeouts`). BAYSOL_PKG_JOBS=N (1) runs the independent cold-depot
+                    installs up to N at once when the memory allows (the first alone).
+                    BAYSOL_PATH_SCAN=warn|fail|off (warn) counts home, work and repository
+                    paths in the bundle (row `buildPathStrings`).
+                    BAYSOL_JULIAC_DEBUG_INFO=0|1|2 sets --debug-info of the juliac Julia
+                    (default 0).
+
+    size            where the bytes of a bundle folder are: per component and file kind,
+                    the 30 largest files, Julia artifacts and packages, Python packages,
+                    test/docs/example/licence folders, duplicates; --archive FILE adds the
+                    compressed size, --dry-run what the three reductions would remove
+                    (nothing is changed)
     log             read the build logs of `dev/build-logs/` (those whose file name contains
                     a NAME, else all) as a short view: version, system, host, and the time
                     and peak RAM and swap of each stage; several logs end with one
@@ -192,11 +222,16 @@ function process_memory(status::AbstractString)::NTuple{2,Int}
 end
 
 """
-    descendants(parents, root) -> Vector{Int}
+    descendants(parents, root; include_root = true) -> Vector{Int}
 
-`root` and every process below it, from a `pid => parent pid` map.
+`root` (unless `include_root` is false) and every process below it, from a
+`pid => parent pid` map.
 """
-function descendants(parents::AbstractDict{Int,Int}, root::Integer)::Vector{Int}
+function descendants(
+    parents::AbstractDict{Int,Int},
+    root::Integer;
+    include_root::Bool = true,
+)::Vector{Int}
     found = [Int(root)]
     i = 1
     while i <= length(found)
@@ -205,7 +240,7 @@ function descendants(parents::AbstractDict{Int,Int}, root::Integer)::Vector{Int}
         end
         i += 1
     end
-    return found
+    return include_root ? found : found[2:end]
 end
 
 """
@@ -225,15 +260,41 @@ function machine_memory()
     return (ram = ram, swap = swap)
 end
 
+"""
+    logical_cores(; os = Platform.os(), sysctl = _sysctl_logicalcpu) -> Int
+
+The logical cores of the machine: on macOS `sysctl -n hw.logicalcpu` (asked of the system
+itself, not of the Julia process), elsewhere `Sys.CPU_THREADS`; `Sys.CPU_THREADS` also when
+the system does not answer a positive integer. `sysctl` is a function returning its text.
+"""
+function logical_cores(; os::Symbol = Platform.os(), sysctl = _sysctl_logicalcpu)::Int
+    if os === :macos
+        n = try
+            tryparse(Int, strip(sysctl()))
+        catch
+            nothing
+        end
+        n !== nothing && n > 0 && return n
+    end
+    return Sys.CPU_THREADS
+end
+
+_sysctl_logicalcpu() = read(`sysctl -n hw.logicalcpu`, String)
+
 "A MiB value for the report, `unknown` when the system does not give it."
 mib_or_unknown(v) = v === nothing ? "unknown" : "$v MiB"
 
 """
-The `(RSS, swap)` MiB summed over this process and all its children: Linux `/proc`; macOS
-`ps` (the RSS of the tree, and the swap in use of the whole machine, which has no
-per-process figure).
+    tree_memory(root = getpid()) -> (ram, swap)
+
+The `(RSS, swap)` MiB summed over the CHILDREN of `root` (every process below it, not
+`root` itself: the bysl driver would add its own ~1 GB to every step). Linux reads
+`/proc` (`VmRSS`, `VmSwap` of those processes). macOS reads `ps` for the RSS and gives the
+swap in use of the WHOLE machine (it has no per-process figure; [`watch_memory`](@ref)
+turns it into a delta); `swap` is `nothing` where the system does not give it.
 """
-function tree_memory(root::Integer = getpid())::NTuple{2,Int}
+function tree_memory(root::Integer = getpid())
+    Platform.iswindows() && return windows_tree_memory(root)
     if Platform.ismacos()
         parents = Dict{Int,Int}()
         rss = Dict{Int,Int}()
@@ -245,8 +306,9 @@ function tree_memory(root::Integer = getpid())::NTuple{2,Int}
             rss[pid] = kb
         end
         used = Platform.swap_usage()
-        return (sum((get(rss, p, 0) for p in descendants(parents, root)); init = 0) ÷ 1024,
-            used === nothing ? 0 : used[2] ÷ 1024^2)
+        kids = descendants(parents, root; include_root = false)
+        return (sum((get(rss, p, 0) for p in kids); init = 0) ÷ 1024,
+            used === nothing ? nothing : used[2] ÷ 1024^2)
     end
     parents = Dict{Int,Int}()
     for d in readdir("/proc")
@@ -258,7 +320,7 @@ function tree_memory(root::Integer = getpid())::NTuple{2,Int}
         end
     end
     total = (0, 0)
-    for pid in descendants(parents, root)
+    for pid in descendants(parents, root; include_root = false)
         try
             total = total .+ process_memory(read("/proc/$pid/status", String))
         catch
@@ -268,23 +330,59 @@ function tree_memory(root::Integer = getpid())::NTuple{2,Int}
 end
 
 """
+    sleep_unless(running, seconds; slice = 0.05)
+
+Sleeps `seconds` in slices of `slice`, returning early once `running[]` is false, so a
+watcher ends within about one slice of the signal instead of after its whole period.
+"""
+function sleep_unless(running::Ref{Bool}, seconds::Real; slice::Real = 0.05)
+    t0 = time()
+    while running[] && time() - t0 < seconds
+        sleep(min(slice, max(seconds - (time() - t0), 0.0)))
+    end
+    return nothing
+end
+
+"""
     watch_memory(f; period = 2) -> (value, peak)
 
-Calls `f()` and samples the memory of the processes it starts (this process and all its
-children, so juliac, gcc, Nuitka or 7-Zip, never the rest of the machine) every `period`
-seconds meanwhile (Linux and macOS; on Windows the peak is `nothing`). `peak` is
-`(ram = MiB, swap = MiB)`, each the highest sample of the resident and the swapped-out
-memory of that tree.
+Calls `f()` and samples the memory of the processes it starts (the children of this
+process: juliac, gcc, Nuitka or 7-Zip, never the bysl driver itself nor the rest of the
+machine) every `period` seconds meanwhile (Linux and macOS; on Windows the peak is
+`nothing`). `peak` is `(ram = MiB, swap = MiB or nothing)`, each the highest sample.
+Linux: the swapped-out memory of those processes. macOS: the swap in use is machine-wide
+and only grows, so it is reported as the increase over the swap in use when `f` started
+(never below 0). The watcher stops within about 0.1 s of `f` returning.
 """
 function watch_memory(f; period = 2)
-    (Platform.islinux() || Platform.ismacos()) || return f(), nothing
+    (Platform.islinux() || Platform.ismacos() || Platform.iswindows()) ||
+        return f(), nothing
     peak = [0, 0]
-    sample() = peak .= max.(peak, tree_memory())
+    ram_unknown = Ref(false)
+    unknown = Ref(false)
+    base = Ref(0)
+    first_sample = Ref(true)
+    function sample()
+        ram, swap = tree_memory()
+        if ram === nothing   # the probe gave nothing (Windows): unknown, never 0
+            ram_unknown[] = true
+            ram = 0
+        end
+        if swap === nothing
+            unknown[] = true
+            swap = 0
+        elseif Platform.ismacos()
+            first_sample[] && (base[] = swap)
+            swap = max(swap - base[], 0)
+        end
+        first_sample[] = false
+        peak .= max.(peak, (ram, swap))
+    end
     sample()
     running = Ref(true)
     watcher = @async while running[]
         sample()
-        sleep(period)
+        sleep_unless(running, period)
     end
     value = try
         f()
@@ -293,7 +391,11 @@ function watch_memory(f; period = 2)
         wait(watcher)
         sample()
     end
-    return value, (ram = peak[1], swap = peak[2])
+    return value,
+    (
+        ram = ram_unknown[] && peak[1] == 0 ? nothing : peak[1],
+        swap = unknown[] ? nothing : peak[2],
+    )
 end
 
 """
@@ -306,23 +408,22 @@ function guarded(cmd::Cmd; env = Dict{String,String}(), dir = pwd(), log = nothi
     c = addenv(Cmd(cmd; dir, ignorestatus = true), env...)
     out = log === nothing ? stdout : open(log, "w")
     proc = Base.run(pipeline(c; stdout = out, stderr = out); wait = false)
-    stopped = Ref(false)
-    watch =
-        Platform.islinux() ?
-        @async(begin
-            while process_running(proc)
-                if swap_low(parse_meminfo(read("/proc/meminfo", String)))
-                    stopped[] = true
-                    kill(proc)
-                end
-                sleep(2)
+    stopped = Ref("")
+    watch = @async begin
+        while process_running(proc)
+            why = current_guard_reason()   # Linux: swap; macOS, Windows: free disk
+            if why !== nothing
+                stopped[] = why
+                kill_tree(getpid(); include_root = false)   # by PID, never pkill -f
+                kill(proc)
             end
-        end) : nothing
+            sleep(2)
+        end
+    end
     wait(proc)
-    watch === nothing || wait(watch)
+    wait(watch)
     log === nothing || close(out)
-    stopped[] &&
-        throw(ToolError("$WHO: stopped, free swap under $MIN_FREE_SWAP_MIB MiB", 1))
+    isempty(stopped[]) || throw(ToolError("$WHO: stopped, $(stopped[])", 1))
     return success(proc)
 end
 
@@ -459,7 +560,10 @@ function step(name::AbstractString, f; top::Bool = false, pattern = PROBLEM_LINE
             false
         end
     end
-    mem = peak === nothing ? "" : "   peak RAM $(peak.ram) MiB, swap $(peak.swap) MiB"
+    mem =
+        peak === nothing ? "" :
+        "   peak RAM $(peak.ram === nothing ? "unknown" : "$(peak.ram) MiB")" *
+        (peak.swap === nothing ? "" : ", swap $(peak.swap) MiB")
     line = string(top ? "" : "  ", rpad(name, top ? 10 : 36), ok ? " ok    " : " FAIL  ",
         lpad(round(time() - t0; digits = 1), 8), " s", mem)
     note(line; terminal = top || !ok)
@@ -482,12 +586,15 @@ function write_report(path::AbstractString, archive::AbstractString)
     open(path, "w") do io
         println(io, "bysl pkg   ", Dates.format(Dates.now(), "yyyy-mm-dd HH:MM"))
         println(io, "revision   ", build_revision())
-        println(io, "machine    ", Platform.arch(), ", ", Sys.CPU_THREADS, " threads, RAM ",
+        println(io, "machine    ", Platform.arch(), ", ", logical_cores(),
+            " logical cores (build: ", juliac_threads(), " threads), RAM ",
             mib_or_unknown(m.ram), ", swap ", mib_or_unknown(m.swap))
         println(io, "archive    ", archive)
         println(
             io,
-            "peaks      the processes of the step only (RSS and swapped-out memory)",
+            "peaks      the child processes of the step only (RSS and swapped-out " *
+            "memory; macOS: swap in use over its level at the start of the step, " *
+            "machine-wide)",
         )
         println(io)
         foreach(l -> println(io, l), REPORT)
@@ -619,9 +726,13 @@ function write_build_log(path::AbstractString, archive::AbstractString)
         row("archive", basename(archive))
         row("revision", revision)
         row("julia", VERSION)
+        row("juliacStrip", juliac_strip())
+        foreach(r -> row(r...), size_header_rows(archive))    # pkg-size.jl
+        row("macosDeploymentTarget", something(macos_deployment_target(), "none"))
         row("node", NODE_VERSION)
         row("python", PY_VERSION)
         row("system", "$os-$arch, $(os_description())")
+        foreach(r -> row(r...), machine_log_rows())    # pkg-machine.jl
         println(io, "\n--- stages ---")
         if !isempty(PRIOR_REPORT)
             println(io, "(the runs before the last one of this build, then the last run)")
@@ -639,9 +750,11 @@ function write_build_log(path::AbstractString, archive::AbstractString)
             println(io, "\n--- step: ", name, " ---")
             foreach(l -> println(io, l), lines)
         end
+        foreach(l -> println(io, l), size_block_lines(archive))    # pkg-size.jl
         println(io, "\n--- machine ---")
         row("cpu", cpu_model())
-        row("threads", Sys.CPU_THREADS)
+        row("threads", logical_cores())
+        row("buildThreads", juliac_threads())
         row("ram", mib_or_unknown(m.ram))
         row("swap", mib_or_unknown(m.swap))
     end
@@ -669,25 +782,14 @@ end
 exe(name) = Platform.exe(name)
 
 """
-The icon file of the bundle on this system, at its root: `baysol.ico` (Windows) or
-`baysol.icns` (macOS and Linux; the setup wizard unpacks the sizes of it into the user's
-`hicolor` theme on Linux). [`pack_icon`](@ref) writes it from the PNG sizes in `icons/`.
+The icon of the bundle on this system, at its root: `baysol.ico` (Windows), `baysol.icns`
+(macOS) or the folder `icons` (Linux: `icons/hicolor/<size>/baysol.png`, which the setup
+wizard copies into the user's `hicolor` theme). [`pack_icon`](@ref) writes it: on macOS it
+is the hand-made `icons/icon.icns` verbatim, on Windows an `.ico` and on Linux the PNG
+sizes of `icons/` as they are.
 """
-icon_file() = Platform.iswindows() ? "baysol.ico" : "baysol.icns"
-
-"The `.icns` entry type of each pixel size macOS knows (all PNG)."
-const ICNS_TYPES = Dict(
-    16 => "icp4", 32 => "icp5", 64 => "icp6", 128 => "ic07", 256 => "ic08",
-    512 => "ic09",
-    1024 => "ic10",
-)
-
-"""
-The `.icns` entry type of a pixel size that macOS has no type for (22, 24, 48); only the
-Linux file carries them, so the Mac icon stays standard. The wizard reads sizes from the
-PNG headers, not from these codes.
-"""
-const ICNS_EXTRA_TYPES = Dict(22 => "ix22", 24 => "ix24", 48 => "ix48")
+icon_file() =
+    Platform.iswindows() ? "baysol.ico" : Platform.ismacos() ? "baysol.icns" : "icons"
 
 "The largest side of an `.ico` entry (the directory byte is 0 for 256)."
 const ICO_MAX = 256
@@ -735,31 +837,6 @@ _le16(n) = collect(reinterpret(UInt8, [htol(UInt16(n))]))
 _le32(n) = collect(reinterpret(UInt8, [htol(UInt32(n))]))
 
 """
-    icns_bytes(sizes; extra) -> Vector{UInt8}
-
-An `.icns` file with a PNG entry for each of `sizes`
-(`pixels => png path`); with `extra` the sizes macOS has no type for
-go in under private codes (the Linux file), else they are left out.
-
-# Returns
-The file's bytes.
-
-# Exceptions
-`ErrorException` if no size fits an entry type.
-"""
-function icns_bytes(sizes; extra::Bool = false)::Vector{UInt8}
-    body = UInt8[]
-    for (px, path) in sizes
-        type = get(ICNS_TYPES, px, extra ? get(ICNS_EXTRA_TYPES, px, nothing) : nothing)
-        type === nothing && continue
-        data = read(path)
-        append!(body, codeunits(type), _be32(8 + length(data)), data)
-    end
-    isempty(body) && error("icon: no size fits an .icns entry")
-    return vcat(codeunits("icns"), _be32(8 + length(body)), body)
-end
-
-"""
     ico_bytes(sizes) -> Vector{UInt8}
 
 An `.ico` file with a PNG entry for each size up to 256 pixels (PNG inside `.ico` is read
@@ -789,55 +866,136 @@ function ico_bytes(sizes)::Vector{UInt8}
     return out
 end
 
-"""
-    pack_icon(dest, dir) -> String
+"The hand-made macOS icon in the root of `icons/`, shipped as it is on macOS."
+const MAC_ICNS = "icon.icns"
 
-Writes the icon of this system to `dest` from the PNG sizes in the root of `dir`: an `.ico`
-on Windows, an `.icns` elsewhere (with the extra sizes on Linux only).
+"""
+    check_icns(path) -> String
+
+Checks the hand-made `.icns` of macOS: the file exists, starts with `icns`, its length
+field matches the file and it holds at least one entry (each entry has a four-letter type
+and a length that fits).
+
+# Returns
+`path`.
+
+# Exceptions
+`ErrorException` naming the problem, for a missing or malformed file.
+"""
+function check_icns(path::AbstractString)::String
+    isfile(path) || error("icon: the macOS icon $path is missing")
+    d = read(path)
+    (length(d) >= 16 && d[1:4] == codeunits("icns")) ||
+        error("icon: $path is not an .icns file (no `icns` header)")
+    be(at) = Int(ntoh(only(reinterpret(UInt32, d[at:(at+3)]))))
+    be(5) == length(d) ||
+        error("icon: $path says $(be(5)) bytes but has $(length(d))")
+    entries, i = 0, 9
+    while i <= length(d)
+        (i + 7 <= length(d) && be(i + 4) >= 8 && i + be(i + 4) - 1 <= length(d)) ||
+            error("icon: $path has a broken entry at byte $i")
+        entries += 1
+        i += be(i + 4)
+    end
+    entries > 0 || error("icon: $path has no entries")
+    return path
+end
+
+"""
+    icon_bytes(system, dir) -> Vector{UInt8}
+
+The bytes of the icon file for `system` (`:macos`, `:windows` or `:linux`) from the root of
+`dir`: on `:macos` the hand-made `icon.icns` of `dir`, checked ([`check_icns`](@ref)) and
+otherwise untouched (never replaced by one built from the PNGs); on `:windows` an `.ico` of
+the PNG sizes. Linux has no single file (its PNGs go in as they are, see
+[`pack_icon`](@ref)).
+
+# Returns
+The file's bytes.
+
+# Exceptions
+`ErrorException` for a bad macOS icon, no usable PNG size, or a `system` that is not
+`:macos` or `:windows`.
+"""
+function icon_bytes(system::Symbol, dir::AbstractString)::Vector{UInt8}
+    system in (:macos, :windows) || error("icon: no single icon file for $system")
+    system === :macos && return read(check_icns(joinpath(dir, MAC_ICNS)))
+    sizes = icon_sizes(dir)
+    isempty(sizes) && error("icon: no icon_NxN.png files in $dir")
+    return ico_bytes(sizes)
+end
+
+"""
+The folder of the `hicolor` theme for a pixel size (the `@2` of 512 is 1024 pixels),
+the name the setup wizard looks for under `icons/hicolor` in the bundle.
+"""
+hicolor_folder(px::Integer) = px == 1024 ? "512x512@2" : "$(px)x$(px)"
+
+"The icon system of this machine, as [`icon_bytes`](@ref) takes it."
+icon_system() = Platform.iswindows() ? :windows : Platform.ismacos() ? :macos : :linux
+
+"Whether the icon source of `system` in `dir` is usable (the preflight check)."
+function _icon_ready(system::Symbol, dir::AbstractString)::Bool
+    system === :macos && return try
+        check_icns(joinpath(dir, MAC_ICNS))
+        true
+    catch
+        false
+    end
+    return !isempty(icon_sizes(dir))
+end
+
+"""
+    pack_icon(dest, dir; system) -> String
+
+Writes the icon of `system` (default this one) to `dest`: on macOS the hand-made
+`icons/icon.icns` of `dir` verbatim, on Windows an `.ico` built from the PNG sizes in the
+root of `dir` ([`icon_bytes`](@ref)); on Linux `dest` is a folder that gets those PNGs as
+they are, `dest/hicolor/<size>/baysol.png` ([`hicolor_folder`](@ref)).
 
 # Returns
 `dest`.
 
 # Exceptions
-`ErrorException` if `dir` has no usable size.
+`ErrorException` as [`icon_bytes`](@ref), and for no PNG size on Linux; nothing is
+written then.
 """
-function pack_icon(dest::AbstractString, dir::AbstractString)::String
-    sizes = icon_sizes(dir)
-    isempty(sizes) && error("icon: no icon_NxN.png files in $dir")
-    bytes =
-        Platform.iswindows() ? ico_bytes(sizes) :
-        icns_bytes(sizes; extra = Platform.islinux())
-    write(dest, bytes)
+function pack_icon(
+    dest::AbstractString,
+    dir::AbstractString;
+    system::Symbol = icon_system(),
+)::String
+    if system === :linux
+        sizes = icon_sizes(dir)
+        isempty(sizes) && error("icon: no icon_NxN.png files in $dir")
+        for (px, path) in sizes
+            folder = mkpath(joinpath(dest, "hicolor", hicolor_folder(px)))
+            cp(path, joinpath(folder, "baysol.png"); force = true)
+        end
+        return dest
+    end
+    write(dest, icon_bytes(system, dir))
     return dest
 end
 
-"""
-    launcher() -> (file name, text)
-
-The script of this system that starts `baysol` (it opens what the setup wizard
-chose, TUI or CLI) from the unpacked folder (a double click on macOS, the menu
-entry or a terminal elsewhere): a bash script on Linux, a zsh `.command` file
-on macOS, a `.cmd` file on Windows (untested). The macOS one closes the Terminal window that
-was opened for it after a clean end; an error, or a shell of the user, keeps it.
-"""
-function launcher()
-    if Platform.iswindows()
-        return "baysol.cmd", "@echo off\r\n\"%~dp0baysol.exe\" %*\r\n"
-    elseif Platform.ismacos()
-        return "BAYSOL.command",
-        raw"""
+"The zsh text of the macOS launcher (`BAYSOL.command`), see [`launcher`](@ref)."
+const MACOS_LAUNCHER = raw"""
 #!/bin/zsh
 cd "${0:A:h}" || exit 1
-# the Terminal window this script runs in, empty in another terminal or with more tabs
+# The Terminal window this script runs in, empty in another terminal or with more tabs.
+# Terminal reports stale ttys, so the window is found by a unique title this script sets
+# on its own tab (an escape sequence), never by its tty.
 window=""
-tty=$(tty)
-if [[ $TERM_PROGRAM == Apple_Terminal && $tty == /dev/* ]]; then
-    window=$(/usr/bin/osascript - "$tty" 2>/dev/null <<'END'
+if [[ $TERM_PROGRAM == Apple_Terminal && -t 1 ]]; then
+    mark="baysol-launch-$$-$RANDOM"
+    printf '\033]0;%s\007' "$mark"
+    sleep 0.3
+    window=$(/usr/bin/osascript - "$mark" 2>/dev/null <<'END'
 on run argv
     tell application "Terminal"
         repeat with w in windows
             try
-                if (count of tabs of w) is 1 and tty of tab 1 of w is item 1 of argv then
+                if (count of tabs of w) is 1 and name of w contains (item 1 of argv) then
                     return id of w
                 end if
             end try
@@ -847,6 +1005,7 @@ on run argv
 end run
 END
 )
+    printf '\033]0;BAYSOL\007'
 fi
 ./baysol "$@"
 code=$?
@@ -873,6 +1032,21 @@ END
 fi
 exit $code
 """
+
+"""
+    launcher() -> (file name, text)
+
+The script of this system that starts `baysol` (it opens what the setup wizard
+chose, TUI or CLI) from the unpacked folder (a double click on macOS, the menu
+entry or a terminal elsewhere): a bash script on Linux, a zsh `.command` file
+on macOS, a `.cmd` file on Windows (untested). The macOS one closes the Terminal window that
+was opened for it after a clean end; an error, or a shell of the user, keeps it.
+"""
+function launcher()
+    if Platform.iswindows()
+        return "baysol.cmd", "@echo off\r\n\"%~dp0baysol.exe\" %*\r\n"
+    elseif Platform.ismacos()
+        return "BAYSOL.command", MACOS_LAUNCHER
     end
     return "baysol.sh", raw"""
         #!/usr/bin/env bash
@@ -906,25 +1080,30 @@ function this_archive()
 end
 
 """
-The 7-Zip program: the `7za` of the npm package `7zip-bin`, else `7zz`, `7z`, `7za`. The
-package ships `mac/x64/7za` without the execute bit (only `mac/arm64/7za` has it), so a
-build on Intel macOS or under Rosetta 2 could not start it: it is made executable here.
+The 7-Zip program that starts: `7zz`, `7z` or `7za` on the PATH first, then the `7za` of the
+npm package `7zip-bin` ([`archiver_candidates`](@ref), [`pick_archiver`](@ref); each is
+started once to see that it runs: the x64 one cannot start on Intel macOS under Rosetta 2).
+The package ships `mac/x64/7za` without the execute bit (only `mac/arm64/7za` has it), so it
+is made executable here. `nothing` when none starts; the choice is kept for the run and
+logged as `archiver`.
 """
 function find_7z()
+    ARCHIVER_PATH[] === nothing || return ARCHIVER_PATH[]
     os, arch = system_names()
     bundled = joinpath(Common.root(), "node_modules", "7zip-bin",
         os == "win" ? "win" : os == "darwin" ? "mac" : "linux", arch, exe("7za"))
-    if isfile(bundled)
-        if !Platform.iswindows() && !Sys.isexecutable(bundled)
-            try
-                chmod(bundled, 0o755)
-            catch
-                # a read-only tree: the build stops at the first use, as it did before
-            end
+    if isfile(bundled) && !Platform.iswindows() && !Sys.isexecutable(bundled)
+        try
+            chmod(bundled, 0o755)
+        catch
+            # a read-only tree: it then fails the start probe and the chain goes on
         end
-        return bundled
     end
-    return Platform.find_tool("7zz", "7z", "7za")
+    pick =
+        pick_archiver(archiver_candidates(; bundled = isfile(bundled) ? bundled : nothing))
+    ARCHIVER_PATH[] = pick
+    ARCHIVER[] = pick === nothing ? nothing : "7-Zip $pick"
+    return pick
 end
 
 """
@@ -1253,7 +1432,11 @@ end
 "Runs `cmd` with the environment `env`; true on status 0."
 function run_env(cmd::Cmd, env)
     c = addenv(Cmd(cmd; dir = Common.root(), ignorestatus = true), env...)
-    return success(Base.run(c))
+    # a step past its time, or silent with no CPU, is ended by PID and fails (see `watched`)
+    return watched(; name = current_step(), limit_min = step_timeout_min(),
+        hang_minutes = hang_min()) do
+        success(Base.run(c))
+    end
 end
 
 """
@@ -1380,6 +1563,25 @@ function trace_project_runs(work, dir, julia, env)
 end
 
 """
+    fit_pending(fits, results, id) -> Bool
+
+Whether the trace fit `id` has to run: it has no `<ID>.done` marker in `fits`, or it has
+one but no workbook (`*.xlsx`) in a folder named `id` below `results` (a marker left by an
+interrupted or failed run, or a scratch folder that lost its results).
+"""
+function fit_pending(
+    fits::AbstractString,
+    results::AbstractString,
+    id::AbstractString,
+)::Bool
+    isfile(joinpath(fits, id * ".done")) || return true
+    for (d, _, fs) in walkdir(results)
+        basename(d) == id && any(endswith(".xlsx"), fs) && return false
+    end
+    return true
+end
+
+"""
 Stage `trace`: runs everything once with `--trace-compile` (one file per program
 under `<work>/trace`), in this order, one program at a time: the fits of `TRACE_FITS`
 and every synthetic fit (`bysl fits run --scratch <work>/trace/results`, so their
@@ -1403,19 +1605,23 @@ function stage_trace(work)
     results = mkpath(joinpath(dir, "results"))
     # one fit at a time; `<ID>.done` marks a fit that ended (well or not), so an interrupted
     # build resumes at the fit it was in, whose partial trace is then overwritten
-    pending = filter(id -> !isfile(joinpath(fits, id * ".done")),
+    pending = filter(id -> fit_pending(fits, results, id),
         vcat(TRACE_FITS, Common.synthetic_ids()))
     note("  trace: $(length(pending)) fits to run")
     for id in pending
-        step("fit $id",
-            () -> withenv(env...) do
-                Common.run_step(
-                    false,
-                    ["bysl", "fits", "run", id, "--trace-compile", fits,
-                        "--scratch", results, "--threads", "4"],
-                )
+        ok = step("fit $id",
+            () -> watched(; name = "fit $id", limit_min = fit_timeout_min(),
+                hang_minutes = hang_min()) do
+                withenv(env...) do
+                    Common.run_step(
+                        false,
+                        ["bysl", "fits", "run", id, "--trace-compile", fits,
+                            "--scratch", results, "--threads", "4"],
+                    )
+                end
             end)
-        write(joinpath(fits, id * ".done"), "")
+        # only a fit that passed is done: a resume runs a failed one again
+        ok && write(joinpath(fits, id * ".done"), "")
     end
     tests = joinpath(dir, "tests")
     mkpath(tests)
@@ -1497,46 +1703,114 @@ function juliac_threads()::Int
 end
 
 """
-    patched_juliac(work; bindir = Sys.BINDIR) -> String
+The text of `juliac.jl` where the strip flags of the compile command are collected
+(`strip_args = String[]`, filled only under `--trim`). See [`patch_juliac_text`](@ref).
+"""
+const JULIAC_STRIP_TEXT = "strip_args = String[]"
+
+"The values of `BAYSOL_JULIAC_STRIP`, see [`juliac_strip`](@ref)."
+const JULIAC_STRIP_MODES = ("none", "metadata", "ir")
+
+"""
+    juliac_strip() -> String
+
+The strip mode of the juliac compile command: `BAYSOL_JULIAC_STRIP`, one of `metadata`
+(default, `--strip-metadata`: the docstrings and source metadata of methods, nothing a
+run needs), `none` (stock behaviour, nothing stripped without `--trim`) or `ir`
+(`--strip-metadata --strip-ir`: also the inference IR; opt-in, because code that must be
+inferred at run time cannot be compiled without it).
+
+# Returns
+The mode name.
+
+# Exceptions
+A `ToolError` for any other value.
+"""
+function juliac_strip()::String
+    mode = get(ENV, "BAYSOL_JULIAC_STRIP", "metadata")
+    mode in JULIAC_STRIP_MODES && return mode
+    throw(
+        ToolError(
+            "$WHO: BAYSOL_JULIAC_STRIP=$mode is not one of " *
+            join(JULIAC_STRIP_MODES, ", "),
+            1,
+        ),
+    )
+end
+
+"""
+    patch_juliac_text(text, strip = "none") -> String
+
+The text of `juliac.jl` with the thread count of the build process read from
+`BAYSOL_JULIAC_THREADS` (default 1) and, for `strip` `metadata` or `ir`, the strip flags
+in `strip_args` (see [`juliac_strip`](@ref)).
+
+# Returns
+The patched text.
+
+# Exceptions
+A `ToolError` for an unknown `strip`, or when [`JULIAC_THREADS_TEXT`](@ref) or (for a
+strip mode other than `none`) [`JULIAC_STRIP_TEXT`](@ref) is not in `text` exactly once.
+"""
+function patch_juliac_text(text::AbstractString, strip::AbstractString = "none")::String
+    strip in JULIAC_STRIP_MODES ||
+        throw(ToolError("$WHO: unknown juliac strip mode `$strip`", 1))
+    count(JULIAC_THREADS_TEXT, text) == 1 || throw(
+        ToolError(
+            "$WHO: juliac.jl does not have exactly one `$JULIAC_THREADS_TEXT` " *
+            "(a Julia other than 1.12 ?): the threads of the build cannot be set",
+            1,
+        ),
+    )
+    out = replace(
+        text,
+        JULIAC_THREADS_TEXT =>
+            "\"JULIA_NUM_THREADS\" => " * "get(ENV, \"BAYSOL_JULIAC_THREADS\", \"1\"))",
+    )
+    strip == "none" && return out
+    count(JULIAC_STRIP_TEXT, out) == 1 || throw(
+        ToolError(
+            "$WHO: juliac.jl does not have exactly one `$JULIAC_STRIP_TEXT` " *
+            "(a Julia other than 1.12 ?): the strip flags cannot be set",
+            1,
+        ),
+    )
+    flags = strip == "ir" ? "\"--strip-metadata\", \"--strip-ir\"" : "\"--strip-metadata\""
+    return replace(out, JULIAC_STRIP_TEXT => "strip_args = String[$flags]")
+end
+
+"""
+    patched_juliac(work; bindir = Sys.BINDIR, strip = "none") -> String
 
 A copy of the `juliac` folder of the Julia installation (with the `julia-config.jl` it
-includes) under `<work>/juliac-threads`, where the thread count of the build process is
-read from `BAYSOL_JULIAC_THREADS` (default 1, as before) instead of being fixed at 1.
-Everything else of `juliac.jl` is unchanged; `OPENBLAS_NUM_THREADS` stays 1.
+includes) under `<work>/juliac-threads`, patched by [`patch_juliac_text`](@ref): the thread
+count of the build process is read from `BAYSOL_JULIAC_THREADS` (default 1, as before)
+instead of being fixed at 1, and `strip` (`none`, `metadata`, `ir`) adds strip flags to the
+compile command even without `--trim`. Everything else of `juliac.jl` is unchanged;
+`OPENBLAS_NUM_THREADS` stays 1.
 
 # Returns
 The path of the patched `juliac.jl`.
 
 # Exceptions
-A `ToolError` when `juliac.jl` has not exactly one line of [`JULIAC_THREADS_TEXT`](@ref)
-(another Julia than the one this was written for): the stage must not run unpatched unseen.
+A `ToolError` when `juliac.jl` lacks the expected text exactly once (another Julia than the
+one this was written for): the stage must not run unpatched unseen.
 """
-function patched_juliac(work::AbstractString; bindir = Sys.BINDIR)::String
+function patched_juliac(
+    work::AbstractString;
+    bindir = Sys.BINDIR,
+    strip::AbstractString = "none",
+)::String
     share = normpath(joinpath(bindir, "..", "share", "julia"))
     src = joinpath(share, "juliac", "juliac.jl")
-    text = read(src, String)
-    count(JULIAC_THREADS_TEXT, text) == 1 || throw(
-        ToolError(
-            "$WHO: $src does not have exactly one `$JULIAC_THREADS_TEXT` " *
-            "(a Julia other than 1.12 ?): the threads of the build cannot be set",
-            1,
-        ),
-    )
+    patched_text = patch_juliac_text(read(src, String), strip)
     root = joinpath(work, "juliac-threads")
     ispath(root) && rm_tree(root)
     dest = mkpath(joinpath(root, "share", "julia"))
     cp(joinpath(share, "juliac"), joinpath(dest, "juliac"))
     cp(joinpath(share, "julia-config.jl"), joinpath(dest, "julia-config.jl"))
     patched = joinpath(dest, "juliac", "juliac.jl")
-    write(
-        patched,
-        replace(
-            text,
-            JULIAC_THREADS_TEXT =>
-                "\"JULIA_NUM_THREADS\" => " *
-                "get(ENV, \"BAYSOL_JULIAC_THREADS\", \"1\"))",
-        ),
-    )
+    write(patched, patched_text)
     return patched
 end
 
@@ -1556,7 +1830,8 @@ function stage_julia(work, workload)
     # more than one thread only where it is safe (`juliac_threads`):
     # under Rosetta 2 the stock `juliac.jl` runs, as before
     threads = juliac_threads()
-    threads > 1 && (juliac = patched_juliac(work))
+    strip = juliac_strip()
+    (threads > 1 || strip != "none") && (juliac = patched_juliac(work; strip))
     entry = joinpath(Common.root(), "tui", "julia", "app", "baysol.jl")
     project = joinpath(Common.root(), "tui", "julia")
     # juliac and gcc write about 6 GB to the temp folder: a tmpfs /tmp is too small
@@ -1589,8 +1864,9 @@ function stage_julia(work, workload)
     log = joinpath(work, "julia.log")
     ok = step("juliac (precompile, workload fits, compile, link)",
         () -> guarded(
-            `$(find_julia()) --startup-file=no --project=$project $juliac --output-exe
-            $(exe("baysol")) $(juliac_flags()) $entry`;
+            `$(find_julia()) --startup-file=no $(juliac_debug_args())
+            --project=$project $juliac --output-exe $(exe("baysol"))
+            $(juliac_flags()) $entry`;
             env, dir, log,
         ); pattern = r"^ERROR|Failed to|Exception")
     # what the build-time workload and the compiler said, from the juliac log
@@ -2423,6 +2699,7 @@ function stage_bundle(work)
     cp(joinpath(work, "pytools", "baysol-pytools.dist"), joinpath(out, "lib", "pytools"))
     freed = prune_pytools(joinpath(out, "lib", "pytools"))
     note("  pytools: $(round(freed / 2^20; digits = 1)) MiB of unused numpy files left out")
+    size_prune!(out)    # BAYSOL_PY_PRUNE / BAYSOL_JULIA_PRUNE, off by default (pkg-size.jl)
     copy_runtime(runtime_layout(out).libjulia)
     # only the icon of this system, and the script that starts the terminal interface
     pack_icon(joinpath(out, icon_file()), joinpath(root, "icons"))
@@ -2441,6 +2718,13 @@ function stage_bundle(work)
             joinpath(out, exe("baysol")),
             joinpath(out, "lib", "pytools", exe("baysol-pytools")),
         ])
+    # BAYSOL_DEDUPE, off by default; links stripped files, before the signing (pkg-size.jl)
+    size_dedupe!(out,
+        [
+            joinpath(out, exe("baysol")),
+            joinpath(out, exe("baysol-tui")),
+            joinpath(out, "lib", "pytools", exe("baysol-pytools")),
+        ])
     # after everything that changes a binary
     Platform.ismacos() && sign_macos(macho_files(out))
     finish(work, "bundle")
@@ -2450,19 +2734,92 @@ end
     make_archive(work, archive)
 
 Packs `<work>/bundle/baysol` into the zip file `archive` (deflate at 7-Zip's maximum:
-`-mx=9 -mfb=258 -mpass=15`, which every system opens), the folder `baysol` at its top.
+`-mx=9 -mfb=258 -mpass=15`, which every system opens; `-mmt=on` packs the files on all
+cores, the output format is unchanged), the folder `baysol` at its top.
 """
 function make_archive(work, archive)
     sevenzip = find_7z()
-    need(
-        sevenzip !== nothing,
-        "no 7-Zip found (npm install gives 7zip-bin, or put 7zz on PATH)",
-    )
+    if sevenzip === nothing
+        # macOS only: the system's own `ditto` or `zip` packs the final zip (logged)
+        fb = fallback_archiver()
+        need(
+            fb !== nothing,
+            "no 7-Zip starts (npm install gives 7zip-bin, or put 7zz on PATH)",
+        )
+        ARCHIVER[] = "$(fb.kind) $(fb.path) (no 7-Zip started)"
+        note("  archiver: $(ARCHIVER[])"; terminal = true)
+        cmd, dir = fallback_archive_command(fb, archive, joinpath(work, "bundle", "baysol"))
+        ok = rc(Cmd(cmd; dir))
+        need(ok && isfile(archive), "the archive was not written")
+        return
+    end
     ok = rc(
         `$sevenzip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15 $archive
         $(joinpath(work, "bundle", "baysol"))`,
     )
     need(ok && isfile(archive), "the archive was not written")
+end
+
+"""
+    smoke_run(cmd; timeout = 60) -> (ok, output)
+
+Runs `cmd` and waits at most `timeout` seconds; it is killed after that.
+
+# Returns
+`ok` is true when it exited with status 0 in time; `output` is its stdout and stderr (a
+timeout adds a line saying so).
+
+# Exceptions
+None: a program that cannot start is `ok = false` with the error as `output`.
+"""
+function smoke_run(cmd::Cmd; timeout::Real = 60)
+    file = tempname()
+    try
+        proc = try
+            piped = pipeline(ignorestatus(cmd); stdout = file, stderr = file)
+            Base.run(piped; wait = false)
+        catch e
+            return (false, "cannot start: " * sprint(showerror, e))
+        end
+        t0 = time()
+        while process_running(proc) && time() - t0 < timeout
+            sleep(0.05)
+        end
+        timed_out = process_running(proc)
+        timed_out && kill(proc)
+        wait(proc)
+        text = read(file, String)
+        timed_out && return (false, text * "\nno answer within $timeout s")
+        return (success(proc), text)
+    finally
+        rm(file; force = true)
+    end
+end
+
+"""
+    smoke_test(bundle; timeout = 60) -> Bool
+
+Starts the built `baysol` of the bundle folder with `version` (the lightest entry that
+proves the executable, its runtime libraries and its launcher code load) and checks that
+it answers a `v<version>` line.
+
+# Returns
+True when it did.
+
+# Exceptions
+A `ToolError` naming the program and what it printed when it cannot start, fails or does
+not answer in time.
+"""
+function smoke_test(bundle::AbstractString; timeout::Real = 60)::Bool
+    program = joinpath(bundle, exe("baysol"))
+    need(isfile(program), "the built program is missing: $program")
+    ok, text = smoke_run(`$program version`; timeout)
+    need(
+        ok && occursin(r"v\d", text),
+        "the built baysol does not start (`$program version`): $(strip(text))",
+    )
+    println(text)
+    return true
 end
 
 # --- cold caches
@@ -2488,13 +2845,33 @@ function cold_env(work::AbstractString)::Dict{String,String}
     juliaup = get(ENV, "JULIAUP_DEPOT_PATH") do
         first(Base.DEPOT_PATH)
     end
-    return Dict(
+    env = Dict(
         "JULIA_DEPOT_PATH" => joinpath(work, "depot"),
         "JULIAUP_DEPOT_PATH" => juliaup,
         "UV_CACHE_DIR" => joinpath(work, "uv-cache"),
         "NUITKA_CACHE_DIR" => joinpath(work, "nuitka-cache"),
         "BAYSOL_CACHE" => joinpath(work, "fit-cache"),
     )
+    # the compilers and linkers (juliac, Nuitka) target this macOS version at the least
+    target = macos_deployment_target()
+    target === nothing || (env["MACOSX_DEPLOYMENT_TARGET"] = target)
+    return env
+end
+
+"The default `MACOSX_DEPLOYMENT_TARGET` of the macOS build."
+const DEFAULT_MACOS_DEPLOYMENT_TARGET = "14.0"
+
+"""
+    macos_deployment_target(os = Platform.os()) -> Union{String,Nothing}
+
+The `MACOSX_DEPLOYMENT_TARGET` of the build steps that compile or link: the variable of
+that name if it is set (so it can be overridden), else
+[`DEFAULT_MACOS_DEPLOYMENT_TARGET`](@ref); `nothing` off macOS.
+"""
+function macos_deployment_target(os::Symbol = Platform.os())::Union{String,Nothing}
+    os === :macos || return nothing
+    v = strip(get(ENV, "MACOSX_DEPLOYMENT_TARGET", ""))
+    return isempty(v) ? DEFAULT_MACOS_DEPLOYMENT_TARGET : String(v)
 end
 
 """
@@ -2568,6 +2945,18 @@ A `ToolError` when an install fails.
 """
 function ensure_depot(work::AbstractString, julia::AbstractString)
     done(work, "depot") && return nothing
+    jobs = pkg_jobs()
+    if jobs > 1
+        projects = [
+            rel => joinpath(Common.root(), split(rel, '/')...) for rel in
+            ("tui/julia", "test", "test/fitting_tests")
+        ]
+        parallel_depot(julia, projects, jobs;
+            peaks = earlier_peaks(joinpath(Common.root(), BUILD_LOG_DIR...))) ||
+            throw(ToolError("$WHO: packages could not be installed", 1))
+        finish(work, "depot")
+        return nothing
+    end
     for rel in ("tui/julia", "test", "test/fitting_tests")
         project = joinpath(Common.root(), split(rel, '/')...)
         step("julia packages $rel (cold depot)",
@@ -2622,6 +3011,13 @@ function preflight(archive)
             cs,
             (mib >= 24_000, "RAM + swap >= 24 GiB (juliac peaks near 22 GiB)", "$mib MiB"),
         )
+    else
+        row = memory_preflight(
+            Platform.os();
+            ram_mib = Int(Sys.total_memory()) ÷ 1024^2,
+            free_disk_mib = free_disk_mib(swap_volume()),
+        )
+        row === nothing || push!(cs, row)
     end
     for p in preflight_programs()
         w = Platform.which(p)
@@ -2633,9 +3029,9 @@ function preflight(archive)
     push!(
         cs,
         (
-            !isempty(icon_sizes(joinpath(Common.root(), "icons"))),
-            "icon sizes",
-            "icons/icon_NxN.png",
+            _icon_ready(icon_system(), joinpath(Common.root(), "icons")),
+            "icon source",
+            icon_system() === :macos ? "icons/$MAC_ICNS" : "icons/icon_NxN.png",
         ),
     )
     seven = find_7z()
@@ -2655,6 +3051,7 @@ function run(argv::Vector{String})::Int
         return 0
     end
     isempty(argv) || argv[1] != "log" || return log_command(argv[2:end])
+    isempty(argv) || argv[1] != "size" || return size_command(argv[2:end])
     a = split_args(WHO, ["--out", "--work", "--workload", "--stage"],
         ["--dry-run", "--keep-work", "--resume"], argv)
     isempty(a.specs) || fail(WHO, "unexpected argument $(first(a.specs))")
@@ -2685,6 +3082,7 @@ function run(argv::Vector{String})::Int
     REAL_OUT[] = stdout
     empty!(REPORT)
     empty!(STEP_LOGS)
+    reset_machine_state()   # pkg-machine.jl (the daemon keeps the module between runs)
     LOG_DIR[] = mkpath(joinpath(work, "logs"))
     HISTORY[] = joinpath(work, "history.tsv")
     load_history()   # nothing on a cold build (the folder was emptied above)
@@ -2728,6 +3126,20 @@ function run(argv::Vector{String})::Int
             ok || (failed = true; break)
         end
     end
+    # the built program must start, from the finished bundle folder, before it is packed
+    if !failed && (only === nothing || only == "bundle")
+        step("smoke (baysol version)",
+            () -> smoke_test(joinpath(work, "bundle", "baysol")); top = true) ||
+            (failed = true)
+        # the size of the bundle (for the build log), and the frozen tools after a reduction
+        failed || size_steps(work) || (failed = true)
+        # build paths (home folder, work folder, repository) left in the bundle
+        failed ||
+            step("build paths",
+                () -> path_scan_step(joinpath(work, "bundle", "baysol"); work); top = true,
+            ) ||
+            (failed = true)
+    end
     # a full run always ends with the archive, also when `--resume` found every stage done
     if !failed && only === nothing
         step("archive (7-Zip)", () -> make_archive(work, archive); top = true) ||
@@ -2763,6 +3175,8 @@ function run(argv::Vector{String})::Int
     return 0
 end
 
+include("pkg-size.jl")
 include("pkg-log.jl")
+include("pkg-machine.jl")
 
 end

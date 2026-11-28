@@ -398,6 +398,15 @@ end
             @test sheets[1:4] == ["run", "map", "quantiles2sigma", "stdevFromPrior"]
             @test all(in(sheets), ["data", "model", "residuals", "draws", "ref_CRYSOL"])
             @test all(in(sheets), ["hist_" * h[4] for h in PLOT_HIST_PARAMS])
+            # `dataRaw` is the curve as measured (what an export reruns the fit on and
+            # what the run's chi2 is computed on); `data` is the fitted, binned one
+            @test "dataRaw" in sheets
+            raw = xf["dataRaw"][:]
+            @test string.(raw[1, :]) == ["q", "I", "sigma"]
+            @test size(raw, 1) == length(seed.shannon.qRaw) + 1
+            @test Float64.(raw[2:end, 1]) ≈ seed.shannon.qRaw
+            @test Float64.(raw[2:end, 3]) ≈ seed.shannon.σ_raw
+            @test size(xf["data"][:], 1) == length(seed.shannon.q) + 1
             # sheet and column names are plain ASCII
             @test all(isascii, sheets)
             @test all(isascii, string.(xf["draws"][:][1, :]))
@@ -431,7 +440,7 @@ end
             @test all(in(P._RUN_SECTIONS), sections)
             idx = [findfirst(==(x), P._RUN_SECTIONS) for x in sections]
             @test issorted(idx)                                # grouped, in the set order
-            @test all(k -> haskey(P._RUN_INFO, k), keys_)      # every row is explained
+            @test all(k -> P._runMeta(k) !== nothing, keys_)    # every row is explained
             @test size(run, 2) == 4                            # no meaning column
             # map and quantiles: one row for each reported quantity
             nk = length(BAYSOL.Pipeline._REPORT_KEYS)
@@ -544,7 +553,9 @@ end
             @test all(
                 k -> haskey(kv(machine), k),
                 ("machine.os", "machine.cpu", "machine.cpus", "machine.threads",
-                    "machine.memory_gib", "machine.loadStart"))
+                    "machine.memory_gib", "machine.loadStart", "machine.free_gib_end",
+                    "machine.peak_rss_gib"))
+            @test startswith(machine[end], "machine.peak_rss_gib")
             # the timing table, as a person reads it: a header, the wall clock, the startup
             # (with its note in a column of its own), the groups, then GC and the two halves
             @test startswith(timing[1], "stage") && endswith(timing[1], "notes")

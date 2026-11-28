@@ -14,7 +14,8 @@
 // repaint of the frame puts every cell back right whatever the terminal did to it.
 //
 // When it repaints: `refreshSeconds` (run_flow.json, `screen`) after the last write to
-// stdout (every write re-arms the timer, and an idle screen repeats), after a window
+// stdout (every write re-arms the timer, except the live clock's one frame a second,
+// which would keep it from ever firing; an idle screen repeats), after a window
 // resize, and when the terminal reports focus (`CSI ? 1004 h`; the replies `CSI I` and
 // `CSI O` are read from stdin without taking them: Ink 8 itself discards a complete
 // control sequence that is no key, so a screen never sees them). It NEVER repaints while:
@@ -37,6 +38,7 @@
 // Setting `refreshSeconds` to 0 switches it off without a code change.
 
 import stringWidth from "string-width"
+import { clockWriting } from "../core/clock.js"
 import { RUN_FLOW } from "../core/environment.js"
 import { sixelShown } from "./sixel-view.js"
 
@@ -197,12 +199,16 @@ export function mayRefresh(state: RefreshState): boolean {
  *     when left out.
  * @property seconds - the idle time before a repaint (0 switches the refresh off).
  * @property sixelShown - whether a sixel picture is shown now.
+ * @property clockWriting - whether a write now is probably the clock's own frame (one a
+ *     second): such a write does not restart the idle timer, else it would never fire.
+ *     Left out, no write is taken for the clock's.
  */
 export type RefreshOptions = {
     stream: RefreshStream
     stdin?: RefreshInput
     seconds: number
     sixelShown: () => boolean
+    clockWriting?: () => boolean
 }
 
 /**
@@ -392,6 +398,10 @@ export class ScreenRefresher {
             if (chunk.includes(ALT_SCREEN_LEAVE)) this.setFocus(false)
             else if (chunk.includes(ALT_SCREEN_ENTER)) this.setFocus(true)
         }
+        // the clock's frame, one a second: the timer that runs keeps running (it counts
+        // from the last write of something else); `look` still noted the write time, so
+        // a repaint keeps its settle time
+        if (this.options.clockWriting?.() === true && this.timer !== undefined) return
         this.arm()
     }
 
@@ -465,6 +475,7 @@ export function installScreenRefresh(
         stdin: process.stdin,
         seconds: RUN_FLOW.screen.refreshSeconds,
         sixelShown,
+        clockWriting,
         ...options,
     })
     refresher.install()

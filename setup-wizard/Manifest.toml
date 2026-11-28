@@ -4,7 +4,7 @@ julia_version = "1.12.7"
 manifest_format = "2.0"
 project_hash = "c95de7fff846707588c53f7b16dbad06f49546a7"
 
-[[deps.BAYSOLSetup]]
+[[deps.SetupWizard]]
 deps = ["REPL"]
 path = "."
 uuid = "4b0c7a52-3f0e-4d52-9a6e-6a1f0d2c8e11"

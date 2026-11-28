@@ -155,7 +155,10 @@ writeFileSync(
     join(runDir as string, "run.LOG"),
     `datetime\tnow\nproject\t${project}\ntemperatureC\t${temperature}\n\n--- output ---\n`,
 )
-process.stdout.write("fake julia started\n")
+// The hang modes say "started" only once their signal handlers and the grandchild are in
+// place (below): a test that signals the process on that line must not beat them to it.
+const hangs = !["done", "failed", "plots", "crash"].includes(mode as string)
+if (!hangs) process.stdout.write("fake julia started\n")
 
 if (mode === "done" || mode === "failed" || mode === "plots") {
     if (mode === "plots") writeOutputs()
@@ -172,7 +175,6 @@ if (mode === "done" || mode === "failed" || mode === "plots") {
     })
     if (process.env.FAKE_PIDFILE)
         writeFileSync(process.env.FAKE_PIDFILE, `${process.pid} ${grandchild.pid}\n`)
-    process.stdout.write("ready\n")
     setInterval(() => runJson("running"), 500)
     if (mode === "stubborn") process.on("SIGTERM", () => {})
     else process.on("SIGTERM", () => finish("aborted", 130))
@@ -180,4 +182,5 @@ if (mode === "done" || mode === "failed" || mode === "plots") {
         process.stdin.resume()
         process.stdin.on("end", () => finish("aborted", 130))
     }
+    process.stdout.write("fake julia started\nready\n")
 }

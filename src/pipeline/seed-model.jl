@@ -485,8 +485,10 @@ function seedModel(
                 "and excludeQ): at least 3 are needed; widen qMin/qMax or exclude less",
             ),
         )
-        log.info["lMax"]              = info.lMax
-        log.info["nQRaw"]             = length(info.qRaw)
+        log.info["lMax"]  = info.lMax
+        log.info["nQRaw"] = length(info.qRaw)
+        # the measured curve as read, for the workbook's `dataRaw` sheet (not a LOG row)
+        log.info["rawCurve"]          = (info.qRaw, info.iRaw, info.σ_raw)
         log.info["nQChi2"]            = count(_chisqMask(info))
         log.info["rebin"]             = info.rebin
         log.info["D"]                 = info.D

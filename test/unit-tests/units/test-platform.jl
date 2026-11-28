@@ -175,6 +175,39 @@ end
     @test (Platform._mac_available_memory() === nothing) == !Platform.ismacos()
 end
 
+@testset "macOS free memory: kernel page size, canned vm_stat text" begin
+    vmStat(pageSize) = """
+        Mach Virtual Memory Statistics: (page size of $pageSize bytes)
+        Pages free:                               1000.
+        Pages active:                             5000.
+        Pages inactive:                           3000.
+        Pages speculative:                         200.
+        Pages throttled:                             0.
+        Pages wired down:                         2000.
+        File-backed pages:                        2200.
+        Anonymous pages:                          6000.
+        """
+    GiB = 1024^3
+    # free 1000 + speculative 200, inactive capped at file-backed 2200 - 200 = 2000
+    pages = 1200 + 2000
+    for pageSize in (4096, 16384)
+        @test Platform._parse_vm_stat(vmStat(pageSize)) == pages * pageSize
+    end
+    # the same counts under Rosetta 2 read with getpagesize() would be four times too low
+    @test Platform._parse_vm_stat(vmStat(16384)) ==
+          4 * Platform._parse_vm_stat(vmStat(4096))
+    # never more than the machine has
+    @test Platform._parse_vm_stat(vmStat(16384); total = 10_000) == 10_000
+    @test Platform._parse_vm_stat("page size of 4096 bytes\nPages free: 1.\n") === nothing
+    @test Platform._parse_vm_stat("nothing useful") === nothing
+    @test Platform._mac_available_bytes(10, 100, 5, 40, 16384) == (10 + 35) * 16384
+    @test Platform._mac_available_bytes(10, 100, 50, 40, 4096) == 10 * 4096
+    @test Platform._mac_available_bytes(10, 100, 5, 40, 4096; total = 4096) == 4096
+    @test Platform._mac_implausibly_low(GiB ÷ 4, 16 * GiB)
+    @test !Platform._mac_implausibly_low(8 * GiB, 16 * GiB)
+    @test !Platform.isrosetta() || Platform.ismacosx64()
+end
+
 @testset "utc_offset: the zone's offset as a number, on every system" begin
     t = 1.7e9
     off = Platform.utc_offset(t)

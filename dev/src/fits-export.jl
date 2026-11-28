@@ -402,8 +402,16 @@ function _export_entry(id, projects, dry, fixtures; base = root())
     )
     any(isnothing, values(conditions)) &&
         error("the LOG lacks pH, σ, temperature or energy")
-    # the measured curve: the workbook's `data` sheet (q in 1/Å, I, σ)
-    rows = read_sheet(first(models).book, "data")
+    # the measured curve: the workbook's `dataRaw` sheet (q in 1/Å, I, σ; the curve as
+    # measured, which the run's χ² is computed on). A workbook from before that sheet
+    # has only `data`, the Shannon-binned curve: rerunning the project on it fits the
+    # binned points as if they were raw, and its χ² is a binned one (about 3 times the
+    # raw χ² on SASDMJ9), so the export says so.
+    book = first(models).book
+    sheet = "dataRaw" in sheet_names(book) ? "dataRaw" : "data"
+    sheet == "data" && @warn "no `dataRaw` sheet in $(book): exporting the binned curve; \
+        rerun the fit to export the measured one"
+    rows = read_sheet(book, sheet)
     header = rows[1]
     icol(names...) = findfirst(h -> h isa String && lowercase(h) in names, header)
     qc, ic, sc = icol("q"), icol("i", "intensity"), icol("sigma", "σ", "error")

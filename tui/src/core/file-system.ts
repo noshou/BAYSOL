@@ -14,6 +14,7 @@ import {
     accessSync,
     constants,
     copyFileSync,
+    existsSync,
     mkdirSync,
     readdirSync,
     readFileSync,
@@ -24,7 +25,15 @@ import {
 } from "node:fs"
 import { basename, dirname, join, resolve } from "node:path"
 import { lockSync } from "proper-lockfile"
-import { findExecutable, isLinux, isMac, isWindows, type System } from "./environment.js"
+import {
+    exeName,
+    findExecutable,
+    isLinux,
+    isMac,
+    isWindows,
+    readSystem,
+    type System,
+} from "./environment.js"
 import { compareNoCase } from "./terminal.js"
 
 // ========================================================================================
@@ -457,10 +466,10 @@ export function saveErrorNote(error: unknown): string {
 // ========================================================================================
 
 // The desktop's own file picker: `zenity` or `kdialog` on Linux, AppleScript on macOS,
-// PowerShell's open dialog on Windows; it prints the paths, one to a line. Only the Linux
-// commands have been run; macOS and Windows are untested. A picker needs a desktop
-// (`DISPLAY` or `WAYLAND_DISPLAY` on Linux): without one, or without any of the
-// programs, a short reason is shown. Programs get argument arrays, never a shell.
+// PowerShell's open dialog on Windows; it prints the paths, one to a line. Only the
+// Linux commands have been run; macOS and Windows follow the documentation. A picker
+// needs a desktop (`DISPLAY` or `WAYLAND_DISPLAY` on Linux): without one, or without any
+// of the programs, a short reason is shown. Programs get argument arrays, never a shell.
 
 /**
  * What a picker asks for.
@@ -547,7 +556,7 @@ function kdialogCommand(startDir: string, spec: PickerSpec): string[] {
     ]
 }
 
-/** @returns the `osascript` command that picks files (untested). */
+/** @returns the `osascript` command that picks files */
 function macCommand(spec: PickerSpec): string[] {
     const types = spec.exts.map((e) => `"${e}"`).join(", ")
     const choose =
@@ -570,7 +579,7 @@ function macCommand(spec: PickerSpec): string[] {
     ]
 }
 
-/** @returns the PowerShell command that picks files, starting in a folder (untested). */
+/** @returns the PowerShell command that picks files, starting in a folder */
 function windowsCommand(startDir: string, spec: PickerSpec): string[] {
     const filter = spec.exts.map((e) => `*.${e}`).join(";")
     return [
@@ -680,7 +689,7 @@ export async function pick(
 // ========================================================================================
 
 // "Open" for a folder: the desktop's file manager is tried, and a shell is started in the
-// folder with this program's terminal. The macOS and Windows commands are untested.
+// folder with this program's terminal.
 
 /** How long to wait for the file manager to fail before assuming it worked (ms): it keeps
  * running, so only a quick failure is a failure. */
@@ -753,7 +762,7 @@ function runShellIn(system: System, dir: string): string | undefined {
 }
 
 /**
- * The exit status of the setup wizard after an uninstall (`UNINSTALLED` of `BAYSOLSetup`).
+ * The exit status of the setup wizard after an uninstall (`UNINSTALLED` of `SetupWizard`).
  */
 export const SETUP_UNINSTALLED = 22
 
@@ -777,7 +786,16 @@ export function runSetupWizard(env: NodeJS.ProcessEnv): {
             uninstalled: false,
         }
     }
-    const result = spawnSync(join(bundle, "baysol"), ["setup"], {
+    const program = join(bundle, exeName(readSystem(), "baysol"))
+    if (!existsSync(program)) {
+        return {
+            problem:
+                `the setup wizard cannot start: ${program} is gone (BAYSOL may have ` +
+                "been uninstalled); quit with q",
+            uninstalled: false,
+        }
+    }
+    const result = spawnSync(program, ["setup"], {
         stdio: "inherit",
         env: { ...env, BAYSOL_NO_LAUNCH: "1" },
     })

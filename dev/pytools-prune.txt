@@ -1,0 +1,25 @@
+# The globs `BAYSOL_PY_PRUNE=on` removes from lib/pytools of the bundle (the frozen propka3
+# and pdb2pqr). One glob per line, then `# why it is safe`; a line without a reason is an
+# error. Paths are relative to lib/pytools, with `/`; a trailing `/` names folders;
+# `**/` is any number of folders; licence files are NEVER listed here (their notices must
+# ship). Nothing here was measured on a real build yet: run the smoke stage and L2b.
+
+**/__pycache__/          # bytecode caches: Python rewrites them, imports use the module itself
+**/*.pyi                 # type stubs: read by type checkers, never by the interpreter
+**/tests/                # third-party test suites: imported only by their own test runners
+**/test/                 # same, for packages that name the folder test
+**/docs/                 # documentation sources: not code, not read by an import
+**/doc/                  # same, singular
+**/examples/             # example scripts of third-party packages: never imported
+**/example/              # same, singular
+**/*.dist-info/RECORD    # install manifest: read by pip and Distribution.files, not by version() or entry points
+**/*.dist-info/INSTALLER # which installer wrote the metadata: informational only
+**/*.dist-info/REQUESTED # marker file of pip: informational only
+**/*.dist-info/direct_url.json # where pip got the package from: informational only
+
+# Candidates NOT wired anywhere (untested): Nuitka `--nofollow-import-to=` modules that the
+# two tools do not import. Check each with a build and `propka3`/`pdb2pqr` runs first:
+#   --nofollow-import-to=numpy.testing   (only if neither tool calls numpy.testing)
+#   --nofollow-import-to=numpy.f2py      (numpy's Fortran wrapper generator: no runtime use)
+#   --nofollow-import-to=scipy.*.tests   (if scipy is in the frozen set)
+#   --nofollow-import-to=pip,wheel       (installers: not used at run time)

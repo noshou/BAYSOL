@@ -7,8 +7,9 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { renderToString } from "ink"
 import { createElement, type ReactElement } from "react"
-import { readAssetJson, type System } from "../../src/core/environment.js"
+import { readAssetJson, type System, tmpFolder } from "../../src/core/environment.js"
 import { writeJson } from "../../src/core/file-system.js"
+import { removeProcessFolder } from "../../src/core/scratch.js"
 import type { Drafts } from "../../src/store/lists.js"
 import { defaultCatalog, type SettingDef } from "../../src/store/settings.js"
 import { NavProvider } from "../../src/ui/interaction.js"
@@ -48,6 +49,9 @@ export function fixture(path: string): Record<string, unknown> {
 const made = new Set<string>()
 process.once("exit", () => {
     for (const dir of made) rmSync(dir, { recursive: true, force: true })
+    // what the code under test put in the scratch space (`<tmp>/baysol/<pid>`), and the
+    // root itself when that leaves it empty
+    removeProcessFolder(tmpFolder(), process.pid)
 })
 
 /**

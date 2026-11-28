@@ -32,16 +32,20 @@ The parts of a build log that [`format_build_log`](@ref) shows.
 - `stages`: the [`StageRow`](@ref)s.
 - `skipped`: the stages the build found done before (`--resume`).
 - `total`: the `total` line in minutes, `nothing` without one.
+- `size`: the [`SizeRow`](@ref)s of the `--- size ---` block (empty in older logs).
 """
 struct BuildLog
     rows::Dict{String,String}
     stages::Vector{StageRow}
     skipped::Vector{String}
     total::Union{Float64,Nothing}
+    size::Vector{SizeRow}
 end
 
-const STAGE_ROW =
-    r"^(\s*)(\S.*?)\s+(ok|FAIL)\s+([0-9.]+) s(?:\s+peak RAM (\d+) MiB, swap (\d+) MiB)?\s*$"
+const STAGE_ROW = Regex(
+    "^(\\s*)(\\S.*?)\\s+(ok|FAIL)\\s+([0-9.]+) s" *
+    "(?:\\s+peak RAM (?:(\\d+) MiB|unknown)(?:, swap (\\d+) MiB)?)?\\s*\$",
+)
 const SKIPPED_ROW = r"^(\w+)\s+skipped \(done before\)"
 const TOTAL_ROW = r"^total\s+([0-9.]+) min"
 
@@ -62,6 +66,7 @@ function parse_build_log(text::AbstractString)::BuildLog
     stages = StageRow[]
     skipped = String[]
     total = nothing
+    sizes = SizeRow[]
     section = ""    # the name between `--- ` and ` ---`, "" before the first one
     for line in split(text, '\n')
         m = match(r"^--- (.*?) ---$", line)
@@ -71,7 +76,7 @@ function parse_build_log(text::AbstractString)::BuildLog
             if (s = match(STAGE_ROW, line)) !== nothing
                 peaks =
                     s[5] === nothing ? (nothing, nothing) :
-                    (parse(Int, s[5]), parse(Int, s[6]))
+                    (parse(Int, s[5]), s[6] === nothing ? nothing : parse(Int, s[6]))
                 push!(
                     stages,
                     StageRow(s[2], isempty(s[1]), s[3] == "ok",
@@ -82,12 +87,14 @@ function parse_build_log(text::AbstractString)::BuildLog
             elseif (s = match(TOTAL_ROW, line)) !== nothing
                 total = parse(Float64, s[1])
             end
+        elseif section == "size"
+            (x = parse_size_row(line)) === nothing || push!(sizes, x)
         elseif section in ("", "machine") && occursin('\t', line)
             key, value = split(line, '\t'; limit = 2)
             rows[strip(key)] = strip(value)
         end
     end
-    return BuildLog(rows, stages, skipped, total)
+    return BuildLog(rows, stages, skipped, total, sizes)
 end
 
 "A duration of `s` seconds: seconds under two minutes, else minutes."
@@ -122,6 +129,33 @@ _head(b::BuildLog) = join(
             get(b.rows, "datetime", "?"),
         ],
     ), "   ")
+
+# the size lines of a build: bundle, archive, reductions and the three largest components
+function _size_lines(b::BuildLog)::Vector{String}
+    bytes(k) = (n = tryparse(Int, get(b.rows, k, "")); n === nothing ? nothing : n / 2^20)
+    bundle = bytes("bundleBytes")
+    bundle === nothing && return String[]
+    out = [
+        "size   bundle " * size_text(bundle) * ", archive " *
+        size_text(bytes("archiveBytes")) *
+        ", juliacStrip " * get(b.rows, "juliacStrip", "?"),
+    ]
+    reductions = [
+        k * " " * get(b.rows, k, "?") for k in ("dedupe", "pyPrune", "juliaPrune")
+        if get(b.rows, k, "off") != "off"
+    ]
+    isempty(reductions) || push!(out, "       " * join(reductions, "; "))
+    top = [x for x in b.size if x.group == "component"][1:min(
+        3,
+        count(x->x.group=="component", b.size),
+    )]
+    isempty(top) || push!(
+        out,
+        "       largest: " *
+        join([x.name * " " * size_text(x.bytes / 2^20) for x in top], ", "),
+    )
+    return out
+end
 
 """
     format_build_log(b; steps = false) -> Vector{String}
@@ -175,6 +209,7 @@ function format_build_log(b::BuildLog; steps::Bool = false)::Vector{String}
     end
     isempty(b.skipped) || push!(out, "skipped (done before): " * join(b.skipped, ", "))
     b.total === nothing || push!(out, "total  " * duration_text(b.total * 60))
+    append!(out, _size_lines(b))
     return out
 end
 

@@ -18,12 +18,12 @@ import {
     mkdirSync,
     readdirSync,
     readFileSync,
+    realpathSync,
     writeFileSync,
 } from "node:fs"
-import { tmpdir } from "node:os"
-import { basename, delimiter, join } from "node:path"
+import { basename, delimiter, dirname, join } from "node:path"
 import { test } from "node:test"
-import { readSystem } from "../src/core/environment.js"
+import { readSystem, tmpProcessFolder } from "../src/core/environment.js"
 import { moveChoices } from "../src/screens/open-runs.js"
 import { parseSetting, valueText } from "../src/screens/screen-rules.js"
 import { readPlots } from "../src/screens/viewer.js"
@@ -59,9 +59,18 @@ function unitsOf(projectDir: string, dir: string): { model: PlotUnit; compare: P
     }
 }
 
-/** The names of the `baysol-` temporary folders now in the system's temp folder. */
-const temps = (): string[] =>
-    readdirSync(tmpdir()).filter((n) => /^baysol-(plots|compile|move|extract)-/.test(n))
+/**
+ * The scratch folders (`<purpose>/x-...`) this process has now: the code under test keeps
+ * them in `<tmp>/baysol/<pid>`, which no other test file's process shares, so the lists
+ * before and after a test can be compared however many files run at once.
+ */
+function temps(): string[] {
+    const mine = tmpProcessFolder(process.pid)
+    if (!existsSync(mine)) return []
+    return readdirSync(mine).flatMap((purpose) =>
+        readdirSync(join(mine, purpose)).map((n) => `${purpose}/${n}`),
+    )
+}
 
 /** A folder with an executable script `name` in it; returns the folder. */
 function scriptIn(name: string, body: string, dir: string = tempDir()): string {
@@ -371,8 +380,13 @@ test("compile plots: PDFs land in the run's folder, built in a temp dir", async 
     // it ran in temporary folders (not in the run, not in the plot folder), all removed
     const cwds = readFileSync(log, "utf-8").trim().split("\n")
     assert.equal(cwds.length, 5)
+    // (paths compared as the system spells them: /var is /private/var on macOS)
+    const scratch = realpathSync(tmpProcessFolder(process.pid))
     for (const c of cwds)
-        assert.ok(/baysol-compile-/.test(c) && !c.startsWith(dir) && !existsSync(c), c)
+        assert.ok(
+            realpathSync(dirname(c)) === join(scratch, "compile") && !existsSync(c),
+            c,
+        )
     assert.deepEqual(temps(), before)
     // the run itself is untouched: its archive still holds the figures
     assert.deepEqual(

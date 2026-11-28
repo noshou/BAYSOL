@@ -98,9 +98,17 @@ test("every row of the run sheet that the pipeline writes has its sentence", () 
     )
     const names = [...source.matchAll(/^ {4}"(\w+)" => \("/gm)].map((m) => m[1] ?? "")
     assert.ok(names.length > 40)
-    for (const name of names) assert.ok(all.runRows?.[name], `runRows.${name}`)
+    // the per-run rows `attempt<k><Field>` are one pattern, keyed `attempt<Field>`
+    const block = /const _RUN_ATTEMPT_FIELDS = \(([^)]*)\)/.exec(source)?.[1] ?? ""
+    const fields = [...block.matchAll(/"(\w+)" =>/g)].map((m) => `attempt${m[1]}`)
+    assert.equal(fields.length, 7)
+    for (const name of [...names, ...fields])
+        assert.ok(all.runRows?.[name], `runRows.${name}`)
     for (const name of Object.keys(all.runRows ?? {}))
-        assert.ok(names.includes(name), `runRows.${name} is not a row`)
+        assert.ok(
+            names.includes(name) || fields.includes(name),
+            `runRows.${name} is not a row`,
+        )
 })
 
 test("groups, the run sheet's row sentences and cutting", () => {
@@ -115,6 +123,12 @@ test("groups, the run sheet's row sentences and cutting", () => {
         .runRows?.nAtoms
     assert.ok(nAtoms)
     assert.equal(cellDescription("run", cells, true, 1, 2), nAtoms)
+    // run k of the sampler: the pattern's sentence
+    const rhat = readAssetJson<ColumnDescriptions>("data", "column_descriptions.json")
+        .runRows?.attemptRhat
+    assert.ok(rhat)
+    const attempts = [cells[0] ?? [], ["convergence", "attempt3Rhat", "1.004", ""]]
+    assert.equal(cellDescription("run", attempts, true, 1, 2), rhat)
     // a row without a sentence falls back to the column's
     assert.equal(cellDescription("run", cells, true, 2, 2), describeColumn("run", "value"))
     // a fifth column of an old workbook has no sentence of its own

@@ -6,7 +6,7 @@
 
 # The one place that detects the system (`platform.jl` of the repository), by way of the
 # setup wizard that holds it, so that the entry includes no file of its own.
-const Platform = BAYSOLSetup.Platform
+const Platform = SetupWizard.Platform
 
 """
     bundleDir() -> String
@@ -55,7 +55,7 @@ function prepareEnvironment(bundle::AbstractString)::Nothing
     pytools = joinpath(bundle, "lib", "pytools", Platform.exe("baysol-pytools"))
     isfile(pytools) && setDefault("BAYSOL_PYTOOLS", pytools)
     setDefault("BAYSOL_REVISION", BUILD_REVISION)
-    i = BAYSOLSetup.readInstall(BAYSOLSetup.installFile())
+    i = SetupWizard.readInstall(SetupWizard.installFile())
     if i !== nothing
         setDefault("BAYSOL_HOME", i.home)
         setDefault("BAYSOL_CACHE", i.structureCache)
@@ -104,12 +104,16 @@ end
 """
     afterSetup(bundle, status) -> Int
 
-What follows the wizard: the interface or a shell when the user chose to launch one.
+What follows the wizard: the interface or a shell when the user chose to launch
+one. The status `UNINSTALLED` goes on as it is when the interface started the
+wizard (`noLaunch()`, the interface sets `BAYSOL_NO_LAUNCH`), because the
+interface quits on it; for a user who ran `baysol setup` it is 0, a success.
 """
 function afterSetup(bundle::AbstractString, status::Integer)::Int
-    status == BAYSOLSetup.LAUNCH_TUI && return startTui(bundle, String[])
-    status == BAYSOLSetup.LAUNCH_CLI && return startShell(bundle)
-    return status == BAYSOLSetup.UNINSTALLED ? 0 : Int(status)
+    status == SetupWizard.LAUNCH_TUI && return startTui(bundle, String[])
+    status == SetupWizard.LAUNCH_CLI && return startShell(bundle)
+    status == SetupWizard.UNINSTALLED && return noLaunch() ? Int(status) : 0
+    return Int(status)
 end
 
 "A shell with the bundle on its `PATH` and the usage printed: what a CLI icon opens."
@@ -122,7 +126,7 @@ end
 
 "What the launcher (`baysol` alone, the icon) starts: the choice of `install.json`."
 function launchChosen(bundle::AbstractString)::Int
-    i = BAYSOLSetup.readInstall(BAYSOLSetup.installFile())
+    i = SetupWizard.readInstall(SetupWizard.installFile())
     cli = i !== nothing && i.opens == "cli"
     return cli ? startShell(bundle) : startTui(bundle, String[])
 end

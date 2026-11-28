@@ -226,6 +226,32 @@ test("the refresh's own write does not count as a write (no loop, no re-record)"
     assert.equal(replays(term).length, 2)
 })
 
+test("idle timer: the clock's frames do not re-arm it, others still do", () => {
+    const term = new FakeTerminal()
+    const clock = { value: false }
+    new ScreenRefresher({
+        stream: term,
+        seconds: 5,
+        sixelShown: () => false,
+        clockWriting: () => clock.value,
+    }).install()
+    inkFrame(term, "aa", 0)
+    for (let i = 0; i < 4; i++) {
+        mock.timers.tick(1000)
+        clock.value = true
+        inkFrame(term, `a${i}`, 0)
+        clock.value = false
+    }
+    mock.timers.tick(1000)
+    assert.equal(replays(term).length, 1)
+    // a write of something else restarts the count
+    inkFrame(term, "bb", 1)
+    mock.timers.tick(4999)
+    assert.equal(replays(term).length, 1)
+    mock.timers.tick(1)
+    assert.equal(replays(term).length, 2)
+})
+
 test("a setting of 0 switches it off: nothing wrapped, no focus reporting", () => {
     const term = new FakeTerminal()
     const before = term.write

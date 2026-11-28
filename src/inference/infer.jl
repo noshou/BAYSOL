@@ -208,13 +208,28 @@ function infer(
 )::Inferred
     nChains ≥ 1 || throw(DomainError(nChains, "nChains must be ≥ 1"))
     base = rngSeed === nothing ? drawBase() : (rngSeed % UInt64)
+    # each run of the sampler leaves a record (the LOG rows `attempt<k>...`): what it was
+    # given (by `_infer`) and how it ended (here)
     go =
-        (ns, na, b) -> withGcPaused(
-            () -> _infer(
-                seed, ns, na; δ = δ, base = b, nChains = nChains,
-                options = options,
-            ),
-        )
+        (ns, na, b) -> begin
+            sb = statBuffer(seed.timing)
+            t0 = time_ns()
+            try
+                r = withGcPaused(
+                    () -> _infer(
+                        seed, ns, na; δ = δ, base = b, nChains = nChains,
+                        options = options,
+                    ),
+                )
+                d = r.diagnostics
+                statAttemptInfo!(sb; rhat = _worstRhat(d),
+                    ess = min(_worstEss(d.ess), _worstEss(d.essTail)),
+                    divergent = _divergentShare(r))
+                return r
+            finally
+                statAttemptInfo!(sb; seconds = (time_ns() - t0) / NS_PER_S)
+            end
+        end
     r1 = go(nSamples, nAdapt, base)
     worst = _worstRhat(r1.diagnostics)
     if !_retryNeeded(r1.diagnostics, retry, _divergentShare(r1))

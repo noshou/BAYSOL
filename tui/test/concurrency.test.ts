@@ -395,7 +395,8 @@ test("three real processes claiming a run in one project: exactly one wins", asy
     const gate = join(tempDir(), "gate")
     const workers = [1, 2, 3].map(() => spawnSupport("claim-worker.ts", [project, gate]))
     try {
-        await new Promise((r) => setTimeout(r, 1500)) // all three wait at the gate
+        // all three have loaded and wait at the gate (no guess at how long tsx takes)
+        for (const w of workers) assert.equal(await w.next(), "waiting")
         writeFileSync(gate, "go")
         const answers = await Promise.all(workers.map((w) => w.next()))
         const won = answers.filter((a) => a.startsWith("won "))

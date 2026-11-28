@@ -64,6 +64,19 @@ test("the temporary root is one baysol folder, one folder per pid, one per purpo
     assert.equal(processFolder("/r", 7).replaceAll("\\", "/"), "/r/7")
 })
 
+test("the exit hook takes the root away when it is empty, and only then", () => {
+    const base = tempDir()
+    const root = join(base, "baysol")
+    make(root, "111", "a")
+    make(root, "222", "b")
+    removeProcessFolder(root, 111)
+    assert.ok(existsSync(join(root, "222")), "another process's folder stays")
+    assert.ok(existsSync(root))
+    removeProcessFolder(root, 222)
+    assert.equal(existsSync(root), false, "an empty root goes")
+    removeProcessFolder(root, 333) // nothing there: no error
+})
+
 test("withScratch removes its folder after success and after a failure", async () => {
     let seen = ""
     await withScratch("t", async (folder) => {

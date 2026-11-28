@@ -27,10 +27,30 @@ end
     @test P.process_memory("Name: x\nVmRSS:\t  2048 kB\nVmSwap:\t  1024 kB\n") == (2, 1)
     @test P.process_memory("") == (0, 0)
     @test sort(P.descendants(Dict(2 => 1, 3 => 2, 4 => 1, 9 => 8), 1)) == [1, 2, 3, 4]
+    @test sort(
+        P.descendants(Dict(2 => 1, 3 => 2, 4 => 1, 9 => 8), 1; include_root = false),
+    ) ==
+          [2, 3, 4]
+    # a child process is counted, the driver is not
+    if Platform.islinux()
+        proc = run(`sleep 3`; wait = false)
+        sleep(0.3)
+        @test P.tree_memory()[1] >= 0
+        @test P.tree_memory(getpid())[1] < Sys.total_memory() ÷ 1024^2
+        kill(proc)
+    end
+    # the watcher ends soon after f returns, not after its whole period
+    t = @elapsed P.watch_memory(() -> sleep(0.2); period = 2)
+    @test t < 1
     value, peak = P.watch_memory(() -> 42; period = 0.05)
     @test value == 42
-    Platform.islinux() && @test peak.ram > 0 && peak.swap >= 0
-    Platform.islinux() && @test P.tree_memory()[1] > 0
+    Platform.islinux() && @test peak.ram >= 0 && peak.swap >= 0
+    # a child with real memory is measured by the watcher, never the driver alone
+    if Platform.islinux()
+        _, p2 = P.watch_memory(
+            () -> (run(`sleep 0.5`); nothing); period = 0.1)
+        @test p2.ram > 0
+    end
 end
 
 @testset "report: steps log to files, the report holds the status" begin
@@ -202,16 +222,16 @@ end
 
 @testset "the Platform module in the statements" begin
     # every app package holds its own copy of platform.jl:
-    # BAYSOL.Platform, BAYSOLSetup.Platform, BAYSOLRun.Platform;
+    # BAYSOL.Platform, SetupWizard.Platform, BAYSOLRun.Platform;
     # Dev.Platform belongs to the development tools only
     app = [
         "precompile(Tuple{typeof(BAYSOL.Platform.exe), String})",
         "precompile(Tuple{typeof(BAYSOL.Platform.which), String})",
-        "precompile(Tuple{typeof(BAYSOLSetup.Platform.data_home)})",
-        "precompile(Tuple{typeof(BAYSOLSetup.Platform.iswindows)})",
+        "precompile(Tuple{typeof(SetupWizard.Platform.data_home)})",
+        "precompile(Tuple{typeof(SetupWizard.Platform.iswindows)})",
         "precompile(Tuple{typeof(BAYSOLRun.Platform.exe), String})",
         "precompile(Tuple{typeof(BAYSOLRun.Platform.shell)})",
-        "precompile(Tuple{typeof(BAYSOLSetup.Platform.which), String})",
+        "precompile(Tuple{typeof(SetupWizard.Platform.which), String})",
     ]
     dev = [
         "precompile(Tuple{typeof(Dev.Platform.exe), String})",
@@ -221,16 +241,16 @@ end
         # an app function with a Dev-only argument type, and a script's alias
         "precompile(Tuple{typeof(BAYSOL.Platform.exe), Dev.Common.ToolError})",
         "precompile(Tuple{typeof(Main.Platform.exe), String})",
-        "precompile(Tuple{typeof(Main.BAYSOLSetup.Platform.exe), String})",
+        "precompile(Tuple{typeof(Main.SetupWizard.Platform.exe), String})",
     ]
-    allowed = Set(["Base", "Core", "BAYSOL", "BAYSOLSetup", "BAYSOLRun"])
+    allowed = Set(["Base", "Core", "BAYSOL", "SetupWizard", "BAYSOLRun"])
     @test P.merge_statements(vcat(dev, app, dev)) == app
     @test P.merge_statements(vcat(dev, app); allowed) == app
     @test P.merge_statements(dev; allowed) == String[]
     # the modules an app statement names are the first one only: `Platform` is a submodule
     @test all(l -> [m[1] for m in eachmatch(P._MODULE_NAME, l)] ⊆ allowed, app)
     # the manifest of the app lists the three packages
-    @test issubset(["BAYSOL", "BAYSOLSetup", "BAYSOLRun"], P.app_modules())
+    @test issubset(["BAYSOL", "SetupWizard", "BAYSOLRun"], P.app_modules())
 end
 
 @testset "a printed Char literal becomes evaluable" begin
@@ -373,6 +393,41 @@ end
     @test_throws Dev.Common.ToolError P.patched_juliac(work; bindir = bin)
 end
 
+@testset "the strip mode of the juliac compile command" begin
+    text = "strip_args = String[]\ncmd = addenv(`x`, \"JULIA_NUM_THREADS\" => 1)\n"
+    threaded = "\"JULIA_NUM_THREADS\" => get(ENV, \"BAYSOL_JULIAC_THREADS\", \"1\"))"
+    @test P.patch_juliac_text(text) ==
+          replace(text, "\"JULIA_NUM_THREADS\" => 1)" => threaded)
+    @test occursin(
+        "strip_args = String[\"--strip-metadata\"]",
+        P.patch_juliac_text(text, "metadata"),
+    )
+    ir = P.patch_juliac_text(text, "ir")
+    @test occursin("String[\"--strip-metadata\", \"--strip-ir\"]", ir)
+    @test_throws Dev.Common.ToolError P.patch_juliac_text(text, "bogus")
+    nostrip = replace(text, "strip_args = String[]" => "x = 1")
+    @test P.patch_juliac_text(nostrip) isa String
+    @test_throws Dev.Common.ToolError P.patch_juliac_text(nostrip, "ir")
+    @test_throws Dev.Common.ToolError P.patch_juliac_text(text * text, "ir")
+    withenv("BAYSOL_JULIAC_STRIP" => nothing) do
+        @test P.juliac_strip() == "metadata"
+    end
+    withenv("BAYSOL_JULIAC_STRIP" => "none") do
+        @test P.juliac_strip() == "none"
+    end
+    withenv("BAYSOL_JULIAC_STRIP" => "ir") do
+        @test P.juliac_strip() == "ir"
+    end
+    withenv("BAYSOL_JULIAC_STRIP" => "all") do
+        @test_throws Dev.Common.ToolError P.juliac_strip()
+    end
+end
+
+@testset "a stage line without a swap figure still parses" begin
+    b = P.parse_build_log("--- stages ---\nstage x ok   1.0 s   peak RAM 5 MiB\n")
+    @test b.stages[1].ram == 5 && b.stages[1].swap === nothing
+end
+
 @testset "cold caches" begin
     env = P.cold_env("/w/baysol-pkg-work")
     @test env["JULIA_DEPOT_PATH"] == joinpath("/w/baysol-pkg-work", "depot")
@@ -402,7 +457,7 @@ end
     mktempdir() do dir      # the real icons of the repository pack into this system's file
         dest =
             P.pack_icon(joinpath(dir, P.icon_file()), joinpath(Dev.Common.root(), "icons"))
-        @test filesize(dest) > 1000
+        @test Platform.islinux() ? isdir(joinpath(dest, "hicolor")) : filesize(dest) > 1000
     end
     @test startswith(text, Platform.iswindows() ? "@echo off" : "#!")
 end
@@ -525,11 +580,13 @@ end
         sizes = P.icon_sizes(dir)
         @test first.(sizes) == [16, 22, 32, 256, 1024]           # @2x only where no plain
         @test endswith(last(sizes[3]), "icon_32x32.png")
-        icns = P.icns_bytes(sizes)                                # standard types only
-        @test icns[1:4] == codeunits("icns") &&
-              Int(ntoh(only(reinterpret(UInt32, icns[5:8])))) == length(icns)
-        @test !occursin("ix22", String(copy(icns)))
-        @test occursin("ix22", String(P.icns_bytes(sizes; extra = true)))
+        # Linux: the PNGs go into the folder as they are, one hicolor folder per size
+        dest = P.pack_icon(joinpath(dir, "icons"), dir; system = :linux)
+        @test sort(readdir(joinpath(dest, "hicolor"))) ==
+              sort(["16x16", "22x22", "32x32", "256x256", "512x512@2"])
+        @test read(joinpath(dest, "hicolor", "32x32", "baysol.png")) ==
+              read(joinpath(dir, "icon_32x32.png"))
+        @test P.hicolor_folder(1024) == "512x512@2" && P.hicolor_folder(48) == "48x48"
         ico = P.ico_bytes(sizes)
         # 4 entries: 1024 is left out
         @test ico[1:6] == UInt8[0, 0, 1, 0, 4, 0]
@@ -537,6 +594,54 @@ end
         write(joinpath(dir, "icon_64x64.png"), png(32))           # name and header disagree
         @test_throws ErrorException P.icon_sizes(dir)
         @test isempty(P.icon_sizes(joinpath(dir, "nowhere")))
+    end
+end
+
+@testset "icon: macOS ships the hand-made icns verbatim, the others are built" begin
+    mktempdir() do dir
+        be(n) = collect(reinterpret(UInt8, [hton(UInt32(n))]))
+        png(px) = vcat(UInt8[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], be(13),
+            codeunits("IHDR"), be(px), be(px), zeros(UInt8, 5))
+        for (name, px) in ("icon_16x16.png" => 16, "icon_22x22.png" => 22,
+            "icon_256x256.png" => 256)
+            write(joinpath(dir, name), png(px))
+        end
+        icns(entries) = (
+            body = reduce(vcat,
+                [vcat(codeunits(t), be(8 + length(d)), d) for (t, d) in entries];
+                init = UInt8[]);
+            vcat(codeunits("icns"), be(8 + length(body)), body)
+        )
+        # no hand-made icns: macOS is an error, never the PNG-built file
+        @test_throws ErrorException P.icon_bytes(:macos, dir)
+        @test_throws ErrorException P.pack_icon(joinpath(dir, "x"), dir; system = :macos)
+        @test !isfile(joinpath(dir, "x"))
+        @test !P._icon_ready(:macos, dir) && P._icon_ready(:linux, dir)
+        # an unusual but valid file (TOC, ARGB, mask and PNG entries) is copied as it is
+        mac = icns([
+            "TOC " => zeros(UInt8, 8),
+            "ic04" => vcat(codeunits("ARGB"), zeros(UInt8, 9)),
+            "s8mk" => zeros(UInt8, 5), "ic11" => png(32), "ic10" => png(1024),
+        ])
+        write(joinpath(dir, "icon.icns"), mac)
+        @test P.icon_bytes(:macos, dir) == mac
+        dest = P.pack_icon(joinpath(dir, "baysol.icns"), dir; system = :macos)
+        @test read(dest) == mac && P._icon_ready(:macos, dir)
+        # broken files: bad header, wrong length field, truncated entry, no entry
+        for bad in (vcat(codeunits("junk"), mac[5:end]),
+            vcat(mac[1:4], be(length(mac) + 1), mac[9:end]),
+            mac[1:(end-3)],
+            icns([]))
+            write(joinpath(dir, "icon.icns"), bad)
+            @test_throws ErrorException P.icon_bytes(:macos, dir)
+            @test !P._icon_ready(:macos, dir)
+        end
+        write(joinpath(dir, "icon.icns"), mac)
+        # Windows and Linux ignore it and use the PNG sizes (Linux has no single file)
+        sizes = P.icon_sizes(dir)
+        @test P.icon_bytes(:windows, dir) == P.ico_bytes(sizes)
+        @test_throws ErrorException P.icon_bytes(:linux, dir)
+        @test_throws ErrorException P.icon_bytes(:plan9, dir)
     end
 end
 
@@ -927,4 +1032,59 @@ end
     @test "@rpath/libjulia-internal.$v.dylib" in ran[2] && !("-id" in ran[2])
     @test "-id" in ran[1] && ran[1][end] == "/b/libjulia-codegen.$v.dylib"
     @test_throws Exception P.relink_macos(["/b/x"]; runner = _ -> false)
+end
+
+@testset "trace fits: resume reruns a fit with no marker or no workbook" begin
+    mktempdir() do d
+        fits, results = mkpath(joinpath(d, "fits")), mkpath(joinpath(d, "results"))
+        @test P.fit_pending(fits, results, "A")             # no marker
+        write(joinpath(fits, "A.done"), "")
+        @test P.fit_pending(fits, results, "A")             # marker, no workbook
+        mkpath(joinpath(results, "test", "fitting_tests", "A"))
+        write(joinpath(results, "test", "fitting_tests", "A", "res.xlsx"), "")
+        @test !P.fit_pending(fits, results, "A")            # both: done
+        @test P.fit_pending(fits, results, "B")
+    end
+end
+
+@testset "logical cores, macOS deployment target, MiB rows" begin
+    @test P.logical_cores(; os = :macos, sysctl = () -> "8\n") == 8
+    @test P.logical_cores(; os = :macos, sysctl = () -> "x") == Sys.CPU_THREADS
+    @test P.logical_cores(; os = :macos, sysctl = () -> error("no")) == Sys.CPU_THREADS
+    @test P.logical_cores(; os = :linux, sysctl = () -> "8") == Sys.CPU_THREADS
+    withenv("MACOSX_DEPLOYMENT_TARGET" => nothing) do
+        @test P.macos_deployment_target(:macos) == "14.0"
+        @test P.macos_deployment_target(:linux) === nothing
+    end
+    withenv("MACOSX_DEPLOYMENT_TARGET" => "15.2") do
+        @test P.macos_deployment_target(:macos) == "15.2"
+    end
+    macos = Platform.ismacos()
+    @test haskey(P.cold_env("/w"), "MACOSX_DEPLOYMENT_TARGET") == macos
+end
+
+@testset "smoke test of the built program" begin
+    ok, text = P.smoke_run(`echo v1.2 hello`)
+    @test ok && occursin("v1.2", text)
+    ok, text = P.smoke_run(`false`)
+    @test !ok
+    ok, text = P.smoke_run(Cmd(["/nonexistent/baysol-xyz"]))
+    @test !ok && occursin("cannot start", text)
+    if !Sys.iswindows()
+        t = @elapsed (r = P.smoke_run(`sleep 5`; timeout = 0.3))
+        @test !r[1] && t < 3 && occursin("no answer", r[2])
+    end
+    mktempdir() do d
+        @test_throws Dev.Common.ToolError P.smoke_test(d)       # no program there
+    end
+end
+
+@testset "the macOS launcher finds its window by a unique title" begin
+    text = P.MACOS_LAUNCHER
+    @test startswith(text, "#!/bin/zsh")
+    @test occursin("name of w contains", text) && !occursin("tty of tab", text)
+    @test occursin("baysol-launch-", text)
+    # the window is closed by its id, only when it has one tab and the program ended well
+    @test occursin("close w saving no", text) && occursin("(count of tabs of w) is 1", text)
+    Platform.ismacos() && @test P.launcher()[2] == text
 end

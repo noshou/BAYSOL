@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 using Test
-using BAYSOLSetup
-const Platform = BAYSOLSetup.Platform
-using BAYSOLSetup: targets, defaultThreads, desktopDir, desktopEntry, _pinned, _unpinned,
-    iconPngs, iconFiles, hicolorDir, ICON_FILE, readManifest, manifestFile,
+using SetupWizard
+const Platform = SetupWizard.Platform
+using SetupWizard: targets, defaultThreads, desktopDir, desktopEntry, _pinned, _unpinned,
+    iconPngs, bundleIcons, iconFiles, hicolorDir, ICON_FILE, readManifest, manifestFile,
     _installMacApp!, _installWindows!
 
 # a stand-in PNG (signature and header only) of px x px pixels
@@ -25,6 +25,15 @@ function fakeIcns(file, sizes)
     return write(file, vcat(codeunits("icns"), be(8 + length(body)), body))
 end
 
+# the `icons/hicolor` folders of a Linux bundle, the way `bysl pkg` writes them
+function fakeIcons(bundle, folders)
+    for (folder, px) in folders
+        mkpath(joinpath(bundle, "icons", "hicolor", folder))
+        write(joinpath(bundle, "icons", "hicolor", folder, "baysol.png"), fakePng(px))
+    end
+    return bundle
+end
+
 # the variables that place the data, cache and configuration folders: XDG on Linux, the
 # Windows ones on Windows (where data and cache share LOCALAPPDATA); macOS has none
 function placeEnv(d; data = joinpath(d, "d"), cache = joinpath(d, "c"),
@@ -37,7 +46,7 @@ end
 winOr(win, other) = Platform.iswindows() ? win : other
 
 # every path goes into a temporary folder: no test touches the real home
-@testset "BAYSOLSetup" begin
+@testset "SetupWizard" begin
     home = mktempdir()
     env = placeEnv(home)
     @testset "defaults follow XDG, a relative XDG value is ignored" begin
@@ -59,6 +68,69 @@ winOr(win, other) = Platform.iswindows() ? win : other
             joinpath(home, ".local", "share", "baysol")
         @test defaultInstall(; env = rel, home).home == stock
     end
+    @testset "first-run defaults per system" begin
+        d = defaultInstall(; env, home)
+        @test d.desktop && !d.desktopIcon && !d.taskbarPin
+        @test d.pathLink == !Platform.iswindows()
+        @test d.opens == "tui" && d.terminal == "auto" && d.threads == defaultThreads()
+        # the checklist offers exactly the shortcuts of the system, defaults ticked
+        for os in (:linux, :macos, :windows)
+            offered = first.(SetupWizard.shortcutChoices(os))
+            @test :desktop in offered && :desktopIcon in offered
+            @test (:pathLink in offered) == (os != :windows)
+            @test (:taskbarPin in offered) == (os != :macos)
+        end
+        # the whole default Install survives the file
+        f = joinpath(mktempdir(), "install.json")
+        writeInstall(f, d)
+        @test readInstall(f) == d
+    end
+    @testset "yes/no parsing and the question helper" begin
+        @test parseYesNo("y", false) === true && parseYesNo(" YES ", false) === true
+        @test parseYesNo("n", true) === false && parseYesNo("No", true) === false
+        @test parseYesNo("", true) === true && parseYesNo("  ", false) === false
+        for bad in ("yep", "never", "install now", "not now", "cancel", "1", "yes no")
+            @test parseYesNo(bad, true) === nothing
+        end
+        feed(lines) = (l = copy(lines); io -> popfirst!(l))
+        ask(lines, default) = SetupWizard._askYesNo(IOBuffer(), "Q?", default;
+            read = feed(lines))
+        @test ask([""], true) === true && ask([""], false) === false
+        @test ask(["y"], false) === true && ask(["no"], true) === false
+        # anything else is refused and asked again until a valid answer
+        io = IOBuffer()
+        @test SetupWizard._askYesNo(
+            io,
+            "Q?",
+            true;
+            read = feed(["never", "maybe", "n"]),
+        ) ===
+              false
+        @test count("Please answer Yes or No.", String(take!(io))) == 2
+        # the threads: a number, clamped; the default on an empty or bad line
+        @test parseThreads("6", 4) == 6 && parseThreads("", 4) == 4
+        @test parseThreads("x", 4) == 4 && parseThreads("0", 4) == 1
+        @test parseThreads("9999", 4) == 256
+    end
+    @testset "describeInstall and startNow" begin
+        i = Install(; home = "/h", structureCache = "/s", threads = 3, desktop = true,
+            pathLink = true)
+        io = IOBuffer()
+        describeInstall(io, i; os = :linux)
+        out = String(take!(io))
+        @test occursin("/h", out) && occursin("threads     3", out)
+        @test occursin("application menu entry", out) && occursin("PATH link", out)
+        @test !occursin("Desktop icon", out)
+        # the start question: Yes starts what `opens` says, No starts nothing
+        yes(_, _, _) = true
+        no(_, _, _) = false
+        @test startNow(IOBuffer(), i; ask = yes) == SetupWizard.LAUNCH_TUI
+        cli = SetupWizard._copy(i; opens = "cli")
+        @test startNow(IOBuffer(), cli; ask = yes) == SetupWizard.LAUNCH_CLI
+        @test startNow(IOBuffer(), i; ask = no) == 0
+        @test SetupWizard._copy(i; threads = 9).threads == 9
+        @test SetupWizard._copy(i; threads = 9).home == "/h"
+    end
     @testset "install.json round trip, odd characters, damaged file" begin
         f = joinpath(home, "x", "install.json")
         i = Install(; home = "/a \"b\"/c\\d", structureCache = "/s",
@@ -78,7 +150,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
         b = mkpath(joinpath(d, "bundle"))
         c = check(b; env = e, home = d)
         @test any(occursin("install.json is missing", x) for x in c.fixable)
-        @test length(c.missing) == length(BAYSOLSetup.BUNDLE_FILES)
+        @test length(c.missing) == length(SetupWizard.BUNDLE_FILES)
         i = Install(;
             home = joinpath(d, "h"),
             structureCache = joinpath(d, "s"),
@@ -114,7 +186,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
                 "XDG_DESKTOP_DIR=\"\$HOME/Schreibtisch\"\n")
             @test desktopDir(; env = e, home = d) == joinpath(d, "Schreibtisch")
             b = mkpath(joinpath(d, "bundle"))
-            fakeIcns(joinpath(b, ICON_FILE), ["icp4" => 16, "ix22" => 22, "ic10" => 1024])
+            fakeIcons(b, ["16x16" => 16, "22x22" => 22, "512x512@2" => 1024])
             i = Install(;
                 home = joinpath(d, "h"),
                 structureCache = joinpath(d, "s"),
@@ -131,7 +203,12 @@ winOr(win, other) = Platform.iswindows() ? win : other
             @test isfile(t.icon) && (filemode(t.icon) & 0o111) != 0
             # by name: the theme picks
             @test occursin("Icon=baysol\n", read(t.icon, String))
-            @test [first(p) for p in iconPngs(joinpath(b, ICON_FILE))] == [16, 22, 1024]
+            @test [first(p) for p in bundleIcons(b)] == [16, 22, 1024]
+            # an older bundle with the `.icns` instead of the folder still installs
+            old = mkpath(joinpath(d, "oldbundle"))
+            fakeIcns(joinpath(old, "baysol.icns"), ["icp4" => 16, "ix22" => 22])
+            @test [first(p) for p in bundleIcons(old)] == [16, 22]
+            @test isempty(bundleIcons(mkpath(joinpath(d, "nobundle"))))
             sizes = iconFiles([16, 22, 1024]; env = e, home = d)
             @test all(isfile, sizes)
             @test endswith(sizes[3], joinpath("512x512@2", "apps", "baysol.png"))
@@ -167,7 +244,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
         d = mktempdir()
         e = placeEnv(d)
         b = mkpath(joinpath(d, "bundle"))
-        fakeIcns(joinpath(b, ICON_FILE), ["icp4" => 16, "ic08" => 256])
+        fakeIcons(b, ["16x16" => 16, "256x256" => 256])
         i = Install(;
             home = joinpath(d, "h"),
             structureCache = joinpath(d, "s"),
@@ -190,7 +267,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
             @test isfile(other) && isfile(keep)
             # a second uninstall without a manifest removes no icons and entries
             mkpath(b)
-            fakeIcns(joinpath(b, ICON_FILE), ["icp4" => 16, "ic08" => 256])
+            fakeIcons(b, ["16x16" => 16, "256x256" => 256])
             applyInstall(i, b; env = e, home = d)
             rm(manifestFile(; env = e, home = d))
             uninstall(mkpath(joinpath(d, "b2")); i, env = e, home = d)
@@ -204,7 +281,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
         fakeIcns(icns, ["icp4" => 16])
         made, journal = String[], Function[]
         app = joinpath(d, "Applications", "BAYSOL.app")
-        BAYSOLSetup._installMacApp!(journal, made, joinpath(d, "bundle"), app, icns)
+        SetupWizard._installMacApp!(journal, made, joinpath(d, "bundle"), app, icns)
         @test isfile(joinpath(app, "Contents", "Info.plist"))
         @test occursin(
             "baysol</string>",
@@ -213,19 +290,34 @@ winOr(win, other) = Platform.iswindows() ? win : other
         @test occursin("<string>arm64</string>",
             read(joinpath(app, "Contents", "Info.plist"), String))
         @test isfile(joinpath(app, "Contents", "Resources", "baysol.icns"))
+        # the hand-made macOS file (TOC, ARGB and mask entries, duplicate PNG sizes) is
+        # copied byte for byte, and the PNG reader of the Linux side does not choke on it
+        be(n) = collect(reinterpret(UInt8, [hton(UInt32(n))]))
+        entry(t, d) = vcat(codeunits(t), be(8 + length(d)), d)
+        body = vcat(entry("TOC ", zeros(UInt8, 8)), entry("ic04", codeunits("ARGB....")),
+            entry("is32", zeros(UInt8, 9)), entry("ic11", fakePng(32)),
+            entry("ic08", fakePng(256)), entry("ic13", fakePng(256)))
+        macIcns = joinpath(d, "mac.icns")
+        write(macIcns, vcat(codeunits("icns"), be(8 + length(body)), body))
+        macApp = joinpath(d, "Applications2", "BAYSOL.app")
+        SetupWizard._installMacApp!(Function[], String[], joinpath(d, "bundle"), macApp,
+            macIcns)
+        @test read(joinpath(macApp, "Contents", "Resources", "baysol.icns")) ==
+              read(macIcns)
+        @test [first(p) for p in iconPngs(macIcns)] == [32, 256]
         exe = joinpath(app, "Contents", "MacOS", "BAYSOL")
         @test occursin("BAYSOL.command", read(exe, String))
         # the path survives the shell, and a moved bundle is noticed
         odd = joinpath(d, "a \$HOME `x` \"q\" 'r'")
-        script = BAYSOLSetup._macAppScript(odd)
+        script = SetupWizard._macAppScript(odd)
         arg = Base.shell_split(split(split(script, "command="; limit = 2)[2], '\n')[1])
         @test only(arg) == joinpath(odd, "BAYSOL.command")
-        @test BAYSOLSetup._isMacAppOf(app, joinpath(d, "bundle"))
-        @test !BAYSOLSetup._isMacAppOf(app, joinpath(d, "moved"))
+        @test SetupWizard._isMacAppOf(app, joinpath(d, "bundle"))
+        @test !SetupWizard._isMacAppOf(app, joinpath(d, "moved"))
         # an apply over an app that exists is undone to what was there
         before = read(exe, String)
         again = Function[]
-        BAYSOLSetup._installMacApp!(again, String[], joinpath(d, "moved"), app, icns)
+        SetupWizard._installMacApp!(again, String[], joinpath(d, "moved"), app, icns)
         @test read(exe, String) != before
         rollback!(again)
         @test read(exe, String) == before
@@ -234,7 +326,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
         sibling = joinpath(d, "Applications", "Other.app")
         mkpath(sibling)
         entries = [first(split(l, '\t')) => last(split(l, '\t')) for l in made]
-        BAYSOLSetup._removeManifest(entries, joinpath(d, "bundle"))
+        SetupWizard._removeManifest(entries, joinpath(d, "bundle"))
         @test !isdir(app) && isdir(sibling)
         made = String[]
         lnk = joinpath(d, "Start", "BAYSOL.lnk")
@@ -242,25 +334,25 @@ winOr(win, other) = Platform.iswindows() ? win : other
         write(ico, "ico")
         seen = Ref{Any}(nothing)
         stub = (l, t, ic, w) -> (write(l, "lnk"); seen[] = (l, t, ic))
-        BAYSOLSetup._installWindows!(Function[], made, joinpath(d, "bundle"), lnk,
+        SetupWizard._installWindows!(Function[], made, joinpath(d, "bundle"), lnk,
             joinpath(d, "cfg", "baysol.ico"), ico; makeShortcut = stub, home = d)
         @test isfile(lnk) && isfile(joinpath(d, "cfg", "baysol.ico"))
         @test seen[][2] == joinpath(d, "bundle", "baysol.exe")
         entries = [first(split(l, '\t')) => last(split(l, '\t')) for l in made]
-        BAYSOLSetup._removeManifest(entries, joinpath(d, "bundle"))
+        SetupWizard._removeManifest(entries, joinpath(d, "bundle"))
         @test !ispath(lnk) && !ispath(joinpath(d, "cfg", "baysol.ico")) &&
               !isdir(dirname(lnk))
     end
 
     @testset "the terminal of the macOS icon" begin
-        choices = BAYSOLSetup._terminalChoices
+        choices = SetupWizard._terminalChoices
         @test first.(choices(["iterm2", "wezterm"])) ==
               ["auto", "iterm2", "wezterm", "terminal"]
-        @test last(choices(["wezterm"])[1]) == "Automatic (WezTerm now)"
+        @test last(choices(["wezterm"])[1]) == "Automatic"
         @test first.(choices(String[])) == ["auto", "terminal"]
         d = mktempdir()
         f = joinpath(d, "i.json")
-        for id in BAYSOLSetup.MAC_TERMINAL_IDS
+        for id in SetupWizard.MAC_TERMINAL_IDS
             i = Install(; home = "/a", structureCache = "/s", terminal = id)
             writeInstall(f, i)
             @test readInstall(f) == i
@@ -277,7 +369,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
             b = joinpath(d, "my 'b'")
             cmd = joinpath(b, "BAYSOL.command")
             function opened(id)
-                s = replace(BAYSOLSetup._macAppScript(b, id), "/usr/bin/open" => open_,
+                s = replace(SetupWizard._macAppScript(b, id), "/usr/bin/open" => open_,
                     "in /Applications" => "in $apps")
                 file = joinpath(d, "run.zsh")
                 write(file, s)
@@ -287,7 +379,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
             term = ["-a", "Terminal", cmd]
             wez = ["-a", joinpath(apps, "WezTerm.app"), "-n", "--args", "start", "--", cmd]
             iterm = ["-a", joinpath(apps, "iTerm.app"), cmd]
-            @test all(opened(id) == term for id in BAYSOLSetup.MAC_TERMINAL_IDS)
+            @test all(opened(id) == term for id in SetupWizard.MAC_TERMINAL_IDS)
             mkdir(joinpath(apps, "WezTerm.app"))
             @test opened("auto") == wez && opened("wezterm") == wez
             @test opened("iterm2") == term && opened("terminal") == term
@@ -459,6 +551,113 @@ winOr(win, other) = Platform.iswindows() ? win : other
         @test isfile(joinpath(i.structureCache, "foreign.txt"))
         @test !islink(targets(; env, home).link)
     end
+    @testset "uninstall leaves nothing of the app behind" begin
+        d = mktempdir()
+        h = joinpath(d, "h")
+        e = placeEnv(d)
+        tmp = mkpath(joinpath(d, "tmp"))
+        caches = Platform.cache_dir(; env = e, home = h)
+        function setup(settings)
+            i = Install(; home = joinpath(d, "projects"),
+                structureCache = Platform.default_structure_cache(; env = e, home = h))
+            mkpath(i.structureCache)
+            write(joinpath(i.structureCache, "CACHEDIR.TAG"), "tag")
+            mkpath(joinpath(caches, "_cache"))
+            write(joinpath(caches, "_cache", "fixture"), "x")
+            mkpath(i.home)
+            write(joinpath(i.home, "settings.json"), settings)
+            mkpath(joinpath(tmp, "baysol"))
+            b = mkpath(joinpath(d, "bundle"))
+            write(joinpath(b, "baysol"), "")
+            return i, b
+        end
+        # no projects: the empty settings.json of the interface goes, the folder stays
+        i, b = setup("{}\n")
+        uninstall(b; i, env = e, home = h, tmp)
+        @test !isdir(caches) && !isdir(joinpath(tmp, "baysol")) && !isdir(b)
+        @test isdir(i.home) && !isfile(joinpath(i.home, "settings.json"))
+        @test isempty(readdir(i.home))
+        # settings that hold something, and a project, stay
+        i, b = setup("{\"fitting\": 1}\n")
+        write(joinpath(i.home, "p.txt"), "project")
+        uninstall(b; i, env = e, home = h, tmp)
+        @test isfile(joinpath(i.home, "settings.json")) && isfile(joinpath(i.home, "p.txt"))
+        # everything: not even the projects folder
+        i, b = setup("{}\n")
+        uninstall(b; data = true, i, env = e, home = h, tmp)
+        @test !isdir(i.home) && !isdir(caches) && !isdir(b)
+        # a scratch folder of a process that still runs is not touched
+        i, b = setup("{}\n")
+        mkpath(joinpath(tmp, "baysol", "1234"))
+        uninstall(b; i, env = e, home = h, tmp)
+        @test isdir(joinpath(tmp, "baysol", "1234"))
+        # a cache folder that holds the projects (or the user's home) is kept whole
+        i = Install(; home = joinpath(caches, "projects"),
+            structureCache = joinpath(caches, "_structures"))
+        mkpath(i.home)
+        mkpath(i.structureCache)
+        @test SetupWizard._removeCacheRoot(; env = e, home = h, protect = [i.home]) ===
+              "kept $caches (it holds $(i.home))"
+        @test isdir(i.home)
+        # no settings.json in a folder: nothing to remove
+        @test SetupWizard._removeEmptySettings(joinpath(d, "nothing")) == false
+    end
+    @testset "the Dock entry of BAYSOL on macOS" begin
+        text = """
+        Array {
+            Dict {
+                GUID = 1
+                tile-data = Dict {
+                    bundle-identifier = com.apple.Safari
+                    file-label = Safari
+                }
+                tile-type = file-tile
+            }
+            Dict {
+                GUID = 2
+                tile-data = Dict {
+                    bundle-identifier = org.baysol.app
+                    file-label = BAYSOL
+                }
+                tile-type = file-tile
+            }
+            Dict {
+                GUID = 3
+                tile-type = spacer-tile
+            }
+            Dict {
+                GUID = 4
+                tile-data = Dict {
+                    bundle-identifier = org.baysol.app
+                }
+            }
+        }
+        """
+        @test SetupWizard._dockIndices(text) == [1, 3]
+        @test SetupWizard._dockIndices("Array {\n}\n") == Int[]
+        @test SetupWizard._dockIndices("") == Int[]
+        plist = joinpath(mktempdir(), "com.apple.dock.plist")
+        @test SetupWizard._unpinDock(; plist) === nothing  # no Dock file: nothing
+        write(plist, "x")
+        ran = Cmd[]
+        line = SetupWizard._unpinDock(; plist, capture = c -> text,
+            exec = c -> push!(ran, c))
+        @test line == "removed BAYSOL from the Dock"
+        pb = SetupWizard.PLIST_BUDDY
+        @test ran == [
+            Cmd([pb, "-c", "Delete :persistent-apps:3", plist]),
+            Cmd([pb, "-c", "Delete :persistent-apps:1", plist]),
+            Cmd(["/usr/bin/killall", "Dock"]),
+        ]
+        empty!(ran)
+        @test SetupWizard._unpinDock(; plist, capture = c -> "Array {\n}\n",
+            exec = c -> push!(ran, c)) === nothing
+        @test isempty(ran)  # nothing of BAYSOL in the Dock: the Dock is not restarted
+        @test SetupWizard._unpinDock(; plist, capture = c -> error("no"),
+            exec = c -> push!(ran, c)) === nothing
+        @test SetupWizard._dockPrint(plist) ==
+              Cmd([pb, "-c", "Print :persistent-apps", plist])
+    end
     @testset "a link that points elsewhere is not removed" begin
         t = targets(; env, home)
         if Platform.isunix()
@@ -474,29 +673,29 @@ winOr(win, other) = Platform.iswindows() ? win : other
     end
     @testset "default caches never sit inside the projects folder" begin
         d = defaultInstall(; env, home)
-        @test !BAYSOLSetup._within(d.structureCache, d.home)
+        @test !SetupWizard._within(d.structureCache, d.home)
         # an unrelated folder is not "within"; the folder itself and a child are
-        @test BAYSOLSetup._within(joinpath(home, "a", "b"), joinpath(home, "a"))
-        @test BAYSOLSetup._within(joinpath(home, "a"), joinpath(home, "a"))
-        @test !BAYSOLSetup._within(joinpath(home, "ab"), joinpath(home, "a"))
+        @test SetupWizard._within(joinpath(home, "a", "b"), joinpath(home, "a"))
+        @test SetupWizard._within(joinpath(home, "a"), joinpath(home, "a"))
+        @test !SetupWizard._within(joinpath(home, "ab"), joinpath(home, "a"))
         if Platform.iswindows()
             @test d.home == joinpath(home, "d", "baysol")
             @test d.structureCache == joinpath(home, "d", "baysol-cache", "_structures")
         end
     end
     @testset "PATH link is offered except on Windows" begin
-        fields(os) = first.(BAYSOLSetup.shortcutChoices(os))
+        fields(os) = first.(SetupWizard.shortcutChoices(os))
         @test fields(:linux) == [:desktop, :desktopIcon, :taskbarPin, :pathLink]
         @test fields(:windows) == [:desktop, :desktopIcon, :taskbarPin]
         @test fields(:macos) == [:desktop, :desktopIcon, :pathLink]  # no GNOME pin
-        @test !any(occursin("GNOME", last(c)) for c in BAYSOLSetup.shortcutChoices(:macos))
-        @test BAYSOLSetup.shortcutChoices() == BAYSOLSetup.shortcutChoices(Platform.os())
+        @test !any(occursin("GNOME", last(c)) for c in SetupWizard.shortcutChoices(:macos))
+        @test SetupWizard.shortcutChoices() == SetupWizard.shortcutChoices(Platform.os())
     end
     @testset "_removeBundle: refusals, real removal, the PowerShell command" begin
         scratch = mktempdir()
         mkbundle(name) = (b = mkpath(joinpath(scratch, name));
             write(joinpath(b, "baysol"), ""); b)
-        rb = BAYSOLSetup._removeBundle
+        rb = SetupWizard._removeBundle
         recorded = Cmd[]
         spawn(c) = (push!(recorded, c); nothing)
         # refused: root, home, a parent of the projects folder, a folder with no program,
@@ -524,7 +723,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
         @test isdir(joinpath(scratch, "holds-projects"))
         # the command: the path is in the environment, never in the script
         for name in ("sp ace", "qu\"ote", "dollar\$env", "uni-é-ß-日本", "semi;colon'")
-            c = BAYSOLSetup._cleanupCommand(joinpath(scratch, name))
+            c = SetupWizard._cleanupCommand(joinpath(scratch, name))
             @test any(==("BAYSOL_GONE=" * joinpath(scratch, name)), c.env)
             @test !any(a -> occursin(name, a), c.exec)
             @test c.exec[1] == "powershell"
@@ -556,12 +755,12 @@ winOr(win, other) = Platform.iswindows() ? win : other
     end
     @testset "clearCache empties only a BAYSOL cache" begin
         d = mkpath(joinpath(mktempdir(), "c"))
-        write(joinpath(d, BAYSOLSetup.CACHE_TAG), "")
+        write(joinpath(d, SetupWizard.CACHE_TAG), "")
         write(joinpath(d, "a.pdb"), "x")
         mkpath(joinpath(d, "sub"))
         write(joinpath(d, "sub", "b"), "y")
         @test occursin("2 entries", clearCache(d))
-        @test readdir(d) == [BAYSOLSetup.CACHE_TAG]
+        @test readdir(d) == [SetupWizard.CACHE_TAG]
         f = mkpath(joinpath(mktempdir(), "foreign"))
         write(joinpath(f, "k.txt"), "k")
         @test occursin("kept", clearCache(f))
@@ -570,7 +769,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
         # an entry that cannot be removed (a loaded library on Windows) does not stop the
         # rest: it is kept and named, the others go
         b = mkpath(joinpath(mktempdir(), "busy"))
-        write(joinpath(b, BAYSOLSetup.CACHE_TAG), "")
+        write(joinpath(b, SetupWizard.CACHE_TAG), "")
         write(joinpath(b, "free.pdb"), "x")
         write(joinpath(b, "locked.dll"), "y")
         line = clearCache(
@@ -579,7 +778,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
                 basename(p) == "locked.dll" ? error("in use") : rm(p; force = true),
         )
         @test occursin("1 entries", line) && occursin("kept locked.dll", line)
-        @test sort(readdir(b)) == sort([BAYSOLSetup.CACHE_TAG, "locked.dll"])
+        @test sort(readdir(b)) == sort([SetupWizard.CACHE_TAG, "locked.dll"])
     end
     @testset "openFolder: a missing folder, and the shell runs in the folder" begin
         io = IOBuffer()
@@ -612,7 +811,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
             r = scanDependencies([only_win]; os = :linux, which = fakeWhich(), dims = big)
             @test !only(r).applicable && !only(r).found
             r = scanDependencies([only_win]; os = :windows, which = fakeWhich(),
-                dims = big, detect = (i, e, w, d) -> BAYSOLSetup.Detection(true, "x"))
+                dims = big, detect = (i, e, w, d) -> SetupWizard.Detection(true, "x"))
             @test only(r).applicable && only(r).found
             none = scanDependencies(; os = :linux, env = Dict{String,String}(),
                 which = fakeWhich(), dims = big)
@@ -659,7 +858,7 @@ winOr(win, other) = Platform.iswindows() ? win : other
             which = n -> n in have ? "/fake/bin/$n" : nothing
             offer(k, runner = c -> (push!(ran, c); true)) =
                 offerInstall(IOBuffer(), brew, :macos; which, runner, ask = (p, c) -> k)
-            @test [offer(k) for k in (0, 2, 3, 4)] == ["later", "later", "no", "never"]
+            @test [offer(k) for k in (0, 2)] == ["later", "no"]
             @test isempty(ran)
             @test offer(1) == "later"  # the installer ended without Homebrew
             @test offer(1, c -> false) == "later"
@@ -671,10 +870,10 @@ winOr(win, other) = Platform.iswindows() ? win : other
             checkDependencies(IOBuffer(); env = placeEnv(d), home = d, os = :macos, which,
                 dims = big, runner,
                 items = [brew, only(i for i in items if i.id == "sixel")],
-                detect = (a...) -> BAYSOLSetup.Detection(false, ""),
+                detect = (a...) -> SetupWizard.Detection(false, ""),
                 ask = (p, c) -> (push!(prompts, c[1]); 1))
-            @test prompts == ["Install now", "Install now"]
-            @test ran == [BAYSOLSetup.BREW_INSTALL,
+            @test prompts == ["Yes", "Yes"]
+            @test ran == [SetupWizard.BREW_INSTALL,
                 Cmd(["/fake/bin/brew", "install", "--cask", "iterm2"])]
         end
         @testset "iTerm2 on a Mac without Homebrew" begin
@@ -687,16 +886,18 @@ winOr(win, other) = Platform.iswindows() ? win : other
                 return offerInstall(IOBuffer(), sixel, os; which, runner,
                     ask = (p, c) -> pick)
             end
-            @test [offer(k) for k in (0, 3, 4, 5)] == ["later", "later", "no", "never"]
-            @test isempty(ran)  # nothing runs without the choice
-            @test offer(2) == "later"
-            @test only(ran) == Cmd(["/usr/bin/open", BAYSOLSetup.ITERM_PAGE])
+            @test [offer(k) for k in (0, 2)] == ["later", "no"]
+            @test isempty(ran)  # nothing runs without the Yes
+            io = IOBuffer()
+            offerInstall(io, sixel, :macos; which, runner = c -> true,
+                ask = (p, c) -> (@test c == ["Yes", "No"]; 2))
+            @test occursin(SetupWizard.ITERM_PAGE, String(take!(io)))  # the page is named
             # the installer fails, or ends without Homebrew: iTerm2 is not tried
             @test offer(1; runner = c -> (push!(ran, c); false)) == "later"
             @test length(ran) == 1
             @test offer(1) == "later" && length(ran) == 1
             @test offer(1; runner = brewComes) == "yes"
-            @test ran[1] == BAYSOLSetup.BREW_INSTALL
+            @test ran[1] == SetupWizard.BREW_INSTALL
             @test ran[2] == Cmd(["/fake/bin/brew", "install", "--cask", "iterm2"])
             # Homebrew is there now: the plain offer
             @test offer(1) == "yes" && only(ran) == ran[1] && "install" in ran[1].exec
@@ -712,13 +913,13 @@ winOr(win, other) = Platform.iswindows() ? win : other
             font = only(i for i in items if i.id == "font")
             mac = Dict("TERM_PROGRAM" => "Apple_Terminal")
             found(f; env = mac, w = fakeWhich("osascript")) =
-                BAYSOLSetup._detectFont(env, w; read = _ -> f).found
+                SetupWizard._detectFont(env, w; read = _ -> f).found
             @test !found("SFMono-Regular 11") && !found("SFMono-Bold 14")
             @test found("Menlo-Regular 14")
             # not asked: the font is unknown, or it is another terminal
             @test found(nothing) && found("") && found("SFMono-Regular 11"; w = fakeWhich())
             @test found("SFMono-Regular 11"; env = Dict("TERM_PROGRAM" => "iTerm.app"))
-            @test BAYSOLSetup._macFont("/no/such/osascript") === nothing
+            @test SetupWizard._macFont("/no/such/osascript") === nothing
             for os in (:linux, :windows)
                 r = scanDependencies([font]; os, env = mac, which = fakeWhich(), dims = big)
                 @test !only(r).applicable
@@ -727,13 +928,13 @@ winOr(win, other) = Platform.iswindows() ? win : other
             ran = Cmd[]
             offer(pick, io = IOBuffer()) = offerInstall(io, font, :macos;
                 which = fakeWhich("osascript"), runner = c -> (push!(ran, c); true),
-                ask = (p, c) -> (@test c[1] == "Change now"; pick))
-            @test [offer(k) for k in (0, 2, 3, 4)] == ["later", "later", "no", "never"]
+                ask = (p, c) -> (@test c == ["Yes", "No"]; pick))
+            @test [offer(k) for k in (0, 2)] == ["later", "no"]
             @test isempty(ran)
             io = IOBuffer()
             @test offer(1, io) == "yes"
             @test only(ran) ==
-                  Cmd(["/fake/bin/osascript", "-e", BAYSOLSetup.MAC_FONT_SET])
+                  Cmd(["/fake/bin/osascript", "-e", SetupWizard.MAC_FONT_SET])
             text = String(take!(io))
             @test occursin("osascript -e 'tell", text) && occursin("to undo", text)
             report = IOBuffer()
@@ -744,29 +945,36 @@ winOr(win, other) = Platform.iswindows() ? win : other
             spacing = only(i for i in items if i.id == "spacing")
             mac = Dict("TERM_PROGRAM" => "Apple_Terminal")
             found(x; env = mac) =
-                BAYSOLSetup._detectSpacing(env, fakeWhich(); read = _ -> x).found
+                SetupWizard._detectSpacing(env, fakeWhich(); read = _ -> x).found
             @test found((1.0, 1.0)) && found(nothing)
             @test !found((1.004032258064516, 1.0)) && !found((1.0, 1.1))
             @test !found((0.9959677419354839, 1.0))
             @test found((1.2, 1.2); env = Dict("TERM_PROGRAM" => "iTerm.app"))
-            @test BAYSOLSetup._macSpacing(fakeWhich()) === nothing
-            @test BAYSOLSetup._macSpacing(fakeWhich("osascript", "defaults", "plutil")) ===
+            @test SetupWizard._macSpacing(fakeWhich()) === nothing
+            @test SetupWizard._macSpacing(fakeWhich("osascript", "defaults", "plutil")) ===
                   nothing
-            parsed = BAYSOLSetup._parseSpacing
+            parsed = SetupWizard._parseSpacing
             @test parsed("<dict></dict>") == (1.0, 1.0)
             @test parsed(
                 "<key>FontWidthSpacing</key>\n\t<real>1.004</real>" *
                 "<key>FontHeightSpacing</key><integer>2</integer>",
             ) == (1.004, 2.0)
             ran = Cmd[]
-            io = IOBuffer()
-            answers = [
-                offerInstall(io, spacing, :macos; which = fakeWhich(),
-                    runner = c -> (push!(ran, c); true), ask = (p, c) -> k) for k in 0:4
-            ]
-            @test answers == ["later", "yes", "later", "no", "never"]
-            @test isempty(ran)
-            @test occursin("character spacing and line spacing to 1.0", String(take!(io)))
+            texts = String[]
+            answers = map(0:2) do k
+                io = IOBuffer()
+                a = offerInstall(io, spacing, :macos; which = fakeWhich(),
+                    runner = c -> (push!(ran, c); true),
+                    ask = (p, c) -> (@test c == ["Yes", "No"]; k))
+                push!(texts, String(take!(io)))
+                a
+            end
+            @test answers == ["later", "yes", "no"]
+            @test isempty(ran)  # Terminal has no command: the steps are shown, not run
+            steps = "character spacing and line spacing to 1.0"
+            @test occursin(steps, texts[2])  # a Yes shows the steps
+            @test !occursin(steps, texts[1]) && !occursin(steps, texts[3])
+            @test !any(occursin("I changed it", t) for t in texts)
         end
         @testset "report content" begin
             r = scanDependencies(items; os = :linux, env = Dict{String,String}(),
@@ -798,39 +1006,45 @@ winOr(win, other) = Platform.iswindows() ? win : other
             ran = Cmd[]
             runner = c -> (push!(ran, c); true)
             io = IOBuffer()
-            # macOS cask needs admin: shown, never run, even on "Install" being absent
+            # macOS cask needs admin: a note with the command, never a question, never run
+            noAsk = (p, c) -> (@test false; 1)
             a = offerInstall(io, items[1], :macos; which = fakeWhich("brew"), runner,
-                ask = (p, c) -> (@test !("Install now" in c); 1))
+                ask = noAsk)
+            out = String(take!(io))
             @test a == "later" && isempty(ran)
-            @test occursin("sudo brew install --cask mactex-no-gui", String(take!(io)))
-            # Windows has no route for TeX Live: manual text, no winget needed
+            @test occursin("sudo brew install --cask mactex-no-gui", out)
+            @test occursin("administrator rights", out)
+            # Windows has no route for TeX Live: the manual text as a note
             a = offerInstall(io, items[1], :windows; which = fakeWhich("winget"), runner,
-                ask = (p, c) -> 2)
-            @test a == "no" && isempty(ran)
+                ask = noAsk)
+            @test a == "later" && isempty(ran)
             @test occursin("install-tl", String(take!(io)))
             # a route whose manager is missing falls back to the manual text
             a = offerInstall(io, items[1], :linux; which = fakeWhich(), runner,
-                ask = (p, c) -> 3)
+                ask = noAsk)
             out = String(take!(io))
-            @test a == "never" && isempty(ran)
+            @test a == "later" && isempty(ran)
             @test occursin("No package manager found", out) &&
                   occursin("texlive packages", out)
-            # a runnable route (winget, no admin): only the explicit Install now runs it
+            # a runnable route (winget, no admin): Yes or No, only the Yes runs it
             term = items[2]
+            prompts = Vector{String}[]
+            ask(pick) = (p, c) -> (push!(prompts, c); pick)
             a = offerInstall(io, term, :windows; which = fakeWhich("winget"), runner,
-                ask = (p, c) -> 2)  # Not now
+                ask = ask(2))  # No
+            @test a == "no" && isempty(ran)
+            a = offerInstall(io, term, :windows; which = fakeWhich("winget"), runner,
+                ask = ask(0))  # menu cancelled
             @test a == "later" && isempty(ran)
             a = offerInstall(io, term, :windows; which = fakeWhich("winget"), runner,
-                ask = (p, c) -> 0)  # menu cancelled
-            @test a == "later" && isempty(ran)
-            a = offerInstall(io, term, :windows; which = fakeWhich("winget"), runner,
-                ask = (p, c) -> 1)  # Install now
+                ask = ask(1))  # Yes
             @test a == "yes" && length(ran) == 1
+            @test all(==(["Yes", "No"]), prompts)
             @test ran[1] == Cmd(["/fake/bin/winget", "install", "--id",
                 "Microsoft.WindowsTerminal", "-e"])
             # a failing install is "later", not "yes"
             a = offerInstall(io, term, :windows; which = fakeWhich("winget"),
-                runner = c -> false, ask = (p, c) -> 1)
+                runner = c -> false, ask = ask(1))
             @test a == "later"
         end
         @testset "answers are remembered in install.json" begin
@@ -843,10 +1057,10 @@ winOr(win, other) = Platform.iswindows() ? win : other
             asks = String[]
             run1(picks; kw...) = checkDependencies(IOBuffer(); env = e, home = d,
                 os = :windows, which = fakeWhich("winget"), runner, dims = big,
-                detect = (i, en, w, dm) -> BAYSOLSetup._detect(i, env0, w, dm),
+                detect = (i, en, w, dm) -> SetupWizard._detect(i, env0, w, dm),
                 ask = (p, c) -> (push!(asks, p); popfirst!(picks)), kw...)
             # before the first setup there is no file: nothing is written
-            run1([1, 2]; items)
+            run1([2]; items)  # sixel: No (TeX Live is a note: no question)
             @test !isfile(file) && isempty(ran)
             # the folder of install.json exists once set up
             # (folders that can be made: the apply below makes them)
@@ -854,27 +1068,30 @@ winOr(win, other) = Platform.iswindows() ? win : other
             i = Install(; home = h, structureCache = joinpath(d, "s"), threads = 2)
             writeInstall(file, i)
             empty!(asks)
-            # latex: Windows has no route (Not now = 1); sixel: winget route, Install now
-            run1([1, 1])
+            # latex: Windows has no route (a note); sixel: winget route, Yes
+            run1([1])
+            @test length(asks) == 1
             @test readDepAnswers(file) == Dict("latex" => "later", "sixel" => "yes")
             @test length(ran) == 1
             back = readInstall(file)
             @test back.threads == 2 && back.home == h  # other fields kept
             @test occursin("\"dep.latex\": \"later\"", read(file, String))
-            # asked again for "later" (the sixel item is still not detected here)
+            # asked again for a missing item after "yes" (sixel is still not detected here)
             empty!(asks)
-            run1([2, 4])  # latex: No; sixel: Never
-            @test length(asks) == 2
-            @test readDepAnswers(file) == Dict("latex" => "no", "sixel" => "never")
-            # the first run does not ask "no" or "never" again
+            run1([2])  # sixel: No
+            @test length(asks) == 1
+            @test readDepAnswers(file) == Dict("latex" => "later", "sixel" => "no")
+            # the first run does not ask "no" again
             empty!(asks)
             run1(Int[]; firstRun = true)
             @test isempty(asks)
-            # the menu asks "no" again, but never "never"
+            # the menu asks "no" again
             empty!(asks)
-            run1([3])  # latex: Never ask again
+            run1([2])
             @test length(asks) == 1
-            @test readDepAnswers(file)["latex"] == "never"
+            # a "never" stored by an older version is still honoured, never asked
+            @test saveDepAnswers(Dict("latex" => "never", "sixel" => "never");
+                env = e, home = d)
             empty!(asks)
             run1(Int[])
             @test isempty(asks)
@@ -936,16 +1153,105 @@ winOr(win, other) = Platform.iswindows() ? win : other
         end
     end
 
-    @testset "icon" begin
-        S = BAYSOLSetup
-        @test S._plainIcon(Dict("TERM_PROGRAM" => "Apple_Terminal"))
-        @test !S._plainIcon(Dict("TERM_PROGRAM" => "iTerm.app"))
-        @test allequal(length.(S.ICON_CELLS))
-        for truecolor in (true, false)
-            drawn = sprint(io -> S.drawIcon(io; truecolor, plain = true))
-            @test count('\n', drawn) == length(S.ICON_CELLS)
-            @test isempty(strip(replace(drawn, r"\e\[[0-9;]*m" => "")))
-            @test occursin('▀', sprint(io -> S.drawIcon(io; truecolor, plain = false)))
+    @testset "clock" begin
+        S = SetupWizard
+        tm(h, m, sec, wday) = Libc.TmStruct(sec, m, h, 27, 10, 126, wday, 0, 0)
+        @test formatClock(tm(14, 3, 22, 5); offsetMinutes = 60, zone = "CET") ==
+              "Fri, 27 Nov 2026, 14:03:22-CET (UTC+01:00)"
+        @test formatClock(tm(0, 0, 0, 0); offsetMinutes = -330, zone = "X") ==
+              "Sun, 27 Nov 2026, 00:00:00-X (UTC-05:30)"
+        @test formatClock(tm(23, 59, 59, 3); offsetMinutes = 0, zone = "UTC") ==
+              "Wed, 27 Nov 2026, 23:59:59-UTC (UTC+00:00)"
+        @test formatClock(tm(9, 5, 7, 6); offsetMinutes = 60) ==
+              "Sat, 27 Nov 2026, 09:05:07 (UTC+01:00)"
+        # the offset from the C library agrees with a known date arithmetic
+        @test S._daysFromCivil(1970, 1, 1) == 0 && S._daysFromCivil(2000, 3, 1) == 11017
+        @test S.localOffsetMinutes(0) % 15 == 0 && abs(S.localOffsetMinutes()) <= 14 * 60
+        # the zone: a short name is kept, a long (Windows) one dropped, a failure is empty
+        @test S.localZoneName(0; format = (f, t) -> "CET\n") == "CET"
+        @test S.localZoneName(0; format = (f, t) -> "Central European Standard Time") == ""
+        @test S.localZoneName(0; format = (f, t) -> error("no")) == ""
+        # the width fits the longest text, the frame is one string with save and restore
+        w = S.clockWidth("CET")
+        @test w == ncodeunits("Wed, 27 Nov 2026, 23:59:59-CET (UTC+01:00)")
+        f = S.clockFrame("Fri, 27 Nov 2026, 14:03:22-CET (UTC+01:00)", 24, 80, w)
+        @test startswith(f, "\e7\e[24;$(80 - w)H") && endswith(f, "\e8")
+        @test occursin("H" * "Fri, 27 Nov 2026, 14:03:22-CET (UTC+01:00)", f)
+        @test occursin(
+            "  Fri, 27 Nov 2026, 14:03:22 (UTC+01:00)",
+            S.clockFrame("Fri, 27 Nov 2026, 14:03:22 (UTC+01:00)", 24, 80, w),
+        )
+        @test occursin(" "^w, S.clockFrame("", 24, 80, w; blank = true))
+        # the writer on a buffer with a fake size; time and zone are given
+        out = IOBuffer()
+        fake =
+            (sz) -> startClock(out; size = () -> sz, zone = "CET", interval = 3600,
+                now = () -> (tm(14, 3, 22, 5), 60))
+        c = fake((24, 80))
+        @test clockTick!(c)
+        @test occursin("Fri, 27 Nov 2026, 14:03:22-CET (UTC+01:00)", String(take!(out)))
+        # paused: nothing is written (the line is cleared once), resumed: it ticks again
+        pauseClock!(c)
+        cleared = String(take!(out))
+        @test occursin("\e7", cleared) && !occursin("Friday", cleared)
+        @test !clockTick!(c) && isempty(take!(out))
+        resumeClock!(c)
+        @test clockTick!(c)
+        take!(out)
+        # a terminal too small: not drawn, and what was drawn is cleared
+        c.size = () -> (9, 80)
+        @test !clockTick!(c) && !c.drawn
+        take!(out)
+        c.size = () -> (24, 59)
+        @test !clockTick!(c) && isempty(take!(out))
+        # stopping ends the task, clears the line, is idempotent, and nothing ticks after
+        c.size = () -> (24, 80)
+        @test clockTick!(c)
+        take!(out)
+        stopClock!(c)
+        @test istaskdone(c.task) && !c.drawn
+        @test occursin("\e7", String(take!(out)))
+        stopClock!(c)
+        @test !clockTick!(c) && isempty(take!(out))
+        stopClock!(nothing)
+        # the task ticks by itself on a short interval, and stops at once
+        out2 = IOBuffer()
+        c2 = startClock(out2; size = () -> (24, 80), zone = "", interval = 0.05,
+            now = () -> (tm(1, 2, 3, 4), 0))
+        sleep(0.4)
+        stopClock!(c2)
+        @test istaskdone(c2.task)
+        @test count("Thu, 27 Nov 2026, 01:02:03 (UTC+00:00)", String(take!(out2))) >= 2
+        # no clock without a terminal or on a dumb one; _quiet pauses the active clock
+        @test !S.clockWanted(IOBuffer(), Dict("TERM" => "xterm"))
+        c3 = fake((24, 80))
+        S.ACTIVE_CLOCK[] = c3
+        S._quiet() do
+            @test c3.paused
         end
+        @test !c3.paused
+        S.ACTIVE_CLOCK[] = nothing
+        stopClock!(c3)
+        @test S._quiet(() -> 7) == 7
+    end
+    @testset "icon" begin
+        S = SetupWizard
+        @test allequal(length.(S.ICON_CELLS))
+        @test length(S.ICON_CELLS) <= 5 && length(S.ICON_CELLS[1]) <= 10
+        @test all(c -> haskey(S.ICON_RGB, c) && haskey(S.ICON_256, c), join(S.ICON_CELLS))
+        for truecolor in (true, false)
+            drawn = sprint(io -> S.drawIcon(io; color = true, truecolor))
+            @test count('\n', drawn) == length(S.ICON_CELLS)
+            @test isempty(strip(replace(drawn, r"\e\[[0-9;]*m" => "")))  # spaces only
+            @test !occursin('▀', drawn)
+            @test occursin(truecolor ? "48;2;" : "48;5;", drawn)
+        end
+        # no colour: plain text, no escape codes, an ASCII box
+        plain = sprint(io -> S.drawIcon(io; color = false))
+        @test !occursin('\e', plain) && occursin("BAYSOL", plain) && isascii(plain)
+        @test count('\n', plain) == length(S.ICON_PLAIN)
+        # a buffer is not a terminal, NO_COLOR and a dumb terminal turn the colour off
+        @test !S.useColor(IOBuffer(), Dict{String,String}())
+        @test sprint(io -> S.drawIcon(io)) == plain
     end
 end

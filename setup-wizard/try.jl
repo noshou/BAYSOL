@@ -9,7 +9,8 @@ const HERE = @__DIR__
 include(joinpath(HERE, "..", "platform.jl"))
 sandbox = mktempdir()
 bundle = mkpath(joinpath(sandbox, "bundle"))
-for f in ("baysol", joinpath("sysimage", "baysol.so"), "baysol.icns", "baysol.ico")
+for f in ("baysol", joinpath("sysimage", "baysol.so"), "baysol.icns", "baysol.ico",
+    joinpath("icons", "hicolor", "16x16", "baysol.png"))
     mkpath(dirname(joinpath(bundle, f)))
     write(joinpath(bundle, f), "")
 end
@@ -25,7 +26,7 @@ env = Dict(
     "BAYSOL_BUNDLE" => bundle,
 )
 println("sandbox: $sandbox")
-code = "using BAYSOLSetup; exit(runWizard())"
+code = "using SetupWizard; exit(runWizard())"
 cmd = addenv(`$(Base.julia_cmd()) --startup-file=no --project=$HERE -e $code`, env...)
 try
     run(cmd)

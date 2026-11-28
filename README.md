@@ -18,6 +18,30 @@ Silicon, Linux (ARM) and Windows 11, with the bugs below. They are to be fixed i
 "Fixed in the source" means that the 0.5.1 macOS package built on 25 November 2026 still has
 the bug.
 
+**Status on 27 November 2026 (0.5.2 work, in the source, no package built from it yet).** The
+unit tests and the checks of each change pass, and none has been run in a packaged build.
+- *Fixed in the source, to confirm in a build:* quitting after an uninstall and the missing
+  program message; the files an uninstall left behind (cache folder, empty `settings.json`,
+  `<tmp>/baysol`, and the Dock entry on macOS); the test folders left in the temporary folder;
+  the yes/no questions of the wizard and the TeX Live note; `(iTerm2 now)` and the Terminal
+  spacing question; the memory figures of `bysl pkg` (children of the step only, no inflated
+  step times, swap as an increase on macOS, no fake 0), with the fit LOG's new rows
+  `machine.free_gib_end` and `machine.peak_rss_gib`; `--resume` no longer skips a failed fit;
+  the logical core count in the report (`buildThreads` row); a smoke start of the built
+  program; the `libz`/`libpython` lookup of `bysl audit` on macOS (a diagnosis from the code, to
+  confirm on a real bundle); `MACOSX_DEPLOYMENT_TARGET` 14.0; a multi-threaded 7-Zip; the
+  macOS launcher closing its window by id (hand check on macOS needed).
+- *Understood, fix written, to confirm:* the two chi-squared values of SASDMJ9. The export took
+  the Shannon-binned curve (137 points) as the measured one, so the packaged program reports
+  a binned chi-squared (about 2.6) where the script reports the raw one (0.856). The workbook
+  now carries a `dataRaw` sheet and the export prefers it; workbooks written before need a rerun.
+- *Chain count test:* the number of chains depends on the optima the MAP search finds, so the
+  test now asks for a range, not 8.
+- *Still open:* parallel stages of `bysl pkg` and the thread patch of juliac (design), the strip-flag
+  build test (`BAYSOL_JULIAC_STRIP`, needs a quiet machine), and everything marked untested below.
+  The SIGHUP test of the interface was a race in its helper process (the signal handlers were
+  installed after the helper reported its folder); fixed, 5 of 5 runs pass.
+
 **Every system** (shared code; seen on macOS, not yet checked on the others)
 
 - *Uninstalling from the interface returns to the menu.* After the setup wizard, opened with
@@ -34,21 +58,19 @@ the bug.
   after an uninstall (first bug) can write some of them again.
 - *The tests of the interface leave `baysol-help-*` folders* (and `<tmp>/baysol`) in the
   temporary folder.
-- *The icon of the setup wizard is drawn with half blocks (`▀`)* and the large logo of the main
-  menu with full blocks (`█`). In a terminal whose font does not fill the cell with them,
+- *The icon of the setup wizard was shrunk (10 x 5 cells) and is now drawn with coloured spaces
+  only* (a plain ASCII box without colour); pending a check in Terminal, iTerm2 and WezTerm.
+  Before, it used half blocks (`▀`), and the large logo of the main
+  menu uses full blocks (`█`). In a terminal whose font does not fill the cell with them,
   strips of the wrong colour cross the icon and gaps show between the rows of the logo. Seen in
   the Terminal of macOS, where it is fixed in the source (both are drawn with coloured spaces
   there; the new logo of the menu has not been looked at in Terminal yet). Other terminals keep
   the blocks and can show the same.
-- *The setup wizard has far too many options* and is confusing to read: a menu of six entries,
-  then folders, threads, launcher, terminal, shortcuts and the missing items. It needs fewer
-  questions and sensible defaults.
-- *The questions of the wizard are not yes or no.* A missing item is asked with Install now,
-  Not now, No and Never ask again, which do not make sense together. Every question of this
-  kind should be Yes or No.
+- *Fixed in the source, pending a check in a real terminal on each OS:* the wizard had far too many options and its questions were not yes or no. Every question is now Yes/No; the only other inputs are default paths (edit or Enter), the threads and one shortcut checklist; the first run is "Change any of these?", "Apply?", "Start BAYSOL now?", and the menu has four entries (Set up/Change, Advanced, Uninstall, Quit). The TeX Live note is no longer a question.
 - *`Install LaTeX engine (TeX Live)?` can have no answer that installs it*: it was shown with Not
   now, No and Never ask again only, because an install that needs administrator rights is never
-  run by the wizard. It should not be asked as a question then.
+  run by the wizard. It should not be asked as a question then. Fixed in the source: it is a
+  printed note, with the command to run (included in the entry above, pending the same check).
 - *SASDMJ9 has two chi-squared values*: 0.856 from the script of its fitting test, 2.649 from
   the exported project in the packaged program. The cause is not known.
 - *The report and the build log of `bysl pkg` say `ram 0 MiB` and `swap 0 MiB` on macOS and
@@ -190,6 +212,13 @@ the bug.
   entry of `org.baysol.app`, also one the user dragged there (the wizard makes none and so lists
   none in its manifest).
 - *The app icon is clipped.* The icon works, but its artwork has to be redone for macOS.
+  Changed in the source (27 November 2026), pending a check on macOS: the macOS build now
+  ships the hand-made `icons/icon.icns` verbatim instead of an `.icns` built from the PNG sizes.
+  Other icons are also drawn wrongly on macOS (owner, 27 November 2026); the set is to be
+  redesigned. Not a blocker.
+- *Build status by platform (owner, 27 November 2026):* only Linux arm64 and macOS arm64 have
+  been seen to work end to end; Windows x64, Linux x86_64 and macOS x86_64 have built but are not
+  validated end to end.
 - *Some texts still say that macOS is untested*, also below.
 - *Three tests of the interface fail*: `compile plots` and two of the zip64 archive tests (955
   of 958 pass). Once a fourth failed that passed in three reruns; which one was not
