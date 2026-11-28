@@ -172,7 +172,7 @@ uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 version = "1.11.0"
 
 [[deps.BAYSOL]]
-deps = ["AdvancedHMC", "BioStructures", "Bumper", "Colors", "DBInterface", "Dierckx", "DiffResults", "Distributions", "Downloads", "FastClosures", "FiniteDiff", "ForwardDiff", "JSON3", "LinearAlgebra", "LogExpFunctions", "MCMCDiagnosticTools", "NearestNeighbors", "Optim", "PGFPlotsX", "Peaks", "PrecompileTools", "Printf", "Random", "SHA", "SQLite", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase", "UnicodePlots", "XLSX"]
+deps = ["AdvancedHMC", "BioStructures", "Bumper", "Colors", "DBInterface", "DiffResults", "Distributions", "Downloads", "FastClosures", "FiniteDiff", "ForwardDiff", "JSON3", "LinearAlgebra", "LogExpFunctions", "MCMCDiagnosticTools", "NearestNeighbors", "Optim", "PGFPlotsX", "Peaks", "PrecompileTools", "Printf", "Random", "SHA", "SQLite", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase", "UnicodePlots", "XLSX"]
 path = ".."
 uuid = "f10a6c88-74b5-485f-9c8c-589f8f9e3c2a"
 version = "0.5.1"
@@ -384,18 +384,6 @@ deps = ["InteractiveUtils"]
 git-tree-sha1 = "c0dfa5a35710a193d83f03124356eef3386688fc"
 uuid = "3f0dd361-4fe0-5fc6-8523-80b14ec94d85"
 version = "1.1.0"
-
-[[deps.Dierckx]]
-deps = ["Dierckx_jll"]
-git-tree-sha1 = "7da4b14cc4c3443a1afc64abee17f4fcb45ad837"
-uuid = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
-version = "0.5.4"
-
-[[deps.Dierckx_jll]]
-deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "3251f44b3cac6fec4cec8db45d3ab0bfed51c4d8"
-uuid = "cd4c43a9-7502-52ba-aa6d-59fb2a88580b"
-version = "0.2.0+0"
 
 [[deps.DiffResults]]
 deps = ["StaticArraysCore"]

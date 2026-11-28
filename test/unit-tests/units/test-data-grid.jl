@@ -249,6 +249,42 @@ bruteDiameter(P) = maximum(
         )
         # fewer than four nodes: linear
         @test modelOnRaw(two, [1.0, 2.0, 3.0]) ≈ [1.0, 2.0, 3.0]
+        # a parabola through three nodes is reproduced, also outside them
+        three = shannonData(
+            [0.1, 0.2, 0.35, 0.5],
+            [1.0, 2.0, 3.0, 4.0],
+            [0.1, 0.1, 0.1, 0.1];
+            D = 5.0,
+            rebin = nothing,
+        )
+        sub = shannonData(
+            three.q[1:3],
+            [1.0, 2.0, 3.0],
+            fill(0.1, 3);
+            D = 5.0,
+            rebin = nothing,
+        )
+        g(x) = 1 .+ 3 .* x .- 7 .* x .^ 2
+        @test modelOnRaw(sub, g(sub.q)) ≈ g(sub.qRaw)
+        # a cubic on non-uniform nodes, extended beyond the end nodes
+        nodes = [0.0, 0.01, 0.03, 0.04, 0.08, 0.09, 0.15, 0.2]
+        curve = shannonData(nodes, 1 .+ nodes, fill(0.1, 8); D = 50.0, rebin = nothing)
+        raw = collect(range(-0.02, 0.24; length = 31))
+        shifted = (; curve.q, qRaw = raw)
+        h(x) = 2 .- x .+ 90 .* x .^ 2 .- 400 .* x .^ 3
+        sys = BAYSOL.DataGrid._splineSystem(shifted.q)
+        mm = zeros(8)
+        BAYSOL.DataGrid._moments!(mm, sys, h(shifted.q))
+        vals = zeros(31)
+        BAYSOL.DataGrid._evaluate!(
+            vals,
+            sys,
+            h(shifted.q),
+            mm,
+            raw,
+            BAYSOL.DataGrid._segments(sys.x, raw),
+        )
+        @test vals ≈ h(raw)
         @test_throws DimensionMismatch modelOnRaw(info, zeros(length(info.q) + 1))
         oneBin = shannonData(
             [0.1, 0.101],
